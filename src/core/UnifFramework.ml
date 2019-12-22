@@ -14,8 +14,35 @@ module type PARAMETERS = sig
   val identify_scope : T.t Scoped.t -> T.t Scoped.t -> T.t * T.t * Scoped.scope * S.t
   val frag_algs : unit -> (T.t Scoped.t -> T.t Scoped.t -> S.t -> S.t list) list
   val pb_oracle : (T.t Scoped.t -> T.t Scoped.t -> flag_type -> S.t -> Scoped.scope -> (S.t * flag_type) option LL.t)
-  val oracle_composer : 'a OSeq.t -> 'a OSeq.t -> 'a OSeq.t
+  val oracle_composer : (Subst.t option OSeq.t) OSeq.t -> Subst.t option OSeq.t
 end
+
+(* Given a sequence of sequences (i.e., a generator) A
+       take one element from the A[0],
+       then one element from A[0] and A[1]
+       then one element from A[0],A[1] and A[2], etc.. *)
+let take_fair gens =
+  (* Take one element from A[0],A[1],...,A[k-1] *)
+  let rec take_first_k k gens =
+    if k = 0 then (OSeq.empty, gens)
+    else (match gens () with 
+    | OSeq.Nil -> (OSeq.empty, OSeq.empty)
+    | OSeq.Cons(x,xs) ->
+      begin match x () with 
+      | OSeq.Nil ->
+        take_first_k (k-1) xs
+      | OSeq.Cons(y, ys) ->
+        let taken, new_gens = take_first_k (k-1) xs in
+        (OSeq.cons y taken, OSeq.cons ys new_gens) end) in
+  
+  (* Take one element from A[0],A[1],...A[i-1]
+      and then take one element from A[0],A[1],...,A[i]   *)
+  let rec aux i gens =
+    let taken, new_gens = take_first_k i gens in
+    if OSeq.is_empty new_gens then taken
+    else (function () -> OSeq.append taken (aux (i+1) new_gens) ()) 
+  in
+  aux 1 gens
 
 module Make (P : PARAMETERS) = struct 
   let rec nfapply_mono subst (t,sc) =
@@ -69,35 +96,6 @@ module Make (P : PARAMETERS) = struct
     | T.Const _  -> not @@ T.is_const t
     | T.AppBuiltin _ ->  not @@ T.is_appbuiltin t
     | _ -> false
-
-  let tasks_taken = 100
-
-  (* Given a sequence of sequences (i.e., a generator) A
-       take one element from the A[0],
-       then one element from A[0] and A[1]
-       then one element from A[0],A[1] and A[2], etc.. *)
-  let take_fair gens =
-    (* Take one element from A[0],A[1],...,A[k-1] *)
-    let rec take_first_k k gens =
-      if k = 0 then (OSeq.empty, gens)
-      else (match gens () with 
-      | OSeq.Nil -> (OSeq.empty, OSeq.empty)
-      | OSeq.Cons(x,xs) ->
-        begin match x () with 
-        | OSeq.Nil ->
-          take_first_k (k-1) xs
-        | OSeq.Cons(y, ys) ->
-          let taken, new_gens = take_first_k (k-1) xs in
-          (OSeq.cons y taken, OSeq.cons ys new_gens) end) in
-    
-    (* Take one element from A[0],A[1],...A[i-1]
-       and then take one element from A[0],A[1],...,A[i]   *)
-    let rec aux i gens =
-      let taken, new_gens = take_first_k i gens in
-      if OSeq.is_empty new_gens then taken
-      else (function () -> OSeq.append taken (aux (i+1) new_gens) ()) 
-    in
-    aux 1 gens
 
   let do_unif problem subst mono unifscope =   
     let rec aux ~steps subst problem =
@@ -189,9 +187,9 @@ module Make (P : PARAMETERS) = struct
                 | Some substs ->
                   (* We assume that the substitution was augmented so that it is mgu for
                       lhs and rhs *)
-                  CCList.map (fun sub -> aux ~steps sub rest) substs
+                  CCList.map (fun sub () -> aux ~steps sub rest ()) substs
                   |> OSeq.of_list
-                  |> OSeq.merge
+                  |> P.oracle_composer
                 | None ->
                   let args_unif =
                     if T.is_var hd_lhs && T.is_var hd_rhs && T.equal hd_lhs hd_rhs then
@@ -202,17 +200,16 @@ module Make (P : PARAMETERS) = struct
                     P.pb_oracle (body_lhs, unifscope) (body_rhs, unifscope) flag subst unifscope in
 
                   let oracle_unifs = 
-                    OSeq.map (fun sub_flag_opt -> 
+                    OSeq.map (fun sub_flag_opt ->
                       match sub_flag_opt with 
-                      | None -> 
-                        OSeq.return None
+                      | None -> OSeq.return None
                       | Some (sub', flag') ->
                         try
                           let subst' = Subst.merge subst sub' in
-                          aux ~steps:(steps+1) subst' ((lhs,rhs,flag') :: rest)
+                          fun () -> aux ~steps:(steps+1) subst' ((lhs,rhs,flag') :: rest) ()
                         with Subst.InconsistentBinding _ ->
                           OSeq.empty) all_oracles
-                    |> take_fair in
+                    |> P.oracle_composer in
                   OSeq.interleave oracle_unifs args_unif
               with Unif.Fail -> OSeq.empty) in
     aux ~steps:0 subst problem

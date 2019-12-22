@@ -49,7 +49,8 @@ module Make (S : sig val st: Flex_state.t end) = struct
       let func_projs = CCList.map (fun s -> Some (s,depth+1)) func_projs in
       OSeq.append 
         (OSeq.of_list simp_projs)
-        (delay depth (OSeq.of_list func_projs))
+        (if CCList.is_empty func_projs then OSeq.empty
+         else delay depth (OSeq.of_list func_projs))
 
   let proj_rule ~counter ~scope s t depth =
     let maybe_project u =
@@ -121,10 +122,12 @@ module Make (S : sig val st: Flex_state.t end) = struct
           (delay depth @@ iter_rule ~counter ~scope s t depth)
       | `Flex _, `Rigid
       | `Rigid, `Flex _ ->
+        let flex, rigid = if Term.is_var (T.head_term s) then s,t else t,s in
+        let delay_fr imit = 
+          if depth > 5 then OSeq.append (OSeq.take (depth*10) (OSeq.repeat None)) imit else imit in
         OSeq.append
-          (delay depth @@ imit_rule ~counter ~scope s t depth)
-          (let flex, rigid = if Term.is_var (T.head_term s) then s,t else t,s in
-           hs_proj_flex_rigid ~counter ~scope ~flex rigid depth)
+          (delay_fr @@ imit_rule ~counter ~scope s t depth)
+          (hs_proj_flex_rigid ~counter ~scope ~flex rigid depth) 
       | _ -> 
         assert false)
 
@@ -141,7 +144,7 @@ module Make (S : sig val st: Flex_state.t end) = struct
       let frag_algs = deciders ~counter
       let pb_oracle s t (f:flag_type) _ scope = 
         oracle ~counter ~scope s t f
-      let oracle_composer = OSeq.append
+      let oracle_composer = Flex_state.get_exn PUP.k_oracle_composer S.st
     end in
 
     let module JPFull = UnifFramework.Make(JPFullParams) in

@@ -48,6 +48,7 @@ module Make(A : ARG) = struct
     (* cycles from 0 to ratio, changed at every [take_stm_nb] and [take_stm_nb_fix_stm];
        when 0, remove an element from each stream in the queue;
        otherwise use the chosen heuristic. *)
+    mutable fair_tries : int;
     ratio: int;
     guard: int;
     weight: Stm.t -> int; (* function that assigns an initial weight to a stream (based on what criteria?) *)
@@ -64,6 +65,7 @@ module Make(A : ARG) = struct
       name;
       ratio;
       time_before_fair=ratio;
+      fair_tries = 0;
       guard;
       stm_nb = 0;
       hp = H.empty;
@@ -150,12 +152,15 @@ module Make(A : ARG) = struct
       (* TODO: the heap is fully traversed two times, can both operations be done with one traversal? *)
       (* q.hp <- H.filter (fun (_,s) -> not (Stm.is_empty s)) q.hp;
       H.fold (fun res (_,s) -> Stm.drip s :: res) [] q.hp *)
-      let all_stms = H.to_list q.hp in
+      q.fair_tries <- q.fair_tries + 1;
+      (* H.fold (fun res (_,s) -> Stm.drip s :: res) [] q.hp *)
+      let all_stms = CCList.sort (fun (_,s) (_,s') -> CCInt.compare (Stm.id s) (Stm.id s')) (H.to_list q.hp) in
+      let to_drip, rest = CCList.take_drop q.fair_tries all_stms in
       let dripped = CCList.filter_map (fun (_, s) ->
        try
          Some (Stm.drip s, s)
-       with Stm.Empty_Stream -> None) all_stms in
-      q.hp <- H.of_list (List.map (fun (_,s) -> Stm.penalty s, s) dripped);
+       with Stm.Empty_Stream -> None) to_drip in
+      q.hp <- H.of_list ((List.map (fun (_,s) -> Stm.penalty s, s) dripped) @ rest);
       List.map fst dripped
     ) else (
       q.time_before_fair <- q.time_before_fair - 1;
@@ -185,13 +190,15 @@ module Make(A : ARG) = struct
   let take_stm_nb_fix_stm q =
     if q.time_before_fair = 0 then (
       q.time_before_fair <- q.ratio;
+      q.fair_tries <- q.fair_tries + 1;
       (* H.fold (fun res (_,s) -> Stm.drip s :: res) [] q.hp *)
-      let all_stms = H.to_list q.hp in
+      let all_stms = CCList.sort (fun (_,s) (_,s') -> CCInt.compare (Stm.id s) (Stm.id s')) (H.to_list q.hp) in
+      let to_drip, rest = CCList.take_drop q.fair_tries all_stms in
       let dripped = CCList.filter_map (fun (_, s) ->
        try
          Some (Stm.drip s, s)
-       with Stm.Empty_Stream -> None) all_stms in
-      q.hp <- H.of_list (List.map (fun (_,s) -> Stm.penalty s, s) dripped);
+       with Stm.Empty_Stream -> None) to_drip in
+      q.hp <- H.of_list ((List.map (fun (_,s) -> Stm.penalty s, s) dripped) @ rest);
       List.map fst dripped
     ) else (
       q.time_before_fair <- q.time_before_fair - 1;

@@ -538,11 +538,8 @@ let rec is_fo_term t =
   | Var _ -> not @@ Type.is_fun @@ ty t
   | AppBuiltin _ -> false
   | App (hd, l) -> 
-    let expected_args = List.length @@ Type.expected_args @@ ty hd in
-    let actual_args = List.length l in
-    expected_args = actual_args && T.is_const hd 
-    && List.for_all is_fo_term l
-  | Const _ -> true
+    not (Type.is_fun (ty t)) && T.is_const hd && List.for_all is_fo_term l
+  | Const _ -> not (Type.is_fun (ty t))
   | _ -> false
 
 let is_true_or_false t = match view t with

@@ -1319,7 +1319,7 @@ let _elim_leibniz_eq = ref (-1)
 let _unif_max_depth = ref 11
 let _prune_arg_fun = ref `NoPrune
 let prim_enum_terms = ref Term.Set.empty
-
+let _oracle_composer = ref (OSeq.merge :> (Logtk.Subst.t option OSeq.t OSeq.t -> Logtk.Subst.t option OSeq.t))
 
 let extension =
   let register env =
@@ -1370,6 +1370,7 @@ let extension =
     state
     |> Flex_state.add k_some_ho is_ho
     |> Flex_state.add k_enabled !enabled_
+    |> Flex_state.add PragUnifParams.k_oracle_composer !_oracle_composer
     |> Flex_state.add k_enable_def_unfold !def_unfold_enabled_
     |> Flex_state.add k_enable_ho_unif (!enabled_ && !enable_unif_)
     |> Flex_state.add k_ho_prim_mode (if !enabled_ then !prim_mode_ else `None)
@@ -1391,6 +1392,9 @@ let () =
       "--ho-elim-pred-var", Arg.Bool (fun b -> _elim_pred_var := b), " disable predicate variable elimination";
       "--ho-prim-enum", set_prim_mode_, " set HO primitive enum mode";
       "--ho-prim-max", Arg.Set_int prim_max_penalty, " max penalty for HO primitive enum";
+      "--ho-oracle-composer", Arg.Symbol (["merge";"fair"], (fun s -> 
+        if s = "merge" then _oracle_composer := (OSeq.merge :> (Logtk.Subst.t option OSeq.t OSeq.t -> Logtk.Subst.t option OSeq.t))
+        else _oracle_composer := UnifFramework.take_fair)), " choose either OSeq.merge or Unif.take_fair as the composer";
       "--ho-ext-axiom", Arg.Bool (fun v -> _ext_axiom := v), " enable/disable extensionality axiom";
       "--ho-choice-axiom", Arg.Bool (fun v -> _choice_axiom := v), " enable choice axiom";
       "--ho-ext-pos", Arg.Bool (fun v -> _ext_pos := v), " enable/disable positive extensionality rule";

@@ -204,12 +204,14 @@ module Make (St : sig val st : Flex_state.t end) = struct
     if depth > !max_skipped then (
       max_skipped := depth;
       int_of_float ((log10 (float_of_int depth)) *. get_option PUP.k_skip_multiplier)
-    ) else 1
+    ) else (if depth!=0 then 3 else 0)
   
   let delay depth res =
-    OSeq.append
-      (OSeq.take (skip depth) (OSeq.repeat None))
-    res
+    if OSeq.is_empty res then OSeq.empty
+    else(
+      OSeq.append
+        (OSeq.take (skip depth) (OSeq.repeat None))
+      res)
 
   (*Create all possible projection and imitation bindings. *)
   let proj_imit_lr ?(disable_imit=false) ~counter ~scope ~subst s t flag =
@@ -378,7 +380,7 @@ module Make (St : sig val st : Flex_state.t end) = struct
       let frag_algs = deciders ~counter (*[]*)
       let pb_oracle s t (f:flag_type) subst scope = 
         oracle ~counter ~scope ~subst s t f
-      let oracle_composer = OSeq.append
+      let oracle_composer = Flex_state.get_exn PUP.k_oracle_composer St.st
     end in
 
     let module PragUnif = UnifFramework.Make(PragUnifParams) in
