@@ -113,29 +113,32 @@ module Make(A : ARG) = struct
   let take_first q =
     assert (q.guard >= 0);
     _take_first q.guard q
+  
+  let take_fair tries q =
+    q.time_before_fair <- q.ratio;
+    (* TODO: the heap is fully traversed two times, can both operations be done with one traversal? *)
+    (* q.hp <- H.filter (fun (_,s) -> not (Stm.is_empty s)) q.hp;
+    H.fold (fun res (_,s) -> Stm.drip s :: res) [] q.hp *)
+    q.fair_tries <- q.fair_tries + 1;
+    (* H.fold (fun res (_,s) -> Stm.drip s :: res) [] q.hp *)
+    let all_stms = CCList.sort (fun (_,s) (_,s') -> CCInt.compare (Stm.id s) (Stm.id s')) (H.to_list q.hp) in
+    let to_drip, rest = CCList.take_drop tries all_stms in
+    let dripped = CCList.filter_map (fun (_, s) ->
+      try
+        Some (Stm.drip s, s)
+      with Stm.Empty_Stream -> None) to_drip in
+    let new_stms = (List.map (fun (_,s) -> Stm.penalty s, s) dripped) @ rest in
+    q.hp <- H.of_list new_stms;
+    q.stm_nb <- List.length new_stms;
+    List.map fst dripped
 
-  let rec take_first_anyway q =
-    if H.is_empty q.hp then None
+
+  let rec take_fair_anyway q =
+    if H.is_empty q.hp then [None]
     else (
-      let dripped = ref None in
-      let reduced_hp, (w, s) = H.take_exn q.hp in
-      let new_hp =
-        (
-          try
-            dripped := Stm.drip s;
-            H.insert (q.weight s, s) reduced_hp
-          with
-          | Stm.Empty_Stream ->
-            assert (q.stm_nb > 0);
-            q.stm_nb <- q.stm_nb - 1;
-            reduced_hp
-        ) in
-      q.hp <- new_hp;
-      match !dripped with
-      | None -> take_first_anyway q
-      | Some _ ->
-        (* q.time_before_fair <- q.ratio; TODO: is this still necessary here? *)
-        !dripped
+      let res = CCList.filter_map CCFun.id (take_fair (H.size q.hp) q) in
+      if CCList.is_empty res then take_fair_anyway q
+      else List.map CCOpt.return res
     )
 
   let rec _take_nb q nb prev_res =
@@ -147,22 +150,8 @@ module Make(A : ARG) = struct
       | Not_found -> prev_res
 
   let take_stm_nb q =
-    if q.time_before_fair = 0 then (
-      q.time_before_fair <- q.ratio;
-      (* TODO: the heap is fully traversed two times, can both operations be done with one traversal? *)
-      (* q.hp <- H.filter (fun (_,s) -> not (Stm.is_empty s)) q.hp;
-      H.fold (fun res (_,s) -> Stm.drip s :: res) [] q.hp *)
-      q.fair_tries <- q.fair_tries + 1;
-      (* H.fold (fun res (_,s) -> Stm.drip s :: res) [] q.hp *)
-      let all_stms = CCList.sort (fun (_,s) (_,s') -> CCInt.compare (Stm.id s) (Stm.id s')) (H.to_list q.hp) in
-      let to_drip, rest = CCList.take_drop q.fair_tries all_stms in
-      let dripped = CCList.filter_map (fun (_, s) ->
-       try
-         Some (Stm.drip s, s)
-       with Stm.Empty_Stream -> None) to_drip in
-      q.hp <- H.of_list ((List.map (fun (_,s) -> Stm.penalty s, s) dripped) @ rest);
-      List.map fst dripped
-    ) else (
+    if q.time_before_fair = 0 then take_fair (q.fair_tries+1) q 
+    else (
       q.time_before_fair <- q.time_before_fair - 1;
       _take_nb q q.stm_nb []
     )
@@ -188,19 +177,8 @@ module Make(A : ARG) = struct
         _take_stm_nb_fix_stm q n' (res'@res)
 
   let take_stm_nb_fix_stm q =
-    if q.time_before_fair = 0 then (
-      q.time_before_fair <- q.ratio;
-      q.fair_tries <- q.fair_tries + 1;
-      (* H.fold (fun res (_,s) -> Stm.drip s :: res) [] q.hp *)
-      let all_stms = CCList.sort (fun (_,s) (_,s') -> CCInt.compare (Stm.id s) (Stm.id s')) (H.to_list q.hp) in
-      let to_drip, rest = CCList.take_drop q.fair_tries all_stms in
-      let dripped = CCList.filter_map (fun (_, s) ->
-       try
-         Some (Stm.drip s, s)
-       with Stm.Empty_Stream -> None) to_drip in
-      q.hp <- H.of_list ((List.map (fun (_,s) -> Stm.penalty s, s) dripped) @ rest);
-      List.map fst dripped
-    ) else (
+    if q.time_before_fair = 0 then take_fair (q.fair_tries+1) q
+    else (
       q.time_before_fair <- q.time_before_fair - 1;
       _take_stm_nb_fix_stm q q.stm_nb []
     )

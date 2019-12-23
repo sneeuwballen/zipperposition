@@ -37,7 +37,7 @@ let check_add_stm_to_queue = ()
 
 let check_take_first_when_available = ()
 
-let check_take_first_anyway = ()
+let check_take_fair_anyway = ()
 
 let suite : unit Alcotest.test_case list =
   [  (*check_empty_stm;*)

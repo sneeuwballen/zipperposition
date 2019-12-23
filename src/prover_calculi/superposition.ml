@@ -1582,9 +1582,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
    * ---------------------------------------------------------------------- *)
 
   let extract_from_stream_queue ~full () =
+    CCFormat.printf "full:%b@." full;
     let cl =
       if full then
-        [StmQ.take_first_anyway (_stmq())]
+        StmQ.take_fair_anyway (_stmq())
       else
         StmQ.take_stm_nb (_stmq())
     in
@@ -1597,7 +1598,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let extract_from_stream_queue_fix_stm ~full () =
     let cl =
       if full then
-        [StmQ.take_first_anyway (_stmq())]
+        StmQ.take_fair_anyway (_stmq())
       else
         StmQ.take_stm_nb_fix_stm (_stmq())
     in
@@ -2803,6 +2804,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
     if Env.flex_get k_complete_ho_unification
     then (
+      CCFormat.printf "m infs=%d@." (Env.flex_get k_max_infs);
+      CCFormat.printf "pup m infs=%d@." (Env.flex_get PragUnifParams.k_max_inferences);
+
       if (Env.flex_get k_max_infs) = -1 then (
         Env.add_binary_inf "superposition_passive" infer_passive_complete_ho;
         Env.add_binary_inf "superposition_active" infer_active_complete_ho;
@@ -2833,7 +2837,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Env.add_unary_inf "trigger_pred_var active" trigger_insantiation;
         Env.add_unary_inf "trigger_pred_var passive" instantiate_with_triggers;
       );
-
 
       if (List.exists CCFun.id [Env.flex_get k_fluidsup;
                                 Env.flex_get k_dupsup;
@@ -2963,6 +2966,8 @@ let register ~sup =
   E.flex_add k_switch_stream_extraction !_switch_stream_extraction;
   E.flex_add k_dont_simplify !_dont_simplify;
   E.flex_add k_use_semantic_tauto !_use_semantic_tauto;
+
+  CCFormat.printf "max infs: %d@." !_max_infs;
 
   E.flex_add PragUnifParams.k_max_inferences !_max_infs;
   E.flex_add PragUnifParams.k_skip_multiplier !_skip_multiplier;
