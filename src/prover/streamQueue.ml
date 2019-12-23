@@ -138,7 +138,9 @@ module Make(A : ARG) = struct
     else (
       let res = CCList.filter_map CCFun.id (take_fair (H.size q.hp) q) in
       if CCList.is_empty res then take_fair_anyway q
-      else List.map CCOpt.return res
+      else (
+        q.time_before_fair <- q.ratio;
+        List.map CCOpt.return res)
     )
 
   let rec _take_nb q nb prev_res =
