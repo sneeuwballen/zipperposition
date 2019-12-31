@@ -595,6 +595,9 @@ let lift_lambdas st =
   Util.debugf 1 "into @ @[%a@]\n" (fun k -> k (CCList.pp pp_input) (Iter.to_list res));
   res
 
+  let sine_axiom_selector ?(depth_start=1) ?(depth_end=5) ?(tolerance=1.5) formulas =
+    formulas
+
 module ZF = struct
   module UA = UntypedAST.A
 
