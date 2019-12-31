@@ -19,28 +19,28 @@ end
 
 (* Given a sequence of sequences (i.e., a generator) A
        take one element from the A[0],
-       then one element from A[0] and A[1]
-       then one element from A[0],A[1] and A[2], etc.. *)
+       then one element from A[1] and A[0]
+       then one element from A[2],A[1] and A[0], etc.. *)
 let take_fair gens =
   (* Take one element from A[0],A[1],...,A[k-1] *)
-  let rec take_first_k k gens =
-    if k = 0 then (OSeq.empty, gens)
+  let rec take_first_k k acc gens =
+    if k = 0 then (acc, gens)
     else (match gens () with 
-    | OSeq.Nil -> (OSeq.empty, OSeq.empty)
+    | OSeq.Nil -> (acc, OSeq.empty)
     | OSeq.Cons(x,xs) ->
       begin match x () with 
       | OSeq.Nil ->
-        take_first_k (k-1) xs
+        take_first_k (k-1) acc xs
       | OSeq.Cons(y, ys) ->
-        let taken, new_gens = take_first_k (k-1) xs in
-        (OSeq.cons y taken, OSeq.cons ys new_gens) end) in
+        let taken, new_gens = take_first_k (k-1) (OSeq.cons y acc) xs in
+        (taken, OSeq.cons ys new_gens) end) in
   
   (* Take one element from A[0],A[1],...A[i-1]
       and then take one element from A[0],A[1],...,A[i]   *)
   let rec aux i gens =
-    let taken, new_gens = take_first_k i gens in
+    let taken, new_gens = take_first_k i OSeq.empty gens in
     if OSeq.is_empty new_gens then taken
-    else (function () -> OSeq.append taken (aux (i+1) new_gens) ()) 
+    else (OSeq.append taken (function () -> aux (i+1) new_gens ())) 
   in
   aux 1 gens
 

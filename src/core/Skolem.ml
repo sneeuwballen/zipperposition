@@ -83,7 +83,7 @@ let incr_counter ctx = ctx.sc_counter <- ctx.sc_counter + 1
 let fresh_id ?(start0=false) ~ctx prefix =
   let n = CCHashtbl.get_or ~default:0 ctx.sc_gensym prefix in
   Hashtbl.replace ctx.sc_gensym prefix (n+1);
-  let name = if n=0 && not start0 then prefix else prefix ^ string_of_int n in
+  let name = if n=0 && not start0 then prefix else prefix ^ "_" ^ string_of_int n in
   ID.make name
 
 let fresh_skolem_prefix ~ctx ~ty prefix =
