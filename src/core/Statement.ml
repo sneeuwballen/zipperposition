@@ -595,8 +595,61 @@ let lift_lambdas st =
   Util.debugf 1 "into @ @[%a@]\n" (fun k -> k (CCList.pp pp_input) (Iter.to_list res));
   res
 
+  module AsKey = struct
+  type t = input_t
+    let equal a b = compare a b = 0
+    let hash a = a.id
+    let compare = compare
+  end
+  module InpStmSet = Set.Make(AsKey)
+
   let sine_axiom_selector ?(depth_start=1) ?(depth_end=5) ?(tolerance=1.5) formulas =
-    formulas
+    let symset_of_ax ax =
+      Seq.forms ax
+      |> Iter.flat_map TST.Seq.symbols
+      |> ID.Set.of_seq in
+
+    let count_occ ~tbl ax = 
+      symset_of_ax ax
+      |> ID.Set.iter (fun k ->
+        ID.Tbl.update tbl ~f:(fun _ vopt -> match vopt with
+        | Some v -> Some (v+1)
+        | None -> Some 1) ~k) in
+    
+    let create_trigger_map ~tbl axioms = 
+      let map = ID.Tbl.create (Iter.length @@ ID.Tbl.keys tbl) in
+      CCList.iter (fun ax -> 
+        let symset = ID.Set.to_seq @@ symset_of_ax ax in
+        let min_occ = ref (max_int) in
+        Iter.iter (fun id -> 
+          let cnt = ID.Tbl.get_or tbl id ~default:max_int in
+          if cnt < !min_occ then min_occ := cnt;
+        ) symset;
+        (* now we calculate trigger map based on the min_occ *)
+        let threshold = int_of_float @@ tolerance *. (float_of_int !min_occ) in
+        Iter.iter (fun id -> 
+          let cnt = ID.Tbl.get_or tbl id ~default:max_int in
+          if cnt <= threshold then (
+            ID.Tbl.update ~f:(fun k vopt -> 
+            match vopt with 
+            | Some ax_set -> Some (InpStmSet.add ax ax_set)
+            | None -> Some (InpStmSet.singleton ax)) ~k:id map)) symset) 
+      axioms in
+    
+    let axioms, goals =
+      Iter.to_list formulas
+      |> CCList.partition (fun st -> match view st with 
+                                     | Goal _ | NegatedGoal _ -> false
+                                     | _ -> true) in
+    
+    let tbl = ID.Tbl.create 1024 in
+    List.iter (count_occ ~tbl) axioms;
+    (* now tbl contains occurences of all symbols *)
+
+    let triggers = create_trigger_map ~tbl axioms in
+    () 
+
+
 
 module ZF = struct
   module UA = UntypedAST.A

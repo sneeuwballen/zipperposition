@@ -427,6 +427,13 @@ module Seq = struct
       (fun t -> match view t with
          | Var v -> Some v
          | _ -> None)
+  
+  let symbols t =
+    subterms t
+    |> Iter.filter_map
+      (fun t -> match view t with
+         | Const id -> Some id
+         | _ -> None)
 
   let metas t =
     subterms t

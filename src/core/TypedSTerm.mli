@@ -289,6 +289,7 @@ module Seq : sig
   val vars : t -> t Var.t Iter.t
   val free_vars : t -> t Var.t Iter.t
   val metas : t -> meta_var Iter.t
+  val symbols : t -> ID.t Iter.t
 end
 
 (** {2 Substitutions} *)
