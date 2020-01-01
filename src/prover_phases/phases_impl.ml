@@ -24,7 +24,7 @@ let _lift_lambdas = ref false
 let _sine_d_min = ref 1
 let _sine_d_max = ref 5
 let _sine_tolerance = ref 1.5
-let _sine = ref false
+let _sine_threshold = ref (-1)
 
 (* setup an alarm for abrupt stop *)
 let setup_alarm timeout =
@@ -139,10 +139,11 @@ let cnf ~sk_ctx decls =
   let stmts =
     decls
     |> CCVector.to_seq
-    |> (if not !_sine then CCFun.id
+    |> (fun seq -> 
+        if (!_sine_threshold < 0 || Iter.length seq < !_sine_threshold) then CCFun.id seq
         else Statement.sine_axiom_selector ~depth_start:!_sine_d_min 
             ~depth_end:!_sine_d_max 
-            ~tolerance:!_sine_tolerance )
+            ~tolerance:!_sine_tolerance seq)
     |> (if not !_lift_lambdas then CCFun.id
         else Iter.flat_map Statement.lift_lambdas)
     |> Cnf.cnf_of_seq ~ctx:sk_ctx
@@ -594,14 +595,15 @@ let () =
     " Set weight of lambda symbol for KBO";
     "--kbo-weight-fun", Arg.Set_string _kbo_wf,
     " Set the function for symbol weight calculation.";
-    "--sine-depth-min", Arg.Int (fun v ->  _sine:=true; _sine_d_min := v),
-    " Turn on SinE and set min SinE depth.";
-    "--sine-depth-max", Arg.Int (fun v ->  _sine:=true; _sine_d_max := v),
-    " Turn on SinE and set max SinE depth.";
-    "--sine-tolerance", Arg.Float (fun v ->  _sine:=true; _sine_tolerance := v),
-    " Turn on SinE and set SinE symbol tolerance.";
-    "--sine", Arg.Set _sine,
-    " Turn on SinE with default settings: depth in range 1-5 and tolerance 1.5"
+    "--sine-depth-min", Arg.Int (fun v ->  _sine_threshold:=100; _sine_d_min := v),
+    " Turn on SinE with threshold and set min SinE depth.";
+    "--sine-depth-max", Arg.Int (fun v ->  _sine_threshold:=100; _sine_d_max := v),
+    " Turn on SinE with threshold and set max SinE depth.";
+    "--sine-tolerance", Arg.Float (fun v ->  _sine_threshold:=100; _sine_tolerance := v),
+    " Turn on SinE with threshold of 100 and set SinE symbol tolerance.";
+    "--sine", Arg.Set_int _sine_threshold,
+    " Set SinE axiom number threshold (negative number turns it off)" ^
+    " with default settings: depth in range 1-5 and tolerance 1.5"
   ];
 
   Params.add_to_mode "ho-pragmatic" (fun () ->
