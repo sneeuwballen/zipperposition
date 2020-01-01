@@ -26,15 +26,15 @@ let take_fair gens =
   let rec take_first_k k acc gens =
     if k = 0 then (acc, gens)
     else (match gens () with 
-    | OSeq.Nil -> (acc, OSeq.empty)
-    | OSeq.Cons(x,xs) ->
-      begin match x () with 
-      | OSeq.Nil ->
-        take_first_k (k-1) acc xs
-      | OSeq.Cons(y, ys) ->
-        let taken, new_gens = take_first_k (k-1) (OSeq.cons y acc) xs in
-        (taken, OSeq.cons ys new_gens) end) in
-  
+        | OSeq.Nil -> (acc, OSeq.empty)
+        | OSeq.Cons(x,xs) ->
+          begin match x () with 
+            | OSeq.Nil ->
+              take_first_k (k-1) acc xs
+            | OSeq.Cons(y, ys) ->
+              let taken, new_gens = take_first_k (k-1) (OSeq.cons y acc) xs in
+              (taken, OSeq.cons ys new_gens) end) in
+
   (* Take one element from A[0],A[1],...A[i-1]
       and then take one element from A[0],A[1],...,A[i]   *)
   let rec aux i gens =
@@ -201,14 +201,14 @@ module Make (P : PARAMETERS) = struct
 
                   let oracle_unifs = 
                     OSeq.map (fun sub_flag_opt ->
-                      match sub_flag_opt with 
-                      | None -> OSeq.return None
-                      | Some (sub', flag') ->
-                        try
-                          let subst' = Subst.merge subst sub' in
-                          fun () -> aux ~steps:(steps+1) subst' ((lhs,rhs,flag') :: rest) ()
-                        with Subst.InconsistentBinding _ ->
-                          OSeq.empty) all_oracles
+                        match sub_flag_opt with 
+                        | None -> OSeq.return None
+                        | Some (sub', flag') ->
+                          try
+                            let subst' = Subst.merge subst sub' in
+                            fun () -> aux ~steps:(steps+1) subst' ((lhs,rhs,flag') :: rest) ()
+                          with Subst.InconsistentBinding _ ->
+                            OSeq.empty) all_oracles
                     |> P.oracle_composer in
                   OSeq.interleave oracle_unifs args_unif
               with Unif.Fail -> OSeq.empty) in

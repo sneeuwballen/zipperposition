@@ -19,7 +19,7 @@ let section = Util.Section.make ~parent:Const.section "sup"
 let flag_simplified = SClause.new_flag()
 
 module type S = Superposition_intf.S
-                
+
 (* statistics *)
 let stat_basic_simplify_calls = Util.mk_stat "sup.basic_simplify calls"
 let stat_basic_simplify = Util.mk_stat "sup.basic_simplify"
@@ -106,8 +106,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       module C = C
     end)
   module StmQ = StreamQueue.Make(struct 
-    module Stm = Stm
-    module Env = Env end)
+      module Stm = Stm
+      module Env = Env end)
   module Bools = Booleans.Make(Env)
   module SS = SolidSubsumption.Make(struct let st = Env.flex_state () end)
 
@@ -3070,7 +3070,7 @@ let () =
       "--max-inferences", Arg.Int (fun p -> _max_infs := p), " set maximal number of inferences";
       "--stream-queue-guard", Arg.Set_int _guard, "set value of guard for streamQueue";
       "--stream-queue-ratio", Arg.Set_int _ratio, "set value of ratio for streamQueue"
-      ];
+    ];
 
   Params.add_to_mode "ho-complete-basic" (fun () ->
       _use_simultaneous_sup := false;

@@ -113,20 +113,20 @@ module Make(A : ARG) = struct
   let take_first q =
     assert (q.guard >= 0);
     _take_first q.guard q
-  
+
   let take_fair tries q =
     q.time_before_fair <- q.ratio;
     (* TODO: the heap is fully traversed two times, can both operations be done with one traversal? *)
     (* q.hp <- H.filter (fun (_,s) -> not (Stm.is_empty s)) q.hp;
-    H.fold (fun res (_,s) -> Stm.drip s :: res) [] q.hp *)
+       H.fold (fun res (_,s) -> Stm.drip s :: res) [] q.hp *)
     q.fair_tries <- q.fair_tries + 1;
     (* H.fold (fun res (_,s) -> Stm.drip s :: res) [] q.hp *)
     let all_stms = CCList.sort (fun (_,s) (_,s') -> CCInt.compare (Stm.id s) (Stm.id s')) (H.to_list q.hp) in
     let to_drip, rest = CCList.take_drop tries all_stms in
     let dripped = CCList.filter_map (fun (_, s) ->
-      try
-        Some (Stm.drip s, s)
-      with Stm.Empty_Stream -> None) to_drip in
+        try
+          Some (Stm.drip s, s)
+        with Stm.Empty_Stream -> None) to_drip in
     let new_stms = (List.map (fun (_,s) -> Stm.penalty s, s) dripped) @ rest in
     q.hp <- H.of_list new_stms;
     q.stm_nb <- List.length new_stms;

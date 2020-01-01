@@ -21,6 +21,10 @@ let _db_w = ref 1
 let _lmb_w = ref 1
 let _kbo_wf = ref "invfreqrank"
 let _lift_lambdas = ref false
+let _sine_d_min = ref 1
+let _sine_d_max = ref 5
+let _sine_tolerance = ref 1.5
+let _sine = ref false
 
 (* setup an alarm for abrupt stop *)
 let setup_alarm timeout =
@@ -578,18 +582,20 @@ let main ?setup_gc:(gc=true) ?params file =
 let () = 
   let open Libzipperposition in
   Params.add_opts [
-    "--de-bruijn-weight"
-  , Arg.Set_int _db_w
-  , " Set weight of de Bruijn index for KBO";
-    "--lift-lambdas"
-  , Arg.Bool (fun v -> _lift_lambdas := v)
-  , " Turn lambda lifting on or off.";
-    "--lambda-weight"
-  , Arg.Set_int _lmb_w
-  , " Set weight of lambda symbol for KBO";
-    "--kbo-weight-fun"
-  , Arg.Set_string _kbo_wf
-  , " Set the function for symbol weight calculation.";
+    "--de-bruijn-weight", Arg.Set_int _db_w, 
+    " Set weight of de Bruijn index for KBO";
+    "--lift-lambdas", Arg.Bool (fun v -> _lift_lambdas := v),
+    " Turn lambda lifting on or off.";
+    "--lambda-weight", Arg.Set_int _lmb_w,
+    " Set weight of lambda symbol for KBO";
+    "--kbo-weight-fun", Arg.Set_string _kbo_wf,
+    " Set the function for symbol weight calculation.";
+    "--sine-depth-min", Arg.Int (fun v ->  _sine:=true; _sine_d_min := v),
+    " Turn on SinE and set min SinE depth.";
+    "--sine-depth-max", Arg.Int (fun v ->  _sine:=true; _sine_d_max := v),
+    " Turn on SinE and set max SinE depth.";
+    "--sine-tolerance", Arg.Float (fun v ->  _sine:=true; _sine_tolerance := v),
+    " Turn on SinE and set SinE symbol tolerance."
   ];
 
   Params.add_to_mode "ho-pragmatic" (fun () ->

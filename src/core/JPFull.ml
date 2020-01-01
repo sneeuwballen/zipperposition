@@ -23,7 +23,7 @@ module Make (S : sig val st: Flex_state.t end) = struct
   let delay depth res =
     OSeq.append
       (OSeq.take (skip depth) (OSeq.repeat None))
-    res
+      res
 
   let iter_rule ?(flex_same=false) ~counter ~scope t u depth  =
     JP_unif.iterate ~flex_same ~scope ~counter t u []

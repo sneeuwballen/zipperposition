@@ -595,61 +595,83 @@ let lift_lambdas st =
   Util.debugf 1 "into @ @[%a@]\n" (fun k -> k (CCList.pp pp_input) (Iter.to_list res));
   res
 
-  module AsKey = struct
+module AsKey = struct
   type t = input_t
-    let equal a b = compare a b = 0
-    let hash a = a.id
-    let compare = compare
-  end
-  module InpStmSet = Set.Make(AsKey)
+  let equal a b = compare a b = 0
+  let hash a = a.id
+  let compare = compare
+end
 
-  let sine_axiom_selector ?(depth_start=1) ?(depth_end=5) ?(tolerance=1.5) formulas =
-    let symset_of_ax ax =
-      Seq.forms ax
-      |> Iter.flat_map TST.Seq.symbols
-      |> ID.Set.of_seq in
+module InpStmSet = Set.Make(AsKey)
 
-    let count_occ ~tbl ax = 
-      symset_of_ax ax
-      |> ID.Set.iter (fun k ->
+let sine_axiom_selector ?(depth_start=1) ?(depth_end=5) ?(tolerance=1.5) formulas =
+  let symset_of_ax ax =
+    Seq.forms ax
+    |> Iter.flat_map TST.Seq.symbols
+    |> ID.Set.of_seq in
+
+  let symset_of_axs axs =
+    List.fold_left (fun acc c -> ID.Set.union acc (symset_of_ax c)) ID.Set.empty axs in
+
+  let triggered_by_syms ~triggers syms =
+    ID.Set.fold (fun id acc -> 
+        let triggered = ID.Tbl.get_or triggers id ~default:InpStmSet.empty in
+        (InpStmSet.elements triggered) @ acc) 
+      syms [] in
+
+  let count_occ ~tbl ax = 
+    symset_of_ax ax
+    |> ID.Set.iter (fun k ->
         ID.Tbl.update tbl ~f:(fun _ vopt -> match vopt with
-        | Some v -> Some (v+1)
-        | None -> Some 1) ~k) in
-    
-    let create_trigger_map ~tbl axioms = 
-      let map = ID.Tbl.create (Iter.length @@ ID.Tbl.keys tbl) in
-      CCList.iter (fun ax -> 
+            | Some v -> Some (v+1)
+            | None -> Some 1) ~k) in
+
+  let create_trigger_map ~tbl axioms = 
+    let map = ID.Tbl.create (Iter.length @@ ID.Tbl.keys tbl) in
+    CCList.iter (fun ax -> 
         let symset = ID.Set.to_seq @@ symset_of_ax ax in
         let min_occ = ref (max_int) in
         Iter.iter (fun id -> 
-          let cnt = ID.Tbl.get_or tbl id ~default:max_int in
-          if cnt < !min_occ then min_occ := cnt;
-        ) symset;
+            let cnt = ID.Tbl.get_or tbl id ~default:max_int in
+            if cnt < !min_occ then min_occ := cnt;
+          ) symset;
         (* now we calculate trigger map based on the min_occ *)
         let threshold = int_of_float @@ tolerance *. (float_of_int !min_occ) in
         Iter.iter (fun id -> 
-          let cnt = ID.Tbl.get_or tbl id ~default:max_int in
-          if cnt <= threshold then (
-            ID.Tbl.update ~f:(fun k vopt -> 
-            match vopt with 
-            | Some ax_set -> Some (InpStmSet.add ax ax_set)
-            | None -> Some (InpStmSet.singleton ax)) ~k:id map)) symset) 
-      axioms in
-    
-    let axioms, goals =
-      Iter.to_list formulas
-      |> CCList.partition (fun st -> match view st with 
-                                     | Goal _ | NegatedGoal _ -> false
-                                     | _ -> true) in
-    
-    let tbl = ID.Tbl.create 1024 in
-    List.iter (count_occ ~tbl) axioms;
-    (* now tbl contains occurences of all symbols *)
+            let cnt = ID.Tbl.get_or tbl id ~default:max_int in
+            if cnt <= threshold then (
+              ID.Tbl.update ~f:(fun k vopt -> 
+                  match vopt with 
+                  | Some ax_set -> Some (InpStmSet.add ax ax_set)
+                  | None -> Some (InpStmSet.singleton ax)) ~k:id map)) symset) 
+      axioms;
+    map in
 
-    let triggers = create_trigger_map ~tbl axioms in
-    () 
+  let axioms, goals =
+    Iter.to_list formulas
+    |> CCList.partition (fun st -> match view st with 
+        | Goal _ | NegatedGoal _ -> false
+        | _ -> true) in
 
+  let tbl = ID.Tbl.create 1024 in
+  List.iter (count_occ ~tbl) axioms;
+  (* now tbl contains occurences of all symbols *)
 
+  let triggers = create_trigger_map ~tbl axioms in
+  let conj_syms = symset_of_axs goals in
+  let triggered_1 = triggered_by_syms ~triggers conj_syms in
+
+  let rec take_axs k processed_syms k_triggered_axs = 
+    if k >= depth_end then []
+    else (
+      let taken = if k >= depth_start then k_triggered_axs else [] in
+      let new_syms = symset_of_axs k_triggered_axs in
+      let unprocessed = ID.Set.diff new_syms processed_syms in
+      let k_p_1_triggered_ax = triggered_by_syms ~triggers unprocessed in
+      taken @ (take_axs (k+1) (ID.Set.union processed_syms unprocessed) k_p_1_triggered_ax)) 
+  in
+  let taken_axs = take_axs 1 conj_syms triggered_1 in
+  Iter.of_list (taken_axs @ goals)
 
 module ZF = struct
   module UA = UntypedAST.A

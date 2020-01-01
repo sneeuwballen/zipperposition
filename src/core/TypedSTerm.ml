@@ -427,7 +427,7 @@ module Seq = struct
       (fun t -> match view t with
          | Var v -> Some v
          | _ -> None)
-  
+
   let symbols t =
     subterms t
     |> Iter.filter_map

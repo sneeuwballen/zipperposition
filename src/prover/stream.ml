@@ -57,7 +57,7 @@ module Make(A:ARG) = struct
     | Some c ->
       s.hits <- s.hits +1;
       C.penalty c
-  
+
   let drip s =
     match s.stm () with
     | OSeq.Nil -> 
