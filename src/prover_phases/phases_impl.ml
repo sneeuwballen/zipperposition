@@ -139,6 +139,10 @@ let cnf ~sk_ctx decls =
   let stmts =
     decls
     |> CCVector.to_seq
+    |> (if not !_sine then CCFun.id
+        else Statement.sine_axiom_selector ~depth_start:!_sine_d_min 
+            ~depth_end:!_sine_d_max 
+            ~tolerance:!_sine_tolerance )
     |> (if not !_lift_lambdas then CCFun.id
         else Iter.flat_map Statement.lift_lambdas)
     |> Cnf.cnf_of_seq ~ctx:sk_ctx
@@ -595,7 +599,9 @@ let () =
     "--sine-depth-max", Arg.Int (fun v ->  _sine:=true; _sine_d_max := v),
     " Turn on SinE and set max SinE depth.";
     "--sine-tolerance", Arg.Float (fun v ->  _sine:=true; _sine_tolerance := v),
-    " Turn on SinE and set SinE symbol tolerance."
+    " Turn on SinE and set SinE symbol tolerance.";
+    "--sine", Arg.Set _sine,
+    " Turn on SinE with default settings: depth in range 1-5 and tolerance 1.5"
   ];
 
   Params.add_to_mode "ho-pragmatic" (fun () ->
