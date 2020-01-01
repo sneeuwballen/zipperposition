@@ -26,7 +26,7 @@ let _sine_d_max = ref 5
 let _sine_tolerance = ref 1.5
 let _sine_threshold = ref (-1)
 
-(* setup an alarm for abrupt stop *)
+(** setup an alarm for abrupt stop *)
 let setup_alarm timeout =
   let handler _ =
     Format.printf "%% SZS status ResourceOut@.";
@@ -139,11 +139,10 @@ let cnf ~sk_ctx decls =
   let stmts =
     decls
     |> CCVector.to_seq
-    |> (fun seq -> 
-        if (!_sine_threshold < 0 || Iter.length seq < !_sine_threshold) then CCFun.id seq
+    |> (fun seq ->
+        if (!_sine_threshold < 0 || Iter.length seq < !_sine_threshold) then (CCFun.id seq)
         else Statement.sine_axiom_selector ~depth_start:!_sine_d_min 
-            ~depth_end:!_sine_d_max 
-            ~tolerance:!_sine_tolerance seq)
+            ~depth_end:!_sine_d_max ~tolerance:!_sine_tolerance seq)
     |> (if not !_lift_lambdas then CCFun.id
         else Iter.flat_map Statement.lift_lambdas)
     |> Cnf.cnf_of_seq ~ctx:sk_ctx

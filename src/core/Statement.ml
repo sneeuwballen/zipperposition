@@ -652,6 +652,11 @@ let sine_axiom_selector ?(depth_start=1) ?(depth_end=5) ?(tolerance=1.5) formula
     |> CCList.partition (fun st -> match view st with 
         | Goal _ | NegatedGoal _ -> false
         | _ -> true) in
+  let helper_axioms, axioms =
+    CCList.partition (fun st -> 
+      match view st with 
+      | TyDecl _ | Def _ | Rewrite _ -> true 
+      | _ -> false) axioms in
 
   let tbl = ID.Tbl.create 1024 in
   List.iter (count_occ ~tbl) axioms;
@@ -670,8 +675,9 @@ let sine_axiom_selector ?(depth_start=1) ?(depth_end=5) ?(tolerance=1.5) formula
       let k_p_1_triggered_ax = triggered_by_syms ~triggers unprocessed in
       taken @ (take_axs (k+1) (ID.Set.union processed_syms unprocessed) k_p_1_triggered_ax)) 
   in
-  let taken_axs = take_axs 1 conj_syms triggered_1 in
-  Iter.of_list (taken_axs @ goals)
+  let taken_axs = 
+    CCList.sort_uniq ~cmp:compare @@ take_axs 1 conj_syms triggered_1 in
+  Iter.of_list (helper_axioms @ taken_axs @ goals)
 
 module ZF = struct
   module UA = UntypedAST.A
