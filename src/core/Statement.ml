@@ -655,7 +655,7 @@ let sine_axiom_selector ?(depth_start=1) ?(depth_end=5) ?(tolerance=1.5) formula
   let helper_axioms, axioms =
     CCList.partition (fun st -> 
       match view st with 
-      | TyDecl _ | Def _ | Rewrite _ -> true 
+      | TyDecl _  -> true 
       | _ -> false) axioms in
 
   let tbl = ID.Tbl.create 1024 in
