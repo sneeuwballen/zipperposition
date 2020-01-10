@@ -235,10 +235,9 @@ end = struct
         incr n;
         let c = CQ.take_first q in
         let c, _ = E.unary_simplify c in
-        assert (C.trail c |> Trail.is_empty);
         (* check for empty clause *)
         if C.comes_from_goal c then () (* ignore, a valid lemma might contradict goal *)
-        else if C.is_empty c then raise (Yield_false c)
+        else if C.is_empty c && Trail.is_empty (C.trail c) then raise (Yield_false c)
         else if E.is_trivial c then ()
         else (
           trivial := false; (* at least one clause does not simplify to [true] *)
