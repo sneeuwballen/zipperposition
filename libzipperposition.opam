@@ -17,7 +17,7 @@ depends: [
   "iter" { >= "1.2" }
   "oseq"
   "dune" { >= "1.1" }
-  "msat" { >= "0.8" < "0.9" }
+  "msat" { >= "0.8.1" < "0.9" }
   "menhir" {build}
   "logtk"
   "ocaml" {>= "4.03"}
