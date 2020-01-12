@@ -604,7 +604,7 @@ end
 
 module InpStmSet = Set.Make(AsKey)
 
-let sine_axiom_selector ?(depth_start=1) ?(depth_end=5) ?(tolerance=1.5) formulas =
+let sine_axiom_selector ?(depth_start=1) ?(depth_end=3) ?(tolerance=2.0) formulas =
   let symset_of_ax ax =
     Seq.forms ax
     |> Iter.flat_map TST.Seq.symbols
@@ -655,9 +655,9 @@ let sine_axiom_selector ?(depth_start=1) ?(depth_end=5) ?(tolerance=1.5) formula
   let helper_axioms, axioms =
     CCList.partition (fun st ->
       ID.Set.is_empty (symset_of_ax st) || 
-      match view st with 
-      | TyDecl _  -> true 
-      | _ -> false) axioms in
+        match view st with 
+        | TyDecl _  -> true 
+        | _ -> false) axioms in
 
   let tbl = ID.Tbl.create 1024 in
   List.iter (count_occ ~tbl) axioms;

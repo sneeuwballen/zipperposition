@@ -9,6 +9,7 @@ module T = Term
 module Lit = Literal
 module Lits = Literals
 module P = Proof
+module IntSet = Set.Make(CCInt)
 
 let section = Util.Section.make ~parent:Const.section "env"
 
@@ -735,29 +736,40 @@ module Make(X : sig
     let did_simplify = ref false in
     let set = ref C.ClauseSet.empty in
     let q = Queue.create () in
-    let c, st = simplify c in
-    if st=`New then did_simplify := true;
-    let single_step_simplified = !_ss_multi_simpl_rule c in
-    begin
-      match single_step_simplified with
-      | None -> Queue.push c q;
-      | Some l -> did_simplify := true;
-        List.iter (fun res -> Queue.push res q) l
-    end;
+    Queue.push c q;
+    let blocked_sss = ref IntSet.empty in
+
     while not (Queue.is_empty q) do
       let c = Queue.pop q in
       let c, st = simplify c in
       if st=`New then did_simplify := true;
       if is_trivial c || is_redundant c
       then ()
-      else match multi_simplify c with
-        | None ->
-          (* clause has reached fixpoint *)
-          set := C.ClauseSet.add c !set
+      else (
+        let sss_blocked = IntSet.mem (C.id c) !blocked_sss in
+        let single_step_simplified = 
+          if sss_blocked then None
+          else !_ss_multi_simpl_rule c in
+        
+        match single_step_simplified with 
+        | None -> 
+          begin 
+            match multi_simplify c with
+            | None ->
+              (* clause has reached fixpoint *)
+              set := C.ClauseSet.add c !set
+            | Some l ->
+              (* continue processing *)
+              did_simplify := true;
+              List.iter (fun c ->
+                if sss_blocked then 
+                  (blocked_sss := IntSet.add (C.id c) !blocked_sss);
+                Queue.push c q) l end
         | Some l ->
-          (* continue processing *)
           did_simplify := true;
-          List.iter (fun c -> Queue.push c q) l
+          List.iter (fun res -> 
+            blocked_sss := IntSet.add (C.id res) !blocked_sss; 
+            Queue.push res q) l)
     done;
     let res = C.ClauseSet.to_list !set in
     Util.exit_prof prof_all_simplify;
