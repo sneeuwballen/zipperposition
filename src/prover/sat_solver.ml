@@ -279,7 +279,10 @@ module Make()
       Solver.assume solver c proof
     done;
     (* solve *)
-    begin match Solver.solve solver with
+    Util.debug ~section 4 "solve...";
+    let res = Solver.solve solver in
+    Util.debug ~section 4 "solve done.";
+    begin match res with
       | Solver.Sat s ->
         eval_ := s.SI.eval;
         eval_level_ := s.SI.eval_level;

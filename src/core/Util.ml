@@ -119,8 +119,8 @@ let debug_fmt_ = Format.std_formatter
 let debugf_real ~section msg k =
   let now = total_time_s() in
   if section == Section.root
-  then Format.fprintf debug_fmt_ "@{<Black>@[<4>%.3f[]@}@ " now
-  else Format.fprintf debug_fmt_ "@{<Black>@[<4>%.3f[%s]@}@ "
+  then Format.fprintf debug_fmt_ "@{<blue>@[<4>%.3f[]@}@ " now
+  else Format.fprintf debug_fmt_ "@{<blue>@[<4>%.3f[%s]@}@ "
       now section.Section.full_name;
   k (Format.kfprintf
        (fun fmt ->

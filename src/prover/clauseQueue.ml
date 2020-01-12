@@ -632,14 +632,15 @@ module Make(C : Clause_intf.S) = struct
     let current_heap, (_,_,c) =  H.take_exn current_heap in
     Array.set q.heaps q.current_heap_idx current_heap;
 
-    if not (C.Tbl.mem q.tbl c) then take_first_mixed q
-    else (
+    if not (C.Tbl.mem q.tbl c) then (
+      take_first_mixed q
+    ) else (
       C.Tbl.remove q.tbl c;
       move_queue q;
       c
     )
 
-  let mixed_eval = {
+  let mixed_eval () : mixed = {
     heaps=CCArray.empty;
     weight_funs=CCArray.empty;
     tbl=C.Tbl.create 16;
@@ -649,7 +650,7 @@ module Make(C : Clause_intf.S) = struct
     current_heap_idx=0;
   }
 
-  let add_to_mixed_eval ~ratio ~weight_fun =
+  let add_to_mixed_eval ~ratio ~weight_fun mixed_eval : unit =
     let was_empty = CCArray.length mixed_eval.heaps = 0 in
     mixed_eval.heaps <- Array.append mixed_eval.heaps ([| H.empty |]);
     mixed_eval.weight_funs <- Array.append mixed_eval.weight_funs ([| weight_fun |]);
@@ -657,7 +658,7 @@ module Make(C : Clause_intf.S) = struct
     if was_empty then (
       mixed_eval.ratios_limit <- ratio
     );
-    Mixed mixed_eval
+    ()
 
   let take_first = function
     | FIFO q ->
@@ -684,8 +685,10 @@ module Make(C : Clause_intf.S) = struct
       ) in
     (* make ~ratio:6 ~weight name *)
     let weight_fun = const_prioritize_fun weight in
-    ignore(add_to_mixed_eval ~ratio:5 ~weight_fun);
-    add_to_mixed_eval ~ratio:1 ~weight_fun:fifo_wf
+    let mixed = mixed_eval() in
+    add_to_mixed_eval ~ratio:5 ~weight_fun mixed;
+    add_to_mixed_eval ~ratio:1 ~weight_fun:fifo_wf mixed;
+    Mixed mixed
 
   let bfs () : t = FIFO (Queue.create ())
 
@@ -695,15 +698,19 @@ module Make(C : Clause_intf.S) = struct
       penalize ( combine [ default, 3; ] ) in
     (* make ~ratio:1 ~weight "almost_bfs" *)
     let weight_fun = const_prioritize_fun weight in
-    ignore(add_to_mixed_eval ~ratio:1 ~weight_fun);
-    add_to_mixed_eval ~ratio:1 ~weight_fun:fifo_wf
+    let mixed = mixed_eval() in
+    add_to_mixed_eval ~ratio:1 ~weight_fun mixed;
+    add_to_mixed_eval ~ratio:1 ~weight_fun:fifo_wf mixed;
+    Mixed mixed
 
   let explore () : t =
     let open WeightFun in
     (* make ~ratio:6 ~weight "explore" *)
     let weight_fun = const_prioritize_fun explore_fun in
-    ignore(add_to_mixed_eval ~ratio:5 ~weight_fun);
-    add_to_mixed_eval ~ratio:1 ~weight_fun:fifo_wf
+    let mixed = mixed_eval() in
+    add_to_mixed_eval ~ratio:5 ~weight_fun mixed;
+    add_to_mixed_eval ~ratio:1 ~weight_fun:fifo_wf mixed;
+    Mixed mixed
 
   let ground () : t =
     let open WeightFun in
@@ -715,21 +722,27 @@ module Make(C : Clause_intf.S) = struct
     in
     (* make ~ratio:6 ~weight "ground" *)
     let weight_fun = const_prioritize_fun weight in
-    ignore(add_to_mixed_eval ~ratio:5 ~weight_fun);
-    add_to_mixed_eval ~ratio:1 ~weight_fun:fifo_wf
+    let mixed = mixed_eval() in
+    add_to_mixed_eval ~ratio:5 ~weight_fun mixed;
+    add_to_mixed_eval ~ratio:1 ~weight_fun:fifo_wf mixed;
+    Mixed mixed
 
   let default () : t =
     let open WeightFun in
     (* make ~ratio:6 ~weight "default" *)
     let weight_fun = const_prioritize_fun default_fun in
-    ignore(add_to_mixed_eval ~ratio:5 ~weight_fun);
-    add_to_mixed_eval ~ratio:1 ~weight_fun:fifo_wf
+    let mixed = mixed_eval() in
+    add_to_mixed_eval ~ratio:5 ~weight_fun mixed;
+    add_to_mixed_eval ~ratio:1 ~weight_fun:fifo_wf mixed;
+    Mixed mixed
 
   let conj_relative_mk () : t =
     (* make ~ratio:6 ~weight:WeightFun.conj_relative "conj_relative" *)
     let weight_fun = const_prioritize_fun WeightFun.conj_relative in
-    ignore(add_to_mixed_eval ~ratio:5 ~weight_fun);
-    add_to_mixed_eval ~ratio:1 ~weight_fun:fifo_wf
+    let mixed = mixed_eval() in
+    add_to_mixed_eval ~ratio:5 ~weight_fun mixed;
+    add_to_mixed_eval ~ratio:1 ~weight_fun:fifo_wf mixed;
+    Mixed mixed
 
   let conj_var_relative_mk () : t =
     (* make ~ratio:!cr_var_ratio ~weight:(WeightFun.conj_relative ~distinct_vars_mul:!cr_var_mul)
@@ -737,26 +750,34 @@ module Make(C : Clause_intf.S) = struct
     let weight_fun = const_prioritize_fun 
         (WeightFun.conj_relative ~distinct_vars_mul:!cr_var_mul 
            ~parameters_magnitude:!parameters_magnitude ~goal_penalty:!goal_penalty) in
-    ignore(add_to_mixed_eval ~ratio:!cr_var_ratio ~weight_fun);
-    add_to_mixed_eval ~ratio:1 ~weight_fun:fifo_wf
+    let mixed = mixed_eval() in
+    add_to_mixed_eval ~ratio:!cr_var_ratio ~weight_fun mixed;
+    add_to_mixed_eval ~ratio:1 ~weight_fun:fifo_wf mixed;
+    Mixed mixed
 
   let ho_weight () =
     (* make ~ratio:4 ~weight:WeightFun.ho_weight_calc "ho-weight" *)
     let weight_fun = const_prioritize_fun WeightFun.ho_weight_calc in
-    ignore(add_to_mixed_eval ~ratio:3 ~weight_fun);
-    add_to_mixed_eval ~ratio:1 ~weight_fun:fifo_wf
+    let mixed = mixed_eval() in
+    add_to_mixed_eval ~ratio:3 ~weight_fun mixed;
+    add_to_mixed_eval ~ratio:1 ~weight_fun:fifo_wf mixed;
+    Mixed mixed
 
   let ho_weight_init () =
     (* make ~ratio:5 ~weight:WeightFun.ho_weight_initial "ho-weight-init" *)
     let weight_fun = const_prioritize_fun WeightFun.ho_weight_initial in
-    ignore(add_to_mixed_eval ~ratio:4 ~weight_fun);
-    add_to_mixed_eval ~ratio:1 ~weight_fun:fifo_wf
+    let mixed = mixed_eval() in
+    add_to_mixed_eval ~ratio:4 ~weight_fun mixed;
+    add_to_mixed_eval ~ratio:1 ~weight_fun:fifo_wf mixed;
+    Mixed mixed
 
   let avoid_expensive_mk () : t =
     (* make ~ratio:20 ~weight:WeightFun.avoid_expensive "avoid-expensive" *)
     let weight_fun = const_prioritize_fun WeightFun.avoid_expensive in
-    ignore(add_to_mixed_eval ~ratio:10 ~weight_fun);
-    add_to_mixed_eval ~ratio:1 ~weight_fun:fifo_wf
+    let mixed = mixed_eval() in
+    add_to_mixed_eval ~ratio:10 ~weight_fun mixed;
+    add_to_mixed_eval ~ratio:1 ~weight_fun:fifo_wf mixed;
+    Mixed mixed
 
   let of_profile p =
     let open ClauseQueue_intf in
@@ -774,11 +795,13 @@ module Make(C : Clause_intf.S) = struct
       | P_ho_weight_init -> ho_weight_init ()
       | P_avoid_expensive -> avoid_expensive_mk ())
     else (
-      List.fold_left (fun _ (ratio, prio, weight) -> 
+      let mixed = mixed_eval() in
+      List.iter (fun (ratio, prio, weight) -> 
           let prio_fun = PriorityFun.of_string prio in
           let weight_fun = WeightFun.of_string weight in
-          add_to_mixed_eval ~ratio ~weight_fun:(fun c -> prio_fun c, weight_fun c)
-        ) (Mixed mixed_eval) !funs_to_parse
+          add_to_mixed_eval ~ratio ~weight_fun:(fun c -> prio_fun c, weight_fun c) mixed;
+        ) !funs_to_parse;
+      Mixed mixed
     )
 
   let pp out q = CCFormat.fprintf out "queue %s" (name q)

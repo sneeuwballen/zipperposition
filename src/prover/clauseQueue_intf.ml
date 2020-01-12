@@ -96,8 +96,6 @@ module type S = sig
         from a priority queue that uses [weight] to sort clauses
       @param name the name of this clause queue *) *)
 
-  val add_to_mixed_eval: ratio:int -> weight_fun:(C.t -> int * int) -> t
-
 
   val bfs : unit -> t
   (** FIFO *)
