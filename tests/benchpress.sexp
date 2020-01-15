@@ -1,13 +1,13 @@
 
 (prover
   (name zip-find-expect)
-  (cmd "grep ' expect:'")
+  (cmd "grep ' expect:' $file")
   (sat "expect: sat")
   (unsat "expect: unsat"))
 
 (prover
   (name tptp-find-status)
-  (cmd "grep '% Status[ ]*:'")
+  (cmd "grep '% Status[ ]*:' $file")
   (sat "Status[ ]*: (CounterSatisfiable|Satisfiable)")
   (unsat "Status[ ]*: (Unsatisfiable|Theorem|CounterTheorem|Lemma)"))
 
