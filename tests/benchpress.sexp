@@ -5,15 +5,26 @@
   (sat "expect: sat")
   (unsat "expect: unsat"))
 
+(prover
+  (name tptp-find-expect)
+  (cmd "grep '% Status[ ]*:'")
+  (sat "Status[ ]*: (CounterSatisfiable|Satisfiable)")
+  (unsat "Status[ ]*: (Unsatisfiable|Theorem|CounterTheorem|Lemma)"))
+
 (dir
   (path $cur_dir)
   (pattern ".*\\zf")
-  (expect (try (run zip-find-expect) (const unsat))))
+  (expect (try (run zip-find-expect) (run tptp-find-status) (const unknown))))
 
 (dir
   (path $cur_dir/../examples/)
   (pattern ".*\\.(zf|p)")
-  (expect (const unsat)))
+  (expect (try (run zip-find-expect) (run tptp-find-status) (const unknown))))
+
+(dir
+  (path $home/workspace/TPTP-v6.1.0//)
+  (pattern ".*\\.p")
+  (expect (try (run tptp-find-status) (const unknown))))
 
 (prover
   (name zip-dev)
