@@ -6,7 +6,7 @@
   (unsat "expect: unsat"))
 
 (prover
-  (name tptp-find-expect)
+  (name tptp-find-status)
   (cmd "grep '% Status[ ]*:'")
   (sat "Status[ ]*: (CounterSatisfiable|Satisfiable)")
   (unsat "Status[ ]*: (Unsatisfiable|Theorem|CounterTheorem|Lemma)"))
