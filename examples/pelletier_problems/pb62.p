@@ -1,5 +1,6 @@
 
 % not a theorem (SPASS finds a completion)
+% expect: sat
 
 fof(goal, conjecture,
   (f(a) & ! [X] : (f(X) => f(g(X))))
