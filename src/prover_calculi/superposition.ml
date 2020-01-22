@@ -1662,8 +1662,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                 (* subst(l) > subst(r) and restriction does not apply, we can rewrite *)
              then (
                Util.debugf ~section 3
-                 "@[<hv2>demod:@ @[<hv>t=%a[%d],@ l=%a[%d],@ r=%a[%d]@],@ subst=@[%a@]@]"
-                 (fun k->k T.pp t 0 T.pp l cur_sc T.pp r cur_sc S.pp subst);
+                 "@[<hv2>demod(%d):@ @[<hv>t=%a[%d],@ l=%a[%d],@ r=%a[%d]@],@ subst=@[%a@]@]"
+                 (fun k->k (C.id c) T.pp t 0 T.pp l cur_sc T.pp r cur_sc S.pp subst);
 
                let t' = Lambda.eta_reduce @@ Lambda.snf t in
                let l' = Lambda.eta_reduce @@ Lambda.snf @@  Subst.FO.apply Subst.Renaming.none subst (l,cur_sc) in
@@ -1682,12 +1682,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         | Some (rhs,subst,cur_sc) ->
           (* reduce [rhs] in current scope [cur_sc] *)
           assert (cur_sc < st.demod_sc);
+          (* If not beta-reduced this can get out of hands --  *)
+          let rhs' = Lambda.snf @@ Subst.FO.apply Subst.Renaming.none subst (rhs,cur_sc) in
           Util.debugf ~section 3
-            "@[<2>demod:@ rewrite `@[%a@]`@ into `@[%a@]`@ using %a[%d]@]"
-            (fun k->k T.pp t T.pp rhs Subst.pp subst cur_sc);
+            "@[<2>demod(%d):@ rewrite `@[%a@]`@ into `@[%a@]`@ resulting `@[%a@]`@ nf `@[%a@]` using %a[%d]@]"
+            (fun k->k (C.id c) T.pp t T.pp rhs T.pp rhs' T.pp (Lambda.snf rhs') Subst.pp subst cur_sc);
           (* NOTE: we retraverse the term several times, but this is simpler *)
-          let rhs = Subst.FO.apply Subst.Renaming.none subst (rhs,cur_sc) in
-          normal_form ~restrict rhs k (* done one rewriting step, continue *)
+          normal_form ~restrict rhs' k (* done one rewriting step, continue *)
       end
     (* rewrite innermost-leftmost of [subst(t,scope)]. The initial scope is
        0, but then we normal_form terms in which variables are really the variables
@@ -1737,7 +1738,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                (fun l' -> k (t' :: l')))
     in
     normal_form ~restrict t (fun t->t)
-
+  
   let[@inline] eq_c_subst (c1,s1,sc1)(c2,s2,sc2) =
     C.equal c1 c2 && sc1=sc2 && Subst.equal s1 s2
 
@@ -1780,6 +1781,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (fun t -> demod_nf ~restrict:(restrict_term t) st c t)
         lit
     in
+
+
     (* demodulate every literal *)
     let lits = Array.mapi demod_lit (C.lits c) in
     if CCList.is_empty st.demod_clauses then (
@@ -2915,8 +2918,8 @@ let _solidification_limit = ref 5
 let _max_unifs_solid_ff = ref 20
 let _use_weight_for_solid_subsumption = ref false
 
-let _guard = ref 35
-let _ratio = ref 80
+let _guard = ref 25
+let _ratio = ref 70
 
 let key = Flex_state.create_key ()
 
