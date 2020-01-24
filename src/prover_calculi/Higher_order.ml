@@ -185,8 +185,8 @@ module Make(E : Env.S) : S with module Env = E = struct
                     let new_c =
                       C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c)
                     in
-                    Format.printf "@[EP: @[%a@] => @[%a@]@].\n" C.pp c C.pp new_c;
-                    Format.force_newline ();
+                    (* Format.printf "@[EP: @[%a@] => @[%a@]@].\n" C.pp c C.pp new_c; *)
+                    (* Format.force_newline (); *)
                     Util.incr_stat stat_ext_pos;
                     Util.debugf ~section 4
                       "(@[ext_pos@ :clause %a@ :yields %a@])"
