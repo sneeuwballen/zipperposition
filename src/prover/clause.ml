@@ -365,11 +365,12 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     let vars c = terms c |> Iter.flat_map T.Seq.vars
   end
 
-  let apply_subst ?(proof=None) (c,sc) subst =
+  let apply_subst ?(proof=None) ?(penalty_inc=None) (c,sc) subst =
     let lits = lits c in
     let new_lits = _apply_subst_no_simpl subst (lits, sc) in
     let proof_step = CCOpt.get_or ~default:(proof_step c) proof in
-    create ~trail:(trail c) ~penalty:(penalty c) (CCArray.to_list new_lits) proof_step
+    let penalty = (CCOpt.get_or ~default:0 penalty_inc) + (penalty c) in
+    create ~trail:(trail c) ~penalty (CCArray.to_list new_lits) proof_step
 
 
   let ground_clause c =

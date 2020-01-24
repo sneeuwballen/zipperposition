@@ -709,6 +709,50 @@ module Make(E : Env.S) : S with module Env = E = struct
     |> Iter.flat_map_l build_choice_inst
     |> Iter.to_list
 
+  (* Given a clause C, project all its applied variables to base-type arguments 
+     if there is a variable occurence in which at least one of base-type arguments is
+     not a bound variable.
+     Penalty of the resulting clause is penalty of the original clause + penalty_inc *)
+  let simple_projection ~penalty_inc c =
+    C.Seq.terms c
+    |> Iter.flat_map (Term.Seq.subterms ~include_builtin:true ~ignore_head:true)
+    |> Iter.fold (fun var_map subterm -> 
+        match T.view subterm with 
+        | T.App(hd, args) when T.is_var hd && 
+                                List.exists (fun t -> 
+                                  not (Type.is_fun (T.ty t)) && 
+                                  not (T.is_bvar t)) 
+                                args -> 
+          let var_arg_tys, var_ret_ty = Type.open_fun (T.ty hd) in
+          assert (not (Type.is_fun var_ret_ty));
+
+          let new_bindings = 
+            CCList.foldi (fun acc idx arg -> 
+              let arg_ty = T.ty arg in
+              if Type.is_ground arg_ty && Type.equal arg_ty var_ret_ty then (
+                let db = T.bvar ~ty:arg_ty (List.length var_arg_tys - 1 - idx) in
+                let binding = T.fun_l var_arg_tys db in
+                Term.Set.add binding acc
+              ) else acc) Term.Set.empty args in
+          let old_bindings = Term.Map.get_or hd ~default:Term.Set.empty var_map in
+          
+          Term.Map.add hd (Term.Set.union old_bindings new_bindings) var_map
+        | _ -> var_map) Term.Map.empty
+    |> (fun var_map -> 
+          Term.Map.fold (fun var bindings acc -> 
+            let var = Term.as_var_exn var in
+            
+            Term.Set.fold (fun binding acc ->
+              let subst = (Subst.FO.bind' Subst.empty (var, 0) (binding, 0)) in
+              let proof =
+                Some 
+                  (Proof.Step.inference ~rule:(Proof.Rule.mk "simp.projection") 
+                                        ~tags:[Proof.Tag.T_ho]
+                     [C.proof_parent_subst Subst.Renaming.none (c,0) subst]) in
+                (C.apply_subst ~penalty_inc:(Some penalty_inc) ~proof (c,0) subst) :: acc
+            ) bindings acc
+          ) var_map [])
+
   let recognize_choice_ops c =
     let extract_not_p_x l = match l with
       | Literal.Equation(lhs,rhs,true) when T.equal T.false_ rhs && T.is_app_var lhs ->
