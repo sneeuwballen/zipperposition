@@ -23,6 +23,13 @@ let find signature s =
     try Some (find_exn signature s)
     with Not_found -> None
 
+let find_by_type (sym_map ,ty_map) ty =
+  let res = Type.Map.get_or ty ty_map ~default:ID.Set.empty in
+  assert(ID.Set.for_all (fun id -> 
+    let ty', _ = ID.Map.find id sym_map in
+    Type.equal ty' ty) res);
+  res
+
 
 exception AlreadyDeclared of ID.t * Type.t * Type.t
 

@@ -31,6 +31,9 @@ val find_exn : t -> ID.t -> Type.t
 (** Lookup the type of a symbol
     @raise Not_found if the symbol is not in the signature *)
 
+val find_by_type : t -> Type.t -> ID.Set.t
+(** Reverse lookup -- given a type return all IDs with that type *)
+
 val sym_in_conj : ID.t -> t -> bool
 
 val set_sym_in_conj : ID.t -> t -> t
