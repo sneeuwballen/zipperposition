@@ -51,6 +51,7 @@ let k_unif_max_depth = Flex_state.create_key ()
 let k_prune_arg_fun = Flex_state.create_key ()
 let k_prim_enum_terms = Flex_state.create_key ()
 let k_simple_projection = Flex_state.create_key ()
+let k_simple_projection_md = Flex_state.create_key ()
 
 
 type prune_kind = [`NoPrune | `OldPrune | `PruneAllCovers | `PruneMaxCover]
@@ -715,45 +716,48 @@ module Make(E : Env.S) : S with module Env = E = struct
      if there is a variable occurence in which at least one of base-type arguments is
      not a bound variable.
      Penalty of the resulting clause is penalty of the original clause + penalty_inc *)
-  let simple_projection ~penalty_inc c =
-    C.Seq.terms c
-    |> Iter.flat_map (Term.Seq.subterms ~include_builtin:true ~ignore_head:true)
-    |> Iter.fold (fun var_map subterm -> 
-        match T.view subterm with 
-        | T.App(hd, args) when T.is_var hd && 
-                                List.exists (fun t -> 
-                                  not (Type.is_fun (T.ty t)) && 
-                                  not (T.is_bvar t)) 
-                                args -> 
-          let var_arg_tys, var_ret_ty = Type.open_fun (T.ty hd) in
-          assert (not (Type.is_fun var_ret_ty));
+  let simple_projection ~penalty_inc ~max_depth c =
+    if C.proof_depth c > max_depth then []
+    else (
+      C.Seq.terms c
+      |> Iter.flat_map (Term.Seq.subterms ~include_builtin:true ~ignore_head:true)
+      |> Iter.fold (fun var_map subterm -> 
+          match T.view subterm with 
+          | T.App(hd, args) when T.is_var hd && 
+                                  List.exists (fun t -> 
+                                    not (Type.is_fun (T.ty t)) && 
+                                    not (T.is_bvar t)) 
+                                  args -> 
+            let var_arg_tys, var_ret_ty = Type.open_fun (T.ty hd) in
+            assert (not (Type.is_fun var_ret_ty));
 
-          let new_bindings = 
-            CCList.foldi (fun acc idx arg -> 
-              let arg_ty = T.ty arg in
-              if Type.is_ground arg_ty && Type.equal arg_ty var_ret_ty then (
-                let db = T.bvar ~ty:arg_ty (List.length var_arg_tys - 1 - idx) in
-                let binding = T.fun_l var_arg_tys db in
-                Term.Set.add binding acc
-              ) else acc) Term.Set.empty args in
-          let old_bindings = Term.Map.get_or hd ~default:Term.Set.empty var_map in
-          
-          Term.Map.add hd (Term.Set.union old_bindings new_bindings) var_map
-        | _ -> var_map) Term.Map.empty
-    |> (fun var_map -> 
-          Term.Map.fold (fun var bindings acc -> 
-            let var = Term.as_var_exn var in
+            let new_bindings = 
+              CCList.foldi (fun acc idx arg -> 
+                let arg_ty = T.ty arg in
+                if Type.is_ground arg_ty && Type.equal arg_ty var_ret_ty then (
+                  let db = T.bvar ~ty:arg_ty (List.length var_arg_tys - 1 - idx) in
+                  let binding = T.fun_l var_arg_tys db in
+                  Term.Set.add binding acc
+                ) else acc) Term.Set.empty args in
+            let old_bindings = Term.Map.get_or hd ~default:Term.Set.empty var_map in
             
-            Term.Set.fold (fun binding acc ->
-              let subst = (Subst.FO.bind' Subst.empty (var, 0) (binding, 0)) in
-              let proof =
-                Some 
-                  (Proof.Step.inference ~rule:(Proof.Rule.mk "simp.projection") 
-                                        ~tags:[Proof.Tag.T_ho]
-                     [C.proof_parent_subst Subst.Renaming.none (c,0) subst]) in
-                (C.apply_subst ~penalty_inc:(Some penalty_inc) ~proof (c,0) subst) :: acc
-            ) bindings acc
-          ) var_map [])
+            Term.Map.add hd (Term.Set.union old_bindings new_bindings) var_map
+          | _ -> var_map) Term.Map.empty
+      |> (fun var_map -> 
+            Term.Map.fold (fun var bindings acc -> 
+              let var = Term.as_var_exn var in
+              
+              Term.Set.fold (fun binding acc ->
+                let subst = (Subst.FO.bind' Subst.empty (var, 0) (binding, 0)) in
+                let proof =
+                  Some 
+                    (Proof.Step.inference ~rule:(Proof.Rule.mk "simp.projection") 
+                                          ~tags:[Proof.Tag.T_ho]
+                      [C.proof_parent_subst Subst.Renaming.none (c,0) subst]) in
+                let res = C.apply_subst ~penalty_inc:(Some penalty_inc) ~proof (c,0) subst in
+                res :: acc
+              ) bindings acc
+            ) var_map []))
 
   let recognize_choice_ops c =
     let extract_not_p_x l = match l with
@@ -1293,7 +1297,8 @@ module Make(E : Env.S) : S with module Env = E = struct
 
       if Env.flex_get k_simple_projection >= 0 then (
         let penalty_inc = Env.flex_get k_simple_projection in
-        Env.add_unary_inf "simple_projection" (simple_projection ~penalty_inc)
+        let max_depth = Env.flex_get k_simple_projection_md in
+        Env.add_unary_inf "simple_projection" (simple_projection ~penalty_inc ~max_depth);
       );
 
       begin match Env.flex_get k_ho_prim_mode with
@@ -1375,6 +1380,7 @@ let _prune_arg_fun = ref `NoPrune
 let prim_enum_terms = ref Term.Set.empty
 let _oracle_composer = ref (OSeq.merge :> (Logtk.Subst.t option OSeq.t OSeq.t -> Logtk.Subst.t option OSeq.t))
 let _simple_projection = ref (-1)
+let _simple_projection_md = ref 2
 
 let extension =
   let register env =
@@ -1396,6 +1402,8 @@ let extension =
     E.flex_add k_prune_arg_fun !_prune_arg_fun;
     E.flex_add k_prim_enum_terms prim_enum_terms;
     E.flex_add k_simple_projection !_simple_projection;
+    E.flex_add k_simple_projection_md !_simple_projection_md;
+
 
 
 
@@ -1470,6 +1478,7 @@ let () =
           " enable simple projection instantiation." ^ 
           " positive argument is increase in clause penalty for the conclusion; " ^
           " negative argument turns the inference off";
+      "--ho-simple-projection-max-depth", Arg.Set_int _simple_projection_md, " sets the max depth for simple projection";
       "--ho-ext-axiom-penalty", Arg.Int (fun p -> _ext_axiom_penalty := p), " penalty for extensionality axiom";
     ];
   Params.add_to_mode "ho-complete-basic" (fun () ->
