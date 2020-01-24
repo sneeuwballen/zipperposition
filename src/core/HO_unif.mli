@@ -12,6 +12,7 @@ val enum_prop :
   ?mode:[`Full | `Pragmatic | `Neg | `None | `TF] ->
   Term.var Scoped.t ->
   enum_cache: Term.Set.t ref ->
+  signature: Signature.t ->
   offset:int ->
   (Subst.t * penalty) list
 (** Given a variable of type [τ1…τn -> prop], enumerate possible shapes

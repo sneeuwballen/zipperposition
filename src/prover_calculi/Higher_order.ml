@@ -605,7 +605,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       vars
       |> T.VarSet.to_seq
       |> Iter.flat_map_l
-        (fun v -> HO_unif.enum_prop ~enum_cache:(Env.flex_get k_prim_enum_terms) 
+        (fun v -> HO_unif.enum_prop 
+            ~enum_cache:(Env.flex_get k_prim_enum_terms) 
+            ~signature:(Ctx.signature ())
             ~mode ~offset (v,sc_c))
       |> Iter.map
         (fun (subst,penalty) ->

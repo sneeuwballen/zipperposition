@@ -33,7 +33,7 @@ let term_arity args =
   |> Util.take_drop_while (fun t -> T.is_type t)
   |> CCPair.map List.length List.length
 
-let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~offset : (Subst.t * penalty) list =
+let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~signature ~offset : (Subst.t * penalty) list =
   let ty_v = HVar.ty v in
   let n, ty_args, ty_ret = Type.open_poly_fun ty_v in
   assert (Type.is_prop ty_ret);
@@ -110,6 +110,11 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~offset : (Subst.t 
             | None -> acc) [] 
       (* [] *)
       | _ -> []
+    and l_symbols = match mode with 
+      | `Full | `Pragmatic ->
+        let syms_of_var_ty = Signature.find_by_type signature ty_v in
+        ID.Set.fold (fun sym acc -> Term.const ~ty:ty_v sym :: acc ) syms_of_var_ty []
+      | _ -> []
     and l_simpl_op = match mode with
       | `Pragmatic -> 
         let n = List.length vars in
@@ -156,6 +161,7 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~offset : (Subst.t 
         l_false, 1;
         l_true, 1;
         l_simpl_op, 2;
+        l_symbols, 2;
         l_quants, 10;
       ]
   )
