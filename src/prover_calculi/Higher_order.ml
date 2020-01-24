@@ -50,6 +50,8 @@ let k_elim_leibniz_eq = Flex_state.create_key ()
 let k_unif_max_depth = Flex_state.create_key ()
 let k_prune_arg_fun = Flex_state.create_key ()
 let k_prim_enum_terms = Flex_state.create_key ()
+let k_simple_projection = Flex_state.create_key ()
+
 
 type prune_kind = [`NoPrune | `OldPrune | `PruneAllCovers | `PruneMaxCover]
 
@@ -1288,6 +1290,12 @@ module Make(E : Env.S) : S with module Env = E = struct
       if Env.flex_get k_enable_ho_unif then (
         Env.add_unary_inf "ho_unif" ho_unif;
       );
+
+      if Env.flex_get k_simple_projection >= 0 then (
+        let penalty_inc = Env.flex_get k_simple_projection in
+        Env.add_unary_inf "simple_projection" (simple_projection ~penalty_inc)
+      );
+
       begin match Env.flex_get k_ho_prim_mode with
         | `None -> ()
         | mode ->
@@ -1366,6 +1374,7 @@ let _unif_max_depth = ref 11
 let _prune_arg_fun = ref `NoPrune
 let prim_enum_terms = ref Term.Set.empty
 let _oracle_composer = ref (OSeq.merge :> (Logtk.Subst.t option OSeq.t OSeq.t -> Logtk.Subst.t option OSeq.t))
+let _simple_projection = ref (-1)
 
 let extension =
   let register env =
@@ -1386,6 +1395,7 @@ let extension =
     E.flex_add k_unif_max_depth !_unif_max_depth;
     E.flex_add k_prune_arg_fun !_prune_arg_fun;
     E.flex_add k_prim_enum_terms prim_enum_terms;
+    E.flex_add k_simple_projection !_simple_projection;
 
 
 
@@ -1456,6 +1466,10 @@ let () =
       "--ho-elim-leibniz", Arg.Int (fun v -> _elim_leibniz_eq := v), " enable/disable treatment of Leibniz equality";
       "--ho-def-unfold", Arg.Bool (fun v -> def_unfold_enabled_ := v), " enable ho definition unfolding";
       "--ho-choice-inst", Arg.Bool (fun v -> _instantiate_choice_ax := v), " enable ho definition unfolding";
+      "--ho-simple-projection", Arg.Int (fun v -> _simple_projection := v), 
+          " enable simple projection instantiation." ^ 
+          " positive argument is increase in clause penalty for the conclusion; " ^
+          " negative argument turns the inference off";
       "--ho-ext-axiom-penalty", Arg.Int (fun p -> _ext_axiom_penalty := p), " penalty for extensionality axiom";
     ];
   Params.add_to_mode "ho-complete-basic" (fun () ->
