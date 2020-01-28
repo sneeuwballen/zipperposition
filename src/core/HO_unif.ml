@@ -171,10 +171,10 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~signature ~offset 
         l_and, 2;
         l_or, 2;
         l_eq,  1;
-        l_false, 0;
-        l_true, 0;
+        l_false, (if mode == `Pragmatic then 0 else 3);
+        l_true, (if mode == `Pragmatic then 0 else 3);
         l_simpl_op, 0;
-        l_symbols, 1;
+        l_symbols, (if mode == `Pragmatic then 1 else 3);
         l_quants, 2;
       ]
   )
