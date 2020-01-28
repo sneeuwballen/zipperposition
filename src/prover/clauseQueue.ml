@@ -497,8 +497,12 @@ module Make(C : Clause_intf.S) = struct
             match l with
             | Literal.Equation(lhs,_,_) -> Type.is_fun (Term.ty lhs)
             | _ -> false) in
-      if has_lam_eq c || prefer_formulas c = 1 then 0 
-      else if prefer_lambdas c = 1 then 1
+      let all_in_pfho c = 
+        try 
+          C.Seq.terms c |> Iter.for_all Term.in_pfho_fragment
+        with _ -> false in
+      if has_lam_eq c || prefer_formulas c = 1 then 0
+      else if all_in_pfho c then 1
       else 2
 
     let defer_formulas c =

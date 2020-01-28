@@ -2904,7 +2904,7 @@ let _ground_subs_check = ref 0
 let _sup_t_f = ref true
 let _solid_subsumption = ref false
 
-let _skip_multiplier = ref 15.0
+let _skip_multiplier = ref 20.0
 let _imit_first = ref false
 let _max_depth = ref 3
 let _max_rigid_imitations = ref 3
@@ -2918,8 +2918,8 @@ let _solidification_limit = ref 5
 let _max_unifs_solid_ff = ref 20
 let _use_weight_for_solid_subsumption = ref false
 
-let _guard = ref 40
-let _ratio = ref 120
+let _guard = ref 45
+let _ratio = ref 150
 
 let key = Flex_state.create_key ()
 

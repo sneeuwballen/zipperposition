@@ -249,7 +249,8 @@ module Make(E : Env.S) : S with module Env = E = struct
         let eq = Literal.View.as_eqn l in
         match eq with 
         | Some (l,r,sign) -> 
-          Type.is_prop (T.ty l) && 
+          Type.is_prop (T.ty l) &&
+          not (T.equal l r) &&
           ((not (T.equal r T.true_) && not (T.equal r T.false_))
            || T.is_formula l || T.is_formula r)
         | None            -> false 

@@ -504,15 +504,17 @@ let rec nnf f =
   Util.debugf ~section 5 "@[<2>nnf of@ `@[%a@]`@]" (fun k->k T.pp f);
   match F.view f with
   | F.Atom _
-  | F.Neq _
-  | F.Eq _
   | F.True
   | F.False -> f
+  | F.Neq (a,b) ->
+    if T.equal a b then F.false_ else f 
+  | F.Eq (a,b) ->
+    if T.equal a b then F.true_ else f
   | F.Not f' ->
     begin match F.view f' with
       | F.Not f'' -> nnf f''
-      | F.Neq (a,b) -> F.eq a b
-      | F.Eq (a,b) -> F.neq a b
+      | F.Neq (a,b) -> if T.equal a b then F.false_ else f 
+      | F.Eq (a,b) -> if T.equal a b then F.true_ else f
       | F.And l ->
         F.or_ (List.map (fun f -> nnf (F.not_ f)) l)
       | F.Or l ->
@@ -537,12 +539,15 @@ let rec nnf f =
     nnf (F.or_ [ (F.not_ f1); f2 ])
   | F.Equiv(f1,f2) ->
     (* equivalence with positive polarity *)
-    nnf (F.and_
-           [ F.imply f1 f2; F.imply f2 f1 ])
+    if T.equal f1 f2 then F.true_
+    else (
+      nnf (F.and_
+           [ F.imply f1 f2; F.imply f2 f1 ]))
   | F.Xor (f1,f2) ->
     (* equivalence with negative polarity *)
-    nnf (F.and_
-           [ F.or_ [f1; f2]; F.or_ [F.not_ f1; F.not_ f2] ])
+    if T.equal f1 f2 then F.false_
+    else (nnf (F.and_
+           [ F.or_ [f1; f2]; F.or_ [F.not_ f1; F.not_ f2] ]))
   | F.Forall (var,f') -> F.forall var (nnf f')
   | F.Exists (var,f') -> F.exists var (nnf f')
 

@@ -81,12 +81,12 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~signature ~offset 
               (T.app (T.var f) (List.map T.var vars))
               (T.app (T.var g) (List.map T.var vars)))]
     and l_false = match mode with
-      | `None  -> []
-      | `Neg | `Pragmatic | `Full | `TF  ->
+      | `None | `Full  -> []
+      | `Neg | `Pragmatic  | `TF  ->
         [T.fun_of_fvars vars T.false_]
     and l_true = match mode with
-      | `None -> []
-      | `Neg | `Pragmatic | `Full | `TF ->
+      | `None | `Full -> []
+      | `Neg | `Pragmatic | `TF ->
         [T.fun_of_fvars vars T.true_]
     and l_quants = match mode with
       | `Full ->
@@ -111,7 +111,7 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~signature ~offset 
       (* [] *)
       | _ -> []
     and l_symbols = match mode with 
-      | `Full | `Pragmatic ->
+      | `Pragmatic ->
         let syms_of_var_ty = Signature.find_by_type signature ty_v in
         ID.Set.fold (fun sym acc -> Term.const ~ty:ty_v sym :: acc ) syms_of_var_ty []
       | _ -> []
@@ -154,15 +154,15 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~signature ~offset 
              enum_cache := Term.Set.add cached_t !enum_cache;
              let subst = Subst.FO.bind' Subst.empty (v,sc_v) (t,sc_v) in
              (subst, penalty) )ts ) 
-      [ l_not, 3;
-        l_and, 10;
-        l_or, 10;
-        l_eq,  5;
-        l_false, 1;
-        l_true, 1;
-        l_simpl_op, 2;
-        l_symbols, 2;
-        l_quants, 10;
+      [ l_not, 1;
+        l_and, 2;
+        l_or, 2;
+        l_eq,  1;
+        l_false, 0;
+        l_true, 0;
+        l_simpl_op, 0;
+        l_symbols, 1;
+        l_quants, 2;
       ]
   )
 
