@@ -2918,7 +2918,7 @@ let _solidification_limit = ref 5
 let _max_unifs_solid_ff = ref 20
 let _use_weight_for_solid_subsumption = ref false
 
-let _guard = ref 40
+let _guard = ref 60
 let _ratio = ref 120
 
 let key = Flex_state.create_key ()
@@ -2929,7 +2929,7 @@ let unif_params_to_def () =
   _max_rigid_imitations := 1;
   _max_identifications := 1;
   _max_elims           := 1;
-  _max_infs := -1 
+  _max_infs := -1
 
 let register ~sup =
   let module Sup = (val sup : S) in
