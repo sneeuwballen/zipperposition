@@ -1653,9 +1653,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
              (* r is the term subterm is going to be rewritten into *)
              assert (C.is_unit_clause unit_clause);
              if sign &&
+                C.trail_subsumes unit_clause c &&
                 not (C.equal unit_clause c) &&
                 (not (Lazy.force restrict) || not (S.is_renaming subst)) &&
-                C.trail_subsumes unit_clause c &&
                 (O.compare ord
                    (S.FO.apply rename subst (l,cur_sc))
                    (S.FO.apply rename subst (r,cur_sc)) = Comp.Gt)
@@ -1973,11 +1973,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (fun set (_t',with_pos,subst) ->
            let c = with_pos.C.WithPos.clause in
            (* subst(l) matches t' and is > subst(r), very likely to rewrite! *)
-           if ((oriented ||
+           if (C.trail_subsumes c given && (oriented ||
                 O.compare ord
                   (S.FO.apply renaming subst (l,0))
                   (S.FO.apply renaming subst (r,0)) = Comp.Gt
-               ) && C.trail_subsumes c given
+               )
               )
            then  (* add the clause to the set, it may be rewritten by l -> r *)
              C.ClauseSet.add c set
@@ -2212,8 +2212,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         |> Iter.iter
           (fun (l,r,(_,_,_,c'),subst) ->
              assert (Unif.FO.equal ~subst (l,1)(t1,0));
-             if Unif.FO.equal ~subst (r,1)(t2,0)
-             && C.trail_subsumes c' c
+             if C.trail_subsumes c' c &&
+                Unif.FO.equal ~subst (r,1)(t2,0)
              then begin
                (* t1!=t2 is refuted by l\sigma = r\sigma *)
                Util.debugf ~section 4
@@ -2267,8 +2267,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
              assert (Unif.FO.equal ~subst (l, 1) (s, 0));
              Util.debugf ~section 3 "@[neg_reflect trying to eliminate@ @[%a=%a@]@ with @[%a@]@]"
                (fun k->k T.pp s T.pp t C.pp c');
-             if Unif.FO.equal ~subst (r, 1) (t, 0)
-             && C.trail_subsumes c' c
+             if C.trail_subsumes c' c && Unif.FO.equal ~subst (r, 1) (t, 0)
              then begin
                (* TODO: useless? *)
                let subst = Unif.FO.matching ~subst ~pattern:(r, 1) (t, 0) in

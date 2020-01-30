@@ -161,7 +161,6 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       (E.flex_get k_max_trail_size < 0 || 
         Trail.length (C.trail c) <= E.flex_get k_max_trail_size) in
 
-
     let res = if (should_split c) then simplify_split_ c else None in
     Util.exit_prof prof_splits;
     res

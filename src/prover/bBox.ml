@@ -139,13 +139,14 @@ let find_boolean_lit lits =
         assert (Lit.sign blit);
         (* assert (_check_variant lits lits'); *)
         Some blit
-      | _ -> None), sign
+      | _ -> None)
+  |> CCOpt.map (fun t -> Lit.apply_sign sign t), sign
 
 (* clause -> boolean lit *)
 let inject_lits_ lits  =
   let old_lit, sign = find_boolean_lit lits in
   begin match old_lit with
-    | Some t -> Lit.apply_sign sign t
+    | Some t -> t (* sign already applied*)
     | None ->
       (* build new literal *)
       let lits_copy = Array.copy lits in
