@@ -497,21 +497,52 @@ module Make(C : Clause_intf.S) = struct
             match l with
             | Literal.Equation(lhs,_,_) -> Type.is_fun (Term.ty lhs)
             | _ -> false) in
-      let all_in_pfho c = 
-        try 
-          C.Seq.terms c |> Iter.for_all Term.in_pfho_fragment
-        with _ -> false in
-      if has_lam_eq c || prefer_formulas c = 1 then 0
-      else if all_in_pfho c then 1
+      let in_pattern_fragment c =
+        (* returns has_lambdas, is_pattern *)
+        let rec aux t =
+          match Term.view t with
+          | App(hd, args) ->
+            if (Term.is_const hd) then aux_l args 
+            else (false, List.for_all Term.is_bvar args)
+            (*           ignoring distinctness *)
+          | AppBuiltin(_, args) -> aux_l args
+          | Const _ | Var _ | DB _-> (false, true)
+          | Fun _ ->
+            let _, body = Term.open_fun t in
+            (true, snd @@ aux body)
+        and aux_l args = 
+          CCList.fold_while (fun (has_lambda, is_pattern) arg ->
+            assert(is_pattern);
+            let h_l', i_p' = aux arg in
+            if i_p' then (h_l' || has_lambda, true), `Continue
+            else (false, false), `Stop
+          ) (false,true) args in
+      
+        C.Seq.terms c 
+        |> Iter.map aux
+        (* at least one subterm is functional and all subterms are patterns *)
+        |> (fun seq -> Iter.exists fst seq && Iter.for_all snd seq) in
+
+      if has_lam_eq c || in_pattern_fragment c then 0
+      else if prefer_formulas c == 1 then 1
       else 2
 
     let defer_formulas c =
       - (prefer_formulas c)
 
     let prefer_fo c =
+      let rec almost_fo t = 
+        (* allows partial application, formulas and unapplied HO variables *)
+        match Term.view t with
+        | App(hd, args) ->
+          Term.is_const hd && List.for_all almost_fo args
+        | AppBuiltin(_, args) -> List.for_all almost_fo args
+        | Const _ | Var _ -> true
+        | Fun _ | DB _ -> false in
+
       let all_terms = Iter.filter (fun t-> not (Term.is_true_or_false t)) (C.Seq.terms c) in
       let num_terms = float_of_int (Iter.length all_terms) in
-      let num_fo_terms = float_of_int (Iter.filter_count Term.is_true_or_false all_terms) in
+      let num_fo_terms = float_of_int (Iter.filter_count almost_fo all_terms) in
       int_of_float @@  (1.0 -. (num_fo_terms /. num_terms)) *. 100.0
 
     let defer_fo c = 

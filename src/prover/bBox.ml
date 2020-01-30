@@ -119,8 +119,8 @@ let save_ lit =
 let _check_variant lits lits' =
   Lits.matches lits lits' && Lits.matches lits' lits
 
-(* clause -> boolean lit *)
-let inject_lits_ lits  =
+
+let find_boolean_lit lits = 
   (* special case: one negative literal. *)
   let lits, sign = match lits with
     | [| lit0 |]
@@ -131,17 +131,19 @@ let inject_lits_ lits  =
     | _ -> lits, true
   in
   (* retrieve clause. the index doesn't matter for retrieval *)
-  let old_lit =
-    _retrieve_alpha_equiv lits
-    |> Iter.find_map
-      (function
-        | lits', Clause_component _, blit
-          when Lits.are_variant lits lits' ->
-          assert (Lit.sign blit);
-          (* assert (_check_variant lits lits'); *)
-          Some blit
-        | _ -> None)
-  in
+  _retrieve_alpha_equiv lits
+  |> Iter.find_map
+    (function
+      | lits', Clause_component _, blit
+        when Lits.are_variant lits lits' ->
+        assert (Lit.sign blit);
+        (* assert (_check_variant lits lits'); *)
+        Some blit
+      | _ -> None), sign
+
+(* clause -> boolean lit *)
+let inject_lits_ lits  =
+  let old_lit, sign = find_boolean_lit lits in
   begin match old_lit with
     | Some t -> Lit.apply_sign sign t
     | None ->

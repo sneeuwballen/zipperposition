@@ -27,6 +27,11 @@ val dummy : t
 
 val pp_payload : payload CCFormat.printer
 
+val find_boolean_lit : Literals.t -> (t option * bool)
+(** Find a boolean literal that abstracts given clause component and 
+    the new sign of the abstracted literal. If no boolean literal exists,
+    None will be the first component.  *)
+
 val inject_lits : Literals.t -> t
 (** Inject a clause into a boolean literal. No other clause will map
     to the same literal unless it is alpha-equivalent to this one.

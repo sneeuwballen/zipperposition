@@ -33,6 +33,10 @@ let k_avatar : (module S) Flex_state.key = Flex_state.create_key ()
 let k_show_lemmas : bool Flex_state.key = Flex_state.create_key()
 let k_simplify_trail : bool Flex_state.key = Flex_state.create_key()
 let k_back_simplify_trail : bool Flex_state.key = Flex_state.create_key()
+let k_abstract_known_singletons : bool Flex_state.key = Flex_state.create_key()
+let k_split_only_initial : bool Flex_state.key = Flex_state.create_key()
+let k_max_trail_size : int Flex_state.key = Flex_state.create_key()
+
 
 module Make(E : Env.S)(Sat : Sat_solver.S)
 = struct
@@ -89,16 +93,30 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     Lit.Set.iter (fun lit -> components := [lit] :: !components) !cluster_ground;
     UF.iter uf_vars (fun _ comp -> components := Lit.Set.to_list comp :: !components);
 
+    let proof =
+      Proof.Step.esa ~rule:(Proof.Rule.mk "split")
+        [Proof.Parent.from @@ C.proof c] in
+    let bool_guard =
+      C.trail c
+      |> Trail.to_list
+      |> List.map Trail.Lit.neg in
+
     begin match !components with
       | [] -> assert (Array.length lits=0); None
-      | [_] -> None
+      | [lits] ->
+        if E.flex_get k_abstract_known_singletons then (
+          let lits = Array.of_list lits in
+          let bool_name, _ = BBox.find_boolean_lit lits in
+          CCOpt.iter (fun bool_lit -> 
+            (* asserting Trail -> bool_name *)
+            Sat.add_clause ~proof (bool_lit :: bool_guard)
+          ) bool_name
+        );
+        None
       | _::_ ->
         (* do a simplification! *)
         Util.incr_stat stat_splits;
-        let proof =
-          Proof.Step.esa ~rule:(Proof.Rule.mk "split")
-            [Proof.Parent.from @@ C.proof c]
-        in
+        
         (* elements of the trail to keep *)
         let keep_trail =
           C.trail c |> Trail.filter BBox.must_be_kept
@@ -117,17 +135,13 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
             !components
         in
         let clauses, bool_clause = List.split clauses_and_names in
-        Util.debugf ~section 4 "@[split of @[%a@]@ yields @[%a@]@]"
+        Util.debugf ~section 1 "@[split of @[%a@]@ yields @[%a@]@]"
           (fun k->k C.pp c (Util.pp_list C.pp) clauses);
         (* add boolean constraint: trail(c) => bigor_{name in clauses} name *)
-        let bool_guard =
-          C.trail c
-          |> Trail.to_list
-          |> List.map Trail.Lit.neg
-        in
+        
         let bool_clause = List.append bool_clause bool_guard in
         Sat.add_clause ~proof bool_clause;
-        Util.debugf ~section 4 "@[constraint clause is @[%a@]@]"
+        Util.debugf ~section 1 "@[constraint clause is @[%a@]@]"
           (fun k->k BBox.pp_bclause bool_clause);
         (* return the clauses *)
         Some clauses
@@ -136,11 +150,19 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
   (* Avatar splitting *)
   let split c =
     Util.enter_prof prof_splits;
-    let res =
-      if Array.length (C.lits c) <= 1 || Literals.is_trivial (C.lits c)
-      then None
-      else simplify_split_ c
-    in
+
+    let should_split c = 
+      (not @@ Literals.is_trivial (C.lits c)) &&
+      (not @@ E.flex_get k_split_only_initial || C.proof_depth c == 0) &&
+      (not @@ E.flex_get k_abstract_known_singletons ||
+         Array.length (C.lits c) != 0) &&
+      (E.flex_get k_abstract_known_singletons ||
+         Array.length (C.lits c) >= 1) &&
+      (E.flex_get k_max_trail_size < 0 || 
+        Trail.length (C.trail c) <= E.flex_get k_max_trail_size) in
+
+
+    let res = if (should_split c) then simplify_split_ c else None in
     Util.exit_prof prof_splits;
     res
 
@@ -566,6 +588,11 @@ let enabled_ = ref true
 let show_lemmas_ = ref false
 let simplify_trail_ = ref true
 let back_simplify_trail_ = ref true
+let abstract_known_singletons = ref false
+let split_only_initial = ref false
+let max_trail_size = ref (-1)
+
+
 
 let extension =
   let action env =
@@ -578,6 +605,10 @@ let extension =
     E.flex_add k_show_lemmas !show_lemmas_;
     E.flex_add k_simplify_trail !simplify_trail_;
     E.flex_add k_back_simplify_trail !back_simplify_trail_;
+    E.flex_add k_abstract_known_singletons !abstract_known_singletons;
+    E.flex_add k_split_only_initial !split_only_initial;
+    E.flex_add k_max_trail_size !max_trail_size;
+
     Util.debug 1 "enable Avatar";
     A.register ~split:!enabled_ ()
   in
@@ -592,6 +623,14 @@ let () =
     ; "--no-avatar-simp-trail", Arg.Clear simplify_trail_, " do not simplify boolean trails in Avatar"
     ; "--avatar-backward-simp-trail", Arg.Set back_simplify_trail_, " backward-simplify boolean trails in Avatar"
     ; "--no-avatar-backward-simp-trail", Arg.Clear back_simplify_trail_, " do not backward-simplify boolean trails in Avatar"
+    ; "--abstract-known-singletons", Arg.Bool (fun b -> abstract_known_singletons :=  b), 
+      " if a clause C <- [|A1, ..., An|] cannot be split, but its component is " ^
+      " C is known, then add \\neg A1 \\lor ... \\lor \\neg An \\lor [| C |] to the " ^
+      " set of SAT clauses."
+    ; "--split-only-initial", Arg.Bool (fun b -> split_only_initial :=  b), " split only initial clauses"
+    ; "--max-trail-size", Arg.Int (fun v -> max_trail_size := v), 
+      " sets the limit of the trail size that a clause can have to be splittable. " ^
+      " Negative value sets the limit to infinity"
     ];
   Params.add_to_mode "ho-complete-basic" (fun () ->
       enabled_ := false
