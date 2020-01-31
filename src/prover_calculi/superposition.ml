@@ -2917,8 +2917,8 @@ let _solidification_limit = ref 5
 let _max_unifs_solid_ff = ref 20
 let _use_weight_for_solid_subsumption = ref false
 
-let _guard = ref 60
-let _ratio = ref 120
+let _guard = ref 100
+let _ratio = ref 100
 
 let key = Flex_state.create_key ()
 

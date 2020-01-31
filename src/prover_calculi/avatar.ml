@@ -157,7 +157,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       (not @@ E.flex_get k_abstract_known_singletons ||
          Array.length (C.lits c) != 0) &&
       (E.flex_get k_abstract_known_singletons ||
-         Array.length (C.lits c) >= 1) &&
+         Array.length (C.lits c) > 1) &&
       (E.flex_get k_max_trail_size < 0 || 
         Trail.length (C.trail c) <= E.flex_get k_max_trail_size) in
 
