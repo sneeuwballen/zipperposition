@@ -36,6 +36,7 @@ let k_back_simplify_trail : bool Flex_state.key = Flex_state.create_key()
 let k_abstract_known_singletons : bool Flex_state.key = Flex_state.create_key()
 let k_split_only_initial : bool Flex_state.key = Flex_state.create_key()
 let k_max_trail_size : int Flex_state.key = Flex_state.create_key()
+let k_infer_from_components : bool Flex_state.key = Flex_state.create_key()
 
 
 module Make(E : Env.S)(Sat : Sat_solver.S)
@@ -94,7 +95,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     UF.iter uf_vars (fun _ comp -> components := Lit.Set.to_list comp :: !components);
 
     let proof =
-      Proof.Step.esa ~rule:(Proof.Rule.mk "split")
+      Proof.Step.esa
         [Proof.Parent.from @@ C.proof c] in
     let bool_guard =
       C.trail c
@@ -106,10 +107,15 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       | [lits] ->
         if E.flex_get k_abstract_known_singletons then (
           let lits = Array.of_list lits in
-          let bool_name, _ = BBox.find_boolean_lit lits in
+          let bool_name = BBox.find_boolean_lit lits in
           CCOpt.iter (fun bool_lit -> 
             (* asserting Trail -> bool_name *)
-            Sat.add_clause ~proof (bool_lit :: bool_guard)
+            if List.for_all (fun bg -> 
+                BBox.Lit.equal (BBox.Lit.neg bg) bool_lit)
+               bool_guard then (
+            (* ignoring tautoligies *)
+            Sat.add_clause ~proof:(proof ~rule:(Proof.Rule.mk "recognize_known")) 
+              (bool_lit :: bool_guard));
           ) bool_name
         );
         None
@@ -130,7 +136,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
                  (fun k->k Literals.pp lits BBox.pp bool_name);
                (* new trail: add the new one *)
                let trail = Trail.add bool_name keep_trail in
-               let c = C.create_a ~trail ~penalty:(C.penalty c) lits proof in
+               let c = C.create_a ~trail ~penalty:(C.penalty c) lits (proof ~rule:(Proof.Rule.mk "split")) in
                c, bool_name)
             !components
         in
@@ -140,7 +146,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
         (* add boolean constraint: trail(c) => bigor_{name in clauses} name *)
         
         let bool_clause = List.append bool_clause bool_guard in
-        Sat.add_clause ~proof bool_clause;
+        Sat.add_clause ~proof:(proof ~rule:(Proof.Rule.mk "split")) bool_clause;
         Util.debugf ~section 1 "@[constraint clause is @[%a@]@]"
           (fun k->k BBox.pp_bclause bool_clause);
         (* return the clauses *)
@@ -182,7 +188,29 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
         (fun k->k C.pp c (C.id c) BBox.pp_bclause b_clause);
       Sat.add_clause ~proof:(C.proof_step c) b_clause;
     );
-    [] (* never infers anything! *)
+    if Array.length (C.lits c) = 0 &&
+       E.flex_get k_infer_from_components && 
+       Trail.length (C.trail c) = 1 then (
+      let bool_lit = List.hd (Trail.to_list (C.trail c)) in
+      let negate = if BBox.Lit.sign bool_lit then Lit.negate else CCFun.id in
+      match BBox.as_lits bool_lit with 
+      | Some lits ->
+        let skolemizer = 
+          Literals.vars lits
+          |> List.map (fun v -> 
+             (v, 0), (snd @@ Term.mk_fresh_skolem [] (HVar.ty v), 0))
+          |> Subst.FO.of_list' in
+        let lits' = 
+          Literals.apply_subst Subst.Renaming.none skolemizer (lits,0)
+          |> CCArray.to_list in
+        let proof = 
+          Proof.Step.inference ~rule:(Proof.Rule.mk "ground_avatar") [C.proof_parent c] in
+        List.map (fun lit ->
+          C.create ~penalty:(C.penalty c) ~trail:Trail.empty 
+            [negate lit] proof 
+        ) lits'
+      | None -> []
+    ) else [] (* never infers anything! *)
 
   (* check whether the trail is false and will remain so *)
   let trail_is_trivial_ (trail:Trail.t): bool =
@@ -590,7 +618,7 @@ let back_simplify_trail_ = ref true
 let abstract_known_singletons = ref false
 let split_only_initial = ref false
 let max_trail_size = ref (-1)
-
+let infer_from_components = ref false
 
 
 let extension =
@@ -607,6 +635,7 @@ let extension =
     E.flex_add k_abstract_known_singletons !abstract_known_singletons;
     E.flex_add k_split_only_initial !split_only_initial;
     E.flex_add k_max_trail_size !max_trail_size;
+    E.flex_add k_infer_from_components !infer_from_components;
 
     Util.debug 1 "enable Avatar";
     A.register ~split:!enabled_ ()
@@ -630,6 +659,9 @@ let () =
     ; "--max-trail-size", Arg.Int (fun v -> max_trail_size := v), 
       " sets the limit of the trail size that a clause can have to be splittable. " ^
       " Negative value sets the limit to infinity"
+    ; "--infer-from-components", Arg.Bool (fun b -> infer_from_components := b), 
+      " when empty clause \bot <- A is infered, if A has only one component,
+        skolemize and negate the component and add it to the proof state. "
     ];
   Params.add_to_mode "ho-complete-basic" (fun () ->
       enabled_ := false

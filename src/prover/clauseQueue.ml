@@ -530,6 +530,12 @@ module Make(C : Clause_intf.S) = struct
     let defer_formulas c =
       - (prefer_formulas c)
 
+    let prefer_short_trail c =
+      Trail.length (C.trail c)
+
+    let prefer_long_trail c =
+      - (Trail.length (C.trail c))
+
     let prefer_fo c =
       let rec almost_fo t = 
         (* allows partial application, formulas and unapplied HO variables *)
@@ -574,7 +580,9 @@ module Make(C : Clause_intf.S) = struct
        "prefer-ground", (fun _ -> prefer_ground);
        "defer-ground", (fun _ -> defer_ground);
        "defer-fo", (fun _ -> defer_fo);
-       "prefer-fo", (fun _ -> prefer_fo);]
+       "prefer-fo", (fun _ -> prefer_fo);
+       "prefer-short-trail", (fun _ -> prefer_short_trail);
+       "prefer-long-trail", (fun _ -> prefer_long_trail)]
 
     let of_string s = 
       try 

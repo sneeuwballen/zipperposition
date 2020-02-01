@@ -27,7 +27,7 @@ val dummy : t
 
 val pp_payload : payload CCFormat.printer
 
-val find_boolean_lit : Literals.t -> (t option * bool)
+val find_boolean_lit : Literals.t -> t option
 (** Find a boolean literal that abstracts given clause component and 
     the new sign of the abstracted literal. If no boolean literal exists,
     None will be the first component.  *)
@@ -57,6 +57,8 @@ val as_case : t -> inductive_case list option
 
 val as_lemma : t -> Cut_form.t option
 
+val as_lits : t -> Literals.t option
+
 val must_be_kept : t -> bool
 (** [must_be_kept lit] means that [lit] should survive in boolean splitting,
     that is, that if [C <- lit, Gamma] then any clause derived from [C]
@@ -64,6 +66,7 @@ val must_be_kept : t -> bool
 
 val is_lemma : t -> bool
 (** returns [true] if the bool literal represents a lemma *)
+
 
 val to_s_form : t -> TypedSTerm.Form.t
 

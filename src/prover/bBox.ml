@@ -120,16 +120,18 @@ let _check_variant lits lits' =
   Lits.matches lits lits' && Lits.matches lits' lits
 
 
+let negate_ground lits =
+  match lits with
+  | [| lit0 |]
+    when Literal.is_ground lit0 &&
+          Literal.is_neg lit0 &&
+          not (Literal.is_constraint lit0) ->
+    [| Literal.negate lits.(0) |], false
+  | _ -> lits, true 
+
 let find_boolean_lit lits = 
-  (* special case: one negative literal. *)
-  let lits, sign = match lits with
-    | [| lit0 |]
-      when Literal.is_ground lit0 &&
-           Literal.is_neg lit0 &&
-           not (Literal.is_constraint lit0) ->
-      [| Literal.negate lits.(0) |], false
-    | _ -> lits, true
-  in
+  (* special case, negative ground literal *)
+  let lits, sign = negate_ground lits in
   (* retrieve clause. the index doesn't matter for retrieval *)
   _retrieve_alpha_equiv lits
   |> Iter.find_map
@@ -140,15 +142,16 @@ let find_boolean_lit lits =
         (* assert (_check_variant lits lits'); *)
         Some blit
       | _ -> None)
-  |> CCOpt.map (fun t -> Lit.apply_sign sign t), sign
+  |> CCOpt.map (fun t -> Lit.apply_sign sign t)
 
 (* clause -> boolean lit *)
 let inject_lits_ lits  =
-  let old_lit, sign = find_boolean_lit lits in
+  let old_lit = find_boolean_lit lits in
   begin match old_lit with
     | Some t -> t (* sign already applied*)
     | None ->
       (* build new literal *)
+      let lits, sign = negate_ground lits in
       let lits_copy = Array.copy lits in
       let t = Lit.make (Clause_component lits_copy) in
       (* maintain mapping *)
@@ -211,6 +214,10 @@ let as_case lit = match Lit.payload (Lit.abs lit) with
 
 let as_lemma lit = match Lit.payload (Lit.abs lit) with
   | Lemma f -> Some f
+  | _ -> None
+
+let as_lits lit = match Lit.payload (Lit.abs lit) with
+  | Clause_component lits -> Some lits
   | _ -> None
 
 (* boolean lit -> payload *)
