@@ -113,9 +113,9 @@ module Make (P : PARAMETERS) = struct
           else new_args, rest in
 
         let sort_class =
-          List.sort (fun (l,r,_) (l', r',_) -> 
-            let l,l' = T.head_term @@ snd @@ T.open_fun l, T.head_term @@ snd @@ T.open_fun l' in
-            let r,r' = T.head_term @@ snd @@ T.open_fun r, T.head_term @@ snd @@ T.open_fun r' in
+          List.sort (fun (l,r,_) (l', r',_) ->
+            let l,l' = CCPair.map_same (fun t -> T.head_term @@ snd @@ T.open_fun t) (l,l') in
+            let r,r' = CCPair.map_same (fun t -> T.head_term @@ snd @@ T.open_fun t) (r,r') in
             if (not (Term.is_app l) || not (Term.is_app r)) &&
                (not (Term.is_app l') || not (Term.is_app r')) then 0
             else if not (Term.is_app l) || not (Term.is_app r) then -1
