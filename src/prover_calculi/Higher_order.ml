@@ -47,7 +47,6 @@ let k_ext_axiom_penalty = Flex_state.create_key ()
 let k_neg_cong_fun = Flex_state.create_key ()
 let k_instantiate_choice_ax = Flex_state.create_key ()
 let k_elim_leibniz_eq = Flex_state.create_key ()
-let k_unif_max_depth = Flex_state.create_key ()
 let k_prune_arg_fun = Flex_state.create_key ()
 let k_prim_enum_terms = Flex_state.create_key ()
 let k_simple_projection = Flex_state.create_key ()
@@ -1375,7 +1374,6 @@ let _var_solve = ref false
 let _neg_cong_fun = ref false
 let _instantiate_choice_ax = ref false
 let _elim_leibniz_eq = ref (-1)
-let _unif_max_depth = ref 11
 let _prune_arg_fun = ref `NoPrune
 let prim_enum_terms = ref Term.Set.empty
 let _oracle_composer = ref (OSeq.merge :> (Logtk.Subst.t option OSeq.t OSeq.t -> Logtk.Subst.t option OSeq.t))
@@ -1398,7 +1396,6 @@ let extension =
     E.flex_add k_neg_cong_fun !_neg_cong_fun;
     E.flex_add k_instantiate_choice_ax !_instantiate_choice_ax;
     E.flex_add k_elim_leibniz_eq !_elim_leibniz_eq;
-    E.flex_add k_unif_max_depth !_unif_max_depth;
     E.flex_add k_prune_arg_fun !_prune_arg_fun;
     E.flex_add k_prim_enum_terms prim_enum_terms;
     E.flex_add k_simple_projection !_simple_projection;
