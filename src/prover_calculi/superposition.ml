@@ -2916,6 +2916,7 @@ let _solid_decider = ref false
 let _solidification_limit = ref 5
 let _max_unifs_solid_ff = ref 20
 let _use_weight_for_solid_subsumption = ref false
+let _sort_constraints = ref false
 
 let _guard = ref 45
 let _ratio = ref 135
@@ -2979,6 +2980,7 @@ let register ~sup =
   E.flex_add PragUnifParams.k_solidification_limit !_solidification_limit;
   E.flex_add PragUnifParams.k_max_unifs_solid_ff !_max_unifs_solid_ff;
   E.flex_add PragUnifParams.k_use_weight_for_solid_subsumption !_use_weight_for_solid_subsumption;
+  E.flex_add PragUnifParams.k_sort_constraints !_sort_constraints;
 
   E.flex_add StreamQueue.k_guard !_guard;
   E.flex_add StreamQueue.k_ratio !_ratio;
@@ -3071,7 +3073,8 @@ let () =
       "--ho-fixpoint-decider", Arg.Bool (fun b -> _fixpoint_decider := b), "turn fixpoint decider on or off";
       "--max-inferences", Arg.Int (fun p -> _max_infs := p), " set maximal number of inferences";
       "--stream-queue-guard", Arg.Set_int _guard, "set value of guard for streamQueue";
-      "--stream-queue-ratio", Arg.Set_int _ratio, "set value of ratio for streamQueue"
+      "--stream-queue-ratio", Arg.Set_int _ratio, "set value of ratio for streamQueue";
+      "--ho-sort-constraints", Arg.Bool (fun b -> _sort_constraints := b), "sort constraints in unification algorithm by weight"
     ];
 
   Params.add_to_mode "ho-complete-basic" (fun () ->

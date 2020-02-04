@@ -100,40 +100,63 @@ module Make (P : PARAMETERS) = struct
   let do_unif problem subst mono unifscope =   
     let rec aux ~steps subst problem =
       let decompose args_l args_r rest flag =
-        let rec classify lx ly =
-          match lx, ly with
-          | [], [] -> ([],[],[],[])
-          | x::xs, y::ys ->
-            let is_rigid t = T.is_const t || T.is_bvar t in 
+        let rec zipped_with_flag = function 
+          | [], [] -> []
+          | x::xs, y::ys -> (x,y,flag) :: (zipped_with_flag (xs,ys))
+          | _, _ -> invalid_arg "lists must be of the same size." in
 
-            let rr,fr,pure_var,ff = classify xs ys in
-            let hd_x, args_x = T.as_app x in
-            let hd_y, args_y = T.as_app y in
-            if is_rigid hd_x && is_rigid hd_y then ((x,y,flag)::rr,fr,pure_var,ff)
-            else (
-              if T.is_var hd_x && T.is_var hd_y then (
-                if CCList.is_empty args_x || CCList.is_empty args_y then (
-                  (rr,fr,(x,y,flag)::pure_var,ff)
-                ) else (rr,fr,pure_var,(x,y,flag)::ff)
-              ) else (rr,(x,y,flag)::fr,pure_var,ff)
-            )
-          | _ -> invalid_arg "arguments have to be of the same size" in
-        let rigid_rigid, flex_rigid, pure_vars, flex_flex = classify args_l args_r in
-        if List.length rest > 10 then (
-          rigid_rigid @ rest @ flex_rigid @ pure_vars @ flex_flex)
-        else (
-          let rec decompose_rest = function 
-            | [] -> ([],[],[])
-            | ((l,r,_) as x) :: xs ->
-              let num_vars = if T.is_var (T.head_term l) then 1 else 0 
-                                                                     + if T.is_var (T.head_term r) then 1 else 0 in
-              let rr, fr, vars = decompose_rest xs in
-              if num_vars = 2 then (rr, fr, x :: vars)
-              else if num_vars = 1 then (rr, x::fr, vars)
-              else (x::rr, fr, vars) in
-          let rest_rr, rest_fr, rest_vars = decompose_rest rest in
-          rigid_rigid @ rest_rr @ rest_fr @ flex_rigid @ pure_vars @ rest_vars @ flex_flex
-        ) in
+        let new_args = zipped_with_flag (args_l,args_r) in
+        
+        let to_classify, rest = 
+          if List.length rest <= 15
+          then new_args@rest, []
+          else new_args, rest in
+
+        let sort_class =
+          List.sort (fun (l,r,_) (l', r',_) ->
+            let l,l' = CCPair.map_same (fun t -> T.head_term @@ snd @@ T.open_fun t) (l,l') in
+            let r,r' = CCPair.map_same (fun t -> T.head_term @@ snd @@ T.open_fun t) (r,r') in
+            if (not (Term.is_app l) || not (Term.is_app r)) &&
+               (not (Term.is_app l') || not (Term.is_app r')) then 0
+            else if not (Term.is_app l) || not (Term.is_app r) then -1
+            else if not (Term.is_app l') || not (Term.is_app r') then 1
+            else Term.ho_weight l + Term.ho_weight r - 
+                 Term.ho_weight l' - Term.ho_weight r'
+          ) in
+        
+        let classify_one s =
+          let rec follow_bindings t =
+            let hd = T.head_term @@ snd @@ (T.open_fun t) in
+            let derefed,_ = Subst.FO.deref subst (hd, unifscope) in
+            if T.equal hd derefed then hd
+            else follow_bindings derefed in
+          
+          let hd = follow_bindings s in
+          
+          if T.is_const hd then `Const
+          else if T.is_var hd then `Var
+          (* when it is bound variable, we do not know what will 
+             happen when it is reduced *)
+          else `Unknown in
+
+
+        (* classifies the pairs as (rigid-rigid, flex-rigid, and flex-flex *)
+        let rec classify = function 
+        | ((lhs,rhs,flag) as cstr) :: xs ->
+          let rr,fr,unsure,ff = classify xs in
+          begin match classify_one lhs, classify_one rhs with 
+          | `Const, `Const -> cstr::rr,fr,unsure,ff
+          | _, `Const  | `Const, _ -> rr, cstr::fr, unsure, ff
+          | _, `Unknown | `Unknown, _ -> rr, fr, cstr::unsure, ff
+          | `Var, `Var -> rr,fr,unsure, cstr::ff end
+        | [] -> ([],[],[],[]) in
+
+        let rr,fr,unsure,ff = classify to_classify in
+        if Flex_state.get_exn PragUnifParams.k_sort_constraints P.flex_state then
+          sort_class rr @ sort_class fr @ sort_class unsure @ rest @ sort_class ff
+        else rr @ fr @ unsure @ rest @ ff in
+
+
 
       let decompose_and_cont ?(inc_step=0) args_l args_r rest flag subst =
         let new_prob = decompose args_l args_r rest flag in
