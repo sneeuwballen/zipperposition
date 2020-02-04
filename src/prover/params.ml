@@ -95,7 +95,7 @@ let parse_args () =
   (* options list *)
   let options = (
     [ "--mode", mode_spec (), " mode"
-    ; "--ord", Arg.Set_string ord, " choose ordering (rpo,kbo)"
+    ; "--ord", Arg.Symbol (Ordering.names(), (:=) ord), " choose term ordering"
     ; "--version", Arg.Set version, " print version"
     ; "--steps", Arg.Set_int steps,
       " maximal number of steps of given clause loop (no limit if negative)"
