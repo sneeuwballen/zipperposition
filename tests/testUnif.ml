@@ -603,8 +603,7 @@ let reg_matching1 = "regression matching", `Quick, fun () ->
 let test_jp_unif_aux = "JP unification", `Quick, fun () ->
   Util.set_debug 1; Printexc.record_backtrace true;
 
-  (** Find disagreement tests *)
-  
+  (** Find disagreement tests *)  
   let test_disagree =
     Alcotest.testable
       Fmt.Dump.(option (pair (pair T.ZF.pp T.ZF.pp) (list @@ pair HVar.pp int)))
@@ -629,7 +628,6 @@ let test_jp_unif_aux = "JP unification", `Quick, fun () ->
             pterm "a"), []));
 
   (** Rule tests *)
-
   let test_rule =
     Alcotest.testable Fmt.Dump.(list T.ZF.pp) CCEqual.(list T.equal)
   in
@@ -674,8 +672,9 @@ let test_jp_unif_aux = "JP unification", `Quick, fun () ->
 
 let suite_unif2 = [ reg_matching1; test_jp_unif_aux ]
 
-let suite = suite_unif1 @ suite_unif2 @ suite_jp_unif
-
+let suite = 
+  (* suite_unif1 @ suite_unif2 @ suite_jp_unif *)
+  []
 
 (** {2 Properties} *)
 
