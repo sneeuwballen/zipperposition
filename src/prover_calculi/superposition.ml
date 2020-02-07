@@ -2284,7 +2284,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     then (
       (* no literal removed *)
       Util.exit_prof prof_neg_simplify_reflect;
-      Util.debug ~section 3 "@[neg_reflect did not simplify the clause @]";
+      Util.debug ~section 3 "neg_reflect did not simplify the clause";
       SimplM.return_same c
     ) else (
       let proof =
