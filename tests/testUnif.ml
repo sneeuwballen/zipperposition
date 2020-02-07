@@ -628,7 +628,7 @@ let test_jp_unif_aux = "JP unification", `Quick, fun () ->
     (Some ((T.bvar ~ty:(Type.Conv.of_simple_term_exn (Type.Conv.create ()) (psterm "term")) 0,
             pterm "a"), []));
 
-  (** Rule tests *)
+  (* Rule tests *)
 
   let test_rule =
     Alcotest.testable Fmt.Dump.(list T.ZF.pp) CCEqual.(list T.equal)
