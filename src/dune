@@ -3,3 +3,9 @@
   (_ (ocamlopt_flags :standard -no-assert -O3 -unbox-closures -unbox-closures-factor 20))
 )
 
+(alias
+ (name    runtest)
+ (package zipperposition)
+ (deps    %{bin:zipperposition.exe} Makefile (source_tree ../examples/))
+ (action  (run ./test_must_pass.sh %{bin:zipperposition.exe})))
+

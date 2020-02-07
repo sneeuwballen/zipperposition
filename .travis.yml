@@ -13,5 +13,4 @@ env:
   - OCAML_VERSION="4.05"
   - OCAML_VERSION="4.06"
   - OCAML_VERSION="4.08"
-    POST_INSTALL_HOOK="make test-must-pass"
   - OCAML_VERSION="4.09"

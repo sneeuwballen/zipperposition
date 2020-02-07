@@ -22,13 +22,6 @@ test: test-dune test-must-pass
 test-dune:
 	@dune runtest --no-buffer -f $(DUNE_OPTS)
 
-test-must-pass:
-	@for i in ` cat examples/must_pass.txt ` ; do \
-	  echo "must pass: $$i"; \
-		(./zipperposition.exe $$i -t 5 -o none | grep "SZS status Theorem" > /dev/null) \
-		  || (echo "must-pass failed on $$i" && exit 1) ; \
-	  done
-
 uninstall:
 	@ocamlfind remove zipperposition libzipperposition logtk || true
 
