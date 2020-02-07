@@ -1,0 +1,4 @@
+examples/frontpage.zf
+examples/ac.zf
+examples/ARI114=1.p
+examples/pelletier_problems/pb34.zf
