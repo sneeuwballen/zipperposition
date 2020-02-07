@@ -39,6 +39,7 @@ test-unit:
 
 test-list:
 	@./tests/run_tests.sh list
+	@echo "NOTE: "
 	@echo "to run a particular test: ./tests/run_tests.sh -only-test <path>"
 
 INTERFACE_FILES = $(shell find src -name '*.mli')
