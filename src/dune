@@ -1,5 +1,5 @@
 (env
-  (_ (flags :standard -warn-error -3 -color always -safe-string))
+  (_ (flags :standard -warn-error -3 -w -3 -color always -safe-string))
   (_ (ocamlopt_flags :standard -no-assert -O3 -unbox-closures -unbox-closures-factor 20))
 )
 
