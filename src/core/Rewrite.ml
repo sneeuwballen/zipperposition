@@ -898,7 +898,7 @@ module Defined_cst = struct
       Type.apply c_ty (List.map Type.var ty_vars)
       |> Type.open_poly_fun
     in
-    let x = HVar.make ~ty:ty_x 0 in
+    let x = HVar.make ~ty:ty_x n_ty_vars in
     let args =
       List.map
         (fun proj ->
@@ -921,7 +921,7 @@ module Defined_cst = struct
           let rule = mk_rule_cstor_ c proof in
           Util.debugf ~section 3 "(@[declare-cstor %a@ :rule %a@])"
             (fun k->k ID.pp c_id Rule.pp rule);
-          ignore (declare ?level:None c_id (Rule_set.singleton rule))
+          ignore (declare ?level:None c_id (Rule_set.singleton rule) : t)
       end
     )
 end
