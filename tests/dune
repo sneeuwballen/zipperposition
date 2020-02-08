@@ -6,6 +6,7 @@
 
 (alias
  (name    runtest)
+ (package logtk)
  (deps    run_tests.exe)
  (action  (run %{deps})))
 
