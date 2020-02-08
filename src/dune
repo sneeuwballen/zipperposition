@@ -6,6 +6,6 @@
 (alias
  (name    runtest)
  (package zipperposition)
- (deps    %{bin:zipperposition.exe} Makefile (source_tree ../examples/))
- (action  (run ./test_must_pass.sh %{bin:zipperposition.exe})))
+ (deps    main/zipperposition.exe test_must_pass.sh (source_tree ../examples/))
+ (action  (run ./test_must_pass.sh ./main/zipperposition.exe)))
 
