@@ -7,6 +7,7 @@ synopsis: "A fully automatic theorem prover for typed higher-order and beyond"
 build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "build" "@doc" "-p" name "-j" jobs] {with-doc}
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
 depends: [
   "base-unix"
