@@ -37,20 +37,20 @@ let stat_arith_demod_ineq_steps = Util.mk_stat "int.demod_ineq.steps"
 let stat_arith_reflexivity_resolution = Util.mk_stat "int.reflexivity_resolution"
 *)
 
-let prof_arith_sup = Util.mk_profiler "int.superposition"
-let prof_arith_cancellation = Util.mk_profiler "int.arith_cancellation"
-let prof_arith_eq_factoring = Util.mk_profiler "int.eq_factoring"
-let prof_arith_ineq_chaining = Util.mk_profiler "int.ineq_chaining"
-let prof_arith_demod = Util.mk_profiler "int.demod"
-let prof_arith_backward_demod = Util.mk_profiler "int.backward_demod"
-let prof_arith_semantic_tautology = Util.mk_profiler "int.semantic_tauto"
-let prof_arith_ineq_factoring = Util.mk_profiler "int.ineq_factoring"
-let prof_arith_div_chaining = Util.mk_profiler "int.div_chaining"
-let prof_arith_divisibility = Util.mk_profiler "int.divisibility"
-let prof_arith_trivial_ineq = Util.mk_profiler "int.redundant_by_ineq"
-let prof_arith_demod_ineq = Util.mk_profiler "int.demod_ineq"
+let prof_arith_sup = ZProf.make "int.superposition"
+let prof_arith_cancellation = ZProf.make "int.arith_cancellation"
+let prof_arith_eq_factoring = ZProf.make "int.eq_factoring"
+let prof_arith_ineq_chaining = ZProf.make "int.ineq_chaining"
+let prof_arith_demod = ZProf.make "int.demod"
+let prof_arith_backward_demod = ZProf.make "int.backward_demod"
+let prof_arith_semantic_tautology = ZProf.make "int.semantic_tauto"
+let prof_arith_ineq_factoring = ZProf.make "int.ineq_factoring"
+let prof_arith_div_chaining = ZProf.make "int.div_chaining"
+let prof_arith_divisibility = ZProf.make "int.divisibility"
+let prof_arith_trivial_ineq = ZProf.make "int.redundant_by_ineq"
+let prof_arith_demod_ineq = ZProf.make "int.demod_ineq"
 (*
-let prof_arith_reflexivity_resolution = Util.mk_profiler "int.reflexivity_resolution"
+let prof_arith_reflexivity_resolution = ZProf.make "int.reflexivity_resolution"
 *)
 
 let section = Util.Section.make ~parent:Const.section "int-arith"
@@ -352,7 +352,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     )
 
   let canc_sup_active c =
-    Util.enter_prof prof_arith_sup;
+    ZProf.enter_prof prof_arith_sup;
     let ord = Ctx.ord () in
     let eligible = C.Eligible.(pos ** max c ** filter Lit.is_arith_eq) in
     let sc_a = 0 and sc_p = 1 in
@@ -387,11 +387,11 @@ module Make(E : Env.S) : S with module Env = E = struct
              acc)
         []
     in
-    Util.exit_prof prof_arith_sup;
+    ZProf.exit_prof prof_arith_sup;
     res
 
   let canc_sup_passive c =
-    Util.enter_prof prof_arith_sup;
+    ZProf.enter_prof prof_arith_sup;
     let ord = Ctx.ord () in
     let eligible = C.Eligible.(max c ** arith) in
     let sc_a = 0 and sc_p = 1 in
@@ -426,7 +426,7 @@ module Make(E : Env.S) : S with module Env = E = struct
              acc)
         []
     in
-    Util.exit_prof prof_arith_sup;
+    ZProf.exit_prof prof_arith_sup;
     res
 
   exception SimplifyInto of AL.t * C.t * S.t
@@ -525,7 +525,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* demodulation (simplification) *)
   let _demodulation c =
-    Util.enter_prof prof_arith_demod;
+    ZProf.enter_prof prof_arith_demod;
     let did_simplify = ref false in
     let lits = ref [] in  (* simplified literals *)
     let add_lit l = lits := l :: !lits in
@@ -570,7 +570,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       ) else
         SimplM.return_same c
     in
-    Util.exit_prof prof_arith_demod;
+    ZProf.exit_prof prof_arith_demod;
     res
 
   let canc_demodulation c = _demodulation c
@@ -578,7 +578,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* find clauses in which some literal could be rewritten by [c], iff
      [c] is a positive unit arith clause *)
   let canc_backward_demodulation c =
-    Util.enter_prof prof_arith_backward_demod;
+    ZProf.enter_prof prof_arith_backward_demod;
     let ord = Ctx.ord () in
     let res = C.ClauseSet.empty in
     let res = match C.lits c with
@@ -607,11 +607,11 @@ module Make(E : Env.S) : S with module Env = E = struct
         res (* TODO *)
       | _ -> res (* no demod *)
     in
-    Util.exit_prof prof_arith_backward_demod;
+    ZProf.exit_prof prof_arith_backward_demod;
     res
 
   let cancellation c =
-    Util.enter_prof prof_arith_cancellation;
+    ZProf.enter_prof prof_arith_cancellation;
     let ord = Ctx.ord () in
     let eligible = C.Eligible.(max c ** arith) in
     let res =
@@ -693,13 +693,13 @@ module Make(E : Env.S) : S with module Env = E = struct
                acc)
         []
     in
-    Util.exit_prof prof_arith_cancellation;
+    ZProf.exit_prof prof_arith_cancellation;
     res
 
   let rule_canc_eq_fact = Proof.Rule.mk "arith_eq_factoring"
 
   let canc_equality_factoring c =
-    Util.enter_prof prof_arith_eq_factoring;
+    ZProf.enter_prof prof_arith_eq_factoring;
     let ord = Ctx.ord () in
     let eligible = C.Eligible.(max c ** filter Lit.is_arith_eq) in
     let res =
@@ -772,7 +772,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                   acc)
              acc)
         []
-    in Util.exit_prof prof_arith_eq_factoring;
+    in ZProf.exit_prof prof_arith_eq_factoring;
     res
 
   (** Data necessary to fully describe a chaining inference.
@@ -894,7 +894,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       acc
 
   let canc_ineq_chaining c =
-    Util.enter_prof prof_arith_ineq_chaining;
+    ZProf.enter_prof prof_arith_ineq_chaining;
     let ord = Ctx.ord () in
     let eligible = C.Eligible.(max c ** filter Lit.is_arith_lesseq) in
     let sc_l = 0 and sc_r = 1 in
@@ -949,12 +949,12 @@ module Make(E : Env.S) : S with module Env = E = struct
            | _ -> assert false)
         []
     in
-    Util.exit_prof prof_arith_ineq_chaining;
+    ZProf.exit_prof prof_arith_ineq_chaining;
     res
 
   (* TODO: update with equality case, check that signs correct *)
   let canc_ineq_factoring c =
-    Util.enter_prof prof_arith_ineq_factoring;
+    ZProf.enter_prof prof_arith_ineq_factoring;
     let ord = Ctx.ord () in
     let acc = ref [] in
     (* do the factoring if ordering conditions are ok *)
@@ -1043,7 +1043,7 @@ module Make(E : Env.S) : S with module Env = E = struct
               | _ -> assert false
            )
       );
-    Util.exit_prof prof_arith_ineq_factoring;
+    ZProf.exit_prof prof_arith_ineq_factoring;
     !acc
 
   (** One-shot literal/clause removal.
@@ -1161,7 +1161,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     | _ -> None
 
   let is_redundant_by_ineq c =
-    Util.enter_prof prof_arith_trivial_ineq;
+    ZProf.enter_prof prof_arith_trivial_ineq;
     let res =
       CCArray.exists
         (fun lit -> match _ineq_is_redundant_by_unit c lit with
@@ -1174,7 +1174,7 @@ module Make(E : Env.S) : S with module Env = E = struct
              true)
         (C.lits c)
     in
-    Util.exit_prof prof_arith_trivial_ineq;
+    ZProf.exit_prof prof_arith_trivial_ineq;
     res
 
   (* allow traces of depth at most 3 *)
@@ -1289,7 +1289,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* demodulate using inequalities *)
   let demod_ineq c : C.t SimplM.t =
-    Util.enter_prof prof_arith_demod_ineq;
+    ZProf.enter_prof prof_arith_demod_ineq;
     let res =
       CCArray.findi
         (fun i lit -> match _ineq_is_absurd_by_unit c lit with
@@ -1313,14 +1313,14 @@ module Make(E : Env.S) : S with module Env = E = struct
         let c' = C.create lits proof ~penalty:(C.penalty c) ~trail:(C.trail c) in
         SimplM.return_new c'
     in
-    Util.exit_prof prof_arith_demod_ineq;
+    ZProf.exit_prof prof_arith_demod_ineq;
     res
 
   (** {3 Divisibility} *)
 
   let canc_div_chaining c =
     let ord = Ctx.ord () in
-    Util.enter_prof prof_arith_div_chaining;
+    ZProf.enter_prof prof_arith_div_chaining;
     let eligible = C.Eligible.(max c ** filter Lit.is_arith_divides) in
     let sc1 = 0 and sc2 = 1 in
     (* do the inference (if ordering conditions are ok) *)
@@ -1411,7 +1411,7 @@ module Make(E : Env.S) : S with module Env = E = struct
            | _ -> acc)
         []
     in
-    Util.exit_prof prof_arith_div_chaining;
+    ZProf.exit_prof prof_arith_div_chaining;
     res
 
   exception ReplaceLitByLitsInSameClause of int * Lit.t list
@@ -1550,7 +1550,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       Some clauses
 
   let canc_divisibility c =
-    Util.enter_prof prof_arith_divisibility;
+    ZProf.enter_prof prof_arith_divisibility;
     (* inference on 1/ positive eq  2/ positive divisibility *)
     let eligible = C.Eligible.(max c **
                                (filter Lit.is_arith_eq ++ (pos ** filter Lit.is_arith_divides))) in
@@ -1621,7 +1621,7 @@ module Make(E : Env.S) : S with module Env = E = struct
              acc)
         []
     in
-    Util.exit_prof prof_arith_divisibility;
+    ZProf.exit_prof prof_arith_divisibility;
     res
 
   (* regular literal ----> arith literal, sometimes *)
@@ -1675,7 +1675,7 @@ module Make(E : Env.S) : S with module Env = E = struct
      it's unsat in Q, it's unsat in Z, and its negation (a subset of c)
      is tautological *)
   let _is_tautology c =
-    Util.enter_prof prof_arith_semantic_tautology;
+    ZProf.enter_prof prof_arith_semantic_tautology;
     (* convert a monome into a rational monome + Q constant *)
     let to_rat m =
       let const = Q.of_bigint (M.const m) in
@@ -1700,7 +1700,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         []
     in
     let simplex = Simp.add_constraints Simp.empty constraints in
-    Util.exit_prof prof_arith_semantic_tautology;
+    ZProf.exit_prof prof_arith_semantic_tautology;
     match Simp.ksolve simplex with
     | Simp.Unsatisfiable _ -> true (* negation unsatisfiable *)
     | Simp.Solution _ -> false

@@ -14,8 +14,8 @@ module Stmt = Statement
 
 type term = T.t
 
-let prof_detect = Util.mk_profiler "enum_types.detect"
-let prof_instantiate = Util.mk_profiler "enum_types.instantiate_vars"
+let prof_detect = ZProf.make "enum_types.detect"
+let prof_instantiate = ZProf.make "enum_types.instantiate_vars"
 
 let stat_declare = Util.mk_stat "enum_types.declare"
 let stat_simplify = Util.mk_stat "enum_types.simplify"
@@ -243,7 +243,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         _check_all_vars ~ty:(T.ty r) ~var [l] lits
       | _ -> None
 
-  let detect_declaration c = Util.with_prof prof_detect detect_decl_ c
+  let detect_declaration c = ZProf.with_prof prof_detect detect_decl_ c
 
   (* retrieve variables that are directly under a positive equation *)
   let vars_under_eq_ lits =
@@ -348,7 +348,7 @@ module Make(E : Env.S) : S with module Env = E = struct
            Some l)
       vars
 
-  let instantiate_vars c = Util.with_prof prof_instantiate instantiate_vars_ c
+  let instantiate_vars c = ZProf.with_prof prof_instantiate instantiate_vars_ c
 
   let instantiate_axiom_ ~ty_s s poly_args decl =
     if ID.Set.mem s decl.decl_symbols

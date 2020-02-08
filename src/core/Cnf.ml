@@ -8,12 +8,12 @@ module F = T.Form
 module Stmt = Statement
 module Fmt = CCFormat
 
-let prof_estimate = Util.mk_profiler "cnf.estimate_num_clauses"
-let prof_simplify_rename = Util.mk_profiler "cnf.simplify_rename"
-let prof_flatten = Util.mk_profiler "cnf.flatten"
-let prof_to_cnf = Util.mk_profiler "cnf.distribute"
-let prof_miniscope = Util.mk_profiler "cnf.miniscope"
-let prof_skolemize = Util.mk_profiler "cnf.skolemize"
+let prof_estimate = ZProf.make "cnf.estimate_num_clauses"
+let prof_simplify_rename = ZProf.make "cnf.simplify_rename"
+let prof_flatten = ZProf.make "cnf.flatten"
+let prof_to_cnf = ZProf.make "cnf.distribute"
+let prof_miniscope = ZProf.make "cnf.miniscope"
+let prof_skolemize = ZProf.make "cnf.skolemize"
 
 let section = Util.Section.make "cnf"
 
@@ -448,7 +448,7 @@ end
 
 (* miniscoping (push quantifiers as deep as possible in the formula) *)
 let miniscope ?(distribute_exists=false) f =
-  Util.enter_prof prof_miniscope;
+  ZProf.enter_prof prof_miniscope;
   (* recursive miniscoping *)
   let rec miniscope f = match F.view f with
     | F.Forall (var, f') ->
@@ -496,7 +496,7 @@ let miniscope ?(distribute_exists=false) f =
     | F.Atom _ -> f
   in
   let res = miniscope f in
-  Util.exit_prof prof_miniscope;
+  ZProf.exit_prof prof_miniscope;
   res
 
 (* negation normal form (also remove equivalence and implications). *)
@@ -547,7 +547,7 @@ let rec nnf f =
   | F.Exists (var,f') -> F.exists var (nnf f')
 
 let skolemize ~ctx f =
-  Util.enter_prof prof_skolemize;
+  ZProf.enter_prof prof_skolemize;
   let rec skolemize subst f = match F.view f with
     | F.And l -> F.and_ (List.map (skolemize subst) l)
     | F.Or l -> F.or_ (List.map (skolemize subst) l)
@@ -575,7 +575,7 @@ let skolemize ~ctx f =
       skolemize subst f'
   in
   let res = skolemize f in
-  Util.exit_prof prof_skolemize;
+  ZProf.exit_prof prof_skolemize;
   res
 
 (* For the following, we use "handbook of automated reasoning",
@@ -618,7 +618,7 @@ end
 
 (* estimate the number of clauses needed by this formula. *)
 let estimate_num_clauses ~pos f =
-  Util.enter_prof prof_estimate;
+  ZProf.enter_prof prof_estimate;
   let module E = Estimation in
   (* recursive function.
      @param pos true if the formula is positive, false if it's negated *)
@@ -654,7 +654,7 @@ let estimate_num_clauses ~pos f =
     | x :: tail -> E.(num pos x */ prod_list pos tail)
   in
   let n = num pos f in
-  Util.exit_prof prof_estimate;
+  ZProf.exit_prof prof_estimate;
   n
 
 (* atomic formula, or forall/exists/not an atomic formula (1 literal) *)
@@ -839,9 +839,9 @@ let rec to_cnf_rec f = match F.view f with
       T.pp f
 
 let to_cnf f =
-  Util.enter_prof prof_to_cnf;
+  ZProf.enter_prof prof_to_cnf;
   let res = to_cnf_rec f in
-  Util.exit_prof prof_to_cnf;
+  ZProf.exit_prof prof_to_cnf;
   res
 
 type options =
@@ -967,7 +967,7 @@ let is_rw stmt = match Stmt.view stmt with
 
 (* simplify formulas and rename them. May introduce new formulas *)
 let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
-  Util.enter_prof prof_simplify_rename;
+  ZProf.enter_prof prof_simplify_rename;
   (* process a formula *)
   let process_form ~is_goal stmt f =
     Util.debugf ~section 2 "@[<2>simplify and rename@ `@[%a@]`@]" (fun k->k T.pp f);
@@ -1070,7 +1070,7 @@ let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
       )
     |> CCVector.of_seq ?init:None
   in
-  Util.exit_prof prof_simplify_rename;
+  ZProf.exit_prof prof_simplify_rename;
   res
 
 type f_statement = (term, term, type_) Statement.t

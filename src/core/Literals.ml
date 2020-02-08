@@ -12,7 +12,7 @@ type term = Term.t
 
 type t = Literal.t array
 
-let prof_maxlits = Util.mk_profiler "lits.maxlits"
+let prof_maxlits = ZProf.make "lits.maxlits"
 
 let equal lits1 lits2 =
   let rec check i =
@@ -132,24 +132,24 @@ let _to_multiset_with_idx lits =
 
 (* TODO: optimize! quite a bottleneck on pb47.p with NoSelection *)
 let maxlits_l ~ord lits =
-  Util.enter_prof prof_maxlits;
+  ZProf.enter_prof prof_maxlits;
   let m = _to_multiset_with_idx lits in
   let max = MLI.max_seq (_compare_lit_with_idx ~ord) m
             |> Iter.map fst
             |> Iter.to_list
   in
-  Util.exit_prof prof_maxlits;
+  ZProf.exit_prof prof_maxlits;
   max
 
 let maxlits ~ord lits =
-  Util.enter_prof prof_maxlits;
+  ZProf.enter_prof prof_maxlits;
   let m = _to_multiset_with_idx lits in
   let max = MLI.max_seq (_compare_lit_with_idx ~ord) m
             |> Iter.map (fun (x,_) -> snd x)
             |> Iter.to_list
             |> BV.of_list
   in
-  Util.exit_prof prof_maxlits;
+  ZProf.exit_prof prof_maxlits;
   max
 
 let is_max ~ord lits =

@@ -10,7 +10,7 @@ module US = Unif_subst
 let stat_unif_calls = Util.mk_stat "ho_unif.calls"
 let stat_unif_steps = Util.mk_stat "ho_unif.steps"
 
-let prof_norm_subst = Util.mk_profiler "ho_unif.norm_subst"
+let prof_norm_subst = ZProf.make "ho_unif.norm_subst"
 
 let section = Util.Section.make "ho_unif"
 
@@ -611,7 +611,7 @@ module U = struct
 
   let norm_subst offset sc us =
     if !enable_norm_subst
-    then Util.with_prof prof_norm_subst (norm_subst_ offset sc us) ()
+    then ZProf.with_prof prof_norm_subst (norm_subst_ offset sc us) ()
     else us
 
   let apply_subst pairs us =

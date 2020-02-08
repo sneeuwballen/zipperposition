@@ -17,8 +17,8 @@ type 'a sequence = ('a -> unit) -> unit
 
 let section = Util.Section.make "unif"
 
-let prof_unify = Util.mk_profiler "unify"
-let prof_matching = Util.mk_profiler "matching"
+let prof_unify = ZProf.make "unify"
+let prof_matching = ZProf.make "matching"
 
 let fail () = raise Fail
 
@@ -927,7 +927,7 @@ module Inner = struct
     with Fail -> false
 
   let unify_full ?(subst=US.empty) a b : unif_subst =
-    Util.with_prof prof_unify
+    ZProf.with_prof prof_unify
       (fun () -> unif_rec ~root:true ~op:O_unify ~bvars:B_vars.empty subst a b) ()
 
   let unify_syn ?(subst=Subst.empty) a b : Subst.t =
@@ -940,7 +940,7 @@ module Inner = struct
   let matching ?(subst=Subst.empty) ~pattern b =
     if Scoped.same_scope pattern b then invalid_arg "Unif.matching: same scopes";
     let scope = Scoped.scope b in
-    Util.with_prof prof_matching
+    ZProf.with_prof prof_matching
       (fun () ->
          let subst = US.of_subst subst in
          let subst =
@@ -957,7 +957,7 @@ module Inner = struct
        free variables of [b] *)
     let protect = Iter.append protect (T.Seq.vars b) in
     let blocked = T.VarSet.of_seq protect in
-    Util.with_prof prof_matching
+    ZProf.with_prof prof_matching
       (fun () ->
          let subst = US.of_subst subst in
          let subst =

@@ -15,9 +15,9 @@ type 'a printer = Format.formatter -> 'a -> unit
 let section = Util.Section.make ~parent:Const.section "avatar"
 (** {2 Avatar} *)
 
-let prof_splits = Util.mk_profiler "avatar.split"
-let prof_check = Util.mk_profiler "avatar.check"
-let prof_simp_trail = Util.mk_profiler "avatar.simp_trail"
+let prof_splits = ZProf.make "avatar.split"
+let prof_check = ZProf.make "avatar.check"
+let prof_simp_trail = ZProf.make "avatar.simp_trail"
 
 let stat_splits = Util.mk_stat "avatar.splits"
 let stat_trail_trivial = Util.mk_stat "avatar.trivial_trail"
@@ -135,13 +135,13 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
 
   (* Avatar splitting *)
   let split c =
-    Util.enter_prof prof_splits;
+    ZProf.enter_prof prof_splits;
     let res =
       if Array.length (C.lits c) <= 1 || Literals.is_trivial (C.lits c)
       then None
       else simplify_split_ c
     in
-    Util.exit_prof prof_splits;
+    ZProf.exit_prof prof_splits;
     res
 
   let filter_absurd_trails_ = ref (fun _ -> true)
@@ -221,7 +221,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     with Trail_is_trivial ->
       Tr_trivial
 
-  let simplify_opt trail = Util.with_prof prof_simp_trail simplify_opt_ trail
+  let simplify_opt trail = ZProf.with_prof prof_simp_trail simplify_opt_ trail
 
   (* simplify the trail of [c] using boolean literals that have been proven *)
   let simplify_trail_ c =
@@ -518,7 +518,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
 
   (* Just check the solver *)
   let check_satisfiability ~full () =
-    Util.enter_prof prof_check;
+    ZProf.enter_prof prof_check;
     Signal.send before_check_sat ();
     let res = match Sat.check ~full ()  with
       | Sat_solver.Sat ->
@@ -531,7 +531,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
         [c]
     in
     Signal.send after_check_sat ();
-    Util.exit_prof prof_check;
+    ZProf.exit_prof prof_check;
     res
 
   let register ~split:do_split () =

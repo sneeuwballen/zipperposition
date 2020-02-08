@@ -31,9 +31,9 @@ let stat_neg_ext = Util.mk_stat "ho.neg_ext_success"
 let stat_neg_cong_fun = Util.mk_stat "ho.neg_cong_fun_success"
 
 
-let prof_eq_res = Util.mk_profiler "ho.eq_res"
-let prof_eq_res_syn = Util.mk_profiler "ho.eq_res_syntactic"
-let prof_ho_unif = Util.mk_profiler "ho.unif"
+let prof_eq_res = ZProf.make "ho.eq_res"
+let prof_eq_res_syn = ZProf.make "ho.eq_res_syntactic"
+let prof_ho_unif = ZProf.make "ho.unif"
 
 let k_ext_pos = Flex_state.create_key ()
 let k_ext_pos_all_lits = Flex_state.create_key ()
@@ -857,9 +857,9 @@ module Make(E : Env.S) : S with module Env = E = struct
             | lit -> `Right lit)
       in
       assert (pairs <> []);
-      Util.enter_prof prof_ho_unif;
+      ZProf.enter_prof prof_ho_unif;
       let r = ho_unif_real_ c pairs others in
-      Util.exit_prof prof_ho_unif;
+      ZProf.exit_prof prof_ho_unif;
       r
     ) else []
 

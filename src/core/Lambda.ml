@@ -3,10 +3,10 @@
 
 (** {1 Lambda-Calculus} *)
 
-let prof_whnf = Util.mk_profiler "term.whnf"
-let prof_snf = Util.mk_profiler "term.snf"
-let prof_eta_expand = Util.mk_profiler "term.eta_expand"
-let prof_eta_reduce = Util.mk_profiler "term.eta_reduce"
+let prof_whnf = ZProf.make "term.whnf"
+let prof_snf = ZProf.make "term.snf"
+let prof_eta_expand = ZProf.make "term.eta_expand"
+let prof_eta_reduce = ZProf.make "term.eta_reduce"
 
 
 module OptionSet = Set.Make(
@@ -237,9 +237,9 @@ module Inner = struct
     t'
 
   let whnf t =
-    Util.enter_prof prof_whnf;
+    ZProf.enter_prof prof_whnf;
     let t' = whnf_term t in
-    Util.exit_prof prof_whnf;
+    ZProf.exit_prof prof_whnf;
     t'
 
 
@@ -252,14 +252,14 @@ module Inner = struct
     { st with args = st.args @ args; ty; }
 
   let snf t =
-    Util.enter_prof prof_snf;
+    ZProf.enter_prof prof_snf;
     let t' = snf_rec t in
-    Util.exit_prof prof_snf;
+    ZProf.exit_prof prof_snf;
     t'
 
-  let eta_expand t = Util.with_prof prof_eta_expand eta_expand_rec t
+  let eta_expand t = ZProf.with_prof prof_eta_expand eta_expand_rec t
 
-  let eta_reduce ?(full=true) t = Util.with_prof prof_eta_reduce (eta_reduce_aux ~full) t
+  let eta_reduce ?(full=true) t = ZProf.with_prof prof_eta_reduce (eta_reduce_aux ~full) t
 
 end
 

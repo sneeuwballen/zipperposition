@@ -6,8 +6,8 @@ open Logtk
 module Lits = Literals
 
 let section = Util.Section.make ~parent:Const.section "bbox"
-let prof_inject_lits = Util.mk_profiler "bbox.inject_lits"
-let prof_inject_lemma = Util.mk_profiler "bbox.inject_lemma"
+let prof_inject_lits = ZProf.make "bbox.inject_lits"
+let prof_inject_lemma = ZProf.make "bbox.inject_lemma"
 
 let pp_bbox_id : bool ref = ref true
 
@@ -154,7 +154,7 @@ let inject_lits_ lits  =
   end
 
 let inject_lits lits =
-  Util.with_prof prof_inject_lits inject_lits_ lits
+  ZProf.with_prof prof_inject_lits inject_lits_ lits
 
 let inject_lemma_ (f:Cut_form.t): t =
   let old_lit = match _retrieve_lemma f with
@@ -173,7 +173,7 @@ let inject_lemma_ (f:Cut_form.t): t =
   end
 
 let inject_lemma f =
-  Util.with_prof prof_inject_lemma inject_lemma_ f
+  ZProf.with_prof prof_inject_lemma inject_lemma_ f
 
 let inject_case p =
   (* normalize by sorting the list of cases *)

@@ -13,7 +13,7 @@ module Err = CCResult
 module Subst = Var.Subst
 module Fmt = CCFormat
 
-let prof_infer = Util.mk_profiler "TypeInference.infer"
+let prof_infer = ZProf.make "TypeInference.infer"
 let section = Util.Section.(make "ty-infer")
 
 type 'a or_error = ('a, string) CCResult.t
@@ -791,14 +791,14 @@ and infer_prop_ ?loc ctx t =
   t
 
 let infer_exn ctx t =
-  Util.enter_prof prof_infer;
+  ZProf.enter_prof prof_infer;
   Util.debugf ~section 50 "@[<2>infer type of@ `@[%a@]`@]" (fun k->k PT.pp t);
   try
     let t = infer_rec ctx t in
-    Util.exit_prof prof_infer;
+    ZProf.exit_prof prof_infer;
     t
   with e ->
-    Util.exit_prof prof_infer;
+    ZProf.exit_prof prof_infer;
     raise e
 
 let infer ctx t =
@@ -807,14 +807,14 @@ let infer ctx t =
     Err.of_exn_trace e
 
 let infer_clause_exn ctx c =
-  Util.enter_prof prof_infer;
+  ZProf.enter_prof prof_infer;
   try
     let c = List.map (infer_prop_ ctx) c in
     Ctx.exit_scope ctx;
-    Util.exit_prof prof_infer;
+    ZProf.exit_prof prof_infer;
     c
   with e ->
-    Util.exit_prof prof_infer;
+    ZProf.exit_prof prof_infer;
     raise e
 
 let infer_prop_exn ctx t =

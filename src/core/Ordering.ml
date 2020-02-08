@@ -8,8 +8,8 @@ module W = Precedence.Weight
 
 open Comparison
 
-let prof_rpo6 = Util.mk_profiler "compare_rpo6"
-let prof_kbo = Util.mk_profiler "compare_kbo"
+let prof_rpo6 = ZProf.make "compare_rpo6"
+let prof_kbo = ZProf.make "compare_kbo"
 
 
 module T = Term
@@ -359,9 +359,9 @@ module KBO : ORD = struct
     res
 
   let compare_terms ~prec x y =
-    Util.enter_prof prof_kbo;
+    ZProf.enter_prof prof_kbo;
     let compare = kbo ~prec x y in
-    Util.exit_prof prof_kbo;
+    ZProf.exit_prof prof_kbo;
     compare
 
   (* The ordering might flip if one side is a lambda-expression *)
@@ -454,9 +454,9 @@ module RPO6 : ORD = struct
        | Incomparable | Lt -> alpha ~prec ss' t)
 
   let compare_terms ~prec x y =
-    Util.enter_prof prof_rpo6;
+    ZProf.enter_prof prof_rpo6;
     let compare = rpo6 ~prec x y in
-    Util.exit_prof prof_rpo6;
+    ZProf.exit_prof prof_rpo6;
     compare
 
   (* The ordering might flip if one side is a lambda-expression or if the order is established using the subterm rule *)

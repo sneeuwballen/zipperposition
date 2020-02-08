@@ -16,9 +16,9 @@ let stat_narrowing_lit = Util.mk_stat "narrow.lit_steps"
 let stat_narrowing_term = Util.mk_stat "narrow.term_steps"
 let stat_ctx_narrowing = Util.mk_stat "narrow.ctx_narrow_steps"
 
-let prof_narrowing_term = Util.mk_profiler "narrow.term"
-let prof_narrowing_lit = Util.mk_profiler "narrow.lit"
-let prof_ctx_narrowing = Util.mk_profiler "narrow.ctx_narrow"
+let prof_narrowing_term = ZProf.make "narrow.term"
+let prof_narrowing_lit = ZProf.make "narrow.lit"
+let prof_ctx_narrowing = ZProf.make "narrow.ctx_narrow"
 
 let max_steps = 500
 let rewrite_before_cnf = ref false
@@ -102,7 +102,7 @@ module Make(E : Env_intf.S) = struct
       )
     |> Iter.to_rev_list
 
-  let narrow_term_passive = Util.with_prof prof_narrowing_term narrow_term_passive_
+  let narrow_term_passive = ZProf.with_prof prof_narrowing_term narrow_term_passive_
 
   (* XXX: for now, we only do one step, and let Env.multi_simplify
      manage the fixpoint *)
@@ -169,7 +169,7 @@ module Make(E : Env_intf.S) = struct
       []
 
   let narrow_lits lits =
-    Util.with_prof prof_narrowing_lit narrow_lits_ lits
+    ZProf.with_prof prof_narrowing_lit narrow_lits_ lits
 
   (* find positions in rules' LHS *)
   let ctx_narrow_find (s,sc_a) sc_p : (RW.Rule.t * Position.t * Unif_subst.t) Iter.t =
@@ -289,7 +289,7 @@ module Make(E : Env_intf.S) = struct
     new_clauses
 
   let contextual_narrowing c =
-    Util.with_prof prof_ctx_narrowing contextual_narrowing_ c
+    ZProf.with_prof prof_ctx_narrowing contextual_narrowing_ c
 
   let setup ?(ctx_narrow=true) ~has_rw () =
     Util.debug ~section 1 "register Rewriting to Env...";

@@ -14,14 +14,14 @@ let section = Util.Section.make ~parent:Const.section "env"
 
 let stat_inferred = Util.mk_stat "env.inferred clauses"
 
-let prof_generate = Util.mk_profiler "env.generate"
-let prof_generate_unary = Util.mk_profiler "env.generate_unary"
-let prof_generate_binary = Util.mk_profiler "env.generate_binary"
-let prof_back_simplify = Util.mk_profiler "env.back_simplify"
-let prof_simplify = Util.mk_profiler "env.simplify"
-let prof_all_simplify = Util.mk_profiler "env.all_simplify"
-let prof_is_redundant = Util.mk_profiler "env.is_redundant"
-let prof_subsumed_by = Util.mk_profiler "env.subsumed_by"
+let prof_generate = ZProf.make "env.generate"
+let prof_generate_unary = ZProf.make "env.generate_unary"
+let prof_generate_binary = ZProf.make "env.generate_binary"
+let prof_back_simplify = ZProf.make "env.back_simplify"
+let prof_simplify = ZProf.make "env.simplify"
+let prof_all_simplify = ZProf.make "env.all_simplify"
+let prof_is_redundant = ZProf.make "env.is_redundant"
+let prof_subsumed_by = ZProf.make "env.subsumed_by"
 
 (** {2 Signature} *)
 module type S = Env_intf.S
@@ -259,7 +259,7 @@ module Make(X : sig
 
   (** do binary inferences that involve the given clause *)
   let do_binary_inferences c =
-    Util.enter_prof prof_generate_binary;
+    ZProf.enter_prof prof_generate_binary;
     Util.debugf ~section 5 "@[<2>do binary inferences with current active set:@ `@[%a@]`@]"
       (fun k->k C.pp_set (ProofState.ActiveSet.clauses ()));
     (* apply every inference rule *)
@@ -271,12 +271,12 @@ module Make(X : sig
            List.rev_append new_clauses acc)
         [] !_binary_rules
     in
-    Util.exit_prof prof_generate_binary;
+    ZProf.exit_prof prof_generate_binary;
     Iter.of_list clauses
 
   (** do unary inferences for the given clause *)
   let do_unary_inferences c =
-    Util.enter_prof prof_generate_unary;
+    ZProf.enter_prof prof_generate_unary;
     Util.debug ~section 3 "do unary inferences";
     (* apply every inference rule *)
     let clauses = List.fold_left
@@ -285,7 +285,7 @@ module Make(X : sig
            let new_clauses = rule c in
            List.rev_append new_clauses acc)
         [] !_unary_rules in
-    Util.exit_prof prof_generate_unary;
+    ZProf.exit_prof prof_generate_unary;
     Iter.of_list clauses
 
   let do_generate ~full () =
@@ -514,7 +514,7 @@ module Make(X : sig
 
   let simplify c =
     let open SimplM.Infix in
-    Util.enter_prof prof_simplify;
+    ZProf.enter_prof prof_simplify;
     let res = fix_simpl c
         ~f:(fun c ->
             let old_c = c in
@@ -531,7 +531,7 @@ module Make(X : sig
                 (fun k->k C.pp old_c C.pp c);
             c)
     in
-    Util.exit_prof prof_simplify;
+    ZProf.exit_prof prof_simplify;
     res
 
   let multi_simplify c : C.t list option =
@@ -582,7 +582,7 @@ module Make(X : sig
 
   (* Perform backward simplification with the given clause *)
   let backward_simplify given =
-    Util.enter_prof prof_back_simplify;
+    ZProf.enter_prof prof_back_simplify;
     (* set of candidate clauses, that may be unit-simplifiable *)
     let candidates = backward_simplify_find_candidates given in
     let back_simplify c =
@@ -624,7 +624,7 @@ module Make(X : sig
            end)
         candidates (C.ClauseSet.empty, [])
     in
-    Util.exit_prof prof_back_simplify;
+    ZProf.exit_prof prof_back_simplify;
     before, Iter.of_list after
 
   let simplify_active_with f =
@@ -664,7 +664,7 @@ module Make(X : sig
 
   (** generate all clauses from inferences *)
   let generate given =
-    Util.enter_prof prof_generate;
+    ZProf.enter_prof prof_generate;
     (* binary clauses *)
     let binary_clauses = do_binary_inferences given in
     (* unary inferences *)
@@ -696,7 +696,7 @@ module Make(X : sig
           (append binary_clauses other_clauses))
     in
     Util.add_stat stat_inferred (Iter.length result);
-    Util.exit_prof prof_generate;
+    ZProf.exit_prof prof_generate;
     result
 
   (* check whether the clause is redundant w.r.t the current active_set *)
@@ -712,11 +712,11 @@ module Make(X : sig
 
   let is_redundant c =
     C.is_redundant c
-    || Util.with_prof prof_is_redundant is_redundant_ c
+    || ZProf.with_prof prof_is_redundant is_redundant_ c
 
   (** find redundant clauses in current active_set *)
   let subsumed_by c =
-    Util.enter_prof prof_subsumed_by;
+    ZProf.enter_prof prof_subsumed_by;
     let res =
       List.fold_left
         (fun set rule -> rule set c)
@@ -725,13 +725,13 @@ module Make(X : sig
     in
     (* all those clauses are redundant *)
     C.ClauseSet.iter C.mark_redundant res;
-    Util.exit_prof prof_subsumed_by;
+    ZProf.exit_prof prof_subsumed_by;
     res
 
   (** Use all simplification rules to convert a clause into a list of
       maximally simplified clauses *)
   let all_simplify c =
-    Util.enter_prof prof_all_simplify;
+    ZProf.enter_prof prof_all_simplify;
     let did_simplify = ref false in
     let set = ref C.ClauseSet.empty in
     let q = Queue.create () in
@@ -760,7 +760,7 @@ module Make(X : sig
           List.iter (fun c -> Queue.push c q) l
     done;
     let res = C.ClauseSet.to_list !set in
-    Util.exit_prof prof_all_simplify;
+    ZProf.exit_prof prof_all_simplify;
     if !did_simplify
     then SimplM.return_new res
     else SimplM.return_same res

@@ -13,6 +13,9 @@
 val total_time_s : unit -> float
 (** time elapsed since start of program, in seconds *)
 
+val get_time_mon_ : unit -> float
+(** A "monotonic" clock (TODO! right now, just unix clock) *)
+
 (** {2 Misc} *)
 
 (** Debug section *)
@@ -120,20 +123,6 @@ module Exn : sig
 
   val string_of_backtrace : unit -> string
 end
-
-(** {2 profiling facilities} *)
-
-type profiler
-
-val enable_profiling : bool ref (** Enable/disable profiling *)
-
-val mk_profiler : string -> profiler (** Create a named profiler *)
-
-val enter_prof : profiler -> unit (** Enter the profiler *)
-
-val exit_prof : profiler -> unit (** Exit the profiler *)
-
-val with_prof : profiler -> ('a -> 'b) -> 'a -> 'b
 
 (** {2 Runtime statistics} *)
 

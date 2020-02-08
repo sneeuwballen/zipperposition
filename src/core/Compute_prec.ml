@@ -5,7 +5,7 @@
 
 module T = Term
 
-let prof_mk_prec = Util.mk_profiler "mk_precedence"
+let prof_mk_prec = ZProf.make "mk_precedence"
 
 let section = Util.Section.(make ~parent:root) "compute_prec"
 
@@ -69,7 +69,7 @@ let _add_custom_weights weights arg_coeff=
     ) (weights, arg_coeff) input_list
 
 let mk_precedence ~db_w ~lmb_w t seq =
-  Util.enter_prof prof_mk_prec;
+  ZProf.enter_prof prof_mk_prec;
   (* set of symbols *)
   let symbols =
     seq
@@ -94,7 +94,7 @@ let mk_precedence ~db_w ~lmb_w t seq =
   List.iter
     (fun (s,status) -> Precedence.declare_status p s status)
     t.status;
-  Util.exit_prof prof_mk_prec;
+  ZProf.exit_prof prof_mk_prec;
   p
 
 let () =

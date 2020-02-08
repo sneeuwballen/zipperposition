@@ -75,7 +75,8 @@ let add_opts l = other_opts := l @ !other_opts
 let make () =
   List.rev_append
     [ "--debug", Arg.Int Util.set_debug, " debug level (int)"
-    ; "--profile", Arg.Set Util.enable_profiling, " enable profiling"
+    ; "--profile", Arg.Set ZProf.enable_profiling, " enable profiling probes"
+    ; "--no-profile", Arg.Clear ZProf.enable_profiling, " disable profiling probes"
     ; "--print-types", Arg.Unit _print_types , " print type annotations everywhere"
     ; "--print-hashconsing-id",
       Arg.Set InnerTerm.print_hashconsing_ids,
