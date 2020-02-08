@@ -43,7 +43,7 @@
   (name zip-local-test)
   (action
     (run_provers
-      (provers zip-dev zip-dev-check)
+      (provers zip-dev) ; zip-dev-check)
       (timeout 10)
       (memory 2000)
       (dirs))))
