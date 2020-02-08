@@ -205,6 +205,8 @@ let order ty: int =
   in
   max 1 (aux ty)  (* never less than 1 *)
 
+let contains_prop t = Seq.sub t |> Iter.exists is_prop
+
 let is_ground = T.is_ground
 let size = T.size
 

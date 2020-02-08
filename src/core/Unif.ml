@@ -540,7 +540,7 @@ module Inner = struct
       | _, T.Bind (Binder.Lambda, _, _) ->
         (* perform HO unification after moving both terms into same
            scope [sc2] *)
-        Util.debugf ~section 40 "var_ho-unifying: %a =?= %a" (fun k-> k T.pp t1 T.pp t2);
+        Util.debugf ~section 40 "(@[var_ho-unifying:@ %a@ =?= %a@])" (fun k-> k T.pp t1 T.pp t2);
         begin match op with
           | O_match_protect (P_scope sc2') | O_variant (P_scope sc2') ->
             assert (sc2=sc2');

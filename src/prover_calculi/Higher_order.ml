@@ -1273,20 +1273,29 @@ let set_prim_mode_ =
   let set_ s = prim_mode_ := List.assoc s l in
   Arg.Symbol (List.map fst l, set_)
 
+(* detection of HO statements *)
 let st_contains_ho (st:(_,_,_) Statement.t): bool =
   let is_non_atomic_ty ty =
     let n_ty_vars, args, _ = Type.open_poly_fun ty in
     n_ty_vars > 0 || args<>[]
+  and has_prop_in_args ty =
+    let n_ty_vars, args, _ = Type.open_poly_fun ty in
+    List.exists Type.contains_prop args
   in
-  (* is there a HO variable? *)
+  (* is there a HO variable? Any variable with a type that is
+     Prop or just not an atomic type is. *)
   let has_ho_var () =
     Statement.Seq.terms st
     |> Iter.flat_map T.Seq.vars
-    |> Iter.exists (fun v -> is_non_atomic_ty (HVar.ty v))
-  (* is there a HO symbol? *)
+    |> Iter.map HVar.ty
+    |> Iter.exists (fun ty -> is_non_atomic_ty ty || Type.contains_prop ty)
+  (* is there a HO symbol?
+     means the symbol has a higher-order, or contains Prop in a sub-position
+     of an argument. *)
   and has_ho_sym () =
     Statement.Seq.ty_decls st
-    |> Iter.exists (fun (_,ty) -> Type.order ty > 1)
+    |> Iter.exists
+      (fun (_,ty) -> Type.order ty > 1 || has_prop_in_args ty)
   and has_ho_eq() =
     Statement.Seq.forms st
     |> Iter.exists
