@@ -2,3 +2,15 @@ examples/frontpage.zf
 examples/ac.zf
 examples/ARI114=1.p
 examples/pelletier_problems/pb34.zf
+examples/don_t_use_omega.p --no-avatar
+examples/GEG021=1.p
+examples/GEG022=1.p
+examples/GEG023=1.p
+examples/polymorph.p
+examples/regression/bad_set_avatar.zf
+examples/regression/contextual_narrow1.zf
+examples/set_fancy.zf
+examples/simple_case.zf
+examples/loop.p
+examples/regression/npdtree_fail.zf
+examples/regression/ho_pos.zf
