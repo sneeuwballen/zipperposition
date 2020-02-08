@@ -3,7 +3,7 @@
 
 type t
 
-val enable_profiling : bool ref (** Enable/disable profiling *)
+val enable_profiling : bool -> unit (** Enable/disable profiling *)
 
 val make : string -> t (** Create a named profiler *)
 

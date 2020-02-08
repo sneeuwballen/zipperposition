@@ -1323,3 +1323,7 @@ let rec normalize_bools t =
     if same_l l' l then t
     else app_builtin ~ty:(ty t) hd l'
 
+let () =
+  Options.add_opts [
+    "--print-types", Arg.Set print_all_types, " print type annotations everywhere";
+  ]

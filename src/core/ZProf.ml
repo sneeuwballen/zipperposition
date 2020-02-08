@@ -15,10 +15,19 @@ type t = {
   mutable prof_enter : timestamp; (* time at which we entered the profiler (ns) *)
 }
 
-(* enables compile-time branch cutting *)
+(* NOTE: profiling:
+   enables compile-time branch cutting.
+   if you want profiling, change this to [true]. *)
 let __prof = false
 
-let enable_profiling = ref false
+let active_ = ref false
+
+let enable_profiling b =
+  if b && not __prof then (
+    Util.errorf ~where:"zprof"
+      "profiling has been deactivated at compile time. \
+       Change `ZProf.__prof` and recompile."
+  )
 
 let profilers = ref []
 
@@ -37,7 +46,7 @@ let make name =
   prof
 
 let[@inline] enter_prof profiler =
-  if __prof && !enable_profiling then (
+  if __prof && !active_ then (
     profiler.prof_enter <- Util.get_time_mon_ ()
   )
 
@@ -50,7 +59,7 @@ let[@inline never] exit_prof_ profiler =
   ()
 
 let[@inline] exit_prof profiler =
-  if __prof && !enable_profiling then (
+  if __prof && !active_ then (
     exit_prof_ profiler
   )
 
@@ -65,7 +74,7 @@ let with_prof_ p f x =
     raise e
 
 let[@inline] with_prof p f x =
-  if __prof && !enable_profiling then (
+  if __prof && !active_ then (
     with_prof_ p f x
   ) else (
     f x
@@ -104,7 +113,11 @@ let show_profilers out () =
 (** Print profiling data upon exit *)
 let () =
   if __prof then (
+    Options.add_opts [
+      "--profile", Arg.Unit (fun ()->enable_profiling true), " enable profiling probes";
+      "--no-profile", Arg.Unit (fun ()->enable_profiling false), " disable profiling probes";
+    ];
     at_exit
       (fun () ->
-         if !enable_profiling then Format.eprintf "%a@." show_profilers ())
+         if !active_ then Format.eprintf "%a@." show_profilers ())
   )
