@@ -14,3 +14,5 @@ examples/simple_case.zf
 examples/loop.p
 examples/regression/npdtree_fail.zf
 examples/regression/ho_pos.zf
+examples/ho/neg_eq1.zf
+examples/data/length.zf
