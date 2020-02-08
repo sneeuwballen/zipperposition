@@ -12,11 +12,6 @@
   (unsat "Status[ ]*: (Unsatisfiable|Theorem|CounterTheorem|Lemma)"))
 
 (dir
-  (path $cur_dir)
-  (pattern ".*\\zf")
-  (expect (try (run zip-find-expect) (run tptp-find-status) (const unknown))))
-
-(dir
   (path $cur_dir/../examples/)
   (pattern ".*\\.(zf|p)")
   (expect (try (run zip-find-expect) (run tptp-find-status) (const unknown))))

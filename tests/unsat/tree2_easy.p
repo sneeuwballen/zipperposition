@@ -1,1 +1,0 @@
-../../examples/ind/tree2_easy.p

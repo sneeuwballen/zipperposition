@@ -1,1 +1,0 @@
-../../examples/ind/nat_false3.p
