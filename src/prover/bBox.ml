@@ -234,7 +234,7 @@ let to_s_form (lit:t) =
 let pp out i =
   if not (Lit.sign i) then CCFormat.string out "¬";
   pp_payload out (payload i);
-  if !pp_bbox_id then Format.fprintf out "@{<Black>/%d@}" (Lit.to_int i|>abs);
+  if !pp_bbox_id then Format.fprintf out "/%d" (Lit.to_int i|>abs);
   ()
 
 let pp_bclause out lits =

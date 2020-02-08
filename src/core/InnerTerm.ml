@@ -1006,7 +1006,7 @@ let rec pp_depth ?(hooks=[]) depth out t =
     else (
       _pp_root depth out t ;
       if !print_hashconsing_ids then (
-        Format.fprintf out "@{<Black>/%d@}" t.id
+        Format.fprintf out "/%d" t.id
       );
     )
   and _pp_root depth out t = match view t with
