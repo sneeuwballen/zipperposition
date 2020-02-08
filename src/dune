@@ -6,6 +6,7 @@
 (alias
  (name    runtest)
  (package zipperposition)
+ (locks   /tlock)
  (deps    main/zipperposition.exe test_must_pass.sh (source_tree ../examples/))
  (action  (run ./test_must_pass.sh ./main/zipperposition.exe)))
 

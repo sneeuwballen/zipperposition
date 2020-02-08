@@ -17,7 +17,7 @@ doc:
 install: build
 	@dune install
 
-test: test-dune test-must-pass
+test: test-dune
 
 test-dune:
 	@dune runtest --no-buffer -f $(DUNE_OPTS)
