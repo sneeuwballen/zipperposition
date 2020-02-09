@@ -14,13 +14,34 @@
 
 type term = Term.t
 
-(** a literal, that is, a signed atomic formula *)
+(** Generic unification function *)
+type ('subst, 'a) unif =
+  subst:'subst -> 'a Scoped.t -> 'a Scoped.t -> 'subst Iter.t
+
+type ('subst, 'a, 'b) apply_subst =
+  Subst.Renaming.t -> Subst.t -> 'a Scoped.t -> 'b
+
+(** Unification-like operation on components of a literal. *)
+type 'subst unif_op = {
+  term: ('subst, term) unif;
+  monomes : 'a. ('subst, 'a Monome.t) unif;
+}
+
+type t_open = ..
+type tc
+
+(* TODO: expose a function to build [tc], use it in Rat_lit/Int_lit *)
+
 type t = private
   | True
   | False
   | Equation of term * term * bool
   | Int of Int_lit.t
   | Rat of Rat_lit.t
+  | Open of {
+      x: t_open;
+      tc: tc;
+    }
 
 val equal_com : t -> t -> bool     (** commutative equality of lits *)
 

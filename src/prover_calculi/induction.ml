@@ -748,7 +748,7 @@ module Make
         | Literal.Equation (l,r,_) ->
           let check_t t = T.is_var t || not (T.var_occurs ~var:x t) in
           check_t l && check_t r
-        | Literal.Int _ | Literal.Rat _ -> false
+        | Literal.Int _ | Literal.Rat _ | Literal.Open _ -> false
         | Literal.True | Literal.False -> true)
 
   let active_subterms_form (f:Cut_form.t): T.t Iter.t =

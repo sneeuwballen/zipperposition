@@ -13,12 +13,55 @@ module VS = T.VarSet
 
 type term = Term.t
 
+(** Generic unification function *)
+type ('subst, 'a) unif =
+  subst:'subst -> 'a Scoped.t -> 'a Scoped.t -> 'subst Iter.t
+
+type ('subst, 'a, 'b) apply_subst =
+  Subst.Renaming.t -> Subst.t -> 'a Scoped.t -> 'b
+
+(** Unification-like operation on components of a literal. *)
+type 'subst unif_op = {
+  term: ('subst, term) unif;
+  monomes : 'a. ('subst, 'a Monome.t) unif;
+}
+
 type t =
   | True
   | False
   | Equation of term * term * bool
   | Int of Int_lit.t
   | Rat of Rat_lit.t
+  | Open of {
+      x: t_open;
+      tc: tc;
+    }
+
+and tc = {
+  tc_equal: t_open -> t_open -> bool;
+  tc_equal_comm: (t_open -> t_open -> bool) option;
+  tc_compare: t_open -> t_open -> int;
+  tc_hash: t_open -> int;
+  tc_fold: 'a. 'a -> t_open -> 'a;
+  tc_heuristic_weight: (t_open -> int) option;
+  tc_is_pos: t_open -> bool;
+  tc_neg: t_open -> t;
+  tc_terms: t_open -> Term.t Iter.t;
+  tc_unif: 'subst. 'subst unif_op -> ('subst, t_open) unif;
+  tc_tags: Builtin.Tag.t list;
+  tc_map: (term -> term) -> t_open -> t;
+  tc_apply_subst:
+    'subst. ('subst, term, term) apply_subst -> ('subst, t_open, t) apply_subst;
+  tc_to_multiset: t_open -> Multisets.MT.t;
+  tc_is_trivial: t_open -> bool;
+  tc_is_absurd: t_open -> bool;
+  tc_fold_terms: at_term:(pos:Position.t -> term -> unit) -> t_open -> unit;
+  tc_pp: Output_format.t -> Format.formatter -> t_open -> unit;
+  tc_to_form: t_open -> term SLiteral.t;
+}
+
+and t_open = ..
+(** User provided literal *)
 
 type lit = t
 
@@ -30,12 +73,8 @@ let equal l1 l2 =
   | False, False -> true
   | Int o1, Int o2 -> Int_lit.equal o1 o2
   | Rat o1, Rat o2 -> Rat_lit.equal o1 o2
-  | Equation _, _
-  | True, _
-  | False, _
-  | Int _, _
-  | Rat _, _
-    -> false
+  | Open o1, Open o2 -> o1.tc.tc_equal o1.x o2.x
+  | (Equation _ | True | False | Int _ | Rat _ | Open _), _ -> false
 
 let equal_com l1 l2 =
   match l1, l2 with
@@ -46,12 +85,18 @@ let equal_com l1 l2 =
   | True, True
   | False, False -> true
   | Int o1, Int o2 -> Int_lit.equal_com o1 o2
+  | Rat o1, Rat o2 -> Rat_lit.equal_com o1 o2
+  | Open o1, Open o2 ->
+    begin match o1.tc.tc_equal_comm with
+      | None -> equal l1 l2
+      | Some f -> f o1.x o2.x
+    end
   | _ -> equal l1 l2  (* regular comparison *)
 
-let no_prop_invariant = 
+let no_prop_invariant =
   let diff_f_t t = not (T.equal t T.true_) && not (T.equal t T.false_) in
-  function 
-  | Equation (lhs,rhs,sign) -> 
+  function
+  | Equation (lhs,rhs,sign) ->
     let res = diff_f_t lhs && (diff_f_t rhs || sign = true) in
     if not res then (
       CCFormat.printf "NO PROP INVARIANT BROKEN: %a,%a,%b.\n" T.pp lhs T.pp rhs sign;
@@ -68,6 +113,7 @@ let compare l1 l2 =
     | Equation _ -> 2
     | Int _ -> 5
     | Rat _ -> 6
+    | Open _ -> 10
   in
   match l1, l2 with
   | Equation (l1,r1,sign1), Equation (l2,r2,sign2) ->
@@ -80,14 +126,17 @@ let compare l1 l2 =
   | False, False -> 0
   | Int o1, Int o2 -> Int_lit.compare o1 o2
   | Rat o1, Rat o2 -> Rat_lit.compare o1 o2
-  | _, _ -> __to_int l1 - __to_int l2
+  | Open o1, Open o2 -> o1.tc.tc_compare o1.x o2.x
+  | (Equation _ | True | False | Int _ | Rat _ | Open _), _
+    -> CCInt.compare (__to_int l1) (__to_int l2)
 
-let fold f acc lit = match lit with
+let fold f acc lit =
+  match lit with
   | Equation (l, r, _) -> f (f acc l) r
   | Int o -> Int_lit.fold f acc o
   | Rat o -> Rat_lit.fold f acc o
-  | True
-  | False -> acc
+  | Open o -> o.tc.tc_fold acc o.x
+  | True | False -> acc
 
 let for_all f lit = fold (fun b t -> b && f t) true lit
 
@@ -99,12 +148,13 @@ let hash lit =
     Hash.combine4 30 (Hash.bool sign) (T.hash l) (T.hash r)
   | True -> 40
   | False -> 50
+  | Open o -> Hash.combine2 100 (o.tc.tc_hash o.x)
 
 let weight lit =
   fold (fun acc t -> acc + T.size t) 0 lit
 
 let ho_weight =
-  fold (fun acc t -> acc + T.ho_weight t) 0 
+  fold (fun acc t -> acc + T.ho_weight t) 0
 
 let heuristic_weight weight = function
   | Equation (l, r, true) 
@@ -121,6 +171,11 @@ let heuristic_weight weight = function
     Rat_lit.Seq.terms alit
     |> Iter.filter (fun t -> not (T.is_var t))
     |> Iter.fold (fun acc t -> acc + weight t) 0
+  | Open o ->
+    begin match o.tc.tc_heuristic_weight with
+      | None -> 0
+      | Some f -> f o.x
+    end
 
 let depth lit =
   fold (fun acc t -> max acc (T.depth t)) 0 lit
@@ -129,14 +184,16 @@ module Set = CCSet.Make(struct type t = lit let compare = compare end)
 
 let is_pos = function
   | Equation (l, r, sign) ->
-    let hd_l = Term.head_term l in  
+    let hd_l = Term.head_term l in
     if sign && T.is_true_or_false r && T.is_const hd_l then (
-      T.equal r T.true_ 
+      T.equal r T.true_
     ) else sign
   (* sign *)
   | Int o -> Int_lit.sign o
   | False -> false
-  | _ -> true
+  | Open o -> o.tc.tc_is_pos o.x
+  | True | Rat _ -> true
+
 (* specific: for the term comparison *)
 let polarity = function
   | Int o -> Int_lit.polarity o
@@ -359,8 +416,8 @@ module Seq = struct
     | Equation(l, r, _) -> k l; k r
     | Int o -> Int_lit.Seq.terms o k
     | Rat o -> Rat_lit.Seq.terms o k
-    | True
-    | False -> ()
+    | Open o -> o.tc.tc_terms o.x k
+    | True | False -> ()
 
   let vars lit = Iter.flat_map T.Seq.vars (terms lit)
 
@@ -375,16 +432,6 @@ end
 
 let symbols ?(include_types=false) lit = Seq.symbols ~include_types lit |> ID.Set.of_seq
 
-(** Unification-like operation on components of a literal. *)
-module UnifOp = struct
-  type 'subst op = {
-    term : subst:'subst -> term Scoped.t -> term Scoped.t ->
-      'subst Iter.t;
-    monomes : 'a. subst:'subst -> 'a Monome.t Scoped.t -> 'a Monome.t
-        Scoped.t -> 'subst Iter.t;
-  }
-end
-
 (* match {x1,y1} in scope 1, with {x2,y2} with scope2 *)
 let unif4 op ~subst x1 y1 sc1 x2 y2 sc2 k =
   op ~subst (Scoped.make x1 sc1) (Scoped.make x2 sc2)
@@ -395,7 +442,6 @@ let unif4 op ~subst x1 y1 sc1 x2 y2 sc2 k =
 
 (* generic unification structure *)
 let unif_lits op ~subst (lit1,sc1) (lit2,sc2) k =
-  let open UnifOp in
   match lit1, lit2 with
   | True, True
   | False, False -> k (subst,[])
@@ -407,15 +453,19 @@ let unif_lits op ~subst (lit1,sc1) (lit2,sc2) k =
   | Rat o1, Rat o2 ->
     Rat_lit.generic_unif op.monomes ~subst (o1,sc1) (o2,sc2)
       (fun s -> k(s,[Builtin.Tag.T_lra]))
-  | _, _ -> ()
+  | Open o1, Open o2 ->
+    o1.tc.tc_unif op ~subst (o1.x,sc1) (o2.x,sc2)
+      (fun s -> k (s, o1.tc.tc_tags))
+  | (True | False | Equation _ | Int _ | Rat _ | Open _), _
+    -> ()
 
 let variant ?(subst=S.empty) lit1 lit2 k =
-  let op = UnifOp.({
+  let op = {
       term=(fun ~subst t1 t2 k ->
           try k (Unif.FO.variant ~subst t1 t2)
           with Unif.Fail -> ());
       monomes=(fun ~subst m1 m2 k -> Monome.variant ~subst m1 m2 k)
-    })
+    }
   in
   unif_lits op ~subst lit1 lit2
     (fun (subst,tags) -> if Subst.is_renaming subst then k (subst,tags))
@@ -424,12 +474,12 @@ let are_variant lit1 lit2 =
   not (Iter.is_empty (variant (Scoped.make lit1 0) (Scoped.make lit2 1)))
 
 let matching ?(subst=Subst.empty) ~pattern:lit1 lit2 k =
-  let op = UnifOp.({
+  let op = {
       term=(fun ~subst t1 t2 k ->
           try k (Unif.FO.matching_adapt_scope ~subst ~pattern:t1 t2)
           with Unif.Fail -> ());
       monomes=(fun ~subst m1 m2 k -> Monome.matching ~subst m1 m2 k)
-    })
+    }
   in
   unif_lits op ~subst lit1 lit2 k
 
@@ -495,12 +545,12 @@ let subsumes ?(subst=Subst.empty) (lit1,sc1) (lit2,sc2) k =
   | _ -> matching ~subst ~pattern:(lit1,sc1) (lit2,sc2) k
 
 let unify ?(subst=US.empty) lit1 lit2 k =
-  let op = UnifOp.({
+  let op = {
       term=(fun ~subst t1 t2 k ->
           try k (Unif.FO.unify_full ~subst t1 t2)
           with Unif.Fail -> ());
       monomes=(fun ~subst m1 m2 k -> Monome.unify ~subst m1 m2 k)
-    })
+    }
   in
   unif_lits op ~subst lit1 lit2 k
 
@@ -511,27 +561,29 @@ let map_ f = function
     mk_lit new_left new_right sign
   | Int o -> Int (Int_lit.map f o)
   | Rat o -> Rat (Rat_lit.map f o)
+  | Open o -> o.tc.tc_map f o.x
   | True -> True
   | False -> False
 
 let map f lit = map_ f lit
 
-let apply_subst_ ~f_term ~f_arith_lit ~f_rat subst (lit,sc) =
+let apply_subst_ renaming ~f_term ~f_arith_lit ~f_rat subst (lit,sc) =
   match lit with
   | Equation (l,r,sign) ->
-    let new_l = f_term subst (l,sc)
-    and new_r = f_term subst (r,sc) in
+    let new_l = f_term renaming subst (l,sc)
+    and new_r = f_term renaming subst (r,sc) in
     mk_lit new_l new_r sign
-  | Int o -> Int (f_arith_lit subst (o,sc))
-  | Rat o -> Rat (f_rat subst (o,sc))
+  | Int o -> Int (f_arith_lit renaming subst (o,sc))
+  | Rat o -> Rat (f_rat renaming subst (o,sc))
+  | Open o -> o.tc.tc_apply_subst f_term renaming subst (o.x,sc)
   | True
   | False -> lit
 
 let apply_subst renaming subst (lit,sc) =
-  apply_subst_ subst (lit,sc)
-    ~f_term:(S.FO.apply renaming)
-    ~f_arith_lit:(Int_lit.apply_subst renaming)
-    ~f_rat:(Rat_lit.apply_subst renaming)
+  apply_subst_ renaming subst (lit,sc)
+    ~f_term:S.FO.apply
+    ~f_arith_lit:Int_lit.apply_subst
+    ~f_rat:Rat_lit.apply_subst
 
 let apply_subst_no_simp renaming subst (lit,sc) =
   match lit with
@@ -541,6 +593,8 @@ let apply_subst_no_simp renaming subst (lit,sc) =
     mk_lit (S.FO.apply renaming subst (l,sc)) (S.FO.apply renaming subst (r,sc)) sign
   | True
   | False -> lit
+  | Open o ->
+    o.tc.tc_apply_subst S.FO.apply renaming subst (o.x, sc)
 
 let apply_subst_list renaming subst (lits,sc) =
   List.map
@@ -557,7 +611,7 @@ let is_constraint = function
   | Equation (t, u, false) -> T.is_var t || T.is_var u
   | _ -> false
 
-let negate lit = 
+let negate lit =
   assert(no_prop_invariant lit);
   match lit with
   | Equation (l,r,true) when T.equal r T.true_ || T.equal r T.false_ ->
@@ -567,21 +621,22 @@ let negate lit =
   | False -> True
   | Int o -> Int (Int_lit.negate o)
   | Rat o -> mk_false (Rat_lit.to_term o)
+  | Open o -> o.tc.tc_neg o.x
 
 let vars lit =
   Seq.vars lit |> T.VarSet.of_seq |> T.VarSet.to_list
 
 let var_occurs v lit = match lit with
   | Equation (l,r,_) -> T.var_occurs ~var:v l || T.var_occurs ~var:v r
-  | Int _
-  | Rat _ -> Iter.exists (T.var_occurs ~var:v) (Seq.terms lit)
+  | Int _ | Rat _ | Open _ ->
+    Iter.exists (T.var_occurs ~var:v) (Seq.terms lit)
   | True
   | False -> false
 
 let is_ground lit = match lit with
   | Equation (l,r,_) -> T.is_ground l && T.is_ground r
-  | Int _
-  | Rat _ -> Iter.for_all T.is_ground (Seq.terms lit)
+  | Int _ | Rat _ | Open _ ->
+    Iter.for_all T.is_ground (Seq.terms lit)
   | True
   | False -> true
 
@@ -600,6 +655,7 @@ let to_multiset lit = match lit with
   | Rat o ->
     Rat_lit.Seq.to_multiset o |> Iter.map fst
     |> Multisets.MT.Seq.of_seq Multisets.MT.empty
+  | Open o -> o.tc.tc_to_multiset o.x
 
 let is_trivial lit = 
   assert(no_prop_invariant lit);
@@ -610,6 +666,7 @@ let is_trivial lit =
   | Equation (_, _, false) -> false
   | Int o -> Int_lit.is_trivial o
   | Rat o -> Rat_lit.is_trivial o
+  | Open o -> o.tc.tc_is_trivial o.x
 
 (* is it impossible for these terms to be equal? check if a cstor-only
      path leads to distinct constructors/constants *)
@@ -632,7 +689,7 @@ let rec cannot_be_eq (t1:term)(t2:term): Builtin.Tag.t list option =
     | _ -> None
   end
 
-let is_absurd lit = 
+let is_absurd lit =
   assert(no_prop_invariant lit);
   match lit with
   | Equation (l, r, false) when T.equal l r -> true
@@ -641,8 +698,9 @@ let is_absurd lit =
   | Int o -> Int_lit.is_absurd o
   | Rat o -> Rat_lit.is_absurd o
   | Equation _ | True -> false
+  | Open o -> o.tc.tc_is_absurd o.x
 
-let is_absurd_tags lit = 
+let is_absurd_tags lit =
   assert(no_prop_invariant lit);
   match lit with
   | Equation (l,r,true) -> cannot_be_eq l r |> CCOpt.get_or ~default:[]
@@ -650,6 +708,7 @@ let is_absurd_tags lit =
   | True -> assert false
   | Int _ -> [Builtin.Tag.T_lia]
   | Rat _ -> [Builtin.Tag.T_lra]
+  | Open o -> o.tc.tc_tags
 
 
 let fold_terms ?(position=Position.stop) ?(vars=false) ?(var_args=true) ?(fun_bodies=true) ?ty_args ~which ?(ord=Ordering.none) ~subterms lit k =
@@ -686,6 +745,7 @@ let fold_terms ?(position=Position.stop) ?(vars=false) ?(var_args=true) ?(fun_bo
       Rat_lit.fold_terms ~pos:position ?ty_args ~vars ~var_args ~fun_bodies ~which ~ord ~subterms o k
     | True
     | False -> ()
+    | Open o -> o.tc.tc_fold_terms ~at_term o.x
   end
 
 (* try to convert a literal into a term *)
@@ -696,8 +756,7 @@ let to_ho_term (lit:t): T.t option = match lit with
     Some  ((if T.equal u T.false_ then T.Form.not_ else CCFun.id) t)
   | Equation (t, u, sign) ->
     Some (if sign then T.Form.eq t u else T.Form.neq t u)
-  | Int _
-  | Rat _ -> None
+  | Int _ | Rat _ | Open _ -> None
 
 let as_ho_predicate (lit:t) : _ option = 
   assert(no_prop_invariant lit);
@@ -759,7 +818,9 @@ let pp_debug ?(hooks=[]) out lit =
         Format.fprintf out "@[<1>%a@ ≠ %a@]" T.pp l T.pp r
       | Int o -> CCFormat.within "(" ")" Int_lit.pp out o
       | Rat o -> CCFormat.within "(" ")" Rat_lit.pp out o
+      | Open o -> o.tc.tc_pp Output_format.normal out o.x
     end)
+
 let pp_tstp out lit =
   match lit with
   | Equation (p, t, true) when T.equal t T.true_  -> T.TPTP.pp out p
@@ -772,6 +833,7 @@ let pp_tstp out lit =
     Format.fprintf out "@[<1>%a@ != %a@]" T.TPTP.pp l T.TPTP.pp r
   | Int o -> Int_lit.pp_tstp out o
   | Rat o -> Rat_lit.pp_tstp out o
+  | Open o -> o.tc.tc_pp Output_format.tptp out o.x
 
 let pp_zf out lit =
   match lit with
@@ -785,6 +847,7 @@ let pp_zf out lit =
     Format.fprintf out "@[<1>%a@ != %a@]" T.ZF.pp l T.ZF.pp r
   | Int o -> Int_lit.pp_zf out o
   | Rat o -> Rat_lit.pp_zf out o
+  | Open o -> o.tc.tc_pp Output_format.zf out o.x
 
 type print_hook = CCFormat.t -> t -> bool
 let __hooks = ref []
@@ -821,6 +884,11 @@ module Comp = struct
     | Rat a -> Rat_lit.max_terms ~ord a
     | True
     | False -> []
+    | Open _ ->
+      let m = to_multiset lit in
+      Multisets.MT.max (Ordering.compare ord) m
+      |> Multisets.MT.to_list
+      |> List.rev_map fst
 
   (* general comparison is a bit complicated.
      - First we compare literals l1 and l2
@@ -873,6 +941,7 @@ module Comp = struct
       | Int (Divides _) -> 17
       | Rat {Rat_lit.op=Rat_lit.Equal; _} -> 20
       | Rat {Rat_lit.op=Rat_lit.Less; _} -> 21
+      | Open _ -> 22
       | Equation _ -> 30
     in
     C.of_total (Pervasives.compare (_to_int l1) (_to_int l2))
@@ -1038,7 +1107,7 @@ module Pos = struct
       Iter.for_all
         (fun t' -> Ordering.compare ord t t' <> Comparison.Lt)
         (Monome.Seq.terms d.AL.monome)
-    | Rat _, _ ->
+    | (Rat _ | Open _), _ ->
       let t = root_term lit pos in
       Iter.for_all
         (fun t' -> Ordering.compare ord t t' <> Comparison.Lt)
@@ -1100,6 +1169,7 @@ module Conv = struct
           | False -> SLiteral.false_
           | Int o -> Int_lit.to_form o
           | Rat o -> Rat_lit.to_form o
+          | Open o -> o.tc.tc_to_form o.x
         end
     end
 
@@ -1129,10 +1199,7 @@ module View = struct
     assert(no_prop_invariant lit);
     match lit with
     | Equation (l,r,sign) -> Some (l, r, sign)
-    | True
-    | False
-    | Rat _
-    | Int _ -> None
+    | True | False | Rat _ | Int _ | Open _ -> None
 
   let get_eqn lit position =
     match lit, position with

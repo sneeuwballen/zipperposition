@@ -342,11 +342,8 @@ let fold_eqn ?(both=true) ?sign ~ord ~eligible lits k =
                 (* only one side *)
                 k (l, r, sign, Position.(arg i @@ left @@ stop))
           end
-        | Lit.Equation _
-        | Lit.Int _
-        | Lit.Rat _
-        | Lit.True
-        | Lit.False -> ()
+        | Lit.Equation _ | Lit.Int _ | Lit.Rat _
+        | Lit.Open _ | Lit.True | Lit.False -> ()
       end;
       aux (i+1)
     )
