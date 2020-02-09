@@ -2,7 +2,7 @@
 (executable
   (name run_tests)
   (libraries logtk logtk.parsers logtk.arbitrary iter qcheck-core qcheck-alcotest alcotest)
-  (flags :standard -warn-error -3 -w +a-4-29-42-44-48-58-32-60@8 -color always))
+  (flags :standard -warn-error -3 -w -3-50 -color always))
 
 (alias
  (name    runtest)
