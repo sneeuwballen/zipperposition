@@ -1569,7 +1569,7 @@ let try_alpha_renaming f1 f2 =
           | Some ty1, Some ty2 -> (ty1,ty2) :: rest
         in
         aux subst ((List.combine xs ys) @ rest)
-      | AppBuiltin(hd_x, xs), AppBuiltin(hd_y, ys) when Builtin.equal hd_x hd_y ->
+      | AppBuiltin(hd_x, _), AppBuiltin(hd_y, _) when Builtin.equal hd_x hd_y ->
         fail_unif_ [f1,f2] "arity mismatch"
       | Bind(b, v, body), Bind(b', v', body') when Binder.equal b b' ->
         assert(not @@ Subst.mem subst v);
