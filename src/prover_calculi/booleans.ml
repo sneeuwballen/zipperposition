@@ -89,10 +89,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let term_as_false = Term.Tbl.create 4 in
     let cased_term_selection = Env.flex_get k_cased_term_selection in
     let rec find_bools top t =
-      let can_be_cased = Type.is_prop(T.ty t) && T.DB.is_closed t && (not top ||
-                                                                      (* It is useful to case top level equality like 𝘵𝘦𝘳𝘮𝘴 
-                                                                         because these are simplified into 𝘭𝘪𝘵𝘦𝘳𝘢𝘭𝘴. *)
-                                                                      match T.view t with AppBuiltin((Eq|Neq|Equiv|Xor),_) -> true | _ -> false) in
+      let can_be_cased = Type.is_prop(T.ty t) && T.DB.is_closed t && (not top) in
       let is_quant = match T.view t with 
         | AppBuiltin(b,_) -> 
           Builtin.equal b Builtin.ForallConst || Builtin.equal b Builtin.ExistsConst
@@ -143,15 +140,13 @@ module Make(E : Env.S) : S with module Env = E = struct
     let term_to_equations = Term.Tbl.create 8 in
     let cased_term_selection = Env.flex_get k_cased_term_selection in
     let rec find_bools top t =
-      let can_be_cased = Type.is_prop(T.ty t) && T.DB.is_closed t && (not top ||
-                                                                      (* It is useful to case top level equality like 𝘵𝘦𝘳𝘮𝘴 because these are simplified into 𝘭𝘪𝘵𝘦𝘳𝘢𝘭𝘴. *)
-                                                                      match T.view t with AppBuiltin((Eq|Neq|Equiv|Xor),_) -> true | _ -> false) in
+      let can_be_cased = Type.is_prop(T.ty t) && T.DB.is_closed t && (not top) in
       let is_quant = match T.view t with 
         | AppBuiltin(b,_) -> 
           Builtin.equal b Builtin.ForallConst || Builtin.equal b Builtin.ExistsConst
         | _ -> false in
       (* Add only propositions. *)
-      let add t x y = if can_be_cased then Term.Tbl.add term_to_equations t (x=~y, x/~y) in
+      let add t x y = if can_be_cased then Term.Tbl.replace term_to_equations t (x=~y, x/~y) in
       (* Stop recursion in combination of certain settings. *)
       let inner f x = 
         if is_quant || (can_be_cased && cased_term_selection = Large) 
@@ -182,12 +177,13 @@ module Make(E : Env.S) : S with module Env = E = struct
       (* first clausify, then get bool subterms *)
       Literals.Seq.terms(C.lits c) 
       |> Iter.iter(find_bools true));
+
     let res = 
       Term.Tbl.fold(fun b (b_true, b_false) clauses ->
           if cased_term_selection != Minimal ||
              Term.Seq.subterms b |> 
-             Iter.for_all (fun st -> T.equal b st || 
-                                     not (Type.is_prop (T.ty st))) then (
+             Iter.for_all (fun st -> 
+              T.equal b st || not (Type.is_prop (T.ty st)) || T.is_true_or_false st) then (
             let proof = Proof.Step.simp[C.proof_parent c]
                 ~rule:(Proof.Rule.mk"bool_case_simp") ~tags:[Proof.Tag.T_ho]
             in
@@ -200,10 +196,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             clauses)
           else clauses) term_to_equations [] in
     if CCList.is_empty res then None
-    else (
-      (* CCFormat.printf "bool case simp: %a.\n" C.pp c; *)
-      (* CCList.iteri (fun i nc -> CCFormat.printf "@[%d: @[%a@]@].\n" i C.pp nc) res; *)
-      Some res)
+    else (Some res)
 
   let simpl_bool_subterms c =
     let new_lits = Literals.map T.simplify_bools (C.lits c) in
@@ -404,7 +397,10 @@ open CCList
 
 let if_changed proof (mk: ?attrs:Logtk.Statement.attrs -> 'r) s f p =
   let fp = f s p in
-  if fp = [p] then [s] else map(fun x -> mk ~proof:(proof s) x) fp
+  if fp == [p] then [s] else map(fun x -> mk ~proof:(proof s) x) fp
+  (* match fp with 
+  | [ x ] when TypedSTerm.equal x p -> [s]
+  | _ -> map(fun x -> mk ~proof:(proof s) x) fp *)
 
 let map_propositions ~proof f =
   CCVector.flat_map_list(fun s -> match Statement.view s with
@@ -515,7 +511,7 @@ let with_subterm_or_id t f = try
 
 (* If p is non-constant subproposition closed wrt variables vs, then (p ⇒ c[p:=⊤]) ∧ (p ∨ c[p:=⊥]) or else c unmodified. *)
 let case_bool vs c p =
-  if is_bool p && not(is_T_F p) && p!=c && Var.Set.is_empty(Var.Set.diff (free_vars_set p) vs) then
+  if is_bool p && not(is_T_F p) && not (TypedSTerm.equal p c) && Var.Set.is_empty(Var.Set.diff (free_vars_set p) vs) then
     let ty = prop in
     app_builtin ~ty And [
       app_builtin ~ty Imply [p; replace p Form.true_ c];
@@ -530,7 +526,7 @@ let rec case_bools_wrt vs t =
       match view s with
       | App(f,ps) ->
         let t' = fold_left (case_bool vs) t ps in
-        if t==t' then None else Some(case_bools_wrt vs t')
+        if TypedSTerm.equal t t' then None else Some(case_bools_wrt vs t')
       | _ -> None
     )
 
@@ -542,7 +538,7 @@ let eager_cases_far =
       [with_subterm_or_id t (fun vs s -> match view s with
            | Bind((Forall|Exists) as q, v, b) ->
              let b' = case_bools_wrt (Var.Set.add vs v) b in
-             if b==b' then None else Some(replace s (bind ~ty:prop q v b') t)
+             if TypedSTerm.equal b b' then None else Some(replace s (bind ~ty:prop q v b') t)
            | _ -> None)
        |> case_bools_wrt Var.Set.empty])
 
@@ -558,8 +554,8 @@ let eager_cases_near =
         | Bind((Forall|Exists),_,_) -> None
         | AppBuiltin((Eq|Neq), [x;y]) when is_bool x -> None
         | _ when is_bool s ->
-          let s' = case_bool vs s (with_subterm_or_id s (fun _ -> CCOpt.if_(fun x -> x!=s && is_bool x && not(is_T_F x)))) in
-          if s==s' then None else Some(case_near(replace s s' t))
+          let s' = case_bool vs s (with_subterm_or_id s (fun _ -> CCOpt.if_(fun x -> not (TypedSTerm.equal x s) && is_bool x && not(is_T_F x)))) in
+          if TypedSTerm.equal s s' then None else Some(case_near(replace s s' t))
         | _ -> None)
   in
   map_propositions ~proof (fun _ p -> [case_near p])
