@@ -127,7 +127,7 @@ end
 
 let enable_arith_ = ref true
 let enable_ac_ = ref false
-let enable_semantic_tauto_ = ref true
+let enable_semantic_tauto_ = ref false (* FIXME: seems to be super slow on ARI184 *)
 let enable_trivial_ineq_ = ref true
 let enable_demod_ineq_ = ref true
 let dot_unit_ = ref None
@@ -1707,9 +1707,11 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* cache the result because it's a bit expensive *)
   let is_tautology c =
-    if C.get_flag flag_computed_tauto c
-    then C.get_flag flag_tauto c
-    else (
+    if C.get_flag flag_computed_tauto c then (
+      C.get_flag flag_tauto c
+    ) else if not !enable_semantic_tauto_ then (
+      false
+    ) else (
       (* compute whether [c] is an arith tautology *)
       let res = _has_arith c && _is_tautology c in
       C.set_flag flag_tauto c res;
@@ -2245,6 +2247,9 @@ let () =
     [ "--no-int-semantic-tauto"
     , Arg.Clear enable_semantic_tauto_
     , " disable integer arithmetic semantic tautology check"
+    ; "--int-semantic-tauto"
+    , Arg.Set enable_semantic_tauto_
+    , " enable integer arithmetic semantic tautology check"
     ; "--int-trivial-ineq"
     , Arg.Set enable_trivial_ineq_
     , " enable integer inequality triviality checking by rewriting"

@@ -51,7 +51,7 @@ let section = Util.Section.make ~parent:Const.section "rat-arith"
 
 let enable_rat_ = ref true
 let enable_ac_ = ref false
-let enable_semantic_tauto_ = ref true
+let enable_semantic_tauto_ = ref false (* FIXME: seems to be super slow on ARI184 *)
 let dot_unit_ = ref None
 
 let flag_tauto = SClause.new_flag ()
@@ -1165,9 +1165,11 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* cache the result because it's a bit expensive *)
   let is_tautology c =
-    if C.get_flag flag_computed_tauto c
-    then C.get_flag flag_tauto c
-    else (
+    if C.get_flag flag_computed_tauto c then (
+      C.get_flag flag_tauto c
+    ) else if not !enable_semantic_tauto_ then (
+      false
+    ) else (
       (* compute whether [c] is an arith tautology *)
       let res = _has_rat c && _is_tautology c in
       C.set_flag flag_tauto c res;
@@ -1505,9 +1507,12 @@ let extension =
 
 let () =
   Params.add_opts
-    [ "--rat-no-semantic-tauto"
+    [ "--no-rat-semantic-tauto"
     , Arg.Clear enable_semantic_tauto_
     , " disable rational arithmetic semantic tautology check"
+    ; "--rat-semantic-tauto"
+    , Arg.Set enable_semantic_tauto_
+    , " enable rational arithmetic semantic tautology check"
     ; "--rat-arith"
     , Arg.Set enable_rat_
     , " enable axiomatic rational arithmetic"
