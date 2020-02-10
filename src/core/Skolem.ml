@@ -239,8 +239,9 @@ let define_form ?(pattern="zip_tseitin") ~ctx ~rw_rules ~polarity ~parents form 
         assert (T.equal form (T.Subst.eval ~rename_binders:false subst def.form));
         (* nothing is bound in form *)
         assert(T.equal form (T.Subst.eval ~rename_binders:false subst form));
-        Util.debugf ~section 1 "@[Reusing definition %a. Old def: %a. New def: %a]"
-          (fun k -> k T.pp def.proxy T.pp def.form T.pp form);
+        Util.debugf ~section 1
+          "@[<1>Reusing definition %a@ with type %a.@ Old def: %a.@ New def: %a]"
+          (fun k -> k T.pp def.proxy T.pp def.proxy_ty T.pp def.form T.pp form);
         let proxy = T.Subst.eval subst def.proxy in
         let proof = Proof.Step.define_internal def.proxy_id parents in
         let res = {
