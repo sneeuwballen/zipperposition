@@ -1045,8 +1045,14 @@ let rec pp_depth ?(hooks=[]) depth out t =
       Format.fprintf out "%a %a. %a" Builtin.pp b (_pp depth) x (_pp depth) body;
     | AppBuiltin (b, ([_;a] | [a])) when Builtin.is_prefix b ->
       Format.fprintf out "@[<1>%a %a@]" Builtin.pp b (_pp depth) a
+    | AppBuiltin (b, [t1;t2]) when Builtin.is_infix b ->
+      Format.fprintf out "(@[%a %s@ %a@])" (_pp depth) t1 (Builtin.to_string b) (_pp depth) t2
+    | AppBuiltin (b, [_ty;t1;t2]) when Builtin.is_infix b && is_tType (ty_exn _ty) ->
+      (* always drop the type argument, it's always inferrable for builtins *)
+      Format.fprintf out "(@[%a %s@ %a@])" (_pp depth) t1 (Builtin.to_string b) (_pp depth) t2
     | AppBuiltin (b, l) when Builtin.is_infix b && List.length l >= 2 ->
-      let sep = CCFormat.sprintf " %s " (Builtin.TPTP.to_string b) in
+      Format.printf "cc %a@." (CCFormat.Dump.list (_pp depth)) l;
+      let sep = CCFormat.sprintf " %s " (Builtin.to_string b) in
       Format.fprintf out "(@[%a@])" (Util.pp_list ~sep (_pp depth)) l
     | AppBuiltin (b, []) -> Builtin.pp out b
     | AppBuiltin (b, l) ->
@@ -1123,8 +1129,13 @@ let rec pp_zf out t =
       Format.printf "%a %a. %a" Builtin.pp b pp_zf x pp_zf body;
     | AppBuiltin (b, ([_;a] | [a])) when Builtin.is_prefix b ->
       Format.fprintf out "@[<1>%a %a@]" Builtin.ZF.pp b (pp_ depth) a
+    | AppBuiltin (b, [t1;t2]) when Builtin.is_infix b ->
+      Format.fprintf out "(@[%a %a@ %a@])" (pp_ depth) t1 Builtin.ZF.pp b (pp_ depth) t2
+    | AppBuiltin (b, [_ty;t1;t2]) when Builtin.is_infix b && is_tType (ty_exn _ty) ->
+      (* always drop the type argument, it's always inferrable for builtins *)
+      Format.fprintf out "(@[%a %a@ %a@])" (pp_ depth) t1 Builtin.ZF.pp b (pp_ depth) t2
     | AppBuiltin (b, l) when List.length l >= 2 && Builtin.is_infix b ->
-      let sep = CCFormat.sprintf " %s " (Builtin.TPTP.to_string b) in
+      let sep = CCFormat.sprintf " %s " (Builtin.to_string b) in
       Format.fprintf out "(@[%a@])" (Util.pp_list ~sep pp_zf) l
     | AppBuiltin (b, []) -> Builtin.ZF.pp out b
     | AppBuiltin (b, l) ->
