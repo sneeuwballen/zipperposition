@@ -68,6 +68,7 @@ $(TEST_TOOL)-local: check-test-tool snapshots
 	  --summary snapshots/local-$(DATE).txt \
 	  --csv snapshots/local-$(DATE).csv $(TEST_FILES)
 
+.PHONY: docker-build
 docker-build:
 	docker build -t zipperposition .
 
