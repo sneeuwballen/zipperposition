@@ -73,7 +73,7 @@ let create
     sc_counter=0;
     sc_new_defs = [];
     sc_gensym = Hashtbl.create 16;
-    sc_new_ids = []; 
+    sc_new_ids = [];
     sc_on_new = on_new;
   } in
   ctx
@@ -193,17 +193,17 @@ let stmt_of_form rw_rules polarity proxy proxy_id proxy_ty form proof =
 let find_def_in_ctx ~ctx form =
   CCList.find_map (fun def ->
       match def with
-      | Def_form def when not def.rw_rules -> 
+      | Def_form def when not def.rw_rules ->
         let def_form = def.form in
-        let df_vars, f_vars = 
+        let df_vars, f_vars =
           CCPair.map_same (fun x -> Var.Set.of_seq (T.Seq.vars x)) (def_form,form) in
-        if not (Var.Set.intersection_empty df_vars f_vars) then None 
+        if not (Var.Set.intersection_empty df_vars f_vars) then None
         else CCOpt.map (fun subst -> def,subst) (TypedSTerm.try_alpha_renaming def_form form)
-      | _ -> None) 
+      | _ -> None)
     ctx.sc_new_defs
 
 let define_form ?(pattern="zip_tseitin") ~ctx ~rw_rules ~polarity ~parents form =
-  let create_new ~ctx ~rw_rules ~polarity ~parents ~form = 
+  let create_new ~ctx ~rw_rules ~polarity ~parents ~form =
     incr_counter ctx;
     let tyvars, vars = collect_vars Var.Subst.empty form in
     let vars_t = List.map (fun v->T.var v) vars in
@@ -229,7 +229,7 @@ let define_form ?(pattern="zip_tseitin") ~ctx ~rw_rules ~polarity ~parents form 
     Util.debugf ~section 5 "@[<2>define_form@ %a@ :proof %a@]"
       (fun k->k pp_form_definition def Proof.Step.pp proof);
     def in
-  let res = 
+  let res =
     if not rw_rules then (
       (* Format.printf "defining:@ @[%a@]\n" T.pp form; *)
 
@@ -245,7 +245,7 @@ let define_form ?(pattern="zip_tseitin") ~ctx ~rw_rules ~polarity ~parents form 
         let proxy = T.Subst.eval subst def.proxy in
         let proof = Proof.Step.define_internal def.proxy_id parents in
         let res = {
-          def with 
+          def with
           form; proxy; proof; polarity;
           as_stmt = lazy (stmt_of_form rw_rules polarity proxy
                             def.proxy_id def.proxy_ty form proof);

@@ -46,7 +46,7 @@ module Make(C : Index.CLAUSE) = struct
              Iter.filter SLiteral.is_neg lits |> Iter.length);
       }
 
-    let rec _depth_term depth t = 
+    let rec _depth_term depth t =
       let pref,t = T.open_fun t in
       let depth = depth + (List.length pref) in
       match T.view t with
@@ -58,7 +58,7 @@ module Make(C : Index.CLAUSE) = struct
       | T.App (_, l) ->
         if CCList.is_empty l || T.is_var (T.head_term t)  then depth (* for logical operators*)
         else (
-          let max_arg_depth = 
+          let max_arg_depth =
             Iter.max_exn (Iter.map (_depth_term depth) (Iter.of_list l)) in
           max_arg_depth + 1
         )

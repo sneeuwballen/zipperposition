@@ -118,8 +118,8 @@ module Cst_ = struct
   let rules_term_seq t : term_rule Iter.t =
     rules_seq t
     |> Iter.filter_map
-      (function 
-        | T_rule t -> 
+      (function
+        | T_rule t ->
           Some t
         | _ -> None)
 
@@ -303,7 +303,7 @@ module Term = struct
     (* compute normal form of subterm. Tail-recursive.
        @param k the continuation
        @return [t'] where [t'] is the normal form of [t] *)
-    let rec reduce t k = 
+    let rec reduce t k =
       let t = Lambda.snf t in
       match T.view t with
       | _ when !fuel = 0 -> k t

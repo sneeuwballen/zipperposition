@@ -160,12 +160,12 @@ let compute_prec ~signature stmts =
     (* add constraint about inductive constructors, etc. *)
     |> Compute_prec.add_constr 10 Classify_cst.prec_constr
     |> Compute_prec.set_weight_rule (
-      fun stmts -> 
-        let sym_depth = 
-          stmts 
-          |> Iter.flat_map Statement.Seq.terms 
+      fun stmts ->
+        let sym_depth =
+          stmts
+          |> Iter.flat_map Statement.Seq.terms
           |> Iter.flat_map (fun t -> Term.Seq.subterms_depth t
-                                     |> Iter.filter_map (fun (st,d) -> 
+                                     |> Iter.filter_map (fun (st,d) ->
                                          CCOpt.map (fun id -> (id,d)) (Term.head st)))  in
         Precedence.weight_fun_of_string ~signature !_kbo_wf sym_depth)
     (* |> Compute_prec.set_weight_rule (fun _ -> Classify_cst.weight_fun) *)
@@ -432,9 +432,9 @@ let parse_cli =
 
 let syms_in_conj decls =
   let open Iter in
-  decls 
+  decls
   |> CCVector.to_seq
-  |> flat_map (fun st -> 
+  |> flat_map (fun st ->
       let pr = Statement.proof_step st in
       if CCOpt.is_some (Proof.Step.distance_to_goal pr) then (
         Statement.Seq.symbols st
@@ -450,14 +450,14 @@ let process_file ?(prelude=Iter.empty) file =
   let has_goal = has_goal_decls_ decls in
   Util.debugf ~section 1 "parsed %d declarations (%s goal(s))"
     (fun k->k (CCVector.length decls) (if has_goal then "some" else "no"));
-  (* Hooks exist but they can't be used to add statements. 
-     Hence naming quantifiers inside terms is done directly here. 
+  (* Hooks exist but they can't be used to add statements.
+     Hence naming quantifiers inside terms is done directly here.
      Without this Type.Conv.Error occures so the naming is done unconditionally. *)
-  let quant_transformer = 
-    if !Booleans._quant_rename then Booleans.preprocess_booleans 
+  let quant_transformer =
+    if !Booleans._quant_rename then Booleans.preprocess_booleans
     else CCFun.id in
   let transformed = Rewriting.unfold_def_before_cnf (quant_transformer decls) in
-  let sk_ctx = Skolem.create () in 
+  let sk_ctx = Skolem.create () in
   cnf ~sk_ctx transformed >>= fun stmts ->
   let stmts = Booleans.preprocess_cnf_booleans stmts in
   (* compute signature, precedence, ordering *)
@@ -575,7 +575,7 @@ let main ?setup_gc:(gc=true) ?params file =
   Phases.exit >|= fun () ->
   errcode
 
-let () = 
+let () =
   let open Libzipperposition in
   Params.add_opts [
     "--de-bruijn-weight"

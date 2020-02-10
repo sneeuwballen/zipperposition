@@ -187,7 +187,7 @@ val is_pure_var : t -> bool
 val as_pos_pure_var : t -> (Term.var * Term.var) option
 
 val fold_terms :
-  ?position:Position.t -> ?vars:bool -> ?var_args:bool -> ?fun_bodies:bool -> ?ty_args:bool -> 
+  ?position:Position.t -> ?vars:bool -> ?var_args:bool -> ?fun_bodies:bool -> ?ty_args:bool ->
   which:[<`Max|`All] ->
   ?ord:Ordering.t ->
   subterms:bool ->

@@ -42,7 +42,7 @@ module Solver = Msat.Make_pure_sat(struct
     type proof = Sat_solver_intf.proof_step
   end)
 
-module Make() 
+module Make()
   (*   : Sat_solver_intf.S *)
 = struct
   module Lit = BBox.Lit

@@ -140,7 +140,7 @@ let is_int = function Int _ -> true | _ -> false
 let is_rat = function Rat _ -> true | _ -> false
 let is_numeric = function Int _ | Rat _ -> true | _ -> false
 let is_not_numeric x = not (is_numeric x)
-let is_logical_op = function 
+let is_logical_op = function
   |And|Or|Not|Imply|Equiv|Xor|ForallConst|ExistsConst -> true
   |_ -> false
 
@@ -148,7 +148,7 @@ let is_logical_binop = function
   |And|Or|Imply|Xor|Equiv -> true
   |_->false
 
-let is_quantifier = function 
+let is_quantifier = function
   |ForallConst|ExistsConst -> true
   |_ -> false
 

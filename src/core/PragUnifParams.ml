@@ -17,6 +17,6 @@ let k_max_inferences = Flex_state.create_key ()
 let k_max_unifs_solid_ff = Flex_state.create_key ()
 let k_use_weight_for_solid_subsumption = Flex_state.create_key ()
 
-let k_oracle_composer : (((Subst.t option OSeq.t) OSeq.t -> Subst.t option OSeq.t) Flex_state.key) =  (Flex_state.create_key ()) 
+let k_oracle_composer : (((Subst.t option OSeq.t) OSeq.t -> Subst.t option OSeq.t) Flex_state.key) =  (Flex_state.create_key ())
 
 let k_skip_multiplier = Flex_state.create_key ()

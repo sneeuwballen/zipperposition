@@ -48,10 +48,10 @@ let equal_com l1 l2 =
   | Int o1, Int o2 -> Int_lit.equal_com o1 o2
   | _ -> equal l1 l2  (* regular comparison *)
 
-let no_prop_invariant = 
+let no_prop_invariant =
   let diff_f_t t = not (T.equal t T.true_) && not (T.equal t T.false_) in
-  function 
-  | Equation (lhs,rhs,sign) -> 
+  function
+  | Equation (lhs,rhs,sign) ->
     let res = diff_f_t lhs && (diff_f_t rhs || sign = true) in
     if not res then (
       CCFormat.printf "NO PROP INVARIANT BROKEN: %a,%a,%b.\n" T.pp lhs T.pp rhs sign;
@@ -104,10 +104,10 @@ let weight lit =
   fold (fun acc t -> acc + T.size t) 0 lit
 
 let ho_weight =
-  fold (fun acc t -> acc + T.ho_weight t) 0 
+  fold (fun acc t -> acc + T.ho_weight t) 0
 
 let heuristic_weight weight = function
-  | Equation (l, r, true) 
+  | Equation (l, r, true)
     when Term.equal r Term.true_ || Term.equal r Term.false_ -> weight l
   | Equation (l, r, _) -> weight l + weight r
   | True
@@ -129,9 +129,9 @@ module Set = CCSet.Make(struct type t = lit let compare = compare end)
 
 let is_pos = function
   | Equation (l, r, sign) ->
-    let hd_l = Term.head_term l in  
+    let hd_l = Term.head_term l in
     if sign && T.is_true_or_false r && T.is_const hd_l then (
-      T.equal r T.true_ 
+      T.equal r T.true_
     ) else sign
   (* sign *)
   | Int o -> Int_lit.sign o
@@ -178,7 +178,7 @@ let is_type_pred = function
 let is_typex_pred = function
   | Equation(lhs,rhs,true) when T.is_true_or_false rhs ->
     begin match Term.view lhs with
-      | App(f, xs) when not (CCList.is_empty xs) -> 
+      | App(f, xs) when not (CCList.is_empty xs) ->
         T.is_const f && List.for_all T.is_var xs
       | _ -> false end
   | _ -> false
@@ -204,7 +204,7 @@ let is_rat = function Rat _ -> true | _ -> false
 let is_rat_eq = _on_rat Rat_lit.is_eq
 let is_rat_less = _on_rat Rat_lit.is_less
 
-let is_essentially_prop = function 
+let is_essentially_prop = function
   | Equation (_, rhs, true) -> T.is_true_or_false rhs
   | _ -> false
 
@@ -466,7 +466,7 @@ let _eq_subsumes ~subst l1 r1 sc1 l2 r2 sc2 k =
 
         (* CCFormat.printf "%a = %a;\n%a = %a;\n%a.\n" T.pp l1 T.pp l2 T.pp r1 T.pp r2 Subst.pp subst; *)
         k subst
-      with Unif.Fail -> 
+      with Unif.Fail ->
         (* CCFormat.printf "FAILED: %a = %a;\n%a = %a;\n%a.\n" T.pp l1 T.pp l2 T.pp r1 T.pp r2 Subst.pp subst; *)
         ()
     end;
@@ -476,7 +476,7 @@ let _eq_subsumes ~subst l1 r1 sc1 l2 r2 sc2 k =
         let subst = Unif.FO.matching_adapt_scope
             ~subst ~pattern:(Scoped.make r1 sc1) (Scoped.make l2 sc2) in
         k subst
-      with Unif.Fail -> 
+      with Unif.Fail ->
         (* CCFormat.printf "FAILED: %a = %a;\n%a = %a;\n%a.\n" T.pp l1 T.pp l2 T.pp r1 T.pp r2 Subst.pp subst; *)
         ()
     end;
@@ -557,7 +557,7 @@ let is_constraint = function
   | Equation (t, u, false) -> T.is_var t || T.is_var u
   | _ -> false
 
-let negate lit = 
+let negate lit =
   assert(no_prop_invariant lit);
   match lit with
   | Equation (l,r,true) when T.equal r T.true_ || T.equal r T.false_ ->
@@ -601,7 +601,7 @@ let to_multiset lit = match lit with
     Rat_lit.Seq.to_multiset o |> Iter.map fst
     |> Multisets.MT.Seq.of_seq Multisets.MT.empty
 
-let is_trivial lit = 
+let is_trivial lit =
   assert(no_prop_invariant lit);
   match lit with
   | True -> true
@@ -632,7 +632,7 @@ let rec cannot_be_eq (t1:term)(t2:term): Builtin.Tag.t list option =
     | _ -> None
   end
 
-let is_absurd lit = 
+let is_absurd lit =
   assert(no_prop_invariant lit);
   match lit with
   | Equation (l, r, false) when T.equal l r -> true
@@ -642,7 +642,7 @@ let is_absurd lit =
   | Rat o -> Rat_lit.is_absurd o
   | Equation _ | True -> false
 
-let is_absurd_tags lit = 
+let is_absurd_tags lit =
   assert(no_prop_invariant lit);
   match lit with
   | Equation (l,r,true) -> cannot_be_eq l r |> CCOpt.get_or ~default:[]
@@ -699,7 +699,7 @@ let to_ho_term (lit:t): T.t option = match lit with
   | Int _
   | Rat _ -> None
 
-let as_ho_predicate (lit:t) : _ option = 
+let as_ho_predicate (lit:t) : _ option =
   assert(no_prop_invariant lit);
   match lit with
   | Equation(lhs,rhs,true) when (T.equal rhs T.true_ || T.equal rhs T.false_) ->
@@ -726,15 +726,15 @@ let of_unif_subst renaming (s:Unif_subst.t) : t list =
        let u = T.of_term_unsafe u in
        mk_constraint t u)
 
-let normalize_eq lit = 
+let normalize_eq lit =
   match lit with
-  | Equation(lhs, rhs, true) 
+  | Equation(lhs, rhs, true)
     when T.equal rhs T.false_ || T.equal rhs T.true_ ->
-    begin match T.view lhs with 
+    begin match T.view lhs with
       | T.AppBuiltin(Builtin.Eq, [_;l;r]) (* first arg can be type variable *)
       | T.AppBuiltin(Builtin.Eq, [l;r]) ->
         let eq_cons = if T.equal rhs T.true_ then mk_eq else mk_neq in
-        Some (eq_cons l r) 
+        Some (eq_cons l r)
       | T.AppBuiltin(Builtin.Neq, [_;l;r])
       | T.AppBuiltin(Builtin.Neq, [l;r]) ->
         let eq_cons = if T.equal rhs T.true_ then mk_neq else mk_eq in
@@ -804,7 +804,7 @@ module Comp = struct
     | C.Gt -> [l]
     | C.Lt -> [r]
     | C.Eq -> [l]
-    | C.Incomparable -> 
+    | C.Incomparable ->
       [l; r]
 
   (* maximal terms of the literal *)
@@ -815,7 +815,7 @@ module Comp = struct
       let l = Lambda.whnf l in
       if T.is_app_var l && T.equal T.true_ r then [l;r]
       else [l]
-    | Equation (l, r, _) -> 
+    | Equation (l, r, _) ->
       _maxterms2 ~ord l r
     | Int a -> Int_lit.max_terms ~ord a
     | Rat a -> Rat_lit.max_terms ~ord a
@@ -1078,7 +1078,7 @@ module Conv = struct
       | Some f -> f
       | None ->
         begin match lit with
-          | Equation (l, r, true) -> 
+          | Equation (l, r, true) ->
             if Type.is_prop (Term.ty l) then (
               if Term.equal r T.true_ then (
                 SLiteral.atom l true
@@ -1088,7 +1088,7 @@ module Conv = struct
                 SLiteral.atom (T.app_builtin ~ty:Type.prop (Builtin.Equiv) [l;r]) true
               )
             ) else SLiteral.eq l r
-          | Equation (l, r, false) -> 
+          | Equation (l, r, false) ->
             if Type.is_prop (Term.ty l) then (
               if Term.equal Term.true_ r || Term.equal Term.false_ r then (
                 raise (invalid_arg "negative equation cannot be with fale or true");
@@ -1125,7 +1125,7 @@ module Conv = struct
 end
 
 module View = struct
-  let as_eqn lit = 
+  let as_eqn lit =
     assert(no_prop_invariant lit);
     match lit with
     | Equation (l,r,sign) -> Some (l, r, sign)
@@ -1170,15 +1170,15 @@ let _as_var = fun t -> T.as_var_exn (Lambda.eta_reduce t)
 let as_inj_def lit =
   match View.as_eqn lit with
   | Some (l, r, false) ->
-    (try  
+    (try
        let hd_l, hd_r = T.head_exn l, T.head_exn r in
        let vars_l, vars_r = List.map _as_var (T.args l), List.map _as_var (T.args r) in
        let args_l, args_r = VS.of_list vars_l, VS.of_list vars_r in
 
-       (* We are looking for literal f X1 ... Xn ~= f Y1 ... Yn 
+       (* We are looking for literal f X1 ... Xn ~= f Y1 ... Yn
           where all X_i, Y_i are different pairwise, but form each
           other also. *)
-       if hd_l = hd_r && 
+       if hd_l = hd_r &&
           VS.cardinal args_l = List.length (T.args l) &&
           VS.cardinal args_r = List.length (T.args r) &&
           VS.cardinal args_l = VS.cardinal args_r &&
@@ -1189,9 +1189,9 @@ let as_inj_def lit =
   | _ -> None
 
 let is_pure_var lit =
-  match lit with 
-  | Equation(l,r,_) -> 
-    begin 
+  match lit with
+  | Equation(l,r,_) ->
+    begin
       try
         ignore(_as_var l, _as_var r);
         true
@@ -1200,6 +1200,6 @@ let is_pure_var lit =
   | _ -> false
 
 let as_pos_pure_var lit =
-  match View.as_eqn lit with 
+  match View.as_eqn lit with
   | Some (l, r, true) when is_pure_var lit && is_pos lit -> Some(_as_var l,_as_var r)
   | _ -> None

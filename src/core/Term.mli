@@ -241,7 +241,7 @@ val weight : ?var:int -> ?sym:(ID.t -> int) -> t -> int
     @param sym function from ID.ts to their weight (default [const 1])
     @since 0.5.3 *)
 
-val ho_weight : t -> int 
+val ho_weight : t -> int
 
 val ty_vars : t -> Type.VarSet.t
 (** Set of free type variables *)

@@ -25,7 +25,7 @@ module Make (S : sig val st : Flex_state.t end) = struct
        Third argument are possible replacements. *)
     | App of TS.t * multiterm list * TS.t
     (* Lambda abstraction of multiterms *)
-    | Fun of Type.t * multiterm 
+    | Fun of Type.t * multiterm
     (* Replacements that are either bound variables or constants *)
     | Repl of TS.t
 
@@ -65,7 +65,7 @@ module Make (S : sig val st : Flex_state.t end) = struct
     | Repl repls -> repls
     | _ -> invalid_arg "cannot open repl"
 
-  let repl repls = 
+  let repl repls =
     if TS.for_all bvar_or_const repls then (
       Repl repls
     ) else (
@@ -83,7 +83,7 @@ module Make (S : sig val st : Flex_state.t end) = struct
       fun_ ty (of_term body)
     | _ -> repl (TS.singleton term)
 
-  let rec pp out = function 
+  let rec pp out = function
     | AppBuiltin(b,args,repls) ->
       CCFormat.fprintf out "|@[%a@](@[%a@])|@[%a@]|" Builtin.pp b (CCList.pp ~sep:"," pp) args (TS.pp ~sep:" " T.pp) repls;
     | App(hds,args,repls) ->
@@ -93,16 +93,16 @@ module Make (S : sig val st : Flex_state.t end) = struct
     | Repl repls ->
       CCFormat.fprintf out "{r:@[%a@]}" (TS.pp ~sep:" " T.pp) repls
 
-  let cover t solids : multiterm = 
+  let cover t solids : multiterm =
     let n = List.length solids in
 
     let rec aux ~depth s_args t : multiterm  =
       (* All the ways in which we can represent term t using solids *)
-      let sols_as_db = List.mapi (fun i t -> 
+      let sols_as_db = List.mapi (fun i t ->
           (t,T.bvar ~ty:(T.ty t) (n-i-1+depth))) s_args in
-      let matches_of_solids target = 
-        (CCList.filter_map (fun (s, s_db) -> 
-             if T.equal s target then Some s_db else None) 
+      let matches_of_solids target =
+        (CCList.filter_map (fun (s, s_db) ->
+             if T.equal s target then Some s_db else None)
             sols_as_db)
         |> TS.of_list in
       let db_hits = matches_of_solids t in
@@ -116,7 +116,7 @@ module Make (S : sig val st : Flex_state.t end) = struct
         let hds = TS.add hd @@ matches_of_solids hd in
         let args = List.map (aux ~depth s_args) args in
         app hds args db_hits
-      | Fun _ -> 
+      | Fun _ ->
         let ty_args, body = T.open_fun t in
         let d_inc = List.length ty_args in
         let s_args' = List.map (T.DB.shift d_inc) s_args in
@@ -129,12 +129,12 @@ module Make (S : sig val st : Flex_state.t end) = struct
     aux ~depth:0 solids t
 
   let term_intersection s t =
-    let rec aux s t =  
-      match s with 
+    let rec aux s t =
+      match s with
       | AppBuiltin(s_b,s_args,s_repls) ->
         let (t_b,t_args,t_repls) = open_builtin t in
         if s_b = t_b then (
-          let args = List.map (fun (s,t) -> aux s t) @@ 
+          let args = List.map (fun (s,t) -> aux s t) @@
             List.combine s_args t_args in
           app_builtin s_b args (TS.inter s_repls t_repls)
         ) else raise SolidMatchFail
@@ -142,7 +142,7 @@ module Make (S : sig val st : Flex_state.t end) = struct
         let (t_hds,t_args,t_repls) = open_app t in
         let i_hds = TS.inter s_hds t_hds in
         if not @@ TS.is_empty i_hds then (
-          let args = List.map (fun (s,t) -> aux s t) @@ 
+          let args = List.map (fun (s,t) -> aux s t) @@
             List.combine s_args t_args in
           app i_hds args (TS.inter s_repls t_repls)
         ) else raise SolidMatchFail
@@ -156,24 +156,24 @@ module Make (S : sig val st : Flex_state.t end) = struct
         if TS.is_empty res then raise SolidMatchFail
         else repl res
     in
-    try 
+    try
       aux s t
     with Invalid_argument s ->
       Util.debugf 3 "Incompatible constructors: %s" (fun k -> k s);
       raise SolidMatchFail
 
 
-  let refine_subst_w_term subst var t = 
+  let refine_subst_w_term subst var t =
     if not @@ MS.mem var subst then (
       MS.add var t subst
     ) else (
       let old = CCOpt.get_exn @@ MS.get var subst in
-      MS.add var (term_intersection old t) subst 
+      MS.add var (term_intersection old t) subst
     )
 
   let refine_subst_w_subst metasubst subst =
     let res = ref metasubst in
-    Subst.FO.iter (fun (v,_) (t,_) ->  
+    Subst.FO.iter (fun (v,_) (t,_) ->
         res := refine_subst_w_term !res v (of_term t);
       ) subst;
     !res
@@ -184,22 +184,22 @@ module Make (S : sig val st : Flex_state.t end) = struct
     let rec aux subst l r =
       match T.view l with
       | AppBuiltin(b, args) ->
-        begin match T.view r with 
-          | AppBuiltin(b', args') 
+        begin match T.view r with
+          | AppBuiltin(b', args')
             when Builtin.equal b b' && List.length args = List.length args' ->
-            List.fold_left 
-              (fun subst (l',r') ->  aux subst l' r') 
+            List.fold_left
+              (fun subst (l',r') ->  aux subst l' r')
               subst (List.combine args args')
           | _ -> raise SolidMatchFail end
-      | App(hd, args) when T.is_var hd -> 
+      | App(hd, args) when T.is_var hd ->
         refine_subst_w_term subst (T.as_var_exn hd) (cover r args)
-      | App(hd, args) -> 
+      | App(hd, args) ->
         assert(T.is_const hd || T.is_bvar hd);
-        begin match T.view r with 
+        begin match T.view r with
           | App(hd', args') when T.equal hd hd' ->
             assert(List.length args = List.length args');
-            List.fold_left 
-              (fun subst (l',r') ->  aux subst l' r') 
+            List.fold_left
+              (fun subst (l',r') ->  aux subst l' r')
               subst (List.combine args args')
           | _ -> raise SolidMatchFail end
       | Fun _ ->
@@ -208,7 +208,7 @@ module Make (S : sig val st : Flex_state.t end) = struct
         assert(List.length prefix = List.length prefix');
         aux subst body body'
       | Var x -> refine_subst_w_term subst x (cover r [])
-      | _ -> if T.equal l r then subst else raise SolidMatchFail 
+      | _ -> if T.equal l r then subst else raise SolidMatchFail
     in
 
     if Type.equal (T.ty pattern) (T.ty target) then aux subst pattern target
@@ -218,7 +218,7 @@ module Make (S : sig val st : Flex_state.t end) = struct
     let eta_exp_snf ?(f=CCFun.id) =
       Ls.map (fun t -> f @@ Lambda.eta_expand @@ Lambda.snf @@ t) in
 
-    let target' = 
+    let target' =
       Ls.ground_lits @@ eta_exp_snf target in
 
     let subsumer' = eta_exp_snf ~f:(SU.solidify ~limit:false ~exception_on_error:false) subsumer in
@@ -226,21 +226,21 @@ module Make (S : sig val st : Flex_state.t end) = struct
        should be removed *)
     subsumer', target'
 
-  let sign l = 
-    let res = 
-      match l with 
+  let sign l =
+    let res =
+      match l with
       | L.Equation (_, r, sign) ->
         if sign && T.is_true_or_false r then T.equal r T.true_ else sign
       | L.Int o -> Int_lit.sign o
       | L.False -> false
-      | _ -> true 
+      | _ -> true
     in
     if res then 1 else -1
 
   let cmp_by_sign l1 l2 =
     CCOrd.int (sign l1) (sign l2)
 
-  let cmp_by_weight l1 l2 = 
+  let cmp_by_weight l1 l2 =
     CCOrd.int (L.ho_weight l1) (L.ho_weight l2)
 
   let subsumption_cmp l1 l2 =
@@ -262,7 +262,7 @@ module Make (S : sig val st : Flex_state.t end) = struct
             assert(T.is_ground lhs');
             assert(T.is_ground rhs');
             (* let res_list = ref [] in  *)
-            if sign=sign' then 
+            if sign=sign' then
               (
                 (try
                    let c_subst = classic_match ~subst:Subst.empty ~pattern:lhs ~target:lhs' in
@@ -278,7 +278,7 @@ module Make (S : sig val st : Flex_state.t end) = struct
                    let subst1 = (solid_match ~subst ~pattern:lhs ~target:lhs') in
                    k (solid_match ~subst:subst1 ~pattern:rhs ~target:rhs')
                  with SolidMatchFail -> ());
-                (try 
+                (try
                    let subst2 = (solid_match ~subst ~pattern:lhs ~target:rhs') in
                    k (solid_match ~subst:subst2 ~pattern:rhs ~target:lhs')
                  with SolidMatchFail -> ());
@@ -286,18 +286,18 @@ module Make (S : sig val st : Flex_state.t end) = struct
           | _ -> () end
       | L.True -> begin match target with | L.True -> k subst | _ -> () end
       | L.False -> begin match target with | L.False -> k subst | _ -> () end
-      | _ -> 
+      | _ ->
         raise UnsupportedLiteralKind end
 
   let check_subsumption_possibility subsumer target =
     let is_more_specific pattern target =
       not @@ Iter.is_empty (lit_matchers ~subst:MS.empty ~pattern ~target) in
 
-    let neg_s, neg_t = CCPair.map_same (CCArray.fold (fun acc l -> if sign l = (-1) then acc + 1 else acc) 0) (subsumer, target) in 
+    let neg_s, neg_t = CCPair.map_same (CCArray.fold (fun acc l -> if sign l = (-1) then acc + 1 else acc) 0) (subsumer, target) in
     let pos_s, pos_t = CCPair.map_same (CCArray.fold (fun acc l -> if sign l = 1 then acc + 1 else acc) 0) (subsumer, target) in
     (not @@ get_op PUP.k_use_weight_for_solid_subsumption ||
      Ls.weight subsumer <= Ls.weight target) &&
-    neg_s <= neg_t && pos_s <= pos_t && 
+    neg_s <= neg_t && pos_s <= pos_t &&
     (not (neg_t >=3 || pos_t >= 3) ||
      CCArray.for_all (fun l -> CCArray.exists (is_more_specific l) target) subsumer)
 
@@ -309,9 +309,9 @@ module Make (S : sig val st : Flex_state.t end) = struct
       if i >= n then true
       else (
         let lit = subsumer.(i) in
-        CCArray.exists (fun (j,lit') -> 
+        CCArray.exists (fun (j,lit') ->
             if CCBV.get picklist j || cmp_by_sign lit lit' != 0 ||
-               (get_op PUP.k_use_weight_for_solid_subsumption && cmp_by_weight lit lit' > 0) then false 
+               (get_op PUP.k_use_weight_for_solid_subsumption && cmp_by_weight lit lit' > 0) then false
             else (
               let matchers = lit_matchers ~subst ~pattern:lit ~target:lit' in
               Iter.exists (fun subst' ->
@@ -331,8 +331,8 @@ module Make (S : sig val st : Flex_state.t end) = struct
       let picklist = CCBV.create ~size:(Array.length target) false in
       let target_i = CCArray.mapi (fun i l -> (i,l)) target in
       let res = aux picklist MS.empty subsumer target_i in
-      (* CCFormat.printf 
-         "subsumption[%s]:@.S_O:@[%a@]@.S_N:@[%a@]@.T_O:@[%a@]@.T_N:@[%a@]@.@." 
+      (* CCFormat.printf
+         "subsumption[%s]:@.S_O:@[%a@]@.S_N:@[%a@]@.T_O:@[%a@]@.T_N:@[%a@]@.@."
           (if res then "OK" else "FAIL")
           Ls.pp subsumer_o Ls.pp subsumer
           Ls.pp target_o Ls.pp target; *)

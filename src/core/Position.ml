@@ -86,18 +86,18 @@ let rec is_prefix p1 p2 : bool = match p1, p2 with
 let is_strict_prefix p1 p2 = not (equal p1 p2) && is_prefix p1 p2
 
 let rec until_first_fun =
-  function 
-  | Stop -> Stop 
-  | Type p -> Type (until_first_fun p) 
-  | Left p -> Left (until_first_fun p) 
-  | Right p -> Right (until_first_fun p) 
-  | Head p -> Head (until_first_fun p) 
+  function
+  | Stop -> Stop
+  | Type p -> Type (until_first_fun p)
+  | Left p -> Left (until_first_fun p)
+  | Right p -> Right (until_first_fun p)
+  | Head p -> Head (until_first_fun p)
   | Arg(i, p) -> Arg (i, until_first_fun p)
   | Body _ -> Stop
 
-let rec num_of_funs = function 
+let rec num_of_funs = function
   | Stop -> 0
-  | Type p' | Left p' | Right p' | Head p' | Arg (_,p') -> 
+  | Type p' | Left p' | Right p' | Head p' | Arg (_,p') ->
     num_of_funs p'
   | Body p' -> 1 + num_of_funs p'
 

@@ -54,8 +54,8 @@ module Make(X : PARAMETERS) = struct
   let on_signature_update = Signal.create()
 
   let find_signature s = Signature.find !_signature s
-  let find_signature_exn s = 
-    try 
+  let find_signature_exn s =
+    try
       Signature.find_exn !_signature s
     with Not_found ->
       invalid_arg (CCFormat.sprintf "%a not found in signature" ID.pp s)
@@ -96,8 +96,8 @@ module Make(X : PARAMETERS) = struct
     ZProf.exit_prof prof_declare_sym;
     ()
 
-  let set_injective_for_arg sym i = 
-    let arg_bv = 
+  let set_injective_for_arg sym i =
+    let arg_bv =
       match ID.Map.find_opt sym !_inj_syms with
         Some res -> res
       | None -> CCBV.empty () in
@@ -107,7 +107,7 @@ module Make(X : PARAMETERS) = struct
   let is_injective_for_arg sym i  =
     match ID.Map.find_opt sym !_inj_syms with
       Some res -> CCBV.get res i
-    | None -> false 
+    | None -> false
 
 
   module Lit = struct

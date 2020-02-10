@@ -231,23 +231,23 @@ type arg_coeff_fun = ID.t -> int list
 
 let depth_occ_driver ~flip stmt_d =
   let tbl = ID.Tbl.create 16 in
-  Iter.iter (fun (sym,d) -> 
-      try 
+  Iter.iter (fun (sym,d) ->
+      try
         let l = ID.Tbl.find tbl sym in
         ID.Tbl.replace tbl sym (d :: l)
       with _ -> ID.Tbl.add tbl sym [d]
     ) stmt_d;
 
-  let rec sum = function 
+  let rec sum = function
     | [] -> 0
     | x :: xs -> x + (sum xs) in
 
-  let sorted = 
-    ID.Tbl.to_list tbl 
-    |> List.map (fun (id, depths) -> 
+  let sorted =
+    ID.Tbl.to_list tbl
+    |> List.map (fun (id, depths) ->
         let d_sum = sum depths and n = List.length depths in
         (d_sum / n, n, id))
-    |> List.sort (fun (avg1, n1, id1) (avg2, n2, id2) -> 
+    |> List.sort (fun (avg1, n1, id1) (avg2, n2, id2) ->
         let open CCOrd in
         if flip then compare avg2 avg1 <?> (compare, n2, n1) <?> (ID.compare, id2, id1)
         else compare avg1 avg2 <?> (compare, n1, n2) <?> (ID.compare, id1, id2)
@@ -264,12 +264,12 @@ let depth_occurence =  depth_occ_driver ~flip:true
 
 
 (* weight of f = arity of f + 4 *)
-let weight_modarity ~signature a = 
+let weight_modarity ~signature a =
   let arity =  try snd @@ Signature.arity signature a with _ -> 10 in
   Weight.int (arity + 4)
 
-let weight_invarity ~signature = 
-  let max_arity = 
+let weight_invarity ~signature =
+  let max_arity =
     Signature.Seq.symbols signature
     |> Iter.map (fun sym -> snd @@ Signature.arity signature sym)
     |> Iter.max |> CCOpt.get_or ~default:max_int in
@@ -286,19 +286,19 @@ let weight_invfreq (symbs : ID.t Iter.t) : ID.t -> Weight.t =
   let tbl = ID.Tbl.create 16 in
   Iter.iter (ID.Tbl.incr tbl) symbs;
   let max_freq = List.fold_left (max) 0 (ID.Tbl.values_list tbl) in
-  fun sym ->Weight.int (max_freq - (ID.Tbl.get_or ~default:1 tbl sym) + 5) 
+  fun sym ->Weight.int (max_freq - (ID.Tbl.get_or ~default:1 tbl sym) + 5)
 
 let weight_freq (symbs : ID.t Iter.t) : ID.t -> Weight.t =
   let tbl = ID.Tbl.create 16 in
   Iter.iter (ID.Tbl.incr tbl) symbs;
-  fun sym ->Weight.int ((ID.Tbl.get_or ~default:10 tbl sym) + 5) 
+  fun sym ->Weight.int ((ID.Tbl.get_or ~default:10 tbl sym) + 5)
 
 let weight_invfreqrank (symbs : ID.t Iter.t) : ID.t -> Weight.t =
   let tbl = ID.Tbl.create 16 in
   Iter.iter (ID.Tbl.incr tbl) symbs;
-  let sorted = 
-    Iter.sort ~cmp:(fun s1 s2 -> 
-        CCInt.compare (ID.Tbl.get_or tbl ~default:0 s1) 
+  let sorted =
+    Iter.sort ~cmp:(fun s1 s2 ->
+        CCInt.compare (ID.Tbl.get_or tbl ~default:0 s1)
           (ID.Tbl.get_or tbl ~default:0 s2)) symbs in
   ID.Tbl.clear tbl;
   let tbl = ID.Tbl.create 16 in
@@ -309,24 +309,24 @@ let weight_invfreqrank (symbs : ID.t Iter.t) : ID.t -> Weight.t =
 let weight_freqrank (symbs : ID.t Iter.t) : ID.t -> Weight.t =
   let tbl = ID.Tbl.create 16 in
   Iter.iter (ID.Tbl.incr tbl) symbs;
-  let sorted = 
-    Iter.sort ~cmp:(fun s1 s2 -> 
-        CCInt.compare (ID.Tbl.get_or tbl ~default:0 s2) 
+  let sorted =
+    Iter.sort ~cmp:(fun s1 s2 ->
+        CCInt.compare (ID.Tbl.get_or tbl ~default:0 s2)
           (ID.Tbl.get_or tbl ~default:0 s1)) symbs in
   ID.Tbl.clear tbl;
   Iter.iteri (fun i sym -> ID.Tbl.add tbl sym (i+1)) sorted;
   (fun sym -> Weight.int (ID.Tbl.get_or ~default:10 tbl sym))
 
 
-let weight_fun_of_string ~signature s = 
-  let syms_only sym_depth = 
+let weight_fun_of_string ~signature s =
+  let syms_only sym_depth =
     Iter.map fst sym_depth in
   let with_syms f sym_depth = f (syms_only sym_depth) in
-  let ignore_arg f _ = f in 
+  let ignore_arg f _ = f in
 
-  let wf_map = 
-    ["invfreq", with_syms weight_invfreq; 
-     "freq", with_syms weight_freq; 
+  let wf_map =
+    ["invfreq", with_syms weight_invfreq;
+     "freq", with_syms weight_freq;
      "invfreqrank", with_syms weight_invfreqrank;
      "freqrank", with_syms weight_freqrank;
      "modarity", ignore_arg @@ weight_modarity ~signature;

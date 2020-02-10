@@ -4,10 +4,10 @@ module US = Unif_subst
 exception NotUnif = PatternUnif.NotUnifiable
 exception DontKnow = PatternUnif.NotInFragment
 
-(* 
+(*
   an example showing that variable appearing under a rigid symbol can still
   unify: F =?= \u. u (F (\vw.v)) (G F)
-  A unifier is {F |-> \u.u Y Z; G |-> Z} 
+  A unifier is {F |-> \u.u Y Z; G |-> Z}
 
 
   Nonunifiable rigid path is the one with ends up with nonapplied variable,
@@ -33,22 +33,22 @@ let path_check ~subst ~scope var t =
         if under_var || not no_prefix then None
         else raise NotUnif)
       else (
-        CCOpt.map (fun args' -> 
-            if T.same_l args args' then t else T.app hd args') 
+        CCOpt.map (fun args' ->
+            if T.same_l args args' then t else T.app hd args')
           (aux_l ~depth ~under_var:true args))
-    | T.App(hd,args) -> 
+    | T.App(hd,args) ->
       assert(not (T.is_fun hd));
       begin match aux ~depth ~under_var hd with
         | None -> None
-        | Some hd' -> 
-          CCOpt.map (fun args' -> 
-              if T.same_l args args' && T.equal hd hd' then t 
-              else T.app hd' args') 
+        | Some hd' ->
+          CCOpt.map (fun args' ->
+              if T.same_l args args' && T.equal hd hd' then t
+              else T.app hd' args')
             (aux_l ~depth ~under_var args) end
-    | T.AppBuiltin(b, args) -> 
-      CCOpt.map (fun args' -> 
-          if T.same_l args args' then t 
-          else T.app_builtin ~ty:(T.ty t) b args') 
+    | T.AppBuiltin(b, args) ->
+      CCOpt.map (fun args' ->
+          if T.same_l args args' then t
+          else T.app_builtin ~ty:(T.ty t) b args')
         (aux_l ~depth ~under_var args)
     | T.Var _ ->
       assert(not (US.FO.mem subst (T.as_var_exn t,scope)));
@@ -60,14 +60,14 @@ let path_check ~subst ~scope var t =
       let depth_inc = List.length pref_tys in
       begin match aux ~depth:(depth+depth_inc) ~under_var body' with
         | None -> None
-        | Some t' -> 
+        | Some t' ->
           if T.equal t' t then Some t
           else Some (T.fun_l pref_tys t') end
-    | T.DB i when i >= depth -> 
+    | T.DB i when i >= depth ->
       if under_var then None else raise NotUnif
-    | _ -> Some t 
+    | _ -> Some t
   and aux_l ~depth ~under_var args =
-    match args with 
+    match args with
     | [] -> Some []
     | x :: xs ->
       let xs' = aux_l ~depth ~under_var xs in
@@ -85,11 +85,11 @@ let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
       if T.equal s t then subst
       else US.FO.bind subst (T.as_var_exn s, scope) (t, scope))
     else if not (T.is_var s) && not (T.is_var t) then (
-      raise DontKnow) 
+      raise DontKnow)
     else (
       let var, rigid = if T.is_var s then s, t else t,s in
-      match path_check ~subst ~scope var rigid with 
-      | None -> 
+      match path_check ~subst ~scope var rigid with
+      | None ->
         raise DontKnow
       | Some rigid ->
         assert (T.DB.is_closed rigid);
@@ -104,4 +104,4 @@ let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
     else (
       let t0', t1' = fst t0_s, fst t1_s in
       driver t0' t1' (Scoped.scope t0_s) subst
-    )) 
+    ))

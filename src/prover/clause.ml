@@ -160,7 +160,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     | Stmt.Data _
     | Stmt.TyDecl _ -> []
     | Stmt.Def _
-    | Stmt.Rewrite _ -> 
+    | Stmt.Rewrite _ ->
       if not convert_defs then [] (*dealt with by rewriting *)
       (* dealt with  *)
       else List.map of_lits (Stmt.get_formulas_from_defs st)
@@ -266,7 +266,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let eta_reduce c =
     let lit_arr = lits c in
     let changed = ref false in
-    let new_lits = Literals.map (fun t -> 
+    let new_lits = Literals.map (fun t ->
         let reduced = Lambda.eta_reduce (Lambda.snf t) in
         if not (Term.equal t reduced) then changed := true;
         reduced) lit_arr in
@@ -280,7 +280,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let eligible_param (c,sc) subst =
     let ord = Ctx.ord () in
     if BV.is_empty (Lazy.force c.selected) then (
-      let bv, lits' = 
+      let bv, lits' =
         if not @@ Subst.is_empty subst then (
           let lits' = _apply_subst_no_simpl subst (lits c,sc) in
           (* maximal ones *)
@@ -346,9 +346,9 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
         else (
           let (x, y) = List.hd l in
           let v_eq = HVar.equal Type.equal in
-          let rec args_same n = function 
+          let rec args_same n = function
             | [] -> None
-            | (x', y') :: xs -> if (v_eq x x' && v_eq y y') || 
+            | (x', y') :: xs -> if (v_eq x x' && v_eq y y') ||
                                    (v_eq x y' && v_eq y x') then Some (sym, n)
               else args_same (n+1) xs in
           args_same 0 var_pairs

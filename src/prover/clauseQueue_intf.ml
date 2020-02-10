@@ -48,7 +48,7 @@ module type S = sig
     (** The closest a clause is from the initial goal, the lowest its weight.
         Some threshold is used for clauses that are too far away *)
 
-    val conj_relative : ?distinct_vars_mul:float -> 
+    val conj_relative : ?distinct_vars_mul:float ->
       ?parameters_magnitude:[< `Large | `Small > `Large ] ->
       ?goal_penalty:bool -> t
 

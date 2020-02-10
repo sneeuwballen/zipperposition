@@ -12,7 +12,7 @@ type term = Term.t
 (** Deal with boolean subterms as if prop was a specific case of datatype.
     The rules are:
 
-          C[s]  
+          C[s]
     ----------------------
       C[true] or s=false
     where s boolean, not a variable, proper subterm

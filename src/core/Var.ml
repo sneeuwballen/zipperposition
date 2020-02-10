@@ -49,7 +49,7 @@ module Set = struct
           | `Right _ -> None
           | `Both _ -> None)
   let cardinal t = ID.Map.cardinal t
-  let intersection_empty s t =  
+  let intersection_empty s t =
     try
       let _ =
         ID.Map.merge_safe s t

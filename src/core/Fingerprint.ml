@@ -13,7 +13,7 @@ let prof_traverse = ZProf.make "fingerprint.traverse"
 (* a feature.
    A    = variable
    B    = below variable
-   DB i = De-Bruijn index i 
+   DB i = De-Bruijn index i
    N    = invalid position
    S c  = symbol c
 *)
@@ -27,11 +27,11 @@ type fingerprint_fun = T.t -> feature list
 (* TODO: more efficient implem of traversal, only following branches that
    are useful instead of folding and filtering *)
 
-let expand_otf_ body = 
+let expand_otf_ body =
   let extra_args = Type.expected_args (Term.ty body) in
   if CCList.is_empty extra_args then body else (
     let n = List.length extra_args in
-    T.app (T.DB.shift n body) 
+    T.app (T.DB.shift n body)
       (List.mapi (fun i ty -> T.bvar ~ty (n-1-i)) extra_args)
   )
 
@@ -40,8 +40,8 @@ let rec gfpf ?(depth=0) pos t =
   let t_ty = Term.ty t in
   let exp_args_num = List.length (Type.expected_args t_ty) in
   let _, body =  T.open_fun t in
-  match pos with 
-  | [] -> 
+  match pos with
+  | [] ->
     let body = expand_otf_ body in
     gfpf_root ~depth:(depth + exp_args_num) body
   | i::is ->
@@ -56,20 +56,20 @@ let rec gfpf ?(depth=0) pos t =
       if num_acutal_args >= i then (
         let arg = T.DB.shift (List.length extra_args) (List.nth args (i-1)) in
         gfpf ~depth:(depth + exp_args_num) is arg
-      ) 
+      )
       else if num_acutal_args + (List.length extra_args) >= i then (
         let exp_arg_idx = i - num_acutal_args in
         let db_ty = List.nth extra_args (exp_arg_idx-1) in
         let arg = T.bvar (List.length extra_args - exp_arg_idx) ~ty:db_ty in
-        gfpf ~depth:(depth + exp_args_num) is arg) 
+        gfpf ~depth:(depth + exp_args_num) is arg)
       else N
     )
 and gfpf_root ~depth t =
-  match T.view t with 
+  match T.view t with
   | T.AppBuiltin(_, _) -> Ignore
   (* if we are sampling under a function, it can happen that there are
      loosely bound variables that can be unified inside LambdaSup. *)
-  | T.DB i -> if (i < depth) then DB i else Ignore 
+  | T.DB i -> if (i < depth) then DB i else Ignore
   | T.Var _ -> A
   | T.Const c -> S c
   | T.App (hd,_) -> (match T.view hd with
@@ -83,11 +83,11 @@ and gfpf_root ~depth t =
 (* TODO more efficient way to compute a vector of s: if the fingerprint
    is in BFS, compute features during only one traversal of the term? *)
 
-let pp_feature out = function 
+let pp_feature out = function
   | A -> CCFormat.fprintf out "A"
-  | B -> CCFormat.fprintf out "B" 
-  | DB i -> CCFormat.fprintf out "DB %d" i 
-  | N -> CCFormat.fprintf out "N" 
+  | B -> CCFormat.fprintf out "B"
+  | DB i -> CCFormat.fprintf out "DB %d" i
+  | N -> CCFormat.fprintf out "N"
   | S id -> CCFormat.fprintf out "S %a" ID.pp id
   | Ignore -> CCFormat.fprintf out "I"
 
@@ -138,7 +138,7 @@ let cmp_feature f1 f2 = match f1, f2 with
 let compatible_features_unif f1 f2 =
   match f1 with
   | S s1 -> (match f2 with
-      | S s2 -> ID.equal s1 s2 
+      | S s2 -> ID.equal s1 s2
       | A | B | Ignore -> true
       | N | DB _ -> false)
   | Ignore -> true
@@ -146,11 +146,11 @@ let compatible_features_unif f1 f2 =
   | A    -> (match f2 with
       | N  -> false
       | DB _ | Ignore | S _ | A | B  -> true)
-  | DB i -> (match f2 with 
+  | DB i -> (match f2 with
       | DB j -> i = j
       | B | A | Ignore -> true
       | S _ | N -> false)
-  | N ->    (match f2 with 
+  | N ->    (match f2 with
       | N | B | Ignore -> true
       | A | DB _ | S _ -> false)
 
@@ -159,18 +159,18 @@ let compatible_features_match f1 f2 =
   match f1 with
   | S s1 -> (match f2 with
       | S s2 -> ID.equal s1 s2
-      | Ignore -> true 
+      | Ignore -> true
       | _ -> false)
-  | Ignore 
+  | Ignore
   | B    -> true
   | A    -> (match f2 with
       | A | DB _ | S _ | Ignore -> true
       | _ -> false)
-  | DB i -> (match f2 with 
+  | DB i -> (match f2 with
       | DB j -> i = j
       | Ignore -> true
       | _ -> false)
-  | N ->    (match f2 with 
+  | N ->    (match f2 with
       | N | Ignore -> true
       | _ -> false)
 
@@ -346,7 +346,7 @@ module Make(X : Set.OrderedType) = struct
 
   let retrieve_unifiables = retrieve_unifiables_aux Leaf.fold_unify
 
-  let retrieve_unifiables_complete ?(unif_alg=JP_unif.unify_scoped) = 
+  let retrieve_unifiables_complete ?(unif_alg=JP_unif.unify_scoped) =
     retrieve_unifiables_aux (Leaf.fold_unify_complete ~unif_alg)
 
   let retrieve_generalizations ?(subst=S.empty) (idx,sc_idx) t k =

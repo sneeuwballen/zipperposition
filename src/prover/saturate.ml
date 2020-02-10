@@ -23,9 +23,9 @@ let check_timeout = function
   | Some timeout -> Util.total_time_s () > timeout
 
 let e_path = ref (None : string option)
-let tried_e = ref false 
+let tried_e = ref false
 let should_try_e = function
-  | Some timeout when CCOpt.is_some !e_path -> 
+  | Some timeout when CCOpt.is_some !e_path ->
     let passed = Util.total_time_s () in
     if not !tried_e && passed > timeout /. 5.0 then (
       tried_e := true;
@@ -80,7 +80,7 @@ module Make(E : Env.S) = struct
   module Env = E
   module EInterface = EIntf.Make(E)
 
-  let[@inline] check_clause_ c = 
+  let[@inline] check_clause_ c =
     if !_check_types then Env.C.check_types c;
     assert (Env.C.Seq.terms c |> Iter.for_all Term.DB.is_closed);
     assert (Env.C.lits c |> Literals.vars_distinct);
@@ -136,8 +136,8 @@ module Make(E : Env.S) = struct
           Unsat proof
         | c :: l', _ ->
           (* put clauses of [l'] back in passive set *)
-          assert(List.for_all (fun c -> 
-              let is_prop_encoded = 
+          assert(List.for_all (fun c ->
+              let is_prop_encoded =
                 Env.C.Seq.terms c |> Iter.for_all  Lambda.is_properly_encoded in
               if not is_prop_encoded then (
                 CCFormat.printf "IMPROPERLY ENCODED: %a" Env.C.pp c;
@@ -224,7 +224,7 @@ module Make(E : Env.S) = struct
 
           if should_try_e timeout then (
             let res = EInterface.try_e (Env.get_active ()) (Env.get_passive ()) in
-            match res with 
+            match res with
             | Some c -> Env.add_passive (Iter.singleton c);
             | _ -> ()
           );

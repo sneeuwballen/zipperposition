@@ -300,9 +300,9 @@ let app_builtin ?loc ~ty b (l:t list) =
         | AppBuiltin (Builtin.False,[]) -> mk_ Builtin.True []
         | _ -> mk_ b l
       end
-    | Builtin.Arrow, ret1 :: args1 -> 
-      begin match view ret1 with 
-        | AppBuiltin (Builtin.Arrow, ret2 :: args2) -> 
+    | Builtin.Arrow, ret1 :: args1 ->
+      begin match view ret1 with
+        | AppBuiltin (Builtin.Arrow, ret2 :: args2) ->
           mk_ Builtin.Arrow (ret2 :: args1 @ args2)
         | _ -> mk_ b l
       end
@@ -532,7 +532,7 @@ let close_all ~ty s t =
 let close_with_vars vars t =
   let vars = List.map (fun v -> match view v with
       | Var v -> v
-      | _ -> invalid_arg "has to be a variable" ) 
+      | _ -> invalid_arg "has to be a variable" )
       vars in
   bind_list Binder.Forall vars t ~ty:prop
 
@@ -861,14 +861,14 @@ module Form = struct
     let flattened = flatten_ `And [] l in
     match flattened with
     | [] -> true_
-    | [t] -> t 
+    | [t] -> t
     | _ ->  app_builtin ?loc ~ty:Ty.prop Builtin.And (flattened)
 
-  let or_ ?loc l = 
+  let or_ ?loc l =
     let flattened = flatten_ `Or [] l in
     match flattened with
     | [] -> false_
-    | [t] -> t 
+    | [t] -> t
     | _ ->  app_builtin ?loc ~ty:Ty.prop Builtin.Or (flattened)
 
   let not_ ?loc f = app_builtin ?loc ~ty:Ty.prop Builtin.Not [f]
@@ -891,13 +891,13 @@ module Form = struct
     in
     forall_l ?loc tyvars (forall_l ?loc vars f)
 
-  let is_var = function 
+  let is_var = function
     | Atom x -> is_var x
     | _ -> false
 end
 
 let _l_counter = ref 0
-let _lam_ids = Tbl.create 16 
+let _lam_ids = Tbl.create 16
 
 let is_monomorphic t =
   Seq.subterms t
@@ -1005,13 +1005,13 @@ let rec rectify_aux ?(pref="v_") ~cnt ~subst t =
   let t_ty = ty_exn t in
   match view t with
   | Const _ -> (t, subst)
-  | Var v -> 
+  | Var v ->
     let (t,subst,_) = handle_var ~pref ~cnt ~subst v t_ty in (t,subst)
-  | App (hd, fs) -> 
+  | App (hd, fs) ->
     let ts, subst = rec_aux_l ~cnt ~subst (hd :: fs) in
     let hd = List.hd ts and args = List.tl ts in
     app ~ty:t_ty hd args, subst
-  | Bind(b, v_old, body) ->  
+  | Bind(b, v_old, body) ->
     let old = Subst.find subst v_old in
     let (_,subst,v) = handle_var ~rename:false ~pref ~cnt ~subst v_old t_ty in
     let (body, subst) = rectify_aux ~cnt ~subst body in
@@ -1023,11 +1023,11 @@ let rec rectify_aux ?(pref="v_") ~cnt ~subst t =
   | _ -> t, subst
 and rec_aux_l ?(pref="v_") ~cnt ~subst args =
   ignore(pref);
-  List.fold_right (fun arg (tmp,subst) -> 
+  List.fold_right (fun arg (tmp,subst) ->
       let arg', subst' = rectify_aux ~subst ~cnt arg in
       arg' :: tmp, subst'
     ) args ([], subst)
-and handle_var ~pref ?(rename=true) ~cnt ~subst v t_ty = 
+and handle_var ~pref ?(rename=true) ~cnt ~subst v t_ty =
   ignore(pref);
   if rename && Subst.mem subst v then (Subst.find_exn subst v, subst, v) else (
     let id = CCRef.get_then_incr cnt in
@@ -1037,7 +1037,7 @@ and handle_var ~pref ?(rename=true) ~cnt ~subst v t_ty =
     (res, subst, v')
   )
 
-let rectify ?(cnt=ref 0) ?(subst=Subst.empty) t = 
+let rectify ?(cnt=ref 0) ?(subst=Subst.empty) t =
   rectify_aux ~cnt ~subst t
 
 let rectify_l ?(cnt=ref 0) ?(subst=Subst.empty)  ls =
@@ -1047,36 +1047,36 @@ let rectify_l ?(cnt=ref 0) ?(subst=Subst.empty)  ls =
 let rec lift_lambdas  f =
   let aux = lift_lambdas  in
   let ty = ty_exn f in
-  match view f with 
+  match view f with
   | Var _ | Const _ -> (f,[])
-  | App (hd, fs) -> 
+  | App (hd, fs) ->
     let hd', hd_def = aux hd in
-    let fs', all_defs = 
-      List.fold_right (fun f (args, defs) -> 
+    let fs', all_defs =
+      List.fold_right (fun f (args, defs) ->
           let f', new_defs = aux f in
           (f'::args, new_defs @ defs)) fs ([],hd_def) in
     if not (CCList.is_empty all_defs) then (
       app ~ty hd' fs', all_defs
     ) else f, []
-  | Bind(Binder.Lambda, _, _) ->  
+  | Bind(Binder.Lambda, _, _) ->
     let vars, body = unfold_binder Binder.Lambda f in
     assert(not @@ CCList.is_empty vars);
     let body', new_defs = aux body in
     let var_set = Var.Set.of_list vars in
-    let free_vars = 
+    let free_vars =
       Var.Set.diff (Var.Set.of_seq (Seq.free_vars body')) var_set
       |> Var.Set.to_list in
-    let replacement, def = 
+    let replacement, def =
       define_lambda_of  ~bound:vars ~free:free_vars body' in
     replacement, def :: new_defs
-  | Bind(b, v, body) ->  
+  | Bind(b, v, body) ->
     let body', new_defs = aux body in
     if not (CCList.is_empty new_defs) then (
       bind ~ty b v body', new_defs
     ) else f,[]
   | AppBuiltin(b, fs) ->
-    let fs', all_defs = 
-      List.fold_right (fun f (args, defs) -> 
+    let fs', all_defs =
+      List.fold_right (fun f (args, defs) ->
           let f', new_defs = aux f in
           (f'::args, new_defs @ defs)) fs ([],[]) in
     if not (CCList.is_empty all_defs) then (
@@ -1084,26 +1084,26 @@ let rec lift_lambdas  f =
     ) else f, []
   | _ -> invalid_arg "not implemented yet"
 and define_lambda_of ~bound ~free body =
-  let cnt = ref 0 in  
+  let cnt = ref 0 in
   let rec_free, rectifier = rectify_l ~cnt (List.rev_map var free) in
   let rec_bound, rectifier = rectify_l ~cnt ~subst:rectifier (List.rev_map var bound) in
   let rec_body, recitifier = rectify ~cnt ~subst:rectifier body in
 
-  let eval_vars vs  = List.map (fun v -> 
-      match view (Subst.eval recitifier v) with 
+  let eval_vars vs  = List.map (fun v ->
+      match view (Subst.eval recitifier v) with
       | Var v -> v
       | _ -> invalid_arg "substitution is not a rectifier")  vs in
   let rec_bound = eval_vars rec_bound and rec_free = eval_vars rec_free in
   let closed  = fun_l (rec_free @ rec_bound) rec_body in
   let args = List.map (fun v -> var v) (free @ bound) in
 
-  let def_opt = 
+  let def_opt =
     (* old versions of OCaml do not support Tbl.find_opt *)
-    if Tbl.mem _lam_ids closed 
+    if Tbl.mem _lam_ids closed
     then Some (Tbl.find _lam_ids closed)
     else None in
 
-  match def_opt with 
+  match def_opt with
   | Some (id,def) ->
     fst @@ apply_to_new_hd id free bound body args, def
   | None ->
@@ -1503,7 +1503,7 @@ let apply_unify ?gen_fresh_meta ?allow_open ?loc ?st ?(subst=Subst.empty) ty l =
       aux_l subst exp ret l
     | Ty.Ty_meta _, _ ->
       begin match gen_fresh_meta with
-        | None -> 
+        | None ->
           fail_uniff_ ?loc [] "cannot apply type `@[%a@]`@ to `@[%a@]`"
             pp ty (Util.pp_list pp) l
         | Some g ->
@@ -1513,7 +1513,7 @@ let apply_unify ?gen_fresh_meta ?allow_open ?loc ?st ?(subst=Subst.empty) ty l =
             (Ty.fun_ (List.map ty_exn l) ret);
           ret
       end
-    | Ty.Ty_var v, _ when Subst.mem subst v -> 
+    | Ty.Ty_var v, _ when Subst.mem subst v ->
       (* Apply the substitution because it could replace the type variable by a function type *)
       aux subst (Subst.eval subst ty) l
     | (Ty.Ty_var _ | Ty.Ty_app _ | Ty.Ty_builtin _
@@ -1534,17 +1534,19 @@ let app_infer ?st ?subst f l =
   let ty = apply_unify ?st ?subst (ty_exn f) l in
   app ~ty f l
 
-let try_alpha_renaming f1 f2 = 
-  let rec aux subst = function 
+let try_alpha_renaming f1 f2 =
+  let rec aux subst = function
     | [] -> subst
-    | (f1,f2) :: rest -> 
+    | (f1,f2) :: rest ->
       match view f1, view f2 with
       | Var v, Var v' ->
-        begin match Subst.find subst v with 
-          | Some t -> begin match view t with
+        begin match Subst.find subst v with
+          | Some t ->
+            begin match view t with
               | Var v'' when Var.equal v' v'' && equal (Var.ty v') (Var.ty v'') ->
                 aux subst rest
-              | _ -> fail_unif_ [f1,f2] "double binding" end
+              | _ -> fail_unif_ [f1,f2] "double binding"
+            end
           | None ->
             if not (Var.equal v v')
             then aux (Subst.add subst v f2) ((Var.ty v,Var.ty v')::rest)
@@ -1557,7 +1559,7 @@ let try_alpha_renaming f1 f2 =
            the same algorithm *)
         let args = List.combine (hd_x :: xs) (hd_y :: ys) in
         aux subst (args @ rest)
-      | AppBuiltin(hd_x, xs), AppBuiltin(hd_y, ys) 
+      | AppBuiltin(hd_x, xs), AppBuiltin(hd_y, ys)
         when Builtin.equal hd_x hd_y && List.length xs = List.length ys ->
         (* unify types, if they have any *)
         let rest = match f1.ty, f2.ty with
@@ -1571,7 +1573,7 @@ let try_alpha_renaming f1 f2 =
         fail_unif_ [f1,f2] "arity mismatch"
       | Bind(b, v, body), Bind(b', v', body') when Binder.equal b b' ->
         assert(not @@ Subst.mem subst v);
-        let subst = if not (Var.equal v v') then Subst.add subst v (var v') 
+        let subst = if not (Var.equal v v') then Subst.add subst v (var v')
           else subst in
         aux subst ((Var.ty v, Var.ty v') :: (body, body') ::  rest)
       | _ -> fail_unif_ [f1,f2] "mismatch or unknown constructors"

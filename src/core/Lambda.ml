@@ -10,7 +10,7 @@ let prof_eta_reduce = ZProf.make "term.eta_reduce"
 
 
 module OptionSet = Set.Make(
-  struct 
+  struct
     let compare x y = Pervasives.compare x y
     type t = int option
   end)
@@ -71,7 +71,7 @@ module Inner = struct
         (* beta-reduce *)
         Util.debugf 50 "(@[<2>beta-reduce@ @[%a@ %a@]@])"
           (fun k->k T.pp st.head T.pp a);
-        assert (not (T.is_ground ty_var) || not (T.is_ground (T.ty_exn a)) 
+        assert (not (T.is_ground ty_var) || not (T.is_ground (T.ty_exn a))
                 || T.equal ty_var (T.ty_exn a));
         let st' =
           { head=body;
@@ -84,7 +84,7 @@ module Inner = struct
       | T.AppBuiltin _, _ | T.Bind _, _ -> st
     end
 
-  let whnf_term_aux ?(env=DBEnv.empty) t = 
+  let whnf_term_aux ?(env=DBEnv.empty) t =
     match T.ty t with
     | T.HasType ty->
       let st = st_of_term ~ty ~env t in
@@ -124,7 +124,7 @@ module Inner = struct
           | T.Bind (b, varty, body) ->
             let body' = snf_rec body in
             if T.equal body body' then t else T.bind b ~ty ~varty body'
-        end) 
+        end)
     else t
 
   let eta_expand_rec t =
@@ -173,15 +173,15 @@ module Inner = struct
     aux t
 
   (* compute eta-reduced normal form *)
-  let eta_reduce_aux ?(full=true) t =      
+  let eta_reduce_aux ?(full=true) t =
     let q_reduce ~pref_len t =
       let hd, args = T.as_app t in
       let n = List.length args in
-      let _, r_bvars = 
-        List.fold_right (fun arg (idx, vars) -> 
+      let _, r_bvars =
+        List.fold_right (fun arg (idx, vars) ->
             if idx = -1 then (idx, vars)
             else (
-              if idx < pref_len && T.is_bvar_i idx arg then 
+              if idx < pref_len && T.is_bvar_i idx arg then
                 (idx+1, arg :: vars)
               else (-1, vars)
             )
@@ -193,19 +193,19 @@ module Inner = struct
         let _, m = List.fold_right (fun arg (idx, m) ->
             if idx = -1 then (idx, m)
             else (
-              if not @@ List.exists (fun tt -> 
+              if not @@ List.exists (fun tt ->
                   T.DB.contains tt (T.as_bvar_exn arg)) non_redundant then
-                (idx+1, m+1) 
+                (idx+1, m+1)
               else (-1, m))
           ) r_bvars (0, 0) in
         if m > 0 then (
-          let args = CCList.take (n-m) args in 
+          let args = CCList.take (n-m) args in
           let ty = Type.apply_unsafe (Type.of_term_unsafe @@ T.ty_exn hd) args in
           m, T.DB.unshift m (T.app ~ty:(ty :> T.t) hd args)
         ) else 0, t
       ) in
     let rec aux t =
-      if T.has_lambda t then (      
+      if T.has_lambda t then (
         match T.ty t with
         | T.NoType -> t
         | T.HasType ty ->
@@ -243,7 +243,7 @@ module Inner = struct
     t'
 
 
-  let beta_red_head t = 
+  let beta_red_head t =
     let pref, body = T.open_fun t in
     let res = T.fun_l pref (whnf body) in
     res
@@ -303,9 +303,9 @@ let beta_red_head t =
 let rec is_lambda_pattern t = match T.view (whnf t) with
   | T.AppBuiltin (_, ts) -> List.for_all is_lambda_pattern ts
   | T.DB _ | T.Var _ | T.Const _ -> true
-  | T.App (hd, args) -> if T.is_var hd 
-    then all_distinct_bound args 
-    else List.for_all is_lambda_pattern args 
+  | T.App (hd, args) -> if T.is_var hd
+    then all_distinct_bound args
+    else List.for_all is_lambda_pattern args
   | T.Fun (_, body) -> is_lambda_pattern body
 and all_distinct_bound args =
   List.map (fun arg -> match T.view (eta_reduce arg) with T.DB i -> Some i | _ -> None) args
@@ -314,7 +314,7 @@ and all_distinct_bound args =
 
 let rec is_properly_encoded t = match T.view t with
   | Var _ | DB _ | Const _ -> true
-  | AppBuiltin (hd,l) when Builtin.equal hd Builtin.ForallConst 
+  | AppBuiltin (hd,l) when Builtin.equal hd Builtin.ForallConst
                         || Builtin.equal hd Builtin.ExistsConst ->
     let res = begin match l with
       | [body] -> let ty = Term.ty body in
@@ -324,5 +324,5 @@ let rec is_properly_encoded t = match T.view t with
     res
   | AppBuiltin(_,l) -> List.for_all is_properly_encoded l
   | App (hd, l) -> List.for_all is_properly_encoded (hd::l)
-  | Fun (_,u) -> is_properly_encoded u 
+  | Fun (_,u) -> is_properly_encoded u
 

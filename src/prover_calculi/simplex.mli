@@ -126,7 +126,7 @@ module type S = sig
       Notice that it doesn't mean the assignment returned satisfies all bounds.*)
   val get_full_assign : t -> (var * Q.t) list
 
-  (** [get_bounds s x] returns the pair [(low, upp)] of the current bounds for the variable [x]. 
+  (** [get_bounds s x] returns the pair [(low, upp)] of the current bounds for the variable [x].
       Notice that it is possible that [low] is strictly greater than [upp]. *)
   val get_bounds : t -> var -> Q.t * Q.t
 

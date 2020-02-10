@@ -342,7 +342,7 @@ module Make(X : sig
           | Some (t',proof) ->
             applied_rules := StrSet.add name !applied_rules;
             proofs := List.rev_append proof !proofs;
-            let new_t = match !_norm_rule t' with 
+            let new_t = match !_norm_rule t' with
               | None -> t'
               | Some tt -> tt in
             Util.debugf ~section 5
@@ -350,7 +350,7 @@ module Make(X : sig
               (fun k->k T.pp t T.pp new_t (Util.pp_list Proof.pp_parent) proof);
             reduce_term !_rewrite_rules new_t  (* re-apply all rules *)
         end
-    in 
+    in
     let lits' =
       Array.map
         (fun lit -> Lit.map (reduce_term !_rewrite_rules) lit)
@@ -377,7 +377,7 @@ module Make(X : sig
     let did_reduce = ref false in
     let lits' =
       Array.map
-        (fun lit -> Lit.map (fun t -> match !_norm_rule t with 
+        (fun lit -> Lit.map (fun t -> match !_norm_rule t with
              | None -> t
              | Some t' -> did_reduce := true; t' ) lit)
         (C.lits c)

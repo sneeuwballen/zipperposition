@@ -307,7 +307,7 @@ end
 let ctx_narrow_ = ref true
 
 let post_cnf stmts st =
-  CCVector.iter Statement.scan_stmt_for_defined_cst 
+  CCVector.iter Statement.scan_stmt_for_defined_cst
     (if not !rewrite_before_cnf then stmts
      else (
        CCVector.filter (fun st -> match Statement.view st with
@@ -324,10 +324,10 @@ let post_cnf stmts st =
   st
   |> Flex_state.add Key.has_rw has_rw
 
-(* let post_typing stmts state = 
+(* let post_typing stmts state =
 *)
 
-let rewrite_tst_stmt stmt = 
+let rewrite_tst_stmt stmt =
   let aux f =
     let ctx = Type.Conv.create () in
     let t = Term.Conv.of_simple_term_exn ctx f in
@@ -340,26 +340,26 @@ let rewrite_tst_stmt stmt =
     else (
       let proof = ref [] in
       let combined = CCList.combine fs ts in
-      let res = 
-        List.map (fun (f,res) -> 
+      let res =
+        List.map (fun (f,res) ->
             let f', p_list = CCOpt.get_or ~default:(f,[]) res in
             proof := p_list @ !proof;
             f') combined in
       Some (res, !proof)) in
 
   let mk_proof ~stmt_parents f_opt orig =
-    CCOpt.map (fun (f', parent_list) -> 
+    CCOpt.map (fun (f', parent_list) ->
         let rule = Proof.Rule.mk "definition expansion" in
         f', Proof.S.mk_f_simp ~rule orig (parent_list @ stmt_parents)) f_opt in
 
   let stmt_parents = [Proof.Parent.from @@ Statement.as_proof_i stmt] in
   match Statement.view stmt with
-  | Assert f -> 
+  | Assert f ->
     (match mk_proof ~stmt_parents (aux f) f with
      | Some (f', proof) -> Statement.assert_ ~proof:(Proof.S.step proof) f'
      | None -> stmt)
-  | Lemma fs -> 
-    begin match aux_l fs with 
+  | Lemma fs ->
+    begin match aux_l fs with
       | Some (fs', parents) ->
         let rule = Proof.Rule.mk "definition expansion" in
         let fs_parents = (List.map (fun f -> Proof.Parent.from (Proof.S.mk_f_esa ~rule f stmt_parents)) fs)
@@ -371,8 +371,8 @@ let rewrite_tst_stmt stmt =
     (match mk_proof ~stmt_parents (aux g) g with
      | Some (g', proof) -> Statement.goal ~proof:(Proof.S.step proof) g'
      | None -> stmt)
-  | NegatedGoal (skolems, ngs) -> 
-    begin match aux_l ngs with 
+  | NegatedGoal (skolems, ngs) ->
+    begin match aux_l ngs with
       | Some (ng', parents) ->
         let rule = Proof.Rule.mk "definition expansion" in
         let ng_parents = (List.map (fun f -> Proof.Parent.from (Proof.S.mk_f_esa ~rule f stmt_parents)) ngs)
@@ -384,7 +384,7 @@ let rewrite_tst_stmt stmt =
 
 let unfold_def_before_cnf stmts =
   if !rewrite_before_cnf then (
-    CCVector.map (fun stmt -> 
+    CCVector.map (fun stmt ->
         let res = rewrite_tst_stmt stmt in
         (* CCFormat.printf "rewriting @[%a@] into @[%a@]@." Statement.pp_input stmt Statement.pp_input res; *)
         res

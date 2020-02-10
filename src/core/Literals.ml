@@ -62,7 +62,7 @@ let matches a1 a2 =
 let weight lits =
   Array.fold_left (fun w lit -> w + Lit.weight lit) 0 lits
 
-let ho_weight lits = 
+let ho_weight lits =
   Array.fold_left (fun w lit -> w + Lit.ho_weight lit) 0 lits
 
 let depth lits =
@@ -254,15 +254,15 @@ module Conv = struct
   let to_forms ?hooks lits =
     Array.to_list (Array.map (Lit.Conv.to_form ?hooks) lits)
 
-  let to_tst lits = 
+  let to_tst lits =
     let ctx = Type.Conv.create () in
-    Array.map (fun t -> Lit.Conv.lit_to_tst ~ctx (Lit.Conv.to_form t)) lits 
+    Array.map (fun t -> Lit.Conv.lit_to_tst ~ctx (Lit.Conv.to_form t)) lits
     |> Array.to_list
     |> (fun or_args ->
         let ty = TypedSTerm.Ty.prop in
         let clause_vars = T.VarSet.of_seq (Seq.vars lits) in
         let vars = clause_vars
-                   |> T.VarSet.to_list 
+                   |> T.VarSet.to_list
                    |> CCList.map (fun v -> T.Conv.to_simple_term ctx (T.var v))  in
         let disjuncts =  TypedSTerm.app_builtin ~ty Builtin.or_ or_args in
         TypedSTerm.close_with_vars vars disjuncts
@@ -541,16 +541,16 @@ let unshielded_vars ?(filter=fun _->true) lits: _ list =
        filter var &&
        not (is_shielded var lits))
 
-let vars_distinct lits = 
+let vars_distinct lits =
   let dif_vars = vars lits in
-  let dif_ids  = 
+  let dif_ids  =
     List.sort_uniq CCOrd.int @@ List.map HVar.id dif_vars in
   List.length dif_ids = List.length dif_vars
 
-let ground_lits lits = 
+let ground_lits lits =
   let counter = ref 0 in
   let all_vars = T.VarSet.of_seq @@ Seq.vars lits in
-  let gr_subst = T.VarSet.fold (fun v subst -> 
+  let gr_subst = T.VarSet.fold (fun v subst ->
       let ty = HVar.ty v in
       Subst.FO.bind subst ((v :> InnerTerm.t HVar.t),0) (T.mk_tmp_cst ~counter ~ty,0)
     ) all_vars Subst.empty in

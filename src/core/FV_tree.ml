@@ -189,7 +189,7 @@ module Make(C: Index_intf.CLAUSE) = struct
             | Const _
             | DB _
             | Var _ -> ()
-            | Fun (_,u) -> recurse depth u (* not increasing the depth when we go under a fun 
+            | Fun (_,u) -> recurse depth u (* not increasing the depth when we go under a fun
                                                 -- no need to eta expand *)
             | AppBuiltin (_, l) -> List.iter (recurse (depth+1)) l
             | App (hd, l) ->

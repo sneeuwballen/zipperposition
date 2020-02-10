@@ -206,8 +206,8 @@ let conv_rule_i ~proof (r:_ def_rule) = match r with
     Rewrite.T_rule rule
   | Def_form {lhs;rhs;_} ->
     let ctx = Type.Conv.create () in
-    match lhs with 
-    | SLiteral.Atom(lhs, true) -> 
+    match lhs with
+    | SLiteral.Atom(lhs, true) ->
       let lhs = Term.Conv.of_simple_term_exn ctx lhs in
       let hd, args = Term.as_app lhs in
       let ty = Term.ty hd in
@@ -259,15 +259,15 @@ let decl_data_functions ity proof : unit =
 let get_formulas_from_defs st =
   let get_from_rule rule =
     match rule with
-    | Def_term {vars;id;ty;args;rhs;as_form} -> 
+    | Def_term {vars;id;ty;args;rhs;as_form} ->
       ignore(vars,id,ty,args,rhs);
       [as_form]
-    | Def_form {vars;lhs;rhs;polarity;as_form} -> 
+    | Def_form {vars;lhs;rhs;polarity;as_form} ->
       ignore(vars,lhs,polarity,rhs);
       as_form in
 
 
-  match view st with 
+  match view st with
   | Def defs -> CCList.flat_map (fun d -> CCList.flat_map get_from_rule d.def_rules) defs
   | Rewrite def_rule  -> get_from_rule def_rule
   | _ -> []
@@ -525,7 +525,7 @@ let name (st:(_,_,_)t) : string =
       s
   end
 
-let lift_lambdas st = 
+let lift_lambdas st =
   let get_tydecl_from_def ~proof def =
     let _, body = TST.unfold_binder Binder.Forall def in
     match TST.view body with
@@ -535,32 +535,32 @@ let lift_lambdas st =
         | TST.App(hd, _) when TST.is_const hd ->
           let hd_id = TST.head_exn hd in
           let ty = TST.ty_exn hd in
-          ty_decl ~proof hd_id ty 
+          ty_decl ~proof hd_id ty
         | _ -> invalid_arg "wrong encoding of def" end
     | _ -> invalid_arg "wrong encoding of def" in
 
   let ll_proof_step st f new_defs =
     let rule = Proof.Rule.mk "lift_lambdas" in
-    let parents  = Proof.Step.parents (proof_step st) @ 
+    let parents  = Proof.Step.parents (proof_step st) @
                    CCList.flat_map (fun d -> Proof.Step.parents @@ Proof.S.step @@ Proof.S.mk_f_trivial d) new_defs in
     (* Proof.Step.simp ~tags ~rule (Proof.Step.parents (proof_step st))  *)
     let step = Proof.S.mk_f_simp ~rule f parents in
     Proof.S.step step in
 
-  let assert_defs def = 
+  let assert_defs def =
     let step = Proof.Step.intro (Proof.Src.internal []) Proof.R_assert in
     let proof = Proof.S.step (Proof.S.mk_f step def) in
     [get_tydecl_from_def ~proof def; assert_ ~proof def] in
 
   let stmt_parents = Proof.Step.parents (proof_step st) in
   let res = begin match view st with
-    | Assert f -> 
+    | Assert f ->
       let f', new_defs =  TST.lift_lambdas f in
       (if CCList.is_empty new_defs then Iter.singleton st
        else (assert_ ~proof:(ll_proof_step st f new_defs) f') :: (CCList.flat_map assert_defs new_defs)
             |> Iter.of_list)
     | Lemma fs ->
-      let fs', defs = List.fold_right (fun f (ffs, ddefs) -> 
+      let fs', defs = List.fold_right (fun f (ffs, ddefs) ->
           let f', new_defs = TST.lift_lambdas f in
           f' :: ffs, new_defs @ ddefs
         ) fs ([], []) in
@@ -578,14 +578,14 @@ let lift_lambdas st =
       else ((goal ~proof:(ll_proof_step st f new_defs) f') ::  (CCList.flat_map assert_defs new_defs)
             |> Iter.of_list)
     | NegatedGoal (skolems,fs) ->
-      let fs', defs = List.fold_right (fun f (ffs, ddefs) -> 
+      let fs', defs = List.fold_right (fun f (ffs, ddefs) ->
           let f', new_defs = TST.lift_lambdas f in
           f' :: ffs, new_defs @ ddefs
         ) fs ([], []) in
       if CCList.is_empty defs then Iter.singleton st
       else (
         let rule = Proof.Rule.mk "lift_lambdas" in
-        let fs_parents = (List.map (fun f -> 
+        let fs_parents = (List.map (fun f ->
             Proof.Parent.from (Proof.S.mk_f_esa ~rule f stmt_parents)) fs) in
         let proof = Proof.Step.simp ~rule fs_parents in
         (neg_goal ~proof ~skolems fs' :: (CCList.flat_map assert_defs defs))
@@ -921,8 +921,8 @@ let get_rw_rule ?weight_incr:(w_i=1000000) c  =
 
   let build_from_head sym vars rhs =
     let rhs = Lambda.eta_reduce @@ Lambda.snf (fst (Rewrite.Term.normalize_term rhs)) in
-    let vars_lhs = Term.VarSet.of_seq (Iter.fold (fun acc v -> 
-        Iter.append acc (Term.Seq.vars v)) 
+    let vars_lhs = Term.VarSet.of_seq (Iter.fold (fun acc v ->
+        Iter.append acc (Term.Seq.vars v))
         Iter.empty (Iter.of_list vars)) in
     if not (Term.symbols rhs |> ID.Set.mem sym) &&
        Term.VarSet.cardinal
@@ -946,7 +946,7 @@ let get_rw_rule ?weight_incr:(w_i=1000000) c  =
              None)
            else rw_rule )
        | _ -> build_from_head sym l t2)
-    ) 
+    )
     else None in
 
   let all_lits =  Seq.lits c in

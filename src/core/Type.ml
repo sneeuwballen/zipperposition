@@ -64,8 +64,8 @@ let[@inline] is_fun ty = match T.view ty with | T.AppBuiltin(Builtin.Arrow, _) -
 let[@inline] is_forall ty = match T.view ty with T.Bind (Binder.ForallTy, _, _) -> true | _ -> false
 let[@inline] is_prop ty = match T.view ty with T.AppBuiltin (Builtin.Prop, []) -> true | _ -> false
 
-let as_var_exn ty = match view ty with 
-  | Var v -> v 
+let as_var_exn ty = match view ty with
+  | Var v -> v
   | _ -> invalid_arg "as_var_exn"
 
 let tType = T.tType

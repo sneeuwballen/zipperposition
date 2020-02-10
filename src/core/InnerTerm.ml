@@ -15,10 +15,10 @@ let (~~~) = I.lognot
 
 (* flags for propetries
    flag is set if for any subterm the corresponding property holds *)
-let f_has_freevars = I.one 
+let f_has_freevars = I.one
 let f_is_beta_reducible = f_has_freevars <<< 1
 
-(* From 16th bit onwards, we will keep the maximum 
+(* From 16th bit onwards, we will keep the maximum
    De Bruijn variable seen so far. *)
 
 (* If DB has more than 16 bits (very unlikely),
@@ -35,7 +35,7 @@ let set_property props prop_flag =
 let unset_property props prop_flag =
   props &&& (~~~ prop_flag)
 
-let get_property props prop_flag = 
+let get_property props prop_flag =
   not @@ I.equal zero (props &&& prop_flag)
 
 let dec_max_db props =
@@ -46,9 +46,9 @@ let dec_max_db props =
 
 let update_max_db props new_db =
   if new_db > max_db then (
-    set_property props f_db_overflowed 
+    set_property props f_db_overflowed
   ) else (
-    let max_db_val = 
+    let max_db_val =
       max (I.to_int ((props &&& f_db_mask) >>> 16)) new_db in
     (props &&& (~~~ f_db_mask)) ||| ((I.of_int max_db_val) <<< 16))
 
@@ -92,7 +92,7 @@ and type_result =
 type term = t
 
 let any_props_for_ts =
-  List.fold_left (fun acc t -> 
+  List.fold_left (fun acc t ->
       let new_props = (any_props &&& t.props) ||| acc in
       update_max_db new_props (get_max_db t.props)
     ) zero
@@ -229,21 +229,21 @@ let open_fun ty = match view ty with
   | AppBuiltin (Builtin.Arrow, ret :: args) -> args, ret
   | _ -> [], ty
 
-let ho_weight_ t t_ty = 
-  let rec aux t t_ty = 
-    let init_w s_ty = 
-      match s_ty with 
+let ho_weight_ t t_ty =
+  let rec aux t t_ty =
+    let init_w s_ty =
+      match s_ty with
       | NoType -> 0
-      | HasType ty -> 
-        begin match view ty with 
+      | HasType ty ->
+        begin match view ty with
           | AppBuiltin (Builtin.Arrow, l) -> List.length l - 1
           | _ -> 0 end in
-    begin match t with 
+    begin match t with
       | Var _  | DB _  | Const _ -> init_w t_ty +  1
       | Bind (Binder.Lambda, _, t') ->
         let _, t' = open_bind Binder.Lambda t' in
         init_w (ty t') + aux (view t') (ty t')
-      | Bind (_,_, t') -> 
+      | Bind (_,_, t') ->
         aux (view t') (ty t')
       | App (f, l) ->
         if is_var f then 1
@@ -251,9 +251,9 @@ let ho_weight_ t t_ty =
       | AppBuiltin (_, l) -> aux_l (init_w t_ty + 1) l end
   and aux_l acc = function
     | [] -> acc
-    | x :: xs -> aux_l (acc + aux (view x) (ty x))  xs 
+    | x :: xs -> aux_l (acc + aux (view x) (ty x))  xs
   in
-  aux t t_ty  
+  aux t t_ty
 
 let[@inline] ho_weight t = Lazy.force t.ho_weight
 
@@ -262,7 +262,7 @@ let make_ ~props ~ty term  =
     props; ho_weight = lazy (ho_weight_ term ty) }
 
 let const ~ty s =
-  let my_t = make_ ~props:(add_ty_vars zero ty.props) ~ty:(HasType ty) (Const s) in 
+  let my_t = make_ ~props:(add_ty_vars zero ty.props) ~ty:(HasType ty) (Const s) in
   H.hashcons my_t
 
 let builtin ~ty b =
@@ -285,7 +285,7 @@ let rec app_builtin ~ty b l = match b, l with
   | Builtin.Not, [{term=AppBuiltin(Builtin.False,[]); _}] ->
     app_builtin ~ty Builtin.True []
   | _ ->
-    let l = if Builtin.is_quantifier b then 
+    let l = if Builtin.is_quantifier b then
         List.filter (fun t -> not @@ equal (ty_exn t) tType) l else l in
     if Builtin.is_quantifier b  && CCList.length l > 1 then (
       let err_msg = CCFormat.sprintf "wrong encoding of quants: %a %d" Builtin.pp b (List.length l) in
@@ -336,7 +336,7 @@ let app ~ty f l = match f.term, l with
     let my_t = make_ ~props ~ty:(HasType ty) (App (f,l)) in
     H.hashcons my_t
 
-let var v = 
+let var v =
   let props = set_property zero f_has_freevars in
   H.hashcons (make_ ~props ~ty:(HasType (HVar.ty v)) (Var v))
 
@@ -348,11 +348,11 @@ let bvar ~ty i =
 
 let bind ~ty ~varty s t' =
   let props = add_ty_vars (add_ty_vars t'.props ty.props) varty.props in
-  let props = 
-    if Binder.equal Binder.Lambda s || Binder.equal Binder.ForallTy s 
-    then dec_max_db props 
+  let props =
+    if Binder.equal Binder.Lambda s || Binder.equal Binder.ForallTy s
+    then dec_max_db props
     else props in
-  let props = 
+  let props =
     if Binder.equal Binder.Lambda s
     then set_property props f_has_lams
     else props in
@@ -460,12 +460,12 @@ module DB = struct
   let[@inline] _id x = x
 
   let closed t =
-    let db_calc t = 
+    let db_calc t =
       _to_seq ~depth:0 t
       |> Iter.map (fun (bvar,depth) -> bvar < depth)
       |> Iter.for_all _id in
     if get_property t.props f_db_overflowed then (
-      db_calc t 
+      db_calc t
     ) else (
       let res = (get_max_db t.props) = 0 in
       (* if(res != db_calc t) then (
@@ -908,8 +908,8 @@ let rec expected_ty_vars ty = match view ty with
   | Bind (Binder.ForallTy, _, ty') -> 1 + expected_ty_vars ty'
   | _ -> 0
 
-let is_ground t = 
-  not @@ get_property t.props f_has_freevars 
+let is_ground t =
+  not @@ get_property t.props f_has_freevars
 
 (** {3 Misc} *)
 
@@ -954,16 +954,16 @@ let [@inline] get_type t = match ty t with
   | NoType -> invalid_arg "must have type!"
 
 let[@inline] as_app t = match view t with
-  | App (f,l) -> 
-    begin match view f with 
+  | App (f,l) ->
+    begin match view f with
       | AppBuiltin(b, l') -> app_builtin b ~ty:(ty_exn t) (l'@l), []
-      | _ -> f, l 
+      | _ -> f, l
     end
   | AppBuiltin(b, l ) when Builtin.is_logical_op b && not (Builtin.is_quantifier b) ->
     let prop = builtin ~ty:tType Builtin.Prop in
     let args = if (Builtin.is_logical_binop b) then [prop;prop]
       else [prop] in
-    app_builtin b ~ty:(arrow args prop) [], l 
+    app_builtin b ~ty:(arrow args prop) [], l
   | _ -> t, []
 
 let[@inline] as_var t = match view t with Var v -> Some v | _ -> None

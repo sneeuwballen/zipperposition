@@ -23,7 +23,7 @@ val eliminate : scope:Scoped.scope -> counter:int ref -> T.t -> T.t -> (Type.t H
 
 val iterate : ?flex_same:bool -> scope:Scoped.scope -> counter:int ref -> T.t -> T.t -> (T.var * 'a) CCList.t -> Unif_subst.t option OSeq.t
 
-(** Find disagreeing subterms. 
+(** Find disagreeing subterms.
     This function also returns a list of variables occurring above the
     disagreement pair, along with the index of the argument that the disagreement
     pair occurs in. *)

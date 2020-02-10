@@ -58,10 +58,10 @@ let select = ref default.select
 
 let _modes = Hashtbl.create 10
 let mode_spec () =
-  Arg.Symbol 
-    (List.sort_uniq String.compare (CCHashtbl.keys_list _modes), 
+  Arg.Symbol
+    (List.sort_uniq String.compare (CCHashtbl.keys_list _modes),
      fun s -> List.iter (fun f -> f ()) (Hashtbl.find_all _modes s))
-let add_to_mode mode f = 
+let add_to_mode mode f =
   Hashtbl.add _modes mode f
 
 (** parse_args returns parameters *)

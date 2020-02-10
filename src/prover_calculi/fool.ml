@@ -101,7 +101,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       (fun (idx,lit) -> match lit with
          | Literal.Equation (lhs, rhs, true) when  (T.equal rhs T.true_) || (T.equal rhs T.false_) ->
            begin match T.as_var lhs with
-             | Some v -> 
+             | Some v ->
                let sign = T.equal rhs T.true_ in
                (* found var, replace it with [not sign] *)
                let t = if sign then T.false_ else T.true_ in
@@ -160,7 +160,7 @@ module Make(E : Env.S) : S with module Env = E = struct
            let c_pos = Literal.mk_true a :: Literal.mk_true b :: lits |> mk_c in
            let c_neg = Literal.mk_false a :: Literal.mk_false b :: lits |> mk_c in
            Some [c_pos; c_neg]
-         | Literal.Equation (lhs, rhs, true) 
+         | Literal.Equation (lhs, rhs, true)
            when  (T.equal rhs T.true_) || (T.equal rhs T.false_) ->
            (* see if there is some CNF to do here *)
            let sign = T.equal rhs T.true_ in

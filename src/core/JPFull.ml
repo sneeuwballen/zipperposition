@@ -13,8 +13,8 @@ module Make (S : sig val st: Flex_state.t end) = struct
 
   let get_op k = Flex_state.get_exn k S.st
 
-  let max_skipped = ref 0 
-  let skip depth = 
+  let max_skipped = ref 0
+  let skip depth =
     if depth > max !max_skipped 1 then (
       max_skipped := depth;
       int_of_float ((log10 (float_of_int depth)) *. get_op PUP.k_skip_multiplier)
@@ -23,7 +23,7 @@ module Make (S : sig val st: Flex_state.t end) = struct
   let delay depth res =
     OSeq.append
       (OSeq.take (skip depth) (OSeq.repeat None))
-    res
+      res
 
   let iter_rule ?(flex_same=false) ~counter ~scope t u depth  =
     JP_unif.iterate ~flex_same ~scope ~counter t u []
@@ -38,16 +38,16 @@ module Make (S : sig val st: Flex_state.t end) = struct
     let flex_hd_id = HVar.id flex_var  in
     if IntSet.mem flex_hd_id !ident_vars then OSeq.empty
     else
-      let projections = 
+      let projections =
         PUnif.proj_hs ~counter ~scope ~flex u in
       let simp_projs, func_projs =
-        CCList.partition (fun sub -> 
+        CCList.partition (fun sub ->
             let binding,_ = Subst.FO.deref sub (T.head_term flex,scope) in
             let _,body = T.open_fun binding in
             T.is_bvar body) projections in
       let simp_projs = CCList.map (fun s -> Some (s,depth)) simp_projs in
       let func_projs = CCList.map (fun s -> Some (s,depth+1)) func_projs in
-      OSeq.append 
+      OSeq.append
         (OSeq.of_list simp_projs)
         (if CCList.is_empty func_projs then OSeq.empty
          else delay depth (OSeq.of_list func_projs))
@@ -61,9 +61,9 @@ module Make (S : sig val st: Flex_state.t end) = struct
     OSeq.append (maybe_project s) (maybe_project t)
     |> OSeq.map (fun x -> Some (U.subst x, depth+1))
 
-  let ident_rule ~counter ~scope t u depth = 
+  let ident_rule ~counter ~scope t u depth =
     JP_unif.identify ~scope ~counter t u []
-    |> OSeq.map (fun x -> 
+    |> OSeq.map (fun x ->
         let subst = U.subst x  in
         (* variable introduced by identification *)
         let subs_t = T.of_term_unsafe (fst (snd (List.hd (Subst.to_list subst)))) in
@@ -73,28 +73,28 @@ module Make (S : sig val st: Flex_state.t end) = struct
         ident_vars := IntSet.add new_var_id !ident_vars;
         Some (subst, depth+1))
 
-  let renamer ~counter t0s t1s = 
+  let renamer ~counter t0s t1s =
     let lhs,rhs, unifscope, us = U.FO.rename_to_new_scope ~counter t0s t1s in
     lhs,rhs,unifscope,U.subst us
 
   let deciders ~counter () =
-    let pattern = 
-      if get_op PUP.k_pattern_decider then [fun s t sub -> 
+    let pattern =
+      if get_op PUP.k_pattern_decider then [fun s t sub ->
           [U.subst @@ PatternUnif.unify_scoped ~subst:(U.of_subst sub) ~counter s t]]
       else [] in
-    let solid = 
-      if get_op PUP.k_solid_decider then [fun s t sub -> 
-          List.map U.subst @@ SU.unify_scoped ~subst:(U.of_subst sub) ~counter s t] 
+    let solid =
+      if get_op PUP.k_solid_decider then [fun s t sub ->
+          List.map U.subst @@ SU.unify_scoped ~subst:(U.of_subst sub) ~counter s t]
       else [] in
-    let fixpoint = 
-      if get_op PUP.k_fixpoint_decider then [fun s t sub -> 
+    let fixpoint =
+      if get_op PUP.k_fixpoint_decider then [fun s t sub ->
           [U.subst @@ FixpointUnif.unify_scoped ~subst:(U.of_subst sub) ~counter s t]]
       else [] in
     fixpoint @ pattern @ solid
   (* pattern @ fixpoint @ solid *)
 
   let head_classifier s =
-    match T.view @@ T.head_term s with 
+    match T.view @@ T.head_term s with
     | T.Var x -> `Flex x
     | _ -> `Rigid
 
@@ -104,7 +104,7 @@ module Make (S : sig val st: Flex_state.t end) = struct
        IntSet.mem (HVar.id @@ T.as_var_exn hd_t) !elim_vars then (
       OSeq.empty)
     else (
-      match head_classifier s, head_classifier t with 
+      match head_classifier s, head_classifier t with
       | `Flex x, `Flex y when HVar.equal Type.equal x y ->
         (* eliminate + iter *)
         delay depth @@
@@ -118,31 +118,31 @@ module Make (S : sig val st: Flex_state.t end) = struct
           OSeq.append
             (proj_rule ~counter ~scope s t depth)
             (delay depth @@ (ident_rule ~counter ~scope s t depth)) in
-        OSeq.append proj_ident 
+        OSeq.append proj_ident
           (delay depth @@ iter_rule ~counter ~scope s t depth)
       | `Flex _, `Rigid
       | `Rigid, `Flex _ ->
         let flex, rigid = if Term.is_var (T.head_term s) then s,t else t,s in
-        let delay_fr imit = 
+        let delay_fr imit =
           if depth > 5 then OSeq.append (OSeq.take (depth*10) (OSeq.repeat None)) imit else imit in
         OSeq.append
           (delay_fr @@ imit_rule ~counter ~scope s t depth)
-          (hs_proj_flex_rigid ~counter ~scope ~flex rigid depth) 
-      | _ -> 
+          (hs_proj_flex_rigid ~counter ~scope ~flex rigid depth)
+      | _ ->
         assert false)
 
-  let unify_scoped =  
+  let unify_scoped =
     let counter = ref 0 in
 
     let module JPFullParams = struct
       exception NotInFragment = PatternUnif.NotInFragment
       exception NotUnifiable = PatternUnif.NotUnifiable
       type flag_type = int
-      let flex_state = S.st 
+      let flex_state = S.st
       let init_flag = (0:flag_type)
       let identify_scope = renamer ~counter
       let frag_algs = deciders ~counter
-      let pb_oracle s t (f:flag_type) _ scope = 
+      let pb_oracle s t (f:flag_type) _ scope =
         oracle ~counter ~scope s t f
       let oracle_composer = Flex_state.get_exn PUP.k_oracle_composer S.st
     end in

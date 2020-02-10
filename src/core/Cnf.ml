@@ -375,7 +375,7 @@ module Flatten = struct
               T.app_builtin ~ty:T.Ty.prop Builtin.Less [b; a];
             ]
         in aux_maybe_define ~should_define pos f
-      | T.AppBuiltin (Builtin.Eq, [a;b]) 
+      | T.AppBuiltin (Builtin.Eq, [a;b])
         when  (T.is_fun a || T.is_fun b)
            &&  not (T.Ty.is_prop (T.Ty.returns (T.ty_exn a)))  (* false *) ->
         (* turn [f = λx. t] into [∀x. f x=t] *)
@@ -388,8 +388,8 @@ module Flatten = struct
       | T.AppBuiltin (Builtin.Eq, [a;b]) ->
         (F.eq <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
       (* >|= aux_maybe_define ~should_define pos *)
-      | T.AppBuiltin (Builtin.Neq, [a;b]) 
-        when  (T.is_fun a || T.is_fun b) 
+      | T.AppBuiltin (Builtin.Neq, [a;b])
+        when  (T.is_fun a || T.is_fun b)
            &&  not (T.Ty.is_prop (T.Ty.returns (T.ty_exn a)))   (*false*) ->
         (* turn [f ≠ λx. t] into [∃x. f x≠t] *)
         let vars_exist, a, b = complete_eq a b in
@@ -439,7 +439,7 @@ module Flatten = struct
     and aux_maybe_define ~should_define pos f =
       assert (T.Ty.is_prop (T.ty_exn f));
       if (not should_define) then f
-      else 
+      else
         begin match pos with
           | Pos_toplevel -> f
           | Pos_inner ->
@@ -671,7 +671,7 @@ let estimate_num_clauses ~pos f =
   n
 
 (* atomic formula, or forall/exists/not an atomic formula (1 literal) *)
-let rec will_yield_lit f = 
+let rec will_yield_lit f =
   let v = F.view f in
   match v with
   | F.Not f'
@@ -684,9 +684,9 @@ let rec will_yield_lit f =
   | F.False -> true
   | F.And _
   | F.Or _
-  | F.Imply _ -> false 
+  | F.Imply _ -> false
   | F.Equiv(a,b)
-  | F.Xor(a,b) -> 
+  | F.Xor(a,b) ->
     let is_tf f =
       match F.view f with
       | F.True | F.False -> true

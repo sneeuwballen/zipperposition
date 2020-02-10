@@ -91,11 +91,11 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~offset : (Subst.t 
     and l_quants = match mode with
       | `Full ->
         let n = List.length ty_args in
-        CCList.mapi (fun i ty -> 
+        CCList.mapi (fun i ty ->
             if Type.is_fun ty && Type.returns_prop ty then (
               let arg_typeargs,_ = Type.open_fun ty in
               let m = List.length arg_typeargs in
-              let form_body = T.app (T.bvar ~ty (m+n-i-1)) 
+              let form_body = T.app (T.bvar ~ty (m+n-i-1))
                   (List.mapi (fun j ty -> T.bvar ~ty (m-j-1)) arg_typeargs) in
               let forall = T.close_quantifier Builtin.ForallConst arg_typeargs form_body in
               let exists = T.close_quantifier Builtin.ExistsConst arg_typeargs form_body in
@@ -105,20 +105,20 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~offset : (Subst.t 
               assert(Lambda.is_properly_encoded exists);
               Some (forall, exists))
             else None) ty_args
-        |> CCList.fold_left (fun acc opt -> match opt with 
-            | Some (x,y) -> x :: y :: acc 
-            | None -> acc) [] 
+        |> CCList.fold_left (fun acc opt -> match opt with
+            | Some (x,y) -> x :: y :: acc
+            | None -> acc) []
       (* [] *)
       | _ -> []
     and l_simpl_op = match mode with
-      | `Pragmatic -> 
+      | `Pragmatic ->
         let n = List.length vars in
         let db_vars = List.mapi (fun i ty -> T.bvar ~ty (n-i-1)) ty_args in
         CCList.mapi (fun i db_i ->
             let projs = if Type.is_prop (Term.ty db_i) then (
                 [T.fun_l ty_args db_i]
               ) else [] in
-            let log_ops = 
+            let log_ops =
               CCList.mapi (fun j db_j ->
                   if i < j && Type.equal (T.ty db_i) (T.ty db_j) then (
                     let res = [T.fun_l ty_args (T.Form.eq db_i db_j);
@@ -129,18 +129,18 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~offset : (Subst.t 
                        T.fun_l ty_args (T.Form.or_ db_i db_j);]
                     else res
                   )
-                  else []) 
+                  else [])
                 db_vars
               |> CCList.flatten in
-            projs @ log_ops) 
+            projs @ log_ops)
           db_vars
         |> CCList.flatten
       | _ -> []
 
     in
     CCList.flat_map
-      (fun (ts,penalty) -> 
-         List.map (fun t -> 
+      (fun (ts,penalty) ->
+         List.map (fun t ->
              assert (T.DB.is_closed t);
 
              (* Caching of primitive enumeration terms, so that trigger-based instantiation
@@ -148,7 +148,7 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~offset : (Subst.t 
              let cached_t = Subst.FO.canonize_all_vars t in
              enum_cache := Term.Set.add cached_t !enum_cache;
              let subst = Subst.FO.bind' Subst.empty (v,sc_v) (t,sc_v) in
-             (subst, penalty) )ts ) 
+             (subst, penalty) )ts )
       [ l_not, 3;
         l_and, 10;
         l_or, 10;

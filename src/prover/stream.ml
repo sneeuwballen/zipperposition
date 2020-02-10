@@ -50,17 +50,17 @@ module Make(A:ARG) = struct
 
   let penalty s = s.penalty
 
-  let clause_penalty s = function 
+  let clause_penalty s = function
     | None ->
       s.hits <- s.hits +1;
       5
     | Some c ->
       s.hits <- s.hits +1;
       C.penalty c
-  
+
   let drip s =
     match s.stm () with
-    | OSeq.Nil -> 
+    | OSeq.Nil ->
       s.penalty <- 0;
       raise Empty_Stream
     | OSeq.Cons (hd,tl) ->

@@ -27,7 +27,7 @@ let _e_auto = ref false
 
 let e_bin = ref (None : string option)
 
-let regex_refutation = Str.regexp ".*SZS output start CNFRefutation.*" 
+let regex_refutation = Str.regexp ".*SZS output start CNFRefutation.*"
 let reg_thf_clause = Str.regexp "thf(zip_cl_\\([0-9]+\\),.*"
 
 module IntSet = CCSet.Make(CCInt)
@@ -46,7 +46,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     Format.fprintf out "@[thf(zip_cl_%d,axiom,@[%a@]).@]@\n" (C.id clause) TypedSTerm.TPTP_THF.pp lits_converted
 
   let output_symdecl ~out sym ty =
-    Format.fprintf out "@[thf(@['%a_type',type,@[%a@]:@ @[%a@]@]).@]@\n" 
+    Format.fprintf out "@[thf(@['%a_type',type,@[%a@]:@ @[%a@]@]).@]@\n"
       ID.pp sym ID.pp_tstp sym (Type.TPTP.pp_ho) ty
 
   let output_all ?(already_defined=ID.Set.empty) ~out cl_set =
@@ -56,7 +56,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                |> ID.Set.to_list
     in
     (* first printing type declarations, and only then the types *)
-    CCList.fold_right (fun sym acc -> 
+    CCList.fold_right (fun sym acc ->
         let ty = Ctx.find_signature_exn sym in
         if Type.is_tType ty then (
           output_symdecl ~out sym ty;
@@ -75,14 +75,14 @@ module Make(E : Env.S) : S with module Env = E = struct
     ID.Set.of_list syms
 
   let set_e_bin path =
-    e_bin := Some path 
+    e_bin := Some path
 
   let run_e prob_path =
-    match !e_bin with 
+    match !e_bin with
     | Some e_path ->
       let to_ = !_timeout in
-      let cmd = 
-        CCFormat.sprintf "timeout %d %s %s --cpu-limit=%d %s -s -p" 
+      let cmd =
+        CCFormat.sprintf "timeout %d %s %s --cpu-limit=%d %s -s -p"
           (to_+2) e_path prob_path to_ (if !_e_auto then "--auto" else "--auto-schedule") in
       CCFormat.printf "%% Running : %s.\n" cmd;
       let process_channel = Unix.open_process_in cmd in
@@ -90,16 +90,16 @@ module Make(E : Env.S) : S with module Env = E = struct
       begin match status with
         | WEXITED _ ->
           let refutation_found = ref false in
-          (try 
-             while not !refutation_found do 
+          (try
+             while not !refutation_found do
                let line = input_line process_channel in
-               if Str.string_match regex_refutation line 0 then 
+               if Str.string_match regex_refutation line 0 then
                  refutation_found := true;
              done;
              if !refutation_found then (
                let clause_ids = ref [] in
-               (try 
-                  while true do 
+               (try
+                  while true do
                     let line = input_line process_channel in
                     flush_all ();
                     if Str.string_match reg_thf_clause line 0 then (
@@ -125,10 +125,10 @@ module Make(E : Env.S) : S with module Env = E = struct
       let ty = Term.ty t in
       can_translate_ty ty &&
       match Term.view t with
-      | AppBuiltin(b, [body]) when Builtin.is_quantifier b && Type.is_fun (Term.ty body) -> 
+      | AppBuiltin(b, [body]) when Builtin.is_quantifier b && Type.is_fun (Term.ty body) ->
         let _, fun_body = Term.open_fun body in
         can_be_translated fun_body
-      | AppBuiltin(b, l) -> (not (Builtin.is_logical_binop b) || List.length l >= 2) && 
+      | AppBuiltin(b, l) -> (not (Builtin.is_logical_binop b) || List.length l >= 2) &&
                             (b != Builtin.Not || List.length l = 1) &&
                             List.for_all can_be_translated l
       | DB _ -> false
@@ -141,15 +141,15 @@ module Make(E : Env.S) : S with module Env = E = struct
       let clause_no_lams cl =
         Iter.for_all can_be_translated (C.Seq.terms cl) in
 
-      let reduced s = 
+      let reduced s =
         Iter.map (fun c -> CCOpt.get_or ~default:c (C.eta_reduce c)) s in
-      let init_clauses s = 
+      let init_clauses s =
         Iter.filter (fun c -> C.proof_depth c = 0 && clause_no_lams c) (reduced s) in
 
       let set = Iter.filter (fun c -> not (IntSet.mem (C.id c) ignore_ids)) set in
       Iter.append (init_clauses set) (
         (reduced set)
-        |> Iter.filter (fun c -> 
+        |> Iter.filter (fun c ->
             let proof_d = C.proof_depth c in
             let has_ho_step = Proof.Step.has_ho_step (C.proof_step c) in
             has_ho_step && proof_d  > 0 && clause_no_lams c)
@@ -162,7 +162,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let prob_name, prob_channel = Filename.open_temp_file ~temp_dir:!_tmp_dir "e_input" "" in
     let out = Format.formatter_of_out_channel prob_channel in
 
-    try 
+    try
       let active_set = take_from_set active_set in
       let ignore_ids = IntSet.of_list (List.map C.id active_set) in
       let passive_set =  take_from_set ~ignore_ids passive_set in
@@ -172,27 +172,27 @@ module Make(E : Env.S) : S with module Env = E = struct
       close_out prob_channel;
       let cl_set = active_set @ passive_set in
 
-      let res = 
+      let res =
         match run_e prob_name with
         | Some ids ->
           assert(not (CCList.is_empty ids));
 
-          let clauses = List.map (fun id -> 
+          let clauses = List.map (fun id ->
               List.find (fun cl -> (C.id cl) = id) cl_set) ids in
           let rule = Proof.Rule.mk "eprover" in
           let proof = Proof.Step.inference  ~rule (List.map C.proof_parent clauses) in
           let penalty = CCOpt.get_exn @@ Iter.max (Iter.map C.penalty (Iter.of_list clauses)) in
           let trail = C.trail_l clauses in
           Some (C.create ~penalty ~trail [] proof)
-        | _ -> None 
+        | _ -> None
       in
       (* Sys.remove prob_name; *)
       res
-    with PolymorphismDetected -> 
+    with PolymorphismDetected ->
       CCFormat.printf "%% Running E stopped because polymorphism was detected @.";
       None
 
-  let setup () = 
+  let setup () =
     ()
 end
 

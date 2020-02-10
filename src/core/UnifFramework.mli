@@ -16,6 +16,6 @@ end
 
 val take_fair : (Subst.t option OSeq.t) OSeq.t -> Subst.t option OSeq.t
 
-module Make(X:PARAMETERS) : sig 
+module Make(X:PARAMETERS) : sig
   val unify_scoped : T.t Scoped.t -> T.t Scoped.t -> S.FO.t option OSeq.t
 end

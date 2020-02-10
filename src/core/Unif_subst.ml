@@ -39,7 +39,7 @@ let bind t v u = {t with subst=Subst.bind t.subst v u}
 let update t v u = {t with subst=Subst.update t.subst v u}
 let mem t v = Subst.mem t.subst v
 let deref t v = Subst.deref t.subst v
-let merge t1 t2 = {subst=Subst.merge t1.subst t2.subst; cstr_l = t1.cstr_l @ t2.cstr_l} 
+let merge t1 t2 = {subst=Subst.merge t1.subst t2.subst; cstr_l = t1.cstr_l @ t2.cstr_l}
 let compose ~scope t1 t2 = {subst=Subst.FO.compose ~scope t1.subst t2.subst; cstr_l = t1.cstr_l @ t2.cstr_l}
 
 module FO = struct
@@ -55,12 +55,12 @@ module FO = struct
     let apply_ty s ty = Subst.Ty.apply Subst.Renaming.none (subst s) ty in
     let new_scope = if scope0 < scope1 then scope1 + 1 else scope0 + 1 in
     let add_renaming scope subst v =
-      if mem subst (v,scope) 
+      if mem subst (v,scope)
       then subst
-      else 
+      else
         let ty = apply_ty subst (HVar.ty v, scope) in
         let newvar = Term.var (H.fresh_cnt ~counter ~ty ()) in
-        bind subst (v,scope) (newvar, new_scope) 
+        bind subst (v,scope) (newvar, new_scope)
     in
     let subst = empty in
     let subst = Term.Seq.vars t0 |> Iter.fold (add_renaming scope0) subst in
