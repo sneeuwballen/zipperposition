@@ -164,7 +164,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         | Builtin.Eq | Builtin.Neq | Builtin.Equiv | Builtin.Xor ->
           (match ps with 
            | [_;x;y]
-           | [x;y] when (cased_term_selection != Minimal || Type.is_prop(T.ty x)) ->
+           | [x;y]->
              add t x y;
              if (f = Builtin.Neq || f = Builtin.Xor) && can_be_cased then
                Term.Tbl.replace term_to_equations t (Term.Tbl.find term_to_equations t |> CCPair.swap)
@@ -181,7 +181,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let res = 
       Term.Tbl.fold(fun b (b_true, b_false) clauses ->
           if cased_term_selection != Minimal ||
-             Term.Seq.subterms b |> 
+             Term.Seq.subterms ~include_builtin:true b |> 
              Iter.for_all (fun st -> 
               T.equal b st || not (Type.is_prop (T.ty st)) || T.is_true_or_false st) then (
             let proof = Proof.Step.simp[C.proof_parent c]
