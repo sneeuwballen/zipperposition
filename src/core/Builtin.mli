@@ -64,6 +64,7 @@ type t =
   | Greatereq
   | Box_opaque (** hint not to open this formula *)
   | Pseudo_de_bruijn of int (** magic to embed De Bruijn indices in normal terms *)
+  | Distinct
 
 include Interfaces.HASH with type t := t
 include Interfaces.ORD with type t := t

@@ -225,12 +225,15 @@ module Flatten = struct
     let u = T.app_whnf ~ty:ty_ret (T.Subst.eval subst_u u) args_u in
     ty_vars @ vars, t, u
 
+  (* NOTE(perf): having hashconsing of TypedSTerm would be helpful
+     to simplify here as a DAG, not a tree *)
   (* conversion of terms can yield several possible terms, by
      eliminating if and match
      @param vars the variables that can be replaced in the context
      @param of_ the ID being defined, if any
   *)
-  let flatten_rec ?of_ ~should_define (ctx:Skolem.ctx) stmt (pos:position) (vars:type_ Var.t list)(t:term): T.t t =
+  let flatten_rec ?of_ ~should_define (ctx:Skolem.ctx)
+      stmt (pos:position) (vars:type_ Var.t list)(t:term): T.t t =
     (* how to name intermediate subterms? *)
     let mk_pat what = match of_ with
       | None -> what ^  "_"
@@ -239,6 +242,16 @@ module Flatten = struct
     let rec aux pos vars t = match T.view t with
       | T.AppBuiltin (Builtin.True, []) -> return F.true_
       | T.AppBuiltin (Builtin.False, []) -> return F.false_
+      | T.AppBuiltin (Builtin.Distinct, l) ->
+        (* expand [distinct(ts)] into [And_{i<j} t_i != t_j] *)
+        let l =
+          CCList.diagonal l
+          |> List.rev_map (fun (t,u) -> T.Form.neq_or_xor t u)
+        in
+        let f = T.Form.and_ ?loc:(T.loc t) l in
+        Util.debugf ~section 5 "(@[flatten.expand-distinct@ %a@ :into %a@])"
+          (fun k->k T.pp t T.pp f);
+        aux pos vars f
       | T.Var v ->
         (* look [v] up in subst *)
         get_subst >>= fun subst ->
@@ -503,7 +516,7 @@ let miniscope ?(distribute_exists=false) f =
 let rec nnf f =
   Util.debugf ~section 5 "@[<2>nnf of@ `@[%a@]`@]" (fun k->k T.pp f);
   match F.view f with
-  | F.Atom _
+  | F.Atom t -> t
   | F.Neq _
   | F.Eq _
   | F.True
@@ -1093,7 +1106,7 @@ let proof_neg stmt =
     [Stmt.as_proof_i stmt |> Proof.Parent.from]
 
 (* Transform the clauses into proper CNF; returns a list of clauses *)
-let cnf_of_seq ~ctx ?(opts=[])  seq =
+let cnf_of_seq ~ctx ?(opts=[]) (seq:Stmt.input_t Iter.t) : _ CCVector.t =
   (* read options *)
   let disable_renaming = List.mem DisableRenaming opts in
   let preprocess =

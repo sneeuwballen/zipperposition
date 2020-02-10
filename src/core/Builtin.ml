@@ -59,6 +59,7 @@ type t =
   | Greatereq
   | Box_opaque (** hint not to open this formula *)
   | Pseudo_de_bruijn of int (** magic to embed De Bruijn indices in normal terms *)
+  | Distinct
 
 type t_ = t
 
@@ -117,6 +118,7 @@ let to_int_ = function
   | TyReal -> 70
   | Real _ -> 71
   | Pseudo_de_bruijn _ -> 100
+  | Distinct -> 110
 
 let compare a b = match a, b with
   | Int i, Int j -> Z.compare i j
@@ -211,6 +213,7 @@ let to_string s = match s with
   | Greatereq -> "≥"
   | Box_opaque -> "<box>"
   | Pseudo_de_bruijn i -> Printf.sprintf "db_%d" i
+  | Distinct -> "distinct"
 
 let pp out s = Format.pp_print_string out (to_string s)
 
@@ -375,6 +378,7 @@ module TPTP = struct
     | Greatereq -> "$greatereq"
     | Box_opaque -> "$$box"
     | Pseudo_de_bruijn i -> Printf.sprintf "$$db_%d" i
+    | Distinct -> "$distinct"
 
   let pp out b = CCFormat.string out (to_string b)
 
@@ -416,6 +420,7 @@ module TPTP = struct
     | "$lesseq" -> Lesseq
     | "$greater" -> Greater
     | "$greatereq" -> Greatereq
+    | "$distinct" -> Distinct
     | _ -> raise NotABuiltin
 
   let fixity = function
@@ -710,6 +715,7 @@ module ZF = struct
     | Greatereq -> ">="
     | Box_opaque -> "<box>"
     | Pseudo_de_bruijn i -> Printf.sprintf "<db %d>" i
+    | Distinct -> "distinct"
 
   let pp out b = CCFormat.string out (to_string b)
 end
