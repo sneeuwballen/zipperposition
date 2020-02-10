@@ -205,6 +205,8 @@ let order ty: int =
   in
   max 1 (aux ty)  (* never less than 1 *)
 
+let contains_prop t = Seq.sub t |> Iter.exists is_prop
+
 let is_ground = T.is_ground
 let size = T.size
 
@@ -546,7 +548,8 @@ module Conv = struct
         forall t'
       | PT.Record _ -> failwith "cannot convert record-type into type"
       | PT.Meta (_,{contents=Some ty'},_) -> aux depth v2db ty'
-      | PT.AppBuiltin (Builtin.TyReal,[]) -> failwith "cannot handle type `real`"
+      | PT.AppBuiltin (Builtin.TyReal,[]) ->
+        Util.errorf ~where:"type" "cannot handle type `real`"
       | PT.Bind _
       | PT.AppBuiltin _
       | PT.Meta _

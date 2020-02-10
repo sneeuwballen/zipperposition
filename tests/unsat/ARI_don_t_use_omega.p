@@ -1,1 +1,0 @@
-../../examples/don_t_use_omega.p

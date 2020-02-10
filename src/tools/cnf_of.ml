@@ -29,7 +29,13 @@ let options =
   |> List.sort Pervasives.compare
   |> Arg.align
 
-let print_res decls = match !Options.output with
+let print_res (decls: _ CCVector.ro_vector) : unit =
+  let close_c c =
+    c
+    |> List.map SLiteral.to_form |> TypedSTerm.Form.or_
+    |> TypedSTerm.Form.close_forall
+  in
+  match !Options.output with
   | Options.O_none -> ()
   | Options.O_normal ->
     let ppst =
@@ -41,26 +47,19 @@ let print_res decls = match !Options.output with
       (CCVector.pp ~sep:"" ppst)
       decls
   | Options.O_tptp ->
-    let pp_c out c =
-      let f = c
-              |> List.map SLiteral.to_form |> TypedSTerm.Form.or_
-              |> TypedSTerm.Form.close_forall
-      in
-      TypedSTerm.TPTP.pp out f in
+    let pp_c out c = TypedSTerm.TPTP.pp out (close_c c) in
     let ppst out st =
-      Statement.TPTP.pp
-        pp_c T.TPTP.pp T.TPTP.pp
-        out st
+      Statement.TPTP.pp pp_c T.TPTP.pp T.TPTP.pp out st
     in
     Format.printf "@[<v>%a@]@."
       (CCVector.pp ~sep:"" ppst)
       decls
   | Options.O_zf ->
+    let pp_c out c = T.ZF.pp_inner out (close_c c) in
     let ppst out st =
-      Statement.ZF.pp
-        (Util.pp_list ~sep:" || " (SLiteral.ZF.pp T.ZF.pp_inner)) T.ZF.pp_inner T.ZF.pp_inner
-        out st
+      Statement.ZF.pp pp_c T.ZF.pp_inner T.ZF.pp_inner out st
     in
+    Format.printf "val term : type.@."; (* implicit *)
     Format.printf "@[<v>%a@]@."
       (CCVector.pp ~sep:"" ppst)
       decls

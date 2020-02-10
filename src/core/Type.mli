@@ -181,6 +181,8 @@ val order : t -> int
     [order ((a->b)->c) = 2]
     [order (((a->b)->c)->d) = 2] *)
 
+val contains_prop : t -> bool
+
 val is_ground : t -> bool
 (** Is the type ground? (means that no {!Var} not {!BVar} occurs in it) *)
 

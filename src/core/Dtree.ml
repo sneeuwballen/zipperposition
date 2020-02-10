@@ -6,7 +6,7 @@ module ST = InnerTerm
 module T = Term
 module S = Subst
 
-let prof_dtree_retrieve = Util.mk_profiler "dtree_retrieve"
+let prof_dtree_retrieve = ZProf.make "dtree_retrieve"
 
 (** {2 Term traversal}
 
@@ -193,7 +193,7 @@ module Make(E : Index.EQUATION) = struct
     Iter.fold remove dt seq
 
   let retrieve ?(subst=S.empty) ~sign dt t k =
-    Util.enter_prof prof_dtree_retrieve;
+    ZProf.enter_prof prof_dtree_retrieve;
     (* recursive traversal of the trie, following paths compatible with t *)
     let rec traverse trie iter subst =
       match iter with
@@ -252,7 +252,7 @@ module Make(E : Index.EQUATION) = struct
           trie.map
     in
     traverse (fst dt) (iterate (fst t)) subst;
-    Util.exit_prof prof_dtree_retrieve;
+    ZProf.exit_prof prof_dtree_retrieve;
     ()
 
   (** iterate on all (term -> value) in the tree *)

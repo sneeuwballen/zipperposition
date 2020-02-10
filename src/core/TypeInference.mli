@@ -76,6 +76,7 @@ module Ctx : sig
         then {!type_erm} will be used)
       @param def_as_rewrite if true, definitions will be treated like rewrite rules
       @param on_undef behavior when an undefined identifier is met
+      @param is_tptp if true, interpret some constants as in TPTP
       @param on_var behavior when a variable without type annotation is met
   *)
 

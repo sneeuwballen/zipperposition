@@ -1,1 +1,0 @@
-../../examples/arith2.p

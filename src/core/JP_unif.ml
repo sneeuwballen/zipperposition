@@ -7,7 +7,7 @@ module T = Term
 module US = Unif_subst
 module H = HVar
 
-let prof_jp_unify = Util.mk_profiler "jp_unify"
+let prof_jp_unify = ZProf.make "jp_unify"
 type subst = US.t
 
 module S = struct
@@ -378,7 +378,7 @@ let unify ~scope ~counter t0 s0 =
 (* TODO: Remove tracking of rules for efficiency? *)
 
 let unify_scoped (t0, scope0) (t1, scope1) =
-  Util.with_prof prof_jp_unify
+  ZProf.with_prof prof_jp_unify
     (fun () -> 
        (* Find a scope that's different from the two given ones *)
        let unifscope = if scope0 < scope1 then scope1 + 1 else scope0 + 1 in

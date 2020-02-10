@@ -31,9 +31,9 @@ let stat_neg_ext = Util.mk_stat "ho.neg_ext_success"
 let stat_neg_cong_fun = Util.mk_stat "ho.neg_cong_fun_success"
 
 
-let prof_eq_res = Util.mk_profiler "ho.eq_res"
-let prof_eq_res_syn = Util.mk_profiler "ho.eq_res_syntactic"
-let prof_ho_unif = Util.mk_profiler "ho.unif"
+let prof_eq_res = ZProf.make "ho.eq_res"
+let prof_eq_res_syn = ZProf.make "ho.eq_res_syntactic"
+let prof_ho_unif = ZProf.make "ho.unif"
 
 let k_ext_pos = Flex_state.create_key ()
 let k_ext_pos_all_lits = Flex_state.create_key ()
@@ -895,9 +895,9 @@ module Make(E : Env.S) : S with module Env = E = struct
             | lit -> `Right lit)
       in
       assert (pairs <> []);
-      Util.enter_prof prof_ho_unif;
+      ZProf.enter_prof prof_ho_unif;
       let r = ho_unif_real_ c pairs others in
-      Util.exit_prof prof_ho_unif;
+      ZProf.exit_prof prof_ho_unif;
       r
     ) else []
 
@@ -1318,20 +1318,29 @@ let set_prim_mode_ =
   let set_ s = prim_mode_ := List.assoc s l in
   Arg.Symbol (List.map fst l, set_)
 
+(* detection of HO statements *)
 let st_contains_ho (st:(_,_,_) Statement.t): bool =
   let is_non_atomic_ty ty =
     let n_ty_vars, args, _ = Type.open_poly_fun ty in
     n_ty_vars > 0 || args<>[]
+  and has_prop_in_args ty =
+    let n_ty_vars, args, _ = Type.open_poly_fun ty in
+    List.exists Type.contains_prop args
   in
-  (* is there a HO variable? *)
+  (* is there a HO variable? Any variable with a type that is
+     Prop or just not an atomic type is. *)
   let has_ho_var () =
     Statement.Seq.terms st
     |> Iter.flat_map T.Seq.vars
-    |> Iter.exists (fun v -> is_non_atomic_ty (HVar.ty v))
-  (* is there a HO symbol? *)
+    |> Iter.map HVar.ty
+    |> Iter.exists (fun ty -> is_non_atomic_ty ty || Type.contains_prop ty)
+  (* is there a HO symbol?
+     means the symbol has a higher-order, or contains Prop in a sub-position
+     of an argument. *)
   and has_ho_sym () =
     Statement.Seq.ty_decls st
-    |> Iter.exists (fun (_,ty) -> Type.order ty > 1)
+    |> Iter.exists
+      (fun (_,ty) -> Type.order ty > 1 || has_prop_in_args ty)
   and has_ho_eq() =
     Statement.Seq.forms st
     |> Iter.exists

@@ -12,8 +12,8 @@ module Unif = Logtk.Unif
 (** {2 Context for a Proof} *)
 module type S = Ctx_intf.S
 
-let prof_add_signature = Util.mk_profiler "ctx.add_signature"
-let prof_declare_sym= Util.mk_profiler "ctx.declare"
+let prof_add_signature = ZProf.make "ctx.add_signature"
+let prof_declare_sym= ZProf.make "ctx.declare"
 
 module type PARAMETERS = sig
   val signature : Signature.t
@@ -82,18 +82,18 @@ module Make(X : PARAMETERS) = struct
     ()
 
   let add_signature signature =
-    Util.enter_prof prof_add_signature;
+    ZProf.enter_prof prof_add_signature;
     let _diff = Signature.diff signature !_signature in
     (* declare new symbols *)
     Signature.iter _diff declare_new_;
-    Util.exit_prof prof_add_signature;
+    ZProf.exit_prof prof_add_signature;
     ()
 
   let declare symb ty =
-    Util.enter_prof prof_declare_sym;
+    ZProf.enter_prof prof_declare_sym;
     let is_new = not (Signature.mem !_signature symb) in
     if is_new then declare_new_ symb (ty,false);
-    Util.exit_prof prof_declare_sym;
+    ZProf.exit_prof prof_declare_sym;
     ()
 
   let set_injective_for_arg sym i = 

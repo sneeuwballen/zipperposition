@@ -8,7 +8,7 @@ open Logtk
 module SI = Msat.Solver_intf
 
 let section = Util.Section.make ~parent:Const.section "msat"
-let prof_call_msat = Util.mk_profiler "msat.call"
+let prof_call_msat = ZProf.make "msat.call"
 let stat_num_clauses = Util.mk_stat "msat.num_clauses"
 let stat_num_calls = Util.mk_stat "msat.num_calls"
 
@@ -310,7 +310,7 @@ module Make()
     let res = check_unconditional_ () in
     assert (res = Sat)
 
-  let check ~full () = Util.with_prof prof_call_msat check_ full
+  let check ~full () = ZProf.with_prof prof_call_msat check_ full
 
   let set_printer pp = pp_ := pp
 

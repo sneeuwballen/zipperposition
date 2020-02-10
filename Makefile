@@ -14,11 +14,13 @@ clean:
 doc:
 	@dune build @doc
 
-test:
-	@dune runtest --no-buffer -f $(DUNE_OPTS)
-
 install: build
 	@dune install
+
+test: test-dune
+
+test-dune:
+	@dune runtest --no-buffer -f $(DUNE_OPTS)
 
 uninstall:
 	@ocamlfind remove zipperposition libzipperposition logtk || true
@@ -39,6 +41,7 @@ test-unit:
 
 test-list:
 	@./tests/run_tests.sh list
+	@echo "NOTE: "
 	@echo "to run a particular test: ./tests/run_tests.sh -only-test <path>"
 
 INTERFACE_FILES = $(shell find src -name '*.mli')

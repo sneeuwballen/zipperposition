@@ -651,7 +651,7 @@ let () =
     , " turn the quantifier renaming on or off";
       "--disable-simplifying-cnf",
       Arg.Set _cnf_non_simpl,
-      "implement cnf on-the-fly as an inference rule";
+      " implement cnf on-the-fly as an inference rule";
       "--interpret-bool-funs"
     , Arg.Bool (fun v -> _interpret_bool_funs := v)
     , " turn interpretation of boolean functions as forall or negation of forall on or off";

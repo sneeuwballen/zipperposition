@@ -7,8 +7,8 @@ module PB = Position.Build
 module PW = Position.With
 module T = InnerTerm
 
-let prof_app = Util.mk_profiler "term.app"
-let prof_ac_normal_form = Util.mk_profiler "term.AC_normal_form"
+let prof_app = ZProf.make "term.app"
+let prof_ac_normal_form = ZProf.make "term.AC_normal_form"
 
 (** {2 Term} *)
 
@@ -134,23 +134,23 @@ let tyapp t args = match args with
 let app f l = match l with
   | [] -> f
   | _::_ ->
-    Util.enter_prof prof_app;
+    ZProf.enter_prof prof_app;
     (* first; compute type *)
     let ty_result = Type.apply_unsafe (ty f) l in
     (* apply constant to type args and args *)
     let res = T.app ~ty:(ty_result : Type.t :> T.t) f l in
-    Util.exit_prof prof_app;
+    ZProf.exit_prof prof_app;
     res
 
 let app_w_ty ~ty f l  = match l with
   | [] -> f
   | _::_ ->
-    Util.enter_prof prof_app;
+    ZProf.enter_prof prof_app;
     (* first; compute type *)
     let ty_result = Type.apply_unsafe ty l in
     (* apply constant to type args and args *)
     let res = T.app ~ty:(ty_result : Type.t :> T.t) f l in
-    Util.exit_prof prof_app;
+    ZProf.exit_prof prof_app;
     res
 
 
@@ -682,7 +682,7 @@ module AC(A : AC_SPEC) = struct
     in flatten [] l
 
   let normal_form t =
-    Util.enter_prof prof_ac_normal_form;
+    ZProf.enter_prof prof_ac_normal_form;
     let rec normalize t = match T.view t with
       | T.Const _
       | T.Var _
@@ -723,7 +723,7 @@ module AC(A : AC_SPEC) = struct
         T.bind ~ty:(T.ty_exn t) ~varty b (normalize body)
     in
     let t' = normalize t in
-    Util.exit_prof prof_ac_normal_form;
+    ZProf.exit_prof prof_ac_normal_form;
     t'
 
   let equal t1 t2 =
@@ -1323,3 +1323,7 @@ let rec normalize_bools t =
     if same_l l' l then t
     else app_builtin ~ty:(ty t) hd l'
 
+let () =
+  Options.add_opts [
+    "--print-types", Arg.Set print_all_types, " print type annotations everywhere";
+  ]

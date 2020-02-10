@@ -1,1 +1,0 @@
-../../examples/ind/nat7_hard.p

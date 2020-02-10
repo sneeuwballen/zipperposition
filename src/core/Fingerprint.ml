@@ -8,7 +8,7 @@ module T = Term
 module I = Index
 module S = Subst
 
-let prof_traverse = Util.mk_profiler "fingerprint.traverse"
+let prof_traverse = ZProf.make "fingerprint.traverse"
 
 (* a feature.
    A    = variable
@@ -315,7 +315,7 @@ module Make(X : Set.OrderedType) = struct
 
   (** fold on parts of the trie that are compatible with features *)
   let traverse ~compatible idx features k =
-    Util.enter_prof prof_traverse;
+    ZProf.enter_prof prof_traverse;
     (* fold on the trie *)
     let rec recurse trie features =
       match trie, features with
@@ -333,9 +333,9 @@ module Make(X : Set.OrderedType) = struct
     in
     try
       recurse idx.trie features;
-      Util.exit_prof prof_traverse;
+      ZProf.exit_prof prof_traverse;
     with e ->
-      Util.exit_prof prof_traverse;
+      ZProf.exit_prof prof_traverse;
       raise e
 
   let retrieve_unifiables_aux fold_unify (idx,sc_idx) t k =

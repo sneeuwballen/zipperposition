@@ -286,9 +286,9 @@ let rec pp_rec depth out (t:t) = match view t with
     Fmt.fprintf out "(@[%a@ %a@])" (Linexp_rat.pp (pp_rec_inner depth)) l Rat_op.pp o
 and pp_rec_inner depth out t = match view t with
   | App _ | Bind _ | AppBuiltin (_,_::_) | Arrow _ | Ite _ ->
-    Fmt.fprintf out "(%a)@{<Black>/%d@}" (pp_rec depth) t t.id
+    Fmt.fprintf out "(%a)/%d" (pp_rec depth) t t.id
   | Type | Const _ | Var _ | AppBuiltin (_,[]) | Int_pred _ | Rat_pred _ ->
-    Fmt.fprintf out "%a@{<Black>/%d@}" (pp_rec depth) t t.id
+    Fmt.fprintf out "%a/%d" (pp_rec depth) t t.id
 and pp_infix_ depth b out l = match l with
   | [] -> assert false
   | [t] -> pp_rec_inner depth out t

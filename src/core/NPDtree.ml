@@ -7,12 +7,12 @@ module T = Term
 module S = Subst
 module TC = T.Classic
 
-let prof_npdtree_retrieve = Util.mk_profiler "NPDtree_retrieve"
-let prof_npdtree_term_unify = Util.mk_profiler "NPDtree_term_unify"
+let prof_npdtree_retrieve = ZProf.make "NPDtree_retrieve"
+let prof_npdtree_term_unify = ZProf.make "NPDtree_term_unify"
 let prof_npdtree_term_generalizations =
-  Util.mk_profiler "NPDtree_term_generalizations"
+  ZProf.make "NPDtree_term_generalizations"
 let prof_npdtree_term_specializations =
-  Util.mk_profiler "NPDtree_term_specializations"
+  ZProf.make "NPDtree_term_specializations"
 
 (** {2 Term traversal} *)
 
@@ -157,7 +157,7 @@ module Make(E : Index.EQUATION) = struct
   let remove_seq dt seq = Iter.fold remove dt seq
 
   let retrieve ?(subst=S.empty) ~sign dt t k =
-    Util.enter_prof prof_npdtree_retrieve;
+    ZProf.enter_prof prof_npdtree_retrieve;
     (* extended callback *)
     let k' (t', eqn, subst) =
       let _, r, sign' = E.extract eqn in
@@ -167,9 +167,9 @@ module Make(E : Index.EQUATION) = struct
     let rec traverse trie iter =
       match iter with
       | None ->
-        Util.exit_prof prof_npdtree_retrieve;
+        ZProf.exit_prof prof_npdtree_retrieve;
         Leaf.fold_match ~subst (Scoped.set dt trie.leaf) t k';
-        Util.enter_prof prof_npdtree_retrieve;
+        ZProf.enter_prof prof_npdtree_retrieve;
       | Some i ->
         match view_head i.cur_term with
         | As_star ->
@@ -192,9 +192,9 @@ module Make(E : Index.EQUATION) = struct
     in
     try
       traverse (fst dt) (iterate (fst t));
-      Util.exit_prof prof_npdtree_retrieve;
+      ZProf.exit_prof prof_npdtree_retrieve;
     with e ->
-      Util.exit_prof prof_npdtree_retrieve;
+      ZProf.exit_prof prof_npdtree_retrieve;
       raise e
 
   (** iterate on all (term -> value) in the tree *)
@@ -344,13 +344,13 @@ module MakeTerm(X : Set.OrderedType) = struct
     skip trie 1 k
 
   let retrieve_unifiables_aux fold_unify dt t k =
-    Util.enter_prof prof_npdtree_term_unify;
+    ZProf.enter_prof prof_npdtree_term_unify;
     (* recursive traversal of the trie, following paths compatible with t *)
     let rec traverse trie iter = match iter with
       | None ->
-        Util.exit_prof prof_npdtree_term_unify;
+        ZProf.exit_prof prof_npdtree_term_unify;
         fold_unify (Scoped.set dt trie.leaf) t k;
-        Util.enter_prof prof_npdtree_term_unify;
+        ZProf.enter_prof prof_npdtree_term_unify;
       | Some i ->
         match view_head i.cur_term with
         | As_star ->
@@ -372,9 +372,9 @@ module MakeTerm(X : Set.OrderedType) = struct
     in
     try
       traverse (fst dt) (iterate (fst t));
-      Util.exit_prof prof_npdtree_term_unify;
+      ZProf.exit_prof prof_npdtree_term_unify;
     with e ->
-      Util.exit_prof prof_npdtree_term_unify;
+      ZProf.exit_prof prof_npdtree_term_unify;
       raise e
 
   let retrieve_unifiables = retrieve_unifiables_aux Leaf.fold_unify 
@@ -382,13 +382,13 @@ module MakeTerm(X : Set.OrderedType) = struct
   let retrieve_unifiables_complete ?(unif_alg=JP_unif.unify_scoped) = retrieve_unifiables_aux (Leaf.fold_unify_complete ~unif_alg) 
 
   let retrieve_generalizations ?(subst=S.empty) dt t k =
-    Util.enter_prof prof_npdtree_term_generalizations;
+    ZProf.enter_prof prof_npdtree_term_generalizations;
     (* recursive traversal of the trie, following paths compatible with t *)
     let rec traverse trie iter = match iter with
       | None ->
-        Util.exit_prof prof_npdtree_term_generalizations;
+        ZProf.exit_prof prof_npdtree_term_generalizations;
         Leaf.fold_match ~subst (Scoped.set dt trie.leaf) t k;
-        Util.enter_prof prof_npdtree_term_generalizations;
+        ZProf.enter_prof prof_npdtree_term_generalizations;
       | Some i ->
         match view_head i.cur_term with
         | As_star ->
@@ -412,19 +412,19 @@ module MakeTerm(X : Set.OrderedType) = struct
     in
     try
       traverse (fst dt) (iterate (fst t));
-      Util.exit_prof prof_npdtree_term_generalizations;
+      ZProf.exit_prof prof_npdtree_term_generalizations;
     with e ->
-      Util.exit_prof prof_npdtree_term_generalizations;
+      ZProf.exit_prof prof_npdtree_term_generalizations;
       raise e
 
   let retrieve_specializations ?(subst=S.empty) dt t k =
-    Util.enter_prof prof_npdtree_term_specializations;
+    ZProf.enter_prof prof_npdtree_term_specializations;
     (* recursive traversal of the trie, following paths compatible with t *)
     let rec traverse trie iter = match iter with
       | None ->
-        Util.exit_prof prof_npdtree_term_specializations;
+        ZProf.exit_prof prof_npdtree_term_specializations;
         Leaf.fold_matched ~subst (Scoped.set dt trie.leaf) t k;
-        Util.enter_prof prof_npdtree_term_specializations;
+        ZProf.enter_prof prof_npdtree_term_specializations;
       | Some i ->
         match view_head i.cur_term with
         | As_star ->
@@ -442,9 +442,9 @@ module MakeTerm(X : Set.OrderedType) = struct
     in
     try
       traverse (fst dt) (iterate (fst t));
-      Util.exit_prof prof_npdtree_term_specializations;
+      ZProf.exit_prof prof_npdtree_term_specializations;
     with e ->
-      Util.exit_prof prof_npdtree_term_specializations;
+      ZProf.exit_prof prof_npdtree_term_specializations;
       raise e
 
   (** iterate on all (term -> value) in the tree *)

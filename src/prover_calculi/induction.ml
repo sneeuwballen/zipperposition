@@ -33,7 +33,7 @@ let stat_generalize_terms_active_pos = Util.mk_stat "induction.generalize_terms_
 let stat_assess_goal = Util.mk_stat "induction.assess_goal_calls"
 let stat_assess_goal_ok = Util.mk_stat "induction.assess_goal_ok"
 
-let prof_check_goal = Util.mk_profiler "induction.check_goal"
+let prof_check_goal = ZProf.make "induction.check_goal"
 
 let k_enable : bool Flex_state.key = Flex_state.create_key()
 let k_ind_depth : int Flex_state.key = Flex_state.create_key()
@@ -280,7 +280,7 @@ end = struct
       false
 
   let check_not_absurd_or_trivial g =
-    Util.with_prof prof_check_goal check_not_absurd_or_trivial_ g
+    ZProf.with_prof prof_check_goal check_not_absurd_or_trivial_ g
 
   (* some checks that [g] should be considered as a goal *)
   let is_acceptable_goal (g:t) : bool =
