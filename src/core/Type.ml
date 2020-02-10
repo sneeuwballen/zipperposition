@@ -548,7 +548,8 @@ module Conv = struct
         forall t'
       | PT.Record _ -> failwith "cannot convert record-type into type"
       | PT.Meta (_,{contents=Some ty'},_) -> aux depth v2db ty'
-      | PT.AppBuiltin (Builtin.TyReal,[]) -> failwith "cannot handle type `real`"
+      | PT.AppBuiltin (Builtin.TyReal,[]) ->
+        Util.errorf ~where:"type" "cannot handle type `real`"
       | PT.Bind _
       | PT.AppBuiltin _
       | PT.Meta _
