@@ -199,7 +199,7 @@ let rec pp out t = match view t with
       | _, Some s, [a] ->
         Format.fprintf out "@[<1>%s@ %a@]" s pp_inner a
       | _ ->
-        Format.fprintf out "@[<2>%a@ %a@]"
+        Format.fprintf out "@[<1>%a@ %a@]"
           pp_inner f (Util.pp_list ~sep:" " pp_inner) l
     end
   | Bind (s, _, _) ->
@@ -207,7 +207,7 @@ let rec pp out t = match view t with
     let pp_bound_var out v =
       Format.fprintf out "@[%a%a@]" Var.pp_fullc v pp_var_ty v
     in
-    Format.fprintf out "@[<2>%a %a.@ %a@]"
+    Format.fprintf out "@[<1>%a %a.@ %a@]"
       Binder.pp s (Util.pp_list ~sep:" " pp_bound_var) vars pp_inner body
   | Record (l, None) ->
     Format.fprintf out "{%a}" pp_fields l
@@ -226,16 +226,16 @@ let rec pp out t = match view t with
     Format.fprintf out "@[<hv>%a@]" (pp_infix_ b) l
   | AppBuiltin (b, []) -> Builtin.pp out b
   | AppBuiltin (b, l) ->
-    Format.fprintf out "@[<2>%a@ %a@]" Builtin.pp b (Util.pp_list pp_inner) l
+    Format.fprintf out "@[<1>%a@ %a@]" Builtin.pp b (Util.pp_list pp_inner) l
   | Ite (a,b,c) ->
-    Format.fprintf out "@[<2>if %a@ then %a@ else %a@]" pp a pp b pp c
+    Format.fprintf out "@[<1>if %a@ then %a@ else %a@]" pp a pp b pp c
   | Let (l, u) ->
     let pp_binding out (v,t) = Format.fprintf out "@[%a := %a@]" Var.pp v pp t in
-    Format.fprintf out "@[<2>let %a@ in %a@]"
+    Format.fprintf out "@[let %a in@ %a@]"
       (Util.pp_list ~sep:" and " pp_binding) l pp u
   | Match (u, l) ->
     let pp_branch out (c,vars,rhs) =
-      Format.fprintf out "@[<2>case@ @[%a%a%a@] ->@ %a@]"
+      Format.fprintf out "@[<1>case@ @[%a%a%a@] ->@ %a@]"
         ID.pp c.cstor_id (Util.pp_list0 ~sep:" " pp_inner) c.cstor_args
         (Util.pp_list0 ~sep:" " Var.pp_fullc) vars pp rhs
     in

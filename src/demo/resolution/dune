@@ -1,5 +1,6 @@
 
 (executable
   (name resolution1)
+  (flags :standard -warn-error -a+8)
   (libraries logtk logtk.parsers containers iter))
 

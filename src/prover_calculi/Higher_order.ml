@@ -35,6 +35,8 @@ let prof_eq_res = ZProf.make "ho.eq_res"
 let prof_eq_res_syn = ZProf.make "ho.eq_res_syntactic"
 let prof_ho_unif = ZProf.make "ho.unif"
 
+type prune_kind = [`NoPrune | `OldPrune | `PruneAllCovers | `PruneMaxCover]
+
 let k_ext_pos = Flex_state.create_key ()
 let k_ext_pos_all_lits = Flex_state.create_key ()
 let k_ext_axiom = Flex_state.create_key ()
@@ -48,10 +50,8 @@ let k_neg_cong_fun = Flex_state.create_key ()
 let k_instantiate_choice_ax = Flex_state.create_key ()
 let k_elim_leibniz_eq = Flex_state.create_key ()
 let k_unif_max_depth = Flex_state.create_key ()
-let k_prune_arg_fun = Flex_state.create_key ()
+let k_prune_arg_fun: prune_kind Flex_state.key = Flex_state.create_key ()
 let k_prim_enum_terms = Flex_state.create_key ()
-
-type prune_kind = [`NoPrune | `OldPrune | `PruneAllCovers | `PruneMaxCover]
 
 
 module type S = sig
@@ -1279,7 +1279,7 @@ let st_contains_ho (st:(_,_,_) Statement.t): bool =
     let n_ty_vars, args, _ = Type.open_poly_fun ty in
     n_ty_vars > 0 || args<>[]
   and has_prop_in_args ty =
-    let n_ty_vars, args, _ = Type.open_poly_fun ty in
+    let _, args, _ = Type.open_poly_fun ty in
     List.exists Type.contains_prop args
   in
   (* is there a HO variable? Any variable with a type that is

@@ -68,7 +68,9 @@ module Make(E : Env.S) : S with module Env = E = struct
   let exists t = 
     let t2bool = Type.arrow [t] Type.prop in
     [T.app_builtin ~ty:(Type.arrow [t2bool] Type.prop) Builtin.ExistsConst [] =~ T.fun_ t2bool
-       (Builtin.Not @:[Builtin.ForallConst @:[T.fun_ t (Builtin.Not @:[T.app (T.bvar t2bool 1) [T.bvar t 0]])]])]
+       (Builtin.Not
+        @:[Builtin.ForallConst
+            @:[T.fun_ t (Builtin.Not @:[T.app (T.bvar ~ty:t2bool 1) [T.bvar ~ty:t 0]])]])]
 
   let as_clause c = Env.C.create ~penalty:1 ~trail:Trail.empty c Proof.Step.trivial
 
@@ -248,7 +250,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let idx = CCArray.find_idx (fun l -> 
         let eq = Literal.View.as_eqn l in
         match eq with 
-        | Some (l,r,sign) -> 
+        | Some (l,r,_sign) -> 
           Type.is_prop (T.ty l) && 
           ((not (T.equal r T.true_) && not (T.equal r T.false_))
            || T.is_formula l || T.is_formula r)
@@ -283,7 +285,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                     |> CCList.flatten
                     |> List.map (fun c -> 
                         C.create ~penalty  ~trail (CCArray.to_list (C.lits c)) proof) in
-      List.iteri (fun i new_c -> 
+      List.iter (fun new_c -> 
           assert((C.proof_depth c) <= C.proof_depth new_c);) clauses;
       Some clauses
     | None -> None
@@ -476,13 +478,13 @@ let name_quantifiers stmts =
   in
   stmts |> CCVector.map(fun s ->
       match Statement.view s with
-      | TyDecl(id,t)	-> s
-      | Data ts	-> s
-      | Def defs	-> s
-      | Rewrite _	-> s
-      | Assert p	-> if_changed assert_ s (name_prop_Qs s p)
-      | Lemma ps	-> if_changed_list lemma s (map (name_prop_Qs s) ps)
-      | Goal p	-> if_changed goal s (name_prop_Qs s p)
+      | TyDecl _ -> s
+      | Data _ -> s
+      | Def _ -> s
+      | Rewrite _ -> s
+      | Assert p -> if_changed assert_ s (name_prop_Qs s p)
+      | Lemma ps -> if_changed_list lemma s (map (name_prop_Qs s) ps)
+      | Goal p-> if_changed goal s (name_prop_Qs s p)
       | NegatedGoal(ts, ps)	-> if_changed_list (neg_goal ~skolems:ts) s (map (name_prop_Qs s) ps)
     ) |> CCVector.append new_stmts;
   CCVector.freeze new_stmts
@@ -527,7 +529,7 @@ let case_bool vs c p =
 let rec case_bools_wrt vs t =
   with_subterm_or_id t (fun _ s -> 
       match view s with
-      | App(f,ps) ->
+      | App (_f,ps) ->
         let t' = fold_left (case_bool vs) t ps in
         if t==t' then None else Some(case_bools_wrt vs t')
       | _ -> None
@@ -555,7 +557,7 @@ let eager_cases_near =
         match view s with
         | AppBuiltin((And|Or|Imply|Not|Equiv|Xor|ForallConst|ExistsConst),_)
         | Bind((Forall|Exists),_,_) -> None
-        | AppBuiltin((Eq|Neq), [x;y]) when is_bool x -> None
+        | AppBuiltin((Eq|Neq), [x;_]) when is_bool x -> None
         | _ when is_bool s ->
           let s' = case_bool vs s (with_subterm_or_id s (fun _ -> CCOpt.if_(fun x -> x!=s && is_bool x && not(is_T_F x)))) in
           if s==s' then None else Some(case_near(replace s s' t))

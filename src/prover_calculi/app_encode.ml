@@ -33,7 +33,7 @@ let ty_ae_app =
 let const_ae_app = T.const ~ty:ty_ae_app id_ae_app
 
 (** Type declarations for these new symbols *)
-let ty_decls = 
+let ty_decls =
   let ae_fun_decl = Statement.ty_decl ~proof:Proof.Step.trivial id_ae_fun ty_ae_fun in
   let ae_app_decl = Statement.ty_decl ~proof:Proof.Step.trivial id_ae_app ty_ae_app in
   Iter.of_list [ae_fun_decl; ae_app_decl]
@@ -105,8 +105,8 @@ let rec app_encode_term toplevel t  =
         )
         (app_encode_term false f)
         args
-    | T.AppBuiltin (f, ts) ->
-      Util.debugf 5 "AppBuiltin-Term: %a" (fun k -> k T.pp t); 
+    | T.AppBuiltin (_f, _ts) ->
+      Util.debugf 5 "AppBuiltin-Term: %a" (fun k -> k T.pp t);
       failwith "Not implemented: AppBuiltin"
     | T.Const c -> T.const ~ty c
     | T.Var v -> T.var (app_encode_var v)
@@ -119,8 +119,8 @@ let rec app_encode_term toplevel t  =
   t'
 
 (** Encode a literal *)
-let app_encode_lit lit = 
-  SLiteral.map (app_encode_term true) lit
+let app_encode_lit lit =
+  SLiteral.map ~f:(app_encode_term true) lit
 
 (** Encode a clause *)
 let app_encode_lits lits = List.map app_encode_lit lits
@@ -148,9 +148,9 @@ let result_tc =
     ~pp_in:pp_clause_in
     ~is_stmt:true
     ~name:Statement.name
-    ~to_form:(fun ~ctx st ->
+    ~to_form:(fun ~ctx:_ st ->
         let conv_c (c:(T.t SLiteral.t) list) : _ =
-          c 
+          c
           |> List.map SLiteral.to_form
           |> T.Form.or_
         in
@@ -169,8 +169,8 @@ let app_encode_stmt stmt =
   | Statement.Rewrite _ -> failwith "Not implemented: Rewrite"
   | Statement.Data _ -> failwith "Not implemented: Data"
   | Statement.Lemma _ -> failwith "Not implemented: Lemma"
-  | Statement.Goal lits -> failwith "Not implemented: Goal"
-  | Statement.NegatedGoal (skolems,clauses) -> 
+  | Statement.Goal _lits -> failwith "Not implemented: Goal"
+  | Statement.NegatedGoal (skolems,clauses) ->
     let skolems = List.map (fun (id, ty) -> (id, app_encode_ty ty)) skolems in
     Statement.neg_goal ~proof ~skolems (List.map app_encode_lits clauses)
   | Statement.Assert lits -> Statement.assert_ ~proof (app_encode_lits lits)
@@ -199,11 +199,11 @@ let extension =
       (* Add type declarations *)
       let seq = Iter.append ty_decls seq in
       (* Add extensionality axiom *)
-      let seq = 
-        if !mode_ = `Extensional 
-        then Iter.append seq (Iter.singleton extensionality_axiom) 
+      let seq =
+        if !mode_ = `Extensional
+        then Iter.append seq (Iter.singleton extensionality_axiom)
         else seq in
-      Util.debug ~section 2 "Finished applicative encoding"; 
+      Util.debug ~section 2 "Finished applicative encoding";
       seq
     ) else seq
   in
@@ -211,7 +211,7 @@ let extension =
     { default with name="app_encode"; post_cnf_modifiers=[modifier]; }
   )
 
-let options = 
+let options =
   ["none", `None
   ;"extensional", `Extensional
   ;"intensional", `Intensional]

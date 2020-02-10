@@ -103,7 +103,7 @@ let test_whnf2 = "whnf2", `Quick, fun () ->
   Alcotest.(check t_test) "whnf2" t1 t';
   ()
 
-let test_whnf2 = "patterns", `Quick, fun () ->
+let test_patterns = "patterns", `Quick, fun () ->
   let t1 = f (g a) (g b) in 
   let t2 = T.fun_ ty (f (T.bvar ~ty 0) (g (T.bvar ~ty 1))) in
   let t3 = T.fun_ ty (f (fun_var (T.bvar ~ty 0) (T.bvar ~ty 1)) (g (T.bvar ~ty 1))) in 
@@ -177,6 +177,7 @@ let suite : unit Alcotest.test_case list =
     test_app_var;
     test_whnf1;
     test_whnf2;
+    test_patterns;
     test_polymorphic_app;
     test_eta_reduce;
     test_eta_expand;

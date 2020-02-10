@@ -166,13 +166,13 @@ let prefer_app_var ~ord lits =
     )
 
 let weight_based_sel_driver ?(blocker=(fun _ -> false)) ~ord lits f =
-  let min_lit = 
+  let min_lit =
     CCArray.to_seq lits
-    |> Iter.mapi (fun i el -> f (i,el), i) 
+    |> Iter.mapi (fun i el -> f (i,el), i)
     |> Iter.min in
   match min_lit with
   | None -> BV.empty ()
-  | Some (_, idx) -> 
+  | Some (_, idx) ->
     if can_select_lit ~ord lits idx && not @@ blocker (CCArray.get lits idx) then (
       let res = BV.empty () in
       (* CCFormat.printf "Selected %d: %a.\n" idx Lits.pp lits; *)
@@ -187,15 +187,15 @@ let lit_sel_diff_w l =
     100*((max lhs_w rhs_w) - (min lhs_w rhs_w)) + lhs_w + rhs_w
   | _ -> 0
 
-let pred_freq ~ord lits = 
+let pred_freq ~ord lits =
   Literals.fold_eqn ~both:false ~ord ~eligible:(fun _ _ -> true) lits
-  |> Iter.fold (fun acc (l,r,sign,_) -> 
+  |> Iter.fold (fun acc (l,r,sign,_) ->
       if sign && T.equal T.true_ r then (
         (* positive predicate *)
         let hd = T.head l in
-        match hd with 
+        match hd with
         | None -> acc
-        | Some id -> 
+        | Some id ->
           let current_val = ID.Map.get_or id acc ~default:0 in
           ID.Map.add id (current_val+1) acc
       ) else acc
@@ -204,15 +204,15 @@ let pred_freq ~ord lits =
 let get_pred_freq ~freq_tbl l =
   match l with
   | Lit.Equation(l,r,true) when T.is_true_or_false r ->
-    begin 
+    begin
       match T.head l with
       | Some id -> ID.Map.get_or id freq_tbl ~default:0
       | None -> max_int
     end
   | _ -> max_int
 
-let e_sel ~ord lits = 
-  let chooser ~freq_tbl (i,l) = 
+let e_sel ~ord lits =
+  let chooser ~freq_tbl (i,l) =
     ((if Lit.is_pos l then 1 else 0),
      (if Lits.is_max ~ord lits i then 0 else 100 +
                                              if Lit.is_pure_var l then 0 else 10 +
@@ -222,26 +222,26 @@ let e_sel ~ord lits =
   let freq_tbl = pred_freq ~ord lits in
   weight_based_sel_driver ~ord lits (chooser ~freq_tbl)
 
-let e_sel2 ~ord lits = 
-  let symbols = Lits.symbols lits 
-                |> ID.Set.to_seq 
-                |> Iter.sort ~cmp:ID.compare 
+let e_sel2 ~ord lits =
+  let symbols = Lits.symbols lits
+                |> ID.Set.to_seq
+                |> Iter.sort ~cmp:ID.compare
                 |> Iter.to_array in
   let blocker l = Lit.is_type_pred l || Lit.is_propositional l in
-  let chooser (_,l) = 
-    let sign_val = if Lit.is_pos l then 1 else 0 in 
+  let chooser (_,l) =
+    let sign_val = if Lit.is_pos l then 1 else 0 in
     let diff_val = -(lit_sel_diff_w l) in
     let prec = Ordering.precedence ord in
-    match l with 
-    | Equation(lhs,rhs,sign) when not @@ blocker l ->
+    match l with
+    | Equation(lhs,_rhs,_sign) when not @@ blocker l ->
       if T.is_var (T.head_term lhs) then (
         (sign_val, 0, 0, diff_val)
       ) else (
         let hd_is_cst = T.is_const (T.head_term lhs) in
-        let prec_weight = 
+        let prec_weight =
           if not hd_is_cst then 0
           else Precedence.sel_prec_weight prec (T.head_exn lhs) in
-        let alpha_rank = 
+        let alpha_rank =
           if not hd_is_cst then max_int
           else (
             match CCArray.bsearch ~cmp:ID.compare (T.head_exn lhs) symbols with
@@ -254,8 +254,8 @@ let e_sel2 ~ord lits =
     | _ -> (sign_val,max_int,max_int,diff_val) (* won't be chosen *) in
   weight_based_sel_driver ~ord ~blocker lits chooser
 
-let e_sel3 ~ord lits = 
-  let chooser (i,l) = 
+let e_sel3 ~ord lits =
+  let chooser (_i,l) =
     let sign = (if Lit.is_pos l then 1 else 0) in
     if Lit.is_pure_var l then (
       (sign, 0, 0, 0)
@@ -267,17 +267,17 @@ let e_sel3 ~ord lits =
   weight_based_sel_driver ~ord lits chooser
 
 let e_sel4 ~ord lits =
-  let chooser (i,l) = 
+  let chooser (_i,l) =
     let lhs = match l with
-      | Lit.Equation(lhs_t,rhs_t,_) -> lhs_t
+      | Lit.Equation(lhs_t,_rhs_t,_) -> lhs_t
       | _ -> T.true_ (* a term to fill in *) in
     let sign = if Lit.is_pos l then 1 else 0 in
     let freq_tbl = pred_freq ~ord lits in
     let hd_freq = get_pred_freq ~freq_tbl l in
     if Lit.is_ground l then (
-      (sign, 0, -(T.ho_weight lhs), hd_freq) 
+      (sign, 0, -(T.ho_weight lhs), hd_freq)
     ) else if not @@ Lit.is_typex_pred l then (
-      let max_term_weight = 
+      let max_term_weight =
         Iter.of_list (Lit.Comp.max_terms ~ord l)
         |> Iter.map (T.weight ~var:0)
         |> Iter.sum in
@@ -286,26 +286,26 @@ let e_sel4 ~ord lits =
       (sign, 20, -(T.ho_weight lhs), hd_freq)
     ) else (sign, max_int, max_int, max_int) in
   let blocker = Lit.is_type_pred in
-  weight_based_sel_driver ~ord ~blocker lits chooser 
+  weight_based_sel_driver ~ord ~blocker lits chooser
 
 let e_sel5 ~ord lits =
-  let chooser (i,l) =
-    (if Lit.is_pos l then 1 else 0), 
+  let chooser (_i,l) =
+    (if Lit.is_pos l then 1 else 0),
     (if Lit.is_ground l then 0 else 1),
     (- (lit_sel_diff_w l)),
     0 in
   if CCArray.exists (fun l -> Lit.is_neg l && Lit.depth l <= 2) lits then (
-    weight_based_sel_driver ~ord lits chooser 
+    weight_based_sel_driver ~ord lits chooser
   ) else BV.empty ()
 
 let e_sel6 ~ord lits =
   (* SelectLargestOrientable *)
-  let is_oriented lit = 
+  let is_oriented lit =
     match lit with
     | Lit.Equation(l,r,_) ->
       Ordering.compare ord l r != Comparison.Incomparable
     | _ -> true in
-  let chooser (i,l) =
+  let chooser (_i,l) =
     (if Lit.is_pos l then 1 else 0),
     (if is_oriented l then 0 else 1),
     (- (Lit.weight l)),
@@ -313,75 +313,75 @@ let e_sel6 ~ord lits =
   let blocker t = not @@ is_oriented t in
   weight_based_sel_driver ~ord lits chooser ~blocker
 
-let e_sel7 ~ord lits = 
+let e_sel7 ~ord lits =
   (* SelectComplexExceptRRHorn *)
   if Lits.is_RR_horn_clause lits
   then BV.empty () (* do not select (conditional rewrite rule) *)
   else e_sel3 ~ord lits
 
-let e_sel8 ~ord lits = 
-  let symbols = Lits.symbols lits 
-                |> ID.Set.to_seq 
-                |> Iter.sort ~cmp:ID.compare 
+let e_sel8 ~ord lits =
+  let symbols = Lits.symbols lits
+                |> ID.Set.to_seq
+                |> Iter.sort ~cmp:ID.compare
                 |> Iter.to_array in
-  let is_truly_equational = function 
-    | Lit.Equation(l,r,sign) -> 
+  let is_truly_equational = function
+    | Lit.Equation(_l,r,_sign) ->
       not (Term.is_true_or_false r)
     | _ -> false  in
-  let get_arity = function 
-    | Lit.Equation(l,r,sign) when sign && Term.is_true_or_false r -> 
+  let get_arity = function
+    | Lit.Equation(l,r,sign) when sign && Term.is_true_or_false r ->
       List.length (Type.expected_args (Term.ty (T.head_term l)))
     | _ -> 0  in
-  let alpha_rank = function 
-    | Lit.Equation(l,r,sign) when sign && Term.is_true_or_false r 
-                                  && T.is_const (T.head_term l) -> 
+  let alpha_rank = function
+    | Lit.Equation(l,r,sign) when sign && Term.is_true_or_false r
+                                  && T.is_const (T.head_term l) ->
       let hd = T.head_exn l in
       (match CCArray.bsearch ~cmp:ID.compare hd symbols with
        | `At idx -> idx
        | _       -> max_int)
     | _ -> max_int  in
   let blocker l = Lit.is_type_pred l || Lit.is_propositional l in
-  let chooser (i,l) =
+  let chooser (_i,l) =
     if is_truly_equational l then (
       (if Lit.is_pos l then 1 else 0),
       min_int, 0, lit_sel_diff_w l
     ) else (
       (if Lit.is_pos l then 1 else 0),
-      (if not (blocker l) then -(get_arity l) else max_int), 
+      (if not (blocker l) then -(get_arity l) else max_int),
       alpha_rank l, lit_sel_diff_w l
     )
   in
   weight_based_sel_driver ~ord lits chooser ~blocker
 
-let ho_sel ~ord lits = 
-  let chooser (i,l) = 
+let ho_sel ~ord lits =
+  let chooser (_i,l) =
     let sign = (if Lit.is_pos l then 1 else 0) in
     let ground = if Lit.is_ground l then 1.0 else 1.5 in
     let has_formula = Iter.exists T.is_formula @@ Lit.Seq.terms l in
-    let app_var_num = 
+    let app_var_num =
       Lit.Seq.terms l
       |> Iter.flat_map (Term.Seq.subterms ~include_builtin:true)
-      |> Iter.map (fun t -> if Term.is_app_var t then 1 else 0) 
-      |> Iter.sum 
+      |> Iter.map (fun t -> if Term.is_app_var t then 1 else 0)
+      |> Iter.sum
       |> float_of_int in
     let weight = float_of_int (Lit.weight l) in
-    (sign, 
+    (sign,
      (if has_formula then 1 else 0),
      int_of_float (weight *. ((1.2) ** app_var_num) /. ground),  0)  in
   weight_based_sel_driver ~ord lits chooser
 
 let ho_sel2 ~ord lits =
   let app_var_pen l =
-    match l with 
+    match l with
     | Lit.Equation(lhs,rhs,_) ->
       let num_app_var_sides = (if T.is_var @@ T.head_term lhs then 1 else 0) +
                               (if T.is_var @@ T.head_term rhs then 1 else 0) in
       if num_app_var_sides = 1 then 0
-      else if num_app_var_sides = 2 then 1 
+      else if num_app_var_sides = 2 then 1
       else 2
     | _ -> max_int in
 
-  let chooser (i,l) = 
+  let chooser (_i,l) =
     let sign = (if Lit.is_pos l then 1 else 0) in
     (sign, app_var_pen l, Lit.weight l, (if not (Lit.is_ground l) then 0 else 1))  in
   weight_based_sel_driver ~ord lits chooser

@@ -164,7 +164,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
     Literals.fold_terms ~ord ~subterms:true ~eligible:C.Eligible.always 
       ~which:`All (C.lits c) ~fun_bodies:false 
-    |> Iter.filter_map (fun (t,p) -> 
+    |> Iter.filter_map (fun (t,_p) -> 
         let ty = Term.ty t and hd = Term.head_term t in
         let cached_t = Subst.FO.canonize_all_vars t in
         if not (Term.Set.mem cached_t !Higher_order.prim_enum_terms) &&
@@ -1898,8 +1898,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let eligible = 
         if Env.flex_get k_ext_dec_lits = `OnlyMax then C.Eligible.param given else C.Eligible.always in
       Lits.fold_eqn ~ord ~both:true ~sign:true ~eligible (C.lits given)
-      |> Iter.flat_map (fun (l,_,sign,pos) ->
-          let hd,args = T.as_app l in
+      |> Iter.flat_map (fun (l,_,_sign,pos) ->
+          let hd, _args = T.as_app l in
           if T.is_const hd && T.has_ho_subterm l then (
             let inf_partners = retrieve_from_extdec_idx !_ext_dec_into_idx (T.as_const_exn hd) in
             Iter.map (fun (into_c,into_t, into_p) -> 
@@ -1917,7 +1917,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false ~ty_args:false 
         ~ord ~which ~subterms:true ~eligible (C.lits given)
       |> Iter.flat_map (fun (t,p) ->
-          let hd, args = T.as_app t in
+          let hd, _ = T.as_app t in
           if T.is_const hd && T.has_ho_subterm t  then (
             let inf_partners = retrieve_from_extdec_idx !_ext_dec_from_idx (T.as_const_exn hd) in
             Iter.map (fun (from_c,from_t, from_p) -> 

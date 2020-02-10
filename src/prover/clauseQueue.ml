@@ -228,10 +228,13 @@ module Make(C : Clause_intf.S) = struct
     let conj_relative_cheap ~v ~f ~pos_mul ~conj_mul ~dist_var_mul c  =
       let sgn = C.Ctx.signature () in
       let res =
-        Array.mapi (fun i xx -> i,xx) (C.lits c)
-        |> (Array.fold_left (fun acc (i,l) -> acc +.
-                                              let l_w, l_s = (calc_lweight l sgn v f conj_mul) in
-                                              ( if l_s then pos_mul else 1.0 )*. float_of_int l_w ) 0.0) in
+        Array.fold_left
+          (fun acc l ->
+             let l_w, l_s = calc_lweight l sgn v f conj_mul in
+             acc +.
+             (if l_s then pos_mul else 1.0 )*. float_of_int l_w)
+          0.0 (C.lits c)
+      in
       let dist_vars =  List.length (Literals.vars (C.lits c)) in
       int_of_float (dist_var_mul ** (float_of_int dist_vars) *. res)
 
@@ -459,7 +462,7 @@ module Make(C : Clause_intf.S) = struct
   module PriorityFun = struct
     type t = C.t -> int
 
-    let const_prio c = 1
+    let const_prio _c = 1
 
     let prefer_ho_steps c = if Proof.Step.has_ho_step (C.proof_step c) then 0 else 1
 
@@ -667,7 +670,7 @@ module Make(C : Clause_intf.S) = struct
 
   let name q = match q with
     | FIFO _ -> "bfs"
-    | Mixed q -> "mixed"
+    | Mixed _ -> "mixed"
 
   (** {6 Combination of queues} *)
 

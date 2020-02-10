@@ -1,7 +1,10 @@
 (env
+  (release
+    (flags :standard -warn-error -3+8 -w -3 -color always -safe-string)
+    (ocamlopt_flags :standard -O3 -unbox-closures -unbox-closures-factor 20))
   (_
     (flags :standard -warn-error -3+8 -w -3 -color always -safe-string)
-    (ocamlopt_flags :standard -O3 -unbox-closures -unbox-closures-factor 20)))
+    (ocamlopt_flags :standard -O2 -opaque)))
 
 (alias
  (name    runtest)
