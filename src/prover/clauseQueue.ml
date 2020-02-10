@@ -497,7 +497,6 @@ module Make(C : Clause_intf.S) = struct
             match l with
             | Literal.Equation(lhs,_,_) -> Type.is_fun (Term.ty lhs)
             | _ -> false) in
-<<<<<<< HEAD
       let in_pattern_fragment c =
         (* returns has_lambdas, is_pattern *)
         let rec aux t =
@@ -526,10 +525,6 @@ module Make(C : Clause_intf.S) = struct
 
       if has_lam_eq c || in_pattern_fragment c then 0
       else if prefer_formulas c == 1 then 1
-=======
-      if has_lam_eq c || prefer_formulas c = 1 then 0
-      else if prefer_lambdas c = 1 then 1
->>>>>>> master
       else 2
 
     let defer_formulas c =

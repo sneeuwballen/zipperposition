@@ -113,7 +113,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
             (* asserting Trail -> bool_name *)
             if List.for_all (fun bg -> 
                 BBox.Lit.equal (BBox.Lit.neg bg) bool_lit)
-               bool_guard then (\
+               bool_guard then (
             (* ignoring tautoligies *)
             Sat.add_clause ~proof:(proof ~rule:(Proof.Rule.mk "recognize_known")) 
               (bool_lit :: bool_guard));

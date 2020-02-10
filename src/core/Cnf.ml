@@ -516,13 +516,7 @@ let miniscope ?(distribute_exists=false) f =
 let rec nnf f =
   Util.debugf ~section 5 "@[<2>nnf of@ `@[%a@]`@]" (fun k->k T.pp f);
   match F.view f with
-<<<<<<< HEAD
   | F.Atom _
-=======
-  | F.Atom t -> t
-  | F.Neq _
-  | F.Eq _
->>>>>>> master
   | F.True
   | F.False -> f
   | F.Neq (a,b) ->
@@ -532,7 +526,7 @@ let rec nnf f =
   | F.Not f' ->
     begin match F.view f' with
       | F.Not f'' -> nnf f''
-      | F.Neq (a,b) -> if T.equal a b then F.false_ else f 
+      | F.Neq (a,b) -> if T.equal a b then F.false_ else f
       | F.Eq (a,b) -> if T.equal a b then F.true_ else f
       | F.And l ->
         F.or_ (List.map (fun f -> nnf (F.not_ f)) l)

@@ -39,7 +39,7 @@ let simpl_term t =
       RW.Rule.set_as_proof_parents rules
     in
 
-    Util.debugf ~section 2
+    Util.debugf ~section 3
       "@[<2>@{<green> simpl rewrite@} `@[%a@]`@ :into `@[%a@]`@ :using %a@]"
       (fun k->k T.pp t T.pp t' RW.Term.Rule_inst_set.pp rules);
     Some (t',proof)
@@ -384,7 +384,10 @@ let rewrite_tst_stmt stmt =
 
 let unfold_def_before_cnf stmts =
   if !rewrite_before_cnf then (
-    CCVector.map (fun stmt -> 
+    let cnt = ref 0 in
+    CCVector.map (fun stmt ->
+        incr cnt; 
+        CCFormat.printf "rewriting %d/%d@." !cnt (CCVector.size stmts);
         let res = rewrite_tst_stmt stmt in
         (* CCFormat.printf "rewriting @[%a@] into @[%a@]@." Statement.pp_input stmt Statement.pp_input res; *)
         res
