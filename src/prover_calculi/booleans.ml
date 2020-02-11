@@ -158,7 +158,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let term_to_equations = Term.Tbl.create 8 in
     let cased_term_selection = Env.flex_get k_cased_term_selection in
     let rec find_bools top t =
-      let can_be_cased = Type.is_prop(T.ty t) && T.DB.is_closed t && (not top) in
+      let can_be_cased = Type.is_prop (T.ty t) && T.DB.is_closed t && (not top) in
       let is_quant = match T.view t with 
         | AppBuiltin(b,_) -> 
           Builtin.equal b Builtin.ForallConst || Builtin.equal b Builtin.ExistsConst
