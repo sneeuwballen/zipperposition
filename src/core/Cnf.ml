@@ -549,10 +549,18 @@ let rec nnf f =
   | F.And l -> F.and_ (List.map nnf l)
   | F.Or l -> F.or_ (List.map nnf l)
   | F.Imply (f1, f2) ->
-    nnf (F.or_ [ (F.not_ f1); f2 ])
+    if T.equal f1 F.true_ then nnf f2
+    else if T.equal f1 F.false_ then F.true_ 
+    else if T.equal f2 F.false_ then nnf (F.not_ f1)
+    else if T.equal f1 f2 then F.true_
+    else nnf (F.or_ [ (F.not_ f1); f2 ])
   | F.Equiv(f1,f2) ->
     (* equivalence with positive polarity *)
     if T.equal f1 f2 then F.true_
+    else if T.equal f1 F.true_  then nnf f2
+    else if T.equal f2 F.true_  then nnf f1
+    else if T.equal f1 F.false_ then nnf (F.not_ f2)
+    else if T.equal f2 F.false_ then nnf (F.not_ f1)
     else (
       nnf (F.and_
            [ F.imply f1 f2; F.imply f2 f1 ]))
