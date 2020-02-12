@@ -268,6 +268,7 @@ let prop = Prop
 let term = Term
 let ty_int = TyInt
 let ty_rat = TyRat
+let ty_real = TyReal
 let grounding = Grounding
 
 module Tag = struct

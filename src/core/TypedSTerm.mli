@@ -105,7 +105,7 @@ val box_opaque : t -> t
 module Ty : sig
   type t = term
 
-  type builtin = Prop | TType | Term | Int | Rat
+  type builtin = Prop | TType | Term | Int | Rat | Real
 
   type view =
     | Ty_builtin of builtin
@@ -138,6 +138,7 @@ module Ty : sig
   val prop : t
   val int : t
   val rat : t
+  val real : t
   val real : t
   val term : t
 

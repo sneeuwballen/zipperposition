@@ -598,7 +598,7 @@ let map ~f ~bind:f_bind b_acc t = match view t with
 module Ty = struct
   type t = term
 
-  type builtin = Prop | TType | Term | Int | Rat
+  type builtin = Prop | TType | Term | Int | Rat | Real
 
   type view =
     | Ty_builtin of builtin
@@ -633,11 +633,10 @@ module Ty = struct
     | AppBuiltin (Builtin.TType, []) -> Ty_builtin TType
     | AppBuiltin (Builtin.TyInt, []) -> Ty_builtin Int
     | AppBuiltin (Builtin.TyRat, []) -> Ty_builtin Rat
+    | AppBuiltin (Builtin.TyReal, []) -> Ty_builtin Real
     | AppBuiltin (Builtin.Term, []) -> Ty_builtin Term
     | AppBuiltin (Builtin.Arrow, ret::args) -> Ty_fun (args, ret)
     | AppBuiltin (Builtin.Multiset, [t]) -> Ty_multiset t
-    | AppBuiltin (Builtin.TyReal, []) ->
-      failwith "cannot handle values of type `real`"
     | Let _
     | Ite _
     | Match _
@@ -718,6 +717,7 @@ module Ty = struct
       | Ty_builtin TType -> Buffer.add_string buf "ty"
       | Ty_builtin Int -> Buffer.add_string buf "int"
       | Ty_builtin Rat -> Buffer.add_string buf "rat"
+      | Ty_builtin Real -> Buffer.add_string buf "real"
       | Ty_builtin Prop -> Buffer.add_string buf "prop"
       | Ty_builtin Term -> Buffer.add_string buf "i"
       | Ty_var v -> add_id buf (Var.id v)

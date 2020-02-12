@@ -25,7 +25,7 @@ type t = private InnerTerm.t
 
 type ty = t
 
-type builtin = TType | Prop | Term | Rat | Int
+type builtin = TType | Prop | Term | Rat | Int | Real
 
 val pp_builtin : builtin CCFormat.printer
 val builtin_conv : builtin -> Builtin.t
@@ -66,6 +66,7 @@ val prop : t
 val term : t
 val int : t
 val rat : t
+val real : t
 
 val var : t HVar.t -> t
 

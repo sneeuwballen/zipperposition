@@ -122,6 +122,7 @@ val prop : t
 val term : t
 val ty_int : t
 val ty_rat : t
+val ty_real : t
 val has_type : t
 
 val wildcard : t    (** $_ for type inference *)
