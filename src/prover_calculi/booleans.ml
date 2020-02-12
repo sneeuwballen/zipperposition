@@ -565,15 +565,13 @@ let eager_cases_far stms =
   let proof s = Proof.Step.esa [Proof.Parent.from(Statement.as_proof_i s)]
       ~rule:(Proof.Rule.mk "eager_cases_far")
   in
-  let res = 
   map_propositions ~proof (fun _ t ->
       [with_subterm_or_id t (fun vs s -> match view s with
            | Bind((Forall|Exists) as q, v, b) ->
              let b' = case_bools_wrt (Var.Set.add vs v) b in
              if TypedSTerm.equal b b' then None else Some(replace s (bind ~ty:prop q v b') t)
            | _ -> None)
-       |> case_bools_wrt Var.Set.empty]) stms in
-  res
+       |> case_bools_wrt Var.Set.empty]) stms
 
 
 let eager_cases_near stms =
@@ -587,12 +585,12 @@ let eager_cases_near stms =
         | Bind((Forall|Exists),_,_) -> None
         | AppBuiltin((Eq|Neq), [x;y]) when is_bool x -> None
         | _ when is_bool s ->
+          (* Case split a maximal boolean strict subterm of s which by selection of s isn't a direct subterm. *)
           let s' = case_bool vs s (with_subterm_or_id s (fun _ -> CCOpt.if_(fun x -> not (TypedSTerm.equal x s) && is_bool x && not(is_T_F x)))) in
           if TypedSTerm.equal s s' then None else Some(case_near(replace s s' t))
         | _ -> None)
   in
-  let res = map_propositions ~proof (fun _ p -> [case_near p]) stms in
-  res
+  map_propositions ~proof (fun _ p -> [case_near p]) stms
 
 
 
