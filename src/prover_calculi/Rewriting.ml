@@ -312,7 +312,7 @@ let post_cnf stmts st =
      else (
        CCVector.filter (fun st -> match Statement.view st with
            | Statement.Rewrite _ -> false
-           | _ -> false) stmts));
+           | _ -> true) stmts));
   (* check if there are rewrite rules *)
   let has_rw =
     CCVector.to_seq stmts
@@ -387,7 +387,6 @@ let unfold_def_before_cnf stmts =
     let cnt = ref 0 in
     CCVector.map (fun stmt ->
         incr cnt; 
-        CCFormat.printf "rewriting %d/%d@." !cnt (CCVector.size stmts);
         let res = rewrite_tst_stmt stmt in
         (* CCFormat.printf "rewriting @[%a@] into @[%a@]@." Statement.pp_input stmt Statement.pp_input res; *)
         res

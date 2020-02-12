@@ -115,6 +115,15 @@ let parse_file file =
     ~x:parsed >>= fun () ->
   Phases.return_phase (input,parsed)
 
+let sine_filter stmts = 
+  if (!_sine_threshold < 0 || CCVector.length stmts < !_sine_threshold) then (stmts)
+  else (
+    let seq = CCVector.to_seq stmts in
+    let filtered = 
+      Statement.sine_axiom_selector ~depth_start:!_sine_d_min 
+      ~depth_end:!_sine_d_max ~tolerance:!_sine_tolerance seq in
+    CCVector.freeze (CCVector.of_seq filtered))
+
 let typing ~file prelude (input,stmts) =
   Phases.start_phase Phases.Typing >>= fun () ->
   Phases.get_key Params.key >>= fun params ->
@@ -127,6 +136,7 @@ let typing ~file prelude (input,stmts) =
     ~def_as_rewrite ?ctx:None ~file
     (Iter.append prelude stmts)
   >>?= fun stmts ->
+  let stmts = sine_filter stmts in
   Util.debugf ~section 3 "@[<hv2>@{<green>typed statements@}@ %a@]"
     (fun k->k (Util.pp_seq Statement.pp_input) (CCVector.to_seq stmts));
   do_extensions ~field:(fun e -> e.Extensions.post_typing_actions)
@@ -139,10 +149,6 @@ let cnf ~sk_ctx decls =
   let stmts =
     decls
     |> CCVector.to_seq
-    |> (fun seq ->
-        if (!_sine_threshold < 0 || Iter.length seq < !_sine_threshold) then (CCFun.id seq)
-        else Statement.sine_axiom_selector ~depth_start:!_sine_d_min 
-            ~depth_end:!_sine_d_max ~tolerance:!_sine_tolerance seq)
     |> (if not !_lift_lambdas then CCFun.id
         else Iter.flat_map Statement.lift_lambdas)
     |> Cnf.cnf_of_seq ~ctx:sk_ctx
