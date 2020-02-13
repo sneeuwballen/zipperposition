@@ -23,6 +23,7 @@ type var =
 type t = private {
   term : view;
   loc : location option;
+  attrs: attr list;
 }
 
 and match_branch =
@@ -42,6 +43,8 @@ and view =
   | Record of (string * t) list * var option (** extensible record *)
 
 and typed_var = var * t option
+and attr =
+  | Attr_distinct_const
 
 type term = t
 
@@ -59,7 +62,7 @@ val app : ?loc:location -> t -> t list -> t
 val app_const : ?loc:location -> string -> t list -> t
 val builtin : ?loc:location -> Builtin.t -> t
 val app_builtin : ?loc:location -> Builtin.t -> t list -> t
-val const : ?loc:location -> string -> t
+val const : ?loc:location -> ?attrs:attr list -> string -> t
 val bind : ?loc:location -> Binder.t -> typed_var list -> t -> t
 val ite : ?loc:location -> t -> t -> t -> t
 val match_ : ?loc:location -> t -> match_branch list -> t

@@ -1,1 +1,0 @@
-../../examples/array_domain.p

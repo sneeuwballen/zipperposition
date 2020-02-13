@@ -12,6 +12,7 @@ type var =
 type t = {
   term : view;
   loc : location option;
+  attrs: attr list;
 }
 
 and match_branch =
@@ -20,7 +21,7 @@ and match_branch =
 
 and view =
   | Var of var (** variable *)
-  | Const of string (** constant *)
+  | Const of string
   | AppBuiltin of Builtin.t * t list
   | App of t * t list (** apply term *)
   | Ite of t * t * t
@@ -31,6 +32,8 @@ and view =
   | Record of (string * t) list * var option (** extensible record *)
 
 and typed_var = var * t option
+and attr =
+  | Attr_distinct_const
 
 type term = t
 
@@ -130,7 +133,7 @@ and hash_var v = match v with
   | V s -> Hash.string s
   | Wildcard -> Hash.string "_"
 
-let make_ ?loc view = {term=view; loc;}
+let make_ ?loc ?(attrs=[]) view = {term=view; loc; attrs; }
 
 let mk_var ?loc v = make_ ?loc (Var v)
 let var ?loc s = mk_var ?loc (V s)
@@ -142,7 +145,7 @@ let app ?loc s l = match s.term, l with
   | AppBuiltin (s1,l1), _ -> app_builtin ?loc s1 (l1@l)
   | App (s1,l1), _::_ -> make_ ?loc (App (s1,l1@l))
   | _, _::_ -> make_ ?loc (App(s,l))
-let const ?loc s = make_ ?loc (Const s)
+let const ?loc ?attrs s = make_ ?loc ?attrs (Const s)
 let app_const ?loc s l = app (const ?loc s) l
 let bind ?loc s v l = match v, l with
   | [], _ -> l

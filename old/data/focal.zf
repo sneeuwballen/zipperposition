@@ -1,0 +1,96 @@
+### Booleans
+
+
+data 'basics.bool__t' := 'basics.true' | 'basics.false'.
+val 'basics._equal_' : pi a. a -> a -> 'basics.bool__t'.
+
+def 'dk_bool.true' : 'basics.bool__t' := 'basics.true'.
+def 'dk_bool.false' : 'basics.bool__t' := 'basics.false'.
+def 'basics.syntactic_equal' : pi a. a -> a -> 'basics.bool__t' where
+  forall a (x y : a). 'basics.syntactic_equal' a x y = 'basics._equal_' a x y.
+
+def 'dk_logic.ebP' : 'basics.bool__t' -> prop where
+  'dk_logic.ebP' 'basics.true' = true;
+  'dk_logic.ebP' 'basics.false' = false.
+rewrite forall a (x y : a). 'dk_logic.ebP' ('basics._equal_' x y) <=> (x = y).
+
+# Negation
+def 'basics._tilda__tilda_' : 'basics.bool__t' -> 'basics.bool__t' where
+  'basics._tilda__tilda_' 'basics.true' = 'basics.false';
+  'basics._tilda__tilda_' 'basics.false' = 'basics.true';
+  forall b. 'basics._tilda__tilda_' ('basics._tilda__tilda_' b) = b.
+
+# Conjunction
+def 'basics._amper__amper_' : 'basics.bool__t' -> 'basics.bool__t' -> 'basics.bool__t' where
+  forall b. 'basics._amper__amper_' 'dk_bool.true' b = b;
+  forall b. 'basics._amper__amper_' b 'dk_bool.true' = b;
+  forall b. 'basics._amper__amper_' b 'dk_bool.false' = 'basics.false';
+  forall b. 'basics._amper__amper_' 'dk_bool.false' b = 'basics.false'.
+
+# Disjunction
+def 'basics._bar__bar_' : 'basics.bool__t' -> 'basics.bool__t' -> 'basics.bool__t' where
+  forall b. 'basics._bar__bar_' 'dk_bool.true' b = 'dk_bool.true';
+  forall b. 'basics._bar__bar_' b 'dk_bool.true' = 'dk_bool.true';
+  forall b. 'basics._bar__bar_' b 'dk_bool.false' = b;
+  forall b. 'basics._bar__bar_' 'dk_bool.false' b = b.
+
+# Exclusive disjunction
+def 'basics._bar__lt__gt__bar_' : 'basics.bool__t' -> 'basics.bool__t' -> 'basics.bool__t' where
+  forall b. 'basics._bar__lt__gt__bar_' 'dk_bool.true' b = 'basics._tilda__tilda_' b;
+  forall b. 'basics._bar__lt__gt__bar_' b 'dk_bool.true' = 'basics._tilda__tilda_' b;
+  forall b. 'basics._bar__lt__gt__bar_' b 'dk_bool.false' = b;
+  forall b. 'basics._bar__lt__gt__bar_' 'dk_bool.false' b = b.
+
+def 'dk_bool.ite' : pi a. 'basics.bool__t' -> a -> a -> a where
+  forall a (x y : a). 'dk_bool.ite' 'dk_bool.true' x y = x;
+  forall a (x y : a). 'dk_bool.ite' 'dk_bool.false' x y = x.
+
+# Associativity
+rewrite forall b1 b2 b3. 'basics._amper__amper_' ('basics._amper__amper_' b1 b2) b3 = 'basics._amper__amper_' b1 ('basics._amper__amper_' b2 b3).
+rewrite forall b1 b2 b3. 'basics._bar__bar_' ('basics._bar__bar_' b1 b2) b3 = 'basics._bar__bar_' b1 ('basics._bar__bar_' b2 b3).
+rewrite forall b1 b2 b3. 'basics._bar__lt__gt__bar_' ('basics._bar__lt__gt__bar_' b1 b2) b3 = 'basics._bar__lt__gt__bar_' b1 ('basics._bar__lt__gt__bar_' b2 b3).
+
+# Distributivity
+rewrite forall b1 b2 b3. 'basics._amper__amper_' b1 ('basics._bar__bar_' b2 b3) = 'basics._bar__bar_' ('basics._amper__amper_' b1 b2) ('basics._amper__amper_' b1 b3).
+rewrite forall b1 b2 b3. 'basics._amper__amper_' ('basics._bar__bar_' b1 b2) b3 = 'basics._bar__bar_' ('basics._amper__amper_' b1 b3) ('basics._amper__amper_' b2 b3).
+
+rewrite forall b1 b2. 'basics._tilda__tilda_' ('basics._amper__amper_' b1 b2) = 'basics._bar__bar_' ('basics._tilda__tilda_' b1) ('basics._tilda__tilda_' b2).
+rewrite forall b1 b2. 'basics._tilda__tilda_' ('basics._bar__bar_' b1 b2) = 'basics._amper__amper_' ('basics._tilda__tilda_' b1) ('basics._tilda__tilda_' b2).
+
+
+### Failure
+
+val 'dk_fail.fail' : pi a. a.
+
+### Tuples
+
+data 'dk_tuple.pair' a b := 'basics.pair' ('basics.fst' : a) ('basics.snd' : b).
+
+def 'dk_tuple.match__pair' : pi a b c. 'dk_tuple.pair' a b -> (a -> b -> c) -> c -> c where
+  forall a b c (t : 'dk_tuple.pair' a b) (f : a -> b -> c) (d : c).
+     'dk_tuple.match__pair' a b c t f d = f ('basics.fst' t) ('basics.snd' t).
+
+
+### Lists
+
+data 'basics.list__t' a := nil | cons a ('basics.list__t' a).
+
+def 'basics.match_nil' : pi a b. 'basics.list__t' a -> b -> b -> b where
+  forall a b p d . 'basics.match_nil' a b (nil a) p d = p;
+  forall a b x l p d . 'basics.match_nil' a b (cons a x l) p d = d.
+
+def 'basics.match_cons' : pi a b. 'basics.list__t' a -> (a -> 'basics.list__t' a -> b) -> b -> b where
+  forall a b f d . 'basics.match_cons' a b (nil a) f d = d;
+  forall a b x l f d . 'basics.match_cons' a b (cons a x l) f d = f x l.
+
+val 'dk_nat.nat' : type.
+val 'dk_int.from_nat' : 'dk_nat.nat' -> int.
+
+val 'basics.char__t' : type.
+val 'basics.string__t' : type.
+val 'basics.float__t' : type.
+
+val 'dk_builtins.call_by_value' : pi a b. (a -> b) -> a -> b.
+
+
+

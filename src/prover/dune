@@ -1,5 +1,6 @@
 (rule
  (targets const.ml)
+ (deps (glob_files ../../*.opam))
  (action
   (with-stdout-to
    %{targets}
@@ -12,5 +13,4 @@
   (public_name libzipperposition)
   (synopsis "library for the Zipperposition theorem prover")
   (libraries containers zarith msat logtk logtk.proofs logtk.parsers str)
-  (flags :standard -w -32-50)
-)
+  (flags :standard -w -32-50))

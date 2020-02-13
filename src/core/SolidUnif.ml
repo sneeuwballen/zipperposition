@@ -13,11 +13,11 @@ module US_A = struct
 
 end
 
-let prof_flex_same = Util.mk_profiler "su.flex_same"
-let prof_flex_diff = Util.mk_profiler "su.flex_diff"
-let prof_flex_rigid = Util.mk_profiler "su.flex_rigid"
-let prof_cover_rigid = Util.mk_profiler "su.cover_rigid"
-let prof_solidifier = Util.mk_profiler "su.solidifier"
+let prof_flex_same = ZProf.make "su.flex_same"
+let prof_flex_diff = ZProf.make "su.flex_diff"
+let prof_flex_rigid = ZProf.make "su.flex_rigid"
+let prof_cover_rigid = ZProf.make "su.cover_rigid"
+let prof_solidifier = ZProf.make "su.solidifier"
 
 exception NotInFragment = PU.NotInFragment
 exception NotUnifiable = PU.NotUnifiable
@@ -84,9 +84,9 @@ module Make (St : sig val st : Flex_state.t end) = struct
         T.fun_ ty body'
       | _ -> t in
 
-    Util.enter_prof prof_solidifier;
+    ZProf.enter_prof prof_solidifier;
     let res = aux t in
-    Util.exit_prof prof_solidifier;
+    ZProf.exit_prof prof_solidifier;
     res
 
   let all_combs ~combs_limit l =
@@ -164,9 +164,9 @@ module Make (St : sig val st : Flex_state.t end) = struct
       else CCList.interleave db_hits rest in
 
     try
-      Util.enter_prof prof_cover_rigid;
+      ZProf.enter_prof prof_cover_rigid;
       let res = aux ~depth:0 solids t in
-      Util.exit_prof prof_cover_rigid;
+      ZProf.exit_prof prof_cover_rigid;
       res
     with CoveringImpossible -> []
 
@@ -220,7 +220,7 @@ module Make (St : sig val st : Flex_state.t end) = struct
     aux ~bvar_tys:[] t
 
   let solve_flex_flex_diff ~subst ~counter ~scope lhs rhs =
-    Util.enter_prof prof_flex_diff;
+    ZProf.enter_prof prof_flex_diff;
     let lhs = solidify @@ Lambda.whnf @@ Subst.FO.apply Subst.Renaming.none subst (lhs,scope) in 
     let rhs = solidify @@ Lambda.whnf @@ Subst.FO.apply Subst.Renaming.none subst (rhs,scope) in
     assert(Type.equal (Term.ty lhs) (Term.ty rhs));
@@ -269,11 +269,11 @@ module Make (St : sig val st : Flex_state.t end) = struct
         let subst = Subst.FO.bind' subst (hd_l, scope) (subs_l,scope) in
         let subst = Subst.FO.bind' subst (hd_r, scope) (subs_r,scope) in
         US.of_subst subst) in
-    Util.exit_prof prof_flex_diff;
+    ZProf.exit_prof prof_flex_diff;
     res
 
   let solve_flex_flex_same ~subst ~counter ~scope lhs rhs =
-    Util.enter_prof prof_flex_same;
+    ZProf.enter_prof prof_flex_same;
     let lhs = solidify @@ Lambda.whnf @@ Subst.FO.apply Subst.Renaming.none subst (lhs,scope) in 
     let rhs = solidify @@ Lambda.whnf @@ Subst.FO.apply Subst.Renaming.none subst (rhs,scope) in
     assert(Type.equal (Term.ty lhs) (Term.ty rhs));
@@ -302,12 +302,12 @@ module Make (St : sig val st : Flex_state.t end) = struct
         let subs_val = T.fun_l (List.map T.ty args_l) (T.app fresh_var same_args) in
         let subst = Subst.FO.bind' subst (hd_l,scope) (subs_val,scope) in
         US.of_subst subst) in
-    Util.exit_prof prof_flex_same;
+    ZProf.exit_prof prof_flex_same;
     res
 
 
   let cover_flex_rigid ~subst ~counter ~scope flex rigid =
-    Util.enter_prof prof_flex_rigid;
+    ZProf.enter_prof prof_flex_rigid;
     assert(T.is_var (T.head_term flex));
     assert(not @@ T.is_app_var rigid);
 
@@ -349,7 +349,7 @@ module Make (St : sig val st : Flex_state.t end) = struct
               US.of_subst subs_flex
             ) rigid_covers)
       ) in
-    Util.exit_prof prof_flex_rigid;
+    ZProf.exit_prof prof_flex_rigid;
     res
 
   let var_conditions s t = 

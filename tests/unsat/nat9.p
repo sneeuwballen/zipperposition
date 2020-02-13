@@ -1,1 +1,0 @@
-../../examples/ind/nat9.p

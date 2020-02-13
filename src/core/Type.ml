@@ -9,7 +9,7 @@ type t = T.t
 
 type ty = t
 
-type builtin = TType | Prop | Term | Rat | Int
+type builtin = TType | Prop | Term | Rat | Int | Real
 
 let builtin_conv = function
   | TType -> Builtin.tType
@@ -17,6 +17,7 @@ let builtin_conv = function
   | Term -> Builtin.term
   | Rat -> Builtin.ty_rat
   | Int -> Builtin.ty_int
+  | Real -> Builtin.ty_real
 
 let pp_builtin out b = Builtin.pp out (builtin_conv b)
 
@@ -47,6 +48,7 @@ let view t = match T.view t with
   | T.AppBuiltin (Builtin.Term, []) -> Builtin Term
   | T.AppBuiltin (Builtin.TyInt, []) -> Builtin Int
   | T.AppBuiltin (Builtin.TyRat, []) -> Builtin Rat
+  | T.AppBuiltin (Builtin.TyReal, []) -> Builtin Real
   | _ -> assert false
 
 let hash = T.hash
@@ -73,6 +75,7 @@ let prop = T.builtin ~ty:tType Builtin.Prop
 let term = T.builtin ~ty:tType Builtin.Term
 let int = T.builtin ~ty:tType Builtin.TyInt
 let rat = T.builtin ~ty:tType Builtin.TyRat
+let real = T.builtin ~ty:tType Builtin.TyReal
 
 let builtin = function
   | TType -> tType
@@ -80,6 +83,7 @@ let builtin = function
   | Term -> term
   | Int -> int
   | Rat -> rat
+  | Real -> real
 
 let var = T.var
 
@@ -205,6 +209,8 @@ let order ty: int =
   in
   max 1 (aux ty)  (* never less than 1 *)
 
+let contains_prop t = Seq.sub t |> Iter.exists is_prop
+
 let is_ground = T.is_ground
 let size = T.size
 
@@ -307,6 +313,7 @@ module TPTP = struct
     | Builtin Term -> CCFormat.string out "$i"
     | Builtin Int -> CCFormat.string out "$int"
     | Builtin Rat -> CCFormat.string out "$rat"
+    | Builtin Real -> CCFormat.string out "$real"
     | Var v -> Format.fprintf out "X%d" (HVar.id v)
     | DB i -> Format.fprintf out "Tb%d" (depth-i-1)
     | App (p, []) -> ID.pp_tstp out p
@@ -337,6 +344,7 @@ module TPTP = struct
     | Builtin Term -> CCFormat.string out "$i"
     | Builtin Int -> CCFormat.string out "$int"
     | Builtin Rat -> CCFormat.string out "$rat"
+    | Builtin Real -> CCFormat.string out "$real"
     | Var v -> Format.fprintf out "X%d" (HVar.id v)
     | DB i -> Format.fprintf out "Tb%d" (depth-i-1)
     | App (p, []) -> ID.pp_tstp out p
@@ -436,6 +444,7 @@ let mangle (ty:t): string =
     | Builtin TType -> Buffer.add_string buf "ty"
     | Builtin Int -> Buffer.add_string buf "int"
     | Builtin Rat -> Buffer.add_string buf "rat"
+    | Builtin Real -> Buffer.add_string buf "real"
     | Builtin Prop -> Buffer.add_string buf "prop"
     | Builtin Term -> Buffer.add_string buf "i"
     | Var _ -> Buffer.add_string buf "_"
@@ -533,6 +542,7 @@ module Conv = struct
       | PT.AppBuiltin (Builtin.TType,[]) -> tType
       | PT.AppBuiltin (Builtin.TyInt,[]) -> int
       | PT.AppBuiltin (Builtin.TyRat,[]) -> rat
+      | PT.AppBuiltin (Builtin.TyReal,[]) -> real
       | PT.App (f, l) ->
         begin match PT.view f with
           | PT.Const hd ->
@@ -546,7 +556,6 @@ module Conv = struct
         forall t'
       | PT.Record _ -> failwith "cannot convert record-type into type"
       | PT.Meta (_,{contents=Some ty'},_) -> aux depth v2db ty'
-      | PT.AppBuiltin (Builtin.TyReal,[]) -> failwith "cannot handle type `real`"
       | PT.Bind _
       | PT.AppBuiltin _
       | PT.Meta _
@@ -584,6 +593,7 @@ module Conv = struct
       | Builtin Term -> PT.builtin ~ty:PT.tType Builtin.Term
       | Builtin Int -> PT.builtin ~ty:PT.tType Builtin.TyInt
       | Builtin Rat -> PT.builtin ~ty:PT.tType Builtin.TyRat
+      | Builtin Real -> PT.builtin ~ty:PT.tType Builtin.TyReal
       | Var v ->
         let v = aux_var v in
         PT.var v

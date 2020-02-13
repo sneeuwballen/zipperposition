@@ -46,10 +46,6 @@ let set_in s = input := input_format_of_string s
 let set_out s = output := print_format_of_string s
 let comment() = Output_format.comment_prefix !output
 
-let _print_types () =
-  Term.print_all_types := true;
-  ()
-
 let switch_opt b f = Arg.Unit (fun () -> f b)
 let switch_set b r = Arg.Unit (fun () -> r := b)
 
@@ -75,8 +71,6 @@ let add_opts l = other_opts := l @ !other_opts
 let make () =
   List.rev_append
     [ "--debug", Arg.Int Util.set_debug, " debug level (int)"
-    ; "--profile", Arg.Set Util.enable_profiling, " enable profiling"
-    ; "--print-types", Arg.Unit _print_types , " print type annotations everywhere"
     ; "--print-hashconsing-id",
       Arg.Set InnerTerm.print_hashconsing_ids,
       " print each term's unique hashconsing ID"

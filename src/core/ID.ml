@@ -72,7 +72,7 @@ let pp out id = CCFormat.string out id.name
 let to_string = CCFormat.to_string pp
 
 let pp_full out id = Format.fprintf out "%s/%d" id.name id.id
-let pp_fullc out id = Format.fprintf out "%s/@{<Black>%d@}" id.name id.id
+let pp_fullc = pp_full
 
 let pp_tstp out id =
   if Util.tstp_needs_escaping id.name

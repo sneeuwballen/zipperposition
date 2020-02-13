@@ -463,9 +463,9 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let pp out c =
     let pp_selected selected out i =
-      if BV.get selected i then Format.fprintf out "@{<Black>+@}"
+      if BV.get selected i then Format.fprintf out "+"
     and pp_maxlit maxlits out i =
-      if BV.get maxlits i then Format.fprintf out "@{<Black>*@}"
+      if BV.get maxlits i then Format.fprintf out "*"
     in
     (* print literals with a '*' for maximal, and '+' for selected *)
     let selected = Lazy.force c.selected in

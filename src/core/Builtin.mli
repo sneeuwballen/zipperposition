@@ -64,6 +64,7 @@ type t =
   | Greatereq
   | Box_opaque (** hint not to open this formula *)
   | Pseudo_de_bruijn of int (** magic to embed De Bruijn indices in normal terms *)
+  | Distinct
 
 include Interfaces.HASH with type t := t
 include Interfaces.ORD with type t := t
@@ -121,6 +122,7 @@ val prop : t
 val term : t
 val ty_int : t
 val ty_rat : t
+val ty_real : t
 val has_type : t
 
 val wildcard : t    (** $_ for type inference *)

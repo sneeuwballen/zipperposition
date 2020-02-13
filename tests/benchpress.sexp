@@ -12,11 +12,6 @@
   (unsat "Status[ ]*: (Unsatisfiable|Theorem|CounterTheorem|Lemma)"))
 
 (dir
-  (path $cur_dir)
-  (pattern ".*\\zf")
-  (expect (try (run zip-find-expect) (run tptp-find-status) (const unknown))))
-
-(dir
   (path $cur_dir/../examples/)
   (pattern ".*\\.(zf|p)")
   (expect (try (run zip-find-expect) (run tptp-find-status) (const unknown))))
@@ -48,7 +43,7 @@
   (name zip-local-test)
   (action
     (run_provers
-      (provers zip-dev zip-dev-check)
+      (provers zip-dev) ; zip-dev-check)
       (timeout 10)
       (memory 2000)
       (dirs))))

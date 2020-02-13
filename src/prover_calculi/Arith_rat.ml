@@ -33,25 +33,25 @@ let stat_rat_demod_ineq_steps = Util.mk_stat "rat.demod_ineq.steps"
 let stat_rat_reflexivity_resolution = Util.mk_stat "rat.reflexivity_resolution"
 *)
 
-let prof_rat_sup = Util.mk_profiler "rat.superposition"
-let prof_rat_cancellation = Util.mk_profiler "rat.rat_cancellation"
-let prof_rat_eq_factoring = Util.mk_profiler "rat.eq_factoring"
-let prof_rat_ineq_chaining = Util.mk_profiler "rat.ineq_chaining"
-let prof_rat_demod = Util.mk_profiler "rat.demod"
-let prof_rat_backward_demod = Util.mk_profiler "rat.backward_demod"
-let prof_rat_semantic_tautology = Util.mk_profiler "rat.semantic_tauto"
-let prof_rat_ineq_factoring = Util.mk_profiler "rat.ineq_factoring"
-let prof_rat_trivial_ineq = Util.mk_profiler "rat.redundant_by_ineq"
-let prof_rat_demod_ineq = Util.mk_profiler "rat.demod_ineq"
+let prof_rat_sup = ZProf.make "rat.superposition"
+let prof_rat_cancellation = ZProf.make "rat.rat_cancellation"
+let prof_rat_eq_factoring = ZProf.make "rat.eq_factoring"
+let prof_rat_ineq_chaining = ZProf.make "rat.ineq_chaining"
+let prof_rat_demod = ZProf.make "rat.demod"
+let prof_rat_backward_demod = ZProf.make "rat.backward_demod"
+let prof_rat_semantic_tautology = ZProf.make "rat.semantic_tauto"
+let prof_rat_ineq_factoring = ZProf.make "rat.ineq_factoring"
+let prof_rat_trivial_ineq = ZProf.make "rat.redundant_by_ineq"
+let prof_rat_demod_ineq = ZProf.make "rat.demod_ineq"
 (*
-let prof_rat_reflexivity_resolution = Util.mk_profiler "rat.reflexivity_resolution"
+let prof_rat_reflexivity_resolution = ZProf.make "rat.reflexivity_resolution"
 *)
 
 let section = Util.Section.make ~parent:Const.section "rat-arith"
 
 let enable_rat_ = ref true
 let enable_ac_ = ref false
-let enable_semantic_tauto_ = ref true
+let enable_semantic_tauto_ = ref false (* FIXME: seems to be super slow on ARI184 *)
 let dot_unit_ = ref None
 
 let flag_tauto = SClause.new_flag ()
@@ -260,7 +260,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     )
 
   let canc_sup_active c =
-    Util.enter_prof prof_rat_sup;
+    ZProf.enter_prof prof_rat_sup;
     let ord = Ctx.ord () in
     let eligible = C.Eligible.(pos ** max c ** filter Lit.is_rat_eq) in
     let sc_a = 0 and sc_p = 1 in
@@ -295,11 +295,11 @@ module Make(E : Env.S) : S with module Env = E = struct
              acc)
         []
     in
-    Util.exit_prof prof_rat_sup;
+    ZProf.exit_prof prof_rat_sup;
     res
 
   let canc_sup_passive c =
-    Util.enter_prof prof_rat_sup;
+    ZProf.enter_prof prof_rat_sup;
     let ord = Ctx.ord () in
     let eligible = C.Eligible.(max c ** arith) in
     let sc_a = 0 and sc_p = 1 in
@@ -334,7 +334,7 @@ module Make(E : Env.S) : S with module Env = E = struct
              acc)
         []
     in
-    Util.exit_prof prof_rat_sup;
+    ZProf.exit_prof prof_rat_sup;
     res
 
   exception SimplifyInto of AL.t * C.t * S.t
@@ -414,7 +414,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* demodulation (simplification) *)
   let _demodulation c =
-    Util.enter_prof prof_rat_demod;
+    ZProf.enter_prof prof_rat_demod;
     let did_simplify = ref false in
     let lits = ref [] in  (* simplified literals *)
     let add_lit l = lits := l :: !lits in
@@ -459,7 +459,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       ) else
         SimplM.return_same c
     in
-    Util.exit_prof prof_rat_demod;
+    ZProf.exit_prof prof_rat_demod;
     res
 
   let canc_demodulation c = _demodulation c
@@ -467,7 +467,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* find clauses in which some literal could be rewritten by [c], iff
      [c] is a positive unit arith clause *)
   let canc_backward_demodulation c =
-    Util.enter_prof prof_rat_backward_demod;
+    ZProf.enter_prof prof_rat_backward_demod;
     let ord = Ctx.ord () in
     let res = C.ClauseSet.empty in
     let res = match C.lits c with
@@ -492,11 +492,11 @@ module Make(E : Env.S) : S with module Env = E = struct
           C.ClauseSet.empty
       | _ -> res (* no demod *)
     in
-    Util.exit_prof prof_rat_backward_demod;
+    ZProf.exit_prof prof_rat_backward_demod;
     res
 
   let cancellation c =
-    Util.enter_prof prof_rat_cancellation;
+    ZProf.enter_prof prof_rat_cancellation;
     let ord = Ctx.ord () in
     let eligible = C.Eligible.(max c ** arith) in
     let res =
@@ -544,13 +544,13 @@ module Make(E : Env.S) : S with module Env = E = struct
              ) acc)
         []
     in
-    Util.exit_prof prof_rat_cancellation;
+    ZProf.exit_prof prof_rat_cancellation;
     res
 
   let rule_canc_eq_fact = Proof.Rule.mk "rat_eq_factoring"
 
   let canc_equality_factoring c =
-    Util.enter_prof prof_rat_eq_factoring;
+    ZProf.enter_prof prof_rat_eq_factoring;
     let ord = Ctx.ord () in
     let eligible = C.Eligible.(max c ** filter Lit.is_rat_eq) in
     let res =
@@ -625,7 +625,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                   acc)
              acc)
         []
-    in Util.exit_prof prof_rat_eq_factoring;
+    in ZProf.exit_prof prof_rat_eq_factoring;
     res
 
   (** Data necessary to fully describe a chaining inference.
@@ -709,7 +709,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       acc
 
   let canc_ineq_chaining c =
-    Util.enter_prof prof_rat_ineq_chaining;
+    ZProf.enter_prof prof_rat_ineq_chaining;
     let ord = Ctx.ord () in
     let eligible = C.Eligible.(max c ** filter Lit.is_rat_less) in
     let sc_l = 0 and sc_r = 1 in
@@ -764,12 +764,12 @@ module Make(E : Env.S) : S with module Env = E = struct
            | _ -> assert false)
         []
     in
-    Util.exit_prof prof_rat_ineq_chaining;
+    ZProf.exit_prof prof_rat_ineq_chaining;
     res
 
   (* TODO: update with equality case, check that signs correct *)
   let canc_ineq_factoring c =
-    Util.enter_prof prof_rat_ineq_factoring;
+    ZProf.enter_prof prof_rat_ineq_factoring;
     let ord = Ctx.ord () in
     let acc = ref [] in
     (* do the factoring if ordering conditions are ok *)
@@ -858,7 +858,7 @@ module Make(E : Env.S) : S with module Env = E = struct
               | _ -> assert false
            )
       );
-    Util.exit_prof prof_rat_ineq_factoring;
+    ZProf.exit_prof prof_rat_ineq_factoring;
     !acc
 
   (** One-shot literal/clause removal.
@@ -976,7 +976,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     | _ -> None
 
   let is_redundant_by_ineq c =
-    Util.enter_prof prof_rat_trivial_ineq;
+    ZProf.enter_prof prof_rat_trivial_ineq;
     let res =
       CCArray.exists
         (fun lit -> match _ineq_is_redundant_by_unit c lit with
@@ -989,7 +989,7 @@ module Make(E : Env.S) : S with module Env = E = struct
              true)
         (C.lits c)
     in
-    Util.exit_prof prof_rat_trivial_ineq;
+    ZProf.exit_prof prof_rat_trivial_ineq;
     res
 
   (* allow traces of depth at most 3 *)
@@ -1104,7 +1104,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* demodulate using inequalities *)
   let demod_ineq c : C.t SimplM.t =
-    Util.enter_prof prof_rat_demod_ineq;
+    ZProf.enter_prof prof_rat_demod_ineq;
     let res =
       CCArray.findi
         (fun i lit -> match _ineq_is_absurd_by_unit c lit with
@@ -1128,7 +1128,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         let c' = C.create lits proof ~penalty:(C.penalty c) ~trail:(C.trail c) in
         SimplM.return_new c'
     in
-    Util.exit_prof prof_rat_demod_ineq;
+    ZProf.exit_prof prof_rat_demod_ineq;
     res
 
   (** {3 Others} *)
@@ -1140,7 +1140,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* tautology check: take the linear system that is the negation
      of all a≠b and a≤b, and check its satisfiability *)
   let _is_tautology c =
-    Util.enter_prof prof_rat_semantic_tautology;
+    ZProf.enter_prof prof_rat_semantic_tautology;
     (* convert a monome into a rational monome + Q constant *)
     let conv m = M.coeffs m, M.const m in
     (* create a list of constraints for some arith lits *)
@@ -1158,16 +1158,18 @@ module Make(E : Env.S) : S with module Env = E = struct
         []
     in
     let simplex = Simp.add_constraints Simp.empty constraints in
-    Util.exit_prof prof_rat_semantic_tautology;
+    ZProf.exit_prof prof_rat_semantic_tautology;
     match Simp.ksolve simplex with
     | Simp.Unsatisfiable _ -> true (* negation unsatisfiable *)
     | Simp.Solution _ -> false
 
   (* cache the result because it's a bit expensive *)
   let is_tautology c =
-    if C.get_flag flag_computed_tauto c
-    then C.get_flag flag_tauto c
-    else (
+    if C.get_flag flag_computed_tauto c then (
+      C.get_flag flag_tauto c
+    ) else if not !enable_semantic_tauto_ then (
+      false
+    ) else (
       (* compute whether [c] is an arith tautology *)
       let res = _has_rat c && _is_tautology c in
       C.set_flag flag_tauto c res;
@@ -1505,9 +1507,12 @@ let extension =
 
 let () =
   Params.add_opts
-    [ "--rat-no-semantic-tauto"
+    [ "--no-rat-semantic-tauto"
     , Arg.Clear enable_semantic_tauto_
     , " disable rational arithmetic semantic tautology check"
+    ; "--rat-semantic-tauto"
+    , Arg.Set enable_semantic_tauto_
+    , " enable rational arithmetic semantic tautology check"
     ; "--rat-arith"
     , Arg.Set enable_rat_
     , " enable axiomatic rational arithmetic"

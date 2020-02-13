@@ -8,12 +8,12 @@ module F = T.Form
 module Stmt = Statement
 module Fmt = CCFormat
 
-let prof_estimate = Util.mk_profiler "cnf.estimate_num_clauses"
-let prof_simplify_rename = Util.mk_profiler "cnf.simplify_rename"
-let prof_flatten = Util.mk_profiler "cnf.flatten"
-let prof_to_cnf = Util.mk_profiler "cnf.distribute"
-let prof_miniscope = Util.mk_profiler "cnf.miniscope"
-let prof_skolemize = Util.mk_profiler "cnf.skolemize"
+let prof_estimate = ZProf.make "cnf.estimate_num_clauses"
+let prof_simplify_rename = ZProf.make "cnf.simplify_rename"
+let prof_flatten = ZProf.make "cnf.flatten"
+let prof_to_cnf = ZProf.make "cnf.distribute"
+let prof_miniscope = ZProf.make "cnf.miniscope"
+let prof_skolemize = ZProf.make "cnf.skolemize"
 
 let section = Util.Section.make "cnf"
 
@@ -225,12 +225,15 @@ module Flatten = struct
     let u = T.app_whnf ~ty:ty_ret (T.Subst.eval subst_u u) args_u in
     ty_vars @ vars, t, u
 
+  (* NOTE(perf): having hashconsing of TypedSTerm would be helpful
+     to simplify here as a DAG, not a tree *)
   (* conversion of terms can yield several possible terms, by
      eliminating if and match
      @param vars the variables that can be replaced in the context
      @param of_ the ID being defined, if any
   *)
-  let flatten_rec ?of_ ~should_define (ctx:Skolem.ctx) stmt (pos:position) (vars:type_ Var.t list)(t:term): T.t t =
+  let flatten_rec ?of_ ~should_define (ctx:Skolem.ctx)
+      stmt (pos:position) (vars:type_ Var.t list)(t:term): T.t t =
     (* how to name intermediate subterms? *)
     let mk_pat what = match of_ with
       | None -> what ^  "_"
@@ -239,6 +242,16 @@ module Flatten = struct
     let rec aux pos vars t = match T.view t with
       | T.AppBuiltin (Builtin.True, []) -> return F.true_
       | T.AppBuiltin (Builtin.False, []) -> return F.false_
+      | T.AppBuiltin (Builtin.Distinct, l) ->
+        (* expand [distinct(ts)] into [And_{i<j} t_i != t_j] *)
+        let l =
+          CCList.diagonal l
+          |> List.rev_map (fun (t,u) -> T.Form.neq_or_xor t u)
+        in
+        let f = T.Form.and_ ?loc:(T.loc t) l in
+        Util.debugf ~section 5 "(@[flatten.expand-distinct@ %a@ :into %a@])"
+          (fun k->k T.pp t T.pp f);
+        aux pos vars f
       | T.Var v ->
         (* look [v] up in subst *)
         get_subst >>= fun subst ->
@@ -448,7 +461,7 @@ end
 
 (* miniscoping (push quantifiers as deep as possible in the formula) *)
 let miniscope ?(distribute_exists=false) f =
-  Util.enter_prof prof_miniscope;
+  ZProf.enter_prof prof_miniscope;
   (* recursive miniscoping *)
   let rec miniscope f = match F.view f with
     | F.Forall (var, f') ->
@@ -496,14 +509,14 @@ let miniscope ?(distribute_exists=false) f =
     | F.Atom _ -> f
   in
   let res = miniscope f in
-  Util.exit_prof prof_miniscope;
+  ZProf.exit_prof prof_miniscope;
   res
 
 (* negation normal form (also remove equivalence and implications). *)
 let rec nnf f =
   Util.debugf ~section 5 "@[<2>nnf of@ `@[%a@]`@]" (fun k->k T.pp f);
   match F.view f with
-  | F.Atom _
+  | F.Atom t -> t
   | F.True
   | F.False -> f
   | F.Neq (a,b) ->
@@ -552,7 +565,7 @@ let rec nnf f =
   | F.Exists (var,f') -> F.exists var (nnf f')
 
 let skolemize ~ctx f =
-  Util.enter_prof prof_skolemize;
+  ZProf.enter_prof prof_skolemize;
   let rec skolemize subst f = match F.view f with
     | F.And l -> F.and_ (List.map (skolemize subst) l)
     | F.Or l -> F.or_ (List.map (skolemize subst) l)
@@ -580,7 +593,7 @@ let skolemize ~ctx f =
       skolemize subst f'
   in
   let res = skolemize f in
-  Util.exit_prof prof_skolemize;
+  ZProf.exit_prof prof_skolemize;
   res
 
 (* For the following, we use "handbook of automated reasoning",
@@ -623,7 +636,7 @@ end
 
 (* estimate the number of clauses needed by this formula. *)
 let estimate_num_clauses ~pos f =
-  Util.enter_prof prof_estimate;
+  ZProf.enter_prof prof_estimate;
   let module E = Estimation in
   (* recursive function.
      @param pos true if the formula is positive, false if it's negated *)
@@ -659,7 +672,7 @@ let estimate_num_clauses ~pos f =
     | x :: tail -> E.(num pos x */ prod_list pos tail)
   in
   let n = num pos f in
-  Util.exit_prof prof_estimate;
+  ZProf.exit_prof prof_estimate;
   n
 
 (* atomic formula, or forall/exists/not an atomic formula (1 literal) *)
@@ -844,9 +857,9 @@ let rec to_cnf_rec f = match F.view f with
       T.pp f
 
 let to_cnf f =
-  Util.enter_prof prof_to_cnf;
+  ZProf.enter_prof prof_to_cnf;
   let res = to_cnf_rec f in
-  Util.exit_prof prof_to_cnf;
+  ZProf.exit_prof prof_to_cnf;
   res
 
 type options =
@@ -972,7 +985,7 @@ let is_rw stmt = match Stmt.view stmt with
 
 (* simplify formulas and rename them. May introduce new formulas *)
 let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
-  Util.enter_prof prof_simplify_rename;
+  ZProf.enter_prof prof_simplify_rename;
   (* process a formula *)
   let process_form ~is_goal stmt f =
     Util.debugf ~section 2 "@[<2>simplify and rename@ `@[%a@]`@]" (fun k->k T.pp f);
@@ -1075,7 +1088,7 @@ let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
       )
     |> CCVector.of_seq ?init:None
   in
-  Util.exit_prof prof_simplify_rename;
+  ZProf.exit_prof prof_simplify_rename;
   res
 
 type f_statement = (term, term, type_) Statement.t
@@ -1098,7 +1111,7 @@ let proof_neg stmt =
     [Stmt.as_proof_i stmt |> Proof.Parent.from]
 
 (* Transform the clauses into proper CNF; returns a list of clauses *)
-let cnf_of_seq ~ctx ?(opts=[])  seq =
+let cnf_of_seq ~ctx ?(opts=[]) (seq:Stmt.input_t Iter.t) : _ CCVector.t =
   (* read options *)
   let disable_renaming = List.mem DisableRenaming opts in
   let preprocess =

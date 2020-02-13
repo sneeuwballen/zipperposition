@@ -1,5 +1,12 @@
 (env
-  (_ (flags :standard -warn-error -3 -color always -safe-string))
-  (_ (ocamlopt_flags :standard -no-assert -O3 -unbox-closures -unbox-closures-factor 20))
-)
+  (_
+    (flags :standard -warn-error -3+8 -w -3 -color always -safe-string)
+    (ocamlopt_flags :standard -O3 -unbox-closures -unbox-closures-factor 20)))
+
+(alias
+ (name    runtest)
+ (package zipperposition)
+ (locks   /tlock)
+ (deps    main/zipperposition.exe test_must_pass.sh (source_tree ../examples/))
+ (action  (run ./test_must_pass.sh ./main/zipperposition.exe)))
 

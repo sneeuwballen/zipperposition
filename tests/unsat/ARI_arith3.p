@@ -1,1 +1,0 @@
-../../examples/arith3.p

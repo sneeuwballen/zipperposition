@@ -605,7 +605,7 @@ let map ~f ~bind:f_bind b_acc t = match view t with
 module Ty = struct
   type t = term
 
-  type builtin = Prop | TType | Term | Int | Rat
+  type builtin = Prop | TType | Term | Int | Rat | Real
 
   type view =
     | Ty_builtin of builtin
@@ -640,11 +640,10 @@ module Ty = struct
     | AppBuiltin (Builtin.TType, []) -> Ty_builtin TType
     | AppBuiltin (Builtin.TyInt, []) -> Ty_builtin Int
     | AppBuiltin (Builtin.TyRat, []) -> Ty_builtin Rat
+    | AppBuiltin (Builtin.TyReal, []) -> Ty_builtin Real
     | AppBuiltin (Builtin.Term, []) -> Ty_builtin Term
     | AppBuiltin (Builtin.Arrow, ret::args) -> Ty_fun (args, ret)
     | AppBuiltin (Builtin.Multiset, [t]) -> Ty_multiset t
-    | AppBuiltin (Builtin.TyReal, []) ->
-      failwith "cannot handle values of type `real`"
     | Let _
     | Ite _
     | Match _
@@ -725,6 +724,7 @@ module Ty = struct
       | Ty_builtin TType -> Buffer.add_string buf "ty"
       | Ty_builtin Int -> Buffer.add_string buf "int"
       | Ty_builtin Rat -> Buffer.add_string buf "rat"
+      | Ty_builtin Real -> Buffer.add_string buf "real"
       | Ty_builtin Prop -> Buffer.add_string buf "prop"
       | Ty_builtin Term -> Buffer.add_string buf "i"
       | Ty_var v -> add_id buf (Var.id v)
@@ -1198,7 +1198,7 @@ let pp_stack out l =
     | Some ty -> Format.fprintf out ":%a" pp ty
   in
   let pp_frame out (t1,t2) =
-    Format.fprintf out "@[unifying `@[%a@,%a@]` and `@[%a@,%a@]`@]"
+    Format.fprintf out "@[<2>unifying `@[%a@,%a@]`@ and `@[%a@,%a@]`@]"
       pp t1 pp_ty (ty t1) pp t2 pp_ty (ty t2)
   in
   Format.fprintf out "@[<v>%a@]" (Util.pp_list pp_frame) l
@@ -1549,11 +1549,16 @@ let try_alpha_renaming f1 f2 =
       | Var v, Var v' ->
         begin match Subst.find subst v with 
           | Some t -> begin match view t with
-              | Var v'' when Var.equal v' v'' -> aux subst rest
-              | _ -> raise (UnifyFailure ("double binding",[],None)) end
-          | None -> if not (Var.equal v v') then aux (Subst.add subst v f2) rest 
-            else aux subst rest end
-      | Const x, Const y when ID.equal x y -> aux subst rest
+              | Var v'' when Var.equal v' v'' && equal (Var.ty v') (Var.ty v'') ->
+                aux subst rest
+              | _ -> fail_unif_ [f1,f2] "double binding" end
+          | None ->
+            if not (Var.equal v v')
+            then aux (Subst.add subst v f2) ((Var.ty v,Var.ty v')::rest)
+            else aux subst rest
+        end
+      | Const x, Const y when ID.equal x y ->
+        aux subst ((ty_exn f1, ty_exn f2) :: rest)
       | App(hd_x, xs), App (hd_y, ys) when List.length xs = List.length ys ->
         (* head might be a lambda or a const, delegate solving it to
            the same algorithm *)
@@ -1561,20 +1566,35 @@ let try_alpha_renaming f1 f2 =
         aux subst (args @ rest)
       | AppBuiltin(hd_x, xs), AppBuiltin(hd_y, ys) 
         when Builtin.equal hd_x hd_y && List.length xs = List.length ys ->
+        (* unify types, if they have any *)
+        let rest = match f1.ty, f2.ty with
+          | None, None -> rest
+          | None, Some _ | Some _, None ->
+            fail_unif_ [f1,f2] "incompatible types"
+          | Some ty1, Some ty2 -> (ty1,ty2) :: rest
+        in
         aux subst ((List.combine xs ys) @ rest)
+      | AppBuiltin(hd_x, xs), AppBuiltin(hd_y, ys) when Builtin.equal hd_x hd_y ->
+        fail_unif_ [f1,f2] "arity mismatch"
       | Bind(b, v, body), Bind(b', v', body') when Binder.equal b b' ->
-        assert(CCOpt.is_none (Subst.find subst v));
+        assert(not @@ Subst.mem subst v);
         let subst = if not (Var.equal v v') then Subst.add subst v (var v') 
           else subst in
-        aux subst ((body, body') ::  rest)
-      | _ -> raise (UnifyFailure ("unknown constructors",[],None)) 
+        aux subst ((Var.ty v, Var.ty v') :: (body, body') ::  rest)
+      | _ -> fail_unif_ [f1,f2] "mismatch or unknown constructors"
   in
   try
-    if not @@ Iter.is_empty 
-        (Iter.inter ~eq:Var.equal ~hash:Var.hash (Seq.vars f1 ) (Seq.vars f2)) then None
-    else Some (aux Subst.empty [f1,f2])
-  with UnifyFailure (msg, _, _) ->
-    Util.debugf 1 "Alpha renaming failed: %s@." (fun k -> k msg);
+    let vars1 = Seq.vars f1 |> Var.Set.of_seq in
+    let vars2 = Seq.vars f2 |> Var.Set.of_seq in
+    if Var.Set.intersection_empty vars1 vars2 then (
+      let subst = aux Subst.empty [f1,f2] in
+      Util.debugf ~section 5 "Alpha renaming succeeded:@ of %a@ and %a@ with subst %a"
+        (fun k->k pp f1 pp f2 Subst.pp subst);
+      Some subst
+    ) else None
+  with UnifyFailure (msg, st, _) ->
+    Util.debugf ~section 1 "Alpha renaming failed: %s@ %a"
+      (fun k -> k msg pp_stack st);
     None
 
 

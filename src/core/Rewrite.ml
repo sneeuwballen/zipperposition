@@ -8,9 +8,9 @@ module Fmt = CCFormat
 
 let section = Util.Section.make "rewrite"
 let stat_term_rw = Util.mk_stat "rw.steps_term"
-let prof_term_rw = Util.mk_profiler "rw.term"
+let prof_term_rw = ZProf.make "rw.term"
 let stat_lit_rw = Util.mk_stat "rw.steps_lit"
-let prof_lit_rw = Util.mk_profiler "rw.lit"
+let prof_lit_rw = ZProf.make "rw.lit"
 
 (* do we rewrite literals of the form [t = u]? *)
 let allow_pos_eqn_rewrite_ = ref false
@@ -406,7 +406,7 @@ module Term = struct
     reduce t0 (fun t -> t, !set)
 
   let normalize_term ?(max_steps=1000) (t:term): term * Rule_inst_set.t =
-    Util.with_prof prof_term_rw (normalize_term_ max_steps) t
+    ZProf.with_prof prof_term_rw (normalize_term_ max_steps) t
 
   let normalize_term_fst ?max_steps t = fst (normalize_term ?max_steps t)
 
@@ -611,7 +611,7 @@ module Lit = struct
     end
 
   let normalize_clause lits =
-    Util.with_prof prof_lit_rw normalize_clause_ lits
+    ZProf.with_prof prof_lit_rw normalize_clause_ lits
 
   let narrow_lit ?(subst=Unif_subst.empty) ~scope_rules:sc_r (lit,sc_lit) =
     rules_of_lit lit
@@ -898,7 +898,7 @@ module Defined_cst = struct
       Type.apply c_ty (List.map Type.var ty_vars)
       |> Type.open_poly_fun
     in
-    let x = HVar.make ~ty:ty_x 0 in
+    let x = HVar.make ~ty:ty_x n_ty_vars in
     let args =
       List.map
         (fun proj ->
@@ -921,7 +921,7 @@ module Defined_cst = struct
           let rule = mk_rule_cstor_ c proof in
           Util.debugf ~section 3 "(@[declare-cstor %a@ :rule %a@])"
             (fun k->k ID.pp c_id Rule.pp rule);
-          ignore (declare ?level:None c_id (Rule_set.singleton rule))
+          ignore (declare ?level:None c_id (Rule_set.singleton rule) : t)
       end
     )
 end

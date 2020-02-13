@@ -115,6 +115,20 @@ let parse_file file =
     ~x:parsed >>= fun () ->
   Phases.return_phase (input,parsed)
 
+let has_real stmt : bool =
+  let module TS = TypedSTerm in
+  let is_real ty = TS.equal ty TS.Ty.real in
+  begin
+    CCVector.to_iter stmt
+    |> Iter.flat_map Statement.Seq.to_seq
+    |> Iter.flat_map
+      (function
+        | `Ty ty -> Iter.return ty
+        | `Term t | `Form t -> TS.Seq.subterms t |> Iter.filter_map TS.ty
+        | `ID _ -> Iter.empty)
+    |> Iter.exists is_real
+  end
+
 let typing ~file prelude (input,stmts) =
   Phases.start_phase Phases.Typing >>= fun () ->
   Phases.get_key Params.key >>= fun params ->
@@ -129,6 +143,12 @@ let typing ~file prelude (input,stmts) =
   >>?= fun stmts ->
   Util.debugf ~section 3 "@[<hv2>@{<green>typed statements@}@ %a@]"
     (fun k->k (Util.pp_seq Statement.pp_input) (CCVector.to_seq stmts));
+  begin
+    if has_real stmts then (
+      Util.debug ~section 1 "problem contains $real, lost completeness";
+      Phases.set_key Ctx.Key.lost_completeness true
+    ) else Phases.return ()
+  end >>= fun () ->
   do_extensions ~field:(fun e -> e.Extensions.post_typing_actions)
     ~x:stmts >>= fun () ->
   Phases.return_phase stmts

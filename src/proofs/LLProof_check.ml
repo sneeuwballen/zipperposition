@@ -30,7 +30,7 @@ type stats = {
 }
 
 let section = LLProof.section
-let prof_check = Util.mk_profiler "llproof.check.step"
+let prof_check = ZProf.make "llproof.check.step"
 let stat_check = Util.mk_stat "llproof.check.step"
 
 let pp_res out = function
@@ -156,7 +156,7 @@ let check_step_ ?dot_prefix (p:proof): check_step_res =
       ) else CS_skip `Tags
   end
 
-let check_step ?dot_prefix p = Util.with_prof prof_check (check_step_ ?dot_prefix) p
+let check_step ?dot_prefix p = ZProf.with_prof prof_check (check_step_ ?dot_prefix) p
 
 let check
     ?dot_prefix

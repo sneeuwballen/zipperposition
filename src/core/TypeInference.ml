@@ -13,7 +13,7 @@ module Err = CCResult
 module Subst = Var.Subst
 module Fmt = CCFormat
 
-let prof_infer = Util.mk_profiler "TypeInference.infer"
+let prof_infer = ZProf.make "TypeInference.infer"
 let section = Util.Section.(make "ty-infer")
 
 type 'a or_error = ('a, string) CCResult.t
@@ -276,10 +276,10 @@ module Ctx = struct
       Fmt.fprintf out " (did you mean any of [@[%a@]]?)" (Util.pp_list Fmt.string) l
 
   (* Does the identifier represent a (TPTP) distinct object? *)
-  let is_distinct_ s =
-    String.length s > 2 && s.[0] = '"' && s.[String.length s-1] = '"'
+  let is_distinct_ _s attrs =
+    List.exists (function PT.Attr_distinct_const -> true) attrs
 
-  let get_id_ ?loc ~arity ctx name =
+  let get_id_ ?loc ~arity ~attrs ctx name =
     try match Hashtbl.find ctx.env name with
       | `ID (id, ty) -> id, ty
       | `Var _ -> error_ ?loc "@[<2>expected `%s` to be a constant, not a variable@]" name
@@ -294,7 +294,7 @@ module Ctx = struct
             name pp_names (find_close_names ctx name) T.pp ty;
       end;
       let id = ID.make name in
-      if is_distinct_ name then ID.set_payload id ID.Attr_distinct;
+      if is_distinct_ name attrs then ID.set_payload id ID.Attr_distinct;
       Hashtbl.add ctx.env name (`ID (id, ty));
       ctx.new_types <- (id, ty) :: ctx.new_types;
       id, ty
@@ -400,7 +400,7 @@ let rec infer_ty_ ?loc ctx ty =
       end
     | PT.Const f ->
       (* constant type *)
-      let id, ty = Ctx.get_id_ ?loc ctx ~arity:0 f in
+      let id, ty = Ctx.get_id_ ?loc ctx ~arity:0 ~attrs:ty.PT.attrs f in
       unify ?loc ty T.Ty.tType;
       T.Ty.const id
     | PT.App (f, l) ->
@@ -408,7 +408,7 @@ let rec infer_ty_ ?loc ctx ty =
         | PT.Var PT.Wildcard -> error_ ?loc "wildcard function: not supported"
         | PT.Var (PT.V name)
         | PT.Const name ->
-          let id, ty = Ctx.get_id_ ?loc ctx ~arity:(List.length l) name in
+          let id, ty = Ctx.get_id_ ?loc ctx ~attrs:ty.PT.attrs ~arity:(List.length l) name in
           aux_app id ty l
         | _ -> error_ ?loc "@[<2>cannot apply non-constant@ `@[%a@]`@]" PT.pp f
       end
@@ -485,7 +485,7 @@ let rec infer_rec ?loc ctx t =
           T.app ?loc ~ty (T.const ?loc ~ty:ty_id id) l
       end
     | PT.Const s ->
-      let id, ty_id = Ctx.get_id_ ?loc ~arity:0 ctx s in
+      let id, ty_id = Ctx.get_id_ ?loc ~arity:0 ~attrs:t.PT.attrs ctx s in
       (* implicit parameters, e.g. for [nil] *)
       let l = add_implicit_params ctx ty_id [] |> List.map (infer_rec ?loc ctx) in
       let ty = apply_unify ctx ?loc ~allow_open:true ty_id l in
@@ -504,7 +504,7 @@ let rec infer_rec ?loc ctx t =
           T.app ?loc ~ty (T.var ?loc v) l
       end
     | PT.App ({PT.term=PT.Const s; _}, l) ->
-      let id, ty_s = Ctx.get_id_ ?loc ~arity:(List.length l) ctx s in
+      let id, ty_s = Ctx.get_id_ ?loc ~arity:(List.length l) ~attrs:t.PT.attrs ctx s in
       infer_app ?loc ctx id ty_s l
     | PT.App (f,l) ->
       (* higher order application *)
@@ -656,6 +656,13 @@ let rec infer_rec ?loc ctx t =
       t
     | PT.AppBuiltin (Builtin.HasType, l) ->
       error_ ?loc "ill-formed has_type@ [@[<hv>%a@]]" (Util.pp_list PT.pp) l
+    | PT.AppBuiltin (Builtin.Distinct, ([] | [_])) -> T.Form.true_
+    | PT.AppBuiltin (Builtin.Distinct, l) ->
+      (* [distinct(l)] is boolean typed *)
+      let l = List.map (infer_rec ?loc ctx) l in
+      let x = match l with x::_ -> x | _ -> assert false in
+      List.iter (fun y -> unify ?loc (T.ty_exn x) (T.ty_exn y)) l;
+      T.app_builtin ?loc ~ty:T.Ty.prop Builtin.Distinct l
     | PT.AppBuiltin (b,l) ->
       begin match TyBuiltin.ty b with
         | None ->
@@ -734,7 +741,8 @@ and infer_match ?loc ctx ~ty_matched t data (l:PT.match_branch list)
                   ))
                data
            | PT.Match_case (s, vars, rhs) ->
-             let c_id, c_ty = Ctx.get_id_ ?loc ~arity:(List.length vars) ctx s in
+             let c_id, c_ty =
+               Ctx.get_id_ ?loc ~attrs:t.PT.attrs ~arity:(List.length vars) ctx s in
              if List.exists (ID.equal c_id) !seen then (
                error_ ?loc "duplicate branch for constructor `%a`" ID.pp c_id
              );
@@ -791,14 +799,14 @@ and infer_prop_ ?loc ctx t =
   t
 
 let infer_exn ctx t =
-  Util.enter_prof prof_infer;
+  ZProf.enter_prof prof_infer;
   Util.debugf ~section 50 "@[<2>infer type of@ `@[%a@]`@]" (fun k->k PT.pp t);
   try
     let t = infer_rec ctx t in
-    Util.exit_prof prof_infer;
+    ZProf.exit_prof prof_infer;
     t
   with e ->
-    Util.exit_prof prof_infer;
+    ZProf.exit_prof prof_infer;
     raise e
 
 let infer ctx t =
@@ -807,14 +815,14 @@ let infer ctx t =
     Err.of_exn_trace e
 
 let infer_clause_exn ctx c =
-  Util.enter_prof prof_infer;
+  ZProf.enter_prof prof_infer;
   try
     let c = List.map (infer_prop_ ctx) c in
     Ctx.exit_scope ctx;
-    Util.exit_prof prof_infer;
+    ZProf.exit_prof prof_infer;
     c
   with e ->
-    Util.exit_prof prof_infer;
+    ZProf.exit_prof prof_infer;
     raise e
 
 let infer_prop_exn ctx t =
