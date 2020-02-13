@@ -669,15 +669,15 @@ let () =
       " when empty clause \bot <- A is infered, if A has only one component,
         skolemize and negate the component and add it to the proof state. "
     ];
-  Params.add_to_mode "ho-complete-basic" (fun () ->
-      enabled_ := false
-    );
-  Params.add_to_mode "ho-pragmatic" (fun () ->
-      enabled_ := false
-    );
-  Params.add_to_mode "ho-competitive" (fun () ->
-      enabled_ := false
-    );
-  Params.add_to_mode "fo-complete-basic" (fun () ->
+  Params.add_to_modes 
+    [ "ho-complete-basic"
+    ; "ho-pragmatic"
+    ; "ho-competitive"
+    ; "fo-complete-basic"
+    ; "lambda-free-intensional"
+    ; "lambda-free-extensional"
+    ; "lambda-free-purify-intensional"
+    ; "lambda-free-purify-extensional"] 
+    (fun () ->
       enabled_ := false
     );

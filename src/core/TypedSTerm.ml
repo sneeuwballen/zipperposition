@@ -969,11 +969,12 @@ module Subst = struct
       | None ->
         var ?loc:t.loc (Var.update_ty v ~f:(eval_ ~recursive ~rename_binders subst))
       | Some t' ->
-        if not (t != t') then (
-          Format.printf "faulty subst:@ %a.\n" pp subst;
-          assert(false);
-        );
-        if recursive then (eval_ ~recursive ~rename_binders subst t') else (t')
+        if recursive 
+        then (
+          assert (t != t');
+          eval_ ~recursive ~rename_binders subst t'
+        ) 
+        else (t')
     end
   and eval_binders ~rename_binders ~recursive ~t subst v =
     subst, match view (eval_var ~recursive ~rename_binders ~t subst v) with

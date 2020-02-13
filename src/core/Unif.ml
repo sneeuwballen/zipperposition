@@ -22,6 +22,8 @@ let prof_matching = ZProf.make "matching"
 
 let fail () = raise Fail
 
+let _allow_pattern_unif = ref true
+
 (** {2 Signatures} *)
 
 module type S = Unif_intf.S
@@ -754,12 +756,12 @@ module Inner = struct
            "(@[unif_ho.flex_rigid, trying@ `@[:f1 %a :l1 %a@]`@ :t2 `%a`@ :subst %a@ :bvars %a@])@."
            (Scoped.pp T.pp) (f1,scope) (CCFormat.Dump.list T.pp) l1
            (Scoped.pp T.pp) (t2,scope) US.pp subst B_vars.pp bvars; *)
-        if distinct_bvar_l ~bvars:bvars.B_vars.left l1 
-        && CCList.subset ~eq:(=) (T.DB.unbound t2) (List.map T.as_bvar_exn l1) 
+        if !_allow_pattern_unif && distinct_bvar_l ~bvars:bvars.B_vars.left l1 
+           && CCList.subset ~eq:(=) (T.DB.unbound t2) (List.map T.as_bvar_exn l1) 
         then (
           (* flex/rigid pattern unif *)
           flex_rigid ~op ~bvars:bvars.B_vars.left subst f1 l1 t2 ~scope
-        ) else if distinct_ground_l l1 then (
+        ) else if !_allow_pattern_unif && distinct_ground_l l1 then (
           (* [v t = t2] becomes [v = λx. t2[x/t]] *)
           let t2 = lift_terms l1 t2 in
           unif_rec ~op ~root ~bvars subst (f1,scope) (t2,scope)
@@ -777,13 +779,13 @@ module Inner = struct
           "(@[unif_ho.flex_rigid@ `@[:f2 %a :l2 %a@]`@ :t1 `%a`@ :subst %a@ :bvars %a@])@."
           (Scoped.pp T.pp) (f2,scope) (CCFormat.Dump.list T.pp) l2
           (Scoped.pp T.pp) (t1,scope) US.pp subst B_vars.pp bvars;*)
-        if distinct_bvar_l ~bvars:bvars.B_vars.right l2 
-        && CCList.subset ~eq:(=) (T.DB.unbound t1) (List.map T.as_bvar_exn l2) 
-        && op=O_unify 
+        if !_allow_pattern_unif && distinct_bvar_l ~bvars:bvars.B_vars.right l2 
+           && CCList.subset ~eq:(=) (T.DB.unbound t1) (List.map T.as_bvar_exn l2) 
+           && op=O_unify 
         then (
           (* flex/rigid pattern unif *)
           flex_rigid ~op ~bvars:bvars.B_vars.right subst f2 l2 t1 ~scope
-        ) else if distinct_ground_l l2 && op=O_unify then (
+        ) else if !_allow_pattern_unif && distinct_ground_l l2 && op=O_unify then (
           (* [t1 = v t] becomes [v = λx. t1[x/t]] *)
           let t1 = lift_terms l2 t1 in
           unif_rec ~op ~root ~bvars subst (t1,scope) (f2,scope)
@@ -798,6 +800,7 @@ module Inner = struct
         ) else fail()
       | T.Var v1, T.Var v2
         when op=O_unify &&
+             !_allow_pattern_unif &&
              distinct_bvar_l ~bvars:bvars.B_vars.left l1 &&
              distinct_bvar_l ~bvars:bvars.B_vars.right l2 ->
         (* flex/flex equation for pattern unif *)
@@ -805,6 +808,7 @@ module Inner = struct
           v1 l1 v2 l2
       | T.Var v1, T.Var v2
         when is_match_op op &&
+             !_allow_pattern_unif &&
              distinct_bvar_l ~bvars:bvars.B_vars.left l1 &&
              distinct_bvar_l ~bvars:bvars.B_vars.right l2 &&
              CCList.subset ~eq:T.equal l2 l1 ->
@@ -1224,3 +1228,7 @@ module FO = struct
     let l1, l2 = pair_lists_ f1 l1 f2 l2 in
     Term.of_term_unsafe_l l1, Term.of_term_unsafe_l l2
 end
+
+let () =
+  Options.add_opts
+    [ "--unif-pattern", Arg.Bool (fun b -> _allow_pattern_unif := b), " enable/disable pattern unification"]

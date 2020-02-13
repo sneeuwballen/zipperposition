@@ -51,7 +51,8 @@ let k_prune_arg_fun = Flex_state.create_key ()
 let k_prim_enum_terms = Flex_state.create_key ()
 let k_simple_projection = Flex_state.create_key ()
 let k_simple_projection_md = Flex_state.create_key ()
-
+let k_check_lambda_free = Flex_state.create_key()
+let k_purify_applied_vars = Flex_state.create_key()
 
 type prune_kind = [`NoPrune | `OldPrune | `PruneAllCovers | `PruneMaxCover]
 
@@ -1228,6 +1229,129 @@ module Make(E : Env.S) : S with module Env = E = struct
     )
   (* TODO: Simplified flag like in first-order? Profiler?*)
 
+
+  (* Purify variables
+     - if they occur applied and unapplied ("int" mode).
+     - if they occur with differen argumetns ("ext" mode).
+     Example: g X = X a \/ X a = b becomes g X = Y a \/ Y a = b \/ X != Y.
+     Literals with only a variable on both sides are not affected. *)
+  let purify_applied_variable c =
+    (* set of new literals *)
+    let new_lits = ref [] in
+    let add_lit_ lit = new_lits := lit :: !new_lits in
+    (* cache for term headed by variable -> replacement variable *)
+    let cache_replacement_ = T.Tbl.create 8 in
+    (* cache for variable -> untouched term (the first term we encounter with a certain variable as head) *)
+    let cache_untouched_ = VTbl.create 8 in
+    (* index of the next fresh variable *)
+    let varidx =
+      Literals.Seq.terms (C.lits c)
+      |> Iter.flat_map T.Seq.vars
+      |> T.Seq.max_var |> succ
+      |> CCRef.create
+    in
+    (* variable used to purify a term *)
+    let replacement_var t =
+      try T.Tbl.find cache_replacement_ t
+      with Not_found ->
+        let head, _ = T.as_app t in
+        let ty = T.ty head in
+        let v = T.var_of_int ~ty (CCRef.get_then_incr varidx) in
+        let lit = Literal.mk_neq v head in
+        add_lit_ lit;
+        T.Tbl.add cache_replacement_ t v;
+        v
+    in
+    (* We make the variables of two (variable-headed) terms different if they are
+       in different classes.
+       For extensional variable purification, two terms are only in the same class
+       if they are identical.
+       For intensional variable purification, two terms are in the same class if
+       they are both unapplied variables or both applied variables. *)
+    let same_class t1 t2 =
+      assert (T.is_var (fst (T.as_app t1)));
+      assert (T.is_var (fst (T.as_app t2)));
+      if Env.flex_get k_purify_applied_vars == `Ext
+      then
+        t1 = t2
+      else (
+        assert (Env.flex_get k_purify_applied_vars == `Int);
+        match T.view t1, T.view t2 with
+          | T.Var x, T.Var y when x=y -> true
+          | T.App (f, _), T.App (g, _) when f=g -> true
+          | _ -> false
+      )
+    in
+    (* Term should not be purified if
+       - this is the first term we encounter with this variable as head or
+       - it is equal to the first term encountered with this variable as head *)
+    let should_purify t v =
+      try
+        if same_class t (VTbl.find cache_untouched_ v) then (
+          Util.debugf ~section 5
+            "Leaving untouched: %a"
+            (fun k->k T.pp t);false
+        ) else (
+          Util.debugf ~section 5
+            "To purify: %a"
+            (fun k->k T.pp t);true
+        )
+      with Not_found ->
+        VTbl.add cache_untouched_ v t;
+        Util.debugf ~section 5
+          "Add untouched term: %a"
+          (fun k->k T.pp t);
+        false
+    in
+    (* purify a term *)
+    let rec purify_term t =
+      let head, args = T.as_app t in
+      let res = match T.as_var head with
+        | Some v ->
+          if should_purify t v then (
+            (* purify *)
+            Util.debugf ~section 5
+              "@[Purifying: %a.@ Untouched is: %a@]"
+              (fun k->k T.pp t T.pp (VTbl.find cache_untouched_ v));
+            let v' = replacement_var t in
+            assert (Type.equal (HVar.ty v) (T.ty v'));
+            T.app v' (List.map purify_term args)
+          ) else (
+            (* dont purify *)
+            T.app head (List.map purify_term args)
+          )
+        | None -> (* dont purify *)
+          T.app head (List.map purify_term args)
+      in
+      assert (Type.equal (T.ty res) (T.ty t));
+      res
+    in
+    (* purify a literal *)
+    let purify_lit lit =
+      (* don't purify literals with only a variable on both sides *)
+      if Literal.for_all T.is_var lit
+      then lit
+      else Literal.map purify_term lit
+    in
+    (* try to purify *)
+    let lits' = Array.map purify_lit (C.lits c) in
+    begin match !new_lits with
+      | [] -> SimplM.return_same c
+      | _::_ ->
+        (* replace! *)
+        let all_lits = !new_lits @ (Array.to_list lits') in
+        let parent = C.proof_parent c in
+        let proof =
+          Proof.Step.simp
+            ~rule:(Proof.Rule.mk "ho.purify_applied_variable") ~tags:[Proof.Tag.T_ho]
+            [parent] in
+        let new_clause = (C.create ~trail:(C.trail c) ~penalty:(C.penalty c) all_lits proof) in
+        Util.debugf ~section 5
+          "@[<hv2>Purified:@ Old: %a@ New: %a@]"
+          (fun k->k C.pp c C.pp new_clause);
+        SimplM.return_new new_clause
+    end
+
   let setup () =
     if not (Env.flex_get k_enabled) then (
       Util.debug ~section 1 "HO rules disabled";
@@ -1289,6 +1413,10 @@ module Make(E : Env.S) : S with module Env = E = struct
         Env.add_unary_simplify neg_ext_simpl;
       );
 
+      if(Env.flex_get k_purify_applied_vars != `None) then (
+        Env.add_unary_simplify purify_applied_variable
+      );
+
       if Env.flex_get k_enable_ho_unif then (
         Env.add_unary_inf "ho_unif" ho_unif;
       );
@@ -1308,6 +1436,11 @@ module Make(E : Env.S) : S with module Env = E = struct
         Env.ProofState.PassiveSet.add (Iter.singleton extensionality_clause);
       if Env.flex_get k_choice_axiom then
         Env.ProofState.PassiveSet.add (Iter.singleton choice_clause);
+
+      if Env.flex_get k_check_lambda_free then 
+        Env.add_fragment_check (fun c ->
+            (Env.C.Seq.terms c 
+                 |> Iter.for_all Term.in_lfho_fragment))
     );
     ()
 end
@@ -1383,10 +1516,12 @@ let _neg_cong_fun = ref false
 let _instantiate_choice_ax = ref false
 let _elim_leibniz_eq = ref (-1)
 let _prune_arg_fun = ref `NoPrune
+let _check_lambda_free = ref false
 let prim_enum_terms = ref Term.Set.empty
 let _oracle_composer = ref (OSeq.merge :> (Logtk.Subst.t option OSeq.t OSeq.t -> Logtk.Subst.t option OSeq.t))
 let _simple_projection = ref (-1)
 let _simple_projection_md = ref 2
+let _purify_applied_vars = ref `None
 
 let extension =
   let register env =
@@ -1408,6 +1543,8 @@ let extension =
     E.flex_add k_prim_enum_terms prim_enum_terms;
     E.flex_add k_simple_projection !_simple_projection;
     E.flex_add k_simple_projection_md !_simple_projection_md;
+    E.flex_add k_check_lambda_free !_check_lambda_free;
+    E.flex_add k_purify_applied_vars !_purify_applied_vars;
 
 
 
@@ -1451,6 +1588,10 @@ let extension =
     env_actions=[register];
   }
 
+let purify_opt =
+  let set_ n = _purify_applied_vars := n in
+  let l = [ "ext", `Ext; "int", `Int; "none", `None] in
+  Arg.Symbol (List.map fst l, fun s -> set_ (List.assoc s l))
 
 let () =
   Options.add_opts
@@ -1485,7 +1626,10 @@ let () =
       " negative argument turns the inference off";
       "--ho-simple-projection-max-depth", Arg.Set_int _simple_projection_md, " sets the max depth for simple projection";
       "--ho-ext-axiom-penalty", Arg.Int (fun p -> _ext_axiom_penalty := p), " penalty for extensionality axiom";
-    ];
+      "--ho-purify", purify_opt, " enable purification of applied variables: 'ext' purifies" ^
+        " whenever a variable is applied to different arguments." ^
+        " 'int' purifies whenever a variable appears applied and unapplied.";
+     ];
   Params.add_to_mode "ho-complete-basic" (fun () ->
       enabled_ := true;
       def_unfold_enabled_ := false;
@@ -1536,5 +1680,16 @@ let () =
     );
   Params.add_to_mode "fo-complete-basic" (fun () ->
       enabled_ := false;
+    );
+  Params.add_to_modes 
+    [ "lambda-free-intensional"
+    ; "lambda-free-extensional"
+    ; "lambda-free-purify-intensional"
+    ; "lambda-free-purify-extensional"]
+    (fun () ->
+      enabled_ := true;
+      _check_lambda_free := true;
+      Unif._allow_pattern_unif := false
+      (* TODO: set eta and others *)
     );
   Extensions.register extension;

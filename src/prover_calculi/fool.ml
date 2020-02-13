@@ -215,16 +215,16 @@ let extension =
 let () =
   Options.add_opts
     [ "--fool", Arg.Bool (fun v -> enabled_ := v), " enable/disable fool (first-class booleans)"  ];
-  Params.add_to_mode "ho-complete-basic" (fun () ->
-      enabled_ := false
-    );
-  Params.add_to_mode "ho-pragmatic" (fun () ->
-      enabled_ := false
-    );
-  Params.add_to_mode "ho-competitive" (fun () ->
-      enabled_ := false
-    );
-  Params.add_to_mode "fo-complete-basic" (fun () ->
+  Params.add_to_modes 
+    [ "ho-complete-basic"
+    ; "ho-pragmatic"
+    ; "ho-competitive"
+    ; "fo-complete-basic"
+    ; "lambda-free-intensional"
+    ; "lambda-free-extensional"
+    ; "lambda-free-purify-intensional"
+    ; "lambda-free-purify-extensional"] 
+    (fun () ->
       enabled_ := false
     );
   Extensions.register extension

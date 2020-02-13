@@ -123,6 +123,7 @@ module Make(X : sig
   let _generate_rules : (string * generate_rule) list ref = ref []
   let _clause_conversion_rules : clause_conversion_rule list ref = ref []
   let _step_init = ref []
+  let _fragment_checks = ref []
 
   let on_start = Signal.create()
   let on_input_statement = Signal.create()
@@ -228,6 +229,10 @@ module Make(X : sig
     _clause_conversion_rules := r :: !_clause_conversion_rules
 
   let add_step_init f = _step_init := f :: !_step_init
+
+  let add_fragment_check f = _fragment_checks := f :: !_fragment_checks
+
+  let check_fragment c = CCList.for_all (fun f -> f c) !_fragment_checks
 
   let params = X.params
 

@@ -158,6 +158,10 @@ module type S = sig
   val add_step_init : (unit -> unit) -> unit
   (** add a function to call before each saturation step *)
 
+  val add_fragment_check : (C.t -> bool) -> unit
+
+  val check_fragment : C.t -> bool
+
   (** {2 Use the Env} *)
 
   val multi_simplify : C.t -> C.t list option

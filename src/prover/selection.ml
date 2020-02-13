@@ -456,3 +456,11 @@ let () =
   Params.add_to_mode "ho-pragmatic" (fun () ->
       _ho_restriction := `NoVarHeadingMaxTerm
     );
+  Params.add_to_modes 
+    [ "lambda-free-intensional"
+    ; "lambda-free-extensional"
+    ; "lambda-free-purify-intensional"
+    ; "lambda-free-purify-extensional"] 
+    (fun () ->
+      _ho_restriction := `NoHigherOrderVariables
+    );

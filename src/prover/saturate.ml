@@ -89,7 +89,8 @@ module Make(E : Env.S) = struct
       CCFormat.printf "proof : %a.\n" Proof.S.pp_normal (Env.C.proof c);
       assert(false);
     );
-    CCArray.iter (fun t -> assert(Literal.no_prop_invariant t)) (Env.C.lits c)
+    CCArray.iter (fun t -> assert(Literal.no_prop_invariant t)) (Env.C.lits c);
+    assert (Env.check_fragment c)
 
   let[@inline] check_clauses_ seq =
     Iter.iter check_clause_ seq
@@ -243,6 +244,13 @@ module Make(E : Env.S) = struct
 
   let presaturate () =
     given_clause ?steps:None ?timeout:None ~generating:false ()
+
+  let check_fragment () =
+    if not (Env.get_passive () |> Iter.for_all Env.check_fragment)
+    then invalid_arg "Problem out of fragment"
+
+  let () =
+    Signal.on_every Env.on_start check_fragment;
 end
 
 let () =
