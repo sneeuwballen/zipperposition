@@ -32,7 +32,7 @@ type t = {
 }
 
 let default : t = {
-  ord= "kbo";
+  ord= "lambda_kbo";
   seed = 1928575;
   steps = -1;
   version= false;

@@ -106,7 +106,7 @@ module Make (P : PARAMETERS) = struct
           | _, _ -> invalid_arg "lists must be of the same size." in
 
         let new_args = zipped_with_flag (args_l,args_r) in
-        
+
         let to_classify, rest = 
           if List.length rest <= 15
           then new_args@rest, []
@@ -114,25 +114,25 @@ module Make (P : PARAMETERS) = struct
 
         let sort_class =
           List.sort (fun (l,r,_) (l', r',_) ->
-            let l,l' = CCPair.map_same (fun t -> T.head_term @@ snd @@ T.open_fun t) (l,l') in
-            let r,r' = CCPair.map_same (fun t -> T.head_term @@ snd @@ T.open_fun t) (r,r') in
-            if (not (Term.is_app l) || not (Term.is_app r)) &&
-               (not (Term.is_app l') || not (Term.is_app r')) then 0
-            else if not (Term.is_app l) || not (Term.is_app r) then -1
-            else if not (Term.is_app l') || not (Term.is_app r') then 1
-            else Term.ho_weight l + Term.ho_weight r - 
-                 Term.ho_weight l' - Term.ho_weight r'
-          ) in
-        
+              let l,l' = CCPair.map_same (fun t -> T.head_term @@ snd @@ T.open_fun t) (l,l') in
+              let r,r' = CCPair.map_same (fun t -> T.head_term @@ snd @@ T.open_fun t) (r,r') in
+              if (not (Term.is_app l) || not (Term.is_app r)) &&
+                 (not (Term.is_app l') || not (Term.is_app r')) then 0
+              else if not (Term.is_app l) || not (Term.is_app r) then -1
+              else if not (Term.is_app l') || not (Term.is_app r') then 1
+              else Term.ho_weight l + Term.ho_weight r - 
+                   Term.ho_weight l' - Term.ho_weight r'
+            ) in
+
         let classify_one s =
           let rec follow_bindings t =
             let hd = T.head_term @@ snd @@ (T.open_fun t) in
             let derefed,_ = Subst.FO.deref subst (hd, unifscope) in
             if T.equal hd derefed then hd
             else follow_bindings derefed in
-          
+
           let hd = follow_bindings s in
-          
+
           if T.is_const hd then `Const
           else if T.is_var hd then `Var
           (* when it is bound variable, we do not know what will 
@@ -142,14 +142,14 @@ module Make (P : PARAMETERS) = struct
 
         (* classifies the pairs as (rigid-rigid, flex-rigid, and flex-flex *)
         let rec classify = function 
-        | ((lhs,rhs,flag) as cstr) :: xs ->
-          let rr,fr,unsure,ff = classify xs in
-          begin match classify_one lhs, classify_one rhs with 
-          | `Const, `Const -> cstr::rr,fr,unsure,ff
-          | _, `Const  | `Const, _ -> rr, cstr::fr, unsure, ff
-          | _, `Unknown | `Unknown, _ -> rr, fr, cstr::unsure, ff
-          | `Var, `Var -> rr,fr,unsure, cstr::ff end
-        | [] -> ([],[],[],[]) in
+          | ((lhs,rhs,flag) as cstr) :: xs ->
+            let rr,fr,unsure,ff = classify xs in
+            begin match classify_one lhs, classify_one rhs with 
+              | `Const, `Const -> cstr::rr,fr,unsure,ff
+              | _, `Const  | `Const, _ -> rr, cstr::fr, unsure, ff
+              | _, `Unknown | `Unknown, _ -> rr, fr, cstr::unsure, ff
+              | `Var, `Var -> rr,fr,unsure, cstr::ff end
+          | [] -> ([],[],[],[]) in
 
         let rr,fr,unsure,ff = classify to_classify in
         if Flex_state.get_exn PragUnifParams.k_sort_constraints P.flex_state then

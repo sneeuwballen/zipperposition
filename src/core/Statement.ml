@@ -654,7 +654,7 @@ let sine_axiom_selector ?(depth_start=1) ?(depth_end=3) ?(tolerance=2.0) formula
         | _ -> true) in
   let helper_axioms, axioms =
     CCList.partition (fun st ->
-      ID.Set.is_empty (symset_of_ax st) || 
+        ID.Set.is_empty (symset_of_ax st) || 
         match view st with 
         | TyDecl _  -> true 
         | _ -> false) axioms in

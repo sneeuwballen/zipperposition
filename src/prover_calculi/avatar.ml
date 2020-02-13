@@ -110,20 +110,20 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
           let lits = Array.of_list lits in
           let bool_name = BBox.find_boolean_lit lits in
           CCOpt.iter (fun bool_lit -> 
-            (* asserting Trail -> bool_name *)
-            if List.for_all (fun bg -> 
-                BBox.Lit.equal (BBox.Lit.neg bg) bool_lit)
-               bool_guard then (
-            (* ignoring tautoligies *)
-            Sat.add_clause ~proof:(proof ~rule:(Proof.Rule.mk "recognize_known")) 
-              (bool_lit :: bool_guard));
-          ) bool_name
+              (* asserting Trail -> bool_name *)
+              if List.for_all (fun bg -> 
+                  BBox.Lit.equal (BBox.Lit.neg bg) bool_lit)
+                  bool_guard then (
+                (* ignoring tautoligies *)
+                Sat.add_clause ~proof:(proof ~rule:(Proof.Rule.mk "recognize_known")) 
+                  (bool_lit :: bool_guard));
+            ) bool_name
         );
         None
       | _::_ ->
         (* do a simplification! *)
         Util.incr_stat stat_splits;
-        
+
         (* elements of the trail to keep *)
         let keep_trail =
           C.trail c |> Trail.filter BBox.must_be_kept
@@ -145,7 +145,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
         Util.debugf ~section 1 "@[split of @[%a@]@ yields @[%a@]@]"
           (fun k->k C.pp c (Util.pp_list C.pp) clauses);
         (* add boolean constraint: trail(c) => bigor_{name in clauses} name *)
-        
+
         let bool_clause = List.append bool_clause bool_guard in
         Sat.add_clause ~proof:(proof ~rule:(Proof.Rule.mk "split")) bool_clause;
         Util.debugf ~section 1 "@[constraint clause is @[%a@]@]"
@@ -162,13 +162,13 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       (not @@ Literals.is_trivial (C.lits c)) &&
       (not @@ E.flex_get k_split_only_initial || C.proof_depth c == 0) &&
       (not @@ E.flex_get k_split_only_goals || 
-        CCOpt.get_or ~default:(-1) (C.distance_to_goal c) >= 0) &&
+       CCOpt.get_or ~default:(-1) (C.distance_to_goal c) >= 0) &&
       (not @@ E.flex_get k_abstract_known_singletons ||
-         Array.length (C.lits c) != 0) &&
+       Array.length (C.lits c) != 0) &&
       (E.flex_get k_abstract_known_singletons ||
-         Array.length (C.lits c) > 1) &&
+       Array.length (C.lits c) > 1) &&
       (E.flex_get k_max_trail_size < 0 || 
-        Trail.length (C.trail c) <= E.flex_get k_max_trail_size) in
+       Trail.length (C.trail c) <= E.flex_get k_max_trail_size) in
 
     let res = if (should_split c) then simplify_split_ c else None in
     ZProf.exit_prof prof_splits;
@@ -201,7 +201,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
         let skolemizer = 
           Literals.vars lits
           |> List.map (fun v -> 
-             (v, 0), (snd @@ Term.mk_fresh_skolem [] (HVar.ty v), 0))
+              (v, 0), (snd @@ Term.mk_fresh_skolem [] (HVar.ty v), 0))
           |> Subst.FO.of_list' in
         let lits' = 
           Literals.apply_subst Subst.Renaming.none skolemizer (lits,0)
@@ -209,9 +209,9 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
         let proof = 
           Proof.Step.inference ~rule:(Proof.Rule.mk "ground_avatar") [C.proof_parent c] in
         List.map (fun lit ->
-          C.create ~penalty:(C.penalty c) ~trail:Trail.empty 
-            [negate lit] proof 
-        ) lits'
+            C.create ~penalty:(C.penalty c) ~trail:Trail.empty 
+              [negate lit] proof 
+          ) lits'
       | None -> []
     ) else [] (* never infers anything! *)
 

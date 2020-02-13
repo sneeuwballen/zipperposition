@@ -119,14 +119,14 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~signature ~offset 
         let arg_tys, ret_ty = Type.open_fun ty_v in 
         let bvars = 
           snd @@ List.fold_right (fun ty (idx, res) -> 
-            (idx+1, T.bvar ~ty idx :: res)) arg_tys (0, []) in
+              (idx+1, T.bvar ~ty idx :: res)) arg_tys (0, []) in
         let fresh_vars = List.mapi (fun i ty -> 
-          let var_ty = Type.arrow arg_tys ty in
-          T.app (T.var (HVar.make ~ty:var_ty (offset+i))) bvars
-        ) arg_tys in
+            let var_ty = Type.arrow arg_tys ty in
+            T.app (T.var (HVar.make ~ty:var_ty (offset+i))) bvars
+          ) arg_tys in
         ID.Set.fold (fun sym acc -> 
-          (T.fun_l arg_tys (Term.app (Term.const ~ty:ty_v sym) fresh_vars)) :: acc) 
-        syms_of_var_ty []
+            (T.fun_l arg_tys (Term.app (Term.const ~ty:ty_v sym) fresh_vars)) :: acc) 
+          syms_of_var_ty []
       | _ -> []
     and l_simpl_op = match mode with
       | `Pragmatic -> 

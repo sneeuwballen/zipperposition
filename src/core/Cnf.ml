@@ -555,12 +555,12 @@ let rec nnf f =
     if T.equal f1 f2 then F.true_
     else (
       nnf (F.and_
-           [ F.imply f1 f2; F.imply f2 f1 ]))
+             [ F.imply f1 f2; F.imply f2 f1 ]))
   | F.Xor (f1,f2) ->
     (* equivalence with negative polarity *)
     if T.equal f1 f2 then F.false_
     else (nnf (F.and_
-           [ F.or_ [f1; f2]; F.or_ [F.not_ f1; F.not_ f2] ]))
+                 [ F.or_ [f1; f2]; F.or_ [F.not_ f1; F.not_ f2] ]))
   | F.Forall (var,f') -> F.forall var (nnf f')
   | F.Exists (var,f') -> F.exists var (nnf f')
 

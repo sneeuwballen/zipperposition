@@ -1738,7 +1738,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                (fun l' -> k (t' :: l')))
     in
     normal_form ~restrict t (fun t->t)
-  
+
   let[@inline] eq_c_subst (c1,s1,sc1)(c2,s2,sc2) =
     C.equal c1 c2 && sc1=sc2 && Subst.equal s1 s2
 
@@ -1974,10 +1974,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
            let c = with_pos.C.WithPos.clause in
            (* subst(l) matches t' and is > subst(r), very likely to rewrite! *)
            if (C.trail_subsumes c given && (oriented ||
-                O.compare ord
-                  (S.FO.apply renaming subst (l,0))
-                  (S.FO.apply renaming subst (r,0)) = Comp.Gt
-               )
+                                            O.compare ord
+                                              (S.FO.apply renaming subst (l,0))
+                                              (S.FO.apply renaming subst (r,0)) = Comp.Gt
+                                           )
               )
            then  (* add the clause to the set, it may be rewritten by l -> r *)
              C.ClauseSet.add c set

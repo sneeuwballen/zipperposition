@@ -7,7 +7,7 @@ type t = (((Type.t * bool) ID.Map.t) * (ID.Set.t Type.Map.t))
 (** A signature maps symbols to their sort *)
 
 let empty =
-    (ID.Map.empty, Type.Map.empty)
+  (ID.Map.empty, Type.Map.empty)
 
 let is_empty (sym_map, ty_map) =
   let sym_map_empty = ID.Map.is_empty sym_map in
@@ -20,14 +20,14 @@ let find_exn (sym_map, ty_map) s =
   let (t, _) = ID.Map.find s sym_map in t
 
 let find signature s =
-    try Some (find_exn signature s)
-    with Not_found -> None
+  try Some (find_exn signature s)
+  with Not_found -> None
 
 let find_by_type (sym_map ,ty_map) ty =
   let res = Type.Map.get_or ty ty_map ~default:ID.Set.empty in
   assert(ID.Set.for_all (fun id -> 
-    let ty', _ = ID.Map.find id sym_map in
-    Type.equal ty' ty) res);
+      let ty', _ = ID.Map.find id sym_map in
+      Type.equal ty' ty) res);
   res
 
 
@@ -71,31 +71,31 @@ let is_ground (sym_map, _) =
 
 let ty_map_of_s_map smap = 
   let ty_map = ID.Map.fold (fun id (ty, _) acc -> 
-    let id_set = Type.Map.get_or ty acc ~default:ID.Set.empty in 
-    Type.Map.add ty (ID.Set.add id id_set) acc) smap Type.Map.empty in
+      let id_set = Type.Map.get_or ty acc ~default:ID.Set.empty in 
+      Type.Map.add ty (ID.Set.add id id_set) acc) smap Type.Map.empty in
   ty_map
 
 let merge (s_map1, _) (s_map2, _) =
   let s_map = ID.Map.merge
-    (fun s t1 t2 -> match t1, t2 with
-       | None, None -> assert false
-       | Some (ty1, c1), Some (ty2, c2) ->
-         if Type.equal ty1 ty2
-         then Some (ty1, c1 && c2)
-         else raise (AlreadyDeclared (s, ty1, ty2))
-       | Some (s1,c1), None -> Some (s1,c1)
-       | None, Some (s2,c2) -> Some (s2,c2))
-    s_map1 s_map2 in
+      (fun s t1 t2 -> match t1, t2 with
+         | None, None -> assert false
+         | Some (ty1, c1), Some (ty2, c2) ->
+           if Type.equal ty1 ty2
+           then Some (ty1, c1 && c2)
+           else raise (AlreadyDeclared (s, ty1, ty2))
+         | Some (s1,c1), None -> Some (s1,c1)
+         | None, Some (s2,c2) -> Some (s2,c2))
+      s_map1 s_map2 in
   s_map, ty_map_of_s_map s_map
 
 let diff (s_map1, _) (s_map2, _) =
   let s_map = ID.Map.merge
-    (fun _ ty1 ty2 -> match ty1, ty2 with
-       | Some ty1, None -> Some ty1
-       | Some _, Some _
-       | None, Some _
-       | None, None -> None)
-    s_map1 s_map2 in
+      (fun _ ty1 ty2 -> match ty1, ty2 with
+         | Some ty1, None -> Some ty1
+         | Some _, Some _
+         | None, Some _
+         | None, None -> None)
+      s_map1 s_map2 in
   s_map, ty_map_of_s_map s_map
 
 let well_founded (s,_) =

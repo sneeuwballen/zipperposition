@@ -55,19 +55,19 @@ module Arr = struct
 end
 
 (*$inject
-     let c = Arr.create ~buck_size:2 20
+  let c = Arr.create ~buck_size:2 20
 
 *)
 
 (*$Q
-       Q.int (fun n -> Array.length (Arr.make c n '_') = n)
+    Q.int (fun n -> Array.length (Arr.make c n '_') = n)
 *)
 
 (*$T
-     let a = Arr.make c 1 '_' in Array.length a = 1
-     let a = Arr.make c 2 '_' in Array.length a = 2
-     let a = Arr.make c 3 '_' in Array.length a = 3
-     let a = Arr.make c 4 '_' in Array.length a = 4
+  let a = Arr.make c 1 '_' in Array.length a = 1
+  let a = Arr.make c 2 '_' in Array.length a = 2
+  let a = Arr.make c 3 '_' in Array.length a = 3
+  let a = Arr.make c 4 '_' in Array.length a = 4
 *)
 
 

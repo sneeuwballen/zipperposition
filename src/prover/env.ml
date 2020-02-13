@@ -750,7 +750,7 @@ module Make(X : sig
         let single_step_simplified = 
           if sss_blocked then None
           else !_ss_multi_simpl_rule c in
-        
+
         match single_step_simplified with 
         | None -> 
           begin 
@@ -762,14 +762,14 @@ module Make(X : sig
               (* continue processing *)
               did_simplify := true;
               List.iter (fun c ->
-                if sss_blocked then 
-                  (blocked_sss := IntSet.add (C.id c) !blocked_sss);
-                Queue.push c q) l end
+                  if sss_blocked then 
+                    (blocked_sss := IntSet.add (C.id c) !blocked_sss);
+                  Queue.push c q) l end
         | Some l ->
           did_simplify := true;
           List.iter (fun res -> 
-            blocked_sss := IntSet.add (C.id res) !blocked_sss; 
-            Queue.push res q) l)
+              blocked_sss := IntSet.add (C.id res) !blocked_sss; 
+              Queue.push res q) l)
     done;
     let res = C.ClauseSet.to_list !set in
     ZProf.exit_prof prof_all_simplify;

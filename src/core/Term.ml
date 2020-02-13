@@ -369,16 +369,17 @@ module Seq = struct
     in
     aux t
 
-  let subterms ?(include_builtin=false) ?(ignore_head=false) t k =
+  let subterms ?(include_builtin=false) ?(include_app_vars=true) ?(ignore_head=false) t k =
     let rec aux t =
       k t;
       match view t with
       | AppBuiltin (_, l) -> if include_builtin then List.iter aux l;
       | Const _
       | Var _
-      | DB _ -> ()
-      | Fun (_, u) -> aux u
+      | DB _  -> ()
+      | App (f, l) when include_app_vars && T.is_var f -> ()
       | App (f, l) -> if not ignore_head then aux f; List.iter aux l
+      | Fun (_, u) -> aux u
     in
     aux t
 

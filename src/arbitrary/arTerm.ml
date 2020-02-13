@@ -79,7 +79,7 @@ module PT = struct
 
   let ground = mk_ ground_g
 
-  let default_fuel_ ~ho n =
+  let default_fuel_ ~mode n =
     let var_x= Var.of_string ~ty:ty_term "X" in
     let var_y = Var.of_string ~ty:ty_term "Y" in
     let var_z = Var.of_string ~ty:ty_term "Z" in
@@ -102,7 +102,7 @@ module PT = struct
            let self = self (n-1) in
            if n<=0 then base
            else (
-             let l = [
+             let fo_list = [
                3, base;
                1, map2 f self self;
                1, map2 sum self self;
@@ -110,30 +110,35 @@ module PT = struct
                1, map h self;
                1, map3 ite self self self;
              ] in
+             let lf_list = [ 2, map2 app1 (oneofl [vf;vg]) self;
+                             2, map3 app2 (oneofl [vf2;vg2]) self self
+                           ] in
+             let g_fun_t gen = map2 lam (oneofl [var_x;var_y;var_z]) gen in
+             let g_fun_f1 = map2 lam (oneofl [var_f;var_g]) self in
+             let g_fun_f2 = map2 lam (oneofl [var_f2;var_g2]) self in
+             let ho_list = [
+               1, map2 app1 (g_fun_t self) self;
+               1, map2 app1 g_fun_f1 (g_fun_t self);
+               1, map2 app1 g_fun_f2 (g_fun_t (g_fun_t self));
+               1, map3 app2 (return p_ho2) (g_fun_t self) (g_fun_t self);
+             ] in
              let l =
-               if ho then (
-                 (* fun term -> x *)
-                 let g_fun_t gen = map2 lam (oneofl [var_x;var_y;var_z]) gen in
-                 let g_fun_f1 = map2 lam (oneofl [var_f;var_g]) self in
-                 let g_fun_f2 = map2 lam (oneofl [var_f2;var_g2]) self in
-                 [ 2, map2 app1 (oneofl [vf;vg]) self;
-                   2, map3 app2 (oneofl [vf2;vg2]) self self;
-                   1, map2 app1 (g_fun_t self) self;
-                   1, map2 app1 g_fun_f1 (g_fun_t self);
-                   1, map2 app1 g_fun_f2 (g_fun_t (g_fun_t self));
-                   1, map3 app2 (return p_ho2) (g_fun_t self) (g_fun_t self);
-                 ] @ l
-               ) else l
+               match mode with
+               | `HigherOrder -> fo_list @ lf_list @ ho_list
+               | `LambdaFreeHigherOrder -> fo_list @ lf_list
+               | `FirstOrder -> fo_list
              in
              frequency l
            ))
     in
     QA.Gen.((1 -- n) >>= gen)
 
-  let default_fuel = default_fuel_ ~ho:false
-  let default_ho_fuel = default_fuel_ ~ho:true
+  let default_fuel = default_fuel_ ~mode:`FirstOrder
+  let default_lfho_fuel = default_fuel_ ~mode:`LambdaFreeHigherOrder
+  let default_ho_fuel = default_fuel_ ~mode:`HigherOrder
 
   let default_g = QA.Gen.(1 -- 4 >>= default_fuel)
+  let default_lfho_g = QA.Gen.(1 -- 4 >>= default_lfho_fuel)
   let default_ho_g = QA.Gen.(1 -- 4 >>= default_ho_fuel)
   let default = mk_ default_g
 
@@ -188,8 +193,10 @@ let mk_ gen = QA.make ~print:T.to_string ~shrink gen
 let ctx = Term.Conv.create()
 
 let default_g = QCheck.Gen.map (Term.Conv.of_simple_term_exn ctx) PT.default_g
+let default_lfho_g = QCheck.Gen.map (Term.Conv.of_simple_term_exn ctx) PT.default_lfho_g
 let default_ho_g = QCheck.Gen.map (Term.Conv.of_simple_term_exn ctx) PT.default_ho_g
 let default = mk_ default_g
+let default_lfho = mk_ default_lfho_g
 let default_ho = mk_ default_ho_g
 
 let default_fuel f =

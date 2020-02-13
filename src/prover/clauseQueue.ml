@@ -504,7 +504,7 @@ module Make(C : Clause_intf.S) = struct
           | App(hd, args) ->
             if (Term.is_const hd) then aux_l args 
             else (false, List.for_all Term.is_bvar args)
-            (*           ignoring distinctness *)
+          (*           ignoring distinctness *)
           | AppBuiltin(_, args) -> aux_l args
           | Const _ | Var _ | DB _-> (false, true)
           | Fun _ ->
@@ -512,12 +512,12 @@ module Make(C : Clause_intf.S) = struct
             (true, snd @@ aux body)
         and aux_l args = 
           CCList.fold_while (fun (has_lambda, is_pattern) arg ->
-            assert(is_pattern);
-            let h_l', i_p' = aux arg in
-            if i_p' then (h_l' || has_lambda, true), `Continue
-            else (false, false), `Stop
-          ) (false,true) args in
-      
+              assert(is_pattern);
+              let h_l', i_p' = aux arg in
+              if i_p' then (h_l' || has_lambda, true), `Continue
+              else (false, false), `Stop
+            ) (false,true) args in
+
         C.Seq.terms c 
         |> Iter.map aux
         (* at least one subterm is functional and all subterms are patterns *)

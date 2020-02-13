@@ -123,7 +123,7 @@ module Make(E : Env.S) = struct
       )
     | Some c ->
       Util.debugf ~section 1 "@[<2>@{<green>given@} (before simplification):@ `@[%a@]`@]"
-            (fun k->k Env.C.pp c);
+        (fun k->k Env.C.pp c);
       check_clause_ c;
       Util.incr_stat stat_steps;
       begin match Env.all_simplify c with

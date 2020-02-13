@@ -723,39 +723,39 @@ module Make(E : Env.S) : S with module Env = E = struct
       |> Iter.fold (fun var_map subterm -> 
           match T.view subterm with 
           | T.App(hd, args) when T.is_var hd && 
-                                  List.exists (fun t -> 
-                                    not (Type.is_fun (T.ty t)) && 
-                                    not (T.is_bvar t)) 
-                                  args -> 
+                                 List.exists (fun t -> 
+                                     not (Type.is_fun (T.ty t)) && 
+                                     not (T.is_bvar t)) 
+                                   args -> 
             let var_arg_tys, var_ret_ty = Type.open_fun (T.ty hd) in
             assert (not (Type.is_fun var_ret_ty));
 
             let new_bindings = 
               CCList.foldi (fun acc idx arg -> 
-                let arg_ty = T.ty arg in
-                if Type.is_ground arg_ty && Type.equal arg_ty var_ret_ty then (
-                  let db = T.bvar ~ty:arg_ty (List.length var_arg_tys - 1 - idx) in
-                  let binding = T.fun_l var_arg_tys db in
-                  Term.Set.add binding acc
-                ) else acc) Term.Set.empty args in
+                  let arg_ty = T.ty arg in
+                  if Type.is_ground arg_ty && Type.equal arg_ty var_ret_ty then (
+                    let db = T.bvar ~ty:arg_ty (List.length var_arg_tys - 1 - idx) in
+                    let binding = T.fun_l var_arg_tys db in
+                    Term.Set.add binding acc
+                  ) else acc) Term.Set.empty args in
             let old_bindings = Term.Map.get_or hd ~default:Term.Set.empty var_map in
-            
+
             Term.Map.add hd (Term.Set.union old_bindings new_bindings) var_map
           | _ -> var_map) Term.Map.empty
       |> (fun var_map -> 
-            Term.Map.fold (fun var bindings acc -> 
+          Term.Map.fold (fun var bindings acc -> 
               let var = Term.as_var_exn var in
-              
+
               Term.Set.fold (fun binding acc ->
-                let subst = (Subst.FO.bind' Subst.empty (var, 0) (binding, 0)) in
-                let proof =
-                  Some 
-                    (Proof.Step.inference ~rule:(Proof.Rule.mk "simp.projection") 
-                                          ~tags:[Proof.Tag.T_ho]
-                      [C.proof_parent_subst Subst.Renaming.none (c,0) subst]) in
-                let res = C.apply_subst ~penalty_inc:(Some penalty_inc) ~proof (c,0) subst in
-                res :: acc
-              ) bindings acc
+                  let subst = (Subst.FO.bind' Subst.empty (var, 0) (binding, 0)) in
+                  let proof =
+                    Some 
+                      (Proof.Step.inference ~rule:(Proof.Rule.mk "simp.projection") 
+                         ~tags:[Proof.Tag.T_ho]
+                         [C.proof_parent_subst Subst.Renaming.none (c,0) subst]) in
+                  let res = C.apply_subst ~penalty_inc:(Some penalty_inc) ~proof (c,0) subst in
+                  res :: acc
+                ) bindings acc
             ) var_map []))
 
   let recognize_choice_ops c =
@@ -1277,7 +1277,6 @@ module Make(E : Env.S) : S with module Env = E = struct
               | Some tt -> Some tt))
       in
       Env.set_ho_normalization_rule ho_norm;
-      Ordering.normalize := (fun t -> CCOpt.get_or ~default:t (ho_norm t));
 
       if(Env.flex_get k_neg_cong_fun) then (
         Env.add_unary_inf "neg_cong_fun" neg_cong_fun 
@@ -1481,9 +1480,9 @@ let () =
       "--ho-def-unfold", Arg.Bool (fun v -> def_unfold_enabled_ := v), " enable ho definition unfolding";
       "--ho-choice-inst", Arg.Bool (fun v -> _instantiate_choice_ax := v), " enable ho definition unfolding";
       "--ho-simple-projection", Arg.Int (fun v -> _simple_projection := v), 
-          " enable simple projection instantiation." ^ 
-          " positive argument is increase in clause penalty for the conclusion; " ^
-          " negative argument turns the inference off";
+      " enable simple projection instantiation." ^ 
+      " positive argument is increase in clause penalty for the conclusion; " ^
+      " negative argument turns the inference off";
       "--ho-simple-projection-max-depth", Arg.Set_int _simple_projection_md, " sets the max depth for simple projection";
       "--ho-ext-axiom-penalty", Arg.Int (fun p -> _ext_axiom_penalty := p), " penalty for extensionality axiom";
     ];
