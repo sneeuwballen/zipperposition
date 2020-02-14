@@ -28,7 +28,6 @@ type t = {
   presaturate : bool; (** initial interreduction of proof state? *)
   unary_depth : int; (** Maximum successive levels of unary inferences *)
   check: bool; (** check proof *)
-  eta: [`Reduce | `Expand | `None]; (** eta conversion *)
 }
 
 let default : t = {
@@ -51,7 +50,6 @@ let default : t = {
   dot_sat= false;
   expand_def= false;
   check= false;
-  eta = `Reduce;
 }
 
 let select = ref default.select
@@ -65,7 +63,7 @@ let add_to_mode mode f =
   Hashtbl.add _modes mode f
 let add_to_modes modes f = 
   List.iter (fun m -> add_to_mode m f) modes
-  
+
 (** parse_args returns parameters *)
 let parse_args () =
   let ord = ref default.ord
@@ -85,12 +83,6 @@ let parse_args () =
   and prelude = CCVector.create()
   and files = CCVector.create ()
   and check = ref default.check
-  and eta = ref `Reduce
-  in
-  let eta_opt =
-    let set_ n = eta := n in
-    let l = [ "reduce", `Reduce; "expand", `Expand; "none", `None] in
-    Arg.Symbol (List.map fst l, fun s -> set_ (List.assoc s l))
   in
   (* special handlers *)
   let add_file s = CCVector.push files s in
@@ -119,7 +111,6 @@ let parse_args () =
     ; "--check", Arg.Set check, " check proof"
     ; "--prelude", Arg.String (CCVector.push prelude), " parse prelude file"
     ; "--no-check", Arg.Clear check, " do not check proof"
-    ; "--ho-eta", eta_opt, " eta-expansion/reduction"
     ] @ Options.make ()
   ) |> List.sort (fun (s1,_,_)(s2,_,_) -> String.compare s1 s2)
     |> Arg.align
@@ -141,7 +132,7 @@ let parse_args () =
     dot_file = !dot_file; dot_llproof= !dot_llproof;
     dot_check= !dot_check;
     unary_depth= !unary_depth; dot_sat= !dot_sat;
-    expand_def= !expand_def; check= !check; eta = !eta}
+    expand_def= !expand_def; check= !check}
 
 let add_opt = Options.add_opt
 let add_opts = Options.add_opts

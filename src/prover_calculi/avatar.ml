@@ -679,5 +679,5 @@ let () =
     ; "lambda-free-purify-intensional"
     ; "lambda-free-purify-extensional"] 
     (fun () ->
-      enabled_ := false
+       enabled_ := false
     );

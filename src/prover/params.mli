@@ -21,7 +21,6 @@ type t = {
   presaturate : bool; (** initial interreduction of proof state? *)
   unary_depth : int; (** Maximum successive levels of unary inferences *)
   check: bool; (** check proof *)
-  eta: [`Reduce | `Expand | `None]; (** eta conversion *)
 }
 
 val parse_args : unit -> t

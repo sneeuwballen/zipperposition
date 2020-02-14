@@ -19,7 +19,6 @@ module type PARAMETERS = sig
   val signature : Signature.t
   val ord : Ordering.t
   val select : Selection.t
-  val eta : [`Reduce | `Expand | `None]
   val sk_ctx : Skolem.ctx
 
 end
@@ -31,7 +30,6 @@ end
 module Make(X : PARAMETERS) = struct
   let _ord = ref X.ord
   let _select = ref X.select
-  let _eta = ref X.eta
   let _signature = ref X.signature
   let _complete = ref true
   let _sk_ctx = ref X.sk_ctx
@@ -45,10 +43,6 @@ module Make(X : PARAMETERS) = struct
   let selection_fun () = !_select
   let set_selection_fun s = _select := s
   let signature () = !_signature
-  let eta_normalize = match !_eta with
-    | `Reduce -> Lambda.eta_reduce ~full:true
-    | `Expand -> Lambda.eta_expand
-    | `None -> (fun t -> t)
 
   let on_new_symbol = Signal.create()
   let on_signature_update = Signal.create()

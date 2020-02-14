@@ -7,6 +7,9 @@ open Libzipperposition
 
 val prim_enum_terms : Term.Set.t ref
 
+type prune_kind = [`NoPrune | `OldPrune | `PruneAllCovers | `PruneMaxCover]
+val k_prune_arg_fun : prune_kind Logtk.Flex_state.key
+
 module type S = sig
   module Env : Env.S
   module C : module type of Env.C

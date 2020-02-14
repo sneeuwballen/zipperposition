@@ -53,6 +53,7 @@ let k_simple_projection = Flex_state.create_key ()
 let k_simple_projection_md = Flex_state.create_key ()
 let k_check_lambda_free = Flex_state.create_key()
 let k_purify_applied_vars = Flex_state.create_key()
+let k_eta = Flex_state.create_key()
 
 type prune_kind = [`NoPrune | `OldPrune | `PruneAllCovers | `PruneMaxCover]
 
@@ -930,10 +931,15 @@ module Make(E : Env.S) : S with module Env = E = struct
       Some t'
     )
 
-  (* rule for eta-expansion *)
+  let eta_normalize = match Env.flex_get k_eta with
+    | `Reduce -> Lambda.eta_reduce ~full:true
+    | `Expand -> Lambda.eta_expand
+    | `None -> (fun t -> t)
+
+  (* rule for eta-expansion/reduction *)
   let eta_normalize t =
     (* assert (T.DB.is_closed t); *)
-    let t' = Ctx.eta_normalize t in
+    let t' = eta_normalize t in
     if (T.equal t t') then (
       Util.debugf ~section 50 "(@[eta_normalize `%a`@ failed `@])" (fun k->k T.pp t );
       None)
@@ -1233,8 +1239,8 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* Purify variables
      - if they occur applied and unapplied ("int" mode).
      - if they occur with differen argumetns ("ext" mode).
-     Example: g X = X a \/ X a = b becomes g X = Y a \/ Y a = b \/ X != Y.
-     Literals with only a variable on both sides are not affected. *)
+       Example: g X = X a \/ X a = b becomes g X = Y a \/ Y a = b \/ X != Y.
+       Literals with only a variable on both sides are not affected. *)
   let purify_applied_variable c =
     (* set of new literals *)
     let new_lits = ref [] in
@@ -1277,9 +1283,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       else (
         assert (Env.flex_get k_purify_applied_vars == `Int);
         match T.view t1, T.view t2 with
-          | T.Var x, T.Var y when x=y -> true
-          | T.App (f, _), T.App (g, _) when f=g -> true
-          | _ -> false
+        | T.Var x, T.Var y when x=y -> true
+        | T.App (f, _), T.App (g, _) when f=g -> true
+        | _ -> false
       )
     in
     (* Term should not be purified if
@@ -1440,7 +1446,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       if Env.flex_get k_check_lambda_free then 
         Env.add_fragment_check (fun c ->
             (Env.C.Seq.terms c 
-                 |> Iter.for_all Term.in_lfho_fragment))
+             |> Iter.for_all Term.in_lfho_fragment))
     );
     ()
 end
@@ -1522,6 +1528,7 @@ let _oracle_composer = ref (OSeq.merge :> (Logtk.Subst.t option OSeq.t OSeq.t ->
 let _simple_projection = ref (-1)
 let _simple_projection_md = ref 2
 let _purify_applied_vars = ref `None
+let _eta = ref `Reduce
 
 let extension =
   let register env =
@@ -1545,6 +1552,7 @@ let extension =
     E.flex_add k_simple_projection_md !_simple_projection_md;
     E.flex_add k_check_lambda_free !_check_lambda_free;
     E.flex_add k_purify_applied_vars !_purify_applied_vars;
+    E.flex_add k_eta !_eta;
 
 
 
@@ -1593,6 +1601,11 @@ let purify_opt =
   let l = [ "ext", `Ext; "int", `Int; "none", `None] in
   Arg.Symbol (List.map fst l, fun s -> set_ (List.assoc s l))
 
+let eta_opt =
+  let set_ n = _eta := n in
+  let l = [ "reduce", `Reduce; "expand", `Expand; "none", `None] in
+  Arg.Symbol (List.map fst l, fun s -> set_ (List.assoc s l))
+
 let () =
   Options.add_opts
     [ "--ho", Arg.Bool (fun b -> enabled_ := b), " enable/disable HO reasoning";
@@ -1627,9 +1640,10 @@ let () =
       "--ho-simple-projection-max-depth", Arg.Set_int _simple_projection_md, " sets the max depth for simple projection";
       "--ho-ext-axiom-penalty", Arg.Int (fun p -> _ext_axiom_penalty := p), " penalty for extensionality axiom";
       "--ho-purify", purify_opt, " enable purification of applied variables: 'ext' purifies" ^
-        " whenever a variable is applied to different arguments." ^
-        " 'int' purifies whenever a variable appears applied and unapplied.";
-     ];
+                                 " whenever a variable is applied to different arguments." ^
+                                 " 'int' purifies whenever a variable appears applied and unapplied.";
+      "--ho-eta", eta_opt, " eta-expansion/reduction";
+    ];
   Params.add_to_mode "ho-complete-basic" (fun () ->
       enabled_ := true;
       def_unfold_enabled_ := false;
@@ -1680,16 +1694,45 @@ let () =
     );
   Params.add_to_mode "fo-complete-basic" (fun () ->
       enabled_ := false;
+      Unif._allow_pattern_unif := false;
     );
   Params.add_to_modes 
     [ "lambda-free-intensional"
     ; "lambda-free-extensional"
     ; "lambda-free-purify-intensional"
-    ; "lambda-free-purify-extensional"]
-    (fun () ->
-      enabled_ := true;
-      _check_lambda_free := true;
-      Unif._allow_pattern_unif := false
-      (* TODO: set eta and others *)
+    ; "lambda-free-purify-extensional"] (fun () ->
+        enabled_ := true;
+        enable_unif_ := false;
+        force_enabled_ := true;
+        _elim_pred_var := false;
+        _neg_ext_as_simpl := false;
+        _prune_arg_fun := `NoPrune;
+        prim_mode_ := `None;
+        _check_lambda_free := true;
+        Unif._allow_pattern_unif := false;
+        _eta := `None;
+      );
+  Params.add_to_modes 
+    [ "lambda-free-extensional"
+    ; "lambda-free-purify-extensional"] (fun () ->
+        _ext_axiom := true;
+        _neg_ext := true;
+        _ext_pos := true;
+        _ext_pos_all_lits := true;
+      );
+  Params.add_to_modes 
+    [ "lambda-free-intensional"
+    ; "lambda-free-purify-intensional"] (fun () ->
+        _ext_axiom := false;
+        _neg_ext := false;
+        _ext_pos := false;
+        _ext_pos_all_lits := false;
+      );
+  Params.add_to_mode "lambda-free-purify-intensional" (fun () ->
+      _purify_applied_vars := `Int
     );
+  Params.add_to_mode "lambda-free-purify-extensional" (fun () ->
+      _purify_applied_vars := `Ext
+    );
+
   Extensions.register extension;

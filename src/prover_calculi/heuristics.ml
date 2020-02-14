@@ -120,6 +120,6 @@ let () =
     ; "lambda-free-purify-intensional"
     ; "lambda-free-purify-extensional"] 
     (fun () ->
-      no_max_vars := true;
+       no_max_vars := true;
     );
   ()

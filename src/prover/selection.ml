@@ -462,5 +462,5 @@ let () =
     ; "lambda-free-purify-intensional"
     ; "lambda-free-purify-extensional"] 
     (fun () ->
-      _ho_restriction := `NoHigherOrderVariables
+       _ho_restriction := `NoHigherOrderVariables
     );

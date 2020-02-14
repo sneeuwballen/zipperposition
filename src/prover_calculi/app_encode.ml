@@ -64,10 +64,10 @@ let rec app_encode_ty ty =
       T.app ~ty:T.tType (app_encode_ty f) (CCList.map app_encode_ty args)
     | T.AppBuiltin (Builtin.Arrow, ret::args) when (not (T.Ty.is_tType ret)) ->
       let ret_ty = CCList.fold_right
-        (fun arg t ->
-           T.app ~ty:T.tType function_type [app_encode_ty arg;t]
-        )
-        args (app_encode_ty ret)
+          (fun arg t ->
+             T.app ~ty:T.tType function_type [app_encode_ty arg;t]
+          )
+          args (app_encode_ty ret)
       in ret_ty
     | T.AppBuiltin (f,args) ->
       T.app_builtin ~ty:T.tType f (CCList.map app_encode_ty args)
@@ -106,32 +106,32 @@ let rec app_encode_term toplevel t  =
         (fun term arg ->
            Util.debugf ~section 5 "Encoding application of %a to %a" (fun k -> k T.pp_with_ty term T.pp arg);
            match T.view (T.ty_exn term) with
-             | T.App (f, types) ->
-               assert (T.equal f function_type);
-               assert (List.length types == 2);
-               assert (not (is_type arg));
-               let arg' = app_encode_term false arg in
-               T.app
-                 ~ty:(List.nth types 1)
-                 const_ae_app
-                 [CCOpt.get_exn (T.ty arg'); List.nth types 1; term; arg']
-             | T.Bind (Binder.ForallTy, var, t) ->
-               assert (is_type arg);
-               let arg' = app_encode_ty arg in
-               let t' = T.Subst.eval_nonrec (Var.Subst.singleton var arg') t  in
-               T.app ~ty:t' term [arg']
-             | T.AppBuiltin (Builtin.Arrow, ret_ty::arg_tys) ->
-              (* mandatory arguments *)
-              let arg' = app_encode_term false arg in
-              let ty' = begin match arg_tys with
-                | [] -> assert false
-                | _ :: [] -> ret_ty
-                | _ :: arg_tys_head :: arg_tys_tail -> 
-                  T.app_builtin ~ty:T.tType Builtin.Arrow 
-                    (ret_ty :: arg_tys_head :: arg_tys_tail)
-              end in
-              T.app ~ty:ty' term [arg']
-             | _ -> failwith "Expected quantified or function type"
+           | T.App (f, types) ->
+             assert (T.equal f function_type);
+             assert (List.length types == 2);
+             assert (not (is_type arg));
+             let arg' = app_encode_term false arg in
+             T.app
+               ~ty:(List.nth types 1)
+               const_ae_app
+               [CCOpt.get_exn (T.ty arg'); List.nth types 1; term; arg']
+           | T.Bind (Binder.ForallTy, var, t) ->
+             assert (is_type arg);
+             let arg' = app_encode_ty arg in
+             let t' = T.Subst.eval_nonrec (Var.Subst.singleton var arg') t  in
+             T.app ~ty:t' term [arg']
+           | T.AppBuiltin (Builtin.Arrow, ret_ty::arg_tys) ->
+             (* mandatory arguments *)
+             let arg' = app_encode_term false arg in
+             let ty' = begin match arg_tys with
+               | [] -> assert false
+               | _ :: [] -> ret_ty
+               | _ :: arg_tys_head :: arg_tys_tail -> 
+                 T.app_builtin ~ty:T.tType Builtin.Arrow 
+                   (ret_ty :: arg_tys_head :: arg_tys_tail)
+             end in
+             T.app ~ty:ty' term [arg']
+           | _ -> failwith "Expected quantified or function type"
         )
         (app_encode_term false f)
         args
@@ -179,33 +179,33 @@ let res_tc =
     ~is_stmt:true
     ~name:Statement.name
     ~to_form:(fun ~ctx st ->
-      let conv_c (c:(T.t SLiteral.t) list) : _ =
-        c 
-        |> List.map SLiteral.to_form
-        |> T.Form.or_
-      in
-      Statement.Seq.forms st
-      |> Iter.map conv_c
-      |> Iter.to_list
-      |> T.Form.and_)
+        let conv_c (c:(T.t SLiteral.t) list) : _ =
+          c 
+          |> List.map SLiteral.to_form
+          |> T.Form.or_
+        in
+        Statement.Seq.forms st
+        |> Iter.map conv_c
+        |> Iter.to_list
+        |> T.Form.and_)
     ()
 
 (** encode a statement *)
 let app_encode_stmt stmt =
   let as_proof = Proof.S.mk (Statement.proof_step stmt) (Proof.Result.make res_tc stmt) in
   let proof = Proof.Step.esa ~rule:(Proof.Rule.mk "app_encode") [as_proof |> Proof.Parent.from] in
-   match Statement.view stmt with
-    | Statement.Def _ -> failwith "Not implemented: Def"
-    | Statement.Rewrite _ -> failwith "Not implemented: Rewrite"
-    | Statement.Data _ -> failwith "Not implemented: Data"
-    | Statement.Lemma _ -> failwith "Not implemented: Lemma"
-    | Statement.Goal lits -> failwith "Not implemented: Goal"
-    | Statement.NegatedGoal (skolems,clauses) -> 
-      let skolems = List.map (fun (id, ty) -> (id, app_encode_ty ty)) skolems in
-      Statement.neg_goal ~proof ~skolems (List.map app_encode_lits clauses)
-    | Statement.Assert lits -> Statement.assert_ ~proof (app_encode_lits lits)
-    | Statement.TyDecl (id, ty) ->
-      Statement.ty_decl ~proof:Proof.Step.trivial id (app_encode_ty ty)
+  match Statement.view stmt with
+  | Statement.Def _ -> failwith "Not implemented: Def"
+  | Statement.Rewrite _ -> failwith "Not implemented: Rewrite"
+  | Statement.Data _ -> failwith "Not implemented: Data"
+  | Statement.Lemma _ -> failwith "Not implemented: Lemma"
+  | Statement.Goal lits -> failwith "Not implemented: Goal"
+  | Statement.NegatedGoal (skolems,clauses) -> 
+    let skolems = List.map (fun (id, ty) -> (id, app_encode_ty ty)) skolems in
+    Statement.neg_goal ~proof ~skolems (List.map app_encode_lits clauses)
+  | Statement.Assert lits -> Statement.assert_ ~proof (app_encode_lits lits)
+  | Statement.TyDecl (id, ty) ->
+    Statement.ty_decl ~proof:Proof.Step.trivial id (app_encode_ty ty)
 
 let extensionality_axiom =
   let alpha = Var.make ~ty:T.tType (ID.make "alpha") in

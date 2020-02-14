@@ -220,13 +220,12 @@ let compute_ord_select precedence =
   Util.debugf ~section 2 "@[<2>selection function:@ %s@]" (fun k->k params.Params.select);
   Phases.return_phase (ord, select)
 
-let make_ctx ~signature ~ord ~select ~eta ~sk_ctx () =
+let make_ctx ~signature ~ord ~select ~sk_ctx () =
   Phases.start_phase Phases.MakeCtx >>= fun () ->
   let module Res = struct
     let signature = signature
     let ord = ord
     let select = select
-    let eta = eta
     let sk_ctx = sk_ctx
   end in
   let module MyCtx = Ctx.Make(Res) in
@@ -496,9 +495,8 @@ let process_file ?(prelude=Iter.empty) file =
   compute_ord_select precedence >>= fun (ord, select) ->
   (* HO *)
   Phases.get_key Params.key >>= fun params ->
-  let eta = params.Params.eta in
   (* build the context and env *)
-  make_ctx ~signature ~ord ~select ~eta ~sk_ctx () >>= fun ctx ->
+  make_ctx ~signature ~ord ~select ~sk_ctx () >>= fun ctx ->
   make_env ~params ~ctx stmts >>= fun (Phases.Env_clauses (env,clauses)) ->
   (* main workload *)
   has_goal_ := has_goal; (* FIXME: should be computed at Env initialization *)

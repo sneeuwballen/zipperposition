@@ -63,12 +63,10 @@ let k_trigger_bool_inst = Flex_state.create_key ()
 let k_sup_at_vars = Flex_state.create_key ()
 let k_sup_in_var_args = Flex_state.create_key ()
 let k_sup_under_lambdas = Flex_state.create_key ()
-let k_sup_true_false = Flex_state.create_key ()
 let k_sup_at_var_headed = Flex_state.create_key ()
 let k_fluidsup = Flex_state.create_key ()
 let k_dupsup = Flex_state.create_key ()
 let k_lambdasup = Flex_state.create_key ()
-let k_sup_w_pure_vars = Flex_state.create_key ()
 let k_demod_in_var_args = Flex_state.create_key ()
 let k_lambda_demod = Flex_state.create_key ()
 let k_ext_dec_lits = Flex_state.create_key ()
@@ -89,6 +87,8 @@ let k_switch_stream_extraction = Flex_state.create_key ()
 let k_dont_simplify = Flex_state.create_key ()
 let k_use_semantic_tauto = Flex_state.create_key ()
 let k_restrict_fluidsup = Flex_state.create_key ()
+let k_check_sup_at_var_cond = Flex_state.create_key ()
+let k_restrict_hidden_sup_at_vars = Flex_state.create_key ()
 let _NO_LAMSUP = -1
 
 
@@ -216,12 +216,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let sup_at_vars = Env.flex_get k_sup_at_vars in
     let sup_in_var_args = Env.flex_get k_sup_in_var_args in
     let sup_under_lambdas = Env.flex_get k_sup_under_lambdas in
-    let sup_t_f = Env.flex_get k_sup_true_false in
     let sup_at_var_headed = Env.flex_get k_sup_at_var_headed in
     let fluidsup = Env.flex_get k_fluidsup in
     let dupsup = Env.flex_get k_dupsup in
     let lambdasup = Env.flex_get k_lambdasup in
-    let sup_with_pure_vars = Env.flex_get k_sup_w_pure_vars in
     let demod_in_var_args = Env.flex_get k_demod_in_var_args in
     let lambda_demod = Env.flex_get k_lambda_demod in
 
@@ -231,7 +229,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ~ty_args:false ~ord ~which:`Max ~subterms:true  ~eligible:(C.Eligible.res c) (C.lits c)
       |> Iter.filter (fun (t, _) ->
           (* Util.debugf ~section 3 "@[ Filtering vars %a,1  @]" (fun k-> k T.pp t); *)
-          (sup_t_f || not (Term.is_true_or_false t)) &&
           (not (T.is_var t) || T.is_ho_var t))
       (* TODO: could exclude more variables from the index:
          they are not needed if they occur with the same args everywhere in the clause *)
@@ -302,9 +299,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     _idx_sup_from :=
       Lits.fold_eqn ~ord ~both:true ~sign:true
         ~eligible:(C.Eligible.param c) (C.lits c)
-      |> Iter.filter (fun (l,r,_,_) -> 
-          (sup_with_pure_vars || not (Term.is_var l) || not (Term.is_var r))
-          && (sup_t_f || not (Term.is_true_or_false l)))
       |> Iter.filter((fun (l, _, _, _) -> not (T.equal l T.false_)))
       |> Iter.fold
         (fun tree (l, _, sign, pos) ->
@@ -464,35 +458,115 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   (* Checks whether we must allow superposition at variables to be complete. *)
   let sup_at_var_condition info var replacement =
-    let open SupInfo in
-    let us = info.subst in
-    let subst = US.subst us in
-    let renaming = S.Renaming.create () in
-    let replacement' = S.FO.apply renaming subst (replacement, info.scope_active) in
-    let var' = S.FO.apply renaming subst (var, info.scope_passive) in
-    if (not (Type.is_fun (Term.ty var')) || not (O.might_flip ord var' replacement'))
-    then (
-      Util.debugf ~section 3
-        "Cannot flip: %a = %a"
-        (fun k->k T.pp var' T.pp replacement');
-      false (* If the lhs vs rhs cannot flip, we don't need a sup at var *)
-    )
-    else (
-      (* Check whether Cσ is >= C[var -> replacement]σ *)
-      try
-        let passive'_lits = Lits.apply_subst renaming subst (C.lits info.passive, info.scope_passive) in
-        let subst_t = Unif.FO.bind_or_update subst (T.as_var_exn var, info.scope_passive) (replacement, info.scope_active) in
-        let passive_t'_lits = Lits.apply_subst renaming subst_t (C.lits info.passive, info.scope_passive) in
-        if Lits.compare_multiset ~ord passive'_lits passive_t'_lits = Comp.Gt
-        then (
-          Util.debugf ~section 3
-            "Sup at var condition is not fulfilled because: %a >= %a"
-            (fun k->k Lits.pp passive'_lits Lits.pp passive_t'_lits);
-          false
-        )
-        else true (* If Cσ is either <= or incomparable to C[var -> replacement]σ, we need sup at var.*)
-      with Unif.Fail -> true (* occurs check failed, do the inference -- check with Alex.*)
-    )
+    if Env.flex_get k_check_sup_at_var_cond then (
+      let open SupInfo in
+      let us = info.subst in
+      let subst = US.subst us in
+      let renaming = S.Renaming.create () in
+      let replacement' = S.FO.apply renaming subst (replacement, info.scope_active) in
+      let var' = S.FO.apply renaming subst (var, info.scope_passive) in
+      if (not (Type.is_fun (Term.ty var')) || not (O.might_flip ord var' replacement'))
+      then (
+        Util.debugf ~section 3
+          "Cannot flip: %a = %a"
+          (fun k->k T.pp var' T.pp replacement');
+        false (* If the lhs vs rhs cannot flip, we don't need a sup at var *)
+      )
+      else (
+        (* Check whether var occurs only with the same arguments everywhere. *)
+        let unique_args_of_var c =
+          C.lits c
+          |> Lits.fold_terms ~vars:true ~ty_args:false ~which:`All ~ord ~subterms:true ~eligible:(fun _ _ -> true)
+          |> Iter.fold_while
+            (fun unique_args (t,_) ->
+               if Term.equal (fst (T.as_app t)) var
+               then (
+                 if CCOpt.equal (CCList.equal T.equal) unique_args (Some (snd (T.as_app t)))
+                 then (unique_args, `Continue) (* found the same arguments of var again *)
+                 else (None, `Stop) (* different arguments of var found *)
+               ) else (unique_args, `Continue) (* this term doesn't have var as head *)
+            )
+            None
+        in
+        let unique_vars = 
+          if Env.flex_get Higher_order.k_prune_arg_fun != `NoPrune 
+          then None 
+          else unique_args_of_var info.passive in 
+        match unique_vars with
+        | Some _ ->
+          Util.debugf ~section 5
+            "Variable %a has same args everywhere in %a"
+            (fun k->k T.pp var C.pp info.passive);
+          false (* If var occurs with the same arguments everywhere, we don't need sup at vars *)
+        | None ->
+          (* Check whether Cσ is >= C[var -> replacement]σ *)
+          let passive'_lits = Lits.apply_subst renaming subst (C.lits info.passive, info.scope_passive) in
+          let scope_after_rename = max info.scope_active info.scope_passive + 1 in
+          let subst_t = Unif.FO.bind_or_update subst (T.as_var_exn var, info.scope_passive) (replacement', scope_after_rename) in
+          let passive_t'_lits = Lits.apply_subst renaming subst_t (C.lits info.passive, info.scope_passive) in
+          if Lits.compare_multiset ~ord passive'_lits passive_t'_lits = Comp.Gt
+          then (
+            Util.debugf ~section 3
+              "Sup at var condition is not fulfilled because: %a >= %a"
+              (fun k->k Lits.pp passive'_lits Lits.pp passive_t'_lits);
+            false
+          )
+          else true (* If Cσ is either <= or incomparable to C[var -> replacement]σ, we need sup at var.*)
+      )
+    ) 
+    else false (* if k_check_sup_at_var_cond is false, never allow superposition at variable headed terms *)
+
+
+  (* check for hidden superposition at variables,	
+     e.g. superposing g x = f x into h (x b) = a to give h (f b) = a.	
+     Returns a term only containing the concerned variable	
+     and a term consisting of the part of info.t that unifies with the variable,	
+     e.g. (x, f) in the example above. *)	
+  let is_hidden_sup_at_var info =	
+    let open SupInfo in	
+    let active_idx = Lits.Pos.idx info.active_pos in	
+    begin match T.view info.u_p with	
+      | T.App (head, args) ->	
+        begin match T.as_var head with	
+          | Some _ ->	
+            (* rewritten term is variable-headed *)	
+            begin match T.view info.s, T.view info.t  with	
+              | T.App (f, ss), T.App (g, tt) ->	
+                let s_args = Array.of_list ss in	
+                let t_args = Array.of_list tt in	
+                if	
+                  Array.length s_args >= List.length args	
+                  && Array.length t_args >= List.length args	
+                  (* Check whether the last argument(s) of s and t are equal *)	
+                  && Array.sub s_args (Array.length s_args - List.length args) (List.length args) =	
+                  Array.sub t_args (Array.length t_args - List.length args) (List.length args)	
+                  (* Check whether they are all variables that occur nowhere else *)	
+                  && CCList.(Array.length s_args - List.length args --^ Array.length s_args)	
+                     |> List.for_all (fun idx ->	
+                       match T.as_var (Array.get s_args idx) with	
+                         | Some v ->	
+                           (* Check whether variable occurs in previous arguments: *)	
+                           not (CCArray.exists (T.var_occurs ~var:v) (Array.sub s_args 0 idx))	
+                           && not (CCArray.exists (T.var_occurs ~var:v) (Array.sub t_args 0 (Array.length t_args - List.length args))	
+                                   (* Check whether variable occurs in heads: *)	
+                                   && not (T.var_occurs ~var:v f)	
+                                   && not (T.var_occurs ~var:v g)	
+                                   (* Check whether variable occurs in other literals: *)	
+                                   && not (List.exists (Literal.var_occurs v) (CCArray.except_idx (C.lits info.active) active_idx)))	
+                         | None -> false	
+                     )	
+                then	
+                  (* Calculate the part of t that unifies with the variable *)	
+                  let t_prefix = T.app g (Array.to_list (Array.sub t_args 0 (Array.length t_args - List.length args))) in	
+                  Some (head, t_prefix)	
+                else	
+                  None	
+              | _ -> None	
+            end	
+          | None -> None	
+        end	
+      | _ -> None	
+    end
 
 
   let dup_sup_apply_subst t sc_a sc_p subst renaming =
@@ -612,6 +686,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           Util.debugf ~section 3 "superposition at variable" (fun k->k);
           raise (ExitSuperposition "superposition at variable");
         );
+
+      (* Check for hidden superposition at a variable *)	
+      if Env.flex_get k_restrict_hidden_sup_at_vars then (	
+        match is_hidden_sup_at_var info with	
+          | Some (var,replacement) when not (sup_at_var_condition info var replacement)	
+            -> raise (ExitSuperposition "hidden superposition at variable")	
+          | _ -> ()	
+      );
 
       (* ordering constraints are ok *)
       let lits_a = CCArray.except_idx (C.lits info.active) active_idx in
@@ -815,9 +897,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let new_clauses =
       Lits.fold_eqn ~sign:true ~ord
         ~both:true ~eligible (C.lits clause)
-      |> Iter.filter (fun (l,r,_,_) -> 
-          (Env.flex_get k_sup_w_pure_vars || not (Term.is_var l) || not (Term.is_var r))
-          && (Env.flex_get k_sup_true_false || not (Term.is_true_or_false l)))
       |> Iter.flat_map
         (fun (s, t, _, s_pos) ->
            let do_sup u_p with_pos subst =
@@ -1532,9 +1611,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
            let active_idx = Lits.Pos.idx s_pos in
            let is_var_pred = 
              T.is_var (T.head_term s) && Type.is_prop (T.ty s) && T.is_true_or_false t in
-           if not @@ Env.flex_get k_sup_true_false && T.is_true_or_false s 
-           then Iter.empty (* disable factoring from false*)
-           else if T.equal t T.false_ && not is_var_pred then Iter.empty 
+           if T.equal t T.false_ && not is_var_pred then Iter.empty 
            else (
              let var_pred_status = (is_var_pred, t) in
              find_unifiable_lits ~var_pred_status active_idx s s_pos)
@@ -2788,10 +2865,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
     Env.flex_add k_stmq (StmQ.default ());
 
-    if not @@ Env.flex_get k_sup_w_pure_vars then (
-      Env.Ctx.lost_completeness ()
-    );
-
     if Env.flex_get k_recognize_injectivity then (
       Env.add_unary_inf "recognize injectivity" recognize_injectivity;
     );
@@ -2884,14 +2957,14 @@ let _demod_in_var_args = ref true
 let _dot_demod_into = ref None
 let _complete_ho_unification = ref false
 let _switch_stream_extraction = ref false
-let _ord_in_normal_form = ref false
 let _fluidsup_penalty = ref 0
 let _fluidsup = ref true
 let _dupsup = ref true
 let _trigger_bool_inst = ref (-1)
 let _recognize_injectivity = ref false
-let _sup_with_pure_vars = ref true
 let _restrict_fluidsup = ref false
+let _check_sup_at_var_cond = ref true
+let _restrict_hidden_sup_at_vars = ref false
 
 let _lambdasup = ref (-1)
 let _max_infs = ref (-1)
@@ -2900,7 +2973,6 @@ let _ext_dec_lits = ref `OnlyMax
 let _unif_alg = ref `NewJPFull
 let _unif_level = ref `Full
 let _ground_subs_check = ref 0
-let _sup_t_f = ref true
 let _solid_subsumption = ref false
 
 let _skip_multiplier = ref 20.0
@@ -2940,13 +3012,13 @@ let register ~sup =
   E.flex_add k_sup_at_vars !_sup_at_vars;
   E.flex_add k_sup_in_var_args !_sup_in_var_args;
   E.flex_add k_sup_under_lambdas !_sup_under_lambdas;
-  E.flex_add k_sup_true_false !_sup_t_f;
   E.flex_add k_sup_at_var_headed !_sup_at_var_headed;
   E.flex_add k_fluidsup !_fluidsup;
   E.flex_add k_dupsup !_dupsup;
   E.flex_add k_lambdasup !_lambdasup;
-  E.flex_add k_sup_w_pure_vars !_sup_with_pure_vars;
   E.flex_add k_restrict_fluidsup !_restrict_fluidsup;
+  E.flex_add k_check_sup_at_var_cond !_check_sup_at_var_cond;
+  E.flex_add k_restrict_hidden_sup_at_vars !_check_sup_at_var_cond;
   E.flex_add k_demod_in_var_args !_demod_in_var_args;
   E.flex_add k_lambda_demod !_lambda_demod;
   E.flex_add k_ext_dec_lits !_ext_dec_lits;
@@ -3027,7 +3099,6 @@ let () =
       "--demod-in-var-args", Arg.Bool (fun b -> _demod_in_var_args := b), " enable demodulation in arguments of variables";
       "--complete-ho-unif", Arg.Bool (fun b -> _complete_ho_unification := b), " enable complete higher-order unification algorithm (Jensen-Pietrzykowski)";
       "--switch-stream-extract", Arg.Bool (fun b -> _switch_stream_extraction := b), " in ho mode, switches heuristic of clause extraction from the stream queue";
-      "--ord-in-normal-form", Arg.Bool (fun v -> _ord_in_normal_form := v), " compare intermediate terms in calculus rules in beta-normal-eta-long form";
       "--ext-decompose", Arg.Set_int max_lits_ext_dec, " Sets the maximal number of literals clause can have for ExtDec inference.";
       "--ext-decompose-lits", Arg.Symbol (["all";"max"], (fun str -> 
           _ext_dec_lits := if String.equal str "all" then `All else `OnlyMax))
@@ -3044,9 +3115,7 @@ let () =
       "--ground-before-subs", Arg.Set_int _ground_subs_check, " set the level of grounding before substitution. 0 - no grounding. 1 - only active. 2 - both.";
       "--solid-subsumption", Arg.Bool (fun v -> _solid_subsumption := v), " set solid subsumption on or off";
       "--recognize-injectivity", Arg.Bool (fun v -> _recognize_injectivity := v), " recognize injectivity axiom and axiomatize corresponding inverse";
-      "--sup-with-pure-vars" , Arg.Bool (fun v -> _sup_with_pure_vars := v), " enable/disable superposition to and from pure variable equations";
       "--restrict-fluidsup" , Arg.Bool (fun v -> _restrict_fluidsup := v), " enable/disable restriction of fluidSup to up to two literal or inital clauses";
-      "--sup-with-true-false", Arg.Bool (fun v ->( _sup_t_f := v)), " enable/disable superposition, eq-res and eq-fact with true/false";
       "--use-weight-for-solid-subsumption", Arg.Bool (fun v -> _use_weight_for_solid_subsumption := v), 
       " enable/disable superposition to and from pure variable equations";
       "--trigger-bool-inst", Arg.Set_int _trigger_bool_inst
@@ -3074,7 +3143,9 @@ let () =
       "--max-inferences", Arg.Int (fun p -> _max_infs := p), " set maximal number of inferences";
       "--stream-queue-guard", Arg.Set_int _guard, "set value of guard for streamQueue";
       "--stream-queue-ratio", Arg.Set_int _ratio, "set value of ratio for streamQueue";
-      "--ho-sort-constraints", Arg.Bool (fun b -> _sort_constraints := b), "sort constraints in unification algorithm by weight"
+      "--ho-sort-constraints", Arg.Bool (fun b -> _sort_constraints := b), "sort constraints in unification algorithm by weight";
+      "--check-sup-at-var-cond", Arg.Bool (fun b -> _check_sup_at_var_cond := b), " enable/disable superposition at variable monotonicity check";
+      "--restrict-hidden-sup-at-vars", Arg.Bool (fun b -> _restrict_hidden_sup_at_vars :=	b), " enable/disable hidden superposition at variables only under certain ordering conditions"
     ];
 
   Params.add_to_mode "ho-complete-basic" (fun () ->
@@ -3085,7 +3156,6 @@ let () =
       _lambda_demod := false;
       _demod_in_var_args := false;
       _complete_ho_unification := true;
-      _ord_in_normal_form := true;
       _sup_at_var_headed := false;
       _unif_alg := `NewJPFull;
       _lambdasup := -1;
@@ -3100,7 +3170,6 @@ let () =
       _demod_in_var_args := false;
       _complete_ho_unification := true;
       _unif_alg := `NewJPPragmatic;
-      _ord_in_normal_form := true;
       _sup_at_var_headed := true;
       _lambdasup := -1;
       _dupsup := false;
@@ -3120,7 +3189,6 @@ let () =
       _demod_in_var_args := false;
       _complete_ho_unification := true;
       _unif_alg := `NewJPFull;
-      _ord_in_normal_form := true;
       _sup_at_var_headed := true;
       _lambdasup := -1;
       _dupsup := false;
@@ -3132,4 +3200,40 @@ let () =
       _fluidsup := false;
     );
   Params.add_to_mode "fo-complete-basic" (fun () ->
-      _use_simultaneous_sup := false;)
+      _use_simultaneous_sup := false;
+      );
+  Params.add_to_modes 
+    [ "lambda-free-intensional"
+    ; "lambda-free-extensional"
+    ; "lambda-free-purify-intensional"
+    ; "lambda-free-purify-extensional"] (fun () ->
+    Unif._allow_pattern_unif := false;
+    _use_simultaneous_sup := false;
+    _sup_in_var_args := true;
+    _demod_in_var_args := true;
+    _dupsup := false;
+    _complete_ho_unification := false;
+    _lambdasup := -1;
+    _fluidsup := false;
+  );
+  Params.add_to_modes 
+    [ "lambda-free-extensional"
+    ; "lambda-free-purify-extensional"] (fun () ->
+    _restrict_hidden_sup_at_vars := true;
+  );
+  Params.add_to_modes 
+    [ "lambda-free-intensional"
+    ; "lambda-free-purify-intensional"] (fun () ->
+    _restrict_hidden_sup_at_vars := false;
+  );
+  Params.add_to_modes
+    [ "lambda-free-intensional"
+    ; "lambda-free-extensional"] (fun () ->
+      _sup_at_vars := true;
+  );
+  Params.add_to_modes
+    [ "lambda-free-purify-intensional"
+    ; "lambda-free-purify-extensional"] (fun () ->
+      _sup_at_vars := false;
+      _check_sup_at_var_cond := false;
+  );
