@@ -2096,8 +2096,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             | Literal.Equation (t, u, true) 
               when Type.is_var (T.ty t) && not is_poly_arg_cong_res ->
               (* A polymorphic variable might be functional on the ground level *)
-              let ty_args = OSeq.iterate [] (fun types_w -> 
-                Type.var (HVar.fresh ~ty:Type.tType ()) :: types_w) in
+              let ty_args = 
+                OSeq.iterate [Type.var @@ HVar.fresh ~ty:Type.tType ()] 
+                  (fun types_w -> 
+                    Type.var (HVar.fresh ~ty:Type.tType ()) :: types_w) in
               let res = 
                 ty_args
                 |> OSeq.mapi (fun arrarg_idx arrow_args -> 
