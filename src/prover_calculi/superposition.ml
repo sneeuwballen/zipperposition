@@ -38,6 +38,8 @@ let stat_semantic_tautology = Util.mk_stat "sup.semantic_tautologies"
 let stat_condensation = Util.mk_stat "sup.condensation"
 let stat_ext_dec = Util.mk_stat "sup.ext_dec calls"
 let stat_clc = Util.mk_stat "sup.clc"
+let stat_complete_eq = Util.mk_stat "ho.complete_eq.steps"
+
 
 let prof_demodulate = ZProf.make "sup.demodulate"
 let prof_back_demodulate = ZProf.make "sup.backward_demodulate"
@@ -488,10 +490,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             )
             None
         in
-        let unique_vars = 
-          if Env.flex_get Higher_order.k_prune_arg_fun != `NoPrune 
-          then None 
-          else unique_args_of_var info.passive in 
+        let unique_vars =
+          if Env.flex_get Higher_order.k_prune_arg_fun != `NoPrune
+          then None
+          else unique_args_of_var info.passive in
         match unique_vars with
         | Some _ ->
           Util.debugf ~section 5
@@ -531,9 +533,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           | Some _ ->	
             (* rewritten term is variable-headed *)	
             begin match T.view info.s, T.view info.t  with	
-              | T.App (f, ss), T.App (g, tt) ->	
+              | T.App (f, ss), T.App (g, tt) 
+                (* 
+                  FIXME(ALEX):
+                  when not (T.is_var f) && not (T.is_var g) *) ->	
                 let s_args = Array.of_list ss in	
-                let t_args = Array.of_list tt in	
+                let t_args = Array.of_list tt in
                 let sub_s_args = 
                   Array.sub s_args (Array.length s_args - List.length args) (List.length args)
                   |> CCArray.to_list in
@@ -565,9 +570,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                   let t_prefix = T.app g (Array.to_list (Array.sub t_args 0 (Array.length t_args - List.length args))) in	
                   Some (head, t_prefix)	
                 else	
-                  None	
-              | _ -> None	
-            end	
+                  None 
+              | _ -> None
+            end
+            
           | None -> None	
         end	
       | _ -> None	
@@ -2044,6 +2050,87 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let ext_eqres_decompose given = 
     ZProf.with_prof prof_ext_dec ext_eqres_decompose_aux given
 
+  (* complete [f = g] into [f x1…xn = g x1…xn] for each [n ≥ 1] *)
+  let complete_eq_args (c:C.t) : C.t list =
+    let var_offset = C.Seq.vars c |> Type.Seq.max_var |> succ in
+    let eligible = C.Eligible.param c in
+    let aux ?(start=1) ~poly lits lit_idx t u =
+      let n_ty_args, ty_args, _ = Type.open_poly_fun (T.ty t) in
+      assert (n_ty_args = 0);
+      assert (ty_args <> []);
+      let vars =
+        List.mapi
+          (fun i ty -> HVar.make ~ty (i+var_offset) |> T.var)
+          ty_args
+      in
+      CCList.(start -- List.length vars)
+      |> List.map
+        (fun prefix_len ->
+          let vars_prefix = CCList.take prefix_len vars in
+          let new_lit = Literal.mk_eq (T.app t vars_prefix) (T.app u vars_prefix) in
+          let new_lits = new_lit :: CCArray.except_idx lits lit_idx in
+          let proof =
+            Proof.Step.inference [C.proof_parent c]
+              ~rule:(Proof.Rule.mk "ho_complete_eq")
+              ~tags:[Proof.Tag.T_ho]
+          in
+          let penalty = C.penalty c + (if poly then 1 else 0) in
+          let new_c =
+            C.create new_lits proof ~penalty ~trail:(C.trail c) in
+
+          if poly then (
+            C.set_flag SClause.flag_poly_arg_cong_res new_c true;
+          );
+
+          new_c)
+      in
+      let is_poly_arg_cong_res = C.get_flag SClause.flag_poly_arg_cong_res c in
+      let new_c =
+        C.lits c
+        |> Iter.of_array |> Util.seq_zipi
+        |> Iter.filter (fun (idx,lit) -> eligible idx lit)
+        |> Iter.flat_map_l
+          (fun (lit_idx,lit) -> match lit with
+            | Literal.Equation (t, u, true) when Type.is_fun (T.ty t) ->
+              aux ~poly:false (C.lits c) lit_idx t u
+            | Literal.Equation (t, u, true) 
+              when Type.is_var (T.ty t) && not is_poly_arg_cong_res ->
+              (* A polymorphic variable might be functional on the ground level *)
+              let ty_args = OSeq.iterate [] (fun types_w -> 
+                Type.var (HVar.fresh ~ty:Type.tType ()) :: types_w) in
+              let res = 
+                ty_args
+                |> OSeq.mapi (fun arrarg_idx arrow_args -> 
+                    let var = Type.as_var_exn (T.ty t) in
+                    let funty = 
+                      T.of_ty 
+                        (Type.arrow arrow_args (Type.var (HVar.fresh ~ty:Type.tType ()))) in
+                    let subst = Unif_subst.FO.singleton (var,0) (funty,0) in
+                    let renaming, subst = Subst.Renaming.none, Unif_subst.subst subst in
+                    let lits' = Lits.apply_subst renaming subst (C.lits c, 0) in
+                    let t' = Subst.FO.apply renaming subst (t, 0) in
+                    let u' = Subst.FO.apply renaming subst (u, 0) in
+                    let new_cl = aux ~poly:true ~start:(arrarg_idx+1) lits' lit_idx t' u' in
+                    assert(List.length new_cl == 1);
+                    List.hd new_cl
+                ) in
+              let first_two, rest = 
+                OSeq.take 2 res, OSeq.map CCOpt.return (OSeq.drop 2 res) in
+              let stm =  Stm.make ~penalty:(C.penalty c + 1) rest in
+              StmQ.add (_stmq()) stm;
+              
+              OSeq.to_list first_two
+            | _ -> [])
+        |> Iter.to_rev_list
+      in
+      if new_c<>[] then (
+        Util.add_stat stat_complete_eq (List.length new_c);
+        Util.debugf ~section 4
+          "(@[complete-eq@ :clause %a@ :yields (@[<hv>%a@])@])"
+          (fun k->k C.pp c (Util.pp_list ~sep:" " C.pp) new_c);
+      );
+      new_c
+
   (** Find clauses that [given] may demodulate, add them to set *)
   let backward_demodulate set given =
     ZProf.enter_prof prof_back_demodulate;
@@ -2870,6 +2957,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
     Env.flex_add k_stmq (StmQ.default ());
 
+    Env.add_unary_inf "ho_complete_eq" complete_eq_args;
+    if Env.flex_get k_switch_stream_extraction then (
+      Env.add_generate "stream_queue_extraction" extract_from_stream_queue_fix_stm)
+    else (
+      Env.add_generate "stream_queue_extraction" extract_from_stream_queue);
+
     if Env.flex_get k_recognize_injectivity then (
       Env.add_unary_inf "recognize injectivity" recognize_injectivity;
     );
@@ -2913,16 +3006,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Env.add_unary_inf "trigger_pred_var active" trigger_insantiation;
         Env.add_unary_inf "trigger_pred_var passive" instantiate_with_triggers;
       );
-
-      if (List.exists CCFun.id [Env.flex_get k_fluidsup;
-                                Env.flex_get k_dupsup;
-                                Env.flex_get k_lambdasup != -1;
-                                Env.flex_get k_max_infs = -1]) then (
-        if Env.flex_get k_switch_stream_extraction then
-          Env.add_generate "stream_queue_extraction" extract_from_stream_queue_fix_stm
-        else
-          Env.add_generate "stream_queue_extraction" extract_from_stream_queue;
-      )
     )
     else (
       Env.add_binary_inf "superposition_passive" infer_passive;
@@ -3023,7 +3106,7 @@ let register ~sup =
   E.flex_add k_lambdasup !_lambdasup;
   E.flex_add k_restrict_fluidsup !_restrict_fluidsup;
   E.flex_add k_check_sup_at_var_cond !_check_sup_at_var_cond;
-  E.flex_add k_restrict_hidden_sup_at_vars !_check_sup_at_var_cond;
+  E.flex_add k_restrict_hidden_sup_at_vars !_restrict_hidden_sup_at_vars;
   E.flex_add k_demod_in_var_args !_demod_in_var_args;
   E.flex_add k_lambda_demod !_lambda_demod;
   E.flex_add k_ext_dec_lits !_ext_dec_lits;

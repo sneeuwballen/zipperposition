@@ -20,7 +20,6 @@ let stat_eq_res = Util.mk_stat "ho.eq_res.steps"
 let stat_eq_res_syntactic = Util.mk_stat "ho.eq_res_syntactic.steps"
 let stat_ext_neg_lit = Util.mk_stat "ho.extensionality-.steps"
 let stat_ext_pos = Util.mk_stat "ho.extensionality+.steps"
-let stat_complete_eq = Util.mk_stat "ho.complete_eq.steps"
 let stat_beta = Util.mk_stat "ho.beta_reduce.steps"
 let stat_eta_normalize = Util.mk_stat "ho.eta_normalize.steps"
 let stat_prim_enum = Util.mk_stat "ho.prim_enum.steps"
@@ -272,65 +271,6 @@ module Make(E : Env.S) : S with module Env = E = struct
         (fun k->k C.pp c (Util.pp_list ~sep:" " C.pp) new_clauses);
     );
     new_clauses
-
-  (* complete [f = g] into [f x1…xn = g x1…xn] for each [n ≥ 1] *)
-  let complete_eq_args (c:C.t) : C.t list =
-    let var_offset = C.Seq.vars c |> Type.Seq.max_var |> succ in
-    let eligible = C.Eligible.param c in
-    let aux lits lit_idx t u =
-      let n_ty_args, ty_args, _ = Type.open_poly_fun (T.ty t) in
-      assert (n_ty_args = 0);
-      assert (ty_args <> []);
-      let vars =
-        List.mapi
-          (fun i ty -> HVar.make ~ty (i+var_offset) |> T.var)
-          ty_args
-      in
-      CCList.(1 -- List.length vars)
-      |> List.map
-        (fun prefix_len ->
-           let vars_prefix = CCList.take prefix_len vars in
-           let new_lit = Literal.mk_eq (T.app t vars_prefix) (T.app u vars_prefix) in
-           let new_lits = new_lit :: CCArray.except_idx lits lit_idx in
-           let proof =
-             Proof.Step.inference [C.proof_parent c]
-               ~rule:(Proof.Rule.mk "ho_complete_eq")
-               ~tags:[Proof.Tag.T_ho]
-           in
-           let new_c =
-             C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c)
-           in
-           new_c)
-    in
-    let new_c =
-      C.lits c
-      |> Iter.of_array |> Util.seq_zipi
-      |> Iter.filter (fun (idx,lit) -> eligible idx lit)
-      |> Iter.flat_map_l
-        (fun (lit_idx,lit) -> match lit with
-           | Literal.Equation (t, u, true) when Type.is_fun (T.ty t) ->
-             aux (C.lits c) lit_idx t u
-           | Literal.Equation (t, u, true) when Type.is_var (T.ty t) ->
-             (* A polymorphic variable might be functional on the ground level *)
-             let var = Type.as_var_exn (T.ty t) in
-             let funty = T.of_ty (Type.arrow [Type.var (HVar.fresh ~ty:Type.tType ())]
-                                    (Type.var (HVar.fresh ~ty:Type.tType ()))) in
-             let subst = Unif_subst.FO.singleton (var,0) (funty,0) in
-             let renaming, subst = Subst.Renaming.none, Unif_subst.subst subst in
-             let lits' = Lits.apply_subst renaming subst (C.lits c, 0) in
-             let t' = Subst.FO.apply renaming subst (t, 0) in
-             let u' = Subst.FO.apply renaming subst (u, 0) in
-             aux lits' lit_idx t' u'
-           | _ -> [])
-      |> Iter.to_rev_list
-    in
-    if new_c<>[] then (
-      Util.add_stat stat_complete_eq (List.length new_c);
-      Util.debugf ~section 4
-        "(@[complete-eq@ :clause %a@ :yields (@[<hv>%a@])@])"
-        (fun k->k C.pp c (Util.pp_list ~sep:" " C.pp) new_c);
-    );
-    new_c
 
   let neg_cong_fun (c:C.t) : C.t list =
     let find_diffs s t = 
@@ -1279,12 +1219,12 @@ module Make(E : Env.S) : S with module Env = E = struct
       assert (T.is_var (fst (T.as_app t2)));
       if Env.flex_get k_purify_applied_vars == `Ext
       then
-        t1 = t2
+        T.equal t1 t2
       else (
         assert (Env.flex_get k_purify_applied_vars == `Int);
         match T.view t1, T.view t2 with
-        | T.Var x, T.Var y when x=y -> true
-        | T.App (f, _), T.App (g, _) when f=g -> true
+        | T.Var x, T.Var y when HVar.equal Type.equal x y -> true
+        | T.App (f, _), T.App (g, _) when T.equal f g -> true
         | _ -> false
       )
     in
@@ -1364,7 +1304,6 @@ module Make(E : Env.S) : S with module Env = E = struct
     ) else (
       Util.debug ~section 1 "setup HO rules";
       Env.Ctx.lost_completeness();
-      Env.add_unary_inf "ho_complete_eq" complete_eq_args;
       if Env.flex_get k_elim_pred_var then
         Env.add_unary_inf "ho_elim_pred_var" elim_pred_variable;
       if Env.flex_get k_ext_neg_lit then

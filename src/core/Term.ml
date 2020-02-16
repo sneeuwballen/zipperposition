@@ -516,7 +516,7 @@ let rec in_pfho_fragment t =
     if((not (is_var hd || hd_is_skolem) || type_ok (ty t)) && 
        List.map ty l |> List.for_all type_ok
        && List.for_all in_pfho_fragment l) then true
-    else (raise (Failure (CCFormat.sprintf "Arugment of a term has out-of-fragment type [%a]" T.pp t)))
+    else (raise (Failure (CCFormat.sprintf "Arugment of a term has out-of-fragment type [%a:%a]" T.pp t Type.pp (ty t))))
   | Fun (var_t, body) -> if(type_ok (var_t) &&
                             type_ok (ty body) &&
                             in_pfho_fragment body) then true
