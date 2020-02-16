@@ -119,7 +119,7 @@ let has_real stmt : bool =
   let module TS = TypedSTerm in
   let is_real ty = TS.equal ty TS.Ty.real in
   begin
-    CCVector.to_iter stmt
+    CCVector.to_seq stmt
     |> Iter.flat_map Statement.Seq.to_seq
     |> Iter.flat_map
       (function

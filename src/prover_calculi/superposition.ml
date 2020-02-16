@@ -534,12 +534,17 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               | T.App (f, ss), T.App (g, tt) ->	
                 let s_args = Array.of_list ss in	
                 let t_args = Array.of_list tt in	
+                let sub_s_args = 
+                  Array.sub s_args (Array.length s_args - List.length args) (List.length args)
+                  |> CCArray.to_list in
+                let sub_t_args =
+                  Array.sub t_args (Array.length t_args - List.length args) (List.length args)
+                  |> CCArray.to_list in
                 if	
                   Array.length s_args >= List.length args	
                   && Array.length t_args >= List.length args	
                   (* Check whether the last argument(s) of s and t are equal *)	
-                  && Array.sub s_args (Array.length s_args - List.length args) (List.length args) =	
-                  Array.sub t_args (Array.length t_args - List.length args) (List.length args)	
+                  && List.for_all (fun (s,t) -> T.equal s t) (List.combine sub_s_args sub_t_args) 
                   (* Check whether they are all variables that occur nowhere else *)	
                   && CCList.(Array.length s_args - List.length args --^ Array.length s_args)	
                      |> List.for_all (fun idx ->	
