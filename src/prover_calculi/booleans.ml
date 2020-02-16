@@ -87,7 +87,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       [Builtin.Not @:[T.false_] =~ T.true_]; ] 
     |> List.map as_clause |> Iter.of_list
 
-  let find_bools ~subterm_selection ~eligible c =
+  let find_bools c =
+    let subterm_selection = Env.flex_get k_cased_term_selection in
+
     let rec find_in_term ~top t k =
       match T.view t with 
       | T.Const _ when Type.is_prop (T.ty t) -> k t
@@ -112,6 +114,11 @@ module Make(E : Env.S) : S with module Env = E = struct
       | T.Fun (_,body) ->
         find_in_term ~top:false body k
       | _ -> () in
+
+    let eligible = 
+      match Env.flex_get k_filter_literals with
+      | `All -> C.Eligible.always
+      | `Max -> C.Eligible.param c in
     
     Literals.fold_terms ~which:`All
       ~subterms:false ~eligible ~ord:(C.Ctx.ord ()) (C.lits c)
@@ -124,39 +131,28 @@ module Make(E : Env.S) : S with module Env = E = struct
       (new_lit :: Array.to_list( C.lits c |> Literals.map (T.replace ~old ~by:repl)))
       proof
 
-  let bool_case_inf (c: C.t) : C.t list =
-    let eligible = 
-      match Env.flex_get k_filter_literals with
-      | `All -> C.Eligible.always
-      | `Max -> C.Eligible.param c in
-    
+  let bool_case_inf (c: C.t) : C.t list =    
     let proof = Proof.Step.inference [C.proof_parent c]
                 ~rule:(Proof.Rule.mk"bool_inf") ~tags:[Proof.Tag.T_ho] in
 
-    find_bools ~subterm_selection:(Env.flex_get k_cased_term_selection)
-               ~eligible c
+    find_bools c
     |> CCList.fold_left (fun acc old ->
       let neg_lit, repl = no old, T.true_ in
       (mk_res ~proof ~old ~repl neg_lit c) :: acc
     ) []
 
   let bool_case_simp (c: C.t) : C.t list option =
-    let eligible = 
-      match Env.flex_get k_filter_literals with
-      | `All -> C.Eligible.always
-      | `Max -> C.Eligible.param c in
-    
     let proof = Proof.Step.simp [C.proof_parent c]
                 ~rule:(Proof.Rule.mk"bool_simp") ~tags:[Proof.Tag.T_ho] in
 
-    let bool_subterms =
-      find_bools ~eligible c
-        ~subterm_selection:(Env.flex_get k_cased_term_selection) in
+    let bool_subterms = find_bools c in
     if CCList.is_empty bool_subterms then None
     else (
       CCOpt.return @@ CCList.fold_left (fun acc old ->
-      let neg_lit, repl = no old, T.true_ in
-      (mk_res ~proof ~old ~repl neg_lit c) :: acc
+      let neg_lit, repl_neg = no old, T.true_ in
+      let pos_lit, repl_pos = yes old, T.false_ in
+      (mk_res ~proof ~old ~repl:repl_neg neg_lit c) ::
+      (mk_res ~proof ~old ~repl:repl_pos neg_lit c) :: acc
     ) [] bool_subterms)
 
   let simpl_bool_subterms c =
