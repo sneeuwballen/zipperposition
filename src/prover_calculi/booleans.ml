@@ -130,7 +130,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       | `All -> C.Eligible.always
       | `Max -> C.Eligible.param c in
     
-    let proof = Proof.Step.simp [C.proof_parent c]
+    let proof = Proof.Step.inference [C.proof_parent c]
                 ~rule:(Proof.Rule.mk"bool_inf") ~tags:[Proof.Tag.T_ho] in
 
     find_bools ~subterm_selection:(Env.flex_get k_cased_term_selection)
