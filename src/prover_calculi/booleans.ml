@@ -604,7 +604,7 @@ let () =
                                              | "cases-eager-near" -> BoolCasesEagerNear
                                              | _ -> assert false), 
       " enable/disable boolean axioms";
-      "--bool-subterm-selection", 
+      "--bool-subterm-selection",
       Arg.Symbol(["A"; "M"; "L"], (fun opt -> _cased_term_selection := 
                                       match opt with "A"->Any | "M"->Minimal | "L"->Large
                                                    | _ -> assert false)), 

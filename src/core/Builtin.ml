@@ -64,9 +64,9 @@ type t =
 type t_ = t
 
 let to_int_ = function
-  (* True < false for the completeness of (HO case) FOOL paramodulation: C[b] ⟹ b ∨ C[false]. The opposite way required b=false would simplify b≠true (aka ¬b) which doesn't rewrite. *)
-  | True -> 0
-  | False -> 1
+  (* True > false for the completeness of (HO case) FOOL paramodulation: C[b] ⟹ b ∨ C[false]. The opposite way required b=false would simplify b≠true (aka ¬b) which doesn't rewrite. *)
+  | True -> 1
+  | False -> 0
   | Not -> 2
   | And -> 3
   | Or -> 4
