@@ -661,10 +661,13 @@ let () =
     , Arg.Bool (fun v -> _solve_formulas := v)
     , " solve phi != psi eagerly using unification, where phi and psi are formulas"
     ];
-  Params.add_to_mode "ho-complete-basic" (fun () ->
+  Params.add_to_modes ["ho-complete-basic";
+                       "ho-pragmatic";
+                       "lambda-free-intensional";
+                       "lambda-free-purify-intensional";
+                       "lambda-free-extensional";
+                       "lambda-free-purify-extensional";
+                       "fo-complete-basic"] (fun () ->
       _bool_reasoning := BoolReasoningDisabled
-    );
-  Params.add_to_mode "fo-complete-basic" (fun () ->
-      _bool_reasoning := BoolReasoningDisabled
-    );
+  );
   Extensions.register extension

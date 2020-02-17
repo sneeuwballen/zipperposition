@@ -255,7 +255,6 @@ module Kind = struct
       | Define _ -> Format.fprintf out "define([status(thm)])"
     end
 end
-
 module Result = struct
   type t = result
   type 'a tc = 'a result_tc

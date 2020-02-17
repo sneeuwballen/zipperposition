@@ -9,7 +9,7 @@ open Logtk
 (* TODO: params to enable/disable some preprocessing *)
 
 type t = {
-  ord : string;
+  ord : string ref;
   seed : int;
   steps : int;
   version : bool;
@@ -31,7 +31,7 @@ type t = {
 }
 
 let default : t = {
-  ord= "lambda_kbo";
+  ord = ref "lambda_kbo";
   seed = 1928575;
   steps = -1;
   version= false;
@@ -66,7 +66,7 @@ let add_to_modes modes f =
 
 (** parse_args returns parameters *)
 let parse_args () =
-  let ord = ref default.ord
+  let ord = default.ord
   and seed = ref default.seed
   and steps = ref default.steps
   and version = ref default.version
@@ -124,7 +124,7 @@ let parse_args () =
   let prelude = CCVector.freeze prelude in
   let files = CCVector.freeze files in
   (* return parameter structure *)
-  { ord= !ord; seed = !seed; steps = !steps;
+  { ord= ord; seed = !seed; steps = !steps;
     version= !version; timeout = !timeout; prelude= prelude;
     files = files; select = !select;
     stats= ! Options._stats; def_as_rewrite= !def_as_rewrite;
@@ -139,4 +139,19 @@ let add_opts = Options.add_opts
 
 (* key used to store the parameters in Flex_state *)
 let key : t Flex_state.key = Flex_state.create_key()
+
+let () =
+  add_to_modes 
+      [ "lambda-free-intensional"
+      ; "lambda-free-extensional"
+      ; "lambda-free-purify-intensional"
+      ; "lambda-free-purify-extensional"] (fun () ->
+      default.ord := "lambdafree_kbo"
+    );
+  
+  add_to_modes 
+      [ "ho-competitive"
+      ; "ho-pragmatic"] (fun () ->
+      default.ord := "lambda_kbo"
+    );
 

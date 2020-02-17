@@ -2,7 +2,7 @@
 open Logtk
 
 type t = {
-  ord : string;
+  ord : string ref;
   seed : int;
   steps : int;
   version : bool;

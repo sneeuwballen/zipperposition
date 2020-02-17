@@ -212,7 +212,7 @@ let compute_prec ~signature stmts =
 let compute_ord_select precedence =
   Phases.start_phase Phases.Compute_ord_select >>= fun () ->
   Phases.get_key Params.key >>= fun params ->
-  let ord = Ordering.by_name params.Params.ord precedence in
+  let ord = Ordering.by_name !(params.Params.ord) precedence in
   Util.debugf ~section 2 "@[<2>ordering %s@]" (fun k->k (Ordering.name ord));
   let select = Selection.from_string ~ord params.Params.select in
   do_extensions ~field:(fun e->e.Extensions.ord_select_actions)

@@ -534,9 +534,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             (* rewritten term is variable-headed *)	
             begin match T.view info.s, T.view info.t  with	
               | T.App (f, ss), T.App (g, tt) 
-                (* 
-                  FIXME(ALEX):
-                  when not (T.is_var f) && not (T.is_var g) *) ->	
+                when List.length ss > List.length args 
+                      && List.length tt > List.length args ->	
                 let s_args = Array.of_list ss in	
                 let t_args = Array.of_list tt in
                 let sub_s_args = 
