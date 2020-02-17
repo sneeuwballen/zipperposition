@@ -137,7 +137,7 @@ let skolem_form ~ctx subst var form =
   let ty = ty_forall_l tyvars (T.Ty.fun_ (List.map Var.ty vars) ty_var) in
   let prefix = "sk_" ^ Var.to_string var in
   let f = fresh_skolem_prefix ~ctx ~ty prefix in
-  let skolem_t = T.app ~ty:T.Ty.prop (T.const ~ty f) (tyvars_t @ vars_t) in
+  let skolem_t = T.app ~ty:ty_var (T.const ~ty f) (tyvars_t @ vars_t) in
   T.Subst.eval subst skolem_t
 
 let pop_new_skolem_symbols ~ctx =
