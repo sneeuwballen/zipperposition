@@ -123,7 +123,7 @@ module Make(E : Env.S) = struct
         Unknown
       )
     | Some c ->
-      Util.debugf ~section 1 "@[<2>@{<green>given@} (before simplification):@ `@[%a@]`@]"
+      Util.debugf ~section 2 "@[<2>@{<green>given@} (before simplification):@ `@[%a@]`@]"
         (fun k->k Env.C.pp c);
       check_clause_ c;
       Util.incr_stat stat_steps;
