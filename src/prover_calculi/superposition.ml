@@ -1610,6 +1610,26 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         | T.App(s_hd, s_args), T.App(t_hd, t_args) 
             when T.equal s_hd t_hd && T.is_const s_hd ->
           aux_l s_args t_args
+        | T.App(s_hd, s_args), T.App(t_hd, t_args) 
+            when not (T.equal s_hd t_hd) 
+                && T.is_const s_hd && T.is_const t_hd ->
+          (* trying to find prefix subterm that is the differing context *)
+          let lhs,rhs,args_lhs,args_rhs = 
+            if List.length s_args > List.length t_args then (
+              let taken,dropped = 
+                CCList.take_drop (List.length s_args - List.length t_args) s_args in
+              T.app s_hd taken, t_hd, dropped, t_args
+            ) else (
+              let taken,dropped = 
+                CCList.take_drop (List.length t_args - List.length s_args) t_args in
+              s_hd, T.app t_hd taken, s_args, dropped
+            ) in
+          if T.same_l args_lhs args_rhs then ([lhs,rhs])
+          else (
+            if Env.flex_get k_ho_disagremeents = `AllHo && not (type_is_ho s)
+            then raise StopSearch
+            else [s,t]
+          )
         | _ -> 
           if Env.flex_get k_ho_disagremeents = `AllHo && not (type_is_ho s) then
             raise StopSearch
@@ -1993,41 +2013,41 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let do_ext_dec from_c from_p from_t into_c into_p into_t = 
     let sc_f, sc_i = 0, 1 in
-    let renaming = Subst.Renaming.create () in
-    let (hd_f, args_f), (hd_i,args_i) = Term.as_app from_t, Term.as_app into_t in
-    if Type.equal (Term.ty from_t) (Term.ty into_t) && List.length args_f = List.length args_i  &&
+    if Type.equal (Term.ty from_t) (Term.ty into_t) &&
        not (C.id from_c = C.id into_c && Position.equal from_p into_p) then (
-      (* Renaming variables apart *)
-      let args_f = List.map (fun t -> Subst.FO.apply renaming Subst.empty (t,sc_f)) args_f in
-      let args_i = List.map (fun t -> Subst.FO.apply renaming Subst.empty (t,sc_i)) args_i in
-      let combined = CCList.combine args_f args_i in
-      if T.equal hd_f hd_i && T.is_const hd_f 
-         && List.for_all (fun (s,t) -> Type.equal (T.ty s) (T.ty t)) combined then (
-        if List.exists (fun (s,t) ->
-            (* otherwise they would be unifyible *)
-            not (T.is_var (T.head_term s)) && not (T.is_var (T.head_term t))) combined then (
-          let lits_f = Lits.apply_subst renaming Subst.empty (C.lits from_c, sc_f) in
-          let lits_i = Lits.apply_subst renaming Subst.empty (C.lits into_c, sc_i) in
 
-          let new_neq_lits = 
-            List.map (fun (arg_f, arg_i) -> Lit.mk_neq arg_f arg_i) combined  in
+      match find_ho_disagremeents (from_t, sc_f) (into_t, sc_i) with 
+      | Some (disagreements, subst) ->
+        assert(not @@ US.has_constr subst);
+        
+        let subst = US.subst subst in
+        let renaming = Subst.Renaming.create () in
+        let lits_f = Lits.apply_subst renaming subst (C.lits from_c, sc_f) in
+        let lits_i = Lits.apply_subst renaming subst (C.lits into_c, sc_i) in
 
-          let (i, pos_f) = Lits.Pos.cut from_p in
-          let from_s = Lits.Pos.at lits_f (Position.arg i (Position.opp pos_f)) in
-          Lits.Pos.replace lits_i ~at:into_p ~by:from_s;
-          let new_lits = new_neq_lits @ CCArray.except_idx lits_f i  @ CCArray.to_list lits_i in
-          let trail = C.trail_l [from_c; into_c] in
-          let penalty = max (C.penalty from_c) (C.penalty into_c) in
-          let tags = [Proof.Tag.T_ho] in
-          let proof =
-            Proof.Step.inference
-              [C.proof_parent_subst renaming (from_c, sc_f) Subst.empty;
-               C.proof_parent_subst renaming  (into_c, sc_i) Subst.empty] 
-              ~rule:(Proof.Rule.mk "ext_decompose") ~tags in
-          let new_c = C.create ~trail ~penalty new_lits proof in
-          Some new_c
-        ) else None
-      ) else None
+        let app_subst scoped_t =
+          Subst.FO.apply renaming subst scoped_t in
+
+        let new_neq_lits = 
+          List.map (fun (arg_f, arg_i) -> 
+            Lit.mk_neq (app_subst (arg_f, sc_f)) (app_subst (arg_i, sc_i))) 
+          disagreements  in
+
+        let (i, pos_f) = Lits.Pos.cut from_p in
+        let from_s = Lits.Pos.at lits_f (Position.arg i (Position.opp pos_f)) in
+        Lits.Pos.replace lits_i ~at:into_p ~by:from_s;
+        let new_lits = new_neq_lits @ CCArray.except_idx lits_f i  @ CCArray.to_list lits_i in
+        let trail = C.trail_l [from_c; into_c] in
+        let penalty = max (C.penalty from_c) (C.penalty into_c) in
+        let tags = [Proof.Tag.T_ho] in
+        let proof =
+          Proof.Step.inference
+            [C.proof_parent_subst renaming (from_c, sc_f) Subst.empty;
+              C.proof_parent_subst renaming  (into_c, sc_i) Subst.empty] 
+            ~rule:(Proof.Rule.mk "ext_sup") ~tags in
+        let new_c = C.create ~trail ~penalty new_lits proof in
+        Some new_c
+      | None -> None
     ) else None
 
 
@@ -2063,7 +2083,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           if T.is_const hd && T.has_ho_subterm l then (
             let inf_partners = retrieve_from_extdec_idx !_ext_dec_into_idx (T.as_const_exn hd) in
             Iter.map (fun (into_c,into_t, into_p) -> 
-                do_ext_dec given pos l into_c into_p into_t) inf_partners) 
+                do_ext_dec given pos l into_c into_p into_t) inf_partners)
           else Iter.empty)
       |> Iter.filter_map CCFun.id
       |> Iter.to_list)
@@ -3264,7 +3284,7 @@ let () =
           _ext_dec_lits := if String.equal str "all" then `All else `OnlyMax))
       , " Sets the maximal number of literals clause can have for ExtDec inference.";
       "--ext-decompose-ho-disagremeents", Arg.Symbol (["all-ho";"some-ho"], (fun str -> 
-          _ext_dec_lits := if String.equal str "all" then `All else `OnlyMax))
+          _ho_disagremeents := if String.equal str "all-ho" then `AllHo else `SomeHo))
       , " Perform Ext-Sup, Ext-EqFact, or Ext-EqRes rules only when all disagreements are HO" ^
         " or when there exists a HO disagremeent";
       "--fluidsup-penalty", Arg.Int (fun p -> _fluidsup_penalty := p), " penalty for FluidSup inferences";
