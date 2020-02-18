@@ -91,6 +91,7 @@ let k_use_semantic_tauto = Flex_state.create_key ()
 let k_restrict_fluidsup = Flex_state.create_key ()
 let k_check_sup_at_var_cond = Flex_state.create_key ()
 let k_restrict_hidden_sup_at_vars = Flex_state.create_key ()
+let k_ho_disagremeents = Flex_state.create_key ()
 let _NO_LAMSUP = -1
 
 
@@ -1574,6 +1575,76 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       !res)
     else []
 
+  (* Given terms s and t, identify maximal common context u
+     such that s = u[s1,...,sn] and t = u[t1,...,tn]. Then,
+     if some of the disagrements are solvable by a weak
+     unification algorihtm (e.g., pattern or fixpoint), filter
+     them out and create the unifying substitution. Based on
+     k_ho_disagremeents at least one or all of s1...sn have
+     to be of functional/boolean type *)
+  let find_ho_disagremeents (s,s_sc) (t,t_sc) =
+    let open CCFun in
+    let exception StopSearch in
+    let counter = ref 0 in
+
+    let type_is_ho s =
+      Type.is_prop (T.ty s) || Type.is_fun (T.ty s) in
+
+    let cheap_unify ~subst (s,s_sc) (t,t_sc) =
+      let unif_alg = 
+        if T.is_var s || T.is_var t then (
+          FixpointUnif.unify_scoped ~subst ~counter
+        ) else PatternUnif.unify_scoped ~subst ~counter in
+      
+      try
+        Some (unif_alg (s,s_sc) (t,t_sc))
+      with PatternUnif.NotInFragment | PatternUnif.NotUnifiable ->
+        None
+    in
+    
+    let rec aux s t =
+      assert(Type.equal (T.ty s) (T.ty t));
+      if T.equal s t then []
+      else (
+        match T.view s, T.view t with
+        | T.App(s_hd, s_args), T.App(t_hd, t_args) 
+            when T.equal s_hd t_hd && T.is_const s_hd ->
+          aux_l s_args t_args
+        | _ -> 
+          if Env.flex_get k_ho_disagremeents = `AllHo && not (type_is_ho s) then
+            raise StopSearch
+          else [s,t])
+    and aux_l xs ys =
+      match xs,ys with
+      | [],[] -> []
+      | x :: xxs, y :: yys -> aux x y @ aux_l xxs yys
+      | _ -> invalid_arg "args must be of the same length" in
+    
+    try
+      let disagrements = aux (Lambda.eta_expand s) (Lambda.eta_expand t) in
+
+      (* There must exist at least one constraint of HO type *)
+      if List.for_all (not % type_is_ho) (List.map fst disagrements) then (
+        raise StopSearch
+      );
+
+      (* Filter out the pairs that are easy to unify *)
+      let disagreements = 
+        List.fold_left (fun (dis_acc, subst) (si, ti) -> 
+          match cheap_unify ~subst (si,s_sc) (ti, t_sc) with
+          | Some subst' -> dis_acc, subst'
+          | None -> (si,ti) :: dis_acc, subst)
+        ([],US.empty) (aux s t) in
+
+      (* If all of pairs are flex-flex then we could have done 
+         all of this with HO unification *)
+      if List.for_all (fun (si,ti) -> 
+          T.is_ho_var si && T.is_ho_var ti) (fst disagreements) then (
+          raise StopSearch
+      );
+
+      Some disagreements
+    with StopSearch -> None
 
   let ext_eqfact_decompose given =
     if Proof.Step.inferences_performed (C.proof_step given)
@@ -3077,6 +3148,7 @@ let _solidification_limit = ref 5
 let _max_unifs_solid_ff = ref 20
 let _use_weight_for_solid_subsumption = ref false
 let _sort_constraints = ref false
+let _ho_disagremeents = ref `AllHo
 
 let _guard = ref 45
 let _ratio = ref 135
@@ -3191,6 +3263,10 @@ let () =
       "--ext-decompose-lits", Arg.Symbol (["all";"max"], (fun str -> 
           _ext_dec_lits := if String.equal str "all" then `All else `OnlyMax))
       , " Sets the maximal number of literals clause can have for ExtDec inference.";
+      "--ext-decompose-ho-disagremeents", Arg.Symbol (["all-ho";"some-ho"], (fun str -> 
+          _ext_dec_lits := if String.equal str "all" then `All else `OnlyMax))
+      , " Perform Ext-Sup, Ext-EqFact, or Ext-EqRes rules only when all disagreements are HO" ^
+        " or when there exists a HO disagremeent";
       "--fluidsup-penalty", Arg.Int (fun p -> _fluidsup_penalty := p), " penalty for FluidSup inferences";
       "--fluidsup", Arg.Bool (fun b -> _fluidsup :=b), " enable/disable FluidSup inferences (only effective when complete higher-order unification is enabled)";
       "--lambdasup", Arg.Int (fun l -> 
