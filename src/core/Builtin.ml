@@ -148,6 +148,10 @@ let is_logical_binop = function
   |And|Or|Imply|Xor|Equiv -> true
   |_->false
 
+let is_flattened_logical = function
+  |And|Or -> true
+  |_ -> false
+
 let is_quantifier = function 
   |ForallConst|ExistsConst -> true
   |_ -> false
