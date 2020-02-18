@@ -1496,85 +1496,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     ) else
       None
 
-  let ext_eqfact_decompose_aux cl =
-    let try_ext_eq_fact (s,t) (u,v) idx =
-      let (s_hd, s_args), (u_hd, u_args) = CCPair.map_same T.as_app (s,u) in
-      if not (T.equal s_hd u_hd) && Type.equal (T.ty s) (T.ty u) && 
-         List.length s_args = List.length u_args &&
-         List.for_all (fun (s, t) -> Term.equal s t) (CCList.combine s_args u_args) then (
-        let new_lits = 
-          Lit.mk_neq s_hd u_hd
-          :: Lit.mk_neq t v
-          :: CCArray.except_idx (C.lits cl) idx in
-        let proof =
-          Proof.Step.inference [C.proof_parent cl] 
-            ~rule:(Proof.Rule.mk "ext_eqfact_decompose") in
-        let new_c = C.create ~trail:(C.trail cl) ~penalty:(C.penalty cl) new_lits proof in
-        [new_c]
-      ) else [] in
-
-    let aux_eq_rest (s,t) i lits = 
-      List.mapi (fun j lit -> 
-          if i < j then (
-            match lit with 
-            | Lit.Equation(u,v,true) ->
-              try_ext_eq_fact (s,t) (u,v) i
-              @
-              try_ext_eq_fact (s,t) (v,u) i 
-            | _ -> []
-          ) else []) lits
-      |> CCList.flatten in
-
-    let lits = CCArray.to_list (C.lits cl) in
-    List.mapi (fun i lit -> match lit with
-        | Lit.Equation (s,t,true) ->
-          aux_eq_rest (s,t) i lits
-        | _ -> []) lits
-    |> CCList.flatten
-
-  let pred_var_instantiation c trigger_set =
-    let p_vars = pred_vars c in
-    let substs = CCList.flat_map (fun v ->
-        let res = ref [] in (* no really efficient way without turning set to list *) 
-        Term.Set.iter (fun t ->
-            let var_ty = HVar.ty v and t_ty = Term.ty t in
-            if Type.is_ground var_ty && Type.is_ground t_ty && Type.equal var_ty t_ty then (
-              let subst = Subst.FO.bind' Subst.empty (v,0) (t,1) in
-              res := subst :: !res;
-            )) trigger_set;
-        !res
-      ) p_vars in
-    Iter.of_list substs
-    |> Iter.map (fun sub ->
-        let renaming = Subst.Renaming.create() in
-        let new_lits = Lits.apply_subst renaming sub (C.lits c, 0) in
-        let trail = C.trail c in 
-        let penalty = C.penalty c in
-        let rule = Proof.Rule.mk "instantiate_w_trigger" in
-        let tags = [Proof.Tag.T_ho] in
-        let proof = Proof.Step.inference ~tags ~rule [C.proof_parent_subst renaming (c, 0) sub] in
-        let new_clause = C.create ~trail ~penalty (CCArray.to_list new_lits) proof in
-        (* CCFormat.printf "[BOOL_INST: %a, %a => %a].\n" C.pp c Subst.pp sub C.pp new_clause; *)
-        assert (C.Seq.terms c |> Iter.for_all T.DB.is_closed);
-        assert (C.Seq.terms new_clause |> Iter.for_all T.DB.is_closed);
-        new_clause)
-    |> Iter.to_list
-
-  let instantiate_with_triggers c =
-    if C.proof_depth c < Env.flex_get k_trigger_bool_inst then ( 
-      pred_var_instantiation c !_trigger_bools)
-    else []
-
-  let trigger_insantiation c =
-    if C.proof_depth c < Env.flex_get k_trigger_bool_inst then (
-      let triggers = Term.Set.of_seq @@ get_triggers c in
-      let res = ref [] in
-      C.ClauseSet.iter (fun old_c -> 
-          res := pred_var_instantiation old_c triggers @ !res
-        ) !_cls_w_pred_vars;
-      !res)
-    else []
-
   (* Given terms s and t, identify maximal common context u
      such that s = u[s1,...,sn] and t = u[t1,...,tn]. Then,
      if some of the disagrements are solvable by a weak
@@ -1665,6 +1586,85 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
       Some disagreements
     with StopSearch -> None
+
+  let ext_eqfact_decompose_aux cl =
+    let try_ext_eq_fact (s,t) (u,v) idx =
+      let (s_hd, s_args), (u_hd, u_args) = CCPair.map_same T.as_app (s,u) in
+      if not (T.equal s_hd u_hd) && Type.equal (T.ty s) (T.ty u) && 
+         List.length s_args = List.length u_args &&
+         List.for_all (fun (s, t) -> Term.equal s t) (CCList.combine s_args u_args) then (
+        let new_lits = 
+          Lit.mk_neq s_hd u_hd
+          :: Lit.mk_neq t v
+          :: CCArray.except_idx (C.lits cl) idx in
+        let proof =
+          Proof.Step.inference [C.proof_parent cl] 
+            ~rule:(Proof.Rule.mk "ext_eqfact") in
+        let new_c = C.create ~trail:(C.trail cl) ~penalty:(C.penalty cl) new_lits proof in
+        [new_c]
+      ) else [] in
+
+    let aux_eq_rest (s,t) i lits = 
+      List.mapi (fun j lit -> 
+          if i < j then (
+            match lit with 
+            | Lit.Equation(u,v,true) ->
+              try_ext_eq_fact (s,t) (u,v) i
+              @
+              try_ext_eq_fact (s,t) (v,u) i 
+            | _ -> []
+          ) else []) lits
+      |> CCList.flatten in
+
+    let lits = CCArray.to_list (C.lits cl) in
+    List.mapi (fun i lit -> match lit with
+        | Lit.Equation (s,t,true) ->
+          aux_eq_rest (s,t) i lits
+        | _ -> []) lits
+    |> CCList.flatten
+
+  let pred_var_instantiation c trigger_set =
+    let p_vars = pred_vars c in
+    let substs = CCList.flat_map (fun v ->
+        let res = ref [] in (* no really efficient way without turning set to list *) 
+        Term.Set.iter (fun t ->
+            let var_ty = HVar.ty v and t_ty = Term.ty t in
+            if Type.is_ground var_ty && Type.is_ground t_ty && Type.equal var_ty t_ty then (
+              let subst = Subst.FO.bind' Subst.empty (v,0) (t,1) in
+              res := subst :: !res;
+            )) trigger_set;
+        !res
+      ) p_vars in
+    Iter.of_list substs
+    |> Iter.map (fun sub ->
+        let renaming = Subst.Renaming.create() in
+        let new_lits = Lits.apply_subst renaming sub (C.lits c, 0) in
+        let trail = C.trail c in 
+        let penalty = C.penalty c in
+        let rule = Proof.Rule.mk "instantiate_w_trigger" in
+        let tags = [Proof.Tag.T_ho] in
+        let proof = Proof.Step.inference ~tags ~rule [C.proof_parent_subst renaming (c, 0) sub] in
+        let new_clause = C.create ~trail ~penalty (CCArray.to_list new_lits) proof in
+        (* CCFormat.printf "[BOOL_INST: %a, %a => %a].\n" C.pp c Subst.pp sub C.pp new_clause; *)
+        assert (C.Seq.terms c |> Iter.for_all T.DB.is_closed);
+        assert (C.Seq.terms new_clause |> Iter.for_all T.DB.is_closed);
+        new_clause)
+    |> Iter.to_list
+
+  let instantiate_with_triggers c =
+    if C.proof_depth c < Env.flex_get k_trigger_bool_inst then ( 
+      pred_var_instantiation c !_trigger_bools)
+    else []
+
+  let trigger_insantiation c =
+    if C.proof_depth c < Env.flex_get k_trigger_bool_inst then (
+      let triggers = Term.Set.of_seq @@ get_triggers c in
+      let res = ref [] in
+      C.ClauseSet.iter (fun old_c -> 
+          res := pred_var_instantiation old_c triggers @ !res
+        ) !_cls_w_pred_vars;
+      !res)
+    else []
 
   let ext_eqfact_decompose given =
     if Proof.Step.inferences_performed (C.proof_step given)
@@ -2108,30 +2108,36 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     else []
 
   let ext_eqres_decompose_aux c =
-    let eligible = C.Eligible.neg in
+    let eligible = C.Eligible.always in
     if C.proof_depth c < Env.flex_get k_max_lits_ext_dec then (
       let res = 
         Literals.fold_eqn (C.lits c) ~eligible ~ord ~both:false ~sign:false
         |> Iter.to_list
         |> CCList.filter_map (fun (lhs,rhs,sign,pos) ->
             assert(sign = false);
-            let (l_hd, l_args), (r_hd, r_args) = CCPair.map_same T.as_app (lhs,rhs) in
-            if not (T.equal l_hd r_hd) && List.length l_args = List.length r_args &&
-               List.for_all (fun (s, t) -> Type.equal (Term.ty s) (Term.ty t)) (CCList.combine l_args r_args) &&
-               (List.for_all (fun (s, t) -> Term.equal s t) (CCList.combine l_args r_args)) then (
-              let new_neq_lits = 
-                ((l_hd,r_hd) :: CCList.combine l_args r_args) 
-                |> CCList.filter_map (fun (arg_f, arg_i) -> 
-                    if not (T.equal arg_f arg_i) then Some (Lit.mk_neq arg_f arg_i)
-                    else None) in
-              let i, _ = Literals.Pos.cut pos in
-              let new_lits = new_neq_lits @ CCArray.except_idx (C.lits c) i in
-              let proof =
-                Proof.Step.inference [C.proof_parent c] 
-                  ~rule:(Proof.Rule.mk "ext_eqres_decompose") in
-              let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
-              Some new_c) 
-            else None) in
+            let idx = Lits.Pos.idx pos in
+            if Env.flex_get k_ext_dec_lits != `OnlyMax ||
+               BV.get (C.eligible_res_no_subst c) idx then (
+              let sc = 0 in
+              match find_ho_disagremeents (lhs,sc) (rhs, sc) with
+              | Some (disagremeents, subst) ->
+                let new_neq_lits =
+                  List.map (fun (s,t) -> Lit.mk_neq s t) disagremeents in
+                let i, _ = Literals.Pos.cut pos in
+                let new_lits =
+                  (Array.of_list @@ new_neq_lits @ CCArray.except_idx (C.lits c) i, sc)
+                  |> Literals.apply_subst (Subst.Renaming.create()) (US.subst subst)
+                  |> Array.to_list in
+                let proof =
+                  Proof.Step.inference [C.proof_parent c]
+                    ~rule:(Proof.Rule.mk "ext_eqres") in
+                let new_c =
+                  C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
+                Some new_c
+              | None -> None)
+            else None)
+
+        in
       Util.incr_stat stat_ext_dec;
       res
     ) else []
