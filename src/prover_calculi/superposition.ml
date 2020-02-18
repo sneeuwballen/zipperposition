@@ -395,7 +395,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
            assert sign;
            let hd,_ = T.as_app l in
            if T.is_const hd && Term.has_ho_subterm l then (
-             (* CCFormat.printf "adding %a to ext_dec index.\n" T.pp l; *)
              f _ext_dec_from_idx (c,pos,l)
            )));
     Signal.ContinueListening

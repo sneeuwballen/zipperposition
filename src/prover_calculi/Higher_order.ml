@@ -27,7 +27,6 @@ let stat_elim_pred = Util.mk_stat "ho.elim_pred.steps"
 let stat_ho_unif = Util.mk_stat "ho.unif.calls"
 let stat_ho_unif_steps = Util.mk_stat "ho.unif.steps"
 let stat_neg_ext = Util.mk_stat "ho.neg_ext_success"
-let stat_neg_cong_fun = Util.mk_stat "ho.neg_cong_fun_success"
 
 
 let prof_eq_res = ZProf.make "ho.eq_res"
@@ -43,7 +42,6 @@ let k_ext_neg_lit = Flex_state.create_key ()
 let k_neg_ext = Flex_state.create_key ()
 let k_neg_ext_as_simpl = Flex_state.create_key ()
 let k_ext_axiom_penalty = Flex_state.create_key ()
-let k_neg_cong_fun = Flex_state.create_key ()
 let k_instantiate_choice_ax = Flex_state.create_key ()
 let k_elim_leibniz_eq = Flex_state.create_key ()
 let k_prune_arg_fun = Flex_state.create_key ()
@@ -271,72 +269,6 @@ module Make(E : Env.S) : S with module Env = E = struct
         (fun k->k C.pp c (Util.pp_list ~sep:" " C.pp) new_clauses);
     );
     new_clauses
-
-  let neg_cong_fun (c:C.t) : C.t list =
-    let find_diffs s t = 
-      let rec loop s t =
-        let (hd_s, args_s), (hd_t, args_t) = T.as_app s , T.as_app t in
-        if T.is_const hd_s && T.is_const hd_t then (
-          if T.equal hd_s hd_t then (
-            let zipped = CCList.combine args_s args_t in
-            let zipped = List.filter (fun (a_s, a_t) -> not (T.equal a_s a_t)) zipped in
-            if List.length zipped = 1 then (
-              let s,t = List.hd zipped in loop s t 
-            ) else zipped) 
-          else [(s,t)]) 
-        else [(s,t)]
-      in
-
-      let (hd_s,_), (hd_t,_) = T.as_app s, T.as_app t in
-      if T.is_const hd_s && T.is_const hd_t && T.equal hd_s hd_t then (
-        let diffs = loop s t in
-        if List.for_all (fun (s,t) -> Type.equal (T.ty s) (T.ty t)) diffs 
-        then diffs else [] (* because of polymorphism, it might be possible 
-                              that terms will not be of the same type,
-                              and that will give rise to wrong term applications*)
-      ) else [] 
-    in
-    let is_eligible = C.Eligible.always in
-    C.lits c
-    |> CCArray.mapi (fun i l -> 
-        match l with 
-        | Literal.Equation (lhs,rhs,false) when is_eligible i l ->
-          let subterms = find_diffs lhs rhs in
-          assert(List.for_all (fun (s,t) -> Type.equal (T.ty s) (T.ty t)) subterms);
-          if not (CCList.is_empty subterms) &&
-             List.exists (fun (l,_) -> 
-                 Type.is_fun (T.ty l) || Type.is_prop (T.ty l)) subterms then
-            let subterms_lit = CCList.map (fun (l,r) ->
-                let free_vars = T.VarSet.union (T.vars l) (T.vars r) |> T.VarSet.to_list in 
-                let arg_types = Type.expected_args @@ T.ty l in
-                if CCList.is_empty arg_types then Literal.mk_neq l r
-                else (
-                  let skolem_decls = ref [] in
-                  let skolems = List.map (fun ty -> 
-                      let sk, res =  T.mk_fresh_skolem free_vars ty in
-                      skolem_decls := sk :: !skolem_decls;
-                      res) arg_types in
-                  declare_skolems !skolem_decls;
-                  Literal.mk_neq (T.app l skolems) (T.app r skolems)
-                )
-              ) subterms in
-            let new_lits = CCList.flat_map (fun (j,x) -> 
-                if i!=j then [x]
-                else subterms_lit) 
-                (C.lits c |> Array.mapi (fun j x -> (j,x)) |> Array.to_list) in
-            let proof =
-              Proof.Step.inference [C.proof_parent c] 
-                ~rule:(Proof.Rule.mk "neg_cong_fun") 
-                ~tags:[Proof.Tag.T_ho]
-            in
-            let new_c =
-              C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c) in
-            Util.incr_stat stat_neg_cong_fun;
-            Some new_c
-          else None
-        | _ -> None)
-    |> CCArray.filter_map (fun x -> x)
-    |> CCArray.to_list
 
   let neg_ext (c:C.t) : C.t list =
     let is_eligible = C.Eligible.res c in 
@@ -1347,10 +1279,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       in
       Env.set_ho_normalization_rule ho_norm;
 
-      if(Env.flex_get k_neg_cong_fun) then (
-        Env.add_unary_inf "neg_cong_fun" neg_cong_fun 
-      );
-
       if(Env.flex_get k_neg_ext) then (
         Env.add_unary_inf "neg_ext" neg_ext 
       )
@@ -1457,7 +1385,6 @@ let _cons_elim = ref true
 let _imit_first = ref false
 let _compose_subs = ref false
 let _var_solve = ref false
-let _neg_cong_fun = ref false
 let _instantiate_choice_ax = ref false
 let _elim_leibniz_eq = ref (-1)
 let _prune_arg_fun = ref `NoPrune
@@ -1482,7 +1409,6 @@ let extension =
     E.flex_add k_neg_ext !_neg_ext;
     E.flex_add k_neg_ext_as_simpl !_neg_ext_as_simpl;
     E.flex_add k_ext_axiom_penalty !_ext_axiom_penalty;
-    E.flex_add k_neg_cong_fun !_neg_cong_fun;
     E.flex_add k_instantiate_choice_ax !_instantiate_choice_ax;
     E.flex_add k_elim_leibniz_eq !_elim_leibniz_eq;
     E.flex_add k_prune_arg_fun !_prune_arg_fun;
@@ -1550,7 +1476,6 @@ let () =
     [ "--ho", Arg.Bool (fun b -> enabled_ := b), " enable/disable HO reasoning";
       "--force-ho", Arg.Bool  (fun b -> force_enabled_ := b), " enable/disable HO reasoning even if the problem is first-order";
       "--ho-unif", Arg.Bool (fun v -> enable_unif_ := v), " enable full HO unification";
-      "--ho-neg-cong-fun", Arg.Bool (fun v -> _neg_cong_fun := v), "enable NegCongFun";
       "--ho-elim-pred-var", Arg.Bool (fun b -> _elim_pred_var := b), " disable predicate variable elimination";
       "--ho-prim-enum", set_prim_mode_, " set HO primitive enum mode";
       "--ho-prim-max", Arg.Set_int prim_max_penalty, " max penalty for HO primitive enum";
@@ -1595,7 +1520,6 @@ let () =
       _ext_pos_all_lits := false;
       prim_mode_ := `None;
       _elim_pred_var := false;
-      _neg_cong_fun := false;
       enable_unif_ := false;
       _prune_arg_fun := `PruneMaxCover;
     );
@@ -1611,7 +1535,6 @@ let () =
       _ext_pos_all_lits := true;
       prim_mode_ := `None;
       _elim_pred_var := true;
-      _neg_cong_fun := false;
       enable_unif_ := false;
       _prune_arg_fun := `PruneMaxCover;
     );
@@ -1627,7 +1550,6 @@ let () =
       _ext_pos_all_lits := true;
       prim_mode_ := `None;
       _elim_pred_var := true;
-      _neg_cong_fun := false;
       enable_unif_ := false;
       _prune_arg_fun := `PruneMaxCover;
     );
