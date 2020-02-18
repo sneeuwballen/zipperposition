@@ -149,10 +149,10 @@ module Make(E : Env.S) : S with module Env = E = struct
     if CCList.is_empty bool_subterms then None
     else (
       CCOpt.return @@ CCList.fold_left (fun acc old ->
-      let neg_lit, repl_neg = no old, T.true_ in
-      let pos_lit, repl_pos = yes old, T.false_ in
-      (mk_res ~proof ~old ~repl:repl_neg neg_lit c) ::
-      (mk_res ~proof ~old ~repl:repl_pos neg_lit c) :: acc
+        let neg_lit, repl_neg = no old, T.true_ in
+        let pos_lit, repl_pos = yes old, T.false_ in
+        (mk_res ~proof ~old ~repl:repl_neg neg_lit c) ::
+        (mk_res ~proof ~old ~repl:repl_pos pos_lit c) :: acc
     ) [] bool_subterms)
 
   let simpl_bool_subterms c =

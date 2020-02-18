@@ -78,7 +78,7 @@ module Make (P : PARAMETERS) = struct
       assert(List.length remaining != 0);
       let num_vars = List.length remaining in
       let vars = List.mapi (fun i ty -> 
-          let ty = S.Ty.apply S.Renaming.none subst (ty,scope) in
+          (* let ty = S.Ty.apply S.Renaming.none subst (ty,scope) in *)
           T.bvar ~ty (num_vars-1-i)) remaining in
       let shifted = T.DB.shift num_vars t in
       T.app shifted vars in
