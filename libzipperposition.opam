@@ -13,7 +13,7 @@ depends: [
   "base-unix"
   "zarith"
   "logtk" { = version }
-  "containers" { >= "1.0" }
+  "containers" { >= "2.8" }
   "iter" { >= "1.2" }
   "oseq"
   "dune" { >= "1.1" }

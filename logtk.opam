@@ -14,7 +14,7 @@ depends: [
   "base-unix"
   "zarith"
   "oseq"
-  "containers" { >= "1.0" }
+  "containers" { >= "2.8" }
   "iter" { >= "1.2" }
   "menhir" {build}
   "dune" { >= "1.1" }
