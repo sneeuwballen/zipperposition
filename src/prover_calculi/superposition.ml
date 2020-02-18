@@ -1563,7 +1563,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     
     try
       if not (Type.equal (T.ty s) (T.ty t)) then raise StopSearch;
-
       let disagrements = aux (Lambda.eta_expand s) (Lambda.eta_expand t) in
 
       (* There must exist at least one constraint of HO type *)
@@ -1571,13 +1570,19 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         raise StopSearch
       );
 
+      let _,_,unifscope,init_subst =
+        US.FO.rename_to_new_scope ~counter (s,s_sc) (t,t_sc) in
+      let app_subst subst =
+        Subst.FO.apply Subst.Renaming.none (US.subst subst) in
+
       (* Filter out the pairs that are easy to unify *)
       let disagreements = 
-        List.fold_left (fun (dis_acc, subst) (si, ti) -> 
-          match cheap_unify ~subst (si,s_sc) (ti, t_sc) with
+        List.fold_left (fun (dis_acc, subst) (si, ti) ->
+          let si',ti' = CCPair.map_same (app_subst subst) ((si,s_sc), (ti,t_sc)) in
+          match cheap_unify ~subst (si',unifscope) (ti', unifscope) with
           | Some subst' -> dis_acc, subst'
           | None -> (si,ti) :: dis_acc, subst)
-        ([],US.empty) (aux s t) in
+        ([],init_subst) (disagrements) in
 
       (* If all of pairs are flex-flex then we could have done 
          all of this with HO unification *)
@@ -3231,6 +3236,7 @@ let register ~sup =
   E.flex_add k_switch_stream_extraction !_switch_stream_extraction;
   E.flex_add k_dont_simplify !_dont_simplify;
   E.flex_add k_use_semantic_tauto !_use_semantic_tauto;
+  E.flex_add k_ho_disagremeents !_ho_disagremeents;
 
   E.flex_add PragUnifParams.k_max_inferences !_max_infs;
   E.flex_add PragUnifParams.k_skip_multiplier !_skip_multiplier;
@@ -3297,7 +3303,7 @@ let () =
       "--ext-decompose-lits", Arg.Symbol (["all";"max"], (fun str -> 
           _ext_dec_lits := if String.equal str "all" then `All else `OnlyMax))
       , " Sets the maximal number of literals clause can have for ExtDec inference.";
-      "--ext-decompose-ho-disagremeents", Arg.Symbol (["all-ho";"some-ho"], (fun str -> 
+      "--ext-decompose-ho-disagreements", Arg.Symbol (["all-ho";"some-ho"], (fun str -> 
           _ho_disagremeents := if String.equal str "all-ho" then `AllHo else `SomeHo))
       , " Perform Ext-Sup, Ext-EqFact, or Ext-EqRes rules only when all disagreements are HO" ^
         " or when there exists a HO disagremeent";
