@@ -1562,6 +1562,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       | _ -> invalid_arg "args must be of the same length" in
     
     try
+      if not (Type.equal (T.ty s) (T.ty t)) then raise StopSearch;
+
       let disagrements = aux (Lambda.eta_expand s) (Lambda.eta_expand t) in
 
       (* There must exist at least one constraint of HO type *)
@@ -1589,39 +1591,46 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let ext_eqfact_decompose_aux cl =
     let try_ext_eq_fact (s,t) (u,v) idx =
-      let (s_hd, s_args), (u_hd, u_args) = CCPair.map_same T.as_app (s,u) in
-      if not (T.equal s_hd u_hd) && Type.equal (T.ty s) (T.ty u) && 
-         List.length s_args = List.length u_args &&
-         List.for_all (fun (s, t) -> Term.equal s t) (CCList.combine s_args u_args) then (
+      let sc = 0 in
+      match find_ho_disagremeents (s,sc) (u,sc) with
+      | Some (disagrements, subst) ->
+        assert(not (US.has_constr subst));
+        let subst = US.subst subst in
+        let dis_lits = List.map (fun (a,b) -> Lit.mk_neq a b) disagrements in
         let new_lits = 
-          Lit.mk_neq s_hd u_hd
-          :: Lit.mk_neq t v
-          :: CCArray.except_idx (C.lits cl) idx in
+          dis_lits @ ((Lit.mk_neq t v) :: CCArray.except_idx (C.lits cl) idx)
+          |> CCArray.of_list
+          |> (fun lits ->
+                Literals.apply_subst (Subst.Renaming.create ()) subst (lits, sc))
+          |> CCArray.to_list in
         let proof =
           Proof.Step.inference [C.proof_parent cl] 
             ~rule:(Proof.Rule.mk "ext_eqfact") in
         let new_c = C.create ~trail:(C.trail cl) ~penalty:(C.penalty cl) new_lits proof in
         [new_c]
-      ) else [] in
+      | None -> [] in
 
     let aux_eq_rest (s,t) i lits = 
-      List.mapi (fun j lit -> 
-          if i < j then (
-            match lit with 
-            | Lit.Equation(u,v,true) ->
-              try_ext_eq_fact (s,t) (u,v) i
-              @
-              try_ext_eq_fact (s,t) (v,u) i 
-            | _ -> []
-          ) else []) lits
-      |> CCList.flatten in
+      CCList.flatten @@ List.mapi (fun j lit -> 
+        if i < j then (
+          match lit with 
+          | Lit.Equation(u,v,true) ->
+            try_ext_eq_fact (s,t) (u,v) i
+            @
+            try_ext_eq_fact (s,t) (v,u) i 
+          | _ -> []
+        ) else []) lits in
 
     let lits = CCArray.to_list (C.lits cl) in
-    List.mapi (fun i lit -> match lit with
-        | Lit.Equation (s,t,true) ->
-          aux_eq_rest (s,t) i lits
-        | _ -> []) lits
-    |> CCList.flatten
+    let maximal = C.eligible_param (cl,0) Subst.empty in
+    CCList.flatten @@ List.mapi (fun i lit ->
+      match lit with
+      | Lit.Equation (s,t,true) 
+        when Env.flex_get k_ext_dec_lits != `OnlyMax ||
+             BV.get maximal i ->
+        aux_eq_rest (s,t) i lits
+      | _ -> []
+    ) lits
 
   let pred_var_instantiation c trigger_set =
     let p_vars = pred_vars c in
@@ -2136,7 +2145,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                 Some new_c
               | None -> None)
             else None)
-
         in
       Util.incr_stat stat_ext_dec;
       res
