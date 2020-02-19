@@ -8,6 +8,9 @@ DUNE_OPTS= -j $(J) --profile=release
 build:
 	@dune build @install $(DUNE_OPTS)
 
+check:
+	@dune build @check $(DUNE_OPTS)
+
 clean:
 	@dune clean
 
