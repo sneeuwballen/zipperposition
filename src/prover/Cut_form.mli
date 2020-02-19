@@ -41,6 +41,8 @@ val apply_subst : Subst.Renaming.t -> Subst.t -> t Scoped.t -> t
 val are_variant : t -> t -> bool
 (** Are these two cut formulas alpha-equivalent? *)
 
+val normalize_form : form -> form
+
 val normalize : t -> t
 (** Use rewriting to normalize the formula *)
 

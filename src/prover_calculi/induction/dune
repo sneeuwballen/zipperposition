@@ -1,0 +1,7 @@
+
+(library
+  (name libzipperposition_induction)
+  (public_name libzipperposition.induction)
+  (synopsis "Induction calculus for the Zipperposition theorem prover")
+  (libraries libzipperposition libzipperposition.avatar)
+  (flags :standard -w -32))

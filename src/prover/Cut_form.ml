@@ -115,7 +115,52 @@ let variant_ ~subst (f1,sc1)(f2,sc2): _ Iter.t =
 let are_variant f1 f2: bool =
   not @@ Iter.is_empty @@ variant_ ~subst:Subst.empty (f1,1)(f2,0)
 
-let normalize (f:t): t = cs f |> Test_prop.normalize_form |> make
+let normalize_form (f:form): form =
+  let module RW = Rewrite in
+  let rec simplify c =
+    let lit_abs = CCArray.find_idx Literal.is_absurd c in
+    begin match lit_abs with
+      | None -> c
+      | Some (i,_) ->
+        let new_c = CCArray.except_idx c i |> Array.of_list in
+        simplify new_c
+    end
+  in
+  (* fixpoint of rewriting *)
+  let rec normalize_up_to fuel (c:clause): clause Iter.t =
+    assert (fuel>=0);
+    if fuel=0 then Iter.return c
+    else normalize_step (fuel-1) c
+  and normalize_step fuel c =
+    let progress=ref false in
+    (* how to normalize a term/lit (with restricted resources) *)
+    let rw_term t =
+      let t', rules = RW.Term.normalize_term ~max_steps:10 t in
+      if not (RW.Term.Rule_inst_set.is_empty rules) then progress := true;
+      t'
+    in
+    let rw_terms c = Literals.map rw_term c
+    and rw_clause c = match RW.Lit.normalize_clause c with
+      | None -> [c]
+      | Some (cs,_,_,_,_,_) ->
+        progress := true;
+        cs
+    and rm_trivial =
+      List.filter (fun c -> not (Literals.is_trivial c))
+    in
+    let cs = c |> rw_terms |> rw_clause |> rm_trivial in
+    if !progress
+    then normalize_form fuel cs (* normalize each result recursively *)
+    else (
+      (* done, just simplify *)
+      Iter.of_list cs |> Iter.map simplify
+    )
+  and normalize_form fuel (f:form): clause Iter.t =
+    Iter.of_list f |> Iter.flat_map (normalize_up_to fuel)
+  in
+  normalize_form 3 f |> Iter.to_rev_list
+
+let normalize (f:t): t = cs f |> normalize_form |> make
 
 let to_s_form (f:t) =
   let module F = TypedSTerm.Form in

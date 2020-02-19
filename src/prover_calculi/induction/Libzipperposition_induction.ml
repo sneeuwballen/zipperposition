@@ -11,7 +11,9 @@ module T = Term
 module Ty = Type
 module Fmt = CCFormat
 module RW = Rewrite
+module Avatar = Libzipperposition_avatar
 
+module type AVATAR = Libzipperposition_avatar.S
 module type S = Induction_intf.S
 
 type term = T.t
@@ -425,7 +427,7 @@ end
 (** {2 Calculus of Induction} *)
 module Make
     (E : Env.S)
-    (A : Avatar_intf.S with module E = E)
+    (A : AVATAR with module E = E)
 = struct
   module Env = E
   module Ctx = E.Ctx

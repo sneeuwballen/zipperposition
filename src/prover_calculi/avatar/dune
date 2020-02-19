@@ -1,0 +1,7 @@
+(library
+  (name libzipperposition_avatar)
+  (public_name libzipperposition.avatar)
+  (synopsis "Avatar calculus for the Zipperposition theorem prover")
+  (libraries libzipperposition)
+  (flags :standard -w -32)
+)
