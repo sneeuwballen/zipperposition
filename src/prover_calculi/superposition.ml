@@ -1525,15 +1525,15 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     
     let rec aux s t =
       assert(Type.equal (T.ty s) (T.ty t));
-      if T.equal s t then []
+      if T.equal s t && (s_sc == t_sc || T.is_ground s) then []
       else (
         match T.view s, T.view t with
         | T.App(s_hd, s_args), T.App(t_hd, t_args) 
             when T.equal s_hd t_hd && T.is_const s_hd ->
           aux_l s_args t_args
         | T.App(s_hd, s_args), T.App(t_hd, t_args) 
-            when not (T.equal s_hd t_hd) 
-                && T.is_const s_hd && T.is_const t_hd ->
+            when not (T.equal s_hd t_hd)
+                 && T.is_const s_hd && T.is_const t_hd ->
           (* trying to find prefix subterm that is the differing context *)
           let lhs,rhs,args_lhs,args_rhs = 
             if List.length s_args > List.length t_args then (
@@ -1545,7 +1545,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                 CCList.take_drop (List.length t_args - List.length s_args) t_args in
               s_hd, T.app t_hd taken, s_args, dropped
             ) in
-          if T.same_l args_lhs args_rhs then ([lhs,rhs])
+          if T.same_l args_lhs args_rhs && s_sc == t_sc then ([lhs,rhs])
           else (
             if Env.flex_get k_ho_disagremeents = `AllHo && not (type_is_ho s)
             then raise StopSearch
@@ -1563,10 +1563,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     
     try
       if not (Type.equal (T.ty s) (T.ty t)) then raise StopSearch;
-      let disagrements = aux (Lambda.eta_expand s) (Lambda.eta_expand t) in
+      let disagreements = aux (Lambda.eta_expand s) (Lambda.eta_expand t) in
 
       (* There must exist at least one constraint of HO type *)
-      if List.for_all (not % type_is_ho) (List.map fst disagrements) then (
+      if List.for_all (not % type_is_ho) (List.map fst disagreements) then (
         raise StopSearch
       );
 
@@ -1582,15 +1582,17 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           match cheap_unify ~subst (si',unifscope) (ti', unifscope) with
           | Some subst' -> dis_acc, subst'
           | None -> (si,ti) :: dis_acc, subst)
-        ([],init_subst) (disagrements) in
+        ([],init_subst) (disagreements) in
 
-      (* If all of pairs are flex-flex then we could have done 
-         all of this with HO unification *)
-      if List.for_all (fun (si,ti) -> 
-          T.is_ho_var si && T.is_ho_var ti) (fst disagreements) then (
+
+      (* If no constraints are left or 
+         all of pairs are flex-flex then we could 
+         have done  all of this with HO unification *)
+      if (*CCList.is_empty (fst disagreements) || *)
+          List.for_all (fun (si,ti) -> 
+            T.is_ho_var si && T.is_ho_var ti) (fst disagreements) then (
           raise StopSearch
       );
-
       Some disagreements
     with StopSearch -> None
 
@@ -2034,30 +2036,31 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       | Some (disagreements, subst) ->
         assert(not @@ US.has_constr subst);
         
-        let subst = US.subst subst in
         let renaming = Subst.Renaming.create () in
+        let subst = US.subst subst in
         let lits_f = Lits.apply_subst renaming subst (C.lits from_c, sc_f) in
         let lits_i = Lits.apply_subst renaming subst (C.lits into_c, sc_i) in
-
-        let app_subst scoped_t =
+        
+        let app_subst renaming scoped_t =
           Subst.FO.apply renaming subst scoped_t in
-
+        
         let new_neq_lits = 
-          List.map (fun (arg_f, arg_i) -> 
-            Lit.mk_neq (app_subst (arg_f, sc_f)) (app_subst (arg_i, sc_i))) 
+          List.map (fun (arg_f, arg_i) ->
+            Lit.mk_neq (app_subst renaming (arg_f, sc_f)) (app_subst renaming (arg_i, sc_i))) 
           disagreements  in
 
+        
         let (i, pos_f) = Lits.Pos.cut from_p in
         let from_s = Lits.Pos.at lits_f (Position.arg i (Position.opp pos_f)) in
-        Lits.Pos.replace lits_i ~at:into_p ~by:from_s;
+        Lits.Pos.replace lits_i ~at:into_p ~by:(from_s);
         let new_lits = new_neq_lits @ CCArray.except_idx lits_f i  @ CCArray.to_list lits_i in
         let trail = C.trail_l [from_c; into_c] in
         let penalty = max (C.penalty from_c) (C.penalty into_c) in
         let tags = [Proof.Tag.T_ho] in
         let proof =
           Proof.Step.inference
-            [C.proof_parent_subst renaming (from_c, sc_f) Subst.empty;
-              C.proof_parent_subst renaming  (into_c, sc_i) Subst.empty] 
+            [C.proof_parent_subst renaming (from_c, sc_f) subst;
+              C.proof_parent_subst renaming  (into_c, sc_i) subst] 
             ~rule:(Proof.Rule.mk "ext_sup") ~tags in
         let new_c = C.create ~trail ~penalty new_lits proof in
         Some new_c
@@ -3425,11 +3428,12 @@ let () =
       _sup_at_var_headed := true;
       _lambdasup := -1;
       _dupsup := false;
-      _max_infs := 5;
-      _max_depth := 3;
+      _max_infs := 4;
+      _max_depth := 2;
       _max_app_projections := 0;
+      _max_rigid_imitations := 2;
       _max_identifications := 1;
-      _max_elims := 1;
+      _max_elims := 0;
       _fluidsup := false;
     );
   Params.add_to_mode "ho-competitive" (fun () ->
@@ -3444,11 +3448,12 @@ let () =
       _sup_at_var_headed := true;
       _lambdasup := -1;
       _dupsup := false;
-      _max_infs := 10;
-      _max_depth := 6;
-      _max_app_projections := 1;
+      _max_infs := 8;
+      _max_depth := 4;
+      _max_app_projections := 3;
       _max_identifications := 1;
       _max_elims := 1;
+      _max_rigid_imitations := 3;
       _fluidsup := false;
     );
   Params.add_to_mode "fo-complete-basic" (fun () ->
