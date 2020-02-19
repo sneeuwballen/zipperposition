@@ -266,6 +266,22 @@ let head_term_mono t = match view t with
     app_builtin ~ty b []
   | _ -> t
 
+let as_app_mono t = match view t with
+  | App (f,l) ->
+    let ty_args, args = CCList.partition is_type l in
+    app f ty_args, args
+  | AppBuiltin(b, l) when not (Builtin.is_quantifier b) ->
+    let ty_args, args = CCList.partition is_type l in
+    let ty = Type.arrow (List.map ty args) (ty t) in 
+    app_builtin ~ty b ty_args, args
+  | AppBuiltin(b, l) ->
+    assert(Builtin.is_quantifier b);
+    assert(Type.is_prop @@ ty t);
+    assert(List.length l = 1);
+    let ty = Type.arrow [ty (List.hd l)] Type.prop in
+    app_builtin ~ty b [], l
+  | _ -> t,[]
+
 let is_ho_var t = match view t with
   | Var v -> Type.needs_args (HVar.ty v)
   | _ -> false

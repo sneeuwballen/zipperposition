@@ -2975,43 +2975,89 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     ZProf.with_prof prof_condensation condensation_rec c
 
   let recognize_injectivity c =
-    if C.length c == 2 then (
-      let pos_lit = CCArray.find_idx Lit.is_pos (C.lits c) in
-      let neg_lit = CCArray.find_idx Lit.is_neg (C.lits c) in
-      try 
-        let _,pos_lit = CCOpt.get_exn pos_lit in
-        let _,neg_lit = CCOpt.get_exn neg_lit in
-        match pos_lit with 
-        | Equation(x, y, true) ->
-          if Term.is_var x && Term.is_var y && not (Term.equal x y) then (
-            match neg_lit with 
-            | Equation(l,r,false) ->
-              let hd_l,hd_r = CCPair.map_same Term.head_term (l,r) in
-              if Term.is_const hd_l && Term.is_const hd_r 
-                 && Term.equal hd_l hd_r then (
-                let covered_l = Term.max_cover l [Some x] in 
-                let covered_r = Term.max_cover r [Some y] in
-                if Term.equal covered_l covered_r then (
-                  let ty = Type.arrow [Term.ty l] (Term.ty x) in
-                  let sk_vars = Term.vars covered_l |> Term.VarSet.to_list in
-                  let (sk_id, sk_ty), sk_term = Term.mk_fresh_skolem sk_vars ty in
-                  let inverse_x = Term.app sk_term [l] in
-                  let inverse_lit = [Lit.mk_eq inverse_x x] in
-                  let proof = Proof.Step.inference ~rule:(Proof.Rule.mk "inverse recognition") 
-                      [C.proof_parent c] in
-                  Ctx.declare sk_id sk_ty;
-                  let new_clause = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) inverse_lit proof in
-                  Util.debugf ~section 1 "Injectivity recognized: %a |---| %a" (fun k -> k C.pp c C.pp new_clause);
-                  (* Format.printf "Injectivity recognized: %a |---| %a" C.pp c C.pp new_clause; *)
+    let exception Fail in
 
-                  [new_clause]
-                ) else []
-              ) else []
-            | _ -> [] (* predicate *)
-          ) else []
-        | _ -> assert false
-      with Invalid_argument _ -> []
-    ) else []
+    (* avoiding cascading if-then-elses *)
+    let fail_on condition =
+      if condition then raise Fail in
+
+    let find_in_args var args =
+      fst @@ CCOpt.get_or ~default:(-1, T.true_)
+        (CCList.find_idx (T.equal var) args) in
+
+    try 
+      fail_on (C.length c != 2);
+
+      match C.lits c with
+      | [|lit1; lit2|] ->
+        fail_on (not ((Lit.is_pos lit1 || Lit.is_pos lit2) &&
+                     (Lit.is_neg lit1 || Lit.is_neg lit2)));
+
+        let pos_lit,neg_lit = 
+          if Lit.is_pos lit1 then lit1, lit2 else lit2,lit1 in
+        
+        begin match neg_lit, pos_lit with
+        | Equation(x,y,sign), Equation(lhs,rhs,true) ->
+          fail_on (sign); (* fail if neg. literal is propositional (= false)*)
+          fail_on (not (T.is_var x && T.is_var y));
+          fail_on (T.equal x y);
+
+          let (hd_lhs, lhs_args), (hd_rhs, rhs_args) = 
+            CCPair.map_same T.as_app_mono (lhs,rhs) in
+          
+          fail_on (not (T.is_const hd_lhs && T.is_const hd_rhs));
+          fail_on (not (T.equal hd_lhs hd_rhs));
+          fail_on (not (List.length lhs_args == List.length rhs_args));
+
+          fail_on (not ((find_in_args x lhs_args) != (-1) ||
+                        (find_in_args x rhs_args) != (-1)));
+          fail_on (not ((find_in_args y lhs_args) != (-1) ||
+                        (find_in_args y rhs_args) != (-1)));
+          
+          (* reorient equations so that x appears in lhs *)
+          let lhs_args,rhs_args =
+            if find_in_args x lhs_args != -1 
+            then (lhs_args, rhs_args)
+            else (rhs_args, lhs_args) in
+          
+          let same_vars, diff_eqns = List.fold_left (fun (same, diff) (s,t) -> 
+            fail_on (not (T.is_var s && T.is_var t));
+            if T.equal s t then (s :: same, diff)
+            else (same, (s,t)::diff)
+          ) ([],[]) (List.combine lhs_args rhs_args) in
+
+          let same_set = T.Set.of_list same_vars in
+          let diff_lhs_set, diff_rhs_set = 
+            CCPair.map_same T.Set.of_list (CCList.split diff_eqns) in
+          
+          (* variables in each group are unique *)
+          fail_on (List.length same_vars != T.Set.cardinal same_set);
+          fail_on (List.length diff_eqns != T.Set.cardinal diff_lhs_set);
+          fail_on (List.length diff_eqns != T.Set.cardinal diff_rhs_set);
+
+          (* variable groups do not intersect *)
+          fail_on (not (T.Set.is_empty (T.Set.inter diff_lhs_set diff_rhs_set)));
+          fail_on (not (T.Set.is_empty (T.Set.inter diff_lhs_set same_set)));
+          fail_on (not (T.Set.is_empty (T.Set.inter diff_rhs_set same_set)));
+
+          let (sk_id, sk_ty),inv_sk = 
+            Term.mk_fresh_skolem 
+              (List.map T.as_var_exn same_vars) 
+              (Type.arrow [T.ty lhs] (T.ty x)) in
+          let inv_sk = T.app inv_sk [lhs] in
+          let inv_lit = [Lit.mk_eq inv_sk x] in
+
+           let proof = Proof.Step.inference ~rule:(Proof.Rule.mk "inj_rec") 
+              [C.proof_parent c] in
+          Ctx.declare sk_id sk_ty;
+          let new_clause = 
+            C.create ~trail:(C.trail c) ~penalty:(C.penalty c) inv_lit proof in
+          Util.debugf ~section 1 "Injectivity recognized: %a |---| %a" 
+            (fun k -> k C.pp c C.pp new_clause);
+          [new_clause]
+        | _ -> assert false; end
+      | _ -> assert false;
+    with Fail -> []
 
   (** {2 Registration} *)
 

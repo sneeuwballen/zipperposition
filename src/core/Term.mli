@@ -162,6 +162,9 @@ val head_term : t -> t
 val head_term_mono : t -> t
 (** head term, but still with type arguments *)
 
+val as_app_mono : t -> (t * (t list))
+(** head term, but still with type arguments and the remaining arguments *)
+
 val args : t -> t list
 (** [args t = snd (as_app t)] *)
 
