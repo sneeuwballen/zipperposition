@@ -2995,9 +2995,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
         let pos_lit,neg_lit = 
           if Lit.is_pos lit1 then lit1, lit2 else lit2,lit1 in
-        
-        begin match neg_lit, pos_lit with
-        | Equation(x,y,sign), Equation(lhs,rhs,true) ->
+       
+        begin match pos_lit, neg_lit with
+        | Equation(x,y,true), Equation(lhs,rhs,sign) ->
           fail_on (sign); (* fail if neg. literal is propositional (= false)*)
           fail_on (not (T.is_var x && T.is_var y));
           fail_on (T.equal x y);
@@ -3019,6 +3019,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             if find_in_args x lhs_args != -1 
             then (lhs_args, rhs_args)
             else (rhs_args, lhs_args) in
+
+          fail_on (find_in_args x lhs_args != find_in_args y rhs_args);
           
           let same_vars, diff_eqns = List.fold_left (fun (same, diff) (s,t) -> 
             fail_on (not (T.is_var s && T.is_var t));
