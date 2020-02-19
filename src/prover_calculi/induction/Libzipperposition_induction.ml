@@ -135,7 +135,7 @@ end = struct
 
   (* union-find for sets of clauses *)
   module UF_clauses =
-    UnionFind.Make(struct
+    Avatar.UnionFind.Make(struct
       type key = T.var
       type value = clause list
       let equal = HVar.equal Type.equal
@@ -914,7 +914,7 @@ module Make
     var_always_naked f x
 
   module UF_vars =
-    UnionFind.Make(struct
+    Avatar.UnionFind.Make(struct
       type key = T.var
       type value = T.var list
       let equal = HVar.equal Type.equal

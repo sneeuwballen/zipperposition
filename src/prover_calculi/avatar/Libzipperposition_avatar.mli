@@ -15,6 +15,8 @@
 open Logtk
 open Libzipperposition
 
+module UnionFind = UnionFind
+
 type 'a printer = Format.formatter -> 'a -> unit
 
 (** {2 Avatar: splitting+sat} *)

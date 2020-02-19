@@ -52,8 +52,8 @@ let load_extensions =
   Extensions.register EnumTypes.extension;
   Extensions.register Libzipperposition_induction.extension;
   Extensions.register Rewriting.extension;
-  Extensions.register Arith_int.extension;
-  Extensions.register Arith_rat.extension;
+  Extensions.register Libzipperposition_arith.int_ext;
+  Extensions.register Libzipperposition_arith.rat_ext;
   Extensions.register Ind_types.extension;
   Extensions.register Fool.extension;
   Extensions.register Booleans.extension;
