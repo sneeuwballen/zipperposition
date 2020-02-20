@@ -452,24 +452,11 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* rule for primitive enumeration of predicates [P t1…tn]
      (using ¬ and ∧ and =) *)
   let prim_enum_ ~(mode) (c:C.t) : C.t list =
-    let free_vars = Literals.vars (C.lits c) |> T.VarSet.of_list in
     (* set of variables to refine (only those occurring in "interesting" lits) *)
     let vars =
-      Literals.fold_lits ~eligible:C.Eligible.always (C.lits c)
-      |> Iter.map fst
-      |> Iter.flat_map Literal.Seq.terms
-      |> Iter.flat_map T.Seq.subterms
-      |> Iter.filter (fun t -> Type.is_prop (T.ty t))
-      |> Iter.filter_map
-        (fun t ->
-           let hd = T.head_term t in
-           begin match T.as_var hd, Type.arity (T.ty hd) with
-             | Some v, Type.Arity (0, n)
-               when n>0 && Type.returns_prop (T.ty hd) && T.VarSet.mem v free_vars ->
-               Some v
-             | _ -> None
-           end)
-      |> T.VarSet.of_seq (* unique *)
+      Literals.vars (C.lits c)
+      |> CCList.filter (fun v -> Type.returns_prop @@ HVar.ty v)
+      |> T.VarSet.of_list (* unique *)
     in
     if not (T.VarSet.is_empty vars) then (
       Util.debugf ~section 5 "(@[<hv2>ho.refine@ :clause %a@ :terms {@[%a@]}@])"
@@ -497,7 +484,7 @@ module Make(E : Env.S) : S with module Env = E = struct
              C.create_a lits proof
                ~penalty:(C.penalty c + penalty) ~trail:(C.trail c)
            in
-           (* CCFormat.printf "[Prim_enum:] @[%a@]\n=>\n@[%a@].\n" C.pp c C.pp new_c;  *)
+           (* CCFormat.printf "[Prim_enum:] @[%a@]\n=>\n@[%a@].\n" C.pp c C.pp new_c;*)
            Util.debugf ~section 3
              "(@[<hv2>ho.refine@ :from %a@ :subst %a@ :yields %a@])"
              (fun k->k C.pp c Subst.pp subst C.pp new_c);

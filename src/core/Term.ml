@@ -1186,7 +1186,8 @@ module Conv = struct
       | _ -> invalid_arg "expected variable" 
 
     in
-    aux_t env t
+    let res = aux_t env t in
+    res
 end
 
 let rebuild_rec t =

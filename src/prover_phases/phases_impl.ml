@@ -130,6 +130,14 @@ let has_real stmt : bool =
         | `ID _ -> Iter.empty)
     |> Iter.exists is_real
   end
+let sine_filter stmts = 
+  if (!_sine_threshold < 0 || CCVector.length stmts < !_sine_threshold) then (stmts)
+  else (
+    let seq = CCVector.to_seq stmts in
+    let filtered = 
+      Statement.sine_axiom_selector ~depth_start:!_sine_d_min 
+      ~depth_end:!_sine_d_max ~tolerance:!_sine_tolerance seq in
+    CCVector.freeze (CCVector.of_seq filtered))
 
 let typing ~file prelude (input,stmts) =
   Phases.start_phase Phases.Typing >>= fun () ->
@@ -143,6 +151,7 @@ let typing ~file prelude (input,stmts) =
     ~def_as_rewrite ?ctx:None ~file
     (Iter.append prelude stmts)
   >>?= fun stmts ->
+  let stmts = sine_filter stmts in
   Util.debugf ~section 3 "@[<hv2>@{<green>typed statements@}@ %a@]"
     (fun k->k (Util.pp_seq Statement.pp_input) (CCVector.to_seq stmts));
   begin
@@ -161,10 +170,6 @@ let cnf ~sk_ctx decls =
   let stmts =
     decls
     |> CCVector.to_seq
-    |> (fun seq ->
-        if (!_sine_threshold < 0 || Iter.length seq < !_sine_threshold) then (CCFun.id seq)
-        else Statement.sine_axiom_selector ~depth_start:!_sine_d_min 
-            ~depth_end:!_sine_d_max ~tolerance:!_sine_tolerance seq)
     |> (if not !_lift_lambdas then CCFun.id
         else Iter.flat_map Statement.lift_lambdas)
     |> Cnf.cnf_of_seq ~ctx:sk_ctx
@@ -479,13 +484,7 @@ let process_file ?(prelude=Iter.empty) file =
   let has_goal = has_goal_decls_ decls in
   Util.debugf ~section 1 "parsed %d declarations (%s goal(s))"
     (fun k->k (CCVector.length decls) (if has_goal then "some" else "no"));
-  (* Hooks exist but they can't be used to add statements. 
-     Hence naming quantifiers inside terms is done directly here. 
-     Without this Type.Conv.Error occures so the naming is done unconditionally. *)
-  let quant_transformer = 
-    if !Booleans._quant_rename then Booleans.preprocess_booleans 
-    else CCFun.id in
-  let transformed = Rewriting.unfold_def_before_cnf (quant_transformer decls) in
+  let transformed = Booleans.preprocess_booleans(Rewriting.unfold_def_before_cnf decls) in
   let sk_ctx = Skolem.create () in 
   cnf ~sk_ctx transformed >>= fun stmts ->
   let stmts = Booleans.preprocess_cnf_booleans stmts in

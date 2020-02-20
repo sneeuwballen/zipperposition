@@ -7,6 +7,7 @@ open Logtk
 open Libzipperposition
 
 module T = Term
+module Pos = Position
 
 type selection_setting = Any | Minimal | Large
 type reasoning_kind    = 
@@ -23,6 +24,8 @@ let k_interpret_bool_funs = Flex_state.create_key ()
 let k_cnf_non_simpl = Flex_state.create_key ()
 let k_norm_bools = Flex_state.create_key () 
 let k_solve_formulas = Flex_state.create_key ()
+let k_filter_literals = Flex_state.create_key ()
+
 
 module type S = sig
   module Env : Env.S
@@ -84,119 +87,73 @@ module Make(E : Env.S) : S with module Env = E = struct
       [Builtin.Not @:[T.false_] =~ T.true_]; ] 
     |> List.map as_clause |> Iter.of_list
 
-  let bool_cases(c: C.t) : C.t list =
-    let term_as_true = Term.Tbl.create 8 in
-    let term_as_false = Term.Tbl.create 4 in
-    let cased_term_selection = Env.flex_get k_cased_term_selection in
-    let rec find_bools top t =
-      let can_be_cased = Type.is_prop(T.ty t) && T.DB.is_closed t && (not top) in
-      let is_quant = match T.view t with 
-        | AppBuiltin(b,_) -> 
-          Builtin.equal b Builtin.ForallConst || Builtin.equal b Builtin.ExistsConst
-        | _ -> false in
-      (* Add only propositions. *)
-      let add = if can_be_cased then Term.Tbl.add term_as_true else fun _ _ -> () in
-      let yes = if can_be_cased then yes else fun _ -> yes T.true_ in
-      (* Stop recursion in combination of certain settings. *)
-      let inner f x = 
-        if is_quant || can_be_cased && cased_term_selection = Large 
-        then () 
-        else List.iter(f false) x in
-      match T.view t with
-      | DB _ | Var _ -> ()
-      | Const _ -> add t (yes t)
-      | Fun(_,b) -> find_bools false b
-      | App(f,ps) -> add t (yes t); inner find_bools (f::ps)
-      | AppBuiltin(f,ps) ->
-        inner find_bools ps;
-        match f with
-        | Builtin.True | Builtin.False -> ()
-        | Builtin.Eq | Builtin.Neq | Builtin.Equiv | Builtin.Xor ->
-          begin match ps with 
-            | [x;y] when (cased_term_selection != Minimal || Type.is_prop(T.ty x)) ->
-              if f = Builtin.Neq || f = Builtin.Xor then(
-                if can_be_cased then Term.Tbl.add term_as_false t (x =~ y);
-                add t (x /~ y))
-              else add t (x =~ y)
-            | _ -> () end
-        | Builtin.And | Builtin.Or | Builtin.Imply | Builtin.Not ->
-          if cased_term_selection != Minimal then add t (yes t) else()
-        | _ -> add t (yes t) 
-    in
-    Literals.Seq.terms(C.lits c) |> Iter.iter(find_bools true);
-    let case polarity b b_lit clauses =
-      let proof = Proof.Step.inference[C.proof_parent c]
-          ~rule:(Proof.Rule.mk"bool_cases") ~tags:[Proof.Tag.T_ho]
-      in
-      C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
-        (b_lit :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:b ~by:polarity)))
-        proof :: clauses
-    in
-    Term.Tbl.fold(case T.false_) term_as_true [] @
-    Term.Tbl.fold(case T.true_) term_as_false []
+  let find_bools c =
+    let subterm_selection = Env.flex_get k_cased_term_selection in
 
+    let rec find_in_term ~top t k =
+      match T.view t with 
+      | T.Const _ when Type.is_prop (T.ty t) -> k t
+      | T.App(_, args)
+      | T.AppBuiltin(_, args) ->
+        let take_subterm =
+          not top &&
+          Type.is_prop (T.ty t) && 
+          not (T.is_true_or_false t) &&
+          T.DB.is_closed t &&
+          (subterm_selection != Minimal ||
+           Iter.is_empty 
+            (Iter.flat_map (find_in_term ~top:false) 
+              (CCList.to_seq args))) in
+        let continue =
+          (subterm_selection = Any || not take_subterm) in
+        if take_subterm then k t;
+        if continue then (
+          List.iter (fun arg -> 
+            find_in_term ~top:false arg k 
+          ) args)
+      | T.Fun (_,body) ->
+        find_in_term ~top:false body k
+      | _ -> () in
 
-  let bool_case_simp(c: C.t) : C.t list option =
-    let term_to_equations = Term.Tbl.create 8 in
-    let cased_term_selection = Env.flex_get k_cased_term_selection in
-    let rec find_bools top t =
-      let can_be_cased = Type.is_prop(T.ty t) && T.DB.is_closed t && (not top) in
-      let is_quant = match T.view t with 
-        | AppBuiltin(b,_) -> 
-          Builtin.equal b Builtin.ForallConst || Builtin.equal b Builtin.ExistsConst
-        | _ -> false in
-      (* Add only propositions. *)
-      let add t x y = if can_be_cased then Term.Tbl.replace term_to_equations t (x=~y, x/~y) in
-      (* Stop recursion in combination of certain settings. *)
-      let inner f x = 
-        if is_quant || (can_be_cased && cased_term_selection = Large) 
-        then () 
-        else List.iter(f false) x in
-      match T.view t with
-      | DB _ | Var _ -> ()
-      | Const _ -> add t t T.true_
-      | Fun(_,b) -> find_bools false b
-      | App(f,ps) -> add t t T.true_; inner find_bools (f::ps)
-      | AppBuiltin(f,ps) ->
-        inner find_bools ps;
-        match f with
-        | Builtin.True | Builtin.False -> ()
-        | Builtin.Eq | Builtin.Neq | Builtin.Equiv | Builtin.Xor ->
-          (match ps with 
-           | [_;x;y]
-           | [x;y] when (cased_term_selection != Minimal || Type.is_prop(T.ty x)) ->
-             add t x y;
-             if (f = Builtin.Neq || f = Builtin.Xor) && can_be_cased then
-               Term.Tbl.replace term_to_equations t (Term.Tbl.find term_to_equations t |> CCPair.swap)
-           | _ -> ())
-        | Builtin.And | Builtin.Or | Builtin.Imply | Builtin.Not ->
-          if cased_term_selection != Minimal then add t t T.true_ else()
-        | _ -> add t t T.true_
-    in
-    if not @@ Iter.exists T.is_formula (C.Seq.terms c) then (
-      (* first clausify, then get bool subterms *)
-      Literals.Seq.terms(C.lits c) 
-      |> Iter.iter(find_bools true));
+    let eligible = 
+      match Env.flex_get k_filter_literals with
+      | `All -> C.Eligible.always
+      | `Max -> C.Eligible.param c in
+    
+    Literals.fold_terms ~which:`All
+      ~subterms:false ~eligible ~ord:(C.Ctx.ord ()) (C.lits c)
+    |> Iter.flat_map (fun (t,_) -> find_in_term ~top:true t)
+    |> T.Set.of_seq
+    |> T.Set.to_list
+  
+  let mk_res ~proof ~old ~repl new_lit c =
+    C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
+      (new_lit :: Array.to_list( C.lits c |> Literals.map (T.replace ~old ~by:repl)))
+      proof
 
-    let res = 
-      Term.Tbl.fold(fun b (b_true, b_false) clauses ->
-          if cased_term_selection != Minimal ||
-             Term.Seq.subterms b |> 
-             Iter.for_all (fun st -> 
-                 T.equal b st || not (Type.is_prop (T.ty st)) || T.is_true_or_false st) then (
-            let proof = Proof.Step.simp[C.proof_parent c]
-                ~rule:(Proof.Rule.mk"bool_case_simp") ~tags:[Proof.Tag.T_ho]
-            in
-            C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
-              (b_true :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:b ~by:T.false_)))
-              proof ::
-            C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
-              (b_false :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:b ~by:T.true_)))
-              proof ::
-            clauses)
-          else clauses) term_to_equations [] in
-    if CCList.is_empty res then None
-    else (Some res)
+  let bool_case_inf (c: C.t) : C.t list =    
+    let proof = Proof.Step.inference [C.proof_parent c]
+                ~rule:(Proof.Rule.mk"bool_inf") ~tags:[Proof.Tag.T_ho] in
+
+    find_bools c
+    |> CCList.fold_left (fun acc old ->
+      let neg_lit, repl = no old, T.true_ in
+      (mk_res ~proof ~old ~repl neg_lit c) :: acc
+    ) []
+
+  let bool_case_simp (c: C.t) : C.t list option =
+    let proof = Proof.Step.simp [C.proof_parent c]
+                ~rule:(Proof.Rule.mk"bool_simp") ~tags:[Proof.Tag.T_ho] in
+
+    let bool_subterms = find_bools c in
+    if CCList.is_empty bool_subterms then None
+    else (
+      CCOpt.return @@ CCList.fold_left (fun acc old ->
+        let neg_lit, repl_neg = no old, T.true_ in
+        let pos_lit, repl_pos = yes old, T.false_ in
+        (mk_res ~proof ~old ~repl:repl_neg neg_lit c) ::
+        (mk_res ~proof ~old ~repl:repl_pos pos_lit c) :: acc
+    ) [] bool_subterms)
 
   let simpl_bool_subterms c =
     let new_lits = Literals.map T.simplify_bools (C.lits c) in
@@ -377,7 +334,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       );
 
       if Env.flex_get k_bool_reasoning = BoolCasesInference then (
-        Env.add_unary_inf "bool_cases" bool_cases;
+        Env.add_unary_inf "bool_cases" bool_case_inf;
       )
       else if Env.flex_get k_bool_reasoning = BoolCasesSimplification then (
         Env.set_single_step_multi_simpl_rule bool_case_simp;
@@ -530,7 +487,7 @@ let rec case_bools_wrt vs t =
       | _ -> None
     )
 
-let eager_cases_far =
+let eager_cases_far stms =
   let proof s = Proof.Step.esa [Proof.Parent.from(Statement.as_proof_i s)]
       ~rule:(Proof.Rule.mk "eager_cases_far")
   in
@@ -540,10 +497,10 @@ let eager_cases_far =
              let b' = case_bools_wrt (Var.Set.add vs v) b in
              if TypedSTerm.equal b b' then None else Some(replace s (bind ~ty:prop q v b') t)
            | _ -> None)
-       |> case_bools_wrt Var.Set.empty])
+       |> case_bools_wrt Var.Set.empty]) stms
 
 
-let eager_cases_near =
+let eager_cases_near stms =
   let proof s = Proof.Step.esa [Proof.Parent.from(Statement.as_proof_i s)]
       ~rule:(Proof.Rule.mk "eager_cases_near")
   in
@@ -554,11 +511,13 @@ let eager_cases_near =
         | Bind((Forall|Exists),_,_) -> None
         | AppBuiltin((Eq|Neq), [x;y]) when is_bool x -> None
         | _ when is_bool s ->
+          (* Case split a maximal boolean strict subterm of s which by selection of s isn't a direct subterm. *)
           let s' = case_bool vs s (with_subterm_or_id s (fun _ -> CCOpt.if_(fun x -> not (TypedSTerm.equal x s) && is_bool x && not(is_T_F x)))) in
           if TypedSTerm.equal s s' then None else Some(case_near(replace s s' t))
         | _ -> None)
   in
-  map_propositions ~proof (fun _ p -> [case_near p])
+  map_propositions ~proof (fun _ p -> [case_near p]) stms
+
 
 
 open Term
@@ -572,6 +531,7 @@ let post_eager_cases =
       fold_left(SLiteral.fold(fun res -> (* Loop over subterms of terms of literals of a clause. *)
           Seq.subterms_depth %> Iter.fold(fun res (s,d) ->
               if d = 0 || not(Type.is_prop(ty s)) || is_true_or_false s || is_var s || Set.mem s !cased
+                       || not (T.DB.is_closed s)
               then
                 res
               else(
@@ -607,6 +567,7 @@ let _interpret_bool_funs = ref false
 let _cnf_non_simpl = ref false
 let _norm_bools = ref false 
 let _solve_formulas = ref false
+let _filter_literals = ref `All
 
 
 let extension =
@@ -620,6 +581,8 @@ let extension =
     E.flex_add k_cnf_non_simpl !_cnf_non_simpl;
     E.flex_add k_norm_bools !_norm_bools;
     E.flex_add k_solve_formulas !_solve_formulas;
+    E.flex_add k_filter_literals !_filter_literals;
+
 
     ET.setup ()
   in
@@ -641,7 +604,7 @@ let () =
                                              | "cases-eager-near" -> BoolCasesEagerNear
                                              | _ -> assert false), 
       " enable/disable boolean axioms";
-      "--bool-subterm-selection", 
+      "--bool-subterm-selection",
       Arg.Symbol(["A"; "M"; "L"], (fun opt -> _cased_term_selection := 
                                       match opt with "A"->Any | "M"->Minimal | "L"->Large
                                                    | _ -> assert false)), 
@@ -657,9 +620,16 @@ let () =
     , " turn interpretation of boolean functions as forall or negation of forall on or off";
       "--normalize-bool-terms", Arg.Bool((fun v -> _norm_bools := v)),
       " normalize boolean subterms using their weight.";
-      "--solve-formulas"
+    "--solve-formulas"
     , Arg.Bool (fun v -> _solve_formulas := v)
-    , " solve phi != psi eagerly using unification, where phi and psi are formulas"
+    , " solve phi != psi eagerly using unification, where phi and psi are formulas";
+    "--boolean-reasoning-filter-literals"
+    , Arg.Symbol(["all"; "max"], (fun v ->
+        match v with 
+        | "all" -> _filter_literals:=`All
+        | "max" -> _filter_literals:= `Max
+        | _ -> assert false;))
+    , " select on which literals to apply bool reasoning rules"
     ];
   Params.add_to_modes ["ho-complete-basic";
                        "ho-pragmatic";

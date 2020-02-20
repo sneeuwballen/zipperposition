@@ -211,7 +211,7 @@ module Term = struct
 
     let make_ head args term_lhs term_rhs proof =
       let term_proof =
-        Proof.Step.define head (Proof.Src.internal[]) [Proof.Parent.from proof]
+        Proof.Step.define head (Proof.Src.internal []) [Proof.Parent.from proof]
       in
       { term_head=head; term_args=args; term_arity=List.length args;
         term_lhs; term_rhs; term_proof }
@@ -238,6 +238,10 @@ module Term = struct
           ID.pp id T.pp rhs
       );
       make_ id args lhs rhs proof
+
+    let make_rewritten ~proof ~rewrite_fun id ty args rhs : t =
+      let proof, rhs = rewrite_fun rhs in
+      make ~proof id ty args rhs
 
     let pp out r = pp_term_rule out r
 
@@ -383,6 +387,7 @@ module Term = struct
            closed terms to closed terms, so we can safely rewrite under λ *)
         reduce body
           (fun body' ->
+             assert (Type.equal (T.ty body) (T.ty body'));
              let t =
                if T.equal body body' then t else (T.fun_ arg body')
              in k t)
@@ -405,12 +410,13 @@ module Term = struct
     in
     reduce t0 (fun t -> t, !set)
 
-  let normalize_term ?(max_steps=1000) (t:term): term * Rule_inst_set.t =
+  let normalize_term ?(max_steps=3) (t:term): term * Rule_inst_set.t =
     ZProf.with_prof prof_term_rw (normalize_term_ max_steps) t
 
   let normalize_term_fst ?max_steps t = fst (normalize_term ?max_steps t)
 
   let narrow_term ?(subst=Unif_subst.empty) ~scope_rules:sc_r (t,sc_t): _ Iter.t =
+    let t = Lambda.snf t in
     begin match T.view t with
       | T.Const _ -> Iter.empty (* already normal form *)
       | T.App (f, _) ->

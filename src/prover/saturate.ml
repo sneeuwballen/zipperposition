@@ -123,8 +123,8 @@ module Make(E : Env.S) = struct
         Unknown
       )
     | Some c ->
-      Util.debugf ~section 2 "@[<2>@{<green>given@} (before simplification):@ `@[%a@]`@]"
-        (fun k->k Env.C.pp c);
+      (* Util.debugf ~section 1 "@[<2>@{<green>given@} (before simplification):@ `@[%a@]`@]"
+            (fun k->k Env.C.pp c); *)
       check_clause_ c;
       Util.incr_stat stat_steps;
       begin match Env.all_simplify c with
@@ -152,15 +152,11 @@ module Make(E : Env.S) = struct
           (* very expensive assert *)
           (* assert (not (Env.is_redundant c)); *)
           (* process the given clause! *)
-          (* (match Env.C.is_inj_axiom c with
-             | Some (sym,i) -> Env.Ctx.set_injective_for_arg sym i
-             | None -> ()); *)
           Util.incr_stat stat_processed_given;
           Util.debugf ~section 1 "@[@{<Yellow>### step %5d ###@}@]"(fun k->k num);
           Util.debugf ~section 1 "@[<2>@{<green>given@} (%d steps, penalty %d):@ `@[%a@]`@]"
             (fun k->k num (Env.C.penalty c) Env.C.pp c);
-          Util.debugf ~section 1 "@[<2>@{<green>given@} simplified: `@[%a@]`@]"
-            (fun k-> k (CCList.pp Env.C.pp) l');
+          Util.debugf ~section 1 "@[proof:@[%a@]@]" (fun k -> k Proof.S.pp_tstp (Env.C.proof c));
           (* find clauses that are subsumed by given in active_set *)
           let subsumed_active = Env.C.ClauseSet.to_seq (Env.subsumed_by c) in
           Env.remove_active subsumed_active;

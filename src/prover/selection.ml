@@ -70,7 +70,7 @@ let can_select_lit ~ord (lits:Lits.t) (i:int) : bool =
       let vars_args = var_headed_subterms `All in
       Lit.fold_terms ~vars:true ~ty_args:false ~which:`All ~subterms:true lits.(i)
       |> Iter.exists (fun (t,_) ->
-          vars_args |> CCList.exists (fun (head, args) -> head = t && not (CCList.is_empty args))
+          vars_args |> CCList.exists (fun (head, args) -> T.equal head t && not (CCList.is_empty args))
         )
     | `NoHigherOrderVariables ->
       (* We cannot select literals containing a HO variable: *)

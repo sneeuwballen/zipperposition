@@ -103,6 +103,7 @@ val is_arith : t -> bool
 (** Any arithmetic operator, or constant *)
 val is_logical_op : t -> bool
 val is_logical_binop : t -> bool
+val is_flattened_logical : t -> bool
 val is_quantifier : t -> bool
 val true_ : t
 val false_ : t
