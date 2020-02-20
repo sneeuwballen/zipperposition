@@ -45,11 +45,17 @@ let take_fair gens =
   aux 1 gens
 
 module Make (P : PARAMETERS) = struct 
+  exception PolymorphismDetected
+
   let rec nfapply_mono subst (t,sc) =
     let pref, tt = T.open_fun t in
     let t' =  
       begin match T.view tt with
         | T.Var _ ->
+          if not (Type.is_ground (T.ty tt)) then (
+            raise PolymorphismDetected
+          );
+
           let u, _ = S.FO.deref subst (tt,sc) in
           if T.equal tt u then u
           else nfapply_mono subst (u,sc)
@@ -57,6 +63,7 @@ module Make (P : PARAMETERS) = struct
           let f = nfapply_mono subst (f0, sc) in
           let t =
             if T.equal f0 f then tt else T.app f l in
+          
           let u = Lambda.whnf t in
           if T.equal t u
           then t
@@ -68,9 +75,16 @@ module Make (P : PARAMETERS) = struct
 
   (* apply a substitution, possibly eta-expand because
      a type substitution might introduce a need for expansion and reduce to whnf *)
-  let nfapply s u = Lambda.whnf @@ Lambda.eta_expand @@ S.FO.apply S.Renaming.none s u
+  let nfapply s u = Lambda.whnf @@ S.FO.apply S.Renaming.none s u
 
-  let normalize ~mono = if mono then nfapply_mono else nfapply
+  let normalize s u =
+    try
+      if not (Type.is_ground (T.ty (fst u))) then
+        raise PolymorphismDetected;
+
+      nfapply_mono s u 
+    with PolymorphismDetected -> 
+      nfapply s u 
 
   let eta_expand_otf ~subst ~scope pref1 pref2 t1 t2 =
     let do_exp_otf n types t = 
@@ -78,7 +92,7 @@ module Make (P : PARAMETERS) = struct
       assert(List.length remaining != 0);
       let num_vars = List.length remaining in
       let vars = List.mapi (fun i ty -> 
-          let ty = S.Ty.apply S.Renaming.none subst (ty,scope) in
+          (* let ty = S.Ty.apply S.Renaming.none subst (ty,scope) in *)
           T.bvar ~ty (num_vars-1-i)) remaining in
       let shifted = T.DB.shift num_vars t in
       T.app shifted vars in
@@ -97,7 +111,7 @@ module Make (P : PARAMETERS) = struct
     | T.AppBuiltin _ ->  not @@ T.is_appbuiltin t
     | _ -> false
 
-  let do_unif problem subst mono unifscope =   
+  let do_unif problem subst unifscope =   
     let rec aux ~steps subst problem =
       let decompose args_l args_r rest flag =
         let rec zipped_with_flag = function 
@@ -170,8 +184,8 @@ module Make (P : PARAMETERS) = struct
         | None -> OSeq.empty
         | Some subst ->
           let subst = Unif_subst.subst subst in
-          let lhs = normalize ~mono subst (lhs, unifscope) 
-          and rhs = normalize ~mono subst (rhs, unifscope) in
+          let lhs = normalize subst (lhs, unifscope) 
+          and rhs = normalize subst (rhs, unifscope) in
           let (pref_lhs, body_lhs) = T.open_fun lhs
           and (pref_rhs, body_rhs) = T.open_fun rhs in 
           let body_lhs, body_rhs, _ = 
@@ -239,10 +253,8 @@ module Make (P : PARAMETERS) = struct
 
   let unify_scoped t0s t1s =
     let lhs,rhs,unifscope,subst = P.identify_scope t0s t1s in
-    let mono = 
-      Iter.is_empty @@ Iter.append (Term.Seq.ty_vars lhs) (Term.Seq.ty_vars rhs) in
     try
-      do_unif [(lhs,rhs,P.init_flag)] subst mono unifscope
+      do_unif [(lhs,rhs,P.init_flag)] subst unifscope
     (* |> OSeq.map (fun opt -> CCOpt.map (fun subst -> 
        let l = Lambda.eta_reduce @@ Lambda.snf @@ S.FO.apply Subst.Renaming.none subst t0s in 
        let r = Lambda.eta_reduce @@ Lambda.snf @@ S.FO.apply Subst.Renaming.none subst t1s in
