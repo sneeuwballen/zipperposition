@@ -24,6 +24,7 @@ end
 
 let _timeout = ref 11
 let _e_auto = ref false
+let _max_derived = ref 16
 
 let e_bin = ref (None : string option)
 
@@ -42,8 +43,11 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let output_cl ~out clause =
     let lits_converted = Literals.Conv.to_tst (C.lits clause) in
-    Format.fprintf out "%% %d:\n" (Proof.Step.inferences_performed (C.proof_step clause));
-    Format.fprintf out "@[thf(zip_cl_%d,axiom,@[%a@]).@]@\n" (C.id clause) TypedSTerm.TPTP_THF.pp lits_converted
+    Format.fprintf out "%% %d:\n" (C.proof_depth clause);
+    if CCOpt.is_some (C.distance_to_goal clause) then (
+      Format.fprintf out "@[thf(zip_cl_%d,negated_conjecture,@[%a@]).@]@\n" (C.id clause) TypedSTerm.TPTP_THF.pp lits_converted
+    ) else Format.fprintf out "@[thf(zip_cl_%d,axiom,@[%a@]).@]@\n" (C.id clause) TypedSTerm.TPTP_THF.pp lits_converted
+
 
   let output_symdecl ~out sym ty =
     Format.fprintf out "@[thf(@['%a_type',type,@[%a@]:@ @[%a@]@]).@]@\n" 
@@ -116,7 +120,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
 
   let try_e active_set passive_set =
-    let max_others = 16 in
+    let max_others = !_max_derived in
 
     let rec can_be_translated t =
       let can_translate_ty ty =
@@ -200,4 +204,5 @@ let () =
   Options.add_opts
     [ "--tmp-dir", Arg.String (fun v -> _tmp_dir := v), " scratch directory for running E";
       "--e-timeout", Arg.Set_int _timeout, " set E prover timeout.";
+      "--e-max-derived", Arg.Set_int _max_derived, " set the limit of clauses that are derived by Zipperposition and given to E";
       "--e-auto", Arg.Bool (fun v -> _e_auto := v), " If set to on eprover will not run in autoschedule, but in auto mode"]

@@ -1546,15 +1546,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               s_hd, T.app t_hd taken, s_args, dropped
             ) in
           if T.same_l args_lhs args_rhs && s_sc == t_sc then ([lhs,rhs])
-          else (
-            if Env.flex_get k_ho_disagremeents = `AllHo && not (type_is_ho s)
-            then raise StopSearch
-            else [s,t]
-          )
-        | _ -> 
-          if Env.flex_get k_ho_disagremeents = `AllHo && not (type_is_ho s) then
-            raise StopSearch
-          else [s,t])
+          else [s,t]
+        | _ -> [s,t])
     and aux_l xs ys =
       match xs,ys with
       | [],[] -> []
@@ -1563,12 +1556,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     
     try
       if not (Type.equal (T.ty s) (T.ty t)) then raise StopSearch;
-      let disagreements = aux (Lambda.eta_expand s) (Lambda.eta_expand t) in
 
-      (* There must exist at least one constraint of HO type *)
-      if List.for_all (not % type_is_ho) (List.map fst disagreements) then (
-        raise StopSearch
-      );
+      let diss = aux (Lambda.eta_expand s) (Lambda.eta_expand t) in
 
       let _,_,unifscope,init_subst =
         US.FO.rename_to_new_scope ~counter (s,s_sc) (t,t_sc) in
@@ -1576,24 +1565,32 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Subst.FO.apply Subst.Renaming.none (US.subst subst) in
 
       (* Filter out the pairs that are easy to unify *)
-      let disagreements = 
+      let diss = 
         List.fold_left (fun (dis_acc, subst) (si, ti) ->
           let si',ti' = CCPair.map_same (app_subst subst) ((si,s_sc), (ti,t_sc)) in
           match cheap_unify ~subst (si',unifscope) (ti', unifscope) with
           | Some subst' -> dis_acc, subst'
           | None -> (si,ti) :: dis_acc, subst)
-        ([],init_subst) (disagreements) in
+        ([],init_subst) (diss) in
 
 
-      (* If no constraints are left or 
-         all of pairs are flex-flex then we could 
-         have done  all of this with HO unification *)
-      if (*CCList.is_empty (fst disagreements) || *)
-          List.for_all (fun (si,ti) -> 
-            T.is_ho_var si && T.is_ho_var ti) (fst disagreements) then (
+      (* If no constraints are left or all of pairs are flex-flex
+         or all of pairs are FO then we could have done all of 
+         this with HO unification or FO superposition *)
+      if CCList.is_empty (fst diss) ||
+         List.for_all (fun (si,ti) -> 
+            T.is_ho_var si && T.is_ho_var ti) (fst diss) ||
+         List.for_all (fun (si,_) ->
+            not (type_is_ho si)) (fst diss) then (
           raise StopSearch
       );
-      Some disagreements
+
+      if Env.flex_get k_ho_disagremeents == `AllHo &&
+         List.exists (fun (si,_) -> not (type_is_ho si)) (fst diss) then (
+           raise StopSearch
+        );
+
+      Some diss
     with StopSearch -> None
 
   let ext_eqfact_decompose_aux cl =
@@ -2034,8 +2031,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
       match find_ho_disagremeents (from_t, sc_f) (into_t, sc_i) with 
       | Some (disagreements, subst) ->
-        assert(not @@ US.has_constr subst);
-        
+        assert(not @@ US.has_constr subst);        
         let renaming = Subst.Renaming.create () in
         let subst = US.subst subst in
         let lits_f = Lits.apply_subst renaming subst (C.lits from_c, sc_f) in
@@ -2146,8 +2142,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                   |> Literals.apply_subst (Subst.Renaming.create()) (US.subst subst)
                   |> Array.to_list in
                 let proof =
-                  Proof.Step.inference [C.proof_parent c]
-                    ~rule:(Proof.Rule.mk "ext_eqres") in
+                  Proof.Step.inference [C.proof_parent c] ~rule:(Proof.Rule.mk "ext_eqres") in
                 let new_c =
                   C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
                 Some new_c
@@ -3238,7 +3233,7 @@ let _solidification_limit = ref 5
 let _max_unifs_solid_ff = ref 20
 let _use_weight_for_solid_subsumption = ref false
 let _sort_constraints = ref false
-let _ho_disagremeents = ref `AllHo
+let _ho_disagremeents = ref `SomeHo
 
 let _guard = ref 45
 let _ratio = ref 135

@@ -155,7 +155,6 @@ let bool_encode_stmt stmt =
     | Statement.Lemma _ -> failwith "Not implemented: Lemma"
     | Statement.Goal lits -> failwith "Not implemented: Goal"
     | Statement.NegatedGoal (skolems,clauses) -> 
-      List.iter (fun (id,ty) -> CCFormat.printf "@[%a@]:@[%a@]@." ID.pp id T.pp ty) skolems;
       let skolems = List.map (fun (id, ty) -> (id, bool_encode_ty ty)) skolems in
       Statement.neg_goal ~proof ~skolems (List.map bool_encode_lits clauses)
     | Statement.Assert lits -> Statement.assert_ ~proof (bool_encode_lits lits)
