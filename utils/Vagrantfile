@@ -54,6 +54,7 @@ Vagrant.configure("2") do |config|
     apt-get install git unzip xfce4 opam mccs -y
     apt-get install fish kitty-terminfo libgmp-dev -y
     apt-get remove gringo -y
+    apt-get install emacs vim
     chsh -s /usr/bin/fish vagrant
   SHELL
 
@@ -62,7 +63,7 @@ Vagrant.configure("2") do |config|
 
   config.vm.provision "shell", privileged: false, inline: <<-SHELL
     mkdir -p ~/.config/fish/
-    echo 'source /home/simon/.opam/opam-init/init.fish > /dev/null 2> /dev/null; or true' > ~/.config/fish/config.fish
+    echo 'source $HOME/.opam/opam-init/init.fish > /dev/null 2> /dev/null; or true' > ~/.config/fish/config.fish
     git clone https://github.com/sneeuwballen/zipperposition.git zipperposition
     opam init -y
     opam update -y
@@ -70,5 +71,15 @@ Vagrant.configure("2") do |config|
     eval `opam env`
     opam pin zipperposition#HEAD -y -n
     opam install zipperposition -y
+    opam install ocp-indent merlin -y
+  SHELL
+
+  # vscode
+  config.vm.provision "shell", inline: <<-SHELL
+    apt-get install software-properties-common -y
+    wget -qO - https://gitlab.com/paulcarroty/vscodium-deb-rpm-repo/raw/master/pub.gpg | sudo apt-key add -
+    apt-add-repository 'deb https://gitlab.com/paulcarroty/vscodium-deb-rpm-repo/raw/repos/debs/ vscodium main'
+    apt update -y
+    apt install codium -y
   SHELL
 end
