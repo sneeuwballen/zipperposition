@@ -51,17 +51,20 @@ Vagrant.configure("2") do |config|
   # documentation for more information about their specific syntax and use.
   config.vm.provision "shell", inline: <<-SHELL
     apt-get update -y
-    apt-get install git unzip xfce4 opam fish -y
+    apt-get install git unzip xfce4 opam -y
+    apt-get install fish kitty-terminfo -y
+    chsh -s /usr/bin/fish vagrant
   SHELL
 
-  config.vm.provision "file", source: "../", destination: "$HOME/zipperposition/"
+  # NOTE: faster to just `git clone`, somehow. Also doesn't copy _build/ or symlinks.
+  #config.vm.provision("file", source: "../", destination: "$HOME/zipperposition")
 
-  config.vm.provision "shell", inline: <<-SHELL
-    opam pin .#HEAD -y
-  SHELL
-
-  config.vm.provision "shell", inline: <<-SHELL
-    apt-get install fish -y
-    chsh -s fish
+  config.vm.provision "shell", privileged: false, inline: <<-SHELL
+    git clone https://github.com/sneeuwballen/zipperposition.git zipperposition
+    opam init -y
+    opam update -y
+    opam switch create 4.08.1 -y
+    eval `opam env`
+    opam pin zipperposition#HEAD -y
   SHELL
 end
