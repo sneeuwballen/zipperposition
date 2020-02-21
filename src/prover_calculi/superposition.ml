@@ -620,6 +620,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             C.pp info.passive sc_p Lit.pp info.passive_lit
             Position.pp info.passive_pos US.pp info.subst);
 
+      if (info.sup_kind = LambdaSup && US.has_constr info.subst) then (
+        raise (ExitSuperposition "Might sneak in bound vars through constraints.")
+      );
+
       let renaming = S.Renaming.create () in
       let us = info.subst in
       let subst = US.subst us in
@@ -639,7 +643,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
       if(info.sup_kind = LambdaSup && 
          T.Set.exists (fun v -> 
-             not @@ T.DB.is_closed @@  Subst.FO.apply renaming subst (v,sc_p)) 
+             not @@ T.DB.is_closed @@  Subst.FO.apply ~shift_vars renaming subst (v,sc_p)) 
            lambdasup_vars) then (
         let msg = "LambdaSup: an into free variable sneaks in bound variable" in
         Util.debugf ~section 3 "%s" (fun k->k msg);
@@ -774,11 +778,22 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       and penalty =
         max (C.penalty info.active) (C.penalty info.passive)
         + (if T.is_var s' then 2 else 0) (* superposition from var = bad *)
+        + (if info.sup_kind == FluidSup then Env.flex_get k_fluidsup_penalty else 0)
+        + (if info.sup_kind == DupSup then Env.flex_get k_fluidsup_penalty/3 else 0)
+        + (if info.sup_kind == LambdaSup then 1 else 0)
+
       in
       let new_clause = C.create ~trail:new_trail ~penalty new_lits proof in
       (* Format.printf "LS: %a\n" C.pp new_clause;  *)
       Util.debugf ~section 3 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
-      assert (List.for_all (Lit.for_all Term.DB.is_closed) new_lits); 
+      if (not (List.for_all (Lit.for_all Term.DB.is_closed) new_lits)) then (
+        CCFormat.printf "@[<2>sup, kind %s(%d)@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a, t'=%a@]@])@ \
+         (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@]"
+         (kind_to_str info.sup_kind) (Term.Set.cardinal lambdasup_vars) C.pp info.active sc_a T.pp info.s T.pp info.t
+            T.pp t' C.pp info.passive sc_p Lit.pp info.passive_lit
+            Position.pp info.passive_pos US.pp info.subst;
+        assert false;
+      );
       assert(Array.for_all Literal.no_prop_invariant (C.lits new_clause));
       Some new_clause
     with ExitSuperposition reason ->
@@ -1596,40 +1611,39 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   
     let ext_inst ~parents (s,s_sc) (t,t_sc) =
-    assert(not (CCList.is_empty parents));
+      assert(not (CCList.is_empty parents));
 
-    let renaming = Subst.Renaming.create () in
-    let apply_subst = Subst.FO.apply renaming Subst.empty  in
-    let s, t = apply_subst (s,s_sc), apply_subst (t,t_sc) in
-    assert(Type.equal (T.ty s) (T.ty t));
-    assert(Type.is_fun (T.ty s));
-    
-    let ty_args, ret  = Type.open_fun (T.ty s) in
-    let alpha = T.of_ty @@ List.hd ty_args in
-    let beta = T.of_ty @@ Type.arrow (List.tl ty_args) ret in
-    let diff_const = Env.flex_get HO.k_diff_const in
-    
-    let diff_s_t = T.app diff_const [alpha; beta; s; t] in
-    let s_diff, t_diff = T.app s [diff_s_t], T.app t [diff_s_t] in
+      let renaming = Subst.Renaming.create () in
+      let apply_subst = Subst.FO.apply renaming Subst.empty  in
+      let s, t = apply_subst (s,s_sc), apply_subst (t,t_sc) in
+      assert(Type.equal (T.ty s) (T.ty t));
+      assert(Type.is_fun (T.ty s));
+      
+      let ty_args, ret  = Type.open_fun (T.ty s) in
+      let alpha = T.of_ty @@ List.hd ty_args in
+      let beta = T.of_ty @@ Type.arrow (List.tl ty_args) ret in
+      let diff_const = Env.flex_get HO.k_diff_const in
+      
+      let diff_s_t = T.app diff_const [alpha; beta; s; t] in
+      let s_diff, t_diff = T.app s [diff_s_t], T.app t [diff_s_t] in
 
-    let neg_lit = Lit.mk_neq s_diff t_diff in
-    let pos_lit = Lit.mk_eq s t in
-    let new_lits = [neg_lit; pos_lit] in
+      let neg_lit = Lit.mk_neq s_diff t_diff in
+      let pos_lit = Lit.mk_eq s t in
+      let new_lits = [neg_lit; pos_lit] in
 
-    let proof =
-          Proof.Step.inference (List.map C.proof_parent parents)
-            ~rule:(Proof.Rule.mk "ext_inst") in
-    let penalty = List.fold_left max 1 (List.map C.penalty parents) in
+      let proof =
+            Proof.Step.inference (List.map C.proof_parent parents)
+              ~rule:(Proof.Rule.mk "ext_inst") in
+      let penalty = List.fold_left max 1 (List.map C.penalty parents) in
 
-    C.create ~trail:(C.trail_l parents) ~penalty new_lits proof
+      C.create ~trail:(C.trail_l parents) ~penalty new_lits proof
 
   let do_ext_inst ~parents ((from_t,sc_f) as s) ((into_t,sc_t) as t) =
-    let sc_f,sc_i = 0,1 in
     match find_ho_disagremeents ~unify:false s t  with
     | Some (disagreements, subst) -> 
       assert (US.is_empty subst);
-      let ho_dis = List.filter (fun (s,t) -> t_type_is_ho s) disagreements in
-      assert (not (CCList.is_empty ho_dis));
+      let ho_dis = List.filter (fun (s,t) -> Type.is_fun (T.ty s)) disagreements in
+      (* assert (not (CCList.is_empty ho_dis)); *)
 
       CCList.map (fun (lhs,rhs) -> ext_inst ~parents (lhs,sc_f) (rhs,sc_t)) ho_dis
     | None -> []
@@ -1656,11 +1670,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       | None -> [] in
 
     let try_ext_eq_factinst (s,_) (u,_) =
-      match find_ho_disagremeents ~unify:false (s,0) (u,0) with
-      | Some (dis, subst) ->
-        assert(US.is_empty subst);
-        CCList.map (fun (s,t) -> ext_inst ~parents:[cl] (s,0) (t,0)) dis
-      | None -> [] in
+      do_ext_inst ~parents:[cl] (s,0) (u,0) in
 
     let try_factorings (s,t) (u,v) idx =
       let ext_family = 
@@ -1743,7 +1753,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let ext_eqfact given =
     if Proof.Step.inferences_performed (C.proof_step given)
-       < Env.flex_get k_ext_rules_max_depth then  
+       <= Env.flex_get k_ext_rules_max_depth then  
       ZProf.with_prof prof_ext_dec ext_inst_or_family_eqfact_aux given
     else []
 
@@ -2260,11 +2270,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             let idx = Lits.Pos.idx pos in
             if Env.flex_get k_ext_dec_lits != `OnlyMax ||
                BV.get (C.eligible_res_no_subst c) idx then (
-              match find_ho_disagremeents ~unify:false (lhs, 0) (rhs, 0) with
-              | Some (dis, subst) ->
-                assert(US.is_empty subst);
-                CCList.map (fun (s,t) -> ext_inst ~parents:[c] (s,0) (t,0)) dis
-              | None -> [])
+              do_ext_inst ~parents:[c] (lhs,0) (rhs,0))
             else [])
         in
       Util.incr_stat stat_ext_inst;
@@ -3242,8 +3248,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Env.add_unary_inf "recognize injectivity" recognize_injectivity;
     );
 
-    if Env.flex_get k_ext_rules_kind = `ExtFamily ||
-       Env.flex_get k_ext_rules_kind = `Both then (
+    if Env.flex_get k_ext_rules_kind == `ExtFamily ||
+       Env.flex_get k_ext_rules_kind == `Both then (
       Env.add_binary_inf "ext_dec_act" ext_sup_act;
       Env.add_binary_inf "ext_dec_pas" ext_sup_pas;
       Env.add_unary_inf "ext_eqres_dec" ext_eqres;
@@ -3333,7 +3339,7 @@ let _demod_in_var_args = ref true
 let _dot_demod_into = ref None
 let _complete_ho_unification = ref false
 let _switch_stream_extraction = ref false
-let _fluidsup_penalty = ref 0
+let _fluidsup_penalty = ref 9
 let _fluidsup = ref true
 let _dupsup = ref true
 let _trigger_bool_inst = ref (-1)

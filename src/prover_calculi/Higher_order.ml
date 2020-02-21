@@ -52,6 +52,8 @@ let k_check_lambda_free = Flex_state.create_key()
 let k_purify_applied_vars = Flex_state.create_key()
 let k_eta = Flex_state.create_key()
 let k_diff_const = Flex_state.create_key()
+let k_use_diff_for_neg_ext = Flex_state.create_key()
+
 
 
 type prune_kind = [`NoPrune | `OldPrune | `PruneAllCovers | `PruneMaxCover]
@@ -273,23 +275,44 @@ module Make(E : Env.S) : S with module Env = E = struct
     new_clauses
 
   let neg_ext (c:C.t) : C.t list =
+    let diff_const = Env.flex_get k_diff_const in
+
+    let rec app_diff_exhaustively s t = function 
+    | alpha :: beta :: [] ->
+      let diff_s_t = T.app diff_const [T.of_ty alpha;T.of_ty beta;s;t] in
+      T.app s [diff_s_t], T.app t [diff_s_t]
+    | alpha :: ((beta :: rest) as xs) ->
+      assert(not @@ CCList.is_empty rest);
+      let rest', ret = CCList.take_drop (List.length rest -1) rest in
+      assert(List.length ret = 1);
+      let new_beta = Type.arrow (beta::rest') (List.hd ret) in
+      let diff_s_t = T.app diff_const [T.of_ty alpha;T.of_ty new_beta;s;t] in
+      app_diff_exhaustively (T.app s [diff_s_t]) (T.app t [diff_s_t]) xs
+    | _ -> invalid_arg "argument must be a function type" in
+
     let is_eligible = C.Eligible.res c in 
     C.lits c
     |> CCArray.mapi (fun i l -> 
         match l with 
         | Literal.Equation (lhs,rhs,false) 
           when is_eligible i l && Type.is_fun @@ T.ty lhs ->
-          let arg_types = Type.expected_args @@ T.ty lhs in
+          let arg_types, ret_ty = Type.open_fun (T.ty lhs) in
           let free_vars = Literal.vars l in
           let skolem_decls = ref [] in
           let new_lits = CCList.map (fun (j,x) -> 
               if i!=j then x
               else (
-                let skolems = List.map (fun ty -> 
-                    let sk, res =  T.mk_fresh_skolem free_vars ty in
-                    skolem_decls := sk :: !skolem_decls;
-                    res) arg_types in
-                Literal.mk_neq (T.app lhs skolems) (T.app rhs skolems))
+                let lhs,rhs = 
+                if Env.flex_get k_use_diff_for_neg_ext then (
+                  app_diff_exhaustively lhs rhs (arg_types @ [ret_ty])
+                )
+                else (
+                  let skolems = List.map (fun ty -> 
+                      let sk, res =  T.mk_fresh_skolem free_vars ty in
+                      skolem_decls := sk :: !skolem_decls;
+                      res) arg_types in
+                  T.app lhs skolems, T.app rhs skolems) in
+                Literal.mk_neq lhs rhs)
             ) (C.lits c |> Array.mapi (fun j x -> (j,x)) |> Array.to_list) in
           declare_skolems !skolem_decls;
           let proof =
@@ -1396,6 +1419,7 @@ let _simple_projection = ref (-1)
 let _simple_projection_md = ref 2
 let _purify_applied_vars = ref `None
 let _eta = ref `Reduce
+let _use_diff_for_neg_ext = ref false
 
 let extension =
   let register env =
@@ -1419,6 +1443,7 @@ let extension =
     E.flex_add k_check_lambda_free !_check_lambda_free;
     E.flex_add k_purify_applied_vars !_purify_applied_vars;
     E.flex_add k_eta !_eta;
+    E.flex_add k_use_diff_for_neg_ext !_use_diff_for_neg_ext;
 
 
 
@@ -1508,6 +1533,8 @@ let () =
                                  " whenever a variable is applied to different arguments." ^
                                  " 'int' purifies whenever a variable appears applied and unapplied.";
       "--ho-eta", eta_opt, " eta-expansion/reduction";
+      "--ho-use-diff-for-neg-ext", Arg.Bool ((:=) _use_diff_for_neg_ext), " use diff constant for NegExt rule instead of fresh skolem";
+
     ];
   Params.add_to_mode "ho-complete-basic" (fun () ->
       enabled_ := true;
