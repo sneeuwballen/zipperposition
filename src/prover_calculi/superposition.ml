@@ -73,7 +73,8 @@ let k_lambdasup = Flex_state.create_key ()
 let k_demod_in_var_args = Flex_state.create_key ()
 let k_lambda_demod = Flex_state.create_key ()
 let k_ext_dec_lits = Flex_state.create_key ()
-let k_max_lits_ext_dec = Flex_state.create_key ()
+let k_ext_rules_max_depth = Flex_state.create_key ()
+let k_ext_rules_kind = Flex_state.create_key ()
 let k_use_simultaneous_sup = Flex_state.create_key ()
 let k_unif_alg = Flex_state.create_key ()
 let k_fluidsup_penalty = Flex_state.create_key ()
@@ -377,7 +378,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let update_ext_dec_indices f c =
     let which, eligible = if Env.flex_get k_ext_dec_lits = `OnlyMax 
       then `Max, C.Eligible.res c else `All, C.Eligible.always in
-    if C.proof_depth c <= Env.flex_get k_max_lits_ext_dec then (
+    if C.proof_depth c <= Env.flex_get k_ext_rules_max_depth then (
       Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false ~ty_args:false 
         ~ord ~which ~subterms:true ~eligible (C.lits c)
       |> Iter.filter (fun (t, _) ->
@@ -1674,8 +1675,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       !res)
     else []
 
-  let ext_inst (s,s_sc) (t,t_sc) parent_cls =
-    assert(not (CCList.is_empty parent_cls));
+  let ext_inst ~parents (s,s_sc) (t,t_sc) =
+    assert(not (CCList.is_empty parents));
 
     let renaming = Subst.Renaming.create () in
     let sub_empty = Subst.empty in
@@ -1697,15 +1698,15 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let new_lits = [neg_lit; pos_lit] in
 
     let proof =
-          Proof.Step.inference (List.map C.proof_parent parent_cls)
+          Proof.Step.inference (List.map C.proof_parent parents)
             ~rule:(Proof.Rule.mk "ext_inst") in
-    let penalty = List.fold_left max 1 (List.map C.penalty parent_cls) in
+    let penalty = List.fold_left max 1 (List.map C.penalty parents) in
 
-    C.create ~trail:(C.trail_l parent_cls) ~penalty new_lits proof
+    C.create ~trail:(C.trail_l parents) ~penalty new_lits proof
 
   let ext_eqfact given =
     if Proof.Step.inferences_performed (C.proof_step given)
-       < Env.flex_get k_max_lits_ext_dec then  
+       < Env.flex_get k_ext_rules_max_depth then  
       ZProf.with_prof prof_ext_dec ext_eqfact_decompose_aux given
     else []
 
@@ -2111,7 +2112,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           |> Iter.map (fun (t,p) -> (c,t,p)))
 
   let ext_sup_act given =
-    if C.length given <= Env.flex_get k_max_lits_ext_dec then (
+    if C.length given <= Env.flex_get k_ext_rules_max_depth then (
       let eligible = 
         if Env.flex_get k_ext_dec_lits = `OnlyMax then C.Eligible.param given else C.Eligible.always in
       Lits.fold_eqn ~ord ~both:true ~sign:true ~eligible (C.lits given)
@@ -2127,7 +2128,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     else []
 
   let ext_sup_pas given =
-    if C.length given <= Env.flex_get k_max_lits_ext_dec then ( 
+    if C.length given <= Env.flex_get k_ext_rules_max_depth then ( 
       let which, eligible =
         if Env.flex_get k_ext_dec_lits = `OnlyMax then `Max, C.Eligible.res given 
         else `All, C.Eligible.always in
@@ -2146,7 +2147,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let ext_eqres_aux c =
     let eligible = C.Eligible.always in
-    if C.proof_depth c < Env.flex_get k_max_lits_ext_dec then (
+    if C.proof_depth c < Env.flex_get k_ext_rules_max_depth then (
       let res = 
         Literals.fold_eqn (C.lits c) ~eligible ~ord ~both:false ~sign:false
         |> Iter.to_list
@@ -3147,7 +3148,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Env.add_unary_inf "recognize injectivity" recognize_injectivity;
     );
 
-    if Env.flex_get k_max_lits_ext_dec != 0 then (
+    if Env.flex_get k_ext_rules_max_depth != 0 then (
       Env.add_binary_inf "ext_dec_act" ext_sup_act;
       Env.add_binary_inf "ext_dec_pas" ext_sup_pas;
       Env.add_unary_inf "ext_eqres_dec" ext_eqres;
@@ -3236,7 +3237,9 @@ let _restrict_hidden_sup_at_vars = ref false
 
 let _lambdasup = ref (-1)
 let _max_infs = ref (-1)
-let max_lits_ext_dec = ref 0
+let ext_rules_max_depth = ref (-1)
+let ext_rules_kind = ref (`Off)
+
 let _ext_dec_lits = ref `OnlyMax
 let _unif_alg = ref `NewJPFull
 let _unif_level = ref `Full
@@ -3291,7 +3294,9 @@ let register ~sup =
   E.flex_add k_demod_in_var_args !_demod_in_var_args;
   E.flex_add k_lambda_demod !_lambda_demod;
   E.flex_add k_ext_dec_lits !_ext_dec_lits;
-  E.flex_add k_max_lits_ext_dec !max_lits_ext_dec;
+  E.flex_add k_ext_rules_max_depth !ext_rules_max_depth;
+  E.flex_add k_ext_rules_kind !ext_rules_kind;
+
   E.flex_add k_use_simultaneous_sup !_use_simultaneous_sup;  
   E.flex_add k_fluidsup_penalty !_fluidsup_penalty;
   E.flex_add k_ground_subs_check !_ground_subs_check;
@@ -3369,7 +3374,16 @@ let () =
       "--demod-in-var-args", Arg.Bool (fun b -> _demod_in_var_args := b), " enable demodulation in arguments of variables";
       "--complete-ho-unif", Arg.Bool (fun b -> _complete_ho_unification := b), " enable complete higher-order unification algorithm (Jensen-Pietrzykowski)";
       "--switch-stream-extract", Arg.Bool (fun b -> _switch_stream_extraction := b), " in ho mode, switches heuristic of clause extraction from the stream queue";
-      "--ext-decompose", Arg.Set_int max_lits_ext_dec, " Sets the maximal number of literals clause can have for ExtDec inference.";
+      "--ext-rules-max-depth", Arg.Set_int ext_rules_max_depth, 
+        " Sets the maximal proof depth of the clause eligible for Ext-* or ExtInst inferences";
+      "--ext-rules", Arg.Symbol (["off"; "ext-inst"; "ext-family"; "both"], (
+        function 
+        | "off" -> ext_rules_kind := `Off; ext_rules_max_depth:=-1;
+        | "ext-inst" -> ext_rules_kind := `ExtInst;
+        | "ext-family" -> ext_rules_kind := `ExtFamily;
+        | "both" -> ext_rules_kind := `Both
+        |  _ -> assert false)),
+        " Chooses the kind of extensionality rules to use";
       "--ext-decompose-lits", Arg.Symbol (["all";"max"], (fun str -> 
           _ext_dec_lits := if String.equal str "all" then `All else `OnlyMax))
       , " Sets the maximal number of literals clause can have for ExtDec inference.";
