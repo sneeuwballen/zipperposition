@@ -51,6 +51,8 @@ let k_simple_projection_md = Flex_state.create_key ()
 let k_check_lambda_free = Flex_state.create_key()
 let k_purify_applied_vars = Flex_state.create_key()
 let k_eta = Flex_state.create_key()
+let k_diff_const = Flex_state.create_key()
+
 
 type prune_kind = [`NoPrune | `OldPrune | `PruneAllCovers | `PruneMaxCover]
 
@@ -819,7 +821,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   module VarTermMultiMap = CCMultiMap.Make (TVar) (Term)
   module VTbl = CCHashtbl.Make(TVar)
 
-  let extensionality_clause =
+  let mk_diff_const () = 
     let diff_id = ID.make("zf_ext_diff") in
     ID.set_payload diff_id (ID.Attr_skolem ID.K_normal); (* make the arguments of diff mandatory *)
     let alpha_var = HVar.make ~ty:Type.tType 0 in
@@ -829,6 +831,17 @@ module Make(E : Env.S) : S with module Env = E = struct
     let alpha_to_beta = Type.arrow [alpha] beta in
     let diff_type = Type.forall_fvars [alpha_var;beta_var] (Type.arrow [alpha_to_beta; alpha_to_beta] alpha) in
     let diff = Term.const ~ty:diff_type diff_id in
+
+    Env.Ctx.declare diff_id diff_type;
+    Env.flex_add k_diff_const diff
+
+  let mk_extensionality_clause () =
+    let diff = Env.flex_get k_diff_const in
+    let alpha_var = HVar.make ~ty:Type.tType 0 in
+    let alpha = Type.var alpha_var in
+    let beta_var = HVar.make ~ty:Type.tType 1 in
+    let beta = Type.var beta_var in
+    let alpha_to_beta = Type.arrow [alpha] beta in    
     let x = Term.var (HVar.make ~ty:alpha_to_beta 2) in
     let y = Term.var (HVar.make ~ty:alpha_to_beta 3) in
     let x_diff = Term.app x [Term.app diff [T.of_ty alpha; T.of_ty beta; x; y]] in
@@ -1218,6 +1231,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     end
 
   let setup () =
+    mk_diff_const ();
     if not (Env.flex_get k_enabled) then (
       Util.debug ~section 1 "HO rules disabled";
     ) else (
@@ -1293,7 +1307,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           Env.add_unary_inf "ho_prim_enum" (prim_enum ~mode);
       end;
       if Env.flex_get k_ext_axiom then
-        Env.ProofState.PassiveSet.add (Iter.singleton extensionality_clause);
+        Env.ProofState.PassiveSet.add (Iter.singleton (mk_extensionality_clause ())) ;
       if Env.flex_get k_choice_axiom then
         Env.ProofState.PassiveSet.add (Iter.singleton choice_clause);
 

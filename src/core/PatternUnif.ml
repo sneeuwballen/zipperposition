@@ -277,12 +277,8 @@ let rec unify ~scope ~counter ~subst = function
             Builtin.equal hd_s hd_t &&
             List.length args_s' + List.length args_s = 
             List.length args_t' + List.length args_t ->
-          let normalize ts =
-            List.sort (fun s t -> T.ho_weight s - T.ho_weight t) ts in
           let args_lhs,args_rhs = 
-            if Builtin.is_flattened_logical hd_s 
-            then CCPair.map_same normalize (args_s@args_s', args_t@args_t')
-            else (args_s@args_s', args_t@args_t') in
+            args_s@args_s', args_t@args_t' in
           unify ~subst ~counter ~scope @@ build_constraints args_lhs args_rhs rest
         | T.DB i, T.DB j when i = j && List.length args_s = List.length args_t ->
           (* assert (List.length args_s = List.length args_t); *)

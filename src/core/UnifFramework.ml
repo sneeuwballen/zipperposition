@@ -206,14 +206,7 @@ module Make (P : PARAMETERS) = struct
             | T.AppBuiltin(b1, args1), T.AppBuiltin(b2, args2) ->
               let args_lhs = args_lhs @ args1 and args_rhs = args_rhs @ args2 in
               if Builtin.equal b1 b2 && List.length args_lhs = List.length args_rhs then (
-                if Builtin.is_flattened_logical b1 then (
-                  (* normalize associative and commutative logical symbols *)
-                  let normalize ts =
-                    List.sort (fun s t -> T.ho_weight s - T.ho_weight t) ts in
-                  decompose_and_cont (normalize args_lhs) (normalize args_rhs) rest flag subst 
-                ) else (
                   decompose_and_cont (args_lhs) (args_rhs) rest flag subst
-                )
               ) else OSeq.empty
             | _ when different_rigid_heads hd_lhs hd_rhs -> OSeq.empty
             | _ -> 

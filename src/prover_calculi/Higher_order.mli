@@ -8,7 +8,11 @@ open Libzipperposition
 val prim_enum_terms : Term.Set.t ref
 
 type prune_kind = [`NoPrune | `OldPrune | `PruneAllCovers | `PruneMaxCover]
-val k_prune_arg_fun : prune_kind Logtk.Flex_state.key
+val k_prune_arg_fun : prune_kind Flex_state.key
+(* diff const is of type ![alpha,beta]: (alpha->beta) -> (alpha->beta) -> alpha
+   -- NB: EXPECTS TYPE ARGUMENTS! *)
+val k_diff_const : Term.t Flex_state.key
+
 
 module type S = sig
   module Env : Env.S
