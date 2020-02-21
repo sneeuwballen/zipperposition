@@ -45,7 +45,7 @@ let eta_expand_otf ~subst ~scope pref1 pref2 t1 t2 =
     assert(List.length remaining != 0);
     let num_vars = List.length remaining in
     let vars = List.mapi (fun i ty -> 
-        let ty = Subst.Ty.apply Subst.Renaming.none (US.subst subst) (ty,scope) in
+        (* let ty = Subst.Ty.apply Subst.Renaming.none (US.subst subst) (ty,scope) in *)
         T.bvar ~ty (num_vars-1-i)) remaining in
     let shifted = T.DB.shift num_vars t in
     T.app shifted vars in
@@ -237,17 +237,19 @@ let rec unify ~scope ~counter ~subst = function
   | (s,t) :: rest -> ( 
       (* let ty_unif = unif_simple ~subst:(US.subst subst) ~scope 
                     (T.of_ty (T.ty s)) (T.of_ty (T.ty t)) in *)
-
       if not @@ Type.is_ground (T.ty s) || not @@ Type.is_ground (T.ty t) then (
         raise NotInFragment
       );
-
       if not (Type.equal (T.ty s) (T.ty t)) then (
         raise NotUnifiable
       );
       (* let ty_unif = CCOpt.get_exn ty_unif in *)
       (* let subst = US.merge subst ty_unif in *)
       let s', t' = norm_deref subst (s,scope), norm_deref subst (t,scope) in
+
+
+
+
       (* rotating to get naked variables on the lhs *)
 
       if not (Term.equal s' t') then (
