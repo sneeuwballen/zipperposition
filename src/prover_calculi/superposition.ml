@@ -38,6 +38,7 @@ let stat_demodulate_step = Util.mk_stat "sup.demodulate steps"
 let stat_semantic_tautology = Util.mk_stat "sup.semantic_tautologies"
 let stat_condensation = Util.mk_stat "sup.condensation"
 let stat_ext_dec = Util.mk_stat "sup.ext_dec calls"
+let stat_ext_inst = Util.mk_stat "sup.ext_inst calls"
 let stat_clc = Util.mk_stat "sup.clc"
 let stat_complete_eq = Util.mk_stat "ho.complete_eq.steps"
 
@@ -1654,7 +1655,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         [new_c]
       | None -> [] in
 
-    let try_ext_eq_factinst (s,t) (u,v) =
+    let try_ext_eq_factinst (s,_) (u,_) =
       match find_ho_disagremeents ~unify:false (s,0) (u,0) with
       | Some (dis, subst) ->
         assert(US.is_empty subst);
@@ -2250,7 +2251,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let ext_inst_eqres c =
     let eligible = C.Eligible.always in
-    if C.proof_depth c < Env.flex_get k_ext_rules_max_depth then (
+    if C.proof_depth c <= Env.flex_get k_ext_rules_max_depth then (
       let res = 
         Literals.fold_eqn (C.lits c) ~eligible ~ord ~both:false ~sign:false
         |> Iter.to_list
@@ -2259,15 +2260,15 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             let idx = Lits.Pos.idx pos in
             if Env.flex_get k_ext_dec_lits != `OnlyMax ||
                BV.get (C.eligible_res_no_subst c) idx then (
-              match find_ho_disagremeents ~unify:false (lhs,0) (rhs, 0) with
+              match find_ho_disagremeents ~unify:false (lhs, 0) (rhs, 0) with
               | Some (dis, subst) ->
                 assert(US.is_empty subst);
-                CCList.map (fun (s,t) -> do_ext_inst ~parents:[c] (s,0) (t,0)) dis
+                CCList.map (fun (s,t) -> ext_inst ~parents:[c] (s,0) (t,0)) dis
               | None -> [])
             else [])
         in
-      Util.incr_stat stat_ext_dec;
-      CCList.flatten res
+      Util.incr_stat stat_ext_inst;
+      res
     ) else []
 
 
