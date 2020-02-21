@@ -48,7 +48,7 @@ let k_prune_arg_fun = Flex_state.create_key ()
 let k_prim_enum_terms = Flex_state.create_key ()
 let k_simple_projection = Flex_state.create_key ()
 let k_simple_projection_md = Flex_state.create_key ()
-let k_check_lambda_free = Flex_state.create_key()
+let k_check_lambda_free = Saturate.k_check_lambda_free
 let k_purify_applied_vars = Flex_state.create_key()
 let k_eta = Flex_state.create_key()
 
@@ -1507,6 +1507,7 @@ let () =
                                  " whenever a variable is applied to different arguments." ^
                                  " 'int' purifies whenever a variable appears applied and unapplied.";
       "--ho-eta", eta_opt, " eta-expansion/reduction";
+      "--check-lambda-free", Arg.Bool ((:=) _check_lambda_free), "check whether problem belongs to lambda-free"
     ];
   Params.add_to_mode "ho-complete-basic" (fun () ->
       enabled_ := true;

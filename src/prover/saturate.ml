@@ -18,6 +18,8 @@ let stat_steps = Util.mk_stat "saturate.steps"
 
 let section = Util.Section.make ~parent:Const.section "saturate"
 
+let k_check_lambda_free = Flex_state.create_key ()
+
 let check_timeout = function
   | None -> false
   | Some timeout -> Util.total_time_s () > timeout
@@ -250,7 +252,9 @@ module Make(E : Env.S) = struct
     then invalid_arg "Problem out of fragment"
 
   let () =
-    Signal.on_every Env.on_start check_fragment;
+    if Env.flex_get k_check_lambda_free then (
+      Signal.on_every Env.on_start check_fragment;
+    )
 end
 
 let () =
