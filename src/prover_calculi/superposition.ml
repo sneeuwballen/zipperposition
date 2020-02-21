@@ -378,7 +378,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let update_ext_dec_indices f c =
     let which, eligible = if Env.flex_get k_ext_dec_lits = `OnlyMax 
       then `Max, C.Eligible.res c else `All, C.Eligible.always in
-    if C.proof_depth c <= Env.flex_get k_ext_rules_max_depth then (
+    if Env.flex_get k_ext_rules_kind != `Off &&
+       C.proof_depth c <= Env.flex_get k_ext_rules_max_depth then (
       Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false ~ty_args:false 
         ~ord ~which ~subterms:true ~eligible (C.lits c)
       |> Iter.filter (fun (t, _) ->
@@ -1675,13 +1676,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       !res)
     else []
 
-  let ext_inst ~parents (s,s_sc) (t,t_sc) =
+  let ext_inst ~parents ?(subst=Subst.empty) (s,s_sc) (t,t_sc) =
     assert(not (CCList.is_empty parents));
 
     let renaming = Subst.Renaming.create () in
-    let sub_empty = Subst.empty in
-    let rename = Subst.FO.apply renaming sub_empty  in
-    let s, t = rename (s,s_sc), rename (t,t_sc) in
+    let apply_subst = Subst.FO.apply renaming subst  in
+    let s, t = apply_subst (s,s_sc), apply_subst (t,t_sc) in
     assert(Type.equal (T.ty s) (T.ty t));
     assert(Type.is_fun (T.ty s));
     
@@ -3148,7 +3148,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Env.add_unary_inf "recognize injectivity" recognize_injectivity;
     );
 
-    if Env.flex_get k_ext_rules_max_depth != 0 then (
+    if Env.flex_get k_ext_rules_kind = `ExtFamily ||
+       Env.flex_get k_ext_rules_kind = `Both then (
       Env.add_binary_inf "ext_dec_act" ext_sup_act;
       Env.add_binary_inf "ext_dec_pas" ext_sup_pas;
       Env.add_unary_inf "ext_eqres_dec" ext_eqres;
