@@ -1519,7 +1519,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
      them out and create the unifying substitution. Based on
      k_ho_disagremeents at least one or all of s1...sn have
      to be of functional/boolean type *)
-  let find_ho_disagremeents ?(unify=true) (s,s_sc) (t,t_sc) =
+  let find_ho_disagremeents ?(unify=true) (orig_s,s_sc) (orig_t,t_sc) =
     let open CCFun in
     let exception StopSearch in
     let counter = ref 0 in
@@ -1538,17 +1538,22 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     in
     
     let rec aux s t =
-      assert(Type.equal (T.ty s) (T.ty t));
       if T.equal s t && (s_sc == t_sc || T.is_ground s) then []
       else (
         match T.view s, T.view t with
         | T.App(s_hd, s_args), T.App(t_hd, t_args) 
-            when T.equal s_hd t_hd && T.is_const s_hd ->
-          aux_l s_args t_args
+            when T.is_const s_hd ->
+          let (s_hd, s_args), (t_hd, t_args) = 
+            CCPair.map_same T.as_app_mono (s,t) in
+          if T.equal s_hd t_hd then aux_l s_args t_args
+          else [s,t]
         | T.App(s_hd, s_args), T.App(t_hd, t_args) 
             when not (T.equal s_hd t_hd)
                  && T.is_const s_hd && T.is_const t_hd ->
           (* trying to find prefix subterm that is the differing context *)
+          let (s_hd, s_args), (t_hd, t_args) = 
+            CCPair.map_same T.as_app_mono (s,t) in
+
           let lhs,rhs,args_lhs,args_rhs = 
             if List.length s_args > List.length t_args then (
               let taken,dropped = 
@@ -1569,13 +1574,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       | _ -> invalid_arg "args must be of the same length" in
     
     try
-      if not (Type.equal (T.ty s) (T.ty t)) then raise StopSearch;
+      if not (Type.equal (T.ty orig_s) (T.ty orig_t)) then raise StopSearch;
 
-      let diss = aux (Lambda.eta_expand s) (Lambda.eta_expand t) in
+      let diss = aux (Lambda.eta_expand orig_s) (Lambda.eta_expand orig_t) in
 
       let _,_,unifscope,init_subst =
-        if not unify then (s,t,0,US.empty)
-        else US.FO.rename_to_new_scope ~counter (s,s_sc) (t,t_sc) in
+        if not unify then (orig_s,orig_t,0,US.empty)
+        else US.FO.rename_to_new_scope ~counter (orig_s,s_sc) (orig_t,t_sc) in
       let app_subst subst =
         if not unify then (fun (s,_) -> s)
         else Subst.FO.apply Subst.Renaming.none (US.subst subst) in

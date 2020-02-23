@@ -1232,9 +1232,11 @@ let simplify_bools t =
       let netural_el, absorbing_el = 
         if b = Builtin.And then true_,false_ else (false_,true_) in
 
+      let l' = CCList.sort_uniq ~cmp:compare l in
+
       if compl_in_l l || List.exists (equal absorbing_el) l then absorbing_el
       else (
-        let l' = List.filter (fun s -> not (equal s netural_el)) l in
+        let l' = List.filter (fun s -> not (equal s netural_el)) l' in
         if List.length l = List.length l' then t
         else (
           if CCList.is_empty l' then netural_el
@@ -1306,6 +1308,11 @@ let simplify_bools t =
   aux t
 
 let rec normalize_bools t =
+  let weight_cmp s t =
+    let (<?>) = CCOrd.(<?>) in
+    (T.ho_weight s - T.ho_weight t)
+    <?> (CCInt.compare, (T.hash s), (T.hash t)) in
+
   match view t with 
   | DB _ | Const _ | Var _ -> t
   | Fun(ty, body) ->
@@ -1318,11 +1325,8 @@ let rec normalize_bools t =
     else app hd' args'
   | AppBuiltin((Builtin.And|Builtin.Or) as b, l) -> 
     let l' = List.map normalize_bools l in
-    let sorted = 
-      List.combine l' (List.map T.size l')
-      |> List.fast_sort (fun x y -> CCInt.compare (snd x) (snd y))
-      |> List.map fst in
-    if same_l l l' && same_l l' sorted then t
+    let sorted = List.fast_sort weight_cmp l' in
+    if same_l l sorted then t
     else app_builtin ~ty:Type.prop b sorted
   | AppBuiltin((Builtin.Eq|Builtin.Neq|Builtin.Xor|Builtin.Equiv) as b, ([_;x;y] as l) )
   | AppBuiltin((Builtin.Eq|Builtin.Neq|Builtin.Xor|Builtin.Equiv) as b, ([x;y] as l)) -> 
@@ -1332,7 +1336,7 @@ let rec normalize_bools t =
       | x :: xs -> x :: swap_last_two xs in
     let x', y' = normalize_bools x, normalize_bools y in
     let l = if List.length l = 3 then List.hd l :: x' :: [y'] else x' :: [y'] in
-    if T.size x' > T.size y' then (
+    if weight_cmp x' y' < 0 then (
       app_builtin ~ty:Type.prop b (swap_last_two l)
     ) else if T.equal x x' && T.equal y y' then t 
     else app_builtin ~ty:Type.prop b l
