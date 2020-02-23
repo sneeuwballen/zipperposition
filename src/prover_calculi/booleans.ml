@@ -229,14 +229,20 @@ module Make(E : Env.S) : S with module Env = E = struct
           Statement.Seq.ty_decls cl
           |> Iter.iter (fun (id,ty) -> Ctx.declare id ty)) cnf_vec;
 
-      let clauses = CCVector.map (C.of_statement ~convert_defs:true) cnf_vec
-                    |> CCVector.to_list 
-                    |> CCList.flatten
-                    |> List.map (fun c -> 
-                        C.create ~penalty  ~trail (CCArray.to_list (C.lits c)) proof) in
-      List.iteri (fun i new_c -> 
-          assert((C.proof_depth c) <= C.proof_depth new_c);) clauses;
-      Some clauses
+      begin try 
+        let clauses = CCVector.map (C.of_statement ~convert_defs:true) cnf_vec
+                      |> CCVector.to_list 
+                      |> CCList.flatten
+                      |> List.map (fun c -> 
+                          C.create ~penalty  ~trail (CCArray.to_list (C.lits c)) proof) in
+        List.iteri (fun i new_c -> 
+            assert((C.proof_depth c) <= C.proof_depth new_c);) clauses;
+        Some clauses
+      with Type.ApplyError err ->
+        CCFormat.printf "cnf(@[%a@])@.err:@[%s@]@." C.pp c err;
+        CCFormat.printf "result:@[%a@]@." (CCVector.pp ~sep:";\n" (Statement.pp_clause_in Output_format.O_tptp)) cnf_vec;
+        CCFormat.printf "proof:@[%a@]@." Proof.S.pp_tstp (C.proof c);
+        assert false; end
     | None -> None
 
   let cnf_infer cl = 

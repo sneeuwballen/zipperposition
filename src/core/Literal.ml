@@ -1079,6 +1079,7 @@ module Conv = struct
       | None ->
         begin match lit with
           | Equation (l, r, true) -> 
+            assert(Type.equal (Term.ty l) (Term.ty r));
             if Type.is_prop (Term.ty l) then (
               if Term.equal r T.true_ then (
                 SLiteral.atom l true

@@ -273,7 +273,10 @@ let tType =
   let my_t = make_ ~props:zero ~ty:NoType (AppBuiltin(Builtin.TType, [])) in
   H.hashcons my_t
 
-let rec app_builtin ~ty b l = match b, l with
+let rec app_builtin ~ty b l = 
+  let prop = builtin ~ty:tType Builtin.prop in
+  
+  match b, l with
   | Builtin.Arrow, [] -> assert false
   | Builtin.Arrow, [ret] -> ret
   | Builtin.Arrow, ({term=AppBuiltin(Builtin.Arrow, ret::l1); _} :: l2) ->
@@ -284,6 +287,16 @@ let rec app_builtin ~ty b l = match b, l with
     app_builtin ~ty Builtin.False []
   | Builtin.Not, [{term=AppBuiltin(Builtin.False,[]); _}] ->
     app_builtin ~ty Builtin.True []
+  | Builtin.Not, [] ->
+    let ty = app_builtin ~ty:tType Builtin.arrow [prop;prop] in
+    let my_t = make_ ~props:zero ~ty:(HasType ty) (AppBuiltin (b,[])) in
+    H.hashcons my_t
+  | (Builtin.And | Builtin.Or), l when CCList.length l < 2 ->
+    let args = (if CCList.is_empty l then [prop] else []) @ [prop;prop] in
+    let ty = app_builtin ~ty:tType Builtin.arrow args in
+    let props = add_ty_vars (any_props_for_ts l) ty.props in
+    let my_t = make_ ~props ~ty:(HasType ty) (AppBuiltin (b,l)) in
+    H.hashcons my_t
   | _ ->
     let l = if Builtin.is_quantifier b then 
         List.filter (fun t -> not @@ equal (ty_exn t) tType) l else l in

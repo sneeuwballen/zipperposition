@@ -87,7 +87,11 @@ module Make(E : Env.S) = struct
       CCFormat.printf "proof:@[%a@]@." Proof.S.pp_tstp (Env.C.proof c);
       assert false;
     );
-    assert (Env.C.lits c |> Literals.vars_distinct);
+    if not (Env.C.lits c |> Literals.vars_distinct) then (
+      CCFormat.printf "variables are not distinct:@[%a@]@." Env.C.pp c;
+      CCFormat.printf "proof:@[%a@]@." Proof.S.pp_tstp (Env.C.proof c);
+      assert false;
+    );
     CCArray.iter (fun t -> assert(Literal.no_prop_invariant t)) (Env.C.lits c);
     assert (Env.check_fragment c)
 

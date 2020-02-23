@@ -867,8 +867,8 @@ module Form = struct
   let and_ ?loc l  =
     let flattened = flatten_ `And [] l in
     match flattened with
-    | [] -> true_
-    | [t] -> t 
+    | [] when (not @@ CCList.is_empty l) -> true_
+    | [t] when (CCList.length l != 1) -> t 
     | _ ->  app_builtin ?loc ~ty:Ty.prop Builtin.And (flattened)
 
   let or_ ?loc l = 

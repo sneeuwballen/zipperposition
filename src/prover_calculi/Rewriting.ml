@@ -27,6 +27,7 @@ let rewrite_before_cnf = ref false
 module Key = struct
   let has_rw = Flex_state.create_key()
   let ctx_narrow = Flex_state.create_key()
+  let narrow = Flex_state.create_key()
 end
 
 let simpl_term t =
@@ -286,20 +287,22 @@ module Make(E : Env_intf.S) = struct
   let contextual_narrowing c =
     ZProf.with_prof prof_ctx_narrowing contextual_narrowing_ c
 
-  let setup ?(ctx_narrow=true) ~has_rw () =
+  let setup ?(ctx_narrow=true) ~narrowing ~has_rw () =
     Util.debug ~section 1 "register Rewriting to Env...";
     E.add_rewrite_rule "rewrite_defs" simpl_term;
-    E.add_binary_inf "narrow_term_defs" narrow_term_passive;
+    if narrowing then (
+      E.add_binary_inf "narrow_term_defs" narrow_term_passive;
+      E.add_unary_inf "narrow_lit_defs" narrow_lits);
     if ctx_narrow then (
       E.add_binary_inf "ctx_narrow" contextual_narrowing;
     );
     if has_rw then  E.Ctx.lost_completeness ();
     E.add_multi_simpl_rule simpl_clause;
-    E.add_unary_inf "narrow_lit_defs" narrow_lits;
     ()
 end
 
 let ctx_narrow_ = ref true
+let narrowing = ref true
 
 let post_cnf stmts st =
   CCVector.iter Statement.scan_stmt_for_defined_cst 
@@ -405,7 +408,10 @@ let normalize_simpl (module E : Env_intf.S) =
   let module M = Make(E) in
   let has_rw = E.flex_get Key.has_rw in
   E.flex_add Key.ctx_narrow !ctx_narrow_;
-  M.setup ~has_rw ~ctx_narrow:!ctx_narrow_ ()
+  E.flex_add Key.narrow !narrowing;
+
+  M.setup ~has_rw ~narrowing:!narrowing 
+                  ~ctx_narrow:!ctx_narrow_ ()
 
 let extension =
   let open Extensions in
@@ -420,4 +426,17 @@ let () = Options.add_opts
     [ "--rw-ctx-narrow", Arg.Set ctx_narrow_, " enable contextual narrowing";
       "--no-rw-ctx-narrow", Arg.Clear ctx_narrow_, " disable contextual narrowing";
       "--rewrite-before-cnf", Arg.Bool (fun v -> rewrite_before_cnf := v), " enable/disable rewriting before CNF"
-    ]
+    ];
+    Params.add_to_modes 
+    [ "ho-complete-basic"
+    ; "ho-pragmatic"
+    ; "ho-competitive"
+    ; "fo-complete-basic"
+    ; "lambda-free-intensional"
+    ; "lambda-free-extensional"
+    ; "lambda-free-purify-intensional"
+    ; "lambda-free-purify-extensional"] 
+    (fun () ->
+      narrowing := false;
+      ctx_narrow_ := false;
+    );
