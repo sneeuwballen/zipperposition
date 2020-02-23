@@ -215,6 +215,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
            | _ -> false)
     | None -> false
 
+  let ext_rule_eligible cl =
+    Env.flex_get k_ext_rules_max_depth < 0 ||
+    C.proof_depth cl <= Env.flex_get k_ext_rules_max_depth
+
   (* apply operation [f] to some parts of the clause [c] just added/removed
      from the active set *)
   let _update_active f c =
@@ -380,7 +384,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let which, eligible = if Env.flex_get k_ext_dec_lits = `OnlyMax 
       then `Max, C.Eligible.res c else `All, C.Eligible.always in
     if Env.flex_get k_ext_rules_kind != `Off &&
-       C.proof_depth c <= Env.flex_get k_ext_rules_max_depth then (
+       ext_rule_eligible c then (
       Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false ~ty_args:false 
         ~ord ~which ~subterms:true ~eligible (C.lits c)
       |> Iter.filter (fun (t, _) ->
@@ -1757,8 +1761,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     else []
 
   let ext_eqfact given =
-    if Proof.Step.inferences_performed (C.proof_step given)
-       <= Env.flex_get k_ext_rules_max_depth then  
+    if ext_rule_eligible given then  
       ZProf.with_prof prof_ext_dec ext_inst_or_family_eqfact_aux given
     else []
 
@@ -2163,7 +2166,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           |> Iter.map (fun (t,p) -> (c,t,p)))
 
   let ext_sup_act given =
-    if C.length given <= Env.flex_get k_ext_rules_max_depth then (
+    if ext_rule_eligible given then (
       let eligible = 
         if Env.flex_get k_ext_dec_lits = `OnlyMax then C.Eligible.param given else C.Eligible.always in
       Lits.fold_eqn ~ord ~both:true ~sign:true ~eligible (C.lits given)
@@ -2179,7 +2182,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     else []
 
   let ext_sup_pas given =
-    if C.length given <= Env.flex_get k_ext_rules_max_depth then ( 
+    if ext_rule_eligible given then ( 
       let which, eligible =
         if Env.flex_get k_ext_dec_lits = `OnlyMax then `Max, C.Eligible.res given 
         else `All, C.Eligible.always in
@@ -2197,7 +2200,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     else []
 
   let ext_inst_sup_act given =
-    if C.length given <= Env.flex_get k_ext_rules_max_depth then (
+    if ext_rule_eligible given then (
       let eligible =
         if Env.flex_get k_ext_dec_lits = `OnlyMax then C.Eligible.param given else C.Eligible.always in
       Lits.fold_eqn ~ord ~both:true ~sign:true ~eligible (C.lits given)
@@ -2214,7 +2217,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     else []
 
   let ext_inst_sup_pas given =
-    if C.length given <= Env.flex_get k_ext_rules_max_depth then ( 
+    if ext_rule_eligible given then ( 
       let which, eligible =
         if Env.flex_get k_ext_dec_lits = `OnlyMax then `Max, C.Eligible.res given 
         else `All, C.Eligible.always in
@@ -2233,7 +2236,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let ext_eqres_aux c =
     let eligible = C.Eligible.always in
-    if C.proof_depth c < Env.flex_get k_ext_rules_max_depth then (
+    if ext_rule_eligible c then (
       let res = 
         Literals.fold_eqn (C.lits c) ~eligible ~ord ~both:false ~sign:false
         |> Iter.to_list
@@ -2266,7 +2269,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let ext_inst_eqres c =
     let eligible = C.Eligible.always in
-    if C.proof_depth c <= Env.flex_get k_ext_rules_max_depth then (
+    if ext_rule_eligible c then (
       let res = 
         Literals.fold_eqn (C.lits c) ~eligible ~ord ~both:false ~sign:false
         |> Iter.to_list
