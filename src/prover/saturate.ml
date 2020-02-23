@@ -82,13 +82,12 @@ module Make(E : Env.S) = struct
 
   let[@inline] check_clause_ c = 
     if !_check_types then Env.C.check_types c;
-    assert (Env.C.Seq.terms c |> Iter.for_all Term.DB.is_closed);
-    assert (Env.C.lits c |> Literals.vars_distinct);
-    if not (Env.C.Seq.terms c |> Iter.for_all Lambda.is_properly_encoded) then (
-      CCFormat.printf "ENCODED WRONGLY: %a:%d.\n" Env.C.pp_tstp c (Env.C.proof_depth c);
-      CCFormat.printf "proof : %a.\n" Proof.S.pp_normal (Env.C.proof c);
-      assert(false);
+    if not (Env.C.Seq.terms c |> Iter.for_all Term.DB.is_closed) then (
+      CCFormat.printf "not closed:@[%a@]@." Env.C.pp c;
+      CCFormat.printf "proof:@[%a@]@." Proof.S.pp_tstp (Env.C.proof c);
+      assert false;
     );
+    assert (Env.C.lits c |> Literals.vars_distinct);
     CCArray.iter (fun t -> assert(Literal.no_prop_invariant t)) (Env.C.lits c);
     assert (Env.check_fragment c)
 

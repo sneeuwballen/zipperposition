@@ -1105,7 +1105,7 @@ module FO = struct
     let ta, sca = sc1 in 
     let tb, scb = sc2 in
 
-    if(not (Term.DB.is_closed ta) || not (Term.DB.is_closed tb)) then (
+    if (not (Term.DB.is_closed ta) || not (Term.DB.is_closed tb)) then (
       let sk_a, sk_a_subs = Term.DB.skolemize_loosely_bound ta in
       let sk_b, sk_b_subs = Term.DB.skolemize_loosely_bound tb in
       let res = (unify_full :> ?subst:unif_subst -> term Scoped.t -> term Scoped.t -> unif_subst)

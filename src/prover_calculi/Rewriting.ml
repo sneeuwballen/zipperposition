@@ -60,27 +60,21 @@ module Make(E : Env_intf.S) = struct
     |> Iter.flat_map
       (fun (u_p, passive_pos) ->
          RW.Term.narrow_term ~scope_rules:sc_rule (u_p,sc_c)
-         |> Iter.map
+         |> Iter.filter_map
            (fun (rule,us) ->
-              let i, _ = Literals.Pos.cut passive_pos in
               let renaming = Subst.Renaming.create() in
               let subst = Unif_subst.subst us in
               let c_guard = Literal.of_unif_subst renaming us in
               (* side literals *)
               let lits_passive = C.lits c in
-              let lits_passive =
+              let lits' =
                 Literals.apply_subst renaming subst (lits_passive,sc_c) in
-              let lits' = CCArray.except_idx lits_passive i in
               (* substitute in rule *)
               let rhs =
                 Subst.FO.apply renaming subst (RW.Term.Rule.rhs rule, sc_rule)
-              and lhs =
-                Subst.FO.apply renaming subst (RW.Term.Rule.lhs rule, sc_rule)
               in
               (* literal in which narrowing took place: replace lhs by rhs *)
-              let new_lit =
-                Literal.replace lits_passive.(i) ~old:lhs ~by:rhs
-              in
+              Literals.Pos.replace lits' ~at:passive_pos ~by:rhs;
               (* make new clause *)
               Util.incr_stat stat_narrowing_term;
               let proof =
@@ -91,13 +85,14 @@ module Make(E : Env_intf.S) = struct
                   ~rule:(Proof.Rule.mk "narrow") in
               let c' =
                 C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
-                  (new_lit :: c_guard @ lits') proof
+                  (c_guard @ CCArray.to_list lits') proof
               in
+              
               Util.debugf ~section 3
                 "@[<2>term narrowing:@ from `@[%a@]`@ to `@[%a@]`@ \
                  using rule `%a`@ and subst @[%a@]@]"
                 (fun k->k C.pp c C.pp c' RW.Term.Rule.pp rule Unif_subst.pp us);
-              c'
+              Some c'
            )
       )
     |> Iter.to_rev_list
