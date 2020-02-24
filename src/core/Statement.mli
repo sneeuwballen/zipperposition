@@ -138,6 +138,11 @@ val map_def :
   ('f1, 't1, 'ty1) def ->
   ('f2, 't2, 'ty2) def
 
+val map_def_rule :
+  form:('a -> 'b) ->
+  term:('c -> 'd) ->
+  ty:('e -> 'f) -> ('a, 'c, 'e) def_rule -> ('b, 'd, 'f) def_rule
+
 val map :
   form:('f1 -> 'f2) ->
   term:('t1 -> 't2) ->

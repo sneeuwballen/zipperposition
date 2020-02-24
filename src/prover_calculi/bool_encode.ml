@@ -149,11 +149,21 @@ let bool_encode_stmt stmt =
   let proof = Proof.Step.esa ~rule:(Proof.Rule.mk "bool_encode") [as_proof |> Proof.Parent.from] in
   let res = 
     match Statement.view stmt with
-    | Statement.Def _ -> failwith "Not implemented: Def"
-    | Statement.Rewrite _ -> failwith "Not implemented: Rewrite"
     | Statement.Data _ -> failwith "Not implemented: Data"
     | Statement.Lemma _ -> failwith "Not implemented: Lemma"
     | Statement.Goal lits -> failwith "Not implemented: Goal"
+    | Statement.Def def ->
+      let map_single = 
+        Statement.map_def ~form:bool_encode_lits 
+                          ~term:bool_encode_term 
+                          ~ty:bool_encode_ty in
+      Statement.def ~proof (List.map map_single def)
+    | Statement.Rewrite def ->
+      let new_def = 
+        Statement.map_def_rule ~form:bool_encode_lits 
+                               ~term:bool_encode_term 
+                               ~ty:bool_encode_ty def in
+      Statement.rewrite ~proof new_def
     | Statement.NegatedGoal (skolems,clauses) -> 
       let skolems = List.map (fun (id, ty) -> (id, bool_encode_ty ty)) skolems in
       Statement.neg_goal ~proof ~skolems (List.map bool_encode_lits clauses)

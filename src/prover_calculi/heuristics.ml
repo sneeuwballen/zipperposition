@@ -105,12 +105,10 @@ let () =
       "--enable-max-vars", Arg.Clear no_max_vars, "enable maximum number of variables per clause";
     ];
   Params.add_to_mode "ho-pragmatic" (fun () ->
-      no_max_vars := false;
-      max_vars    := 10;
+      no_max_vars := true;
     );
   Params.add_to_mode "ho-competitive" (fun () ->
-      no_max_vars := false;
-      max_vars    := 10;
+      no_max_vars := true;
     );
   Params.add_to_modes 
     [ "ho-complete-basic"

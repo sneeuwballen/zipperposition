@@ -909,7 +909,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let shift_vars = if info.sup_kind = LambdaSup then 0 else -1 in
     let s = Subst.FO.apply ~shift_vars renaming (US.subst info.subst) (info.s, info.scope_active) in
     let u_p = Subst.FO.apply ~shift_vars renaming (US.subst info.subst) (info.u_p, info.scope_passive) in
-    assert(Term.equal (Lambda.eta_reduce @@ Lambda.snf @@ s) (Lambda.eta_reduce @@ Lambda.snf @@ u_p) || US.has_constr info.subst);
+    if not (Term.equal (Lambda.eta_reduce @@ Lambda.snf @@ s) (Lambda.eta_reduce @@ Lambda.snf @@ u_p) || US.has_constr info.subst) then (
+      CCFormat.printf "@[<2>sup, kind %s@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a@]@])@ \
+         (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@].\n"
+            (kind_to_str info.sup_kind) C.pp info.active info.scope_active T.pp info.s T.pp info.t
+            C.pp info.passive info.scope_passive Lit.pp info.passive_lit
+            Position.pp info.passive_pos US.pp info.subst;
+            assert false;
+    );
     if Env.flex_get k_use_simultaneous_sup && info.sup_kind != LambdaSup && info.sup_kind != DupSup
     then do_simultaneous_superposition info
     else do_classic_superposition info
@@ -1621,6 +1628,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   
     let ext_inst ~parents (s,s_sc) (t,t_sc) =
       assert(not (CCList.is_empty parents));
+      assert(CCList.length parents != 2 || s_sc != t_sc);
 
       let renaming = Subst.Renaming.create () in
       let apply_subst = Subst.FO.apply renaming Subst.empty  in
@@ -2209,7 +2217,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           if T.is_const hd && T.has_ho_subterm l then (
             let inf_partners = retrieve_from_extdec_idx !_ext_dec_into_idx (T.as_const_exn hd) in
             Iter.map (fun (into_c,into_t, _) -> 
-              do_ext_inst ~parents:[given;into_c] (l, 0) (into_t, 0)
+              do_ext_inst ~parents:[given;into_c] (l, 0) (into_t, 1)
           ) inf_partners)
           else Iter.empty)
       |> Iter.to_list

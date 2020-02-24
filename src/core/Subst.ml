@@ -25,7 +25,7 @@ end
 
 module H = Hashtbl.Make(VarInt)
 module M = CCMap.Make(VarInt)
-module MWTy = CCMap.Make(VarWTypeInt)
+(* module MWTy = CCMap.Make(VarWTypeInt) *)
 module IntMap = Map.Make(CCInt)
 
 
@@ -35,7 +35,7 @@ module Renaming = struct
   type t =
     | R_none
     | R_some of {
-        mutable map: var MWTy.t;
+        mutable map: var M.t;
         mutable n: int;
       }
 
@@ -43,18 +43,18 @@ module Renaming = struct
 
   let[@inline] is_none = function R_none -> true | R_some _ -> false
 
-  let[@inline] create () = R_some {map=MWTy.empty; n=0}
+  let[@inline] create () = R_some {map=M.empty; n=0}
 
   (* rename variable *)
   let rename r ((v,_) as var) = match r with
     | R_none -> v
     | R_some r ->
       try
-        MWTy.find var r.map
+        M.find var r.map
       with Not_found ->
         let v' = HVar.make ~ty:(HVar.ty v) r.n in
         r.n <- r.n + 1;
-        r.map <- MWTy.add var v' r.map;
+        r.map <- M.add var v' r.map;
         v'
 
   (* rename variable (after specializing its type if needed) *)

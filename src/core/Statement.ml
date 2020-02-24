@@ -131,7 +131,8 @@ let map_data ~ty:fty d =
         d.data_cstors;
   }
 
-let map_def_rule ~form:fform ~term:fterm ~ty:fty d = match d with
+let map_def_rule ~form:fform ~term:fterm ~ty:fty d = 
+  match d with
   | Def_term {vars;id;ty;args;rhs;as_form} ->
     let vars = List.map (Var.update_ty ~f:fty) vars in
     Def_term {vars;id;ty=fty ty;args=List.map fterm args;
