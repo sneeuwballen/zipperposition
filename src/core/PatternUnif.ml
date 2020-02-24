@@ -5,6 +5,7 @@
 
 module T = Term
 module US = Unif_subst
+module Sub = Subst
 module H = HVar
 
 
@@ -88,32 +89,51 @@ let get_bvars args =
     else None) 
   else None
 
+exception PolymorphismDetected
 
-let norm t = 
-  if Term.is_fun (T.head_term t)
-  then Lambda.whnf t else t
-
-(* Dereference and normalize the head of the term *)
-let rec norm_deref subst (t,sc) =
+let rec nfapply_mono subst (t,sc) =
   let pref, tt = T.open_fun t in
   let t' =  
     begin match T.view tt with
       | T.Var _ ->
-        let u, _ = US.FO.deref subst (tt,sc) in
+        if not (Type.is_ground (T.ty tt)) then (
+          raise PolymorphismDetected
+        );
+
+        let u, _ = Sub.FO.deref subst (tt,sc) in
         if T.equal tt u then u
-        else norm_deref subst (u,sc)
+        else nfapply_mono subst (u,sc)
       | T.App (f0, l) ->
-        let f = norm_deref subst (f0, sc) in
+        let f = nfapply_mono subst (f0, sc) in
         let t =
           if T.equal f0 f then tt else T.app f l in
-        let u = norm t in
+        
+        let u = Lambda.whnf t in
         if T.equal t u
         then t
-        else norm_deref subst (u,sc)
+        else nfapply_mono subst (u,sc)
       | _ -> tt
     end in
   if T.equal tt t' then t
   else T.fun_l pref t'
+
+(* apply a substitution, possibly eta-expand because
+    a type substitution might introduce a need for expansion and reduce to whnf *)
+let nfapply s u = Lambda.whnf @@ Sub.FO.apply Sub.Renaming.none s u
+
+let norm_deref s u =
+  let s = US.subst s in
+  try
+    if not (Type.is_ground (T.ty (fst u))) then
+      raise PolymorphismDetected;
+
+    nfapply_mono s u 
+  with PolymorphismDetected -> 
+    nfapply s u 
+
+let norm t = 
+  if Term.is_fun (T.head_term t)
+  then Lambda.whnf t else t
 
 (* Given variable var, its bound variables in bvar_map, and a target term t
    return (t',s) where 
@@ -135,7 +155,7 @@ let rec build_term ?(depth=0) ~all_args ~subst ~scope ~counter var bvar_map t =
   let t = norm t in
   match T.view t with
   | T.Var _ ->
-    let t' = fst @@ US.FO.deref subst (t,scope) in
+    let t' = S.apply subst (t,scope) in
     if T.equal t' t then (
       if T.equal var t then (
         if Type.is_fun (T.ty var) then raise NotInFragment
@@ -203,8 +223,15 @@ let rec build_term ?(depth=0) ~all_args ~subst ~scope ~counter var bvar_map t =
             let arg', subst = build_term ~all_args ~depth ~subst ~scope ~counter var bvar_map arg in
             arg' :: l, subst 
           ) args ([], subst) in
-      if T.equal new_hd hd && List.for_all2 T.equal args new_args then t,subst
-      else T.app new_hd new_args, subst
+      try 
+        if T.equal new_hd hd && List.for_all2 T.equal args new_args then t,subst
+        else T.app new_hd new_args, subst
+      with Type.ApplyError err ->
+        CCFormat.printf "err:%s@." err;
+        CCFormat.printf "t:@[%a@]@." T.pp t;
+        CCFormat.printf "subst:@[%a@]@." US.pp subst;
+        assert false;
+
     )
   | T.Fun(ty, body) -> 
     let b', subst = build_term ~all_args  ~depth:(depth+1) ~subst ~scope ~counter var bvar_map body in
@@ -246,10 +273,6 @@ let rec unify ~scope ~counter ~subst = function
       (* let ty_unif = CCOpt.get_exn ty_unif in *)
       (* let subst = US.merge subst ty_unif in *)
       let s', t' = norm_deref subst (s,scope), norm_deref subst (t,scope) in
-
-
-
-
       (* rotating to get naked variables on the lhs *)
 
       if not (Term.equal s' t') then (
