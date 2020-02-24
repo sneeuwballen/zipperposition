@@ -25,8 +25,8 @@ let bool_encode_ty ?(top=true) ty_orig =
   let rec aux ~top ty =
     match T.view ty with
       | T.App (f, args) ->
-        T.app ~ty:T.tType (aux ~top:false f) 
-          (CCList.map (aux ~top:false) args)
+        T.app ~ty:T.tType (aux ~top:true f) 
+          (CCList.map (aux ~top:true) args)
       | T.AppBuiltin (Builtin.Arrow, ret::args) ->
         let ret' = aux ~top ret in
         let args' = List.map (aux ~top:false) args in
@@ -42,7 +42,7 @@ let bool_encode_ty ?(top=true) ty_orig =
                 T.pp ty_orig in
             invalid_arg err
           )) else (
-          T.app_builtin ~ty:T.tType f (List.map (aux ~top:false) args))
+          T.app_builtin ~ty:T.tType f (List.map (aux ~top:true) args))
       | T.Const _ -> ty
       | T.Var _ -> ty
       | T.Bind (b,v,t) -> T.bind ~ty:T.tType b v (aux ~top t)
@@ -62,35 +62,39 @@ let bool_encode_term t_orig  =
       Var.update_ty v ~f:(fun _ -> ty) in
     
     try
-      let ty = bool_encode_ty ~top (CCOpt.get_exn (T.ty t)) in
-      match T.view t with
-        | T.Const c -> T.const ~ty c
-        | T.Var v ->
-          T.var (encode_var v)
-        | T.App (f, []) -> aux ~top f
-        | T.App (f, args) ->
-          let f' = aux ~top f in
-          let args' = List.map (aux ~top:false) args in
-          T.app ~ty f' args'
-        | T.AppBuiltin (f, ts) ->
-          assert (not ((T.equal t T.Form.true_) || (T.equal t T.Form.false_)));
-          T.app_builtin ~ty f (List.map (aux ~top:false) ts)
-        | T.Bind (Binder.Lambda, var, body) ->
-          let var' = encode_var var in
-          let body' = aux ~top:false body in
-          let ty = bool_encode_ty ~top:false (CCOpt.get_exn (T.ty t)) in
-          T.bind ~ty Binder.Lambda var' body'
-        | T.Bind (Binder.Forall, _, _) -> failwith "Not implemented: Forall"
-        | T.Bind (Binder.Exists, _, _) -> failwith "Not implemented: Exist"
-        | _ -> failwith "Not implemented: Other kind of term"
-    with Invalid_argument ty_err ->
-      let err = 
-        CCFormat.sprintf 
-          "Subterm @[%a@]:@[%a@] of @[%a@] cannot be encoded because of type error: @[%s@]"
-          T.pp t T.pp (T.ty_exn t) T.pp t_orig ty_err in
-      if CCString.prefix ~pre:"type" ty_err then invalid_arg err
-      else invalid_arg ty_err in
-      
+      if T.equal (T.ty_exn t) T.tType 
+      then bool_encode_ty t
+      else (
+        let ty = bool_encode_ty ~top (CCOpt.get_exn (T.ty t)) in
+        match T.view t with
+          | T.Const c -> 
+            T.const ~ty c
+          | T.Var v ->
+            T.var (encode_var v)
+          | T.App (f, []) -> aux ~top f
+          | T.App (f, args) ->
+            let f' = aux ~top f in
+            let args' = List.map (aux ~top:false) args in
+            T.app ~ty f' args'
+          | T.AppBuiltin (f, ts) ->
+            assert (not ((T.equal t T.Form.true_) || (T.equal t T.Form.false_)));
+            T.app_builtin ~ty f (List.map (aux ~top:false) ts)
+          | T.Bind (Binder.Lambda, var, body) ->
+            let var' = encode_var var in
+            let body' = aux ~top:false body in
+            let ty = bool_encode_ty ~top:false (CCOpt.get_exn (T.ty t)) in
+            T.bind ~ty Binder.Lambda var' body'
+          | T.Bind (Binder.Forall, _, _) -> failwith "Not implemented: Forall"
+          | T.Bind (Binder.Exists, _, _) -> failwith "Not implemented: Exist"
+          | _ -> failwith "Not implemented: Other kind of term")
+      with Invalid_argument ty_err ->
+        let err = 
+          CCFormat.sprintf 
+            "Subterm @[%a@]:@[%a@] of @[%a@] cannot be encoded because of type error: @[%s@]"
+            T.pp t T.pp (T.ty_exn t) T.pp t_orig ty_err in
+        if CCString.prefix ~pre:"type" ty_err then invalid_arg err
+        else invalid_arg ty_err in
+        
   let res = aux ~top:true t_orig in
   Util.debugf ~section 1 "Encoded term @[%a@] into @[%a@]" (fun k -> k T.pp t_orig T.pp res);
   res
