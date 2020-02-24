@@ -17,6 +17,8 @@ type szs_status =
   | Error of string
   | Timeout
 
+val k_check_lambda_free : bool Flex_state.key
+
 module type S = sig
   module Env : Env.S
 

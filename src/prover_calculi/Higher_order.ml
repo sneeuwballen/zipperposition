@@ -48,7 +48,7 @@ let k_prune_arg_fun = Flex_state.create_key ()
 let k_prim_enum_terms = Flex_state.create_key ()
 let k_simple_projection = Flex_state.create_key ()
 let k_simple_projection_md = Flex_state.create_key ()
-let k_check_lambda_free = Flex_state.create_key()
+let k_check_lambda_free = Saturate.k_check_lambda_free
 let k_purify_applied_vars = Flex_state.create_key()
 let k_eta = Flex_state.create_key()
 let k_diff_const = Flex_state.create_key()
@@ -1534,7 +1534,7 @@ let () =
                                  " 'int' purifies whenever a variable appears applied and unapplied.";
       "--ho-eta", eta_opt, " eta-expansion/reduction";
       "--ho-use-diff-for-neg-ext", Arg.Bool ((:=) _use_diff_for_neg_ext), " use diff constant for NegExt rule instead of fresh skolem";
-
+      "--check-lambda-free", Arg.Bool ((:=) _check_lambda_free), "check whether problem belongs to lambda-free"
     ];
   Params.add_to_mode "ho-complete-basic" (fun () ->
       enabled_ := true;
