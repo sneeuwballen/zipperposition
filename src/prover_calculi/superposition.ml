@@ -510,10 +510,15 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           false (* If var occurs with the same arguments everywhere, we don't need sup at vars *)
         | None ->
           (* Check whether Cσ is >= C[var -> replacement]σ *)
+          (* This is notoriously hard to implement due to the scope mechanism.
+          Especially note that var may be of polymorphic type and subst might
+          map to var, which can easily cause cyclic substitutions. *)
           let passive'_lits = Lits.apply_subst renaming subst (C.lits info.passive, info.scope_passive) in
-          let scope_after_rename = max info.scope_active info.scope_passive + 1 in
-          let subst_t = Unif.FO.bind_or_update subst (T.as_var_exn var, info.scope_passive) (replacement', scope_after_rename) in
-          let passive_t'_lits = Lits.apply_subst renaming subst_t (C.lits info.passive, info.scope_passive) in
+          let fresh_var = HVar.fresh ~ty:(T.ty var) () in
+          let subst_fresh_var = US.FO.bind US.empty (T.as_var_exn var, info.scope_passive) (T.var fresh_var, info.scope_passive) in
+          let passive_fresh_var = Lits.apply_subst Subst.Renaming.none (US.subst subst_fresh_var) (C.lits info.passive, info.scope_passive) in
+          let subst_replacement = Unif.FO.bind subst (fresh_var, info.scope_passive) (replacement, info.scope_active) in
+          let passive_t'_lits = Lits.apply_subst renaming subst_replacement (passive_fresh_var, info.scope_passive) in
           if Lits.compare_multiset ~ord passive'_lits passive_t'_lits = Comp.Gt
           then (
             Util.debugf ~section 3
