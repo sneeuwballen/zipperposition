@@ -1600,6 +1600,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let diss = 
         List.fold_left (fun (dis_acc, subst) (si, ti) ->
           let si',ti' = CCPair.map_same (app_subst subst) ((si,s_sc), (ti,t_sc)) in
+          if not (Type.is_ground (T.ty si')) || not (Type.is_ground (T.ty ti')) then (
+            (* polymorphism is currently not supported *)
+            raise StopSearch
+          );
           match cheap_unify ~subst (si',unifscope) (ti', unifscope) with
           | Some subst' -> dis_acc, subst'
           | None -> (si,ti) :: dis_acc, subst)
