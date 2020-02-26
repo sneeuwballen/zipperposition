@@ -207,9 +207,9 @@ let conv_rule_i ~proof (r:_ def_rule) = match r with
     let args = List.map (Term.Conv.of_simple_term_exn ctx) args in
     let rhs = Lambda.snf (Term.Conv.of_simple_term_exn ctx rhs) in
     (* let rhs_rewritten, rw_rules = Rewrite.Term.normalize_term rhs in
-    let proof_parents = Proof.Parent.from proof :: Rewrite.Rule.set_as_proof_parents rw_rules in
-    let form = Proof.Result.to_form (Proof.S.result proof) in
-    let proof = Proof.S.mk_f (Proof.Step.simp ~rule:(Proof.Rule.mk "simplify_rw_rule") proof_parents) form in *)
+       let proof_parents = Proof.Parent.from proof :: Rewrite.Rule.set_as_proof_parents rw_rules in
+       let form = Proof.Result.to_form (Proof.S.result proof) in
+       let proof = Proof.S.mk_f (Proof.Step.simp ~rule:(Proof.Rule.mk "simplify_rw_rule") proof_parents) form in *)
     let rule = Rewrite.Term.Rule.make id ty args (rhs) ~proof in
     Rewrite.T_rule rule
   | Def_form {lhs;rhs;_} ->
@@ -618,9 +618,9 @@ let sine_axiom_selector ?(depth_start=1) ?(depth_end=3) ?(tolerance=2.0) formula
   (* calculates transitive closure of defined-using-symbol relation *)
   let unroll_defined_symbols sym =
     (* let rec aux sym =
-      match RW.as_defined_cst sym with 
-      | None -> ID.Set.singleton sym
-      | Some dcst ->
+       match RW.as_defined_cst sym with 
+       | None -> ID.Set.singleton sym
+       | Some dcst ->
         DC.rules_term_seq dcst
         |> Iter.flat_map (fun rule ->
           Term.Seq.symbols (RW.Term.Rule.rhs rule))
@@ -629,9 +629,9 @@ let sine_axiom_selector ?(depth_start=1) ?(depth_end=3) ?(tolerance=2.0) formula
               ID.Set.fold (fun def_sym acc -> 
                 ID.Set.union (aux def_sym) acc
               ) symset ID.Set.empty) in
-    let res = aux sym in
-    (* CCFormat.printf "unfolded %a into @[%a@]@." ID.pp sym (ID.Set.pp ~start:"{" ~stop:"}" ID.pp) res; *)
-    res in *)
+       let res = aux sym in
+       (* CCFormat.printf "unfolded %a into @[%a@]@." ID.pp sym (ID.Set.pp ~start:"{" ~stop:"}" ID.pp) res; *)
+       res in *)
     ID.Set.singleton sym in
 
 
@@ -641,8 +641,8 @@ let sine_axiom_selector ?(depth_start=1) ?(depth_end=3) ?(tolerance=2.0) formula
     |> ID.Set.of_seq 
     |> (fun symset -> 
         ID.Set.fold (fun def_sym acc -> 
-          ID.Set.union (unroll_defined_symbols def_sym) acc
-        ) symset ID.Set.empty) in
+            ID.Set.union (unroll_defined_symbols def_sym) acc
+          ) symset ID.Set.empty) in
 
   let symset_of_axs axs =
     List.fold_left (fun acc c -> ID.Set.union acc (symset_of_ax c)) ID.Set.empty axs in
@@ -686,14 +686,14 @@ let sine_axiom_selector ?(depth_start=1) ?(depth_end=3) ?(tolerance=2.0) formula
     |> CCList.partition (fun st -> match view st with 
         | Goal _ | NegatedGoal _ -> false
         | _ -> true) in
-  
+
   let helper_axioms, axioms =
     CCList.partition (fun st ->
         ID.Set.is_empty (symset_of_ax st) || 
         match view st with 
         | TyDecl _  -> true 
         | _ -> false) axioms in
-  
+
   let tbl = ID.Tbl.create 1024 in
   List.iter (count_occ ~tbl) axioms;
   (* now tbl contains occurences of all symbols *)
@@ -715,7 +715,7 @@ let sine_axiom_selector ?(depth_start=1) ?(depth_end=3) ?(tolerance=2.0) formula
     CCList.sort_uniq ~cmp:compare @@ take_axs 1 conj_syms triggered_1 in
 
   Util.debugf ~section 2 "taken axioms:@[%a@]@." (fun k -> k (CCList.pp CCString.pp) (List.map name taken_axs));
-  
+
   let res = helper_axioms @ taken_axs @ goals in
   Iter.of_list (res)
 
