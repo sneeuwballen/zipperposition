@@ -135,7 +135,6 @@ module Make(A : ARG) = struct
 
 
   let rec take_fair_anyway q =
-    CCFormat.printf "forcing:%b,%d,%d@." (H.is_empty q.hp) (H.size q.hp) (q.stm_nb);
     if H.is_empty q.hp then [None]
     else (
       let res = CCList.filter_map CCFun.id (take_fair (H.size q.hp) q) in
