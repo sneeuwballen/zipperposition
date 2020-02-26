@@ -20,5 +20,7 @@ end
 
 val k_guard : int Flex_state.key
 val k_ratio : int Flex_state.key
+val k_clause_num : int Flex_state.key
+
 
 module Make(A : ARG) : S with module Stm = A.Stm

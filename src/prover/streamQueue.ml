@@ -13,6 +13,7 @@ end
 
 let k_guard = Flex_state.create_key ()
 let k_ratio = Flex_state.create_key ()
+let k_clause_num = Flex_state.create_key ()
 
 module Make(A : ARG) = struct
   module Stm = A.Stm
@@ -151,11 +152,17 @@ module Make(A : ARG) = struct
       with
       | Not_found -> prev_res
 
+  let clauses_to_take q =
+    let max_clause = E.flex_get k_clause_num in
+    if max_clause < 0 then q.stm_nb
+    else min max_clause q.stm_nb
+
   let take_stm_nb q =
+    let n = clauses_to_take q in
     if q.time_before_fair = 0 then take_fair (q.fair_tries+1) q 
     else (
       q.time_before_fair <- q.time_before_fair - 1;
-      _take_nb q q.stm_nb []
+      _take_nb q n []
     )
 
   let rec _take_stm_nb_fix_stm q n res =
@@ -179,10 +186,11 @@ module Make(A : ARG) = struct
         _take_stm_nb_fix_stm q n' (res'@res)
 
   let take_stm_nb_fix_stm q =
+    let n = clauses_to_take q in
     if q.time_before_fair = 0 then take_fair (q.fair_tries+1) q
     else (
       q.time_before_fair <- q.time_before_fair - 1;
-      _take_stm_nb_fix_stm q q.stm_nb []
+      _take_stm_nb_fix_stm q n []
     )
 
 

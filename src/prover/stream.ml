@@ -53,7 +53,7 @@ module Make(A:ARG) = struct
   let clause_penalty s = function 
     | None ->
       s.hits <- s.hits +1;
-      1
+      int_of_float (log (float_of_int s.hits)) + 1 
     | Some c ->
       s.hits <- s.hits +1;
       C.penalty c
