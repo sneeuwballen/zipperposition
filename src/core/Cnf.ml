@@ -376,8 +376,7 @@ module Flatten = struct
             ]
         in aux_maybe_define ~should_define pos f
       | T.AppBuiltin (Builtin.Eq, [a;b]) 
-        when  (T.is_fun a || T.is_fun b)
-           &&  not (T.Ty.is_prop (T.Ty.returns (T.ty_exn a)))  (* false *) ->
+        when  (T.is_fun a || T.is_fun b)  (* false *) ->
         (* turn [f = λx. t] into [∀x. f x=t] *)
         let vars_forall, a, b = complete_eq a b in
         let t' = F.forall_l vars_forall (F.eq_or_equiv a b) in
@@ -1123,6 +1122,7 @@ let cnf_of_seq ~ctx ?(opts=[]) (seq:Stmt.input_t Iter.t) : _ CCVector.t =
   (* read options *)
   let disable_renaming = List.mem DisableRenaming opts in
   let preprocess =
+    T.simplify_formula ::
     CCList.filter_map
       (function InitialProcessing f -> Some f | _ -> None)
       opts
