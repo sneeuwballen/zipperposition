@@ -80,6 +80,9 @@ let ty_decls =
                 neq_clone_tydecl; forall_clone_tydecl;
                 exists_clone_tydecl]
 
+let app_bool hd args =
+    T.app hd ~ty:bool_clone_ty args
+
 let boolean_axioms = 
   let bool_x = T.var (Var.make ~ty:bool_clone_ty (ID.make "X")) in
   let bool_y = T.var (Var.make ~ty:bool_clone_ty (ID.make "Y")) in
@@ -91,9 +94,6 @@ let boolean_axioms =
 
   let alpha2bool_p =
     T.var (Var.make ~ty:([alpha] ==> bool_clone_ty) (ID.make "P")) in
-
-  let app_bool hd args =
-    T.app hd ~ty:bool_clone_ty args in
   
   let either_true_or_false =
     [SLiteral.eq bool_x true_term; SLiteral.eq bool_x false_term] in
@@ -148,8 +148,6 @@ let boolean_axioms =
                 impl_def]
 
 
-
-
 let bool_encode_ty ty_orig =
   let rec aux ty =
     match T.view ty with
@@ -162,10 +160,8 @@ let bool_encode_ty ty_orig =
         T.Ty.fun_ args' ret'
       | T.AppBuiltin (f,args) ->
         assert(f != Builtin.Arrow);
-        if f == Builtin.Prop then (
-          bool_clone_ty) 
-        else (
-          T.app_builtin ~ty:T.tType f (List.map aux args))
+        if f == Builtin.Prop then bool_clone_ty
+        else T.app_builtin ~ty:T.tType f (List.map aux args)
       | T.Const _ -> ty
       | T.Var _ -> ty
       | T.Bind (b,v,t) -> T.bind ~ty:T.tType b v (aux t)
@@ -179,7 +175,7 @@ let bool_encode_ty ty_orig =
 
 
 let bool_encode_term t_orig  =
-  let rec aux ~top t = 
+  let rec aux t = 
     let encode_var v =  
       let ty = bool_encode_ty (Var.ty v) in
       Var.update_ty v ~f:(fun _ -> ty) in
@@ -194,17 +190,43 @@ let bool_encode_term t_orig  =
             T.const ~ty c
           | T.Var v ->
             T.var (encode_var v)
-          | T.App (f, []) -> aux ~top f
+          | T.App (f, []) -> aux f
           | T.App (f, args) ->
-            let f' = aux ~top f in
-            let args' = List.map (aux ~top:false) args in
+            let f' = aux f in
+            let args' = List.map aux args in
             T.app ~ty f' args'
+          | T.AppBuiltin (((And|Or) as b), ts) ->
+            let head = if b == And then and_term else or_term in
+            begin match ts with 
+            | [] -> head
+            | [x] -> app_bool head ts
+            | x :: y :: tts ->
+              let init = app_bool head [aux x; aux y] in
+              List.fold_left (fun acc arg -> app_bool head [acc;aux arg]) init tts
+            end
+          | T.AppBuiltin (((Equiv|Xor|Eq|Neq) as b), [x;y]) ->
+            assert (T.equal (T.ty_exn x) (T.ty_exn y));
+            let head = if b = Equiv || b = Eq then eq_term else neq_term in
+            let x = aux x and y = aux y in
+            let ty_arg = T.ty_exn x in
+            app_bool head [ty_arg; x; y]
+          | T.AppBuiltin ((Imply), [x;y]) ->
+            assert (T.equal (T.ty_exn x) (T.ty_exn y));
+            let x = aux x and y = aux y in
+            app_bool impl_term [x;y]
+          | T.AppBuiltin (((ForallConst|ExistsConst) as b), [x]) ->
+            let x = aux x in
+            let _, args, _ = T.Ty.unfold (T.ty_exn x) in
+            assert(List.length args = 1);
+            let ty_arg = List.hd args in
+            let head = if b = ForallConst then forall_term else exists_term in
+            app_bool head [ty_arg; x]
           | T.AppBuiltin (f, ts) ->
             assert (not ((T.equal t T.Form.true_) || (T.equal t T.Form.false_)));
-            T.app_builtin ~ty f (List.map (aux ~top:false) ts)
+            T.app_builtin ~ty f (List.map aux ts)
           | T.Bind (Binder.Lambda, var, body) ->
             let var' = encode_var var in
-            let body' = aux ~top:false body in
+            let body' = aux body in
             let ty = bool_encode_ty (CCOpt.get_exn (T.ty t)) in
             T.bind ~ty Binder.Lambda var' body'
           | T.Bind (Binder.Forall, _, _) -> failwith "Not implemented: Forall"
@@ -218,7 +240,7 @@ let bool_encode_term t_orig  =
         if CCString.prefix ~pre:"type" ty_err then invalid_arg err
         else invalid_arg ty_err in
         
-  let res = aux ~top:true t_orig in
+  let res = aux t_orig in
   Util.debugf ~section 1 "Encoded term @[%a@] into @[%a@]" (fun k -> k T.pp t_orig T.pp res);
   res
 
