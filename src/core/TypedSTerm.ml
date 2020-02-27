@@ -536,12 +536,12 @@ let close_all ~ty s t =
   let vars = free_vars t in
   bind_list ~ty s vars t
 
-let close_with_vars vars t =
+let close_with_vars ?(binder=Binder.Forall) vars t =
   let vars = List.map (fun v -> match view v with
       | Var v -> v
       | _ -> invalid_arg "has to be a variable" ) 
       vars in
-  bind_list Binder.Forall vars t ~ty:prop
+  bind_list binder vars t ~ty:prop
 
 let unfold_fun = unfold_binder Binder.Lambda
 
