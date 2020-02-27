@@ -342,9 +342,10 @@ let extension =
       Util.debug ~section 2 "Start boolean encoding";
       (* Encode statements *)
       let seq = Iter.map bool_encode_stmt seq in
+      let axioms = 
+        Iter.map (Statement.assert_ ~proof:Proof.Step.trivial) boolean_axioms in
       (* Add type declarations *)
-      let ty_decls = Iter.of_list [bool_clone_tydecl;true_clone_tydecl] in
-      let seq = Iter.append ty_decls seq in
+      let seq = Iter.append ty_decls (Iter.append axioms seq) in
       (* Add extensionality axiom *)
       Util.debug ~section 2 "Finished boolean encoding"; 
       seq
