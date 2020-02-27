@@ -14,7 +14,6 @@ let enabled_ = ref false
 let (==>) = T.Ty.(==>)
 
 let decl id ty = Statement.ty_decl ~proof:Proof.Step.trivial id ty
-let decl2 id ty = Statement.ty_decl ~proof:Proof.Step.trivial id ty
 
 let bool_clone_id = ID.make "$_bool"
 let bool_clone_ty = T.const ~ty:T.tType bool_clone_id
@@ -95,22 +94,31 @@ let boolean_axioms =
   let alpha2bool_p =
     T.var (Var.make ~ty:([alpha] ==> bool_clone_ty) (ID.make "P")) in
   
+  (* x = T \/ x = F *)
   let either_true_or_false =
     [SLiteral.eq bool_x true_term; SLiteral.eq bool_x false_term] in
+  (* T != F *)
   let true_neq_false =
     [SLiteral.neq true_term false_term] in
+  (* and T x = T *)
   let and_true =
     [SLiteral.eq (app_bool and_term [true_term; bool_x]) bool_x] in
+  (* and F x = F *)
   let and_false =
     [SLiteral.eq (app_bool and_term [false_term; bool_x]) false_term] in
+  (* not T = F *)
   let not_true =
     [SLiteral.eq (app_bool not_term [true_term]) false_term] in
+  (* not F = T *)
   let not_false =
     [SLiteral.eq (app_bool not_term [false_term]) true_term] in
+  (* or T x = T *)
   let or_true =
     [SLiteral.eq (app_bool or_term [true_term; bool_x]) true_term] in
+  (* or F x = x *)
   let or_false =
     [SLiteral.eq (app_bool or_term [false_term; bool_x]) bool_x] in
+  (* impl x y = or (not x) y *)
   let impl_def =
     let impl_x_y = app_bool impl_term [bool_x; bool_y] in
     let not_x_or_y = app_bool or_term [app_bool not_term [bool_x]; bool_y] in
@@ -119,24 +127,31 @@ let boolean_axioms =
   let eq_x_y = app_bool eq_term [alpha;alpha_x;alpha_y] in
   let neq_x_y = app_bool neq_term [alpha;alpha_x;alpha_y] in
   
+  (* x != y \/ eq x y = T *)
   let eq_true =
     [SLiteral.neq alpha_x alpha_y; SLiteral.eq eq_x_y true_term] in
+  (* x = y \/ eq x y = F *)
   let eq_false =
     [SLiteral.eq alpha_x alpha_y; SLiteral.eq eq_x_y false_term] in
+  (* neq x y = not (eq x y) *)
   let neq_is_not_eq =
     [SLiteral.eq neq_x_y (app_bool not_term [eq_x_y])] in
   
   let lambda_x_true = T.fun_l [alpha_var] true_term in
 
+  (* forall (\x. T) = T *)
   let forall_true =
     [SLiteral.eq (app_bool forall_term [alpha; lambda_x_true]) true_term] in
+  (* P = \x. T \/ forall P = F *)
   let forall_false =
     [SLiteral.eq alpha2bool_p lambda_x_true;
      SLiteral.eq (app_bool forall_term [alpha; alpha2bool_p]) false_term] in
 
+  (* \x. not (P x) *)
   let l_not_p_x = 
     T.close_with_vars ~binder:Binder.Lambda [alpha_x]
       (app_bool not_term [app_bool alpha2bool_p [alpha_x]]) in
+  (* exists P = not (forall (\x. not (P x))) *)
   let exists_def = 
     [SLiteral.eq 
       (app_bool exists_term [alpha; alpha2bool_p])
