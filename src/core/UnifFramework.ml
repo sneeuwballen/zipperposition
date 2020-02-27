@@ -261,7 +261,7 @@ module Make (P : PARAMETERS) = struct
        if not ((T.equal l r) && (Type.equal (Term.ty l) (Term.ty r))) then (
         CCFormat.printf "orig:@[%a@]=?=@[%a@]@." (Scoped.pp T.pp) t0s (Scoped.pp T.pp) t1s;
         CCFormat.printf "subst:@[%a@]@." Subst.pp subst;
-        CCFormat.printf "new:@[%a@]=?=@[%a@]@." T.pp l T.pp r;
+        CCFormat.printf "new:@[%a:%a@]=?=@[%a:%a@]@." T.pp l Type.pp (T.ty l) T.pp r Type.pp (T.ty r);
         assert(false)
        ); subst) opt)
     with Unif.Fail -> OSeq.empty

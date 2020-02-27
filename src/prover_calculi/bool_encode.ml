@@ -137,7 +137,7 @@ let boolean_axioms =
   let neq_is_not_eq =
     [SLiteral.eq neq_x_y (app_bool not_term [eq_x_y])] in
   
-  let lambda_x_true = T.fun_l [alpha_var] true_term in
+  let lambda_x_true = T.close_with_vars ~binder:Binder.Lambda [alpha_x] true_term in
 
   (* forall (\x. T) = T *)
   let forall_true =
@@ -236,6 +236,10 @@ let bool_encode_term t_orig  =
             let ty_arg = List.hd args in
             let head = if b = ForallConst then forall_term else exists_term in
             app_bool head [ty_arg; x]
+          | T.AppBuiltin (Not, [x]) ->
+            app_bool not_term [aux x]
+          | T.AppBuiltin (True, []) -> true_term
+          | T.AppBuiltin (False, []) -> false_term
           | T.AppBuiltin (f, ts) ->
             assert (not ((T.equal t T.Form.true_) || (T.equal t T.Form.false_)));
             T.app_builtin ~ty f (List.map aux ts)
