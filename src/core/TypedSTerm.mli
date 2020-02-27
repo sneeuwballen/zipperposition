@@ -384,6 +384,7 @@ val app_infer :
     @raise UnifyFailure if types do not correspond *)
 
 val try_alpha_renaming : t -> t -> Subst.t option
+val simplify_formula : t -> t
 
 (** {2 Conversion} *)
 

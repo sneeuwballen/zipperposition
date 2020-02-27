@@ -1605,6 +1605,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let diss = 
         List.fold_left (fun (dis_acc, subst) (si, ti) ->
           let si',ti' = CCPair.map_same (app_subst subst) ((si,s_sc), (ti,t_sc)) in
+          if not (Type.is_ground (T.ty si')) || not (Type.is_ground (T.ty ti')) then (
+            (* polymorphism is currently not supported *)
+            raise StopSearch
+          );
           match cheap_unify ~subst (si',unifscope) (ti', unifscope) with
           | Some subst' -> dis_acc, subst'
           | None -> (si,ti) :: dis_acc, subst)
@@ -3398,6 +3402,7 @@ let _ho_disagremeents = ref `SomeHo
 
 let _guard = ref 45
 let _ratio = ref 135
+let _clause_num = ref (-1)
 
 let key = Flex_state.create_key ()
 
@@ -3465,6 +3470,7 @@ let register ~sup =
 
   E.flex_add StreamQueue.k_guard !_guard;
   E.flex_add StreamQueue.k_ratio !_ratio;
+  E.flex_add StreamQueue.k_clause_num !_clause_num;
 
   let module JPF = JPFull.Make(struct let st = E.flex_state () end) in
   let module JPP = PUnif.Make(struct let st = E.flex_state () end) in
@@ -3565,6 +3571,7 @@ let () =
       "--max-inferences", Arg.Int (fun p -> _max_infs := p), " set maximal number of inferences";
       "--stream-queue-guard", Arg.Set_int _guard, "set value of guard for streamQueue";
       "--stream-queue-ratio", Arg.Set_int _ratio, "set value of ratio for streamQueue";
+      "--stream-clause-num", Arg.Set_int _clause_num, "how many clauses to take from streamQueue; by default as many as there are streams";
       "--ho-sort-constraints", Arg.Bool (fun b -> _sort_constraints := b), "sort constraints in unification algorithm by weight";
       "--check-sup-at-var-cond", Arg.Bool (fun b -> _check_sup_at_var_cond := b), " enable/disable superposition at variable monotonicity check";
       "--restrict-hidden-sup-at-vars", Arg.Bool (fun b -> _restrict_hidden_sup_at_vars :=	b), " enable/disable hidden superposition at variables only under certain ordering conditions"

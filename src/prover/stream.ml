@@ -53,10 +53,10 @@ module Make(A:ARG) = struct
   let clause_penalty s = function 
     | None ->
       s.hits <- s.hits +1;
-      1
+      max 4 (s.hits-16)
     | Some c ->
       s.hits <- s.hits +1;
-      C.penalty c
+      max (C.penalty c) (s.hits-64) 
 
   let drip s =
     match s.stm () with

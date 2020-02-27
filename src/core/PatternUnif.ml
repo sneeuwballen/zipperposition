@@ -428,12 +428,12 @@ let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
       )
     ) 
   in
-  (* let l = Lambda.eta_reduce @@ Lambda.snf @@ S.apply res t0_s in 
+  let l = Lambda.eta_reduce @@ Lambda.snf @@ S.apply res t0_s in 
      let r = Lambda.eta_reduce @@ Lambda.snf @@ S.apply res t1_s in
      if not ((T.equal l r) && (Type.equal (Term.ty l) (Term.ty r))) then (
      CCFormat.printf "orig:@[%a@]=?=@[%a@]@." (Scoped.pp T.pp) t0_s (Scoped.pp T.pp) t1_s;
      CCFormat.printf "before:@[%a@]@." US.pp subst;
      CCFormat.printf "after:@[%a@]@." US.pp res;
      assert(false);
-     ); *)
+     );
   res

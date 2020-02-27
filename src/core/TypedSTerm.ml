@@ -1598,6 +1598,86 @@ let try_alpha_renaming f1 f2 =
       (fun k -> k msg pp_stack st);
     None
 
+(* 
+  Perform rewritings of this form
+    A | A -> A; A | ~ A -> T; A | T -> T; A | F -> A
+    A & A -> A; A & ~ A -> F; A & T -> A; A & F -> F
+    ~T -> F        ~F -> T
+    A <=> ~A -> F; A <=> A -> T  A <=> F -> ~A  A <=> T -> A
+    P <~> P -> ~(P<->P)
+    A => ~A -> F; A <-> A => T  A <-> F => ~A  A <-> T => A *)
+let simplify_formula t =
+  let module F = Form in
+  let simplify_and_or t b l =
+    let exists_double args =
+      let pos, neg = 
+        CCList.partition_map (fun t -> 
+            match view t with 
+            | AppBuiltin(Builtin.Not, [s]) -> `Right s
+            | _ -> `Left t) args
+        |> CCPair.map_same Set.of_list in
+      not (Set.is_empty (Set.inter pos neg)) in
+
+      let netural_el, absorbing_el = 
+        if b = Builtin.And then F.true_,F.false_ else (F.false_,F.true_) in
+
+      let l' = CCList.sort_uniq ~cmp:compare l in
+
+      if exists_double l || List.exists (equal absorbing_el) l then absorbing_el
+      else (
+        let l' = List.filter (fun s -> not (equal s netural_el)) l' in
+        if List.length l = List.length l' then t
+        else (
+          if CCList.is_empty l' then netural_el
+          else (if List.length l' = 1 then List.hd l'
+                else app_builtin ~ty:(prop) b l')
+        ))
+  in
+
+  let rec aux t =
+    let ty = ty_exn t in
+    match view t with 
+    | AppBuiltin( ((And|Or) as b) , args) ->
+      simplify_and_or t b (List.map aux args)
+    | AppBuiltin( Not, [s]) ->
+      begin match view s with
+      | AppBuiltin(Not, [u]) -> aux u
+      | AppBuiltin(True,[]) -> F.false_
+      | AppBuiltin(False, []) -> F.true_
+      | _ -> app_builtin  ~ty Not [aux s] end
+    | AppBuiltin( (Eq|Equiv) as b, [x;y]) when Ty.is_prop (ty_exn x) ->
+      let x = aux x and y  = aux y in
+      if equal x y then F.true_
+      else if equal x F.true_  then y
+      else if equal x F.false_ then F.not_ y
+      else if equal y F.true_ then x
+      else if equal y F.false_ then F.not_ x
+      else if equal x (F.not_ y) || equal y (F.not_ x) then F.false_
+      else app_builtin ~ty b [x;y]
+    | AppBuiltin( (Neq|Xor), [x;y]) when Ty.is_prop (ty_exn x) ->
+      aux (F.not_ (F.eq_or_equiv x y))
+    | AppBuiltin( Imply, [x;y]) ->
+      let x = aux x and y  = aux y in
+      if equal x y then F.true_
+      else if equal x F.true_  then y
+      else if equal x F.false_ then F.true_
+      else if equal y F.true_ then F.true_
+      else if equal y F.false_ then F.not_ x
+      else if equal x (F.not_ y) then y
+      else if equal y (F.not_ x) then y
+      else app_builtin ~ty Imply [x;y]
+    | AppBuiltin( (Neq|Xor), [x;y]) when Ty.is_prop (ty_exn x) ->
+      aux (F.not_ (F.eq_or_equiv x y))
+    | AppBuiltin(b, args) ->
+      app_builtin ~ty b (List.map aux args)
+    | App (hd, args) ->
+      app ~ty (aux hd) (List.map aux args)
+    | Bind (s, v, body) ->
+      bind ~ty s v (aux body)
+    | _ -> t in
+  
+  aux t
+
 
 (** {2 Conversion} *)
 
