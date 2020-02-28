@@ -248,8 +248,12 @@ let bool_encode_term t_orig  =
             let body' = aux body in
             let ty = bool_encode_ty (CCOpt.get_exn (T.ty t)) in
             T.bind ~ty Binder.Lambda var' body'
-          | T.Bind (Binder.Forall, _, _) -> failwith "Not implemented: Forall"
-          | T.Bind (Binder.Exists, _, _) -> failwith "Not implemented: Exist"
+          | T.Bind ( ((Forall|Exists as b)), x, body) ->
+            let head = if b = Forall then forall_term else exists_term in
+            let x = encode_var x in
+            let ty_arg = Var.ty x in
+            let fun_body = T.close_with_vars ~binder:Binder.Lambda [T.var x] (aux body) in
+            app_bool head [ty_arg; fun_body]
           | _ -> failwith "Not implemented: Other kind of term")
       with Invalid_argument ty_err ->
         let err = 

@@ -64,6 +64,9 @@ module Constr = struct
     (* bigger arity means bigger symbol *)
     arity_of s1 - arity_of s2
 
+  let inv_arity arity_of s2 s1 =
+    arity_of s2 - arity_of s1
+
   let invfreq seq =
     (* symbol -> number of occurrences of symbol in seq *)
     let tbl = ID.Tbl.create 16 in
@@ -263,21 +266,31 @@ let inv_depth_occurence =  depth_occ_driver ~flip:false
 let depth_occurence =  depth_occ_driver ~flip:true
 
 
+let max_arity signature = 
+  Signature.Seq.symbols signature
+  |> Iter.map (fun sym -> snd @@ Signature.arity signature sym)
+  |> Iter.max |> CCOpt.get_or ~default:max_int
+
 (* weight of f = arity of f + 4 *)
 let weight_modarity ~signature a = 
   let arity =  try snd @@ Signature.arity signature a with _ -> 10 in
   Weight.int (arity + 4)
 
-let weight_invarity ~signature = 
-  let max_arity = 
-    Signature.Seq.symbols signature
-    |> Iter.map (fun sym -> snd @@ Signature.arity signature sym)
-    |> Iter.max |> CCOpt.get_or ~default:max_int in
-
+let weight_invarity ~signature =
+  let max_a = max_arity signature in
   (fun a ->
      let arity =  try snd @@ Signature.arity signature a with _ -> 0 in
-     Weight.int (max_arity - arity + 3))
+     Weight.int (max_a - arity + 3))
 
+let weight_sq_arity ~signature a =
+  let arity =  try snd @@ Signature.arity signature a with _ -> 10 in
+  Weight.int (arity * arity + 1)
+
+let weight_invsq_arity ~signature =
+  let max_a = max_arity signature in
+  (fun a -> 
+    let arity =  try snd @@ Signature.arity signature a with _ -> max_a / 2 in
+    Weight.int (max_a*max_a - arity * arity + 1))
 
 (* constant weight *)
 let weight_constant _ = Weight.int 4
@@ -331,6 +344,8 @@ let weight_fun_of_string ~signature s =
      "freqrank", with_syms weight_freqrank;
      "modarity", ignore_arg @@ weight_modarity ~signature;
      "invarity", ignore_arg @@ weight_invarity ~signature;
+     "sqarity", ignore_arg @@ weight_sq_arity ~signature;
+     "invsqarity", ignore_arg @@ weight_invsq_arity ~signature;
      "invdocc", inv_depth_occurence;
      "docc", depth_occurence;
      "const", ignore_arg weight_constant] in

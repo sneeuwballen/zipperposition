@@ -78,6 +78,7 @@ let funs_to_parse = ref []
 module Make(C : Clause_intf.S) = struct
   module C = C
 
+
   (* weight of a term [t], using the precedence's weight *)
   let term_weight t = Term.size t
 
@@ -271,6 +272,13 @@ module Make(C : Clause_intf.S) = struct
             (Util.debugf  10 "cl: %a, w:%d\n" (fun k -> k C.pp c val_);
              val_))
 
+    let _max_weight = ref (-1.0)
+    
+    let staggered ~stagger_factor c =
+      let float_weight c = float_of_int @@ C.weight c in
+      _max_weight := max (!_max_weight) (float_weight c) +. 1.0;
+
+      int_of_float @@ float_weight c /. (!_max_weight *. stagger_factor)
 
     let penalty = C.penalty
 
@@ -412,6 +420,18 @@ module Make(C : Clause_intf.S) = struct
         "expected pnrefined(+var_weight:int,+fun_weight:int" ^
         "-var_weight:int,-fun_weight:int" ^
         "pos_lit_mult:float, max_t_mult:float, max_lit_mul:float)"
+    
+    let parse_staggered s =
+      let or_lmax_regex =
+        Str.regexp
+          ("staggered(\\([0-9]+[.]?[0-9]*\\))") in
+      try
+        ignore(Str.search_forward or_lmax_regex s 0);
+        let stagger_factor = CCFloat.of_string (Str.matched_group 1 s) in
+        staggered ~stagger_factor
+      with Not_found | Invalid_argument _ ->
+        invalid_arg @@
+        "expected staggered(+stagger_factor:int)"
 
     let parse_conj_relative_cheap s =
       let or_lmax_regex =
@@ -444,6 +464,7 @@ module Make(C : Clause_intf.S) = struct
        "conjecture-relative-var", parse_crv;
        "conjecture-relative-cheap", parse_conj_relative_cheap;
        "pnrefined", parse_pnrefine;
+       "staggered", parse_staggered;
        "orient-lmax", parse_orient_lmax]
 
     let of_string s =
@@ -563,6 +584,14 @@ module Make(C : Clause_intf.S) = struct
     let defer_sos c =
       if C.proof_depth c = 0 || CCOpt.is_some (C.distance_to_goal c) then 1 else 0
 
+    let by_neg_lit c =
+      abs @@
+        Array.fold_left (fun acc lit -> 
+          if Lit.is_pos lit then acc + 400
+          else if Lit.is_ground lit then acc - 3
+          else acc - 1
+        ) 0 (C.lits c)
+
     let parsers =
       ["const", (fun _ -> const_prio);
        "prefer-ho-steps", (fun _ -> prefer_ho_steps);
@@ -582,7 +611,8 @@ module Make(C : Clause_intf.S) = struct
        "defer-fo", (fun _ -> defer_fo);
        "prefer-fo", (fun _ -> prefer_fo);
        "prefer-short-trail", (fun _ -> prefer_short_trail);
-       "prefer-long-trail", (fun _ -> prefer_long_trail)]
+       "prefer-long-trail", (fun _ -> prefer_long_trail);
+       "by-neg-lit", (fun _ -> by_neg_lit)]
 
     let of_string s =
       try
