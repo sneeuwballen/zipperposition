@@ -28,6 +28,7 @@ module type S = sig
   (** {6 Registration} *)
   val setup : unit -> unit
   val maybe_conv_lams : Env.C.t -> Env.C.t
+  val force_conv_lams : Env.C.t -> Env.C.t
 end
 
 (* Helper function for defining combinators *)
@@ -826,6 +827,11 @@ module Make(E : Env.S) : S with module Env = E = struct
       if E.flex_get k_enable_combinators then (
         SimplM.get (lams2combs_otf c)
       ) else c
+    
+    let force_conv_lams c =
+      let c' = lams2combs_otf c in
+      if SimplM.is_same c' then c
+      else SimplM.get c'
     
     let setup () =
       if E.flex_get k_enable_combinators then (

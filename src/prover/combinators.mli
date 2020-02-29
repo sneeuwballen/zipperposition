@@ -12,6 +12,9 @@ module type S = sig
      if combinator reasoning is enabled. *)
   val maybe_conv_lams : Env.C.t -> Env.C.t
 
+  (* Converts lambdas in either case *)
+  val force_conv_lams : Env.C.t -> Env.C.t
+
   (** Register rules in the environment *)
 end
 

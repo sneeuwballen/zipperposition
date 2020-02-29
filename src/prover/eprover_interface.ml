@@ -43,7 +43,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let (==>) = Type.(==>)
 
-  exception CantEncode
+  exception CantEncode of string
 
   let output_empty_conj ~out =
     Format.fprintf out "thf(conj,conjecture,($false))."
@@ -51,7 +51,10 @@ module Make(E : Env.S) : S with module Env = E = struct
   let rec encode_ty_args_t ~encoded_symbols t =
     let t_ty t =
       if Type.is_ground (T.ty t) then T.ty t
-      else raise CantEncode in
+      else 
+        let err = 
+          CCFormat.sprintf "%a:%a has nonground type" T.pp t Type.pp (T.ty t) in
+        raise @@ CantEncode err in
 
     let make_new_sym encoded_head args =
       let arg_tys = List.map t_ty args in
@@ -64,10 +67,15 @@ module Make(E : Env.S) : S with module Env = E = struct
     let rec aux ~sym_map t =
       match T.view t with 
       | T.Const _ | T.Var _ -> sym_map, t
-      | T.DB _ | T.Fun _ -> raise CantEncode
+      | T.DB _ | T.Fun _ -> 
+        let err = 
+          CCFormat.sprintf "%a is a lambda" T.pp t in
+        raise @@ CantEncode err
       | T.AppBuiltin(b, l)
         when Builtin.is_logical_op b && not (Type.is_prop (t_ty t)) ->
-        raise CantEncode
+        let err = 
+          CCFormat.sprintf "%a ho bool" T.pp t in
+        raise @@  CantEncode err
       | T.AppBuiltin(_, l)
       | T.App(_, l) ->
         let hd_mono, args = T.as_app_mono t in
@@ -198,14 +206,16 @@ module Make(E : Env.S) : S with module Env = E = struct
       let init, rest, encoded_symbols = 
         List.fold_left (fun (init, rest, encoded_symbols) cl -> 
           try
-            if IntSet.mem (C.id cl) ignore_ids then raise CantEncode;
+            if IntSet.mem (C.id cl) ignore_ids then raise @@ CantEncode "skip id";
             let p_d = C.proof_depth cl in
             let encoded_symbols, cl' = encode_ty_args_cl ~encoded_symbols cl in
             if p_d = 0 then (cl'::init,rest,encoded_symbols)
             else if Proof.Step.has_ho_step (C.proof_step cl) 
                  then (init, cl'::rest,encoded_symbols)
-                 else raise CantEncode
-          with CantEncode -> (init, rest, encoded_symbols)
+                 else raise @@ CantEncode "skip not ho step"
+          with CantEncode reason -> 
+          CCFormat.printf "@[cant encode @[%a@]:%s@]@." C.pp cl reason;
+          (init, rest, encoded_symbols)
         ) ([],[],encoded_symbols) (Iter.to_list (reduced set)) in
       let rest = CCList.sort (fun c1 c2 ->
         let pd1 = C.proof_depth c1 and pd2 = C.proof_depth c2 in
@@ -220,8 +230,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       let encoded_symbols = Term.Map.empty in
       let converter = 
         match !_encode_lams with
-        | `Ignore -> (fun c -> [c])
-        | `Combs -> (fun c -> [Combs.maybe_conv_lams c])
+        | `Ignore -> CCFormat.printf "ignoring@."; (fun c -> [c])
+        | `Combs -> CCFormat.printf "combs@."; (fun c -> [Combs.force_conv_lams c])
         | _ -> invalid_arg "not implemented" in
       let encoded_symbols, active_set = 
         take_from_set ~ignore_ids:IntSet.empty ~encoded_symbols ~converter active_set in
