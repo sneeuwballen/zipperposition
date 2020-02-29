@@ -6,6 +6,7 @@
 open Logtk
 
 let _tmp_dir = ref "/tmp"
+let _encode_lams = ref `Ignore
 
 exception PolymorphismDetected
 
@@ -38,6 +39,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   module C = Env.C
   module Ctx = Env.Ctx
   module T = Term
+  module Combs = Combinators.Make(Env)
 
   let (==>) = Type.(==>)
 
@@ -184,9 +186,15 @@ module Make(E : Env.S) : S with module Env = E = struct
   let try_e active_set passive_set =
     let max_others = !_max_derived in
 
-    let take_from_set ~ignore_ids ~encoded_symbols set =
+    let take_from_set ?(converter=(fun c -> [c])) 
+                      ~ignore_ids ~encoded_symbols set =
       let reduced s =
-        Iter.map (fun c -> CCOpt.get_or ~default:c (C.eta_reduce c)) s in
+        Iter.filter_map (fun c -> 
+          let p_d = C.proof_depth c in
+          if p_d == 0 || Proof.Step.has_ho_step (C.proof_step c)
+          then Some (CCOpt.get_or ~default:c (C.eta_reduce c))
+          else None) s
+        |> Iter.flat_map_l converter in
       let init, rest, encoded_symbols = 
         List.fold_left (fun (init, rest, encoded_symbols) cl -> 
           try
@@ -210,10 +218,16 @@ module Make(E : Env.S) : S with module Env = E = struct
 
     try 
       let encoded_symbols = Term.Map.empty in
+      let converter = 
+        match !_encode_lams with
+        | `Ignore -> (fun c -> [c])
+        | `Combs -> (fun c -> [Combs.maybe_conv_lams c])
+        | _ -> invalid_arg "not implemented" in
       let encoded_symbols, active_set = 
-        take_from_set ~ignore_ids:IntSet.empty ~encoded_symbols active_set in
+        take_from_set ~ignore_ids:IntSet.empty ~encoded_symbols ~converter active_set in
       let ignore_ids = IntSet.of_list (List.map C.id active_set) in
-      let _, passive_set =  take_from_set ~encoded_symbols ~ignore_ids passive_set in
+      let _, passive_set = 
+        take_from_set ~encoded_symbols ~converter ~ignore_ids passive_set in
       let already_defined = output_all ~out active_set in
       Format.fprintf out "%% -- PASSIVE -- \n";
       ignore(output_all  ~already_defined ~out passive_set);
@@ -246,7 +260,15 @@ end
 
 let () =
   Options.add_opts
-    [ "--tmp-dir", Arg.String (fun v -> _tmp_dir := v), " scratch directory for running E";
+    [ "--e-encode-lambdas", 
+        Arg.Symbol (["ignore"; "lift"; "combs"], (fun str -> 
+          match str with 
+          | "ignore" -> _encode_lams := `Ignore
+          | "lift" -> _encode_lams := `Lift
+          | "combs" -> _encode_lams := `Combs
+          | _ -> assert false
+      )), " how to treat lambdas when giving problem to E";
+      "--tmp-dir", Arg.String (fun v -> _tmp_dir := v), " scratch directory for running E";
       "--e-timeout", Arg.Set_int _timeout, " set E prover timeout.";
       "--e-max-derived", Arg.Set_int _max_derived, " set the limit of clauses that are derived by Zipperposition and given to E";
       "--e-auto", Arg.Bool (fun v -> _e_auto := v), " If set to on eprover will not run in autoschedule, but in auto mode"]

@@ -1298,7 +1298,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         | `NoPrune -> ();
       end;
 
-      if Env.flex_get Saturate.k_enable_combinators then (
+      if Env.flex_get Combinators.k_enable_combinators then (
         Env.set_ho_normalization_rule "comb-normalize" Combinators.comb_normalize;
       ) else (
         let ho_norm = (fun t -> t |> beta_reduce |> (
