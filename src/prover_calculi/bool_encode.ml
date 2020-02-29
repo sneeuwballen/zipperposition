@@ -214,7 +214,7 @@ let bool_encode_term t_orig  =
             let head = if b == And then and_term else or_term in
             begin match ts with 
             | [] -> head
-            | [x] -> app_bool head ts
+            | [x] -> app_bool head [aux x]
             | x :: y :: tts ->
               let init = app_bool head [aux x; aux y] in
               List.fold_left (fun acc arg -> app_bool head [acc;aux arg]) init tts
@@ -236,8 +236,7 @@ let bool_encode_term t_orig  =
             let ty_arg = List.hd args in
             let head = if b = ForallConst then forall_term else exists_term in
             app_bool head [ty_arg; x]
-          | T.AppBuiltin (Not, [x]) ->
-            app_bool not_term [aux x]
+          | T.AppBuiltin (Not, l) -> app_bool not_term (List.map aux l)
           | T.AppBuiltin (True, []) -> true_term
           | T.AppBuiltin (False, []) -> false_term
           | T.AppBuiltin (f, ts) ->
@@ -248,7 +247,7 @@ let bool_encode_term t_orig  =
             let body' = aux body in
             let ty = bool_encode_ty (CCOpt.get_exn (T.ty t)) in
             T.bind ~ty Binder.Lambda var' body'
-          | T.Bind ( ((Forall|Exists as b)), x, body) ->
+          | T.Bind (((Forall|Exists as b)), x, body) ->
             let head = if b = Forall then forall_term else exists_term in
             let x = encode_var x in
             let ty_arg = Var.ty x in
