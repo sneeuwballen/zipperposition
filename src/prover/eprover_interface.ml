@@ -37,9 +37,68 @@ module Make(E : Env.S) : S with module Env = E = struct
   module Env = E
   module C = Env.C
   module Ctx = Env.Ctx
+  module T = Term
+
+  let (==>) = Type.(==>)
+
+  exception CantEncode
 
   let output_empty_conj ~out =
     Format.fprintf out "thf(conj,conjecture,($false))."
+
+  let rec encode_ty_args_t ~encoded_symbols t =
+    let t_ty t =
+      if Type.is_ground (T.ty t) then T.ty t
+      else raise CantEncode in
+
+    let make_new_sym encoded_head args =
+      let arg_tys = List.map t_ty args in
+      let ret_ty = t_ty t in
+      let ty = arg_tys ==> ret_ty in
+      let (id, ty), res = T.mk_fresh_skolem ~prefix:"ty_enc" [] ty in
+      Env.Ctx.declare id ty;
+      res in
+
+    
+    let rec aux ~sym_map t =
+      match T.view t with 
+      | T.Const _ | T.Var _ -> sym_map, t
+      | T.DB _ | T.Fun _ -> raise CantEncode
+      | T.AppBuiltin(b, l)
+        when Builtin.is_logical_op b && not (Type.is_prop (t_ty t)) ->
+        raise CantEncode
+      | T.AppBuiltin(_, l)
+      | T.App(_, l) ->
+        let hd_mono, args = T.as_app_mono t in
+        let sym_map, hd = 
+          if List.length args != List.length l then (
+            match T.Map.get hd_mono sym_map with
+            | Some mapped -> sym_map, mapped
+            | None -> 
+              let new_sym =  make_new_sym hd_mono args in
+              T.Map.add hd_mono new_sym sym_map, new_sym
+          ) else (sym_map, hd_mono) in
+        let sym_map, args' = List.fold_right (fun a (sym_map, as_) -> 
+          let sym_map, a' = aux ~sym_map a in
+          (sym_map, a'::as_)
+        ) args (sym_map, []) in
+        sym_map, T.app hd args' in
+    aux ~sym_map:encoded_symbols t
+
+  let encode_ty_args_cl ~encoded_symbols cl =
+    let encoded_symbols, lits =
+      CCArray.fold_right (fun l (encoded_symbols, ls) -> 
+        match l with 
+        | Literal.Equation(lhs,rhs,sign) ->
+          let encoded_symbols, lhs = encode_ty_args_t ~encoded_symbols lhs in
+          let encoded_symbols, rhs = encode_ty_args_t ~encoded_symbols rhs in
+          encoded_symbols, (Literal.mk_lit lhs rhs sign) :: ls
+        | _ -> (encoded_symbols, l :: ls)
+      ) (C.lits cl) (encoded_symbols, []) in
+    let rule = Proof.Rule.mk "remove_ty_args" in
+    let proof = Proof.Step.inference ~rule [C.proof_parent cl] in
+    let res = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lits proof in
+    encoded_symbols, res
 
   let output_cl ~out clause =
     let lits_converted = Literals.Conv.to_tst (C.lits clause) in
@@ -122,57 +181,36 @@ module Make(E : Env.S) : S with module Env = E = struct
   let try_e active_set passive_set =
     let max_others = !_max_derived in
 
-    let rec can_be_translated t =
-      let can_translate_ty ty =
-        Type.is_ground ty in
-
-      let ty = Term.ty t in
-      can_translate_ty ty &&
-      match Term.view t with
-      | AppBuiltin(b, [body]) when Builtin.is_quantifier b && Type.is_fun (Term.ty body) -> 
-        let _, fun_body = Term.open_fun body in
-        can_be_translated fun_body
-      | AppBuiltin(b, _) when Builtin.is_combinator b -> false
-      | AppBuiltin(b, l) -> (not (Builtin.is_logical_binop b) || List.length l >= 2) &&
-                            (not (Builtin.equal b Builtin.Eq) || List.length l >= 2) &&
-                            (not (Builtin.equal b Builtin.Neq) || List.length l >= 2) &&
-                            (b != Builtin.Not || List.length l = 1) &&
-                            List.for_all can_be_translated l
-      | DB _ -> false
-      | Var _ | Const _ -> true
-      | App(hd,args) -> can_be_translated hd && List.for_all can_be_translated args
-      | Fun _ -> false in
-
-
-    let take_from_set ?(ignore_ids=IntSet.empty) set =
-      let clause_no_lams cl =
-        Iter.for_all can_be_translated (C.Seq.terms cl) in
-
-      let reduced s = 
+    let take_from_set ~ignore_ids ~encoded_symbols set =
+      let reduced s =
         Iter.map (fun c -> CCOpt.get_or ~default:c (C.eta_reduce c)) s in
-      let init_clauses s = 
-        Iter.filter (fun c -> C.proof_depth c = 0 && clause_no_lams c) (reduced s) in
-
-      let set = Iter.filter (fun c -> not (IntSet.mem (C.id c) ignore_ids)) set in
-      Iter.append (init_clauses set) (
-        (reduced set)
-        |> Iter.filter (fun c -> 
-            let proof_d = C.proof_depth c in
-            let has_ho_step = Proof.Step.has_ho_step (C.proof_step c) in
-            has_ho_step && proof_d  > 0 && clause_no_lams c)
-        |> Iter.sort ~cmp:(fun c1 c2 ->
-            let pd1 = C.proof_depth c1 and pd2 = C.proof_depth c2 in
-            CCInt.compare pd1 pd2)
-        |> Iter.take max_others)
-      |> Iter.to_list in
+      let init, rest, encoded_symbols = 
+        List.fold_left (fun (init, rest, encoded_symbols) cl -> 
+          try
+            if IntSet.mem (C.id cl) ignore_ids then raise CantEncode;
+            let p_d = C.proof_depth cl in
+            let encoded_symbols, cl' = encode_ty_args_cl ~encoded_symbols cl in
+            if p_d = 0 then (cl'::init,rest,encoded_symbols)
+            else if Proof.Step.has_ho_step (C.proof_step cl) 
+                 then (init, cl'::rest,encoded_symbols)
+                 else raise CantEncode
+          with CantEncode -> (init, rest, encoded_symbols)
+        ) ([],[],encoded_symbols) (Iter.to_list (reduced set)) in
+      let rest = CCList.sort (fun c1 c2 ->
+        let pd1 = C.proof_depth c1 and pd2 = C.proof_depth c2 in
+        if pd1 = pd2 then CCInt.compare (C.weight c1) (C.weight c2)
+        else CCInt.compare pd1 pd2) rest in
+      encoded_symbols, init @ (CCList.take max_others rest) in
 
     let prob_name, prob_channel = Filename.open_temp_file ~temp_dir:!_tmp_dir "e_input" "" in
     let out = Format.formatter_of_out_channel prob_channel in
 
     try 
-      let active_set = take_from_set active_set in
+      let encoded_symbols = Term.Map.empty in
+      let encoded_symbols, active_set = 
+        take_from_set ~ignore_ids:IntSet.empty ~encoded_symbols active_set in
       let ignore_ids = IntSet.of_list (List.map C.id active_set) in
-      let passive_set =  take_from_set ~ignore_ids passive_set in
+      let _, passive_set =  take_from_set ~encoded_symbols ~ignore_ids passive_set in
       let already_defined = output_all ~out active_set in
       Format.fprintf out "%% -- PASSIVE -- \n";
       ignore(output_all  ~already_defined ~out passive_set);
