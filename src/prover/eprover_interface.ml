@@ -58,7 +58,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       let (id, ty), res = T.mk_fresh_skolem ~prefix:"ty_enc" [] ty in
       Env.Ctx.declare id ty;
       res in
-
     
     let rec aux ~sym_map t =
       match T.view t with 
@@ -103,9 +102,13 @@ module Make(E : Env.S) : S with module Env = E = struct
   let output_cl ~out clause =
     let lits_converted = Literals.Conv.to_tst (C.lits clause) in
     Format.fprintf out "%% %d:\n" (C.proof_depth clause);
-    if CCOpt.is_some (C.distance_to_goal clause) then (
-      Format.fprintf out "@[thf(zip_cl_%d,negated_conjecture,@[%a@]).@]@\n" (C.id clause) TypedSTerm.TPTP_THF.pp lits_converted
-    ) else Format.fprintf out "@[thf(zip_cl_%d,axiom,@[%a@]).@]@\n" (C.id clause) TypedSTerm.TPTP_THF.pp lits_converted
+    match (C.distance_to_goal clause) with 
+    | Some d when d = 0 ->
+      Format.fprintf out "@[thf(zip_cl_%d,negated_conjecture,@[%a@]).@]@\n"
+        (C.id clause) TypedSTerm.TPTP_THF.pp lits_converted
+    | _ -> 
+      Format.fprintf out "@[thf(zip_cl_%d,axiom,@[%a@]).@]@\n"
+        (C.id clause) TypedSTerm.TPTP_THF.pp lits_converted
 
 
   let output_symdecl ~out sym ty =
