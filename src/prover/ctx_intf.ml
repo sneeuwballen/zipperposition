@@ -28,9 +28,6 @@ module type S = sig
 
   val select : Selection.t
 
-  val eta_normalize : Term.t -> Term.t
-  (** eta_normalize a term (expand or reduce or neutral, depending on cli options) *)
-
   val lost_completeness : unit -> unit
   (** To be called when completeness is not preserved *)
 

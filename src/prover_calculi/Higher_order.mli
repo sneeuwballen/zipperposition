@@ -7,6 +7,13 @@ open Libzipperposition
 
 val prim_enum_terms : Term.Set.t ref
 
+type prune_kind = [`NoPrune | `OldPrune | `PruneAllCovers | `PruneMaxCover]
+val k_prune_arg_fun : prune_kind Flex_state.key
+(* diff const is of type ![alpha,beta]: (alpha->beta) -> (alpha->beta) -> alpha
+   -- NB: EXPECTS TYPE ARGUMENTS! *)
+val k_diff_const : Term.t Flex_state.key
+
+
 module type S = sig
   module Env : Env.S
   module C : module type of Env.C
@@ -16,7 +23,7 @@ module type S = sig
   val setup : unit -> unit
   (** Register rules in the environment *)
 
-  
+
 end
 
 module Make(E : Env.S) : S with module Env = E

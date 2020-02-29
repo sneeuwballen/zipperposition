@@ -13,7 +13,7 @@ let stat_narrow_fail = Util.mk_stat "test_prop.narrow.fails"
 let stat_narrow_ok = Util.mk_stat "test_prop.narrow.ok"
 let stat_narrow_step_term = Util.mk_stat "test_prop.narrow.steps_term"
 let stat_narrow_step_lit = Util.mk_stat "test_prop.narrow.steps_lit"
-let prof_narrow = Util.mk_profiler "test_prop.narrow"
+let prof_narrow = ZProf.make "test_prop.narrow"
 
 type term = T.t
 type lit = Literal.t
@@ -253,7 +253,7 @@ end
 let default_limit = Narrow.default_limit
 
 let check_form ?(limit=Narrow.default_limit) (f:form): res =
-  Util.with_prof prof_narrow (Narrow.check_form ~limit) f
+  ZProf.with_prof prof_narrow (Narrow.check_form ~limit) f
 
 (* [t] head symbol is a function that is not a constructor *)
 let starts_with_fun (t:T.t): bool = match T.head t with

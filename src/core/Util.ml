@@ -119,15 +119,15 @@ let debug_fmt_ = Format.std_formatter
 let debugf_real ~section msg k =
   let now = total_time_s() in
   if section == Section.root
-  then Format.fprintf debug_fmt_ "@{<Black>@[<4>%.3f[]@}@ " now
-  else Format.fprintf debug_fmt_ "@{<Black>@[<4>%.3f[%s]@}@ "
+  then Format.fprintf debug_fmt_ "@{<blue>@[<4>%.3f[]@}@ " now
+  else Format.fprintf debug_fmt_ "@{<blue>@[<4>%.3f[%s]@}@ "
       now section.Section.full_name;
   k (Format.kfprintf
-      (fun fmt ->
-         Format.fprintf fmt "@]@.";
-         if !break_on_debug then wait_user_input();
-      )
-      debug_fmt_ msg)
+       (fun fmt ->
+          Format.fprintf fmt "@]@.";
+          if !break_on_debug then wait_user_input();
+       )
+       debug_fmt_ msg)
 
 let[@inline] debugf ?(section=Section.root) l msg k =
   if l <= Section.cur_level section then (
@@ -217,94 +217,6 @@ module Exn = struct
     else "<no backtrace>"
 end
 
-(** {2 profiling facilities} *)
-
-(** A profiler (do not call recursively) *)
-type profiler = {
-  prof_name : string;
-  mutable prof_total : timestamp; (* total time *)
-  mutable prof_calls : int; (* number of calls *)
-  mutable prof_max : timestamp; (* max time in the profiled function (ns) *)
-  mutable prof_enter : timestamp; (* time at which we entered the profiler (ns) *)
-}
-
-let enable_profiling = ref false
-
-let profilers = ref []
-
-let mk_profiler name =
-  let prof = {
-    prof_name = name;
-    prof_enter = 0.;
-    prof_total = 0.;
-    prof_calls = 0;
-    prof_max = 0.;
-  } in
-  (* register profiler *)
-  profilers := prof :: !profilers;
-  prof
-
-let enter_prof profiler =
-  if !enable_profiling
-  then profiler.prof_enter <- get_time_mon_ ()
-
-let exit_prof profiler =
-  if !enable_profiling then (
-    let stop = get_time_mon_ () in
-    let delta = timestamp_sub stop profiler.prof_enter in
-    profiler.prof_total <- timestamp_add profiler.prof_total delta;
-    profiler.prof_calls <- profiler.prof_calls + 1;
-    if delta > profiler.prof_max then profiler.prof_max <- delta;
-  )
-
-let with_prof p f x =
-  if !enable_profiling then (
-    enter_prof p;
-    try
-      let y = f x in
-      exit_prof p;
-      y
-    with e ->
-      exit_prof p;
-      raise e
-  ) else f x
-
-let show_profilers out () =
-  Format.fprintf out "@[<v>";
-  Format.fprintf out
-    "@[%39s ---------- --------- --------- --------- ---------@]@,"
-    (String.make 39 '-');
-  Format.fprintf out
-    "@[%-39s %10s %9s %9s %9s %9s@]@,"
-    "function" "#calls" "total" "% total" "max" "average";
-  (* sort profilers by decreasing total time *)
-  let profilers =
-    List.sort
-      (fun p1 p2 -> - (timestamp_cmp p1.prof_total p2.prof_total))
-      !profilers
-  in
-  let tot = total_time_s ()in
-  List.iter
-    (fun profiler -> if profiler.prof_calls > 0 then
-        (* print content of the profiler *)
-        Format.fprintf out "@[%-39s %10d %9.4f %9.2f %9.4f %9.4f@]@,"
-          profiler.prof_name
-          profiler.prof_calls
-          profiler.prof_total
-          (profiler.prof_total *. 100. /. tot)
-          profiler.prof_max
-          (profiler.prof_total /. (float_of_int profiler.prof_calls))
-    )
-    profilers;
-  Format.fprintf out "@]";
-  ()
-
-(** Print profiling data upon exit *)
-let () =
-  at_exit
-    (fun () ->
-       if !enable_profiling then Format.eprintf "%a@." show_profilers ())
-
 (** {2 Runtime statistics} *)
 
 (* TODO cleanup, make hierarchic *)
@@ -393,12 +305,12 @@ let map_product ~f l =
       [] a
   in
   match l with
-    | [] -> []
-    | l1 :: tail ->
-      List.fold_left
-        (fun acc x -> product (f x) acc)
-        (f l1)
-        tail
+  | [] -> []
+  | l1 :: tail ->
+    List.fold_left
+      (fun acc x -> product (f x) acc)
+      (f l1)
+      tail
 
 let seq_map_l ~f l =
   let rec aux l yield = match l with

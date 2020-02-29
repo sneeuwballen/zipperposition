@@ -377,7 +377,7 @@ defined_atom:
   | s=DISTINCT_OBJECT
     {
       let loc = L.mk_pos $startpos $endpos in
-      PT.const ~loc s
+      PT.const ~loc ~attrs:[PT.Attr_distinct_const] s
     }
 
 defined_atomic_term:

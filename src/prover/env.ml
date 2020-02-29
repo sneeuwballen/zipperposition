@@ -9,19 +9,20 @@ module T = Term
 module Lit = Literal
 module Lits = Literals
 module P = Proof
+module IntSet = Set.Make(CCInt)
 
 let section = Util.Section.make ~parent:Const.section "env"
 
 let stat_inferred = Util.mk_stat "env.inferred clauses"
 
-let prof_generate = Util.mk_profiler "env.generate"
-let prof_generate_unary = Util.mk_profiler "env.generate_unary"
-let prof_generate_binary = Util.mk_profiler "env.generate_binary"
-let prof_back_simplify = Util.mk_profiler "env.back_simplify"
-let prof_simplify = Util.mk_profiler "env.simplify"
-let prof_all_simplify = Util.mk_profiler "env.all_simplify"
-let prof_is_redundant = Util.mk_profiler "env.is_redundant"
-let prof_subsumed_by = Util.mk_profiler "env.subsumed_by"
+let prof_generate = ZProf.make "env.generate"
+let prof_generate_unary = ZProf.make "env.generate_unary"
+let prof_generate_binary = ZProf.make "env.generate_binary"
+let prof_back_simplify = ZProf.make "env.back_simplify"
+let prof_simplify = ZProf.make "env.simplify"
+let prof_all_simplify = ZProf.make "env.all_simplify"
+let prof_is_redundant = ZProf.make "env.is_redundant"
+let prof_subsumed_by = ZProf.make "env.subsumed_by"
 
 (** {2 Signature} *)
 module type S = Env_intf.S
@@ -55,7 +56,7 @@ module Make(X : sig
       [(c, `Same)] means the clause has not been simplified;
       [(c, `New)] means the clause has been simplified at least once *)
 
-   
+
   type term_norm_rule = Term.t -> Term.t option
   (** Normalization rule on terms *)
 
@@ -123,6 +124,7 @@ module Make(X : sig
   let _generate_rules : (string * generate_rule) list ref = ref []
   let _clause_conversion_rules : clause_conversion_rule list ref = ref []
   let _step_init = ref []
+  let _fragment_checks = ref []
 
   let on_start = Signal.create()
   let on_input_statement = Signal.create()
@@ -230,6 +232,10 @@ module Make(X : sig
 
   let add_step_init f = _step_init := f :: !_step_init
 
+  let add_fragment_check f = _fragment_checks := f :: !_fragment_checks
+
+  let check_fragment c = CCList.for_all (fun f -> f c) !_fragment_checks
+
   let params = X.params
 
   let[@inline] get_empty_clauses () =
@@ -261,7 +267,7 @@ module Make(X : sig
 
   (** do binary inferences that involve the given clause *)
   let do_binary_inferences c =
-    Util.enter_prof prof_generate_binary;
+    ZProf.enter_prof prof_generate_binary;
     Util.debugf ~section 5 "@[<2>do binary inferences with current active set:@ `@[%a@]`@]"
       (fun k->k C.pp_set (ProofState.ActiveSet.clauses ()));
     (* apply every inference rule *)
@@ -273,12 +279,12 @@ module Make(X : sig
            List.rev_append new_clauses acc)
         [] !_binary_rules
     in
-    Util.exit_prof prof_generate_binary;
+    ZProf.exit_prof prof_generate_binary;
     Iter.of_list clauses
 
   (** do unary inferences for the given clause *)
   let do_unary_inferences c =
-    Util.enter_prof prof_generate_unary;
+    ZProf.enter_prof prof_generate_unary;
     Util.debug ~section 3 "do unary inferences";
     (* apply every inference rule *)
     let clauses = List.fold_left
@@ -287,7 +293,7 @@ module Make(X : sig
            let new_clauses = rule c in
            List.rev_append new_clauses acc)
         [] !_unary_rules in
-    Util.exit_prof prof_generate_unary;
+    ZProf.exit_prof prof_generate_unary;
     Iter.of_list clauses
 
   let do_generate ~full () =
@@ -337,21 +343,21 @@ module Make(X : sig
     let proofs : Proof.parent list ref = ref [] in
     let rec reduce_term rules t =
       match rules with
-        | [] -> t
-        | (name, r)::rules' ->
-          begin match r t with
-            | None -> reduce_term rules' t (* try next rules *)
-            | Some (t',proof) ->
-              applied_rules := StrSet.add name !applied_rules;
-              proofs := List.rev_append proof !proofs;
-              let new_t = match !_norm_rule t' with 
-                                       | None -> t'
-                                       | Some tt -> tt in
-              Util.debugf ~section 5
-                "@[<2>rewrite `@[%a@]`@ into `@[%a@]`@ :proof (@[%a@])@]"
-                (fun k->k T.pp t T.pp new_t (Util.pp_list Proof.pp_parent) proof);
-              reduce_term !_rewrite_rules new_t  (* re-apply all rules *)
-          end
+      | [] -> t
+      | (name, r)::rules' ->
+        begin match r t with
+          | None -> reduce_term rules' t (* try next rules *)
+          | Some (t',proof) ->
+            applied_rules := StrSet.add name !applied_rules;
+            proofs := List.rev_append proof !proofs;
+            let new_t = match !_norm_rule t' with 
+              | None -> t'
+              | Some tt -> tt in
+            Util.debugf ~section 5
+              "@[<2>rewrite `@[%a@]`@ into `@[%a@]`@ :proof (@[%a@])@]"
+              (fun k->k T.pp t T.pp new_t (Util.pp_list Proof.pp_parent) proof);
+            reduce_term !_rewrite_rules new_t  (* re-apply all rules *)
+        end
     in 
     let lits' =
       Array.map
@@ -375,13 +381,13 @@ module Make(X : sig
       SimplM.return_new c'
     )
 
-   let ho_normalize c =
+  let ho_normalize c =
     let did_reduce = ref false in
     let lits' =
       Array.map
         (fun lit -> Lit.map (fun t -> match !_norm_rule t with 
-                                       | None -> t
-                                       | Some t' -> did_reduce := true; t' ) lit)
+             | None -> t
+             | Some t' -> did_reduce := true; t' ) lit)
         (C.lits c)
     in
     if not !did_reduce
@@ -410,17 +416,17 @@ module Make(X : sig
       | [] -> lit
       | (name,r)::rules' ->
         match r lit with
-          | None -> rewrite_lit rules' lit
-          | Some (lit',proof,tgs) ->
-            applied_rules := StrSet.add name !applied_rules;
-            proofs := List.rev_append proof !proofs;
-            tags := List.rev_append tgs !tags;
-            Util.debugf ~section 5
-              "@[rewritten lit `@[%a@]`@ into `@[%a@]`@ (using %s)@ \
-               :proof (@[%a@]) :tags %a@]"
-              (fun k->k Lit.pp lit Lit.pp lit' name
-                  (Util.pp_list Proof.pp_parent) proof Proof.pp_tags tgs);
-            rewrite_lit !_lit_rules lit'
+        | None -> rewrite_lit rules' lit
+        | Some (lit',proof,tgs) ->
+          applied_rules := StrSet.add name !applied_rules;
+          proofs := List.rev_append proof !proofs;
+          tags := List.rev_append tgs !tags;
+          Util.debugf ~section 5
+            "@[rewritten lit `@[%a@]`@ into `@[%a@]`@ (using %s)@ \
+             :proof (@[%a@]) :tags %a@]"
+            (fun k->k Lit.pp lit Lit.pp lit' name
+                (Util.pp_list Proof.pp_parent) proof Proof.pp_tags tgs);
+          rewrite_lit !_lit_rules lit'
     in
     (* apply lit rules *)
     let lits = Array.map (fun lit -> rewrite_lit !_lit_rules lit) (C.lits c) in
@@ -470,70 +476,70 @@ module Make(X : sig
     let open SimplM.Infix in
     fix_simpl c
       ~f:(fun c ->
-        basic_simplify c >>= fun c ->
-        (* first, rewrite terms *)
-        ho_normalize c >>= fun c ->
-        rewrite c >>= fun c ->
-        (* rewrite literals (if needed) *)
-        begin match !_lit_rules with
-          | [] -> SimplM.return_same c
-          | _::_ -> rewrite_lits c
-        end
-        >>= fun c ->
-        (* apply simplifications *)
-        begin match !_unary_simplify with
-          | [] -> SimplM.return_same c
-          | [f] -> f c
-          | [f;g] -> f c >>= g
-          | l -> SimplM.app_list l c
-        end)
+          basic_simplify c >>= fun c ->
+          (* first, rewrite terms *)
+          ho_normalize c >>= fun c ->
+          rewrite c >>= fun c ->
+          (* rewrite literals (if needed) *)
+          begin match !_lit_rules with
+            | [] -> SimplM.return_same c
+            | _::_ -> rewrite_lits c
+          end
+          >>= fun c ->
+          (* apply simplifications *)
+          begin match !_unary_simplify with
+            | [] -> SimplM.return_same c
+            | [f] -> f c
+            | [f;g] -> f c >>= g
+            | l -> SimplM.app_list l c
+          end)
 
   (* rewrite clause with simpl_set *)
   let rw_simplify c =
     let open SimplM.Infix in
     fix_simpl c
       ~f:(fun c ->
-        if C.get_flag SClause.flag_persistent c
-        then SimplM.return_same c
-        else match !_rw_simplify with
-          | [] -> SimplM.return_same c
-          | [f] -> f c
-          | [f;g] -> f c >>= g
-          | l -> SimplM.app_list l c)
+          if C.get_flag SClause.flag_persistent c
+          then SimplM.return_same c
+          else match !_rw_simplify with
+            | [] -> SimplM.return_same c
+            | [f] -> f c
+            | [f;g] -> f c >>= g
+            | l -> SimplM.app_list l c)
 
   (* simplify clause w.r.t. active set *)
   let active_simplify c =
     let open SimplM.Infix in
     fix_simpl c
       ~f:(fun c ->
-        if C.get_flag SClause.flag_persistent c
-        then SimplM.return_same c
-        else match !_active_simplify with
-          | [] -> SimplM.return_same c
-          | [f] -> f c
-          | [f;g] -> f c >>= g
-          | l -> SimplM.app_list l c)
+          if C.get_flag SClause.flag_persistent c
+          then SimplM.return_same c
+          else match !_active_simplify with
+            | [] -> SimplM.return_same c
+            | [f] -> f c
+            | [f;g] -> f c >>= g
+            | l -> SimplM.app_list l c)
 
   let simplify c =
     let open SimplM.Infix in
-    Util.enter_prof prof_simplify;
+    ZProf.enter_prof prof_simplify;
     let res = fix_simpl c
         ~f:(fun c ->
-          let old_c = c in
-          basic_simplify c >>=
-          (* simplify with unit clauses, then all active clauses *)
-          ho_normalize >>=
-          rewrite >>=
-          rw_simplify >>=
-          unary_simplify >>=
-          active_simplify >|= fun c ->
-          if not (Lits.equal_com (C.lits c) (C.lits old_c))
-          then
-            Util.debugf ~section 2 "@[clause `@[%a@]`@ simplified into `@[%a@]`@]"
-              (fun k->k C.pp old_c C.pp c);
-          c)
+            let old_c = c in
+            basic_simplify c >>=
+            (* simplify with unit clauses, then all active clauses *)
+            ho_normalize >>=
+            rewrite >>=
+            rw_simplify >>=
+            unary_simplify >>=
+            active_simplify >|= fun c ->
+            if not (Lits.equal_com (C.lits c) (C.lits old_c))
+            then
+              Util.debugf ~section 2 "@[clause `@[%a@]`@ simplified into `@[%a@]`@]"
+                (fun k->k C.pp old_c C.pp c);
+            c)
     in
-    Util.exit_prof prof_simplify;
+    ZProf.exit_prof prof_simplify;
     res
 
   let multi_simplify c : C.t list option =
@@ -543,8 +549,8 @@ module Make(X : sig
       | [] -> None
       | r::rules' ->
         match r c with
-          | Some l -> Some l
-          | None -> try_next c rules'
+        | Some l -> Some l
+        | None -> try_next c rules'
     in
     (* fixpoint of [try_next] *)
     let set = ref C.ClauseSet.empty in
@@ -556,12 +562,12 @@ module Make(X : sig
         let c, st = unary_simplify c in
         if st = `New then did_something := true;
         match try_next c !_multi_simpl_rule with
-          | None ->
-            (* keep the clause! *)
-            set := C.ClauseSet.add c !set;
-          | Some l ->
-            did_something := true;
-            List.iter (fun c -> Queue.push c q) l;
+        | None ->
+          (* keep the clause! *)
+          set := C.ClauseSet.add c !set;
+        | Some l ->
+          did_something := true;
+          List.iter (fun c -> Queue.push c q) l;
       )
     done;
     if !did_something
@@ -574,35 +580,35 @@ module Make(X : sig
   (* find candidates for backward simplification in active set *)
   let backward_simplify_find_candidates given =
     match !_backward_simplify with
-      | [] -> C.ClauseSet.empty
-      | [f] -> f given
-      | [f;g] -> C.ClauseSet.union (f given) (g given)
-      | l ->
-        List.fold_left
-          (fun set f -> C.ClauseSet.union set (f given))
-          C.ClauseSet.empty l
+    | [] -> C.ClauseSet.empty
+    | [f] -> f given
+    | [f;g] -> C.ClauseSet.union (f given) (g given)
+    | l ->
+      List.fold_left
+        (fun set f -> C.ClauseSet.union set (f given))
+        C.ClauseSet.empty l
 
   (* Perform backward simplification with the given clause *)
   let backward_simplify given =
-    Util.enter_prof prof_back_simplify;
+    ZProf.enter_prof prof_back_simplify;
     (* set of candidate clauses, that may be unit-simplifiable *)
     let candidates = backward_simplify_find_candidates given in
     let back_simplify c =
       let open SimplM.Infix in
       fix_simpl c
         ~f:(fun c ->
-          let old_c = c in
-          basic_simplify c >>=
-          (* simplify with unit clauses, then all active clauses *)
-          ho_normalize >>=
-          rewrite >>=
-          rw_simplify >>=
-          unary_simplify >|= fun c ->
-          if not (Lits.equal_com (C.lits c) (C.lits old_c)) then (
-            Util.debugf ~section 2 "@[clause `@[%a@]`@ simplified into `@[%a@]`@]"
-              (fun k->k C.pp old_c C.pp c);
-          );
-          c)
+            let old_c = c in
+            basic_simplify c >>=
+            (* simplify with unit clauses, then all active clauses *)
+            ho_normalize >>=
+            rewrite >>=
+            rw_simplify >>=
+            unary_simplify >|= fun c ->
+            if not (Lits.equal_com (C.lits c) (C.lits old_c)) then (
+              Util.debugf ~section 2 "@[clause `@[%a@]`@ simplified into `@[%a@]`@]"
+                (fun k->k C.pp old_c C.pp c);
+            );
+            c)
     in
     (* try to simplify the candidates. Before is the set of clauses that
        are simplified, after is the list of those clauses after simplification *)
@@ -626,7 +632,7 @@ module Make(X : sig
            end)
         candidates (C.ClauseSet.empty, [])
     in
-    Util.exit_prof prof_back_simplify;
+    ZProf.exit_prof prof_back_simplify;
     before, Iter.of_list after
 
   let simplify_active_with f =
@@ -634,20 +640,20 @@ module Make(X : sig
       C.ClauseSet.fold
         (fun c set ->
            match f c with
-             | None -> set
-             | Some clauses ->
-               let redundant, clauses =
-                 CCList.fold_map
-                   (fun red c ->
-                      let c', is_new = unary_simplify c in
-                      (red || is_new=`New), c')
-                   false clauses
-               in
-               if redundant then C.mark_redundant c;
-               Util.debugf ~section 3
-                 "@[active clause `@[%a@]`@ simplified into clauses `@[%a@]`@]"
-                 (fun k->k C.pp c (CCFormat.list C.pp) clauses);
-               (c, clauses) :: set)
+           | None -> set
+           | Some clauses ->
+             let redundant, clauses =
+               CCList.fold_map
+                 (fun red c ->
+                    let c', is_new = unary_simplify c in
+                    (red || is_new=`New), c')
+                 false clauses
+             in
+             if redundant then C.mark_redundant c;
+             Util.debugf ~section 3
+               "@[active clause `@[%a@]`@ simplified into clauses `@[%a@]`@]"
+               (fun k->k C.pp c (CCFormat.list C.pp) clauses);
+             (c, clauses) :: set)
         (ProofState.ActiveSet.clauses ()) []
     in
     (* remove clauses from active set, put their simplified version into
@@ -666,7 +672,7 @@ module Make(X : sig
 
   (** generate all clauses from inferences *)
   let generate given =
-    Util.enter_prof prof_generate;
+    ZProf.enter_prof prof_generate;
     (* binary clauses *)
     let binary_clauses = do_binary_inferences given in
     (* unary inferences *)
@@ -698,7 +704,7 @@ module Make(X : sig
           (append binary_clauses other_clauses))
     in
     Util.add_stat stat_inferred (Iter.length result);
-    Util.exit_prof prof_generate;
+    ZProf.exit_prof prof_generate;
     result
 
   (* check whether the clause is redundant w.r.t the current active_set *)
@@ -714,11 +720,11 @@ module Make(X : sig
 
   let is_redundant c =
     C.is_redundant c
-    || Util.with_prof prof_is_redundant is_redundant_ c
+    || ZProf.with_prof prof_is_redundant is_redundant_ c
 
   (** find redundant clauses in current active_set *)
   let subsumed_by c =
-    Util.enter_prof prof_subsumed_by;
+    ZProf.enter_prof prof_subsumed_by;
     let res =
       List.fold_left
         (fun set rule -> rule set c)
@@ -727,42 +733,53 @@ module Make(X : sig
     in
     (* all those clauses are redundant *)
     C.ClauseSet.iter C.mark_redundant res;
-    Util.exit_prof prof_subsumed_by;
+    ZProf.exit_prof prof_subsumed_by;
     res
 
   (** Use all simplification rules to convert a clause into a list of
       maximally simplified clauses *)
   let all_simplify c =
-    Util.enter_prof prof_all_simplify;
+    ZProf.enter_prof prof_all_simplify;
     let did_simplify = ref false in
     let set = ref C.ClauseSet.empty in
     let q = Queue.create () in
-    let c, st = simplify c in
-    if st=`New then did_simplify := true;
-    let single_step_simplified = !_ss_multi_simpl_rule c in
-    begin
-      match single_step_simplified with
-      | None -> Queue.push c q;
-      | Some l -> did_simplify := true;
-                  List.iter (fun res -> Queue.push res q) l
-    end;
+    Queue.push c q;
+    let blocked_sss = ref IntSet.empty in
+
     while not (Queue.is_empty q) do
       let c = Queue.pop q in
       let c, st = simplify c in
       if st=`New then did_simplify := true;
       if is_trivial c || is_redundant c
       then ()
-      else match multi_simplify c with
-        | None ->
-          (* clause has reached fixpoint *)
-          set := C.ClauseSet.add c !set
+      else (
+        let sss_blocked = IntSet.mem (C.id c) !blocked_sss in
+        let single_step_simplified = 
+          if sss_blocked then None
+          else !_ss_multi_simpl_rule c in
+
+        match single_step_simplified with 
+        | None -> 
+          begin 
+            match multi_simplify c with
+            | None ->
+              (* clause has reached fixpoint *)
+              set := C.ClauseSet.add c !set
+            | Some l ->
+              (* continue processing *)
+              did_simplify := true;
+              List.iter (fun c ->
+                  if sss_blocked then 
+                    (blocked_sss := IntSet.add (C.id c) !blocked_sss);
+                  Queue.push c q) l end
         | Some l ->
-          (* continue processing *)
           did_simplify := true;
-          List.iter (fun c -> Queue.push c q) l
+          List.iter (fun res -> 
+              blocked_sss := IntSet.add (C.id res) !blocked_sss; 
+              Queue.push res q) l)
     done;
     let res = C.ClauseSet.to_list !set in
-    Util.exit_prof prof_all_simplify;
+    ZProf.exit_prof prof_all_simplify;
     if !did_simplify
     then SimplM.return_new res
     else SimplM.return_same res

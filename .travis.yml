@@ -5,11 +5,12 @@ services:
 - docker
 env:
   global:
-  - PINS="zipperposition:. logtk:. libzipperposition:."
-  - DISTRO="ubuntu-16.04"
+  - PINS="zipperposition:. logtk:. libzipperposition:. zipperposition-tools:."
+  - DISTRO="ubuntu-18.04"
+  - PACKAGE="zipperposition" 
   matrix:
-  - PACKAGE="zipperposition" OCAML_VERSION="4.03"
-  - PACKAGE="zipperposition" OCAML_VERSION="4.04"
-  - PACKAGE="zipperposition" OCAML_VERSION="4.05"
-  - PACKAGE="zipperposition" OCAML_VERSION="4.06"
-  - PACKAGE="zipperposition" OCAML_VERSION="4.08"
+  - OCAML_VERSION="4.03"
+  - OCAML_VERSION="4.05"
+  - OCAML_VERSION="4.06"
+  - OCAML_VERSION="4.08"
+  - OCAML_VERSION="4.09"

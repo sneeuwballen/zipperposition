@@ -6,15 +6,13 @@
 (** A signature is a finite mapping from identifiers to types
     and a property sym_in_conjecture. *)
 
-type t = (Type.t * bool) ID.Map.t
-(** A signature maps symbols to types *)
+type t = (((Type.t * bool) ID.Map.t) * (ID.Set.t Type.Map.t))
+(** A signature maps symbols to types, and there is a map in the backwards direction *)
 
 val empty : t
 (** Empty signature *)
 
 val is_empty : t -> bool
-
-val singleton : ID.t -> (Type.t * bool) -> t
 
 val mem : t -> ID.t -> bool
 (** Is the symbol declared? *)
@@ -32,6 +30,9 @@ val find : t -> ID.t -> Type.t option
 val find_exn : t -> ID.t -> Type.t
 (** Lookup the type of a symbol
     @raise Not_found if the symbol is not in the signature *)
+
+val find_by_type : t -> Type.t -> ID.Set.t
+(** Reverse lookup -- given a type return all IDs with that type *)
 
 val sym_in_conj : ID.t -> t -> bool
 
@@ -65,16 +66,12 @@ module Seq : sig
   val symbols : t -> ID.t Iter.t
   val types : t -> Type.t Iter.t
   val to_seq : t -> (ID.t * (Type.t * bool)) Iter.t
-  val of_seq : (ID.t * (Type.t * bool)) Iter.t -> t
-  val add_seq : t -> (ID.t * (Type.t * bool)) Iter.t -> t
 end
 
 val to_set : t -> ID.Set.t
 (** Set of symbols of the signature *)
 
 val to_list : t -> (ID.t * (Type.t*bool)) list
-val add_list : t -> (ID.t * (Type.t*bool)) list -> t
-val of_list : (ID.t * (Type.t*bool)) list -> t
 
 val iter : t -> (ID.t -> (Type.t*bool) -> unit) -> unit
 

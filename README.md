@@ -1,12 +1,10 @@
-# Zipperposition
+# Zipperposition [![build status](https://api.travis-ci.org/sneeuwballen/zipperposition.svg?branch=master)](https://travis-ci.org/sneeuwballen/zipperposition)
 
 - Automated theorem prover for first-order logic with equality and theories.
 - Logic toolkit (`logtk`), designed primarily
   for first-order automated reasoning. It aims
   at providing basic types and algorithms (terms, unification, orderings,
   indexing, etc.) that can be factored out of several applications.
-
-[![build status](https://api.travis-ci.org/sneeuwballen/zipperposition.svg?branch=master)](https://travis-ci.org/sneeuwballen/zipperposition)
 
 ## Short summary
 
@@ -157,7 +155,8 @@ $ make uninstall
 The native syntax, with file extension `.zf`, resembles a simple fragment of
 ML with explicit polymorphism. Many examples
 in `examples/` are written using this syntax.
-A vim [syntax coloring file](https://github.com/c-cube/vim-zf) is available.
+A vim syntax coloring file can be found in `utils/vim`
+(see [the readme](./utils/vim/README.md) for instructions on how to install it).
 
 
 <details>
@@ -468,6 +467,14 @@ Some advices if you want to hack on the code:
   * `-cq bfs` (BFS traversal of the search space, instead of weight-based
     clause selection rules)
   * `--ord none` for disabling term orderings
+
+### Profiling
+
+- a script using `perf` can be found in `utils/profile.sh`
+- profiling probes are inserted into the code, but they're disabled by
+  default (see `src/core/ZProf.ml`, `let __prof=false`).
+  By setting `__prof=true` the probes will become active, and the
+  command line option `--profile` will be available.
 
 ## StarExec
 

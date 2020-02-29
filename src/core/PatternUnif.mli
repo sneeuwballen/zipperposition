@@ -6,7 +6,7 @@
     \url{http://matryoshka.gforge.inria.fr/pubs/hounif_paper.pdf}.
     It can be applied to terms out of the pattern fragment in which
     case it raises NotInFragment exception.
-     *)
+*)
 
 
 module T = Term

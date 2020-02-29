@@ -6,8 +6,8 @@ open Logtk
 module Lits = Literals
 
 let section = Util.Section.make ~parent:Const.section "bbox"
-let prof_inject_lits = Util.mk_profiler "bbox.inject_lits"
-let prof_inject_lemma = Util.mk_profiler "bbox.inject_lemma"
+let prof_inject_lits = ZProf.make "bbox.inject_lits"
+let prof_inject_lemma = ZProf.make "bbox.inject_lemma"
 
 let pp_bbox_id : bool ref = ref true
 
@@ -68,8 +68,8 @@ module FV_components = FV_tree.Make(struct
     type t = Lits.t * payload * lit
     let compare (l1,i1,j1)(l2,i2,j2) =
       CCOrd.(Lits.compare l1 l2
-        <?> (compare_payload, i1, i2)
-        <?> (Lit.compare, j1, j2))
+             <?> (compare_payload, i1, i2)
+             <?> (Lit.compare, j1, j2))
     let to_lits (l,_,_) = Lits.to_form l |> Iter.of_list
     let labels _ = Util.Int_set.empty
   end)
@@ -119,33 +119,39 @@ let save_ lit =
 let _check_variant lits lits' =
   Lits.matches lits lits' && Lits.matches lits' lits
 
+
+let negate_ground lits =
+  match lits with
+  | [| lit0 |]
+    when Literal.is_ground lit0 &&
+         Literal.is_neg lit0 &&
+         not (Literal.is_constraint lit0) ->
+    [| Literal.negate lits.(0) |], false
+  | _ -> lits, true 
+
+let find_boolean_lit lits = 
+  (* special case, negative ground literal *)
+  let lits, sign = negate_ground lits in
+  (* retrieve clause. the index doesn't matter for retrieval *)
+  _retrieve_alpha_equiv lits
+  |> Iter.find_map
+    (function
+      | lits', Clause_component _, blit
+        when Lits.are_variant lits lits' ->
+        assert (Lit.sign blit);
+        (* assert (_check_variant lits lits'); *)
+        Some blit
+      | _ -> None)
+  |> CCOpt.map (fun t -> Lit.apply_sign sign t)
+
 (* clause -> boolean lit *)
 let inject_lits_ lits  =
-  (* special case: one negative literal. *)
-  let lits, sign = match lits with
-    | [| lit0 |]
-      when Literal.is_ground lit0 &&
-           Literal.is_neg lit0 &&
-           not (Literal.is_constraint lit0) ->
-      [| Literal.negate lits.(0) |], false
-    | _ -> lits, true
-  in
-  (* retrieve clause. the index doesn't matter for retrieval *)
-  let old_lit =
-    _retrieve_alpha_equiv lits
-    |> Iter.find_map
-      (function
-        | lits', Clause_component _, blit
-          when Lits.are_variant lits lits' ->
-          assert (Lit.sign blit);
-          (* assert (_check_variant lits lits'); *)
-          Some blit
-        | _ -> None)
-  in
+  let old_lit = find_boolean_lit lits in
   begin match old_lit with
-    | Some t -> Lit.apply_sign sign t
+    | Some t -> t (* sign already applied*)
     | None ->
       (* build new literal *)
+      let lits, sign = negate_ground lits in
       let lits_copy = Array.copy lits in
       let t = Lit.make (Clause_component lits_copy) in
       (* maintain mapping *)
@@ -154,7 +160,7 @@ let inject_lits_ lits  =
   end
 
 let inject_lits lits =
-  Util.with_prof prof_inject_lits inject_lits_ lits
+  ZProf.with_prof prof_inject_lits inject_lits_ lits
 
 let inject_lemma_ (f:Cut_form.t): t =
   let old_lit = match _retrieve_lemma f with
@@ -173,7 +179,7 @@ let inject_lemma_ (f:Cut_form.t): t =
   end
 
 let inject_lemma f =
-  Util.with_prof prof_inject_lemma inject_lemma_ f
+  ZProf.with_prof prof_inject_lemma inject_lemma_ f
 
 let inject_case p =
   (* normalize by sorting the list of cases *)
@@ -189,10 +195,10 @@ let inject_case p =
 
 let must_be_kept lit =
   match Lit.payload (Lit.abs lit) with
-    | Fresh
-    | Clause_component _ -> false
-    | Lemma _
-    | Case _ -> true
+  | Fresh
+  | Clause_component _ -> false
+  | Lemma _
+  | Case _ -> true
 
 let is_lemma lit = match Lit.payload (Lit.abs lit) with
   | Lemma _ -> true
@@ -208,6 +214,10 @@ let as_case lit = match Lit.payload (Lit.abs lit) with
 
 let as_lemma lit = match Lit.payload (Lit.abs lit) with
   | Lemma f -> Some f
+  | _ -> None
+
+let as_lits lit = match Lit.payload (Lit.abs lit) with
+  | Clause_component lits -> Some lits
   | _ -> None
 
 (* boolean lit -> payload *)
@@ -234,7 +244,7 @@ let to_s_form (lit:t) =
 let pp out i =
   if not (Lit.sign i) then CCFormat.string out "¬";
   pp_payload out (payload i);
-  if !pp_bbox_id then Format.fprintf out "@{<Black>/%d@}" (Lit.to_int i|>abs);
+  if !pp_bbox_id then Format.fprintf out "/%d" (Lit.to_int i|>abs);
   ()
 
 let pp_bclause out lits =

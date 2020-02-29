@@ -1,17 +1,16 @@
-
 (rule
-  (targets const.ml)
-  (action
-    (with-stdout-to %{targets}
-      (progn
-        (echo "let version = \"${version:libzipperposition}\"\n")
-        (echo "let section = Logtk.Util.Section.make \"zip\"\n"))))
-  )
+ (targets const.ml)
+ (deps (glob_files ../../*.opam))
+ (action
+  (with-stdout-to
+   %{targets}
+   (progn
+    (echo "let version = \"%{version:libzipperposition}\"\n")
+    (echo "let section = Logtk.Util.Section.make \"zip\"\n")))))
 
 (library
   (name libzipperposition)
   (public_name libzipperposition)
   (synopsis "library for the Zipperposition theorem prover")
   (libraries containers zarith msat logtk logtk.proofs logtk.parsers str)
-  (flags :standard -w -32-50)
-)
+  (flags :standard -w -32-50))

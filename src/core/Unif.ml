@@ -17,12 +17,13 @@ type 'a sequence = ('a -> unit) -> unit
 
 let section = Util.Section.make "unif"
 
-let prof_unify = Util.mk_profiler "unify"
-let prof_matching = Util.mk_profiler "matching"
+let prof_unify = ZProf.make "unify"
+let prof_matching = ZProf.make "matching"
 
 let fail () = raise Fail
 
-let disable_pattern_unif = ref false
+let _allow_pattern_unif = ref true
+
 (** {2 Signatures} *)
 
 module type S = Unif_intf.S
@@ -38,22 +39,22 @@ let occurs_check ~depth subst (v,sc_v) t =
       (* check type and subterms *)
       check ~depth (ty, sc_t) ||
       match T.view t with
-        | T.Var v' ->
-          (HVar.equal T.equal v v' && sc_v = sc_t)
-          ||
-          begin match Subst.find subst (v',sc_t) with
-            | None -> false
-            | Some t' -> check ~depth t'
-          end
-        | T.DB i -> i>=depth (* not closed! *)
-        | T.Const _ -> false
-        | T.Bind (_, varty, t') ->
-          check ~depth (varty,sc_t) ||
-          check ~depth:(depth+1) (t',sc_t)
-        | T.AppBuiltin (_, l) -> check_l ~depth l sc_t
-        | T.App (hd, l) ->
-          check ~depth (hd,sc_t) ||
-          check_l ~depth l sc_t
+      | T.Var v' ->
+        (HVar.equal T.equal v v' && sc_v = sc_t)
+        ||
+        begin match Subst.find subst (v',sc_t) with
+          | None -> false
+          | Some t' -> check ~depth t'
+        end
+      | T.DB i -> i>=depth (* not closed! *)
+      | T.Const _ -> false
+      | T.Bind (_, varty, t') ->
+        check ~depth (varty,sc_t) ||
+        check ~depth:(depth+1) (t',sc_t)
+      | T.AppBuiltin (_, l) -> check_l ~depth l sc_t
+      | T.App (hd, l) ->
+        check ~depth (hd,sc_t) ||
+        check_l ~depth l sc_t
   and check_l ~depth l sc = match l with
     | [] -> false
     | [t] -> check ~depth (t,sc)
@@ -331,7 +332,7 @@ module Inner = struct
   (* distinct ground terms *)
   let distinct_ground_l l : bool =
     List.for_all (fun t -> T.is_ground t (*&& CCList.is_empty @@ T.DB.unbound t*)) l 
-      && distinct_term_l l
+    && distinct_term_l l
 
   (* given [l], a list of distinct (ground) terms, and [rhs],
      replace [l] by distinct fresh variables indices in [rhs],
@@ -417,7 +418,7 @@ module Inner = struct
      [λall_vars. H (l1 ∩ l2)] *)
   let restrict_fun2
     : unif_subst -> ty_ret:T.t -> bvars:B_vars.t -> scope:Scoped.scope ->
-    _ -> _ -> unif_subst
+      _ -> _ -> unif_subst
     = fun subst ~ty_ret ~bvars ~scope (v1,l1) (v2,l2) ->
       assert (not (HVar.equal T.equal v1 v2)); (* non-trivial *)
       assert (not (US.mem subst (v1,scope)));
@@ -473,7 +474,7 @@ module Inner = struct
      @param env typing environment for binders
      useful for constraints (only allowed in subterms, where [root=false])
   *)
-  let rec unif_rec ~ext_dec ~op ~root ~bvars subst t1s t2s : unif_subst =
+  let rec unif_rec  ~op ~root ~bvars subst t1s t2s : unif_subst =
     let t1,sc1 = US.deref subst t1s
     and t2,sc2 = US.deref subst t2s in
     begin match T.ty t1, T.ty t2 with
@@ -487,17 +488,11 @@ module Inner = struct
       (* Util.debugf ~section 5 "(@[unif_start@ :t1 `%a`@ :t2 `%a`@ :op %a@ :subst @[%a@]@ :bvars %a@])@."
       (fun k -> k (Scoped.pp T.pp) (t1,sc1) (Scoped.pp T.pp) (t2,sc2)
                 pp_op op US.pp subst B_vars.pp bvars); *)
-        let subst = unif_rec ~ext_dec ~op ~root:true ~bvars subst (ty1,sc1) (ty2,sc2) in
-        try
-          unif_term ~ext_dec ~op ~root ~bvars subst t1 sc1 t2 sc2
-        with Fail ->
-          let ty = Type.of_term_unsafe ty1 in
-          if ext_dec && T.equal ty1 ty2 && (Type.is_fun ty || Type.is_prop ty) then (
-            delay ~bvars subst t1 sc1 t2 sc2 ~tags:[]
-          ) else fail ()
+        let subst = unif_rec  ~op ~root:true ~bvars subst (ty1,sc1) (ty2,sc2) in
+        unif_term  ~op ~root ~bvars subst t1 sc1 t2 sc2
     end
 
-  and unif_term ~ext_dec ~op ~root ~bvars subst t1 sc1 t2 sc2 : unif_subst =
+  and unif_term  ~op ~root ~bvars subst t1 sc1 t2 sc2 : unif_subst =
     let view1 = T.view t1 and view2 = T.view t2 in
     let delay() = delay ~bvars subst t1 sc1 t2 sc2 in
     (* fast check for terms in WHNF *)
@@ -508,7 +503,7 @@ module Inner = struct
       | _ -> true
     in
     (* assert (not (T.is_a_type t1 && Type.is_forall (Type.of_term_unsafe t1)));
-    assert (not (T.is_a_type t2 && Type.is_forall (Type.of_term_unsafe t2))); *)
+       assert (not (T.is_a_type t2 && Type.is_forall (Type.of_term_unsafe t2))); *)
     begin match view1, view2 with
       | _ when sc1=sc2 && T.equal t1 t2 ->
         subst (* the terms are equal under any substitution *)
@@ -534,7 +529,7 @@ module Inner = struct
            List.length l1 = List.length l2
         then (
           (* just unify subterms pairwise *)
-          unif_list ~ext_dec ~op ~bvars subst l1 sc1 l2 sc2
+          unif_list  ~op ~bvars subst l1 sc1 l2 sc2
         ) else if op=O_unify && not root && has_non_unifiable_type_or_is_prop t1 then (
           (* TODO: notion of value, here, to fail fast in some cases.
              e.g.  [a + 1 = a] should fail immediately *)
@@ -547,14 +542,14 @@ module Inner = struct
       | _, T.Bind (Binder.Lambda, _, _) ->
         (* perform HO unification after moving both terms into same
            scope [sc2] *)
-        Util.debugf ~section 40 "var_ho-unifying: %a =?= %a" (fun k-> k T.pp t1 T.pp t2);
+        Util.debugf ~section 40 "(@[var_ho-unifying:@ %a@ =?= %a@])" (fun k-> k T.pp t1 T.pp t2);
         begin match op with
           | O_match_protect (P_scope sc2') | O_variant (P_scope sc2') ->
             assert (sc2=sc2');
             if sc1=sc2' then (
               (* no renaming at all, same scope already *)
               Util.debug ~section 40 "no renaming needed *";
-              unif_ho ~ext_dec ~op ~root ~bvars subst t1 t2 ~scope:sc2
+              unif_ho  ~op ~root ~bvars subst t1 t2 ~scope:sc2
             ) else (
               let subst, t1 = restrict_to_scope subst (t1,sc1) ~into:sc2 in
               (* NOTE: we collapse both scopes together. The idea now
@@ -562,30 +557,30 @@ module Inner = struct
                  the (fresh) variables of [t1] to bind, but not the
                  variables of [t2] *)
               Util.debug ~section 40 "restricting scope *";
-              unif_ho ~ext_dec ~op ~root ~bvars subst t1 t2 ~scope:sc2
+              unif_ho  ~op ~root ~bvars subst t1 t2 ~scope:sc2
             )
           | O_match_protect (P_vars _) | O_variant (P_vars _) | O_equal ->
             (* rename in [t1] but not [t2] *)
             Util.debug ~section 40 "protected with set *";
             let subst, t1 = restrict_to_scope subst (t1,sc1) ~into:sc2 in
-            unif_ho ~ext_dec ~op ~root ~bvars subst t1 t2 ~scope:sc2
+            unif_ho  ~op ~root ~bvars subst t1 t2 ~scope:sc2
           | O_unify ->
             let subst, t1 = restrict_to_scope subst (t1,sc1) ~into:sc2 in
             let subst, t2 = restrict_to_scope subst (t2,sc2) ~into:sc2 in
-            unif_ho ~ext_dec ~op ~root ~bvars subst t1 t2 ~scope:sc2
+            unif_ho  ~op ~root ~bvars subst t1 t2 ~scope:sc2
         end
       | T.AppBuiltin (Builtin.Arrow, ret1::args1),
         T.AppBuiltin (Builtin.Arrow, ret2::args2) ->
         (* unify [a -> b] and [a' -> b'], virtually *)
         let l1, l2 = pair_lists_left args1 ret1 args2 ret2 in
-        unif_list ~ext_dec ~op ~bvars subst l1 sc1 l2 sc2
+        unif_list  ~op ~bvars subst l1 sc1 l2 sc2
       | T.Bind ((Binder.Forall | Binder.Exists | Binder.ForallTy) as b1, varty1, t1'),
         T.Bind (b2, varty2, t2') when b1=b2 ->
         (* unify types, then enter bodies *)
         let subst =
-          unif_rec ~ext_dec ~op ~root:true ~bvars subst (varty1,sc1) (varty2,sc2)
+          unif_rec  ~op ~root:true ~bvars subst (varty1,sc1) (varty2,sc2)
         in
-        unif_rec  ~ext_dec ~op ~root:false ~bvars
+        unif_rec   ~op ~root:false ~bvars
           subst (t1',sc1) (t2',sc2)
       | T.Bind ((Binder.Forall | Binder.Exists), _, _), _
       | _, T.Bind ((Binder.Forall | Binder.Exists), _, _) ->
@@ -602,23 +597,22 @@ module Inner = struct
       | _ when op=O_unify && not root && has_non_unifiable_type_or_is_prop t1 ->
         let tags = T.type_non_unifiable_tags (T.ty_exn t1) in
         delay ~tags () (* push pair as a constraint, because of typing. *)
-      | T.AppBuiltin (s1, l1), T.AppBuiltin(s2,l2)
+      (* 
+        APPLY FRESH VARIABLES TO COMBINATORS
+        | T.AppBuiltin (s1, l1), T.AppBuiltin(s2,l2)
         when Builtin.is_combinator s1 && Builtin.is_combinator s2
-              && Builtin.equal s1 s2 && ext_dec && op=O_unify ->
-        begin try
-          unif_list ~ext_dec:false ~op ~bvars subst l1 sc1 l2 sc2 
-        with Fail -> delay ~tags:[] () end
+              && Builtin.equal s1 s2 && op=O_unify -> *)
       | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when 
-        Builtin.equal s1 s2 ->
+          Builtin.equal s1 s2 ->
         (* && not (Builtin.equal Builtin.ForallConst s1) && 
-        not (Builtin.equal Builtin.ExistsConst s1) -> *)
+           not (Builtin.equal Builtin.ExistsConst s1) -> *)
         (* try to unify/match builtins pairwise *)
-        unif_list ~ext_dec ~op ~bvars subst l1 sc1 l2 sc2
+        unif_list  ~op ~bvars subst l1 sc1 l2 sc2
       | _, _ -> raise Fail
     end
 
   and unif_vars ~op subst t1 sc1 t2 sc2 : unif_subst =
-   (* Util.debugf ~section 4 "var_binidng: %a =?= %a" (fun k-> k T.pp t1 T.pp t2); *)
+    (* Util.debugf ~section 4 "var_binidng: %a =?= %a" (fun k-> k T.pp t1 T.pp t2); *)
     let t1,t2 = CCPair.map_same (fun t -> ((Lambda.eta_reduce t) :> InnerTerm.t)) (Term.of_term_unsafe t1,Term.of_term_unsafe t2) in
     begin match T.view t1, T.view t2, op with
       | T.Var v1, T.Var v2, O_equal ->
@@ -664,16 +658,16 @@ module Inner = struct
     end
 
   (* unify lists pairwise *)
-  and unif_list ~ext_dec ~op ~bvars subst l1 sc1 l2 sc2 : unif_subst = match l1, l2 with
+  and unif_list  ~op ~bvars subst l1 sc1 l2 sc2 : unif_subst = match l1, l2 with
     | [], [] -> subst
     | _, []
     | [], _ -> fail ()
     | t1::l1', t2::l2' ->
-      let subst = unif_rec ~ext_dec ~op ~root:false ~bvars subst (t1,sc1) (t2,sc2) in
-      unif_list ~ext_dec ~op ~bvars subst l1' sc1 l2' sc2
+      let subst = unif_rec  ~op ~root:false ~bvars subst (t1,sc1) (t2,sc2) in
+      unif_list  ~op ~bvars subst l1' sc1 l2' sc2
 
   (* non-trivial cases of HO unification *)
-  and unif_ho ~ext_dec ~op ~root ~bvars subst t1_0 t2_0 ~scope : unif_subst =
+  and unif_ho  ~op ~root ~bvars subst t1_0 t2_0 ~scope : unif_subst =
     (* first, normalize and un-app both terms *)
     let subst, t1 = whnf_deref subst (t1_0,scope) in
     let subst, t2 = whnf_deref subst (t2_0,scope) in
@@ -692,7 +686,7 @@ module Inner = struct
       if List.length l1 = List.length l2
       then (
         (* just unify subterms pairwise *)
-        unif_list ~ext_dec ~op ~bvars subst l1 scope l2 scope
+        unif_list  ~op ~bvars subst l1 scope l2 scope
       ) else if op=O_unify && not root && has_non_unifiable_type_or_is_prop t1 then (
         let tags = T.type_non_unifiable_tags (T.ty_exn t1) in
         delay ~tags ()
@@ -707,20 +701,20 @@ module Inner = struct
         let new_vars1, f1, new_vars2, f2 =
           T.open_bind2 Binder.Lambda f1 f2
         in
-        unif_rec ~ext_dec ~op ~root:false
+        unif_rec  ~op ~root:false
           ~bvars:(B_vars.make
-              (DBEnv.push_l_rev bvars.B_vars.left new_vars1)
-              (DBEnv.push_l_rev bvars.B_vars.right new_vars2))
+                    (DBEnv.push_l_rev bvars.B_vars.left new_vars1)
+                    (DBEnv.push_l_rev bvars.B_vars.right new_vars2))
           subst (f1,scope) (f2,scope)
       | T.Bind (Binder.Lambda, _, _), _ ->
         (* [λx. t = u] becomes [t = u x] *)
         assert (l1=[]);
         let new_vars, f1 = T.open_bind Binder.Lambda f1 in
         let n = List.length new_vars in
-        unif_rec ~ext_dec ~op ~root
+        unif_rec  ~op ~root
           ~bvars:(B_vars.make
-              (DBEnv.push_l_rev bvars.B_vars.left new_vars)
-              (DBEnv.push_l_rev bvars.B_vars.right new_vars))
+                    (DBEnv.push_l_rev bvars.B_vars.left new_vars)
+                    (DBEnv.push_l_rev bvars.B_vars.right new_vars))
           subst
           (f1,scope)
           (T.app ~ty:(T.ty_exn f1)
@@ -731,10 +725,10 @@ module Inner = struct
         assert (l2=[]);
         let new_vars, f2 = T.open_bind Binder.Lambda f2 in
         let n = List.length new_vars in
-        unif_rec ~ext_dec ~op ~root
+        unif_rec  ~op ~root
           ~bvars:(B_vars.make
-              (DBEnv.push_l_rev bvars.B_vars.left new_vars)
-              (DBEnv.push_l_rev bvars.B_vars.right new_vars))
+                    (DBEnv.push_l_rev bvars.B_vars.left new_vars)
+                    (DBEnv.push_l_rev bvars.B_vars.right new_vars))
           subst
           (T.app ~ty:(T.ty_exn f2)
              (T.DB.shift n t1)
@@ -753,10 +747,10 @@ module Inner = struct
         if i1=i2 then same_rigid_head() else fail()
       | T.Var _, _ when l1=[] ->
         (* Format.printf "** Unif rec, var left no args **"; *)
-        unif_rec ~ext_dec ~op ~bvars ~root subst (t1,scope) (t2, scope) (* to bind *)
+        unif_rec  ~op ~bvars ~root subst (t1,scope) (t2, scope) (* to bind *)
       | _, T.Var _ when l2=[] ->
         (* Format.printf "** Unif rec, var right no args **"; *)
-        unif_rec ~ext_dec ~op ~bvars ~root subst (t1,scope) (t2, scope) (* to bind *)
+        unif_rec  ~op ~bvars ~root subst (t1,scope) (t2, scope) (* to bind *)
       | T.Var v1, T.Const _ ->
         begin match op with
           | O_match_protect (P_scope sc2')
@@ -766,19 +760,18 @@ module Inner = struct
           | O_variant _ | O_equal -> fail()
         end;
         (* Format.printf
-          "(@[unif_ho.flex_rigid, trying@ `@[:f1 %a :l1 %a@]`@ :t2 `%a`@ :subst %a@ :bvars %a@])@."
-          (Scoped.pp T.pp) (f1,scope) (CCFormat.Dump.list T.pp) l1
-          (Scoped.pp T.pp) (t2,scope) US.pp subst B_vars.pp bvars; *)
-        let patterns = not !disable_pattern_unif in
-        if patterns && distinct_bvar_l ~bvars:bvars.B_vars.left l1 
-          && CCList.subset ~eq:(=) (T.DB.unbound t2) (List.map T.as_bvar_exn l1) 
+           "(@[unif_ho.flex_rigid, trying@ `@[:f1 %a :l1 %a@]`@ :t2 `%a`@ :subst %a@ :bvars %a@])@."
+           (Scoped.pp T.pp) (f1,scope) (CCFormat.Dump.list T.pp) l1
+           (Scoped.pp T.pp) (t2,scope) US.pp subst B_vars.pp bvars; *)
+        if !_allow_pattern_unif && distinct_bvar_l ~bvars:bvars.B_vars.left l1 
+           && CCList.subset ~eq:(=) (T.DB.unbound t2) (List.map T.as_bvar_exn l1) 
         then (
           (* flex/rigid pattern unif *)
-          flex_rigid ~ext_dec ~op ~bvars:bvars.B_vars.left subst f1 l1 t2 ~scope
-        ) else if patterns && distinct_ground_l l1 then (
+          flex_rigid  ~op ~bvars:bvars.B_vars.left subst f1 l1 t2 ~scope
+        ) else if !_allow_pattern_unif && distinct_ground_l l1 then (
           (* [v t = t2] becomes [v = λx. t2[x/t]] *)
           let t2 = lift_terms l1 t2 in
-          unif_rec ~ext_dec ~op ~root ~bvars subst (f1,scope) (t2,scope)
+          unif_rec  ~op ~root ~bvars subst (f1,scope) (t2,scope)
         ) else if l2<>[] then (
           (* λfree-HO: unify with currying, "from the right" *)
           let l1, l2 = pair_lists_right f1 l1 f2 l2 in
@@ -786,29 +779,23 @@ module Inner = struct
              does take type arguments. This avoids errors with the debug output. *)
           assert (T.expected_ty_vars (HVar.ty v1) = 0);
           if T.expected_ty_vars (T.ty_exn (List.hd l2)) != 0 then fail();
-          if not ext_dec || op != O_unify
-          then unif_list ~ext_dec ~op ~bvars subst l1 scope l2 scope
-          else (
-            try
-              unif_list ~ext_dec ~op ~bvars subst l1 scope l2 scope
-            with Fail -> delay ~tags:[Builtin.Tag.T_ho] ())
+          unif_list  ~op ~bvars subst l1 scope l2 scope
         ) else fail()
       | T.Const _, T.Var v2 ->
         (*Format.printf
           "(@[unif_ho.flex_rigid@ `@[:f2 %a :l2 %a@]`@ :t1 `%a`@ :subst %a@ :bvars %a@])@."
           (Scoped.pp T.pp) (f2,scope) (CCFormat.Dump.list T.pp) l2
           (Scoped.pp T.pp) (t1,scope) US.pp subst B_vars.pp bvars;*)
-        let patterns = not !disable_pattern_unif in
-        if patterns && distinct_bvar_l ~bvars:bvars.B_vars.right l2 
-          && CCList.subset ~eq:(=) (T.DB.unbound t1) (List.map T.as_bvar_exn l2) 
-          && op=O_unify 
+        if !_allow_pattern_unif && distinct_bvar_l ~bvars:bvars.B_vars.right l2 
+           && CCList.subset ~eq:(=) (T.DB.unbound t1) (List.map T.as_bvar_exn l2) 
+           && op=O_unify 
         then (
           (* flex/rigid pattern unif *)
-          flex_rigid ~ext_dec ~op ~bvars:bvars.B_vars.right subst f2 l2 t1 ~scope
-        ) else if patterns &&  distinct_ground_l l2 && op=O_unify then (
+          flex_rigid  ~op ~bvars:bvars.B_vars.right subst f2 l2 t1 ~scope
+        ) else if !_allow_pattern_unif && distinct_ground_l l2 && op=O_unify then (
           (* [t1 = v t] becomes [v = λx. t1[x/t]] *)
           let t1 = lift_terms l2 t1 in
-          unif_rec ~ext_dec ~op ~root ~bvars subst (t1,scope) (f2,scope)
+          unif_rec  ~op ~root ~bvars subst (t1,scope) (f2,scope)
         ) else if l1<>[] then (
           (* λfree-HO: unify with currying, "from the right" *)
           let l1, l2 = pair_lists_right f1 l1 f2 l2 in
@@ -816,15 +803,11 @@ module Inner = struct
              does take type arguments. This avoids errors with the debug output. *)
           assert (T.expected_ty_vars (HVar.ty v2) = 0);
           if T.expected_ty_vars (T.ty_exn (List.hd l1)) != 0 then fail();
-          if not ext_dec || op != O_unify 
-          then unif_list ~ext_dec ~op ~bvars subst l1 scope l2 scope
-          else ( 
-            try
-              unif_list ~op ~ext_dec ~bvars subst l1 scope l2 scope
-            with Fail -> delay ~tags:[Builtin.Tag.T_ho] ())
+          unif_list  ~op ~bvars subst l1 scope l2 scope
         ) else fail()
       | T.Var v1, T.Var v2
         when op=O_unify &&
+             !_allow_pattern_unif &&
              distinct_bvar_l ~bvars:bvars.B_vars.left l1 &&
              distinct_bvar_l ~bvars:bvars.B_vars.right l2 ->
         (* flex/flex equation for pattern unif *)
@@ -832,6 +815,7 @@ module Inner = struct
           v1 l1 v2 l2
       | T.Var v1, T.Var v2
         when is_match_op op &&
+             !_allow_pattern_unif &&
              distinct_bvar_l ~bvars:bvars.B_vars.left l1 &&
              distinct_bvar_l ~bvars:bvars.B_vars.right l2 &&
              CCList.subset ~eq:T.equal l2 l1 ->
@@ -840,12 +824,12 @@ module Inner = struct
       | T.Var _, T.Var _ ->
         (* λfree-HO: unify with currying, "from the right" *)
         let l1, l2 = pair_lists_right f1 l1 f2 l2 in
-        unif_list ~ext_dec ~op ~bvars subst l1 scope l2 scope
+        unif_list  ~op ~bvars subst l1 scope l2 scope
       | _ ->  fail()
     end
 
   (* flex/rigid pair *)
-  and flex_rigid ~ext_dec ~bvars ~op subst f1 l1 t2 ~scope : unif_subst =
+  and flex_rigid  ~bvars ~op subst f1 l1 t2 ~scope : unif_subst =
     Util.debugf ~section 5
       "(@[flex_rigid@ :subst %a@ `@[%a %a@]`@ :rhs `%a`@ :bvars %a@])"
       (fun k->k US.pp subst T.pp f1 (Util.pp_list T.pp) l1 T.pp t2
@@ -856,7 +840,7 @@ module Inner = struct
     (* bind [v1 := λl1. t2], then traverse [t2] *)
     let rhs = fun_of_bvars ~bvars l1 t2 in
     let subst =
-      unif_rec ~ext_dec ~op ~root:true ~bvars:B_vars.empty
+      unif_rec  ~op ~root:true ~bvars:B_vars.empty
         subst (f1,scope) (rhs,scope)
     in
     Util.debugf ~section 5 "(@[flex_rigid_bind@ :subst %a@])" (fun k->k US.pp subst);
@@ -953,11 +937,10 @@ module Inner = struct
       true
     with Fail -> false
 
-  let unify_full ?(ext_dec=false) ?(subst=US.empty) a b : unif_subst =
-    Util.with_prof prof_unify
+  let unify_full ?(subst=US.empty) a b : unif_subst =
+    ZProf.with_prof prof_unify
       (fun () -> 
-        let res = unif_rec ~ext_dec ~root:true ~op:O_unify ~bvars:B_vars.empty subst a b in
-        res
+        unif_rec  ~root:true ~op:O_unify ~bvars:B_vars.empty subst a b
         ) ()
 
   let unify_syn ?(subst=Subst.empty) a b : Subst.t =
@@ -970,11 +953,11 @@ module Inner = struct
   let matching ?(subst=Subst.empty) ~pattern b =
     if Scoped.same_scope pattern b then invalid_arg "Unif.matching: same scopes";
     let scope = Scoped.scope b in
-    Util.with_prof prof_matching
+    ZProf.with_prof prof_matching
       (fun () ->
          let subst = US.of_subst subst in
          let subst =
-           unif_rec ~ext_dec:false subst pattern b
+           unif_rec subst pattern b
              ~root:true ~op:(O_match_protect (P_scope scope)) ~bvars:B_vars.empty
          in
          assert (not @@ US.has_constr subst);
@@ -987,11 +970,11 @@ module Inner = struct
        free variables of [b] *)
     let protect = Iter.append protect (T.Seq.vars b) in
     let blocked = T.VarSet.of_seq protect in
-    Util.with_prof prof_matching
+    ZProf.with_prof prof_matching
       (fun () ->
          let subst = US.of_subst subst in
          let subst =
-           unif_rec ~ext_dec:false
+           unif_rec
              subst (Scoped.make pattern scope) (Scoped.make b scope)
              ~op:(O_match_protect (P_vars blocked)) ~root:true ~bvars:B_vars.empty
          in
@@ -1015,7 +998,7 @@ module Inner = struct
       in
       O_variant protect
     in
-    let subst = unif_rec ~ext_dec:false ~op ~root:true ~bvars:B_vars.empty subst a b in
+    let subst = unif_rec ~op ~root:true ~bvars:B_vars.empty subst a b in
     assert (not @@ US.has_constr subst);
     let subst = US.subst subst in
     if Subst.is_renaming subst then subst else raise Fail
@@ -1024,7 +1007,7 @@ module Inner = struct
   let equal ~subst a b =
     let subst = US.of_subst subst in
     try
-      let subst = unif_rec ~ext_dec:false ~op:O_equal ~root:true ~bvars:B_vars.empty  subst a b in
+      let subst = unif_rec ~op:O_equal ~root:true ~bvars:B_vars.empty  subst a b in
       assert (not @@ US.has_constr subst);
       true
     with Fail -> false
@@ -1072,7 +1055,7 @@ module Ty = struct
     (update :> ?check:bool -> subst -> ty HVar.t Scoped.t -> term Scoped.t -> subst)
 
   let unify_full =
-    (unify_full :> ?ext_dec:bool -> ?subst:unif_subst -> term Scoped.t -> term Scoped.t -> unif_subst)
+    (unify_full :> ?subst:unif_subst -> term Scoped.t -> term Scoped.t -> unif_subst)
 
   let unify_syn =
     (unify_syn :> ?subst:subst -> term Scoped.t -> term Scoped.t -> subst)
@@ -1126,7 +1109,7 @@ module FO = struct
     if S.mem subst (var :> InnerTerm.t HVar.t Scoped.t) then update ~check subst var t
     else bind ~check subst var t
 
-  let unify_full ?(ext_dec=false) ?(subst=US.empty) =
+  let unify_full ?(subst=US.empty) =
     fun sc1 sc2 -> 
       let ta, sca = sc1 in 
       let tb, scb = sc2 in
@@ -1134,8 +1117,8 @@ module FO = struct
       if(not (Term.DB.is_closed ta) || not (Term.DB.is_closed tb)) then (
          let sk_a, sk_a_subs = Term.DB.skolemize_loosely_bound ta in
          let sk_b, sk_b_subs = Term.DB.skolemize_loosely_bound tb in
-         let res = (unify_full :> ?ext_dec:bool -> ?subst:unif_subst -> term Scoped.t -> term Scoped.t -> unif_subst)
-                  ~ext_dec ~subst (Scoped.make sk_a sca) (Scoped.make sk_b scb) in
+         let res = (unify_full :> ?subst:unif_subst -> term Scoped.t -> term Scoped.t -> unif_subst)
+                   ~subst (Scoped.make sk_a sca) (Scoped.make sk_b scb) in
          let sk_a_rev = Term.IntMap.fold (fun k v acc -> Term.Map.add v k acc) sk_a_subs Term.Map.empty in
          let sk_b_rev = Term.IntMap.fold (fun k v acc -> Term.Map.add v k acc) sk_b_subs Term.Map.empty in
          let sk_rev_union = Term.Map.union (fun _ _ _ -> raise (Invalid_argument "keys must be unique "))
@@ -1146,8 +1129,8 @@ module FO = struct
          res'  
       )
       else (
-         (unify_full :> ?ext_dec:bool -> ?subst:unif_subst -> term Scoped.t -> term Scoped.t -> unif_subst)
-         ~ext_dec ~subst sc1 sc2
+         (unify_full :> ?subst:unif_subst -> term Scoped.t -> term Scoped.t -> unif_subst)
+          ~subst sc1 sc2
       )
       
 
@@ -1170,8 +1153,8 @@ module FO = struct
       else (
         (unify_syn :> ?subst:subst -> term Scoped.t -> term Scoped.t -> subst)
         ~subst sc1 sc2
-      )
-     
+    )
+
 
   let matching =
     (matching :> ?subst:subst ->
@@ -1236,3 +1219,7 @@ module FO = struct
     let l1, l2 = pair_lists_ f1 l1 f2 l2 in
     Term.of_term_unsafe_l l1, Term.of_term_unsafe_l l2
 end
+
+let () =
+  Options.add_opts
+    [ "--unif-pattern", Arg.Bool (fun b -> _allow_pattern_unif := b), " enable/disable pattern unification"]

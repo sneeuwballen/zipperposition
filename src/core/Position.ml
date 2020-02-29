@@ -100,10 +100,10 @@ let rec until_first_fun =
   | Body _ -> Stop
 
 let rec num_of_funs = function 
-   | Stop -> 0
-   | Type p' | Left p' | Right p' | Head p' | Arg (_,p') -> 
-     num_of_funs p'
-   | Body p' -> 1 + num_of_funs p'
+  | Stop -> 0
+  | Type p' | Left p' | Right p' | Head p' | Arg (_,p') -> 
+    num_of_funs p'
+  | Body p' -> 1 + num_of_funs p'
 
 module Map = struct
   include CCMap.Make(struct

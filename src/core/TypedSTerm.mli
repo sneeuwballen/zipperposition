@@ -105,7 +105,7 @@ val box_opaque : t -> t
 module Ty : sig
   type t = term
 
-  type builtin = Prop | TType | Term | Int | Rat
+  type builtin = Prop | TType | Term | Int | Rat | Real
 
   type view =
     | Ty_builtin of builtin
@@ -138,6 +138,7 @@ module Ty : sig
   val prop : t
   val int : t
   val rat : t
+  val real : t
   val real : t
   val term : t
 
@@ -260,7 +261,7 @@ val free_vars_set : t -> t Var.Set.t
 val close_all : ty:t -> Binder.t -> t -> t
 (** Bind all free vars with the symbol *)
 
-val close_with_vars : t list -> t -> t
+val close_with_vars : ?binder:Binder.t -> t list -> t -> t
 
 val lift_lambdas : t -> (t * (t list))
 
@@ -289,6 +290,7 @@ module Seq : sig
   val vars : t -> t Var.t Iter.t
   val free_vars : t -> t Var.t Iter.t
   val metas : t -> meta_var Iter.t
+  val symbols : t -> ID.t Iter.t
 end
 
 (** {2 Substitutions} *)
@@ -382,6 +384,7 @@ val app_infer :
     @raise UnifyFailure if types do not correspond *)
 
 val try_alpha_renaming : t -> t -> Subst.t option
+val simplify_formula : t -> t
 
 (** {2 Conversion} *)
 

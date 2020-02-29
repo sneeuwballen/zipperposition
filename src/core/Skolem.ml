@@ -83,7 +83,7 @@ let incr_counter ctx = ctx.sc_counter <- ctx.sc_counter + 1
 let fresh_id ?(start0=false) ~ctx prefix =
   let n = CCHashtbl.get_or ~default:0 ctx.sc_gensym prefix in
   Hashtbl.replace ctx.sc_gensym prefix (n+1);
-  let name = if n=0 && not start0 then prefix else prefix ^ string_of_int n in
+  let name = if n=0 && not start0 then prefix else prefix ^ "_" ^ string_of_int n in
   ID.make name
 
 let fresh_skolem_prefix ~ctx ~ty prefix =
@@ -137,7 +137,7 @@ let skolem_form ~ctx subst var form =
   let ty = ty_forall_l tyvars (T.Ty.fun_ (List.map Var.ty vars) ty_var) in
   let prefix = "sk_" ^ Var.to_string var in
   let f = fresh_skolem_prefix ~ctx ~ty prefix in
-  let skolem_t = T.app ~ty:T.Ty.prop (T.const ~ty f) (tyvars_t @ vars_t) in
+  let skolem_t = T.app ~ty:ty_var (T.const ~ty f) (tyvars_t @ vars_t) in
   T.Subst.eval subst skolem_t
 
 let pop_new_skolem_symbols ~ctx =
@@ -192,15 +192,15 @@ let stmt_of_form rw_rules polarity proxy proxy_id proxy_ty form proof =
 
 let find_def_in_ctx ~ctx form =
   CCList.find_map (fun def ->
-    match def with
-    | Def_form def when not def.rw_rules -> 
-      let def_form = def.form in
-      let df_vars, f_vars = 
-        CCPair.map_same (fun x -> Var.Set.of_seq (T.Seq.vars x)) (def_form,form) in
-      if not (Var.Set.intersection_empty df_vars f_vars) then None 
-      else CCOpt.map (fun subst -> def,subst) (TypedSTerm.try_alpha_renaming def_form form)
-    | _ -> None) 
-  ctx.sc_new_defs
+      match def with
+      | Def_form def when not def.rw_rules -> 
+        let def_form = def.form in
+        let df_vars, f_vars = 
+          CCPair.map_same (fun x -> Var.Set.of_seq (T.Seq.vars x)) (def_form,form) in
+        if not (Var.Set.intersection_empty df_vars f_vars) then None 
+        else CCOpt.map (fun subst -> def,subst) (TypedSTerm.try_alpha_renaming def_form form)
+      | _ -> None) 
+    ctx.sc_new_defs
 
 let define_form ?(pattern="zip_tseitin") ~ctx ~rw_rules ~polarity ~parents form =
   let create_new ~ctx ~rw_rules ~polarity ~parents ~form = 
@@ -230,32 +230,33 @@ let define_form ?(pattern="zip_tseitin") ~ctx ~rw_rules ~polarity ~parents form 
       (fun k->k pp_form_definition def Proof.Step.pp proof);
     def in
   let res = 
-  if not rw_rules then (
-    (* Format.printf "defining:@ @[%a@]\n" T.pp form; *)
+    if not rw_rules then (
+      (* Format.printf "defining:@ @[%a@]\n" T.pp form; *)
 
-    match find_def_in_ctx ~ctx form with
-    | Some (def, subst) ->
-      (* def.form is alpha renaming *)
-      assert (T.equal form (T.Subst.eval ~rename_binders:false subst def.form));
-      (* nothing is bound in form *)
-      assert(T.equal form (T.Subst.eval ~rename_binders:false subst form));
-      Util.debugf ~section 1 "@[Reusing definition %a. Old def: %a. New def: %a]"
-        (fun k -> k T.pp def.proxy T.pp def.form T.pp form);
-      let proxy = T.Subst.eval subst def.proxy in
-      let proof = Proof.Step.define_internal def.proxy_id parents in
-      let res = {
-        def with 
+      match find_def_in_ctx ~ctx form with
+      | Some (def, subst) ->
+        (* def.form is alpha renaming *)
+        assert (T.equal form (T.Subst.eval ~rename_binders:false subst def.form));
+        (* nothing is bound in form *)
+        assert(T.equal form (T.Subst.eval ~rename_binders:false subst form));
+        Util.debugf ~section 1
+          "@[<1>Reusing definition %a@ with type %a.@ Old def: %a.@ New def: %a]"
+          (fun k -> k T.pp def.proxy T.pp def.proxy_ty T.pp def.form T.pp form);
+        let proxy = T.Subst.eval subst def.proxy in
+        let proof = Proof.Step.define_internal def.proxy_id parents in
+        let res = {
+          def with 
           form; proxy; proof; polarity;
           as_stmt = lazy (stmt_of_form rw_rules polarity proxy
-                           def.proxy_id def.proxy_ty form proof);
-      }  in
-      if def.polarity != polarity then (
-        incr_counter ctx;
-        ctx.sc_new_defs <- Def_form res :: ctx.sc_new_defs
-      );
-      res
-    | None -> create_new ~ctx ~rw_rules ~polarity ~parents ~form
-  ) else (create_new ~ctx ~rw_rules ~polarity ~parents ~form)
+                            def.proxy_id def.proxy_ty form proof);
+        }  in
+        if def.polarity != polarity then (
+          incr_counter ctx;
+          ctx.sc_new_defs <- Def_form res :: ctx.sc_new_defs
+        );
+        res
+      | None -> create_new ~ctx ~rw_rules ~polarity ~parents ~form
+    ) else (create_new ~ctx ~rw_rules ~polarity ~parents ~form)
   in
   res
 

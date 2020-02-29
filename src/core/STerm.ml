@@ -12,6 +12,7 @@ type var =
 type t = {
   term : view;
   loc : location option;
+  attrs: attr list;
 }
 
 and match_branch =
@@ -20,7 +21,7 @@ and match_branch =
 
 and view =
   | Var of var (** variable *)
-  | Const of string (** constant *)
+  | Const of string
   | AppBuiltin of Builtin.t * t list
   | App of t * t list (** apply term *)
   | Ite of t * t * t
@@ -31,6 +32,8 @@ and view =
   | Record of (string * t) list * var option (** extensible record *)
 
 and typed_var = var * t option
+and attr =
+  | Attr_distinct_const
 
 type term = t
 
@@ -77,8 +80,8 @@ let rec compare t1 t2 = match t1.term, t2.term with
     let cmp_branch b1 b2 = match b1, b2 with
       | Match_case (s1,vars1,rhs1), Match_case (s2,vars2,rhs2) ->
         CCOrd.(String.compare s1 s2
-          <?> (list compare_var, vars1,vars2)
-          <?> (compare,rhs1,rhs2))
+               <?> (list compare_var, vars1,vars2)
+               <?> (compare,rhs1,rhs2))
       | Match_default t1, Match_default t2 -> compare t1 t2
       | Match_case _, Match_default _ -> -1
       | Match_default _, Match_case _ -> 1
@@ -86,7 +89,7 @@ let rec compare t1 t2 = match t1.term, t2.term with
     CCOrd.( compare u1 u2 <?> (list cmp_branch,l1,l2))
   | Let (l1,t1), Let (l2,t2) ->
     CCOrd.( compare t1 t2
-      <?> (list (pair compare_var compare), l1, l2))
+            <?> (list (pair compare_var compare), l1, l2))
   | (Var _,_)
   | (Const _,_)
   | (Ite _, _)
@@ -130,7 +133,7 @@ and hash_var v = match v with
   | V s -> Hash.string s
   | Wildcard -> Hash.string "_"
 
-let make_ ?loc view = {term=view; loc;}
+let make_ ?loc ?(attrs=[]) view = {term=view; loc; attrs; }
 
 let mk_var ?loc v = make_ ?loc (Var v)
 let var ?loc s = mk_var ?loc (V s)
@@ -142,7 +145,7 @@ let app ?loc s l = match s.term, l with
   | AppBuiltin (s1,l1), _ -> app_builtin ?loc s1 (l1@l)
   | App (s1,l1), _::_ -> make_ ?loc (App (s1,l1@l))
   | _, _::_ -> make_ ?loc (App(s,l))
-let const ?loc s = make_ ?loc (Const s)
+let const ?loc ?attrs s = make_ ?loc ?attrs (Const s)
 let app_const ?loc s l = app (const ?loc s) l
 let bind ?loc s v l = match v, l with
   | [], _ -> l
@@ -232,22 +235,22 @@ module Seq = struct
     let rec iter t =
       k t;
       match t.term with
-        | Var _ | Const _ -> ()
-        | List l
-        | AppBuiltin (_,l) -> List.iter iter l
-        | App (f, l) -> iter f; List.iter iter l
-        | Ite (a,b,c) -> iter a; iter b; iter c
-        | Let (l,u) -> iter u; List.iter (fun (_,t) -> iter t) l
-        | Match (u,l) ->
-          iter u;
-          List.iter
-            (function
-              | Match_case (_,_,rhs)
-              | Match_default rhs -> iter rhs)
-            l
-        | Bind (_, _, t') -> iter t'
-        | Record (l, _) ->
-          List.iter (fun (_,t') -> iter t') l
+      | Var _ | Const _ -> ()
+      | List l
+      | AppBuiltin (_,l) -> List.iter iter l
+      | App (f, l) -> iter f; List.iter iter l
+      | Ite (a,b,c) -> iter a; iter b; iter c
+      | Let (l,u) -> iter u; List.iter (fun (_,t) -> iter t) l
+      | Match (u,l) ->
+        iter u;
+        List.iter
+          (function
+            | Match_case (_,_,rhs)
+            | Match_default rhs -> iter rhs)
+          l
+      | Bind (_, _, t') -> iter t'
+      | Record (l, _) ->
+        List.iter (fun (_,t') -> iter t') l
     in iter t
 
   let vars t = subterms t
@@ -265,33 +268,33 @@ module Seq = struct
     let rec iter bound t =
       k (t, bound);
       match t.term with
-        | Var _ | Const _ -> ()
-        | AppBuiltin (_, l)
-        | List l -> List.iter (iter bound) l
-        | App (f, l) -> iter bound f; List.iter (iter bound) l
-        | Bind (_, v, t') ->
-          (* add variables of [v] to the set *)
-          let bound' = List.fold_left add_typed_var bound v in
-          iter bound' t'
-        | Ite (a,b,c) -> iter bound a; iter bound b; iter bound c
-        | Let (l,u) ->
-          let bound' =
-            List.fold_left
-              (fun bound' (v,u) -> iter bound u; add_var bound' v)
-              bound l
-          in
-          iter bound' u
-        | Match (u,l) ->
-          iter bound u;
-          List.iter
-            (function
-              | Match_case (_,vars,rhs) ->
-                let bound' = List.fold_left add_var bound vars in
-                iter bound' rhs
-              | Match_default rhs -> iter bound rhs)
-            l
-        | Record (l, _) ->
-          List.iter (fun (_,t') -> iter bound t') l
+      | Var _ | Const _ -> ()
+      | AppBuiltin (_, l)
+      | List l -> List.iter (iter bound) l
+      | App (f, l) -> iter bound f; List.iter (iter bound) l
+      | Bind (_, v, t') ->
+        (* add variables of [v] to the set *)
+        let bound' = List.fold_left add_typed_var bound v in
+        iter bound' t'
+      | Ite (a,b,c) -> iter bound a; iter bound b; iter bound c
+      | Let (l,u) ->
+        let bound' =
+          List.fold_left
+            (fun bound' (v,u) -> iter bound u; add_var bound' v)
+            bound l
+        in
+        iter bound' u
+      | Match (u,l) ->
+        iter bound u;
+        List.iter
+          (function
+            | Match_case (_,vars,rhs) ->
+              let bound' = List.fold_left add_var bound vars in
+              iter bound' rhs
+            | Match_default rhs -> iter bound rhs)
+          l
+      | Record (l, _) ->
+        List.iter (fun (_,t') -> iter bound t') l
     in iter StringSet.empty t
 
   let free_vars t =
@@ -511,7 +514,7 @@ module TPTP_THF = struct
     | Match _ -> failwith "cannot print `match` in TPTP"
     | Record _ -> failwith "cannot print records in TPTP"
     | List _ -> failwith "cannot print lists in TPTP THF"
-    
+
   and pp_typed_var out (v,o) = match o with
     | None -> pp_var out v
     | Some ty -> Format.fprintf out "%a:%a" pp_var v pp_surrounded ty
@@ -631,8 +634,8 @@ let empty_subst = StrMap.empty
 let merge_subst a b =
   StrMap.merge_safe a b
     ~f:(fun _ v -> match v with
-      | `Both (_,x) -> Some x (* favor right one *)
-      | `Left x | `Right x -> Some x)
+        | `Both (_,x) -> Some x (* favor right one *)
+        | `Left x | `Right x -> Some x)
 
 (* make fresh copy of [base] not bound in subst *)
 let copy_fresh_ subst v : subst * var = match v with

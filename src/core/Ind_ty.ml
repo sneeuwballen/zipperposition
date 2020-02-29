@@ -77,9 +77,9 @@ let pp out ty =
 let type_hd ty =
   let _, _, ret = Type.open_poly_fun ty in
   match Type.view ret with
-    | Type.Builtin b -> Some (B b)
-    | Type.App (s, _) -> Some (I s)
-    | _ -> None
+  | Type.Builtin b -> Some (B b)
+  | Type.App (s, _) -> Some (I s)
+  | _ -> None
 
 let type_hd_exn ty = match type_hd ty with
   | Some res -> res
@@ -89,22 +89,22 @@ let type_hd_exn ty = match type_hd ty with
 let as_inductive_ty id =
   ID.payload_find id
     ~f:(function
-      | Payload_ind_type ty -> Some ty
-      | _ -> None)
+        | Payload_ind_type ty -> Some ty
+        | _ -> None)
 
 let as_inductive_ty_exn id =
   match as_inductive_ty id with
-    | Some ty -> ty
-    | None -> invalid_declf_ "%a is not an inductive type" ID.pp id
+  | Some ty -> ty
+  | None -> invalid_declf_ "%a is not an inductive type" ID.pp id
 
 let is_inductive_ty id =
   match as_inductive_ty id with Some _ -> true | None -> false
 
 let is_inductive_type ty =
   match type_hd ty with
-    | Some (I id) -> is_inductive_ty id
-    | Some (B _)
-    | None -> false
+  | Some (I id) -> is_inductive_ty id
+  | Some (B _)
+  | None -> false
 
 let is_inductive_simple_type ty =
   try is_inductive_ty (TypedSTerm.head_exn ty)
@@ -210,8 +210,8 @@ let mk_constructor id ty args =
 let as_constructor id =
   ID.payload_find id
     ~f:(function
-      | Payload_ind_cstor (cstor,ity) -> Some (cstor,ity)
-      | _ -> None)
+        | Payload_ind_cstor (cstor,ity) -> Some (cstor,ity)
+        | _ -> None)
 
 let as_constructor_exn id = match as_constructor id with
   | None -> raise (NotAnInductiveConstructor id)
@@ -234,5 +234,5 @@ let projector_cstor p = Lazy.force p.p_cstor
 let as_projector id =
   ID.payload_find id
     ~f:(function
-      | Payload_ind_projector p -> Some p
-      | _ -> None)
+        | Payload_ind_projector p -> Some p
+        | _ -> None)

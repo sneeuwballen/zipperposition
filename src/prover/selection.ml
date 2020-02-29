@@ -46,38 +46,38 @@ let can_select_lit ~ord (lits:Lits.t) (i:int) : bool =
     (* Given a list of (var_head, args) pairs, check whether our lit contains
        one of those variables, but with different arguments. *)
     let occur_with_other_args vars_args =
-        Lit.fold_terms ~vars:true ~ty_args:false ~which:`All ~subterms:true lits.(i)
-        |> Iter.exists (fun (t,_) ->
-            let t_head, t_args = T.as_app t in
-            vars_args |> CCList.exists (fun (head, args) -> T.equal head t_head && not @@ T.same_l_gen t_args args)
-          )
-      in
-    match !_ho_restriction with
-      | `None -> true
-      | `NoVarHeadingMaxTerm ->
-        (* Don't select literals containing a variable that heads the maximal term
-           of the clause but occurs with different arguments there. *)
-        let vars_args = var_headed_subterms `Max in
-        not (occur_with_other_args vars_args)
-      | `NoVarDifferentArgs ->
-        (* Don't selected if the literal contains a variable that is applied to
-           different arguments in the clause *)
-        let vars_args = var_headed_subterms `All in
-        not (occur_with_other_args vars_args)
-      | `NoUnappliedVarOccurringApplied ->
-        (* Don't selected if the literal contains an unapplied variable that also
-           occurs applied in the clause *)
-        let vars_args = var_headed_subterms `All in
-        Lit.fold_terms ~vars:true ~ty_args:false ~which:`All ~subterms:true lits.(i)
-        |> Iter.exists (fun (t,_) ->
-            vars_args |> CCList.exists (fun (head, args) -> T.equal head t && not (CCList.is_empty args))
-          )
-      | `NoHigherOrderVariables ->
-        (* We cannot select literals containing a HO variable: *)
-        not (
-          Lit.fold_terms ~vars:true ~ty_args:false ~which:`All ~subterms:true lits.(i)
-          |> Iter.exists (fun (t,_) -> T.is_ho_var (fst (T.as_app t)))
+      Lit.fold_terms ~vars:true ~ty_args:false ~which:`All ~subterms:true lits.(i)
+      |> Iter.exists (fun (t,_) ->
+          let t_head, t_args = T.as_app t in
+          vars_args |> CCList.exists (fun (head, args) -> T.equal head t_head && not @@ T.same_l_gen t_args args)
         )
+    in
+    match !_ho_restriction with
+    | `None -> true
+    | `NoVarHeadingMaxTerm ->
+      (* Don't select literals containing a variable that heads the maximal term
+         of the clause but occurs with different arguments there. *)
+      let vars_args = var_headed_subterms `Max in
+      not (occur_with_other_args vars_args)
+    | `NoVarDifferentArgs ->
+      (* Don't selected if the literal contains a variable that is applied to
+         different arguments in the clause *)
+      let vars_args = var_headed_subterms `All in
+      not (occur_with_other_args vars_args)
+    | `NoUnappliedVarOccurringApplied ->
+      (* Don't selected if the literal contains an unapplied variable that also
+         occurs applied in the clause *)
+      let vars_args = var_headed_subterms `All in
+      Lit.fold_terms ~vars:true ~ty_args:false ~which:`All ~subterms:true lits.(i)
+      |> Iter.exists (fun (t,_) ->
+          vars_args |> CCList.exists (fun (head, args) -> T.equal head t && not (CCList.is_empty args))
+        )
+    | `NoHigherOrderVariables ->
+      (* We cannot select literals containing a HO variable: *)
+      not (
+        Lit.fold_terms ~vars:true ~ty_args:false ~which:`All ~subterms:true lits.(i)
+        |> Iter.exists (fun (t,_) -> T.is_ho_var (fst (T.as_app t)))
+      )
   )
   else false
 
@@ -112,58 +112,58 @@ let bv_first_ bv = BV.iter_true bv |> Iter.head
 
 let max_goal ~strict ~ord lits =
   mk_ ~ord lits ~f:(fun lits ->
-    let bv = Lits.maxlits ~ord lits in
-    (* only retain negative normal lits, or constraints
-       that are unshielded *)
-    BV.filter bv (fun i -> can_select_lit ~ord lits i);
-    begin match bv_first_ bv with
-      | Some i ->
-        (* keep only first satisfying lit *)
-        BV.clear bv;
-        BV.set bv i;
-        if not strict then (
-          BV.union_into ~into:bv (Lits.pos lits);
-        );
-        bv
-      | None ->
-        BV.empty ()  (* empty one *)
-    end)
+      let bv = Lits.maxlits ~ord lits in
+      (* only retain negative normal lits, or constraints
+         that are unshielded *)
+      BV.filter bv (fun i -> can_select_lit ~ord lits i);
+      begin match bv_first_ bv with
+        | Some i ->
+          (* keep only first satisfying lit *)
+          BV.clear bv;
+          BV.set bv i;
+          if not strict then (
+            BV.union_into ~into:bv (Lits.pos lits);
+          );
+          bv
+        | None ->
+          BV.empty ()  (* empty one *)
+      end)
 
 let ho_sel_driver lits f =
   let neg_max = CCArray.mapi (fun i l -> i,l)  lits
                 |> CCArray.filter (fun (_,l) -> Lit.is_neg l) in
-    if CCArray.length neg_max = 0 then BV.empty ()
-    else (
-      CCArray.fast_sort (fun (i, _) (j, _) -> compare (f i) (f j)) neg_max;
-      let idx, _ = CCArray.get neg_max 0 in
-      let res = BV.empty () in
-      BV.set res idx;
-      res
-    )
+  if CCArray.length neg_max = 0 then BV.empty ()
+  else (
+    CCArray.fast_sort (fun (i, _) (j, _) -> compare (f i) (f j)) neg_max;
+    let idx, _ = CCArray.get neg_max 0 in
+    let res = BV.empty () in
+    BV.set res idx;
+    res
+  )
 
 let avoid_app_var ~ord lits =
   mk_ ~ord lits ~f:(fun lits ->
-    let avoid_av_feature i  =
-      let l = lits.(i) in
+      let avoid_av_feature i  =
+        let l = lits.(i) in
         (Lit.is_app_var_eq l,
          not (Lits.is_max ~ord lits i),
-        Lit.Seq.terms l |> Iter.fold (fun acc t ->
-          if (T.is_app_var t) then (acc+1) else acc) 0,
-        Lit.weight l) in
-    ho_sel_driver lits avoid_av_feature
-  )
+         Lit.Seq.terms l |> Iter.fold (fun acc t ->
+             if (T.is_app_var t) then (acc+1) else acc) 0,
+         Lit.weight l) in
+      ho_sel_driver lits avoid_av_feature
+    )
 
 let prefer_app_var ~ord lits =
   mk_ ~ord lits ~f:(fun lits ->
-    let prefer_av_feature i  =
-      let l = lits.(i) in
+      let prefer_av_feature i  =
+        let l = lits.(i) in
         (not (Lit.is_app_var_eq l),
          not (Lits.is_max ~ord lits i),
          - (Lit.Seq.terms l |> Iter.fold (fun acc t ->
-          if (T.is_app_var t) then (acc+1) else acc) 0),
-        -Lit.weight l) in
-    ho_sel_driver lits prefer_av_feature
-  )
+             if (T.is_app_var t) then (acc+1) else acc) 0),
+         -Lit.weight l) in
+      ho_sel_driver lits prefer_av_feature
+    )
 
 let weight_based_sel_driver ?(blocker=(fun _ -> false)) ~ord lits f =
   let min_lit = 
@@ -188,20 +188,20 @@ let lit_sel_diff_w l =
   | _ -> 0
 
 let pred_freq ~ord lits = 
-    Literals.fold_eqn ~both:false ~ord ~eligible:(fun _ _ -> true) lits
-    |> Iter.fold (fun acc (l,r,sign,_) -> 
-        if sign && T.equal T.true_ r then (
-          (* positive predicate *)
-            let hd = T.head l in
-            match hd with 
-            | None -> acc
-            | Some id -> 
-                let current_val = ID.Map.get_or id acc ~default:0 in
-                ID.Map.add id (current_val+1) acc
-        ) else acc
+  Literals.fold_eqn ~both:false ~ord ~eligible:(fun _ _ -> true) lits
+  |> Iter.fold (fun acc (l,r,sign,_) -> 
+      if sign && T.equal T.true_ r then (
+        (* positive predicate *)
+        let hd = T.head l in
+        match hd with 
+        | None -> acc
+        | Some id -> 
+          let current_val = ID.Map.get_or id acc ~default:0 in
+          ID.Map.add id (current_val+1) acc
+      ) else acc
     ) ID.Map.empty
 
-  let get_pred_freq ~freq_tbl l =
+let get_pred_freq ~freq_tbl l =
   match l with
   | Lit.Equation(l,r,true) when T.is_true_or_false r ->
     begin 
@@ -215,10 +215,10 @@ let e_sel ~ord lits =
   let chooser ~freq_tbl (i,l) = 
     ((if Lit.is_pos l then 1 else 0),
      (if Lits.is_max ~ord lits i then 0 else 100 +
-      if Lit.is_pure_var l then 0 else 10 +
-        if Lit.is_ground l then 0 else 1),
+                                             if Lit.is_pure_var l then 0 else 10 +
+                                                                              if Lit.is_ground l then 0 else 1),
      -(lit_sel_diff_w l),
-      get_pred_freq ~freq_tbl l) in
+     get_pred_freq ~freq_tbl l) in
   let freq_tbl = pred_freq ~ord lits in
   weight_based_sel_driver ~ord lits (chooser ~freq_tbl)
 
@@ -234,23 +234,23 @@ let e_sel2 ~ord lits =
     let prec = Ordering.precedence ord in
     match l with 
     | Equation(lhs,rhs,sign) when not @@ blocker l ->
-        if T.is_var (T.head_term lhs) then (
-          (sign_val, 0, 0, diff_val)
-        ) else (
-          let hd_is_cst = T.is_const (T.head_term lhs) in
-          let prec_weight = 
-            if not hd_is_cst then 0
-            else Precedence.sel_prec_weight prec (T.head_exn lhs) in
-          let alpha_rank = 
-            if not hd_is_cst then max_int
-            else (
-              match CCArray.bsearch ~cmp:ID.compare (T.head_exn lhs) symbols with
-              | `At idx -> idx
-              | _       -> max_int
-            ) in
+      if T.is_var (T.head_term lhs) then (
+        (sign_val, 0, 0, diff_val)
+      ) else (
+        let hd_is_cst = T.is_const (T.head_term lhs) in
+        let prec_weight = 
+          if not hd_is_cst then 0
+          else Precedence.sel_prec_weight prec (T.head_exn lhs) in
+        let alpha_rank = 
+          if not hd_is_cst then max_int
+          else (
+            match CCArray.bsearch ~cmp:ID.compare (T.head_exn lhs) symbols with
+            | `At idx -> idx
+            | _       -> max_int
+          ) in
 
-          (sign_val, -prec_weight, alpha_rank, diff_val)
-        )
+        (sign_val, -prec_weight, alpha_rank, diff_val)
+      )
     | _ -> (sign_val,max_int,max_int,diff_val) (* won't be chosen *) in
   weight_based_sel_driver ~ord ~blocker lits chooser
 
@@ -269,8 +269,8 @@ let e_sel3 ~ord lits =
 let e_sel4 ~ord lits =
   let chooser (i,l) = 
     let lhs = match l with
-              | Lit.Equation(lhs_t,rhs_t,_) -> lhs_t
-              | _ -> T.true_ (* a term to fill in *) in
+      | Lit.Equation(lhs_t,rhs_t,_) -> lhs_t
+      | _ -> T.true_ (* a term to fill in *) in
     let sign = if Lit.is_pos l then 1 else 0 in
     let freq_tbl = pred_freq ~ord lits in
     let hd_freq = get_pred_freq ~freq_tbl l in
@@ -297,13 +297,13 @@ let e_sel5 ~ord lits =
   if CCArray.exists (fun l -> Lit.is_neg l && Lit.depth l <= 2) lits then (
     weight_based_sel_driver ~ord lits chooser 
   ) else BV.empty ()
-  
+
 let e_sel6 ~ord lits =
   (* SelectLargestOrientable *)
   let is_oriented lit = 
     match lit with
     | Lit.Equation(l,r,_) ->
-        Ordering.compare ord l r != Comparison.Incomparable
+      Ordering.compare ord l r != Comparison.Incomparable
     | _ -> true in
   let chooser (i,l) =
     (if Lit.is_pos l then 1 else 0),
@@ -313,45 +313,45 @@ let e_sel6 ~ord lits =
   let blocker t = not @@ is_oriented t in
   weight_based_sel_driver ~ord lits chooser ~blocker
 
-  let e_sel7 ~ord lits = 
-    (* SelectComplexExceptRRHorn *)
-    if Lits.is_RR_horn_clause lits
-    then BV.empty () (* do not select (conditional rewrite rule) *)
-    else e_sel3 ~ord lits
+let e_sel7 ~ord lits = 
+  (* SelectComplexExceptRRHorn *)
+  if Lits.is_RR_horn_clause lits
+  then BV.empty () (* do not select (conditional rewrite rule) *)
+  else e_sel3 ~ord lits
 
-   let e_sel8 ~ord lits = 
-    let symbols = Lits.symbols lits 
+let e_sel8 ~ord lits = 
+  let symbols = Lits.symbols lits 
                 |> ID.Set.to_seq 
                 |> Iter.sort ~cmp:ID.compare 
                 |> Iter.to_array in
-    let is_truly_equational = function 
+  let is_truly_equational = function 
     | Lit.Equation(l,r,sign) -> 
       not (Term.is_true_or_false r)
     | _ -> false  in
-    let get_arity = function 
+  let get_arity = function 
     | Lit.Equation(l,r,sign) when sign && Term.is_true_or_false r -> 
       List.length (Type.expected_args (Term.ty (T.head_term l)))
     | _ -> 0  in
-    let alpha_rank = function 
+  let alpha_rank = function 
     | Lit.Equation(l,r,sign) when sign && Term.is_true_or_false r 
-                                       && T.is_const (T.head_term l) -> 
+                                  && T.is_const (T.head_term l) -> 
       let hd = T.head_exn l in
       (match CCArray.bsearch ~cmp:ID.compare hd symbols with
-              | `At idx -> idx
-              | _       -> max_int)
+       | `At idx -> idx
+       | _       -> max_int)
     | _ -> max_int  in
-    let blocker l = Lit.is_type_pred l || Lit.is_propositional l in
-    let chooser (i,l) =
-      if is_truly_equational l then (
-        (if Lit.is_pos l then 1 else 0),
-        min_int, 0, lit_sel_diff_w l
-      ) else (
-        (if Lit.is_pos l then 1 else 0),
-        (if not (blocker l) then -(get_arity l) else max_int), 
-        alpha_rank l, lit_sel_diff_w l
-      )
-      in
-    weight_based_sel_driver ~ord lits chooser ~blocker
+  let blocker l = Lit.is_type_pred l || Lit.is_propositional l in
+  let chooser (i,l) =
+    if is_truly_equational l then (
+      (if Lit.is_pos l then 1 else 0),
+      min_int, 0, lit_sel_diff_w l
+    ) else (
+      (if Lit.is_pos l then 1 else 0),
+      (if not (blocker l) then -(get_arity l) else max_int), 
+      alpha_rank l, lit_sel_diff_w l
+    )
+  in
+  weight_based_sel_driver ~ord lits chooser ~blocker
 
 let ho_sel ~ord lits = 
   let chooser (i,l) = 
@@ -448,11 +448,19 @@ let () =
       "--ho-selection-restriction", ho_restriction_opt, " selection restrictions for lambda-free higher-order terms (none/no-var-heading-max-term/no-var-different-args/no-unapplied-var-occurring-applied/no-ho-vars)"
     ];
   Params.add_to_mode "ho-complete-basic" (fun () ->
-    _ho_restriction := `NoVarHeadingMaxTerm
-  );
+      _ho_restriction := `NoVarHeadingMaxTerm
+    );
   Params.add_to_mode "ho-competitive" (fun () ->
-    _ho_restriction := `NoVarHeadingMaxTerm
-  );
+      _ho_restriction := `NoVarHeadingMaxTerm
+    );
   Params.add_to_mode "ho-pragmatic" (fun () ->
-    _ho_restriction := `NoVarHeadingMaxTerm
-  );
+      _ho_restriction := `NoVarHeadingMaxTerm
+    );
+  Params.add_to_modes 
+    [ "lambda-free-intensional"
+    ; "lambda-free-extensional"
+    ; "lambda-free-purify-intensional"
+    ; "lambda-free-purify-extensional"] 
+    (fun () ->
+       _ho_restriction := `NoHigherOrderVariables
+    );

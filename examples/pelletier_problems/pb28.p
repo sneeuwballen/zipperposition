@@ -1,4 +1,5 @@
 
+% expect: sat
 % this should be a theorem, but SPASS finds a completion...
 
 fof(ax1, axiom, (! [X] : p(X)) => (! [X] : q(X))).

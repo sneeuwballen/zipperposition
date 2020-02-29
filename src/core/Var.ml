@@ -45,15 +45,21 @@ module Set = struct
   let diff a b =
     ID.Map.merge_safe a b
       ~f:(fun _ pair -> match pair with
-        | `Left x -> Some x
-        | `Right _ -> None
-        | `Both _ -> None)
+          | `Left x -> Some x
+          | `Right _ -> None
+          | `Both _ -> None)
   let cardinal t = ID.Map.cardinal t
   let intersection_empty s t =  
-    ID.Set.is_empty @@ 
-    ID.Set.inter 
-      (ID.Set.of_seq (ID.Map.keys s))
-      (ID.Set.of_seq (ID.Map.keys t))
+    try
+      let _ =
+        ID.Map.merge_safe s t
+          ~f:(fun _ o ->
+              match o with
+              |  `Left _ | `Right _ -> None
+              | `Both _ -> raise Exit)
+      in
+      true
+    with Exit -> false
   let of_seq s = s |> Iter.map (fun v->v.id, v) |> ID.Map.of_seq
   let add_seq m s = s |> Iter.map (fun v->v.id, v) |> ID.Map.add_seq m
   let add_list m s = s |> List.map (fun v->v.id, v) |> ID.Map.add_list m
@@ -86,6 +92,6 @@ module Subst = struct
   let merge a b =
     ID.Map.merge_safe a b
       ~f:(fun _ v -> match v with
-        | `Both (_,x) -> Some x (* favor right one *)
-        | `Left x | `Right x -> Some x)
+          | `Both (_,x) -> Some x (* favor right one *)
+          | `Left x | `Right x -> Some x)
 end

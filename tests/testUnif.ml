@@ -411,177 +411,6 @@ let suite_unif1 : unit Alcotest.test_case list =
       (* ( "F a" =?=> "fun (x : term). f_ho2 (fun (y:term). y) (fun (y:term). y)") |> Task.add_var_type "F" "term -> term -> term" *)
     ]
 
-let jp_check_count t u count : unit Alcotest.test_case =
-  "JP-unif check count", `Quick, fun () ->
-    let t' = JP_unif.unify_scoped_nonterminating t u in
-    if count = OSeq.length t' then ()
-    else
-      Alcotest.failf
-        "@[<hv>Found %d unifiers instead of %d@]" (OSeq.length t') count
-
-let jp_check_nonunifiable ?(msg="") t u : unit Alcotest.test_case =
-  "JP-unif check nonunifiable", `Quick, fun () ->
-  if OSeq.for_all CCOpt.is_none (OSeq.take 20 (JP_unif.unify_scoped t u)) then ()
-  else (
-    Alcotest.failf
-      "@[<2>`%a`@ should not unify with @ `%a`%s@]@."
-       (Scoped.pp T.ZF.pp) t (Scoped.pp T.ZF.pp) u msg
-  )
-
-let jp_check_unifier t u ~res =
-  "JP-unif check unifier", `Quick, fun () ->
-  let is_res subst = match subst with
-    | None -> false
-    | Some s ->
-      let found = Lambda.snf (JP_unif.S.apply s t) in
-      Unif.FO.are_variant res found 
-  in
-  let unifiers = JP_unif.unify_scoped t u in
-  if OSeq.exists is_res unifiers then () 
-  else (
-    Alcotest.failf
-      "@[<2>`%a`@ and `%a`@ should unify as @ `%a`@]@."
-        (Scoped.pp T.ZF.pp) t (Scoped.pp T.ZF.pp) u T.ZF.pp res
-  )
-
-let jp_check_eqs t u ts =
-  "JP-unif check equalities", `Quick, fun () ->
-  let is_res subst = match subst with
-    | None -> false
-    | Some s ->
-      CCList.for_all (fun (t1,t2,_) -> 
-        let t1 = Lambda.eta_reduce (Lambda.snf (JP_unif.S.apply s t1)) in
-        let t2 = Lambda.eta_reduce (Lambda.snf (JP_unif.S.apply s t2)) in
-        Unif.FO.are_variant t1 t2 
-      ) ts
-  in
-  let unifiers = JP_unif.unify_scoped t u in
-  if OSeq.exists is_res unifiers then () 
-  else (
-    Alcotest.failf
-      "@[<2>`%a`@ and `%a`@ should unify this list: @ `%a`@]@."
-        (Scoped.pp T.ZF.pp) t (Scoped.pp T.ZF.pp) u (CCList.pp (CCPair.pp T.ZF.pp T.ZF.pp)) (CCList.map (fun ((t1, _), (t2, _), _) -> t1, t2) ts)
-  )
-
-let suite_jp_unif : unit Alcotest.test_case list =
-  Util.set_debug 1; Printexc.record_backtrace true;
-  let (=?=) a b = Task.mk_unif a b in (* unif pair *)
-  let (<?>) a b = Task.mk_unif ~negated:true a b in (* unif pair *)
-  let (>->) a b = Task.set_with_ty b a in (* specify return type *)
-  let (>?->) a b = Action.set_with_ty b a in (* specify return type *)
-  let (>>>) a b = Task.add_action b a in (* specify return type *)
-  let mk_tests (pair) =
-    let parsed_pair = ref None in
-    let parsed_actions = ref [] in
-    parse_with_vars (Task.var_types pair) ~f:(fun () ->
-       parsed_pair := Some (Task.parse pair);
-       parsed_actions := List.map Action.parse (Task.actions pair)
-    );
-    let t, u = CCOpt.get_exn !parsed_pair in
-    let t, u = (t,0), (u,0) in
-    let actions = !parsed_actions in
-    clear_scope();
-    if Task.is_negated pair then
-      [jp_check_nonunifiable t u]
-    else 
-      actions |> CCList.flat_map  (fun action -> match action with
-        | Action.Count {count} -> [jp_check_count t u count]
-        | Action.Yield {t=res;_} -> [jp_check_unifier t u ~res]
-        | Action.Eqs {ts} -> [jp_check_eqs t u (List.map (fun (t1,t2,ty) -> (t1,0),(t2,0),ty) ts)]
-        | _ -> assert false
-      ) 
-  in
-
-  CCList.flat_map mk_tests
-    [ 
-      (* 
-        Because of the iteration rule, which was not complete before,
-        now we have infinitely many unifiers!
-      "X a" =?= "Y b" >-> "term"
-      >>> Action.count 17; *)
-
-      "X a" <?> "g (X a)" >-> "term";
-
-      "(g (X a))" =?= "(X (g a))" >-> "term"
-      >>> (Action.yield "g (g (g (g a)))" >?-> "term");
-
-      (* Example 3 in the Jensen-Pietrzykowski paper *)
-      (* "Z Y X" =?= "Z (fun u. u) (g a)" >-> "term"
-      >>> Action.eqs [
-            "X", "a", None; 
-            "Y", "g", None; 
-            "Z", "fun (z : term -> term). fun (x : term). X0 (z x)", Some "(term -> term) -> term -> term"
-        ]
-      |> Task.add_var_type "X" "term"
-      |> Task.add_var_type "Y" "term -> term"; *)
-
-      (* Iterate on head of disagreement pair *)
-      "X g" =?= "g a" >-> "term"
-      >>> Action.eqs [
-            "X", "fun z. z a", Some "(term -> term) -> term"
-          ];
-
-      (* Iterate with non-empty w tuple *)
-      "X (fun z. f z a)" =?= "X (fun z. f a z)" >-> "term"
-      >>> Action.eqs ["X", "fun (z : term -> term). Z (fun (w : alpha). z a)", Some "(term -> term) -> term"];
-
-      "f X Y" =?= "f Y X" >-> "term"
-      |> Task.add_var_type "X" "term"
-      |> Task.add_var_type "Y" "term"
-      (* >>> Action.yield "f W Z" *)
-      >>> Action.count 1;
-
-
-      "X a b" =?= "f b Y"
-      |> Task.add_var_type "X" "term -> term -> term"
-      |> Task.add_var_type "Y" "term"
-      >>> Action.eqs [
-         "X", "fun (x : term) (y : term). f y Y ", None;
-      ]
-      >>> Action.eqs [
-         "X", "fun (x : term) (y : term). f y y ", None;
-         "Y", "b", None;
-      ];
-
-      (* Polymorphism *)
-
-      "fun (x : alpha). x" =?= "fun (x : term). x" |> Task.set_unif_types false
-      >>> Action.count 1;
-
-      "f_ho2 (a_poly term) (a_poly term)" =?= "f_ho2 X X" |> Task.set_unif_types false
-      >>> Action.count 1;
-
-      (* Example from "Higher-Order Unification, Polymorphism, and Subsorts (Extended Abstract)" by T. Nipkow *)
-      "(fun (y : term). y) (X Y)" =?= "a" >-> "term" |> Task.set_unif_types false
-      >>> Action.eqs [
-              "X", "fun (z : term -> term). z (z (z a))", None;
-              "Y", "fun (z : term). z", None
-          ]
-      >>> Action.eqs[ 
-          (* The example actually states the unifier "z (X z) (Y z)", but the following equally general unifier comes out of our procedure: *)
-              "X", "fun (z : alpha -> gamma -> term). z (X000 z) (Y000 z (z (X000 z)))", None;
-              "Y", "fun (x : alpha) (y : gamma). a", None 
-          ]
-        |> Task.add_var_type "X" "beta -> term"
-        |> Task.add_var_type "Y" "beta";
-
-
-      (* More *)
-
-      "fun (x : term). x" <?> "fun (x : term). X" |> Task.set_unif_types false
-      |> Task.add_var_type "X" "term";
-
-      (* 
-        these tests go crazy with the iteration
-      "X a" =?= "sk a" 
-      >>> Action.count 1
-      |> Task.add_var_type "X" "term -> term"; *)
-
-      (* "X a" =?= "g a" 
-      >>> Action.count 2
-      |> Task.add_var_type "X" "term -> term"; *)
-    ]
-
 
 let reg_matching1 = "regression matching", `Quick, fun () ->
   let terms =
@@ -599,6 +428,7 @@ let reg_matching1 = "regression matching", `Quick, fun () ->
     with Unif.Fail -> ();
   ) 
 
+<<<<<<< HEAD
 (** Jensen-Pietrzykowski auxiliary functions tests *)
 let test_jp_unif_aux = "JP unification", `Quick, fun () ->
   Util.set_debug 1; Printexc.record_backtrace true;
@@ -674,8 +504,11 @@ let test_jp_unif_aux = "JP unification", `Quick, fun () ->
   ()
 
 let suite_unif2 = [ reg_matching1; test_jp_unif_aux ]
+=======
+let suite_unif2 = [ reg_matching1; ]
+>>>>>>> bools
 
-let suite = suite_unif1 @ suite_unif2 @ suite_jp_unif
+let suite = suite_unif1 @ suite_unif2
 
 
 (** {2 Properties} *)

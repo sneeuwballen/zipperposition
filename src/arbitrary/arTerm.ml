@@ -24,17 +24,17 @@ module PT = struct
   and shrink_sub t =
     let open QA.Iter in
     match PT.view t with
-      | PT.App (f, l) ->
-        append
-          (shrink f >|= fun f' -> PT.app ~ty:(PT.ty_exn t) f' l)
-          (Iter.(0 -- (List.length l-1)) >>= fun i ->
-           let sub = List.nth l i in
-           shrink_sub sub >|= fun sub' ->
-           let l' = CCList.set_at_idx i sub' l in
-           PT.app ~ty:(PT.ty_exn t) f l')
-      | PT.Bind (b, v, bod) ->
-        shrink bod >|= PT.bind ~ty:(PT.ty_exn t) b v
-      | _ -> empty
+    | PT.App (f, l) ->
+      append
+        (shrink f >|= fun f' -> PT.app ~ty:(PT.ty_exn t) f' l)
+        (Iter.(0 -- (List.length l-1)) >>= fun i ->
+         let sub = List.nth l i in
+         shrink_sub sub >|= fun sub' ->
+         let l' = CCList.set_at_idx i sub' l in
+         PT.app ~ty:(PT.ty_exn t) f l')
+    | PT.Bind (b, v, bod) ->
+      shrink bod >|= PT.bind ~ty:(PT.ty_exn t) b v
+    | _ -> empty
 
   let mk_ gen =
     QA.make ~print:TypedSTerm.to_string ~shrink gen
@@ -79,7 +79,7 @@ module PT = struct
 
   let ground = mk_ ground_g
 
-  let default_fuel_ ~ho n =
+  let default_fuel_ ~mode n =
     let var_x= Var.of_string ~ty:ty_term "X" in
     let var_y = Var.of_string ~ty:ty_term "Y" in
     let var_z = Var.of_string ~ty:ty_term "Z" in
@@ -102,7 +102,7 @@ module PT = struct
            let self = self (n-1) in
            if n<=0 then base
            else (
-             let l = [
+             let fo_list = [
                3, base;
                1, map2 f self self;
                1, map2 sum self self;
@@ -110,30 +110,35 @@ module PT = struct
                1, map h self;
                1, map3 ite self self self;
              ] in
+             let lf_list = [ 2, map2 app1 (oneofl [vf;vg]) self;
+                             2, map3 app2 (oneofl [vf2;vg2]) self self
+                           ] in
+             let g_fun_t gen = map2 lam (oneofl [var_x;var_y;var_z]) gen in
+             let g_fun_f1 = map2 lam (oneofl [var_f;var_g]) self in
+             let g_fun_f2 = map2 lam (oneofl [var_f2;var_g2]) self in
+             let ho_list = [
+               1, map2 app1 (g_fun_t self) self;
+               1, map2 app1 g_fun_f1 (g_fun_t self);
+               1, map2 app1 g_fun_f2 (g_fun_t (g_fun_t self));
+               1, map3 app2 (return p_ho2) (g_fun_t self) (g_fun_t self);
+             ] in
              let l =
-               if ho then (
-                 (* fun term -> x *)
-                 let g_fun_t gen = map2 lam (oneofl [var_x;var_y;var_z]) gen in
-                 let g_fun_f1 = map2 lam (oneofl [var_f;var_g]) self in
-                 let g_fun_f2 = map2 lam (oneofl [var_f2;var_g2]) self in
-                 [ 2, map2 app1 (oneofl [vf;vg]) self;
-                   2, map3 app2 (oneofl [vf2;vg2]) self self;
-                   1, map2 app1 (g_fun_t self) self;
-                   1, map2 app1 g_fun_f1 (g_fun_t self);
-                   1, map2 app1 g_fun_f2 (g_fun_t (g_fun_t self));
-                   1, map3 app2 (return p_ho2) (g_fun_t self) (g_fun_t self);
-                 ] @ l
-               ) else l
+               match mode with
+               | `HigherOrder -> fo_list @ lf_list @ ho_list
+               | `LambdaFreeHigherOrder -> fo_list @ lf_list
+               | `FirstOrder -> fo_list
              in
              frequency l
            ))
     in
     QA.Gen.((1 -- n) >>= gen)
 
-  let default_fuel = default_fuel_ ~ho:false
-  let default_ho_fuel = default_fuel_ ~ho:true
+  let default_fuel = default_fuel_ ~mode:`FirstOrder
+  let default_lfho_fuel = default_fuel_ ~mode:`LambdaFreeHigherOrder
+  let default_ho_fuel = default_fuel_ ~mode:`HigherOrder
 
   let default_g = QA.Gen.(1 -- 4 >>= default_fuel)
+  let default_lfho_g = QA.Gen.(1 -- 4 >>= default_lfho_fuel)
   let default_ho_g = QA.Gen.(1 -- 4 >>= default_ho_fuel)
   let default = mk_ default_g
 
@@ -171,25 +176,27 @@ let rec shrink t =
 and shrink_sub t =
   let open QA.Iter in
   match T.view t with
-    | T.App (f, l) ->
-      append
-        (shrink f >|= fun f' -> T.app f' l)
-        (Iter.(0 -- (List.length l-1)) >>= fun i ->
-         let sub = List.nth l i in
-         shrink_sub sub >|= fun sub' ->
-         let l' = CCList.set_at_idx i sub' l in
-         T.app f l')
-    | T.Fun (ty_arg, bod) ->
-      shrink bod >|= T.fun_ ty_arg
-    | _ -> empty
+  | T.App (f, l) ->
+    append
+      (shrink f >|= fun f' -> T.app f' l)
+      (Iter.(0 -- (List.length l-1)) >>= fun i ->
+       let sub = List.nth l i in
+       shrink_sub sub >|= fun sub' ->
+       let l' = CCList.set_at_idx i sub' l in
+       T.app f l')
+  | T.Fun (ty_arg, bod) ->
+    shrink bod >|= T.fun_ ty_arg
+  | _ -> empty
 
 let mk_ gen = QA.make ~print:T.to_string ~shrink gen
 
 let ctx = Term.Conv.create()
 
 let default_g = QCheck.Gen.map (Term.Conv.of_simple_term_exn ctx) PT.default_g
+let default_lfho_g = QCheck.Gen.map (Term.Conv.of_simple_term_exn ctx) PT.default_lfho_g
 let default_ho_g = QCheck.Gen.map (Term.Conv.of_simple_term_exn ctx) PT.default_ho_g
 let default = mk_ default_g
+let default_lfho = mk_ default_lfho_g
 let default_ho = mk_ default_ho_g
 
 let default_fuel f =
@@ -209,15 +216,15 @@ let pos t =
   let rec recurse t pb st =
     let stop = return (PB.to_pos pb) in
     match T.view t with
-      | T.App (_, [])
-      | T.Const _
-      | T.Var _
-      | T.DB _ -> PB.to_pos pb
-      | T.AppBuiltin (_, l)
-      | T.App (_, l) ->
-        let len = List.length l in
-        oneof (stop :: List.mapi (fun i t' -> recurse t' (PB.arg (len - 1 - i) pb)) l) st
-      | T.Fun (_,bod) ->
-        oneof [stop; recurse bod (PB.body pb)] st
+    | T.App (_, [])
+    | T.Const _
+    | T.Var _
+    | T.DB _ -> PB.to_pos pb
+    | T.AppBuiltin (_, l)
+    | T.App (_, l) ->
+      let len = List.length l in
+      oneof (stop :: List.mapi (fun i t' -> recurse t' (PB.arg (len - 1 - i) pb)) l) st
+    | T.Fun (_,bod) ->
+      oneof [stop; recurse bod (PB.body pb)] st
   in
   recurse t PB.empty

@@ -17,85 +17,100 @@ module Make(A:ARG) = struct
   module Ctx = A.Ctx
   module C = A.C
 
-type t = {
-  id : int; (** unique ID of the stream *)
-  penalty: int; (** heuristic penalty *)
-  mutable stm : C.t option OSeq.t; (** the stream itself *)
-}
+  type t = {
+    id : int; (** unique ID of the stream *)
+    mutable penalty: int; (** heuristic penalty, increased by every drip *)
+    mutable hits : int; (** how many attemts to retrieve unifier were there  *)
+    mutable stm : C.t option OSeq.t; (** the stream itself *)
+  }
 
-exception Empty_Stream
-exception Drip_n_Unfinished of C.t option list * int
+  exception Empty_Stream
+  exception Drip_n_Unfinished of C.t option list * int * int
 
-let id_count_ = ref 0
+  let id_count_ = ref 0
 
-(** {2 Basics} *)
+  (** {2 Basics} *)
 
-let make ?penalty:(p=1) s =
-  Util.incr_stat stat_stream_create;
-  let id = !id_count_ in
-  incr id_count_;
-  { id; penalty = p; stm = s; }
+  let make ?penalty:(p=1) s =
+    Util.incr_stat stat_stream_create;
+    let id = !id_count_ in
+    incr id_count_;
+    { id; penalty = p; hits=0; stm = s; }
 
-let equal s1 s2 = s1.id = s2.id
-let compare s1 s2 = Pervasives.compare s1.id s2.id
-let id s = s.id
-let hash s = Hashtbl.hash s.id
+  let equal s1 s2 = s1.id = s2.id
+  let compare s1 s2 = Pervasives.compare s1.id s2.id
+  let id s = s.id
+  let hash s = Hashtbl.hash s.id
 
-(* TODO: does it really pop an element? *)
-(* normally it should be fine, check with Simon *)
-let is_empty s = OSeq.is_empty s.stm
+  (* TODO: does it really pop an element? *)
+  (* normally it should be fine, check with Simon *)
+  let is_empty s = OSeq.is_empty s.stm
 
-(* No length function because some streams are infinite *)
+  (* No length function because some streams are infinite *)
 
-let penalty s = s.penalty
+  let penalty s = s.penalty
 
-let drip s =
-  match s.stm () with
-    | OSeq.Nil -> raise Empty_Stream
+  let clause_penalty s = function 
+    | None ->
+      s.hits <- s.hits +1;
+      max 4 (s.hits-16)
+    | Some c ->
+      s.hits <- s.hits +1;
+      max (C.penalty c) (s.hits-64) 
+
+  let drip s =
+    match s.stm () with
+    | OSeq.Nil -> 
+      s.penalty <- 0;
+      raise Empty_Stream
     | OSeq.Cons (hd,tl) ->
       s.stm <- tl;
+      s.penalty <-  s.penalty + (clause_penalty s hd);
       hd
   (* let dripped = OSeq.nth 0 s.stm in
-  s.stm <- OSeq.drop 1 s.stm;
-  dripped *)
+     s.stm <- OSeq.drop 1 s.stm;
+     dripped *)
 
-let rec _drip_n st n guard =
-  if guard = 0 then (st,[])
-  else
-    match n with
-      | 0 -> (st,[])
-      | _ ->
-        match st () with
-          | OSeq.Nil -> raise (Drip_n_Unfinished([],n))
+  let drip_n s n guard =
+    let rec _drip_n st n guard =
+      if guard = 0 then (st,0,[])
+      else
+        match n with
+        | 0 -> (st,0,[])
+        | _ ->
+          match st () with
+          | OSeq.Nil -> raise (Drip_n_Unfinished([],0,n))
           | OSeq.Cons (hd,tl) ->
+            let p = clause_penalty s hd in
             match hd with
-              | None -> (
-                  try
-                    let (s',tl_res) = _drip_n tl n (guard - 1) in
-                    (s',tl_res)
-                  with
-                    | Drip_n_Unfinished (partial_res,n') -> raise (Drip_n_Unfinished((hd::partial_res),n'))
-                )
-              | _ -> (
-                  try
-                    let (s',tl_res) = _drip_n tl (n-1) (guard - 1) in
-                    (s',(hd::tl_res))
-                  with
-                    | Drip_n_Unfinished (partial_res,n') -> raise (Drip_n_Unfinished((hd::partial_res),n'))
-                )
+            | None -> (
+                try
+                  let (s',p_tl,tl_res) = _drip_n tl n (guard - 1) in
+                  (s',p+p_tl,tl_res)
+                with
+                | Drip_n_Unfinished (partial_res,p_partial,n') -> raise (Drip_n_Unfinished((hd::partial_res),p+p_partial,n'))
+              )
+            | _ -> (
+                try
+                  let (s',p_tl,tl_res) = _drip_n tl (n-1) (guard - 1) in
+                  (s',p+p_tl,(hd::tl_res))
+                with
+                | Drip_n_Unfinished (partial_res,p_partial,n') -> raise (Drip_n_Unfinished((hd::partial_res),p+p_partial,n')))
+    in
 
-let drip_n s n guard =
-  try
-    let (s',cl) = _drip_n s.stm n guard in
-    s.stm <- s';
-    cl
-  with
-    | Drip_n_Unfinished (res,n') ->
+    try
+      let (s',p_add,cl) = _drip_n s.stm n guard in
+      s.penalty <- s.penalty + p_add;
+      s.stm <- s';
+      cl
+    with
+    | Drip_n_Unfinished (res,p_add,n') ->
       s.stm <- OSeq.empty;
-      raise (Drip_n_Unfinished (res,n'))
+      s.penalty <- s.penalty + p_add;
+      raise (Drip_n_Unfinished (res,p_add,n'))
 
-let pp out s =
-  Format.fprintf out "stream %i" s.id;
-  ()
+  let pp out s =
+    Format.fprintf out "stream %i" s.id;
+    ()
 
 end

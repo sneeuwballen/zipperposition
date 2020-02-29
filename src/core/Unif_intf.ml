@@ -27,7 +27,7 @@ module type S = sig
   (** Unify terms syntictally, returns a subst
       @raise Fail if the terms are not unifiable *)
 
-  val unify_full : ?ext_dec:bool -> ?subst:unif_subst ->
+  val unify_full : ?subst:unif_subst ->
     term Scoped.t -> term Scoped.t -> unif_subst
   (** Unify terms, returns a subst + constraints or
       @raise Fail if the terms are not unifiable *)

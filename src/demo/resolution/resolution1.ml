@@ -19,10 +19,10 @@ let _signature = ref Logtk.Signature.empty
     applications of a constant (symbol) to a list of sub-terms.
 
     Examples (capitalized letter are variables):
-      - f(X, g(X,a))
-      - age_of(grandmother_of(frida))
-      - Y
-      - the_universe
+    - f(X, g(X,a))
+    - age_of(grandmother_of(frida))
+    - Y
+    - the_universe
 *)
 
 let conv_ty =
@@ -35,8 +35,8 @@ let conv_ty =
     propositions), or its negation. We represent this as a pair of [(term, sign)].
 
     Examples:
-      - [(older_than(obama, bieber), true)]
-      - [(lives_in(paris, poutine), false)]
+    - [(older_than(obama, bieber), true)]
+    - [(lives_in(paris, poutine), false)]
 *)
 module Lit = struct
   type t = T.t * bool
@@ -166,9 +166,9 @@ let _add_active c =
 
     {[
       A or A' or C
-      ---------------
-        sigma (A' or C)
-          if sigma(A) = sigma(A')
+                 ---------------
+                 sigma (A' or C)
+                   if sigma(A) = sigma(A')
     ]}
 
     means that if the clause has two positive literals (A,true) and (A',true)
@@ -206,9 +206,9 @@ let _factoring c =
 
     {[
       A or C    ¬A' or D
-      ------------------
-        sigma(C or D)
-          if sigma(A) = sigma(A')
+                        ------------------
+                        sigma(C or D)
+                          if sigma(A) = sigma(A')
     ]}
 
     This rule is called "resolution" and it's one of the first automated proof
@@ -217,14 +217,14 @@ let _factoring c =
 
     Let us explain in the propositional case (ignoring variables), assuming
     [A = A']. The idea is, roughly:
-      - we know that either [A] or either [not A] is true
+    - we know that either [A] or either [not A] is true
         (excluded middle)
-      - if [A] is true, it means that [not A' or D]
+    - if [A] is true, it means that [not A' or D]
         can only be true if [D] is true (since [A=A'=true]). Therefore
         [D] must be true.
-      - if [A] is false, then [A or C] can only be true if [C] is true;
+    - if [A] is false, then [A or C] can only be true if [C] is true;
         therefore [C] holds.
-      - by excluded middle one of those must be true, so in any
+    - by excluded middle one of those must be true, so in any
         case [C or D] is true. Hence the conclusion.
 
     For the first-order case, we compute the {b most general unifier} or
@@ -263,8 +263,8 @@ let _resolve_with c =
                 (let c' = CCList.remove_at_idx i c in
                  Clause.apply_subst ~renaming subst (c',1))
                 @
-                  (let d' = CCList.remove_at_idx j d in
-                   Clause.apply_subst ~renaming subst (d',0))
+                (let d' = CCList.remove_at_idx j d in
+                 Clause.apply_subst ~renaming subst (d',0))
               in
               (** Simplify the resulting clause (remove duplicate literals)
                   and add it into the passive set, to be processed later *)
@@ -283,9 +283,9 @@ let _resolve_with c =
     - add all the clauses into the passive set
     - while some passive clauses remain unprocessed, pick one of them,
         call it [c], and then do the following:
-        - add [c] into the active set
-        - perform inferences between [c] and the active set (including [c] itself)
-        - add the resulting new clauses to the passive set.
+    - add [c] into the active set
+    - perform inferences between [c] and the active set (including [c] itself)
+    - add the resulting new clauses to the passive set.
     - if at any point the empty clause [[]] is found, then
       the initial set of clauses is unsatisfiable (absurd).
     - otherwise, if the loop stops, we have computed a fixpoint of the
@@ -308,7 +308,7 @@ let _saturate clauses =
     done;
     `Sat
   with
-    | Unsat -> `Unsat
+  | Unsat -> `Unsat
 
 (** {2 Main} *)
 
@@ -328,7 +328,8 @@ let process_file f =
           because resolution only works on clauses.
 
           This algorithm is already implemented in {!Logtk}. *)
-      let decls = Cnf.cnf_of_seq ?ctx:None (CCVector.to_seq st) in
+      let ctx = Skolem.create() in
+      let decls = Cnf.cnf_of_seq ~ctx (CCVector.to_seq st) in
       _signature :=
         CCVector.to_seq decls
         |> Cnf.type_declarations
@@ -345,11 +346,11 @@ let process_file f =
       E.return (_saturate clauses)
     ) in
   match res with
-    | E.Error msg ->
-      print_endline msg;
-      exit 1
-    | E.Ok `Sat -> print_endline "sat"
-    | E.Ok `Unsat -> print_endline "unsat"
+  | E.Error msg ->
+    print_endline msg;
+    exit 1
+  | E.Ok `Sat -> print_endline "sat"
+  | E.Ok `Unsat -> print_endline "unsat"
 
 (** Parse command-line arguments, including the file to process *)
 
@@ -364,7 +365,7 @@ let _set_file f = match !_file with
 let main () =
   Arg.parse !_options _set_file _help;
   match !_file with
-    | None -> print_endline _help; exit 0
-    | Some f -> process_file f
+  | None -> print_endline _help; exit 0
+  | Some f -> process_file f
 
 let () = main()

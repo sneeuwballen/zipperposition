@@ -193,8 +193,8 @@ module FO : sig
   val filter : (Type.t HVar.t Scoped.t -> term Scoped.t -> bool) -> t -> t
   val compose:  scope:int -> t -> t -> t
   (** Takes a substitution that might map a variable x to a term
-     that containts loosely bound variables. It fixes the substitution
-     so that all such variables are remaped to a fresh skolem *)
+      that containts loosely bound variables. It fixes the substitution
+      so that all such variables are remaped to a fresh skolem *)
   val unleak_variables : t -> t * (Term.t list)
   val subset_is_renaming : subset:(term Scoped.t list) -> res_scope:int -> t -> bool
   val canonize_neg_vars : var_set:(InnerTerm.VarSet.t) -> t

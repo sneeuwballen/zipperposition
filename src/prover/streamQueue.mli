@@ -9,6 +9,18 @@
     criterion (e.g. the age of the clause, so that older clauses are more
     likely to be chosen). *)
 
+open Logtk
+
 module type S = StreamQueue_intf.S
 
-module Make(Stm : Stream.S) : S with module Stm = Stm
+module type ARG = sig
+  module Stm : Stream.S
+  module Env : Env.S
+end
+
+val k_guard : int Flex_state.key
+val k_ratio : int Flex_state.key
+val k_clause_num : int Flex_state.key
+
+
+module Make(A : ARG) : S with module Stm = A.Stm

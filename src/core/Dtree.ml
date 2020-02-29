@@ -6,7 +6,7 @@ module ST = InnerTerm
 module T = Term
 module S = Subst
 
-let prof_dtree_retrieve = Util.mk_profiler "dtree_retrieve"
+let prof_dtree_retrieve = ZProf.make "dtree_retrieve"
 
 (** {2 Term traversal}
 
@@ -37,25 +37,25 @@ let compare_char c1 c2 =
     if c=0 then Type.compare (HVar.ty v1) (HVar.ty v2) else c
   in
   match c1, c2 with
-    | Symbol s1, Symbol s2 -> ID.compare s1 s2
-    | Variable v1, Variable v2 -> compare_vars v1 v2
-    | Subterm t1, Subterm t2 -> T.compare t1 t2
-    | _ -> Pervasives.compare (char_to_int_ c1) (char_to_int_ c2)
+  | Symbol s1, Symbol s2 -> ID.compare s1 s2
+  | Variable v1, Variable v2 -> compare_vars v1 v2
+  | Subterm t1, Subterm t2 -> T.compare t1 t2
+  | _ -> Pervasives.compare (char_to_int_ c1) (char_to_int_ c2)
 
 let[@inline] eq_char c1 c2 = compare_char c1 c2 = 0
 
 (** first symbol of t, or variable *)
 let term_to_char (t:T.t) : character * T.t list =
   match ST.view (t:>ST.t) with
-    | ST.Var v -> Variable (Type.cast_var_unsafe v), []
-    | _ when Type.is_fun (T.ty t) -> Subterm t, [] (* partial app *)
-    | ST.Const s -> Symbol s, []
-    | ST.App (f, l) ->
-      begin match ST.view f with
-        | ST.Const s -> Symbol s, (T.of_term_unsafe_l l)
-        | _ -> Subterm t, []
-      end
-    | ST.AppBuiltin _ | ST.DB _ | ST.Bind _ -> Subterm t, []
+  | ST.Var v -> Variable (Type.cast_var_unsafe v), []
+  | _ when Type.is_fun (T.ty t) -> Subterm t, [] (* partial app *)
+  | ST.Const s -> Symbol s, []
+  | ST.App (f, l) ->
+    begin match ST.view f with
+      | ST.Const s -> Symbol s, (T.of_term_unsafe_l l)
+      | _ -> Subterm t, []
+    end
+  | ST.AppBuiltin _ | ST.DB _ | ST.Bind _ -> Subterm t, []
 
 let pp_char out = function
   | Variable v -> Type.pp_typed_var out v
@@ -95,13 +95,13 @@ let to_list t : _ list =
   let rec getnext acc iter : _ list =
     let acc' = iter.cur_char :: acc in
     match next iter with
-      | None -> List.rev acc'
-      | Some iter' ->
-        getnext acc' iter'
+    | None -> List.rev acc'
+    | Some iter' ->
+      getnext acc' iter'
   in
   match iterate t with
-    | None -> assert false
-    | Some i -> getnext [] i
+  | None -> assert false
+  | Some i -> getnext [] i
 
 module CharMap = CCMap.Make(struct
     type t = character
@@ -134,28 +134,28 @@ module Make(E : Index.EQUATION) = struct
     (* function to go to the given leaf, building it if needed *)
     let rec goto trie t rebuild =
       match t with
-        | [] -> (* look at leaf *)
-          begin match k trie.leaf with
-            | new_leaf when trie.leaf == new_leaf -> root (* no change, return same tree *)
-            | new_leaf -> rebuild {trie with leaf=new_leaf} (* replace by new leaf *)
-          end
-        | c::t' ->
-          begin match CharMap.get c trie.map with
-            | Some subtrie ->
-              let rebuild' subtrie = match subtrie with
-                | _ when is_empty subtrie ->
-                  rebuild {trie with map=CharMap.remove c trie.map}
-                | _ -> rebuild {trie with map=CharMap.add c subtrie trie.map}
-              in
-              goto subtrie t' rebuild'
-            | None ->
-              let subtrie = empty_trie in
-              let rebuild' subtrie = match subtrie with
-                | _ when is_empty subtrie -> root  (* same tree *)
-                | _ -> rebuild {trie with map=CharMap.add c subtrie trie.map}
-              in
-              goto subtrie t' rebuild'
-          end
+      | [] -> (* look at leaf *)
+        begin match k trie.leaf with
+          | new_leaf when trie.leaf == new_leaf -> root (* no change, return same tree *)
+          | new_leaf -> rebuild {trie with leaf=new_leaf} (* replace by new leaf *)
+        end
+      | c::t' ->
+        begin match CharMap.get c trie.map with
+          | Some subtrie ->
+            let rebuild' subtrie = match subtrie with
+              | _ when is_empty subtrie ->
+                rebuild {trie with map=CharMap.remove c trie.map}
+              | _ -> rebuild {trie with map=CharMap.add c subtrie trie.map}
+            in
+            goto subtrie t' rebuild'
+          | None ->
+            let subtrie = empty_trie in
+            let rebuild' subtrie = match subtrie with
+              | _ when is_empty subtrie -> root  (* same tree *)
+              | _ -> rebuild {trie with map=CharMap.add c subtrie trie.map}
+            in
+            goto subtrie t' rebuild'
+        end
     in
     goto trie t (fun t -> t)
 
@@ -193,66 +193,66 @@ module Make(E : Index.EQUATION) = struct
     Iter.fold remove dt seq
 
   let retrieve ?(subst=S.empty) ~sign dt t k =
-    Util.enter_prof prof_dtree_retrieve;
+    ZProf.enter_prof prof_dtree_retrieve;
     (* recursive traversal of the trie, following paths compatible with t *)
     let rec traverse trie iter subst =
       match iter with
-        | None ->  (* yield all equations, they all match *)
-          List.iter
-            (fun (_, eqn, _) ->
-               let l, r, sign' = E.extract eqn in
-               if sign = sign' then k (l, r, eqn, subst))
-            trie.leaf
-        | Some i ->
-          (* "lazy" transformation to flatterm *)
-          let t_pos = i.cur_term in
-          let c1 = i.cur_char in
-          CharMap.iter
-            (fun c2 subtrie ->
-               match c2 with
-                 | Variable v2 ->
-                   (* deal with the variable branche in the trie *)
-                   begin match S.FO.get_var subst (Scoped.set dt (v2:>ST.t HVar.t)) with
-                     | None ->
-                       (* not bound: try to match types + bind, then continue *)
-                       begin
-                         try
-                           let subst =
-                             Unif.Ty.matching ~subst
-                               ~pattern:(Scoped.set dt (HVar.ty v2))
-                               (Scoped.set t (T.ty t_pos))
-                           in
-                           let subst =
-                             Unif.FO.bind ~check:false subst
-                               (Scoped.set dt v2) (Scoped.set t t_pos) in
-                           traverse subtrie (skip i) subst
-                         with Unif.Fail -> () (* incompatible binding, or occur check *)
-                       end
-                     | Some t' ->
-                       (* already bound, check consistency *)
-                       if Unif.FO.equal ~subst (Scoped.set t t_pos) t'
-                       then traverse subtrie (skip i) subst
-                   end
-                 | Subterm t2 ->
-                   (* fallback to matching *)
+      | None ->  (* yield all equations, they all match *)
+        List.iter
+          (fun (_, eqn, _) ->
+             let l, r, sign' = E.extract eqn in
+             if sign = sign' then k (l, r, eqn, subst))
+          trie.leaf
+      | Some i ->
+        (* "lazy" transformation to flatterm *)
+        let t_pos = i.cur_term in
+        let c1 = i.cur_char in
+        CharMap.iter
+          (fun c2 subtrie ->
+             match c2 with
+             | Variable v2 ->
+               (* deal with the variable branche in the trie *)
+               begin match S.FO.get_var subst (Scoped.set dt (v2:>ST.t HVar.t)) with
+                 | None ->
+                   (* not bound: try to match types + bind, then continue *)
                    begin
                      try
                        let subst =
-                         Unif.FO.matching
-                           ~subst ~pattern:(Scoped.set dt t2) (Scoped.set t t_pos)
+                         Unif.Ty.matching ~subst
+                           ~pattern:(Scoped.set dt (HVar.ty v2))
+                           (Scoped.set t (T.ty t_pos))
                        in
+                       let subst =
+                         Unif.FO.bind ~check:false subst
+                           (Scoped.set dt v2) (Scoped.set t t_pos) in
                        traverse subtrie (skip i) subst
-                     with Unif.Fail -> ()
+                     with Unif.Fail -> () (* incompatible binding, or occur check *)
                    end
-                 | _ when eq_char c2 c1 ->
-                   (* explore branch that has the same symbol, if any *)
-                   assert (not (T.is_var t_pos));
-                   traverse subtrie (next i) subst;
-                 | _ -> ())
-            trie.map
+                 | Some t' ->
+                   (* already bound, check consistency *)
+                   if Unif.FO.equal ~subst (Scoped.set t t_pos) t'
+                   then traverse subtrie (skip i) subst
+               end
+             | Subterm t2 ->
+               (* fallback to matching *)
+               begin
+                 try
+                   let subst =
+                     Unif.FO.matching
+                       ~subst ~pattern:(Scoped.set dt t2) (Scoped.set t t_pos)
+                   in
+                   traverse subtrie (skip i) subst
+                 with Unif.Fail -> ()
+               end
+             | _ when eq_char c2 c1 ->
+               (* explore branch that has the same symbol, if any *)
+               assert (not (T.is_var t_pos));
+               traverse subtrie (next i) subst;
+             | _ -> ())
+          trie.map
     in
     traverse (fst dt) (iterate (fst t)) subst;
-    Util.exit_prof prof_dtree_retrieve;
+    ZProf.exit_prof prof_dtree_retrieve;
     ()
 
   (** iterate on all (term -> value) in the tree *)
@@ -283,12 +283,12 @@ module Make(E : Index.EQUATION) = struct
         ~eq:equal_
         ~tbl:(CCGraph.mk_table ~eq:equal_ ~hash:Hashtbl.hash 128)
         ~attrs_v:(fun trie ->
-          let shape = if CharMap.is_empty trie.map then "box" else "circle" in
-          let len = List.length trie.leaf in
-          [`Shape shape; `Label (string_of_int len)])
+            let shape = if CharMap.is_empty trie.map then "box" else "circle" in
+            let len = List.length trie.leaf in
+            [`Shape shape; `Label (string_of_int len)])
         ~attrs_e:(fun e ->
-          let e = CCFormat.to_string pp_char e in
-          [`Label e])
+            let e = CCFormat.to_string pp_char e in
+            [`Label e])
         ~name:"NPDtree" ~graph:_as_graph
     in
     Format.fprintf out "@[<2>%a@]@." pp t;

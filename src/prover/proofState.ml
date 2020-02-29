@@ -16,7 +16,7 @@ module Pos = Position
 module PB = Position.Build
 module CQ = ClauseQueue
 
-let prof_next_passive = Util.mk_profiler "proofState.next_passive"
+let prof_next_passive = ZProf.make "proofState.next_passive"
 
 (** {2 Set of active clauses} *)
 module type S = ProofState_intf.S
@@ -103,11 +103,11 @@ module Make(C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
 
     let remove seq =
       seq (fun c ->
-        if C.ClauseSet.mem c !clauses_
-        then (
-          clauses_ := C.ClauseSet.remove c !clauses_;
-          Signal.send on_remove_clause c
-        ));
+          if C.ClauseSet.mem c !clauses_
+          then (
+            clauses_ := C.ClauseSet.remove c !clauses_;
+            Signal.send on_remove_clause c
+          ));
       ()
   end
 
@@ -139,7 +139,7 @@ module Make(C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
         Some x
       )
 
-    let next () = Util.with_prof prof_next_passive next_ ()
+    let next () = ZProf.with_prof prof_next_passive next_ ()
 
     (* register to signal *)
     let () =

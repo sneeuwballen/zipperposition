@@ -3,6 +3,8 @@
 
 (** {1 A priority queue of streams} *)
 
+open Logtk
+
 module type S = sig
   module Stm : Stream_intf.S
 
@@ -48,8 +50,8 @@ module type S = sig
       Guarded recursion: can't loop forever
       @raises Not_found in the guard is reached *)
 
-  val take_first_anyway: t -> Stm.C.t option
-  (** Takes a clause out of the queue.
+  val take_fair_anyway: t -> Stm.C.t option list
+  (** Takes clauses from the queue in a fair manner.
       Unguarded recursion, may loop forever *)
 
   val take_stm_nb: t -> Stm.C.t option list
@@ -70,7 +72,7 @@ module type S = sig
   (** Creates a priority queue that uses [weight] to sort streams.
       @param ratio pick-given ratio. Only one in [ratio] truly returns
         a clause if there is one available in calls to {!take_first_when_available}
-        and {!take_first_anyway}.
+        and {!take_fair_anyway}.
       @param name the name of this stream queue *)
 
   val default : unit -> t

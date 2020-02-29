@@ -4,9 +4,9 @@
 
     This module is used for two things that overlap:
     - inferring the types of symbols that have not been declared (e.g. in
-    "fof" or "cnf" TPTP statements) so as to enrich a {!Signature}
+      "fof" or "cnf" TPTP statements) so as to enrich a {!Signature}
     - converting {i untyped} terms or formulas into {i typed} formulas, by inferring
-    the exact type of each subterm (and possibly inferring type parameters).
+      the exact type of each subterm (and possibly inferring type parameters).
 
     In this context, {b generalizing} type variables means that if some ID.t
     whose type was unknown and its type still contains variables after the
@@ -76,6 +76,7 @@ module Ctx : sig
         then {!type_erm} will be used)
       @param def_as_rewrite if true, definitions will be treated like rewrite rules
       @param on_undef behavior when an undefined identifier is met
+      @param is_tptp if true, interpret some constants as in TPTP
       @param on_var behavior when a variable without type annotation is met
   *)
 

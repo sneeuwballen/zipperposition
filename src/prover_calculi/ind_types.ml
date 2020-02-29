@@ -179,32 +179,32 @@ module Make(Env : Env_intf.S) = struct
   let injectivity_destruct_pos c =
     let eligible = C.Eligible.(filter Literal.is_eq) in
     match find_cstor_pair ~sign:true ~eligible c with
-      | Some (idx,s1,l1,s2,l2) when ID.equal s1 s2 ->
-        (* same constructor: simplify *)
-        assert (List.length l1 = List.length l2);
-        let other_lits = CCArray.except_idx (C.lits c) idx in
-        let new_lits =
-          List.combine l1 l2
-          |> CCList.filter_map
-            (fun (t1,t2) ->
-               if T.equal t1 t2 then None else Some (Literal.mk_eq t1 t2))
-        in
-        let rule = Proof.Rule.mk "injectivity_destruct+" in
-        let proof = Proof.Step.inference ~tags:[Proof.Tag.T_data] ~rule [C.proof_parent c] in
-        (* make one clause per [new_lits] *)
-        let clauses =
-          List.map
-            (fun lit ->
-               C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
-                 (lit :: other_lits) proof)
-            new_lits
-        in
-        Util.incr_stat stat_injectivity;
-        Util.debugf ~section 3 "@[<hv2>injectivity:@ simplify @[%a@]@ into @[<v>%a@]@]"
-          (fun k->k C.pp c (CCFormat.list C.pp) clauses);
-        Some clauses
-      | Some _
-      | None -> None
+    | Some (idx,s1,l1,s2,l2) when ID.equal s1 s2 ->
+      (* same constructor: simplify *)
+      assert (List.length l1 = List.length l2);
+      let other_lits = CCArray.except_idx (C.lits c) idx in
+      let new_lits =
+        List.combine l1 l2
+        |> CCList.filter_map
+          (fun (t1,t2) ->
+             if T.equal t1 t2 then None else Some (Literal.mk_eq t1 t2))
+      in
+      let rule = Proof.Rule.mk "injectivity_destruct+" in
+      let proof = Proof.Step.inference ~tags:[Proof.Tag.T_data] ~rule [C.proof_parent c] in
+      (* make one clause per [new_lits] *)
+      let clauses =
+        List.map
+          (fun lit ->
+             C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
+               (lit :: other_lits) proof)
+          new_lits
+      in
+      Util.incr_stat stat_injectivity;
+      Util.debugf ~section 3 "@[<hv2>injectivity:@ simplify @[%a@]@ into @[<v>%a@]@]"
+        (fun k->k C.pp c (CCFormat.list C.pp) clauses);
+      Some clauses
+    | Some _
+    | None -> None
 
   (* rule on literals that are trivial or absurd depending on toplevel
      constructor *)
@@ -360,20 +360,20 @@ let env_act (module E : Env_intf.S) =
 let extension =
   let open Extensions in
   { default with
-      name="ind_types";
-      env_actions=[env_act]
+    name="ind_types";
+    env_actions=[env_act]
   }
 
 let () =
   Params.add_to_mode "ho-complete-basic" (fun () ->
-    enabled_ := false
-  );
+      enabled_ := false
+    );
   Params.add_to_mode "ho-pragmatic" (fun () ->
-    enabled_ := false
-  );
+      enabled_ := false
+    );
   Params.add_to_mode "ho-competitive" (fun () ->
-    enabled_ := false
-  );
+      enabled_ := false
+    );
   Params.add_to_mode "fo-complete-basic" (fun () ->
-    enabled_ := false
-  );
+      enabled_ := false
+    );

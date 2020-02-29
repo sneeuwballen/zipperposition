@@ -170,6 +170,9 @@ val head_term : t -> t
 val head_term_mono : t -> t
 (** head term, but still with type arguments *)
 
+val as_app_mono : t -> (t * (t list))
+(** head term, but still with type arguments and the remaining arguments *)
+
 val args : t -> t list
 (** [args t = snd (as_app t)] *)
 
@@ -192,7 +195,7 @@ module VarTbl : CCHashtbl.S with type key = var
 
 module Seq : sig
   val vars : t -> var Iter.t
-  val subterms : ?include_builtin:bool -> ?ignore_head:bool -> t -> t Iter.t
+  val subterms : ?include_builtin:bool -> ?include_app_vars:bool -> ?ignore_head:bool -> t -> t Iter.t
   val subterms_depth : ?filter_term:(t -> bool) -> t -> (t * int) Iter.t  (* subterms with their depth *)
   val symbols : ?include_types:bool -> ?filter_term:(t -> bool) -> t -> ID.t Iter.t
   val max_var : var Iter.t -> int (** max var *)
@@ -248,7 +251,7 @@ val weight : ?var:int -> ?sym:(ID.t -> int) -> t -> int
     @param var unique weight for every variable (default 1)
     @param sym function from ID.ts to their weight (default [const 1])
     @since 0.5.3 *)
-  
+
 val ho_weight : t -> int 
 
 val ty_vars : t -> Type.VarSet.t

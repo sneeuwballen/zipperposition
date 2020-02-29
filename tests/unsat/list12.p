@@ -1,1 +1,0 @@
-../../examples/ind/list12.p

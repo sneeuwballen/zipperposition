@@ -8,9 +8,9 @@ module Fmt = CCFormat
 
 let section = Util.Section.make "rewrite"
 let stat_term_rw = Util.mk_stat "rw.steps_term"
-let prof_term_rw = Util.mk_profiler "rw.term"
+let prof_term_rw = ZProf.make "rw.term"
 let stat_lit_rw = Util.mk_stat "rw.steps_lit"
-let prof_lit_rw = Util.mk_profiler "rw.lit"
+let prof_lit_rw = ZProf.make "rw.lit"
 
 (* do we rewrite literals of the form [t = u]? *)
 let allow_pos_eqn_rewrite_ = ref false
@@ -36,7 +36,7 @@ type lit_rule = {
 
 let compare_tr r1 r2 =
   CCOrd.(T.compare r1.term_lhs r2.term_lhs
-    <?> (T.compare, r1.term_rhs, r2.term_rhs))
+         <?> (T.compare, r1.term_rhs, r2.term_rhs))
 
 let compare_lr r1 r2 =
   let open CCOrd.Infix in
@@ -104,8 +104,8 @@ exception Payload_defined_cst of defined_cst
 let as_defined_cst id =
   ID.payload_find id
     ~f:(function
-      | Payload_defined_cst c -> Some c
-      | _ -> None)
+        | Payload_defined_cst c -> Some c
+        | _ -> None)
 
 let is_defined_cst id = CCOpt.is_some (as_defined_cst id)
 
@@ -211,7 +211,7 @@ module Term = struct
 
     let make_ head args term_lhs term_rhs proof =
       let term_proof =
-        Proof.Step.define head (Proof.Src.internal[]) [Proof.Parent.from proof]
+        Proof.Step.define head (Proof.Src.internal []) [Proof.Parent.from proof]
       in
       { term_head=head; term_args=args; term_arity=List.length args;
         term_lhs; term_rhs; term_proof }
@@ -230,7 +230,7 @@ module Term = struct
     (* [id args := rhs] *)
     let make ~proof id ty args rhs : t =
       Util.debugf ~section 1 "Making rule for %a"
-         (fun k -> k ID.pp id);
+        (fun k -> k ID.pp id);
       let lhs = T.app (T.const ~ty id) args in
       if not (T.VarSet.subset (T.vars rhs) (T.vars lhs)) then (
         Util.invalid_argf
@@ -238,6 +238,10 @@ module Term = struct
           ID.pp id T.pp rhs
       );
       make_ id args lhs rhs proof
+
+    let make_rewritten ~proof ~rewrite_fun id ty args rhs : t =
+      let proof, rhs = rewrite_fun rhs in
+      make ~proof id ty args rhs
 
     let pp out r = pp_term_rule out r
 
@@ -304,8 +308,8 @@ module Term = struct
        @param k the continuation
        @return [t'] where [t'] is the normal form of [t] *)
     let rec reduce t k = 
-    let t = Lambda.snf t in
-    match T.view t with
+      let t = Lambda.snf t in
+      match T.view t with
       | _ when !fuel = 0 -> k t
       | T.Const id ->
         (* pick a constant rule *)
@@ -331,14 +335,14 @@ module Term = struct
         (* assert(l != 0) *)
         reduce_l l
           (fun l' ->
-            let t' = if T.same_l l l' then t else T.app f l' in
-            let n_l = List.length l' in
-            begin match T.view f with
-              | T.Const id ->
-                let find_rule =
-                  rules_of_id id
-                  |> Iter.find_map
-                    (fun r ->
+             let t' = if T.same_l l l' then t else T.app f l' in
+             let n_l = List.length l' in
+             begin match T.view f with
+               | T.Const id ->
+                 let find_rule =
+                   rules_of_id id
+                   |> Iter.find_map
+                     (fun r ->
                         try
                           let n_r = Rule.arity r in
                           let t', l_rest =
@@ -356,44 +360,45 @@ module Term = struct
                           let cur_sc_r = sc_r in
                           Some (r, subst', cur_sc_r, l_rest)
                         with Unif.Fail | Exit ->  None)
-                in
-                begin match find_rule with
-                  | None -> k t'
-                  | Some (r, subst, sc_r, l_rest) ->
-                    (* rewrite [t = r.lhs\sigma] into [rhs] (and normalize [rhs],
-                        which contain variables bound by [subst]) *)
-                    Util.debugf ~section 5
-                      "(@[<2>rewrite `@[%a@]`@ :using `@[%a@]`@ \
+                 in
+                 begin match find_rule with
+                   | None -> k t'
+                   | Some (r, subst, sc_r, l_rest) ->
+                     (* rewrite [t = r.lhs\sigma] into [rhs] (and normalize [rhs],
+                         which contain variables bound by [subst]) *)
+                     Util.debugf ~section 5
+                       "(@[<2>rewrite `@[%a@]`@ :using `@[%a@]`@ \
                         :with `@[%a@]`[%d]@ :rest [@[%a@]]@])"
-                      (fun k->k T.pp t' Rule.pp r Subst.pp subst sc_r
-                          (Util.pp_list ~sep:"," T.pp) l_rest);
-                    set := Rule_inst_set.add (r,subst,sc_r) !set;
-                    Util.incr_stat stat_term_rw;
-                    decr fuel;
-                    (* NOTE: not efficient, will traverse [t'] fully *)
-                    let rhs = Subst.FO.apply Subst.Renaming.none subst (r.term_rhs,sc_r) in
-                    (* add leftover arguments *)
-                    let rhs = T.app rhs l_rest in
-                    reduce rhs k
-                end
-              | _ -> k t'
-            end)
+                       (fun k->k T.pp t' Rule.pp r Subst.pp subst sc_r
+                           (Util.pp_list ~sep:"," T.pp) l_rest);
+                     set := Rule_inst_set.add (r,subst,sc_r) !set;
+                     Util.incr_stat stat_term_rw;
+                     decr fuel;
+                     (* NOTE: not efficient, will traverse [t'] fully *)
+                     let rhs = Subst.FO.apply Subst.Renaming.none subst (r.term_rhs,sc_r) in
+                     (* add leftover arguments *)
+                     let rhs = T.app rhs l_rest in
+                     reduce rhs k
+                 end
+               | _ -> k t'
+             end)
       | T.Fun (arg, body) ->
         (* term rewrite rules, because [vars(rhs)⊆vars(lhs)], map
-          closed terms to closed terms, so we can safely rewrite under λ *)
+           closed terms to closed terms, so we can safely rewrite under λ *)
         reduce body
           (fun body' ->
-            let t =
-              if T.equal body body' then t else (T.fun_ arg body')
-            in k t)
+             assert (Type.equal (T.ty body) (T.ty body'));
+             let t =
+               if T.equal body body' then t else (T.fun_ arg body')
+             in k t)
       | T.Var _
       | T.DB _ -> k t
       | T.AppBuiltin (_,[]) -> k t
       | T.AppBuiltin (b,l) ->
         reduce_l l
           (fun l' ->
-            let t' = if T.same_l l l' then t else T.app_builtin ~ty:(T.ty t) b l' in
-            k t')
+             let t' = if T.same_l l l' then t else T.app_builtin ~ty:(T.ty t) b l' in
+             k t')
 
     (* reduce list *)
     and reduce_l (l:_ list) k = match l with
@@ -405,12 +410,13 @@ module Term = struct
     in
     reduce t0 (fun t -> t, !set)
 
-  let normalize_term ?(max_steps=1000) (t:term): term * Rule_inst_set.t =
-    Util.with_prof prof_term_rw (normalize_term_ max_steps) t
+  let normalize_term ?(max_steps=3) (t:term): term * Rule_inst_set.t =
+    ZProf.with_prof prof_term_rw (normalize_term_ max_steps) t
 
   let normalize_term_fst ?max_steps t = fst (normalize_term ?max_steps t)
 
   let narrow_term ?(subst=Unif_subst.empty) ~scope_rules:sc_r (t,sc_t): _ Iter.t =
+    let t = Lambda.snf t in
     begin match T.view t with
       | T.Const _ -> Iter.empty (* already normal form *)
       | T.App (f, _) ->
@@ -611,7 +617,7 @@ module Lit = struct
     end
 
   let normalize_clause lits =
-    Util.with_prof prof_lit_rw normalize_clause_ lits
+    ZProf.with_prof prof_lit_rw normalize_clause_ lits
 
   let narrow_lit ?(subst=Unif_subst.empty) ~scope_rules:sc_r (lit,sc_lit) =
     rules_of_lit lit
@@ -642,7 +648,7 @@ let pseudo_rule_of_rule (r:rule): pseudo_rule = match r with
     in
     let view_lit id (lit:Literal.t) = match lit with
       | Equation (lhs, rhs, true) when T.equal rhs T.true_ || T.equal rhs T.false_ ->
-          view_atom id lhs
+        view_atom id lhs
       | _ -> None
     in
     let fail() =
@@ -898,7 +904,7 @@ module Defined_cst = struct
       Type.apply c_ty (List.map Type.var ty_vars)
       |> Type.open_poly_fun
     in
-    let x = HVar.make ~ty:ty_x 0 in
+    let x = HVar.make ~ty:ty_x n_ty_vars in
     let args =
       List.map
         (fun proj ->
@@ -921,7 +927,7 @@ module Defined_cst = struct
           let rule = mk_rule_cstor_ c proof in
           Util.debugf ~section 3 "(@[declare-cstor %a@ :rule %a@])"
             (fun k->k ID.pp c_id Rule.pp rule);
-          ignore (declare ?level:None c_id (Rule_set.singleton rule))
+          ignore (declare ?level:None c_id (Rule_set.singleton rule) : t)
       end
     )
 end

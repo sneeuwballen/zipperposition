@@ -43,3 +43,4 @@ benchs
 zipperposition.exe
 diffs
 out
+tests/testCombinators.ml

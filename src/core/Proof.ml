@@ -255,7 +255,6 @@ module Kind = struct
       | Define _ -> Format.fprintf out "define([status(thm)])"
     end
 end
-
 module Result = struct
   type t = result
   type 'a tc = 'a result_tc
@@ -339,7 +338,7 @@ module Result = struct
   let form_tc : form result_tc =
     make_tc
       ~of_exn:(function
-        | E_form f -> Some f | _ -> None)
+          | E_form f -> Some f | _ -> None)
       ~to_exn:(fun f -> E_form f)
       ~to_form:(fun ~ctx:_ t -> t)
       ~compare:T.compare
@@ -428,14 +427,14 @@ module Step = struct
         let parents = List.map (fun par -> aux ((Parent.proof par).step)) p.parents in
         CCOpt.get_or ~default:0 (Iter.max (Iter.of_list parents)) + 1 
       | _ -> 0 in
-  aux p
+    aux p
 
   let rec has_ho_step p = match p.kind with
-  | Simplification(_,tags)
-  | Inference(_,tags) -> 
+    | Simplification(_,tags)
+    | Inference(_,tags) -> 
       List.mem Tag.T_ho tags ||
       List.exists has_ho_step (List.map (fun par -> (Parent.proof par).step) p.parents)
-  | _ -> false
+    | _ -> false
 
 
   let step_ ?(infos=[]) kind parents =
@@ -450,8 +449,8 @@ module Step = struct
           | p::l -> List.fold_left combine_dist (Parent.proof p).step.dist_to_goal l
         in
         match kind with
-          | Inference _ -> CCOpt.map succ d
-          | _ -> d
+        | Inference _ -> CCOpt.map succ d
+        | _ -> d
     in
     { id=get_id_(); kind; parents; dist_to_goal; infos; }
 
@@ -615,16 +614,16 @@ module S = struct
     while !current <> [] do
       (* exhaust the current layer of proofs to explore *)
       List.iter (fun proof ->
-        if Tbl.mem traversed proof then ()
-        else (
-          Tbl.add traversed proof ();
-          (* traverse premises first *)
-          List.iter
-            (fun proof' -> next := Parent.proof proof' :: !next)
-            (Step.parents @@ step proof);
-          (* yield proof *)
-          k proof
-        ))
+          if Tbl.mem traversed proof then ()
+          else (
+            Tbl.add traversed proof ();
+            (* traverse premises first *)
+            List.iter
+              (fun proof' -> next := Parent.proof proof' :: !next)
+              (Step.parents @@ step proof);
+            (* yield proof *)
+            k proof
+          ))
         !current;
       (* explore next layer *)
       current := !next;
@@ -648,8 +647,8 @@ module S = struct
 
   let traverse ?(traversed=Tbl.create 16) ~order proof k =
     match order with
-      | `BFS -> traverse_bfs ~traversed proof k
-      | `DFS -> traverse_dfs ~traversed proof k
+    | `BFS -> traverse_bfs ~traversed proof k
+    | `DFS -> traverse_dfs ~traversed proof k
 
   let pp_normal out proof =
     let sep = "by" in
@@ -754,33 +753,33 @@ module S = struct
       ~name
       ~graph:as_graph
       ~attrs_v:(fun p ->
-        let label = _to_str_escape "@[<2>%a@]@." pp_result_of p in
-        let attrs = [`Label label; `Style "filled"] in
-        let shape = `Shape "box" in
-        if is_proof_of_false p then [`Color "red"; `Label "[]"; `Shape "box"; `Style "filled"]
-        else if is_pure_bool p then `Color "cyan3" :: shape :: attrs
-        else if has_absurd_lits p then `Color "orange" :: shape :: attrs
-        else if is_def p then `Color "navajowhite" :: shape :: attrs
-        else if Step.is_goal @@ step p then `Color "green" :: shape :: attrs
-        else if Step.is_trivial @@ step p then `Color "cyan" :: shape :: attrs
-        else if Step.is_by_def @@ step p then `Color "navajowhite" :: shape :: attrs
-        else if Step.is_assert_like @@ step p then `Color "yellow" :: shape :: attrs
-        else shape :: attrs
-      )
+          let label = _to_str_escape "@[<2>%a@]@." pp_result_of p in
+          let attrs = [`Label label; `Style "filled"] in
+          let shape = `Shape "box" in
+          if is_proof_of_false p then [`Color "red"; `Label "[]"; `Shape "box"; `Style "filled"]
+          else if is_pure_bool p then `Color "cyan3" :: shape :: attrs
+          else if has_absurd_lits p then `Color "orange" :: shape :: attrs
+          else if is_def p then `Color "navajowhite" :: shape :: attrs
+          else if Step.is_goal @@ step p then `Color "green" :: shape :: attrs
+          else if Step.is_trivial @@ step p then `Color "cyan" :: shape :: attrs
+          else if Step.is_by_def @@ step p then `Color "navajowhite" :: shape :: attrs
+          else if Step.is_assert_like @@ step p then `Color "yellow" :: shape :: attrs
+          else shape :: attrs
+        )
       ~attrs_e:(fun (r,s,infos) ->
-        let pp_subst out s =
-          if not (Subst.is_empty @@ Subst.Projection.subst s) then (
-            Format.fprintf out "@,%a" Subst.Projection.pp s
-          )
-        in
-        let label =
-          if s=None && infos=[] then Rule.name r
-          else (
-            _to_str_escape "@[<v>%s%a%a@]@."
-              (Rule.name r) (CCFormat.some pp_subst) s Step.pp_infos infos
-          )
-        in
-        [`Label label; `Other ("dir", "back")])
+          let pp_subst out s =
+            if not (Subst.is_empty @@ Subst.Projection.subst s) then (
+              Format.fprintf out "@,%a" Subst.Projection.pp s
+            )
+          in
+          let label =
+            if s=None && infos=[] then Rule.name r
+            else (
+              _to_str_escape "@[<v>%s%a%a@]@."
+                (Rule.name r) (CCFormat.some pp_subst) s Step.pp_infos infos
+            )
+          in
+          [`Label label; `Other ("dir", "back")])
       out
       seq;
     Format.pp_print_newline out ();

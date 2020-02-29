@@ -12,7 +12,7 @@ open AC_intf
 
 let section = Util.Section.make "AC"
 
-let prof_simplify = Util.mk_profiler "AC.simplify"
+let prof_simplify = ZProf.make "AC.simplify"
 
 let stat_ac_simplify = Util.mk_stat "AC.simplify"
 let stat_ac_redundant = Util.mk_stat "AC.redundant"
@@ -121,8 +121,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     &&
     (
       match lit with
-        | Lit.Equation (l, r, true) -> has_ac_ids_ l r && A.equal l r
-        | _ -> false
+      | Lit.Equation (l, r, true) -> has_ac_ids_ l r && A.equal l r
+      | _ -> false
     )
 
   let is_trivial c =
@@ -139,7 +139,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   (* simplify: remove literals that are redundant modulo AC *)
   let simplify c =
-    Util.enter_prof prof_simplify;
+    ZProf.enter_prof prof_simplify;
     if exists_ac ()
     then (
       let n = Array.length (C.lits c) in
@@ -161,21 +161,21 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         let tags = List.map (fun id -> Builtin.Tag.T_ac id) symbols in
         let premises =
           C.proof_parent c ::
-            List.map (fun id -> (ID.Tbl.find tbl id).proof) symbols
+          List.map (fun id -> (ID.Tbl.find tbl id).proof) symbols
         in
         let proof =
           Proof.Step.simp premises
             ~rule:(Proof.Rule.mk "AC.normalize") ~tags
         in
         let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) lits proof in
-        Util.exit_prof prof_simplify;
+        ZProf.exit_prof prof_simplify;
         Util.incr_stat stat_ac_simplify;
         Util.debugf ~section 3 "@[<2>@[%a@]@ AC-simplify into @[%a@]@]"
           (fun k->k C.pp c C.pp new_c);
         SimplM.return_new new_c
       ) else (
         (* no simplification *)
-        Util.exit_prof prof_simplify;
+        ZProf.exit_prof prof_simplify;
         SimplM.return_same c
       )
     ) else SimplM.return_same c

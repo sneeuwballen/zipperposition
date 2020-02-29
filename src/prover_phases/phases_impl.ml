@@ -21,8 +21,12 @@ let _db_w = ref 1
 let _lmb_w = ref 1
 let _kbo_wf = ref "invfreqrank"
 let _lift_lambdas = ref false
+let _sine_d_min = ref 1
+let _sine_d_max = ref 5
+let _sine_tolerance = ref 1.5
+let _sine_threshold = ref (-1)
 
-(* setup an alarm for abrupt stop *)
+(** setup an alarm for abrupt stop *)
 let setup_alarm timeout =
   let handler _ =
     Format.printf "%% SZS status ResourceOut@.";
@@ -61,6 +65,8 @@ let load_extensions =
   Extensions.register Combinators.extension;
 
   Extensions.register App_encode.extension;
+  Extensions.register Bool_encode.extension;
+
   let l = Extensions.extensions () in
   Phases.return_phase l
 
@@ -70,8 +76,8 @@ let do_extensions ~x ~field =
   Extensions.extensions ()
   |> Phases.fold_l ~x:()
     ~f:(fun () e ->
-      Phases.fold_l (field e) ~x:()
-        ~f:(fun () f -> Phases.update ~f:(f x)))
+        Phases.fold_l (field e) ~x:()
+          ~f:(fun () f -> Phases.update ~f:(f x)))
 
 let apply_modifiers ~field o =
   Extensions.extensions ()
@@ -113,6 +119,28 @@ let parse_file file =
     ~x:parsed >>= fun () ->
   Phases.return_phase (input,parsed)
 
+let has_real stmt : bool =
+  let module TS = TypedSTerm in
+  let is_real ty = TS.equal ty TS.Ty.real in
+  begin
+    CCVector.to_seq stmt
+    |> Iter.flat_map Statement.Seq.to_seq
+    |> Iter.flat_map
+      (function
+        | `Ty ty -> Iter.return ty
+        | `Term t | `Form t -> TS.Seq.subterms t |> Iter.filter_map TS.ty
+        | `ID _ -> Iter.empty)
+    |> Iter.exists is_real
+  end
+let sine_filter stmts = 
+  if (!_sine_threshold < 0 || CCVector.length stmts < !_sine_threshold) then (stmts)
+  else (
+    let seq = CCVector.to_seq stmts in
+    let filtered = 
+      Statement.sine_axiom_selector ~depth_start:!_sine_d_min 
+      ~depth_end:!_sine_d_max ~tolerance:!_sine_tolerance seq in
+    CCVector.freeze (CCVector.of_seq filtered))
+
 let typing ~file prelude (input,stmts) =
   Phases.start_phase Phases.Typing >>= fun () ->
   Phases.get_key Params.key >>= fun params ->
@@ -125,8 +153,15 @@ let typing ~file prelude (input,stmts) =
     ~def_as_rewrite ?ctx:None ~file
     (Iter.append prelude stmts)
   >>?= fun stmts ->
+  let stmts = sine_filter stmts in
   Util.debugf ~section 3 "@[<hv2>@{<green>typed statements@}@ %a@]"
     (fun k->k (Util.pp_seq Statement.pp_input) (CCVector.to_seq stmts));
+  begin
+    if has_real stmts then (
+      Util.debug ~section 1 "problem contains $real, lost completeness";
+      Phases.set_key Ctx.Key.lost_completeness true
+    ) else Phases.return ()
+  end >>= fun () ->
   do_extensions ~field:(fun e -> e.Extensions.post_typing_actions)
     ~x:stmts >>= fun () ->
   Phases.return_phase stmts
@@ -162,13 +197,13 @@ let compute_prec ~signature stmts =
     (* add constraint about inductive constructors, etc. *)
     |> Compute_prec.add_constr 10 Classify_cst.prec_constr
     |> Compute_prec.set_weight_rule (
-       fun stmts -> 
+      fun stmts -> 
         let sym_depth = 
           stmts 
           |> Iter.flat_map Statement.Seq.terms 
           |> Iter.flat_map (fun t -> Term.Seq.subterms_depth t
                                      |> Iter.filter_map (fun (st,d) -> 
-                                        CCOpt.map (fun id -> (id,d)) (Term.head st)))  in
+                                         CCOpt.map (fun id -> (id,d)) (Term.head st)))  in
         Precedence.weight_fun_of_string ~signature !_kbo_wf sym_depth)
     (* |> Compute_prec.set_weight_rule (fun _ -> Classify_cst.weight_fun) *)
 
@@ -186,7 +221,7 @@ let compute_prec ~signature stmts =
 let compute_ord_select precedence =
   Phases.start_phase Phases.Compute_ord_select >>= fun () ->
   Phases.get_key Params.key >>= fun params ->
-  let ord = Ordering.by_name params.Params.ord precedence in
+  let ord = Ordering.by_name !(params.Params.ord) precedence in
   Util.debugf ~section 2 "@[<2>ordering %s@]" (fun k->k (Ordering.name ord));
   let select = Selection.from_string ~ord params.Params.select in
   do_extensions ~field:(fun e->e.Extensions.ord_select_actions)
@@ -194,13 +229,12 @@ let compute_ord_select precedence =
   Util.debugf ~section 2 "@[<2>selection function:@ %s@]" (fun k->k params.Params.select);
   Phases.return_phase (ord, select)
 
-let make_ctx ~signature ~ord ~select ~eta ~sk_ctx () =
+let make_ctx ~signature ~ord ~select ~sk_ctx () =
   Phases.start_phase Phases.MakeCtx >>= fun () ->
   let module Res = struct
     let signature = signature
     let ord = ord
     let select = select
-    let eta = eta
     let sk_ctx = sk_ctx
   end in
   let module MyCtx = Ctx.Make(Res) in
@@ -433,14 +467,14 @@ let parse_cli =
   Phases.return_phase (files, params)
 
 let syms_in_conj decls =
-   let open Iter in
-    decls 
-    |> CCVector.to_seq
-    |> flat_map (fun st -> 
-        let pr = Statement.proof_step st in
-        if CCOpt.is_some (Proof.Step.distance_to_goal pr) then (
-          Statement.Seq.symbols st
-        ) else empty)
+  let open Iter in
+  decls 
+  |> CCVector.to_seq
+  |> flat_map (fun st -> 
+      let pr = Statement.proof_step st in
+      if CCOpt.is_some (Proof.Step.distance_to_goal pr) then (
+        Statement.Seq.symbols st
+      ) else empty)
 
 (* Process the given file (try to solve it) *)
 let process_file ?(prelude=Iter.empty) file =
@@ -452,13 +486,7 @@ let process_file ?(prelude=Iter.empty) file =
   let has_goal = has_goal_decls_ decls in
   Util.debugf ~section 1 "parsed %d declarations (%s goal(s))"
     (fun k->k (CCVector.length decls) (if has_goal then "some" else "no"));
-  (* Hooks exist but they can't be used to add statements. 
-     Hence naming quantifiers inside terms is done directly here. 
-     Without this Type.Conv.Error occures so the naming is done unconditionally. *)
-  let quant_transformer = 
-    if !Booleans._quant_rename then Booleans.preprocess_booleans 
-    else CCFun.id in
-  let transformed = Rewriting.unfold_def_before_cnf (quant_transformer decls) in
+  let transformed = Booleans.preprocess_booleans(Rewriting.unfold_def_before_cnf decls) in
   let sk_ctx = Skolem.create () in 
   cnf ~sk_ctx transformed >>= fun stmts ->
   let stmts = Booleans.preprocess_cnf_booleans stmts in
@@ -470,9 +498,8 @@ let process_file ?(prelude=Iter.empty) file =
   compute_ord_select precedence >>= fun (ord, select) ->
   (* HO *)
   Phases.get_key Params.key >>= fun params ->
-  let eta = params.Params.eta in
   (* build the context and env *)
-  make_ctx ~signature ~ord ~select ~eta ~sk_ctx () >>= fun ctx ->
+  make_ctx ~signature ~ord ~select ~sk_ctx () >>= fun ctx ->
   make_env ~params ~ctx stmts >>= fun (Phases.Env_clauses (env,clauses)) ->
   (* main workload *)
   has_goal_ := has_goal; (* FIXME: should be computed at Env initialization *)
@@ -580,31 +607,36 @@ let main ?setup_gc:(gc=true) ?params file =
 let () = 
   let open Libzipperposition in
   Params.add_opts [
-    "--de-bruijn-weight"
-    , Arg.Set_int _db_w
-    , " Set weight of de Bruijn index for KBO";
-    "--lift-lambdas"
-    , Arg.Bool (fun v -> _lift_lambdas := v)
-    , " Turn lambda lifting on or off.";
-    "--lambda-weight"
-    , Arg.Set_int _lmb_w
-    , " Set weight of lambda symbol for KBO";
-    "--kbo-weight-fun"
-    , Arg.Set_string _kbo_wf
-    , " Set the function for symbol weight calculation.";
+    "--de-bruijn-weight", Arg.Set_int _db_w, 
+    " Set weight of de Bruijn index for KBO";
+    "--lift-lambdas", Arg.Bool (fun v -> _lift_lambdas := v),
+    " Turn lambda lifting on or off.";
+    "--lambda-weight", Arg.Set_int _lmb_w,
+    " Set weight of lambda symbol for KBO";
+    "--kbo-weight-fun", Arg.Set_string _kbo_wf,
+    " Set the function for symbol weight calculation.";
+    "--sine-depth-min", Arg.Int (fun v ->  _sine_threshold:=100; _sine_d_min := v),
+    " Turn on SinE with threshold and set min SinE depth.";
+    "--sine-depth-max", Arg.Int (fun v ->  _sine_threshold:=100; _sine_d_max := v),
+    " Turn on SinE with threshold and set max SinE depth.";
+    "--sine-tolerance", Arg.Float (fun v ->  _sine_threshold:=100; _sine_tolerance := v),
+    " Turn on SinE with threshold of 100 and set SinE symbol tolerance.";
+    "--sine", Arg.Set_int _sine_threshold,
+    " Set SinE axiom number threshold (negative number turns it off)" ^
+    " with default settings: depth in range 1-5 and tolerance 1.5"
   ];
 
-   Params.add_to_mode "ho-pragmatic" (fun () ->
+  Params.add_to_mode "ho-pragmatic" (fun () ->
       _lmb_w := 20;
       _db_w  := 10;
-   );
-   
-   Params.add_to_mode "ho-complete-basic" (fun () ->
-      _lmb_w := 20;
-      _db_w  := 10;
-   );
+    );
 
-   Params.add_to_mode "ho-competitive" (fun () ->
+  Params.add_to_mode "ho-complete-basic" (fun () ->
       _lmb_w := 20;
       _db_w  := 10;
-   );
+    );
+
+  Params.add_to_mode "ho-competitive" (fun () ->
+      _lmb_w := 20;
+      _db_w  := 10;
+    );

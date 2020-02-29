@@ -25,7 +25,7 @@ type t = private InnerTerm.t
 
 type ty = t
 
-type builtin = TType | Prop | Term | Rat | Int
+type builtin = TType | Prop | Term | Rat | Int | Real
 
 val pp_builtin : builtin CCFormat.printer
 val builtin_conv : builtin -> Builtin.t
@@ -66,6 +66,7 @@ val prop : t
 val term : t
 val int : t
 val rat : t
+val real : t
 
 val var : t HVar.t -> t
 
@@ -180,6 +181,8 @@ val order : t -> int
     [order (a->b) = 1]
     [order ((a->b)->c) = 2]
     [order (((a->b)->c)->d) = 2] *)
+
+val contains_prop : t -> bool
 
 val is_ground : t -> bool
 (** Is the type ground? (means that no {!Var} not {!BVar} occurs in it) *)

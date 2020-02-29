@@ -15,9 +15,9 @@ type 'a printer = Format.formatter -> 'a -> unit
 let section = Util.Section.make ~parent:Const.section "avatar"
 (** {2 Avatar} *)
 
-let prof_splits = Util.mk_profiler "avatar.split"
-let prof_check = Util.mk_profiler "avatar.check"
-let prof_simp_trail = Util.mk_profiler "avatar.simp_trail"
+let prof_splits = ZProf.make "avatar.split"
+let prof_check = ZProf.make "avatar.check"
+let prof_simp_trail = ZProf.make "avatar.simp_trail"
 
 let stat_splits = Util.mk_stat "avatar.splits"
 let stat_trail_trivial = Util.mk_stat "avatar.trivial_trail"
@@ -33,6 +33,12 @@ let k_avatar : (module S) Flex_state.key = Flex_state.create_key ()
 let k_show_lemmas : bool Flex_state.key = Flex_state.create_key()
 let k_simplify_trail : bool Flex_state.key = Flex_state.create_key()
 let k_back_simplify_trail : bool Flex_state.key = Flex_state.create_key()
+let k_abstract_known_singletons : bool Flex_state.key = Flex_state.create_key()
+let k_split_only_initial : bool Flex_state.key = Flex_state.create_key()
+let k_split_only_goals : bool Flex_state.key = Flex_state.create_key()
+let k_max_trail_size : int Flex_state.key = Flex_state.create_key()
+let k_infer_from_components : bool Flex_state.key = Flex_state.create_key()
+
 
 module Make(E : Env.S)(Sat : Sat_solver.S)
 = struct
@@ -89,16 +95,35 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     Lit.Set.iter (fun lit -> components := [lit] :: !components) !cluster_ground;
     UF.iter uf_vars (fun _ comp -> components := Lit.Set.to_list comp :: !components);
 
+    let proof =
+      Proof.Step.esa
+        [Proof.Parent.from @@ C.proof c] in
+    let bool_guard =
+      C.trail c
+      |> Trail.to_list
+      |> List.map Trail.Lit.neg in
+
     begin match !components with
       | [] -> assert (Array.length lits=0); None
-      | [_] -> None
+      | [lits] ->
+        if E.flex_get k_abstract_known_singletons then (
+          let lits = Array.of_list lits in
+          let bool_name = BBox.find_boolean_lit lits in
+          CCOpt.iter (fun bool_lit -> 
+              (* asserting Trail -> bool_name *)
+              if List.for_all (fun bg -> 
+                  BBox.Lit.equal (BBox.Lit.neg bg) bool_lit)
+                  bool_guard then (
+                (* ignoring tautoligies *)
+                Sat.add_clause ~proof:(proof ~rule:(Proof.Rule.mk "recognize_known")) 
+                  (bool_lit :: bool_guard));
+            ) bool_name
+        );
+        None
       | _::_ ->
         (* do a simplification! *)
         Util.incr_stat stat_splits;
-        let proof =
-          Proof.Step.esa ~rule:(Proof.Rule.mk "split")
-            [Proof.Parent.from @@ C.proof c]
-        in
+
         (* elements of the trail to keep *)
         let keep_trail =
           C.trail c |> Trail.filter BBox.must_be_kept
@@ -112,22 +137,18 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
                  (fun k->k Literals.pp lits BBox.pp bool_name);
                (* new trail: add the new one *)
                let trail = Trail.add bool_name keep_trail in
-               let c = C.create_a ~trail ~penalty:(C.penalty c) lits proof in
+               let c = C.create_a ~trail ~penalty:(C.penalty c) lits (proof ~rule:(Proof.Rule.mk "split")) in
                c, bool_name)
             !components
         in
         let clauses, bool_clause = List.split clauses_and_names in
-        Util.debugf ~section 4 "@[split of @[%a@]@ yields @[%a@]@]"
+        Util.debugf ~section 1 "@[split of @[%a@]@ yields @[%a@]@]"
           (fun k->k C.pp c (Util.pp_list C.pp) clauses);
         (* add boolean constraint: trail(c) => bigor_{name in clauses} name *)
-        let bool_guard =
-          C.trail c
-          |> Trail.to_list
-          |> List.map Trail.Lit.neg
-        in
+
         let bool_clause = List.append bool_clause bool_guard in
-        Sat.add_clause ~proof bool_clause;
-        Util.debugf ~section 4 "@[constraint clause is @[%a@]@]"
+        Sat.add_clause ~proof:(proof ~rule:(Proof.Rule.mk "split")) bool_clause;
+        Util.debugf ~section 1 "@[constraint clause is @[%a@]@]"
           (fun k->k BBox.pp_bclause bool_clause);
         (* return the clauses *)
         Some clauses
@@ -135,13 +156,22 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
 
   (* Avatar splitting *)
   let split c =
-    Util.enter_prof prof_splits;
-    let res =
-      if Array.length (C.lits c) <= 1 || Literals.is_trivial (C.lits c)
-      then None
-      else simplify_split_ c
-    in
-    Util.exit_prof prof_splits;
+    ZProf.enter_prof prof_splits;
+
+    let should_split c = 
+      (not @@ Literals.is_trivial (C.lits c)) &&
+      (not @@ E.flex_get k_split_only_initial || C.proof_depth c == 0) &&
+      (not @@ E.flex_get k_split_only_goals || 
+       CCOpt.get_or ~default:(-1) (C.distance_to_goal c) >= 0) &&
+      (not @@ E.flex_get k_abstract_known_singletons ||
+       Array.length (C.lits c) != 0) &&
+      (E.flex_get k_abstract_known_singletons ||
+       Array.length (C.lits c) > 1) &&
+      (E.flex_get k_max_trail_size < 0 || 
+       Trail.length (C.trail c) <= E.flex_get k_max_trail_size) in
+
+    let res = if (should_split c) then simplify_split_ c else None in
+    ZProf.exit_prof prof_splits;
     res
 
   let filter_absurd_trails_ = ref (fun _ -> true)
@@ -161,7 +191,29 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
         (fun k->k C.pp c (C.id c) BBox.pp_bclause b_clause);
       Sat.add_clause ~proof:(C.proof_step c) b_clause;
     );
-    [] (* never infers anything! *)
+    if Array.length (C.lits c) = 0 &&
+       E.flex_get k_infer_from_components && 
+       Trail.length (C.trail c) = 1 then (
+      let bool_lit = List.hd (Trail.to_list (C.trail c)) in
+      let negate = if BBox.Lit.sign bool_lit then Lit.negate else CCFun.id in
+      match BBox.as_lits bool_lit with 
+      | Some lits ->
+        let skolemizer = 
+          Literals.vars lits
+          |> List.map (fun v -> 
+              (v, 0), (snd @@ Term.mk_fresh_skolem [] (HVar.ty v), 0))
+          |> Subst.FO.of_list' in
+        let lits' = 
+          Literals.apply_subst Subst.Renaming.none skolemizer (lits,0)
+          |> CCArray.to_list in
+        let proof = 
+          Proof.Step.inference ~rule:(Proof.Rule.mk "ground_avatar") [C.proof_parent c] in
+        List.map (fun lit ->
+            C.create ~penalty:(C.penalty c) ~trail:Trail.empty 
+              [negate lit] proof 
+          ) lits'
+      | None -> []
+    ) else [] (* never infers anything! *)
 
   (* check whether the trail is false and will remain so *)
   let trail_is_trivial_ (trail:Trail.t): bool =
@@ -221,7 +273,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     with Trail_is_trivial ->
       Tr_trivial
 
-  let simplify_opt trail = Util.with_prof prof_simp_trail simplify_opt_ trail
+  let simplify_opt trail = ZProf.with_prof prof_simp_trail simplify_opt_ trail
 
   (* simplify the trail of [c] using boolean literals that have been proven *)
   let simplify_trail_ c =
@@ -399,8 +451,8 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
           |> Cut_form.cs
           |> Util.map_product
             ~f:(fun lits ->
-              let lits = Array.map (fun l -> [Literal.negate l]) lits in
-              Array.to_list lits)
+                let lits = Array.map (fun l -> [Literal.negate l]) lits in
+                Array.to_list lits)
           |> CCList.map
             (fun l ->
                let lits = Array.of_list l in
@@ -518,7 +570,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
 
   (* Just check the solver *)
   let check_satisfiability ~full () =
-    Util.enter_prof prof_check;
+    ZProf.enter_prof prof_check;
     Signal.send before_check_sat ();
     let res = match Sat.check ~full ()  with
       | Sat_solver.Sat ->
@@ -531,7 +583,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
         [c]
     in
     Signal.send after_check_sat ();
-    Util.exit_prof prof_check;
+    ZProf.exit_prof prof_check;
     res
 
   let register ~split:do_split () =
@@ -566,6 +618,12 @@ let enabled_ = ref true
 let show_lemmas_ = ref false
 let simplify_trail_ = ref true
 let back_simplify_trail_ = ref true
+let abstract_known_singletons = ref false
+let split_only_initial = ref false
+let split_only_goals = ref false
+let max_trail_size = ref (-1)
+let infer_from_components = ref false
+
 
 let extension =
   let action env =
@@ -578,6 +636,12 @@ let extension =
     E.flex_add k_show_lemmas !show_lemmas_;
     E.flex_add k_simplify_trail !simplify_trail_;
     E.flex_add k_back_simplify_trail !back_simplify_trail_;
+    E.flex_add k_abstract_known_singletons !abstract_known_singletons;
+    E.flex_add k_split_only_initial !split_only_initial;
+    E.flex_add k_split_only_goals !split_only_goals;
+    E.flex_add k_max_trail_size !max_trail_size;
+    E.flex_add k_infer_from_components !infer_from_components;
+
     Util.debug 1 "enable Avatar";
     A.register ~split:!enabled_ ()
   in
@@ -592,16 +656,28 @@ let () =
     ; "--no-avatar-simp-trail", Arg.Clear simplify_trail_, " do not simplify boolean trails in Avatar"
     ; "--avatar-backward-simp-trail", Arg.Set back_simplify_trail_, " backward-simplify boolean trails in Avatar"
     ; "--no-avatar-backward-simp-trail", Arg.Clear back_simplify_trail_, " do not backward-simplify boolean trails in Avatar"
+    ; "--abstract-known-singletons", Arg.Bool (fun b -> abstract_known_singletons :=  b), 
+      " if a clause C <- [|A1, ..., An|] cannot be split, but its component is " ^
+      " C is known, then add \\neg A1 \\lor ... \\lor \\neg An \\lor [| C |] to the " ^
+      " set of SAT clauses."
+    ; "--split-only-initial", Arg.Bool (fun b -> split_only_initial :=  b), " split only initial clauses"
+    ; "--split-only-goals", Arg.Bool (fun b -> split_only_goals :=  b), " split only clauses that interacted with goal"
+    ; "--max-trail-size", Arg.Int (fun v -> max_trail_size := v), 
+      " sets the limit of the trail size that a clause can have to be splittable. " ^
+      " Negative value sets the limit to infinity"
+    ; "--infer-from-components", Arg.Bool (fun b -> infer_from_components := b), 
+      " when empty clause \bot <- A is infered, if A has only one component,
+        skolemize and negate the component and add it to the proof state. "
     ];
-  Params.add_to_mode "ho-complete-basic" (fun () ->
-    enabled_ := false
-  );
-  Params.add_to_mode "ho-pragmatic" (fun () ->
-    enabled_ := false
-  );
-  Params.add_to_mode "ho-competitive" (fun () ->
-    enabled_ := false
-  );
-  Params.add_to_mode "fo-complete-basic" (fun () ->
-    enabled_ := false
-  );
+  Params.add_to_modes 
+    [ "ho-complete-basic"
+    ; "ho-pragmatic"
+    ; "ho-competitive"
+    ; "fo-complete-basic"
+    ; "lambda-free-intensional"
+    ; "lambda-free-extensional"
+    ; "lambda-free-purify-intensional"
+    ; "lambda-free-purify-extensional"] 
+    (fun () ->
+       enabled_ := false
+    );

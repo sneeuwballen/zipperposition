@@ -1,12 +1,13 @@
 
 (executables
   (names
-    type_check cnf_of app_encode tptp_to_zf
+    type_check cnf_of tptp_to_zf
     proof_check_tstp fo_detector)
   (public_names
-    zipper_type_check zipper_cnf_of zipper_app_encode zipper_tptp_to_zf
+    zipper_type_check zipper_cnf_of zipper_tptp_to_zf
     zipper_proof_check_tstp zipper_fo_detector)
   (modes native)
+  (promote (until-clean) (into ../..))
   (libraries logtk logtk.parsers)
   (package zipperposition-tools)
   (flags :standard -w -32)

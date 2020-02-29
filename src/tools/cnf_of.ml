@@ -29,7 +29,13 @@ let options =
   |> List.sort Pervasives.compare
   |> Arg.align
 
-let print_res decls = match !Options.output with
+let print_res (decls: _ CCVector.ro_vector) : unit =
+  let close_c c =
+    c
+    |> List.map SLiteral.to_form |> TypedSTerm.Form.or_
+    |> TypedSTerm.Form.close_forall
+  in
+  match !Options.output with
   | Options.O_none -> ()
   | Options.O_normal ->
     let ppst =
@@ -41,26 +47,19 @@ let print_res decls = match !Options.output with
       (CCVector.pp ~sep:"" ppst)
       decls
   | Options.O_tptp ->
-    let pp_c out c =
-      let f = c
-              |> List.map SLiteral.to_form |> TypedSTerm.Form.or_
-              |> TypedSTerm.Form.close_forall
-      in
-      TypedSTerm.TPTP.pp out f in
+    let pp_c out c = TypedSTerm.TPTP.pp out (close_c c) in
     let ppst out st =
-      Statement.TPTP.pp
-        pp_c T.TPTP.pp T.TPTP.pp
-        out st
+      Statement.TPTP.pp pp_c T.TPTP.pp T.TPTP.pp out st
     in
     Format.printf "@[<v>%a@]@."
       (CCVector.pp ~sep:"" ppst)
       decls
   | Options.O_zf ->
+    let pp_c out c = T.ZF.pp_inner out (close_c c) in
     let ppst out st =
-      Statement.ZF.pp
-        (Util.pp_list ~sep:" || " (SLiteral.ZF.pp T.ZF.pp_inner)) T.ZF.pp_inner T.ZF.pp_inner
-        out st
+      Statement.ZF.pp pp_c T.ZF.pp_inner T.ZF.pp_inner out st
     in
+    Format.printf "val term : type.@."; (* implicit *)
     Format.printf "@[<v>%a@]@."
       (CCVector.pp ~sep:"" ppst)
       decls
@@ -83,8 +82,8 @@ let process file =
         (CCVector.pp ~sep:"" Statement.pp_input) st;
     let opts =
       (if !flag_distribute_exists then [Cnf.DistributeExists] else []) @
-        (if !flag_disable_renaming then [Cnf.DisableRenaming] else []) @
-        []
+      (if !flag_disable_renaming then [Cnf.DisableRenaming] else []) @
+      []
     in
     let decls = Cnf.cnf_of_seq ~opts ~ctx:(Skolem.create()) (CCVector.to_seq st) in
     let sigma = Cnf.type_declarations (CCVector.to_seq decls) in
@@ -97,10 +96,10 @@ let process file =
     print_res decls;
     ()
   in match res with
-    | CCResult.Ok () -> ()
-    | CCResult.Error msg ->
-      print_endline msg;
-      exit 1
+  | CCResult.Ok () -> ()
+  | CCResult.Error msg ->
+    print_endline msg;
+    exit 1
 
 let main () =
   CCFormat.set_color_default true;

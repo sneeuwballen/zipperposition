@@ -8,7 +8,7 @@ open Logtk
 module SI = Msat.Solver_intf
 
 let section = Util.Section.make ~parent:Const.section "msat"
-let prof_call_msat = Util.mk_profiler "msat.call"
+let prof_call_msat = ZProf.make "msat.call"
 let stat_num_clauses = Util.mk_stat "msat.num_clauses"
 let stat_num_calls = Util.mk_stat "msat.num_calls"
 
@@ -40,10 +40,10 @@ module Solver = Msat.Make_pure_sat(struct
         l', if b then SI.Negated else SI.Same_sign
     end
     type proof = Sat_solver_intf.proof_step
-end)
+  end)
 
 module Make() 
-(*   : Sat_solver_intf.S *)
+  (*   : Sat_solver_intf.S *)
 = struct
   module Lit = BBox.Lit
   let solver = Solver.create ~size:`Big ()
@@ -179,27 +179,27 @@ module Make()
     let rec aux p =
       let module P = Solver.Proof in
       match P.expand p with
-        | {P. step = P.Lemma _; _ } -> errorf "SAT proof involves a lemma"
-        | {P. step = P.Assumption; _ } -> errorf "SAT proof involves an assumption"
-        | {P. step = P.Duplicate (c',_); _} -> aux c'
-        | {P. conclusion=c; step = P.Hyper_res {P.hr_init; hr_steps} } ->
-          let c = bool_clause_of_sat c in
-          (* atomic resolution step *)
-          let q1 = aux hr_init in
-          let q2 = List.map (fun (_,p) -> aux p) hr_steps in
-          begin match ResTbl.get tbl_res (c,q1::q2) with
-            | Some s -> s
-            | None ->
-              let parents = Proof.Parent.from q1 :: List.map Proof.Parent.from q2 in
-              let step =
-                Proof.Step.inference parents
-                  ~rule:(Proof.Rule.mk "sat_resolution") in
-              let s = Proof.S.mk step (Bool_clause.mk_proof_res c) in
-              ResTbl.add tbl_res (c,q1::q2) s;
-              s
-          end
-        | {P. conclusion=c; step = P.Hypothesis step; _ } ->
-          proof_of_leaf c step
+      | {P. step = P.Lemma _; _ } -> errorf "SAT proof involves a lemma"
+      | {P. step = P.Assumption; _ } -> errorf "SAT proof involves an assumption"
+      | {P. step = P.Duplicate (c',_); _} -> aux c'
+      | {P. conclusion=c; step = P.Hyper_res {P.hr_init; hr_steps} } ->
+        let c = bool_clause_of_sat c in
+        (* atomic resolution step *)
+        let q1 = aux hr_init in
+        let q2 = List.map (fun (_,p) -> aux p) hr_steps in
+        begin match ResTbl.get tbl_res (c,q1::q2) with
+          | Some s -> s
+          | None ->
+            let parents = Proof.Parent.from q1 :: List.map Proof.Parent.from q2 in
+            let step =
+              Proof.Step.inference parents
+                ~rule:(Proof.Rule.mk "sat_resolution") in
+            let s = Proof.S.mk step (Bool_clause.mk_proof_res c) in
+            ResTbl.add tbl_res (c,q1::q2) s;
+            s
+        end
+      | {P. conclusion=c; step = P.Hypothesis step; _ } ->
+        proof_of_leaf c step
     in
     Solver.Proof.check p;
     aux p
@@ -235,8 +235,8 @@ module Make()
     if not b || l <> 0 then invalid_arg "get_proof_of_lit";
     let a = Solver.make_atom solver lit in
     match P.prove_atom a with
-      | Some p -> conv_proof_ p
-      | None -> assert false
+    | Some p -> conv_proof_ p
+    | None -> assert false
 
   let proved_at_0 lit =
     let a = Solver.make_atom solver lit in
@@ -279,7 +279,10 @@ module Make()
       Solver.assume solver c proof
     done;
     (* solve *)
-    begin match Solver.solve solver with
+    Util.debug ~section 4 "solve...";
+    let res = Solver.solve solver in
+    Util.debug ~section 4 "solve done.";
+    begin match res with
       | Solver.Sat s ->
         eval_ := s.SI.eval;
         eval_level_ := s.SI.eval_level;
@@ -307,7 +310,7 @@ module Make()
     let res = check_unconditional_ () in
     assert (res = Sat)
 
-  let check ~full () = Util.with_prof prof_call_msat check_ full
+  let check ~full () = ZProf.with_prof prof_call_msat check_ full
 
   let set_printer pp = pp_ := pp
 

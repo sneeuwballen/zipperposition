@@ -5,7 +5,7 @@
 
 module T = Term
 
-let prof_mk_prec = Util.mk_profiler "mk_precedence"
+let prof_mk_prec = ZProf.make "mk_precedence"
 
 let section = Util.Section.(make ~parent:root) "compute_prec"
 
@@ -65,11 +65,11 @@ let _add_custom_weights weights arg_coeff=
            if ID.name constant = name then List.tl values
            else arg_coeff constant)
       with
-        | Failure _ | Not_found -> failwith "Syntax error in custom weights"
+      | Failure _ | Not_found -> failwith "Syntax error in custom weights"
     ) (weights, arg_coeff) input_list
 
 let mk_precedence ~db_w ~lmb_w t seq =
-  Util.enter_prof prof_mk_prec;
+  ZProf.enter_prof prof_mk_prec;
   (* set of symbols *)
   let symbols =
     seq
@@ -80,7 +80,7 @@ let mk_precedence ~db_w ~lmb_w t seq =
   (* constraints *)
   let constrs =
     t.constrs @
-      List.map (fun (p,rule) -> p, rule seq) t.constr_rules
+    List.map (fun (p,rule) -> p, rule seq) t.constr_rules
   in
   Util.debugf ~section 2 "@[<2>%d precedence constraint(s)@]"
     (fun k->k(List.length constrs));
@@ -94,7 +94,7 @@ let mk_precedence ~db_w ~lmb_w t seq =
   List.iter
     (fun (s,status) -> Precedence.declare_status p s status)
     t.status;
-  Util.exit_prof prof_mk_prec;
+  ZProf.exit_prof prof_mk_prec;
   p
 
 let () =

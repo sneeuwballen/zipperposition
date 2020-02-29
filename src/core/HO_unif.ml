@@ -10,7 +10,7 @@ module US = Unif_subst
 let stat_unif_calls = Util.mk_stat "ho_unif.calls"
 let stat_unif_steps = Util.mk_stat "ho_unif.steps"
 
-let prof_norm_subst = Util.mk_profiler "ho_unif.norm_subst"
+let prof_norm_subst = ZProf.make "ho_unif.norm_subst"
 
 let section = Util.Section.make "ho_unif"
 
@@ -33,7 +33,7 @@ let term_arity args =
   |> Util.take_drop_while (fun t -> T.is_type t)
   |> CCPair.map List.length List.length
 
-let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~offset : (Subst.t * penalty) list =
+let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~signature ~offset : (Subst.t * penalty) list =
   let ty_v = HVar.ty v in
   let n, ty_args, ty_ret = Type.open_poly_fun ty_v in
   assert (Type.is_prop ty_ret);
@@ -47,7 +47,7 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~offset : (Subst.t 
       | `Neg | `Full | `Pragmatic ->
         let f = HVar.make offset ~ty:ty_v in
         [T.fun_of_fvars vars
-          (T.Form.not_ (T.app (T.var f) (List.map T.var vars)))]
+           (T.Form.not_ (T.app (T.var f) (List.map T.var vars)))]
     (* projection with "∧": [λvars. (F1 vars) ∧ (F2 vars)] *)
     and l_and = match mode with
       | `Neg | `None | `Pragmatic | `TF -> []
@@ -55,18 +55,18 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~offset : (Subst.t 
         let f = HVar.make offset ~ty:ty_v in
         let g = HVar.make (offset+1) ~ty:ty_v in
         [T.fun_of_fvars vars
-          (T.Form.and_
-             (T.app (T.var f) (List.map T.var vars))
-             (T.app (T.var g) (List.map T.var vars)))]
+           (T.Form.and_
+              (T.app (T.var f) (List.map T.var vars))
+              (T.app (T.var g) (List.map T.var vars)))]
     and l_or = match mode with
       | `Neg | `None | `Pragmatic | `TF -> []
       | `Full ->
         let f = HVar.make offset ~ty:ty_v in
         let g = HVar.make (offset+1) ~ty:ty_v in
         [T.fun_of_fvars vars
-          (T.Form.or_
-             (T.app (T.var f) (List.map T.var vars))
-             (T.app (T.var g) (List.map T.var vars)))]
+           (T.Form.or_
+              (T.app (T.var f) (List.map T.var vars))
+              (T.app (T.var g) (List.map T.var vars)))]
     (* projection with "=": [λvars. (F1 vars) = (F2 vars)]
        where [F1 : Πa. ty_args -> a] *)
     and l_eq = match mode with
@@ -77,11 +77,11 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~offset : (Subst.t 
         let f = HVar.make (offset+1) ~ty:ty_fun in
         let g = HVar.make (offset+2) ~ty:ty_fun in
         [T.fun_of_fvars vars
-          (T.Form.eq
-             (T.app (T.var f) (List.map T.var vars))
-             (T.app (T.var g) (List.map T.var vars)))]
+           (T.Form.eq
+              (T.app (T.var f) (List.map T.var vars))
+              (T.app (T.var g) (List.map T.var vars)))]
     and l_false = match mode with
-      | `None  -> []
+      | `None -> []
       | `Neg | `Pragmatic | `Full | `TF  ->
         [T.fun_of_fvars vars T.false_]
     and l_true = match mode with
@@ -92,71 +92,90 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~offset : (Subst.t 
       | `Full ->
         let n = List.length ty_args in
         CCList.mapi (fun i ty -> 
-          if Type.is_fun ty && Type.returns_prop ty then (
-            let arg_typeargs,_ = Type.open_fun ty in
-            let m = List.length arg_typeargs in
-            let form_body = T.app (T.bvar ~ty (m+n-i-1)) 
-                                  (List.mapi (fun j ty -> T.bvar ~ty (m-j-1)) arg_typeargs) in
-            let forall = T.close_quantifier Builtin.ForallConst arg_typeargs form_body in
-            let exists = T.close_quantifier Builtin.ExistsConst arg_typeargs form_body in
-            let forall, exists = CCPair.map_same (T.fun_l ty_args) (forall, exists) in
-            assert(T.DB.is_closed forall && T.DB.is_closed exists);
-            assert(Lambda.is_properly_encoded forall);
-            assert(Lambda.is_properly_encoded exists);
-            Some (forall, exists))
-          else None) ty_args
+            if Type.is_fun ty && Type.returns_prop ty then (
+              let arg_typeargs,_ = Type.open_fun ty in
+              let m = List.length arg_typeargs in
+              let form_body = T.app (T.bvar ~ty (m+n-i-1)) 
+                  (List.mapi (fun j ty -> T.bvar ~ty (m-j-1)) arg_typeargs) in
+              let forall = T.close_quantifier Builtin.ForallConst arg_typeargs form_body in
+              let exists = T.close_quantifier Builtin.ExistsConst arg_typeargs form_body in
+              let forall, exists = CCPair.map_same (T.fun_l ty_args) (forall, exists) in
+              assert(T.DB.is_closed forall && T.DB.is_closed exists);
+              assert(Lambda.is_properly_encoded forall);
+              assert(Lambda.is_properly_encoded exists);
+              Some (forall, exists))
+            else None) ty_args
         |> CCList.fold_left (fun acc opt -> match opt with 
-          | Some (x,y) -> x :: y :: acc 
-          | None -> acc) [] 
-          (* [] *)
+            | Some (x,y) -> x :: y :: acc 
+            | None -> acc) [] 
+      (* [] *)
+      | _ -> []
+    and l_symbols = match mode with 
+      | `Pragmatic ->
+        let syms_of_var_ty = Signature.find_by_type signature ty_v in
+        ID.Set.fold (fun sym acc -> Term.const ~ty:ty_v sym :: acc ) syms_of_var_ty []
+      | `Full -> 
+        let syms_of_var_ty = Signature.find_by_type signature ty_v in
+        let arg_tys, ret_ty = Type.open_fun ty_v in 
+        let bvars = 
+          snd @@ List.fold_right (fun ty (idx, res) -> 
+              (idx+1, T.bvar ~ty idx :: res)) arg_tys (0, []) in
+        let fresh_vars = List.mapi (fun i ty -> 
+            let var_ty = Type.arrow arg_tys ty in
+            T.app (T.var (HVar.make ~ty:var_ty (offset+i))) bvars
+          ) arg_tys in
+        ID.Set.fold (fun sym acc -> 
+            (T.fun_l arg_tys (Term.app (Term.const ~ty:ty_v sym) fresh_vars)) :: acc) 
+          syms_of_var_ty []
       | _ -> []
     and l_simpl_op = match mode with
       | `Pragmatic -> 
         let n = List.length vars in
         let db_vars = List.mapi (fun i ty -> T.bvar ~ty (n-i-1)) ty_args in
         CCList.mapi (fun i db_i ->
-          let projs = if Type.is_prop (Term.ty db_i) then (
-            [T.fun_l ty_args db_i]
-          ) else [] in
-          let log_ops = 
-          CCList.mapi (fun j db_j ->
-            if i < j && Type.equal (T.ty db_i) (T.ty db_j) then (
-              let res = [T.fun_l ty_args (T.Form.eq db_i db_j);
-                         T.fun_l ty_args (T.Form.neq db_i db_j);] in
-              if Type.is_prop (T.ty db_i) then
-               res @
-                [T.fun_l ty_args (T.Form.and_ db_i db_j);
-                 T.fun_l ty_args (T.Form.or_ db_i db_j);]
-               else res
-            )
-            else []) 
+            let projs = if Type.is_prop (Term.ty db_i) then (
+                [T.fun_l ty_args db_i]
+              ) else [] in
+            let log_ops = 
+              CCList.mapi (fun j db_j ->
+                  if i < j && Type.equal (T.ty db_i) (T.ty db_j) then (
+                    let res = [T.fun_l ty_args (T.Form.eq db_i db_j);
+                               T.fun_l ty_args (T.Form.neq db_i db_j);] in
+                    if Type.is_prop (T.ty db_i) then
+                      res @
+                      [T.fun_l ty_args (T.Form.and_ db_i db_j);
+                       T.fun_l ty_args (T.Form.or_ db_i db_j);]
+                    else res
+                  )
+                  else []) 
+                db_vars
+              |> CCList.flatten in
+            projs @ log_ops) 
           db_vars
-          |> CCList.flatten in
-          projs @ log_ops) 
-        db_vars
         |> CCList.flatten
       | _ -> []
 
     in
     CCList.flat_map
       (fun (ts,penalty) -> 
-          List.map (fun t -> 
-          assert (T.DB.is_closed t);
-          
-          (* Caching of primitive enumeration terms, so that trigger-based instantiation
-             does not catch them. *)
-          let cached_t = Subst.FO.canonize_all_vars t in
-          enum_cache := Term.Set.add cached_t !enum_cache;
-          let subst = Subst.FO.bind' Subst.empty (v,sc_v) (t,sc_v) in
-          (subst, penalty) )ts ) 
-      [ l_not, 5;
-        l_and, 7;
-        l_or, 7;
-        l_eq,  7;
-        l_false, 0;
-        l_true, 0;
-        l_simpl_op, 2;
-        l_quants, 10;
+         List.map (fun t -> 
+             assert (T.DB.is_closed t);
+
+             (* Caching of primitive enumeration terms, so that trigger-based instantiation
+                does not catch them. *)
+             let cached_t = Subst.FO.canonize_all_vars t in
+             enum_cache := Term.Set.add cached_t !enum_cache;
+             let subst = Subst.FO.bind' Subst.empty (v,sc_v) (t,sc_v) in
+             (subst, penalty) )ts ) 
+      [ l_not, 1;
+        l_and, 2;
+        l_or, 2;
+        l_eq,  1;
+        l_false, (if mode == `Pragmatic then 0 else 3);
+        l_true, (if mode == `Pragmatic then 0 else 3);
+        l_simpl_op, 0;
+        l_symbols, (if mode == `Pragmatic then 1 else 3);
+        l_quants, 2;
       ]
   )
 
@@ -301,7 +320,7 @@ module U = struct
       let lhs =
         T.app (T.var v')
           (List.map (T.DB.shift n) args @
-             List.mapi (fun i ty -> T.bvar ~ty (n-i-1)) ty_t_args) in
+           List.mapi (fun i ty -> T.bvar ~ty (n-i-1)) ty_t_args) in
       ty_t_args @ env, lhs, t_body
     in
     let new_pairs = [ bind_v; new_pair_body ] in
@@ -593,25 +612,25 @@ module U = struct
   let norm_subst_ offset sc (us:US.t) () : US.t =
     US.map_subst us
       ~f:(fun subst ->
-        Subst.normalize subst
-        |> Subst.FO.filter
-          (fun (v,sc_v) (t,sc_t) ->
-             (* filter out intermediate variables. They are the ones
-                that have an index >= offset,
-                and only point to other intermediate vars *)
-             let is_fvar (v,sc_v) =
-               sc_v = sc && HVar.id v >= offset &&
-               not (Type.is_tType (HVar.ty v))
-             in
-             not (is_fvar (v,sc_v)) ||
-             (T.Seq.vars t
-              |> Iter.exists (fun v' -> not (is_fvar (v',sc_t)))))
-        |> Subst.FO.map Lambda.snf
-      )
+          Subst.normalize subst
+          |> Subst.FO.filter
+            (fun (v,sc_v) (t,sc_t) ->
+               (* filter out intermediate variables. They are the ones
+                  that have an index >= offset,
+                  and only point to other intermediate vars *)
+               let is_fvar (v,sc_v) =
+                 sc_v = sc && HVar.id v >= offset &&
+                 not (Type.is_tType (HVar.ty v))
+               in
+               not (is_fvar (v,sc_v)) ||
+               (T.Seq.vars t
+                |> Iter.exists (fun v' -> not (is_fvar (v',sc_t)))))
+          |> Subst.FO.map Lambda.snf
+        )
 
   let norm_subst offset sc us =
     if !enable_norm_subst
-    then Util.with_prof prof_norm_subst (norm_subst_ offset sc us) ()
+    then ZProf.with_prof prof_norm_subst (norm_subst_ offset sc us) ()
     else us
 
   let apply_subst pairs us =

@@ -19,11 +19,11 @@ type input_format =
 
 let input_format_of_string s =
   match s |> String.trim |> CCString.lowercase_ascii with
-    | "tptp" | "tstp" -> I_tptp
-    | "zf" -> I_zf
-    | "tip" -> I_tip
-    | "dk" -> I_dk
-    | s -> failwith ("unknown input format " ^ s)
+  | "tptp" | "tstp" -> I_tptp
+  | "zf" -> I_zf
+  | "tip" -> I_tip
+  | "dk" -> I_dk
+  | s -> failwith ("unknown input format " ^ s)
 
 type print_format = Output_format.t =
   | O_none
@@ -33,22 +33,18 @@ type print_format = Output_format.t =
 
 let print_format_of_string s =
   match s |> String.trim |> CCString.lowercase_ascii with
-    | "none" -> O_none
-    | "tptp" | "tstp" -> O_tptp
-    | "default" | "normal" -> O_normal
-    | "dk"
-    | "zf" -> O_zf
-    | _ -> failwith ("unknown print format " ^ s)
+  | "none" -> O_none
+  | "tptp" | "tstp" -> O_tptp
+  | "default" | "normal" -> O_normal
+  | "dk"
+  | "zf" -> O_zf
+  | _ -> failwith ("unknown print format " ^ s)
 
 let input = ref I_guess
 let output = ref O_normal
 let set_in s = input := input_format_of_string s
 let set_out s = output := print_format_of_string s
 let comment() = Output_format.comment_prefix !output
-
-let _print_types () =
-  Term.print_all_types := true;
-  ()
 
 let switch_opt b f = Arg.Unit (fun () -> f b)
 let switch_set b r = Arg.Unit (fun () -> r := b)
@@ -75,8 +71,6 @@ let add_opts l = other_opts := l @ !other_opts
 let make () =
   List.rev_append
     [ "--debug", Arg.Int Util.set_debug, " debug level (int)"
-    ; "--profile", Arg.Set Util.enable_profiling, " enable profiling"
-    ; "--print-types", Arg.Unit _print_types , " print type annotations everywhere"
     ; "--print-hashconsing-id",
       Arg.Set InnerTerm.print_hashconsing_ids,
       " print each term's unique hashconsing ID"

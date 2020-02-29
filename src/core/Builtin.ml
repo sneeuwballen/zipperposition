@@ -65,13 +65,14 @@ type t =
   | KComb
   | SComb
 
+  | Distinct
 
 type t_ = t
 
 let to_int_ = function
-  (* True < false for the completeness of (HO case) FOOL paramodulation: C[b] ⟹ b ∨ C[false]. The opposite way required b=false would simplify b≠true (aka ¬b) which doesn't rewrite. *)
-  | True -> 0
-  | False -> 1
+  (* True > false for the completeness of (HO case) FOOL paramodulation: C[b] ⟹ b ∨ C[false]. The opposite way required b=false would simplify b≠true (aka ¬b) which doesn't rewrite. *)
+  | True -> 1
+  | False -> 0
   | Not -> 2
   | And -> 3
   | Or -> 4
@@ -128,6 +129,7 @@ let to_int_ = function
   | KComb -> 83
   | SComb -> 84
   | Pseudo_de_bruijn _ -> 100
+  | Distinct -> 110
 
 let compare a b = match a, b with
   | Int i, Int j -> Z.compare i j
@@ -150,16 +152,20 @@ let is_rat = function Rat _ -> true | _ -> false
 let is_numeric = function Int _ | Rat _ -> true | _ -> false
 let is_not_numeric x = not (is_numeric x)
 let is_logical_op = function 
-    |And|Or|Not|Imply|Equiv|Xor|ForallConst|ExistsConst -> true
-    |_ -> false
+  |And|Or|Not|Imply|Equiv|Xor|ForallConst|ExistsConst -> true
+  |_ -> false
 
 let is_logical_binop = function
-    |And|Or|Imply|Xor|Equiv -> true
-    |_->false
+  |And|Or|Imply|Xor|Equiv -> true
+  |_->false
+
+let is_flattened_logical = function
+  |And|Or -> true
+  |_ -> false
 
 let is_quantifier = function 
-    |ForallConst|ExistsConst -> true
-    |_ -> false
+  |ForallConst|ExistsConst -> true
+  |_ -> false
 
 let is_arith = function
   | Int _ | Rat _ | Floor | Ceiling | Truncate | Round | Prec | Succ | Sum
@@ -227,6 +233,7 @@ let to_string s = match s with
   | KComb -> "K"
   | SComb -> "S"
   | Pseudo_de_bruijn i -> Printf.sprintf "db_%d" i
+  | Distinct -> "distinct"
 
 let pp out s = Format.pp_print_string out (to_string s)
 
@@ -285,6 +292,7 @@ let prop = Prop
 let term = Term
 let ty_int = TyInt
 let ty_rat = TyRat
+let ty_real = TyReal
 let grounding = Grounding
 
 module Tag = struct
@@ -400,6 +408,7 @@ module TPTP = struct
     | SComb -> "$S"
     | Box_opaque -> "$$box"
     | Pseudo_de_bruijn i -> Printf.sprintf "$$db_%d" i
+    | Distinct -> "$distinct"
 
   let pp out b = CCFormat.string out (to_string b)
 
@@ -446,6 +455,7 @@ module TPTP = struct
     | "$C" -> CComb
     | "$K" -> KComb
     | "$I" -> IComb
+    | "$distinct" -> Distinct
     | _ -> raise NotABuiltin
 
   let fixity = function
@@ -745,6 +755,7 @@ module ZF = struct
     | SComb -> "S"
     | Box_opaque -> "<box>"
     | Pseudo_de_bruijn i -> Printf.sprintf "<db %d>" i
+    | Distinct -> "distinct"
 
   let pp out b = CCFormat.string out (to_string b)
 end

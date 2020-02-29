@@ -1,22 +1,22 @@
 opam-version: "2.0"
 maintainer: "simon.cruanes.2007@m4x.org"
-author: "Simon Cruanes"
+authors: ["Simon Cruanes" "Petar Vukmirovic" "Alexander Bentkamp" "Sophie Tourret" "Visa Nummelin"]
 homepage: "https://github.com/sneeuwballen/zipperposition"
-version: "1.5"
+version: "1.6"
 synopsis: "Support tools for Zipperposition"
 build: [
-  ["dune" "build" "-p" name]
-  ["dune" "build" "@doc" "-p" name] {with-doc}
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "build" "@doc" "-p" name "-j" jobs] {with-doc}
 ]
 depends: [
-  "dune" { build }
+  "dune" { >= "1.11" }
   "containers" { >= "1.0" }
   "iter" { >= "1.2" }
   "oseq" { >= "0.2" }
   "msat" { >= "0.8" < "0.9" }
   "zarith"
-  "logtk" { >= "1.5" }
-  "libzipperposition" { >= "1.5" }
+  "logtk" { = version }
+  "libzipperposition" { = version }
   "ocaml" {>= "4.03"}
 ]
 bug-reports: "https://github.com/sneeuwballen/zipperposition/issues"

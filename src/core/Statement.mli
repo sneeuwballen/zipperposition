@@ -138,6 +138,11 @@ val map_def :
   ('f1, 't1, 'ty1) def ->
   ('f2, 't2, 'ty2) def
 
+val map_def_rule :
+  form:('a -> 'b) ->
+  term:('c -> 'd) ->
+  ty:('e -> 'f) -> ('a, 'c, 'e) def_rule -> ('b, 'd, 'f) def_rule
+
 val map :
   form:('f1 -> 'f2) ->
   term:('t1 -> 't2) ->
@@ -180,6 +185,10 @@ val scan_simple_stmt_for_ind_ty : input_t -> unit
 val get_rw_rule:  ?weight_incr:int -> clause_t -> (ID.Set.elt * Rewrite.rule) option
 
 val get_formulas_from_defs: ('a, _, _) t -> 'a CCList.t
+
+val sine_axiom_selector: ?depth_start:int -> ?depth_end:int -> ?tolerance:float -> input_t Iter.t -> input_t Iter.t
+(** Implementation of SinE algorithm with the usual parameters
+    described in Hoder and Voronkov Sine Qua Non paper *)
 
 (** {2 Iterators} *)
 

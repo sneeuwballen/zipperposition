@@ -834,7 +834,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         E.add_clause_conversion enocde_stmt;
         E.add_unary_inf "narrow applied variable" narrow_app_vars;
         E.Ctx.set_ord (Ordering.compose cmp_by_max_weak_r_len (E.Ctx.ord ()));
-        Unif.disable_pattern_unif := true;
+        Unif._allow_pattern_unif := false;
       )
 
 end

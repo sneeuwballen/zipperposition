@@ -11,10 +11,11 @@ RUN eval `opam config env` && \
     opam depext -i zarith && \
     opam install dune zarith containers iter msat menhir oseq
 # main build
-COPY --chown=opam:nogroup src *.opam Makefile dune-project ./
+COPY --chown=opam:nogroup src ./src
+COPY --chown=opam:nogroup *.opam Makefile dune-project ./
 RUN eval `opam config env` && \
     make build && \
-    cp _build/default/main/zipperposition.exe ./zipperposition
+    cp _build/default/src/main/zipperposition.exe ./zipperposition
 
 # prepare lightweight production image
 FROM alpine:latest as prod
