@@ -56,14 +56,18 @@ module Make(E : Env.S) : S with module Env = E = struct
           CCFormat.sprintf "%a:%a has nonground type" T.pp t Type.pp (T.ty t) in
         raise @@ CantEncode err in
 
-    let make_new_sym encoded_head args =
-      let arg_tys = List.map t_ty args in
-      let ret_ty = t_ty t in
-      let ty = arg_tys ==> ret_ty in
-      let (id, ty), res = T.mk_fresh_skolem ~prefix:"ty_enc" [] ty in
+    let make_new_sym mono_head =
+      let (id, ty), res = 
+        T.mk_fresh_skolem ~prefix:"ty_enc" [] (T.ty mono_head) in
       Env.Ctx.declare id ty;
       res in
     
+    let is_partial_logical_op t =
+      match T.view t with 
+      | T.AppBuiltin(b, _) -> 
+        Builtin.is_logical_op b && not (Type.is_prop (t_ty t))
+      | _ -> false in
+
     let rec aux ~sym_map t =
       match T.view t with 
       | T.Const _ | T.Var _ -> sym_map, t
@@ -71,27 +75,23 @@ module Make(E : Env.S) : S with module Env = E = struct
         let err = 
           CCFormat.sprintf "%a is a lambda" T.pp t in
         raise @@ CantEncode err
-      | T.AppBuiltin(b, l)
-        when Builtin.is_logical_op b && not (Type.is_prop (t_ty t)) ->
-        let err = 
-          CCFormat.sprintf "%a ho bool" T.pp t in
-        raise @@  CantEncode err
       | T.AppBuiltin(_, l)
       | T.App(_, l) ->
         let hd_mono, args = T.as_app_mono t in
-        let sym_map, hd = 
-          if List.length args != List.length l then (
-            match T.Map.get hd_mono sym_map with
-            | Some mapped -> sym_map, mapped
-            | None -> 
-              let new_sym =  make_new_sym hd_mono args in
-              T.Map.add hd_mono new_sym sym_map, new_sym
-          ) else (sym_map, hd_mono) in
-        let sym_map, args' = List.fold_right (fun a (sym_map, as_) -> 
-          let sym_map, a' = aux ~sym_map a in
-          (sym_map, a'::as_)
-        ) args (sym_map, []) in
-        sym_map, T.app hd args' in
+          let sym_map, hd = 
+            if List.length args != List.length l ||
+               is_partial_logical_op hd_mono then (
+              match T.Map.get hd_mono sym_map with
+              | Some mapped -> sym_map, mapped
+              | None -> 
+                let new_sym = make_new_sym hd_mono in
+                T.Map.add hd_mono new_sym sym_map, new_sym
+            ) else (sym_map, hd_mono) in
+          let sym_map, args' = List.fold_right (fun a (sym_map, as_) -> 
+            let sym_map, a' = aux ~sym_map a in
+            (sym_map, a'::as_)
+          ) args (sym_map, []) in
+          sym_map, T.app hd args' in
     aux ~sym_map:encoded_symbols t
 
   let encode_ty_args_cl ~encoded_symbols cl =

@@ -591,8 +591,8 @@ let depth t = Seq.subterms_depth t |> Iter.map snd |> Iter.fold max 0
 
 (* @param vars the free variables the parameter must depend upon
    @param ty_ret the return type *)
+let n = ref 0
 let mk_fresh_skolem ?(prefix="$_fresh_sk") =
-  let n = ref 0 in
   fun vars ty_ret ->
     let i = CCRef.incr_then_get n in
     (** fresh skolem **)
