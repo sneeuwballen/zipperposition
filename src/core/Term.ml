@@ -270,6 +270,7 @@ let head_term_mono t = match view t with
 
 let as_app_mono t = match view t with
   | App (f,l) ->
+    assert(match view f with AppBuiltin _ -> false | _ -> true);
     let l1,l2 = CCList.partition is_type l in
     app f l1, l2 (* re-apply to type parameters *)
   | AppBuiltin((Builtin.Eq | Builtin.Neq) as b, (x :: rest as l)) ->

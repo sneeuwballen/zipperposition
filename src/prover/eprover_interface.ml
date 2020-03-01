@@ -49,49 +49,51 @@ module Make(E : Env.S) : S with module Env = E = struct
     Format.fprintf out "thf(conj,conjecture,($false))."
 
   let rec encode_ty_args_t ~encoded_symbols t =
-    let t_ty t =
-      if Type.is_ground (T.ty t) then T.ty t
-      else 
-        let err = 
-          CCFormat.sprintf "%a:%a has nonground type" T.pp t Type.pp (T.ty t) in
-        raise @@ CantEncode err in
-
     let make_new_sym mono_head =
+      if not (T.is_ground mono_head) then (
+         let err = 
+          CCFormat.sprintf "%a has non-ground type argument"  T.pp t in
+        raise @@ CantEncode err;
+      );
       let (id, ty), res = 
         T.mk_fresh_skolem ~prefix:"ty_enc" [] (T.ty mono_head) in
       Env.Ctx.declare id ty;
       res in
-    
-    let is_partial_logical_op t =
-      match T.view t with 
-      | T.AppBuiltin(b, _) -> 
-        Builtin.is_logical_op b && not (Type.is_prop (t_ty t))
-      | _ -> false in
 
     let rec aux ~sym_map t =
+      if not (Type.is_ground (T.ty t)) then (
+        let err = 
+          CCFormat.sprintf "%a has non-ground type %a" 
+            T.pp t Type.pp (T.ty t) in
+        raise @@ CantEncode err;
+      );
       match T.view t with 
       | T.Const _ | T.Var _ -> sym_map, t
       | T.DB _ | T.Fun _ -> 
         let err = 
           CCFormat.sprintf "%a is a lambda" T.pp t in
         raise @@ CantEncode err
+      | T.AppBuiltin(b,_) when Builtin.is_logical_op b 
+                          && not (Type.is_prop (T.ty t)) -> 
+        let err = 
+          CCFormat.sprintf "%a is ho bool" T.pp t in
+        raise @@ CantEncode err
       | T.AppBuiltin(_, l)
       | T.App(_, l) ->
         let hd_mono, args = T.as_app_mono t in
-          let sym_map, hd = 
-            if List.length args != List.length l ||
-               is_partial_logical_op hd_mono then (
-              match T.Map.get hd_mono sym_map with
-              | Some mapped -> sym_map, mapped
-              | None -> 
-                let new_sym = make_new_sym hd_mono in
-                T.Map.add hd_mono new_sym sym_map, new_sym
-            ) else (sym_map, hd_mono) in
-          let sym_map, args' = List.fold_right (fun a (sym_map, as_) -> 
-            let sym_map, a' = aux ~sym_map a in
-            (sym_map, a'::as_)
-          ) args (sym_map, []) in
-          sym_map, T.app hd args' in
+        let sym_map, hd = 
+          if List.length args != List.length l then (
+            match T.Map.get hd_mono sym_map with
+            | Some mapped -> sym_map, mapped
+            | None -> 
+              let new_sym = make_new_sym hd_mono in
+              T.Map.add hd_mono new_sym sym_map, new_sym
+          ) else (sym_map, hd_mono) in
+        let sym_map, args' = List.fold_right (fun a (sym_map, as_) -> 
+          let sym_map, a' = aux ~sym_map a in
+          (sym_map, a'::as_)
+        ) args (sym_map, []) in
+        sym_map, T.app hd args' in
     aux ~sym_map:encoded_symbols t
 
   let encode_ty_args_cl ~encoded_symbols cl =
@@ -160,7 +162,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let cmd = 
         CCFormat.sprintf "timeout %d %s %s --cpu-limit=%d %s -s -p" 
           (to_+2) e_path prob_path to_ (if !_e_auto then "--auto" else "--auto-schedule") in
-      CCFormat.printf "%% Running : %s.\n" cmd;
+      CCFormat.printf "%% Running : %s.@." cmd;
       let process_channel = Unix.open_process_in cmd in
       let _,status = Unix.wait () in
       begin match status with
@@ -199,7 +201,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let reduced s =
         Iter.filter_map (fun c -> 
           let p_d = C.proof_depth c in
-          if p_d == 0 || Proof.Step.has_ho_step (C.proof_step c)
+          if p_d == 0 || (Proof.Step.has_ho_step (C.proof_step c) && p_d <= 3)
           then Some (CCOpt.get_or ~default:c (C.eta_reduce c))
           else None) s
         |> Iter.flat_map_l converter in
@@ -214,7 +216,6 @@ module Make(E : Env.S) : S with module Env = E = struct
                  then (init, cl'::rest,encoded_symbols)
                  else raise @@ CantEncode "skip not ho step"
           with CantEncode reason -> 
-          CCFormat.printf "@[cant encode @[%a@]:%s@]@." C.pp cl reason;
           (init, rest, encoded_symbols)
         ) ([],[],encoded_symbols) (Iter.to_list (reduced set)) in
       let rest = CCList.sort (fun c1 c2 ->
@@ -226,12 +227,12 @@ module Make(E : Env.S) : S with module Env = E = struct
     let prob_name, prob_channel = Filename.open_temp_file ~temp_dir:!_tmp_dir "e_input" "" in
     let out = Format.formatter_of_out_channel prob_channel in
 
-    try 
+    try
       let encoded_symbols = Term.Map.empty in
       let converter = 
         match !_encode_lams with
-        | `Ignore -> CCFormat.printf "ignoring@."; (fun c -> [c])
-        | `Combs -> CCFormat.printf "combs@."; (fun c -> [Combs.force_conv_lams c])
+        | `Ignore -> (fun c -> [c])
+        | `Combs ->  (fun c -> [Combs.force_conv_lams c])
         | _ -> invalid_arg "not implemented" in
       let encoded_symbols, active_set = 
         take_from_set ~ignore_ids:IntSet.empty ~encoded_symbols ~converter active_set in

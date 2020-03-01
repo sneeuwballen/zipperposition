@@ -286,6 +286,11 @@ let[@inline] is_a_type t = match ty t with
   | HasType ty -> equal ty tType
   | NoType -> assert false
 
+let expected_args t = 
+  match view t with 
+  | AppBuiltin(Builtin.Arrow, l) -> CCList.length l-1
+  | _ -> 0
+
 let rec app_builtin ~ty b l = 
   let prop = builtin ~ty:tType Builtin.prop in
   
@@ -304,7 +309,9 @@ let rec app_builtin ~ty b l =
     let ty = app_builtin ~ty:tType Builtin.arrow [prop;prop] in
     let my_t = make_ ~props:zero ~ty:(HasType ty) (AppBuiltin (b,[])) in
     H.hashcons my_t
-  | (Builtin.And | Builtin.Or), l when CCList.length l < 2 ->
+  | (Builtin.And | Builtin.Or), l 
+    when CCList.length l < 2 && 
+         expected_args ty < 2 ->
     let args = (if CCList.is_empty l then [prop] else []) @ [prop;prop] in
     let ty = app_builtin ~ty:tType Builtin.arrow args in
     let props = add_ty_vars (any_props_for_ts l) ty.props in
@@ -1080,7 +1087,6 @@ let rec pp_depth ?(hooks=[]) depth out t =
       (* always drop the type argument, it's always inferrable for builtins *)
       Format.fprintf out "(@[%a %s@ %a@])" (_pp depth) t1 (Builtin.to_string b) (_pp depth) t2
     | AppBuiltin (b, l) when Builtin.is_infix b && List.length l >= 2 ->
-      Format.printf "cc %a@." (CCFormat.Dump.list (_pp depth)) l;
       let sep = CCFormat.sprintf " %s " (Builtin.to_string b) in
       Format.fprintf out "(@[%a@])" (Util.pp_list ~sep (_pp depth)) l
     | AppBuiltin (b, []) -> Builtin.pp out b

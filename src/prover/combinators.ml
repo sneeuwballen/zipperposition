@@ -621,8 +621,14 @@ let abf ~rules t =
       let args' = List.map aux args in
       
       assert (not (T.is_fun hd_mono));
-      if T.same_l args args' then t
-      else T.app hd_mono args' (* flattens AppBuiltin if necessary *)
+      begin try
+        if T.same_l args args' then t
+        else T.app hd_mono args' (* flattens AppBuiltin if necessary *)
+      with Type.ApplyError _ ->
+        CCFormat.printf "hd:@[%a@]; type:@[%a@]@." T.pp hd_mono Type.pp (T.ty hd_mono);
+        CCFormat.printf "tys of args: @[%a@]" (CCList.pp Ty.pp) (CCList.map T.ty args');
+        CCFormat.printf "error for @[%a@]@." T.pp t;
+        assert false; end
     | T.Fun(ty, body) ->
       let body' = aux body in
       abstract ~bvar_ty:(Term.of_ty ty) body'
@@ -829,6 +835,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       ) else c
     
     let force_conv_lams c =
+      assert(C.Seq.terms c |> Iter.for_all T.DB.is_closed);
       let c' = lams2combs_otf c in
       if SimplM.is_same c' then c
       else SimplM.get c'
