@@ -73,7 +73,9 @@ module Make(E : Env.S) : S with module Env = E = struct
         let err = 
           CCFormat.sprintf "%a is a lambda" T.pp t in
         raise @@ CantEncode err
-      | T.AppBuiltin(b,_) when Builtin.is_logical_op b 
+      | T.AppBuiltin(b,_) when (Builtin.is_logical_op b 
+                                || b == Builtin.Eq 
+                                || b = Builtin.Neq)
                           && not (Type.is_prop (T.ty t)) -> 
         let err = 
           CCFormat.sprintf "%a is ho bool" T.pp t in
@@ -108,7 +110,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       ) (C.lits cl) (encoded_symbols, []) in
     let rule = Proof.Rule.mk "remove_ty_args" in
     let proof = Proof.Step.inference ~rule [C.proof_parent cl] in
-    let res = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lits proof in
+    let res = 
+      if Literals.equal (CCArray.of_list lits) (C.lits cl) then cl
+      else C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lits proof in
     encoded_symbols, res
 
   let output_cl ~out clause =
@@ -198,31 +202,36 @@ module Make(E : Env.S) : S with module Env = E = struct
 
     let take_from_set ?(converter=(fun c -> [c])) 
                       ~ignore_ids ~encoded_symbols set =
-      let reduced s =
-        Iter.filter_map (fun c -> 
+      let init, rest = 
+        Iter.to_list set
+        |> CCList.partition_map (fun c -> 
           let p_d = C.proof_depth c in
-          if p_d == 0 || (Proof.Step.has_ho_step (C.proof_step c) && p_d <= 3)
-          then Some (CCOpt.get_or ~default:c (C.eta_reduce c))
-          else None) s
-        |> Iter.flat_map_l converter in
-      let init, rest, encoded_symbols = 
-        List.fold_left (fun (init, rest, encoded_symbols) cl -> 
-          try
+          if p_d = 0 then `Left c
+          else if Proof.Step.has_ho_step (C.proof_step c) then `Right c
+          else `Drop
+        ) in
+      let rest = 
+        CCList.sort (fun c1 c2 ->
+          let pd1 = C.proof_depth c1 and pd2 = C.proof_depth c2 in
+          if pd1 = pd2 then CCInt.compare (C.weight c1) (C.weight c2)
+          else CCInt.compare pd1 pd2) rest
+        |> CCList.take max_others in
+      
+      let converted = 
+        CCList.map (fun c -> 
+          CCOpt.get_or ~default:c (C.eta_reduce c)) init @ rest
+        |> CCList.flat_map converter in
+
+      let encoded, encoded_symbols = 
+        CCList.fold_left (fun (acc, encoded_symbols) cl ->
+
+          try 
             if IntSet.mem (C.id cl) ignore_ids then raise @@ CantEncode "skip id";
-            let p_d = C.proof_depth cl in
             let encoded_symbols, cl' = encode_ty_args_cl ~encoded_symbols cl in
-            if p_d = 0 then (cl'::init,rest,encoded_symbols)
-            else if Proof.Step.has_ho_step (C.proof_step cl) 
-                 then (init, cl'::rest,encoded_symbols)
-                 else raise @@ CantEncode "skip not ho step"
-          with CantEncode reason -> 
-          (init, rest, encoded_symbols)
-        ) ([],[],encoded_symbols) (Iter.to_list (reduced set)) in
-      let rest = CCList.sort (fun c1 c2 ->
-        let pd1 = C.proof_depth c1 and pd2 = C.proof_depth c2 in
-        if pd1 = pd2 then CCInt.compare (C.weight c1) (C.weight c2)
-        else CCInt.compare pd1 pd2) rest in
-      encoded_symbols, init @ (CCList.take max_others rest) in
+            (cl'::acc, encoded_symbols)
+          with CantEncode _ -> (acc, encoded_symbols)
+        ) ([], encoded_symbols) converted in
+      encoded_symbols, encoded in
 
     let prob_name, prob_channel = Filename.open_temp_file ~temp_dir:!_tmp_dir "e_input" "" in
     let out = Format.formatter_of_out_channel prob_channel in
