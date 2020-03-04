@@ -68,7 +68,6 @@ let load_extensions =
 
   Extensions.register App_encode.extension;
   Extensions.register Bool_encode.extension;
-  CCFormat.printf "registering eq extension@.";
   Extensions.register Eq_encode.extension;
 
 

@@ -120,7 +120,6 @@ let eq_encode_stmt stmt =
 
 let extension =
   let modifier seq =
-    CCFormat.printf "in modifier@.";
     if !enabled_ then (
       let seq = Iter.map eq_encode_stmt seq in
       Util.debug ~section 2 "Start eq encoding";
