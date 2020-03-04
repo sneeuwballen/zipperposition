@@ -235,6 +235,8 @@ val head_exn : t -> ID.t (** head ID.t (or Invalid_argument) *)
 val size : t -> int (** Size (number of nodes) *)
 
 val simplify_bools : t -> t
+val nnf_bools : t -> t
+
 (* Sort the arguments to logical operators using their weights
    in an attempt to make more terms unifiable. *)
 val normalize_bools : t -> t

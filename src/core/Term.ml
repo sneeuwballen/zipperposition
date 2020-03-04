@@ -1359,9 +1359,8 @@ let nnf_bools t =
       begin match view f with 
       | AppBuiltin(Not, [g]) -> aux g
       | AppBuiltin( ((And|Or) as b), l) when List.length l >= 2 ->
-        let flipped = if b = Builtin.And then Builtin.Or else Builtin.And in
-        let l' = List.map aux l in
-        app_builtin ~ty:(ty t) flipped l'
+        let flipped = if b = Builtin.And then Form.or_l else Form.and_l in
+        flipped (List.map aux l)
       | AppBuiltin( ((ForallConst|ExistsConst) as b), ([g]|[_;g]) ) ->
         let flipped = 
           if b = Builtin.ForallConst then Builtin.ExistsConst

@@ -25,6 +25,8 @@ let k_cnf_non_simpl = Flex_state.create_key ()
 let k_norm_bools = Flex_state.create_key () 
 let k_solve_formulas = Flex_state.create_key ()
 let k_filter_literals = Flex_state.create_key ()
+let k_nnf = Flex_state.create_key ()
+
 
 
 module type S = sig
@@ -162,6 +164,18 @@ module Make(E : Env.S) : S with module Env = E = struct
     ) else (
       let proof = Proof.Step.simp [C.proof_parent c] 
           ~rule:(Proof.Rule.mk "simplify boolean subterms") in
+      let new_ = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) 
+          (Array.to_list new_lits) proof in
+      SimplM.return_new new_
+    )
+
+  let nnf_bool_subters c =
+    let new_lits = Literals.map T.nnf_bools (C.lits c) in
+    if Literals.equal (C.lits c) new_lits then (
+      SimplM.return_same c
+    ) else (
+      let proof = Proof.Step.simp [C.proof_parent c] 
+          ~rule:(Proof.Rule.mk "nnf boolean subterms") in
       let new_ = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) 
           (Array.to_list new_lits) proof in
       SimplM.return_new new_
@@ -329,6 +343,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       (* Env.ProofState.PassiveSet.add (create_clauses ()); *)
       Env.add_basic_simplify simpl_bool_subterms;
       Env.add_basic_simplify normalize_equalities;
+      if Env.flex_get k_nnf then (
+        E.add_basic_simplify nnf_bool_subters;
+      );
       if Env.flex_get k_norm_bools then (
         Env.add_basic_simplify normalize_bool_terms
       );
@@ -575,6 +592,7 @@ let _cnf_non_simpl = ref false
 let _norm_bools = ref false 
 let _solve_formulas = ref false
 let _filter_literals = ref `All
+let _nnf = ref false
 
 
 let extension =
@@ -589,6 +607,7 @@ let extension =
     E.flex_add k_norm_bools !_norm_bools;
     E.flex_add k_solve_formulas !_solve_formulas;
     E.flex_add k_filter_literals !_filter_literals;
+    E.flex_add k_nnf !_nnf;
 
 
     ET.setup ()
@@ -630,6 +649,9 @@ let () =
     "--solve-formulas"
     , Arg.Bool (fun v -> _solve_formulas := v)
     , " solve phi != psi eagerly using unification, where phi and psi are formulas";
+    "--nnf-nested-formulas"
+    , Arg.Bool (fun v -> _nnf := v)
+    , " convert nested formulas into negation normal form";
     "--boolean-reasoning-filter-literals"
     , Arg.Symbol(["all"; "max"], (fun v ->
         match v with 
