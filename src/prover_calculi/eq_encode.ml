@@ -15,7 +15,7 @@ module T = TypedSTerm
 let enabled_ = ref false
 let refl_ = ref true
 let symm_ = ref true
-let trans_ = ref true
+let trans_ = ref false
 
 let (==>) = T.Ty.(==>)
 
