@@ -243,7 +243,9 @@ module Make(E : Env.S) : S with module Env = E = struct
         match !_encode_lams with
         | `Ignore -> (fun c -> [c])
         | `Combs ->  (fun c -> ([Combs.force_conv_lams c] :> C.t list))
-        | _ -> (LLift.lift_lambdas :> (C.t -> C.t list)) in
+        | _ -> (fun c -> 
+            let lifted = LLift.lift_lambdas c in
+            if CCList.is_empty lifted then [c] else lifted) in
       let encoded_symbols, active_set = 
         take_from_set ~ignore_ids:IntSet.empty ~encoded_symbols ~converter active_set in
       let ignore_ids = IntSet.of_list (List.map C.id active_set) in
