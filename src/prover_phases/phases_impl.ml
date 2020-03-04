@@ -63,6 +63,8 @@ let load_extensions =
   Extensions.register Booleans.extension;
   Extensions.register Higher_order.extension;
   Extensions.register Combinators.extension;
+  Extensions.register Lift_lambdas.extension;
+
 
   Extensions.register App_encode.extension;
   Extensions.register Bool_encode.extension;

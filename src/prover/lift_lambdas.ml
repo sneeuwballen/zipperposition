@@ -1,6 +1,7 @@
 open Logtk
 module T = Term
 
+let section = Util.Section.make ~parent:Const.section "live_lifting"
 
 let k_live_lifting = Flex_state.create_key ()
 
@@ -80,9 +81,11 @@ let lift_lambdas_t t  =
   let rec aux t =
     match T.view t with
     | T.Fun _ ->
+      Util.debugf ~section 1 "before lifting:@[%a@]@." (fun k -> k T.pp t);
       let pref_vars, body = T.open_fun t in
-      let body', defs = aux body in
+      let body', (reused_defs,new_defs) = aux body in
       let body_closed = T.fun_l pref_vars body' in
+      Util.debugf ~section 1 "after lifting:@[%a@]@." (fun k -> k T.pp body_closed);
       let generalization = 
         Idx.retrieve_generalizations (!idx, 1) (body_closed, 0)
         |> Iter.head in
@@ -93,7 +96,7 @@ let lift_lambdas_t t  =
         begin match lits.(0) with
         | Literal.Equation(lhs,_,true) ->
           let lhs' = Subst.FO.apply Subst.Renaming.none subst (lhs, 1) in
-          lhs', ([],[def])
+          lhs', (def :: reused_defs, new_defs)
         | _ -> assert(false) end
       | None -> 
         let free_vars = T.vars body' in
@@ -103,18 +106,16 @@ let lift_lambdas_t t  =
         let (id, ty), new_ll_sym = 
           T.mk_fresh_skolem ~prefix:"l_lift" all_vars (T.ty t) in
         Ctx.declare id ty;
-        let lhs = T.app new_ll_sym (List.map T.var all_vars) in
-        let rhs = unbound in
+        let lhs = new_ll_sym and rhs = unbound in
         let lhs_applied, rhs_applied = fully_apply lhs rhs in
         let lits = [Literal.mk_eq lhs_applied rhs_applied] in
         let proof = Proof.Step.define_internal id [] in
         let new_def = C.create ~penalty:1 ~trail:Trail.empty lits proof in
         let repl = Subst.FO.apply Subst.Renaming.none subst (sc lhs) in
         idx := Idx.add !idx rhs new_def;
-        repl, ([],[new_def])
+        repl, (reused_defs, (new_def :: new_defs))
         end
-    | T.Var _ | T.Const _ -> t, ([],[])
-    | T.DB _ -> assert false;
+    | T.Var _ | T.Const _  | T.DB _ -> t, ([],[])
     | T.App(hd, l) -> 
       assert(not (T.is_fun hd));
       let l', new_defs = aux_l l in
@@ -128,7 +129,7 @@ let lift_lambdas_t t  =
       let x', (x_reused_defs, x_new_defs) = aux x in
       let xs', (xs_reused_defs, xs_new_defs) = aux_l xs in
       x' :: xs', (x_reused_defs @ xs_reused_defs, x_new_defs @ xs_new_defs) in
-
+  Util.debugf ~section 1 "lifting @[%a@]@." (fun k -> k T.pp t);
   aux t
 
   let lift_lambdas cl =
@@ -158,8 +159,12 @@ let lift_lambdas_t t  =
 
   let lift_lambdas_simp cl =
     let res = lift_lambdas cl in
-    if CCList.is_empty res then None
-    else Some res
+    if CCList.is_empty res then (
+      Util.debugf ~section 1 "Nothing to do for @[%a@]@." (fun k -> k C.pp cl);
+      None)
+    else (
+      Util.debugf ~section 1 "lifting(@[%a@])@. = @[%a@]" (fun k -> k C.pp cl (CCList.pp C.pp) res);
+      Some res)
 
   let setup () =
     if Env.flex_get k_live_lifting then (
@@ -184,7 +189,7 @@ let extension =
 
 let () =
   Options.add_opts
-    [ "--live-lifting", Arg.Bool ((:=) _live_lifting), 
+    [ "--live-lambda-lifting", Arg.Bool ((:=) _live_lifting), 
       " enable/disable lambda lifting as simplifying inference";
     ];
   Params.add_to_modes ["ho-complete-basic";
