@@ -838,6 +838,9 @@ module Form = struct
   let exists t =
     assert(Type.is_fun (ty t) && Type.returns_prop (ty t));
     app_builtin ~ty:Type.prop Builtin.ExistsConst [t]
+
+  let imply f g =
+    app_builtin ~ty:Type.prop Builtin.Imply [f; g]
 end
 
 (** {2 Arith} *)
@@ -1337,6 +1340,54 @@ let simplify_bools t =
       let args' = List.map aux args in
       if same_l args args' then t
       else app_builtin ~ty:(ty t) hd args' in  
+  aux t
+
+let nnf_bools t =
+  let rec aux t =
+    match view t with 
+    | Const _ | DB _ | Var _ -> t
+    | Fun _ ->
+      let tyargs, body = open_fun t in
+      let body' = aux body in
+      if equal body body' then t
+      else fun_l tyargs body'
+    | App(hd, l) ->
+      let hd' = aux hd and l' = List.map aux l in
+      if equal hd hd' && same_l l l' then t
+      else app hd' l'
+    | AppBuiltin (Builtin.Not, [f]) ->
+      begin match view f with 
+      | AppBuiltin(Not, [g]) -> aux g
+      | AppBuiltin( ((And|Or) as b), l) when List.length l >= 2 ->
+        let flipped = if b = Builtin.And then Builtin.Or else Builtin.And in
+        let l' = List.map aux l in
+        app_builtin ~ty:(ty t) flipped l'
+      | AppBuiltin( ((ForallConst|ExistsConst) as b), ([g]|[_;g]) ) ->
+        let flipped = 
+          if b = Builtin.ForallConst then Builtin.ExistsConst
+          else Builtin.ForallConst in
+        let g' = aux (Form.not_ g) in
+        app_builtin ~ty:(ty t) flipped [g']
+      | AppBuiltin( Imply, [g;h] ) ->
+        Form.and_ (aux g) (aux @@ Form.not_ h)
+      | AppBuiltin( ((Equiv|Xor) as b), [g;h] ) ->
+        let flipped = if b = Equiv then Builtin.Xor else Builtin.Equiv in
+        aux (app_builtin ~ty:(ty t) flipped [g;h])
+      | AppBuiltin(((Eq|Neq) as b), ([_;s;t]|[s;t])) ->
+        let flipped = if b = Eq then Form.neq else Form.eq in
+        flipped (aux s) (aux t)
+      | _ -> Form.not_ (aux f)
+      end
+    | AppBuiltin(Imply, [f;g]) -> aux (Form.or_ (Form.not_ f) g)
+    | AppBuiltin(Equiv, [f;g]) ->
+      aux (Form.and_ (Form.imply f g) (Form.imply g f))
+    | AppBuiltin(Xor, [f;g]) ->
+      aux (Form.and_ (Form.or_ f g) 
+                     (Form.or_ (Form.not_ f)  (Form.not_ g)))
+    | AppBuiltin(b, l) ->
+      let l' = List.map aux l in
+      if same_l l l' then t
+      else app_builtin ~ty:(ty t) b l' in
   aux t
 
 let rec normalize_bools t =
