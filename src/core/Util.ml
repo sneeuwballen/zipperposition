@@ -285,7 +285,7 @@ let tstp_needs_escaping s =
 let pp_str_tstp out s =
   CCFormat.string out (if tstp_needs_escaping s then "'" ^ String.escaped s ^ "'" else s)
 
-let pp_var_tstp out s = CCFormat.string out (CCString.capitalize_ascii s)
+let pp_var_tstp out s = pp_str_tstp out (CCString.capitalize_ascii s)
 
 let ord_option c o1 o2 = match o1, o2 with
   | None, None -> 0

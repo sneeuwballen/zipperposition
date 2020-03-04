@@ -39,7 +39,8 @@ module Make(E : Env.S) : S with module Env = E = struct
   module C = Env.C
   module Ctx = Env.Ctx
   module T = Term
-  module Combs = Combinators.Make(Env)
+  module Combs = Combinators.Make(E)
+  module LLift = Lift_lambdas.Make(E)
 
   let (==>) = Type.(==>)
 
@@ -241,8 +242,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       let converter = 
         match !_encode_lams with
         | `Ignore -> (fun c -> [c])
-        | `Combs ->  (fun c -> [Combs.force_conv_lams c])
-        | _ -> invalid_arg "not implemented" in
+        | `Combs ->  (fun c -> ([Combs.force_conv_lams c] :> C.t list))
+        | _ -> (LLift.lift_lambdas :> (C.t -> C.t list)) in
       let encoded_symbols, active_set = 
         take_from_set ~ignore_ids:IntSet.empty ~encoded_symbols ~converter active_set in
       let ignore_ids = IntSet.of_list (List.map C.id active_set) in

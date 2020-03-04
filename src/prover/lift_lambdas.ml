@@ -11,7 +11,7 @@ module type S = sig
 
   (** {6 Registration} *)
   val setup : unit -> unit
-  val lift_lambdas : C.t -> C.t list
+  val lift_lambdas : Env.C.t -> Env.C.t list
 end
 
 
@@ -32,7 +32,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let idx = ref (Idx.empty ())
 
-  let loose_bound_to_fvars t =
+  let loose_bound_to_fvars ~counter t =
     let rec aux ~depth ~lb_map ~subst t =
       match T.view t with
       | DB i ->
@@ -44,7 +44,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             assert(not @@ Scoped.equal T.equal (sc var) (Subst.FO.deref subst (sc var)));
             var, lb_map, subst
           | None  ->
-            let fvar = HVar.fresh ~ty:(T.ty t) () in
+            let fvar = HVar.fresh_cnt ~counter ~ty:(T.ty t) () in
             let t' = T.var fvar in
             let lb_map = Util.Int_map.add i t' lb_map in 
             let unshifted = T.bvar ~ty:(T.ty t) i in
@@ -73,16 +73,16 @@ module Make(E : Env.S) : S with module Env = E = struct
     aux t ~depth:0 ~lb_map:Util.Int_map.empty ~subst:Subst.empty
     
 
-let fully_apply s t  =
+let fully_apply ~counter s t  =
   assert(Type.equal (T.ty s) (T.ty t));
   if not (Type.is_fun (T.ty t)) then  (s,t)
   else (
     let tys,_ = Type.open_fun (T.ty t) in
-    let fresh_vars = List.map (fun ty -> T.var (HVar.fresh ~ty ())) tys in
+    let fresh_vars = List.map (fun ty -> T.var (HVar.fresh_cnt ~counter ~ty ())) tys in
     Lambda.whnf @@ T.app s fresh_vars, Lambda.whnf @@ T.app t fresh_vars
   )
 
-let lift_lambdas_t t  =
+let lift_lambdas_t ~counter t  =
   let rec aux t =
     match T.view t with
     | T.Fun _ ->
@@ -102,14 +102,14 @@ let lift_lambdas_t t  =
         lhs', (def :: reused_defs, new_defs)
       | None -> 
         let free_vars = T.vars body' in
-        let unbound, _, subst = loose_bound_to_fvars body_closed in
+        let unbound, _, subst = loose_bound_to_fvars ~counter body_closed in
         let new_free_vars = T.VarSet.diff (T.vars unbound) (free_vars) in
         let all_vars = T.VarSet.to_list free_vars @ T.VarSet.to_list new_free_vars in
         let (id, ty), new_ll_sym = 
           T.mk_fresh_skolem ~prefix:"l_lift" all_vars (T.ty t) in
         Ctx.declare id ty;
         let lhs = new_ll_sym and rhs = unbound in
-        let lhs_applied, rhs_applied = fully_apply lhs rhs in
+        let lhs_applied, rhs_applied = fully_apply ~counter lhs rhs in
         let lits = [Literal.mk_eq lhs_applied rhs_applied] in
         let proof = Proof.Step.define_internal id [] in
         let new_def = C.create ~penalty:1 ~trail:Trail.empty lits proof in
@@ -135,14 +135,17 @@ let lift_lambdas_t t  =
   aux t
 
   let lift_lambdas cl =
+    let counter = 
+      ref ((C.Seq.vars cl |> Iter.map HVar.id 
+            |> Iter.max |> CCOpt.get_or ~default:0) + 1) in
     let lits, (reused_defs, new_defs) = 
       C.lits cl
       |> CCArray.to_list
       |> (fun l -> List.fold_right (fun lit (acc, (reused_defs, new_defs)) -> 
           match lit with 
           | Literal.Equation(lhs, rhs, sign) ->
-            let lhs', (reused_lhs, new_lhs) = lift_lambdas_t lhs in
-            let rhs', (reused_rhs, new_rhs) = lift_lambdas_t rhs in
+            let lhs', (reused_lhs, new_lhs) = lift_lambdas_t ~counter lhs in
+            let rhs', (reused_rhs, new_rhs) = lift_lambdas_t ~counter rhs in
             let reused = reused_lhs @ reused_rhs and new_ = new_rhs @ new_lhs in
             let lit' = Literal.mk_lit lhs' rhs' sign in
             lit'::acc, (reused@reused_defs, new_@new_defs)
@@ -151,7 +154,8 @@ let lift_lambdas_t t  =
     if CCList.is_empty reused_defs && CCList.is_empty new_defs then []
     else (
       let proof = 
-        Proof.Step.simp ~rule:(Proof.Rule.mk "lambda_lifting")
+        Proof.Step.simp 
+          ~tags:[Proof.Tag.T_ho] ~rule:(Proof.Rule.mk "lambda_lifting")
           (List.map C.proof_parent (cl :: reused_defs @ new_defs)) in
       let lifted =
         C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lits proof in
