@@ -194,7 +194,22 @@ module Make(E : Env.S) : S with module Env = E = struct
       SimplM.return_same c 
     )
 
-  let cnf_otf c : C.t list option =   
+  let solve_bool_formulas cl =
+    let module PUnif = PUnif.Make(struct let st = Env.flex_state () end) in
+    let unifiers = CCList.flat_map (fun literal -> 
+        match literal with 
+        | Literal.Equation(lhs, rhs, false) when Type.is_prop (Term.ty lhs) ->
+          PUnif.unify_scoped (lhs,0) (rhs,0)
+          |> OSeq.filter_map CCFun.id
+          |> OSeq.to_list
+        | _ -> []
+      ) (CCArray.to_list (C.lits cl)) in
+    if CCList.is_empty unifiers then None
+    else Some (List.map (fun subst -> 
+        let subst = Unif_subst.subst subst in
+        C.apply_subst (cl,0) subst) unifiers)
+
+  let cnf_otf c : C.t list option =
     let idx = CCArray.find_idx (fun l -> 
         let eq = Literal.View.as_eqn l in
         match eq with 
@@ -228,6 +243,10 @@ module Make(E : Env.S) : S with module Env = E = struct
       CCVector.iter (fun cl -> 
           Statement.Seq.ty_decls cl
           |> Iter.iter (fun (id,ty) -> Ctx.declare id ty)) cnf_vec;
+      let solved = 
+        if Env.flex_get k_solve_formulas then (
+          CCOpt.get_or ~default:[] (solve_bool_formulas c))
+        else [] in
 
       begin try 
         let clauses = CCVector.map (C.of_statement ~convert_defs:true) cnf_vec
@@ -237,7 +256,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                           C.create ~penalty  ~trail (CCArray.to_list (C.lits c)) proof) in
         List.iteri (fun i new_c -> 
             assert((C.proof_depth c) <= C.proof_depth new_c);) clauses;
-        Some clauses
+        Some (solved @clauses)
       with Type.ApplyError err ->
         CCFormat.printf "cnf(@[%a@])@.err:@[%s@]@." C.pp c err;
         CCFormat.printf "result:@[%a@]@." (CCVector.pp ~sep:";\n" (Statement.pp_clause_in Output_format.O_tptp)) cnf_vec;
@@ -303,21 +322,6 @@ module Make(E : Env.S) : S with module Env = E = struct
         forall_cl :: forall_neg_cl :: res
       ) []
 
-  let solve_bool_formulas cl =
-    let module PUnif = PUnif.Make(struct let st = Env.flex_state () end) in
-    let unifiers = CCList.flat_map (fun literal -> 
-        match literal with 
-        | Literal.Equation(lhs, rhs, false) when Type.is_prop (Term.ty lhs) ->
-          PUnif.unify_scoped (lhs,0) (rhs,0)
-          |> OSeq.filter_map CCFun.id
-          |> OSeq.to_list
-        | _ -> []
-      ) (CCArray.to_list (C.lits cl)) in
-    if CCList.is_empty unifiers then None
-    else Some (List.map (fun subst -> 
-        let subst = Unif_subst.subst subst in
-        C.apply_subst (cl,0) subst) unifiers)
-
   let setup () =
     match Env.flex_get k_bool_reasoning with 
     | BoolReasoningDisabled -> ()
@@ -332,9 +336,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       if Env.flex_get k_cnf_non_simpl then (
         Env.add_unary_inf "cnf otf inf" cnf_infer;
       ) else  Env.add_multi_simpl_rule cnf_otf;
-      if Env.flex_get k_solve_formulas then (
-        Env.add_multi_simpl_rule solve_bool_formulas
-      );
       if (Env.flex_get k_interpret_bool_funs) then (
         Env.add_unary_inf "interpret boolean functions" interpret_boolean_functions;
       );

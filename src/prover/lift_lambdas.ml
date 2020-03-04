@@ -19,7 +19,12 @@ module Make(E : Env.S) : S with module Env = E = struct
   module Env = E
   module C = Env.C
   module Ctx = Env.Ctx
-  module Idx = Fingerprint.Make(C)
+  module Idx = Fingerprint.Make(struct 
+    type t = C.t * T.t
+    let (<?>) = (CCOrd.Infix.(<?>)) 
+    let compare (a,b) (c,d) =
+      (C.compare a c) <?> (T.compare, b, d)
+   end)
 
   let setup () = ()
   
@@ -90,14 +95,11 @@ let lift_lambdas_t t  =
         Idx.retrieve_generalizations (!idx, 1) (body_closed, 0)
         |> Iter.head in
       begin match generalization with 
-      | Some (_,def,subst) ->
+      | Some (_,(def, lhs),subst) ->
         let lits = C.lits def in
         assert(Array.length lits = 1);
-        begin match lits.(0) with
-        | Literal.Equation(lhs,_,true) ->
-          let lhs' = Subst.FO.apply Subst.Renaming.none subst (lhs, 1) in
-          lhs', (def :: reused_defs, new_defs)
-        | _ -> assert(false) end
+        let lhs' = Subst.FO.apply Subst.Renaming.none subst (lhs, 1) in
+        lhs', (def :: reused_defs, new_defs)
       | None -> 
         let free_vars = T.vars body' in
         let unbound, _, subst = loose_bound_to_fvars body_closed in
@@ -112,7 +114,7 @@ let lift_lambdas_t t  =
         let proof = Proof.Step.define_internal id [] in
         let new_def = C.create ~penalty:1 ~trail:Trail.empty lits proof in
         let repl = Subst.FO.apply Subst.Renaming.none subst (sc lhs) in
-        idx := Idx.add !idx rhs new_def;
+        idx := Idx.add !idx rhs (new_def, lhs);
         repl, (reused_defs, (new_def :: new_defs))
         end
     | T.Var _ | T.Const _  | T.DB _ -> t, ([],[])
@@ -149,8 +151,8 @@ let lift_lambdas_t t  =
     if CCList.is_empty reused_defs && CCList.is_empty new_defs then []
     else (
       let proof = 
-        Proof.Step.inference ~rule:(Proof.Rule.mk "lambda_lifting")
-          (List.map C.proof_parent (reused_defs @ new_defs)) in
+        Proof.Step.simp ~rule:(Proof.Rule.mk "lambda_lifting")
+          (List.map C.proof_parent (cl :: reused_defs @ new_defs)) in
       let lifted =
         C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lits proof in
       
