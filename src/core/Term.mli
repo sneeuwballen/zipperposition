@@ -234,9 +234,6 @@ val head_exn : t -> ID.t (** head ID.t (or Invalid_argument) *)
 
 val size : t -> int (** Size (number of nodes) *)
 
-val simplify_bools : t -> t
-val nnf_bools : t -> t
-
 (* Sort the arguments to logical operators using their weights
    in an attempt to make more terms unifiable. *)
 val normalize_bools : t -> t
@@ -373,6 +370,7 @@ val debugf : Format.formatter -> t -> unit
 
 module Form : sig
   val not_ : t -> t
+  val imply : t -> t -> t
   val eq : t -> t -> t
   val neq : t -> t -> t
   val and_ : t -> t -> t

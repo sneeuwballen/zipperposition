@@ -8,6 +8,7 @@ open Libzipperposition
 
 module T = Term
 module Pos = Position
+module US = Unif_subst
 
 type selection_setting = Any | Minimal | Large
 type reasoning_kind    = 
@@ -157,8 +158,133 @@ module Make(E : Env.S) : S with module Env = E = struct
         (mk_res ~proof ~old ~repl:repl_pos pos_lit c) :: acc
     ) [] bool_subterms)
 
+  let simplify_bools t =
+    let simplify_and_or t b l =
+      let open Term in
+      let compl_in_l l =
+        let pos, neg = 
+          CCList.partition_map (fun t -> 
+              match view t with 
+              | AppBuiltin(Builtin.Not, [s]) -> `Right s
+              | _ -> `Left t) l
+          |> CCPair.map_same Set.of_list in
+        not (Set.is_empty (Set.inter pos neg)) in
+      
+      let res = 
+        assert(b = Builtin.And || b = Builtin.Or);
+        let netural_el, absorbing_el = 
+          if b = Builtin.And then true_,false_ else (false_,true_) in
+
+        let l' = CCList.sort_uniq ~cmp:compare l in
+
+        if compl_in_l l || List.exists (equal absorbing_el) l then absorbing_el
+        else (
+          let l' = List.filter (fun s -> not (equal s netural_el)) l' in
+          if List.length l = List.length l' then t
+          else (
+            if CCList.is_empty l' then netural_el
+            else (if List.length l' = 1 then List.hd l'
+                  else app_builtin ~ty:(Type.prop) b l')
+          )) 
+      in
+      res 
+    in
+
+  let rec aux t =
+    match T.view t with 
+    | DB _ | Const _ | Var _ -> t
+    | Fun(ty, body) ->
+      let body' = aux body in
+      if T.equal body body' then t
+      else T.fun_ ty body'
+    | App(hd, args) ->
+      let hd' = aux hd and  args' = List.map aux args in
+      if T.equal hd hd' && T.same_l args args' then t
+      else T.app hd' args'
+    | AppBuiltin(Builtin.And, [x]) 
+        when T.is_true_or_false x && List.length (Type.expected_args (T.ty t)) = 1 ->
+      if T.equal x T.true_ then (
+        T.fun_ Type.prop (T.bvar ~ty:Type.prop 0)
+      ) else (
+        assert (T.equal x T.false_);
+        T.fun_ Type.prop T.false_
+      )
+    | AppBuiltin(Builtin.Or, [x]) 
+        when T.is_true_or_false x && List.length (Type.expected_args (T.ty t)) = 1 ->
+      let prop = Type.prop in
+      if T.equal x T.true_ then (
+        T.fun_ prop (T.true_)
+      ) else (
+        assert (T.equal x T.false_);
+        T.fun_ prop (T.bvar ~ty:prop 0)
+      )
+    | AppBuiltin(Builtin.And, l) when List.length l > 1 ->
+      let l' = List.map aux l in
+      let t = if T.same_l l l' then t 
+        else T.app_builtin ~ty:(Type.prop) Builtin.And l' in
+      simplify_and_or t Builtin.And l'
+    | AppBuiltin(Builtin.Or, l) when List.length l > 1 ->
+      let l' = List.map aux l in
+      let t = if T.same_l l l' then t 
+        else T.app_builtin ~ty:(Type.prop) Builtin.Or l' in
+      simplify_and_or t Builtin.Or l'
+    | AppBuiltin(Builtin.Not, [s]) ->
+      if T.equal s T.true_ then T.false_
+      else 
+      if T.equal s T.false_ then T.true_
+      else (
+        match T.view s with 
+        | AppBuiltin(Builtin.Not, [s']) -> aux s'
+        | _ ->  
+          let s' = aux s in
+          if T.equal s s' then t else
+            T.app_builtin ~ty:(Type.prop) Builtin.Not [s'] 
+      )
+    | AppBuiltin(Builtin.Imply, [p;c]) ->
+      if T.equal p T.true_ then aux c
+      else if T.equal p T.false_ then T.true_
+      else (
+        let p',c' = aux p, aux c in
+        if T.equal p p' && T.equal c c' then t 
+        else T.app_builtin ~ty:(T.ty t) Builtin.Imply [p';c'])
+    | AppBuiltin(hd, ([a;b]|[_;a;b])) 
+        when hd = Builtin.Eq || hd = Builtin.Equiv ->
+      if T.equal a b then T.true_ else (
+        let a',b' = aux a, aux b in
+        if T.equal a a' && T.equal b b' then t 
+        else T.app_builtin ~ty:(T.ty t) hd [a';b']
+      )
+    | AppBuiltin(hd, ([a;b]|[_;a;b]))
+        when hd = Builtin.Neq || hd = Builtin.Xor ->
+      if T.equal a b then T.false_ else (
+        let a',b' = aux a, aux b in
+        if T.equal a a' && T.equal b b' then t 
+        else T.app_builtin ~ty:(T.ty t) hd [a';b']
+      )
+    | AppBuiltin((ExistsConst|ForallConst) as b, [g]) ->
+      let g' = aux g in
+      let exp_g = Lambda.eta_expand g' in
+      let _, body = T.open_fun exp_g in
+      assert(Type.is_prop (T.ty body));
+      if (T.Seq.subterms ~include_builtin:true body
+          |> Iter.exists T.is_bvar) then (
+        if T.equal g g' then t
+        else T.app_builtin ~ty:(T.ty t) b [g']
+      ) else body
+    | AppBuiltin(hd, args) ->
+      let args' = List.map aux args in
+      if T.same_l args args' then t
+      else T.app_builtin ~ty:(T.ty t) hd args' in  
+  let res = aux t in
+  if not (T.DB.is_closed res) then (
+    CCFormat.printf "t:@[%a@]@." T.pp t;
+    CCFormat.printf "res:@[%a@]@." T.pp res;
+    assert false;
+  );
+  res
+
   let simpl_bool_subterms c =
-    let new_lits = Literals.map T.simplify_bools (C.lits c) in
+    let new_lits = Literals.map simplify_bools (C.lits c) in
     if Literals.equal (C.lits c) new_lits then (
       SimplM.return_same c
     ) else (
@@ -169,8 +295,59 @@ module Make(E : Env.S) : S with module Env = E = struct
       SimplM.return_new new_
     )
 
+  let nnf_bools t =
+    let module F = T.Form in
+    let rec aux t =
+      match T.view t with 
+      | Const _ | DB _ | Var _ -> t
+      | Fun _ ->
+        let tyargs, body = T.open_fun t in
+        let body' = aux body in
+        if T.equal body body' then t
+        else T.fun_l tyargs body'
+      | App(hd, l) ->
+        let hd' = aux hd and l' = List.map aux l in
+        if T.equal hd hd' && T.same_l l l' then t
+        else T.app hd' l'
+      | AppBuiltin (Builtin.Not, [f]) ->
+        begin match T.view f with 
+        | AppBuiltin(Not, [g]) -> aux g
+        | AppBuiltin( ((And|Or) as b), l) when List.length l >= 2 ->
+          let flipped = if b = Builtin.And then F.or_l else F.and_l in
+          flipped (List.map aux l)
+        | AppBuiltin( ((ForallConst|ExistsConst) as b), ([g]|[_;g]) ) ->
+          let flipped = 
+            if b = Builtin.ForallConst then Builtin.ExistsConst
+            else Builtin.ForallConst in
+          let g_ty_args, g_body = T.open_fun (Lambda.eta_expand g)  in
+          let g_body' = aux @@ F.not_ g_body in
+          let g' = Lambda.eta_reduce (T.fun_l g_ty_args g_body') in
+          T.app_builtin ~ty:(T.ty t) flipped [g']
+        | AppBuiltin( Imply, [g;h] ) ->
+          F.and_ (aux g) (aux @@ F.not_ h)
+        | AppBuiltin( ((Equiv|Xor) as b), [g;h] ) ->
+          let flipped = if b = Equiv then Builtin.Xor else Builtin.Equiv in
+          aux (T.app_builtin ~ty:(T.ty t) flipped [g;h])
+        | AppBuiltin(((Eq|Neq) as b), ([_;s;t]|[s;t])) ->
+          let flipped = if b = Eq then F.neq else F.eq in
+          flipped (aux s) (aux t)
+        | _ -> F.not_ (aux f)
+        end
+      | AppBuiltin(Imply, [f;g]) -> aux (F.or_ (F.not_ f) g)
+      | AppBuiltin(Equiv, [f;g]) ->
+        aux (F.and_ (F.imply f g) (F.imply g f))
+      | AppBuiltin(Xor, [f;g]) ->
+        aux (F.and_ (F.or_ f g)
+                      (F.or_ (F.not_ f)  (F.not_ g)))
+      | AppBuiltin(b, l) ->
+        let l' = List.map aux l in
+        if T.same_l l l' then t
+        else T.app_builtin ~ty:(T.ty t) b l' in
+    aux t
+
+
   let nnf_bool_subters c =
-    let new_lits = Literals.map T.nnf_bools (C.lits c) in
+    let new_lits = Literals.map nnf_bools (C.lits c) in
     if Literals.equal (C.lits c) new_lits then (
       SimplM.return_same c
     ) else (
@@ -208,20 +385,83 @@ module Make(E : Env.S) : S with module Env = E = struct
       SimplM.return_same c 
     )
 
-  let solve_bool_formulas cl =
-    let module PUnif = PUnif.Make(struct let st = Env.flex_state () end) in
-    let unifiers = CCList.flat_map (fun literal -> 
-        match literal with 
-        | Literal.Equation(lhs, rhs, false) when Type.is_prop (Term.ty lhs) ->
-          PUnif.unify_scoped (lhs,0) (rhs,0)
-          |> OSeq.filter_map CCFun.id
-          |> OSeq.to_list
-        | _ -> []
-      ) (CCArray.to_list (C.lits cl)) in
-    if CCList.is_empty unifiers then None
-    else Some (List.map (fun subst -> 
-        let subst = Unif_subst.subst subst in
-        C.apply_subst (cl,0) subst) unifiers)
+  let solve_bool_formulas c =
+    let module PUnif = 
+      PUnif.Make(struct 
+        let st = 
+          Env.flex_state ()
+          |> Flex_state.add PragUnifParams.k_fixpoint_decider true
+          |> Flex_state.add PragUnifParams.k_pattern_decider true
+          |> Flex_state.add PragUnifParams.k_solid_decider true
+          |> Flex_state.add PragUnifParams.k_max_inferences 1
+          |> Flex_state.add PragUnifParams.k_max_depth 2
+          |> Flex_state.add PragUnifParams.k_max_app_projections 1
+          |> Flex_state.add PragUnifParams.k_max_rigid_imitations 2
+          |> Flex_state.add PragUnifParams.k_max_elims 1
+          |> Flex_state.add PragUnifParams.k_max_identifications 1
+        end) in
+    
+    let normalize_not t =
+      let rec aux t = 
+        match T.view t with
+        | T.AppBuiltin(Not, [f]) ->
+          begin match T.view f with
+          | T.AppBuiltin(Not, [g]) -> aux g
+          | T.AppBuiltin( ((Eq|Equiv) as b), l ) ->
+            let flipped = 
+              if b = Builtin.Eq then Builtin.Neq else Builtin.Xor in
+            T.app_builtin flipped l ~ty:(T.ty f)
+          | T.AppBuiltin( ((Neq|Xor) as b), l ) ->
+            let flipped = 
+              if b = Builtin.Neq then Builtin.Eq else Builtin.Equiv in
+            T.app_builtin flipped l ~ty:(T.ty f)
+          | _ -> t end
+        | _ -> t in
+      aux t in
+
+    let find_resolvable_form lit =
+      match (Literal.View.as_eqn lit) with 
+      | Some (l,r,sign) ->
+        if not sign && not (T.is_true_or_false r) && Type.is_prop (T.ty l) then (
+          Some (l,r)
+        ) else if T.is_true_or_false r then (
+          let neg = if T.equal r T.true_ then CCFun.id else T.Form.not_ in
+          match T.view (normalize_not (neg l)) with 
+          | T.AppBuiltin((Neq|Xor), ([f;g]|[_;f;g])) when Type.is_prop (T.ty f) ->
+            assert(Type.equal (T.ty f) (T.ty g));
+            Some (f,g)
+          | _ -> None
+        ) else None
+      | None -> None in
+    
+    C.lits c
+    |> CCArray.mapi (fun i lit -> 
+      match find_resolvable_form lit with 
+      | None -> None
+      | Some (l,r) ->
+        try
+          let subst = 
+            PUnif.unify_scoped (l,0) (r,0)
+            |> OSeq.nth 0
+            |> CCOpt.get_exn in
+          assert(not @@ Unif_subst.has_constr subst);
+          let new_lits = 
+            CCArray.except_idx (C.lits c) i
+            |> CCArray.of_list
+            |> (fun l -> 
+                Literals.apply_subst 
+                  (Subst.Renaming.create ()) (US.subst subst) (l,0))
+            |> CCArray.to_list in
+          let proof = 
+            Proof.Step.inference ~tags:[Proof.Tag.T_ho]
+              ~rule:(Proof.Rule.mk "solve_formulas")
+              [C.proof_parent c] in
+          Some (C.create ~penalty:(C.penalty c) ~trail:(C.trail c) new_lits proof)
+        with _ -> None)
+      |> CCArray.filter_map CCFun.id
+      |> CCArray.to_list
+      |> (fun l -> if CCList.is_empty l then None else Some l)
+
 
   let cnf_otf c : C.t list option =
     let idx = CCArray.find_idx (fun l -> 
