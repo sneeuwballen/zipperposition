@@ -246,9 +246,9 @@ let bool_encode_term t_orig  =
             let head = if b = Equiv || b = Eq then equiv_term else xor_term in
             let x = aux x and y = aux y in
             app_bool head [x; y]
-          | T.AppBuiltin (((Eq|Neq) as b), [x;y]) when not (T.Ty.is_prop (T.ty_exn x)) ->
+          | T.AppBuiltin (((Eq|Neq) as b), [x;y]) ->
             assert (T.equal (T.ty_exn x) (T.ty_exn y));
-            let head = if b = Equiv || b = Eq then eq_term else neq_term in
+            let head = if b = Eq then eq_term else neq_term in
             let x = aux x and y = aux y in
             let ty_arg = T.ty_exn x in
             app_bool head [ty_arg; x; y]
