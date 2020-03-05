@@ -125,7 +125,7 @@ let same_l l1 l2 = match l1, l2 with
   | _ -> same_l_rec l1 l2
 
 let [@inline] ty_is_fun ty = match view ty with
-  | AppBuiltin (Builtin.Arrow, ret :: args) -> List.length args != 0
+  | AppBuiltin (Builtin.Arrow, _ret :: args) -> List.length args != 0
   | _ -> false
 
 let same_l_gen l1 l2 =
