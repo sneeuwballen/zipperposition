@@ -659,6 +659,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         raise @@ ExitSuperposition(msg);
       );
 
+      if info.sup_kind = FluidSup && 
+         Term.equal (Lambda.eta_reduce @@ Lambda.snf @@ t') 
+           (Lambda.eta_reduce @@ Lambda.snf @@ S.FO.apply ~shift_vars renaming subst (info.s, sc_a)) then (
+        let msg = "Passive literal is trivial after substitution" in
+        Util.debugf ~section 3 "%s" (fun k->k msg);
+        raise @@ ExitSuperposition(msg);
+      );
+
       begin match info.passive_lit, info.passive_pos with
         | Lit.Equation (_, v, true), P.Arg(_, P.Left P.Stop)
         | Lit.Equation (v, _, true), P.Arg(_, P.Right P.Stop) ->
