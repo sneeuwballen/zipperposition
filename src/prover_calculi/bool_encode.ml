@@ -47,6 +47,17 @@ let impl_type = [bool_clone_ty; bool_clone_ty] ==> bool_clone_ty
 let impl_term = T.const ~ty:impl_type impl_id
 let impl_clone_tydecl = decl impl_id impl_type
 
+let equiv_id = ID.make "$_equiv"
+let equiv_type = [bool_clone_ty; bool_clone_ty] ==> bool_clone_ty
+let equiv_term = T.const ~ty:equiv_type equiv_id
+let equiv_clone_tydecl = decl equiv_id equiv_type
+
+let xor_id = ID.make "$_xor"
+let xor_type = [bool_clone_ty; bool_clone_ty] ==> bool_clone_ty
+let xor_term = T.const ~ty:xor_type xor_id
+let xor_clone_tydecl = decl xor_id xor_type
+
+
 let eq_id = ID.make "$_eq"
 let eq_type = 
   let alpha = Var.make ~ty:T.tType (ID.make "alpha") in
@@ -75,7 +86,8 @@ let ty_decls =
   Iter.of_list [bool_clone_tydecl;true_clone_tydecl;
                 false_clone_tydecl; and_clone_tydecl;
                 or_clone_tydecl; not_clone_tydecl;
-                impl_clone_tydecl; eq_clone_tydecl;
+                impl_clone_tydecl; equiv_clone_tydecl;
+                xor_clone_tydecl; eq_clone_tydecl;
                 neq_clone_tydecl; forall_clone_tydecl;
                 exists_clone_tydecl]
 
@@ -100,7 +112,7 @@ let boolean_axioms =
   (* T != F *)
   let true_neq_false =
     [SLiteral.neq true_term false_term] in
-  (* and T x = T *)
+  (* and T x = x *)
   let and_true =
     [SLiteral.eq (app_bool and_term [true_term; bool_x]) bool_x] in
   (* and F x = F *)
@@ -118,11 +130,21 @@ let boolean_axioms =
   (* or F x = x *)
   let or_false =
     [SLiteral.eq (app_bool or_term [false_term; bool_x]) bool_x] in
-  (* impl x y = or (not x) y *)
-  let impl_def =
-    let impl_x_y = app_bool impl_term [bool_x; bool_y] in
-    let not_x_or_y = app_bool or_term [app_bool not_term [bool_x]; bool_y] in
-    [SLiteral.eq impl_x_y not_x_or_y] in
+  (* impl T x = x *)
+  let impl_t =
+    [SLiteral.eq (app_bool impl_term [true_term; bool_x]) bool_x] in
+  (* impl F x = T *)
+  let impl_f =
+    [SLiteral.eq (app_bool impl_term [false_term; bool_x]) true_term] in
+  let equiv_def =
+    [SLiteral.eq 
+      (app_bool equiv_term [bool_x; bool_y]) 
+      (app_bool and_term [app_bool impl_term [bool_x; bool_y];
+                          app_bool impl_term [bool_y; bool_x]])] in
+  let xor_def =
+    [SLiteral.eq 
+      (app_bool xor_term [bool_x; bool_y]) 
+      (app_bool not_term [app_bool eq_term [bool_x; bool_y]])] in
 
   let eq_x_y = app_bool eq_term [alpha;alpha_x;alpha_y] in
   let neq_x_y = app_bool neq_term [alpha;alpha_x;alpha_y] in
@@ -160,7 +182,7 @@ let boolean_axioms =
   Iter.of_list [either_true_or_false; true_neq_false; and_true; and_false;
                 not_true; not_false; or_true; or_false; eq_true; eq_false;
                 neq_is_not_eq; forall_true; forall_false; exists_def;
-                impl_def]
+                impl_t; impl_f; equiv_def; xor_def]
 
 
 let bool_encode_ty ty_orig =
@@ -219,9 +241,14 @@ let bool_encode_term t_orig  =
               let init = app_bool head [aux x; aux y] in
               List.fold_left (fun acc arg -> app_bool head [acc;aux arg]) init tts
             end
-          | T.AppBuiltin (((Equiv|Xor|Eq|Neq) as b), [x;y]) ->
+          | T.AppBuiltin (((Eq|Equiv|Neq|Xor) as b), [x;y]) when (T.Ty.is_prop (T.ty_exn x)) ->
             assert (T.equal (T.ty_exn x) (T.ty_exn y));
-            let head = if b = Equiv || b = Eq then eq_term else neq_term in
+            let head = if b = Equiv || b = Eq then equiv_term else xor_term in
+            let x = aux x and y = aux y in
+            app_bool head [x; y]
+          | T.AppBuiltin (((Eq|Neq) as b), [x;y]) ->
+            assert (T.equal (T.ty_exn x) (T.ty_exn y));
+            let head = if b = Eq then eq_term else neq_term in
             let x = aux x and y = aux y in
             let ty_arg = T.ty_exn x in
             app_bool head [ty_arg; x; y]

@@ -276,7 +276,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         | AppBuiltin(Not, [g]) -> aux g
         | AppBuiltin( ((And|Or) as b), l) when List.length l >= 2 ->
           let flipped = if b = Builtin.And then F.or_l else F.and_l in
-          flipped (List.map aux l)
+          flipped (List.map (fun t -> aux (F.not_ t))  l)
         | AppBuiltin( ((ForallConst|ExistsConst) as b), ([g]|[_;g]) ) ->
           let flipped = 
             if b = Builtin.ForallConst then Builtin.ExistsConst
@@ -299,8 +299,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       | AppBuiltin(Equiv, [f;g]) ->
         aux (F.and_ (F.imply f g) (F.imply g f))
       | AppBuiltin(Xor, [f;g]) ->
-        aux (F.and_ (F.or_ f g)
-                      (F.or_ (F.not_ f)  (F.not_ g)))
+        aux (F.and_ (F.or_ f g) (F.or_ (F.not_ f)  (F.not_ g)))
       | AppBuiltin(b, l) ->
         let l' = List.map aux l in
         if T.same_l l l' then t
