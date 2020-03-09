@@ -555,7 +555,11 @@ module Make(C : Clause_intf.S) = struct
       - (prefer_formulas c)
 
     let prefer_short_trail c =
-      Trail.length (C.trail c)
+      if Trail.is_empty (C.trail c) then max_int
+      else Trail.length (C.trail c)
+    
+    let prefer_empty_trail c =
+      if Trail.is_empty (C.trail c) then 0 else 1
 
     let prefer_long_trail c =
       - (Trail.length (C.trail c))
@@ -660,6 +664,7 @@ module Make(C : Clause_intf.S) = struct
       "defer-ground", (fun _ -> defer_ground);
       "defer-fo", (fun _ -> defer_fo);
       "prefer-fo", (fun _ -> prefer_fo);
+      "prefer-empty-trail", (fun _ -> prefer_empty_trail);
       "prefer-short-trail", (fun _ -> prefer_short_trail);
       "prefer-long-trail", (fun _ -> prefer_long_trail);
       "by-neg-lit", (fun _ -> by_neg_lit);

@@ -144,7 +144,7 @@ let boolean_axioms =
   let xor_def =
     [SLiteral.eq 
       (app_bool xor_term [bool_x; bool_y]) 
-      (app_bool not_term [app_bool eq_term [bool_x; bool_y]])] in
+      (app_bool not_term [app_bool equiv_term [bool_x; bool_y]])] in
 
   let eq_x_y = app_bool eq_term [alpha;alpha_x;alpha_y] in
   let neq_x_y = app_bool neq_term [alpha;alpha_x;alpha_y] in
@@ -178,11 +178,13 @@ let boolean_axioms =
     [SLiteral.eq 
       (app_bool exists_term [alpha; alpha2bool_p])
       (app_bool not_term [app_bool forall_term [alpha; l_not_p_x]])] in
-  
-  Iter.of_list [either_true_or_false; true_neq_false; and_true; and_false;
-                not_true; not_false; or_true; or_false; eq_true; eq_false;
-                neq_is_not_eq; forall_true; forall_false; exists_def;
-                impl_t; impl_f; equiv_def; xor_def]
+
+    Iter.of_list [either_true_or_false; true_neq_false; and_true; and_false;
+                  not_true; not_false; or_true; or_false; eq_true; eq_false;
+                  neq_is_not_eq; forall_true; forall_false; exists_def;
+                  impl_t; impl_f; equiv_def; xor_def] 
+
+
 
 
 let bool_encode_ty ty_orig =
@@ -246,7 +248,7 @@ let bool_encode_term t_orig  =
             let head = if b = Equiv || b = Eq then equiv_term else xor_term in
             let x = aux x and y = aux y in
             app_bool head [x; y]
-          | T.AppBuiltin (((Eq|Neq) as b), [x;y]) ->
+          | T.AppBuiltin (((Eq|Neq) as b), ([x;y]|[_;x;y])) ->
             assert (T.equal (T.ty_exn x) (T.ty_exn y));
             let head = if b = Eq then eq_term else neq_term in
             let x = aux x and y = aux y in
