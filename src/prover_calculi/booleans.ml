@@ -51,45 +51,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let (@:) = T.app_builtin ~ty:Type.prop
   let no a = a =~ T.false_
   let yes a = a =~ T.true_
-  let imply a b = Builtin.Imply @: [a;b]
-  let const_true p = T.fun_ (List.hd @@ fst @@ Type.open_fun (T.ty p)) T.true_
-
-  let true_not_false = [T.true_ /~ T.false_]
-  let true_or_false a = [yes a; a =~ T.false_]
-  let imp_true1 a b = [yes a; yes(imply a b)]
-  let imp_true2 a b = [no b; yes(imply a b)]
-  let imp_false a b = [no(imply a b); no a; yes b]
-  let all_true p = [p /~ const_true p; yes(Builtin.ForallConst@:[p])]
-  let all_false p = [no(Builtin.ForallConst@:[p]); p =~ const_true p]
-  let eq_true x y = [x/~y; yes(Builtin.Eq@:[x;y])]
-  let eq_false x y = [no(Builtin.Eq@:[x;y]); x=~y]
-  let and_ a b = [Builtin.And @: [a;b] 
-                  =~  imply (imply a (imply b T.false_)) T.false_]
-  let or_ a b = [Builtin.Or @: [a;b] 
-                 =~  imply (imply a T.false_) b] 
-
-  let and_true a  = [Builtin.And @: [T.true_; a] =~ a]
-  let and_false a  = [Builtin.And @: [T.false_; a] =~ T.false_]
-
-  let exists t = 
-    let t2bool = Type.arrow [t] Type.prop in
-    [T.app_builtin ~ty:(Type.arrow [t2bool] Type.prop) Builtin.ExistsConst [] =~ T.fun_ t2bool
-       (Builtin.Not @:[Builtin.ForallConst @:[T.fun_ t (Builtin.Not @:[T.app (T.bvar t2bool 1) [T.bvar t 0]])]])]
-
-  let as_clause c = Env.C.create ~penalty:1 ~trail:Trail.empty c Proof.Step.trivial
-
-  let create_clauses () = 
-    let a = T.var (HVar.make ~ty:Type.prop 0) in
-    [ [Builtin.And @:[T.true_; a] =~ a];
-      [Builtin.And @:[T.false_; a] =~ T.false_];
-      [Builtin.Or @:[T.true_; a] =~ T.true_];
-      [Builtin.Or @:[T.false_; a] =~ a];
-      [Builtin.Imply @:[T.true_; a] =~ a];
-      [Builtin.Imply @:[T.false_; a] =~ T.true_];
-      [Builtin.Not @:[T.true_] =~ T.false_];
-      [Builtin.Not @:[T.false_] =~ T.true_]; ] 
-    |> List.map as_clause |> Iter.of_list
-
+  
   let find_bools c =
     let subterm_selection = Env.flex_get k_cased_term_selection in
 
