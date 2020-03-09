@@ -792,7 +792,7 @@ let _interpret_bool_funs = ref false
 let _cnf_non_simpl = ref false
 let _norm_bools = ref false 
 let _solve_formulas = ref false
-let _filter_literals = ref `All
+let _filter_literals = ref `Max
 let _nnf = ref false
 
 
