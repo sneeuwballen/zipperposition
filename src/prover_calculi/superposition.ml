@@ -2550,13 +2550,17 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                end
              | Lit.Equation (l, r, true) when Type.is_prop (T.ty l) ->
                begin match T.view l, T.view r with
-                 | ( T.AppBuiltin (Builtin.True, []), T.Var x
-                   | T.Var x, T.AppBuiltin (Builtin.True, []))
+                 | ( (T.AppBuiltin ( (Builtin.True|Builtin.False) as b , [])), T.Var x
+                   | T.Var x, (T.AppBuiltin ((Builtin.True|Builtin.False) as b, [])))
                    when not (var_in_subst_ !us x 0) ->
                    (* [C or x=true ---> C[x:=false]] *)
                    begin
                      try
-                       let subst' = US.FO.bind !us (x,0) (T.false_,0) in
+                       let notb = 
+                        if Builtin.equal b Builtin.True
+                        then T.false_
+                        else T.true_ in
+                       let subst' = US.FO.bind !us (x,0) (notb,0) in
                        has_changed := true;
                        BV.reset bv i;
                        us := subst';
