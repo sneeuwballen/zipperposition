@@ -13,6 +13,8 @@ module VS = T.VarSet
 
 type term = Term.t
 
+let _equational_sign = ref false
+
 type t =
   | True
   | False
@@ -55,6 +57,7 @@ let no_prop_invariant =
     let res = diff_f_t lhs && (diff_f_t rhs || sign = true) in
     if not res then (
       CCFormat.printf "NO PROP INVARIANT BROKEN: %a,%a,%b.\n" T.pp lhs T.pp rhs sign;
+      assert false;
     );
     res
   | _ -> true
@@ -129,11 +132,13 @@ module Set = CCSet.Make(struct type t = lit let compare = compare end)
 
 let is_pos = function
   | Equation (l, r, sign) ->
-    (* let hd_l = Term.head_term l in  
-    if sign && T.is_true_or_false r && T.is_const hd_l then (
-      T.equal r T.true_ 
-    ) else sign *)
-  sign
+    if !_equational_sign then sign
+    else (
+      let hd_l = Term.head_term l in  
+      if sign && T.is_true_or_false r && T.is_const hd_l then (
+        T.equal r T.true_ 
+      ) else sign
+    )
   | Int o -> Int_lit.sign o
   | False -> false
   | _ -> true
@@ -1204,3 +1209,8 @@ let as_pos_pure_var lit =
   match View.as_eqn lit with 
   | Some (l, r, true) when is_pure_var lit && is_pos lit -> Some(_as_var l,_as_var r)
   | _ -> None
+
+let () =
+  Options.add_opts
+    [ "--equational-sign", (Arg.Bool ((:=)_equational_sign)), " use the sign of the equation to report polarity"
+    ];

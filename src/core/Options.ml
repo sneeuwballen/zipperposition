@@ -89,5 +89,6 @@ let make () =
     ; "--break", Arg.Set Util.break_on_debug, " wait for user input after each debug message"
     ; "--show-ty-args", Arg.Set InnerTerm.show_type_arguments, " show type arguments in terms"
     ; "--hide-ty-args", Arg.Clear InnerTerm.show_type_arguments, " hide type arguments in terms"
+    ; "--t-bigger-f", (Arg.Bool ((:=) Builtin._t_bigger_false)), " is T bigger than F"
     ]
     (List.rev_append !other_opts (mk_debug_opts ()))

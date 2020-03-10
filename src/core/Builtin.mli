@@ -10,6 +10,8 @@
 
     @since 1.5 *)
 
+val _t_bigger_false : bool ref
+
 type t =
   | Not
   | And
