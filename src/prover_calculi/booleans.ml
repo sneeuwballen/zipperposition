@@ -29,6 +29,10 @@ let k_filter_literals = Flex_state.create_key ()
 let k_nnf = Flex_state.create_key ()
 
 
+let selection_to_str = function
+  | Any -> "any"
+  | Minimal -> "minimal"
+  | Large -> "large"
 
 module type S = sig
   module Env : Env.S
@@ -81,29 +85,41 @@ module Make(E : Env.S) : S with module Env = E = struct
       | _ -> () in
 
     let eligible = 
-      match Env.flex_get k_filter_literals with
-      | `All -> C.Eligible.always
-      | `Max -> C.Eligible.param c in
+      if C.get_flag SClause.flag_cases_res c then (
+        (* Disabling resolutions from results of Cases* rule *)
+        fun _ _ -> false
+      ) else (
+        match Env.flex_get k_filter_literals with
+        | `All -> C.Eligible.always
+        | `Max -> C.Eligible.res c) in
     
     Literals.fold_terms ~which:`All
       ~subterms:false ~eligible ~ord:(C.Ctx.ord ()) (C.lits c)
-    |> Iter.flat_map (fun (t,_) -> find_in_term ~top:true t)
+    |> Iter.flat_map (fun (t,_) ->
+      find_in_term ~top:true t)
     |> T.Set.of_seq
     |> T.Set.to_list
   
   let mk_res ~proof ~old ~repl new_lit c =
-    C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
-      (new_lit :: Array.to_list( C.lits c |> Literals.map (T.replace ~old ~by:repl)))
-      proof
+    let res_cl =
+      C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
+        (new_lit :: Array.to_list( C.lits c |> Literals.map (T.replace ~old ~by:repl)))
+        proof in
+    C.set_flag SClause.flag_cases_res res_cl true;
+    res_cl
 
   let bool_case_inf (c: C.t) : C.t list =    
     let proof = Proof.Step.inference [C.proof_parent c]
                 ~rule:(Proof.Rule.mk"bool_inf") ~tags:[Proof.Tag.T_ho] in
 
+    Util.debugf 1 ~section "bci(@[%a@])=@." (fun k -> k C.pp c);
+
     find_bools c
     |> CCList.fold_left (fun acc old ->
       let neg_lit, repl = no old, T.true_ in
-      (mk_res ~proof ~old ~repl neg_lit c) :: acc
+      let res = mk_res ~proof ~old ~repl neg_lit c in
+      Util.debugf 1 ~section "  res(@[%a@])=@[%a@]@." (fun k -> k T.pp old C.pp res);
+      res :: acc
     ) []
 
   let bool_case_simp (c: C.t) : C.t list option =
@@ -205,13 +221,21 @@ module Make(E : Env.S) : S with module Env = E = struct
     | AppBuiltin(Builtin.Imply, [p;c]) ->
       if T.equal p T.true_ then aux c
       else if T.equal p T.false_ then T.true_
+      else if T.equal c T.false_ then aux (T.Form.not_ p)
+      else if T.equal c T.true_ then T.true_
+      else if T.equal p c then T.true_
       else (
         let p',c' = aux p, aux c in
         if T.equal p p' && T.equal c c' then t 
         else T.app_builtin ~ty:(T.ty t) Builtin.Imply [p';c'])
     | AppBuiltin(hd, ([a;b]|[_;a;b])) 
         when hd = Builtin.Eq || hd = Builtin.Equiv ->
-      if T.equal a b then T.true_ else (
+      if T.equal a b then T.true_ 
+      else if T.equal a T.true_ then aux b
+      else if T.equal b T.true_ then aux a
+      else if T.equal a T.false_ then aux (T.Form.not_ b)
+      else if T.equal b T.false_ then aux (T.Form.not_ a)
+      else (
         let a',b' = aux a, aux b in
         if T.equal a a' && T.equal b b' then t 
         else T.app_builtin ~ty:(T.ty t) hd [a';b']

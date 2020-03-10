@@ -569,7 +569,7 @@ let rec is_fo_term t =
   | _ -> false
 
 let is_true_or_false t = match view t with
-  | AppBuiltin(b, []) -> 
+  | AppBuiltin(b, _) -> 
     CCList.mem ~eq:Builtin.equal b [Builtin.True; Builtin.False];
   | _ -> false
 

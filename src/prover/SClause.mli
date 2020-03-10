@@ -46,6 +46,8 @@ val flag_backward_simplified : flag (** clause has been backward simplified *)
 
 val flag_poly_arg_cong_res : flag (** clause is the result of polymorphic ArgCong *)
 
+val flag_cases_res : flag (** clause is the result of Cases(Inf|Simps) *)
+
 val set_flag : flag -> t -> bool -> unit (** set boolean flag *)
 
 val get_flag : flag -> t -> bool (** get value of boolean flag *)
