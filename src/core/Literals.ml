@@ -168,13 +168,6 @@ let is_trivial lits =
     if i = Array.length lits then false
     else
       let triv = match lits.(i) with
-        | Lit.Equation (lhs, rhs, true) when T.equal rhs T.true_ || T.equal rhs T.false_ ->
-          CCArray.exists
-            (function
-              | Lit.Equation (lhs', rhs', true) when T.equal rhs' T.true_ || T.equal rhs' T.false_ ->
-                T.equal lhs lhs' && not @@ T.equal rhs rhs'
-              | _ -> false)
-            lits
         | Lit.Equation (l, r, true) when T.equal l r -> true
         | Lit.Equation (l, r, sign) ->
           CCArray.exists

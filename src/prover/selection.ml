@@ -203,7 +203,7 @@ let pred_freq ~ord lits =
 
 let get_pred_freq ~freq_tbl l =
   match l with
-  | Lit.Equation(l,r,true) when T.is_true_or_false r ->
+  | Lit.Equation(l,r,sign) when T.equal T.true_ r ->
     begin 
       match T.head l with
       | Some id -> ID.Map.get_or id freq_tbl ~default:0
@@ -325,16 +325,15 @@ let e_sel8 ~ord lits =
                 |> Iter.sort ~cmp:ID.compare 
                 |> Iter.to_array in
   let is_truly_equational = function 
-    | Lit.Equation(l,r,sign) -> 
-      not (Term.is_true_or_false r)
+    | Lit.Equation(l,r,sign) -> not (T.equal T.true_ r)
     | _ -> false  in
   let get_arity = function 
-    | Lit.Equation(l,r,sign) when sign && Term.is_true_or_false r -> 
+    | Lit.Equation(l,r,sign) when Term.equal T.true_ r -> 
       List.length (Type.expected_args (Term.ty (T.head_term l)))
     | _ -> 0  in
   let alpha_rank = function 
-    | Lit.Equation(l,r,sign) when sign && Term.is_true_or_false r 
-                                  && T.is_const (T.head_term l) -> 
+    | Lit.Equation(l,r,sign) when sign && Term.equal T.true_ r 
+                                       && T.is_const (T.head_term l) -> 
       let hd = T.head_exn l in
       (match CCArray.bsearch ~cmp:ID.compare hd symbols with
        | `At idx -> idx

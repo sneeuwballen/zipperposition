@@ -340,16 +340,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           | Comparison.Gt ->
             f idx (l,r,true,c)
           | Comparison.Lt ->
-            assert(not (T.is_true_or_false r));
             f idx (r,l,true,c)
           | Comparison.Incomparable ->
-            assert(T.is_var (T.head_term l) || not (T.is_true_or_false l));
             let idx = f idx (l,r,true,c) in
             f idx (r,l,true,c)
           | Comparison.Eq -> idx  (* no modif *)
         end
       | [| Lit.Equation (l,r,false) |] ->
-        assert(not (T.equal r T.true_ || T.equal r T.false_));
         f idx (l,r,false,c)
       | _ -> idx
     in
@@ -1803,7 +1800,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let infer_equality_factoring_aux ~unify ~iterate_substs clause =
     ZProf.enter_prof prof_infer_equality_factoring;
-    let eligible = C.Eligible.(filter Lit.is_pos) in
+    let eligible = C.Eligible.(filter (function 
+      | Equation(_,_,true) -> true
+      | Equation(lhs,rhs,false) -> T.is_app_var lhs && T.equal rhs T.true_
+      | l -> Lit.is_pos l  )) in
     (* find root terms that are unifiable with s and are not in the
        literal at s_pos. Calls [k] with a position and substitution *)
     let find_unifiable_lits ~var_pred_status idx s _s_pos k =
@@ -1812,19 +1812,18 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (fun i lit ->
            match lit with
            | _ when i = idx -> () (* same index *)
-           | Lit.Equation (u, v, true) ->
-             (* positive equation *)
-             if T.equal v T.false_ && not is_pred_var then ()
+           | Lit.Equation (u, v, sign) ->
+             if not sign && not is_pred_var then ()
              else (
-               if is_pred_var && T.is_true_or_false v then (
-                 assert(T.is_true_or_false pred_var_sign);
-                 if T.equal v pred_var_sign then (
+               if is_pred_var && T.equal T.true_ v then (
+                 if sign == pred_var_sign then (
                    k (u, v, unify (s,0) (u,0))
                  ) else (
                    let u = T.Form.not_ u in
-                   k (u, pred_var_sign, unify (s,0) (u,0))
+                   k (u, (if sign then T.false_ else T.true_),
+                      unify (s,0) (u,0))
                  )
-               ) else (
+               ) else if sign then (
                  k (u, v, unify (s,0) (u,0));
                  k (v, u, unify (s,0) (v,0))
                );
@@ -1836,22 +1835,21 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let new_clauses =
       Lits.fold_eqn ~sign:true ~ord ~both:true ~eligible (C.lits clause)
       |> Iter.flat_map
-        (fun (s, t, _, s_pos) -> (* try with s=t *)
+        (fun (s, t, sign, s_pos) -> (* try with s=t *)
+           assert(sign || (T.equal T.true_ t && T.is_app_var s));
            let active_idx = Lits.Pos.idx s_pos in
            let is_var_pred = 
-             T.is_var (T.head_term s) && Type.is_prop (T.ty s) && T.is_true_or_false t in
-           if T.equal t T.false_ && not is_var_pred then Iter.empty 
-           else (
-             let var_pred_status = (is_var_pred, t) in
-             find_unifiable_lits ~var_pred_status active_idx s s_pos)
-             |> Iter.filter_map
-               (fun (u,v,substs) ->
-                  iterate_substs substs
-                    (fun subst ->
-                       let info = EqFactInfo.({
-                           clause; s; t; u; v; active_idx; subst; scope=0;
-                         }) in
-                      do_eq_factoring info)))
+             T.is_var (T.head_term s) && Type.is_prop (T.ty s) && T.equal T.true_ t in
+           let var_pred_status = (is_var_pred, sign) in
+           find_unifiable_lits ~var_pred_status active_idx s s_pos
+           |> Iter.filter_map
+             (fun (u,v,substs) ->
+               iterate_substs substs
+                 (fun subst ->
+                     let info = EqFactInfo.({
+                         clause; s; t; u; v; active_idx; subst; scope=0;
+                       }) in
+                   do_eq_factoring info)))
       |> Iter.to_rev_list
     in
     ZProf.exit_prof prof_infer_equality_factoring;
@@ -2464,17 +2462,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (fun cc lit -> match lit with
            | Lit.Equation (l, r, false) ->
              Congruence.FO.mk_eq cc l r
-           (* registering equations of the form ~ P as negative equations P = true *)
-           | Lit.Equation (p, t, true) when T.equal t T.false_ ->
-             Congruence.FO.mk_eq cc p T.true_
            | _ -> cc)
         cc (C.lits c)
     in
     let res = CCArray.exists
         (function
-          (* making sure we do not catch equations of the form P = false
-             that are interpreted as negative equations P = true *)
-          | Lit.Equation (l, r, true) when not (T.equal r T.false_) ->
+          | Lit.Equation (l, r, true) ->
             (* if l=r is implied by the congruence, then the clause is redundant *)
             Congruence.FO.is_eq cc l r
           | _ -> false)
@@ -2548,15 +2541,16 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                    try_unif i r 0 l 0
                  | _ -> ()
                end
-             | Lit.Equation (l, r, true) when Type.is_prop (T.ty l) ->
+             | Lit.Equation (l, r, sign) when Type.is_prop (T.ty l) ->
                begin match T.view l, T.view r with
-                 | ( T.AppBuiltin (Builtin.True, []), T.Var x
-                   | T.Var x, T.AppBuiltin (Builtin.True, []))
+                 | T.Var x, (T.AppBuiltin (Builtin.True, []))
                    when not (var_in_subst_ !us x 0) ->
                    (* [C or x=true ---> C[x:=false]] *)
+                   (* [C or x!=true ---> C[x:=true]] *)
                    begin
                      try
-                       let subst' = US.FO.bind !us (x,0) (T.false_,0) in
+                       let notb = if sign then T.false_ else T.true_ in 
+                       let subst' = US.FO.bind !us (x,0) (notb,0) in
                        has_changed := true;
                        BV.reset bv i;
                        us := subst';
@@ -3169,7 +3163,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
        
         begin match pos_lit, neg_lit with
         | Equation(x,y,true), Equation(lhs,rhs,sign) ->
-          fail_on (sign); (* fail if neg. literal is propositional (= false)*)
           fail_on (not (T.is_var x && T.is_var y));
           fail_on (T.equal x y);
 

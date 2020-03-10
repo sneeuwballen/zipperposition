@@ -3,6 +3,8 @@
 
 (** {1 Builtin Objects} *)
 
+let _t_bigger_false = ref true;
+
 module Fmt = CCFormat
 
 type t =
@@ -71,8 +73,8 @@ type t_ = t
 
 let to_int_ = function
   (* True > false for the completeness of (HO case) FOOL paramodulation: C[b] ⟹ b ∨ C[false]. The opposite way required b=false would simplify b≠true (aka ¬b) which doesn't rewrite. *)
-  | True -> 1
-  | False -> 0
+  | True -> if !_t_bigger_false then 1 else 0
+  | False -> if !_t_bigger_false then 0 else 1
   | Not -> 2
   | And -> 3
   | Or -> 4

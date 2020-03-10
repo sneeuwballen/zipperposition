@@ -27,6 +27,7 @@ let k_norm_bools = Flex_state.create_key ()
 let k_solve_formulas = Flex_state.create_key ()
 let k_filter_literals = Flex_state.create_key ()
 let k_nnf = Flex_state.create_key ()
+let k_elim_bvars = Flex_state.create_key ()
 
 
 let selection_to_str = function
@@ -116,10 +117,10 @@ module Make(E : Env.S) : S with module Env = E = struct
 
     find_bools c
     |> CCList.fold_left (fun acc old ->
-      let neg_lit, repl = no old, T.true_ in
-      let res = mk_res ~proof ~old ~repl neg_lit c in
-      Util.debugf 1 ~section "  res(@[%a@])=@[%a@]@." (fun k -> k T.pp old C.pp res);
-      res :: acc
+      let neg_lit, repl = 
+        if Builtin.compare Builtin.True Builtin.False > 0 then (no old, T.true_)
+        else (yes old, T.false_) in
+      (mk_res ~proof ~old ~repl neg_lit c) :: acc
     ) []
 
   let bool_case_simp (c: C.t) : C.t list option =
@@ -380,10 +381,10 @@ module Make(E : Env.S) : S with module Env = E = struct
           |> Flex_state.add PragUnifParams.k_solid_decider true
           |> Flex_state.add PragUnifParams.k_max_inferences 1
           |> Flex_state.add PragUnifParams.k_max_depth 2
-          |> Flex_state.add PragUnifParams.k_max_app_projections 1
+          |> Flex_state.add PragUnifParams.k_max_app_projections 2
           |> Flex_state.add PragUnifParams.k_max_rigid_imitations 2
-          |> Flex_state.add PragUnifParams.k_max_elims 1
-          |> Flex_state.add PragUnifParams.k_max_identifications 1
+          |> Flex_state.add PragUnifParams.k_max_elims 2
+          |> Flex_state.add PragUnifParams.k_max_identifications 2
         end) in
     
     let normalize_not t =
@@ -506,6 +507,27 @@ module Make(E : Env.S) : S with module Env = E = struct
   let cnf_infer cl = 
     CCOpt.get_or ~default:[] (cnf_otf cl)
 
+  let elim_bvars c =
+    C.Seq.vars c
+    |> T.VarSet.of_seq |> T.VarSet.to_seq
+    |> Iter.filter (fun v -> Type.is_prop (HVar.ty v))
+    |> Iter.flat_map_l (fun v ->
+        let subst_true = 
+          Subst.FO.bind' Subst.empty (v, 0) (T.true_, 0) in
+        let subst_false = 
+          Subst.FO.bind' Subst.empty (v, 0) (T.false_, 0) in
+        [subst_true; subst_false])
+    |> Iter.map (fun subst ->
+        let proof =
+          Some (Proof.Step.simp 
+            ~tags:[Proof.Tag.T_ho] ~rule:(Proof.Rule.mk "elim_bool_vars")
+            [C.proof_parent c]) in
+        C.apply_subst ~proof (c,0) subst)
+    |> (fun iter -> 
+        if Iter.is_empty iter then None
+        else Some (Iter.to_list iter))
+
+
   let interpret_boolean_functions c =
     (* Collects boolean functions only at top level, 
        and not the ones that are already a part of the quantifier *)
@@ -575,6 +597,9 @@ module Make(E : Env.S) : S with module Env = E = struct
         Env.add_basic_simplify normalize_bool_terms
       );
       Env.add_multi_simpl_rule Fool.rw_bool_lits;
+      if Env.flex_get k_elim_bvars then (
+        Env.add_multi_simpl_rule elim_bvars
+      );
       if Env.flex_get k_cnf_non_simpl then (
         Env.add_unary_inf "cnf otf inf" cnf_infer;
       ) else  Env.add_multi_simpl_rule cnf_otf;
@@ -818,6 +843,7 @@ let _norm_bools = ref false
 let _solve_formulas = ref false
 let _filter_literals = ref `Max
 let _nnf = ref false
+let _elim_bvars = ref false
 
 
 let extension =
@@ -833,6 +859,7 @@ let extension =
     E.flex_add k_solve_formulas !_solve_formulas;
     E.flex_add k_filter_literals !_filter_literals;
     E.flex_add k_nnf !_nnf;
+    E.flex_add k_elim_bvars !_elim_bvars;
 
 
     ET.setup ()
@@ -877,6 +904,9 @@ let () =
     "--nnf-nested-formulas"
     , Arg.Bool (fun v -> _nnf := v)
     , " convert nested formulas into negation normal form";
+    "--elim-bvars"
+    , Arg.Bool ((:=) _elim_bvars)
+    , " replace boolean variables by T and F";
     "--boolean-reasoning-filter-literals"
     , Arg.Symbol(["all"; "max"], (fun v ->
         match v with 

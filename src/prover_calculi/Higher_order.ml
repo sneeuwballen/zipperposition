@@ -378,9 +378,8 @@ module Make(E : Env.S) : S with module Env = E = struct
         Array.fold_left
           (fun (others,set) lit ->
              begin match lit with
-               | Literal.Equation (lhs, rhs, true) when T.equal rhs T.true_ || T.equal rhs T.false_ ->
+               | Literal.Equation (lhs, rhs, sign) when T.equal rhs T.true_->
                  let f, args = T.as_app lhs in
-                 let sign = T.equal rhs T.true_ in
                  begin match T.view f with
                    | T.Var q when HVar.equal Type.equal v q ->
                      (* found an occurrence *)
@@ -648,14 +647,14 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let recognize_choice_ops c =
     let extract_not_p_x l = match l with
-      | Literal.Equation(lhs,rhs,true) when T.equal T.false_ rhs && T.is_app_var lhs ->
+      | Literal.Equation(lhs,rhs,false) when T.equal T.true_ rhs && T.is_app_var lhs ->
         begin match T.view lhs with
           | T.App(hd, [var]) when T.is_var var -> Some hd
           | _ -> None end
       | _ -> None in
 
     let extract_p_choice_p p l = match l with 
-      | Literal.Equation(lhs,rhs,true) when T.equal T.true_ rhs && T.is_app_var lhs ->
+      | Literal.Equation(lhs,rhs,true) when T.equal T.true_ rhs ->
         begin match T.view lhs with
           | T.App(hd, [ch_p]) when T.equal hd p ->
             begin match T.view ch_p with 

@@ -99,10 +99,9 @@ module Make(E : Env.S) : S with module Env = E = struct
     |> Iter.of_array_i
     |> Iter.filter_map
       (fun (idx,lit) -> match lit with
-         | Literal.Equation (lhs, rhs, true) when  (T.equal rhs T.true_) || (T.equal rhs T.false_) ->
+         | Literal.Equation (lhs, rhs, sign) when T.equal rhs T.true_->
            begin match T.as_var lhs with
              | Some v -> 
-               let sign = T.equal rhs T.true_ in
                (* found var, replace it with [not sign] *)
                let t = if sign then T.false_ else T.true_ in
                let subst =
