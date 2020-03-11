@@ -95,6 +95,8 @@ let k_restrict_fluidsup = Flex_state.create_key ()
 let k_check_sup_at_var_cond = Flex_state.create_key ()
 let k_restrict_hidden_sup_at_vars = Flex_state.create_key ()
 let k_ho_disagremeents = Flex_state.create_key ()
+let k_bool_demod = Flex_state.create_key ()
+
 let _NO_LAMSUP = -1
 
 
@@ -336,17 +338,19 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let idx = !_idx_simpl in
     let idx' = match C.lits c with
       | [| Lit.Equation (l,r,sign) |] when sign || T.equal r T.true_ ->
-        let l, r = if sign then l, r else l, T.false_ in
-        begin match Ordering.compare ord l r with
-          | Comparison.Gt ->
-            f idx (l,r,true,c)
-          | Comparison.Lt ->
-            f idx (r,l,true,c)
-          | Comparison.Incomparable ->
-            let idx = f idx (l,r,true,c) in
-            f idx (r,l,true,c)
-          | Comparison.Eq -> idx  (* no modif *)
-        end
+        if Env.flex_get k_bool_demod || sign then (
+          let l, r = if sign then l, r else l, T.false_ in
+          begin match Ordering.compare ord l r with
+            | Comparison.Gt ->
+              f idx (l,r,true,c)
+            | Comparison.Lt ->
+              f idx (r,l,true,c)
+            | Comparison.Incomparable ->
+              let idx = f idx (l,r,true,c) in
+              f idx (r,l,true,c)
+            | Comparison.Eq -> idx  (* no modif *)
+          end) 
+        else idx
       | [| Lit.Equation (l,r,false) |] ->
         f idx (l,r,false,c)
       | _ -> idx
@@ -3416,6 +3420,7 @@ let _max_unifs_solid_ff = ref 20
 let _use_weight_for_solid_subsumption = ref false
 let _sort_constraints = ref false
 let _ho_disagremeents = ref `SomeHo
+let _bool_demod = ref false
 
 let _guard = ref 45
 let _ratio = ref 135
@@ -3468,6 +3473,8 @@ let register ~sup =
   E.flex_add k_dont_simplify !_dont_simplify;
   E.flex_add k_use_semantic_tauto !_use_semantic_tauto;
   E.flex_add k_ho_disagremeents !_ho_disagremeents;
+  E.flex_add k_bool_demod !_bool_demod;
+
 
   E.flex_add PragUnifParams.k_max_inferences !_max_infs;
   E.flex_add PragUnifParams.k_skip_multiplier !_skip_multiplier;
@@ -3588,6 +3595,7 @@ let () =
       "--max-inferences", Arg.Int (fun p -> _max_infs := p), " set maximal number of inferences";
       "--stream-queue-guard", Arg.Set_int _guard, "set value of guard for streamQueue";
       "--stream-queue-ratio", Arg.Set_int _ratio, "set value of ratio for streamQueue";
+      "--bool-demod", Arg.Bool ((:=) _bool_demod), " turn BoolDemod on/off";
       "--stream-clause-num", Arg.Set_int _clause_num, "how many clauses to take from streamQueue; by default as many as there are streams";
       "--ho-sort-constraints", Arg.Bool (fun b -> _sort_constraints := b), "sort constraints in unification algorithm by weight";
       "--check-sup-at-var-cond", Arg.Bool (fun b -> _check_sup_at_var_cond := b), " enable/disable superposition at variable monotonicity check";
