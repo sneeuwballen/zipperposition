@@ -53,7 +53,7 @@ let k_purify_applied_vars = Flex_state.create_key()
 let k_eta = Flex_state.create_key()
 let k_diff_const = Flex_state.create_key()
 let k_use_diff_for_neg_ext = Flex_state.create_key()
-
+let k_generalize_choice_trigger = Flex_state.create_key ()
 
 
 type prune_kind = [`NoPrune | `OldPrune | `PruneAllCovers | `PruneMaxCover]
@@ -479,9 +479,19 @@ module Make(E : Env.S) : S with module Env = E = struct
   let prim_enum_ ~(mode) (c:C.t) : C.t list =
     (* set of variables to refine (only those occurring in "interesting" lits) *)
     let vars =
-      Literals.vars (C.lits c)
-      |> CCList.filter (fun v -> Type.returns_prop @@ HVar.ty v)
-      |> T.VarSet.of_list (* unique *)
+      Literals.fold_eqn 
+        ~both:false ~ord:(Ctx.ord()) 
+        ~eligible:(C.Eligible.always) (C.lits c)
+      |> Iter.flat_map_l (fun (l,r,_,_) -> 
+          let extract_var t = 
+            let _, body = T.open_fun t in
+            match T.view body with
+            | T.App(hd, _) when T.is_var hd ->  Some (T.as_var_exn hd)
+            | _ -> None in
+          CCOpt.to_list (extract_var l) @ CCOpt.to_list (extract_var r)
+      )
+      |> Iter.filter (fun v -> Type.returns_prop @@ HVar.ty v)
+      |> T.VarSet.of_seq (* unique *)
     in
     if not (T.VarSet.is_empty vars) then (
       Util.debugf ~section 5 "(@[<hv2>ho.refine@ :clause %a@ :terms {@[%a@]}@])"
@@ -528,10 +538,9 @@ module Make(E : Env.S) : S with module Env = E = struct
   let new_choice_counter = ref 0
 
   let insantiate_choice ?(inst_vars=true) ?(choice_ops=choice_ops) c =
-    let max_var = C.Seq.vars c
-                  |> Iter.map HVar.id
-                  |> Iter.max
-                  |> CCOpt.get_or ~default: 0 in
+    let max_var = 
+      ref ((C.Seq.vars c |> Iter.map HVar.id
+            |> Iter.max |> CCOpt.get_or ~default: 0) + 1) in
 
     let is_choice_subterm t = 
       match T.view t with
@@ -545,16 +554,25 @@ module Make(E : Env.S) : S with module Env = E = struct
     let neg_trigger t =
       assert(T.DB.is_closed t);
       let arg_ty = List.hd (Type.expected_args (T.ty t)) in
-      let applied_to_0 = T.Form.not_ (Lambda.whnf (T.app t [T.bvar ~ty:arg_ty 0])) in
-      let res = T.fun_ arg_ty applied_to_0 in
+      let negated = T.Form.not_ (Lambda.whnf (T.app t [T.bvar ~ty:arg_ty 0])) in
+      let res = T.fun_ arg_ty negated in
       assert(T.DB.is_closed res);
       res in
 
+    let generalize_trigger t =
+      assert(T.DB.is_closed t);
+      let arg_ty = List.hd (Type.expected_args (T.ty t)) in
+      let applied_to_0 = Lambda.whnf (T.app t [T.bvar ~ty:arg_ty 0]) in
+      let ty = Type.arrow [Type.prop] Type.prop in
+      let fresh_var = T.var @@ HVar.fresh_cnt ~counter:max_var ~ty () in
+      let res = T.fun_ arg_ty (T.app fresh_var [applied_to_0]) in
+      assert(T.DB.is_closed res);
+      res in
 
     let choice_inst_of_hd hd arg =
       let arg_ty = Term.ty arg in
       let ty = List.hd (Type.expected_args arg_ty) in
-      let x = T.var_of_int ~ty (max_var+1) in
+      let x = T.var @@ HVar.fresh_cnt ~counter:max_var ~ty () in
       let choice_x = Lambda.whnf (T.app arg [x]) in
       let choice_arg = Lambda.snf (T.app arg [T.app hd [arg]]) in
       let new_lits = [Literal.mk_prop choice_x false;
@@ -575,6 +593,12 @@ module Make(E : Env.S) : S with module Env = E = struct
       choice_ops := Term.Set.add new_ch_const !choice_ops;
       new_ch_const in
 
+    let generate_instances hd arg =
+      choice_inst_of_hd hd arg 
+      :: choice_inst_of_hd hd (neg_trigger arg)
+      :: (if not @@  Env.flex_get k_generalize_choice_trigger then []
+          else [choice_inst_of_hd hd (generalize_trigger arg)]) in
+
     let build_choice_inst t =
       match T.view t with
       | T.App(hd, [arg]) ->
@@ -584,12 +608,10 @@ module Make(E : Env.S) : S with module Env = E = struct
             Term.Set.filter (fun t -> Type.equal (Term.ty t) hd_ty) !choice_ops
             |> Term.Set.to_list
             |> (fun l -> if CCList.is_empty l then [new_choice_op hd_ty] else l) in
-          CCList.flat_map (fun hd -> 
-              [choice_inst_of_hd hd arg; choice_inst_of_hd hd (neg_trigger arg)]) 
+          CCList.flat_map (fun hd -> generate_instances hd arg) 
             choice_ops
-        ) else if Term.Set.mem hd !choice_ops then (
-          [choice_inst_of_hd hd arg; choice_inst_of_hd hd (neg_trigger arg)]
-        ) else []
+        ) else if Term.Set.mem hd !choice_ops then generate_instances hd arg
+          else []
       | _ -> assert (false) in
 
     C.Seq.terms c 
@@ -1428,6 +1450,7 @@ let _simple_projection_md = ref 2
 let _purify_applied_vars = ref `None
 let _eta = ref `Reduce
 let _use_diff_for_neg_ext = ref false
+let _generalize_choice_trigger = ref false
 
 let extension =
   let register env =
@@ -1452,8 +1475,7 @@ let extension =
     E.flex_add k_purify_applied_vars !_purify_applied_vars;
     E.flex_add k_eta !_eta;
     E.flex_add k_use_diff_for_neg_ext !_use_diff_for_neg_ext;
-
-
+    E.flex_add k_generalize_choice_trigger !_generalize_choice_trigger;
 
 
     if E.flex_get k_some_ho || !force_enabled_ then (
@@ -1542,6 +1564,7 @@ let () =
                                  " 'int' purifies whenever a variable appears applied and unapplied.";
       "--ho-eta", eta_opt, " eta-expansion/reduction";
       "--ho-use-diff-for-neg-ext", Arg.Bool ((:=) _use_diff_for_neg_ext), " use diff constant for NegExt rule instead of fresh skolem";
+      "--ho-generalize-choice-trigger", Arg.Bool ((:=) _generalize_choice_trigger), " apply choice trigger to a fresh variable";
       "--check-lambda-free", Arg.Bool ((:=) _check_lambda_free), "check whether problem belongs to lambda-free"
     ];
   Params.add_to_mode "ho-complete-basic" (fun () ->
