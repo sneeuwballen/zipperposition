@@ -58,6 +58,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let yes a = a =~ T.true_
   
   let find_bools c =
+    let found = ref false in
     let subterm_selection = Env.flex_get k_cased_term_selection in
 
     let rec find_in_term ~top t k =
@@ -86,28 +87,29 @@ module Make(E : Env.S) : S with module Env = E = struct
       | _ -> () in
 
     let eligible = 
-      if C.get_flag SClause.flag_cases_res c then (
-        (* Disabling resolutions from results of Cases* rule *)
-        fun _ _ -> false
-      ) else (
-        match Env.flex_get k_filter_literals with
-        | `All -> C.Eligible.always
-        | `Max -> C.Eligible.res c) in
+      match Env.flex_get k_filter_literals with
+      | `All -> C.Eligible.always
+      | `Max -> (
+          match subterm_selection with 
+          | Any -> C.Eligible.res c
+          | _ -> (fun i lit -> 
+            (* found gives us the leftmost match! *)
+            not (!found) && C.Eligible.res c i lit)) in
     
     Literals.fold_terms ~which:`All
       ~subterms:false ~eligible ~ord:(C.Ctx.ord ()) (C.lits c)
     |> Iter.flat_map (fun (t,_) ->
-      find_in_term ~top:true t)
+      let res = find_in_term ~top:true t in
+      if not (Iter.is_empty res) then found := true;
+      res
+    )
     |> T.Set.of_seq
     |> T.Set.to_list
   
   let mk_res ~proof ~old ~repl new_lit c =
-    let res_cl =
-      C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
-        (new_lit :: Array.to_list( C.lits c |> Literals.map (T.replace ~old ~by:repl)))
-        proof in
-    C.set_flag SClause.flag_cases_res res_cl true;
-    res_cl
+    C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
+      (new_lit :: Array.to_list( C.lits c |> Literals.map (T.replace ~old ~by:repl)))
+    proof
 
   let bool_case_inf (c: C.t) : C.t list =    
     let proof = Proof.Step.inference [C.proof_parent c]
