@@ -335,7 +335,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     assert (CCArray.for_all Lit.no_prop_invariant (C.lits c));
     let idx = !_idx_simpl in
     let idx' = match C.lits c with
-      | [| Lit.Equation (l,r,true) |] ->
+      | [| Lit.Equation (l,r,sign) |] when sign || T.equal r T.true_ ->
+        let l, r = if sign then l, r else l, T.false_ in
         begin match Ordering.compare ord l r with
           | Comparison.Gt ->
             f idx (l,r,true,c)
@@ -1607,6 +1608,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     
     try
       if not (Type.equal (T.ty orig_s) (T.ty orig_t)) then raise StopSearch;
+
+      if T.equal T.true_ orig_s || T.equal T.true_ orig_t then raise StopSearch;
 
       let diss = aux (Lambda.eta_expand orig_s) (Lambda.eta_expand orig_t) in
 
