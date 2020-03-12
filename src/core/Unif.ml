@@ -625,7 +625,7 @@ module Inner = struct
               && Builtin.equal s1 s2 && op=O_unify -> *)
       | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when 
           Builtin.equal s1 s2 ->
-        let l1,l2 = if sc1 = sc2 then (norm_logical_inner s1 l1 l2) else l1, l2 in
+        let l1,l2 = if sc1 = sc2 && List.length l1 = List.length l2 then (norm_logical_inner s1 l1 l2) else l1, l2 in
         unif_list  ~op ~bvars subst l1 sc1 l2 sc2
       | _, _ -> raise Fail
     end

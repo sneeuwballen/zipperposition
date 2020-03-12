@@ -1617,6 +1617,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       if T.equal T.true_ orig_s || T.equal T.true_ orig_t then raise StopSearch;
 
       let diss = aux (Lambda.eta_expand orig_s) (Lambda.eta_expand orig_t) in
+      if List.for_all (fun (s,t) -> 
+        T.is_var @@ T.head_term s || T.is_var @@ T.head_term t) diss then (
+          raise StopSearch
+      );
 
       let _,_,unifscope,init_subst =
         if not unify then (orig_s,orig_t,0,US.empty)
@@ -1979,8 +1983,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                  "@[<hv2>demod(%d):@ @[<hv>t=%a[%d],@ l=%a[%d],@ r=%a[%d]@],@ subst=@[%a@]@]"
                  (fun k->k (C.id c) T.pp t 0 T.pp l cur_sc T.pp r cur_sc S.pp subst);
 
-               let t' = Lambda.eta_reduce @@ Lambda.snf t in
-               let l' = Lambda.eta_reduce @@ Lambda.snf @@  Subst.FO.apply Subst.Renaming.none subst (l,cur_sc) in               
+               let norm t = T.normalize_bools @@ Lambda.eta_reduce @@ Lambda.snf t in
+               let t' = norm t in
+               let l' = norm @@ Subst.FO.apply Subst.Renaming.none subst (l,cur_sc) in               
                (* sanity checks *)
                assert (Type.equal (T.ty l) (T.ty r));
                assert (T.equal l' t');
