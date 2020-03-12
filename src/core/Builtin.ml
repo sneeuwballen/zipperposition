@@ -3,7 +3,7 @@
 
 (** {1 Builtin Objects} *)
 
-let _t_bigger_false = ref true;
+let _t_bigger_false = ref false;
 
 module Fmt = CCFormat
 
