@@ -930,7 +930,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let shift_vars = if info.sup_kind = LambdaSup then 0 else -1 in
     let s = Subst.FO.apply ~shift_vars renaming (US.subst info.subst) (info.s, info.scope_active) in
     let u_p = Subst.FO.apply ~shift_vars renaming (US.subst info.subst) (info.u_p, info.scope_passive) in
-    if not (Term.equal (Lambda.eta_reduce @@ Lambda.snf @@ s) (Lambda.eta_reduce @@ Lambda.snf @@ u_p) || US.has_constr info.subst) then (
+    let norm t = T.normalize_bools @@ Lambda.eta_reduce @@ Lambda.snf t in
+    if not (Term.equal (norm @@ s) (norm @@ u_p) || US.has_constr info.subst) then (
       CCFormat.printf "@[<2>sup, kind %s@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a@]@])@ \
          (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@].\n"
             (kind_to_str info.sup_kind) C.pp info.active info.scope_active T.pp info.s T.pp info.t
@@ -1641,11 +1642,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       (* If no constraints are left or all of pairs are flex-flex
          or all of pairs are FO then we could have done all of 
          this with HO unification or FO superposition *)
-      if CCList.is_empty (fst diss) ||
-         List.for_all (fun (si,ti) -> 
-            T.is_ho_var si && T.is_ho_var ti) (fst diss) ||
-         List.for_all (fun (si,_) ->
-            not (t_type_is_ho si)) (fst diss) then (
+      if (CCList.is_empty (fst diss) && US.is_empty (snd diss)) ||
+          (not (CCList.is_empty (fst diss)) && 
+            List.for_all (fun (si,ti) -> 
+              T.is_ho_var si && T.is_ho_var ti) (fst diss)) then (
           raise StopSearch
       );
 

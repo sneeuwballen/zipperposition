@@ -115,7 +115,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let proof = Proof.Step.inference [C.proof_parent c]
                 ~rule:(Proof.Rule.mk"bool_inf") ~tags:[Proof.Tag.T_ho] in
 
-    Util.debugf 1 ~section "bci(@[%a@])=@." (fun k -> k C.pp c);
+    Util.debugf 5 ~section "bci(@[%a@])=@." (fun k -> k C.pp c);
 
     find_bools c
     |> CCList.fold_left (fun acc old ->
@@ -408,26 +408,31 @@ module Make(E : Env.S) : S with module Env = E = struct
       aux t in
 
     let find_resolvable_form lit =
-      match (Literal.View.as_eqn lit) with 
-      | Some (l,r,sign) ->
-        if not sign && not (T.is_true_or_false r) && Type.is_prop (T.ty l) then (
-          Some (l,r)
-        ) else if T.is_true_or_false r then (
-          let neg = if T.equal r T.true_ then CCFun.id else T.Form.not_ in
-          match T.view (normalize_not (neg l)) with 
-          | T.AppBuiltin((Neq|Xor), ([f;g]|[_;f;g])) when Type.is_prop (T.ty f) ->
-            assert(Type.equal (T.ty f) (T.ty g));
-            Some (f,g)
-          | _ -> None
-        ) else None
-      | None -> None in
+      let res = 
+        match (Literal.View.as_eqn lit) with 
+        | Some (l,r,sign) ->
+          if not sign && not (T.is_true_or_false r) && Type.is_prop (T.ty l) then (
+            Some (l,r)
+          ) else if T.is_true_or_false r then (
+            let neg = if T.equal r T.true_ then CCFun.id else T.Form.not_ in
+            match T.view (normalize_not (neg l)) with 
+            | T.AppBuiltin((Neq|Xor), ([f;g]|[_;f;g])) when Type.is_prop (T.ty f) ->
+              assert(Type.equal (T.ty f) (T.ty g));
+              Some (f,g)
+            | _ -> None
+          ) else None
+        | None -> None in
+      CCOpt.map (fun (l,r) -> T.normalize_bools l, T.normalize_bools r) res in
     
+    Util.debugf ~section 1 "bool solving @[%a@]@."(fun k -> k C.pp c);
     C.lits c
-    |> CCArray.mapi (fun i lit -> 
+    |> CCArray.mapi (fun i lit ->
       match find_resolvable_form lit with 
-      | None -> None
+      | None -> 
+        None
       | Some (l,r) ->
         try
+          Util.debugf ~section 1 "trying lit @[%d:%a@]@."(fun k -> k i Literal.pp lit);
           let subst = 
             PUnif.unify_scoped (l,0) (r,0)
             |> OSeq.nth 0
@@ -444,8 +449,12 @@ module Make(E : Env.S) : S with module Env = E = struct
             Proof.Step.inference ~tags:[Proof.Tag.T_ho]
               ~rule:(Proof.Rule.mk "solve_formulas")
               [C.proof_parent c] in
-          Some (C.create ~penalty:(C.penalty c) ~trail:(C.trail c) new_lits proof)
-        with _ -> None)
+          let res = C.create ~penalty:(C.penalty c) ~trail:(C.trail c) new_lits proof in
+          Util.debugf ~section 1 "solved by @[%a@]@."(fun k ->  k C.pp res);
+          Some res
+        with _ -> 
+          Util.debugf ~section 1 "failed @." (fun k -> k);
+          None)
       |> CCArray.filter_map CCFun.id
       |> CCArray.to_list
       |> (fun l -> if CCList.is_empty l then None else Some l)

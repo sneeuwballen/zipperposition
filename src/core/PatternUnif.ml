@@ -301,7 +301,7 @@ let rec unify ~scope ~counter ~subst = function
             List.length args_s' + List.length args_s = 
             List.length args_t' + List.length args_t ->
           let args_lhs,args_rhs = 
-            args_s@args_s', args_t@args_t' in
+            Unif.norm_logical_disagreements hd_s (args_s@args_s') (args_t@args_t') in
           unify ~subst ~counter ~scope @@ build_constraints args_lhs args_rhs rest
         | T.DB i, T.DB j when i = j && List.length args_s = List.length args_t ->
           (* assert (List.length args_s = List.length args_t); *)
@@ -428,12 +428,13 @@ let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
       )
     ) 
   in
-  let l = Lambda.eta_reduce @@ Lambda.snf @@ S.apply res t0_s in 
-     let r = Lambda.eta_reduce @@ Lambda.snf @@ S.apply res t1_s in
-     if not ((T.equal l r) && (Type.equal (Term.ty l) (Term.ty r))) then (
-     CCFormat.printf "orig:@[%a@]=?=@[%a@]@." (Scoped.pp T.pp) t0_s (Scoped.pp T.pp) t1_s;
-     CCFormat.printf "before:@[%a@]@." US.pp subst;
-     CCFormat.printf "after:@[%a@]@." US.pp res;
-     assert(false);
-     );
+  let norm t = T.normalize_bools @@ Lambda.eta_reduce @@ Lambda.snf t in
+  let l = norm @@ S.apply res t0_s in 
+  let r = norm @@ S.apply res t1_s in
+  if not ((T.equal l r) && (Type.equal (Term.ty l) (Term.ty r))) then (
+  CCFormat.printf "orig:@[%a@]=?=@[%a@]@." (Scoped.pp T.pp) t0_s (Scoped.pp T.pp) t1_s;
+  CCFormat.printf "before:@[%a@]@." US.pp subst;
+  CCFormat.printf "after:@[%a@]@." US.pp res;
+  assert(false);
+  );
   res

@@ -448,12 +448,8 @@ module Make (St : sig val st : Flex_state.t end) = struct
             Builtin.equal hd_s hd_t &&
             List.length args_s' + List.length args_s = 
             List.length args_t' + List.length args_t ->
-          let normalize ts =
-            List.sort (fun s t -> T.ho_weight s - T.ho_weight t) ts in
-          let args_lhs,args_rhs = 
-            if Builtin.is_flattened_logical hd_s 
-            then CCPair.map_same normalize (args_s@args_s', args_t@args_t')
-            else (args_s@args_s', args_t@args_t') in
+          let args_lhs, args_rhs = 
+            Unif.norm_logical_disagreements hd_s (args_s'@args_s) (args_t'@args_t) in
           unify ~subst ~counter ~scope @@ build_constraints args_lhs args_rhs rest
         | T.Const f , T.Const g when ID.equal f g && List.length args_s = List.length args_t ->
           unify ~subst ~counter ~scope @@ build_constraints args_s args_t rest

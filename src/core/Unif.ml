@@ -9,6 +9,27 @@ module US = Unif_subst
 
 exception Fail
 
+let norm_logical_disagreements b args args' : _ list * _ list =
+  assert(List.length args = List.length args');
+  let sort =
+    CCList.sort (fun t1 t2 -> 
+      let (<?>) = CCOrd.(<?>) in
+      CCInt.compare (Term.ho_weight t1) (Term.ho_weight t2) 
+        <?> (CCInt.compare, Term.hash t1, Term.hash t2))  in
+
+  if Builtin.is_flattened_logical b then (
+    let a_set, a'_set = CCPair.map_same Term.Set.of_list (args,args') in
+    let uniq_a, uniq_a' = Term.Set.diff a_set a'_set, Term.Set.diff a'_set a_set in
+    assert(Term.Set.cardinal uniq_a = Term.Set.cardinal uniq_a');
+    let args, args' = CCPair.map_same Term.Set.to_list (uniq_a, uniq_a') in
+    sort args, sort args')
+  else (args, args')
+
+let norm_logical_inner b args args' = 
+  let args, args' = CCPair.map_same Term.of_term_unsafe_l (args, args') in
+  ((norm_logical_disagreements b args args') :> (InnerTerm.t list * InnerTerm.t list))
+
+
 type unif_subst = Unif_subst.t
 type subst = Subst.t
 type term = InnerTerm.t
@@ -604,9 +625,7 @@ module Inner = struct
               && Builtin.equal s1 s2 && op=O_unify -> *)
       | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when 
           Builtin.equal s1 s2 ->
-        (* && not (Builtin.equal Builtin.ForallConst s1) && 
-           not (Builtin.equal Builtin.ExistsConst s1) -> *)
-        (* try to unify/match builtins pairwise *)
+        let l1,l2 = if sc1 = sc2 then (norm_logical_inner s1 l1 l2) else l1, l2 in
         unif_list  ~op ~bvars subst l1 sc1 l2 sc2
       | _, _ -> raise Fail
     end
@@ -940,7 +959,7 @@ module Inner = struct
   let unify_full ?(subst=US.empty) a b : unif_subst =
     ZProf.with_prof prof_unify
       (fun () -> 
-        unif_rec  ~root:true ~op:O_unify ~bvars:B_vars.empty subst a b
+        unif_rec ~root:true ~op:O_unify ~bvars:B_vars.empty subst a b
         ) ()
 
   let unify_syn ?(subst=Subst.empty) a b : Subst.t =
@@ -1099,6 +1118,10 @@ module FO = struct
   type ty = Type.t
   type term = Term.t
 
+
+  let norm_logical_disagreements b =
+    (norm_logical_disagreements b :> term list -> term list -> term list * term list)
+
   let bind =
     (bind :> ?check:bool -> subst -> ty HVar.t Scoped.t -> term Scoped.t -> subst)
 
@@ -1218,6 +1241,7 @@ module FO = struct
   let pair_lists f1 l1 f2 l2 =
     let l1, l2 = pair_lists_ f1 l1 f2 l2 in
     Term.of_term_unsafe_l l1, Term.of_term_unsafe_l l2
+
 end
 
 let () =
