@@ -720,10 +720,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       let pos_pred_vars, neg_pred_vars, occurences = 
         Lits.fold_eqn ~both:false ~ord ~eligible (C.lits c)
         |> Iter.fold (fun (pos_vs,neg_vs,occ) (lhs,rhs,sign,_) -> 
-            if Type.is_prop (Term.ty lhs) && Term.is_app_var lhs && sign
-               && Term.is_true_or_false rhs then (
+            if Type.is_prop (Term.ty lhs) && Term.is_app_var lhs && T.equal T.true_ rhs then (
               let var_hd = Term.as_var_exn (Term.head_term lhs) in
-              if Term.equal T.true_ rhs then (Term.VarSet.add var_hd pos_vs, neg_vs, Term.Map.add lhs true occ)
+              if sign then (Term.VarSet.add var_hd pos_vs, neg_vs, Term.Map.add lhs true occ)
               else (pos_vs, Term.VarSet.add var_hd neg_vs, Term.Map.add lhs false occ)
             ) else (pos_vs, neg_vs, occ)
           ) (Term.VarSet.empty,Term.VarSet.empty,Term.Map.empty) in

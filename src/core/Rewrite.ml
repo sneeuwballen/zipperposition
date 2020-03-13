@@ -556,7 +556,7 @@ module Lit = struct
     end
 
   let rules_of_lit lit: rule Iter.t = match lit with
-    | Literal.Equation (lhs, rhs, sign) when T.equal rhs T.true_ ->
+    | Literal.Equation (lhs, rhs, _) when T.equal rhs T.true_ ->
       begin match T.Classic.view lhs with
         | T.Classic.App (id, _) -> rules_of_id id
         | _ -> Iter.empty

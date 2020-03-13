@@ -215,8 +215,8 @@ let e_sel ~ord lits =
   let chooser ~freq_tbl (i,l) = 
     ((if Lit.is_pos l then 1 else 0),
      (if Lits.is_max ~ord lits i then 0 else 100 +
-                                             if Lit.is_pure_var l then 0 else 10 +
-                                                                              if Lit.is_ground l then 0 else 1),
+      if Lit.is_pure_var l then 0 else 10 +
+      if Lit.is_ground l then 0 else 1),
      -(lit_sel_diff_w l),
      get_pred_freq ~freq_tbl l) in
   let freq_tbl = pred_freq ~ord lits in
@@ -233,7 +233,7 @@ let e_sel2 ~ord lits =
     let diff_val = -(lit_sel_diff_w l) in
     let prec = Ordering.precedence ord in
     match l with 
-    | Equation(lhs,rhs,sign) when not @@ blocker l ->
+    | Equation(lhs,_,sign) when not @@ blocker l ->
       if T.is_var (T.head_term lhs) then (
         (sign_val, 0, 0, diff_val)
       ) else (
@@ -269,7 +269,7 @@ let e_sel3 ~ord lits =
 let e_sel4 ~ord lits =
   let chooser (i,l) = 
     let lhs = match l with
-      | Lit.Equation(lhs_t,rhs_t,_) -> lhs_t
+      | Lit.Equation(lhs_t,_,_) -> lhs_t
       | _ -> T.true_ (* a term to fill in *) in
     let sign = if Lit.is_pos l then 1 else 0 in
     let freq_tbl = pred_freq ~ord lits in

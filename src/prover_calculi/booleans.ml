@@ -414,7 +414,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           if not sign && not (T.is_true_or_false r) && Type.is_prop (T.ty l) then (
             Some (l,r)
           ) else if T.is_true_or_false r then (
-            let neg = if T.equal r T.true_ then CCFun.id else T.Form.not_ in
+            let neg = if sign then CCFun.id else T.Form.not_ in
             match T.view (normalize_not (neg l)) with 
             | T.AppBuiltin((Neq|Xor), ([f;g]|[_;f;g])) when Type.is_prop (T.ty f) ->
               assert(Type.equal (T.ty f) (T.ty g));

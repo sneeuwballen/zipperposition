@@ -1617,7 +1617,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       if T.equal T.true_ orig_s || T.equal T.true_ orig_t then raise StopSearch;
 
       let diss = aux (Lambda.eta_expand orig_s) (Lambda.eta_expand orig_t) in
-      if List.for_all (fun (s,t) -> 
+      if CCList.is_empty diss || List.for_all (fun (s,t) -> 
         T.is_var @@ T.head_term s || T.is_var @@ T.head_term t) diss then (
           raise StopSearch
       );

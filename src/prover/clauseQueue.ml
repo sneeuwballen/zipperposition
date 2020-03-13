@@ -159,7 +159,9 @@ module Make(C : Clause_intf.S) = struct
       let max_lits = C.maxlits (c,0) Subst.empty in
       let ord = C.Ctx.ord () in
       let res = CCArray.foldi (fun sum i lit ->
-          let term_w = (fun t -> float_of_int (Term.weight ~var:v_w ~sym:(fun _ -> f_w) t)) in
+          let term_w = (fun t -> 
+            if Term.is_true_or_false t then 0.0
+            else float_of_int (Term.weight ~var:v_w ~sym:(fun _ -> f_w) t)) in
           let w =
             match lit with
             | Lit.Equation(l,r,_) ->
