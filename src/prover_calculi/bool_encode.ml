@@ -82,6 +82,15 @@ let exists_id = ID.make "$_exists"
 let exists_term = T.const ~ty:forall_type exists_id
 let exists_clone_tydecl = decl exists_id forall_type
 
+let choice_id = ID.make "$_choice"
+let choice_type = 
+  let alpha = Var.make ~ty:T.tType (ID.make "alpha") in
+  let body = [([T.var alpha] ==> bool_clone_ty)] ==> T.var alpha in
+  T.Ty.close_forall body
+let choice_term = T.const ~ty:choice_type choice_id
+let choice_clone_tydecl = decl choice_id choice_type
+
+
 let ty_decls = 
   Iter.of_list [bool_clone_tydecl;true_clone_tydecl;
                 false_clone_tydecl; and_clone_tydecl;
@@ -89,7 +98,7 @@ let ty_decls =
                 impl_clone_tydecl; equiv_clone_tydecl;
                 xor_clone_tydecl; eq_clone_tydecl;
                 neq_clone_tydecl; forall_clone_tydecl;
-                exists_clone_tydecl]
+                exists_clone_tydecl; choice_clone_tydecl]
 
 let app_bool hd args =
     T.app hd ~ty:bool_clone_ty args
@@ -178,11 +187,23 @@ let boolean_axioms =
     [SLiteral.eq 
       (app_bool exists_term [alpha; alpha2bool_p])
       (app_bool not_term [app_bool forall_term [alpha; l_not_p_x]])] in
+  
+  (* P X *)
+  let p_x = 
+    app_bool alpha2bool_p [alpha_x] in
+  
+  let p_choice_p =
+    app_bool alpha2bool_p 
+      [T.app ~ty:alpha choice_term [alpha; alpha2bool_p]] in
+  (* exists P = not (forall (\x. not (P x))) *)
+  let choice_def = 
+    [SLiteral.eq (p_x) (false_term);
+     SLiteral.eq (p_choice_p) (true_term);] in
 
     Iter.of_list [either_true_or_false; true_neq_false; and_true; and_false;
                   not_true; not_false; or_true; or_false; eq_true; eq_false;
                   neq_is_not_eq; forall_true; forall_false; exists_def;
-                  impl_t; impl_f; equiv_def; xor_def] 
+                  impl_t; impl_f; equiv_def; xor_def; choice_def] 
 
 
 

@@ -802,7 +802,7 @@ module Comp = struct
     match lit with
     | Equation (l, r, _) when is_essentially_prop lit ->
       let l = Lambda.whnf l in
-      if T.is_app_var l && T.equal T.true_ r then [l;r]
+      if T.is_app_var l then [l;r]
       else [l]
     | Equation (l, r, _) -> 
       _maxterms2 ~ord l r

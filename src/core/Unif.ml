@@ -20,8 +20,10 @@ let norm_logical_disagreements b args args' : _ list * _ list =
   if Builtin.is_flattened_logical b then (
     let a_set, a'_set = CCPair.map_same Term.Set.of_list (args,args') in
     let uniq_a, uniq_a' = Term.Set.diff a_set a'_set, Term.Set.diff a'_set a_set in
-    assert(Term.Set.cardinal uniq_a = Term.Set.cardinal uniq_a');
-    let args, args' = CCPair.map_same Term.Set.to_list (uniq_a, uniq_a') in
+    let args, args' =
+      if Term.Set.cardinal uniq_a = Term.Set.cardinal uniq_a' then
+        CCPair.map_same Term.Set.to_list (uniq_a, uniq_a')
+      else args, args' in
     sort args, sort args')
   else (args, args')
 

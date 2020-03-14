@@ -373,10 +373,10 @@ module Make(E : Env.S) : S with module Env = E = struct
            not (Literals.is_shielded v (C.lits c)))
     (* find all constraints on [v], also returns the remaining literals.
        returns None if some constraints contains [v] itself. *)
-    and gather_lits v : (Literal.t list * (T.t list * bool) list) option =
+    and gather_lits v  =
       try
         Array.fold_left
-          (fun (others,set) lit ->
+          (fun (others,set,pos_lits) lit ->
              begin match lit with
                | Literal.Equation (lhs, rhs, sign) when T.equal rhs T.true_->
                  let f, args = T.as_app lhs in
@@ -386,12 +386,13 @@ module Make(E : Env.S) : S with module Env = E = struct
                      if List.exists (T.var_occurs ~var:v) args then (
                        raise Exit; (* [P … t[v] …] is out of scope *)
                      );
-                     others, (args, sign) :: set
-                   | _ -> lit :: others, set
+                     others, (args, sign) :: set, 
+                     (if sign then [lit] else []) @ pos_lits
+                   | _ -> lit :: others, set, pos_lits
                  end
-               | _ -> lit :: others, set
+               | _ -> lit :: others, set, pos_lits
              end)
-          ([], [])
+          ([], [], [])
           (C.lits c)
         |> CCOpt.return
       with Exit -> None
@@ -401,8 +402,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       (* gather constraints on [v] *)
       begin match gather_lits v with
         | None
-        | Some (_, []) -> None
-        | Some (other_lits, constr_l) ->
+        | Some (_, [], _) -> None
+        | Some (other_lits, constr_l, pos_lits) ->
           (* gather positive/negative args *)
           let pos_args, neg_args =
             CCList.partition_map
@@ -428,7 +429,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                    List.map2 T.Form.eq vars_t tup |> T.Form.and_l)
               |> T.Form.or_l
             in
-            Util.debugf ~section 5
+            Util.debugf ~section 1
               "(@[elim-pred-with@ (@[@<1>λ @[%a@].@ %a@])@])"
               (fun k->k (Util.pp_list ~sep:" " Type.pp_typed_var) vars T.pp body);
             Util.incr_stat stat_elim_pred;
@@ -439,16 +440,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           let renaming = Subst.Renaming.create () in
           let new_lits =
             let l1 = Literal.apply_subst_list renaming subst (other_lits,0) in
-            let l2 =
-              CCList.product
-                (fun args_pos args_neg ->
-                   let args_pos = Subst.FO.apply_l renaming subst (args_pos,0) in
-                   let args_neg = Subst.FO.apply_l renaming subst (args_neg,0) in
-                   List.map2 Literal.mk_eq args_pos args_neg)
-                pos_args
-                neg_args
-              |> List.flatten
-            in
+            let l2 = Literal.apply_subst_list renaming subst (pos_lits,0) in
             l1 @ l2
           in
           let proof =
