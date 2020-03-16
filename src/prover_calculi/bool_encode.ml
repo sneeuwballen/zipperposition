@@ -195,7 +195,8 @@ let boolean_axioms =
   let p_choice_p =
     app_bool alpha2bool_p 
       [T.app ~ty:alpha choice_term [alpha; alpha2bool_p]] in
-  (* exists P = not (forall (\x. not (P x))) *)
+  
+  (* p x \/ p (choice p) *)
   let choice_def = 
     [SLiteral.eq (p_x) (false_term);
      SLiteral.eq (p_choice_p) (true_term);] in
@@ -204,8 +205,6 @@ let boolean_axioms =
                   not_true; not_false; or_true; or_false; eq_true; eq_false;
                   neq_is_not_eq; forall_true; forall_false; exists_def;
                   impl_t; impl_f; equiv_def; xor_def; choice_def] 
-
-
 
 
 let bool_encode_ty ty_orig =

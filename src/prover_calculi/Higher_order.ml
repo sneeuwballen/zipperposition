@@ -478,6 +478,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           let extract_var t = 
             let _, body = T.open_fun t in
             match T.view body with
+            | T.Var x -> Some x
             | T.App(hd, _) when T.is_var hd ->  Some (T.as_var_exn hd)
             | _ -> None in
           CCOpt.to_list (extract_var l) @ CCOpt.to_list (extract_var r)
@@ -486,7 +487,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       |> T.VarSet.of_seq (* unique *)
     in
     if not (T.VarSet.is_empty vars) then (
-      Util.debugf ~section 5 "(@[<hv2>ho.refine@ :clause %a@ :terms {@[%a@]}@])"
+      Util.debugf ~section 1 "(@[<hv2>ho.refine@ :clause %a@ :terms {@[%a@]}@])"
         (fun k->k C.pp c (Util.pp_seq T.pp_var) (T.VarSet.to_seq vars));
     );
     let sc_c = 0 in
@@ -501,22 +502,22 @@ module Make(E : Env.S) : S with module Env = E = struct
             ~mode ~offset (v,sc_c))
       |> Iter.map
         (fun (subst,penalty) ->
-           let renaming = Subst.Renaming.create() in
-           let lits = Literals.apply_subst renaming subst (C.lits c,sc_c) in
-           let proof =
-             Proof.Step.inference ~rule:(Proof.Rule.mk "ho.refine") ~tags:[Proof.Tag.T_ho]
-               [C.proof_parent_subst renaming (c,sc_c) subst]
-           in
-           let new_c =
-             C.create_a lits proof
-               ~penalty:(C.penalty c + penalty) ~trail:(C.trail c)
-           in
-           (* CCFormat.printf "[Prim_enum:] @[%a@]\n=>\n@[%a@].\n" C.pp c C.pp new_c;*)
-           Util.debugf ~section 3
-             "(@[<hv2>ho.refine@ :from %a@ :subst %a@ :yields %a@])"
-             (fun k->k C.pp c Subst.pp subst C.pp new_c);
-           Util.incr_stat stat_prim_enum;
-           new_c)
+          let renaming = Subst.Renaming.create() in
+          let lits = Literals.apply_subst renaming subst (C.lits c,sc_c) in
+          let proof =
+            Proof.Step.inference ~rule:(Proof.Rule.mk "ho.refine") ~tags:[Proof.Tag.T_ho]
+              [C.proof_parent_subst renaming (c,sc_c) subst]
+          in
+          let new_c =
+            C.create_a lits proof
+              ~penalty:(C.penalty c + penalty) ~trail:(C.trail c)
+          in
+          (* CCFormat.printf "[Prim_enum:] @[%a@]\n=>\n@[%a@].\n" C.pp c C.pp new_c;*)
+          Util.debugf ~section 1
+            "(@[<hv2>ho.refine@ :from %a@ :subst %a@ :yields %a@])"
+            (fun k->k C.pp c Subst.pp subst C.pp new_c);
+          Util.incr_stat stat_prim_enum;
+          new_c)
       |> Iter.to_rev_list
     end
 
@@ -1541,7 +1542,16 @@ let () =
           else if s = "old-prune" then _prune_arg_fun := `OldPrune 
           else _prune_arg_fun := `NoPrune)), " choose arg prune mode";
       "--ho-ext-neg-lit", Arg.Bool (fun  v -> _ext_neg_lit := v), " enable/disable negative extensionality rule on literal level [?]";
-      "--ho-elim-leibniz", Arg.Int (fun v -> _elim_leibniz_eq := v), " enable/disable treatment of Leibniz equality";
+      "--ho-elim-leibniz", Arg.String (fun v -> 
+        match v with 
+        | "inf" ->  _elim_leibniz_eq := max_int
+        | "off" -> _elim_leibniz_eq := -1
+        | _ ->
+          match CCInt.of_string v with
+          | None -> invalid_arg "number expected for --ho-elim-leibniz"
+          | Some x -> _elim_leibniz_eq := x
+         ), " enable/disable treatment of Leibniz equality. inf enables it for infinte depth of clauses"
+            ^ "; off disables it; number enables it for a given depth of clause";
       "--ho-def-unfold", Arg.Bool (fun v -> def_unfold_enabled_ := v), " enable ho definition unfolding";
       "--ho-choice-inst", Arg.Bool (fun v -> _instantiate_choice_ax := v), " enable ho definition unfolding";
       "--ho-simple-projection", Arg.Int (fun v -> _simple_projection := v), 

@@ -28,6 +28,7 @@ let k_solve_formulas = Flex_state.create_key ()
 let k_filter_literals = Flex_state.create_key ()
 let k_nnf = Flex_state.create_key ()
 let k_elim_bvars = Flex_state.create_key ()
+let k_simplify_bools = Flex_state.create_key ()
 
 
 let selection_to_str = function
@@ -598,8 +599,9 @@ module Make(E : Env.S) : S with module Env = E = struct
     match Env.flex_get k_bool_reasoning with 
     | BoolReasoningDisabled -> ()
     | _ -> 
-      (* Env.ProofState.PassiveSet.add (create_clauses ()); *)
-      Env.add_basic_simplify simpl_bool_subterms;
+      if Env.flex_get k_simplify_bools then (
+        Env.add_basic_simplify simpl_bool_subterms
+      );
       Env.add_basic_simplify normalize_equalities;
       if Env.flex_get k_nnf then (
         E.add_basic_simplify nnf_bool_subters;
@@ -854,6 +856,7 @@ let _norm_bools = ref false
 let _solve_formulas = ref false
 let _filter_literals = ref `Max
 let _nnf = ref false
+let _simplify_bools = ref true
 let _elim_bvars = ref false
 
 
@@ -871,7 +874,7 @@ let extension =
     E.flex_add k_filter_literals !_filter_literals;
     E.flex_add k_nnf !_nnf;
     E.flex_add k_elim_bvars !_elim_bvars;
-
+    E.flex_add k_simplify_bools !_simplify_bools;
 
     ET.setup ()
   in
@@ -915,6 +918,9 @@ let () =
     "--nnf-nested-formulas"
     , Arg.Bool (fun v -> _nnf := v)
     , " convert nested formulas into negation normal form";
+    "--simplify-bools"
+    , Arg.Bool (fun v -> _simplify_bools := v)
+    , " simplify boolean subterms";
     "--elim-bvars"
     , Arg.Bool ((:=) _elim_bvars)
     , " replace boolean variables by T and F";

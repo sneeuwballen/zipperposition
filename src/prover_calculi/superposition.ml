@@ -2553,7 +2553,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                    try_unif i r 0 l 0
                  | _ -> ()
                end
-             | Lit.Equation (l, r, sign) when Type.is_prop (T.ty l) ->
+             (* | Lit.Equation (l, r, sign) when Type.is_prop (T.ty l) ->
                begin match T.view l, T.view r with
                  | T.Var x, (T.AppBuiltin (Builtin.True, []))
                    when not (var_in_subst_ !us x 0) ->
@@ -2570,7 +2570,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                    end
 
                  | _ -> ()
-               end
+               end *)
              | _ -> ())
         lits;
       let new_lits = BV.select bv lits in
