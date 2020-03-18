@@ -1117,6 +1117,7 @@ module Conv = struct
           PT.Var_tbl.replace tbl v (!depth,ty_arg);
           incr depth;
           let ty_b = Type.Conv.of_simple_term_exn ctx (PT.ty_exn body) in
+          assert(Type.is_prop ty_b);
           let body = fun_ ty_arg (aux body) in
           decr depth;
           if CCOpt.is_some previous then PT.Var_tbl.replace tbl v (CCOpt.get_exn previous)

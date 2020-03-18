@@ -78,6 +78,29 @@ let as_cnf f = match F.view f with
   | F.Forall _
   | F.Exists _ -> not_cnf_ f
 
+let lazy_as_cnf f =
+  let rec aux ~pol f = match F.view f with 
+    | F.True -> if pol then [[SLiteral.true_]] else [[SLiteral.false_]]
+    | F.False -> if pol then [[SLiteral.false_]] else [[SLiteral.true_]]
+    | F.Not f' ->
+      assert (T.Ty.is_prop (T.ty_exn f'));
+      aux ~pol:(not pol) f'
+    | F.Eq(a,b) 
+    | F.Equiv(a,b) ->
+      let cons = if pol then SLiteral.eq else SLiteral.neq in
+      [[cons a b]]
+    | F.Neq(a,b)
+    | F.Xor(a,b) ->
+      let cons = if pol then SLiteral.neq else SLiteral.eq in
+      [[cons a b]]
+    | _ -> 
+      let cons = if pol then SLiteral.eq else SLiteral.neq in
+      assert(T.Ty.is_prop (T.ty_exn f));
+      [[cons f F.true_]] in
+  aux ~pol:true f
+
+
+
 let is_clause f =
   try ignore (as_clause f); true
   with NotCNF _ | SLiteral.NotALit _ -> false
@@ -870,6 +893,7 @@ let to_cnf f =
   res
 
 type options =
+  | LazyCnf
   | DistributeExists
   | DisableRenaming
   | InitialProcessing of (form -> form) (** any processing, at the beginning *)
@@ -1120,7 +1144,7 @@ let proof_neg stmt =
 (* Transform the clauses into proper CNF; returns a list of clauses *)
 let cnf_of_seq ~ctx ?(opts=[]) (seq:Stmt.input_t Iter.t) : _ CCVector.t =
   (* read options *)
-  let disable_renaming = List.mem DisableRenaming opts in
+  let disable_renaming = List.mem DisableRenaming opts || List.mem LazyCnf opts in
   let preprocess =
     T.simplify_formula ::
     CCList.filter_map
@@ -1145,8 +1169,10 @@ let cnf_of_seq ~ctx ?(opts=[]) (seq:Stmt.input_t Iter.t) : _ CCVector.t =
   (* convert formula into CNF, returning a list of clauses and a list of skolems *)
   let conv_form_sk f : (ID.t * type_) list * clause list =
     Util.debugf ~section 2 "@[<2>reduce@ `@[%a@]`@ to CNF@]" (fun k->k T.pp f);
+    let view_as_cnf =
+      if List.mem LazyCnf opts then lazy_as_cnf else as_cnf in
     let clauses =
-      try as_cnf f
+      try view_as_cnf f
       with NotCNF _ | SLiteral.NotALit _ ->
         let f = nnf f in
         (* processing post-nnf *)
