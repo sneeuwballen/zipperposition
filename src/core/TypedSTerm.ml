@@ -866,19 +866,23 @@ module Form = struct
 
   let and_ ?loc l  =
     let flattened = flatten_ `And [] l in
+    let parsing = CCOpt.is_some loc in
     match flattened with
-    | [] when (not @@ CCList.is_empty l) -> true_
-    | [t] when (CCList.length l != 1) -> t 
+    | [] when not parsing -> true_
+    | [t] when not parsing -> t 
     | _ ->  app_builtin ?loc ~ty:Ty.prop Builtin.And (flattened)
 
   let or_ ?loc l = 
     let flattened = flatten_ `Or [] l in
+    let parsing = CCOpt.is_some loc in
     match flattened with
-    | [] -> false_
-    | [t] -> t 
+    | [] when not parsing -> false_
+    | [t] when not parsing -> t 
     | _ ->  app_builtin ?loc ~ty:Ty.prop Builtin.Or (flattened)
 
-  let not_ ?loc f = app_builtin ?loc ~ty:Ty.prop Builtin.Not [f]
+  let not_ ?loc f = 
+    assert(Ty.is_prop (ty_exn f));
+    app_builtin ?loc ~ty:Ty.prop Builtin.Not [f]
 
   let forall ?loc v t = bind ?loc ~ty:Ty.prop Binder.Forall v t
   let exists ?loc v t = bind ?loc ~ty:Ty.prop Binder.Exists v t

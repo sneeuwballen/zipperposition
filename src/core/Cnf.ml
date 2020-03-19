@@ -78,8 +78,9 @@ let as_cnf f = match F.view f with
   | F.Forall _
   | F.Exists _ -> not_cnf_ f
 
-let lazy_as_cnf f =
-  let rec aux ~pol f = match F.view f with 
+let lazy_as_cnf =
+  let rec aux ~pol f =
+   match F.view f with 
     | F.True -> if pol then [[SLiteral.true_]] else [[SLiteral.false_]]
     | F.False -> if pol then [[SLiteral.false_]] else [[SLiteral.true_]]
     | F.Not f' ->
@@ -97,9 +98,7 @@ let lazy_as_cnf f =
       let cons = if pol then SLiteral.eq else SLiteral.neq in
       assert(T.Ty.is_prop (T.ty_exn f));
       [[cons f F.true_]] in
-  aux ~pol:true f
-
-
+  aux ~pol:true
 
 let is_clause f =
   try ignore (as_clause f); true
@@ -1170,6 +1169,7 @@ let cnf_of_seq ~ctx ?(opts=[]) (seq:Stmt.input_t Iter.t) : _ CCVector.t =
   let conv_form_sk f : (ID.t * type_) list * clause list =
     Util.debugf ~section 2 "@[<2>reduce@ `@[%a@]`@ to CNF@]" (fun k->k T.pp f);
     let view_as_cnf =
+      assert(T.Ty.is_prop (T.ty_exn f));
       if List.mem LazyCnf opts then lazy_as_cnf else as_cnf in
     let clauses =
       try view_as_cnf f
@@ -1286,7 +1286,9 @@ let cnf_of_seq ~ctx ?(opts=[]) (seq:Stmt.input_t Iter.t) : _ CCVector.t =
          CCVector.push res (Stmt.lemma ~attrs ~proof l)
        | Stmt.Goal f ->
          (* intermediate statement to represent the negation step *)
+         assert(T.Ty.is_prop (T.ty_exn f));
          let not_f = F.not_ f in
+         assert(T.Ty.is_prop (T.ty_exn not_f));
          let stmt = Stmt.neg_goal ~proof:(proof_neg stmt) ~skolems:[] [not_f] in
          (* now take the CNF of negated goal *)
          let skolems, l = conv_form_sk not_f in
