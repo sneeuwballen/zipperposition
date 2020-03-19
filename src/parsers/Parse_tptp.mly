@@ -63,6 +63,7 @@
 %token FORALLCONST
 %token EXISTSCONST
 %token NOTCONST
+%token IMPLYCONST
 
 %token UNDERSCORE
 
@@ -318,9 +319,6 @@ type_arg: l=assoc_binary_formula_aux(ARROW) {
 atomic_formula:
   | TRUE { PT.true_ }
   | FALSE { PT.false_ }
-  | NOTCONST { PT.builtin Builtin.Not }
-  | EXISTSCONST { PT.builtin Builtin.ExistsConst }
-  | FORALLCONST { PT.builtin Builtin.ForallConst }
   | t=term
     {
       let loc = L.mk_pos $startpos $endpos in
@@ -487,6 +485,10 @@ atomic_word:
   | s=LOWER_WORD { s }
 
 atomic_defined_word:
+  | NOTCONST { PT.builtin Builtin.Not }
+  | IMPLYCONST { PT.builtin Builtin.Imply }
+  | EXISTSCONST { PT.builtin Builtin.ExistsConst }
+  | FORALLCONST { PT.builtin Builtin.ForallConst }
   | WILDCARD { PT.wildcard }
 
 defined_ty:
