@@ -126,7 +126,7 @@ module type S = sig
   val add_multi_simpl_rule : multi_simpl_rule -> unit
   (** Add a multi-clause simplification rule *)
 
-  val set_single_step_multi_simpl_rule : multi_simpl_rule -> unit
+  val add_single_step_multi_simpl_rule : multi_simpl_rule -> unit
   (** Add a multi-clause simplification rule, that is going to be applied
       only once, not in a fixed-point manner *)
 

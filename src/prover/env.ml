@@ -120,7 +120,7 @@ module Make(X : sig
   let _is_trivial : is_trivial_rule list ref = ref []
   let _empty_clauses = ref C.ClauseSet.empty
   let _multi_simpl_rule : multi_simpl_rule list ref = ref []
-  let _ss_multi_simpl_rule : multi_simpl_rule ref = ref (fun _ -> None)
+  let _ss_multi_simpl_rule : multi_simpl_rule list ref = ref []
   let _generate_rules : (string * generate_rule) list ref = ref []
   let _clause_conversion_rules : clause_conversion_rule list ref = ref []
   let _step_init = ref []
@@ -220,8 +220,8 @@ module Make(X : sig
   let add_multi_simpl_rule rule =
     _multi_simpl_rule := rule :: !_multi_simpl_rule
 
-  let set_single_step_multi_simpl_rule rule =
-    _ss_multi_simpl_rule := rule
+  let add_single_step_multi_simpl_rule rule =
+    _ss_multi_simpl_rule := rule :: !_ss_multi_simpl_rule
 
   let cr_skip = CR_skip
   let cr_add x = CR_add x
@@ -744,7 +744,9 @@ module Make(X : sig
     let set = ref C.ClauseSet.empty in
     let q = Queue.create () in
     Queue.push c q;
-    let blocked_sss = ref IntSet.empty in
+    let blocked_sss = 
+      CCArray.of_list 
+        (List.map (fun _ -> IntSet.empty) !_ss_multi_simpl_rule) in
 
     while not (Queue.is_empty q) do
       let c = Queue.pop q in
@@ -753,10 +755,25 @@ module Make(X : sig
       if is_trivial c || is_redundant c
       then ()
       else (
-        let sss_blocked = IntSet.mem (C.id c) !blocked_sss in
-        let single_step_simplified = 
-          if sss_blocked then None
-          else !_ss_multi_simpl_rule c in
+        (* A list of single step rules works like this:
+           Each rule can be applied to a clause which is not
+           a descendent of a clause to which the rule has already been applied!
+
+           For each rule, we keep the set of clauses that the rule has been applied on
+           an their descendents. Then, we apply a rule on a clause not in this set.
+         *)
+        let single_step_simplified =
+          let rec aux i = function 
+          | [] -> None
+          | rule :: rs ->
+            let block_set = blocked_sss.(i) in
+            if IntSet.mem (C.id c) block_set then aux (i+1) rs
+            else (
+              match rule c with 
+              | None -> aux (i+1) rs
+              | Some l' -> Some(i, l')
+            ) in
+          aux 0 !_ss_multi_simpl_rule in 
 
         match single_step_simplified with 
         | None -> 
@@ -768,15 +785,24 @@ module Make(X : sig
             | Some l ->
               (* continue processing *)
               did_simplify := true;
-              List.iter (fun c ->
-                  if sss_blocked then 
-                    (blocked_sss := IntSet.add (C.id c) !blocked_sss);
-                  Queue.push c q) l end
-        | Some l ->
+              let new_ids = IntSet.of_list (List.map C.id l) in
+
+              (* non-functional for efficiency *)
+              for i = 0 to (List.length !_ss_multi_simpl_rule) -1 do
+                let bs_i = blocked_sss.(i) in
+                if IntSet.mem (C.id c) bs_i then (
+                  (* Adding descendents to blocked set *)
+                  Array.set blocked_sss i (IntSet.union new_ids bs_i))
+              done;
+
+              List.iter (fun c -> Queue.push c q) l end
+        | Some (i,l) ->
           did_simplify := true;
-          List.iter (fun res -> 
-              blocked_sss := IntSet.add (C.id res) !blocked_sss; 
-              Queue.push res q) l)
+          let new_ids = IntSet.of_list (List.map C.id l) in
+          List.iter (fun res ->
+            (* Blocking descdendents for i *)
+            Array.set blocked_sss i (IntSet.union new_ids blocked_sss.(i));
+            Queue.push res q) l)
     done;
     let res = C.ClauseSet.to_list !set in
     ZProf.exit_prof prof_all_simplify;

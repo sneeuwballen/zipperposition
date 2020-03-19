@@ -624,7 +624,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         Env.add_unary_inf "bool_cases" bool_case_inf;
       )
       else if Env.flex_get k_bool_reasoning = BoolCasesSimplification then (
-        Env.set_single_step_multi_simpl_rule bool_case_simp;
+        Env.add_single_step_multi_simpl_rule bool_case_simp;
       ) else if Env.flex_get k_bool_reasoning = BoolCasesKeepParent then (
         let keep_parent c  = CCOpt.get_or ~default:[] (bool_case_simp c) in
         Env.add_unary_inf "bool_cases_keep_parent" keep_parent;
