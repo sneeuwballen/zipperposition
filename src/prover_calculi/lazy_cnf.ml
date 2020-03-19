@@ -102,8 +102,39 @@ module Make(E : Env.S) : S with module Env = E = struct
         | T.AppBuiltin(Not, _) -> assert false
         | _ -> []
       ) else []) 
-    |> Iter.to_list
+    |> (fun iter -> 
+          if Iter.is_empty iter then None
+          else Some (Iter.to_list iter))
     
 
-  let setup () = ()
+  let setup () =
+    if !enabled then (
+      Env.add_single_step_multi_simpl_rule lazy_clausify;
+    )
 end
+
+let extension =
+  let register env =
+    let module E = (val env : Env.S) in
+    let module ET = Make(E) in
+    ET.setup ()
+  in
+  { Extensions.default with
+    Extensions.name = "lazy_cnf";
+    env_actions=[register];
+  }
+
+let () =
+  Options.add_opts [
+    "--lazy-cnf", Arg.Bool ((:=) enabled), "turn on lazy clausification"
+  ];
+  Params.add_to_modes ["ho-complete-basic";
+                       "ho-pragmatic";
+                       "lambda-free-intensional";
+                       "lambda-free-purify-intensional";
+                       "lambda-free-extensional";
+                       "lambda-free-purify-extensional";
+                       "fo-complete-basic"] (fun () ->
+      enabled := false;
+  );
+  Extensions.register extension

@@ -25,7 +25,6 @@ let _sine_d_min = ref 1
 let _sine_d_max = ref 5
 let _sine_tolerance = ref 1.5
 let _sine_threshold = ref (-1)
-let _lazy_cnf  = ref false
 
 (** setup an alarm for abrupt stop *)
 let setup_alarm timeout =
@@ -174,7 +173,7 @@ let typing ~file prelude (input,stmts) =
 (* obtain clauses  *)
 let cnf ~sk_ctx decls =
   Phases.start_phase Phases.CNF >>= fun () ->
-  let opts = if !_lazy_cnf then [Cnf.LazyCnf] else [ ] in
+  let opts = if !Lazy_cnf.enabled then [Cnf.LazyCnf] else [ ] in
   let stmts =
     decls
     |> CCVector.to_seq
@@ -613,7 +612,6 @@ let main ?setup_gc:(gc=true) ?params file =
 let () = 
   let open Libzipperposition in
   Params.add_opts [
-    "--lazy-cnf", Arg.Bool ((:=) _lazy_cnf), "turn on lazy clausification";
     "--de-bruijn-weight", Arg.Set_int _db_w, 
     " Set weight of de Bruijn index for KBO";
     "--lift-lambdas", Arg.Bool (fun v -> _lift_lambdas := v),
