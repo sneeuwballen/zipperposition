@@ -81,10 +81,10 @@ module Make(E : Env.S) : S with module Env = E = struct
         if take_subterm then k t;
         if continue then (
           List.iter (fun arg -> 
-            find_in_term ~top:false arg k 
+            find_in_term ~top:(top && T.is_appbuiltin t) arg k 
           ) args)
       | T.Fun (_,body) ->
-        find_in_term ~top:false body k
+        find_in_term ~top body k
       | _ -> () in
 
     let eligible = 
