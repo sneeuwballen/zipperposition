@@ -7,6 +7,8 @@ module T = Term
 
 let enabled = ref false
 
+let k_lazy_cnf_kind = Flex_state.create_key ()
+
 module type S = sig
   module Env : Env.S
   module C : module type of Env.C
@@ -44,7 +46,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let proof = proof rule_name c in
     [C.create ~penalty:(C.penalty c) ~trail:(C.trail c) lits proof]
 
-  let lazy_clausify c =
+  let lazy_clausify_simpl c =
     fold_lits c
     |> Iter.flat_map_l ( fun (lhs, rhs, sign, pos) -> 
       let i,_ = Ls.Pos.cut pos in
@@ -105,18 +107,25 @@ module Make(E : Env.S) : S with module Env = E = struct
     |> (fun iter -> 
           if Iter.is_empty iter then None
           else Some (Iter.to_list iter))
-    
+
+  let lazy_clausify_inf c = 
+    CCOpt.get_or ~default:[] (lazy_clausify_simpl c)   
 
   let setup () =
     if !enabled then (
-      Env.add_single_step_multi_simpl_rule lazy_clausify;
+      match Env.flex_get k_lazy_cnf_kind with 
+      | `Inf -> Env.add_unary_inf "lazy_cnf" lazy_clausify_inf;
+      | `Simp -> Env.add_multi_simpl_rule lazy_clausify_simpl;
     )
 end
+
+let _lazy_cnf_kind = ref `Inf
 
 let extension =
   let register env =
     let module E = (val env : Env.S) in
     let module ET = Make(E) in
+    E.flex_add k_lazy_cnf_kind !_lazy_cnf_kind;
     ET.setup ()
   in
   { Extensions.default with
@@ -126,8 +135,12 @@ let extension =
 
 let () =
   Options.add_opts [
-    "--lazy-cnf", Arg.Bool ((:=) enabled), "turn on lazy clausification"
-  ];
+    "--lazy-cnf", Arg.Bool ((:=) enabled), "turn on lazy clausification";
+    "--lazy-cnf-kind", Arg.Symbol (["inf"; "simp"], (fun str -> 
+      match str with 
+      | "inf" -> _lazy_cnf_kind := `Inf
+      | "simp" -> _lazy_cnf_kind := `Simp
+      | _ -> assert false)), " use lazy cnf as either simplification or inference"];
   Params.add_to_modes ["ho-complete-basic";
                        "ho-pragmatic";
                        "lambda-free-intensional";
