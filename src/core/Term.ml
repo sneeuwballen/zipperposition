@@ -839,6 +839,12 @@ module Form = struct
     assert(Type.is_fun (ty t) && Type.returns_prop (ty t));
     app_builtin ~ty:Type.prop Builtin.ExistsConst [t]
 
+  let equiv f g =
+    app_builtin ~ty:Type.prop Builtin.Equiv [f; g]
+
+  let xor f g =
+    app_builtin ~ty:Type.prop Builtin.Xor [f; g]
+
   let imply f g =
     app_builtin ~ty:Type.prop Builtin.Imply [f; g]
 end

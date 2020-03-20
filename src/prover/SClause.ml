@@ -55,6 +55,7 @@ let flag_persistent = new_flag ()
 let flag_redundant = new_flag ()
 let flag_backward_simplified = new_flag()
 let flag_poly_arg_cong_res = new_flag()
+let flag_is_lazy_def = new_flag()
 
 
 let set_flag flag c truth =
