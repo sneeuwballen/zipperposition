@@ -25,7 +25,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let fold_lits c = 
     Ls.fold_eqn 
-      ~both:true ~ord:(E.Ctx.ord ()) ~eligible:(C.Eligible.res c) 
+      ~both:false ~ord:(E.Ctx.ord ()) ~eligible:(C.Eligible.res c) 
       (C.lits c)
 
   let proof ~name c =
@@ -110,8 +110,8 @@ module Make(E : Env.S) : S with module Env = E = struct
           mk_or ~rule_name [res] c i
         | T.AppBuiltin(Not, _) -> assert false
         | _ -> []
-      ) else if Type.is_prop (T.ty lhs) then (
-        let rule_name = "lazy_cnf_equiv" in
+      ) else if Type.is_prop (T.ty lhs) && not (T.is_var lhs) then (
+          let rule_name = "lazy_cnf_equiv" in
           if sign then (
             let not_a_or_b = T.Form.or_ (T.Form.not_ lhs) rhs  in
             let a_or_not_b = T.Form.or_ lhs (T.Form.not_ rhs)  in

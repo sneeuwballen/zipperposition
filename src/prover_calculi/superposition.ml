@@ -2672,7 +2672,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                 Subst.FO.apply Subst.Renaming.none subst t in
              assert(T.equal (app_sub (l,1)) (app_sub (t1, 0)));
              if C.trail_subsumes c' c &&
-                Unif.FO.equal ~subst (r,1)(t2,0)
+                Term.equal (app_sub (r,1)) (app_sub (t2,0))
              then begin
                (* t1!=t2 is refuted by l\sigma = r\sigma *)
                Util.debugf ~section 4
