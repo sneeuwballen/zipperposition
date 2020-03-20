@@ -77,18 +77,25 @@ module Make(E : Env.S) : S with module Env = E = struct
             mk_and [a_or_b; not_a_or_not_b] c i ~rule_name
           )
         | T.AppBuiltin((ForallConst|ExistsConst) as hd, [f]) ->
-          let rule_name = 
-            CCFormat.sprintf "lazy_cnf_%s" 
-              (if hd = ForallConst then "forall" else "exists") in
           let free_vars = C.Seq.vars c in
           let var_id = T.Seq.max_var free_vars + 1 in
+          let f = Lambda.eta_expand f in
           let var_tys, body =  T.open_fun f in
-          assert(CCList.length var_tys = 1);
+          if not (CCList.length var_tys = 1) then (
+            CCFormat.printf "c: @[%a@]@." C.pp c;
+            CCFormat.printf "f: @[%a@]@." T.pp f;
+            CCFormat.printf "var_tys: @[%a@]@." (CCList.pp Type.pp) var_tys;
+            CCFormat.printf "body: @[%a@]@." T.pp body;
+            assert false;
+          );
           let var_ty = List.hd var_tys in
           let hd, f =
             if sign then hd,f
             else ((if hd=ForallConst then ExistsConst else ForallConst),
                   T.fun_ var_ty (T.Form.not_ body)) in
+          let rule_name = 
+            CCFormat.sprintf "lazy_cnf_%s" 
+              (if hd = ForallConst then "forall" else "exists") in
           let subst_term =
             if hd = ForallConst then (
               T.var @@ HVar.make ~ty:var_ty var_id
@@ -103,7 +110,17 @@ module Make(E : Env.S) : S with module Env = E = struct
           mk_or ~rule_name [res] c i
         | T.AppBuiltin(Not, _) -> assert false
         | _ -> []
-      ) else []) 
+      ) else if Type.is_prop (T.ty lhs) then (
+        let rule_name = "lazy_cnf_equiv" in
+          if sign then (
+            let not_a_or_b = T.Form.or_ (T.Form.not_ lhs) rhs  in
+            let a_or_not_b = T.Form.or_ lhs (T.Form.not_ rhs)  in
+            mk_and [not_a_or_b; a_or_not_b] c i ~rule_name
+          ) else (
+            let a_or_b = T.Form.or_ lhs rhs  in
+            let not_a_or_not_b = T.Form.or_ (T.Form.not_ lhs) (T.Form.not_ rhs) in
+            mk_and [a_or_b; not_a_or_not_b] c i ~rule_name
+      )) else []) 
     |> (fun iter -> 
           if Iter.is_empty iter then None
           else Some (Iter.to_list iter))

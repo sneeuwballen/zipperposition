@@ -721,11 +721,10 @@ let normalize_eq lit =
   | Equation(lhs, rhs, sign) 
     when T.equal rhs T.true_ ->
     begin match T.view lhs with 
-      | T.AppBuiltin(Builtin.Eq, ([_;l;r] | [l;r])) -> (* first arg can be type variable *)
+      | T.AppBuiltin(Builtin.(Eq|Equiv), ([_;l;r] | [l;r])) -> (* first arg can be type variable *)
         let eq_cons = if sign then mk_eq else mk_neq in
         Some (eq_cons l r) 
-      | T.AppBuiltin(Builtin.Neq, [_;l;r])
-      | T.AppBuiltin(Builtin.Neq, [l;r]) ->
+      | T.AppBuiltin(Builtin.(Neq|Xor), ([_;l;r]|[l;r])) ->
         let eq_cons = if sign then mk_neq else mk_eq in
         Some (eq_cons l r)
       | _ -> None

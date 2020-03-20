@@ -2667,7 +2667,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         UnitIdx.retrieve ~sign:true (!_idx_simpl,1)(t1,0)
         |> Iter.iter
           (fun (l,r,(_,_,_,c'),subst) ->
-             assert (Unif.FO.equal ~subst (l,1)(t1,0));
+             let app_sub t = 
+              Term.normalize_bools @@ Lambda.eta_expand @@ Lambda.snf @@ 
+                Subst.FO.apply Subst.Renaming.none subst t in
+             assert(T.equal (app_sub (l,1)) (app_sub (t1, 0)));
              if C.trail_subsumes c' c &&
                 Unif.FO.equal ~subst (r,1)(t2,0)
              then begin
