@@ -8,13 +8,14 @@ val enabled : bool ref
 
 module type S = sig
   module Env : Env.S
-  module C : module type of Env.C
+  module C : module type of Env.C with type t = Env.C.t
 
   (** {6 Registration} *)
 
   val setup : unit -> unit
   (** Register rules in the environment *)
 
+  val update_form_counter: action:[< `Decrease | `Increase ] -> C.t -> unit
 
 end
 

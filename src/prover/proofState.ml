@@ -136,6 +136,7 @@ module Make(C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
       then None
       else (
         let x = CQueue.take_first queue in
+        Signal.send on_remove_clause x;
         Some x
       )
 

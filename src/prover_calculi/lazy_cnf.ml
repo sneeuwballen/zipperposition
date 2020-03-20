@@ -12,17 +12,22 @@ let k_renaming_threshold = Flex_state.create_key ()
 
 module type S = sig
   module Env : Env.S
-  module C : module type of Env.C
+  module C : module type of Env.C with type t = Env.C.t
 
   (** {6 Registration} *)
 
   val setup : unit -> unit
   (** Register rules in the environment *)
+
+  val update_form_counter: action:[< `Decrease | `Increase ] -> C.t -> unit
+
 end
 
 module Make(E : Env.S) : S with module Env = E = struct
   module Env = E
   module C = Env.C
+  
+  let _form_counter = Term.Tbl.create 256
 
   module Idx = Fingerprint.Make(struct 
     type t = T.t * ((C.t * bool) list ref)
@@ -38,28 +43,26 @@ module Make(E : Env.S) : S with module Env = E = struct
     | _ -> invalid_arg "only one or two element lists"
 
 
-  let _form_counter = Term.Tbl.create 256 
   let _skolem_idx = ref @@ Idx.empty ()
   let _renaming_idx = ref @@ Idx.empty ()
 
-  let update_counter ~action c =
-    Ls.fold_eqn 
-      ~both:false ~ord:(E.Ctx.ord ()) ~eligible:(C.Eligible.always) 
-      (C.lits c)
-    |> Iter.iter (fun (lhs,rhs,_,_) -> 
-      let terms = 
-        if T.equal T.true_ rhs && T.is_appbuiltin lhs  then [lhs]
-        else if Type.is_prop (T.ty lhs) && not (Term.is_var lhs) then
-          [T.Form.equiv lhs rhs]
-        else [] in
-      List.iter (fun t -> 
-        match action with
-          | `Increase ->
-            Term.Tbl.incr _form_counter t
-          | `Decrease -> 
-            assert(Term.Tbl.mem _form_counter t);
-            Term.Tbl.decr _form_counter t
-      ) terms)
+  let update_form_counter ~action c =
+    if not (C.get_flag SClause.flag_is_lazy_def c) then (
+      Ls.fold_eqn 
+        ~both:false ~ord:(E.Ctx.ord ()) ~eligible:(C.Eligible.always) 
+        (C.lits c)
+      |> Iter.iter (fun (lhs,rhs,_,_) ->
+        let terms = 
+          if T.equal T.true_ rhs && T.is_appbuiltin lhs  then [lhs]
+          else if Type.is_prop (T.ty lhs) && not (T.equal T.true_ rhs) &&
+                  (Term.is_appbuiltin lhs || T.is_appbuiltin rhs) then
+            [T.Form.equiv lhs rhs]
+          else [] in
+        List.iter (fun t -> 
+          match action with
+            | `Increase -> Term.Tbl.incr _form_counter t
+            | `Decrease -> Term.Tbl.decr _form_counter t
+        ) terms))
 
   let fold_lits c = 
     Ls.fold_eqn 
@@ -76,9 +79,9 @@ module Make(E : Env.S) : S with module Env = E = struct
 
     let res = 
       if sign then (
-        C.create ~penalty:0 ~trail:Trail.empty 
+        C.create ~penalty:1 ~trail:Trail.empty 
           [L.mk_false renamer; L.mk_true form] proof
-      ) else (C.create ~penalty:0 ~trail:Trail.empty 
+      ) else (C.create ~penalty:1 ~trail:Trail.empty 
           [L.mk_true renamer; L.mk_false form] proof
       ) in
     C.set_flag SClause.flag_is_lazy_def res true;
@@ -86,7 +89,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let rename ~c form sign =
     assert(Type.is_prop (T.ty form));
-    if C.get_flag SClause.flag_is_lazy_def c then None
+    if C.get_flag SClause.flag_is_lazy_def c || not (T.is_appbuiltin form) then None
     else (
       let gen = Iter.head @@ 
         Idx.retrieve_generalizations (!_renaming_idx, 0) (form, 1) in
@@ -102,13 +105,15 @@ module Make(E : Env.S) : S with module Env = E = struct
             let def = mk_renaming_clause c ~renamer ~form:orig sign in
             defined_as := (def,sign) :: !defined_as;
             (renamer_sub, [def], !defined_as)) in
-        Some(renamer_sub, new_defs,
-             CCList.filter_map (fun (c, sign') ->
-              if sign != sign' then None else Some c) parents)
+
+          Some(renamer_sub, new_defs,
+              CCList.filter_map (fun (c, sign') ->
+                if sign != sign' then None else Some c) parents)
       | None ->
         (* maybe we need to define it if it appears too many times *)
         let num_occurences = Term.Tbl.get_or _form_counter form ~default:0 in
-        if num_occurences >= Env.flex_get k_renaming_threshold then (
+        if num_occurences >= Env.flex_get k_renaming_threshold (*&&
+           CCArray.length (C.lits c) > 1*)  then (
           Term.Tbl.remove _form_counter form;
 
           let free_vars = T.vars form |> T.VarSet.to_list in
@@ -145,14 +150,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     |> Iter.flat_map_l ( fun (lhs, rhs, sign, pos) -> 
       let i,_ = Ls.Pos.cut pos in
       if T.equal rhs T.true_ then (
-        match rename ~c lhs sign with
-        | Some (renamer, new_defs, parents) ->
-          let rule_name = "renaming" in
-          let renamer = (if sign then CCFun.id else T.Form.not_) renamer in
-          (mk_or ~rule_name [renamer] c ~parents:(c :: parents) i)
-          @ new_defs
-        | None -> 
-          begin match T.view lhs with 
+          match T.view lhs with 
           | T.AppBuiltin(And, l) when List.length l >= 2 ->
             let rule_name = "lazy_cnf_and" in
             if sign then mk_and l c i ~rule_name
@@ -176,7 +174,7 @@ module Make(E : Env.S) : S with module Env = E = struct
               @ mk_or ~rule_name [a; b] c i 
             )
           | T.AppBuiltin((ForallConst|ExistsConst) as hd, [f]) ->
-            let free_vars = C.Seq.vars c in
+            let free_vars = T.Seq.vars f in
             let var_id = T.Seq.max_var free_vars + 1 in
             let f = Lambda.eta_expand f in
             let var_tys, body =  T.open_fun f in
@@ -193,59 +191,80 @@ module Make(E : Env.S) : S with module Env = E = struct
               if hd = ForallConst then (
                 T.var @@ HVar.make ~ty:var_ty var_id
               ) else (
-                let free_vars_l = 
-                    T.VarSet.to_list (T.VarSet.of_seq free_vars) in
-                let (id,ty), t = T.mk_fresh_skolem ~prefix:"sk" free_vars_l var_ty in
-                E.Ctx.declare id ty;
-                t) in
-            let res = Lambda.snf @@ T.app f [subst_term] in
+                let gen = Iter.head @@ 
+                  Idx.retrieve_generalizations (!_skolem_idx, 0) (f, 1) in
+                match gen with 
+                | Some (orig, (skolem, _), subst) ->
+                  Subst.FO.apply Subst.Renaming.none subst (skolem,0) 
+                | None ->
+                  let free_vars_l = 
+                      T.VarSet.to_list (T.VarSet.of_seq free_vars) in
+                  let (id,ty), t = T.mk_fresh_skolem ~prefix:"sk" free_vars_l var_ty in
+                  E.Ctx.declare id ty;
+                  _skolem_idx := Idx.add !_skolem_idx f (t, ref[]);
+                  t
+              ) in
+            let res = Lambda.eta_reduce @@ Lambda.snf @@ T.app f [subst_term] in
             assert(Type.is_prop (T.ty res));
             mk_or ~rule_name [res] c i
           | T.AppBuiltin(Not, _) -> assert false
-          | _ -> [] end
+          | _ -> []
       ) else if Type.is_prop (T.ty lhs) && not (T.is_var lhs) then (
           let rule_name = "lazy_cnf_equiv" in
           
+          if sign then (
+              let not_a_or_b = T.Form.or_ (T.Form.not_ lhs) rhs  in
+              let a_or_not_b = T.Form.or_ lhs (T.Form.not_ rhs)  in
+              mk_and [not_a_or_b; a_or_not_b] c i ~rule_name
+          ) else (
+            let a_or_b = T.Form.or_ lhs rhs  in
+            let not_a_or_not_b = T.Form.or_ (T.Form.not_ lhs) (T.Form.not_ rhs) in
+            mk_and [a_or_b; not_a_or_not_b] c i ~rule_name
+      )) else [])
+
+  let rename_subformulas c =
+    Ls.fold_eqn 
+        ~both:false ~ord:(E.Ctx.ord ()) ~eligible:(C.Eligible.always) 
+        (C.lits c)
+    |> Iter.fold_while (fun _ (lhs,rhs,sign,pos) -> 
+      let i,_ = Ls.Pos.cut pos in
+      if T.equal rhs T.true_ && T.is_appbuiltin lhs then (
+        match rename ~c lhs sign with
+        | Some (renamer, new_defs, parents) ->
+          let rule_name = "renaming" in
+          let renamer = (if sign then CCFun.id else T.Form.not_) renamer in
+          let res = 
+            (mk_or ~rule_name [renamer] c ~parents:(c :: parents) i) @ new_defs in
+          Some res, `Stop
+        | None -> None, `Continue
+      ) else if Type.is_prop (T.ty lhs) && not (T.equal rhs T.true_) &&
+              (T.is_appbuiltin lhs || T.is_appbuiltin rhs) then (
           match rename_eq ~c lhs rhs sign with
           | Some (renamer, new_defs, parents) ->
             let rule_name = "renaming" in
             let renamer = (if sign then CCFun.id else T.Form.not_) renamer in
-            (mk_or ~rule_name [renamer] c ~parents:(c :: parents) i)
-            @ new_defs
-          | None ->
-            if sign then (
-              let not_a_or_b = T.Form.or_ (T.Form.not_ lhs) rhs  in
-              let a_or_not_b = T.Form.or_ lhs (T.Form.not_ rhs)  in
-              mk_and [not_a_or_b; a_or_not_b] c i ~rule_name
-            ) else (
-              let a_or_b = T.Form.or_ lhs rhs  in
-              let not_a_or_not_b = T.Form.or_ (T.Form.not_ lhs) (T.Form.not_ rhs) in
-              mk_and [a_or_b; not_a_or_not_b] c i ~rule_name
-      )) else [])
+            let res = 
+              (mk_or ~rule_name [renamer] c ~parents:(c :: parents) i) @ new_defs in
+            Some res, `Stop
+          | None -> None, `Continue)
+        else None, `Continue) None
 
   let lazy_clausify_simpl c =
     let res = Iter.to_list @@ lazy_clausify_driver c  in
     if CCList.is_empty res then None
-    else ( 
-      update_counter ~action:`Decrease c;
-      CCList.iter (update_counter ~action:`Increase) res;
-      Some res )
+    else (Some res )
 
-  let lazy_clausify_inf c = 
-    let res = Iter.to_list (lazy_clausify_driver c) in
-    CCList.iter (update_counter ~action:`Increase) res;
-    res
-  
-  let initialize () =
-    Iter.append (E.get_active ()) (E.get_passive ())
-    |> Iter.iter (update_counter ~action:`Increase)
+  let lazy_clausify_inf c =
+    Iter.to_list (lazy_clausify_driver c)
 
   let setup () =
     if !enabled then (
-      initialize ();
-      match Env.flex_get k_lazy_cnf_kind with 
-      | `Inf -> Env.add_unary_inf "lazy_cnf" lazy_clausify_inf;
-      | `Simp -> Env.add_multi_simpl_rule lazy_clausify_simpl;
+      begin match Env.flex_get k_lazy_cnf_kind with 
+      | `Inf -> Env.add_unary_inf "lazy_cnf" lazy_clausify_inf
+      | `Simp -> Env.add_multi_simpl_rule lazy_clausify_simpl 
+      end;
+
+      Env.add_multi_simpl_rule rename_subformulas;
     )
 end
 
@@ -258,6 +277,17 @@ let extension =
     let module ET = Make(E) in
     E.flex_add k_lazy_cnf_kind !_lazy_cnf_kind;
     E.flex_add k_renaming_threshold !_renaming_threshold;
+
+    let handler f c =
+      f c;
+      Signal.ContinueListening in
+
+    Signal.on E.ProofState.PassiveSet.on_add_clause (handler (ET.update_form_counter ~action:`Increase));
+    Signal.on E.ProofState.ActiveSet.on_add_clause (handler (ET.update_form_counter ~action:`Increase));
+    Signal.on E.ProofState.PassiveSet.on_remove_clause (handler (ET.update_form_counter ~action:`Decrease));
+    Signal.on E.ProofState.ActiveSet.on_remove_clause (handler (ET.update_form_counter ~action:`Decrease));
+    (* Signal.on E.ProofState.SimplSet.on_add_clause (handler (ET.update_form_counter ~action:`Increase)); *)
+    (* Signal.on E.ProofState.SimplSet.on_remove_clause (handler (ET.update_form_counter ~action:`Decrease)); *)
 
     ET.setup ()
   in

@@ -64,7 +64,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
     let rec find_in_term ~top t k =
       match T.view t with 
-      | T.Const _ when Type.is_prop (T.ty t) -> k t
+      | T.Const _ when Type.is_prop (T.ty t) && not top -> k t
       | T.App(_, args)
       | T.AppBuiltin(_, args) ->
         let take_subterm =
