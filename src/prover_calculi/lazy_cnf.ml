@@ -23,6 +23,8 @@ module Make(E : Env.S) : S with module Env = E = struct
   module Env = E
   module C = Env.C
 
+  let _form_counter = Term.Tbl.create 256 
+
   let fold_lits c = 
     Ls.fold_eqn 
       ~both:false ~ord:(E.Ctx.ord ()) ~eligible:(C.Eligible.res c) 
@@ -126,10 +128,35 @@ module Make(E : Env.S) : S with module Env = E = struct
           else Some (Iter.to_list iter))
 
   let lazy_clausify_inf c = 
-    CCOpt.get_or ~default:[] (lazy_clausify_simpl c)   
+    CCOpt.get_or ~default:[] (lazy_clausify_simpl c)
+  
+  let update_counter ~action c =
+    Ls.fold_eqn 
+      ~both:false ~ord:(E.Ctx.ord ()) ~eligible:(C.Eligible.always) 
+      (C.lits c)
+    |> Iter.iter (fun (lhs,rhs,_,_) -> 
+      let terms = 
+        if T.equal T.true_ rhs && T.is_appbuiltin lhs  then [lhs]
+        else if Type.is_prop (T.ty lhs) then 
+          List.filter T.is_appbuiltin [lhs;rhs]
+        else [] in
+      List.iter (fun t -> 
+        match action with
+          | `Increase ->
+            Term.Tbl.incr _form_counter t
+          | `Decrease -> 
+            assert(Term.Tbl.mem _form_counter t);
+            Term.Tbl.decr _form_counter t
+      ) terms)
+
+
+  let initialize () =
+    Iter.append (E.get_active ()) (E.get_passive ())
+    |> Iter.iter (update_counter ~action:`Increase)
 
   let setup () =
     if !enabled then (
+      initialize ();
       match Env.flex_get k_lazy_cnf_kind with 
       | `Inf -> Env.add_unary_inf "lazy_cnf" lazy_clausify_inf;
       | `Simp -> Env.add_multi_simpl_rule lazy_clausify_simpl;
@@ -143,6 +170,7 @@ let extension =
     let module E = (val env : Env.S) in
     let module ET = Make(E) in
     E.flex_add k_lazy_cnf_kind !_lazy_cnf_kind;
+
     ET.setup ()
   in
   { Extensions.default with
