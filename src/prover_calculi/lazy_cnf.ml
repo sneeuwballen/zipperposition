@@ -130,6 +130,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     assert(Type.equal (T.ty lhs) (T.ty rhs));
     assert(Type.is_prop (T.ty lhs));
     rename ~c (T.Form.equiv lhs rhs) sign
+    (* None *)
 
   let mk_and ~rule_name and_args c ?(parents=[c]) lit_idx =
     let lits = CCArray.except_idx (C.lits c) lit_idx in
@@ -183,7 +184,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             )
           | T.AppBuiltin((ForallConst|ExistsConst) as hd, [f]) ->
             let free_vars = T.Seq.vars f in
-            let var_id = T.Seq.max_var free_vars + 1 in
+            let var_id = T.Seq.max_var (C.Seq.vars c) + 1 in
             let f = Lambda.eta_expand f in
             let var_tys, body =  T.open_fun f in
             assert(List.length var_tys = 1);
@@ -217,7 +218,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             return @@ mk_or ~rule_name [res] c i
           | T.AppBuiltin(Not, _) -> assert false
           | _ -> continue
-      ) else if Type.is_prop (T.ty lhs) && not (T.is_var lhs) then (
+      ) else if Type.is_prop (T.ty lhs) && not (T.equal T.true_ rhs) && not (T.is_var lhs) then (
           let rule_name = "lazy_cnf_equiv" in
           
           if sign then (
