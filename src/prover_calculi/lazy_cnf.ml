@@ -66,7 +66,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let fold_lits c = 
     Ls.fold_eqn 
-      ~both:false ~ord:(E.Ctx.ord ()) ~eligible:(C.Eligible.res c) 
+      ~both:false ~ord:(E.Ctx.ord ()) ~eligible:(C.Eligible.always) 
       (C.lits c)
 
   let proof ~name ~parents c =
@@ -146,32 +146,40 @@ module Make(E : Env.S) : S with module Env = E = struct
     [C.create ~penalty:(C.penalty c) ~trail:(C.trail c) lits proof]
 
   let lazy_clausify_driver c =
+    let return l =
+      Iter.of_list l, `Stop in
+    
+    let continue =
+      Iter.empty, `Continue in
+
     fold_lits c
-    |> Iter.flat_map_l ( fun (lhs, rhs, sign, pos) -> 
+    |> Iter.fold_while ( fun _ (lhs, rhs, sign, pos) -> 
       let i,_ = Ls.Pos.cut pos in
       if T.equal rhs T.true_ then (
           match T.view lhs with 
           | T.AppBuiltin(And, l) when List.length l >= 2 ->
             let rule_name = "lazy_cnf_and" in
-            if sign then mk_and l c i ~rule_name
-            else mk_or (List.map T.Form.not_ l) c i ~rule_name
+            if sign then return @@ mk_and l c i ~rule_name
+            else return @@ mk_or (List.map T.Form.not_ l) c i ~rule_name
           | T.AppBuiltin(Or, l) when List.length l >= 2 ->
             let rule_name = "lazy_cnf_or" in
-            if sign then mk_or l c i ~rule_name
-            else mk_and (List.map T.Form.not_ l) c i ~rule_name
+            if sign then return @@ mk_or l c i ~rule_name
+            else return @@ mk_and (List.map T.Form.not_ l) c i ~rule_name
           | T.AppBuiltin(Imply, [a;b]) ->
             let rule_name = "lazy_cnf_imply" in
-            if sign then mk_or [T.Form.not_ a; b] c i ~rule_name
-            else mk_and [a; T.Form.not_ b] c i ~rule_name
+            if sign then return @@ mk_or [T.Form.not_ a; b] c i ~rule_name
+            else return @@ mk_and [a; T.Form.not_ b] c i ~rule_name
           | T.AppBuiltin((Equiv|Xor) as hd, [a;b]) ->
             let hd = if sign then hd else (if hd = Equiv then Xor else Equiv) in
             let rule_name = CCFormat.sprintf "lazy_cnf_%a" Builtin.pp hd  in
             if hd = Equiv then (
-              mk_or ~rule_name [T.Form.not_ a; b] c i 
-              @ mk_or ~rule_name [a; T.Form.not_ b] c i 
+              return @@ (
+                mk_or ~rule_name [T.Form.not_ a; b] c i 
+                  @ mk_or ~rule_name [a; T.Form.not_ b] c i)
             ) else (
-              mk_or ~rule_name [T.Form.not_ a; T.Form.not_ b] c i 
-              @ mk_or ~rule_name [a; b] c i 
+              return @@ (
+                mk_or ~rule_name [T.Form.not_ a; T.Form.not_ b] c i 
+                @ mk_or ~rule_name [a; b] c i )
             )
           | T.AppBuiltin((ForallConst|ExistsConst) as hd, [f]) ->
             let free_vars = T.Seq.vars f in
@@ -206,26 +214,24 @@ module Make(E : Env.S) : S with module Env = E = struct
               ) in
             let res = Lambda.eta_reduce @@ Lambda.snf @@ T.app f [subst_term] in
             assert(Type.is_prop (T.ty res));
-            mk_or ~rule_name [res] c i
+            return @@ mk_or ~rule_name [res] c i
           | T.AppBuiltin(Not, _) -> assert false
-          | _ -> []
+          | _ -> continue
       ) else if Type.is_prop (T.ty lhs) && not (T.is_var lhs) then (
           let rule_name = "lazy_cnf_equiv" in
           
           if sign then (
-              let not_a_or_b = T.Form.or_ (T.Form.not_ lhs) rhs  in
-              let a_or_not_b = T.Form.or_ lhs (T.Form.not_ rhs)  in
-              mk_and [not_a_or_b; a_or_not_b] c i ~rule_name
+            return @@ (
+              mk_or ~rule_name [T.Form.not_ lhs; rhs] c i 
+              @ mk_or ~rule_name [lhs; T.Form.not_ rhs] c i)
           ) else (
-            let a_or_b = T.Form.or_ lhs rhs  in
-            let not_a_or_not_b = T.Form.or_ (T.Form.not_ lhs) (T.Form.not_ rhs) in
-            mk_and [a_or_b; not_a_or_not_b] c i ~rule_name
-      )) else [])
+            return @@ (
+                mk_or ~rule_name [T.Form.not_ lhs; T.Form.not_ rhs] c i 
+                @ mk_or ~rule_name [lhs; rhs] c i )
+      )) else continue) Iter.empty
 
   let rename_subformulas c =
-    Ls.fold_eqn 
-        ~both:false ~ord:(E.Ctx.ord ()) ~eligible:(C.Eligible.always) 
-        (C.lits c)
+    fold_lits c
     |> Iter.fold_while (fun _ (lhs,rhs,sign,pos) -> 
       let i,_ = Ls.Pos.cut pos in
       if T.equal rhs T.true_ && T.is_appbuiltin lhs then (

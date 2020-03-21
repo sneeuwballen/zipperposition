@@ -72,6 +72,8 @@ module Make(E : Env.S) : S with module Env = E = struct
           Type.is_prop (T.ty t) && 
           not (T.is_true_or_false t) &&
           T.DB.is_closed t &&
+          not (T.is_var (T.head_term t)) &&
+          not (T.is_bvar (T.head_term t)) &&
           (subterm_selection != Minimal ||
            Iter.is_empty 
             (Iter.flat_map (find_in_term ~top:false) 
