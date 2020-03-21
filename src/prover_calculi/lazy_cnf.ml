@@ -271,7 +271,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       | `Simp -> Env.add_multi_simpl_rule lazy_clausify_simpl 
       end;
 
-      Env.add_multi_simpl_rule rename_subformulas;
+      if Env.flex_get k_renaming_threshold > 0 then(
+        Env.add_multi_simpl_rule rename_subformulas
+      );
     )
 end
 
@@ -307,7 +309,7 @@ let () =
   Options.add_opts [
     "--lazy-cnf", Arg.Bool ((:=) enabled), " turn on lazy clausification";
     "--lazy-cnf-renaming-threshold", Arg.Int ((:=) _renaming_threshold), 
-      " set the subformula renaming threshold";
+      " set the subformula renaming threshold -- negative value turns renaming off";
     "--lazy-cnf-kind", Arg.Symbol (["inf"; "simp"], (fun str -> 
       match str with 
       | "inf" -> _lazy_cnf_kind := `Inf
