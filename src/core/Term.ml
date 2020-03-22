@@ -824,11 +824,11 @@ module Form = struct
 
   let and_l = function
     | [] -> true_
-    | [t] -> t
+    | [t] -> assert (Type.is_prop (ty t)); t
     | a :: tail -> List.fold_left and_ a tail
   let or_l = function
     | [] -> false_
-    | [t] -> t
+    | [t] -> assert (Type.is_prop (ty t)); t
     | a :: tail -> List.fold_left or_ a tail
 
   let forall t =

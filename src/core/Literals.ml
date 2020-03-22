@@ -237,6 +237,12 @@ module Pos = struct
   let cut = function
     | Position.Arg (i, pos') -> i, pos'
     | p -> _fail_pos p
+
+  (* Does this position target one side of an equation? *)
+  let is_toplevel_pos = function
+    | Position.Arg (_, ((Position.Left p) | (Position.Right p))) ->
+      Position.equal p Position.stop
+    | _ -> false
 end
 
 module Conv = struct

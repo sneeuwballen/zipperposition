@@ -423,9 +423,10 @@ module Step = struct
       | Simplification _ -> 
         let parents = List.map (fun par -> aux ((Parent.proof par).step)) p.parents in
         CCOpt.get_or ~default:0 (Iter.max (Iter.of_list parents))
-      | Inference _ -> 
+      | Inference (rule,tags) -> 
         let parents = List.map (fun par -> aux ((Parent.proof par).step)) p.parents in
-        CCOpt.get_or ~default:0 (Iter.max (Iter.of_list parents)) + 1 
+        let inc = if List.mem Tag.T_live_cnf tags then 0 else 1 in
+        CCOpt.get_or ~default:0 (Iter.max (Iter.of_list parents)) + inc
       | _ -> 0 in
     aux p
 

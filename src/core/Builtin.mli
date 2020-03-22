@@ -182,6 +182,7 @@ module Tag : sig
     | T_lia (** integer arith *)
     | T_lra (** rational arith *)
     | T_ho (** higher order *)
+    | T_live_cnf (** live_cnf *)
     | T_ext (** extensionality *)
     | T_ind (** induction *)
     | T_data (** datatypes *)

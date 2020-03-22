@@ -10,6 +10,8 @@ let enabled = ref false
 let k_lazy_cnf_kind = Flex_state.create_key ()
 let k_renaming_threshold = Flex_state.create_key ()
 let k_rename_eq = Flex_state.create_key ()
+let k_scoping = Flex_state.create_key ()
+
 
 let section = Util.Section.make ~parent:Const.section "lazy_cnf"
 
@@ -97,8 +99,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       (C.lits c)
 
   let proof ~constructor ~name ~parents c =
-    constructor 
-      ~rule:(Proof.Rule.mk name) (List.map C.proof_parent parents)
+    constructor ~rule:(Proof.Rule.mk name)
+      (List.map C.proof_parent parents)
 
   let mk_renaming_clause parent ~renamer ~form sign =
     let proof = Proof.Step.define_internal 
@@ -173,6 +175,68 @@ module Make(E : Env.S) : S with module Env = E = struct
     let proof = proof ~constructor:proof_cons ~parents ~name:rule_name c in
     [C.create ~penalty:(C.penalty c) ~trail:(C.trail c) lits proof]
 
+  let cnf_scope form =
+    let kind = Env.flex_get k_scoping in
+    let open CCOpt in
+
+    let rec maxiscoping_eligible l =
+      let get_quant t = 
+        let t = Lambda.eta_expand t in
+        match T.view t with
+        | T.AppBuiltin((ForallConst|ExistsConst) as b, [x]) ->
+          let ty, body = T.open_fun x in
+          assert(List.length ty = 1);
+          Some (b, List.hd ty, [body])
+        | _ -> None in
+
+      match l with
+        | [] -> assert false;
+        | [x] -> get_quant x
+        | x :: xs -> 
+          get_quant x
+          >>= (fun (b,ty,body) -> 
+            maxiscoping_eligible xs
+            >>= (fun (b', ty', bodies) ->
+              if Builtin.equal b b' && Type.equal ty ty' then (
+                Some(b, ty, (List.hd body)::bodies)
+              ) else None)) in
+
+    let miniscope hd f =
+      let distribute_quant hd ty bodies =
+        let quant_hd = 
+          if Builtin.equal hd Or then T.Form.exists else T.Form.forall in
+        let outer_hd =
+          if Builtin.equal hd Or then T.Form.or_l else T.Form.and_l in
+        
+        outer_hd (List.map (fun t -> quant_hd (T.fun_ ty t) ) bodies) in 
+
+      let f = Lambda.eta_expand f in
+      if T.is_fun f then (
+        let ty, body = T.open_fun f in
+        assert(List.length ty = 1);
+        match T.view f with
+        | T.AppBuiltin(Or, l) when Builtin.equal hd ExistsConst ->
+          Some (distribute_quant Or (List.hd ty) l)
+        | T.AppBuiltin(And, l) when Builtin.equal hd ForallConst ->
+          Some (distribute_quant And (List.hd ty) l)
+        | _ -> None
+      ) else None in
+
+    match T.view form with 
+    | T.AppBuiltin(And, ((_ :: _) as l)) when kind = `Maxi ->
+      begin match maxiscoping_eligible l with
+      | Some (ForallConst, ty, bodies) ->
+        Some (T.Form.forall (T.fun_ ty (T.Form.and_l bodies)))
+      | _ -> None end
+    | T.AppBuiltin(Or, ((_ :: _) as l)) when kind = `Maxi ->
+      begin match maxiscoping_eligible l with
+      | Some (ExistsConst, ty, bodies) ->
+        Some (T.Form.exists (T.fun_ ty (T.Form.or_l bodies)))
+      | _ -> None end
+    | T.AppBuiltin(((ExistsConst|ForallConst) as b), [f]) when kind = `Mini ->
+      miniscope b f
+    | _ -> None
+
   let lazy_clausify_driver ~proof_cons c =
     let return l =
       Iter.of_list l, `Stop in
@@ -186,8 +250,14 @@ module Make(E : Env.S) : S with module Env = E = struct
     |> Iter.fold_while ( fun _ (lhs, rhs, sign, pos) -> 
       let i,_ = Ls.Pos.cut pos in
       if T.equal rhs T.true_ then (
-          Util.debugf ~section 2 "  subformula:%d:@[%a@]" (fun k -> k i L.pp (C.lits c).(i) );
-          match T.view lhs with 
+        Util.debugf ~section 2 "  subformula:%d:@[%a@]" (fun k -> k i L.pp (C.lits c).(i) );
+        match cnf_scope lhs with 
+        | Some f ->
+          let rule_name = CCFormat.sprintf "lazy_cnf_%sscoping" 
+            (if Env.flex_get k_scoping == `Maxi then "maxi" else "mini") in
+          return @@ mk_or ~proof_cons [f] c i ~rule_name
+        | None -> 
+          begin match T.view lhs with 
           | T.AppBuiltin(And, l) when List.length l >= 2 ->
             let rule_name = "lazy_cnf_and" in
             if sign then return @@ mk_and ~proof_cons l c i ~rule_name
@@ -249,7 +319,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             assert(Type.is_prop (T.ty res));
             return @@ mk_or ~proof_cons ~rule_name [res] c i
           | T.AppBuiltin(Not, _) -> assert false
-          | _ -> continue
+          | _ -> continue end
       ) else if Type.is_prop (T.ty lhs) && not (T.equal T.true_ rhs) then (
           let rule_name = 
             CCFormat.sprintf "lazy_cnf_%s" (if sign then "equiv" else "xor") in
@@ -270,7 +340,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     fold_lits c
     |> Iter.fold_while (fun _ (lhs,rhs,sign,pos) -> 
       let i,_ = Ls.Pos.cut pos in
-      let proof_cons = Proof.Step.simp ~infos:[] ~tags:[] in
+      let proof_cons = Proof.Step.simp ~infos:[] ~tags:[Proof.Tag.T_live_cnf] in
       if T.equal rhs T.true_ && T.is_appbuiltin lhs then (
         match rename ~c lhs sign with
         | Some (renamer, new_defs, parents) ->
@@ -301,7 +371,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         else None, `Continue) None
 
   let lazy_clausify_simpl c =
-    let proof_cons = Proof.Step.simp ~infos:[] ~tags:[] in
+    let proof_cons = Proof.Step.simp ~infos:[] ~tags:[Proof.Tag.T_live_cnf] in
     let res = Iter.to_list @@ lazy_clausify_driver ~proof_cons c  in
     Util.debugf ~section 1 "lazy_cnf_simp(@[%a@])=" (fun k -> k C.pp c);
     Util.debugf ~section 1 "@[%a@]@." (fun k -> k (CCList.pp C.pp) res);
@@ -309,7 +379,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     else (Some res)
 
   let lazy_clausify_inf c =
-    let proof_cons = Proof.Step.inference ~infos:[] ~tags:[] in
+    let proof_cons = Proof.Step.inference ~infos:[] ~tags:[Proof.Tag.T_live_cnf] in
     let res = Iter.to_list (lazy_clausify_driver ~proof_cons c) in
     Util.debugf ~section 1 "lazy_cnf_inf(@[%a@])=" (fun k -> k C.pp c);
     Util.debugf ~section 1 "@[%a@]@." (fun k -> k (CCList.pp C.pp) res);
@@ -331,6 +401,7 @@ end
 let _lazy_cnf_kind = ref `Inf
 let _renaming_threshold = ref 8
 let _rename_eq = ref true
+let _scoping = ref `Off
 
 let extension =
   let register env =
@@ -339,6 +410,7 @@ let extension =
     E.flex_add k_lazy_cnf_kind !_lazy_cnf_kind;
     E.flex_add k_renaming_threshold !_renaming_threshold;
     E.flex_add k_rename_eq !_rename_eq;
+    E.flex_add k_scoping !_scoping;
 
     let handler f c =
       f c;
@@ -361,6 +433,13 @@ let extension =
 let () =
   Options.add_opts [
     "--lazy-cnf", Arg.Bool ((:=) enabled), " turn on lazy clausification";
+    "--lazy-cnf-scoping", Arg.Symbol (["off"; "mini"; "maxi"], (fun str -> 
+      match str with 
+      | "mini" -> _scoping := `Mini
+      | "maxi" -> _scoping := `Maxi
+      | "off" -> _scoping := `Off
+      | _ -> assert false)), 
+    " use mini/maxi scoping rules for lazy cnf";
     "--lazy-cnf-renaming-threshold", Arg.Int ((:=) _renaming_threshold), 
       " set the subformula renaming threshold -- negative value turns renaming off";
     "--lazy-cnf-kind", Arg.Symbol (["inf"; "simp"], (fun str -> 
