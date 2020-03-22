@@ -340,16 +340,21 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       | [| Lit.Equation (l,r,sign) |] when sign || T.equal r T.true_ ->
         if Env.flex_get k_bool_demod || sign then (
           let l, r = if sign then l, r else l, T.false_ in
-          begin match Ordering.compare ord l r with
-            | Comparison.Gt ->
-              f idx (l,r,true,c)
-            | Comparison.Lt ->
-              f idx (r,l,true,c)
-            | Comparison.Incomparable ->
-              let idx = f idx (l,r,true,c) in
-              f idx (r,l,true,c)
-            | Comparison.Eq -> idx  (* no modif *)
-          end) 
+          (* do not use formulas for rewriting... can have adverse
+             effects on lazy cnf *)
+          if not !Lazy_cnf.enabled ||
+             T.is_appbuiltin l || T.is_appbuiltin r then idx
+          else (
+            begin match Ordering.compare ord l r with
+              | Comparison.Gt ->
+                f idx (l,r,true,c)
+              | Comparison.Lt ->
+                f idx (r,l,true,c)
+              | Comparison.Incomparable ->
+                let idx = f idx (l,r,true,c) in
+                f idx (r,l,true,c)
+              | Comparison.Eq -> idx  (* no modif *)
+            end)) 
         else idx
       | [| Lit.Equation (l,r,false) |] ->
         f idx (l,r,false,c)

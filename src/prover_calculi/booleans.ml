@@ -79,7 +79,11 @@ module Make(E : Env.S) : S with module Env = E = struct
             (Iter.flat_map (find_in_term ~top:false) 
               (CCList.to_seq args))) in
         let continue =
-          (subterm_selection = Any || not take_subterm) in
+          (subterm_selection = Any || not take_subterm) &&
+          (* do not traverse variable-headed terms *)
+          not (T.is_var (T.head_term t)) &&
+          not (T.is_bvar (T.head_term t))
+           in
         if take_subterm then k t;
         if continue then (
           List.iter (fun arg -> 
@@ -367,7 +371,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     if List.exists CCOpt.is_some normalized then (
       let new_lits = List.mapi (fun i l_opt -> 
           CCOpt.get_or ~default:(Array.get (C.lits c) i) l_opt) normalized in
-      let proof = Proof.Step.inference [C.proof_parent c] 
+      let proof = Proof.Step.simp [C.proof_parent c] 
           ~rule:(Proof.Rule.mk "simplify nested equalities")  in
       let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
       SimplM.return_new new_c
