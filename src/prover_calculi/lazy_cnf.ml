@@ -175,7 +175,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let proof = proof ~constructor:proof_cons ~parents ~name:rule_name c in
     [C.create ~penalty:(C.penalty c) ~trail:(C.trail c) lits proof]
 
-  let cnf_scope form =
+  let cnf_scope_form form =
     let kind = Env.flex_get k_scoping in
     let open CCOpt in
 
@@ -214,7 +214,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       if T.is_fun f then (
         let ty, body = T.open_fun f in
         assert(List.length ty = 1);
-        match T.view f with
+        match T.view body with
         | T.AppBuiltin(Or, l) when Builtin.equal hd ExistsConst ->
           Some (distribute_quant Or (List.hd ty) l)
         | T.AppBuiltin(And, l) when Builtin.equal hd ForallConst ->
@@ -251,75 +251,69 @@ module Make(E : Env.S) : S with module Env = E = struct
       let i,_ = Ls.Pos.cut pos in
       if T.equal rhs T.true_ then (
         Util.debugf ~section 2 "  subformula:%d:@[%a@]" (fun k -> k i L.pp (C.lits c).(i) );
-        match cnf_scope lhs with 
-        | Some f ->
-          let rule_name = CCFormat.sprintf "lazy_cnf_%sscoping" 
-            (if Env.flex_get k_scoping == `Maxi then "maxi" else "mini") in
-          return @@ mk_or ~proof_cons [f] c i ~rule_name
-        | None -> 
-          begin match T.view lhs with 
-          | T.AppBuiltin(And, l) when List.length l >= 2 ->
-            let rule_name = "lazy_cnf_and" in
-            if sign then return @@ mk_and ~proof_cons l c i ~rule_name
-            else return @@ mk_or ~proof_cons (List.map T.Form.not_ l) c i ~rule_name
-          | T.AppBuiltin(Or, l) when List.length l >= 2 ->
-            let rule_name = "lazy_cnf_or" in
-            if sign then return @@ mk_or ~proof_cons l c i ~rule_name
-            else return @@ mk_and ~proof_cons (List.map T.Form.not_ l) c i ~rule_name
-          | T.AppBuiltin(Imply, [a;b]) ->
-            let rule_name = "lazy_cnf_imply" in
-            if sign then return @@ mk_or ~proof_cons [T.Form.not_ a; b] c i ~rule_name
-            else return @@ mk_and ~proof_cons [a; T.Form.not_ b] c i ~rule_name
-          | T.AppBuiltin((Equiv|Xor) as hd, [a;b]) ->
-            let hd = if sign then hd else (if hd = Equiv then Xor else Equiv) in
-            let rule_name = 
-              CCFormat.sprintf "lazy_cnf_%s" 
-                (if hd = Equiv then "equiv" else "xor") in
-            if hd = Equiv then (
-              return @@ (
-                mk_or ~proof_cons ~rule_name [T.Form.not_ a; b] c i 
-                  @ mk_or ~proof_cons ~rule_name [a; T.Form.not_ b] c i)
+        begin match T.view lhs with 
+        | T.AppBuiltin(And, l) when List.length l >= 2 ->
+          let rule_name = "lazy_cnf_and" in
+          if sign then return @@ mk_and ~proof_cons l c i ~rule_name
+          else return @@ mk_or ~proof_cons (List.map T.Form.not_ l) c i ~rule_name
+        | T.AppBuiltin(Or, l) when List.length l >= 2 ->
+          let rule_name = "lazy_cnf_or" in
+          if sign then return @@ mk_or ~proof_cons l c i ~rule_name
+          else return @@ mk_and ~proof_cons (List.map T.Form.not_ l) c i ~rule_name
+        | T.AppBuiltin(Imply, [a;b]) ->
+          let rule_name = "lazy_cnf_imply" in
+          if sign then return @@ mk_or ~proof_cons [T.Form.not_ a; b] c i ~rule_name
+          else return @@ mk_and ~proof_cons [a; T.Form.not_ b] c i ~rule_name
+        | T.AppBuiltin((Equiv|Xor) as hd, [a;b]) ->
+          let hd = if sign then hd else (if hd = Equiv then Xor else Equiv) in
+          let rule_name = 
+            CCFormat.sprintf "lazy_cnf_%s" 
+              (if hd = Equiv then "equiv" else "xor") in
+          if hd = Equiv then (
+            return @@ (
+              mk_or ~proof_cons ~rule_name [T.Form.not_ a; b] c i 
+                @ mk_or ~proof_cons ~rule_name [a; T.Form.not_ b] c i)
+          ) else (
+            return @@ (
+              mk_or ~proof_cons ~rule_name [T.Form.not_ a; T.Form.not_ b] c i 
+              @ mk_or ~proof_cons ~rule_name [a; b] c i )
+          )
+        | T.AppBuiltin((ForallConst|ExistsConst) as hd, [f]) ->
+          let free_vars = T.Seq.vars f in
+          let var_id = T.Seq.max_var (C.Seq.vars c) + 1 in
+          let f = Lambda.eta_expand f in
+          let var_tys, body =  T.open_fun f in
+          assert(List.length var_tys = 1);
+          let var_ty = List.hd var_tys in
+          let hd, f =
+            if sign then hd,f
+            else ((if hd=ForallConst then ExistsConst else ForallConst),
+                  T.fun_ var_ty (T.Form.not_ body)) in
+          let rule_name = 
+            CCFormat.sprintf "lazy_cnf_%s" 
+              (if hd = ForallConst then "forall" else "exists") in
+          let subst_term =
+            if hd = ForallConst then (
+              T.var @@ HVar.make ~ty:var_ty var_id
             ) else (
-              return @@ (
-                mk_or ~proof_cons ~rule_name [T.Form.not_ a; T.Form.not_ b] c i 
-                @ mk_or ~proof_cons ~rule_name [a; b] c i )
-            )
-          | T.AppBuiltin((ForallConst|ExistsConst) as hd, [f]) ->
-            let free_vars = T.Seq.vars f in
-            let var_id = T.Seq.max_var (C.Seq.vars c) + 1 in
-            let f = Lambda.eta_expand f in
-            let var_tys, body =  T.open_fun f in
-            assert(List.length var_tys = 1);
-            let var_ty = List.hd var_tys in
-            let hd, f =
-              if sign then hd,f
-              else ((if hd=ForallConst then ExistsConst else ForallConst),
-                    T.fun_ var_ty (T.Form.not_ body)) in
-            let rule_name = 
-              CCFormat.sprintf "lazy_cnf_%s" 
-                (if hd = ForallConst then "forall" else "exists") in
-            let subst_term =
-              if hd = ForallConst then (
-                T.var @@ HVar.make ~ty:var_ty var_id
-              ) else (
-                let gen = Iter.head @@ 
-                  Idx.retrieve_generalizations (!_skolem_idx, 0) (f, 1) in
-                match gen with 
-                | Some (orig, (skolem, _), subst) ->
-                  Subst.FO.apply Subst.Renaming.none subst (skolem,0) 
-                | None ->
-                  let free_vars_l = 
-                      T.VarSet.to_list (T.VarSet.of_seq free_vars) in
-                  let (id,ty), t = T.mk_fresh_skolem ~prefix:"sk" free_vars_l var_ty in
-                  E.Ctx.declare id ty;
-                  _skolem_idx := Idx.add !_skolem_idx f (t, ref[]);
-                  t
-              ) in
-            let res = Lambda.eta_reduce @@ Lambda.snf @@ T.app f [subst_term] in
-            assert(Type.is_prop (T.ty res));
-            return @@ mk_or ~proof_cons ~rule_name [res] c i
-          | T.AppBuiltin(Not, _) -> assert false
-          | _ -> continue end
+              let gen = Iter.head @@ 
+                Idx.retrieve_generalizations (!_skolem_idx, 0) (f, 1) in
+              match gen with 
+              | Some (orig, (skolem, _), subst) ->
+                Subst.FO.apply Subst.Renaming.none subst (skolem,0) 
+              | None ->
+                let free_vars_l = 
+                    T.VarSet.to_list (T.VarSet.of_seq free_vars) in
+                let (id,ty), t = T.mk_fresh_skolem ~prefix:"sk" free_vars_l var_ty in
+                E.Ctx.declare id ty;
+                _skolem_idx := Idx.add !_skolem_idx f (t, ref[]);
+                t
+            ) in
+          let res = Lambda.eta_reduce @@ Lambda.snf @@ T.app f [subst_term] in
+          assert(Type.is_prop (T.ty res));
+          return @@ mk_or ~proof_cons ~rule_name [res] c i
+        | T.AppBuiltin(Not, _) -> assert false
+        | _ -> continue end
       ) else if Type.is_prop (T.ty lhs) && not (T.equal T.true_ rhs) then (
           let rule_name = 
             CCFormat.sprintf "lazy_cnf_%s" (if sign then "equiv" else "xor") in
@@ -370,6 +364,21 @@ module Make(E : Env.S) : S with module Env = E = struct
           | None -> None, `Continue)
         else None, `Continue) None
 
+  let cnf_scope c =
+    fold_lits c
+    |> Iter.fold_while (fun _ (lhs,rhs,sign,pos) -> 
+      let i,_ = Ls.Pos.cut pos in
+      let proof_cons = Proof.Step.simp ~infos:[] ~tags:[Proof.Tag.T_live_cnf] in
+      if T.equal rhs T.true_ && T.is_appbuiltin lhs then (
+        match cnf_scope_form lhs with 
+        | Some f ->
+          let rule_name = CCFormat.sprintf "lazy_cnf_%sscoping" 
+            (if Env.flex_get k_scoping == `Maxi then "maxi" else "mini") in
+          let app_sign = if sign then CCFun.id else T.Form.not_ in
+          Some (mk_or ~proof_cons [app_sign f] c i ~rule_name), `Stop
+        | None -> None, `Continue
+      ) else None, `Continue) None
+
   let lazy_clausify_simpl c =
     let proof_cons = Proof.Step.simp ~infos:[] ~tags:[Proof.Tag.T_live_cnf] in
     let res = Iter.to_list @@ lazy_clausify_driver ~proof_cons c  in
@@ -392,9 +401,15 @@ module Make(E : Env.S) : S with module Env = E = struct
       | `Simp -> Env.add_multi_simpl_rule lazy_clausify_simpl 
       end;
 
+      (* ** IMPORTANT **
+         RENAMING MUST BE ADDED AFTER CLAUSIFICATION RULES (so that
+         it runs ***before*** lazy_clausify_simpl) *)
       if Env.flex_get k_renaming_threshold > 0 then(
         Env.add_multi_simpl_rule rename_subformulas
       );
+      if Env.flex_get k_scoping != `Off then (
+        Env.add_multi_simpl_rule cnf_scope;
+      )
     )
 end
 
@@ -420,8 +435,6 @@ let extension =
     Signal.on E.ProofState.ActiveSet.on_add_clause (handler (ET.update_form_counter ~action:`Increase));
     Signal.on E.ProofState.PassiveSet.on_remove_clause (handler (ET.update_form_counter ~action:`Decrease));
     Signal.on E.ProofState.ActiveSet.on_remove_clause (handler (ET.update_form_counter ~action:`Decrease));
-    (* Signal.on E.ProofState.SimplSet.on_add_clause (handler (ET.update_form_counter ~action:`Increase)); *)
-    (* Signal.on E.ProofState.SimplSet.on_remove_clause (handler (ET.update_form_counter ~action:`Decrease)); *)
 
     ET.setup ()
   in
