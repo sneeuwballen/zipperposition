@@ -494,75 +494,37 @@ let max_weak_reduction_length var_handler ~state t =
       let err_msg = 
         CCFormat.sprintf "lambdas should be removed:@[%a@]@." T.pp t in
       invalid_arg err_msg
-    | T.Const _ -> 0, t 
+    | T.Const _ -> 0
     | T.Var _ ->
       var_handler state t;
-      0, t
-    | T.App (hd, l)->
-      if T.is_var hd then (
-        match T.Tbl.get state.var_map t with 
-        | Some t' ->
-          var_handler state t';
-          0, t'
-        | None ->
-          let fresh_var = T.var (HVar.fresh ~ty:(T.ty t) ()) in
-          T.Tbl.add state.var_map t fresh_var;
-          var_handler state fresh_var;
-          0, fresh_var)
-      else (
-        let steps_hd, hd' = aux hd in
-        let steps_args, l' = aux_l l in
-        if T.equal hd hd' && T.same_l l' l then (
-          assert(steps_hd = 0 && steps_args = 0);
-          0, t)
-        else steps_hd + steps_args, T.app hd' l')
+      0
+    | T.App (hd, l) ->
+      assert(not @@ T.is_var hd);
+      let steps_hd = aux hd in
+      let steps_args = aux_l l in
+      steps_hd + steps_args
     | T.AppBuiltin(b, l) when Builtin.is_combinator b ->
-      if T.is_ground t then (
-        let c_kind, ty_args, args =  unpack_comb t in
-        begin match c_kind with 
-        | Builtin.IComb ->
-          if CCList.is_empty args then 0, t
-          else (
-            let steps, t' = aux (narrow_one t) in
-            steps+1, t')
-        | Builtin.KComb ->
-          if CCList.length args < 2 then (
-            let steps, args' = aux_l args in
-            if T.same_l args args' then (
-              assert(steps = 0);
-              0, t
-            ) else steps, comb_map_args t args')
-          else (
-            let steps_inc = 1 + fst (aux (List.nth args 1)) in
-            let steps_rest, t' = aux (narrow_one t) in
-            steps_rest + steps_inc, t')
-        | Builtin.SComb | Builtin.CComb | Builtin.BComb -> 
-          if CCList.length args < 3 then (
-            let steps, args' = aux_l args in
-            if T.same_l args args' then (
-              assert(steps = 0);
-              0, t
-            ) else steps, comb_map_args t args')
-          else (
-            let steps_rest, t' = aux (narrow_one t) in
-            steps_rest + 1, t')  
-        | _ -> invalid_arg "only combinators are supported" end)
-      else (
-        let fresh_var = Ordering.ty1comb_to_var t state.var_map in
-        var_handler state fresh_var;
-        0, fresh_var)
-    | T.AppBuiltin(b, l) ->
-      let steps, l' = aux_l l in
-      if T.same_l l l' then (
-        assert (steps = 0);
-        0, t) 
-      else (steps, T.app_builtin ~ty:(T.ty t) b l')
+      assert(T.is_ground t);
+      let c_kind, _, args =  unpack_comb t in
+      begin match c_kind with 
+      | Builtin.IComb ->
+        if CCList.is_empty args then 0
+        else (aux (narrow_one t) + 1)
+      | Builtin.KComb ->
+        if CCList.length args < 2 then (
+          aux_l args)
+        else (
+          let steps_inc = 1 + (aux (List.nth args 1)) in
+          let steps_rest = aux (narrow_one t) in
+          steps_rest + steps_inc)
+      | Builtin.SComb | Builtin.CComb | Builtin.BComb -> 
+        if CCList.length args < 3 then (aux_l args)
+        else (aux (narrow_one t) + 1)  
+      | _ -> invalid_arg "only combinators are supported" end
+    | T.AppBuiltin(b, l) -> aux_l l
   and aux_l = function 
-    | [] -> 0, []
-    | t :: ts -> 
-      let steps, t' = aux t in
-      let steps_rest , t_rest = aux_l ts in
-      steps+steps_rest, t' :: t_rest
+    | [] -> 0
+    | t :: ts ->  aux t + aux_l ts
   and narrow_one t = 
     let t' = apply_rw_rules ~rules:narrow_rules t in
     assert (not @@ T.equal t' t);
@@ -575,13 +537,46 @@ let cmp_by_max_weak_r_len t1 t2 =
     { pos_counter = 0; neg_counter = 0;
       balance = Term.Tbl.create numvars;
       var_map = Term.Tbl.create 16 } in
-  let t1_len,_ = max_weak_reduction_length add_pos_var ~state t1 in
-  let t2_len,_ = max_weak_reduction_length add_neg_var ~state t2 in
+
+  let rec encode_vars t =
+    let encode t =
+      match T.Tbl.get state.var_map t with 
+      | Some t' -> t'
+      | None ->
+        let fresh_var = T.var (HVar.fresh ~ty:(T.ty t) ()) in
+        T.Tbl.add state.var_map t fresh_var;
+        fresh_var in
+
+    if T.is_ground t then t
+    else (
+      match T.view t with
+      | T.App(hd,l) ->
+        if T.is_var hd then (
+          encode t
+        ) else (
+          (* head is not the variable, only args have to be managed *)
+          let l' = List.map encode_vars l in
+          if T.same_l l l' then t else T.app hd l'
+        )
+      | T.AppBuiltin(hd, l) ->
+        if Builtin.is_combinator hd then (
+          assert(not (T.is_ground t));
+          encode t
+        ) else (
+          let l' = List.map encode_vars l in
+          if T.same_l l l' then t else T.app_builtin ~ty:(T.ty t) hd l'
+        )
+      | _ -> t) in
+
+  let t1,t2 = CCPair.map_same encode_vars (t1,t2) in
+  let return res = res,t1,t2 in
+  let t1_len = max_weak_reduction_length add_pos_var ~state t1 in
+  let t2_len = max_weak_reduction_length add_neg_var ~state t2 in
   if t1_len > t2_len then (
-    if state.neg_counter > 0 then Comparison.Incomparable else Comparison.Gt
+    if state.neg_counter > 0 then return Comparison.Incomparable else return Comparison.Gt
   ) else if t1_len < t2_len then (
-    if state.pos_counter > 0 then Comparison.Incomparable else Comparison.Lt
-  ) else Comparison.Eq
+    if state.pos_counter > 0 then return Comparison.Incomparable else return Comparison.Lt
+  ) else return Comparison.Eq
 
 (* Assumes beta-reduced, eta-short term *)
 let abf ~rules t =
@@ -844,6 +839,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       if E.flex_get k_enable_combinators then (
         E.add_clause_conversion enocde_stmt;
         E.add_unary_inf "narrow applied variable" narrow_app_vars;
+        E.add_basic_simplify lams2combs_otf;
         E.Ctx.set_ord (Ordering.compose cmp_by_max_weak_r_len (E.Ctx.ord ()));
         Unif._allow_pattern_unif := false;
       )

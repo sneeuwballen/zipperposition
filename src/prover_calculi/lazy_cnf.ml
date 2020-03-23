@@ -382,16 +382,20 @@ module Make(E : Env.S) : S with module Env = E = struct
   let lazy_clausify_simpl c =
     let proof_cons = Proof.Step.simp ~infos:[] ~tags:[Proof.Tag.T_live_cnf] in
     let res = Iter.to_list @@ lazy_clausify_driver ~proof_cons c  in
-    Util.debugf ~section 1 "lazy_cnf_simp(@[%a@])=" (fun k -> k C.pp c);
-    Util.debugf ~section 1 "@[%a@]@." (fun k -> k (CCList.pp C.pp) res);
+    if not @@ CCList.is_empty res then (
+      Util.debugf ~section 1 "lazy_cnf_simp(@[%a@])=" (fun k -> k C.pp c);
+      Util.debugf ~section 1 "@[%a@]@." (fun k -> k (CCList.pp C.pp) res);
+    ) else Util.debugf ~section 3 "lazy_cnf_simp(@[%a@])=Ø" (fun k -> k C.pp c);
     if CCList.is_empty res then None
     else (Some res)
 
   let lazy_clausify_inf c =
     let proof_cons = Proof.Step.inference ~infos:[] ~tags:[Proof.Tag.T_live_cnf] in
     let res = Iter.to_list (lazy_clausify_driver ~proof_cons c) in
-    Util.debugf ~section 1 "lazy_cnf_inf(@[%a@])=" (fun k -> k C.pp c);
-    Util.debugf ~section 1 "@[%a@]@." (fun k -> k (CCList.pp C.pp) res);
+    if not @@ CCList.is_empty res then (
+      Util.debugf ~section 1 "lazy_cnf_inf(@[%a@])=" (fun k -> k C.pp c);
+      Util.debugf ~section 1 "@[%a@]@." (fun k -> k (CCList.pp C.pp) res);
+    ) else Util.debugf ~section 3 "lazy_cnf_simp(@[%a@])=Ø" (fun k -> k C.pp c);
     res
 
   let setup () =

@@ -61,7 +61,7 @@ val lambda_kbo : Precedence.t -> t
 val lambda_rpo : Precedence.t -> t
 (** Efficient implementation of RPO (recursive path ordering) *)
 
-val compose : (term -> term -> Comparison.t) -> t -> t
+val compose : (term -> term -> (Comparison.t*term*term)) -> t -> t
 (** Takes a function that is going to be run before the chosen order and the order.
     If the first argument returns Comparison.Eq, then the order determined by second arg.
     Otherwise, the result of the first argument is returned. *) 

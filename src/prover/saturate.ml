@@ -134,12 +134,13 @@ module Make(E : Env.S) = struct
             (fun k->k Env.C.pp c); *)
       check_clause_ c;
       Util.incr_stat stat_steps;
+      let orig_c = c in
       begin match Env.all_simplify c with
         | [], _ ->
           Util.incr_stat stat_redundant_given;
-          Util.debugf ~section 2 "@[<2>given clause dropped@ @[%a@]@]"
+          Util.debugf ~section 1 "@[<2>given clause dropped@ @[%a@]@]"
             (fun k->k Env.C.pp c);
-          Util.debugf ~section 2 "@[proof:@[%a@]@]" (fun k -> k Proof.S.pp_tstp (Env.C.proof c));
+          Util.debugf ~section 1 "@[proof:@[%a@]@]" (fun k -> k Proof.S.pp_tstp (Env.C.proof c));
           Unknown
         | l, _ when List.exists Env.C.is_empty l ->
           (* empty clause found *)
@@ -147,13 +148,10 @@ module Make(E : Env.S) = struct
           Unsat proof
         | c :: l', _ ->
           (* put clauses of [l'] back in passive set *)
-          assert(List.for_all (fun c -> 
-              let is_prop_encoded = 
-                Env.C.Seq.terms c |> Iter.for_all  Lambda.is_properly_encoded in
-              if not is_prop_encoded then (
-                CCFormat.printf "IMPROPERLY ENCODED: %a" Env.C.pp c;
-              );
-              is_prop_encoded) (c::l'));
+
+          Util.debugf ~section 5 "all_simplify(@[%a@])=@." (fun k -> k Env.C.pp orig_c);
+          Util.debugf ~section 5 "  @[%a@]@." (fun k -> k (CCList.pp Env.C.pp) (c :: l'));
+
           Env.add_passive (Iter.of_list l');
           (* process the clause [c] *)
           let new_clauses = CCVector.create () in
@@ -194,22 +192,21 @@ module Make(E : Env.S) = struct
           let inferred_clauses =
             Iter.filter_map
               (fun c ->
-                 Util.debugf ~section 1 "inferred: `@[%a@]`" (fun k->k Env.C.pp c);
-                 check_clause_ c;
+                 Util.debugf ~section 10 "inferred: `@[%a@]`" (fun k->k Env.C.pp c);
                  let c, _ = Env.forward_simplify c in
                  check_clause_ c;
                  (* keep clauses  that are not redundant *)
                  if Env.is_trivial c || Env.is_active c || Env.is_passive c
                  then (
-                   Util.debugf ~section 1 "clause `@[%a@]` is trivial, dump" (fun k->k Env.C.pp c);
-                   Util.debugf ~section 1 "@[proof:@[%a@]@]" (fun k -> k Proof.S.pp_tstp (Env.C.proof c));
+                   Util.debugf ~section 10 "clause `@[%a@]` is trivial, dump" (fun k->k Env.C.pp c);
+                   Util.debugf ~section 10 "@[proof:@[%a@]@]" (fun k -> k Proof.S.pp_tstp (Env.C.proof c));
 
                    None
                  ) else Some c)
               inferred_clauses
           in
           CCVector.append_seq new_clauses inferred_clauses;
-          Util.debugf ~section 2 "@[<2>inferred @{<green>new clauses@}:@ [@[<v>%a@]]@]"
+          Util.debugf ~section 1 "@[<2>inferred @{<green>new clauses@}:@ [@[<v>%a@]]@]"
             (fun k->k (Util.pp_seq Env.C.pp) (CCVector.to_seq new_clauses));
           (* add new clauses (including simplified active clauses)
              to passive set and simpl_set *)

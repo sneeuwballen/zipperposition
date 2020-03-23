@@ -3199,10 +3199,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                         (find_in_args y rhs_args) != (-1)));
           
           (* reorient equations so that x appears in lhs *)
-          let lhs_args,rhs_args =
+          let lhs,rhs,lhs_args,rhs_args =
             if find_in_args x lhs_args != -1 
-            then (lhs_args, rhs_args)
-            else (rhs_args, lhs_args) in
+            then (lhs, rhs, lhs_args, rhs_args)
+            else (rhs, lhs, rhs_args, lhs_args) in
 
           fail_on (find_in_args x lhs_args != find_in_args y rhs_args);
           

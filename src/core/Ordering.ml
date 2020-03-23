@@ -705,10 +705,10 @@ let compose f ord =
     compare = 
       fun prec a b ->
         (* CCFormat.printf "kbo: @[%a@]<?>@[%a@]@." T.pp a T.pp b; *)
-        let f_res = f a b in
+        let f_res,a',b' = f a b in
         (* CCFormat.printf "f_res: @[%a@]@." Comparison.pp f_res; *)
         if Comparison.equal Comparison.Eq f_res then (
-          let res = ord.compare prec a b in
+          let res = ord.compare prec a' b' in
           (* CCFormat.printf "res: @[%a@]@." Comparison.pp res; *)
           res
         ) else f_res
