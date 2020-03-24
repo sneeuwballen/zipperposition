@@ -963,8 +963,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   (* choose between regular and simultaneous superposition *)
   let do_superposition info =
     let open SupInfo in
-    assert (info.sup_kind=DupSup || Type.equal (T.ty info.s) (T.ty info.t));
-    assert (info.sup_kind=DupSup ||
+    assert (info.sup_kind=DupSup || info.sup_kind=SubVarSup || Type.equal (T.ty info.s) (T.ty info.t));
+    assert (info.sup_kind=DupSup || info.sup_kind=SubVarSup ||
             Unif.Ty.equal ~subst:(US.subst info.subst)
               (T.ty info.s, info.scope_active) (T.ty info.u_p, info.scope_passive));
     let renaming = Subst.Renaming.create () in
@@ -972,7 +972,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let s = Subst.FO.apply ~shift_vars renaming (US.subst info.subst) (info.s, info.scope_active) in
     let u_p = Subst.FO.apply ~shift_vars renaming (US.subst info.subst) (info.u_p, info.scope_passive) in
     let norm t = T.normalize_bools @@ Lambda.eta_reduce @@ Lambda.snf t in
-    if not (Term.equal (norm @@ s) (norm @@ u_p) || US.has_constr info.subst) then (
+    if info.sup_kind != SubVarSup && 
+       not (Term.equal (norm @@ s) (norm @@ u_p) || US.has_constr info.subst) then (
       CCFormat.printf "@[<2>sup, kind %s@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a@]@])@ \
          (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@].\n"
             (kind_to_str info.sup_kind) C.pp info.active info.scope_active T.pp info.s T.pp info.t
@@ -1455,25 +1456,28 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let do_subvarsup ~active_pos ~passive_pos =
     (* Variable names in each clause renamed apart *)
     let renaming = Subst.Renaming.create () in
-    let rename_term t = Subst.FO.apply renaming Subst.empty (t,0) in
+    let rename_term t = Subst.FO.apply renaming Subst.empty t in
+    let sc_a, sc_p = 0, 1 in
+
     let cl_a, cl_p = 
-      CCPair.map_same (fun c -> C.apply_subst ~renaming (c,0) Subst.empty) 
-        (active_pos.C.WithPos.clause, passive_pos.C.WithPos.clause) in
+      C.apply_subst ~renaming (active_pos.C.WithPos.clause,sc_a) Subst.empty,
+      C.apply_subst ~renaming (passive_pos.C.WithPos.clause,sc_p) Subst.empty in
     let s,t = 
       match Lits.View.get_eqn (C.lits cl_a) active_pos.C.WithPos.pos with
-      | Some(l,r,_) -> CCPair.map_same rename_term (l,r)
+      | Some(l,r,_) -> l,r
       | _ -> invalid_arg "active lit must be an equation" in
 
     assert(T.is_var t || T.is_app_var t || T.is_comb t);
 
-    let u_p = rename_term passive_pos.C.WithPos.term in
-    let var =
+    let u_p = rename_term (passive_pos.C.WithPos.term,sc_p) in
+    let var,args =
       match T.view u_p with 
-      | T.Var v -> v
+      | T.Var v -> v,[]
       | T.App(hd, [x]) when T.is_var hd ->
-        T.as_var_exn hd
+        T.as_var_exn hd, [x]
       | _ -> invalid_arg "u_p must be of the form y or y s" in
     
+
     let z_ty = Type.arrow [T.ty t] (HVar.ty var) in
     let z = T.app (T.var @@ HVar.fresh ~ty:z_ty ()) [t] in
     let subst = Subst.FO.bind' Subst.empty (var, 0) (z,0) in
@@ -1482,7 +1486,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
     let sup_info = 
       SupInfo.{
-        active = cl_a; active_pos=active_pos.C.WithPos.pos; scope_active=0; s; t;
+        active = cl_a; active_pos=active_pos.C.WithPos.pos; scope_active=0; s; t=T.app z args;
         passive = cl_p; passive_pos=passive_pos.C.WithPos.pos; scope_passive=0;
         passive_lit; u_p; subst = US.of_subst subst; sup_kind = SubVarSup} in
     do_superposition sup_info
