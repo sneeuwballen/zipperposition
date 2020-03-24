@@ -1502,7 +1502,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             (fun acc _ with_pos ->
               let active_pos = C.WithPos.{term=s; pos=s_pos; clause} in
               match do_subvarsup ~passive_pos:with_pos ~active_pos with
-              | Some c -> Iter.cons c acc
+              | Some c -> 
+                Format.printf "svs: @[%a@]@. @[%a@]. @[%a@]@." C.pp clause C.pp with_pos.clause C.pp c;
+                Iter.cons c acc
               | None -> acc)
             Iter.empty
       )
@@ -1526,7 +1528,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               match Lits.View.get_eqn (C.lits with_pos.C.WithPos.clause) with_pos.C.WithPos.pos with
               | Some(l,r,_) when T.is_var r || T.is_app_var r || T.is_comb r->
                 begin match do_subvarsup ~passive_pos ~active_pos:with_pos with
-                | Some c -> Iter.cons c acc
+                | Some c -> 
+                  Format.printf "svs: @[%a@]@. @[%a@]. @[%a@]@." C.pp with_pos.clause C.pp clause C.pp c;
+                  Iter.cons c acc
                 | None -> acc end
               | _ -> acc)
             Iter.empty
