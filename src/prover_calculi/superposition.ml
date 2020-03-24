@@ -1503,7 +1503,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               let active_pos = C.WithPos.{term=s; pos=s_pos; clause} in
               match do_subvarsup ~passive_pos:with_pos ~active_pos with
               | Some c -> 
-                Format.printf "svs: @[%a@]@. @[%a@]. @[%a@]@." C.pp clause C.pp with_pos.clause C.pp c;
+                Util.debugf ~section 1 "svs: @[%a@]@. @[%a@]. @[%a@]@." 
+                  (fun k -> k C.pp clause C.pp with_pos.clause C.pp c);
                 Iter.cons c acc
               | None -> acc)
             Iter.empty
@@ -1529,7 +1530,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               | Some(l,r,_) when T.is_var r || T.is_app_var r || T.is_comb r->
                 begin match do_subvarsup ~passive_pos ~active_pos:with_pos with
                 | Some c -> 
-                  Format.printf "svs: @[%a@]@. @[%a@]. @[%a@]@." C.pp with_pos.clause C.pp clause C.pp c;
+                  Util.debugf ~section 1 "svs: @[%a@]@. @[%a@]. @[%a@]@." 
+                    (fun k -> k C.pp with_pos.clause C.pp clause C.pp c);
                   Iter.cons c acc
                 | None -> acc end
               | _ -> acc)
