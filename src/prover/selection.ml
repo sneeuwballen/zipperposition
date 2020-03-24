@@ -50,8 +50,12 @@ let can_select_lit ~ord (lits:Lits.t) (i:int) : bool =
       |> Iter.exists (fun (t,_) ->
           let t_head, t_args = T.as_app t in
           vars_args |> CCList.exists (fun (head, args) -> T.equal head t_head && not @@ T.same_l_gen t_args args)
-        )
-    in
+        ) in
+    let contains_maxvar_as_fo_subterm vars_args =
+      let vars,_ = CCList.split vars_args in
+      Lit.fold_terms ~vars:true ~ty_args:false ~which:`All ~subterms:true lits.(i)
+      |> Iter.exists (fun (t, _) -> 
+          (T.is_var t) && List.exists (T.equal t) vars)  in
     match !_ho_restriction with
     | `None -> true
     | `NoVarHeadingMaxTerm ->
@@ -78,6 +82,10 @@ let can_select_lit ~ord (lits:Lits.t) (i:int) : bool =
         Lit.fold_terms ~vars:true ~ty_args:false ~which:`All ~subterms:true lits.(i)
         |> Iter.exists (fun (t,_) -> T.is_ho_var (fst (T.as_app t)))
       )
+    | `NoMaxVarInFoContext ->
+      let vars_args = var_headed_subterms `Max in
+      not (contains_maxvar_as_fo_subterm vars_args)
+      
   )
   else false
 
@@ -437,7 +445,8 @@ let ho_restriction_opt =
     "no-var-heading-max-term", `NoVarHeadingMaxTerm;
     "no-var-different-args", `NoVarDifferentArgs;
     "no-unapplied-var-occurring-applied", `NoUnappliedVarOccurringApplied;
-    "no-ho-vars", `NoHigherOrderVariables] in
+    "no-ho-vars", `NoHigherOrderVariables;
+    "no-max-vars-as-fo", `NoMaxVarInFoContext] in
   Arg.Symbol (List.map fst l, fun s -> set_ (List.assoc s l))
 
 let () =
@@ -463,3 +472,4 @@ let () =
     (fun () ->
        _ho_restriction := `NoHigherOrderVariables
     );
+  Params.add_to_modes [ "ho-comb-complete"] (fun () -> _ho_restriction := `NoMaxVarInFoContext);

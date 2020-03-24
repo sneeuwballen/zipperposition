@@ -144,6 +144,7 @@ let () =
   add_to_modes 
       [ "lambda-free-intensional"
       ; "lambda-free-extensional"
+      ; "ho-comb-complete"
       ; "lambda-free-purify-intensional"
       ; "lambda-free-purify-extensional"] (fun () ->
       default.ord := "lambdafree_kbo"
