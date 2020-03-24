@@ -69,6 +69,7 @@ let k_sup_in_var_args = Flex_state.create_key ()
 let k_sup_under_lambdas = Flex_state.create_key ()
 let k_sup_at_var_headed = Flex_state.create_key ()
 let k_fluidsup = Flex_state.create_key ()
+let k_subvarsup = Flex_state.create_key ()
 let k_dupsup = Flex_state.create_key ()
 let k_lambdasup = Flex_state.create_key ()
 let k_demod_in_var_args = Flex_state.create_key ()
@@ -130,6 +131,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let _idx_sup_into = ref (TermIndex.empty ())
   let _idx_lambdasup_into = ref (TermIndex.empty ())
   let _idx_fluidsup_into = ref (TermIndex.empty ())
+  let _idx_subvarsup_into = ref (TermIndex.empty ())
   let _idx_dupsup_into = ref (TermIndex.empty ())
   let _idx_sup_from = ref (TermIndex.empty ())
   let _idx_back_demod = ref (TermIndex.empty ())
@@ -182,6 +184,19 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ) else None
       )
 
+  let has_bad_occurence_elsewhere c var pos =
+    assert(T.is_var var);
+    Lits.fold_terms ~ord ~subterms:true ~eligible:C.Eligible.always ~which:`All
+      (C.lits c)
+    |> Iter.exists (fun (t, pos') -> 
+      not (Position.equal pos pos') &&
+      (* variable appears at a prefix position
+        somewhere else (pos ≠ pos') *)
+      match T.view t with
+      | T.App(hd, _) -> T.equal hd var
+      | _ -> false
+    )
+
   let handle_pred_var_inst c =
     if C.proof_depth c < Env.flex_get k_trigger_bool_inst then (
       if not (CCList.is_empty (pred_vars c)) then (
@@ -230,6 +245,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let sup_under_lambdas = Env.flex_get k_sup_under_lambdas in
     let sup_at_var_headed = Env.flex_get k_sup_at_var_headed in
     let fluidsup = Env.flex_get k_fluidsup in
+    let subvarsup = Env.flex_get k_subvarsup in
     let dupsup = Env.flex_get k_dupsup in
     let lambdasup = Env.flex_get k_lambdasup in
     let demod_in_var_args = Env.flex_get k_demod_in_var_args in
@@ -266,6 +282,24 @@ module Make(Env : Env.S) : S with module Env = Env = struct
              let with_pos = C.WithPos.({term=t; pos; clause=c;}) in
              f tree t with_pos)
           !_idx_fluidsup_into;
+
+     (* index subterms that can be rewritten by FluidSup *)
+    if subvarsup then
+      _idx_subvarsup_into :=
+        Lits.fold_terms ~vars:true ~var_args:false ~fun_bodies:false
+          ~ty_args:false ~ord ~which:`Max ~subterms:true
+          ~eligible:(C.Eligible.res c) (C.lits c)
+        |> Iter.filter (fun (t, pos) ->
+          match T.view t with
+          | T.Var _ -> has_bad_occurence_elsewhere c t pos
+          | T.App(hd, [_]) when T.is_var hd -> has_bad_occurence_elsewhere c hd pos
+          | _ -> false
+        ) 
+        |> Iter.fold
+          (fun tree (t, pos) ->
+             let with_pos = C.WithPos.({term=t; pos; clause=c;}) in
+             f tree t with_pos)
+          !_idx_subvarsup_into;
 
     if dupsup then 
       _idx_dupsup_into :=
@@ -446,12 +480,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     | FluidSup
     | LambdaSup
     | DupSup
+    | SubVarSup
 
   let kind_to_str = function
     | Classic -> "sup"
     | FluidSup -> "fluidSup"
     | LambdaSup -> "lambdaSup"
     | DupSup -> "dupSup"
+    | SubVarSup -> "subVarSup"
 
   (* all the information needed for a superposition inference *)
   module SupInfo = struct
@@ -1411,6 +1447,85 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     StmQ.add_lst (_stmq()) stm_res;
     ZProf.exit_prof prof_infer_fluidsup_passive;
     []
+
+  (* ----------------------------------------------------------------------
+   * SubVarSup rules
+   * ---------------------------------------------------------------------- *)
+
+  let do_subvarsup ~active_pos ~passive_pos =
+    (* Variable names in each clause renamed apart *)
+    let renaming = Subst.Renaming.create () in
+    let rename_term t = Subst.FO.apply renaming Subst.empty (t,0) in
+    let cl_a, cl_p = 
+      CCPair.map_same (fun c -> C.apply_subst ~renaming (c,0) Subst.empty) 
+        (active_pos.C.WithPos.clause, passive_pos.C.WithPos.clause) in
+    let s,t = 
+      match Lits.View.get_eqn (C.lits cl_a) active_pos.C.WithPos.pos with
+      | Some(l,r,_) -> CCPair.map_same rename_term (l,r)
+      | _ -> invalid_arg "active lit must be an equation" in
+
+    assert(T.is_var t || T.is_app_var t || T.is_comb t);
+
+    let u_p = rename_term passive_pos.C.WithPos.term in
+    let var =
+      match T.view u_p with 
+      | T.Var v -> v
+      | T.App(hd, l) ->
+        assert(T.is_var hd);
+        assert(List.length l <=1);
+        T.as_var_exn hd
+      | _ -> invalid_arg "u_p must be a var" in
+    
+    let z_ty = Type.arrow [T.ty t] (HVar.ty var) in
+    let z = T.var @@ HVar.fresh ~ty:z_ty () in
+    let subst = Subst.FO.bind' Subst.empty (var, 0) (z,0) in
+    
+    let passive_lit,_ = Lits.Pos.lit_at (C.lits cl_p) passive_pos.C.WithPos.pos in
+
+
+    let sup_info = 
+      SupInfo.{
+        active = cl_a; active_pos=active_pos.C.WithPos.pos; scope_active=0; s; t;
+        passive = cl_p; passive_pos = passive_pos.C.WithPos.pos; scope_passive=0;
+        passive_lit; u_p; subst = US.of_subst subst;
+        sup_kind = FluidSup} in
+    do_superposition sup_info
+  
+  let infer_subvarsup_active clause =
+    let eligible = C.Eligible.param clause in
+    Lits.fold_eqn ~sign:true ~ord ~both:true ~eligible (C.lits clause)
+    |> Iter.filter(fun (_,t,_,_) -> T.is_var t || T.is_app_var t || T.is_comb t) 
+    |> Iter.flat_map
+      (fun (s, t, _, s_pos) ->
+          (* rewrite clauses using s *)
+          I.fold !_idx_subvarsup_into
+            (fun acc _ with_pos ->
+              let active_pos = C.WithPos.{term=s; pos=s_pos; clause} in
+              match do_subvarsup ~passive_pos:with_pos ~active_pos with
+              | Some c -> Iter.cons c acc
+              | None -> acc)
+            Iter.empty
+      )
+    |> Iter.to_rev_list
+
+
+  let infer_subvarsup_passive clause =
+    let eligible = C.Eligible.(res clause) in
+    Lits.fold_terms ~vars:true ~var_args:false ~fun_bodies:false ~subterms:true ~ord
+      ~which:`Max ~eligible ~ty_args:false (C.lits clause)
+    |> Iter.filter( fun (t,_) -> 
+        T.is_var t || T.is_app_var t || T.is_comb t)
+    |> Iter.flat_map
+      (fun (u_p, passive_pos) ->
+          I.fold !_idx_sup_from
+            (fun acc _ with_pos ->
+              let passive_pos = C.WithPos.{term=u_p; pos=passive_pos; clause} in
+              match do_subvarsup ~passive_pos ~active_pos:with_pos with
+              | Some c -> Iter.cons c acc
+              | None -> acc)
+            Iter.empty
+      )
+    |> Iter.to_rev_list
 
 
   (* ----------------------------------------------------------------------
@@ -3299,6 +3414,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
     Env.flex_add k_stmq (StmQ.default ());
 
+    if Env.flex_get Combinators.k_enable_combinators
+       && Env.flex_get k_subvarsup then (
+      (* TODO! add subvarsup passive/active here *)
+    );
+
     Env.add_unary_inf "ho_complete_eq" complete_eq_args;
     if Env.flex_get k_switch_stream_extraction then (
       Env.add_generate "stream_queue_extraction" extract_from_stream_queue_fix_stm)
@@ -3400,6 +3520,7 @@ let _complete_ho_unification = ref false
 let _switch_stream_extraction = ref false
 let _fluidsup_penalty = ref 9
 let _fluidsup = ref true
+let _subvarsup = ref true
 let _dupsup = ref true
 let _trigger_bool_inst = ref (-1)
 let _recognize_injectivity = ref false
@@ -3460,6 +3581,7 @@ let register ~sup =
   E.flex_add k_sup_under_lambdas !_sup_under_lambdas;
   E.flex_add k_sup_at_var_headed !_sup_at_var_headed;
   E.flex_add k_fluidsup !_fluidsup;
+  E.flex_add k_subvarsup !_subvarsup;
   E.flex_add k_dupsup !_dupsup;
   E.flex_add k_lambdasup !_lambdasup;
   E.flex_add k_restrict_fluidsup !_restrict_fluidsup;
@@ -3570,6 +3692,7 @@ let () =
         " or when there exists a HO disagremeent";
       "--fluidsup-penalty", Arg.Int (fun p -> _fluidsup_penalty := p), " penalty for FluidSup inferences";
       "--fluidsup", Arg.Bool (fun b -> _fluidsup :=b), " enable/disable FluidSup inferences (only effective when complete higher-order unification is enabled)";
+      "--subvarsup", Arg.Bool ((:=) _subvarsup), " enable/disable SubVarSup inferences";
       "--lambdasup", Arg.Int (fun l -> 
           if l < 0 then 
             raise (Util.Error ("argument parsing", 
