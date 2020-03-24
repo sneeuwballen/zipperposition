@@ -3418,7 +3418,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
     if Env.flex_get Combinators.k_enable_combinators
        && Env.flex_get k_subvarsup then (
-      (* TODO! add subvarsup passive/active here *)
+      Env.add_binary_inf "subvarsup" infer_subvarsup_active;
+      Env.add_binary_inf "subvarsup" infer_subvarsup_passive;
     );
 
     Env.add_unary_inf "ho_complete_eq" complete_eq_args;

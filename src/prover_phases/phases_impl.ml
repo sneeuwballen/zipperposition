@@ -49,6 +49,9 @@ let print_version ~params =
 let load_extensions =
   let open Libzipperposition_calculi in
   Phases.start_phase Phases.LoadExtensions >>= fun () ->
+  Extensions.register Lazy_cnf.extension;
+  Extensions.register Combinators.extension;
+  Extensions.register Higher_order.extension;
   Extensions.register Superposition.extension;
   Extensions.register AC.extension;
   Extensions.register Heuristics.extension;
@@ -61,10 +64,7 @@ let load_extensions =
   Extensions.register Ind_types.extension;
   Extensions.register Fool.extension;
   Extensions.register Booleans.extension;
-  Extensions.register Higher_order.extension;
-  Extensions.register Combinators.extension;
   Extensions.register Lift_lambdas.extension;
-  Extensions.register Lazy_cnf.extension;
 
 
 
