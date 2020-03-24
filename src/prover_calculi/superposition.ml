@@ -1470,25 +1470,21 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let var =
       match T.view u_p with 
       | T.Var v -> v
-      | T.App(hd, l) ->
-        assert(T.is_var hd);
-        assert(List.length l <=1);
+      | T.App(hd, [x]) when T.is_var hd ->
         T.as_var_exn hd
-      | _ -> invalid_arg "u_p must be a var" in
+      | _ -> invalid_arg "u_p must be of the form y or y s" in
     
     let z_ty = Type.arrow [T.ty t] (HVar.ty var) in
-    let z = T.var @@ HVar.fresh ~ty:z_ty () in
+    let z = T.app (T.var @@ HVar.fresh ~ty:z_ty ()) [t] in
     let subst = Subst.FO.bind' Subst.empty (var, 0) (z,0) in
     
     let passive_lit,_ = Lits.Pos.lit_at (C.lits cl_p) passive_pos.C.WithPos.pos in
 
-
     let sup_info = 
       SupInfo.{
         active = cl_a; active_pos=active_pos.C.WithPos.pos; scope_active=0; s; t;
-        passive = cl_p; passive_pos = passive_pos.C.WithPos.pos; scope_passive=0;
-        passive_lit; u_p; subst = US.of_subst subst;
-        sup_kind = FluidSup} in
+        passive = cl_p; passive_pos=passive_pos.C.WithPos.pos; scope_passive=0;
+        passive_lit; u_p; subst = US.of_subst subst; sup_kind = SubVarSup} in
     do_superposition sup_info
   
   let infer_subvarsup_active clause =
@@ -1513,16 +1509,22 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let eligible = C.Eligible.(res clause) in
     Lits.fold_terms ~vars:true ~var_args:false ~fun_bodies:false ~subterms:true ~ord
       ~which:`Max ~eligible ~ty_args:false (C.lits clause)
-    |> Iter.filter( fun (t,_) -> 
-        T.is_var t || T.is_app_var t || T.is_comb t)
+    |> Iter.filter( fun (t,pos) -> 
+        match T.view t with 
+        | T.Var _ -> has_bad_occurence_elsewhere clause t pos
+        | T.App(hd, [x]) -> has_bad_occurence_elsewhere clause hd pos
+        | _ -> false)
     |> Iter.flat_map
       (fun (u_p, passive_pos) ->
           I.fold !_idx_sup_from
             (fun acc _ with_pos ->
               let passive_pos = C.WithPos.{term=u_p; pos=passive_pos; clause} in
-              match do_subvarsup ~passive_pos ~active_pos:with_pos with
-              | Some c -> Iter.cons c acc
-              | None -> acc)
+              match Lits.View.get_eqn (C.lits with_pos.C.WithPos.clause) with_pos.C.WithPos.pos with
+              | Some(l,r,_) when T.is_var r || T.is_app_var r || T.is_comb r->
+                begin match do_subvarsup ~passive_pos ~active_pos:with_pos with
+                | Some c -> Iter.cons c acc
+                | None -> acc end
+              | _ -> acc)
             Iter.empty
       )
     |> Iter.to_rev_list
