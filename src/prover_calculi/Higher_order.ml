@@ -1626,7 +1626,9 @@ let () =
     prim_mode_ := `None;
     _elim_pred_var := true;
     enable_unif_ := false;
-    _prune_arg_fun := `NoPrune;  
+    _prune_arg_fun := `NoPrune;
+    Unif._allow_pattern_unif := false;
+    _eta  := `None
   );
   Params.add_to_mode "fo-complete-basic" (fun () ->
       enabled_ := false;

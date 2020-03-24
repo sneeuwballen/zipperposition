@@ -676,6 +676,7 @@ let () =
     ; "fo-complete-basic"
     ; "lambda-free-intensional"
     ; "lambda-free-extensional"
+    ; "ho-comb-complete"
     ; "lambda-free-purify-intensional"
     ; "lambda-free-purify-extensional"] 
     (fun () ->

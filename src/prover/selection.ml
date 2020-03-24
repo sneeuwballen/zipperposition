@@ -472,4 +472,4 @@ let () =
     (fun () ->
        _ho_restriction := `NoHigherOrderVariables
     );
-  Params.add_to_modes [ "ho-comb-complete"] (fun () -> _ho_restriction := `NoMaxVarInFoContext);
+  Params.add_to_modes ["ho-comb-complete"] (fun () -> _ho_restriction := `NoMaxVarInFoContext);

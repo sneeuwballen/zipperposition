@@ -3793,6 +3793,7 @@ let () =
   Params.add_to_modes 
     [ "lambda-free-intensional"
     ; "lambda-free-extensional"
+    ; "ho-comb-complete"
     ; "lambda-free-purify-intensional"
     ; "lambda-free-purify-extensional"] (fun () ->
     Unif._allow_pattern_unif := false;
@@ -3806,6 +3807,7 @@ let () =
   );
   Params.add_to_modes 
     [ "lambda-free-extensional"
+    ; "ho-comb-complete"
     ; "lambda-free-purify-extensional"] (fun () ->
     _restrict_hidden_sup_at_vars := true;
   );
@@ -3816,7 +3818,8 @@ let () =
   );
   Params.add_to_modes
     [ "lambda-free-intensional"
-    ; "lambda-free-extensional"] (fun () ->
+    ; "lambda-free-extensional"
+    ; "ho-comb-complete"] (fun () ->
       _sup_at_vars := true;
   );
   Params.add_to_modes

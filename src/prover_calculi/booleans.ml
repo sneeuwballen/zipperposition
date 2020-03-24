@@ -944,6 +944,7 @@ let () =
                        "lambda-free-intensional";
                        "lambda-free-purify-intensional";
                        "lambda-free-extensional";
+                       "ho-comb-complete";
                        "lambda-free-purify-extensional";
                        "fo-complete-basic"] (fun () ->
       _bool_reasoning := BoolReasoningDisabled
