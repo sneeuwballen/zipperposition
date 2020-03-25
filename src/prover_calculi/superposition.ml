@@ -967,7 +967,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let do_superposition info =
     let open SupInfo in
     assert (info.sup_kind=DupSup || info.sup_kind=SubVarSup || Type.equal (T.ty info.s) (T.ty info.t));
-    assert (info.sup_kind=DupSup ||
+    assert (info.sup_kind=DupSup || info.sup_kind=SubVarSup ||
             Unif.Ty.equal ~subst:(US.subst info.subst)
               (T.ty info.s, info.scope_active) (T.ty info.u_p, info.scope_passive));
     let renaming = Subst.Renaming.create () in
