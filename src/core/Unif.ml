@@ -220,9 +220,10 @@ module Inner = struct
     else S.update subst v t
 
   (* is the type of [t] prop, or some other non-syntactically unifiable type? *)
-  let has_non_unifiable_type_or_is_prop (t:T.t): bool = match T.ty t with
+  let has_non_unifiable_type (t:T.t): bool = match T.ty t with
     | T.NoType -> false
-    | T.HasType ty -> T.type_is_prop ty || not (T.type_is_unifiable ty)
+    | T.HasType ty -> (*T.type_is_prop ty ||*) not (T.type_is_unifiable ty)
+                      (* is prop is removed since ext sup takes care of that *)
 
   (* change the scope of variables in this term so they live in [scope]
       NOTE: terrible hack starts here:
@@ -514,7 +515,7 @@ module Inner = struct
         let subst = unif_rec  ~op ~root:true ~bvars subst (ty1,sc1) (ty2,sc2) in
         unif_term  ~op ~root ~bvars subst t1 sc1 t2 sc2
     end
-
+(* disabled this rule since extsup takes care of reasoning like this *)
   and unif_term  ~op ~root ~bvars subst t1 sc1 t2 sc2 : unif_subst =
     let view1 = T.view t1 and view2 = T.view t2 in
     let delay() = delay ~bvars subst t1 sc1 t2 sc2 in
@@ -539,7 +540,7 @@ module Inner = struct
       | T.Const f, T.Const g ->
         if ID.equal f g
         then subst
-        else if op=O_unify && not root && has_non_unifiable_type_or_is_prop t1
+        else if op=O_unify && not root && has_non_unifiable_type t1
         then (
           let tags = T.type_non_unifiable_tags (T.ty_exn t1) in
           US.add_constr (Unif_constr.make ~tags (t1,sc1)(t2,sc2)) subst
@@ -553,8 +554,9 @@ module Inner = struct
         then (
           (* just unify subterms pairwise *)
           unif_list  ~op ~bvars subst l1 sc1 l2 sc2
-        ) else if op=O_unify && not root && has_non_unifiable_type_or_is_prop t1 then (
+        ) else if op=O_unify && not root && has_non_unifiable_type t1 then (
           (* TODO: notion of value, here, to fail fast in some cases.
+        (* disabled this rule since extsup takes care of reasoning like this *)
              e.g.  [a + 1 = a] should fail immediately *)
           let tags = T.type_non_unifiable_tags (T.ty_exn t1) in
           delay ~tags ()
@@ -605,9 +607,10 @@ module Inner = struct
         in
         unif_rec   ~op ~root:false ~bvars
           subst (t1',sc1) (t2',sc2)
-      | T.Bind ((Binder.Forall | Binder.Exists), _, _), _
+        (* disabled this rule since extsup takes care of reasoning like this *)
+      (* | T.Bind ((Binder.Forall | Binder.Exists), _, _), _
       | _, T.Bind ((Binder.Forall | Binder.Exists), _, _) ->
-        delay ~tags:[] () (* cannot unify non-atomic propositions, so delay *)
+        delay ~tags:[] () cannot unify non-atomic propositions, so delay *)
       | T.AppBuiltin (Builtin.Int n1,[]),
         T.AppBuiltin (Builtin.Int n2,[]) ->
         if Z.equal n1 n2 then subst else raise Fail (* int equality *)
@@ -617,9 +620,10 @@ module Inner = struct
       | T.AppBuiltin (Builtin.True, _), _
       | T.AppBuiltin (Builtin.False, _), _ ->
         if T.equal t1 t2 then subst else raise Fail (* boolean equality *)
-      | _ when op=O_unify && not root && has_non_unifiable_type_or_is_prop t1 ->
+      (* disabled this rule since extsup takes care of reasoning like this *)
+      (* | _ when op=O_unify && not root && has_non_unifiable_type_or_is_prop t1 ->
         let tags = T.type_non_unifiable_tags (T.ty_exn t1) in
-        delay ~tags () (* push pair as a constraint, because of typing. *)
+        delay ~tags () push pair as a constraint, because of typing. *)
       (* 
         APPLY FRESH VARIABLES TO COMBINATORS
         | T.AppBuiltin (s1, l1), T.AppBuiltin(s2,l2)
@@ -708,7 +712,7 @@ module Inner = struct
       then (
         (* just unify subterms pairwise *)
         unif_list  ~op ~bvars subst l1 scope l2 scope
-      ) else if op=O_unify && not root && has_non_unifiable_type_or_is_prop t1 then (
+      ) else if op=O_unify && not root && has_non_unifiable_type t1 then (
         let tags = T.type_non_unifiable_tags (T.ty_exn t1) in
         delay ~tags ()
       ) else fail()
@@ -758,7 +762,7 @@ module Inner = struct
       | T.Const id1, T.Const id2 ->
         (* first-order applications *)
         if ID.equal id1 id2 then same_rigid_head()
-        else if op=O_unify && not root && has_non_unifiable_type_or_is_prop t1
+        else if op=O_unify && not root && has_non_unifiable_type t1
         then (
           let tags = T.type_non_unifiable_tags (T.ty_exn t1) in
           delay ~tags () (* push pair as a constraint, because of typing. *)

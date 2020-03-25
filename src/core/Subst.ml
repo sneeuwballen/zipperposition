@@ -215,8 +215,9 @@ let[@inline] hash (s:t): int =
 
 let pp_bindings out subst =
   let pp_binding out (v,t) =
-    Format.fprintf out "@[<2>@[%a@] @<1>→@ @[%a@]@]"
-      (Scoped.pp T.pp_var) v (Scoped.pp T.pp) t
+    Format.fprintf out "@[<2>@[%a:%a@] @<1>→@ @[%a:%a@]@]"
+      (Scoped.pp T.pp_var) v Type.pp (Type.of_term_unsafe @@ HVar.ty (fst v)) 
+      (Scoped.pp T.pp) t Type.pp (Type.of_term_unsafe @@ T.ty_exn (fst t)) 
   in
   Util.pp_seq ~sep:", " pp_binding out (to_seq subst)
 

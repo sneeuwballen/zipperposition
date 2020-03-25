@@ -590,8 +590,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             (* rewritten term is variable-headed *)	
             begin match T.view info.s, T.view info.t  with	
               | T.App (f, ss), T.App (g, tt) 
-                when List.length ss > List.length args 
-                      && List.length tt > List.length args ->	
+                when List.length ss >= List.length args 
+                      && List.length tt >= List.length args ->	
                 let s_args = Array.of_list ss in	
                 let t_args = Array.of_list tt in
                 let sub_s_args = 
@@ -770,6 +770,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let lits_a = CCArray.except_idx (C.lits info.active) active_idx in
       let lits_p = CCArray.except_idx (C.lits info.passive) passive_idx in
       (* replace s\sigma by t\sigma in u|_p\sigma *)
+      let u_p' = Lit.Pos.at passive_lit' passive_lit_pos in
+      Util.debugf ~section 1 "passive_lit'=@[%a@]@. u_p = @[%a@]; pos = @[%a@]@." 
+        (fun k -> k Lit.pp passive_lit' Term.pp u_p' Position.pp passive_lit_pos);
       let new_passive_lit =
         Lit.Pos.replace passive_lit'
           ~at:passive_lit_pos ~by:t' in
@@ -964,7 +967,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let do_superposition info =
     let open SupInfo in
     assert (info.sup_kind=DupSup || info.sup_kind=SubVarSup || Type.equal (T.ty info.s) (T.ty info.t));
-    assert (info.sup_kind=DupSup || info.sup_kind=SubVarSup ||
+    assert (info.sup_kind=DupSup ||
             Unif.Ty.equal ~subst:(US.subst info.subst)
               (T.ty info.s, info.scope_active) (T.ty info.u_p, info.scope_passive));
     let renaming = Subst.Renaming.create () in
@@ -1695,15 +1698,17 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let counter = ref 0 in
 
     let cheap_unify ~subst (s,s_sc) (t,t_sc) =
-      let unif_alg = 
-        if T.is_var s || T.is_var t then (
+      let unif_alg =
+        if Env.flex_get Combinators.k_enable_combinators then
+           (fun s t -> Unif_subst.of_subst @@ Unif.FO.unify_syn ~subst:(Unif_subst.subst subst) s t)
+        else if T.is_var s || T.is_var t then (
           FixpointUnif.unify_scoped ~subst ~counter
         ) else PatternUnif.unify_scoped ~subst ~counter in
       
       try
         if not unify then None
         else Some (unif_alg (s,s_sc) (t,t_sc))
-      with PatternUnif.NotInFragment | PatternUnif.NotUnifiable ->
+      with PatternUnif.NotInFragment | PatternUnif.NotUnifiable | Unif.Fail ->
         None
     in
     
@@ -1748,7 +1753,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
       if T.equal T.true_ orig_s || T.equal T.true_ orig_t then raise StopSearch;
 
-      let diss = aux (Lambda.eta_expand orig_s) (Lambda.eta_expand orig_t) in
+      let norm = 
+        if Env.flex_get Combinators.k_enable_combinators 
+        then CCFun.id 
+        else Lambda.eta_expand in
+
+      let diss = aux (norm orig_s) (norm orig_t) in
       if CCList.is_empty diss || List.for_all (fun (s,t) -> 
         T.is_var @@ T.head_term s || T.is_var @@ T.head_term t) diss then (
           raise StopSearch

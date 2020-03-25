@@ -630,14 +630,6 @@ let ty_vars t = Seq.ty_vars t |> Type.VarSet.of_seq
 
 (** {2 Subterms and positions} *)
 
-module Pos = struct
-  let at t pos = of_term_unsafe (T.Pos.at (t :> T.t) pos)
-
-  let replace t pos ~by =
-    assert (Type.equal (at t pos |> ty) (ty by));
-    of_term_unsafe (T.Pos.replace (t:>T.t) pos ~by:(by:>T.t))
-end
-
 let replace t ~old ~by =
   assert (Type.equal (ty by) (ty old));
   of_term_unsafe (T.replace (t:t:>T.t) ~old:(old:t:>T.t) ~by:(by:t:>T.t))
@@ -1057,6 +1049,19 @@ let pp_in = function
   | Output_format.O_none -> CCFormat.silent
 
 (** {2 Conversions} *)
+
+module Pos = struct
+  let at t pos = of_term_unsafe (T.Pos.at (t :> T.t) pos)
+
+  let replace t pos ~by =
+    if not (Type.equal (at t pos |> ty) (ty by)) then (
+      CCFormat.printf "t:@[%a:%a@]@." pp (at t pos) Type.pp (at t pos |> ty);
+      CCFormat.printf "by:@[%a:%a@]@." pp (by) Type.pp (ty by);
+      assert false;
+    );
+    of_term_unsafe (T.Pos.replace (t:>T.t) pos ~by:(by:>T.t))
+end
+
 
 module Conv = struct
   module PT = TypedSTerm

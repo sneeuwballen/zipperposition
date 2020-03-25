@@ -222,8 +222,6 @@ let rec mk_lit a b sign =
   | T.AppBuiltin (Builtin.False, []), T.AppBuiltin (Builtin.True, []) -> if sign then False else True
   | T.AppBuiltin (Builtin.True, []), T.AppBuiltin (Builtin.True, []) -> if sign then True else False
   | T.AppBuiltin (Builtin.False, []), T.AppBuiltin (Builtin.False, []) -> if sign then True else False
-  | T.AppBuiltin (Builtin.Not, [f]), _ when T.is_true_or_false b -> mk_lit f b (not sign)
-  | _, T.AppBuiltin (Builtin.Not, [f]) when T.is_true_or_false a -> mk_lit a f (not sign)
   | T.AppBuiltin (Builtin.True, []), _ -> Equation (b, T.true_, sign)
   | _, T.AppBuiltin (Builtin.True, []) -> Equation (a, T.true_, sign)
   | T.AppBuiltin (Builtin.False, []), _ -> Equation (b, T.true_, not sign)
@@ -727,6 +725,7 @@ let normalize_eq lit =
       | T.AppBuiltin(Builtin.(Neq|Xor), ([_;l;r]|[l;r])) ->
         let eq_cons = if sign then mk_neq else mk_eq in
         Some (eq_cons l r)
+      | T.AppBuiltin (Builtin.Not, [f]) -> Some (mk_lit f T.true_ (not sign))
       | _ -> None
     end
   | _ -> None

@@ -130,8 +130,10 @@ module Make(E : Env.S) = struct
         Unknown
       )
     | Some c ->
-      (* Util.debugf ~section 1 "@[<2>@{<green>given@} (before simplification):@ `@[%a@]`@]"
-            (fun k->k Env.C.pp c); *)
+      Util.debugf ~section 1 "@[<2>@{<green>given@} (before simplification):@ `@[%a@]`@]"
+            (fun k->k Env.C.pp c);
+      Util.debugf ~section 1 "@[proof:@[%a@]@]" (fun k -> k Proof.S.pp_tstp (Env.C.proof c));
+      
       check_clause_ c;
       Util.incr_stat stat_steps;
       let orig_c = c in
