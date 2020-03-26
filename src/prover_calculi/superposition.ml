@@ -692,9 +692,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             T.pp t' C.pp info.passive sc_p Lit.pp info.passive_lit
             Position.pp info.passive_pos US.pp info.subst);
 
-      if(info.sup_kind = LambdaSup && 
-         T.Set.exists (fun v -> 
-             not @@ T.DB.is_closed @@  Subst.FO.apply ~shift_vars renaming subst (v,sc_p)) 
+      if(info.sup_kind = LambdaSup &&
+         T.Set.exists (fun v ->
+             not @@ T.DB.is_closed @@  Subst.FO.apply ~shift_vars renaming subst (v,sc_p))
            lambdasup_vars) then (
         let msg = "LambdaSup: an into free variable sneaks in bound variable" in
         Util.debugf ~section 3 "%s" (fun k->k msg);
