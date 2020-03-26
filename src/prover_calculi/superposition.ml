@@ -974,7 +974,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let shift_vars = if info.sup_kind = LambdaSup then 0 else -1 in
     let s = Subst.FO.apply ~shift_vars renaming (US.subst info.subst) (info.s, info.scope_active) in
     let u_p = Subst.FO.apply ~shift_vars renaming (US.subst info.subst) (info.u_p, info.scope_passive) in
-    let norm t = T.normalize_bools @@ Lambda.eta_reduce @@ Lambda.snf t in
+    let norm t = T.normalize_bools @@ Lambda.eta_expand @@ Lambda.snf t in
     if info.sup_kind != SubVarSup && 
        not (Term.equal (norm @@ s) (norm @@ u_p) || US.has_constr info.subst) then (
       CCFormat.printf "@[<2>sup, kind %s@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a@]@])@ \
