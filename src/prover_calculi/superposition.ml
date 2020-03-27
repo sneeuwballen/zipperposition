@@ -3634,13 +3634,12 @@ let () =
     );
   Params.add_to_mode "fo-complete-basic" (fun () ->
       _use_simultaneous_sup := false;
-      );
+    );
   Params.add_to_modes 
     [ "lambda-free-intensional"
     ; "lambda-free-extensional"
     ; "lambda-free-purify-intensional"
     ; "lambda-free-purify-extensional"] (fun () ->
-    Unif._allow_pattern_unif := false;
     _use_simultaneous_sup := false;
     _sup_in_var_args := true;
     _demod_in_var_args := true;

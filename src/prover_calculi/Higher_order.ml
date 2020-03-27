@@ -1447,6 +1447,12 @@ let extension =
       E.add_fragment_check (fun c ->
           E.C.Seq.terms c |> Iter.for_all Term.in_lfho_fragment
         );
+    
+    Signal.on_every E.on_start (fun () -> 
+      if not !Unif._unif_bool 
+      then print_endline 
+        ("To remain in the chosen logic fragment, " ^
+        "unification with booleans has been disabled."));
 
     if E.flex_get k_some_ho || !force_enabled_ then (
       let module ET = Make(E) in
@@ -1587,6 +1593,7 @@ let () =
   Params.add_to_mode "fo-complete-basic" (fun () ->
       enabled_ := false;
       Unif._allow_pattern_unif := false;
+      Unif._unif_bool := false;
     );
   Params.add_to_modes 
     [ "lambda-free-intensional"
@@ -1602,6 +1609,7 @@ let () =
         prim_mode_ := `None;
         _check_lambda_free := `True;
         Unif._allow_pattern_unif := false;
+        Unif._unif_bool := false;
         _eta := `None;
       );
   Params.add_to_modes 
