@@ -1759,8 +1759,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         else Lambda.eta_expand in
 
       let diss = aux (norm orig_s) (norm orig_t) in
-      if CCList.is_empty diss || List.for_all (fun (s,t) -> 
-        T.is_var @@ T.head_term s || T.is_var @@ T.head_term t) diss then (
+      let hd_is_var t = 
+        let _,body = T.open_fun t in
+        T.is_var @@ T.head_term body in
+      
+      if CCList.is_empty diss || List.for_all (fun (s,t) -> hd_is_var s || hd_is_var t) diss then (
           raise StopSearch
       );
 
