@@ -63,7 +63,6 @@ let load_extensions =
   Extensions.register Booleans.extension;
   Extensions.register Higher_order.extension;
   Extensions.register App_encode.extension;
-  Extensions.register Bool_encode.extension;
 
   let l = Extensions.extensions () in
   Phases.return_phase l
