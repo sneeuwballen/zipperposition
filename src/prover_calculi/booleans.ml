@@ -12,7 +12,8 @@ module US = Unif_subst
 
 type selection_setting = Any | Minimal | Large
 type reasoning_kind    = 
-    BoolReasoningDisabled | BoolCasesInference | BoolCasesSimplification | BoolCasesKeepParent
+    BoolReasoningDisabled | BoolCasesInference | BoolCasesDisabled 
+  | BoolCasesSimplification | BoolCasesKeepParent
   | BoolCasesEagerFar | BoolCasesEagerNear
 
 let section = Util.Section.make ~parent:Const.section "booleans"
@@ -892,10 +893,11 @@ let extension =
 
 let () =
   Options.add_opts
-    [ "--boolean-reasoning", Arg.Symbol (["off"; "cases-inf"; "cases-simpl"; "cases-simpl-kp"; "cases-eager"; "cases-eager-near"], 
+    [ "--boolean-reasoning", Arg.Symbol (["off"; "no-cases"; "cases-inf"; "cases-simpl"; "cases-simpl-kp"; "cases-eager"; "cases-eager-near"], 
                                          fun s -> _bool_reasoning := 
                                              match s with 
                                              | "off" -> BoolReasoningDisabled
+                                             | "no-cases" -> BoolCasesDisabled
                                              | "cases-inf" -> BoolCasesInference
                                              | "cases-simpl" -> BoolCasesSimplification
                                              | "cases-simpl-kp" -> BoolCasesKeepParent

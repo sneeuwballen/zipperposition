@@ -1022,7 +1022,7 @@ let needs_args (t:t): bool = match view t with
   | Bind (Binder.ForallTy, _, _) -> true
   | _ -> false
 
-let show_type_arguments = ref true
+let show_type_arguments = ref false
 
 let rec open_bind2 b t1 t2 = match view t1, view t2 with
   | Bind (b1', ty1, t1'), Bind (b2', ty2, t2') when b=b1' && b=b2' ->
@@ -1081,7 +1081,8 @@ let rec pp_depth ?(hooks=[]) depth out t =
         ) else (
           CCFormat.sprintf "%a " Builtin.pp b, x :: rest
         ) in
-      Format.fprintf out " @[%a@]" (Util.pp_list ~sep (_pp depth)) l
+      if CCList.length l = 1 then Format.fprintf out "(= @[%a@])" (_pp depth) (List.hd l)
+      else Format.fprintf out " @[%a@]" (Util.pp_list ~sep (_pp depth)) l
     | AppBuiltin (b, ([_;a] | [a])) when Builtin.is_prefix b ->
       Format.fprintf out "@[<1>%a %a@]" Builtin.pp b (_pp depth) a
     | AppBuiltin (b, [t1;t2]) when Builtin.is_infix b ->

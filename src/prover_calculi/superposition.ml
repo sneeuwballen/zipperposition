@@ -710,7 +710,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           let v' = S.FO.apply ~shift_vars:0 renaming subst (v, sc_p) in
           if T.equal t' v'
           then (
-            Util.debugf ~section 3 "will yield a tautology" (fun k->k);
+            Util.debugf ~section 1 "will yield a tautology" (fun k->k);
             raise (ExitSuperposition "will yield a tautology");)
         | _ -> ()
       end;
@@ -748,7 +748,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         not (Lit.Pos.is_max_term ~ord passive_lit' passive_lit_pos) ||
         not (BV.get (C.eligible_res (info.passive, sc_p) subst) passive_idx) ||
         not (C.is_eligible_param (info.active, sc_a) subst ~idx:active_idx)
-      ) then raise (ExitSuperposition "bad ordering conditions");
+      ) then (raise (ExitSuperposition "bad ordering conditions"));
       (* Check for superposition at a variable *)
       if info.sup_kind != FluidSup then
         if not @@ Env.flex_get k_sup_at_vars then
@@ -770,9 +770,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let lits_a = CCArray.except_idx (C.lits info.active) active_idx in
       let lits_p = CCArray.except_idx (C.lits info.passive) passive_idx in
       (* replace s\sigma by t\sigma in u|_p\sigma *)
-      let u_p' = Lit.Pos.at passive_lit' passive_lit_pos in
-      Util.debugf ~section 1 "passive_lit'=@[%a@]@. u_p = @[%a@]; pos = @[%a@]@." 
-        (fun k -> k Lit.pp passive_lit' Term.pp u_p' Position.pp passive_lit_pos);
       let new_passive_lit =
         Lit.Pos.replace passive_lit'
           ~at:passive_lit_pos ~by:t' in
@@ -861,7 +858,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       );
       Some new_clause
     with ExitSuperposition reason ->
-      Util.debugf ~section 3 "... cancel, %s" (fun k->k reason);
+      Util.debugf ~section 1 "... cancel, %s" (fun k->k reason);
       None
 
   (* simultaneous superposition: when rewriting D with C \lor s=t,
@@ -1763,7 +1760,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         let _,body = T.open_fun t in
         T.is_var @@ T.head_term body in
       
-      if CCList.is_empty diss || List.for_all (fun (s,t) -> hd_is_var s || hd_is_var t) diss then (
+      if CCList.is_empty diss 
+          || List.for_all (fun (s,t) -> hd_is_var s || hd_is_var t) diss
+          || List.for_all (fun (s,_) -> not @@ t_type_is_ho s) diss then (
           raise StopSearch
       );
 
