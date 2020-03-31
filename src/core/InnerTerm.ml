@@ -1081,7 +1081,7 @@ let rec pp_depth ?(hooks=[]) depth out t =
         ) else (
           CCFormat.sprintf "%a " Builtin.pp b, x :: rest
         ) in
-      if CCList.length l = 1 then Format.fprintf out "(= @[%a@])" (_pp depth) (List.hd l)
+      if CCList.length l = 1 then Format.fprintf out "(%a @[%a@])" Builtin.pp b (_pp depth) (List.hd l)
       else Format.fprintf out " @[%a@]" (Util.pp_list ~sep (_pp depth)) l
     | AppBuiltin (b, ([_;a] | [a])) when Builtin.is_prefix b ->
       Format.fprintf out "@[<1>%a %a@]" Builtin.pp b (_pp depth) a

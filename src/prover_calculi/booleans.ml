@@ -239,8 +239,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         let p',c' = aux p, aux c in
         if T.equal p p' && T.equal c c' then t 
         else T.app_builtin ~ty:(T.ty t) Builtin.Imply [p';c'])
-    | AppBuiltin(hd, ([a;b]|[_;a;b])) 
-        when hd = Builtin.Eq || hd = Builtin.Equiv ->
+    | AppBuiltin((Builtin.Eq | Builtin.Equiv) as hd, ([a;b]|[_;a;b])) ->
       if T.equal a b then T.true_ 
       else if T.equal a T.true_ then aux b
       else if T.equal b T.true_ then aux a
@@ -251,8 +250,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         if T.equal a a' && T.equal b b' then t 
         else T.app_builtin ~ty:(T.ty t) hd [a';b']
       )
-    | AppBuiltin(hd, ([a;b]|[_;a;b]))
-        when hd = Builtin.Neq || hd = Builtin.Xor ->
+    | AppBuiltin((Builtin.Neq | Builtin.Xor) as hd, ([a;b]|[_;a;b])) ->
       if T.equal a b then T.false_ else (
         let a',b' = aux a, aux b in
         if T.equal a a' && T.equal b b' then t 
@@ -273,11 +271,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       if T.same_l args args' then t
       else T.app_builtin ~ty:(T.ty t) hd args' in  
   let res = aux t in
-  if not (T.DB.is_closed res) then (
-    CCFormat.printf "t:@[%a@]@." T.pp t;
-    CCFormat.printf "res:@[%a@]@." T.pp res;
-    assert false;
-  );
+  assert (T.DB.is_closed res);
   res
 
   let simpl_bool_subterms c =
