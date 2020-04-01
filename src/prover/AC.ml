@@ -25,7 +25,9 @@ type spec = AC_intf.spec
 module type S = AC_intf.S
 
 let key_ac : (module S) Flex_state.key = Flex_state.create_key()
+let key_scan_cl_ac = Flex_state.create_key()
 
+let _scan_cl_ac = ref false
 module Make(Env : Env.S) : S with module Env = Env = struct
   module Ctx = Env.Ctx
   module Env = Env
@@ -39,6 +41,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let tbl : cell ID.Tbl.t = ID.Tbl.create 3
   let on_add : spec Signal.t = Signal.create ()
+
 
   let mk_axioms_ proof s ty: C.t list =
     let ty_args_n, ty_args, _ty_ret = Type.open_poly_fun ty in
@@ -235,8 +238,87 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       end
     )
 
+  let register_ac c id ty =
+    mk_axioms_ (C.proof_parent c) id ty
+
+  let scan_clause c =
+    let exception Fail in
+
+    let fail_on cond = if not cond then raise Fail in
+
+    let test_commutativty s t =
+      try 
+        begin match T.view s, T.view t with 
+        | T.App(hd_s, [x_s;y_s]), T.App(hd_t, [x_t; y_t]) ->
+          fail_on (not (T.equal hd_s hd_t));
+          fail_on (not (T.is_const hd_s));
+          fail_on (not (T.is_var x_s) || not (T.is_var y_s));
+          fail_on (not (T.is_var x_t) || not (T.is_var y_t));
+          fail_on (T.equal x_s y_s);
+          fail_on (T.equal x_t y_t);
+          fail_on (not (T.equal x_s y_t && T.equal y_s x_t));
+
+          true
+        | _ -> false end
+      with Fail -> false in
+    
+    let test_associativity s t =
+      try 
+        begin match T.view s, T.view t with 
+        | T.App(hd_s, [x_s;fyz_s]), T.App(hd_t, [fxy_t; z_t]) ->
+          begin match T.view fyz_s, T.view fxy_t with
+          | T.App(hd_s', [y_s; z_s]), T.App(hd_t', [x_t; y_t]) ->
+            fail_on (not (T.equal hd_s hd_t && T.equal hd_t hd_s' 
+                            && T.equal hd_s' hd_t'));
+            fail_on (not (T.is_const hd_s));
+            fail_on (not (List.for_all T.is_var [x_s;y_s;z_s]));
+            fail_on (not (List.for_all T.is_var [x_t;y_t;z_t]));
+
+            fail_on (T.Set.cardinal (T.Set.of_list [x_s;y_s;z_s]) != 3);
+            fail_on (not (T.equal x_s x_t && T.equal y_s y_t && T.equal z_s z_t));
+            true
+          | _ -> false end
+        | _ -> false end
+      with Fail -> false in
+    
+    match C.lits c with 
+    | [| Literal.Equation(lhs,rhs,true) |] ->
+      let ty = T.ty (T.head_term lhs) in
+      CCOpt.get_or ~default:[] (CCOpt.map (fun id -> 
+        if not (ID.is_ac id) then (
+          if ID.is_comm id then (
+            if test_associativity lhs rhs || test_associativity rhs lhs then (
+              ID.set_payload id ID.Attr_assoc;
+              assert(ID.is_ac id);
+              register_ac c id ty
+            ) else [])
+          else if ID.is_assoc id then (
+            if test_commutativty lhs rhs then (
+              ID.set_payload id ID.Attr_comm;
+              assert(ID.is_ac id);
+              register_ac c id ty
+            ) else []
+          ) else (
+            if test_commutativty lhs rhs then (
+              ID.set_payload id ID.Attr_comm;
+              assert(ID.is_comm id);
+            ) else if test_associativity lhs rhs || test_associativity rhs lhs then (
+              ID.set_payload id ID.Attr_assoc;
+              assert(ID.is_assoc id);
+            );
+            []
+          )) else []) (T.head lhs))
+    | _ -> []
+  
+
   (* just look for AC axioms *)
   let setup () =
+    Env.flex_add key_scan_cl_ac !_scan_cl_ac;
+
+    if !_scan_cl_ac then (
+      Env.add_unary_inf "infer_ac" scan_clause
+    );
+
     Signal.on_every
       Env.on_input_statement scan_statement
 end
@@ -252,3 +334,8 @@ let extension =
                          name="ac";
                          env_actions=[action];
   }
+
+let () =
+  Options.add_opts [
+    "scan-clause-ac", Arg.Bool ((:=) _scan_cl_ac), " scan clauses for AC definitions"
+  ]

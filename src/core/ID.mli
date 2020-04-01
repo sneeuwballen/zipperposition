@@ -90,6 +90,9 @@ exception Attr_skolem of skolem_kind
 
 exception Attr_distinct
 
+exception Attr_comm
+exception Attr_assoc
+
 val as_infix : t -> string option
 val is_infix : t -> bool
 
@@ -106,3 +109,7 @@ val as_skolem : t -> skolem_kind option
 
 val is_distinct_object : t -> bool
 (** whether the identifier is a distinct object (as defined in TPTP syntax) *)
+
+val is_comm : t -> bool
+val is_assoc : t -> bool
+val is_ac : t -> bool
