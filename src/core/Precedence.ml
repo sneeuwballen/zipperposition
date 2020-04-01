@@ -330,8 +330,41 @@ let weight_freqrank (symbs : ID.t Iter.t) : ID.t -> Weight.t =
   Iter.iteri (fun i sym -> ID.Tbl.add tbl sym (i+1)) sorted;
   (fun sym -> Weight.int (ID.Tbl.get_or ~default:10 tbl sym))
 
+let lambda_def_weight base_weight lits =
+  let def_rhs lit =
+    let is_def t =
+      let hd,args = Term.as_app t in
+      Term.is_const hd && List.for_all Term.is_var args &&
+      Term.Set.cardinal (Term.Set.of_list args) = List.length args
+    in
+    
+    match lit with
+    | SLiteral.Eq(lhs,rhs) ->
+      if is_def lhs then Some (rhs, Term.head_exn lhs)
+      else if is_def rhs then Some (lhs, Term.head_exn rhs)
+      else None  
+    | _ -> None in
 
-let weight_fun_of_string ~signature s = 
+  let evaluate_weight current_evals t =
+    2*Term.weight ~sym:(fun sy -> 
+      ID.Map.get_or sy current_evals ~default:((base_weight sy).Weight.one)
+    ) t in
+
+  let id_map = 
+    Iter.fold (fun acc lit ->
+      match def_rhs lit with 
+      | Some (rhs,lhs_id) ->
+        let rhs_eval = evaluate_weight acc rhs in
+        ID.Map.update lhs_id (fun prev ->
+          Some (max (CCOpt.get_or ~default:0 prev) rhs_eval)
+        ) acc
+      | None -> acc) ID.Map.empty lits in
+  
+  fun sy ->
+    Weight.int (ID.Map.get_or ~default:(base_weight sy).Weight.one sy id_map)
+
+
+let weight_fun_of_string ~signature ~lits s sd = 
   let syms_only sym_depth = 
     Iter.map fst sym_depth in
   let with_syms f sym_depth = f (syms_only sym_depth) in
@@ -350,7 +383,12 @@ let weight_fun_of_string ~signature s =
      "docc", depth_occurence;
      "const", ignore_arg weight_constant] in
   try
-    List.assoc s wf_map
+    begin match CCString.chop_prefix ~pre:"lambda-def" s with 
+    | Some s ->
+      let base_weight = List.assoc s wf_map sd in
+      lambda_def_weight base_weight lits
+      (* List.assoc s wf_map sd *)
+    | None -> List.assoc s wf_map sd end
   with Not_found -> invalid_arg "KBO weight function not found"
 
 (* default argument coefficients *)
