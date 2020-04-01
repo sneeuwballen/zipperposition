@@ -1977,6 +1977,15 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         | Some (rhs,subst,cur_sc) ->
           (* reduce [rhs] in current scope [cur_sc] *)
           assert (cur_sc < st.demod_sc);
+          (* bind variables not occurring in [rhs] to fresh ones *)
+          let subst = 
+            (InnerTerm.Seq.vars (rhs :> InnerTerm.t)) 
+            |> Iter.fold (fun subst v -> 
+                if S.mem subst (v, cur_sc) 
+                then subst 
+                else S.bind subst (v, cur_sc) 
+                  (InnerTerm.var (HVar.fresh ~ty:(HVar.ty v) ()), cur_sc)) 
+              subst in
           (* If not beta-reduced this can get out of hands --  *)
           let rhs' = Lambda.snf @@ Subst.FO.apply Subst.Renaming.none subst (rhs,cur_sc) in
           Util.debugf ~section 3
