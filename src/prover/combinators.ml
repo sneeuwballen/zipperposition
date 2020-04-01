@@ -691,7 +691,7 @@ let comb2lam t =
   let res = aux t in
   assert(Iter.for_all (fun sub -> 
     not (T.is_comb sub)) 
-    (T.Seq.subterms ~include_builtin:true ~include_app_vars:true t));
+    (T.Seq.subterms ~include_builtin:true ~include_app_vars:true res));
   res
 
 module Make(E : Env.S) : S with module Env = E = struct
@@ -909,7 +909,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           let proof = 
             Proof.Step.simp ~rule 
               [C.proof_parent_subst Subst.Renaming.none (c,0) subst] in
-          SimplM.return_new (C.create ~penalty:0 ~trail:(C.trail c) [] proof)
+          SimplM.return_new (C.create ~penalty:1 ~trail:(C.trail c) [] proof)
         | _ -> SimplM.return_same c
         end
       | _ -> SimplM.return_same c
@@ -937,9 +937,9 @@ module Make(E : Env.S) : S with module Env = E = struct
 end
 
 let _enable_combinators = ref false
-let _s_penalty = ref 6
+let _s_penalty = ref 2
 let _b_penalty = ref 2
-let _c_penalty = ref 3
+let _c_penalty = ref 2
 let _k_penalty = ref 2
 let _app_var_constraints = ref false
 let _deep_app_var_penalty = ref false
