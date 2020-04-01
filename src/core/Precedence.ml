@@ -332,7 +332,7 @@ let weight_freqrank (symbs : ID.t Iter.t) : ID.t -> Weight.t =
 
 (* This function takes base KBO weight function and adjusts it so
    that defined symbols are larger than its defitnitions. *)
-let lambda_def_weight base_weight lits =
+let lambda_def_weight lm_w db_w base_weight lits =
   let def_rhs lit =
     let is_def t =
       let hd,args = Term.as_app t in
@@ -348,9 +348,17 @@ let lambda_def_weight base_weight lits =
     | _ -> None in
 
   let evaluate_weight current_evals t =
-    3*Term.weight ~sym:(fun sy -> 
+    2*(Term.weight ~sym:(fun sy -> 
       ID.Map.get_or sy current_evals ~default:((base_weight sy).Weight.one)
-    ) t in
+    ) t + 
+      (Term.Seq.subterms ~include_builtin:true ~include_app_vars:true t
+      |> Iter.fold (fun acc sub -> 
+        let inc = 
+          if Term.is_fun sub then lm_w
+          else if Term.is_bvar sub then db_w
+          else 0 in
+        acc + inc ) 0))
+     in
 
   let id_map = 
     Iter.fold (fun acc lit ->
@@ -361,12 +369,14 @@ let lambda_def_weight base_weight lits =
           Some (max (CCOpt.get_or ~default:0 prev) rhs_eval)
         ) acc
       | None -> acc) ID.Map.empty lits in
+
   
   fun sy ->
     Weight.int (ID.Map.get_or ~default:(base_weight sy).Weight.one sy id_map)
 
 
-let weight_fun_of_string ~signature ~lits s sd = 
+
+let weight_fun_of_string ~signature ~lits ~lm_w ~db_w s sd = 
   let syms_only sym_depth = 
     Iter.map fst sym_depth in
   let with_syms f sym_depth = f (syms_only sym_depth) in
@@ -388,7 +398,7 @@ let weight_fun_of_string ~signature ~lits s sd =
     begin match CCString.chop_prefix ~pre:"lambda-def-" s with 
     | Some s ->
       let base_weight = List.assoc s wf_map sd in
-      lambda_def_weight base_weight lits
+      lambda_def_weight lm_w db_w base_weight lits
       (* List.assoc s wf_map sd *)
     | None -> List.assoc s wf_map sd end
   with Not_found -> invalid_arg "KBO weight function not found"

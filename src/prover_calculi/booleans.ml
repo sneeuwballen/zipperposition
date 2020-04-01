@@ -425,6 +425,13 @@ module Make(E : Env.S) : S with module Env = E = struct
           ) else None
         | None -> None in
       CCOpt.map (fun (l,r) -> T.normalize_bools l, T.normalize_bools r) res in
+
+    let unif_alg l r =
+      if not (Env.flex_get Combinators.k_enable_combinators) then (
+        PUnif.unify_scoped (l,0) (r,0)
+        |> OSeq.nth 0
+        |> CCOpt.get_exn
+      ) else Unif_subst.of_subst @@ Unif.FO.unify_syn (l,0) (r,0) in
     
     Util.debugf ~section 1 "bool solving @[%a@]@."(fun k -> k C.pp c);
     C.lits c
@@ -435,10 +442,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       | Some (l,r) ->
         try
           Util.debugf ~section 1 "trying lit @[%d:%a@]@."(fun k -> k i Literal.pp lit);
-          let subst = 
-            PUnif.unify_scoped (l,0) (r,0)
-            |> OSeq.nth 0
-            |> CCOpt.get_exn in
+          let subst = unif_alg l r in
           assert(not @@ Unif_subst.has_constr subst);
           let new_lits = 
             CCArray.except_idx (C.lits c) i

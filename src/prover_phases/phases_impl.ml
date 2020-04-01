@@ -212,7 +212,7 @@ let compute_prec ~signature stmts =
                                      |> Iter.filter_map (fun (st,d) -> 
                                          CCOpt.map (fun id -> (id,d)) (Term.head st)))  in
         let lits = Iter.flat_map (Statement.Seq.lits) stmts in
-        Precedence.weight_fun_of_string ~signature ~lits !_kbo_wf sym_depth)
+        Precedence.weight_fun_of_string ~signature ~lits ~lm_w:!_lmb_w ~db_w:!_db_w !_kbo_wf sym_depth)
     (* |> Compute_prec.set_weight_rule (fun _ -> Classify_cst.weight_fun) *)
 
     (* use "invfreq", with low priority *)

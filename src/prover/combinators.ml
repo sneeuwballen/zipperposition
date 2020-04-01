@@ -18,6 +18,7 @@ let k_b_penalty = Flex_state.create_key ()
 let k_c_penalty = Flex_state.create_key ()
 let k_k_penalty = Flex_state.create_key ()
 let k_deep_app_var_penalty = Flex_state.create_key ()
+let k_unif_resolve = Flex_state.create_key ()
 
 
 
@@ -646,6 +647,53 @@ let comb_normalize t =
   if not (T.equal t t') then changed := true;
   if !changed then Some t' else None
 
+let comb2lam t =
+  let rec aux t =
+    match T.view t with
+    | T.App(hd, args) ->
+      let hd' = aux hd in
+      let args' = List.map aux args in
+      T.app hd' args'
+    | T.Fun(ty, body) -> T.fun_ ty (aux body)
+    | T.AppBuiltin(b, args) when Builtin.is_combinator b ->
+      let hd, args = T.as_app_mono t in
+      let args' = List.map aux args in
+      let ty_args = (fst (Type.open_fun (T.ty hd))) in
+      let (--) = (fun l idx -> List.nth l idx) in
+      let lam = 
+        begin match b with
+        | Builtin.SComb ->
+          let x = T.bvar ~ty:(ty_args -- 0) 2 in
+          let y = T.bvar ~ty:(ty_args -- 1) 1 in
+          let z = T.bvar ~ty:(ty_args -- 2) 0 in
+          let xz_yz = T.app x [z; T.app y [z]] in
+          T.fun_l ty_args xz_yz
+        | Builtin.BComb ->
+          let x = T.bvar ~ty:(ty_args -- 0) 2 in
+          let y = T.bvar ~ty:(ty_args -- 1) 1 in
+          let z = T.bvar ~ty:(ty_args -- 2) 0 in
+          let x_yz = T.app x [T.app y [z]] in
+          T.fun_l ty_args x_yz
+        | Builtin.CComb ->
+          let x = T.bvar ~ty:(ty_args -- 0) 2 in
+          let y = T.bvar ~ty:(ty_args -- 1) 1 in
+          let z = T.bvar ~ty:(ty_args -- 2) 0 in
+          let xzy = T.app x [z; y] in
+          T.fun_l ty_args xzy
+        | Builtin.KComb ->
+          T.fun_l ty_args (T.bvar ~ty:(ty_args -- 0) 1)
+        | Builtin.IComb ->
+          T.fun_l ty_args (T.bvar ~ty:(ty_args -- 0) 0)
+        | _ -> assert false
+        end in
+      Lambda.eta_reduce (Lambda.snf (T.app lam args'))
+    | _ -> t in
+  let res = aux t in
+  assert(Iter.for_all (fun sub -> 
+    not (T.is_comb sub)) 
+    (T.Seq.subterms ~include_builtin:true ~include_app_vars:true t));
+  res
+
 module Make(E : Env.S) : S with module Env = E = struct
   module Env = E
   module C = Env.C
@@ -828,6 +876,43 @@ module Make(E : Env.S) : S with module Env = E = struct
       if E.flex_get k_enable_combinators then (
         SimplM.get (lams2combs_otf c)
       ) else c
+
+    let ho_unif_solve c =
+      let module PUnif = 
+        PUnif.Make(struct 
+          let st = 
+            Env.flex_state ()
+            |> Flex_state.add PragUnifParams.k_fixpoint_decider true
+            |> Flex_state.add PragUnifParams.k_pattern_decider true
+            |> Flex_state.add PragUnifParams.k_solid_decider true
+            |> Flex_state.add PragUnifParams.k_max_inferences 1
+            |> Flex_state.add PragUnifParams.k_max_depth 2
+            |> Flex_state.add PragUnifParams.k_max_app_projections 2
+            |> Flex_state.add PragUnifParams.k_max_rigid_imitations 2
+            |> Flex_state.add PragUnifParams.k_max_elims 2
+            |> Flex_state.add PragUnifParams.k_max_identifications 2
+          end) in
+      
+      let get_unif l r =
+        try 
+          OSeq.nth 0 (PUnif.unify_scoped (l,0) (r,0))
+        with Not_found -> None in
+      
+
+      match C.lits c with 
+      | [| Lit.Equation (lhs,rhs,false) |] ->
+        let lhs,rhs = CCPair.map_same comb2lam (lhs,rhs) in
+        begin match get_unif lhs rhs with
+        | Some subst ->
+          let rule = Proof.Rule.mk "ho_unif_resolve" in
+          let subst = Unif_subst.subst subst in
+          let proof = 
+            Proof.Step.simp ~rule 
+              [C.proof_parent_subst Subst.Renaming.none (c,0) subst] in
+          SimplM.return_new (C.create ~penalty:0 ~trail:(C.trail c) [] proof)
+        | _ -> SimplM.return_same c
+        end
+      | _ -> SimplM.return_same c
     
     let force_conv_lams c =
       assert(C.Seq.terms c |> Iter.for_all T.DB.is_closed);
@@ -841,6 +926,11 @@ module Make(E : Env.S) : S with module Env = E = struct
         E.add_unary_inf "narrow applied variable" narrow_app_vars;
         E.add_basic_simplify lams2combs_otf;
         E.Ctx.set_ord (Ordering.compose cmp_by_max_weak_r_len (E.Ctx.ord ()));
+        
+        if Env.flex_get k_unif_resolve then (
+          E.add_unary_simplify ho_unif_solve
+        );
+
         Unif._allow_pattern_unif := false;
       )
 
@@ -853,6 +943,7 @@ let _c_penalty = ref 3
 let _k_penalty = ref 2
 let _app_var_constraints = ref false
 let _deep_app_var_penalty = ref false
+let _unif_resolve = ref false
 
 
 let extension =
@@ -866,6 +957,7 @@ let extension =
     E.flex_add k_b_penalty !_b_penalty;
     E.flex_add k_k_penalty !_k_penalty;
     E.flex_add k_deep_app_var_penalty !_deep_app_var_penalty;
+    E.flex_add k_unif_resolve !_unif_resolve;
 
     let module ET = Make(E) in
     ET.setup ()
@@ -878,9 +970,10 @@ let extension =
 
 let () =
   Options.add_opts
-    [ "--combinator-based-reasoning", Arg.Bool (fun v -> _enable_combinators := v), "enable / disable combinator based reasoning";
-     "--app-var-constraints", Arg.Bool (fun v -> _app_var_constraints := v), "enable / disable delaying app var clashes as constraints";
-     "--penalize-deep-appvars", Arg.Bool (fun v -> _deep_app_var_penalty := v), "enable / disable penalizing narrow app var inferences with deep variables";
+    [ "--combinator-based-reasoning", Arg.Bool (fun v -> _enable_combinators := v), " enable / disable combinator based reasoning";
+     "--app-var-constraints", Arg.Bool (fun v -> _app_var_constraints := v), " enable / disable delaying app var clashes as constraints";
+     "--penalize-deep-appvars", Arg.Bool (fun v -> _deep_app_var_penalty := v), " enable / disable penalizing narrow app var inferences with deep variables";
+     "--comb-unif-resolve", Arg.Bool ((:=) _unif_resolve), " enable / disable higher-order unit clause resolutions";
      "--comb-s-penalty", Arg.Set_int _s_penalty, "penalty for narrowing with $S X Y";
      "--comb-c-penalty", Arg.Set_int _c_penalty, "penalty for narrowing with $C X Y";
      "--comb-b-penalty", Arg.Set_int _b_penalty, "penalty for narrowing with $B X Y";
