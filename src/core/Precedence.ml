@@ -330,6 +330,8 @@ let weight_freqrank (symbs : ID.t Iter.t) : ID.t -> Weight.t =
   Iter.iteri (fun i sym -> ID.Tbl.add tbl sym (i+1)) sorted;
   (fun sym -> Weight.int (ID.Tbl.get_or ~default:10 tbl sym))
 
+(* This function takes base KBO weight function and adjusts it so
+   that defined symbols are larger than its defitnitions. *)
 let lambda_def_weight base_weight lits =
   let def_rhs lit =
     let is_def t =
@@ -346,7 +348,7 @@ let lambda_def_weight base_weight lits =
     | _ -> None in
 
   let evaluate_weight current_evals t =
-    2*Term.weight ~sym:(fun sy -> 
+    3*Term.weight ~sym:(fun sy -> 
       ID.Map.get_or sy current_evals ~default:((base_weight sy).Weight.one)
     ) t in
 
@@ -383,7 +385,7 @@ let weight_fun_of_string ~signature ~lits s sd =
      "docc", depth_occurence;
      "const", ignore_arg weight_constant] in
   try
-    begin match CCString.chop_prefix ~pre:"lambda-def" s with 
+    begin match CCString.chop_prefix ~pre:"lambda-def-" s with 
     | Some s ->
       let base_weight = List.assoc s wf_map sd in
       lambda_def_weight base_weight lits
