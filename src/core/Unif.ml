@@ -206,7 +206,7 @@ module Inner = struct
       NOTE: terrible hack starts here:
        rename variables of [t'] to fresh variables that will
        live in [scope] *)
-  let restrict_to_scope subst(t,sc_t) ~into:scope =
+  let restrict_to_scope subst (t,sc_t) ~into:scope =
     let rec aux sc_t subst t : US.t * term = match T.ty t with
       | T.NoType -> subst, t
       | T.HasType ty ->
@@ -224,6 +224,8 @@ module Inner = struct
                 else if T.is_var u && sc_u = scope
                 then
                   (* We already have a corresponding variable in [scope]. Use that one.*)
+                  let subst, u' = aux sc_u subst u in
+                  assert (T.equal u u');
                   subst, u
                 else (
                   (* Create a corresponding variable v' in [scope]. *)
