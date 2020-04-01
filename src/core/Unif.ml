@@ -623,8 +623,8 @@ module Inner = struct
         when sc1 = sc && not (HVar.is_fresh v1) ->
         (* CCFormat.printf "failed matching %a %a.\n" T.pp t1 T.pp t2; *)
         fail() (* variable belongs to the protected scope and is not fresh *)
-      | T.AppBuiltin (Builtin.Prop, []), _, _ when not !_unif_bool -> fail()
-      | _, T.AppBuiltin (Builtin.Prop, []), _ when not !_unif_bool -> fail()
+      | _, _, _ when not !_unif_bool && (match T.open_poly_fun t1 with | _, _, ret -> T.type_is_prop ret) -> fail()
+      | _, _, _ when not !_unif_bool && (match T.open_poly_fun t2 with | _, _, ret -> T.type_is_prop ret) -> fail()
       | T.Var v1, _, (O_unify | O_match_protect _) ->
         if occurs_check ~depth:0 (US.subst subst) (v1,sc1) (t2,sc2)
         then fail () (* occur check or t2 is open *)
