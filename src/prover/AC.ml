@@ -239,15 +239,18 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     )
 
   let register_ac c id ty =
-    mk_axioms_ (C.proof_parent c) id ty
+    add (C.proof_parent c) id ty
 
   let scan_clause c =
     let exception Fail in
 
-    let fail_on cond = if not cond then raise Fail in
+    Util.debugf ~section 1 "Scanning @[%a@]@." (fun k -> k C.pp c);
+
+    let fail_on cond = if cond then raise Fail in
 
     let test_commutativty s t =
-      try 
+      try
+        Util.debugf ~section 1 "Testing commutativity @[(%a,%a)@]@." (fun k -> k T.pp s T.pp t);
         begin match T.view s, T.view t with 
         | T.App(hd_s, [x_s;y_s]), T.App(hd_t, [x_t; y_t]) ->
           fail_on (not (T.equal hd_s hd_t));
@@ -257,13 +260,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           fail_on (T.equal x_s y_s);
           fail_on (T.equal x_t y_t);
           fail_on (not (T.equal x_s y_t && T.equal y_s x_t));
-
+          Util.debugf ~section 1 "Commutativity recognized@." (fun k-> k);
           true
         | _ -> false end
       with Fail -> false in
     
     let test_associativity s t =
       try 
+        Util.debugf ~section 1 "Testing associativity @[(%a,%a)@]@." (fun k -> k T.pp s T.pp t);
         begin match T.view s, T.view t with 
         | T.App(hd_s, [x_s;fyz_s]), T.App(hd_t, [fxy_t; z_t]) ->
           begin match T.view fyz_s, T.view fxy_t with
@@ -276,6 +280,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
             fail_on (T.Set.cardinal (T.Set.of_list [x_s;y_s;z_s]) != 3);
             fail_on (not (T.equal x_s x_t && T.equal y_s y_t && T.equal z_s z_t));
+            Util.debugf ~section 1 "Associativity recognized @." (fun k-> k);
             true
           | _ -> false end
         | _ -> false end
@@ -284,31 +289,27 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     match C.lits c with 
     | [| Literal.Equation(lhs,rhs,true) |] ->
       let ty = T.ty (T.head_term lhs) in
-      CCOpt.get_or ~default:[] (CCOpt.map (fun id -> 
+      CCOpt.iter (fun id -> 
         if not (ID.is_ac id) then (
           if ID.is_comm id then (
             if test_associativity lhs rhs || test_associativity rhs lhs then (
               ID.set_payload id ID.Attr_assoc;
               assert(ID.is_ac id);
-              register_ac c id ty
-            ) else [])
+              register_ac c id ty))
           else if ID.is_assoc id then (
             if test_commutativty lhs rhs then (
               ID.set_payload id ID.Attr_comm;
               assert(ID.is_ac id);
               register_ac c id ty
-            ) else []
-          ) else (
+            )) else (
             if test_commutativty lhs rhs then (
               ID.set_payload id ID.Attr_comm;
               assert(ID.is_comm id);
             ) else if test_associativity lhs rhs || test_associativity rhs lhs then (
               ID.set_payload id ID.Attr_assoc;
               assert(ID.is_assoc id);
-            );
-            []
-          )) else []) (T.head lhs))
-    | _ -> []
+            )))) (T.head lhs)
+    | _ -> ()
   
 
   (* just look for AC axioms *)
@@ -316,8 +317,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     Env.flex_add key_scan_cl_ac !_scan_cl_ac;
 
     if !_scan_cl_ac then (
-      Env.add_unary_inf "infer_ac" scan_clause
-    );
+      Signal.on_every Env.ProofState.PassiveSet.on_add_clause (fun c ->
+        scan_clause c;
+        Signal.ContinueListening));
 
     Signal.on_every
       Env.on_input_statement scan_statement
@@ -337,5 +339,5 @@ let extension =
 
 let () =
   Options.add_opts [
-    "scan-clause-ac", Arg.Bool ((:=) _scan_cl_ac), " scan clauses for AC definitions"
+    "--scan-clause-ac", Arg.Bool ((:=) _scan_cl_ac), " scan clauses for AC definitions"
   ]
