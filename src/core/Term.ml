@@ -393,7 +393,7 @@ module Seq = struct
       | Const _
       | Var _
       | DB _  -> ()
-      | App (f, l) when include_app_vars && T.is_var f -> ()
+      | App (f, l) when not include_app_vars && T.is_var f -> ()
       | App (f, l) -> if not ignore_head then aux f; List.iter aux l
       | Fun (_, u) -> aux u
     in
