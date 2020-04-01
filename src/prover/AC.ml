@@ -248,6 +248,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
     let fail_on cond = if cond then raise Fail in
 
+    (* commutativity test is symmetric *)
     let test_commutativty s t =
       try
         Util.debugf ~section 1 "Testing commutativity @[(%a,%a)@]@." (fun k -> k T.pp s T.pp t);
@@ -265,6 +266,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         | _ -> false end
       with Fail -> false in
     
+    (* associativity test is NOT symmetric:
+       it specifically checks for equation of the kind
+       f X (f Y Z) = f (f X Y) Z *)
     let test_associativity s t =
       try 
         Util.debugf ~section 1 "Testing associativity @[(%a,%a)@]@." (fun k -> k T.pp s T.pp t);
