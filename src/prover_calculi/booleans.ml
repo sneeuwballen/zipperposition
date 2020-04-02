@@ -180,6 +180,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     in
 
   let rec aux t =
+    let ty_is_prop t = Type.is_prop (T.ty t) in
+
     match T.view t with 
     | DB _ | Const _ | Var _ -> t
     | Fun(ty, body) ->
@@ -190,8 +192,10 @@ module Make(E : Env.S) : S with module Env = E = struct
       let hd' = aux hd and  args' = List.map aux args in
       if T.equal hd hd' && T.same_l args args' then t
       else T.app hd' args'
-    | AppBuiltin(Builtin.And, [x]) 
-        when T.is_true_or_false x && List.length (Type.expected_args (T.ty t)) = 1 ->
+    | AppBuiltin(Builtin.And, [x])
+        when T.is_true_or_false x
+             && ty_is_prop t
+             && List.length (Type.expected_args (T.ty t)) = 1 ->
       if T.equal x T.true_ then (
         T.fun_ Type.prop (T.bvar ~ty:Type.prop 0)
       ) else (
@@ -199,7 +203,9 @@ module Make(E : Env.S) : S with module Env = E = struct
         T.fun_ Type.prop T.false_
       )
     | AppBuiltin(Builtin.Or, [x]) 
-        when T.is_true_or_false x && List.length (Type.expected_args (T.ty t)) = 1 ->
+        when T.is_true_or_false x 
+             && ty_is_prop t
+             && List.length (Type.expected_args (T.ty t)) = 1 ->
       let prop = Type.prop in
       if T.equal x T.true_ then (
         T.fun_ prop (T.true_)
@@ -207,12 +213,16 @@ module Make(E : Env.S) : S with module Env = E = struct
         assert (T.equal x T.false_);
         T.fun_ prop (T.bvar ~ty:prop 0)
       )
-    | AppBuiltin(Builtin.And, l) when List.length l > 1 ->
+    | AppBuiltin(Builtin.And, l)
+      when  ty_is_prop t &&
+            List.length l > 1 ->
       let l' = List.map aux l in
       let t = if T.same_l l l' then t 
         else T.app_builtin ~ty:(Type.prop) Builtin.And l' in
       simplify_and_or t Builtin.And l'
-    | AppBuiltin(Builtin.Or, l) when List.length l > 1 ->
+    | AppBuiltin(Builtin.Or, l)
+      when ty_is_prop t &&
+           List.length l > 1 ->
       let l' = List.map aux l in
       let t = if T.same_l l l' then t 
         else T.app_builtin ~ty:(Type.prop) Builtin.Or l' in
@@ -598,6 +608,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         T.Form.forall (T.fun_ ty acc)
       ) ty_args body in 
 
+    let res = 
     Iter.flat_map collect_tl_bool_funs 
       (C.Seq.terms c
        (* If the term is a top-level function, then apply extensionality,
@@ -636,7 +647,9 @@ module Make(E : Env.S) : S with module Env = E = struct
 
           forall_cl :: forall_neg_cl :: res
         ) else res) 
-      []
+      [] in
+    List.iter (C.check_types) res;
+    res
 
   let setup () =
     match Env.flex_get k_bool_reasoning with 
