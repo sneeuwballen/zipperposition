@@ -696,7 +696,7 @@ let comb2lam t =
     | _ -> t in
   let res = aux t in
   assert(Iter.for_all (fun sub -> 
-    not (T.is_comb sub)) 
+    not (T.is_comb sub))
     (T.Seq.subterms ~include_builtin:true ~include_app_vars:true res));
   res
 

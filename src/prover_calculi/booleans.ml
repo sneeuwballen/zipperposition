@@ -548,16 +548,18 @@ module Make(E : Env.S) : S with module Env = E = struct
   let interpret_boolean_functions c =
     (* Collects boolean functions only at top level, 
        and not the ones that are already a part of the quantifier *)
-    let collect_tl_bool_funcs t k = 
+    let collect_tl_bool_funs t k = 
       let rec aux t =
-        match T.view t with
-        | Var _  | Const _  | DB _ -> ()
-        | Fun _ -> if Type.is_prop (Term.ty (snd @@ Term.open_fun t)) then k t
-        | App (f, l) ->
-          aux f;
-          List.iter aux l
-        | AppBuiltin (b,l) -> 
-          if not @@ Builtin.is_quantifier b then List.iter aux l 
+        let ty_args, ret_ty = Type.open_fun (T.ty t) in
+        if Type.is_prop ret_ty then k t else(
+          match T.view t with
+          | App (f, l) ->
+            aux f;
+            List.iter aux l
+          | AppBuiltin (b,l) when not (Builtin.is_quantifier b) ->
+            List.iter aux l
+          | Fun _ -> assert false; (* dealt with above *)
+          | _ -> ())
       in
       aux t in
     let interpret t i = 
@@ -571,20 +573,47 @@ module Make(E : Env.S) : S with module Env = E = struct
       T.fun_l ty_args (T.Form.not_ body)
     in
 
-    Iter.flat_map collect_tl_bool_funcs 
+    (* Expands the chosen term to be of the form 
+       \lambda (all type vars). body of prop type *)
+    let expand t = 
+      if Env.flex_get Combinators.k_enable_combinators then (
+        assert(not (T.is_fun t)); (* no lambdas if combinators are on *)
+        let ty_args, ret_ty = Type.open_fun (T.ty t) in
+        let n = List.length ty_args in
+        let bvars = List.mapi (fun i ty -> T.bvar ~ty (n-i-1)) ty_args in
+        let t' = T.app t bvars in
+        let body = CCOpt.get_or ~default:t' (Combinators.comb_normalize t') in
+        assert(Type.equal ret_ty (T.ty body));
+        T.fun_l ty_args body
+      ) else Lambda.eta_expand t in
+
+    let forall_close t = 
+      let ty_args, body = T.open_fun t in
+      assert(Type.is_prop (T.ty body));
+
+      List.fold_right (fun ty acc -> 
+        T.Form.forall (T.fun_ ty acc)
+      ) ty_args body in 
+
+    Iter.flat_map collect_tl_bool_funs 
       (C.Seq.terms c
+       (* If the term is a top-level function, then apply extensionality,
+          not this rule on it. *)
        |> Iter.filter (fun t -> not @@ T.is_fun t))
-    |> Iter.sort_uniq ~cmp:Term.compare
+    (* avoiding terms introduced by primitive enumeration *)
     |> Iter.filter (fun t ->  
         let cached_t = Subst.FO.canonize_all_vars t in
         not (Term.Set.mem cached_t !Higher_order.prim_enum_terms))
+    |> Iter.map expand
+    |> Iter.sort_uniq ~cmp:Term.compare
     |> Iter.fold (fun res t -> 
         assert(T.DB.is_closed t);
         let proof = Proof.Step.inference[C.proof_parent c]
             ~rule:(Proof.Rule.mk"interpret boolean function") ~tags:[Proof.Tag.T_ho]
         in
-        let as_forall = Literal.mk_prop (T.Form.forall t) false in
-        let as_neg_forall = Literal.mk_prop (T.Form.forall (negate_bool_fun t)) false in
+
+        let as_forall = Literal.mk_prop (forall_close t) false in
+        let as_neg_forall = Literal.mk_prop (forall_close (negate_bool_fun t)) false in
         let forall_cl =
           C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
             (as_forall :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:t ~by:(interpret t T.true_))))
