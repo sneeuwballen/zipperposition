@@ -585,7 +585,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         in
         let as_forall = Literal.mk_prop (T.Form.forall t) false in
         let as_neg_forall = Literal.mk_prop (T.Form.forall (negate_bool_fun t)) false in
-        let forall_cl = 
+        let forall_cl =
           C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
             (as_forall :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:t ~by:(interpret t T.true_))))
             proof in

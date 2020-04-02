@@ -654,12 +654,12 @@ let comb2lam t =
       let hd' = aux hd in
       let args' = List.map aux args in
       T.app hd' args'
-    | T.Fun(ty, body) -> T.fun_ ty (aux body)
     | T.AppBuiltin(b, args) when Builtin.is_combinator b ->
       let hd, args = T.as_app_mono t in
       let args' = List.map aux args in
       let ty_args = (fst (Type.open_fun (T.ty hd))) in
-      let (--) = (fun l idx -> List.nth l idx) in
+      let (--) = List.nth in
+      let (-|) = (fun l i -> CCList.take i l) in
       let lam = 
         begin match b with
         | Builtin.SComb ->
@@ -667,26 +667,32 @@ let comb2lam t =
           let y = T.bvar ~ty:(ty_args -- 1) 1 in
           let z = T.bvar ~ty:(ty_args -- 2) 0 in
           let xz_yz = T.app x [z; T.app y [z]] in
-          T.fun_l ty_args xz_yz
+          T.fun_l (ty_args -| 3) xz_yz
         | Builtin.BComb ->
           let x = T.bvar ~ty:(ty_args -- 0) 2 in
           let y = T.bvar ~ty:(ty_args -- 1) 1 in
           let z = T.bvar ~ty:(ty_args -- 2) 0 in
           let x_yz = T.app x [T.app y [z]] in
-          T.fun_l ty_args x_yz
+          T.fun_l (ty_args -| 3) x_yz
         | Builtin.CComb ->
           let x = T.bvar ~ty:(ty_args -- 0) 2 in
           let y = T.bvar ~ty:(ty_args -- 1) 1 in
           let z = T.bvar ~ty:(ty_args -- 2) 0 in
           let xzy = T.app x [z; y] in
-          T.fun_l ty_args xzy
+          T.fun_l (ty_args -| 3) xzy
         | Builtin.KComb ->
-          T.fun_l ty_args (T.bvar ~ty:(ty_args -- 0) 1)
+          T.fun_l (ty_args -| 2) (T.bvar ~ty:(ty_args -- 0) 1)
         | Builtin.IComb ->
-          T.fun_l ty_args (T.bvar ~ty:(ty_args -- 0) 0)
+          T.fun_l (ty_args -| 1) (T.bvar ~ty:(ty_args -- 0) 0)
         | _ -> assert false
         end in
-      Lambda.eta_reduce (Lambda.snf (T.app lam args'))
+      let res = Lambda.eta_reduce (Lambda.snf (T.app lam args')) in
+      assert (Type.equal (T.ty t) (T.ty res));
+      res
+    | T.AppBuiltin(b, args) ->
+      let args' = List.map aux args in
+      T.app_builtin ~ty:(T.ty t) b args'
+    | T.Fun(ty, body) -> T.fun_ ty (aux body)
     | _ -> t in
   let res = aux t in
   assert(Iter.for_all (fun sub -> 
