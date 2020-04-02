@@ -551,10 +551,13 @@ module Make(E : Env.S) : S with module Env = E = struct
     let collect_tl_bool_funs t k = 
       let rec aux t =
         let ty_args, ret_ty = Type.open_fun (T.ty t) in
-        if Type.is_prop ret_ty then k t else(
+        if not (CCList.is_empty ty_args) 
+           && Type.is_prop ret_ty
+           && not (T.is_var t) 
+           && not (T.is_app_var t) then k t else(
           match T.view t with
           | App (f, l) ->
-            aux f;
+            (* head positions are not taken into account *)
             List.iter aux l
           | AppBuiltin (b,l) when not (Builtin.is_quantifier b) ->
             List.iter aux l
@@ -599,35 +602,41 @@ module Make(E : Env.S) : S with module Env = E = struct
       (C.Seq.terms c
        (* If the term is a top-level function, then apply extensionality,
           not this rule on it. *)
-       |> Iter.filter (fun t -> not @@ T.is_fun t))
+       |> Iter.filter (fun t -> not @@ Type.is_fun (T.ty t)))
     (* avoiding terms introduced by primitive enumeration *)
-    |> Iter.filter (fun t ->  
+    |> Iter.filter (fun t ->
         let cached_t = Subst.FO.canonize_all_vars t in
         not (Term.Set.mem cached_t !Higher_order.prim_enum_terms))
-    |> Iter.map expand
     |> Iter.sort_uniq ~cmp:Term.compare
     |> Iter.fold (fun res t -> 
         assert(T.DB.is_closed t);
-        let proof = Proof.Step.inference[C.proof_parent c]
+        let proof = Proof.Step.inference [C.proof_parent c]
             ~rule:(Proof.Rule.mk"interpret boolean function") ~tags:[Proof.Tag.T_ho]
         in
 
-        let as_forall = Literal.mk_prop (forall_close t) false in
-        let as_neg_forall = Literal.mk_prop (forall_close (negate_bool_fun t)) false in
-        let forall_cl =
-          C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
-            (as_forall :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:t ~by:(interpret t T.true_))))
-            proof in
-        let forall_neg_cl = 
-          C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
-            (as_neg_forall :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:t ~by:(interpret t T.false_))))
-            proof in
+        let t' = expand t in
+        let _,t'_body = T.open_fun t' in
 
-        Util.debugf ~section  1 "interpret bool: %a !!> %a.\n"  (fun k -> k C.pp c C.pp forall_cl);
-        Util.debugf ~section  1 "interpret bool: %a !!~> %a.\n" (fun k -> k C.pp c C.pp forall_neg_cl);
+        if not (T.is_true_or_false t'_body) then (
+          let as_forall = Literal.mk_prop (forall_close t') false in
+          let as_neg_forall = Literal.mk_prop (forall_close (negate_bool_fun t')) false in
+          let forall_cl =
+            C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
+              (as_forall :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:t ~by:(interpret t' T.true_))))
+              proof in
+          let forall_neg_cl = 
+            C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
+              (as_neg_forall :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:t ~by:(interpret t' T.false_))))
+              proof in
 
-        forall_cl :: forall_neg_cl :: res
-      ) []
+          Util.debugf ~section  1 "interpret bool(@[%a@]):@.@[%a@] !!> @. @[%a@]@."  
+            (fun k -> k T.pp t Literals.pp (C.lits c) Literals.pp (C.lits forall_cl));
+          Util.debugf ~section  1 "interpret bool(@[%a@]):@.@[%a@] !!> @. @[%a@]@." 
+            (fun k -> k T.pp t Literals.pp (C.lits c) Literals.pp (C.lits forall_neg_cl));
+
+          forall_cl :: forall_neg_cl :: res
+        ) else res) 
+      []
 
   let setup () =
     match Env.flex_get k_bool_reasoning with 
