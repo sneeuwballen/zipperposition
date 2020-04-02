@@ -192,7 +192,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let hd' = aux hd and  args' = List.map aux args in
       if T.equal hd hd' && T.same_l args args' then t
       else T.app hd' args'
-    | AppBuiltin(Builtin.And, [x])
+    | AppBuiltin(Builtin.And, [x]) 
         when T.is_true_or_false x
              && ty_is_prop t
              && List.length (Type.expected_args (T.ty t)) = 1 ->
@@ -571,7 +571,6 @@ module Make(E : Env.S) : S with module Env = E = struct
             List.iter aux l
           | AppBuiltin (b,l) when not (Builtin.is_quantifier b) ->
             List.iter aux l
-          | Fun _ -> assert false; (* dealt with above *)
           | _ -> ())
       in
       aux t in
@@ -608,7 +607,6 @@ module Make(E : Env.S) : S with module Env = E = struct
         T.Form.forall (T.fun_ ty acc)
       ) ty_args body in 
 
-    let res = 
     Iter.flat_map collect_tl_bool_funs 
       (C.Seq.terms c
        (* If the term is a top-level function, then apply extensionality,
@@ -647,9 +645,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
           forall_cl :: forall_neg_cl :: res
         ) else res) 
-      [] in
-    List.iter (C.check_types) res;
-    res
+      []
 
   let setup () =
     match Env.flex_get k_bool_reasoning with 
