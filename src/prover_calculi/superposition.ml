@@ -41,6 +41,7 @@ let stat_ext_dec = Util.mk_stat "sup.ext_dec calls"
 let stat_ext_inst = Util.mk_stat "sup.ext_inst calls"
 let stat_clc = Util.mk_stat "sup.clc"
 let stat_complete_eq = Util.mk_stat "ho.complete_eq.steps"
+let stat_orphan_checks = Util.mk_stat "orphan checks"
 
 
 let prof_demodulate = ZProf.make "sup.demodulate"
@@ -97,6 +98,7 @@ let k_check_sup_at_var_cond = Flex_state.create_key ()
 let k_restrict_hidden_sup_at_vars = Flex_state.create_key ()
 let k_ho_disagremeents = Flex_state.create_key ()
 let k_bool_demod = Flex_state.create_key ()
+let k_orphan_check = Flex_state.create_key ()
 
 let _NO_LAMSUP = -1
 
@@ -3313,6 +3315,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let condensation c =
     ZProf.with_prof prof_condensation condensation_rec c
 
+  let is_orphaned c =
+    let res = C.is_orphaned c in
+    if res then (
+      Util.incr_stat stat_orphan_checks
+    );
+    res
+
   let recognize_injectivity c =
     let exception Fail in
 
@@ -3534,6 +3543,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Env.add_backward_simplify backward_simplify
     );
     Env.add_redundant redundant;
+    if Env.flex_get k_orphan_check then (
+      Env.add_redundant is_orphaned
+    );
     Env.add_backward_redundant backward_redundant;
     if Env.flex_get k_use_semantic_tauto
     then Env.add_is_trivial is_semantic_tautology;
@@ -3595,6 +3607,7 @@ let _use_weight_for_solid_subsumption = ref false
 let _sort_constraints = ref false
 let _ho_disagremeents = ref `SomeHo
 let _bool_demod = ref false
+let _orphan_check = ref false
 
 let _guard = ref 45
 let _ratio = ref 135
@@ -3649,6 +3662,7 @@ let register ~sup =
   E.flex_add k_use_semantic_tauto !_use_semantic_tauto;
   E.flex_add k_ho_disagremeents !_ho_disagremeents;
   E.flex_add k_bool_demod !_bool_demod;
+  E.flex_add k_orphan_check !_orphan_check;
 
 
   E.flex_add PragUnifParams.k_max_inferences !_max_infs;
@@ -3772,6 +3786,7 @@ let () =
       "--stream-queue-guard", Arg.Set_int _guard, "set value of guard for streamQueue";
       "--stream-queue-ratio", Arg.Set_int _ratio, "set value of ratio for streamQueue";
       "--bool-demod", Arg.Bool ((:=) _bool_demod), " turn BoolDemod on/off";
+      "--orphan-check", Arg.Bool ((:=) _orphan_check), " turn orphan check on/off";
       "--stream-clause-num", Arg.Set_int _clause_num, "how many clauses to take from streamQueue; by default as many as there are streams";
       "--ho-sort-constraints", Arg.Bool (fun b -> _sort_constraints := b), "sort constraints in unification algorithm by weight";
       "--check-sup-at-var-cond", Arg.Bool (fun b -> _check_sup_at_var_cond := b), " enable/disable superposition at variable monotonicity check";

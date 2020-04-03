@@ -241,6 +241,9 @@ let incr_stat (_, count) = count := Int64.add !count Int64.one  (** increment gi
 
 let add_stat (_, count) num = count := Int64.add !count (Int64.of_int num) (** add to stat *)
 
+let pp_stat out (name, count) =
+  Format.fprintf out "%s-%d" name (CCInt64.to_int !count)
+
 (** {Flags as integers} *)
 
 module Flag = struct

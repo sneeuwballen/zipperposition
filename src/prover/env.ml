@@ -93,6 +93,7 @@ module Make(X : sig
   (** (maybe) rewrite a clause to a set of clauses.
       Must return [None] if the clause is unmodified *)
 
+  type immediate_simplification_rule = C.t -> C.t Iter.t -> C.t Iter.t option
   type 'a conversion_result =
     | CR_skip (** rule didn't fire *)
     | CR_drop (** remove the clause from proof state *)
@@ -125,6 +126,7 @@ module Make(X : sig
   let _clause_conversion_rules : clause_conversion_rule list ref = ref []
   let _step_init = ref []
   let _fragment_checks = ref []
+  let _immediate_simpl : immediate_simplification_rule list ref = ref []
 
   let on_start = Signal.create()
   let on_input_statement = Signal.create()
@@ -206,6 +208,9 @@ module Make(X : sig
   let add_rewrite_rule name rule =
     Util.debugf ~section 1 "[ Adding rule %s to env ]" (fun k-> k name);
     _rewrite_rules := (name, rule) :: !_rewrite_rules
+
+  let add_immediate_simpl_rule rule =
+    _immediate_simpl := rule :: !_immediate_simpl
 
   let set_ho_normalization_rule name rule =
     _norm_name := name;
@@ -327,6 +332,15 @@ module Make(X : sig
       if res then C.mark_redundant c;
       res
     )
+
+  let immediate_simplify given immediate =
+    let rec aux = function 
+    | [] -> immediate
+    | f :: fs ->
+      match f given immediate with 
+      | Some res -> res
+      | None -> aux fs in
+    aux !_immediate_simpl
 
   let is_active c =
     C.ClauseSet.mem c (ProofState.ActiveSet.clauses ())

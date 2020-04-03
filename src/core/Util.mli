@@ -136,6 +136,9 @@ val incr_stat : stat -> unit
 
 val add_stat : stat -> int -> unit
 
+val pp_stat : Format.formatter -> stat -> unit
+
+
 (** {2 Flags as integers} *)
 
 module Flag : sig

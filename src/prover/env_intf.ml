@@ -41,6 +41,12 @@ module type S = sig
        first param is the set of already known redundant clause, the rule
        should add clauses to it *)
 
+  type immediate_simplification_rule = C.t -> C.t Iter.t -> C.t Iter.t option
+  (** Following Kotelnikov's iProver superposition implementation, try to simplify
+      given clause (first argument) using a set of clauses (second argument).
+      If simplification suceeded, then a set of clauses to be injected
+      into passive set is returned. *)
+
   type is_trivial_trail_rule = Trail.t -> bool
   (** Rule that checks whether the trail is trivial (a tautology) *)
 
@@ -143,6 +149,8 @@ module type S = sig
   (** Add a ho norm rule *)
 
   val get_ho_normalization_rule : unit -> term_norm_rule
+
+  val add_immediate_simpl_rule : immediate_simplification_rule -> unit
 
   val add_lit_rule : string -> lit_rewrite_rule -> unit
   (** Add a literal rewrite rule *)
@@ -252,6 +260,11 @@ module type S = sig
 
   val forward_simplify : simplify_rule
   (** Simplify the clause w.r.t to the active set and experts *)
+
+  val immediate_simplify : C.t -> C.t Iter.t -> (C.t Iter.t)
+  (** Simplify given clause using its children. Given clause is
+      removed from active set and result of this rule is added to passive set,
+      if any of the registered rules suceeded *)
 
   val generate : C.t -> C.t Iter.t
   (** Perform all generating inferences *)

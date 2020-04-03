@@ -24,6 +24,8 @@ module type S = sig
   val mark_backward_simplified : t -> unit
   val is_backward_simplified : t -> bool
 
+  val is_orphaned : t -> bool
+
   (** {2 Basics} *)
 
   include Interfaces.EQ with type t := t
