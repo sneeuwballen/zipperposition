@@ -13,6 +13,7 @@ exception Fail
 (** Raised when a unification/matching attempt fails *)
 
 val _allow_pattern_unif : bool ref
+val _unif_bool : bool ref
 
 val norm_logical_disagreements : Builtin.t -> Term.t list -> Term.t list -> Term.t list * Term.t list
 

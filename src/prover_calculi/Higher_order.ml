@@ -48,7 +48,7 @@ let k_prune_arg_fun = Flex_state.create_key ()
 let k_prim_enum_terms = Flex_state.create_key ()
 let k_simple_projection = Flex_state.create_key ()
 let k_simple_projection_md = Flex_state.create_key ()
-let k_check_lambda_free = Saturate.k_check_lambda_free
+let k_check_lambda_free = Flex_state.create_key ()
 let k_purify_applied_vars = Flex_state.create_key()
 let k_eta = Flex_state.create_key()
 let k_diff_const = Flex_state.create_key()
@@ -1355,11 +1355,6 @@ module Make(E : Env.S) : S with module Env = E = struct
         Env.ProofState.PassiveSet.add (Iter.singleton (mk_extensionality_clause ())) ;
       if Env.flex_get k_choice_axiom then
         Env.ProofState.PassiveSet.add (Iter.singleton choice_clause);
-
-      if Env.flex_get k_check_lambda_free then 
-        Env.add_fragment_check (fun c ->
-            (Env.C.Seq.terms c 
-             |> Iter.for_all Term.in_lfho_fragment))
     );
     ()
 end
@@ -1434,7 +1429,7 @@ let _var_solve = ref false
 let _instantiate_choice_ax = ref false
 let _elim_leibniz_eq = ref (-1)
 let _prune_arg_fun = ref `NoPrune
-let _check_lambda_free = ref false
+let _check_lambda_free = ref `False
 let prim_enum_terms = ref Term.Set.empty
 let _oracle_composer = ref (OSeq.merge :> (Logtk.Subst.t option OSeq.t OSeq.t -> Logtk.Subst.t option OSeq.t))
 let _simple_projection = ref (-1)
@@ -1469,6 +1464,20 @@ let extension =
     E.flex_add k_use_diff_for_neg_ext !_use_diff_for_neg_ext;
     E.flex_add k_generalize_choice_trigger !_generalize_choice_trigger;
 
+
+    if E.flex_get k_check_lambda_free = `Only 
+    then E.flex_add Saturate.k_abort_after_fragment_check true;
+    
+    if E.flex_get k_check_lambda_free != `False then 
+      E.add_fragment_check (fun c ->
+          E.C.Seq.terms c |> Iter.for_all Term.in_lfho_fragment
+        );
+    
+    Signal.on_every E.on_start (fun () -> 
+      if not !Unif._unif_bool 
+      then print_endline 
+        ("To remain in the chosen logic fragment, " ^
+        "unification with booleans has been disabled."));
 
     if E.flex_get k_some_ho || !force_enabled_ then (
       let module ET = Make(E) in
@@ -1566,7 +1575,10 @@ let () =
       "--ho-eta", eta_opt, " eta-expansion/reduction";
       "--ho-use-diff-for-neg-ext", Arg.Bool ((:=) _use_diff_for_neg_ext), " use diff constant for NegExt rule instead of fresh skolem";
       "--ho-generalize-choice-trigger", Arg.Bool ((:=) _generalize_choice_trigger), " apply choice trigger to a fresh variable";
-      "--check-lambda-free", Arg.Bool ((:=) _check_lambda_free), "check whether problem belongs to lambda-free"
+      "--check-lambda-free", Arg.Symbol (["true";"false";"only"], fun s -> match s with 
+        | "true" -> _check_lambda_free := `True
+        | "only" -> _check_lambda_free := `Only
+        | _ -> _check_lambda_free := `False), "check whether problem belongs to lambda-free ('only' will abort after the check)";
     ];
   Params.add_to_mode "ho-complete-basic" (fun () ->
       enabled_ := true;
@@ -1633,6 +1645,7 @@ let () =
   Params.add_to_mode "fo-complete-basic" (fun () ->
       enabled_ := false;
       Unif._allow_pattern_unif := false;
+      Unif._unif_bool := false;
     );
   Params.add_to_modes 
     [ "lambda-free-intensional"
@@ -1646,8 +1659,9 @@ let () =
         _neg_ext_as_simpl := false;
         _prune_arg_fun := `NoPrune;
         prim_mode_ := `None;
-        _check_lambda_free := true;
+        _check_lambda_free := `True;
         Unif._allow_pattern_unif := false;
+        Unif._unif_bool := false;
         _eta := `None;
       );
   Params.add_to_modes 

@@ -46,6 +46,7 @@ let prof_matching = ZProf.make "matching"
 let fail () = raise Fail
 
 let _allow_pattern_unif = ref true
+let _unif_bool = ref true
 
 (** {2 Signatures} *)
 
@@ -652,6 +653,8 @@ module Inner = struct
         when sc1 = sc && not (HVar.is_fresh v1) ->
         (* CCFormat.printf "failed matching %a %a.\n" T.pp t1 T.pp t2; *)
         fail() (* variable belongs to the protected scope and is not fresh *)
+      | _, _, _ when not !_unif_bool && (match T.open_poly_fun t1 with | _, _, ret -> T.type_is_prop ret) -> fail()
+      | _, _, _ when not !_unif_bool && (match T.open_poly_fun t2 with | _, _, ret -> T.type_is_prop ret) -> fail()
       | T.Var v1, _, (O_unify | O_match_protect _) ->
         if occurs_check ~depth:0 (US.subst subst) (v1,sc1) (t2,sc2)
         then fail () (* occur check or t2 is open *)
@@ -1252,4 +1255,5 @@ end
 
 let () =
   Options.add_opts
-    [ "--unif-pattern", Arg.Bool (fun b -> _allow_pattern_unif := b), " enable/disable pattern unification"]
+    [ "--unif-pattern", Arg.Bool ((:=) _allow_pattern_unif), " enable/disable pattern unification"
+    ; "--unif-bool", Arg.Bool ((:=) _unif_bool), "enable/disable unification of type variables with bool"]

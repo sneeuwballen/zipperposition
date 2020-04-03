@@ -11,6 +11,7 @@ open Comparison
 let prof_rpo = ZProf.make "compare_rpo"
 let prof_kbo = ZProf.make "compare_kbo"
 let prof_epo = ZProf.make "compare_epo"
+let prof_lambdafree_kbo_coeff = ZProf.make "compare_lambdafree_kbo_coeff"
 
 module T = Term
 module TC = Term.Classic
@@ -624,6 +625,162 @@ module EPO : ORD = struct
   let might_flip _ _ _ = false
 end
 
+(** Lambda-free KBO with argument coefficients (quite slow) *)
+module LambdaFreeKBOCoeff : ORD = struct
+  let name = "lambdafree_kbo_coeff"
+
+
+  module Weight_indet = struct
+    type var = Type.t HVar.t
+
+    type t =
+      | Weight of var
+      | Arg_coeff of var * int;;
+
+    let compare x y = match (x, y) with
+        Weight x', Weight y' -> HVar.compare Type.compare x' y'
+      | Arg_coeff (x', i), Arg_coeff (y', j) ->
+        let c = HVar.compare Type.compare x' y' in
+        if c <> 0 then c else abs(i-j)
+      | Weight _, Arg_coeff (_, _) -> 1
+      | Arg_coeff (_, _), Weight _ -> -1
+
+    let pp out (a:t): unit =
+      begin match a with
+          Weight x-> Format.fprintf out "w_%a" HVar.pp x
+        | Arg_coeff (x, i) -> Format.fprintf out "k_%a_%d" HVar.pp x i
+      end
+    let to_string = CCFormat.to_string pp
+  end
+
+  module WI = Weight_indet
+  module Weight_polynomial = Polynomial.Make(W)(WI)
+  module WP = Weight_polynomial
+
+  let rec weight prec t =
+    (* Returns a function that is applied to the weight of argument i of a term
+       headed by t before adding the weights of all arguments *)
+    let arg_coeff_multiplier t i =
+      begin match T.view t with
+        | T.Const fid -> Some (WP.mult_const (Prec.arg_coeff prec fid i))
+        | T.Var x ->     Some (WP.mult_indet (WI.Arg_coeff (x, i)))
+        | _ -> None
+      end
+    in
+    (* recursively calculates weights of args, applies coeff_multipliers, and
+       adds all those weights plus the head_weight.*)
+    let app_weight head_weight coeff_multipliers args =
+      args
+      |> List.mapi (fun i s ->
+        begin match weight prec s, coeff_multipliers i with
+          | Some w, Some c -> Some (c w)
+          | _ -> None
+        end )
+      |> List.fold_left
+        (fun w1 w2 ->
+           begin match (w1, w2) with
+             | Some w1', Some w2' -> Some (WP.add w1' w2')
+             | _, _ -> None
+           end )
+        head_weight
+    in
+    begin match T.view t with
+      | T.App (f,args) -> app_weight (weight prec f) (arg_coeff_multiplier f) args
+      | T.AppBuiltin (_,args) -> app_weight (Some (WP.const (W.one))) (fun _ -> Some (fun x -> x)) args
+      | T.Const fid -> Some (WP.const (Prec.weight prec fid))
+      | T.Var x ->     Some (WP.indet (WI.Weight x))
+      | _ -> None
+    end
+
+  let rec lfhokbo_arg_coeff ~prec t s =
+    (* lexicographic comparison *)
+    let rec lfhokbo_lex ts ss = match ts, ss with
+      | [], [] -> Eq
+      | _ :: _, [] -> Gt
+      | [] , _ :: _ -> Lt
+      | t0 :: t_rest , s0 :: s_rest ->
+        begin match lfhokbo_arg_coeff ~prec t0 s0 with
+          | Gt -> Gt
+          | Lt -> Lt
+          | Eq -> lfhokbo_lex t_rest s_rest
+          | Incomparable -> Incomparable
+        end
+    in
+    let lfhokbo_lenlex ts ss =
+      if List.length ts = List.length ss then
+        lfhokbo_lex ts ss
+      else (
+        if List.length ts > List.length ss
+        then Gt
+        else Lt
+      )
+    in
+    (* compare t = g tt and s = f ss (assuming they have the same weight) *)
+    let lfhokbo_composite g f ts ss =
+      match prec_compare prec g f with
+        | Incomparable -> (* try rule C2 *)
+          let hd_ts_s = lfhokbo_arg_coeff ~prec (List.hd ts) s in
+          let hd_ss_t = lfhokbo_arg_coeff ~prec (List.hd ss) t in
+          if List.length ts = 1 && (hd_ts_s = Gt || hd_ts_s = Eq) then Gt else
+          if List.length ss = 1 && (hd_ss_t = Gt || hd_ss_t = Eq) then Lt else
+            Incomparable
+        | Gt -> Gt (* by rule C3 *)
+        | Lt -> Lt (* by rule C3 inversed *)
+        | Eq -> (* try rule C4 *)
+          begin match prec_status prec g with
+            | Prec.Lexicographic -> lfhokbo_lex ts ss
+            | Prec.LengthLexicographic -> lfhokbo_lenlex ts ss
+            | _ -> assert false
+          end
+    in
+    (* compare t and s assuming they have the same weight *)
+    let lfhokbo_same_weight t s =
+      match T.view t, T.view s with
+        | _ -> let g, f = Head.term_to_head t, Head.term_to_head s in
+          lfhokbo_composite g f (Head.term_to_args t) (Head.term_to_args s)
+    in
+    (
+      if T.equal t s then Eq else
+        match weight prec t, weight prec s with
+          | Some wt, Some ws ->
+            if WP.compare wt ws > 0 then Gt (* by rule C1 *)
+            else if WP.compare wt ws < 0 then Lt (* by rule C1 *)
+            else if WP.equal wt ws then lfhokbo_same_weight t s (* try rules C2 - C4 *)
+            else Incomparable (* Our approximation of comparing polynomials cannot
+                                 determine the greater polynomial *)
+          | _ -> Incomparable
+    )
+
+  let compare_terms ~prec x y =
+    ZProf.enter_prof prof_lambdafree_kbo_coeff;
+    let compare = lfhokbo_arg_coeff ~prec x y in
+    ZProf.exit_prof prof_lambdafree_kbo_coeff;
+    compare
+
+  let might_flip prec t s =
+    (* Terms can flip if they have different argument coefficients for remaining arguments. *)
+    assert (Term.ty t = Term.ty s);
+    let term_arity =
+      match Type.arity (Term.ty t) with
+        | Type.NoArity ->
+          failwith (CCFormat.sprintf "term %a has ill-formed type %a" Term.pp t Type.pp (Term.ty t))
+        | Type.Arity (_,n) -> n in
+    let id_arity s =
+      match Type.arity (Type.const s) with
+        | Type.NoArity ->
+          failwith (CCFormat.sprintf "symbol %a has ill-formed type %a" ID.pp s Type.pp (Type.const s))
+        | Type.Arity (_,n) -> n in
+    match Head.term_to_head t, Head.term_to_head s with
+      | Head.I g, Head.I f ->
+        List.exists
+          (fun i ->
+             Prec.arg_coeff prec g (id_arity g - i) != Prec.arg_coeff prec f (id_arity f - i)
+          )
+          CCList.(0 --^ term_arity)
+      | Head.V _, Head.I _ | Head.I _, Head.V _ -> true
+      | _ -> assert false
+end
+
 (** {2 Value interface} *)
 
 let dummy_cache_ = CCCache.dummy
@@ -725,6 +882,16 @@ let epo prec =
   let might_flip = EPO.might_flip in
   { cache_compare; compare; name=EPO.name; prec; might_flip; cache_might_flip; monotonic=true }
 
+let lambdafree_kbo_coeff prec =
+  let cache_compare = mk_cache 256 in
+  let compare prec a b = CCCache.with_cache cache_compare
+      (fun (a, b) -> LambdaFreeKBOCoeff.compare_terms ~prec a b) (a,b)
+  in
+  let cache_might_flip = mk_cache 256 in
+  let might_flip prec a b = CCCache.with_cache cache_might_flip
+      (fun (a, b) -> LambdaFreeKBOCoeff.might_flip prec a b) (a,b) in
+  { cache_compare; compare; name=LambdaFreeKBOCoeff.name; prec; might_flip; cache_might_flip; monotonic=false }
+
 let none =
   let compare _ t1 t2 = if T.equal t1 t2 then Eq else Incomparable in
   let might_flip _ _ _ = false in
@@ -751,6 +918,7 @@ let tbl_ =
   Hashtbl.add h "lambdafree_rpo" lambdafree_rpo;
   Hashtbl.add h "lambda_rpo" lambda_rpo;
   Hashtbl.add h "epo" epo;
+  Hashtbl.add h "lambdafree_kbo_coeff" lambdafree_kbo_coeff;
   Hashtbl.add h "none" (fun _ -> none);
   Hashtbl.add h "subterm" (fun _ -> subterm);
   h
