@@ -72,6 +72,7 @@ type 'a result_tc = {
   res_to_exn: 'a -> exn;
   res_compare: 'a -> 'a -> int;
   res_is_stmt: bool;
+  res_is_dead_cl: unit -> bool;
   res_pp_in: Output_format.t -> 'a CCFormat.printer;
   res_to_form: ctx:Term.Conv.ctx -> 'a -> TypedSTerm.Form.t;
   res_to_form_subst: ctx:Term.Conv.ctx -> Subst.Projection.t -> 'a -> form * inst_subst;
@@ -313,6 +314,7 @@ module Result = struct
       ~pp_in
       ?name
       ?(is_stmt=false)
+      ?(is_dead_cl= fun () -> false)
       ?(flavor=fun _ -> `Vanilla)
       () : a result_tc
     =
@@ -322,6 +324,7 @@ module Result = struct
       res_to_exn=to_exn;
       res_compare=compare;
       res_is_stmt=is_stmt;
+      res_is_dead_cl=is_dead_cl;
       res_pp_in=pp_in;
       res_to_form=to_form;
       res_to_form_subst=to_form_subst;
@@ -348,6 +351,7 @@ module Result = struct
 
   let of_form = make form_tc
   let is_stmt (Res (r,_)) = r.res_is_stmt
+  let is_dead_cl (Res (r,_)) = r.res_is_dead_cl
 end
 
 let pp_parent out = function
@@ -392,6 +396,8 @@ module Step = struct
   let is_trivial p = match p.kind with Trivial -> true | _ -> false
   let is_by_def p = match p.kind with By_def _ -> true | _ -> false
 
+  let is_inference p = match p.kind with Inference _ -> true | _ -> false
+
   let distance_to_goal p = p.dist_to_goal
 
   let get_id_ =
@@ -418,7 +424,7 @@ module Step = struct
     | Some x, Some y -> Some (min x y)
 
   let inferences_performed p =
-    let rec aux p = 
+    let rec aux p =
       match p.kind with 
       | Simplification _ -> 
         let parents = List.map (fun par -> aux ((Parent.proof par).step)) p.parents in

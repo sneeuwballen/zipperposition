@@ -159,7 +159,7 @@ let to_s_form_subst ~ctx subst c : _ * _ Var.Subst.t =
   in
   f, inst_subst
 
-let proof_tc =
+let proof_tc cl  =
   Proof.Result.make_tc
     ~of_exn:(function | E_proof c -> Some c | _ -> None)
     ~to_exn:(fun c -> E_proof c)
@@ -170,10 +170,11 @@ let proof_tc =
           else `Absurd_lits
         else `Vanilla)
     ~to_form:(fun ~ctx c -> to_s_form ~allow_free_db:true ~ctx c)
+    ~is_dead_cl:(fun () -> is_redundant cl)
     ~to_form_subst:to_s_form_subst
     ~pp_in
     ()
 
-let mk_proof_res = Proof.Result.make proof_tc
+let mk_proof_res cl = Proof.Result.make (proof_tc cl) cl
 
 let adapt p c = Proof.S.adapt p (mk_proof_res c)
