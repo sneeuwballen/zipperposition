@@ -380,19 +380,17 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     create ~trail:(trail c) ~penalty:(penalty c) new_lits proof_step
 
   let is_orphaned c =
-    let rec aux proof =
+    let aux proof =
       let p_res, step = Proof.S.result proof, Proof.S.step proof in
       (* we reached the root *)
       if Proof.Result.is_stmt p_res then false
       else (
-        let parents = List.map Proof.Parent.proof (Proof.Step.parents step) in
-        if Proof.Step.is_inference step &&
-           List.exists (fun pr -> 
-            Proof.Result.is_dead_cl (Proof.S.result pr) ()) parents 
-        then true
-        else List.exists aux parents
-      ) in
-    aux (proof c)
+        Proof.Step.is_inference step &&
+        List.exists (fun pr ->
+          Proof.Result.is_dead_cl (Proof.S.result pr) ())
+        (List.map Proof.Parent.proof (Proof.Step.parents step))) 
+    in
+    not (is_empty c) && aux (proof c)
   (** {2 Filter literals} *)
 
   module Eligible = struct

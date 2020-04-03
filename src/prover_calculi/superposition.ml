@@ -98,7 +98,6 @@ let k_check_sup_at_var_cond = Flex_state.create_key ()
 let k_restrict_hidden_sup_at_vars = Flex_state.create_key ()
 let k_ho_disagremeents = Flex_state.create_key ()
 let k_bool_demod = Flex_state.create_key ()
-let k_orphan_check = Flex_state.create_key ()
 let k_immediate_simplification = Flex_state.create_key ()
 
 
@@ -3316,20 +3315,28 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let condensation c =
     ZProf.with_prof prof_condensation condensation_rec c
+  
+  let subsumption_weight c =
+    C.Seq.terms c
+    |> Iter.fold (fun acc t -> (T.weight ~var:1 ~sym:(fun _ -> 2) t) + acc ) 0
 
   let immediate_subsume c immediate =
     let lits_c = C.lits c in
     let try_eq_subsumption = CCArray.exists Lit.is_eqn (C.lits c) in
-    Iter.find_map (fun c' -> 
-      if (C.trail_subsumes c' c &&
-           ((try_eq_subsumption && eq_subsumes (C.lits c') lits_c) ||
-             subsumes (C.lits c') lits_c)) then (
-        C.mark_redundant c;
-        Env.remove_active (Iter.singleton c);
-        Env.remove_simpl (Iter.singleton c);
-        Util.debugf ~section 2 "immediate subsume @[%a@]@." (fun k -> k C.pp c);
-        Some c'
-      ) else None) immediate
+    if Iter.exists C.is_empty immediate then None
+    else (
+      Iter.find_map (fun c' -> 
+        if (C.trail_subsumes c' c &&
+           (* If clauses are the same -- then we can loop! *)
+           subsumption_weight c' < subsumption_weight c &&
+            ((try_eq_subsumption && eq_subsumes (C.lits c') lits_c) ||
+              subsumes (C.lits c') lits_c)) then (
+          C.mark_redundant c;
+          Env.remove_active (Iter.singleton c);
+          Env.remove_simpl (Iter.singleton c);
+          Util.debugf ~section 2 "immediate subsume @[%a@]@." (fun k -> k C.pp c);
+          Some c'
+        ) else None) immediate)
     |> (function 
         | Some subsumer -> Some (Iter.singleton subsumer)
         | None -> Some immediate)
@@ -3562,9 +3569,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Env.add_backward_simplify backward_simplify
     );
     Env.add_redundant redundant;
-    if Env.flex_get k_orphan_check then (
-      Env.add_redundant is_orphaned
-    );
     Env.add_backward_redundant backward_redundant;
     if Env.flex_get k_use_semantic_tauto
     then Env.add_is_trivial is_semantic_tautology;
@@ -3629,7 +3633,6 @@ let _use_weight_for_solid_subsumption = ref false
 let _sort_constraints = ref false
 let _ho_disagremeents = ref `SomeHo
 let _bool_demod = ref false
-let _orphan_check = ref false
 let _immediate_simplification = ref false
 
 let _guard = ref 45
@@ -3685,7 +3688,6 @@ let register ~sup =
   E.flex_add k_use_semantic_tauto !_use_semantic_tauto;
   E.flex_add k_ho_disagremeents !_ho_disagremeents;
   E.flex_add k_bool_demod !_bool_demod;
-  E.flex_add k_orphan_check !_orphan_check;
   E.flex_add k_immediate_simplification !_immediate_simplification;
 
 
@@ -3810,7 +3812,6 @@ let () =
       "--stream-queue-guard", Arg.Set_int _guard, "set value of guard for streamQueue";
       "--stream-queue-ratio", Arg.Set_int _ratio, "set value of ratio for streamQueue";
       "--bool-demod", Arg.Bool ((:=) _bool_demod), " turn BoolDemod on/off";
-      "--orphan-check", Arg.Bool ((:=) _orphan_check), " turn orphan check on/off";
       "--immediate-simplification", Arg.Bool ((:=) _immediate_simplification), " turn immediate simplification on/off";
       "--stream-clause-num", Arg.Set_int _clause_num, "how many clauses to take from streamQueue; by default as many as there are streams";
       "--ho-sort-constraints", Arg.Bool (fun b -> _sort_constraints := b), "sort constraints in unification algorithm by weight";

@@ -619,7 +619,7 @@ module Make(X : sig
             rw_simplify >>=
             unary_simplify >|= fun c ->
             if not (Lits.equal_com (C.lits c) (C.lits old_c)) then (
-              Util.debugf ~section 2 "@[clause `@[%a@]`@ simplified into `@[%a@]`@]"
+              Util.debugf ~section 1 "@[clause `@[%a@]`@ simplified into `@[%a@]`@]"
                 (fun k->k C.pp old_c C.pp c);
             );
             c)

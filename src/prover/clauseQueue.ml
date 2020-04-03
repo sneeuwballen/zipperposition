@@ -73,7 +73,7 @@ let get_profile () = !_profile
 let set_profile p = _profile := p
 let parse_profile s = _profile := (profile_of_string s)
 let funs_to_parse = ref []
-
+let _ignore_orphans = ref false
 
 module Make(C : Clause_intf.S) = struct
   module C = C
@@ -767,7 +767,16 @@ module Make(C : Clause_intf.S) = struct
     let current_heap, (_,_,c) =  H.take_exn current_heap in
     Array.set q.heaps q.current_heap_idx current_heap;
 
+    let is_orphaned c =
+      !_ignore_orphans && C.is_orphaned c in
+
+    (* if clause was picked by another queue 
+       or it should be ignored, repeat clause choice.  *)
     if not (C.Tbl.mem q.tbl c) then (
+      take_first_mixed q
+    ) else if is_orphaned c then (
+      C.Tbl.remove q.tbl c;
+      Util.debugf 5 "ignoring orphaned clause:@ @[%a@]@." (fun k -> k C.pp c);
       take_first_mixed q
     ) else (
       C.Tbl.remove q.tbl c;
@@ -966,7 +975,8 @@ let () =
       "-cq", o, " alias to --clause-queue";
       "--add-queue", add_queue, " create a new clause evaluation queue. Its description is of the form" ^
                                 " RATIO|PRIORITY_FUN|WEIGHT_FUN";
-      "-q", add_queue, "alias to --add-queue"
+      "-q", add_queue, "alias to --add-queue";
+      "--ignore-orphans", Arg.Bool ((:=) _ignore_orphans), " whether to ignore the orphans during clause selection"
     ];
 
   Params.add_to_mode "ho-pragmatic" (fun () ->
