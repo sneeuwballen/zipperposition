@@ -3327,7 +3327,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         C.mark_redundant c;
         Env.remove_active (Iter.singleton c);
         Env.remove_simpl (Iter.singleton c);
-        CCFormat.printf "immediate subsume @[%a@]@." C.pp c;
+        Util.debugf ~section 2 "immediate subsume @[%a@]@." (fun k -> k C.pp c);
         Some c'
       ) else None) immediate
     |> (function 
