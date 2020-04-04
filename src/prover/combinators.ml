@@ -787,28 +787,28 @@ module Make(E : Env.S) : S with module Env = E = struct
     let beta = T.var tyvarB
     let gamma = T.var tyvarC
 
-    let partially_applied_s =
+    let partially_applied_s () =
       partially_apply ~comb:(mk_s ~alpha ~beta ~gamma ~args:[], 0)
         [s_arg1, 1; s_arg2, Env.flex_get k_s_penalty]
 
-    let partially_applied_b =
+    let partially_applied_b () =
       partially_apply ~comb:(mk_b ~alpha ~beta ~gamma ~args:[], 0)
         [b_arg1, 1; b_arg2, Env.flex_get k_b_penalty]
 
-    let partially_applied_c =
+    let partially_applied_c () =
       partially_apply ~comb:(mk_c ~alpha ~beta ~gamma ~args:[], 0)
         [c_arg1, 1; c_arg2, Env.flex_get k_c_penalty]
     
-    let partially_applied_k =
+    let partially_applied_k () =
       partially_apply ~comb:(mk_k ~alpha ~beta ~args:[], 0)
         [k_arg1, Env.flex_get k_k_penalty]
     
-    let partially_applied_i =
+    let partially_applied_i () =
       [mk_i ~alpha ~args:[], 0]
 
-    let partially_applied_combs =
-      partially_applied_s @ partially_applied_b @ partially_applied_c @ 
-      partially_applied_k @ partially_applied_i
+    let partially_applied_combs () =
+      partially_applied_s () @ partially_applied_b () @ partially_applied_c () @ 
+      partially_applied_k () @ partially_applied_i ()
       (* partially_applied_b @ partially_applied_s @ partially_applied_i *)
       
 
@@ -818,7 +818,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         try
           Some (Unif.FO.unify_syn (comb, 0) (var, 1), penalty)
         with Unif.Fail -> None
-      ) partially_applied_combs
+      ) (partially_applied_combs ())
 
 
     let narrow_app_vars clause =
