@@ -12,6 +12,9 @@ module type S = ClauseQueue_intf.S
 
 type profile = ClauseQueue_intf.profile
 
+let section = Util.Section.make ~parent:Const.section "clause.queue"
+
+
 let cr_var_ratio = ref 5
 let cr_var_mul   = ref 1.1
 let parameters_magnitude = ref `Large
@@ -132,7 +135,7 @@ module Make(C : Clause_intf.S) = struct
         int_of_float (weight c *. (1.25 ** (app_var_num c *. (1.35 ** p_depth c)))
                       *. (0.85 ** formulas_num c)
                       *. 1.05 ** t_depth c) in
-      Util.debugf 5 "[C_W:]@ @[%a@]@ :@ %d(%g, %g, %g).\n"
+      Util.debugf ~section 5 "[C_W:]@ @[%a@]@ :@ %d(%g, %g, %g).\n"
         (fun k -> k C.pp c res (app_var_num c) (formulas_num c) (p_depth c));
       res
 
@@ -269,7 +272,7 @@ module Make(C : Clause_intf.S) = struct
                 1.0 /. divider
               ) else 1.0 in
             let val_ = int_of_float (goal_dist_penalty *. dist_var_penalty *. res) in
-            (Util.debugf  10 "cl: %a, w:%d\n" (fun k -> k C.pp c val_);
+            (Util.debugf ~section  10 "cl: %a, w:%d\n" (fun k -> k C.pp c val_);
              val_))
 
     let _max_weight = ref (-1.0)
@@ -776,7 +779,8 @@ module Make(C : Clause_intf.S) = struct
       take_first_mixed q
     ) else if is_orphaned c then (
       C.Tbl.remove q.tbl c;
-      Util.debugf 5 "ignoring orphaned clause:@ @[%a@]@." (fun k -> k C.pp c);
+      Util.debugf ~section 1 "ignoring orphaned clause:@ @[%a@]@." (fun k -> k C.pp c);
+      Util.debugf ~section 2 "proof:@ @[%a@]@." (fun k -> k Proof.S.pp_tstp (C.proof c));
       take_first_mixed q
     ) else (
       C.Tbl.remove q.tbl c;

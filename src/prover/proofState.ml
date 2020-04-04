@@ -135,9 +135,11 @@ module Make(C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
       if CQueue.is_empty queue
       then None
       else (
-        let x = CQueue.take_first queue in
-        Signal.send on_remove_clause x;
-        Some x
+        try 
+          let x = CQueue.take_first queue in
+          Signal.send on_remove_clause x;
+          Some x
+        with Not_found -> None
       )
 
     let next () = ZProf.with_prof prof_next_passive next_ ()

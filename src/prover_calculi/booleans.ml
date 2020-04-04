@@ -121,7 +121,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let bool_case_inf (c: C.t) : C.t list =    
     let proof = Proof.Step.inference [C.proof_parent c]
-                ~rule:(Proof.Rule.mk"bool_inf") ~tags:[Proof.Tag.T_ho] in
+                ~rule:(Proof.Rule.mk "bool_inf") ~tags:[Proof.Tag.T_ho] in
 
     Util.debugf 5 ~section "bci(@[%a@])=@." (fun k -> k C.pp c);
 
@@ -462,7 +462,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                   (Subst.Renaming.create ()) (US.subst subst) (l,0))
             |> CCArray.to_list in
           let proof = 
-            Proof.Step.inference ~tags:[Proof.Tag.T_ho]
+            Proof.Step.simp ~tags:[Proof.Tag.T_ho]
               ~rule:(Proof.Rule.mk "solve_formulas")
               [C.proof_parent c] in
           let res = C.create ~penalty:(C.penalty c) ~trail:(C.trail c) new_lits proof in
@@ -515,20 +515,14 @@ module Make(E : Env.S) : S with module Env = E = struct
           CCOpt.get_or ~default:[] (solve_bool_formulas c))
         else [] in
 
-      begin try 
-        let clauses = CCVector.map (C.of_statement ~convert_defs:true) cnf_vec
-                      |> CCVector.to_list 
-                      |> CCList.flatten
-                      |> List.map (fun c -> 
-                          C.create ~penalty  ~trail (CCArray.to_list (C.lits c)) proof) in
-        List.iteri (fun i new_c -> 
-            assert((C.proof_depth c) <= C.proof_depth new_c);) clauses;
-        Some (solved @clauses)
-      with Type.ApplyError err ->
-        CCFormat.printf "cnf(@[%a@])@.err:@[%s@]@." C.pp c err;
-        CCFormat.printf "result:@[%a@]@." (CCVector.pp ~sep:";\n" (Statement.pp_clause_in Output_format.O_tptp)) cnf_vec;
-        CCFormat.printf "proof:@[%a@]@." Proof.S.pp_tstp (C.proof c);
-        assert false; end
+      let clauses = CCVector.map (C.of_statement ~convert_defs:true) cnf_vec
+                    |> CCVector.to_list 
+                    |> CCList.flatten
+                    |> List.map (fun c -> 
+                        C.create ~penalty  ~trail (CCArray.to_list (C.lits c)) proof) in
+      List.iteri (fun i new_c -> 
+          assert((C.proof_depth c) <= C.proof_depth new_c);) clauses;
+      Some (solved @clauses)
     | None -> None
 
   let cnf_infer cl = 

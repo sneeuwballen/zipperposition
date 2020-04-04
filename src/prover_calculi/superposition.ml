@@ -1945,7 +1945,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         let tags = [Proof.Tag.T_ho] in
         let proof = Proof.Step.inference ~tags ~rule [C.proof_parent_subst renaming (c, 0) sub] in
         let new_clause = C.create ~trail ~penalty (CCArray.to_list new_lits) proof in
-        (* CCFormat.printf "[BOOL_INST: %a, %a => %a].\n" C.pp c Subst.pp sub C.pp new_clause; *)
         assert (C.Seq.terms c |> Iter.for_all T.DB.is_closed);
         assert (C.Seq.terms new_clause |> Iter.for_all T.DB.is_closed);
         new_clause)
@@ -3226,7 +3225,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           (* hc' allowed us to cut a literal *)
           assert (List.length new_lits + 1 = Array.length (C.lits c));
           let proof =
-            Proof.Step.inference
+            Proof.Step.simp
               ~rule:(Proof.Rule.mk "clc") ~tags
               [C.proof_parent c;
                C.proof_parent_subst Subst.Renaming.none (c',1) subst] in

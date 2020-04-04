@@ -213,7 +213,9 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
               [negate lit] proof 
           ) lits'
       | None -> []
-    ) else [] (* never infers anything! *)
+    ) else [] (* never infers anything -- 
+                 if ground empty avatar clauses 
+                 are not added to the proof state. *)
 
   (* check whether the trail is false and will remain so *)
   let trail_is_trivial_ (trail:Trail.t): bool =
