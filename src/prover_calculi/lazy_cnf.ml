@@ -31,6 +31,7 @@ end
 module Make(E : Env.S) : S with module Env = E = struct
   module Env = E
   module C = Env.C
+  module Combs = Combinators.Make(Env)
   
   let _form_counter = Term.Tbl.create 256
 
@@ -181,7 +182,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
     let rec maxiscoping_eligible l =
       let get_quant t = 
-        let t = Lambda.eta_expand t in
+        let t = Combs.expand t in
         match T.view t with
         | T.AppBuiltin((ForallConst|ExistsConst) as b, [x]) ->
           let ty, body = T.open_fun x in
@@ -210,7 +211,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         
         outer_hd (List.map (fun t -> quant_hd (T.fun_ ty t) ) bodies) in 
 
-      let f = Lambda.eta_expand f in
+      let f = Combs.expand f in
       if T.is_fun f then (
         let ty, body = T.open_fun f in
         assert(List.length ty = 1);
@@ -281,7 +282,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         | T.AppBuiltin((ForallConst|ExistsConst) as hd, [f]) ->
           let free_vars = T.Seq.vars f in
           let var_id = T.Seq.max_var (C.Seq.vars c) + 1 in
-          let f = Lambda.eta_expand f in
+          let f = Combs.expand f in
           let var_tys, body =  T.open_fun f in
           assert(List.length var_tys = 1);
           let var_ty = List.hd var_tys in

@@ -30,6 +30,7 @@ module type S = sig
   val setup : unit -> unit
   val maybe_conv_lams : Env.C.t -> Env.C.t
   val force_conv_lams : Env.C.t -> Env.C.t
+  val expand : T.t -> T.t
 end
 
 (* Helper function for defining combinators *)
@@ -925,6 +926,19 @@ module Make(E : Env.S) : S with module Env = E = struct
       let c' = lams2combs_otf c in
       if SimplM.is_same c' then c
       else SimplM.get c'
+
+    (* Expands the chosen term to be of the form 
+       \lambda (all type vars). body of prop type *)
+    let expand t = 
+      if Env.flex_get k_enable_combinators then (
+        assert(not (T.is_fun t)); (* no lambdas if combinators are on *)
+        let ty_args, ret_ty = Type.open_fun (T.ty t) in
+        let n = List.length ty_args in
+        let bvars = List.mapi (fun i ty -> T.bvar ~ty (n-i-1)) ty_args in
+        let t' = T.app t bvars in
+        let body = CCOpt.get_or ~default:t' (comb_normalize t') in
+        T.fun_l ty_args body
+      ) else Lambda.eta_expand t
     
     let setup () =
       if E.flex_get k_enable_combinators then (

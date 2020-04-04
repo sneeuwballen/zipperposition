@@ -1093,6 +1093,10 @@ module Conv = struct
       | SLiteral.Atom (p,s) ->
         let p = if s then p else T.Form.not_ p in
         T.Conv.to_simple_term ctx p
+      | SLiteral.Eq(l,r) when T.equal T.true_ r ->
+        T.Conv.to_simple_term ctx l
+      | SLiteral.Neq(l,r) when T.equal T.true_ r ->
+        T.Conv.to_simple_term ctx (T.Form.not_ l)  
       | SLiteral.Eq(l,r) ->
         let l,r = CCPair.map_same (T.Conv.to_simple_term ctx) (l,r) in
         TypedSTerm.app_builtin ~ty:TypedSTerm.Ty.prop Builtin.Eq [l;r]

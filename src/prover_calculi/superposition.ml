@@ -688,7 +688,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let t' = if info.sup_kind != DupSup then 
           S.FO.apply ~shift_vars renaming subst (info.t, sc_a)
         else dup_sup_apply_subst info.t sc_a sc_p subst renaming in
-      Util.debugf ~section 1
+      Util.debugf ~section 2
         "@[<2>sup, kind %s(%d)@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a, t'=%a@]@])@ \
          (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@]"
         (fun k->k (kind_to_str info.sup_kind) (Term.Set.cardinal lambdasup_vars) C.pp info.active sc_a T.pp info.s T.pp info.t
@@ -721,7 +721,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           let v' = S.FO.apply ~shift_vars:0 renaming subst (v, sc_p) in
           if T.equal t' v'
           then (
-            Util.debugf ~section 1 "will yield a tautology" (fun k->k);
+            Util.debugf ~section 2 "will yield a tautology" (fun k->k);
             raise (ExitSuperposition "will yield a tautology");)
         | _ -> ()
       end;
@@ -876,7 +876,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       );
       Some new_clause
     with ExitSuperposition reason ->
-      Util.debugf ~section 1 "... cancel, %s" (fun k->k reason);
+      Util.debugf ~section 3 "... cancel, %s" (fun k->k reason);
       None
 
   (* simultaneous superposition: when rewriting D with C \lor s=t,
@@ -3121,7 +3121,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     in
     ZProf.exit_prof prof_subsumption_set;
     if res then (
-      Util.debugf ~section 1 "@[<2>@[%a@]@ subsumed by active set@]" (fun k->k C.pp c);
+      Util.debugf ~section 2 "@[<2>@[%a@]@ subsumed by active set@]" (fun k->k C.pp c);
       Util.incr_stat stat_clauses_subsumed;
     );
     res
@@ -3333,7 +3333,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           C.mark_redundant c;
           Env.remove_active (Iter.singleton c);
           Env.remove_simpl (Iter.singleton c);
-          Util.debugf ~section 2 "immediate subsume @[%a@]@." (fun k -> k C.pp c);
+          Util.debugf ~section 1 "immediate subsume @[%a@]@." (fun k -> k C.pp c);
           Some c'
         ) else None) immediate)
     |> (function 

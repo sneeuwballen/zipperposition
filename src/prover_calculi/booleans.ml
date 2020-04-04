@@ -53,6 +53,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   module C = Env.C
   module Ctx = Env.Ctx
   module Fool = Fool.Make(Env)
+  module Combs = Combinators.Make(Env)
 
   let (=~),(/~) = Literal.mk_eq, Literal.mk_neq
   let (@:) = T.app_builtin ~ty:Type.prop
@@ -268,7 +269,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       )
     | AppBuiltin((ExistsConst|ForallConst) as b, [g]) ->
       let g' = aux g in
-      let exp_g = Lambda.eta_expand g' in
+      let exp_g = Combs.expand g' in
       let _, body = T.open_fun exp_g in
       assert(Type.is_prop (T.ty body));
       if (T.Seq.subterms ~include_builtin:true body
@@ -320,7 +321,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           let flipped = 
             if b = Builtin.ForallConst then Builtin.ExistsConst
             else Builtin.ForallConst in
-          let g_ty_args, g_body = T.open_fun (Lambda.eta_expand g)  in
+          let g_ty_args, g_body = T.open_fun (Combs.expand g)  in
           let g_body' = aux @@ F.not_ g_body in
           let g' = Lambda.eta_reduce (T.fun_l g_ty_args g_body') in
           T.app_builtin ~ty:(T.ty t) flipped [g']
@@ -579,20 +580,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       T.fun_l ty_args (T.Form.not_ body)
     in
 
-    (* Expands the chosen term to be of the form 
-       \lambda (all type vars). body of prop type *)
-    let expand t = 
-      if Env.flex_get Combinators.k_enable_combinators then (
-        assert(not (T.is_fun t)); (* no lambdas if combinators are on *)
-        let ty_args, ret_ty = Type.open_fun (T.ty t) in
-        let n = List.length ty_args in
-        let bvars = List.mapi (fun i ty -> T.bvar ~ty (n-i-1)) ty_args in
-        let t' = T.app t bvars in
-        let body = CCOpt.get_or ~default:t' (Combinators.comb_normalize t') in
-        assert(Type.equal ret_ty (T.ty body));
-        T.fun_l ty_args body
-      ) else Lambda.eta_expand t in
-
     let forall_close t = 
       let ty_args, body = T.open_fun t in
       assert(Type.is_prop (T.ty body));
@@ -617,7 +604,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             ~rule:(Proof.Rule.mk"interpret boolean function") ~tags:[Proof.Tag.T_ho]
         in
 
-        let t' = expand t in
+        let t' = Combs.expand t in
         let _,t'_body = T.open_fun t' in
 
         if not (T.is_true_or_false t'_body) then (

@@ -15,6 +15,11 @@ module type S = sig
   (* Converts lambdas in either case *)
   val force_conv_lams : Env.C.t -> Env.C.t
 
+
+  (* Expands the term to be of the form 
+      \lambda (all type vars). body of prop type *)
+  val expand : Term.t -> Term.t
+
   (** Register rules in the environment *)
 end
 
