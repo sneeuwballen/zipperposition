@@ -806,8 +806,8 @@ module Form = struct
   let view (t:term) = match view t with
     | AppBuiltin (Builtin.True, []) -> True
     | AppBuiltin (Builtin.False, []) -> False
-    | AppBuiltin (Builtin.And, l) -> And l
-    | AppBuiltin (Builtin.Or, l) -> Or l
+    | AppBuiltin (Builtin.And, l) when Ty.is_prop (ty_exn t) -> And l
+    | AppBuiltin (Builtin.Or, l) when Ty.is_prop (ty_exn t) -> Or l
     | AppBuiltin (Builtin.Not, [f]) -> Not f
     | AppBuiltin (Builtin.Imply, [a;b]) -> Imply(a,b)
     | AppBuiltin (Builtin.Equiv, [a;b]) -> Equiv(a,b)
@@ -1641,7 +1641,7 @@ let simplify_formula t =
   let rec aux t =
     let ty = ty_exn t in
     match view t with 
-    | AppBuiltin( ((And|Or) as b) , args) ->
+    | AppBuiltin( ((And|Or) as b) , args) when Ty.is_prop ty ->
       simplify_and_or t b (List.map aux args)
     | AppBuiltin( Not, [s]) ->
       begin match view s with

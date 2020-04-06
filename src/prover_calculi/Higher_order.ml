@@ -1066,7 +1066,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let status = VTbl.create 8 in
     let free_vars = Literals.vars (C.lits c) |> T.VarSet.of_list in
     C.lits c
-    |> Literals.map (fun t -> Lambda.eta_expand t) (* to make sure that DB indices are everywhere the same *)
+    |> Literals.map (fun t -> Combs.expand t) (* to make sure that DB indices are everywhere the same *)
     |> Literals.fold_terms ~vars:true ~ty_args:false ~which:`All ~ord:Ordering.none 
       ~subterms:true  ~eligible:(fun _ _ -> true)
     |> Iter.iter

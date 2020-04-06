@@ -999,7 +999,7 @@ module TPTP = struct
       | AppBuiltin (b,[]) -> Builtin.TPTP.pp out b
       | AppBuiltin (b, ([t;u])) when Builtin.TPTP.is_infix b ->
         Format.fprintf out "(@[%a %a@ %a@])" pp_rec t Builtin.TPTP.pp b pp_rec u
-      | AppBuiltin (b, l) when Builtin.TPTP.fixity b = Builtin.Infix_nary ->
+      | AppBuiltin (b, l) when Builtin.TPTP.fixity b = Builtin.Infix_nary && CCList.length l >= 2 ->
         Format.fprintf out "(@[%a@])"
           (Util.pp_list ~sep:(Builtin.TPTP.to_string b) pp_rec) l
       | AppBuiltin (b,l) ->
