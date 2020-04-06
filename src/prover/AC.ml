@@ -248,6 +248,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
     let fail_on cond = if cond then raise Fail in
 
+    let is_binary_sym hd_s =
+      List.length (Type.expected_args (T.ty hd_s)) == 2 in
+
     (* commutativity test is symmetric *)
     let test_commutativty s t =
       try
@@ -256,6 +259,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         | T.App(hd_s, [x_s;y_s]), T.App(hd_t, [x_t; y_t]) ->
           fail_on (not (T.equal hd_s hd_t));
           fail_on (not (T.is_const hd_s));
+          fail_on (not (is_binary_sym hd_s));
           fail_on (not (T.is_var x_s) || not (T.is_var y_s));
           fail_on (not (T.is_var x_t) || not (T.is_var y_t));
           fail_on (T.equal x_s y_s);
@@ -279,6 +283,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             fail_on (not (T.equal hd_s hd_t && T.equal hd_t hd_s' 
                             && T.equal hd_s' hd_t'));
             fail_on (not (T.is_const hd_s));
+            fail_on (not (is_binary_sym hd_s));
             fail_on (not (List.for_all T.is_var [x_s;y_s;z_s]));
             fail_on (not (List.for_all T.is_var [x_t;y_t;z_t]));
 

@@ -73,7 +73,7 @@ let k_some_ho : bool Flex_state.key = Flex_state.create_key()
 let k_enabled : bool Flex_state.key = Flex_state.create_key()
 let k_enable_def_unfold : bool Flex_state.key = Flex_state.create_key()
 let k_enable_ho_unif : bool Flex_state.key = Flex_state.create_key()
-let k_ho_prim_mode : [`Full | `Neg | `None | `Pragmatic | `TF ] Flex_state.key = Flex_state.create_key()
+let k_ho_prim_mode : [`Combinators | `Full | `Neg | `None | `Pragmatic | `TF ] Flex_state.key = Flex_state.create_key()
 let k_ho_prim_max_penalty : int Flex_state.key = Flex_state.create_key()
 
 module Make(E : Env.S) : S with module Env = E = struct
@@ -512,7 +512,6 @@ module Make(E : Env.S) : S with module Env = E = struct
             C.create_a lits proof
               ~penalty:(C.penalty c + penalty) ~trail:(C.trail c)
           in
-          (* CCFormat.printf "[Prim_enum:] @[%a@]\n=>\n@[%a@].\n" C.pp c C.pp new_c;*)
           Util.debugf ~section 1
             "(@[<hv2>ho.refine@ :from %a@ :subst %a@ :yields %a@])"
             (fun k->k C.pp c Subst.pp subst C.pp new_c);
@@ -522,10 +521,10 @@ module Make(E : Env.S) : S with module Env = E = struct
     end
 
   let prim_enum ~(mode) c =
-    (*if C.proof_depth c < max_penalty_prim_ 
+    if C.proof_depth c < max_penalty_prim_ 
     then prim_enum_ ~mode c
-    else []*)
-    prim_enum_ ~mode c
+    else []
+    (* prim_enum_ ~mode c *)
 
   let choice_ops = ref Term.Set.empty
   let new_choice_counter = ref 0
@@ -1364,13 +1363,14 @@ let def_unfold_enabled_ = ref false
 let force_enabled_ = ref false
 let enable_unif_ = ref false (* this unification seems very buggy, had to turn it off *)
 let prim_mode_ = ref `Neg
-let prim_max_penalty = ref 1 (* FUDGE *)
+let prim_max_penalty = ref 2 (* FUDGE *)
 
 let set_prim_mode_ =
   let l = [
     "neg", `Neg;
     "full", `Full;
     "pragmatic", `Pragmatic;
+    "combs", `Combinators;
     "tf", `TF;
     "none", `None;
   ] in
