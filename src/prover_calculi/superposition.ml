@@ -1808,10 +1808,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       (* If no constraints are left or all of pairs are flex-flex
          or all of pairs are FO then we could have done all of 
          this with HO unification or FO superposition *)
-      if (CCList.is_empty (fst diss) && US.is_empty (snd diss)) ||
-          (not (CCList.is_empty (fst diss)) && 
-            List.for_all (fun (si,ti) -> 
-              T.is_ho_var si && T.is_ho_var ti) (fst diss)) then (
+      if (CCList.is_empty (fst diss)) then (
           raise StopSearch
       );
 
