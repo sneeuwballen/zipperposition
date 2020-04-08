@@ -82,7 +82,7 @@ let fully_apply ~counter s t  =
     Lambda.whnf @@ T.app s fresh_vars, Lambda.whnf @@ T.app t fresh_vars
   )
 
-let lift_lambdas_t ~counter t  =
+let lift_lambdas_t ~parent ~counter t  =
   let rec aux t =
     match T.view t with
     | T.Fun _ ->
@@ -111,7 +111,7 @@ let lift_lambdas_t ~counter t  =
         let lhs = new_ll_sym and rhs = unbound in
         let lhs_applied, rhs_applied = fully_apply ~counter lhs rhs in
         let lits = [Literal.mk_eq lhs_applied rhs_applied] in
-        let proof = Proof.Step.define_internal id [] in
+        let proof = Proof.Step.define_internal id [C.proof_parent parent] in
         let new_def = C.create ~penalty:1 ~trail:Trail.empty lits proof in
         let repl = Subst.FO.apply Subst.Renaming.none subst (sc lhs) in
         idx := Idx.add !idx rhs (new_def, lhs);
@@ -144,8 +144,8 @@ let lift_lambdas_t ~counter t  =
       |> (fun l -> List.fold_right (fun lit (acc, (reused_defs, new_defs)) -> 
           match lit with 
           | Literal.Equation(lhs, rhs, sign) ->
-            let lhs', (reused_lhs, new_lhs) = lift_lambdas_t ~counter lhs in
-            let rhs', (reused_rhs, new_rhs) = lift_lambdas_t ~counter rhs in
+            let lhs', (reused_lhs, new_lhs) = lift_lambdas_t ~parent:cl ~counter lhs in
+            let rhs', (reused_rhs, new_rhs) = lift_lambdas_t ~parent:cl ~counter rhs in
             let reused = reused_lhs @ reused_rhs and new_ = new_rhs @ new_lhs in
             let lit' = Literal.mk_lit lhs' rhs' sign in
             lit'::acc, (reused@reused_defs, new_@new_defs)

@@ -474,11 +474,12 @@ module Conv = struct
     mutable vars: (PT.t, t HVar.t) Var.Subst.t;
     mutable n: int;  (* counter for free vars *)
     mutable hvars: PT.t Var.t VarMap.t;
-    mutable bvars_to_db: int VarMap.t ;
+    mutable bvars_to_db: int VarMap.t;
+    mutable max_vars: int option ref;
   }
 
   let create () = { vars=Var.Subst.empty; n=0; hvars=VarMap.empty;
-                    bvars_to_db=VarMap.empty }
+                    bvars_to_db=VarMap.empty; max_vars= ref None }
 
   let enter_bvar ctx v =
     let ret_handle = VarMap.find_opt v ctx.bvars_to_db in
@@ -509,6 +510,16 @@ module Conv = struct
     let n = ctx.n in
     ctx.n <- n+1;
     HVar.make ~ty:tType n
+
+  let set_maxvar ctx i =
+    ctx.max_vars := Some (i+1);
+    ctx.n <- i+1
+
+  let get_maxvar ctx =
+    CCOpt.get_or ~default:0 (!(ctx.max_vars))
+  
+  let incr_maxvar ctx =
+    set_maxvar ctx (get_maxvar ctx + 1)
 
   exception Error of TypedSTerm.t
 

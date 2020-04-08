@@ -1061,10 +1061,7 @@ module Conv = struct
       end
 
   let to_form ?(hooks=[]) lit =
-    if not (no_prop_invariant lit) then (
-      CCFormat.printf "failed:@[%a]@." pp lit;
-      assert false;
-    );
+    assert (no_prop_invariant lit);
     begin match try_hooks lit hooks with
       | Some f -> f
       | None ->
@@ -1072,7 +1069,7 @@ module Conv = struct
           | Equation (l, r, sign) -> 
             assert(Type.equal (Term.ty l) (Term.ty r));
             if Type.is_prop (Term.ty l) then (
-              if T.equal l T.true_ then SLiteral.atom l sign 
+              if T.equal r T.true_ then SLiteral.atom l sign 
               else (
                 let hd = if sign then Builtin.Equiv else Builtin.Xor in
                 SLiteral.atom (T.app_builtin ~ty:Type.prop hd [l;r]) true

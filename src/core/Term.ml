@@ -1152,7 +1152,8 @@ module Conv = struct
   let to_simple_term ?(allow_free_db=false) ?(env=DBEnv.empty) ctx t =
     let module ST = TypedSTerm in
     let n = ref 0 in
-    let max_var = ref ((Seq.vars t |> Seq.max_var) + 1) in
+    let max_t = max ((Seq.vars t |> Seq.max_var) + 1) (Type.Conv.get_maxvar ctx) in
+    Type.Conv.set_maxvar ctx max_t;
     let orig_term = t in
     let rec aux_t env t =
       match view t with
@@ -1184,13 +1185,13 @@ module Conv = struct
           Util.error ~where:"Term" err_msg;
         ) else (
           let fresh_vars = List.map (fun ty -> 
-              incr max_var;
-              var_of_int ~ty !max_var) ty_args in
+              Type.Conv.incr_maxvar ctx;
+              var_of_int ~ty (Type.Conv.get_maxvar ctx)) ty_args in
           let replacement = DBEnv.push_l_rev DBEnv.empty fresh_vars in
           let body  = DB.eval replacement fun_body in
           let remaining_vars = List.map (fun ty ->
-              incr max_var;
-              var_of_int ~ty !max_var) (Type.expected_args (ty fun_body)) in
+              Type.Conv.incr_maxvar ctx;
+              var_of_int ~ty (Type.Conv.get_maxvar ctx)) (Type.expected_args (ty fun_body)) in
           let body = app body remaining_vars in
           let vars_converted = List.map convert_var (fresh_vars @ remaining_vars) in
           List.fold_right (fun v acc ->
