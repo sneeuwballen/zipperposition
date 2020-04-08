@@ -371,7 +371,7 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
       (* do the recursive computation of kbo *)
       let wb', res = tckbo_rec wb f g ss ts in
       let wb'' = W.(wb' + weight prec f - weight prec g) in
-      if P.lambda_mode then (
+      if not P.lambda_mode then (
         begin match f with
           | Head.V x -> add_pos_var balance (T.var x)
           | _ -> ()
