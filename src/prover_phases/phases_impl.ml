@@ -49,6 +49,9 @@ let print_version ~params =
 let load_extensions =
   let open Libzipperposition_calculi in
   Phases.start_phase Phases.LoadExtensions >>= fun () ->
+  Extensions.register Lazy_cnf.extension;
+  Extensions.register Combinators.extension;
+  Extensions.register Higher_order.extension;
   Extensions.register Superposition.extension;
   Extensions.register AC.extension;
   Extensions.register Heuristics.extension;
@@ -61,8 +64,13 @@ let load_extensions =
   Extensions.register Ind_types.extension;
   Extensions.register Fool.extension;
   Extensions.register Booleans.extension;
-  Extensions.register Higher_order.extension;
+  Extensions.register Lift_lambdas.extension;
+
+
+
   Extensions.register App_encode.extension;
+  Extensions.register Eq_encode.extension;
+
 
   let l = Extensions.extensions () in
   Phases.return_phase l
@@ -166,12 +174,13 @@ let typing ~file prelude (input,stmts) =
 (* obtain clauses  *)
 let cnf ~sk_ctx decls =
   Phases.start_phase Phases.CNF >>= fun () ->
+  let opts = if !Lazy_cnf.enabled then [Cnf.LazyCnf] else [ ] in
   let stmts =
     decls
     |> CCVector.to_seq
     |> (if not !_lift_lambdas then CCFun.id
         else Iter.flat_map Statement.lift_lambdas)
-    |> Cnf.cnf_of_seq ~ctx:sk_ctx
+    |> Cnf.cnf_of_seq ~ctx:sk_ctx ~opts
     |> CCVector.to_seq
     |> apply_modifiers ~field:(fun e -> e.Extensions.post_cnf_modifiers)
     |> Cnf.convert
@@ -201,7 +210,8 @@ let compute_prec ~signature stmts =
           |> Iter.flat_map (fun t -> Term.Seq.subterms_depth t
                                      |> Iter.filter_map (fun (st,d) -> 
                                          CCOpt.map (fun id -> (id,d)) (Term.head st)))  in
-        Precedence.weight_fun_of_string ~signature !_kbo_wf sym_depth)
+        let lits = Iter.flat_map (Statement.Seq.lits) stmts in
+        Precedence.weight_fun_of_string ~signature ~lits ~lm_w:!_lmb_w ~db_w:!_db_w !_kbo_wf sym_depth)
     (* |> Compute_prec.set_weight_rule (fun _ -> Classify_cst.weight_fun) *)
 
     (* use "invfreq", with low priority *)

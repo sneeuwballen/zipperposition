@@ -8,10 +8,12 @@ open Libzipperposition
 
 module T = Term
 module Pos = Position
+module US = Unif_subst
 
 type selection_setting = Any | Minimal | Large
 type reasoning_kind    = 
-    BoolReasoningDisabled | BoolCasesInference | BoolCasesSimplification | BoolCasesKeepParent
+    BoolReasoningDisabled | BoolCasesInference | BoolCasesDisabled 
+  | BoolCasesSimplification | BoolCasesKeepParent
   | BoolCasesEagerFar | BoolCasesEagerNear
 
 let section = Util.Section.make ~parent:Const.section "booleans"
@@ -25,7 +27,15 @@ let k_cnf_non_simpl = Flex_state.create_key ()
 let k_norm_bools = Flex_state.create_key () 
 let k_solve_formulas = Flex_state.create_key ()
 let k_filter_literals = Flex_state.create_key ()
+let k_nnf = Flex_state.create_key ()
+let k_elim_bvars = Flex_state.create_key ()
+let k_simplify_bools = Flex_state.create_key ()
 
+
+let selection_to_str = function
+  | Any -> "any"
+  | Minimal -> "minimal"
+  | Large -> "large"
 
 module type S = sig
   module Env : Env.S
@@ -43,56 +53,20 @@ module Make(E : Env.S) : S with module Env = E = struct
   module C = Env.C
   module Ctx = Env.Ctx
   module Fool = Fool.Make(Env)
+  module Combs = Combinators.Make(Env)
 
   let (=~),(/~) = Literal.mk_eq, Literal.mk_neq
   let (@:) = T.app_builtin ~ty:Type.prop
   let no a = a =~ T.false_
   let yes a = a =~ T.true_
-  let imply a b = Builtin.Imply @: [a;b]
-  let const_true p = T.fun_ (List.hd @@ fst @@ Type.open_fun (T.ty p)) T.true_
-
-  let true_not_false = [T.true_ /~ T.false_]
-  let true_or_false a = [yes a; a =~ T.false_]
-  let imp_true1 a b = [yes a; yes(imply a b)]
-  let imp_true2 a b = [no b; yes(imply a b)]
-  let imp_false a b = [no(imply a b); no a; yes b]
-  let all_true p = [p /~ const_true p; yes(Builtin.ForallConst@:[p])]
-  let all_false p = [no(Builtin.ForallConst@:[p]); p =~ const_true p]
-  let eq_true x y = [x/~y; yes(Builtin.Eq@:[x;y])]
-  let eq_false x y = [no(Builtin.Eq@:[x;y]); x=~y]
-  let and_ a b = [Builtin.And @: [a;b] 
-                  =~  imply (imply a (imply b T.false_)) T.false_]
-  let or_ a b = [Builtin.Or @: [a;b] 
-                 =~  imply (imply a T.false_) b] 
-
-  let and_true a  = [Builtin.And @: [T.true_; a] =~ a]
-  let and_false a  = [Builtin.And @: [T.false_; a] =~ T.false_]
-
-  let exists t = 
-    let t2bool = Type.arrow [t] Type.prop in
-    [T.app_builtin ~ty:(Type.arrow [t2bool] Type.prop) Builtin.ExistsConst [] =~ T.fun_ t2bool
-       (Builtin.Not @:[Builtin.ForallConst @:[T.fun_ t (Builtin.Not @:[T.app (T.bvar t2bool 1) [T.bvar t 0]])]])]
-
-  let as_clause c = Env.C.create ~penalty:1 ~trail:Trail.empty c Proof.Step.trivial
-
-  let create_clauses () = 
-    let a = T.var (HVar.make ~ty:Type.prop 0) in
-    [ [Builtin.And @:[T.true_; a] =~ a];
-      [Builtin.And @:[T.false_; a] =~ T.false_];
-      [Builtin.Or @:[T.true_; a] =~ T.true_];
-      [Builtin.Or @:[T.false_; a] =~ a];
-      [Builtin.Imply @:[T.true_; a] =~ a];
-      [Builtin.Imply @:[T.false_; a] =~ T.true_];
-      [Builtin.Not @:[T.true_] =~ T.false_];
-      [Builtin.Not @:[T.false_] =~ T.true_]; ] 
-    |> List.map as_clause |> Iter.of_list
-
+  
   let find_bools c =
+    let found = ref false in
     let subterm_selection = Env.flex_get k_cased_term_selection in
 
     let rec find_in_term ~top t k =
       match T.view t with 
-      | T.Const _ when Type.is_prop (T.ty t) -> k t
+      | T.Const _ when Type.is_prop (T.ty t) && not top -> k t
       | T.App(_, args)
       | T.AppBuiltin(_, args) ->
         let take_subterm =
@@ -100,44 +74,63 @@ module Make(E : Env.S) : S with module Env = E = struct
           Type.is_prop (T.ty t) && 
           not (T.is_true_or_false t) &&
           T.DB.is_closed t &&
+          not (T.is_var (T.head_term t)) &&
+          not (T.is_bvar (T.head_term t)) &&
           (subterm_selection != Minimal ||
            Iter.is_empty 
             (Iter.flat_map (find_in_term ~top:false) 
               (CCList.to_seq args))) in
         let continue =
-          (subterm_selection = Any || not take_subterm) in
+          (subterm_selection = Any || not take_subterm) &&
+          (* do not traverse variable-headed terms *)
+          not (T.is_var (T.head_term t)) &&
+          not (T.is_bvar (T.head_term t))
+           in
         if take_subterm then k t;
         if continue then (
           List.iter (fun arg -> 
-            find_in_term ~top:false arg k 
+            find_in_term ~top:(top && T.is_appbuiltin t) arg k 
           ) args)
       | T.Fun (_,body) ->
-        find_in_term ~top:false body k
+        find_in_term ~top body k
       | _ -> () in
 
     let eligible = 
       match Env.flex_get k_filter_literals with
       | `All -> C.Eligible.always
-      | `Max -> C.Eligible.param c in
+      | `Max -> (
+          match subterm_selection with 
+          | Any -> C.Eligible.res c
+          | _ -> (fun i lit -> 
+            (* found gives us the leftmost match! *)
+            not (!found) && C.Eligible.res c i lit)) in
     
     Literals.fold_terms ~which:`All
       ~subterms:false ~eligible ~ord:(C.Ctx.ord ()) (C.lits c)
-    |> Iter.flat_map (fun (t,_) -> find_in_term ~top:true t)
+    |> Iter.flat_map (fun (t,_) ->
+      let res = find_in_term ~top:true t in
+      if not (Iter.is_empty res) then found := true;
+      res
+    )
     |> T.Set.of_seq
     |> T.Set.to_list
   
   let mk_res ~proof ~old ~repl new_lit c =
     C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
       (new_lit :: Array.to_list( C.lits c |> Literals.map (T.replace ~old ~by:repl)))
-      proof
+    proof
 
   let bool_case_inf (c: C.t) : C.t list =    
     let proof = Proof.Step.inference [C.proof_parent c]
-                ~rule:(Proof.Rule.mk"bool_inf") ~tags:[Proof.Tag.T_ho] in
+                ~rule:(Proof.Rule.mk "bool_inf") ~tags:[Proof.Tag.T_ho] in
+
+    Util.debugf 5 ~section "bci(@[%a@])=@." (fun k -> k C.pp c);
 
     find_bools c
     |> CCList.fold_left (fun acc old ->
-      let neg_lit, repl = no old, T.true_ in
+      let neg_lit, repl = 
+        if Builtin.compare Builtin.True Builtin.False > 0 then (no old, T.true_)
+        else (yes old, T.false_) in
       (mk_res ~proof ~old ~repl neg_lit c) :: acc
     ) []
 
@@ -155,13 +148,212 @@ module Make(E : Env.S) : S with module Env = E = struct
         (mk_res ~proof ~old ~repl:repl_pos pos_lit c) :: acc
     ) [] bool_subterms)
 
+  let simplify_bools t =
+    let simplify_and_or t b l =
+      let open Term in
+      let compl_in_l l =
+        let pos, neg = 
+          CCList.partition_map (fun t -> 
+              match view t with 
+              | AppBuiltin(Builtin.Not, [s]) -> `Right s
+              | _ -> `Left t) l
+          |> CCPair.map_same Set.of_list in
+        not (Set.is_empty (Set.inter pos neg)) in
+      
+      let res = 
+        assert(b = Builtin.And || b = Builtin.Or);
+        let netural_el, absorbing_el = 
+          if b = Builtin.And then true_,false_ else (false_,true_) in
+
+        let l' = CCList.sort_uniq ~cmp:compare l in
+
+        if compl_in_l l || List.exists (equal absorbing_el) l then absorbing_el
+        else (
+          let l' = List.filter (fun s -> not (equal s netural_el)) l' in
+          if List.length l = List.length l' then t
+          else (
+            if CCList.is_empty l' then netural_el
+            else (if List.length l' = 1 then List.hd l'
+                  else app_builtin ~ty:(Type.prop) b l')
+          )) 
+      in
+      res 
+    in
+
+  let rec aux t =
+    let ty_is_prop t = Type.is_prop (T.ty t) in
+
+    match T.view t with 
+    | DB _ | Const _ | Var _ -> t
+    | Fun(ty, body) ->
+      let body' = aux body in
+      if T.equal body body' then t
+      else T.fun_ ty body'
+    | App(hd, args) ->
+      let hd' = aux hd and  args' = List.map aux args in
+      if T.equal hd hd' && T.same_l args args' then t
+      else T.app hd' args'
+    | AppBuiltin(Builtin.And, [x]) 
+        when T.is_true_or_false x
+             && ty_is_prop t
+             && List.length (Type.expected_args (T.ty t)) = 1 ->
+      if T.equal x T.true_ then (
+        T.fun_ Type.prop (T.bvar ~ty:Type.prop 0)
+      ) else (
+        assert (T.equal x T.false_);
+        T.fun_ Type.prop T.false_
+      )
+    | AppBuiltin(Builtin.Or, [x]) 
+        when T.is_true_or_false x 
+             && ty_is_prop t
+             && List.length (Type.expected_args (T.ty t)) = 1 ->
+      let prop = Type.prop in
+      if T.equal x T.true_ then (
+        T.fun_ prop (T.true_)
+      ) else (
+        assert (T.equal x T.false_);
+        T.fun_ prop (T.bvar ~ty:prop 0)
+      )
+    | AppBuiltin(Builtin.And, l)
+      when  ty_is_prop t &&
+            List.length l > 1 ->
+      let l' = List.map aux l in
+      let t = if T.same_l l l' then t 
+        else T.app_builtin ~ty:(Type.prop) Builtin.And l' in
+      simplify_and_or t Builtin.And l'
+    | AppBuiltin(Builtin.Or, l)
+      when ty_is_prop t &&
+           List.length l > 1 ->
+      let l' = List.map aux l in
+      let t = if T.same_l l l' then t 
+        else T.app_builtin ~ty:(Type.prop) Builtin.Or l' in
+      simplify_and_or t Builtin.Or l'
+    | AppBuiltin(Builtin.Not, [s]) ->
+      if T.equal s T.true_ then T.false_
+      else 
+      if T.equal s T.false_ then T.true_
+      else (
+        match T.view s with 
+        | AppBuiltin(Builtin.Not, [s']) -> aux s'
+        | _ ->  
+          let s' = aux s in
+          if T.equal s s' then t else
+            T.app_builtin ~ty:(Type.prop) Builtin.Not [s'] 
+      )
+    | AppBuiltin(Builtin.Imply, [p;c]) ->
+      if T.equal p T.true_ then aux c
+      else if T.equal p T.false_ then T.true_
+      else if T.equal c T.false_ then aux (T.Form.not_ p)
+      else if T.equal c T.true_ then T.true_
+      else if T.equal p c then T.true_
+      else (
+        let p',c' = aux p, aux c in
+        if T.equal p p' && T.equal c c' then t 
+        else T.app_builtin ~ty:(T.ty t) Builtin.Imply [p';c'])
+    | AppBuiltin((Builtin.Eq | Builtin.Equiv) as hd, ([a;b]|[_;a;b])) ->
+      if T.equal a b then T.true_ 
+      else if T.equal a T.true_ then aux b
+      else if T.equal b T.true_ then aux a
+      else if T.equal a T.false_ then aux (T.Form.not_ b)
+      else if T.equal b T.false_ then aux (T.Form.not_ a)
+      else (
+        let a',b' = aux a, aux b in
+        if T.equal a a' && T.equal b b' then t 
+        else T.app_builtin ~ty:(T.ty t) hd [a';b']
+      )
+    | AppBuiltin((Builtin.Neq | Builtin.Xor) as hd, ([a;b]|[_;a;b])) ->
+      if T.equal a b then T.false_ else (
+        let a',b' = aux a, aux b in
+        if T.equal a a' && T.equal b b' then t 
+        else T.app_builtin ~ty:(T.ty t) hd [a';b']
+      )
+    | AppBuiltin((ExistsConst|ForallConst) as b, [g]) ->
+      let g' = aux g in
+      let exp_g = Combs.expand g' in
+      let _, body = T.open_fun exp_g in
+      assert(Type.is_prop (T.ty body));
+      if (T.Seq.subterms ~include_builtin:true body
+          |> Iter.exists T.is_bvar) then (
+        if T.equal g g' then t
+        else T.app_builtin ~ty:(T.ty t) b [g']
+      ) else body
+    | AppBuiltin(hd, args) ->
+      let args' = List.map aux args in
+      if T.same_l args args' then t
+      else T.app_builtin ~ty:(T.ty t) hd args' in  
+  let res = aux t in
+  assert (T.DB.is_closed res);
+  res
+
   let simpl_bool_subterms c =
-    let new_lits = Literals.map T.simplify_bools (C.lits c) in
+    let new_lits = Literals.map simplify_bools (C.lits c) in
     if Literals.equal (C.lits c) new_lits then (
       SimplM.return_same c
     ) else (
       let proof = Proof.Step.simp [C.proof_parent c] 
           ~rule:(Proof.Rule.mk "simplify boolean subterms") in
+      let new_ = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) 
+          (Array.to_list new_lits) proof in
+      SimplM.return_new new_
+    )
+
+  let nnf_bools t =
+    let module F = T.Form in
+    let rec aux t =
+      match T.view t with 
+      | Const _ | DB _ | Var _ -> t
+      | Fun _ ->
+        let tyargs, body = T.open_fun t in
+        let body' = aux body in
+        if T.equal body body' then t
+        else T.fun_l tyargs body'
+      | App(hd, l) ->
+        let hd' = aux hd and l' = List.map aux l in
+        if T.equal hd hd' && T.same_l l l' then t
+        else T.app hd' l'
+      | AppBuiltin (Builtin.Not, [f]) ->
+        begin match T.view f with 
+        | AppBuiltin(Not, [g]) -> aux g
+        | AppBuiltin( ((And|Or) as b), l) when List.length l >= 2 ->
+          let flipped = if b = Builtin.And then F.or_l else F.and_l in
+          flipped (List.map (fun t -> aux (F.not_ t))  l)
+        | AppBuiltin( ((ForallConst|ExistsConst) as b), ([g]|[_;g]) ) ->
+          let flipped = 
+            if b = Builtin.ForallConst then Builtin.ExistsConst
+            else Builtin.ForallConst in
+          let g_ty_args, g_body = T.open_fun (Combs.expand g)  in
+          let g_body' = aux @@ F.not_ g_body in
+          let g' = Lambda.eta_reduce (T.fun_l g_ty_args g_body') in
+          T.app_builtin ~ty:(T.ty t) flipped [g']
+        | AppBuiltin( Imply, [g;h] ) ->
+          F.and_ (aux g) (aux @@ F.not_ h)
+        | AppBuiltin( ((Equiv|Xor) as b), [g;h] ) ->
+          let flipped = if b = Equiv then Builtin.Xor else Builtin.Equiv in
+          aux (T.app_builtin ~ty:(T.ty t) flipped [g;h])
+        | AppBuiltin(((Eq|Neq) as b), ([_;s;t]|[s;t])) ->
+          let flipped = if b = Eq then F.neq else F.eq in
+          flipped (aux s) (aux t)
+        | _ -> F.not_ (aux f)
+        end
+      | AppBuiltin(Imply, [f;g]) -> aux (F.or_ (F.not_ f) g)
+      | AppBuiltin(Equiv, [f;g]) ->
+        aux (F.and_ (F.imply f g) (F.imply g f))
+      | AppBuiltin(Xor, [f;g]) ->
+        aux (F.and_ (F.or_ f g) (F.or_ (F.not_ f)  (F.not_ g)))
+      | AppBuiltin(b, l) ->
+        let l' = List.map aux l in
+        if T.same_l l l' then t
+        else T.app_builtin ~ty:(T.ty t) b l' in
+    aux t
+
+
+  let nnf_bool_subters c =
+    let new_lits = Literals.map nnf_bools (C.lits c) in
+    if Literals.equal (C.lits c) new_lits then (
+      SimplM.return_same c
+    ) else (
+      let proof = Proof.Step.simp [C.proof_parent c] 
+          ~rule:(Proof.Rule.mk "nnf boolean subterms") in
       let new_ = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) 
           (Array.to_list new_lits) proof in
       SimplM.return_new new_
@@ -185,7 +377,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     if List.exists CCOpt.is_some normalized then (
       let new_lits = List.mapi (fun i l_opt -> 
           CCOpt.get_or ~default:(Array.get (C.lits c) i) l_opt) normalized in
-      let proof = Proof.Step.inference [C.proof_parent c] 
+      let proof = Proof.Step.simp [C.proof_parent c] 
           ~rule:(Proof.Rule.mk "simplify nested equalities")  in
       let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
       SimplM.return_new new_c
@@ -194,7 +386,98 @@ module Make(E : Env.S) : S with module Env = E = struct
       SimplM.return_same c 
     )
 
-  let cnf_otf c : C.t list option =   
+  let solve_bool_formulas c =
+    let module PUnif = 
+      PUnif.Make(struct 
+        let st = 
+          Env.flex_state ()
+          |> Flex_state.add PragUnifParams.k_fixpoint_decider true
+          |> Flex_state.add PragUnifParams.k_pattern_decider true
+          |> Flex_state.add PragUnifParams.k_solid_decider true
+          |> Flex_state.add PragUnifParams.k_max_inferences 1
+          |> Flex_state.add PragUnifParams.k_max_depth 2
+          |> Flex_state.add PragUnifParams.k_max_app_projections 2
+          |> Flex_state.add PragUnifParams.k_max_rigid_imitations 2
+          |> Flex_state.add PragUnifParams.k_max_elims 2
+          |> Flex_state.add PragUnifParams.k_max_identifications 2
+        end) in
+    
+    let normalize_not t =
+      let rec aux t = 
+        match T.view t with
+        | T.AppBuiltin(Not, [f]) ->
+          begin match T.view f with
+          | T.AppBuiltin(Not, [g]) -> aux g
+          | T.AppBuiltin( ((Eq|Equiv) as b), l ) ->
+            let flipped = 
+              if b = Builtin.Eq then Builtin.Neq else Builtin.Xor in
+            T.app_builtin flipped l ~ty:(T.ty f)
+          | T.AppBuiltin( ((Neq|Xor) as b), l ) ->
+            let flipped = 
+              if b = Builtin.Neq then Builtin.Eq else Builtin.Equiv in
+            T.app_builtin flipped l ~ty:(T.ty f)
+          | _ -> t end
+        | _ -> t in
+      aux t in
+
+    let find_resolvable_form lit =
+      let res = 
+        match (Literal.View.as_eqn lit) with 
+        | Some (l,r,sign) ->
+          if not sign && not (T.is_true_or_false r) && Type.is_prop (T.ty l) then (
+            Some (l,r)
+          ) else if T.is_true_or_false r then (
+            let neg = if sign then CCFun.id else T.Form.not_ in
+            match T.view (normalize_not (neg l)) with 
+            | T.AppBuiltin((Neq|Xor), ([f;g]|[_;f;g])) when Type.is_prop (T.ty f) ->
+              assert(Type.equal (T.ty f) (T.ty g));
+              Some (f,g)
+            | _ -> None
+          ) else None
+        | None -> None in
+      CCOpt.map (fun (l,r) -> T.normalize_bools l, T.normalize_bools r) res in
+
+    let unif_alg l r =
+      if not (Env.flex_get Combinators.k_enable_combinators) then (
+        PUnif.unify_scoped (l,0) (r,0)
+        |> OSeq.nth 0
+        |> CCOpt.get_exn
+      ) else Unif_subst.of_subst @@ Unif.FO.unify_syn (l,0) (r,0) in
+    
+    Util.debugf ~section 1 "bool solving @[%a@]@."(fun k -> k C.pp c);
+    C.lits c
+    |> CCArray.mapi (fun i lit ->
+      match find_resolvable_form lit with 
+      | None -> 
+        None
+      | Some (l,r) ->
+        try
+          Util.debugf ~section 1 "trying lit @[%d:%a@]@."(fun k -> k i Literal.pp lit);
+          let subst = unif_alg l r in
+          assert(not @@ Unif_subst.has_constr subst);
+          let new_lits = 
+            CCArray.except_idx (C.lits c) i
+            |> CCArray.of_list
+            |> (fun l -> 
+                Literals.apply_subst 
+                  (Subst.Renaming.create ()) (US.subst subst) (l,0))
+            |> CCArray.to_list in
+          let proof = 
+            Proof.Step.simp ~tags:[Proof.Tag.T_ho]
+              ~rule:(Proof.Rule.mk "solve_formulas")
+              [C.proof_parent c] in
+          let res = C.create ~penalty:(C.penalty c) ~trail:(C.trail c) new_lits proof in
+          Util.debugf ~section 1 "solved by @[%a@]@."(fun k ->  k C.pp res);
+          Some res
+        with _ -> 
+          Util.debugf ~section 1 "failed @." (fun k -> k);
+          None)
+      |> CCArray.filter_map CCFun.id
+      |> CCArray.to_list
+      |> (fun l -> if CCList.is_empty l then None else Some l)
+
+
+  let cnf_otf c : C.t list option =
     let idx = CCArray.find_idx (fun l -> 
         let eq = Literal.View.as_eqn l in
         match eq with 
@@ -228,39 +511,62 @@ module Make(E : Env.S) : S with module Env = E = struct
       CCVector.iter (fun cl -> 
           Statement.Seq.ty_decls cl
           |> Iter.iter (fun (id,ty) -> Ctx.declare id ty)) cnf_vec;
+      let solved = 
+        if Env.flex_get k_solve_formulas then (
+          CCOpt.get_or ~default:[] (solve_bool_formulas c))
+        else [] in
 
-      begin try 
-        let clauses = CCVector.map (C.of_statement ~convert_defs:true) cnf_vec
-                      |> CCVector.to_list 
-                      |> CCList.flatten
-                      |> List.map (fun c -> 
-                          C.create ~penalty  ~trail (CCArray.to_list (C.lits c)) proof) in
-        List.iteri (fun i new_c -> 
-            assert((C.proof_depth c) <= C.proof_depth new_c);) clauses;
-        Some clauses
-      with Type.ApplyError err ->
-        CCFormat.printf "cnf(@[%a@])@.err:@[%s@]@." C.pp c err;
-        CCFormat.printf "result:@[%a@]@." (CCVector.pp ~sep:";\n" (Statement.pp_clause_in Output_format.O_tptp)) cnf_vec;
-        CCFormat.printf "proof:@[%a@]@." Proof.S.pp_tstp (C.proof c);
-        assert false; end
+      let clauses = CCVector.map (C.of_statement ~convert_defs:true) cnf_vec
+                    |> CCVector.to_list 
+                    |> CCList.flatten
+                    |> List.map (fun c -> 
+                        C.create ~penalty  ~trail (CCArray.to_list (C.lits c)) proof) in
+      List.iteri (fun i new_c -> 
+          assert((C.proof_depth c) <= C.proof_depth new_c);) clauses;
+      Some (solved @clauses)
     | None -> None
 
   let cnf_infer cl = 
     CCOpt.get_or ~default:[] (cnf_otf cl)
 
+  let elim_bvars c =
+    C.Seq.vars c
+    |> T.VarSet.of_seq |> T.VarSet.to_seq
+    |> Iter.filter (fun v -> Type.is_prop (HVar.ty v))
+    |> Iter.flat_map_l (fun v ->
+        let subst_true = 
+          Subst.FO.bind' Subst.empty (v, 0) (T.true_, 0) in
+        let subst_false = 
+          Subst.FO.bind' Subst.empty (v, 0) (T.false_, 0) in
+        [subst_true; subst_false])
+    |> Iter.map (fun subst ->
+        let proof =
+          Some (Proof.Step.simp 
+            ~tags:[Proof.Tag.T_ho] ~rule:(Proof.Rule.mk "elim_bool_vars")
+            [C.proof_parent c]) in
+        C.apply_subst ~proof (c,0) subst)
+    |> (fun iter -> 
+        if Iter.is_empty iter then None
+        else Some (Iter.to_list iter))
+
+
   let interpret_boolean_functions c =
     (* Collects boolean functions only at top level, 
        and not the ones that are already a part of the quantifier *)
-    let collect_tl_bool_funcs t k = 
+    let collect_tl_bool_funs t k = 
       let rec aux t =
-        match T.view t with
-        | Var _  | Const _  | DB _ -> ()
-        | Fun _ -> if Type.is_prop (Term.ty (snd @@ Term.open_fun t)) then k t
-        | App (f, l) ->
-          aux f;
-          List.iter aux l
-        | AppBuiltin (b,l) -> 
-          if not @@ Builtin.is_quantifier b then List.iter aux l 
+        let ty_args, ret_ty = Type.open_fun (T.ty t) in
+        if not (CCList.is_empty ty_args) 
+           && Type.is_prop ret_ty
+           && not (T.is_var t) 
+           && not (T.is_app_var t) then k t else(
+          match T.view t with
+          | App (f, l) ->
+            (* head positions are not taken into account *)
+            List.iter aux l
+          | AppBuiltin (b,l) when not (Builtin.is_quantifier b) ->
+            List.iter aux l
+          | _ -> ())
       in
       aux t in
     let interpret t i = 
@@ -274,67 +580,76 @@ module Make(E : Env.S) : S with module Env = E = struct
       T.fun_l ty_args (T.Form.not_ body)
     in
 
-    Iter.flat_map collect_tl_bool_funcs 
+    let forall_close t = 
+      let ty_args, body = T.open_fun t in
+      assert(Type.is_prop (T.ty body));
+
+      List.fold_right (fun ty acc -> 
+        T.Form.forall (T.fun_ ty acc)
+      ) ty_args body in 
+
+    Iter.flat_map collect_tl_bool_funs 
       (C.Seq.terms c
-       |> Iter.filter (fun t -> not @@ T.is_fun t))
-    |> Iter.sort_uniq ~cmp:Term.compare
-    |> Iter.filter (fun t ->  
+       (* If the term is a top-level function, then apply extensionality,
+          not this rule on it. *)
+       |> Iter.filter (fun t -> not @@ Type.is_fun (T.ty t)))
+    (* avoiding terms introduced by primitive enumeration *)
+    |> Iter.filter (fun t ->
         let cached_t = Subst.FO.canonize_all_vars t in
         not (Term.Set.mem cached_t !Higher_order.prim_enum_terms))
+    |> Iter.sort_uniq ~cmp:Term.compare
     |> Iter.fold (fun res t -> 
         assert(T.DB.is_closed t);
-        let proof = Proof.Step.inference[C.proof_parent c]
+        let proof = Proof.Step.inference [C.proof_parent c]
             ~rule:(Proof.Rule.mk"interpret boolean function") ~tags:[Proof.Tag.T_ho]
         in
-        let as_forall = Literal.mk_prop (T.Form.forall t) false in
-        let as_neg_forall = Literal.mk_prop (T.Form.forall (negate_bool_fun t)) false in
-        let forall_cl = 
-          C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
-            (as_forall :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:t ~by:(interpret t T.true_))))
-            proof in
-        let forall_neg_cl = 
-          C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
-            (as_neg_forall :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:t ~by:(interpret t T.false_))))
-            proof in
 
-        Util.debugf ~section  1 "interpret bool: %a !!> %a.\n"  (fun k -> k C.pp c C.pp forall_cl);
-        Util.debugf ~section  1 "interpret bool: %a !!~> %a.\n" (fun k -> k C.pp c C.pp forall_neg_cl);
+        let t' = Combs.expand t in
+        let _,t'_body = T.open_fun t' in
 
-        forall_cl :: forall_neg_cl :: res
-      ) []
+        if not (T.is_true_or_false t'_body) then (
+          let as_forall = Literal.mk_prop (forall_close t') false in
+          let as_neg_forall = Literal.mk_prop (forall_close (negate_bool_fun t')) false in
+          let forall_cl =
+            C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
+              (as_forall :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:t ~by:(interpret t' T.true_))))
+              proof in
+          let forall_neg_cl = 
+            C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
+              (as_neg_forall :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:t ~by:(interpret t' T.false_))))
+              proof in
 
-  let solve_bool_formulas cl =
-    let module PUnif = PUnif.Make(struct let st = Env.flex_state () end) in
-    let unifiers = CCList.flat_map (fun literal -> 
-        match literal with 
-        | Literal.Equation(lhs, rhs, false) when Type.is_prop (Term.ty lhs) ->
-          PUnif.unify_scoped (lhs,0) (rhs,0)
-          |> OSeq.filter_map CCFun.id
-          |> OSeq.to_list
-        | _ -> []
-      ) (CCArray.to_list (C.lits cl)) in
-    if CCList.is_empty unifiers then None
-    else Some (List.map (fun subst -> 
-        let subst = Unif_subst.subst subst in
-        C.apply_subst (cl,0) subst) unifiers)
+          Util.debugf ~section  1 "interpret bool(@[%a@]):@.@[%a@] !!> @. @[%a@]@."  
+            (fun k -> k T.pp t Literals.pp (C.lits c) Literals.pp (C.lits forall_cl));
+          Util.debugf ~section  1 "interpret bool(@[%a@]):@.@[%a@] !!> @. @[%a@]@." 
+            (fun k -> k T.pp t Literals.pp (C.lits c) Literals.pp (C.lits forall_neg_cl));
+
+          forall_cl :: forall_neg_cl :: res
+        ) else res) 
+      []
 
   let setup () =
     match Env.flex_get k_bool_reasoning with 
     | BoolReasoningDisabled -> ()
     | _ -> 
-      (* Env.ProofState.PassiveSet.add (create_clauses ()); *)
-      Env.add_basic_simplify simpl_bool_subterms;
+      if Env.flex_get k_simplify_bools then (
+        Env.add_basic_simplify simpl_bool_subterms
+      );
       Env.add_basic_simplify normalize_equalities;
+      if Env.flex_get k_nnf then (
+        E.add_basic_simplify nnf_bool_subters;
+      );
       if Env.flex_get k_norm_bools then (
         Env.add_basic_simplify normalize_bool_terms
       );
-      Env.add_multi_simpl_rule Fool.rw_bool_lits;
-      if Env.flex_get k_cnf_non_simpl then (
-        Env.add_unary_inf "cnf otf inf" cnf_infer;
-      ) else  Env.add_multi_simpl_rule cnf_otf;
-      if Env.flex_get k_solve_formulas then (
-        Env.add_multi_simpl_rule solve_bool_formulas
+      if Env.flex_get k_elim_bvars then (
+        Env.add_multi_simpl_rule elim_bvars
       );
+      if not !Lazy_cnf.enabled then (
+        Env.add_multi_simpl_rule Fool.rw_bool_lits;
+        if Env.flex_get k_cnf_non_simpl then (
+          Env.add_unary_inf "cnf otf inf" cnf_infer;
+        ) else  Env.add_multi_simpl_rule cnf_otf);
       if (Env.flex_get k_interpret_bool_funs) then (
         Env.add_unary_inf "interpret boolean functions" interpret_boolean_functions;
       );
@@ -343,7 +658,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         Env.add_unary_inf "bool_cases" bool_case_inf;
       )
       else if Env.flex_get k_bool_reasoning = BoolCasesSimplification then (
-        Env.set_single_step_multi_simpl_rule bool_case_simp;
+        Env.add_single_step_multi_simpl_rule bool_case_simp;
       ) else if Env.flex_get k_bool_reasoning = BoolCasesKeepParent then (
         let keep_parent c  = CCOpt.get_or ~default:[] (bool_case_simp c) in
         Env.add_unary_inf "bool_cases_keep_parent" keep_parent;
@@ -573,7 +888,10 @@ let _interpret_bool_funs = ref false
 let _cnf_non_simpl = ref false
 let _norm_bools = ref false 
 let _solve_formulas = ref false
-let _filter_literals = ref `All
+let _filter_literals = ref `Max
+let _nnf = ref false
+let _simplify_bools = ref true
+let _elim_bvars = ref false
 
 
 let extension =
@@ -588,7 +906,9 @@ let extension =
     E.flex_add k_norm_bools !_norm_bools;
     E.flex_add k_solve_formulas !_solve_formulas;
     E.flex_add k_filter_literals !_filter_literals;
-
+    E.flex_add k_nnf !_nnf;
+    E.flex_add k_elim_bvars !_elim_bvars;
+    E.flex_add k_simplify_bools !_simplify_bools;
 
     ET.setup ()
   in
@@ -599,10 +919,11 @@ let extension =
 
 let () =
   Options.add_opts
-    [ "--boolean-reasoning", Arg.Symbol (["off"; "cases-inf"; "cases-simpl"; "cases-simpl-kp"; "cases-eager"; "cases-eager-near"], 
+    [ "--boolean-reasoning", Arg.Symbol (["off"; "no-cases"; "cases-inf"; "cases-simpl"; "cases-simpl-kp"; "cases-eager"; "cases-eager-near"], 
                                          fun s -> _bool_reasoning := 
                                              match s with 
                                              | "off" -> BoolReasoningDisabled
+                                             | "no-cases" -> BoolCasesDisabled
                                              | "cases-inf" -> BoolCasesInference
                                              | "cases-simpl" -> BoolCasesSimplification
                                              | "cases-simpl-kp" -> BoolCasesKeepParent
@@ -629,6 +950,15 @@ let () =
     "--solve-formulas"
     , Arg.Bool (fun v -> _solve_formulas := v)
     , " solve phi != psi eagerly using unification, where phi and psi are formulas";
+    "--nnf-nested-formulas"
+    , Arg.Bool (fun v -> _nnf := v)
+    , " convert nested formulas into negation normal form";
+    "--simplify-bools"
+    , Arg.Bool (fun v -> _simplify_bools := v)
+    , " simplify boolean subterms";
+    "--elim-bvars"
+    , Arg.Bool ((:=) _elim_bvars)
+    , " replace boolean variables by T and F";
     "--boolean-reasoning-filter-literals"
     , Arg.Symbol(["all"; "max"], (fun v ->
         match v with 
@@ -642,6 +972,7 @@ let () =
                        "lambda-free-intensional";
                        "lambda-free-purify-intensional";
                        "lambda-free-extensional";
+                       "ho-comb-complete";
                        "lambda-free-purify-extensional";
                        "fo-complete-basic"] (fun () ->
       _bool_reasoning := BoolReasoningDisabled

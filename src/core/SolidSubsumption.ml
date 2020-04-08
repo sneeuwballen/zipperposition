@@ -229,8 +229,7 @@ module Make (S : sig val st : Flex_state.t end) = struct
   let sign l = 
     let res = 
       match l with 
-      | L.Equation (_, r, sign) ->
-        if sign && T.is_true_or_false r then T.equal r T.true_ else sign
+      | L.Equation (_, _, sign) -> sign
       | L.Int o -> Int_lit.sign o
       | L.False -> false
       | _ -> true 

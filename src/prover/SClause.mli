@@ -73,7 +73,7 @@ val pp_in : Output_format.t -> t CCFormat.printer
 
 (** {2 Proofs} *)
 
-val proof_tc : t Proof.Result.tc
+val proof_tc : t -> t Proof.Result.tc
 
 val mk_proof_res : t -> Proof.Result.t
 

@@ -317,10 +317,10 @@ let rec is_properly_encoded t = match T.view t with
   | AppBuiltin (hd,l) when Builtin.equal hd Builtin.ForallConst 
                         || Builtin.equal hd Builtin.ExistsConst ->
     let res = begin match l with
-      | [body] -> let ty = Term.ty body in
-        Type.is_fun ty && Type.returns_prop ty
-      | _ -> false end in
-    if not res then CCFormat.printf "Failed for %a.\n" T.pp t;
+    | [body] -> let ty = Term.ty body in
+      Type.is_fun ty && Type.returns_prop ty
+    | _ -> false end in
+    (* if not res then CCFormat.printf "Failed for %a.\n" T.pp t; *)
     res
   | AppBuiltin(_,l) -> List.for_all is_properly_encoded l
   | App (hd, l) -> List.for_all is_properly_encoded (hd::l)

@@ -536,12 +536,12 @@ let close_all ~ty s t =
   let vars = free_vars t in
   bind_list ~ty s vars t
 
-let close_with_vars vars t =
+let close_with_vars ?(binder=Binder.Forall) vars t =
   let vars = List.map (fun v -> match view v with
       | Var v -> v
       | _ -> invalid_arg "has to be a variable" ) 
       vars in
-  bind_list Binder.Forall vars t ~ty:prop
+  bind_list binder vars t ~ty:prop
 
 let unfold_fun = unfold_binder Binder.Lambda
 
@@ -806,8 +806,8 @@ module Form = struct
   let view (t:term) = match view t with
     | AppBuiltin (Builtin.True, []) -> True
     | AppBuiltin (Builtin.False, []) -> False
-    | AppBuiltin (Builtin.And, l) -> And l
-    | AppBuiltin (Builtin.Or, l) -> Or l
+    | AppBuiltin (Builtin.And, l) when Ty.is_prop (ty_exn t) -> And l
+    | AppBuiltin (Builtin.Or, l) when Ty.is_prop (ty_exn t) -> Or l
     | AppBuiltin (Builtin.Not, [f]) -> Not f
     | AppBuiltin (Builtin.Imply, [a;b]) -> Imply(a,b)
     | AppBuiltin (Builtin.Equiv, [a;b]) -> Equiv(a,b)
@@ -866,19 +866,23 @@ module Form = struct
 
   let and_ ?loc l  =
     let flattened = flatten_ `And [] l in
+    let parsing = CCOpt.is_some loc in
     match flattened with
-    | [] when (not @@ CCList.is_empty l) -> true_
-    | [t] when (CCList.length l != 1) -> t 
+    | [] when not parsing -> true_
+    | [t] when not parsing -> t 
     | _ ->  app_builtin ?loc ~ty:Ty.prop Builtin.And (flattened)
 
   let or_ ?loc l = 
     let flattened = flatten_ `Or [] l in
+    let parsing = CCOpt.is_some loc in
     match flattened with
-    | [] -> false_
-    | [t] -> t 
+    | [] when not parsing -> false_
+    | [t] when not parsing -> t 
     | _ ->  app_builtin ?loc ~ty:Ty.prop Builtin.Or (flattened)
 
-  let not_ ?loc f = app_builtin ?loc ~ty:Ty.prop Builtin.Not [f]
+  let not_ ?loc f = 
+    assert(Ty.is_prop (ty_exn f));
+    app_builtin ?loc ~ty:Ty.prop Builtin.Not [f]
 
   let forall ?loc v t = bind ?loc ~ty:Ty.prop Binder.Forall v t
   let exists ?loc v t = bind ?loc ~ty:Ty.prop Binder.Exists v t
@@ -1637,7 +1641,7 @@ let simplify_formula t =
   let rec aux t =
     let ty = ty_exn t in
     match view t with 
-    | AppBuiltin( ((And|Or) as b) , args) ->
+    | AppBuiltin( ((And|Or) as b) , args) when Ty.is_prop ty ->
       simplify_and_or t b (List.map aux args)
     | AppBuiltin( Not, [s]) ->
       begin match view s with

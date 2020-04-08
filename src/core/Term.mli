@@ -140,7 +140,10 @@ val in_lfho_fragment : t -> bool
 val is_fo_term : t -> bool
 val is_true_or_false : t -> bool
 
-val mk_fresh_skolem : var list -> Type.t -> (ID.t*Type.t) * t
+val hd_is_comb: Builtin.t -> bool
+val is_comb : t -> bool
+
+val mk_fresh_skolem : ?prefix:string -> var list -> Type.t -> (ID.t*Type.t) * t
 
 val as_const : t -> ID.t option
 val as_const_exn : t -> ID.t
@@ -152,6 +155,11 @@ val as_bvar_exn : t -> int
 val as_app : t -> t * t list
 (** [as_app t] decomposes [t] into a head (non-application) and arguments,
     such as [(let f,l = as_app t in app f l) = t] *)
+
+val as_app_mono : t -> t * t list
+(** [as_app t] decomposes [t] into a head (possibly applied to type arguments) 
+    and arguments, such as [(let f,l = as_app t in app f l) = t] *)
+
 
 val as_fun : t -> Type.t list * t
 (** Open functions *)
@@ -226,7 +234,6 @@ val head_exn : t -> ID.t (** head ID.t (or Invalid_argument) *)
 
 val size : t -> int (** Size (number of nodes) *)
 
-val simplify_bools : t -> t
 (* Sort the arguments to logical operators using their weights
    in an attempt to make more terms unifiable. *)
 val normalize_bools : t -> t
@@ -363,6 +370,9 @@ val debugf : Format.formatter -> t -> unit
 
 module Form : sig
   val not_ : t -> t
+  val equiv : t -> t -> t
+  val xor : t -> t -> t
+  val imply : t -> t -> t
   val eq : t -> t -> t
   val neq : t -> t -> t
   val and_ : t -> t -> t

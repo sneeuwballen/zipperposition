@@ -170,8 +170,6 @@ module Make (P : PARAMETERS) = struct
           sort_class rr @ sort_class fr @ sort_class unsure @ rest @ sort_class ff
         else rr @ fr @ unsure @ rest @ ff in
 
-
-
       let decompose_and_cont ?(inc_step=0) args_l args_r rest flag subst =
         let new_prob = decompose args_l args_r rest flag in
         aux ~steps:(steps+inc_step) subst new_prob in
@@ -206,7 +204,9 @@ module Make (P : PARAMETERS) = struct
             | T.AppBuiltin(b1, args1), T.AppBuiltin(b2, args2) ->
               let args_lhs = args_lhs @ args1 and args_rhs = args_rhs @ args2 in
               if Builtin.equal b1 b2 && List.length args_lhs = List.length args_rhs then (
-                  decompose_and_cont (args_lhs) (args_rhs) rest flag subst
+                let args_lhs, args_rhs = 
+                  Unif.norm_logical_disagreements b1 args_lhs args_rhs in
+                decompose_and_cont (args_lhs) (args_rhs) rest flag subst
               ) else OSeq.empty
             | _ when different_rigid_heads hd_lhs hd_rhs -> OSeq.empty
             | _ -> 
@@ -255,13 +255,14 @@ module Make (P : PARAMETERS) = struct
     let lhs,rhs,unifscope,subst = P.identify_scope t0s t1s in
     try
       do_unif [(lhs,rhs,P.init_flag)] subst unifscope
-    |> OSeq.map (fun opt -> CCOpt.map (fun subst -> 
-       let l = Lambda.eta_reduce @@ Lambda.snf @@ S.FO.apply Subst.Renaming.none subst t0s in 
-       let r = Lambda.eta_reduce @@ Lambda.snf @@ S.FO.apply Subst.Renaming.none subst t1s in
+    |> OSeq.map (fun opt -> CCOpt.map (fun subst ->
+       let norm t = T.normalize_bools @@ Lambda.eta_expand @@ Lambda.snf t in
+       let l = norm @@ S.FO.apply Subst.Renaming.none subst t0s in 
+       let r = norm @@ S.FO.apply Subst.Renaming.none subst t1s in
        if not ((T.equal l r) && (Type.equal (Term.ty l) (Term.ty r))) then (
-        CCFormat.printf "orig:@[%a@]=?=@[%a@]@." (Scoped.pp T.pp) t0s (Scoped.pp T.pp) t1s;
         CCFormat.printf "subst:@[%a@]@." Subst.pp subst;
-        CCFormat.printf "new:@[%a@]=?=@[%a@]@." T.pp l T.pp r;
+        CCFormat.printf "orig:@[%a@]@.=?=@.@[%a@]@." (Scoped.pp T.pp) t0s (Scoped.pp T.pp) t1s;
+        CCFormat.printf "new:@[%a:%a@]@.=?=@.@[%a:%a@]@." T.pp l Type.pp (T.ty l) T.pp r Type.pp (T.ty r);
         assert(false)
        ); subst) opt)
     with Unif.Fail -> OSeq.empty

@@ -43,14 +43,14 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~signature ~offset 
     let vars = List.mapi (fun i ty -> HVar.make ~ty i) ty_args in
     (* projection with "¬": [λvars. ¬ (F vars)] *)
     let l_not = match mode with
-      | `None | `TF -> []
+      | `None | `TF | `Combinators -> []
       | `Neg | `Full | `Pragmatic ->
         let f = HVar.make offset ~ty:ty_v in
         [T.fun_of_fvars vars
            (T.Form.not_ (T.app (T.var f) (List.map T.var vars)))]
     (* projection with "∧": [λvars. (F1 vars) ∧ (F2 vars)] *)
     and l_and = match mode with
-      | `Neg | `None | `Pragmatic | `TF -> []
+      | `Neg | `None | `Pragmatic | `TF | `Combinators -> []
       | `Full ->
         let f = HVar.make offset ~ty:ty_v in
         let g = HVar.make (offset+1) ~ty:ty_v in
@@ -59,7 +59,7 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~signature ~offset 
               (T.app (T.var f) (List.map T.var vars))
               (T.app (T.var g) (List.map T.var vars)))]
     and l_or = match mode with
-      | `Neg | `None | `Pragmatic | `TF -> []
+      | `Neg | `None | `Pragmatic | `TF | `Combinators -> []
       | `Full ->
         let f = HVar.make offset ~ty:ty_v in
         let g = HVar.make (offset+1) ~ty:ty_v in
@@ -70,7 +70,7 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~signature ~offset 
     (* projection with "=": [λvars. (F1 vars) = (F2 vars)]
        where [F1 : Πa. ty_args -> a] *)
     and l_eq = match mode with
-      | `Neg | `Pragmatic | `None | `TF -> []
+      | `Neg | `Pragmatic | `None | `TF | `Combinators -> []
       | `Full ->
         let a = HVar.make offset ~ty:Type.tType in
         let ty_fun = Type.arrow ty_args (Type.var a) in
@@ -81,12 +81,12 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~signature ~offset 
               (T.app (T.var f) (List.map T.var vars))
               (T.app (T.var g) (List.map T.var vars)))]
     and l_false = match mode with
-      | `None -> []
-      | `Neg | `Pragmatic | `Full | `TF  ->
+      | `None | `Combinators -> []
+      | `Neg | `Pragmatic | `TF  | `Full ->
         [T.fun_of_fvars vars T.false_]
     and l_true = match mode with
-      | `None -> []
-      | `Neg | `Pragmatic | `Full | `TF ->
+      | `None | `Combinators -> []
+      | `Neg | `Pragmatic | `TF | `Full ->
         [T.fun_of_fvars vars T.true_]
     and l_quants = match mode with
       | `Full ->
@@ -154,29 +154,54 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~signature ~offset 
           db_vars
         |> CCList.flatten
       | _ -> []
+    and l_combinators = match mode with
+      | `Combinators -> 
+        let (==>) = Type.arrow in
+        let o = Type.prop in
+        let fresh_ty = Type.var (HVar.make ~ty:Type.tType offset) in 
+        let symbols = [
+          T.true_, 0; 
+          T.false_, 0;
+          T.app_builtin ~ty:([o;o] ==> o) Builtin.And [],2;
+          T.app_builtin ~ty:([o;o] ==> o) Builtin.Or [],2;
+          T.app_builtin ~ty:([o] ==> o) Builtin.Not [],1;
+          T.app_builtin ~ty:([fresh_ty; fresh_ty] ==> o) Builtin.Eq [],1;
+          T.app_builtin ~ty:([[fresh_ty] ==> o] ==> o) Builtin.ForallConst [],2;
+          T.app_builtin ~ty:([[fresh_ty] ==> o] ==> o) Builtin.ExistsConst [],2;
+        ] in
+        
+        List.fold_left (fun res (op,penalty) -> 
+          try
+            (Unif.FO.unify_syn (T.var v, sc_v) (op, sc_v),penalty)::res
+          with Unif.Fail -> res
+        ) [] symbols
+      | _ -> []
 
     in
-    CCList.flat_map
-      (fun (ts,penalty) -> 
-         List.map (fun t -> 
-             assert (T.DB.is_closed t);
+    let lambdas = 
+      CCList.flat_map
+        (fun (ts,penalty) -> 
+          List.map (fun t -> 
+              assert (T.DB.is_closed t);
 
-             (* Caching of primitive enumeration terms, so that trigger-based instantiation
-                does not catch them. *)
-             let cached_t = Subst.FO.canonize_all_vars t in
-             enum_cache := Term.Set.add cached_t !enum_cache;
-             let subst = Subst.FO.bind' Subst.empty (v,sc_v) (t,sc_v) in
-             (subst, penalty) )ts ) 
-      [ l_not, 1;
-        l_and, 2;
-        l_or, 2;
-        l_eq,  1;
-        l_false, (if mode == `Pragmatic then 0 else 3);
-        l_true, (if mode == `Pragmatic then 0 else 3);
-        l_simpl_op, 0;
-        l_symbols, (if mode == `Pragmatic then 1 else 3);
-        l_quants, 2;
-      ]
+              (* Caching of primitive enumeration terms, so that trigger-based instantiation
+                  does not catch them. *)
+              let cached_t = Subst.FO.canonize_all_vars t in
+              enum_cache := Term.Set.add cached_t !enum_cache;
+              let subst = Subst.FO.bind' Subst.empty (v,sc_v) (t,sc_v) in
+              (subst, penalty) )ts ) 
+        [ l_not, 1;
+          l_and, 2;
+          l_or, 2;
+          l_eq,  1;
+          l_false, (if mode == `Pragmatic then 0 else 3);
+          l_true, (if mode == `Pragmatic then 0 else 3);
+          l_simpl_op, 0;
+          l_symbols, (if mode == `Pragmatic then 1 else 3);
+          l_quants, 2;
+        ] in
+    let combs = l_combinators in
+    if mode == `Combinators then combs else lambdas
   )
 
 let pp_pair out ((env,t,u):pair) =

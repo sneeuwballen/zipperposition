@@ -169,6 +169,7 @@ module Result : sig
     pp_in:(Output_format.t -> 'a CCFormat.printer) ->
     ?name:('a -> string) ->
     ?is_stmt:bool ->
+    ?is_dead_cl:(unit -> bool) ->
     ?flavor:('a -> flavor) ->
     unit ->
     'a tc
@@ -193,6 +194,7 @@ module Result : sig
   val pp_in : Output_format.t -> t CCFormat.printer
   val pp : t CCFormat.printer
   val is_stmt : t -> bool
+  val is_dead_cl : t -> unit -> bool
   val to_form : ?ctx:Term.Conv.ctx -> t -> form
 
   val to_form_subst : ?ctx:Term.Conv.ctx -> Subst.Projection.t -> t -> form * inst_subst
@@ -250,6 +252,8 @@ module Step : sig
   val esa : ?infos:infos -> rule:rule -> parent list -> t
 
   val to_attrs : t -> UntypedAST.attrs
+
+  val is_inference : t -> bool
 
   val is_trivial : t -> bool
   val is_by_def : t -> bool

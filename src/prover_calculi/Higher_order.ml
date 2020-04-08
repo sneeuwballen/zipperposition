@@ -53,7 +53,7 @@ let k_purify_applied_vars = Flex_state.create_key()
 let k_eta = Flex_state.create_key()
 let k_diff_const = Flex_state.create_key()
 let k_use_diff_for_neg_ext = Flex_state.create_key()
-
+let k_generalize_choice_trigger = Flex_state.create_key ()
 
 
 type prune_kind = [`NoPrune | `OldPrune | `PruneAllCovers | `PruneMaxCover]
@@ -73,13 +73,14 @@ let k_some_ho : bool Flex_state.key = Flex_state.create_key()
 let k_enabled : bool Flex_state.key = Flex_state.create_key()
 let k_enable_def_unfold : bool Flex_state.key = Flex_state.create_key()
 let k_enable_ho_unif : bool Flex_state.key = Flex_state.create_key()
-let k_ho_prim_mode : [`Full | `Neg | `None | `Pragmatic | `TF ] Flex_state.key = Flex_state.create_key()
+let k_ho_prim_mode : [`Combinators | `Full | `Neg | `None | `Pragmatic | `TF ] Flex_state.key = Flex_state.create_key()
 let k_ho_prim_max_penalty : int Flex_state.key = Flex_state.create_key()
 
 module Make(E : Env.S) : S with module Env = E = struct
   module Env = E
   module C = Env.C
   module Ctx = Env.Ctx
+  module Combs = Combinators.Make(E)
 
 
   (* index for ext-neg, to ensure α-equivalent negative equations have the same skolems *)
@@ -372,26 +373,26 @@ module Make(E : Env.S) : S with module Env = E = struct
            not (Literals.is_shielded v (C.lits c)))
     (* find all constraints on [v], also returns the remaining literals.
        returns None if some constraints contains [v] itself. *)
-    and gather_lits v : (Literal.t list * (T.t list * bool) list) option =
+    and gather_lits v  =
       try
         Array.fold_left
-          (fun (others,set) lit ->
+          (fun (others,set,pos_lits) lit ->
              begin match lit with
-               | Literal.Equation (lhs, rhs, true) when T.equal rhs T.true_ || T.equal rhs T.false_ ->
+               | Literal.Equation (lhs, rhs, sign) when T.equal rhs T.true_->
                  let f, args = T.as_app lhs in
-                 let sign = T.equal rhs T.true_ in
                  begin match T.view f with
                    | T.Var q when HVar.equal Type.equal v q ->
                      (* found an occurrence *)
                      if List.exists (T.var_occurs ~var:v) args then (
                        raise Exit; (* [P … t[v] …] is out of scope *)
                      );
-                     others, (args, sign) :: set
-                   | _ -> lit :: others, set
+                     others, (args, sign) :: set, 
+                     (if sign then [lit] else []) @ pos_lits
+                   | _ -> lit :: others, set, pos_lits
                  end
-               | _ -> lit :: others, set
+               | _ -> lit :: others, set, pos_lits
              end)
-          ([], [])
+          ([], [], [])
           (C.lits c)
         |> CCOpt.return
       with Exit -> None
@@ -401,8 +402,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       (* gather constraints on [v] *)
       begin match gather_lits v with
         | None
-        | Some (_, []) -> None
-        | Some (other_lits, constr_l) ->
+        | Some (_, [], _) -> None
+        | Some (other_lits, constr_l, pos_lits) ->
           (* gather positive/negative args *)
           let pos_args, neg_args =
             CCList.partition_map
@@ -428,7 +429,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                    List.map2 T.Form.eq vars_t tup |> T.Form.and_l)
               |> T.Form.or_l
             in
-            Util.debugf ~section 5
+            Util.debugf ~section 1
               "(@[elim-pred-with@ (@[@<1>λ @[%a@].@ %a@])@])"
               (fun k->k (Util.pp_list ~sep:" " Type.pp_typed_var) vars T.pp body);
             Util.incr_stat stat_elim_pred;
@@ -439,16 +440,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           let renaming = Subst.Renaming.create () in
           let new_lits =
             let l1 = Literal.apply_subst_list renaming subst (other_lits,0) in
-            let l2 =
-              CCList.product
-                (fun args_pos args_neg ->
-                   let args_pos = Subst.FO.apply_l renaming subst (args_pos,0) in
-                   let args_neg = Subst.FO.apply_l renaming subst (args_neg,0) in
-                   List.map2 Literal.mk_eq args_pos args_neg)
-                pos_args
-                neg_args
-              |> List.flatten
-            in
+            let l2 = Literal.apply_subst_list renaming subst (pos_lits,0) in
             l1 @ l2
           in
           let proof =
@@ -479,12 +471,23 @@ module Make(E : Env.S) : S with module Env = E = struct
   let prim_enum_ ~(mode) (c:C.t) : C.t list =
     (* set of variables to refine (only those occurring in "interesting" lits) *)
     let vars =
-      Literals.vars (C.lits c)
-      |> CCList.filter (fun v -> Type.returns_prop @@ HVar.ty v)
-      |> T.VarSet.of_list (* unique *)
+      Literals.fold_eqn 
+        ~both:false ~ord:(Ctx.ord()) 
+        ~eligible:(C.Eligible.always) (C.lits c)
+      |> Iter.flat_map_l (fun (l,r,_,_) -> 
+          let extract_var t = 
+            let _, body = T.open_fun t in
+            match T.view body with
+            | T.Var x -> Some x
+            | T.App(hd, _) when T.is_var hd ->  Some (T.as_var_exn hd)
+            | _ -> None in
+          CCOpt.to_list (extract_var l) @ CCOpt.to_list (extract_var r)
+      )
+      |> Iter.filter (fun v -> Type.returns_prop @@ HVar.ty v)
+      |> T.VarSet.of_seq (* unique *)
     in
     if not (T.VarSet.is_empty vars) then (
-      Util.debugf ~section 5 "(@[<hv2>ho.refine@ :clause %a@ :terms {@[%a@]}@])"
+      Util.debugf ~section 1 "(@[<hv2>ho.refine@ :clause %a@ :terms {@[%a@]}@])"
         (fun k->k C.pp c (Util.pp_seq T.pp_var) (T.VarSet.to_seq vars));
     );
     let sc_c = 0 in
@@ -499,22 +502,21 @@ module Make(E : Env.S) : S with module Env = E = struct
             ~mode ~offset (v,sc_c))
       |> Iter.map
         (fun (subst,penalty) ->
-           let renaming = Subst.Renaming.create() in
-           let lits = Literals.apply_subst renaming subst (C.lits c,sc_c) in
-           let proof =
-             Proof.Step.inference ~rule:(Proof.Rule.mk "ho.refine") ~tags:[Proof.Tag.T_ho]
-               [C.proof_parent_subst renaming (c,sc_c) subst]
-           in
-           let new_c =
-             C.create_a lits proof
-               ~penalty:(C.penalty c + penalty) ~trail:(C.trail c)
-           in
-           (* CCFormat.printf "[Prim_enum:] @[%a@]\n=>\n@[%a@].\n" C.pp c C.pp new_c;*)
-           Util.debugf ~section 3
-             "(@[<hv2>ho.refine@ :from %a@ :subst %a@ :yields %a@])"
-             (fun k->k C.pp c Subst.pp subst C.pp new_c);
-           Util.incr_stat stat_prim_enum;
-           new_c)
+          let renaming = Subst.Renaming.create() in
+          let lits = Literals.apply_subst renaming subst (C.lits c,sc_c) in
+          let proof =
+            Proof.Step.inference ~rule:(Proof.Rule.mk "ho.refine") ~tags:[Proof.Tag.T_ho]
+              [C.proof_parent_subst renaming (c,sc_c) subst]
+          in
+          let new_c =
+            C.create_a lits proof
+              ~penalty:(C.penalty c + penalty) ~trail:(C.trail c)
+          in
+          Util.debugf ~section 1
+            "(@[<hv2>ho.refine@ :from %a@ :subst %a@ :yields %a@])"
+            (fun k->k C.pp c Subst.pp subst C.pp new_c);
+          Util.incr_stat stat_prim_enum;
+          new_c)
       |> Iter.to_rev_list
     end
 
@@ -522,15 +524,15 @@ module Make(E : Env.S) : S with module Env = E = struct
     if C.proof_depth c < max_penalty_prim_ 
     then prim_enum_ ~mode c
     else []
+    (* prim_enum_ ~mode c *)
 
   let choice_ops = ref Term.Set.empty
   let new_choice_counter = ref 0
 
   let insantiate_choice ?(inst_vars=true) ?(choice_ops=choice_ops) c =
-    let max_var = C.Seq.vars c
-                  |> Iter.map HVar.id
-                  |> Iter.max
-                  |> CCOpt.get_or ~default: 0 in
+    let max_var = 
+      ref ((C.Seq.vars c |> Iter.map HVar.id
+            |> Iter.max |> CCOpt.get_or ~default: 0) + 1) in
 
     let is_choice_subterm t = 
       match T.view t with
@@ -544,16 +546,25 @@ module Make(E : Env.S) : S with module Env = E = struct
     let neg_trigger t =
       assert(T.DB.is_closed t);
       let arg_ty = List.hd (Type.expected_args (T.ty t)) in
-      let applied_to_0 = T.Form.not_ (Lambda.whnf (T.app t [T.bvar ~ty:arg_ty 0])) in
-      let res = T.fun_ arg_ty applied_to_0 in
+      let negated = T.Form.not_ (Lambda.whnf (T.app t [T.bvar ~ty:arg_ty 0])) in
+      let res = T.fun_ arg_ty negated in
       assert(T.DB.is_closed res);
       res in
 
+    let generalize_trigger t =
+      assert(T.DB.is_closed t);
+      let arg_ty = List.hd (Type.expected_args (T.ty t)) in
+      let applied_to_0 = Lambda.whnf (T.app t [T.bvar ~ty:arg_ty 0]) in
+      let ty = Type.arrow [Type.prop] Type.prop in
+      let fresh_var = T.var @@ HVar.fresh_cnt ~counter:max_var ~ty () in
+      let res = T.fun_ arg_ty (T.app fresh_var [applied_to_0]) in
+      assert(T.DB.is_closed res);
+      res in
 
     let choice_inst_of_hd hd arg =
       let arg_ty = Term.ty arg in
       let ty = List.hd (Type.expected_args arg_ty) in
-      let x = T.var_of_int ~ty (max_var+1) in
+      let x = T.var @@ HVar.fresh_cnt ~counter:max_var ~ty () in
       let choice_x = Lambda.whnf (T.app arg [x]) in
       let choice_arg = Lambda.snf (T.app arg [T.app hd [arg]]) in
       let new_lits = [Literal.mk_prop choice_x false;
@@ -574,6 +585,12 @@ module Make(E : Env.S) : S with module Env = E = struct
       choice_ops := Term.Set.add new_ch_const !choice_ops;
       new_ch_const in
 
+    let generate_instances hd arg =
+      choice_inst_of_hd hd arg 
+      :: choice_inst_of_hd hd (neg_trigger arg)
+      :: (if not @@  Env.flex_get k_generalize_choice_trigger then []
+          else [choice_inst_of_hd hd (generalize_trigger arg)]) in
+
     let build_choice_inst t =
       match T.view t with
       | T.App(hd, [arg]) ->
@@ -583,12 +600,10 @@ module Make(E : Env.S) : S with module Env = E = struct
             Term.Set.filter (fun t -> Type.equal (Term.ty t) hd_ty) !choice_ops
             |> Term.Set.to_list
             |> (fun l -> if CCList.is_empty l then [new_choice_op hd_ty] else l) in
-          CCList.flat_map (fun hd -> 
-              [choice_inst_of_hd hd arg; choice_inst_of_hd hd (neg_trigger arg)]) 
+          CCList.flat_map (fun hd -> generate_instances hd arg) 
             choice_ops
-        ) else if Term.Set.mem hd !choice_ops then (
-          [choice_inst_of_hd hd arg; choice_inst_of_hd hd (neg_trigger arg)]
-        ) else []
+        ) else if Term.Set.mem hd !choice_ops then generate_instances hd arg
+          else []
       | _ -> assert (false) in
 
     C.Seq.terms c 
@@ -646,14 +661,14 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let recognize_choice_ops c =
     let extract_not_p_x l = match l with
-      | Literal.Equation(lhs,rhs,true) when T.equal T.false_ rhs && T.is_app_var lhs ->
+      | Literal.Equation(lhs,rhs,false) when T.equal T.true_ rhs && T.is_app_var lhs ->
         begin match T.view lhs with
           | T.App(hd, [var]) when T.is_var var -> Some hd
           | _ -> None end
       | _ -> None in
 
     let extract_p_choice_p p l = match l with 
-      | Literal.Equation(lhs,rhs,true) when T.equal T.true_ rhs && T.is_app_var lhs ->
+      | Literal.Equation(lhs,rhs,true) when T.equal T.true_ rhs ->
         begin match T.view lhs with
           | T.App(hd, [ch_p]) when T.equal hd p ->
             begin match T.view ch_p with 
@@ -668,21 +683,24 @@ module Make(E : Env.S) : S with module Env = E = struct
       | Some p ->
         let p_ch_p = CCArray.find_map (extract_p_choice_p p) (C.lits c) in
         begin match p_ch_p with
-          | Some sym ->
-            choice_ops := Term.Set.add sym !choice_ops;
-            let new_cls = 
-              Env.get_active ()
-              |> Iter.flat_map_l (fun pas_cl -> 
-                  if C.id pas_cl = C.id c then []
-                  else (
-                    insantiate_choice ~inst_vars:false 
-                      ~choice_ops:(ref (Term.Set.singleton sym)) 
-                      pas_cl
-                  )) in
-            Env.add_passive new_cls;
-            C.mark_redundant c;
-            true
-          | None -> false end
+        | Some sym ->
+          choice_ops := Term.Set.add sym !choice_ops;
+          let new_cls = 
+            Env.get_active ()
+            |> Iter.flat_map_l (fun pas_cl -> 
+                if C.id pas_cl = C.id c then []
+                else (
+                insantiate_choice ~inst_vars:false 
+                                  ~choice_ops:(ref (Term.Set.singleton sym)) 
+                                  pas_cl
+                ))
+            |> Iter.map Combs.maybe_conv_lams
+          in
+          
+          Env.add_passive new_cls;
+          C.mark_redundant c;
+          true
+        | None -> false end
       | None -> false
     ) else false
 
@@ -694,10 +712,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       let pos_pred_vars, neg_pred_vars, occurences = 
         Lits.fold_eqn ~both:false ~ord ~eligible (C.lits c)
         |> Iter.fold (fun (pos_vs,neg_vs,occ) (lhs,rhs,sign,_) -> 
-            if Type.is_prop (Term.ty lhs) && Term.is_app_var lhs && sign
-               && Term.is_true_or_false rhs then (
+            if Type.is_prop (Term.ty lhs) && Term.is_app_var lhs && T.equal T.true_ rhs then (
               let var_hd = Term.as_var_exn (Term.head_term lhs) in
-              if Term.equal T.true_ rhs then (Term.VarSet.add var_hd pos_vs, neg_vs, Term.Map.add lhs true occ)
+              if sign then (Term.VarSet.add var_hd pos_vs, neg_vs, Term.Map.add lhs true occ)
               else (pos_vs, Term.VarSet.add var_hd neg_vs, Term.Map.add lhs false occ)
             ) else (pos_vs, neg_vs, occ)
           ) (Term.VarSet.empty,Term.VarSet.empty,Term.Map.empty) in
@@ -1049,7 +1066,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let status = VTbl.create 8 in
     let free_vars = Literals.vars (C.lits c) |> T.VarSet.of_list in
     C.lits c
-    |> Literals.map (fun t -> Lambda.eta_expand t) (* to make sure that DB indices are everywhere the same *)
+    |> Literals.map (fun t -> Combs.expand t) (* to make sure that DB indices are everywhere the same *)
     |> Literals.fold_terms ~vars:true ~ty_args:false ~which:`All ~ord:Ordering.none 
       ~subterms:true  ~eligible:(fun _ _ -> true)
     |> Iter.iter
@@ -1293,15 +1310,19 @@ module Make(E : Env.S) : S with module Env = E = struct
         | `NoPrune -> ();
       end;
 
-      let ho_norm = (fun t -> t |> beta_reduce |> (
-          fun opt -> match opt with
-              None -> eta_normalize t
-            | Some t' ->
-              match eta_normalize t' with
-                None -> Some t'
-              | Some tt -> Some tt))
-      in
-      Env.set_ho_normalization_rule ho_norm;
+      if Env.flex_get Combinators.k_enable_combinators then (
+        Env.set_ho_normalization_rule "comb-normalize" Combinators.comb_normalize;
+      ) else (
+        let ho_norm = (fun t -> t |> beta_reduce |> (
+            fun opt -> match opt with
+                None -> eta_normalize t
+              | Some t' ->
+                match eta_normalize t' with
+                  None -> Some t'
+                | Some tt -> Some tt))
+        in
+        Env.set_ho_normalization_rule "ho_norm" ho_norm);
+      
 
       if(Env.flex_get k_neg_ext) then (
         Env.add_unary_inf "neg_ext" neg_ext 
@@ -1342,13 +1363,14 @@ let def_unfold_enabled_ = ref false
 let force_enabled_ = ref false
 let enable_unif_ = ref false (* this unification seems very buggy, had to turn it off *)
 let prim_mode_ = ref `Neg
-let prim_max_penalty = ref 1 (* FUDGE *)
+let prim_max_penalty = ref 2 (* FUDGE *)
 
 let set_prim_mode_ =
   let l = [
     "neg", `Neg;
     "full", `Full;
     "pragmatic", `Pragmatic;
+    "combs", `Combinators;
     "tf", `TF;
     "none", `None;
   ] in
@@ -1415,6 +1437,7 @@ let _simple_projection_md = ref 2
 let _purify_applied_vars = ref `None
 let _eta = ref `Reduce
 let _use_diff_for_neg_ext = ref false
+let _generalize_choice_trigger = ref false
 
 let extension =
   let register env =
@@ -1439,6 +1462,8 @@ let extension =
     E.flex_add k_purify_applied_vars !_purify_applied_vars;
     E.flex_add k_eta !_eta;
     E.flex_add k_use_diff_for_neg_ext !_use_diff_for_neg_ext;
+    E.flex_add k_generalize_choice_trigger !_generalize_choice_trigger;
+
 
     if E.flex_get k_check_lambda_free = `Only 
     then E.flex_add Saturate.k_abort_after_fragment_check true;
@@ -1526,7 +1551,16 @@ let () =
           else if s = "old-prune" then _prune_arg_fun := `OldPrune 
           else _prune_arg_fun := `NoPrune)), " choose arg prune mode";
       "--ho-ext-neg-lit", Arg.Bool (fun  v -> _ext_neg_lit := v), " enable/disable negative extensionality rule on literal level [?]";
-      "--ho-elim-leibniz", Arg.Int (fun v -> _elim_leibniz_eq := v), " enable/disable treatment of Leibniz equality";
+      "--ho-elim-leibniz", Arg.String (fun v -> 
+        match v with 
+        | "inf" ->  _elim_leibniz_eq := max_int
+        | "off" -> _elim_leibniz_eq := -1
+        | _ ->
+          match CCInt.of_string v with
+          | None -> invalid_arg "number expected for --ho-elim-leibniz"
+          | Some x -> _elim_leibniz_eq := x
+         ), " enable/disable treatment of Leibniz equality. inf enables it for infinte depth of clauses"
+            ^ "; off disables it; number enables it for a given depth of clause";
       "--ho-def-unfold", Arg.Bool (fun v -> def_unfold_enabled_ := v), " enable ho definition unfolding";
       "--ho-choice-inst", Arg.Bool (fun v -> _instantiate_choice_ax := v), " enable ho definition unfolding";
       "--ho-simple-projection", Arg.Int (fun v -> _simple_projection := v), 
@@ -1540,6 +1574,7 @@ let () =
                                  " 'int' purifies whenever a variable appears applied and unapplied.";
       "--ho-eta", eta_opt, " eta-expansion/reduction";
       "--ho-use-diff-for-neg-ext", Arg.Bool ((:=) _use_diff_for_neg_ext), " use diff constant for NegExt rule instead of fresh skolem";
+      "--ho-generalize-choice-trigger", Arg.Bool ((:=) _generalize_choice_trigger), " apply choice trigger to a fresh variable";
       "--check-lambda-free", Arg.Symbol (["true";"false";"only"], fun s -> match s with 
         | "true" -> _check_lambda_free := `True
         | "only" -> _check_lambda_free := `Only
@@ -1589,7 +1624,24 @@ let () =
       _elim_pred_var := true;
       enable_unif_ := false;
       _prune_arg_fun := `PruneMaxCover;
-    );
+  );
+  Params.add_to_mode "ho-comb-complete" (fun () ->
+    enabled_ := true;
+    def_unfold_enabled_ := false;
+    force_enabled_ := true;
+    _ext_axiom := false;
+    _ext_neg_lit := false;
+    _neg_ext := true;
+    _neg_ext_as_simpl := false;
+    _ext_pos := true;
+    _ext_pos_all_lits := true;
+    prim_mode_ := `None;
+    _elim_pred_var := true;
+    enable_unif_ := false;
+    _prune_arg_fun := `NoPrune;
+    Unif._allow_pattern_unif := false;
+    _eta  := `None
+  );
   Params.add_to_mode "fo-complete-basic" (fun () ->
       enabled_ := false;
       Unif._allow_pattern_unif := false;

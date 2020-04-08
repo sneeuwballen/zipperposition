@@ -53,6 +53,11 @@ val miniscope : ?distribute_exists:bool -> form -> form
 
 (** Options are used to tune the behavior of the CNF conversion. *)
 type options =
+  | LazyCnf
+  (** if enabled, inital formulas will not be converted to the
+      clausal form. Instead, formulas will be presented as is,
+      and lazy calculus rules will be used to clausify. *)
+
   | DistributeExists
   (** if enabled, will distribute existential quantifiers over
       disjunctions. This can make skolem symbols smaller (smaller arity) but

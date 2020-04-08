@@ -216,7 +216,8 @@ let[@inline] hash (s:t): int =
 let pp_bindings out subst =
   let pp_binding out (v,t) =
     Format.fprintf out "@[<2>@[%a@] @<1>→@ @[%a@]@]"
-      (Scoped.pp T.pp_var) v (Scoped.pp T.pp) t
+      (Scoped.pp T.pp_var) v 
+      (Scoped.pp T.pp) t 
   in
   Util.pp_seq ~sep:", " pp_binding out (to_seq subst)
 

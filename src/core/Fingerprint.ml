@@ -45,25 +45,27 @@ let rec gfpf ?(depth=0) pos t =
     let body = expand_otf_ body in
     gfpf_root ~depth:(depth + exp_args_num) body
   | i::is ->
-    let hd, args = T.as_app body in
-    let args = List.filter (fun x -> not @@ T.is_type x) args in
-    (*                 if we are sampling something of variable type, it might eta-expand *)
-    if T.is_var hd || (Type.is_var (snd (Type.open_fun (Term.ty body)))) then B
-    else (
-      let num_acutal_args = List.length args in
-      let extra_args,_ = Type.open_fun (T.ty body) in  (* arguments for eta-expansion *)
+      let hd, args = T.as_app body in
+      if T.is_appbuiltin body then Ignore
+      else (
+        let args = List.filter (fun x -> not @@ T.is_type x) args in
+        (*                 if we are sampling something of variable type, it might eta-expand *)
+        if T.is_var hd || (Type.is_var (snd (Type.open_fun (Term.ty body)))) then B
+        else (
+          let num_acutal_args = List.length args in
+          let extra_args,_ = Type.open_fun (T.ty body) in  (* arguments for eta-expansion *)
 
-      if num_acutal_args >= i then (
-        let arg = T.DB.shift (List.length extra_args) (List.nth args (i-1)) in
-        gfpf ~depth:(depth + exp_args_num) is arg
-      ) 
-      else if num_acutal_args + (List.length extra_args) >= i then (
-        let exp_arg_idx = i - num_acutal_args in
-        let db_ty = List.nth extra_args (exp_arg_idx-1) in
-        let arg = T.bvar (List.length extra_args - exp_arg_idx) ~ty:db_ty in
-        gfpf ~depth:(depth + exp_args_num) is arg) 
-      else N
-    )
+          if num_acutal_args >= i then (
+            let arg = T.DB.shift (List.length extra_args) (List.nth args (i-1)) in
+            gfpf ~depth:(depth + exp_args_num) is arg
+          ) 
+          else if num_acutal_args + (List.length extra_args) >= i then (
+            let exp_arg_idx = i - num_acutal_args in
+            let db_ty = List.nth extra_args (exp_arg_idx-1) in
+            let arg = T.bvar (List.length extra_args - exp_arg_idx) ~ty:db_ty in
+            gfpf ~depth:(depth + exp_args_num) is arg) 
+          else N
+        ))
 and gfpf_root ~depth t =
   match T.view t with 
   | T.AppBuiltin(_, _) -> Ignore
@@ -344,8 +346,8 @@ module Make(X : Set.OrderedType) = struct
     traverse ~compatible idx features
       (fun leaf -> fold_unify (leaf,sc_idx) t k)
 
-  let retrieve_unifiables = retrieve_unifiables_aux Leaf.fold_unify
-
+  let retrieve_unifiables = retrieve_unifiables_aux (Leaf.fold_unify)
+  
   let retrieve_unifiables_complete ?(unif_alg=JP_unif.unify_scoped) = 
     retrieve_unifiables_aux (Leaf.fold_unify_complete ~unif_alg)
 

@@ -6,6 +6,7 @@
 open Logtk
 
 let _tmp_dir = ref "/tmp"
+let _encode_lams = ref `Ignore
 
 exception PolymorphismDetected
 
@@ -37,16 +38,97 @@ module Make(E : Env.S) : S with module Env = E = struct
   module Env = E
   module C = Env.C
   module Ctx = Env.Ctx
+  module T = Term
+  module Combs = Combinators.Make(E)
+  module LLift = Lift_lambdas.Make(E)
+
+  let (==>) = Type.(==>)
+
+  exception CantEncode of string
 
   let output_empty_conj ~out =
     Format.fprintf out "thf(conj,conjecture,($false))."
 
+  let rec encode_ty_args_t ~encoded_symbols t =
+    let make_new_sym mono_head =
+      if not (T.is_ground mono_head) then (
+         let err = 
+          CCFormat.sprintf "%a has non-ground type argument"  T.pp t in
+        raise @@ CantEncode err;
+      );
+      let (id, ty), res = 
+        T.mk_fresh_skolem ~prefix:"ty_enc" [] (T.ty mono_head) in
+      Env.Ctx.declare id ty;
+      res in
+
+    let rec aux ~sym_map t =
+      if not (Type.is_ground (T.ty t)) then (
+        let err = 
+          CCFormat.sprintf "%a has non-ground type %a" 
+            T.pp t Type.pp (T.ty t) in
+        raise @@ CantEncode err;
+      );
+      match T.view t with 
+      | T.Const _ | T.Var _ -> sym_map, t
+      | T.DB _ | T.Fun _ -> 
+        let err = 
+          CCFormat.sprintf "%a is a lambda" T.pp t in
+        raise @@ CantEncode err
+      | T.AppBuiltin(b,_) when (Builtin.is_logical_op b 
+                                || b == Builtin.Eq 
+                                || b = Builtin.Neq)
+                          && not (Type.is_prop (T.ty t)) -> 
+        let err = 
+          CCFormat.sprintf "%a is ho bool" T.pp t in
+        raise @@ CantEncode err
+      | T.AppBuiltin(_, l)
+      | T.App(_, l) ->
+        let hd_mono, args = T.as_app_mono t in
+        let sym_map, hd = 
+          if List.length args != List.length l then (
+            match T.Map.get hd_mono sym_map with
+            | Some mapped -> sym_map, mapped
+            | None -> 
+              let new_sym = make_new_sym hd_mono in
+              T.Map.add hd_mono new_sym sym_map, new_sym
+          ) else (sym_map, hd_mono) in
+        let sym_map, args' = List.fold_right (fun a (sym_map, as_) -> 
+          let sym_map, a' = aux ~sym_map a in
+          (sym_map, a'::as_)
+        ) args (sym_map, []) in
+        sym_map, T.app hd args' in
+    aux ~sym_map:encoded_symbols t
+
+  let encode_ty_args_cl ~encoded_symbols cl =
+    let encoded_symbols, lits =
+      CCArray.fold_right (fun l (encoded_symbols, ls) -> 
+        match l with 
+        | Literal.Equation(lhs,rhs,sign) ->
+          let encoded_symbols, lhs = encode_ty_args_t ~encoded_symbols lhs in
+          let encoded_symbols, rhs = encode_ty_args_t ~encoded_symbols rhs in
+          encoded_symbols, (Literal.mk_lit lhs rhs sign) :: ls
+        | _ -> (encoded_symbols, l :: ls)
+      ) (C.lits cl) (encoded_symbols, []) in
+    let rule = Proof.Rule.mk "remove_ty_args" in
+    let proof = Proof.Step.inference ~rule [C.proof_parent cl] in
+    let res = 
+      if Literals.equal (CCArray.of_list lits) (C.lits cl) then cl
+      else C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lits proof in
+    encoded_symbols, res
+
   let output_cl ~out clause =
     let lits_converted = Literals.Conv.to_tst (C.lits clause) in
     Format.fprintf out "%% %d:\n" (C.proof_depth clause);
-    if CCOpt.is_some (C.distance_to_goal clause) then (
-      Format.fprintf out "@[thf(zip_cl_%d,negated_conjecture,@[%a@]).@]@\n" (C.id clause) TypedSTerm.TPTP_THF.pp lits_converted
-    ) else Format.fprintf out "@[thf(zip_cl_%d,axiom,@[%a@]).@]@\n" (C.id clause) TypedSTerm.TPTP_THF.pp lits_converted
+    let orig_cl_str = CCFormat.sprintf "%% @[%a@]@." C.pp_tstp clause in
+    let commented = CCString.replace ~which:`All ~sub:"\n" ~by:"\n% " orig_cl_str in
+    Format.fprintf out "%% orig:@.@[%s@]@." commented;
+    match (C.distance_to_goal clause) with 
+    | Some d when d = 0 ->
+      Format.fprintf out "@[thf(zip_cl_%d,negated_conjecture,@[%a@]).@]@\n"
+        (C.id clause) TypedSTerm.TPTP_THF.pp lits_converted
+    | _ -> 
+      Format.fprintf out "@[thf(zip_cl_%d,axiom,@[%a@]).@]@\n"
+        (C.id clause) TypedSTerm.TPTP_THF.pp lits_converted
 
 
   let output_symdecl ~out sym ty =
@@ -88,7 +170,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let cmd = 
         CCFormat.sprintf "timeout %d %s %s --cpu-limit=%d %s -s -p" 
           (to_+2) e_path prob_path to_ (if !_e_auto then "--auto" else "--auto-schedule") in
-      CCFormat.printf "%% Running : %s.\n" cmd;
+      CCFormat.printf "%% Running : %s.@." cmd;
       let process_channel = Unix.open_process_in cmd in
       let _,status = Unix.wait () in
       begin match status with
@@ -122,54 +204,56 @@ module Make(E : Env.S) : S with module Env = E = struct
   let try_e active_set passive_set =
     let max_others = !_max_derived in
 
-    let rec can_be_translated t =
-      let can_translate_ty ty =
-        Type.is_ground ty in
+    let take_from_set ?(converter=(fun c -> [c])) 
+                      ~ignore_ids ~encoded_symbols set =
+      let init, rest = 
+        Iter.to_list set
+        |> CCList.partition_map (fun c -> 
+          let p_d = C.proof_depth c in
+          if p_d = 0 then `Left c
+          else if Proof.Step.has_ho_step (C.proof_step c) then `Right c
+          else `Drop
+        ) in
+      let rest = 
+        CCList.sort (fun c1 c2 ->
+          let pd1 = C.proof_depth c1 and pd2 = C.proof_depth c2 in
+          if pd1 = pd2 then CCInt.compare (C.weight c1) (C.weight c2)
+          else CCInt.compare pd1 pd2) rest
+        |> CCList.take max_others in
+      
+      let converted = 
+        CCList.map (fun c -> 
+          CCOpt.get_or ~default:c (C.eta_reduce c)) init @ rest
+        |> CCList.flat_map converter in
 
-      let ty = Term.ty t in
-      can_translate_ty ty &&
-      match Term.view t with
-      | AppBuiltin(b, [body]) when Builtin.is_quantifier b && Type.is_fun (Term.ty body) -> 
-        let _, fun_body = Term.open_fun body in
-        can_be_translated fun_body
-      | AppBuiltin(b, l) -> (not (Builtin.is_logical_binop b) || List.length l >= 2) && 
-                            (b != Builtin.Not || List.length l = 1) &&
-                            List.for_all can_be_translated l
-      | DB _ -> false
-      | Var _ | Const _ -> true
-      | App(hd,args) -> can_be_translated hd && List.for_all can_be_translated args
-      | Fun _ -> false in
+      let encoded, encoded_symbols = 
+        CCList.fold_left (fun (acc, encoded_symbols) cl ->
 
-
-    let take_from_set ?(ignore_ids=IntSet.empty) set =
-      let clause_no_lams cl =
-        Iter.for_all can_be_translated (C.Seq.terms cl) in
-
-      let reduced s = 
-        Iter.map (fun c -> CCOpt.get_or ~default:c (C.eta_reduce c)) s in
-      let init_clauses s = 
-        Iter.filter (fun c -> C.proof_depth c = 0 && clause_no_lams c) (reduced s) in
-
-      let set = Iter.filter (fun c -> not (IntSet.mem (C.id c) ignore_ids)) set in
-      Iter.append (init_clauses set) (
-        (reduced set)
-        |> Iter.filter (fun c -> 
-            let proof_d = C.proof_depth c in
-            let has_ho_step = Proof.Step.has_ho_step (C.proof_step c) in
-            has_ho_step && proof_d  > 0 && clause_no_lams c)
-        |> Iter.sort ~cmp:(fun c1 c2 ->
-            let pd1 = C.proof_depth c1 and pd2 = C.proof_depth c2 in
-            CCInt.compare pd1 pd2)
-        |> Iter.take max_others)
-      |> Iter.to_list in
+          try 
+            if IntSet.mem (C.id cl) ignore_ids then raise @@ CantEncode "skip id";
+            let encoded_symbols, cl' = encode_ty_args_cl ~encoded_symbols cl in
+            (cl'::acc, encoded_symbols)
+          with CantEncode _ -> (acc, encoded_symbols)
+        ) ([], encoded_symbols) converted in
+      encoded_symbols, encoded in
 
     let prob_name, prob_channel = Filename.open_temp_file ~temp_dir:!_tmp_dir "e_input" "" in
     let out = Format.formatter_of_out_channel prob_channel in
 
-    try 
-      let active_set = take_from_set active_set in
+    try
+      let encoded_symbols = Term.Map.empty in
+      let converter = 
+        match !_encode_lams with
+        | `Ignore -> (fun c -> [c])
+        | `Combs ->  (fun c -> ([Combs.force_conv_lams c] :> C.t list))
+        | _ -> (fun c -> 
+            let lifted = LLift.lift_lambdas c in
+            if CCList.is_empty lifted then [c] else lifted) in
+      let encoded_symbols, active_set = 
+        take_from_set ~ignore_ids:IntSet.empty ~encoded_symbols ~converter active_set in
       let ignore_ids = IntSet.of_list (List.map C.id active_set) in
-      let passive_set =  take_from_set ~ignore_ids passive_set in
+      let _, passive_set = 
+        take_from_set ~encoded_symbols ~converter ~ignore_ids passive_set in
       let already_defined = output_all ~out active_set in
       Format.fprintf out "%% -- PASSIVE -- \n";
       ignore(output_all  ~already_defined ~out passive_set);
@@ -202,7 +286,15 @@ end
 
 let () =
   Options.add_opts
-    [ "--tmp-dir", Arg.String (fun v -> _tmp_dir := v), " scratch directory for running E";
+    [ "--e-encode-lambdas", 
+        Arg.Symbol (["ignore"; "lift"; "combs"], (fun str -> 
+          match str with 
+          | "ignore" -> _encode_lams := `Ignore
+          | "lift" -> _encode_lams := `Lift
+          | "combs" -> _encode_lams := `Combs
+          | _ -> assert false
+      )), " how to treat lambdas when giving problem to E";
+      "--tmp-dir", Arg.String (fun v -> _tmp_dir := v), " scratch directory for running E";
       "--e-timeout", Arg.Set_int _timeout, " set E prover timeout.";
       "--e-max-derived", Arg.Set_int _max_derived, " set the limit of clauses that are derived by Zipperposition and given to E";
       "--e-auto", Arg.Bool (fun v -> _e_auto := v), " If set to on eprover will not run in autoschedule, but in auto mode"]

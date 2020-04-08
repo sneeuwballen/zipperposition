@@ -61,6 +61,10 @@ val lambda_kbo : Precedence.t -> t
 val lambda_rpo : Precedence.t -> t
 (** Efficient implementation of RPO (recursive path ordering) *)
 
+val compose : (term -> term -> (Comparison.t*term*term)) -> t -> t
+(** Takes a function that is going to be run before the chosen order and the order.
+    If the first argument returns Comparison.Eq, then the order determined by second arg.
+    Otherwise, the result of the first argument is returned. *) 
 val lambdafree_kbo : Precedence.t -> t
 (** Knuth-Bendix simplification ordering - lambdafree version *)
 
@@ -96,3 +100,7 @@ val register : string -> (Precedence.t -> t) -> unit
 (** Register a new ordering, which can depend on a precedence.
     The name must not be registered already.
     @raise Invalid_argument if the name is already used. *)
+
+(* Type-1 combinator is a combinator that is not ground
+     (see Ahmed's combinator KBO paper) *)
+val ty1comb_to_var : Term.t -> Term.t Term.Tbl.t -> Term.t

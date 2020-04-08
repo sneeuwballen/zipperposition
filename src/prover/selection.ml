@@ -50,8 +50,12 @@ let can_select_lit ~ord (lits:Lits.t) (i:int) : bool =
       |> Iter.exists (fun (t,_) ->
           let t_head, t_args = T.as_app t in
           vars_args |> CCList.exists (fun (head, args) -> T.equal head t_head && not @@ T.same_l_gen t_args args)
-        )
-    in
+        ) in
+    let contains_maxvar_as_fo_subterm vars_args =
+      let vars,_ = CCList.split vars_args in
+      Lit.fold_terms ~vars:true ~ty_args:false ~which:`All ~subterms:true lits.(i)
+      |> Iter.exists (fun (t, _) -> 
+          (T.is_var t) && List.exists (T.equal t) vars)  in
     match !_ho_restriction with
     | `None -> true
     | `NoVarHeadingMaxTerm ->
@@ -78,6 +82,10 @@ let can_select_lit ~ord (lits:Lits.t) (i:int) : bool =
         Lit.fold_terms ~vars:true ~ty_args:false ~which:`All ~subterms:true lits.(i)
         |> Iter.exists (fun (t,_) -> T.is_ho_var (fst (T.as_app t)))
       )
+    | `NoMaxVarInFoContext ->
+      let vars_args = var_headed_subterms `Max in
+      not (contains_maxvar_as_fo_subterm vars_args)
+      
   )
   else false
 
@@ -203,7 +211,7 @@ let pred_freq ~ord lits =
 
 let get_pred_freq ~freq_tbl l =
   match l with
-  | Lit.Equation(l,r,true) when T.is_true_or_false r ->
+  | Lit.Equation(l,r,sign) when T.equal T.true_ r ->
     begin 
       match T.head l with
       | Some id -> ID.Map.get_or id freq_tbl ~default:0
@@ -215,8 +223,8 @@ let e_sel ~ord lits =
   let chooser ~freq_tbl (i,l) = 
     ((if Lit.is_pos l then 1 else 0),
      (if Lits.is_max ~ord lits i then 0 else 100 +
-                                             if Lit.is_pure_var l then 0 else 10 +
-                                                                              if Lit.is_ground l then 0 else 1),
+      if Lit.is_pure_var l then 0 else 10 +
+      if Lit.is_ground l then 0 else 1),
      -(lit_sel_diff_w l),
      get_pred_freq ~freq_tbl l) in
   let freq_tbl = pred_freq ~ord lits in
@@ -233,7 +241,7 @@ let e_sel2 ~ord lits =
     let diff_val = -(lit_sel_diff_w l) in
     let prec = Ordering.precedence ord in
     match l with 
-    | Equation(lhs,rhs,sign) when not @@ blocker l ->
+    | Equation(lhs,_,sign) when not @@ blocker l ->
       if T.is_var (T.head_term lhs) then (
         (sign_val, 0, 0, diff_val)
       ) else (
@@ -269,7 +277,7 @@ let e_sel3 ~ord lits =
 let e_sel4 ~ord lits =
   let chooser (i,l) = 
     let lhs = match l with
-      | Lit.Equation(lhs_t,rhs_t,_) -> lhs_t
+      | Lit.Equation(lhs_t,_,_) -> lhs_t
       | _ -> T.true_ (* a term to fill in *) in
     let sign = if Lit.is_pos l then 1 else 0 in
     let freq_tbl = pred_freq ~ord lits in
@@ -325,16 +333,15 @@ let e_sel8 ~ord lits =
                 |> Iter.sort ~cmp:ID.compare 
                 |> Iter.to_array in
   let is_truly_equational = function 
-    | Lit.Equation(l,r,sign) -> 
-      not (Term.is_true_or_false r)
+    | Lit.Equation(l,r,sign) -> not (T.equal T.true_ r)
     | _ -> false  in
   let get_arity = function 
-    | Lit.Equation(l,r,sign) when sign && Term.is_true_or_false r -> 
+    | Lit.Equation(l,r,sign) when Term.equal T.true_ r -> 
       List.length (Type.expected_args (Term.ty (T.head_term l)))
     | _ -> 0  in
   let alpha_rank = function 
-    | Lit.Equation(l,r,sign) when sign && Term.is_true_or_false r 
-                                  && T.is_const (T.head_term l) -> 
+    | Lit.Equation(l,r,sign) when sign && Term.equal T.true_ r 
+                                       && T.is_const (T.head_term l) -> 
       let hd = T.head_exn l in
       (match CCArray.bsearch ~cmp:ID.compare hd symbols with
        | `At idx -> idx
@@ -438,7 +445,8 @@ let ho_restriction_opt =
     "no-var-heading-max-term", `NoVarHeadingMaxTerm;
     "no-var-different-args", `NoVarDifferentArgs;
     "no-unapplied-var-occurring-applied", `NoUnappliedVarOccurringApplied;
-    "no-ho-vars", `NoHigherOrderVariables] in
+    "no-ho-vars", `NoHigherOrderVariables;
+    "no-max-vars-as-fo", `NoMaxVarInFoContext] in
   Arg.Symbol (List.map fst l, fun s -> set_ (List.assoc s l))
 
 let () =
@@ -464,3 +472,4 @@ let () =
     (fun () ->
        _ho_restriction := `NoHigherOrderVariables
     );
+  Params.add_to_modes ["ho-comb-complete"] (fun () -> _ho_restriction := `NoMaxVarInFoContext);

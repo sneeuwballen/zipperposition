@@ -33,6 +33,8 @@ val head : t -> t
 val body : t -> t
 val arg : int -> t -> t
 
+val size : t -> int
+
 val opp : t -> t
 (** Opposite position, when it makes sense (left/right) *)
 

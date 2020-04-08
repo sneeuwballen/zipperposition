@@ -241,6 +241,9 @@ let incr_stat (_, count) = count := Int64.add !count Int64.one  (** increment gi
 
 let add_stat (_, count) num = count := Int64.add !count (Int64.of_int num) (** add to stat *)
 
+let pp_stat out (name, count) =
+  Format.fprintf out "%s-%d" name (CCInt64.to_int !count)
+
 (** {Flags as integers} *)
 
 module Flag = struct
@@ -285,7 +288,7 @@ let tstp_needs_escaping s =
 let pp_str_tstp out s =
   CCFormat.string out (if tstp_needs_escaping s then "'" ^ String.escaped s ^ "'" else s)
 
-let pp_var_tstp out s = CCFormat.string out (CCString.capitalize_ascii s)
+let pp_var_tstp out s = pp_str_tstp out (CCString.capitalize_ascii s)
 
 let ord_option c o1 o2 = match o1, o2 with
   | None, None -> 0

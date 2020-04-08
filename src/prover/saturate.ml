@@ -84,18 +84,20 @@ module Make(E : Env.S) = struct
 
   let[@inline] check_clause_ c = 
     if !_check_types then Env.C.check_types c;
-    if not (Env.C.Seq.terms c |> Iter.for_all Term.DB.is_closed) then (
-      CCFormat.printf "not closed:@[%a@]@." Env.C.pp c;
-      CCFormat.printf "proof:@[%a@]@." Proof.S.pp_tstp (Env.C.proof c);
-      assert false;
-    );
+    assert (Env.C.Seq.terms c |> Iter.for_all Term.DB.is_closed);
     if not (Env.C.lits c |> Literals.vars_distinct) then (
-      CCFormat.printf "variables are not distinct:@[%a@]@." Env.C.pp c;
-      CCFormat.printf "proof:@[%a@]@." Proof.S.pp_tstp (Env.C.proof c);
+      CCFormat.printf "Vars not distinct: @[%a@].@." Env.C.pp_tstp c;
+      CCFormat.printf "proof:@[%a@].@." Proof.S.pp_normal (Env.C.proof c);
       assert false;
     );
-    CCArray.iter (fun t -> assert(Literal.no_prop_invariant t)) (Env.C.lits c);
-    assert (Env.check_fragment c)
+    if Env.flex_get Combinators.k_enable_combinators &&
+       not (Env.C.Seq.terms c 
+            |> Iter.flat_map (fun t -> Term.Seq.subterms ~include_builtin:true ~ignore_head:false t)
+            |> Iter.for_all (fun t -> not @@ Term.is_fun t)) then (
+      CCFormat.printf "ENCODED WRONGLY: %a:%d.\n" Env.C.pp_tstp c (Env.C.proof_depth c);
+      CCFormat.printf "proof : %a.\n" Proof.S.pp_normal (Env.C.proof c);
+      assert(false));
+    CCArray.iter (fun t -> assert(Literal.no_prop_invariant t)) (Env.C.lits c)
 
   let[@inline] check_clauses_ seq =
     Iter.iter check_clause_ seq
@@ -128,15 +130,19 @@ module Make(E : Env.S) = struct
         Unknown
       )
     | Some c ->
-      (* Util.debugf ~section 1 "@[<2>@{<green>given@} (before simplification):@ `@[%a@]`@]"
-            (fun k->k Env.C.pp c); *)
+      Util.debugf ~section 10 "@[<2>@{<green>given@} (before simplification):@ `@[%a@]`@]"
+            (fun k->k Env.C.pp c);
+      Util.debugf ~section 10 "@[proof:@[%a@]@]" (fun k -> k Proof.S.pp_tstp (Env.C.proof c));
+      
       check_clause_ c;
       Util.incr_stat stat_steps;
+      let orig_c = c in
       begin match Env.all_simplify c with
         | [], _ ->
           Util.incr_stat stat_redundant_given;
-          Util.debugf ~section 2 "@[<2>given clause dropped@ @[%a@]@]"
+          Util.debugf ~section 1 "@[<2>given clause dropped@ @[%a@]@]"
             (fun k->k Env.C.pp c);
+          Util.debugf ~section 10 "@[proof:@[%a@]@]" (fun k -> k Proof.S.pp_tstp (Env.C.proof c));
           Unknown
         | l, _ when List.exists Env.C.is_empty l ->
           (* empty clause found *)
@@ -144,13 +150,10 @@ module Make(E : Env.S) = struct
           Unsat proof
         | c :: l', _ ->
           (* put clauses of [l'] back in passive set *)
-          assert(List.for_all (fun c -> 
-              let is_prop_encoded = 
-                Env.C.Seq.terms c |> Iter.for_all  Lambda.is_properly_encoded in
-              if not is_prop_encoded then (
-                CCFormat.printf "IMPROPERLY ENCODED: %a" Env.C.pp c;
-              );
-              is_prop_encoded) (c::l'));
+
+          Util.debugf ~section 5 "all_simplify(@[%a@])=@." (fun k -> k Env.C.pp orig_c);
+          Util.debugf ~section 5 "  @[%a@]@." (fun k -> k (CCList.pp Env.C.pp) (c :: l'));
+
           Env.add_passive (Iter.of_list l');
           (* process the clause [c] *)
           let new_clauses = CCVector.create () in
@@ -161,7 +164,7 @@ module Make(E : Env.S) = struct
           Util.debugf ~section 1 "@[@{<Yellow>### step %5d ###@}@]"(fun k->k num);
           Util.debugf ~section 1 "@[<2>@{<green>given@} (%d steps, penalty %d):@ `@[%a@]`@]"
             (fun k->k num (Env.C.penalty c) Env.C.pp c);
-          Util.debugf ~section 1 "@[proof:@[%a@]@]" (fun k -> k Proof.S.pp_tstp (Env.C.proof c));
+          Util.debugf ~section 5 "@[proof:@[%a@]@]" (fun k -> k Proof.S.pp_tstp (Env.C.proof c));
           (* find clauses that are subsumed by given in active_set *)
           let subsumed_active = Env.C.ClauseSet.to_seq (Env.subsumed_by c) in
           Env.remove_active subsumed_active;
@@ -179,6 +182,10 @@ module Make(E : Env.S) = struct
           Env.remove_active simplified_actives;
           Env.remove_simpl simplified_actives;
           CCVector.append_seq new_clauses newly_simplified;
+
+          Util.debugf ~section 2 "simplified_actives:@ @[%a@]@." (fun k -> k (Iter.pp_seq Env.C.pp) simplified_actives);
+          Util.debugf ~section 2 "newly_simplified:@ @[%a@]@." (fun k -> k (Iter.pp_seq Env.C.pp) newly_simplified);
+
           (* add given clause to active set *)
           Env.add_active (Iter.singleton c);
           (* do inferences between c and the active set (including c),
@@ -191,19 +198,22 @@ module Make(E : Env.S) = struct
           let inferred_clauses =
             Iter.filter_map
               (fun c ->
-                 check_clause_ c;
+                 Util.debugf ~section 1 "inferred: `@[%a@]`" (fun k->k Env.C.pp c);
                  let c, _ = Env.forward_simplify c in
                  check_clause_ c;
                  (* keep clauses  that are not redundant *)
                  if Env.is_trivial c || Env.is_active c || Env.is_passive c
                  then (
-                   Util.debugf ~section 5 "clause `@[%a@]` is trivial, dump" (fun k->k Env.C.pp c);
+                   Util.debugf ~section 3 "clause `@[%a@]` is trivial, dump" (fun k->k Env.C.pp c);
+                   Util.debugf ~section 10 "@[proof:@[%a@]@]" (fun k -> k Proof.S.pp_tstp (Env.C.proof c));
+
                    None
                  ) else Some c)
               inferred_clauses
           in
+          let inferred_clauses = Env.immediate_simplify c inferred_clauses in
           CCVector.append_seq new_clauses inferred_clauses;
-          Util.debugf ~section 2 "@[<2>inferred @{<green>new clauses@}:@ [@[<v>%a@]]@]"
+          Util.debugf ~section 1 "@[<2>inferred @{<green>new clauses@}:@ [@[<v>%a@]]@]"
             (fun k->k (Util.pp_seq Env.C.pp) (CCVector.to_seq new_clauses));
           (* add new clauses (including simplified active clauses)
              to passive set and simpl_set *)

@@ -60,6 +60,18 @@ let pp out ord =
 
 let to_string ord = CCFormat.to_string pp ord
 
+(* Type-1 combinator is a combinator that is not ground
+    (see Ahmed's combinator KBO paper) *)
+let ty1comb_to_var t balance =
+  if T.is_comb t && not (T.is_ground t) then (
+    match T.Tbl.find_opt balance t with
+    | Some t' -> t'
+    | None ->
+        let fresh_var = T.var (HVar.fresh ~ty:(T.ty t) ()) in
+        T.Tbl.add balance t fresh_var;
+        fresh_var
+  ) else t
+
 (** Common internal interface for orderings *)
 
 module type ORD = sig
@@ -173,12 +185,14 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
     mutable pos_counter : int;
     mutable neg_counter : int;
     mutable balance : CCInt.t Term.Tbl.t;
+    mutable comb2var : T.t Term.Tbl.t
   }
 
   (** create a balance for the two terms *)
   let mk_balance t1 t2 =
     let numvars = Iter.length (T.Seq.vars t1) + Iter.length (T.Seq.vars t2) in
-    { offset = 0; pos_counter = 0; neg_counter = 0; balance = Term.Tbl.create numvars; }
+    { offset = 0; pos_counter = 0; neg_counter = 0; balance = Term.Tbl.create numvars;
+      comb2var = Term.Tbl.create 16 }
 
   (** add a positive variable *)
   let add_pos_var balance var =
@@ -217,6 +231,7 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
         @return weight balance, was `s` found?
     *)
     let rec balance_weight (wb:W.t) t s ~pos : W.t * bool =
+      let t = ty1comb_to_var t balance.comb2var in
       match T.view t with
       | T.Var _ ->
         balance_weight_var wb t s ~pos
@@ -260,10 +275,10 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
     and balance_weight_var (wb:W.t) t s ~pos : W.t * bool =
       if pos then (
         add_pos_var balance t;
-        W.(wb + weight_var_headed), CCOpt.is_some s && ( Term.equal (CCOpt.get_exn s) t)
+        W.(wb + weight_var_headed), CCOpt.is_some s && (Term.equal (CCOpt.get_exn s) t)
       ) else (
         add_neg_var balance t;
-        W.(wb - weight_var_headed), CCOpt.is_some s && ( Term.equal (CCOpt.get_exn s) t)
+        W.(wb - weight_var_headed), CCOpt.is_some s && (Term.equal (CCOpt.get_exn s) t)
       )
     (** list version of the previous one, threaded with the check result *)
     and balance_weight_rec wb terms s ~pos res = match terms with
@@ -332,6 +347,8 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
         | h1, h2 -> tckbo_composite wb h1 h2 (Head.term_to_args t1) (Head.term_to_args t2)
       ) 
       else (
+        let t1 = ty1comb_to_var t1 balance.comb2var in 
+        let t2 = ty1comb_to_var t2 balance.comb2var in
         match T.view t1, T.view t2 with
         | T.Var x, T.Var y ->
           add_pos_var balance t1;
@@ -840,6 +857,21 @@ let lambda_rpo prec =
   let monotonic = false in
   { cache_compare; compare; name=RPO.name; prec; might_flip; cache_might_flip; monotonic }
 
+let compose f ord =
+  {ord with 
+    compare = 
+      fun prec a b ->
+        (* CCFormat.printf "kbo: @[%a@]<?>@[%a@]@." T.pp a T.pp b; *)
+        let f_res,a',b' = f a b in
+        (* CCFormat.printf "f_res: @[%a@]@." Comparison.pp f_res; *)
+        if Comparison.equal Comparison.Eq f_res then (
+          let res = ord.compare prec a' b' in
+          (* CCFormat.printf "res: @[%a@]@." Comparison.pp res; *)
+          res
+        ) else f_res
+      }
+
+let dummy_cache_ = CCCache.dummy
 let epo prec =
   let cache_compare = mk_cache 256 in
   (* TODO: make internal EPO cache accessible here ? **)

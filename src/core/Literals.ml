@@ -168,13 +168,6 @@ let is_trivial lits =
     if i = Array.length lits then false
     else
       let triv = match lits.(i) with
-        | Lit.Equation (lhs, rhs, true) when T.equal rhs T.true_ || T.equal rhs T.false_ ->
-          CCArray.exists
-            (function
-              | Lit.Equation (lhs', rhs', true) when T.equal rhs' T.true_ || T.equal rhs' T.false_ ->
-                T.equal lhs lhs' && not @@ T.equal rhs rhs'
-              | _ -> false)
-            lits
         | Lit.Equation (l, r, true) when T.equal l r -> true
         | Lit.Equation (l, r, sign) ->
           CCArray.exists
@@ -244,6 +237,12 @@ module Pos = struct
   let cut = function
     | Position.Arg (i, pos') -> i, pos'
     | p -> _fail_pos p
+
+  (* Does this position target one side of an equation? *)
+  let is_toplevel_pos = function
+    | Position.Arg (_, ((Position.Left p) | (Position.Right p))) ->
+      Position.equal p Position.stop
+    | _ -> false
 end
 
 module Conv = struct
@@ -256,11 +255,13 @@ module Conv = struct
 
   let to_tst lits = 
     let ctx = Type.Conv.create () in
+    let var_seq = Seq.vars lits in
+    Type.Conv.set_maxvar ctx (T.Seq.max_var var_seq);
     Array.map (fun t -> Lit.Conv.lit_to_tst ~ctx (Lit.Conv.to_form t)) lits 
     |> Array.to_list
     |> (fun or_args ->
         let ty = TypedSTerm.Ty.prop in
-        let clause_vars = T.VarSet.of_seq (Seq.vars lits) in
+        let clause_vars = T.VarSet.of_seq (var_seq) in
         let vars = clause_vars
                    |> T.VarSet.to_list 
                    |> CCList.map (fun v -> T.Conv.to_simple_term ctx (T.var v))  in
@@ -268,7 +269,13 @@ module Conv = struct
         TypedSTerm.close_with_vars vars disjuncts
       )
 
-  let to_s_form ?allow_free_db ?(ctx=T.Conv.create()) ?hooks lits =
+  let to_s_form ?allow_free_db ?(ctx) ?hooks lits =
+    let ctx = 
+      if CCOpt.is_some ctx then CCOpt.get_exn ctx
+      else (
+        let res = Type.Conv.create () in
+        Type.Conv.set_maxvar res (Seq.vars lits |> T.Seq.max_var);
+        res) in
     Array.to_list lits
     |> List.map (Literal.Conv.to_s_form ?hooks ?allow_free_db ~ctx)
     |> TypedSTerm.Form.or_

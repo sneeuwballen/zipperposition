@@ -415,9 +415,11 @@ module TPTP = struct
         (Util.pp_list ~sep:"," pp) l;
     | AppBuiltin (Builtin.And, l) ->
       if CCList.is_empty l then Format.fprintf out "%s" "(&)"
+      else if CCList.length l = 1 then Format.fprintf out "(& %a)" pp_surrounded (List.hd l)
       else  Util.pp_list ~sep:" & " pp_surrounded out l
     | AppBuiltin (Builtin.Or, l) ->
       if CCList.is_empty l then Format.fprintf out "%s" "(|)"
+      else if CCList.length l = 1 then Format.fprintf out "(| %a)" pp_surrounded (List.hd l)
       else  Util.pp_list ~sep:" | " pp_surrounded out l
     | AppBuiltin (Builtin.Not, [a]) ->
       Format.fprintf out "@[<1>~@,@[%a@]@]" pp_surrounded a
@@ -432,7 +434,7 @@ module TPTP = struct
     | AppBuiltin (Builtin.Neq, ([_;a;b] | [a;b])) ->
       Format.fprintf out "@[%a !=@ %a@]" pp_surrounded a pp_surrounded b
     | AppBuiltin (Builtin.Arrow, [ret;a]) ->
-      Format.fprintf out "@[<2>%a >@ %a@]" pp a pp ret
+      Format.fprintf out "(@[<2>%a >@ %a@])" pp a pp ret
     | AppBuiltin (Builtin.Arrow, ret::l) ->
       Format.fprintf out "@[<2>(@[<hv>%a@]) >@ %a@]" (Util.pp_list~sep:" * " pp) l pp_surrounded ret
     | AppBuiltin (s, []) -> Builtin.TPTP.pp out s

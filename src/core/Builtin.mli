@@ -10,6 +10,8 @@
 
     @since 1.5 *)
 
+val _t_bigger_false : bool ref
+
 type t =
   | Not
   | And
@@ -64,6 +66,11 @@ type t =
   | Greatereq
   | Box_opaque (** hint not to open this formula *)
   | Pseudo_de_bruijn of int (** magic to embed De Bruijn indices in normal terms *)
+  | BComb (** BCIKS combinators *)
+  | CComb
+  | IComb
+  | KComb
+  | SComb
   | Distinct
 
 include Interfaces.HASH with type t := t
@@ -105,6 +112,7 @@ val is_logical_op : t -> bool
 val is_logical_binop : t -> bool
 val is_flattened_logical : t -> bool
 val is_quantifier : t -> bool
+val is_combinator : t -> bool
 val true_ : t
 val false_ : t
 val eq : t
@@ -174,6 +182,7 @@ module Tag : sig
     | T_lia (** integer arith *)
     | T_lra (** rational arith *)
     | T_ho (** higher order *)
+    | T_live_cnf (** live_cnf *)
     | T_ext (** extensionality *)
     | T_ind (** induction *)
     | T_data (** datatypes *)

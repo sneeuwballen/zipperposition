@@ -131,7 +131,9 @@ let norm_deref s u =
   with PolymorphismDetected -> 
     nfapply s u 
 
-let norm t = 
+let norm subst scope t =
+  let t = 
+    if Type.is_ground (T.ty t) then t else S.apply subst (t,scope) in
   if Term.is_fun (T.head_term t)
   then Lambda.whnf t else t
 
@@ -152,7 +154,7 @@ let rec build_term ?(depth=0) ~all_args ~subst ~scope ~counter var bvar_map t =
     | [], [] -> true
     | _ -> false in
 
-  let t = norm t in
+  let t = norm subst scope t in
   match T.view t with
   | T.Var _ ->
     let t' = S.apply subst (t,scope) in
@@ -212,9 +214,14 @@ let rec build_term ?(depth=0) ~all_args ~subst ~scope ~counter var bvar_map t =
         )
       )
       else (
-        let hd',_ =  US.FO.deref subst (hd, scope) in
-        let t' = if T.equal hd hd' then t else T.app hd' args in
-        build_term ~all_args ~depth ~subst ~scope ~counter var bvar_map t' 
+        let hd' =  S.apply subst (hd,scope)in
+        let t' = if T.equal hd hd' then t else (
+          (* if polymorhpism is detected, then apply type substitution to args *)
+          let args = if Type.equal (T.ty hd) (T.ty hd') then args else
+                     List.map (fun t -> S.apply subst (t,scope)) args in
+          T.app hd' args
+        ) in
+        build_term ~all_args ~depth ~subst ~scope ~counter var bvar_map t'           
       )
     ) else (
       let new_hd, subst = build_term ~all_args ~depth ~subst ~scope ~counter var bvar_map hd in 
@@ -223,15 +230,8 @@ let rec build_term ?(depth=0) ~all_args ~subst ~scope ~counter var bvar_map t =
             let arg', subst = build_term ~all_args ~depth ~subst ~scope ~counter var bvar_map arg in
             arg' :: l, subst 
           ) args ([], subst) in
-      try 
-        if T.equal new_hd hd && List.for_all2 T.equal args new_args then t,subst
-        else T.app new_hd new_args, subst
-      with Type.ApplyError err ->
-        CCFormat.printf "err:%s@." err;
-        CCFormat.printf "t:@[%a@]@." T.pp t;
-        CCFormat.printf "subst:@[%a@]@." US.pp subst;
-        assert false;
-
+      if T.equal new_hd hd && List.for_all2 T.equal args new_args then t,subst
+      else T.app new_hd new_args, subst
     )
   | T.Fun(ty, body) -> 
     let b', subst = build_term ~all_args  ~depth:(depth+1) ~subst ~scope ~counter var bvar_map body in
@@ -301,7 +301,7 @@ let rec unify ~scope ~counter ~subst = function
             List.length args_s' + List.length args_s = 
             List.length args_t' + List.length args_t ->
           let args_lhs,args_rhs = 
-            args_s@args_s', args_t@args_t' in
+            Unif.norm_logical_disagreements hd_s (args_s@args_s') (args_t@args_t') in
           unify ~subst ~counter ~scope @@ build_constraints args_lhs args_rhs rest
         | T.DB i, T.DB j when i = j && List.length args_s = List.length args_t ->
           (* assert (List.length args_s = List.length args_t); *)
@@ -428,12 +428,13 @@ let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
       )
     ) 
   in
-  let l = Lambda.eta_reduce @@ Lambda.snf @@ S.apply res t0_s in 
-     let r = Lambda.eta_reduce @@ Lambda.snf @@ S.apply res t1_s in
-     if not ((T.equal l r) && (Type.equal (Term.ty l) (Term.ty r))) then (
-     CCFormat.printf "orig:@[%a@]=?=@[%a@]@." (Scoped.pp T.pp) t0_s (Scoped.pp T.pp) t1_s;
-     CCFormat.printf "before:@[%a@]@." US.pp subst;
-     CCFormat.printf "after:@[%a@]@." US.pp res;
-     assert(false);
-     );
+  let norm t = T.normalize_bools @@ Lambda.eta_reduce @@ Lambda.snf t in
+  let l = norm @@ S.apply res t0_s in 
+  let r = norm @@ S.apply res t1_s in
+  if not ((T.equal l r) && (Type.equal (Term.ty l) (Term.ty r))) then (
+  CCFormat.printf "orig:@[%a@]=?=@[%a@]@." (Scoped.pp T.pp) t0_s (Scoped.pp T.pp) t1_s;
+  CCFormat.printf "before:@[%a@]@." US.pp subst;
+  CCFormat.printf "after:@[%a@]@." US.pp res;
+  assert(false);
+  );
   res

@@ -27,6 +27,10 @@ let compare = Pervasives.compare
 let equal p1 p2 = compare p1 p2 = 0
 let hash p = Hashtbl.hash p
 
+let rec size = function 
+  | Stop -> 0
+  | Type p | Left p | Right p | Head p | Arg(_,p) | Body p -> 1 + size p
+
 let rev pos =
   let rec aux acc pos = match pos with
     | Stop -> acc

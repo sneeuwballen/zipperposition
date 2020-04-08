@@ -64,6 +64,9 @@ module Constr = struct
     (* bigger arity means bigger symbol *)
     arity_of s1 - arity_of s2
 
+  let inv_arity arity_of s2 s1 =
+    arity_of s2 - arity_of s1
+
   let invfreq seq =
     (* symbol -> number of occurrences of symbol in seq *)
     let tbl = ID.Tbl.create 16 in
@@ -263,21 +266,31 @@ let inv_depth_occurence =  depth_occ_driver ~flip:false
 let depth_occurence =  depth_occ_driver ~flip:true
 
 
+let max_arity signature = 
+  Signature.Seq.symbols signature
+  |> Iter.map (fun sym -> snd @@ Signature.arity signature sym)
+  |> Iter.max |> CCOpt.get_or ~default:max_int
+
 (* weight of f = arity of f + 4 *)
 let weight_modarity ~signature a = 
   let arity =  try snd @@ Signature.arity signature a with _ -> 10 in
   Weight.int (arity + 4)
 
-let weight_invarity ~signature = 
-  let max_arity = 
-    Signature.Seq.symbols signature
-    |> Iter.map (fun sym -> snd @@ Signature.arity signature sym)
-    |> Iter.max |> CCOpt.get_or ~default:max_int in
-
+let weight_invarity ~signature =
+  let max_a = max_arity signature in
   (fun a ->
      let arity =  try snd @@ Signature.arity signature a with _ -> 0 in
-     Weight.int (max_arity - arity + 3))
+     Weight.int (max_a - arity + 3))
 
+let weight_sq_arity ~signature a =
+  let arity =  try snd @@ Signature.arity signature a with _ -> 10 in
+  Weight.int (arity * arity + 1)
+
+let weight_invsq_arity ~signature =
+  let max_a = max_arity signature in
+  (fun a -> 
+    let arity =  try snd @@ Signature.arity signature a with _ -> max_a / 2 in
+    Weight.int (max_a*max_a - arity * arity + 1))
 
 (* constant weight *)
 let weight_constant _ = Weight.int 4
@@ -317,8 +330,53 @@ let weight_freqrank (symbs : ID.t Iter.t) : ID.t -> Weight.t =
   Iter.iteri (fun i sym -> ID.Tbl.add tbl sym (i+1)) sorted;
   (fun sym -> Weight.int (ID.Tbl.get_or ~default:10 tbl sym))
 
+(* This function takes base KBO weight function and adjusts it so
+   that defined symbols are larger than its defitnitions. *)
+let lambda_def_weight lm_w db_w base_weight lits =
+  let def_rhs lit =
+    let is_def t =
+      let hd,args = Term.as_app t in
+      Term.is_const hd && List.for_all Term.is_var args &&
+      Term.Set.cardinal (Term.Set.of_list args) = List.length args
+    in
+    
+    match lit with
+    | SLiteral.Eq(lhs,rhs) ->
+      if is_def lhs then Some (rhs, Term.head_exn lhs)
+      else if is_def rhs then Some (lhs, Term.head_exn rhs)
+      else None  
+    | _ -> None in
 
-let weight_fun_of_string ~signature s = 
+  let evaluate_weight current_evals t =
+    2*(Term.weight ~sym:(fun sy -> 
+      ID.Map.get_or sy current_evals ~default:((base_weight sy).Weight.one)
+    ) t + 
+      (Term.Seq.subterms ~include_builtin:true ~include_app_vars:true t
+      |> Iter.fold (fun acc sub -> 
+        let inc = 
+          if Term.is_fun sub then lm_w
+          else if Term.is_bvar sub then db_w
+          else 0 in
+        acc + inc ) 0))
+     in
+
+  let id_map = 
+    Iter.fold (fun acc lit ->
+      match def_rhs lit with 
+      | Some (rhs,lhs_id) ->
+        let rhs_eval = evaluate_weight acc rhs in
+        ID.Map.update lhs_id (fun prev ->
+          Some (max (CCOpt.get_or ~default:0 prev) rhs_eval)
+        ) acc
+      | None -> acc) ID.Map.empty lits in
+
+  
+  fun sy ->
+    Weight.int (ID.Map.get_or ~default:(base_weight sy).Weight.one sy id_map)
+
+
+
+let weight_fun_of_string ~signature ~lits ~lm_w ~db_w s sd = 
   let syms_only sym_depth = 
     Iter.map fst sym_depth in
   let with_syms f sym_depth = f (syms_only sym_depth) in
@@ -331,11 +389,18 @@ let weight_fun_of_string ~signature s =
      "freqrank", with_syms weight_freqrank;
      "modarity", ignore_arg @@ weight_modarity ~signature;
      "invarity", ignore_arg @@ weight_invarity ~signature;
+     "sqarity", ignore_arg @@ weight_sq_arity ~signature;
+     "invsqarity", ignore_arg @@ weight_invsq_arity ~signature;
      "invdocc", inv_depth_occurence;
      "docc", depth_occurence;
      "const", ignore_arg weight_constant] in
   try
-    List.assoc s wf_map
+    begin match CCString.chop_prefix ~pre:"lambda-def-" s with 
+    | Some s ->
+      let base_weight = List.assoc s wf_map sd in
+      lambda_def_weight lm_w db_w base_weight lits
+      (* List.assoc s wf_map sd *)
+    | None -> List.assoc s wf_map sd end
   with Not_found -> invalid_arg "KBO weight function not found"
 
 (* default argument coefficients *)

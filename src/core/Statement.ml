@@ -1091,4 +1091,3 @@ let get_rw_rule ?weight_incr:(w_i=1000000) c  =
               conv_terms_rw t2 t1 else None)
     | _ -> None
   else None
-
