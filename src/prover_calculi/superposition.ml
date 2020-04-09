@@ -121,7 +121,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       module Stm = Stm
       module Env = Env end)
   module Bools = Booleans.Make(Env)
-  module SS = SolidSubsumption.Make(struct let st = Env.flex_state () end)
 
   (** {6 Stream queue} *)
   let k_stmq = Flex_state.create_key ()
@@ -3038,7 +3037,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     | Some _ -> true
 
   let subsumes a b = 
+    let module SS = SolidSubsumption.Make(struct let st = Env.flex_state () end) in
+
     if not @@ Env.flex_get k_solid_subsumption 
+       || Env.flex_get Combinators.k_enable_combinators
     then subsumes_classic a b 
     else (
       try 
