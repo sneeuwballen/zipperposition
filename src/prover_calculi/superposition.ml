@@ -2284,14 +2284,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
            let pp_c_s out (c,s,sc) =
              Format.fprintf out "(@[%a@ :subst %a[%d]@])" C.pp c Subst.pp s sc in
            k C.pp c C.pp new_c (Util.pp_list pp_c_s) st.demod_clauses);
-      (* Assertion against variable clashes *)
-      (* Not sure if this assertion is in place -- maybe Zip renames the vars afterwards
-         TODO: INVESTIGATE!!!
-      *)
-      (* Lits.vars (C.lits new_c) 
-         |> CCList.map (fun v -> (HVar.id v))
-         |> (fun vars -> assert (CCList.length (CCList.uniq ~eq:CCInt.equal vars) == CCList.length vars)); *)
-      (* return simplified clause *)
       assert(C.lits new_c |> Literals.vars_distinct);
       SimplM.return_new new_c
     )
@@ -3144,7 +3136,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (fun res c' ->
            if C.trail_subsumes c c'
            then
-             let c' = if Env.flex_get k_ground_subs_check > 1 then  C.ground_clause c' else c' in
+             let c' = if Env.flex_get k_ground_subs_check > 1 then C.ground_clause c' else c' in
              let redundant =
                (try_eq_subsumption && eq_subsumes (C.lits c) (C.lits c'))
                || subsumes (C.lits c) (C.lits c')

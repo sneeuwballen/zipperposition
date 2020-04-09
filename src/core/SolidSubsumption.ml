@@ -16,6 +16,15 @@ module Make (S : sig val st : Flex_state.t end) = struct
   module SU = SolidUnif.Make(S)
   let get_op k = Flex_state.get_exn k S.st
 
+  (* Multiterm is built more or less like a normal term,
+     except that at any point (at any constructor) there is an
+     alternative way to see this term -- as a bound variable corresponding
+     to some argument of a __solid pattern__.CCArray
+     
+     For example let s = F a (f b) be a solid pattern.
+     For a term t = g (f a) (f b) multiterm
+     {g} [{f} [{a} [] {1}] {}; {f} [{b} [] {}] {0} ] {}
+     represents exponentially many ways to match term t using pattern s*)
   type multiterm =
     (* Application of Builtin constant to a list of multiterms.
        Third argument are possible replacements. *)
