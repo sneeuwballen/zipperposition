@@ -23,8 +23,9 @@ module Make (S : sig val st : Flex_state.t end) = struct
      
      For example let s = F a (f b) be a solid pattern.
      For a term t = g (f a) (f b) multiterm
-     {g} [{f} [{a} [] {1}] {}; {f} [{b} [] {}] {0} ] {}
-     represents exponentially many ways to match term t using pattern s*)
+     {g} [{f} [{a,1}] {}; {f} [{b}] {0} ] {}
+     represents exponentially many ways to match term t using pattern s
+     (in this case 2*2=4) *)
   type multiterm =
     (* Application of Builtin constant to a list of multiterms.
        Third argument are possible replacements. *)
