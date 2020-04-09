@@ -529,16 +529,11 @@ let rec in_pfho_fragment t =
   | Var _ -> if (not (type_ok (ty t))) then
       (raise (Failure (CCFormat.sprintf "Variable has out-of-fragment type [%a]" T.pp t)))
     else true
-  | Const sym -> if (List.for_all type_ok (Type.expected_args (ty t))) then true
+  | Const sym -> if (top_level_exception t || type_ok (ty t)) then true
     else (raise (Failure (CCFormat.sprintf "Constant has out-of-fragment type [%a] " ID.pp sym)))
   | AppBuiltin( _, l)
-  | App (_, l) -> let hd = head_term t in
-    let hd_is_skolem = match as_const hd with
-      | Some sym -> ID.is_skolem sym
-      | None -> false in
-    (* If the head is a variable or skolem, the return type must be ok. 
-       But if the head is a constant, we want to allow predicate symbols. *)
-    if((not (is_var hd || hd_is_skolem) || type_ok (ty t)) && 
+  | App (_, l) -> 
+    if((top_level_exception t || type_ok (ty t)) && 
        List.map ty l |> List.for_all type_ok
        && List.for_all in_pfho_fragment l) then true
     else (raise (Failure (CCFormat.sprintf "Argument of a term has out-of-fragment type [%a:%a]" T.pp t Type.pp (ty t))))
@@ -548,6 +543,16 @@ let rec in_pfho_fragment t =
     else (raise (Failure (CCFormat.sprintf "Lambda body has out-of-fragment type [%a]" T.pp t)))
   | DB _ -> if(type_ok (ty t)) then true
     else (raise (Failure "Bound variable has out-of-fragment type"))
+and top_level_exception t =
+  (* If the head is a variable or skolem, the type must be ok. 
+    But if the head is a constant, we want to allow predicate symbols. *)
+  let hd = head_term t in
+  let hd_is_skolem = match as_const hd with
+    | Some sym -> ID.is_skolem sym
+    | None -> false in
+  if is_var hd || hd_is_skolem then false
+  else if Type.equal (ty t) (Type.prop) then true
+  else false
 and type_ok ty_ =
   not (Type.Seq.sub ty_ |> Iter.exists (fun t -> Type.equal t (Type.prop) || Type.equal t (Type.rat) || Type.equal t (Type.int)))
 
