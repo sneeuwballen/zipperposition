@@ -54,6 +54,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   module Ctx = Env.Ctx
   module Fool = Fool.Make(Env)
   module Combs = Combinators.Make(Env)
+  module HO = Higher_order.Make(Env)
 
   let (=~),(/~) = Literal.mk_eq, Literal.mk_neq
   let (@:) = T.app_builtin ~ty:Type.prop
@@ -631,7 +632,8 @@ module Make(E : Env.S) : S with module Env = E = struct
   let setup () =
     match Env.flex_get k_bool_reasoning with 
     | BoolReasoningDisabled -> ()
-    | _ -> 
+    | _ ->
+      Env.add_unary_inf "infer_tf" HO.prim_enum_tf;
       if Env.flex_get k_simplify_bools then (
         Env.add_basic_simplify simpl_bool_subterms
       );

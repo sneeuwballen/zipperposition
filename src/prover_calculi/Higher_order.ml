@@ -54,6 +54,7 @@ let k_eta = Flex_state.create_key()
 let k_diff_const = Flex_state.create_key()
 let k_use_diff_for_neg_ext = Flex_state.create_key()
 let k_generalize_choice_trigger = Flex_state.create_key ()
+let k_prim_enum_simpl = Flex_state.create_key ()
 
 
 type prune_kind = [`NoPrune | `OldPrune | `PruneAllCovers | `PruneMaxCover]
@@ -67,6 +68,8 @@ module type S = sig
 
   val setup : unit -> unit
   (** Register rules in the environment *)
+
+  val prim_enum_tf : Env.C.t -> Env.C.t list
 end
 
 let k_some_ho : bool Flex_state.key = Flex_state.create_key()
@@ -528,6 +531,15 @@ module Make(E : Env.S) : S with module Env = E = struct
     then prim_enum_ ~mode c
     else []
     (* prim_enum_ ~mode c *)
+
+  let prim_enum_simpl ~mode c =
+    if C.proof_depth c < max_penalty_prim_ then (
+      let res = prim_enum_ ~mode c in
+      if CCList.is_empty res then None else Some res
+    ) else None
+
+  let prim_enum_tf c =
+    prim_enum_ ~mode:`TF c
 
   let choice_ops = ref Term.Set.empty
   let new_choice_counter = ref 0
@@ -1351,7 +1363,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       begin match Env.flex_get k_ho_prim_mode with
         | `None -> ()
         | mode ->
-          Env.add_unary_inf "ho_prim_enum" (prim_enum ~mode);
+          if Env.flex_get k_prim_enum_simpl then (
+            Env.add_multi_simpl_rule (prim_enum_simpl ~mode)
+          ) else Env.add_unary_inf "ho_prim_enum" (prim_enum ~mode);
       end;
       if Env.flex_get k_ext_axiom then
         Env.ProofState.PassiveSet.add (Iter.singleton (mk_extensionality_clause ())) ;
@@ -1445,6 +1459,7 @@ let _purify_applied_vars = ref `None
 let _eta = ref `Reduce
 let _use_diff_for_neg_ext = ref false
 let _generalize_choice_trigger = ref false
+let _prim_enum_simpl = ref false
 
 let extension =
   let register env =
@@ -1470,6 +1485,7 @@ let extension =
     E.flex_add k_eta !_eta;
     E.flex_add k_use_diff_for_neg_ext !_use_diff_for_neg_ext;
     E.flex_add k_generalize_choice_trigger !_generalize_choice_trigger;
+    E.flex_add k_prim_enum_simpl !_prim_enum_simpl;
 
 
     if E.flex_get k_check_lambda_free = `Only 
@@ -1543,6 +1559,7 @@ let () =
       "--ho-elim-pred-var", Arg.Bool (fun b -> _elim_pred_var := b), " disable predicate variable elimination";
       "--ho-prim-enum", set_prim_mode_, " set HO primitive enum mode";
       "--ho-prim-max", Arg.Set_int prim_max_penalty, " max penalty for HO primitive enum";
+      "--ho-prim-enum-simpl", Arg.Bool ((:=) _prim_enum_simpl), " use primitive enumeration as simplification rule";
       "--ho-oracle-composer", Arg.Symbol (["merge";"fair"], (fun s -> 
           if s = "merge" then _oracle_composer := (OSeq.merge :> (Logtk.Subst.t option OSeq.t OSeq.t -> Logtk.Subst.t option OSeq.t))
           else _oracle_composer := UnifFramework.take_fair)), " choose either OSeq.merge or Unif.take_fair as the composer";

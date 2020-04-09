@@ -23,6 +23,7 @@ module type S = sig
   val setup : unit -> unit
   (** Register rules in the environment *)
 
+  val prim_enum_tf : Env.C.t -> Env.C.t list
 
 end
 
