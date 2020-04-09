@@ -265,8 +265,5 @@ module Make (P : PARAMETERS) = struct
         CCFormat.printf "new:@[%a:%a@]@.=?=@.@[%a:%a@]@." T.pp l Type.pp (T.ty l) T.pp r Type.pp (T.ty r);
         assert(false)
        ); subst) opt)
-    with Unif.Fail -> OSeq.empty
-
-  let unify_raw t0s t1s =
-    
+    with Unif.Fail -> OSeq.empty    
 end

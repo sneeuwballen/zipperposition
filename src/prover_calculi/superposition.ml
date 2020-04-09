@@ -3033,9 +3033,18 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       res
     )
 
-  let subsumes a b = match subsumes_with (a,0) (b,1) with
+  let subsumes_classic a b = match subsumes_with (a,0) (b,1) with
     | None -> false
     | Some _ -> true
+
+  let subsumes a b = 
+    if not @@ Env.flex_get k_solid_subsumption 
+    then subsumes_classic a b 
+    else (
+      try 
+        SS.subsumes a b
+      with SolidSubsumption.UnsupportedLiteralKind -> 
+        subsumes_classic a b)
 
   (* anti-unification of the two terms with at most one disagreement point *)
   let anti_unify (t:T.t)(u:T.t): (T.t * T.t) option =
@@ -3099,13 +3108,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let try_eq_subsumption = CCArray.exists Lit.is_eqn (C.lits c) in
     (* use feature vector indexing *)
     let c = if Env.flex_get k_ground_subs_check > 0 then  C.ground_clause c else c in
-    let subsumes a b = 
-      if not @@ Env.flex_get k_solid_subsumption then subsumes a b else (
-        try 
-          SS.subsumes a b
-        with SolidSubsumption.UnsupportedLiteralKind -> 
-          subsumes a b
-      ) in
     let res =
       SubsumIdx.retrieve_subsuming_c !_idx_fv c
       |> Iter.exists
@@ -3132,13 +3134,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       C.is_unit_clause c && Lit.is_pos (C.lits c).(0)
     in
     (* use feature vector indexing *)
-    let subsumes a b = 
-      if not @@ Env.flex_get k_solid_subsumption then subsumes a b else (
-        try 
-          SS.subsumes a b
-        with SolidSubsumption.UnsupportedLiteralKind -> 
-          subsumes a b
-      ) in
     let res =
       SubsumIdx.retrieve_subsumed_c !_idx_fv c
       |> Iter.fold
