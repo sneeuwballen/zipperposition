@@ -477,9 +477,8 @@ module Make(E : Env.S) : S with module Env = E = struct
   let  prim_enum_ ~(mode) (c:C.t) : C.t list =
     (* set of variables to refine (only those occurring in "interesting" lits) *)
     let vars =
-      Literals.fold_eqn 
-        ~both:false ~ord:(Ctx.ord()) 
-        ~eligible:(C.Eligible.always) (C.lits c)
+      Literals.fold_eqn ~both:false ~ord:(Ctx.ord()) ~eligible:(C.Eligible.always)
+        (C.lits c)
       |> Iter.flat_map_l (fun (l,r,_,_) -> 
           let extract_var t = 
             let _, body = T.open_fun t in
@@ -487,8 +486,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             | T.Var x -> Some x
             | T.App(hd, _) when T.is_var hd ->  Some (T.as_var_exn hd)
             | _ -> None in
-          CCOpt.to_list (extract_var l) @ CCOpt.to_list (extract_var r)
-      )
+          CCOpt.to_list (extract_var l) @ CCOpt.to_list (extract_var r))
       |> Iter.filter (fun v -> Type.returns_prop @@ HVar.ty v)
       |> T.VarSet.of_seq (* unique *)
     in
@@ -531,12 +529,6 @@ module Make(E : Env.S) : S with module Env = E = struct
     then prim_enum_ ~mode c
     else []
     (* prim_enum_ ~mode c *)
-
-  let prim_enum_simpl ~mode c =
-    if C.proof_depth c < max_penalty_prim_ then (
-      let res = prim_enum_ ~mode c in
-      if CCList.is_empty res then None else Some res
-    ) else None
 
   let prim_enum_tf c =
     prim_enum_ ~mode:`TF c
@@ -719,51 +711,51 @@ module Make(E : Env.S) : S with module Env = E = struct
       | None -> false
     ) else false
 
+  let elim_leibniz_eq_ c =
+    let ord = Env.ord () in
+    let eligible = C.Eligible.always in
+    let pos_pred_vars, neg_pred_vars, occurences = 
+      Lits.fold_eqn ~both:false ~ord ~eligible (C.lits c)
+      |> Iter.fold (fun (pos_vs,neg_vs,occ) (lhs,rhs,sign,_) -> 
+          if Type.is_prop (Term.ty lhs) && Term.is_app_var lhs && T.equal T.true_ rhs then (
+            let var_hd = Term.as_var_exn (Term.head_term lhs) in
+            if sign then (Term.VarSet.add var_hd pos_vs, neg_vs, Term.Map.add lhs true occ)
+            else (pos_vs, Term.VarSet.add var_hd neg_vs, Term.Map.add lhs false occ)
+          ) else (pos_vs, neg_vs, occ)
+        ) (Term.VarSet.empty,Term.VarSet.empty,Term.Map.empty) in
+    let pos_neg_vars = Term.VarSet.inter pos_pred_vars neg_pred_vars in
+    let res = 
+      if Term.VarSet.is_empty pos_neg_vars then []
+      else (
+        CCList.flat_map (fun (t,sign) -> 
+            let hd, args = T.as_app t in
+            let var_hd = T.as_var_exn hd in
+            if Term.VarSet.mem (Term.as_var_exn hd) pos_neg_vars then (
+              let tyargs, _ = Type.open_fun (Term.ty hd) in
+              let n = List.length tyargs in
+              CCList.filter_map (fun (i,arg) ->
+                  if T.var_occurs ~var:var_hd arg then None 
+                  else (
+                    let body = (if sign then T.Form.neq else T.Form.eq) 
+                        arg (T.bvar ~ty:(T.ty arg) (n-i-1)) in
+                    let subs_term = T.fun_l tyargs body in 
+                    (let cached_t = Subst.FO.canonize_all_vars subs_term in
+                      E.flex_add k_prim_enum_terms 
+                        (ref (Term.Set.add cached_t !(Env.flex_get k_prim_enum_terms))));
+                    let subst = Subst.FO.bind' (Subst.empty) (var_hd, 0) (subs_term, 0) in
+                    let rule = Proof.Rule.mk ("elim_leibniz_eq_" ^ (if sign then "+" else "-")) in
+                    let tags = [Proof.Tag.T_ho] in
+                    let proof = Some (Proof.Step.inference ~rule ~tags [C.proof_parent c]) in
+                    Some (C.apply_subst ~proof (c,0) subst))
+                ) (CCList.mapi (fun i arg -> (i, arg)) args)
+            ) else [] 
+          ) (Term.Map.to_list occurences)) in
+    res
+
 
   let elim_leibniz_equality c =
     if C.proof_depth c < Env.flex_get k_elim_leibniz_eq then (
-      let ord = Env.ord () in
-      let eligible = C.Eligible.always in
-      let pos_pred_vars, neg_pred_vars, occurences = 
-        Lits.fold_eqn ~both:false ~ord ~eligible (C.lits c)
-        |> Iter.fold (fun (pos_vs,neg_vs,occ) (lhs,rhs,sign,_) -> 
-            if Type.is_prop (Term.ty lhs) && Term.is_app_var lhs && T.equal T.true_ rhs then (
-              let var_hd = Term.as_var_exn (Term.head_term lhs) in
-              if sign then (Term.VarSet.add var_hd pos_vs, neg_vs, Term.Map.add lhs true occ)
-              else (pos_vs, Term.VarSet.add var_hd neg_vs, Term.Map.add lhs false occ)
-            ) else (pos_vs, neg_vs, occ)
-          ) (Term.VarSet.empty,Term.VarSet.empty,Term.Map.empty) in
-      let pos_neg_vars = Term.VarSet.inter pos_pred_vars neg_pred_vars in
-      let res = 
-        if Term.VarSet.is_empty pos_neg_vars then []
-        else (
-          CCList.flat_map (fun (t,sign) -> 
-              let hd, args = T.as_app t in
-              let var_hd = T.as_var_exn hd in
-              if Term.VarSet.mem (Term.as_var_exn hd) pos_neg_vars then (
-                let tyargs, _ = Type.open_fun (Term.ty hd) in
-                let n = List.length tyargs in
-                CCList.filter_map (fun (i,arg) ->
-                    if T.var_occurs ~var:var_hd arg then None 
-                    else (
-                      let body = (if sign then T.Form.neq else T.Form.eq) 
-                          arg (T.bvar ~ty:(T.ty arg) (n-i-1)) in
-                      let subs_term = T.fun_l tyargs body in 
-                      (let cached_t = Subst.FO.canonize_all_vars subs_term in
-                       E.flex_add k_prim_enum_terms 
-                         (ref (Term.Set.add cached_t !(Env.flex_get k_prim_enum_terms))));
-                      let subst = Subst.FO.bind' (Subst.empty) (var_hd, 0) (subs_term, 0) in
-                      let rule = Proof.Rule.mk ("elim_leibniz_eq_" ^ (if sign then "+" else "-")) in
-                      let tags = [Proof.Tag.T_ho] in
-                      let proof = Some (Proof.Step.inference ~rule ~tags [C.proof_parent c]) in
-                      Some (C.apply_subst ~proof (c,0) subst))
-                  ) (CCList.mapi (fun i arg -> (i, arg)) args)
-              ) else [] 
-            ) (Term.Map.to_list occurences)) in
-      (* CCFormat.printf "Elim Leibniz eq:@ @[%a@].\n" C.pp c;
-         CCFormat.printf "Pos/neg vars:@ @[%a@].\n" (Term.VarSet.pp HVar.pp) pos_neg_vars;
-         CCFormat.printf "Res:@ @[%a@].\n" (CCList.pp C.pp) res); *)
-      res
+      elim_leibniz_eq_ c
     ) else []
 
 
@@ -1162,6 +1154,30 @@ module Make(E : Env.S) : S with module Env = E = struct
     )
   (* TODO: Simplified flag like in first-order? Profiler?*)
 
+  let prim_enum_simpl ~mode c =
+    if C.proof_depth c < max_penalty_prim_ then (
+      (* Primitive enumeration will replace the original clause with 
+         instances. This will chage the shape of the clause and disable some
+         instantiating rules (e.g. choice and Leibniz equality removal).
+         Therefore, we should apply these rules as part of this
+         destrutive simplification.
+       *)
+      
+      if Env.flex_get k_instantiate_choice_ax && recognize_choice_ops c then None
+      else (
+        let other_insts =
+          (if Env.flex_get k_instantiate_choice_ax then (insantiate_choice c)
+           else [])
+          @ (if C.proof_depth c < Env.flex_get k_elim_leibniz_eq then elim_leibniz_eq_ c
+            else [])
+          @ (if Env.flex_get k_elim_pred_var then elim_pred_variable c 
+            else []) in
+
+        let res = other_insts @ prim_enum_ ~mode c  in
+        if CCList.is_empty res then None else Some res
+      )
+    ) else None
+
 
   (* Purify variables
      - if they occur applied and unapplied ("int" mode).
@@ -1364,7 +1380,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         | `None -> ()
         | mode ->
           if Env.flex_get k_prim_enum_simpl then (
-            Env.add_multi_simpl_rule (prim_enum_simpl ~mode)
+            Env.add_single_step_multi_simpl_rule (prim_enum_simpl ~mode)
           ) else Env.add_unary_inf "ho_prim_enum" (prim_enum ~mode);
       end;
       if Env.flex_get k_ext_axiom then

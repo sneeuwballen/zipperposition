@@ -46,7 +46,7 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~signature ~offset 
       | `Neg | `Full | `Pragmatic ->
         let f = HVar.make offset ~ty:ty_v in
         [T.fun_of_fvars vars
-           (T.Form.not_ (T.app (T.var f) (List.map T.var vars)))]
+          (T.Form.not_ (T.app (T.var f) (List.map T.var vars)))]
       | _ -> []
     (* projection with "∧": [λvars. (F1 vars) ∧ (F2 vars)] *)
     and l_and = match mode with

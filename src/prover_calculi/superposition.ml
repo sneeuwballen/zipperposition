@@ -2698,7 +2698,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
              not (var_in_subst_ !us v 0) && not (Type.is_fun (HVar.ty v))
            in
            if BV.get bv i then match lit with
-             | Lit.Equation (l, r, false) ->
+             | Lit.Equation (l, r, false) when not (T.is_true_or_false r) ->
                begin match T.view l, T.view r with
                  | T.Var v, _ when can_destr_eq_var v ->
                    (* eligible for destructive Equality Resolution, try to update
@@ -2711,24 +2711,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                    try_unif i r 0 l 0
                  | _ -> ()
                end
-             (* | Lit.Equation (l, r, sign) when Type.is_prop (T.ty l) ->
-               begin match T.view l, T.view r with
-                 | T.Var x, (T.AppBuiltin (Builtin.True, []))
-                   when not (var_in_subst_ !us x 0) ->
-                   (* [C or x=true ---> C[x:=false]] *)
-                   (* [C or x!=true ---> C[x:=true]] *)
-                   begin
-                     try
-                       let notb = if sign then T.false_ else T.true_ in 
-                       let subst' = US.FO.bind !us (x,0) (notb,0) in
-                       has_changed := true;
-                       BV.reset bv i;
-                       us := subst';
-                     with Unif.Fail -> ()
-                   end
-
-                 | _ -> ()
-               end *)
              | _ -> ())
         lits;
       let new_lits = BV.select bv lits in
@@ -3315,22 +3297,25 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     |> Iter.fold (fun acc t -> (T.weight ~var:1 ~sym:(fun _ -> 2) t) + acc ) 0
 
   let immediate_subsume c immediate =
-    let lits_c = C.lits c in
-    let try_eq_subsumption = CCArray.exists Lit.is_eqn (C.lits c) in
-    if Iter.exists C.is_empty immediate then None
+    let subsumes subsumer subsumee =
+      (subsumption_weight subsumer <= subsumption_weight subsumee) &&
+      C.trail_subsumes subsumer subsumee &&
+      ((Array.exists Lit.is_eqn (C.lits subsumee) && 
+          eq_subsumes (C.lits subsumer) (C.lits subsumee)) ||
+        subsumes (C.lits subsumer) (C.lits subsumee)) in
+
+    let immediate = Iter.filter (fun c' -> not (subsumes c c')) immediate in
+    if Iter.exists C.is_empty immediate then None 
     else (
-      Iter.find_map (fun c' -> 
-        if (C.trail_subsumes c' c &&
-           (* If clauses are the same -- then we can loop! *)
-           subsumption_weight c' < subsumption_weight c &&
-            ((try_eq_subsumption && eq_subsumes (C.lits c') lits_c) ||
-              subsumes (C.lits c') lits_c)) then (
+      immediate
+      |> Iter.find_map (fun c' -> 
+        if (subsumes c' c) then (
           C.mark_redundant c;
           Env.remove_active (Iter.singleton c);
           Env.remove_simpl (Iter.singleton c);
           Util.debugf ~section 1 "immediate subsume @[%a@]@." (fun k -> k C.pp c);
           Some c'
-        ) else None) immediate)
+        ) else None))
     |> (function 
         | Some subsumer -> Some (Iter.singleton subsumer)
         | None -> Some immediate)

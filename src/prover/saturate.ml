@@ -130,7 +130,7 @@ module Make(E : Env.S) = struct
         Unknown
       )
     | Some c ->
-      Util.debugf ~section 10 "@[<2>@{<green>given@} (before simplification):@ `@[%a@]`@]"
+      Util.debugf ~section 1 "@[<2>@{<green>given@} (before simplification):@ `@[%a@]`@]"
             (fun k->k Env.C.pp c);
       Util.debugf ~section 10 "@[proof:@[%a@]@]" (fun k -> k Proof.S.pp_tstp (Env.C.proof c));
       
@@ -151,8 +151,8 @@ module Make(E : Env.S) = struct
         | c :: l', _ ->
           (* put clauses of [l'] back in passive set *)
 
-          Util.debugf ~section 5 "all_simplify(@[%a@])=@." (fun k -> k Env.C.pp orig_c);
-          Util.debugf ~section 5 "  @[%a@]@." (fun k -> k (CCList.pp Env.C.pp) (c :: l'));
+          Util.debugf ~section 1 "all_simplify(@[%a@])=@." (fun k -> k Env.C.pp orig_c);
+          Util.debugf ~section 1 "  @[%a@]@." (fun k -> k (CCList.pp Env.C.pp) (c :: l'));
 
           Env.add_passive (Iter.of_list l');
           (* process the clause [c] *)
