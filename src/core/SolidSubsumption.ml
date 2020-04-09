@@ -221,7 +221,11 @@ module Make (S : sig val st : Flex_state.t end) = struct
       | _ -> if T.equal l r then subst else raise SolidMatchFail 
     in
 
-    if Type.equal (T.ty pattern) (T.ty target) then aux subst pattern target
+    if Type.equal (T.ty pattern) (T.ty target) &&
+       (*if terms are first-order we should not deal with them
+         since LFHO would have already done it.  *)
+       not (T.is_fo_term pattern) &&
+       not (T.is_fo_term target) then aux subst pattern target
     else raise SolidMatchFail
 
   let normaize_clauses subsumer target =

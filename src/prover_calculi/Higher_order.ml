@@ -1386,7 +1386,7 @@ let set_prim_mode_ =
   let l = [
     "and", `And;
     "or", `Or;
-    "not", `Neg;
+    "neg", `Neg;
     "eq", `Eq;
     "quants", `Quants;
     "tf", `TF;
