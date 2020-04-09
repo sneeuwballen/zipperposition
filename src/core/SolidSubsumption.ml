@@ -232,7 +232,7 @@ module Make (S : sig val st : Flex_state.t end) = struct
       let target' = 
         Ls.ground_lits @@ eta_exp_snf target in
 
-      let subsumer' = eta_exp_snf ~f:(SU.solidify ~limit:false ~exception_on_error:false) subsumer in
+      let subsumer' = eta_exp_snf ~f:(SU.solidify ~limit:false) subsumer in
       (* We populate app_var_map to contain indices of all arguments that
         should be removed *)
       subsumer', target'

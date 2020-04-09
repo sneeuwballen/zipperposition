@@ -9,7 +9,8 @@ type penalty = int
 (** penalty on the search space *)
 
 val enum_prop :
-  ?mode:[`Full | `Pragmatic | `Neg | `None | `TF | `Combinators] ->
+  ?mode:[`And | `Or | `Neg |`Quants | `TF | `Eq | `Combinators | `Full
+         | `Pragmatic | `Simple | `None] ->
   Term.var Scoped.t ->
   enum_cache: Term.Set.t ref ->
   signature: Signature.t ->

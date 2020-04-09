@@ -73,7 +73,10 @@ let k_some_ho : bool Flex_state.key = Flex_state.create_key()
 let k_enabled : bool Flex_state.key = Flex_state.create_key()
 let k_enable_def_unfold : bool Flex_state.key = Flex_state.create_key()
 let k_enable_ho_unif : bool Flex_state.key = Flex_state.create_key()
-let k_ho_prim_mode : [`Combinators | `Full | `Neg | `None | `Pragmatic | `TF ] Flex_state.key = Flex_state.create_key()
+let k_ho_prim_mode :
+  [ `Combinators | `And | `Or | `Neg | `Quants | `Eq | `TF  
+    | `Full | `Pragmatic | `Simple | `None ] Flex_state.key 
+   = Flex_state.create_key()
 let k_ho_prim_max_penalty : int Flex_state.key = Flex_state.create_key()
 
 module Make(E : Env.S) : S with module Env = E = struct
@@ -468,7 +471,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* rule for primitive enumeration of predicates [P t1…tn]
      (using ¬ and ∧ and =) *)
-  let prim_enum_ ~(mode) (c:C.t) : C.t list =
+  let  prim_enum_ ~(mode) (c:C.t) : C.t list =
     (* set of variables to refine (only those occurring in "interesting" lits) *)
     let vars =
       Literals.fold_eqn 
@@ -1367,11 +1370,15 @@ let prim_max_penalty = ref 2 (* FUDGE *)
 
 let set_prim_mode_ =
   let l = [
-    "neg", `Neg;
+    "and", `And;
+    "or", `Or;
+    "not", `Neg;
+    "quants", `Quants;
+    "tf", `TF;
+    "combs", `Combinators;
     "full", `Full;
     "pragmatic", `Pragmatic;
-    "combs", `Combinators;
-    "tf", `TF;
+    "simple", `Simple;
     "none", `None;
   ] in
   let set_ s = prim_mode_ := List.assoc s l in
