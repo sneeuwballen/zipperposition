@@ -225,16 +225,18 @@ module Make (S : sig val st : Flex_state.t end) = struct
     else raise SolidMatchFail
 
   let normaize_clauses subsumer target =
-    let eta_exp_snf ?(f=CCFun.id) =
-      Ls.map (fun t -> f @@ Lambda.eta_expand @@ Lambda.snf @@ t) in
+    try 
+      let eta_exp_snf ?(f=CCFun.id) =
+        Ls.map (fun t -> f @@ Lambda.eta_expand @@ Lambda.snf @@ t) in
 
-    let target' = 
-      Ls.ground_lits @@ eta_exp_snf target in
+      let target' = 
+        Ls.ground_lits @@ eta_exp_snf target in
 
-    let subsumer' = eta_exp_snf ~f:(SU.solidify ~limit:false ~exception_on_error:false) subsumer in
-    (* We populate app_var_map to contain indices of all arguments that
-       should be removed *)
-    subsumer', target'
+      let subsumer' = eta_exp_snf ~f:(SU.solidify ~limit:false ~exception_on_error:false) subsumer in
+      (* We populate app_var_map to contain indices of all arguments that
+        should be removed *)
+      subsumer', target'
+    with PatternUnif.NotInFragment -> raise UnsupportedLiteralKind
 
   let sign l = 
     let res = 
