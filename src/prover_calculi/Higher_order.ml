@@ -847,7 +847,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       Some t'
     )
 
-  let eta_normalize = match Env.flex_get k_eta with
+  let eta_normalize () = match Env.flex_get k_eta with
     | `Reduce -> Lambda.eta_reduce ~full:true
     | `Expand -> Lambda.eta_expand
     | `None -> (fun t -> t)
@@ -855,7 +855,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* rule for eta-expansion/reduction *)
   let eta_normalize t =
     (* assert (T.DB.is_closed t); *)
-    let t' = eta_normalize t in
+    let t' = eta_normalize () t in
     if (T.equal t t') then (
       Util.debugf ~section 50 "(@[eta_normalize `%a`@ failed `@])" (fun k->k T.pp t );
       None)
@@ -1387,6 +1387,7 @@ let set_prim_mode_ =
     "and", `And;
     "or", `Or;
     "not", `Neg;
+    "eq", `Eq;
     "quants", `Quants;
     "tf", `TF;
     "combs", `Combinators;

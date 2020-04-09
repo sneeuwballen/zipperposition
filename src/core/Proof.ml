@@ -426,14 +426,12 @@ module Step = struct
   let inferences_performed p =
     let rec aux p =
       match p.kind with 
-      | Simplification _ -> 
+      | Inference _ -> 
         let parents = List.map (fun par -> aux ((Parent.proof par).step)) p.parents in
-        CCOpt.get_or ~default:0 (Iter.max (Iter.of_list parents))
-      | Inference (rule,tags) -> 
+        CCOpt.get_or ~default:0 (Iter.max (Iter.of_list parents)) + 1
+      | _ -> 
         let parents = List.map (fun par -> aux ((Parent.proof par).step)) p.parents in
-        let inc = if List.mem Tag.T_live_cnf tags then 0 else 1 in
-        CCOpt.get_or ~default:0 (Iter.max (Iter.of_list parents)) + inc
-      | _ -> 0 in
+        CCOpt.get_or ~default:0 (Iter.max (Iter.of_list parents)) in
     aux p
 
   let rec has_ho_step p = match p.kind with
