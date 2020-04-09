@@ -112,8 +112,8 @@ module Make (S : sig val st : Flex_state.t end) = struct
           (t,T.bvar ~ty:(T.ty t) (n-i-1+depth))) s_args in
       let matches_of_solids target = 
         (CCList.filter_map (fun (s, s_db) -> 
-             if T.equal s target then Some s_db else None) 
-            sols_as_db)
+            if T.equal s target then Some s_db else None) 
+          sols_as_db)
         |> TS.of_list in
       let db_hits = matches_of_solids t in
 
@@ -340,11 +340,6 @@ module Make (S : sig val st : Flex_state.t end) = struct
       let picklist = CCBV.create ~size:(Array.length target) false in
       let target_i = CCArray.mapi (fun i l -> (i,l)) target in
       let res = aux picklist MS.empty subsumer target_i in
-      (* CCFormat.printf 
-         "subsumption[%s]:@.S_O:@[%a@]@.S_N:@[%a@]@.T_O:@[%a@]@.T_N:@[%a@]@.@." 
-          (if res then "OK" else "FAIL")
-          Ls.pp subsumer_o Ls.pp subsumer
-          Ls.pp target_o Ls.pp target; *)
       res
     ) else false
 end
