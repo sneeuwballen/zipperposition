@@ -263,8 +263,6 @@ val close_all : ty:t -> Binder.t -> t -> t
 
 val close_with_vars : ?binder:Binder.t -> t list -> t -> t
 
-val lift_lambdas : t -> (t * (t list))
-
 (** Generic non-recursive map *)
 val map :
   f:('a -> t -> t) ->

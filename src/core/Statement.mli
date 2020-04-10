@@ -192,7 +192,6 @@ val sine_axiom_selector: ?depth_start:int -> ?depth_end:int -> ?tolerance:float 
 
 (** {2 Iterators} *)
 
-val lift_lambdas: input_t -> input_t Iter.t
 
 module Seq : sig
   val to_seq : ('f,'t,'ty) t ->

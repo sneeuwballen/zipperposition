@@ -20,7 +20,6 @@ let section = Const.section
 let _db_w = ref 1
 let _lmb_w = ref 1
 let _kbo_wf = ref "invfreqrank"
-let _lift_lambdas = ref false
 let _sine_d_min = ref 1
 let _sine_d_max = ref 5
 let _sine_tolerance = ref 1.5
@@ -178,8 +177,6 @@ let cnf ~sk_ctx decls =
   let stmts =
     decls
     |> CCVector.to_seq
-    |> (if not !_lift_lambdas then CCFun.id
-        else Iter.flat_map Statement.lift_lambdas)
     |> Cnf.cnf_of_seq ~ctx:sk_ctx ~opts
     |> CCVector.to_seq
     |> apply_modifiers ~field:(fun e -> e.Extensions.post_cnf_modifiers)
@@ -616,8 +613,6 @@ let () =
   Params.add_opts [
     "--de-bruijn-weight", Arg.Set_int _db_w, 
     " Set weight of de Bruijn index for KBO";
-    "--lift-lambdas", Arg.Bool (fun v -> _lift_lambdas := v),
-    " Turn lambda lifting on or off.";
     "--lambda-weight", Arg.Set_int _lmb_w,
     " Set weight of lambda symbol for KBO";
     "--kbo-weight-fun", Arg.Set_string _kbo_wf,
