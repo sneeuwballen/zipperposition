@@ -4,6 +4,7 @@ module T = Term
 let section = Util.Section.make ~parent:Const.section "live_lifting"
 
 let k_live_lifting = Flex_state.create_key ()
+let k_post_cnf_lifting = Flex_state.create_key ()
 
 module type S = sig
   module Env : Env.S
@@ -151,6 +152,7 @@ let lift_lambdas_t ~parent ~counter t  =
             lit'::acc, (reused@reused_defs, new_@new_defs)
           | _ -> lit::acc, (reused_defs, new_defs)
        ) l ([],([],[]))) in
+
     if CCList.is_empty reused_defs && CCList.is_empty new_defs then []
     else (
       let proof = 
@@ -172,13 +174,23 @@ let lift_lambdas_t ~parent ~counter t  =
       Util.debugf ~section 1 "lifting(@[%a@])@. = @[%a@]" (fun k -> k C.pp cl (CCList.pp C.pp) res);
       Some res)
 
+  
+  let lift_lambdas_cnf st =
+    Env.cr_return @@ CCList.flat_map (fun c -> 
+      CCOpt.get_or ~default:[c] (lift_lambdas_simp c)
+    )(E.C.of_statement st)
+
   let setup () =
     if Env.flex_get k_live_lifting then (
       Env.add_multi_simpl_rule lift_lambdas_simp
     );
+    if Env.flex_get k_post_cnf_lifting then (
+      Env.add_clause_conversion lift_lambdas_cnf
+    );
 end
 
 let _live_lifting = ref false
+let _post_cnf_lifting = ref false
 
 let extension =
   let register env =
@@ -186,6 +198,7 @@ let extension =
     let module ET = Make(E) in
 
     E.flex_add k_live_lifting !_live_lifting;
+    E.flex_add k_post_cnf_lifting !_post_cnf_lifting;
     ET.setup ()
   in
   { Extensions.default with
@@ -197,6 +210,8 @@ let () =
   Options.add_opts
     [ "--live-lambda-lifting", Arg.Bool ((:=) _live_lifting), 
       " enable/disable lambda lifting as simplifying inference";
+      "--post-cnf-lambda-lifting", Arg.Bool ((:=) _post_cnf_lifting),
+      "enable/disable post-cnf lambda lifting";
     ];
   Params.add_to_modes ["ho-complete-basic";
                        "ho-pragmatic";

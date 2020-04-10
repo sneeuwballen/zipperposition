@@ -381,6 +381,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       ) else None, `Continue) None
 
   let lazy_clausify_simpl c =
+    update_form_counter ~action:`Increase c;
+
     let proof_cons = Proof.Step.simp ~infos:[] ~tags:[Proof.Tag.T_live_cnf] in
     let res = Iter.to_list @@ lazy_clausify_driver ~proof_cons c  in
     if not @@ CCList.is_empty res then (
@@ -436,10 +438,16 @@ let extension =
       f c;
       Signal.ContinueListening in
 
-    Signal.on E.ProofState.PassiveSet.on_add_clause (handler (ET.update_form_counter ~action:`Increase));
-    Signal.on E.ProofState.ActiveSet.on_add_clause (handler (ET.update_form_counter ~action:`Increase));
-    Signal.on E.ProofState.PassiveSet.on_remove_clause (handler (ET.update_form_counter ~action:`Decrease));
-    Signal.on E.ProofState.ActiveSet.on_remove_clause (handler (ET.update_form_counter ~action:`Decrease));
+    if E.flex_get k_lazy_cnf_kind == `Inf then (
+      Signal.on E.ProofState.PassiveSet.on_add_clause 
+        (handler (ET.update_form_counter ~action:`Increase));
+      Signal.on E.ProofState.ActiveSet.on_add_clause
+        (handler (ET.update_form_counter ~action:`Increase));
+      Signal.on E.ProofState.PassiveSet.on_remove_clause
+        (handler (ET.update_form_counter ~action:`Decrease));
+      Signal.on E.ProofState.ActiveSet.on_remove_clause
+        (handler (ET.update_form_counter ~action:`Decrease))
+    );
 
     ET.setup ()
   in

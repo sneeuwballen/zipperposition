@@ -817,12 +817,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         List.mapi (fun i lit ->
           Lit.map (fun t ->
             Term.Map.fold 
-              (fun sk sk_v acc -> 
-                (* For polymorphism -- will apply type substitution.  *)
-                let scope = if i < (List.length c_guard + List.length lits_a)
-                            then sc_a else sc_p in
-                let sk = S.FO.apply renaming subst (sk, scope) in
-                Term.replace ~old:sk ~by:sk_v acc)
+              (fun sk sk_v acc -> Term.replace ~old:sk ~by:sk_v acc)
               sk_with_vars t ) lit) new_lits in
       
       let subst_is_ho = 
