@@ -368,7 +368,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     )
 
   (* try to eliminate a predicate variable in one fell swoop *)
-  let elim_pred_variable (c:C.t) : C.t list =
+  let elim_pred_variable ?(proof_constructor=Proof.Step.inference) (c:C.t) : C.t list =
     (* find unshielded predicate vars *)
     let find_vars(): _ HVar.t Iter.t =
       Literals.vars (C.lits c)
@@ -450,7 +450,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             l1 @ l2
           in
           let proof =
-            Proof.Step.inference ~rule:(Proof.Rule.mk "ho_elim_pred") ~tags:[Proof.Tag.T_ho]
+            proof_constructor ~rule:(Proof.Rule.mk "ho_elim_pred") ~tags:[Proof.Tag.T_ho]
               [ C.proof_parent_subst renaming (c,0) subst ]
           in
           let new_c =
@@ -474,7 +474,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* rule for primitive enumeration of predicates [P t1…tn]
      (using ¬ and ∧ and =) *)
-  let  prim_enum_ ~(mode) (c:C.t) : C.t list =
+  let  prim_enum_ ?(proof_constructor = Proof.Step.inference) ~(mode) (c:C.t) : C.t list =
     (* set of variables to refine (only those occurring in "interesting" lits) *)
     let vars =
       Literals.fold_eqn ~both:false ~ord:(Ctx.ord()) ~eligible:(C.Eligible.always)
@@ -537,7 +537,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let choice_ops = ref Term.Set.empty
   let new_choice_counter = ref 0
 
-  let insantiate_choice ?(inst_vars=true) ?(choice_ops=choice_ops) c =
+  let insantiate_choice ?(proof_constructor=Proof.Step.inference) ?(inst_vars=true) ?(choice_ops=choice_ops) c =
     let max_var = 
       ref ((C.Seq.vars c |> Iter.map HVar.id
             |> Iter.max |> CCOpt.get_or ~default: 0) + 1) in
@@ -578,7 +578,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let new_lits = [Literal.mk_prop choice_x false;
                       Literal.mk_prop choice_arg true] in
       let arg_str = CCFormat.sprintf "%a" T.TPTP.pp arg in
-      let proof = Proof.Step.inference ~rule:(Proof.Rule.mk ("inst_choice" ^ arg_str)) [] in
+      let proof = proof_constructor ~rule:(Proof.Rule.mk ("inst_choice" ^ arg_str)) [] in
       C.create ~penalty:1 ~trail:Trail.empty new_lits proof in
 
 
@@ -712,7 +712,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       | None -> false
     ) else false
 
-  let elim_leibniz_eq_ c =
+  let elim_leibniz_eq_ ?(proof_constructor=Proof.Step.inference) c =
     let ord = Env.ord () in
     let eligible = C.Eligible.always in
     let pos_pred_vars, neg_pred_vars, occurences = 
@@ -746,7 +746,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                     let subst = Subst.FO.bind' (Subst.empty) (var_hd, 0) (subs_term, 0) in
                     let rule = Proof.Rule.mk ("elim_leibniz_eq_" ^ (if sign then "+" else "-")) in
                     let tags = [Proof.Tag.T_ho] in
-                    let proof = Some (Proof.Step.inference ~rule ~tags [C.proof_parent c]) in
+                    let proof = Some (proof_constructor ~rule ~tags [C.proof_parent c]) in
                     Some (C.apply_subst ~proof (c,0) subst))
                 ) (CCList.mapi (fun i arg -> (i, arg)) args)
             ) else [] 
@@ -1163,18 +1163,19 @@ module Make(E : Env.S) : S with module Env = E = struct
          Therefore, we should apply these rules as part of this
          destrutive simplification.
        *)
+      let proof_constructor = Proof.Step.simp in
       
       if Env.flex_get k_instantiate_choice_ax && recognize_choice_ops c then None
       else (
         let other_insts =
-          (if Env.flex_get k_instantiate_choice_ax then (insantiate_choice c)
-           else [])
-          @ (if C.proof_depth c < Env.flex_get k_elim_leibniz_eq then elim_leibniz_eq_ c
-            else [])
-          @ (if Env.flex_get k_elim_pred_var then elim_pred_variable c 
-            else []) in
+          (if Env.flex_get k_instantiate_choice_ax
+           then (insantiate_choice ~proof_constructor c) else [])
+          @ (if C.proof_depth c < Env.flex_get k_elim_leibniz_eq
+             then elim_leibniz_eq_ ~proof_constructor c else [])
+          @ (if Env.flex_get k_elim_pred_var
+            then elim_pred_variable ~proof_constructor c else []) in
 
-        let res = other_insts @ prim_enum_ ~mode c  in
+        let res = other_insts @ prim_enum_ ~proof_constructor ~mode c  in
         if CCList.is_empty res then None else Some res
       )
     ) else None
