@@ -220,7 +220,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           if pd1 = pd2 then CCInt.compare (C.weight c1) (C.weight c2)
           else CCInt.compare pd1 pd2) rest
         |> CCList.take max_others in
-      
+
       let converted = 
         CCList.map (fun c -> 
           CCOpt.get_or ~default:c (C.eta_reduce c)) init @ rest

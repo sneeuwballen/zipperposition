@@ -88,6 +88,7 @@ type step = {
   id: int; (* unique ID *)
   kind: kind;
   dist_to_goal: int option; (* distance to goal *)
+  proof_depth: int;
   parents: parent list;
   infos: UntypedAST.attr list; (* additional info *)
 }
@@ -400,22 +401,26 @@ module Step = struct
 
   let distance_to_goal p = p.dist_to_goal
 
+  let parent_proof_depth parents =
+    List.map (fun par -> (Parent.proof par).step.proof_depth) parents
+    |> CCList.fold_left (fun acc depth -> max acc depth) 0
+
   let get_id_ =
     let n = ref 0 in
     fun () -> CCRef.incr_then_get n
 
-  let trivial = {id=get_id_(); parents=[]; kind=Trivial; dist_to_goal=None; infos=[]; }
-  let by_def id = {id=get_id_(); parents=[]; kind=By_def id; dist_to_goal=None; infos=[]; }
+  let trivial = {id=get_id_(); parents=[]; kind=Trivial; dist_to_goal=None; proof_depth=0;  infos=[]; }
+  let by_def id = {id=get_id_(); parents=[]; kind=By_def id; dist_to_goal=None; proof_depth=0; infos=[]; }
   let intro src r =
     let dist_to_goal = match r with
       | R_goal | R_lemma -> Some 0 | _ -> None
     in
-    {id=get_id_(); parents=[]; kind=Intro(src,r); dist_to_goal; infos=[]}
+    {id=get_id_(); parents=[]; proof_depth=0; kind=Intro(src,r); dist_to_goal; infos=[]}
   let define id src parents =
-    {id=get_id_(); parents; kind=Define (id,src); dist_to_goal=None; infos=[]; }
+    {id=get_id_(); parents; kind=Define (id,src); dist_to_goal=None; proof_depth=parent_proof_depth parents; infos=[]; }
   let define_internal id parents = define id (Src.internal []) parents
   let lemma src =
-    {id=get_id_(); parents=[]; kind=Intro(src,R_lemma); dist_to_goal=Some 0; infos=[]; }
+    {id=get_id_(); parents=[]; kind=Intro(src,R_lemma); dist_to_goal=Some 0; proof_depth=0; infos=[]; }
 
   let combine_dist o p = match o, (Parent.proof p).step.dist_to_goal with
     | None, None -> None
@@ -423,16 +428,7 @@ module Step = struct
     | None, (Some _ as res) -> res
     | Some x, Some y -> Some (min x y)
 
-  let inferences_performed p =
-    let rec aux p =
-      match p.kind with 
-      | Inference _ -> 
-        let parents = List.map (fun par -> aux ((Parent.proof par).step)) p.parents in
-        CCOpt.get_or ~default:0 (Iter.max (Iter.of_list parents)) + 1
-      | _ -> 
-        let parents = List.map (fun par -> aux ((Parent.proof par).step)) p.parents in
-        CCOpt.get_or ~default:0 (Iter.max (Iter.of_list parents)) in
-    aux p
+  let inferences_performed p = p.proof_depth
 
   let rec has_ho_step p = match p.kind with
     | Simplification(_,tags)
@@ -457,7 +453,9 @@ module Step = struct
         | Inference _ -> CCOpt.map succ d
         | _ -> d
     in
-    { id=get_id_(); kind; parents; dist_to_goal; infos; }
+    let inc = match kind with Inference _ -> 1 | _ -> 0 in
+    { id=get_id_(); kind; parents; dist_to_goal; 
+      proof_depth=parent_proof_depth parents + inc; infos; }
 
   let intro src r = step_ (Intro(src,r)) []
 

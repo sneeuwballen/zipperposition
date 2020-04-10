@@ -506,6 +506,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             ~mode ~offset (v,sc_c))
       |> Iter.map
         (fun (subst,penalty) ->
+          let penalty = if Env.flex_get k_prim_enum_simpl then 0 else penalty in
           let renaming = Subst.Renaming.create() in
           let lits = Literals.apply_subst renaming subst (C.lits c,sc_c) in
           let proof =
