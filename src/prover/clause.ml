@@ -72,6 +72,9 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let is_ground c = Literals.is_ground c.sclause.lits
 
   let weight c = Lits.weight c.sclause.lits
+  let ho_weight c = 
+    Lits.Seq.terms c.sclause.lits
+    |> Iter.fold (fun acc t -> T.ho_weight t + acc) 0
 
   let trail c = c.sclause.trail
   let has_trail c = not (Trail.is_empty c.sclause.trail)

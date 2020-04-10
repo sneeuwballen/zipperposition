@@ -119,9 +119,9 @@ module Make(E : Env.S) : S with module Env = E = struct
   let output_cl ~out clause =
     let lits_converted = Literals.Conv.to_tst (C.lits clause) in
     Format.fprintf out "%% %d:\n" (C.proof_depth clause);
-    let orig_cl_str = CCFormat.sprintf "%% @[%a@]@." C.pp_tstp clause in
+    (* let orig_cl_str = CCFormat.sprintf "%% @[%a@]@." C.pp_tstp clause in
     let commented = CCString.replace ~which:`All ~sub:"\n" ~by:"\n% " orig_cl_str in
-    Format.fprintf out "%% orig:@.@[%s@]@." commented;
+    Format.fprintf out "%% orig:@.@[%s@]@." commented; *)
     match (C.distance_to_goal clause) with 
     | Some d when d = 0 ->
       Format.fprintf out "@[thf(zip_cl_%d,negated_conjecture,@[%a@]).@]@\n"
@@ -217,7 +217,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let rest = 
         CCList.sort (fun c1 c2 ->
           let pd1 = C.proof_depth c1 and pd2 = C.proof_depth c2 in
-          if pd1 = pd2 then CCInt.compare (C.weight c1) (C.weight c2)
+          if pd1 = pd2 then CCInt.compare (C.ho_weight c1) (C.ho_weight c2)
           else CCInt.compare pd1 pd2) rest
         |> CCList.take max_others in
 
@@ -228,7 +228,6 @@ module Make(E : Env.S) : S with module Env = E = struct
 
       let encoded, encoded_symbols = 
         CCList.fold_left (fun (acc, encoded_symbols) cl ->
-
           try 
             if IntSet.mem (C.id cl) ignore_ids then raise @@ CantEncode "skip id";
             let encoded_symbols, cl' = encode_ty_args_cl ~encoded_symbols cl in

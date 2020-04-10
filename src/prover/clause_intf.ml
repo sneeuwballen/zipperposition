@@ -37,6 +37,8 @@ module type S = sig
 
   val is_ground : t -> bool
   val weight : t -> int
+  (* cached weight in terms *)
+  val ho_weight : t -> int
 
   module Tbl : CCHashtbl.S with type key = t
 
