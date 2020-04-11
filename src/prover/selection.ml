@@ -383,7 +383,7 @@ let e_sel9 ~ord lits =
   let chooser (i,l) =
     (if is_truly_equational l then max_int else 0),
     (lhs_head_arity l),
-    (lhs_head_alpha),
+    (lhs_head_alpha l),
     0 in
   weight_based_sel_driver ~ord lits chooser
 
