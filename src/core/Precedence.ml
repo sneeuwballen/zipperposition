@@ -116,7 +116,6 @@ module Constr = struct
     let map = [
       ("arity", arity);
       ("invarity", inv_arity);
-      ("invarity", inv_arity);
       ("invfreq", invfreq);
       ("unary_first", unary_first);
       ("const_first", const_first);
