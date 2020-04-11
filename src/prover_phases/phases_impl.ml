@@ -20,6 +20,7 @@ let section = Const.section
 let _db_w = ref 1
 let _lmb_w = ref 1
 let _kbo_wf = ref "invfreqrank"
+let _prec_fun = ref "invfreq"
 let _sine_d_min = ref 1
 let _sine_d_max = ref 5
 let _sine_tolerance = ref 1.5
@@ -201,7 +202,7 @@ let compute_prec ~signature stmts =
     |> Compute_prec.add_constr 10 Classify_cst.prec_constr
     |> Compute_prec.set_weight_rule (
       fun stmts -> 
-        let sym_depth = 
+        let sym_depth =
           stmts 
           |> Iter.flat_map Statement.Seq.terms 
           |> Iter.flat_map (fun t -> Term.Seq.subterms_depth t
@@ -214,10 +215,11 @@ let compute_prec ~signature stmts =
     (* use "invfreq", with low priority *)
     |> Compute_prec.add_constr_rule 90
       (fun seq ->
+        let syms = 
          seq
          |> Iter.flat_map Statement.Seq.terms
-         |> Iter.flat_map Term.Seq.symbols
-         |> Precedence.Constr.invfreq)
+         |> Iter.flat_map Term.Seq.symbols in
+        Precedence.Constr.prec_fun_of_str !_prec_fun ~signature syms)
   in
   let prec = Compute_prec.mk_precedence ~db_w:!_db_w ~lmb_w:!_lmb_w cp stmts in
   Phases.return_phase prec
@@ -617,6 +619,8 @@ let () =
     " Set weight of lambda symbol for KBO";
     "--kbo-weight-fun", Arg.Set_string _kbo_wf,
     " Set the function for symbol weight calculation.";
+    "--prec-gen-fun", Arg.Set_string _prec_fun,
+    " Set the function used for precedence generation";
     "--sine-depth-min", Arg.Int (fun v ->  _sine_threshold:=100; _sine_d_min := v),
     " Turn on SinE with threshold and set min SinE depth.";
     "--sine-depth-max", Arg.Int (fun v ->  _sine_threshold:=100; _sine_d_max := v),

@@ -45,22 +45,26 @@ module Constr : sig
         equivalence classes, within which all symbols are equal, but
         symbols of distinct equivalence classes are always ordered. *)
 
+  type prec_fun = signature:Signature.t -> ID.t Iter.t -> [`partial] t
+
   (* TODO: sth based on order of the type. Higher-order functions should
      be bigger than first-order functions, so that ghd() works fine
      with types in KBO *)
 
-  val arity : (ID.t -> int) -> [`partial] t
+  val arity : prec_fun
   (** decreasing arity constraint (big arity => high in precedence) *)
 
-  val invfreq : ID.t Iter.t -> [`partial] t
+  val invfreq : prec_fun
   (** symbols with high frequency are smaller. Elements of unknown
       frequency are assumed to have a frequency of 0. *)
 
-  val max : ID.t list -> [`partial] t
+  val max : prec_fun
   (** maximal symbols, in decreasing order *)
 
-  val min : ID.t list -> [`partial] t
+  val min : prec_fun
   (** minimal symbols, in decreasing order *)
+
+  val prec_fun_of_str : string -> prec_fun
 
   val alpha : [`total] t
   (** alphabetic ordering on symbols, themselves bigger than builtin *)

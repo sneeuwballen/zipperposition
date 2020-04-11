@@ -60,26 +60,83 @@ module Constr = struct
   type 'a t = ID.t -> ID.t -> int
     constraint 'a = [< `partial | `total]
 
-  let arity arity_of s1 s2 =
+  type prec_fun = signature:Signature.t -> ID.t Iter.t -> [`partial] t
+
+
+  let get_arity ~signature s =
+    try 
+      snd (Signature.arity signature s)
+    with Not_found -> 0
+
+  let arity ~signature _ s1 s2 =
+    let open CCOrd in
     (* bigger arity means bigger symbol *)
-    arity_of s1 - arity_of s2
+    (get_arity ~signature s1 - get_arity ~signature s2)
+    <?> (ID.compare, s1, s2)
 
-  let inv_arity arity_of s2 s1 =
-    arity_of s2 - arity_of s1
+  let inv_arity ~signature _ s1 s2 =
+    let open CCOrd in
+    (get_arity ~signature s2 - get_arity ~signature s1)
+    <?> (ID.compare, s2, s1)
 
-  let invfreq seq =
+  let invfreq ~signature seq =
     (* symbol -> number of occurrences of symbol in seq *)
     let tbl = ID.Tbl.create 16 in
     Iter.iter (ID.Tbl.incr tbl) seq;
-    let find_freq s = ID.Tbl.get_or ~default:0 tbl s in
+    let find_freq s = ID.Tbl.get_or ~default:max_int tbl s in
     (* compare by inverse frequency (higher frequency => smaller) *)
     fun s1 s2 ->
+      let open CCOrd in
       let n1 = find_freq s1 in
       let n2 = find_freq s2 in
       CCInt.compare n2 n1
+      <?> (ID.compare, s2, s1)
+  
+  let unary_first ~signature _ s1 s2 =
+    let open CCOrd in
+    let is_unary s = get_arity ~signature s == 1 in
+    let weight s =
+      if is_unary s then max_int
+      else if not (Signature.mem signature s) then max_int - 1
+      else get_arity ~signature s  in
+    weight s1 - weight s2
+    <?> (ID.compare, s1, s2)
 
-  let max l =
-    let set = ID.Set.of_list l in
+  let const_first ~signature _ s1 s2 =
+    let open CCOrd in
+    let is_const s = get_arity ~signature s == 0 in
+    let weight s =
+      if not (Signature.mem signature s) then max_int -1
+      else if is_const s then max_int
+      else get_arity ~signature s  in
+    weight s1 - weight s2
+    <?> (ID.compare, s1, s2)
+
+  let prec_fun_of_str name =
+    let map = [
+      ("arity", arity);
+      ("invarity", inv_arity);
+      ("invarity", inv_arity);
+      ("invfreq", invfreq);
+      ("unary_first", unary_first);
+      ("const_first", const_first);
+    ] in
+    match CCList.assoc_opt ~eq:CCString.equal name map with 
+    | Some wfun -> wfun
+    | None -> 
+      let err =
+        CCFormat.sprintf "precedences are one of:@[%a@]" 
+          (CCList.pp CCString.pp ~sep:"|" ~start:"(" ~stop:")") (List.map fst map) in
+      invalid_arg err
+
+  (* regular string ordering *)
+  let alpha a b =
+    let c = String.compare (ID.name a) (ID.name b) in
+    if c = 0
+    then ID.compare a b else c
+
+  let max ~signature l =
+    let set = ID.Set.of_seq l in
     fun s1 s2 ->
       let is_max1 = ID.Set.mem s1 set in
       let is_max2 = ID.Set.mem s2 set in
@@ -89,8 +146,8 @@ module Constr = struct
       | true, false -> 1
       | false, true -> -1
 
-  let min l =
-    let set = ID.Set.of_list l in
+  let min ~signature l =
+    let set = ID.Set.of_seq l in
     fun s1 s2 ->
       let is_min1 = ID.Set.mem s1 set in
       let is_min2 = ID.Set.mem s2 set in
@@ -99,12 +156,6 @@ module Constr = struct
       | false, false -> 0
       | true, false -> -1
       | false, true -> 1
-
-  (* regular string ordering *)
-  let alpha a b =
-    let c = String.compare (ID.name a) (ID.name b) in
-    if c = 0
-    then ID.compare a b else c
 
   let compose a b s1 s2 =
     let c = a s1 s2 in
