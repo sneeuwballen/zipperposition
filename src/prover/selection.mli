@@ -62,6 +62,18 @@ val e_sel8 : ord:Ordering.t -> t
 (** Selection function  identical to E's 
     SelectCQArNTNpEqFirst *)
 
+val e_sel9 : ord:Ordering.t -> t
+(** Selection function  identical to E's 
+    SelectCQArEqLast *)
+
+val e_sel10 : ord:Ordering.t -> t
+(** Selection function  identical to E's 
+    SelectNegativeLits *)
+
+val e_sel11 : ord:Ordering.t -> t
+(** Selection function  identical to E's 
+    PSelectNewComplexAHP *)
+
 val ho_sel  : ord:Ordering.t -> t
 (** Selection function that tries to take 
     into account the number of nested applied variables.

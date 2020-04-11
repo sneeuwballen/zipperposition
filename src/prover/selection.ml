@@ -209,6 +209,10 @@ let pred_freq ~ord lits =
       ) else acc
     ) ID.Map.empty
 
+let is_truly_equational = function 
+    | Lit.Equation(l,r,sign) -> not (T.equal T.true_ r)
+    | _ -> false
+
 let get_pred_freq ~freq_tbl l =
   match l with
   | Lit.Equation(l,r,sign) when T.equal T.true_ r ->
@@ -275,12 +279,12 @@ let e_sel3 ~ord lits =
   weight_based_sel_driver ~ord lits chooser
 
 let e_sel4 ~ord lits =
+  let freq_tbl = pred_freq ~ord lits in
   let chooser (i,l) = 
     let lhs = match l with
       | Lit.Equation(lhs_t,_,_) -> lhs_t
       | _ -> T.true_ (* a term to fill in *) in
     let sign = if Lit.is_pos l then 1 else 0 in
-    let freq_tbl = pred_freq ~ord lits in
     let hd_freq = get_pred_freq ~freq_tbl l in
     if Lit.is_ground l then (
       (sign, 0, -(T.ho_weight lhs), hd_freq) 
@@ -332,9 +336,6 @@ let e_sel8 ~ord lits =
                 |> ID.Set.to_seq 
                 |> Iter.sort ~cmp:ID.compare 
                 |> Iter.to_array in
-  let is_truly_equational = function 
-    | Lit.Equation(l,r,sign) -> not (T.equal T.true_ r)
-    | _ -> false  in
   let get_arity = function 
     | Lit.Equation(l,r,sign) when Term.equal T.true_ r -> 
       List.length (Type.expected_args (Term.ty (T.head_term l)))
@@ -359,6 +360,64 @@ let e_sel8 ~ord lits =
     )
   in
   weight_based_sel_driver ~ord lits chooser ~blocker
+
+let e_sel9 ~ord lits =
+  (* SelectLargestOrientable *)
+  let lhs_head_arity lit = 
+    match lit with 
+    | Lit.Equation (lhs, _, _) ->
+      let hd = T.head_term lhs in
+      if T.is_const hd then -(CCList.length (Type.expected_args (Term.ty hd)))
+      else max_int
+    | _ -> max_int in
+
+  let lhs_head_alpha lit = 
+    match lit with 
+    | Lit.Equation (lhs, _, _) ->
+      let hd = T.head_term lhs in
+      if T.is_const hd then ID.id (T.as_const_exn hd)
+      else max_int
+    | _ -> max_int in
+
+
+  let chooser (i,l) =
+    (if is_truly_equational l then max_int else 0),
+    (lhs_head_arity l),
+    (lhs_head_alpha),
+    0 in
+  weight_based_sel_driver ~ord lits chooser
+
+let e_sel10 ~ord lits =
+  mk_ ~ord lits ~f:(fun lits ->
+    let bv = Lits.neg lits in
+    (* select all selectable negative lits *)
+    BV.filter bv (fun i -> can_select_lit ~ord lits i);
+    bv)
+
+let e_sel11 ~ord lits =
+  let freq_tbl = pred_freq ~ord lits in
+  let blocker l = Lit.is_type_pred l in
+  let eqn_max_weight = function 
+  | Lit.Equation(lhs,rhs,false) ->
+    if Ordering.compare ord lhs rhs  == Comparison.Gt then Term.ho_weight lhs 
+    else Term.ho_weight lhs + Term.ho_weight rhs
+  | _ -> max_int in
+  let lhs_weight  = function 
+  | Lit.Equation(lhs,rhs,false) ->
+    if Ordering.compare ord lhs rhs  == Comparison.Gt then Term.ho_weight lhs 
+    else Term.ho_weight lhs
+  | _ -> max_int in
+
+  let chooser (i,l) =
+    if Lit.is_pos l then (max_int,max_int,max_int)
+    else if Lit.is_ground l then (0, lhs_weight l, get_pred_freq ~freq_tbl l)
+    else if not (Lit.is_typex_pred l) then (10, eqn_max_weight l, get_pred_freq ~freq_tbl l)
+    else if not (Lit.is_type_pred l) then (20, - (lhs_weight l), get_pred_freq ~freq_tbl l)
+    else (max_int, max_int, max_int) in
+  
+  if CCArray.exists (fun l -> Lit.is_neg l && Lit.depth l <= 2) lits then (
+    weight_based_sel_driver ~ord lits chooser ~blocker
+  ) else BV.empty ()
 
 let ho_sel ~ord lits = 
   let chooser (i,l) = 
@@ -416,6 +475,9 @@ let l =
       "e-selection6", e_sel6;
       "e-selection7", e_sel7;
       "e-selection8", e_sel8;
+      "e-selection9", e_sel9;
+      "e-selection10", e_sel10;
+      "e-selection11", e_sel11;
       "ho-selection", ho_sel;
       "ho-selection2", ho_sel2;
     ]
