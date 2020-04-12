@@ -986,12 +986,17 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let norm t = T.normalize_bools @@ Lambda.eta_expand @@ Lambda.snf t in
     if info.sup_kind != SubVarSup && 
        not (Term.equal (norm @@ s) (norm @@ u_p) || US.has_constr info.subst) then (
-      CCFormat.printf "@[<2>sup, kind %s@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a@]@])@ \
-         (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@].\n"
-            (kind_to_str info.sup_kind) C.pp info.active info.scope_active T.pp info.s T.pp info.t
-            C.pp info.passive info.scope_passive Lit.pp info.passive_lit
-            Position.pp info.passive_pos US.pp info.subst;
-            assert false;
+        CCFormat.printf "@[<2>sup, kind %s@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a@]@])@ \
+          (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@].\n"
+              (kind_to_str info.sup_kind) C.pp info.active info.scope_active T.pp info.s T.pp info.t
+              C.pp info.passive info.scope_passive Lit.pp info.passive_lit
+              Position.pp info.passive_pos US.pp info.subst;
+        CCFormat.printf "orig_s:@[%a@]@." T.pp info.s;
+        CCFormat.printf "norm_s:@[%a@]@." T.pp (norm s);
+        CCFormat.printf "orig_u_p:@[%a@]@." T.pp info.u_p;
+        CCFormat.printf "norm_u_p:@[%a@]@." T.pp (norm u_p);
+
+        assert false;
     );
     if Env.flex_get k_use_simultaneous_sup && info.sup_kind != LambdaSup && info.sup_kind != DupSup
     then do_simultaneous_superposition info

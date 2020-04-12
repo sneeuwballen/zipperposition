@@ -358,8 +358,11 @@ module Inner = struct
 
   (* distinct ground terms *)
   let distinct_ground_l l : bool =
-    List.for_all (fun t -> T.is_ground t (*&& CCList.is_empty @@ T.DB.unbound t*)) l 
-    && distinct_term_l l
+    (* List.for_all (fun t -> T.is_ground t && CCList.is_empty @@ T.DB.unbound t) l 
+    && distinct_term_l l *)
+  (* turning off distinct ground lifting since it is buggy --
+     DeBruijn indices do not get set properly. *)
+  false    
 
   (* given [l], a list of distinct (ground) terms, and [rhs],
      replace [l] by distinct fresh variables indices in [rhs],
@@ -495,6 +498,10 @@ module Inner = struct
         fail()
       )
     )
+
+  let has_no_lambdas t = 
+    T.Seq.subterms t
+    |> Iter.for_all (fun t -> not (T.is_bind t))
 
   (* @param op which operation to perform (unification,matching,alpha-eq)
      @param root if we are at the root of the original problem. This is
