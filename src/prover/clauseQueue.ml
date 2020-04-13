@@ -111,6 +111,7 @@ module Make(C : Clause_intf.S) = struct
         ) Term.Set.empty l
       | _ -> Term.Set.singleton t in
     aux t
+    |> Term.Set.filter (fun t -> not (Term.is_true_or_false t) && not (Term.is_const t))
   
   let add_related_term_ t =
     if Term.Set.cardinal !_related_terms < max_related_ then (
@@ -336,22 +337,33 @@ module Make(C : Clause_intf.S) = struct
           | T.Const x, T.Const y when ID.equal x y -> 1
           | T.DB i, T.DB j when i = j -> 1
           | T.Var _, _ -> int_of_float (inst_penalty *. (w conj_term))
+          | T.App(hd,_), _ when T.is_var hd -> 
+            int_of_float (w given_term +. inst_penalty *. (w conj_term))
           | _, T.Var _ -> int_of_float (gen_penalty *. (w given_term))
-          | T.App(hd1, args1), T.App(hd2, args2) when T.equal hd1 hd2 ->
+          | _, T.App(hd,_) when T.is_var hd -> 
+            int_of_float (w conj_term +. inst_penalty *. (w given_term))
+          | T.App(hd1, args1), T.App(hd2, args2) 
+            when T.equal hd1 hd2 && List.length args1 = List.length args2 ->
             w_diff_l args1 args2
           | T.AppBuiltin(hd1, args1), T.AppBuiltin(hd2, args2) 
             when Builtin.equal hd1 hd2 && List.length args1 = List.length args2 ->
             w_diff_l args1 args2
+          | T.Fun(ty1, body1), T.Fun(ty2, body2) 
+            when Type.equal ty1 ty2 && Type.equal (T.ty body1) (T.ty body2) ->
+            w_diff body1 body2
           | _, _ -> 
             int_of_float (inst_penalty *. (w conj_term) +. gen_penalty *. (w given_term))
         and w_diff_l xs ys =
           CCList.fold_left2 (fun acc x y -> 
             acc + w_diff ~given_term:x ~conj_term:y) 0 xs ys in
         
+        let t = Lambda.eta_expand t in
         if Term.Set.is_empty !_related_terms then int_of_float (w t)
         else (
           Term.Set.to_seq !_related_terms
-          |> Iter.map (fun conj_term -> w_diff ~given_term:t ~conj_term)
+          |> Iter.map (fun conj_term -> 
+             let conj_term = Lambda.eta_expand conj_term in
+             w_diff ~given_term:t ~conj_term)
           |> Iter.min_exn ~lt:(fun x y -> x < y)
         ) in
 
@@ -363,7 +375,10 @@ module Make(C : Clause_intf.S) = struct
 
         Lit.Seq.terms lit
         |> Iter.filter (fun t -> not (Term.is_true_or_false t))
-        |> Iter.fold (fun acc t -> acc + struct_diff_weight t) acc
+        |> Iter.fold (fun acc t -> 
+            let w = struct_diff_weight t in 
+            Util.debugf ~section 1 "struct(@[%a@])=%d" (fun k -> k Term.pp t w);
+            acc + w) acc
         |> (fun res ->
               let mul = 
                 (if is_pos then pos_mul else 1.0) *. 
