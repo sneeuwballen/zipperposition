@@ -328,8 +328,8 @@ let rec is_properly_encoded t = match T.view t with
 
 let lambda_depth t =
   let inc_depth = function 
-  | None -> Some 0
-  | Some x -> Some (x + 1) in
+    | None -> Some 0
+    | Some x -> Some (x + 1) in
 
   let max_d a b =
     match a with 

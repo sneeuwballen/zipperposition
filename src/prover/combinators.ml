@@ -637,6 +637,18 @@ let abf ~rules t =
   CCFormat.printf "@.   @[%a@]@." T.pp res; *)
   res
 
+let comb_depth t =
+  let changed = ref false in
+  let rules = curry_optimizations @ bunder_optimizations in
+  let t =
+    if T.has_lambda t then (
+      changed := true;
+      abf ~rules t
+    ) else t in
+  let t' = narrow t in
+  if not (T.equal t t') then changed := true;
+  if !changed then Some t' else None
+
 let comb_normalize t =
   let changed = ref false in
   let rules = curry_optimizations @ bunder_optimizations in
