@@ -871,7 +871,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             let proof = 
               Proof.Step.inference ~rule ~tags
                 [C.proof_parent_subst renaming (clause,1) subst] in
-            let penalty = depth_mul * comb_penalty + C.penalty clause in
+            let penalty = depth_mul * comb_penalty * C.penalty clause in
             let new_clause = C.create ~trail:(C.trail clause) ~penalty lits' proof in
 
             Util.debugf ~section 2 "success: @[%a@]@." (fun k -> k C.pp new_clause);
@@ -969,10 +969,10 @@ module Make(E : Env.S) : S with module Env = E = struct
 end
 
 let _enable_combinators = ref false
-let _s_penalty = ref 2
-let _b_penalty = ref 2
-let _c_penalty = ref 2
-let _k_penalty = ref 2
+let _s_penalty = ref 1
+let _b_penalty = ref 1
+let _c_penalty = ref 1
+let _k_penalty = ref 1
 let _app_var_constraints = ref false
 let _deep_app_var_penalty = ref false
 let _unif_resolve = ref false
