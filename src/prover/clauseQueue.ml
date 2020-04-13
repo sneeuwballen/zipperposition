@@ -650,6 +650,30 @@ module Make(C : Clause_intf.S) = struct
           else acc - 1
         ) 0 (C.lits c)
 
+    (* defer if there are no ho subterms *)
+    let by_ho_depth ?(modifier=(fun x -> x)) ~depth_fun  c =
+      let max_opt a b =
+        match a, b with 
+        | Some x, Some y -> if x > y then a else b
+        | Some x, None -> a
+        | _ -> b in
+
+      C.Seq.terms c
+      |> Iter.fold (fun acc t -> max_opt acc (depth_fun t)) None
+      |> CCOpt.map modifier
+      |> CCOpt.get_or ~default:max_int
+
+    
+    let prefer_shallow_lambdas c = 
+      by_ho_depth ~depth_fun:Term.lambda_depth c
+    let prefer_deep_lambdas c = 
+      by_ho_depth ~depth_fun:Term.lambda_depth ~modifier:(fun x -> -x) c
+    
+    let prefer_shallow_combs c = 
+      by_ho_depth ~depth_fun:Term.comb_depth c
+    let prefer_deep_combs c = 
+      by_ho_depth ~depth_fun:Term.comb_depth ~modifier:(fun x -> -x) c
+
     let parsers =
       ["const", (fun _ -> const_prio);
       "prefer-ho-steps", (fun _ -> prefer_ho_steps);
@@ -677,7 +701,11 @@ module Make(C : Clause_intf.S) = struct
       "prefer-shallow-appvars", (fun _ -> prefer_shallow_app_var);
       "prefer-deep-appvars", (fun _ -> prefer_deep_app_var);
       "prefer-neg-unit", (fun _ -> prefer_neg_unit);
-      "defer-neg-unit", (fun _ -> defer_neg_unit)]
+      "defer-neg-unit", (fun _ -> defer_neg_unit);
+      "prefer-shallow-lambdas", (fun _ -> prefer_shallow_lambdas);
+      "prefer-deep-lambdas", (fun _ -> prefer_deep_lambdas);
+      "prefer-shallow-combs", (fun _ -> prefer_shallow_combs);
+      "prefer-deep-combs", (fun _ -> prefer_deep_combs);]
 
     let of_string s = 
       try 

@@ -8,6 +8,9 @@ let prof_snf = ZProf.make "term.snf"
 let prof_eta_expand = ZProf.make "term.eta_expand"
 let prof_eta_reduce = ZProf.make "term.eta_reduce"
 
+let section = Util.Section.make "lambdas"
+
+
 
 module OptionSet = Set.Make(
   struct 
@@ -325,32 +328,3 @@ let rec is_properly_encoded t = match T.view t with
   | AppBuiltin(_,l) -> List.for_all is_properly_encoded l
   | App (hd, l) -> List.for_all is_properly_encoded (hd::l)
   | Fun (_,u) -> is_properly_encoded u
-
-let lambda_depth t =
-  let inc_depth = function 
-    | None -> Some 0
-    | Some x -> Some (x + 1) in
-
-  let max_d a b =
-    match a with 
-    | None -> b
-    | Some x ->
-      (match b with
-      | Some y when y > x -> b
-      | _ -> a) in
-  
-  let max_d_l =
-    let rec max_d_l_aux acc = function 
-    | [] -> acc
-    | x :: xs -> max_d_l_aux (max_d x acc) xs in
-    max_d_l_aux None in
-
-  let rec aux acc t =
-    match T.view t with
-    | AppBuiltin(_,l) -> max_d_l (List.map (aux acc) l)
-    | App (hd, l) -> max_d_l (List.map (aux acc) (hd::l))
-    | Fun (_,u) -> aux (inc_depth acc) u 
-    | Var _ | DB _ | Const _ -> acc in
-  
-  aux None t
-

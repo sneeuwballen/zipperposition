@@ -637,17 +637,6 @@ let abf ~rules t =
   CCFormat.printf "@.   @[%a@]@." T.pp res; *)
   res
 
-let comb_depth t =
-  let changed = ref false in
-  let rules = curry_optimizations @ bunder_optimizations in
-  let t =
-    if T.has_lambda t then (
-      changed := true;
-      abf ~rules t
-    ) else t in
-  let t' = narrow t in
-  if not (T.equal t t') then changed := true;
-  if !changed then Some t' else None
 
 let comb_normalize t =
   let changed = ref false in
@@ -718,6 +707,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   module Env = E
   module C = Env.C
   module Ctx = Env.Ctx
+
     let has_lams_aux = 
       Iter.exists (fun t ->
         T.Seq.subterms ~include_builtin:true ~ignore_head:false t 
@@ -867,12 +857,12 @@ module Make(E : Env.S) : S with module Env = E = struct
           let renaming = Subst.Renaming.create () in
           let lit_idx, lit_pos = Lits.Pos.cut u_pos in
 
-          Util.debugf ~section 2 "narrow vars:@[%a@]:@[%d@]" (fun k -> k C.pp clause lit_idx);
+          Util.debugf ~section 3  "narrow vars:@[%a@]:@[%d@]" (fun k -> k C.pp clause lit_idx);
 
           let lit = Lit.apply_subst_no_simp renaming subst (lits.(lit_idx), 1) in
           if not (Lit.Pos.is_max_term ~ord lit lit_pos) ||
              not (CCBV.get (C.eligible_res (clause, 1) subst) lit_idx) then (
-            Util.debugf ~section 2 "ordering restriction fail: @[%a@]@." (fun k -> k Subst.pp subst);
+            Util.debugf ~section 3 "ordering restriction fail: @[%a@]@." (fun k -> k Subst.pp subst);
             None)
           else (
             let t_depth = Position.size (Literal.Pos.term_pos (lits.(lit_idx)) lit_pos) in
@@ -886,7 +876,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             let penalty = depth_mul * comb_penalty * C.penalty clause in
             let new_clause = C.create ~trail:(C.trail clause) ~penalty lits' proof in
 
-            Util.debugf ~section 2 "success: @[%a@]@." (fun k -> k C.pp new_clause);
+            Util.debugf ~section 3 "success: @[%a@]@." (fun k -> k C.pp new_clause);
 
             Some new_clause
           )) (instantiate_var_w_comb ~var))

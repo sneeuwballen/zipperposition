@@ -140,6 +140,15 @@ val in_lfho_fragment : t -> bool
 val is_fo_term : t -> bool
 val is_true_or_false : t -> bool
 
+(** If term has no lambdas reutrn None;
+   otherwise, return Some d where d is the
+   maximal level of lambda nestings *)
+val lambda_depth : t -> int option
+
+(** combinatory equivalent to lambda_depth *)
+val comb_depth : t -> int option
+
+
 val hd_is_comb: Builtin.t -> bool
 val is_comb : t -> bool
 

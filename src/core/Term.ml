@@ -578,6 +578,61 @@ let is_true_or_false t = match view t with
     CCList.mem ~eq:Builtin.equal b [Builtin.True; Builtin.False];
   | _ -> false
 
+let inc_depth = function 
+    | None -> Some 0
+    | Some x -> Some (x + 1)
+
+let max_d a b =
+  match a with 
+  | None -> b
+  | Some x ->
+    (match b with
+    | Some y when y > x -> b
+    | _ -> a)
+
+let max_d_l =
+  let rec max_d_l_aux acc = function 
+  | [] -> acc
+  | x :: xs -> max_d_l_aux (max_d x acc) xs in
+  max_d_l_aux None
+
+let lambda_depth t =
+  let rec aux acc t =
+    match view t with
+    | AppBuiltin(_,l) -> max_d_l (List.map (aux acc) l)
+    | App (hd, l) -> max_d_l (List.map (aux acc) (hd::l))
+    | Fun (_,u) -> aux (inc_depth acc) u 
+    | Var _ | DB _ | Const _ -> acc in
+  let res = aux None t in
+  CCFormat.printf "l_depth(@[%a@])=@[%a@]@." T.pp t (CCOpt.pp CCInt.pp) res;
+  res
+
+let comb_depth t =
+  (* comb streak is true if while traversing the term, we went
+     only through terms that have combinators for heads *)
+  let rec aux ~comb_streak acc t =
+    match view t with
+    | AppBuiltin(b,l) when Builtin.is_combinator b ->
+      let acc, comb_streak =  
+        if comb_streak then (
+          (* if up to this point we have been seeing only combinators,
+            do not increase the depth *)
+          acc, comb_streak
+        ) else (
+          (* new comb_streak begins *)
+          inc_depth acc, true
+        ) in
+      
+      max_d_l (List.map (aux ~comb_streak acc) l)
+    | AppBuiltin(_,l) -> max_d_l (List.map (aux ~comb_streak:false acc) l)
+    | App (hd, l) -> max_d_l (List.map (aux ~comb_streak:false acc) (hd::l))
+    | Fun (_,u) -> invalid_arg "lambdas should have been removed."
+    | Var _ | DB _ | Const _ -> acc in
+
+  let res = aux ~comb_streak:false None t in
+  CCFormat.printf "c_depth(@[%a@])=@[%a@]@." T.pp t (CCOpt.pp CCInt.pp) res;
+  res
+
 let monomorphic t = Iter.is_empty (Seq.ty_vars t)
 
 let max_var set = VarSet.to_seq set |> Seq.max_var

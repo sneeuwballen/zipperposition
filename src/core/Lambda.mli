@@ -34,10 +34,6 @@ val is_lambda_pattern : term -> bool
 
 val is_properly_encoded : term -> bool
 
-(* If term has no lambdas reutrn None;
-   otherwise, return Some d where d is the
-   maximal level of lambda nestings *)
-val lambda_depth : term -> int option
 
 (** Low level interface *)
 module Inner : sig
