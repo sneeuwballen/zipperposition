@@ -604,7 +604,7 @@ let lambda_depth t =
     | Fun (_,u) -> aux (inc_depth acc) u 
     | Var _ | DB _ | Const _ -> acc in
   let res = aux None t in
-  CCFormat.printf "l_depth(@[%a@])=@[%a@]@." T.pp t (CCOpt.pp CCInt.pp) res;
+  (* CCFormat.printf "l_depth(@[%a@])=@[%a@]@." T.pp t (CCOpt.pp CCInt.pp) res; *)
   res
 
 let comb_depth t =
@@ -630,7 +630,7 @@ let comb_depth t =
     | Var _ | DB _ | Const _ -> acc in
 
   let res = aux ~comb_streak:false None t in
-  CCFormat.printf "c_depth(@[%a@])=@[%a@]@." T.pp t (CCOpt.pp CCInt.pp) res;
+  (* CCFormat.printf "c_depth(@[%a@])=@[%a@]@." T.pp t (CCOpt.pp CCInt.pp) res; *)
   res
 
 let monomorphic t = Iter.is_empty (Seq.ty_vars t)

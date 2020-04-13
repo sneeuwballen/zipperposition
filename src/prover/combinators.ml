@@ -856,6 +856,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         CCList.filter_map (fun (subst, comb_penalty) ->
           let renaming = Subst.Renaming.create () in
           let lit_idx, lit_pos = Lits.Pos.cut u_pos in
+          let comb_penalty = max comb_penalty 1 in
 
           Util.debugf ~section 3  "narrow vars:@[%a@]:@[%d@]" (fun k -> k C.pp clause lit_idx);
 
