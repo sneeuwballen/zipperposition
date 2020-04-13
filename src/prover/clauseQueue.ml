@@ -123,6 +123,7 @@ module Make(C : Clause_intf.S) = struct
         when !_rel_terms_enabled 
              && Term.Set.cardinal !_related_terms < max_related_ ->
       C.Seq.terms cl
+      |> Iter.filter (fun t -> not (Term.is_true_or_false t))
       |> Iter.iter add_related_term_
     | _ -> ()
 
@@ -316,9 +317,56 @@ module Make(C : Clause_intf.S) = struct
             (Util.debugf ~section  10 "cl: %a, w:%d\n" (fun k -> k C.pp c val_);
              val_))
 
+    (* function inspired by Struct from the paper https://arxiv.org/abs/1606.03888 *)
     let conj_relative_struct ~inst_penalty ~gen_penalty ~var_w ~sym_w c =
-      _rel_terms_enabled := true;
-      1
+      let pos_mul,max_mul = 2.0,1.5 in
+      let max_lits = C.maxlits (c,0) Subst.empty in
+
+      let struct_diff_weight t =
+        let module T = Term in
+        let w t =
+          float_of_int @@ Term.weight ~var:var_w ~sym:(fun _ -> sym_w) t in
+
+        let rec w_diff ~given_term ~conj_term =
+          match T.view given_term, T.view conj_term with
+          | T.Var _, T.Var _ -> 1
+          | T.Const x, T.Const y when ID.equal x y -> 1
+          | T.DB i, T.DB j when i = j -> 1
+          | T.Var _, _ -> int_of_float (inst_penalty *. (w conj_term))
+          | _, T.Var _ -> int_of_float (gen_penalty *. (w given_term))
+          | T.App(hd1, args1), T.App(hd2, args2) when T.equal hd1 hd2 ->
+            w_diff_l args1 args2
+          | T.AppBuiltin(hd1, args1), T.AppBuiltin(hd2, args2) 
+            when Builtin.equal hd1 hd2 && List.length args1 = List.length args2 ->
+            w_diff_l args1 args2
+          | _, _ -> 
+            int_of_float (inst_penalty *. (w conj_term) +. gen_penalty *. (w given_term))
+        and w_diff_l xs ys =
+          CCList.fold_left2 (fun acc x y -> 
+            acc + w_diff ~given_term:x ~conj_term:y) 0 xs ys in
+        
+        if Term.Set.is_empty !_related_terms then int_of_float (w t)
+        else (
+          Term.Set.to_seq !_related_terms
+          |> Iter.map (fun conj_term -> w_diff ~given_term:t ~conj_term)
+          |> Iter.min_exn ~lt:(fun x y -> x < y)
+        ) in
+
+
+      C.Seq.lits c
+      |> Iter.foldi (fun acc idx lit -> 
+        let is_pos = Lit.is_pos lit in
+        let is_max = CCBV.get max_lits idx in
+
+        Lit.Seq.terms lit
+        |> Iter.filter (fun t -> not (Term.is_true_or_false t))
+        |> Iter.fold (fun acc t -> acc + struct_diff_weight t) acc
+        |> (fun res ->
+              let mul = 
+                (if is_pos then pos_mul else 1.0) *. 
+                (if is_max then max_mul else 1.0) in
+              int_of_float (mul *. (float_of_int res)))
+      ) 0 
 
     let _max_weight = ref (-1.0)
     
@@ -422,6 +470,7 @@ module Make(C : Clause_intf.S) = struct
           "expected conjecture-relative-var(dist_var_mul:float,parameters_magnitude:l/s,goal_penalty:t/f)"
 
     let parse_cr_struct s =
+      _rel_terms_enabled := true;
       let crs_regex = 
         Str.regexp "conjecture-relative-struct(\\([0-9][.]?[0-9]*+\\),\\([0-9][.]?[0-9]*+\\),\\([0-9]+\\),\\([0-9]+\\))" in
       try
