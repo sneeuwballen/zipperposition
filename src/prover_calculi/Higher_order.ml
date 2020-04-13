@@ -1344,7 +1344,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       end;
 
       if Env.flex_get Combinators.k_enable_combinators then (
-        Env.set_ho_normalization_rule "comb-normalize" Combinators.comb_normalize;
+        Env.set_ho_normalization_rule "comb-normalize" Combinators_base.comb_normalize;
       ) else (
         let ho_norm = (fun t -> t |> beta_reduce |> (
             fun opt -> match opt with

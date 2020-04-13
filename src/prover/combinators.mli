@@ -23,9 +23,6 @@ module type S = sig
   (** Register rules in the environment *)
 end
 
-val comb_normalize : Term.t -> Term.t option
-
-
 module Make(E : Env.S) : S with module Env = E
 
 val k_enable_combinators : bool Logtk.Flex_state.key

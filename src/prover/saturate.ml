@@ -262,8 +262,13 @@ module Make(E : Env.S) = struct
     else if (try (Env.flex_get k_abort_after_fragment_check) with Not_found -> false)
     then (print_endline "Problem in fragment"; exit 0)
 
+  let register_conjectures () =
+    Env.get_passive ()
+    |> Iter.iter Env.ProofState.CQueue.register_conjecture_clause
+
   let () =
       Signal.on_every Env.on_start check_fragment;
+      Signal.on_every Env.on_start register_conjectures;
     
 end
 

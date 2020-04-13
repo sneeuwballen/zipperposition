@@ -77,13 +77,54 @@ let set_profile p = _profile := p
 let parse_profile s = _profile := (profile_of_string s)
 let funs_to_parse = ref []
 let _ignore_orphans = ref false
+let _rel_terms_enabled = ref false
 
 module Make(C : Clause_intf.S) = struct
   module C = C
 
-
   (* weight of a term [t], using the precedence's weight *)
   let term_weight t = Term.size t
+
+  let _related_terms = ref Term.Set.empty
+  let max_related_ = 100
+
+  let norm_app hd arg =
+    let body = Term.app hd [arg] in
+    if Term.is_fun hd then (
+      Lambda.snf body 
+    ) else if Term.is_comb hd then (
+      CCOpt.get_or ~default:body (Combinators_base.comb_normalize body)
+    ) else body
+
+
+  let unroll_logical_symbols t =
+    let rec aux t = 
+      match Term.view t with
+      | AppBuiltin((Builtin.ForallConst|Builtin.ExistsConst), [x]) ->
+        let var_ty = List.hd (fst (Type.open_fun (Term.ty x))) in
+        let fresh_var = Term.var @@ HVar.fresh ~ty:var_ty () in
+        let app_x = norm_app x fresh_var in
+        aux app_x
+      | AppBuiltin(b, l) when Builtin.is_logical_binop b ->
+        List.fold_left (fun acc t -> 
+          Term.Set.union acc (aux t)
+        ) Term.Set.empty l
+      | _ -> Term.Set.singleton t in
+    aux t
+  
+  let add_related_term_ t =
+    if Term.Set.cardinal !_related_terms < max_related_ then (
+      _related_terms := Term.Set.union !_related_terms (unroll_logical_symbols t)
+    )
+
+  let register_conjecture_clause cl =
+    match C.distance_to_goal cl with
+    | Some 0 
+        when !_rel_terms_enabled 
+             && Term.Set.cardinal !_related_terms < max_related_ ->
+      C.Seq.terms cl
+      |> Iter.iter add_related_term_
+    | _ -> ()
 
   (** {6 Weight functions} *)
   module WeightFun = struct
@@ -275,6 +316,10 @@ module Make(C : Clause_intf.S) = struct
             (Util.debugf ~section  10 "cl: %a, w:%d\n" (fun k -> k C.pp c val_);
              val_))
 
+    let conj_relative_struct ~inst_penalty ~gen_penalty ~var_w ~sym_w c =
+      _rel_terms_enabled := true;
+      1
+
     let _max_weight = ref (-1.0)
     
     let staggered ~stagger_factor c =
@@ -376,6 +421,20 @@ module Make(C : Clause_intf.S) = struct
         invalid_arg
           "expected conjecture-relative-var(dist_var_mul:float,parameters_magnitude:l/s,goal_penalty:t/f)"
 
+    let parse_cr_struct s =
+      let crs_regex = 
+        Str.regexp "conjecture-relative-struct(\\([0-9][.]?[0-9]*+\\),\\([0-9][.]?[0-9]*+\\),\\([0-9]+\\),\\([0-9]+\\))" in
+      try
+        ignore(Str.search_forward crs_regex s 0);
+        let inst_penalty = CCFloat.of_string_exn (Str.matched_group 1 s) in
+        let gen_penalty = CCFloat.of_string_exn (Str.matched_group 2 s) in
+        let var_w = CCOpt.get_exn @@ CCInt.of_string (Str.matched_group 3 s) in
+        let sym_w = CCOpt.get_exn @@  CCInt.of_string (Str.matched_group 4 s) in
+        conj_relative_struct ~inst_penalty ~gen_penalty ~var_w ~sym_w
+      with Not_found | Invalid_argument _ ->
+        invalid_arg
+          "expected conjecture-relative-struct(inst_penalty:float,gen_penalty:float,var_weight:int,sym_weight:int)"
+
     let parse_orient_lmax s =
       let or_lmax_regex =
         Str.regexp
@@ -465,6 +524,7 @@ module Make(C : Clause_intf.S) = struct
                                   ~parameters_magnitude:`Large
                                   ~goal_penalty:false );
        "conjecture-relative-var", parse_crv;
+       "conjecture-relative-struct", parse_cr_struct;
        "conjecture-relative-cheap", parse_conj_relative_cheap;
        "pnrefined", parse_pnrefine;
        "staggered", parse_staggered;
