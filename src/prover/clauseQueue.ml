@@ -90,11 +90,11 @@ module Make(C : Clause_intf.S) = struct
 
   let norm_app hd arg =
     let body = Term.app hd [arg] in
-    if Term.is_fun hd then (
-      Lambda.snf body 
-    ) else if Term.is_comb hd then (
-      CCOpt.get_or ~default:body (Combinators_base.comb_normalize body)
-    ) else body
+    let normalize = 
+      if Term.is_fun hd then Lambda.whnf 
+      else if Term.is_comb hd then Combinators_base.narrow 
+      else CCFun.id in
+    normalize body
 
 
   let unroll_logical_symbols t =
