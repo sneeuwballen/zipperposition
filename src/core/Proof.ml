@@ -405,6 +405,17 @@ module Step = struct
     List.map (fun par -> (Parent.proof par).step.proof_depth) parents
     |> CCList.fold_left (fun acc depth -> max acc depth) 0
 
+  let count_rules ~name p =
+    let rec aux p =
+      let init = 
+        CCOpt.get_or ~default: 0 (CCOpt.map (fun r -> 
+          if CCString.equal (Rule.name r) name then 1 else 0)
+        (rule p)) in
+      List.fold_left (fun acc par -> 
+        acc + aux ((Parent.proof par).step)
+      ) init (p.parents) in 
+    aux p
+
   let get_id_ =
     let n = ref 0 in
     fun () -> CCRef.incr_then_get n

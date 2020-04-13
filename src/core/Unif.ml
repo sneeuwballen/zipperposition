@@ -360,8 +360,8 @@ module Inner = struct
   let distinct_ground_l l : bool =
     (* List.for_all (fun t -> T.is_ground t && CCList.is_empty @@ T.DB.unbound t) l 
     && distinct_term_l l *)
-  (* turning off distinct ground lifting since it is buggy --
-     DeBruijn indices do not get set properly. *)
+    (* turning off distinct ground lifting since it is buggy --
+       DeBruijn indices do not get set properly. *)
   false    
 
   (* given [l], a list of distinct (ground) terms, and [rhs],

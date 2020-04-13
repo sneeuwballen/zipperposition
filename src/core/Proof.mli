@@ -243,6 +243,10 @@ module Step : sig
 
   val inferences_performed : t -> int
 
+  (* count how many inferences with the given name
+     have been used in construction of the proof  *)
+  val count_rules : name:string -> t -> int
+
   val has_ho_step : t -> bool
 
   val inference : ?infos:infos -> ?tags:tag list -> rule:rule -> parent list -> t

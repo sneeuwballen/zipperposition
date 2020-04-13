@@ -19,6 +19,7 @@ let k_c_penalty = Flex_state.create_key ()
 let k_k_penalty = Flex_state.create_key ()
 let k_deep_app_var_penalty = Flex_state.create_key ()
 let k_unif_resolve = Flex_state.create_key ()
+let k_combinators_max_depth = Flex_state.create_key ()
 
 
 
@@ -807,10 +808,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       [mk_i ~alpha ~args:[], 0]
 
     let partially_applied_combs () =
-      partially_applied_s () @ partially_applied_b () @ partially_applied_c () @ 
+      partially_applied_s () @ partially_applied_b () @ partially_applied_c () @
       partially_applied_k () @ partially_applied_i ()
-      (* partially_applied_b @ partially_applied_s @ partially_applied_i *)
-      
 
 
     let instantiate_var_w_comb ~var =
@@ -820,9 +819,20 @@ module Make(E : Env.S) : S with module Env = E = struct
         with Unif.Fail -> None
       ) (partially_applied_combs ())
 
+    let narrow_app_var_rule_name = 
+      "narrow_applied_variable"
+
+
+    let narrow_app_vars_applicable cl =
+      match Env.flex_get k_combinators_max_depth with
+      | None -> true
+      | Some max_depth ->
+        Proof.Step.count_rules ~name:narrow_app_var_rule_name (C.proof_step cl)
+          <= max_depth
+
 
     let narrow_app_vars clause =
-      let rule = Proof.Rule.mk "narrow applied variable" in
+      let rule = Proof.Rule.mk narrow_app_var_rule_name in
       let tags = [Proof.Tag.T_ho] in
 
       let ord = Env.ord () in 
@@ -830,9 +840,11 @@ module Make(E : Env.S) : S with module Env = E = struct
       let lits = C.lits clause in
       (* do the inferences in which clause is passive (rewritten),
         so we consider both negative and positive literals *)
-      Lits.fold_terms ~vars:(false) ~var_args:(true) ~fun_bodies:(false) 
-                      ~subterms:true ~ord ~which:`Max ~eligible ~ty_args:false
-      lits
+      (if narrow_app_vars_applicable clause then (
+        Lits.fold_terms ~vars:(false) ~var_args:(true) ~fun_bodies:(false) 
+                        ~subterms:true ~ord ~which:`Max ~eligible ~ty_args:false
+        lits)
+      else Iter.empty)
       (* Variable has at least one arugment *)
       |> Iter.filter (fun (u_p, _) -> T.is_app_var u_p)
       |> Iter.flat_map_l (fun (u, u_pos) -> 
@@ -964,6 +976,7 @@ let _k_penalty = ref 2
 let _app_var_constraints = ref false
 let _deep_app_var_penalty = ref false
 let _unif_resolve = ref false
+let _combinators_max_depth = ref None
 
 
 let extension =
@@ -978,6 +991,7 @@ let extension =
     E.flex_add k_k_penalty !_k_penalty;
     E.flex_add k_deep_app_var_penalty !_deep_app_var_penalty;
     E.flex_add k_unif_resolve !_unif_resolve;
+    E.flex_add k_combinators_max_depth !_combinators_max_depth;
 
     let module ET = Make(E) in
     ET.setup ()
@@ -993,6 +1007,7 @@ let () =
     [ "--combinator-based-reasoning", Arg.Bool (fun v -> _enable_combinators := v), " enable / disable combinator based reasoning";
      "--app-var-constraints", Arg.Bool (fun v -> _app_var_constraints := v), " enable / disable delaying app var clashes as constraints";
      "--penalize-deep-appvars", Arg.Bool (fun v -> _deep_app_var_penalty := v), " enable / disable penalizing narrow app var inferences with deep variables";
+     "--comb-max-depth", Arg.Int (fun v -> _combinators_max_depth := Some v), " set the maximal number off variable narrowings allowed. ";
      "--comb-unif-resolve", Arg.Bool ((:=) _unif_resolve), " enable / disable higher-order unit clause resolutions";
      "--comb-s-penalty", Arg.Set_int _s_penalty, "penalty for narrowing with $S X Y";
      "--comb-c-penalty", Arg.Set_int _c_penalty, "penalty for narrowing with $C X Y";
