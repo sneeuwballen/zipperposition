@@ -114,7 +114,10 @@ module Make(C : Clause_intf.S) = struct
   
   let add_related_term_ t =
     if Term.Set.cardinal !_related_terms < max_related_ then (
-      _related_terms := Term.Set.union !_related_terms (unroll_logical_symbols t)
+      let new_terms = unroll_logical_symbols t in
+      Util.debugf ~section 1 "addding related terms:@.@[%a@]@." 
+        (fun k -> k (Term.Set.pp Term.pp) new_terms);
+      _related_terms := Term.Set.union !_related_terms new_terms
     )
 
   let register_conjecture_clause cl =
