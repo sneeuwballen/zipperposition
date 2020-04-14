@@ -251,10 +251,48 @@ module Make (P : PARAMETERS) = struct
               with Unif.Fail -> OSeq.empty) in
     aux ~steps:0 subst problem
 
+  let try_lfho_unif ((s,_) as t0) ((t,_) as t1) =
+    
+    (* term is eligible for LFHO unif if it has applied variables
+       but has no lambdas -- we want to avoid FO terms to avoid
+       returning same unifier twice (since our unif algo will also
+       compute FO unifier)  *)
+    let eligible_for_lfho t =
+      let exception LambdaFound in
+      let no_lams t =
+        if Iter.exists T.is_fun (T.Seq.subterms ~include_builtin:true t) 
+        then raise LambdaFound
+        else true in
+
+      let rec aux t = 
+        match T.view t with
+        | T.App(hd, args) when T.is_const hd -> 
+          List.for_all no_lams args
+        | T.App(hd, args) -> List.exists aux (hd::args)
+        | T.AppBuiltin(_, args)  -> List.exists aux args
+        | T.Fun _ -> raise LambdaFound
+        (* unif algo can easily take care of naked vars and consts *)
+        | _ -> false in
+      
+      try
+        aux t
+      with LambdaFound -> false in
+    
+    if Flex_state.get_exn PUP.k_try_lfho P.flex_state &&
+       eligible_for_lfho s && eligible_for_lfho t then (
+        try
+          OSeq.return (Some (Unif_subst.subst (Unif.FO.unify_full t0 t1)))
+        with Unif.Fail -> OSeq.empty
+    ) else OSeq.empty
+
+
+
   let unify_scoped t0s t1s =
     let lhs,rhs,unifscope,subst = P.identify_scope t0s t1s in
     try
-      do_unif [(lhs,rhs,P.init_flag)] subst unifscope
+      OSeq.append 
+        (try_lfho_unif t0s t1s)
+        (do_unif [(lhs,rhs,P.init_flag)] subst unifscope)
     |> OSeq.map (fun opt -> CCOpt.map (fun subst ->
        let norm t = T.normalize_bools @@ Lambda.eta_expand @@ Lambda.snf t in
        let l = norm @@ S.FO.apply Subst.Renaming.none subst t0s in 
