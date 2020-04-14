@@ -12,10 +12,17 @@ exception Fail
 let norm_logical_disagreements b args args' : _ list * _ list =
   assert(List.length args = List.length args');
   let sort =
-    CCList.sort (fun t1 t2 -> 
+    CCList.sort (fun t1 t2 ->
       let (<?>) = CCOrd.(<?>) in
-      CCInt.compare (Term.ho_weight t1) (Term.ho_weight t2) 
-        <?> (CCInt.compare, Term.hash t1, Term.hash t2))  in
+      let hd_to_int t =
+        match Term.view (Term.head_term t) with
+        | Const x -> ID.id x
+        | AppBuiltin(b,_) -> Builtin.as_int b
+        | _ -> max_int in
+      
+      CCInt.compare (hd_to_int t1) (hd_to_int t2)
+      <?> (CCInt.compare, (Term.ho_weight t1), (Term.ho_weight t2) )
+      <?> (CCInt.compare, Term.hash t1, Term.hash t2))  in
 
   if Builtin.is_flattened_logical b then (
     let a_set, a'_set = CCPair.map_same Term.Set.of_list (args,args') in

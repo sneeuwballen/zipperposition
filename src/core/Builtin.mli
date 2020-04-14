@@ -140,6 +140,8 @@ val multiset : t    (** type of multisets *)
 
 val grounding : t
 
+val as_int : t -> int
+
 module Arith : sig
   val floor : t
   val ceiling : t

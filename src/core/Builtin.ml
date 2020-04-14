@@ -133,6 +133,8 @@ let to_int_ = function
   | Pseudo_de_bruijn _ -> 100
   | Distinct -> 110
 
+let as_int = to_int_
+
 let compare a b = match a, b with
   | Int i, Int j -> Z.compare i j
   | Rat i, Rat j -> Q.compare i j
