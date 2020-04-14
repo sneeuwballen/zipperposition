@@ -74,6 +74,10 @@ val e_sel11 : ord:Ordering.t -> t
 (** Selection function  identical to E's 
     PSelectNewComplexAHP *)
 
+val e_sel12 : ord:Ordering.t -> t
+(** Selection function  identical to E's 
+    SelectComplexExceptUniqMaxHorn *)
+
 val ho_sel  : ord:Ordering.t -> t
 (** Selection function that tries to take 
     into account the number of nested applied variables.

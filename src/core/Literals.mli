@@ -213,6 +213,10 @@ val is_RR_horn_clause : t -> bool
 val is_horn : t -> bool
 (** Recognizes Horn clauses (at most one positive literal) *)
 
+val is_unique_max_horn_clause : ord:Ordering.t -> t -> bool
+(** Recognized whether the clause is a Range-Restricted Horn clause *)
+
+
 val is_pos_eq : t -> (term * term) option
 (** Recognize whether the clause is a positive unit equality. *)
 

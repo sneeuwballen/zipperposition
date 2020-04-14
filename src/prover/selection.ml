@@ -419,6 +419,11 @@ let e_sel11 ~ord lits =
     weight_based_sel_driver ~ord lits chooser ~blocker
   ) else BV.empty ()
 
+let e_sel12 ~ord lits =
+  if Lits.is_unique_max_horn_clause ~ord lits
+  then BV.empty () 
+  else e_sel3 ~ord lits
+
 let ho_sel ~ord lits = 
   let chooser (i,l) = 
     let sign = (if Lit.is_pos l then 1 else 0) in
@@ -478,6 +483,7 @@ let l =
       "e-selection9", e_sel9;
       "e-selection10", e_sel10;
       "e-selection11", e_sel11;
+      "e-selection12", e_sel12;
       "ho-selection", ho_sel;
       "ho-selection2", ho_sel2;
     ]

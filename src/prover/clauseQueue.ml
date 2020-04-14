@@ -519,7 +519,6 @@ module Make(C : Clause_intf.S) = struct
       try
         ignore(Str.search_forward crv_regex s 0);
         
-        CCFormat.printf "matched@.";
         let sym_w = CCOpt.get_exn @@  CCInt.of_string (Str.matched_group 1 s) in
         let var_w = CCOpt.get_exn @@ CCInt.of_string (Str.matched_group 2 s) in
         let max_t_mul = CCFloat.of_string_exn (Str.matched_group 3 s) in

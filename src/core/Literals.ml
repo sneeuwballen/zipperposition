@@ -505,6 +505,11 @@ let is_RR_horn_clause lits =
     List.length hd_vars = List.length (vars lits)
   | _ -> false
 
+(** Is clause Horn and has a unique maximal literal  *)
+let is_unique_max_horn_clause ~ord lits =
+  BV.cardinal (pos lits) = 1 &&
+  BV.cardinal (maxlits ~ord lits) = 1
+
 (** Recognizes Horn clauses (at most one positive literal) *)
 let is_horn lits =
   let bv = pos lits in
