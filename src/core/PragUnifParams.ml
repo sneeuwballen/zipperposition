@@ -20,4 +20,6 @@ let k_sort_constraints = Flex_state.create_key ()
 
 let k_oracle_composer : (((Subst.t option OSeq.t) OSeq.t -> Subst.t option OSeq.t) Flex_state.key) =  (Flex_state.create_key ()) 
 
+let k_try_lfho = Flex_state.create_key ()
+
 let k_skip_multiplier = Flex_state.create_key ()

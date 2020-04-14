@@ -3613,6 +3613,7 @@ let _sort_constraints = ref false
 let _ho_disagremeents = ref `SomeHo
 let _bool_demod = ref false
 let _immediate_simplification = ref false
+let _try_lfho_unif = ref false
 
 let _guard = ref 45
 let _ratio = ref 135
@@ -3685,6 +3686,7 @@ let register ~sup =
   E.flex_add PragUnifParams.k_max_unifs_solid_ff !_max_unifs_solid_ff;
   E.flex_add PragUnifParams.k_use_weight_for_solid_subsumption !_use_weight_for_solid_subsumption;
   E.flex_add PragUnifParams.k_sort_constraints !_sort_constraints;
+  E.flex_add PragUnifParams.k_try_lfho !_try_lfho_unif;
 
   E.flex_add StreamQueue.k_guard !_guard;
   E.flex_add StreamQueue.k_ratio !_ratio;
@@ -3792,6 +3794,7 @@ let () =
       "--stream-queue-ratio", Arg.Set_int _ratio, "set value of ratio for streamQueue";
       "--bool-demod", Arg.Bool ((:=) _bool_demod), " turn BoolDemod on/off";
       "--immediate-simplification", Arg.Bool ((:=) _immediate_simplification), " turn immediate simplification on/off";
+      "--try-lfho-unif", Arg.Bool ((:=) _try_lfho_unif), " if term is of the right shape, try LFHO unification before HO unification";
       "--stream-clause-num", Arg.Set_int _clause_num, "how many clauses to take from streamQueue; by default as many as there are streams";
       "--ho-sort-constraints", Arg.Bool (fun b -> _sort_constraints := b), "sort constraints in unification algorithm by weight";
       "--check-sup-at-var-cond", Arg.Bool (fun b -> _check_sup_at_var_cond := b), " enable/disable superposition at variable monotonicity check";
