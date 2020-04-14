@@ -386,6 +386,43 @@ module Make(C : Clause_intf.S) = struct
               int_of_float (mul *. (float_of_int res)))
       ) 0 
 
+    let diversity_weight 
+      ~var_w ~sym_w ~pos_mul ~max_t_mul ~max_l_mul
+      ~fdiff_a ~fdiff_b ~vdiff_a ~vdiff_b c =
+      
+      let ord = C.Ctx.ord () in
+
+      let mul_max_t (l,w_l) (r,w_r) =
+        match Ordering.compare ord l r with
+        | Comparison.Gt ->
+          (max_l_mul *. (float_of_int w_l)) +. (float_of_int w_r)
+        | Comparison.Lt ->
+          (max_l_mul *. (float_of_int w_r)) +. (float_of_int w_l)
+        | _ -> float_of_int (w_l + w_r) in
+      
+      let max_lits = C.maxlits (c,0) Subst.empty in
+      let get_syms l r = ID.Set.union (Term.symbols l) (Term.symbols r) in
+      let get_vars l r = Term.VarSet.union (Term.vars l) (Term.vars r) in
+    
+      C.Seq.lits c
+      |> Iter.foldi (fun (weight,syms,vars) idx lit -> 
+        let pos_c = if Lit.is_pos lit then pos_mul else 1.0 in
+        let max_c = if CCBV.get max_lits idx then max_l_mul else 1.0 in
+
+        match lit with
+        | Literal.Equation(l,r,_) ->
+          let w_l = Term.weight ~var:var_w ~sym:(fun _ -> sym_w) l in
+          let w_r = Term.weight ~var:var_w ~sym:(fun _ -> sym_w) l in
+          let w =  pos_c *. max_c *. mul_max_t (l,w_l) (r,w_r) in 
+          (w, ID.Set.union syms (get_syms l r), Term.VarSet.union vars (get_vars l r))
+        | _ -> weight +. 1.0, syms, vars
+      ) (0.0, ID.Set.empty, Term.VarSet.empty)
+      |> (fun (w, syms, vars) ->
+          let f = float_of_int @@ ID.Set.cardinal syms in
+          let v = float_of_int @@ Term.VarSet.cardinal vars in
+          int_of_float (w +. fdiff_a *. f +. fdiff_b +. vdiff_a *. v +. vdiff_b ))
+
+
     let _max_weight = ref (-1.0)
     
     let staggered ~stagger_factor c =
@@ -470,6 +507,37 @@ module Make(C : Clause_intf.S) = struct
           [ default, 3; favor_all_neg, 1; favor_small_num_vars, 2
           ; favor_goal, 1; favor_pos_unit, 1; ]
       )
+
+    (* imitation of the E function of the same name *)
+    let parse_diversity_weight s =
+      let crv_regex = Str.regexp 
+        ("diversity-weight(" ^ 
+          "\\([0-9]+\\),\\([0-9]+\\),\\([0-9]+[.]?[0-9]*\\)," ^ 
+          "\\([0-9]+[.]?[0-9]*\\),\\([0-9]+[.]?[0-9]*\\)," ^
+          "\\([+-]?[0-9]+[.]?[0-9]*\\),\\([+-]?[0-9]+[.]?[0-9]*\\)," ^
+          "\\([+-]?[0-9]+[.]?[0-9]*\\),\\([+-]?[0-9]+[.]?[0-9]*\\))") in
+      try
+        ignore(Str.search_forward crv_regex s 0);
+        
+        CCFormat.printf "matched@.";
+        let sym_w = CCOpt.get_exn @@  CCInt.of_string (Str.matched_group 1 s) in
+        let var_w = CCOpt.get_exn @@ CCInt.of_string (Str.matched_group 2 s) in
+        let max_t_mul = CCFloat.of_string_exn (Str.matched_group 3 s) in
+        let max_l_mul = CCFloat.of_string_exn (Str.matched_group 4 s) in
+        let pos_mul = CCFloat.of_string_exn (Str.matched_group 5 s) in
+        let fdiff_a = CCFloat.of_string_exn (Str.matched_group 6 s) in
+        let fdiff_b = CCFloat.of_string_exn (Str.matched_group 7 s) in
+        let vdiff_a = CCFloat.of_string_exn (Str.matched_group 8 s) in
+        let vdiff_b = CCFloat.of_string_exn (Str.matched_group 9 s) in
+
+
+        diversity_weight ~sym_w ~var_w ~max_t_mul ~max_l_mul ~pos_mul 
+                         ~fdiff_a ~fdiff_b ~vdiff_a ~vdiff_b
+      with Not_found | Invalid_argument _ ->
+        invalid_arg
+          ("expected diversity-weight(" ^
+            "f_w:int,v_w:int,max_t_mul:float,max_l_mul:float,pos_mul:float," ^
+            "fdiff_a:float,fdiff_b:flaot,vdiff_a:float,vdiff_b:float)")
 
     let parse_crv s =
       let crv_regex = Str.regexp "conjecture-relative-var(\\([0-9]+[.]?[0-9]*\\),\\([lsLS]\\),\\([tfTF]\\))" in
@@ -593,6 +661,7 @@ module Make(C : Clause_intf.S) = struct
        "conjecture-relative-var", parse_crv;
        "conjecture-relative-struct", parse_cr_struct;
        "conjecture-relative-cheap", parse_conj_relative_cheap;
+       "diversity-weight", parse_diversity_weight;
        "pnrefined", parse_pnrefine;
        "staggered", parse_staggered;
        "orient-lmax", parse_orient_lmax]

@@ -56,17 +56,16 @@ end
 
 (** {2 Constraints} *)
 
+let get_arity ~signature s =
+  try 
+    snd (Signature.arity signature s)
+  with Not_found -> 0
+
 module Constr = struct
   type 'a t = ID.t -> ID.t -> int
     constraint 'a = [< `partial | `total]
 
   type prec_fun = signature:Signature.t -> ID.t Iter.t -> [`partial] t
-
-
-  let get_arity ~signature s =
-    try 
-      snd (Signature.arity signature s)
-    with Not_found -> 0
 
   let arity ~signature _ s1 s2 =
     let open CCOrd in
@@ -326,6 +325,30 @@ let weight_modarity ~signature a =
   let arity =  try snd @@ Signature.arity signature a with _ -> 10 in
   Weight.int (arity + 4)
 
+let weight_arity0 ~signature =
+  let max_arity a b =
+    match a, b with
+    | None, x -> Some x
+    | Some (_, arity1), (_,arity2) ->
+      if arity2 > arity1 then Some b else a in
+
+  let max_sym = 
+    Signature.Seq.symbols signature
+    |> Iter.fold (fun acc sym -> 
+        let ar = snd @@ Signature.arity signature sym in
+        max_arity acc (sym,ar)
+      ) None
+    |> CCOpt.map fst in
+  
+  function a ->
+    let res = 
+      match max_sym with 
+      | None -> get_arity ~signature a + 1
+      | Some m_id -> if ID.equal m_id a then 0 else (get_arity ~signature a + 1)
+    in
+    Weight.int res
+    
+
 let weight_invarity ~signature =
   let max_a = max_arity signature in
   (fun a ->
@@ -424,8 +447,6 @@ let lambda_def_weight lm_w db_w base_weight lits =
   fun sy ->
     Weight.int (ID.Map.get_or ~default:(base_weight sy).Weight.one sy id_map)
 
-
-
 let weight_fun_of_string ~signature ~lits ~lm_w ~db_w s sd = 
   let syms_only sym_depth = 
     Iter.map fst sym_depth in
@@ -438,6 +459,7 @@ let weight_fun_of_string ~signature ~lits ~lm_w ~db_w s sd =
      "invfreqrank", with_syms weight_invfreqrank;
      "freqrank", with_syms weight_freqrank;
      "modarity", ignore_arg @@ weight_modarity ~signature;
+     "arity0", ignore_arg @@ weight_arity0 ~signature;
      "invarity", ignore_arg @@ weight_invarity ~signature;
      "sqarity", ignore_arg @@ weight_sq_arity ~signature;
      "invsqarity", ignore_arg @@ weight_invsq_arity ~signature;
