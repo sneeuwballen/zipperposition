@@ -645,7 +645,8 @@ let sine_axiom_selector ?(depth_start=1) ?(depth_end=3) ?(tolerance=2.0) formula
   let taken_axs = 
     CCList.sort_uniq ~cmp:compare @@ take_axs 1 conj_syms triggered_1 in
 
-  Util.debugf ~section 2 "taken axioms:@[%a@]@." (fun k -> k (CCList.pp CCString.pp) (List.map name taken_axs));
+  Util.debugf ~section 2 "taken %d axioms:@[%a@]@." 
+    (fun k -> k (List.length taken_axs) (CCList.pp CCString.pp) (List.map name taken_axs));
 
   let res = helper_axioms @ taken_axs @ goals in
   Iter.of_list (res)

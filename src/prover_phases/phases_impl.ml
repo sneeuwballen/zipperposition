@@ -165,6 +165,9 @@ let typing ~file prelude (input,stmts) =
     if has_real stmts then (
       Util.debug ~section 1 "problem contains $real, lost completeness";
       Phases.set_key Ctx.Key.lost_completeness true
+    ) else if !_sine_threshold >= 0 then (
+      Util.debug ~section 1 "sine is applied, lost completeness";
+      Phases.set_key Ctx.Key.lost_completeness true
     ) else Phases.return ()
   end >>= fun () ->
   do_extensions ~field:(fun e -> e.Extensions.post_typing_actions)
