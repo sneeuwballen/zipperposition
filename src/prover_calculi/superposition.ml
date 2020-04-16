@@ -3475,7 +3475,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Env.add_binary_inf "subvarsup" infer_subvarsup_passive;
     );
 
-    if Env.flex_get k_arg_cong then (
+    if Env.flex_get k_arg_cong then ( 
       Env.add_unary_inf "ho_complete_eq" complete_eq_args
     );
     if Env.flex_get k_switch_stream_extraction then (
@@ -3725,7 +3725,8 @@ let extension =
 let () =
   Params.add_opts
     [
-      "--semantic-tauto", Arg.Bool (fun v -> _use_semantic_tauto := v), " enable/disable semantic tautology check"; 
+      "--arg-cong", Arg.Bool (fun v -> _arg_cong := v), " enable/disable ArgCong"; 
+      "--semantic-tauto", Arg.Bool (fun v -> _use_semantic_tauto := v), " enable/disable semantic tautology check";
       "--dot-sup-into", Arg.String (fun s -> _dot_sup_into := Some s), " print superposition-into index into file";
       "--dot-sup-from", Arg.String (fun s -> _dot_sup_from := Some s), " print superposition-from index into file";
       "--dot-demod", Arg.String (fun s -> _dot_simpl := Some s), " print forward rewriting index into file";
