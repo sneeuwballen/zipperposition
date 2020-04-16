@@ -239,14 +239,20 @@ module Make(C : Clause_intf.S) = struct
                 then max_t_m else 1.0 in
               let r_mul = if ord_side = Comparison.Lt || ord_side = Comparison.Incomparable
                 then max_t_m else 1.0 in
-              let t_w = l_mul *. (term_w l) +. r_mul *. (term_w r) in
+              let eq_inc = 
+                if Term.equal Term.true_ r 
+                then float_of_int (if Lit.is_pos lit then pf_w else nf_w)
+                else 0.0  in
+              let t_w = l_mul *. (term_w l) +. r_mul *. (term_w r) +. eq_inc in
               let t_w = if Lit.is_pos lit then pos_m *. t_w else t_w in
               let t_w = if CCBV.get max_lits i then max_l_m *. t_w else t_w in
               t_w
             | _ -> 1.0 in
           sum +. w
         ) 0.0 (C.lits c) in
-      int_of_float res
+      let w = int_of_float res in
+      Util.debugf ~section 1 "pnrefined(@[%a@],@[%g@])=%d@." (fun k -> k C.pp c pos_m w);
+      w
 
     let ho_weight_initial c =
       if C.proof_depth c  = 0 then 1
@@ -394,6 +400,8 @@ module Make(C : Clause_intf.S) = struct
 
       let mul_max_t (l,w_l) (r,w_r) =
         match Ordering.compare ord l r with
+        | Comparison.Incomparable ->
+          (max_l_mul *. (float_of_int w_l)) +. max_l_mul *. (float_of_int w_r)
         | Comparison.Gt ->
           (max_l_mul *. (float_of_int w_l)) +. (float_of_int w_r)
         | Comparison.Lt ->
@@ -404,23 +412,31 @@ module Make(C : Clause_intf.S) = struct
       let get_syms l r = ID.Set.union (Term.symbols l) (Term.symbols r) in
       let get_vars l r = Term.VarSet.union (Term.vars l) (Term.vars r) in
     
-      C.Seq.lits c
-      |> Iter.foldi (fun (weight,syms,vars) idx lit -> 
-        let pos_c = if Lit.is_pos lit then pos_mul else 1.0 in
-        let max_c = if CCBV.get max_lits idx then max_l_mul else 1.0 in
+      let res = 
+        C.Seq.lits c
+        |> Iter.foldi (fun (weight,syms,vars) idx lit -> 
+          let pos_c = if Lit.is_pos lit then pos_mul else 1.0 in
+          let max_c = if CCBV.get max_lits idx then max_l_mul else 1.0 in
 
-        match lit with
-        | Literal.Equation(l,r,_) ->
-          let w_l = Term.weight ~var:var_w ~sym:(fun _ -> sym_w) l in
-          let w_r = Term.weight ~var:var_w ~sym:(fun _ -> sym_w) l in
-          let w =  pos_c *. max_c *. mul_max_t (l,w_l) (r,w_r) in 
-          (w, ID.Set.union syms (get_syms l r), Term.VarSet.union vars (get_vars l r))
-        | _ -> weight +. 1.0, syms, vars
-      ) (0.0, ID.Set.empty, Term.VarSet.empty)
-      |> (fun (w, syms, vars) ->
-          let f = float_of_int @@ ID.Set.cardinal syms in
-          let v = float_of_int @@ Term.VarSet.cardinal vars in
-          int_of_float (w +. fdiff_a *. f +. fdiff_b +. vdiff_a *. v +. vdiff_b ))
+          match lit with
+          | Literal.Equation(l,r,_) ->
+            let w_l = Term.weight ~var:var_w ~sym:(fun _ -> sym_w) l in
+            let w_r = Term.weight ~var:var_w ~sym:(fun _ -> sym_w) r in
+            let w =  pos_c *. max_c *. mul_max_t (l,w_l) (r,w_r) in
+            assert (int_of_float w != 0);
+            (w +. weight, ID.Set.union syms (get_syms l r), Term.VarSet.union vars (get_vars l r))
+          | _ -> weight +. 1.0, syms, vars
+        ) (0.0, ID.Set.empty, Term.VarSet.empty)
+        |> (fun (w, syms, vars) ->
+            let f = float_of_int @@ ID.Set.cardinal syms in
+            let v = float_of_int @@ Term.VarSet.cardinal vars in
+
+            let f_factor = fdiff_a *. f +. fdiff_b in
+            let v_factor = vdiff_a *. v +. vdiff_b in
+            Util.debugf ~section 2 "w:%g;f:%g;v:%g" (fun k -> k w f_factor v_factor);
+            int_of_float (w +. f_factor +. v_factor  )) in
+      Util.debugf ~section 1 "diversity_weight(@[%a@])=%d@." (fun k -> k C.pp c res);
+      res
 
 
     let _max_weight = ref (-1.0)
@@ -603,19 +619,19 @@ module Make(C : Clause_intf.S) = struct
            ^ "\\([0-9]+[.]?[0-9]*\\))") in
       try
         ignore(Str.search_forward or_lmax_regex s 0);
-        let pv_w = CCOpt.get_exn (CCInt.of_string (Str.matched_group 1 s)) in
-        let pf_w = CCOpt.get_exn (CCInt.of_string (Str.matched_group 2 s)) in
-        let nv_w = CCOpt.get_exn (CCInt.of_string (Str.matched_group 2 s)) in
-        let nf_w = CCOpt.get_exn (CCInt.of_string (Str.matched_group 2 s)) in
-        let pos_m = CCFloat.of_string_exn (Str.matched_group 3 s) in
-        let max_t_m = CCFloat.of_string_exn (Str.matched_group 4 s) in
-        let max_l_m = CCFloat.of_string_exn (Str.matched_group 5 s) in
+        let pf_w = CCOpt.get_exn (CCInt.of_string (Str.matched_group 1 s)) in
+        let pv_w = CCOpt.get_exn (CCInt.of_string (Str.matched_group 2 s)) in
+        let nf_w = CCOpt.get_exn (CCInt.of_string (Str.matched_group 3 s)) in
+        let nv_w = CCOpt.get_exn (CCInt.of_string (Str.matched_group 4 s)) in
+        let max_t_m = CCFloat.of_string_exn (Str.matched_group 5 s) in
+        let max_l_m = CCFloat.of_string_exn (Str.matched_group 6 s) in
+        let pos_m = CCFloat.of_string_exn (Str.matched_group 7 s) in
         pn_refined_weight ~pv_w ~pf_w ~nv_w ~nf_w ~pos_m ~max_t_m ~max_l_m
       with Not_found | Invalid_argument _ ->
         invalid_arg @@
-        "expected pnrefined(+var_weight:int,+fun_weight:int" ^
-        "-var_weight:int,-fun_weight:int" ^
-        "pos_lit_mult:float, max_t_mult:float, max_lit_mul:float)"
+        "expected pnrefined(+fun_weight:int,+var_weight:int" ^
+        "-fun_weight:int,-var_weight:int" ^
+        "max_t_mult:float, max_lit_mul:float, pos_lit_mult:float)"
     
     let parse_staggered s =
       let or_lmax_regex =
@@ -1002,8 +1018,8 @@ module Make(C : Clause_intf.S) = struct
       take_first_mixed q
     ) else if is_orphaned c then (
       C.Tbl.remove q.tbl c;
-      Util.debugf ~section 1 "ignoring orphaned clause:@ @[%a@]@." (fun k -> k C.pp c);
-      Util.debugf ~section 2 "proof:@ @[%a@]@." (fun k -> k Proof.S.pp_tstp (C.proof c));
+      Util.debugf ~section 5 "ignoring orphaned clause:@ @[%a@]@." (fun k -> k C.pp c);
+      Util.debugf ~section 5 "proof:@ @[%a@]@." (fun k -> k Proof.S.pp_tstp (C.proof c));
       take_first_mixed q
     ) else (
       C.Tbl.remove q.tbl c;
@@ -1188,7 +1204,7 @@ let parse_wf_with_priority s =
     let ratio = CCOpt.get_exn (CCInt.of_string (Str.matched_group 1 s)) in
     let priority_str = CCString.trim (Str.matched_group 2 s) in
     let weight_fun = CCString.trim (Str.matched_group 3 s) in
-    funs_to_parse := (ratio, priority_str, weight_fun) :: !funs_to_parse
+    funs_to_parse := !funs_to_parse @ [(ratio, priority_str, weight_fun)]
   with Not_found | Invalid_argument _ ->
     invalid_arg
       "weight function is of the form \"ratio:int|priority:name|weight:name(options..)\""

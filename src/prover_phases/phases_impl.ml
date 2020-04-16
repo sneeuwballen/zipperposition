@@ -224,7 +224,7 @@ let compute_prec ~signature stmts =
          |> Iter.flat_map Term.Seq.symbols in
         Precedence.Constr.prec_fun_of_str !_prec_fun ~signature syms)
   in
-  let prec = Compute_prec.mk_precedence ~db_w:!_db_w ~lmb_w:!_lmb_w cp stmts in
+  let prec = Compute_prec.mk_precedence ~signature ~db_w:!_db_w ~lmb_w:!_lmb_w cp stmts in
   Phases.return_phase prec
 
 let compute_ord_select precedence =

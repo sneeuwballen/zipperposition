@@ -12,6 +12,7 @@ let section = Util.Section.(make ~parent:root) "compute_prec"
 let _alpha_precedence = ref false
 let _custom_weights = ref ""
 let _from_prec = ref false
+let _kbo_const_weight = ref None
 
 type 'a parametrized = Statement.clause_t Iter.t -> 'a
 
@@ -82,7 +83,17 @@ let weight_fun_of_prec ~symbols ~prec_fun =
     let res = CCOpt.get_or ~default:max_int (ID.Map.get id w_tbl) in
     Precedence.Weight.int res
 
-let mk_precedence ~db_w ~lmb_w t seq =
+let force_const_weight ~weight ~signature = function
+  | Some c_w ->
+    (function s ->
+      try
+        if snd (Signature.arity signature s) == 0
+        then Precedence.Weight.int c_w
+        else weight s
+      with Not_found -> weight s)
+  | None -> weight
+
+let mk_precedence ~db_w ~lmb_w ~signature t seq =
   ZProf.enter_prof prof_mk_prec;
   (* set of symbols *)
   let symbols =
@@ -106,6 +117,7 @@ let mk_precedence ~db_w ~lmb_w t seq =
      then weight_fun_of_prec ~symbols:(ID.Set.of_list symbols) ~prec_fun:constr 
      else t.weight_rule seq) in
   let weight,arg_coeff = _add_custom_weights weight _default_arg_coeff in
+  let weight = force_const_weight ~weight ~signature !_kbo_const_weight in
   let p = Precedence.create ~weight ~arg_coeff ~db_w ~lmb_w constr symbols in
   (* multiset status *)
   List.iter
@@ -122,6 +134,9 @@ let () =
     ; "--kbo-weight-fun-from-precedence", 
       Arg.Bool ((:=) _from_prec),
       " assign to each symbol the weight equal to the number of symbols greater than it in the precedence"
+    ; "--kbo-const-weight", 
+      Arg.Int (fun v -> _kbo_const_weight := Some v),
+      " force the weight of constants to this value in KBO"
     ;  "--weights"
      , Arg.Set_string _custom_weights
      , " set weights, e.g. f=2,g=3,h=1, or weights and argument coefficients, e.g. f=2:3:4,g=3:2"
