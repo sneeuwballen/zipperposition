@@ -63,6 +63,7 @@ let prof_infer_fluidsup_active = ZProf.make "sup.infer_fluidsup_active"
 let prof_infer_fluidsup_passive = ZProf.make "sup.infer_fluidsup_passive"
 let prof_infer_equality_resolution = ZProf.make "sup.infer_equality_resolution"
 let prof_infer_equality_factoring = ZProf.make "sup.infer_equality_factoring"
+let prof_queues = ZProf.make "sup.queues"
 
 let k_trigger_bool_inst = Flex_state.create_key ()
 let k_sup_at_vars = Flex_state.create_key ()
@@ -2059,27 +2060,29 @@ module Make(Env : Env.S) : S with module Env = Env = struct
    * ---------------------------------------------------------------------- *)
 
   let extract_from_stream_queue ~full () =
+    ZProf.enter_prof prof_queues;
     let cl =
       if full then
         StmQ.take_fair_anyway (_stmq())
       else
         StmQ.take_stm_nb (_stmq())
     in
-    let opt_res = CCOpt.sequence_l (List.filter CCOpt.is_some cl)
-    in
+    let opt_res = CCOpt.sequence_l (List.filter CCOpt.is_some cl)  in
+    ZProf.exit_prof prof_queues;
     match opt_res with
     | None -> []
     | Some l ->  l
 
   let extract_from_stream_queue_fix_stm ~full () =
+    ZProf.enter_prof prof_queues;
     let cl =
       if full then
         StmQ.take_fair_anyway (_stmq())
       else
         StmQ.take_stm_nb_fix_stm (_stmq())
     in
-    let opt_res = CCOpt.sequence_l (List.filter CCOpt.is_some cl)
-    in
+    let opt_res = CCOpt.sequence_l (List.filter CCOpt.is_some cl) in
+    ZProf.exit_prof prof_queues;
     match opt_res with
     | None -> []
     | Some l -> l

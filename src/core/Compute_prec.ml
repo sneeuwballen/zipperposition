@@ -11,6 +11,7 @@ let section = Util.Section.(make ~parent:root) "compute_prec"
 
 let _alpha_precedence = ref false
 let _custom_weights = ref ""
+let _from_prec = ref false
 
 type 'a parametrized = Statement.clause_t Iter.t -> 'a
 
@@ -68,6 +69,19 @@ let _add_custom_weights weights arg_coeff=
       | Failure _ | Not_found -> failwith "Syntax error in custom weights"
     ) (weights, arg_coeff) input_list
 
+let weight_fun_of_prec ~symbols ~prec_fun =
+  let w_tbl =
+    ID.Set.fold (fun f tbl -> 
+      let num_greater = ID.Set.fold (fun g acc ->  
+        let inc = if Precedence.Constr.compare_by prec_fun g f > 0 then 1 else 0 in
+        acc + inc
+      ) symbols 1 in
+      ID.Map.add f num_greater tbl
+    ) symbols ID.Map.empty in
+  function id ->
+    let res = CCOpt.get_or ~default:max_int (ID.Map.get id w_tbl) in
+    Precedence.Weight.int res
+
 let mk_precedence ~db_w ~lmb_w t seq =
   ZProf.enter_prof prof_mk_prec;
   (* set of symbols *)
@@ -84,11 +98,14 @@ let mk_precedence ~db_w ~lmb_w t seq =
   in
   Util.debugf ~section 2 "@[<2>%d precedence constraint(s)@]"
     (fun k->k(List.length constrs));
-  let weight = t.weight_rule seq in
-  let weight,arg_coeff = _add_custom_weights weight _default_arg_coeff in
   let constr = Precedence.Constr.compose_sort constrs in
   let constr = Precedence.Constr.compose constr t.last_constr in
   let constr = (if !_alpha_precedence then Precedence.Constr.alpha else constr) in
+  let weight = 
+    (if !_from_prec 
+     then weight_fun_of_prec ~symbols:(ID.Set.of_list symbols) ~prec_fun:constr 
+     else t.weight_rule seq) in
+  let weight,arg_coeff = _add_custom_weights weight _default_arg_coeff in
   let p = Precedence.create ~weight ~arg_coeff ~db_w ~lmb_w constr symbols in
   (* multiset status *)
   List.iter
@@ -102,6 +119,9 @@ let () =
     [  "--alpha-precedence"
     , Arg.Set _alpha_precedence
     , " use pure alphabetical precedence"
+    ; "--kbo-weight-fun-from-precedence", 
+      Arg.Bool ((:=) _from_prec),
+      " assign to each symbol the weight equal to the number of symbols greater than it in the precedence"
     ;  "--weights"
      , Arg.Set_string _custom_weights
      , " set weights, e.g. f=2,g=3,h=1, or weights and argument coefficients, e.g. f=2:3:4,g=3:2"

@@ -78,6 +78,10 @@ module Constr : sig
       the earlier an ordering is applied, and therefore the more
       impact it has) before composing *)
 
+  val compare_by : constr: ('a t) ->  ID.t -> ID.t -> int
+  (** [compare_by ~constr a b returns the result of comparing symbols
+       a and b using constr]  *)
+
   val make : (ID.t -> ID.t -> int) -> [`partial] t
   (** Create a new partial order.
       {b CAUTION}, this order must respect some properties (see {!'a t}) *)

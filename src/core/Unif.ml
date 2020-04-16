@@ -646,11 +646,6 @@ module Inner = struct
       | _ when op=O_unify && not root && type_not_syntactically_unif t1 ->
         let tags = T.type_non_unifiable_tags (T.ty_exn t1) in
         delay ~tags () (* push pair as a constraint, because of typing. *)
-      (* 
-        APPLY FRESH VARIABLES TO COMBINATORS
-        | T.AppBuiltin (s1, l1), T.AppBuiltin(s2,l2)
-        when Builtin.is_combinator s1 && Builtin.is_combinator s2
-              && Builtin.equal s1 s2 && op=O_unify -> *)
       | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when 
           Builtin.equal s1 s2 ->
         let l1,l2 = if sc1 = sc2 && List.length l1 = List.length l2 then (norm_logical_inner s1 l1 l2) else l1, l2 in

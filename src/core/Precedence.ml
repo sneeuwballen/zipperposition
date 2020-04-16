@@ -135,6 +135,25 @@ module Constr = struct
         <?> (CCInt.compare, a2, b2)
         <?> (CCInt.compare, a3, b3)
 
+    let invfreqconj ~signature seq =
+      (* symbol -> number of occurrences of symbol in seq *)
+      let tbl = ID.Tbl.create 16 in
+      Iter.iter (ID.Tbl.incr tbl) seq;
+      let find_freq s = ID.Tbl.get_or ~default:max_int tbl s in
+
+      fun s1 s2 ->
+        let open CCOrd in
+        (* criteria as in generate_invfreq_hack_precedence -- E source *)
+        let categorize s =
+          ((if Signature.sym_in_conj s signature then 1 else 0),
+           find_freq s, ID.id s) in
+        let (a1,a2,a3), (b1,b2,b3) = CCPair.map_same categorize (s1, s2) in
+        CCInt.compare a1 b1
+        <?> (CCInt.compare, a2, b2)
+        <?> (CCInt.compare, a3, b3)
+
+
+
   
   let invfreq ~signature seq =
     (* symbol -> number of occurrences of symbol in seq *)
@@ -176,6 +195,7 @@ module Constr = struct
       ("invfreq", invfreq);
       ("invfreqhack", invfreqhack);
       ("invfreq_constmin", invfreq_constmin);
+      ("invfreq_conj", invfreqconj);
       ("unary_first", unary_first);
       ("const_first", const_first);
     ] in
@@ -230,6 +250,8 @@ module Constr = struct
         compose o1 o2
     in
     mk l
+
+  let compare_by ~constr a b = constr a b
 
   let make c = c
 end
