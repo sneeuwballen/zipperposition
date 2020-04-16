@@ -227,6 +227,11 @@ module Inner = struct
     else if not (S.mem subst v) then fail()
     else S.update subst v t
 
+   (* is the type of [t] prop, or some other non-syntactically unifiable type? *)
+  let type_not_syntactically_unif (t:T.t): bool = match T.ty t with
+    | T.NoType -> false
+    | T.HasType ty -> not (T.type_is_unifiable ty)
+
   (* is the type of [t] prop, or some other non-syntactically unifiable type? *)
   let has_non_unifiable_type (t:T.t): bool = match T.ty t with
     | T.NoType -> false
@@ -638,9 +643,9 @@ module Inner = struct
       | T.AppBuiltin (Builtin.False, _), _ ->
         if T.equal t1 t2 then subst else raise Fail (* boolean equality *)
       (* disabled this rule since extsup takes care of reasoning like this *)
-      (* | _ when op=O_unify && not root && has_non_unifiable_type_or_is_prop t1 ->
+      | _ when op=O_unify && not root && type_not_syntactically_unif t1 ->
         let tags = T.type_non_unifiable_tags (T.ty_exn t1) in
-        delay ~tags () push pair as a constraint, because of typing. *)
+        delay ~tags () (* push pair as a constraint, because of typing. *)
       (* 
         APPLY FRESH VARIABLES TO COMBINATORS
         | T.AppBuiltin (s1, l1), T.AppBuiltin(s2,l2)
