@@ -401,11 +401,11 @@ module Make(C : Clause_intf.S) = struct
       let mul_max_t (l,w_l) (r,w_r) =
         match Ordering.compare ord l r with
         | Comparison.Incomparable ->
-          (max_l_mul *. (float_of_int w_l)) +. max_l_mul *. (float_of_int w_r)
+          (max_t_mul *. (float_of_int w_l)) +. max_t_mul *. (float_of_int w_r)
         | Comparison.Gt ->
-          (max_l_mul *. (float_of_int w_l)) +. (float_of_int w_r)
+          (max_t_mul *. (float_of_int w_l)) +. (float_of_int w_r)
         | Comparison.Lt ->
-          (max_l_mul *. (float_of_int w_r)) +. (float_of_int w_l)
+          (max_t_mul *. (float_of_int w_r)) +. (float_of_int w_l)
         | _ -> float_of_int (w_l + w_r) in
       
       let max_lits = C.maxlits (c,0) Subst.empty in
