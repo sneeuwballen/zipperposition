@@ -99,6 +99,8 @@ let k_restrict_hidden_sup_at_vars = Flex_state.create_key ()
 let k_ho_disagremeents = Flex_state.create_key ()
 let k_bool_demod = Flex_state.create_key ()
 let k_immediate_simplification = Flex_state.create_key ()
+let k_arg_cong = Flex_state.create_key ()
+
 
 
 let _NO_LAMSUP = -1
@@ -3473,7 +3475,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Env.add_binary_inf "subvarsup" infer_subvarsup_passive;
     );
 
-    Env.add_unary_inf "ho_complete_eq" complete_eq_args;
+    if Env.flex_get k_arg_cong then (
+      Env.add_unary_inf "ho_complete_eq" complete_eq_args
+    );
     if Env.flex_get k_switch_stream_extraction then (
       Env.add_generate "stream_queue_extraction" extract_from_stream_queue_fix_stm)
     else (
@@ -3613,6 +3617,7 @@ let _sort_constraints = ref false
 let _ho_disagremeents = ref `SomeHo
 let _bool_demod = ref false
 let _immediate_simplification = ref false
+let _arg_cong = ref true
 let _try_lfho_unif = ref false
 
 let _guard = ref 45
@@ -3669,6 +3674,7 @@ let register ~sup =
   E.flex_add k_ho_disagremeents !_ho_disagremeents;
   E.flex_add k_bool_demod !_bool_demod;
   E.flex_add k_immediate_simplification !_immediate_simplification;
+  E.flex_add k_arg_cong !_arg_cong;
 
 
   E.flex_add PragUnifParams.k_max_inferences !_max_infs;
@@ -3850,6 +3856,7 @@ let () =
     );
   Params.add_to_mode "fo-complete-basic" (fun () ->
       _use_simultaneous_sup := false;
+      _arg_cong := false;
     );
   Params.add_to_modes 
     [ "lambda-free-intensional"
