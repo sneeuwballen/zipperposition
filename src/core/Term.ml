@@ -573,6 +573,32 @@ let rec is_fo_term t =
   | Const _ -> not (Type.is_fun (ty t))
   | _ -> false
 
+let in_fool_fragment t =
+  let fool_subterm_found = ref false in
+
+  let rec aux t =
+    not (Type.is_fun (ty t)) &&
+    (match view t with
+     | Var _ ->
+       if Type.is_prop (ty t) then (
+         fool_subterm_found := true
+       );
+       true
+     | AppBuiltin (b, l) ->
+       if Builtin.is_logical_op b || 
+          Builtin.equal Builtin.Eq b || Builtin.equal Builtin.Neq b then (
+         fool_subterm_found := true;
+         List.for_all aux l
+       ) else false 
+     | App (hd, l) -> T.is_const hd && List.for_all aux l
+     | Const _ -> true
+     | _ -> false) in
+  if not (aux t) then (
+    let err_msg = CCFormat.sprintf "%a is not a fool term" T.pp t in
+    raise (Failure(err_msg))
+  );
+  true, !fool_subterm_found
+
 let is_true_or_false t = match view t with
   | AppBuiltin(b, _) -> 
     CCList.mem ~eq:Builtin.equal b [Builtin.True; Builtin.False];

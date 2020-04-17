@@ -138,7 +138,9 @@ val is_type : t -> bool (** Does it have type [tType]? *)
 val in_pfho_fragment : t -> bool
 val in_lfho_fragment : t -> bool
 val is_fo_term : t -> bool
+val in_fool_fragment : t -> (bool * bool)
 val is_true_or_false : t -> bool
+
 
 (** If term has no lambdas reutrn None;
    otherwise, return Some d where d is the
