@@ -14,6 +14,10 @@
 let printable_char = [^ '\n']
 let comment_line = ';' printable_char*
 
+let alphanumeric = ['a'-'z''A'-'Z''0'-'9']
+let space = [' ']
+let set_line = '(' space* "set-" alphanumeric+ space+ printable_char+ ')'
+
 let sym = [^ '"' '(' ')' '\\' ' ' '\t' '\r' '\n']
 
 let ident = sym+
@@ -25,6 +29,7 @@ rule token = parse
   | '\n' { Lexing.new_line lexbuf; token lexbuf }
   | [' ' '\t' '\r'] { token lexbuf }
   | comment_line { token lexbuf }
+  | set_line { (* ignoring set lines *) token lexbuf }
   | '(' { LEFT_PAREN }
   | ')' { RIGHT_PAREN }
   | "Bool" { BOOL }
@@ -57,6 +62,7 @@ rule token = parse
   | "define-funs-rec" { DEFINE_FUNS_REC }
   | "forall" { FORALL }
   | "exists" { EXISTS }
+  | "exit" { EXIT }
   | "check-sat" { CHECK_SAT }
   | ident { IDENT(Lexing.lexeme lexbuf) }
   | quoted {
