@@ -67,10 +67,10 @@ module Make(A:ARG) = struct
       s.stm <- tl;
       let cl_p = (clause_penalty s hd) in
       s.penalty <-  s.penalty + cl_p;
-      CCOpt.iter (fun cl -> 
+      (* CCOpt.iter (fun cl -> 
         if C.penalty cl != cl_p then (
           C.inc_penalty cl (int_of_float (log10 (float_of_int cl_p))) ;
-      )) hd;
+      )) hd; *)
       hd
   (* let dripped = OSeq.nth 0 s.stm in
      s.stm <- OSeq.drop 1 s.stm;
