@@ -122,7 +122,7 @@ module Make(X : sig
   let _empty_clauses = ref C.ClauseSet.empty
   let _multi_simpl_rule : multi_simpl_rule list ref = ref []
   let _ss_multi_simpl_rule : multi_simpl_rule list ref = ref []
-  let _generate_rules : (string * generate_rule) list ref = ref []
+  let _generate_rules : (int * string * generate_rule) list ref = ref []
   let _clause_conversion_rules : clause_conversion_rule list ref = ref []
   let _step_init = ref []
   let _fragment_checks = ref []
@@ -174,9 +174,15 @@ module Make(X : sig
     if not (List.mem_assoc name !_unary_rules)
     then _unary_rules := (name, rule) :: !_unary_rules
 
-  let add_generate name rule =
-    if not (List.mem_assoc name !_generate_rules)
-    then _generate_rules := (name, rule) :: !_generate_rules
+  let add_generate ~priority name rule =
+    if not (List.mem name (List.map (fun (_,n,_) -> n) !_generate_rules))
+    then (
+      let cmp (p1,n1,r1) (p2,n2,r2) =
+        let open CCOrd in
+        CCInt.compare p2 p1
+        <?> (CCString.compare, n2, n1) in
+
+      _generate_rules := CCList.sorted_insert ~cmp (priority,name,rule) !_generate_rules )
 
   let add_rw_simplify r =
     _rw_simplify := r :: !_rw_simplify
@@ -303,10 +309,15 @@ module Make(X : sig
 
   let do_generate ~full () =
     let clauses =
-      List.fold_left
-        (fun acc (name,g) ->
+      CCList.fold_while
+        (fun acc (_,name,g) ->
            Util.debugf ~section 3 "apply generating rule %s (full: %b)" (fun k->k name full);
-           List.rev_append (g ~full ()) acc)
+           (* We are trying low effort generating functions first.
+              If they find an empty clause -- then we do not go on to
+              full effort generating functions *)
+           let from_g  = g ~full () in
+           let status = if List.exists C.is_empty from_g then `Stop else `Continue in
+           List.rev_append (from_g) acc, status)
         []
         !_generate_rules
     in

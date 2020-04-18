@@ -3482,9 +3482,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Env.add_unary_inf "ho_complete_eq" complete_eq_args
     );
     if Env.flex_get k_switch_stream_extraction then (
-      Env.add_generate "stream_queue_extraction" extract_from_stream_queue_fix_stm)
+      Env.add_generate ~priority:0 "stream_queue_extraction" extract_from_stream_queue_fix_stm)
     else (
-      Env.add_generate "stream_queue_extraction" extract_from_stream_queue);
+      Env.add_generate ~priority:0 "stream_queue_extraction" extract_from_stream_queue);
 
     if Env.flex_get k_recognize_injectivity then (
       Env.add_unary_inf "recognize injectivity" recognize_injectivity;

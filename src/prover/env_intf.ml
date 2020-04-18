@@ -155,7 +155,9 @@ module type S = sig
   val add_lit_rule : string -> lit_rewrite_rule -> unit
   (** Add a literal rewrite rule *)
 
-  val add_generate : string -> generate_rule -> unit
+  val add_generate : priority:int -> string -> generate_rule -> unit
+  (** Add a generation rule with assigned priority.
+      Rules with higher priority will be tried first. *) 
 
   val cr_skip : _ conversion_result
   val cr_return : 'a -> 'a conversion_result

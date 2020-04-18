@@ -596,8 +596,8 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       E.add_multi_simpl_rule split;
     );
     E.add_unary_inf "avatar_check_empty" check_empty;
-    E.add_generate "avatar_check_sat" check_satisfiability;
-    E.add_generate "avatar.lemmas" inf_new_lemmas;
+    E.add_generate ~priority:1000 "avatar_check_sat" check_satisfiability;
+    E.add_generate ~priority:100 "avatar.lemmas" inf_new_lemmas;
     E.add_clause_conversion convert_lemma;
     E.add_is_trivial_trail trail_is_trivial;
     if E.flex_get k_simplify_trail then (

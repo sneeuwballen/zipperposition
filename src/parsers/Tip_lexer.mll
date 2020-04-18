@@ -16,7 +16,7 @@ let comment_line = ';' printable_char*
 
 let alphanumeric = ['a'-'z''A'-'Z''0'-'9']
 let space = [' ']
-let set_line = '(' space* "set-" alphanumeric+ space+ printable_char+ ')'
+let set_line = '(' space* "set-" alphanumeric+ space+ [^ ')']* ')'
 
 let sym = [^ '"' '(' ')' '\\' ' ' '\t' '\r' '\n']
 
