@@ -184,6 +184,8 @@ module type S = sig
 
   val penalty : t -> int
 
+  val inc_penalty : t -> int -> unit
+
   val is_unit_clause : t -> bool
   (** is the clause a unit clause? *)
 

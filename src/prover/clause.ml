@@ -40,7 +40,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   type t = {
     sclause : sclause;
-    penalty: int; (** heuristic penalty *)
+    mutable penalty: int; (** heuristic penalty *)
     selected : BV.t Lazy.t; (** bitvector for selected lits*)
     max_lits : int list Lazy.t; (** bitvector for maximal lits *)
     mutable proof : proof_step; (** Proof of the clause *)
@@ -81,6 +81,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let trail_subsumes c1 c2 = Trail.subsumes c1.sclause.trail c2.sclause.trail
   let is_active c ~v = Trail.is_active c.sclause.trail ~v
   let penalty c = c.penalty
+  let inc_penalty c inc = c.penalty <- c.penalty + inc
 
   let trail_l = function
     | [] -> Trail.empty
