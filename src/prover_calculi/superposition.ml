@@ -1385,7 +1385,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                   in
                   let penalty = 
                     max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause) 
-                    + Env.flex_get k_fluidsup_penalty in
+                    + (Env.flex_get k_fluidsup_penalty / 3) in
                   (* /!\ may differ from the actual penalty (by -2) *)
                   Iter.cons (penalty,res) acc
                 ))
@@ -1456,7 +1456,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                       in
                       let penalty = 
                         max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause) 
-                        + Env.flex_get k_fluidsup_penalty in
+                        + ((Env.flex_get k_fluidsup_penalty) / 3) in
                       (* /!\ may differ from the actual penalty (by -2) *)
                       Iter.cons (penalty,res) acc))
                 | _ -> acc)
