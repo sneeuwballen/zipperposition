@@ -381,7 +381,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           let l, r = if sign then l, r else l, T.false_ in
           (* do not use formulas for rewriting... can have adverse
              effects on lazy cnf *)
-          if not !Lazy_cnf.enabled &&
+          if !Lazy_cnf.enabled &&
              (T.is_appbuiltin l || T.is_appbuiltin r) then idx
           else (
             begin match Ordering.compare ord l r with
