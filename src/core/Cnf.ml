@@ -397,8 +397,12 @@ module Flatten = struct
               T.app_builtin ~ty:T.Ty.prop Builtin.Less [b; a];
             ]
         in aux_maybe_define ~should_define pos f
-      | T.AppBuiltin (Builtin.Eq, [a;b]) 
-        when  (T.is_fun a || T.is_fun b)  (* false *) ->
+      | T.AppBuiltin (Builtin.Eq, [a;b])
+        (* when either of a and b are formulas, and they contain HO subterms
+           it is better not to replace Lambda with Forall.
+           
+           Similarly for NEQ. *)
+        when  (T.is_fun a || T.is_fun b) &&  not (T.Ty.is_prop (T.Ty.returns (T.ty_exn a))) ->
         (* turn [f = λx. t] into [∀x. f x=t] *)
         let vars_forall, a, b = complete_eq a b in
         let t' = F.forall_l vars_forall (F.eq_or_equiv a b) in
@@ -410,8 +414,7 @@ module Flatten = struct
         (F.eq <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
       (* >|= aux_maybe_define ~should_define pos *)
       | T.AppBuiltin (Builtin.Neq, [a;b]) 
-        when  (T.is_fun a || T.is_fun b) 
-           &&  not (T.Ty.is_prop (T.Ty.returns (T.ty_exn a)))   (*false*) ->
+        when  (T.is_fun a || T.is_fun b)  &&  not (T.Ty.is_prop (T.Ty.returns (T.ty_exn a)))   (*false*) ->
         (* turn [f ≠ λx. t] into [∃x. f x≠t] *)
         let vars_exist, a, b = complete_eq a b in
         let t' = F.exists_l vars_exist (F.neq_or_xor a b) in
