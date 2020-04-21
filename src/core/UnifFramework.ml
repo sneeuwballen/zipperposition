@@ -111,8 +111,17 @@ module Make (P : PARAMETERS) = struct
     | T.AppBuiltin _ ->  not @@ T.is_appbuiltin t
     | _ -> false
 
-  let do_unif problem subst unifscope =   
-    let rec aux ~steps subst problem =
+  let do_unif ~bind_cnt problem subst unifscope =
+    let delay res =
+      let skipper = 
+        int_of_float (Flex_state.get_exn PUP.k_skip_multiplier P.flex_state) in
+      if !bind_cnt mod skipper == 0 then (
+        let none_count = !bind_cnt / skipper in
+        OSeq.append (OSeq.take none_count (OSeq.repeat None)) res
+      ) else res 
+    in
+
+    let rec aux subst problem =
       let decompose args_l args_r rest flag =
         let rec zipped_with_flag = function 
           | [], [] -> []
@@ -172,7 +181,7 @@ module Make (P : PARAMETERS) = struct
 
       let decompose_and_cont ?(inc_step=0) args_l args_r rest flag subst =
         let new_prob = decompose args_l args_r rest flag in
-        aux ~steps:(steps+inc_step) subst new_prob in
+        aux subst new_prob in
 
       match problem with 
       | [] -> OSeq.return (Some subst)
@@ -191,7 +200,7 @@ module Make (P : PARAMETERS) = struct
           let (hd_lhs, args_lhs), (hd_rhs, args_rhs) = T.as_app body_lhs, T.as_app body_rhs in
 
           if T.equal body_lhs body_rhs then (
-            aux ~steps subst rest
+            aux subst rest
           ) else (
             match T.view hd_lhs, T.view hd_rhs with
             | T.DB i, T.DB j ->
@@ -226,7 +235,7 @@ module Make (P : PARAMETERS) = struct
                 | Some substs ->
                   (* We assume that the substitution was augmented so that it is mgu for
                       lhs and rhs *)
-                  CCList.map (fun sub () -> aux ~steps sub rest ()) substs
+                  CCList.map (fun sub () -> aux sub rest ()) substs
                   |> OSeq.of_list
                   |> P.oracle_composer
                 | None ->
@@ -245,13 +254,14 @@ module Make (P : PARAMETERS) = struct
                         | Some (sub', flag') ->
                           try
                             let subst' = Subst.merge subst sub' in
-                            fun () -> aux ~steps:(steps+1) subst' ((lhs,rhs,flag') :: rest) ()
+                            incr bind_cnt;
+                            delay (fun () -> aux subst' ((lhs,rhs,flag') :: rest) ())
                           with Subst.InconsistentBinding _ ->
                             OSeq.empty) all_oracles
                     |> P.oracle_composer in
                   OSeq.interleave oracle_unifs args_unif
               with Unif.Fail -> OSeq.empty) in
-    aux ~steps:0 subst problem
+    aux subst problem
 
   let try_lfho_unif ((s,_) as t0) ((t,_) as t1) =
     
@@ -291,10 +301,11 @@ module Make (P : PARAMETERS) = struct
 
   let unify_scoped t0s t1s =
     let lhs,rhs,unifscope,subst = P.identify_scope t0s t1s in
+    let bind_cnt = ref 0 in
     try
       OSeq.append 
         (try_lfho_unif t0s t1s)
-        (do_unif [(lhs,rhs,P.init_flag)] subst unifscope)
+        (do_unif ~bind_cnt [(lhs,rhs,P.init_flag)] subst unifscope)
     |> OSeq.map (fun opt -> CCOpt.map (fun subst ->
        let norm t = T.normalize_bools @@ Lambda.eta_expand @@ Lambda.snf t in
        let l = norm @@ S.FO.apply Subst.Renaming.none subst t0s in 

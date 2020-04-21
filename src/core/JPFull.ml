@@ -13,17 +13,7 @@ module Make (S : sig val st: Flex_state.t end) = struct
 
   let get_op k = Flex_state.get_exn k S.st
 
-  let max_skipped = ref 0 
-  let skip depth = 
-    if depth > max !max_skipped 1 then (
-      max_skipped := depth;
-      int_of_float ((log10 (float_of_int depth)) *. get_op PUP.k_skip_multiplier)
-    )else (if depth !=0 then 5 else 0)
-
-  let delay depth res =
-    OSeq.append
-      (OSeq.take (skip depth) (OSeq.repeat None))
-      res
+  let delay _ res = res
 
   let iter_rule ?(flex_same=false) ~counter ~scope t u depth  =
     JP_unif.iterate ~flex_same ~scope ~counter t u []
@@ -151,6 +141,5 @@ module Make (S : sig val st: Flex_state.t end) = struct
     (fun x y ->
        elim_vars := IntSet.empty;
        ident_vars := IntSet.empty;
-       max_skipped := 0;
        OSeq.map (CCOpt.map Unif_subst.of_subst) (JPFull.unify_scoped x y))
 end
