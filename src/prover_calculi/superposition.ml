@@ -1650,6 +1650,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       v : T.t;
       subst : US.t;
       scope : int;
+      pred_var_eq_fact : bool
     }
   end
 
@@ -1662,10 +1663,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let renaming = S.Renaming.create () in
     let subst = US.subst us in
 
-    if O.compare ord (S.FO.apply renaming subst (s, info.scope))
-        (S.FO.apply renaming subst (t, info.scope)) <> Comp.Lt
-       &&
-       C.is_eligible_param (info.clause,info.scope) subst ~idx:info.active_idx
+    if info.pred_var_eq_fact ||
+        (O.compare ord (S.FO.apply renaming subst (s, info.scope))
+          (S.FO.apply renaming subst (t, info.scope)) <> Comp.Lt
+        &&
+        (C.is_eligible_param (info.clause,info.scope) subst ~idx:info.active_idx))
     then (
       let subst_is_ho = 
         Subst.codomain subst
@@ -1696,8 +1698,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (fun k->k C.pp info.clause C.pp new_clause);
 
       Some new_clause
-    ) else
-      None
+    ) else(None)
 
   let t_type_is_ho s =
       Type.is_prop (T.ty s) || Type.is_fun (T.ty s)
@@ -2004,21 +2005,29 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     in
     (* try to do inferences with each positive literal *)
     let new_clauses =
-      Lits.fold_eqn ~sign:true ~ord ~both:true ~eligible (C.lits clause)
+      Lits.fold_eqn ~ord ~both:true ~eligible (C.lits clause)
       |> Iter.flat_map
         (fun (s, t, sign, s_pos) -> (* try with s=t *)
-           assert(sign || (T.equal T.true_ t && T.is_app_var s));
+           assert(sign || (T.equal T.true_ t && T.is_app_var s) || (T.equal T.true_ s && T.is_app_var t));
            let active_idx = Lits.Pos.idx s_pos in
            let is_var_pred = 
-             T.is_var (T.head_term s) && Type.is_prop (T.ty s) && T.equal T.true_ t in
+             T.is_app_var s && Type.is_prop (T.ty s) && T.equal T.true_ t in
            let var_pred_status = (is_var_pred, sign) in
            find_unifiable_lits ~var_pred_status active_idx s s_pos
            |> Iter.filter_map
              (fun (u,v,substs) ->
+               let t =
+                (* the only way we can introduce false on the RHS of the
+                   equation is when we flip (u = true) to
+                   ((not u) = false)... Then, we also need to flip the original
+                   equation F x != true to F x = false, which is done in the
+                   next two lines  *)
+                if not (is_var_pred) || not (T.equal T.false_ v) then t
+                else T.false_ in
                iterate_substs substs
                  (fun subst ->
                      let info = EqFactInfo.({
-                         clause; s; t; u; v; active_idx; subst; scope=0;
+                         clause; s; t; u; v; active_idx; subst; scope=0; pred_var_eq_fact=is_var_pred
                        }) in
                    do_eq_factoring info)))
       |> Iter.to_rev_list

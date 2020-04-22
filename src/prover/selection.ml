@@ -176,17 +176,20 @@ let prefer_app_var ~ord lits =
 let weight_based_sel_driver ?(blocker=(fun _ -> false)) ~ord lits f =
   let min_lit = 
     CCArray.to_seq lits
-    |> Iter.mapi (fun i el -> f (i,el), i) 
+    |> Iter.filter_mapi (fun i l ->
+      if can_select_lit ~ord lits i && not (blocker l) 
+      then Some (l,i)
+      else None)
+    |> Iter.map (fun (lit, lit_idx) -> f (lit_idx,lit), lit_idx) 
     |> Iter.min in
   match min_lit with
   | None -> BV.empty ()
   | Some (_, idx) -> 
-    if can_select_lit ~ord lits idx && not @@ blocker (CCArray.get lits idx) then (
-      let res = BV.empty () in
-      (* CCFormat.printf "Selected %d: %a.\n" idx Lits.pp lits; *)
-      BV.set res idx;
-      res
-    ) else BV.empty ()
+    assert(can_select_lit ~ord lits idx);
+    assert(not (blocker (CCArray.get lits idx)));
+    let res = BV.empty () in
+    BV.set res idx;
+    res
 
 let lit_sel_diff_w l =
   match l with
@@ -445,8 +448,8 @@ let ho_sel2 ~ord lits =
   let app_var_pen l =
     match l with 
     | Lit.Equation(lhs,rhs,_) ->
-      let num_app_var_sides = (if T.is_var @@ T.head_term lhs then 1 else 0) +
-                              (if T.is_var @@ T.head_term rhs then 1 else 0) in
+      let num_app_var_sides = (if T.is_app_var lhs then 1 else 0) +
+                              (if T.is_app_var rhs then 1 else 0) in
       if num_app_var_sides = 1 then 0
       else if num_app_var_sides = 2 then 1 
       else 2
@@ -455,6 +458,36 @@ let ho_sel2 ~ord lits =
   let chooser (i,l) = 
     let sign = (if Lit.is_pos l then 1 else 0) in
     (sign, app_var_pen l, Lit.weight l, (if not (Lit.is_ground l) then 0 else 1))  in
+  weight_based_sel_driver ~ord lits chooser
+
+let ho_sel3 ~ord lits =
+  let lit_penalty = function
+    | Lit.Equation(lhs,rhs, _) ->
+      let var_headed t = Term.is_var (Term.head_term t) in
+      let lhs,rhs = 
+        if var_headed rhs then (rhs,lhs) else (lhs,rhs) in
+      (* Prefer using the following criteria:
+         (1) literal is pure var
+         (2a) literal is of the form X = %x.t or X = formula
+         (2b) literal is of the form X a b c = %x.t or X a b c = formula
+         (3) literal is of the form X (a b c) = s where s has a HO subterm
+         (4) literal is of the form X (a b c) = s where s has no var head
+         (5) literal is of the form X a b c = Y a b c *)
+      if var_headed lhs then (
+        if Term.is_var lhs && Term.is_var rhs then 0
+        else if Term.is_fun rhs || Term.is_formula rhs then (
+          1 + (if Term.is_app_var lhs then 3 else 0)) 
+        else if Term.is_true_or_false rhs then (
+          if Term.is_var lhs then 1 else 10)
+        else if Term.is_app_var lhs && Term.is_app_var rhs then 20
+        else if Term.has_ho_subterm rhs then 5
+        else 10)
+      else 100
+    | _ -> max_int in 
+  let chooser (i,l) = 
+    let sign = (if Lit.is_pos l then 1 else 0) in
+    let lit_pen = lit_penalty l in
+    (sign, lit_pen, Lit.weight l, (if (Lit.is_ground l) then 0 else 1))  in
   weight_based_sel_driver ~ord lits chooser
 
 let except_RR_horn (p:parametrized) ~strict ~ord lits =
@@ -486,6 +519,8 @@ let l =
       "e-selection12", e_sel12;
       "ho-selection", ho_sel;
       "ho-selection2", ho_sel2;
+      "ho-selection3", ho_sel3;
+
     ]
   and by_ord =
     CCList.flat_map

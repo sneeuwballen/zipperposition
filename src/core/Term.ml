@@ -461,6 +461,7 @@ module Seq = struct
 end
 
 let has_ho_subterm t =
+  not (equal true_ t) && not (equal false_ t) &&
   Seq.subterms ~include_builtin:true ~ignore_head:true t
   |> Iter.exists (fun st -> 
       not (T.equal st t) &&

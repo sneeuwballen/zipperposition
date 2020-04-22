@@ -164,7 +164,7 @@ module Make(E : Env.S) = struct
           Util.debugf ~section 1 "@[@{<Yellow>### step %5d ###@}@]"(fun k->k num);
           Util.debugf ~section 1 "@[<2>@{<green>given@} (%d steps, penalty %d):@ `@[%a@]`@]"
             (fun k->k num (Env.C.penalty c) Env.C.pp c);
-          Util.debugf ~section 2 "@[proof:@[%a@]@]" (fun k -> k Proof.S.pp_tstp (Env.C.proof c));
+          Util.debugf ~section 3 "@[proof:@[%a@]@]" (fun k -> k Proof.S.pp_tstp (Env.C.proof c));
           (* find clauses that are subsumed by given in active_set *)
           let subsumed_active = Env.C.ClauseSet.to_seq (Env.subsumed_by c) in
           Env.remove_active subsumed_active;
@@ -213,7 +213,7 @@ module Make(E : Env.S) = struct
           in
           let inferred_clauses = Env.immediate_simplify c inferred_clauses in
           CCVector.append_seq new_clauses inferred_clauses;
-          Util.debugf ~section 4 "@[<2>inferred @{<green>new clauses@}:@ [@[<v>%a@]]@]"
+          Util.debugf ~section 2 "@[<2>inferred @{<green>new clauses@}:@ [@[<v>%a@]]@]"
             (fun k->k (Util.pp_seq Env.C.pp) (CCVector.to_seq new_clauses));
           (* add new clauses (including simplified active clauses)
              to passive set and simpl_set *)
