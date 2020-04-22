@@ -64,14 +64,14 @@ module Make(A:ARG) = struct
 
   let drip s =
     if ClauseQueue.ignore_orphans () && is_orphaned s then (
-      s.penalty <- 0;
+      s.penalty <- max_int;
       s.stm <- OSeq.empty;
       CCFormat.printf "removing orphan@.";
       raise Empty_Stream
     ) else( 
       match s.stm () with
       | OSeq.Nil -> 
-        s.penalty <- 0;
+        s.penalty <- max_int;
         raise Empty_Stream
       | OSeq.Cons (hd,tl) ->
         s.stm <- tl;
