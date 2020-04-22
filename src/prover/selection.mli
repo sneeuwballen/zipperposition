@@ -34,7 +34,7 @@ val except_RR_horn : parametrized -> parametrized
 val default : ord:Ordering.t -> t
 (** Default selection function *)
 
-val e_sel  : ord:Ordering.t -> t
+val e_sel  : ?blocker:(Literal.t -> bool) -> ord:Ordering.t -> t
 (** Selection function  identical to E's 
     SelectMaxLComplexAvoidPosPred  *)
 
@@ -42,7 +42,7 @@ val e_sel2  : ord:Ordering.t -> t
 (** Selection function  identical to E's 
     SelectCQIPrecWNTNp  *)
 
-val e_sel3  : ord:Ordering.t -> t
+val e_sel3  : ?blocker:(Literal.t -> bool) -> ord:Ordering.t -> t
 (** Selection function  identical to E's 
     SelectComplexG *)
 

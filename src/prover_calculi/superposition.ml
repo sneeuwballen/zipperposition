@@ -1179,10 +1179,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ~process_retrieved:(fun do_sup (u_p, with_pos, substs) ->
             (* let penalty = max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause) in *)
             (* /!\ may differ from the actual penalty (by -2) *)
-            Some (0, OSeq.map (CCOpt.flat_map (do_sup u_p with_pos)) substs))
+            let parents = [clause; with_pos.clause] in
+            Some (0, parents, OSeq.map (CCOpt.flat_map (do_sup u_p with_pos)) substs))
         clause
     in
-    let stm_res = List.map (fun (p,s) -> Stm.make ~penalty:p s) inf_res in
+    let stm_res = List.map (fun (penalty, parents, s) -> Stm.make ~penalty ~parents s) inf_res in
     StmQ.add_lst (_stmq()) stm_res; []
 
   let infer_passive_complete_ho clause =
@@ -1191,10 +1192,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ~process_retrieved:(fun do_sup (u_p, with_pos, substs) ->
             (* let penalty = max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause) in *)
             (* /!\ may differ from the actual penalty (by -2) *)
-            Some (0, OSeq.map (CCOpt.flat_map (do_sup u_p with_pos)) substs))
+            let parents = [clause; with_pos.clause] in
+            Some (0, parents, OSeq.map (CCOpt.flat_map (do_sup u_p with_pos)) substs))
         clause
     in
-    let stm_res = List.map (fun (p,s) -> Stm.make ~penalty:p s) inf_res in
+    let stm_res = List.map (fun (penalty,parents,s) -> Stm.make ~penalty ~parents s) inf_res in
     StmQ.add_lst (_stmq()) stm_res; []
 
   let infer_active_pragmatic_ho max_unifs clause =
@@ -1265,14 +1267,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                     max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause)
                     + (Env.flex_get k_fluidsup_penalty) in
                   (* /!\ may differ from the actual penalty (by -2) *)
-                  Iter.cons (penalty,res) acc
+                  Iter.cons (penalty,res,[clause;with_pos.clause]) acc
                )
                Iter.empty
           )
         |> Iter.to_rev_list
       else []
     in
-    let stm_res = List.map (fun (p,s) -> Stm.make ~penalty:p s) new_clauses in
+    let stm_res = List.map (fun (p,s,parents) -> Stm.make ~penalty:p ~parents s) new_clauses in
     StmQ.add_lst (_stmq()) stm_res;
     ZProf.exit_prof prof_infer_fluidsup_active;
     []
@@ -1318,14 +1320,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                     max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause) 
                     + Env.flex_get k_fluidsup_penalty in
                   (* /!\ may differ from the actual penalty (by -2) *)
-                  Iter.cons (penalty,res) acc
+                  Iter.cons (penalty,res,[clause;with_pos.clause]) acc
                )
                Iter.empty
           )
         |> Iter.to_rev_list
       else []
     in
-    let stm_res = List.map (fun (p,s) -> Stm.make ~penalty:p s) new_clauses in
+    let stm_res = List.map (fun (p,s,parents) -> Stm.make ~penalty:p ~parents s) new_clauses in
     StmQ.add_lst (_stmq()) stm_res;
     ZProf.exit_prof prof_infer_fluidsup_passive;
     []
@@ -1387,13 +1389,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                     max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause) 
                     + (Env.flex_get k_fluidsup_penalty / 3) in
                   (* /!\ may differ from the actual penalty (by -2) *)
-                  Iter.cons (penalty,res) acc
+                  Iter.cons (penalty,res,[clause; with_pos.clause]) acc
                 ))
              Iter.empty
         )
       |> Iter.to_rev_list
     in
-    let stm_res = List.map (fun (p,s) -> Stm.make ~penalty:p s) new_clauses in
+    let stm_res = List.map (fun (p,s,parents) -> Stm.make ~penalty:p ~parents s) new_clauses in
     StmQ.add_lst (_stmq()) stm_res;
     ZProf.exit_prof prof_infer_fluidsup_active;
     []
@@ -1458,13 +1460,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                         max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause) 
                         + ((Env.flex_get k_fluidsup_penalty) / 3) in
                       (* /!\ may differ from the actual penalty (by -2) *)
-                      Iter.cons (penalty,res) acc))
+                      Iter.cons (penalty,res,[clause;with_pos.clause]) acc))
                 | _ -> acc)
              Iter.empty
         )
       |> Iter.to_rev_list
     in
-    let stm_res = List.map (fun (p,s) -> Stm.make ~penalty:p s) new_clauses in
+    let stm_res = List.map (fun (p,s,parents) -> Stm.make ~penalty:p ~parents s) new_clauses in
     StmQ.add_lst (_stmq()) stm_res;
     ZProf.exit_prof prof_infer_fluidsup_passive;
     []
@@ -1621,7 +1623,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ~iterate_substs:(fun substs do_eq_res -> Some (OSeq.map (CCOpt.flat_map do_eq_res) substs))
         clause
     in
-    let stm_res = List.map (Stm.make ~penalty:0) inf_res in
+    let stm_res = List.map (Stm.make ~penalty:(C.penalty clause) ~parents:[clause]) inf_res in
     StmQ.add_lst (_stmq()) stm_res; []
 
   let infer_equality_resolution_pragmatic_ho max_unifs clause =
@@ -2049,7 +2051,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ~iterate_substs:(fun substs do_eq_fact -> Some (OSeq.map (CCOpt.flat_map do_eq_fact) substs))
         clause
     in
-    let stm_res = List.map (Stm.make ~penalty:0) inf_res in
+    let stm_res = List.map (Stm.make ~penalty:(C.penalty clause) ~parents:[clause]) inf_res in
     StmQ.add_lst (_stmq()) stm_res; []
 
   let infer_equality_factoring_pragmatic_ho max_unifs clause =
@@ -2579,7 +2581,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                 ) in
               let first_two, rest = 
                 OSeq.take 2 res, OSeq.map CCOpt.return (OSeq.drop 2 res) in
-              let stm =  Stm.make ~penalty:(C.penalty c + 1) rest in
+              let stm =  Stm.make ~penalty:(C.penalty c + 1) ~parents:[c] rest in
               StmQ.add (_stmq()) stm;
               
               OSeq.to_list first_two

@@ -79,6 +79,8 @@ let funs_to_parse = ref []
 let _ignore_orphans = ref false
 let _rel_terms_enabled = ref false
 
+let ignore_orphans () = !_ignore_orphans
+
 module Make(C : Clause_intf.S) = struct
   module C = C
 

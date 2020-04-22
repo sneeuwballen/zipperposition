@@ -6,6 +6,7 @@ module type S = sig
 
   type t = private {
     id : int; (** unique ID of the stream *)
+    parents : C.t list; (** parent clauses for inference generating this stream *)
     mutable penalty: int; (** heuristic penalty *)
     mutable hits: int; (** how many attemts to retrieve unifier were there  *)
     mutable stm : C.t option OSeq.t; (** the stream itself *)
@@ -16,7 +17,7 @@ module type S = sig
 
   (** {2 Basics} *)
 
-  val make : ?penalty:int -> C.t option OSeq.t -> t
+  val make : ?penalty:int -> parents:C.t list -> C.t option OSeq.t -> t
 
   val equal : t -> t -> bool
   val compare : t -> t -> int

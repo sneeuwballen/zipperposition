@@ -226,7 +226,7 @@ let get_pred_freq ~freq_tbl l =
     end
   | _ -> max_int
 
-let e_sel ~ord lits = 
+let e_sel ?(blocker=(fun _ -> false)) ~ord lits = 
   let chooser ~freq_tbl (i,l) = 
     ((if Lit.is_pos l then 1 else 0),
      (if Lits.is_max ~ord lits i then 0 else 100 +
@@ -235,7 +235,7 @@ let e_sel ~ord lits =
      -(lit_sel_diff_w l),
      get_pred_freq ~freq_tbl l) in
   let freq_tbl = pred_freq ~ord lits in
-  weight_based_sel_driver ~ord lits (chooser ~freq_tbl)
+  weight_based_sel_driver ~ord lits (chooser ~freq_tbl) ~blocker
 
 let e_sel2 ~ord lits = 
   let symbols = Lits.symbols lits 
@@ -269,7 +269,7 @@ let e_sel2 ~ord lits =
     | _ -> (sign_val,max_int,max_int,diff_val) (* won't be chosen *) in
   weight_based_sel_driver ~ord ~blocker lits chooser
 
-let e_sel3 ~ord lits = 
+let e_sel3 ?(blocker=(fun _ -> false)) ~ord lits = 
   let chooser (i,l) = 
     let sign = (if Lit.is_pos l then 1 else 0) in
     if Lit.is_pure_var l then (
@@ -279,7 +279,7 @@ let e_sel3 ~ord lits =
     ) else (
       (sign, 20, - (lit_sel_diff_w l) , 0)
     ) in
-  weight_based_sel_driver ~ord lits chooser
+  weight_based_sel_driver ~ord ~blocker lits chooser 
 
 let e_sel4 ~ord lits =
   let freq_tbl = pred_freq ~ord lits in
@@ -490,6 +490,17 @@ let ho_sel3 ~ord lits =
     (sign, lit_pen, Lit.weight l, (if (Lit.is_ground l) then 0 else 1))  in
   weight_based_sel_driver ~ord lits chooser
 
+let ho_sel4 ~ord =
+  e_sel3 ~ord ~blocker:(function 
+    | Literal.Equation(lhs,rhs,_) -> T.is_app_var lhs || T.is_app_var rhs
+    | _ -> false)
+
+let ho_sel5 ~ord =
+  e_sel ~ord ~blocker:(function 
+    | Literal.Equation(lhs,rhs,_) -> T.is_app_var lhs || T.is_app_var rhs
+    | _ -> false)
+
+
 let except_RR_horn (p:parametrized) ~strict ~ord lits =
   if Lits.is_RR_horn_clause lits
   then BV.empty () (* do not select (conditional rewrite rule) *)
@@ -505,9 +516,9 @@ let l =
       "default", default;
       "avoid_app_var", avoid_app_var;
       "prefer_app_var", prefer_app_var;
-      "e-selection", e_sel;
+      "e-selection", e_sel ~blocker:(fun _ -> false);
       "e-selection2", e_sel2;
-      "e-selection3", e_sel3;
+      "e-selection3", e_sel3 ~blocker:(fun _ -> false);
       "e-selection4", e_sel4;
       "e-selection5", e_sel5;
       "e-selection6", e_sel6;
@@ -520,7 +531,8 @@ let l =
       "ho-selection", ho_sel;
       "ho-selection2", ho_sel2;
       "ho-selection3", ho_sel3;
-
+      "ho-selection4", ho_sel4;
+      "ho-selection5", ho_sel5;
     ]
   and by_ord =
     CCList.flat_map

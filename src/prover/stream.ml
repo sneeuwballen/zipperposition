@@ -19,6 +19,7 @@ module Make(A:ARG) = struct
 
   type t = {
     id : int; (** unique ID of the stream *)
+    parents : C.t list; (** parent clauses for inference generating this stream *)
     mutable penalty: int; (** heuristic penalty, increased by every drip *)
     mutable hits : int; (** how many attemts to retrieve unifier were there  *)
     mutable stm : C.t option OSeq.t; (** the stream itself *)
@@ -31,11 +32,11 @@ module Make(A:ARG) = struct
 
   (** {2 Basics} *)
 
-  let make ?penalty:(p=1) s =
+  let make ?penalty:(p=1) ~parents s =
     Util.incr_stat stat_stream_create;
     let id = !id_count_ in
     incr id_count_;
-    { id; penalty = p; hits=0; stm = s; }
+    { id; penalty = p; hits=0; stm = s; parents }
 
   let equal s1 s2 = s1.id = s2.id
   let compare s1 s2 = Pervasives.compare s1.id s2.id
@@ -58,23 +59,25 @@ module Make(A:ARG) = struct
       s.hits <- s.hits +1;
       max (C.penalty c) (s.hits-64) 
 
+  let is_orphaned s =
+    List.exists C.is_orphaned s.parents
+
   let drip s =
-    match s.stm () with
-    | OSeq.Nil -> 
+    if ClauseQueue.ignore_orphans () && is_orphaned s then (
       s.penalty <- 0;
+      s.stm <- OSeq.empty;
       raise Empty_Stream
-    | OSeq.Cons (hd,tl) ->
-      s.stm <- tl;
-      let cl_p = (clause_penalty s hd) in
-      s.penalty <-  s.penalty + cl_p;
-      (* CCOpt.iter (fun cl -> 
-        if C.penalty cl != cl_p then (
-          C.inc_penalty cl (int_of_float (log10 (float_of_int cl_p))) ;
-      )) hd; *)
-      hd
-  (* let dripped = OSeq.nth 0 s.stm in
-     s.stm <- OSeq.drop 1 s.stm;
-     dripped *)
+    ) else( 
+      match s.stm () with
+      | OSeq.Nil -> 
+        s.penalty <- 0;
+        raise Empty_Stream
+      | OSeq.Cons (hd,tl) ->
+        s.stm <- tl;
+        let cl_p = (clause_penalty s hd) in
+        s.penalty <-  s.penalty + cl_p;
+        hd
+    )
 
   let drip_n s n guard =
     let rec _drip_n st n guard =
