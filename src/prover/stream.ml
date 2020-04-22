@@ -60,12 +60,13 @@ module Make(A:ARG) = struct
       max (C.penalty c) (s.hits-64) 
 
   let is_orphaned s =
-    List.exists C.is_orphaned s.parents
+    List.exists C.is_redundant s.parents
 
   let drip s =
     if ClauseQueue.ignore_orphans () && is_orphaned s then (
       s.penalty <- 0;
       s.stm <- OSeq.empty;
+      CCFormat.printf "removing orphan@.";
       raise Empty_Stream
     ) else( 
       match s.stm () with
