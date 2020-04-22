@@ -66,7 +66,6 @@ module Make(A:ARG) = struct
     if ClauseQueue.ignore_orphans () && is_orphaned s then (
       s.penalty <- max_int;
       s.stm <- OSeq.empty;
-      CCFormat.printf "removing orphan@.";
       raise Empty_Stream
     ) else( 
       match s.stm () with

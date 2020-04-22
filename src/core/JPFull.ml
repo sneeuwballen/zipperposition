@@ -113,10 +113,10 @@ module Make (S : sig val st: Flex_state.t end) = struct
       | `Flex _, `Rigid
       | `Rigid, `Flex _ ->
         let flex, rigid = if Term.is_var (T.head_term s) then s,t else t,s in
-        let delay_fr imit = 
-          if depth > 4 then OSeq.append (OSeq.take (depth*10) (OSeq.repeat None)) imit else imit in
+        (* let delay_fr imit = 
+          if depth > 4 then OSeq.append (OSeq.take (depth*2) (OSeq.repeat None)) imit else imit in *)
         OSeq.append
-          (delay_fr @@ imit_rule ~counter ~scope s t depth)
+          (imit_rule ~counter ~scope s t depth)
           (hs_proj_flex_rigid ~counter ~scope ~flex rigid depth) 
       | _ -> 
         assert false)

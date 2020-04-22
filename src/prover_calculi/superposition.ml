@@ -3614,7 +3614,7 @@ let _unif_level = ref `Full
 let _ground_subs_check = ref 0
 let _solid_subsumption = ref false
 
-let _skip_multiplier = ref 20.0
+let _skip_multiplier = ref 2.0
 let _imit_first = ref false
 let _max_depth = ref 3
 let _max_rigid_imitations = ref 3
