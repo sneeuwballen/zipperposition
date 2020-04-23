@@ -121,8 +121,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     let unif_alg l r =
       if not (Env.flex_get Combinators.k_enable_combinators) then (
         PUnif.unify_scoped (l,0) (r,0)
+        |> OSeq.filter_map CCFun.id
         |> OSeq.nth 0
-        |> CCOpt.get_exn
       ) else Unif_subst.of_subst @@ Unif.FO.unify_syn (l,0) (r,0) in
     
     Util.debugf ~section 1 "bool solving @[%a@]@."(fun k -> k C.pp c);
@@ -133,21 +133,23 @@ module Make(E : Env.S) : S with module Env = E = struct
       | None -> 
         None
       | Some (l,r) ->
+        let module US = Unif_subst in
         try
           Util.debugf ~section 1 "trying lit @[%d:%a@]@."(fun k -> k i Literal.pp lit);
+          Util.debugf ~section 1 "unif problem: @[%a=?=%a@]@."(fun k -> k T.pp l T.pp r);
           let subst = unif_alg l r in
           assert(not @@ Unif_subst.has_constr subst);
+          let renaming = Subst.Renaming.create () in
           let new_lits = 
             CCArray.except_idx (C.lits c) i
             |> CCArray.of_list
             |> (fun l -> 
-                Literals.apply_subst 
-                  (Subst.Renaming.create ()) (Unif_subst.subst subst) (l,0))
+                Literals.apply_subst renaming (US.subst subst) (l,0))
             |> CCArray.to_list in
           let proof = 
             Proof.Step.simp ~tags:[Proof.Tag.T_ho]
               ~rule:(Proof.Rule.mk "solve_formulas")
-              [C.proof_parent c] in
+              [C.proof_parent_subst renaming (c,0) (US.subst subst) ] in
           let res = C.create ~penalty:(C.penalty c) ~trail:(C.trail c) new_lits proof in
           Util.debugf ~section 1 "solved by @[%a@]@."(fun k ->  k C.pp res);
           Some res
@@ -491,6 +493,10 @@ module Make(E : Env.S) : S with module Env = E = struct
 
     let proof_cons = Proof.Step.simp ~infos:[] ~tags:[Proof.Tag.T_live_cnf] in
     let res = Iter.to_list @@ lazy_clausify_driver ~proof_cons c  in
+    let res = 
+      (if Env.flex_get k_solve_formulas
+       then (CCOpt.get_or ~default:[] (solve_bool_formulas c))
+       else [])  @ res in
     if not @@ CCList.is_empty res then (
       Util.debugf ~section 1 "lazy_cnf_simp(@[%a@])=" (fun k -> k C.pp c);
       Util.debugf ~section 1 "@[%a@]@." (fun k -> k (CCList.pp C.pp) res);
