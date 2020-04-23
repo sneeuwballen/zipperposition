@@ -11,6 +11,7 @@ let k_lazy_cnf_kind = Flex_state.create_key ()
 let k_renaming_threshold = Flex_state.create_key ()
 let k_rename_eq = Flex_state.create_key ()
 let k_scoping = Flex_state.create_key ()
+let k_solve_formulas = Flex_state.create_key ()
 
 
 let section = Util.Section.make ~parent:Const.section "lazy_cnf"
@@ -25,6 +26,8 @@ module type S = sig
   (** Register rules in the environment *)
 
   val update_form_counter: action:[< `Decrease | `Increase ] -> C.t -> unit
+  val solve_bool_formulas: C.t -> C.t CCList.t option
+
 
 end
 
@@ -52,6 +55,109 @@ module Make(E : Env.S) : S with module Env = E = struct
   let _skolem_idx = ref @@ Idx.empty ()
   let _renaming_idx = ref @@ Idx.empty ()
   let _renamer_symbols = ref @@ ID.Set.empty
+
+  let solve_bool_formulas c =
+    let module PUnif = 
+      PUnif.Make(struct 
+        let st = 
+          Env.flex_state ()
+          |> Flex_state.add PragUnifParams.k_fixpoint_decider true
+          |> Flex_state.add PragUnifParams.k_pattern_decider true
+          |> Flex_state.add PragUnifParams.k_solid_decider true
+          |> Flex_state.add PragUnifParams.k_max_inferences 1
+          |> Flex_state.add PragUnifParams.k_max_depth 3
+          |> Flex_state.add PragUnifParams.k_max_app_projections 1
+          |> Flex_state.add PragUnifParams.k_max_rigid_imitations 3
+          |> Flex_state.add PragUnifParams.k_max_elims 0
+          |> Flex_state.add PragUnifParams.k_max_identifications 0
+        end) in
+    
+    let normalize_not t =
+      let rec aux t = 
+        match T.view t with
+        | T.AppBuiltin(Not, [f]) ->
+          begin match T.view f with
+          | T.AppBuiltin(Not, [g]) -> aux g
+          | T.AppBuiltin( ((Eq|Equiv) as b), l ) ->
+            let flipped = 
+              if b = Builtin.Eq then Builtin.Neq else Builtin.Xor in
+            T.app_builtin flipped l ~ty:(T.ty f)
+          | T.AppBuiltin( ((Neq|Xor) as b), l ) ->
+            let flipped = 
+              if b = Builtin.Neq then Builtin.Eq else Builtin.Equiv in
+            T.app_builtin flipped l ~ty:(T.ty f)
+          | _ -> t end
+        | _ -> t in
+      aux t in
+
+    let find_resolvable_form lit =
+      let is_var_headed t = T.is_var (T.head_term t) in
+
+      (* Rewrite positive equations of the form F s = t, where t is not
+         var-headed into F s != (not t).  *)
+      let find_pos_var_headed_eq l r = 
+        if is_var_headed l && not (is_var_headed r) then (Some(l, T.Form.not_ r)) 
+        else if is_var_headed r && not (is_var_headed l) then (Some(r, T.Form.not_ l))
+        else None in
+
+      match (Literal.View.as_eqn lit) with 
+      | Some (l,r,sign) ->
+        if not (T.is_true_or_false r) && Type.is_prop (T.ty l) then (
+          if not sign then Some (l,r)
+          else find_pos_var_headed_eq l r)
+        else if T.is_true_or_false r then (
+          let neg = if sign then CCFun.id else T.Form.not_ in
+          match T.view (normalize_not (neg l)) with 
+          | T.AppBuiltin((Neq|Xor), ([f;g]|[_;f;g])) when Type.is_prop (T.ty f) ->
+            assert(Type.equal (T.ty f) (T.ty g));
+            Some (f,g)
+          | T.AppBuiltin((Eq|Equiv), ([f;g]|[_;f;g])) when Type.is_prop (T.ty f) ->
+            assert(Type.equal (T.ty f) (T.ty g));
+            find_pos_var_headed_eq f g
+          | _ -> None
+        ) else None
+      | None -> None in
+    
+    let unif_alg l r =
+      if not (Env.flex_get Combinators.k_enable_combinators) then (
+        PUnif.unify_scoped (l,0) (r,0)
+        |> OSeq.nth 0
+        |> CCOpt.get_exn
+      ) else Unif_subst.of_subst @@ Unif.FO.unify_syn (l,0) (r,0) in
+    
+    Util.debugf ~section 1 "bool solving @[%a@]@."(fun k -> k C.pp c);
+
+    C.lits c
+    |> CCArray.mapi (fun i lit ->
+      match find_resolvable_form lit with 
+      | None -> 
+        None
+      | Some (l,r) ->
+        try
+          Util.debugf ~section 1 "trying lit @[%d:%a@]@."(fun k -> k i Literal.pp lit);
+          let subst = unif_alg l r in
+          assert(not @@ Unif_subst.has_constr subst);
+          let new_lits = 
+            CCArray.except_idx (C.lits c) i
+            |> CCArray.of_list
+            |> (fun l -> 
+                Literals.apply_subst 
+                  (Subst.Renaming.create ()) (Unif_subst.subst subst) (l,0))
+            |> CCArray.to_list in
+          let proof = 
+            Proof.Step.simp ~tags:[Proof.Tag.T_ho]
+              ~rule:(Proof.Rule.mk "solve_formulas")
+              [C.proof_parent c] in
+          let res = C.create ~penalty:(C.penalty c) ~trail:(C.trail c) new_lits proof in
+          Util.debugf ~section 1 "solved by @[%a@]@."(fun k ->  k C.pp res);
+          Some res
+        with _ -> 
+          Util.debugf ~section 1 "failed @." (fun k -> k);
+          None)
+      |> CCArray.filter_map CCFun.id
+      |> CCArray.to_list
+      |> (fun l -> if CCList.is_empty l then None else Some l)
+
 
 
   (* Two-literal clause of which one is a renaming literal
@@ -424,6 +530,7 @@ let _lazy_cnf_kind = ref `Inf
 let _renaming_threshold = ref 8
 let _rename_eq = ref true
 let _scoping = ref `Off
+let _solve_formulas = ref false
 
 let extension =
   let register env =
@@ -433,6 +540,7 @@ let extension =
     E.flex_add k_renaming_threshold !_renaming_threshold;
     E.flex_add k_rename_eq !_rename_eq;
     E.flex_add k_scoping !_scoping;
+    E.flex_add k_solve_formulas !_solve_formulas;
 
     let handler f c =
       f c;
@@ -468,6 +576,10 @@ let () =
     " use mini/maxi scoping rules for lazy cnf";
     "--lazy-cnf-renaming-threshold", Arg.Int ((:=) _renaming_threshold), 
       " set the subformula renaming threshold -- negative value turns renaming off";
+    "--solve-formulas"
+    , Arg.Bool (fun v -> _solve_formulas := v)
+    , " solve phi != psi eagerly using unification, where phi and psi are formulas";
+    
     "--lazy-cnf-kind", Arg.Symbol (["inf"; "simp"], (fun str -> 
       match str with 
       | "inf" -> _lazy_cnf_kind := `Inf

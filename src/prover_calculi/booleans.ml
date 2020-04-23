@@ -25,7 +25,6 @@ let k_quant_rename = Flex_state.create_key ()
 let k_interpret_bool_funs = Flex_state.create_key ()
 let k_cnf_non_simpl = Flex_state.create_key ()
 let k_norm_bools = Flex_state.create_key () 
-let k_solve_formulas = Flex_state.create_key ()
 let k_filter_literals = Flex_state.create_key ()
 let k_nnf = Flex_state.create_key ()
 let k_elim_bvars = Flex_state.create_key ()
@@ -55,6 +54,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   module Fool = Fool.Make(Env)
   module Combs = Combinators.Make(Env)
   module HO = Higher_order.Make(Env)
+  module LazyCNF = Lazy_cnf.Make(Env)
 
   let (=~),(/~) = Literal.mk_eq, Literal.mk_neq
   let (@:) = T.app_builtin ~ty:Type.prop
@@ -387,97 +387,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       SimplM.return_same c 
     )
 
-  let solve_bool_formulas c =
-    let module PUnif = 
-      PUnif.Make(struct 
-        let st = 
-          Env.flex_state ()
-          |> Flex_state.add PragUnifParams.k_fixpoint_decider true
-          |> Flex_state.add PragUnifParams.k_pattern_decider true
-          |> Flex_state.add PragUnifParams.k_solid_decider true
-          |> Flex_state.add PragUnifParams.k_max_inferences 1
-          |> Flex_state.add PragUnifParams.k_max_depth 2
-          |> Flex_state.add PragUnifParams.k_max_app_projections 2
-          |> Flex_state.add PragUnifParams.k_max_rigid_imitations 2
-          |> Flex_state.add PragUnifParams.k_max_elims 2
-          |> Flex_state.add PragUnifParams.k_max_identifications 2
-        end) in
-    
-    let normalize_not t =
-      let rec aux t = 
-        match T.view t with
-        | T.AppBuiltin(Not, [f]) ->
-          begin match T.view f with
-          | T.AppBuiltin(Not, [g]) -> aux g
-          | T.AppBuiltin( ((Eq|Equiv) as b), l ) ->
-            let flipped = 
-              if b = Builtin.Eq then Builtin.Neq else Builtin.Xor in
-            T.app_builtin flipped l ~ty:(T.ty f)
-          | T.AppBuiltin( ((Neq|Xor) as b), l ) ->
-            let flipped = 
-              if b = Builtin.Neq then Builtin.Eq else Builtin.Equiv in
-            T.app_builtin flipped l ~ty:(T.ty f)
-          | _ -> t end
-        | _ -> t in
-      aux t in
-
-    let find_resolvable_form lit =
-      let res = 
-        match (Literal.View.as_eqn lit) with 
-        | Some (l,r,sign) ->
-          if not sign && not (T.is_true_or_false r) && Type.is_prop (T.ty l) then (
-            Some (l,r)
-          ) else if T.is_true_or_false r then (
-            let neg = if sign then CCFun.id else T.Form.not_ in
-            match T.view (normalize_not (neg l)) with 
-            | T.AppBuiltin((Neq|Xor), ([f;g]|[_;f;g])) when Type.is_prop (T.ty f) ->
-              assert(Type.equal (T.ty f) (T.ty g));
-              Some (f,g)
-            | _ -> None
-          ) else None
-        | None -> None in
-      CCOpt.map (fun (l,r) -> T.normalize_bools l, T.normalize_bools r) res in
-
-    let unif_alg l r =
-      if not (Env.flex_get Combinators.k_enable_combinators) then (
-        PUnif.unify_scoped (l,0) (r,0)
-        |> OSeq.nth 0
-        |> CCOpt.get_exn
-      ) else Unif_subst.of_subst @@ Unif.FO.unify_syn (l,0) (r,0) in
-    
-    Util.debugf ~section 1 "bool solving @[%a@]@."(fun k -> k C.pp c);
-    C.lits c
-    |> CCArray.mapi (fun i lit ->
-      match find_resolvable_form lit with 
-      | None -> 
-        None
-      | Some (l,r) ->
-        try
-          Util.debugf ~section 1 "trying lit @[%d:%a@]@."(fun k -> k i Literal.pp lit);
-          let subst = unif_alg l r in
-          assert(not @@ Unif_subst.has_constr subst);
-          let new_lits = 
-            CCArray.except_idx (C.lits c) i
-            |> CCArray.of_list
-            |> (fun l -> 
-                Literals.apply_subst 
-                  (Subst.Renaming.create ()) (US.subst subst) (l,0))
-            |> CCArray.to_list in
-          let proof = 
-            Proof.Step.simp ~tags:[Proof.Tag.T_ho]
-              ~rule:(Proof.Rule.mk "solve_formulas")
-              [C.proof_parent c] in
-          let res = C.create ~penalty:(C.penalty c) ~trail:(C.trail c) new_lits proof in
-          Util.debugf ~section 1 "solved by @[%a@]@."(fun k ->  k C.pp res);
-          Some res
-        with _ -> 
-          Util.debugf ~section 1 "failed @." (fun k -> k);
-          None)
-      |> CCArray.filter_map CCFun.id
-      |> CCArray.to_list
-      |> (fun l -> if CCList.is_empty l then None else Some l)
-
-
   let cnf_otf c : C.t list option =
     let idx = CCArray.find_idx (fun l -> 
         let eq = Literal.View.as_eqn l in
@@ -507,14 +416,13 @@ module Make(E : Env.S) : S with module Env = E = struct
       let proof = Proof.Step.simp ~rule:(Proof.Rule.mk "cnf_otf") ~tags:[Proof.Tag.T_ho] [C.proof_parent c] in
       let trail = C.trail c and penalty = C.penalty c in
       let stmt = Statement.assert_ ~proof f in
-      let cnf_vec = Cnf.convert @@ CCVector.to_seq @@ 
-        Cnf.cnf_of ~opts ~ctx:(Ctx.sk_ctx ()) stmt in
+      let cnf_vec = Cnf.convert @@ CCVector.to_seq @@ Cnf.cnf_of ~opts ~ctx:(Ctx.sk_ctx ()) stmt in
       CCVector.iter (fun cl -> 
           Statement.Seq.ty_decls cl
           |> Iter.iter (fun (id,ty) -> Ctx.declare id ty)) cnf_vec;
       let solved = 
-        if Env.flex_get k_solve_formulas then (
-          CCOpt.get_or ~default:[] (solve_bool_formulas c))
+        if Env.flex_get Lazy_cnf.k_solve_formulas then (
+          CCOpt.get_or ~default:[] (LazyCNF.solve_bool_formulas c))
         else [] in
 
       let clauses = CCVector.map (C.of_statement ~convert_defs:true) cnf_vec
@@ -889,7 +797,6 @@ let _cased_term_selection = ref Large
 let _interpret_bool_funs = ref false
 let _cnf_non_simpl = ref false
 let _norm_bools = ref false 
-let _solve_formulas = ref false
 let _filter_literals = ref `Max
 let _nnf = ref false
 let _simplify_bools = ref true
@@ -906,7 +813,6 @@ let extension =
     E.flex_add k_interpret_bool_funs !_interpret_bool_funs;
     E.flex_add k_cnf_non_simpl !_cnf_non_simpl;
     E.flex_add k_norm_bools !_norm_bools;
-    E.flex_add k_solve_formulas !_solve_formulas;
     E.flex_add k_filter_literals !_filter_literals;
     E.flex_add k_nnf !_nnf;
     E.flex_add k_elim_bvars !_elim_bvars;
@@ -949,9 +855,6 @@ let () =
     , " turn interpretation of boolean functions as forall or negation of forall on or off";
       "--normalize-bool-terms", Arg.Bool((fun v -> _norm_bools := v)),
       " normalize boolean subterms using their weight.";
-    "--solve-formulas"
-    , Arg.Bool (fun v -> _solve_formulas := v)
-    , " solve phi != psi eagerly using unification, where phi and psi are formulas";
     "--nnf-nested-formulas"
     , Arg.Bool (fun v -> _nnf := v)
     , " convert nested formulas into negation normal form";
