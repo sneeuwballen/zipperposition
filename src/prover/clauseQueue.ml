@@ -76,7 +76,7 @@ let get_profile () = !_profile
 let set_profile p = _profile := p
 let parse_profile s = _profile := (profile_of_string s)
 let funs_to_parse = ref []
-let _ignore_orphans = ref false
+let _ignore_orphans = ref true
 let _rel_terms_enabled = ref false
 
 let ignore_orphans () = !_ignore_orphans

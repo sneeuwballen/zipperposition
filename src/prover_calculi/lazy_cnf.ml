@@ -500,6 +500,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     if not @@ CCList.is_empty res then (
       Util.debugf ~section 1 "lazy_cnf_simp(@[%a@])=" (fun k -> k C.pp c);
       Util.debugf ~section 1 "@[%a@]@." (fun k -> k (CCList.pp C.pp) res);
+      update_form_counter ~action:`Decrease c;
+      CCList.iter (update_form_counter ~action:`Increase) res;
     ) else Util.debugf ~section 3 "lazy_cnf_simp(@[%a@])=Ø" (fun k -> k C.pp c);
     if CCList.is_empty res then None
     else (Some res)
