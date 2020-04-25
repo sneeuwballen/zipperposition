@@ -101,6 +101,7 @@ let k_ho_disagremeents = Flex_state.create_key ()
 let k_bool_demod = Flex_state.create_key ()
 let k_immediate_simplification = Flex_state.create_key ()
 let k_arg_cong = Flex_state.create_key ()
+let k_bool_eq_fact = Flex_state.create_key ()
 
 
 
@@ -2012,7 +2013,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (fun (s, t, sign, s_pos) -> (* try with s=t *)
            assert(sign || (T.equal T.true_ t && T.is_app_var s) || (T.equal T.true_ s && T.is_app_var t));
            let active_idx = Lits.Pos.idx s_pos in
-           let is_var_pred = 
+           let is_var_pred =
+             Env.flex_get k_bool_eq_fact &&
              T.is_app_var s && Type.is_prop (T.ty s) && T.equal T.true_ t in
            let var_pred_status = (is_var_pred, sign) in
            find_unifiable_lits ~var_pred_status active_idx s s_pos
@@ -3633,6 +3635,7 @@ let _bool_demod = ref false
 let _immediate_simplification = ref false
 let _arg_cong = ref true
 let _try_lfho_unif = ref false
+let _bool_eq_fact = ref false
 
 let _guard = ref 45
 let _ratio = ref 135
@@ -3689,6 +3692,7 @@ let register ~sup =
   E.flex_add k_bool_demod !_bool_demod;
   E.flex_add k_immediate_simplification !_immediate_simplification;
   E.flex_add k_arg_cong !_arg_cong;
+  E.flex_add k_bool_eq_fact !_bool_eq_fact;
 
 
   E.flex_add PragUnifParams.k_max_inferences !_max_infs;
@@ -3773,6 +3777,7 @@ let () =
       , " Perform Ext-Sup, Ext-EqFact, or Ext-EqRes rules only when all disagreements are HO" ^
         " or when there exists a HO disagremeent";
       "--fluidsup-penalty", Arg.Int (fun p -> _fluidsup_penalty := p), " penalty for FluidSup inferences";
+      "--bool-eq-fact", Arg.Bool ((:=) _bool_eq_fact), " turn bool eq-fact on or off";
       "--fluidsup", Arg.Bool (fun b -> _fluidsup :=b), " enable/disable FluidSup inferences (only effective when complete higher-order unification is enabled)";
       "--subvarsup", Arg.Bool ((:=) _subvarsup), " enable/disable SubVarSup inferences";
       "--lambdasup", Arg.Int (fun l -> 
