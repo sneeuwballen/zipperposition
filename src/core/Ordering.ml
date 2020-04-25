@@ -48,8 +48,7 @@ let monotonic ord = ord.monotonic
 
 let precedence ord = ord.prec
 
-let add_list ord l = Prec.add_list ord.prec l
-let add_seq ord seq = Prec.add_seq ord.prec seq
+let add_list ~signature ord l = Prec.add_list ~signature ord.prec l
 
 let name ord = ord.name
 

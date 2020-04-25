@@ -125,7 +125,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         |> OSeq.nth 0
       ) else Unif_subst.of_subst @@ Unif.FO.unify_syn (l,0) (r,0) in
     
-    Util.debugf ~section 1 "bool solving @[%a@]@."(fun k -> k C.pp c);
+    Util.debugf ~section 2 "bool solving @[%a@]@."(fun k -> k C.pp c);
 
     C.lits c
     |> CCArray.mapi (fun i lit ->
@@ -135,8 +135,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       | Some (l,r) ->
         let module US = Unif_subst in
         try
-          Util.debugf ~section 1 "trying lit @[%d:%a@]@."(fun k -> k i Literal.pp lit);
-          Util.debugf ~section 1 "unif problem: @[%a=?=%a@]@."(fun k -> k T.pp l T.pp r);
+          Util.debugf ~section 2 "trying lit @[%d:%a@]@."(fun k -> k i Literal.pp lit);
+          Util.debugf ~section 2 "unif problem: @[%a=?=%a@]@."(fun k -> k T.pp l T.pp r);
           let subst = unif_alg l r in
           assert(not @@ Unif_subst.has_constr subst);
           let renaming = Subst.Renaming.create () in
@@ -151,10 +151,10 @@ module Make(E : Env.S) : S with module Env = E = struct
               ~rule:(Proof.Rule.mk "solve_formulas")
               [C.proof_parent_subst renaming (c,0) (US.subst subst) ] in
           let res = C.create ~penalty:(C.penalty c) ~trail:(C.trail c) new_lits proof in
-          Util.debugf ~section 1 "solved by @[%a@]@."(fun k ->  k C.pp res);
+          Util.debugf ~section 2 "solved by @[%a@]@."(fun k ->  k C.pp res);
           Some res
         with _ -> 
-          Util.debugf ~section 1 "failed @." (fun k -> k);
+          Util.debugf ~section 2 "failed @." (fun k -> k);
           None)
       |> CCArray.filter_map CCFun.id
       |> CCArray.to_list
@@ -226,7 +226,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let rename ~c form sign =
     assert(Type.is_prop (T.ty form));
-    if is_renaming_clause c || not (T.is_appbuiltin form) then None
+    if is_renaming_clause c || not (T.is_appbuiltin form) || T.is_true_or_false form then None
     else (
       let gen = Iter.head @@ 
         Idx.retrieve_generalizations (!_renaming_idx, 0) (form, 1) in
@@ -451,9 +451,9 @@ module Make(E : Env.S) : S with module Env = E = struct
           let renamer = (if sign then CCFun.id else T.Form.not_) renamer in
           let renamed = mk_or ~proof_cons ~rule_name [renamer] c ~parents:(c :: parents) i in
           let res = renamed @ new_defs in
-          Util.debugf ~section 2 "  @[renamed subformula %d(@[%a@]) into @[%a@]@]@." 
-            (fun k -> k i L.pp (C.lits c).(i) (CCList.pp C.pp) renamed);
-          Util.debugf ~section 2 "  new defs:@[%a@]@." 
+          Util.debugf ~section 1 "  @[renamed subformula %d:(@[%a@])=@. @[%a@]@]@." 
+            (fun k -> k i C.pp c (CCList.pp C.pp) renamed);
+          Util.debugf ~section 1 "  new defs:@[%a@]@." 
             (fun k -> k (CCList.pp C.pp) new_defs);
           Some res, `Stop
         | None -> None, `Continue
@@ -465,9 +465,9 @@ module Make(E : Env.S) : S with module Env = E = struct
             let renamer = (if sign then CCFun.id else T.Form.not_) renamer in
             let renamed = mk_or ~proof_cons ~rule_name [renamer] c ~parents:(c :: parents) i in
             let res = renamed @ new_defs in
-            Util.debugf ~section 2 "  @[renamed eq %d(@[%a@]) into @[%a@]@]@." 
+            Util.debugf ~section 1 "  @[renamed eq %d(@[%a@]) into @[%a@]@]@." 
             (fun k -> k i L.pp (C.lits c).(i) (CCList.pp C.pp) renamed);
-            Util.debugf ~section 2 "  new defs:@[%a@]@." 
+            Util.debugf ~section 1 "  new defs:@[%a@]@." 
               (fun k -> k (CCList.pp C.pp) new_defs);
               Some res, `Stop
           | None -> None, `Continue)
@@ -498,8 +498,8 @@ module Make(E : Env.S) : S with module Env = E = struct
        then (CCOpt.get_or ~default:[] (solve_bool_formulas c))
        else [])  @ res in
     if not @@ CCList.is_empty res then (
-      Util.debugf ~section 1 "lazy_cnf_simp(@[%a@])=" (fun k -> k C.pp c);
-      Util.debugf ~section 1 "@[%a@]@." (fun k -> k (CCList.pp C.pp) res);
+      Util.debugf ~section 2 "lazy_cnf_simp(@[%a@])=" (fun k -> k C.pp c);
+      Util.debugf ~section 2 "@[%a@]@." (fun k -> k (CCList.pp C.pp) res);
       update_form_counter ~action:`Decrease c;
       CCList.iter (update_form_counter ~action:`Increase) res;
     ) else Util.debugf ~section 3 "lazy_cnf_simp(@[%a@])=Ø" (fun k -> k C.pp c);
@@ -534,7 +534,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     )
 end
 
-let _lazy_cnf_kind = ref `Inf
+let _lazy_cnf_kind = ref `Simp
 let _renaming_threshold = ref 8
 let _rename_eq = ref true
 let _scoping = ref `Off

@@ -72,7 +72,7 @@ module Make(X : PARAMETERS) = struct
     _signature := Signature.declare !_signature symb ty;
     Signal.send on_signature_update !_signature;
     Signal.send on_new_symbol (symb,ty);
-    Ordering.add_list (ord ()) [symb];
+    Ordering.add_list ~signature:!_signature (ord ()) [symb];
     ()
 
   let add_signature signature =

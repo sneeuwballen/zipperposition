@@ -56,10 +56,16 @@ end
 
 (** {2 Constraints} *)
 
-let get_arity ~signature s =
+let get_arity ~sig_ref s =
   try 
-    snd (Signature.arity signature s)
+    snd (Signature.arity !sig_ref s)
   with Not_found -> 0
+
+let on_signature_update = Signal.create()
+
+let update_signature prev_sig signature =
+  prev_sig := signature;
+  Signal.ContinueListening
 
 module Constr = struct
   type 'a t = ID.t -> ID.t -> int
@@ -68,21 +74,29 @@ module Constr = struct
   type prec_fun = signature:Signature.t -> ID.t Iter.t -> [`partial] t
 
   let arity ~signature _ s1 s2 =
+    let _sig = ref signature in
+    Signal.on on_signature_update (update_signature _sig);
     let open CCOrd in
     (* bigger arity means bigger symbol *)
-    (get_arity ~signature s1 - get_arity ~signature s2)
+    (get_arity ~sig_ref:_sig s1 - get_arity ~sig_ref:_sig s2)
     <?> (ID.compare, s1, s2)
 
   let inv_arity ~signature _ s1 s2 =
+    let _sig = ref signature in
+    Signal.on on_signature_update (update_signature _sig);
     let open CCOrd in
-    (get_arity ~signature s2 - get_arity ~signature s1)
+    (get_arity ~sig_ref:_sig s2 - get_arity ~sig_ref:_sig s1)
     <?> (ID.compare, s2, s1)
 
   let invfreqhack ~signature seq =
+    let _sig = ref signature in
+    Signal.on on_signature_update (update_signature _sig);
+
     (* symbol -> number of occurrences of symbol in seq *)
     let tbl = ID.Tbl.create 16 in
     Iter.iter (ID.Tbl.incr tbl) seq;
-    let find_freq s = ID.Tbl.get_or ~default:max_int tbl s in
+    let avg = Iter.sum (ID.Tbl.values tbl) / Iter.length (ID.Tbl.values tbl) in
+    let find_freq s = ID.Tbl.get_or ~default:avg tbl s in
     let max_unary_freq =
       Signature.Seq.symbols signature
       |> Iter.filter_map (fun id ->
@@ -93,73 +107,79 @@ module Constr = struct
       |> Iter.max
       |> CCOpt.get_or ~default:max_int in
     (* compare by inverse frequency (higher frequency => smaller) *)
-    let is_unary_max_freq s1 =
-      Signature.mem signature s1 
-      && get_arity ~signature s1 == 1
+    let is_unary_max_freq _sig s1 =
+      Signature.mem !_sig s1
+      && get_arity ~sig_ref:_sig s1 == 1
       && find_freq s1 == max_unary_freq in
     
-    let is_nullary s1 =
-      Signature.mem signature s1 
-      && get_arity ~signature s1 == 0 in
+    let is_nullary _sig s1 =
+      Signature.mem !_sig s1 
+      && get_arity ~sig_ref:_sig s1 == 0 in
 
     fun s1 s2 ->
       let open CCOrd in
       (* criteria as in generate_invfreq_hack_precedence -- E source *)
       let categorize s =
-        if is_nullary s then (min_int, - (find_freq s), ID.id s)
-        else if is_unary_max_freq s then (max_int, 0, ID.id s)
-        else (- (find_freq s), get_arity ~signature s, ID.id s) in
+        if is_nullary _sig s then (min_int, - (find_freq s), ID.id s)
+        else if is_unary_max_freq _sig s then (max_int, 0, ID.id s)
+        else (- (find_freq s), get_arity ~sig_ref:_sig s, ID.id s) in
       let (a1,a2,a3), (b1,b2,b3) = CCPair.map_same categorize (s1, s2) in
       CCInt.compare a1 b1
       <?> (CCInt.compare, a2, b2)
       <?> (CCInt.compare, a3, b3)
 
-    let invfreq_constmin ~signature seq =
-      (* symbol -> number of occurrences of symbol in seq *)
-      let tbl = ID.Tbl.create 16 in
-      Iter.iter (ID.Tbl.incr tbl) seq;
-      let find_freq s = ID.Tbl.get_or ~default:max_int tbl s in
-      
-      let is_nullary s1 =
-        Signature.mem signature s1 
-        && get_arity ~signature s1 == 0 in
+  let invfreq_constmin ~signature seq =
+    let _sig = ref signature in
+    Signal.on on_signature_update (update_signature _sig);
 
-      fun s1 s2 ->
-        let open CCOrd in
-        (* criteria as in generate_invfreq_hack_precedence -- E source *)
-        let categorize s =
-          if is_nullary s then (min_int, - (find_freq s), ID.id s)
-          else (- (find_freq s), get_arity ~signature s, ID.id s) in
-        let (a1,a2,a3), (b1,b2,b3) = CCPair.map_same categorize (s1, s2) in
-        CCInt.compare a1 b1
-        <?> (CCInt.compare, a2, b2)
-        <?> (CCInt.compare, a3, b3)
-
-    let invfreqconj ~signature seq =
-      (* symbol -> number of occurrences of symbol in seq *)
-      let tbl = ID.Tbl.create 16 in
-      Iter.iter (ID.Tbl.incr tbl) seq;
-      let find_freq s = ID.Tbl.get_or ~default:max_int tbl s in
-
-      fun s1 s2 ->
-        let open CCOrd in
-        (* criteria as in generate_invfreq_hack_precedence -- E source *)
-        let categorize s =
-          ((if Signature.sym_in_conj s signature then 1 else 0),
-           find_freq s, ID.id s) in
-        let (a1,a2,a3), (b1,b2,b3) = CCPair.map_same categorize (s1, s2) in
-        CCInt.compare a1 b1
-        <?> (CCInt.compare, a2, b2)
-        <?> (CCInt.compare, a3, b3)
-
-
-
-  
-  let invfreq ~signature seq =
     (* symbol -> number of occurrences of symbol in seq *)
     let tbl = ID.Tbl.create 16 in
     Iter.iter (ID.Tbl.incr tbl) seq;
-    let find_freq s = ID.Tbl.get_or ~default:max_int tbl s in
+    let avg = Iter.sum (ID.Tbl.values tbl) / Iter.length (ID.Tbl.values tbl) in
+    let find_freq s = ID.Tbl.get_or ~default:avg tbl s in
+    
+    let is_nullary _sig s1 =
+      Signature.mem !_sig s1 
+      && get_arity ~sig_ref:_sig s1 == 0 in
+
+    fun s1 s2 ->
+      let open CCOrd in
+      (* criteria as in generate_invfreq_hack_precedence -- E source *)
+      let categorize s =
+        if is_nullary _sig s then (min_int, - (find_freq s), ID.id s)
+        else (- (find_freq s), get_arity ~sig_ref:_sig s, ID.id s) in
+      let (a1,a2,a3), (b1,b2,b3) = CCPair.map_same categorize (s1, s2) in
+      CCInt.compare a1 b1
+      <?> (CCInt.compare, a2, b2)
+      <?> (CCInt.compare, a3, b3)
+
+  let invfreqconj ~signature seq =
+    (* The set of conjecture symbols cannot increase, so we do not subscribe to
+       signature changes*)
+    let tbl = ID.Tbl.create 16 in
+    Iter.iter (ID.Tbl.incr tbl) seq;
+    let avg = Iter.sum (ID.Tbl.values tbl) / Iter.length (ID.Tbl.values tbl) in
+    let find_freq s = ID.Tbl.get_or ~default:avg tbl s in
+
+    fun s1 s2 ->
+      let open CCOrd in
+      (* criteria as in generate_invfreq_hack_precedence -- E source *)
+      let categorize s =
+        ((if Signature.sym_in_conj s signature then 1 else 0),
+          find_freq s, ID.id s) in
+      let (a1,a2,a3), (b1,b2,b3) = CCPair.map_same categorize (s1, s2) in
+      CCInt.compare a1 b1
+      <?> (CCInt.compare, a2, b2)
+      <?> (CCInt.compare, a3, b3)
+
+  
+  (* symbol -> number of occurrences of symbol in seq *)
+  let invfreq ~signature seq =
+    (* Does not use the signature *)
+    let tbl = ID.Tbl.create 16 in
+    Iter.iter (ID.Tbl.incr tbl) seq;
+    let avg = Iter.sum (ID.Tbl.values tbl) / Iter.length (ID.Tbl.values tbl) in
+    let find_freq s = ID.Tbl.get_or ~default:avg tbl s in
     (* compare by inverse frequency (higher frequency => smaller) *)
     fun s1 s2 ->
       let open CCOrd in
@@ -170,22 +190,30 @@ module Constr = struct
   
   let unary_first ~signature _ s1 s2 =
     let open CCOrd in
-    let is_unary s = get_arity ~signature s == 1 in
-    let weight s =
-      if is_unary s then max_int
-      else if not (Signature.mem signature s) then max_int - 1
-      else get_arity ~signature s  in
-    weight s1 - weight s2
+    
+    let _sig = ref signature in
+    Signal.on on_signature_update (update_signature _sig);
+    
+    let is_unary _sig s = get_arity ~sig_ref:_sig s == 1 in
+    let weight _sig s =
+      if is_unary _sig s then max_int
+      else if not (Signature.mem !_sig s) then max_int - 1
+      else get_arity ~sig_ref:_sig s  in
+    weight _sig s1 - weight _sig s2
     <?> (ID.compare, s1, s2)
 
   let const_first ~signature _ s1 s2 =
     let open CCOrd in
-    let is_const s = get_arity ~signature s == 0 in
-    let weight s =
-      if not (Signature.mem signature s) then max_int -1
-      else if is_const s then max_int
-      else get_arity ~signature s  in
-    weight s1 - weight s2
+
+    let _sig = ref signature in
+    Signal.on on_signature_update (update_signature _sig);
+
+    let is_const _sig s = get_arity ~sig_ref:_sig s == 0 in
+    let weight _sig s =
+      if not (Signature.mem !_sig s) then max_int -1
+      else if is_const _sig s then max_int
+      else get_arity ~sig_ref:_sig s  in
+    weight _sig s1  - weight _sig s2
     <?> (ID.compare, s1, s2)
 
   let prec_fun_of_str name =
@@ -390,7 +418,7 @@ let depth_occ_driver ~flip stmt_d =
   ID.Tbl.clear tbl;
   let tbl = ID.Tbl.create 16 in
   List.iteri (fun i (_,_,sym) -> ID.Tbl.add tbl sym (Weight.int (i + 5))) sorted;
-  let default = Weight.int 10 in
+  let default = Weight.int 5 in
   fun sym -> (ID.Tbl.get_or ~default tbl sym)
 
 let inv_depth_occurence =  depth_occ_driver ~flip:false
@@ -403,11 +431,18 @@ let max_arity signature =
   |> Iter.max |> CCOpt.get_or ~default:max_int
 
 (* weight of f = arity of f + 4 *)
-let weight_modarity ~signature a = 
-  let arity =  try snd @@ Signature.arity signature a with _ -> 10 in
-  Weight.int (arity + 4)
+let weight_modarity ~signature =
+  let _sig = ref signature in
+  Signal.on on_signature_update (update_signature _sig);
+
+  fun a ->
+    let arity =  try snd @@ Signature.arity !_sig a with _ -> 5 in
+    Weight.int (arity + 4)
 
 let weight_arity0 ~signature =
+  let _sig = ref signature in
+  Signal.on on_signature_update (update_signature _sig);
+
   let max_arity a b =
     match a, b with
     | None, x -> Some x
@@ -425,23 +460,28 @@ let weight_arity0 ~signature =
   function a ->
     let res = 
       match max_sym with 
-      | None -> get_arity ~signature a + 1
-      | Some m_id -> if ID.equal m_id a then 0 else (get_arity ~signature a + 1)
+      | None -> get_arity ~sig_ref:_sig a + 1
+      | Some m_id -> if ID.equal m_id a then 0 else (get_arity ~sig_ref:_sig a + 1)
     in
     Weight.int res
     
 
 let weight_invarity ~signature =
+  (* Depends on max arity, and cannot easily evolve during the proving *)
   let max_a = max_arity signature in
   (fun a ->
      let arity =  try snd @@ Signature.arity signature a with _ -> 0 in
      Weight.int (max_a - arity + 3))
 
-let weight_sq_arity ~signature a =
-  let arity =  try snd @@ Signature.arity signature a with _ -> 10 in
-  Weight.int (arity * arity + 1)
+let weight_sq_arity ~signature =
+  let _sig = ref signature in
+  Signal.on on_signature_update (update_signature _sig);
+  fun a ->
+    let arity =  try snd @@ Signature.arity !_sig a with _ -> 2 in
+    Weight.int (arity * arity + 1)
 
 let weight_invsq_arity ~signature =
+  (* Depends on max arity, and cannot easily evolve during the proving *)
   let max_a = max_arity signature in
   (fun a -> 
     let arity =  try snd @@ Signature.arity signature a with _ -> max_a / 2 in
@@ -594,8 +634,9 @@ let create ?(weight=weight_constant) ?(arg_coeff=arg_coeff_default)
   assert (check_inv_ res);
   res
 
-let add_list p l =
+let add_list ~signature p l =
   (* sorted insertion in snapshot *)
+  Signal.send on_signature_update signature;
   let rec insert_ id l = match l with
     | [] -> [id], true
     | id' :: l' ->
@@ -626,8 +667,6 @@ let add_list p l =
   )
 
 let add p id = add_list p [id]
-
-let add_seq p seq = Iter.iter (add p) seq
 
 let default l = create Constr.alpha l
 

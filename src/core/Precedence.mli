@@ -124,10 +124,8 @@ val lam_weight : t -> Weight.t
 val arg_coeff : t -> ID.t -> int -> int
 (** Nth argument coefficient of a symbol (for KBO with argument coefficients). *)
 
-val add_list : t -> ID.t list -> unit
+val add_list : signature:Signature.t -> t -> ID.t list -> unit
 (** Update the precedence with the given symbols *)
-
-val add_seq : t -> ID.t Iter.t -> unit
 
 val declare_status : t -> ID.t -> symbol_status -> unit
 (** Change the status of the given precedence

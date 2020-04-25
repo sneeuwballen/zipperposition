@@ -37,11 +37,8 @@ val monotonic : t -> bool
 val precedence : t -> Precedence.t
 (** Current precedence *)
 
-val add_list : t -> ID.t list -> unit
+val add_list : signature:Signature.t -> t -> ID.t list -> unit
 (** Update precedence with symbols *)
-
-val add_seq : t -> ID.t Iter.t -> unit
-(** Update precedence with signature *)
 
 val name : t -> string
 (** Name that describes this ordering *)
