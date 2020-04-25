@@ -3635,7 +3635,7 @@ let _bool_demod = ref false
 let _immediate_simplification = ref false
 let _arg_cong = ref true
 let _try_lfho_unif = ref false
-let _bool_eq_fact = ref false
+let _bool_eq_fact = ref true
 
 let _guard = ref 45
 let _ratio = ref 135
