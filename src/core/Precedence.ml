@@ -95,7 +95,9 @@ module Constr = struct
     (* symbol -> number of occurrences of symbol in seq *)
     let tbl = ID.Tbl.create 16 in
     Iter.iter (ID.Tbl.incr tbl) seq;
-    let avg = Iter.sum (ID.Tbl.values tbl) / Iter.length (ID.Tbl.values tbl) in
+    let avg = 
+      if Iter.length seq == 0 then 10
+      else Iter.sum (ID.Tbl.values tbl) / Iter.length (ID.Tbl.values tbl) in
     let find_freq s = ID.Tbl.get_or ~default:avg tbl s in
     let max_unary_freq =
       Signature.Seq.symbols signature
@@ -135,7 +137,9 @@ module Constr = struct
     (* symbol -> number of occurrences of symbol in seq *)
     let tbl = ID.Tbl.create 16 in
     Iter.iter (ID.Tbl.incr tbl) seq;
-    let avg = Iter.sum (ID.Tbl.values tbl) / Iter.length (ID.Tbl.values tbl) in
+    let avg = 
+      if Iter.length seq == 0 then 10
+      else Iter.sum (ID.Tbl.values tbl) / Iter.length (ID.Tbl.values tbl) in
     let find_freq s = ID.Tbl.get_or ~default:avg tbl s in
     
     let is_nullary _sig s1 =
@@ -158,7 +162,9 @@ module Constr = struct
        signature changes*)
     let tbl = ID.Tbl.create 16 in
     Iter.iter (ID.Tbl.incr tbl) seq;
-    let avg = Iter.sum (ID.Tbl.values tbl) / Iter.length (ID.Tbl.values tbl) in
+    let avg = 
+      if Iter.length seq == 0 then 10
+      else Iter.sum (ID.Tbl.values tbl) / Iter.length (ID.Tbl.values tbl) in
     let find_freq s = ID.Tbl.get_or ~default:avg tbl s in
 
     fun s1 s2 ->
@@ -178,7 +184,9 @@ module Constr = struct
     (* Does not use the signature *)
     let tbl = ID.Tbl.create 16 in
     Iter.iter (ID.Tbl.incr tbl) seq;
-    let avg = Iter.sum (ID.Tbl.values tbl) / Iter.length (ID.Tbl.values tbl) in
+    let avg = 
+      if Iter.length seq == 0 then 10
+      else Iter.sum (ID.Tbl.values tbl) / Iter.length (ID.Tbl.values tbl) in
     let find_freq s = ID.Tbl.get_or ~default:avg tbl s in
     (* compare by inverse frequency (higher frequency => smaller) *)
     fun s1 s2 ->
@@ -494,7 +502,7 @@ let weight_invfreq (symbs : ID.t Iter.t) : ID.t -> Weight.t =
   let tbl = ID.Tbl.create 16 in
   Iter.iter (ID.Tbl.incr tbl) symbs;
   let max_freq = List.fold_left (max) 0 (ID.Tbl.values_list tbl) in
-  fun sym ->Weight.int (max_freq - (ID.Tbl.get_or ~default:1 tbl sym) + 5) 
+  fun sym ->Weight.int (max_freq - (ID.Tbl.get_or ~default:(max_freq/2) tbl sym) + 5) 
 
 let weight_freq (symbs : ID.t Iter.t) : ID.t -> Weight.t =
   let tbl = ID.Tbl.create 16 in
