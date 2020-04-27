@@ -2567,7 +2567,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                 ) in
               let first_two, rest = 
                 OSeq.take 2 res, OSeq.map CCOpt.return (OSeq.drop 2 res) in
-              let stm =  Stm.make ~penalty:(C.penalty c + 1) rest in
+              let stm =  Stm.make ~penalty:(C.penalty c + 10) rest in
               StmQ.add (_stmq()) stm;
               
               OSeq.to_list first_two

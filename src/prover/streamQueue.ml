@@ -162,7 +162,10 @@ module Make(A : ARG) = struct
     if q.time_before_fair = 0 then take_fair (q.fair_tries+1) q 
     else (
       q.time_before_fair <- q.time_before_fair - 1;
-      _take_nb q n []
+      (* Only extract clauses if the minimal stream weight is low *)
+      if not (H.is_empty q.hp) && fst (H.find_min_exn q.hp) <= 10
+      then _take_nb q n [] 
+      else []
     )
 
   let rec _take_stm_nb_fix_stm q n res =
