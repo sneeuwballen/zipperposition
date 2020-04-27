@@ -82,6 +82,7 @@ module Make()
 
   (* add clause, if not added already *)
   let add_clause_ ~proof c =
+    let open Msat in
     if not (ClauseTbl.mem clause_tbl_ c) then (
       Util.incr_stat stat_num_clauses;
       (* add new clause -> check again *)

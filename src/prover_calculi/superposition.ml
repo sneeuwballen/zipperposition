@@ -373,7 +373,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   (* update simpl. index using the clause [c] just added or removed to
      the simplification set *)
-  let _update_simpl f c =
+  let _update_simpl f c = 
     assert (CCArray.for_all Lit.no_prop_invariant (C.lits c));
     let idx = !_idx_simpl in
     let idx' = match C.lits c with
@@ -2583,7 +2583,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                 ) in
               let first_two, rest = 
                 OSeq.take 2 res, OSeq.map CCOpt.return (OSeq.drop 2 res) in
-              let stm =  Stm.make ~penalty:(C.penalty c + 1) ~parents:[c] rest in
+              let stm =  Stm.make ~penalty:(C.penalty c + 10) ~parents:[c] rest in
               StmQ.add (_stmq()) stm;
               
               OSeq.to_list first_two
