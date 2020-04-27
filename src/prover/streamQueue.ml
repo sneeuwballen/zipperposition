@@ -163,7 +163,7 @@ module Make(A : ARG) = struct
     else (
       q.time_before_fair <- q.time_before_fair - 1;
       (* Only extract clauses if the minimal stream weight is low *)
-      if not (H.is_empty q.hp) && fst (H.find_min_exn q.hp) <= 10
+      if not (H.is_empty q.hp) && fst (H.find_min_exn q.hp) <= 20
       then _take_nb q n [] 
       else []
     )
