@@ -1998,7 +1998,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                    k (u, (if sign then T.false_ else T.true_),
                       unify (s,0) (u,0))
                  )
-               ) else if sign then (
+               ) else if sign && ((not is_pred_var) || pred_var_sign) then (
                  k (u, v, unify (s,0) (u,0));
                  k (v, u, unify (s,0) (v,0))
                );
