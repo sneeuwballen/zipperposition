@@ -102,6 +102,7 @@ let k_bool_demod = Flex_state.create_key ()
 let k_immediate_simplification = Flex_state.create_key ()
 let k_arg_cong = Flex_state.create_key ()
 let k_bool_eq_fact = Flex_state.create_key ()
+let k_cc_simplify = Flex_state.create_key ()
 
 
 
@@ -128,6 +129,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   (** {6 Stream queue} *)
   let k_stmq = Flex_state.create_key ()
+  let _cc_simpl = ref (Congruence.FO.create ~size:256 ())
 
 
   let _stmq () = Env.flex_get k_stmq
@@ -3431,6 +3433,32 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       | _ -> assert false;
     with Fail -> []
 
+  (* Resolve negative literals that are implied by
+     equational theory stored in _cc_simpl *)
+  let cc_resolve_lits cl =
+    let is_resolved l = match l with 
+      | Lit.Equation(lhs, rhs, false) 
+          when Term.is_ground lhs && Term.is_ground rhs &&
+          Congruence.FO.is_eq !_cc_simpl lhs rhs ->
+        None
+      | _ -> Some l in
+    let new_lits = CCList.filter_map is_resolved (CCArray.to_list (C.lits cl)) in
+    if CCList.length new_lits != C.length cl then (
+      let step = Proof.Step.simp ~rule:(Proof.Rule.mk "cc_resolve_neg") [C.proof_parent cl] in
+      let res = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) new_lits step in
+      SimplM.return_new res
+    ) else SimplM.return_same cl
+
+  (* Remove the clause if it has  *)
+  let is_cc_tautology cl =
+    let is_cc_trivial = function
+    | Lit.Equation(lhs, rhs, true) ->
+      T.is_ground lhs && T.is_ground rhs &&
+      Congruence.FO.is_eq !_cc_simpl lhs rhs
+    | _ -> false in
+    Array.exists is_cc_trivial (C.lits cl)
+
+
   (** {2 Registration} *)
 
   (* print index into file *)
@@ -3466,6 +3494,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     ()
 
   let register () =
+
     let open SimplM.Infix in
     let rw_simplify c =
       canonize_variables c
@@ -3482,6 +3511,23 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     and redundant = subsumed_by_active_set
     and backward_redundant = subsumed_in_active_set
     and is_trivial = is_tautology in
+
+    if Env.flex_get k_cc_simplify then (
+      let insert_into_cc c =
+        (match C.lits c with 
+        | [| Lit.Equation(lhs, rhs, true) |] ->
+          if Term.is_ground lhs && Term.is_ground rhs && Trail.is_empty (C.trail c) then (
+            _cc_simpl := Congruence.FO.mk_eq !_cc_simpl lhs rhs
+          )
+        | _ -> ());
+        Signal.ContinueListening 
+      in
+
+      Signal.on Env.ProofState.PassiveSet.on_add_clause insert_into_cc;
+
+      Env.add_basic_simplify cc_resolve_lits;
+      Env.add_is_trivial is_cc_tautology;
+    );
 
     Env.flex_add k_stmq (StmQ.default ());
 
@@ -3604,6 +3650,7 @@ let _recognize_injectivity = ref false
 let _restrict_fluidsup = ref false
 let _check_sup_at_var_cond = ref true
 let _restrict_hidden_sup_at_vars = ref false
+let _cc_simplify = ref false
 
 let _lambdasup = ref (-1)
 let _max_infs = ref (-1)
@@ -3634,7 +3681,7 @@ let _ho_disagremeents = ref `SomeHo
 let _bool_demod = ref false
 let _immediate_simplification = ref false
 let _arg_cong = ref true
-let _try_lfho_unif = ref false
+let _try_lfho_unif = ref true
 let _bool_eq_fact = ref true
 
 let _guard = ref 45
@@ -3716,15 +3763,14 @@ let register ~sup =
   E.flex_add StreamQueue.k_ratio !_ratio;
   E.flex_add StreamQueue.k_clause_num !_clause_num;
 
+  E.flex_add k_cc_simplify !_cc_simplify;
+
   let module JPF = JPFull.Make(struct let st = E.flex_state () end) in
   let module JPP = PUnif.Make(struct let st = E.flex_state () end) in
   begin match !_unif_alg with 
     | `OldJP -> E.flex_add k_unif_alg JP_unif.unify_scoped
     | `NewJPFull -> E.flex_add k_unif_alg JPF.unify_scoped
     | `NewJPPragmatic -> E.flex_add k_unif_alg JPP.unify_scoped end
-
-
-
 
 (* TODO: move DOT index printing into the extension *)
 
@@ -3819,6 +3865,7 @@ let () =
       "--stream-queue-guard", Arg.Set_int _guard, "set value of guard for streamQueue";
       "--stream-queue-ratio", Arg.Set_int _ratio, "set value of ratio for streamQueue";
       "--bool-demod", Arg.Bool ((:=) _bool_demod), " turn BoolDemod on/off";
+      "--cc-simplify", Arg.Bool ((:=) _cc_simplify), " use cong-closure of all positive ground unit eqs to simplify the clauses";
       "--immediate-simplification", Arg.Bool ((:=) _immediate_simplification), " turn immediate simplification on/off";
       "--try-lfho-unif", Arg.Bool ((:=) _try_lfho_unif), " if term is of the right shape, try LFHO unification before HO unification";
       "--stream-clause-num", Arg.Set_int _clause_num, "how many clauses to take from streamQueue; by default as many as there are streams";

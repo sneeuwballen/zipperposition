@@ -119,9 +119,9 @@ module Make(E : Env.S) : S with module Env = E = struct
   let output_cl ~out clause =
     let lits_converted = Literals.Conv.to_tst (C.lits clause) in
     Format.fprintf out "%% %d:\n" (C.proof_depth clause);
-    (* let orig_cl_str = CCFormat.sprintf "%% @[%a@]@." C.pp_tstp clause in
+    let orig_cl_str = CCFormat.sprintf "%% @[%a@]@." C.pp_tstp clause in
     let commented = CCString.replace ~which:`All ~sub:"\n" ~by:"\n% " orig_cl_str in
-    Format.fprintf out "%% orig:@.@[%s@]@." commented; *)
+    Format.fprintf out "%% orig:@.@[%s@]@." commented;
     match (C.distance_to_goal clause) with 
     | Some d when d = 0 ->
       Format.fprintf out "@[thf(zip_cl_%d,negated_conjecture,@[%a@]).@]@\n"
