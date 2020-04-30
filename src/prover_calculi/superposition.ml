@@ -3456,6 +3456,17 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       T.is_ground lhs && T.is_ground rhs &&
       Congruence.FO.is_eq !_cc_simpl lhs rhs
     | _ -> false in
+    (* Because literals from the passive set are also added,
+       then unit positive equation from the passive set can make
+       itself tautology when it is chosen for processing...
+       
+       Two ways to avoid this:
+        1. Do tautology checking on non-unit clauses
+        2. Do the check on clauses with AVATAR asertions --
+           the clauses added to CC are not asserted and thus
+           cannot make themselves tautologies.
+       *)
+    (C.length cl > 1 || not (Trail.is_empty (C.trail cl))) &&
     Array.exists is_cc_trivial (C.lits cl)
 
 
