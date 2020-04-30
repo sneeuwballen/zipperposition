@@ -14,7 +14,7 @@ type selection_setting = Any | Minimal | Large
 type reasoning_kind    = 
     BoolReasoningDisabled | BoolCasesInference | BoolCasesDisabled 
   | BoolCasesSimplification | BoolCasesKeepParent
-  | BoolCasesEagerFar | BoolCasesEagerNear
+  | BoolCasesPreprocess
 
 let section = Util.Section.make ~parent:Const.section "booleans"
 
@@ -710,7 +710,7 @@ let case_bool vs c p =
 
 (* Apply repeatedly the transformation t[p] ↦ (p ⇒ t[⊤]) ∧ (¬p ⇒ t[⊥]) for each boolean parameter p≠⊤,⊥ that is closed in context where variables vs are bound. *)
 let rec case_bools_wrt vs t =
-  with_subterm_or_id t (fun _ s -> 
+  with_subterm_or_id t (fun _ s ->
       match view s with
       | App(f,ps) ->
         let t' = fold_left (case_bool vs) t ps in
@@ -723,7 +723,8 @@ let eager_cases_far stms =
       ~rule:(Proof.Rule.mk "eager_cases_far")
   in
   map_propositions ~proof (fun _ t ->
-      [with_subterm_or_id t (fun vs s -> match view s with
+      [with_subterm_or_id t (fun vs s -> 
+        match view s with
            | Bind((Forall|Exists) as q, v, b) ->
              let b' = case_bools_wrt (Var.Set.add vs v) b in
              if TypedSTerm.equal b b' then None else Some(replace s (bind ~ty:prop q v b') t)
@@ -735,19 +736,63 @@ let eager_cases_near stms =
   let proof s = Proof.Step.esa [Proof.Parent.from(Statement.as_proof_i s)]
       ~rule:(Proof.Rule.mk "eager_cases_near")
   in
-  let rec case_near t =
-    with_subterm_or_id t (fun vs s ->
-        match view s with
-        | AppBuiltin((And|Or|Imply|Not|Equiv|Xor|ForallConst|ExistsConst),_)
-        | Bind((Forall|Exists),_,_) -> None
-        | AppBuiltin((Eq|Neq), [x;y]) when is_bool x -> None
-        | _ when is_bool s ->
-          (* Case split a maximal boolean strict subterm of s which by selection of s isn't a direct subterm. *)
-          let s' = case_bool vs s (with_subterm_or_id s (fun _ -> CCOpt.if_(fun x -> not (TypedSTerm.equal x s) && is_bool x && not(is_T_F x)))) in
-          if TypedSTerm.equal s s' then None else Some(case_near(replace s s' t))
-        | _ -> None)
-  in
-  map_propositions ~proof (fun _ p -> [case_near p]) stms
+
+  let module T = TypedSTerm in
+
+  let find_fool_subterm p =
+    let rec aux ~top p =
+      let p_ty = T.ty_exn p in
+      match T.view p with
+      | AppBuiltin(hd, args)
+        when not top && Builtin.is_logical_op hd ||
+        Builtin.equal hd Builtin.Eq ||
+        Builtin.equal hd Builtin.Neq -> 
+        Some (T.Form.true_, T.Form.false_, p)
+      | Bind((Binder.Exists | Binder.Forall), var, body) when not top ->
+        Some (T.Form.true_, T.Form.false_, p)
+      | App(hd, args) when not top && T.Ty.is_prop p_ty  ->
+        Some (T.Form.true_, T.Form.false_, p)
+      | Const _ when not top && T.Ty.is_prop p_ty  ->
+        Some (T.Form.true_, T.Form.false_, p)
+      | App(hd,args) ->
+        CCOpt.map (fun (args_t,args_f, s) -> 
+          (T.app ~ty:p_ty hd args_t, T.app ~ty:p_ty hd args_f, s)
+        ) (aux_l args)
+      | _ -> None
+    and aux_l = function 
+    | [] -> None
+    | x :: xs ->
+      begin match aux ~top:false x with
+      | Some (x_t, x_f, s) -> Some(x_t::xs, x_f::xs, s)
+      | None -> 
+        begin match aux_l xs with 
+        | Some (xs_t, xs_f, s) -> Some (x::xs_t, x::xs_f, s)
+        | None -> None end
+      end in
+  aux ~top:true p in
+
+  
+  let unroll_fool p =
+    let rec aux p = 
+      let p_ty = T.ty_exn p in
+      match T.view p with 
+      | AppBuiltin(hd, args) ->
+        T.app_builtin ~ty:p_ty hd (List.map aux args)
+      | App(hd, args) ->
+        begin match find_fool_subterm p with
+        | Some(p_t, p_f, subterm) ->
+          let subterm' = aux subterm in
+          let if_true = T.Form.or_ [T.Form.not_ (subterm'); aux p_t] in
+          let if_false = T.Form.or_ [subterm'; aux p_f] in
+          T.Form.and_ [if_true; if_false]
+        | None -> p end
+      | Bind((Binder.Exists | Binder.Forall) as b, var , body) ->
+        let body' = aux body in
+        T.bind ~ty:p_ty b var body'
+      | _ -> p in
+    let res = aux p in
+    res in
+  map_propositions ~proof (fun _ p -> [unroll_fool p]) stms
 
 
 
@@ -783,13 +828,14 @@ let _quant_rename = ref false
    so (for now it is impossible to move them to Env
    since it is not even made at the moment) *)
 let preprocess_booleans stmts = (match !_bool_reasoning with
-    | BoolCasesEagerFar -> eager_cases_far
-    | BoolCasesEagerNear -> eager_cases_near
+    | BoolCasesPreprocess -> eager_cases_near
     | _ -> id
   ) (if !_quant_rename then name_quantifiers stmts else stmts)
 
 let preprocess_cnf_booleans stmts = match !_bool_reasoning with
-  | BoolCasesEagerFar | BoolCasesEagerNear -> post_eager_cases stmts
+  | BoolCasesPreprocess -> 
+    let res = post_eager_cases stmts in
+    res
   | _ -> stmts
 
 
@@ -827,7 +873,7 @@ let extension =
 
 let () =
   Options.add_opts
-    [ "--boolean-reasoning", Arg.Symbol (["off"; "no-cases"; "cases-inf"; "cases-simpl"; "cases-simpl-kp"; "cases-eager"; "cases-eager-near"], 
+    [ "--boolean-reasoning", Arg.Symbol (["off"; "no-cases"; "cases-inf"; "cases-simpl"; "cases-simpl-kp"; "cases-eager"; "cases-preprocess"], 
                                          fun s -> _bool_reasoning := 
                                              match s with 
                                              | "off" -> BoolReasoningDisabled
@@ -835,8 +881,7 @@ let () =
                                              | "cases-inf" -> BoolCasesInference
                                              | "cases-simpl" -> BoolCasesSimplification
                                              | "cases-simpl-kp" -> BoolCasesKeepParent
-                                             | "cases-eager" -> BoolCasesEagerFar
-                                             | "cases-eager-near" -> BoolCasesEagerNear
+                                             | "cases-preprocess" -> BoolCasesPreprocess
                                              | _ -> assert false), 
       " enable/disable boolean axioms";
       "--bool-subterm-selection",

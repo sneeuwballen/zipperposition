@@ -50,21 +50,25 @@ let as_lit_opt t = try Some (as_lit t) with _ -> None
 (* check whether the formula is already in CNF *)
 let as_clause f = match F.view f with
   | F.Or l -> List.map as_lit l
-  | F.Not _
-  | F.True
-  | F.False
-  | F.Atom _
-  | F.Neq _
-  | F.Eq _ -> [as_lit f]
   | F.And _
   | F.Equiv _
   | F.Xor _
   | F.Imply _
   | F.Forall _
   | F.Exists _ -> not_cnf_ f
+  | F.Eq(a,b) when T.Ty.is_prop (T.ty_exn a) -> not_cnf_ f
+  | F.Neq(a,b) when T.Ty.is_prop (T.ty_exn a) -> not_cnf_ f
+  | F.Not _
+  | F.True
+  | F.False
+  | F.Atom _
+  | F.Neq _
+  | F.Eq _ -> [as_lit f]
 
 let as_cnf f = match F.view f with
   | F.Or _ -> [as_clause f]
+  | F.Eq(a,b) when T.Ty.is_prop (T.ty_exn a) -> not_cnf_ f
+  | F.Neq(a,b) when T.Ty.is_prop (T.ty_exn a) -> not_cnf_ f
   | F.Not _
   | F.True
   | F.False
@@ -544,14 +548,16 @@ let rec nnf f =
   | F.True
   | F.False -> f
   | F.Neq (a,b) ->
-    if T.equal a b then F.false_ else f 
+    if T.equal a b then F.false_ 
+    else if T.Ty.is_prop (T.ty_exn a) then nnf (T.Form.xor a b) else f
   | F.Eq (a,b) ->
-    if T.equal a b then F.true_ else f
+    if T.equal a b then F.true_ 
+    else if T.Ty.is_prop (T.ty_exn a) then nnf (T.Form.equiv a b) else f
   | F.Not f' ->
     begin match F.view f' with
       | F.Not f'' -> nnf f''
-      | F.Neq (a,b) -> if T.equal a b then F.false_ else f
-      | F.Eq (a,b) -> if T.equal a b then F.true_ else f
+      | F.Neq (a,b) -> nnf (T.Form.eq_or_equiv a b)
+      | F.Eq (a,b) -> nnf (T.Form.neq_or_xor a b)
       | F.And l ->
         F.or_ (List.map (fun f -> nnf (F.not_ f)) l)
       | F.Or l ->
@@ -710,25 +716,26 @@ let estimate_num_clauses ~pos f =
 (* atomic formula, or forall/exists/not an atomic formula (1 literal) *)
 let rec will_yield_lit f = 
   let v = F.view f in
+  let is_tf f =
+      match F.view f with
+      | F.True | F.False -> true
+      | _ -> false in
   match v with
   | F.Not f'
   | F.Exists (_, f')
   | F.Forall (_, f') -> will_yield_lit f'
+  | F.And _
+  | F.Or _
+  | F.Imply _ -> false 
+  | F.Equiv(a,b)
+  | F.Xor(a,b) -> is_tf a && is_tf b
+  | F.Eq(a,b) when T.Ty.is_prop (T.ty_exn a) -> is_tf a && is_tf b
+  | F.Neq(a,b) when T.Ty.is_prop (T.ty_exn a) -> is_tf a && is_tf b
   | F.Eq _
   | F.Neq _
   | F.Atom _
   | F.True
   | F.False -> true
-  | F.And _
-  | F.Or _
-  | F.Imply _ -> false 
-  | F.Equiv(a,b)
-  | F.Xor(a,b) -> 
-    let is_tf f =
-      match F.view f with
-      | F.True | F.False -> true
-      | _ -> false in
-    is_tf a && is_tf b
 
 
 (* introduce definitions for sub-formulas of [f], is needed. This might
@@ -783,12 +790,7 @@ let introduce_defs ~ctx ~is_pos stmt f =
       f'
     ) else f
   (* introduce definitions for subterms *)
-  and maybe_rename_subformulas ~polarity a b f = match F.view f with
-    | F.True
-    | F.False
-    | F.Atom _
-    | F.Eq _
-    | F.Neq _ -> f
+  and maybe_rename_subformulas ~polarity a b f = match F.view f with 
     | F.And l ->
       let l' =
         List.mapi
@@ -821,6 +823,17 @@ let introduce_defs ~ctx ~is_pos stmt f =
         maybe_rename ~polarity a' b' f2
       in
       F.imply f1' f2'
+    | F.Eq(f1,f2) when T.Ty.is_prop (T.ty_exn f1) ->
+      let f1' =
+        let a' = E.(a */ p false f2 +/ b */ p true f2) in
+        let b' = E.(a */ p true f2 +/ b */ p false f2) in
+        maybe_rename ~polarity:`Both a' b' f1
+      and f2' =
+        let a' = E.(a */ p false f1 +/ b */ p true f1) in
+        let b' = E.(a */ p true f1 +/ b */ p false f1) in
+        maybe_rename ~polarity:`Both a' b' f2
+      in
+      F.equiv f1' f2'
     | F.Equiv (f1, f2) ->
       let f1' =
         let a' = E.(a */ p false f2 +/ b */ p true f2) in
@@ -832,6 +845,18 @@ let introduce_defs ~ctx ~is_pos stmt f =
         maybe_rename ~polarity:`Both a' b' f2
       in
       F.equiv f1' f2'
+    | F.Neq (f1, f2) when T.Ty.is_prop (T.ty_exn f1) ->
+      (* we consider that f1 has reverted polarity *)
+      let f1' =
+        let b' = E.(a */ p false f2 +/ b */ p true f2) in
+        let a' = E.(a */ p true f2 +/ b */ p false f2) in
+        maybe_rename ~polarity:`Both a' b' f1
+      and f2' =
+        let a' = E.(a */ p true f1 +/ b */ p false f1) in
+        let b' = E.(a */ p false f1 +/ b */ p true f1) in
+        maybe_rename ~polarity:`Both a' b' f2
+      in
+      F.xor f1' f2'
     | F.Xor (f1, f2) ->
       (* we consider that f1 has reverted polarity *)
       let f1' =
@@ -848,6 +873,11 @@ let introduce_defs ~ctx ~is_pos stmt f =
       F.forall var (maybe_rename ~polarity a b f')
     | F.Exists (var, f') ->
       F.exists var (maybe_rename ~polarity a b f')
+    | F.True
+    | F.False
+    | F.Atom _
+    | F.Eq _
+    | F.Neq _ -> f
   (* product of all (p ~pos x) for x in l if idx(x) != except *)
   and prod_p ~pos l i ~except = match l with
     | [] -> E.Exactly 1
@@ -1025,8 +1055,9 @@ let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
     (* preprocessing *)
     let f = List.fold_left (|>) f preprocess in
     (* introduce definitions? *)
+
     if disable_renaming || is_clause f || is_rw stmt
-    then f
+    then (CCFormat.printf "not introducing defs %b %b %b @." disable_renaming (is_clause f) (is_rw stmt) ; f)
     else introduce_defs ~is_pos:(not is_goal) ~ctx stmt f
   in
   let process_def stmt d = match d with

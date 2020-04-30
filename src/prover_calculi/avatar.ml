@@ -179,7 +179,10 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
 
   (* if c.lits = [], negate c.trail *)
   let check_empty c =
-    if Array.length (C.lits c) = 0 && !filter_absurd_trails_ (C.trail c)
+    (* trail can be empty if clause is simplified into empty clause *)
+    if Array.length (C.lits c) = 0 
+       && not (Trail.is_empty (C.trail c))
+       && !filter_absurd_trails_ (C.trail c)
     then (
       assert (not (Trail.is_empty (C.trail c)));
       let b_clause =
