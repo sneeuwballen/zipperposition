@@ -534,7 +534,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let prim_enum_tf c =
     prim_enum_ ~mode:`TF c
 
-  let choice_ops = ref Term.Set.empty
+  let choice_ops = ref Term.Map.empty
   let new_choice_counter = ref 0
 
   let insantiate_choice ?(proof_constructor=Proof.Step.inference) ?(inst_vars=true) ?(choice_ops=choice_ops) c =
@@ -544,7 +544,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
     let is_choice_subterm t = 
       match T.view t with
-      | T.App(hd, [arg]) when T.is_var hd || Term.Set.mem hd !choice_ops ->
+      | T.App(hd, [arg]) when T.is_var hd || Term.Map.mem hd !choice_ops ->
         let ty = T.ty arg in
         Type.is_fun ty && List.length (Type.expected_args ty) = 1 &&
         Type.equal (Term.ty t) (List.hd (Type.expected_args ty)) &&
@@ -569,7 +569,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       assert(T.DB.is_closed res);
       res in
 
-    let choice_inst_of_hd hd arg =
+    let choice_inst_of_hd ~def_clause hd arg =
       let arg_ty = Term.ty arg in
       let ty = List.hd (Type.expected_args arg_ty) in
       let x = T.var @@ HVar.fresh_cnt ~counter:max_var ~ty () in
@@ -578,7 +578,10 @@ module Make(E : Env.S) : S with module Env = E = struct
       let new_lits = [Literal.mk_prop choice_x false;
                       Literal.mk_prop choice_arg true] in
       let arg_str = CCFormat.sprintf "%a" T.TPTP.pp arg in
-      let proof = proof_constructor ~rule:(Proof.Rule.mk ("inst_choice" ^ arg_str)) [] in
+      let parents = match def_clause with
+        | Some def -> [C.proof_parent def; C.proof_parent c]
+        | None -> [C.proof_parent c] in
+      let proof = proof_constructor ~rule:(Proof.Rule.mk ("inst_choice" ^ arg_str)) parents in
       C.create ~penalty:1 ~trail:Trail.empty new_lits proof in
 
 
@@ -590,14 +593,15 @@ module Make(E : Env.S) : S with module Env = E = struct
       Ctx.add_signature (Signature.declare (C.Ctx.signature ()) new_ch_id ty);
       Util.debugf 1 "new choice for type %a: %a(%a).\n" 
         (fun k -> k Type.pp ty T.pp new_ch_const Type.pp (T.ty new_ch_const));
-      choice_ops := Term.Set.add new_ch_const !choice_ops;
+      choice_ops := Term.Map.add new_ch_const None !choice_ops;
       new_ch_const in
 
-    let generate_instances hd arg =
-      choice_inst_of_hd hd arg 
-      :: choice_inst_of_hd hd (neg_trigger arg)
+    (* def_clause is the clause that defined the symbol hd *)
+    let generate_instances ~def_clause hd arg =
+      choice_inst_of_hd ~def_clause hd arg 
+      :: choice_inst_of_hd ~def_clause hd (neg_trigger arg)
       :: (if not @@  Env.flex_get k_generalize_choice_trigger then []
-          else [choice_inst_of_hd hd (generalize_trigger arg)]) in
+          else [choice_inst_of_hd ~def_clause hd (generalize_trigger arg)]) in
 
     let build_choice_inst t =
       match T.view t with
@@ -605,13 +609,15 @@ module Make(E : Env.S) : S with module Env = E = struct
         if Term.is_var hd && inst_vars then (
           let hd_ty = Term.ty hd in
           let choice_ops = 
-            Term.Set.filter (fun t -> Type.equal (Term.ty t) hd_ty) !choice_ops
-            |> Term.Set.to_list
-            |> (fun l -> if CCList.is_empty l then [new_choice_op hd_ty] else l) in
-          CCList.flat_map (fun hd -> generate_instances hd arg) 
+            Term.Map.filter (fun t _ -> Type.equal (Term.ty t) hd_ty) !choice_ops
+            |> Term.Map.to_list
+            |> (fun l -> if CCList.is_empty l then [new_choice_op hd_ty, None] else l) in
+          CCList.flat_map (fun (hd,def_clause) -> generate_instances ~def_clause hd arg) 
             choice_ops
-        ) else if Term.Set.mem hd !choice_ops then generate_instances hd arg
-          else []
+        ) else (
+          match Term.Map.find_opt hd !choice_ops with
+          | Some def_clause ->  generate_instances ~def_clause hd arg
+          | None -> [])
       | _ -> assert (false) in
 
     C.Seq.terms c 
@@ -692,20 +698,21 @@ module Make(E : Env.S) : S with module Env = E = struct
         let p_ch_p = CCArray.find_map (extract_p_choice_p p) (C.lits c) in
         begin match p_ch_p with
         | Some sym ->
-          choice_ops := Term.Set.add sym !choice_ops;
-          let new_cls = 
-            Env.get_active ()
-            |> Iter.flat_map_l (fun pas_cl -> 
-                if C.id pas_cl = C.id c then []
-                else (
-                insantiate_choice ~inst_vars:false 
-                                  ~choice_ops:(ref (Term.Set.singleton sym)) 
-                                  pas_cl
-                ))
-            |> Iter.map Combs.maybe_conv_lams
-          in
-          
-          Env.add_passive new_cls;
+          if not (Term.Map.mem sym !choice_ops) then (
+            choice_ops := Term.Map.add sym (Some c) !choice_ops;
+            let new_cls = 
+              Env.get_active ()
+              |> Iter.flat_map_l (fun pas_cl -> 
+                  if C.id pas_cl = C.id c then []
+                  else (
+                  insantiate_choice ~inst_vars:false 
+                                    ~choice_ops:(ref (Term.Map.singleton sym (Some c))) 
+                                    pas_cl
+                  ))
+              |> Iter.map Combs.maybe_conv_lams
+            in
+            
+            Env.add_passive new_cls);
           C.mark_redundant c;
           true
         | None -> false end
