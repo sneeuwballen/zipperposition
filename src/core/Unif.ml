@@ -1157,24 +1157,30 @@ module FO = struct
     if S.mem subst (var :> InnerTerm.t HVar.t Scoped.t) then update ~check subst var t
     else bind ~check subst var t
 
+  let is_poly t =
+    Term.Seq.vars t
+    |> Iter.exists (fun t -> Type.is_tType (HVar.ty t))
+
   let unify_full ?(subst=US.empty) =
     fun sc1 sc2 -> 
       let ta, sca = sc1 in 
       let tb, scb = sc2 in
 
       if(not (Term.DB.is_closed ta) || not (Term.DB.is_closed tb)) then (
-         let sk_a, sk_a_subs = Term.DB.skolemize_loosely_bound ta in
-         let sk_b, sk_b_subs = Term.DB.skolemize_loosely_bound tb in
-         let res = (unify_full :> ?subst:unif_subst -> term Scoped.t -> term Scoped.t -> unif_subst)
-                   ~subst (Scoped.make sk_a sca) (Scoped.make sk_b scb) in
-         let sk_a_rev = Term.IntMap.fold (fun k v acc -> Term.Map.add v k acc) sk_a_subs Term.Map.empty in
-         let sk_b_rev = Term.IntMap.fold (fun k v acc -> Term.Map.add v k acc) sk_b_subs Term.Map.empty in
-         let sk_rev_union = Term.Map.union (fun _ _ _ -> raise (Invalid_argument "keys must be unique "))
-                           sk_a_rev sk_b_rev in
-         let subst = Unif_subst.subst res in 
-         let mapped = Subst.FO.map (fun t -> Term.DB.unskolemize sk_rev_union t) subst in
-         let res' = Unif_subst.make mapped (Unif_subst.constr_l res) in
-         res'  
+        if is_poly ta || is_poly tb then raise Fail;
+
+        let sk_a, sk_a_subs = Term.DB.skolemize_loosely_bound ta in
+        let sk_b, sk_b_subs = Term.DB.skolemize_loosely_bound tb in
+        let res = (unify_full :> ?subst:unif_subst -> term Scoped.t -> term Scoped.t -> unif_subst)
+                  ~subst (Scoped.make sk_a sca) (Scoped.make sk_b scb) in
+        let sk_a_rev = Term.IntMap.fold (fun k v acc -> Term.Map.add v k acc) sk_a_subs Term.Map.empty in
+        let sk_b_rev = Term.IntMap.fold (fun k v acc -> Term.Map.add v k acc) sk_b_subs Term.Map.empty in
+        let sk_rev_union = Term.Map.union (fun _ _ _ -> raise (Invalid_argument "keys must be unique "))
+                          sk_a_rev sk_b_rev in
+        let subst = Unif_subst.subst res in 
+        let mapped = Subst.FO.map (fun t -> Term.DB.unskolemize sk_rev_union t) subst in
+        let res' = Unif_subst.make mapped (Unif_subst.constr_l res) in
+        res'  
       )
       else (
          (unify_full :> ?subst:unif_subst -> term Scoped.t -> term Scoped.t -> unif_subst)
@@ -1187,6 +1193,7 @@ module FO = struct
       let ta, sca = sc1 in 
       let tb, scb = sc2 in  
       if(not (Term.DB.is_closed ta) || not (Term.DB.is_closed tb)) then (
+        if is_poly ta || is_poly tb then raise Fail;
         let sk_a, sk_a_subs = Term.DB.skolemize_loosely_bound ta in
         let sk_b, sk_b_subs = Term.DB.skolemize_loosely_bound tb in
         let res = (unify_syn :> ?subst:subst -> term Scoped.t -> term Scoped.t -> subst)

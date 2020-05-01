@@ -278,7 +278,7 @@ let bool_encode_term t_orig  =
             assert (T.equal (T.ty_exn x) (T.ty_exn y));
             let x = aux x and y = aux y in
             app_bool impl_term [x;y]
-          | T.AppBuiltin (((ForallConst|ExistsConst) as b), [x]) ->
+          | T.AppBuiltin (((ForallConst|ExistsConst) as b), ([x]|[_;x])) ->
             let x = aux x in
             let _, args, _ = T.Ty.unfold (T.ty_exn x) in
             assert(List.length args = 1);
