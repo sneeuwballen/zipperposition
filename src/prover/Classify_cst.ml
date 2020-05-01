@@ -34,7 +34,7 @@ let classify id =
          let open CCOpt.Infix in
          ID.as_skolem id >>= function
          | ID.K_ind -> Some (Inductive_cst None)
-         | ID.K_normal -> Some Skolem);
+         | ID.K_normal | ID.K_after_cnf -> Some Skolem);
       (Ind_ty.as_projector |>> fun p -> Projector (Ind_ty.projector_id p));
       (Rewrite.as_defined_cst |>> fun cst ->
        DefinedCst (Rewrite.Defined_cst.level cst, Rewrite.Defined_cst.rules cst));

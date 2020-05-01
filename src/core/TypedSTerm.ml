@@ -1570,6 +1570,7 @@ let simplify_formula t =
       | AppBuiltin(False, []) -> F.true_
       | _ -> app_builtin  ~ty Not [aux s] end
     | AppBuiltin( (Eq|Equiv) as b, [x;y]) when Ty.is_prop (ty_exn x) ->
+      assert(Ty.is_prop (ty_exn y));
       let x = aux x and y  = aux y in
       if equal x y then F.true_
       else if equal x F.true_  then y

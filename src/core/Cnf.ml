@@ -1057,7 +1057,7 @@ let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
     (* introduce definitions? *)
 
     if disable_renaming || is_clause f || is_rw stmt
-    then (CCFormat.printf "not introducing defs %b %b %b @." disable_renaming (is_clause f) (is_rw stmt) ; f)
+    then (f)
     else introduce_defs ~is_pos:(not is_goal) ~ctx stmt f
   in
   let process_def stmt d = match d with

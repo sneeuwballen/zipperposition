@@ -687,7 +687,7 @@ let mk_fresh_skolem ?(prefix="_fresh_sk") =
     let i = CCRef.incr_then_get n in
     (** fresh skolem **)
     let id = ID.makef "#%s%d" prefix i in
-    ID.set_payload id (ID.Attr_skolem ID.K_normal);
+    ID.set_payload id (ID.Attr_skolem ID.K_after_cnf);
     let ty_vars, vars =
       List.partition (fun v -> Type.is_tType (HVar.ty v)) vars
     in

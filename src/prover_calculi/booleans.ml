@@ -776,7 +776,25 @@ let eager_cases_near stms =
     let rec aux p = 
       let p_ty = T.ty_exn p in
       match T.view p with 
-      | AppBuiltin(hd, args) ->
+      | AppBuiltin(((Builtin.Neq|Builtin.Eq) as hd), [a;b]) when not (T.Ty.is_prop (T.ty_exn a)) ->
+        let cons = if hd = Neq then T.Form.neq else T.Form.eq in
+        begin match find_fool_subterm a with 
+        | None ->
+          begin match find_fool_subterm b with 
+          | None -> p
+          | Some(b_t, b_f, subterm) ->
+            let subterm' = aux subterm in
+            let if_true = T.Form.or_ [T.Form.not_ (subterm'); aux @@ cons a b_t] in
+            let if_false = T.Form.or_ [subterm'; aux @@ cons a b_f] in
+            T.Form.and_ [if_true; if_false]
+          end
+        | Some(a_t, a_f, subterm) ->
+          let subterm' = aux subterm in
+          let if_true = T.Form.or_ [T.Form.not_ (subterm'); aux @@ cons a_t b] in
+          let if_false = T.Form.or_ [subterm'; aux @@ cons a_f b] in
+          T.Form.and_ [if_true; if_false]
+        end
+      | AppBuiltin(hd, args) -> 
         T.app_builtin ~ty:p_ty hd (List.map aux args)
       | App(hd, args) ->
         begin match find_fool_subterm p with

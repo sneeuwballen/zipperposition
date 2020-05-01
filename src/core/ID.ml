@@ -111,7 +111,7 @@ exception Attr_prefix of string
 
 exception Attr_parameter of int
 
-type skolem_kind = K_normal | K_ind (* inductive *)
+type skolem_kind = K_normal | K_after_cnf | K_ind (* inductive *)
 
 exception Attr_skolem of skolem_kind
 

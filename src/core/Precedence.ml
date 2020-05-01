@@ -61,6 +61,12 @@ let get_arity ~sig_ref s =
     snd (Signature.arity !sig_ref s)
   with Not_found -> 0
 
+let is_post_cnf_skolem ~sig_ref s =
+  not (Signature.mem !sig_ref s)
+  || (match ID.as_skolem s with 
+      | Some ID.K_after_cnf -> true
+      | _ -> false)
+
 let on_signature_update = Signal.create()
 
 let update_signature prev_sig signature =
@@ -73,20 +79,27 @@ module Constr = struct
 
   type prec_fun = signature:Signature.t -> ID.t Iter.t -> [`partial] t
 
+  (* In the following functions, fresh symbols are made the smallest.
+     However, newer fresh symbols are placed after older fresh symbols
+     (using monotonicity of the value of ID.int)
+   *)
+
   let arity ~signature _ s1 s2 =
     let _sig = ref signature in
     Signal.on on_signature_update (update_signature _sig);
     let open CCOrd in
     (* bigger arity means bigger symbol *)
-    (get_arity ~sig_ref:_sig s1 - get_arity ~sig_ref:_sig s2)
+    Bool.compare (is_post_cnf_skolem ~sig_ref:_sig s1) (is_post_cnf_skolem ~sig_ref:_sig s2)
+    <?> (CCInt.compare, get_arity ~sig_ref:_sig s1, get_arity ~sig_ref:_sig s2)
     <?> (ID.compare, s1, s2)
 
   let inv_arity ~signature _ s1 s2 =
     let _sig = ref signature in
     Signal.on on_signature_update (update_signature _sig);
     let open CCOrd in
-    (get_arity ~sig_ref:_sig s2 - get_arity ~sig_ref:_sig s1)
-    <?> (ID.compare, s2, s1)
+    Bool.compare (is_post_cnf_skolem ~sig_ref:_sig s1) (is_post_cnf_skolem ~sig_ref:_sig s2)
+    <?> (CCInt.compare, get_arity ~sig_ref:_sig s2, get_arity ~sig_ref:_sig s1)
+    <?> (ID.compare, s1, s2)
 
   let invfreqhack ~signature seq =
     let _sig = ref signature in
@@ -122,7 +135,8 @@ module Constr = struct
       let open CCOrd in
       (* criteria as in generate_invfreq_hack_precedence -- E source *)
       let categorize s =
-        if is_nullary _sig s then (min_int, - (find_freq s), ID.id s)
+        if is_post_cnf_skolem ~sig_ref:_sig s then (min_int, ID.id s, 0)
+        else if is_nullary _sig s then (min_int, - (find_freq s), ID.id s)
         else if is_unary_max_freq _sig s then (max_int, 0, ID.id s)
         else (- (find_freq s), get_arity ~sig_ref:_sig s, ID.id s) in
       let (a1,a2,a3), (b1,b2,b3) = CCPair.map_same categorize (s1, s2) in
@@ -150,7 +164,8 @@ module Constr = struct
       let open CCOrd in
       (* criteria as in generate_invfreq_hack_precedence -- E source *)
       let categorize s =
-        if is_nullary _sig s then (min_int, - (find_freq s), ID.id s)
+        if is_post_cnf_skolem ~sig_ref:_sig s then (min_int, ID.id s, 0)
+        else if is_nullary _sig s then (min_int, - (find_freq s), ID.id s)
         else (- (find_freq s), get_arity ~sig_ref:_sig s, ID.id s) in
       let (a1,a2,a3), (b1,b2,b3) = CCPair.map_same categorize (s1, s2) in
       CCInt.compare a1 b1
@@ -171,6 +186,8 @@ module Constr = struct
       let open CCOrd in
       (* criteria as in generate_invfreq_hack_precedence -- E source *)
       let categorize s =
+        if is_post_cnf_skolem ~sig_ref:(ref (signature)) s then (min_int, ID.id s, 0)
+        else 
         ((if Signature.sym_in_conj s signature then 1 else 0),
           find_freq s, ID.id s) in
       let (a1,a2,a3), (b1,b2,b3) = CCPair.map_same categorize (s1, s2) in
@@ -188,13 +205,17 @@ module Constr = struct
       if Iter.length seq == 0 then 10
       else Iter.sum (ID.Tbl.values tbl) / Iter.length (ID.Tbl.values tbl) in
     let find_freq s = ID.Tbl.get_or ~default:avg tbl s in
+    let sig_ref = ref signature in
     (* compare by inverse frequency (higher frequency => smaller) *)
     fun s1 s2 ->
       let open CCOrd in
       let n1 = find_freq s1 in
       let n2 = find_freq s2 in
-      CCInt.compare n2 n1
-      <?> (ID.compare, s2, s1)
+
+      Bool.compare (is_post_cnf_skolem ~sig_ref s1) (is_post_cnf_skolem ~sig_ref s2)
+      (* post-cnf symbols have the same value of n2 and n1 *)
+      <?> (CCInt.compare, n2, n1)
+      <?> (ID.compare, s1, s2)
   
   let unary_first ~signature _ s1 s2 =
     let open CCOrd in
@@ -204,10 +225,11 @@ module Constr = struct
     
     let is_unary _sig s = get_arity ~sig_ref:_sig s == 1 in
     let weight _sig s =
-      if is_unary _sig s then max_int
+      if is_post_cnf_skolem ~sig_ref:_sig s then min_int
+      else if is_unary _sig s then max_int
       else if not (Signature.mem !_sig s) then max_int - 1
       else get_arity ~sig_ref:_sig s  in
-    weight _sig s1 - weight _sig s2
+    CCInt.compare (weight _sig s1) (weight _sig s2)
     <?> (ID.compare, s1, s2)
 
   let const_first ~signature _ s1 s2 =
@@ -218,10 +240,11 @@ module Constr = struct
 
     let is_const _sig s = get_arity ~sig_ref:_sig s == 0 in
     let weight _sig s =
-      if not (Signature.mem !_sig s) then max_int -1
+      if is_post_cnf_skolem ~sig_ref:_sig s then min_int
+      else if not (Signature.mem !_sig s) then max_int -1
       else if is_const _sig s then max_int
       else get_arity ~sig_ref:_sig s  in
-    weight _sig s1  - weight _sig s2
+    CCInt.compare (weight _sig s1) (weight _sig s2)
     <?> (ID.compare, s1, s2)
 
   let prec_fun_of_str name =
