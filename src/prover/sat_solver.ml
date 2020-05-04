@@ -26,7 +26,7 @@ let errorf msg = Util.errorf ~where:"sat_solver" msg
 
 let sat_dump_file_ = ref ""
 let sat_log_file = ref ""
-let sat_compact_ = ref false
+let sat_compact_ = ref true
 let sat_pp_model_ = ref false
 
 module type S = Sat_solver_intf.S
