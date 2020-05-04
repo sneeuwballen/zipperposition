@@ -360,6 +360,28 @@ let fold_eqn ?(both=true) ?sign ~ord ~eligible lits k =
   in
   aux 0
 
+let fold_eqn_simple ?sign lits k =
+  let sign_ok s = match sign with
+    | None -> true
+    | Some sign -> sign = s
+  in
+  let rec aux i =
+    if i = Array.length lits then ()
+    else (
+      begin match lits.(i) with
+        | Lit.Equation (l,r,sign) when sign_ok sign ->
+          k (l, r, sign, Position.(arg i @@ left @@ stop))
+        | Lit.Equation _
+        | Lit.Int _
+        | Lit.Rat _
+        | Lit.True
+        | Lit.False -> ()
+      end;
+      aux (i+1)
+    )
+  in
+  aux 0
+
 let fold_arith ~eligible lits k =
   let rec aux i =
     if i = Array.length lits then ()

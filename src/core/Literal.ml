@@ -53,7 +53,7 @@ let equal_com l1 l2 =
 let no_prop_invariant = 
   function 
   | Equation (lhs,rhs,sign) -> 
-    if (T.equal rhs T.false_) then (
+    if (T.equal rhs T.false_) || T.is_true_or_false lhs then (
       CCFormat.printf "failed for: @[%a@] @[%a@] @[%b@]@." T.pp lhs T.pp rhs sign;
       false
     ) else true

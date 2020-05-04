@@ -164,6 +164,9 @@ val fold_eqn : ?both:bool -> ?sign:bool -> ord:Ordering.t ->
     if [sign = true], then only positive equations are visited; if it's
       [false], only negative ones; if it's not defined, both. *)
 
+val fold_eqn_simple : ?sign:bool -> t -> (term * term * bool * Position.t) Iter.t
+(** Like previous version but simpler: it visits all equations only in the orientation l = r  *)
+
 val fold_arith :
   eligible:(int -> Literal.t -> bool) ->
   t -> Int_lit.t Position.With.t Iter.t

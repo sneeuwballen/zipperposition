@@ -140,7 +140,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           let subst = unif_alg l r in
           assert(not @@ Unif_subst.has_constr subst);
           let renaming = Subst.Renaming.create () in
-          let new_lits = 
+          let new_lits =
             CCArray.except_idx (C.lits c) i
             |> CCArray.of_list
             |> (fun l -> 
@@ -203,9 +203,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         ) terms))
 
   let fold_lits c = 
-    Ls.fold_eqn 
-      ~both:false ~ord:(E.Ctx.ord ()) ~eligible:(C.Eligible.always) 
-      (C.lits c)
+    Ls.fold_eqn_simple (C.lits c)
 
   let proof ~constructor ~name ~parents c =
     constructor ~rule:(Proof.Rule.mk name)
@@ -356,7 +354,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     Util.debugf ~section 2 "lazy_cnf(@[%a@])@." (fun k -> k C.pp c);
 
     fold_lits c
-    |> Iter.fold_while ( fun _ (lhs, rhs, sign, pos) -> 
+    |> Iter.fold_while ( fun _ (lhs, rhs, sign, pos) ->
       let i,_ = Ls.Pos.cut pos in
       if T.equal rhs T.true_ then (
         Util.debugf ~section 2 "  subformula:%d:@[%a@]" (fun k -> k i L.pp (C.lits c).(i) );
@@ -427,7 +425,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           let rule_name = 
             CCFormat.sprintf "lazy_cnf_%s" (if sign then "equiv" else "xor") in
           
-          Util.debugf ~section 2 "  subeq:%d:@[%a@]" (fun k -> k i L.pp (C.lits c).(i) );
+          Util.debugf ~section 2 "  subeq:%d:@[%a %s= %a@]" (fun k -> k i T.pp lhs (if sign then "" else "~") T.pp rhs );
           if sign then (
             return @@ (
               mk_or ~proof_cons ~rule_name [T.Form.not_ lhs; rhs] c i 

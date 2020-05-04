@@ -127,25 +127,32 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~signature ~offset 
       | `Pragmatic | `Simple -> 
         let n = List.length vars in
         let db_vars = List.mapi (fun i ty -> T.bvar ~ty (n-i-1)) ty_args in
+        let project db_i =
+          let db_ty_args, _ = Type.open_fun (T.ty db_i) in
+          let new_args = List.mapi (fun i ty_arg -> 
+            let var_ty = Type.arrow ty_args ty_arg in
+            T.app (T.var (HVar.make ~ty:var_ty (offset+i+1))) db_vars
+          ) db_ty_args in
+          T.app db_i new_args in
         CCList.mapi (fun i db_i ->
-            let projs = if Type.is_prop (Term.ty db_i) then (
-                [T.fun_l ty_args db_i]
-              ) else [] in
-            let log_ops = 
-              CCList.mapi (fun j db_j ->
-                  if i < j && Type.equal (T.ty db_i) (T.ty db_j) then (
-                    let res = [T.fun_l ty_args (T.Form.eq db_i db_j);
-                               T.fun_l ty_args (T.Form.neq db_i db_j);] in
-                    if Type.is_prop (T.ty db_i) then
-                      res @
-                      [T.fun_l ty_args (T.Form.and_ db_i db_j);
-                       T.fun_l ty_args (T.Form.or_ db_i db_j);]
-                    else res
-                  )
-                  else []) 
-                db_vars
-              |> CCList.flatten in
-            projs @ log_ops) 
+          let projs = if Type.returns_prop (Term.ty db_i) then (
+              [T.fun_l ty_args (project db_i)]
+            ) else [] in
+          let log_ops = 
+            CCList.mapi (fun j db_j ->
+                if i < j && Type.equal (T.ty db_i) (T.ty db_j) then (
+                  let res = [T.fun_l ty_args (T.Form.eq (project db_i) (project db_j));
+                              T.fun_l ty_args (T.Form.neq (project db_i) (project db_j));] in
+                  if Type.is_prop (T.ty db_i) then
+                    res @
+                    [T.fun_l ty_args (T.Form.and_ (project db_i) (project db_j));
+                      T.fun_l ty_args (T.Form.or_ (project db_i) (project db_j));]
+                  else res
+                )
+                else []) 
+              db_vars
+            |> CCList.flatten in
+          projs @ log_ops) 
           db_vars
         |> CCList.flatten
       | _ -> []
