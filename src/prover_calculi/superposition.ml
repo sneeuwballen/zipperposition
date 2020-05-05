@@ -224,7 +224,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     if C.proof_depth cl < Env.flex_get k_trigger_bool_inst then (
       let new_triggers = (get_triggers cl) in
       if not (Iter.is_empty new_triggers) then (
-        Iter.iter (fun t -> 
+        Iter.iter (fun t ->
+          let triggers = (Type.Map.get_or ~default:[] (T.ty t) !_trigger_bools) in
+          if not (CCList.mem ~eq:T.equal t triggers) then (
           _trigger_bools := Type.Map.update (T.ty t) (function 
             | None -> Some [t]
             | Some res -> Some (t :: res)
@@ -232,7 +234,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           Type.Map.get_or ~default:[] (T.ty t) !_cls_w_pred_vars
           |> CCList.map (fun (clause,var) -> instantiate_w_bool ~clause ~var ~trigger:t)
           |> CCList.to_iter
-          |> Env.add_passive
+          |> Env.add_passive)
         ) new_triggers
       ));
     Signal.ContinueListening
