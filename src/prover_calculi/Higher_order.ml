@@ -55,6 +55,7 @@ let k_diff_const = Flex_state.create_key()
 let k_use_diff_for_neg_ext = Flex_state.create_key()
 let k_generalize_choice_trigger = Flex_state.create_key ()
 let k_prim_enum_simpl = Flex_state.create_key ()
+let k_prim_enum_early_bird = Flex_state.create_key ()
 
 
 type prune_kind = [`NoPrune | `OldPrune | `PruneAllCovers | `PruneMaxCover]
@@ -920,6 +921,24 @@ module Make(E : Env.S) : S with module Env = E = struct
     let lits = [Literal.mk_prop px false; Literal.mk_prop p_choice true] in
     Env.C.create ~penalty:1 ~trail:Trail.empty lits Proof.Step.trivial
 
+  let early_bird_prim_enum cl var =
+    assert(T.is_var var);
+    let offset = C.Seq.vars cl |> T.Seq.max_var |> succ in
+    let mode = Env.flex_get k_ho_prim_mode in
+    let sc = 0 in
+    
+    HO_unif.enum_prop 
+      ~enum_cache:(Env.flex_get k_prim_enum_terms) 
+      ~signature:(Ctx.signature ()) ~mode ~offset (T.as_var_exn var,sc)
+    |> CCList.map (fun (subst,_) -> 
+      let renaming = Subst.Renaming.create () in
+      let lits = Literals.apply_subst renaming subst (C.lits cl, sc) in
+      let proof =
+        Proof.Step.inference ~rule:(Proof.Rule.mk "ho.refine.early.bird") ~tags:[Proof.Tag.T_ho]
+          [C.proof_parent_subst renaming (cl, sc) subst] in
+      C.create_a lits proof ~penalty:(C.penalty cl) ~trail:(C.trail cl))
+    |> CCList.to_seq
+    |> Env.add_passive
 
   type fixed_arg_status =
     | Always of T.t (* This argument is always the given term in all occurences *)
@@ -1385,13 +1404,20 @@ module Make(E : Env.S) : S with module Env = E = struct
         Env.add_unary_inf "simple_projection" (simple_projection ~penalty_inc ~max_depth);
       );
 
-      begin match Env.flex_get k_ho_prim_mode with
-        | `None -> ()
-        | mode ->
-          if Env.flex_get k_prim_enum_simpl then (
-            Env.add_single_step_multi_simpl_rule (prim_enum_simpl ~mode)
-          ) else Env.add_unary_inf "ho_prim_enum" (prim_enum ~mode);
-      end;
+      if not (Env.flex_get k_prim_enum_early_bird) then (
+        begin match Env.flex_get k_ho_prim_mode with
+          | `None -> ()
+          | mode ->
+            if Env.flex_get k_prim_enum_simpl then (
+              Env.add_single_step_multi_simpl_rule (prim_enum_simpl ~mode)
+            ) else Env.add_unary_inf "ho_prim_enum" (prim_enum ~mode);
+        end
+      ) else (
+        Signal.on Env.on_pred_var_elimination (fun (cl,var) ->
+          early_bird_prim_enum cl var;
+          Signal.ContinueListening
+        )
+      );
       if Env.flex_get k_ext_axiom then
         Env.ProofState.PassiveSet.add (Iter.singleton (mk_extensionality_clause ())) ;
       if Env.flex_get k_choice_axiom then
@@ -1486,6 +1512,7 @@ let _eta = ref `Reduce
 let _use_diff_for_neg_ext = ref false
 let _generalize_choice_trigger = ref false
 let _prim_enum_simpl = ref false
+let _prim_enum_early_bird = ref false
 
 let extension =
   let register env =
@@ -1512,6 +1539,7 @@ let extension =
     E.flex_add k_use_diff_for_neg_ext !_use_diff_for_neg_ext;
     E.flex_add k_generalize_choice_trigger !_generalize_choice_trigger;
     E.flex_add k_prim_enum_simpl !_prim_enum_simpl;
+    E.flex_add k_prim_enum_early_bird !_prim_enum_early_bird;
 
 
     if E.flex_get k_check_lambda_free = `Only 
@@ -1586,6 +1614,7 @@ let () =
       "--ho-prim-enum", set_prim_mode_, " set HO primitive enum mode";
       "--ho-prim-max", Arg.Set_int prim_max_penalty, " max penalty for HO primitive enum";
       "--ho-prim-enum-simpl", Arg.Bool ((:=) _prim_enum_simpl), " use primitive enumeration as simplification rule";
+      "--ho-prim-enum-early-bird", Arg.Bool ((:=) _prim_enum_early_bird), " use early-bird primitive enumeration (requires lazy CNF)";
       "--ho-oracle-composer", Arg.Symbol (["merge";"fair"], (fun s -> 
           if s = "merge" then _oracle_composer := (OSeq.merge :> (Logtk.Subst.t option OSeq.t OSeq.t -> Logtk.Subst.t option OSeq.t))
           else _oracle_composer := UnifFramework.take_fair)), " choose either OSeq.merge or Unif.take_fair as the composer";
