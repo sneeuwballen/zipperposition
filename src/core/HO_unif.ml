@@ -37,6 +37,13 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~signature ~offset 
   let ty_v = HVar.ty v in
   let n, ty_args, ty_ret = Type.open_poly_fun ty_v in
   assert (Type.is_prop ty_ret);
+  let project ~db_vars db_i =
+    let db_ty_args, _ = Type.open_fun (T.ty db_i) in
+    let new_args = List.mapi (fun i ty_arg -> 
+      let var_ty = Type.arrow ty_args ty_arg in
+      T.app (T.var (HVar.make ~ty:var_ty (offset+i+1))) db_vars
+    ) db_ty_args in
+    T.app db_i new_args in
   if n>0 then [] (* FIXME: what to do? *)
   else (
     (* local variables to build the λ-term *)
@@ -69,7 +76,10 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~signature ~offset 
       | _ -> []
     (* projection with "=": [λvars. (F1 vars) = (F2 vars)]
        where [F1 : Πa. ty_args -> a] *)
-    and l_eq = match mode with
+    and l_eq = 
+      let n = List.length vars in
+      let db_vars = List.mapi (fun i ty -> T.bvar ~ty (n-i-1)) ty_args in
+      match mode with
       | `Full | `Eq ->
         let a = HVar.make offset ~ty:Type.tType in
         let ty_fun = Type.arrow ty_args (Type.var a) in
@@ -78,7 +88,15 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~signature ~offset 
         [T.fun_of_fvars vars
            (T.Form.eq
               (T.app (T.var f) (List.map T.var vars))
-              (T.app (T.var g) (List.map T.var vars)))]
+              (T.app (T.var g) (List.map T.var vars)))] @
+        (CCList.flat_map_i (fun i db_i -> 
+          CCList.flat_map_i (fun j db_j ->
+            if i < j && Type.equal (T.ty db_i) (T.ty db_j) then (
+              [T.fun_l ty_args (T.Form.eq (project ~db_vars db_i) (project ~db_vars db_j));
+               T.fun_l ty_args (T.Form.neq (project ~db_vars db_i) (project ~db_vars db_j));]
+            ) else []
+          ) db_vars
+        ) db_vars)
       | _ -> []
     (* generate true and false in any case *)
     and l_false =  [T.fun_of_fvars vars T.false_]
@@ -127,29 +145,21 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~signature ~offset 
       | `Pragmatic | `Simple -> 
         let n = List.length vars in
         let db_vars = List.mapi (fun i ty -> T.bvar ~ty (n-i-1)) ty_args in
-        let project db_i =
-          let db_ty_args, _ = Type.open_fun (T.ty db_i) in
-          let new_args = List.mapi (fun i ty_arg -> 
-            let var_ty = Type.arrow ty_args ty_arg in
-            T.app (T.var (HVar.make ~ty:var_ty (offset+i+1))) db_vars
-          ) db_ty_args in
-          T.app db_i new_args in
         CCList.mapi (fun i db_i ->
           let projs = if Type.returns_prop (Term.ty db_i) then (
-              [T.fun_l ty_args (project db_i)]
+              [T.fun_l ty_args (project ~db_vars db_i)]
             ) else [] in
           let log_ops = 
             CCList.mapi (fun j db_j ->
                 if i < j && Type.equal (T.ty db_i) (T.ty db_j) then (
-                  let res = [T.fun_l ty_args (T.Form.eq (project db_i) (project db_j));
-                              T.fun_l ty_args (T.Form.neq (project db_i) (project db_j));] in
-                  if Type.is_prop (T.ty db_i) then
+                  let res = [T.fun_l ty_args (T.Form.eq (db_i) (db_j));
+                             T.fun_l ty_args (T.Form.neq (db_i) (db_j));] in
+                  if Type.returns_prop (T.ty db_i) then
                     res @
-                    [T.fun_l ty_args (T.Form.and_ (project db_i) (project db_j));
-                      T.fun_l ty_args (T.Form.or_ (project db_i) (project db_j));]
+                    [T.fun_l ty_args (T.Form.and_ (project ~db_vars db_i) (project ~db_vars db_j));
+                     T.fun_l ty_args (T.Form.or_ (project ~db_vars db_i) (project ~db_vars db_j));]
                   else res
-                )
-                else []) 
+                ) else []) 
               db_vars
             |> CCList.flatten in
           projs @ log_ops) 
@@ -164,12 +174,12 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~signature ~offset 
         let symbols = [
           T.true_, 0; 
           T.false_, 0;
-          T.app_builtin ~ty:([o;o] ==> o) Builtin.And [],2;
-          T.app_builtin ~ty:([o;o] ==> o) Builtin.Or [],2;
+          T.app_builtin ~ty:([o;o] ==> o) Builtin.And [],1;
+          T.app_builtin ~ty:([o;o] ==> o) Builtin.Or [],1;
           T.app_builtin ~ty:([o] ==> o) Builtin.Not [],1;
           T.app_builtin ~ty:([fresh_ty; fresh_ty] ==> o) Builtin.Eq [],1;
-          T.app_builtin ~ty:([[fresh_ty] ==> o] ==> o) Builtin.ForallConst [],2;
-          T.app_builtin ~ty:([[fresh_ty] ==> o] ==> o) Builtin.ExistsConst [],2;
+          T.app_builtin ~ty:([[fresh_ty] ==> o] ==> o) Builtin.ForallConst [],1;
+          T.app_builtin ~ty:([[fresh_ty] ==> o] ==> o) Builtin.ExistsConst [],1;
         ] in
         
         List.fold_left (fun res (op,penalty) -> 

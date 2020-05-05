@@ -298,4 +298,9 @@ module type S = sig
   val flex_get : 'a Flex_state.key -> 'a
   (** [flex_get k] is the same as [Flex_state.get_exn k (flex_state ())].
       @raise Not_found if the key is not present *)
+
+  val on_pred_var_elimination : (C.t * Term.t) Signal.t
+  (** this signal is raised if a formula that universally quantifies
+      a predicate removes that predicate and rules that want to instantiate it
+      early should listen to this *)
 end

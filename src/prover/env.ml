@@ -359,6 +359,8 @@ module Make(X : sig
   let is_passive c =
     C.ClauseSet.mem c (ProofState.PassiveSet.clauses ())
 
+  let on_pred_var_elimination = Signal.create ()
+
   module StrSet = CCSet.Make(String)
 
   (** Apply rewrite rules AND evaluation functions *)

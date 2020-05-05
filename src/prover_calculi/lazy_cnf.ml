@@ -401,7 +401,11 @@ module Make(E : Env.S) : S with module Env = E = struct
               (if hd = ForallConst then "forall" else "exists") in
           let subst_term =
             if hd = ForallConst then (
-              T.var @@ HVar.make ~ty:var_ty var_id
+              let res = T.var @@ HVar.make ~ty:var_ty var_id in
+              if Type.returns_prop var_ty then (
+                Signal.send Env.on_pred_var_elimination (c,res)
+              );
+              res
             ) else (
               let gen = Iter.head @@ 
                 Idx.retrieve_generalizations (!_skolem_idx, 0) (f, 1) in
