@@ -199,10 +199,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let subst = Subst.FO.bind' Subst.empty (T.as_var_exn var, cl_sc) (trigger, trig_sc) in
     let renaming = Subst.Renaming.create () in
     let lits = Literals.apply_subst renaming subst (C.lits clause, cl_sc) in
+    let lits = Literals.map (fun t -> Lambda.eta_reduce @@ Lambda.snf t) lits in
       let proof =
         Proof.Step.inference ~rule:(Proof.Rule.mk "triggered_bool_instantiation") ~tags:[Proof.Tag.T_ho]
           [C.proof_parent_subst renaming (clause, cl_sc) subst] in
-      C.create_a lits proof ~penalty:(C.penalty clause) ~trail:(C.trail clause)
+    let res = C.create_a lits proof ~penalty:(C.penalty clause) ~trail:(C.trail clause) in
+    (* CCFormat.printf "instatiate:@.c:@[%a@]@.subst:@[%a@]@.res:@[%a@]@." C.pp clause Subst.pp subst C.pp res; *)
+    res
 
   let handle_new_pred_var_clause (clause,var) =
     assert(T.is_var var);
@@ -221,20 +224,22 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     Signal.ContinueListening
 
   let update_triggers cl =
+    (* if triggered boolean instantiation is off
+       k_trigger_bool_inst is -1 *)
     if C.proof_depth cl < Env.flex_get k_trigger_bool_inst then (
       let new_triggers = (get_triggers cl) in
       if not (Iter.is_empty new_triggers) then (
         Iter.iter (fun t ->
-          let triggers = (Type.Map.get_or ~default:[] (T.ty t) !_trigger_bools) in
+          let triggers = Type.Map.get_or ~default:[] (T.ty t) !_trigger_bools in
           if not (CCList.mem ~eq:T.equal t triggers) then (
-          _trigger_bools := Type.Map.update (T.ty t) (function 
-            | None -> Some [t]
-            | Some res -> Some (t :: res)
-          ) !_trigger_bools;
-          Type.Map.get_or ~default:[] (T.ty t) !_cls_w_pred_vars
-          |> CCList.map (fun (clause,var) -> instantiate_w_bool ~clause ~var ~trigger:t)
-          |> CCList.to_iter
-          |> Env.add_passive)
+            _trigger_bools := Type.Map.update (T.ty t) (function 
+              | None -> Some [t]
+              | Some res -> Some (t :: res)
+            ) !_trigger_bools;
+            Type.Map.get_or ~default:[] (T.ty t) !_cls_w_pred_vars
+            |> CCList.map (fun (clause,var) -> instantiate_w_bool ~clause ~var ~trigger:t)
+            |> CCList.to_iter
+            |> Env.add_passive)
         ) new_triggers
       ));
     Signal.ContinueListening

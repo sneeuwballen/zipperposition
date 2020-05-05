@@ -401,11 +401,7 @@ module Make(E : Env.S) : S with module Env = E = struct
               (if hd = ForallConst then "forall" else "exists") in
           let subst_term =
             if hd = ForallConst then (
-              let res = T.var @@ HVar.make ~ty:var_ty var_id in
-              if Type.returns_prop var_ty then (
-                Signal.send Env.on_pred_var_elimination (c,res)
-              );
-              res
+              T.var @@ HVar.make ~ty:var_ty var_id
             ) else (
               let gen = Iter.head @@ 
                 Idx.retrieve_generalizations (!_skolem_idx, 0) (f, 1) in
@@ -422,7 +418,13 @@ module Make(E : Env.S) : S with module Env = E = struct
             ) in
           let res = Lambda.eta_reduce @@ Lambda.snf @@ T.app f [subst_term] in
           assert(Type.is_prop (T.ty res));
-          return @@ mk_or ~proof_cons ~rule_name [res] c i
+          let res_cl = mk_or ~proof_cons ~rule_name [res] c i in
+          if Type.returns_prop var_ty && hd == ForallConst then (
+            assert (List.length res_cl == 1);
+            assert (T.is_var subst_term);
+            Signal.send Env.on_pred_var_elimination (List.hd res_cl, subst_term)
+          );
+          return res_cl
         | T.AppBuiltin(Not, _) -> assert false
         | _ -> continue end
       ) else if Type.is_prop (T.ty lhs) && not (T.equal T.true_ rhs) then (

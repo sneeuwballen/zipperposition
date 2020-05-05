@@ -933,10 +933,13 @@ module Make(E : Env.S) : S with module Env = E = struct
     |> CCList.map (fun (subst,_) -> 
       let renaming = Subst.Renaming.create () in
       let lits = Literals.apply_subst renaming subst (C.lits cl, sc) in
+      let lits = Literals.map (fun t -> Lambda.eta_reduce @@ Lambda.snf t) lits in
       let proof =
         Proof.Step.inference ~rule:(Proof.Rule.mk "ho.refine.early.bird") ~tags:[Proof.Tag.T_ho]
           [C.proof_parent_subst renaming (cl, sc) subst] in
-      C.create_a lits proof ~penalty:(C.penalty cl) ~trail:(C.trail cl))
+      let res = C.create_a lits proof ~penalty:(C.penalty cl) ~trail:(C.trail cl) in
+      (* CCFormat.printf "orig:@[%a@]@.subst:@[%a@]@.res:@[%a@]@." C.pp cl Subst.pp subst C.pp res; *)
+      res)
     |> CCList.to_seq
     |> Env.add_passive
 
