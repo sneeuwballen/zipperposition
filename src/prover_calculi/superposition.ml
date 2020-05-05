@@ -147,8 +147,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   (* let _idx_fv = ref (SubsumIdx.of_signature (Ctx.signature()) ()) *)
 
   let _idx_simpl = ref (UnitIdx.empty ())
-  let _cls_w_pred_vars = ref (C.ClauseSet.empty)
-  let _trigger_bools   = ref (Term.Set.empty)
+  let _cls_w_pred_vars = ref (Type.Map.empty) (* type --> (clause,var) *)
+  let _trigger_bools   = ref (Type.Map.empty) (* type --> boolean trigger *)
   let _ext_dec_from_idx = ref (ID.Map.empty)
   let _ext_dec_into_idx = ref (ID.Map.empty)
 
@@ -162,19 +162,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let ord =
     Ctx.ord ()
 
-  let pred_vars c =
-    (* instantiate only variables in eligible lits *)
-    let eligible = C.Eligible.res c in
-    let lits = 
-      CCArray.mapi (fun i lit -> (i, lit)) (C.lits c)
-      |> CCArray.filter_map (fun (i,lit) -> 
-          if eligible i lit then Some lit else None) in
-    CCList.to_seq (Literals.vars lits) 
-    |> Iter.filter (fun v -> 
-        let ty = HVar.ty v in
-        Type.is_fun ty && Type.returns_prop ty)
-    |> Iter.to_list
-
   let get_triggers c =
     let trivial_trigger t =
       T.is_const (T.head_term t) ||
@@ -187,7 +174,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         let cached_t = Subst.FO.canonize_all_vars t in
         if not (Term.Set.mem cached_t !Higher_order.prim_enum_terms) &&
            Type.is_fun ty && Type.returns_prop ty && not (Term.is_var hd) &&
-           not (trivial_trigger t) then (        
+           not (trivial_trigger t) then (
           Some t
         ) else None
       )
@@ -205,13 +192,49 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       | _ -> false
     )
 
-  let handle_pred_var_inst c =
-    if C.proof_depth c < Env.flex_get k_trigger_bool_inst then (
-      if not (CCList.is_empty (pred_vars c)) then (
-        _cls_w_pred_vars := C.ClauseSet.add c !_cls_w_pred_vars;
-      );
-      _trigger_bools := Term.Set.add_seq !_trigger_bools (get_triggers c);
-    );
+  let instantiate_w_bool ~clause ~var ~trigger =
+    assert(Type.equal (T.ty var) (T.ty trigger));
+
+    let cl_sc, trig_sc = 0, 1 in
+    let subst = Subst.FO.bind' Subst.empty (T.as_var_exn var, cl_sc) (trigger, trig_sc) in
+    let renaming = Subst.Renaming.create () in
+    let lits = Literals.apply_subst renaming subst (C.lits clause, cl_sc) in
+      let proof =
+        Proof.Step.inference ~rule:(Proof.Rule.mk "triggered_bool_instantiation") ~tags:[Proof.Tag.T_ho]
+          [C.proof_parent_subst renaming (clause, cl_sc) subst] in
+      C.create_a lits proof ~penalty:(C.penalty clause) ~trail:(C.trail clause)
+
+  let handle_new_pred_var_clause (clause,var) =
+    assert(T.is_var var);
+    let ty = T.ty var in
+    
+    Type.Map.get_or ~default:[] ty !_trigger_bools
+    |> CCList.map (fun trigger -> instantiate_w_bool ~clause ~var ~trigger)
+    |> CCList.to_iter
+    |> Env.add_passive;
+
+    _cls_w_pred_vars := Type.Map.update ty (function 
+      | None -> Some [(clause, var)]
+      | Some res -> Some ((clause, var) :: res)
+    ) !_cls_w_pred_vars;
+
+    Signal.ContinueListening
+
+  let update_triggers cl =
+    if C.proof_depth cl < Env.flex_get k_trigger_bool_inst then (
+      let new_triggers = (get_triggers cl) in
+      if not (Iter.is_empty new_triggers) then (
+        Iter.iter (fun t -> 
+          _trigger_bools := Type.Map.update (T.ty t) (function 
+            | None -> Some [t]
+            | Some res -> Some (t :: res)
+          ) !_trigger_bools;
+          Type.Map.get_or ~default:[] (T.ty t) !_cls_w_pred_vars
+          |> CCList.map (fun (clause,var) -> instantiate_w_bool ~clause ~var ~trigger:t)
+          |> CCList.to_iter
+          |> Env.add_passive
+        ) new_triggers
+      ));
     Signal.ContinueListening
 
   let fluidsup_applicable cl =
@@ -463,12 +486,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       (fun c ->
          _idx_fv := SubsumIdx.add !_idx_fv c;
          ignore(_update_active TermIndex.add c);
-         ignore(handle_pred_var_inst c);
+         ignore(update_triggers c);
          update_ext_dec_indices insert_into_ext_dec_index c);
     Signal.on PS.ActiveSet.on_remove_clause
       (fun c ->
          _idx_fv := SubsumIdx.remove !_idx_fv c;
-         _cls_w_pred_vars := C.ClauseSet.remove c !_cls_w_pred_vars;
          ignore(update_ext_dec_indices remove_from_ext_dec_index c);
          _update_active TermIndex.remove c);
     Signal.on PS.SimplSet.on_add_clause
@@ -1928,48 +1950,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       | _ -> []
     ) lits
 
-  let pred_var_instantiation c trigger_set =
-    let p_vars = pred_vars c in
-    let substs = CCList.flat_map (fun v ->
-        let res = ref [] in (* no really efficient way without turning set to list *) 
-        Term.Set.iter (fun t ->
-            let var_ty = HVar.ty v and t_ty = Term.ty t in
-            if Type.is_ground var_ty && Type.is_ground t_ty && Type.equal var_ty t_ty then (
-              let subst = Subst.FO.bind' Subst.empty (v,0) (t,1) in
-              res := subst :: !res;
-            )) trigger_set;
-        !res
-      ) p_vars in
-    Iter.of_list substs
-    |> Iter.map (fun sub ->
-        let renaming = Subst.Renaming.create() in
-        let new_lits = Lits.apply_subst renaming sub (C.lits c, 0) in
-        let trail = C.trail c in 
-        let penalty = C.penalty c in
-        let rule = Proof.Rule.mk "instantiate_w_trigger" in
-        let tags = [Proof.Tag.T_ho] in
-        let proof = Proof.Step.inference ~tags ~rule [C.proof_parent_subst renaming (c, 0) sub] in
-        let new_clause = C.create ~trail ~penalty (CCArray.to_list new_lits) proof in
-        assert (C.Seq.terms c |> Iter.for_all T.DB.is_closed);
-        assert (C.Seq.terms new_clause |> Iter.for_all T.DB.is_closed);
-        new_clause)
-    |> Iter.to_list
-
-  let instantiate_with_triggers c =
-    if C.proof_depth c < Env.flex_get k_trigger_bool_inst then ( 
-      pred_var_instantiation c !_trigger_bools)
-    else []
-
-  let trigger_insantiation c =
-    if C.proof_depth c < Env.flex_get k_trigger_bool_inst then (
-      let triggers = Term.Set.of_seq @@ get_triggers c in
-      let res = ref [] in
-      C.ClauseSet.iter (fun old_c -> 
-          res := pred_var_instantiation old_c triggers @ !res
-        ) !_cls_w_pred_vars;
-      !res)
-    else []
-
+  
   let ext_eqfact given =
     if ext_rule_eligible given then  
       ZProf.with_prof prof_ext_dec ext_inst_or_family_eqfact_aux given
@@ -3607,8 +3588,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Env.add_binary_inf "lambdasup_passive(into)" infer_lambdasup_into;
       );
       if Env.flex_get k_trigger_bool_inst > 0 then (
-        Env.add_unary_inf "trigger_pred_var active" trigger_insantiation;
-        Env.add_unary_inf "trigger_pred_var passive" instantiate_with_triggers;
+        Signal.on Env.on_pred_var_elimination handle_new_pred_var_clause;
       );
     )
     else (
