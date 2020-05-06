@@ -78,6 +78,10 @@ val e_sel12 : ord:Ordering.t -> t
 (** Selection function  identical to E's 
     SelectComplexExceptUniqMaxHorn *)
 
+val e_sel13 : ord:Ordering.t -> t
+(** Selection function  identical to E's 
+    SelectGroundNegativeLiteral *)
+
 val ho_sel  : ord:Ordering.t -> t
 (** Selection function that tries to take 
     into account the number of nested applied variables.

@@ -427,6 +427,14 @@ let e_sel12 ~ord lits =
   then BV.empty () 
   else e_sel3 ~ord lits
 
+let e_sel13 ~ord lits =
+   let chooser (i,l) =
+    (if Lit.is_pos l then 1 else 0), 
+    (if Lit.is_ground l then 0 else 1),
+    (- (lit_sel_diff_w l)),
+    0 in
+  weight_based_sel_driver ~ord lits chooser
+
 let ho_sel ~ord lits = 
   let chooser (i,l) = 
     let sign = (if Lit.is_pos l then 1 else 0) in
