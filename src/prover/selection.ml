@@ -536,6 +536,7 @@ let l =
       "e-selection10", e_sel10;
       "e-selection11", e_sel11;
       "e-selection12", e_sel12;
+      "e-selection13", e_sel13;
       "ho-selection", ho_sel;
       "ho-selection2", ho_sel2;
       "ho-selection3", ho_sel3;
