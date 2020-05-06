@@ -930,14 +930,15 @@ module Make(E : Env.S) : S with module Env = E = struct
     HO_unif.enum_prop 
       ~enum_cache:(Env.flex_get k_prim_enum_terms) 
       ~signature:(Ctx.signature ()) ~mode ~offset (T.as_var_exn var,sc)
-    |> CCList.map (fun (subst,_) -> 
+    |> CCList.map (fun (subst,p) -> 
       let renaming = Subst.Renaming.create () in
       let lits = Literals.apply_subst renaming subst (C.lits cl, sc) in
       let lits = Literals.map (fun t -> Lambda.eta_reduce @@ Lambda.snf t) lits in
       let proof =
-        Proof.Step.inference ~rule:(Proof.Rule.mk "ho.refine.early.bird") ~tags:[Proof.Tag.T_ho]
+        Proof.Step.inference ~rule:(Proof.Rule.mk "ho.refine.early.bird") 
+          ~tags:[Proof.Tag.T_ho; Proof.Tag.T_cannot_orphan]
           [C.proof_parent_subst renaming (cl, sc) subst] in
-      let res = C.create_a lits proof ~penalty:(C.penalty cl) ~trail:(C.trail cl) in
+      let res = C.create_a lits proof ~penalty:(C.penalty cl + p) ~trail:(C.trail cl) in
       (* CCFormat.printf "orig:@[%a@]@.subst:@[%a@]@.res:@[%a@]@." C.pp cl Subst.pp subst C.pp res; *)
       res)
     |> CCList.to_seq

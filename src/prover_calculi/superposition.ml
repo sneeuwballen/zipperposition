@@ -164,8 +164,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let get_triggers c =
     let trivial_trigger t =
+      let body = snd @@ T.open_fun t in
       T.is_const (T.head_term t) ||
-      T.is_var (snd @@ T.open_fun t) in
+      T.is_var body || T.is_true_or_false body in
 
     Literals.fold_terms ~ord ~subterms:true ~eligible:C.Eligible.always 
       ~which:`All (C.lits c) ~fun_bodies:false 
@@ -201,7 +202,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let lits = Literals.apply_subst renaming subst (C.lits clause, cl_sc) in
     let lits = Literals.map (fun t -> Lambda.eta_reduce @@ Lambda.snf t) lits in
       let proof =
-        Proof.Step.inference ~rule:(Proof.Rule.mk "triggered_bool_instantiation") ~tags:[Proof.Tag.T_ho]
+        Proof.Step.inference 
+          ~rule:(Proof.Rule.mk "triggered_bool_instantiation") 
+          ~tags:[Proof.Tag.T_ho; Proof.Tag.T_cannot_orphan]
           [C.proof_parent_subst renaming (clause, cl_sc) subst] in
     let res = C.create_a lits proof ~penalty:(C.penalty clause) ~trail:(C.trail clause) in
     (* CCFormat.printf "instatiate:@.c:@[%a@]@.subst:@[%a@]@.res:@[%a@]@." C.pp clause Subst.pp subst C.pp res; *)
@@ -230,6 +233,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let new_triggers = (get_triggers cl) in
       if not (Iter.is_empty new_triggers) then (
         Iter.iter (fun t ->
+          (* CCFormat.printf "trigger(@[%a@])=@[%a@]@." C.pp cl T.pp t; *)
           let triggers = Type.Map.get_or ~default:[] (T.ty t) !_trigger_bools in
           if not (CCList.mem ~eq:T.equal t triggers) then (
             _trigger_bools := Type.Map.update (T.ty t) (function 

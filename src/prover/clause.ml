@@ -390,6 +390,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       if Proof.Result.is_stmt p_res then false
       else (
         Proof.Step.is_inference step &&
+        not (List.mem Proof.Tag.T_cannot_orphan (Proof.Step.tags step)) &&
         List.exists (fun pr ->
           Proof.Result.is_dead_cl (Proof.S.result pr) ())
         (List.map Proof.Parent.proof (Proof.Step.parents step))) 

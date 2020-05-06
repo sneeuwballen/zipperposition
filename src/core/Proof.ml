@@ -485,6 +485,11 @@ module Step = struct
   let[@inline] dedup_tags (tgs:tag list) : tag list =
     CCList.sort_uniq ~cmp:Builtin.Tag.compare tgs
 
+  let tags p = match p.kind with
+    | Simplification(_,tags)
+    | Inference(_,tags) -> dedup_tags tags
+    | _ -> []
+
   let inference ?infos ?(tags=[]) ~rule parents =
     let tags = dedup_tags tags in
     step_ ?infos (Inference (rule,tags)) parents

@@ -310,6 +310,7 @@ module Tag = struct
     | T_data (** datatypes *)
     | T_distinct (** distinct constants *)
     | T_ac of ID.t (** AC symbols *)
+    | T_cannot_orphan
 
   let compare = Pervasives.compare
 
@@ -323,6 +324,7 @@ module Tag = struct
     | T_data -> Fmt.string out "data"
     | T_distinct -> Fmt.string out "distinct_constants"
     | T_ac id -> Fmt.fprintf out "(ac %a)" ID.pp_full id
+    | T_cannot_orphan -> Fmt.fprintf out "cannot orphan"
 end
 
 

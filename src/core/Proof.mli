@@ -224,6 +224,8 @@ module Step : sig
 
   val src : t -> source option
 
+  val tags : t -> tag list
+
   val trivial : t
 
   val by_def : ID.t -> t
