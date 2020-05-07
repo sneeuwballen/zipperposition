@@ -1558,6 +1558,23 @@ let simplify_formula t =
         ))
   in
 
+  let simpl_and_or_imp premise conclusion =
+    (* if premise is of the form a1 /\ ... /\ an
+       and the conclusion of the form b1 \/ ... \/ bm
+       and if the intersection of {a1, ..., an} and {b1, ..., bm}
+       is not empty then simplify the implication into T  *)
+    let premise_terms =
+      match view premise with
+      | AppBuiltin(And, l) -> l
+      | _ -> [premise] in
+    let conc_terms = 
+      match view conclusion with
+      | AppBuiltin(Or, l) -> l
+      | _ -> [conclusion] in
+    let is_true = 
+      List.exists (fun c -> List.exists (equal c) premise_terms) conc_terms in
+    if is_true then Some F.true_ else None in
+
   let rec aux t =
     let ty = ty_exn t in
     match view t with 
@@ -1583,14 +1600,17 @@ let simplify_formula t =
       aux (F.not_ (F.eq_or_equiv x y))
     | AppBuiltin( Imply, [x;y]) ->
       let x = aux x and y  = aux y in
-      if equal x y then F.true_
-      else if equal x F.true_  then y
-      else if equal x F.false_ then F.true_
-      else if equal y F.true_ then F.true_
-      else if equal y F.false_ then F.not_ x
-      else if equal x (F.not_ y) then y
-      else if equal y (F.not_ x) then y
-      else app_builtin ~ty Imply [x;y]
+      begin match simpl_and_or_imp x y with
+      | Some res -> res
+      | None ->
+        if equal x y then F.true_
+        else if equal x F.true_  then y
+        else if equal x F.false_ then F.true_
+        else if equal y F.true_ then F.true_
+        else if equal y F.false_ then F.not_ x
+        else if equal x (F.not_ y) then y
+        else if equal y (F.not_ x) then y
+        else app_builtin ~ty Imply [x;y] end
     | AppBuiltin( (Neq|Xor), [x;y]) when Ty.is_prop (ty_exn x) ->
       aux (F.not_ (F.eq_or_equiv x y))
     | AppBuiltin(b, args) ->

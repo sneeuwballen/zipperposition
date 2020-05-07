@@ -242,11 +242,18 @@ module Make(E : Env.S) : S with module Env = E = struct
             T.app_builtin ~ty:(Type.prop) Builtin.Not [s'] 
       )
     | AppBuiltin(Builtin.Imply, [p;c]) ->
-      if T.equal p T.true_ then aux c
+      let ps = match T.view p with 
+        | AppBuiltin(And, l) -> T.Set.of_list l
+        | _ -> T.Set.singleton p in
+      let cs = match T.view c with 
+        | AppBuiltin(Or, l) -> T.Set.of_list l
+        | _ -> T.Set.singleton c in
+
+      if not (T.Set.is_empty (T.Set.inter ps cs)) then T.true_
+      else if T.equal p T.true_ then aux c
       else if T.equal p T.false_ then T.true_
       else if T.equal c T.false_ then aux (T.Form.not_ p)
       else if T.equal c T.true_ then T.true_
-      else if T.equal p c then T.true_
       else (
         let p',c' = aux p, aux c in
         if T.equal p p' && T.equal c c' then t 

@@ -751,7 +751,7 @@ module Make(C : Clause_intf.S) = struct
        "conjecture-relative-var", parse_crv;
        "conjecture-relative-struct", parse_cr_struct;
        "conjecture-relative-cheap", parse_conj_relative_cheap;
-       "conjecture-relative-e", parse_cr_e;
+      "conjecture-relative-e", parse_cr_e;
        "diversity-weight", parse_diversity_weight;
        "pnrefined", parse_pnrefine;
        "staggered", parse_staggered;
