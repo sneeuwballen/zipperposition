@@ -105,6 +105,9 @@ val is_parameter : t -> bool
 val is_skolem : t -> bool
 (** [is_skolem id] returns [true] iff [id] is a Skolem symbol *)
 
+val is_postcnf_skolem : t -> bool
+(** [is_postcnf_skolem id] returns [true] iff [id] is a Skolem symbol introduced during proof search *)
+
 val as_skolem : t -> skolem_kind option
 
 val is_distinct_object : t -> bool

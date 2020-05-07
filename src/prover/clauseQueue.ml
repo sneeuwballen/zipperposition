@@ -392,7 +392,57 @@ module Make(C : Clause_intf.S) = struct
                 (if is_pos then pos_mul else 1.0) *. 
                 (if is_max then max_mul else 1.0) in
               int_of_float (mul *. (float_of_int res)))
-      ) 0 
+      ) 0
+
+    let conjecture_relative_e ~conj_mul ~fresh_mul ~f ~cst ~p ~v ~max_term_mul ~max_lit_mul ~pos_mul c =
+      let sgn = C.Ctx.signature () in
+
+      let f_weight sym ty =
+        let multipliers = 
+          (if Signature.sym_in_conj sym sgn then conj_mul else 1.0)
+          *. (if ID.is_postcnf_skolem sym then fresh_mul else 1.0) in
+        int_of_float (float_of_int (
+          if Type.returns_prop ty then p
+          else if Type.is_fun ty then f
+          else cst
+        ) *. multipliers) in
+
+      let t_weight ~mul t =
+        let rec aux t =
+          match Term.view t with 
+          | App(hd,args) -> aux_l (hd::args)
+          | AppBuiltin(b,args) -> f + aux_l args
+          | Fun(_,body) -> v + aux body
+          | DB _ | Var _ -> v
+          | Const sym -> f_weight sym (Term.ty t)
+        and aux_l xs = List.fold_left (fun acc arg -> acc + aux arg) 0 xs in
+        int_of_float (mul *. float_of_int (aux t)) in
+
+      let lit_weight is_max lit =
+        let is_pos = Lit.is_pos lit in
+        let multipliers =
+          (if is_max then max_lit_mul else 1.0) *.
+          (if is_pos then pos_mul else 1.0) in
+        let base_weight = 
+          match lit with 
+          | Literal.Equation(lhs,rhs,_) ->
+            begin match Ordering.compare (C.Ctx.ord()) lhs rhs with 
+            | Comparison.Gt ->
+              t_weight ~mul:max_term_mul lhs + t_weight ~mul:1.0 rhs
+            | Comparison.Lt ->
+              t_weight ~mul:max_term_mul rhs + t_weight ~mul:1.0 lhs
+            | _ ->
+              t_weight ~mul:1.0 lhs + t_weight ~mul:1.0 rhs
+            end
+          | _ -> 1 in
+        int_of_float (multipliers *. (float_of_int base_weight)) in
+
+      let max_lits = C.maxlits (c,0) Subst.empty in
+      C.Seq.lits c
+      |> Iter.foldi (fun acc idx lit -> 
+        let is_max = CCBV.get max_lits idx in
+        acc + lit_weight is_max lit
+      ) 0
 
     let diversity_weight 
       ~var_w ~sym_w ~pos_mul ~max_t_mul ~max_l_mul
@@ -572,6 +622,29 @@ module Make(C : Clause_intf.S) = struct
         invalid_arg
           "expected conjecture-relative-var(dist_var_mul:float,parameters_magnitude:l/s,goal_penalty:t/f)"
 
+    let parse_cr_e s =
+      let crv_regex = 
+        Str.regexp 
+          ("conjecture-relative-e(\\([0-9]+[.]?[0-9]*\\),\\([0-9]+[.]?[0-9]*\\),\\([0-9]+\\),\\([0-9]+\\),"
+          ^ "\\([0-9]+\\),\\([0-9]+\\),\\([0-9]+[.]?[0-9]*\\),\\([0-9]+[.]?[0-9]*\\),\\([0-9]+[.]?[0-9]*\\)" ^ ")") in
+      try
+        ignore(Str.search_forward crv_regex s 0);
+        let conj_mul = CCFloat.of_string_exn (Str.matched_group 1 s) in
+        let fresh_mul = CCFloat.of_string_exn (Str.matched_group 2 s) in
+        let f = CCOpt.get_exn @@ CCInt.of_string (Str.matched_group 3 s) in
+        let cst = CCOpt.get_exn @@  CCInt.of_string (Str.matched_group 4 s) in
+        let p = CCOpt.get_exn @@  CCInt.of_string (Str.matched_group 5 s) in
+        let v = CCOpt.get_exn @@  CCInt.of_string (Str.matched_group 6 s) in
+        let max_term_mul = CCFloat.of_string_exn (Str.matched_group 7 s) in
+        let max_lit_mul = CCFloat.of_string_exn (Str.matched_group 8 s) in
+        let pos_mul = CCFloat.of_string_exn (Str.matched_group 9 s) in
+        
+        conjecture_relative_e ~conj_mul ~fresh_mul ~f ~cst ~p ~v ~max_term_mul ~max_lit_mul ~pos_mul 
+      with Not_found | Invalid_argument _ ->
+        invalid_arg
+          ("expected conjecture-relative-var(conj_mul:float, fresh_mul:float, f:int, const:int," ^ 
+          "p:int, v:int, max_term_mul:float, max_lit_mul:float, pos_mul:float)")
+
     let parse_cr_struct s =
       _rel_terms_enabled := true;
       let crs_regex = 
@@ -678,6 +751,7 @@ module Make(C : Clause_intf.S) = struct
        "conjecture-relative-var", parse_crv;
        "conjecture-relative-struct", parse_cr_struct;
        "conjecture-relative-cheap", parse_conj_relative_cheap;
+       "conjecture-relative-e", parse_cr_e;
        "diversity-weight", parse_diversity_weight;
        "pnrefined", parse_pnrefine;
        "staggered", parse_staggered;

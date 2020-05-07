@@ -138,6 +138,12 @@ let is_skolem id =
         | Attr_skolem _ -> true
         | _ -> false)
 
+let is_postcnf_skolem id =
+  payload_pred id
+    ~f:(function
+        | Attr_skolem K_after_cnf -> true
+        | _ -> false)
+
 let as_skolem id =
   payload_find id
     ~f:(function
