@@ -18,9 +18,19 @@ let norm_logical_disagreements b args args' : _ list * _ list =
         match Term.view (Term.head_term t) with
         | Const x -> ID.id x
         | AppBuiltin(b,_) -> Builtin.as_int b
+        | DB i -> i
+        | Var v -> HVar.id v
         | _ -> max_int in
       
-      CCInt.compare (hd_to_int t1) (hd_to_int t2)
+      let hd_class t =
+        match Term.view (Term.head_term t) with
+        | Const x -> 0
+        | AppBuiltin(b,_) -> 1
+        | DB i -> 2
+        | _ -> 3 in
+      
+      CCInt.compare (hd_class t1) (hd_class t2)
+      <?> (CCInt.compare, (hd_to_int t1), (hd_to_int t2))
       <?> (CCInt.compare, (Term.ho_weight t1), (Term.ho_weight t2) )
       <?> (CCInt.compare, Term.hash t1, Term.hash t2))  in
 

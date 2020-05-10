@@ -379,21 +379,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       SimplM.return_new new_
     )
 
-  let normalize_equalities c =
-    let lits = Array.to_list (C.lits c) in
-    let normalized = List.map Literal.normalize_eq lits in
-    if List.exists CCOpt.is_some normalized then (
-      let new_lits = List.mapi (fun i l_opt -> 
-          CCOpt.get_or ~default:(Array.get (C.lits c) i) l_opt) normalized in
-      let proof = Proof.Step.simp [C.proof_parent c] 
-          ~rule:(Proof.Rule.mk "simplify nested equalities")  in
-      let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
-      SimplM.return_new new_c
-    ) 
-    else (
-      SimplM.return_same c 
-    )
-
   let cnf_otf c : C.t list option =
     let idx = CCArray.find_idx (fun l -> 
         let eq = Literal.View.as_eqn l in
@@ -552,7 +537,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       if Env.flex_get k_simplify_bools then (
         Env.add_basic_simplify simpl_bool_subterms
       );
-      Env.add_basic_simplify normalize_equalities;
       if Env.flex_get k_nnf then (
         E.add_basic_simplify nnf_bool_subters;
       );

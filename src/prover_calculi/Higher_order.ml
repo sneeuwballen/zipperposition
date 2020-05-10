@@ -535,6 +535,21 @@ module Make(E : Env.S) : S with module Env = E = struct
   let prim_enum_tf c =
     prim_enum_ ~mode:`TF c
 
+  let normalize_equalities c =
+    let lits = Array.to_list (C.lits c) in
+    let normalized = List.map Literal.normalize_eq lits in
+    if List.exists CCOpt.is_some normalized then (
+      let new_lits = List.mapi (fun i l_opt -> 
+          CCOpt.get_or ~default:(Array.get (C.lits c) i) l_opt) normalized in
+      let proof = Proof.Step.simp [C.proof_parent c] 
+          ~rule:(Proof.Rule.mk "simplify nested equalities")  in
+      let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
+      SimplM.return_new new_c
+    ) 
+    else (
+      SimplM.return_same c 
+    )
+
   let choice_ops = ref Term.Map.empty
   let new_choice_counter = ref 0
 
@@ -543,7 +558,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       ref ((C.Seq.vars c |> Iter.map HVar.id
             |> Iter.max |> CCOpt.get_or ~default: 0) + 1) in
 
-    let is_choice_subterm t = 
+    let is_choice_subterm t =
       match T.view t with
       | T.App(hd, [arg]) when T.is_var hd || Term.Map.mem hd !choice_ops ->
         let ty = T.ty arg in
@@ -578,11 +593,14 @@ module Make(E : Env.S) : S with module Env = E = struct
       let choice_arg = Lambda.snf (T.app arg [T.app hd [arg]]) in
       let new_lits = [Literal.mk_prop choice_x false;
                       Literal.mk_prop choice_arg true] in
-      let arg_str = CCFormat.sprintf "%a" T.TPTP.pp arg in
+      let arg_str = CCFormat.sprintf "(%a)" T.TPTP.pp arg in
       let parents = match def_clause with
         | Some def -> [C.proof_parent def; C.proof_parent c]
         | None -> [C.proof_parent c] in
-      let proof = proof_constructor ~rule:(Proof.Rule.mk ("inst_choice" ^ arg_str)) parents in
+      let proof = 
+        proof_constructor ~tags:[Proof.Tag.T_cannot_orphan] 
+                          ~rule:(Proof.Rule.mk ("inst_choice" ^ arg_str)) 
+                          parents in
       C.create ~penalty:1 ~trail:Trail.empty new_lits proof in
 
 
@@ -622,7 +640,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       | _ -> assert (false) in
 
     C.Seq.terms c 
-    |> Iter.flat_map Term.Seq.subterms
+    |> Iter.flat_map (Term.Seq.subterms ~include_builtin:true)
     |> Iter.filter is_choice_subterm
     |> Iter.flat_map_l build_choice_inst
     |> Iter.to_list
@@ -1340,6 +1358,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     ) else (
       Util.debug ~section 1 "setup HO rules";
       Env.Ctx.lost_completeness();
+      Env.add_basic_simplify normalize_equalities;
       if Env.flex_get k_elim_pred_var then
         Env.add_unary_inf "ho_elim_pred_var" elim_pred_variable;
       if Env.flex_get k_ext_neg_lit then

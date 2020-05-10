@@ -118,7 +118,7 @@ module Make(C : Clause_intf.S) = struct
   let add_related_term_ t =
     if Term.Set.cardinal !_related_terms < max_related_ then (
       let new_terms = unroll_logical_symbols t in
-      Util.debugf ~section 1 "addding related terms:@.@[%a@]@." 
+      Util.debugf ~section 10 "addding related terms:@.@[%a@]@." 
         (fun k -> k (Term.Set.pp Term.pp) new_terms);
       _related_terms := Term.Set.union !_related_terms new_terms
     )
@@ -253,7 +253,7 @@ module Make(C : Clause_intf.S) = struct
           sum +. w
         ) 0.0 (C.lits c) in
       let w = int_of_float res in
-      Util.debugf ~section 1 "pnrefined(@[%a@],@[%g@])=%d@." (fun k -> k C.pp c pos_m w);
+      Util.debugf ~section 3 "pnrefined(@[%a@],@[%g@])=%d@." (fun k -> k C.pp c pos_m w);
       w
 
     let ho_weight_initial c =
@@ -326,7 +326,7 @@ module Make(C : Clause_intf.S) = struct
                 1.0 /. divider
               ) else 1.0 in
             let val_ = int_of_float (goal_dist_penalty *. dist_var_penalty *. res) in
-            (Util.debugf ~section  10 "cl: %a, w:%d\n" (fun k -> k C.pp c val_);
+            (Util.debugf ~section  3 "cl: %a, w:%d\n" (fun k -> k C.pp c val_);
              val_))
 
     (* function inspired by Struct from the paper https://arxiv.org/abs/1606.03888 *)
@@ -385,7 +385,7 @@ module Make(C : Clause_intf.S) = struct
         |> Iter.filter (fun t -> not (Term.is_true_or_false t))
         |> Iter.fold (fun acc t -> 
             let w = struct_diff_weight t in 
-            Util.debugf ~section 1 "struct(@[%a@])=%d" (fun k -> k Term.pp t w);
+            Util.debugf ~section 3 "struct(@[%a@])=%d" (fun k -> k Term.pp t w);
             acc + w) acc
         |> (fun res ->
               let mul = 
@@ -443,6 +443,10 @@ module Make(C : Clause_intf.S) = struct
         let is_max = CCBV.get max_lits idx in
         acc + lit_weight is_max lit
       ) 0
+      |> (fun res ->
+        Util.debugf ~section 3 "cr-e(@[%a@])=%d@." (fun k -> k C.pp c res);
+        res
+      )
 
     let diversity_weight 
       ~var_w ~sym_w ~pos_mul ~max_t_mul ~max_l_mul
@@ -485,9 +489,9 @@ module Make(C : Clause_intf.S) = struct
 
             let f_factor = fdiff_a *. f +. fdiff_b in
             let v_factor = vdiff_a *. v +. vdiff_b in
-            Util.debugf ~section 2 "w:%g;f:%g;v:%g" (fun k -> k w f_factor v_factor);
+            Util.debugf ~section 3 "w:%g;f:%g;v:%g" (fun k -> k w f_factor v_factor);
             int_of_float (w +. f_factor +. v_factor  )) in
-      Util.debugf ~section 1 "diversity_weight(@[%a@])=%d@." (fun k -> k C.pp c res);
+      Util.debugf ~section 3 "diversity_weight(@[%a@])=%d@." (fun k -> k C.pp c res);
       res
 
 
@@ -762,7 +766,11 @@ module Make(C : Clause_intf.S) = struct
       let splitted = CCString.split ~by:"(" s in
       let name = List.hd splitted in
       let w = List.assoc name parsers s in
-      penalize w
+      fun c ->
+        let res = penalize w c in
+        Util.debugf ~section 1 "@[%s(%a)@]=@[%d@]" (fun k -> k name C.pp c res);
+        res
+
     with Not_found | Failure _ -> 
       invalid_arg (CCFormat.sprintf "unknown weight function %s" s)
     
@@ -804,6 +812,17 @@ module Make(C : Clause_intf.S) = struct
     let prefer_formulas c =
       if (C.Seq.terms c |> Iter.exists (fun t -> Iter.exists Term.is_formula (Term.Seq.subterms t)))
       then 0 else 1
+
+    let prefer_bool_neq c =
+      C.Seq.lits c
+      |> Iter.map (fun lit -> match lit with
+        | Lit.Equation(lhs,rhs,false) -> 
+          if Type.is_prop (Term.ty lhs) && not (Term.is_true_or_false rhs) then (
+            2 - (List.length (List.filter Term.is_appbuiltin [lhs;rhs]))
+          ) else max_int
+        | _ -> max_int)
+      |> Iter.min
+      |> CCOpt.get_or ~default:0
 
     let prefer_easy_ho c =
       let has_lam_eq c =
@@ -961,6 +980,15 @@ module Make(C : Clause_intf.S) = struct
     let prefer_deep_combs c = 
       by_ho_depth ~depth_fun:Term.comb_depth ~modifier:(fun x -> -x) c
 
+    let prefer_shallow c =
+      Literals.Seq.terms (C.lits c)
+      |> Iter.map Term.depth
+      |> Iter.max
+      |> CCOpt.get_or ~default:0
+
+    let defer_shallow c =
+      - (prefer_shallow c)
+
     let parsers =
       ["const", (fun _ -> const_prio);
       "prefer-ho-steps", (fun _ -> prefer_ho_steps);
@@ -973,12 +1001,15 @@ module Make(C : Clause_intf.S) = struct
       "prefer-lambdas", (fun _ -> prefer_lambdas);
       "defer-lambdas", (fun _ -> defer_lambdas);
       "prefer-formulas", (fun _ -> prefer_formulas);
+      "prefer-bool-neq", (fun _ -> prefer_bool_neq);
       "defer-formulas", (fun _ -> defer_formulas);
       "prefer-easy-ho", (fun _ -> prefer_easy_ho);
       "prefer-ground", (fun _ -> prefer_ground);
       "defer-ground", (fun _ -> defer_ground);
       "defer-fo", (fun _ -> defer_fo);
       "prefer-fo", (fun _ -> prefer_fo);
+      "prefer-shallow", (fun _ -> prefer_shallow);
+      "defer-shallow", (fun _ -> defer_shallow);
       "prefer-empty-trail", (fun _ -> prefer_empty_trail);
       "prefer-short-trail", (fun _ -> prefer_short_trail);
       "prefer-long-trail", (fun _ -> prefer_long_trail);
@@ -1094,8 +1125,8 @@ module Make(C : Clause_intf.S) = struct
       take_first_mixed q
     ) else if is_orphaned c then (
       C.Tbl.remove q.tbl c;
-      Util.debugf ~section 1 "ignoring orphaned clause:@ @[%a@]@." (fun k -> k C.pp c);
-      Util.debugf ~section 2 "proof:@ @[%a@]@." (fun k -> k Proof.S.pp_tstp (C.proof c));
+      Util.debugf ~section 3 "ignoring orphaned clause:@ @[%a@]@." (fun k -> k C.pp c);
+      Util.debugf ~section 4 "proof:@ @[%a@]@." (fun k -> k Proof.S.pp_tstp (C.proof c));
       take_first_mixed q
     ) else (
       C.Tbl.remove q.tbl c;

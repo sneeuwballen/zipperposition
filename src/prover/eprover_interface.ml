@@ -232,7 +232,9 @@ module Make(E : Env.S) : S with module Env = E = struct
             if IntSet.mem (C.id cl) ignore_ids then raise @@ CantEncode "skip id";
             let encoded_symbols, cl' = encode_ty_args_cl ~encoded_symbols cl in
             (cl'::acc, encoded_symbols)
-          with CantEncode _ -> (acc, encoded_symbols)
+          with CantEncode reason -> 
+            Util.debugf 5 "cannot encode(%s):@.@[%a@]@." (fun k -> k reason C.pp cl);
+            (acc, encoded_symbols)
         ) ([], encoded_symbols) converted in
       encoded_symbols, encoded in
 

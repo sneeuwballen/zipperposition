@@ -223,8 +223,8 @@ module Make (St : sig val st : Flex_state.t end) = struct
          (OSeq.of_list simp_proj)
          (delay (get_depth flag) @@ OSeq.append (OSeq.of_list imit_binding) (OSeq.of_list func_proj)) *)
       OSeq.append 
-        (OSeq.append (OSeq.of_list imit_binding) (OSeq.of_list simp_proj))
-        (delay (get_depth flag) (OSeq.of_list func_proj))
+        (OSeq.append (OSeq.of_list simp_proj) (OSeq.of_list imit_binding) )
+        ((OSeq.of_list func_proj))
     with Invalid_argument s when String.equal s "as_var_exn" ->
       OSeq.empty
 
@@ -370,5 +370,6 @@ module Make (St : sig val st : Flex_state.t end) = struct
     (fun x y ->
        elim_vars := IntSet.empty;
        ident_vars := IntSet.empty;
-       OSeq.map (CCOpt.map Unif_subst.of_subst) (PragUnif.unify_scoped x y))
+       let res = PragUnif.unify_scoped x y in
+       OSeq.map (CCOpt.map Unif_subst.of_subst) (res))
 end

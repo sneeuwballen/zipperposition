@@ -4,6 +4,8 @@
 open Logtk
 
 let stat_stream_create = Util.mk_stat "stream.create"
+let section = Util.Section.make ~parent:Const.section "stm"
+
 
 (** {2 Signature} *)
 module type S = Stream_intf.S
@@ -38,6 +40,10 @@ module Make(A:ARG) = struct
     incr id_count_;
     { id; penalty = p; hits=0; stm = s; parents }
 
+  let pp out s =
+    Format.fprintf out "stm %i/%i/%i" s.id s.penalty s.hits;
+    ()
+
   let equal s1 s2 = s1.id = s2.id
   let compare s1 s2 = Pervasives.compare s1.id s2.id
   let id s = s.id
@@ -63,21 +69,24 @@ module Make(A:ARG) = struct
     List.exists C.is_redundant s.parents
 
   let drip s =
-    if ClauseQueue.ignore_orphans () && is_orphaned s then (
-      s.penalty <- max_int;
-      s.stm <- OSeq.empty;
-      raise Empty_Stream
-    ) else( 
-      match s.stm () with
-      | OSeq.Nil -> 
+    let orig_penalty = s.penalty in
+    let res = 
+      if ClauseQueue.ignore_orphans () && is_orphaned s then (
         s.penalty <- max_int;
+        s.stm <- OSeq.empty;
         raise Empty_Stream
-      | OSeq.Cons (hd,tl) ->
-        s.stm <- tl;
-        let cl_p = (clause_penalty s hd) in
-        s.penalty <-  s.penalty + cl_p;
-        hd
-    )
+      ) else( 
+        match s.stm () with
+        | OSeq.Nil -> 
+          s.penalty <- max_int;
+          raise Empty_Stream
+        | OSeq.Cons (hd,tl) ->
+          s.stm <- tl;
+          let cl_p = (clause_penalty s hd) in
+          s.penalty <-  s.penalty + cl_p;
+          hd) in
+    Util.debugf ~section 1 "drip:%d->@[%a@]:@. @[%a@]@." (fun k -> k orig_penalty pp s (CCOpt.pp C.pp) res);
+    res
 
   let drip_n s n guard =
     let rec _drip_n st n guard =
@@ -106,19 +115,19 @@ module Make(A:ARG) = struct
                 | Drip_n_Unfinished (partial_res,p_partial,n') -> raise (Drip_n_Unfinished((hd::partial_res),p+p_partial,n')))
     in
 
-    try
-      let (s',p_add,cl) = _drip_n s.stm n guard in
-      s.penalty <- s.penalty + p_add;
-      s.stm <- s';
-      cl
-    with
-    | Drip_n_Unfinished (res,p_add,n') ->
-      s.stm <- OSeq.empty;
-      s.penalty <- s.penalty + p_add;
-      raise (Drip_n_Unfinished (res,p_add,n'))
-
-  let pp out s =
-    Format.fprintf out "stream %i" s.id;
-    ()
+    let orig_penalty = s.penalty in
+    let res =
+      try
+        let (s',p_add,cl) = _drip_n s.stm n guard in
+        s.penalty <- s.penalty + p_add;
+        s.stm <- s';
+        cl
+      with
+      | Drip_n_Unfinished (res,p_add,n') ->
+        s.stm <- OSeq.empty;
+        s.penalty <- s.penalty + p_add;
+        raise (Drip_n_Unfinished (res,p_add,n')) in
+    Util.debugf ~section 1 "drip_n:%d->@[%a@]:@. @[%a@]@." (fun k -> k orig_penalty pp s (CCList.pp (CCOpt.pp C.pp)) res);
+    res
 
 end

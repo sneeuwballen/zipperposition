@@ -124,19 +124,18 @@ module Make(E : Env.S) = struct
                            then None
                            else Some c)
                       |> Iter.to_list in
-        Util.debugf 2 ~section "@[<2>inferred @{<green>new clauses@}@ @[<v>%a@]@]"
+        Util.debugf 3 ~section "@[<2>inferred @{<green>new clauses@}@ @[<v>%a@]@]"
           (fun k->k (CCFormat.list Env.C.pp) clauses);
         Env.add_passive (Iter.of_list clauses);
         Unknown
       )
     | Some c ->
-      Util.debugf ~section 1 "@[<2>@{<green>given@} (before simplification):@ `@[%a@]`@]"
+      Util.debugf ~section 2 "@[<2>@{<green>given@} (before simplification):@ `@[%a@]`@]"
             (fun k->k Env.C.pp c);
       Util.debugf ~section 10 "@[proof:@[%a@]@]" (fun k -> k Proof.S.pp_tstp (Env.C.proof c));
       
       check_clause_ c;
       Util.incr_stat stat_steps;
-      let orig_c = c in
       begin match Env.all_simplify c with
         | [], _ ->
           Util.incr_stat stat_redundant_given;
@@ -151,9 +150,8 @@ module Make(E : Env.S) = struct
         | c :: l', _ ->
           (* put clauses of [l'] back in passive set *)
 
-          Util.debugf ~section 1 "all_simplify(@[%a@])=@." (fun k -> k Env.C.pp orig_c);
-          Util.debugf ~section 1 "  @[%a@]@." (fun k -> k (CCList.pp Env.C.pp) (c :: l'));
-
+          Util.debugf ~section 2 "@[ remaining after simplification:@.@[%a@]@. @]" (fun k -> k (CCList.pp Env.C.pp) l');
+          
           Env.add_passive (Iter.of_list l');
           (* process the clause [c] *)
           let new_clauses = CCVector.create () in
@@ -164,7 +162,7 @@ module Make(E : Env.S) = struct
           Util.debugf ~section 1 "@[@{<Yellow>### step %5d ###@}@]"(fun k->k num);
           Util.debugf ~section 1 "@[<2>@{<green>given@} (%d steps, penalty %d):@ `@[%a@]`@]"
             (fun k->k num (Env.C.penalty c) Env.C.pp c);
-          Util.debugf ~section 1 "@[proof:@[%a@]@]" (fun k -> k Proof.S.pp_tstp (Env.C.proof c));
+          Util.debugf ~section 4 "@[proof:@[%a@]@]" (fun k -> k Proof.S.pp_tstp (Env.C.proof c));
           (* find clauses that are subsumed by given in active_set *)
           let subsumed_active = Env.C.ClauseSet.to_seq (Env.subsumed_by c) in
           Env.remove_active subsumed_active;

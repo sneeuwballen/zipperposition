@@ -1606,13 +1606,16 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     ZProf.enter_prof prof_infer_equality_resolution;
     let eligible = C.Eligible.always in
     (* iterate on those literals *)
+    (* CCFormat.printf "eq_res(@[%a@])@." C.pp clause; *)
     let new_clauses =
       Lits.fold_eqn ~sign:false ~ord ~both:false ~eligible (C.lits clause)
       |> Iter.filter_map
         (fun (l, r, _, l_pos) ->
           let do_eq_res us =
             let pos = Lits.Pos.idx l_pos in
-            if BV.get (C.eligible_res_no_subst clause) pos
+            (* CCFormat.printf "trying %d@." pos; *)
+            let eligible = BV.get (C.eligible_res_no_subst clause) pos in
+            if eligible  
             (* subst(lit) is maximal, we can do the inference *)
             then (
               Util.incr_stat stat_equality_resolution_call;
@@ -1633,6 +1636,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               let proof = Proof.Step.inference ~rule ~tags
                   [C.proof_parent_subst renaming (clause,0) subst] in
               let new_clause = C.create ~trail ~penalty (c_guard@new_lits) proof in
+              (* CCFormat.printf "success: @[%a@]@." C.pp new_clause; *)
               Util.debugf ~section 1 "@[<hv2>equality resolution on@ @[%a@]@ yields @[%a@],\n subst @[%a@]@]"
                 (fun k->k C.pp clause C.pp new_clause US.pp us);
               Some new_clause
@@ -1659,7 +1663,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ~iterate_substs:(fun substs do_eq_res -> Some (OSeq.map (CCOpt.flat_map do_eq_res) substs))
         clause
     in
-    let stm_res = List.map (Stm.make ~penalty:(C.penalty clause) ~parents:[clause]) inf_res in
+    let stm_res = List.map (Stm.make ~penalty:(0) ~parents:[clause]) inf_res in
     StmQ.add_lst (_stmq()) stm_res; []
 
   let infer_equality_resolution_pragmatic_ho max_unifs clause =
@@ -2047,7 +2051,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ~iterate_substs:(fun substs do_eq_fact -> Some (OSeq.map (CCOpt.flat_map do_eq_fact) substs))
         clause
     in
-    let stm_res = List.map (Stm.make ~penalty:(C.penalty clause) ~parents:[clause]) inf_res in
+    let stm_res = List.map (Stm.make ~penalty:(0) ~parents:[clause]) inf_res in
     StmQ.add_lst (_stmq()) stm_res; []
 
   let infer_equality_factoring_pragmatic_ho max_unifs clause =

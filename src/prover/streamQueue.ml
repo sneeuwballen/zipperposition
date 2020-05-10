@@ -4,6 +4,8 @@
 (** {1 A priority queue of streams} *)
 
 open Logtk
+let section = Util.Section.make ~parent:Const.section "stmq"
+
 module type S = StreamQueue_intf.S
 
 module type ARG = sig
@@ -131,7 +133,9 @@ module Make(A : ARG) = struct
     let new_stms = (List.map (fun (_,s) -> Stm.penalty s, s) dripped) @ rest in
     q.hp <- H.of_list new_stms;
     q.stm_nb <- List.length new_stms;
-    List.map fst dripped
+    let taken = List.map fst dripped in
+    Util.debugf ~section 1 "taken clauses: @[%a@]@." (fun k -> k (CCList.pp (CCOpt.pp Stm.C.pp)) taken);
+    taken
 
 
   let rec take_fair_anyway q =
@@ -159,14 +163,17 @@ module Make(A : ARG) = struct
 
   let take_stm_nb q =
     let n = clauses_to_take q in
-    if q.time_before_fair = 0 then take_fair (q.fair_tries+1) q 
-    else (
-      q.time_before_fair <- q.time_before_fair - 1;
-      (* Only extract clauses if the minimal stream weight is low *)
-      if not (H.is_empty q.hp) && fst (H.find_min_exn q.hp) <= 20
-      then _take_nb q n [] 
-      else []
-    )
+    let taken =
+      if q.time_before_fair = 0 then take_fair (q.fair_tries+1) q 
+      else (
+        q.time_before_fair <- q.time_before_fair - 1;
+        (* Only extract clauses if the minimal stream weight is low *)
+        if not (H.is_empty q.hp) && fst (H.find_min_exn q.hp) <= 20
+        then _take_nb q n [] 
+        else []
+      ) in
+    Util.debugf ~section 1 "taken clauses: @[%a@]@." (fun k -> k (CCList.pp (CCOpt.pp Stm.C.pp)) taken);
+    taken
 
   let rec _take_stm_nb_fix_stm q n res =
     if n = 0 || H.is_empty q.hp then res

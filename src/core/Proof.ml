@@ -464,7 +464,10 @@ module Step = struct
         | Inference _ -> CCOpt.map succ d
         | _ -> d
     in
-    let inc = match kind with Inference _ -> 1 | _ -> 0 in
+    let inc = 
+      match kind with 
+      | Inference (_,tag_list) when not (List.mem Tag.T_live_cnf tag_list) -> 1 
+      | _ -> 0 in
     { id=get_id_(); kind; parents; dist_to_goal; 
       proof_depth=parent_proof_depth parents + inc; infos; }
 
