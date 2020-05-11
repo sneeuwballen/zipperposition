@@ -936,6 +936,12 @@ module Make(C : Clause_intf.S) = struct
       |> Iter.map app_var_depth
       |> Iter.max
       |> CCOpt.get_or ~default:min_int
+
+    let by_app_var_num c =
+      C.Seq.terms c
+      |> Iter.flat_map (Term.Seq.subterms ~include_builtin:true)
+      |> Iter.filter Term.is_app_var
+      |> Iter.length
     
     let prefer_deep_app_var c =
       - (prefer_shallow_app_var c)
@@ -1014,6 +1020,7 @@ module Make(C : Clause_intf.S) = struct
       "prefer-short-trail", (fun _ -> prefer_short_trail);
       "prefer-long-trail", (fun _ -> prefer_long_trail);
       "by-neg-lit", (fun _ -> by_neg_lit);
+      "by-app-var-num", (fun _ -> by_app_var_num);
       "prefer-top-level-appvars", (fun _ -> prefer_top_level_app_var);
       "defer-top-level-appvars", (fun _ -> prefer_top_level_app_var);
       "prefer-shallow-appvars", (fun _ -> prefer_shallow_app_var);

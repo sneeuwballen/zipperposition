@@ -422,6 +422,8 @@ module Make(E : Env.S) : S with module Env = E = struct
                     |> CCList.flatten
                     |> List.map (fun c -> 
                         C.create ~penalty  ~trail (CCArray.to_list (C.lits c)) proof) in
+      Util.debugf ~section 1 "cl:@[%a@]@." (fun k-> k C.pp c);
+      Util.debugf ~section 1 " @[%a@]@." (fun k-> k (CCList.pp C.pp) clauses);
       List.iteri (fun i new_c -> 
           assert((C.proof_depth c) <= C.proof_depth new_c);) clauses;
       Some (solved @clauses)
@@ -533,7 +535,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     match Env.flex_get k_bool_reasoning with 
     | BoolReasoningDisabled -> ()
     | _ ->
-      Env.add_unary_inf "infer_tf" HO.prim_enum_tf;
+      (* Env.add_unary_inf "infer_tf" HO.prim_enum_tf; *)
       if Env.flex_get k_simplify_bools then (
         Env.add_basic_simplify simpl_bool_subterms
       );
