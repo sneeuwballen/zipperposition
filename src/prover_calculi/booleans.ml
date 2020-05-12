@@ -183,11 +183,11 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let rec aux t =
     let ty_is_prop t = Type.is_prop (T.ty t) in
-
     match T.view t with 
     | DB _ | Const _ | Var _ -> t
     | Fun(ty, body) ->
       let body' = aux body in
+      assert(Type.equal (T.ty body) (T.ty body'));
       if T.equal body body' then t
       else T.fun_ ty body'
     | App(hd, args) ->
@@ -294,16 +294,22 @@ module Make(E : Env.S) : S with module Env = E = struct
   res
 
   let simpl_bool_subterms c =
-    let new_lits = Literals.map simplify_bools (C.lits c) in
-    if Literals.equal (C.lits c) new_lits then (
-      SimplM.return_same c
-    ) else (
-      let proof = Proof.Step.simp [C.proof_parent c] 
-          ~rule:(Proof.Rule.mk "simplify boolean subterms") in
-      let new_ = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) 
-          (Array.to_list new_lits) proof in
-      SimplM.return_new new_
-    )
+    try
+      C.check_types c;
+      let new_lits = Literals.map simplify_bools (C.lits c) in
+      if Literals.equal (C.lits c) new_lits then (
+        SimplM.return_same c
+      ) else (
+        let proof = Proof.Step.simp [C.proof_parent c] 
+            ~rule:(Proof.Rule.mk "simplify boolean subterms") in
+        let new_ = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) 
+            (Array.to_list new_lits) proof in
+        SimplM.return_new new_
+      )
+    with Type.ApplyError err ->
+      CCFormat.printf "error(%s):@[%a@]@." err C.pp c;
+      CCFormat.printf "@[%a@]@." Proof.S.pp_tstp (C.proof c);
+      assert false
 
   let nnf_bools t =
     let module F = T.Form in

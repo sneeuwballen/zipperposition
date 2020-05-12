@@ -990,11 +990,9 @@ let[@inline] as_app t = match view t with
       | AppBuiltin(b, l') -> app_builtin b ~ty:(ty_exn t) (l'@l), []
       | _ -> f, l 
     end
-  | AppBuiltin(b, l ) when Builtin.is_logical_op b && not (Builtin.is_quantifier b) ->
-    let prop = builtin ~ty:tType Builtin.Prop in
-    let args = if (Builtin.is_logical_binop b) then [prop;prop]
-      else [prop] in
-    app_builtin b ~ty:(arrow args prop) [], l 
+  | AppBuiltin(b, l) when Builtin.is_logical_op b && not (Builtin.is_quantifier b) ->
+    let args = List.map ty_exn l in
+    app_builtin b ~ty:(arrow args (ty_exn t)) [], l 
   | _ -> t, []
 
 let[@inline] as_var t = match view t with Var v -> Some v | _ -> None

@@ -197,6 +197,7 @@ module Make(E : Env.S) = struct
             Iter.filter_map
               (fun c ->
                  Util.debugf ~section 4 "inferred: `@[%a@]`" (fun k->k Env.C.pp c);
+                 check_clause_ c;
                  let c, _ = Env.forward_simplify c in
                  check_clause_ c;
                  (* keep clauses  that are not redundant *)
