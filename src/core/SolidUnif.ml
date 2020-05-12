@@ -176,7 +176,7 @@ module Make (St : sig val st : Flex_state.t end) = struct
 
   let collect_flex_flex ~counter ~flex_args t =
     let replace_var ~bvar_tys ~target =
-      if CCList.is_empty flex_args && CCList.is_empty (T.args target) 
+      if Type.returns_tType (T.ty target) || CCList.is_empty flex_args && CCList.is_empty (T.args target)
       then target,[]
       else (
         let bvars = 
