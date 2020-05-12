@@ -125,7 +125,10 @@ module Make (St : sig val st : Flex_state.t end) = struct
       | None -> None
       | Some x -> if x < 0 then None else Some x in
 
-    let rec aux ~depth s_args t : (T.t list)  =
+    (* if we are dealing with polymorphic constant it will be of the form 
+        App(cst, tyargs) and with current design we might run into endless loop.
+        That is why we set recurse to false, to run this function at most once.  *)
+    let rec aux ?(recurse=true) ~depth s_args t : (T.t list)  =
       (* All the ways in which we can represent term t using solids *)
       let sols_as_db = List.mapi (fun i t -> 
           (t,T.bvar ~ty:(T.ty t) (n-i-1+depth))) s_args in
@@ -136,20 +139,21 @@ module Make (St : sig val st : Flex_state.t end) = struct
       let rest =
         try 
           match T.view t with
-          | AppBuiltin (hd,args) ->
+          | AppBuiltin (hd,args)  ->
             if CCList.is_empty args then [t]
             else (
               let args_combined = all_combs ~combs_limit (List.map (aux ~depth s_args) args) in
               List.map (T.app_builtin ~ty:(T.ty t) hd) args_combined
             )
-          | App(hd,args) ->
+          | App(hd,args) when recurse ->
             if Term.is_var hd then [t]
             else (
               assert(not (CCList.is_empty args));
               let hd, args = T.head_term_mono t, CCList.drop_while T.is_type args in
-              let hd_args_combined = 
-                all_combs ~combs_limit (aux ~depth s_args hd :: (List.map (aux ~depth s_args) args)) in
-              List.map (fun l -> T.app (List.hd l) (List.tl l)) hd_args_combined)
+              let covered_hd = aux ~recurse:(recurse && not (T.is_app hd)) ~depth s_args hd in
+              let covered_args = List.map (aux ~depth s_args) args in
+              let cobmined = all_combs ~combs_limit (covered_hd :: covered_args) in
+              List.map (fun l -> T.app (List.hd l) (List.tl l)) cobmined)
           | Fun _ -> 
             let ty_args, body = T.open_fun t in
             let d_inc = List.length ty_args in
@@ -388,6 +392,7 @@ module Make (St : sig val st : Flex_state.t end) = struct
     rf @ rest @ other
 
   let project_flex_rigid ~subst ~scope flex rigid =
+    assert(T.is_var (T.head_term flex));
     let flex_var, flex_args = T.as_var_exn @@ T.head_term flex,
                               List.mapi (fun i a -> i,a) (T.args flex) in
     let pref_tys, ret_ty = Type.open_fun @@ HVar.ty flex_var in
@@ -424,7 +429,6 @@ module Make (St : sig val st : Flex_state.t end) = struct
         let body_s', body_t', _ = eta_expand_otf ~subst:(US.subst subst) ~scope pref_s pref_t body_s body_t in
         let hd_s, args_s = T.as_app body_s' in
         let hd_t, args_t = T.as_app body_t' in
-        (* let hd_s, hd_t = CCPair.map_same (fun t -> cast_var t subst scope) (hd_s, hd_t) in                                        *)
         match T.view hd_s, T.view hd_t with 
         | (T.Var _, T.Var _) ->
           if not (T.equal hd_s hd_t) then (
