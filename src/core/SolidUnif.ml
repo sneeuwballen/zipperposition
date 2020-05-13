@@ -72,7 +72,7 @@ module Make (St : sig val st : Flex_state.t end) = struct
         let args' = List.map (fun arg -> 
             if Type.is_fun (T.ty arg) then (
               let arg = Lambda.eta_reduce arg in
-              if T.is_bvar arg || not exception_on_error then arg else raise NotInFragment
+              if (T.is_bvar arg && T.is_ground arg) || not exception_on_error then arg else raise NotInFragment
             ) else (
               let arg = Lambda.snf arg in
               if T.is_ground arg || not exception_on_error then arg else raise NotInFragment

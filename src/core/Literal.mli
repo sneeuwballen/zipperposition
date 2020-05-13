@@ -186,6 +186,8 @@ val as_inj_def : t -> (ID.t * (Term.var * Term.var) list) option
 val is_pure_var : t -> bool
 val as_pos_pure_var : t -> (Term.var * Term.var) option
 
+val max_term_positions : ord:Ordering.t -> t -> int
+
 val fold_terms :
   ?position:Position.t -> ?vars:bool -> ?var_args:bool -> ?fun_bodies:bool -> ?ty_args:bool -> 
   which:[<`Max|`All] ->

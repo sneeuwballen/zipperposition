@@ -173,11 +173,11 @@ let prefer_app_var ~ord lits =
       ho_sel_driver lits prefer_av_feature
     )
 
-let weight_based_sel_driver ?(blocker=(fun _ -> false)) ~ord lits f =
+let weight_based_sel_driver ?(blocker=(fun _ _ -> false)) ~ord lits f =
   let min_lit = 
     CCArray.to_seq lits
     |> Iter.filter_mapi (fun i l ->
-      if can_select_lit ~ord lits i && not (blocker l) 
+      if can_select_lit ~ord lits i && not (blocker i l) 
       then Some (l,i)
       else None)
     |> Iter.map (fun (lit, lit_idx) -> f (lit_idx,lit), lit_idx) 
@@ -186,7 +186,7 @@ let weight_based_sel_driver ?(blocker=(fun _ -> false)) ~ord lits f =
   | None -> BV.empty ()
   | Some (_, idx) -> 
     assert(can_select_lit ~ord lits idx);
-    assert(not (blocker (CCArray.get lits idx)));
+    assert(not (blocker idx (CCArray.get lits idx)));
     let res = BV.empty () in
     BV.set res idx;
     res
@@ -226,7 +226,7 @@ let get_pred_freq ~freq_tbl l =
     end
   | _ -> max_int
 
-let e_sel ?(blocker=(fun _ -> false)) ~ord lits = 
+let e_sel ?(blocker=(fun _ _ -> false)) ~ord lits = 
   let chooser ~freq_tbl (i,l) = 
     ((if Lit.is_pos l then 1 else 0),
      (if Lits.is_max ~ord lits i then 0 else 100 +
@@ -242,13 +242,13 @@ let e_sel2 ~ord lits =
                 |> ID.Set.to_seq 
                 |> Iter.sort ~cmp:ID.compare 
                 |> Iter.to_array in
-  let blocker l = Lit.is_type_pred l || Lit.is_propositional l in
-  let chooser (_,l) = 
+  let blocker _ l = Lit.is_type_pred l || Lit.is_propositional l in
+  let chooser (idx ,l) = 
     let sign_val = if Lit.is_pos l then 1 else 0 in 
     let diff_val = -(lit_sel_diff_w l) in
     let prec = Ordering.precedence ord in
     match l with 
-    | Equation(lhs,_,sign) when not @@ blocker l ->
+    | Equation(lhs,_,sign) when not @@ blocker idx l ->
       if T.is_var (T.head_term lhs) then (
         (sign_val, 0, 0, diff_val)
       ) else (
@@ -269,7 +269,7 @@ let e_sel2 ~ord lits =
     | _ -> (sign_val,max_int,max_int,diff_val) (* won't be chosen *) in
   weight_based_sel_driver ~ord ~blocker lits chooser
 
-let e_sel3 ?(blocker=(fun _ -> false)) ~ord lits = 
+let e_sel3 ?(blocker=(fun _ _ -> false)) ~ord lits = 
   let chooser (i,l) = 
     let sign = (if Lit.is_pos l then 1 else 0) in
     if Lit.is_pure_var l then (
@@ -300,7 +300,7 @@ let e_sel4 ~ord lits =
     ) else if not @@ Lit.is_type_pred l then (
       (sign, 20, -(T.ho_weight lhs), hd_freq)
     ) else (sign, max_int, max_int, max_int) in
-  let blocker = Lit.is_type_pred in
+  let blocker _ l = Lit.is_type_pred l in
   weight_based_sel_driver ~ord ~blocker lits chooser 
 
 let e_sel5 ~ord lits =
@@ -325,7 +325,7 @@ let e_sel6 ~ord lits =
     (if is_oriented l then 0 else 1),
     (- (Lit.weight l)),
     0 in
-  let blocker t = not @@ is_oriented t in
+  let blocker _ t = not @@ is_oriented t in
   weight_based_sel_driver ~ord lits chooser ~blocker
 
 let e_sel7 ~ord lits = 
@@ -351,14 +351,14 @@ let e_sel8 ~ord lits =
        | `At idx -> idx
        | _       -> max_int)
     | _ -> max_int  in
-  let blocker l = Lit.is_type_pred l || Lit.is_propositional l in
+  let blocker _ l = Lit.is_type_pred l || Lit.is_propositional l in
   let chooser (i,l) =
     if is_truly_equational l then (
       (if Lit.is_pos l then 1 else 0),
       min_int, 0, lit_sel_diff_w l
     ) else (
       (if Lit.is_pos l then 1 else 0),
-      (if not (blocker l) then -(get_arity l) else max_int), 
+      (if not (blocker i l) then -(get_arity l) else max_int), 
       alpha_rank l, lit_sel_diff_w l
     )
   in
@@ -399,7 +399,7 @@ let e_sel10 ~ord lits =
 
 let e_sel11 ~ord lits =
   let freq_tbl = pred_freq ~ord lits in
-  let blocker l = Lit.is_type_pred l in
+  let blocker _ l = Lit.is_type_pred l in
   let eqn_max_weight = function 
   | Lit.Equation(lhs,rhs,false) ->
     if Ordering.compare ord lhs rhs  == Comparison.Gt then Term.ho_weight lhs 
@@ -434,6 +434,71 @@ let e_sel13 ~ord lits =
     (- (lit_sel_diff_w l)),
     0 in
   weight_based_sel_driver ~ord lits chooser
+
+let e_sel14 ~ord lits =
+  let freq_tbl = pred_freq ~ord lits in
+
+  let blocked = CCBV.create ~size:(CCArray.length lits) false in
+
+  let chooser (i,l) =
+    let hd_freq = get_pred_freq ~freq_tbl l in
+    let hd_is_fresh_pred = function
+      | Lit.Equation(lhs, rhs, _) when T.is_true_or_false rhs -> 
+        begin match T.as_const (T.head_term lhs) with
+        | Some c -> ID.is_postcnf_skolem c
+        | None -> false end
+      | _ -> false in
+    let max_val = (max_int, max_int, max_int) in
+
+    let block i = 
+      CCBV.set blocked i;
+      max_val in
+    
+    if Lit.is_pos l ||  hd_is_fresh_pred l then block i
+    else if Lit.is_ground l then (0, Lit.weight l, hd_freq)
+    else if not (Lit.is_typex_pred l) then (10, Lit.max_term_positions ~ord l, hd_freq)
+    else if not (Lit.is_type_pred l) then (20, - (Lit.ho_weight l), hd_freq)
+    else block i in
+  
+  let blocker i _ = CCBV.get blocked i in
+
+  weight_based_sel_driver ~ord lits chooser ~blocker
+
+let e_sel15 ~ord lits =
+  let (<+>) = CCOpt.Infix.(<+>)  in
+  let lits_l = CCList.mapi (fun i l -> (i,l)) (CCArray.to_list lits) in
+  let sel_bv = CCBV.create ~size:(CCArray.length lits) false in
+  let res = 
+    (* find first negative pure var lit *)
+    (CCList.find_map (fun (i, l) ->
+      if Lit.is_neg l && Lit.is_pure_var l then (
+        CCBV.set sel_bv i;
+        Some sel_bv
+      ) else None
+    ) lits_l)
+  <+>
+    (* else find smallest negative ground lit *)
+    (lits_l
+     |> CCList.filter_map (fun (i, l) -> 
+          if Lit.is_neg l && Lit.is_ground l then (
+            Some (i, Lit.ho_weight l)
+          ) else None)
+     |> CCList.to_seq
+     |> Iter.min ~lt:(fun (_, w1) (_, w2) -> w1 < w2)
+     |> CCOpt.map (fun (i,_) -> CCBV.set sel_bv i; sel_bv))
+  <+>
+    (* else if there is a _single_ maximal positive literal,
+       do not select anything *)
+    (let max_lits = Literals.maxlits ~ord lits in
+     if CCBV.cardinal max_lits = 1 &&
+        Lit.is_pos lits.(CCBV.first_exn max_lits) then (
+        assert(CCBV.is_empty sel_bv);
+        Some sel_bv
+     ) else None)
+  <+>
+    (* else behave as SelectNewComplexAHPNS  *)
+    Some (e_sel14 ~ord lits) in
+  CCOpt.get_exn res
 
 let ho_sel ~ord lits = 
   let chooser (i,l) = 
@@ -499,12 +564,12 @@ let ho_sel3 ~ord lits =
   weight_based_sel_driver ~ord lits chooser
 
 let ho_sel4 ~ord =
-  e_sel3 ~ord ~blocker:(function 
+  e_sel3 ~ord ~blocker:(fun _ -> function 
     | Literal.Equation(lhs,rhs,_) -> T.is_app_var lhs || T.is_app_var rhs
     | _ -> false)
 
 let ho_sel5 ~ord =
-  e_sel ~ord ~blocker:(function 
+  e_sel ~ord ~blocker:(fun _ -> function 
     | Literal.Equation(lhs,rhs,_) -> T.is_app_var lhs || T.is_app_var rhs
     | _ -> false)
 
@@ -524,9 +589,9 @@ let l =
       "default", default;
       "avoid_app_var", avoid_app_var;
       "prefer_app_var", prefer_app_var;
-      "e-selection", e_sel ~blocker:(fun _ -> false);
+      "e-selection", e_sel ~blocker:(fun _ _ -> false);
       "e-selection2", e_sel2;
-      "e-selection3", e_sel3 ~blocker:(fun _ -> false);
+      "e-selection3", e_sel3 ~blocker:(fun _ _ -> false);
       "e-selection4", e_sel4;
       "e-selection5", e_sel5;
       "e-selection6", e_sel6;
@@ -537,6 +602,8 @@ let l =
       "e-selection11", e_sel11;
       "e-selection12", e_sel12;
       "e-selection13", e_sel13;
+      "e-selection14", e_sel14;
+      "e-selection15", e_sel15;
       "ho-selection", ho_sel;
       "ho-selection2", ho_sel2;
       "ho-selection3", ho_sel3;

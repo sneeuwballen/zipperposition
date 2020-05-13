@@ -70,6 +70,7 @@ let k_sup_at_vars = Flex_state.create_key ()
 let k_sup_in_var_args = Flex_state.create_key ()
 let k_sup_under_lambdas = Flex_state.create_key ()
 let k_sup_at_var_headed = Flex_state.create_key ()
+let k_sup_from_var_headed = Flex_state.create_key ()
 let k_fluidsup = Flex_state.create_key ()
 let k_subvarsup = Flex_state.create_key ()
 let k_dupsup = Flex_state.create_key ()
@@ -82,6 +83,7 @@ let k_ext_rules_kind = Flex_state.create_key ()
 let k_use_simultaneous_sup = Flex_state.create_key ()
 let k_unif_alg = Flex_state.create_key ()
 let k_fluidsup_penalty = Flex_state.create_key ()
+let k_dupsup_penalty = Flex_state.create_key ()
 let k_ground_subs_check = Flex_state.create_key ()
 let k_solid_subsumption = Flex_state.create_key ()
 let k_dot_sup_into = Flex_state.create_key ()
@@ -286,6 +288,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let sup_in_var_args = Env.flex_get k_sup_in_var_args in
     let sup_under_lambdas = Env.flex_get k_sup_under_lambdas in
     let sup_at_var_headed = Env.flex_get k_sup_at_var_headed in
+    let sup_from_var_headed = Env.flex_get k_sup_from_var_headed in
     let fluidsup = Env.flex_get k_fluidsup in
     let subvarsup = Env.flex_get k_subvarsup in
     let dupsup = Env.flex_get k_dupsup in
@@ -388,6 +391,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Lits.fold_eqn ~ord ~both:true ~sign:true
         ~eligible:(C.Eligible.param c) (C.lits c)
       |> Iter.filter((fun (l, _, _, _) -> not (T.equal l T.false_)))
+      |> Iter.filter(fun (l, _, _, _) -> 
+          sup_from_var_headed || not (T.is_app_var l))
       |> Iter.fold
         (fun tree (l, _, sign, pos) ->
            assert sign;
@@ -697,7 +702,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     assert (info.sup_kind == LambdaSup || InnerTerm.DB.closed (info.u_p:T.t:>InnerTerm.t));
     assert (not(T.is_var info.u_p) || T.is_ho_var info.u_p || info.sup_kind = FluidSup);
     assert (Env.flex_get k_sup_at_var_headed || info.sup_kind = FluidSup || 
-            info.sup_kind = DupSup || not (T.is_var (T.head_term info.u_p)));
+            info.sup_kind = DupSup || info.sup_kind = SubVarSup || not (T.is_var (T.head_term info.u_p)));
     let active_idx = Lits.Pos.idx info.active_pos in
     let shift_vars = if info.sup_kind = LambdaSup then 0 else -1 in
     let passive_idx, passive_lit_pos = Lits.Pos.cut info.passive_pos in
@@ -882,9 +887,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         let pen_a = C.penalty info.active in
         let pen_b = C.penalty info.passive in
         (if pen_a == 1 && pen_b == 1 then 1 else pen_a + pen_b)
-        + (if T.is_var s' then 2 else 0) (* superposition from var = bad *)
+        + (if info.sup_kind == Classic && T.is_var s' then 2 else 0) (* superposition from var = bad *)
         + (if info.sup_kind == FluidSup then Env.flex_get k_fluidsup_penalty else 0)
-        + (if info.sup_kind == DupSup then Env.flex_get k_fluidsup_penalty/3 else 0)
+        + (if info.sup_kind == DupSup then Env.flex_get k_dupsup_penalty else 0)
         + (if info.sup_kind == LambdaSup then 1 else 0)
 
       in
@@ -3640,6 +3645,7 @@ let _dot_simpl = ref None
 let _dont_simplify = ref false
 let _sup_at_vars = ref false
 let _sup_at_var_headed = ref true
+let _sup_from_var_headed = ref true
 let _sup_in_var_args = ref true
 let _sup_under_lambdas = ref true
 let _lambda_demod = ref false
@@ -3648,6 +3654,7 @@ let _dot_demod_into = ref None
 let _complete_ho_unification = ref false
 let _switch_stream_extraction = ref false
 let _fluidsup_penalty = ref 9
+let _dupsup_penalty = ref 2
 let _fluidsup = ref true
 let _subvarsup = ref true
 let _dupsup = ref true
@@ -3714,6 +3721,7 @@ let register ~sup =
   E.flex_add k_sup_in_var_args !_sup_in_var_args;
   E.flex_add k_sup_under_lambdas !_sup_under_lambdas;
   E.flex_add k_sup_at_var_headed !_sup_at_var_headed;
+  E.flex_add k_sup_from_var_headed !_sup_from_var_headed;
   E.flex_add k_fluidsup !_fluidsup;
   E.flex_add k_subvarsup !_subvarsup;
   E.flex_add k_dupsup !_dupsup;
@@ -3729,6 +3737,7 @@ let register ~sup =
 
   E.flex_add k_use_simultaneous_sup !_use_simultaneous_sup;  
   E.flex_add k_fluidsup_penalty !_fluidsup_penalty;
+  E.flex_add k_dupsup_penalty !_dupsup_penalty;
   E.flex_add k_ground_subs_check !_ground_subs_check;
   E.flex_add k_solid_subsumption !_solid_subsumption;
   E.flex_add k_dot_sup_into !_dot_sup_into;
@@ -3805,6 +3814,7 @@ let () =
       "--dont-simplify", Arg.Set _dont_simplify, " disable simplification rules";
       "--sup-at-vars", Arg.Bool (fun v -> _sup_at_vars := v), " enable/disable superposition at variables under certain ordering conditions";
       "--sup-at-var-headed", Arg.Bool (fun b -> _sup_at_var_headed := b), " enable/disable superposition at variable headed terms";
+      "--sup-from-var-headed", Arg.Bool (fun b -> _sup_from_var_headed := b), " enable/disable superposition from variable headed terms";
       "--sup-in-var-args", Arg.Bool (fun b -> _sup_in_var_args := b), " enable/disable superposition in arguments of applied variables";
       "--sup-under-lambdas", Arg.Bool (fun b -> _sup_under_lambdas := b), " enable/disable superposition in bodies of lambda-expressions";
       "--lambda-demod", Arg.Bool (fun b -> _lambda_demod := b), " enable/disable demodulation in bodies of lambda-expressions";
@@ -3829,6 +3839,7 @@ let () =
       , " Perform Ext-Sup, Ext-EqFact, or Ext-EqRes rules only when all disagreements are HO" ^
         " or when there exists a HO disagremeent";
       "--fluidsup-penalty", Arg.Int (fun p -> _fluidsup_penalty := p), " penalty for FluidSup inferences";
+      "--dupsup-penalty", Arg.Int (fun p -> _dupsup_penalty := p), " penalty for DupSup inferences";
       "--bool-eq-fact", Arg.Bool ((:=) _bool_eq_fact), " turn bool eq-fact on or off";
       "--fluidsup", Arg.Bool (fun b -> _fluidsup :=b), " enable/disable FluidSup inferences (only effective when complete higher-order unification is enabled)";
       "--subvarsup", Arg.Bool ((:=) _subvarsup), " enable/disable SubVarSup inferences";
@@ -3968,3 +3979,4 @@ let () =
       _sup_at_vars := false;
       _check_sup_at_var_cond := false;
   );
+

@@ -1189,6 +1189,15 @@ let is_pure_var lit =
     end
   | _ -> false
 
+let max_term_positions ~ord = function
+  | Equation (lhs, rhs, _) ->
+    begin match Ordering.compare ord lhs rhs with 
+    | Comparison.Gt -> Term.ho_weight lhs
+    | Comparison.Lt -> Term.ho_weight rhs
+    | _ -> Term.ho_weight lhs + Term.ho_weight rhs
+    end
+  | _ -> 1
+
 let as_pos_pure_var lit =
   match View.as_eqn lit with 
   | Some (l, r, true) when is_pure_var lit && is_pos lit -> Some(_as_var l,_as_var r)

@@ -497,7 +497,9 @@ module Make(E : Env.S) : S with module Env = E = struct
             ) else (
               (mk_or ~proof_cons ~rule_name [T.Form.not_ lhs; T.Form.not_ rhs] c i)
               @ (mk_or ~proof_cons ~rule_name [lhs; rhs] c i)) in
-          let pen_inc = if (T.is_ground lhs && T.is_ground rhs) then 0 else 1 in
+          let pen_inc = 
+            if (T.is_ground lhs && T.is_ground rhs) then 0 
+            else (if T.is_app_var lhs || T.is_app_var rhs then 3 else 1) in
           List.iter (fun c -> C.inc_penalty c pen_inc) new_cls;
           new_cls @ acc
         ) else acc) []
