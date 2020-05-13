@@ -175,16 +175,17 @@ let prefer_app_var ~ord lits =
 
 let weight_based_sel_driver ?(blocker=(fun _ _ -> false)) ~ord lits f =
   let min_lit = 
-    CCArray.to_seq lits
-    |> Iter.filter_mapi (fun i l ->
-      if can_select_lit ~ord lits i && not (blocker i l) 
-      then Some (l,i)
-      else None)
-    |> Iter.map (fun (lit, lit_idx) -> f (lit_idx,lit), lit_idx) 
-    |> Iter.min in
+    CCArray.to_iter lits
+    |> Iter.mapi (fun i l -> f (i,l), i)
+    |> Iter.sort
+    |> Iter.find_map (fun (_,i) ->
+      let lit = lits.(i) in
+      if can_select_lit ~ord lits i && not (blocker i lit) 
+      then Some (lit,i)
+      else None) in
   match min_lit with
   | None -> BV.empty ()
-  | Some (_, idx) -> 
+  | Some (_, idx) ->
     assert(can_select_lit ~ord lits idx);
     assert(not (blocker idx (CCArray.get lits idx)));
     let res = BV.empty () in
@@ -450,19 +451,19 @@ let e_sel14 ~ord lits =
       | _ -> false in
     let max_val = (max_int, max_int, max_int) in
 
-    let block i = 
-      CCBV.set blocked i;
+    let block b i = 
+      CCBV.set b i;
       max_val in
     
-    if Lit.is_pos l ||  hd_is_fresh_pred l then block i
+    if Lit.is_pos l ||  hd_is_fresh_pred l then (CCFormat.printf "blocking1 %d@." i; block blocked i)
     else if Lit.is_ground l then (0, Lit.weight l, hd_freq)
     else if not (Lit.is_typex_pred l) then (10, Lit.max_term_positions ~ord l, hd_freq)
     else if not (Lit.is_type_pred l) then (20, - (Lit.ho_weight l), hd_freq)
-    else block i in
+    else (CCFormat.printf "blocking2 %d@." i; block blocked i) in
   
-  let blocker i _ = CCBV.get blocked i in
+  let blocker blocked i l = CCBV.get blocked i in
 
-  weight_based_sel_driver ~ord lits chooser ~blocker
+  weight_based_sel_driver ~ord lits chooser ~blocker:(blocker blocked)
 
 let e_sel15 ~ord lits =
   let (<+>) = CCOpt.Infix.(<+>)  in
