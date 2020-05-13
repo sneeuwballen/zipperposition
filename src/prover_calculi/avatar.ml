@@ -609,6 +609,20 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     E.add_generate ~priority:1000 "avatar_check_sat" check_satisfiability;
     E.add_generate ~priority:100 "avatar.lemmas" inf_new_lemmas;
     E.add_clause_conversion convert_lemma;
+
+    if split_kind != `Off then 
+      Signal.on E.on_start (fun () -> 
+        E.get_passive ()
+        |> Iter.iter (fun cl ->
+          match split cl with 
+          | None -> ()
+          | Some splitted ->
+            E.remove_passive (Iter.singleton cl);
+            E.add_passive (Iter.of_list splitted)
+        );
+
+      Signal.ContinueListening
+    );
     E.add_is_trivial_trail trail_is_trivial;
     if E.flex_get k_simplify_trail then (
       E.add_unary_simplify simplify_trail;

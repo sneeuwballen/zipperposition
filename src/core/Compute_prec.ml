@@ -12,6 +12,7 @@ let section = Util.Section.(make ~parent:root) "compute_prec"
 let _alpha_precedence = ref false
 let _custom_weights = ref ""
 let _from_prec = ref false
+let _rank = ref None
 let _kbo_const_weight = ref None
 
 type 'a parametrized = Statement.clause_t Iter.t -> 'a
@@ -70,17 +71,25 @@ let _add_custom_weights weights arg_coeff=
       | Failure _ | Not_found -> failwith "Syntax error in custom weights"
     ) (weights, arg_coeff) input_list
 
-let weight_fun_of_prec ~symbols ~prec_fun =
+let weight_fun_of_prec ?(rank=None) ~symbols ~prec_fun =
+  let symbol_to_rank idx =
+    let sym_no = ID.Set.cardinal symbols in
+    match rank with 
+    | Some numb_ranks when sym_no > numb_ranks ->
+      let divider = sym_no / numb_ranks in
+      (idx / divider) + 1
+    | _ -> idx + 1 in
+
   let w_tbl =
-    ID.Set.fold (fun f tbl -> 
-      let num_greater = ID.Set.fold (fun g acc ->  
-        let inc = if Precedence.Constr.compare_by prec_fun g f > 0 then 1 else 0 in
-        acc + inc
-      ) symbols 1 in
-      ID.Map.add f num_greater tbl
-    ) symbols ID.Map.empty in
+    ID.Set.to_list symbols
+    (* inverse sorting, we want the number of *larger* symbols *)
+    |> List.sort (fun f g -> Precedence.Constr.compare_by prec_fun g f)
+    |> CCList.foldi (fun tbl idx f -> 
+        ID.Map.add f (symbol_to_rank idx) tbl) 
+       ID.Map.empty in
+
   function id ->
-    let res = CCOpt.get_or ~default:max_int (ID.Map.get id w_tbl) in
+    let res = CCOpt.get_or ~default:5 (ID.Map.get id w_tbl) in
     Precedence.Weight.int res
 
 let force_const_weight ~weight ~signature = function
@@ -114,7 +123,7 @@ let mk_precedence ~db_w ~lmb_w ~signature t seq =
   let constr = (if !_alpha_precedence then Precedence.Constr.alpha else constr) in
   let weight = 
     (if !_from_prec 
-     then weight_fun_of_prec ~symbols:(ID.Set.of_list symbols) ~prec_fun:constr 
+     then weight_fun_of_prec ~rank:!_rank ~symbols:(ID.Set.of_list symbols) ~prec_fun:constr 
      else t.weight_rule seq) in
   let weight,arg_coeff = _add_custom_weights weight _default_arg_coeff in
   let weight = force_const_weight ~weight ~signature !_kbo_const_weight in
@@ -133,7 +142,10 @@ let () =
     , " use pure alphabetical precedence"
     ; "--kbo-weight-fun-from-precedence", 
       Arg.Bool ((:=) _from_prec),
-      " assign to each symbol the weight equal to the number of symbols greater than it in the precedence"
+      " assign to each symbol the weight equal to the number of symbols greater than it in the precedence";
+    "--kbo-weight-fun-from-precedence-rank", 
+      Arg.Int (fun i -> _rank := Some i),
+      " split the symbols from the precedence in *n* ranks"
     ; "--kbo-const-weight", 
       Arg.Int (fun v -> _kbo_const_weight := Some v),
       " force the weight of constants to this value in KBO"
