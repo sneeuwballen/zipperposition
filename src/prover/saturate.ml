@@ -210,6 +210,11 @@ module Make(E : Env.S) = struct
               inferred_clauses
           in
           let inferred_clauses = Env.immediate_simplify c inferred_clauses in
+          let inferred_clauses =
+            (* After forward simplification, do cheap multi simplification like AVATAR *)
+            Iter.flat_map_l (fun c -> 
+              CCOpt.get_or ~default:[c] (Env.cheap_multi_simplify c)
+            ) inferred_clauses in
           CCVector.append_seq new_clauses inferred_clauses;
           Util.debugf ~section 2 "@[<2>inferred @{<green>new clauses@}:@ [@[<v>%a@]]@]"
             (fun k->k (Util.pp_seq Env.C.pp) (CCVector.to_seq new_clauses));

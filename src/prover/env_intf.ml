@@ -136,6 +136,11 @@ module type S = sig
   (** Add a multi-clause simplification rule, that is going to be applied
       only once, not in a fixed-point manner *)
 
+  val add_cheap_multi_simpl_rule : multi_simpl_rule -> unit
+  (** Add an efficient multi-clause simplification rule,
+      that will be used to simplify newly generated clauses
+      when they are moved from unprocessed to passive set. *)
+
   val add_is_trivial_trail : is_trivial_trail_rule -> unit
   (** Add tautology detection rule *)
 
@@ -263,6 +268,9 @@ module type S = sig
   val forward_simplify : simplify_rule
   (** Simplify the clause w.r.t to the active set and experts *)
 
+  val cheap_multi_simplify : C.t -> C.t list option
+  (** Cheap simplifications that can result in multiple clauses (e.g. AVATAR splitting) *)
+
   val immediate_simplify : C.t -> C.t Iter.t -> (C.t Iter.t)
   (** Simplify given clause using its children. Given clause is
       removed from active set and result of this rule is added to passive set,
@@ -299,8 +307,12 @@ module type S = sig
   (** [flex_get k] is the same as [Flex_state.get_exn k (flex_state ())].
       @raise Not_found if the key is not present *)
 
+  (* The following signals are raised only existentially  *)
   val on_pred_var_elimination : (C.t * Term.t) Signal.t
   (** this signal is raised if a formula that universally quantifies
       a predicate removes that predicate and rules that want to instantiate it
       early should listen to this *)
+
+  val on_pred_skolem_introduction : (C.t * Term.t) Signal.t
+  (** this signal is raised when a predicate Skolem is introduced  *)
 end

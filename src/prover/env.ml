@@ -121,6 +121,7 @@ module Make(X : sig
   let _is_trivial : is_trivial_rule list ref = ref []
   let _empty_clauses = ref C.ClauseSet.empty
   let _multi_simpl_rule : multi_simpl_rule list ref = ref []
+  let _cheap_msr : multi_simpl_rule list ref = ref []
   let _ss_multi_simpl_rule : multi_simpl_rule list ref = ref []
   let _generate_rules : (int * string * generate_rule) list ref = ref []
   let _clause_conversion_rules : clause_conversion_rule list ref = ref []
@@ -230,6 +231,9 @@ module Make(X : sig
 
   let add_multi_simpl_rule rule =
     _multi_simpl_rule := rule :: !_multi_simpl_rule
+  
+  let add_cheap_multi_simpl_rule rule =
+    _cheap_msr := rule :: !_cheap_msr
 
   let add_single_step_multi_simpl_rule rule =
     _ss_multi_simpl_rule := rule :: !_ss_multi_simpl_rule
@@ -360,6 +364,7 @@ module Make(X : sig
     C.ClauseSet.mem c (ProofState.PassiveSet.clauses ())
 
   let on_pred_var_elimination = Signal.create ()
+  let on_pred_skolem_introduction = Signal.create ()
 
   module StrSet = CCSet.Make(String)
 
@@ -696,6 +701,29 @@ module Make(X : sig
   let forward_simplify c =
     let open SimplM.Infix in
     ho_normalize c >>= rewrite >>= rw_simplify >>= unary_simplify
+
+  let cheap_multi_simplify c = 
+    let rec apply_rules ~rules c =
+      match rules with
+      | [] -> None
+      | r :: rs ->
+        CCOpt.or_lazy ~else_:(fun () -> apply_rules rs c) (r c) in
+    
+    let q = Queue.create () in
+    Queue.add c q;
+    let res = ref [] in
+    let any_simplified = ref false in
+
+    while not (Queue.is_empty q) do
+      let c = Queue.pop q in
+      match apply_rules ~rules:!_cheap_msr c with
+      | None -> res := c :: !res
+      | Some simplified ->
+        any_simplified := true;
+        List.iter (fun c -> Queue.add c q) simplified;
+    done;
+
+    if !any_simplified then Some !res else None
 
   (** generate all clauses from inferences *)
   let generate given =

@@ -194,7 +194,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       | T.App(hd, _) -> T.equal hd var
       | _ -> false
     )
-
+  
   let instantiate_w_bool ~clause ~var ~trigger =
     assert(Type.equal (T.ty var) (T.ty trigger));
 
@@ -212,6 +212,22 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* CCFormat.printf "instatiate:@.c:@[%a@]@.subst:@[%a@]@.res:@[%a@]@." C.pp clause Subst.pp subst C.pp res; *)
     res
 
+  let insert_new_trigger t =
+    (* CCFormat.printf "trigger(@[%a@])=@[%a@]@." C.pp cl T.pp t; *)
+    let triggers = Type.Map.get_or ~default:[] (T.ty t) !_trigger_bools in
+    if not (CCList.mem ~eq:T.equal t triggers) then (
+      _trigger_bools := Type.Map.update (T.ty t) (function 
+        | None -> Some [t]
+        | Some res -> Some (t :: res)
+      ) !_trigger_bools;
+
+      Type.Map.get_or ~default:[] (T.ty t) !_cls_w_pred_vars
+      |> CCList.map (fun (clause,var) -> instantiate_w_bool ~clause ~var ~trigger:t)
+      |> CCList.to_iter
+      |> Env.add_passive
+    )
+
+
   let handle_new_pred_var_clause (clause,var) =
     assert(T.is_var var);
     let ty = T.ty var in
@@ -228,26 +244,25 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
     Signal.ContinueListening
 
+  let handle_new_skolem_sym (c,trigger) =
+    let trig_hd = T.head_term trigger in
+    assert(T.is_const trig_hd);
+    assert(ID.is_postcnf_skolem (T.as_const_exn trig_hd));
+
+    if C.proof_depth c <  Env.flex_get k_trigger_bool_inst 
+    then  insert_new_trigger trigger;
+    
+    Signal.ContinueListening
+
+
   let update_triggers cl =
     (* if triggered boolean instantiation is off
        k_trigger_bool_inst is -1 *)
     if C.proof_depth cl < Env.flex_get k_trigger_bool_inst then (
       let new_triggers = (get_triggers cl) in
       if not (Iter.is_empty new_triggers) then (
-        Iter.iter (fun t ->
-          (* CCFormat.printf "trigger(@[%a@])=@[%a@]@." C.pp cl T.pp t; *)
-          let triggers = Type.Map.get_or ~default:[] (T.ty t) !_trigger_bools in
-          if not (CCList.mem ~eq:T.equal t triggers) then (
-            _trigger_bools := Type.Map.update (T.ty t) (function 
-              | None -> Some [t]
-              | Some res -> Some (t :: res)
-            ) !_trigger_bools;
-            Type.Map.get_or ~default:[] (T.ty t) !_cls_w_pred_vars
-            |> CCList.map (fun (clause,var) -> instantiate_w_bool ~clause ~var ~trigger:t)
-            |> CCList.to_iter
-            |> Env.add_passive)
-        ) new_triggers
-      ));
+        Iter.iter insert_new_trigger new_triggers
+    ));
     Signal.ContinueListening
 
   let fluidsup_applicable cl =
@@ -3609,6 +3624,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       );
       if Env.flex_get k_trigger_bool_inst > 0 then (
         Signal.on Env.on_pred_var_elimination handle_new_pred_var_clause;
+        Signal.on Env.on_pred_skolem_introduction handle_new_skolem_sym;
       );
     )
     else (

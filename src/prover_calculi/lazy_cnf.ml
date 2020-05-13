@@ -418,6 +418,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                     T.VarSet.to_list (T.VarSet.of_seq free_vars) in
                 let (id,ty), t = T.mk_fresh_skolem ~prefix:"sk" free_vars_l var_ty in
                 E.Ctx.declare id ty;
+                Signal.send Env.on_pred_skolem_introduction (c, t);
                 _skolem_idx := Idx.add !_skolem_idx f (t, ref[]);
                 t
             ) in

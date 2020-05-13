@@ -591,13 +591,20 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     ZProf.exit_prof prof_check;
     res
 
-  let register ~split:do_split () =
-    Util.debugf ~section:Const.section 2 "register extension Avatar (split: %B)"
-      (fun k->k do_split);
+  let register ~split_kind () =
+    let split_to_str = function
+      | `Lazy -> "lazy"
+      | `Eager -> "eager"
+      | `Off -> "off" in
+
+    Util.debugf ~section:Const.section 2 "register extension Avatar (split: %s)"
+      (fun k->k (split_to_str split_kind));
     Sat.set_printer BBox.pp;
-    if do_split then (
-      E.add_multi_simpl_rule split;
-    );
+    (match split_kind with
+    | `Lazy -> E.add_multi_simpl_rule split
+    | `Eager -> E.add_cheap_multi_simpl_rule split
+    | `Off -> ());
+    
     E.add_unary_inf "avatar_check_empty" check_empty;
     E.add_generate ~priority:1000 "avatar_check_sat" check_satisfiability;
     E.add_generate ~priority:100 "avatar.lemmas" inf_new_lemmas;
@@ -619,7 +626,7 @@ end
 
 let get_env (module E : Env.S) : (module S) = E.flex_get k_avatar
 
-let enabled_ = ref true
+let avatar_kind = ref `Lazy
 let show_lemmas_ = ref false
 let simplify_trail_ = ref true
 let back_simplify_trail_ = ref true
@@ -648,14 +655,18 @@ let extension =
     E.flex_add k_infer_from_components !infer_from_components;
 
     Util.debug 1 "enable Avatar";
-    A.register ~split:!enabled_ ()
+    A.register ~split_kind:!avatar_kind ()
   in
   Extensions.({default with name="avatar"; env_actions=[action]})
 
 let () =
   Params.add_opts
-    [ "--avatar", Arg.Set enabled_, " enable Avatar splitting"
-    ; "--no-avatar", Arg.Clear enabled_, " disable Avatar splitting"
+    [ "--avatar", Arg.Symbol (["lazy";"eager";"off"],
+        (fun s -> match s with 
+          | "lazy" -> avatar_kind := `Lazy
+          | "eager" -> avatar_kind := `Eager
+          | "off" -> avatar_kind := `Off
+          | _ -> assert false)), " enable Avatar splitting"
     ; "--print-lemmas", Arg.Set show_lemmas_, " show status of Avatar lemmas"
     ; "--avatar-simp-trail", Arg.Set simplify_trail_, " simplify boolean trails in Avatar"
     ; "--no-avatar-simp-trail", Arg.Clear simplify_trail_, " do not simplify boolean trails in Avatar"
@@ -685,5 +696,5 @@ let () =
     ; "lambda-free-purify-intensional"
     ; "lambda-free-purify-extensional"] 
     (fun () ->
-       enabled_ := false
+       avatar_kind := `Off
     );
