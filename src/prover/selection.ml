@@ -455,11 +455,11 @@ let e_sel14 ~ord lits =
       CCBV.set b i;
       max_val in
     
-    if Lit.is_pos l ||  hd_is_fresh_pred l then (CCFormat.printf "blocking1 %d@." i; block blocked i)
+    if Lit.is_pos l ||  hd_is_fresh_pred l then (block blocked i)
     else if Lit.is_ground l then (0, Lit.weight l, hd_freq)
     else if not (Lit.is_typex_pred l) then (10, Lit.max_term_positions ~ord l, hd_freq)
     else if not (Lit.is_type_pred l) then (20, - (Lit.ho_weight l), hd_freq)
-    else (CCFormat.printf "blocking2 %d@." i; block blocked i) in
+    else (block blocked i) in
   
   let blocker blocked i l = CCBV.get blocked i in
 
