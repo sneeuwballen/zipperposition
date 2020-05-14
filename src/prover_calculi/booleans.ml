@@ -249,7 +249,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         | AppBuiltin(Or, l) -> T.Set.of_list l
         | _ -> T.Set.singleton c in
 
-      if not (T.Set.is_empty (T.Set.inter ps cs)) then T.true_
+      if T.equal p c || not (T.Set.is_empty (T.Set.inter ps cs)) then T.true_
       else if T.equal p T.true_ then aux c
       else if T.equal p T.false_ then T.true_
       else if T.equal c T.false_ then aux (T.Form.not_ p)

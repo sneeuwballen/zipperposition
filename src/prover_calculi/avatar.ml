@@ -142,13 +142,13 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
             !components
         in
         let clauses, bool_clause = List.split clauses_and_names in
-        Util.debugf ~section 1 "@[split of @[%a@]@ yields @[%a@]@]"
+        Util.debugf ~section 2 "@[split of @[%a@]@ yields @[%a@]@]"
           (fun k->k C.pp c (Util.pp_list C.pp) clauses);
         (* add boolean constraint: trail(c) => bigor_{name in clauses} name *)
 
         let bool_clause = List.append bool_clause bool_guard in
         Sat.add_clause ~proof:(proof ~rule:(Proof.Rule.mk "split")) bool_clause;
-        Util.debugf ~section 1 "@[constraint clause is @[%a@]@]"
+        Util.debugf ~section 2 "@[constraint clause is @[%a@]@]"
           (fun k->k BBox.pp_bclause bool_clause);
         (* return the clauses *)
         Some clauses
@@ -171,6 +171,14 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
        Trail.length (C.trail c) <= E.flex_get k_max_trail_size) in
 
     let res = if (should_split c) then simplify_split_ c else None in
+    
+    (match res with 
+    | None -> Util.debugf ~section 1 "Clause @[%a@] cannot be split@." (fun k -> k C.pp c);
+    | Some res ->
+      Util.debugf ~section 1 "Clause @[%a@] split into:@.@[%a@]@." 
+        (fun k -> k C.pp c (CCList.pp C.pp) res));
+
+
     ZProf.exit_prof prof_splits;
     res
 
