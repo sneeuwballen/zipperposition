@@ -36,6 +36,7 @@ let k_back_simplify_trail : bool Flex_state.key = Flex_state.create_key()
 let k_abstract_known_singletons : bool Flex_state.key = Flex_state.create_key()
 let k_split_only_initial : bool Flex_state.key = Flex_state.create_key()
 let k_split_only_goals : bool Flex_state.key = Flex_state.create_key()
+let k_split_only_ground : bool Flex_state.key = Flex_state.create_key()
 let k_max_trail_size : int Flex_state.key = Flex_state.create_key()
 let k_infer_from_components : bool Flex_state.key = Flex_state.create_key()
 
@@ -161,6 +162,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     let should_split c = 
       (not @@ Literals.is_trivial (C.lits c)) &&
       (not @@ E.flex_get k_split_only_initial || C.proof_depth c == 0) &&
+      (not @@ E.flex_get k_split_only_ground || C.is_ground c) &&
       (not @@ E.flex_get k_split_only_goals || 
        CCOpt.get_or ~default:(-1) (C.distance_to_goal c) >= 0) &&
       (not @@ E.flex_get k_abstract_known_singletons ||
@@ -655,6 +657,7 @@ let back_simplify_trail_ = ref true
 let abstract_known_singletons = ref false
 let split_only_initial = ref false
 let split_only_goals = ref false
+let split_only_ground = ref false
 let max_trail_size = ref (-1)
 let infer_from_components = ref false
 
@@ -673,6 +676,7 @@ let extension =
     E.flex_add k_abstract_known_singletons !abstract_known_singletons;
     E.flex_add k_split_only_initial !split_only_initial;
     E.flex_add k_split_only_goals !split_only_goals;
+    E.flex_add k_split_only_ground !split_only_ground;
     E.flex_add k_max_trail_size !max_trail_size;
     E.flex_add k_infer_from_components !infer_from_components;
 
@@ -700,6 +704,7 @@ let () =
       " set of SAT clauses."
     ; "--split-only-initial", Arg.Bool (fun b -> split_only_initial :=  b), " split only initial clauses"
     ; "--split-only-goals", Arg.Bool (fun b -> split_only_goals :=  b), " split only clauses that interacted with goal"
+    ; "--split-only-ground", Arg.Bool ((:=) split_only_ground), " split only ground clauses"
     ; "--max-trail-size", Arg.Int (fun v -> max_trail_size := v), 
       " sets the limit of the trail size that a clause can have to be splittable. " ^
       " Negative value sets the limit to infinity"
