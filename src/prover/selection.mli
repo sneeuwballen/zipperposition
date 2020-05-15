@@ -90,6 +90,10 @@ val e_sel15 : ord:Ordering.t -> t
 (** Selection function  identical to E's 
     SelectVGNonCR *)
 
+val e_sel16 : ord:Ordering.t -> t
+(** Selection function  identical to E's 
+    SelectCQArNT *)
+
 val ho_sel  : ord:Ordering.t -> t
 (** Selection function that tries to take 
     into account the number of nested applied variables.

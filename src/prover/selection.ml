@@ -501,6 +501,27 @@ let e_sel15 ~ord lits =
     Some (e_sel14 ~ord lits) in
   CCOpt.get_exn res
 
+let e_sel16 ~ord lits =
+  let blocked = CCBV.create ~size:(Array.length lits) false in
+  let chooser (i,l) =
+    match l with 
+    | Lit.Equation(lhs,rhs, _) ->
+      let hd_val =
+        if not (T.is_const (T.head_term lhs)) then 0
+        else ID.id (T.as_const_exn (T.head_term lhs)) in
+      if T.is_true_or_false rhs then (
+        (* predicate literal *)
+        (-2, hd_val, lit_sel_diff_w l)
+      ) else if Lit.is_type_pred l then (
+        (* equational literal *)
+        CCBV.set blocked i;
+        (max_int, max_int, max_int)
+      ) else (
+        let hd_arity = List.length (Type.expected_args (T.ty (Term.head_term lhs))) in
+        (-hd_arity, hd_val, lit_sel_diff_w l))
+      | _ -> (max_int,max_int,max_int) in
+  weight_based_sel_driver ~ord lits chooser ~blocker:(fun i _ -> CCBV.get blocked i)
+
 let ho_sel ~ord lits = 
   let chooser (i,l) = 
     let sign = (if Lit.is_pos l then 1 else 0) in
@@ -605,6 +626,7 @@ let l =
       "e-selection13", e_sel13;
       "e-selection14", e_sel14;
       "e-selection15", e_sel15;
+      "e-selection16", e_sel16;
       "ho-selection", ho_sel;
       "ho-selection2", ho_sel2;
       "ho-selection3", ho_sel3;
