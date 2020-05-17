@@ -611,7 +611,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       (fun k->k (split_to_str split_kind));
     Sat.set_printer BBox.pp;
     (match split_kind with
-    | `Lazy -> E.add_multi_simpl_rule ~priority:1 split
+    | `Lazy -> E.add_multi_simpl_rule ~priority:0 split
     | `Eager -> E.add_cheap_multi_simpl_rule split
     | `Off -> ());
     

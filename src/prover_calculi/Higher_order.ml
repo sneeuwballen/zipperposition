@@ -956,7 +956,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         Proof.Step.inference ~rule:(Proof.Rule.mk "ho.refine.early.bird") 
           ~tags:[Proof.Tag.T_ho; Proof.Tag.T_cannot_orphan]
           [C.proof_parent_subst renaming (cl, sc) subst] in
-      let res = C.create_a lits proof ~penalty:(C.penalty cl + p) ~trail:(C.trail cl) in
+      let res = C.create_a lits proof ~penalty:(C.penalty cl + (max (p-1) 0)) ~trail:(C.trail cl) in
       (* CCFormat.printf "orig:@[%a@]@.subst:@[%a@]@.res:@[%a@]@." C.pp cl Subst.pp subst C.pp res; *)
       res)
     |> CCList.to_seq
