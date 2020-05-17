@@ -1194,8 +1194,10 @@ let cnf_of_seq ~ctx ?(opts=[]) (seq:Stmt.input_t Iter.t) : _ CCVector.t =
   in
   (* simplify and introduce definitions *)
   let v =
+    if List.mem LazyCnf opts then CCVector.of_seq seq
+    else (
     flatten ~should_define:(not disable_renaming) ~ctx seq
-    |> simplify_and_rename ~ctx ~disable_renaming ~preprocess
+    |> simplify_and_rename ~ctx ~disable_renaming ~preprocess)
   in
   (* reduce the new formulas to CNF *)
   let res = CCVector.create () in

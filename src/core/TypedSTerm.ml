@@ -870,7 +870,9 @@ module Form = struct
     match flattened with
     | [] when not parsing -> true_
     | [t] when not parsing -> t 
-    | _ ->  app_builtin ?loc ~ty:Ty.prop Builtin.And (flattened)
+    | _ -> 
+      app_builtin ?loc ~ty:Ty.prop Builtin.And 
+        (if parsing then l else flattened)
 
   let or_ ?loc l = 
     let flattened = flatten_ `Or [] l in
@@ -878,7 +880,8 @@ module Form = struct
     match flattened with
     | [] when not parsing -> false_
     | [t] when not parsing -> t 
-    | _ ->  app_builtin ?loc ~ty:Ty.prop Builtin.Or (flattened)
+    | _ ->  app_builtin ?loc ~ty:Ty.prop Builtin.Or 
+      (if parsing then l else flattened)
 
   let not_ ?loc f = 
     assert(Ty.is_prop (ty_exn f));
@@ -1621,7 +1624,8 @@ let simplify_formula t =
       bind ~ty s v (aux body)
     | _ -> t in
   
-  aux t
+  let res = aux t in
+  res
 
 
 (** {2 Conversion} *)
