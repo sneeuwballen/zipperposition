@@ -194,7 +194,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let setup () =
     Util.debug ~section 1 "setup fool rules";
     Env.add_unary_inf "fool_param" fool_param;
-    Env.add_multi_simpl_rule rw_bool_lits;
+    Env.add_multi_simpl_rule ~priority:5 rw_bool_lits;
     Env.add_unary_inf "fool_elim_var" fool_elim_var;
     ()
 end

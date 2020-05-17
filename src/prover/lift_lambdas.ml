@@ -182,7 +182,7 @@ let lift_lambdas_t ~parent ~counter t  =
 
   let setup () =
     if Env.flex_get k_live_lifting then (
-      Env.add_multi_simpl_rule lift_lambdas_simp
+      Env.add_multi_simpl_rule ~priority:5 lift_lambdas_simp
     );
     if Env.flex_get k_post_cnf_lifting then (
       Env.add_clause_conversion lift_lambdas_cnf

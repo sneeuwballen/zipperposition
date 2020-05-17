@@ -552,13 +552,13 @@ module Make(E : Env.S) : S with module Env = E = struct
         Env.add_basic_simplify normalize_bool_terms
       );
       if Env.flex_get k_elim_bvars then (
-        Env.add_multi_simpl_rule elim_bvars
+        Env.add_multi_simpl_rule ~priority:2 elim_bvars
       );
       if not !Lazy_cnf.enabled then (
-        Env.add_multi_simpl_rule Fool.rw_bool_lits;
+        Env.add_multi_simpl_rule ~priority:2 Fool.rw_bool_lits;
         if Env.flex_get k_cnf_non_simpl then (
           Env.add_unary_inf "cnf otf inf" cnf_infer;
-        ) else  Env.add_multi_simpl_rule cnf_otf);
+        ) else  Env.add_multi_simpl_rule ~priority:2 cnf_otf);
       if (Env.flex_get k_interpret_bool_funs) then (
         Env.add_unary_inf "interpret boolean functions" interpret_boolean_functions;
       );

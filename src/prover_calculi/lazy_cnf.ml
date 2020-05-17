@@ -553,17 +553,17 @@ module Make(E : Env.S) : S with module Env = E = struct
       | `Inf -> Env.add_unary_inf "lazy_cnf" lazy_clausify_inf
       | `Simp -> 
           Env.add_unary_inf "elim eq" clausify_eq;
-          Env.add_multi_simpl_rule lazy_clausify_simpl 
+          Env.add_multi_simpl_rule ~priority:5 lazy_clausify_simpl 
       end;
 
       (* ** IMPORTANT **
          RENAMING MUST BE ADDED AFTER CLAUSIFICATION RULES (so that
          it runs ***before*** lazy_clausify_simpl) *)
       if Env.flex_get k_renaming_threshold > 0 then(
-        Env.add_multi_simpl_rule rename_subformulas
+        Env.add_multi_simpl_rule ~priority:5 rename_subformulas
       );
       if Env.flex_get k_scoping != `Off then (
-        Env.add_multi_simpl_rule cnf_scope;
+        Env.add_multi_simpl_rule ~priority:5 cnf_scope;
       )
     )
 end

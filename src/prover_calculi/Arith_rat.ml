@@ -1439,7 +1439,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.add_unary_inf "rat_eq_factoring" canc_equality_factoring;
     Env.add_binary_inf "rat_ineq_chaining" canc_ineq_chaining;
     Env.add_unary_inf "rat_ineq_factoring" canc_ineq_factoring;
-    Env.add_multi_simpl_rule eliminate_unshielded;
+    Env.add_multi_simpl_rule ~priority:5 eliminate_unshielded;
     Env.add_unary_simplify canc_demodulation;
     Env.add_backward_simplify canc_backward_demodulation;
     Env.add_is_trivial is_tautology;
@@ -1450,7 +1450,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     if !enable_demod_ineq_ then (
       Env.add_active_simplify demod_ineq;
     );
-    Env.add_multi_simpl_rule eliminate_unshielded;
+    Env.add_multi_simpl_rule ~priority:5 eliminate_unshielded;
     (* completeness? I don't think so *)
     Ctx.lost_completeness ();
     (* enable AC-property of sum *)

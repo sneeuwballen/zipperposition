@@ -346,7 +346,7 @@ module Make(Env : Env_intf.S) = struct
       Util.debug ~section 2 "setup inductive types calculus";
       Env.add_is_trivial acyclicity_trivial;
       Env.add_unary_simplify acyclicity_simplify;
-      Env.add_multi_simpl_rule injectivity_destruct_pos;
+      Env.add_multi_simpl_rule ~priority:5 injectivity_destruct_pos;
       Env.add_lit_rule "ind_types.disjointness" disjointness;
       Env.add_unary_inf "ind_types.acyclicity" acyclicity_inf;
       Env.add_unary_inf "ind_types.exhaustiveness" exhaustiveness

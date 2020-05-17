@@ -129,7 +129,7 @@ module type S = sig
   val add_unary_simplify : simplify_rule -> unit
   (** Add unary simplification rule (not dependent on proof state)  *)
 
-  val add_multi_simpl_rule : multi_simpl_rule -> unit
+  val add_multi_simpl_rule : priority:int -> multi_simpl_rule -> unit
   (** Add a multi-clause simplification rule *)
 
   val add_single_step_multi_simpl_rule : multi_simpl_rule -> unit

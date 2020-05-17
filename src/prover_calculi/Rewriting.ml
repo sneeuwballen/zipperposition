@@ -297,7 +297,7 @@ module Make(E : Env_intf.S) = struct
       E.add_binary_inf "ctx_narrow" contextual_narrowing;
     );
     if has_rw then  E.Ctx.lost_completeness ();
-    E.add_multi_simpl_rule simpl_clause;
+    E.add_multi_simpl_rule ~priority:5 simpl_clause;
     ()
 end
 

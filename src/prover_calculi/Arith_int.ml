@@ -2169,8 +2169,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.add_binary_inf "div_chaining" canc_div_chaining;
     Env.add_unary_inf "divisibility" canc_divisibility;
     Env.add_unary_inf "div_case_switch" canc_div_case_switch;
-    Env.add_multi_simpl_rule canc_div_prime_decomposition;
-    Env.add_multi_simpl_rule eliminate_unshielded;
+    Env.add_multi_simpl_rule ~priority:5 canc_div_prime_decomposition;
+    Env.add_multi_simpl_rule ~priority:5 eliminate_unshielded;
     Env.add_lit_rule "canc_lit_of_lit" canc_lit_of_lit;
     Env.add_lit_rule "less_to_lesseq" canc_less_to_lesseq;
     (* transformation ≠ to ≤ *)
@@ -2188,7 +2188,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     if !enable_demod_ineq_ then (
       Env.add_active_simplify demod_ineq;
     );
-    Env.add_multi_simpl_rule eliminate_unshielded;
+    Env.add_multi_simpl_rule ~priority:5 eliminate_unshielded;
     (* completeness? I don't think so *)
     Ctx.lost_completeness ();
     (* enable AC-property of sum *)

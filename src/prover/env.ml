@@ -120,7 +120,7 @@ module Make(X : sig
   let _is_trivial_trail : is_trivial_trail_rule list ref = ref []
   let _is_trivial : is_trivial_rule list ref = ref []
   let _empty_clauses = ref C.ClauseSet.empty
-  let _multi_simpl_rule : multi_simpl_rule list ref = ref []
+  let _multi_simpl_rule : (int * multi_simpl_rule) list ref = ref []
   let _cheap_msr : multi_simpl_rule list ref = ref []
   let _ss_multi_simpl_rule : multi_simpl_rule list ref = ref []
   let _generate_rules : (int * string * generate_rule) list ref = ref []
@@ -229,8 +229,13 @@ module Make(X : sig
   let add_lit_rule name rule =
     _lit_rules := (name, rule) :: !_lit_rules
 
-  let add_multi_simpl_rule rule =
-    _multi_simpl_rule := rule :: !_multi_simpl_rule
+  let add_multi_simpl_rule ~priority rule =
+    _multi_simpl_rule := 
+      CCList.sorted_insert ~cmp:(fun (p1,_) (p2,_) -> CCInt.compare p1 p2) 
+        (priority,rule) !_multi_simpl_rule
+
+  let multi_simpl_rules () =
+    List.map snd !_multi_simpl_rule
   
   let add_cheap_multi_simpl_rule rule =
     _cheap_msr := rule :: !_cheap_msr
@@ -593,7 +598,7 @@ module Make(X : sig
       if not (C.ClauseSet.mem c !set) then (
         let c, st = unary_simplify c in
         if st = `New then did_something := true;
-        match try_next c !_multi_simpl_rule with
+        match try_next c (multi_simpl_rules ()) with
         | None ->
           (* keep the clause! *)
           set := C.ClauseSet.add c !set;
@@ -702,7 +707,7 @@ module Make(X : sig
     let open SimplM.Infix in
     ho_normalize c >>= rewrite >>= rw_simplify >>= unary_simplify
 
-  let cheap_multi_simplify c = 
+  let _apply_multi_rules ~rule_list c = 
     let rec apply_rules ~rules c =
       match rules with
       | [] -> None
@@ -716,14 +721,19 @@ module Make(X : sig
 
     while not (Queue.is_empty q) do
       let c = Queue.pop q in
-      match apply_rules ~rules:!_cheap_msr c with
+      match apply_rules ~rules:rule_list c with
       | None -> res := c :: !res
       | Some simplified ->
         any_simplified := true;
         List.iter (fun c -> Queue.add c q) simplified;
     done;
 
-    if !any_simplified then Some !res else None
+    (!res, !any_simplified)
+
+  let cheap_multi_simplify c = 
+    let res,any_simplified = _apply_multi_rules ~rule_list:!_cheap_msr c in
+
+    if any_simplified then Some res else None
 
   (** generate all clauses from inferences *)
   let generate given =
