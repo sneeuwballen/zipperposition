@@ -566,8 +566,33 @@ let sine_axiom_selector ?(depth_start=1) ?(depth_end=3) ?(tolerance=2.0) formula
     ID.Set.singleton sym in
 
 
-  let symset_of_ax ax =
+  let symset_of_ax ?(is_goal=false) ax =
+    let eliminate_long_implications ~is_goal f =
+      let _elim_long_imps f =
+        let rec aux f =
+          match TST.Form.view f with
+          | TST.Form.Imply(lhs, rhs) ->
+            let is_form t = 
+              match TST.Form.view t with 
+              | Atom _ -> false
+              | _ -> true in
+            if not (is_form lhs) then (
+              let premises, concl = aux rhs in
+              lhs::premises, concl
+            ) else ([], f)
+          | _ -> ([], f) in
+        let premises, concl = aux f in
+        if CCList.length premises > 5 
+        then (
+          Util.debugf ~section 2 "trimmed @[%a@] into @[%a@]@." (fun k -> k TST.pp f TST.pp concl);
+          concl)
+        else f in
+
+      if not is_goal then f
+      else _elim_long_imps f in
+
     Seq.forms ax
+    |> Iter.map (eliminate_long_implications ~is_goal)
     |> Iter.flat_map TST.Seq.symbols
     |> ID.Set.of_seq 
     |> (fun symset -> 
@@ -575,8 +600,8 @@ let sine_axiom_selector ?(depth_start=1) ?(depth_end=3) ?(tolerance=2.0) formula
             ID.Set.union (unroll_defined_symbols def_sym) acc
           ) symset ID.Set.empty) in
 
-  let symset_of_axs axs =
-    List.fold_left (fun acc c -> ID.Set.union acc (symset_of_ax c)) ID.Set.empty axs in
+  let symset_of_axs ?(is_goal=false) axs =
+    List.fold_left (fun acc c -> ID.Set.union acc (symset_of_ax ~is_goal c)) ID.Set.empty axs in
 
   let triggered_by_syms ~triggers syms =
     ID.Set.fold (fun id acc -> 
@@ -630,7 +655,8 @@ let sine_axiom_selector ?(depth_start=1) ?(depth_end=3) ?(tolerance=2.0) formula
   (* now tbl contains occurences of all symbols *)
 
   let triggers = create_trigger_map ~tbl axioms in
-  let conj_syms = symset_of_axs goals in
+  let conj_syms = symset_of_axs ~is_goal:true goals in
+  Util.debugf ~section 2 "conj_syms:@[%a@]" (fun k -> k (ID.Set.pp ID.pp) conj_syms);
   let triggered_1 = triggered_by_syms ~triggers conj_syms in
 
   let rec take_axs k processed_syms k_triggered_axs = 
