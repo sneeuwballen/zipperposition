@@ -82,6 +82,8 @@ let k_ho_prim_mode :
     | `Full | `Pragmatic | `Simple | `None ] Flex_state.key 
    = Flex_state.create_key()
 let k_ho_prim_max_penalty : int Flex_state.key = Flex_state.create_key()
+let k_ground_app_vars :  [ `Off | `Fresh | `All ] Flex_state.key  = Flex_state.create_key()
+
 
 module Make(E : Env.S) : S with module Env = E = struct
   module Env = E
@@ -1203,6 +1205,45 @@ module Make(E : Env.S) : S with module Env = E = struct
     )
   (* TODO: Simplified flag like in first-order? Profiler?*)
 
+  let groundings = Type.Tbl.create 32
+  let ground_app_vars ~mode c =
+    assert(mode != `Off);
+    let app_var = 
+      C.Seq.vars c
+      |> Iter.filter (fun v -> Type.is_fun (HVar.ty v) && Type.is_ground (HVar.ty v))
+      |> Iter.head in
+
+    let get_groundings var =
+      let introduce_new_const ty =
+        let (f_id, f_ty), f = Term.mk_fresh_skolem [] ty in
+        C.Ctx.add_signature (Signature.declare (C.Ctx.signature ()) f_id f_ty);
+        f in
+      let ty = T.ty var in
+      match mode with
+      | `Off -> []
+      | `Fresh ->
+        [Type.Tbl.get_or_add groundings ~f:introduce_new_const ~k:ty]
+      | `All ->
+        let ids = Signature.find_by_type (C.Ctx.signature ()) ty in
+        if not (ID.Set.is_empty ids) then List.map (Term.const ~ty) (ID.Set.to_list ids)
+        else [Type.Tbl.get_or_add groundings ~f:introduce_new_const ~k:ty] 
+    in
+    CCOpt.map (fun v ->
+      let inst repl =
+        assert (T.is_ground repl);
+        let subst = Subst.FO.bind' Subst.empty (v,0) (repl,0) in
+        let renaming = Subst.Renaming.none in
+        let p = 
+          Proof.Step.simp ~rule:(Proof.Rule.mk "ground_app_vars") ~tags:[Proof.Tag.T_ho]
+            [C.proof_parent_subst renaming (c,0) subst] in
+        let res = C.apply_subst ~renaming ~proof:(Some p) (c,0) subst in
+        (* CCFormat.printf "grond: @[%a@] => @[%a@]@." C.pp c C.pp res;
+        CCFormat.printf "proof: @[%a@]@." Proof.S.pp_tstp (C.proof res); *)
+        res in
+      List.map inst (get_groundings (T.var v))
+    ) app_var
+
+
   let prim_enum_simpl ~mode c =
     if C.proof_depth c < max_penalty_prim_ then (
       (* Primitive enumeration will replace the original clause with 
@@ -1358,6 +1399,13 @@ module Make(E : Env.S) : S with module Env = E = struct
     ) else (
       Util.debug ~section 1 "setup HO rules";
       Env.Ctx.lost_completeness();
+
+      if Env.flex_get k_ground_app_vars != `Off then (
+        let mode = Env.flex_get k_ground_app_vars in
+        E.add_cheap_multi_simpl_rule (ground_app_vars ~mode);
+        E.add_multi_simpl_rule ~priority:1000 (ground_app_vars ~mode)
+      );
+
       Env.add_basic_simplify normalize_equalities;
       if Env.flex_get k_elim_pred_var then
         Env.add_unary_inf "ho_elim_pred_var" elim_pred_variable;
@@ -1536,6 +1584,7 @@ let _use_diff_for_neg_ext = ref false
 let _generalize_choice_trigger = ref false
 let _prim_enum_simpl = ref false
 let _prim_enum_early_bird = ref false
+let _ground_app_vars = ref `Off
 
 let extension =
   let register env =
@@ -1563,6 +1612,7 @@ let extension =
     E.flex_add k_generalize_choice_trigger !_generalize_choice_trigger;
     E.flex_add k_prim_enum_simpl !_prim_enum_simpl;
     E.flex_add k_prim_enum_early_bird !_prim_enum_early_bird;
+    E.flex_add k_ground_app_vars !_ground_app_vars;
 
 
     if E.flex_get k_check_lambda_free = `Only 
@@ -1675,6 +1725,13 @@ let () =
                                  " whenever a variable is applied to different arguments." ^
                                  " 'int' purifies whenever a variable appears applied and unapplied.";
       "--ho-eta", eta_opt, " eta-expansion/reduction";
+      "--ground-app-vars", 
+        Arg.Symbol (["off"; "fresh"; "all"], (fun kind ->
+          match kind with 
+          | "off" -> _ground_app_vars := `Off
+          | "fresh" -> _ground_app_vars := `Fresh
+          | "all" -> _ground_app_vars := `All
+          | _ -> assert false)), " ground all applied variables to either all constants of the right type in signature or a fresh constant";
       "--ho-use-diff-for-neg-ext", Arg.Bool ((:=) _use_diff_for_neg_ext), " use diff constant for NegExt rule instead of fresh skolem";
       "--ho-generalize-choice-trigger", Arg.Bool ((:=) _generalize_choice_trigger), " apply choice trigger to a fresh variable";
       "--check-lambda-free", Arg.Symbol (["true";"false";"only"], fun s -> match s with 

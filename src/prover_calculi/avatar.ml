@@ -612,7 +612,10 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     Sat.set_printer BBox.pp;
     (match split_kind with
     | `Lazy -> E.add_multi_simpl_rule ~priority:0 split
-    | `Eager -> E.add_cheap_multi_simpl_rule split
+    | `Eager -> 
+      E.add_cheap_multi_simpl_rule split;
+      (* this rule is used to interfere with lazy clausification *)
+      E.add_multi_simpl_rule ~priority:0 split
     | `Off -> ());
     
     E.add_unary_inf "avatar_check_empty" check_empty;

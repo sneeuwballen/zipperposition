@@ -12,6 +12,7 @@ let k_renaming_threshold = Flex_state.create_key ()
 let k_rename_eq = Flex_state.create_key ()
 let k_scoping = Flex_state.create_key ()
 let k_solve_formulas = Flex_state.create_key ()
+let k_skolem_mode = Flex_state.create_key ()
 
 
 let section = Util.Section.make ~parent:Const.section "lazy_cnf"
@@ -344,6 +345,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       miniscope b f
     | _ -> None
 
+  let choice_tbl = Type.Tbl.create 32
   let lazy_clausify_driver ?(ignore_eq=false) ~proof_cons c =
     let return l =
       Iter.of_list l, `Stop in
@@ -352,7 +354,36 @@ module Make(E : Env.S) : S with module Env = E = struct
       Iter.empty, `Continue in
 
     let eligible_for_ignore_eq ~ignore_eq lhs rhs = 
-      not (T.is_true_or_false lhs) && not (T.is_true_or_false rhs) in
+      ignore_eq && not (T.is_true_or_false lhs) && not (T.is_true_or_false rhs) in
+
+    let get_skolem ~free_vars ~ret_ty ~mode f = 
+      match mode with 
+      | `Skolem ->
+        let gen = Iter.head @@ 
+        Idx.retrieve_generalizations (!_skolem_idx, 0) (f, 1) in
+        begin match gen with 
+        | Some (orig, (skolem, _), subst) ->
+          Subst.FO.apply Subst.Renaming.none subst (skolem,0) 
+        | None ->
+          let free_vars_l = 
+              T.VarSet.to_list (T.VarSet.of_seq free_vars) in
+          let (id,ty), t = T.mk_fresh_skolem ~prefix:"sk" free_vars_l ret_ty in
+          E.Ctx.declare id ty;
+          Signal.send Env.on_pred_skolem_introduction (c, t);
+          _skolem_idx := Idx.add !_skolem_idx f (t, ref[]);
+          t end
+      | `Choice ->
+        let hd = Type.Tbl.get_or_add choice_tbl ~f:(fun ty ->
+          let arg_tys, ret_ty_form = Type.open_fun ty in
+          assert(List.length arg_tys == 1);
+          assert(Type.is_prop ret_ty_form);
+          assert(Type.equal (List.hd arg_tys) ret_ty);
+          let (hd_id, hd_ty), res =
+            Term.mk_fresh_skolem ~prefix:"$_choose" [] (Type.arrow [ty] (List.hd arg_tys)) in
+          E.Ctx.declare hd_id hd_ty;
+          res
+        ) ~k:(T.ty f) in
+        T.app hd [f] in
 
     Util.debugf ~section 2 "lazy_cnf(@[%a@])@." (fun k -> k C.pp c);
 
@@ -408,19 +439,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             if hd = ForallConst then (
               T.var @@ HVar.make ~ty:var_ty var_id
             ) else (
-              let gen = Iter.head @@ 
-                Idx.retrieve_generalizations (!_skolem_idx, 0) (f, 1) in
-              match gen with 
-              | Some (orig, (skolem, _), subst) ->
-                Subst.FO.apply Subst.Renaming.none subst (skolem,0) 
-              | None ->
-                let free_vars_l = 
-                    T.VarSet.to_list (T.VarSet.of_seq free_vars) in
-                let (id,ty), t = T.mk_fresh_skolem ~prefix:"sk" free_vars_l var_ty in
-                E.Ctx.declare id ty;
-                Signal.send Env.on_pred_skolem_introduction (c, t);
-                _skolem_idx := Idx.add !_skolem_idx f (t, ref[]);
-                t
+              get_skolem ~free_vars ~ret_ty:var_ty ~mode:(Env.flex_get k_skolem_mode) f
             ) in
           let res = Lambda.eta_reduce @@ Lambda.snf @@ T.app f [subst_term] in
           assert(Type.is_prop (T.ty res));
@@ -540,7 +559,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let lazy_clausify_inf c =
     let proof_cons = Proof.Step.inference ~infos:[] ~tags:[Proof.Tag.T_live_cnf] in
-    let res = Iter.to_list (lazy_clausify_driver ~proof_cons c) in
+    let res = Iter.to_list (lazy_clausify_driver ~ignore_eq:false ~proof_cons c) in
     if not @@ CCList.is_empty res then (
       Util.debugf ~section 2 "lazy_cnf_inf(@[%a@])=" (fun k -> k C.pp c);
       Util.debugf ~section 2 "@[%a@]@." (fun k -> k (CCList.pp C.pp) res);
@@ -573,6 +592,7 @@ let _renaming_threshold = ref 8
 let _rename_eq = ref true
 let _scoping = ref `Off
 let _solve_formulas = ref false
+let _skolem_mode = ref `Skolem
 
 let extension =
   let register env =
@@ -583,6 +603,7 @@ let extension =
     E.flex_add k_rename_eq !_rename_eq;
     E.flex_add k_scoping !_scoping;
     E.flex_add k_solve_formulas !_solve_formulas;
+    E.flex_add k_skolem_mode !_skolem_mode;
 
     let handler f c =
       f c;
@@ -622,6 +643,11 @@ let () =
     , Arg.Bool (fun v -> _solve_formulas := v)
     , " solve phi != psi eagerly using unification, where phi and psi are formulas";
     
+    "--lazy-cnf-skolem-mode", Arg.Symbol (["skolem"; "choice"], (fun str -> 
+      match str with 
+      | "skolem" -> _skolem_mode := `Skolem
+      | "choice" -> _skolem_mode := `Choice
+      | _ -> assert false)), " use lazy cnf as either simplification or inference";
     "--lazy-cnf-kind", Arg.Symbol (["inf"; "simp"], (fun str -> 
       match str with 
       | "inf" -> _lazy_cnf_kind := `Inf
