@@ -546,67 +546,19 @@ module RW = Rewrite
 module DC = RW.Defined_cst
 
 let sine_axiom_selector ?(depth_start=1) ?(depth_end=3) ?(tolerance=2.0) formulas =
-  (* calculates transitive closure of defined-using-symbol relation *)
-  let unroll_defined_symbols sym =
-    (* let rec aux sym =
-       match RW.as_defined_cst sym with 
-       | None -> ID.Set.singleton sym
-       | Some dcst ->
-        DC.rules_term_seq dcst
-        |> Iter.flat_map (fun rule ->
-          Term.Seq.symbols (RW.Term.Rule.rhs rule))
-        |> ID.Set.of_seq
-        |> (fun symset -> 
-              ID.Set.fold (fun def_sym acc -> 
-                ID.Set.union (aux def_sym) acc
-              ) symset ID.Set.empty) in
-       let res = aux sym in
-       (* CCFormat.printf "unfolded %a into @[%a@]@." ID.pp sym (ID.Set.pp ~start:"{" ~stop:"}" ID.pp) res; *)
-       res in *)
-    ID.Set.singleton sym in
-
-
   let symset_of_ax ?(is_goal=false) ax =
-    let eliminate_long_implications ~is_goal f =
-      let _elim_long_imps f =
-        let rec aux f =
-          match TST.Form.view f with
-          | TST.Form.Imply(lhs, rhs) ->
-            let is_form t = 
-              match TST.Form.view t with 
-              | Atom _ -> false
-              | _ -> true in
-            if not (is_form lhs) then (
-              let premises, concl = aux rhs in
-              lhs::premises, concl
-            ) else ([], f)
-          | _ -> ([], f) in
-        let premises, concl = aux f in
-        if CCList.length premises > 5 
-        then (
-          Util.debugf ~section 2 "trimmed @[%a@] into @[%a@]@." (fun k -> k TST.pp f TST.pp concl);
-          concl)
-        else f in
-
-      if not is_goal then f
-      else _elim_long_imps f in
-
-    Seq.forms ax
-    |> Iter.map (eliminate_long_implications ~is_goal)
+     Seq.forms ax
     |> Iter.flat_map TST.Seq.symbols
-    |> ID.Set.of_seq 
-    |> (fun symset -> 
-        ID.Set.fold (fun def_sym acc -> 
-            ID.Set.union (unroll_defined_symbols def_sym) acc
-          ) symset ID.Set.empty) in
+    |> ID.Set.of_seq in
 
   let symset_of_axs ?(is_goal=false) axs =
     List.fold_left (fun acc c -> ID.Set.union acc (symset_of_ax ~is_goal c)) ID.Set.empty axs in
 
-  let triggered_by_syms ~triggers syms =
+  let triggered_by_syms ~ids_to_defs ~triggers syms =
     ID.Set.fold (fun id acc -> 
-        let triggered = ID.Tbl.get_or triggers id ~default:InpStmSet.empty in
-        (InpStmSet.elements triggered) @ acc) 
+        let axs = ID.Tbl.get_or triggers id ~default:InpStmSet.empty in
+        let defs = ID.Map.get_or id ids_to_defs ~default:InpStmSet.empty in
+        (InpStmSet.elements axs) @ (InpStmSet.elements defs) @  acc) 
       syms [] in
 
   let count_occ ~tbl ax = 
@@ -637,19 +589,57 @@ let sine_axiom_selector ?(depth_start=1) ?(depth_end=3) ?(tolerance=2.0) formula
       axioms;
     map in
 
-  let axioms, goals =
-    Iter.to_list formulas
-    |> CCList.partition (fun st -> match view st with 
-        | Goal _ | NegatedGoal _ -> false
-        | _ -> true) in
+  let ids_to_defs_compute defs =
+    let rec aux map d = 
+      let update_map map id stm =
+        let prev = ID.Map.get_or ~default:InpStmSet.empty id map in
+        ID.Map.add id (InpStmSet.add stm prev) map in
 
-  let helper_axioms, axioms =
-    CCList.partition (fun st ->
-        ID.Set.is_empty (symset_of_ax st) || 
-        match view st with 
-        | TyDecl _  -> true 
-        | _ -> false) axioms in
+      match view d with
+      | Def l ->
+        List.fold_left
+          (fun map {def_id; _} -> update_map map def_id d)
+        map l;
+      | Rewrite r ->
+          begin match r with 
+          | Def_term {id;_} -> update_map map id d
+          | Def_form {lhs;rhs;polarity=pol;_} ->
+            begin match lhs with 
+            | Atom(t,_) -> 
+              begin match TST.head t with 
+              | Some hd -> update_map map hd d
+              | None -> map 
+              end
+            | _ -> map 
+            end
+          end
+      | _ -> map in
+    List.fold_left (fun map d -> aux map d) ID.Map.empty defs in
 
+
+  let  categorize_formulas forms =
+    let rec do_categorize (defs, helpers, axioms, conjs) f =
+      match view f with 
+      | Def _ | Rewrite _ -> (f::defs, helpers, axioms, conjs)
+      | Assert _ -> (defs, helpers, f::axioms, conjs)
+      | Goal _ | NegatedGoal _ -> (defs, helpers, axioms, f :: conjs)
+      | _ -> (defs, f::helpers, axioms, conjs) in
+    
+    let rec aux acc fs = 
+      if Iter.is_empty fs then acc
+      else (
+        let hd = Iter.head_exn fs in
+        let tl = Iter.drop 1 fs in
+        aux (do_categorize acc hd) tl
+      ) in
+    
+    aux ([],[],[],[]) forms in
+
+  let defs,helper_axioms,axioms, goals = 
+    categorize_formulas formulas in
+
+  let ids_to_defs = ids_to_defs_compute defs in
+  
   let tbl = ID.Tbl.create 1024 in
   List.iter (count_occ ~tbl) axioms;
   (* now tbl contains occurences of all symbols *)
@@ -657,7 +647,7 @@ let sine_axiom_selector ?(depth_start=1) ?(depth_end=3) ?(tolerance=2.0) formula
   let triggers = create_trigger_map ~tbl axioms in
   let conj_syms = symset_of_axs ~is_goal:true goals in
   Util.debugf ~section 2 "conj_syms:@[%a@]" (fun k -> k (ID.Set.pp ID.pp) conj_syms);
-  let triggered_1 = triggered_by_syms ~triggers conj_syms in
+  let triggered_1 = triggered_by_syms ~ids_to_defs ~triggers conj_syms in
 
   let rec take_axs k processed_syms k_triggered_axs = 
     if k >= depth_end then []
@@ -665,7 +655,7 @@ let sine_axiom_selector ?(depth_start=1) ?(depth_end=3) ?(tolerance=2.0) formula
       let taken = if k >= depth_start then k_triggered_axs else [] in
       let new_syms = symset_of_axs k_triggered_axs in
       let unprocessed = ID.Set.diff new_syms processed_syms in
-      let k_p_1_triggered_ax = triggered_by_syms ~triggers unprocessed in
+      let k_p_1_triggered_ax = triggered_by_syms ~ids_to_defs ~triggers unprocessed in
       taken @ (take_axs (k+1) (ID.Set.union processed_syms unprocessed) k_p_1_triggered_ax)) 
   in
   let taken_axs = 
