@@ -207,7 +207,7 @@ let compute_prec ~signature stmts =
       fun stmts -> 
         let sym_depth =
           stmts 
-          |> Iter.flat_map Statement.Seq.terms 
+          |> Iter.flat_map Statement.Seq.terms
           |> Iter.flat_map (fun t -> Term.Seq.subterms_depth t
                                      |> Iter.filter_map (fun (st,d) -> 
                                          CCOpt.map (fun id -> (id,d)) (Term.head st)))  in
@@ -218,10 +218,7 @@ let compute_prec ~signature stmts =
     (* use "invfreq", with low priority *)
     |> Compute_prec.add_constr_rule 90
       (fun seq ->
-        let syms = 
-         seq
-         |> Iter.flat_map Statement.Seq.terms
-         |> Iter.flat_map Term.Seq.symbols in
+        let syms = Signature.Seq.symbols signature in
         Precedence.Constr.prec_fun_of_str !_prec_fun ~signature syms)
   in
   let prec = Compute_prec.mk_precedence ~signature ~db_w:!_db_w ~lmb_w:!_lmb_w cp stmts in
@@ -624,11 +621,11 @@ let () =
     " Set the function for symbol weight calculation.";
     "--prec-gen-fun", Arg.Set_string _prec_fun,
     " Set the function used for precedence generation";
-    "--sine-depth-min", Arg.Int (fun v ->  _sine_threshold:=100; _sine_d_min := v),
+    "--sine-depth-min", Arg.Int (fun v ->  if !_sine_threshold == (-1) then _sine_threshold:=100; _sine_d_min := v),
     " Turn on SinE with threshold and set min SinE depth.";
-    "--sine-depth-max", Arg.Int (fun v ->  _sine_threshold:=100; _sine_d_max := v),
+    "--sine-depth-max", Arg.Int (fun v ->  if !_sine_threshold == (-1) then _sine_threshold:=100; _sine_d_max := v),
     " Turn on SinE with threshold and set max SinE depth.";
-    "--sine-tolerance", Arg.Float (fun v ->  _sine_threshold:=100; _sine_tolerance := v),
+    "--sine-tolerance", Arg.Float (fun v ->  if !_sine_threshold == (-1) then _sine_threshold:=100; _sine_tolerance := v),
     " Turn on SinE with threshold of 100 and set SinE symbol tolerance.";
     "--sine", Arg.Set_int _sine_threshold,
     " Set SinE axiom number threshold (negative number turns it off)" ^

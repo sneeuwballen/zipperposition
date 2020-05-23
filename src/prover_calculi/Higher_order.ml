@@ -1630,15 +1630,12 @@ let extension =
 
     if !def_unfold_enabled_ then (
       (* let new_vec = *)
-      CCVector.iter (fun c -> 
-        match Statement.get_rw_rule c with
-            Some (sym, r) -> 
-              CCFormat.printf "@[%a@] is defined@." ID.pp sym;
-              Util.debugf ~section 1
-                "@[<2> Adding constant def rule: `@[%a@]`@]"
-                 (fun k->k Rewrite.Rule.pp r);
+      CCVector.iter (fun c -> match Statement.get_rw_rule c with
+            Some (sym, r) -> Util.debugf ~section 1
+                               "@[<2> Adding constant def rule: `@[%a@]`@]"
+                               (fun k->k Rewrite.Rule.pp r);
             Rewrite.Defined_cst.declare_or_add sym  r;
-          | _ -> CCFormat.printf "@[%a@] is not a definition@." Statement.pp_clause c; ()) vec (*vec in*)
+          | _ -> ()) vec (*vec in*)
     );
 
     state

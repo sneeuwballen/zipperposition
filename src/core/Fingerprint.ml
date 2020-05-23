@@ -66,6 +66,7 @@ let rec gfpf ?(depth=0) pos t =
             gfpf ~depth:(depth + exp_args_num) is arg) 
           else N
         ))
+    (* A *)
 and gfpf_root ~depth t =
   match T.view t with 
   | T.AppBuiltin(_, _) -> Ignore

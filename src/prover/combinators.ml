@@ -165,6 +165,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
 
     let narrow_app_vars clause =
+      (* CCFormat.printf "narrowing:@[%a@]@." C.pp clause; *)
       let rule = Proof.Rule.mk narrow_app_var_rule_name in
       let tags = [Proof.Tag.T_ho] in
 
@@ -206,6 +207,7 @@ module Make(E : Env.S) : S with module Env = E = struct
               Proof.Step.inference ~rule ~tags
                 [C.proof_parent_subst renaming (clause,1) subst] in
             let penalty = depth_mul * comb_penalty * C.penalty clause in
+            CCFormat.printf "penalty:%d@." penalty;
             let new_clause = C.create ~trail:(C.trail clause) ~penalty lits' proof in
 
             Util.debugf ~section 3 "success: @[%a@]@." (fun k -> k C.pp new_clause);

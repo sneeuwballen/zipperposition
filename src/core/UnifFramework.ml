@@ -227,7 +227,9 @@ module Make (P : PARAMETERS) = struct
                         Some (alg (lhs, unifscope) (rhs, unifscope) subst)
                       with 
                       | P.NotInFragment -> None
-                      | P.NotUnifiable -> raise Unif.Fail
+                      | P.NotUnifiable -> 
+                      (* CCFormat.printf "@[%a@]@ =@ @[%a@] not unif@."  T.pp lhs T.pp rhs; *)
+                      raise Unif.Fail
                     ) (P.frag_algs ()) in 
                 match mgu with 
                 | Some substs ->

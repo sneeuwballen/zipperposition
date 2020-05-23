@@ -585,6 +585,8 @@ let lambda_def_weight lm_w db_w base_weight lits =
           else 0 in
         acc + inc ) 0))
      in
+  
+
 
   let id_map = 
     Iter.fold (fun acc lit ->

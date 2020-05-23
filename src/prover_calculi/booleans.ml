@@ -239,16 +239,17 @@ module Make(E : Env.S) : S with module Env = E = struct
         else if T.equal s s' then t 
         else T.app_builtin ~ty:(Type.prop) Builtin.Not [s'] end
     | AppBuiltin(Builtin.Imply, [p;c]) ->
-      let ps p = match T.view p with 
+      let unroll_and p = match T.view p with 
         | AppBuiltin(And, l) -> T.Set.of_list l
         | _ -> T.Set.singleton p in
-      let cs p = match T.view c with 
+      let unroll_or p = match T.view p with 
         | AppBuiltin(Or, l) -> T.Set.of_list l
-        | _ -> T.Set.singleton c in
+        | _ -> T.Set.singleton p in
 
       let p' = aux p and c' = aux c in
 
-      if T.equal p' c' || not (T.Set.is_empty (T.Set.inter (ps p') (cs c'))) then T.true_
+      if T.equal p' c' || 
+         not (T.Set.is_empty (T.Set.inter (unroll_and p') (unroll_or c'))) then T.true_
       else if T.equal p' T.true_ then c'
       else if T.equal p' T.false_ then T.true_
       else if T.equal c' T.false_ then aux (T.Form.not_ p')
@@ -257,19 +258,24 @@ module Make(E : Env.S) : S with module Env = E = struct
         if T.equal p p' && T.equal c c' then t 
         else T.app_builtin ~ty:(T.ty t) Builtin.Imply [p';c'])
     | AppBuiltin((Builtin.Eq | Builtin.Equiv) as hd, ([a;b]|[_;a;b])) ->
-      if T.equal a b then T.true_ 
-      else if T.equal a T.true_ then aux b
-      else if T.equal b T.true_ then aux a
-      else if T.equal a T.false_ then aux (T.Form.not_ b)
-      else if T.equal b T.false_ then aux (T.Form.not_ a)
+      let a',b' = aux a, aux b in
+      if T.equal a' b' then T.true_ 
+      else if T.equal a' T.true_ then b'
+      else if T.equal b' T.true_ then a'
+      else if T.equal a' T.false_ then aux (T.Form.not_ b')
+      else if T.equal b' T.false_ then aux (T.Form.not_ a')
       else (
-        let a',b' = aux a, aux b in
         if T.equal a a' && T.equal b b' then t 
         else T.app_builtin ~ty:(T.ty t) hd [a';b']
       )
     | AppBuiltin((Builtin.Neq | Builtin.Xor) as hd, ([a;b]|[_;a;b])) ->
-      if T.equal a b then T.false_ else (
-        let a',b' = aux a, aux b in
+      let a',b' = aux a, aux b in
+      if T.equal a' b' then T.false_ 
+      else if T.equal a' T.true_ then aux (T.Form.not_ b')
+      else if T.equal b' T.true_ then aux (T.Form.not_ a')
+      else if T.equal a' T.false_ then b'
+      else if T.equal b' T.false_ then a'
+      else (
         if T.equal a a' && T.equal b b' then t 
         else T.app_builtin ~ty:(T.ty t) hd [a';b']
       )
@@ -296,14 +302,12 @@ module Make(E : Env.S) : S with module Env = E = struct
     try
       let new_lits = Literals.map simplify_bools (C.lits c) in
       if Literals.equal (C.lits c) new_lits then (
-        (* CCFormat.printf "@[%a@] is not simplified@." C.pp c; *)
         SimplM.return_same c
       ) else (
         let proof = Proof.Step.simp [C.proof_parent c] 
             ~rule:(Proof.Rule.mk "simplify boolean subterms") in
         let new_ = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) 
             (Array.to_list new_lits) proof in
-        (* CCFormat.printf "@[%a@] -~>@.@[%a@]@." C.pp c C.pp new_; *)
         SimplM.return_new new_
       )
     with Type.ApplyError err ->
@@ -557,7 +561,6 @@ module Make(E : Env.S) : S with module Env = E = struct
     match Env.flex_get k_bool_reasoning with 
     | BoolReasoningDisabled -> ()
     | _ ->
-      (* Env.add_unary_inf "infer_tf" HO.prim_enum_tf; *)
       Env.add_basic_simplify normalize_equalities;
       if Env.flex_get k_simplify_bools then (
         Env.add_basic_simplify simpl_bool_subterms

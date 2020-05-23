@@ -546,6 +546,7 @@ module RW = Rewrite
 module DC = RW.Defined_cst
 
 let sine_axiom_selector ?(depth_start=1) ?(depth_end=3) ?(tolerance=2.0) formulas =
+  let formulas = Iter.to_list formulas in
   let symset_of_ax ?(is_goal=false) ax =
      Seq.forms ax
     |> Iter.flat_map TST.Seq.symbols
@@ -624,13 +625,9 @@ let sine_axiom_selector ?(depth_start=1) ?(depth_end=3) ?(tolerance=2.0) formula
       | Goal _ | NegatedGoal _ -> (defs, helpers, axioms, f :: conjs)
       | _ -> (defs, f::helpers, axioms, conjs) in
     
-    let rec aux acc fs = 
-      if Iter.is_empty fs then acc
-      else (
-        let hd = Iter.head_exn fs in
-        let tl = Iter.drop 1 fs in
-        aux (do_categorize acc hd) tl
-      ) in
+    let rec aux acc = function
+    | [] -> acc
+    | x :: xs -> aux (do_categorize acc x) xs in
     
     aux ([],[],[],[]) forms in
 
@@ -672,8 +669,8 @@ let sine_axiom_selector ?(depth_start=1) ?(depth_end=3) ?(tolerance=2.0) formula
       ((InpStmSet.elements conj_defined_syms) @
       (take_axs 1 conj_syms triggered_1)) in
 
-  Util.debugf ~section 2 "taken %d axioms:@[%a@]@." 
-    (fun k -> k (List.length taken_axs) (CCList.pp CCString.pp) (List.map name taken_axs));
+  Util.debugf ~section 2 "taken %d/%d axioms:@[%a@]@." 
+    (fun k -> k (List.length taken_axs) (List.length axioms) (CCList.pp CCString.pp) (List.map name taken_axs));
 
   let res = helper_axioms @ taken_axs @ goals in
   Iter.of_list (res)

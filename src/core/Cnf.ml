@@ -1205,9 +1205,14 @@ let cnf_of_seq ~ctx ?(opts=[]) (seq:Stmt.input_t Iter.t) : _ CCVector.t =
   (* convert formula into CNF, returning a list of clauses and a list of skolems *)
   let conv_form_sk f : (ID.t * type_) list * clause list =
     Util.debugf ~section 2 "@[<2>reduce@ `@[%a@]`@ to CNF@]" (fun k->k T.pp f);
-    let view_as_cnf =
+    let view_as_cnf f =
       assert(T.Ty.is_prop (T.ty_exn f));
-      if List.mem LazyCnf opts then lazy_as_cnf else as_cnf in
+      let eligible_for_lazy_cnf f =
+        List.mem LazyCnf opts && 
+        T.Seq.vars f
+        |> Iter.for_all (fun sf -> not (T.Ty.is_tType (Var.ty sf))) in
+
+      if eligible_for_lazy_cnf f then lazy_as_cnf f else as_cnf f in
     let clauses =
       try view_as_cnf f
       with NotCNF _ | SLiteral.NotALit _ ->
