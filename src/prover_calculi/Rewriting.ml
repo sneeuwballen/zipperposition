@@ -386,7 +386,7 @@ let unfold_def_before_cnf stmts =
     CCVector.map (fun stmt ->
         incr cnt; 
         let res = rewrite_tst_stmt stmt in
-        (* CCFormat.printf "rewriting @[%a@] into @[%a@]@." Statement.pp_input stmt Statement.pp_input res; *)
+        Util.debugf ~section 1 "rewriting @[%a@]:@. @[%a@]@." (fun k -> k Statement.pp_input stmt Statement.pp_input res);
         res
       ) stmts
   ) else stmts

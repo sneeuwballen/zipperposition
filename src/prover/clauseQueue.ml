@@ -646,7 +646,7 @@ module Make(C : Clause_intf.S) = struct
         conjecture_relative_e ~conj_mul ~fresh_mul ~f ~cst ~p ~v ~max_term_mul ~max_lit_mul ~pos_mul 
       with Not_found | Invalid_argument _ ->
         invalid_arg
-          ("expected conjecture-relative-var(conj_mul:float, fresh_mul:float, f:int, const:int," ^ 
+          ("expected conjecture-relative-e(conj_mul:float, fresh_mul:float, f:int, const:int," ^ 
           "p:int, v:int, max_term_mul:float, max_lit_mul:float, pos_mul:float)")
 
     let parse_cr_struct s =

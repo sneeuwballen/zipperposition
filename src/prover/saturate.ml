@@ -139,7 +139,7 @@ module Make(E : Env.S) = struct
       begin match Env.all_simplify c with
         | [], _ ->
           Util.incr_stat stat_redundant_given;
-          Util.debugf ~section 1 "@[<2>given clause dropped@ @[%a@]@]"
+          Util.debugf ~section 2 "@[<2>given clause dropped@ @[%a@]@]"
             (fun k->k Env.C.pp c);
           Util.debugf ~section 10 "@[proof:@[%a@]@]" (fun k -> k Proof.S.pp_tstp (Env.C.proof c));
           Unknown

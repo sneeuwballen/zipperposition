@@ -17,6 +17,7 @@ let prof_skolemize = ZProf.make "cnf.skolemize"
 
 let section = Util.Section.make "cnf"
 
+
 type term = T.t
 type type_ = T.t
 type form = F.t
@@ -406,7 +407,7 @@ module Flatten = struct
            it is better not to replace Lambda with Forall.
            
            Similarly for NEQ. *)
-        when  (T.is_fun a || T.is_fun b) &&  not (T.Ty.is_prop (T.Ty.returns (T.ty_exn a))) ->
+        when  (T.is_fun a || T.is_fun b) (*&&  not (T.Ty.is_prop (T.Ty.returns (T.ty_exn a)))*) ->
         (* turn [f = λx. t] into [∀x. f x=t] *)
         let vars_forall, a, b = complete_eq a b in
         let t' = F.forall_l vars_forall (F.eq_or_equiv a b) in
@@ -418,7 +419,7 @@ module Flatten = struct
         (F.eq <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
       (* >|= aux_maybe_define ~should_define pos *)
       | T.AppBuiltin (Builtin.Neq, [a;b]) 
-        when  (T.is_fun a || T.is_fun b)  &&  not (T.Ty.is_prop (T.Ty.returns (T.ty_exn a)))   (*false*) ->
+        when  (T.is_fun a || T.is_fun b)  (*&&  not (T.Ty.is_prop (T.Ty.returns (T.ty_exn a)))*)   (*false*) ->
         (* turn [f ≠ λx. t] into [∃x. f x≠t] *)
         let vars_exist, a, b = complete_eq a b in
         let t' = F.exists_l vars_exist (F.neq_or_xor a b) in

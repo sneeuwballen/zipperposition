@@ -203,8 +203,8 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~signature ~offset 
               let subst = Subst.FO.bind' Subst.empty (v,sc_v) (t,sc_v) in
               (subst, penalty) )ts ) 
         [ l_not, 1;
-          l_and, 2;
-          l_or, 2;
+          l_and, (if mode == `Full then 2 else 1);
+          l_or, (if mode == `Full then 2 else 1);
           l_eq,  1;
           l_false, (if mode == `Full then 2 else 1);
           l_true, (if mode == `Full then 2 else 1);

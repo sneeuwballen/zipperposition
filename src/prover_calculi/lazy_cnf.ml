@@ -568,6 +568,8 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let setup () =
     if !enabled then (
+      (* orders are still not really fixed for completeness *)
+      Env.Ctx.lost_completeness ();
       begin match Env.flex_get k_lazy_cnf_kind with 
       | `Inf -> Env.add_unary_inf "lazy_cnf" lazy_clausify_inf
       | `Simp -> 

@@ -154,8 +154,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       let open Term in
       let compl_in_l l =
         let pos, neg = 
-          CCList.partition_map (fun t -> 
-              match view t with 
+          CCList.partition_map (fun t ->
+              match view t with
               | AppBuiltin(Builtin.Not, [s]) -> `Right s
               | _ -> `Left t) l
           |> CCPair.map_same Set.of_list in
@@ -176,7 +176,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             if CCList.is_empty l' then netural_el
             else (if List.length l' = 1 then List.hd l'
                   else app_builtin ~ty:(Type.prop) b l')
-          )) 
+          ))
       in
       res 
     in
@@ -191,10 +191,10 @@ module Make(E : Env.S) : S with module Env = E = struct
       if T.equal body body' then t
       else T.fun_ ty body'
     | App(hd, args) ->
-      let hd' = aux hd and  args' = List.map aux args in
+      let hd' = aux hd and args' = List.map aux args in
       if T.equal hd hd' && T.same_l args args' then t
       else T.app hd' args'
-    | AppBuiltin(Builtin.And, [x]) 
+    | AppBuiltin (Builtin.And, [x]) 
         when T.is_true_or_false x
              && ty_is_prop t
              && List.length (Type.expected_args (T.ty t)) = 1 ->
@@ -230,32 +230,30 @@ module Make(E : Env.S) : S with module Env = E = struct
         else T.app_builtin ~ty:(Type.prop) Builtin.Or l' in
       simplify_and_or t Builtin.Or l'
     | AppBuiltin(Builtin.Not, [s]) ->
-      if T.equal s T.true_ then T.false_
-      else 
-      if T.equal s T.false_ then T.true_
-      else (
-        match T.view s with 
-        | AppBuiltin(Builtin.Not, [s']) -> aux s'
-        | _ ->  
-          let s' = aux s in
-          if T.equal s s' then t else
-            T.app_builtin ~ty:(Type.prop) Builtin.Not [s'] 
-      )
+      let s' = aux s in
+      begin match T.view s' with 
+      | AppBuiltin(Builtin.Not, [s'']) -> s''
+      | _ ->  
+        if T.equal s' T.true_ then T.false_
+        else if T.equal s' T.false_ then T.true_
+        else if T.equal s s' then t 
+        else T.app_builtin ~ty:(Type.prop) Builtin.Not [s'] end
     | AppBuiltin(Builtin.Imply, [p;c]) ->
-      let ps = match T.view p with 
+      let ps p = match T.view p with 
         | AppBuiltin(And, l) -> T.Set.of_list l
         | _ -> T.Set.singleton p in
-      let cs = match T.view c with 
+      let cs p = match T.view c with 
         | AppBuiltin(Or, l) -> T.Set.of_list l
         | _ -> T.Set.singleton c in
 
-      if T.equal p c || not (T.Set.is_empty (T.Set.inter ps cs)) then T.true_
-      else if T.equal p T.true_ then aux c
-      else if T.equal p T.false_ then T.true_
-      else if T.equal c T.false_ then aux (T.Form.not_ p)
-      else if T.equal c T.true_ then T.true_
+      let p' = aux p and c' = aux c in
+
+      if T.equal p' c' || not (T.Set.is_empty (T.Set.inter (ps p') (cs c'))) then T.true_
+      else if T.equal p' T.true_ then c'
+      else if T.equal p' T.false_ then T.true_
+      else if T.equal c' T.false_ then aux (T.Form.not_ p')
+      else if T.equal c' T.true_ then T.true_
       else (
-        let p',c' = aux p, aux c in
         if T.equal p p' && T.equal c c' then t 
         else T.app_builtin ~ty:(T.ty t) Builtin.Imply [p';c'])
     | AppBuiltin((Builtin.Eq | Builtin.Equiv) as hd, ([a;b]|[_;a;b])) ->
@@ -289,21 +287,23 @@ module Make(E : Env.S) : S with module Env = E = struct
       let args' = List.map aux args in
       if T.same_l args args' then t
       else T.app_builtin ~ty:(T.ty t) hd args' in  
+  
   let res = aux t in
   assert (T.DB.is_closed res);
   res
 
   let simpl_bool_subterms c =
     try
-      C.check_types c;
       let new_lits = Literals.map simplify_bools (C.lits c) in
       if Literals.equal (C.lits c) new_lits then (
+        (* CCFormat.printf "@[%a@] is not simplified@." C.pp c; *)
         SimplM.return_same c
       ) else (
         let proof = Proof.Step.simp [C.proof_parent c] 
             ~rule:(Proof.Rule.mk "simplify boolean subterms") in
         let new_ = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) 
             (Array.to_list new_lits) proof in
+        (* CCFormat.printf "@[%a@] -~>@.@[%a@]@." C.pp c C.pp new_; *)
         SimplM.return_new new_
       )
     with Type.ApplyError err ->
@@ -537,11 +537,28 @@ module Make(E : Env.S) : S with module Env = E = struct
         ) else res) 
       []
 
+  let normalize_equalities c =
+    let lits = Array.to_list (C.lits c) in
+    let normalized = List.map Literal.normalize_eq lits in
+    if List.exists CCOpt.is_some normalized then (
+      let new_lits = List.mapi (fun i l_opt -> 
+          CCOpt.get_or ~default:(Array.get (C.lits c) i) l_opt) normalized in
+      let proof = Proof.Step.simp [C.proof_parent c] 
+          ~rule:(Proof.Rule.mk "simplify nested equalities")  in
+      let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
+      SimplM.return_new new_c
+    ) 
+    else (
+      SimplM.return_same c 
+    )
+
+
   let setup () =
     match Env.flex_get k_bool_reasoning with 
     | BoolReasoningDisabled -> ()
     | _ ->
       (* Env.add_unary_inf "infer_tf" HO.prim_enum_tf; *)
+      Env.add_basic_simplify normalize_equalities;
       if Env.flex_get k_simplify_bools then (
         Env.add_basic_simplify simpl_bool_subterms
       );

@@ -206,10 +206,10 @@ let conv_rule_i ~proof (r:_ def_rule) = match r with
     let ty = Type.Conv.of_simple_term_exn ctx ty in
     let args = List.map (Term.Conv.of_simple_term_exn ctx) args in
     let rhs = Lambda.snf (Term.Conv.of_simple_term_exn ctx rhs) in
-    (* let rhs_rewritten, rw_rules = Rewrite.Term.normalize_term rhs in
+    let rhs_rewritten, rw_rules = Rewrite.Term.normalize_term rhs in
        let proof_parents = Proof.Parent.from proof :: Rewrite.Rule.set_as_proof_parents rw_rules in
        let form = Proof.Result.to_form (Proof.S.result proof) in
-       let proof = Proof.S.mk_f (Proof.Step.simp ~rule:(Proof.Rule.mk "simplify_rw_rule") proof_parents) form in *)
+       let proof = Proof.S.mk_f (Proof.Step.simp ~rule:(Proof.Rule.mk "simplify_rw_rule") proof_parents) form in
     let rule = Rewrite.Term.Rule.make id ty args (rhs) ~proof in
     Rewrite.T_rule rule
   | Def_form {lhs;rhs;_} ->
@@ -554,11 +554,10 @@ let sine_axiom_selector ?(depth_start=1) ?(depth_end=3) ?(tolerance=2.0) formula
   let symset_of_axs ?(is_goal=false) axs =
     List.fold_left (fun acc c -> ID.Set.union acc (symset_of_ax ~is_goal c)) ID.Set.empty axs in
 
-  let triggered_by_syms ~ids_to_defs ~triggers syms =
+  let triggered_by_syms ~triggers syms =
     ID.Set.fold (fun id acc -> 
         let axs = ID.Tbl.get_or triggers id ~default:InpStmSet.empty in
-        let defs = ID.Map.get_or id ids_to_defs ~default:InpStmSet.empty in
-        (InpStmSet.elements axs) @ (InpStmSet.elements defs) @  acc) 
+        (InpStmSet.elements axs) @ acc) 
       syms [] in
 
   let count_occ ~tbl ax = 
@@ -635,8 +634,10 @@ let sine_axiom_selector ?(depth_start=1) ?(depth_end=3) ?(tolerance=2.0) formula
     
     aux ([],[],[],[]) forms in
 
-  let defs,helper_axioms,axioms, goals = 
+  let defs,helper_axioms,axioms,goals = 
     categorize_formulas formulas in
+
+  let axioms = defs @ axioms in
 
   let ids_to_defs = ids_to_defs_compute defs in
   
@@ -644,10 +645,10 @@ let sine_axiom_selector ?(depth_start=1) ?(depth_end=3) ?(tolerance=2.0) formula
   List.iter (count_occ ~tbl) axioms;
   (* now tbl contains occurences of all symbols *)
 
-  let triggers = create_trigger_map ~tbl axioms in
+  let triggers = create_trigger_map ~tbl (axioms) in
   let conj_syms = symset_of_axs ~is_goal:true goals in
   Util.debugf ~section 2 "conj_syms:@[%a@]" (fun k -> k (ID.Set.pp ID.pp) conj_syms);
-  let triggered_1 = triggered_by_syms ~ids_to_defs ~triggers conj_syms in
+  let triggered_1 = triggered_by_syms ~triggers conj_syms in
 
   let rec take_axs k processed_syms k_triggered_axs = 
     if k >= depth_end then []
@@ -655,11 +656,21 @@ let sine_axiom_selector ?(depth_start=1) ?(depth_end=3) ?(tolerance=2.0) formula
       let taken = if k >= depth_start then k_triggered_axs else [] in
       let new_syms = symset_of_axs k_triggered_axs in
       let unprocessed = ID.Set.diff new_syms processed_syms in
-      let k_p_1_triggered_ax = triggered_by_syms ~ids_to_defs ~triggers unprocessed in
+      let k_p_1_triggered_ax = triggered_by_syms ~triggers unprocessed in
       taken @ (take_axs (k+1) (ID.Set.union processed_syms unprocessed) k_p_1_triggered_ax)) 
   in
+
+  let conj_defined_syms =
+    ID.Set.fold (fun s_id conj_defs -> 
+      InpStmSet.union conj_defs
+        (ID.Map.get_or ~default:InpStmSet.empty s_id ids_to_defs)
+    ) conj_syms (InpStmSet.empty)
+  in
+
   let taken_axs = 
-    CCList.sort_uniq ~cmp:compare @@ take_axs 1 conj_syms triggered_1 in
+    CCList.sort_uniq ~cmp:compare
+      ((InpStmSet.elements conj_defined_syms) @
+      (take_axs 1 conj_syms triggered_1)) in
 
   Util.debugf ~section 2 "taken %d axioms:@[%a@]@." 
     (fun k -> k (List.length taken_axs) (CCList.pp CCString.pp) (List.map name taken_axs));

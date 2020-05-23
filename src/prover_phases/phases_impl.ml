@@ -495,8 +495,8 @@ let process_file ?(prelude=Iter.empty) file =
   let has_goal = has_goal_decls_ decls in
   Util.debugf ~section 1 "parsed %d declarations (%s goal(s))"
     (fun k->k (CCVector.length decls) (if has_goal then "some" else "no"));
-  let transformed = Booleans.preprocess_booleans(Rewriting.unfold_def_before_cnf decls) in
-  let sk_ctx = Skolem.create () in 
+  let transformed = Booleans.preprocess_booleans (Rewriting.unfold_def_before_cnf decls) in
+  let sk_ctx = Skolem.create () in
   cnf ~sk_ctx transformed >>= fun stmts ->
   let stmts = Booleans.preprocess_cnf_booleans stmts in
   (* compute signature, precedence, ordering *)

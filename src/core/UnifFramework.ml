@@ -304,15 +304,15 @@ module Make (P : PARAMETERS) = struct
       OSeq.append 
         (try_lfho_unif t0s t1s)
         (do_unif ~bind_cnt [(lhs,rhs,P.init_flag)] subst unifscope)
-    |> OSeq.map (fun opt -> CCOpt.map (fun subst ->
-       let norm t = T.normalize_bools @@ Lambda.eta_expand @@ Lambda.snf t in
-       let l = norm @@ S.FO.apply Subst.Renaming.none subst t0s in 
-       let r = norm @@ S.FO.apply Subst.Renaming.none subst t1s in
-       if not ((T.equal l r) && (Type.equal (Term.ty l) (Term.ty r))) then (
-        CCFormat.printf "subst:@[%a@]@." Subst.pp subst;
-        CCFormat.printf "orig:@[%a@]@.=?=@.@[%a@]@." (Scoped.pp T.pp) t0s (Scoped.pp T.pp) t1s;
-        CCFormat.printf "new:@[%a:%a@]@.=?=@.@[%a:%a@]@." T.pp l Type.pp (T.ty l) T.pp r Type.pp (T.ty r);
-        assert(false)
-       ); subst) opt)
+      |> OSeq.map (fun opt -> CCOpt.map (fun subst ->
+        let norm t = T.normalize_bools @@ Lambda.eta_expand @@ Lambda.snf t in
+        let l = norm @@ S.FO.apply Subst.Renaming.none subst t0s in 
+        let r = norm @@ S.FO.apply Subst.Renaming.none subst t1s in
+        if not ((T.equal l r) && (Type.equal (Term.ty l) (Term.ty r))) then (
+          CCFormat.printf "subst:@[%a@]@." Subst.pp subst;
+          CCFormat.printf "orig:@[%a@]@.=?=@.@[%a@]@." (Scoped.pp T.pp) t0s (Scoped.pp T.pp) t1s;
+          CCFormat.printf "new:@[%a:%a@]@.=?=@.@[%a:%a@]@." T.pp l Type.pp (T.ty l) T.pp r Type.pp (T.ty r);
+          assert(false)
+        ); subst) opt)
     with Unif.Fail -> OSeq.empty    
 end

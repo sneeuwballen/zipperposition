@@ -537,21 +537,6 @@ module Make(E : Env.S) : S with module Env = E = struct
   let prim_enum_tf c =
     prim_enum_ ~mode:`TF c
 
-  let normalize_equalities c =
-    let lits = Array.to_list (C.lits c) in
-    let normalized = List.map Literal.normalize_eq lits in
-    if List.exists CCOpt.is_some normalized then (
-      let new_lits = List.mapi (fun i l_opt -> 
-          CCOpt.get_or ~default:(Array.get (C.lits c) i) l_opt) normalized in
-      let proof = Proof.Step.simp [C.proof_parent c] 
-          ~rule:(Proof.Rule.mk "simplify nested equalities")  in
-      let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
-      SimplM.return_new new_c
-    ) 
-    else (
-      SimplM.return_same c 
-    )
-
   let choice_ops = ref Term.Map.empty
   let new_choice_counter = ref 0
 
@@ -1407,7 +1392,6 @@ module Make(E : Env.S) : S with module Env = E = struct
         E.add_multi_simpl_rule ~priority:1000 (ground_app_vars ~mode)
       );
 
-      Env.add_basic_simplify normalize_equalities;
       if Env.flex_get k_elim_pred_var then
         Env.add_unary_inf "ho_elim_pred_var" elim_pred_variable;
       if Env.flex_get k_ext_neg_lit then
@@ -1646,12 +1630,15 @@ let extension =
 
     if !def_unfold_enabled_ then (
       (* let new_vec = *)
-      CCVector.iter (fun c -> match Statement.get_rw_rule c with
-            Some (sym, r) -> Util.debugf ~section 1
-                               "@[<2> Adding constant def rule: `@[%a@]`@]"
-                               (fun k->k Rewrite.Rule.pp r);
+      CCVector.iter (fun c -> 
+        match Statement.get_rw_rule c with
+            Some (sym, r) -> 
+              CCFormat.printf "@[%a@] is defined@." ID.pp sym;
+              Util.debugf ~section 1
+                "@[<2> Adding constant def rule: `@[%a@]`@]"
+                 (fun k->k Rewrite.Rule.pp r);
             Rewrite.Defined_cst.declare_or_add sym  r;
-          | _ -> ()) vec (*vec in*)
+          | _ -> CCFormat.printf "@[%a@] is not a definition@." Statement.pp_clause c; ()) vec (*vec in*)
     );
 
     state

@@ -439,7 +439,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           (* do not use formulas for rewriting... can have adverse
              effects on lazy cnf *)
           if !Lazy_cnf.enabled &&
-             (T.is_appbuiltin l || T.is_appbuiltin r) then idx
+             (T.is_appbuiltin l || (T.is_appbuiltin r && not @@ T.is_true_or_false r) ) then idx
           else (
             begin match Ordering.compare ord l r with
               | Comparison.Gt ->
@@ -901,8 +901,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       and penalty =
         let pen_a = C.penalty info.active in
         let pen_b = C.penalty info.passive in
+        let max_d = max (C.proof_depth info.active) (C.proof_depth info.passive) in
+
         (if pen_a == 1 && pen_b == 1 then 1 else pen_a + pen_b)
-        + (if info.sup_kind == Classic && T.is_var s' then 2 else 0) (* superposition from var = bad *)
+        + (if info.sup_kind == Classic && T.is_var info.s then 1 else 0) (* superposition from app var = bad, unless we are superposing into a formula *)
+        + (if info.sup_kind == Classic && T.is_app_var info.s 
+           then (if T.is_var (T.head_term info.t) then 2*max_d else max (max_d - 2) 0)
+           else 0)
         + (if info.sup_kind == FluidSup then Env.flex_get k_fluidsup_penalty else 0)
         + (if info.sup_kind == DupSup then Env.flex_get k_dupsup_penalty else 0)
         + (if info.sup_kind == LambdaSup then 1 else 0)
