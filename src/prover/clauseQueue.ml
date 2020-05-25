@@ -995,6 +995,35 @@ module Make(C : Clause_intf.S) = struct
     let defer_shallow c =
       - (prefer_shallow c)
 
+    (* Given a clause calculate how much was the size of it reduced (enlarged)
+       by the last normalization and prefer clauses which were reduced much
+     *)
+    let by_normalization_factor c =
+      let default = 5000 in
+
+      let norm_fact c =
+        let aux proof =
+          let p_res, step = Proof.S.result proof, Proof.S.step proof in
+          (* clause is not obtained by normalization *)
+          if not (List.mem Proof.Tag.T_ho_norm (Proof.Step.tags step)) then default
+          else (
+            assert(Proof.Step.is_simpl step);
+            let parents = List.map Proof.Parent.proof (Proof.Step.parents step) in
+            assert(List.length parents == 1);
+            let calc_w pr =
+              TypedSTerm.Seq.subterms (Proof.Result.to_form @@ Proof.S.result pr)
+              |> Iter.length
+              |> float_of_int in
+
+            let new_w = calc_w (C.proof c) in
+            let old_w = calc_w (List.hd parents) in 
+            int_of_float ((new_w /. old_w) *. (float_of_int default))
+          ) in
+        aux (C.proof c) in
+
+      let res = norm_fact c in
+      res
+
     let parsers =
       ["const", (fun _ -> const_prio);
       "prefer-ho-steps", (fun _ -> prefer_ho_steps);
@@ -1021,6 +1050,7 @@ module Make(C : Clause_intf.S) = struct
       "prefer-long-trail", (fun _ -> prefer_long_trail);
       "by-neg-lit", (fun _ -> by_neg_lit);
       "by-app-var-num", (fun _ -> by_app_var_num);
+      "by-norm-factor", (fun _ -> by_normalization_factor);
       "prefer-top-level-appvars", (fun _ -> prefer_top_level_app_var);
       "defer-top-level-appvars", (fun _ -> prefer_top_level_app_var);
       "prefer-shallow-appvars", (fun _ -> prefer_shallow_app_var);

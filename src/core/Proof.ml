@@ -398,6 +398,14 @@ module Step = struct
   let is_by_def p = match p.kind with By_def _ -> true | _ -> false
 
   let is_inference p = match p.kind with Inference _ -> true | _ -> false
+  let is_simpl ?(name=None) p = 
+    match p.kind with
+    | Simplification(rule,_) ->
+      begin match name with 
+      | None -> true
+      | Some n -> String.equal (Rule.name rule) n
+      end
+    | _ -> false
 
   let distance_to_goal p = p.dist_to_goal
 

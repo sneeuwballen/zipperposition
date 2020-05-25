@@ -387,6 +387,12 @@ module Make(E : Env.S) : S with module Env = E = struct
 
     Util.debugf ~section 2 "lazy_cnf(@[%a@])@." (fun k -> k C.pp c);
 
+    let init = 
+      if Env.flex_get k_solve_formulas
+      then Iter.of_list (CCOpt.get_or ~default:[] (solve_bool_formulas c))
+      else Iter.empty 
+    in
+
     fold_lits c
     |> Iter.fold_while ( fun _ (lhs, rhs, sign, pos) ->
       let i,_ = Ls.Pos.cut pos in
@@ -466,7 +472,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             return @@ (
                 mk_or ~proof_cons ~rule_name [T.Form.not_ lhs; T.Form.not_ rhs] c i 
                 @ mk_or ~proof_cons ~rule_name [lhs; rhs] c i ))
-      ) else continue) Iter.empty
+      ) else continue) (init)
 
   let rename_subformulas c =
     Util.debugf ~section 2 "lazy-cnf-rename(@[%a@])@." (fun k -> k C.pp c);
@@ -544,10 +550,6 @@ module Make(E : Env.S) : S with module Env = E = struct
 
     let proof_cons = Proof.Step.simp ~infos:[] ~tags:[Proof.Tag.T_live_cnf] in
     let res = Iter.to_list @@ lazy_clausify_driver ~ignore_eq:true ~proof_cons c  in
-    let res = 
-      (if Env.flex_get k_solve_formulas
-       then (CCOpt.get_or ~default:[] (solve_bool_formulas c))
-       else [])  @ res in
     if not @@ CCList.is_empty res then (
       Util.debugf ~section 2 "lazy_cnf_simp(@[%a@])=" (fun k -> k C.pp c);
       Util.debugf ~section 2 "@[%a@]@." (fun k -> k (CCList.pp C.pp) res);

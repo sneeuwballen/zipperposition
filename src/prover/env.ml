@@ -434,7 +434,7 @@ module Make(X : sig
       (* FIXME: put the rules as parameters *)
       let rule = Proof.Rule.mk !_norm_name in
       let proof =
-        Proof.Step.simp ~rule
+        Proof.Step.simp ~rule  ~tags:[Proof.Tag.T_ho_norm]
           ([C.proof_parent c])
       in
       let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) lits' proof in

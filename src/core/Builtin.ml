@@ -305,6 +305,7 @@ module Tag = struct
     | T_lra (** rational arith *)
     | T_ho (** higher order *)
     | T_live_cnf (** live cnf *)
+    | T_ho_norm (** higher-order normalization *)
     | T_ext (** extensionality *)
     | T_ind (** induction *)
     | T_data (** datatypes *)
@@ -319,6 +320,7 @@ module Tag = struct
     | T_lra -> Fmt.string out "lra"
     | T_ho -> Fmt.string out "ho"
     | T_live_cnf -> Fmt.string out "live_cnf"
+    | T_ho_norm -> Fmt.string out "ho_norm"
     | T_ext -> Fmt.string out "extensionality"
     | T_ind -> Fmt.string out "ind"
     | T_data -> Fmt.string out "data"

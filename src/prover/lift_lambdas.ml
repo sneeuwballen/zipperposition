@@ -89,7 +89,7 @@ let lift_lambdas_t ~parent ~counter t  =
     | T.Fun _ ->
       Util.debugf ~section 1 "before lifting:@[%a@]@." (fun k -> k T.pp t);
       let pref_vars, body = T.open_fun t in
-      let body', (reused_defs,new_defs) = aux body in
+      let body', (reused_defs,new_defs), declared_syms = aux body in
       let body_closed = T.fun_l pref_vars body' in
       Util.debugf ~section 1 "after lifting:@[%a@]@." (fun k -> k T.pp body_closed);
       let generalization = 
@@ -100,7 +100,7 @@ let lift_lambdas_t ~parent ~counter t  =
         let lits = C.lits def in
         assert(Array.length lits = 1);
         let lhs' = Subst.FO.apply Subst.Renaming.none subst (lhs, 1) in
-        lhs', (def :: reused_defs, new_defs)
+        lhs', (def :: reused_defs, new_defs), declared_syms
       | None -> 
         let free_vars = T.vars body' in
         let unbound, _, subst = loose_bound_to_fvars ~counter body_closed in
@@ -108,7 +108,6 @@ let lift_lambdas_t ~parent ~counter t  =
         let all_vars = T.VarSet.to_list free_vars @ T.VarSet.to_list new_free_vars in
         let (id, ty), new_ll_sym = 
           T.mk_fresh_skolem ~prefix:"l_lift" all_vars (T.ty t) in
-        Ctx.declare id ty;
         let lhs = new_ll_sym and rhs = unbound in
         let lhs_applied, rhs_applied = fully_apply ~counter lhs rhs in
         let lits = [Literal.mk_eq lhs_applied rhs_applied] in
@@ -116,24 +115,27 @@ let lift_lambdas_t ~parent ~counter t  =
         let new_def = C.create ~penalty:1 ~trail:Trail.empty lits proof in
         let repl = Subst.FO.apply Subst.Renaming.none subst (sc lhs) in
         idx := Idx.add !idx rhs (new_def, lhs);
-        repl, (reused_defs, (new_def :: new_defs))
+        repl, (reused_defs, (new_def :: new_defs)), ((id,ty) :: declared_syms)
         end
-    | T.Var _ | T.Const _  | T.DB _ -> t, ([],[])
+    | T.Var _ | T.Const _  | T.DB _ -> t, ([],[]), []
     | T.App(hd, l) -> 
       assert(not (T.is_fun hd));
-      let l', new_defs = aux_l l in
-      T.app hd l', new_defs
+      let l', new_defs, declared_syms = aux_l l in
+      (if T.same_l l l' then t else (T.app hd l')), new_defs, declared_syms
     | T.AppBuiltin(b, l) ->
-      let l', new_defs = aux_l l in
-      T.app_builtin ~ty:(T.ty t) b l', new_defs
+      let l', new_defs, declared_syms = aux_l l in
+      (if T.same_l l l' then t else T.app_builtin ~ty:(T.ty t) b l'), 
+        new_defs, declared_syms
   and aux_l = function 
-    | [] -> ([], ([],[]))
+    | [] -> ([], ([],[]), [])
     | x :: xs ->
-      let x', (x_reused_defs, x_new_defs) = aux x in
-      let xs', (xs_reused_defs, xs_new_defs) = aux_l xs in
-      x' :: xs', (x_reused_defs @ xs_reused_defs, x_new_defs @ xs_new_defs) in
+      let x', (x_reused_defs, x_new_defs), declared_syms = aux x in
+      let xs', (xs_reused_defs, xs_new_defs), declared_symss = aux_l xs in
+      x' :: xs', (x_reused_defs @ xs_reused_defs, x_new_defs @ xs_new_defs), declared_syms @ declared_symss in
   Util.debugf ~section 1 "lifting @[%a@]@." (fun k -> k T.pp t);
-  aux t
+  let res, defs, declared_syms =  aux t in
+  Ctx.declare_syms declared_syms;
+  (res,defs)
 
   let lift_lambdas cl =
     let counter = 

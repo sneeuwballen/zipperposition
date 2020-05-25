@@ -207,7 +207,7 @@ module Make(E : Env.S) : S with module Env = E = struct
               Proof.Step.inference ~rule ~tags
                 [C.proof_parent_subst renaming (clause,1) subst] in
             let penalty = depth_mul * comb_penalty * C.penalty clause in
-            CCFormat.printf "penalty:%d@." penalty;
+            (* CCFormat.printf "penalty:%d@." penalty; *)
             let new_clause = C.create ~trail:(C.trail clause) ~penalty lits' proof in
 
             Util.debugf ~section 3 "success: @[%a@]@." (fun k -> k C.pp new_clause);

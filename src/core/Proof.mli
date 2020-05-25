@@ -260,6 +260,8 @@ module Step : sig
   val to_attrs : t -> UntypedAST.attrs
 
   val is_inference : t -> bool
+  val is_simpl : ?name:String.t option -> step -> bool
+
 
   val is_trivial : t -> bool
   val is_by_def : t -> bool

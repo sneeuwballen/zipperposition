@@ -1020,7 +1020,7 @@ let needs_args (t:t): bool = match view t with
   | Bind (Binder.ForallTy, _, _) -> true
   | _ -> false
 
-let show_type_arguments = ref true
+let show_type_arguments = ref false
 
 let rec open_bind2 b t1 t2 = match view t1, view t2 with
   | Bind (b1', ty1, t1'), Bind (b2', ty2, t2') when b=b1' && b=b2' ->

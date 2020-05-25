@@ -47,6 +47,10 @@ module type S = sig
   val declare : ID.t -> Type.t -> unit
   (** Declare the type of a symbol (updates signature) *)
 
+  val declare_syms : (ID.t * Type.t) list -> unit
+  (** Declare multiple symbols (more efficient that calling
+      declare function incrementally) *)
+
   val on_new_symbol : (ID.t * Type.t) Signal.t
   val on_signature_update : Signature.t Signal.t
 

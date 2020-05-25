@@ -26,10 +26,11 @@ let check_timeout = function
 
 let e_path = ref (None : string option)
 let tried_e = ref false 
+let e_call_point = ref 0.2
 let should_try_e = function
   | Some timeout when CCOpt.is_some !e_path -> 
     let passed = Util.total_time_s () in
-    if not !tried_e && passed > timeout /. 5.0 then (
+    if not !tried_e && passed > !e_call_point *. timeout then (
       tried_e := true;
       true
     ) else false
@@ -280,5 +281,9 @@ let () =
     [ "--progress", Arg.Set _progress, " progress bar";
       "-p", Arg.Set _progress, " alias to --progress";
       "--check-types", Arg.Set _check_types, " check types in new clauses";
-      "--try-e", Arg.String (fun path -> e_path := Some path), " try the given eprover binary on the problem"
+      "--try-e", Arg.String (fun path -> e_path := Some path), " try the given eprover binary on the problem";
+      "--e-call-point", Arg.Float 
+        (fun v -> if v > 1.0 || v < 0.0 then invalid_arg "0 <= e-call-point <= 1.0"
+                  else e_call_point := v), 
+      " point in the runtime when E is called in range 0.0 to 1.0 ";
     ]

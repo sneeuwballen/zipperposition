@@ -26,6 +26,7 @@ end
 let _timeout = ref 11
 let _e_auto = ref false
 let _max_derived = ref 16
+let _only_ho_steps = ref true
 
 let e_bin = ref (None : string option)
 
@@ -206,12 +207,24 @@ module Make(E : Env.S) : S with module Env = E = struct
 
     let take_from_set ?(converter=(fun c -> [c])) 
                       ~ignore_ids ~encoded_symbols set =
+
+      let lambdas_too_deep c=
+        let lambda_limit = 6 in
+        C.Seq.terms c
+        |> Iter.map (fun t -> 
+            CCOpt.get_or ~default:0 (Term.lambda_depth t))
+        |> Iter.max
+        |> CCOpt.get_or ~default:0
+        |> (fun lam_depth -> lam_depth > lambda_limit) in
+
+
       let init, rest = 
         Iter.to_list set
         |> CCList.partition_map (fun c -> 
           let p_d = C.proof_depth c in
-          if p_d = 0 then `Left c
-          else if Proof.Step.has_ho_step (C.proof_step c) then `Right c
+          if lambdas_too_deep c then `Drop
+          else if p_d = 0 then `Left c
+          else if not !_only_ho_steps || Proof.Step.has_ho_step (C.proof_step c) then `Right c
           else `Drop
         ) in
       let rest = 
@@ -247,7 +260,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         match !_encode_lams with
         | `Ignore -> (fun c -> [c])
         | `Combs ->  (fun c -> ([Combs.force_conv_lams c] :> C.t list))
-        | _ -> (fun c -> 
+        | _ -> (fun c ->
             let lifted = LLift.lift_lambdas c in
             if CCList.is_empty lifted then [c] else lifted) in
       let encoded_symbols, active_set = 
@@ -297,5 +310,6 @@ let () =
       )), " how to treat lambdas when giving problem to E";
       "--tmp-dir", Arg.String (fun v -> _tmp_dir := v), " scratch directory for running E";
       "--e-timeout", Arg.Set_int _timeout, " set E prover timeout.";
+      "--e-only-ho-steps", Arg.Bool ((:=) _only_ho_steps), " translate only HO proof steps to E";
       "--e-max-derived", Arg.Set_int _max_derived, " set the limit of clauses that are derived by Zipperposition and given to E";
       "--e-auto", Arg.Bool (fun v -> _e_auto := v), " If set to on eprover will not run in autoschedule, but in auto mode"]
