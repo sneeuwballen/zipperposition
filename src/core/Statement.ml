@@ -545,15 +545,47 @@ module InpStmSet = Set.Make(AsKey)
 module RW = Rewrite
 module DC = RW.Defined_cst
 
-let sine_axiom_selector ?(depth_start=1) ?(depth_end=3) ?(tolerance=2.0) formulas =
+let sine_axiom_selector ?(trim_implications=false) ?(depth_start=1) ?(depth_end=3) ?(tolerance=2.0) formulas =
   let formulas = Iter.to_list formulas in
-  let symset_of_ax ?(is_goal=false) ax =
+
+  let eliminate_long_implications ~is_goal f =
+      let _elim_long_imps f =
+        let rec aux f =
+          match TST.Form.view f with
+          | TST.Form.Imply(lhs, rhs) ->
+            let is_form t = 
+              match TST.Form.view t with 
+              | Atom _ -> false
+              | _ -> true in
+            if not (is_form lhs) then (
+              let premises, concl = aux rhs in
+              lhs::premises, concl
+            ) else ([], f)
+          | _ -> ([], f) in
+        let premises, concl = aux f in
+        if CCList.length premises > 5 
+        then (
+          Util.debugf ~section 2 "trimmed @[%a@] into @[%a@]@." 
+            (fun k -> k TST.pp f TST.pp concl);
+          concl)
+        else f in
+
+      if not is_goal then f
+      else _elim_long_imps f in
+
+  let symset_of_ax ~trim_implications ?(is_goal=false) ax =
      Seq.forms ax
+    |> Iter.map 
+      (if trim_implications 
+       then eliminate_long_implications ~is_goal 
+       else CCFun.id)
     |> Iter.flat_map TST.Seq.symbols
     |> ID.Set.of_seq in
 
-  let symset_of_axs ?(is_goal=false) axs =
-    List.fold_left (fun acc c -> ID.Set.union acc (symset_of_ax ~is_goal c)) ID.Set.empty axs in
+  let symset_of_axs ~trim_implications ?(is_goal=false) axs =
+    List.fold_left (fun acc c -> 
+      ID.Set.union acc (symset_of_ax ~trim_implications ~is_goal c)) 
+    ID.Set.empty axs in
 
   let triggered_by_syms ~triggers syms =
     ID.Set.fold (fun id acc -> 
@@ -562,30 +594,30 @@ let sine_axiom_selector ?(depth_start=1) ?(depth_end=3) ?(tolerance=2.0) formula
       syms [] in
 
   let count_occ ~tbl ax = 
-    symset_of_ax ax
+    symset_of_ax ~trim_implications:false ax
     |> ID.Set.iter (fun k ->
         ID.Tbl.update tbl ~f:(fun _ vopt -> match vopt with
             | Some v -> Some (v+1)
             | None -> Some 1) ~k) in
 
-  let create_trigger_map ~tbl axioms = 
+  let create_trigger_map ~trim_implications ~tbl axioms = 
     let map = ID.Tbl.create (Iter.length @@ ID.Tbl.keys tbl) in
     CCList.iter (fun ax ->
-        let symset = ID.Set.to_seq @@ symset_of_ax ax in
-        let min_occ = ref (max_int) in
-        Iter.iter (fun id -> 
-            let cnt = ID.Tbl.get_or tbl id ~default:max_int in
-            if cnt < !min_occ then min_occ := cnt;
-          ) symset;
-        (* now we calculate trigger map based on the min_occ *)
-        let threshold = int_of_float @@ tolerance *. (float_of_int !min_occ) in
-        Iter.iter (fun id -> 
-            let cnt = ID.Tbl.get_or tbl id ~default:max_int in
-            if cnt <= threshold then (
-              ID.Tbl.update ~f:(fun k vopt -> 
-                  match vopt with 
-                  | Some ax_set -> Some (InpStmSet.add ax ax_set)
-                  | None -> Some (InpStmSet.singleton ax)) ~k:id map)) symset) 
+      let symset = ID.Set.to_seq @@ symset_of_ax ~trim_implications:false ax in
+      let min_occ = ref (max_int) in
+      Iter.iter (fun id -> 
+          let cnt = ID.Tbl.get_or tbl id ~default:max_int in
+          if cnt < !min_occ && (not trim_implications || cnt != 1) then min_occ := cnt;
+        ) symset;
+      (* now we calculate trigger map based on the min_occ *)
+      let threshold = int_of_float @@ tolerance *. (float_of_int !min_occ) in
+      Iter.iter (fun id -> 
+          let cnt = ID.Tbl.get_or tbl id ~default:max_int in
+          if cnt <= threshold then (
+            ID.Tbl.update ~f:(fun k vopt -> 
+                match vopt with 
+                | Some ax_set -> Some (InpStmSet.add ax ax_set)
+                | None -> Some (InpStmSet.singleton ax)) ~k:id map)) symset) 
       axioms;
     map in
 
@@ -642,8 +674,8 @@ let sine_axiom_selector ?(depth_start=1) ?(depth_end=3) ?(tolerance=2.0) formula
   List.iter (count_occ ~tbl) axioms;
   (* now tbl contains occurences of all symbols *)
 
-  let triggers = create_trigger_map ~tbl (axioms) in
-  let conj_syms = symset_of_axs ~is_goal:true goals in
+  let triggers = create_trigger_map ~trim_implications ~tbl (axioms) in
+  let conj_syms = symset_of_axs ~trim_implications ~is_goal:true goals in
   Util.debugf ~section 2 "conj_syms:@[%a@]" (fun k -> k (ID.Set.pp ID.pp) conj_syms);
   let triggered_1 = triggered_by_syms ~triggers conj_syms in
 
@@ -651,7 +683,7 @@ let sine_axiom_selector ?(depth_start=1) ?(depth_end=3) ?(tolerance=2.0) formula
     if k >= depth_end then []
     else (
       let taken = if k >= depth_start then k_triggered_axs else [] in
-      let new_syms = symset_of_axs k_triggered_axs in
+      let new_syms = symset_of_axs ~trim_implications:false k_triggered_axs in
       let unprocessed = ID.Set.diff new_syms processed_syms in
       let k_p_1_triggered_ax = triggered_by_syms ~triggers unprocessed in
       taken @ (take_axs (k+1) (ID.Set.union processed_syms unprocessed) k_p_1_triggered_ax)) 

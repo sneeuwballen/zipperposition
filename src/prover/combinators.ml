@@ -13,6 +13,7 @@ let section = Util.Section.make ~parent:Const.section "combs"
 type conv_rule = T.t -> T.t option
 
 let k_enable_combinators = Flex_state.create_key ()
+let k_app_var_narrowing = Flex_state.create_key ()
 let k_s_penalty = Flex_state.create_key ()
 let k_b_penalty = Flex_state.create_key ()
 let k_c_penalty = Flex_state.create_key ()
@@ -291,7 +292,9 @@ module Make(E : Env.S) : S with module Env = E = struct
     let setup () =
       if E.flex_get k_enable_combinators then (
         E.add_clause_conversion enocde_stmt;
-        E.add_unary_inf "narrow applied variable" narrow_app_vars;
+        if E.flex_get k_app_var_narrowing then (
+          E.add_unary_inf "narrow applied variable" narrow_app_vars
+        );
         E.add_basic_simplify lams2combs_otf;
         E.Ctx.set_ord (Ordering.compose cmp_by_max_weak_r_len (E.Ctx.ord ()));
         
@@ -305,6 +308,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 end
 
 let _enable_combinators = ref false
+let _app_var_narrowing = ref true
 let _s_penalty = ref 1
 let _b_penalty = ref 1
 let _c_penalty = ref 1
@@ -321,6 +325,7 @@ let extension =
   let register env =
     let module E = (val env : Env.S) in
     E.flex_add k_enable_combinators !_enable_combinators;
+    E.flex_add k_app_var_narrowing !_app_var_narrowing;
     E.flex_add k_s_penalty !_s_penalty;
     E.flex_add k_c_penalty !_c_penalty;
     E.flex_add k_b_penalty !_b_penalty;
@@ -342,6 +347,7 @@ let () =
   Options.add_opts
     [ "--combinator-based-reasoning", Arg.Bool (fun v -> _enable_combinators := v), " enable / disable combinator based reasoning";
      "--app-var-constraints", Arg.Bool (fun v -> _app_var_constraints := v), " enable / disable delaying app var clashes as constraints";
+     "--app-var-narrowing", Arg.Bool ((:=) _app_var_narrowing), " enable / disable app_var_narrowing";
      "--penalize-deep-appvars", Arg.Bool (fun v -> _deep_app_var_penalty := v), " enable / disable penalizing narrow app var inferences with deep variables";
      "--comb-max-depth", Arg.Int (fun v -> _combinators_max_depth := Some v), " set the maximal number off variable narrowings allowed. ";
      "--comb-unif-resolve", Arg.Bool ((:=) _unif_resolve), " enable / disable higher-order unit clause resolutions";

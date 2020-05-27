@@ -112,10 +112,35 @@ let lift_lambdas_t ~parent ~counter t  =
         let lhs_applied, rhs_applied = fully_apply ~counter lhs rhs in
         let lits = [Literal.mk_eq lhs_applied rhs_applied] in
         let proof = Proof.Step.define_internal id [C.proof_parent parent] in
-        let new_def = C.create ~penalty:1 ~trail:Trail.empty lits proof in
+        let lift_def = C.create ~penalty:1 ~trail:Trail.empty lits proof in
         let repl = Subst.FO.apply Subst.Renaming.none subst (sc lhs) in
-        idx := Idx.add !idx rhs (new_def, lhs);
-        repl, (reused_defs, (new_def :: new_defs)), ((id,ty) :: declared_syms)
+
+        let new_def =
+          Idx.retrieve_specializations (!idx, 1) (rhs, 0)
+          |> Iter.fold (fun acc (_,(def,lhs_spec),subst) -> 
+            let subst_has_lams subst = 
+              Subst.codomain subst
+              |> Iter.exists (fun (t,_) -> 
+                  Iter.exists T.is_fun (T.Seq.subterms (T.of_term_unsafe t))) in
+
+            if not (subst_has_lams subst) then (
+              let renaming = Subst.Renaming.create () in
+              let lhs, rhs = 
+                Subst.FO.apply renaming subst (lhs, 0), Subst.FO.apply renaming subst (lhs_spec, 1) in
+              let lits = [Literal.mk_eq lhs rhs] in
+              let proof = Proof.Step.define_internal id [C.proof_parent parent; C.proof_parent def] in
+              let lift_rel = C.create ~penalty:1 ~trail:Trail.empty lits proof in
+
+              (* CCFormat.printf "Relationship between@.@[%a@]@ and@ @[%a@]@ is @.@[%a@]@." 
+                  C.pp lift_def C.pp def C.pp lift_rel; *)
+
+              lift_rel :: acc)
+            else acc
+          ) [lift_def] in
+        
+
+        idx := Idx.add !idx rhs (lift_def, lhs);
+        repl, (reused_defs, (new_def @ new_defs)), ((id,ty) :: declared_syms)
         end
     | T.Var _ | T.Const _  | T.DB _ -> t, ([],[]), []
     | T.App(hd, l) -> 

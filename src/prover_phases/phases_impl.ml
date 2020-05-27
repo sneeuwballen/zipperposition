@@ -21,6 +21,7 @@ let _db_w = ref 1
 let _lmb_w = ref 1
 let _kbo_wf = ref "invfreqrank"
 let _prec_fun = ref "invfreq"
+let _trim_implications = ref false
 let _sine_d_min = ref 1
 let _sine_d_max = ref 5
 let _sine_tolerance = ref 1.5
@@ -142,8 +143,11 @@ let sine_filter stmts =
   else (
     let seq = CCVector.to_seq stmts in
     let filtered = 
-      Statement.sine_axiom_selector ~depth_start:!_sine_d_min 
-      ~depth_end:!_sine_d_max ~tolerance:!_sine_tolerance seq in
+      Statement.sine_axiom_selector 
+      ~trim_implications:!_trim_implications
+      ~depth_start:!_sine_d_min 
+      ~depth_end:!_sine_d_max 
+      ~tolerance:!_sine_tolerance seq in
     CCVector.freeze (CCVector.of_seq filtered))
 
 let typing ~file prelude (input,stmts) =
@@ -627,6 +631,8 @@ let () =
     " Turn on SinE with threshold and set max SinE depth.";
     "--sine-tolerance", Arg.Float (fun v ->  if !_sine_threshold == (-1) then _sine_threshold:=100; _sine_tolerance := v),
     " Turn on SinE with threshold of 100 and set SinE symbol tolerance.";
+    "--sine-trim-implications", Arg.Bool ((:=) _trim_implications),
+    " trim long implications while getting symbols from conjecture";
     "--sine", Arg.Set_int _sine_threshold,
     " Set SinE axiom number threshold (negative number turns it off)" ^
     " with default settings: depth in range 1-5 and tolerance 1.5"

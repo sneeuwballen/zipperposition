@@ -169,7 +169,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     | Some e_path ->
       let to_ = !_timeout in
       let cmd = 
-        CCFormat.sprintf "timeout %d %s %s --cpu-limit=%d %s -s -p" 
+        CCFormat.sprintf "timeout %d %s --pos-ext=all --neg-ext=all %s --cpu-limit=%d %s -s -p" 
           (to_+2) e_path prob_path to_ (if !_e_auto then "--auto" else "--auto-schedule") in
       CCFormat.printf "%% Running : %s.@." cmd;
       let process_channel = Unix.open_process_in cmd in
