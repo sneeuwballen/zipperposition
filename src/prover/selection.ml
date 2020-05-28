@@ -243,7 +243,7 @@ let e_sel2 ~ord lits =
                 |> ID.Set.to_seq 
                 |> Iter.sort ~cmp:ID.compare 
                 |> Iter.to_array in
-  let blocker _ l = Lit.is_type_pred l || Lit.is_propositional l in
+  let blocker _ l = Lit.is_type_pred l || Lit.is_predicate_lit l in
   let chooser (idx ,l) = 
     let sign_val = if Lit.is_pos l then 1 else 0 in 
     let diff_val = -(lit_sel_diff_w l) in
@@ -352,7 +352,7 @@ let e_sel8 ~ord lits =
        | `At idx -> idx
        | _       -> max_int)
     | _ -> max_int  in
-  let blocker _ l = Lit.is_type_pred l || Lit.is_propositional l in
+  let blocker _ l = Lit.is_type_pred l || Lit.is_predicate_lit l in
   let chooser (i,l) =
     if is_truly_equational l then (
       (if Lit.is_pos l then 1 else 0),

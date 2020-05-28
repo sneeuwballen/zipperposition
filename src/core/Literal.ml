@@ -177,7 +177,7 @@ let is_typex_pred = function
       | _ -> false end
   | _ -> false
 
-let is_propositional = function
+let is_predicate_lit = function
   | Equation(_,rhs,_) -> T.equal T.true_ rhs
   | _ -> false
 

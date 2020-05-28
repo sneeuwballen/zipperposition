@@ -374,7 +374,8 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     let renaming = CCOpt.get_or ~default:(S.Renaming.create ()) renaming in
     let new_lits = Literals.apply_subst renaming  subst (lits, sc) in
     let proof_step = CCOpt.get_or ~default:(proof_step c) proof in
-    let penalty = (CCOpt.get_or ~default:0 penalty_inc) + (penalty c) in
+    (* increase can be negative if we perform a simplification *)
+    let penalty = max ((CCOpt.get_or ~default:0 penalty_inc) + (penalty c)) 1 in
     create ~trail:(trail c) ~penalty (CCArray.to_list new_lits) proof_step
 
 

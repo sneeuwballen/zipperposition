@@ -1629,7 +1629,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let infer_equality_resolution_aux ~unify ~iterate_substs clause =
     ZProf.enter_prof prof_infer_equality_resolution;
-    let eligible = C.Eligible.always in
+    let eligible = C.Eligible.filter (fun lit -> not @@ Lit.is_predicate_lit lit) in
     (* iterate on those literals *)
     (* CCFormat.printf "eq_res(@[%a@])@." C.pp clause; *)
     let new_clauses =

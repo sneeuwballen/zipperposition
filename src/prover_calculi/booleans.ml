@@ -443,9 +443,12 @@ module Make(E : Env.S) : S with module Env = E = struct
     CCOpt.get_or ~default:[] (cnf_otf cl)
 
   let elim_bvars c =
-    C.Seq.vars c
-    |> T.VarSet.of_seq |> T.VarSet.to_seq
-    |> Iter.filter (fun v -> Type.is_prop (HVar.ty v))
+    C.Seq.terms c
+    |> Iter.filter_map (fun v -> 
+        if T.is_var v && Type.is_prop (T.ty v) then (
+          Some (T.as_var_exn v) 
+        ) else None)
+    |> Iter.sort_uniq ~cmp:(HVar.compare Type.compare)
     |> Iter.flat_map_l (fun v ->
         let subst_true = 
           Subst.FO.bind' Subst.empty (v, 0) (T.true_, 0) in
@@ -457,11 +460,8 @@ module Make(E : Env.S) : S with module Env = E = struct
           Some (Proof.Step.simp 
             ~tags:[Proof.Tag.T_ho] ~rule:(Proof.Rule.mk "elim_bool_vars")
             [C.proof_parent c]) in
-        C.apply_subst ~proof (c,0) subst)
-    |> (fun iter -> 
-        if Iter.is_empty iter then None
-        else Some (Iter.to_list iter))
-
+        C.apply_subst ~proof ~penalty_inc:(Some (-1)) (c,0) subst)
+    |> Iter.to_list
 
   let interpret_boolean_functions c =
     (* Collects boolean functions only at top level, 
@@ -572,7 +572,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         Env.add_basic_simplify normalize_bool_terms
       );
       if Env.flex_get k_elim_bvars then (
-        Env.add_multi_simpl_rule ~priority:2 elim_bvars
+        Env.add_unary_inf "elim_bvars" elim_bvars;
       );
       if not !Lazy_cnf.enabled then (
         Env.add_multi_simpl_rule ~priority:2 Fool.rw_bool_lits;
@@ -883,7 +883,7 @@ let _norm_bools = ref false
 let _filter_literals = ref `Max
 let _nnf = ref false
 let _simplify_bools = ref true
-let _elim_bvars = ref false
+let _elim_bvars = ref true
 
 
 let extension =

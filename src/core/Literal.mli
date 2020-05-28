@@ -180,7 +180,7 @@ val is_app_var_eq : t -> bool
 val is_type_pred : t -> bool
 val is_typex_pred : t -> bool (* like in E, type predicate with multiple variables *)
 
-val is_propositional : t -> bool
+val is_predicate_lit : t -> bool
 
 val as_inj_def : t -> (ID.t * (Term.var * Term.var) list) option
 val is_pure_var : t -> bool
