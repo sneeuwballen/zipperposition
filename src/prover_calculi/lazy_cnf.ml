@@ -479,7 +479,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     fold_lits c
     |> Iter.fold_while (fun _ (lhs,rhs,sign,pos) -> 
       let i,_ = Ls.Pos.cut pos in
-      let proof_cons = Proof.Step.simp ~infos:[] ~tags:[Proof.Tag.T_live_cnf] in
+      let proof_cons = Proof.Step.simp ~infos:[] ~tags:[Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth] in
       if T.equal rhs T.true_ && T.is_appbuiltin lhs then (
         match rename ~c lhs sign with
         | Some (renamer, new_defs, parents) ->
@@ -514,7 +514,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     fold_lits c
     |> Iter.fold (fun acc (lhs,rhs,sign,pos) -> 
         let i,_ = Ls.Pos.cut pos in
-        let proof_cons = Proof.Step.inference ~infos:[] ~tags:[Proof.Tag.T_live_cnf] in
+        let proof_cons = Proof.Step.inference ~infos:[] ~tags:[Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth] in
         if not (T.is_true_or_false rhs) && Type.is_prop (T.ty lhs) then (
           let new_cls =
             if sign then (
@@ -534,7 +534,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     fold_lits c
     |> Iter.fold_while (fun _ (lhs,rhs,sign,pos) -> 
       let i,_ = Ls.Pos.cut pos in
-      let proof_cons = Proof.Step.simp ~infos:[] ~tags:[Proof.Tag.T_live_cnf] in
+      let proof_cons = Proof.Step.simp ~infos:[] ~tags:[Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth] in
       if T.equal rhs T.true_ && T.is_appbuiltin lhs then (
         match cnf_scope_form lhs with 
         | Some f ->
@@ -548,7 +548,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let lazy_clausify_simpl c =
     update_form_counter ~action:`Increase c;
 
-    let proof_cons = Proof.Step.simp ~infos:[] ~tags:[Proof.Tag.T_live_cnf] in
+    let proof_cons = Proof.Step.simp ~infos:[] ~tags:[Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth] in
     let res = Iter.to_list @@ lazy_clausify_driver ~ignore_eq:true ~proof_cons c  in
     if not @@ CCList.is_empty res then (
       Util.debugf ~section 2 "lazy_cnf_simp(@[%a@])=" (fun k -> k C.pp c);
@@ -560,7 +560,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     else (Some res)
 
   let lazy_clausify_inf c =
-    let proof_cons = Proof.Step.inference ~infos:[] ~tags:[Proof.Tag.T_live_cnf] in
+    let proof_cons = Proof.Step.inference ~infos:[] ~tags:[Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth] in
     let res = Iter.to_list (lazy_clausify_driver ~ignore_eq:false ~proof_cons c) in
     if not @@ CCList.is_empty res then (
       Util.debugf ~section 2 "lazy_cnf_inf(@[%a@])=" (fun k -> k C.pp c);

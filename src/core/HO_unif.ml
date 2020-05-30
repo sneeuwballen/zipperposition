@@ -206,8 +206,8 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~signature ~offset 
           l_and, (if mode == `Full then 2 else 1);
           l_or, (if mode == `Full then 2 else 1);
           l_eq,  1;
-          l_false, (if mode == `Full then 2 else 1);
-          l_true, (if mode == `Full then 2 else 1);
+          l_false, (if mode == `Full then 1 else 0);
+          l_true, (if mode == `Full then 1 else 0);
           l_simpl_op, 1;
           (* 
             Disable symbols -- combinator modes will pick it up better

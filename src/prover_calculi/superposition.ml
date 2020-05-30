@@ -167,7 +167,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let get_triggers c =
     let trivial_trigger t =
       let body = snd @@ T.open_fun t in
-      T.is_const (T.head_term t) ||
       T.is_var body || T.is_true_or_false body in
 
     Literals.fold_terms ~ord ~subterms:true ~eligible:C.Eligible.always 
@@ -2559,8 +2558,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           let new_lits = new_lit :: CCArray.except_idx lits lit_idx in
           let proof =
             Proof.Step.inference [C.proof_parent c]
+              (* THIS NAME IS USED IN HEURISTICS -- CHANGE CAREFULLY! *)
               ~rule:(Proof.Rule.mk "ho_complete_eq")
-              ~tags:[Proof.Tag.T_ho]
+              ~tags:[Proof.Tag.T_ho;Proof.Tag.T_dont_increase_depth]
           in
           let penalty = C.penalty c + (if poly then 1 else 0) in
           let new_c =

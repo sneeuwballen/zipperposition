@@ -825,6 +825,25 @@ module Make(C : Clause_intf.S) = struct
       |> CCOpt.get_or ~default:0
 
     let prefer_easy_ho c =
+      let is_arg_cong_child c =
+        let rec aux proof =
+          let p_res, step = Proof.S.result proof, Proof.S.step proof in
+          let parents = List.map Proof.Parent.proof (Proof.Step.parents step) in
+          (* clause is not obtained by normalization *)
+
+          if Proof.Step.is_simpl step then (
+            (* Looking through single-step simplifications *)
+            match parents with 
+            | [parent] -> aux parent
+            | _ -> false 
+          ) else if Proof.Step.is_inference step then (
+            begin match Proof.Step.rule step with 
+            | Some rule -> String.equal (Proof.Rule.name rule) "ho_complete_eq"
+            | None -> false end
+          ) else false  in
+        let ans = aux (C.proof c) in
+        ans in
+
       let has_lam_eq c =
         C.Seq.lits c
         |> Iter.exists (fun l ->
@@ -857,9 +876,10 @@ module Make(C : Clause_intf.S) = struct
         (* at least one subterm is functional and all subterms are patterns *)
         |> (fun seq -> Iter.exists fst seq && Iter.for_all snd seq) in
 
-      if has_lam_eq c || in_pattern_fragment c then 0
-      else if prefer_formulas c == 1 then 1
-      else 2
+      if is_arg_cong_child c then 0
+      else if has_lam_eq c || in_pattern_fragment c then 1
+      else if prefer_formulas c == 1 then 2
+      else 3
 
     let defer_formulas c =
       - (prefer_formulas c)

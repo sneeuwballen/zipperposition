@@ -328,7 +328,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           let proof =
             Proof.Step.inference [C.proof_parent c] 
               ~rule:(Proof.Rule.mk "neg_ext")
-              ~tags:[Proof.Tag.T_ho; Proof.Tag.T_ext]
+              ~tags:[Proof.Tag.T_ho; Proof.Tag.T_ext; Proof.Tag.T_dont_increase_depth]
           in
           let new_c =
             C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c) in

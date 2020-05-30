@@ -827,7 +827,7 @@ module Make(X : sig
            For each rule, we keep the set of clauses that the rule has been applied on
            an their descendents. Then, we apply a rule on a clause not in this set.
          *)
-        let single_step_simplified =
+        let single_step_simplified c =
           let rec aux i = function 
           | [] -> None
           | rule :: rs ->
@@ -840,34 +840,35 @@ module Make(X : sig
             ) in
           aux 0 !_ss_multi_simpl_rule in 
 
-        match single_step_simplified with 
-        | None -> 
-          begin 
-            match multi_simplify c with
+          match multi_simplify c with
+          | None ->
+            begin match single_step_simplified c with 
             | None ->
-              (* clause has reached fixpoint *)
-              set := C.ClauseSet.add c !set
-            | Some l ->
-              (* continue processing *)
+              set := C.ClauseSet.add c !set;
+            | Some (i,l) ->
               did_simplify := true;
               let new_ids = IntSet.of_list (List.map C.id l) in
+              List.iter (fun res ->
+                (* Blocking descdendents for i *)
+                Array.set blocked_sss i (IntSet.union new_ids blocked_sss.(i));
+              Queue.push res q) l 
+            end
+            (* clause has reached fixpoint *)
+          | Some l ->
+            (* continue processing *)
+            did_simplify := true;
+            let new_ids = IntSet.of_list (List.map C.id l) in
 
-              (* non-functional for efficiency *)
-              for i = 0 to (List.length !_ss_multi_simpl_rule) -1 do
-                let bs_i = blocked_sss.(i) in
-                if IntSet.mem (C.id c) bs_i then (
-                  (* Adding descendents to blocked set *)
-                  Array.set blocked_sss i (IntSet.union new_ids bs_i))
-              done;
+            (* non-functional for efficiency *)
+            for i = 0 to (List.length !_ss_multi_simpl_rule) -1 do
+              let bs_i = blocked_sss.(i) in
+              if IntSet.mem (C.id c) bs_i then (
+                (* Adding descendents to blocked set *)
+                Array.set blocked_sss i (IntSet.union new_ids bs_i))
+            done;
 
-              List.iter (fun c -> Queue.push c q) l end
-        | Some (i,l) ->
-          did_simplify := true;
-          let new_ids = IntSet.of_list (List.map C.id l) in
-          List.iter (fun res ->
-            (* Blocking descdendents for i *)
-            Array.set blocked_sss i (IntSet.union new_ids blocked_sss.(i));
-            Queue.push res q) l)
+            List.iter (fun c -> Queue.push c q) l;
+    );
     done;
     let res = C.ClauseSet.to_list !set in
     ZProf.exit_prof prof_all_simplify;

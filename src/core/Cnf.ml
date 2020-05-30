@@ -259,7 +259,7 @@ module Flatten = struct
      @param vars the variables that can be replaced in the context
      @param of_ the ID being defined, if any
   *)
-  let flatten_rec ?of_ ~should_define (ctx:Skolem.ctx)
+  let flatten_rec ?of_ ~lazy_cnf ~should_define (ctx:Skolem.ctx)
       stmt (pos:position) (vars:type_ Var.t list)(t:term): T.t t =
     (* how to name intermediate subterms? *)
     let mk_pat what = match of_ with
@@ -407,7 +407,7 @@ module Flatten = struct
            it is better not to replace Lambda with Forall.
            
            Similarly for NEQ. *)
-        when  (T.is_fun a || T.is_fun b) (*&&  not (T.Ty.is_prop (T.Ty.returns (T.ty_exn a)))*) ->
+        when  (T.is_fun a || T.is_fun b) &&  not lazy_cnf ->
         (* turn [f = λx. t] into [∀x. f x=t] *)
         let vars_forall, a, b = complete_eq a b in
         let t' = F.forall_l vars_forall (F.eq_or_equiv a b) in
@@ -419,7 +419,7 @@ module Flatten = struct
         (F.eq <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
       (* >|= aux_maybe_define ~should_define pos *)
       | T.AppBuiltin (Builtin.Neq, [a;b]) 
-        when  (T.is_fun a || T.is_fun b)  (*&&  not (T.Ty.is_prop (T.Ty.returns (T.ty_exn a)))*)   (*false*) ->
+        when  (T.is_fun a || T.is_fun b)  && not lazy_cnf ->
         (* turn [f ≠ λx. t] into [∃x. f x≠t] *)
         let vars_exist, a, b = complete_eq a b in
         let t' = F.exists_l vars_exist (F.neq_or_xor a b) in
@@ -484,8 +484,8 @@ module Flatten = struct
       (fun k->k T.pp t (Util.pp_list Var.pp_fullc) vars);
     aux pos vars t
 
-  let flatten_rec_l ?of_ ~should_define ctx stmt pos vars l =
-    map_m (flatten_rec ?of_ ~should_define ctx stmt pos vars) l
+  let flatten_rec_l ?of_ ~lazy_cnf ~should_define ctx stmt pos vars l =
+    map_m (flatten_rec ?of_ ~should_define ~lazy_cnf ctx stmt pos vars) l
 end
 
 (* miniscoping (push quantifiers as deep as possible in the formula) *)
@@ -956,12 +956,12 @@ let pp_stmt out st = Stmt.pp T.pp T.pp_inner T.pp_inner out st
 
 (* flatten definitions, removing some constructs such as if/match,
    introducing new definitions *)
-let flatten ~ctx ~should_define seq : _ Iter.t =
+let flatten ~ctx ~lazy_cnf ~should_define seq : _ Iter.t =
   let open Flatten in
   let flatten_axiom stmt f =
     begin
       let vars, body = F.unfold_forall f in
-      flatten_rec ~should_define ctx stmt Pos_toplevel vars body >>= fun body ->
+      flatten_rec ~should_define ~lazy_cnf ctx stmt Pos_toplevel vars body >>= fun body ->
       get_subst >|= fun subst ->
       let vars = List.map (Var.update_ty ~f:(T.Subst.eval subst)) vars in
       let body = T.Subst.eval subst body in
@@ -971,9 +971,9 @@ let flatten ~ctx ~should_define seq : _ Iter.t =
   let flatten_def stmt d : _ Stmt.def_rule list = match d with
     | Stmt.Def_term {vars;id;ty;args;rhs;as_form} ->
       begin
-        flatten_rec_l ~of_:id ~should_define ctx stmt Pos_inner vars args >>= fun args ->
-        flatten_rec_l ~of_:id ~should_define ctx stmt Pos_toplevel vars args >>= fun args ->
-        flatten_rec ~of_:id ~should_define ctx stmt Pos_toplevel vars rhs >>= fun rhs ->
+        flatten_rec_l ~of_:id ~should_define ~lazy_cnf ctx stmt Pos_inner vars args >>= fun args ->
+        flatten_rec_l ~of_:id ~should_define ~lazy_cnf ctx stmt Pos_toplevel vars args >>= fun args ->
+        flatten_rec ~of_:id ~lazy_cnf ~should_define ctx stmt Pos_toplevel vars rhs >>= fun rhs ->
         get_subst >|= fun subst ->
         let args = List.map (T.Subst.eval subst) args in
         let rhs = T.Subst.eval subst rhs in
@@ -987,8 +987,8 @@ let flatten ~ctx ~should_define seq : _ Iter.t =
           | SLiteral.Atom (t,_) -> T.head t
           | _ -> None
         in
-        map_sliteral (flatten_rec ~should_define ?of_ ctx stmt Pos_inner vars) lhs >>= fun lhs ->
-        flatten_rec_l ?of_ ~should_define ctx stmt Pos_toplevel vars rhs >>= fun rhs ->
+        map_sliteral (flatten_rec ~should_define ~lazy_cnf ?of_ ctx stmt Pos_inner vars) lhs >>= fun lhs ->
+        flatten_rec_l ?of_ ~should_define ~lazy_cnf ctx stmt Pos_toplevel vars rhs >>= fun rhs ->
         get_subst >|= fun subst ->
         let lhs = SLiteral.map ~f:(T.Subst.eval subst) lhs in
         let rhs = List.map (T.Subst.eval subst) rhs in
@@ -1179,6 +1179,7 @@ let proof_neg stmt =
 let cnf_of_seq ~ctx ?(opts=[]) (seq:Stmt.input_t Iter.t) : _ CCVector.t =
   (* read options *)
   let disable_renaming = List.mem DisableRenaming opts || List.mem LazyCnf opts in
+  let lazy_cnf = List.mem LazyCnf opts in
   let preprocess =
     T.simplify_formula ::
     CCList.filter_map
@@ -1197,7 +1198,7 @@ let cnf_of_seq ~ctx ?(opts=[]) (seq:Stmt.input_t Iter.t) : _ CCVector.t =
   let v =
     if (*List.mem LazyCnf opts*) false then CCVector.of_seq seq
     else (
-    flatten ~should_define:(not disable_renaming) ~ctx seq
+    flatten ~lazy_cnf ~should_define:(not disable_renaming) ~ctx seq
     |> simplify_and_rename ~ctx ~disable_renaming ~preprocess)
   in
   (* reduce the new formulas to CNF *)

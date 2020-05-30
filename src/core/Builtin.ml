@@ -306,6 +306,7 @@ module Tag = struct
     | T_ho (** higher order *)
     | T_live_cnf (** live cnf *)
     | T_ho_norm (** higher-order normalization *)
+    | T_dont_increase_depth (** an inference rule that makes a clause more first-order and should not be counted in the proof depth.  *)
     | T_ext (** extensionality *)
     | T_ind (** induction *)
     | T_data (** datatypes *)
@@ -321,6 +322,7 @@ module Tag = struct
     | T_ho -> Fmt.string out "ho"
     | T_live_cnf -> Fmt.string out "live_cnf"
     | T_ho_norm -> Fmt.string out "ho_norm"
+    | T_dont_increase_depth -> Fmt.string out "dont_increase_depth"
     | T_ext -> Fmt.string out "extensionality"
     | T_ind -> Fmt.string out "ind"
     | T_data -> Fmt.string out "data"

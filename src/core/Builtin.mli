@@ -186,6 +186,7 @@ module Tag : sig
     | T_ho (** higher order *)
     | T_live_cnf (** live_cnf *)
     | T_ho_norm (** higher-order normalization *)
+    | T_dont_increase_depth (** don't increase depth  *)
     | T_ext (** extensionality *)
     | T_ind (** induction *)
     | T_data (** datatypes *)

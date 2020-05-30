@@ -761,18 +761,36 @@ let eager_cases_near stms =
   let find_fool_subterm p =
     let rec aux ~top p =
       let p_ty = T.ty_exn p in
+
+      let return p =
+        assert(T.Ty.is_prop (T.ty_exn p));
+        assert(T.closed p);
+        Some (T.Form.true_, T.Form.false_, p) in
+
       match T.view p with
       | AppBuiltin(hd, args)
-        when not top && Builtin.is_logical_op hd ||
-        Builtin.equal hd Builtin.Eq ||
-        Builtin.equal hd Builtin.Neq -> 
-        Some (T.Form.true_, T.Form.false_, p)
-      | Bind((Binder.Exists | Binder.Forall), var, body) when not top ->
-        Some (T.Form.true_, T.Form.false_, p)
-      | App(hd, args) when not top && T.Ty.is_prop p_ty  ->
-        Some (T.Form.true_, T.Form.false_, p)
+          when not top && T.closed p && T.Ty.is_prop (T.ty_exn p) &&
+            (* making sure it is not T or F *)
+            (Builtin.is_logical_op hd ||
+            Builtin.equal hd Builtin.Eq ||
+            Builtin.equal hd Builtin.Neq) -> 
+        return p
+      | Bind((Binder.Exists | Binder.Forall), var, body)
+          when not top && T.closed p ->
+        return p
+      | Bind(Binder.Lambda, var, body) ->
+        CCOpt.map (fun (body_t, body_f, s) -> 
+          assert(T.closed s);
+          (T.fun_l [var] body_t, T.fun_l [var] body_f, s)
+        ) (aux ~top:false body)
+      | App(hd, args) when not top && T.Ty.is_prop p_ty && T.closed p  ->
+        return p
       | Const _ when not top && T.Ty.is_prop p_ty  ->
-        Some (T.Form.true_, T.Form.false_, p)
+        return p
+      | AppBuiltin(b, args) ->
+        CCOpt.map (fun (args_t,args_f, s) -> 
+          (T.app_builtin ~ty:p_ty b args_t, T.app_builtin ~ty:p_ty b args_f, s)
+        ) (aux_l args)
       | App(hd,args) ->
         CCOpt.map (fun (args_t,args_f, s) -> 
           (T.app ~ty:p_ty hd args_t, T.app ~ty:p_ty hd args_f, s)
@@ -788,7 +806,9 @@ let eager_cases_near stms =
         | Some (xs_t, xs_f, s) -> Some (x::xs_t, x::xs_f, s)
         | None -> None end
       end in
-  aux ~top:true p in
+  let res = aux ~top:true p in
+  res in
+  
 
   
   let unroll_fool p =
