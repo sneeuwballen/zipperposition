@@ -585,10 +585,10 @@ let rec infer_rec ?loc ctx t =
       T.Ty.fun_ ?loc args ret
     | PT.AppBuiltin (Builtin.True, []) -> T.Form.true_
     | PT.AppBuiltin (Builtin.False, []) -> T.Form.false_
-    | PT.AppBuiltin (Builtin.And, l) ->
+    | PT.AppBuiltin (Builtin.And, l) when List.length l >= 2 ->
       let l = List.map (infer_prop_ ?loc ctx) l in
       T.Form.and_ ?loc l
-    | PT.AppBuiltin (Builtin.Or, l) ->
+    | PT.AppBuiltin (Builtin.Or, l)  when List.length l >= 2 ->
       let l = List.map (infer_prop_ ?loc ctx) l in
       T.Form.or_ ?loc l
     | PT.AppBuiltin (((Builtin.Equiv | Builtin.Xor | Builtin.Imply) as conn), [a;b]) ->

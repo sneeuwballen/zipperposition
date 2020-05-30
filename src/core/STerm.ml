@@ -172,8 +172,8 @@ let is_var = function | {term=Var _; _} -> true | _ -> false
 let true_ = builtin Builtin.true_
 let false_ = builtin Builtin.false_
 
-let and_ ?loc = function [] -> true_ | [x] -> x | l -> app_builtin ?loc Builtin.and_ l
-let or_ ?loc = function [] -> false_ | [x] -> x | l -> app_builtin ?loc Builtin.or_ l
+let and_ ?loc = app_builtin ?loc Builtin.and_
+let or_ ?loc = app_builtin ?loc Builtin.or_
 let not_ ?loc a = app_builtin ?loc Builtin.not_ [a]
 let equiv ?loc a b = app_builtin ?loc Builtin.equiv [a;b]
 let xor ?loc a b = app_builtin ?loc Builtin.xor [a;b]
