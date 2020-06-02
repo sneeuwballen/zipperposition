@@ -66,6 +66,7 @@ let prof_infer_equality_factoring = ZProf.make "sup.infer_equality_factoring"
 let prof_queues = ZProf.make "sup.queues"
 
 let k_trigger_bool_inst = Flex_state.create_key ()
+let k_trigger_bool_ind = Flex_state.create_key ()
 let k_sup_at_vars = Flex_state.create_key ()
 let k_sup_in_var_args = Flex_state.create_key ()
 let k_sup_under_lambdas = Flex_state.create_key ()
@@ -211,8 +212,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* CCFormat.printf "instatiate:@.c:@[%a@]@.subst:@[%a@]@.res:@[%a@]@." C.pp clause Subst.pp subst C.pp res; *)
     res
 
-  let insert_new_trigger t =
-    (* CCFormat.printf "trigger(@[%a@])=@[%a@]@." C.pp cl T.pp t; *)
+  let inst_clauses_w_trigger t =
     let triggers = Type.Map.get_or ~default:[] (T.ty t) !_trigger_bools in
     if not (CCList.mem ~eq:T.equal t triggers) then (
       _trigger_bools := Type.Map.update (T.ty t) (function 
@@ -222,9 +222,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
       Type.Map.get_or ~default:[] (T.ty t) !_cls_w_pred_vars
       |> CCList.map (fun (clause,var) -> instantiate_w_bool ~clause ~var ~trigger:t)
-      |> CCList.to_iter
-      |> Env.add_passive
-    )
+    ) else []
+
+  let insert_new_trigger t =
+    inst_clauses_w_trigger t
+    |> CCList.to_iter
+    |> Env.add_passive
 
 
   let handle_new_pred_var_clause (clause,var) =
@@ -263,6 +266,67 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Iter.iter insert_new_trigger new_triggers
     ));
     Signal.ContinueListening
+
+  let trigger_induction cl =
+    (* abstracts away closed subterm from the term t
+       by replacing it with (accordingly shifted) DB variable 0 *)
+    let abstract ~subterm t =
+      assert(T.DB.is_closed subterm);
+
+      let rec aux ~depth t =
+        if T.equal subterm t then (
+          T.bvar ~ty:(T.ty subterm) depth
+        ) else (
+          match T.view t with
+          | T.App(hd, args) ->
+            let hd' = aux ~depth hd in
+            let args' = List.map (aux ~depth) args in
+            if T.equal hd hd' && T.same_l args args' then t
+            else T.app hd' args'
+          | T.AppBuiltin(hd, args) ->
+            let args' = List.map (aux ~depth) args in
+            if T.same_l args args' then t
+            else T.app_builtin ~ty:(T.ty t) hd args'
+          | T.Fun _ ->
+            let pref, body = T.open_fun t in
+            let body' = aux ~depth:(depth+(List.length pref)) body in
+            if T.equal body body' then t else T.fun_l pref body'
+          | _ -> t
+        ) in
+      
+      let res = aux ~depth:0 t in
+      assert (Type.equal (T.ty res) (T.ty t));
+      if T.equal res t then None else (Some res) in
+    
+    let make_triggers lhs rhs sign =
+      let lhs_body, rhs_body = snd (Term.open_fun lhs), snd (Term.open_fun rhs) in
+      let immediate_args =
+        if (T.is_const (T.head_term lhs_body)) && 
+           (T.is_const (T.head_term rhs_body)) then (
+          List.sort_uniq T.compare (T.args lhs_body @ T.args rhs_body)
+        ) else [] in
+      CCList.filter_map (fun arg -> 
+        if T.DB.is_closed arg && not (Type.is_tType (T.ty arg)) then (
+          match abstract ~subterm:arg lhs, abstract ~subterm:arg rhs with
+          | Some(lhs'), Some(rhs') ->
+            assert (Type.equal (T.ty lhs') (T.ty rhs'));
+            (* Flipping the sign that is present in conjecture,
+               to prove the negated conjecture using induction *)
+            let build_body sign = if sign then T.Form.neq else T.Form.eq in
+            let res = T.fun_ (T.ty arg) (build_body sign lhs' rhs') in
+            assert (T.DB.is_closed res);
+            Some res
+          | _ -> None
+        ) else None
+      ) immediate_args in
+
+    if C.proof_depth cl < Env.flex_get k_trigger_bool_ind &&
+       CCOpt.is_some (C.distance_to_goal cl) then (
+      match C.lits cl with
+      | [| Literal.Equation(lhs, rhs, sign) |] ->
+        CCList.flat_map inst_clauses_w_trigger (make_triggers lhs rhs sign)
+      | _ -> []
+    ) else []
 
   let fluidsup_applicable cl =
     not (Env.flex_get k_restrict_fluidsup) ||
@@ -3581,6 +3645,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Env.add_unary_inf "recognize injectivity" recognize_injectivity;
     );
 
+    if Env.flex_get k_trigger_bool_ind > 0 then (
+      Env.add_unary_inf "trigger bool ind" trigger_induction
+    );
+
     if Env.flex_get k_ext_rules_kind == `ExtFamily ||
        Env.flex_get k_ext_rules_kind == `Both then (
       Env.add_binary_inf "ext_dec_act" ext_sup_act;
@@ -3680,6 +3748,7 @@ let _fluidsup = ref true
 let _subvarsup = ref true
 let _dupsup = ref true
 let _trigger_bool_inst = ref (-1)
+let _trigger_bool_ind = ref (-1)
 let _recognize_injectivity = ref false
 let _restrict_fluidsup = ref false
 let _check_sup_at_var_cond = ref true
@@ -3738,6 +3807,7 @@ let register ~sup =
 
   E.update_flex_state (Flex_state.add key sup);
   E.flex_add k_trigger_bool_inst !_trigger_bool_inst;
+  E.flex_add k_trigger_bool_ind !_trigger_bool_ind;
   E.flex_add k_sup_at_vars !_sup_at_vars;
   E.flex_add k_sup_in_var_args !_sup_in_var_args;
   E.flex_add k_sup_under_lambdas !_sup_under_lambdas;
@@ -3879,6 +3949,8 @@ let () =
       " enable/disable superposition to and from pure variable equations";
       "--trigger-bool-inst", Arg.Set_int _trigger_bool_inst
       , " instantiate predicate variables with boolean terms already in the proof state. Argument is the maximal proof depth of predicate variable";
+       "--trigger-bool-ind", Arg.Set_int _trigger_bool_ind
+      , " abstract away constants from the goal and use them to trigger axioms of induction";
       "--ho-unif-level",
       Arg.Symbol (["full-framework";"full"; "pragmatic-framework";], (fun str ->
           _unif_alg := if (String.equal "full" str) then `OldJP

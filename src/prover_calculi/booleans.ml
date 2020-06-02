@@ -150,6 +150,14 @@ module Make(E : Env.S) : S with module Env = E = struct
     ) [] bool_subterms)
 
   let simplify_bools t =
+    let negate t =
+      match T.view t with
+      | T.AppBuiltin(((Builtin.Eq|Builtin.Neq) as b), l) ->
+        let hd = if b = Builtin.Eq then Builtin.Neq else Builtin.Eq in
+        T.app_builtin ~ty:(T.ty t) hd l
+      | T.AppBuiltin(Builtin.Not, [s]) -> s
+      | _ -> T.Form.not_ t in
+
     let simplify_and_or t b l =
       let open Term in
       let compl_in_l l =
@@ -245,18 +253,42 @@ module Make(E : Env.S) : S with module Env = E = struct
       let unroll_or p = match T.view p with 
         | AppBuiltin(Or, l) -> T.Set.of_list l
         | _ -> T.Set.singleton p in
-
+      let is_impl p = match T.view p with 
+        | AppBuiltin(Imply, [l;r]) -> true
+        | _ -> false in
+      
+      (* Take a term of the form p11 /\ ... /\ p1n1 -> p21 /\ ... /\ p2n2 -> ... -> q1 \/ ... \/ qn  
+         and return the set of premises {p11,...} and conclusions {q1, ... }
+      *)
+      let unroll_impl p =
+        assert(is_impl p);
+        let rec aux acc p =
+          match T.view p with
+          | AppBuiltin(Imply, [l;r]) ->
+            let unrolled_l = unroll_and l in
+            let acc' = Term.Set.union unrolled_l acc in
+            if is_impl r then aux acc' r
+            else (acc', unroll_or r)
+          | _ -> assert false in
+        aux Term.Set.empty p
+      in
+      
       let p' = aux p and c' = aux c in
+      let (premises,conclusions) = unroll_impl (T.Form.imply p' c') in
 
-      if T.equal p' c' || 
-         not (T.Set.is_empty (T.Set.inter (unroll_and p') (unroll_or c'))) then T.true_
+      if not (T.Set.is_empty (T.Set.inter premises conclusions)) then (
+        T.true_
+      ) else if T.equal p' c' then T.true_
+      else if T.equal c' (negate p') then c'
+      else if T.equal p' (negate c') then c'
       else if T.equal p' T.true_ then c'
       else if T.equal p' T.false_ then T.true_
       else if T.equal c' T.false_ then aux (T.Form.not_ p')
       else if T.equal c' T.true_ then T.true_
       else (
-        if T.equal p p' && T.equal c c' then t 
-        else T.app_builtin ~ty:(T.ty t) Builtin.Imply [p';c'])
+        if T.equal p p' && T.equal c c' then t
+        else T.app_builtin ~ty:(T.ty t) Builtin.Imply [p';c']
+      )
     | AppBuiltin((Builtin.Eq | Builtin.Equiv) as hd, ([a;b]|[_;a;b])) ->
       let a',b' = aux a, aux b in
       if T.equal a' b' then T.true_ 
