@@ -121,10 +121,12 @@ module Make(E : Env.S) : S with module Env = E = struct
          end)
 
   let remove_ff_constraints c =
+    let module VS = Term.VarSet in
+
     (* assumes literal is negative flex-flex lit *)
     let extract_hd_vars = function
       | Literal.Equation(lhs,rhs,false) ->
-        T.VarSet.of_list [T.as_var_exn (T.head_term lhs);
+        VS.of_list [T.as_var_exn (T.head_term lhs);
                           T.as_var_exn (T.head_term rhs)]
       | _ -> assert false
     in
@@ -136,24 +138,43 @@ module Make(E : Env.S) : S with module Env = E = struct
       | _ -> false 
     in
     
-    let non_ff_vars =
+    (* variable is blocked if it is not flex-flex or if it appears as variable head
+       in the literal where blocked occurrs as well *)
+    let blocked_vars =
       CCArray.filter (fun l -> not @@ is_neg_ff l) (C.lits c)
       |> Literals.vars 
-      |> T.VarSet.of_list
+      |> VS.of_list
     in
 
-    let new_lits =
-      CCArray.to_list (C.lits c)
-      |> CCList.filter_map (fun lit -> 
-        if is_neg_ff lit then (
-          let c_vars = extract_hd_vars lit in
-          if T.VarSet.is_empty (T.VarSet.inter c_vars non_ff_vars) then None
-          else Some lit
-        ) else Some lit) 
-    in
-    
-    if CCArray.length (C.lits c) == List.length new_lits then (SimplM.return_same c)
+    (* ad-hoc union find with two equivalence classes -- shares variables
+       with blocked_vars or not -- used to compute whether var is blocked or not*)
+    let vars_to_remove,_ =
+      CCArray.fold (fun ((allowed, bl) as acc) lit -> 
+        match lit with 
+        | Literal.Equation(lhs, rhs, false) when is_neg_ff lit ->
+          let l_var,r_var = CCPair.map_same (fun t -> T.as_var_exn (T.head_term t)) (lhs,rhs) in
+          if not (VS.mem l_var bl) && not (VS.mem r_var bl) then (
+            (VS.add_list allowed [l_var;r_var]), bl
+          ) else (
+            if VS.mem l_var allowed || VS.mem r_var allowed then (
+              VS.empty, VS.add_list (VS.union allowed bl) [l_var;r_var]
+            ) else (allowed, VS.add_list bl [l_var; r_var])
+          )
+          
+        | _ -> acc
+      ) (VS.empty, blocked_vars) (C.lits c) in
+
+
+    if VS.is_empty vars_to_remove then (SimplM.return_same c)
     else (
+      let new_lits =
+        CCArray.to_list (C.lits c)
+        |> CCList.filter_map (fun lit -> 
+          if is_neg_ff lit then (
+            let c_vars = extract_hd_vars lit in
+            if VS.subset c_vars vars_to_remove then None
+            else Some lit
+          ) else Some lit) in
       let proof =
         Proof.Step.simp 
           ~tags:[Proof.Tag.T_ho] 
