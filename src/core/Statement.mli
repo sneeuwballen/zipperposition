@@ -187,6 +187,9 @@ val get_rw_rule:  ?weight_incr:int -> clause_t -> (ID.Set.elt * Rewrite.rule) op
 val get_formulas_from_defs: ('a, _, _) t -> 'a CCList.t
 
 val sine_axiom_selector: 
+  ?ignore_k_most_common_symbols: int option ->
+  ?take_conj_defs:bool ->
+  ?take_only_defs:bool ->
   ?trim_implications:bool ->
   ?depth_start:int -> 
   ?depth_end:int -> 

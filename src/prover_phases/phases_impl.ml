@@ -22,6 +22,9 @@ let _lmb_w = ref 1
 let _kbo_wf = ref "invfreqrank"
 let _prec_fun = ref "invfreq"
 let _trim_implications = ref false
+let _take_only_defs = ref false
+let _ignore_k_most_common_symbols = ref None
+let _take_conj_defs = ref true
 let _sine_d_min = ref 1
 let _sine_d_max = ref 5
 let _sine_tolerance = ref 1.5
@@ -143,7 +146,10 @@ let sine_filter stmts =
   else (
     let seq = CCVector.to_seq stmts in
     let filtered = 
-      Statement.sine_axiom_selector 
+      Statement.sine_axiom_selector
+      ~ignore_k_most_common_symbols:!_ignore_k_most_common_symbols
+      ~take_conj_defs:!_take_conj_defs
+      ~take_only_defs:!_take_only_defs
       ~trim_implications:!_trim_implications
       ~depth_start:!_sine_d_min 
       ~depth_end:!_sine_d_max 
@@ -634,6 +640,12 @@ let () =
     " Turn on SinE with threshold of 100 and set SinE symbol tolerance.";
     "--sine-trim-implications", Arg.Bool ((:=) _trim_implications),
     " trim long implications while getting symbols from conjecture";
+    "--sine-take-only-defs", Arg.Bool ((:=) _take_only_defs),
+    " take only axioms marked as definitions and the conjecture";
+    "--sine-ignore-k-most-common-syms", Arg.Int (fun v -> _ignore_k_most_common_symbols := Some v),
+    " if conjecture symbol is within k most common occuring ones, then it will be disregarded as conjecture symbol";
+    "--sine-take-conj-defs", Arg.Bool ((:=) _take_conj_defs),
+    " force taking definitions of symbols ocurring in conjecture";
     "--sine", Arg.Set_int _sine_threshold,
     " Set SinE axiom number threshold (negative number turns it off)" ^
     " with default settings: depth in range 1-5 and tolerance 1.5"

@@ -402,6 +402,10 @@ module Flatten = struct
               T.app_builtin ~ty:T.Ty.prop Builtin.Less [b; a];
             ]
         in aux_maybe_define ~should_define pos f
+      | T.AppBuiltin (Builtin.Eq, ([_;a;b]|[a;b])) when not lazy_cnf && T.Ty.is_prop (T.ty_exn a)  ->
+        (* converting equality to equivalence to ensure better CNF (that is better renaming)
+           when lazy cnf is off *)
+        (F.equiv <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
       | T.AppBuiltin (Builtin.Eq, [a;b])
         (* when either of a and b are formulas, and they contain HO subterms
            it is better not to replace Lambda with Forall.
@@ -415,6 +419,8 @@ module Flatten = struct
           (fun k->k T.pp t T.pp t');
         assert (vars_forall<>[]);
         aux pos vars t'
+      | T.AppBuiltin (Builtin.Neq, ([_;a;b]|[a;b])) when not lazy_cnf && T.Ty.is_prop (T.ty_exn a)  ->
+        (F.xor <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
       | T.AppBuiltin (Builtin.Eq, [a;b]) ->
         (F.eq <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
       (* >|= aux_maybe_define ~should_define pos *)
