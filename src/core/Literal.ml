@@ -715,22 +715,45 @@ let of_unif_subst renaming (s:Unif_subst.t) : t list =
        mk_constraint t u)
 
 let normalize_eq lit =
+  let as_neg t =
+    match T.view t with 
+    | T.AppBuiltin(Not, [f]) -> Some f
+    | _ -> None 
+  in
+
+  let is_neg t = CCOpt.is_some @@ as_neg t in
+
+  let eq_builder ~pos ~neg l r =
+    match as_neg l, as_neg r with
+    | Some f1, Some f2 -> pos f1 f2
+    | Some f1, None -> neg f1 r
+    | None, Some f2 -> neg l f2
+    | None, None -> pos l r
+  in
+
+  let mk_eq_ l r = eq_builder ~pos:mk_eq ~neg:mk_neq l r in
+  let mk_neq_ l r = eq_builder ~pos:mk_neq ~neg:mk_eq l r in
+
+
   let rec aux lit = 
     match lit with
     | Equation(lhs, rhs, sign) 
       when T.equal rhs T.true_ ->
       begin match T.view lhs with 
         | T.AppBuiltin(Builtin.(Eq|Equiv), ([_;l;r] | [l;r])) -> (* first arg can be type variable *)
-          let eq_cons = if sign then mk_eq else mk_neq in
+          let eq_cons = if sign then mk_eq_ else mk_neq_ in
           Some (eq_cons l r) 
         | T.AppBuiltin(Builtin.(Neq|Xor), ([_;l;r]|[l;r])) ->
-          let eq_cons = if sign then mk_neq else mk_eq in
+          let eq_cons = if sign then mk_neq_ else mk_eq_ in
           Some (eq_cons l r)
         | T.AppBuiltin (Builtin.Not, [f]) -> 
           let elim_not = mk_lit f T.true_ (not sign) in
           Some (CCOpt.get_or ~default:elim_not (aux elim_not))
         | _ -> None
       end
+    | Equation(lhs,rhs,sign) when is_neg lhs || is_neg rhs ->
+      assert (not (T.equal rhs T.true_));
+      Some ((if sign then mk_eq_ else mk_neq_) lhs rhs)
     | _ -> None in
   aux lit
 

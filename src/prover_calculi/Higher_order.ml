@@ -56,6 +56,7 @@ let k_use_diff_for_neg_ext = Flex_state.create_key()
 let k_generalize_choice_trigger = Flex_state.create_key ()
 let k_prim_enum_simpl = Flex_state.create_key ()
 let k_prim_enum_early_bird = Flex_state.create_key ()
+let k_resolve_flex_flex = Flex_state.create_key ()
 
 
 type prune_kind = [`NoPrune | `OldPrune | `PruneAllCovers | `PruneMaxCover]
@@ -118,6 +119,49 @@ module Make(E : Env.S) : S with module Env = E = struct
              Some skolems
            | None -> None
          end)
+
+  let remove_ff_constraints c =
+    (* assumes literal is negative flex-flex lit *)
+    let extract_hd_vars = function
+      | Literal.Equation(lhs,rhs,false) ->
+        T.VarSet.of_list [T.as_var_exn (T.head_term lhs);
+                          T.as_var_exn (T.head_term rhs)]
+      | _ -> assert false
+    in
+
+    let is_neg_ff = function
+      | Literal.Equation(lhs,rhs,false) -> 
+        T.is_var (T.head_term lhs) &&
+        T.is_var (T.head_term rhs)
+      | _ -> false 
+    in
+    
+    let non_ff_vars =
+      CCArray.filter (fun l -> not @@ is_neg_ff l) (C.lits c)
+      |> Literals.vars 
+      |> T.VarSet.of_list
+    in
+
+    let new_lits =
+      CCArray.to_list (C.lits c)
+      |> CCList.filter_map (fun lit -> 
+        if is_neg_ff lit then (
+          let c_vars = extract_hd_vars lit in
+          if T.VarSet.is_empty (T.VarSet.inter c_vars non_ff_vars) then None
+          else Some lit
+        ) else Some lit) 
+    in
+    
+    if CCArray.length (C.lits c) == List.length new_lits then (SimplM.return_same c)
+    else (
+      let proof =
+        Proof.Step.simp 
+          ~tags:[Proof.Tag.T_ho] 
+          ~rule:(Proof.Rule.mk "remove_ff_constraints")
+          [C.proof_parent c] in
+      let cl = C.create ~penalty:(C.penalty c) ~trail:(C.trail c) new_lits proof in
+      SimplM.return_new cl
+    )
 
   let rec declare_skolems = function
     | [] -> ()
@@ -1386,6 +1430,10 @@ module Make(E : Env.S) : S with module Env = E = struct
       Util.debug ~section 1 "setup HO rules";
       Env.Ctx.lost_completeness();
 
+      if Env.flex_get k_resolve_flex_flex then (
+        Env.add_basic_simplify remove_ff_constraints
+      );
+
       if Env.flex_get k_ground_app_vars != `Off then (
         let mode = Env.flex_get k_ground_app_vars in
         E.add_cheap_multi_simpl_rule (ground_app_vars ~mode);
@@ -1569,6 +1617,7 @@ let _use_diff_for_neg_ext = ref false
 let _generalize_choice_trigger = ref false
 let _prim_enum_simpl = ref false
 let _prim_enum_early_bird = ref false
+let _resolve_flex_flex = ref true
 let _ground_app_vars = ref `Off
 
 let extension =
@@ -1597,6 +1646,7 @@ let extension =
     E.flex_add k_generalize_choice_trigger !_generalize_choice_trigger;
     E.flex_add k_prim_enum_simpl !_prim_enum_simpl;
     E.flex_add k_prim_enum_early_bird !_prim_enum_early_bird;
+    E.flex_add k_resolve_flex_flex !_resolve_flex_flex;
     E.flex_add k_ground_app_vars !_ground_app_vars;
 
 
@@ -1673,6 +1723,7 @@ let () =
       "--ho-prim-max", Arg.Set_int prim_max_penalty, " max penalty for HO primitive enum";
       "--ho-prim-enum-simpl", Arg.Bool ((:=) _prim_enum_simpl), " use primitive enumeration as simplification rule";
       "--ho-prim-enum-early-bird", Arg.Bool ((:=) _prim_enum_early_bird), " use early-bird primitive enumeration (requires lazy CNF)";
+      "--ho-resolve-flex-flex", Arg.Bool ((:=) _resolve_flex_flex), " eagerly remove non-essential flex-flex constraints";
       "--ho-oracle-composer", Arg.Symbol (["merge";"fair"], (fun s -> 
           if s = "merge" then _oracle_composer := (OSeq.merge :> (Logtk.Subst.t option OSeq.t OSeq.t -> Logtk.Subst.t option OSeq.t))
           else _oracle_composer := UnifFramework.take_fair)), " choose either OSeq.merge or Unif.take_fair as the composer";
@@ -1772,6 +1823,7 @@ let () =
   Params.add_to_mode "ho-comb-complete" (fun () ->
     enabled_ := true;
     def_unfold_enabled_ := false;
+    _resolve_flex_flex := false;
     force_enabled_ := true;
     _ext_axiom := false;
     _ext_neg_lit := false;
@@ -1788,6 +1840,7 @@ let () =
   );
   Params.add_to_mode "fo-complete-basic" (fun () ->
       enabled_ := false;
+      _resolve_flex_flex := false;
       Unif._allow_pattern_unif := false;
       Unif._unif_bool := false;
     );
@@ -1798,6 +1851,7 @@ let () =
     ; "lambda-free-purify-extensional"] (fun () ->
         enabled_ := true;
         enable_unif_ := false;
+        _resolve_flex_flex := false;
         force_enabled_ := true;
         _elim_pred_var := false;
         _neg_ext_as_simpl := false;

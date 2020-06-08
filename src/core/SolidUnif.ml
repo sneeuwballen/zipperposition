@@ -46,6 +46,8 @@ module Make (St : sig val st : Flex_state.t end) = struct
       if n1 < n2 then (do_exp_otf n1 pref2 t1,t2,pref2)
       else (t1,do_exp_otf n2 pref1 t2,pref1))
 
+  (* Perform some form of lazy normalization to bring term into solid
+     form if that is possible (e.g. beta reducing applied variables) *)
   let solidify ?(limit=true) ?(exception_on_error=true) t =
     let rec aux t =
       (* right now working only on monomorphic terms *)
@@ -431,13 +433,12 @@ module Make (St : sig val st : Flex_state.t end) = struct
         let hd_t, args_t = T.as_app body_t' in
         match T.view hd_s, T.view hd_t with 
         | (T.Var _, T.Var _) ->
-          if not (T.equal hd_s hd_t) then (
-            let subst = solve_flex_flex_diff ~subst:(US.subst subst) ~scope ~counter body_s' body_t' in
-            unify ~scope ~counter ~subst rest
-          ) else (
-            let subst = solve_flex_flex_same ~subst:(US.subst subst) ~scope ~counter body_s' body_t' in
-            unify ~scope ~counter ~subst rest
-          )
+          let solver = 
+            if not (T.equal hd_s hd_t)
+            then solve_flex_flex_diff
+            else solve_flex_flex_same in
+          let subst = solver ~subst:(US.subst subst) ~scope ~counter body_s' body_t' in
+          unify ~scope ~counter ~subst rest
         | (T.Var _, _) ->
           let projected = project_flex_rigid ~subst:(US.subst subst) ~scope body_s' body_t' in
           let covered = cover_flex_rigid ~subst:(US.subst subst) ~counter ~scope  body_s' body_t' in
