@@ -70,7 +70,13 @@ module Make(E : Env.S) : S with module Env = E = struct
         raise @@ CantEncode err;
       );
       match T.view t with 
-      | T.Const _ | T.Var _ -> sym_map, t
+      | T.Const sym ->
+        if CCOpt.is_none (Ctx.find_signature sym)  then (
+          let err = 
+            CCFormat.sprintf "%a is not in signature" ID.pp sym in
+          raise @@ CantEncode err
+        ) else (sym_map, t)
+      | T.Var _ -> sym_map, t
       | T.DB _ | T.Fun _ -> 
         let err = 
           CCFormat.sprintf "%a is a lambda" T.pp t in
@@ -84,6 +90,13 @@ module Make(E : Env.S) : S with module Env = E = struct
         raise @@ CantEncode err
       | T.AppBuiltin(_, l)
       | T.App(_, l) ->
+        if T.is_const (T.head_term t) then (
+          let sym = T.as_const_exn (T.head_term t) in
+          if CCOpt.is_none (Ctx.find_signature sym)  then (
+            let err = 
+              CCFormat.sprintf "%a is not in signature" ID.pp sym in
+            raise @@ CantEncode err)
+        );
         let hd_mono, args = T.as_app_mono t in
         let sym_map, hd = 
           if List.length args != List.length l then (
@@ -138,9 +151,10 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let output_all ?(already_defined=ID.Set.empty) ~out cl_set =
     let cl_iter = Iter.of_list cl_set in
-    let syms = C.symbols ~include_types:true cl_iter
-               |> (fun syms -> ID.Set.diff syms already_defined)
-               |> ID.Set.to_list
+    let syms = 
+      C.symbols ~include_types:true cl_iter
+      |> (fun syms -> ID.Set.diff syms already_defined)
+      |> ID.Set.to_list
     in
     (* first printing type declarations, and only then the types *)
     CCList.fold_right (fun sym acc -> 

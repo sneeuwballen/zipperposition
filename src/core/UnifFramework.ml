@@ -124,13 +124,13 @@ module Make (P : PARAMETERS) = struct
       ) else res 
     in
 
-    let rec aux ~root ~delayed subst problem =
-      let delay_ff ~subst ~rest lhs rhs flag =
+    let rec aux ~root ~delayed ~lambda_pref subst problem =
+      let delay_ff ~lambda_pref ~subst ~rest lhs rhs flag =
         assert(T.is_var (T.head_term lhs));
         assert(T.is_var (T.head_term rhs));
 
         let delayed = delay_pair ~delayed lhs rhs flag in
-        aux ~root:false ~delayed subst rest in
+        aux ~lambda_pref ~root:false ~delayed subst rest in
       
       let decompose args_l args_r rest flag =
         let rec zipped_with_flag = function 
@@ -189,9 +189,9 @@ module Make (P : PARAMETERS) = struct
           sort_class rr @ sort_class fr @ sort_class unsure @ rest @ sort_class ff
         else rr @ fr @ unsure @ rest @ ff in
 
-      let decompose_and_cont ?(inc_step=0) args_l args_r rest flag subst =
+      let decompose_and_cont ?(inc_step=0) ~lambda_pref args_l args_r rest flag subst =
         let new_prob = decompose args_l args_r rest flag in
-        aux ~root:false ~delayed subst new_prob in
+        aux ~root:false ~lambda_pref ~delayed subst new_prob in
 
       match problem with 
       | [] -> 
@@ -206,13 +206,15 @@ module Make (P : PARAMETERS) = struct
           let mapped, unmapped = List.partition is_mapped delayed in
           if CCList.is_empty mapped then (
             let subst = List.fold_left (fun subst (l,r,_) ->
+              let l,r = CCPair.map_same (T.fun_l (List.rev lambda_pref)) (l,r) in
+              assert(T.DB.is_closed l && T.DB.is_closed r);
               US.add_constr (Unif_constr.make_fo ~tags:[] (l,unifscope) (r,unifscope)) subst
-            ) subst delayed 
+            ) (US.of_subst (US.subst subst)) delayed 
             in
             OSeq.return (Some subst)
           )
           else (
-            aux ~root:false ~delayed:unmapped subst mapped
+            aux ~root:false ~delayed:unmapped ~lambda_pref subst mapped
            )
         )
       | (lhs, rhs, flag) :: rest ->
@@ -224,27 +226,28 @@ module Make (P : PARAMETERS) = struct
           and rhs = normalize (US.subst subst) (rhs, unifscope) in
           let (pref_lhs, body_lhs) = T.open_fun lhs
           and (pref_rhs, body_rhs) = T.open_fun rhs in 
-          let body_lhs, body_rhs, _ = 
+          let body_lhs, body_rhs, new_pref = 
             eta_expand_otf ~subst ~scope:unifscope pref_lhs pref_rhs body_lhs body_rhs in
           let (hd_lhs, args_lhs), (hd_rhs, args_rhs) = T.as_app body_lhs, T.as_app body_rhs in
+          let lambda_pref = (List.rev new_pref) @ lambda_pref in
 
           if T.equal body_lhs body_rhs then (
-            aux ~root:false ~delayed subst rest
+            aux ~root:false ~delayed ~lambda_pref subst rest
           ) else (
             match T.view hd_lhs, T.view hd_rhs with
             | T.DB i, T.DB j ->
-              if i = j then decompose_and_cont args_lhs args_rhs rest flag subst
+              if i = j then decompose_and_cont ~lambda_pref args_lhs args_rhs rest flag subst
               else OSeq.empty
             | T.Const f, T.Const g ->
               if ID.equal f g && List.length args_lhs = List.length args_rhs 
-              then decompose_and_cont args_lhs args_rhs rest flag subst
+              then decompose_and_cont ~lambda_pref args_lhs args_rhs rest flag subst
               else OSeq.empty
             | T.AppBuiltin(b1, args1), T.AppBuiltin(b2, args2) ->
               let args_lhs = args_lhs @ args1 and args_rhs = args_rhs @ args2 in
               if Builtin.equal b1 b2 && List.length args_lhs = List.length args_rhs then (
                 let args_lhs, args_rhs = 
                   Unif.norm_logical_disagreements b1 args_lhs args_rhs in
-                decompose_and_cont (args_lhs) (args_rhs) rest flag subst
+                decompose_and_cont ~lambda_pref (args_lhs) (args_rhs) rest flag subst
               ) else OSeq.empty
             | _ when different_rigid_heads hd_lhs hd_rhs -> OSeq.empty
             | _ -> 
@@ -271,17 +274,17 @@ module Make (P : PARAMETERS) = struct
                         (fun (l,r) -> (T.of_term_unsafe l, T.of_term_unsafe r,flag)) 
                         (Unif_constr.apply_subst_l S.Renaming.none S.empty cstr) in
                     let delayed = new_delayed @ delayed in
-                    aux ~root:false ~delayed sub rest ()) substs
+                    aux ~lambda_pref ~root:false ~delayed sub rest ()) substs
                   |> OSeq.of_list
                   |> OSeq.merge
                 | None ->
                   if not root && delay_enabled &&
                      T.is_var hd_lhs && T.is_var rhs then (
-                    delay_ff ~subst ~rest lhs rhs flag
+                    delay_ff ~lambda_pref ~subst ~rest body_lhs body_rhs flag
                   ) else (
                     let args_unif =
                       if T.is_var hd_lhs && T.is_var hd_rhs && T.equal hd_lhs hd_rhs then
-                        decompose_and_cont args_lhs args_rhs rest flag subst
+                        decompose_and_cont ~lambda_pref args_lhs args_rhs rest flag subst
                       else OSeq.empty in
 
                     let all_oracles = 
@@ -295,13 +298,13 @@ module Make (P : PARAMETERS) = struct
                             try
                               let subst' = US.merge subst (US.of_subst sub') in
                               incr bind_cnt;
-                              slow_down (fun () -> aux ~delayed ~root:false subst' ((lhs,rhs,flag') :: rest) ())
+                              slow_down (fun () -> aux ~delayed ~lambda_pref ~root:false subst' ((lhs,rhs,flag') :: rest) ())
                             with Subst.InconsistentBinding _ ->
                               OSeq.empty) all_oracles
                       |> OSeq.merge in
                     OSeq.interleave oracle_unifs args_unif)
               with Unif.Fail -> OSeq.empty) in
-    aux ~root:true ~delayed:[] subst problem
+    aux ~root:true ~delayed:[] ~lambda_pref:[] subst problem
 
   let try_lfho_unif ((s,_) as t0) ((t,_) as t1) =
     

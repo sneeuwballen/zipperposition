@@ -178,6 +178,11 @@ module Make (St : sig val st : Flex_state.t end) = struct
 
   let collect_flex_flex ~counter ~flex_args t =
     let replace_var ~bvar_tys ~target =
+      let close_terms =
+        if get_op PUP.k_delay_flex_flex then (T.fun_l (List.rev bvar_tys))
+        else CCFun.id 
+      in
+
       if Type.returns_tType (T.ty target) || CCList.is_empty flex_args && CCList.is_empty (T.args target)
       then target,[]
       else (
@@ -193,7 +198,7 @@ module Make (St : sig val st : Flex_state.t end) = struct
         let flex_args_db =
           List.mapi (fun i a -> T.bvar ~ty: (T.ty a) (n_bvars+(num_f_args-1-i))) flex_args in
         let replacement = T.app (T.var fresh_var) (flex_args_db @ bvars) in
-        replacement, [unif_w_target, target]
+        replacement, [close_terms unif_w_target, close_terms target]
       ) in
 
     let rec aux ~bvar_tys t =
@@ -312,7 +317,7 @@ module Make (St : sig val st : Flex_state.t end) = struct
     res
 
 
-  let cover_flex_rigid ~subst ~counter ~scope flex rigid =
+  let cover_flex_rigid ~subst ~counter ~scope ~lambda_pref flex rigid =
     ZProf.enter_prof prof_flex_rigid;
     assert(T.is_var (T.head_term flex));
     assert(not @@ T.is_app_var rigid);
@@ -324,11 +329,13 @@ module Make (St : sig val st : Flex_state.t end) = struct
     let flex_args = T.args flex in
     let to_bind, flex_constraints = collect_flex_flex ~counter ~flex_args rigid in
 
+    let pref = (List.rev (lambda_pref :> InnerTerm.t list)) in
+
     let subst =
       if get_op PUP.k_delay_flex_flex then (
         List.fold_left (fun subst (lhs,rhs) -> 
           US.add_constr 
-            (Unif_constr.make ~tags:[] (lhs,scope) (rhs,scope) ) subst
+            (Unif_constr.make ~tags:[] (InnerTerm.fun_l pref lhs,scope) (InnerTerm.fun_l pref rhs,scope) ) subst
         ) subst ((flex_constraints) :> (InnerTerm.t * InnerTerm.t) list)  )
       else (
         List.fold_left (fun subst (lhs,rhs) -> 
@@ -421,7 +428,7 @@ module Make (St : sig val st : Flex_state.t end) = struct
             | _ -> None end
         ) flex_args
 
-  let rec unify ~scope ~counter ~subst ~root constraints =
+  let rec unify ~scope ~counter ~subst ~root ~lambda_pref constraints =
     let delay_enabled = 
       Flex_state.get_exn PUP.k_delay_flex_flex St.st in
 
@@ -441,50 +448,56 @@ module Make (St : sig val st : Flex_state.t end) = struct
       if not (Term.equal s' t') then (
         let pref_s, body_s = T.open_fun s' in
         let pref_t, body_t = T.open_fun t' in 
-        let body_s', body_t', _ = eta_expand_otf ~subst:(US.subst subst) ~scope pref_s pref_t body_s body_t in
+        let body_s', body_t', new_pref = eta_expand_otf ~subst:(US.subst subst) ~scope pref_s pref_t body_s body_t in
+        let lambda_pref = (List.rev new_pref) @ lambda_pref in
         let hd_s, args_s = T.as_app body_s' in
         let hd_t, args_t = T.as_app body_t' in
         match T.view hd_s, T.view hd_t with 
         | (T.Var _, T.Var _) ->
           if not root && delay_enabled && hard_flex_flex args_s args_t then (
+            let lambda_pref = List.rev lambda_pref in
             let subst = 
               US.add_constr (Unif_constr.make ~tags:[] 
-                ((s',scope) :> InnerTerm.t Scoped.t)
-                ((t',scope) :> InnerTerm.t Scoped.t)
+                ((T.fun_l lambda_pref s',scope) :> InnerTerm.t Scoped.t)
+                ((T.fun_l lambda_pref t',scope) :> InnerTerm.t Scoped.t)
               ) subst in
-            unify ~scope ~counter ~subst ~root:false rest
+            unify ~scope ~lambda_pref ~counter ~subst ~root:false rest
           ) else (
             let solver = 
               if not (T.equal hd_s hd_t)
               then solve_flex_flex_diff
               else solve_flex_flex_same in
             let subst = solver ~subst ~scope ~counter body_s' body_t' in
-            unify ~scope ~counter ~subst ~root:false rest
+            unify ~scope ~lambda_pref ~counter ~subst ~root:false rest
           )
         | (T.Var _, _) ->
           let projected = project_flex_rigid ~subst ~scope body_s' body_t' in
-          let covered = cover_flex_rigid ~subst:subst ~counter ~scope  body_s' body_t' in
-          (CCList.flat_map (fun subst -> unify ~root:false ~scope ~counter ~subst rest) covered) @
-          (CCList.flat_map (fun (subst,s,t) -> unify ~scope ~root:false ~counter ~subst ((s,t)::rest)) projected)
+          let covered =
+            let lambda_pref = (lambda_pref :> InnerTerm.t list) in
+            cover_flex_rigid ~lambda_pref ~subst:subst ~counter ~scope  body_s' body_t' in
+          (CCList.flat_map (fun subst -> unify ~root:false ~lambda_pref ~scope ~counter ~subst rest) covered) @
+          (CCList.flat_map (fun (subst,s,t) -> unify ~lambda_pref ~scope ~root:false ~counter ~subst ((s,t)::rest)) projected)
         | (_, T.Var _) ->
           let projected = project_flex_rigid ~subst ~scope body_t' body_s' in
-          let covered = cover_flex_rigid ~subst ~counter ~scope  body_t' body_s' in
-          (CCList.flat_map (fun subst -> unify ~scope ~root:false ~counter ~subst rest) covered) @ 
-          (CCList.flat_map (fun (subst,s,t) -> unify ~scope ~counter ~root:false ~subst ((s,t)::rest)) projected)
+          let covered = 
+            let lambda_pref = (lambda_pref :> InnerTerm.t list) in
+            cover_flex_rigid ~lambda_pref ~subst ~counter ~scope  body_t' body_s' in
+          (CCList.flat_map (fun subst -> unify ~lambda_pref ~scope ~root:false ~counter ~subst rest) covered) @ 
+          (CCList.flat_map (fun (subst,s,t) -> unify ~lambda_pref ~scope ~counter ~root:false ~subst ((s,t)::rest)) projected)
         | T.AppBuiltin(hd_s, args_s'), T.AppBuiltin(hd_t, args_t') when
             Builtin.equal hd_s hd_t &&
             List.length args_s' + List.length args_s = 
             List.length args_t' + List.length args_t ->
           let args_lhs, args_rhs = 
             Unif.norm_logical_disagreements hd_s (args_s'@args_s) (args_t'@args_t) in
-          unify ~subst ~counter ~scope ~root:false @@ build_constraints args_lhs args_rhs rest
+          unify ~lambda_pref ~subst ~counter ~scope ~root:false @@ build_constraints args_lhs args_rhs rest
         | T.Const f , T.Const g when ID.equal f g && List.length args_s = List.length args_t ->
-          unify ~subst ~counter ~scope ~root:false @@ build_constraints args_s args_t rest
+          unify ~lambda_pref ~subst ~counter ~scope ~root:false @@ build_constraints args_s args_t rest
         | T.DB i, T.DB j when i = j && List.length args_s = List.length args_t ->
-          unify ~subst ~counter ~scope ~root:false @@ build_constraints args_s args_t rest
+          unify ~lambda_pref ~subst ~counter ~scope ~root:false @@ build_constraints args_s args_t rest
         | _ -> raise NotUnifiable) 
       else (
-        unify ~subst ~counter ~scope ~root:false rest
+        unify ~lambda_pref ~subst ~counter ~scope ~root:false rest
       )
 
 
@@ -495,7 +508,7 @@ module Make (St : sig val st : Flex_state.t end) = struct
           let t0',t1',scope,subst = US.FO.rename_to_new_scope ~counter t0_s t1_s in
           if var_conditions t0' t1' then (
             let t0',t1' = solidify t0', solidify t1' in
-            unify ~scope ~counter ~subst ~root:true [(t0', t1')])
+            unify ~lambda_pref:[] ~scope ~counter ~subst ~root:true [(t0', t1')])
           else raise NotInFragment
         )
         else (
@@ -506,7 +519,7 @@ module Make (St : sig val st : Flex_state.t end) = struct
             let t0', t1' = US_A.apply subst t0_s, US_A.apply subst t1_s in
             if var_conditions t0' t1' then (
               let t0',t1' = solidify t0', solidify t1' in
-              unify ~scope:(Scoped.scope t0_s) ~counter ~subst ~root:true [(t0', t1')]
+              unify ~lambda_pref:[] ~scope:(Scoped.scope t0_s) ~counter ~subst ~root:true [(t0', t1')]
             )
             else (raise NotInFragment)
           )
@@ -514,20 +527,20 @@ module Make (St : sig val st : Flex_state.t end) = struct
       in
 
       assert(CCList.for_all (fun sub ->
-          if not (US.has_constr sub) then true
+          if (US.has_constr sub) then true
           else (
-          let norm t = Lambda.eta_reduce @@ Lambda.snf t in
-          let lhs_o = norm @@ US_A.apply subst t0_s and rhs_o = norm @@ US_A.apply subst t1_s in
-          (* CCFormat.printf "l_o:@[%a@];r_0:@[%a@]@.sub:@[%a@]@." T.pp lhs_o T.pp rhs_o US.pp sub; *)
-          let lhs = norm @@ US_A.apply sub t0_s and rhs = norm @@ US_A.apply sub t1_s in
-          if T.equal lhs rhs then true
-          else (
-            CCFormat.printf "orig: @[%a@]=?=@[%a@]@." (Scoped.pp T.pp) t0_s (Scoped.pp T.pp) t1_s ;
-            CCFormat.printf "orig_sub: @[%a@]@." US.pp subst;
-            CCFormat.printf "orig_app: @[%a@]=?=@[%a@]@." (T.pp) lhs_o (T.pp) rhs_o ;
-            CCFormat.printf "new_sub: @[%a@]@." US.pp sub ;
-            CCFormat.printf "res: @[%a@]=?=@[%a@]@." T.pp lhs T.pp rhs ;
-            false
+            let norm t = Lambda.eta_reduce @@ Lambda.snf t in
+            let lhs_o = norm @@ US_A.apply subst t0_s and rhs_o = norm @@ US_A.apply subst t1_s in
+            (* CCFormat.printf "l_o:@[%a@];r_0:@[%a@]@.sub:@[%a@]@." T.pp lhs_o T.pp rhs_o US.pp sub; *)
+            let lhs = norm @@ US_A.apply sub t0_s and rhs = norm @@ US_A.apply sub t1_s in
+            if T.equal lhs rhs then true
+            else (
+              CCFormat.printf "orig: @[%a@]=?=@[%a@]@." (Scoped.pp T.pp) t0_s (Scoped.pp T.pp) t1_s ;
+              CCFormat.printf "orig_sub: @[%a@]@." US.pp subst;
+              CCFormat.printf "orig_app: @[%a@]=?=@[%a@]@." (T.pp) lhs_o (T.pp) rhs_o ;
+              CCFormat.printf "new_sub: @[%a@]@." US.pp sub ;
+              CCFormat.printf "res: @[%a@]=?=@[%a@]@." T.pp lhs T.pp rhs ;
+              false
           ))) res);
       res    
     with NotInFragment ->
