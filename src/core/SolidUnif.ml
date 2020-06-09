@@ -317,15 +317,25 @@ module Make (St : sig val st : Flex_state.t end) = struct
     assert(T.is_var (T.head_term flex));
     assert(not @@ T.is_app_var rigid);
 
-    let rigid = Lambda.snf @@ Subst.FO.apply Subst.Renaming.none subst (rigid, scope) in
+    let sub = US.subst subst in
+    let rigid = Lambda.snf @@ Subst.FO.apply Subst.Renaming.none sub (rigid, scope) in
     let rigid_orig = rigid in
     let flex, rigid = solidify flex, solidify rigid in
     let flex_args = T.args flex in
     let to_bind, flex_constraints = collect_flex_flex ~counter ~flex_args rigid in
 
-    let subst = List.fold_left (fun subst (lhs,rhs) -> 
-        US.subst (solve_flex_flex_diff ~subst ~counter ~scope lhs rhs)
-      ) subst flex_constraints in
+    let subst =
+      if get_op PUP.k_delay_flex_flex then (
+        List.fold_left (fun subst (lhs,rhs) -> 
+          US.add_constr 
+            (Unif_constr.make ~tags:[] (lhs,scope) (rhs,scope) ) subst
+        ) subst ((flex_constraints) :> (InnerTerm.t * InnerTerm.t) list)  )
+      else (
+        List.fold_left (fun subst (lhs,rhs) -> 
+          let solution = (solve_flex_flex_diff ~subst:sub ~counter ~scope lhs rhs) in
+          assert (not (US.has_constr solution));
+          US.merge subst solution
+        ) subst flex_constraints) in
 
     let covers_limit = Some (2 * get_op PUP.k_max_inferences) in
     let rigid_covers = cover_rigid_skeleton ~covers_limit to_bind flex_args in
@@ -344,15 +354,13 @@ module Make (St : sig val st : Flex_state.t end) = struct
           );
           assert (List.length rigid_covers = 1);
 
-          let res = Subst.FO.bind' subst (head_var,scope) (rigid,scope) in
-          [US.of_subst res]
+          [US.FO.bind subst (head_var,scope) (rigid,scope)]
         ) else (
           let tys = List.map T.ty flex_args in
           List.map (fun r ->
               let closed_rigid = T.fun_l tys r in
               assert(T.DB.is_closed closed_rigid);
-              let subs_flex = Subst.FO.bind' subst (head_var,scope) (closed_rigid,scope) in
-              US.of_subst subs_flex
+              US.FO.bind subst (head_var,scope) (closed_rigid,scope)
             ) rigid_covers)
       ) in
     ZProf.exit_prof prof_flex_rigid;
@@ -415,7 +423,14 @@ module Make (St : sig val st : Flex_state.t end) = struct
             | _ -> None end
         ) flex_args
 
-  let rec unify ~scope ~counter ~subst constraints =
+  let rec unify ~scope ~counter ~subst ~root constraints =
+    let delay_enabled = 
+      Flex_state.get_exn PUP.k_delay_flex_flex St.st in
+
+    let hard_flex_flex args1 args2 =
+      List.length args1 > 3 &&
+      List.length args2 > 3 in
+
     match constraints with
     | [] -> [subst]
     | (s,t) :: rest -> 
@@ -433,36 +448,45 @@ module Make (St : sig val st : Flex_state.t end) = struct
         let hd_t, args_t = T.as_app body_t' in
         match T.view hd_s, T.view hd_t with 
         | (T.Var _, T.Var _) ->
-          let solver = 
-            if not (T.equal hd_s hd_t)
-            then solve_flex_flex_diff
-            else solve_flex_flex_same in
-          let subst = solver ~subst:(US.subst subst) ~scope ~counter body_s' body_t' in
-          unify ~scope ~counter ~subst rest
+          if not root && delay_enabled && hard_flex_flex args_s args_t then (
+            let subst = 
+              US.add_constr (Unif_constr.make ~tags:[] 
+                ((s',scope) :> InnerTerm.t Scoped.t)
+                ((t',scope) :> InnerTerm.t Scoped.t)
+              ) subst in
+            unify ~scope ~counter ~subst ~root:false rest
+          ) else (
+            let solver = 
+              if not (T.equal hd_s hd_t)
+              then solve_flex_flex_diff
+              else solve_flex_flex_same in
+            let subst = solver ~subst:(US.subst subst) ~scope ~counter body_s' body_t' in
+            unify ~scope ~counter ~subst ~root:false rest
+          )
         | (T.Var _, _) ->
           let projected = project_flex_rigid ~subst:(US.subst subst) ~scope body_s' body_t' in
-          let covered = cover_flex_rigid ~subst:(US.subst subst) ~counter ~scope  body_s' body_t' in
-          (CCList.flat_map (fun subst -> unify ~scope ~counter ~subst rest) covered) @
-          (CCList.flat_map (fun (subst,s,t) -> unify ~scope ~counter ~subst:(US.of_subst subst) ((s,t)::rest)) projected)
+          let covered = cover_flex_rigid ~subst:subst ~counter ~scope  body_s' body_t' in
+          (CCList.flat_map (fun subst -> unify ~root:false ~scope ~counter ~subst rest) covered) @
+          (CCList.flat_map (fun (subst,s,t) -> unify ~scope ~root:false ~counter ~subst:(US.of_subst subst) ((s,t)::rest)) projected)
         | (_, T.Var _) ->
           let projected = project_flex_rigid ~subst:(US.subst subst) ~scope body_t' body_s' in
-          let covered = cover_flex_rigid ~subst:(US.subst subst) ~counter ~scope  body_t' body_s' in
-          (CCList.flat_map (fun subst -> unify ~scope ~counter ~subst rest) covered) @ 
-          (CCList.flat_map (fun (subst,s,t) -> unify ~scope ~counter ~subst:(US.of_subst subst) ((s,t)::rest)) projected)
+          let covered = cover_flex_rigid ~subst ~counter ~scope  body_t' body_s' in
+          (CCList.flat_map (fun subst -> unify ~scope ~root:false ~counter ~subst rest) covered) @ 
+          (CCList.flat_map (fun (subst,s,t) -> unify ~scope ~counter ~root:false ~subst:(US.of_subst subst) ((s,t)::rest)) projected)
         | T.AppBuiltin(hd_s, args_s'), T.AppBuiltin(hd_t, args_t') when
             Builtin.equal hd_s hd_t &&
             List.length args_s' + List.length args_s = 
             List.length args_t' + List.length args_t ->
           let args_lhs, args_rhs = 
             Unif.norm_logical_disagreements hd_s (args_s'@args_s) (args_t'@args_t) in
-          unify ~subst ~counter ~scope @@ build_constraints args_lhs args_rhs rest
+          unify ~subst ~counter ~scope ~root:false @@ build_constraints args_lhs args_rhs rest
         | T.Const f , T.Const g when ID.equal f g && List.length args_s = List.length args_t ->
-          unify ~subst ~counter ~scope @@ build_constraints args_s args_t rest
+          unify ~subst ~counter ~scope ~root:false @@ build_constraints args_s args_t rest
         | T.DB i, T.DB j when i = j && List.length args_s = List.length args_t ->
-          unify ~subst ~counter ~scope @@ build_constraints args_s args_t rest
+          unify ~subst ~counter ~scope ~root:false @@ build_constraints args_s args_t rest
         | _ -> raise NotUnifiable) 
       else (
-        unify ~subst ~counter ~scope rest
+        unify ~subst ~counter ~scope ~root:false rest
       )
 
 
@@ -473,7 +497,7 @@ module Make (St : sig val st : Flex_state.t end) = struct
           let t0',t1',scope,subst = US.FO.rename_to_new_scope ~counter t0_s t1_s in
           if var_conditions t0' t1' then (
             let t0',t1' = solidify t0', solidify t1' in
-            unify ~scope ~counter ~subst [(t0', t1')])
+            unify ~scope ~counter ~subst ~root:true [(t0', t1')])
           else raise NotInFragment
         )
         else (
@@ -484,7 +508,7 @@ module Make (St : sig val st : Flex_state.t end) = struct
             let t0', t1' = US_A.apply subst t0_s, US_A.apply subst t1_s in
             if var_conditions t0' t1' then (
               let t0',t1' = solidify t0', solidify t1' in
-              unify ~scope:(Scoped.scope t0_s) ~counter ~subst [(t0', t1')]
+              unify ~scope:(Scoped.scope t0_s) ~counter ~subst ~root:true [(t0', t1')]
             )
             else (raise NotInFragment)
           )
