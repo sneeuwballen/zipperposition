@@ -513,7 +513,9 @@ module Make (St : sig val st : Flex_state.t end) = struct
         ) 
       in
 
-      assert(CCList.for_all (fun sub -> 
+      assert(CCList.for_all (fun sub ->
+          if not (US.has_constr sub) then true
+          else (
           let norm t = Lambda.eta_reduce @@ Lambda.snf t in
           let lhs_o = norm @@ US_A.apply subst t0_s and rhs_o = norm @@ US_A.apply subst t1_s in
           (* CCFormat.printf "l_o:@[%a@];r_0:@[%a@]@.sub:@[%a@]@." T.pp lhs_o T.pp rhs_o US.pp sub; *)
@@ -526,7 +528,7 @@ module Make (St : sig val st : Flex_state.t end) = struct
             CCFormat.printf "new_sub: @[%a@]@." US.pp sub ;
             CCFormat.printf "res: @[%a@]=?=@[%a@]@." T.pp lhs T.pp rhs ;
             false
-          )) res);
+          ))) res);
       res    
     with NotInFragment ->
       (* let norm t = Lambda.eta_reduce @@ Lambda.snf t in
