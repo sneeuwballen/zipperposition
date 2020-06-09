@@ -104,16 +104,16 @@ module Make (St : sig val st : Flex_state.t end) = struct
 
     if CCList.for_all (fun l -> List.length l = 1 ) l then [CCList.flatten l]
     else (
-      let rec limit_combinations max l = 
-        if max <= 1 then CCList.map (fun l -> [List.hd l]) l
+      let rec limit_combinations max_c l = 
+        if max_c <= 1 then CCList.map (fun l -> [List.hd l]) l
         else (match l with 
             | [] -> [] 
             | x :: xs -> 
               let n = List.length x in
-              let x,max = 
-                if n >= max then x, max / n
-                else CCList.take max x, 0 in
-              x :: limit_combinations max xs) in
+              let x,max_c = 
+                if n <= max_c then x, max_c / n
+                else CCList.take (max max_c 1) x, 0 in
+              x :: limit_combinations max_c xs) in
       match combs_limit with
       | None -> aux l
       | Some max -> aux (limit_combinations max l))
