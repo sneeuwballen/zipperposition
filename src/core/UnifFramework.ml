@@ -226,12 +226,10 @@ module Make (P : PARAMETERS) = struct
                       try
                         Some (alg (lhs, unifscope) (rhs, unifscope) subst)
                       with 
-                      | P.NotInFragment ->
-                        (* CCFormat.printf "@[%a@]@ =@ @[%a@] not in fragment@."  T.pp lhs T.pp rhs; *)
-                        None
+                      | P.NotInFragment -> None
                       | P.NotUnifiable -> 
-                        (* CCFormat.printf "@[%a@]@ =@ @[%a@] not unif@."  T.pp lhs T.pp rhs; *)
-                        raise Unif.Fail
+                      (* CCFormat.printf "@[%a@]@ =@ @[%a@] not unif@."  T.pp lhs T.pp rhs; *)
+                      raise Unif.Fail
                     ) (P.frag_algs ()) in 
                 match mgu with 
                 | Some substs ->
@@ -280,7 +278,7 @@ module Make (P : PARAMETERS) = struct
 
       let rec aux t = 
         match T.view t with
-        | T.App(hd, args) when T.is_var hd -> 
+        | T.App(hd, args) when T.is_const hd -> 
           List.for_all no_lams args
         | T.App(hd, args) -> List.exists aux (hd::args)
         | T.AppBuiltin(_, args)  -> List.exists aux args
