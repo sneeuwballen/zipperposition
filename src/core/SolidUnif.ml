@@ -227,11 +227,12 @@ module Make (St : sig val st : Flex_state.t end) = struct
 
   let solve_flex_flex_diff ~subst ~counter ~scope lhs rhs =
     ZProf.enter_prof prof_flex_diff;
-    let lhs = solidify @@ Lambda.whnf @@ Subst.FO.apply Subst.Renaming.none subst (lhs,scope) in 
-    let rhs = solidify @@ Lambda.whnf @@ Subst.FO.apply Subst.Renaming.none subst (rhs,scope) in
+    let sub = US.subst subst in
+    let lhs = solidify @@ Lambda.whnf @@ Subst.FO.apply Subst.Renaming.none sub (lhs,scope) in 
+    let rhs = solidify @@ Lambda.whnf @@ Subst.FO.apply Subst.Renaming.none sub (rhs,scope) in
     assert(Type.equal (Term.ty lhs) (Term.ty rhs));
     let pref_lhs, lhs = T.open_fun lhs and  pref_rhs, rhs = T.open_fun rhs in
-    let lhs,rhs,_ = eta_expand_otf ~subst ~scope pref_lhs pref_rhs lhs rhs in
+    let lhs,rhs,_ = eta_expand_otf ~subst:sub ~scope pref_lhs pref_rhs lhs rhs in
 
     let hd_l, args_l, n_l = 
       T.as_var_exn @@ T.head_term lhs, T.args lhs, List.length @@ T.args lhs in
@@ -245,8 +246,7 @@ module Make (St : sig val st : Flex_state.t end) = struct
 
     let res = 
       if CCList.is_empty args_l && CCList.is_empty args_r then (
-        let res = Subst.FO.bind' subst (hd_l,scope) (rhs,scope) in
-        US.of_subst res
+        US.FO.bind subst (hd_l,scope) (rhs,scope)
       )
       else (
         let covered_l =
@@ -272,19 +272,20 @@ module Make (St : sig val st : Flex_state.t end) = struct
         let fresh_var = T.var (HVar.fresh_cnt ~counter ~ty:fresh_var_ty ()) in
         let subs_l = T.fun_l (List.map T.ty args_l) (T.app fresh_var (List.map fst all_covers)) in
         let subs_r = T.fun_l (List.map T.ty args_r) (T.app fresh_var (List.map snd all_covers)) in
-        let subst = Subst.FO.bind' subst (hd_l, scope) (subs_l,scope) in
-        let subst = Subst.FO.bind' subst (hd_r, scope) (subs_r,scope) in
-        US.of_subst subst) in
+        let subst = US.FO.bind subst (hd_l, scope) (subs_l,scope) in
+        let subst = US.FO.bind subst (hd_r, scope) (subs_r,scope) in
+        subst) in
     ZProf.exit_prof prof_flex_diff;
     res
 
   let solve_flex_flex_same ~subst ~counter ~scope lhs rhs =
     ZProf.enter_prof prof_flex_same;
-    let lhs = solidify @@ Lambda.whnf @@ Subst.FO.apply Subst.Renaming.none subst (lhs,scope) in 
-    let rhs = solidify @@ Lambda.whnf @@ Subst.FO.apply Subst.Renaming.none subst (rhs,scope) in
+    let sub = US.subst subst in
+    let lhs = solidify @@ Lambda.whnf @@ Subst.FO.apply Subst.Renaming.none sub (lhs,scope) in 
+    let rhs = solidify @@ Lambda.whnf @@ Subst.FO.apply Subst.Renaming.none sub (rhs,scope) in
     assert(Type.equal (Term.ty lhs) (Term.ty rhs));
     let pref_lhs, lhs = T.open_fun lhs and  pref_rhs, rhs = T.open_fun rhs in
-    let lhs,rhs,_ = eta_expand_otf ~subst ~scope pref_lhs pref_rhs lhs rhs in
+    let lhs,rhs,_ = eta_expand_otf ~subst:sub ~scope pref_lhs pref_rhs lhs rhs in
 
     let hd_l, args_l, n_l = 
       T.as_var_exn @@ T.head_term lhs, T.args lhs, List.length @@ T.args lhs in
@@ -293,7 +294,7 @@ module Make (St : sig val st : Flex_state.t end) = struct
 
     let res = 
       if CCList.is_empty args_l && CCList.is_empty args_r then (
-        US.of_subst subst
+        subst
       ) else (
         assert(HVar.equal Type.equal hd_l hd_r);
         assert(n_l = n_r);
@@ -306,8 +307,7 @@ module Make (St : sig val st : Flex_state.t end) = struct
         let fresh_var_ty = Type.arrow (List.map (fun t -> T.ty t) same_args) (T.ty lhs) in
         let fresh_var = T.var (HVar.fresh_cnt ~counter ~ty:fresh_var_ty ()) in
         let subs_val = T.fun_l (List.map T.ty args_l) (T.app fresh_var same_args) in
-        let subst = Subst.FO.bind' subst (hd_l,scope) (subs_val,scope) in
-        US.of_subst subst) in
+        US.FO.bind subst (hd_l,scope) (subs_val,scope)) in
     ZProf.exit_prof prof_flex_same;
     res
 
@@ -332,9 +332,7 @@ module Make (St : sig val st : Flex_state.t end) = struct
         ) subst ((flex_constraints) :> (InnerTerm.t * InnerTerm.t) list)  )
       else (
         List.fold_left (fun subst (lhs,rhs) -> 
-          let solution = (solve_flex_flex_diff ~subst:sub ~counter ~scope lhs rhs) in
-          assert (not (US.has_constr solution));
-          US.merge subst solution
+          solve_flex_flex_diff ~subst ~counter ~scope lhs rhs
         ) subst flex_constraints) in
 
     let covers_limit = Some (2 * get_op PUP.k_max_inferences) in
@@ -416,7 +414,7 @@ module Make (St : sig val st : Flex_state.t end) = struct
           begin match T.head fa with 
             | Some id' when ID.equal id id' && Type.equal (T.ty fa) ret_ty ->
               let subs_term = T.fun_l pref_tys (T.bvar ~ty:ret_ty (n-1-i)) in
-              let subst = Subst.FO.bind' subst (flex_var, scope) (subs_term, scope) in
+              let subst = US.FO.bind subst (flex_var, scope) (subs_term, scope) in
               let flex_arg = if CCList.is_empty trailing_tys then fa else T.fun_l trailing_tys fa in
               assert(Type.equal (T.ty flex_arg) (T.ty rigid));
               Some (subst, flex_arg, rigid)
@@ -460,19 +458,19 @@ module Make (St : sig val st : Flex_state.t end) = struct
               if not (T.equal hd_s hd_t)
               then solve_flex_flex_diff
               else solve_flex_flex_same in
-            let subst = solver ~subst:(US.subst subst) ~scope ~counter body_s' body_t' in
+            let subst = solver ~subst ~scope ~counter body_s' body_t' in
             unify ~scope ~counter ~subst ~root:false rest
           )
         | (T.Var _, _) ->
-          let projected = project_flex_rigid ~subst:(US.subst subst) ~scope body_s' body_t' in
+          let projected = project_flex_rigid ~subst ~scope body_s' body_t' in
           let covered = cover_flex_rigid ~subst:subst ~counter ~scope  body_s' body_t' in
           (CCList.flat_map (fun subst -> unify ~root:false ~scope ~counter ~subst rest) covered) @
-          (CCList.flat_map (fun (subst,s,t) -> unify ~scope ~root:false ~counter ~subst:(US.of_subst subst) ((s,t)::rest)) projected)
+          (CCList.flat_map (fun (subst,s,t) -> unify ~scope ~root:false ~counter ~subst ((s,t)::rest)) projected)
         | (_, T.Var _) ->
-          let projected = project_flex_rigid ~subst:(US.subst subst) ~scope body_t' body_s' in
+          let projected = project_flex_rigid ~subst ~scope body_t' body_s' in
           let covered = cover_flex_rigid ~subst ~counter ~scope  body_t' body_s' in
           (CCList.flat_map (fun subst -> unify ~scope ~root:false ~counter ~subst rest) covered) @ 
-          (CCList.flat_map (fun (subst,s,t) -> unify ~scope ~counter ~root:false ~subst:(US.of_subst subst) ((s,t)::rest)) projected)
+          (CCList.flat_map (fun (subst,s,t) -> unify ~scope ~counter ~root:false ~subst ((s,t)::rest)) projected)
         | T.AppBuiltin(hd_s, args_s'), T.AppBuiltin(hd_t, args_t') when
             Builtin.equal hd_s hd_t &&
             List.length args_s' + List.length args_s = 

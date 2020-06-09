@@ -23,6 +23,7 @@ type t = private {
 }
 
 val make : tags:Proof.tag list -> term Scoped.t -> term Scoped.t -> t
+val make_fo : tags:Proof.tag list -> Term.t Scoped.t -> Term.t Scoped.t -> t
 
 val tags : t -> Proof.tag list
 

@@ -16,6 +16,7 @@ type t = {
 }
 
 let[@inline] make ~tags (t1,sc1) (t2,sc2) = {t1;sc1;t2;sc2;tags}
+let make_fo ~tags ((t1 : Term.t),sc1) ((t2 : Term.t),sc2) = {t1 :> InnerTerm.t;sc1;t2:>InnerTerm.t;sc2;tags}
 let[@inline] tags t = t.tags
 
 let apply_subst renaming subst (c:t): term * term =

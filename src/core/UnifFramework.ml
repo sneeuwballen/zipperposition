@@ -204,7 +204,13 @@ module Make (P : PARAMETERS) = struct
             US.mem subst ((T.as_var_exn (get_head rhs), unifscope) :> InnerTerm.t HVar.t Scoped.t)
           in
           let mapped, unmapped = List.partition is_mapped delayed in
-          if CCList.is_empty mapped then OSeq.return (Some subst)
+          if CCList.is_empty mapped then (
+            let subst = List.fold_left (fun subst (l,r,_) ->
+              US.add_constr (Unif_constr.make_fo ~tags:[] (l,unifscope) (r,unifscope)) subst
+            ) subst delayed 
+            in
+            OSeq.return (Some subst)
+          )
           else (
             aux ~root:false ~delayed:unmapped subst mapped
            )
