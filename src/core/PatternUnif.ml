@@ -24,9 +24,9 @@ module S = struct
 
 end
 
-let unif_simple ?(subst=Subst.empty) ~scope t s = 
+let unif_simple ?(subst=US.empty) ~scope t s = 
   try 
-    let type_unifier = Unif.FO.unify_syn ~subst (t, scope) (s, scope) in
+    let type_unifier = Unif.FO.unify_syn ~subst:(US.subst subst) (t, scope) (s, scope) in
     Some (US.of_subst type_unifier)
   with Unif.Fail -> None
 

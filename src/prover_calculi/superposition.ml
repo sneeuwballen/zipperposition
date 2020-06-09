@@ -3785,6 +3785,7 @@ let _bool_demod = ref false
 let _immediate_simplification = ref false
 let _arg_cong = ref true
 let _try_lfho_unif = ref true
+let _delay_ff = ref true
 let _bool_eq_fact = ref true
 
 let _guard = ref 45
@@ -3864,6 +3865,7 @@ let register ~sup =
   E.flex_add PragUnifParams.k_use_weight_for_solid_subsumption !_use_weight_for_solid_subsumption;
   E.flex_add PragUnifParams.k_sort_constraints !_sort_constraints;
   E.flex_add PragUnifParams.k_try_lfho !_try_lfho_unif;
+  E.flex_add PragUnifParams.k_delay_flex_flex !_delay_ff;
 
   E.flex_add StreamQueue.k_guard !_guard;
   E.flex_add StreamQueue.k_ratio !_ratio;
@@ -3909,6 +3911,7 @@ let () =
       "--sup-in-var-args", Arg.Bool (fun b -> _sup_in_var_args := b), " enable/disable superposition in arguments of applied variables";
       "--sup-under-lambdas", Arg.Bool (fun b -> _sup_under_lambdas := b), " enable/disable superposition in bodies of lambda-expressions";
       "--lambda-demod", Arg.Bool (fun b -> _lambda_demod := b), " enable/disable demodulation in bodies of lambda-expressions";
+      "--delay-flex-flex", Arg.Bool ((:=) _delay_ff), " enable/disable delaying flex-flex pairs";
       "--demod-in-var-args", Arg.Bool (fun b -> _demod_in_var_args := b), " enable demodulation in arguments of variables";
       "--complete-ho-unif", Arg.Bool (fun b -> _complete_ho_unification := b), " enable complete higher-order unification algorithm (Jensen-Pietrzykowski)";
       "--switch-stream-extract", Arg.Bool (fun b -> _switch_stream_extraction := b), " in ho mode, switches heuristic of clause extraction from the stream queue";

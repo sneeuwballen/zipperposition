@@ -109,7 +109,7 @@ let proj_lr ~counter ~scope ~subst s t flag max_app_projs =
     )
   |> CCList.filter_map(fun (i, ty) ->
       let _, arg_ret_ty = Type.open_fun ty in
-      match PatternUnif.unif_simple ~subst ~scope 
+      match PatternUnif.unif_simple ~subst:(Unif_subst.of_subst subst) ~scope 
               (T.of_ty arg_ret_ty) (T.of_ty hd_ret_ty) with
       | Some subst' ->
         (* we project only to arguments of appropriate type *)
@@ -279,15 +279,15 @@ module Make (St : sig val st : Flex_state.t end) = struct
   let deciders ~counter () =
     let pattern = 
       if get_option PUP.k_pattern_decider then 
-        [(fun s t sub -> [(U.subst @@ PatternUnif.unify_scoped ~subst:(U.of_subst sub) ~counter s t)])] 
+        [(fun s t sub -> [(PatternUnif.unify_scoped ~subst:sub ~counter s t)])] 
       else [] in
     let solid = 
       if get_option PUP.k_solid_decider then 
-        [(fun s t sub -> (List.map U.subst @@ SU.unify_scoped ~subst:(U.of_subst sub) ~counter s t))] 
+        [(fun s t sub -> (SU.unify_scoped ~subst:sub ~counter s t))] 
       else [] in
     let fixpoint = 
       if get_option PUP.k_fixpoint_decider then 
-        [(fun s t sub -> [(U.subst @@ FixpointUnif.unify_scoped ~subst:(U.of_subst sub) ~counter s t)])] 
+        [(fun s t sub -> [(FixpointUnif.unify_scoped ~subst:sub ~counter s t)])] 
       else [] in
     fixpoint @ pattern @ solid
 
@@ -363,13 +363,11 @@ module Make (St : sig val st : Flex_state.t end) = struct
       let frag_algs = deciders ~counter (*[]*)
       let pb_oracle s t (f:flag_type) subst scope = 
         oracle ~counter ~scope ~subst s t f
-      let oracle_composer = Flex_state.get_exn PUP.k_oracle_composer St.st
     end in
 
     let module PragUnif = UnifFramework.Make(PragUnifParams) in
     (fun x y ->
        elim_vars := IntSet.empty;
        ident_vars := IntSet.empty;
-       let res = PragUnif.unify_scoped x y in
-       OSeq.map (CCOpt.map Unif_subst.of_subst) (res))
+       PragUnif.unify_scoped x y )
 end

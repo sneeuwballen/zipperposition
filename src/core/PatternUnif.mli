@@ -31,6 +31,6 @@ val norm_deref :  Unif_subst.t -> Term.t Scoped.t -> Term.t
 
 (* Does unification on types (or other simple constructs) and catches
    exception in case of non-unifiability *)
-val unif_simple : ?subst:Subst.t -> scope:int -> Term.t -> Term.t -> US.t option
+val unif_simple : ?subst:Unif_subst.t -> scope:int -> Term.t -> Term.t -> US.t option
 
 val unify_scoped : ?subst:subst -> ?counter:int ref -> Term.t Scoped.t -> Term.t Scoped.t -> subst

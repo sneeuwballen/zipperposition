@@ -70,15 +70,15 @@ module Make (S : sig val st: Flex_state.t end) = struct
   let deciders ~counter () =
     let pattern = 
       if get_op PUP.k_pattern_decider then [fun s t sub -> 
-          [U.subst @@ PatternUnif.unify_scoped ~subst:(U.of_subst sub) ~counter s t]]
+          [PatternUnif.unify_scoped ~subst:(sub) ~counter s t]]
       else [] in
     let solid = 
       if get_op PUP.k_solid_decider then [fun s t sub -> 
-          List.map U.subst @@ SU.unify_scoped ~subst:(U.of_subst sub) ~counter s t] 
+          SU.unify_scoped ~subst:(sub) ~counter s t] 
       else [] in
     let fixpoint = 
       if get_op PUP.k_fixpoint_decider then [fun s t sub -> 
-          [U.subst @@ FixpointUnif.unify_scoped ~subst:(U.of_subst sub) ~counter s t]]
+          [FixpointUnif.unify_scoped ~subst:(sub) ~counter s t]]
       else [] in
     fixpoint @ pattern @ solid
   (* pattern @ fixpoint @ solid *)
@@ -134,12 +134,11 @@ module Make (S : sig val st: Flex_state.t end) = struct
       let frag_algs = deciders ~counter
       let pb_oracle s t (f:flag_type) _ scope = 
         oracle ~counter ~scope s t f
-      let oracle_composer = Flex_state.get_exn PUP.k_oracle_composer S.st
     end in
 
     let module JPFull = UnifFramework.Make(JPFullParams) in
     (fun x y ->
        elim_vars := IntSet.empty;
        ident_vars := IntSet.empty;
-       OSeq.map (CCOpt.map Unif_subst.of_subst) (JPFull.unify_scoped x y))
+       (JPFull.unify_scoped x y))
 end

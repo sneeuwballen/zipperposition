@@ -2,7 +2,7 @@ module S = Subst
 module LL = OSeq
 module T = Term
 module U = Unif
-module Q = CCDeque
+module US = Unif_subst
 module PUP = PragUnifParams
 
 module type PARAMETERS = sig
@@ -12,9 +12,8 @@ module type PARAMETERS = sig
   val init_flag : flag_type
   val flex_state : Flex_state.t
   val identify_scope : T.t Scoped.t -> T.t Scoped.t -> T.t * T.t * Scoped.scope * S.t
-  val frag_algs : unit -> (T.t Scoped.t -> T.t Scoped.t -> S.t -> S.t list) list
+  val frag_algs : unit -> (T.t Scoped.t -> T.t Scoped.t -> US.t -> US.t list) list
   val pb_oracle : (T.t Scoped.t -> T.t Scoped.t -> flag_type -> S.t -> Scoped.scope -> (S.t * flag_type) option LL.t)
-  val oracle_composer : (Subst.t option OSeq.t) OSeq.t -> Subst.t option OSeq.t
 end
 
 (* Given a sequence of sequences (i.e., a generator) A
@@ -112,7 +111,11 @@ module Make (P : PARAMETERS) = struct
     | _ -> false
 
   let do_unif ~bind_cnt problem subst unifscope =
-    let delay res =
+    let delay_pair ~delayed lhs rhs flag = (lhs,rhs,flag) :: delayed in
+    let delay_enabled = 
+      Flex_state.get_exn PUP.k_delay_flex_flex P.flex_state in
+
+    let slow_down res =
       let skipper = 
         int_of_float (Flex_state.get_exn PUP.k_skip_multiplier P.flex_state) in
       if !bind_cnt mod skipper == 0 then (
@@ -121,7 +124,14 @@ module Make (P : PARAMETERS) = struct
       ) else res 
     in
 
-    let rec aux subst problem =
+    let rec aux ~root ~delayed subst problem =
+      let delay_ff ~subst ~rest lhs rhs flag =
+        assert(T.is_var (T.head_term lhs));
+        assert(T.is_var (T.head_term rhs));
+
+        let delayed = delay_pair ~delayed lhs rhs flag in
+        aux ~root:false ~delayed subst rest in
+      
       let decompose args_l args_r rest flag =
         let rec zipped_with_flag = function 
           | [], [] -> []
@@ -150,7 +160,7 @@ module Make (P : PARAMETERS) = struct
         let classify_one s =
           let rec follow_bindings t =
             let hd = T.head_term @@ snd @@ (T.open_fun t) in
-            let derefed,_ = Subst.FO.deref subst (hd, unifscope) in
+            let derefed,_ = Subst.FO.deref (US.subst subst) (hd, unifscope) in
             if T.equal hd derefed then hd
             else follow_bindings derefed in
 
@@ -181,18 +191,31 @@ module Make (P : PARAMETERS) = struct
 
       let decompose_and_cont ?(inc_step=0) args_l args_r rest flag subst =
         let new_prob = decompose args_l args_r rest flag in
-        aux subst new_prob in
+        aux ~root:false ~delayed subst new_prob in
 
       match problem with 
-      | [] -> OSeq.return (Some subst)
+      | [] -> 
+        if CCList.is_empty delayed then OSeq.return (Some subst)
+        else (
+          let get_head t = T.head_term (snd (T.open_fun t)) in
+          let is_mapped (lhs,rhs,flag) =
+            assert (T.is_var (get_head lhs) && T.is_var (get_head rhs));
+            US.mem subst ((T.as_var_exn (get_head lhs), unifscope) :> InnerTerm.t HVar.t Scoped.t) ||
+            US.mem subst ((T.as_var_exn (get_head rhs), unifscope) :> InnerTerm.t HVar.t Scoped.t)
+          in
+          let mapped, unmapped = List.partition is_mapped delayed in
+          if CCList.is_empty mapped then OSeq.return (Some subst)
+          else (
+            aux ~root:false ~delayed:unmapped subst mapped
+           )
+        )
       | (lhs, rhs, flag) :: rest ->
         match PatternUnif.unif_simple ~subst ~scope:unifscope 
                 (T.of_ty (T.ty lhs)) (T.of_ty (T.ty rhs)) with 
         | None -> OSeq.empty
         | Some subst ->
-          let subst = Unif_subst.subst subst in
-          let lhs = normalize subst (lhs, unifscope) 
-          and rhs = normalize subst (rhs, unifscope) in
+          let lhs = normalize (US.subst subst) (lhs, unifscope) 
+          and rhs = normalize (US.subst subst) (rhs, unifscope) in
           let (pref_lhs, body_lhs) = T.open_fun lhs
           and (pref_rhs, body_rhs) = T.open_fun rhs in 
           let body_lhs, body_rhs, _ = 
@@ -200,7 +223,7 @@ module Make (P : PARAMETERS) = struct
           let (hd_lhs, args_lhs), (hd_rhs, args_rhs) = T.as_app body_lhs, T.as_app body_rhs in
 
           if T.equal body_lhs body_rhs then (
-            aux subst rest
+            aux ~root:false ~delayed subst rest
           ) else (
             match T.view hd_lhs, T.view hd_rhs with
             | T.DB i, T.DB j ->
@@ -235,33 +258,44 @@ module Make (P : PARAMETERS) = struct
                 | Some substs ->
                   (* We assume that the substitution was augmented so that it is mgu for
                       lhs and rhs *)
-                  CCList.map (fun sub () -> aux sub rest ()) substs
+                  CCList.map (fun sub () -> 
+                    let cstr = US.constr_l sub in
+                    let new_delayed = 
+                      List.map 
+                        (fun (l,r) -> (T.of_term_unsafe l, T.of_term_unsafe r,flag)) 
+                        (Unif_constr.apply_subst_l S.Renaming.none S.empty cstr) in
+                    let delayed = new_delayed @ delayed in
+                    aux ~root:false ~delayed sub rest ()) substs
                   |> OSeq.of_list
-                  |> P.oracle_composer
+                  |> OSeq.merge
                 | None ->
-                  let args_unif =
-                    if T.is_var hd_lhs && T.is_var hd_rhs && T.equal hd_lhs hd_rhs then
-                      decompose_and_cont args_lhs args_rhs rest flag subst
-                    else OSeq.empty in
+                  if not root && delay_enabled &&
+                     T.is_var hd_lhs && T.is_var rhs then (
+                    delay_ff ~subst ~rest lhs rhs flag
+                  ) else (
+                    let args_unif =
+                      if T.is_var hd_lhs && T.is_var hd_rhs && T.equal hd_lhs hd_rhs then
+                        decompose_and_cont args_lhs args_rhs rest flag subst
+                      else OSeq.empty in
 
-                  let all_oracles = 
-                    P.pb_oracle (body_lhs, unifscope) (body_rhs, unifscope) flag subst unifscope in
+                    let all_oracles = 
+                      P.pb_oracle (body_lhs, unifscope) (body_rhs, unifscope) flag (US.subst subst) unifscope in
 
-                  let oracle_unifs = 
-                    OSeq.map (fun sub_flag_opt ->
-                        match sub_flag_opt with 
-                        | None -> OSeq.return None
-                        | Some (sub', flag') ->
-                          try
-                            let subst' = Subst.merge subst sub' in
-                            incr bind_cnt;
-                            delay (fun () -> aux subst' ((lhs,rhs,flag') :: rest) ())
-                          with Subst.InconsistentBinding _ ->
-                            OSeq.empty) all_oracles
-                    |> P.oracle_composer in
-                  OSeq.interleave oracle_unifs args_unif
+                    let oracle_unifs = 
+                      OSeq.map (fun sub_flag_opt ->
+                          match sub_flag_opt with 
+                          | None -> OSeq.return None
+                          | Some (sub', flag') ->
+                            try
+                              let subst' = US.merge subst (US.of_subst sub') in
+                              incr bind_cnt;
+                              slow_down (fun () -> aux ~delayed ~root:false subst' ((lhs,rhs,flag') :: rest) ())
+                            with Subst.InconsistentBinding _ ->
+                              OSeq.empty) all_oracles
+                      |> OSeq.merge in
+                    OSeq.interleave oracle_unifs args_unif)
               with Unif.Fail -> OSeq.empty) in
-    aux subst problem
+    aux ~root:true ~delayed:[] subst problem
 
   let try_lfho_unif ((s,_) as t0) ((t,_) as t1) =
     
@@ -293,7 +327,7 @@ module Make (P : PARAMETERS) = struct
     if Flex_state.get_exn PUP.k_try_lfho P.flex_state &&
        eligible_for_lfho s && eligible_for_lfho t then (
         try
-          OSeq.return (Some (Unif_subst.subst (Unif.FO.unify_full t0 t1)))
+          OSeq.return (Some (US.of_subst @@ Unif.FO.unify_syn t0 t1))
         with Unif.Fail -> OSeq.empty
     ) else OSeq.empty
 
@@ -301,20 +335,23 @@ module Make (P : PARAMETERS) = struct
 
   let unify_scoped t0s t1s =
     let lhs,rhs,unifscope,subst = P.identify_scope t0s t1s in
+    let subst = US.of_subst subst in
     let bind_cnt = ref 0 in
     try
       OSeq.append 
         (try_lfho_unif t0s t1s)
         (do_unif ~bind_cnt [(lhs,rhs,P.init_flag)] subst unifscope)
       |> OSeq.map (fun opt -> CCOpt.map (fun subst ->
-        let norm t = T.normalize_bools @@ Lambda.eta_expand @@ Lambda.snf t in
-        let l = norm @@ S.FO.apply Subst.Renaming.none subst t0s in 
-        let r = norm @@ S.FO.apply Subst.Renaming.none subst t1s in
-        if not ((T.equal l r) && (Type.equal (Term.ty l) (Term.ty r))) then (
-          CCFormat.printf "subst:@[%a@]@." Subst.pp subst;
-          CCFormat.printf "orig:@[%a@]@.=?=@.@[%a@]@." (Scoped.pp T.pp) t0s (Scoped.pp T.pp) t1s;
-          CCFormat.printf "new:@[%a:%a@]@.=?=@.@[%a:%a@]@." T.pp l Type.pp (T.ty l) T.pp r Type.pp (T.ty r);
-          assert(false)
-        ); subst) opt)
+        if not @@ US.has_constr subst then (
+          let s = US.subst subst in
+          let norm t = T.normalize_bools @@ Lambda.eta_expand @@ Lambda.snf t in
+          let l = norm @@ S.FO.apply Subst.Renaming.none s t0s in 
+          let r = norm @@ S.FO.apply Subst.Renaming.none s t1s in
+          if not ((T.equal l r) && (Type.equal (Term.ty l) (Term.ty r))) then (
+            CCFormat.printf "subst:@[%a@]@." Subst.pp s;
+            CCFormat.printf "orig:@[%a@]@.=?=@.@[%a@]@." (Scoped.pp T.pp) t0s (Scoped.pp T.pp) t1s;
+            CCFormat.printf "new:@[%a:%a@]@.=?=@.@[%a:%a@]@." T.pp l Type.pp (T.ty l) T.pp r Type.pp (T.ty r);
+            assert(false)
+        )); subst) opt)
     with Unif.Fail -> OSeq.empty    
 end
