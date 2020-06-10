@@ -263,7 +263,11 @@ let to_ast st =
     | A.FOF (name,role,f,_) ->
       conv_form name role f
     | A.CNF (name,role,f,_) ->
-      let f = PT.or_ f in
+      assert (not (CCList.is_empty f));
+      (* to get correct typing. *)
+      let f =
+        if List.length f == 1 then List.hd f else PT.or_ f 
+      in
       conv_form name role f
   end
 
