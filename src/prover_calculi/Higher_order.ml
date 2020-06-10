@@ -1638,7 +1638,7 @@ let _use_diff_for_neg_ext = ref false
 let _generalize_choice_trigger = ref false
 let _prim_enum_simpl = ref false
 let _prim_enum_early_bird = ref false
-let _resolve_flex_flex = ref true
+let _resolve_flex_flex = ref false
 let _ground_app_vars = ref `Off
 
 let extension =
