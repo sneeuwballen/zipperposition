@@ -2476,6 +2476,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let new_lits = CCArray.to_list new_lits in
       let proof = Proof.Step.simp [C.proof_parent c] ~rule:(Proof.Rule.mk "local_rewriting") in
       let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
+      Util.debugf ~section 1 "local_rw(@[%a@]):@.@[%a@]@." (fun k -> k C.pp c C.pp new_c);
       SimplM.return_new new_c
     )
 
