@@ -2404,6 +2404,82 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     assert (Term.VarSet.for_all (fun v -> HVar.id v >= 0) (Literals.vars (C.lits c) |> Term.VarSet.of_list));
     ZProf.with_prof prof_demodulate demodulate_ c
 
+  let local_rewrite c =
+    let neqs, others =
+      CCArray.fold_left (fun (neq_map, others) lit ->
+        match lit with
+        | Literal.Equation(lhs,rhs,sign) ->
+          if sign && T.is_true_or_false rhs then (
+            let negate t = if T.equal t T.true_ then T.false_ else T.true_ in
+            ((T.Map.add lhs (negate rhs) neq_map), others)
+          ) else if not sign then (
+            match Ordering.compare ord lhs rhs with
+            | Gt -> ((T.Map.add lhs rhs neq_map), others)
+            | Lt -> ((T.Map.add rhs lhs neq_map), others)
+            | _ -> ((neq_map), lit::others)
+          ) else ((neq_map), lit::others)
+        | _ -> ((neq_map), lit::others)
+      ) ((Term.Map.empty),[]) (C.lits c) in
+    
+    let normalize ~restrict ~neqs t =
+      let rec aux ~top t =
+        match T.Map.get t neqs with
+        | Some t' when not restrict || not top -> aux ~top t'
+        | _ ->
+          begin
+            match T.view t with
+            | T.App(hd, args) ->
+              let hd' = aux ~top:false hd in
+              let args' = List.map (aux ~top:false) args in
+              if T.equal hd hd' && T.same_l args args' then t
+              else aux ~top:false (T.app hd' args')
+            | T.AppBuiltin(hd, args) ->
+              let args' = List.map (aux ~top:false) args in
+              if T.same_l args args' then t
+              else aux ~top:false (T.app_builtin ~ty:(T.ty t) hd args')
+            | _ -> t (* do not rewrite under lambdas *)
+          end in
+      aux ~top:true t in
+
+    let rewritten = ref false in
+    let new_lits =
+      CCArray.map (function
+      | Lit.Equation(lhs,rhs,sign) as l ->
+        if sign && T.is_true_or_false rhs then (
+          let lhs' = normalize ~restrict:true ~neqs lhs in
+          if not (T.equal lhs lhs') then (
+            rewritten := true;
+            Lit.mk_lit lhs' rhs sign
+          ) else l
+        ) else if not sign then (
+          let lhs', rhs' = 
+            match Ordering.compare ord lhs rhs with
+            | Gt -> normalize ~restrict:true ~neqs lhs, normalize ~restrict:false ~neqs rhs
+            | Lt -> normalize ~restrict:false ~neqs lhs, normalize ~restrict:true ~neqs rhs
+            | _ -> normalize ~restrict:false ~neqs lhs, normalize ~restrict:false ~neqs rhs 
+          in
+          if not (T.equal lhs lhs') || not (T.equal rhs rhs') then (
+            rewritten := true;
+            Lit.mk_lit lhs' rhs' sign
+          ) else l
+        ) else (
+          let lhs',rhs' = normalize ~restrict:false ~neqs lhs, normalize ~restrict:false ~neqs rhs in
+          if not (T.equal lhs lhs') || not (T.equal rhs rhs') then (
+              rewritten := true;
+              Lit.mk_lit lhs' rhs' sign
+          ) else l
+        )
+      | x -> x) (C.lits c) in
+    if not !rewritten then SimplM.return_same c
+    else (
+      let new_lits = CCArray.to_list new_lits in
+      let proof = Proof.Step.simp [C.proof_parent c] ~rule:(Proof.Rule.mk "local_rewriting") in
+      let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
+      SimplM.return_new new_c
+    )
+
+    
+
   let canonize_variables c =
     let all_vars = Literals.vars (C.lits c) 
                    |> (fun v -> InnerTerm.VarSet.of_list (v:>InnerTerm.t HVar.t list)) in
