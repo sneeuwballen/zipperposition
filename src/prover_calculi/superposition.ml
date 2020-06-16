@@ -106,6 +106,7 @@ let k_immediate_simplification = Flex_state.create_key ()
 let k_arg_cong = Flex_state.create_key ()
 let k_bool_eq_fact = Flex_state.create_key ()
 let k_cc_simplify = Flex_state.create_key ()
+let k_local_rw = Flex_state.create_key ()
 
 
 
@@ -2411,11 +2412,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         | Literal.Equation(lhs,rhs,sign) ->
           if sign && T.is_true_or_false rhs then (
             let negate t = if T.equal t T.true_ then T.false_ else T.true_ in
-            ((T.Map.add lhs (negate rhs) neq_map), others)
+            (T.Map.add lhs (negate rhs) neq_map, others)
           ) else if not sign then (
             match Ordering.compare ord lhs rhs with
-            | Gt -> ((T.Map.add lhs rhs neq_map), others)
-            | Lt -> ((T.Map.add rhs lhs neq_map), others)
+            | Gt -> (T.Map.add lhs rhs neq_map, others)
+            | Lt -> (T.Map.add rhs lhs neq_map, others)
             | _ -> ((neq_map), lit::others)
           ) else ((neq_map), lit::others)
         | _ -> ((neq_map), lit::others)
@@ -3684,6 +3685,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     and backward_redundant = subsumed_in_active_set
     and is_trivial = is_tautology in
 
+    if Env.flex_get k_local_rw then (
+      Env.add_basic_simplify local_rewrite
+    );
+
     if Env.flex_get k_cc_simplify then (
       let insert_into_cc c =
         (match C.lits c with 
@@ -3830,6 +3835,7 @@ let _restrict_fluidsup = ref false
 let _check_sup_at_var_cond = ref true
 let _restrict_hidden_sup_at_vars = ref false
 let _cc_simplify = ref false
+let _local_rw = ref false
 
 let _lambdasup = ref (-1)
 let _max_infs = ref (-1)
@@ -3946,6 +3952,7 @@ let register ~sup =
   E.flex_add StreamQueue.k_clause_num !_clause_num;
 
   E.flex_add k_cc_simplify !_cc_simplify;
+  E.flex_add k_local_rw !_local_rw;
 
   let module JPF = JPFull.Make(struct let st = E.flex_state () end) in
   let module JPP = PUnif.Make(struct let st = E.flex_state () end) in
@@ -4052,6 +4059,7 @@ let () =
       "--stream-queue-ratio", Arg.Set_int _ratio, "set value of ratio for streamQueue";
       "--bool-demod", Arg.Bool ((:=) _bool_demod), " turn BoolDemod on/off";
       "--cc-simplify", Arg.Bool ((:=) _cc_simplify), " use cong-closure of all positive ground unit eqs to simplify the clauses";
+      "--local-rw", Arg.Bool ((:=) _local_rw), " turn local rewriting rule on/off";
       "--immediate-simplification", Arg.Bool ((:=) _immediate_simplification), " turn immediate simplification on/off";
       "--try-lfho-unif", Arg.Bool ((:=) _try_lfho_unif), " if term is of the right shape, try LFHO unification before HO unification";
       "--stream-clause-num", Arg.Set_int _clause_num, "how many clauses to take from streamQueue; by default as many as there are streams";
