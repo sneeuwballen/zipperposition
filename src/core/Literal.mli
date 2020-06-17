@@ -48,7 +48,6 @@ val is_prop : t -> bool           (** is the literal a boolean proposition? *)
 val is_eq : t -> bool             (** is the literal of the form a = b? *)
 
 val is_neq : t -> bool            (** is the literal of the form a != b? *)
-val is_essentially_prop : t -> bool (** is the literal non-equational literal of type Prop *)
 
 val is_arith : t -> bool
 val is_arith_eqn : t -> bool    (** = or != *)

@@ -219,10 +219,6 @@ val is_horn : t -> bool
 val is_unique_max_horn_clause : ord:Ordering.t -> t -> bool
 (** Recognized whether the clause is a Range-Restricted Horn clause *)
 
-
-val is_pos_eq : t -> (term * term) option
-(** Recognize whether the clause is a positive unit equality. *)
-
 (** {2 Shielded Variables} *)
 
 val is_shielded : Term.var -> t -> bool
