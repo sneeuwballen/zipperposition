@@ -13,8 +13,6 @@ module VS = T.VarSet
 
 type term = Term.t
 
-let _equational_sign = ref false
-
 type t =
   | True
   | False
@@ -53,8 +51,9 @@ let equal_com l1 l2 =
 let no_prop_invariant = 
   function 
   | Equation (lhs,rhs,sign) -> 
-    if (T.equal rhs T.false_) || T.is_true_or_false lhs then (
-      CCFormat.printf "failed for: @[%a@] @[%a@] @[%b@]@." T.pp lhs T.pp rhs sign;
+    if T.is_true_or_false rhs && not sign then (
+      CCFormat.printf "literal wrongly encoded: @[%a@] @[%a@] @[%b@]@."
+        T.pp lhs T.pp rhs sign;
       false
     ) else true
   | _ -> true
@@ -127,7 +126,8 @@ let depth lit =
 module Set = CCSet.Make(struct type t = lit let compare = compare end)
 
 let is_pos = function
-  | Equation (l, r, sign) -> sign
+  | Equation (l, r, sign) -> 
+    sign && (not @@ T.equal r T.false_)
   | Int o -> Int_lit.sign o
   | False -> false
   | _ -> true
@@ -162,24 +162,25 @@ let _on_arith p lit = match lit with
   | Int o -> p o
   | _ -> false
 
+let [@inline] is_predicate_lit = function
+  | Equation(_,rhs,true) -> T.is_true_or_false rhs
+  | _ -> false
+
 let is_type_pred = function
-  | Equation(lhs,rhs,_) when T.equal T.true_ rhs ->
+  | Equation(lhs,rhs,_) as l when is_predicate_lit l ->
     begin match Term.view lhs with
       | App(f, [x]) -> T.is_var x && T.is_const f
       | _ -> false end
   | _ -> false
 
 let is_typex_pred = function
-  | Equation(lhs,rhs,_) when T.equal T.true_ rhs ->
+  | Equation(lhs,rhs,_) as l when is_predicate_lit l ->
     begin match Term.view lhs with
       | App(f, xs) when not (CCList.is_empty xs) -> 
         T.is_const f && List.for_all T.is_var xs
       | _ -> false end
   | _ -> false
 
-let is_predicate_lit = function
-  | Equation(_,rhs,_) -> T.equal T.true_ rhs
-  | _ -> false
 
 let is_arith_eqn = _on_arith Int_lit.is_eqn
 let is_arith_eq = _on_arith Int_lit.is_eq
@@ -196,10 +197,6 @@ let _on_rat p lit = match lit with
 let is_rat = function Rat _ -> true | _ -> false
 let is_rat_eq = _on_rat Rat_lit.is_eq
 let is_rat_less = _on_rat Rat_lit.is_less
-
-let is_essentially_prop = function 
-  | Equation (_, rhs, _) -> T.equal T.true_ rhs
-  | _ -> false
 
 let ty_error_ a b =
   let msg =
@@ -222,11 +219,18 @@ let rec mk_lit a b sign =
   | T.AppBuiltin (Builtin.False, []), T.AppBuiltin (Builtin.True, []) -> if sign then False else True
   | T.AppBuiltin (Builtin.True, []), T.AppBuiltin (Builtin.True, []) -> if sign then True else False
   | T.AppBuiltin (Builtin.False, []), T.AppBuiltin (Builtin.False, []) -> if sign then True else False
-  | T.AppBuiltin (Builtin.True, []), _ -> Equation (b, T.true_, sign)
-  | _, T.AppBuiltin (Builtin.True, []) -> Equation (a, T.true_, sign)
-  | T.AppBuiltin (Builtin.False, []), _ -> Equation (b, T.true_, not sign)
-  | _, T.AppBuiltin (Builtin.False, []) -> Equation (a, T.true_, not sign)
-
+  | T.AppBuiltin (Builtin.True, []), _ -> 
+    let lhs, rhs = b, if sign then T.true_ else T.false_ in
+    Equation(lhs,rhs,true)
+  | _, T.AppBuiltin (Builtin.True, []) ->
+    let lhs, rhs = a, if sign then T.true_ else T.false_ in
+    Equation(lhs,rhs,true)
+  | T.AppBuiltin (Builtin.False, []), _ ->
+    let lhs, rhs = b, if sign then T.false_ else T.true_ in
+    Equation(lhs,rhs,true)
+  | _, T.AppBuiltin (Builtin.False, []) -> 
+    let lhs, rhs = a, if sign then T.false_ else T.true_ in
+    Equation(lhs,rhs,true)
   | _ when has_num_ty a ->
     begin match mk_num_eq a b sign with
       | None -> Equation (a,b,sign)
@@ -507,6 +511,10 @@ let map_ f = function
 
 let map f lit = map_ f lit
 
+let eqn_sign = function 
+  | Equation(_,_,sign) -> sign
+  | lit -> is_pos lit
+
 let apply_subst_ ~f_term ~f_arith_lit ~f_rat subst (lit,sc) =
   match lit with
   | Equation (l,r,sign) ->
@@ -541,11 +549,11 @@ let apply_subst_list renaming subst (lits,sc) =
 exception Lit_is_constraint
 
 let is_ho_constraint = function
-  | Equation (l, r, false) -> T.is_ho_at_root l || T.is_ho_at_root r
+  | Equation (l, r, _) as lit when is_neg lit -> T.is_ho_at_root l || T.is_ho_at_root r
   | _ -> false
 
 let is_constraint = function
-  | Equation (t, u, false) -> T.is_var t || T.is_var u
+  | Equation (t, u, _) as lit when is_neg lit -> T.is_var t || T.is_var u
   | _ -> false
 
 let negate lit = 
@@ -578,7 +586,7 @@ let root_terms l =
   Seq.terms l |> Iter.to_rev_list
 
 let to_multiset lit = match lit with
-  | Equation (l,r,_) when T.equal r T.true_ ->
+  | Equation (l, r, _) when is_predicate_lit lit ->
     Multisets.MT.singleton l
   | Equation (l, r, _) -> Multisets.MT.doubleton l r
   | True
@@ -681,8 +689,8 @@ let fold_terms ?(position=Position.stop) ?(vars=false) ?(var_args=true) ?(fun_bo
 let to_ho_term (lit:t): T.t option = match lit with
   | True -> Some T.true_
   | False -> Some T.false_
-  | Equation (t, u, sign) when T.equal T.true_ u ->
-    Some  ((if not sign then T.Form.not_ else CCFun.id) t)
+  | Equation (t, u, _) when is_predicate_lit lit ->
+    Some  ((if is_neg lit then T.Form.not_ else CCFun.id) t)
   | Equation (t, u, sign) ->
     Some (if sign then T.Form.eq t u else T.Form.neq t u)
   | Int _
@@ -691,10 +699,10 @@ let to_ho_term (lit:t): T.t option = match lit with
 let as_ho_predicate (lit:t) : _ option = 
   assert(no_prop_invariant lit);
   match lit with
-  | Equation(lhs,rhs,sign) when T.equal rhs T.true_ ->
+  | Equation(lhs,rhs,_) when is_predicate_lit lit ->
     let hd_t, args_t = T.as_app lhs in
     begin match T.view hd_t, args_t with
-      | T.Var v, _::_ -> Some (v, hd_t, args_t, sign)
+      | T.Var v, _::_ -> Some (v, hd_t, args_t, is_pos lit)
       | _ -> None
     end
   | _ -> None
@@ -702,7 +710,7 @@ let as_ho_predicate (lit:t) : _ option =
 let is_ho_predicate lit = CCOpt.is_some (as_ho_predicate lit)
 
 let is_ho_unif lit = match lit with
-  | Equation (t, u, false) -> Term.is_ho_app t || Term.is_ho_app u
+  | Equation (t, u, _) when is_neg lit -> Term.is_ho_app t || Term.is_ho_app u
   | _ -> false
 
 let of_unif_subst renaming (s:Unif_subst.t) : t list =
@@ -737,8 +745,9 @@ let normalize_eq lit =
 
   let rec aux lit = 
     match lit with
-    | Equation(lhs, rhs, sign) 
-      when T.equal rhs T.true_ ->
+    | Equation(lhs, rhs, _) 
+      when is_predicate_lit lit ->
+      let sign = is_pos lit in
       begin match T.view lhs with 
         | T.AppBuiltin(Builtin.(Eq|Equiv), ([_;l;r] | [l;r])) -> (* first arg can be type variable *)
           let eq_cons = if sign then mk_eq_ else mk_neq_ in
@@ -752,7 +761,7 @@ let normalize_eq lit =
         | _ -> None
       end
     | Equation(lhs,rhs,sign) when is_neg lhs || is_neg rhs ->
-      assert (not (T.equal rhs T.true_));
+      assert (not (T.is_true_or_false rhs));
       Some ((if sign then mk_eq_ else mk_neq_) lhs rhs)
     | _ -> None in
   aux lit
@@ -763,8 +772,8 @@ let pp_debug ?(hooks=[]) out lit =
   (* assert(no_prop_invariant lit); *)
   if List.for_all (fun h -> not (h out lit)) hooks
   then (begin match lit with
-      | Equation (p, t, sign) when T.equal t T.true_ -> 
-        Format.fprintf out "@[%s%a@]" (if sign then "" else "¬") T.pp p
+      | Equation (p, t, _) when is_predicate_lit lit -> 
+        Format.fprintf out "@[%s%a@]" (if (is_pos lit) then "" else "¬") T.pp p
       | True -> CCFormat.string out "Τ"
       | False -> CCFormat.string out "⊥"
       | Equation (l, r, true) ->
@@ -776,8 +785,8 @@ let pp_debug ?(hooks=[]) out lit =
     end)
 let pp_tstp out lit =
   match lit with
-  | Equation (p, t, sign) when T.equal t T.true_ -> 
-    Format.fprintf out "%s %a" (if sign then "" else "~") T.TPTP.pp p
+  | Equation (p, t, _) when is_predicate_lit lit -> 
+    Format.fprintf out "%s %a" (if (is_pos lit) then "" else "~") T.TPTP.pp p
   | True -> CCFormat.string out "$true"
   | False -> CCFormat.string out "$false"
   | Equation (l, r, true) ->
@@ -789,8 +798,8 @@ let pp_tstp out lit =
 
 let pp_zf out lit =
   match lit with
-  | Equation (p, t, sign) when T.equal t T.true_ -> 
-    Format.fprintf out "%s %a" (if sign then "" else "~") T.ZF.pp p
+  | Equation (p, t, _) when is_predicate_lit lit -> 
+    Format.fprintf out "%s %a" (if (is_pos lit) then "" else "~") T.ZF.pp p
   | True -> CCFormat.string out "true"
   | False -> CCFormat.string out "false"
   | Equation (l, r, true) ->
@@ -825,12 +834,10 @@ module Comp = struct
   let max_terms ~ord lit =
     assert(no_prop_invariant lit);
     match lit with
-    | Equation (l, r, _) when is_essentially_prop lit ->
+    | Equation (l, r, _) when is_predicate_lit lit ->
       let l = Lambda.whnf l in
-      if T.is_app_var l then [l;r]
-      else [l]
-    | Equation (l, r, _) -> 
-      _maxterms2 ~ord l r
+      if T.is_app_var l then [l;r] else [l]
+    | Equation (l, r, _) -> _maxterms2 ~ord l r
     | Int a -> Int_lit.max_terms ~ord a
     | Rat a -> Rat_lit.max_terms ~ord a
     | True
@@ -1093,10 +1100,11 @@ module Conv = struct
       | Some f -> f
       | None ->
         begin match lit with
-          | Equation (l, r, sign) -> 
-            assert(Type.equal (Term.ty l) (Term.ty r));
+          | Equation (l, r, _) -> 
+            assert (Type.equal (Term.ty l) (Term.ty r));
+            let sign = is_pos lit in
             if Type.is_prop (Term.ty l) then (
-              if T.equal r T.true_ then SLiteral.atom l sign 
+              if T.is_true_or_false r then SLiteral.atom l sign 
               else (
                 let hd = if sign then Builtin.Equiv else Builtin.Xor in
                 SLiteral.atom (T.app_builtin ~ty:Type.prop hd [l;r]) true
@@ -1226,7 +1234,3 @@ let as_pos_pure_var lit =
   | Some (l, r, true) when is_pure_var lit && is_pos lit -> Some(_as_var l,_as_var r)
   | _ -> None
 
-let () =
-  Options.add_opts
-    [ "--equational-sign", (Arg.Bool ((:=)_equational_sign)), " use the sign of the equation to report polarity"
-    ];
