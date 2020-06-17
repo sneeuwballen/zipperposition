@@ -105,7 +105,6 @@ let k_bool_demod = Flex_state.create_key ()
 let k_immediate_simplification = Flex_state.create_key ()
 let k_arg_cong = Flex_state.create_key ()
 let k_bool_eq_fact = Flex_state.create_key ()
-let k_cc_simplify = Flex_state.create_key ()
 let k_local_rw = Flex_state.create_key ()
 
 
@@ -324,8 +323,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     if C.proof_depth cl < Env.flex_get k_trigger_bool_ind &&
        CCOpt.is_some (C.distance_to_goal cl) then (
       match C.lits cl with
-      | [| Literal.Equation(lhs, rhs, sign) |] ->
-        CCList.flat_map inst_clauses_w_trigger (make_triggers lhs rhs sign)
+      | [| Literal.Equation(lhs, rhs, _) as lit |] ->
+        CCList.flat_map inst_clauses_w_trigger (make_triggers lhs rhs (Literal.is_pos lit))
       | _ -> []
     ) else []
 
@@ -497,27 +496,23 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     assert (CCArray.for_all Lit.no_prop_invariant (C.lits c));
     let idx = !_idx_simpl in
     let idx' = match C.lits c with
-      | [| Lit.Equation (l,r,sign) |] when sign || T.equal r T.true_ ->
-        if Env.flex_get k_bool_demod || sign then (
-          let l, r = if sign then l, r else l, T.false_ in
-          (* do not use formulas for rewriting... can have adverse
-             effects on lazy cnf *)
-          if !Lazy_cnf.enabled &&
-             (T.is_appbuiltin l || (T.is_appbuiltin r && not @@ T.is_true_or_false r) ) then idx
-          else (
-            begin match Ordering.compare ord l r with
-              | Comparison.Gt ->
-                f idx (l,r,true,c)
-              | Comparison.Lt ->
-                f idx (r,l,true,c)
-              | Comparison.Incomparable ->
-                let idx = f idx (l,r,true,c) in
-                f idx (r,l,true,c)
-              | Comparison.Eq -> idx  (* no modif *)
-            end)) 
-        else idx
-      | [| Lit.Equation (l,r,false) |] ->
-        f idx (l,r,false,c)
+      | [| Lit.Equation (l,r,true) |] ->
+        (* do not use formulas for rewriting... can have adverse
+            effects on lazy cnf *)
+        if !Lazy_cnf.enabled &&
+            (T.is_appbuiltin l || (T.is_appbuiltin r && not @@ T.is_true_or_false r) ) then idx
+        else (
+          begin match Ordering.compare ord l r with
+            | Comparison.Gt ->
+              f idx (l,r,true,c)
+            | Comparison.Lt ->
+              f idx (r,l,true,c)
+            | Comparison.Incomparable ->
+              let idx = f idx (l,r,true,c) in
+              f idx (r,l,true,c)
+            | Comparison.Eq -> idx  (* no modif *)
+          end)
+      | [| Lit.Equation (l,r,false) |] -> f idx (l,r,false,c)
       | _ -> idx
     in
     _idx_simpl := idx';
@@ -2036,7 +2031,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       CCList.flatten @@ List.mapi (fun j lit -> 
         if i < j then (
           match lit with 
-          | Lit.Equation(u,v,true) ->
+          | Lit.Equation(u,v,_) when Lit.is_pos lit ->
             try_factorings (s,t) (u,v) i
             @
             try_factorings (s,t) (v,u) i 
@@ -2047,9 +2042,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let maximal = C.eligible_param (cl,0) Subst.empty in
     CCList.flatten @@ List.mapi (fun i lit ->
       match lit with
-      | Lit.Equation (s,t,true) 
-        when Env.flex_get k_ext_dec_lits != `OnlyMax ||
-             BV.get maximal i ->
+      | Lit.Equation (s,t,_) 
+        when Lit.is_pos lit &&
+             (Env.flex_get k_ext_dec_lits != `OnlyMax ||
+             BV.get maximal i) ->
         aux_eq_rest (s,t) i lits
       | _ -> []
     ) lits
@@ -2063,9 +2059,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let infer_equality_factoring_aux ~unify ~iterate_substs clause =
     ZProf.enter_prof prof_infer_equality_factoring;
     let eligible = C.Eligible.(filter (function 
-      | Equation(_,_,true) -> true
-      | Equation(lhs,rhs,false) -> T.is_app_var lhs && T.equal rhs T.true_
-      | l -> Lit.is_pos l  )) in
+      | Lit.Equation(lhs,_,_) as lit ->
+        Lit.is_pos lit ||
+        (Lit.is_neg lit && Lit.is_predicate_lit lit && T.is_app_var lhs)
+      | _ -> false )) in
     (* find root terms that are unifiable with s and are not in the
        literal at s_pos. Calls [k] with a position and substitution *)
     let find_unifiable_lits ~var_pred_status idx s _s_pos k =
@@ -2074,10 +2071,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (fun i lit ->
            match lit with
            | _ when i = idx -> () (* same index *)
-           | Lit.Equation (u, v, sign) ->
+           | Lit.Equation (u, v, _) ->
+             let sign = Lit.is_pos lit in
              if not sign && not is_pred_var then ()
              else (
-               if is_pred_var && T.equal T.true_ v then (
+               if is_pred_var && Lit.is_predicate_lit lit then (
                  if sign == pred_var_sign then (
                    k (u, v, unify (s,0) (u,0))
                  ) else (
@@ -2098,23 +2096,17 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Lits.fold_eqn ~ord ~both:true ~eligible (C.lits clause)
       |> Iter.flat_map
         (fun (s, t, sign, s_pos) -> (* try with s=t *)
-           assert(sign || (T.equal T.true_ t && T.is_app_var s) || (T.equal T.true_ s && T.is_app_var t));
+           (* temoprary assert for current representation of predicate literals *)
+           assert(sign && 
+                  (not (T.equal t T.false_) || T.is_app_var s) && 
+                  (not (T.equal s T.false_) || T.is_app_var t) );
            let active_idx = Lits.Pos.idx s_pos in
            let is_var_pred =
-             Env.flex_get k_bool_eq_fact &&
-             T.is_app_var s && Type.is_prop (T.ty s) && T.equal T.true_ t in
-           let var_pred_status = (is_var_pred, sign) in
+             Env.flex_get k_bool_eq_fact && T.is_app_var s && Type.is_prop (T.ty s) in
+           let var_pred_status = (is_var_pred, T.equal t T.true_) in
            find_unifiable_lits ~var_pred_status active_idx s s_pos
            |> Iter.filter_map
              (fun (u,v,substs) ->
-               let t =
-                (* the only way we can introduce false on the RHS of the
-                   equation is when we flip (u = true) to
-                   ((not u) = false)... Then, we also need to flip the original
-                   equation F x != true to F x = false, which is done in the
-                   next two lines  *)
-                if not (is_var_pred) || not (T.equal T.false_ v) then t
-                else T.false_ in
                iterate_substs substs
                  (fun subst ->
                      let info = EqFactInfo.({
@@ -2347,7 +2339,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       (* strictly maximal terms might be blocked *)
       let strictly_max = lazy (
         begin match lit with
-          | Lit.Equation (t1,t2,true) -> 
+          | Lit.Equation (t1,t2,_) when Lit.is_pos lit -> 
             begin match O.compare ord t1 t2 with
               | Comp.Gt -> [t1] | Comp.Lt -> [t2] | _ -> []
             end 
@@ -2412,6 +2404,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       CCArray.fold_left (fun (neq_map, others) lit ->
         match lit with
         | Literal.Equation(lhs,rhs,sign) ->
+          (* based on the representation of the literals! *)
           if sign && T.is_true_or_false rhs then (
             let negate t = if T.equal t T.true_ then T.false_ else T.true_ in
             (T.Map.add lhs (negate rhs) neq_map, others)
@@ -2822,6 +2815,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let cc =
       Array.fold_left
         (fun cc lit -> match lit with
+           (* NOTE: Based on the representation of the literals *)
+           | Lit.Equation (l, r, true) when T.equal r T.false_ ->
+             Congruence.FO.mk_eq cc l T.true_
            | Lit.Equation (l, r, false) ->
              Congruence.FO.mk_eq cc l r
            | _ -> cc)
@@ -2829,7 +2825,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     in
     let res = CCArray.exists
         (function
-          | Lit.Equation (l, r, true) ->
+          (* NOTE: Based on the representation of the literals *)
+          | Lit.Equation (l, r, _) as lit when Lit.is_pos lit ->
             (* if l=r is implied by the congruence, then the clause is redundant *)
             Congruence.FO.is_eq cc l r
           | _ -> false)
@@ -2890,7 +2887,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
              not (var_in_subst_ !us v 0) && not (Type.is_fun (HVar.ty v))
            in
            if BV.get bv i then match lit with
-             | Lit.Equation (l, r, false) when not (T.is_true_or_false r) ->
+             | Lit.Equation (l, r, false) ->
+               assert(not (T.is_true_or_false r));
                begin match T.view l, T.view r with
                  | T.Var v, _ when can_destr_eq_var v ->
                    (* eligible for destructive Equality Resolution, try to update
@@ -2946,6 +2944,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let handle_distinct_constants lit =
     match lit with
     | Lit.Equation (l, r, sign) when T.is_const l && T.is_const r ->
+      assert(not (T.is_true_or_false r));
       let s1 = T.head_exn l and s2 = T.head_exn r in
       if ID.is_distinct_object s1 && ID.is_distinct_object s2
       then
@@ -3335,9 +3334,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
      check for this clause. *)
   let num_equational lits =
     Array.fold_left
-      (fun acc lit -> match lit with
-         | Lit.Equation _ -> acc+1
-         | _ -> acc
+      (fun acc lit -> 
+        acc + (if Lit.is_predicate_lit lit then 0 else 1)
       ) 0 lits
 
   (* ----------------------------------------------------------------------
@@ -3605,43 +3603,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       | _ -> assert false;
     with Fail -> []
 
-  (* Resolve negative literals that are implied by
-     equational theory stored in _cc_simpl *)
-  let cc_resolve_lits cl =
-    let is_resolved l = match l with 
-      | Lit.Equation(lhs, rhs, false) 
-          when Term.is_ground lhs && Term.is_ground rhs &&
-          Congruence.FO.is_eq !_cc_simpl lhs rhs ->
-        None
-      | _ -> Some l in
-    let new_lits = CCList.filter_map is_resolved (CCArray.to_list (C.lits cl)) in
-    if CCList.length new_lits != C.length cl then (
-      let step = Proof.Step.simp ~rule:(Proof.Rule.mk "cc_resolve_neg") [C.proof_parent cl] in
-      let res = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) new_lits step in
-      SimplM.return_new res
-    ) else SimplM.return_same cl
-
-  (* Remove the clause if it has  *)
-  let is_cc_tautology cl =
-    let is_cc_trivial = function
-    | Lit.Equation(lhs, rhs, true) ->
-      T.is_ground lhs && T.is_ground rhs &&
-      Congruence.FO.is_eq !_cc_simpl lhs rhs
-    | _ -> false in
-    (* Because literals from the passive set are also added,
-       then unit positive equation from the passive set can make
-       itself tautology when it is chosen for processing...
-       
-       Two ways to avoid this:
-        1. Do tautology checking on non-unit clauses
-        2. Do the check on clauses with AVATAR asertions --
-           the clauses added to CC are not asserted and thus
-           cannot make themselves tautologies.
-       *)
-    (C.length cl > 1 || not (Trail.is_empty (C.trail cl))) &&
-    Array.exists is_cc_trivial (C.lits cl)
-
-
   (** {2 Registration} *)
 
   (* print index into file *)
@@ -3697,23 +3658,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
     if Env.flex_get k_local_rw != `Off then (
       Env.add_basic_simplify local_rewrite
-    );
-
-    if Env.flex_get k_cc_simplify then (
-      let insert_into_cc c =
-        (match C.lits c with 
-        | [| Lit.Equation(lhs, rhs, true) |] ->
-          if Term.is_ground lhs && Term.is_ground rhs && Trail.is_empty (C.trail c) then (
-            _cc_simpl := Congruence.FO.mk_eq !_cc_simpl lhs rhs
-          )
-        | _ -> ());
-        Signal.ContinueListening 
-      in
-
-      Signal.on Env.ProofState.PassiveSet.on_add_clause insert_into_cc;
-
-      Env.add_basic_simplify cc_resolve_lits;
-      Env.add_is_trivial is_cc_tautology;
     );
 
     Env.flex_add k_stmq (StmQ.default ());
@@ -3844,7 +3788,6 @@ let _recognize_injectivity = ref false
 let _restrict_fluidsup = ref false
 let _check_sup_at_var_cond = ref true
 let _restrict_hidden_sup_at_vars = ref false
-let _cc_simplify = ref false
 let _local_rw = ref `Off
 
 let _lambdasup = ref (-1)
@@ -3961,7 +3904,6 @@ let register ~sup =
   E.flex_add StreamQueue.k_ratio !_ratio;
   E.flex_add StreamQueue.k_clause_num !_clause_num;
 
-  E.flex_add k_cc_simplify !_cc_simplify;
   E.flex_add k_local_rw !_local_rw;
 
   let module JPF = JPFull.Make(struct let st = E.flex_state () end) in
@@ -4068,7 +4010,6 @@ let () =
       "--stream-queue-guard", Arg.Set_int _guard, "set value of guard for streamQueue";
       "--stream-queue-ratio", Arg.Set_int _ratio, "set value of ratio for streamQueue";
       "--bool-demod", Arg.Bool ((:=) _bool_demod), " turn BoolDemod on/off";
-      "--cc-simplify", Arg.Bool ((:=) _cc_simplify), " use cong-closure of all positive ground unit eqs to simplify the clauses";
       "--local-rw", Arg.Symbol (["any-context"; "green-context"; "off"], (fun opt -> 
         match opt with
         | "any-context" -> _local_rw := `AnyContext

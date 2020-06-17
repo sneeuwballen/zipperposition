@@ -127,7 +127,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                Util.incr_stat stat_elim_var;
                Util.debugf ~section 3
                  "(@[elim_pred_var@ :var %a :into %B@ :clause %a@ :yield %a@])"
-                 (fun k->k T.pp_var v (not sign) C.pp c C.pp new_c);
+                 (fun k->k T.pp_var v (T.equal rhs T.true_) C.pp c C.pp new_c);
                Some new_c
              | _ -> None
            end

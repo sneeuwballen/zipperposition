@@ -167,16 +167,16 @@ module Make(E : Env.S) : S with module Env = E = struct
      and the other one is a formula *)
   let is_renaming_clause c =
     let is_renaming_lit = function
-      | L.Equation (lhs, rhs, _) when T.equal T.true_ rhs ->
+      | L.Equation (lhs, _, _) as lit when L.is_predicate_lit lit  ->
         let hd = T.head_term lhs in
         begin match T.head hd with
         | Some id  -> ID.Set.mem id !_renamer_symbols
         | None -> false end
       | _ -> false in
     let is_formula_lit = function 
-      | L.Equation (lhs, rhs, _) ->
-        if T.equal T.true_ rhs then T.is_appbuiltin lhs
-        else Type.is_prop (T.ty lhs) && not (T.equal T.true_ rhs)
+      | L.Equation (lhs, rhs, _) as lit ->
+        if Literal.is_predicate_lit lit then T.is_appbuiltin lhs
+        else Type.is_prop (T.ty lhs)
       | _ -> false in
 
     match C.lits c with
