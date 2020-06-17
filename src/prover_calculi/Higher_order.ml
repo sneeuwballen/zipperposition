@@ -127,7 +127,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let extract_hd_vars = function
       | Literal.Equation(lhs,rhs,false) ->
         VS.of_list [T.as_var_exn (T.head_term lhs);
-                          T.as_var_exn (T.head_term rhs)]
+                    T.as_var_exn (T.head_term rhs)]
       | _ -> assert false
     in
 
@@ -452,7 +452,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         Array.fold_left
           (fun (others,set,pos_lits) lit ->
              begin match lit with
-               | Literal.Equation (lhs, rhs, sign) when T.equal rhs T.true_->
+               | Literal.Equation (lhs, rhs, _) when Literal.is_predicate_lit lit->
                  let f, args = T.as_app lhs in
                  begin match T.view f with
                    | T.Var q when HVar.equal Type.equal v q ->
@@ -460,8 +460,8 @@ module Make(E : Env.S) : S with module Env = E = struct
                      if List.exists (T.var_occurs ~var:v) args then (
                        raise Exit; (* [P … t[v] …] is out of scope *)
                      );
-                     others, (args, sign) :: set, 
-                     (if sign then [lit] else []) @ pos_lits
+                     others, (args, Literal.is_pos lit) :: set, 
+                     (if Literal.is_pos lit then [lit] else []) @ pos_lits
                    | _ -> lit :: others, set, pos_lits
                  end
                | _ -> lit :: others, set, pos_lits
@@ -746,14 +746,15 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let recognize_choice_ops c =
     let extract_not_p_x l = match l with
-      | Literal.Equation(lhs,rhs,false) when T.equal T.true_ rhs && T.is_app_var lhs ->
+      | Literal.Equation(lhs,_,_) 
+        when Literal.is_neg l && Literal.is_predicate_lit l ->
         begin match T.view lhs with
           | T.App(hd, [var]) when T.is_var var -> Some hd
           | _ -> None end
       | _ -> None in
 
     let extract_p_choice_p p l = match l with 
-      | Literal.Equation(lhs,rhs,true) when T.equal T.true_ rhs ->
+      | Literal.Equation(lhs,_,_) when Literal.is_pos l && Literal.is_predicate_lit l ->
         begin match T.view lhs with
           | T.App(hd, [ch_p]) when T.equal hd p ->
             begin match T.view ch_p with 

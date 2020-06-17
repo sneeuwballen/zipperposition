@@ -213,13 +213,11 @@ let pred_freq ~ord lits =
       ) else acc
     ) ID.Map.empty
 
-let is_truly_equational = function 
-    | Lit.Equation(l,r,sign) -> not (T.equal T.true_ r)
-    | _ -> false
+let is_truly_equational l = not (Literal.is_predicate_lit l)
 
-let get_pred_freq ~freq_tbl l =
-  match l with
-  | Lit.Equation(l,r,sign) when T.equal T.true_ r ->
+let get_pred_freq ~freq_tbl lit =
+  match lit with
+  | Lit.Equation(l,r,_) when Lit.is_predicate_lit lit ->
     begin 
       match T.head l with
       | Some id -> ID.Map.get_or id freq_tbl ~default:0
@@ -249,7 +247,7 @@ let e_sel2 ~ord lits =
     let diff_val = -(lit_sel_diff_w l) in
     let prec = Ordering.precedence ord in
     match l with 
-    | Equation(lhs,_,sign) when not @@ blocker idx l ->
+    | Equation(lhs,_,_) when not @@ blocker idx l ->
       if T.is_var (T.head_term lhs) then (
         (sign_val, 0, 0, diff_val)
       ) else (
@@ -341,12 +339,12 @@ let e_sel8 ~ord lits =
                 |> Iter.sort ~cmp:ID.compare 
                 |> Iter.to_array in
   let get_arity = function 
-    | Lit.Equation(l,r,sign) when Term.equal T.true_ r -> 
+    | Lit.Equation(l,r,_) as lit when Lit.is_predicate_lit lit -> 
       List.length (Type.expected_args (Term.ty (T.head_term l)))
     | _ -> 0  in
   let alpha_rank = function 
-    | Lit.Equation(l,r,sign) when sign && Term.equal T.true_ r 
-                                       && T.is_const (T.head_term l) -> 
+    | Lit.Equation(l,_,_) as lit 
+      when Lit.is_predicate_lit lit && T.is_const (T.head_term l) -> 
       let hd = T.head_exn l in
       (match CCArray.bsearch ~cmp:ID.compare hd symbols with
        | `At idx -> idx
@@ -402,12 +400,14 @@ let e_sel11 ~ord lits =
   let freq_tbl = pred_freq ~ord lits in
   let blocker _ l = Lit.is_type_pred l in
   let eqn_max_weight = function 
-  | Lit.Equation(lhs,rhs,false) ->
-    if Ordering.compare ord lhs rhs  == Comparison.Gt then Term.ho_weight lhs 
+  | Lit.Equation(lhs,rhs,_) as l when Lit.is_neg l ->
+    let cmp_res = Ordering.compare ord lhs rhs in
+    if cmp_res == Comparison.Gt then Term.ho_weight lhs 
+    else if cmp_res == Comparison.Lt then Term.ho_weight rhs
     else Term.ho_weight lhs + Term.ho_weight rhs
   | _ -> max_int in
   let lhs_weight  = function 
-  | Lit.Equation(lhs,rhs,false) ->
+  | Lit.Equation(lhs,rhs,_) as l when Lit.is_neg l ->
     if Ordering.compare ord lhs rhs  == Comparison.Gt then Term.ho_weight lhs 
     else Term.ho_weight lhs
   | _ -> max_int in
@@ -444,7 +444,7 @@ let e_sel14 ~ord lits =
   let chooser (i,l) =
     let hd_freq = get_pred_freq ~freq_tbl l in
     let hd_is_fresh_pred = function
-      | Lit.Equation(lhs, rhs, _) when T.is_true_or_false rhs -> 
+      | Lit.Equation(lhs, rhs, _) as l when Lit.is_predicate_lit l -> 
         begin match T.as_const (T.head_term lhs) with
         | Some c -> ID.is_postcnf_skolem c
         | None -> false end

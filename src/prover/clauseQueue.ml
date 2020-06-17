@@ -277,8 +277,8 @@ module Make(C : Clause_intf.S) = struct
       assert (Literal.no_prop_invariant l);
       match l with
       (* Special treatment of propositions *)
-      | Lit.Equation (lhs,rhs,sign) when Term.equal rhs Term.true_ ->
-        calc_tweight lhs sg v w c_mul, sign
+      | Lit.Equation (lhs,_,_) when Lit.is_predicate_lit l ->
+        calc_tweight lhs sg v w c_mul, Lit.is_pos l
       | Lit.Equation (lhs,rhs,sign) -> (calc_tweight lhs sg v w c_mul +
                                         calc_tweight rhs sg v w c_mul, sign)
       | _ -> (0,false)
@@ -968,7 +968,7 @@ module Make(C : Clause_intf.S) = struct
 
     let prefer_neg_unit c =
       match C.lits c with 
-      | [| Literal.Equation(_,_,false) |] -> 0
+      | [| l |] when Lit.is_neg l -> 0
       | _ -> 1
     
     let defer_neg_unit c =

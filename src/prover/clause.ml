@@ -321,6 +321,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     let ord = Ctx.ord () in
     match c.sclause.lits with
     | [| Lit.Equation (l, r, true) |] ->
+      (* counting predicate literals of the form p = FALSE as rewrite rules *)
       begin match Ordering.compare ord l r with
         | Comparison.Gt
         | Comparison.Lt -> true
