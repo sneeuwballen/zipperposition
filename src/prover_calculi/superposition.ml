@@ -3845,7 +3845,7 @@ let _restrict_fluidsup = ref false
 let _check_sup_at_var_cond = ref true
 let _restrict_hidden_sup_at_vars = ref false
 let _cc_simplify = ref false
-let _local_rw = ref `AnyContext
+let _local_rw = ref `Off
 
 let _lambdasup = ref (-1)
 let _max_infs = ref (-1)
@@ -4086,6 +4086,7 @@ let () =
 
   Params.add_to_mode "ho-complete-basic" (fun () ->
       _use_simultaneous_sup := false;
+      _local_rw := `GreenContext;
       _sup_at_vars := true;
       _sup_in_var_args := false;
       _sup_under_lambdas := false;
@@ -4103,6 +4104,7 @@ let () =
       _sup_in_var_args := false;
       _sup_under_lambdas := false;
       _lambda_demod := false;
+      _local_rw := `AnyContext;
       _demod_in_var_args := false;
       _complete_ho_unification := true;
       _unif_alg := `NewJPPragmatic;
@@ -4126,6 +4128,7 @@ let () =
       _demod_in_var_args := false;
       _complete_ho_unification := true;
       _unif_alg := `NewJPFull;
+      _local_rw := `AnyContext;
       _sup_at_var_headed := true;
       _lambdasup := -1;
       _dupsup := false;
@@ -4134,6 +4137,7 @@ let () =
   Params.add_to_mode "fo-complete-basic" (fun () ->
       _use_simultaneous_sup := false;
       _arg_cong := false;
+      _local_rw := `GreenContext
     );
   Params.add_to_modes 
     [ "lambda-free-intensional"
@@ -4144,6 +4148,7 @@ let () =
     _use_simultaneous_sup := false;
     _sup_in_var_args := true;
     _demod_in_var_args := true;
+    _local_rw := `GreenContext;
     _dupsup := false;
     _complete_ho_unification := false;
     _lambdasup := -1;
