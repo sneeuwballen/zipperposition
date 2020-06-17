@@ -2406,6 +2406,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     ZProf.with_prof prof_demodulate demodulate_ c
 
   let local_rewrite c =
+    assert(Env.flex_get k_local_rw != `Off);
+
     let neqs, others =
       CCArray.fold_left (fun (neq_map, others) lit ->
         match lit with
@@ -2423,13 +2425,15 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       ) ((Term.Map.empty),[]) (C.lits c) in
     
     let normalize ~restrict ~neqs t =
+      let only_green_ctx = Env.flex_get k_local_rw == `GreenContext in
+      
       let rec aux ~top t =
         match T.Map.get t neqs with
         | Some t' when not restrict || not top -> aux ~top t'
         | _ ->
           begin
             match T.view t with
-            | T.App(hd, args) ->
+            | T.App(hd, args) when not (T.is_var hd) || not only_green_ctx ->
               let hd' = aux ~top:false hd in
               let args' = List.map (aux ~top:false) args in
               if T.equal hd hd' && T.same_l args args' then t
@@ -2438,6 +2442,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               let args' = List.map (aux ~top:false) args in
               if T.same_l args args' then t
               else aux ~top:false (T.app_builtin ~ty:(T.ty t) hd args')
+            | T.Fun _ when not only_green_ctx ->
+              let pref,body = T.open_fun t in
+              let body' = aux ~top:false body in
+              if T.equal body body' then t
+              else T.fun_l pref body'
             | _ -> t (* do not rewrite under lambdas *)
           end in
       aux ~top:true t in
@@ -3686,7 +3695,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     and backward_redundant = subsumed_in_active_set
     and is_trivial = is_tautology in
 
-    if Env.flex_get k_local_rw then (
+    if Env.flex_get k_local_rw != `Off then (
       Env.add_basic_simplify local_rewrite
     );
 
@@ -3836,7 +3845,7 @@ let _restrict_fluidsup = ref false
 let _check_sup_at_var_cond = ref true
 let _restrict_hidden_sup_at_vars = ref false
 let _cc_simplify = ref false
-let _local_rw = ref false
+let _local_rw = ref `AnyContext
 
 let _lambdasup = ref (-1)
 let _max_infs = ref (-1)
@@ -4060,7 +4069,13 @@ let () =
       "--stream-queue-ratio", Arg.Set_int _ratio, "set value of ratio for streamQueue";
       "--bool-demod", Arg.Bool ((:=) _bool_demod), " turn BoolDemod on/off";
       "--cc-simplify", Arg.Bool ((:=) _cc_simplify), " use cong-closure of all positive ground unit eqs to simplify the clauses";
-      "--local-rw", Arg.Bool ((:=) _local_rw), " turn local rewriting rule on/off";
+      "--local-rw", Arg.Symbol (["any-context"; "green-context"; "off"], (fun opt -> 
+        match opt with
+        | "any-context" -> _local_rw := `AnyContext
+        | "green-context" -> _local_rw := `GreenContext
+        | "off" -> _local_rw := `Off
+        | _ -> invalid_arg "possible arugments are: [any-context; green-context; off]"
+      )), " turn local rewriting rule on/off";
       "--immediate-simplification", Arg.Bool ((:=) _immediate_simplification), " turn immediate simplification on/off";
       "--try-lfho-unif", Arg.Bool ((:=) _try_lfho_unif), " if term is of the right shape, try LFHO unification before HO unification";
       "--stream-clause-num", Arg.Set_int _clause_num, "how many clauses to take from streamQueue; by default as many as there are streams";
