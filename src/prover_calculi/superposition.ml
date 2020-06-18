@@ -1895,7 +1895,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     try
       if not (Type.equal (T.ty orig_s) (T.ty orig_t)) then raise StopSearch;
 
-      if T.equal T.true_ orig_s || T.equal T.true_ orig_t then raise StopSearch;
+      if T.is_true_or_false orig_s || T.is_true_or_false orig_t then raise StopSearch;
 
       let norm = 
         if Env.flex_get Combinators.k_enable_combinators 
