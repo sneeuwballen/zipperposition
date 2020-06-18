@@ -2097,9 +2097,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       |> Iter.flat_map
         (fun (s, t, sign, s_pos) -> (* try with s=t *)
            (* temoprary assert for current representation of predicate literals *)
-           assert(sign && 
-                  (not (T.equal t T.false_) || T.is_app_var s) && 
-                  (not (T.equal s T.false_) || T.is_app_var t) );
+           assert (sign || 
+                  (T.equal s T.false_ && T.is_app_var t) || 
+                  (T.equal t T.false_ && T.is_app_var s));
            let active_idx = Lits.Pos.idx s_pos in
            let is_var_pred =
              Env.flex_get k_bool_eq_fact && T.is_app_var s && Type.is_prop (T.ty s) in
