@@ -167,7 +167,7 @@ let _on_arith p lit = match lit with
   | _ -> false
 
 let is_type_pred = function
-  | Equation(lhs,rhs,_) as l when is_predicate_lit l ->
+  | Equation(lhs,_,_) as l when is_predicate_lit l ->
     begin match Term.view lhs with
       | App(f, [x]) -> T.is_var x && T.is_const f
       | _ -> false end

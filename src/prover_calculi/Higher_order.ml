@@ -691,11 +691,18 @@ module Make(E : Env.S) : S with module Env = E = struct
           | None -> [])
       | _ -> assert (false) in
 
-    C.Seq.terms c 
-    |> Iter.flat_map (Term.Seq.subterms ~include_builtin:true)
-    |> Iter.filter is_choice_subterm
-    |> Iter.flat_map_l build_choice_inst
-    |> Iter.to_list
+    let res = 
+      C.Seq.terms c 
+      |> Iter.flat_map (Term.Seq.subterms ~include_builtin:true)
+      |> Iter.filter is_choice_subterm
+      |> Iter.flat_map_l build_choice_inst
+      |> Iter.to_list
+    in
+    if not (CCList.is_empty res) then (
+      Util.debugf ~section 1 "inst(@[%a@])=@.@[%a@]@." 
+        (fun k -> k C.pp c (CCList.pp C.pp) res);
+    );
+    res
 
   (* Given a clause C, project all its applied variables to base-type arguments 
      if there is a variable occurence in which at least one of base-type arguments is
@@ -747,7 +754,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let recognize_choice_ops c =
     let extract_not_p_x l = match l with
       | Literal.Equation(lhs,_,_) 
-        when Literal.is_neg l && Literal.is_predicate_lit l ->
+        when Literal.is_neg l && Literal.is_predicate_lit l && T.is_app_var lhs ->
         begin match T.view lhs with
           | T.App(hd, [var]) when T.is_var var -> Some hd
           | _ -> None end

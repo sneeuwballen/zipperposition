@@ -2834,7 +2834,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     in
     if res then (
       Util.incr_stat stat_semantic_tautology;
-      Util.debugf ~section 2 "@[@[%a@]@ is a semantic tautology@]" (fun k->k C.pp c);
+      Util.debugf ~section 1 "@[@[%a@]@ is a semantic tautology@]" (fun k->k C.pp c);
     );
     res
 
@@ -3287,18 +3287,20 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       SubsumIdx.retrieve_subsuming_c !_idx_fv c
       |> Iter.exists
         (fun c' ->
-           C.trail_subsumes c' c
-           &&
-           ( (try_eq_subsumption && eq_subsumes (C.lits c') (C.lits c))
-             ||
-             subsumes (C.lits c') (C.lits c)
-           ))
+           let res = 
+             C.trail_subsumes c' c
+             &&
+             ( (try_eq_subsumption && eq_subsumes (C.lits c') (C.lits c))
+               ||
+               subsumes (C.lits c') (C.lits c)
+             ) in
+           if res  then (
+            Util.debugf ~section 1 "@[<2>@[%a@]@ subsumed by @[%a@]@]" (fun k->k C.pp c C.pp c');
+            Util.incr_stat stat_clauses_subsumed;
+           );
+           res)
     in
     ZProf.exit_prof prof_subsumption_set;
-    if res then (
-      Util.debugf ~section 2 "@[<2>@[%a@]@ subsumed by active set@]" (fun k->k C.pp c);
-      Util.incr_stat stat_clauses_subsumed;
-    );
     res
 
   let subsumed_in_active_set acc c =
