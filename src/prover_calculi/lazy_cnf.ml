@@ -190,10 +190,12 @@ module Make(E : Env.S) : S with module Env = E = struct
       Ls.fold_eqn 
         ~both:false ~ord:(E.Ctx.ord ()) ~eligible:(C.Eligible.always) 
         (C.lits c)
-      |> Iter.iter (fun (lhs,rhs,_,_) ->
+      |> Iter.iter (fun (lhs,rhs,_,pos) ->
+        let i,_ = Ls.Pos.cut pos in
+        let lit = (C.lits c).(i) in
         let terms = 
-          if T.equal T.true_ rhs && T.is_appbuiltin lhs  then [lhs]
-          else if Type.is_prop (T.ty lhs) && not (T.equal T.true_ rhs) &&
+          if L.is_predicate_lit lit && T.is_appbuiltin lhs  then [lhs]
+          else if Type.is_prop (T.ty lhs) && not (L.is_predicate_lit lit) &&
                   (Term.is_appbuiltin lhs || T.is_appbuiltin rhs) then
             [T.Form.equiv lhs rhs]
           else [] in
@@ -353,7 +355,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let continue =
       Iter.empty, `Continue in
 
-    let eligible_for_ignore_eq ~ignore_eq lhs rhs = 
+    let eligible_to_ignore_eq ~ignore_eq lhs rhs = 
       ignore_eq && not (T.is_true_or_false lhs) && not (T.is_true_or_false rhs) in
 
     let get_skolem ~free_vars ~ret_ty ~mode f = 
@@ -396,8 +398,9 @@ module Make(E : Env.S) : S with module Env = E = struct
     fold_lits c
     |> Iter.fold_while ( fun _ (lhs, rhs, sign, pos) ->
       let i,_ = Ls.Pos.cut pos in
-      if T.equal rhs T.true_ then (
-        Util.debugf ~section 2 "  subformula:%d:@[%a@]" (fun k -> k i L.pp (C.lits c).(i) );
+      let lit = (C.lits c).(i) in
+      if L.is_predicate_lit lit then (
+        Util.debugf ~section 2 "  subformula:%d:@[%a@]" (fun k -> k i L.pp lit );
         begin match T.view lhs with 
         | T.AppBuiltin(And, l) when List.length l >= 2 ->
           let rule_name = "lazy_cnf_and" in
@@ -413,7 +416,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           else return @@ mk_and ~proof_cons [a; T.Form.not_ b] c i ~rule_name
         | T.AppBuiltin((Equiv|Xor) as hd, [a;b]) ->
           let hd = if sign then hd else (if hd = Equiv then Xor else Equiv) in
-          if eligible_for_ignore_eq ~ignore_eq a b then continue
+          if eligible_to_ignore_eq ~ignore_eq a b then continue
           else (
             let rule_name = 
               CCFormat.sprintf "lazy_cnf_%s" 
@@ -458,12 +461,12 @@ module Make(E : Env.S) : S with module Env = E = struct
           return res_cl
         | T.AppBuiltin(Not, _) -> assert false
         | _ -> continue end
-      ) else if Type.is_prop (T.ty lhs) && not (T.equal T.true_ rhs) then (
+      ) else if Type.is_prop (T.ty lhs) && not (L.is_predicate_lit lit) then (
           let rule_name = 
             CCFormat.sprintf "lazy_cnf_%s" (if sign then "equiv" else "xor") in
           
           Util.debugf ~section 2 "  subeq:%d:@[%a %s= %a@]" (fun k -> k i T.pp lhs (if sign then "" else "~") T.pp rhs );
-          if eligible_for_ignore_eq ~ignore_eq lhs rhs then continue
+          if eligible_to_ignore_eq ~ignore_eq lhs rhs then continue
           else if sign then (
             return @@ (
               mk_or ~proof_cons ~rule_name [T.Form.not_ lhs; rhs] c i 
@@ -479,8 +482,9 @@ module Make(E : Env.S) : S with module Env = E = struct
     fold_lits c
     |> Iter.fold_while (fun _ (lhs,rhs,sign,pos) -> 
       let i,_ = Ls.Pos.cut pos in
+      let lit = (C.lits c).(i) in
       let proof_cons = Proof.Step.simp ~infos:[] ~tags:[Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth] in
-      if T.equal rhs T.true_ && T.is_appbuiltin lhs then (
+      if L.is_predicate_lit lit && T.is_appbuiltin lhs then (
         match rename ~c lhs sign with
         | Some (renamer, new_defs, parents) ->
           let rule_name = "renaming" in
@@ -493,7 +497,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             (fun k -> k (CCList.pp C.pp) new_defs);
           Some res, `Stop
         | None -> None, `Continue
-      ) else if Type.is_prop (T.ty lhs) && not (T.equal rhs T.true_) &&
+      ) else if Type.is_prop (T.ty lhs) && not (L.is_predicate_lit lit) &&
               (T.is_appbuiltin lhs || T.is_appbuiltin rhs) then (
           match rename_eq ~c lhs rhs sign with
           | Some (renamer, new_defs, parents) ->
@@ -514,8 +518,9 @@ module Make(E : Env.S) : S with module Env = E = struct
     fold_lits c
     |> Iter.fold (fun acc (lhs,rhs,sign,pos) -> 
         let i,_ = Ls.Pos.cut pos in
+        let lit = (C.lits c).(i) in
         let proof_cons = Proof.Step.inference ~infos:[] ~tags:[Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth] in
-        if not (T.is_true_or_false rhs) && Type.is_prop (T.ty lhs) then (
+        if not (L.is_predicate_lit lit) && Type.is_prop (T.ty lhs) then (
           let new_cls =
             if sign then (
               mk_or ~proof_cons ~rule_name [T.Form.not_ lhs; rhs] c i 
@@ -534,8 +539,9 @@ module Make(E : Env.S) : S with module Env = E = struct
     fold_lits c
     |> Iter.fold_while (fun _ (lhs,rhs,sign,pos) -> 
       let i,_ = Ls.Pos.cut pos in
+      let lit = (C.lits c).(i) in
       let proof_cons = Proof.Step.simp ~infos:[] ~tags:[Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth] in
-      if T.equal rhs T.true_ && T.is_appbuiltin lhs then (
+      if L.is_predicate_lit lit && T.is_appbuiltin lhs then (
         match cnf_scope_form lhs with 
         | Some f ->
           let rule_name = CCFormat.sprintf "lazy_cnf_%sscoping" 

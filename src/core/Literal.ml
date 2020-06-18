@@ -99,6 +99,10 @@ let hash lit =
   | True -> 40
   | False -> 50
 
+let [@inline] is_predicate_lit = function
+  | Equation(_,rhs,true) -> T.is_true_or_false rhs
+  | _ -> false
+
 let weight lit =
   fold (fun acc t -> acc + T.size t) 0 lit
 
@@ -106,7 +110,7 @@ let ho_weight =
   fold (fun acc t -> acc + T.ho_weight t) 0 
 
 let heuristic_weight weight = function
-  | Equation (l, r, sign) when Term.equal r T.true_ -> weight l
+  | Equation (l, _, _) as lit when is_predicate_lit lit -> weight l
   | Equation (l, r, _) -> weight l + weight r
   | True
   | False -> 0
@@ -160,10 +164,6 @@ let is_arith = function
 
 let _on_arith p lit = match lit with
   | Int o -> p o
-  | _ -> false
-
-let [@inline] is_predicate_lit = function
-  | Equation(_,rhs,true) -> T.is_true_or_false rhs
   | _ -> false
 
 let is_type_pred = function
@@ -1127,8 +1127,12 @@ module Conv = struct
         T.Conv.to_simple_term ctx p
       | SLiteral.Eq(l,r) when T.equal T.true_ r ->
         T.Conv.to_simple_term ctx l
+      | SLiteral.Eq(l,r) when T.equal T.false_ r ->
+        T.Conv.to_simple_term ctx (T.Form.not_ l)
       | SLiteral.Neq(l,r) when T.equal T.true_ r ->
-        T.Conv.to_simple_term ctx (T.Form.not_ l)  
+        T.Conv.to_simple_term ctx (T.Form.not_ l)
+      | SLiteral.Neq(l,r) when T.equal T.false_ r ->
+        T.Conv.to_simple_term ctx l  
       | SLiteral.Eq(l,r) ->
         let l,r = CCPair.map_same (T.Conv.to_simple_term ctx) (l,r) in
         TypedSTerm.app_builtin ~ty:TypedSTerm.Ty.prop Builtin.Eq [l;r]

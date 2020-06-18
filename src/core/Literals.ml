@@ -381,6 +381,8 @@ let fold_eqn_simple ?sign lits k =
   let rec aux i =
     if i = Array.length lits then ()
     else (
+      (* IMPORTANT: Returning the computed sign (positivoid vs negativoid)
+         rather than the sign stored in the equation *)
       let sign = Lit.is_pos lits.(i) in
       begin match lits.(i) with
         | Lit.Equation (l,r,_) when sign_ok sign ->

@@ -101,7 +101,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       (fun (idx,lit) -> 
         assert(Literal.no_prop_invariant lit);
         match lit with
-         (* -- Relies on the representation of literals  -- *)
+         (* NOTE: -- Relies on the representation of literals  -- *)
          | Literal.Equation (lhs, rhs, true) when T.is_true_or_false rhs ->
            begin match T.as_var lhs with
              | Some v -> 
@@ -162,8 +162,9 @@ module Make(E : Env.S) : S with module Env = E = struct
            let c_pos = Literal.mk_true a :: Literal.mk_true b :: lits |> mk_c in
            let c_neg = Literal.mk_false a :: Literal.mk_false b :: lits |> mk_c in
            Some [c_pos; c_neg]
-         | Literal.Equation (lhs, rhs, true) 
+         | Literal.Equation (lhs, rhs, true)
            when (T.equal rhs T.true_) || (T.equal rhs T.false_) ->
+           (* NOTE: based on literal representation *)
            (* see if there is some CNF to do here *)
            let sign = T.equal rhs T.true_ in
            begin match T.view lhs, sign with

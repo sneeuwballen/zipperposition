@@ -218,7 +218,7 @@ module Make(E : Env.S) : S with module Env = E = struct
              && List.length (Type.expected_args (T.ty t)) = 1 ->
       let prop = Type.prop in
       if T.equal x T.true_ then (
-        T.fun_ prop (T.true_)
+        T.fun_ prop T.true_
       ) else (
         assert (T.equal x T.false_);
         T.fun_ prop (T.bvar ~ty:prop 0)
@@ -227,14 +227,16 @@ module Make(E : Env.S) : S with module Env = E = struct
       when  ty_is_prop t &&
             List.length l > 1 ->
       let l' = List.map aux l in
-      let t = if T.same_l l l' then t 
+      let t = 
+        if T.same_l l l' then t 
         else T.app_builtin ~ty:(Type.prop) Builtin.And l' in
       simplify_and_or t Builtin.And l'
     | AppBuiltin(Builtin.Or, l)
       when ty_is_prop t &&
            List.length l > 1 ->
       let l' = List.map aux l in
-      let t = if T.same_l l l' then t 
+      let t = 
+        if T.same_l l l' then t 
         else T.app_builtin ~ty:(Type.prop) Builtin.Or l' in
       simplify_and_or t Builtin.Or l'
     | AppBuiltin(Builtin.Not, [s]) ->
@@ -425,7 +427,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let idx = CCArray.find_idx (fun l -> 
         let eq = Literal.View.as_eqn l in
         match eq with 
-        | Some (l,r,sign) -> 
+        | Some (l,r,_) -> 
           Type.is_prop (T.ty l) &&
           not (T.equal l r) &&
           ((not (T.equal r T.true_) && not (T.equal r T.false_))
