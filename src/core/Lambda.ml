@@ -315,24 +315,4 @@ and all_distinct_bound args =
   |> OptionSet.of_list
   |> (fun set -> not (OptionSet.mem None set) && OptionSet.cardinal set = List.length args)
 
-let rec is_properly_encoded t = match T.view t with
-  | Var _ | DB _ | Const _ -> true
-  | AppBuiltin (hd,l) when Builtin.equal hd Builtin.ForallConst 
-                        || Builtin.equal hd Builtin.ExistsConst ->
-    let res = begin match l with
-    | [tyarg] ->
-      Type.is_tType (T.ty tyarg)
-    | [tyarg; body] -> 
-      let ty = Term.ty body in
-      let tyargs, ret_ty = Type.open_fun ty in
-      Type.is_tType (T.ty tyarg) && List.length tyargs = 1  &&
-      Type.equal (Type.of_term_unsafe (tyarg :> InnerTerm.t)) (List.hd tyargs) && 
-      Type.is_prop ret_ty
-    | _ -> false end in
-    (* if not res then CCFormat.printf "Failed for %a.\n" T.pp t; *)
-    res
-  | AppBuiltin(Builtin.(Eq|Neq), l) ->
-    List.length l >= 1 && Type.is_tType (Term.ty (List.hd l))
-  | AppBuiltin(_,l) -> List.for_all is_properly_encoded l
-  | App (hd, l) -> List.for_all is_properly_encoded (hd::l)
-  | Fun (_,u) -> is_properly_encoded u
+

@@ -197,6 +197,7 @@ val of_ty : Type.t -> t
 (** Upcast from type *)
 
 val mk_tmp_cst : counter:int ref -> ty:Type.t -> t
+val is_properly_encoded : t -> bool
 
 module VarSet : CCSet.S with type elt = var
 module VarMap : CCMap.S with type key = var

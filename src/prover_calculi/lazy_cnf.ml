@@ -430,7 +430,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                 mk_or ~proof_cons ~rule_name [T.Form.not_ a; T.Form.not_ b] c i 
                 @ mk_or ~proof_cons ~rule_name [a; b] c i
                 )))
-        | T.AppBuiltin((ForallConst|ExistsConst) as hd, [f]) ->
+        | T.AppBuiltin((ForallConst|ExistsConst) as hd, [_; f]) ->
           let free_vars = T.Seq.vars f in
           let var_id = T.Seq.max_var (C.Seq.vars c) + 1 in
           let f = Combs.expand f in

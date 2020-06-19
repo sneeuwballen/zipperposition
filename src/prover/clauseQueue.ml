@@ -102,7 +102,7 @@ module Make(C : Clause_intf.S) = struct
   let unroll_logical_symbols t =
     let rec aux t = 
       match Term.view t with
-      | AppBuiltin((Builtin.ForallConst|Builtin.ExistsConst), [x]) ->
+      | AppBuiltin((Builtin.ForallConst|Builtin.ExistsConst), [_;x]) ->
         let var_ty = List.hd (fst (Type.open_fun (Term.ty x))) in
         let fresh_var = Term.var @@ HVar.fresh ~ty:var_ty () in
         let app_x = norm_app x fresh_var in

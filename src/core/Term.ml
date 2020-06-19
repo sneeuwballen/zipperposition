@@ -1374,6 +1374,28 @@ let rec normalize_bools t =
     if same_l l' l then t
     else app_builtin ~ty:(ty t) hd l'
 
+let rec is_properly_encoded t = match view t with
+  | Var _ | DB _ | Const _ -> true
+  | AppBuiltin (hd,l) when Builtin.equal hd Builtin.ForallConst 
+                        || Builtin.equal hd Builtin.ExistsConst ->
+    let res = begin match l with
+    | [tyarg] ->
+      Type.is_tType (ty tyarg)
+    | [tyarg; body] -> 
+      let t_ty = ty body in
+      let tyargs, ret_ty = Type.open_fun t_ty in
+      Type.is_tType (ty tyarg) && List.length tyargs = 1  &&
+      Type.equal (Type.of_term_unsafe (tyarg :> InnerTerm.t)) (List.hd tyargs) && 
+      Type.is_prop ret_ty
+    | _ -> false end in
+    (* if not res then CCFormat.printf "Failed for %a.\n" T.pp t; *)
+    res
+  | AppBuiltin(Builtin.(Eq|Neq), l) ->
+    List.length l >= 1 && Type.is_tType (ty (List.hd l))
+  | AppBuiltin(_,l) -> List.for_all is_properly_encoded l
+  | App (hd, l) -> List.for_all is_properly_encoded (hd::l)
+  | Fun (_,u) -> is_properly_encoded u
+
 let () =
   Options.add_opts [
     "--print-types", Arg.Set print_all_types, " print type annotations everywhere";

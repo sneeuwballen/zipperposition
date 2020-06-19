@@ -86,6 +86,7 @@ module Make(E : Env.S) = struct
   let[@inline] check_clause_ c = 
     if !_check_types then Env.C.check_types c;
     assert (Env.C.Seq.terms c |> Iter.for_all Term.DB.is_closed);
+    assert (Env.C.Seq.terms c |> Iter.for_all Term.is_properly_encoded);
     if not (Env.C.lits c |> Literals.vars_distinct) then (
       CCFormat.printf "Vars not distinct: @[%a@].@." Env.C.pp_tstp c;
       CCFormat.printf "proof:@[%a@].@." Proof.S.pp_normal (Env.C.proof c);
