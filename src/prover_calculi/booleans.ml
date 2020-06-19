@@ -849,7 +849,7 @@ let eager_cases_near stms =
     let rec aux p = 
       let p_ty = T.ty_exn p in
       match T.view p with 
-      | AppBuiltin(((Builtin.Neq|Builtin.Eq) as hd), [a;b]) when not (T.Ty.is_prop (T.ty_exn a)) ->
+      | AppBuiltin(((Builtin.Neq|Builtin.Eq) as hd), ([_;a;b]|[a;b])) when not (T.Ty.is_prop (T.ty_exn a)) ->
         let cons = if hd = Neq then T.Form.neq else T.Form.eq in
         begin match find_fool_subterm a with 
         | None ->

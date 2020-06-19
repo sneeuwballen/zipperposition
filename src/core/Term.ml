@@ -115,7 +115,8 @@ let var_of_int ~ty i =
 
 let builtin ~ty b = T.builtin ~ty:(ty : Type.t :> T.t) b
 
-let app_builtin ~ty b l = T.app_builtin ~ty:(ty : Type.t :> T.t) b l
+let app_builtin ~ty b l = 
+  T.app_builtin ~ty:(ty : Type.t :> T.t) b l
 
 let bvar ~ty i =
   assert (i >= 0);

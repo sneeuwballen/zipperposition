@@ -812,8 +812,15 @@ module Form = struct
     | AppBuiltin (Builtin.Imply, [a;b]) -> Imply(a,b)
     | AppBuiltin (Builtin.Equiv, [a;b]) -> Equiv(a,b)
     | AppBuiltin (Builtin.Xor, [a;b]) -> Xor(a,b)
-    | AppBuiltin (Builtin.Eq, [a;b]) -> Eq(a,b)
-    | AppBuiltin (Builtin.Neq, [a;b]) -> Neq(a,b)
+    | AppBuiltin (Builtin.(Eq|Neq) as hd, l) -> 
+      begin match l with 
+      | ([x]|[x;_]) ->
+        if not (Ty.is_tType (ty_exn x)) then (
+          invalid_arg "type argument missing for equality"
+        ) else (Atom t)
+      | [x;l;r] -> if hd = Builtin.Eq then Eq(l,r) else Neq(l,r)
+      | _ -> invalid_arg "equality encoded wrongly" 
+      end
     | Bind(Binder.Forall, v, t) -> Forall (v,t)
     | Bind(Binder.Exists, v, t) -> Exists (v,t)
     | Bind((Binder.ForallTy | Binder.Lambda), _, _) -> assert false
@@ -833,8 +840,8 @@ module Form = struct
   let true_ = builtin ~ty:Ty.prop Builtin.True
   let false_ = builtin ~ty:Ty.prop Builtin.False
   let atom t = t
-  let eq ?loc a b = app_builtin ?loc ~ty:Ty.prop Builtin.Eq [a;b]
-  let neq ?loc a b = app_builtin ?loc ~ty:Ty.prop Builtin.Neq [a;b]
+  let eq ?loc a b = app_builtin ?loc ~ty:Ty.prop Builtin.Eq [ty_exn a; a; b]
+  let neq ?loc a b = app_builtin ?loc ~ty:Ty.prop Builtin.Neq [ty_exn a; a; b]
   let equiv ?loc a b = app_builtin ?loc ~ty:Ty.prop Builtin.Equiv [a;b]
   let xor ?loc a b = app_builtin ?loc ~ty:Ty.prop Builtin.Xor [a;b]
   let ite = ite
