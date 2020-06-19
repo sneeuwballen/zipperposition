@@ -343,8 +343,8 @@ let e_sel8 ~ord lits =
       List.length (Type.expected_args (Term.ty (T.head_term l)))
     | _ -> 0  in
   let alpha_rank = function 
-    | Lit.Equation(l,_,_) as lit 
-      when Lit.is_predicate_lit lit && T.is_const (T.head_term l) -> 
+    | Lit.Equation(l,_,_) as lit when Lit.is_predicate_lit lit 
+        && Lit.is_pos lit &&  T.is_const (T.head_term l) -> 
       let hd = T.head_exn l in
       (match CCArray.bsearch ~cmp:ID.compare hd symbols with
        | `At idx -> idx
