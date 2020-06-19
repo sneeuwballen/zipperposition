@@ -292,6 +292,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         else T.app_builtin ~ty:(T.ty t) Builtin.Imply [p';c']
       )
     | AppBuiltin((Builtin.Eq | Builtin.Equiv) as hd, ([a;b]|[_;a;b])) ->
+      let cons = if hd = Builtin.Eq then T.Form.eq else T.Form.equiv in
       let a',b' = aux a, aux b in
       if T.equal a' b' then T.true_ 
       else if T.equal a' T.true_ then b'
@@ -300,9 +301,10 @@ module Make(E : Env.S) : S with module Env = E = struct
       else if T.equal b' T.false_ then aux (T.Form.not_ a')
       else (
         if T.equal a a' && T.equal b b' then t 
-        else T.app_builtin ~ty:(T.ty t) hd [a';b']
+        else cons a' b'
       )
     | AppBuiltin((Builtin.Neq | Builtin.Xor) as hd, ([a;b]|[_;a;b])) ->
+      let cons = if hd = Builtin.Neq then T.Form.neq else T.Form.xor in
       let a',b' = aux a, aux b in
       if T.equal a' b' then T.false_ 
       else if T.equal a' T.true_ then aux (T.Form.not_ b')
@@ -311,9 +313,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       else if T.equal b' T.false_ then a'
       else (
         if T.equal a a' && T.equal b b' then t 
-        else T.app_builtin ~ty:(T.ty t) hd [a';b']
+        else cons a' b'
       )
-    | AppBuiltin((ExistsConst|ForallConst) as b, [g]) ->
+    | AppBuiltin((ExistsConst|ForallConst) as b, [_;g]) ->
       let g' = aux g in
       let exp_g = Combs.expand g' in
       let _, body = T.open_fun exp_g in

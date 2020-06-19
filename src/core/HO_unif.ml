@@ -177,9 +177,9 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~signature ~offset 
           T.app_builtin ~ty:([o;o] ==> o) Builtin.And [],1;
           T.app_builtin ~ty:([o;o] ==> o) Builtin.Or [],1;
           T.app_builtin ~ty:([o] ==> o) Builtin.Not [],1;
-          T.app_builtin ~ty:([fresh_ty; fresh_ty] ==> o) Builtin.Eq [],1;
-          T.app_builtin ~ty:([[fresh_ty] ==> o] ==> o) Builtin.ForallConst [],1;
-          T.app_builtin ~ty:([[fresh_ty] ==> o] ==> o) Builtin.ExistsConst [],1;
+          T.app_builtin ~ty:([fresh_ty; fresh_ty] ==> o) Builtin.Eq [T.of_ty fresh_ty],1;
+          T.app_builtin ~ty:([[fresh_ty] ==> o] ==> o) Builtin.ForallConst [T.of_ty fresh_ty],1;
+          T.app_builtin ~ty:([[fresh_ty] ==> o] ==> o) Builtin.ExistsConst [T.of_ty fresh_ty],1;
         ] in
         
         List.fold_left (fun res (op,penalty) -> 

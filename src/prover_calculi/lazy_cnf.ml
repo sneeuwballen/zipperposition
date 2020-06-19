@@ -293,7 +293,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let get_quant t = 
         let t = Combs.expand t in
         match T.view t with
-        | T.AppBuiltin((ForallConst|ExistsConst) as b, [x]) ->
+        | T.AppBuiltin((ForallConst|ExistsConst) as b, [_;x]) ->
           let ty, body = T.open_fun x in
           assert(List.length ty = 1);
           Some (b, List.hd ty, [body])
@@ -343,7 +343,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       | Some (ExistsConst, ty, bodies) ->
         Some (T.Form.exists (T.fun_ ty (T.Form.or_l bodies)))
       | _ -> None end
-    | T.AppBuiltin(((ExistsConst|ForallConst) as b), [f]) when kind = `Mini ->
+    | T.AppBuiltin(((ExistsConst|ForallConst) as b), [_;f]) when kind = `Mini ->
       miniscope b f
     | _ -> None
 

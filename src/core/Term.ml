@@ -274,18 +274,16 @@ let as_app_mono t = match view t with
     assert(match view f with AppBuiltin _ -> false | _ -> true);
     let l1,l2 = CCList.partition is_type l in
     app f l1, l2 (* re-apply to type parameters *)
-  | AppBuiltin((Builtin.Eq | Builtin.Neq) as b, (x :: rest as l)) ->
-    let l = if is_type x then rest else l in
-    begin match l with
-    | y :: _ ->
-      let eq_ty = Type.arrow [ty y; ty y] Type.prop in
-      app_builtin ~ty:eq_ty b [], l
-    | [] ->
+  | AppBuiltin((Builtin.Eq | Builtin.Neq) as b, l) ->
+    begin match l with 
+    | [] -> assert false
+    | x :: _ -> 
       assert(is_type x);
       let eq_ty = 
         Type.arrow [Type.of_term_unsafe (x:>InnerTerm.t); 
                     Type.of_term_unsafe (x:>InnerTerm.t)] Type.prop in
-      app_builtin ~ty:eq_ty b [], [] end
+      app_builtin ~ty:eq_ty b [x], []
+    end
   | AppBuiltin(b, l) ->
     let ty_args, args = CCList.partition is_type l in
     let ty = Type.arrow (List.map ty args) (ty t) in 
@@ -470,7 +468,7 @@ let has_ho_subterm t =
 
 let close_quantifier b ty_args body =
   CCList.fold_right (fun ty acc -> 
-      app_builtin ~ty:Type.prop b [fun_ ty acc])
+      app_builtin ~ty:Type.prop b [(ty : Type.t :> T.t); fun_ ty acc])
     ty_args body
 
 let var_occurs ~var t =
@@ -915,11 +913,15 @@ module Form = struct
 
   let forall t =
     assert(Type.is_fun (ty t) && Type.returns_prop (ty t));
-    app_builtin ~ty:Type.prop Builtin.ForallConst [t]
+    let ty_args, ret_ty = Type.open_fun (ty t) in
+    assert(List.length ty_args = 1);
+    app_builtin ~ty:Type.prop Builtin.ForallConst [of_ty (List.hd ty_args); t]
 
   let exists t =
     assert(Type.is_fun (ty t) && Type.returns_prop (ty t));
-    app_builtin ~ty:Type.prop Builtin.ExistsConst [t]
+    let ty_args, ret_ty = Type.open_fun (ty t) in
+    assert(List.length ty_args = 1);
+    app_builtin ~ty:Type.prop Builtin.ExistsConst [of_ty (List.hd ty_args); t]
 
   let equiv f g =
     app_builtin ~ty:Type.prop Builtin.Equiv [f; g]
@@ -1223,7 +1225,7 @@ module Conv = struct
           decr depth;
           if CCOpt.is_some previous then PT.Var_tbl.replace tbl v (CCOpt.get_exn previous)
           else PT.Var_tbl.remove tbl v;
-          app_builtin ~ty:ty_b b [body])
+          app_builtin ~ty:ty_b b [of_ty ty_arg; body])
       | PT.Meta _
       | PT.Record _
       | PT.Ite _
@@ -1261,10 +1263,9 @@ module Conv = struct
       | App (f,l) ->
         ST.app ~ty:(aux_ty (ty t))
           (aux_t env f) (List.map (aux_t env) l)
-      | AppBuiltin (b,[body]) when Builtin.equal b Builtin.ForallConst ||
-                                   Builtin.equal b Builtin.ExistsConst ->
-        let b = if Builtin.equal b Builtin.ForallConst 
-          then Binder.Forall else Binder.Exists in
+      | AppBuiltin (b,[_;body]) when Builtin.equal b Builtin.ForallConst ||
+                                     Builtin.equal b Builtin.ExistsConst ->
+        let b = if Builtin.equal b Builtin.ForallConst then Binder.Forall else Binder.Exists in
         let ty_args, fun_body = open_fun body in 
 
         if is_true_or_false fun_body then (

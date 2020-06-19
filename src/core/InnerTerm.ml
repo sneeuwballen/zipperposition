@@ -321,14 +321,10 @@ let rec app_builtin ~ty b l =
     let my_t = make_ ~props ~ty:(HasType ty) (AppBuiltin (b,l)) in
     H.hashcons my_t
   | _ ->
-    let l = if Builtin.is_quantifier b then 
-        List.filter (fun t -> not @@ equal (ty_exn t) tType) l else l in
-    if Builtin.is_quantifier b  && CCList.length l > 1 then (
-      let err_msg = CCFormat.sprintf "wrong encoding of quants: %a %d" Builtin.pp b (List.length l) in
-      invalid_arg err_msg;
-    );
-    assert(not (Builtin.is_quantifier b && CCList.is_empty l) ||
-           List.length @@ fst @@ open_fun ty =1);
+    assert(not (List.mem b Builtin.[Eq;Neq;ForallConst;ExistsConst]) ||
+           List.length l >= 1 &&
+           is_a_type (List.hd l));
+
     let props = add_ty_vars (any_props_for_ts l) ty.props in
     let my_t = make_ ~props ~ty:(HasType ty) (AppBuiltin (b,l)) in
     H.hashcons my_t
