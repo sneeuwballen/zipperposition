@@ -2404,8 +2404,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       CCArray.fold_left (fun (neq_map, others) lit ->
         match lit with
         | Literal.Equation(lhs,rhs,sign) ->
-          (* based on the representation of the literals! *)
-          if sign && T.is_true_or_false rhs then (
+          (* NOTE: based on the representation of the literals! *)
+          if sign && T.is_true_or_false rhs && not (T.is_var lhs) then (
             let negate t = if T.equal t T.true_ then T.false_ else T.true_ in
             (T.Map.add lhs (negate rhs) neq_map, others)
           ) else if not sign then (
@@ -2422,7 +2422,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       
       let rec aux ~top t =
         match T.Map.get t neqs with
-        | Some t' when not restrict || not top -> aux ~top t'
+        | Some t' when not restrict || not top -> 
+          assert(Type.equal (T.ty t) (T.ty t'));
+          aux ~top t'
         | _ ->
           begin
             match T.view t with

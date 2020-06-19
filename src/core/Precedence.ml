@@ -483,8 +483,7 @@ let weight_arity0 ~signature =
   let max_sym = 
     Signature.Seq.symbols signature
     |> Iter.fold (fun acc sym -> 
-        let ar = snd @@ Signature.arity signature sym in
-        max_arity acc (sym,ar)
+        max_arity acc (sym,ID.id sym)
       ) None
     |> CCOpt.map fst in
   
@@ -492,7 +491,8 @@ let weight_arity0 ~signature =
     let res = 
       match max_sym with 
       | None -> get_arity ~sig_ref:_sig a + 1
-      | Some m_id -> if ID.equal m_id a then 0 else (get_arity ~sig_ref:_sig a + 1)
+      (* no access to the precedence, cannot compute max symbol -- cannot assign 0 *)
+      | Some m_id -> if ID.equal m_id a then 1 else (get_arity ~sig_ref:_sig a + 1)
     in
     Weight.int res
     

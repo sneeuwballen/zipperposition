@@ -213,14 +213,6 @@ quantified_formula:
 unitary_infix_formula:
   | f=unitary_formula { f }
   | l=unitary_atomic_formula op=infix_connective r=unitary_formula { op l r }
-  | LEFT_PAREN AND RIGHT_PAREN op=infix_connective r=unitary_formula { 
-    let loc = L.mk_pos $startpos $endpos in
-    let and_arg = PT.and_ ?loc:(Some loc) [] in
-    op and_arg r }
-  | l=unitary_atomic_formula op=infix_connective LEFT_PAREN AND RIGHT_PAREN { 
-    let loc = L.mk_pos $startpos $endpos in
-    let and_arg = PT.and_ ?loc:(Some loc) [] in
-    op l and_arg }
 
 unary_formula:
   | f=unitary_infix_formula { f }
@@ -238,16 +230,6 @@ unary_formula:
     {
      let loc = L.mk_pos $startpos $endpos in
      o ?loc:(Some loc) f
-    }
-  | LEFT_PAREN AND RIGHT_PAREN
-    {
-      let loc = L.mk_pos $startpos $endpos in
-      PT.and_ ?loc:(Some loc) []
-    }
-  | LEFT_PAREN VLINE RIGHT_PAREN
-    {
-      let loc = L.mk_pos $startpos $endpos in
-      PT.or_ ?loc:(Some loc) []
     }
   | EQUAL AT f1=unary_formula AT f2=unary_formula 
     {
@@ -279,16 +261,6 @@ nonassoc_binary_formula:
     {
       let loc = L.mk_pos $startpos $endpos in
       o ?loc:(Some loc) l r
-    }
-  | LEFT_PAREN AND RIGHT_PAREN AT l=unary_formula AT r=unary_formula
-    {
-      let loc = L.mk_pos $startpos $endpos in
-      PT.and_ ?loc:(Some loc) [l; r]
-    }
-  | LEFT_PAREN VLINE RIGHT_PAREN AT l=unary_formula AT r=unary_formula
-    {
-      let loc = L.mk_pos $startpos $endpos in
-      PT.or_ ?loc:(Some loc) [l; r]
     }
   | l=unary_formula o=binary_connective r=unary_formula
     {
@@ -507,6 +479,9 @@ atomic_defined_word:
   | IMPLYCONST { PT.builtin Builtin.Imply }
   | EXISTSCONST { PT.builtin Builtin.ExistsConst }
   | FORALLCONST { PT.builtin Builtin.ForallConst }
+  | LEFT_PAREN EQUAL RIGHT_PAREN {PT.builtin Builtin.Eq}
+  | LEFT_PAREN AND RIGHT_PAREN {PT.builtin Builtin.And}
+  | LEFT_PAREN VLINE RIGHT_PAREN {PT.builtin Builtin.Or}
   | WILDCARD { PT.wildcard }
 
 defined_ty:
