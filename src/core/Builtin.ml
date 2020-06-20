@@ -27,6 +27,7 @@ type t =
   | Term
   | ForallConst (** constant for simulating forall *)
   | ExistsConst (** constant for simulating exists *)
+  | ChoiceConst (** choice constant *)
   | Grounding (** used for inst-gen *)
   | TyInt
   | TyRat
@@ -121,6 +122,7 @@ let to_int_ = function
   | Greatereq -> 46
   | ForallConst -> 47
   | ExistsConst -> 48
+  | ChoiceConst -> 49
   | Grounding -> 50
   | Box_opaque -> 60
   | TyReal -> 70
@@ -201,6 +203,7 @@ let to_string s = match s with
   | Term -> "ι"
   | ForallConst -> "·∀"
   | ExistsConst -> "·∃"
+  | ChoiceConst -> "·ε"
   | Grounding -> "★"
   | TyInt -> "int"
   | TyRat -> "rat"
@@ -381,6 +384,7 @@ module TPTP = struct
     | Multiset -> failwith "cannot print this symbol in TPTP"
     | ForallConst -> "!!"
     | ExistsConst -> "??"
+    | ChoiceConst -> "$$choice"
     | Grounding -> "$$ground"
     | TyInt -> "$int"
     | TyRat -> "$rat"
@@ -435,6 +439,7 @@ module TPTP = struct
     | "$o" -> Prop
     | "!!" -> ForallConst
     | "??" -> ExistsConst
+    | "$$choice" -> ChoiceConst
     | "$int" -> TyInt
     | "$rat" -> TyRat
     | "$floor" -> Floor
@@ -727,6 +732,7 @@ module ZF = struct
     | Multiset -> failwith "cannot print this symbol in ZF"
     | ForallConst -> "!!"
     | ExistsConst -> "??"
+    | ChoiceConst -> "$choice"
     | Grounding -> "$$grounding"
     | TyInt -> "int"
     | TyRat -> "rat"
