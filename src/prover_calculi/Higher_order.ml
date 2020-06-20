@@ -657,7 +657,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
 
     let new_choice_op ty =
-      let choice_ty_name = "#_choice_" ^ 
+      (* let choice_ty_name = "#_choice_" ^ 
                            CCInt.to_string (CCRef.get_then_incr new_choice_counter) in
       let new_ch_id = ID.make choice_ty_name in
       let new_ch_const = T.const new_ch_id ~ty in
@@ -665,7 +665,14 @@ module Make(E : Env.S) : S with module Env = E = struct
       Util.debugf 1 "new choice for type %a: %a(%a).\n" 
         (fun k -> k Type.pp ty T.pp new_ch_const Type.pp (T.ty new_ch_const));
       choice_ops := Term.Map.add new_ch_const None !choice_ops;
-      new_ch_const in
+      new_ch_const in *)
+      assert (Type.is_fun ty);
+      let args,_ = Type.open_fun ty in
+      let alpha_to_prop = List.hd args in
+      assert(Type.is_fun alpha_to_prop);
+      let alpha = List.hd (fst (Type.open_fun alpha_to_prop)) in
+      let res = T.app_builtin Builtin.ChoiceConst ~ty [T.of_ty alpha] in
+      res in
 
     (* def_clause is the clause that defined the symbol hd *)
     let generate_instances ~def_clause hd arg =
