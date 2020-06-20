@@ -461,12 +461,12 @@ let add_neg_var state var =
   );
   Term.Tbl.add state.balance var (n - 1)
 
-let max_weak_reduction_length var_handler ~state t =
+let max_weak_reduction_length var_handler ~state orig_t =
   let rec aux t  = 
     match T.view t with
     | T.DB _ | T.Fun _ ->
       let err_msg = 
-        CCFormat.sprintf "lambdas should be removed:@[%a@]@." T.pp t in
+        CCFormat.sprintf "lambdas should be removed@.orig:@[%a@];subterm:@[%a@]@." T.pp orig_t T.pp t in
       invalid_arg err_msg
     | T.Const _ -> 0
     | T.Var _ ->
@@ -503,7 +503,7 @@ let max_weak_reduction_length var_handler ~state t =
     let t' = apply_rw_rules ~rules:narrow_rules t in
     assert (not @@ T.equal t' t);
     t'; in
-  aux t
+  aux orig_t
 
 let cmp_by_max_weak_r_len t1 t2 =
   let numvars = Iter.length (T.Seq.vars t1) + Iter.length (T.Seq.vars t2) in

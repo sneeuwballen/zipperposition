@@ -2398,7 +2398,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     ZProf.with_prof prof_demodulate demodulate_ c
 
   let local_rewrite c =
-    assert(Env.flex_get k_local_rw != `Off);
+    try
+      assert(Env.flex_get k_local_rw != `Off);
 
     let neqs, others =
       CCArray.fold_left (fun (neq_map, others) lit ->
@@ -2418,71 +2419,78 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       ) ((Term.Map.empty),[]) (C.lits c) in
     
     let normalize ~restrict ~neqs t =
-      let only_green_ctx = Env.flex_get k_local_rw == `GreenContext in
-      
-      let rec aux ~top t =
-        match T.Map.get t neqs with
-        | Some t' when not restrict || not top -> 
-          assert(Type.equal (T.ty t) (T.ty t'));
-          aux ~top t'
-        | _ ->
-          begin
-            match T.view t with
-            | T.App(hd, args) when not (T.is_var hd) || not only_green_ctx ->
-              let hd' = aux ~top:false hd in
-              let args' = List.map (aux ~top:false) args in
-              if T.equal hd hd' && T.same_l args args' then t
-              else aux ~top:false (T.app hd' args')
-            | T.AppBuiltin(hd, args) ->
-              let args' = List.map (aux ~top:false) args in
-              if T.same_l args args' then t
-              else aux ~top:false (T.app_builtin ~ty:(T.ty t) hd args')
-            | T.Fun _ when not only_green_ctx ->
-              let pref,body = T.open_fun t in
-              let body' = aux ~top:false body in
-              if T.equal body body' then t
-              else T.fun_l pref body'
-            | _ -> t (* do not rewrite under lambdas *)
-          end in
-      aux ~top:true t in
+        let only_green_ctx = Env.flex_get k_local_rw == `GreenContext in
+        
+        let rec aux ~top t =
+          (match T.Map.get t neqs with
+          | Some t' when not restrict || not top -> 
+            assert(Type.equal (T.ty t) (T.ty t'));
+            aux ~top t'
+          | _ ->
+            begin
+              match T.view t with
+              | T.App(hd, args) when not (T.is_var hd) || not only_green_ctx ->
+                let hd' = aux ~top:false hd in
+                let args' = List.map (aux ~top:false) args in
+                if T.equal hd hd' && T.same_l args args' then t
+                else aux ~top:false (T.app hd' args')
+              | T.AppBuiltin(hd, args) ->
+                let args' = List.map (aux ~top:false) args in
+                if T.same_l args args' then t
+                else aux ~top:false (T.app_builtin ~ty:(T.ty t) hd args')
+              | T.Fun _ when not only_green_ctx ->
+                let pref,body = T.open_fun t in
+                let body' = aux ~top:false body in
+                if T.equal body body' then t
+                else T.fun_l pref body'
+              | _ -> t (* do not rewrite under lambdas *)
+            end) in
+        aux ~top:true t in
 
-    let rewritten = ref false in
-    let new_lits =
-      CCArray.map (function
-      | Lit.Equation(lhs,rhs,sign) as l ->
-        if sign && T.is_true_or_false rhs then (
-          let lhs' = normalize ~restrict:true ~neqs lhs in
-          if not (T.equal lhs lhs') then (
-            rewritten := true;
-            Lit.mk_lit lhs' rhs sign
-          ) else l
-        ) else if not sign then (
-          let lhs', rhs' = 
-            match Ordering.compare ord lhs rhs with
-            | Gt -> normalize ~restrict:true ~neqs lhs, normalize ~restrict:false ~neqs rhs
-            | Lt -> normalize ~restrict:false ~neqs lhs, normalize ~restrict:true ~neqs rhs
-            | _ -> normalize ~restrict:false ~neqs lhs, normalize ~restrict:false ~neqs rhs 
-          in
-          if not (T.equal lhs lhs') || not (T.equal rhs rhs') then (
-            rewritten := true;
-            Lit.mk_lit lhs' rhs' sign
-          ) else l
-        ) else (
-          let lhs',rhs' = normalize ~restrict:false ~neqs lhs, normalize ~restrict:false ~neqs rhs in
-          if not (T.equal lhs lhs') || not (T.equal rhs rhs') then (
+      let rewritten = ref false in
+      let new_lits =
+        CCArray.map (function
+        | Lit.Equation(lhs,rhs,sign) as l ->
+          if sign && T.is_true_or_false rhs then (
+            let lhs' = normalize ~restrict:true ~neqs lhs in
+            if not (T.equal lhs lhs') then (
+              rewritten := true;
+              Lit.mk_lit lhs' rhs sign
+            ) else l
+          ) else if not sign then (
+            let lhs', rhs' = 
+              match Ordering.compare ord lhs rhs with
+              | Gt -> normalize ~restrict:true ~neqs lhs, normalize ~restrict:false ~neqs rhs
+              | Lt -> normalize ~restrict:false ~neqs lhs, normalize ~restrict:true ~neqs rhs
+              | _ -> normalize ~restrict:false ~neqs lhs, normalize ~restrict:false ~neqs rhs 
+            in
+            if not (T.equal lhs lhs') || not (T.equal rhs rhs') then (
               rewritten := true;
               Lit.mk_lit lhs' rhs' sign
-          ) else l
-        )
-      | x -> x) (C.lits c) in
-    if not !rewritten then SimplM.return_same c
-    else (
-      let new_lits = CCArray.to_list new_lits in
-      let proof = Proof.Step.simp [C.proof_parent c] ~rule:(Proof.Rule.mk "local_rewriting") in
-      let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
-      Util.debugf ~section 1 "local_rw(@[%a@]):@.@[%a@]@." (fun k -> k C.pp c C.pp new_c);
-      SimplM.return_new new_c
-    )
+            ) else l
+          ) else (
+            let lhs',rhs' = normalize ~restrict:false ~neqs lhs, normalize ~restrict:false ~neqs rhs in
+            if not (T.equal lhs lhs') || not (T.equal rhs rhs') then (
+                rewritten := true;
+                Lit.mk_lit lhs' rhs' sign
+            ) else l
+          )
+        | x -> x) (C.lits c) in
+      
+      if not !rewritten then SimplM.return_same c
+      else (
+        let new_lits = CCArray.to_list new_lits in
+        let proof = Proof.Step.simp [C.proof_parent c] ~rule:(Proof.Rule.mk "local_rewriting") in
+        let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
+        Util.debugf ~section 1 "local_rw(@[%a@]):@.@[%a@]@." (fun k -> k C.pp c C.pp new_c);
+        SimplM.return_new new_c
+      )
+    with Invalid_argument err ->
+      CCFormat.printf "err in local_rw:@[%s@]@." err;
+      CCFormat.printf "proof: @[%a@]@." Proof.S.pp_tstp (C.proof c);
+      CCFormat.printf "local_rw: @[%a@]@." C.pp c;
+      Format.print_flush ();
+      assert false
 
     
 

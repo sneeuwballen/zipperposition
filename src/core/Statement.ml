@@ -224,7 +224,9 @@ let conv_rule_i ~proof (r:_ def_rule) = match r with
         let rule = Rewrite.Term.Rule.make (Term.as_const_exn hd) ty args rhs ~proof in
         Rewrite.T_rule rule
       ) else invalid_arg "rhs must be a singleton list."
-    | _ -> invalid_arg "only positive polarity is supported."
+    | _ -> 
+      CCFormat.printf "@[%a@]@." (SLiteral.pp TST.pp) lhs;
+      invalid_arg "only positive polarity is supported."
 
 (* convert rules *)
 let conv_rules (l:_ def_rule list) proof : definition =

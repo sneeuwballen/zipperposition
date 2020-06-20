@@ -291,6 +291,20 @@ let expected_args t =
   | AppBuiltin(Builtin.Arrow, l) -> CCList.length l-1
   | _ -> 0
 
+let rec debugf out t = match view t with
+  | AppBuiltin (b,[]) -> Builtin.pp out b
+  | AppBuiltin (b,l) ->
+    Format.fprintf out "(@[<1>%a@ %a@])" Builtin.pp b (Util.pp_list debugf) l
+  | Var i -> HVar.pp out i
+  | DB i -> Format.fprintf out "Y%d" i
+  | Const s -> ID.pp out s
+  | App (_, []) -> assert false
+  | App (s, l) ->
+    Format.fprintf out "(@[<1>%a@ %a@])" debugf s (Util.pp_list debugf) l
+  | Bind (b, varty,t') ->
+    Format.fprintf out "(@[<1>%a@ %a@ %a@])"
+      Binder.pp b debugf varty debugf t'
+
 let rec app_builtin ~ty b l = 
   let prop = builtin ~ty:tType Builtin.prop in
   
@@ -321,9 +335,14 @@ let rec app_builtin ~ty b l =
     let my_t = make_ ~props ~ty:(HasType ty) (AppBuiltin (b,l)) in
     H.hashcons my_t
   | _ ->
-    assert(not (List.mem b Builtin.[Eq;Neq;ForallConst;ExistsConst]) ||
-           List.length l >= 1 &&
-           is_a_type (List.hd l));
+    assert (not (List.mem b Builtin.[Eq;Neq;ForallConst;ExistsConst]) ||
+            List.length l >= 1 &&
+            is_a_type (List.hd l));
+    let ty = 
+      if Builtin.is_quantifier b && List.length l = 2 then (
+        (* reassing the type if other parts of the code assigned it wrong *)
+        prop
+      ) else ty in
 
     let props = add_ty_vars (any_props_for_ts l) ty.props in
     let my_t = make_ ~props ~ty:(HasType ty) (AppBuiltin (b,l)) in
@@ -346,7 +365,7 @@ let app ~ty f l = match f.term, l with
     (* flatten *)
     let flattened = l1 @ l in
     let ty =
-      if Builtin.is_logical_op f1 then (
+      if Builtin.is_logical_op f1 && not (Builtin.is_quantifier f1) then (
         let prop = builtin ~ty:tType Builtin.Prop in
 
         let args,_ = open_fun ty in
@@ -445,20 +464,6 @@ module VarSet = CCSet.Make(HVarKey)
 module VarTbl = CCHashtbl.Make(HVarKey)
 
 (** {3 Basic Printer} *)
-
-let rec debugf out t = match view t with
-  | AppBuiltin (b,[]) -> Builtin.pp out b
-  | AppBuiltin (b,l) ->
-    Format.fprintf out "(@[<1>%a@ %a@])" Builtin.pp b (Util.pp_list debugf) l
-  | Var i -> HVar.pp out i
-  | DB i -> Format.fprintf out "Y%d" i
-  | Const s -> ID.pp out s
-  | App (_, []) -> assert false
-  | App (s, l) ->
-    Format.fprintf out "(@[<1>%a@ %a@])" debugf s (Util.pp_list debugf) l
-  | Bind (b, varty,t') ->
-    Format.fprintf out "(@[<1>%a@ %a@ %a@])"
-      Binder.pp b debugf varty debugf t'
 
 let[@inline] has_lambda t =
   get_property t.props f_has_lams

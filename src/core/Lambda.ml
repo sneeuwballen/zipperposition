@@ -41,11 +41,12 @@ module Inner = struct
       { st with head=f; args=List.rev_append l st.args; }
     | T.AppBuiltin (b, l) ->
       (* the arguments in [l] might contain variables *)
+      let ty_args, l = List.partition T.is_a_type l in
       let arg_tys = List.rev_map T.ty_exn l in
       let ret_ty = T.ty_exn st.head in
       let ty = T.arrow arg_tys ret_ty in
       let l = List.rev_map (eval_in_env_ st.env) l in
-      { st with head=T.app_builtin ~ty b []; args=List.rev_append l st.args; }
+      { st with head=T.app_builtin ~ty b ty_args; args=List.rev_append l st.args; }
     | _ -> st
 
   let st_of_term ~env ~ty t = {head=t; args=[]; env; ty; } |> normalize

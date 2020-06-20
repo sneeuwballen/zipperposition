@@ -315,7 +315,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         if T.equal a a' && T.equal b b' then t 
         else cons a' b'
       )
-    | AppBuiltin((ExistsConst|ForallConst) as b, [_;g]) ->
+    | AppBuiltin((ExistsConst|ForallConst) as b, [tyarg;g]) ->
       let g' = aux g in
       let exp_g = Combs.expand g' in
       let _, body = T.open_fun exp_g in
@@ -323,7 +323,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       if (T.Seq.subterms ~include_builtin:true body
           |> Iter.exists T.is_bvar) then (
         if T.equal g g' then t
-        else T.app_builtin ~ty:(T.ty t) b [g']
+        else T.app_builtin ~ty:(T.ty t) b [tyarg; g']
       ) else body
     | AppBuiltin(hd, args) ->
       let args' = List.map aux args in

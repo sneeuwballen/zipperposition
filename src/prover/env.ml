@@ -513,6 +513,7 @@ module Make(X : sig
     let open SimplM.Infix in
     fix_simpl c
       ~f:(fun c ->
+          ho_normalize c >>= fun c ->
           basic_simplify c >>= fun c ->
           (* first, rewrite terms *)
           ho_normalize c >>= fun c ->
@@ -563,7 +564,8 @@ module Make(X : sig
     let res = fix_simpl c
         ~f:(fun c ->
             let old_c = c in
-            basic_simplify c >>=
+            ho_normalize c >>=
+            basic_simplify >>=
             (* simplify with unit clauses, then all active clauses *)
             ho_normalize >>=
             rewrite >>=
@@ -635,7 +637,8 @@ module Make(X : sig
       fix_simpl c
         ~f:(fun c ->
             let old_c = c in
-            basic_simplify c >>=
+            ho_normalize c >>=
+            basic_simplify >>=
             (* simplify with unit clauses, then all active clauses *)
             ho_normalize >>=
             rewrite >>=

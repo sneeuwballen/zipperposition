@@ -935,7 +935,7 @@ let rec as_def ?loc ?of_ bound t =
       let lhs = SLiteral.of_form lhs in
       let pol = if op=Builtin.Equiv then `Equiv else `Imply in
       yield_prop lhs rhs pol
-    | T.AppBuiltin (Builtin.Eq, [lhs;rhs]) ->
+    | T.AppBuiltin (Builtin.Eq, [_;lhs;rhs]) ->
       check_vars_eqn ?loc bound lhs rhs;
       begin match T.view lhs with
         | T.Const id ->
