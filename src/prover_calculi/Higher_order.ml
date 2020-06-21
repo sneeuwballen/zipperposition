@@ -387,8 +387,8 @@ module Make(E : Env.S) : S with module Env = E = struct
                       skolem_decls := sk :: !skolem_decls;
                       res) arg_types in
                   T.app lhs skolems, T.app rhs skolems) in
-                Literal.mk_neq lhs rhs)
-            ) (C.lits c |> Array.mapi (fun j x -> (j,x)) |> Array.to_list) in
+                Literal.mk_neq lhs rhs))
+              (C.lits c |> Array.mapi (fun j x -> (j,x)) |> Array.to_list) in
           declare_skolems !skolem_decls;
           let proof =
             Proof.Step.inference [C.proof_parent c] 

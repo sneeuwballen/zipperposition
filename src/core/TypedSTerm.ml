@@ -812,11 +812,12 @@ module Form = struct
     | AppBuiltin (Builtin.Imply, [a;b]) -> Imply(a,b)
     | AppBuiltin (Builtin.Equiv, [a;b]) -> Equiv(a,b)
     | AppBuiltin (Builtin.Xor, [a;b]) -> Xor(a,b)
-    | AppBuiltin (Builtin.(Eq|Neq) as hd, l) -> 
+    | AppBuiltin (Builtin.(Eq|Neq) as hd, l) when Ty.is_prop (ty_exn t) -> 
       begin match l with 
       | ([x]|[x;_]) ->
         if not (Ty.is_tType (ty_exn x)) then (
-          invalid_arg "type argument missing for equality"
+          let args = CCFormat.sprintf "@[%a@]" (CCList.pp (pp) ) l in
+          invalid_arg ("type argument missing for equality: " ^ args)
         ) else (Atom t)
       | [x;l;r] -> if hd = Builtin.Eq then Eq(l,r) else Neq(l,r)
       | _ -> invalid_arg "equality encoded wrongly" 
@@ -840,8 +841,12 @@ module Form = struct
   let true_ = builtin ~ty:Ty.prop Builtin.True
   let false_ = builtin ~ty:Ty.prop Builtin.False
   let atom t = t
-  let eq ?loc a b = app_builtin ?loc ~ty:Ty.prop Builtin.Eq [ty_exn a; a; b]
-  let neq ?loc a b = app_builtin ?loc ~ty:Ty.prop Builtin.Neq [ty_exn a; a; b]
+  let eq ?loc a b = 
+    assert (not (is_tType (ty_exn a)));
+    app_builtin ?loc ~ty:Ty.prop Builtin.Eq [ty_exn a; a; b]
+  let neq ?loc a b = 
+    assert (not (is_tType (ty_exn a)));
+    app_builtin ?loc ~ty:Ty.prop Builtin.Neq [ty_exn a; a; b]
   let equiv ?loc a b = app_builtin ?loc ~ty:Ty.prop Builtin.Equiv [a;b]
   let xor ?loc a b = app_builtin ?loc ~ty:Ty.prop Builtin.Xor [a;b]
   let ite = ite

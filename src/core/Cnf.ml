@@ -393,7 +393,7 @@ module Flatten = struct
         aux pos vars (T.app_builtin ~ty:T.Ty.prop Builtin.Less [ty;b;a])
       | T.AppBuiltin (Builtin.Greatereq, [ty;a;b]) when T.equal T.Ty.rat (T.ty_exn a) ->
         aux pos vars (T.app_builtin ~ty:T.Ty.prop Builtin.Lesseq [ty;b;a])
-      | T.AppBuiltin (Builtin.Neq, [a;b]) when T.equal T.Ty.rat (T.ty_exn a) ->
+      | T.AppBuiltin (Builtin.Neq, [_;a;b]) when T.equal T.Ty.rat (T.ty_exn a) ->
         (* rat: a!=b -> a<b ∨ a>b *)
         aux Pos_toplevel vars a >>= fun a ->
         aux Pos_toplevel vars b >|= fun b ->
@@ -402,11 +402,11 @@ module Flatten = struct
               T.app_builtin ~ty:T.Ty.prop Builtin.Less [b; a];
             ]
         in aux_maybe_define ~should_define pos f
-      | T.AppBuiltin (Builtin.Eq, ([_;a;b]|[a;b])) when not lazy_cnf && T.Ty.is_prop (T.ty_exn a)  ->
+      | T.AppBuiltin (Builtin.Eq, ([_;a;b])) when not lazy_cnf && T.Ty.is_prop (T.ty_exn a)  ->
         (* converting equality to equivalence to ensure better CNF (that is better renaming)
            when lazy cnf is off *)
         (F.equiv <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
-      | T.AppBuiltin (Builtin.Eq, [a;b])
+      | T.AppBuiltin (Builtin.Eq, [_;a;b])
         (* when either of a and b are formulas, and they contain HO subterms
            it is better not to replace Lambda with Forall.
            
@@ -419,12 +419,12 @@ module Flatten = struct
           (fun k->k T.pp t T.pp t');
         assert (vars_forall<>[]);
         aux pos vars t'
-      | T.AppBuiltin (Builtin.Neq, ([_;a;b]|[a;b])) when not lazy_cnf && T.Ty.is_prop (T.ty_exn a)  ->
+      | T.AppBuiltin (Builtin.Neq, ([_;a;b])) when not lazy_cnf && T.Ty.is_prop (T.ty_exn a)  ->
         (F.xor <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
-      | T.AppBuiltin (Builtin.Eq, [a;b]) ->
+      | T.AppBuiltin (Builtin.Eq, [_;a;b]) ->
         (F.eq <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
       (* >|= aux_maybe_define ~should_define pos *)
-      | T.AppBuiltin (Builtin.Neq, [a;b]) 
+      | T.AppBuiltin (Builtin.Neq, [_;a;b]) 
         when  (T.is_fun a || T.is_fun b)  && not lazy_cnf ->
         (* turn [f ≠ λx. t] into [∃x. f x≠t] *)
         let vars_exist, a, b = complete_eq a b in
@@ -433,7 +433,7 @@ module Flatten = struct
           (fun k->k T.pp t T.pp t');
         assert (vars_exist<>[]);
         aux pos vars t'
-      | T.AppBuiltin (Builtin.Neq, [a;b]) ->
+      | T.AppBuiltin (Builtin.Neq, [_;a;b]) ->
         (F.neq <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
       (* >|= aux_maybe_define pos *)
       | T.AppBuiltin (Builtin.Imply, [a;b]) ->

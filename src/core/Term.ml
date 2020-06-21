@@ -1358,7 +1358,7 @@ let rec normalize_bools t =
     if same_l l sorted then t
     else app_builtin ~ty:Type.prop b sorted
   | AppBuiltin((Builtin.Eq|Builtin.Neq|Builtin.Xor|Builtin.Equiv) as b, ([_;x;y] as l) )
-  | AppBuiltin((Builtin.Eq|Builtin.Neq|Builtin.Xor|Builtin.Equiv) as b, ([x;y] as l)) -> 
+  | AppBuiltin((Builtin.Eq|Builtin.Neq|Builtin.Xor|Builtin.Equiv) as b, ([x;y] as l)) when not (is_type x) -> 
     let rec swap_last_two l = match l with
       | [] | [_] -> l
       | [x;y] -> [y;x]

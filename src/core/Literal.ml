@@ -1135,10 +1135,10 @@ module Conv = struct
         T.Conv.to_simple_term ctx l  
       | SLiteral.Eq(l,r) ->
         let l,r = CCPair.map_same (T.Conv.to_simple_term ctx) (l,r) in
-        TypedSTerm.app_builtin ~ty:TypedSTerm.Ty.prop Builtin.Eq [l;r]
+        TypedSTerm.Form.eq l r
       | SLiteral.Neq(l,r) ->
         let l,r = CCPair.map_same (T.Conv.to_simple_term ctx) (l,r) in
-        TypedSTerm.app_builtin ~ty:TypedSTerm.Ty.prop Builtin.Neq [l;r]
+        TypedSTerm.Form.neq l r
       | SLiteral.True -> TypedSTerm.Form.true_
       | SLiteral.False -> TypedSTerm.Form.false_
     end

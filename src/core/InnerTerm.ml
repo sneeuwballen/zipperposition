@@ -335,9 +335,12 @@ let rec app_builtin ~ty b l =
     let my_t = make_ ~props ~ty:(HasType ty) (AppBuiltin (b,l)) in
     H.hashcons my_t
   | _ ->
-    assert (not (List.mem b Builtin.[Eq;Neq;ForallConst;ExistsConst]) ||
+    if not (not (List.mem b Builtin.[Eq;Neq;ForallConst;ExistsConst]) ||
             List.length l >= 1 &&
-            is_a_type (List.hd l));
+            is_a_type (List.hd l)) then (
+      CCFormat.printf "wrong: @[%a@](@[%a@])@." Builtin.pp b (CCList.pp debugf) l;
+      assert false;
+    );
     let ty = 
       if Builtin.is_quantifier b && List.length l = 2 then (
         (* reassing the type if other parts of the code assigned it wrong *)
