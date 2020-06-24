@@ -81,7 +81,7 @@ let trivial lits t =
 
 let _apply_subst subst (lits, sc) =
   let renaming = Subst.Renaming.create () in
-  Array.map (fun lit -> Literal.apply_subst_no_simp renaming subst (lit, sc)) lits
+  Array.map (fun lit -> Literal.apply_subst renaming subst (lit, sc)) lits
 
 let apply {lits; var; _} t =
   let var = (var : T.var :> InnerTerm.t HVar.t) in

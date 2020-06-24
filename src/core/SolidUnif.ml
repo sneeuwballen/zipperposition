@@ -453,9 +453,11 @@ module Make (St : sig val st : Flex_state.t end) = struct
             Builtin.equal hd_s hd_t &&
             List.length args_s' + List.length args_s = 
             List.length args_t' + List.length args_t ->
-          let args_lhs, args_rhs = 
-            Unif.norm_logical_disagreements hd_s (args_s'@args_s) (args_t'@args_t) in
-          unify ~subst ~counter ~scope @@ build_constraints args_lhs args_rhs rest
+          (try 
+            let args_lhs, args_rhs = 
+              Unif.norm_logical_disagreements hd_s (args_s'@args_s) (args_t'@args_t) in
+            unify ~subst ~counter ~scope @@ build_constraints args_lhs args_rhs rest
+          with Unif.Fail -> raise NotUnifiable)
         | T.Const f , T.Const g when ID.equal f g && List.length args_s = List.length args_t ->
           unify ~subst ~counter ~scope @@ build_constraints args_s args_t rest
         | T.DB i, T.DB j when i = j && List.length args_s = List.length args_t ->

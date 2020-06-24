@@ -3815,6 +3815,7 @@ let _solid_subsumption = ref false
 
 let _skip_multiplier = ref 2.0
 let _imit_first = ref false
+let _unif_logop_mode = ref `Pragmatic
 let _max_depth = ref 2
 let _max_rigid_imitations = ref 2
 let _max_app_projections = ref 1
@@ -3898,6 +3899,7 @@ let register ~sup =
   E.flex_add PragUnifParams.k_max_inferences !_max_infs;
   E.flex_add PragUnifParams.k_skip_multiplier !_skip_multiplier;
   E.flex_add PragUnifParams.k_imit_first !_imit_first;
+  E.flex_add PragUnifParams.k_logop_mode !_unif_logop_mode;
   E.flex_add PragUnifParams.k_max_depth !_max_depth;
   E.flex_add PragUnifParams.k_max_rigid_imitations !_max_rigid_imitations;
   E.flex_add PragUnifParams.k_max_app_projections !_max_app_projections;
@@ -4007,6 +4009,10 @@ let () =
             else if (String.equal "pragmatic-framework" str) then `NewJPPragmatic
             else invalid_arg "unknown argument")), "set the level of HO unification";
       "--ho-imitation-first",Arg.Bool (fun v -> _imit_first:=v), " Use imitation rule before projection rule";
+      "--ho-unif-logop-mode",Arg.Symbol (["conservative"; "pragmatic"; "off"], 
+        (function | "conservative" -> _unif_logop_mode := `Conservative
+                  | "pragmatic" -> _unif_logop_mode := `Pragmatic
+                  | _ -> _unif_logop_mode := `Off)), " Choose level of AC reasoning on logical symbols in unification algorithm";
       "--ho-unif-max-depth", Arg.Set_int _max_depth, " set pragmatic unification max depth";
       "--ho-max-app-projections", Arg.Set_int _max_app_projections, " set maximal number of functional type projections";
       "--ho-max-elims", Arg.Set_int _max_elims, " set maximal number of eliminations";
@@ -4040,6 +4046,7 @@ let () =
   Params.add_to_mode "ho-complete-basic" (fun () ->
       _use_simultaneous_sup := false;
       _local_rw := `GreenContext;
+      _unif_logop_mode := `Conservative;
       _sup_at_vars := true;
       _sup_in_var_args := false;
       _sup_under_lambdas := false;
@@ -4090,7 +4097,8 @@ let () =
   Params.add_to_mode "fo-complete-basic" (fun () ->
       _use_simultaneous_sup := false;
       _arg_cong := false;
-      _local_rw := `GreenContext
+      _local_rw := `GreenContext;
+      _unif_logop_mode := `Conservative
     );
   Params.add_to_modes 
     [ "lambda-free-intensional"
@@ -4100,6 +4108,7 @@ let () =
     ; "lambda-free-purify-extensional"] (fun () ->
     _use_simultaneous_sup := false;
     _sup_in_var_args := true;
+    _unif_logop_mode := `Conservative;
     _demod_in_var_args := true;
     _local_rw := `GreenContext;
     _dupsup := false;

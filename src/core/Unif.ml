@@ -9,8 +9,9 @@ module US = Unif_subst
 
 exception Fail
 
-let norm_logical_disagreements b args args' : _ list * _ list =
-  assert(List.length args = List.length args');
+let norm_logical_disagreements ?(mode=`Conservative) b args args' : _ list * _ list =
+  assert (not @@ CCList.is_empty args);
+  assert (not @@ CCList.is_empty args');
   let sort =
     CCList.sort (fun t1 t2 ->
       let (<?>) = CCOrd.(<?>) in
@@ -35,13 +36,54 @@ let norm_logical_disagreements b args args' : _ list * _ list =
       <?> (CCInt.compare, Term.hash t1, Term.hash t2))  in
 
   if Builtin.is_flattened_logical b then (
-    let a_set, a'_set = CCPair.map_same Term.Set.of_list (args,args') in
-    let uniq_a, uniq_a' = Term.Set.diff a_set a'_set, Term.Set.diff a'_set a_set in
-    let args, args' =
-      if Term.Set.cardinal uniq_a = Term.Set.cardinal uniq_a' then
-        CCPair.map_same Term.Set.to_list (uniq_a, uniq_a')
-      else args, args' in
-    sort args, sort args')
+    match mode with 
+    | `Conservative ->
+      if List.length args > List.length args' then (
+        let n = List.length args' in
+        let a_main, a_rest = CCList.take_drop (n-1) args in
+        let a'_main, a'_rest = CCList.take_drop (n-1) args' in
+        assert(List.length a'_rest = 1);
+        Term.app_builtin ~ty:Type.prop b a_rest :: (a_main),
+        a'_rest @ (a'_main)
+      ) else if  (List.length args' > List.length args) then (
+        let n = List.length args in
+        let a_main, a_rest = CCList.take_drop (n-1) args in
+        let a'_main, a'_rest = CCList.take_drop (n-1) args' in
+        assert(List.length a_rest = 1);
+        Term.app_builtin ~ty:Type.prop b a'_rest :: (a'_main),
+        a_rest @ (a_main)
+      ) else (args, args')
+    | `Pragmatic ->
+      let a_set, a'_set = CCPair.map_same Term.Set.of_list (args,args') in
+      let uniq_a, uniq_a' = Term.Set.diff a_set a'_set, Term.Set.diff a'_set a_set in
+        (* if both lists are empty, then the terms are logically equivalent *)
+        if Term.Set.is_empty uniq_a && Term.Set.is_empty uniq_a' then ([],[])
+        else if Term.Set.is_empty uniq_a || Term.Set.is_empty uniq_a' then (
+          (* if one list is empty, but the other one is not, then 
+             we have extra arguments in one of the lists -- not unifiable*)
+          raise Fail
+        ) else if Term.Set.cardinal uniq_a > Term.Set.cardinal uniq_a' then (
+          let n = Term.Set.cardinal uniq_a' in
+          let (a,a') = CCPair.map_same 
+            (fun s -> sort @@ Term.Set.to_list s) (uniq_a, uniq_a') in
+          let a_main, a_rest = CCList.take_drop (n-1) a in
+          let a'_main, a'_rest = CCList.take_drop (n-1) a' in
+          assert(List.length a'_rest = 1);
+          Term.app_builtin ~ty:Type.prop b a_rest :: (a_main),
+          a'_rest @ (a'_main)
+        ) else if Term.Set.cardinal uniq_a' > Term.Set.cardinal uniq_a then (
+          let n = Term.Set.cardinal uniq_a in
+          let (a,a') = CCPair.map_same 
+            (fun s -> sort @@ Term.Set.to_list s) (uniq_a, uniq_a') in
+          let a_main, a_rest = CCList.take_drop (n-1) a in
+          let a'_main, a'_rest = CCList.take_drop (n-1) a' in
+          assert(List.length a_rest = 1);
+          Term.app_builtin ~ty:Type.prop b a'_rest :: (a'_main),
+          a_rest @ (a_main)
+        ) else CCPair.map_same (fun s -> sort @@ Term.Set.to_list s) (uniq_a, uniq_a')
+    | `Off ->
+      if List.length args = List.length args' then (args,args') else raise Fail
+    )
   else (args, args')
 
 let norm_logical_inner b args args' = 

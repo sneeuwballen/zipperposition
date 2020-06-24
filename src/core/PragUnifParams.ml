@@ -5,6 +5,7 @@ let k_max_rigid_imitations = Flex_state.create_key ()
 let k_max_identifications = Flex_state.create_key ()
 let k_max_elims           = Flex_state.create_key ()
 let k_imit_first = Flex_state.create_key ()
+let k_logop_mode : ([< `Conservative | `Pragmatic | `Off ] Flex_state.key) = Flex_state.create_key ()
 
 let k_pattern_decider = Flex_state.create_key ()
 let k_solid_decider = Flex_state.create_key ()

@@ -197,10 +197,12 @@ module Make (S : sig val st : Flex_state.t end) = struct
         begin match T.view r with 
           | AppBuiltin(b', args') 
             when Builtin.equal b b' && List.length args = List.length args' ->
-            let args, args' = Unif.norm_logical_disagreements b args args' in
-            List.fold_left 
-              (fun subst (l',r') ->  aux subst l' r') 
-              subst (List.combine args args')
+            (try 
+              let args, args' = Unif.norm_logical_disagreements b args args' in
+              List.fold_left 
+                (fun subst (l',r') ->  aux subst l' r') 
+                subst (List.combine args args')
+             with Unif.Fail -> raise SolidMatchFail)
           | _ -> raise SolidMatchFail end
       | App(hd, args) when T.is_var hd -> 
         refine_subst_w_term subst (T.as_var_exn hd) (cover r args)

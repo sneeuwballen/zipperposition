@@ -60,7 +60,7 @@ let no_prop_invariant =
 
 
 let compare l1 l2 =
-  assert(List.for_all no_prop_invariant [l1;l2]);
+  (* assert(List.for_all no_prop_invariant [l1;l2]); *)
   let __to_int = function
     | False -> 0
     | True -> 1
@@ -236,7 +236,7 @@ let rec mk_lit a b sign =
       | None -> Equation (a,b,sign)
       | Some lit -> lit
     end
-  | _ ->  Equation (a, b, sign)
+  | _ -> Equation (a, b, sign)
 
 and mk_num_eq t u sign =
   let open CCOpt in
@@ -537,7 +537,7 @@ let apply_subst_no_simp renaming subst (lit,sc) =
   | Int o -> Int (Int_lit.apply_subst_no_simp renaming subst (o,sc))
   | Rat o -> Rat (Rat_lit.apply_subst_no_simp renaming subst (o,sc))
   | Equation (l,r,sign) ->
-    mk_lit (S.FO.apply renaming subst (l,sc)) (S.FO.apply renaming subst (r,sc)) sign
+    Equation ((S.FO.apply renaming subst (l,sc)), (S.FO.apply renaming subst (r,sc)), sign)
   | True
   | False -> lit
 
@@ -832,7 +832,7 @@ module Comp = struct
 
   (* maximal terms of the literal *)
   let max_terms ~ord lit =
-    assert(no_prop_invariant lit);
+    (* assert(no_prop_invariant lit); *)
     match lit with
     | Equation (l, r, _) when is_predicate_lit lit ->
       let l = Lambda.whnf l in
