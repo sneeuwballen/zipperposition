@@ -212,10 +212,11 @@ module Make (P : PARAMETERS) = struct
               else OSeq.empty
             | T.AppBuiltin(b1, args1), T.AppBuiltin(b2, args2) ->
               let args_lhs = args_lhs @ args1 and args_rhs = args_rhs @ args2 in
-              if Builtin.equal b1 b2 && List.length args_lhs = List.length args_rhs then (
-                try 
+              if Builtin.equal b1 b2 then (
+                try
+                  let mode = Flex_state.get_exn PragUnifParams.k_logop_mode P.flex_state in
                   let args_lhs, args_rhs = 
-                    Unif.norm_logical_disagreements b1 args_lhs args_rhs in
+                    Unif.norm_logical_disagreements ~mode b1 args_lhs args_rhs in
                   decompose_and_cont (args_lhs) (args_rhs) rest flag subst
                 with Unif.Fail -> OSeq.empty
               ) else OSeq.empty
@@ -303,6 +304,7 @@ module Make (P : PARAMETERS) = struct
 
   let unify_scoped t0s t1s =
     let lhs,rhs,unifscope,subst = P.identify_scope t0s t1s in
+
     let bind_cnt = ref 0 in
     try
       OSeq.append 

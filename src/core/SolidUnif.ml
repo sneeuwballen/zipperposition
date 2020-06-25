@@ -453,9 +453,10 @@ module Make (St : sig val st : Flex_state.t end) = struct
             Builtin.equal hd_s hd_t &&
             List.length args_s' + List.length args_s = 
             List.length args_t' + List.length args_t ->
-          (try 
+          (try
+            let mode = Flex_state.get_exn PragUnifParams.k_logop_mode St.st in
             let args_lhs, args_rhs = 
-              Unif.norm_logical_disagreements hd_s (args_s'@args_s) (args_t'@args_t) in
+              Unif.norm_logical_disagreements ~mode hd_s (args_s'@args_s) (args_t'@args_t) in
             unify ~subst ~counter ~scope @@ build_constraints args_lhs args_rhs rest
           with Unif.Fail -> raise NotUnifiable)
         | T.Const f , T.Const g when ID.equal f g && List.length args_s = List.length args_t ->

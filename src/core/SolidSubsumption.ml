@@ -196,9 +196,10 @@ module Make (S : sig val st : Flex_state.t end) = struct
       | AppBuiltin(b, args) ->
         begin match T.view r with 
           | AppBuiltin(b', args') 
-            when Builtin.equal b b' && List.length args = List.length args' ->
-            (try 
-              let args, args' = Unif.norm_logical_disagreements b args args' in
+            when Builtin.equal b b' ->
+            (try
+              let mode = Flex_state.get_exn PragUnifParams.k_logop_mode S.st in
+              let args, args' = Unif.norm_logical_disagreements ~mode b args args' in
               List.fold_left 
                 (fun subst (l',r') ->  aux subst l' r') 
                 subst (List.combine args args')

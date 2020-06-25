@@ -10,8 +10,6 @@ module US = Unif_subst
 exception Fail
 
 let norm_logical_disagreements ?(mode=`Conservative) b args args' : _ list * _ list =
-  assert (not @@ CCList.is_empty args);
-  assert (not @@ CCList.is_empty args');
   let sort =
     CCList.sort (fun t1 t2 ->
       let (<?>) = CCOrd.(<?>) in
@@ -36,6 +34,9 @@ let norm_logical_disagreements ?(mode=`Conservative) b args args' : _ list * _ l
       <?> (CCInt.compare, Term.hash t1, Term.hash t2))  in
 
   if Builtin.is_flattened_logical b then (
+    assert (not @@ CCList.is_empty args);
+    assert (not @@ CCList.is_empty args');
+
     match mode with 
     | `Conservative ->
       if List.length args > List.length args' then (
@@ -82,6 +83,7 @@ let norm_logical_disagreements ?(mode=`Conservative) b args args' : _ list * _ l
           a_rest @ (a_main)
         ) else CCPair.map_same (fun s -> sort @@ Term.Set.to_list s) (uniq_a, uniq_a')
     | `Off ->
+      CCFormat.printf "off@.";
       if List.length args = List.length args' then (args,args') else raise Fail
     )
   else (args, args')
@@ -700,7 +702,7 @@ module Inner = struct
         delay ~tags () (* push pair as a constraint, because of typing. *)
       | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when 
           Builtin.equal s1 s2 ->
-        let l1,l2 = if sc1 = sc2 && List.length l1 = List.length l2 then (norm_logical_inner s1 l1 l2) else l1, l2 in
+        let l1,l2 = if sc1 = sc2 then (norm_logical_inner s1 l1 l2) else l1, l2 in
         unif_list  ~op ~bvars subst l1 sc1 l2 sc2
       | _, _ -> raise Fail
     end

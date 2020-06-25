@@ -1352,7 +1352,7 @@ let rec normalize_bools t =
     let hd' = normalize_bools hd and  args' = List.map normalize_bools args in
     if equal hd hd' && same_l args args' then t
     else app hd' args'
-  | AppBuiltin((Builtin.And|Builtin.Or) as b, l) -> 
+  | AppBuiltin((Builtin.And|Builtin.Or) as b, l) ->
     let l' = List.map normalize_bools l in
     let sorted = List.fast_sort weight_cmp l' in
     if same_l l sorted then t

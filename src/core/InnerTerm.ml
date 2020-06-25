@@ -305,8 +305,21 @@ let rec debugf out t = match view t with
     Format.fprintf out "(@[<1>%a@ %a@ %a@])"
       Binder.pp b debugf varty debugf t'
 
+let flatten_and_or b l =
+  let rec aux acc = function 
+    | [] -> List.rev acc
+    | x :: xs ->
+      match view x with 
+      | AppBuiltin(b', ys) when Builtin.equal b b' ->
+        aux acc (ys @ xs)
+      | _ -> aux (x::acc) xs 
+  in
+  if Builtin.is_flattened_logical b then aux [] l
+  else l
+
 let rec app_builtin ~ty b l = 
   let prop = builtin ~ty:tType Builtin.prop in
+  let l = flatten_and_or b l in
   
   match b, l with
   | Builtin.Arrow, [] -> assert false
@@ -335,12 +348,9 @@ let rec app_builtin ~ty b l =
     let my_t = make_ ~props ~ty:(HasType ty) (AppBuiltin (b,l)) in
     H.hashcons my_t
   | _ ->
-    if not (not (List.mem b Builtin.[Eq;Neq;ForallConst;ExistsConst]) ||
+    assert (not (List.mem b Builtin.[Eq;Neq;ForallConst;ExistsConst]) ||
             List.length l >= 1 &&
-            is_a_type (List.hd l)) then (
-      CCFormat.printf "wrong: @[%a@](@[%a@])@." Builtin.pp b (CCList.pp debugf) l;
-      assert false;
-    );
+            is_a_type (List.hd l));
     let ty = 
       if Builtin.is_quantifier b && List.length l = 2 then (
         (* reassing the type if other parts of the code assigned it wrong *)
@@ -365,8 +375,7 @@ let app ~ty f l = match f.term, l with
     let my_t = make_ ~props ~ty:(HasType ty) (App (f1,flattened)) in
     H.hashcons my_t
   | AppBuiltin (f1, l1), _ ->
-    (* flatten *)
-    let flattened = l1 @ l in
+    let t_args = flatten_and_or f1 l1 @ l in
     let ty =
       if Builtin.is_logical_op f1 && not (Builtin.is_quantifier f1) then (
         let prop = builtin ~ty:tType Builtin.Prop in
@@ -375,16 +384,16 @@ let app ~ty f l = match f.term, l with
         if List.length args > 0 then (
           ty
         ) else if Builtin.is_logical_binop f1 then (
-          if List.length flattened >= 2 then prop
-          else (if List.length flattened = 1 then arrow [prop] prop
+          if List.length t_args >= 2 then prop
+          else (if List.length t_args = 1 then arrow [prop] prop
                 else arrow [prop;prop] prop)
         ) else (
-          if List.length flattened = 1 then prop
+          if List.length t_args = 1 then prop
           else arrow [prop] prop
         ))
       else ty in
-    let props = add_ty_vars (any_props_for_ts flattened) ty.props in
-    let my_t = make_ ~props ~ty:(HasType ty) (AppBuiltin (f1,flattened)) in
+    let props = add_ty_vars (any_props_for_ts t_args) ty.props in
+    let my_t = make_ ~props ~ty:(HasType ty) (AppBuiltin (f1,t_args)) in
     H.hashcons my_t
   | _ ->
     let props = add_ty_vars (any_props_for_ts (f :: l)) ty.props in
