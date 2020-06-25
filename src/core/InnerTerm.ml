@@ -327,14 +327,6 @@ let rec app_builtin ~ty b l =
   | Builtin.Arrow, ({term=AppBuiltin(Builtin.Arrow, ret::l1); _} :: l2) ->
     (* flatten *)
     app_builtin ~ty Builtin.Arrow (ret :: l2 @ l1)
-  (* will be simplified in a special proof step -- 
-     in certain cases (superposition) it eagerly simplifies the term
-     and destroys its structure *)
-  (* | Builtin.Not, [{term=AppBuiltin(Builtin.Not,[t]); _}] -> t
-  | Builtin.Not, [{term=AppBuiltin(Builtin.True,[]); _}] ->
-    app_builtin ~ty Builtin.False []
-  | Builtin.Not, [{term=AppBuiltin(Builtin.False,[]); _}] ->
-    app_builtin ~ty Builtin.True [] *)
   | Builtin.Not, [] ->
     let ty = app_builtin ~ty:tType Builtin.arrow [prop;prop] in
     let my_t = make_ ~props:zero ~ty:(HasType ty) (AppBuiltin (b,[])) in
