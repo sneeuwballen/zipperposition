@@ -60,6 +60,7 @@ module Make(X : PARAMETERS) = struct
   let compare t1 t2 = Ordering.compare !_ord t1 t2
 
   let select lits = !_select lits
+  let bool_select lits = !_b_select lits
 
   let lost_completeness () =
     if !_complete then Util.debug ~section:Const.section 1 "completeness is lost";

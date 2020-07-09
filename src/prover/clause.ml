@@ -42,6 +42,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     sclause : sclause;
     mutable penalty: int; (** heuristic penalty *)
     selected : BV.t Lazy.t; (** bitvector for selected lits*)
+    bool_selected : (Term.t * Position.t) list Lazy.t;
     max_lits : int list Lazy.t; (** bitvector for maximal lits *)
     mutable proof : proof_step; (** Proof of the clause *)
     mutable eligible_res: BV.t option; (* eligible for resolution? *)
@@ -105,7 +106,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let comes_from_goal c = CCOpt.is_some @@ distance_to_goal c
 
   (* private function for building clauses *)
-  let create_inner ~penalty ~selected sclause proof =
+  let create_inner ~penalty ~selected ~bool_selected sclause proof =
     (* create the structure *)
     let ord = Ctx.ord () in
     let max_lits = lazy ( BV.to_list @@ Lits.maxlits sclause.lits ~ord ) in
@@ -113,6 +114,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       sclause;
       penalty;
       selected;
+      bool_selected;
       proof;
       max_lits;
       eligible_res=None;
@@ -123,7 +125,8 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let of_sclause ?(penalty=1) c proof =
     let selected = lazy (Ctx.select c.lits) in
-    create_inner ~penalty ~selected c proof
+    let bool_selected = lazy (Ctx.bool_select c.lits) in
+    create_inner ~penalty ~selected ~bool_selected c proof
 
   let lit_is_false_ = function
     | Literal.False -> true
@@ -137,7 +140,8 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       else lits
     in
     let selected = lazy (Ctx.select lits) in
-    create_inner ~penalty ~selected (SClause.make ~trail lits) proof
+    let bool_selected = lazy (Ctx.bool_select lits) in
+    create_inner ~penalty ~selected ~bool_selected (SClause.make ~trail lits) proof
 
   let create ~penalty ~trail lits proof =
     (* let lits = List.fast_sort (fun l1 l2 -> -CCInt.compare (Lit.hash l1) (Lit.hash l2)) lits in *)
@@ -175,7 +179,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let update_trail f c =
     let sclause = SClause.update_trail f c.sclause in
-    create_inner sclause c.proof ~selected:c.selected ~penalty:c.penalty
+    create_inner sclause c.proof ~selected:c.selected ~bool_selected:c.bool_selected ~penalty:c.penalty
 
   let proof_step c = c.proof
 

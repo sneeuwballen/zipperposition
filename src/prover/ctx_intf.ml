@@ -27,6 +27,7 @@ module type S = sig
   (** Compare two terms *)
 
   val select : Selection.t
+  val bool_select : Bool_selection.t
 
   val lost_completeness : unit -> unit
   (** To be called when completeness is not preserved *)
