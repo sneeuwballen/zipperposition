@@ -9,12 +9,9 @@ open Logtk
     selects positions in the clause that are non-interpreted 
     Boolean subterms. *)
 
-type t = Literal.t array -> Position.t list
+type t = Literal.t array -> (Term.t * Position.t) list
 
 type parametrized = strict:bool -> ord:Ordering.t -> t
-
-val no_select : t
-(** Never select Boolean subterms *)
 
 (** {2 Selection Functions} *)
 
