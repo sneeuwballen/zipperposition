@@ -19,6 +19,7 @@ module type PARAMETERS = sig
   val signature : Signature.t
   val ord : Ordering.t
   val select : Selection.t
+  val bool_select : Bool_selection.t
   val sk_ctx : Skolem.ctx
 
 end
@@ -30,6 +31,7 @@ end
 module Make(X : PARAMETERS) = struct
   let _ord = ref X.ord
   let _select = ref X.select
+  let _b_select = ref X.bool_select
   let _signature = ref X.signature
   let _complete = ref true
   let _sk_ctx = ref X.sk_ctx

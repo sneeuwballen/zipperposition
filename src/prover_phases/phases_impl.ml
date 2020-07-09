@@ -240,17 +240,19 @@ let compute_ord_select precedence =
   let ord = Ordering.by_name !(params.Params.ord) precedence in
   Util.debugf ~section 2 "@[<2>ordering %s@]" (fun k->k (Ordering.name ord));
   let select = Selection.from_string ~ord params.Params.select in
+  let bool_select = Bool_selection.from_string ~ord params.Params.bool_select in
   do_extensions ~field:(fun e->e.Extensions.ord_select_actions)
     ~x:(ord,select) >>= fun () ->
   Util.debugf ~section 2 "@[<2>selection function:@ %s@]" (fun k->k params.Params.select);
-  Phases.return_phase (ord, select)
+  Phases.return_phase (ord, select, bool_select)
 
-let make_ctx ~signature ~ord ~select ~sk_ctx () =
+let make_ctx ~signature ~ord ~select ~bool_select ~sk_ctx () =
   Phases.start_phase Phases.MakeCtx >>= fun () ->
   let module Res = struct
     let signature = signature
     let ord = ord
     let select = select
+    let bool_select = bool_select
     let sk_ctx = sk_ctx
   end in
   let module MyCtx = Ctx.Make(Res) in
@@ -512,11 +514,11 @@ let process_file ?(prelude=Iter.empty) file =
   let signature = Statement.signature ~conj_syms:conj_syms (CCVector.to_seq stmts) in
   compute_prec ~signature (CCVector.to_seq stmts) >>= fun precedence ->
   Util.debugf ~section 1 "@[<2>precedence:@ @[%a@]@]" (fun k->k Precedence.pp precedence);
-  compute_ord_select precedence >>= fun (ord, select) ->
+  compute_ord_select precedence >>= fun (ord, select, bool_select) ->
   (* HO *)
   Phases.get_key Params.key >>= fun params ->
   (* build the context and env *)
-  make_ctx ~signature ~ord ~select ~sk_ctx () >>= fun ctx ->
+  make_ctx ~signature ~ord ~select ~bool_select ~sk_ctx () >>= fun ctx ->
   make_env ~params ~ctx stmts >>= fun (Phases.Env_clauses (env,clauses)) ->
   (* main workload *)
   has_goal_ := has_goal; (* FIXME: should be computed at Env initialization *)

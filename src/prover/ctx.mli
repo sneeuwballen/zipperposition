@@ -16,6 +16,7 @@ module type PARAMETERS = sig
   val signature : Signature.t
   val ord : Ordering.t
   val select : Selection.t
+  val bool_select : Bool_selection.t
   val sk_ctx : Skolem.ctx
 end
 
