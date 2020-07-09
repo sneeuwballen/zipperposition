@@ -230,7 +230,8 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let eligible_res (c,sc) subst =
     let ord = Ctx.ord () in
     let selected = Lazy.force c.selected in
-    if BV.is_empty selected
+    let bool_selected = Lazy.force c.bool_selected in
+    if BV.is_empty selected && CCList.is_empty bool_selected
     then (
       (* maximal literals *)
       if not @@ Subst.is_empty subst then (
@@ -287,7 +288,8 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       are eligible for paramodulation. *)
   let eligible_param (c,sc) subst =
     let ord = Ctx.ord () in
-    if BV.is_empty (Lazy.force c.selected) then (
+    if BV.is_empty (Lazy.force c.selected) && 
+       CCList.is_empty (Lazy.force c.bool_selected) then (
       let bv, lits' = 
         if not @@ Subst.is_empty subst then (
           let lits' = _apply_subst_no_simpl subst (lits c,sc) in
@@ -305,6 +307,8 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     &&
     BV.is_empty (Lazy.force c.selected)
     &&
+    CCList.is_empty (Lazy.force c.bool_selected)
+    &&
     is_maxlit (c,sc) subst ~idx
 
   (** are there selected literals in the clause? *)
@@ -315,6 +319,8 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   (** Indexed list of selected literals *)
   let selected_lits c = BV.selecti (Lazy.force c.selected) c.sclause.lits
+
+  let bool_selected c  = Lazy.force c.bool_selected
 
   (** is the clause a unit clause? *)
   let is_unit_clause c = match c.sclause.lits with
