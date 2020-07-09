@@ -127,4 +127,4 @@ let all =
 let () =
   let set_bselect s = Params.bool_select := s in
   Params.add_opts
-    [ "--select", Arg.Symbol (all(), set_bselect), " set boolean literal selection function"];
+    [ "--bool-select", Arg.Symbol (all(), set_bselect), " set boolean literal selection function"];
