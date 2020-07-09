@@ -4086,7 +4086,7 @@ let () =
 
   Params.add_to_mode "ho-complete-basic" (fun () ->
       _use_simultaneous_sup := false;
-      _local_rw := `GreenContext;
+      (* _local_rw := `GreenContext; *)
       _sup_at_vars := true;
       _sup_in_var_args := false;
       _sup_under_lambdas := false;
@@ -4104,7 +4104,7 @@ let () =
       _sup_in_var_args := false;
       _sup_under_lambdas := false;
       _lambda_demod := false;
-      _local_rw := `AnyContext;
+      (* _local_rw := `AnyContext; *)
       _demod_in_var_args := false;
       _complete_ho_unification := true;
       _unif_alg := `NewJPPragmatic;
@@ -4128,7 +4128,7 @@ let () =
       _demod_in_var_args := false;
       _complete_ho_unification := true;
       _unif_alg := `NewJPFull;
-      _local_rw := `AnyContext;
+      (* _local_rw := `AnyContext; *)
       _sup_at_var_headed := true;
       _lambdasup := -1;
       _dupsup := false;
@@ -4137,7 +4137,7 @@ let () =
   Params.add_to_mode "fo-complete-basic" (fun () ->
       _use_simultaneous_sup := false;
       _arg_cong := false;
-      _local_rw := `GreenContext
+      (* _local_rw := `GreenContext *)
     );
   Params.add_to_modes 
     [ "lambda-free-intensional"
@@ -4148,7 +4148,7 @@ let () =
     _use_simultaneous_sup := false;
     _sup_in_var_args := true;
     _demod_in_var_args := true;
-    _local_rw := `GreenContext;
+    (* _local_rw := `GreenContext; *)
     _dupsup := false;
     _complete_ho_unification := false;
     _lambdasup := -1;
