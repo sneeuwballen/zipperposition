@@ -378,6 +378,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     _idx_sup_into :=
       Lits.fold_terms ~vars:sup_at_vars ~var_args:sup_in_var_args ~fun_bodies:sup_under_lambdas 
         ~ty_args:false ~ord ~which:`Max ~subterms:true  ~eligible:(C.Eligible.res c) (C.lits c)
+      |> Iter.append (CCList.to_iter @@ C.eligible_for_bool_infs c)
       |> Iter.filter (fun (t, _) ->
           (* Util.debugf ~section 3 "@[ Filtering vars %a,1  @]" (fun k-> k T.pp t); *)
           (not (T.is_var t) || T.is_ho_var t))
@@ -399,6 +400,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Lits.fold_terms ~vars:true ~var_args:false ~fun_bodies:false
           ~ty_args:false ~ord ~which:`Max ~subterms:true
           ~eligible:(C.Eligible.res c) (C.lits c)
+        (* TODO(BOOL): How is this going to be extended for Boolean reasoning? *)
         |> Iter.filter (fun (t, _) -> is_fluid_or_deep c t) 
         |> Iter.fold
           (fun tree (t, pos) ->
@@ -412,6 +414,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Lits.fold_terms ~vars:true ~var_args:false ~fun_bodies:false
           ~ty_args:false ~ord ~which:`Max ~subterms:true
           ~eligible:(C.Eligible.res c) (C.lits c)
+        (* TODO(BOOL): How is this going to be extended for Boolean reasoning? *)
         |> Iter.filter (fun (t, pos) ->
           match T.view t with
           | T.Var _ -> has_bad_occurence_elsewhere c t pos
@@ -429,6 +432,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false
           ~ty_args:false ~ord ~which:`Max ~subterms:true
           ~eligible:(C.Eligible.res c) (C.lits c)
+        (* TODO(BOOL): How is this going to be extended for Boolean reasoning? *)
         |> Iter.filter (fun (t, _) -> 
             T.is_var (T.head_term t) && not (CCList.is_empty @@ T.args t)
             && Type.is_ground (T.ty t)) (* Only applied variables *)
@@ -879,7 +883,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         O.compare ord s' t' = Comp.Lt ||
         not (Lit.Pos.is_max_term ~ord passive_lit' passive_lit_pos) ||
         not (BV.get (C.eligible_res (info.passive, sc_p) subst) passive_idx) ||
-        not (Type.is_prop ((T.ty info.u_p)) && passive_at_top) ||
+        not (Type.is_prop ((T.ty info.u_p)) && not passive_at_top) ||
         not (C.is_eligible_param (info.active, sc_a) subst ~idx:active_idx)
       ) then (
         raise (ExitSuperposition (Format.sprintf "bad ordering conditions"))
@@ -1047,7 +1051,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         O.compare ord s' t' = Comp.Lt ||
         not (Lit.Pos.is_max_term ~ord passive_lit' passive_lit_pos) ||
         not (BV.get (C.eligible_res (info.passive, sc_p) subst) passive_idx) ||
-        not (Type.is_prop ((T.ty info.u_p)) && passive_at_top) ||
+        not (Type.is_prop ((T.ty info.u_p)) && not passive_at_top) ||
         not (C.is_eligible_param (info.active, sc_a) subst ~idx:active_idx)
       ) then raise (ExitSuperposition "bad ordering conditions");
       (* Check for superposition at a variable *)
@@ -1178,6 +1182,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ~fun_bodies:(Env.flex_get k_sup_under_lambdas) 
         ~subterms:true ~ord ~which:`Max ~eligible ~ty_args:false 
         (C.lits clause)
+      |> Iter.append (CCList.to_iter (C.eligible_for_bool_infs clause))
       |> Iter.filter (fun (u_p, _) -> not (T.is_var u_p) || T.is_ho_var u_p)
       |> Iter.filter (fun (u_p, _) -> T.DB.is_closed u_p)
       |> Iter.filter (fun (u_p, _) -> 
@@ -3811,7 +3816,7 @@ let _max_infs = ref (-1)
 let ext_rules_max_depth = ref (-1)
 let ext_rules_kind = ref (`Off)
 
-let _ext_dec_lits = ref `OnlyMax
+let _ext_dec_lits = ref `All
 let _unif_alg = ref `NewJPFull
 let _unif_level = ref `Full
 let _ground_subs_check = ref 0

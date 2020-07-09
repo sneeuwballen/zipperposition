@@ -273,6 +273,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     end
 
   let eligible_for_bool_infs c =
+    let module PB = Position.Build in
     let starting_positions = 
       Lazy.force c.bool_selected
       |> List.map (fun (_, pos) -> Position.Build.of_pos pos) 
@@ -281,8 +282,16 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       eligible_res_no_subst c
       |> BV.to_list
       |> CCList.flat_map (fun idx ->
-        [Position.Build.left (Position.Build.arg idx Position.Build.empty);
-         Position.Build.right (Position.Build.arg idx Position.Build.empty)])
+          match (lits c).(idx) with
+          | Equation(lhs,rhs,_) ->
+            begin 
+              match Ordering.compare (Ctx.ord ()) lhs rhs with
+              | Comparison.Lt -> [PB.right (PB.arg idx PB.empty)]
+              | Comparison.Gt -> [PB.left (PB.arg idx PB.empty)]
+              | _ -> [PB.right (PB.arg idx PB.empty);
+                      PB.left (PB.arg idx PB.empty)]
+            end
+          | _ -> [])
     in
     Lazy.force c.bool_selected 
     @
