@@ -272,6 +272,29 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
         bv
     end
 
+  let eligible_for_bool_infs c =
+    let starting_positions = 
+      Lazy.force c.bool_selected
+      |> List.map (fun (_, pos) -> Position.Build.of_pos pos) 
+    in
+    let resolution_positions =
+      eligible_res_no_subst c
+      |> BV.to_list
+      |> CCList.flat_map (fun idx ->
+        [Position.Build.left (Position.Build.arg idx Position.Build.empty);
+         Position.Build.right (Position.Build.arg idx Position.Build.empty)])
+    in
+    Lazy.force c.bool_selected 
+    @
+    CCList.flat_map (fun pb -> 
+      let pos = Position.Build.to_pos pb in
+      let t = Literals.Pos.at (lits c) pos in
+      (* selects --subterms-- of given t that can be selected *)
+      Bool_selection.all_selectable_subterterms ~pos_builder:pb t
+      |> Iter.to_list
+      |> List.map (fun (s, p') -> s, Position.append pos p')) 
+    (starting_positions @ resolution_positions)
+
   let eta_reduce c =
     let lit_arr = lits c in
     let changed = ref false in

@@ -170,6 +170,13 @@ module type S = sig
       is positive, no literal is selecteed, and the literal
       is maximal among literals of [subst(clause)]. *)
 
+  val eligible_for_bool_infs : t -> (Term.t * Position.t) list
+  (** 
+    List that contains terms and positions in which boolean inferences can be
+    performed. Those are selected boolean terms (and their subterms), 
+    all boolean subterms of terms eligible for resolution
+  *)
+
   val is_eligible_param : t Scoped.t -> Subst.t -> idx:int -> bool
   (** Check whether the [idx]-th literal is eligible for paramodulation *)
 

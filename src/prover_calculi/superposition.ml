@@ -780,8 +780,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let active_idx = Lits.Pos.idx info.active_pos in
     let shift_vars = if info.sup_kind = LambdaSup then 0 else -1 in
     let passive_idx, passive_lit_pos = Lits.Pos.cut info.passive_pos in
+    let passive_at_top = 
+      passive_lit_pos == (P.Left P.Stop)|| passive_lit_pos == (P.Right P.Stop) 
+    in
+
     assert(Array.for_all Literal.no_prop_invariant (C.lits info.passive));
-    assert(Array.for_all Literal.no_prop_invariant (C.lits info.passive));
+    assert(Array.for_all Literal.no_prop_invariant (C.lits info.active));
     try
       Util.debugf ~section 3 
         "@[<2>sup, kind %s@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a@]@])@ \
@@ -875,14 +879,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         O.compare ord s' t' = Comp.Lt ||
         not (Lit.Pos.is_max_term ~ord passive_lit' passive_lit_pos) ||
         not (BV.get (C.eligible_res (info.passive, sc_p) subst) passive_idx) ||
+        not (Type.is_prop ((T.ty info.u_p)) && passive_at_top) ||
         not (C.is_eligible_param (info.active, sc_a) subst ~idx:active_idx)
       ) then (
-        let c1 = O.compare ord s' t' = Comp.Lt in
-        let c2 = not (Lit.Pos.is_max_term ~ord passive_lit' passive_lit_pos) in
-        let c3 = not (BV.get (C.eligible_res (info.passive, sc_p) subst) passive_idx) in
-        let c4 = not (C.is_eligible_param (info.active, sc_a) subst ~idx:active_idx) in
-
-        raise (ExitSuperposition (Format.sprintf "bad ordering conditions %b %b %b %b" c1 c2 c3 c4))
+        raise (ExitSuperposition (Format.sprintf "bad ordering conditions"))
         );
       (* Check for superposition at a variable *)
       if info.sup_kind != FluidSup then
@@ -1018,6 +1018,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             info.sup_kind = DupSup || not (T.is_var (T.head_term info.u_p)));
     let active_idx = Lits.Pos.idx info.active_pos in
     let passive_idx, passive_lit_pos = Lits.Pos.cut info.passive_pos in
+    let passive_at_top = 
+      passive_lit_pos == (P.Left P.Stop)|| passive_lit_pos == (P.Right P.Stop) 
+    in
     let shift_vars = if info.sup_kind = LambdaSup then 0 else -1 in
     try
       let renaming = S.Renaming.create () in
@@ -1044,6 +1047,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         O.compare ord s' t' = Comp.Lt ||
         not (Lit.Pos.is_max_term ~ord passive_lit' passive_lit_pos) ||
         not (BV.get (C.eligible_res (info.passive, sc_p) subst) passive_idx) ||
+        not (Type.is_prop ((T.ty info.u_p)) && passive_at_top) ||
         not (C.is_eligible_param (info.active, sc_a) subst ~idx:active_idx)
       ) then raise (ExitSuperposition "bad ordering conditions");
       (* Check for superposition at a variable *)

@@ -2,7 +2,8 @@
 open Logtk
 
 module Lit = Literal
-module PB = Position.Build
+module Pos = Position
+module PB = Pos.Build
 module BIn = Builtin
 module T = Term
 
@@ -10,7 +11,7 @@ module T = Term
     selects positions in the clause that are non-interpreted 
     Boolean subterms. *)
 
-type t = Literal.t array -> (Term.t * Position.t) list
+type t = Literal.t array -> (Term.t * Pos.t) list
 
 type parametrized = strict:bool -> ord:Ordering.t -> t
 
@@ -53,20 +54,8 @@ let select_leftmost ~kind lits =
   in
   CCOpt.map_or ~default:[] (fun x -> [x]) (aux_lits 0)
 
-let get_all_selectable lits = 
-  let open CCOpt in
-  
-  let rec aux_lits idx k =
-    if idx < Array.length lits then (
-      let pos_builder = PB.arg idx (PB.empty) in
-      match lits.(idx) with
-      | Lit.Equation (lhs,rhs,_) ->
-        aux_term ~top:true ~pos_builder:(PB.left pos_builder) lhs k;
-        aux_term ~top:true ~pos_builder:(PB.right pos_builder) rhs k;
-        aux_lits (idx+1) k
-      | _ -> aux_lits (idx+1) k
-    );
-  and aux_term ~top ~pos_builder t k =
+let all_selectable_subterterms ~pos_builder t k =
+  let rec aux_term ~top ~pos_builder t k =
     if can_be_selected top t then (k (t, PB.to_pos pos_builder));
 
     match T.view t with
@@ -80,7 +69,22 @@ let get_all_selectable lits =
     | [] -> ()
     | x :: xs ->
       (aux_term ~top:false ~pos_builder:(PB.arg idx pos_builder) x k);
-      (aux_term_args ~idx:(idx+1) ~pos_builder xs k) 
+      (aux_term_args ~idx:(idx+1) ~pos_builder xs k) in
+  aux_term ~top:true ~pos_builder t k
+
+let get_all_selectable lits = 
+  let open CCOpt in
+  
+  let rec aux_lits idx k =
+    if idx < Array.length lits then (
+      let pos_builder = PB.arg idx (PB.empty) in
+      match lits.(idx) with
+      | Lit.Equation (lhs,rhs,_) ->
+        all_selectable_subterterms ~pos_builder:(PB.left pos_builder) lhs k;
+        all_selectable_subterterms ~pos_builder:(PB.right pos_builder) rhs k;
+        aux_lits (idx+1) k
+      | _ -> aux_lits (idx+1) k
+    )
     in
   aux_lits 0
 
