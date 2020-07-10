@@ -293,18 +293,31 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
             end
           | _ -> [])
     in
-    (* directly at position of selected booleans *)
-    Lazy.force c.bool_selected 
-    @
-    (* below selected literals and selected booleans *)
-    CCList.flat_map (fun pb -> 
-      let pos = Position.Build.to_pos pb in
-      let t = Literals.Pos.at (lits c) pos in
-      (* selects --subterms-- of given t that can be selected *)
-      Bool_selection.all_selectable_subterms ~ord:(Ctx.ord()) ~pos_builder:pb t
-      |> Iter.to_list
-      |> List.map (fun (s, p') -> s, Position.append pos p')) 
-    (starting_positions @ resolution_positions)
+    let res = 
+      (* directly at position of selected booleans *)
+      Lazy.force c.bool_selected 
+      @
+      (* below selected literals and selected booleans *)
+      CCList.flat_map (fun pb -> 
+        let pos = Position.Build.to_pos pb in
+        let t = Literals.Pos.at (lits c) pos in
+        (* selects --subterms-- of given t that can be selected *)
+        Bool_selection.all_selectable_subterms ~ord:(Ctx.ord()) ~pos_builder:pb t
+        |> Iter.to_list) 
+      (starting_positions @ resolution_positions)
+      |> CCList.sort_uniq ~cmp:(fun (_,p1) (_,p2) -> Position.compare p1 p2)
+    in
+
+    if CCList.is_empty res then (
+      Util.debugf 3 "nothing selected for @[%a@]@." (fun k -> k Lits.pp (lits c));
+    ) else (
+      Util.debugf 3 "For @[%a@]@." (fun k -> k Lits.pp (lits c));
+      CCList.iter (fun (t,p) -> 
+        Util.debugf 3 "  |@[%a@] -> @[%a@]@." (fun k -> k Position.pp p T.pp t);
+      ) res;
+    );
+
+    res
 
   let eta_reduce c =
     let lit_arr = lits c in

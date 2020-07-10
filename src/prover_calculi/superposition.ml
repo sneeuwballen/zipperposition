@@ -452,6 +452,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           ~which:`Max ~subterms:true
           ~eligible:(C.Eligible.res c) (C.lits c)
         (* We are going only under lambdas *)
+        (* TODO(BOOL): Maybe add bool stuff to LambdaSup *)
         |> Iter.filter_map (fun (t, p) ->
             if not (T.is_fun t) then None
             else (let tyargs, body = T.open_fun t in
@@ -883,7 +884,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         O.compare ord s' t' = Comp.Lt ||
         not (Lit.Pos.is_max_term ~ord passive_lit' passive_lit_pos) ||
         not (BV.get (C.eligible_res (info.passive, sc_p) subst) passive_idx) ||
-        not (Type.is_prop ((T.ty info.u_p)) && not passive_at_top) ||
+        not (Type.is_prop (T.ty info.u_p) && not passive_at_top) ||
         not (C.is_eligible_param (info.active, sc_a) subst ~idx:active_idx)
       ) then (
         raise (ExitSuperposition (Format.sprintf "bad ordering conditions"))
@@ -1051,7 +1052,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         O.compare ord s' t' = Comp.Lt ||
         not (Lit.Pos.is_max_term ~ord passive_lit' passive_lit_pos) ||
         not (BV.get (C.eligible_res (info.passive, sc_p) subst) passive_idx) ||
-        not (Type.is_prop ((T.ty info.u_p)) && not passive_at_top) ||
+        not (Type.is_prop (T.ty info.u_p) && not passive_at_top) ||
         not (C.is_eligible_param (info.active, sc_a) subst ~idx:active_idx)
       ) then raise (ExitSuperposition "bad ordering conditions");
       (* Check for superposition at a variable *)
