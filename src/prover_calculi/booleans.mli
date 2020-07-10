@@ -8,7 +8,8 @@ open Logtk
 val _quant_rename : bool ref
 
 type reasoning_kind    = 
-    BoolReasoningDisabled | BoolCasesInference | BoolCasesDisabled 
+    BoolReasoningDisabled | BoolCasesInference | BoolCasesDisabled
+  | BoolHoist
   | BoolCasesSimplification | BoolCasesKeepParent
   | BoolCasesPreprocess
 

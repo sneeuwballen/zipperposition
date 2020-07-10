@@ -34,7 +34,7 @@ let select_leftmost ~ord ~kind lits =
           | Comparison.Lt ->
             (aux_term ~top:true ~pos_builder:(PB.right pos_builder) rhs)
           | Comparison.Gt ->
-            (aux_term ~top:true ~pos_builder:(PB.left pos_builder) rhs)
+            (aux_term ~top:true ~pos_builder:(PB.left pos_builder) lhs)
           | _ ->
             (aux_term ~top:true ~pos_builder:(PB.left pos_builder) lhs)
               <+>
@@ -46,11 +46,14 @@ let select_leftmost ~ord ~kind lits =
     match T.view t with
     | T.App(_, args)
     | T.AppBuiltin(_, args) ->
-      let in_args = aux_term_args args ~idx:0 ~pos_builder in
-      if CCOpt.is_some in_args && kind == `Inner then in_args
-      else if can_be_selected ~top t then (Some (t, PB.to_pos pos_builder))
-      else None
-    | T.Const _ when can_be_selected ~top t-> Some (t, PB.to_pos pos_builder)
+      let inner = aux_term_args args ~idx:0 ~pos_builder in
+      let outer =
+        if not (can_be_selected ~top t) then None
+        else Some (t, PB.to_pos pos_builder) 
+      in
+      if kind == `Inner then inner <+> outer
+      else outer <+> inner
+    | T.Const _ when can_be_selected ~top t -> Some (t, PB.to_pos pos_builder)
     | _ -> None
   and aux_term_args ~idx ~pos_builder = function
   | [] -> None
@@ -61,16 +64,14 @@ let select_leftmost ~ord ~kind lits =
   in
   CCOpt.map_or ~default:[] (fun x -> [x]) (aux_lits 0)
 
-let all_selectable_subterterms ~ord ~pos_builder t k =
+let all_selectable_subterms ~ord ~pos_builder t k =
   let rec aux_term ~top ~pos_builder t k =
     if can_be_selected top t then (k (t, PB.to_pos pos_builder));
 
     match T.view t with
-    | T.App(_, args) ->
-      aux_term_args ~idx:0 ~pos_builder args k
     | T.AppBuiltin((BIn.Eq|BIn.Neq|BIn.Xor|BIn.Equiv),( ([a;b] | [_;a;b]) as l)) 
         when Type.is_prop (T.ty a) ->
-      let offset = List.length l - 2 in
+      let offset = List.length l - 2 in (*skipping possible tyarg*)
       (match Ordering.compare ord a b with 
         | Comparison.Lt ->
           aux_term ~top:false ~pos_builder:(PB.arg (1+offset) pos_builder) b k
@@ -79,7 +80,8 @@ let all_selectable_subterterms ~ord ~pos_builder t k =
         | _ ->
           aux_term ~top:false ~pos_builder:(PB.arg (1+offset) pos_builder) b k;
           aux_term ~top:false ~pos_builder:(PB.arg (offset) pos_builder) a k)
-    | T.AppBuiltin(hd, args)->
+    | T.App(_, args)
+    | T.AppBuiltin(_, args)->
       aux_term_args ~idx:0 ~pos_builder args k
     | _ -> ()
   and aux_term_args ~idx ~pos_builder args k = 
@@ -98,8 +100,15 @@ let get_all_selectable ~ord lits =
       let pos_builder = PB.arg idx (PB.empty) in
       match lits.(idx) with
       | Lit.Equation (lhs,rhs,_) ->
-        all_selectable_subterterms ~ord ~pos_builder:(PB.left pos_builder) lhs k;
-        all_selectable_subterterms ~ord~pos_builder:(PB.right pos_builder) rhs k;
+        begin match Ordering.compare ord lhs rhs with
+          | Comparison.Lt ->
+            all_selectable_subterms ~ord ~pos_builder:(PB.right pos_builder) rhs k
+          | Comparison.Gt ->
+            all_selectable_subterms ~ord ~pos_builder:(PB.left pos_builder) lhs k
+          | _ ->
+            all_selectable_subterms ~ord ~pos_builder:(PB.left pos_builder) lhs k;
+            all_selectable_subterms ~ord ~pos_builder:(PB.right pos_builder) rhs k
+        end;
         aux_lits (idx+1) k
       | _ -> aux_lits (idx+1) k
     )

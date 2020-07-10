@@ -12,7 +12,8 @@ module US = Unif_subst
 
 type selection_setting = Any | Minimal | Large
 type reasoning_kind    = 
-    BoolReasoningDisabled | BoolCasesInference | BoolCasesDisabled 
+    BoolReasoningDisabled | BoolCasesInference | BoolCasesDisabled
+  | BoolHoist
   | BoolCasesSimplification | BoolCasesKeepParent
   | BoolCasesPreprocess
 
@@ -134,6 +135,20 @@ module Make(E : Env.S) : S with module Env = E = struct
         else (yes old, T.false_) in
       (mk_res ~proof ~old ~repl neg_lit c) :: acc
     ) []
+
+  let bool_hoist (c:C.t) : C.t list = 
+    let proof = Proof.Step.inference [C.proof_parent c]
+                ~rule:(Proof.Rule.mk "bool_hoist") ~tags:[Proof.Tag.T_ho] in
+
+    C.eligible_for_bool_infs c
+    |> List.map (fun (t, pos) ->
+      let new_lits = CCArray.copy (C.lits c) in
+      Literals.Pos.replace new_lits ~at:pos ~by:Term.false_;
+      
+      C.create ~trail:(C.trail c) ~penalty:(C.penalty c) 
+        (yes t :: Array.to_list new_lits) proof
+    )
+
 
   let bool_case_simp (c: C.t) : C.t list option =
     let proof = Proof.Step.simp [C.proof_parent c]
@@ -627,6 +642,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       ) else if Env.flex_get k_bool_reasoning = BoolCasesKeepParent then (
         let keep_parent c  = CCOpt.get_or ~default:[] (bool_case_simp c) in
         Env.add_unary_inf "bool_cases_keep_parent" keep_parent;
+      ) else if Env.flex_get k_bool_reasoning = BoolHoist then (
+        Env.add_unary_inf "bool_hoist" bool_hoist
       )
 end
 
@@ -966,11 +983,12 @@ let extension =
 
 let () =
   Options.add_opts
-    [ "--boolean-reasoning", Arg.Symbol (["off"; "no-cases"; "cases-inf"; "cases-simpl"; "cases-simpl-kp"; "cases-eager"; "cases-preprocess"], 
+    [ "--boolean-reasoning", Arg.Symbol (["off"; "no-cases"; "bool-hoist"; "cases-inf"; "cases-simpl"; "cases-simpl-kp"; "cases-eager"; "cases-preprocess"], 
                                          fun s -> _bool_reasoning := 
                                              match s with 
                                              | "off" -> BoolReasoningDisabled
                                              | "no-cases" -> BoolCasesDisabled
+                                             | "bool-hoist" -> BoolHoist
                                              | "cases-inf" -> BoolCasesInference
                                              | "cases-simpl" -> BoolCasesSimplification
                                              | "cases-simpl-kp" -> BoolCasesKeepParent

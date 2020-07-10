@@ -293,13 +293,15 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
             end
           | _ -> [])
     in
+    (* directly at position of selected booleans *)
     Lazy.force c.bool_selected 
     @
+    (* below selected literals and selected booleans *)
     CCList.flat_map (fun pb -> 
       let pos = Position.Build.to_pos pb in
       let t = Literals.Pos.at (lits c) pos in
       (* selects --subterms-- of given t that can be selected *)
-      Bool_selection.all_selectable_subterterms ~ord:(Ctx.ord()) ~pos_builder:pb t
+      Bool_selection.all_selectable_subterms ~ord:(Ctx.ord()) ~pos_builder:pb t
       |> Iter.to_list
       |> List.map (fun (s, p') -> s, Position.append pos p')) 
     (starting_positions @ resolution_positions)

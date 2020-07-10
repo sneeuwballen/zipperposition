@@ -173,7 +173,7 @@ module type S = sig
   val eligible_for_bool_infs : t -> (Term.t * Position.t) list
   (** 
     List that contains terms and positions in which boolean inferences can be
-    performed. Those are selected boolean terms (and their subterms), 
+    performed. Those are selected boolean terms (and their subterms) and
     all boolean subterms of terms eligible for resolution
   *)
 
