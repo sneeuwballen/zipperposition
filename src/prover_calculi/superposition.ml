@@ -328,6 +328,44 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       | _ -> []
     ) else []
 
+  let nested_eq_rw c =
+    (* TODO(BOOL): currently incompatible with combiantors *)
+    let unif_alg = 
+      if Env.flex_get Combinators.k_enable_combinators 
+      then (fun _ _ -> OSeq.empty)
+      else Env.flex_get k_unif_alg in
+    let sc = 0 in
+    let mk_sc t = (t,sc) in 
+    let parents = [C.proof_parent c] in
+    C.eligible_for_bool_infs c
+    |> List.filter_map (fun (t,p) -> 
+      match T.view t with
+      | T.AppBuiltin((Builtin.(Eq|Neq|Equiv|Xor) as hd), ([a;b]|[_;a;b])) ->
+        Some (
+          unif_alg (mk_sc a) (mk_sc b)
+          |> OSeq.map (fun unif_subst_opt ->
+              CCOpt.map (fun unif_subst -> 
+                assert (not @@ US.has_constr unif_subst);
+                let subst = US.subst unif_subst in
+                let repl = 
+                  if hd = Builtin.Eq || hd = Builtin.Equiv
+                  then T.true_ else T.false_ in
+                let new_lits = Array.copy (C.lits c) in
+                Lits.Pos.replace ~at:p ~by:repl new_lits;
+                let new_lits = 
+                  Literals.apply_subst (Subst.Renaming.create ()) subst (mk_sc new_lits)
+                  |> CCArray.to_list 
+                in
+                let rule = Proof.Rule.mk ((if T.equal repl T.true_ then "eq" else "neq") ^ "_rw")  in
+                let proof = Proof.Step.inference ~tags:[Proof.Tag.T_ho] ~rule parents in
+                C.create ~penalty:(C.penalty c) ~trail:(C.trail c) new_lits proof
+              ) unif_subst_opt))
+      | _ -> None)
+    |> List.iter (fun clause_seq -> 
+      let stm_res = Stm.make ~penalty:(C.penalty c) ~parents:[c] clause_seq in
+      StmQ.add (_stmq()) stm_res);
+    []
+
   let fluidsup_applicable cl =
     not (Env.flex_get k_restrict_fluidsup) ||
     Array.length (C.lits cl) <= 2 ||  (C.proof_depth cl) == 0
@@ -3680,6 +3718,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
     if Env.flex_get k_local_rw != `Off then (
       Env.add_basic_simplify local_rewrite
+    );
+
+    if Env.flex_get Booleans.k_bool_reasoning == Booleans.BoolHoist
+       && not (Env.flex_get Combinators.k_enable_combinators) then (
+      Env.add_unary_inf "eq_rw" nested_eq_rw;
     );
 
     Env.flex_add k_stmq (StmQ.default ());
