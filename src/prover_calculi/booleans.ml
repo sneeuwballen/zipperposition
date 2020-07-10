@@ -141,12 +141,17 @@ module Make(E : Env.S) : S with module Env = E = struct
                 ~rule:(Proof.Rule.mk "bool_hoist") ~tags:[Proof.Tag.T_ho] in
 
     C.eligible_for_bool_infs c
+    |> List.filter (fun (t,p) -> 
+        match T.view t with
+        | T.AppBuiltin(hd,_) ->
+          (* check that the term has no interpreted sym on top *)
+          not (List.mem hd [Builtin.Eq;Builtin.Neq] || 
+               Builtin.is_logical_binop hd)
+        | _ -> false)
+    (* since we are doing simultaneous version -- we take only unique terms *)
+    |> CCList.sort_uniq ~cmp:(fun (t1,_) (t2,_) -> T.compare t1 t2)
     |> List.map (fun (t, pos) ->
-      let new_lits = CCArray.copy (C.lits c) in
-      Literals.Pos.replace new_lits ~at:pos ~by:Term.false_;
-      
-      C.create ~trail:(C.trail c) ~penalty:(C.penalty c) 
-        (yes t :: Array.to_list new_lits) proof
+      mk_res ~proof ~old:t ~repl:T.false_ (yes t) c
     )
 
 
