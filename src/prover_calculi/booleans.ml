@@ -141,19 +141,127 @@ module Make(E : Env.S) : S with module Env = E = struct
                 ~rule:(Proof.Rule.mk "bool_hoist") ~tags:[Proof.Tag.T_ho] in
 
     C.eligible_for_bool_infs c
-    |> List.filter (fun (t,p) -> 
+    |> List.filter (fun (t,_) -> 
         match T.view t with
         | T.AppBuiltin(hd,_) ->
           (* check that the term has no interpreted sym on top *)
           not (List.mem hd [Builtin.Eq;Builtin.Neq] || 
                Builtin.is_logical_binop hd)
-        | _ -> false)
+        | _ -> true)
     (* since we are doing simultaneous version -- we take only unique terms *)
     |> CCList.sort_uniq ~cmp:(fun (t1,_) (t2,_) -> T.compare t1 t2)
-    |> List.map (fun (t, pos) ->
+    |> List.map (fun (t, _) ->
       mk_res ~proof ~old:t ~repl:T.false_ (yes t) c
     )
 
+  let formula_hoist (c:C.t) : C.t list =
+    let proof ~prefix = 
+      Proof.Step.inference [C.proof_parent c]
+        ~rule:(Proof.Rule.mk (prefix^"_hoist")) ~tags:[Proof.Tag.T_ho] in
+
+    C.eligible_for_bool_infs c
+    |> List.filter (fun (t,_) -> 
+        match T.view t with
+        | T.AppBuiltin(hd,_) ->
+          List.mem hd [Builtin.Eq;Neq;Xor;Equiv;ForallConst;ExistsConst] &&
+          Type.is_prop (T.ty t)
+        | _ -> false)
+    (* since we are doing simultaneous version -- we take only unique terms *)
+    |> CCList.sort_uniq ~cmp:(fun (t1,_) (t2,_) -> T.compare t1 t2)
+    |> List.map (fun (t, _) ->
+        let fresh_var ~body = 
+          assert(Type.is_fun (T.ty body));
+          let pref,_ = T.open_fun body in
+          assert(List.length pref == 1);
+          let var_ty = List.hd pref in
+          let fresh_var  = HVar.fresh ~ty:var_ty () in
+          T.var fresh_var
+        in
+
+        match T.view t with 
+        | T.AppBuiltin(Builtin.(Eq|Equiv), ([a;b]|[_;a;b])) ->
+          let new_lit = Literal.mk_eq a b in
+          mk_res ~proof:(proof ~prefix:"eq") ~old:t ~repl:T.false_ new_lit c
+        | T.AppBuiltin(Builtin.(Neq|Xor), ([a;b]|[_;a;b])) ->
+          let new_lit = Literal.mk_eq a b in
+          mk_res ~proof:(proof ~prefix:"neq") ~old:t ~repl:T.true_ new_lit c
+        | T.AppBuiltin(Builtin.ForallConst, [_;body]) ->
+          let new_lit = yes (T.app body [fresh_var ~body]) in
+          mk_res ~proof:(proof ~prefix:"forall") ~old:t ~repl:T.false_ new_lit c
+        | T.AppBuiltin(Builtin.ExistsConst, [_;body]) ->
+          let new_lit = no (T.app body [fresh_var ~body]) in
+          mk_res ~proof:(proof ~prefix:"exists") ~old:t ~repl:T.true_ new_lit c
+        | _ -> assert false
+    )
+
+  let replace_bool_vars (c:C.t) =
+    let p =
+      Proof.Step.simp [C.proof_parent c]
+        ~rule:(Proof.Rule.mk ("replace_bool_vars")) 
+        ~tags:[Proof.Tag.T_ho] in
+
+    let all_bool_substs vars =
+      let sc = 0 in
+
+      assert (not (CCList.is_empty vars));
+      let rec aux = function
+        | [] -> assert false
+        | [v] ->
+          [Subst.FO.bind' Subst.empty (v,sc) (T.true_, sc);
+           Subst.FO.bind' Subst.empty (v,sc) (T.false_, sc)]
+        | v :: vs ->
+          CCList.flat_map (fun subst -> 
+            [Subst.FO.bind' subst (v,sc) (T.true_, sc);
+             Subst.FO.bind' subst (v,sc) (T.false_, sc)]
+          ) (aux vs)
+      in
+      aux vars
+    in
+
+
+    C.eligible_for_bool_infs c
+    |> List.find_opt (fun (t,_) -> 
+        Type.is_prop (T.ty t) 
+          &&
+        (match T.view t with
+        | T.AppBuiltin(Builtin.(Eq|Neq), [_;a;b]) ->
+          (* tyarg does not have to be a variable *)
+          T.is_var a && T.is_var b
+        | T.AppBuiltin(hd, args) ->
+          (Builtin.is_logical_binop hd || hd = Builtin.Not)
+          && List.for_all T.is_var args
+        | _ -> false)) 
+    |> CCOpt.map (fun (t,_) -> 
+        let vars = T.VarSet.to_list (T.vars t) in
+        assert (List.for_all (fun t -> Type.is_prop (HVar.ty t)) vars);
+        all_bool_substs vars
+        |> List.map (C.apply_subst ~proof:(Some p) (c,0)))
+
+  let quantifier_rw (c:C.t) =
+    let proof =
+      Proof.Step.simp [C.proof_parent c]
+        ~rule:(Proof.Rule.mk ("quantifier_rw")) 
+        ~tags:[Proof.Tag.T_ho] in
+
+    C.eligible_for_bool_infs c
+    |> List.filter_map (fun (t,p) -> 
+      (* TODO(BOOL): Implement skolem reusing *)
+      match T.view t with
+      | T.AppBuiltin(Builtin.(ForallConst|ExistsConst), [_;body]) ->
+        let free_vars_l = T.VarSet.to_list (T.vars body) in
+        let ret_ty = List.hd (fst (Type.open_fun (T.ty body))) in
+        let (id,ty), sk = T.mk_fresh_skolem ~prefix:"sk" free_vars_l ret_ty in
+        E.Ctx.declare id ty;
+        Signal.send Env.on_pred_skolem_introduction (c, t);
+        let repl = T.app body [sk] in
+        let new_lits = CCArray.copy (C.lits c) in
+        Literals.Pos.replace ~at:p ~by:repl new_lits;
+        let new_cl = 
+          C.create ~trail:(C.trail c) ~penalty:(C.penalty c) 
+            (Array.to_list new_lits) proof in
+        Some new_cl
+      | _ -> None
+    )
 
   let bool_case_simp (c: C.t) : C.t list option =
     let proof = Proof.Step.simp [C.proof_parent c]
@@ -648,7 +756,9 @@ module Make(E : Env.S) : S with module Env = E = struct
         let keep_parent c  = CCOpt.get_or ~default:[] (bool_case_simp c) in
         Env.add_unary_inf "bool_cases_keep_parent" keep_parent;
       ) else if Env.flex_get k_bool_reasoning = BoolHoist then (
-        Env.add_unary_inf "bool_hoist" bool_hoist
+        Env.add_unary_inf "bool_hoist" bool_hoist;
+        Env.add_unary_inf "formula_hoist" formula_hoist;
+        Env.add_multi_simpl_rule ~priority:100 replace_bool_vars;
       )
 end
 

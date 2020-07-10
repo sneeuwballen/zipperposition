@@ -555,7 +555,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             | T.App(hd, _) when T.is_var hd ->  Some (T.as_var_exn hd)
             | _ -> None in
           CCOpt.to_list (extract_var l) @ CCOpt.to_list (extract_var r))
-      |> Iter.filter (fun v -> Type.returns_prop @@ HVar.ty v)
+      |> Iter.filter (fun v -> Type.returns_prop @@ HVar.ty v && Type.is_fun @@ HVar.ty v)
       |> T.VarSet.of_seq (* unique *)
     in
     if not (T.VarSet.is_empty vars) then (

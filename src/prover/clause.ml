@@ -309,11 +309,11 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     in
 
     if CCList.is_empty res then (
-      Util.debugf 3 "nothing selected for @[%a@]@." (fun k -> k Lits.pp (lits c));
+      Util.debugf 1 "nothing selected for @[%a@]@." (fun k -> k Lits.pp (lits c));
     ) else (
-      Util.debugf 3 "For @[%a@]@." (fun k -> k Lits.pp (lits c));
+      Util.debugf 1 "For @[%a@]@." (fun k -> k Lits.pp (lits c));
       CCList.iter (fun (t,p) -> 
-        Util.debugf 3 "  |@[%a@] -> @[%a@]@." (fun k -> k Position.pp p T.pp t);
+        Util.debugf 1 "  |@[%a@] -> @[%a@]@." (fun k -> k Position.pp p T.pp t);
       ) res;
     );
 
