@@ -81,7 +81,7 @@ following [github page for releases](https://github.com/sneeuwballen/zipperposit
 
 Look in the file `opam` to see which dependencies you need to install.
 They include `menhir`, `zarith`, `containers`,
-`oclock`, [msat](https://github.com/Gbury/mSAT) and `sequence`, but
+[msat](https://github.com/Gbury/mSAT) and `sequence`, but
 maybe also other libraries. Consider using opam directly if possible.
 
 ```
