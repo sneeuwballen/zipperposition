@@ -15,6 +15,11 @@ type t = Literal.t array -> (Term.t * Pos.t) list
 
 type parametrized = strict:bool -> ord:Ordering.t -> t
 
+(* Zipperposition interprets argumen positions
+   inverted, so we need to convert them before calling PositionBuilder *)
+let inv_idx args idx = 
+    List.length args - idx - 1
+
 let can_be_selected ~top t = 
   Type.is_prop (T.ty t) && not top && 
   not (T.is_var t) && not (T.is_app_var t) &&
@@ -46,7 +51,8 @@ let select_leftmost ~ord ~kind lits =
     match T.view t with
     | T.App(_, args)
     | T.AppBuiltin(_, args) ->
-      let inner = aux_term_args args ~idx:0 ~pos_builder in
+      (* reversing the argument indices *)
+      let inner = aux_term_args args ~idx:(List.length args - 1) ~pos_builder in
       let outer =
         if not (can_be_selected ~top t) then None
         else Some (t, PB.to_pos pos_builder) 
@@ -58,13 +64,14 @@ let select_leftmost ~ord ~kind lits =
   and aux_term_args ~idx ~pos_builder = function
   | [] -> None
   | x :: xs ->
+    assert (idx >= 0);
     (aux_term ~top:false ~pos_builder:(PB.arg idx pos_builder) x)
       <+>
-    (aux_term_args ~idx:(idx+1) ~pos_builder xs) 
+    (aux_term_args ~idx:(idx-1) ~pos_builder xs) 
   in
   CCOpt.map_or ~default:[] (fun x -> [x]) (aux_lits 0)
 
-let all_selectable_subterms ~ord ~pos_builder t k =
+let all_selectable_subterms ~ord ~pos_builder t k =  
   let rec aux_term ~top ~pos_builder t k =
     if can_be_selected top t then (k (t, PB.to_pos pos_builder));
 
@@ -74,12 +81,12 @@ let all_selectable_subterms ~ord ~pos_builder t k =
       let offset = List.length l - 2 in (*skipping possible tyarg*)
       (match Ordering.compare ord a b with 
         | Comparison.Lt ->
-          aux_term ~top:false ~pos_builder:(PB.arg (1+offset) pos_builder) b k
+          aux_term ~top:false ~pos_builder:(PB.arg (inv_idx l (1+offset)) pos_builder) b k
         | Comparison.Gt ->
-          aux_term ~top:false ~pos_builder:(PB.arg (offset) pos_builder) a k
+          aux_term ~top:false ~pos_builder:(PB.arg (inv_idx l offset) pos_builder) a k
         | _ ->
-          aux_term ~top:false ~pos_builder:(PB.arg (1+offset) pos_builder) b k;
-          aux_term ~top:false ~pos_builder:(PB.arg (offset) pos_builder) a k)
+          aux_term ~top:false ~pos_builder:(PB.arg (inv_idx l (1+offset)) pos_builder) b k;
+          aux_term ~top:false ~pos_builder:(PB.arg (inv_idx l offset) pos_builder) a k)
     | T.App(_, args)
     | T.AppBuiltin(_, args)->
       aux_term_args ~idx:0 ~pos_builder args k
@@ -88,7 +95,7 @@ let all_selectable_subterms ~ord ~pos_builder t k =
     match args with
     | [] -> ()
     | x :: xs ->
-      (aux_term ~top:false ~pos_builder:(PB.arg idx pos_builder) x k);
+      (aux_term ~top:false ~pos_builder:(PB.arg (inv_idx args idx) pos_builder) x k);
       (aux_term_args ~idx:(idx+1) ~pos_builder xs k) in
   aux_term ~top:true ~pos_builder t k
 
