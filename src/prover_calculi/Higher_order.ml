@@ -1771,7 +1771,7 @@ let () =
          ), " enable/disable treatment of Leibniz equality. inf enables it for infinte depth of clauses"
             ^ "; off disables it; number enables it for a given depth of clause";
       "--ho-def-unfold", Arg.Bool (fun v -> def_unfold_enabled_ := v), " enable ho definition unfolding";
-      "--ho-choice-inst", Arg.Bool (fun v -> _instantiate_choice_ax := v), " enable ho definition unfolding";
+      "--ho-choice-inst", Arg.Bool (fun v -> _instantiate_choice_ax := v), " enable heuristic Hilbert choice instantiation";
       "--ho-simple-projection", Arg.Int (fun v -> _simple_projection := v), 
       " enable simple projection instantiation." ^ 
       " positive argument is increase in clause penalty for the conclusion; " ^
