@@ -183,7 +183,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ) else None
       )
 
-  let has_bad_occurence_elsewhere c var pos =
+  let has_bad_occurrence_elsewhere c var pos =
     assert(T.is_var var);
     Lits.fold_terms ~ord ~subterms:true ~eligible:C.Eligible.always ~which:`All
       (C.lits c)
@@ -415,8 +415,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           ~eligible:(C.Eligible.res c) (C.lits c)
         |> Iter.filter (fun (t, pos) ->
           match T.view t with
-          | T.Var _ -> has_bad_occurence_elsewhere c t pos
-          | T.App(hd, [_]) when T.is_var hd -> has_bad_occurence_elsewhere c hd pos
+          | T.Var _ -> has_bad_occurrence_elsewhere c t pos
+          | T.App(hd, [_]) when T.is_var hd -> has_bad_occurrence_elsewhere c hd pos
           | _ -> false
         ) 
         |> Iter.fold
@@ -1665,8 +1665,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       ~which:`Max ~eligible ~ty_args:false (C.lits clause)
     |> Iter.filter( fun (t,pos) -> 
         match T.view t with 
-        | T.Var _ -> has_bad_occurence_elsewhere clause t pos
-        | T.App(hd, [x]) -> has_bad_occurence_elsewhere clause hd pos
+        | T.Var _ -> has_bad_occurrence_elsewhere clause t pos
+        | T.App(hd, [x]) -> has_bad_occurrence_elsewhere clause hd pos
         | _ -> false)
     |> Iter.flat_map
       (fun (u_p, passive_pos) ->

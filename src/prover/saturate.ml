@@ -279,7 +279,7 @@ end
 let () =
   Params.add_opts
     [ "--progress", Arg.Set _progress, " progress bar";
-      "-p", Arg.Set _progress, " alias to --progress";
+      "-p", Arg.Set _progress, " alias for --progress";
       "--check-types", Arg.Set _check_types, " check types in new clauses";
       "--try-e", Arg.String (fun path -> e_path := Some path), " try the given eprover binary on the problem";
       "--e-call-point", Arg.Float 

@@ -700,7 +700,7 @@ let sine_axiom_selector
     Util.debugf ~section 1 "most common symbols are: @[%a@]@." 
       (fun k -> k (ID.Set.pp ID.pp) most_commmon_syms);
 
-    (* now tbl contains occurences of all symbols *)
+    (* now tbl contains occurrences of all symbols *)
 
     let triggers = create_trigger_map ~trim_implications ~tbl (axioms) in
     let syms_in_conj = symset_of_axs ~trim_implications ~is_goal:true goals in

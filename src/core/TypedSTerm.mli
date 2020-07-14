@@ -143,7 +143,7 @@ module Ty : sig
   val term : t
 
   val (==>) : t list -> t -> t
-  (** Alias to {!fun_} *)
+  (** alias for {!fun_} *)
 
   val close_forall : t -> t
 

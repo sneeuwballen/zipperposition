@@ -1379,10 +1379,10 @@ let () =
   Params.add_opts
     [ "--clause-queue", o,
       " choose which set of clause queues to use (for selecting next active clause)";
-      "-cq", o, " alias to --clause-queue";
+      "-cq", o, " alias for --clause-queue";
       "--add-queue", add_queue, " create a new clause evaluation queue. Its description is of the form" ^
                                 " RATIO|PRIORITY_FUN|WEIGHT_FUN";
-      "-q", add_queue, "alias to --add-queue";
+      "-q", add_queue, " alias for --add-queue";
       "--ignore-orphans", Arg.Bool ((:=) _ignore_orphans), " whether to ignore the orphans during clause selection"
     ];
 

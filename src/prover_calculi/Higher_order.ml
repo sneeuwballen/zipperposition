@@ -698,7 +698,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     |> Iter.to_list
 
   (* Given a clause C, project all its applied variables to base-type arguments 
-     if there is a variable occurence in which at least one of base-type arguments is
+     if there is a variable occurrence in which at least one of base-type arguments is
      not a bound variable.
      Penalty of the resulting clause is penalty of the original clause + penalty_inc *)
   let simple_projection ~penalty_inc ~max_depth c =
@@ -793,7 +793,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let elim_leibniz_eq_ ?(proof_constructor=Proof.Step.inference) c =
     let ord = Env.ord () in
     let eligible = C.Eligible.always in
-    let pos_pred_vars, neg_pred_vars, occurences = 
+    let pos_pred_vars, neg_pred_vars, occurrences = 
       Lits.fold_eqn ~both:false ~ord ~eligible (C.lits c)
       |> Iter.fold (fun (pos_vs,neg_vs,occ) (lhs,rhs,sign,_) -> 
           if Type.is_prop (Term.ty lhs) && Term.is_app_var lhs && T.equal T.true_ rhs then (
@@ -828,7 +828,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                     Some (C.apply_subst ~proof (c,0) subst))
                 ) (CCList.mapi (fun i arg -> (i, arg)) args)
             ) else [] 
-          ) (Term.Map.to_list occurences)) in
+          ) (Term.Map.to_list occurrences)) in
     res
 
 
@@ -1016,12 +1016,12 @@ module Make(E : Env.S) : S with module Env = E = struct
     |> Env.add_passive
 
   type fixed_arg_status =
-    | Always of T.t (* This argument is always the given term in all occurences *)
+    | Always of T.t (* This argument is always the given term in all occurrences *)
     | Varies        (* This argument contains different terms in differen occurrences *)
 
   type dupl_arg_status =
-    | AlwaysSameAs of int (* This argument is always the same as some other argument across occurences (links to the next arg with this property) *)
-    | Unique              (* This argument is not always the same as some other argument across occurences *)
+    | AlwaysSameAs of int (* This argument is always the same as some other argument across occurrences (links to the next arg with this property) *)
+    | Unique              (* This argument is not always the same as some other argument across occurrences *)
 
   (** Removal of fixed/duplicate arguments of variables.
       - If within a clause, there exists a variable F that's always applied

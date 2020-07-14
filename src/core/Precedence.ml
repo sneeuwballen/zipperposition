@@ -452,8 +452,8 @@ let depth_occ_driver ~flip stmt_d =
   let default = Weight.int 5 in
   fun sym -> (ID.Tbl.get_or ~default tbl sym)
 
-let inv_depth_occurence =  depth_occ_driver ~flip:false
-let depth_occurence =  depth_occ_driver ~flip:true
+let inv_depth_occurrence = depth_occ_driver ~flip:false
+let depth_occurrence = depth_occ_driver ~flip:true
 
 
 let max_arity signature = 
@@ -618,8 +618,8 @@ let weight_fun_of_string ~signature ~lits ~lm_w ~db_w s sd =
      "invarity", ignore_arg @@ weight_invarity ~signature;
      "sqarity", ignore_arg @@ weight_sq_arity ~signature;
      "invsqarity", ignore_arg @@ weight_invsq_arity ~signature;
-     "invdocc", inv_depth_occurence;
-     "docc", depth_occurence;
+     "invdocc", inv_depth_occurrence;
+     "docc", depth_occurrence;
      "const", ignore_arg weight_constant] in
   try
     begin match CCString.chop_prefix ~pre:"lambda-def-" s with 

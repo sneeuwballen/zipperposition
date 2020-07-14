@@ -247,8 +247,8 @@ module Make(E : Env.S) : S with module Env = E = struct
                 if sign != sign' then None else Some c) parents)
       | None ->
         (* maybe we need to define it if it appears too many times *)
-        let num_occurences = Term.Tbl.get_or _form_counter form ~default:0 in
-        if num_occurences >= Env.flex_get k_renaming_threshold (*&&
+        let num_occurrences = Term.Tbl.get_or _form_counter form ~default:0 in
+        if num_occurrences >= Env.flex_get k_renaming_threshold (*&&
            CCArray.length (C.lits c) > 1*)  then (
           Term.Tbl.remove _form_counter form;
 

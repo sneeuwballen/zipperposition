@@ -643,7 +643,7 @@ let () =
     "--sine-take-only-defs", Arg.Bool ((:=) _take_only_defs),
     " take only axioms marked as definitions and the conjecture";
     "--sine-ignore-k-most-common-syms", Arg.Int (fun v -> _ignore_k_most_common_symbols := Some v),
-    " if conjecture symbol is within k most common occuring ones, then it will be disregarded as conjecture symbol";
+    " if conjecture symbol is within k most common occurring ones, then it will be disregarded as conjecture symbol";
     "--sine-take-conj-defs", Arg.Bool ((:=) _take_conj_defs),
     " force taking definitions of symbols ocurring in conjecture";
     "--sine", Arg.Set_int _sine_threshold,

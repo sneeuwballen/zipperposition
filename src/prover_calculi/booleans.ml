@@ -654,7 +654,7 @@ let map_propositions ~proof f =
 let is_bool t = CCOpt.equal Ty.equal (Some prop) (ty t)
 let is_T_F t = match view t with AppBuiltin((True|False),[]) -> true | _ -> false
 
-(* Modify every subterm of t by f except those at the "top". Here top is true if subterm occures under a quantifier Æ in a context where it could participate to the clausification if the surrounding context of Æ was ignored. *)
+(* Modify every subterm of t by f except those at the "top". Here top is true if subterm occurs under a quantifier Æ in a context where it could participate to the clausification if the surrounding context of Æ was ignored. *)
 let rec replaceTST f top t =
   let re = replaceTST f in
   let ty = ty_exn t in
