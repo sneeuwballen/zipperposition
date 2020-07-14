@@ -793,6 +793,7 @@ module ZF = struct
 end
 
 module TPTP = struct
+  let namespace = Proof.S.Tbl.create 8
   let pp ppf ppt ppty out st =
     let name = name st in
     let pp_decl out (id,ty) =
@@ -844,9 +845,17 @@ module TPTP = struct
       fpf out "@[<2>tff(%a, %s,@ (@[%a@]))@]." pp_name name role ppf f
     | NegatedGoal (_,l) ->
       let role = "negated_conjecture" in
+      let parents = []
+      (*
+        List.map (fun p -> `Name (Proof.S.name ~namespace @@
+          Proof.Parent.proof st.proof))
+          (Proof.Step.parents @@ st.proof)
+          *)
+      in
       List.iter
         (fun f ->
-           fpf out "@[<2>tff(%a, %s,@ (@[%a@]))@]." pp_name name role ppf f)
+           fpf out "@[<2>tff(%a, %s,@ (@[%a@]),@ @[%a@])@]." pp_name name role
+             ppf f Proof.Kind.pp_tstp (Proof.Step.kind @@ st.proof, parents))
         l
     | Def l ->
       Format.fprintf out "@[<v>";
