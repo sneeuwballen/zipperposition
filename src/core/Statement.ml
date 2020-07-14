@@ -845,12 +845,9 @@ module TPTP = struct
       fpf out "@[<2>tff(%a, %s,@ (@[%a@]))@]." pp_name name role ppf f
     | NegatedGoal (_,l) ->
       let role = "negated_conjecture" in
-      let parents = []
-      (*
-        List.map (fun p -> `Name (Proof.S.name ~namespace @@
-          Proof.Parent.proof st.proof))
-          (Proof.Step.parents @@ st.proof)
-          *)
+      let parents = 
+        List.map (fun p -> `Name (Proof.S.name ~namespace @@ Proof.Parent.proof p))
+             (Proof.Step.parents @@ st.proof)
       in
       List.iter
         (fun f ->
