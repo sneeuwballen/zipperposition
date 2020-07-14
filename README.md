@@ -29,9 +29,9 @@ Superposition-based theorem proving is an active field of research, so
 there is a lot of literature about it; for this implementation the main references
 for the base calculus are:
 
-* the chapter _paramodulation-based theorem proving_ of the _handbook of automated reasoning_,
-* the paper _E: a brainiac theorem prover_ that describes the [E prover](http://eprover.org) by S.Schulz,
-* the paper _Superposition with equivalence reasoning and delayed clause normal form transformation_ by H.Ganzinger and J.Stuber
+* the chapter _Paramodulation-based theorem proving_ of the _Handbook of Automated Reasoning_,
+* the paper _E: a brainiac theorem prover_ that describes the [E prover](http://eprover.org) by S. Schulz,
+* the paper _Superposition with equivalence reasoning and delayed clause normal form transformation_ by H. Ganzinger and J. Stuber
 
 **Disclaimer**: Note that the prover is a research project.
 Please don't use it to drive your personal nuclear power plant, nor as a
