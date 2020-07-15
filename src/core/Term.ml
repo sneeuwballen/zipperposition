@@ -1096,7 +1096,7 @@ module TPTP = struct
           if Builtin.is_combinator b 
           then List.filter (fun t -> not @@ is_type t) l 
           else l in
-        if CCList.is_empty l then Format.fprintf out "@[%a@]" Builtin.pp b 
+        if CCList.is_empty l then Format.fprintf out "@[%a@]" Builtin.TPTP.pp b 
         else Format.fprintf out "(@[%a(%a)@])" Builtin.TPTP.pp b (Util.pp_list pp_rec) l
       | Const s -> ID.pp_tstp out s
       | App (f, l) ->
