@@ -336,7 +336,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       else Env.flex_get k_unif_alg in
     let sc = 0 in
     let mk_sc t = (t,sc) in 
-    let parents = [C.proof_parent c] in
+    let parents r s = [C.proof_parent_subst r (mk_sc c) s ] in
     C.eligible_for_bool_infs c
     |> List.filter_map (fun (t,p) -> 
       match T.view t with
@@ -352,12 +352,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                   then T.true_ else T.false_ in
                 let new_lits = Array.copy (C.lits c) in
                 Lits.Pos.replace ~at:p ~by:repl new_lits;
+                let renaming = Subst.Renaming.create () in
                 let new_lits = 
-                  Literals.apply_subst (Subst.Renaming.create ()) subst (mk_sc new_lits)
+                  Literals.apply_subst renaming subst (mk_sc new_lits)
                   |> CCArray.to_list 
                 in
                 let rule = Proof.Rule.mk ((if T.equal repl T.true_ then "eq" else "neq") ^ "_rw")  in
-                let proof = Proof.Step.inference ~tags:[Proof.Tag.T_ho] ~rule parents in
+                let proof = Proof.Step.inference ~tags:[Proof.Tag.T_ho] ~rule (parents renaming subst) in
                 C.create ~penalty:(C.penalty c) ~trail:(C.trail c) new_lits proof
               ) unif_subst_opt))
       | _ -> None)
