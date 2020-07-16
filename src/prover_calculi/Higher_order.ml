@@ -1088,7 +1088,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                     Type.var (HVar.fresh ~ty:Type.tType ()) :: types_w) in
               let res = 
                 ty_args
-                |> OSeq.mapi (fun arrarg_idx arrow_args -> 
+                |> OSeq.mapi (fun arrarg_idx arrow_args ->
                     let var = Type.as_var_exn (T.ty t) in
                     let funty = 
                       T.of_ty 
@@ -1974,6 +1974,7 @@ let () =
   Params.add_to_mode "fo-complete-basic" (fun () ->
       enabled_ := false;
       _resolve_flex_flex := false;
+      _arg_cong := false;
       Unif._allow_pattern_unif := false;
       Unif._unif_bool := false;
     );

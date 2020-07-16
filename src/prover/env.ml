@@ -49,7 +49,7 @@ module Make(X : sig
     end)
   module StmQ = StreamQueue.Make(struct
       module Stm = Stm
-      let state = flex_state
+      let state = fun () ->  !flex_state_
   end)
 
   type inf_rule = C.t -> C.t list
@@ -147,9 +147,14 @@ module Make(X : sig
 
   (** {2 Basic operations} *)
 
-  let queue_ = StmQ.default ()
+  let _queue = ref None
 
-  let get_stm_queue () = queue_
+  let get_stm_queue () =
+    match !_queue with
+    | None ->
+      _queue := Some (StmQ.default ());
+      CCOpt.get_exn (!_queue);
+    | Some q -> q 
 
   let add_empty c =
     assert (C.is_empty c);
