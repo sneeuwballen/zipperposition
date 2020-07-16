@@ -7,6 +7,8 @@ module type S = sig
   module Ctx : Ctx.S
   module C : Clause.S with module Ctx = Ctx
   module ProofState : ProofState.S with module C = C and module Ctx = Ctx
+  module Stm : Stream.S with module C = C
+  module StmQ : StreamQueue.S with module Stm = Stm
 
   type inf_rule = C.t -> C.t list
   (** An inference returns a list of conclusions *)
@@ -218,6 +220,8 @@ module type S = sig
 
   type stats = int * int * int
   (** statistics on clauses : num active, num passive, num simplification *)
+
+  val get_stm_queue : unit -> StmQ.t
 
   val stats : unit -> stats
   (** Compute stats *)

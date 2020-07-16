@@ -10,7 +10,7 @@ module type S = StreamQueue_intf.S
 
 module type ARG = sig
   module Stm : Stream.S
-  module Env : Env.S
+  val state: unit -> Flex_state.t
 end
 
 let k_guard = Flex_state.create_key ()
@@ -19,7 +19,9 @@ let k_clause_num = Flex_state.create_key ()
 
 module Make(A : ARG) = struct
   module Stm = A.Stm
-  module E = A.Env
+
+  let get_op k = Flex_state.get_exn k (A.state ())
+
 
   (** {6 Weight functions} *)
   module WeightFun = struct
@@ -157,7 +159,7 @@ module Make(A : ARG) = struct
       | Not_found -> prev_res
 
   let clauses_to_take q =
-    let max_clause = E.flex_get k_clause_num in
+    let max_clause = get_op k_clause_num in
     if max_clause < 0 then q.stm_nb
     else min max_clause q.stm_nb
 
@@ -209,7 +211,7 @@ module Make(A : ARG) = struct
   let default () : t =
     let open WeightFun in
     let weight = penalty in
-    make ~guard:(E.flex_get k_guard)  ~ratio:(E.flex_get k_ratio) ~weight "default"
+    make ~guard:(get_op k_guard)  ~ratio:(get_op k_ratio) ~weight "default"
 
   let pp out q = CCFormat.fprintf out "queue %s" (name q)
   let to_string = CCFormat.to_string pp

@@ -121,21 +121,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   module TermIndex = PS.TermIndex
   module SubsumIdx = PS.SubsumptionIndex
   module UnitIdx = PS.UnitIndex
-  module Stm = Stream.Make(struct
-      module Ctx = Ctx
-      module C = C
-    end)
-  module StmQ = StreamQueue.Make(struct
-      module Stm = Stm
-      module Env = Env end)
-  module Bools = Booleans.Make(Env)
+  module Stm = Env.Stm
+  module StmQ = Env.StmQ 
 
   (** {6 Stream queue} *)
-  let k_stmq = Flex_state.create_key ()
   let _cc_simpl = ref (Congruence.FO.create ~size:256 ())
 
-
-  let _stmq () = Env.flex_get k_stmq
 
   (** {6 Index Management} *)
 
@@ -364,7 +355,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       | _ -> None)
     |> List.iter (fun clause_seq -> 
       let stm_res = Stm.make ~penalty:(C.penalty c) ~parents:[c] clause_seq in
-      StmQ.add (_stmq()) stm_res);
+      StmQ.add (Env.get_stm_queue ()) stm_res);
     []
 
   let fluidsup_applicable cl =
@@ -1353,7 +1344,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         clause
     in
     let stm_res = List.map (fun (penalty, parents, s) -> Stm.make ~penalty ~parents s) inf_res in
-    StmQ.add_lst (_stmq()) stm_res; []
+    StmQ.add_lst (Env.get_stm_queue ()) stm_res; []
 
   let infer_passive_complete_ho clause =
     let inf_res = infer_passive_aux
@@ -1366,7 +1357,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         clause
     in
     let stm_res = List.map (fun (penalty,parents,s) -> Stm.make ~penalty ~parents s) inf_res in
-    StmQ.add_lst (_stmq()) stm_res; []
+    StmQ.add_lst (Env.get_stm_queue ()) stm_res; []
 
   let infer_active_pragmatic_ho max_unifs clause =
     let inf_res = infer_active_aux
@@ -1444,7 +1435,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       else []
     in
     let stm_res = List.map (fun (p,s,parents) -> Stm.make ~penalty:p ~parents s) new_clauses in
-    StmQ.add_lst (_stmq()) stm_res;
+    StmQ.add_lst (Env.get_stm_queue ()) stm_res;
     ZProf.exit_prof prof_infer_fluidsup_active;
     []
 
@@ -1497,7 +1488,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       else []
     in
     let stm_res = List.map (fun (p,s,parents) -> Stm.make ~penalty:p ~parents s) new_clauses in
-    StmQ.add_lst (_stmq()) stm_res;
+    StmQ.add_lst (Env.get_stm_queue ()) stm_res;
     ZProf.exit_prof prof_infer_fluidsup_passive;
     []
 
@@ -1565,7 +1556,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       |> Iter.to_rev_list
     in
     let stm_res = List.map (fun (p,s,parents) -> Stm.make ~penalty:p ~parents s) new_clauses in
-    StmQ.add_lst (_stmq()) stm_res;
+    StmQ.add_lst (Env.get_stm_queue ()) stm_res;
     ZProf.exit_prof prof_infer_fluidsup_active;
     []
 
@@ -1636,7 +1627,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       |> Iter.to_rev_list
     in
     let stm_res = List.map (fun (p,s,parents) -> Stm.make ~penalty:p ~parents s) new_clauses in
-    StmQ.add_lst (_stmq()) stm_res;
+    StmQ.add_lst (Env.get_stm_queue ()) stm_res;
     ZProf.exit_prof prof_infer_fluidsup_passive;
     []
 
@@ -1797,7 +1788,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         clause
     in
     let stm_res = List.map (Stm.make ~penalty:(0) ~parents:[clause]) inf_res in
-    StmQ.add_lst (_stmq()) stm_res; []
+    StmQ.add_lst (Env.get_stm_queue ()) stm_res; []
 
   let infer_equality_resolution_pragmatic_ho max_unifs clause =
     let inf_res = infer_equality_resolution_aux
@@ -2182,7 +2173,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         clause
     in
     let stm_res = List.map (Stm.make ~penalty:(0) ~parents:[clause]) inf_res in
-    StmQ.add_lst (_stmq()) stm_res; []
+    StmQ.add_lst (Env.get_stm_queue ()) stm_res; []
 
   let infer_equality_factoring_pragmatic_ho max_unifs clause =
     let inf_res = infer_equality_factoring_aux
@@ -2204,9 +2195,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     ZProf.enter_prof prof_queues;
     let cl =
       if full then
-        StmQ.take_fair_anyway (_stmq())
+        StmQ.take_fair_anyway (Env.get_stm_queue ())
       else
-        StmQ.take_stm_nb (_stmq())
+        StmQ.take_stm_nb (Env.get_stm_queue ())
     in
     let opt_res = CCOpt.sequence_l (List.filter CCOpt.is_some cl)  in
     ZProf.exit_prof prof_queues;
@@ -2218,9 +2209,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     ZProf.enter_prof prof_queues;
     let cl =
       if full then
-        StmQ.take_fair_anyway (_stmq())
+        StmQ.take_fair_anyway (Env.get_stm_queue ())
       else
-        StmQ.take_stm_nb_fix_stm (_stmq())
+        StmQ.take_stm_nb_fix_stm (Env.get_stm_queue ())
     in
     let opt_res = CCOpt.sequence_l (List.filter CCOpt.is_some cl) in
     ZProf.exit_prof prof_queues;
@@ -2810,7 +2801,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               let first_two, rest = 
                 OSeq.take 2 res, OSeq.map CCOpt.return (OSeq.drop 2 res) in
               let stm =  Stm.make ~penalty:(C.penalty c + 20) ~parents:[c] rest in
-              StmQ.add (_stmq()) stm;
+              StmQ.add (Env.get_stm_queue ()) stm;
               
               OSeq.to_list first_two
             | _ -> [])
@@ -3725,8 +3716,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
        && not (Env.flex_get Combinators.k_enable_combinators) then (
       Env.add_unary_inf "eq_rw" nested_eq_rw;
     );
-
-    Env.flex_add k_stmq (StmQ.default ());
 
     if Env.flex_get Combinators.k_enable_combinators
        && Env.flex_get k_subvarsup then (

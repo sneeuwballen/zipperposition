@@ -40,6 +40,17 @@ module Make(X : sig
   module C = Clause.Make(Ctx)
   module ProofState = ProofState.Make(C)
 
+  let flex_state_ = ref X.flex_state
+  let flex_state () = !flex_state_
+
+  module Stm = Stream.Make(struct
+      module Ctx = Ctx
+      module C = C
+    end)
+  module StmQ = StreamQueue.Make(struct
+      module Stm = Stm
+      let state = flex_state
+  end)
 
   type inf_rule = C.t -> C.t list
   (** An inference returns a list of conclusions *)
@@ -129,11 +140,16 @@ module Make(X : sig
   let _fragment_checks = ref []
   let _immediate_simpl : immediate_simplification_rule list ref = ref []
 
+
   let on_start = Signal.create()
   let on_input_statement = Signal.create()
   let on_empty_clause = Signal.create ()
 
   (** {2 Basic operations} *)
+
+  let queue_ = StmQ.default ()
+
+  let get_stm_queue () = queue_
 
   let add_empty c =
     assert (C.is_empty c);
@@ -930,9 +946,6 @@ module Make(X : sig
     { Clause.c_set; c_sos; }
 
   (** {2 Misc} *)
-
-  let flex_state_ = ref X.flex_state
-  let flex_state () = !flex_state_
   let update_flex_state f = CCRef.update f flex_state_
   let flex_add k v = flex_state_ := Flex_state.add k v !flex_state_
   let flex_get k = Flex_state.get_exn k !flex_state_
