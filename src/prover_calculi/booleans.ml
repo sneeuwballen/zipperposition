@@ -224,7 +224,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         Type.is_prop (T.ty t) 
           &&
         (match T.view t with
-        | T.AppBuiltin(Builtin.(Eq|Neq), [_;a;b]) ->
+        | T.AppBuiltin(Builtin.(Eq|Neq), [_;a;b]) when Type.is_prop (T.ty a) ->
           (* tyarg does not have to be a variable *)
           T.is_var a && T.is_var b
         | T.AppBuiltin(hd, args) ->
@@ -758,6 +758,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       ) else if Env.flex_get k_bool_reasoning = BoolHoist then (
         Env.add_unary_inf "bool_hoist" bool_hoist;
         Env.add_unary_inf "formula_hoist" formula_hoist;
+        Env.add_unary_inf "quant_rw" quantifier_rw;
         Env.add_multi_simpl_rule ~priority:100 replace_bool_vars;
       )
 end
