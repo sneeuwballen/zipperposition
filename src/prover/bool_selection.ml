@@ -89,14 +89,15 @@ let all_selectable_subterms ~ord ~pos_builder t k =
           aux_term ~top:false ~pos_builder:(PB.arg (inv_idx l offset) pos_builder) a k)
     | T.App(_, args)
     | T.AppBuiltin(_, args)->
-      aux_term_args ~idx:0 ~pos_builder args k
+      aux_term_args ~idx:(List.length args - 1) ~pos_builder args k
     | _ -> ()
   and aux_term_args ~idx ~pos_builder args k = 
     match args with
     | [] -> ()
     | x :: xs ->
-      (aux_term ~top:false ~pos_builder:(PB.arg (inv_idx args idx) pos_builder) x k);
-      (aux_term_args ~idx:(idx+1) ~pos_builder xs k) in
+      assert (idx >= 0);
+      (aux_term ~top:false ~pos_builder:(PB.arg idx pos_builder) x k);
+      (aux_term_args ~idx:(idx-1) ~pos_builder xs k) in
   aux_term ~top:true ~pos_builder t k
 
 let get_all_selectable ~ord lits = 

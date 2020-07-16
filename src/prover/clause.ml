@@ -298,12 +298,16 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       Lazy.force c.bool_selected 
       @
       (* below selected literals and selected booleans *)
-      CCList.flat_map (fun pb -> 
-        let pos = Position.Build.to_pos pb in
-        let t = Literals.Pos.at (lits c) pos in
-        (* selects --subterms-- of given t that can be selected *)
-        Bool_selection.all_selectable_subterms ~ord:(Ctx.ord()) ~pos_builder:pb t
-        |> Iter.to_list) 
+      CCList.flat_map (fun pb ->
+        let pos = Position.Build.to_pos pb in 
+        try 
+          let t = Literals.Pos.at (lits c) pos in
+          (* selects --subterms-- of given t that can be selected *)
+          Bool_selection.all_selectable_subterms ~ord:(Ctx.ord()) ~pos_builder:pb t
+          |> Iter.to_list
+        with Failure _ ->
+          CCFormat.printf "failed for @[%a@]::@[%a@]@." Lits.pp (lits c) Position.pp pos;
+          assert false;) 
       (starting_positions @ resolution_positions)
       |> CCList.sort_uniq ~cmp:(fun (_,p1) (_,p2) -> Position.compare p1 p2)
     in
@@ -329,7 +333,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     if !changed then (
       let penalty = penalty c and trail = trail c and proof = proof_step c in
       Some (create ~penalty ~trail (CCArray.to_list new_lits) proof)
-    ) else None
+    ) else None 
 
   (** Bitvector that indicates which of the literals of [subst(clause)]
       are eligible for paramodulation. *)
