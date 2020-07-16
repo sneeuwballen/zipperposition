@@ -32,6 +32,7 @@ let stat_neg_ext = Util.mk_stat "ho.neg_ext_success"
 let prof_eq_res = ZProf.make "ho.eq_res"
 let prof_eq_res_syn = ZProf.make "ho.eq_res_syntactic"
 let prof_ho_unif = ZProf.make "ho.unif"
+let stat_complete_eq = Util.mk_stat "ho.complete_eq.steps"
 
 let k_ext_pos = Flex_state.create_key ()
 let k_ext_pos_all_lits = Flex_state.create_key ()
@@ -57,7 +58,7 @@ let k_generalize_choice_trigger = Flex_state.create_key ()
 let k_prim_enum_simpl = Flex_state.create_key ()
 let k_prim_enum_early_bird = Flex_state.create_key ()
 let k_resolve_flex_flex = Flex_state.create_key ()
-
+let k_arg_cong = Flex_state.create_key ()
 
 type prune_kind = [`NoPrune | `OldPrune | `PruneAllCovers | `PruneMaxCover]
 
@@ -91,7 +92,8 @@ module Make(E : Env.S) : S with module Env = E = struct
   module C = Env.C
   module Ctx = Env.Ctx
   module Combs = Combinators.Make(E)
-
+  module Stm = E.Stm
+  module StmQ = E.StmQ
 
   (* index for ext-neg, to ensure α-equivalent negative equations have the same skolems *)
   module FV_ext_neg_lit = FV_tree.Make(struct
@@ -1033,6 +1035,91 @@ module Make(E : Env.S) : S with module Env = E = struct
     |> CCList.to_seq
     |> Env.add_passive
 
+  (* complete [f = g] into [f x1…xn = g x1…xn] for each [n ≥ 1] *)
+  let complete_eq_args (c:C.t) : C.t list =
+    let var_offset = C.Seq.vars c |> Type.Seq.max_var |> succ in
+    let eligible = C.Eligible.param c in
+    let aux ?(start=1) ~poly lits lit_idx t u =
+      let n_ty_args, ty_args, _ = Type.open_poly_fun (T.ty t) in
+      assert (n_ty_args = 0);
+      assert (ty_args <> []);
+      let vars =
+        List.mapi
+          (fun i ty -> HVar.make ~ty (i+var_offset) |> T.var)
+          ty_args
+      in
+      CCList.(start -- List.length vars)
+      |> List.map
+        (fun prefix_len ->
+          let vars_prefix = CCList.take prefix_len vars in
+          let new_lit = Literal.mk_eq (T.app t vars_prefix) (T.app u vars_prefix) in
+          let new_lits = new_lit :: CCArray.except_idx lits lit_idx in
+          let proof =
+            Proof.Step.inference [C.proof_parent c]
+              (* THIS NAME IS USED IN HEURISTICS -- CHANGE CAREFULLY! *)
+              ~rule:(Proof.Rule.mk "ho_complete_eq")
+              ~tags:[Proof.Tag.T_ho;Proof.Tag.T_dont_increase_depth]
+          in
+          let penalty = C.penalty c + (if poly then 1 else 0) in
+          let new_c =
+            C.create new_lits proof ~penalty ~trail:(C.trail c) in
+
+          if poly then (
+            C.set_flag SClause.flag_poly_arg_cong_res new_c true;
+          );
+
+          new_c)
+      in
+      let is_poly_arg_cong_res = C.get_flag SClause.flag_poly_arg_cong_res c in
+      let new_c =
+        C.lits c
+        |> Iter.of_array |> Util.seq_zipi
+        |> Iter.filter (fun (idx,lit) -> eligible idx lit)
+        |> Iter.flat_map_l
+          (fun (lit_idx,lit) -> match lit with
+            | Literal.Equation (t, u, true) when Type.is_fun (T.ty t) ->
+              aux ~poly:false (C.lits c) lit_idx t u
+            | Literal.Equation (t, u, true) 
+              when Type.is_var (T.ty t) && not is_poly_arg_cong_res ->
+              (* A polymorphic variable might be functional on the ground level *)
+              let ty_args = 
+                OSeq.iterate [Type.var @@ HVar.fresh ~ty:Type.tType ()] 
+                  (fun types_w -> 
+                    Type.var (HVar.fresh ~ty:Type.tType ()) :: types_w) in
+              let res = 
+                ty_args
+                |> OSeq.mapi (fun arrarg_idx arrow_args -> 
+                    let var = Type.as_var_exn (T.ty t) in
+                    let funty = 
+                      T.of_ty 
+                        (Type.arrow arrow_args (Type.var (HVar.fresh ~ty:Type.tType ()))) in
+                    let subst = Unif_subst.FO.singleton (var,0) (funty,0) in
+                    let renaming, subst = Subst.Renaming.none, Unif_subst.subst subst in
+                    let lits' = Lits.apply_subst renaming subst (C.lits c, 0) in
+                    let t' = Subst.FO.apply renaming subst (t, 0) in
+                    let u' = Subst.FO.apply renaming subst (u, 0) in
+                    let new_cl = aux ~poly:true ~start:(arrarg_idx+1) lits' lit_idx t' u' in
+                    assert(List.length new_cl == 1);
+                    List.hd new_cl
+                ) in
+              let first_two, rest = 
+                OSeq.take 2 res, OSeq.map CCOpt.return (OSeq.drop 2 res) in
+              let stm =  Stm.make ~penalty:(C.penalty c + 20) ~parents:[c] rest in
+              StmQ.add (Env.get_stm_queue ()) stm;
+              
+              OSeq.to_list first_two
+            | _ -> [])
+        |> Iter.to_rev_list
+      in
+      if new_c<>[] then (
+        Util.add_stat stat_complete_eq (List.length new_c);
+        Util.debugf ~section 4
+          "(@[complete-eq@ :clause %a@ :yields (@[<hv>%a@])@])"
+          (fun k->k C.pp c (Util.pp_list ~sep:" " C.pp) new_c);
+      );
+      new_c
+
+
   type fixed_arg_status =
     | Always of T.t (* This argument is always the given term in all occurences *)
     | Varies        (* This argument contains different terms in differen occurrences *)
@@ -1469,6 +1556,10 @@ module Make(E : Env.S) : S with module Env = E = struct
       Util.debug ~section 1 "setup HO rules";
       Env.Ctx.lost_completeness();
 
+      if Env.flex_get k_arg_cong then ( 
+        Env.add_unary_inf "ho_complete_eq" complete_eq_args
+      );
+
       if Env.flex_get k_resolve_flex_flex then (
         Env.add_basic_simplify remove_ff_constraints
       );
@@ -1658,6 +1749,7 @@ let _prim_enum_simpl = ref false
 let _prim_enum_early_bird = ref false
 let _resolve_flex_flex = ref false
 let _ground_app_vars = ref `Off
+let _arg_cong = ref true
 
 let extension =
   let register env =
@@ -1687,6 +1779,7 @@ let extension =
     E.flex_add k_prim_enum_early_bird !_prim_enum_early_bird;
     E.flex_add k_resolve_flex_flex !_resolve_flex_flex;
     E.flex_add k_ground_app_vars !_ground_app_vars;
+    E.flex_add k_arg_cong !_arg_cong;
 
 
     if E.flex_get k_check_lambda_free = `Only 
@@ -1756,6 +1849,7 @@ let () =
   Options.add_opts
     [ "--ho", Arg.Bool (fun b -> enabled_ := b), " enable/disable HO reasoning";
       "--force-ho", Arg.Bool  (fun b -> force_enabled_ := b), " enable/disable HO reasoning even if the problem is first-order";
+      "--arg-cong", Arg.Bool (fun v -> _arg_cong := v), " enable/disable ArgCong"; 
       "--ho-unif", Arg.Bool (fun v -> enable_unif_ := v), " enable full HO unification";
       "--ho-elim-pred-var", Arg.Bool (fun b -> _elim_pred_var := b), " disable predicate variable elimination";
       "--ho-prim-enum", set_prim_mode_, " set HO primitive enum mode";

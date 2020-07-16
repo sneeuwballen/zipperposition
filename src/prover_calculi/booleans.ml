@@ -263,6 +263,45 @@ module Make(E : Env.S) : S with module Env = E = struct
       | _ -> None
     )
 
+   let nested_eq_rw c =
+    (* TODO(BOOL): currently incompatible with combiantors *)
+    let unif_alg = 
+      if Env.flex_get Combinators.k_enable_combinators 
+      then (fun _ _ -> OSeq.empty)
+      else Env.flex_get Superposition.k_unif_alg in
+    let sc = 0 in
+    let mk_sc t = (t,sc) in 
+    let parents r s = [C.proof_parent_subst r (mk_sc c) s ] in
+    C.eligible_for_bool_infs c
+    |> List.filter_map (fun (t,p) -> 
+      match T.view t with
+      | T.AppBuiltin((Builtin.(Eq|Neq|Equiv|Xor) as hd), ([a;b]|[_;a;b])) ->
+        Some (
+          unif_alg (mk_sc a) (mk_sc b)
+          |> OSeq.map (fun unif_subst_opt ->
+              CCOpt.map (fun unif_subst -> 
+                assert (not @@ US.has_constr unif_subst);
+                let subst = US.subst unif_subst in
+                let repl = 
+                  if hd = Builtin.Eq || hd = Builtin.Equiv
+                  then T.true_ else T.false_ in
+                let new_lits = Array.copy (C.lits c) in
+                Literals.Pos.replace ~at:p ~by:repl new_lits;
+                let renaming = Subst.Renaming.create () in
+                let new_lits = 
+                  Literals.apply_subst renaming subst (mk_sc new_lits)
+                  |> CCArray.to_list 
+                in
+                let rule = Proof.Rule.mk ((if T.equal repl T.true_ then "eq" else "neq") ^ "_rw")  in
+                let proof = Proof.Step.inference ~tags:[Proof.Tag.T_ho] ~rule (parents renaming subst) in
+                C.create ~penalty:(C.penalty c) ~trail:(C.trail c) new_lits proof
+              ) unif_subst_opt))
+      | _ -> None)
+    |> List.iter (fun clause_seq -> 
+      let stm_res = Env.Stm.make ~penalty:(C.penalty c) ~parents:[c] clause_seq in
+      Env.StmQ.add (Env.get_stm_queue ()) stm_res);
+    []
+
   let bool_case_simp (c: C.t) : C.t list option =
     let proof = Proof.Step.simp [C.proof_parent c]
                 ~rule:(Proof.Rule.mk"bool_simp") ~tags:[Proof.Tag.T_ho] in
@@ -760,6 +799,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         Env.add_unary_inf "formula_hoist" formula_hoist;
         Env.add_unary_inf "quant_rw" quantifier_rw;
         Env.add_multi_simpl_rule ~priority:100 replace_bool_vars;
+        Env.add_unary_inf "eq_rw" nested_eq_rw;
       )
 end
 

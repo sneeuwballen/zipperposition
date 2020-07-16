@@ -17,6 +17,7 @@ val key : (module S) Flex_state.key
     calling [register]), the Env's state contains
     a mapping from "superposition" to the packed module. *)
 
+val k_unif_alg : (Term.t Scoped.t -> Term.t Scoped.t -> Unif_subst.t CCOpt.t OSeq.t) Flex_state.key
 val register : sup:(module S) -> unit
 (** Register the superposition module to its Environment's
     mixtbl. Done automatically by the {!extension}. *)

@@ -40,7 +40,6 @@ let stat_condensation = Util.mk_stat "sup.condensation"
 let stat_ext_dec = Util.mk_stat "sup.ext_dec calls"
 let stat_ext_inst = Util.mk_stat "sup.ext_inst calls"
 let stat_clc = Util.mk_stat "sup.clc"
-let stat_complete_eq = Util.mk_stat "ho.complete_eq.steps"
 let stat_orphan_checks = Util.mk_stat "orphan checks"
 
 
@@ -103,7 +102,6 @@ let k_restrict_hidden_sup_at_vars = Flex_state.create_key ()
 let k_ho_disagremeents = Flex_state.create_key ()
 let k_bool_demod = Flex_state.create_key ()
 let k_immediate_simplification = Flex_state.create_key ()
-let k_arg_cong = Flex_state.create_key ()
 let k_bool_eq_fact = Flex_state.create_key ()
 let k_local_rw = Flex_state.create_key ()
 
@@ -318,45 +316,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         CCList.flat_map inst_clauses_w_trigger (make_triggers lhs rhs (Literal.is_pos lit))
       | _ -> []
     ) else []
-
-  let nested_eq_rw c =
-    (* TODO(BOOL): currently incompatible with combiantors *)
-    let unif_alg = 
-      if Env.flex_get Combinators.k_enable_combinators 
-      then (fun _ _ -> OSeq.empty)
-      else Env.flex_get k_unif_alg in
-    let sc = 0 in
-    let mk_sc t = (t,sc) in 
-    let parents r s = [C.proof_parent_subst r (mk_sc c) s ] in
-    C.eligible_for_bool_infs c
-    |> List.filter_map (fun (t,p) -> 
-      match T.view t with
-      | T.AppBuiltin((Builtin.(Eq|Neq|Equiv|Xor) as hd), ([a;b]|[_;a;b])) ->
-        Some (
-          unif_alg (mk_sc a) (mk_sc b)
-          |> OSeq.map (fun unif_subst_opt ->
-              CCOpt.map (fun unif_subst -> 
-                assert (not @@ US.has_constr unif_subst);
-                let subst = US.subst unif_subst in
-                let repl = 
-                  if hd = Builtin.Eq || hd = Builtin.Equiv
-                  then T.true_ else T.false_ in
-                let new_lits = Array.copy (C.lits c) in
-                Lits.Pos.replace ~at:p ~by:repl new_lits;
-                let renaming = Subst.Renaming.create () in
-                let new_lits = 
-                  Literals.apply_subst renaming subst (mk_sc new_lits)
-                  |> CCArray.to_list 
-                in
-                let rule = Proof.Rule.mk ((if T.equal repl T.true_ then "eq" else "neq") ^ "_rw")  in
-                let proof = Proof.Step.inference ~tags:[Proof.Tag.T_ho] ~rule (parents renaming subst) in
-                C.create ~penalty:(C.penalty c) ~trail:(C.trail c) new_lits proof
-              ) unif_subst_opt))
-      | _ -> None)
-    |> List.iter (fun clause_seq -> 
-      let stm_res = Stm.make ~penalty:(C.penalty c) ~parents:[c] clause_seq in
-      StmQ.add (Env.get_stm_queue ()) stm_res);
-    []
 
   let fluidsup_applicable cl =
     not (Env.flex_get k_restrict_fluidsup) ||
@@ -2731,90 +2690,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let ext_eqres given = 
     ZProf.with_prof prof_ext_dec ext_eqres_aux given
 
-  (* complete [f = g] into [f x1…xn = g x1…xn] for each [n ≥ 1] *)
-  let complete_eq_args (c:C.t) : C.t list =
-    let var_offset = C.Seq.vars c |> Type.Seq.max_var |> succ in
-    let eligible = C.Eligible.param c in
-    let aux ?(start=1) ~poly lits lit_idx t u =
-      let n_ty_args, ty_args, _ = Type.open_poly_fun (T.ty t) in
-      assert (n_ty_args = 0);
-      assert (ty_args <> []);
-      let vars =
-        List.mapi
-          (fun i ty -> HVar.make ~ty (i+var_offset) |> T.var)
-          ty_args
-      in
-      CCList.(start -- List.length vars)
-      |> List.map
-        (fun prefix_len ->
-          let vars_prefix = CCList.take prefix_len vars in
-          let new_lit = Literal.mk_eq (T.app t vars_prefix) (T.app u vars_prefix) in
-          let new_lits = new_lit :: CCArray.except_idx lits lit_idx in
-          let proof =
-            Proof.Step.inference [C.proof_parent c]
-              (* THIS NAME IS USED IN HEURISTICS -- CHANGE CAREFULLY! *)
-              ~rule:(Proof.Rule.mk "ho_complete_eq")
-              ~tags:[Proof.Tag.T_ho;Proof.Tag.T_dont_increase_depth]
-          in
-          let penalty = C.penalty c + (if poly then 1 else 0) in
-          let new_c =
-            C.create new_lits proof ~penalty ~trail:(C.trail c) in
-
-          if poly then (
-            C.set_flag SClause.flag_poly_arg_cong_res new_c true;
-          );
-
-          new_c)
-      in
-      let is_poly_arg_cong_res = C.get_flag SClause.flag_poly_arg_cong_res c in
-      let new_c =
-        C.lits c
-        |> Iter.of_array |> Util.seq_zipi
-        |> Iter.filter (fun (idx,lit) -> eligible idx lit)
-        |> Iter.flat_map_l
-          (fun (lit_idx,lit) -> match lit with
-            | Literal.Equation (t, u, true) when Type.is_fun (T.ty t) ->
-              aux ~poly:false (C.lits c) lit_idx t u
-            | Literal.Equation (t, u, true) 
-              when Type.is_var (T.ty t) && not is_poly_arg_cong_res ->
-              (* A polymorphic variable might be functional on the ground level *)
-              let ty_args = 
-                OSeq.iterate [Type.var @@ HVar.fresh ~ty:Type.tType ()] 
-                  (fun types_w -> 
-                    Type.var (HVar.fresh ~ty:Type.tType ()) :: types_w) in
-              let res = 
-                ty_args
-                |> OSeq.mapi (fun arrarg_idx arrow_args -> 
-                    let var = Type.as_var_exn (T.ty t) in
-                    let funty = 
-                      T.of_ty 
-                        (Type.arrow arrow_args (Type.var (HVar.fresh ~ty:Type.tType ()))) in
-                    let subst = Unif_subst.FO.singleton (var,0) (funty,0) in
-                    let renaming, subst = Subst.Renaming.none, Unif_subst.subst subst in
-                    let lits' = Lits.apply_subst renaming subst (C.lits c, 0) in
-                    let t' = Subst.FO.apply renaming subst (t, 0) in
-                    let u' = Subst.FO.apply renaming subst (u, 0) in
-                    let new_cl = aux ~poly:true ~start:(arrarg_idx+1) lits' lit_idx t' u' in
-                    assert(List.length new_cl == 1);
-                    List.hd new_cl
-                ) in
-              let first_two, rest = 
-                OSeq.take 2 res, OSeq.map CCOpt.return (OSeq.drop 2 res) in
-              let stm =  Stm.make ~penalty:(C.penalty c + 20) ~parents:[c] rest in
-              StmQ.add (Env.get_stm_queue ()) stm;
-              
-              OSeq.to_list first_two
-            | _ -> [])
-        |> Iter.to_rev_list
-      in
-      if new_c<>[] then (
-        Util.add_stat stat_complete_eq (List.length new_c);
-        Util.debugf ~section 4
-          "(@[complete-eq@ :clause %a@ :yields (@[<hv>%a@])@])"
-          (fun k->k C.pp c (Util.pp_list ~sep:" " C.pp) new_c);
-      );
-      new_c
-
   (** Find clauses that [given] may demodulate, add them to set *)
   let backward_demodulate set given =
     ZProf.enter_prof prof_back_demodulate;
@@ -3712,20 +3587,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Env.add_basic_simplify local_rewrite
     );
 
-    if Env.flex_get Booleans.k_bool_reasoning == Booleans.BoolHoist
-       && not (Env.flex_get Combinators.k_enable_combinators) then (
-      Env.add_unary_inf "eq_rw" nested_eq_rw;
-    );
-
     if Env.flex_get Combinators.k_enable_combinators
        && Env.flex_get k_subvarsup then (
       Env.add_binary_inf "subvarsup" infer_subvarsup_active;
       Env.add_binary_inf "subvarsup" infer_subvarsup_passive;
     );
 
-    if Env.flex_get k_arg_cong then ( 
-      Env.add_unary_inf "ho_complete_eq" complete_eq_args
-    );
     if Env.flex_get k_switch_stream_extraction then (
       Env.add_generate ~priority:0 "stream_queue_extraction" extract_from_stream_queue_fix_stm)
     else (
@@ -3875,7 +3742,6 @@ let _sort_constraints = ref false
 let _ho_disagremeents = ref `SomeHo
 let _bool_demod = ref false
 let _immediate_simplification = ref false
-let _arg_cong = ref true
 let _try_lfho_unif = ref true
 let _bool_eq_fact = ref true
 
@@ -3936,7 +3802,6 @@ let register ~sup =
   E.flex_add k_ho_disagremeents !_ho_disagremeents;
   E.flex_add k_bool_demod !_bool_demod;
   E.flex_add k_immediate_simplification !_immediate_simplification;
-  E.flex_add k_arg_cong !_arg_cong;
   E.flex_add k_bool_eq_fact !_bool_eq_fact;
 
 
@@ -3988,7 +3853,6 @@ let extension =
 let () =
   Params.add_opts
     [
-      "--arg-cong", Arg.Bool (fun v -> _arg_cong := v), " enable/disable ArgCong"; 
       "--semantic-tauto", Arg.Bool (fun v -> _use_semantic_tauto := v), " enable/disable semantic tautology check";
       "--dot-sup-into", Arg.String (fun s -> _dot_sup_into := Some s), " print superposition-into index into file";
       "--dot-sup-from", Arg.String (fun s -> _dot_sup_from := Some s), " print superposition-from index into file";
@@ -4140,7 +4004,6 @@ let () =
     );
   Params.add_to_mode "fo-complete-basic" (fun () ->
       _use_simultaneous_sup := false;
-      _arg_cong := false;
       _local_rw := `GreenContext;
       _unif_logop_mode := `Conservative
     );
