@@ -3,29 +3,33 @@
 
 (** {1 Signature} *)
 
-type t = (((Type.t * bool) ID.Map.t) * (ID.Set.t Type.Map.t))
+type t = {
+  sym_map: (Type.t * bool) ID.Map.t;
+  ty_map: ID.Set.t Type.Map.t;
+}
 (** A signature maps symbols to their sort *)
 
-let empty =
-  (ID.Map.empty, Type.Map.empty)
+let mk_ sym_map ty_map : t = {sym_map; ty_map}
 
-let is_empty (sym_map, ty_map) =
+let empty = mk_ ID.Map.empty Type.Map.empty
+
+let is_empty {sym_map; ty_map} =
   let sym_map_empty = ID.Map.is_empty sym_map in
   assert(not sym_map_empty || Type.Map.is_empty ty_map);
   sym_map_empty
 
-let mem (sym_map, ty_map) s = ID.Map.mem s sym_map
+let mem {sym_map; ty_map} s = ID.Map.mem s sym_map
 
-let find_exn (sym_map, ty_map) s =
+let find_exn {sym_map; ty_map} s : Type.t =
   let (t, _) = ID.Map.find s sym_map in t
 
 let find signature s =
   try Some (find_exn signature s)
   with Not_found -> None
 
-let find_by_type (sym_map ,ty_map) ty =
+let find_by_type {sym_map; ty_map} ty =
   let res = Type.Map.get_or ty ty_map ~default:ID.Set.empty in
-  assert(ID.Set.for_all (fun id -> 
+  assert(ID.Set.for_all (fun id ->
       let ty', _ = ID.Map.find id sym_map in
       Type.equal ty' ty) res);
   res
@@ -43,7 +47,7 @@ let () = Printexc.register_printer
             ID.pp id  Type.pp old Type.pp new_ )
       | _ -> None)
 
-let declare ((sym_map, ty_map) as signature) id ty =
+let declare ({sym_map; ty_map} as signature) id ty =
   try
     let ty' = find_exn signature id in
     if not (Type.equal ty ty') then raise (AlreadyDeclared (id, ty', ty))
@@ -52,12 +56,12 @@ let declare ((sym_map, ty_map) as signature) id ty =
     if not (InnerTerm.DB.closed (ty : Type.t :> InnerTerm.t))
     then raise (Invalid_argument "Signature.declare: non-closed type");
     let sym_map = ID.Map.add id (ty, false) sym_map in
-    let ty_map = 
-      let id_set = Type.Map.get_or ty ty_map ~default:ID.Set.empty in 
+    let ty_map =
+      let id_set = Type.Map.get_or ty ty_map ~default:ID.Set.empty in
       Type.Map.add ty (ID.Set.add id id_set) ty_map in
-    (sym_map, ty_map)
+    {sym_map; ty_map}
 
-let cardinal (sym_map, _) = ID.Map.cardinal sym_map
+let cardinal sgn = ID.Map.cardinal sgn.sym_map
 
 let arity signature s =
   let ty = find_exn signature s in
@@ -66,16 +70,16 @@ let arity signature s =
     failwith (CCFormat.sprintf "symbol %a has ill-formed type %a" ID.pp s Type.TPTP.pp ty)
   | Type.Arity (a,b) -> a, b
 
-let is_ground (sym_map, _) =
+let is_ground {sym_map; _} =
   ID.Map.for_all (fun _ (ty, _) -> Type.is_ground ty) sym_map
 
-let ty_map_of_s_map smap = 
-  let ty_map = ID.Map.fold (fun id (ty, _) acc -> 
-      let id_set = Type.Map.get_or ty acc ~default:ID.Set.empty in 
+let ty_map_of_s_map smap =
+  let ty_map = ID.Map.fold (fun id (ty, _) acc ->
+      let id_set = Type.Map.get_or ty acc ~default:ID.Set.empty in
       Type.Map.add ty (ID.Set.add id id_set) acc) smap Type.Map.empty in
   ty_map
 
-let merge (s_map1, _) (s_map2, _) =
+let merge s1 s2 =
   let s_map = ID.Map.merge
       (fun s t1 t2 -> match t1, t2 with
          | None, None -> assert false
@@ -85,53 +89,54 @@ let merge (s_map1, _) (s_map2, _) =
            else raise (AlreadyDeclared (s, ty1, ty2))
          | Some (s1,c1), None -> Some (s1,c1)
          | None, Some (s2,c2) -> Some (s2,c2))
-      s_map1 s_map2 in
-  s_map, ty_map_of_s_map s_map
+      s1.sym_map s2.sym_map in
+  mk_ s_map (ty_map_of_s_map s_map)
 
-let diff (s_map1, _) (s_map2, _) =
+let diff s1 s2 =
   let s_map = ID.Map.merge
       (fun _ ty1 ty2 -> match ty1, ty2 with
          | Some ty1, None -> Some ty1
          | Some _, Some _
          | None, Some _
          | None, None -> None)
-      s_map1 s_map2 in
-  s_map, ty_map_of_s_map s_map
+      s1.sym_map s2.sym_map in
+  mk_ s_map (ty_map_of_s_map s_map)
 
-let well_founded (s,_) =
+let well_founded s =
   ID.Map.exists
     (fun _ (ty,_) -> match Type.arity ty with
        | Type.Arity (_, 0) -> true
        | _ -> false)
-    s
+    s.sym_map
 
-let sym_in_conj s (s_map, _) =
-  snd (ID.Map.get_or s s_map ~default:(Type.int, false))
+let sym_in_conj s sgn =
+  snd (ID.Map.get_or s sgn.sym_map ~default:(Type.int, false))
 
-let set_sym_in_conj s ((s_map,ty_map) as signature) =
+let set_sym_in_conj s signature =
   let t = find_exn signature s in
-  let s_map = ID.Map.add s (t, true) s_map in
-  s_map,ty_map
+  let sym_map = ID.Map.add s (t, true) signature.sym_map in
+  {signature with sym_map}
 
 module Seq = struct
-  let symbols (s,_) =
-    ID.Map.to_seq s |> Iter.map fst
+  let symbols s =
+    ID.Map.to_seq s.sym_map |> Iter.map fst
 
-  let types (s,_) =
-    ID.Map.to_seq s |> Iter.map snd |> Iter.map fst
+  let types s =
+    ID.Map.to_seq s.sym_map |> Iter.map snd |> Iter.map fst
 
-  let to_seq (s,_) = ID.Map.to_seq s
+  let to_seq s = ID.Map.to_seq s.sym_map
+
+  let of_seq l = Iter.fold (fun s (id,ty) -> declare s id ty) empty l
 end
 
 let to_set s = Seq.symbols s |> ID.Set.of_seq
 
-let to_list (s,_) = ID.Map.to_list s
+let to_list s = ID.Map.to_list s.sym_map
 
-let iter (s,_) f =
-  ID.Map.iter f s
+let iter s f = ID.Map.iter f s.sym_map
 
-let fold (s,_) acc f =
-  ID.Map.fold (fun s (ty,c) acc -> f acc s (ty,c)) s acc
+let fold s acc f =
+  ID.Map.fold (fun s (ty,c) acc -> f acc s (ty,c)) s.sym_map acc
 
 let is_bool signature s =
   let rec is_bool ty = match Type.view ty with
