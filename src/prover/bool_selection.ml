@@ -15,8 +15,9 @@ type t = Literal.t array -> (Term.t * Pos.t) list
 
 type parametrized = strict:bool -> ord:Ordering.t -> t
 
-(* Zipperposition interprets argumen positions
-   inverted, so we need to convert them before calling PositionBuilder *)
+(* Zipperposition interprets argument positions
+   inverted, so we need to convert
+   them before calling PositionBuilder *)
 let inv_idx args idx = 
     List.length args - idx - 1
 

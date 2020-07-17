@@ -64,8 +64,6 @@ let prof_infer_equality_resolution = ZProf.make "sup.infer_equality_resolution"
 let prof_infer_equality_factoring = ZProf.make "sup.infer_equality_factoring"
 let prof_queues = ZProf.make "sup.queues"
 
-let k_trigger_bool_inst = Flex_state.create_key ()
-let k_trigger_bool_ind = Flex_state.create_key ()
 let k_sup_at_vars = Flex_state.create_key ()
 let k_sup_in_var_args = Flex_state.create_key ()
 let k_sup_under_lambdas = Flex_state.create_key ()
@@ -139,8 +137,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   (* let _idx_fv = ref (SubsumIdx.of_signature (Ctx.signature()) ()) *)
 
   let _idx_simpl = ref (UnitIdx.empty ())
-  let _cls_w_pred_vars = ref (Type.Map.empty) (* type --> (clause,var) *)
-  let _trigger_bools   = ref (Type.Map.empty) (* type --> boolean trigger *)
+  
   let _ext_dec_from_idx = ref (ID.Map.empty)
   let _ext_dec_into_idx = ref (ID.Map.empty)
 
@@ -154,23 +151,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let ord =
     Ctx.ord ()
 
-  let get_triggers c =
-    let trivial_trigger t =
-      let body = snd @@ T.open_fun t in
-      T.is_var body || T.is_true_or_false body in
-
-    Literals.fold_terms ~ord ~subterms:true ~eligible:C.Eligible.always 
-      ~which:`All (C.lits c) ~fun_bodies:false 
-    |> Iter.filter_map (fun (t,p) -> 
-        let ty = Term.ty t and hd = Term.head_term t in
-        let cached_t = Subst.FO.canonize_all_vars t in
-        if not (Term.Set.mem cached_t !Higher_order.prim_enum_terms) &&
-           Type.is_fun ty && Type.returns_prop ty && not (Term.is_var hd) &&
-           not (trivial_trigger t) then (
-          Some t
-        ) else None
-      )
-
   let has_bad_occurence_elsewhere c var pos =
     assert(T.is_var var);
     Lits.fold_terms ~ord ~subterms:true ~eligible:C.Eligible.always ~which:`All
@@ -183,139 +163,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       | T.App(hd, _) -> T.equal hd var
       | _ -> false
     )
-  
-  let instantiate_w_bool ~clause ~var ~trigger =
-    assert(Type.equal (T.ty var) (T.ty trigger));
-
-    let cl_sc, trig_sc = 0, 1 in
-    let subst = Subst.FO.bind' Subst.empty (T.as_var_exn var, cl_sc) (trigger, trig_sc) in
-    let renaming = Subst.Renaming.create () in
-    let lits = Literals.apply_subst renaming subst (C.lits clause, cl_sc) in
-    let lits = Literals.map (fun t -> Lambda.eta_reduce @@ Lambda.snf t) lits in
-      let proof =
-        Proof.Step.inference 
-          ~rule:(Proof.Rule.mk "triggered_bool_instantiation") 
-          ~tags:[Proof.Tag.T_ho; Proof.Tag.T_cannot_orphan]
-          [C.proof_parent_subst renaming (clause, cl_sc) subst] in
-    let res = C.create_a lits proof ~penalty:(C.penalty clause) ~trail:(C.trail clause) in
-    (* CCFormat.printf "instatiate:@.c:@[%a@]@.subst:@[%a@]@.res:@[%a@]@." C.pp clause Subst.pp subst C.pp res; *)
-    res
-
-  let inst_clauses_w_trigger t =
-    let triggers = Type.Map.get_or ~default:[] (T.ty t) !_trigger_bools in
-    if not (CCList.mem ~eq:T.equal t triggers) then (
-      _trigger_bools := Type.Map.update (T.ty t) (function 
-        | None -> Some [t]
-        | Some res -> Some (t :: res)
-      ) !_trigger_bools;
-
-      Type.Map.get_or ~default:[] (T.ty t) !_cls_w_pred_vars
-      |> CCList.map (fun (clause,var) -> instantiate_w_bool ~clause ~var ~trigger:t)
-    ) else []
-
-  let insert_new_trigger t =
-    inst_clauses_w_trigger t
-    |> CCList.to_iter
-    |> Env.add_passive
-
-
-  let handle_new_pred_var_clause (clause,var) =
-    assert(T.is_var var);
-    let ty = T.ty var in
-    
-    Type.Map.get_or ~default:[] ty !_trigger_bools
-    |> CCList.map (fun trigger -> instantiate_w_bool ~clause ~var ~trigger)
-    |> CCList.to_iter
-    |> Env.add_passive;
-
-    _cls_w_pred_vars := Type.Map.update ty (function 
-      | None -> Some [(clause, var)]
-      | Some res -> Some ((clause, var) :: res)
-    ) !_cls_w_pred_vars;
-
-    Signal.ContinueListening
-
-  let handle_new_skolem_sym (c,trigger) =
-    let trig_hd = T.head_term trigger in
-    assert(T.is_const trig_hd);
-    assert(ID.is_postcnf_skolem (T.as_const_exn trig_hd));
-
-    if C.proof_depth c <  Env.flex_get k_trigger_bool_inst 
-    then  insert_new_trigger trigger;
-    
-    Signal.ContinueListening
-
-
-  let update_triggers cl =
-    (* if triggered boolean instantiation is off
-       k_trigger_bool_inst is -1 *)
-    if C.proof_depth cl < Env.flex_get k_trigger_bool_inst then (
-      let new_triggers = (get_triggers cl) in
-      if not (Iter.is_empty new_triggers) then (
-        Iter.iter insert_new_trigger new_triggers
-    ));
-    Signal.ContinueListening
-
-  let trigger_induction cl =
-    (* abstracts away closed subterm from the term t
-       by replacing it with (accordingly shifted) DB variable 0 *)
-    let abstract ~subterm t =
-      assert(T.DB.is_closed subterm);
-
-      let rec aux ~depth t =
-        if T.equal subterm t then (
-          T.bvar ~ty:(T.ty subterm) depth
-        ) else (
-          match T.view t with
-          | T.App(hd, args) ->
-            let hd' = aux ~depth hd in
-            let args' = List.map (aux ~depth) args in
-            if T.equal hd hd' && T.same_l args args' then t
-            else T.app hd' args'
-          | T.AppBuiltin(hd, args) ->
-            let args' = List.map (aux ~depth) args in
-            if T.same_l args args' then t
-            else T.app_builtin ~ty:(T.ty t) hd args'
-          | T.Fun _ ->
-            let pref, body = T.open_fun t in
-            let body' = aux ~depth:(depth+(List.length pref)) body in
-            if T.equal body body' then t else T.fun_l pref body'
-          | _ -> t
-        ) in
-      
-      let res = aux ~depth:0 t in
-      assert (Type.equal (T.ty res) (T.ty t));
-      if T.equal res t then None else (Some res) in
-    
-    let make_triggers lhs rhs sign =
-      let lhs_body, rhs_body = snd (Term.open_fun lhs), snd (Term.open_fun rhs) in
-      let immediate_args =
-        if (T.is_const (T.head_term lhs_body)) && 
-           (T.is_const (T.head_term rhs_body)) then (
-          List.sort_uniq T.compare (T.args lhs_body @ T.args rhs_body)
-        ) else [] in
-      CCList.filter_map (fun arg -> 
-        if T.DB.is_closed arg && not (Type.is_tType (T.ty arg)) then (
-          match abstract ~subterm:arg lhs, abstract ~subterm:arg rhs with
-          | Some(lhs'), Some(rhs') ->
-            assert (Type.equal (T.ty lhs') (T.ty rhs'));
-            (* Flipping the sign that is present in conjecture,
-               to prove the negated conjecture using induction *)
-            let build_body sign = if sign then T.Form.neq else T.Form.eq in
-            let res = T.fun_ (T.ty arg) (build_body sign lhs' rhs') in
-            assert (T.DB.is_closed res);
-            Some res
-          | _ -> None
-        ) else None
-      ) immediate_args in
-
-    if C.proof_depth cl < Env.flex_get k_trigger_bool_ind &&
-       CCOpt.is_some (C.distance_to_goal cl) then (
-      match C.lits cl with
-      | [| Literal.Equation(lhs, rhs, _) as lit |] ->
-        CCList.flat_map inst_clauses_w_trigger (make_triggers lhs rhs (Literal.is_pos lit))
-      | _ -> []
-    ) else []
 
   let fluidsup_applicable cl =
     not (Env.flex_get k_restrict_fluidsup) ||
@@ -570,7 +417,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       (fun c ->
          _idx_fv := SubsumIdx.add !_idx_fv c;
          ignore(_update_active TermIndex.add c);
-         ignore(update_triggers c);
          update_ext_dec_indices insert_into_ext_dec_index c);
     Signal.on PS.ActiveSet.on_remove_clause
       (fun c ->
@@ -3603,10 +3449,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Env.add_unary_inf "recognize injectivity" recognize_injectivity;
     );
 
-    if Env.flex_get k_trigger_bool_ind > 0 then (
-      Env.add_unary_inf "trigger bool ind" trigger_induction
-    );
-
     if Env.flex_get k_ext_rules_kind == `ExtFamily ||
        Env.flex_get k_ext_rules_kind == `Both then (
       Env.add_binary_inf "ext_dec_act" ext_sup_act;
@@ -3652,10 +3494,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       if Env.flex_get k_lambdasup != -1 then (
         Env.add_binary_inf "lambdasup_active(from)" infer_lambdasup_from;
         Env.add_binary_inf "lambdasup_passive(into)" infer_lambdasup_into;
-      );
-      if Env.flex_get k_trigger_bool_inst > 0 then (
-        Signal.on Env.on_pred_var_elimination handle_new_pred_var_clause;
-        Signal.on Env.on_pred_skolem_introduction handle_new_skolem_sym;
       );
     )
     else (
@@ -3705,8 +3543,6 @@ let _dupsup_penalty = ref 2
 let _fluidsup = ref true
 let _subvarsup = ref true
 let _dupsup = ref true
-let _trigger_bool_inst = ref (-1)
-let _trigger_bool_ind = ref (-1)
 let _recognize_injectivity = ref false
 let _restrict_fluidsup = ref false
 let _check_sup_at_var_cond = ref true
@@ -3764,8 +3600,6 @@ let register ~sup =
   let module E = Sup.Env in
 
   E.update_flex_state (Flex_state.add key sup);
-  E.flex_add k_trigger_bool_inst !_trigger_bool_inst;
-  E.flex_add k_trigger_bool_ind !_trigger_bool_ind;
   E.flex_add k_sup_at_vars !_sup_at_vars;
   E.flex_add k_sup_in_var_args !_sup_in_var_args;
   E.flex_add k_sup_under_lambdas !_sup_under_lambdas;
@@ -3904,10 +3738,6 @@ let () =
       "--restrict-fluidsup" , Arg.Bool (fun v -> _restrict_fluidsup := v), " enable/disable restriction of fluidSup to up to two literal or inital clauses";
       "--use-weight-for-solid-subsumption", Arg.Bool (fun v -> _use_weight_for_solid_subsumption := v), 
       " enable/disable superposition to and from pure variable equations";
-      "--trigger-bool-inst", Arg.Set_int _trigger_bool_inst
-      , " instantiate predicate variables with boolean terms already in the proof state. Argument is the maximal proof depth of predicate variable";
-       "--trigger-bool-ind", Arg.Set_int _trigger_bool_ind
-      , " abstract away constants from the goal and use them to trigger axioms of induction";
       "--ho-unif-level",
       Arg.Symbol (["full-framework";"full"; "pragmatic-framework";], (fun str ->
           _unif_alg := if (String.equal "full" str) then `OldJP
