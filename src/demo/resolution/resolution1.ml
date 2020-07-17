@@ -331,9 +331,10 @@ let process_file f =
       let ctx = Skolem.create() in
       let decls = Cnf.cnf_of_seq ~ctx (CCVector.to_seq st) in
       _signature :=
-        CCVector.to_seq decls
+        CCVector.to_iter decls
         |> Cnf.type_declarations
-        |> ID.Map.map (fun ty -> conv_ty ty, false);
+        |> ID.Map.map (fun ty -> conv_ty ty) |> ID.Map.to_iter
+        |> Signature.Seq.of_seq;
       let clauses =
         CCVector.to_seq decls
         |> Cnf.convert
