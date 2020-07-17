@@ -133,7 +133,6 @@ module Make(E : Env.S) : S with module Env = E = struct
   let handle_new_pred_var_clause (clause,var) =
     assert(T.is_var var);
     let ty = T.ty var in
-    
     Type.Map.get_or ~default:[] ty !_trigger_bools
     |> CCList.map (fun trigger -> instantiate_w_bool ~clause ~var ~trigger)
     |> CCList.to_iter
@@ -213,11 +212,9 @@ module Make(E : Env.S) : S with module Env = E = struct
        CCOpt.is_some (C.distance_to_goal cl) then (
       match C.lits cl with
       | [| Literal.Equation(lhs, rhs, _) as lit |] ->
-        CCFormat.printf "finding trigger @[%a@]@." C.pp cl;
         let res = 
           CCList.flat_map inst_clauses_w_trigger (make_triggers lhs rhs (Literal.is_pos lit))
         in
-        CCFormat.printf "res:@[%a@]@." (CCList.pp C.pp) res;
         res
       | _ -> []
     ) else []
@@ -930,7 +927,6 @@ module Make(E : Env.S) : S with module Env = E = struct
     | _ ->
       Env.add_basic_simplify normalize_equalities;
       if Env.flex_get k_trigger_bool_inst > 0 || Env.flex_get k_trigger_bool_ind > 0 then (
-        CCFormat.printf "turning on triggers@.";
         Signal.on Env.on_pred_var_elimination handle_new_pred_var_clause;
         Signal.on Env.on_pred_skolem_introduction handle_new_skolem_sym;
       );
