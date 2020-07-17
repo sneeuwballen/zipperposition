@@ -620,8 +620,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let active_idx = Lits.Pos.idx info.active_pos in
     let shift_vars = if info.sup_kind = LambdaSup then 0 else -1 in
     let passive_idx, passive_lit_pos = Lits.Pos.cut info.passive_pos in
-    let passive_at_top = 
-      passive_lit_pos == (P.Left P.Stop)|| passive_lit_pos == (P.Right P.Stop) 
+    let passive_at_top =
+      match passive_lit_pos with
+      | P.Left P.Stop | P.Right P.Stop -> true
+      | _ -> false
     in
 
     assert(Array.for_all Literal.no_prop_invariant (C.lits info.passive));
@@ -850,8 +852,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             info.sup_kind = DupSup || not (T.is_var (T.head_term info.u_p)));
     let active_idx = Lits.Pos.idx info.active_pos in
     let passive_idx, passive_lit_pos = Lits.Pos.cut info.passive_pos in
-    let passive_at_top = 
-      passive_lit_pos == (P.Left P.Stop)|| passive_lit_pos == (P.Right P.Stop) 
+    let passive_at_top =
+      match passive_lit_pos with
+      | P.Left P.Stop | P.Right P.Stop -> true
+      | _ -> false
     in
     let shift_vars = if info.sup_kind = LambdaSup then 0 else -1 in
     try
