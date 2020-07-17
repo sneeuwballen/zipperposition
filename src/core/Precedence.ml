@@ -89,7 +89,7 @@ module Constr = struct
     Signal.on on_signature_update (update_signature _sig);
     let open CCOrd in
     (* bigger arity means bigger symbol *)
-    - (Bool.compare (is_post_cnf_skolem ~sig_ref:_sig s1) (is_post_cnf_skolem ~sig_ref:_sig s2))
+    - (CCBool.compare (is_post_cnf_skolem ~sig_ref:_sig s1) (is_post_cnf_skolem ~sig_ref:_sig s2))
     <?> (CCInt.compare, get_arity ~sig_ref:_sig s1, get_arity ~sig_ref:_sig s2)
     <?> (ID.compare, s1, s2)
 
@@ -97,7 +97,7 @@ module Constr = struct
     let _sig = ref signature in
     Signal.on on_signature_update (update_signature _sig);
     let open CCOrd in
-    - (Bool.compare (is_post_cnf_skolem ~sig_ref:_sig s1) (is_post_cnf_skolem ~sig_ref:_sig s2))
+    - (CCBool.compare (is_post_cnf_skolem ~sig_ref:_sig s1) (is_post_cnf_skolem ~sig_ref:_sig s2))
     <?> (CCInt.compare, get_arity ~sig_ref:_sig s2, get_arity ~sig_ref:_sig s1)
     <?> (ID.compare, s1, s2)
 
@@ -212,7 +212,7 @@ module Constr = struct
       let n1 = find_freq s1 in
       let n2 = find_freq s2 in
 
-      - (Bool.compare (is_post_cnf_skolem ~sig_ref s1) (is_post_cnf_skolem ~sig_ref s2))
+      - (CCBool.compare (is_post_cnf_skolem ~sig_ref s1) (is_post_cnf_skolem ~sig_ref s2))
       (* post-cnf symbols have the same value of n2 and n1 *)
       <?> (CCInt.compare, n2, n1)
       <?> (ID.compare, s1, s2)

@@ -788,14 +788,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     assert(Array.for_all Literal.no_prop_invariant (C.lits info.passive));
     assert(Array.for_all Literal.no_prop_invariant (C.lits info.passive));
     try
-      Util.debugf ~section 3 
-        "@[<2>sup, kind %s@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a@]@])@ \
-         (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@].\n"
-        (fun k -> k
-            (kind_to_str info.sup_kind) C.pp info.active sc_a T.pp info.s T.pp info.t
-            C.pp info.passive sc_p Lit.pp info.passive_lit
-            Position.pp info.passive_pos US.pp info.subst);
-
       if (info.sup_kind = LambdaSup && US.has_constr info.subst) then (
         raise (ExitSuperposition "Might sneak in bound vars through constraints.")
       );
