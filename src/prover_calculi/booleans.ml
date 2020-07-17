@@ -405,7 +405,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         ~tags:[Proof.Tag.T_ho] in
 
     C.eligible_for_bool_infs c
-    |> List.filter_map (fun (t,p) -> 
+    |> CCList.filter_map (fun (t,p) -> 
       (* TODO(BOOL): Implement skolem reusing *)
       match T.view t with
       | T.AppBuiltin(Builtin.(ForallConst|ExistsConst), [_;body]) ->
@@ -434,7 +434,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let mk_sc t = (t,sc) in 
     let parents r s = [C.proof_parent_subst r (mk_sc c) s ] in
     C.eligible_for_bool_infs c
-    |> List.filter_map (fun (t,p) -> 
+    |> CCList.filter_map (fun (t,p) -> 
       match T.view t with
       | T.AppBuiltin((Builtin.(Eq|Neq|Equiv|Xor) as hd), ([a;b]|[_;a;b])) ->
         Some (
