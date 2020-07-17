@@ -6,7 +6,10 @@
 (** A signature is a finite mapping from identifiers to types
     and a property sym_in_conjecture. *)
 
-type t = (((Type.t * bool) ID.Map.t) * (ID.Set.t Type.Map.t))
+type t = private {
+  sym_map: (Type.t * bool) ID.Map.t;
+  ty_map: ID.Set.t Type.Map.t;
+}
 (** A signature maps symbols to types, and there is a map in the backwards direction *)
 
 val empty : t
@@ -66,6 +69,7 @@ module Seq : sig
   val symbols : t -> ID.t Iter.t
   val types : t -> Type.t Iter.t
   val to_seq : t -> (ID.t * (Type.t * bool)) Iter.t
+  val of_seq : (ID.t * Type.t) Iter.t -> t
 end
 
 val to_set : t -> ID.Set.t
