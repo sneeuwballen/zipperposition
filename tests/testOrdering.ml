@@ -61,15 +61,15 @@ let check_ordering_inv_by_subst ~gen_t ord =
   let gen = QCheck.make ~print:pp ~small:size gen in
   (* do type inference on the fly
   let tyctx = TypeInference.Ctx.create () in
-  let signature = ref Signature.empty in
   *)
+  let signature = ref Signature.empty in
   let ord = ref ord in
   let prop (t1, t2, subst) =
     (* declare symbols *)
     Iter.of_list [t1;t2]
       |> Iter.flat_map T.Seq.symbols
-      |> ID.Set.of_seq |> ID.Set.to_seq
-      |> O.add_seq !ord;
+      |> ID.Set.of_seq |> ID.Set.to_list
+      |> O.add_list ~signature:!signature !ord;
     let t1' = S.apply Subst.Renaming.none subst (t1,0) in
     let t2' = S.apply Subst.Renaming.none subst (t2,0) in
     (* check that instantiating variables preserves ordering *)
@@ -83,12 +83,13 @@ let check_ordering_trans ~arb_t ord =
   let name = CCFormat.sprintf "ordering_%s_transitive" (O.name ord) in
   let arb = QCheck.triple arb_t arb_t arb_t in
   let ord = ref ord in
+  let signature = ref Signature.empty in
   let prop (t1, t2, t3) =
     (* declare symbols *)
     Iter.of_list [t1;t2;t3]
       |> Iter.flat_map T.Seq.symbols
-      |> ID.Set.of_seq |> ID.Set.to_seq
-      |> O.add_seq !ord;
+      |> ID.Set.of_seq |> ID.Set.to_list
+      |> O.add_list ~signature:!signature !ord;
     (* check that instantiating variables preserves ordering *)
     let o12 = O.compare !ord t1 t2 in
     let o23 = O.compare !ord t2 t3 in
@@ -104,12 +105,13 @@ let check_ordering_swap_args ~arb_t ord =
   let name = CCFormat.sprintf "ordering_%s_swap_args" (O.name ord) in
   let arb = QCheck.pair arb_t arb_t in
   let ord = ref ord in
+  let signature = ref Signature.empty in
   let prop (t1, t2) =
     (* declare symbols *)
     Iter.of_list [t1;t2]
       |> Iter.flat_map T.Seq.symbols
-      |> ID.Set.of_seq |> ID.Set.to_seq
-      |> O.add_seq !ord;
+      |> ID.Set.of_seq |> ID.Set.to_list
+      |> O.add_list ~signature:!signature !ord;
     (* check that instantiating variables preserves ordering *)
     let o12 = O.compare !ord t1 t2 in
     let o21 = O.compare !ord t2 t1 in
@@ -133,13 +135,14 @@ let check_ordering_subterm ~arb_t ord =
   let name = CCFormat.sprintf "ordering_%s_subterm_property" (O.name ord) in
   let arb = arb_t in
   let ord = ref ord in
+  let signature = ref Signature.empty in
   let prop t =
     if contains_ho t then QCheck.assume_fail() else
     (* declare symbols *)
     Iter.of_list [t]
       |> Iter.flat_map T.Seq.symbols
-      |> ID.Set.of_seq |> ID.Set.to_seq
-      |> O.add_seq !ord;
+      |> ID.Set.of_seq |> ID.Set.to_list
+      |> O.add_list ~signature:!signature !ord;
     T.Seq.subterms_depth t
     |> Iter.filter_map (fun (t,i) -> if i>0 then Some t else None)
     |> Iter.for_all
