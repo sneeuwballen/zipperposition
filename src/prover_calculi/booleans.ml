@@ -302,6 +302,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                 ~rule:(Proof.Rule.mk "bool_hoist") ~tags:[Proof.Tag.T_ho] in
 
     C.eligible_for_bool_infs c
+    |> SClause.TPSet.to_list
     |> List.filter (fun (t,_) -> 
         match T.view t with
         | T.AppBuiltin(hd,_) ->
@@ -321,6 +322,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         ~rule:(Proof.Rule.mk (prefix^"_hoist")) ~tags:[Proof.Tag.T_ho] in
 
     C.eligible_for_bool_infs c
+    |> SClause.TPSet.to_list
     |> List.filter (fun (t,_) -> 
         match T.view t with
         | T.AppBuiltin(hd,_) ->
@@ -381,6 +383,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
 
     C.eligible_for_bool_infs c
+    |> SClause.TPSet.to_list
     |> List.find_opt (fun (t,_) -> 
         Type.is_prop (T.ty t) 
           &&
@@ -405,6 +408,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         ~tags:[Proof.Tag.T_ho] in
 
     C.eligible_for_bool_infs c
+    |> SClause.TPSet.to_list
     |> CCList.filter_map (fun (t,p) -> 
       (* TODO(BOOL): Implement skolem reusing *)
       match T.view t with
@@ -434,6 +438,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let mk_sc t = (t,sc) in 
     let parents r s = [C.proof_parent_subst r (mk_sc c) s ] in
     C.eligible_for_bool_infs c
+    |> SClause.TPSet.to_list
     |> CCList.filter_map (fun (t,p) -> 
       match T.view t with
       | T.AppBuiltin((Builtin.(Eq|Neq|Equiv|Xor) as hd), ([a;b]|[_;a;b])) ->

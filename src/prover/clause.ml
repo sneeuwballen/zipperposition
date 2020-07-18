@@ -46,6 +46,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     max_lits : int list Lazy.t; (** bitvector for maximal lits *)
     mutable proof : proof_step; (** Proof of the clause *)
     mutable eligible_res: BV.t option; (* eligible for resolution? *)
+    mutable eligible_bool : SClause.TPSet.t option;
   }
 
   type clause = t
@@ -110,7 +111,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     (* create the structure *)
     let ord = Ctx.ord () in
     let max_lits = lazy ( BV.to_list @@ Lits.maxlits sclause.lits ~ord ) in
-    let c = {
+    let rec c = {
       sclause;
       penalty;
       selected;
@@ -118,6 +119,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       proof;
       max_lits;
       eligible_res=None;
+      eligible_bool=None;
     } in
     (* return clause *)
     Util.incr_stat stat_clause_create;
@@ -272,7 +274,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
         bv
     end
 
-  let eligible_for_bool_infs c =
+  let eligible_for_bool_infs_ c =
     let module PB = Position.Build in
     let starting_positions = 
       Lazy.force c.bool_selected
@@ -309,7 +311,6 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
           CCFormat.printf "failed for @[%a@]::@[%a@]@." Lits.pp (lits c) Position.pp pos;
           assert false;) 
       (starting_positions @ resolution_positions)
-      |> CCList.sort_uniq ~cmp:(fun (_,p1) (_,p2) -> Position.compare p1 p2)
     in
 
     if CCList.is_empty res then (
@@ -322,6 +323,14 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     );
 
     res
+
+    let eligible_for_bool_infs c =
+      match c.eligible_bool with 
+      | None ->
+        let res = SClause.TPSet.of_list (eligible_for_bool_infs_ c) in
+        c.eligible_bool <- Some res;
+        res
+      | Some cache -> cache
 
   let eta_reduce c =
     let lit_arr = lits c in

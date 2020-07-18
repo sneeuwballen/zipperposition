@@ -209,12 +209,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let lambdasup = Env.flex_get k_lambdasup in
     let demod_in_var_args = Env.flex_get k_demod_in_var_args in
     let lambda_demod = Env.flex_get k_lambda_demod in
+    let module TPSet = SClause.TPSet in
 
 
     _idx_sup_into :=
       Lits.fold_terms ~vars:sup_at_vars ~var_args:sup_in_var_args ~fun_bodies:sup_under_lambdas 
         ~ty_args:false ~ord ~which:`Max ~subterms:true  ~eligible:(C.Eligible.res c) (C.lits c)
-      |> Iter.append (CCList.to_iter @@ C.eligible_for_bool_infs c)
+      |> Iter.append (TPSet.to_iter @@ C.eligible_for_bool_infs c)
+      |> Iter.sort_uniq ~cmp:(fun (_, p1) (_, p2) -> Position.compare p1 p2)
       |> Iter.filter (fun (t, _) ->
           (* Util.debugf ~section 3 "@[ Filtering vars %a,1  @]" (fun k-> k T.pp t); *)
           (not (T.is_var t) || T.is_ho_var t))
@@ -609,6 +611,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let do_classic_superposition info =
     let open SupInfo in
     let module P = Position in
+    let module TPS = SClause.TPSet in
     Util.incr_stat stat_superposition_call;
     let sc_a = info.scope_active in
     let sc_p = info.scope_passive in
@@ -620,10 +623,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let active_idx = Lits.Pos.idx info.active_pos in
     let shift_vars = if info.sup_kind = LambdaSup then 0 else -1 in
     let passive_idx, passive_lit_pos = Lits.Pos.cut info.passive_pos in
-    let passive_at_top =
-      match passive_lit_pos with
-      | P.Left P.Stop | P.Right P.Stop -> true
-      | _ -> false
+    let bool_inference = 
+      TPS.mem (info.u_p, info.passive_pos) (C.eligible_for_bool_infs info.passive)
     in
 
     assert(Array.for_all Literal.no_prop_invariant (C.lits info.passive));
@@ -712,8 +713,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       if (
         O.compare ord s' t' = Comp.Lt ||
         not (Lit.Pos.is_max_term ~ord passive_lit' passive_lit_pos) ||
-        not (BV.get (C.eligible_res (info.passive, sc_p) subst) passive_idx) ||
-        not (Type.is_prop (T.ty info.u_p) && not passive_at_top) ||
+        (not (BV.get (C.eligible_res (info.passive, sc_p) subst) passive_idx)
+         && not bool_inference) ||
         not (C.is_eligible_param (info.active, sc_a) subst ~idx:active_idx)
       ) then (
         raise (ExitSuperposition (Format.sprintf "bad ordering conditions"))
@@ -835,6 +836,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let do_simultaneous_superposition info =
     let open SupInfo in
     let module P = Position in
+    let module TPS = SClause.TPSet in
     Util.incr_stat stat_superposition_call;
     let sc_a = info.scope_active in
     let sc_p = info.scope_passive in
@@ -852,10 +854,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             info.sup_kind = DupSup || not (T.is_var (T.head_term info.u_p)));
     let active_idx = Lits.Pos.idx info.active_pos in
     let passive_idx, passive_lit_pos = Lits.Pos.cut info.passive_pos in
-    let passive_at_top =
-      match passive_lit_pos with
-      | P.Left P.Stop | P.Right P.Stop -> true
-      | _ -> false
+    let bool_inference = 
+      TPS.mem (info.u_p, info.passive_pos) (C.eligible_for_bool_infs info.passive)
     in
     let shift_vars = if info.sup_kind = LambdaSup then 0 else -1 in
     try
@@ -882,8 +882,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       if (
         O.compare ord s' t' = Comp.Lt ||
         not (Lit.Pos.is_max_term ~ord passive_lit' passive_lit_pos) ||
-        not (BV.get (C.eligible_res (info.passive, sc_p) subst) passive_idx) ||
-        not (Type.is_prop (T.ty info.u_p) && not passive_at_top) ||
+        not (not (BV.get (C.eligible_res (info.passive, sc_p) subst) passive_idx)
+             && not bool_inference) ||
         not (C.is_eligible_param (info.active, sc_a) subst ~idx:active_idx)
       ) then raise (ExitSuperposition "bad ordering conditions");
       (* Check for superposition at a variable *)
@@ -1008,13 +1008,15 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let eligible = C.Eligible.(res clause) in
     (* do the inferences in which clause is passive (rewritten),
        so we consider both negative and positive literals *)
+    let module TPSet = SClause.TPSet in
     let new_clauses =
       Lits.fold_terms ~vars:(Env.flex_get k_sup_at_vars) 
         ~var_args:(Env.flex_get k_sup_in_var_args)
         ~fun_bodies:(Env.flex_get k_sup_under_lambdas) 
         ~subterms:true ~ord ~which:`Max ~eligible ~ty_args:false 
         (C.lits clause)
-      |> Iter.append (CCList.to_iter (C.eligible_for_bool_infs clause))
+      |> Iter.append (TPSet.to_iter (C.eligible_for_bool_infs clause))
+      |> Iter.sort_uniq ~cmp:(fun (_,p1) (_,p2) -> Position.compare p1 p2)
       |> Iter.filter (fun (u_p, _) -> not (T.is_var u_p) || T.is_ho_var u_p)
       |> Iter.filter (fun (u_p, _) -> T.DB.is_closed u_p)
       |> Iter.filter (fun (u_p, _) -> 

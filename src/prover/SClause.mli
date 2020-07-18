@@ -4,6 +4,8 @@
 
 open Logtk
 
+module TPSet : CCSet.S with type elt = (Term.t * Position.t)
+
 type flag
 
 type t = private {
