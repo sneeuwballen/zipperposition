@@ -1,4 +1,4 @@
-# Zipperposition [![build status](https://api.travis-ci.org/sneeuwballen/zipperposition.svg?branch=master)](https://travis-ci.org/sneeuwballen/zipperposition)
+# Zipperposition [![build status](https://api.travis-ci.org/sneeuwballen/zipperposition.svg?branch=master)](https://travis-ci.org/sneeuwballen/zipperposition) ![build (gh)](https://github.com/sneeuwballen/zipperposition/workflows/build/badge.svg)
 
 - Automated theorem prover for first-order logic with equality and theories.
 - Logic toolkit (`logtk`), designed primarily

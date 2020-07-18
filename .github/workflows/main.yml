@@ -17,5 +17,5 @@ jobs:
     - run: opam pin -n .
     - run: opam depext -yt zipperposition
     - run: opam install -t . --deps-only
-    - run: opam exec -- dune build @install -p zipperposition
+    - run: opam exec -- dune build @install --profile=release
     - run: opam exec -- dune runtest
