@@ -27,7 +27,7 @@ depopts: [
   "msat"
 ]
 conflicts: [
-  "msat" { < "0.8" }
+  "msat" { < "0.8.1" }
   "msat" { >= "0.9" }
 ]
 tags: [ "logic" "unification" "term" ]
