@@ -882,7 +882,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       if (
         O.compare ord s' t' = Comp.Lt ||
         not (Lit.Pos.is_max_term ~ord passive_lit' passive_lit_pos) ||
-        not (not (BV.get (C.eligible_res (info.passive, sc_p) subst) passive_idx)
+        (not (BV.get (C.eligible_res (info.passive, sc_p) subst) passive_idx)
              && not bool_inference) ||
         not (C.is_eligible_param (info.active, sc_a) subst ~idx:active_idx)
       ) then raise (ExitSuperposition "bad ordering conditions");
