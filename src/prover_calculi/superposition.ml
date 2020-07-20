@@ -37,8 +37,6 @@ let stat_demodulate_call = Util.mk_stat "sup.demodulate calls"
 let stat_demodulate_step = Util.mk_stat "sup.demodulate steps"
 let stat_semantic_tautology = Util.mk_stat "sup.semantic_tautologies"
 let stat_condensation = Util.mk_stat "sup.condensation"
-let stat_ext_dec = Util.mk_stat "sup.ext_dec calls"
-let stat_ext_inst = Util.mk_stat "sup.ext_inst calls"
 let stat_clc = Util.mk_stat "sup.clc"
 let stat_orphan_checks = Util.mk_stat "orphan checks"
 
@@ -57,7 +55,6 @@ let prof_subsumption_set = ZProf.make "sup.forward_subsumption"
 let prof_subsumption_in_set = ZProf.make "sup.backward_subsumption"
 let prof_infer_active = ZProf.make "sup.infer_active"
 let prof_infer_passive = ZProf.make "sup.infer_passive"
-let prof_ext_dec = ZProf.make "sup.ext_dec"
 let prof_infer_fluidsup_active = ZProf.make "sup.infer_fluidsup_active"
 let prof_infer_fluidsup_passive = ZProf.make "sup.infer_fluidsup_passive"
 let prof_infer_equality_resolution = ZProf.make "sup.infer_equality_resolution"
@@ -75,9 +72,6 @@ let k_dupsup = Flex_state.create_key ()
 let k_lambdasup = Flex_state.create_key ()
 let k_demod_in_var_args = Flex_state.create_key ()
 let k_lambda_demod = Flex_state.create_key ()
-let k_ext_dec_lits = Flex_state.create_key ()
-let k_ext_rules_max_depth = Flex_state.create_key ()
-let k_ext_rules_kind = Flex_state.create_key ()
 let k_use_simultaneous_sup = Flex_state.create_key ()
 let k_unif_alg = Flex_state.create_key ()
 let k_fluidsup_penalty = Flex_state.create_key ()
@@ -97,7 +91,6 @@ let k_use_semantic_tauto = Flex_state.create_key ()
 let k_restrict_fluidsup = Flex_state.create_key ()
 let k_check_sup_at_var_cond = Flex_state.create_key ()
 let k_restrict_hidden_sup_at_vars = Flex_state.create_key ()
-let k_ho_disagremeents = Flex_state.create_key ()
 let k_bool_demod = Flex_state.create_key ()
 let k_immediate_simplification = Flex_state.create_key ()
 let k_bool_eq_fact = Flex_state.create_key ()
@@ -138,9 +131,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let _idx_simpl = ref (UnitIdx.empty ())
   
-  let _ext_dec_from_idx = ref (ID.Map.empty)
-  let _ext_dec_into_idx = ref (ID.Map.empty)
-
   let idx_sup_into () = !_idx_sup_into
   let idx_sup_from () = !_idx_sup_from
   let idx_fv () = !_idx_fv
@@ -189,10 +179,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
              Iter.exists (HVar.equal Type.equal v) (T.Seq.vars body)
            | _ -> false)
     | None -> false
-
-  let ext_rule_eligible cl =
-    Env.flex_get k_ext_rules_max_depth < 0 ||
-    C.proof_depth cl <= Env.flex_get k_ext_rules_max_depth
 
   (* apply operation [f] to some parts of the clause [c] just added/removed
      from the active set *)
@@ -361,69 +347,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     _idx_simpl := idx';
     Signal.ContinueListening
 
-  let insert_into_ext_dec_index index (c,pos,t) =
-    let key = T.head_exn t in
-    let clause_map = ID.Map.find_opt key !index in
-    let clause_map = match clause_map with 
-      | None -> C.Tbl.create 8
-      | Some res -> res in
-    let all_pos =
-      (try 
-         (t,pos) :: (C.Tbl.find clause_map c)
-       with _ -> 
-         [(t,pos)]) in
-    C.Tbl.replace clause_map c all_pos;
-    index := ID.Map.add key clause_map !index
-
-  let remove_from_ext_dec_index index (c,_,t) =
-    let key = T.head_exn t in
-    let clause_map = ID.Map.find_opt key !index in
-    match clause_map with
-    | None -> Util.debugf ~section 1 "all clauses allready deleted." CCFun.id
-    | Some res -> (
-        C.Tbl.remove res c;
-        index := ID.Map.add key res !index
-      )
-
-  let update_ext_dec_indices f c =
-    let which, eligible = if Env.flex_get k_ext_dec_lits = `OnlyMax 
-      then `Max, C.Eligible.res c else `All, C.Eligible.always in
-    if Env.flex_get k_ext_rules_kind != `Off &&
-       ext_rule_eligible c then (
-      Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false ~ty_args:false 
-        ~ord ~which ~subterms:true ~eligible (C.lits c)
-      |> Iter.filter (fun (t, _) ->
-          not (T.is_var t) || T.is_ho_var t)
-      |> Iter.filter (fun (t, _) ->
-          not (T.is_var (T.head_term t)) &&
-          T.is_const (T.head_term t) && Term.has_ho_subterm t)
-      |> Iter.iter
-        (fun (t, pos) ->
-           f _ext_dec_into_idx (c,pos,t));
-
-      let eligible = if Env.flex_get k_ext_dec_lits = `OnlyMax then C.Eligible.param c 
-        else C.Eligible.always in
-      Lits.fold_eqn ~ord ~both:true ~sign:true ~eligible (C.lits c)
-      |> Iter.iter
-        (fun (l, _, sign, pos) ->
-           assert sign;
-           let hd,_ = T.as_app l in
-           if T.is_const hd && Term.has_ho_subterm l then (
-             f _ext_dec_from_idx (c,pos,l)
-           )));
-    Signal.ContinueListening
-
-
   let () =
     Signal.on PS.ActiveSet.on_add_clause
       (fun c ->
          _idx_fv := SubsumIdx.add !_idx_fv c;
-         ignore(_update_active TermIndex.add c);
-         update_ext_dec_indices insert_into_ext_dec_index c);
+         _update_active TermIndex.add c);
     Signal.on PS.ActiveSet.on_remove_clause
       (fun c ->
          _idx_fv := SubsumIdx.remove !_idx_fv c;
-         ignore(update_ext_dec_indices remove_from_ext_dec_index c);
          _update_active TermIndex.remove c);
     Signal.on PS.SimplSet.on_add_clause
       (_update_simpl UnitIdx.add);
@@ -1669,236 +1600,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Some new_clause
     ) else(None)
 
-  let t_type_is_ho s =
-      Type.is_prop (T.ty s) || Type.is_fun (T.ty s)
-
-  (* Given terms s and t, identify maximal common context u
-     such that s = u[s1,...,sn] and t = u[t1,...,tn]. Then,
-     if some of the disagrements are solvable by a weak
-     unification algorihtm (e.g., pattern or fixpoint), filter
-     them out and create the unifying substitution. Based on
-     k_ho_disagremeents at least one or all of s1...sn have
-     to be of functional/boolean type *)
-  let find_ho_disagremeents ?(unify=true) (orig_s,s_sc) (orig_t,t_sc) =
-    let open CCFun in
-    let exception StopSearch in
-    let counter = ref 0 in
-
-    let cheap_unify ~subst (s,s_sc) (t,t_sc) =
-      let unif_alg =
-        if Env.flex_get Combinators.k_enable_combinators then
-           (fun s t -> Unif_subst.of_subst @@ Unif.FO.unify_syn ~subst:(Unif_subst.subst subst) s t)
-        else if T.is_var s || T.is_var t then (
-          FixpointUnif.unify_scoped ~subst ~counter
-        ) else PatternUnif.unify_scoped ~subst ~counter in
-      
-      try
-        if not unify then None
-        else Some (unif_alg (s,s_sc) (t,t_sc))
-      with PatternUnif.NotInFragment | PatternUnif.NotUnifiable | Unif.Fail ->
-        None
-    in
-    
-    let rec aux s t =
-      if T.equal s t && (s_sc == t_sc || T.is_ground s) then []
-      else (
-        match T.view s, T.view t with
-        | T.App(s_hd, s_args), T.App(t_hd, t_args) 
-            when T.is_const s_hd ->
-          let (s_hd, s_args), (t_hd, t_args) = 
-            CCPair.map_same T.as_app_mono (s,t) in
-          if T.equal s_hd t_hd then aux_l s_args t_args
-          else [s,t]
-        | T.App(s_hd, s_args), T.App(t_hd, t_args) 
-            when not (T.equal s_hd t_hd)
-                 && T.is_const s_hd && T.is_const t_hd ->
-          (* trying to find prefix subterm that is the differing context *)
-          let (s_hd, s_args), (t_hd, t_args) = 
-            CCPair.map_same T.as_app_mono (s,t) in
-
-          let lhs,rhs,args_lhs,args_rhs = 
-            if List.length s_args > List.length t_args then (
-              let taken,dropped = 
-                CCList.take_drop (List.length s_args - List.length t_args) s_args in
-              T.app s_hd taken, t_hd, dropped, t_args
-            ) else (
-              let taken,dropped = 
-                CCList.take_drop (List.length t_args - List.length s_args) t_args in
-              s_hd, T.app t_hd taken, s_args, dropped
-            ) in
-          if T.same_l args_lhs args_rhs && s_sc == t_sc then ([lhs,rhs])
-          else [s,t]
-        | _ -> [s,t])
-    and aux_l xs ys =
-      match xs,ys with
-      | [],[] -> []
-      | x :: xxs, y :: yys -> aux x y @ aux_l xxs yys
-      | _ -> invalid_arg "args must be of the same length" in
-    
-    try
-      if not (Type.equal (T.ty orig_s) (T.ty orig_t)) then raise StopSearch;
-
-      if T.is_true_or_false orig_s || T.is_true_or_false orig_t then raise StopSearch;
-
-      let norm = 
-        if Env.flex_get Combinators.k_enable_combinators 
-        then CCFun.id 
-        else Lambda.eta_expand in
-
-      let diss = aux (norm orig_s) (norm orig_t) in
-      let hd_is_var t = 
-        let _,body = T.open_fun t in
-        T.is_var @@ T.head_term body in
-      
-      if CCList.is_empty diss 
-          || List.for_all (fun (s,t) -> hd_is_var s || hd_is_var t) diss
-          || List.for_all (fun (s,_) -> not @@ t_type_is_ho s) diss then (
-          raise StopSearch
-      );
-
-      let _,_,unifscope,init_subst =
-        if not unify then (orig_s,orig_t,0,US.empty)
-        else US.FO.rename_to_new_scope ~counter (orig_s,s_sc) (orig_t,t_sc) in
-      let app_subst subst =
-        if not unify then (fun (s,_) -> s)
-        else Subst.FO.apply Subst.Renaming.none (US.subst subst) in
-
-      (* Filter out the pairs that are easy to unify *)
-      let diss = 
-        List.fold_left (fun (dis_acc, subst) (si, ti) ->
-          let si',ti' = CCPair.map_same (app_subst subst) ((si,s_sc), (ti,t_sc)) in
-          if not (Type.is_ground (T.ty si')) || not (Type.is_ground (T.ty ti')) then (
-            (* polymorphism is currently not supported *)
-            raise StopSearch
-          );
-          match cheap_unify ~subst (si',unifscope) (ti', unifscope) with
-          | Some subst' -> dis_acc, subst'
-          | None -> (si,ti) :: dis_acc, subst)
-        ([],init_subst) (diss) in
-
-
-      (* If no constraints are left or all of pairs are flex-flex
-         or all of pairs are FO then we could have done all of 
-         this with HO unification or FO superposition *)
-      if (CCList.is_empty (fst diss)) then (
-          raise StopSearch
-      );
-
-      if Env.flex_get k_ho_disagremeents == `AllHo &&
-         List.exists (fun (si,_) -> not (t_type_is_ho si)) (fst diss) then (
-           raise StopSearch
-        );
-
-      Some diss
-    with StopSearch -> None
-
-  
-    let ext_inst ~parents (s,s_sc) (t,t_sc) =
-      assert(not (CCList.is_empty parents));
-      assert(CCList.length parents != 2 || s_sc != t_sc);
-
-      let renaming = Subst.Renaming.create () in
-      let apply_subst = Subst.FO.apply renaming Subst.empty  in
-      let s, t = apply_subst (s,s_sc), apply_subst (t,t_sc) in
-      assert(Type.equal (T.ty s) (T.ty t));
-      assert(Type.is_fun (T.ty s));
-      
-      let ty_args, ret  = Type.open_fun (T.ty s) in
-      let alpha = T.of_ty @@ List.hd ty_args in
-      let beta = T.of_ty @@ Type.arrow (List.tl ty_args) ret in
-      let diff_const = Env.flex_get HO.k_diff_const in
-      
-      let diff_s_t = T.app diff_const [alpha; beta; s; t] in
-      let s_diff, t_diff = T.app s [diff_s_t], T.app t [diff_s_t] in
-
-      let neg_lit = Lit.mk_neq s_diff t_diff in
-      let pos_lit = Lit.mk_eq s t in
-      let new_lits = [neg_lit; pos_lit] in
-
-      let proof =
-            Proof.Step.inference (List.map C.proof_parent parents)
-              ~rule:(Proof.Rule.mk "ext_inst") in
-      let penalty = List.fold_left max 1 (List.map C.penalty parents) in
-
-      C.create ~trail:(C.trail_l parents) ~penalty new_lits proof
-
-  let do_ext_inst ~parents ((from_t,sc_f) as s) ((into_t,sc_t) as t) =
-    match find_ho_disagremeents ~unify:false s t  with
-    | Some (disagreements, subst) -> 
-      assert (US.is_empty subst);
-      let ho_dis = List.filter (fun (s,t) -> Type.is_fun (T.ty s)) disagreements in
-      (* assert (not (CCList.is_empty ho_dis)); *)
-
-      CCList.map (fun (lhs,rhs) -> ext_inst ~parents (lhs,sc_f) (rhs,sc_t)) ho_dis
-    | None -> []
-
-  let ext_inst_or_family_eqfact_aux cl =
-    let try_ext_eq_fact (s,t) (u,v) idx =
-      let sc = 0 in
-      match find_ho_disagremeents (s,sc) (u,sc) with
-      | Some (disagrements, subst) ->
-        assert(not (US.has_constr subst));
-        let subst = US.subst subst in
-        let dis_lits = List.map (fun (a,b) -> Lit.mk_neq a b) disagrements in
-        let new_lits = 
-          dis_lits @ ((Lit.mk_neq t v) :: CCArray.except_idx (C.lits cl) idx)
-          |> CCArray.of_list
-          |> (fun lits ->
-                Literals.apply_subst (Subst.Renaming.create ()) subst (lits, sc))
-          |> CCArray.to_list in
-        let proof =
-          Proof.Step.inference [C.proof_parent cl] 
-            ~rule:(Proof.Rule.mk "ext_eqfact") in
-        let new_c = C.create ~trail:(C.trail cl) ~penalty:(C.penalty cl) new_lits proof in
-        [new_c]
-      | None -> [] in
-
-    let try_ext_eq_factinst (s,_) (u,_) =
-      do_ext_inst ~parents:[cl] (s,0) (u,0) in
-
-    let try_factorings (s,t) (u,v) idx =
-      let ext_family = 
-        if (Env.flex_get k_ext_rules_kind = `Both ||
-           Env.flex_get k_ext_rules_kind = `ExtFamily) then (
-          try_ext_eq_fact (s,t) (u,v) idx
-        ) else [] in
-      
-      let ext_inst = 
-        if (Env.flex_get k_ext_rules_kind = `Both ||
-           Env.flex_get k_ext_rules_kind = `ExtInst) then (
-          try_ext_eq_factinst (s,t) (u,v)
-        ) else [] in
-      ext_inst @ ext_family in
-
-    let aux_eq_rest (s,t) i lits = 
-      CCList.flatten @@ List.mapi (fun j lit -> 
-        if i < j then (
-          match lit with 
-          | Lit.Equation(u,v,_) when Lit.is_pos lit ->
-            try_factorings (s,t) (u,v) i
-            @
-            try_factorings (s,t) (v,u) i 
-          | _ -> []
-        ) else []) lits in
-
-    let lits = CCArray.to_list (C.lits cl) in
-    let maximal = C.eligible_param (cl,0) Subst.empty in
-    CCList.flatten @@ List.mapi (fun i lit ->
-      match lit with
-      | Lit.Equation (s,t,_) 
-        when Lit.is_pos lit &&
-             (Env.flex_get k_ext_dec_lits != `OnlyMax ||
-             BV.get maximal i) ->
-        aux_eq_rest (s,t) i lits
-      | _ -> []
-    ) lits
-
-  
-  let ext_eqfact given =
-    if ext_rule_eligible given then  
-      ZProf.with_prof prof_ext_dec ext_inst_or_family_eqfact_aux given
-    else []
-
   let infer_equality_factoring_aux ~unify ~iterate_substs clause =
     ZProf.enter_prof prof_infer_equality_factoring;
     let eligible = C.Eligible.(filter (function 
@@ -2348,191 +2049,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let proof = Proof.Step.inference [C.proof_parent c] ~rule:(Proof.Rule.mk "cannonize vars") in
       let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
       SimplM.return_new new_c)
-
-  let do_ext_sup from_c from_p from_t into_c into_p into_t = 
-    let sc_f, sc_i = 0, 1 in
-    if Type.equal (Term.ty from_t) (Term.ty into_t) &&
-       not (C.id from_c = C.id into_c && Position.equal from_p into_p) then (
-
-      match find_ho_disagremeents (from_t, sc_f) (into_t, sc_i) with 
-      | Some (disagreements, subst) ->
-        assert(not @@ US.has_constr subst);        
-        let renaming = Subst.Renaming.create () in
-        let subst = US.subst subst in
-        let lits_f = Lits.apply_subst renaming subst (C.lits from_c, sc_f) in
-        let lits_i = Lits.apply_subst renaming subst (C.lits into_c, sc_i) in
-        
-        let app_subst renaming scoped_t =
-          Subst.FO.apply renaming subst scoped_t in
-        
-        let new_neq_lits = 
-          List.map (fun (arg_f, arg_i) ->
-            Lit.mk_neq (app_subst renaming (arg_f, sc_f)) (app_subst renaming (arg_i, sc_i))) 
-          disagreements  in
-
-        
-        let (i, pos_f) = Lits.Pos.cut from_p in
-        let from_s = Lits.Pos.at lits_f (Position.arg i (Position.opp pos_f)) in
-        Lits.Pos.replace lits_i ~at:into_p ~by:(from_s);
-        let new_lits = new_neq_lits @ CCArray.except_idx lits_f i  @ CCArray.to_list lits_i in
-        let trail = C.trail_l [from_c; into_c] in
-        let penalty = max (C.penalty from_c) (C.penalty into_c) in
-        let tags = [Proof.Tag.T_ho] in
-        let proof =
-          Proof.Step.inference
-            [C.proof_parent_subst renaming (from_c, sc_f) subst;
-              C.proof_parent_subst renaming  (into_c, sc_i) subst] 
-            ~rule:(Proof.Rule.mk "ext_sup") ~tags in
-        let new_c = C.create ~trail ~penalty new_lits proof in
-        Some new_c
-      | None -> None
-    ) else None
-
-
-  (* Given a "from"-clause C \/ f t1 ... tn = s  and 
-     "into"-clause D \/ f u1 .. un (~)= v, where some of the t_i 
-     (and consequently u_i) are of functional type, construct
-     a clause C \/ D \/ t1 ~= u1 \/ ... tn ~= un \/ s (~)= v.
-
-     Intuitively, we are waiting for efficient extensionality rules
-     to kick in and fix the problem of not being able to paramodulate
-     with this equation.
-
-     Currently with no restrictions or indexing. After initial evaluation,
-     will find ways to restrict it somehow. *)
-  let retrieve_from_extdec_idx idx id = 
-    let cl_map = ID.Map.find_opt id idx in
-    match cl_map with
-    | None -> Iter.empty
-    | Some cl_map -> 
-      C.Tbl.to_seq cl_map 
-      |> Iter.flat_map (fun (c, l) -> 
-          Iter.of_list l
-          |> Iter.map (fun (t,p) -> (c,t,p)))
-
-  let ext_sup_act given =
-    if ext_rule_eligible given then (
-      let eligible = 
-        if Env.flex_get k_ext_dec_lits = `OnlyMax then C.Eligible.param given else C.Eligible.always in
-      Lits.fold_eqn ~ord ~both:true ~sign:true ~eligible (C.lits given)
-      |> Iter.flat_map (fun (l,_,sign,pos) ->
-          let hd,args = T.as_app l in
-          if T.is_const hd && T.has_ho_subterm l then (
-            let inf_partners = retrieve_from_extdec_idx !_ext_dec_into_idx (T.as_const_exn hd) in
-            Iter.map (fun (into_c,into_t, into_p) -> 
-                do_ext_sup given pos l into_c into_p into_t) inf_partners)
-          else Iter.empty)
-      |> Iter.filter_map CCFun.id
-      |> Iter.to_list)
-    else []
-
-  let ext_sup_pas given =
-    if ext_rule_eligible given then ( 
-      let which, eligible =
-        if Env.flex_get k_ext_dec_lits = `OnlyMax then `Max, C.Eligible.res given 
-        else `All, C.Eligible.always in
-      Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false ~ty_args:false 
-        ~ord ~which ~subterms:true ~eligible (C.lits given)
-      |> Iter.flat_map (fun (t,p) ->
-          let hd, args = T.as_app t in
-          if T.is_const hd && T.has_ho_subterm t  then (
-            let inf_partners = retrieve_from_extdec_idx !_ext_dec_from_idx (T.as_const_exn hd) in
-            Iter.map (fun (from_c,from_t, from_p) -> 
-                do_ext_sup from_c from_p from_t given p t) inf_partners) 
-          else Iter.empty))
-      |> Iter.filter_map CCFun.id
-      |> Iter.to_list
-    else []
-
-  let ext_inst_sup_act given =
-    if ext_rule_eligible given then (
-      let eligible =
-        if Env.flex_get k_ext_dec_lits = `OnlyMax then C.Eligible.param given else C.Eligible.always in
-      Lits.fold_eqn ~ord ~both:true ~sign:true ~eligible (C.lits given)
-      |> Iter.flat_map (fun (l,_,sign,pos) ->
-          let hd,args = T.as_app l in
-          if T.is_const hd && T.has_ho_subterm l then (
-            let inf_partners = retrieve_from_extdec_idx !_ext_dec_into_idx (T.as_const_exn hd) in
-            Iter.map (fun (into_c,into_t, _) -> 
-              do_ext_inst ~parents:[given;into_c] (l, 0) (into_t, 1)
-          ) inf_partners)
-          else Iter.empty)
-      |> Iter.to_list
-      |> CCList.flatten)
-    else []
-
-  let ext_inst_sup_pas given =
-    if ext_rule_eligible given then ( 
-      let which, eligible =
-        if Env.flex_get k_ext_dec_lits = `OnlyMax then `Max, C.Eligible.res given 
-        else `All, C.Eligible.always in
-      Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false ~ty_args:false 
-        ~ord ~which ~subterms:true ~eligible (C.lits given)
-      |> Iter.flat_map (fun (t,p) ->
-          let hd, args = T.as_app t in
-          if T.is_const hd && T.has_ho_subterm t  then (
-            Iter.map (fun (from_c,from_t, from_p) -> 
-              do_ext_inst ~parents:[from_c; given] (from_t,0) (t,1))
-            (retrieve_from_extdec_idx !_ext_dec_from_idx (T.as_const_exn hd)))
-          else Iter.empty))
-      |> Iter.to_list
-      |> CCList.flatten
-    else []
-
-  let ext_eqres_aux c =
-    let eligible = C.Eligible.always in
-    if ext_rule_eligible c then (
-      let res = 
-        Literals.fold_eqn (C.lits c) ~eligible ~ord ~both:false ~sign:false
-        |> Iter.to_list
-        |> CCList.filter_map (fun (lhs,rhs,sign,pos) ->
-            assert(sign = false);
-            let idx = Lits.Pos.idx pos in
-            if Env.flex_get k_ext_dec_lits != `OnlyMax ||
-               BV.get (C.eligible_res_no_subst c) idx then (
-              let sc = 0 in
-              match find_ho_disagremeents (lhs,sc) (rhs, sc) with
-              | Some (disagremeents, subst) ->
-                let new_neq_lits =
-                  List.map (fun (s,t) -> Lit.mk_neq s t) disagremeents in
-                let i, _ = Literals.Pos.cut pos in
-                let new_lits =
-                  (Array.of_list @@ new_neq_lits @ CCArray.except_idx (C.lits c) i, sc)
-                  |> Literals.apply_subst (Subst.Renaming.create()) (US.subst subst)
-                  |> Array.to_list in
-                let proof =
-                  Proof.Step.inference [C.proof_parent c] ~rule:(Proof.Rule.mk "ext_eqres") in
-                let new_c =
-                  C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
-                Some new_c
-              | None -> None)
-            else None)
-        in
-      Util.incr_stat stat_ext_dec;
-      res
-    ) else []
-
-  let ext_inst_eqres c =
-    let eligible = C.Eligible.always in
-    if ext_rule_eligible c then (
-      let res = 
-        Literals.fold_eqn (C.lits c) ~eligible ~ord ~both:false ~sign:false
-        |> Iter.to_list
-        |> CCList.flat_map (fun (lhs,rhs,sign,pos) ->
-            assert(sign = false);
-            let idx = Lits.Pos.idx pos in
-            if Env.flex_get k_ext_dec_lits != `OnlyMax ||
-               BV.get (C.eligible_res_no_subst c) idx then (
-              do_ext_inst ~parents:[c] (lhs,0) (rhs,0))
-            else [])
-        in
-      Util.incr_stat stat_ext_inst;
-      res
-    ) else []
-
-
-  let ext_eqres given = 
-    ZProf.with_prof prof_ext_dec ext_eqres_aux given
 
   (** Find clauses that [given] may demodulate, add them to set *)
   let backward_demodulate set given =
@@ -3447,24 +2963,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Env.add_unary_inf "recognize injectivity" recognize_injectivity;
     );
 
-    if Env.flex_get k_ext_rules_kind == `ExtFamily ||
-       Env.flex_get k_ext_rules_kind == `Both then (
-      Env.add_binary_inf "ext_dec_act" ext_sup_act;
-      Env.add_binary_inf "ext_dec_pas" ext_sup_pas;
-      Env.add_unary_inf "ext_eqres_dec" ext_eqres;
-    );
-
-    if Env.flex_get k_ext_rules_kind = `ExtInst ||
-       Env.flex_get k_ext_rules_kind = `Both then (
-      Env.add_binary_inf "ext_dec_act" ext_inst_sup_act;
-      Env.add_binary_inf "ext_dec_pas" ext_inst_sup_pas;
-      Env.add_unary_inf "ext_eqres_dec" ext_inst_eqres;
-    );
-
-    if Env.flex_get k_ext_rules_kind != `Off then (
-      Env.add_unary_inf "ext_eqfact_both" ext_inst_or_family_eqfact_aux;
-    );
-
     if Env.flex_get k_complete_ho_unification
     then (
       if (Env.flex_get k_max_infs) = -1 then (
@@ -3549,10 +3047,7 @@ let _local_rw = ref `Off
 
 let _lambdasup = ref (-1)
 let _max_infs = ref (-1)
-let ext_rules_max_depth = ref (-1)
-let ext_rules_kind = ref (`Off)
 
-let _ext_dec_lits = ref `All
 let _unif_alg = ref `NewJPFull
 let _unif_level = ref `Full
 let _ground_subs_check = ref 0
@@ -3573,7 +3068,6 @@ let _solidification_limit = ref 3
 let _max_unifs_solid_ff = ref 60
 let _use_weight_for_solid_subsumption = ref false
 let _sort_constraints = ref false
-let _ho_disagremeents = ref `SomeHo
 let _bool_demod = ref false
 let _immediate_simplification = ref false
 let _try_lfho_unif = ref true
@@ -3612,9 +3106,6 @@ let register ~sup =
   E.flex_add k_restrict_hidden_sup_at_vars !_restrict_hidden_sup_at_vars;
   E.flex_add k_demod_in_var_args !_demod_in_var_args;
   E.flex_add k_lambda_demod !_lambda_demod;
-  E.flex_add k_ext_dec_lits !_ext_dec_lits;
-  E.flex_add k_ext_rules_max_depth !ext_rules_max_depth;
-  E.flex_add k_ext_rules_kind !ext_rules_kind;
 
   E.flex_add k_use_simultaneous_sup !_use_simultaneous_sup;  
   E.flex_add k_fluidsup_penalty !_fluidsup_penalty;
@@ -3631,7 +3122,6 @@ let register ~sup =
   E.flex_add k_switch_stream_extraction !_switch_stream_extraction;
   E.flex_add k_dont_simplify !_dont_simplify;
   E.flex_add k_use_semantic_tauto !_use_semantic_tauto;
-  E.flex_add k_ho_disagremeents !_ho_disagremeents;
   E.flex_add k_bool_demod !_bool_demod;
   E.flex_add k_immediate_simplification !_immediate_simplification;
   E.flex_add k_bool_eq_fact !_bool_eq_fact;
@@ -3701,23 +3191,6 @@ let () =
       "--demod-in-var-args", Arg.Bool (fun b -> _demod_in_var_args := b), " enable demodulation in arguments of variables";
       "--complete-ho-unif", Arg.Bool (fun b -> _complete_ho_unification := b), " enable complete higher-order unification algorithm (Jensen-Pietrzykowski)";
       "--switch-stream-extract", Arg.Bool (fun b -> _switch_stream_extraction := b), " in ho mode, switches heuristic of clause extraction from the stream queue";
-      "--ext-rules-max-depth", Arg.Set_int ext_rules_max_depth, 
-        " Sets the maximal proof depth of the clause eligible for Ext-* or ExtInst inferences";
-      "--ext-rules", Arg.Symbol (["off"; "ext-inst"; "ext-family"; "both"], (
-        function 
-        | "off" -> ext_rules_kind := `Off; ext_rules_max_depth:=-1;
-        | "ext-inst" -> ext_rules_kind := `ExtInst;
-        | "ext-family" -> ext_rules_kind := `ExtFamily;
-        | "both" -> ext_rules_kind := `Both
-        |  _ -> assert false)),
-        " Chooses the kind of extensionality rules to use";
-      "--ext-decompose-lits", Arg.Symbol (["all";"max"], (fun str -> 
-          _ext_dec_lits := if String.equal str "all" then `All else `OnlyMax))
-      , " Sets the maximal number of literals clause can have for ExtDec inference.";
-      "--ext-decompose-ho-disagreements", Arg.Symbol (["all-ho";"some-ho"], (fun str -> 
-          _ho_disagremeents := if String.equal str "all-ho" then `AllHo else `SomeHo))
-      , " Perform Ext-Sup, Ext-EqFact, or Ext-EqRes rules only when all disagreements are HO" ^
-        " or when there exists a HO disagremeent";
       "--fluidsup-penalty", Arg.Int (fun p -> _fluidsup_penalty := p), " penalty for FluidSup inferences";
       "--dupsup-penalty", Arg.Int (fun p -> _dupsup_penalty := p), " penalty for DupSup inferences";
       "--bool-eq-fact", Arg.Bool ((:=) _bool_eq_fact), " turn bool eq-fact on or off";
