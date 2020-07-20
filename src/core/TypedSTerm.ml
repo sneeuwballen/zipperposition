@@ -92,85 +92,6 @@ let to_int_ = function
   | Match _ -> 11
   | Let _ -> 12
 
-let rec hash t =
-  if t.hash <> -1 then t.hash
-  else (
-    let h = hash_rec_ t in
-    assert (h <> -1);
-    t.hash <- h;
-    h
-  )
-and hash_rec_ t = match t.term with
-  | Var s -> Hash.combine2 1 (Var.hash s)
-  | Const s -> Hash.combine2 2 (ID.hash s)
-  | App (s, l) -> Hash.combine3 3 (hash s) (Hash.list hash l)
-  | Multiset l -> Hash.combine2 4 (Hash.list hash l)
-  | AppBuiltin (b,l) -> Hash.combine3 5 (Builtin.hash b) (Hash.list hash l)
-  | Bind (s,v,t') -> Hash.combine4 6 (Binder.hash s) (Var.hash v) (hash t')
-  | Record (l, rest) ->
-    Hash.combine3 7
-      (Hash.opt hash rest)
-      (Hash.list (Hash.pair Hash.string hash) l)
-  | Ite (a,b,c) -> Hash.combine4 8 (hash a) (hash b) (hash c)
-  | Let (_, u) -> Hash.combine2 9 (hash u)
-  | Match (u, _) -> Hash.combine2 10 (hash u)
-  | Meta (id,_,_) -> Var.hash id
-
-let rec compare t1 t2 =
-  let h1 = hash t1 in
-  let h2 = hash t2 in
-  let (<?>) = let open CCOrd in (<?>) in
-
-  if h1<>h2 then CCInt.compare h1 h2 (* compare by hash, first *)
-  else match view t1, view t2 with
-    | Var s1, Var s2 -> Var.compare s1 s2
-    | Const s1, Const s2 -> ID.compare s1 s2
-    | App (s1,l1), App (s2, l2) ->
-      compare s1 s2
-      <?> (CCOrd.list compare, l1, l2)
-    | Bind (s1, v1, t1), Bind (s2, v2, t2) ->
-      Binder.compare s1 s2
-      <?> (Var.compare, v1, v2)
-      <?> (compare, t1, t2)
-    | AppBuiltin (b1,l1), AppBuiltin (b2,l2) ->
-      Builtin.compare b1 b2
-      <?> (CCOrd.list compare, l1, l2)
-    | Multiset l1, Multiset l2 ->
-      let l1 = List.sort compare l1 and l2 = List.sort compare l2 in
-      CCOrd.list compare l1 l2
-    | Record (l1, rest1), Record (l2, rest2) ->
-      CCOrd.(
-        CCOpt.compare compare rest1 rest2
-        <?> (cmp_fields, l1, l2)
-      )
-    | Meta (id1,_,_), Meta (id2,_,_) -> Var.compare id1 id2
-    | Ite (a1,b1,c1), Ite (a2,b2,c2) ->
-      CCList.compare compare [a1;b1;c1] [a2;b2;c2]
-    | Let (l1,t1), Let (l2,t2) ->
-      CCOrd.( compare t1 t2
-              <?> (list (pair Var.compare compare), l1, l2))
-    | Match (u1,l1), Match (u2,l2) ->
-      let cmp_branch (c1,vars1,rhs1) (c2,vars2,rhs2) =
-        CCOrd.(ID.compare c1.cstor_id c2.cstor_id
-               <?> (list compare, c1.cstor_args, c2.cstor_args)
-               <?> (list Var.compare, vars1,vars2)
-               <?> (compare,rhs1,rhs2))
-      in
-      CCOrd.( compare u1 u2 <?> (list cmp_branch,l1,l2))
-    | Var _, _
-    | Const _, _
-    | App _, _
-    | Bind _, _
-    | Ite _, _
-    | Let _, _
-    | Match _, _
-    | Multiset _, _
-    | AppBuiltin _, _
-    | Meta _, _
-    | Record _, _ -> to_int_ t1.term - to_int_ t2.term
-and cmp_field x y = CCOrd.pair String.compare compare x y
-and cmp_fields x y = CCOrd.list cmp_field x y
-
 let rec unfold_binder b f = match f.term with
   | Bind (b', v, f') when b=b' ->
     let vars, bod = unfold_binder b f' in
@@ -266,6 +187,162 @@ and pp_var_ty out v =
   match view ty with
   | AppBuiltin (Builtin.Term, []) -> ()
   | _ -> Format.fprintf out ":%a" pp_inner ty
+
+let rec pp_simpl_debug out t = match view t with
+  | Var s -> Var.pp_fullc out s
+  | Const s -> ID.pp_tstp out s
+  | App (_, []) -> assert false
+  | App (f, l) ->
+    pp_simpl_debug out f;
+    CCFormat.fprintf out "(@[%a@])" (Util.pp_list ~sep:", " pp_simpl_debug) l;
+  | Bind (s, _, _) ->
+    let vars, body = unfold_binder s t in
+    let pp_bound_var out v =
+      Format.fprintf out "@[%a%a@]" Var.pp_fullc v pp_var_ty v
+    in
+    Format.fprintf out "@[<2>%a %a.@ %a@]"
+      Binder.pp s (Util.pp_list ~sep:" " pp_bound_var) vars pp_inner body
+  | Record (l, None) ->
+    Format.fprintf out "{%a}" pp_fields l
+  | Record (l, Some r) ->
+    Format.fprintf out "{%a | %a}" pp_fields l pp r
+  | AppBuiltin(hd, l) ->
+    CCFormat.fprintf out "@[%a::%d@]" Builtin.pp hd (Builtin.as_int hd);
+    CCFormat.fprintf out "[@[%a@]]" (Util.pp_list ~sep:", " pp_simpl_debug) l;
+  | Ite (a,b,c) ->
+    Format.fprintf out "@[<2>if %a@ then %a@ else %a@]" pp a pp b pp c
+  | Let (l, u) ->
+    let pp_binding out (v,t) = Format.fprintf out "@[%a := %a@]" Var.pp v pp t in
+    Format.fprintf out "@[<2>let %a@ in %a@]"
+      (Util.pp_list ~sep:" and " pp_binding) l pp u
+  | Match (u, l) ->
+    let pp_branch out (c,vars,rhs) =
+      Format.fprintf out "@[<2>case@ @[%a%a%a@] ->@ %a@]"
+        ID.pp c.cstor_id (Util.pp_list0 ~sep:" " pp_inner) c.cstor_args
+        (Util.pp_list0 ~sep:" " Var.pp_fullc) vars pp rhs
+    in
+    Format.fprintf out "@[<hv>@[<hv2>match %a with@ %a@]@ end@]"
+      pp u (Util.pp_list ~sep:" | " pp_branch) l
+  | Multiset l ->
+    Format.fprintf out "[@[%a@]]" (Util.pp_list ~sep:", " pp_inner) l
+  | Meta (id, r, _) ->
+    assert (!r = None); (* we used {!view} *)
+    Format.fprintf out "?%a" Var.pp id
+and pp_inner out t = match view t with
+  | AppBuiltin (_, _::_) | Ite (_,_,_) | App _ | Let (_,_) | Bind _
+    ->
+    Format.fprintf out "(@[%a@])" pp t  (* avoid ambiguities *)
+  | _ -> pp out t
+
+let rec hash t =
+  if t.hash <> -1 then (
+    CCFormat.printf "found in cache: @[%a@]=%d@." pp_simpl_debug t t.hash;
+    (match view t with 
+    | AppBuiltin(b, l) ->
+      let bh = Builtin.hash b in
+      let hl = Hash.list hash l in
+      let res = Hash.combine3 5 (bh) (hl) in
+      CCFormat.printf "b:@[%a:%d(%d,%d,%d)@]@." Builtin.pp b (Builtin.as_int b) bh hl res;
+    | _ -> ());
+    assert(hash_rec_ t == t.hash);
+    t.hash
+  ) else (
+    let h = hash_rec_ t in
+    CCFormat.printf "computed: @[%a@]=%d@." pp_simpl_debug t h;
+    (match view t with 
+    | AppBuiltin(b, l) ->
+      let bh = Builtin.hash b in
+      let hl = Hash.list hash l in
+      let res = Hash.combine3 5 (bh) (hl) in
+      CCFormat.printf "b:@[%a:%d(%d,%d,%d)@]@." Builtin.pp b (Builtin.as_int b) bh hl res;
+    | _ -> ());
+    assert (h <> -1);
+    t.hash <- h;
+    h
+  )
+and hash_rec_ t = match view t with
+  | Var s -> Hash.combine2 1 (Var.hash s)
+  | Const s -> 
+    CCFormat.printf "const:@[%a@]@." ID.pp s;
+    Hash.combine2 2 (ID.hash s)
+  | App (s, l) -> 
+    Hash.combine3 3 (hash s) (Hash.list hash l)
+  | Multiset l -> Hash.combine2 4 (Hash.list hash l)
+  | AppBuiltin (b,l) ->
+    CCFormat.printf "AppBuiltin(@[%a@], @[%a@])=" 
+      Builtin.pp b (CCList.pp pp_simpl_debug) l;
+    let bh = Builtin.hash b in
+    let hl = Hash.list hash l in
+    let res = Hash.combine3 5 (bh) (hl) in
+    CCFormat.printf "(%d,%d,%d)@." bh hl res;
+    res
+  | Bind (s,v,t') -> Hash.combine4 6 (Binder.hash s) (Var.hash v) (hash t')
+  | Record (l, rest) ->
+    Hash.combine3 7
+      (Hash.opt hash rest)
+      (Hash.list (Hash.pair Hash.string hash) l)
+  | Ite (a,b,c) -> Hash.combine4 8 (hash a) (hash b) (hash c)
+  | Let (_, u) -> Hash.combine2 9 (hash u)
+  | Match (u, _) -> Hash.combine2 10 (hash u)
+  | Meta (id,_,_) -> 
+    Var.hash id
+
+let rec compare t1 t2 =
+  CCFormat.printf "** hash 1 **@.";
+  let h1 = hash t1 in
+  CCFormat.printf "** hash 2 **@.";
+  let h2 = hash t2 in
+  let (<?>) = let open CCOrd in (<?>) in
+
+  if h1<>h2 then CCInt.compare h1 h2 (* compare by hash, first *)
+  else match view t1, view t2 with
+    | Var s1, Var s2 -> Var.compare s1 s2
+    | Const s1, Const s2 -> ID.compare s1 s2
+    | App (s1,l1), App (s2, l2) ->
+      compare s1 s2
+      <?> (CCOrd.list compare, l1, l2)
+    | Bind (s1, v1, t1), Bind (s2, v2, t2) ->
+      Binder.compare s1 s2
+      <?> (Var.compare, v1, v2)
+      <?> (compare, t1, t2)
+    | AppBuiltin (b1,l1), AppBuiltin (b2,l2) ->
+      Builtin.compare b1 b2
+      <?> (CCOrd.list compare, l1, l2)
+    | Multiset l1, Multiset l2 ->
+      let l1 = List.sort compare l1 and l2 = List.sort compare l2 in
+      CCOrd.list compare l1 l2
+    | Record (l1, rest1), Record (l2, rest2) ->
+      CCOrd.(
+        CCOpt.compare compare rest1 rest2
+        <?> (cmp_fields, l1, l2)
+      )
+    | Meta (id1,_,_), Meta (id2,_,_) -> Var.compare id1 id2
+    | Ite (a1,b1,c1), Ite (a2,b2,c2) ->
+      CCList.compare compare [a1;b1;c1] [a2;b2;c2]
+    | Let (l1,t1), Let (l2,t2) ->
+      CCOrd.( compare t1 t2
+              <?> (list (pair Var.compare compare), l1, l2))
+    | Match (u1,l1), Match (u2,l2) ->
+      let cmp_branch (c1,vars1,rhs1) (c2,vars2,rhs2) =
+        CCOrd.(ID.compare c1.cstor_id c2.cstor_id
+               <?> (list compare, c1.cstor_args, c2.cstor_args)
+               <?> (list Var.compare, vars1,vars2)
+               <?> (compare,rhs1,rhs2))
+      in
+      CCOrd.( compare u1 u2 <?> (list cmp_branch,l1,l2))
+    | Var _, _
+    | Const _, _
+    | App _, _
+    | Bind _, _
+    | Ite _, _
+    | Let _, _
+    | Match _, _
+    | Multiset _, _
+    | AppBuiltin _, _
+    | Meta _, _
+    | Record _, _ -> to_int_ t1.term - to_int_ t2.term
+and cmp_field x y = CCOrd.pair String.compare compare x y
+and cmp_fields x y = CCOrd.list cmp_field x y
 
 let pp_with_ty out t = Format.fprintf out "(@[%a@,:%a@])" pp t pp (ty_exn t)
 
@@ -653,8 +730,8 @@ module Ty = struct
 
   let equal = equal
   let compare = compare
-  let hash = hash
-  let hash_fun = hash
+  let hash = hash_rec_
+  let hash_fun = hash_rec_
 
   let tType = tType
   let var = var

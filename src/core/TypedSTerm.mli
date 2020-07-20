@@ -274,6 +274,7 @@ val map :
 include Interfaces.PRINT with type t := t
 
 val pp_inner : t CCFormat.printer
+val pp_simpl_debug : t CCFormat.printer
 val pp_with_ty : t CCFormat.printer
 
 val pp_in : Output_format.t -> t CCFormat.printer

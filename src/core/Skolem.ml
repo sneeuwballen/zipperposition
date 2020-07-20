@@ -236,7 +236,13 @@ let define_form ?(pattern="zip_tseitin") ~ctx ~rw_rules ~polarity ~parents form 
       match find_def_in_ctx ~ctx form with
       | Some (def, subst) ->
         (* def.form is alpha renaming *)
-        assert (T.equal form (T.Subst.eval ~rename_binders:false subst def.form));
+        if not (T.equal form (T.Subst.eval ~rename_binders:false subst def.form)) then (
+          CCFormat.printf "to define @[%a@]@." T.pp_simpl_debug form;
+          CCFormat.printf "using @[%a@]@." T.pp_simpl_debug def.form;
+          CCFormat.printf "subst @[%a@]@." T.Subst.pp subst;
+          CCFormat.printf "subst(def.form) @[%a@]@." T.pp_simpl_debug (T.Subst.eval ~rename_binders:false subst def.form);
+          assert false;
+        );
         (* nothing is bound in form *)
         assert(T.equal form (T.Subst.eval ~rename_binders:false subst form));
         Util.debugf ~section 1
