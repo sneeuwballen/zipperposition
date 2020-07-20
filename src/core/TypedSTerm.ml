@@ -100,7 +100,7 @@ let rec hash t =
     t.hash <- h;
     h
   )
-and hash_rec_ t = match t.term with
+and hash_rec_ t = match view t with
   | Var s -> Hash.combine2 1 (Var.hash s)
   | Const s -> Hash.combine2 2 (ID.hash s)
   | App (s, l) -> Hash.combine3 3 (hash s) (Hash.list hash l)
