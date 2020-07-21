@@ -216,6 +216,7 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
   let weight_var_headed = W.one
 
   let weight prec = function
+    | Head.B (Builtin.ForallConst|Builtin.ExistsConst) -> W.omega
     | Head.B _ -> W.one
     | Head.I s -> Prec.weight prec s
     | Head.V _ -> weight_var_headed

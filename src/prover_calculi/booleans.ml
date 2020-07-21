@@ -31,6 +31,7 @@ let k_elim_bvars = Flex_state.create_key ()
 let k_simplify_bools = Flex_state.create_key ()
 let k_trigger_bool_inst = Flex_state.create_key ()
 let k_trigger_bool_ind = Flex_state.create_key ()
+let k_bool_hoist_simpl = Flex_state.create_key ()
 
 module type S = sig
   module Env : Env.S
@@ -887,7 +888,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       );
 
       if Env.flex_get k_bool_reasoning = BoolHoist then (
-        Env.add_unary_inf "bool_hoist" bool_hoist;
+        if Env.flex_get k_bool_hoist_simpl 
+        then Env.add_multi_simpl_rule ~priority:1000 bool_hoist_simpl
+        else Env.add_unary_inf "bool_hoist" bool_hoist;
         Env.add_unary_inf "formula_hoist" formula_hoist;
         Env.add_unary_inf "quant_rw" quantifier_rw;
         Env.add_multi_simpl_rule ~priority:100 replace_bool_vars;
@@ -1205,7 +1208,7 @@ let _simplify_bools = ref true
 let _elim_bvars = ref true
 let _trigger_bool_inst = ref (-1)
 let _trigger_bool_ind = ref (-1)
-
+let _bool_hoist_simpl = ref false
 
 
 let extension =
@@ -1223,6 +1226,7 @@ let extension =
     E.flex_add k_simplify_bools !_simplify_bools;
     E.flex_add k_trigger_bool_inst !_trigger_bool_inst;
     E.flex_add k_trigger_bool_ind !_trigger_bool_ind;
+    E.flex_add k_bool_hoist_simpl !_bool_hoist_simpl;
 
     ET.setup ()
   in
@@ -1255,6 +1259,9 @@ let () =
       "--interpret-bool-funs"
       , Arg.Bool (fun v -> _interpret_bool_funs := v)
       , " turn interpretation of boolean functions as forall or negation of forall on or off";
+      "--bool-hoist-simpl"
+      , Arg.Bool (fun v -> _bool_hoist_simpl := v)
+      , " use BoolHoistSimpl instead of BoolHoist";
         "--normalize-bool-terms", Arg.Bool((fun v -> _norm_bools := v)),
         " normalize boolean subterms using their weight.";
       "--nnf-nested-formulas"
