@@ -10,11 +10,10 @@ module T = Term
 module Pos = Position
 module US = Unif_subst
 
-type selection_setting = Any | Minimal | Large
 type reasoning_kind    = 
-    BoolReasoningDisabled | BoolCasesInference | BoolCasesDisabled
-  | BoolHoist
-  | BoolCasesSimplification | BoolCasesKeepParent
+    BoolReasoningDisabled 
+  | BoolSimplificationsOnly
+  | BoolHoist 
   | BoolCasesPreprocess
 
 let section = Util.Section.make ~parent:Const.section "booleans"
@@ -32,11 +31,6 @@ let k_elim_bvars = Flex_state.create_key ()
 let k_simplify_bools = Flex_state.create_key ()
 let k_trigger_bool_inst = Flex_state.create_key ()
 let k_trigger_bool_ind = Flex_state.create_key ()
-
-let selection_to_str = function
-  | Any -> "any"
-  | Minimal -> "minimal"
-  | Large -> "large"
 
 module type S = sig
   module Env : Env.S
@@ -223,79 +217,10 @@ module Make(E : Env.S) : S with module Env = E = struct
     Signal.on PS.ActiveSet.on_add_clause (fun c ->
       update_triggers c)
   
-  let find_bools c =
-    let found = ref false in
-    let subterm_selection = Env.flex_get k_cased_term_selection in
-
-    let rec find_in_term ~top t k =
-      match T.view t with 
-      | T.Const _ when Type.is_prop (T.ty t) && not top -> k t
-      | T.App(_, args)
-      | T.AppBuiltin(_, args) ->
-        let take_subterm =
-          not top &&
-          Type.is_prop (T.ty t) && 
-          not (T.is_true_or_false t) &&
-          T.DB.is_closed t &&
-          not (T.is_var (T.head_term t)) &&
-          not (T.is_bvar (T.head_term t)) &&
-          (subterm_selection != Minimal ||
-           Iter.is_empty 
-            (Iter.flat_map (find_in_term ~top:false) 
-              (CCList.to_seq args))) in
-        let continue =
-          (subterm_selection = Any || not take_subterm) &&
-          (* do not traverse variable-headed terms *)
-          not (T.is_var (T.head_term t)) &&
-          not (T.is_bvar (T.head_term t))
-           in
-        if take_subterm then k t;
-        if continue then (
-          List.iter (fun arg -> 
-            find_in_term ~top:(top && T.is_appbuiltin t) arg k 
-          ) args)
-      | T.Fun (_,body) ->
-        find_in_term ~top body k
-      | _ -> () in
-
-    let eligible = 
-      match Env.flex_get k_filter_literals with
-      | `All -> C.Eligible.always
-      | `Max -> (
-          match subterm_selection with 
-          | Any -> C.Eligible.res c
-          | _ -> (fun i lit -> 
-            (* found gives us the leftmost match! *)
-            not (!found) && C.Eligible.res c i lit)) in
-    
-    Literals.fold_terms ~which:`All
-      ~subterms:false ~eligible ~ord:(C.Ctx.ord ()) (C.lits c)
-    |> Iter.flat_map (fun (t,_) ->
-      let res = find_in_term ~top:true t in
-      if not (Iter.is_empty res) then found := true;
-      res
-    )
-    |> T.Set.of_seq
-    |> T.Set.to_list
-  
   let mk_res ~proof ~old ~repl new_lit c =
     C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
       (new_lit :: Array.to_list( C.lits c |> Literals.map (T.replace ~old ~by:repl)))
     proof
-
-  let bool_case_inf (c: C.t) : C.t list =    
-    let proof = Proof.Step.inference [C.proof_parent c]
-                ~rule:(Proof.Rule.mk "bool_inf") ~tags:[Proof.Tag.T_ho] in
-
-    Util.debugf 5 ~section "bci(@[%a@])=@." (fun k -> k C.pp c);
-
-    find_bools c
-    |> CCList.fold_left (fun acc old ->
-      let neg_lit, repl = 
-        if Builtin.compare Builtin.True Builtin.False > 0 then (no old, T.true_)
-        else (yes old, T.false_) in
-      (mk_res ~proof ~old ~repl neg_lit c) :: acc
-    ) []
 
   let get_bool_subterms c =
     C.eligible_for_bool_infs c
@@ -483,20 +408,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       let stm_res = Env.Stm.make ~penalty:(C.penalty c) ~parents:[c] clause_seq in
       Env.StmQ.add (Env.get_stm_queue ()) stm_res);
     []
-
-  let bool_case_simp (c: C.t) : C.t list option =
-    let proof = Proof.Step.simp [C.proof_parent c]
-                ~rule:(Proof.Rule.mk"bool_simp") ~tags:[Proof.Tag.T_ho] in
-
-    let bool_subterms = find_bools c in
-    if CCList.is_empty bool_subterms then None
-    else (
-      CCOpt.return @@ CCList.fold_left (fun acc old ->
-        let neg_lit, repl_neg = no old, T.true_ in
-        let pos_lit, repl_pos = yes old, T.false_ in
-        (mk_res ~proof ~old ~repl:repl_neg neg_lit c) ::
-        (mk_res ~proof ~old ~repl:repl_pos pos_lit c) :: acc
-    ) [] bool_subterms)
 
   let simplify_bools t =
     let negate t =
@@ -975,15 +886,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         Env.add_unary_inf "interpret boolean functions" interpret_boolean_functions;
       );
 
-      if Env.flex_get k_bool_reasoning = BoolCasesInference then (
-        Env.add_unary_inf "bool_cases" bool_case_inf;
-      )
-      else if Env.flex_get k_bool_reasoning = BoolCasesSimplification then (
-        Env.add_single_step_multi_simpl_rule bool_case_simp;
-      ) else if Env.flex_get k_bool_reasoning = BoolCasesKeepParent then (
-        let keep_parent c  = CCOpt.get_or ~default:[] (bool_case_simp c) in
-        Env.add_unary_inf "bool_cases_keep_parent" keep_parent;
-      ) else if Env.flex_get k_bool_reasoning = BoolHoist then (
+      if Env.flex_get k_bool_reasoning = BoolHoist then (
         Env.add_unary_inf "bool_hoist" bool_hoist;
         Env.add_unary_inf "formula_hoist" formula_hoist;
         Env.add_unary_inf "quant_rw" quantifier_rw;
@@ -1293,8 +1196,6 @@ let preprocess_cnf_booleans stmts = match !_bool_reasoning with
     res
   | _ -> stmts
 
-
-let _cased_term_selection = ref Large
 let _interpret_bool_funs = ref false
 let _cnf_non_simpl = ref false
 let _norm_bools = ref false 
@@ -1312,7 +1213,6 @@ let extension =
     let module E = (val env : Env.S) in
     let module ET = Make(E) in
     E.flex_add k_bool_reasoning !_bool_reasoning;
-    E.flex_add k_cased_term_selection !_cased_term_selection;
     E.flex_add k_quant_rename !_quant_rename;
     E.flex_add k_interpret_bool_funs !_interpret_bool_funs;
     E.flex_add k_cnf_non_simpl !_cnf_non_simpl;
@@ -1333,54 +1233,46 @@ let extension =
 
 let () =
   Options.add_opts
-    [ "--boolean-reasoning", Arg.Symbol (["off"; "no-cases"; "bool-hoist"; "cases-inf"; "cases-simpl"; "cases-simpl-kp"; "cases-eager"; "cases-preprocess"], 
+    [ "--boolean-reasoning", Arg.Symbol (["off"; "simpl-only"; "bool-hoist"; "cases-preprocess"], 
                                          fun s -> _bool_reasoning := 
                                              match s with 
                                              | "off" -> BoolReasoningDisabled
-                                             | "no-cases" -> BoolCasesDisabled
+                                             | "simpl-only" -> BoolSimplificationsOnly
                                              | "bool-hoist" -> BoolHoist
-                                             | "cases-inf" -> BoolCasesInference
-                                             | "cases-simpl" -> BoolCasesSimplification
-                                             | "cases-simpl-kp" -> BoolCasesKeepParent
                                              | "cases-preprocess" -> BoolCasesPreprocess
                                              | _ -> assert false), 
       " enable/disable boolean axioms";
-      "--bool-subterm-selection",
-      Arg.Symbol(["A"; "M"; "L"], (fun opt -> _cased_term_selection := 
-                                      match opt with "A"->Any | "M"->Minimal | "L"->Large
-                                                   | _ -> assert false)), 
-      " select boolean subterm selection criterion: A for any, M for minimal and L for large";
       "--quantifier-renaming"
-    , Arg.Bool (fun v -> _quant_rename := v)
-    , " turn the quantifier renaming on or off";
-    "--trigger-bool-ind", Arg.Set_int _trigger_bool_ind
-    , " abstract away constants from the goal and use them to trigger axioms of induction";
-     "--trigger-bool-inst", Arg.Set_int _trigger_bool_inst
-      , " instantiate predicate variables with boolean terms already in the proof state. Argument is the maximal proof depth of predicate variable";
-    "--disable-simplifying-cnf",
-      Arg.Set _cnf_non_simpl,
-      " implement cnf on-the-fly as an inference rule";
-    "--interpret-bool-funs"
-    , Arg.Bool (fun v -> _interpret_bool_funs := v)
-    , " turn interpretation of boolean functions as forall or negation of forall on or off";
-      "--normalize-bool-terms", Arg.Bool((fun v -> _norm_bools := v)),
-      " normalize boolean subterms using their weight.";
-    "--nnf-nested-formulas"
-    , Arg.Bool (fun v -> _nnf := v)
-    , " convert nested formulas into negation normal form";
-    "--simplify-bools"
-    , Arg.Bool (fun v -> _simplify_bools := v)
-    , " simplify boolean subterms";
-    "--elim-bvars"
-    , Arg.Bool ((:=) _elim_bvars)
-    , " replace boolean variables by T and F";
-    "--boolean-reasoning-filter-literals"
-    , Arg.Symbol(["all"; "max"], (fun v ->
-        match v with 
-        | "all" -> _filter_literals:=`All
-        | "max" -> _filter_literals:= `Max
-        | _ -> assert false;))
-    , " select on which literals to apply bool reasoning rules"
+      , Arg.Bool (fun v -> _quant_rename := v)
+      , " turn the quantifier renaming on or off";
+      "--trigger-bool-ind", Arg.Set_int _trigger_bool_ind
+      , " abstract away constants from the goal and use them to trigger axioms of induction";
+      "--trigger-bool-inst", Arg.Set_int _trigger_bool_inst
+        , " instantiate predicate variables with boolean terms already in the proof state. Argument is the maximal proof depth of predicate variable";
+      "--disable-simplifying-cnf",
+        Arg.Set _cnf_non_simpl,
+        " implement cnf on-the-fly as an inference rule";
+      "--interpret-bool-funs"
+      , Arg.Bool (fun v -> _interpret_bool_funs := v)
+      , " turn interpretation of boolean functions as forall or negation of forall on or off";
+        "--normalize-bool-terms", Arg.Bool((fun v -> _norm_bools := v)),
+        " normalize boolean subterms using their weight.";
+      "--nnf-nested-formulas"
+      , Arg.Bool (fun v -> _nnf := v)
+      , " convert nested formulas into negation normal form";
+      "--simplify-bools"
+      , Arg.Bool (fun v -> _simplify_bools := v)
+      , " simplify boolean subterms";
+      "--elim-bvars"
+      , Arg.Bool ((:=) _elim_bvars)
+      , " replace boolean variables by T and F";
+      "--boolean-reasoning-filter-literals"
+      , Arg.Symbol(["all"; "max"], (fun v ->
+          match v with 
+          | "all" -> _filter_literals:=`All
+          | "max" -> _filter_literals:= `Max
+          | _ -> assert false;))
+      , " select on which literals to apply bool reasoning rules"
     ];
   Params.add_to_modes ["ho-complete-basic";
                        "ho-pragmatic";
