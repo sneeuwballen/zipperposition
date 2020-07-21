@@ -217,7 +217,9 @@ module Make (P : PARAMETERS) = struct
                   let mode = Flex_state.get_exn PragUnifParams.k_logop_mode P.flex_state in
                   let args_lhs, args_rhs = 
                     Unif.norm_logical_disagreements ~mode b1 args_lhs args_rhs in
-                  decompose_and_cont (args_lhs) (args_rhs) rest flag subst
+                  if List.length args_lhs = List.length args_rhs then 
+                    decompose_and_cont (args_lhs) (args_rhs) rest flag subst
+                  else OSeq.empty
                 with Unif.Fail -> OSeq.empty
               ) else OSeq.empty
             | _ when different_rigid_heads hd_lhs hd_rhs -> OSeq.empty

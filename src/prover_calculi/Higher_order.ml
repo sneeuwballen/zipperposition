@@ -516,7 +516,9 @@ module Make(E : Env.S) : S with module Env = E = struct
         None
     in
     
-    let rec aux s t =
+    let rec find_diss ~top s t =
+      let return ~top res = if top then [] else res in
+
       if T.equal s t && (s_sc == t_sc || T.is_ground s) then []
       else (
         match T.view s, T.view t with
@@ -524,8 +526,8 @@ module Make(E : Env.S) : S with module Env = E = struct
             when T.is_const s_hd ->
           let (s_hd, s_args), (t_hd, t_args) = 
             CCPair.map_same T.as_app_mono (s,t) in
-          if T.equal s_hd t_hd then aux_l s_args t_args
-          else [s,t]
+          if T.equal s_hd t_hd then find_diss_l s_args t_args
+          else return ~top [s,t]
         | T.App(s_hd, s_args), T.App(t_hd, t_args) 
             when not (T.equal s_hd t_hd)
                  && T.is_const s_hd && T.is_const t_hd ->
@@ -544,12 +546,12 @@ module Make(E : Env.S) : S with module Env = E = struct
               s_hd, T.app t_hd taken, s_args, dropped
             ) in
           if T.same_l args_lhs args_rhs && s_sc == t_sc then ([lhs,rhs])
-          else [s,t]
-        | _ -> [s,t])
-    and aux_l xs ys =
+          else return ~top [s,t]
+        | _ -> return ~top [s,t])
+    and find_diss_l xs ys =
       match xs,ys with
       | [],[] -> []
-      | x :: xxs, y :: yys -> aux x y @ aux_l xxs yys
+      | x :: xxs, y :: yys -> find_diss ~top:false x y @ find_diss_l xxs yys
       | _ -> invalid_arg "args must be of the same length" in
     
     try
@@ -558,11 +560,11 @@ module Make(E : Env.S) : S with module Env = E = struct
       if T.is_true_or_false orig_s || T.is_true_or_false orig_t then raise StopSearch;
 
       let norm = 
-        if Env.flex_get Combinators.k_enable_combinators 
+        if Env.flex_get Combinators.k_enable_combinators
         then CCFun.id 
         else Lambda.eta_expand in
 
-      let diss = aux (norm orig_s) (norm orig_t) in
+      let diss = find_diss ~top:true (norm orig_s) (norm orig_t) in
       let hd_is_var t = 
         let _,body = T.open_fun t in
         T.is_var @@ T.head_term body in
@@ -649,7 +651,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       CCList.map (fun (lhs,rhs) -> ext_inst ~parents (lhs,sc_f) (rhs,sc_t)) ho_dis
     | None -> []
 
-  let ext_inst_or_family_eqfact_aux cl =
+  let ext_inst_or_family_eqfact cl =
     let try_ext_eq_fact (s,t) (u,v) idx =
       let sc = 0 in
       match find_ho_disagremeents (s,sc) (u,sc) with
@@ -666,7 +668,8 @@ module Make(E : Env.S) : S with module Env = E = struct
         let proof =
           Proof.Step.inference [C.proof_parent cl] 
             ~rule:(Proof.Rule.mk "ext_eqfact") in
-        let new_c = C.create ~trail:(C.trail cl) ~penalty:(C.penalty cl) new_lits proof in
+        (* ext_eqfact is rarely used *)
+        let new_c = C.create ~trail:(C.trail cl) ~penalty:(C.penalty cl + (C.proof_depth cl)) new_lits proof in
         [new_c]
       | None -> [] in
 
@@ -841,6 +844,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let ext_eqres_aux c =
     let eligible = C.Eligible.always in
+
     if ext_rule_eligible c then (
       let res = 
         Literals.fold_eqn (C.lits c) ~eligible ~ord ~both:false ~sign:false
@@ -864,8 +868,9 @@ module Make(E : Env.S) : S with module Env = E = struct
                   Proof.Step.inference [C.proof_parent c] ~rule:(Proof.Rule.mk "ext_eqres") in
                 let new_c =
                   C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
+                CCFormat.printf "ext_eqres(@[%a@])=@[%a@]@." C.pp c C.pp new_c;
                 Some new_c
-              | None -> None)
+              | _ -> None)
             else None)
         in
       Util.incr_stat stat_ext_dec;
@@ -1135,7 +1140,10 @@ module Make(E : Env.S) : S with module Env = E = struct
         proof_constructor ~tags:[Proof.Tag.T_cannot_orphan] 
                           ~rule:(Proof.Rule.mk ("inst_choice" ^ arg_str)) 
                           parents in
-      C.create ~penalty:1 ~trail:Trail.empty new_lits proof in
+      let res = C.create ~penalty:1 ~trail:Trail.empty new_lits proof in
+      res
+    in
+      
 
 
     let new_choice_op ty =
@@ -2144,7 +2152,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       );
 
       if Env.flex_get k_ext_rules_kind != `Off then (
-        Env.add_unary_inf "ext_eqfact_both" ext_inst_or_family_eqfact_aux;
+        Env.add_unary_inf "ext_eqfact_both" ext_inst_or_family_eqfact;
       );
 
 
