@@ -297,10 +297,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       (mk_res ~proof ~old ~repl neg_lit c) :: acc
     ) []
 
-  let bool_hoist (c:C.t) : C.t list = 
-    let proof = Proof.Step.inference [C.proof_parent c]
-                ~rule:(Proof.Rule.mk "bool_hoist") ~tags:[Proof.Tag.T_ho] in
-
+  let get_bool_subterms c =
     C.eligible_for_bool_infs c
     |> SClause.TPSet.to_list
     |> List.filter (fun (t,_) -> 
@@ -308,12 +305,31 @@ module Make(E : Env.S) : S with module Env = E = struct
         | T.AppBuiltin(hd,_) ->
           (* check that the term has no interpreted sym on top *)
           not (List.mem hd [Builtin.Eq;Builtin.Neq] || 
-               Builtin.is_logical_binop hd)
+              Builtin.is_logical_binop hd)
         | _ -> true)
     (* since we are doing simultaneous version -- we take only unique terms *)
     |> CCList.sort_uniq ~cmp:(fun (t1,_) (t2,_) -> T.compare t1 t2)
-    |> List.map (fun (t, _) ->
-      mk_res ~proof ~old:t ~repl:T.false_ (yes t) c
+
+  let bool_hoist (c:C.t) : C.t list = 
+    let proof = Proof.Step.inference [C.proof_parent c]
+                ~rule:(Proof.Rule.mk "bool_hoist") ~tags:[Proof.Tag.T_ho] in
+
+    List.map (fun (t, _) ->
+      mk_res ~proof ~old:t ~repl:T.false_ (yes t) c)
+    (get_bool_subterms c)
+
+  let bool_hoist_simpl (c:C.t) : C.t list option = 
+    let proof = Proof.Step.inference [C.proof_parent c]
+                ~rule:(Proof.Rule.mk "bool_hoist") ~tags:[Proof.Tag.T_ho] in
+
+    let bool_subterms  = get_bool_subterms c in
+    CCOpt.return_if (not @@ CCList.is_empty bool_subterms) (
+      CCList.fold_left (fun acc (t,_) -> 
+        let neg_lit, repl_neg = no t, T.true_ in
+        let pos_lit, repl_pos = yes t, T.false_ in
+        (mk_res ~proof ~old:t ~repl:repl_neg neg_lit c) ::
+        (mk_res ~proof ~old:t ~repl:repl_pos pos_lit c) :: acc ) 
+      [] bool_subterms
     )
 
   let formula_hoist (c:C.t) : C.t list =
