@@ -2415,7 +2415,7 @@ let extension =
     E.flex_add k_ext_axiom_penalty !_ext_axiom_penalty;
     E.flex_add k_instantiate_choice_ax !_instantiate_choice_ax;
     E.flex_add k_elim_leibniz_eq !_elim_leibniz_eq;
-    E.flex_add k_elim_leibniz_eq !_elim_andrews_eq;
+    E.flex_add k_elim_andrews_eq !_elim_andrews_eq;
     E.flex_add k_prune_arg_fun !_prune_arg_fun;
     E.flex_add k_prim_enum_terms prim_enum_terms;
     E.flex_add k_simple_projection !_simple_projection;

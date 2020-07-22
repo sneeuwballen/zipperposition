@@ -161,7 +161,7 @@ module Make(E : Env.S) = struct
           (* assert (not (Env.is_redundant c)); *)
           (* process the given clause! *)
           Util.incr_stat stat_processed_given;
-          Util.debugf ~section 1 "@[@{<Yellow>### step %5d ###@}@]"(fun k->k num);
+          Util.debugf ~section 1 "@[@{<Yellow>### step %5d ###@}@]" (fun k->k num);
           Util.debugf ~section 1 "@[<2>@{<green>given@} (%d steps, penalty %d):@ `@[%a@]`@]"
             (fun k->k num (Env.C.penalty c) Env.C.pp c);
           Util.debugf ~section 2 "@[proof:@[%a@]@]" (fun k -> k Proof.S.pp_tstp (Env.C.proof c));
