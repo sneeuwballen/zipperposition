@@ -1464,7 +1464,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     ZProf.enter_prof prof_infer_equality_resolution;
     let eligible = C.Eligible.filter (fun lit -> not @@ Lit.is_predicate_lit lit) in
     (* iterate on those literals *)
-    (* CCFormat.printf "eq_res(@[%a@])@." C.pp clause; *)
     let new_clauses =
       Lits.fold_eqn ~sign:false ~ord ~both:false ~eligible (C.lits clause)
       |> Iter.filter_map

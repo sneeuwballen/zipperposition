@@ -131,7 +131,9 @@ module Make(E : Env.S) : S with module Env = E = struct
     C.lits c
     |> CCArray.mapi (fun i lit ->
       match find_resolvable_form lit with 
-      | None -> 
+      | None ->
+        Util.debugf ~section 2 "for lit %d(@[%a@]) of @[%a@] no resolvable lits found@." 
+          (fun k -> k i Literal.pp lit C.pp c);
         None
       | Some (l,r) ->
         let module US = Unif_subst in
@@ -349,11 +351,11 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let choice_tbl = Type.Tbl.create 32
   let lazy_clausify_driver ?(ignore_eq=false) ~proof_cons c =
-    let return l =
-      Iter.of_list l, `Stop in
+    let return acc l =
+      Iter.append acc (Iter.of_list l), `Stop in
     
-    let continue =
-      Iter.empty, `Continue in
+    let continue acc =
+      acc, `Continue in
 
     let eligible_to_ignore_eq ~ignore_eq lhs rhs = 
       ignore_eq && not (T.is_true_or_false lhs) && not (T.is_true_or_false rhs) in
@@ -387,7 +389,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         ) ~k:(T.ty f) in
         T.app hd [f] in
 
-    Util.debugf ~section 2 "lazy_cnf(@[%a@])@." (fun k -> k C.pp c);
+    Util.debugf ~section 3 "lazy_cnf(@[%a@])@." (fun k -> k C.pp c);
 
     let init = 
       if Env.flex_get k_solve_formulas
@@ -396,37 +398,37 @@ module Make(E : Env.S) : S with module Env = E = struct
     in
 
     fold_lits c
-    |> Iter.fold_while ( fun _ (lhs, rhs, sign, pos) ->
+    |> Iter.fold_while ( fun acc (lhs, rhs, sign, pos) ->
       let i,_ = Ls.Pos.cut pos in
       let lit = (C.lits c).(i) in
       if L.is_predicate_lit lit then (
-        Util.debugf ~section 2 "  subformula:%d:@[%a@]" (fun k -> k i L.pp lit );
+        Util.debugf ~section 3 "  subformula:%d:@[%a@]" (fun k -> k i L.pp lit );
         begin match T.view lhs with 
         | T.AppBuiltin(And, l) when List.length l >= 2 ->
           let rule_name = "lazy_cnf_and" in
-          if sign then return @@ mk_and ~proof_cons l c i ~rule_name
-          else return @@ mk_or ~proof_cons (List.map T.Form.not_ l) c i ~rule_name
+          if sign then return acc @@ mk_and ~proof_cons l c i ~rule_name
+          else return acc @@ mk_or ~proof_cons (List.map T.Form.not_ l) c i ~rule_name
         | T.AppBuiltin(Or, l) when List.length l >= 2 ->
           let rule_name = "lazy_cnf_or" in
-          if sign then return @@ mk_or ~proof_cons l c i ~rule_name
-          else return @@ mk_and ~proof_cons (List.map T.Form.not_ l) c i ~rule_name
+          if sign then return acc @@ mk_or ~proof_cons l c i ~rule_name
+          else return acc @@ mk_and ~proof_cons (List.map T.Form.not_ l) c i ~rule_name
         | T.AppBuiltin(Imply, [a;b]) ->
           let rule_name = "lazy_cnf_imply" in
-          if sign then return @@ mk_or ~proof_cons [T.Form.not_ a; b] c i ~rule_name
-          else return @@ mk_and ~proof_cons [a; T.Form.not_ b] c i ~rule_name
+          if sign then return acc @@ mk_or ~proof_cons [T.Form.not_ a; b] c i ~rule_name
+          else return acc @@ mk_and ~proof_cons [a; T.Form.not_ b] c i ~rule_name
         | T.AppBuiltin((Equiv|Xor) as hd, [a;b]) ->
           let hd = if sign then hd else (if hd = Equiv then Xor else Equiv) in
-          if eligible_to_ignore_eq ~ignore_eq a b then continue
+          if eligible_to_ignore_eq ~ignore_eq a b then continue acc
           else (
             let rule_name = 
               CCFormat.sprintf "lazy_cnf_%s" 
                 (if hd = Equiv then "equiv" else "xor") in
             if hd = Equiv then (
-              return @@ (
+              return acc @@ (
                 mk_or ~proof_cons ~rule_name [T.Form.not_ a; b] c i 
                   @ mk_or ~proof_cons ~rule_name [a; T.Form.not_ b] c i)
             ) else (
-              return @@ (
+              return acc @@ (
                 mk_or ~proof_cons ~rule_name [T.Form.not_ a; T.Form.not_ b] c i 
                 @ mk_or ~proof_cons ~rule_name [a; b] c i
                 )))
@@ -458,27 +460,27 @@ module Make(E : Env.S) : S with module Env = E = struct
             assert (T.is_var subst_term);
             Signal.send Env.on_pred_var_elimination (List.hd res_cl, subst_term)
           );
-          return res_cl
+          return acc res_cl
         | T.AppBuiltin(Not, _) -> assert false
-        | _ -> continue end
+        | _ -> continue acc end
       ) else if Type.is_prop (T.ty lhs) && not (L.is_predicate_lit lit) then (
           let rule_name = 
             CCFormat.sprintf "lazy_cnf_%s" (if sign then "equiv" else "xor") in
           
-          Util.debugf ~section 2 "  subeq:%d:@[%a %s= %a@]" (fun k -> k i T.pp lhs (if sign then "" else "~") T.pp rhs );
-          if eligible_to_ignore_eq ~ignore_eq lhs rhs then continue
+          Util.debugf ~section 3 "  subeq:%d:@[%a %s= %a@]" (fun k -> k i T.pp lhs (if sign then "" else "~") T.pp rhs );
+          if eligible_to_ignore_eq ~ignore_eq lhs rhs then continue acc
           else if sign then (
-            return @@ (
+            return acc @@ (
               mk_or ~proof_cons ~rule_name [T.Form.not_ lhs; rhs] c i 
               @ mk_or ~proof_cons ~rule_name [lhs; T.Form.not_ rhs] c i)
           ) else (
-            return @@ (
+            return acc @@ (
                 mk_or ~proof_cons ~rule_name [T.Form.not_ lhs; T.Form.not_ rhs] c i 
                 @ mk_or ~proof_cons ~rule_name [lhs; rhs] c i ))
-      ) else continue) (init)
+      ) else continue acc) (init)
 
   let rename_subformulas c =
-    Util.debugf ~section 2 "lazy-cnf-rename(@[%a@])@." (fun k -> k C.pp c);
+    Util.debugf ~section 3 "lazy-cnf-rename(@[%a@])@." (fun k -> k C.pp c);
     fold_lits c
     |> Iter.fold_while (fun _ (lhs,rhs,sign,pos) -> 
       let i,_ = Ls.Pos.cut pos in
@@ -491,9 +493,9 @@ module Make(E : Env.S) : S with module Env = E = struct
           let renamer = (if sign then CCFun.id else T.Form.not_) renamer in
           let renamed = mk_or ~proof_cons ~rule_name [renamer] c ~parents:(c :: parents) i in
           let res = renamed @ new_defs in
-          Util.debugf ~section 2 "  @[renamed subformula %d:(@[%a@])=@. @[%a@]@]@." 
+          Util.debugf ~section 3 "  @[renamed subformula %d:(@[%a@])=@. @[%a@]@]@." 
             (fun k -> k i C.pp c (CCList.pp C.pp) renamed);
-          Util.debugf ~section 2 "  new defs:@[%a@]@." 
+          Util.debugf ~section 3 "  new defs:@[%a@]@." 
             (fun k -> k (CCList.pp C.pp) new_defs);
           Some res, `Stop
         | None -> None, `Continue
@@ -505,9 +507,9 @@ module Make(E : Env.S) : S with module Env = E = struct
             let renamer = (if sign then CCFun.id else T.Form.not_) renamer in
             let renamed = mk_or ~proof_cons ~rule_name [renamer] c ~parents:(c :: parents) i in
             let res = renamed @ new_defs in
-            Util.debugf ~section 2 "  @[renamed eq %d(@[%a@]) into @[%a@]@]@." 
+            Util.debugf ~section 3 "  @[renamed eq %d(@[%a@]) into @[%a@]@]@." 
             (fun k -> k i L.pp (C.lits c).(i) (CCList.pp C.pp) renamed);
-            Util.debugf ~section 2 "  new defs:@[%a@]@." 
+            Util.debugf ~section 3 "  new defs:@[%a@]@." 
               (fun k -> k (CCList.pp C.pp) new_defs);
               Some res, `Stop
           | None -> None, `Continue)
@@ -557,11 +559,11 @@ module Make(E : Env.S) : S with module Env = E = struct
     let proof_cons = Proof.Step.simp ~infos:[] ~tags:[Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth] in
     let res = Iter.to_list @@ lazy_clausify_driver ~ignore_eq:true ~proof_cons c  in
     if not @@ CCList.is_empty res then (
-      Util.debugf ~section 2 "lazy_cnf_simp(@[%a@])=" (fun k -> k C.pp c);
-      Util.debugf ~section 2 "@[%a@]@." (fun k -> k (CCList.pp C.pp) res);
+      Util.debugf ~section 1 "lazy_cnf_simp(@[%a@])=" (fun k -> k C.pp c);
+      Util.debugf ~section 1 "@[%a@]@." (fun k -> k (CCList.pp C.pp) res);
       update_form_counter ~action:`Decrease c;
       CCList.iter (update_form_counter ~action:`Increase) res;
-    ) else Util.debugf ~section 3 "lazy_cnf_simp(@[%a@])=Ø" (fun k -> k C.pp c);
+    ) else Util.debugf ~section 1 "lazy_cnf_simp(@[%a@])=Ø" (fun k -> k C.pp c);
     if CCList.is_empty res then None
     else (Some res)
 
@@ -569,8 +571,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     let proof_cons = Proof.Step.inference ~infos:[] ~tags:[Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth] in
     let res = Iter.to_list (lazy_clausify_driver ~ignore_eq:false ~proof_cons c) in
     if not @@ CCList.is_empty res then (
-      Util.debugf ~section 2 "lazy_cnf_inf(@[%a@])=" (fun k -> k C.pp c);
-      Util.debugf ~section 2 "@[%a@]@." (fun k -> k (CCList.pp C.pp) res);
+      Util.debugf ~section 3 "lazy_cnf_inf(@[%a@])=" (fun k -> k C.pp c);
+      Util.debugf ~section 3 "@[%a@]@." (fun k -> k (CCList.pp C.pp) res);
     ) else Util.debugf ~section 3 "lazy_cnf_simp(@[%a@])=Ø" (fun k -> k C.pp c);
     res
 

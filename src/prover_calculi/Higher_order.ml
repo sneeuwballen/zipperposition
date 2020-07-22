@@ -50,6 +50,7 @@ let k_neg_ext_as_simpl = Flex_state.create_key ()
 let k_ext_axiom_penalty = Flex_state.create_key ()
 let k_instantiate_choice_ax = Flex_state.create_key ()
 let k_elim_leibniz_eq = Flex_state.create_key ()
+let k_elim_andrews_eq = Flex_state.create_key ()
 let k_prune_arg_fun = Flex_state.create_key ()
 let k_prim_enum_terms = Flex_state.create_key ()
 let k_simple_projection = Flex_state.create_key ()
@@ -868,7 +869,6 @@ module Make(E : Env.S) : S with module Env = E = struct
                   Proof.Step.inference [C.proof_parent c] ~rule:(Proof.Rule.mk "ext_eqres") in
                 let new_c =
                   C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
-                CCFormat.printf "ext_eqres(@[%a@])=@[%a@]@." C.pp c C.pp new_c;
                 Some new_c
               | _ -> None)
             else None)
@@ -1345,6 +1345,47 @@ module Make(E : Env.S) : S with module Env = E = struct
       elim_leibniz_eq_ c
     ) else []
 
+  let elim_andrews_eq_ ?(proof_constructor=Proof.Step.inference) c =
+    let ord = Env.ord () in
+    let eligible = C.Eligible.always in
+    Lits.fold_eqn ~both:false ~ord ~eligible (C.lits c)
+    |> Iter.fold (fun cmd_list (lhs,rhs,_,pos) ->
+      let i, _ = Lits.Pos.cut pos in
+      let lit = (C.lits c).(i) in
+      if Lit.is_predicate_lit lit && T.is_app_var lhs then (
+        let hd, args = T.as_app lhs in
+        assert (T.is_var hd);
+        let lam_pref, _ = Type.open_fun (T.ty hd) in
+        let return i j  =
+          let mk_db idx = 
+            let idx = (List.length lam_pref) - idx - 1 in
+            let ty = List.nth lam_pref idx in
+            T.bvar ~ty idx
+          in
+          let mk_body ~sign i j = sign (mk_db i) (mk_db j) in
+          let sign = if Lit.is_pos lit then T.Form.neq else T.Form.eq in
+          let subst_t = T.fun_l lam_pref (mk_body ~sign i j) in
+          let var = T.as_var_exn hd in
+          Some (Subst.FO.bind' Subst.empty (var,0) (subst_t, 0))
+        in
+        (CCList.filter_map CCFun.id @@ 
+          CCList.flat_map_i (fun i arg_i ->
+            CCList.mapi (fun j arg_j -> 
+              if j > i && T.equal arg_i arg_j then return i j else None
+            ) args
+          ) args) @ cmd_list
+        ) else cmd_list) ([])
+    |> List.map (fun subst -> 
+      let rule = Proof.Rule.mk "elim_andrews_eq" in
+      let tags = [Proof.Tag.T_ho] in
+      let proof = Some (proof_constructor ~rule ~tags [C.proof_parent c]) in
+      C.apply_subst ~proof (c,0) subst
+    )
+
+  let elim_andrews_equality c =
+    if C.proof_depth c < Env.flex_get k_elim_andrews_eq then (
+      elim_andrews_eq_ c
+    ) else []
 
   let pp_pairs_ out =
     let open CCFormat in
@@ -2178,6 +2219,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       if Env.flex_get k_elim_leibniz_eq > 0 then (
         Env.add_unary_inf "ho_elim_leibniz_eq" elim_leibniz_equality
       );
+      if Env.flex_get k_elim_andrews_eq > 0 then (
+        Env.add_unary_inf "ho_elim_leibniz_eq" elim_andrews_equality
+      );
 
       if Env.flex_get k_instantiate_choice_ax then (
         Env.add_redundant recognize_choice_ops;
@@ -2335,6 +2379,7 @@ let _compose_subs = ref false
 let _var_solve = ref false
 let _instantiate_choice_ax = ref false
 let _elim_leibniz_eq = ref (-1)
+let _elim_andrews_eq = ref (-1)
 let _prune_arg_fun = ref `NoPrune
 let _check_lambda_free = ref `False
 let prim_enum_terms = ref Term.Set.empty
@@ -2370,6 +2415,7 @@ let extension =
     E.flex_add k_ext_axiom_penalty !_ext_axiom_penalty;
     E.flex_add k_instantiate_choice_ax !_instantiate_choice_ax;
     E.flex_add k_elim_leibniz_eq !_elim_leibniz_eq;
+    E.flex_add k_elim_leibniz_eq !_elim_andrews_eq;
     E.flex_add k_prune_arg_fun !_prune_arg_fun;
     E.flex_add k_prim_enum_terms prim_enum_terms;
     E.flex_add k_simple_projection !_simple_projection;
@@ -2490,6 +2536,16 @@ let () =
           | None -> invalid_arg "number expected for --ho-elim-leibniz"
           | Some x -> _elim_leibniz_eq := x
          ), " enable/disable treatment of Leibniz equality. inf enables it for infinte depth of clauses"
+            ^ "; off disables it; number enables it for a given depth of clause";
+      "--ho-elim-andrews", Arg.String (fun v -> 
+        match v with 
+        | "inf" ->  _elim_andrews_eq := max_int
+        | "off" -> _elim_andrews_eq := -1
+        | _ ->
+          match CCInt.of_string v with
+          | None -> invalid_arg "number expected for --ho-elim-leibniz"
+          | Some x -> _elim_andrews_eq := x
+         ), " enable/disable treatment of Andrews equality. inf enables it for infinte depth of clauses"
             ^ "; off disables it; number enables it for a given depth of clause";
       "--ho-def-unfold", Arg.Bool (fun v -> def_unfold_enabled_ := v), " enable ho definition unfolding";
       "--ho-choice-inst", Arg.Bool (fun v -> _instantiate_choice_ax := v), " enable ho definition unfolding";

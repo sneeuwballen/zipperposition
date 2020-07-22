@@ -359,7 +359,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         let ret_ty = List.hd (fst (Type.open_fun (T.ty body))) in
         let (id,ty), sk = T.mk_fresh_skolem ~prefix:"sk" free_vars_l ret_ty in
         E.Ctx.declare id ty;
-        Signal.send Env.on_pred_skolem_introduction (c, t);
+        Signal.send Env.on_pred_skolem_introduction (c, sk);
         let repl = T.app body [sk] in
         let new_lits = CCArray.copy (C.lits c) in
         Literals.Pos.replace ~at:p ~by:repl new_lits;
