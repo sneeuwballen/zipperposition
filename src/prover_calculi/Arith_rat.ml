@@ -244,7 +244,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let all_lits = new_lit :: c_guard @ lits_a @ lits_p in
       (* build clause *)
       let proof =
-        Proof.Step.inference ~tags:[Proof.Tag.T_lra]
+        Proof.Step.inference ~tags:[Proof.Tag.T_lra; Proof.Tag.T_cannot_orphan]
           ~rule:rule_canc
           [C.proof_parent_subst renaming (info.active,s_a) subst;
            C.proof_parent_subst renaming (info.passive,s_p) subst] in
@@ -439,7 +439,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       if !did_simplify then (
         clauses := CCList.uniq ~eq:eq_c_subst !clauses;
         let proof =
-          Proof.Step.inference ~tags:[Proof.Tag.T_lra]
+          Proof.Step.inference ~tags:[Proof.Tag.T_lra; Proof.Tag.T_cannot_orphan]
             ~rule:(Proof.Rule.mk "canc_demod")
             (C.proof_parent c ::
              List.rev_map
@@ -528,7 +528,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                   let c_guard = Literal.of_unif_subst renaming us in
                   let all_lits = new_lit :: c_guard @ lits' in
                   let proof =
-                    Proof.Step.inference ~tags:[Proof.Tag.T_lra]
+                    Proof.Step.inference ~tags:[Proof.Tag.T_lra; Proof.Tag.T_cannot_orphan]
                       ~rule:(Proof.Rule.mk "cancellation")
                       [C.proof_parent_subst renaming (c,0) subst] in
                   let trail = C.trail c in
@@ -608,7 +608,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                          (* apply subst and build clause *)
                          let all_lits = c_guard @ new_lits @ other_lits in
                          let proof =
-                           Proof.Step.inference ~tags:[Proof.Tag.T_lra]
+                           Proof.Step.inference ~tags:[Proof.Tag.T_lra; Proof.Tag.T_cannot_orphan]
                              ~rule:rule_canc_eq_fact
                              [C.proof_parent_subst renaming (c,0) subst] in
                          let penalty = C.penalty c
@@ -687,7 +687,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         let c_guard = Literal.of_unif_subst renaming us in
         let all_lits = new_lit :: c_guard @ lits_l @ lits_r in
         let proof =
-          Proof.Step.inference ~tags:[Proof.Tag.T_lra]
+          Proof.Step.inference ~tags:[Proof.Tag.T_lra; Proof.Tag.T_cannot_orphan]
             ~rule:(Proof.Rule.mk "canc_ineq_chaining")
             [C.proof_parent_subst renaming (info.left,s_l) subst;
              C.proof_parent_subst renaming (info.right,s_r) subst] in
@@ -812,7 +812,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           let lits = new_lit :: c_guard @ other_lits in
           (* build clauses *)
           let proof =
-            Proof.Step.inference ~tags:[Proof.Tag.T_lra]
+            Proof.Step.inference ~tags:[Proof.Tag.T_lra; Proof.Tag.T_cannot_orphan]
               ~rule:(Proof.Rule.mk "canc_ineq_factoring")
               [C.proof_parent_subst renaming (c,0) subst] in
           let trail = C.trail c
@@ -1121,7 +1121,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       | None -> SimplM.return_same c
       | Some (i,cs) ->
         let lits = CCArray.except_idx (C.lits c) i in
-        let proof = Proof.Step.simp ~tags:[Proof.Tag.T_lra]
+        let proof = Proof.Step.simp ~tags:[Proof.Tag.T_lra; Proof.Tag.T_cannot_orphan]
             ~rule:(Proof.Rule.mk "rat.demod_ineq")
             (C.proof_parent c :: List.map C.proof_parent cs)
         in
@@ -1230,7 +1230,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         let lits =
           new_lits @ CCArray.except_idx (C.lits c) i
         and proof =
-          Proof.Step.simp ~tags:[Proof.Tag.T_lra] ~rule:(Proof.Rule.mk "convert_lit")
+          Proof.Step.simp ~tags:[Proof.Tag.T_lra; Proof.Tag.T_cannot_orphan] ~rule:(Proof.Rule.mk "convert_lit")
             [C.proof_parent c]
         in
         let c' =
@@ -1394,7 +1394,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             let clauses = E.to_clauses e in
             let proof =
               Proof.Step.simp [C.proof_parent c]
-                ~tags:[Proof.Tag.T_lra]
+                ~tags:[Proof.Tag.T_lra; Proof.Tag.T_cannot_orphan]
                 ~rule:(Proof.Rule.mkf "elim_var(%a)" T.pp_var x)
             in
             let new_c =

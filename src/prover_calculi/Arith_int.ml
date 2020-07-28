@@ -336,7 +336,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let all_lits = new_lit :: c_guard @ lits_a @ lits_p in
       (* build clause *)
       let proof =
-        Proof.Step.inference ~tags:[Proof.Tag.T_lia]
+        Proof.Step.inference ~tags:[Proof.Tag.T_lia; Proof.Tag.T_cannot_orphan]
           ~rule:rule_canc
           [C.proof_parent_subst renaming (info.active,s_a) subst;
            C.proof_parent_subst renaming (info.passive,s_p) subst] in
@@ -550,7 +550,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       if !did_simplify then (
         clauses := CCList.uniq ~eq:eq_c_subst !clauses;
         let proof =
-          Proof.Step.inference ~tags:[Proof.Tag.T_lia]
+          Proof.Step.inference ~tags:[Proof.Tag.T_lia; Proof.Tag.T_cannot_orphan]
             ~rule:(Proof.Rule.mk "canc_demod")
             (C.proof_parent c ::
              List.rev_map
@@ -644,7 +644,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                     let c_guard = Literal.of_unif_subst renaming us in
                     let all_lits = new_lit :: c_guard @ lits' in
                     let proof =
-                      Proof.Step.inference ~tags:[Proof.Tag.T_lia]
+                      Proof.Step.inference ~tags:[Proof.Tag.T_lia; Proof.Tag.T_cannot_orphan]
                         ~rule:(Proof.Rule.mk "cancellation")
                         [C.proof_parent_subst renaming (c,0) subst] in
                     let trail = C.trail c in
@@ -678,7 +678,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                     let c_guard = Literal.of_unif_subst renaming us in
                     let all_lits = new_lit :: c_guard @ lits' in
                     let proof =
-                      Proof.Step.inference ~tags:[Proof.Tag.T_lia]
+                      Proof.Step.inference ~tags:[Proof.Tag.T_lia; Proof.Tag.T_cannot_orphan]
                         ~rule:(Proof.Rule.mk "cancellation")
                         [C.proof_parent_subst renaming (c,0) subst] in
                     let trail = C.trail c
@@ -755,7 +755,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                          (* apply subst and build clause *)
                          let all_lits = new_lit :: c_guard @ other_lits in
                          let proof =
-                           Proof.Step.inference ~tags:[Proof.Tag.T_lia]
+                           Proof.Step.inference ~tags:[Proof.Tag.T_lia; Proof.Tag.T_cannot_orphan]
                              ~rule:rule_canc_eq_fact
                              [C.proof_parent_subst renaming (c,0) subst] in
                          let penalty = C.penalty c
@@ -840,7 +840,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         let c_guard = Literal.of_unif_subst renaming us in
         let all_lits = new_lit :: c_guard @ lits_l @ lits_r in
         let proof =
-          Proof.Step.inference ~tags:[Proof.Tag.T_lia]
+          Proof.Step.inference ~tags:[Proof.Tag.T_lia; Proof.Tag.T_cannot_orphan]
             ~rule:(Proof.Rule.mk "canc_ineq_chaining")
             [C.proof_parent_subst renaming (info.left,s_l) subst;
              C.proof_parent_subst renaming (info.right,s_r) subst] in
@@ -876,7 +876,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           in
           let all_lits = CCList.flatten [new_lits; c_guard; lits_l; lits_r] in
           let proof =
-            Proof.Step.inference ~tags:[Proof.Tag.T_lia]
+            Proof.Step.inference ~tags:[Proof.Tag.T_lia; Proof.Tag.T_cannot_orphan]
               ~rule:(Proof.Rule.mk "canc_case_switch")
               [C.proof_parent_subst renaming (info.left,s_l) subst;
                C.proof_parent_subst renaming (info.right,s_r) subst] in
@@ -998,7 +998,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           let lits = new_lit :: c_guard @ other_lits in
           (* build clauses *)
           let proof =
-            Proof.Step.inference ~tags:[Proof.Tag.T_lia]
+            Proof.Step.inference ~tags:[Proof.Tag.T_lia; Proof.Tag.T_cannot_orphan]
               ~rule:(Proof.Rule.mk "canc_ineq_factoring")
               [C.proof_parent_subst renaming (c,0) subst] in
           let trail = C.trail c
@@ -1306,7 +1306,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       | None -> SimplM.return_same c
       | Some (i,cs) ->
         let lits = CCArray.except_idx (C.lits c) i in
-        let proof = Proof.Step.simp ~tags:[Proof.Tag.T_lia]
+        let proof = Proof.Step.simp ~tags:[Proof.Tag.T_lia; Proof.Tag.T_cannot_orphan]
             ~rule:(Proof.Rule.mk "int.demod_ineq")
             (C.proof_parent c :: List.map C.proof_parent cs)
         in
@@ -1356,7 +1356,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         let c_guard = Literal.of_unif_subst renaming us in
         let all_lits = new_lit :: c_guard @ lits1 @ lits2 in
         let proof =
-          Proof.Step.inference ~tags:[Proof.Tag.T_lia] ~rule:(Proof.Rule.mk "div_chaining")
+          Proof.Step.inference ~tags:[Proof.Tag.T_lia; Proof.Tag.T_cannot_orphan] ~rule:(Proof.Rule.mk "div_chaining")
             [C.proof_parent_subst renaming (c1,sc1) subst;
              C.proof_parent_subst renaming (c2,sc2) subst] in
         let trail = C.trail_l [c1; c2] in
@@ -1456,7 +1456,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let lits' = CCArray.except_idx (C.lits c) i in
       let all_lits = List.rev_append lits lits' in
       let proof =
-        Proof.Step.inference ~tags:[Proof.Tag.T_lia] ~rule:(Proof.Rule.mk "div_case_switch")
+        Proof.Step.inference ~tags:[Proof.Tag.T_lia; Proof.Tag.T_cannot_orphan] ~rule:(Proof.Rule.mk "div_case_switch")
           [C.proof_parent c] in
       let new_c =
         C.create ~trail:(C.trail c) ~penalty:(C.penalty c) all_lits proof
@@ -1519,7 +1519,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let lits' = CCArray.except_idx (C.lits c) i in
       let all_lits = List.rev_append lits lits' in
       let proof =
-        Proof.Step.inference ~tags:[Proof.Tag.T_lia]
+        Proof.Step.inference ~tags:[Proof.Tag.T_lia; Proof.Tag.T_cannot_orphan]
           ~rule:(Proof.Rule.mk "div_prime_decomposition")
           [C.proof_parent c] in
       let new_c =
@@ -1535,7 +1535,7 @@ module Make(E : Env.S) : S with module Env = E = struct
              let all_lits = Array.copy (C.lits c) in
              all_lits.(i) <- lit;
              let proof =
-               Proof.Step.inference ~tags:[Proof.Tag.T_lia]
+               Proof.Step.inference ~tags:[Proof.Tag.T_lia; Proof.Tag.T_cannot_orphan]
                  [C.proof_parent c]
                  ~rule:(Proof.Rule.mk "div_prime_decomposition")  in
              let new_c =
@@ -1608,7 +1608,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                   let c_guard = Literal.of_unif_subst renaming us in
                   let all_lits = new_lit :: c_guard @ lits' in
                   let proof =
-                    Proof.Step.inference ~tags:[Proof.Tag.T_lia]
+                    Proof.Step.inference ~tags:[Proof.Tag.T_lia; Proof.Tag.T_cannot_orphan]
                       ~rule:(Proof.Rule.mk "divisibility")
                       [C.proof_parent_subst renaming (c,0) subst] in
                   let new_c =
@@ -1640,7 +1640,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                  assuming 0<=opp<n *)
               let m = M.add_const m Z.(rem (~- opp') n) in
               let lit = Lit.mk_divides ~sign n ~power:1 m in
-              Some (lit,[],[Proof.Tag.T_lia])
+              Some (lit,[],[Proof.Tag.T_lia; Proof.Tag.T_cannot_orphan])
             | Some _,
               T.AppBuiltin (Builtin.Int n,[]),
               T.AppBuiltin (Builtin.Int opp', [])
@@ -1648,15 +1648,15 @@ module Make(E : Env.S) : S with module Env = E = struct
               (* remainder(l1, n) = opp --> false
                  assuming opp ∉ [0.. n-1] *)
               let lit = if sign then Lit.mk_absurd else Lit.mk_tauto in
-              Some (lit,[],[Proof.Tag.T_lia])
+              Some (lit,[],[Proof.Tag.T_lia; Proof.Tag.T_cannot_orphan])
             | _ -> None
           end
         | _ ->
           begin match Monome.Int.of_term l, Monome.Int.of_term r with
             | Some m1, Some m2 ->
               if sign
-              then Some (Lit.mk_arith_eq m1 m2,[],[Proof.Tag.T_lia])
-              else Some (Lit.mk_arith_neq m1 m2,[],[Proof.Tag.T_lia])
+              then Some (Lit.mk_arith_eq m1 m2,[],[Proof.Tag.T_lia; Proof.Tag.T_cannot_orphan])
+              else Some (Lit.mk_arith_neq m1 m2,[],[Proof.Tag.T_lia; Proof.Tag.T_cannot_orphan])
             | _, None
             | None, _-> None
           end
@@ -1728,7 +1728,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* Simplification:  a < b  ----> a+1 ≤ b *)
   let canc_less_to_lesseq = function
     | Lit.Int (AL.Binary (AL.Less, m1, m2)) ->
-      Some (Lit.mk_arith_lesseq (M.succ m1) m2, [], [Proof.Tag.T_lia])
+      Some (Lit.mk_arith_lesseq (M.succ m1) m2, [], [Proof.Tag.T_lia; Proof.Tag.T_cannot_orphan])
     | _ -> None
 
   exception VarElim of int * S.t
@@ -1770,7 +1770,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let renaming = Subst.Renaming.create () in
       let lits' = Lit.apply_subst_list renaming subst (lits',0) in
       let proof =
-        Proof.Step.inference ~tags:[Proof.Tag.T_lia]
+        Proof.Step.inference ~tags:[Proof.Tag.T_lia; Proof.Tag.T_cannot_orphan]
           ~rule:(Proof.Rule.mk "canc_eq_res")
           [C.proof_parent_subst renaming (c,0) subst] in
       let c' = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) lits' proof in
@@ -1818,7 +1818,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                ]
              in
              let proof =
-               Proof.Step.inference [C.proof_parent c] ~tags:[Proof.Tag.T_lia]
+               Proof.Step.inference [C.proof_parent c] ~tags:[Proof.Tag.T_lia; Proof.Tag.T_cannot_orphan]
                  ~rule:(Proof.Rule.mk "arith_diff_to_lesseq") in
              let c' =
                C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
@@ -2083,7 +2083,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           in
           (* TODO: use substitution (for ∞ cases just take sth high enough) *)
           let rule = Proof.Rule.mkf "var_elim(%a)" T.pp_var x in
-          let proof = Proof.Step.inference ~tags:[Proof.Tag.T_lia] ~infos ~rule
+          let proof = Proof.Step.inference ~tags:[Proof.Tag.T_lia; Proof.Tag.T_cannot_orphan] ~infos ~rule
               [C.proof_parent c] in
           let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) lits proof in
           Util.debugf ~section 5

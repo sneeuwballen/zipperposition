@@ -973,8 +973,8 @@ let type_is_unifiable (ty:t): bool = match view ty with
   | _ -> true
 
 let type_non_unifiable_tags (ty:t): _ list = match view ty with
-  | AppBuiltin (Builtin.TyInt,_) -> [Builtin.Tag.T_lia]
-  | AppBuiltin (Builtin.TyRat,_) -> [Builtin.Tag.T_lra]
+  | AppBuiltin (Builtin.TyInt,_) -> [Builtin.Tag.T_lia; Builtin.Tag.T_cannot_orphan]
+  | AppBuiltin (Builtin.TyRat,_) -> [Builtin.Tag.T_lra; Builtin.Tag.T_cannot_orphan]
   | Bind (Binder.ForallTy, _, _) -> [Builtin.Tag.T_ho]
   | _ -> []
 

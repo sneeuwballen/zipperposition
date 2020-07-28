@@ -232,39 +232,41 @@ end = struct
         (cs g);
       (* do a few steps of saturation *)
       while not (CQ.is_empty q) && !n < max_steps_ do
-        incr n;
-        let c = CQ.take_first q in
-        let c, _ = E.unary_simplify c in
-        (* check for empty clause *)
-        if C.comes_from_goal c then () (* ignore, a valid lemma might contradict goal *)
-        else if C.is_empty c && Trail.is_empty (C.trail c) then raise (Yield_false c)
-        else if E.is_trivial c then ()
-        else (
-          trivial := false; (* at least one clause does not simplify to [true] *)
-          (* now make inferences with [c] and push non-trivial clauses to [q],
-             if needed *)
-          if !n + 2 < max_steps_ then (
-            let new_c =
-              Iter.append
-                (E.do_binary_inferences c)
-                (E.do_unary_inferences c)
-            in
-            new_c
-            |> Iter.filter_map
-              (fun new_c ->
-                 let new_c, _ = E.unary_simplify new_c in
-                 (* discard trivial/conditional clauses, or clauses coming
-                    from goals (as they might be true lemmas but contradict
-                    the negated goal, which makes them even more useful);
-                    also scan for empty clauses *)
-                 if C.comes_from_goal new_c then None
-                 else if not (Trail.is_empty (C.trail new_c)) then None
-                 else if E.is_trivial new_c then None
-                 else if C.is_empty new_c then raise (Yield_false new_c)
-                 else Some new_c)
-            |> Iter.iter push_c
-          )
-        )
+        try 
+          incr n;
+          let c = CQ.take_first q in
+          let c, _ = E.unary_simplify c in
+          (* check for empty clause *)
+          if C.comes_from_goal c then () (* ignore, a valid lemma might contradict goal *)
+          else if C.is_empty c && Trail.is_empty (C.trail c) then raise (Yield_false c)
+          else if E.is_trivial c then ()
+          else (
+            trivial := false; (* at least one clause does not simplify to [true] *)
+            (* now make inferences with [c] and push non-trivial clauses to [q],
+              if needed *)
+            if !n + 2 < max_steps_ then (
+              let new_c =
+                Iter.append
+                  (E.do_binary_inferences c)
+                  (E.do_unary_inferences c)
+              in
+              new_c
+              |> Iter.filter_map
+                (fun new_c ->
+                  let new_c, _ = E.unary_simplify new_c in
+                  (* discard trivial/conditional clauses, or clauses coming
+                      from goals (as they might be true lemmas but contradict
+                      the negated goal, which makes them even more useful);
+                      also scan for empty clauses *)
+                  if C.comes_from_goal new_c then None
+                  else if not (Trail.is_empty (C.trail new_c)) then None
+                  else if E.is_trivial new_c then None
+                  else if C.is_empty new_c then raise (Yield_false new_c)
+                  else Some new_c)
+              |> Iter.iter push_c))
+        with Not_found ->
+          (* Due to orphan deletion a clause might not be found *)
+          ()
       done;
       Util.debugf ~section 2
         "@[<2>lemma @[%a@]@ apparently not absurd (after %d steps; trivial:%B)@]"
