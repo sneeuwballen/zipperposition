@@ -1358,8 +1358,8 @@ module Make(E : Env.S) : S with module Env = E = struct
         let lam_pref, _ = Type.open_fun (T.ty hd) in
         let return i j  =
           let mk_db idx = 
-            let idx = (List.length lam_pref) - idx - 1 in
             let ty = List.nth lam_pref idx in
+            let idx = (List.length lam_pref) - idx - 1 in
             T.bvar ~ty idx
           in
           let mk_body ~sign i j = sign (mk_db i) (mk_db j) in

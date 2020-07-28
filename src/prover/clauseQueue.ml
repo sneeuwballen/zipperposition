@@ -76,10 +76,11 @@ let get_profile () = !_profile
 let set_profile p = _profile := p
 let parse_profile s = _profile := (profile_of_string s)
 let funs_to_parse = ref []
-let _ignore_orphans = ref true
+let _ignoring_orphans = ref true
 let _rel_terms_enabled = ref false
 
-let ignore_orphans () = !_ignore_orphans
+let ignoring_orphans () = !_ignoring_orphans
+let disable_ignoring_orphans () = _ignoring_orphans := false
 
 module Make(C : Clause_intf.S) = struct
   module C = C
@@ -1174,7 +1175,7 @@ module Make(C : Clause_intf.S) = struct
     Array.set q.heaps q.current_heap_idx current_heap;
 
     let is_orphaned c =
-      !_ignore_orphans && C.is_orphaned c in
+      !_ignoring_orphans && C.is_orphaned c in
 
     (* if clause was picked by another queue 
        or it should be ignored, repeat clause choice.  *)
@@ -1383,7 +1384,7 @@ let () =
       "--add-queue", add_queue, " create a new clause evaluation queue. Its description is of the form" ^
                                 " RATIO|PRIORITY_FUN|WEIGHT_FUN";
       "-q", add_queue, "alias to --add-queue";
-      "--ignore-orphans", Arg.Bool ((:=) _ignore_orphans), " whether to ignore the orphans during clause selection"
+      "--ignore-orphans", Arg.Bool ((:=) _ignoring_orphans), " whether to ignore the orphans during clause selection"
     ];
 
   Params.add_to_modes 
