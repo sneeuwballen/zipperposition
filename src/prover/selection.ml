@@ -681,7 +681,9 @@ let from_string ~ord s =
   | _ -> from_list s l
   
 
-let all () = List.map fst l
+let all () = 
+  List.map fst l
+  @ List.map (fun (s, _) -> "bb+"^s) (bool_blockable ~blocker:(fun _ _ -> false))
 
 let ho_restriction_opt =
   let set_ n = _ho_restriction := n in
