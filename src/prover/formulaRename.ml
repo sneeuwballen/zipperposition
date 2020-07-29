@@ -9,6 +9,8 @@ module type S = sig
 
   val on_pred_skolem_introduction : (C.t * Term.t) Signal.t
 
+  val is_renaming_clause : C.t -> bool
+
   val rename_form : 
     ?should_rename:(T.t -> bool) -> c:C.t ->
     T.t -> bool -> (T.t * C.t list * C.t list) option
@@ -97,10 +99,6 @@ module Make(C : Clause.S) = struct
       | None ->
         (* maybe we need to define it if it appears too many times *)
         if should_rename form  then (
-          (* 
-            -- TODO: MAKE SURE TO PUT THIS CODE BACK INTO lazy_cnf.ml 
-            Term.Tbl.remove _form_counter form;
-          *)
           let free_vars = T.vars form |> T.VarSet.to_list in
           let (id, ty), renamer =
             T.mk_fresh_skolem ~prefix:"form" free_vars Type.prop in

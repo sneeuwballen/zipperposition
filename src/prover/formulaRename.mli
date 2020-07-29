@@ -9,6 +9,9 @@ module type S = sig
   val on_pred_skolem_introduction : (C.t * Term.t) Signal.t
   (** this signal is raised when a predicate Skolem is introduced  *)
 
+  val is_renaming_clause : C.t -> bool
+  (** This clause has the shape of the renaming clause   *)
+
   val rename_form : 
     ?should_rename:(T.t -> bool) -> c:C.t ->
     T.t -> bool -> (T.t * C.t list * C.t list) option

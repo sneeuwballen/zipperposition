@@ -28,34 +28,15 @@ module type S = sig
 
   val update_form_counter: action:[< `Decrease | `Increase ] -> C.t -> unit
   val solve_bool_formulas: C.t -> C.t CCList.t option
-
-
 end
 
 module Make(E : Env.S) : S with module Env = E = struct
   module Env = E
   module C = Env.C
   module Combs = Combinators.Make(Env)
+  module FR = Env.FormRename
   
   let _form_counter = Term.Tbl.create 256
-
-  module Idx = Fingerprint.Make(struct 
-    type t = T.t * ((C.t * bool) list ref)
-    let (<?>) = (CCOrd.Infix.(<?>))
-    let compare (a1,c1) (a2,c2) = (T.compare a1 a2)
-   end)
-
-  let sign_present sign = function
-    | [(c,sign1)] -> sign1 = sign
-    | [(c1, sign1);(c2, sign2)] ->
-      if sign1 = sign2 then invalid_arg "signs must be different!";
-      true
-    | _ -> invalid_arg "only one or two element lists"
-
-
-  let _skolem_idx = ref @@ Idx.empty ()
-  let _renaming_idx = ref @@ Idx.empty ()
-  let _renamer_symbols = ref @@ ID.Set.empty
 
   let solve_bool_formulas c =
     let module PUnif = 
@@ -163,32 +144,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       |> CCArray.to_list
       |> (fun l -> if CCList.is_empty l then None else Some l)
 
-
-
-  (* Two-literal clause of which one is a renaming literal
-     and the other one is a formula *)
-  let is_renaming_clause c =
-    let is_renaming_lit = function
-      | L.Equation (lhs, _, _) as lit when L.is_predicate_lit lit  ->
-        let hd = T.head_term lhs in
-        begin match T.head hd with
-        | Some id  -> ID.Set.mem id !_renamer_symbols
-        | None -> false end
-      | _ -> false in
-    let is_formula_lit = function 
-      | L.Equation (lhs, rhs, _) as lit ->
-        if Literal.is_predicate_lit lit then T.is_appbuiltin lhs
-        else Type.is_prop (T.ty lhs)
-      | _ -> false in
-
-    match C.lits c with
-    | [| a; b |] ->
-      CCArray.length (CCArray.filter is_renaming_lit (C.lits c)) = 1 &&
-      CCArray.length (CCArray.filter is_formula_lit (C.lits c)) = 1
-    | _ -> false
-
   let update_form_counter ~action c =
-    if not (is_renaming_clause c) then (
+    if not (FR.is_renaming_clause c) then (
       Ls.fold_eqn 
         ~both:false ~ord:(E.Ctx.ord ()) ~eligible:(C.Eligible.always) 
         (C.lits c)
@@ -214,63 +171,10 @@ module Make(E : Env.S) : S with module Env = E = struct
     constructor ~rule:(Proof.Rule.mk name)
       (List.map C.proof_parent parents)
 
-  let mk_renaming_clause parent ~renamer ~form sign =
-    let proof = Proof.Step.define_internal 
-      (T.head_exn renamer) [C.proof_parent parent] in
-
-    let res = 
-      if sign then (
-        C.create ~penalty:1 ~trail:Trail.empty 
-          [L.mk_false renamer; L.mk_true form] proof
-      ) else (C.create ~penalty:1 ~trail:Trail.empty 
-          [L.mk_true renamer; L.mk_false form] proof
-      ) in
-    res
-
-  let rename ~c form sign =
-    assert(Type.is_prop (T.ty form));
-    if is_renaming_clause c || not (T.is_appbuiltin form) || T.is_true_or_false form then None
-    else (
-      let gen = Iter.head @@ 
-        Idx.retrieve_generalizations (!_renaming_idx, 0) (form, 1) in
-      match gen with 
-      | Some (orig, (renamer, defined_as), subst) ->
-        let renamer_sub = 
-          Subst.FO.apply Subst.Renaming.none subst (renamer,0) in
-
-        let renamer_sub, new_defs, parents = 
-          if sign_present sign !defined_as then (
-            (renamer_sub, [], !defined_as)
-          ) else (
-            let def = mk_renaming_clause c ~renamer ~form:orig sign in
-            defined_as := (def,sign) :: !defined_as;
-            (renamer_sub, [def], !defined_as)) in
-
-          Some(renamer_sub, new_defs,
-              CCList.filter_map (fun (c, sign') ->
-                if sign != sign' then None else Some c) parents)
-      | None ->
-        (* maybe we need to define it if it appears too many times *)
-        let num_occurences = Term.Tbl.get_or _form_counter form ~default:0 in
-        if num_occurences >= Env.flex_get k_renaming_threshold (*&&
-           CCArray.length (C.lits c) > 1*)  then (
-          Term.Tbl.remove _form_counter form;
-
-          let free_vars = T.vars form |> T.VarSet.to_list in
-          let (id, ty), renamer =
-            T.mk_fresh_skolem ~prefix:"form" free_vars Type.prop in
-          E.Ctx.declare id ty;
-          let def = mk_renaming_clause c ~renamer ~form sign in
-          _renaming_idx := Idx.add !_renaming_idx form (renamer, ref [(def,sign)]);
-          _renamer_symbols := ID.Set.add id !_renamer_symbols;
-          Some(renamer, [def], [def])
-        ) else None
-    )
-
-  let rename_eq ~c lhs rhs sign =
+  let rename_eq ~c ~should_rename lhs rhs sign =
     assert(Type.equal (T.ty lhs) (T.ty rhs));
     assert(Type.is_prop (T.ty lhs));
-    if Env.flex_get k_rename_eq then rename ~c (T.Form.equiv lhs rhs) sign
+    if Env.flex_get k_rename_eq then FR.rename_form ~should_rename ~c (T.Form.equiv lhs rhs) sign
     else None
 
   let mk_and ~proof_cons ~rule_name and_args c ?(parents=[c]) lit_idx =
@@ -349,7 +253,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       miniscope b f
     | _ -> None
 
-  let choice_tbl = Type.Tbl.create 32
   let lazy_clausify_driver ?(ignore_eq=false) ~proof_cons c =
     let return acc l =
       Iter.append acc (Iter.of_list l), `Stop in
@@ -359,35 +262,6 @@ module Make(E : Env.S) : S with module Env = E = struct
 
     let eligible_to_ignore_eq ~ignore_eq lhs rhs = 
       ignore_eq && not (T.is_true_or_false lhs) && not (T.is_true_or_false rhs) in
-
-    let get_skolem ~free_vars ~ret_ty ~mode f = 
-      match mode with 
-      | `Skolem ->
-        let gen = Iter.head @@ 
-        Idx.retrieve_generalizations (!_skolem_idx, 0) (f, 1) in
-        begin match gen with 
-        | Some (orig, (skolem, _), subst) ->
-          Subst.FO.apply Subst.Renaming.none subst (skolem,0) 
-        | None ->
-          let free_vars_l = 
-              T.VarSet.to_list (T.VarSet.of_seq free_vars) in
-          let (id,ty), t = T.mk_fresh_skolem ~prefix:"sk" free_vars_l ret_ty in
-          E.Ctx.declare id ty;
-          Signal.send Env.FormRename.on_pred_skolem_introduction (c, t);
-          _skolem_idx := Idx.add !_skolem_idx f (t, ref[]);
-          t end
-      | `Choice ->
-        let hd = Type.Tbl.get_or_add choice_tbl ~f:(fun ty ->
-          let arg_tys, ret_ty_form = Type.open_fun ty in
-          assert(List.length arg_tys == 1);
-          assert(Type.is_prop ret_ty_form);
-          assert(Type.equal (List.hd arg_tys) ret_ty);
-          let (hd_id, hd_ty), res =
-            Term.mk_fresh_skolem ~prefix:"$_choose" [] (Type.arrow [ty] (List.hd arg_tys)) in
-          E.Ctx.declare hd_id hd_ty;
-          res
-        ) ~k:(T.ty f) in
-        T.app hd [f] in
 
     Util.debugf ~section 3 "lazy_cnf(@[%a@])@." (fun k -> k C.pp c);
 
@@ -433,7 +307,6 @@ module Make(E : Env.S) : S with module Env = E = struct
                 @ mk_or ~proof_cons ~rule_name [a; b] c i
                 )))
         | T.AppBuiltin((ForallConst|ExistsConst) as hd, [_; f]) ->
-          let free_vars = T.Seq.vars f in
           let var_id = T.Seq.max_var (C.Seq.vars c) + 1 in
           let f = Combs.expand f in
           let var_tys, body =  T.open_fun f in
@@ -450,7 +323,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             if hd = ForallConst then (
               T.var @@ HVar.make ~ty:var_ty var_id
             ) else (
-              get_skolem ~free_vars ~ret_ty:var_ty ~mode:(Env.flex_get k_skolem_mode) f
+              FR.get_skolem ~parent:c ~mode:(Env.flex_get k_skolem_mode) f
             ) in
           let res = Lambda.eta_reduce @@ Lambda.snf @@ T.app f [subst_term] in
           assert(Type.is_prop (T.ty res));
@@ -481,14 +354,23 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let rename_subformulas c =
     Util.debugf ~section 3 "lazy-cnf-rename(@[%a@])@." (fun k -> k C.pp c);
+
+    let should_rename f =
+      let num_occurences = Term.Tbl.get_or _form_counter f ~default:0 in
+      num_occurences >= Env.flex_get k_renaming_threshold
+    in
+
     fold_lits c
     |> Iter.fold_while (fun _ (lhs,rhs,sign,pos) -> 
       let i,_ = Ls.Pos.cut pos in
       let lit = (C.lits c).(i) in
-      let proof_cons = Proof.Step.simp ~infos:[] ~tags:[Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth] in
+      let proof_cons = 
+        Proof.Step.simp ~infos:[] ~tags:[Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth] in
       if L.is_predicate_lit lit && T.is_appbuiltin lhs then (
-        match rename ~c lhs sign with
+        match FR.rename_form ~should_rename ~c lhs sign with
         | Some (renamer, new_defs, parents) ->
+          Term.Tbl.remove _form_counter lhs;
+
           let rule_name = "renaming" in
           let renamer = (if sign then CCFun.id else T.Form.not_) renamer in
           let renamed = mk_or ~proof_cons ~rule_name [renamer] c ~parents:(c :: parents) i in
@@ -501,7 +383,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         | None -> None, `Continue
       ) else if Type.is_prop (T.ty lhs) && not (L.is_predicate_lit lit) &&
               (T.is_appbuiltin lhs || T.is_appbuiltin rhs) then (
-          match rename_eq ~c lhs rhs sign with
+          match rename_eq ~should_rename ~c lhs rhs sign with
           | Some (renamer, new_defs, parents) ->
             let rule_name = "renaming" in
             let renamer = (if sign then CCFun.id else T.Form.not_) renamer in
