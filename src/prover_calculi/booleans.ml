@@ -359,7 +359,9 @@ module Make(E : Env.S) : S with module Env = E = struct
         let form_for_skolem = 
           (if b = ForallConst then T.Form.not_ else CCFun.id) 
           (snd @@ T.open_fun body) in
-        let sk = FR.get_skolem ~parent:c ~mode:`Skolem form_for_skolem in
+        let sk = 
+          FR.get_skolem ~parent:c ~mode:`Skolem 
+          (T.fun_l (fst @@ T.open_fun body) form_for_skolem) in
         let repl = T.app body [sk] in
         let new_lits = CCArray.copy (C.lits c) in
         Literals.Pos.replace ~at:p ~by:repl new_lits;

@@ -156,6 +156,7 @@ let () =
   add_to_modes 
       [ "ho-competitive"
       ; "ho-pragmatic"] (fun () ->
-      default.ord := "lambda_kbo"
+      default.ord := "lambda_kbo";
+      bool_select := "smallest"
     );
 
