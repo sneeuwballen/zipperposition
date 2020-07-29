@@ -468,8 +468,12 @@ module Make(E : Env.S) : S with module Env = E = struct
           let rule = Proof.Rule.mk "rename_nested_bools" in
           let parents = List.map C.proof_parent (c :: new_parents) in
           let proof = Proof.Step.simp  ~rule parents in
-          let renamed = 
+          let renamed =
             C.create_a ~penalty:(C.penalty c) ~trail:(C.trail c) new_lits proof in
+
+          Util.debugf ~section 2 "renamed @[%a@] into@. @[%a@]@." 
+            (fun k -> k C.pp c C.pp renamed);
+          
           Some (renamed :: new_defs)
        | _ -> None)
 
