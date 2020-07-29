@@ -1146,16 +1146,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       
 
 
-    let new_choice_op ty =
-      (* let choice_ty_name = "#_choice_" ^ 
-                           CCInt.to_string (CCRef.get_then_incr new_choice_counter) in
-      let new_ch_id = ID.make choice_ty_name in
-      let new_ch_const = T.const new_ch_id ~ty in
-      Ctx.add_signature (Signature.declare (C.Ctx.signature ()) new_ch_id ty);
-      Util.debugf 1 "new choice for type %a: %a(%a).\n" 
-        (fun k -> k Type.pp ty T.pp new_ch_const Type.pp (T.ty new_ch_const));
-      choice_ops := Term.Map.add new_ch_const None !choice_ops;
-      new_ch_const in *)
+    let choice_of_ty ty =
       assert (Type.is_fun ty);
       let args,_ = Type.open_fun ty in
       let alpha_to_prop = List.hd args in
@@ -1179,7 +1170,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           let choice_ops = 
             Term.Map.filter (fun t _ -> Type.equal (Term.ty t) hd_ty) !choice_ops
             |> Term.Map.to_list
-            |> (fun l -> if CCList.is_empty l then [new_choice_op hd_ty, None] else l) in
+            |> (fun l -> if CCList.is_empty l then [choice_of_ty hd_ty, None] else l) in
           CCList.flat_map (fun (hd,def_clause) -> generate_instances ~def_clause hd arg) 
             choice_ops
         ) else (

@@ -393,6 +393,7 @@ module Form : sig
   val or_l : t list -> t
   val forall : t -> t
   val exists : t -> t
+  val choice : t -> t
 end
 
 (** {2 Arith} *)
