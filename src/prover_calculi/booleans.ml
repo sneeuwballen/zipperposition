@@ -32,6 +32,7 @@ let k_simplify_bools = Flex_state.create_key ()
 let k_trigger_bool_inst = Flex_state.create_key ()
 let k_trigger_bool_ind = Flex_state.create_key ()
 let k_bool_hoist_simpl = Flex_state.create_key ()
+let k_rename_nested_bools = Flex_state.create_key ()
 
 module type S = sig
   module Env : Env.S
@@ -408,6 +409,69 @@ module Make(E : Env.S) : S with module Env = E = struct
       let stm_res = Env.Stm.make ~penalty:(C.penalty c) ~parents:[c] clause_seq in
       Env.StmQ.add (Env.get_stm_queue ()) stm_res);
     []
+
+  let rename_nested_booleans c =
+    let module L = Literal in
+
+    (* Introduce a new simple name of the form P(vars) for the
+       given literal -- renaming clauses will stop combinatorial explosion
+       when hoisting boolean subterms *)
+    let rename_lit lit =
+      let sign = L.is_pos lit in
+      if L.is_predicate_lit lit then (
+        match lit with
+        | L.Equation(lhs,_,_) ->
+          CCOpt.get_exn (FR.rename_form ~c lhs sign)
+        | _ -> assert false
+      ) else (
+        let mk_form =
+          (if sign then T.Form.eq else T.Form.neq) 
+        in
+        match lit with
+        | L.Equation(lhs,rhs,_) ->
+          CCOpt.get_exn (FR.rename_form ~c (mk_form lhs rhs) sign)
+        | _ -> assert false
+      )
+    in
+
+    let ord = Ctx.ord () in
+    let pos_builder = Position.Build.empty in
+    let all_selectable = 
+      Bool_selection.all_selectable_subterms ~ord ~pos_builder in
+    (* literal needs to have at least 3 nested booleans *)
+    let threshold = 3 in
+
+    CCArray.to_list (C.lits c)
+    |> CCList.mapi (fun i l ->
+      let nested_bools_cnt = 
+        Literal.Seq.terms l
+        (* estimate worst case of boolean selection *)
+        |> Iter.flat_map all_selectable
+        |> Iter.length
+      in
+      (i, nested_bools_cnt))
+    |> CCList.filter (fun (_, cnt) -> cnt >= threshold)
+    |> (function 
+       | x :: xs when not (CCList.is_empty xs) ->
+         (* there need to be at least two literals with deep booleans.
+            we will remain all but one (for example the first one) *)
+          let new_lits = CCArray.copy (C.lits c) in
+          let (new_defs, new_parents) = 
+            CCList.fold_left (fun (defs, parents) (idx, _) -> 
+              let lit = (C.lits c).(idx) in
+              let renamer, new_defs, new_parents = rename_lit lit in
+              let new_lit = Literal.mk_prop renamer (Literal.is_pos lit) in
+              new_lits.(idx) <- new_lit;
+              (new_defs @ defs, new_parents @ parents) 
+            ) ([], []) xs
+          in
+          let rule = Proof.Rule.mk "rename_nested_bools" in
+          let parents = List.map C.proof_parent (c :: new_parents) in
+          let proof = Proof.Step.simp  ~rule parents in
+          let renamed = 
+            C.create_a ~penalty:(C.penalty c) ~trail:(C.trail c) new_lits proof in
+          Some (renamed :: new_defs)
+       | _ -> None)
 
   let simplify_bools t =
     let negate t =
@@ -890,6 +954,11 @@ module Make(E : Env.S) : S with module Env = E = struct
         if Env.flex_get k_bool_hoist_simpl 
         then Env.add_multi_simpl_rule ~priority:1000 bool_hoist_simpl
         else Env.add_unary_inf "bool_hoist" bool_hoist;
+
+        if Env.flex_get k_rename_nested_bools then (
+          Env.add_multi_simpl_rule ~priority:1 rename_nested_booleans
+        );
+
         Env.add_unary_inf "formula_hoist" formula_hoist;
         Env.add_unary_inf "quant_rw" quantifier_rw;
         Env.add_multi_simpl_rule ~priority:100 replace_bool_vars;
@@ -1208,6 +1277,7 @@ let _elim_bvars = ref true
 let _trigger_bool_inst = ref (-1)
 let _trigger_bool_ind = ref (-1)
 let _bool_hoist_simpl = ref false
+let _rename_nested_bools = ref false
 
 
 let extension =
@@ -1226,6 +1296,7 @@ let extension =
     E.flex_add k_trigger_bool_inst !_trigger_bool_inst;
     E.flex_add k_trigger_bool_ind !_trigger_bool_ind;
     E.flex_add k_bool_hoist_simpl !_bool_hoist_simpl;
+    E.flex_add k_rename_nested_bools !_rename_nested_bools;
 
     ET.setup ()
   in
@@ -1248,6 +1319,9 @@ let () =
       "--quantifier-renaming"
       , Arg.Bool (fun v -> _quant_rename := v)
       , " turn the quantifier renaming on or off";
+      "--rename-nested-bools"
+      , Arg.Bool (fun v -> _rename_nested_bools := v)
+      , " rename deeply nested bool subterms";
       "--trigger-bool-ind", Arg.Set_int _trigger_bool_ind
       , " abstract away constants from the goal and use them to trigger axioms of induction";
       "--trigger-bool-inst", Arg.Set_int _trigger_bool_inst
@@ -1259,8 +1333,8 @@ let () =
       , Arg.Bool (fun v -> _interpret_bool_funs := v)
       , " turn interpretation of boolean functions as forall or negation of forall on or off";
       "--bool-hoist-simpl"
-      , Arg.Bool (fun v -> _bool_hoist_simpl := v)
-      , " use BoolHoistSimpl instead of BoolHoist";
+      , Arg.Bool (fun v -> _bool_hoist_simpl := v; _rename_nested_bools := true)
+      , " use BoolHoistSimpl instead of BoolHoist; NOTE: Setting this option triggers nested booleans renaming";
         "--normalize-bool-terms", Arg.Bool((fun v -> _norm_bools := v)),
         " normalize boolean subterms using their weight.";
       "--nnf-nested-formulas"

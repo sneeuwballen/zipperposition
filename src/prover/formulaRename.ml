@@ -76,7 +76,7 @@ module Make(C : Clause.S) = struct
 
   let rename_form ?(should_rename=(fun _ -> true)) ~c form sign =
     assert(Type.is_prop (T.ty form));
-    if is_renaming_clause c || not (T.is_appbuiltin form) || T.is_true_or_false form then None
+    if T.is_true_or_false form then None
     else (
       let gen = Iter.head @@ 
         Idx.retrieve_generalizations (!_renaming_idx, 0) (form, 1) in

@@ -356,7 +356,8 @@ module Make(E : Env.S) : S with module Env = E = struct
 
     let should_rename f =
       let num_occurences = Term.Tbl.get_or _form_counter f ~default:0 in
-      num_occurences >= Env.flex_get k_renaming_threshold
+      num_occurences >= Env.flex_get k_renaming_threshold &&
+      (not (FR.is_renaming_clause c))
     in
 
     fold_lits c
