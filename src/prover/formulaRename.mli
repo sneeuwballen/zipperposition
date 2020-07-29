@@ -2,7 +2,10 @@ open Logtk
 
 module T = Term
 
-module Make(C:Clause.S) : sig
+module type S = sig
+  module Ctx : Ctx.S
+  module C : Clause.S with module Ctx = Ctx
+
   val on_pred_skolem_introduction : (C.t * Term.t) Signal.t
   (** this signal is raised when a predicate Skolem is introduced  *)
 
@@ -37,3 +40,5 @@ module Make(C:Clause.S) : sig
      depending on the mode  *)
 
 end
+
+module Make(C:Clause.S) : S with module Ctx = C.Ctx and module C = C

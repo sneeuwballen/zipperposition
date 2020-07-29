@@ -3,9 +3,21 @@ open Logtk
 module L = Literal
 module T = Term
 
+module type S = sig
+  module Ctx : Ctx.S
+  module C : Clause.S with module Ctx = Ctx
+
+  val on_pred_skolem_introduction : (C.t * Term.t) Signal.t
+
+  val rename_form : 
+    ?should_rename:(T.t -> bool) -> c:C.t ->
+    T.t -> bool -> (T.t * C.t list * C.t list) option
+  val get_skolem : parent:C.t -> mode:[< `Choice | `Skolem ] -> T.t -> T.t
+end
 
 module Make(C : Clause.S) = struct
   module Ctx = C.Ctx
+  module C = C
 
   module Idx = Fingerprint.Make(struct 
     type t = T.t * ((C.t * bool) list ref)
