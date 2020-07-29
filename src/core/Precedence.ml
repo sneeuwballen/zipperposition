@@ -61,11 +61,15 @@ let get_arity ~sig_ref s =
     snd (Signature.arity !sig_ref s)
   with Not_found -> 0
 
+let is_not_fresh_sk = -1
 let is_post_cnf_skolem ~sig_ref s =
   not (Signature.mem !sig_ref s)
   || (match ID.as_skolem s with 
-      | Some ID.K_after_cnf -> true
-      | _ -> false)
+    | Some ID.K_after_cnf -> true
+    | _ -> false) 
+
+let post_cnf_id ~sig_ref s =
+  if is_post_cnf_skolem ~sig_ref s then ID.id s else is_not_fresh_sk
 
 let on_signature_update = Signal.create()
 
@@ -89,7 +93,7 @@ module Constr = struct
     Signal.on on_signature_update (update_signature _sig);
     let open CCOrd in
     (* bigger arity means bigger symbol *)
-    - (CCBool.compare (is_post_cnf_skolem ~sig_ref:_sig s1) (is_post_cnf_skolem ~sig_ref:_sig s2))
+    - (CCInt.compare (post_cnf_id ~sig_ref:_sig s1) (post_cnf_id ~sig_ref:_sig s2))
     <?> (CCInt.compare, get_arity ~sig_ref:_sig s1, get_arity ~sig_ref:_sig s2)
     <?> (ID.compare, s1, s2)
 
@@ -97,7 +101,7 @@ module Constr = struct
     let _sig = ref signature in
     Signal.on on_signature_update (update_signature _sig);
     let open CCOrd in
-    - (CCBool.compare (is_post_cnf_skolem ~sig_ref:_sig s1) (is_post_cnf_skolem ~sig_ref:_sig s2))
+    - (CCInt.compare (post_cnf_id ~sig_ref:_sig s1) (post_cnf_id ~sig_ref:_sig s2))
     <?> (CCInt.compare, get_arity ~sig_ref:_sig s2, get_arity ~sig_ref:_sig s1)
     <?> (ID.compare, s1, s2)
 
@@ -212,7 +216,7 @@ module Constr = struct
       let n1 = find_freq s1 in
       let n2 = find_freq s2 in
 
-      - (CCBool.compare (is_post_cnf_skolem ~sig_ref s1) (is_post_cnf_skolem ~sig_ref s2))
+      - (CCInt.compare (post_cnf_id ~sig_ref s1) (post_cnf_id ~sig_ref s2))
       (* post-cnf symbols have the same value of n2 and n1 *)
       <?> (CCInt.compare, n2, n1)
       <?> (ID.compare, s1, s2)
@@ -422,6 +426,11 @@ let mk_tbl_ l =
 type weight_fun = ID.t -> Weight.t
 type arg_coeff_fun = ID.t -> int list
 
+(* constant weight *)
+let default_weight = Weight.int 2
+let weight_constant _ = default_weight
+let empty_sig = Signature.empty
+
 let depth_occ_driver ~flip stmt_d =
   let tbl = ID.Tbl.create 16 in
   Iter.iter (fun (sym,d) -> 
@@ -450,7 +459,9 @@ let depth_occ_driver ~flip stmt_d =
   let tbl = ID.Tbl.create 16 in
   List.iteri (fun i (_,_,sym) -> ID.Tbl.add tbl sym (Weight.int (i + 5))) sorted;
   let default = Weight.int 5 in
-  fun sym -> (ID.Tbl.get_or ~default tbl sym)
+  fun sym -> (
+    if is_post_cnf_skolem ~sig_ref:(ref empty_sig) sym then default_weight
+    else ID.Tbl.get_or ~default tbl sym)
 
 let inv_depth_occurence =  depth_occ_driver ~flip:false
 let depth_occurence =  depth_occ_driver ~flip:true
@@ -468,7 +479,8 @@ let weight_modarity ~signature =
 
   fun a ->
     let arity =  try snd @@ Signature.arity !_sig a with _ -> 5 in
-    Weight.int (arity + 4)
+    if is_post_cnf_skolem ~sig_ref:(ref empty_sig) a then default_weight
+    else Weight.int (arity + 4)
 
 let weight_arity0 ~signature =
   let _sig = ref signature in
@@ -494,7 +506,8 @@ let weight_arity0 ~signature =
       (* no access to the precedence, cannot compute max symbol -- cannot assign 0 *)
       | Some m_id -> if ID.equal m_id a then 1 else (get_arity ~sig_ref:_sig a + 1)
     in
-    Weight.int res
+    if is_post_cnf_skolem ~sig_ref:(ref empty_sig) a then default_weight
+    else Weight.int res
     
 
 let weight_invarity ~signature =
@@ -502,35 +515,39 @@ let weight_invarity ~signature =
   let max_a = max_arity signature in
   (fun a ->
      let arity =  try snd @@ Signature.arity signature a with _ -> 0 in
-     Weight.int (max_a - arity + 3))
+     if is_post_cnf_skolem ~sig_ref:(ref empty_sig) a then default_weight
+     else Weight.int (max_a - arity + 3))
 
 let weight_sq_arity ~signature =
   let _sig = ref signature in
   Signal.on on_signature_update (update_signature _sig);
   fun a ->
     let arity =  try snd @@ Signature.arity !_sig a with _ -> 2 in
-    Weight.int (arity * arity + 1)
+    if is_post_cnf_skolem ~sig_ref:(ref empty_sig) a then default_weight
+    else Weight.int (arity * arity + 1)
 
 let weight_invsq_arity ~signature =
   (* Depends on max arity, and cannot easily evolve during the proving *)
   let max_a = max_arity signature in
   (fun a -> 
     let arity =  try snd @@ Signature.arity signature a with _ -> max_a / 2 in
-    Weight.int (max_a*max_a - arity * arity + 1))
-
-(* constant weight *)
-let weight_constant _ = Weight.int 4
+    if is_post_cnf_skolem ~sig_ref:(ref empty_sig) a then default_weight
+    else Weight.int (max_a*max_a - arity * arity + 1))
 
 let weight_invfreq (symbs : ID.t Iter.t) : ID.t -> Weight.t =
   let tbl = ID.Tbl.create 16 in
   Iter.iter (ID.Tbl.incr tbl) symbs;
   let max_freq = List.fold_left (max) 0 (ID.Tbl.values_list tbl) in
-  fun sym ->Weight.int (max_freq - (ID.Tbl.get_or ~default:(max_freq/2) tbl sym) + 5) 
+  fun sym ->
+    if is_post_cnf_skolem ~sig_ref:(ref empty_sig) sym then default_weight
+    else Weight.int (max_freq - (ID.Tbl.get_or ~default:(max_freq/2) tbl sym) + 5) 
 
 let weight_freq (symbs : ID.t Iter.t) : ID.t -> Weight.t =
   let tbl = ID.Tbl.create 16 in
   Iter.iter (ID.Tbl.incr tbl) symbs;
-  fun sym ->Weight.int ((ID.Tbl.get_or ~default:10 tbl sym) + 5) 
+  fun sym -> 
+    if is_post_cnf_skolem ~sig_ref:(ref empty_sig) sym then default_weight
+    else Weight.int ((ID.Tbl.get_or ~default:10 tbl sym) + 5) 
 
 let weight_invfreqrank (symbs : ID.t Iter.t) : ID.t -> Weight.t =
   let tbl = ID.Tbl.create 16 in
@@ -542,7 +559,9 @@ let weight_invfreqrank (symbs : ID.t Iter.t) : ID.t -> Weight.t =
   ID.Tbl.clear tbl;
   let tbl = ID.Tbl.create 16 in
   Iter.iteri (fun i (sym:ID.t) -> ID.Tbl.add tbl sym (i+1)) sorted;
-  (fun sym -> Weight.int (ID.Tbl.get_or ~default:10 tbl sym))
+  (fun sym -> 
+    if is_post_cnf_skolem ~sig_ref:(ref empty_sig) sym then default_weight
+    else Weight.int (ID.Tbl.get_or ~default:10 tbl sym))
 
 
 let weight_freqrank (symbs : ID.t Iter.t) : ID.t -> Weight.t =
@@ -554,7 +573,9 @@ let weight_freqrank (symbs : ID.t Iter.t) : ID.t -> Weight.t =
           (ID.Tbl.get_or tbl ~default:0 s1)) symbs in
   ID.Tbl.clear tbl;
   Iter.iteri (fun i sym -> ID.Tbl.add tbl sym (i+1)) sorted;
-  (fun sym -> Weight.int (ID.Tbl.get_or ~default:10 tbl sym))
+  (fun sym -> 
+    if is_post_cnf_skolem ~sig_ref:(ref empty_sig) sym then default_weight
+    else Weight.int (ID.Tbl.get_or ~default:10 tbl sym))
 
 (* This function takes base KBO weight function and adjusts it so
    that defined symbols are larger than its defitnitions. *)
@@ -585,8 +606,6 @@ let lambda_def_weight lm_w db_w base_weight lits =
           else 0 in
         acc + inc ) 0))
      in
-  
-
 
   let id_map = 
     Iter.fold (fun acc lit ->
@@ -600,7 +619,8 @@ let lambda_def_weight lm_w db_w base_weight lits =
 
   
   fun sy ->
-    Weight.int (ID.Map.get_or ~default:(base_weight sy).Weight.one sy id_map)
+    if is_post_cnf_skolem ~sig_ref:(ref empty_sig) sy then default_weight
+    else Weight.int (ID.Map.get_or ~default:(base_weight sy).Weight.one sy id_map)
 
 let weight_fun_of_string ~signature ~lits ~lm_w ~db_w s sd = 
   let syms_only sym_depth = 
