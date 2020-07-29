@@ -9,6 +9,7 @@ module type S = sig
   module ProofState : ProofState.S with module C = C and module Ctx = Ctx
   module Stm : Stream.S with module C = C
   module StmQ : StreamQueue.S with module Stm = Stm
+  module FormRename : FormulaRename.S with module C = C
 
   type inf_rule = C.t -> C.t list
   (** An inference returns a list of conclusions *)
@@ -316,7 +317,4 @@ module type S = sig
   (** this signal is raised if a formula that universally quantifies
       a predicate removes that predicate and rules that want to instantiate it
       early should listen to this *)
-
-  val on_pred_skolem_introduction : (C.t * Term.t) Signal.t
-  (** this signal is raised when a predicate Skolem is introduced  *)
 end

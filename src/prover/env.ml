@@ -39,6 +39,7 @@ module Make(X : sig
   module Ctx = X.Ctx
   module C = Clause.Make(Ctx)
   module ProofState = ProofState.Make(C)
+  module FormRename = FormulaRename.Make(C)
 
   let flex_state_ = ref X.flex_state
   let flex_state () = !flex_state_
@@ -390,8 +391,7 @@ module Make(X : sig
     C.ClauseSet.mem c (ProofState.PassiveSet.clauses ())
 
   let on_pred_var_elimination = Signal.create ()
-  let on_pred_skolem_introduction = Signal.create ()
-
+  
   module StrSet = CCSet.Make(String)
 
   (** Apply rewrite rules AND evaluation functions *)
