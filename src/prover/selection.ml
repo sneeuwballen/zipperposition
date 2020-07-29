@@ -20,6 +20,7 @@ type parametrized = strict:bool -> ord:Ordering.t -> t
 let no_select _ : BV.t = BV.empty ()
 
 let _ho_restriction = ref `None
+let _restrict_fresh_sk_selection = ref true
 
 (* May we select this literal? *)
 let can_select_lit ~ord (lits:Lits.t) (i:int) : bool =
@@ -56,36 +57,48 @@ let can_select_lit ~ord (lits:Lits.t) (i:int) : bool =
       Lit.fold_terms ~vars:true ~ty_args:false ~which:`All ~subterms:true lits.(i)
       |> Iter.exists (fun (t, _) -> 
           (T.is_var t) && List.exists (T.equal t) vars)  in
-    match !_ho_restriction with
-    | `None -> true
-    | `NoVarHeadingMaxTerm ->
-      (* Don't select literals containing a variable that heads the maximal term
-         of the clause but occurs with different arguments there. *)
-      let vars_args = var_headed_subterms `Max in
-      not (occur_with_other_args vars_args)
-    | `NoVarDifferentArgs ->
-      (* Don't selected if the literal contains a variable that is applied to
-         different arguments in the clause *)
-      let vars_args = var_headed_subterms `All in
-      not (occur_with_other_args vars_args)
-    | `NoUnappliedVarOccurringApplied ->
-      (* Don't selected if the literal contains an unapplied variable that also
-         occurs applied in the clause *)
-      let vars_args = var_headed_subterms `All in
-      Lit.fold_terms ~vars:true ~ty_args:false ~which:`All ~subterms:true lits.(i)
-      |> Iter.exists (fun (t,_) ->
-          vars_args |> CCList.exists (fun (head, args) -> T.equal head t && not (CCList.is_empty args))
-        )
-    | `NoHigherOrderVariables ->
-      (* We cannot select literals containing a HO variable: *)
-      not (
+    let is_ho_allowed = 
+      match !_ho_restriction with
+      | `None -> true
+      | `NoVarHeadingMaxTerm ->
+        (* Don't select literals containing a variable that heads the maximal term
+          of the clause but occurs with different arguments there. *)
+        let vars_args = var_headed_subterms `Max in
+        not (occur_with_other_args vars_args)
+      | `NoVarDifferentArgs ->
+        (* Don't selected if the literal contains a variable that is applied to
+          different arguments in the clause *)
+        let vars_args = var_headed_subterms `All in
+        not (occur_with_other_args vars_args)
+      | `NoUnappliedVarOccurringApplied ->
+        (* Don't selected if the literal contains an unapplied variable that also
+          occurs applied in the clause *)
+        let vars_args = var_headed_subterms `All in
         Lit.fold_terms ~vars:true ~ty_args:false ~which:`All ~subterms:true lits.(i)
-        |> Iter.exists (fun (t,_) -> T.is_ho_var (fst (T.as_app t)))
+        |> Iter.exists (fun (t,_) ->
+            vars_args |> CCList.exists (fun (head, args) -> T.equal head t && not (CCList.is_empty args))
+          )
+      | `NoHigherOrderVariables ->
+        (* We cannot select literals containing a HO variable: *)
+        not (
+          Lit.fold_terms ~vars:true ~ty_args:false ~which:`All ~subterms:true lits.(i)
+          |> Iter.exists (fun (t,_) -> T.is_ho_var (fst (T.as_app t)))
+        )
+      | `NoMaxVarInFoContext ->
+        let vars_args = var_headed_subterms `Max in
+        not (contains_maxvar_as_fo_subterm vars_args)
+    in
+    let is_fresh_sk_allowed =
+      not !_restrict_fresh_sk_selection || (
+        match lits.(i) with
+        | Lit.Equation(lhs,rhs,_) when Lit.is_predicate_lit lits.(i) ->
+          (match T.as_const (T.head_term lhs) with 
+           | Some sym -> not (ID.is_postcnf_skolem sym)
+           | _ -> true)
+        | _ -> true
       )
-    | `NoMaxVarInFoContext ->
-      let vars_args = var_headed_subterms `Max in
-      not (contains_maxvar_as_fo_subterm vars_args)
-      
+    in
+    is_ho_allowed && is_fresh_sk_allowed
   )
   else false
 
@@ -700,6 +713,7 @@ let () =
   let set_select s = Params.select := s in
   Params.add_opts
     [ "--select", Arg.Symbol (all(), set_select), " set literal selection function. Prefix selection function with \"bb+\" to block selecting literals that have selectable boolean subterms. ";
+      "--restrict-fresh-skolem-selection", Arg.Bool ((:=) _restrict_fresh_sk_selection), " Disable selection of literals whose head is fresh Skolem symbol";
       "--ho-selection-restriction", ho_restriction_opt, " selection restrictions for lambda-free higher-order terms (none/no-var-heading-max-term/no-var-different-args/no-unapplied-var-occurring-applied/no-ho-vars)"
     ];
   Params.add_to_mode "ho-complete-basic" (fun () ->
