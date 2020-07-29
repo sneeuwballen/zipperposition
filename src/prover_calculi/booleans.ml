@@ -53,6 +53,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   module Combs = Combinators.Make(Env)
   module HO = Higher_order.Make(Env)
   module LazyCNF = Lazy_cnf.Make(Env)
+  module FR = Env.FormRename
 
   let (=~),(/~) = Literal.mk_eq, Literal.mk_neq
   let (@:) = T.app_builtin ~ty:Type.prop
@@ -230,7 +231,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         match T.view t with
         | T.AppBuiltin(hd,_) ->
           (* check that the term has no interpreted sym on top *)
-          not (List.mem hd [Builtin.Eq;Builtin.Neq] || 
+          not (List.mem hd Builtin.([Eq; Neq; ForallConst; ExistsConst; Not]) || 
               Builtin.is_logical_binop hd)
         | _ -> true)
     (* since we are doing simultaneous version -- we take only unique terms *)
@@ -352,18 +353,16 @@ module Make(E : Env.S) : S with module Env = E = struct
     C.eligible_for_bool_infs c
     |> SClause.TPSet.to_list
     |> CCList.filter_map (fun (t,p) -> 
-      (* TODO(BOOL): Implement skolem reusing *)
       match T.view t with
-      | T.AppBuiltin(Builtin.(ForallConst|ExistsConst), [_;body]) ->
-        let free_vars_l = T.VarSet.to_list (T.vars body) in
-        let ret_ty = List.hd (fst (Type.open_fun (T.ty body))) in
-        let (id,ty), sk = T.mk_fresh_skolem ~prefix:"sk" free_vars_l ret_ty in
-        E.Ctx.declare id ty;
-        Signal.send Env.FormRename.on_pred_skolem_introduction (c, sk);
+      | T.AppBuiltin(Builtin.(ForallConst|ExistsConst) as b, [_;body]) ->
+        let form_for_skolem = 
+          (if b = ForallConst then T.Form.not_ else CCFun.id) 
+          (snd @@ T.open_fun body) in
+        let sk = FR.get_skolem ~parent:c ~mode:`Skolem form_for_skolem in
         let repl = T.app body [sk] in
         let new_lits = CCArray.copy (C.lits c) in
         Literals.Pos.replace ~at:p ~by:repl new_lits;
-        let new_cl = 
+        let new_cl =
           C.create ~trail:(C.trail c) ~penalty:(C.penalty c) 
             (Array.to_list new_lits) proof in
         Some new_cl

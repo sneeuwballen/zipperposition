@@ -14,7 +14,6 @@ let k_scoping = Flex_state.create_key ()
 let k_solve_formulas = Flex_state.create_key ()
 let k_skolem_mode = Flex_state.create_key ()
 
-
 let section = Util.Section.make ~parent:Const.section "lazy_cnf"
 
 module type S = sig
