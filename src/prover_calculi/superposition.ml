@@ -111,7 +111,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   module SubsumIdx = PS.SubsumptionIndex
   module UnitIdx = PS.UnitIndex
   module Stm = Env.Stm
-  module StmQ = Env.StmQ 
+  module StmQ = Env.StmQ
 
   (** {6 Stream queue} *)
   let _cc_simpl = ref (Congruence.FO.create ~size:256 ())
@@ -1818,8 +1818,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* rewrite innermost-leftmost of [subst(t,scope)]. The initial scope is
        0, but then we normal_form terms in which variables are really the variables
        of the RHS of a previously applied rule (in context !sc); all those
-       variables are bound to terms in context 0 *)
-    and normal_form ~restrict t k =
+       variables are bound to terms in context 0 
+       
+       when rewriting under quantifiers whose bodies are lambdas, we need to
+       force lambda rewriting (force_lam_rw) to rewrite the quantifier body
+       *)
+    and normal_form ~restrict ?(force_lam_rw=false) t k =
       match T.view t with
       | T.Const _ -> reduce_at_root ~restrict t k
       | T.App (hd, l) ->
@@ -1839,7 +1843,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         else reduce_at_root ~restrict t k
       | T.Fun (ty_arg, body) ->
         (* reduce under lambdas *)
-        if Env.flex_get k_lambda_demod
+        if force_lam_rw || Env.flex_get k_lambda_demod
         then
           normal_form ~restrict:lazy_false body
             (fun body' ->
@@ -1847,6 +1851,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                reduce_at_root ~restrict u k)
         else reduce_at_root ~restrict t k (* TODO: DemodExt *)
       | T.Var _ | T.DB _ -> k t
+      | T.AppBuiltin(Builtin.(ForallConst|ExistsConst) as hd, [_; body]) ->
+        let mk_quant = if hd = ForallConst then T.Form.forall else T.Form.exists in
+        normal_form ~restrict:lazy_false ~force_lam_rw:true body
+          (fun body' ->
+            let u = if T.equal body body' then t else mk_quant body' in
+            reduce_at_root ~restrict u k)
       | T.AppBuiltin (b, l) ->
         normal_form_l l
           (fun l' ->
