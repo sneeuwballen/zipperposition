@@ -412,7 +412,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           ~tags:[Proof.Tag.T_ho; Proof.Tag.T_ext; Proof.Tag.T_dont_increase_depth]
       in
       let new_c =
-        C.create (CCArray.to_list lits) proof ~penalty ~trail:(C.trail c) in
+        C.create (CCArray.to_list lits) proof ~penalty:(C.penalty c + penalty) ~trail:(C.trail c) in
       Util.debugf 1 ~section "NegExt: @[%a@] => @[%a@].\n" 
         (fun k -> k C.pp c C.pp new_c);
       Util.incr_stat stat_neg_ext;
@@ -441,7 +441,8 @@ module Make(E : Env.S) : S with module Env = E = struct
             aux (penalty+p) rest
           ) repls
       in
-      aux 0 lits_map
+      let res = aux 0 lits_map in
+      
     in
     compute_results new_lits_map
 
