@@ -3,6 +3,8 @@ open Logtk
 module L = Literal
 module T = Term
 
+let section = Util.Section.make ~parent:Const.section "renaming"
+
 module type S = sig
   module Ctx : Ctx.S
   module C : Clause.S with module Ctx = Ctx
@@ -55,11 +57,16 @@ module Make(C : Clause.S) = struct
         if Literal.is_predicate_lit lit then T.is_appbuiltin lhs
         else Type.is_prop (T.ty lhs)
       | _ -> false in
-    match C.lits c with
-    | [| a; b |] ->
-      CCArray.length (CCArray.filter is_renaming_lit (C.lits c)) = 1 &&
-      CCArray.length (CCArray.filter is_formula_lit (C.lits c)) = 1
-    | _ -> false
+    let ans = 
+      match C.lits c with
+      | [| a; b |] ->
+        CCArray.length (CCArray.filter is_renaming_lit (C.lits c)) = 1 &&
+        CCArray.length (CCArray.filter is_formula_lit (C.lits c)) = 1
+      | _ -> false
+    in
+    Util.debugf ~section 1 "@[%a@] is %srenaming" 
+      (fun k -> k C.pp c (if ans then "" else "not "));
+    ans
 
   let mk_renaming_clause parent ~renamer ~form sign =
     let proof = Proof.Step.define_internal 
@@ -76,7 +83,7 @@ module Make(C : Clause.S) = struct
 
   let rename_form ?(should_rename=(fun _ -> true)) ~c form sign =
     assert(Type.is_prop (T.ty form));
-    if T.is_true_or_false form then None
+    if is_renaming_clause c || T.is_true_or_false form then None
     else (
       let gen = Iter.head @@ 
         Idx.retrieve_generalizations (!_renaming_idx, 0) (form, 1) in

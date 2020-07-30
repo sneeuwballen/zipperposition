@@ -352,7 +352,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       ) else continue acc) (init)
 
   let rename_subformulas c =
-    Util.debugf ~section 3 "lazy-cnf-rename(@[%a@])@." (fun k -> k C.pp c);
+    Util.debugf ~section 2 "lazy-cnf-rename(@[%a@])@." (fun k -> k C.pp c);
 
     let should_rename f =
       let num_occurences = Term.Tbl.get_or _form_counter f ~default:0 in
@@ -375,9 +375,9 @@ module Make(E : Env.S) : S with module Env = E = struct
           let renamer = (if sign then CCFun.id else T.Form.not_) renamer in
           let renamed = mk_or ~proof_cons ~rule_name [renamer] c ~parents:(c :: parents) i in
           let res = renamed @ new_defs in
-          Util.debugf ~section 3 "  @[renamed subformula %d:(@[%a@])=@. @[%a@]@]@." 
+          Util.debugf ~section 1 "  @[renamed subformula %d:(@[%a@])=@. @[%a@]@]@." 
             (fun k -> k i C.pp c (CCList.pp C.pp) renamed);
-          Util.debugf ~section 3 "  new defs:@[%a@]@." 
+          Util.debugf ~section 1 "  new defs:@[%a@]@." 
             (fun k -> k (CCList.pp C.pp) new_defs);
           Some res, `Stop
         | None -> None, `Continue
@@ -389,9 +389,9 @@ module Make(E : Env.S) : S with module Env = E = struct
             let renamer = (if sign then CCFun.id else T.Form.not_) renamer in
             let renamed = mk_or ~proof_cons ~rule_name [renamer] c ~parents:(c :: parents) i in
             let res = renamed @ new_defs in
-            Util.debugf ~section 3 "  @[renamed eq %d(@[%a@]) into @[%a@]@]@." 
+            Util.debugf ~section 1 "  @[renamed eq %d(@[%a@]) into @[%a@]@]@." 
             (fun k -> k i L.pp (C.lits c).(i) (CCList.pp C.pp) renamed);
-            Util.debugf ~section 3 "  new defs:@[%a@]@." 
+            Util.debugf ~section 1 "  new defs:@[%a@]@." 
               (fun k -> k (CCList.pp C.pp) new_defs);
               Some res, `Stop
           | None -> None, `Continue)
@@ -473,10 +473,10 @@ module Make(E : Env.S) : S with module Env = E = struct
          RENAMING MUST BE ADDED AFTER CLAUSIFICATION RULES (so that
          it runs ***before*** lazy_clausify_simpl) *)
       if Env.flex_get k_renaming_threshold > 0 then(
-        Env.add_multi_simpl_rule ~priority:5 rename_subformulas
+        Env.add_multi_simpl_rule ~priority:4 rename_subformulas
       );
       if Env.flex_get k_scoping != `Off then (
-        Env.add_multi_simpl_rule ~priority:5 cnf_scope;
+        Env.add_multi_simpl_rule ~priority:3 cnf_scope;
       )
     )
 end

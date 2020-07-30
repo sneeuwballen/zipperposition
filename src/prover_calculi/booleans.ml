@@ -356,6 +356,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     |> CCList.filter_map (fun (t,p) -> 
       match T.view t with
       | T.AppBuiltin(Builtin.(ForallConst|ExistsConst) as b, [_;body]) ->
+        let body = Combs.expand body in
         let form_for_skolem = 
           (if b = ForallConst then T.Form.not_ else CCFun.id) 
           (snd @@ T.open_fun body) in
