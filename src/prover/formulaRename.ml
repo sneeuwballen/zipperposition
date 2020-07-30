@@ -52,11 +52,7 @@ module Make(C : Clause.S) = struct
         | Some id  -> ID.Set.mem id !_renamer_symbols
         | None -> false end
       | _ -> false in
-    let is_formula_lit = function 
-      | L.Equation (lhs, rhs, _) as lit ->
-        if Literal.is_predicate_lit lit then T.is_appbuiltin lhs
-        else Type.is_prop (T.ty lhs)
-      | _ -> false in
+    let is_formula_lit lit = not (is_renaming_lit lit) in
     let ans = 
       match C.lits c with
       | [| a; b |] ->
