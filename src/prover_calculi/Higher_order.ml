@@ -441,8 +441,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             aux (penalty+p) rest
           ) repls
       in
-      let res = aux 0 lits_map in
-      
+      aux 0 lits_map
     in
     compute_results new_lits_map
 
