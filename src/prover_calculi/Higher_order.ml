@@ -59,7 +59,6 @@ let k_check_lambda_free = Flex_state.create_key ()
 let k_purify_applied_vars = Flex_state.create_key()
 let k_eta = Flex_state.create_key()
 let k_diff_const = Flex_state.create_key()
-let k_use_diff_for_neg_ext = Flex_state.create_key()
 let k_generalize_choice_trigger = Flex_state.create_key ()
 let k_prim_enum_simpl = Flex_state.create_key ()
 let k_prim_enum_early_bird = Flex_state.create_key ()
@@ -105,6 +104,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   module Combs = Combinators.Make(E)
   module Stm = E.Stm
   module StmQ = E.StmQ
+  module FR = E.FormRename
 
   (* index for ext-neg, to ensure α-equivalent negative equations have the same skolems *)
   module FV_ext_neg_lit = FV_tree.Make(struct
@@ -366,59 +366,84 @@ module Make(E : Env.S) : S with module Env = E = struct
     new_clauses
 
   let neg_ext (c:C.t) : C.t list =
-    let diff_const = Env.flex_get k_diff_const in
+    let get_new_lits lhs rhs =
+      let calc_skolem lhs rhs =
+        let (pref_l, body_l), (pref_r, body_r) =
+          CCPair.map_same T.open_fun (lhs, rhs) 
+        in
+        assert (CCList.equal Type.equal pref_l pref_r);
+        assert (not (CCList.is_empty pref_l));
+        let hd_var, rest_vars = CCList.hd_tl pref_l in
 
-    let rec app_diff_exhaustively s t = function 
-    | alpha :: beta :: [] ->
-      let diff_s_t = T.app diff_const [T.of_ty alpha;T.of_ty beta;s;t] in
-      T.app s [diff_s_t], T.app t [diff_s_t]
-    | alpha :: ((beta :: rest) as xs) ->
-      assert(not @@ CCList.is_empty rest);
-      let rest', ret = CCList.take_drop (List.length rest -1) rest in
-      assert(List.length ret = 1);
-      let new_beta = Type.arrow (beta::rest') (List.hd ret) in
-      let diff_s_t = T.app diff_const [T.of_ty alpha;T.of_ty new_beta;s;t] in
-      app_diff_exhaustively (T.app s [diff_s_t]) (T.app t [diff_s_t]) xs
-    | _ -> invalid_arg "argument must be a function type" in
+        let body = 
+          T.fun_ hd_var @@ CCList.fold_right (fun ty body -> 
+            T.Form.exists (T.fun_ ty body)
+          ) rest_vars (T.Form.neq lhs rhs)
+        in
 
-    let is_eligible = C.Eligible.res c in 
-    C.lits c
-    |> CCArray.mapi (fun i l -> 
-        match l with 
-        | Literal.Equation (lhs,rhs,false) 
-          when is_eligible i l && Type.is_fun @@ T.ty lhs ->
-          let arg_types, ret_ty = Type.open_fun (T.ty lhs) in
-          let free_vars = Literal.vars l in
-          let skolem_decls = ref [] in
-          let new_lits = CCList.map (fun (j,x) -> 
-              if i!=j then x
-              else (
-                let lhs,rhs = 
-                if Env.flex_get k_use_diff_for_neg_ext then (
-                  app_diff_exhaustively lhs rhs (arg_types @ [ret_ty])
-                )
-                else (
-                  let skolems = List.map (fun ty -> 
-                      let sk, res =  T.mk_fresh_skolem free_vars ty in
-                      skolem_decls := sk :: !skolem_decls;
-                      res) arg_types in
-                  T.app lhs skolems, T.app rhs skolems) in
-                Literal.mk_neq lhs rhs))
-              (C.lits c |> Array.mapi (fun j x -> (j,x)) |> Array.to_list) in
-          declare_skolems !skolem_decls;
-          let proof =
-            Proof.Step.inference [C.proof_parent c] 
-              ~rule:(Proof.Rule.mk "neg_ext")
-              ~tags:[Proof.Tag.T_ho; Proof.Tag.T_ext; Proof.Tag.T_dont_increase_depth]
+        FR.get_skolem ~parent:c ~mode:`Skolem body
+      in    
+
+
+      assert (Type.is_fun (T.ty lhs));
+      let lhs, rhs = CCPair.map_same Combs.expand (lhs,rhs) in
+      
+      let rec aux acc lhs rhs =
+        assert (Type.equal (T.ty lhs) (T.ty rhs));
+        if not (Type.is_fun (T.ty lhs)) then acc
+        else (
+          let sk = calc_skolem lhs rhs in
+          let penalty =
+            if List.length (fst @@ Type.open_fun (T.ty lhs)) = 1 then 0 else 1 
           in
-          let new_c =
-            C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c) in
-          Util.debugf 1 ~section "NegExt: @[%a@] => @[%a@].\n" (fun k -> k C.pp c C.pp new_c);
-          Util.incr_stat stat_neg_ext;
-          Some new_c
-        | _ -> None)
-    |> CCArray.filter_map (fun x -> x)
-    |> CCArray.to_list
+          let lhs', rhs' = 
+            CCPair.map_same (fun hd -> Lambda.whnf @@ T.app hd [sk]) (lhs,rhs)
+          in
+          let new_lit = Lit.mk_neq lhs' rhs' in
+          aux ((new_lit,penalty)::acc) lhs' rhs'
+        )
+      in
+      aux [] lhs rhs in
+
+    let mk_clause ~lits ~penalty =
+      let proof =
+        Proof.Step.inference [C.proof_parent c] 
+          ~rule:(Proof.Rule.mk "neg_ext")
+          ~tags:[Proof.Tag.T_ho; Proof.Tag.T_ext; Proof.Tag.T_dont_increase_depth]
+      in
+      let new_c =
+        C.create (CCArray.to_list lits) proof ~penalty ~trail:(C.trail c) in
+      Util.debugf 1 ~section "NegExt: @[%a@] => @[%a@].\n" 
+        (fun k -> k C.pp c C.pp new_c);
+      Util.incr_stat stat_neg_ext;
+      new_c
+    in
+
+    let eligible = C.Eligible.res c in
+    let new_lits_map =
+      IntMap.to_list @@
+        CCArray.foldi (fun new_lits idx lit -> 
+          match lit with 
+          | Literal.Equation (lhs,rhs,false) 
+            when eligible idx lit && Type.is_fun @@ T.ty lhs ->
+            IntMap.add idx (get_new_lits lhs rhs) new_lits
+          | _ -> new_lits
+        ) IntMap.empty (C.lits c)
+    in
+
+    let compute_results lits_map =
+      let lit_arr = CCArray.copy (C.lits c) in
+      let rec aux penalty = function
+        | [] -> [mk_clause ~lits:lit_arr ~penalty]
+        | (idx, repls) :: rest ->
+          CCList.flat_map (fun (repl, p) ->
+            lit_arr.(idx) <- repl;
+            aux (penalty+p) rest
+          ) repls
+      in
+      aux 0 lits_map
+    in
+    compute_results new_lits_map
 
   let neg_ext_simpl (c:C.t) : C.t SimplM.t =
     let is_eligible = C.Eligible.res c in 
@@ -2379,7 +2404,6 @@ let _simple_projection = ref (-1)
 let _simple_projection_md = ref 2
 let _purify_applied_vars = ref `None
 let _eta = ref `Reduce
-let _use_diff_for_neg_ext = ref false
 let _generalize_choice_trigger = ref false
 let _prim_enum_simpl = ref false
 let _prim_enum_early_bird = ref false
@@ -2414,7 +2438,6 @@ let extension =
     E.flex_add k_check_lambda_free !_check_lambda_free;
     E.flex_add k_purify_applied_vars !_purify_applied_vars;
     E.flex_add k_eta !_eta;
-    E.flex_add k_use_diff_for_neg_ext !_use_diff_for_neg_ext;
     E.flex_add k_generalize_choice_trigger !_generalize_choice_trigger;
     E.flex_add k_prim_enum_simpl !_prim_enum_simpl;
     E.flex_add k_prim_enum_early_bird !_prim_enum_early_bird;
@@ -2557,7 +2580,6 @@ let () =
           | "fresh" -> _ground_app_vars := `Fresh
           | "all" -> _ground_app_vars := `All
           | _ -> assert false)), " ground all applied variables to either all constants of the right type in signature or a fresh constant";
-      "--ho-use-diff-for-neg-ext", Arg.Bool ((:=) _use_diff_for_neg_ext), " use diff constant for NegExt rule instead of fresh skolem";
       "--ho-generalize-choice-trigger", Arg.Bool ((:=) _generalize_choice_trigger), " apply choice trigger to a fresh variable";
       "--check-lambda-free", Arg.Symbol (["true";"false";"only"], fun s -> match s with 
         | "true" -> _check_lambda_free := `True
