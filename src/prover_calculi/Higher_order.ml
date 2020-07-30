@@ -378,9 +378,10 @@ module Make(E : Env.S) : S with module Env = E = struct
         let body = 
           T.fun_ hd_var @@ CCList.fold_right (fun ty body -> 
             T.Form.exists (T.fun_ ty body)
-          ) rest_vars (T.Form.neq lhs rhs)
+          ) rest_vars (T.Form.neq body_l body_r)
         in
 
+        assert(T.DB.is_closed body);
         FR.get_skolem ~parent:c ~mode:`Skolem body
       in    
 
@@ -412,7 +413,8 @@ module Make(E : Env.S) : S with module Env = E = struct
           ~tags:[Proof.Tag.T_ho; Proof.Tag.T_ext; Proof.Tag.T_dont_increase_depth]
       in
       let new_c =
-        C.create (CCArray.to_list lits) proof ~penalty:(C.penalty c + penalty) ~trail:(C.trail c) in
+        C.create ~penalty:(C.penalty c + penalty) ~trail:(C.trail c)
+        (CCArray.to_list lits) proof in
       Util.debugf 1 ~section "NegExt: @[%a@] => @[%a@].\n" 
         (fun k -> k C.pp c C.pp new_c);
       Util.incr_stat stat_neg_ext;
@@ -443,7 +445,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       in
       aux 0 lits_map
     in
-    compute_results new_lits_map
+    if CCList.is_empty new_lits_map then [] 
+    else compute_results new_lits_map
 
   let neg_ext_simpl (c:C.t) : C.t SimplM.t =
     let is_eligible = C.Eligible.res c in 
