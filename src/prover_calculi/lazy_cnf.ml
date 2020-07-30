@@ -355,48 +355,74 @@ module Make(E : Env.S) : S with module Env = E = struct
     Util.debugf ~section 2 "lazy-cnf-rename(@[%a@])@." (fun k -> k C.pp c);
 
     let should_rename f =
+      let will_yield_claues f =
+        let rec aux ~sign f =
+          match T.view f with
+          | T.AppBuiltin(Builtin.And, l) ->
+            (sign && (List.length l >= 2)) || aux_l sign l
+          | T.AppBuiltin(Builtin.Or, l) ->
+            ((not sign) && (List.length l >= 2)) || aux_l sign l
+          | T.AppBuiltin(Builtin.(ForallConst|ExistsConst), [_; body]) ->
+            aux ~sign (snd (T.open_fun body))
+          | T.AppBuiltin(Builtin.Not, [body]) -> aux ~sign:(not sign) body
+          | T.AppBuiltin(Builtin.Imply, [a; b]) ->
+            not sign || aux ~sign:(not sign) a || aux ~sign b
+          | T.AppBuiltin(Builtin.(Eq|Equiv|Neq|Xor), ([a;b]|[_;a;b])) ->
+            Type.is_prop (T.ty a)
+          | _ -> false
+        and aux_l sign = function 
+        | [] -> false
+        | x :: xs -> aux ~sign x || aux_l sign xs in
+      let ans = aux ~sign:true f in
+      Util.debugf ~section 1 "@[%a@] will%s yield clauses@." 
+        (fun k -> k T.pp f (if ans then "" else " not"));
+      ans in
+
       let num_occurences = Term.Tbl.get_or _form_counter f ~default:0 in
       num_occurences >= Env.flex_get k_renaming_threshold &&
-      (not (FR.is_renaming_clause c))
+      (not (FR.is_renaming_clause c)) &&
+      will_yield_claues f
     in
 
-    fold_lits c
-    |> Iter.fold_while (fun _ (lhs,rhs,sign,pos) -> 
-      let i,_ = Ls.Pos.cut pos in
-      let lit = (C.lits c).(i) in
-      let proof_cons = 
-        Proof.Step.simp ~infos:[] ~tags:[Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth] in
-      if L.is_predicate_lit lit && T.is_appbuiltin lhs then (
-        match FR.rename_form ~should_rename ~c lhs sign with
-        | Some (renamer, new_defs, parents) ->
-          Term.Tbl.remove _form_counter lhs;
-
-          let rule_name = "renaming" in
-          let renamer = (if sign then CCFun.id else T.Form.not_) renamer in
-          let renamed = mk_or ~proof_cons ~rule_name [renamer] c ~parents:(c :: parents) i in
-          let res = renamed @ new_defs in
-          Util.debugf ~section 1 "  @[renamed subformula %d:(@[%a@])=@. @[%a@]@]@." 
-            (fun k -> k i C.pp c (CCList.pp C.pp) renamed);
-          Util.debugf ~section 1 "  new defs:@[%a@]@." 
-            (fun k -> k (CCList.pp C.pp) new_defs);
-          Some res, `Stop
-        | None -> None, `Continue
-      ) else if Type.is_prop (T.ty lhs) && not (L.is_predicate_lit lit) &&
-              (T.is_appbuiltin lhs || T.is_appbuiltin rhs) then (
-          match rename_eq ~should_rename ~c lhs rhs sign with
+    if C.length c > 1 then (
+      fold_lits c
+      |> Iter.fold_while (fun _ (lhs,rhs,sign,pos) -> 
+        let i,_ = Ls.Pos.cut pos in
+        let lit = (C.lits c).(i) in
+        let proof_cons = 
+          Proof.Step.simp ~infos:[] 
+          ~tags:[Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth] in
+        if L.is_predicate_lit lit && T.is_appbuiltin lhs then (
+          match FR.rename_form ~should_rename ~c lhs sign with
           | Some (renamer, new_defs, parents) ->
+            Term.Tbl.remove _form_counter lhs;
+
             let rule_name = "renaming" in
             let renamer = (if sign then CCFun.id else T.Form.not_) renamer in
             let renamed = mk_or ~proof_cons ~rule_name [renamer] c ~parents:(c :: parents) i in
             let res = renamed @ new_defs in
-            Util.debugf ~section 1 "  @[renamed eq %d(@[%a@]) into @[%a@]@]@." 
-            (fun k -> k i L.pp (C.lits c).(i) (CCList.pp C.pp) renamed);
+            Util.debugf ~section 1 "  @[renamed subformula %d:(@[%a@])=@. @[%a@]@]@." 
+              (fun k -> k i C.pp c (CCList.pp C.pp) renamed);
             Util.debugf ~section 1 "  new defs:@[%a@]@." 
               (fun k -> k (CCList.pp C.pp) new_defs);
-              Some res, `Stop
-          | None -> None, `Continue)
-        else None, `Continue) None
-
+            Some res, `Stop
+          | None -> None, `Continue
+        ) else if Type.is_prop (T.ty lhs) && not (L.is_predicate_lit lit) &&
+                (T.is_appbuiltin lhs || T.is_appbuiltin rhs) then (
+            match rename_eq ~should_rename ~c lhs rhs sign with
+            | Some (renamer, new_defs, parents) ->
+              let rule_name = "renaming" in
+              let renamer = (if sign then CCFun.id else T.Form.not_) renamer in
+              let renamed = mk_or ~proof_cons ~rule_name [renamer] c ~parents:(c :: parents) i in
+              let res = renamed @ new_defs in
+              Util.debugf ~section 1 "  @[renamed eq %d(@[%a@]) into @[%a@]@]@." 
+              (fun k -> k i L.pp (C.lits c).(i) (CCList.pp C.pp) renamed);
+              Util.debugf ~section 1 "  new defs:@[%a@]@." 
+                (fun k -> k (CCList.pp C.pp) new_defs);
+                Some res, `Stop
+            | None -> None, `Continue)
+          else None, `Continue) None
+    ) else None
   let clausify_eq c =
     let rule_name = "eq_elim" in
     fold_lits c
