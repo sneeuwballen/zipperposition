@@ -354,7 +354,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let rename_subformulas c =
     Util.debugf ~section 2 "lazy-cnf-rename(@[%a@])@." (fun k -> k C.pp c);
 
-    let should_rename f =
+    let should_rename sign f =
       let will_yield_claues f =
         let rec aux ~sign f =
           match T.view f with
@@ -368,12 +368,19 @@ module Make(E : Env.S) : S with module Env = E = struct
           | T.AppBuiltin(Builtin.Imply, [a; b]) ->
             not sign || aux ~sign:(not sign) a || aux ~sign b
           | T.AppBuiltin(Builtin.(Eq|Equiv|Neq|Xor), ([a;b]|[_;a;b])) ->
-            Type.is_prop (T.ty a)
+            (* if it is either an equivalence(xor) which yields at
+               least two clauses, or a complicated higher-order
+               disequation (between app-vars or lambdas) in which case
+               it is good to hide it under renamed formula and 
+               delay reasoning about it *)
+            Type.is_prop (T.ty a) ||
+              T.Seq.subterms ~include_builtin:true f
+              |> Iter.exists (fun x -> T.is_app_var x || T.is_fun x)
           | _ -> false
         and aux_l sign = function 
         | [] -> false
         | x :: xs -> aux ~sign x || aux_l sign xs in
-      let ans = aux ~sign:true f in
+      let ans = aux ~sign f in
       Util.debugf ~section 1 "@[%a@] will%s yield clauses@." 
         (fun k -> k T.pp f (if ans then "" else " not"));
       ans in
@@ -393,7 +400,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           Proof.Step.simp ~infos:[] 
           ~tags:[Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth] in
         if L.is_predicate_lit lit && T.is_appbuiltin lhs then (
-          match FR.rename_form ~should_rename ~c lhs sign with
+          match FR.rename_form ~should_rename:(should_rename sign) ~c lhs sign with
           | Some (renamer, new_defs, parents) ->
             Term.Tbl.remove _form_counter lhs;
 
@@ -409,7 +416,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           | None -> None, `Continue
         ) else if Type.is_prop (T.ty lhs) && not (L.is_predicate_lit lit) &&
                 (T.is_appbuiltin lhs || T.is_appbuiltin rhs) then (
-            match rename_eq ~should_rename ~c lhs rhs sign with
+            match rename_eq ~should_rename:(should_rename sign) ~c lhs rhs sign with
             | Some (renamer, new_defs, parents) ->
               let rule_name = "renaming" in
               let renamer = (if sign then CCFun.id else T.Form.not_) renamer in
