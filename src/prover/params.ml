@@ -157,6 +157,5 @@ let () =
       [ "ho-competitive"
       ; "ho-pragmatic"] (fun () ->
       default.ord := "lambda_kbo";
-      bool_select := "smallest"
     );
 

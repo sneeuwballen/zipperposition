@@ -963,7 +963,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         else Env.add_unary_inf "bool_hoist" bool_hoist;
 
         if Env.flex_get k_rename_nested_bools then (
-          Env.add_multi_simpl_rule ~priority:1 rename_nested_booleans
+          Env.add_multi_simpl_rule ~priority:500 rename_nested_booleans
         );
 
         Env.add_unary_inf "formula_hoist" formula_hoist;
@@ -1315,13 +1315,18 @@ let extension =
 let () =
   Options.add_opts
     [ "--boolean-reasoning", Arg.Symbol (["off"; "simpl-only"; "bool-hoist"; "cases-preprocess"], 
-                                         fun s -> _bool_reasoning := 
-                                             match s with 
-                                             | "off" -> BoolReasoningDisabled
-                                             | "simpl-only" -> BoolSimplificationsOnly
-                                             | "bool-hoist" -> BoolHoist
-                                             | "cases-preprocess" -> BoolCasesPreprocess
-                                             | _ -> assert false), 
+        (fun s -> 
+        _bool_reasoning := 
+            (match s with 
+            | "off" -> BoolReasoningDisabled
+            | "simpl-only" -> BoolSimplificationsOnly
+            | "bool-hoist" -> BoolHoist
+            | "cases-preprocess" -> BoolCasesPreprocess
+            | _ -> assert false);
+        if !_bool_reasoning == BoolHoist then (
+          (* setting default Boolean selection if BoolHoist is on *)
+          Params.bool_select := "smallest";
+        );)), 
       " enable/disable boolean axioms";
       "--quantifier-renaming"
       , Arg.Bool (fun v -> _quant_rename := v)

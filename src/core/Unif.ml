@@ -83,7 +83,6 @@ let norm_logical_disagreements ?(mode=`Conservative) b args args' : _ list * _ l
           a_rest @ (a_main)
         ) else CCPair.map_same (fun s -> sort @@ Term.Set.to_list s) (uniq_a, uniq_a')
     | `Off ->
-      CCFormat.printf "off@.";
       if List.length args = List.length args' then (args,args') else raise Fail
     )
   else (args, args')
