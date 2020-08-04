@@ -421,10 +421,11 @@ module Make(E : Env.S) : S with module Env = E = struct
        when hoisting boolean subterms *)
     let rename_lit lit =
       let sign = L.is_pos lit in
+      let polarity_aware = Env.flex_get Lazy_cnf.k_pa_renaming in
       if L.is_predicate_lit lit then (
         match lit with
         | L.Equation(lhs,_,_) ->
-          CCOpt.get_exn (FR.rename_form ~c lhs sign)
+          CCOpt.get_exn (FR.rename_form ~polarity_aware ~c lhs sign)
         | _ -> assert false
       ) else (
         let mk_form =
@@ -432,7 +433,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         in
         match lit with
         | L.Equation(lhs,rhs,_) ->
-          CCOpt.get_exn (FR.rename_form ~c (mk_form lhs rhs) sign)
+          CCOpt.get_exn (FR.rename_form ~polarity_aware ~c (mk_form lhs rhs) sign)
         | _ -> assert false
       )
     in

@@ -13,7 +13,9 @@ module type S = sig
   (** This clause has the shape of the renaming clause   *)
 
   val rename_form : 
-    ?should_rename:(T.t -> bool) -> c:C.t ->
+    ?should_rename:(T.t -> bool) -> 
+    ?polarity_aware:bool ->
+    c:C.t ->
     T.t -> bool -> (T.t * C.t list * C.t list) option
   (**
     `rename_form ~should_rename ~c f polarity` tries to find

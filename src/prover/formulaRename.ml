@@ -14,7 +14,9 @@ module type S = sig
   val is_renaming_clause : C.t -> bool
 
   val rename_form : 
-    ?should_rename:(T.t -> bool) -> c:C.t ->
+    ?should_rename:(T.t -> bool) -> 
+    ?polarity_aware:bool ->
+    c:C.t ->
     T.t -> bool -> (T.t * C.t list * C.t list) option
   val get_skolem : parent:C.t -> mode:[< `Choice | `Skolem ] -> T.t -> T.t
 end
@@ -64,20 +66,25 @@ module Make(C : Clause.S) = struct
       (fun k -> k C.pp c (if ans then "" else "not "));
     ans
 
-  let mk_renaming_clause parent ~renamer ~form sign =
+  let mk_renaming_clause parent ~polarity_aware ~renamer ~form sign =
     let proof = Proof.Step.define_internal 
       (T.head_exn renamer) [C.proof_parent parent] in
 
-    let res = 
-      if sign then (
-        C.create ~penalty:1 ~trail:Trail.empty 
-          [L.mk_false renamer; L.mk_true form] proof
-      ) else (C.create ~penalty:1 ~trail:Trail.empty 
-          [L.mk_true renamer; L.mk_false form] proof
+    let res =
+      if polarity_aware then (
+        if sign then (
+          C.create ~penalty:1 ~trail:Trail.empty 
+            [L.mk_false renamer; L.mk_true form] proof
+        ) else (C.create ~penalty:1 ~trail:Trail.empty 
+            [L.mk_true renamer; L.mk_false form] proof
+        )
+      ) else (
+        C.create ~penalty:1 ~trail:Trail.empty [L.mk_eq renamer form] proof
       ) in
+      
     res
 
-  let rename_form ?(should_rename=(fun _ -> true)) ~c form sign =
+  let rename_form ?(should_rename=(fun _ -> true)) ?(polarity_aware=true) ~c form sign =
     assert(Type.is_prop (T.ty form));
     if is_renaming_clause c || T.is_true_or_false form then None
     else (
@@ -89,10 +96,10 @@ module Make(C : Clause.S) = struct
           Subst.FO.apply Subst.Renaming.none subst (renamer,0) in
 
         let renamer_sub, new_defs, parents = 
-          if sign_present sign !defined_as then (
+          if sign_present sign !defined_as || not polarity_aware then (
             (renamer_sub, [], !defined_as)
           ) else (
-            let def = mk_renaming_clause c ~renamer ~form:orig sign in
+            let def = mk_renaming_clause c ~polarity_aware ~renamer ~form:orig sign in
             defined_as := (def,sign) :: !defined_as;
             (renamer_sub, [def], !defined_as)) in
 
@@ -106,7 +113,7 @@ module Make(C : Clause.S) = struct
           let (id, ty), renamer =
             T.mk_fresh_skolem ~prefix:"form" free_vars Type.prop in
           Ctx.declare id ty;
-          let def = mk_renaming_clause c ~renamer ~form sign in
+          let def = mk_renaming_clause c ~renamer ~polarity_aware ~form sign in
           _renaming_idx := Idx.add !_renaming_idx form (renamer, ref [(def,sign)]);
           _renamer_symbols := ID.Set.add id !_renamer_symbols;
           Some(renamer, [def], [def])

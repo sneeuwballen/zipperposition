@@ -13,6 +13,7 @@ let k_rename_eq = Flex_state.create_key ()
 let k_scoping = Flex_state.create_key ()
 let k_solve_formulas = Flex_state.create_key ()
 let k_skolem_mode = Flex_state.create_key ()
+let k_pa_renaming = Flex_state.create_key ()
 
 let section = Util.Section.make ~parent:Const.section "lazy_cnf"
 
@@ -173,7 +174,9 @@ module Make(E : Env.S) : S with module Env = E = struct
   let rename_eq ~c ~should_rename lhs rhs sign =
     assert(Type.equal (T.ty lhs) (T.ty rhs));
     assert(Type.is_prop (T.ty lhs));
-    if Env.flex_get k_rename_eq then FR.rename_form ~should_rename ~c (T.Form.equiv lhs rhs) sign
+    let polarity_aware = Env.flex_get k_pa_renaming in
+    if Env.flex_get k_rename_eq 
+    then FR.rename_form ~should_rename ~polarity_aware ~c (T.Form.equiv lhs rhs) sign
     else None
 
   let mk_and ~proof_cons ~rule_name and_args c ?(parents=[c]) lit_idx =
@@ -399,8 +402,10 @@ module Make(E : Env.S) : S with module Env = E = struct
         let proof_cons = 
           Proof.Step.simp ~infos:[] 
           ~tags:[Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth] in
+        let polarity_aware = Env.flex_get k_pa_renaming in
+        let should_rename = should_rename sign in
         if L.is_predicate_lit lit && T.is_appbuiltin lhs then (
-          match FR.rename_form ~should_rename:(should_rename sign) ~c lhs sign with
+          match FR.rename_form ~should_rename ~polarity_aware ~c lhs sign with
           | Some (renamer, new_defs, parents) ->
             Term.Tbl.remove _form_counter lhs;
 
@@ -416,7 +421,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           | None -> None, `Continue
         ) else if Type.is_prop (T.ty lhs) && not (L.is_predicate_lit lit) &&
                 (T.is_appbuiltin lhs || T.is_appbuiltin rhs) then (
-            match rename_eq ~should_rename:(should_rename sign) ~c lhs rhs sign with
+            match rename_eq ~should_rename ~c lhs rhs sign with
             | Some (renamer, new_defs, parents) ->
               let rule_name = "renaming" in
               let renamer = (if sign then CCFun.id else T.Form.not_) renamer in
@@ -520,6 +525,7 @@ let _rename_eq = ref true
 let _scoping = ref `Off
 let _solve_formulas = ref false
 let _skolem_mode = ref `Skolem
+let _pa_renaming = ref true
 
 let extension =
   let register env =
@@ -531,6 +537,7 @@ let extension =
     E.flex_add k_scoping !_scoping;
     E.flex_add k_solve_formulas !_solve_formulas;
     E.flex_add k_skolem_mode !_skolem_mode;
+    E.flex_add k_pa_renaming !_pa_renaming;
 
     let handler f c =
       f c;
@@ -569,7 +576,9 @@ let () =
     "--solve-formulas"
     , Arg.Bool (fun v -> _solve_formulas := v)
     , " solve phi != psi eagerly using unification, where phi and psi are formulas";
-    
+    "--polarity-aware-renaming"
+    , Arg.Bool (fun v -> _pa_renaming := v)
+    , " enable/disable polarity aware renaming (introducing clause with only one definition polarity)";    
     "--lazy-cnf-skolem-mode", Arg.Symbol (["skolem"; "choice"], (fun str -> 
       match str with 
       | "skolem" -> _skolem_mode := `Skolem
