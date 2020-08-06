@@ -14,13 +14,15 @@
 let printable_char = [^ '\n']
 let comment_line = ';' printable_char*
 
+let word = ([^ ')']*) | ('|' [^ '|' '\\']* '|')
+
 let alphanumeric = ['a'-'z''A'-'Z''0'-'9']
 let space = [' ']
-let set_line = '(' space* "set-" alphanumeric+ space+ [^ ')']* ')'
+let set_line = '(' space* "set-" alphanumeric+ space+ (word space*)* ')'
 
 let sym = [^ '"' '(' ')' '\\' ' ' '\t' '\r' '\n']
 
-let ident = sym+
+let ident = sym+ | '|' [^ '|' '\\']+ '|'
 
 let quoted = '"' ([^ '"'] | '\\' '"')* '"'
 
@@ -50,6 +52,9 @@ rule token = parse
   | "=>" { ARROW }
   | "=" { EQ }
   | "@" { AT }
+  | "!" { EXCL }
+  | ":named" { NAMED }
+  | ":pattern" { PATTERN }
   | "declare-datatypes" { DATA }
   | "assert" { ASSERT }
   | "lemma" { LEMMA }
