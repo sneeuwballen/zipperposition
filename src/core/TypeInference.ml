@@ -71,6 +71,7 @@ module TyBuiltin = struct
   let ty1op = T.Ty.(forall a ([a_] ==> a_))
   let ty2op_to_i = T.Ty.([int;int] ==> int)
   let hobinder = T.Ty.(forall a ([[a_] ==> prop] ==> prop))
+  let choice_ty = T.Ty.(forall a ([[a_] ==> prop] ==> a_))
 
   let ty_exn = function
     | Builtin.True -> T.Ty.prop
@@ -108,6 +109,7 @@ module TyBuiltin = struct
     | Builtin.To_rat -> T.Ty.(forall a ([a_] ==> rat))
     | Builtin.Is_int -> T.Ty.(forall a ([a_] ==> prop))
     | Builtin.Is_rat -> T.Ty.(forall a ([a_] ==> prop))
+    | Builtin.ChoiceConst -> choice_ty
     | _ -> invalid_arg "TyBuiltin.ty_exn"
 
   let ty x = try Some (ty_exn x) with _ -> None
@@ -663,6 +665,16 @@ let rec infer_rec ?loc ctx t =
       let x = match l with x::_ -> x | _ -> assert false in
       List.iter (fun y -> unify ?loc (T.ty_exn x) (T.ty_exn y)) l;
       T.app_builtin ?loc ~ty:T.Ty.prop Builtin.Distinct l
+    | PT.AppBuiltin (Builtin.ChoiceConst, [t]) when PT.is_lam t ->
+      let t = infer_rec ?loc ctx t in
+      let ty = T.ty_exn t in
+      let _,alpha_l,_ = T.Ty.unfold ty in
+      if (CCList.length alpha_l != 1) then (
+         error_ ?loc "choice binder takes only one variable";
+      );
+      let alpha = List.hd alpha_l in
+      (* reapplying type argument and reusing lambda binder *)
+      T.app_builtin ?loc ~ty:alpha Builtin.ChoiceConst [alpha; t]
     | PT.AppBuiltin (b,l) ->
       begin match TyBuiltin.ty b with
         | None ->

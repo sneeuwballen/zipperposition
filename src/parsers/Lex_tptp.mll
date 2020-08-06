@@ -101,6 +101,8 @@ rule token = parse
   | '.' { DOT }
   | '_' { UNDERSCORE }
   | "!=" { NOT_EQUAL }
+  | "@+" { CHOICE_BINDER }
+  | "@@+" { CHOICE_CONST }
   | lower_word { LOWER_WORD(Lexing.lexeme lexbuf) }
   | upper_word { UPPER_WORD(Lexing.lexeme lexbuf) }
   | dollar_word { DOLLAR_WORD(Lexing.lexeme lexbuf) }

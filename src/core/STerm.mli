@@ -76,6 +76,7 @@ val wildcard : t
 
 val is_app : t -> bool
 val is_var : t -> bool
+val is_lam : t -> bool
 
 val true_ : t
 val false_ : t

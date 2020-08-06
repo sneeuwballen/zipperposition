@@ -168,6 +168,7 @@ let wildcard = builtin Builtin.wildcard
 
 let is_app = function {term=App _; _} -> true | _ -> false
 let is_var = function | {term=Var _; _} -> true | _ -> false
+let is_lam = function {term=Bind(Binder.Lambda, _, _); _} -> true | _ -> false
 
 let true_ = builtin Builtin.true_
 let false_ = builtin Builtin.false_

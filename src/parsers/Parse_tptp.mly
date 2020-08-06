@@ -42,6 +42,8 @@
 
 %token AT /* @ */
 %token LAMBDA /* ^ */
+%token CHOICE_BINDER /* @+ */
+%token CHOICE_CONST /* @@+ */
 
 %token AND
 %token NOTAND
@@ -303,6 +305,10 @@ type_arg: l=assoc_binary_formula_aux(ARROW) {
   | FORALL { PT.forall }
   | EXISTS { PT.exists }
   | LAMBDA { PT.lambda }
+  | CHOICE_BINDER { fun ?loc vars body -> 
+                      PT.app_builtin ?loc Builtin.ChoiceConst 
+                        [PT.lambda ?loc vars body] 
+                  }
 %inline unary_connective:
   | NOT { PT.not_ }
 
@@ -362,6 +368,11 @@ defined_atom:
   | n=INTEGER { PT.int_ (Z.of_string n) }
   | n=RATIONAL { PT.rat (Q.of_string n) }
   | n=REAL { PT.real n }
+  | CHOICE_CONST 
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      PT.app_builtin ~loc Builtin.ChoiceConst []
+    }
   | s=DISTINCT_OBJECT
     {
       let loc = L.mk_pos $startpos $endpos in
