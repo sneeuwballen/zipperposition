@@ -131,7 +131,8 @@ module Inner = struct
         end) 
     else t
 
-  let eta_expand_rec t =
+  (* if top_level_only is true, then eta_expand will not recurse *)
+  let eta_expand_rec ?(top_level_only=false) t =
     let rec aux t = match T.ty t with
       | T.NoType -> t
       | T.HasType ty ->
@@ -156,7 +157,7 @@ module Inner = struct
               List.mapi (fun i ty_arg -> T.bvar (n_missing-i-1) ~ty:ty_arg) missing_args
             in
             T.fun_l ty_args (aux (T.app ~ty:ty_ret body dbvars))
-          ) else (
+          ) else if not top_level_only then (
             let ty = T.ty_exn body in
             (* traverse body *)
             let body = match T.view body with
@@ -172,7 +173,8 @@ module Inner = struct
                 let body_reduced = aux body' in
                 if body' = body_reduced then body else T.bind ~ty ~varty b body_reduced
             in
-            T.fun_l ty_args body)
+            T.fun_l ty_args body
+          ) else t
     in
     aux t
 
@@ -209,7 +211,8 @@ module Inner = struct
         ) else 0, t
       ) in
     let rec aux t =
-      if T.has_lambda t then (      
+      CCFormat.printf "begin:@[%a@]@." T.pp t;
+      if T.is_eta_reducible t then (      
         match T.ty t with
         | T.NoType -> t
         | T.HasType ty ->
@@ -231,9 +234,20 @@ module Inner = struct
               let l' = List.map aux l in
               if T.equal f f' && T.same_l l l'
               then t
-              else T.app ~ty (aux f) (List.map aux l)
+              else T.app ~ty (aux f) l'
+            | T.AppBuiltin (Builtin.(ExistsConst|ForallConst) as hd, [tyarg;body]) ->
+              (* top-level eta expand body of the quantifier *)
+              CCFormat.printf "in new code: @[%a@]@." T.pp t;
+              let body' = eta_expand_rec ~top_level_only:true body in
+              let pref, matrix = T.open_bind Binder.Lambda body' in
+              (* reduce everything underneath the body *)
+              let matrix' = aux matrix in
+              let body' = T.fun_l pref matrix' in
+              if T.equal body' body then t
+              else T.app_builtin ~ty:(T.ty_exn t) hd [tyarg; body']
             | T.AppBuiltin (b,l) ->
-              T.app_builtin ~ty b (List.map aux l)
+              let l' = List.map aux l in
+              if T.same_l l l' then t else T.app_builtin ~ty b l'
           end)
       else t
     in

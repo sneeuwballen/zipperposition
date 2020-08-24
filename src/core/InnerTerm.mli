@@ -113,6 +113,7 @@ val is_lambda : t -> bool
 
 val hashcons_stats : unit -> int*int*int*int*int*int
 
+val is_eta_reducible : t -> bool
 val is_beta_reducible : t -> bool
 val has_lambda : t -> bool
 

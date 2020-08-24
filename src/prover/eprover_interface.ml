@@ -143,14 +143,15 @@ module Make(E : Env.S) : S with module Env = E = struct
                |> ID.Set.to_list
     in
     (* first printing type declarations, and only then the types *)
-    CCList.fold_right (fun sym acc -> 
+    CCList.fold_right (fun sym acc ->
         let ty = Ctx.find_signature_exn sym in
         if Type.is_tType ty then (
           output_symdecl ~out sym ty;
           acc
         ) else (
-          if (((Type.Seq.sub ty) |> Iter.exists (Type.is_tType))) then
+          if (((Type.Seq.sub ty) |> Iter.exists (Type.is_tType))) then (
             raise PolymorphismDetected;
+          );
           Iter.cons (sym, ty) acc
         )
       ) syms Iter.empty

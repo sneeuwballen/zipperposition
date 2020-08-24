@@ -19,9 +19,13 @@ let g_ = ID.make "g"
 let h_ = ID.make "h"
 let k_ = ID.make "k"
 let l_ = ID.make "l"
+let p_ = ID.make "p"
+let q_ = ID.make "q"
 
 
 let ty = Type.term
+let ty_t = Term.of_ty ty 
+let prop = Type.prop
 let f_fun = (T.const ~ty:Type.([ty;ty] ==> ty) f_)
 let f x y = T.app f_fun [x; y]
 let g_fun = T.const ~ty:Type.([ty] ==> ty) g_
@@ -37,6 +41,9 @@ let b = T.const ~ty (ID.make "b")
 let x = T.var_of_int ~ty 0
 let y = T.var_of_int ~ty 1
 let fun_var x y = T.app (T.var_of_int ~ty:Type.([ty;ty] ==> ty) 2) [x; y]
+let quant body = T.app_builtin ~ty:prop Builtin.ExistsConst [ty_t; body]
+let p_fun = T.const ~ty:Type.([ty] ==> prop) p_
+let q_fun = T.const ~ty:Type.([[ty] ==> prop; ty] ==> prop) q_
 
 let test_db_shift = "db shift", `Quick, fun () ->
   let t = T.fun_ ty (f (T.bvar ~ty 0) (g (T.bvar ~ty 1))) in
@@ -152,6 +159,29 @@ let test_eta_reduce = "eta reduce", `Quick, fun () ->
   let subterm =  T.fun_of_fvars [HVar.make ~ty 0; HVar.make ~ty 1] (T.app f_fun [T.var_of_int ~ty 0; T.var_of_int ~ty 1]) in
   let unreduced = k subterm in 
   let reduced = k f_fun in
+  Alcotest.(check t_test) "eta reduce" (Lambda.eta_reduce unreduced) reduced;
+  
+  (* ∃ p -> ∃ (λx. p x)
+     In HOL, we actually need to expand this subterm *)
+  let lamx_px = T.fun_of_fvars [HVar.make ~ty 0] (T.app p_fun [T.var_of_int ~ty 0]) in
+
+  let reduced = quant p_fun in
+  let expanded = quant lamx_px in
+
+  CCFormat.printf "t: @[%a@]@." T.pp reduced;
+  CCFormat.printf "eta-red(t): @[%a@]@." T.pp (Lambda.eta_reduce reduced);
+  CCFormat.printf "expected: @[%a@]@." T.pp expanded;
+
+  CCFormat.printf "trying@.";
+  Alcotest.(check t_test) "eta reduce" (Lambda.eta_reduce reduced) expanded;
+  CCFormat.printf "failed@.";
+
+  (* ∃ (q (λx. p x)) -> ∃ (λy. (q p y))
+     We expand on the top level, but further down we reduce *)
+  let unreduced = quant (T.app q_fun [lamx_px]) in
+  let reduced = 
+    quant @@ 
+      T.fun_of_fvars [HVar.make ~ty 0] (T.app q_fun [p_fun; T.var_of_int ~ty 0]) in
   Alcotest.(check t_test) "eta reduce" (Lambda.eta_reduce unreduced) reduced
 
 let test_eta_expand = "eta expand", `Quick, fun () ->

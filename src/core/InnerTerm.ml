@@ -18,16 +18,18 @@ let (~~~) = I.lognot
 let f_has_freevars = I.one 
 let f_is_beta_reducible = f_has_freevars <<< 1
 
-(* From 16th bit onwards, we will keep the maximum 
-   De Bruijn variable seen so far. *)
-
 (* If DB has more than 16 bits (very unlikely),
    then we set a bit that forces to recompute the property *)
 let f_db_overflowed = f_is_beta_reducible <<< 1
+
+let f_has_lams = f_db_overflowed <<< 1
+let f_has_quant = f_has_lams <<< 1
+
+(* From 16th bit onwards, we will keep the maximum 
+   De Bruijn variable seen so far. *)
 let f_db_mask = (~~~ zero) <<< 16
 let max_db = I.to_int (f_db_mask >>> 16)
 
-let f_has_lams = f_db_overflowed <<< 1
 
 let set_property props prop_flag =
   props ||| prop_flag
@@ -56,7 +58,7 @@ let get_max_db props =
   I.to_int ((props &&& f_db_mask) >>> 16)
 
 (* Properties that should be set if they are set for ANY of the subterms *)
-let any_props = f_is_beta_reducible ||| f_has_freevars ||| f_has_lams
+let any_props = f_is_beta_reducible ||| f_has_freevars ||| f_has_lams ||| f_has_quant
 (* Properties that should be set if they are set for ALL of the subterms *)
 let all_props = zero (* currently no props like that -- is_closed computed
                         by looking at the value of max_db *)
@@ -65,6 +67,7 @@ let debug_props out props =
   CCFormat.fprintf out "db:%d" (get_max_db props);
   CCFormat.fprintf out " h_fv:%b" (get_property props f_has_freevars);
   CCFormat.fprintf out " h_l:%b" (get_property props f_has_lams);
+  CCFormat.fprintf out " h_q:%b" (get_property props f_has_quant);
   CCFormat.fprintf out " beta_r:%b@." (get_property props f_is_beta_reducible);
 
 type t = {
@@ -350,6 +353,10 @@ let rec app_builtin ~ty b l =
       ) else ty in
 
     let props = add_ty_vars (any_props_for_ts l) ty.props in
+    let props = 
+      if Builtin.is_quantifier b && List.length l = 2 then (
+        set_property props f_has_quant
+      ) else props in
     let my_t = make_ ~props ~ty:(HasType ty) (AppBuiltin (b,l)) in
     H.hashcons my_t
 
@@ -470,6 +477,11 @@ module VarTbl = CCHashtbl.Make(HVarKey)
 (** {3 Basic Printer} *)
 
 let[@inline] has_lambda t =
+  get_property t.props f_has_lams
+
+let[@inline] is_eta_reducible t =
+  (* if it has a quantifier -- we have to expand *)
+  get_property t.props f_has_quant ||
   get_property t.props f_has_lams
 
 let[@inline] is_beta_reducible t =

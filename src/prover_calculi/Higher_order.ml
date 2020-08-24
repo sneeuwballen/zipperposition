@@ -1132,6 +1132,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         Type.is_fun ty && List.length (Type.expected_args ty) = 1 &&
         Type.equal (Term.ty t) (List.hd (Type.expected_args ty)) &&
         Type.returns_prop ty && T.DB.is_closed t
+      | T.AppBuiltin(Builtin.ChoiceConst, l) -> CCList.length l == 2
       | _ -> false in
 
     let neg_trigger t =
@@ -1168,11 +1169,8 @@ module Make(E : Env.S) : S with module Env = E = struct
         proof_constructor ~tags:[Proof.Tag.T_cannot_orphan] 
                           ~rule:(Proof.Rule.mk ("inst_choice" ^ arg_str)) 
                           parents in
-      let res = C.create ~penalty:1 ~trail:Trail.empty new_lits proof in
-      res
+      C.create ~penalty:1 ~trail:Trail.empty new_lits proof
     in
-      
-
 
     let choice_of_ty ty =
       assert (Type.is_fun ty);
@@ -1181,14 +1179,16 @@ module Make(E : Env.S) : S with module Env = E = struct
       assert(Type.is_fun alpha_to_prop);
       let alpha = List.hd (fst (Type.open_fun alpha_to_prop)) in
       let res = T.app_builtin Builtin.ChoiceConst ~ty [T.of_ty alpha] in
-      res in
+      res 
+    in
 
     (* def_clause is the clause that defined the symbol hd *)
-    let generate_instances ~def_clause hd arg =
+    let generate_instances_of_hd ~def_clause hd arg =
       choice_inst_of_hd ~def_clause hd arg 
       :: choice_inst_of_hd ~def_clause hd (neg_trigger arg)
       :: (if not @@  Env.flex_get k_generalize_choice_trigger then []
-          else [choice_inst_of_hd ~def_clause hd (generalize_trigger arg)]) in
+          else [choice_inst_of_hd ~def_clause hd (generalize_trigger arg)]) 
+    in
 
     let build_choice_inst t =
       match T.view t with
@@ -1199,12 +1199,16 @@ module Make(E : Env.S) : S with module Env = E = struct
             Term.Map.filter (fun t _ -> Type.equal (Term.ty t) hd_ty) !choice_ops
             |> Term.Map.to_list
             |> (fun l -> if CCList.is_empty l then [choice_of_ty hd_ty, None] else l) in
-          CCList.flat_map (fun (hd,def_clause) -> generate_instances ~def_clause hd arg) 
+          CCList.flat_map (fun (hd,def_clause) -> generate_instances_of_hd ~def_clause hd arg) 
             choice_ops
         ) else (
           match Term.Map.find_opt hd !choice_ops with
-          | Some def_clause ->  generate_instances ~def_clause hd arg
+          | Some def_clause ->  generate_instances_of_hd ~def_clause hd arg
           | None -> [])
+      | T.AppBuiltin(ChoiceConst, [ty_arg;ch_arg]) ->
+        let ty = Type.arrow [T.ty ch_arg] (T.ty t) in
+        let hd = T.app_builtin ~ty ChoiceConst [ty_arg] in
+        generate_instances_of_hd ~def_clause:None hd ch_arg
       | _ -> assert (false) in
 
     let res = 
