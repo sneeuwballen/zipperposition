@@ -211,7 +211,6 @@ module Inner = struct
         ) else 0, t
       ) in
     let rec aux t =
-      CCFormat.printf "begin:@[%a@]@." T.pp t;
       if T.is_eta_reducible t then (      
         match T.ty t with
         | T.NoType -> t
@@ -237,7 +236,6 @@ module Inner = struct
               else T.app ~ty (aux f) l'
             | T.AppBuiltin (Builtin.(ExistsConst|ForallConst) as hd, [tyarg;body]) ->
               (* top-level eta expand body of the quantifier *)
-              CCFormat.printf "in new code: @[%a@]@." T.pp t;
               let body' = eta_expand_rec ~top_level_only:true body in
               let pref, matrix = T.open_bind Binder.Lambda body' in
               (* reduce everything underneath the body *)

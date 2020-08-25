@@ -234,6 +234,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           (* check that the term has no interpreted sym on top *)
           not (List.mem hd Builtin.([Eq; Neq; ForallConst; ExistsConst; Not]) || 
               Builtin.is_logical_binop hd)
+        | T.App(hd, _) -> not @@ T.is_var hd
         | _ -> true)
     (* since we are doing simultaneous version -- we take only unique terms *)
     |> CCList.sort_uniq ~cmp:(fun (t1,_) (t2,_) -> T.compare t1 t2)

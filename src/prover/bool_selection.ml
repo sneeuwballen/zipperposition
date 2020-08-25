@@ -21,14 +21,34 @@ type parametrized = strict:bool -> ord:Ordering.t -> t
 let inv_idx args idx = 
     List.length args - idx - 1
 
-let can_be_selected ~top t = 
+let is_selectable ~top ~forbidden t =
+  let module VS = T.VarSet in
   Type.is_prop (T.ty t) && not top && 
-  not (T.is_var t) && not (T.is_app_var t) &&
-  not (T.is_true_or_false t)
+  not (T.is_var t) && not (T.is_true_or_false t) &&
+  (
+    T.is_ground t || (* avoid computing the set of vars for t *)
+    VS.is_empty forbidden || (* avoid computing the set of vars for t *)
+    VS.is_empty (VS.inter (VS.of_iter (T.Seq.vars t)) forbidden)
+  )
+
+let get_forbidden_vars ~ord lits =
+  (* Check the HOSup paper for the definition of forbidden vars *)
+  Literals.maxlits_l ~ord lits 
+  |> CCList.map (fun (l,_) -> l) 
+  |> Array.of_list
+  |> CCArray.fold (
+      fun vars lit ->
+        Lit.fold_terms ~vars:true ~ty_args:false
+                       ~which:`Max ~ord ~subterms:false lit
+        |> Iter.filter_map (fun (t,_) -> (T.as_var @@ T.head_term t))
+        |> T.VarSet.of_iter
+        |> T.VarSet.union vars
+    ) T.VarSet.empty
 
 let select_leftmost ~ord ~kind lits =
   let open CCOpt in
-  
+  let forbidden = get_forbidden_vars ~ord lits in
+
   let rec aux_lits idx =
     if idx >= Array.length lits then None
     else (
@@ -49,20 +69,22 @@ let select_leftmost ~ord ~kind lits =
         in_literal <+> (aux_lits (idx+1))
       | _ -> aux_lits (idx+1))
   and aux_term ~top ~pos_builder t =
-    if T.is_app_var t then None
-    else ( 
+    (* if t is app_var then return the term itself, but do not recurse  *)
+    if T.is_app_var t then (
+      CCOpt.return_if (is_selectable ~top ~forbidden t) (t, PB.to_pos pos_builder)
+    ) else ( 
       match T.view t with
       | T.App(_, args)
       | T.AppBuiltin(_, args) ->
         (* reversing the argument indices *)
         let inner = aux_term_args args ~idx:(List.length args - 1) ~pos_builder in
         let outer =
-          if not (can_be_selected ~top t) then None
+          if not (is_selectable ~top ~forbidden t) then None
           else Some (t, PB.to_pos pos_builder) 
         in
         if kind == `Inner then inner <+> outer
         else outer <+> inner
-      | T.Const _ when can_be_selected ~top t -> Some (t, PB.to_pos pos_builder)
+      | T.Const _ when is_selectable ~top ~forbidden t -> Some (t, PB.to_pos pos_builder)
       | _ -> None
     )
   and aux_term_args ~idx ~pos_builder = function
@@ -75,9 +97,9 @@ let select_leftmost ~ord ~kind lits =
   in
   CCOpt.map_or ~default:[] (fun x -> [x]) (aux_lits 0)
 
-let all_selectable_subterms ~ord ~pos_builder t k =  
+let all_selectable_subterms ?(forbidden=T.VarSet.empty) ~ord ~pos_builder t k =  
   let rec aux_term ~top ~pos_builder t k =
-    if can_be_selected top t then (k (t, PB.to_pos pos_builder));
+    if is_selectable ~forbidden ~top t then (k (t, PB.to_pos pos_builder));
 
     if T.is_app_var t then ()
     else (
@@ -109,6 +131,8 @@ let all_selectable_subterms ~ord ~pos_builder t k =
 let get_all_selectable ~ord lits = 
   let open CCOpt in
   
+  let forbidden = get_forbidden_vars ~ord lits in
+
   let rec aux_lits idx k =
     if idx < Array.length lits then (
       let pos_builder = PB.arg idx (PB.empty) in
@@ -116,17 +140,16 @@ let get_all_selectable ~ord lits =
       | Lit.Equation (lhs,rhs,_) ->
         begin match Ordering.compare ord lhs rhs with
           | Comparison.Lt ->
-            all_selectable_subterms ~ord ~pos_builder:(PB.right pos_builder) rhs k
+            all_selectable_subterms ~ord ~forbidden ~pos_builder:(PB.right pos_builder) rhs k
           | Comparison.Gt ->
-            all_selectable_subterms ~ord ~pos_builder:(PB.left pos_builder) lhs k
+            all_selectable_subterms ~ord ~forbidden ~pos_builder:(PB.left pos_builder) lhs k
           | _ ->
-            all_selectable_subterms ~ord ~pos_builder:(PB.left pos_builder) lhs k;
-            all_selectable_subterms ~ord ~pos_builder:(PB.right pos_builder) rhs k
+            all_selectable_subterms ~ord ~forbidden ~pos_builder:(PB.left pos_builder) lhs k;
+            all_selectable_subterms ~ord ~forbidden ~pos_builder:(PB.right pos_builder) rhs k
         end;
         aux_lits (idx+1) k
-      | _ -> aux_lits (idx+1) k
-    )
-    in
+      | _ -> aux_lits (idx+1) k)
+  in
   aux_lits 0
 
 let by_size ~ord ~kind lits =

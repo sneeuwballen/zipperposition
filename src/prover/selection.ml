@@ -717,13 +717,13 @@ let () =
       "--ho-selection-restriction", ho_restriction_opt, " selection restrictions for lambda-free higher-order terms (none/no-var-heading-max-term/no-var-different-args/no-unapplied-var-occurring-applied/no-ho-vars)"
     ];
   Params.add_to_mode "ho-complete-basic" (fun () ->
-      _ho_restriction := `NoVarHeadingMaxTerm
+      _ho_restriction := `NoMaxVarInFoContext
     );
   Params.add_to_mode "ho-competitive" (fun () ->
-      _ho_restriction := `NoVarHeadingMaxTerm
+      _ho_restriction := `NoMaxVarInFoContext
     );
   Params.add_to_mode "ho-pragmatic" (fun () ->
-      _ho_restriction := `NoVarHeadingMaxTerm
+      _ho_restriction := `NoMaxVarInFoContext
     );
   Params.add_to_modes 
     [ "lambda-free-intensional"
