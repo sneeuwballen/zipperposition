@@ -667,6 +667,74 @@ module Make(E : Env.S) : S with module Env = E = struct
   assert (T.DB.is_closed res);
   res
 
+  (* Look at the HOSup paper for the definition of unsupported quant *)
+  let fix_unsupported_quant t =
+    let supported var_ty q_body =
+      let rec aux depth t =
+        match T.view t with
+        | Fun(_, body) -> aux (depth+1) body
+        | App(hd, args) when T.is_var hd ->
+          CCList.flat_map (T.DB.unbound) args
+          |> List.mem depth
+          |> not
+        | App(hd, args) when T.is_fun hd ->
+          aux depth (Lambda.snf t)
+        | App(hd, args) ->
+          not (T.is_bvar hd && T.as_bvar_exn hd == depth)
+          && List.for_all (aux depth) (hd :: args)
+        | AppBuiltin(hd, args) ->
+          List.for_all (aux depth) args
+        | _ -> true
+      in
+      not (Type.is_fun var_ty) ||
+      aux 0 q_body
+    in
+
+    let rec aux t =
+      match T.view t with 
+      | Fun(ty,body) ->
+        let body' = aux body in
+        assert(Type.equal (T.ty body) (T.ty body'));
+        if T.equal body body' then t
+        else T.fun_ ty body'
+      | App(hd,args) ->
+        let hd' = aux hd in
+        let args' = List.map aux args in
+        if T.equal hd hd' && T.same_l args args' then t
+        else T.app hd' args'
+      | AppBuiltin(hd,args) ->
+        let args' = List.map aux args in
+        (* fully applied quantifier *)
+        if Builtin.is_quantifier hd && List.length args' == 2 then (
+          let q_pref, q_body = T.open_fun @@ List.nth args' 1 in
+          let var_ty = List.hd q_pref in
+          if not (supported var_ty q_body) then (
+            if Builtin.equal hd Builtin.ExistsConst then (
+              T.Form.neq (List.nth args' 1) (T.fun_ var_ty T.false_)
+            ) else (
+              T.Form.eq (List.nth args' 1) (T.fun_ var_ty T.true_)
+            )
+          ) else T.app_builtin ~ty:(T.ty t) hd args'
+        ) else (
+          if T.same_l args args' then t
+          else T.app_builtin ~ty:(T.ty t) hd args
+        )
+      | DB _ | Const _ | Var _ -> t
+    in
+    aux t
+
+  let replace_unsupported_quants c =
+    let new_lits = Literals.map fix_unsupported_quant (C.lits c) in
+    if Literals.equal (C.lits c) new_lits then (
+      SimplM.return_same c
+    ) else (
+      let proof = Proof.Step.simp [C.proof_parent c] 
+          ~rule:(Proof.Rule.mk "replace unsupported quants") in
+      let new_ = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) 
+          (Array.to_list new_lits) proof in
+      SimplM.return_new new_
+    )
+
   let simpl_bool_subterms c =
     try
       let new_lits = Literals.map simplify_bools (C.lits c) in
@@ -972,6 +1040,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         Env.add_unary_inf "quant_rw" quantifier_rw;
         Env.add_multi_simpl_rule ~priority:100 replace_bool_vars;
         Env.add_unary_inf "eq_rw" nested_eq_rw;
+        Env.add_unary_simplify replace_unsupported_quants;
       )
 end
 
