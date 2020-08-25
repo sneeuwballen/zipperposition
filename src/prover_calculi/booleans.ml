@@ -717,7 +717,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           ) else T.app_builtin ~ty:(T.ty t) hd args'
         ) else (
           if T.same_l args args' then t
-          else T.app_builtin ~ty:(T.ty t) hd args
+          else T.app_builtin ~ty:(T.ty t) hd args'
         )
       | DB _ | Const _ | Var _ -> t
     in
