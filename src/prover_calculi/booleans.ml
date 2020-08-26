@@ -270,9 +270,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       let t,c = handle_poly_bool_hoist t c in
       mk_res ~proof ~old:t ~repl:T.false_ (yes t) c)
     (get_bool_hoist_eligible c)
-    |> CCFun.tap (fun res ->
-      CCFormat.printf "@[%a@] ==> @[%a]@." C.pp c (CCList.pp C.pp)  res;
-    )
 
   let bool_hoist_simpl (c:C.t) : C.t list option = 
     let proof = Proof.Step.inference [C.proof_parent c]
