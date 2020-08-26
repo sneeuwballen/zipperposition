@@ -448,7 +448,9 @@ module TPTP = struct
         Binder.TPTP.pp s
         (Util.pp_list ~sep:"," pp_typed_var) vars
         pp_surrounded t'
-    | Ite _ -> failwith "cannot print `ite` in TPTP"
+    | Ite (c, if_t, if_f) ->
+      Format.fprintf out  "@[$ite(@[%a@], @[%a@], @[%a@])@]"
+        pp_surrounded c pp_surrounded if_t pp_surrounded if_f
     | Let _ -> failwith "cannot print `let` in TPTP"
     | Match _ -> failwith "cannot print `match` in TPTP"
     | Record _ -> failwith "cannot print records in TPTP"

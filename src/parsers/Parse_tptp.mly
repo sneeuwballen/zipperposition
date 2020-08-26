@@ -66,6 +66,7 @@
 %token IMPLYCONST
 
 %token UNDERSCORE
+%token ITE
 
 %token <string> LOWER_WORD
 %token <string> UPPER_WORD
@@ -368,6 +369,10 @@ plain_term:
       let loc = L.mk_pos $startpos $endpos in
       PT.app ~loc f args
     }
+  | ITE LEFT_PAREN cond=formula COMMA t=formula COMMA f=formula RIGHT_PAREN {
+    let loc = L.mk_pos $startpos $endpos in
+    PT.ite ~loc cond t f
+  }
 
 atomic_term:
   | s=atomic_word
