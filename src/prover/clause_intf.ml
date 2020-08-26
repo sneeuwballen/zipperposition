@@ -170,7 +170,7 @@ module type S = sig
       is positive, no literal is selecteed, and the literal
       is maximal among literals of [subst(clause)]. *)
 
-  val eligible_for_bool_infs : t -> SClause.TPSet.t
+  val eligible_subterms_of_bool : t -> SClause.TPSet.t
   (** 
     List that contains terms and positions in which boolean inferences can be
     performed. Those are selected boolean terms (and their subterms) and

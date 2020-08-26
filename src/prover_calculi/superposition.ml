@@ -201,7 +201,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     _idx_sup_into :=
       Lits.fold_terms ~vars:sup_at_vars ~var_args:sup_in_var_args ~fun_bodies:sup_under_lambdas 
         ~ty_args:false ~ord ~which:`Max ~subterms:true  ~eligible:(C.Eligible.res c) (C.lits c)
-      |> Iter.append (TPSet.to_iter @@ C.eligible_for_bool_infs c)
+      |> Iter.append (TPSet.to_iter @@ C.eligible_subterms_of_bool c)
       |> Iter.sort_uniq ~cmp:(fun (_, p1) (_, p2) -> Position.compare p1 p2)
       |> Iter.filter (fun (t, _) ->
           (* Util.debugf ~section 3 "@[ Filtering vars %a,1  @]" (fun k-> k T.pp t); *)
@@ -555,7 +555,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let shift_vars = if info.sup_kind = LambdaSup then 0 else -1 in
     let passive_idx, passive_lit_pos = Lits.Pos.cut info.passive_pos in
     let bool_inference = 
-      TPS.mem (info.u_p, info.passive_pos) (C.eligible_for_bool_infs info.passive)
+      TPS.mem (info.u_p, info.passive_pos) (C.eligible_subterms_of_bool info.passive)
     in
 
     assert(Array.for_all Literal.no_prop_invariant (C.lits info.passive));
@@ -786,7 +786,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let active_idx = Lits.Pos.idx info.active_pos in
     let passive_idx, passive_lit_pos = Lits.Pos.cut info.passive_pos in
     let bool_inference = 
-      TPS.mem (info.u_p, info.passive_pos) (C.eligible_for_bool_infs info.passive)
+      TPS.mem (info.u_p, info.passive_pos) (C.eligible_subterms_of_bool info.passive)
     in
     let shift_vars = if info.sup_kind = LambdaSup then 0 else -1 in
     try
@@ -946,7 +946,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ~fun_bodies:(Env.flex_get k_sup_under_lambdas) 
         ~subterms:true ~ord ~which:`Max ~eligible ~ty_args:false 
         (C.lits clause)
-      |> Iter.append (TPSet.to_iter (C.eligible_for_bool_infs clause))
+      |> Iter.append (TPSet.to_iter (C.eligible_subterms_of_bool clause))
       |> Iter.sort_uniq ~cmp:(fun (_,p1) (_,p2) -> Position.compare p1 p2)
       |> Iter.filter (fun (u_p, _) -> not (T.is_var u_p) || T.is_ho_var u_p)
       |> Iter.filter (fun (u_p, _) -> T.DB.is_closed u_p)

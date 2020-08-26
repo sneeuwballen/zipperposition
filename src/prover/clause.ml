@@ -274,7 +274,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
         bv
     end
 
-  let eligible_for_bool_infs_ c =
+  let eligible_subterms_of_bool_ c =
     let module PB = Position.Build in
     let starting_positions = 
       Lazy.force c.bool_selected
@@ -302,14 +302,10 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       (* below selected literals and selected booleans *)
       CCList.flat_map (fun pb ->
         let pos = Position.Build.to_pos pb in 
-        try 
-          let t = Literals.Pos.at (lits c) pos in
-          (* selects --subterms-- of given t that can be selected *)
-          Bool_selection.all_selectable_subterms ~ord:(Ctx.ord()) ~pos_builder:pb t
-          |> Iter.to_list
-        with Failure _ ->
-          CCFormat.printf "failed for @[%a@]::@[%a@]@." Lits.pp (lits c) Position.pp pos;
-          assert false;) 
+        let t = Literals.Pos.at (lits c) pos in
+        (* selects --subterms-- of given t that can be selected *)
+        Iter.to_list 
+          (Bool_selection.all_eligible_subterms ~ord:(Ctx.ord()) ~pos_builder:pb t)) 
       (starting_positions @ resolution_positions)
     in
 
@@ -324,13 +320,13 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
     res
 
-    let eligible_for_bool_infs c =
-      match c.eligible_bool with 
-      | None ->
-        let res = SClause.TPSet.of_list (eligible_for_bool_infs_ c) in
-        c.eligible_bool <- Some res;
-        res
-      | Some cache -> cache
+  let eligible_subterms_of_bool c =
+    match c.eligible_bool with 
+    | None ->
+      let res = SClause.TPSet.of_list (eligible_subterms_of_bool_ c) in
+      c.eligible_bool <- Some res;
+      res
+    | Some cache -> cache
 
   let eta_reduce c =
     let lit_arr = lits c in

@@ -20,6 +20,7 @@ type parametrized = strict:bool -> ord:Ordering.t -> t
 (** {2 Selection Functions} *)
 
 val all_selectable_subterms : ?forbidden:T.VarSet.t -> ord:Ordering.t -> pos_builder:PB.t -> T.t -> (T.t * Pos.t -> unit) -> unit
+val all_eligible_subterms : ord:Ordering.t -> pos_builder:PB.t -> T.t -> (T.t * Pos.t -> unit) -> unit
 
 val from_string : ord:Ordering.t -> string -> t
 (** selection function from string (may fail) *)

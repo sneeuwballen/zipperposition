@@ -225,10 +225,12 @@ module Make(E : Env.S) : S with module Env = E = struct
       (new_lit :: Array.to_list( C.lits c |> Literals.map (T.replace ~old ~by:repl)))
     proof
 
-  let get_bool_subterms c =
-    C.eligible_for_bool_infs c
+  let get_bool_hoist_eligible c =
+    C.eligible_subterms_of_bool c
     |> SClause.TPSet.to_list
     |> List.filter (fun (t,_) -> 
+        let ty = T.ty t in
+        (Type.is_prop ty || Type.is_var ty) &&
         match T.view t with
         | T.AppBuiltin(hd,_) ->
           (* check that the term has no interpreted sym on top *)
@@ -239,21 +241,43 @@ module Make(E : Env.S) : S with module Env = E = struct
     (* since we are doing simultaneous version -- we take only unique terms *)
     |> CCList.sort_uniq ~cmp:(fun (t1,_) (t2,_) -> T.compare t1 t2)
 
+  let handle_poly_bool_hoist t c =
+    let ty = T.ty t in
+    assert(Type.is_prop ty || Type.is_var ty);
+    
+    if Type.is_prop ty then (
+      (t, c)
+    ) else (
+      let sub = 
+        Subst.Ty.bind Subst.empty 
+          (* absolutely horrible castings of OCaml *)
+          ((Type.as_var_exn ty, 0) :> InnerTerm.t HVar.t Scoped.t) 
+          (Type.prop, 0) 
+      in
+      let renaming = Subst.Renaming.create () in
+      let t' = Subst.FO.apply renaming sub (t,0) in
+      let c' = C.apply_subst ~renaming (c,0) sub in
+      (t',c')
+    )
+
+
   let bool_hoist (c:C.t) : C.t list = 
     let proof = Proof.Step.inference [C.proof_parent c]
                 ~rule:(Proof.Rule.mk "bool_hoist") ~tags:[Proof.Tag.T_ho] in
 
     List.map (fun (t, _) ->
+      let t,c = handle_poly_bool_hoist t c in
       mk_res ~proof ~old:t ~repl:T.false_ (yes t) c)
-    (get_bool_subterms c)
+    (get_bool_hoist_eligible c)
 
   let bool_hoist_simpl (c:C.t) : C.t list option = 
     let proof = Proof.Step.inference [C.proof_parent c]
                 ~rule:(Proof.Rule.mk "bool_hoist") ~tags:[Proof.Tag.T_ho] in
 
-    let bool_subterms  = get_bool_subterms c in
+    let bool_subterms  = get_bool_hoist_eligible c in
     CCOpt.return_if (not @@ CCList.is_empty bool_subterms) (
-      CCList.fold_left (fun acc (t,_) -> 
+      CCList.fold_left (fun acc (t,_) ->
+        let t,c = handle_poly_bool_hoist t c in
         let neg_lit, repl_neg = no t, T.true_ in
         let pos_lit, repl_pos = yes t, T.false_ in
         (mk_res ~proof ~old:t ~repl:repl_neg neg_lit c) ::
@@ -266,7 +290,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       Proof.Step.inference [C.proof_parent c]
         ~rule:(Proof.Rule.mk (prefix^"_hoist")) ~tags:[Proof.Tag.T_ho] in
 
-    C.eligible_for_bool_infs c
+    C.eligible_subterms_of_bool c
     |> SClause.TPSet.to_list
     |> List.filter (fun (t,_) -> 
         match T.view t with
@@ -302,6 +326,10 @@ module Make(E : Env.S) : S with module Env = E = struct
         | _ -> assert false
     )
 
+  let fluid_hoist (c:C.t) = 
+
+    []
+
   let replace_bool_vars (c:C.t) =
     let p =
       Proof.Step.simp [C.proof_parent c]
@@ -327,7 +355,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     in
 
 
-    C.eligible_for_bool_infs c
+    C.eligible_subterms_of_bool c
     |> SClause.TPSet.to_list
     |> List.find_opt (fun (t,_) -> 
         Type.is_prop (T.ty t) 
@@ -352,7 +380,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         ~rule:(Proof.Rule.mk ("quantifier_rw")) 
         ~tags:[Proof.Tag.T_ho] in
 
-    C.eligible_for_bool_infs c
+    C.eligible_subterms_of_bool c
     |> SClause.TPSet.to_list
     |> CCList.filter_map (fun (t,p) -> 
       match T.view t with
@@ -383,7 +411,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let sc = 0 in
     let mk_sc t = (t,sc) in 
     let parents r s = [C.proof_parent_subst r (mk_sc c) s ] in
-    C.eligible_for_bool_infs c
+    C.eligible_subterms_of_bool c
     |> SClause.TPSet.to_list
     |> CCList.filter_map (fun (t,p) -> 
       match T.view t with

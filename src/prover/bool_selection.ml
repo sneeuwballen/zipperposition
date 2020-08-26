@@ -21,9 +21,10 @@ type parametrized = strict:bool -> ord:Ordering.t -> t
 let inv_idx args idx = 
     List.length args - idx - 1
 
-let is_selectable ~top ~forbidden t =
+let is_selectable ~forbidden ~top t =
   let module VS = T.VarSet in
-  Type.is_prop (T.ty t) && not top && 
+  Type.is_prop (T.ty t) && 
+  not top && 
   not (T.is_var t) && not (T.is_true_or_false t) &&
   (
     T.is_ground t || (* avoid computing the set of vars for t *)
@@ -97,15 +98,16 @@ let select_leftmost ~ord ~kind lits =
   in
   CCOpt.map_or ~default:[] (fun x -> [x]) (aux_lits 0)
 
-let all_selectable_subterms ?(forbidden=T.VarSet.empty) ~ord ~pos_builder t k =  
+let collect_green_subterms_ ~forbidden ~filter ~ord ~pos_builder t k = 
   let rec aux_term ~top ~pos_builder t k =
-    if is_selectable ~forbidden ~top t then (k (t, PB.to_pos pos_builder));
+    if filter ~forbidden ~top t then (k (t, PB.to_pos pos_builder));
 
-    if T.is_app_var t then ()
+    if T.is_app_var t then ( (* only green subterms are eligible *) )
     else (
       match T.view t with
       | T.AppBuiltin((BIn.Eq|BIn.Neq|BIn.Xor|BIn.Equiv),( ([a;b] | [_;a;b]) as l)) 
           when Type.is_prop (T.ty a) ->
+        (* only going to the larger side of the (dis)equation *)
         let offset = List.length l - 2 in (*skipping possible tyarg*)
         (match Ordering.compare ord a b with 
           | Comparison.Lt ->
@@ -127,6 +129,14 @@ let all_selectable_subterms ?(forbidden=T.VarSet.empty) ~ord ~pos_builder t k =
       (aux_term ~top:false ~pos_builder:(PB.arg idx pos_builder) x k);
       (aux_term_args ~idx:(idx-1) ~pos_builder xs k) in
   aux_term ~top:true ~pos_builder t k
+
+let all_selectable_subterms ?(forbidden=T.VarSet.empty) ~ord ~pos_builder =  
+  collect_green_subterms_ ~forbidden ~filter:is_selectable ~ord ~pos_builder
+
+let all_eligible_subterms ~ord ~pos_builder =
+  (* make sure you select only subterms *)
+  let filter ~forbidden ~top _  = not top in
+  collect_green_subterms_ ~forbidden:(T.VarSet.empty) ~filter ~ord ~pos_builder 
 
 let get_all_selectable ~ord lits = 
   let open CCOpt in
