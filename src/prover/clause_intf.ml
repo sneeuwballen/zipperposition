@@ -189,6 +189,9 @@ module type S = sig
   val selected_lits : t -> (Literal.t * int) list
   (** get the list of selected literals *)
 
+  val bool_selected : t -> (Term.t * Logtk.Position.t) list
+  (** get the list of selected Bool subterms *)
+
   val penalty : t -> int
 
   val inc_penalty : t -> int -> unit

@@ -9,6 +9,7 @@ open Libzipperposition
 module T = Term
 module Pos = Position
 module US = Unif_subst
+module L = Literal
 
 type reasoning_kind    = 
     BoolReasoningDisabled 
@@ -33,6 +34,8 @@ let k_trigger_bool_inst = Flex_state.create_key ()
 let k_trigger_bool_ind = Flex_state.create_key ()
 let k_bool_hoist_simpl = Flex_state.create_key ()
 let k_rename_nested_bools = Flex_state.create_key ()
+let k_fluid_hoist = Flex_state.create_key ()
+let k_fluid_log_hoist = Flex_state.create_key ()
 
 module type S = sig
   module Env : Env.S
@@ -328,7 +331,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     )
 
   let fluid_hoist (c:C.t) =
-    let z = T.var (HVar.fresh ~ty:(Type.arrow [Type.prop] Type.prop) ()) in
+    let tyvar = Type.var (HVar.fresh ~ty:Type.tType ()) in
+    let z = T.var (HVar.fresh ~ty:(Type.arrow [Type.prop] tyvar) ()) in
     let x = T.var (HVar.fresh ~ty:Type.prop ()) in
     let zx = T.app z [x] in
     let z_false, z_true = T.app z [T.false_], T.app z [T.true_] in
@@ -346,10 +350,11 @@ module Make(E : Env.S) : S with module Env = E = struct
       let rule = 
         Proof.Rule.mk ("fluid_" ^ (if sign then "bool_" else "loob_") ^ "hoist") in
       let proof = Proof.Step.inference ~rule [C.proof_parent c] in
-      C.create ~penalty:(C.penalty c) ~trail:(C.trail c) 
-        (new_lit :: CCArray.to_list (C.lits c)) proof 
+      let res = 
+        C.create ~penalty:(C.penalty c + 1) ~trail:(C.trail c)
+          (new_lit :: CCArray.to_list (C.lits c')) proof in
+      res
     in
-
 
     (* TODO(BOOL): currently incompatible with combiantors *)
     let unif_alg = 
@@ -359,12 +364,10 @@ module Make(E : Env.S) : S with module Env = E = struct
 
     C.eligible_subterms_of_bool c
     |> (fun set -> 
-      SClause.TPSet.fold (fun (t,p) acc -> 
-        let ty = T.ty t in
-        if (Type.is_prop ty || Type.is_var ty)
-           && T.is_app_var t then (
-          let unif_seq = 
-            unif_alg (zx, sc_zx) (t, sc_cl) 
+      SClause.TPSet.fold (fun (u,p) acc ->
+        if T.is_app_var u then (
+          let unif_seq =
+            unif_alg (zx, sc_zx) (u, sc_cl)
             |> OSeq.flat_map (fun us_opt -> 
               CCOpt.map_or ~default:OSeq.empty (fun us ->
                 assert(not @@ US.has_constr us);
@@ -382,10 +385,10 @@ module Make(E : Env.S) : S with module Env = E = struct
                 else (
                   let bool_res =
                     if T.equal z_false_sub zx_sub then []
-                    else [Some (mk_res false renaming sub p)] in
+                    else [Some (mk_res true renaming sub p)] in
                   let loob_res = 
                     if T.equal z_true_sub zx_sub then []
-                    else [Some (mk_res true renaming sub p)] in
+                    else [Some (mk_res false renaming sub p)] in
                   OSeq.of_list (bool_res @ loob_res)
                 )
               ) us_opt
@@ -396,7 +399,113 @@ module Make(E : Env.S) : S with module Env = E = struct
           []
         ) else acc
     ) set [])
+
+  (* Record holding info for constructing Eq/Neq/Forall/ExistsHoist inference*)
+  type fluid_log_partner_info =
+    {
+      unif_partner : Term.t; (* what is u unified with *)
+      repl : Term.t; (* what is u replaced with *)
+      new_lit : Literal.t option (* possibly a new literal *)
+    }
   
+  (* Fluid hoisting of logical symbols -- 
+     rules EqHoist, NeqHoist, ForallHoist, ExistsHoist 
+     and BoolRw where head is a variable*)
+  let fluid_log_hoist (c:C.t) =
+    (* It is assumed Boolean selection will 
+       not select any top-level terms *)
+
+    let a = Type.var (HVar.fresh ~ty:(Type.tType) ()) in
+    let x_a = T.var (HVar.fresh ~ty:a ()) in
+    let y_a = T.var (HVar.fresh ~ty:a ()) in
+    let y_quant = T.var (HVar.fresh ~ty:(Type.arrow [a] Type.prop) ()) in
+    let yx = T.app y_quant [y_a] in
+    
+    let module F = T.Form in
+    let module PB = Position.Build in
+
+    let partners = 
+    [ {unif_partner=F.eq x_a y_a; repl= T.false_; new_lit=Some (L.mk_eq x_a y_a)};
+      {unif_partner=F.neq x_a y_a; repl= T.true_; new_lit=Some (L.mk_eq x_a y_a)};
+      {unif_partner=F.forall y_a; repl= T.false_; new_lit=Some (L.mk_eq yx T.true_)};
+      {unif_partner=F.exists y_a; repl= T.true_; new_lit=Some (L.mk_eq yx T.false_)};
+      {unif_partner=F.exists y_a; repl= T.true_; new_lit=Some (L.mk_eq yx T.false_)};
+      {unif_partner=(F.not_ T.false_); repl= T.true_; new_lit=None};
+      {unif_partner=(F.not_ T.true_); repl= T.false_; new_lit=None};
+      {unif_partner=(F.eq x_a x_a); repl= T.true_; new_lit=None};
+      {unif_partner=(F.neq x_a x_a); repl= T.false_; new_lit=None};
+      {unif_partner=(F.and_ T.false_ T.false_); repl= T.false_; new_lit=None};
+      {unif_partner=(F.and_ T.true_ T.false_); repl= T.false_; new_lit=None};
+      {unif_partner=(F.and_ T.false_ T.true_); repl= T.false_; new_lit=None};
+      {unif_partner=(F.and_ T.true_ T.true_); repl= T.true_; new_lit=None};
+      {unif_partner=(F.or_ T.false_ T.false_); repl= T.false_; new_lit=None};
+      {unif_partner=(F.or_ T.true_ T.false_); repl= T.true_; new_lit=None};
+      {unif_partner=(F.or_ T.false_ T.true_); repl= T.true_; new_lit=None};
+      {unif_partner=(F.or_ T.true_ T.true_); repl= T.true_; new_lit=None};
+      {unif_partner=(F.imply T.false_ T.false_); repl= T.true_; new_lit=None};
+      {unif_partner=(F.imply T.true_ T.false_); repl= T.false_; new_lit=None};
+      {unif_partner=(F.imply T.false_ T.true_); repl= T.true_; new_lit=None};
+      {unif_partner=(F.imply T.true_ T.true_); repl= T.true_; new_lit=None};]
+    in
+
+    let sc_partner, sc_cl = 0, 1 in
+    let mk_res sub at partner = 
+      let lits = Array.copy @@ C.lits c in
+      Literals.Pos.replace lits ~at ~by:partner.repl;
+      let renaming = Subst.Renaming.create () in
+      let new_lits =
+        (CCOpt.map_or ~default:[] (fun x -> [L.apply_subst renaming sub (x,sc_partner)]) partner.new_lit)
+        @ (Array.to_list (Literals.apply_subst renaming sub (lits, sc_cl)))
+      in
+      let rule = Proof.Rule.mk "fluid_log_symbol_hoist" in
+      let step = Proof.Step.inference ~rule [C.proof_parent c] in
+      C.create ~penalty:(C.penalty c) ~trail:(C.trail c) new_lits step
+    in
+
+
+    (* TODO(BOOL): currently incompatible with combiantors *)
+    let unif_alg = 
+      if Env.flex_get Combinators.k_enable_combinators 
+      then (fun _ _ -> OSeq.empty)
+      else Env.flex_get Superposition.k_unif_alg in
+
+    let eligible = C.Eligible.res c in
+    Literals.fold_lits ~eligible (C.lits c)
+    |> Iter.iter (fun (lit, idx) ->
+      let lit_pos = PB.arg idx PB.empty in
+      match lit with
+      | Literal.Equation(u, v, true) 
+        when Type.is_prop (T.ty u) && T.is_app_var u ->
+        let app_vars = 
+          if Literal.is_predicate_lit lit then [(u, PB.to_pos (PB.left lit_pos))]
+          else if Term.is_app_var v then [(u, PB.to_pos (PB.left lit_pos));
+                                          (v, PB.to_pos (PB.right lit_pos))]
+          else []
+        in
+        List.iter (fun (var, pos) -> 
+          List.iter (fun p -> 
+            let seq = 
+              unif_alg (p.unif_partner, sc_partner) (var, sc_cl)
+              |> OSeq.filter_map (
+                CCOpt.map (fun us -> 
+                  assert(not (Unif_subst.has_constr us));
+                  let sub = Unif_subst.subst us in
+                  let eligible' = C.eligible_res (c, sc_cl) sub in
+                  (* not eligible under substitution *)
+                  if not (CCBV.get eligible' idx) then None
+                  else (
+                    Some (mk_res sub pos p)        
+                )))
+            in
+            let stm_res = Env.Stm.make ~penalty:(C.penalty c) ~parents:[c] seq in
+            Env.StmQ.add (Env.get_stm_queue ()) stm_res;
+          ) partners;          
+        ) app_vars
+      | _ -> ()
+
+    );
+
+    []  
 
   let replace_bool_vars (c:C.t) =
     let p =
@@ -1132,6 +1241,14 @@ module Make(E : Env.S) : S with module Env = E = struct
           Env.add_multi_simpl_rule ~priority:500 rename_nested_booleans
         );
 
+        if Env.flex_get k_fluid_hoist then (
+          Env.add_unary_inf "fluid_hoist" fluid_hoist
+        );
+
+        if Env.flex_get k_fluid_log_hoist then (
+          Env.add_unary_inf "fluid_log_hoist" fluid_log_hoist
+        );
+
         Env.add_unary_inf "formula_hoist" formula_hoist;
         Env.add_unary_inf "quant_rw" quantifier_rw;
         Env.add_multi_simpl_rule ~priority:100 replace_bool_vars;
@@ -1452,6 +1569,8 @@ let _trigger_bool_inst = ref (-1)
 let _trigger_bool_ind = ref (-1)
 let _bool_hoist_simpl = ref false
 let _rename_nested_bools = ref false
+let _fluid_hoist = ref false
+let _fluid_log_hoist = ref false
 
 
 let extension =
@@ -1471,6 +1590,8 @@ let extension =
     E.flex_add k_trigger_bool_ind !_trigger_bool_ind;
     E.flex_add k_bool_hoist_simpl !_bool_hoist_simpl;
     E.flex_add k_rename_nested_bools !_rename_nested_bools;
+    E.flex_add k_fluid_hoist !_fluid_hoist;
+    E.flex_add k_fluid_log_hoist !_fluid_log_hoist;
 
     ET.setup ()
   in
@@ -1522,6 +1643,12 @@ let () =
       "--simplify-bools"
       , Arg.Bool (fun v -> _simplify_bools := v)
       , " simplify boolean subterms";
+      "--fluid-hoist"
+      , Arg.Bool (fun v -> _fluid_hoist := v)
+      , " enable/disable Fluid(Bool|Loob)Hoist rules";
+      "--fluid-log-hoist"
+      , Arg.Bool (fun v -> _fluid_log_hoist := v)
+      , " enable/disable fluid version of BoolRW, (Eq|Neq|Forall|Exists)Hoist rules";
       "--elim-bvars"
       , Arg.Bool ((:=) _elim_bvars)
       , " replace boolean variables by T and F";
