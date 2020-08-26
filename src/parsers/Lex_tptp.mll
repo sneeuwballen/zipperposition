@@ -77,6 +77,7 @@ rule token = parse
   | "$true" { TRUE }
   | "$false" { FALSE }
   | "$tType" { TYPE_TY }
+  | "$ite" { ITE }
   | "$_" { WILDCARD }
   (* | ';' { SEMICOLUMN } *)
   | ':' { COLUMN }

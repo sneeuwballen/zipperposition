@@ -570,7 +570,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let subst = US.subst us in
       let lambdasup_vars =
         if (info.sup_kind = LambdaSup) then (
-          Term.Seq.subterms info.u_p |> Iter.filter Term.is_var |> Term.Set.of_seq)
+          Term.Seq.subterms ~include_builtin:true info.u_p |> Iter.filter Term.is_var |> Term.Set.of_seq)
         else Term.Set.empty in
       let t' = if info.sup_kind != DupSup then 
           S.FO.apply ~shift_vars renaming subst (info.t, sc_a)
@@ -708,7 +708,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Subst.codomain subst
         |> Iter.exists (fun (t,_) -> 
             Iter.exists (fun t -> T.is_fun t || T.is_comb t) 
-              (T.Seq.subterms (T.of_term_unsafe t))) in
+              (T.Seq.subterms ~include_builtin:true (T.of_term_unsafe t))) in
 
       let rule =
         let r = kind_to_str info.sup_kind in
@@ -845,7 +845,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Subst.codomain subst
         |> Iter.exists (fun (t,_) -> 
             Iter.exists (fun t -> T.is_fun t || T.is_comb t) 
-              (T.Seq.subterms (T.of_term_unsafe t))) in
+              (T.Seq.subterms ~include_builtin:true (T.of_term_unsafe t))) in
       let tags = (if subst_is_ho then [Proof.Tag.T_ho] else []) @ Unif_subst.tags us in
       let proof =
         Proof.Step.inference ~rule ~tags
@@ -1486,7 +1486,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                   Subst.codomain subst
                   |> Iter.exists (fun (t,_) -> 
                       Iter.exists (fun t -> T.is_fun t || T.is_comb t) 
-                        (T.Seq.subterms (T.of_term_unsafe t))) in
+                        (T.Seq.subterms ~include_builtin:true (T.of_term_unsafe t))) in
               let tags = (if subst_is_ho then [Proof.Tag.T_ho] else []) @ Unif_subst.tags us in
               let trail = C.trail clause in
               let penalty = if C.penalty clause = 1 then 1 else C.penalty clause + 1 in
@@ -1572,7 +1572,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         Subst.codomain subst
         |> Iter.exists (fun (t,_) -> 
             Iter.exists (fun t -> T.is_fun t || T.is_comb t) 
-              (T.Seq.subterms (T.of_term_unsafe t))) in
+              (T.Seq.subterms ~include_builtin:true (T.of_term_unsafe t))) in
       let tags = (if subst_is_ho then [Proof.Tag.T_ho] else []) @ Unif_subst.tags us in
       Util.incr_stat stat_equality_factoring_call;
       let proof =
@@ -3327,7 +3327,7 @@ let () =
     _sup_in_var_args := true;
     _unif_logop_mode := `Conservative;
     _demod_in_var_args := true;
-    _local_rw := `GreenContext;
+    (* _local_rw := `GreenContext; *)
     _dupsup := false;
     _complete_ho_unification := false;
     _lambdasup := -1;
