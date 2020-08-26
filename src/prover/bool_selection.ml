@@ -135,7 +135,9 @@ let all_selectable_subterms ?(forbidden=T.VarSet.empty) ~ord ~pos_builder =
 
 let all_eligible_subterms ~ord ~pos_builder =
   (* make sure you select only subterms *)
-  let filter ~forbidden ~top _  = not top in
+  let filter ~forbidden ~top t  = 
+    not top &&
+    not (Type.is_tType (T.ty t)) in
   collect_green_subterms_ ~forbidden:(T.VarSet.empty) ~filter ~ord ~pos_builder 
 
 let get_all_selectable ~ord lits = 
