@@ -327,9 +327,76 @@ module Make(E : Env.S) : S with module Env = E = struct
         | _ -> assert false
     )
 
-  let fluid_hoist (c:C.t) = 
+  let fluid_hoist (c:C.t) =
+    let z = T.var (HVar.fresh ~ty:(Type.arrow [Type.prop] Type.prop) ()) in
+    let x = T.var (HVar.fresh ~ty:Type.prop ()) in
+    let zx = T.app z [x] in
+    let z_false, z_true = T.app z [T.false_], T.app z [T.true_] in
 
-    []
+    let sc_zx, sc_cl = 0, 1 in
+
+    let mk_res sign renaming sub at =
+      let new_lit = 
+        let x_sub = Subst.FO.apply renaming sub (x, sc_zx) in
+        Literal.mk_eq x_sub (if sign then T.true_ else T.false_) in
+      let c' = C.apply_subst ~renaming (c, sc_cl) sub in
+      let by = 
+        Subst.FO.apply renaming sub ((if sign then z_false else z_true), sc_zx) in
+      Literals.Pos.replace (C.lits c') ~at ~by;
+      let rule = 
+        Proof.Rule.mk ("fluid_" ^ (if sign then "bool_" else "loob_") ^ "hoist") in
+      let proof = Proof.Step.inference ~rule [C.proof_parent c] in
+      C.create ~penalty:(C.penalty c) ~trail:(C.trail c) 
+        (new_lit :: CCArray.to_list (C.lits c)) proof 
+    in
+
+
+    (* TODO(BOOL): currently incompatible with combiantors *)
+    let unif_alg = 
+      if Env.flex_get Combinators.k_enable_combinators 
+      then (fun _ _ -> OSeq.empty)
+      else Env.flex_get Superposition.k_unif_alg in
+
+    C.eligible_subterms_of_bool c
+    |> (fun set -> 
+      SClause.TPSet.fold (fun (t,p) acc -> 
+        let ty = T.ty t in
+        if (Type.is_prop ty || Type.is_var ty)
+           && T.is_app_var t then (
+          let unif_seq = 
+            unif_alg (zx, sc_zx) (t, sc_cl) 
+            |> OSeq.flat_map (fun us_opt -> 
+              CCOpt.map_or ~default:OSeq.empty (fun us ->
+                assert(not @@ US.has_constr us);
+                let sub = US.subst us in
+                let renaming = Subst.Renaming.create () in
+                let z_false_sub = 
+                  Lambda.snf @@ Subst.FO.apply renaming sub (z_false, sc_zx) in
+                let z_true_sub = 
+                  Lambda.snf @@ Subst.FO.apply renaming sub (z_true, sc_zx) in
+                let x_sub = 
+                  Lambda.snf @@ Subst.FO.apply renaming sub (x, sc_zx) in
+                let zx_sub =
+                  Lambda.snf @@ Subst.FO.apply renaming sub (zx, sc_zx) in
+                if T.is_true_or_false x_sub then OSeq.empty
+                else (
+                  let bool_res =
+                    if T.equal z_false_sub zx_sub then []
+                    else [Some (mk_res false renaming sub p)] in
+                  let loob_res = 
+                    if T.equal z_true_sub zx_sub then []
+                    else [Some (mk_res true renaming sub p)] in
+                  OSeq.of_list (bool_res @ loob_res)
+                )
+              ) us_opt
+            )
+          in
+          let stm_res = Env.Stm.make ~penalty:(C.penalty c) ~parents:[c] unif_seq in
+          Env.StmQ.add (Env.get_stm_queue ()) stm_res;
+          []
+        ) else acc
+    ) set [])
+  
 
   let replace_bool_vars (c:C.t) =
     let p =
