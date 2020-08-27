@@ -247,9 +247,7 @@ module Inner = struct
               let l' = List.map aux l in
               if T.same_l l l' then t else T.app_builtin ~ty b l'
           end)
-      else (
-        CCFormat.printf "@[%a@] is not reducible@." T.pp t;
-        t)
+      else t
     in
     let t' = aux t in
     t'

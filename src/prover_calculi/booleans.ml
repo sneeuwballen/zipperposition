@@ -875,7 +875,6 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* Look at the HOSup paper for the definition of unsupported quant *)
   let fix_unsupported_quant t =
-    let orig_t = t in
     let supported var_ty q_body =
       let rec aux depth t =
         match T.view t with
@@ -914,14 +913,6 @@ module Make(E : Env.S) : S with module Env = E = struct
         (* fully applied quantifier *)
         if Builtin.is_quantifier hd && List.length args' == 2 then (
           let q_pref, q_body = T.open_fun @@ List.nth args' 1 in
-          if CCList.is_empty q_pref then (
-            CCFormat.printf "orig_t: @[%a@]@." T.pp orig_t;
-            CCFormat.printf "eta-reduce(orig_t): @[%a@]@." T.pp (Lambda.eta_reduce orig_t);
-
-            CCFormat.printf "t: @[%a@]@." T.pp t;
-            CCFormat.printf "eta-reduce(t): @[%a@]@." T.pp (Lambda.eta_reduce t);
-            assert false;
-          );
           let var_ty = List.hd q_pref in
           if not (supported var_ty q_body) then (
             if Builtin.equal hd Builtin.ExistsConst then (
@@ -939,7 +930,6 @@ module Make(E : Env.S) : S with module Env = E = struct
     aux t
 
   let replace_unsupported_quants c =
-    CCFormat.printf "replacing @[%a@]@." C.pp c;
     let new_lits = Literals.map fix_unsupported_quant (C.lits c) in
     if Literals.equal (C.lits c) new_lits then (
       SimplM.return_same c
