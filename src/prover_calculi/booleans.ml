@@ -349,7 +349,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       Literals.Pos.replace (C.lits c') ~at ~by;
       let rule = 
         Proof.Rule.mk ("fluid_" ^ (if sign then "bool_" else "loob_") ^ "hoist") in
-      let proof = Proof.Step.inference ~rule [C.proof_parent c] in
+      let proof = Proof.Step.inference ~rule [C.proof_parent_subst renaming (c,sc_cl) sub] in
       let res = 
         C.create ~penalty:(C.penalty c + 1) ~trail:(C.trail c)
           (new_lit :: CCArray.to_list (C.lits c')) proof in
@@ -450,7 +450,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     in
 
     let sc_partner, sc_cl = 0, 1 in
-    let mk_res sub at partner = 
+    let mk_res sub at partner= 
       let lits = Array.copy @@ C.lits c in
       Literals.Pos.replace lits ~at ~by:partner.repl;
       let renaming = Subst.Renaming.create () in
@@ -476,7 +476,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       let lit_pos = PB.arg idx PB.empty in
       match lit with
       | Literal.Equation(u, v, true) 
-        when Type.is_prop (T.ty u) && T.is_app_var u ->
+        when (Type.is_prop (T.ty u) || Type.is_var (T.ty u)) 
+             && T.is_app_var u ->
         let app_vars = 
           if Literal.is_predicate_lit lit then [(u, PB.to_pos (PB.left lit_pos))]
           else if Term.is_app_var v then [(u, PB.to_pos (PB.left lit_pos));
@@ -503,10 +504,94 @@ module Make(E : Env.S) : S with module Env = E = struct
           ) partners;          
         ) app_vars
       | _ -> ()
-
     );
+    []
 
-    []  
+  (* Fluid version of (Forall|Exists)RW *)
+  let fluid_quant_rw  (c:C.t) =
+    (* TODO(BOOL): currently incompatible with combiantors *)
+    let unif_alg = 
+      if Env.flex_get Combinators.k_enable_combinators 
+      then (fun _ _ -> OSeq.empty)
+      else Env.flex_get Superposition.k_unif_alg in
+    
+    let module PB = Position.Build in
+    let module F = T.Form in
+
+    let sc_partner, sc_cl = 0, 1 in
+    let a = Type.var (HVar.fresh ~ty:(Type.tType) ()) in
+    let y_quant = 
+      Lambda.eta_expand @@
+      T.var (HVar.fresh ~ty:(Type.arrow [a] Type.prop) ()) in
+    let partners = 
+    [ {unif_partner=F.forall y_quant; 
+       repl= T.fun_ a (F.not_ (Lambda.whnf @@ T.app y_quant [T.bvar ~ty:a 0])); 
+       new_lit=None};
+      {unif_partner=F.exists y_quant;
+       repl= y_quant (*already eta-expanded *); 
+       new_lit=None};]
+    in
+    
+    let mk_res sub at partner= 
+      let lits = Array.copy @@ C.lits c in
+      (* Literals.Pos.replace lits ~at ~by:partner.repl; *)
+      let renaming = Subst.Renaming.create () in
+      let repl_sub =
+        Lambda.eta_reduce @@ Lambda.snf @@
+          Subst.FO.apply renaming sub (partner.repl, sc_partner) in
+      let sk = FR.get_skolem ~parent:c ~mode:`Skolem repl_sub in
+      let y_sk = 
+        T.app (Subst.FO.apply renaming sub (y_quant, sc_partner)) [sk]
+      in
+      let lits = Literals.apply_subst renaming sub (lits, sc_cl) in
+      Literals.Pos.replace lits ~at ~by:y_sk;
+
+      let rule = Proof.Rule.mk "fluid_quant_rw" in
+      let step = Proof.Step.inference ~rule [C.proof_parent_subst renaming (c,sc_cl) sub] in
+      let res = C.create_a ~penalty:(C.penalty c) ~trail:(C.trail c) lits step in
+
+      Util.debugf ~section 1 "fluid_quant_rw:@.@[%a@] -> @.@[%a@]@." 
+        (fun k -> k C.pp c C.pp res);
+
+      res
+    in
+
+    let eligible = C.Eligible.res c in
+    Literals.fold_lits ~eligible (C.lits c)
+    |> Iter.iter (fun (lit, idx) ->
+      let lit_pos = PB.arg idx PB.empty in
+      match lit with
+      | Literal.Equation(u, v, true) 
+        when (Type.is_var (T.ty u) || Type.is_prop (T.ty u)) 
+             && T.is_app_var u ->
+        let app_vars = 
+          if Literal.is_predicate_lit lit then [(u, PB.to_pos (PB.left lit_pos))]
+          else if Term.is_app_var v then [(u, PB.to_pos (PB.left lit_pos));
+                                          (v, PB.to_pos (PB.right lit_pos))]
+          else []
+        in
+        List.iter (fun (var, pos) -> 
+          List.iter (fun p -> 
+            let seq = 
+              unif_alg (p.unif_partner, sc_partner) (var, sc_cl)
+              |> OSeq.filter_map (
+                CCOpt.map (fun us -> 
+                  assert(not (Unif_subst.has_constr us));
+                  let sub = Unif_subst.subst us in
+                  let eligible' = C.eligible_res (c, sc_cl) sub in
+                  (* not eligible under substitution *)
+                  if not (CCBV.get eligible' idx) then None
+                  else (
+                    Some (mk_res sub pos p)
+                )))
+            in
+            let stm_res = Env.Stm.make ~penalty:(C.penalty c) ~parents:[c] seq in
+            Env.StmQ.add (Env.get_stm_queue ()) stm_res;
+          ) partners;          
+        ) app_vars
+      | _ -> ()
+    );
+    []
 
   let replace_bool_vars (c:C.t) =
     let p =
@@ -1247,7 +1332,8 @@ module Make(E : Env.S) : S with module Env = E = struct
         );
 
         if Env.flex_get k_fluid_log_hoist then (
-          Env.add_unary_inf "fluid_log_hoist" fluid_log_hoist
+          Env.add_unary_inf "fluid_log_hoist" fluid_log_hoist;
+          Env.add_unary_inf "fluid_quant_rw" fluid_quant_rw;
         );
 
         Env.add_unary_inf "formula_hoist" formula_hoist;
@@ -1649,7 +1735,7 @@ let () =
       , " enable/disable Fluid(Bool|Loob)Hoist rules";
       "--fluid-log-hoist"
       , Arg.Bool (fun v -> _fluid_log_hoist := v)
-      , " enable/disable fluid version of BoolRW, (Eq|Neq|Forall|Exists)Hoist rules";
+      , " enable/disable fluid version of BoolRW, (Forall|Exists)RW, (Eq|Neq|Forall|Exists)Hoist rules";
       "--elim-bvars"
       , Arg.Bool ((:=) _elim_bvars)
       , " replace boolean variables by T and F";
