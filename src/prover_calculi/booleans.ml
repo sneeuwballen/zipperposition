@@ -10,6 +10,7 @@ module T = Term
 module Pos = Position
 module US = Unif_subst
 module L = Literal
+module Ls = Literals
 
 type reasoning_kind    = 
     BoolReasoningDisabled 
@@ -228,10 +229,19 @@ module Make(E : Env.S) : S with module Env = E = struct
       (new_lit :: Array.to_list( C.lits c |> Literals.map (T.replace ~old ~by:repl)))
     proof
 
+  let get_green_eligible c =
+    let ord = C.Ctx.ord () in
+    Ls.fold_terms ~vars:false ~var_args:false ~fun_bodies:false 
+                  ~ty_args:false ~ord ~which:`Max ~subterms:true  
+                  ~eligible:(C.Eligible.res c) (C.lits c)
+  
+  let get_bool_eligible c =
+    get_green_eligible c
+    |> Iter.append (SClause.TPSet.to_iter (C.eligible_subterms_of_bool c))
+
   let get_bool_hoist_eligible c =
-    C.eligible_subterms_of_bool c
-    |> SClause.TPSet.to_list
-    |> List.filter (fun (t,_) -> 
+    get_bool_eligible c
+    |> Iter.filter (fun (t,_) -> 
         let ty = T.ty t in
         (Type.is_prop ty || Type.is_var ty) &&
         not (T.is_true_or_false t) &&
@@ -242,6 +252,7 @@ module Make(E : Env.S) : S with module Env = E = struct
               Builtin.is_logical_binop hd)
         | T.App(hd, _) -> not @@ T.is_var hd
         | _ -> true)
+    |> Iter.to_list
     (* since we are doing simultaneous version -- we take only unique terms *)
     |> CCList.sort_uniq ~cmp:(fun (t1,_) (t2,_) -> T.compare t1 t2)
 
@@ -294,14 +305,14 @@ module Make(E : Env.S) : S with module Env = E = struct
       Proof.Step.inference [C.proof_parent c]
         ~rule:(Proof.Rule.mk (prefix^"_hoist")) ~tags:[Proof.Tag.T_ho] in
 
-    C.eligible_subterms_of_bool c
-    |> SClause.TPSet.to_list
-    |> List.filter (fun (t,_) -> 
+    get_bool_eligible c
+    |> Iter.filter (fun (t,_) -> 
         match T.view t with
         | T.AppBuiltin(hd,_) ->
           List.mem hd [Builtin.Eq;Neq;Xor;Equiv;ForallConst;ExistsConst] &&
           Type.is_prop (T.ty t)
         | _ -> false)
+    |> Iter.to_list
     (* since we are doing simultaneous version -- we take only unique terms *)
     |> CCList.sort_uniq ~cmp:(fun (t1,_) (t2,_) -> T.compare t1 t2)
     |> List.map (fun (t, _) ->
@@ -362,9 +373,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       then (fun _ _ -> OSeq.empty)
       else Env.flex_get Superposition.k_unif_alg in
 
-    C.eligible_subterms_of_bool c
-    |> (fun set -> 
-      SClause.TPSet.fold (fun (u,p) acc ->
+    get_bool_eligible c
+    |> (fun iter -> 
+      Iter.fold (fun acc (u,p) ->
         if T.is_app_var u then (
           let unif_seq =
             unif_alg (zx, sc_zx) (u, sc_cl)
@@ -398,7 +409,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           Env.StmQ.add (Env.get_stm_queue ()) stm_res;
           []
         ) else acc
-    ) set [])
+    ) [] iter)
 
   (* Record holding info for constructing Eq/Neq/Forall/ExistsHoist inference*)
   type fluid_log_partner_info =
@@ -618,9 +629,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     in
 
 
-    C.eligible_subterms_of_bool c
-    |> SClause.TPSet.to_list
-    |> List.find_opt (fun (t,_) -> 
+    get_bool_eligible c
+    |> Iter.find_pred (fun (t,_) -> 
         Type.is_prop (T.ty t) 
           &&
         (match T.view t with
@@ -643,9 +653,8 @@ module Make(E : Env.S) : S with module Env = E = struct
         ~rule:(Proof.Rule.mk ("quantifier_rw")) 
         ~tags:[Proof.Tag.T_ho] in
 
-    C.eligible_subterms_of_bool c
-    |> SClause.TPSet.to_list
-    |> CCList.filter_map (fun (t,p) -> 
+    get_bool_eligible c
+    |> Iter.filter_map (fun (t,p) -> 
       match T.view t with
       | T.AppBuiltin(Builtin.(ForallConst|ExistsConst) as b, [_;body]) ->
         let body = Combs.expand body in
@@ -662,8 +671,8 @@ module Make(E : Env.S) : S with module Env = E = struct
           C.create ~trail:(C.trail c) ~penalty:(C.penalty c) 
             (Array.to_list new_lits) proof in
         Some new_cl
-      | _ -> None
-    )
+      | _ -> None) 
+    |> Iter.to_list
 
    let nested_eq_rw c =
     (* TODO(BOOL): currently incompatible with combiantors *)
@@ -674,9 +683,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     let sc = 0 in
     let mk_sc t = (t,sc) in 
     let parents r s = [C.proof_parent_subst r (mk_sc c) s ] in
-    C.eligible_subterms_of_bool c
-    |> SClause.TPSet.to_list
-    |> CCList.filter_map (fun (t,p) -> 
+    get_bool_eligible c
+    |> Iter.filter_map (fun (t,p) -> 
       match T.view t with
       | T.AppBuiltin((Builtin.(Eq|Neq|Equiv|Xor) as hd), ([a;b]|[_;a;b])) ->
         Some (
@@ -700,7 +708,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                 C.create ~penalty:(C.penalty c) ~trail:(C.trail c) new_lits proof
               ) unif_subst_opt))
       | _ -> None)
-    |> List.iter (fun clause_seq -> 
+    |> Iter.iter (fun clause_seq -> 
       let stm_res = Env.Stm.make ~penalty:(C.penalty c) ~parents:[c] clause_seq in
       Env.StmQ.add (Env.get_stm_queue ()) stm_res);
     []

@@ -172,9 +172,8 @@ module type S = sig
 
   val eligible_subterms_of_bool : t -> SClause.TPSet.t
   (** 
-    List that contains terms and positions in which boolean inferences can be
-    performed. Those are selected boolean terms (and their subterms) and
-    all boolean subterms of terms eligible for resolution
+    Set that contains positions of selected Booleans and their
+    eligible green subterms.
   *)
 
   val is_eligible_param : t Scoped.t -> Subst.t -> idx:int -> bool

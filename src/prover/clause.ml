@@ -280,33 +280,18 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       Lazy.force c.bool_selected
       |> List.map (fun (_, pos) -> Position.Build.of_pos pos) 
     in
-    let resolution_positions =
-      eligible_res_no_subst c
-      |> BV.to_list
-      |> CCList.flat_map (fun idx ->
-          match (lits c).(idx) with
-          | Equation(lhs,rhs,_) ->
-            begin 
-              match Ordering.compare (Ctx.ord ()) lhs rhs with
-              | Comparison.Lt -> [PB.right (PB.arg idx PB.empty)]
-              | Comparison.Gt -> [PB.left (PB.arg idx PB.empty)]
-              | _ -> [PB.right (PB.arg idx PB.empty);
-                      PB.left (PB.arg idx PB.empty)]
-            end
-          | _ -> [])
-    in
     let res = 
       (* directly at position of selected booleans *)
       Lazy.force c.bool_selected 
       @
-      (* below selected literals and selected booleans *)
+      (* below selected selected booleans *)
       CCList.flat_map (fun pb ->
         let pos = Position.Build.to_pos pb in 
         let t = Literals.Pos.at (lits c) pos in
-        (* selects --subterms-- of given t that can be selected *)
+        (* selects --subterms-- of given t that are eligible *)
         Iter.to_list 
           (Bool_selection.all_eligible_subterms ~ord:(Ctx.ord()) ~pos_builder:pb t)) 
-      (starting_positions @ resolution_positions)
+      (starting_positions)
     in
 
     if CCList.is_empty res then (

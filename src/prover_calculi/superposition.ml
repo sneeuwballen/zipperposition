@@ -555,6 +555,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let shift_vars = if info.sup_kind = LambdaSup then 0 else -1 in
     let passive_idx, passive_lit_pos = Lits.Pos.cut info.passive_pos in
     let bool_inference =
+      (* optimization -- if no selected subterms, do not enter eligible_subterms_of_bool *)
       not (CCList.is_empty (C.bool_selected info.passive)) &&
       TPS.mem (info.u_p, info.passive_pos) (C.eligible_subterms_of_bool info.passive)
     in
