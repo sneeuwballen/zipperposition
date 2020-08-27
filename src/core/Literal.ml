@@ -652,9 +652,23 @@ let is_absurd_tags lit =
 let fold_terms ?(position=Position.stop) ?(vars=false) ?(var_args=true) ?(fun_bodies=true) ?ty_args ~which ?(ord=Ordering.none) ~subterms lit k =
   assert(no_prop_invariant lit);
   (* function to call at terms *)
+
+  let filter_formula_subterms hd args =
+    let open Builtin in
+    match hd, args with 
+    | (Eq|Neq|Xor|Equiv), ([_;a;b]|[a;b]) ->
+      (match Ordering.compare ord a b with 
+      | Comparison.Lt -> Some [List.length args - 1]
+      | Comparison.Gt -> Some [List.length args - 2]
+      | _ -> None)
+    | (ForallConst|ExistsConst), [_;_] ->
+      Some []
+    | _ -> None
+  in
+    
   let at_term ~pos t =
     if subterms
-    then T.all_positions ?ty_args ~vars ~var_args ~fun_bodies ~pos t k
+    then T.all_positions ~filter_formula_subterms ?ty_args ~vars ~var_args ~fun_bodies ~pos t k
     else if T.is_var t && not vars
     then () (* ignore *)
     else k (t, pos)

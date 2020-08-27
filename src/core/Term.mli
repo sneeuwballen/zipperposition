@@ -317,6 +317,7 @@ val contains_symbol : ID.t -> t -> bool
 (** High level fold-like combinators *)
 
 val all_positions :
+  ?filter_formula_subterms:(Builtin.t -> t list -> int list CCOpt.t) ->
   ?vars:bool -> ?ty_args:bool -> ?var_args:bool -> ?fun_bodies:bool -> ?pos:Position.t ->
   t -> t Position.With.t Iter.t
 (** Iterate on all sub-terms with their position.

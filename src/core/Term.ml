@@ -734,7 +734,9 @@ let contains_symbol f t =
 
 (** {2 Fold} *)
 
-let all_positions ?(vars=false) ?(ty_args=true) ?(var_args=true) ?(fun_bodies=true) ?(pos=Position.stop) t f =
+let all_positions ?(filter_formula_subterms=(fun _ _ -> None)) 
+                  ?(vars=false) ?(ty_args=true) ?(var_args=true)
+                  ?(fun_bodies=true) ?(pos=Position.stop) t f =
   let rec aux pb t = match view t with
     | Var _ | DB _ ->
       if vars && (ty_args || not (Type.is_tType (ty t)))
@@ -748,6 +750,16 @@ let all_positions ?(vars=false) ?(ty_args=true) ?(var_args=true) ?(fun_bodies=tr
       then aux (PB.body pb) u
     | App (head, _) when not var_args && T.is_var head ->
       f (PW.make t (PB.to_pos pb))
+    | AppBuiltin (hd, args) 
+      when CCOpt.is_some (filter_formula_subterms hd args) ->
+      let taken_args = CCOpt.get_exn (filter_formula_subterms hd args) in
+      let len = List.length args in
+      let invi i = len - 1 - i in
+      List.iter
+        (fun i ->
+           (* if [t'] is a type parameter and [not ty_args], ignore *)
+           aux (PB.arg (invi i) pb) (List.nth args i))
+        taken_args
     | AppBuiltin (_, args)
     | App (_, args) ->
       if ty_args || not (Type.is_tType (ty t)) then (
