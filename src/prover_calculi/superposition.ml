@@ -647,6 +647,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         O.compare ord s' t' = Comp.Lt ||
         not (Lit.Pos.is_max_term ~ord passive_lit' passive_lit_pos) ||
         (not (BV.get (C.eligible_res (info.passive, sc_p) subst) passive_idx)
+            (* if it was an inference into selected Bool position, 
+              we do not reevaluate BoolSelection on the new literal set
+              -- in 99% of cases it is selected again. *)
          && not bool_inference) ||
         not (C.is_eligible_param (info.active, sc_a) subst ~idx:active_idx)
       ) then (

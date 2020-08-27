@@ -29,7 +29,6 @@ let k_cnf_non_simpl = Flex_state.create_key ()
 let k_norm_bools = Flex_state.create_key () 
 let k_filter_literals = Flex_state.create_key ()
 let k_nnf = Flex_state.create_key ()
-let k_elim_bvars = Flex_state.create_key ()
 let k_simplify_bools = Flex_state.create_key ()
 let k_trigger_bool_inst = Flex_state.create_key ()
 let k_trigger_bool_ind = Flex_state.create_key ()
@@ -376,7 +375,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     get_bool_eligible c
     |> (fun iter -> 
       Iter.fold (fun acc (u,p) ->
-        if T.is_app_var u then (
+        if T.is_app_var u || T.is_fun u && (not (T.is_ground u)) then (
           let unif_seq =
             unif_alg (zx, sc_zx) (u, sc_cl)
             |> OSeq.flat_map (fun us_opt -> 
@@ -1178,27 +1177,6 @@ module Make(E : Env.S) : S with module Env = E = struct
   let cnf_infer cl = 
     CCOpt.get_or ~default:[] (cnf_otf cl)
 
-  let elim_bvars c =
-    C.Seq.terms c
-    |> Iter.filter_map (fun v -> 
-        if T.is_var v && Type.is_prop (T.ty v) then (
-          Some (T.as_var_exn v) 
-        ) else None)
-    |> Iter.sort_uniq ~cmp:(HVar.compare Type.compare)
-    |> Iter.flat_map_l (fun v ->
-        let subst_true = 
-          Subst.FO.bind' Subst.empty (v, 0) (T.true_, 0) in
-        let subst_false = 
-          Subst.FO.bind' Subst.empty (v, 0) (T.false_, 0) in
-        [subst_true; subst_false])
-    |> Iter.map (fun subst ->
-        let proof =
-          Some (Proof.Step.simp 
-            ~tags:[Proof.Tag.T_ho] ~rule:(Proof.Rule.mk "elim_bool_vars")
-            [C.proof_parent c]) in
-        C.apply_subst ~proof ~penalty_inc:(Some (-1)) (c,0) subst)
-    |> Iter.to_list
-
   let interpret_boolean_functions c =
     (* Collects boolean functions only at top level, 
        and not the ones that are already a part of the quantifier *)
@@ -1313,9 +1291,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       );
       if Env.flex_get k_norm_bools then (
         Env.add_basic_simplify normalize_bool_terms
-      );
-      if Env.flex_get k_elim_bvars then (
-        Env.add_unary_inf "elim_bvars" elim_bvars;
       );
       if not !Lazy_cnf.enabled then (
         Env.add_multi_simpl_rule ~priority:2 Fool.rw_bool_lits;
@@ -1659,7 +1634,6 @@ let _norm_bools = ref false
 let _filter_literals = ref `Max
 let _nnf = ref false
 let _simplify_bools = ref true
-let _elim_bvars = ref true
 let _trigger_bool_inst = ref (-1)
 let _trigger_bool_ind = ref (-1)
 let _bool_hoist_simpl = ref false
@@ -1679,7 +1653,6 @@ let extension =
     E.flex_add k_norm_bools !_norm_bools;
     E.flex_add k_filter_literals !_filter_literals;
     E.flex_add k_nnf !_nnf;
-    E.flex_add k_elim_bvars !_elim_bvars;
     E.flex_add k_simplify_bools !_simplify_bools;
     E.flex_add k_trigger_bool_inst !_trigger_bool_inst;
     E.flex_add k_trigger_bool_ind !_trigger_bool_ind;
@@ -1744,9 +1717,6 @@ let () =
       "--fluid-log-hoist"
       , Arg.Bool (fun v -> _fluid_log_hoist := v)
       , " enable/disable fluid version of BoolRW, (Forall|Exists)RW, (Eq|Neq|Forall|Exists)Hoist rules";
-      "--elim-bvars"
-      , Arg.Bool ((:=) _elim_bvars)
-      , " replace boolean variables by T and F";
       "--boolean-reasoning-filter-literals"
       , Arg.Symbol(["all"; "max"], (fun v ->
           match v with 
