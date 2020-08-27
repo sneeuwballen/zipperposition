@@ -418,8 +418,10 @@ module Make(E : Env.S) : S with module Env = E = struct
     let a = Type.var (HVar.fresh ~ty:(Type.tType) ()) in
     let x_a = T.var (HVar.fresh ~ty:a ()) in
     let y_a = T.var (HVar.fresh ~ty:a ()) in
-    let y_quant = T.var (HVar.fresh ~ty:(Type.arrow [a] Type.prop) ()) in
-    let yx = T.app y_quant [y_a] in
+    let y_quant = 
+      Lambda.eta_expand @@
+      T.var (HVar.fresh ~ty:(Type.arrow [a] Type.prop) ()) in
+    let yx = Lambda.whnf @@ T.app y_quant [y_a] in
     
     let module F = T.Form in
     let module PB = Position.Build in
@@ -427,9 +429,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     let partners = 
     [ {unif_partner=F.eq x_a y_a; repl= T.false_; new_lit=Some (L.mk_eq x_a y_a)};
       {unif_partner=F.neq x_a y_a; repl= T.true_; new_lit=Some (L.mk_eq x_a y_a)};
-      {unif_partner=F.forall y_a; repl= T.false_; new_lit=Some (L.mk_eq yx T.true_)};
-      {unif_partner=F.exists y_a; repl= T.true_; new_lit=Some (L.mk_eq yx T.false_)};
-      {unif_partner=F.exists y_a; repl= T.true_; new_lit=Some (L.mk_eq yx T.false_)};
+      {unif_partner=F.forall y_quant; repl= T.false_; new_lit=Some (L.mk_eq yx T.true_)};
+      {unif_partner=F.exists y_quant; repl= T.true_; new_lit=Some (L.mk_eq yx T.false_)};
       {unif_partner=(F.not_ T.false_); repl= T.true_; new_lit=None};
       {unif_partner=(F.not_ T.true_); repl= T.false_; new_lit=None};
       {unif_partner=(F.eq x_a x_a); repl= T.true_; new_lit=None};
@@ -458,7 +459,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         @ (Array.to_list (Literals.apply_subst renaming sub (lits, sc_cl)))
       in
       let rule = Proof.Rule.mk "fluid_log_symbol_hoist" in
-      let step = Proof.Step.inference ~rule [C.proof_parent c] in
+      let step = Proof.Step.inference ~rule [C.proof_parent_subst renaming (c,sc_cl) sub] in
       C.create ~penalty:(C.penalty c) ~trail:(C.trail c) new_lits step
     in
 
@@ -874,6 +875,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* Look at the HOSup paper for the definition of unsupported quant *)
   let fix_unsupported_quant t =
+    let orig_t = t in
     let supported var_ty q_body =
       let rec aux depth t =
         match T.view t with
@@ -912,6 +914,14 @@ module Make(E : Env.S) : S with module Env = E = struct
         (* fully applied quantifier *)
         if Builtin.is_quantifier hd && List.length args' == 2 then (
           let q_pref, q_body = T.open_fun @@ List.nth args' 1 in
+          if CCList.is_empty q_pref then (
+            CCFormat.printf "orig_t: @[%a@]@." T.pp orig_t;
+            CCFormat.printf "eta-reduce(orig_t): @[%a@]@." T.pp (Lambda.eta_reduce orig_t);
+
+            CCFormat.printf "t: @[%a@]@." T.pp t;
+            CCFormat.printf "eta-reduce(t): @[%a@]@." T.pp (Lambda.eta_reduce t);
+            assert false;
+          );
           let var_ty = List.hd q_pref in
           if not (supported var_ty q_body) then (
             if Builtin.equal hd Builtin.ExistsConst then (
@@ -929,6 +939,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     aux t
 
   let replace_unsupported_quants c =
+    CCFormat.printf "replacing @[%a@]@." C.pp c;
     let new_lits = Literals.map fix_unsupported_quant (C.lits c) in
     if Literals.equal (C.lits c) new_lits then (
       SimplM.return_same c

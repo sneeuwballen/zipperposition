@@ -233,7 +233,7 @@ module Inner = struct
               let l' = List.map aux l in
               if T.equal f f' && T.same_l l l'
               then t
-              else T.app ~ty (aux f) l'
+              else T.app ~ty f' l'
             | T.AppBuiltin (Builtin.(ExistsConst|ForallConst) as hd, [tyarg;body]) ->
               (* top-level eta expand body of the quantifier *)
               let body' = eta_expand_rec ~top_level_only:true body in
@@ -247,7 +247,9 @@ module Inner = struct
               let l' = List.map aux l in
               if T.same_l l l' then t else T.app_builtin ~ty b l'
           end)
-      else t
+      else (
+        CCFormat.printf "@[%a@] is not reducible@." T.pp t;
+        t)
     in
     let t' = aux t in
     t'

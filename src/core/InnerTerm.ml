@@ -392,6 +392,11 @@ let app ~ty f l = match f.term, l with
         ))
       else ty in
     let props = add_ty_vars (any_props_for_ts t_args) ty.props in
+    let props = 
+      if Builtin.is_quantifier f1 && List.length t_args = 2 then (
+        set_property props f_has_quant
+      ) else props 
+    in
     let my_t = make_ ~props ~ty:(HasType ty) (AppBuiltin (f1,t_args)) in
     H.hashcons my_t
   | _ ->
