@@ -249,6 +249,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         let ty = T.ty t in
         (Type.is_prop ty || Type.is_var ty) &&
         not (T.is_true_or_false t) &&
+        not (T.is_var t) && 
         match T.view t with
         | T.AppBuiltin(hd,_) ->
           (* check that the term has no interpreted sym on top *)
@@ -355,23 +356,30 @@ module Make(E : Env.S) : S with module Env = E = struct
     let sc_zx, sc_cl = 0, 1 in
 
     let mk_res sign renaming sub at =
-      let new_lit = 
-        let x_sub = Subst.FO.apply renaming sub (x, sc_zx) in
-        Literal.mk_eq x_sub (if sign then T.true_ else T.false_) in
       let c' = C.apply_subst ~renaming (c, sc_cl) sub in
-      let by = 
-        Subst.FO.apply renaming sub ((if sign then z_false else z_true), sc_zx) in
-      Literals.Pos.replace (C.lits c') ~at ~by;
-      let rule = 
-        Proof.Rule.mk ("fluid_" ^ (if sign then "bool_" else "loob_") ^ "hoist") in
-      let proof = Proof.Step.inference ~rule [C.proof_parent_subst renaming (c,sc_cl) sub] in
-      let res = 
-        C.create ~penalty:(C.penalty c + 1) ~trail:(C.trail c)
-          (new_lit :: CCArray.to_list (C.lits c')) proof in
-      res
+      let still_at_eligible = 
+        get_bool_eligible c'
+        |> Iter.exists (fun (_, p) -> Position.equal p at) 
+      in
+
+
+      if still_at_eligible then (
+        let new_lit = 
+          let x_sub = Subst.FO.apply renaming sub (x, sc_zx) in
+          Literal.mk_eq x_sub (if sign then T.true_ else T.false_) in
+        let by = 
+          Subst.FO.apply renaming sub ((if sign then z_false else z_true), sc_zx) in
+        Literals.Pos.replace (C.lits c') ~at ~by;
+        let rule = 
+          Proof.Rule.mk ("fluid_" ^ (if sign then "bool_" else "loob_") ^ "hoist") in
+        let proof = Proof.Step.inference ~rule [C.proof_parent_subst renaming (c,sc_cl) sub] in
+        let res = 
+          C.create ~penalty:(C.penalty c + 1) ~trail:(C.trail c)
+            (new_lit :: CCArray.to_list (C.lits c')) proof in
+        Some res
+      ) else None
     in
 
-    (* TODO(BOOL): currently incompatible with combiantors *)
     get_bool_eligible c
     |> (fun iter -> 
       Iter.fold (fun acc (u,p) ->
@@ -395,10 +403,10 @@ module Make(E : Env.S) : S with module Env = E = struct
                 else (
                   let bool_res =
                     if T.equal z_false_sub zx_sub then []
-                    else [Some (mk_res true renaming sub p)] in
+                    else [(mk_res true renaming sub p)] in
                   let loob_res = 
                     if T.equal z_true_sub zx_sub then []
-                    else [Some (mk_res false renaming sub p)] in
+                    else [(mk_res false renaming sub p)] in
                   OSeq.of_list (bool_res @ loob_res)
                 )
               ) us_opt
@@ -725,6 +733,51 @@ module Make(E : Env.S) : S with module Env = E = struct
         assert (List.for_all (fun t -> Type.is_prop (HVar.ty t)) vars);
         all_bool_substs vars
         |> List.map (C.apply_subst ~proof:(Some p) (c,0)))
+    
+  let replace_bool_app_vars (c:C.t) =
+    let p sub renaming =
+      Proof.Step.simp [C.proof_parent_subst renaming (c,0) sub]
+        ~rule:(Proof.Rule.mk ("replace_bool_app_vars")) 
+        ~tags:[Proof.Tag.T_ho] 
+      in
+
+    let is_var_headed t = T.is_var (T.head_term t) in
+    let find_eligible_app_var xs =
+      if not (List.for_all is_var_headed xs) then None
+      else CCList.find_opt T.is_app_var xs
+    in
+
+    get_bool_eligible c
+    |> Iter.find_map (fun (t,_) ->
+        (match T.view t with
+        | T.AppBuiltin(Builtin.(Eq|Neq), [_;a;b]) when Type.is_prop (T.ty a) ->
+          (* tyarg does not have to be a variable *)
+          find_eligible_app_var [a;b]
+        | T.AppBuiltin(hd, args) 
+          when (Builtin.is_logical_binop hd || hd = Builtin.Not) ->
+          find_eligible_app_var args
+        | _ -> None)) 
+    |> CCOpt.iter (fun t -> 
+      List.iter (fun target -> 
+        let seq =
+          get_unif_alg () (t, 0) (target, 0)
+          |> OSeq.filter_map (
+              CCOpt.map (fun us -> 
+                assert(not (Unif_subst.has_constr us));
+                let sub = Unif_subst.subst us in
+                let renaming = Subst.Renaming.create () in
+                let res = 
+                  C.apply_subst ~penalty_inc:(Some 1) ~renaming 
+                                ~proof:(Some (p sub renaming)) (c,0) sub 
+                in
+                (* not eligible under substitution *)
+                Some (res)
+              ))
+        in
+      let stm_res = Env.Stm.make ~penalty:(C.penalty c) ~parents:[c] seq in
+      Env.StmQ.add (Env.get_stm_queue ()) stm_res;
+      ) [T.true_; T.false_]);
+    []
 
   let quantifier_rw (c:C.t) =
     let proof =
@@ -1399,6 +1452,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         Env.add_unary_inf "formula_hoist" formula_hoist;
         Env.add_unary_inf "quant_rw" quantifier_rw;
         Env.add_multi_simpl_rule ~priority:100 replace_bool_vars;
+        Env.add_unary_inf "replace_bool_app_vars" replace_bool_app_vars;
         Env.add_unary_inf "eq_rw" nested_eq_rw;
         Env.add_unary_simplify replace_unsupported_quants;
       )
