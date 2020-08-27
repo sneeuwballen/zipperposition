@@ -66,7 +66,12 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let _trigger_bools   = ref (Type.Map.empty) (* type --> boolean trigger *)
   let _cls_w_pred_vars = ref (Type.Map.empty) (* type --> (clause,var) *)
-
+  
+  let get_unif_alg () =
+    if Env.flex_get Combinators.k_enable_combinators
+    then (fun _ _ -> OSeq.empty)
+    else Env.flex_get Superposition.k_unif_alg
+  
   let get_triggers c =
     let ord = Ctx.ord () in
     let trivial_trigger t =
@@ -367,17 +372,12 @@ module Make(E : Env.S) : S with module Env = E = struct
     in
 
     (* TODO(BOOL): currently incompatible with combiantors *)
-    let unif_alg = 
-      if Env.flex_get Combinators.k_enable_combinators 
-      then (fun _ _ -> OSeq.empty)
-      else Env.flex_get Superposition.k_unif_alg in
-
     get_bool_eligible c
     |> (fun iter -> 
       Iter.fold (fun acc (u,p) ->
         if T.is_app_var u || T.is_fun u && (not (T.is_ground u)) then (
           let unif_seq =
-            unif_alg (zx, sc_zx) (u, sc_cl)
+            get_unif_alg () (zx, sc_zx) (u, sc_cl)
             |> OSeq.flat_map (fun us_opt -> 
               CCOpt.map_or ~default:OSeq.empty (fun us ->
                 assert(not @@ US.has_constr us);
@@ -473,13 +473,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       C.create ~penalty:(C.penalty c) ~trail:(C.trail c) new_lits step
     in
 
-
-    (* TODO(BOOL): currently incompatible with combiantors *)
-    let unif_alg = 
-      if Env.flex_get Combinators.k_enable_combinators 
-      then (fun _ _ -> OSeq.empty)
-      else Env.flex_get Superposition.k_unif_alg in
-
     let eligible = C.Eligible.res c in
     Literals.fold_lits ~eligible (C.lits c)
     |> Iter.iter (fun (lit, idx) ->
@@ -497,7 +490,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         List.iter (fun (var, pos) -> 
           List.iter (fun p -> 
             let seq = 
-              unif_alg (p.unif_partner, sc_partner) (var, sc_cl)
+              get_unif_alg () (p.unif_partner, sc_partner) (var, sc_cl)
               |> OSeq.filter_map (
                 CCOpt.map (fun us -> 
                   assert(not (Unif_subst.has_constr us));
@@ -518,13 +511,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     []
 
   (* Fluid version of (Forall|Exists)RW *)
-  let fluid_quant_rw  (c:C.t) =
-    (* TODO(BOOL): currently incompatible with combiantors *)
-    let unif_alg = 
-      if Env.flex_get Combinators.k_enable_combinators 
-      then (fun _ _ -> OSeq.empty)
-      else Env.flex_get Superposition.k_unif_alg in
-    
+  let fluid_quant_rw  (c:C.t) =    
     let module PB = Position.Build in
     let module F = T.Form in
 
@@ -583,7 +570,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         List.iter (fun (var, pos) -> 
           List.iter (fun p -> 
             let seq = 
-              unif_alg (p.unif_partner, sc_partner) (var, sc_cl)
+              get_unif_alg () (p.unif_partner, sc_partner) (var, sc_cl)
               |> OSeq.filter_map (
                 CCOpt.map (fun us -> 
                   assert(not (Unif_subst.has_constr us));
@@ -602,6 +589,99 @@ module Make(E : Env.S) : S with module Env = E = struct
       | _ -> ()
     );
     []
+
+  let false_elim c =
+    let module S = Subst.FO in
+
+    let p sub renaming =
+      Proof.Step.inference [C.proof_parent_subst renaming (c,0) sub]
+        ~rule:(Proof.Rule.mk ("false_elim")) 
+        ~tags:[Proof.Tag.T_ho] 
+    in
+
+    let add_immediate acc sub idx =
+      let renaming = Subst.Renaming.create () in
+      let res = 
+        C.apply_subst ~renaming ~proof:(Some (p sub renaming)) (c,0) sub 
+      in
+      res :: acc
+    in
+      
+    let schedule app_var target idx =     
+      assert(T.is_ground target);
+      let seq =
+        get_unif_alg () (app_var, 0) (target, 0)
+        |> OSeq.filter_map (
+            CCOpt.map (fun us -> 
+              assert(not (Unif_subst.has_constr us));
+              let sub = Unif_subst.subst us in
+              let renaming = Subst.Renaming.create () in
+              let res = 
+                C.apply_subst ~penalty_inc:(Some 1) ~renaming 
+                              ~proof:(Some (p sub renaming)) (c,0) sub 
+              in
+              (* not eligible under substitution *)
+              if not @@ CCBV.get (C.eligible_res_no_subst res) idx then None
+              else (
+                Some (res)
+            )))
+        in
+      let stm_res = Env.Stm.make ~penalty:(C.penalty c) ~parents:[c] seq in
+      Env.StmQ.add (Env.get_stm_queue ()) stm_res;
+    in
+
+    let eligible = C.eligible_res (c, 0) Subst.empty in
+    let get_var = T.as_var_exn in
+    
+    Ls.fold_eqn_simple (C.lits c)
+    |> Iter.filter (fun (_,_,sign,p) ->
+      let idx = Ls.Pos.idx p in
+      CCBV.get eligible idx )
+    |> Iter.fold (fun acc (lhs,rhs,sign,p) -> 
+      let idx = Ls.Pos.idx p in
+      if T.equal T.true_ rhs then (
+        if T.is_var lhs then (
+          let sub = 
+            S.bind' Subst.empty (get_var lhs, 0) (T.false_, 0) in
+          add_immediate acc sub idx
+        ) else if T.is_app_var lhs then (
+          schedule lhs T.false_ idx;
+          acc
+        ) else acc
+      ) else if T.equal T.false_ rhs then (
+        if T.is_var lhs then (
+          let sub = S.bind' Subst.empty (get_var lhs, 0) (T.true_, 0) in
+          add_immediate acc sub idx
+        ) else if T.is_app_var lhs then (
+          schedule lhs T.true_ idx;
+          acc
+        ) else acc
+      ) else if T.is_var (T.head_term lhs) 
+                && T.is_var (T.head_term rhs)
+                && sign then (
+          if T.is_var lhs && T.is_var rhs && Type.is_prop (T.ty lhs) then (
+            let sub_t_f = 
+              S.bind' 
+                (S.bind' Subst.empty (get_var lhs, 0) (T.true_, 0))
+                (get_var rhs,0) (T.false_, 0)
+            in
+            let sub_f_t = 
+              S.bind' 
+                (S.bind' Subst.empty (get_var lhs, 0) (T.false_, 0))
+                (get_var rhs,0) (T.true_, 0)
+            in
+            add_immediate (add_immediate acc sub_t_f idx) sub_f_t idx
+          ) else (
+            let l_eq_r = T.Form.eq lhs rhs in
+            let t_eq_f = T.Form.eq T.true_ T.false_ in
+            let f_eq_t = T.Form.eq T.false_ T.true_ in
+          
+            schedule l_eq_r t_eq_f idx;
+            schedule l_eq_r f_eq_t idx;
+            acc
+          )
+      ) else acc
+    ) []
 
   let replace_bool_vars (c:C.t) =
     let p =
@@ -675,10 +755,6 @@ module Make(E : Env.S) : S with module Env = E = struct
 
    let nested_eq_rw c =
     (* TODO(BOOL): currently incompatible with combiantors *)
-    let unif_alg = 
-      if Env.flex_get Combinators.k_enable_combinators 
-      then (fun _ _ -> OSeq.empty)
-      else Env.flex_get Superposition.k_unif_alg in
     let sc = 0 in
     let mk_sc t = (t,sc) in 
     let parents r s = [C.proof_parent_subst r (mk_sc c) s ] in
@@ -687,7 +763,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       match T.view t with
       | T.AppBuiltin((Builtin.(Eq|Neq|Equiv|Xor) as hd), ([a;b]|[_;a;b])) ->
         Some (
-          unif_alg (mk_sc a) (mk_sc b)
+          get_unif_alg () (mk_sc a) (mk_sc b)
           |> OSeq.map (fun unif_subst_opt ->
               CCOpt.map (fun unif_subst -> 
                 assert (not @@ US.has_constr unif_subst);
@@ -1319,6 +1395,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           Env.add_unary_inf "fluid_quant_rw" fluid_quant_rw;
         );
 
+        Env.add_unary_inf "false_elim" false_elim;
         Env.add_unary_inf "formula_hoist" formula_hoist;
         Env.add_unary_inf "quant_rw" quantifier_rw;
         Env.add_multi_simpl_rule ~priority:100 replace_bool_vars;
