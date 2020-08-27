@@ -1431,7 +1431,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       );
 
       if Env.flex_get k_bool_reasoning = BoolHoist then (
-        if Env.flex_get k_bool_hoist_simpl 
+        if Env.flex_get k_bool_hoist_simpl
         then Env.add_multi_simpl_rule ~priority:1000 bool_hoist_simpl
         else Env.add_unary_inf "bool_hoist" bool_hoist;
 
