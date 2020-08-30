@@ -305,7 +305,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       [] bool_subterms
     )
 
-  let formula_hoist (c:C.t) : C.t list =
+  let eq_hoist (c:C.t) : C.t list =
     let proof ~prefix = 
       Proof.Step.inference [C.proof_parent c]
         ~rule:(Proof.Rule.mk (prefix^"_hoist")) ~tags:[Proof.Tag.T_ho] in
@@ -321,15 +321,6 @@ module Make(E : Env.S) : S with module Env = E = struct
     (* since we are doing simultaneous version -- we take only unique terms *)
     |> CCList.sort_uniq ~cmp:(fun (t1,_) (t2,_) -> T.compare t1 t2)
     |> List.map (fun (t, _) ->
-        let fresh_var ~body = 
-          assert(Type.is_fun (T.ty body));
-          let pref,_ = Type.open_fun (T.ty body) in
-          assert(List.length pref == 1);
-          let var_ty = List.hd pref in
-          let fresh_var  = HVar.fresh ~ty:var_ty () in
-          T.var fresh_var
-        in
-
         match T.view t with 
         | T.AppBuiltin(Builtin.(Eq|Equiv), ([a;b]|[_;a;b])) ->
           let new_lit = Literal.mk_eq a b in
@@ -337,12 +328,6 @@ module Make(E : Env.S) : S with module Env = E = struct
         | T.AppBuiltin(Builtin.(Neq|Xor), ([a;b]|[_;a;b])) ->
           let new_lit = Literal.mk_eq a b in
           mk_res ~proof:(proof ~prefix:"neq") ~old:t ~repl:T.true_ new_lit c
-        | T.AppBuiltin(Builtin.ForallConst, [_;body]) ->
-          let new_lit = yes (T.app body [fresh_var ~body]) in
-          mk_res ~proof:(proof ~prefix:"forall") ~old:t ~repl:T.false_ new_lit c
-        | T.AppBuiltin(Builtin.ExistsConst, [_;body]) ->
-          let new_lit = no (T.app body [fresh_var ~body]) in
-          mk_res ~proof:(proof ~prefix:"exists") ~old:t ~repl:T.true_ new_lit c
         | _ -> assert false
     )
 
@@ -469,12 +454,12 @@ module Make(E : Env.S) : S with module Env = E = struct
 
     let sc_partner, sc_cl = 0, 1 in
     let mk_res sub at partner= 
-      let lits = Array.copy @@ C.lits c in
-      Literals.Pos.replace lits ~at ~by:partner.repl;
       let renaming = Subst.Renaming.create () in
+      let lits = Literals.apply_subst renaming sub ((C.lits c), sc_cl) in
+      Literals.Pos.replace lits ~at ~by:partner.repl;
       let new_lits =
         (CCOpt.map_or ~default:[] (fun x -> [L.apply_subst renaming sub (x,sc_partner)]) partner.new_lit)
-        @ (Array.to_list (Literals.apply_subst renaming sub (lits, sc_cl)))
+        @ (Array.to_list (lits))
       in
       let rule = Proof.Rule.mk "fluid_log_symbol_hoist" in
       let step = Proof.Step.inference ~rule [C.proof_parent_subst renaming (c,sc_cl) sub] in
@@ -779,32 +764,59 @@ module Make(E : Env.S) : S with module Env = E = struct
       ) [T.true_; T.false_]);
     []
 
-  let quantifier_rw (c:C.t) =
-    let proof =
+  let quantifier_rw_and_hoist (c:C.t) =
+
+    let quant_rw ~at b body = 
+      let proof =
       Proof.Step.simp [C.proof_parent c]
         ~rule:(Proof.Rule.mk ("quantifier_rw")) 
-        ~tags:[Proof.Tag.T_ho] in
+        ~tags:[Proof.Tag.T_ho] 
+      in
+      let body = Combs.expand body in
+      let form_for_skolem = 
+        (if b = Builtin.ForallConst then T.Form.not_ else CCFun.id) 
+        (snd @@ T.open_fun body) in
+      let sk = 
+        FR.get_skolem ~parent:c ~mode:`Skolem 
+        (T.fun_l (fst @@ T.open_fun body) form_for_skolem) in
+      let repl = T.app body [sk] in
+      let new_lits = CCArray.copy (C.lits c) in
+      Literals.Pos.replace ~at ~by:repl new_lits;
+      C.create ~trail:(C.trail c) ~penalty:(C.penalty c) 
+        (Array.to_list new_lits) proof
+    in
+    
+    let quant_hoist ~old b body =
+      let proof ~prefix = 
+      Proof.Step.inference [C.proof_parent c]
+        ~rule:(Proof.Rule.mk (prefix^"_hoist")) ~tags:[Proof.Tag.T_ho] in
 
+      let fresh_var ~body = 
+        assert(Type.is_fun (T.ty body));
+        let pref,_ = Type.open_fun (T.ty body) in
+        assert(List.length pref == 1);
+        let var_ty = List.hd pref in
+        let fresh_var  = HVar.fresh ~ty:var_ty () in
+        T.var fresh_var
+      in
+      match b with 
+      | Builtin.ForallConst ->
+        let new_lit = yes (T.app body [fresh_var ~body]) in
+        mk_res ~proof:(proof ~prefix:"forall") ~old ~repl:T.false_ new_lit c
+      | Builtin.ExistsConst ->
+        let new_lit = no (T.app body [fresh_var ~body]) in
+        mk_res ~proof:(proof ~prefix:"exists") ~old ~repl:T.true_ new_lit c
+      | _ -> assert false
+    in
+        
+    
     get_bool_eligible c
-    |> Iter.filter_map (fun (t,p) -> 
+    |> Iter.fold (fun acc (t,p) -> 
       match T.view t with
       | T.AppBuiltin(Builtin.(ForallConst|ExistsConst) as b, [_;body]) ->
-        let body = Combs.expand body in
-        let form_for_skolem = 
-          (if b = ForallConst then T.Form.not_ else CCFun.id) 
-          (snd @@ T.open_fun body) in
-        let sk = 
-          FR.get_skolem ~parent:c ~mode:`Skolem 
-          (T.fun_l (fst @@ T.open_fun body) form_for_skolem) in
-        let repl = T.app body [sk] in
-        let new_lits = CCArray.copy (C.lits c) in
-        Literals.Pos.replace ~at:p ~by:repl new_lits;
-        let new_cl =
-          C.create ~trail:(C.trail c) ~penalty:(C.penalty c) 
-            (Array.to_list new_lits) proof in
-        Some new_cl
-      | _ -> None) 
-    |> Iter.to_list
+        quant_rw ~at:p b body :: quant_hoist ~old:t b body :: acc
+      | _ -> acc) []
+    |> (fun res -> CCOpt.return_if (not @@ CCList.is_empty res) res)
 
    let nested_eq_rw c =
     (* TODO(BOOL): currently incompatible with combiantors *)
@@ -1449,8 +1461,8 @@ module Make(E : Env.S) : S with module Env = E = struct
         );
 
         Env.add_unary_inf "false_elim" false_elim;
-        Env.add_unary_inf "formula_hoist" formula_hoist;
-        Env.add_unary_inf "quant_rw" quantifier_rw;
+        Env.add_unary_inf "formula_hoist" eq_hoist;
+        Env.add_multi_simpl_rule ~priority:90 quantifier_rw_and_hoist;
         Env.add_multi_simpl_rule ~priority:100 replace_bool_vars;
         Env.add_unary_inf "replace_bool_app_vars" replace_bool_app_vars;
         Env.add_unary_inf "eq_rw" nested_eq_rw;

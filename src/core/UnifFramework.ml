@@ -14,35 +14,7 @@ module type PARAMETERS = sig
   val identify_scope : T.t Scoped.t -> T.t Scoped.t -> T.t * T.t * Scoped.scope * S.t
   val frag_algs : unit -> (T.t Scoped.t -> T.t Scoped.t -> S.t -> S.t list) list
   val pb_oracle : (T.t Scoped.t -> T.t Scoped.t -> flag_type -> S.t -> Scoped.scope -> (S.t * flag_type) option LL.t)
-  val oracle_composer : (Subst.t option OSeq.t) OSeq.t -> Subst.t option OSeq.t
 end
-
-(* Given a sequence of sequences (i.e., a generator) A
-       take one element from the A[0],
-       then one element from A[1] and A[0]
-       then one element from A[2],A[1] and A[0], etc.. *)
-let take_fair gens =
-  (* Take one element from A[0],A[1],...,A[k-1] *)
-  let rec take_first_k k acc gens =
-    if k = 0 then (acc, gens)
-    else (match gens () with 
-        | OSeq.Nil -> (acc, OSeq.empty)
-        | OSeq.Cons(x,xs) ->
-          begin match x () with 
-            | OSeq.Nil ->
-              take_first_k (k-1) acc xs
-            | OSeq.Cons(y, ys) ->
-              let taken, new_gens = take_first_k (k-1) (OSeq.cons y acc) xs in
-              (taken, OSeq.cons ys new_gens) end) in
-
-  (* Take one element from A[0],A[1],...A[i-1]
-      and then take one element from A[0],A[1],...,A[i]   *)
-  let rec aux i gens =
-    let taken, new_gens = take_first_k i OSeq.empty gens in
-    if OSeq.is_empty new_gens then taken
-    else (OSeq.append taken (function () -> aux (i+1) new_gens ())) 
-  in
-  aux 1 gens
 
 module Make (P : PARAMETERS) = struct 
   exception PolymorphismDetected
@@ -111,14 +83,13 @@ module Make (P : PARAMETERS) = struct
     | T.AppBuiltin _ ->  not @@ T.is_appbuiltin t
     | _ -> false
 
-  let do_unif ~bind_cnt problem subst unifscope =
-    let delay res =
+  let do_unif ~bind_cnt ~id problem subst unifscope =
+    let delay steps res () =
       let skipper = 
         int_of_float (Flex_state.get_exn PUP.k_skip_multiplier P.flex_state) in
-      if !bind_cnt mod skipper == 0 then (
-        let none_count = !bind_cnt / skipper in
-        OSeq.append (OSeq.take none_count (OSeq.repeat None)) res
-      ) else res 
+      if steps !=0 && steps mod skipper == 0 then (
+        OSeq.append (OSeq.of_list (CCList.replicate (steps / skipper) None)) res ()
+      ) else res ()
     in
 
     let rec aux subst problem =
@@ -181,7 +152,7 @@ module Make (P : PARAMETERS) = struct
 
       let decompose_and_cont ?(inc_step=0) args_l args_r rest flag subst =
         let new_prob = decompose args_l args_r rest flag in
-        aux subst new_prob in
+        (fun () -> aux subst new_prob ()) in
 
       match problem with 
       | [] -> OSeq.return (Some subst)
@@ -242,29 +213,32 @@ module Make (P : PARAMETERS) = struct
                       lhs and rhs *)
                   CCList.map (fun sub () -> aux sub rest ()) substs
                   |> OSeq.of_list
-                  |> P.oracle_composer
+                  |> OSeq.merge
                 | None ->
                   let args_unif =
-                    if T.is_var hd_lhs && T.is_var hd_rhs && T.equal hd_lhs hd_rhs then
-                      decompose_and_cont args_lhs args_rhs rest flag subst
+                    if T.is_var hd_lhs && T.is_var hd_rhs && T.equal hd_lhs hd_rhs then(
+                      incr bind_cnt;
+                      delay !bind_cnt (fun () -> decompose_and_cont args_lhs args_rhs rest flag subst ()))
                     else OSeq.empty in
 
                   let all_oracles = 
                     P.pb_oracle (body_lhs, unifscope) (body_rhs, unifscope) flag subst unifscope in
 
-                  let oracle_unifs = 
-                    OSeq.map (fun sub_flag_opt ->
-                        match sub_flag_opt with 
-                        | None -> OSeq.return None
-                        | Some (sub', flag') ->
-                          try
-                            let subst' = Subst.merge subst sub' in
-                            incr bind_cnt;
-                            delay (fun () -> aux subst' ((lhs,rhs,flag') :: rest) ())
-                          with Subst.InconsistentBinding _ ->
-                            OSeq.empty) all_oracles
-                    |> P.oracle_composer in
-                  OSeq.interleave oracle_unifs args_unif
+                  OSeq.map (fun sub_flag_opt ->
+                      match sub_flag_opt with 
+                      | None -> 
+                        (* CCFormat.printf " (%d) substitution says None@." id; *)
+                        OSeq.return None
+                      | Some (sub', flag') ->
+                        try
+                          let subst' = Subst.merge subst sub' in
+                          incr bind_cnt;
+                          delay !bind_cnt (fun () -> aux subst' ((lhs,rhs,flag') :: rest) ())
+                        with Subst.InconsistentBinding _ ->
+                          OSeq.return None) all_oracles
+                  |> OSeq.merge
+                  |> OSeq.interleave args_unif
+                  (* |> delay *)
               with Unif.Fail -> OSeq.empty) in
     aux subst problem
 
@@ -303,15 +277,17 @@ module Make (P : PARAMETERS) = struct
     ) else OSeq.empty
 
 
+  let problem_id = ref 0
 
   let unify_scoped t0s t1s =
     let lhs,rhs,unifscope,subst = P.identify_scope t0s t1s in
 
+    let id = CCRef.get_then_incr problem_id in
     let bind_cnt = ref 0 in
     try
       OSeq.append 
         (try_lfho_unif t0s t1s)
-        (do_unif ~bind_cnt [(lhs,rhs,P.init_flag)] subst unifscope)
+        (do_unif ~bind_cnt ~id [(lhs,rhs,P.init_flag)] subst unifscope)
       |> OSeq.map (fun opt -> CCOpt.map (fun subst ->
         let norm t = T.normalize_bools @@ Lambda.eta_expand @@ Lambda.snf t in
         let l = norm @@ S.FO.apply Subst.Renaming.none subst t0s in 

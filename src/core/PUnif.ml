@@ -363,7 +363,6 @@ module Make (St : sig val st : Flex_state.t end) = struct
       let frag_algs = deciders ~counter (*[]*)
       let pb_oracle s t (f:flag_type) subst scope = 
         oracle ~counter ~scope ~subst s t f
-      let oracle_composer = Flex_state.get_exn PUP.k_oracle_composer St.st
     end in
 
     let module PragUnif = UnifFramework.Make(PragUnifParams) in

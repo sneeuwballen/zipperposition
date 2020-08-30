@@ -2406,7 +2406,6 @@ let _elim_andrews_eq = ref (-1)
 let _prune_arg_fun = ref `NoPrune
 let _check_lambda_free = ref `False
 let prim_enum_terms = ref Term.Set.empty
-let _oracle_composer = ref (OSeq.merge :> (Logtk.Subst.t option OSeq.t OSeq.t -> Logtk.Subst.t option OSeq.t))
 let _simple_projection = ref (-1)
 let _simple_projection_md = ref 2
 let _purify_applied_vars = ref `None
@@ -2499,7 +2498,6 @@ let extension =
     state
     |> Flex_state.add k_some_ho is_ho
     |> Flex_state.add k_enabled !enabled_
-    |> Flex_state.add PragUnifParams.k_oracle_composer !_oracle_composer
     |> Flex_state.add k_enable_def_unfold !def_unfold_enabled_
     |> Flex_state.add k_enable_ho_unif (!enabled_ && !enable_unif_)
     |> Flex_state.add k_ho_prim_mode (if !enabled_ then !prim_mode_ else `None)
@@ -2533,9 +2531,6 @@ let () =
       "--ho-prim-enum-simpl", Arg.Bool ((:=) _prim_enum_simpl), " use primitive enumeration as simplification rule";
       "--ho-prim-enum-early-bird", Arg.Bool ((:=) _prim_enum_early_bird), " use early-bird primitive enumeration (requires lazy CNF)";
       "--ho-resolve-flex-flex", Arg.Bool ((:=) _resolve_flex_flex), " eagerly remove non-essential flex-flex constraints";
-      "--ho-oracle-composer", Arg.Symbol (["merge";"fair"], (fun s -> 
-          if s = "merge" then _oracle_composer := (OSeq.merge :> (Logtk.Subst.t option OSeq.t OSeq.t -> Logtk.Subst.t option OSeq.t))
-          else _oracle_composer := UnifFramework.take_fair)), " choose either OSeq.merge or Unif.take_fair as the composer";
       "--ho-ext-axiom", Arg.Bool (fun v -> _ext_axiom := v), " enable/disable extensionality axiom";
       "--ho-choice-axiom", Arg.Bool (fun v -> _choice_axiom := v), " enable choice axiom";
       "--ho-ext-pos", Arg.Bool (fun v -> _ext_pos := v), " enable/disable positive extensionality rule";
