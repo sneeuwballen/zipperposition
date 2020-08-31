@@ -1685,7 +1685,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       assert (ty_args <> []);
       let vars =
         List.mapi
-          (fun i ty -> HVar.make ~ty (i+var_offset) |> T.var)
+          (fun i ty -> T.var @@ HVar.make ~ty (i+var_offset))
           ty_args
       in
       CCList.(start -- List.length vars)
@@ -1710,8 +1710,10 @@ module Make(E : Env.S) : S with module Env = E = struct
 
           new_c)
       in
+
       let is_poly_arg_cong_res = C.get_flag SClause.flag_poly_arg_cong_res c in
       let new_c =
+
         C.lits c
         |> Iter.of_array |> Util.seq_zipi
         |> Iter.filter (fun (idx,lit) -> eligible idx lit)
@@ -1922,7 +1924,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     C.lits c
     |> Literals.map (fun t -> Combs.expand t) (* to make sure that DB indices are everywhere the same *)
     |> Literals.fold_terms ~vars:true ~ty_args:false ~which:`All ~ord:Ordering.none 
-      ~subterms:true  ~eligible:(fun _ _ -> true)
+                           ~subterms:true  ~eligible:(fun _ _ -> true)
     |> Iter.iter
       (fun (t,_) ->
          let head, _ = T.as_app t in

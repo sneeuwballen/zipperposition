@@ -7,7 +7,6 @@ open Logtk
 
 val enabled : bool ref
 
-val k_solve_formulas : bool Flex_state.key
 val k_pa_renaming : bool Flex_state.key
 
 module type S = sig
@@ -20,8 +19,6 @@ module type S = sig
   (** Register rules in the environment *)
 
   val update_form_counter: action:[< `Decrease | `Increase ] -> C.t -> unit
-  val solve_bool_formulas: C.t -> C.t CCList.t option
-  (* Find resolvable boolean literals and resolve them before CNF starts *)
 end
 
 module Make(E : Env.S) : S with module Env = E

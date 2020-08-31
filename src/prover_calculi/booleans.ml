@@ -12,6 +12,14 @@ module US = Unif_subst
 module L = Literal
 module Ls = Literals
 
+(* 
+val solve_bool_formulas: ?which:[> `All | `OnlyPositive] -> C.t -> C.t CCList.t option
+  (* Find resolvable boolean literals and resolve them.
+     If which is `OnlyPositive then _only_ literals of the form s = t
+     are rewritten into s != ~t and then unified. Else, both negative
+     and positive literals are unifieds  *)
+ *)
+
 type reasoning_kind    = 
     BoolReasoningDisabled 
   | BoolSimplificationsOnly
@@ -36,6 +44,7 @@ let k_bool_hoist_simpl = Flex_state.create_key ()
 let k_rename_nested_bools = Flex_state.create_key ()
 let k_fluid_hoist = Flex_state.create_key ()
 let k_fluid_log_hoist = Flex_state.create_key ()
+let k_solve_formulas = Flex_state.create_key ()
 
 module type S = sig
   module Env : Env.S
@@ -1270,6 +1279,114 @@ module Make(E : Env.S) : S with module Env = E = struct
           (Array.to_list new_lits) proof in
       SimplM.return_new new_
     )
+  
+  let solve_bool_formulas ~which ?(which=`All) c =
+    let module PUnif = 
+      PUnif.Make(struct 
+        let st = 
+          Env.flex_state ()
+          |> Flex_state.add PragUnifParams.k_fixpoint_decider true
+          |> Flex_state.add PragUnifParams.k_pattern_decider true
+          |> Flex_state.add PragUnifParams.k_solid_decider true
+          |> Flex_state.add PragUnifParams.k_max_inferences 1
+          |> Flex_state.add PragUnifParams.k_max_depth 4
+          |> Flex_state.add PragUnifParams.k_max_app_projections 2
+          |> Flex_state.add PragUnifParams.k_max_rigid_imitations 2
+          |> Flex_state.add PragUnifParams.k_max_elims 0
+          |> Flex_state.add PragUnifParams.k_max_identifications 0
+        end) in
+    
+    let normalize_not t =
+      let rec aux t = 
+        match T.view t with
+        | T.AppBuiltin(Not, [f]) ->
+          begin match T.view f with
+          | T.AppBuiltin(Not, [g]) -> aux g
+          | T.AppBuiltin( ((Eq|Equiv) as b), l ) ->
+            let flipped = 
+              if b = Builtin.Eq then Builtin.Neq else Builtin.Xor in
+            T.app_builtin flipped l ~ty:(T.ty f)
+          | T.AppBuiltin( ((Neq|Xor) as b), l ) ->
+            let flipped = 
+              if b = Builtin.Neq then Builtin.Eq else Builtin.Equiv in
+            T.app_builtin flipped l ~ty:(T.ty f)
+          | _ -> t end
+        | _ -> t in
+      aux t in
+
+    let find_resolvable_form lit =
+      let is_var_headed t = T.is_var (T.head_term t) in
+
+      (* Rewrite positive equations of the form F s = t, where t is not
+         var-headed into F s != (not t).  *)
+      let find_pos_var_headed_eq l r = 
+        if is_var_headed l && not (is_var_headed r) then (Some(l, T.Form.not_ r)) 
+        else if is_var_headed r && not (is_var_headed l) then (Some(r, T.Form.not_ l))
+        else None in
+
+      match (Literal.View.as_eqn lit) with 
+      | Some (l,r,sign) ->
+        if not (T.is_true_or_false r) && Type.is_prop (T.ty l) then (
+          if not sign && which = `All then Some (l,r)
+          else if sign then find_pos_var_headed_eq l r
+          else None)
+        else if T.is_true_or_false r then (
+          let apply_sign = if sign then CCFun.id else T.Form.not_ in
+          match T.view (normalize_not (apply_sign l)) with 
+          | T.AppBuiltin((Neq|Xor), ([f;g]|[_;f;g])) 
+            when Type.is_prop (T.ty f) && which == `All ->
+            assert(Type.equal (T.ty f) (T.ty g));
+            Some (f,g)
+          | T.AppBuiltin((Eq|Equiv), ([f;g]|[_;f;g])) when Type.is_prop (T.ty f) ->
+            assert(Type.equal (T.ty f) (T.ty g));
+            find_pos_var_headed_eq f g
+          | _ -> None
+        ) else None
+      | None -> None in
+    
+    let unif_alg l r =
+      if not (Env.flex_get Combinators.k_enable_combinators) then (
+        PUnif.unify_scoped (l,0) (r,0)
+        |> OSeq.filter_map CCFun.id
+        |> OSeq.nth 0
+      ) else Unif_subst.of_subst @@ Unif.FO.unify_syn (l,0) (r,0) in
+    
+    Util.debugf ~section 2 "bool solving @[%a@]@."(fun k -> k C.pp c);
+
+    C.lits c
+    |> CCArray.mapi (fun i lit ->
+      match find_resolvable_form lit with 
+      | None ->
+        Util.debugf ~section 2 "for lit %d(@[%a@]) of @[%a@] no resolvable lits found@." 
+          (fun k -> k i Literal.pp lit C.pp c);
+        None
+      | Some (l,r) ->
+        let module US = Unif_subst in
+        try
+          Util.debugf ~section 2 "trying lit @[%d:%a@]@."(fun k -> k i Literal.pp lit);
+          Util.debugf ~section 2 "unif problem: @[%a=?=%a@]@."(fun k -> k T.pp l T.pp r);
+          let subst = unif_alg l r in
+          assert(not @@ Unif_subst.has_constr subst);
+          let renaming = Subst.Renaming.create () in
+          let new_lits =
+            CCArray.except_idx (C.lits c) i
+            |> CCArray.of_list
+            |> (fun l -> 
+                Literals.apply_subst renaming (US.subst subst) (l,0))
+            |> CCArray.to_list in
+          let proof = 
+            Proof.Step.simp ~tags:[Proof.Tag.T_ho]
+              ~rule:(Proof.Rule.mk "solve_formulas")
+              [C.proof_parent_subst renaming (c,0) (US.subst subst) ] in
+          let res = C.create ~penalty:(C.penalty c) ~trail:(C.trail c) new_lits proof in
+          Util.debugf ~section 2 "solved by @[%a@]@."(fun k ->  k C.pp res);
+          Some res
+        with _ -> 
+          Util.debugf ~section 2 "failed @." (fun k -> k);
+          None)
+      |> CCArray.filter_map CCFun.id
+      |> CCArray.to_list
+      |> (fun l -> if CCList.is_empty l then None else Some l)
 
   let cnf_otf c : C.t list option =
     let idx = CCArray.find_idx (fun l -> 
@@ -1305,8 +1422,8 @@ module Make(E : Env.S) : S with module Env = E = struct
           Statement.Seq.ty_decls cl
           |> Iter.iter (fun (id,ty) -> Ctx.declare id ty)) cnf_vec;
       let solved = 
-        if Env.flex_get Lazy_cnf.k_solve_formulas then (
-          CCOpt.get_or ~default:[] (LazyCNF.solve_bool_formulas c))
+        if Env.flex_get k_solve_formulas then (
+          CCOpt.get_or ~default:[] (solve_bool_formulas ~which:`All c))
         else [] in
 
       let clauses = CCVector.map (C.of_statement ~convert_defs:true) cnf_vec
@@ -1423,6 +1540,12 @@ module Make(E : Env.S) : S with module Env = E = struct
     | BoolReasoningDisabled -> ()
     | _ ->
       Env.add_basic_simplify normalize_equalities;
+      if Env.flex_get k_solve_formulas then (
+        Env.add_unary_inf "solve formulas" (
+          fun c -> 
+            CCOpt.get_or ~default:[] @@
+            solve_bool_formulas ~which:`OnlyPositive c
+        ));
       if Env.flex_get k_trigger_bool_inst > 0 || Env.flex_get k_trigger_bool_ind > 0 then (
         Signal.on Env.on_pred_var_elimination handle_new_pred_var_clause;
         Signal.on Env.FormRename.on_pred_skolem_introduction handle_new_skolem_sym;
@@ -1789,6 +1912,7 @@ let _bool_hoist_simpl = ref false
 let _rename_nested_bools = ref false
 let _fluid_hoist = ref false
 let _fluid_log_hoist = ref false
+let _solve_formulas = ref false
 
 
 let extension =
@@ -1809,6 +1933,7 @@ let extension =
     E.flex_add k_rename_nested_bools !_rename_nested_bools;
     E.flex_add k_fluid_hoist !_fluid_hoist;
     E.flex_add k_fluid_log_hoist !_fluid_log_hoist;
+    E.flex_add k_solve_formulas !_solve_formulas;
 
     ET.setup ()
   in
@@ -1866,6 +1991,9 @@ let () =
       "--fluid-log-hoist"
       , Arg.Bool (fun v -> _fluid_log_hoist := v)
       , " enable/disable fluid version of BoolRW, (Forall|Exists)RW, (Eq|Neq|Forall|Exists)Hoist rules";
+      "--solve-formulas"
+      , Arg.Bool (fun v -> _solve_formulas := v)
+      , " solve phi = psi eagerly by unifying phi != ~psi, where phi and psi are formulas";
       "--boolean-reasoning-filter-literals"
       , Arg.Symbol(["all"; "max"], (fun v ->
           match v with 

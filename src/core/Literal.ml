@@ -655,15 +655,18 @@ let fold_terms ?(position=Position.stop) ?(vars=false) ?(var_args=true) ?(fun_bo
 
   let filter_formula_subterms hd args =
     let open Builtin in
-    match hd, args with 
-    | (Eq|Neq|Xor|Equiv), ([_;a;b]|[a;b]) ->
-      (match Ordering.compare ord a b with 
-      | Comparison.Lt -> Some [List.length args - 1]
-      | Comparison.Gt -> Some [List.length args - 2]
+    match which with 
+    | `Max -> 
+      (match hd, args with 
+      | (Eq|Neq|Xor|Equiv), ([_;a;b]|[a;b]) ->
+        (match Ordering.compare ord a b with 
+        | Comparison.Lt -> Some [List.length args - 1]
+        | Comparison.Gt -> Some [List.length args - 2]
+        | _ -> None)
+      | (ForallConst|ExistsConst), [_;_] ->
+        Some []
       | _ -> None)
-    | (ForallConst|ExistsConst), [_;_] ->
-      Some []
-    | _ -> None
+    | `All -> None
   in
     
   let at_term ~pos t =
