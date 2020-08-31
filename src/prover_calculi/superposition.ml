@@ -3067,7 +3067,7 @@ let _unif_level = ref `Full
 let _ground_subs_check = ref 0
 let _solid_subsumption = ref false
 
-let _skip_multiplier = ref 6.0
+let _skip_multiplier = ref 4.0
 let _imit_first = ref false
 let _unif_logop_mode = ref `Pragmatic
 let _max_depth = ref 2
@@ -3087,8 +3087,8 @@ let _immediate_simplification = ref false
 let _try_lfho_unif = ref true
 let _bool_eq_fact = ref true
 
-let _guard = ref 15
-let _ratio = ref 120
+let _guard = ref 30
+let _ratio = ref 100
 let _clause_num = ref (-1)
 
 let key = Flex_state.create_key ()

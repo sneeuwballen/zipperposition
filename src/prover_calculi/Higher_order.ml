@@ -1132,7 +1132,8 @@ module Make(E : Env.S) : S with module Env = E = struct
         Type.is_fun ty && List.length (Type.expected_args ty) = 1 &&
         Type.equal (Term.ty t) (List.hd (Type.expected_args ty)) &&
         Type.returns_prop ty && T.DB.is_closed t
-      | T.AppBuiltin(Builtin.ChoiceConst, l) -> CCList.length l == 2
+      | T.AppBuiltin(Builtin.ChoiceConst, l) -> 
+        CCList.length l == 2 && T.DB.is_closed t
       | _ -> false in
 
     let neg_trigger t =
