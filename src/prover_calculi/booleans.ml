@@ -12,14 +12,6 @@ module US = Unif_subst
 module L = Literal
 module Ls = Literals
 
-(* 
-val solve_bool_formulas: ?which:[> `All | `OnlyPositive] -> C.t -> C.t CCList.t option
-  (* Find resolvable boolean literals and resolve them.
-     If which is `OnlyPositive then _only_ literals of the form s = t
-     are rewritten into s != ~t and then unified. Else, both negative
-     and positive literals are unifieds  *)
- *)
-
 type reasoning_kind    = 
     BoolReasoningDisabled 
   | BoolSimplificationsOnly
@@ -1280,7 +1272,11 @@ module Make(E : Env.S) : S with module Env = E = struct
       SimplM.return_new new_
     )
   
-  let solve_bool_formulas ~which ?(which=`All) c =
+  (* Find resolvable boolean literals and resolve them.
+     If which is `OnlyPositive then _only_ literals of the form s = t
+     are rewritten into s != ~t and then unified. Else, both negative
+     and positive literals are unified  *)
+  let solve_bool_formulas ~which c =
     let module PUnif = 
       PUnif.Make(struct 
         let st = 
