@@ -241,7 +241,14 @@ module Make(E : Env.S) : S with module Env = E = struct
   
   let get_bool_eligible c =
     get_green_eligible c
-    |> Iter.append (SClause.TPSet.to_iter (C.eligible_subterms_of_bool c))
+    |> Iter.filter (fun (_,p) -> 
+      let module P = Position in
+      match p with
+      | P.Arg(_, P.Left P.Stop)
+      | P.Arg(_, P.Right P.Stop) ->
+        false
+      | _ -> true
+    ) |> Iter.append (SClause.TPSet.to_iter (C.eligible_subterms_of_bool c))
 
   let get_bool_hoist_eligible c =
     get_bool_eligible c
@@ -346,7 +353,6 @@ module Make(E : Env.S) : S with module Env = E = struct
         get_bool_eligible c'
         |> Iter.exists (fun (_, p) -> Position.equal p at) 
       in
-
 
       if still_at_eligible then (
         let new_lit = 
