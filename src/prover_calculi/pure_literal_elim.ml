@@ -17,12 +17,17 @@ type item = {
 
 exception AppVarFound
 
+module IntSet = Util.Int_set
+
 
 (* Computes a map symbol -> item, that is for each item we know how many times
    it occurs positive, how many times it occurs negative and for the clauses in
    which it occurs, what other symbols occur with what polarity *)
 let compute_occurence_map seq =
-  let process_literals id_map lits =
+
+  (* given map of symbols to clauses in which they occur and a new clause
+     in the form (cl_idx, literals) return updated map and converted clause *)
+  let process_literals id_map (cl_idx, lits) =
 
     (* This will compute the map (symbol, polarity) -> occurrence count
        for the list of literals *)
@@ -55,33 +60,23 @@ let compute_occurence_map seq =
 
     let all_symbol_occurences = ocurrences IDMap.empty lits in
 
-    IDMap.keys all_symbol_occurences
-    |> Iter.map fst
-    |> ID.Set.of_iter 
-    |> (fun syms -> ID.Set.fold (fun sym acc -> 
-      let pos_occ, neg_occ =
-        IDMap.get_or (sym, true) all_symbol_occurences ~default:0,
-        IDMap.get_or (sym, false) all_symbol_occurences ~default:0
-      in
-      let others = 
-        IDMap.filter (fun (sym', _) _ -> not @@ ID.equal sym sym') all_symbol_occurences in
-      let default = {pos_cnt=0; neg_cnt=0; other_occurences=IDMap.empty} in
-      let prev = ID.Map.get_or sym id_map ~default in
-      ID.Map.add sym {
-          pos_cnt=prev.pos_cnt+pos_occ; 
-          neg_cnt = prev.neg_cnt+neg_occ;
-          other_occurences = 
-            IDMap.union (fun sym old new_ -> Some (old + new_))
-              prev.other_occurences others     
-          } id_map
-    ) syms id_map)
+    let id_map' = 
+      IDMap.keys all_symbol_occurences
+      |> Iter.map fst
+      |> ID.Set.of_iter
+      |> (fun syms -> ID.Set.fold (fun sym acc -> 
+        let prev = ID.Map.get_or sym acc ~default:IntSet.empty in
+        ID.Map.add sym (IntSet.add cl_idx prev) acc
+      ) syms id_map)
+    in
+    id_map', all_symbol_occurences
   in
 
-  Iter.fold (fun (forbidden, id_map) stmt -> 
+  Iter.fold (fun (forbidden, ids2clauses, clauses) stmt -> 
     match Statement.view stmt with
       (* Ignoring type declarations *)
     | Statement.TyDecl _ -> 
-      forbidden, id_map
+      forbidden, ids2clauses, clauses
     | Statement.Data _
     | Statement.Lemma _
     | Statement.Def _
@@ -90,15 +85,24 @@ let compute_occurence_map seq =
          Zip -- and will definitely occur in both polarities,
          so we forbid their removal *)
       let f = Statement.Seq.symbols stmt in
-      (ID.Set.union (ID.Set.of_iter f) forbidden), id_map
+      (ID.Set.union (ID.Set.of_iter f) forbidden), ids2clauses, clauses
     | Statement.Assert lits ->
       (* normal clause *)
-      forbidden, process_literals id_map lits
-    | Statement.NegatedGoal (skolems,clauses) -> 
+      let ids2clauses', new_cl = 
+        process_literals ids2clauses (List.length clauses, lits) in
+      forbidden, ids2clauses, new_cl :: clauses
+    | Statement.NegatedGoal (skolems,list_of_lits) ->
       (* clauses stemming from the negated goal *)
-      forbidden, List.fold_left (fun acc lits -> process_literals acc lits) id_map clauses 
+      let ids2clauses', clauses' = 
+        List.fold_left (fun (ids2cls, cls) lits -> 
+          let ids2cls', new_cl = 
+            process_literals ids2cls (List.length cls, lits) in
+          (ids2cls', new_cl :: cls)
+        ) (ids2clauses, clauses) list_of_lits
+      in
+      forbidden, ids2clauses', clauses'
     | Statement.Goal lits -> 
       (* after CNFing a 'normal' problem all goals should 
          be negated and clausified *)
       failwith "Not implemented: Goal"
-  ) (ID.Set.empty, ID.Map.empty) seq
+  ) (ID.Set.empty, ID.Map.empty, []) seq
