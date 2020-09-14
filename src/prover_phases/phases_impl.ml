@@ -71,6 +71,7 @@ let load_extensions =
   Extensions.register Lift_lambdas.extension;
 
 
+  Extensions.register Pure_literal_elim.extension;
   Extensions.register Bool_encode.extension;
   Extensions.register App_encode.extension;
   Extensions.register Eq_encode.extension;

@@ -17,6 +17,8 @@ exception AppVarFound
 
 let _enabled = ref false
 
+let pp_key = CCPair.pp ID.pp CCBool.pp
+
 let cl_syms lits = 
   let lit_syms lit = 
     SLiteral.fold (fun acc t -> 
@@ -44,16 +46,16 @@ let compute_occurence_map (seq : (TST.t SLiteral.t list, TST.t, TST.t) Statement
       function
       | [] -> map
       | x :: xs ->
-        try 
+        try
           match x with
           | SLiteral.Atom(pred, sign) ->
-            inc_map (TST.head_exn pred) sign map
+            ocurrences (inc_map (TST.head_exn pred) sign map) xs
           | SLiteral.Neq(lhs,rhs)
           | SLiteral.Eq(lhs,rhs) when TST.Ty.is_prop (TST.ty_exn lhs) ->
             let (l_hd, r_hd) = CCPair.map_same TST.head_exn (lhs,rhs) in
             (* each symbol occurs once negative and once positive *)
             let inc_l = inc_map l_hd false (inc_map l_hd true map) in
-            inc_map r_hd false (inc_map r_hd true inc_l)
+            ocurrences (inc_map r_hd false (inc_map r_hd true inc_l)) xs
           | _ -> ocurrences map xs
         with Invalid_argument _ -> 
           (* invalid arg is raised if the head is not a symbol *)
@@ -92,7 +94,7 @@ let compute_occurence_map (seq : (TST.t SLiteral.t list, TST.t, TST.t) Statement
       (* normal clause *)
       let ids2clauses', new_cl = 
         process_literals ids2clauses (List.length clauses, lits) in
-      forbidden, ids2clauses, new_cl :: clauses
+      forbidden, ids2clauses', new_cl :: clauses
     | Statement.NegatedGoal (skolems,list_of_lits) ->
       (* clauses stemming from the negated goal *)
       let ids2clauses', clauses' = 
@@ -118,6 +120,9 @@ let get_pure_symbols forbidden ids2clauses clauses =
       if ID.Set.mem sym processed || ID.Set.mem sym forbidden then (
         aux processed symbol_occurences syms
       ) else (
+        (* CCFormat.printf "removing @[%a@]@." ID.pp sym;
+        CCFormat.printf "occurrences @[%a@]@." 
+          (IDMap.pp ~arrow:"==>" ~sep:";" pp_key CCInt.pp) symbol_occurences; *)
         let clauses_to_remove =
           CCList.filter_map (fun idx -> 
             if not (CCBV.get cl_status idx) then (
@@ -159,8 +164,8 @@ let get_pure_symbols forbidden ids2clauses clauses =
   let init_pure = 
     ID.Set.filter (fun sym -> 
       not @@ ID.Set.mem sym forbidden &&
-      (IDMap.find (sym, true) all_clauses == 0 ||
-       IDMap.find (sym, false) all_clauses == 0)
+      (IDMap.get_or ~default:0 (sym, true) all_clauses == 0 ||
+       IDMap.get_or ~default:0 (sym, false) all_clauses == 0)
     ) all_symbols
   in
   let clause_status = CCBV.create ~size:(List.length clauses) false in
@@ -168,14 +173,16 @@ let get_pure_symbols forbidden ids2clauses clauses =
 
 let remove_pure_clauses (seq : (TST.t SLiteral.t list, TST.t, TST.t) Statement.t Iter.t) =
   let forbidden, ids2cls, cls = compute_occurence_map seq in
+
   let pure_syms = 
     ID.Set.diff
       (get_pure_symbols forbidden ids2cls cls)
     forbidden
   in
+
   let filter_if_has_pure stmt lits =
     CCOpt.return_if 
-      (not @@ ID.Set.is_empty @@ ID.Set.inter pure_syms (cl_syms lits)) 
+      (ID.Set.is_empty @@ ID.Set.inter pure_syms (cl_syms lits)) 
     stmt
   in
   Iter.filter_map (fun stmt -> 
@@ -229,4 +236,5 @@ let extension =
 let () =
   Options.add_opts
     [ "--pure-literal-preprocessing", Arg.Bool (fun v -> _enabled := v), 
-      " remove all pure literals in fixpoint"]
+      " remove all pure literals in fixpoint"];
+  Extensions.register extension
