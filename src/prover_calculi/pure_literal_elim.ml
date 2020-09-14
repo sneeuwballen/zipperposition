@@ -1,4 +1,5 @@
 open Logtk
+open Libzipperposition
 
 type id_sgn = ID.t * bool
 module IDMap = CCMap.Make(struct
@@ -10,15 +11,24 @@ module IDMap = CCMap.Make(struct
 end)
 
 module IntSet = Util.Int_set
+module TST = TypedSTerm
 
 exception AppVarFound
 
+let _enabled = ref false
 
+let cl_syms lits = 
+  let lit_syms lit = 
+    SLiteral.fold (fun acc t -> 
+      ID.Set.union (ID.Set.of_iter (TST.Seq.symbols t)) acc)
+    ID.Set.empty lit
+  in
+  List.fold_left (fun acc lit -> ID.Set.union acc (lit_syms lit)) ID.Set.empty lits
 
 (* Computes a map symbol -> item, that is for each item we know how many times
    it occurs positive, how many times it occurs negative and for the clauses in
    which it occurs, what other symbols occur with what polarity *)
-let compute_occurence_map seq =
+let compute_occurence_map (seq : (TST.t SLiteral.t list, TST.t, TST.t) Statement.t Iter.t) =
 
   (* given map of symbols to clauses in which they occur and a new clause
      in the form (cl_idx, literals) return updated map and converted clause *)
@@ -37,13 +47,10 @@ let compute_occurence_map seq =
         try 
           match x with
           | SLiteral.Atom(pred, sign) ->
-            let pred = Lambda.snf pred in
-            let hd = Term.head_exn pred in
-            inc_map hd sign map
+            inc_map (TST.head_exn pred) sign map
           | SLiteral.Neq(lhs,rhs)
-          | SLiteral.Eq(lhs,rhs) when Type.is_prop (Term.ty lhs) ->
-            let (lhs, rhs) = CCPair.map_same Lambda.snf (lhs,rhs) in
-            let (l_hd, r_hd) = CCPair.map_same Term.head_exn (lhs,rhs) in
+          | SLiteral.Eq(lhs,rhs) when TST.Ty.is_prop (TST.ty_exn lhs) ->
+            let (l_hd, r_hd) = CCPair.map_same TST.head_exn (lhs,rhs) in
             (* each symbol occurs once negative and once positive *)
             let inc_l = inc_map l_hd false (inc_map l_hd true map) in
             inc_map r_hd false (inc_map r_hd true inc_l)
@@ -67,7 +74,7 @@ let compute_occurence_map seq =
     id_map', all_symbol_occurences
   in
 
-  Iter.fold (fun (forbidden, ids2clauses, clauses) stmt -> 
+  Iter.fold (fun (forbidden, ids2clauses, clauses) (stmt : (TST.t SLiteral.t list, TST.t, TST.t) Statement.t) -> 
     match Statement.view stmt with
       (* Ignoring type declarations *)
     | Statement.TyDecl _ -> 
@@ -76,11 +83,11 @@ let compute_occurence_map seq =
     | Statement.Lemma _
     | Statement.Def _
     | Statement.Rewrite _ ->
-      (* those are statements (not clauses!) that are treated specially by
-         Zip -- and will definitely occur in both polarities,
-         so we forbid their removal *)
-      let f = Statement.Seq.symbols stmt in
-      (ID.Set.union (ID.Set.of_iter f) forbidden), ids2clauses, clauses
+      let f_syms = 
+        Statement.Seq.forms stmt
+        |> Iter.fold (fun acc lits -> ID.Set.union acc (cl_syms lits)) ID.Set.empty
+      in
+      (ID.Set.union f_syms forbidden), ids2clauses, clauses
     | Statement.Assert lits ->
       (* normal clause *)
       let ids2clauses', new_cl = 
@@ -159,16 +166,7 @@ let get_pure_symbols forbidden ids2clauses clauses =
   let clause_status = CCBV.create ~size:(List.length clauses) false in
   calculate_pure init_pure clause_status all_clauses
 
-let remove_pure_clauses seq =
-  let cl_syms lits = 
-    let lit_syms lit = 
-      SLiteral.fold (fun acc t -> 
-        ID.Set.union (ID.Set.of_iter (Term.Seq.symbols t)) acc)
-      ID.Set.empty lit
-    in
-    List.fold_left (fun acc lit -> ID.Set.union acc (lit_syms lit)) ID.Set.empty lits
-  in
-
+let remove_pure_clauses (seq : (TST.t SLiteral.t list, TST.t, TST.t) Statement.t Iter.t) =
   let forbidden, ids2cls, cls = compute_occurence_map seq in
   let pure_syms = 
     ID.Set.diff
@@ -213,3 +211,15 @@ let remove_pure_clauses seq =
          be negated and clausified *)
       Some stmt
   ) seq
+
+let extension =
+  let modifier (seq : (TST.t SLiteral.t list, TST.t, TST.t) Statement.t Iter.t) = 
+    if !_enabled then remove_pure_clauses seq else seq in
+  Extensions.(
+    { default with name="pure_literal_elimination"; post_cnf_modifiers=[modifier]; }
+  )
+
+let () =
+  Options.add_opts
+    [ "--pure-literal-preprocessing", Arg.Bool (fun v -> _enabled := v), 
+      " remove all pure literals in fixpoint"]
