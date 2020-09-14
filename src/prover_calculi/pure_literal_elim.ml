@@ -118,7 +118,7 @@ let get_pure_symbols forbidden ids2clauses clauses =
               Some (clauses.(idx))
             )
             else None
-          ) (ID.Map.find sym ids2clauses)
+          ) (IntSet.to_list @@ ID.Map.find sym ids2clauses)
         in
         let symbol_occurences', next_to_process =
           List.fold_left (fun (sym_occs, next_to_process) cl -> 
@@ -158,3 +158,58 @@ let get_pure_symbols forbidden ids2clauses clauses =
   in
   let clause_status = CCBV.create ~size:(List.length clauses) false in
   calculate_pure init_pure clause_status all_clauses
+
+let remove_pure_clauses seq =
+  let cl_syms lits = 
+    let lit_syms lit = 
+      SLiteral.fold (fun acc t -> 
+        ID.Set.union (ID.Set.of_iter (Term.Seq.symbols t)) acc)
+      ID.Set.empty lit
+    in
+    List.fold_left (fun acc lit -> ID.Set.union acc (lit_syms lit)) ID.Set.empty lits
+  in
+
+  let forbidden, ids2cls, cls = compute_occurence_map seq in
+  let pure_syms = 
+    ID.Set.diff
+      (get_pure_symbols forbidden ids2cls cls)
+    forbidden
+  in
+  let filter_if_has_pure stmt lits =
+    CCOpt.return_if 
+      (not @@ ID.Set.is_empty @@ ID.Set.inter pure_syms (cl_syms lits)) 
+    stmt
+  in
+  Iter.filter_map (fun stmt -> 
+    match Statement.view stmt with
+    | Statement.TyDecl _
+    | Statement.Data _
+    | Statement.Lemma _
+    | Statement.Def _
+    | Statement.Rewrite _ ->
+      None
+    | Statement.Assert lits ->
+      (* normal clause *)
+      filter_if_has_pure stmt lits
+    | Statement.NegatedGoal (skolems,list_of_lits) ->
+      (* clauses stemming from the negated goal *)
+      let new_cls = 
+        List.filter_map (fun x -> filter_if_has_pure x x) list_of_lits 
+      in
+      if CCList.is_empty new_cls then None
+      else if List.length new_cls == List.length list_of_lits then Some stmt
+      else (
+        let new_stm =
+          Statement.neg_goal
+            ~attrs:(Statement.attrs stmt)
+            ~proof:(Statement.proof_step stmt)
+            ~skolems
+            new_cls
+        in
+        Some (new_stm)
+      )
+    | Statement.Goal lits -> 
+      (* after CNFing a 'normal' problem all goals should 
+         be negated and clausified *)
+      Some stmt
+  ) seq
