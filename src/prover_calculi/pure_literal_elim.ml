@@ -25,7 +25,7 @@ let cl_syms lits =
   in
   List.fold_left (fun acc lit -> ID.Set.union acc (lit_syms lit)) ID.Set.empty lits
 
-(* Computes a map symbol -> item, that is for each item we know how many times
+(* Computes a map (symbol, polarity) -> item, that is for each item we know how many times
    it occurs positive, how many times it occurs negative and for the clauses in
    which it occurs, what other symbols occur with what polarity *)
 let compute_occurence_map (seq : (TST.t SLiteral.t list, TST.t, TST.t) Statement.t Iter.t) =
@@ -214,7 +214,14 @@ let remove_pure_clauses (seq : (TST.t SLiteral.t list, TST.t, TST.t) Statement.t
 
 let extension =
   let modifier (seq : (TST.t SLiteral.t list, TST.t, TST.t) Statement.t Iter.t) = 
-    if !_enabled then remove_pure_clauses seq else seq in
+    if !_enabled then 
+      begin 
+        try 
+          remove_pure_clauses seq 
+        with AppVarFound ->
+          seq
+      end
+    else seq in
   Extensions.(
     { default with name="pure_literal_elimination"; post_cnf_modifiers=[modifier]; }
   )
