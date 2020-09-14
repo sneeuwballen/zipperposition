@@ -9,15 +9,10 @@ module IDMap = CCMap.Make(struct
     <?> (Bool.compare, sgn1, sgn2)
 end)
 
-type item = {
-  pos_cnt : int;
-  neg_cnt : int;
-  other_occurences : int IDMap.t
-}
+module IntSet = Util.Int_set
 
 exception AppVarFound
 
-module IntSet = Util.Int_set
 
 
 (* Computes a map symbol -> item, that is for each item we know how many times
@@ -27,7 +22,7 @@ let compute_occurence_map seq =
 
   (* given map of symbols to clauses in which they occur and a new clause
      in the form (cl_idx, literals) return updated map and converted clause *)
-  let process_literals id_map (cl_idx, lits) =
+  let process_literals ids2clauses (cl_idx, lits) =
 
     (* This will compute the map (symbol, polarity) -> occurrence count
        for the list of literals *)
@@ -67,7 +62,7 @@ let compute_occurence_map seq =
       |> (fun syms -> ID.Set.fold (fun sym acc -> 
         let prev = ID.Map.get_or sym acc ~default:IntSet.empty in
         ID.Map.add sym (IntSet.add cl_idx prev) acc
-      ) syms id_map)
+      ) syms ids2clauses)
     in
     id_map', all_symbol_occurences
   in
@@ -106,3 +101,60 @@ let compute_occurence_map seq =
          be negated and clausified *)
       failwith "Not implemented: Goal"
   ) (ID.Set.empty, ID.Map.empty, []) seq
+
+let get_pure_symbols forbidden ids2clauses clauses =
+  let calculate_pure init_pure cl_status all_clauses =
+    let clauses = CCArray.of_list (List.rev clauses) in
+    let rec aux processed symbol_occurences  = function
+    | [] -> processed
+    | sym :: syms ->
+      if ID.Set.mem sym processed || ID.Set.mem sym forbidden then (
+        aux processed symbol_occurences syms
+      ) else (
+        let clauses_to_remove =
+          CCList.filter_map (fun idx -> 
+            if not (CCBV.get cl_status idx) then (
+              CCBV.set cl_status idx;
+              Some (clauses.(idx))
+            )
+            else None
+          ) (ID.Map.find sym ids2clauses)
+        in
+        let symbol_occurences', next_to_process =
+          List.fold_left (fun (sym_occs, next_to_process) cl -> 
+            IDMap.fold (fun key occ (sym_occs, next_to_process) ->
+              let prev = IDMap.find key sym_occs in
+              let new_ = prev-occ in
+              let sym_occs' = IDMap.add key new_ sym_occs in
+              if new_ = 0 && not (ID.Set.mem sym processed || ID.Set.mem sym forbidden) then (
+                sym_occs', (fst key) :: next_to_process
+              ) else (sym_occs', next_to_process)
+            ) cl (sym_occs, next_to_process) 
+          ) (symbol_occurences, []) clauses_to_remove
+        in
+        aux (ID.Set.add sym processed) symbol_occurences' (next_to_process @ syms))
+    in
+    aux ID.Set.empty all_clauses (ID.Set.to_list init_pure)
+  in
+
+
+  (* joins all clauses in one map with occurences of symbol *)
+  let all_clauses = 
+    List.fold_left (fun acc cl -> 
+      IDMap.union (fun _ a b -> CCOpt.return @@ a + b) acc cl
+    ) IDMap.empty clauses
+  in
+  let all_symbols = 
+    IDMap.keys all_clauses
+    |> Iter.map fst
+    |> ID.Set.of_iter
+  in
+  let init_pure = 
+    ID.Set.filter (fun sym -> 
+      not @@ ID.Set.mem sym forbidden &&
+      (IDMap.find (sym, true) all_clauses == 0 ||
+       IDMap.find (sym, false) all_clauses == 0)
+    ) all_symbols
+  in
+  let clause_status = CCBV.create ~size:(List.length clauses) false in
+  calculate_pure init_pure clause_status all_clauses
