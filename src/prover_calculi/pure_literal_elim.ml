@@ -16,6 +16,8 @@ module TST = TypedSTerm
 exception AppVarFound
 
 let _enabled = ref false
+let total_clauses = Util.mk_stat "total_clauses"
+let removed_clauses = Util.mk_stat "removed_clauses"
 
 let pp_key = CCPair.pp ID.pp CCBool.pp
 
@@ -181,9 +183,14 @@ let remove_pure_clauses (seq : (TST.t SLiteral.t list, TST.t, TST.t) Statement.t
   in
 
   let filter_if_has_pure stmt lits =
-    CCOpt.return_if 
-      (ID.Set.is_empty @@ ID.Set.inter pure_syms (cl_syms lits)) 
-    stmt
+    Util.incr_stat total_clauses;
+    let ans = 
+      CCOpt.return_if 
+        (ID.Set.is_empty @@ ID.Set.inter pure_syms (cl_syms lits)) 
+      stmt
+    in
+    if CCOpt.is_none ans then Util.incr_stat removed_clauses;
+    ans
   in
   Iter.filter_map (fun stmt -> 
     match Statement.view stmt with
@@ -192,7 +199,7 @@ let remove_pure_clauses (seq : (TST.t SLiteral.t list, TST.t, TST.t) Statement.t
     | Statement.Lemma _
     | Statement.Def _
     | Statement.Rewrite _ ->
-      None
+      Some stmt
     | Statement.Assert lits ->
       (* normal clause *)
       filter_if_has_pure stmt lits
@@ -224,13 +231,20 @@ let extension =
     if !_enabled then 
       begin 
         try 
-          remove_pure_clauses seq 
-        with AppVarFound ->
+          remove_pure_clauses seq
+        with AppVarFound | Not_found ->
           seq
       end
     else seq in
+  let print_stats _ =
+    if !_enabled then 
+      CCFormat.printf "%%%a@.%%%a@." Util.pp_stat removed_clauses Util.pp_stat total_clauses;
+    
+  in
   Extensions.(
-    { default with name="pure_literal_elimination"; post_cnf_modifiers=[modifier]; }
+    { default with name="pure_literal_elimination"; 
+      post_cnf_modifiers=[modifier];
+      env_actions=[print_stats]; }
   )
 
 let () =
