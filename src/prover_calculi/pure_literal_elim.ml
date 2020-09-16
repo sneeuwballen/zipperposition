@@ -1,6 +1,8 @@
 open Logtk
 open Libzipperposition
 
+let section = Util.Section.make ~parent:Const.section "ple"
+
 type id_sgn = ID.t * bool
 module IDMap = CCMap.Make(struct
   type t = id_sgn
@@ -118,13 +120,10 @@ let get_pure_symbols forbidden ids2clauses clauses =
     let clauses = CCArray.of_list (List.rev clauses) in
     let rec aux processed symbol_occurences  = function
     | [] -> processed
-    | sym :: syms ->
+    | (sym :: syms) as all_syms ->
       if ID.Set.mem sym processed || ID.Set.mem sym forbidden then (
         aux processed symbol_occurences syms
       ) else (
-        (* CCFormat.printf "removing @[%a@]@." ID.pp sym;
-        CCFormat.printf "occurrences @[%a@]@." 
-          (IDMap.pp ~arrow:"==>" ~sep:";" pp_key CCInt.pp) symbol_occurences; *)
         let clauses_to_remove =
           CCList.filter_map (fun idx -> 
             if not (CCBV.get cl_status idx) then (
@@ -140,12 +139,14 @@ let get_pure_symbols forbidden ids2clauses clauses =
               let prev = IDMap.find key sym_occs in
               let new_ = prev-occ in
               let sym_occs' = IDMap.add key new_ sym_occs in
-              if new_ = 0 && not (ID.Set.mem sym processed || ID.Set.mem sym forbidden) then (
+              if new_ = 0 && not (ID.Set.mem sym processed || ID.Set.mem sym forbidden
+                                 || (CCList.mem ~eq:ID.equal (fst key) all_syms)) then (
                 sym_occs', (fst key) :: next_to_process
               ) else (sym_occs', next_to_process)
             ) cl (sym_occs, next_to_process) 
           ) (symbol_occurences, []) clauses_to_remove
         in
+        Util.debugf ~section 1 "became pure: @[%a@]@." (fun k -> k (CCList.pp ID.pp) next_to_process);
         aux (ID.Set.add sym processed) symbol_occurences' (next_to_process @ syms))
     in
     aux ID.Set.empty all_clauses (ID.Set.to_list init_pure)
@@ -170,6 +171,7 @@ let get_pure_symbols forbidden ids2clauses clauses =
        IDMap.get_or ~default:0 (sym, false) all_clauses == 0)
     ) all_symbols
   in
+  Util.debugf ~section 1 "initially pure: @[%a@]@." (fun k -> k (ID.Set.pp ID.pp) init_pure);
   let clause_status = CCBV.create ~size:(List.length clauses) false in
   calculate_pure init_pure clause_status all_clauses
 
@@ -189,7 +191,11 @@ let remove_pure_clauses (seq : (TST.t SLiteral.t list, TST.t, TST.t) Statement.t
         (ID.Set.is_empty @@ ID.Set.inter pure_syms (cl_syms lits)) 
       stmt
     in
-    if CCOpt.is_none ans then Util.incr_stat removed_clauses;
+    if CCOpt.is_none ans then (
+      Util.incr_stat removed_clauses;
+      Util.debugf ~section 2 "removed: @[%a@]@." 
+        (fun k -> k (CCList.pp (SLiteral.pp TST.pp)) lits); 
+    );
     ans
   in
   Iter.filter_map (fun stmt -> 
@@ -236,6 +242,7 @@ let extension =
           seq
       end
     else seq in
+  
   let print_stats _ =
     if !_enabled then 
       CCFormat.printf "%%%a@.%%%a@." Util.pp_stat removed_clauses Util.pp_stat total_clauses;
