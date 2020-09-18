@@ -166,6 +166,25 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let ord =
     Ctx.ord ()
 
+  (* Given a list of streams, tries getting a single clause 
+     from each of the streams; returns obtained clauses and
+     partially evaluated streams *)
+  let force_getting_cl streams = 
+    let rec aux ((clauses, streams) as acc) = function 
+      | [] -> acc
+      | (penalty, parents, stm) :: xs ->
+        begin
+          match stm () with
+          | OSeq.Nil -> aux acc xs 
+          | OSeq.Cons((Some cl), stm') ->
+            aux (cl::clauses, (Stm.make ~penalty ~parents stm')::streams) xs
+          | OSeq.Cons(None, stm') ->
+            aux (clauses, (Stm.make ~penalty ~parents stm')::streams) xs
+        end 
+    in
+    aux ([], []) streams
+
+
   let get_triggers c =
     let trivial_trigger t =
       let body = snd @@ T.open_fun t in
@@ -1289,7 +1308,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     in
     ZProf.exit_prof prof_infer_passive;
     new_clauses
-
+  
   let infer_active_complete_ho clause =
     let inf_res = infer_active_aux
         ~retrieve_from_index:(I.retrieve_unifiables_complete ~unif_alg:(Env.flex_get k_unif_alg))
@@ -1300,8 +1319,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             Some (0, parents, OSeq.map (CCOpt.flat_map (do_sup u_p with_pos)) substs))
         clause
     in
-    let stm_res = List.map (fun (penalty, parents, s) -> Stm.make ~penalty ~parents s) inf_res in
-    StmQ.add_lst (_stmq()) stm_res; []
+    (* let stm_res = List.map (fun (penalty, parents, s) -> Stm.make ~penalty ~parents s) inf_res in *)
+    let clauses, streams = force_getting_cl inf_res in
+    StmQ.add_lst (_stmq()) streams; clauses
 
   let infer_passive_complete_ho clause =
     let inf_res = infer_passive_aux
@@ -1313,8 +1333,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             Some (0, parents, OSeq.map (CCOpt.flat_map (do_sup u_p with_pos)) substs))
         clause
     in
-    let stm_res = List.map (fun (penalty,parents,s) -> Stm.make ~penalty ~parents s) inf_res in
-    StmQ.add_lst (_stmq()) stm_res; []
+    (* let stm_res = List.map (fun (penalty,parents,s) -> Stm.make ~penalty ~parents s) inf_res in *)
+    let clauses, streams = force_getting_cl inf_res in
+    StmQ.add_lst (_stmq()) streams; clauses
 
   let infer_active_pragmatic_ho max_unifs clause =
     let inf_res = infer_active_aux
@@ -1744,8 +1765,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ~iterate_substs:(fun substs do_eq_res -> Some (OSeq.map (CCOpt.flat_map do_eq_res) substs))
         clause
     in
-    let stm_res = List.map (Stm.make ~penalty:(0) ~parents:[clause]) inf_res in
-    StmQ.add_lst (_stmq()) stm_res; []
+    let cls, stm_res = force_getting_cl (List.map (fun stm -> 0, [clause], stm)  inf_res) in
+    StmQ.add_lst (_stmq()) stm_res; cls
 
   let infer_equality_resolution_pragmatic_ho max_unifs clause =
     let inf_res = infer_equality_resolution_aux
@@ -2132,8 +2153,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ~iterate_substs:(fun substs do_eq_fact -> Some (OSeq.map (CCOpt.flat_map do_eq_fact) substs))
         clause
     in
-    let stm_res = List.map (Stm.make ~penalty:(0) ~parents:[clause]) inf_res in
-    StmQ.add_lst (_stmq()) stm_res; []
+    let cls, stm_res = force_getting_cl (List.map (fun stm -> 0, [clause], stm)  inf_res) in
+    StmQ.add_lst (_stmq()) stm_res; cls
 
   let infer_equality_factoring_pragmatic_ho max_unifs clause =
     let inf_res = infer_equality_factoring_aux
@@ -3871,9 +3892,9 @@ let _arg_cong = ref true
 let _try_lfho_unif = ref true
 let _bool_eq_fact = ref true
 
-let _guard = ref 45
-let _ratio = ref 135
-let _clause_num = ref (-1)
+let _guard = ref 20
+let _ratio = ref 70
+let _clause_num = ref 7
 
 let key = Flex_state.create_key ()
 

@@ -704,7 +704,7 @@ let sine_axiom_selector
 
     let triggers = create_trigger_map ~trim_implications ~tbl (axioms) in
     let syms_in_conj = symset_of_axs ~trim_implications ~is_goal:true goals in
-    let conj_syms = 
+    let conj_syms =
       ID.Set.diff syms_in_conj  most_commmon_syms in
     Util.debugf ~section 2 "conj_syms:@[%a@]" (fun k -> k (ID.Set.pp ID.pp) conj_syms);
     let triggered_1 = triggered_by_syms ~triggers conj_syms in

@@ -691,8 +691,55 @@ module S = struct
     Format.fprintf out "@]"
 
   let pp_tstp out proof =
+    let module F = TypedSTerm in
+
+    let ctx = Type.Conv.create () in
+    let conv_ty ty =
+      Type.Conv.of_simple_term_exn ctx ty
+    in
+
     let namespace = Tbl.create 8 in
+    let tydecl_out out hd ty =
+      Format.fprintf out "thf(@[@[%s@]_type, type, @[%a@]@]).@."
+        (ID.name hd) Type.TPTP.pp_ho (conv_ty ty)
+    in
+    
     Format.fprintf out "@[<v>";
+
+    
+    let constants = ref F.Set.empty in 
+    let types = ref ID.Set.empty in
+
+
+    traverse ~order:`DFS proof (
+      fun p -> 
+        let f = Result.to_form (result p) in
+        constants := 
+          F.Seq.subterms f
+          |> Iter.filter (F.is_const)
+          |> F.Set.of_iter
+          |> F.Set.union !constants;
+      
+        F.Seq.subterms f
+        |> Iter.filter_map (F.ty)
+        |> Iter.iter (fun t ->
+          match F.Ty.view t with
+          | F.Ty.Ty_app(hd, args) when not @@ ID.Set.mem hd (!types) ->
+            let ty = F.Ty.(==>) (CCList.replicate (List.length args) F.Ty.tType) F.Ty.tType in
+            tydecl_out out hd ty
+          | _ -> ()
+
+        )
+        
+    );
+    
+
+    F.Set.iter (fun cst -> 
+      match F.as_id_app  cst with 
+      | Some (hd, ty, []) ->  tydecl_out out hd ty
+      | _ -> assert false
+    ) !constants;
+
     traverse ~order:`DFS proof
       (fun p ->
          let p_name = name ~namespace p in
