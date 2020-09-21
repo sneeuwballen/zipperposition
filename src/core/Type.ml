@@ -368,7 +368,7 @@ module TPTP = struct
   let pp_ho ?(depth=0) out t = pp_ho_depth depth out t
 
   let pp_typed_var out v = match view (HVar.ty v) with
-    | Builtin Term -> HVar.pp out v (* implicit *)
+    (* | Builtin Term -> HVar.pp out v implicit *)
     | _ -> Format.fprintf out "@[%a : %a@]" HVar.pp_tstp v pp (HVar.ty v)
 
   let to_string = CCFormat.to_string pp

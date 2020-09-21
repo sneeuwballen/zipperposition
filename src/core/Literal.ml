@@ -777,13 +777,13 @@ let pp_debug ?(hooks=[]) out lit =
 let pp_tstp out lit =
   match lit with
   | Equation (p, t, sign) when T.equal t T.true_ -> 
-    Format.fprintf out "%s %a" (if sign then "" else "~") T.TPTP.pp p
+    Format.fprintf out "%s%a" (if sign then "" else "~ ") T.TPTP.pp p
   | True -> CCFormat.string out "$true"
   | False -> CCFormat.string out "$false"
   | Equation (l, r, true) ->
-    Format.fprintf out "@[<1>%a@ = %a@]" T.TPTP.pp l T.TPTP.pp r
+    Format.fprintf out "(@[<1>%a@ = %a@])" T.TPTP.pp l T.TPTP.pp r
   | Equation (l, r, false) ->
-    Format.fprintf out "@[<1>%a@ != %a@]" T.TPTP.pp l T.TPTP.pp r
+    Format.fprintf out "(@[<1>%a@ != %a@])" T.TPTP.pp l T.TPTP.pp r
   | Int o -> Int_lit.pp_tstp out o
   | Rat o -> Rat_lit.pp_tstp out o
 

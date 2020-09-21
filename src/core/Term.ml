@@ -1082,34 +1082,37 @@ module TPTP = struct
 
     let rec pp_rec out t = match view t with
       | DB i ->
-        Format.fprintf out "Y%d:%a" (!depth - i - 1) (Type.TPTP.pp_ho ~depth:!depth) (ty t);
+        Format.fprintf out "Y%d" (!depth - i - 1);
         (* print type of term *)
       | AppBuiltin (b,[]) -> Builtin.TPTP.pp out b
-      | AppBuiltin (b, ([t;u])) when Builtin.TPTP.is_infix b ->
+      | AppBuiltin (b, ([tyarg;t;u])) when Builtin.TPTP.is_infix b && is_type tyarg ->
         Format.fprintf out "(@[%a %a@ %a@])" pp_rec t Builtin.TPTP.pp b pp_rec u
+      | AppBuiltin (b, ([t;u])) when Builtin.TPTP.is_infix b ->
+        Format.fprintf out "(@[(%a) %a@ (%a)@])" pp_rec t Builtin.TPTP.pp b pp_rec u
+      | AppBuiltin (b, l) when List.length l >= 2 && Builtin.is_infix b ->
+        let sep = CCFormat.sprintf " %s " (Builtin.TPTP.to_string b) in
+        Format.fprintf out "(@[%a@])" (Util.pp_list ~sep pp_enclosed) l
       | AppBuiltin (b,l) ->
-        let l = 
-          if Builtin.is_combinator b 
-          then List.filter (fun t -> not @@ is_type t) l 
-          else l in
-        if CCList.is_empty l then Format.fprintf out "@[%a@]" Builtin.pp b 
+        (* erasing types for TH0 *)
+        let l = CCList.filter (fun t -> not (Type.is_tType (ty t))) l in
+        if CCList.is_empty l then Format.fprintf out "@[%a@]" Builtin.TPTP.pp b 
         else (
-          Format.fprintf out "(@[(%a) @@ %a@])" Builtin.TPTP.pp b (Util.pp_list ~sep:" @" pp_enclosed) l
+          Format.fprintf out "(@[(%a) @@ %a@])" Builtin.TPTP.pp b (Util.pp_list ~sep:" @ " pp_enclosed) l
         )
       | Const s -> ID.pp_tstp out s
-      | App (f, l) -> Format.fprintf out "%a" (Util.pp_list ~sep:" @" pp_enclosed) (f::l)
+      | App (f, l) -> Format.fprintf out "%a" (Util.pp_list ~sep:" @ " pp_enclosed) (f::l)
       | Fun _ ->
         let ty_args, bod = as_fun t in
         let vars = List.mapi (fun i ty -> i+ !depth, ty) ty_args in
         let pp_db out (i,ty) =
-          Format.fprintf out "Y%d : %a" i Type.TPTP.pp ty
+          Format.fprintf out "Y%d : %a" i (Type.TPTP.pp_ho ~depth:!depth) ty
         in
         let old_d = !depth in
         depth := !depth + List.length ty_args;
         Format.fprintf out "(@[<hv2>^[@[%a@]]:@ %a@])"
           (Util.pp_list ~sep:"," pp_db) vars pp_rec bod;
         depth := old_d;
-      | Var i -> Format.fprintf out "X%d:%a" (HVar.id i)  (Type.TPTP.pp_ho ~depth:!depth) (ty t);
+      | Var i -> Format.fprintf out "X%d" (HVar.id i);
     and pp_enclosed out t =
       if Type.is_tType (ty t) then (
         let ty = Type.of_term_unsafe (t :> T.t) in

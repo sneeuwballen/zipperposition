@@ -827,7 +827,7 @@ module TPTP = struct
             (Util.pp_list ~sep:" & " ppf) rhs
       in
       let pp_top_rule out r =
-        fpf out "@[<2>tff(%s, axiom,@ %a)@]." name pp_rule r
+        fpf out "@[<2>thf(%s, axiom,@ %a)@]." name pp_rule r
       in
       Util.pp_list ~sep:"" pp_top_rule out d.def_rules
     in
@@ -888,7 +888,7 @@ let pp_in pp_f pp_t pp_ty = function
 let pp_clause_in o =
   let pp_t = Term.pp_in o in
   let pp_ty = Type.pp_in o in
-  pp_in (Util.pp_list ~sep:" ∨ " (SLiteral.pp_in o pp_t)) pp_t pp_ty o
+  pp_in (Util.pp_list ~sep:" | " (SLiteral.pp_in o pp_t)) pp_t pp_ty o
 
 let pp_input_in o =
   let pp_t = TypedSTerm.pp_in o in
