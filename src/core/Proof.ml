@@ -701,7 +701,7 @@ module S = struct
     let namespace = Tbl.create 8 in
     let tydecl_out out hd ty =
       Format.fprintf out "thf(@[@[%s@]_type, type, @[%a@]@]).@."
-        (ID.name hd) Type.TPTP.pp_ho (conv_ty ty)
+        (ID.name hd) (Type.TPTP.pp_ho ~depth:0) (conv_ty ty)
     in
     
     Format.fprintf out "@[<v>";
@@ -758,7 +758,7 @@ module S = struct
          if Result.is_stmt (result p) then (
            Format.fprintf out "%a@," (Result.pp_in Output_format.tptp) (result p)
          ) else (
-           Format.fprintf out "tff(@[%s, %s,@ @[%a@],@ @[%a@]%a@]).@,"
+           Format.fprintf out "thf(@[%s, %s,@ (@[%a@]),@ @[%a@]%a@]).@,"
              p_name role (Result.pp_in Output_format.tptp) (result p)
              Kind.pp_tstp (Step.kind @@ step p,parents) pp_infos infos
          ));

@@ -801,7 +801,7 @@ module TPTP = struct
       then
         fpf out "%% (omitted type declaration for distinct object %a.)" ID.pp_tstp id
       else
-        fpf out "tff(@[%s, type,@ %a :@ @[%a@]@])." name ID.pp_tstp id ppty ty
+        fpf out "thf(@[%s, type,@ %a :@ @[%a@]@])." name ID.pp_tstp id ppty ty
     and pp_quant_vars out = function
       | [] -> ()
       | l ->
@@ -835,14 +835,14 @@ module TPTP = struct
     | TyDecl (id,ty) -> pp_decl out (id,ty)
     | Assert f ->
       let role = "axiom" in
-      fpf out "@[<2>tff(%a, %s,@ (@[%a@]))@]." pp_name name role ppf f
+      fpf out "@[<2>thf(%a, %s,@ (@[%a@]))@]." pp_name name role ppf f
     | Lemma l ->
       let role = "lemma" in
-      fpf out "@[<2>tff(%a, %s,@ (@[%a@]))@]." pp_name name role
+      fpf out "@[<2>thf(%a, %s,@ (@[%a@]))@]." pp_name name role
         (Util.pp_list ~sep:" & " ppf) l
     | Goal f ->
       let role = "conjecture" in
-      fpf out "@[<2>tff(%a, %s,@ (@[%a@]))@]." pp_name name role ppf f
+      fpf out "@[<2>thf(%a, %s,@ (@[%a@]))@]." pp_name name role ppf f
     | NegatedGoal (_,l) ->
       let role = "negated_conjecture" in
       let parents = 
@@ -851,7 +851,7 @@ module TPTP = struct
       in
       List.iter
         (fun f ->
-           fpf out "@[<2>tff(%a, %s,@ (@[%a@]),@ @[%a@])@]." pp_name name role
+           fpf out "@[<2>thf(%a, %s,@ (@[%a@]),@ @[%a@])@]." pp_name name role
              ppf f Proof.Kind.pp_tstp (Proof.Step.kind @@ st.proof, parents))
         l
     | Def l ->
@@ -866,11 +866,11 @@ module TPTP = struct
     | Rewrite d ->
       begin match d with
         | Def_term {id;args;rhs;_} ->
-          fpf out "@[<2>tff(%a, axiom,@ %a(%a) =@ @[%a@])@]."
+          fpf out "@[<2>thf(%a, axiom,@ %a(%a) =@ @[%a@])@]."
             pp_name name ID.pp_tstp id (Util.pp_list ~sep:", " ppt) args ppt rhs
         | Def_form {lhs;rhs;polarity=pol;_} ->
           let op = match pol with `Equiv-> "<=>" | `Imply -> "=>" in
-          fpf out "@[<2>tff(%a, axiom,@ %a %s@ (@[%a@]))@]."
+          fpf out "@[<2>thf(%a, axiom,@ %a %s@ (@[%a@]))@]."
             pp_name name (SLiteral.TPTP.pp ppt) lhs op
             (Util.pp_list ~sep:" & " ppf) rhs
       end

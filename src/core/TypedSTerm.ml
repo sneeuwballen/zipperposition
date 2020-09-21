@@ -1688,7 +1688,7 @@ end
 
 let pp_in = function
   | Output_format.O_zf -> ZF.pp
-  | Output_format.O_tptp -> TPTP.pp
+  | Output_format.O_tptp -> TPTP_THF.pp
   | Output_format.O_normal -> pp
   | Output_format.O_none -> CCFormat.silent
 
