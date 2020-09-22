@@ -1115,25 +1115,28 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* Look at the HOSup paper for the definition of unsupported quant *)
   let fix_unsupported_quant t =
-    let supported var_ty q_body =
-      let rec aux depth t =
+    (* for the time being var_ty is not used.. if the definition
+       changes it is useful to have it around *)
+    let quant_normal _ q_body =
+      let has_loosely_bound_0 t =
+        List.mem 0 (T.DB.unbound t)
+      in
+
+      let rec aux t =
         match T.view t with
-        | Fun(_, body) -> aux (depth+1) body
-        | App(hd, args) when T.is_var hd ->
-          CCList.flat_map (T.DB.unbound) args
-          |> List.mem depth
-          |> not
-        | App(hd, args) when T.is_fun hd ->
-          aux depth (Lambda.snf t)
+        | Fun(_, body) -> not @@ has_loosely_bound_0 t
+        | App(hd, args) when T.is_const hd ->
+          List.for_all aux args
         | App(hd, args) ->
-          not (T.is_bvar hd && T.as_bvar_exn hd == depth)
-          && List.for_all (aux depth) (hd :: args)
+          assert (not @@ T.is_fun hd);
+          List.for_all (fun t -> not @@ has_loosely_bound_0 t) (hd :: args )
         | AppBuiltin(hd, args) ->
-          List.for_all (aux depth) args
+          (* going bottom up *)
+          assert(not @@ Builtin.is_quantifier hd);
+          List.for_all aux args
         | _ -> true
       in
-      not (Type.is_fun var_ty) ||
-      aux 0 q_body
+      aux (Lambda.eta_reduce @@ Lambda.snf @@ q_body)
     in
 
     let rec aux t =
@@ -1148,13 +1151,31 @@ module Make(E : Env.S) : S with module Env = E = struct
         let args' = List.map aux args in
         if T.equal hd hd' && T.same_l args args' then t
         else T.app hd' args'
+      | AppBuiltin((ExistsConst|ForallConst) as hd, [alpha]) ->
+        let alpha = Type.of_term_unsafe (alpha :> InnerTerm.t) in
+        let alpha2prop = Type.arrow [alpha] Type.prop in
+        let inner_quant = 
+          let body = 
+            if Builtin.equal hd ExistsConst then T.false_
+            else T.true_
+          in
+          T.fun_ alpha body 
+        in
+        let var = T.bvar ~ty:alpha2prop 0 in
+        let body = 
+          if Builtin.equal hd ExistsConst then T.Form.neq var inner_quant
+          else T.Form.eq var inner_quant
+        in
+        T.fun_ alpha2prop body
+      | AppBuiltin((ExistsConst|ForallConst), ([])) ->
+        invalid_arg "type argument must be present"
       | AppBuiltin(hd,args) ->
         let args' = List.map aux args in
         (* fully applied quantifier *)
         if Builtin.is_quantifier hd && List.length args' == 2 then (
           let q_pref, q_body = T.open_fun @@ List.nth args' 1 in
           let var_ty = List.hd q_pref in
-          if not (supported var_ty q_body) then (
+          if not (quant_normal var_ty q_body) then (
             if Builtin.equal hd Builtin.ExistsConst then (
               T.Form.neq (List.nth args' 1) (T.fun_ var_ty T.false_)
             ) else (
@@ -1167,7 +1188,8 @@ module Make(E : Env.S) : S with module Env = E = struct
         )
       | DB _ | Const _ | Var _ -> t
     in
-    aux t
+    if Env.flex_get Combinators.k_enable_combinators then t 
+    else aux t
 
   let replace_unsupported_quants c =
     let new_lits = Literals.map fix_unsupported_quant (C.lits c) in

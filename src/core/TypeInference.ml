@@ -686,7 +686,8 @@ let rec infer_rec ?loc ctx t =
              we need to add wildcards *)
           let l = List.map (infer_rec ?loc ctx) l in
           let l =
-            if i>0 && List.length l = j
+            if i>0 && List.length l = j 
+              && not (Builtin.is_quantifier b)
             then (
               Util.debugf ~section 50
                 "@[<2>add %d implicit type arguments to@ `@[<1>%a@ (%a)@]`@]"
@@ -696,6 +697,7 @@ let rec infer_rec ?loc ctx t =
               metas @ l
             ) else l
           in
+
           let ty = apply_unify ctx ~allow_open:true ?loc ty_b l in
           T.app_builtin ?loc ~ty b l
       end
