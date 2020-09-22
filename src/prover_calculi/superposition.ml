@@ -1785,7 +1785,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                  "@[<hv2>demod(%d):@ @[<hv>t=%a[%d],@ l=%a[%d],@ r=%a[%d]@],@ subst=@[%a@]@]"
                  (fun k->k (C.id c) T.pp t 0 T.pp l cur_sc T.pp r cur_sc S.pp subst);
 
-               let norm t = T.normalize_bools @@ Lambda.eta_reduce @@ Lambda.snf t in
+               let expand_quant = not @@ Env.flex_get Combinators.k_enable_combinators in
+               let norm t = T.normalize_bools @@ Lambda.eta_reduce ~expand_quant @@ Lambda.snf t in
                let t' = norm t in
                let l' = norm @@ Subst.FO.apply Subst.Renaming.none subst (l,cur_sc) in               
                (* sanity checks *)
@@ -2353,7 +2354,15 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         UnitIdx.retrieve ~sign:false (!_idx_simpl,1) (s,0)
         |> Iter.iter
           (fun (l, r, (_,_,_,c'), subst) ->
-             assert (Unif.FO.equal ~subst (l, 1) (s, 0));
+             (* if not  (Unif.FO.equal ~subst (l, 1) (s, 0)) then (
+               CCFormat.printf "l:@[%a@], r:@[%a@]@." T.pp l T.pp s;
+               CCFormat.printf "subst: @[%a@]@." Subst.pp subst;
+               assert false;
+             ); *)
+             let norm t =
+              let t = Subst.FO.apply Subst.Renaming.none subst t in
+              Lambda.eta_reduce ~expand_quant:false @@ Lambda.snf t in
+             assert(Term.equal (norm (l,1)) (norm (s,0)));
              Util.debugf ~section 3 "@[neg_reflect trying to eliminate@ @[%a=%a@]@ with @[%a@]@]"
                (fun k->k T.pp s T.pp t C.pp c');
              if C.trail_subsumes c' c && Unif.FO.equal ~subst (r, 1) (t, 0)

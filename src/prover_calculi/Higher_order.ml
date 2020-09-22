@@ -242,10 +242,11 @@ module Make(E : Env.S) : S with module Env = E = struct
   let ext_pos ?(only_unit=true) (c:C.t): C.t list =
     (* CCFormat.printf "EP: %b\n" only_unit; *)
     let is_eligible = C.Eligible.always in
+    let expand_quant = not @@ Env.flex_get Combinators.k_enable_combinators in
     if not only_unit || C.lits c |> CCArray.length = 1 then 
       C.lits c
       |> CCArray.mapi (fun i l ->
-          let l = Literal.map (fun t -> Lambda.eta_reduce ~full:true t) l in
+          let l = Literal.map (fun t -> Lambda.eta_reduce ~expand_quant ~full:true t) l in
           match l with 
           | Literal.Equation (t1,t2,true) 
             when is_eligible i l ->
@@ -299,6 +300,8 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let ext_pos_general ?(all_lits = false) (c:C.t) : C.t list =
     let eligible = if all_lits then C.Eligible.always else C.Eligible.param c in
+    let expand_quant = not @@ Env.flex_get Combinators.k_enable_combinators in
+
     (* Remove recursively variables at the end of the literal t = s if possible.
        e.g. ext_pos_lit (f X Y) (g X Y) other_lits = [f X = g X, f = g]
        if X and Y do not appear in other_lits *)
@@ -336,7 +339,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       |> Iter.filter (fun (idx,lit) -> eligible idx lit)
       |> Iter.flat_map_l
         (fun (lit_idx,lit) ->
-           let lit = Literal.map (fun t -> Lambda.eta_reduce t) lit in
+           let lit = Literal.map (fun t -> Lambda.eta_reduce ~expand_quant t) lit in
            match lit with
            | Literal.Equation (t, s, true) ->
              ext_pos_lit t s (CCArray.except_idx (C.lits c) lit_idx)
@@ -1492,7 +1495,10 @@ module Make(E : Env.S) : S with module Env = E = struct
     )
 
   let eta_normalize () = match Env.flex_get k_eta with
-    | `Reduce -> Lambda.eta_reduce ~full:true
+    | `Reduce -> 
+      Lambda.eta_reduce 
+        ~expand_quant:(not @@ Env.flex_get Combinators.k_enable_combinators) 
+        ~full:true
     | `Expand -> Lambda.eta_expand
     | `None -> (fun t -> t)
 
@@ -1576,7 +1582,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     |> CCList.map (fun (subst,p) -> 
       let renaming = Subst.Renaming.create () in
       let lits = Literals.apply_subst renaming subst (C.lits cl, sc) in
-      let lits = Literals.map (fun t -> Lambda.eta_reduce @@ Lambda.snf t) lits in
+      let lits = Literals.map (fun t -> Lambda.snf t) lits in
       let proof =
         Proof.Step.inference ~rule:(Proof.Rule.mk "ho.refine.early.bird") 
           ~tags:[Proof.Tag.T_ho; Proof.Tag.T_cannot_orphan]

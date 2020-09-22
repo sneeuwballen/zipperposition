@@ -97,8 +97,9 @@ module Make(E : Env.S) : S with module Env = E = struct
     let cl_sc, trig_sc = 0, 1 in
     let subst = Subst.FO.bind' Subst.empty (T.as_var_exn var, cl_sc) (trigger, trig_sc) in
     let renaming = Subst.Renaming.create () in
+    let expand_quant = not @@ Env.flex_get Combinators.k_enable_combinators in
     let lits = Literals.apply_subst renaming subst (C.lits clause, cl_sc) in
-    let lits = Literals.map (fun t -> Lambda.eta_reduce @@ Lambda.snf t) lits in
+    let lits = Literals.map (fun t -> Lambda.eta_reduce ~expand_quant @@ Lambda.snf t) lits in
       let proof =
         Proof.Step.inference 
           ~rule:(Proof.Rule.mk "triggered_bool_instantiation") 
@@ -533,8 +534,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       let lits = Array.copy @@ C.lits c in
       (* Literals.Pos.replace lits ~at ~by:partner.repl; *)
       let renaming = Subst.Renaming.create () in
+      let expand_quant = not @@ Env.flex_get Combinators.k_enable_combinators in
       let repl_sub =
-        Lambda.eta_reduce @@ Lambda.snf @@
+        Lambda.eta_reduce ~expand_quant @@ Lambda.snf @@
           Subst.FO.apply renaming sub (partner.repl, sc_partner) in
       let sk = FR.get_skolem ~parent:c ~mode:`Skolem repl_sub in
       let y_sk = 
@@ -1131,8 +1133,6 @@ module Make(E : Env.S) : S with module Env = E = struct
           assert (not @@ T.is_fun hd);
           List.for_all (fun t -> not @@ has_loosely_bound_0 t) (hd :: args )
         | AppBuiltin(hd, args) ->
-          (* going bottom up *)
-          assert(not @@ Builtin.is_quantifier hd);
           List.for_all aux args
         | _ -> true
       in
@@ -1222,6 +1222,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let nnf_bools t =
     let module F = T.Form in
+    let expand_quant = not @@ Env.flex_get Combinators.k_enable_combinators in
     let rec aux t =
       match T.view t with 
       | Const _ | DB _ | Var _ -> t
@@ -1246,7 +1247,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             else Builtin.ForallConst in
           let g_ty_args, g_body = T.open_fun (Combs.expand g)  in
           let g_body' = aux @@ F.not_ g_body in
-          let g' = Lambda.eta_reduce (T.fun_l g_ty_args g_body') in
+          let g' = Lambda.eta_reduce ~expand_quant (T.fun_l g_ty_args g_body') in
           T.app_builtin ~ty:(T.ty t) flipped [g']
         | AppBuiltin( Imply, [g;h] ) ->
           F.and_ (aux g) (aux @@ F.not_ h)

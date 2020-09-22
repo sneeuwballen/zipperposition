@@ -708,7 +708,7 @@ module Inner = struct
 
   and unif_vars ~op subst t1 sc1 t2 sc2 : unif_subst =
     (* Util.debugf ~section 4 "var_binidng: %a =?= %a" (fun k-> k T.pp t1 T.pp t2); *)
-    let t1,t2 = CCPair.map_same (fun t -> ((Lambda.eta_reduce t) :> InnerTerm.t)) (Term.of_term_unsafe t1,Term.of_term_unsafe t2) in
+    let t1,t2 = CCPair.map_same (fun t -> ((Lambda.eta_reduce ~expand_quant:false t) :> InnerTerm.t)) (Term.of_term_unsafe t1,Term.of_term_unsafe t2) in
     begin match T.view t1, T.view t2, op with
       | T.Var v1, T.Var v2, O_equal ->
         if HVar.equal T.equal v1 v2 && sc1=sc2

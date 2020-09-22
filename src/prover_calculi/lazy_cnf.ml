@@ -217,7 +217,8 @@ module Make(E : Env.S) : S with module Env = E = struct
             ) else (
               FR.get_skolem ~parent:c ~mode:(Env.flex_get k_skolem_mode) f
             ) in
-          let res = Lambda.eta_reduce @@ Lambda.snf @@ T.app f [subst_term] in
+          let expand_quant = not @@ Env.flex_get Combinators.k_enable_combinators in
+          let res = Lambda.eta_reduce ~expand_quant @@ Lambda.snf @@ T.app f [subst_term] in
           assert(Type.is_prop (T.ty res));
           let res_cl = mk_or ~proof_cons ~rule_name [res] c i in
           if Type.returns_prop var_ty && hd == ForallConst then (

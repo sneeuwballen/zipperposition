@@ -602,7 +602,7 @@ let abf ~rules t =
       let body' = aux body in
       abstract ~bvar_ty:(Term.of_ty ty) body'
     | _ ->  t in
-  let reduced = Lambda.eta_reduce @@ Lambda.snf @@ t in
+  let reduced = Lambda.eta_reduce ~expand_quant:false @@ Lambda.snf @@ t in
   let res = aux reduced in
   (* CCFormat.printf "abf(@[%a@])=" T.pp reduced;
   CCFormat.printf "@.   @[%a@]@." T.pp res; *)
@@ -660,7 +660,7 @@ let comb2lam t =
           T.fun_l (ty_args -| 1) (T.bvar ~ty:(ty_args -- 0) 0)
         | _ -> assert false
         end in
-      let res = Lambda.eta_reduce (Lambda.snf (T.app lam args')) in
+      let res = Lambda.eta_reduce ~expand_quant:false @@ Lambda.snf @@ T.app lam args' in
       assert (Type.equal (T.ty t) (T.ty res));
       res
     | T.AppBuiltin(b, args) ->

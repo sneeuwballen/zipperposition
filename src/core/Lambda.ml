@@ -179,7 +179,7 @@ module Inner = struct
     aux t
 
   (* compute eta-reduced normal form *)
-  let eta_reduce_aux ?(full=true) t =      
+  let eta_reduce_aux ?(expand_quant=true) ?(full=true) t =      
     let q_reduce ~pref_len t =
       let hd, args = T.as_app t in
       let n = List.length args in
@@ -234,7 +234,8 @@ module Inner = struct
               if T.equal f f' && T.same_l l l'
               then t
               else T.app ~ty f' l'
-            | T.AppBuiltin (Builtin.(ExistsConst|ForallConst) as hd, [tyarg;body]) ->
+            | T.AppBuiltin (Builtin.(ExistsConst|ForallConst) as hd, [tyarg;body])
+              when expand_quant ->
               (* top-level eta expand body of the quantifier *)
               let body' = eta_expand_rec ~top_level_only:true body in
               let pref, matrix = T.open_bind Binder.Lambda body' in
@@ -275,7 +276,8 @@ module Inner = struct
 
   let eta_expand t = ZProf.with_prof prof_eta_expand eta_expand_rec t
 
-  let eta_reduce ?(full=true) t = ZProf.with_prof prof_eta_reduce (eta_reduce_aux ~full) t
+  let eta_reduce ?(expand_quant=true) ?(full=true) t =
+    ZProf.with_prof prof_eta_reduce (eta_reduce_aux ~expand_quant ~full) t
 
 end
 
@@ -308,8 +310,8 @@ let eta_expand t =
 (*|> CCFun.tap (fun t' ->
   if t != t' then Format.printf "@[eta_expand `%a`@ into `%a`@]@." T.pp t T.pp t')*)
 
-let eta_reduce ?(full=true) t =
-  Inner.eta_reduce ~full (t:T.t :> IT.t) |> T.of_term_unsafe
+let eta_reduce ?(expand_quant=true) ?(full=true) t =
+  Inner.eta_reduce ~full ~expand_quant (t:T.t :> IT.t) |> T.of_term_unsafe
 (*|> CCFun.tap (fun t' ->
   if t != t' then Format.printf "@[eta_reduce `%a`@ into `%a`@]@." T.pp t T.pp t')*)
 
