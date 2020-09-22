@@ -227,7 +227,6 @@ module Make(E : Env.S) : S with module Env = E = struct
             Signal.send Env.on_pred_var_elimination (List.hd res_cl, subst_term)
           );
           return acc res_cl
-        | T.AppBuiltin(Not, _) -> assert false
         | _ -> continue acc end
       ) else if Type.is_prop (T.ty lhs) && not (L.is_predicate_lit lit) then (
           let rule_name = 
