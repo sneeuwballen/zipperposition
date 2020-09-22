@@ -246,6 +246,18 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let rename_subformulas c =
     Util.debugf ~section 2 "lazy-cnf-rename(@[%a@])@." (fun k -> k C.pp c);
+    let proof_cons = 
+      Proof.Step.simp ~infos:[] 
+                      ~tags:[Proof.Tag.T_live_cnf;
+                             Proof.Tag.T_dont_increase_depth] in
+    
+    let clausify_defs new_defs =
+      List.fold_left (fun acc c -> 
+        lazy_clausify_driver ~ignore_eq:false ~proof_cons c
+        |> Iter.to_list
+        |> (fun l -> if CCList.is_empty l then c :: acc else l @ acc)
+      ) [] new_defs
+    in
 
     let should_rename sign f =
       let will_yield_claues f =
@@ -298,8 +310,8 @@ module Make(E : Env.S) : S with module Env = E = struct
           match FR.rename_form ~should_rename ~polarity_aware ~c lhs sign with
           | Some (renamer, new_defs, parents) ->
             Term.Tbl.remove _form_counter lhs;
-
             let rule_name = "renaming" in
+            let new_defs = clausify_defs new_defs in
             let renamer = (if sign then CCFun.id else T.Form.not_) renamer in
             let renamed = mk_or ~proof_cons ~rule_name [renamer] c ~parents:(c :: parents) i in
             let res = renamed @ new_defs in
@@ -314,6 +326,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             match rename_eq ~should_rename ~c lhs rhs sign with
             | Some (renamer, new_defs, parents) ->
               let rule_name = "renaming" in
+              let new_defs = clausify_defs new_defs in
               let renamer = (if sign then CCFun.id else T.Form.not_) renamer in
               let renamed = mk_or ~proof_cons ~rule_name [renamer] c ~parents:(c :: parents) i in
               let res = renamed @ new_defs in
@@ -325,6 +338,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             | None -> None, `Continue)
           else None, `Continue) None
     ) else None
+  
   let clausify_eq c =
     let rule_name = "eq_elim" in
     fold_lits c
@@ -399,8 +413,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       end;
 
       (* ** IMPORTANT **
-         RENAMING MUST BE ADDED AFTER CLAUSIFICATION RULES (so that
-         it runs ***before*** lazy_clausify_simpl) *)
+         Due to correctly set priorioty, renaming will run before simplification *)
       if Env.flex_get k_renaming_threshold > 0 then(
         Env.add_multi_simpl_rule ~priority:4 rename_subformulas
       );
