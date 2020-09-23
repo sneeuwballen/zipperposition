@@ -433,6 +433,11 @@ let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
   let r = norm @@ S.apply res t1_s in
   if not ((T.equal l r) && (Type.equal (Term.ty l) (Term.ty r))) then (
     CCFormat.printf "orig:@[%a@]=?=@[%a@]@." (Scoped.pp T.pp) t0_s (Scoped.pp T.pp) t1_s;
+    CCFormat.printf "new:@[%a:%b@]=?=@[%a:%b@]@." 
+      T.pp l 
+      (InnerTerm.is_eta_reducible (l:>InnerTerm.t))
+      T.pp r
+      (InnerTerm.is_eta_reducible (r:>InnerTerm.t));
     CCFormat.printf "before:@[%a@]@." US.pp subst;
     CCFormat.printf "after:@[%a@]@." US.pp res;
     assert(false);

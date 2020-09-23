@@ -268,14 +268,14 @@ module Inner = struct
 
   (* public "bind" function that performs occur check *)
   let bind ?(check=true) subst v t =
-    if check && occurs_check ~depth:0 subst v t
+    if (check && occurs_check ~depth:0 subst v t) || not (T.DB.closed (fst t))
     then fail()
     else if S.mem subst v then fail()
     else S.bind subst v t
 
   (* public "update" function to replace a binding (with occur check) *)
   let update ?(check=true) subst v t =
-    if check && occurs_check ~depth:0 subst v t
+    if (check && occurs_check ~depth:0 subst v t) || not (T.DB.closed (fst t))
     then fail()
     else if not (S.mem subst v) then fail()
     else S.update subst v t

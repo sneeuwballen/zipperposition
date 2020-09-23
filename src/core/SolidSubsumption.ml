@@ -211,7 +211,10 @@ module Make (S : sig val st : Flex_state.t end) = struct
         assert(T.is_const hd || T.is_bvar hd);
         begin match T.view r with 
           | App(hd', args') when T.equal hd hd' ->
-            assert(List.length args = List.length args');
+            if List.length args != List.length args' then (
+              (* polymorphism *)
+              raise SolidMatchFail
+            );
             List.fold_left 
               (fun subst (l',r') ->  aux subst l' r') 
               subst (List.combine args args')
