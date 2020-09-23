@@ -2912,7 +2912,22 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         | _ -> assert false; end
       | _ -> assert false;
     with Fail -> []
-
+  
+  let normalize_equalities c =
+    let lits = Array.to_list (C.lits c) in
+    let normalized = List.map Literal.normalize_eq lits in
+    if List.exists CCOpt.is_some normalized then (
+      let new_lits = List.mapi (fun i l_opt -> 
+          CCOpt.get_or ~default:(Array.get (C.lits c) i) l_opt) normalized in
+      let proof = Proof.Step.simp [C.proof_parent c] 
+          ~rule:(Proof.Rule.mk "simplify nested equalities")  in
+      let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
+      SimplM.return_new new_c
+    ) 
+    else (
+      SimplM.return_same c 
+    )
+  
   (** {2 Registration} *)
 
   (* print index into file *)
@@ -2966,6 +2981,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     and backward_redundant = subsumed_in_active_set
     and is_trivial = is_tautology in
 
+    Env.add_basic_simplify normalize_equalities;
     if Env.flex_get k_local_rw != `Off then (
       Env.add_basic_simplify local_rewrite
     );

@@ -1072,7 +1072,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         if T.equal p p' && T.equal c c' then t
         else T.app_builtin ~ty:(T.ty t) Builtin.Imply [p';c']
       )
-    | AppBuiltin((Builtin.Eq | Builtin.Equiv) as hd, ([a;b]|[_;a;b])) ->
+    | AppBuiltin((Builtin.Eq | Builtin.Equiv) as hd, ([a;b]|[_;a;b])) when Type.is_prop (T.ty t)->
       let cons = if hd = Builtin.Eq then T.Form.eq else T.Form.equiv in
       let a',b' = aux a, aux b in
       if T.equal a' b' then T.true_ 
@@ -1084,7 +1084,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         if T.equal a a' && T.equal b b' then t 
         else cons a' b'
       )
-    | AppBuiltin((Builtin.Neq | Builtin.Xor) as hd, ([a;b]|[_;a;b])) ->
+    | AppBuiltin((Builtin.Neq | Builtin.Xor) as hd, ([a;b]|[_;a;b])) when Type.is_prop (T.ty t) ->
       let cons = if hd = Builtin.Neq then T.Form.neq else T.Form.xor in
       let a',b' = aux a, aux b in
       if T.equal a' b' then T.false_ 
@@ -1538,27 +1538,10 @@ module Make(E : Env.S) : S with module Env = E = struct
         ) else res) 
       []
 
-  let normalize_equalities c =
-    let lits = Array.to_list (C.lits c) in
-    let normalized = List.map Literal.normalize_eq lits in
-    if List.exists CCOpt.is_some normalized then (
-      let new_lits = List.mapi (fun i l_opt -> 
-          CCOpt.get_or ~default:(Array.get (C.lits c) i) l_opt) normalized in
-      let proof = Proof.Step.simp [C.proof_parent c] 
-          ~rule:(Proof.Rule.mk "simplify nested equalities")  in
-      let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
-      SimplM.return_new new_c
-    ) 
-    else (
-      SimplM.return_same c 
-    )
-
-
   let setup () =
     match Env.flex_get k_bool_reasoning with 
     | BoolReasoningDisabled -> ()
     | _ ->
-      Env.add_basic_simplify normalize_equalities;
       if Env.flex_get k_solve_formulas then (
         Env.add_unary_inf "solve formulas" (
           fun c -> 
