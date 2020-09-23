@@ -1375,8 +1375,8 @@ let rec normalize_bools t =
     else app hd' args'
   | AppBuiltin((Builtin.And|Builtin.Or) as b, l) ->
     let l' = List.map normalize_bools l in
-    let sorted = List.fast_sort weight_cmp l' in
-    if same_l l sorted then t
+    let sorted = CCList.sort_uniq ~cmp:weight_cmp l' in
+    if List.length l = List.length sorted && same_l l sorted then t
     else app_builtin ~ty:Type.prop b sorted
   | AppBuiltin((Builtin.Eq|Builtin.Neq|Builtin.Xor|Builtin.Equiv) as b, ([_;x;y] as l) )
   | AppBuiltin((Builtin.Eq|Builtin.Neq|Builtin.Xor|Builtin.Equiv) as b, ([x;y] as l)) when not (is_type x) -> 

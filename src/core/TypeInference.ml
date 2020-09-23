@@ -686,8 +686,10 @@ let rec infer_rec ?loc ctx t =
              we need to add wildcards *)
           let l = List.map (infer_rec ?loc ctx) l in
           let l =
-            if i>0 && List.length l = j 
-              && not (Builtin.is_quantifier b)
+            if i>0 && List.length l = j
+                   (* if some type arguments are already given, then the term
+                      might be partially applied *)
+                   && List.for_all (fun t -> not (T.Ty.is_tType (T.ty_exn t))) l
             then (
               Util.debugf ~section 50
                 "@[<2>add %d implicit type arguments to@ `@[<1>%a@ (%a)@]`@]"
