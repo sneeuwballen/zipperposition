@@ -1316,10 +1316,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             (* let penalty = max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause) in *)
             (* /!\ may differ from the actual penalty (by -2) *)
             let parents = [clause; with_pos.clause] in
-            Some (0, parents, OSeq.map (CCOpt.flat_map (do_sup u_p with_pos)) substs))
+            let p = max (C.penalty clause) (C.penalty with_pos.clause) in
+            Some (p, parents, OSeq.map (CCOpt.flat_map (do_sup u_p with_pos)) substs))
         clause
     in
-    (* let stm_res = List.map (fun (penalty, parents, s) -> Stm.make ~penalty ~parents s) inf_res in *)
     let clauses, streams = force_getting_cl inf_res in
     StmQ.add_lst (_stmq()) streams; clauses
 
@@ -1330,10 +1330,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             (* let penalty = max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause) in *)
             (* /!\ may differ from the actual penalty (by -2) *)
             let parents = [clause; with_pos.clause] in
-            Some (0, parents, OSeq.map (CCOpt.flat_map (do_sup u_p with_pos)) substs))
+            let p = max (C.penalty clause) (C.penalty with_pos.clause) in
+            Some (p, parents, OSeq.map (CCOpt.flat_map (do_sup u_p with_pos)) substs))
         clause
     in
-    (* let stm_res = List.map (fun (penalty,parents,s) -> Stm.make ~penalty ~parents s) inf_res in *)
     let clauses, streams = force_getting_cl inf_res in
     StmQ.add_lst (_stmq()) streams; clauses
 
@@ -1765,7 +1765,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ~iterate_substs:(fun substs do_eq_res -> Some (OSeq.map (CCOpt.flat_map do_eq_res) substs))
         clause
     in
-    let cls, stm_res = force_getting_cl (List.map (fun stm -> 0, [clause], stm)  inf_res) in
+    let cls, stm_res = force_getting_cl (List.map (fun stm -> C.penalty clause, [clause], stm)  inf_res) in
     StmQ.add_lst (_stmq()) stm_res; cls
 
   let infer_equality_resolution_pragmatic_ho max_unifs clause =
@@ -2153,7 +2153,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ~iterate_substs:(fun substs do_eq_fact -> Some (OSeq.map (CCOpt.flat_map do_eq_fact) substs))
         clause
     in
-    let cls, stm_res = force_getting_cl (List.map (fun stm -> 0, [clause], stm)  inf_res) in
+    let cls, stm_res = force_getting_cl (List.map (fun stm -> C.penalty clause, [clause], stm)  inf_res) in
     StmQ.add_lst (_stmq()) stm_res; cls
 
   let infer_equality_factoring_pragmatic_ho max_unifs clause =
