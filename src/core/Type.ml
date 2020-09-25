@@ -332,7 +332,8 @@ module TPTP = struct
     | [ty] -> pp_inner depth out ty
     | _ ->
       Format.fprintf out "(@[%a@])"
-        (Util.pp_list ~sep:" * " (pp_tstp_rec depth)) l
+        (Util.pp_list ~sep:" * " (pp_tstp_rec depth)) l;
+      assert false
 
   let pp out t = pp_tstp_rec 0 out t
 
@@ -349,14 +350,14 @@ module TPTP = struct
     | DB i -> Format.fprintf out "Tb%d" (depth-i-1)
     | App (p, []) -> ID.pp_tstp out p
     | App (p, args) ->
-      Format.fprintf out "@[<2>%a(%a)@]" ID.pp_tstp p
-        (Util.pp_list (pp_ho_depth depth)) args
+      Format.fprintf out "@[<2>%a @@ %a @]" ID.pp_tstp p
+        (Util.pp_list ~sep:" @ " (pp_inner depth)) args
     | Fun (args, ret) ->
       Format.fprintf out "%a > %a" (pp_l depth) args (pp_inner depth) ret
     | Forall ty' ->
       Format.fprintf out "!>[Tb%d:$tType]: %a" depth (pp_inner (depth+1)) ty'
   and pp_inner depth out t = match view t with
-    | Fun _ -> Format.fprintf out "(@[%a@])" (pp_ho_depth depth) t
+    | Fun _ | App(_, _::_) -> Format.fprintf out "(@[%a@])" (pp_ho_depth depth) t
     | _ -> pp_ho_depth depth out t
   and pp_l depth out l = match l with
     | [] -> assert false
@@ -369,7 +370,7 @@ module TPTP = struct
 
   let pp_typed_var out v = match view (HVar.ty v) with
     (* | Builtin Term -> HVar.pp out v implicit *)
-    | _ -> Format.fprintf out "@[%a : %a@]" HVar.pp_tstp v pp (HVar.ty v)
+    | _ -> Format.fprintf out "@[%a : %a@]" HVar.pp_tstp v (pp_ho ~depth:0) (HVar.ty v)
 
   let to_string = CCFormat.to_string pp
 end
@@ -425,7 +426,7 @@ let to_string = CCFormat.to_string pp
 
 let pp_in = function
   | Output_format.O_zf -> ZF.pp
-  | Output_format.O_tptp -> TPTP.pp
+  | Output_format.O_tptp -> TPTP.pp_ho ~depth:0
   | Output_format.O_normal -> pp
   | Output_format.O_none -> CCFormat.silent
 

@@ -705,7 +705,7 @@ module Rule = struct
     end
 
   let pp_zf out r = TypedSTerm.ZF.pp out (to_form r)
-  let pp_tptp out r = TypedSTerm.TPTP.pp out (to_form r)
+  let pp_tptp out r = TypedSTerm.TPTP_THF.pp out (to_form r)
 
   let pp_in = function
     | Output_format.O_normal -> pp

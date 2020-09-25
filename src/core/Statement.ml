@@ -819,15 +819,15 @@ module TPTP = struct
       in
       let pp_rule out = function
         | Def_term {vars;id;args;rhs;_} ->
-          fpf out "%a(@[%a%a@] =@ %a)" pp_quant_vars vars ID.pp_tstp id pp_args args ppt rhs
+          fpf out "%a (@[%a%a@] =@ %a)" pp_quant_vars vars ID.pp_tstp id pp_args args ppt rhs
         | Def_form {vars;lhs;rhs;polarity=pol;_} ->
-          let op = match pol with `Equiv-> "<=>" | `Imply -> "=>" in
+          let op = match pol with `Equiv-> "=" | `Imply -> "=>" in
           fpf out "%a(@[%a@] %s@ (@[<hv>%a@]))"
             pp_quant_vars vars (SLiteral.pp ppt) lhs op
             (Util.pp_list ~sep:" & " ppf) rhs
       in
       let pp_top_rule out r =
-        fpf out "@[<2>thf(%s, axiom,@ %a)@]." name pp_rule r
+        fpf out "@[<2>thf(%s, axiom,@ (%a))@]." name pp_rule r
       in
       Util.pp_list ~sep:"" pp_top_rule out d.def_rules
     in
@@ -866,10 +866,12 @@ module TPTP = struct
     | Rewrite d ->
       begin match d with
         | Def_term {id;args;rhs;_} ->
-          fpf out "@[<2>thf(%a, axiom,@ %a(%a) =@ @[%a@])@]."
-            pp_name name ID.pp_tstp id (Util.pp_list ~sep:", " ppt) args ppt rhs
+          fpf out "@[<2>thf(%a, axiom,((@ %a %s %a) =@ (@[%a@])))@]."
+            pp_name name ID.pp_tstp id 
+            (if CCList.is_empty args then "" else "@")
+            (Util.pp_list ~sep:"@ " ppt) args ppt rhs
         | Def_form {lhs;rhs;polarity=pol;_} ->
-          let op = match pol with `Equiv-> "<=>" | `Imply -> "=>" in
+          let op = match pol with `Equiv-> "=" | `Imply -> "=>" in
           fpf out "@[<2>thf(%a, axiom,@ %a %s@ (@[%a@]))@]."
             pp_name name (SLiteral.TPTP.pp ppt) lhs op
             (Util.pp_list ~sep:" & " ppf) rhs
