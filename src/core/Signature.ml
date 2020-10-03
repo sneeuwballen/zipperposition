@@ -124,7 +124,7 @@ module Seq = struct
   let types s =
     ID.Map.to_iter s.sym_map |> Iter.map snd |> Iter.map fst
 
-  let to_iter s = ID.Map.to_seq s.sym_map
+  let to_iter s = ID.Map.to_iter s.sym_map
 
   let of_iter l = Iter.fold (fun s (id,ty) -> declare s id ty) empty l
 end
@@ -157,7 +157,7 @@ let pp out s =
     Format.fprintf out "@[<hov2>%a:@ %a %B@]" ID.pp s Type.pp ty c
   in
   Format.fprintf out "{@[<hv>";
-  Util.pp_seq ~sep:", " pp_pair out (Seq.to_iter s);
+  Util.pp_iter ~sep:", " pp_pair out (Seq.to_iter s);
   Format.fprintf out "@]}";
   ()
 

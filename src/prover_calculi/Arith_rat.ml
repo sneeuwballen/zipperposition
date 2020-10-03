@@ -1106,7 +1106,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let demod_ineq c : C.t SimplM.t =
     ZProf.enter_prof prof_rat_demod_ineq;
     let res =
-      CCArray.findi
+      CCArray.find_map_i
         (fun i lit -> match _ineq_is_absurd_by_unit c lit with
            | None -> None
            | Some trace ->
@@ -1224,7 +1224,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         end
       | _ -> None
     in
-    begin match CCArray.findi conv_lit (C.lits c) with
+    begin match CCArray.find_map_i conv_lit (C.lits c) with
       | None -> SimplM.return_same c
       | Some (i, new_lits) ->
         let lits =

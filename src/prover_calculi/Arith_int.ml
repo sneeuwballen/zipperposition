@@ -1291,7 +1291,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let demod_ineq c : C.t SimplM.t =
     ZProf.enter_prof prof_arith_demod_ineq;
     let res =
-      CCArray.findi
+      CCArray.find_map_i
         (fun i lit -> match _ineq_is_absurd_by_unit c lit with
            | None -> None
            | Some trace ->

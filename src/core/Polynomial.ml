@@ -117,5 +117,5 @@ module Make(Coeff : IntegerModule)(Indet : OrderedType) = struct
 
   let pp out (a:t): unit =
     Format.fprintf out "Poly[%a]"
-      (Util.pp_list ~sep:" + " (CCPair.pp ~sep:" * " monomial_pp Coeff.pp)) (P.bindings a)
+      (Util.pp_list ~sep:" + " (CCPair.pp ~pp_sep:(CCFormat.return "@ * ") monomial_pp Coeff.pp)) (P.bindings a)
 end

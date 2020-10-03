@@ -3274,7 +3274,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     Util.incr_stat stat_eq_subsumption_call;
     let res = match a with
       | [|Lit.Equation (s, t, true)|] ->
-        let res = CCArray.find (equate_lit_with s t) b in
+        let res = CCArray.find_map (equate_lit_with s t) b in
         begin match res with
           | None -> None
           | Some subst ->

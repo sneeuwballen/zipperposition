@@ -262,8 +262,8 @@ module Constr = struct
     | Some wfun -> wfun
     | None -> 
       let err =
-        CCFormat.sprintf "precedences are one of:@[%a@]" 
-          (CCList.pp CCString.pp ~sep:"|" ~start:"(" ~stop:")") (List.map fst map) in
+        CCFormat.sprintf "precedences are one of: (@[%a@])" 
+          (CCList.pp CCString.pp ~pp_sep:(CCFormat.return "|@,")) (List.map fst map) in
       invalid_arg err
 
   (* regular string ordering *)

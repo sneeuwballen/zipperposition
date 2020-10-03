@@ -180,7 +180,7 @@ module Make(E : Env.S) = struct
           check_clauses_ newly_simplified;
           Env.remove_active simplified_actives;
           Env.remove_simpl simplified_actives;
-          CCVector.append_seq new_clauses newly_simplified;
+          CCVector.append_iter new_clauses newly_simplified;
 
           Util.debugf ~section 5 "simplified_actives:@ @[%a@]@." (fun k -> k (Iter.pp_seq Env.C.pp) simplified_actives);
           Util.debugf ~section 5 "newly_simplified:@ @[%a@]@." (fun k -> k (Iter.pp_seq Env.C.pp) newly_simplified);
@@ -216,9 +216,9 @@ module Make(E : Env.S) = struct
             Iter.flat_map_l (fun c -> 
               CCOpt.get_or ~default:[c] (Env.cheap_multi_simplify c)
             ) inferred_clauses in
-          CCVector.append_seq new_clauses inferred_clauses;
+          CCVector.append_iter new_clauses inferred_clauses;
           Util.debugf ~section 2 "@[<2>inferred @{<green>new clauses@}:@ [@[<v>%a@]]@]"
-            (fun k->k (Util.pp_seq Env.C.pp) (CCVector.to_iter new_clauses));
+            (fun k->k (Util.pp_iter Env.C.pp) (CCVector.to_iter new_clauses));
           (* add new clauses (including simplified active clauses)
              to passive set and simpl_set *)
           Env.add_passive (CCVector.to_iter new_clauses);

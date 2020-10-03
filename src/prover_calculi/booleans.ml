@@ -668,7 +668,7 @@ let rec replaceTST f top t =
      | Match(t, cases) -> 
        match_ (re false t) (map (fun (c,vs,e) -> (c,vs, re false e)) cases)
      | Let(binds, expr) -> 
-       let_ (map(CCPair.map2 (re false)) binds) (re false expr)
+       let_ (map(CCPair.map_snd (re false)) binds) (re false expr)
      | Bind(b,x,t) -> 
        let top = Binder.equal b Binder.Forall || Binder.equal b Binder.Exists in
        bind ~ty b x (re top t)
@@ -732,7 +732,7 @@ let rec replace old by t =
     | App(f,ps) -> app_whnf ~ty (r f) (map r ps)
     | AppBuiltin(f,ps) -> app_builtin ~ty f (map r ps)
     | Ite(c,x,y) -> ite (r c) (r x) (r y)
-    | Let(bs,e) -> let_ (map (CCPair.map2 r) bs) (r e)
+    | Let(bs,e) -> let_ (map (CCPair.map_snd r) bs) (r e)
     | Bind(b,v,e) -> bind ~ty b v (r e)
     | _ -> t
 

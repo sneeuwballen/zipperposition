@@ -170,7 +170,7 @@ let typing ~file prelude (input,stmts) =
   >>?= fun stmts ->
   let stmts = sine_filter stmts in
   Util.debugf ~section 3 "@[<hv2>@{<green>typed statements@}@ %a@]"
-    (fun k->k (Util.pp_seq Statement.pp_input) (CCVector.to_iter stmts));
+    (fun k->k (Util.pp_iter Statement.pp_input) (CCVector.to_iter stmts));
   begin
     if has_real stmts then (
       Util.debug ~section 1 "problem contains $real, lost completeness";
@@ -342,7 +342,7 @@ let presaturate_clauses (type c)
     Env.remove_active (CCVector.to_iter c_set);
     Env.remove_passive (CCVector.to_iter c_set);
     Util.debugf ~section 2 "@[<2>%d clauses pre-saturated into:@ @[<hv>%a@]@]"
-      (fun k->k num_clauses (Util.pp_seq ~sep:" " Env.C.pp) (CCVector.to_iter c_set));
+      (fun k->k num_clauses (Util.pp_iter ~sep:" " Env.C.pp) (CCVector.to_iter c_set));
     Phases.return_phase (result, clauses)
   )
   else Phases.return_phase (Saturate.Unknown, c_sets)
@@ -444,10 +444,10 @@ let print_szs_result (type c) ~file
         | Options.O_zf -> failwith "not implemented: printing in ZF" (* TODO *)
         | Options.O_tptp ->
           Util.debugf ~section 1 "@[<2>saturated set:@ @[<hv>%a@]@]"
-            (fun k->k (Util.pp_seq ~sep:" " Env.C.pp_tstp_full) (Env.get_active ()))
+            (fun k->k (Util.pp_iter ~sep:" " Env.C.pp_tstp_full) (Env.get_active ()))
         | Options.O_normal ->
           Util.debugf ~section 1 "@[<2>saturated set:@ @[<hv>%a@]@]"
-            (fun k->k (Util.pp_seq ~sep:" " Env.C.pp) (Env.get_active ()))
+            (fun k->k (Util.pp_iter ~sep:" " Env.C.pp) (Env.get_active ()))
       end
     | Saturate.Unsat proof ->
       (* print status then proof *)

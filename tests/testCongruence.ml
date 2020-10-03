@@ -86,11 +86,11 @@ end = struct
   (* fixpoint: merge classes that are congruent *)
   let rec update (cc:t) : t =
     let find_merge_ cc =
-      TSet_set.to_seq cc
+      TSet_set.to_iter cc
       |> Iter.flat_map
         (fun s1 ->
            assert (not (T.Set.is_empty s1));
-           TSet_set.to_seq cc
+           TSet_set.to_iter cc
            |> Iter.filter (fun s2 -> s1 != s2)
            |> Iter.map (fun s2 -> s1, s2))
       |> Iter.find_map

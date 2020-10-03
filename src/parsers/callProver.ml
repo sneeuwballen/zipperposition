@@ -222,7 +222,7 @@ module Eprover = struct
     (* build stdin *)
     let input =
       CCFormat.sprintf "@[%a@]"
-        (Util.pp_seq ~sep:"" (A.pp ST.pp)) decls
+        (Util.pp_iter ~sep:"" (A.pp ST.pp)) decls
     in
     Err.(
       (* call E *)
@@ -238,7 +238,7 @@ module Eprover = struct
     (* build stdin *)
     let input =
       CCFormat.sprintf "@[%a@]"
-        (Util.pp_seq ~sep:"" (A.pp ST.pp)) decls
+        (Util.pp_iter ~sep:"" (A.pp ST.pp)) decls
     in
     Err.(
       (* call E *)

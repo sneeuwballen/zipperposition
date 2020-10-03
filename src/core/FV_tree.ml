@@ -38,12 +38,12 @@ end = struct
 
   let pp out (f:t): unit = match f with
     | N i -> Fmt.int out i
-    | S s -> Fmt.fprintf out "(@[set@ %a@])" (Fmt.seq ID.pp) (ID.Set.to_iter s)
+    | S s -> Fmt.fprintf out "(@[set@ %a@])" (Fmt.iter ID.pp) (ID.Set.to_iter s)
     | M m ->
       Fmt.fprintf out "(@[mset@ %a@])"
-        Fmt.(seq (pair ~sep:silent ID.pp int)) (ID.Map.to_iter m)
+        Fmt.(iter (pair ~sep:silent ID.pp int)) (ID.Map.to_iter m)
     | L l ->
-      Fmt.fprintf out "(@[labels@ %a@])" Fmt.(seq int) (Util.Int_set.to_iter l)
+      Fmt.fprintf out "(@[labels@ %a@])" Fmt.(iter int) (Util.Int_set.to_iter l)
 
   let to_string = Fmt.to_string pp
 

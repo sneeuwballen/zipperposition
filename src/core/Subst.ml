@@ -211,7 +211,7 @@ let[@inline] equal (s1:t) s2 : bool = M.equal (Scoped.equal T.equal) s1 s2
 let[@inline] compare s1 s2 = M.compare (Scoped.compare T.compare) s1 s2
 
 let[@inline] hash (s:t): int =
-  CCHash.(seq (pair (Scoped.hash HVar.hash) (Scoped.hash T.hash))) (M.to_iter s)
+  CCHash.(iter (pair (Scoped.hash HVar.hash) (Scoped.hash T.hash))) (M.to_iter s)
 
 let pp_bindings out subst =
   let pp_binding out (v,t) =
@@ -219,7 +219,7 @@ let pp_bindings out subst =
       (Scoped.pp T.pp_var) v 
       (Scoped.pp T.pp) t 
   in
-  Util.pp_seq ~sep:", " pp_binding out (to_iter subst)
+  Util.pp_iter ~sep:", " pp_binding out (to_iter subst)
 
 let pp out subst = Format.fprintf out "{@[<hv>%a@]}" pp_bindings subst
 

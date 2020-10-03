@@ -60,13 +60,13 @@ module Set = struct
       in
       true
     with Exit -> false
-  let of_iter s = s |> Iter.map (fun v->v.id, v) |> ID.Map.of_seq
-  let add_seq m s = s |> Iter.map (fun v->v.id, v) |> ID.Map.add_seq m
+  let of_iter s = s |> Iter.map (fun v->v.id, v) |> ID.Map.of_iter
+  let add_seq m s = s |> Iter.map (fun v->v.id, v) |> ID.Map.add_iter m
   let add_list m s = s |> List.map (fun v->v.id, v) |> ID.Map.add_list m
   let of_list l = l |> List.map (fun v->v.id,v) |> ID.Map.of_list
-  let to_iter t = ID.Map.to_seq t |> Iter.map snd
+  let to_iter t = ID.Map.to_iter t |> Iter.map snd
   let to_list t = ID.Map.fold (fun _ v acc ->v::acc) t []
-  let pp out t = Util.pp_seq ~sep:", " pp out (to_iter t)
+  let pp out t = Util.pp_iter ~sep:", " pp out (to_iter t)
 end
 
 module Subst = struct
@@ -81,14 +81,14 @@ module Subst = struct
   let find_exn t v = snd (ID.Map.find v.id t)
   let find t v = try Some (find_exn t v) with Not_found -> None
   let of_list l = l |> List.map (fun (v,x)->v.id,(v,x)) |> ID.Map.of_list
-  let of_iter s = s |> Iter.map (fun (v,x)->v.id, (v,x)) |> ID.Map.of_seq
-  let to_iter t = ID.Map.to_seq t |> Iter.map snd
+  let of_iter s = s |> Iter.map (fun (v,x)->v.id, (v,x)) |> ID.Map.of_iter
+  let to_iter t = ID.Map.to_iter t |> Iter.map snd
   let to_list t = ID.Map.fold (fun _ tup acc -> tup::acc) t []
   let pp pp_v out t =
     let pp_pair out (v,x) =
       Format.fprintf out "@[%a → %a@]" pp_full v pp_v x
     in
-    Format.fprintf out "@[%a@]" (Util.pp_seq ~sep:", " pp_pair) (to_iter t)
+    Format.fprintf out "@[%a@]" (Util.pp_iter ~sep:", " pp_pair) (to_iter t)
   let merge a b =
     ID.Map.merge_safe a b
       ~f:(fun _ v -> match v with

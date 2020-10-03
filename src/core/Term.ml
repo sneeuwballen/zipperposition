@@ -727,7 +727,7 @@ let replace_m t m =
   of_term_unsafe (T.replace_m (t:t:>T.t) (m:t Map.t:>T.t T.Map.t))
 
 let symbols ?(init=ID.Set.empty) t =
-  ID.Set.add_seq init (Seq.symbols t)
+  ID.Set.add_iter init (Seq.symbols t)
 
 (** Does t contains the symbol f? *)
 let contains_symbol f t =
@@ -845,7 +845,7 @@ module AC(A : AC_SPEC) = struct
   let symbols seq =
     seq
     |> Iter.flat_map seq_symbols
-    |> ID.Set.add_seq ID.Set.empty
+    |> ID.Set.add_iter ID.Set.empty
 end
 
 (** {2 Printing/parsing} *)

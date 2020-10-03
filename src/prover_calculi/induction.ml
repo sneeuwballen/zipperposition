@@ -818,7 +818,7 @@ module Make
                    (function
                      | P_active, pos, t when term_is_var v t -> Some (pos, T.var v')
                      | _ -> None)
-                 |> Position.Map.add_seq m)
+                 |> Position.Map.add_iter m)
               Position.Map.empty vars
           in
           let f' = Cut_form.Pos.replace_many f m in

@@ -301,7 +301,7 @@ let parse ?(recursive=true) filename =
     Util_tptp.parse_file ~recursive filename
     >>= fun decls ->
     Util.debugf 1 "@[<2>decls:@ @[<hv>%a@]@]"
-      (fun k->k (Util.pp_seq ~sep:"" (A.pp T.pp)) decls);
+      (fun k->k (Util.pp_iter ~sep:"" (A.pp T.pp)) decls);
     of_decls decls
   )
 

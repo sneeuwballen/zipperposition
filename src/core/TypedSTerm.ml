@@ -565,7 +565,7 @@ let map ~f ~bind:f_bind b_acc t = match view t with
   | Record (l, rest) ->
     let ty = f b_acc (ty_exn t) in
     record_flatten ?loc:t.loc ~ty
-      (List.map (CCPair.map2 (f b_acc)) l)
+      (List.map (CCPair.map_snd (f b_acc)) l)
       ~rest:(CCOpt.map (f b_acc) rest)
   | Ite (a,b,c) ->
     let a = f b_acc a in

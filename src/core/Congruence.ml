@@ -173,8 +173,8 @@ module Make(T : TERM) = struct
       Fmt.fprintf out "(@[<hv>next@ :of %a@ :is %a@])" T.pp t T.pp u
     in
     Fmt.fprintf out "(@[<v>cc@ :parent_tbl (@[<v>%a@])@ :next_tbl (@[<v>%a@])@])"
-      (Util.pp_seq pp_parent) (H.to_iter cc.parents)
-      (Util.pp_seq pp_next) (H.to_iter cc.next)
+      (Util.pp_iter pp_parent) (H.to_iter cc.parents)
+      (Util.pp_iter pp_next) (H.to_iter cc.next)
 end
 
 module FO = Make(struct

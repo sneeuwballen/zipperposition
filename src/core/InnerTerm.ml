@@ -1062,7 +1062,7 @@ let rec pp_depth ?(hooks=[]) depth out t =
       in
       Format.fprintf out "@[<1>%a@ @[%a@].@ %a@]"
         Binder.pp b
-        (Util.pp_seq ~sep:" " pp_tyvar)
+        (Util.pp_iter ~sep:" " pp_tyvar)
         (Iter.of_array_i (Array.of_list varty_l))
         (_pp_surrounded (depth+List.length varty_l)) t'
     | AppBuiltin (Builtin.Arrow, ([] | [_])) -> assert false
@@ -1158,7 +1158,7 @@ let rec pp_zf out t =
       in
       Format.fprintf out "@[<1>%a@ @[%a@].@ %a@]"
         Binder.ZF.pp b
-        (Util.pp_seq ~sep:" " pp_tyvar)
+        (Util.pp_iter ~sep:" " pp_tyvar)
         (Iter.of_array_i (Array.of_list varty_l))
         (_pp_surrounded (depth+List.length varty_l)) t'
     | AppBuiltin (Builtin.Arrow, ([] | [_])) -> assert false

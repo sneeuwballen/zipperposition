@@ -824,7 +824,7 @@ module S = struct
     Util.ksprintf_noc ~f:Util.escape_dot fmt
 
   let pp_dot_seq ~name out seq =
-    CCGraph.Dot.pp_seq
+    CCGraph.Dot.pp_all
       ~tbl:(CCGraph.mk_table ~eq:equal ~hash:hash 64)
       ~eq:equal
       ~name

@@ -164,7 +164,7 @@ module VarMap = T.VarMap
 module VarSet = T.VarSet
 module VarTbl = T.VarTbl
 
-let vars_set set t = VarSet.add_seq set (Seq.vars t)
+let vars_set set t = VarSet.add_iter set (Seq.vars t)
 
 let vars t = vars_set VarSet.empty t |> VarSet.elements
 

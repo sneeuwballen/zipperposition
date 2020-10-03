@@ -60,7 +60,7 @@ let is_active trail ~v =
        (Lit.sign i) = (v j))  (* valuation match sign *)
     trail
 
-let to_iter = Lit.Set.to_seq
+let to_iter = Lit.Set.to_iter
 
 let labels (t:t) =
   to_iter t

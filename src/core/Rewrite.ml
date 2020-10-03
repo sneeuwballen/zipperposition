@@ -81,7 +81,7 @@ let pp_term_rule out r =
   Fmt.fprintf out "@[<2>@[%a@] :=@ @[%a@]@]" T.pp r.term_lhs T.pp r.term_rhs
 
 let pp_term_rules out (s:term_rule Iter.t): unit =
-  Fmt.(within "{" "}" @@ hvbox @@ Util.pp_seq pp_term_rule) out s
+  Fmt.(within "{" "}" @@ hvbox @@ Util.pp_iter pp_term_rule) out s
 
 let pp_lit_rule out r =
   let pp_c = CCFormat.hvbox (Util.pp_list ~sep:" ∨ " Literal.pp) in
@@ -89,14 +89,14 @@ let pp_lit_rule out r =
     Literal.pp r.lit_lhs (Util.pp_list ~sep:"∧" pp_c) r.lit_rhs
 
 let pp_lit_rules out (s:lit_rule Iter.t): unit =
-  Format.fprintf out "{@[<hv>%a@]}" (Util.pp_seq pp_lit_rule) s
+  Format.fprintf out "{@[<hv>%a@]}" (Util.pp_iter pp_lit_rule) s
 
 let pp_rule out = function
   | T_rule r -> Format.fprintf out "(@[%a [T]@])" pp_term_rule r
   | L_rule l -> Format.fprintf out "(@[%a [B]@])" pp_lit_rule l
 
 let pp_rule_set out (rs: rule_set): unit =
-  Fmt.(within "{" "}" @@ hvbox @@ Util.pp_seq pp_rule) out (Rule_set.to_iter rs)
+  Fmt.(within "{" "}" @@ hvbox @@ Util.pp_iter pp_rule) out (Rule_set.to_iter rs)
 
 (** Annotation on IDs that are defined. *)
 exception Payload_defined_cst of defined_cst
@@ -287,7 +287,7 @@ module Term = struct
       let pp_triple out (r,subst,sc) =
         Fmt.fprintf out "(@[%a@ :with %a[%d]@])" pp_term_rule r Subst.pp subst sc
       in
-      Fmt.fprintf out "{@[<hv>%a@]}" (Util.pp_seq pp_triple) (to_iter s)
+      Fmt.fprintf out "{@[<hv>%a@]}" (Util.pp_iter pp_triple) (to_iter s)
   end
 
   (* TODO: {b long term}
@@ -584,7 +584,7 @@ module Lit = struct
         l
     in
     let step =
-      CCArray.findi
+      CCArray.find_map_i
         (fun i lit -> match step_lit lit with
            | None -> None
            | Some (rule,subst,tags) ->
@@ -784,7 +784,7 @@ module Defined_cst = struct
     in
     Util.debugf ~section 3
       "(@[<2>defined_pos %a@ :pos (@[<hv>%a@])@])"
-      (fun k->k ID.pp id (Util.pp_seq Defined_pos.pp) (IArray.to_iter pos));
+      (fun k->k ID.pp id (Util.pp_iter Defined_pos.pp) (IArray.to_iter pos));
     pos
 
   let check_rules id rules =

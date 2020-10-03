@@ -296,5 +296,5 @@ module Make(E : Map.OrderedType) = struct
 
   let pp pp_x out m =
     let pp_p out (x,n) = Format.fprintf out "%a: %s" pp_x x (Z.to_string n) in
-    Format.fprintf out "{@[<hov>%a@]}" (Util.pp_seq ~sep:", " pp_p) (M.to_iter m)
+    Format.fprintf out "{@[<hov>%a@]}" (Util.pp_iter ~sep:", " pp_p) (M.to_iter m)
 end

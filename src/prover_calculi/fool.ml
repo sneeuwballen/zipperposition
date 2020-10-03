@@ -76,7 +76,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     if not (T.Set.is_empty sub_terms) then (
       Util.debugf ~section 5
         "@[<2>in clause `@[%a@]`@ possible subterms are [@[<hv>%a@]]@]"
-        (fun k->k C.pp c (T.Set.pp ~sep:"," T.pp) sub_terms);
+        (fun k->k C.pp c (T.Set.pp ~pp_sep:(CCFormat.return ",@,") T.pp) sub_terms);
     );
     begin
       T.Set.to_iter sub_terms
@@ -149,7 +149,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         ~penalty:(C.penalty c) ~trail:(C.trail c)
     in
     C.lits c
-    |> CCArray.findi
+    |> CCArray.find_map_i
       (fun i lit -> match lit with
          | Literal.Equation (a, b, false)
            when Type.is_prop (T.ty a) &&

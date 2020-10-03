@@ -560,7 +560,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     in
     if not (T.VarSet.is_empty vars) then (
       Util.debugf ~section 1 "(@[<hv2>ho.refine@ :clause %a@ :terms {@[%a@]}@])"
-        (fun k->k C.pp c (Util.pp_seq T.pp_var) (T.VarSet.to_iter vars));
+        (fun k->k C.pp c (Util.pp_iter T.pp_var) (T.VarSet.to_iter vars));
     );
     let sc_c = 0 in
     let offset = C.Seq.vars c |> T.Seq.max_var |> succ in
