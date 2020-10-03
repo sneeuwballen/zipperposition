@@ -237,7 +237,7 @@ let terms_of_rule (d:_ def_rule): _ Iter.t = match d with
     Iter.of_list (rhs::args)
   | Def_form {lhs;rhs;_} ->
     Iter.cons lhs (Iter.of_list rhs |> Iter.flat_map Iter.of_list)
-    |> Iter.flat_map SLiteral.to_seq
+    |> Iter.flat_map SLiteral.to_iter
 
 let level_of_rule (d:_ def_rule): int =
   terms_of_rule d
@@ -296,10 +296,10 @@ module Seq = struct
       List.iter (fun t->k (`Term t)) (rhs::args);
     | Def_form {vars;lhs;rhs;_} ->
       List.iter (fun v->k (`Ty (Var.ty v))) vars;
-      SLiteral.to_seq lhs |> Iter.map mk_term |> Iter.iter k;
+      SLiteral.to_iter lhs |> Iter.map mk_term |> Iter.iter k;
       Iter.of_list rhs |> Iter.map mk_form |> Iter.iter k
 
-  let to_seq st k =
+  let to_iter st k =
     let decl id ty = k (`ID id); k (`Ty ty) in
     begin match view st with
       | TyDecl (id,ty) -> decl id ty;
@@ -370,28 +370,28 @@ module Seq = struct
         |> Iter.flat_map_l (fun d -> d.def_rules)
         |> Iter.flat_map_l forms_def
       | _ ->
-        to_seq st
+        to_iter st
         |> Iter.filter_map (function `Form f -> Some f | _ -> None)
     end
 
   let lits st = forms st |> Iter.flat_map Iter.of_list
 
   let terms st =
-    to_seq st
+    to_iter st
     |> Iter.flat_map
       (function
-        | `Form f -> Iter.of_list f |> Iter.flat_map SLiteral.to_seq
+        | `Form f -> Iter.of_list f |> Iter.flat_map SLiteral.to_iter
         | `Term t -> Iter.return t
         | _ -> Iter.empty)
 
   let symbols st =
-    to_seq st
+    to_iter st
     |> Iter.flat_map
       (function
         | `ID id -> Iter.return id
         | `Form f ->
           Iter.of_list f
-          |> Iter.flat_map SLiteral.to_seq
+          |> Iter.flat_map SLiteral.to_iter
           |> Iter.flat_map Term.Seq.symbols
         | `Term t -> Term.Seq.symbols t
         | `Ty ty -> Type.Seq.symbols ty)
@@ -587,7 +587,7 @@ let sine_axiom_selector
        then eliminate_long_implications ~is_goal 
        else CCFun.id)
     |> Iter.flat_map TST.Seq.symbols
-    |> ID.Set.of_seq in
+    |> ID.Set.of_iter in
 
   let symset_of_axs ~trim_implications ?(is_goal=false) axs =
     List.fold_left (fun acc c -> 
@@ -610,7 +610,7 @@ let sine_axiom_selector
   let create_trigger_map ~trim_implications ~tbl axioms = 
     let map = ID.Tbl.create (Iter.length @@ ID.Tbl.keys tbl) in
     CCList.iter (fun ax ->
-      let symset = ID.Set.to_seq @@ symset_of_ax ~trim_implications:false ax in
+      let symset = ID.Set.to_iter @@ symset_of_ax ~trim_implications:false ax in
       let min_occ = ref (max_int) in
       Iter.iter (fun id -> 
           let cnt = ID.Tbl.get_or tbl id ~default:max_int in
@@ -1073,7 +1073,7 @@ let get_rw_rule ?weight_incr:(w_i=1000000) c  =
 
   let build_from_head sym vars rhs =
     let rhs = Lambda.eta_reduce @@ Lambda.snf (fst (Rewrite.Term.normalize_term rhs)) in
-    let vars_lhs = Term.VarSet.of_seq (Iter.fold (fun acc v -> 
+    let vars_lhs = Term.VarSet.of_iter (Iter.fold (fun acc v -> 
         Iter.append acc (Term.Seq.vars v)) 
         Iter.empty (Iter.of_list vars)) in
     if not (Term.symbols rhs |> ID.Set.mem sym) &&

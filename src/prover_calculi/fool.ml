@@ -71,7 +71,7 @@ module Make(E : Env.S) : S with module Env = E = struct
              | T.Var _ | T.DB _ -> false
              | T.Fun _ -> assert false (* by typing *)
            end)
-      |> T.Set.of_seq
+      |> T.Set.of_iter
     in
     if not (T.Set.is_empty sub_terms) then (
       Util.debugf ~section 5
@@ -79,7 +79,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         (fun k->k C.pp c (T.Set.pp ~sep:"," T.pp) sub_terms);
     );
     begin
-      T.Set.to_seq sub_terms
+      T.Set.to_iter sub_terms
       |> Iter.flat_map_l
         (fun sub -> [fool_param_sign ~sub true c; fool_param_sign ~sub false c])
       |> Iter.to_rev_list

@@ -364,7 +364,7 @@ module Seq = struct
     T.const ~ty:Type.(const s) s
 end
 
-let symbols ?(include_types=false) lit = Seq.symbols ~include_types lit |> ID.Set.of_seq
+let symbols ?(include_types=false) lit = Seq.symbols ~include_types lit |> ID.Set.of_iter
 
 (** Unification-like operation on components of a literal. *)
 module UnifOp = struct
@@ -558,7 +558,7 @@ let negate lit =
   | Rat o -> mk_false (Rat_lit.to_term o)
 
 let vars lit =
-  Seq.vars lit |> T.VarSet.of_seq |> T.VarSet.to_list
+  Seq.vars lit |> T.VarSet.of_iter |> T.VarSet.to_list
 
 let var_occurs v lit = match lit with
   | Equation (l,r,_) -> T.var_occurs ~var:v l || T.var_occurs ~var:v r
@@ -588,7 +588,7 @@ let to_multiset lit = match lit with
     |> Multisets.MT.Seq.of_coeffs Multisets.MT.empty
   | Rat o ->
     Rat_lit.Seq.to_multiset o |> Iter.map fst
-    |> Multisets.MT.Seq.of_seq Multisets.MT.empty
+    |> Multisets.MT.Seq.of_iter Multisets.MT.empty
 
 let is_trivial lit = 
   assert(no_prop_invariant lit);

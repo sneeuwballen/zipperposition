@@ -2220,8 +2220,8 @@ let extension =
   and post_typing_action stmts state =
     let module PT = TypedSTerm in
     let has_int =
-      CCVector.to_seq stmts
-      |> Iter.flat_map Stmt.Seq.to_seq
+      CCVector.to_iter stmts
+      |> Iter.flat_map Stmt.Seq.to_iter
       |> Iter.flat_map
         (function
           | `ID _ -> Iter.empty

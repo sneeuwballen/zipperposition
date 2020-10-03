@@ -366,7 +366,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           Subst.FO.apply Subst.Renaming.none subst (skolem,0) 
         | None ->
           let free_vars_l = 
-              T.VarSet.to_list (T.VarSet.of_seq free_vars) in
+              T.VarSet.to_list (T.VarSet.of_iter free_vars) in
           let (id,ty), t = T.mk_fresh_skolem ~prefix:"sk" free_vars_l ret_ty in
           E.Ctx.declare id ty;
           Signal.send Env.on_pred_skolem_introduction (c, t);

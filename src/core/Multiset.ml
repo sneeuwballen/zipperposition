@@ -86,12 +86,12 @@ module Make(E : Map.OrderedType) = struct
       m empty
 
   module Seq = struct
-    let of_seq m seq =
+    let of_iter m seq =
       let m = ref m in
       seq (fun x -> m := add !m x);
       !m
 
-    let to_seq (m:t) k =
+    let to_iter (m:t) k =
       M.iter (fun x n -> for _i=1 to Z.to_int n do k x; done) m
 
     let of_coeffs m seq =
@@ -102,12 +102,12 @@ module Make(E : Map.OrderedType) = struct
     let to_coeffs m k = M.iter (fun x n -> k (x,n)) m
   end
 
-  let iter f m = Seq.to_seq m f
+  let iter f m = Seq.to_iter m f
   let iter_coeffs f m = Seq.to_coeffs m (fun (x,n) -> f x n)
 
   let fold f acc m =
     let acc = ref acc in
-    Seq.to_seq m (fun x -> acc := f !acc x);
+    Seq.to_iter m (fun x -> acc := f !acc x);
     !acc
 
   let fold_coeffs f acc (m:t) = M.fold (fun x n acc -> f acc x n) m acc
@@ -296,5 +296,5 @@ module Make(E : Map.OrderedType) = struct
 
   let pp pp_x out m =
     let pp_p out (x,n) = Format.fprintf out "%a: %s" pp_x x (Z.to_string n) in
-    Format.fprintf out "{@[<hov>%a@]}" (Util.pp_seq ~sep:", " pp_p) (M.to_seq m)
+    Format.fprintf out "{@[<hov>%a@]}" (Util.pp_seq ~sep:", " pp_p) (M.to_iter m)
 end

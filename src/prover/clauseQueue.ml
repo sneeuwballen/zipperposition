@@ -368,7 +368,7 @@ module Make(C : Clause_intf.S) = struct
         let t = Lambda.eta_expand t in
         if Term.Set.is_empty !_related_terms then int_of_float (w t)
         else (
-          Term.Set.to_seq !_related_terms
+          Term.Set.to_iter !_related_terms
           |> Iter.map (fun conj_term -> 
              let conj_term = Lambda.eta_expand conj_term in
              w_diff ~given_term:t ~conj_term)

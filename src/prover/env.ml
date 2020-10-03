@@ -162,10 +162,10 @@ module Make(X : sig
   let remove_simpl = ProofState.SimplSet.remove
 
   let get_passive () =
-    ProofState.PassiveSet.clauses () |> C.ClauseSet.to_seq
+    ProofState.PassiveSet.clauses () |> C.ClauseSet.to_iter
 
   let get_active () =
-    ProofState.ActiveSet.clauses () |> C.ClauseSet.to_seq
+    ProofState.ActiveSet.clauses () |> C.ClauseSet.to_iter
 
   let add_binary_inf name rule =
     if not (List.mem_assoc name !_binary_rules)
@@ -919,8 +919,8 @@ module Make(X : sig
     Util.debugf ~section 1
       "@[<v>@[<2>clauses:@ @[<v>%a@]@]@ @[<2>sos:@ @[<v>%a@]@]@]"
       (fun k->k
-          (Util.pp_seq ~sep:" " C.pp) (CCVector.to_seq c_set)
-          (Util.pp_seq ~sep:" " C.pp) (CCVector.to_seq c_sos));
+          (Util.pp_seq ~sep:" " C.pp) (CCVector.to_iter c_set)
+          (Util.pp_seq ~sep:" " C.pp) (CCVector.to_iter c_sos));
     Util.debugf ~section 1 "end@." CCFun.id;
     let c_set = CCVector.freeze c_set in
     let c_sos = CCVector.freeze c_sos in

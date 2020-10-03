@@ -38,12 +38,12 @@ end = struct
 
   let pp out (f:t): unit = match f with
     | N i -> Fmt.int out i
-    | S s -> Fmt.fprintf out "(@[set@ %a@])" (Fmt.seq ID.pp) (ID.Set.to_seq s)
+    | S s -> Fmt.fprintf out "(@[set@ %a@])" (Fmt.seq ID.pp) (ID.Set.to_iter s)
     | M m ->
       Fmt.fprintf out "(@[mset@ %a@])"
-        Fmt.(seq (pair ~sep:silent ID.pp int)) (ID.Map.to_seq m)
+        Fmt.(seq (pair ~sep:silent ID.pp int)) (ID.Map.to_iter m)
     | L l ->
-      Fmt.fprintf out "(@[labels@ %a@])" Fmt.(seq int) (Util.Int_set.to_seq l)
+      Fmt.fprintf out "(@[labels@ %a@])" Fmt.(seq int) (Util.Int_set.to_iter l)
 
   let to_string = Fmt.to_string pp
 
@@ -128,7 +128,7 @@ module Make(C: Index_intf.CLAUSE) = struct
            Iter.filter SLiteral.is_neg lits |> Iter.length |> mk_n)
 
     let weight_lit lit =
-      SLiteral.to_seq lit |> Iter.map T.ho_weight |> Iter.fold (+) 0
+      SLiteral.to_iter lit |> Iter.map T.ho_weight |> Iter.fold (+) 0
 
     let weight_ name filter =
       make name
@@ -149,12 +149,12 @@ module Make(C: Index_intf.CLAUSE) = struct
     let symbols_ filter lits : ID.t Iter.t =
       lits
       |> Iter.filter filter
-      |> Iter.flat_map SLiteral.to_seq
+      |> Iter.flat_map SLiteral.to_iter
       |> Iter.flat_map (T.Seq.symbols ~filter_term:not_app_var)
 
     let set_sym_ filter lits _ =
       symbols_ filter lits
-      |> ID.Set.of_seq
+      |> ID.Set.of_iter
       |> mk_s
 
     let set_sym_plus =
@@ -200,7 +200,7 @@ module Make(C: Index_intf.CLAUSE) = struct
 
       lits
       |> Iter.filter filter
-      |> Iter.flat_map SLiteral.to_seq
+      |> Iter.flat_map SLiteral.to_iter
       |> Iter.flat_map subterms_depth
       |> Iter.filter_map
         (fun (t,d) -> match T.view t with

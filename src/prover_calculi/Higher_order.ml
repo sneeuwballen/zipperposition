@@ -440,7 +440,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     (* find unshielded predicate vars *)
     let find_vars(): _ HVar.t Iter.t =
       Literals.vars (C.lits c)
-      |> CCList.to_seq
+      |> CCList.to_iter
       |> Iter.filter
         (fun v ->
            (Type.is_prop @@ Type.returns @@ HVar.ty v) &&
@@ -556,17 +556,17 @@ module Make(E : Env.S) : S with module Env = E = struct
             | _ -> None in
           CCOpt.to_list (extract_var l) @ CCOpt.to_list (extract_var r))
       |> Iter.filter (fun v -> Type.returns_prop @@ HVar.ty v)
-      |> T.VarSet.of_seq (* unique *)
+      |> T.VarSet.of_iter (* unique *)
     in
     if not (T.VarSet.is_empty vars) then (
       Util.debugf ~section 1 "(@[<hv2>ho.refine@ :clause %a@ :terms {@[%a@]}@])"
-        (fun k->k C.pp c (Util.pp_seq T.pp_var) (T.VarSet.to_seq vars));
+        (fun k->k C.pp c (Util.pp_seq T.pp_var) (T.VarSet.to_iter vars));
     );
     let sc_c = 0 in
     let offset = C.Seq.vars c |> T.Seq.max_var |> succ in
     begin
       vars
-      |> T.VarSet.to_seq
+      |> T.VarSet.to_iter
       |> Iter.flat_map_l
         (fun v -> HO_unif.enum_prop 
             ~enum_cache:(Env.flex_get k_prim_enum_terms) 
@@ -1012,7 +1012,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let res = Combs.maybe_conv_lams res in
       (* CCFormat.printf "orig:@[%a@]@.subst:@[%a@]@.res:@[%a@]@." C.pp cl Subst.pp subst C.pp res; *)
       res)
-    |> CCList.to_seq
+    |> CCList.to_iter
     |> Env.add_passive
 
   type fixed_arg_status =
@@ -1692,7 +1692,7 @@ let extension =
   (* check if there are HO variables *)
   and check_ho vec state =
     let is_ho =
-      CCVector.to_seq vec
+      CCVector.to_iter vec
       |> Iter.exists st_contains_ho
     in
     if is_ho then (

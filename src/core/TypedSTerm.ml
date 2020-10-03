@@ -520,15 +520,15 @@ let as_id_app t = match view t with
   | App ({term=Const id; ty=Some ty; _}, l) -> Some (id, ty, l)
   | _ -> None
 
-let vars t = Seq.vars t |> Var.Set.of_seq |> Var.Set.to_list
+let vars t = Seq.vars t |> Var.Set.of_iter |> Var.Set.to_list
 
-let free_vars_set t = Seq.free_vars t |> Var.Set.of_seq
-let free_vars t = Seq.free_vars t |> Var.Set.of_seq |> Var.Set.to_list
+let free_vars_set t = Seq.free_vars t |> Var.Set.of_iter
+let free_vars t = Seq.free_vars t |> Var.Set.of_iter |> Var.Set.to_list
 
 let free_vars_l l =
   Iter.of_list l
   |> Iter.flat_map Seq.free_vars
-  |> Var.Set.of_seq |> Var.Set.to_list
+  |> Var.Set.of_iter |> Var.Set.to_list
 
 let closed t = Seq.free_vars t |> Iter.is_empty
 
@@ -1512,8 +1512,8 @@ let try_alpha_renaming f1 f2 =
       | _ -> fail_unif_ [f1,f2] "mismatch or unknown constructors"
   in
   try
-    let vars1 = Seq.vars f1 |> Var.Set.of_seq in
-    let vars2 = Seq.vars f2 |> Var.Set.of_seq in
+    let vars1 = Seq.vars f1 |> Var.Set.of_iter in
+    let vars2 = Seq.vars f2 |> Var.Set.of_iter in
     if Var.Set.intersection_empty vars1 vars2 then (
       let subst = aux Subst.empty [f1,f2] in
       Util.debugf ~section 5 "Alpha renaming succeeded:@ of %a@ and %a@ with subst %a"

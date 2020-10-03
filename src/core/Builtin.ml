@@ -485,7 +485,7 @@ module TPTP = struct
     with NotABuiltin -> None
 
   (* TODO add the other ones *)
-  let connectives = Set.of_seq
+  let connectives = Set.of_iter
       (Iter.of_list [ and_; or_; equiv; imply; ])
 
   let is_connective = function

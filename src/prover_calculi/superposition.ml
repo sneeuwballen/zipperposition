@@ -816,7 +816,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let subst = US.subst us in
       let lambdasup_vars =
         if (info.sup_kind = LambdaSup) then (
-          Term.Seq.subterms ~include_builtin:true info.u_p |> Iter.filter Term.is_var |> Term.Set.of_seq)
+          Term.Seq.subterms ~include_builtin:true info.u_p |> Iter.filter Term.is_var |> Term.Set.of_iter)
         else Term.Set.empty in
       let t' = if info.sup_kind != DupSup then 
           S.FO.apply ~shift_vars renaming subst (info.t, sc_a)
@@ -938,7 +938,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let fun_context_around_up =  Subst.FO.apply renaming subst' 
           (Lit.Pos.at info.passive_lit pos_enclosing_up, sc_p) in
       let vars = Iter.append (T.Seq.vars fun_context_around_up) (T.Seq.vars t')
-                 |> Term.VarSet.of_seq
+                 |> Term.VarSet.of_iter
                  |> Term.VarSet.to_list in
       let skolem_decls = ref [] in
       let sk_with_vars =
@@ -2572,7 +2572,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     match cl_map with
     | None -> Iter.empty
     | Some cl_map -> 
-      C.Tbl.to_seq cl_map 
+      C.Tbl.to_iter cl_map 
       |> Iter.flat_map (fun (c, l) -> 
           Iter.of_list l
           |> Iter.map (fun (t,p) -> (c,t,p)))

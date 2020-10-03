@@ -13,7 +13,7 @@ type t = Lit.Set.t
 
 let equal = Lit.Set.equal
 let compare = Lit.Set.compare
-let hash trail = Hash.seq Lit.hash (Lit.Set.to_seq trail)
+let hash trail = Hash.seq Lit.hash (Lit.Set.to_iter trail)
 
 let empty = Lit.Set.empty
 let mem = Lit.Set.mem
@@ -25,9 +25,9 @@ let remove = Lit.Set.remove
 let fold f acc t = Lit.Set.fold (fun x acc -> f acc x) t acc
 let length = Lit.Set.cardinal
 let map f set =
-  Lit.Set.to_seq set
+  Lit.Set.to_iter set
   |> Iter.map f
-  |> Lit.Set.of_seq
+  |> Lit.Set.of_iter
 let of_list = Lit.Set.of_list
 let add_list = Lit.Set.add_list
 let to_list = Lit.Set.to_list
@@ -60,12 +60,12 @@ let is_active trail ~v =
        (Lit.sign i) = (v j))  (* valuation match sign *)
     trail
 
-let to_seq = Lit.Set.to_seq
+let to_iter = Lit.Set.to_seq
 
 let labels (t:t) =
-  to_seq t
+  to_iter t
   |> Iter.map BBox.Lit.to_int
-  |> Util.Int_set.of_seq
+  |> Util.Int_set.of_iter
 
 let to_s_form (t:t) =
   let module F = TypedSTerm.Form in

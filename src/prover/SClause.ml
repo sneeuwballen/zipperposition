@@ -75,7 +75,7 @@ let pp_trail out trail =
   if not (Trail.is_empty trail)
   then
     Format.fprintf out "@ @<2>← @[<hv>%a@]"
-      (Util.pp_seq ~sep:" ⊓ " BBox.pp) (Trail.to_seq trail)
+      (Util.pp_seq ~sep:" ⊓ " BBox.pp) (Trail.to_iter trail)
 
 let pp_vars out c =
   let pp_vars out = function
@@ -93,7 +93,7 @@ let pp out c =
 
 let pp_trail_zf out trail =
   Format.fprintf out "@[<hv>%a@]"
-    (Util.pp_seq ~sep:" && " BBox.pp_zf) (Trail.to_seq trail)
+    (Util.pp_seq ~sep:" && " BBox.pp_zf) (Trail.to_iter trail)
 
 let pp_zf out c =
   if Trail.is_empty c.trail
@@ -121,7 +121,7 @@ let pp_trail_tstp out trail =
   in
   Format.fprintf out "@[<hv>%a@]"
     (Util.pp_seq ~sep:" & " pp_box)
-    (Trail.to_seq trail)
+    (Trail.to_iter trail)
 
 let pp_tstp out c =
   if Trail.is_empty c.trail

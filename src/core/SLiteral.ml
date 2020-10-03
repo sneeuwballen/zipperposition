@@ -49,7 +49,7 @@ let iter ~f = function
   | Eq (a,b)
   | Neq (a,b) -> f a; f b
 
-let to_seq l f = match l with
+let to_iter l f = match l with
   | True
   | False -> ()
   | Atom (t, _) -> f t

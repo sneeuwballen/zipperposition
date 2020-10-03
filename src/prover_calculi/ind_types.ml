@@ -333,7 +333,7 @@ module Make(Env : Env_intf.S) = struct
         (fun t ->
            not (is_cstor_app t) &&
            not (T.Tbl.mem exhaustiveness_tbl_ t))
-      |> T.Set.of_seq |> T.Set.to_list
+      |> T.Set.of_iter |> T.Set.to_list
       |> List.rev_map
         (fun t ->
            T.Tbl.add exhaustiveness_tbl_ t ();

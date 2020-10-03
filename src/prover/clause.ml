@@ -517,12 +517,12 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let pp_set out set =
     Format.fprintf out "{@[<hv>%a@]}"
       (Util.pp_seq ~sep:"," pp)
-      (ClauseSet.to_seq set)
+      (ClauseSet.to_iter set)
 
   let pp_set_tstp out set =
     Format.fprintf out "@[<v>%a@]"
       (Util.pp_seq ~sep:"," pp_tstp)
-      (ClauseSet.to_seq set)
+      (ClauseSet.to_iter set)
 
 
   let check_types c =

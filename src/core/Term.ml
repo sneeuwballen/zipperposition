@@ -664,13 +664,13 @@ let comb_depth t =
 
 let monomorphic t = Iter.is_empty (Seq.ty_vars t)
 
-let max_var set = VarSet.to_seq set |> Seq.max_var
+let max_var set = VarSet.to_iter set |> Seq.max_var
 
-let min_var set = VarSet.to_seq set |> Seq.min_var
+let min_var set = VarSet.to_iter set |> Seq.min_var
 
 let add_vars tbl t = Seq.vars t (fun v -> VarTbl.replace tbl v ())
 
-let vars ts = Seq.vars ts |> VarSet.of_seq
+let vars ts = Seq.vars ts |> VarSet.of_iter
 
 let vars_prefix_order t =
   Seq.vars t
@@ -714,7 +714,7 @@ let head t =
   try Some (head_exn t)
   with Invalid_argument _-> None
 
-let ty_vars t = Seq.ty_vars t |> Type.VarSet.of_seq
+let ty_vars t = Seq.ty_vars t |> Type.VarSet.of_iter
 
 
 (** {2 Subterms and positions} *)

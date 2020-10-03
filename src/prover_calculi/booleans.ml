@@ -80,7 +80,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           (subterm_selection != Minimal ||
            Iter.is_empty 
             (Iter.flat_map (find_in_term ~top:false) 
-              (CCList.to_seq args))) in
+              (CCList.to_iter args))) in
         let continue =
           (subterm_selection = Any || not take_subterm) &&
           (* do not traverse variable-headed terms *)
@@ -113,7 +113,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       if not (Iter.is_empty res) then found := true;
       res
     )
-    |> T.Set.of_seq
+    |> T.Set.of_iter
     |> T.Set.to_list
   
   let mk_res ~proof ~old ~repl new_lit c =
@@ -450,7 +450,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let proof = Proof.Step.simp ~rule:(Proof.Rule.mk "cnf_otf") ~tags:[Proof.Tag.T_ho] [C.proof_parent c] in
       let trail = C.trail c and penalty = C.penalty c in
       let stmt = Statement.assert_ ~proof f in
-      let cnf_vec = Cnf.convert @@ CCVector.to_seq @@ Cnf.cnf_of ~opts ~ctx:(Ctx.sk_ctx ()) stmt in
+      let cnf_vec = Cnf.convert @@ CCVector.to_iter @@ Cnf.cnf_of ~opts ~ctx:(Ctx.sk_ctx ()) stmt in
       CCVector.iter (fun cl -> 
           Statement.Seq.ty_decls cl
           |> Iter.iter (fun (id,ty) -> Ctx.declare id ty)) cnf_vec;
@@ -693,7 +693,7 @@ let name_quantifiers stmts =
   let name_prop_Qs s = replaceTST(fun t -> match TypedSTerm.view t with
       | Bind(Binder.Forall,_,_) | Bind(Binder.Exists, _, _) ->
         changed := true;
-        let vars = Var.Set.of_seq (TypedSTerm.Seq.free_vars t) |> Var.Set.to_list in
+        let vars = Var.Set.of_iter (TypedSTerm.Seq.free_vars t) |> Var.Set.to_list in
         let qid = ID.gensym() in
         let ty = app_builtin ~ty:tType Arrow (prop :: map Var.ty vars) in
         let q = const ~ty qid in

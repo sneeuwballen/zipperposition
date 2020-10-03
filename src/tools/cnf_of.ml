@@ -85,8 +85,8 @@ let process file =
       (if !flag_disable_renaming then [Cnf.DisableRenaming] else []) @
       []
     in
-    let decls = Cnf.cnf_of_seq ~opts ~ctx:(Skolem.create()) (CCVector.to_seq st) in
-    let sigma = Cnf.type_declarations (CCVector.to_seq decls) in
+    let decls = Cnf.cnf_of_iter ~opts ~ctx:(Skolem.create()) (CCVector.to_iter st) in
+    let sigma = Cnf.type_declarations (CCVector.to_iter decls) in
     if !print_sig
     then (
       Format.printf "@[<hv2>signature:@ (@[<v>%a@]@])@."

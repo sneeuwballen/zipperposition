@@ -66,7 +66,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
        two variables occur in the same literal.  *)
     let uf_vars =
       C.Seq.vars c
-      |> T.VarSet.of_seq
+      |> T.VarSet.of_iter
       |> T.VarSet.to_list
       |> UF.create
     (* set of ground literals (each one is its own component) *)
@@ -233,7 +233,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
   (* check whether the trail is false and will remain so *)
   let trail_is_trivial_ (trail:Trail.t): bool =
     let res =
-      Trail.to_seq trail
+      Trail.to_iter trail
       |> Iter.find_map
         (fun lit ->
            try match Sat.valuation_level lit with
@@ -340,7 +340,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
   let backward_simplify_trails (_:C.t): C.ClauseSet.t =
     if Sat.last_result () = Sat_solver.Sat && new_proved_lits () then (
       E.ProofState.ActiveSet.clauses ()
-      |> C.ClauseSet.to_seq
+      |> C.ClauseSet.to_iter
       |> Iter.filter (fun c -> not (Trail.is_empty @@ C.trail c))
       |> Iter.filter
         (fun c ->
@@ -354,7 +354,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
                "(@[<2>backward_simplify_trail@ %a@])" (fun k->k C.pp c);
            );
            ok)
-      |> C.ClauseSet.of_seq
+      |> C.ClauseSet.of_iter
     ) else C.ClauseSet.empty
 
   let skolem_count_ = ref 0

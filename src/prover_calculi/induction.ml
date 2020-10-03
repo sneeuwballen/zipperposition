@@ -164,7 +164,7 @@ end = struct
          end)
       (cs g);
     let all_clusters =
-      (UF_clauses.to_seq uf |> Iter.map snd |> Iter.to_rev_list)
+      (UF_clauses.to_iter uf |> Iter.map snd |> Iter.to_rev_list)
       @ !ground_
     in
     let new_goals = List.rev_map of_form all_clusters in
@@ -806,7 +806,7 @@ module Make
           let m =
             let offset =
               Cut_form.vars f
-              |> T.VarSet.to_seq
+              |> T.VarSet.to_iter
               |> Iter.map HVar.id
               |> Iter.max |> CCOpt.get_or ~default:0 |> succ
             in
@@ -871,7 +871,7 @@ module Make
              (* introduce variable for [t] *)
              let v =
                Cut_form.vars f
-               |> T.VarSet.to_seq
+               |> T.VarSet.to_iter
                |> Iter.map HVar.id
                |> Iter.max |> CCOpt.get_or ~default:0 |> succ
                |> HVar.make ~ty:(T.ty t)
@@ -882,7 +882,7 @@ module Make
                  (function
                    | pos, u when T.equal t u -> Some (pos, T.var v)
                    | _ -> None)
-               |> Position.Map.of_seq
+               |> Position.Map.of_iter
              in
              let f' = Cut_form.Pos.replace_many f m in
              Util.debugf ~section 4
@@ -989,7 +989,7 @@ module Make
            | _ -> ())
     end;
     let res =
-      UF_vars.to_seq uf
+      UF_vars.to_iter uf
       |> Iter.map snd
       |> Iter.filter_map
         (fun vars ->
@@ -1154,7 +1154,7 @@ module Make
     and no_pos_lemma_in_trail () =
       Iter.of_list clauses
       |> Iter.map C.trail
-      |> Iter.flat_map Trail.to_seq
+      |> Iter.flat_map Trail.to_iter
       |> Iter.for_all
         (fun lit -> not (BoolLit.sign lit && BBox.is_lemma lit))
     in
@@ -1241,7 +1241,7 @@ module Make
   (* checks whether the trail is trivial, that is, it contains
      two literals [i = t1] and [i = t2] with [t1], [t2] distinct cover set cases *)
   let trail_is_trivial_cases trail =
-    let seq = Trail.to_seq trail in
+    let seq = Trail.to_iter trail in
     (* all boolean literals that express paths *)
     let relevant_cases = Iter.filter_map BoolBox.as_case seq in
     (* are there two distinct incompatible cases in the trail? *)
@@ -1265,7 +1265,7 @@ module Make
   (* make trails with several lemmas in them trivial, so that we have to wait
      for a lemma to be proved before we can  use it to prove another lemma *)
   let trail_is_trivial_lemmas trail =
-    let seq = Trail.to_seq trail in
+    let seq = Trail.to_iter trail in
     (* all boolean literals that express paths *)
     let relevant_cases =
       seq

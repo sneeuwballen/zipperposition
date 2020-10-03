@@ -1023,7 +1023,7 @@ module Inner = struct
     (* set of variables that should not be bound, including the
        free variables of [b] *)
     let protect = Iter.append protect (T.Seq.vars b) in
-    let blocked = T.VarSet.of_seq protect in
+    let blocked = T.VarSet.of_iter protect in
     ZProf.with_prof prof_matching
       (fun () ->
          let subst = US.of_subst subst in
@@ -1047,7 +1047,7 @@ module Inner = struct
     let op =
       let protect =
         if sc1=sc2
-        then P_vars (T.Seq.vars t2 |> T.VarSet.of_seq)
+        then P_vars (T.Seq.vars t2 |> T.VarSet.of_iter)
         else P_scope sc2
       in
       O_variant protect

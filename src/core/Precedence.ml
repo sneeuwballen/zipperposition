@@ -273,7 +273,7 @@ module Constr = struct
     then ID.compare a b else c
 
   let max ~signature l =
-    let set = ID.Set.of_seq l in
+    let set = ID.Set.of_iter l in
     fun s1 s2 ->
       let is_max1 = ID.Set.mem s1 set in
       let is_max2 = ID.Set.mem s2 set in
@@ -284,7 +284,7 @@ module Constr = struct
       | false, true -> -1
 
   let min ~signature l =
-    let set = ID.Set.of_seq l in
+    let set = ID.Set.of_iter l in
     fun s1 s2 ->
       let is_min1 = ID.Set.mem s1 set in
       let is_min2 = ID.Set.mem s2 set in

@@ -26,7 +26,7 @@ val to_form : term t -> form
 val map : f:('a -> 'b) -> 'a t -> 'b t
 val fold : ('a -> 't -> 'a) -> 'a -> 't t -> 'a
 val iter : f:('a -> unit) -> 'a t -> unit
-val to_seq : 'a t -> 'a Iter.t
+val to_iter : 'a t -> 'a Iter.t
 
 val equal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
 

@@ -166,7 +166,7 @@ let traverse ?(traversed=StepTbl.create 11) proof k =
     end
   done
 
-let to_seq proof = Iter.from_iter (fun k -> traverse proof k)
+let to_iter proof = Iter.from_iter (fun k -> traverse proof k)
 
 (** Depth of a proof, ie max distance between the root and any axiom *)
 let depth proof =
@@ -189,7 +189,7 @@ let depth proof =
   done;
   !depth
 
-let size proof = Iter.length (to_seq proof)
+let size proof = Iter.length (to_iter proof)
 
 (** {2 IO} *)
 

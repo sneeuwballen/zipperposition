@@ -156,7 +156,7 @@ let is_renaming subst =
       (fun (t,sc_t) -> match T.view t with
          | T.Var v -> Some ((v,sc_t),())
          | _ -> None)
-    |> M.of_seq
+    |> M.of_iter
   in
   (* as many variables in codomain as variables in domain *)
   M.cardinal rev = M.cardinal subst
@@ -195,11 +195,11 @@ let[@inline] map f subst = M.map (fun (t,sc) -> f t, sc) subst
 
 let[@inline] filter f subst = M.filter f subst
 
-let[@inline] to_seq subst k = M.iter (fun v t -> k (v,t)) subst
+let[@inline] to_iter subst k = M.iter (fun v t -> k (v,t)) subst
 
 let[@inline] to_list subst = M.fold (fun v t acc -> (v,t)::acc) subst []
 
-let of_seq ?(init=empty) seq =
+let of_iter ?(init=empty) seq =
   Iter.fold (fun subst (v,t) -> bind subst v t) init seq
 
 let of_list ?(init=empty) l = match l with
@@ -211,7 +211,7 @@ let[@inline] equal (s1:t) s2 : bool = M.equal (Scoped.equal T.equal) s1 s2
 let[@inline] compare s1 s2 = M.compare (Scoped.compare T.compare) s1 s2
 
 let[@inline] hash (s:t): int =
-  CCHash.(seq (pair (Scoped.hash HVar.hash) (Scoped.hash T.hash))) (M.to_seq s)
+  CCHash.(seq (pair (Scoped.hash HVar.hash) (Scoped.hash T.hash))) (M.to_iter s)
 
 let pp_bindings out subst =
   let pp_binding out (v,t) =
@@ -219,7 +219,7 @@ let pp_bindings out subst =
       (Scoped.pp T.pp_var) v 
       (Scoped.pp T.pp) t 
   in
-  Util.pp_seq ~sep:", " pp_binding out (to_seq subst)
+  Util.pp_seq ~sep:", " pp_binding out (to_iter subst)
 
 let pp out subst = Format.fprintf out "{@[<hv>%a@]}" pp_bindings subst
 
