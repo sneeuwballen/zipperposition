@@ -13,8 +13,8 @@ depends: [
   "base-bytes"
   "base-unix"
   "zarith"
-  "oseq"
-  "containers" { >= "2.8" }
+  "oseq" { >= "1.0" & < "2.0" }
+  "containers" { >= "2.8" & < "3.0" }
   "iter" { >= "1.2" }
   "menhir" {build}
   "dune" { >= "1.1" }
