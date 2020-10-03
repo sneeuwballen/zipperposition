@@ -120,9 +120,9 @@ end = struct
 
   let pp out (cc:t): unit =
     let pp_c out s =
-      Format.fprintf out "(@[<hv>%a@])" (Util.pp_seq T.pp) (T.Set.to_seq s)
+      Format.fprintf out "(@[<hv>%a@])" (Util.pp_iter T.pp) (T.Set.to_iter s)
     in
-    Format.fprintf out "(@[<v>%a@])" (Util.pp_seq pp_c) (TSet_set.to_seq cc)
+    Format.fprintf out "(@[<v>%a@])" (Util.pp_iter pp_c) (TSet_set.to_iter cc)
 end
 
 let check_ref =
