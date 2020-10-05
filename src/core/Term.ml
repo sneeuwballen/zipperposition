@@ -567,10 +567,12 @@ let in_lfho_fragment t =
 
 let rec is_fo_term t =
   match view t with
-  | Var _ -> not @@ Type.is_fun @@ ty t
-  | AppBuiltin _ -> false
+  | Var _ -> not (Type.is_fun (ty t) || Type.is_prop (ty t))
+  | AppBuiltin _ -> equal t true_ || equal t false_
   | App (hd, l) -> 
-    not (Type.is_fun (ty t)) && T.is_const hd && List.for_all is_fo_term l
+    not (Type.is_fun (ty t)) 
+      && T.is_const hd 
+      && List.for_all (fun t -> not (Type.is_prop (ty t) || Type.is_fun (ty t)) && is_fo_term t) l
   | Const _ -> not (Type.is_fun (ty t))
   | _ -> false
 
