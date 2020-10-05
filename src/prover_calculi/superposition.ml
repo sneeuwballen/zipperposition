@@ -95,6 +95,7 @@ let k_bool_demod = Flex_state.create_key ()
 let k_immediate_simplification = Flex_state.create_key ()
 let k_bool_eq_fact = Flex_state.create_key ()
 let k_local_rw = Flex_state.create_key ()
+let k_destr_eq_res = Flex_state.create_key ()
 
 
 
@@ -2155,36 +2156,38 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         lits;
       (* eliminate inequations x != t *)
       let us = ref US.empty in
-      let try_unif i t1 sc1 t2 sc2 =
-        try
-          let subst' = Unif.FO.unify_full ~subst:!us (t1,sc1) (t2,sc2) in
-          has_changed := true;
-          BV.reset bv i;
-          us := subst';
-        with Unif.Fail -> ()
-      in
-      Array.iteri
-        (fun i lit ->
-           let can_destr_eq_var v =
-             not (var_in_subst_ !us v 0) && not (Type.is_fun (HVar.ty v))
-           in
-           if BV.get bv i then match lit with
-             | Lit.Equation (l, r, false) ->
-               assert(not (T.is_true_or_false r));
-               begin match T.view l, T.view r with
-                 | T.Var v, _ when can_destr_eq_var v ->
-                   (* eligible for destructive Equality Resolution, try to update
-                       [subst]. Careful: in the case [X!=a | X!=b | C] we must
-                       bind X only to [a] or [b], not unify [a] with [b].
+      if Env.flex_get k_destr_eq_res then (
+        let try_unif i t1 sc1 t2 sc2 =
+          try
+            let subst' = Unif.FO.unify_full ~subst:!us (t1,sc1) (t2,sc2) in
+            has_changed := true;
+            BV.reset bv i;
+            us := subst';
+          with Unif.Fail -> ()
+        in
+        Array.iteri
+          (fun i lit ->
+            let can_destr_eq_var v =
+              not (var_in_subst_ !us v 0) && not (Type.is_fun (HVar.ty v))
+            in
+            if BV.get bv i then match lit with
+              | Lit.Equation (l, r, false) ->
+                assert(not (T.is_true_or_false r));
+                begin match T.view l, T.view r with
+                  | T.Var v, _ when can_destr_eq_var v ->
+                    (* eligible for destructive Equality Resolution, try to update
+                        [subst]. Careful: in the case [X!=a | X!=b | C] we must
+                        bind X only to [a] or [b], not unify [a] with [b].
 
-                      NOTE: this also works for HO constraints for unshielded vars *)
-                   try_unif i l 0 r 0
-                 | _, T.Var v when can_destr_eq_var v ->
-                   try_unif i r 0 l 0
-                 | _ -> ()
-               end
-             | _ -> ())
-        lits;
+                        NOTE: this also works for HO constraints for unshielded vars *)
+                    try_unif i l 0 r 0
+                  | _, T.Var v when can_destr_eq_var v ->
+                    try_unif i r 0 l 0
+                  | _ -> ()
+                end
+              | _ -> ())
+          lits
+      );
       let new_lits = BV.select bv lits in
       let new_lits =
         if US.is_empty !us then new_lits
@@ -3065,6 +3068,7 @@ let _restrict_fluidsup = ref false
 let _check_sup_at_var_cond = ref true
 let _restrict_hidden_sup_at_vars = ref false
 let _local_rw = ref `Off
+let _destr_eq_res = ref true
 
 let _lambdasup = ref (-1)
 let _max_infs = ref (-1)
@@ -3171,6 +3175,7 @@ let register ~sup =
   E.flex_add StreamQueue.k_clause_num !_clause_num;
 
   E.flex_add k_local_rw !_local_rw;
+  E.flex_add k_destr_eq_res !_destr_eq_res;
 
   let module JPF = JPFull.Make(struct let st = E.flex_state () end) in
   let module JPP = PUnif.Make(struct let st = E.flex_state () end) in
@@ -3258,6 +3263,7 @@ let () =
       "--stream-queue-guard", Arg.Set_int _guard, "set value of guard for streamQueue";
       "--stream-queue-ratio", Arg.Set_int _ratio, "set value of ratio for streamQueue";
       "--bool-demod", Arg.Bool ((:=) _bool_demod), " turn BoolDemod on/off";
+      "--destr-eq-res", Arg.Bool ((:=) _destr_eq_res), " turn destructive equality resolution on/off";
       "--local-rw", Arg.Symbol (["any-context"; "green-context"; "off"], (fun opt -> 
         match opt with
         | "any-context" -> _local_rw := `AnyContext
@@ -3276,6 +3282,7 @@ let () =
   Params.add_to_mode "ho-complete-basic" (fun () ->
       _use_simultaneous_sup := false;
       _local_rw := `GreenContext;
+      _destr_eq_res := false;
       _unif_logop_mode := `Conservative;
       _sup_at_vars := true;
       _sup_in_var_args := false;
@@ -3327,6 +3334,7 @@ let () =
   Params.add_to_mode "fo-complete-basic" (fun () ->
       _use_simultaneous_sup := false;
       _local_rw := `GreenContext;
+      _destr_eq_res := false;
       _unif_logop_mode := `Conservative
     );
   Params.add_to_modes 
@@ -3342,6 +3350,7 @@ let () =
     (* _local_rw := `GreenContext; *)
     _dupsup := false;
     _complete_ho_unification := false;
+    _destr_eq_res := false;
     _lambdasup := -1;
     _fluidsup := false;
   );
