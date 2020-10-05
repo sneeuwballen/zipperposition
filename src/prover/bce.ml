@@ -17,6 +17,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   module C = Env.C
   module L = Literal
   module T = Term
+  module CC = Congruence.FO
   module SymSignIdx = Map.Make (struct 
       type t = (ID.t * bool) 
       let compare = CCPair.compare ID.compare Bool.compare
@@ -193,20 +194,23 @@ module Make(E : Env.S) : S with module Env = E = struct
     assert (lit_idx < C.length orig_cl);
     let sc_orig, sc_partner = 0, 1 in
 
+    (* splits the partner clause into unifiable and nonunifiable literals
+       with respect to the literal of the original clause chosen for checking *)
     let split_partner lhs sign partner = 
       CCArray.foldi (fun (unifiable, others) idx lit ->
         match lit with
         | L.Equation(lhs', _, _) 
-          when L.is_predicate_lit lit && L.is_pos lit != sign ->
+          when L.is_predicate_lit lit 
+               && L.is_pos lit != sign ->
           begin try
             let subst = Unif.FO.unify_syn (lhs, sc_orig) (lhs', sc_partner) in
-            (lhs, subst) :: unifiable, others
+            (lhs', subst) :: unifiable, others
           with Unif.Fail -> unifiable, lit :: others end
         | _ -> unifiable, lit :: others
       ) ([], []) (C.lits partner)
     in
 
-    let check_resolvents l_idx orig_cl (unifiable, other_lits) =
+    let check_resolvents l_idx orig_cl (unifiable, nonunifiable) =
       let orig_sign = L.is_pos ((C.lits orig_cl).(l_idx)) in
       if CCList.is_empty unifiable then true
       else (
@@ -219,7 +223,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                   Some lit)
                 else None) 
               (C.lits orig_cl))
-             ) other_lits in
+             ) nonunifiable in
           is_valid ||
           (
             not (CCList.is_empty rest) &&
@@ -246,6 +250,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             with Unif.Fail -> true
           ) 
         in
+        (* check if all l-resolvents are valid in polynomial time *)
         let rec check_l_resolvents others = function
           | (lhs, subst) as x :: xs ->
             check_lit lhs subst (others @ xs) &&
@@ -264,4 +269,97 @@ module Make(E : Env.S) : S with module Env = E = struct
       | _ -> assert false (* literal must be eligible for BCE *)
     in
     check_resolvents lit_idx orig_cl (split_partner lhs sign partner)
+
+  let resolvent_is_valid_eq lit_idx orig_cl partner =
+    assert (lit_idx < C.length orig_cl);
+    let sc_orig, sc_partner = 0, 1 in
+    let renaming = Subst.Renaming.create () in
+    let orig_cl = C.apply_subst ~renaming (orig_cl, sc_orig) Subst.empty in
+    let partner = C.apply_subst ~renaming (partner, sc_partner) Subst.empty in
+    
+    let split_partner lhs sign partner =
+      CCArray.foldi (fun (same_hds, others) idx lit ->
+        match lit with
+        | L.Equation(lhs', _, _) 
+          when L.is_predicate_lit lit 
+               && L.is_pos lit != sign 
+               && ID.equal (T.head_exn lhs) (T.head_exn lhs')->      
+          lhs' :: same_hds, others
+        | _ -> same_hds, lit :: others
+      ) ([], []) (C.lits partner)
+    in
+    
+    let lit = (C.lits orig_cl).(lit_idx) in 
+    let lhs, orig_sign = 
+      match lit with
+      | L.Equation(lhs, _, _) when L.is_predicate_lit lit ->
+        (lhs, L.is_pos lit)
+      | _ -> assert false (* literal must be eligible for BCE *)
+    in
+    
+    let check_resolvents l_idx orig_cl (same_hd_lits, diff_hd_lits) =
+      let orig_args = T.args @@ CCOpt.get_exn @@ (L.View.get_lhs (C.lits orig_cl).(l_idx)) in
+
+      let add_flat_resolvent ~cc new_args =
+        List.fold_left (fun acc (lhs,rhs) -> CC.mk_eq acc lhs rhs) 
+          cc (List.combine orig_args new_args)
+      in
+
+      let orig_pos, orig_neg = 
+        CCList.partition L.is_pos (CCArray.except_idx (C.lits orig_cl) l_idx) in
+      let partner_pos, partner_neg = 
+        CCList.partition L.is_pos (diff_hd_lits)
+      in
+      let all_pos = orig_pos @ partner_pos in
+      let all_neg = orig_neg @ partner_neg in
+      let for_congruence_testing =
+        CCList.filter_map (fun lit -> 
+          if L.is_predicate_lit lit && L.is_pos lit = orig_sign then (
+            L.View.get_lhs lit
+          ) else None) (if orig_sign then all_pos else all_neg)
+      in
+      let orig_cc =
+        List.fold_left (fun acc lit -> 
+          assert (L.is_neg lit);
+          let lhs,rhs,_ = CCOpt.get_exn @@ L.View.as_eqn lit in
+          CC.mk_eq acc lhs rhs
+        ) (CC.create ~size:16 ()) all_neg
+      in
+      if CCList.is_empty same_hd_lits then true
+      else (
+        let rec check_lit ~cc rest =
+          let is_valid = List.exists (fun lit -> 
+            assert(L.is_pos lit);
+            match L.View.as_eqn lit with
+            | Some (lhs, rhs, _) -> CC.is_eq cc lhs rhs
+            | None -> assert false
+          ) all_pos in
+          
+          is_valid ||
+          (
+            let congruent, rest = List.partition (fun lhs -> 
+                List.exists (fun lhs' -> CC.is_eq cc lhs lhs') for_congruence_testing
+              ) rest 
+            in
+            if CCList.is_empty congruent then false
+            else (
+              let cc = 
+                List.fold_left (fun acc lhs -> add_flat_resolvent ~cc (T.args lhs)) 
+                  cc congruent
+              in
+              check_lit ~cc rest
+          )) 
+        in
+        (* check if all l-resolvents are valid in polynomial time *)
+        let rec check_l_resolvents others = function
+          | x :: xs ->
+            let cc_with_lhs = add_flat_resolvent ~cc:orig_cc (T.args lhs) in
+            check_lit ~cc:cc_with_lhs (others @ xs) &&
+            check_l_resolvents (x :: others) xs
+          | [] -> true 
+        in
+        check_l_resolvents [] same_hd_lits
+      )
+    in
+    check_resolvents lit_idx orig_cl (split_partner lhs orig_sign partner)
 end
