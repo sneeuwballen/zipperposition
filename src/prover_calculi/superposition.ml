@@ -1748,78 +1748,91 @@ module Make(Env : Env.S) : S with module Env = Env = struct
      - must rewrite matching to work on the record anyway
   *)
 
-  let lazy_false = Lazy.from_val false
-
   type demod_state = {
     mutable demod_clauses: (C.t * Subst.t * Scoped.scope) list; (* rules used *)
     mutable demod_sc: Scoped.scope; (* current scope *)
   }
 
   (** Compute normal form of term w.r.t active set. Clauses used to
-      rewrite are added to the clauses hashset.
-      restrict is an option for restricting demodulation in positive maximal terms *)
-  let demod_nf ?(restrict=lazy_false) (st:demod_state) c t : T.t =
-    (* compute normal form of subterm. If restrict is true, substitutions that
-       are variable renamings are forbidden (since we are at root of a max term) *)
-    let rec reduce_at_root ~restrict t k =
+      rewrite are added to the clauses hashset. *)
+  let demod_nf (st:demod_state) c t : T.t =
+    (* compute normal form of subterm. If `toplevel` is true, we need an extra check 
+      whether the rewriting clause is smaller than the rewritten clause. *)
+    let rec reduce_at_root ~toplevel t k =
       (* find equations l=r that match subterm *)
       let cur_sc = st.demod_sc in
       assert (cur_sc > 0);
       let step =
         UnitIdx.retrieve ~sign:true (!_idx_simpl, cur_sc) (t, 0)
-        |> Iter.find_map
+        |> Iter.find
           (fun (l, r, (_,_,sign,unit_clause), subst) ->
-             let rename = Subst.Renaming.create () in
-             (* r is the term subterm is going to be rewritten into *)
+             let expand_quant = not @@ Env.flex_get Combinators.k_enable_combinators in
+             let norm t = Lambda.eta_reduce ~expand_quant @@ Lambda.snf t in
+             let norm_b t = T.normalize_bools @@ norm t in
+             (* r' is the subterm is going to be rewritten into *)
+             let r' = norm @@ Subst.FO.apply Subst.Renaming.none subst (r,cur_sc) in
              assert (C.is_unit_clause unit_clause);
-             if sign &&
+             (* NOTE: The conditions of Schulz's "braniac" paper cannot be 
+                justified by the standard redundancy criterion.
+                Instead, we check whether the rewriting clause is smaller 
+                than the rewritten clause. *)
+             (* Only perform the rewrite if: *)
+             if (* - The rewriting clause is positive *)
+                sign &&
+                (* - The clause trails are compatible *)
                 C.trail_subsumes unit_clause c &&
+                (* - The clauses are distinct *)
                 not (C.equal unit_clause c) &&
-                (not (Lazy.force restrict) || not (S.is_renaming subst)) &&
+                (* - The rewriting clause is smaller than the rewritten clause *)
+                (not toplevel ||
+                C.lits c |> CCArray.exists (fun lit -> Lit.Seq.terms lit |> 
+                  Iter.exists (fun s -> O.compare ord s t == Comp.Gt)) ||
+                C.lits c |> CCArray.exists (fun lit -> match Literal.View.as_eqn lit with
+                    | Some (litl, litr, true) -> 
+                      T.equal t litl && O.compare ord litr r' == Comp.Gt || 
+                      T.equal t litr && O.compare ord litl r' == Comp.Gt
+                    | Some (litl, litr, false) -> T.equal t litl || T.equal t litr
+                    | None -> false)
+                ) &&
+                (* - subst(l) > subst(r) *)
                 (O.compare ord
-                   (S.FO.apply rename subst (l,cur_sc))
-                   (S.FO.apply rename subst (r,cur_sc)) = Comp.Gt)
-                (* subst(l) > subst(r) and restriction does not apply, we can rewrite *)
+                   (S.FO.apply Subst.Renaming.none subst (l,cur_sc))
+                   (S.FO.apply Subst.Renaming.none subst (r,cur_sc)) = Comp.Gt)
              then (
                Util.debugf ~section 3
                  "@[<hv2>demod(%d):@ @[<hv>t=%a[%d],@ l=%a[%d],@ r=%a[%d]@],@ subst=@[%a@]@]"
                  (fun k->k (C.id c) T.pp t 0 T.pp l cur_sc T.pp r cur_sc S.pp subst);
 
-               let expand_quant = not @@ Env.flex_get Combinators.k_enable_combinators in
-               let norm t = T.normalize_bools @@ Lambda.eta_reduce ~expand_quant @@ Lambda.snf t in
-               let t' = norm t in
-               let l' = norm @@ Subst.FO.apply Subst.Renaming.none subst (l,cur_sc) in               
+               let t' = norm_b t in
+               let l' = norm_b @@ Subst.FO.apply Subst.Renaming.none subst (l,cur_sc) in               
                (* sanity checks *)
                assert (Type.equal (T.ty l) (T.ty r));
                assert (T.equal l' t');
                st.demod_clauses <-
                  (unit_clause,subst,cur_sc) :: st.demod_clauses;
                st.demod_sc <- 1 + st.demod_sc; (* allocate new scope *)
-               Util.incr_stat stat_demodulate_step;
-               Some (r, subst, cur_sc)
+               Util.incr_stat stat_demodulate_step; (* reduce [rhs] in current scope [cur_sc] *)
+               assert (cur_sc < st.demod_sc);
+               (* bind variables not occurring in [rhs] to fresh ones *)
+               let subst = 
+                 (InnerTerm.Seq.vars (r :> InnerTerm.t)) 
+                 |> Iter.fold (fun subst v -> 
+                     if S.mem subst (v, cur_sc) 
+                     then subst 
+                     else S.bind subst (v, cur_sc) 
+                         (InnerTerm.var (HVar.fresh ~ty:(HVar.ty v) ()), cur_sc)) 
+                   subst in
+               Util.debugf ~section 3
+                 "@[<2>demod(%d):@ rewrite `@[%a@]`@ into `@[%a@]`@ resulting `@[%a@]`@ nf `@[%a@]` using %a[%d]@]"
+                 (fun k->k (C.id c) T.pp t T.pp r T.pp r' T.pp (Lambda.snf r') Subst.pp subst cur_sc);
+               Some r'
              ) else None)
       in
       begin match step with
         | None -> k t (* not found any match, normal form found *)
-        | Some (rhs,subst,cur_sc) ->
-          (* reduce [rhs] in current scope [cur_sc] *)
-          assert (cur_sc < st.demod_sc);
-          (* bind variables not occurring in [rhs] to fresh ones *)
-          let subst = 
-            (InnerTerm.Seq.vars (rhs :> InnerTerm.t)) 
-            |> Iter.fold (fun subst v -> 
-                if S.mem subst (v, cur_sc) 
-                then subst 
-                else S.bind subst (v, cur_sc) 
-                  (InnerTerm.var (HVar.fresh ~ty:(HVar.ty v) ()), cur_sc)) 
-              subst in
-          (* If not beta-reduced this can get out of hands --  *)
-          let rhs' = Lambda.snf @@ Subst.FO.apply Subst.Renaming.none subst (rhs,cur_sc) in
-          Util.debugf ~section 3
-            "@[<2>demod(%d):@ rewrite `@[%a@]`@ into `@[%a@]`@ resulting `@[%a@]`@ nf `@[%a@]` using %a[%d]@]"
-            (fun k->k (C.id c) T.pp t T.pp rhs T.pp rhs' T.pp (Lambda.snf rhs') Subst.pp subst cur_sc);
+        | Some r' ->
           (* NOTE: we retraverse the term several times, but this is simpler *)
-          normal_form ~restrict rhs' k (* done one rewriting step, continue *)
+          normal_form ~toplevel r' k (* done one rewriting step, continue *)
       end
     (* rewrite innermost-leftmost of [subst(t,scope)]. The initial scope is
        0, but then we normal_form terms in which variables are really the variables
@@ -1829,9 +1842,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
        when rewriting under quantifiers whose bodies are lambdas, we need to
        force lambda rewriting (force_lam_rw) to rewrite the quantifier body
        *)
-    and normal_form ~restrict ?(force_lam_rw=false) t k =
+    and normal_form ~toplevel ?(force_lam_rw=false) t k =
       match T.view t with
-      | T.Const _ -> reduce_at_root ~restrict t k
+      | T.Const _ -> reduce_at_root ~toplevel t k
       | T.App (hd, l) ->
         (* rewrite subterms in call by value. *)
         let rewrite_args = Env.flex_get k_demod_in_var_args || not (T.is_var hd) in
@@ -1845,40 +1858,40 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                  else T.app hd l'
                in
                (* rewrite term at root *)
-               reduce_at_root ~restrict t' k)
-        else reduce_at_root ~restrict t k
+               reduce_at_root ~toplevel t' k)
+        else reduce_at_root ~toplevel t k
       | T.Fun (ty_arg, body) ->
         (* reduce under lambdas *)
         if force_lam_rw || Env.flex_get k_lambda_demod
         then
-          normal_form ~restrict:lazy_false body
+          normal_form ~toplevel:false body
             (fun body' ->
                let u = if T.equal body body' then t else T.fun_ ty_arg body' in
-               reduce_at_root ~restrict u k)
-        else reduce_at_root ~restrict t k (* TODO: DemodExt *)
+               reduce_at_root ~toplevel u k)
+        else reduce_at_root ~toplevel t k (* TODO: DemodExt *)
       | T.Var _ | T.DB _ -> k t
       | T.AppBuiltin(Builtin.(ForallConst|ExistsConst) as hd, [_; body]) ->
         let mk_quant = if hd = ForallConst then T.Form.forall else T.Form.exists in
-        normal_form ~restrict:lazy_false ~force_lam_rw:true body
+        normal_form ~toplevel:false ~force_lam_rw:true body
           (fun body' ->
             let u = if T.equal body body' then t else mk_quant body' in
-            reduce_at_root ~restrict u k)
+            reduce_at_root ~toplevel u k)
       | T.AppBuiltin (b, l) ->
         normal_form_l l
           (fun l' ->
              let u =
                if T.same_l l l' then t else T.app_builtin ~ty:(T.ty t) b l'
              in
-             reduce_at_root ~restrict u k)
+             reduce_at_root ~toplevel u k)
     and normal_form_l l k = match l with
       | [] -> k []
       | t :: tail ->
-        normal_form ~restrict:lazy_false t
+        normal_form ~toplevel:false t
           (fun t' ->
              normal_form_l tail
                (fun l' -> k (t' :: l')))
     in
-    normal_form ~restrict t (fun t->t)
+    normal_form ~toplevel:true t (fun t->t)
 
   let[@inline] eq_c_subst (c1,s1,sc1)(c2,s2,sc2) =
     C.equal c1 c2 && sc1=sc2 && Subst.equal s1 s2
@@ -1891,40 +1904,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       demod_clauses=[];
       demod_sc=1;
     } in
-    (* literals that are eligible for paramodulation. *)
-    let eligible_param = lazy (C.eligible_param (c,0) S.empty) in
-    (* demodulate literals *)
-    let demod_lit i lit =
-      (* strictly maximal terms might be blocked *)
-      let strictly_max = lazy (
-        begin match lit with
-          | Lit.Equation (t1,t2,_) when Lit.is_pos lit -> 
-            begin match O.compare ord t1 t2 with
-              | Comp.Gt -> [t1] | Comp.Lt -> [t2] | _ -> []
-            end 
-          | _ -> []
-        end
-      ) in
-      (* shall we restrict a subterm? only for max terms in positive
-          equations that are eligible for paramodulation.
-
-         NOTE: E's paper mentions that restrictions should occur for
-         literals eligible for {b resolution}, not paramodulation, but
-         it seems it might be a typo
-      *)
-      let restrict_term t = lazy (
-        Lit.is_pos lit &&
-        BV.get (Lazy.force eligible_param) i &&
-        (* restrict max terms in positive literals eligible for resolution *)
-        CCList.mem ~eq:T.equal t (Lazy.force strictly_max)
-      ) in
-      Lit.map
-        (fun t -> demod_nf ~restrict:(restrict_term t) st c t)
-        lit
-    in
-
 
     (* demodulate every literal *)
+    let demod_lit i lit = Lit.map (fun t -> demod_nf st c t) lit in
     let lits = Array.mapi demod_lit (C.lits c) in
     if CCList.is_empty st.demod_clauses then (
       (* no rewriting performed *)
