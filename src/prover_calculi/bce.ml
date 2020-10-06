@@ -4,12 +4,16 @@
 (** {1 Blocked Clause Elimination} *)
 
 open Logtk
+open Libzipperposition
+
+let k_enabled = Flex_state.create_key ()
+let k_check_at = Flex_state.create_key ()
 
 module type S = sig
   module Env : Env.S
 
   (** {6 Registration} *)
-
+  val setup : unit -> unit
 end
 
 module Make(E : Env.S) : S with module Env = E = struct
@@ -189,7 +193,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             | Some old ->
               let new_ = C.ClauseSet.remove cl old in
               CCOpt.return_if (not (C.ClauseSet.is_empty new_)) new_
-            | None -> assert false) !ss_idx
+            | None -> None (*already removed*)) !ss_idx
       | _ -> ()
     ) (C.lits cl)
 
@@ -205,15 +209,21 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* If clause is removed from the active/passive set, then release
      the locks that it holds, and make all the locked clauses active *)
   let release_locks clause =
-    List.iter (fun task -> 
-      match task.cands with
-      | x :: xs ->
-        assert (C.id x = C.id clause);
-        task.cands <- xs;
-        task.active <- true; 
-        task_queue := TaskPriorityQueue.add !task_queue task;
-      | [] -> assert false
-    ) (Util.Int_map.find (C.id clause) !clause_lock)
+    try 
+      List.iter (fun task -> 
+        match task.cands with
+        | x :: xs ->
+          assert (C.id x = C.id clause);
+          task.cands <- xs;
+          task.active <- true; 
+          task_queue := TaskPriorityQueue.add !task_queue task;
+        | [] -> assert false
+      ) (Util.Int_map.find (C.id clause) !clause_lock);
+      clause_lock := Util.Int_map.remove (C.id clause) !clause_lock
+    with Not_found ->
+      (* clause was already removed *)
+      ()
+
 
   (* remove the clause from the whole BCE tracking system *)
   let deregister_clause clause =
@@ -452,7 +462,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     if !logic == EqFO then resolvent_is_valid_eq
     else resolvent_is_valid_neq
 
-  let eliminate_blocked_clauses () =
+  (* function that actually performs the blocked clause elimination *)
+  let do_eliminate_blocked_clauses () =
     (* checks if each candidate stored in the task has valid L-resolvent.
        if that is not the case, it returns the rest of candidates to be checked. *)
     let process_task task =
@@ -491,11 +502,19 @@ module Make(E : Env.S) : S with module Env = E = struct
       | None -> assert false  end
     done
 
+  let steps = ref 0
+  (* driver that does that every k-th step of given-clause loop *)
+  let eliminate_blocked_clauses () =
+    steps := (!steps + 1) mod (Env.flex_get k_check_at);
+
+    if !steps = 0 then do_eliminate_blocked_clauses ()
+
   let react_clause_addded cl =
     add_clause cl
 
   let react_clause_removed cl =
     deregister_clause cl
+
 
   let initialize () =
     let init_clauses = 
@@ -514,15 +533,28 @@ module Make(E : Env.S) : S with module Env = E = struct
           (C.lits cl))
       init_clauses;
       (* eliminate clauses *)
-      eliminate_blocked_clauses ();
+      do_eliminate_blocked_clauses ();
       
+      (* clauses begin their life when they are added to the passive set *)
       Signal.on_every Env.ProofState.PassiveSet.on_add_clause react_clause_addded;
-      Signal.on_every Env.ProofState.ActiveSet.on_add_clause react_clause_addded;
-      Signal.on_every Env.ProofState.PassiveSet.on_remove_clause react_clause_removed;
+      (* clauses can be calculus-removed from the active set only in DISCOUNT loop *)
       Signal.on_every Env.ProofState.ActiveSet.on_remove_clause react_clause_removed;
-
+      (* Clauses are removed from the passive set when they are moved to active.
+         In this case clause can me modified or deemed redundant by forward
+         modification procedures. we react accordingly.*)
+      Signal.on_every Env.on_forward_simplified (fun (c, new_state) -> 
+        react_clause_removed c;
+        match new_state with
+        | Some c' -> react_clause_addded c'
+        | _ -> () (* c is redundant *)
+      );
+      Env.add_clause_elimination_rule ~priority:1 "BCE" eliminate_blocked_clauses
     with UnsupportedLogic ->
-      () (* cleaning up data structures *)
+      (* releasing possibly used memory *)
+      ss_idx := SymSignIdx.empty;
+      clause_lock := Util.Int_map.empty;
+      task_store := TaskStore.empty;
+      task_queue := TaskPriorityQueue.empty
     end;
     Signal.StopListening
 
@@ -530,4 +562,30 @@ module Make(E : Env.S) : S with module Env = E = struct
   let register () =
     Signal.on Env.on_start initialize
 
+  let setup () =
+    if Env.flex_get k_enabled then register ()
 end
+
+let _enabled = ref false
+let _check_at = ref 10
+
+let extension =
+  let action env =
+    let module E = (val env : Env.S) in
+    let module BCE = Make(E) in
+
+    E.flex_add k_check_at !_check_at;
+    E.flex_add k_enabled !_enabled;
+    
+    BCE.setup ()
+  in
+  { Extensions.default with Extensions.
+                         name="bce";
+                         env_actions=[action];
+  }
+
+let () =
+  Options.add_opts [
+    "--bce", Arg.Bool ((:=) _enabled), " scan clauses for AC definitions";
+    "--bce-check-every", Arg.Int ((:=) _check_at), " check BCE every n steps of saturation algorithm";
+  ]
