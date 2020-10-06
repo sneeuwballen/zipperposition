@@ -27,6 +27,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     | NEqFO  (* nonequational FO *)
     | EqFO (* equational FO *)
     | Unsupported   (* HO or FO with theories *)
+
+  exception UnsupportedLogic
   
   (* an object representing the information necessary for
      performing a task of checking whether a clause is blocked on
@@ -86,8 +88,9 @@ module Make(E : Env.S) : S with module Env = E = struct
     ) !ss_idx
   
   
-  (* Register a clause for tracking with BCE system *)
-  let register_cl cl =
+  (* Scan the clause and if it is in supported logic fragment,
+     store its literals in the symbol index *)
+  let scan_cl_lits cl =
     CCArray.iter (function 
       | L.Equation(lhs,rhs,sign) as lit ->
         let sign = L.is_pos lit in
@@ -97,11 +100,16 @@ module Make(E : Env.S) : S with module Env = E = struct
               register_ss_idx (T.head_exn lhs) sign cl
             ) else (
               (* reasoning with formulas is currently unsupported *)
-              logic := Unsupported
+              logic := Unsupported;
+              raise UnsupportedLogic;
             )
           ) else refine_logic EqFO
-        ) else logic := Unsupported
-      | L.Int _ | L.Rat _ -> logic := Unsupported
+        ) else (
+            logic := Unsupported; 
+            raise UnsupportedLogic)
+      | L.Int _ | L.Rat _ -> 
+        logic := Unsupported;
+        raise UnsupportedLogic
       | _ -> ()
     ) (C.lits cl)
 
@@ -117,9 +125,15 @@ module Make(E : Env.S) : S with module Env = E = struct
           t
     )
 
-  (* Register a new task, calculate its candidates and make it active.
-     Only clauses within the supported logic fragment can be registered. *)
-  let register_task lit_idx clause =
+  (* Register a new task, calculate its candidates and make it active. Only
+     clauses within the supported logic fragment can be registered.
+
+     If update_others is false, index state of other clauses will not be
+     updated. We want to turn this option to false in the initialization phase,
+     as index state will be update when the time for registering new clause
+     comes and updating of states is an expensive operation since it traverses
+     the heap in O(n) *)
+  let register_task ?(update_others=true) lit_idx clause =
     (* insert new clause into the candidate list of previously inserted clauses *)
     let update_cand_lists hd sign clause cands =
       List.iter (fun cand ->
@@ -145,7 +159,9 @@ module Make(E : Env.S) : S with module Env = E = struct
         (CCOpt.get_or
             ~default:C.ClauseSet.empty
             (SymSignIdx.find_opt (hd, not sign) !ss_idx)) in
-      update_cand_lists hd sign clause cands;
+      if update_others then (
+        update_cand_lists hd sign clause cands
+      );
       let task = {lit_idx; clause; cands; active=true} in
       task_store := TaskStore.add (lit_idx, clause) task !task_store;
       task_queue := TaskPriorityQueue.add !task_queue task;
@@ -154,8 +170,13 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* Update all the bookeeping information when a new clause is introduced *)
   let add_clause cl =
-    register_cl cl;
-    CCArray.iteri (fun lit_idx _ -> register_task lit_idx cl) (C.lits cl)
+    try 
+      scan_cl_lits cl;
+      CCArray.iteri (fun lit_idx _ -> register_task lit_idx cl) (C.lits cl)
+    with UnsupportedLogic ->
+      (* if the initial problem had only supported features (FO logic),
+         it cannot jump out of the fragment *)
+      invalid_arg "jumped out of the supported logic fragment"
 
   (* remove the clause from symbol index *)
   let deregister_symbols cl =
@@ -171,6 +192,15 @@ module Make(E : Env.S) : S with module Env = E = struct
             | None -> assert false) !ss_idx
       | _ -> ()
     ) (C.lits cl)
+
+  let lock_clause locker locked_task =
+    assert(C.id locker == C.id (List.hd locked_task.cands));
+    locked_task.active <- false;
+    clause_lock := Util.Int_map.update (C.id locker) (fun old_val -> 
+      let locked_tasks = CCOpt.get_or ~default:[] old_val in
+      Some (locked_task :: locked_tasks)
+    ) !clause_lock
+
   
   (* If clause is removed from the active/passive set, then release
      the locks that it holds, and make all the locked clauses active *)
@@ -186,9 +216,16 @@ module Make(E : Env.S) : S with module Env = E = struct
     ) (Util.Int_map.find (C.id clause) !clause_lock)
 
   (* remove the clause from the whole BCE tracking system *)
-  let remove_clause clause =
+  let deregister_clause clause =
     deregister_symbols clause;
     release_locks clause
+
+  let remove_from_proof_state clause = 
+    C.mark_redundant clause;
+    Env.remove_active (Iter.singleton clause);
+    Env.remove_passive (Iter.singleton clause);
+    Env.remove_simpl (Iter.singleton clause)
+  
   
   (* checks whether all L-resolvents between orig_cl on literal with index
      lit_idx and partner are valid   *)
@@ -409,4 +446,88 @@ module Make(E : Env.S) : S with module Env = E = struct
       )
     in
     check_resolvents lit_idx orig_cl (split_partner orig_lhs orig_sign partner)
+
+  let get_validity_checker () =
+    assert (!logic != Unsupported);
+    if !logic == EqFO then resolvent_is_valid_eq
+    else resolvent_is_valid_neq
+
+  let eliminate_blocked_clauses () =
+    (* checks if each candidate stored in the task has valid L-resolvent.
+       if that is not the case, it returns the rest of candidates to be checked. *)
+    let process_task task =
+      let cl = task.clause in
+      let lit_idx = task.lit_idx in
+      let validity_checker = get_validity_checker () in
+      
+      let rec process_candidates = function
+        | [] -> []
+        | (partner :: rest) as cands ->
+          if C.equal cl partner || validity_checker lit_idx cl partner 
+          then process_candidates rest
+          else (
+            lock_clause partner task;
+            cands
+          )
+      in
+      
+      match process_candidates task.cands with
+      | [] ->
+        deregister_clause cl;
+        remove_from_proof_state cl
+      | rest ->
+        task.active <- false;
+        task.cands <- rest;
+
+    in
+
+
+    let module Q = TaskPriorityQueue in
+    while not (Q.is_empty !task_queue) do
+      begin match Q.take !task_queue with
+      | Some (q, task) -> 
+        task_queue := q;
+        process_task task;
+      | None -> assert false  end
+    done
+
+  let react_clause_addded cl =
+    add_clause cl
+
+  let react_clause_removed cl =
+    deregister_clause cl
+
+  let initialize () =
+    let init_clauses = 
+      C.ClauseSet.to_list @@ C.ClauseSet.union
+        (Env.ProofState.PassiveSet.clauses ())
+        (Env.ProofState.ActiveSet.clauses ())
+    in
+    begin try
+      (* build the symbol index *)
+      List.iter scan_cl_lits init_clauses;
+      (* create tasks for each clause *)
+      List.iter 
+        (fun cl ->
+          CCArray.iteri (fun lit_idx _ -> 
+            register_task ~update_others:false lit_idx cl) 
+          (C.lits cl))
+      init_clauses;
+      (* eliminate clauses *)
+      eliminate_blocked_clauses ();
+      
+      Signal.on_every Env.ProofState.PassiveSet.on_add_clause react_clause_addded;
+      Signal.on_every Env.ProofState.ActiveSet.on_add_clause react_clause_addded;
+      Signal.on_every Env.ProofState.PassiveSet.on_remove_clause react_clause_removed;
+      Signal.on_every Env.ProofState.ActiveSet.on_remove_clause react_clause_removed;
+
+    with UnsupportedLogic ->
+      () (* cleaning up data structures *)
+    end;
+    Signal.StopListening
+
+
+  let register () =
+    Signal.on Env.on_start initialize
+
 end
