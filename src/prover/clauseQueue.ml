@@ -1174,7 +1174,7 @@ module Make(C : Clause_intf.S) = struct
     Array.set q.heaps q.current_heap_idx current_heap;
 
     let is_orphaned c =
-      !_ignore_orphans && C.is_orphaned c in
+      (!_ignore_orphans && C.is_orphaned c) || C.is_redundant c in
 
     (* if clause was picked by another queue 
        or it should be ignored, repeat clause choice.  *)

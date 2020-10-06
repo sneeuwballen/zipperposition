@@ -477,18 +477,20 @@ module Make(E : Env.S) : S with module Env = E = struct
           if C.equal cl partner || validity_checker lit_idx cl partner 
           then process_candidates rest
           else (
+            task.cands <- cands;
             lock_clause partner task;
             cands
           )
       in
       
-      match process_candidates task.cands with
-      | [] ->
-        deregister_clause cl;
-        remove_from_proof_state cl
-      | rest ->
-        task.active <- false;
-        task.cands <- rest;
+      if not @@ C.is_redundant task.clause then (
+        match process_candidates task.cands with
+        | [] ->
+          deregister_clause cl;
+          remove_from_proof_state cl
+        | rest ->
+          task.active <- false
+      );
 
     in
 
@@ -534,7 +536,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       init_clauses;
       (* eliminate clauses *)
       do_eliminate_blocked_clauses ();
-      
+
       (* clauses begin their life when they are added to the passive set *)
       Signal.on_every Env.ProofState.PassiveSet.on_add_clause react_clause_addded;
       (* clauses can be calculus-removed from the active set only in DISCOUNT loop *)

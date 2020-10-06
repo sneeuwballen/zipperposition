@@ -11,3 +11,5 @@ module type S = sig
 end
 
 module Make(E : Env.S) : S with module Env = E
+
+val extension : Extensions.t

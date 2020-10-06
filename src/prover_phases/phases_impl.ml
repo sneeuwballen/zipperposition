@@ -57,6 +57,7 @@ let load_extensions =
   Extensions.register Combinators.extension;
   Extensions.register Higher_order.extension;
   Extensions.register Superposition.extension;
+  Extensions.register Bce.extension;
   Extensions.register AC.extension;
   Extensions.register Heuristics.extension;
   Extensions.register Avatar.extension;
