@@ -8,6 +8,9 @@ open Libzipperposition
 
 let k_enabled = Flex_state.create_key ()
 let k_check_at = Flex_state.create_key ()
+let k_max_symbol_occ = Flex_state.create_key ()
+
+let section = Util.Section.make ~parent:Const.section "bce"
 
 module type S = sig
   module Env : Env.S
@@ -22,6 +25,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   module L = Literal
   module T = Term
   module CC = Congruence.FO
+  module DEQ = CCDeque
   module SymSignIdx = Map.Make (struct 
       type t = (ID.t * bool) 
       let compare = CCPair.compare ID.compare Bool.compare
@@ -44,7 +48,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     lit_idx : int;  
     clause  : C.t; 
     (* list of candidates to check *)
-    mutable cands   : C.t list;
+    cands   : C.t CCDeque.t;
     (* is the list actively stored in the heap of tasks, or in the waiting
        state, because check against some candidate failed *)
     mutable heap_idx  : int;
@@ -53,7 +57,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   module TaskStore = Map.Make (struct 
     type t = int * C.t
     let compare (idx_a, cl_a) (idx_b, cl_b) = 
-      CCOrd.(<?>) (C.compare cl_a cl_b) (compare, idx_a, idx_b)
+      CCOrd.(<?>) (CCInt.compare (C.id cl_a) (C.id cl_b)) (compare, idx_a, idx_b)
   end)
 
   module TaskWrapper = struct
@@ -62,11 +66,11 @@ module Make(E : Env.S) : S with module Env = E = struct
     let set_idx task idx = 
       task.heap_idx <- idx
     let lt a b =
-      (List.length a.cands < List.length b.cands)
-      || (List.length a.cands = List.length b.cands 
-            && C.compare a.clause b.clause < 0)
-      || (List.length a.cands = List.length b.cands 
-            && C.compare a.clause b.clause = 0 
+      (DEQ.length a.cands < DEQ.length b.cands)
+      || (DEQ.length a.cands = DEQ.length b.cands 
+            && CCInt.compare (C.id a.clause) (C.id b.clause) < 0)
+      || (DEQ.length a.cands = DEQ.length b.cands 
+            && CCInt.compare (C.id a.clause) (C.id b.clause) = 0 
             && a.lit_idx < b.lit_idx)
   end
 
@@ -81,6 +85,8 @@ module Make(E : Env.S) : S with module Env = E = struct
   let task_store = ref TaskStore.empty
   (* priority queue of the tasks to be performed *)
   let task_queue = TaskPriorityQueue.create ()
+  (* a set containing symbols for which BCE will not be tried *)
+  let ignored_symbols = ref ID.Set.empty
   
   (* assuming the weakest logic *)
   let logic = ref NEqFO
@@ -93,11 +99,26 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* ignoring other fields of tasks *)
   let task_eq a b = a.lit_idx = b.lit_idx && C.equal a.clause b.clause
 
+  let symbol_occurrs_too_often sym_count =
+    Env.flex_get k_max_symbol_occ > 0 &&
+    (sym_count > Env.flex_get k_max_symbol_occ)
+
   let register_ss_idx sym sign cl =
-    ss_idx := SymSignIdx.update (sym, sign) (fun old ->
-      Some (C.ClauseSet.add cl (CCOpt.get_or ~default:C.ClauseSet.empty old))
-    ) !ss_idx
-  
+    let sym_occs sym sign =
+      CCOpt.map_or ~default:0 C.ClauseSet.cardinal
+        (SymSignIdx.find_opt (sym,sign) !ss_idx)
+    in
+
+    let total_sym_occs = sym_occs sym true + sym_occs sym false + 1 in
+
+    if symbol_occurrs_too_often total_sym_occs then (
+      ss_idx := SymSignIdx.remove (sym, false) (SymSignIdx.remove (sym, true) !ss_idx);
+      ignored_symbols := ID.Set.add sym !ignored_symbols;
+      Util.debugf ~section 1 "ignoring symbol @[%a@]" (fun k -> k ID.pp sym);
+    ) else (
+      ss_idx := SymSignIdx.update (sym, sign) (fun old ->
+        Some (C.ClauseSet.add cl (CCOpt.get_or ~default:C.ClauseSet.empty old))
+      ) !ss_idx)
   
   (* Scan the clause and if it is in supported logic fragment,
      store its literals in the symbol index *)
@@ -108,7 +129,9 @@ module Make(E : Env.S) : S with module Env = E = struct
         if T.is_fo_term lhs && T.is_fo_term rhs then (
           if Type.is_prop (T.ty lhs) then (
             if L.is_predicate_lit lit then (
-              register_ss_idx (T.head_exn lhs) sign cl
+              let hd_sym = T.head_exn lhs in
+              if not (ID.Set.mem hd_sym !ignored_symbols) 
+              then register_ss_idx hd_sym sign cl
             ) else (
               (* reasoning with formulas is currently unsupported *)
               logic := Unsupported;
@@ -127,12 +150,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* Add candidates to already registered task *)
   let add_candidates lit_idx cl cand_cls =
     let t = TaskStore.find (lit_idx, cl) !task_store in
-    let new_cand_list = 
-      match t.cands with 
-      | [] -> cand_cls
-      | x :: xs -> x :: (cand_cls @ xs)
-    in
-    t.cands <- new_cand_list; (* making sure that we do not delete the first element *)
+    DEQ.add_iter_back t.cands (CCList.to_iter cand_cls);
     if TaskPriorityQueue.in_heap t then (
       TaskPriorityQueue.increase task_queue t;
     )
@@ -163,7 +181,9 @@ module Make(E : Env.S) : S with module Env = E = struct
     in
 
     match (C.lits clause).(lit_idx) with
-    | L.Equation (lhs, rhs, sign) as lit when L.is_predicate_lit lit ->
+    | L.Equation (lhs, rhs, sign) as lit 
+      when L.is_predicate_lit lit
+            && not (ID.Set.mem (T.head_exn lhs) !ignored_symbols) ->
       assert (T.is_fo_term lhs);
       let hd = T.head_exn lhs in
       let sign = L.is_pos lit in
@@ -175,9 +195,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       if update_others then (
         update_cand_lists hd sign clause cands
       );
-      let task = {lit_idx; clause; cands; heap_idx = init_heap_idx} in
+      let task = {lit_idx; clause; cands=DEQ.of_list cands;
+                  heap_idx = init_heap_idx} in
       task_store := TaskStore.add (lit_idx, clause) task !task_store;
-      (* task_queue := TaskPriorityQueue.add !task_queue task; *)
       TaskPriorityQueue.insert task_queue task
     | _ -> ( (* equation literals do not represent tasks *) )
 
@@ -207,7 +227,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     ) (C.lits cl)
 
   let lock_clause locker locked_task =
-    assert(C.id locker == C.id (List.hd locked_task.cands));
+    assert(C.id locker == C.id (DEQ.peek_front locked_task.cands));
     clause_lock := Util.Int_map.update (C.id locker) (fun old_val -> 
       let locked_tasks = CCOpt.get_or ~default:[] old_val in
       Some (locked_task :: locked_tasks)
@@ -218,14 +238,12 @@ module Make(E : Env.S) : S with module Env = E = struct
      the locks that it holds, and make all the locked clauses active *)
   let release_locks clause =
     try 
-      List.iter (fun task -> 
-        match task.cands with
-        | x :: xs ->
-          assert (C.id x = C.id clause);
-          task.cands <- xs;
-          assert (not (TaskPriorityQueue.in_heap task));
-          TaskPriorityQueue.insert task_queue task
-        | [] -> assert false
+      List.iter (fun task ->
+        assert (not (TaskPriorityQueue.in_heap task));
+        assert (not (DEQ.is_empty task.cands));
+        let locking_cl = DEQ.take_front task.cands in
+        assert (C.id locking_cl = C.id clause);
+        TaskPriorityQueue.insert task_queue task
       ) (Util.Int_map.find (C.id clause) !clause_lock);
       clause_lock := Util.Int_map.remove (C.id clause) !clause_lock
     with Not_found ->
@@ -477,26 +495,30 @@ module Make(E : Env.S) : S with module Env = E = struct
     let process_task task =
       let cl = task.clause in
       let lit_idx = task.lit_idx in
+      let hd_sym = 
+        T.head_exn @@ CCOpt.get_exn @@ L.View.get_lhs (C.lits task.clause).(lit_idx)
+      in
       let validity_checker = get_validity_checker () in
       
-      let rec process_candidates = function
-        | [] -> []
-        | (partner :: rest) as cands ->
+      let rec task_is_blocked deq =
+        DEQ.is_empty deq || (
+          let partner = DEQ.take_front deq in
           if C.equal cl partner || C.is_redundant partner || validity_checker lit_idx cl partner 
-          then process_candidates rest
+          then (task_is_blocked deq)
           else (
-            task.cands <- cands;
-            lock_clause partner task;
-            cands
-          )
+             DEQ.push_front deq partner;
+             lock_clause partner task;
+             false
+          ))
       in
       
-      if not @@ C.is_redundant task.clause then (
-        match process_candidates task.cands with
-        | [] ->
+      if not (C.is_redundant task.clause || 
+              ID.Set.mem hd_sym !ignored_symbols) then (
+        match task_is_blocked task.cands with
+        | true ->
           deregister_clause cl;
           remove_from_proof_state cl
-        | rest -> 
+        | false -> 
           assert (not (TaskPriorityQueue.in_heap task))
       );
 
@@ -574,6 +596,7 @@ end
 
 let _enabled = ref false
 let _check_at = ref 10
+let _max_symbol_occ = ref (-1) (* -1 stands for infinity *)
 
 let extension =
   let action env =
@@ -582,6 +605,7 @@ let extension =
 
     E.flex_add k_check_at !_check_at;
     E.flex_add k_enabled !_enabled;
+    E.flex_add k_max_symbol_occ !_max_symbol_occ;
     
     BCE.setup ()
   in
@@ -594,4 +618,5 @@ let () =
   Options.add_opts [
     "--bce", Arg.Bool ((:=) _enabled), " scan clauses for AC definitions";
     "--bce-check-every", Arg.Int ((:=) _check_at), " check BCE every n steps of saturation algorithm";
+    "--bce-max-symbol-occurences", Arg.Int ((:=) _max_symbol_occ), " limit a given symbol to n occurences only";
   ]
