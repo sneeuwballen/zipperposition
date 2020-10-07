@@ -120,7 +120,12 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* Add candidates to already registered task *)
   let add_candidates lit_idx cl cand_cls =
     let t = TaskStore.find (lit_idx, cl) !task_store in
-    t.cands <- cand_cls @ t.cands;
+    let new_cand_list = 
+      match t.cands with 
+      | [] -> cand_cls
+      | x :: xs -> x :: (cand_cls @ xs)
+    in
+    t.cands <- new_cand_list; (* making sure that we do not delete the first element *)
     if t.active then (
       (* unfortunately, CCHeap does not support key increase / decrease operations *)
       task_queue :=
@@ -141,15 +146,16 @@ module Make(E : Env.S) : S with module Env = E = struct
     (* insert new clause into the candidate list of previously inserted clauses *)
     let update_cand_lists hd sign clause cands =
       List.iter (fun cand ->
-        CCArray.iteri (fun lit_idx lit ->
-          match lit with
-          | L.Equation(lhs,_,_)
-            when L.is_predicate_lit lit  &&
-                 ID.equal (T.head_exn lhs) hd &&
-                 sign != L.is_pos lit ->
-            add_candidates lit_idx cand [clause]
-          | _ -> ()
-        ) (C.lits cand)
+        if not (C.equal cand clause) then (
+          CCArray.iteri (fun lit_idx lit ->
+            match lit with
+            | L.Equation(lhs,_,_)
+              when L.is_predicate_lit lit  &&
+                  ID.equal (T.head_exn lhs) hd &&
+                  sign != L.is_pos lit ->
+              add_candidates lit_idx cand [clause]
+            | _ -> ()
+          ) (C.lits cand))
       ) cands;
     in
 
