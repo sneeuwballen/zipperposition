@@ -274,7 +274,7 @@ module MakeSolver(X : sig end) = struct
     let symbols =
       Iter.of_list l
       |> Iter.flat_map C.Seq.exprs
-      |> ID.Set.of_seq
+      |> ID.Set.of_iter
       |> ID.Set.elements
     in
     let num = List.length symbols in

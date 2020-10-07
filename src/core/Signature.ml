@@ -119,17 +119,17 @@ let set_sym_in_conj s signature =
 
 module Seq = struct
   let symbols s =
-    ID.Map.to_seq s.sym_map |> Iter.map fst
+    ID.Map.to_iter s.sym_map |> Iter.map fst
 
   let types s =
-    ID.Map.to_seq s.sym_map |> Iter.map snd |> Iter.map fst
+    ID.Map.to_iter s.sym_map |> Iter.map snd |> Iter.map fst
 
-  let to_seq s = ID.Map.to_seq s.sym_map
+  let to_iter s = ID.Map.to_iter s.sym_map
 
-  let of_seq l = Iter.fold (fun s (id,ty) -> declare s id ty) empty l
+  let of_iter l = Iter.fold (fun s (id,ty) -> declare s id ty) empty l
 end
 
-let to_set s = Seq.symbols s |> ID.Set.of_seq
+let to_set s = Seq.symbols s |> ID.Set.of_iter
 
 let to_list s = ID.Map.to_list s.sym_map
 
@@ -157,7 +157,7 @@ let pp out s =
     Format.fprintf out "@[<hov2>%a:@ %a %B@]" ID.pp s Type.pp ty c
   in
   Format.fprintf out "{@[<hv>";
-  Util.pp_seq ~sep:", " pp_pair out (Seq.to_seq s);
+  Util.pp_iter ~sep:", " pp_pair out (Seq.to_iter s);
   Format.fprintf out "@]}";
   ()
 

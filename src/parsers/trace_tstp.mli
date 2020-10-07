@@ -57,7 +57,7 @@ val traverse : ?traversed:proof_set -> t -> (t -> unit) -> unit
 (** Traverse the proof. Each proof node is traversed only once,
     using the set to recognize already traversed proofs. *)
 
-val to_seq : t -> t Iter.t
+val to_iter : t -> t Iter.t
 (** Traversal of parent proofs *)
 
 val depth : t -> int

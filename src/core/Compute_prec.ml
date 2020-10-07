@@ -108,7 +108,7 @@ let mk_precedence ~db_w ~lmb_w ~signature t seq =
   let symbols =
     seq
     |> Iter.flat_map Statement.Seq.symbols
-    |> ID.Set.of_seq
+    |> ID.Set.of_iter
     |> ID.Set.to_list
   in
   (* constraints *)

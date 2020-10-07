@@ -27,7 +27,7 @@ let make cs =
     let vars =
       Iter.of_list cs
       |> Iter.flat_map Literals.Seq.vars
-      |> T.VarSet.of_seq
+      |> T.VarSet.of_iter
     and cs = CCList.sort_uniq ~cmp:Literals.compare cs in
     {cs; vars;}
   )
@@ -217,5 +217,5 @@ module FV_tbl(X : Map.OrderedType) = struct
 
   let mem t k = get t k |> CCOpt.is_some
 
-  let to_seq t = FV.iter t.fv
+  let to_iter t = FV.iter t.fv
 end

@@ -26,6 +26,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       type t = (ID.t * bool) 
       let compare = CCPair.compare ID.compare Bool.compare
   end)
+  (* module MH = CCMutHeap.Make() *)
   
   type logic = 
     | NEqFO  (* nonequational FO *)
@@ -46,7 +47,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     mutable cands   : C.t list;
     (* is the list actively stored in the heap of tasks, or in the waiting
        state, because check against some candidate failed *)
-    mutable active  : bool;
+    mutable heap_idx  : int;
   }
 
   module TaskStore = Map.Make (struct 
@@ -55,16 +56,22 @@ module Make(E : Env.S) : S with module Env = E = struct
       CCOrd.(<?>) (C.compare cl_a cl_b) (compare, idx_a, idx_b)
   end)
 
-  module TaskPriorityQueue = CCHeap.Make (struct
+  module TaskWrapper = struct
     type t = bce_check_task
-    let leq a b =
+    let idx task = task.heap_idx
+    let set_idx task idx = 
+      task.heap_idx <- idx
+    let lt a b =
       (List.length a.cands < List.length b.cands)
       || (List.length a.cands = List.length b.cands 
             && C.compare a.clause b.clause < 0)
       || (List.length a.cands = List.length b.cands 
             && C.compare a.clause b.clause = 0 
             && a.lit_idx < b.lit_idx)
-    end)
+  end
+
+  module TaskPriorityQueue = CCMutHeap.Make(TaskWrapper)
+  let init_heap_idx = -1
 
   (* (symbol, sign) -> clauses with the corresponding occurence *)
   let ss_idx = ref SymSignIdx.empty
@@ -73,7 +80,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* a store that implements perfect sharing of tasks  *)
   let task_store = ref TaskStore.empty
   (* priority queue of the tasks to be performed *)
-  let task_queue = ref TaskPriorityQueue.empty
+  let task_queue = TaskPriorityQueue.create ()
   
   (* assuming the weakest logic *)
   let logic = ref NEqFO
@@ -126,12 +133,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       | x :: xs -> x :: (cand_cls @ xs)
     in
     t.cands <- new_cand_list; (* making sure that we do not delete the first element *)
-    if t.active then (
-      (* unfortunately, CCHeap does not support key increase / decrease operations *)
-      task_queue :=
-        TaskPriorityQueue.add 
-          (TaskPriorityQueue.delete_one task_eq t !task_queue) 
-          t
+    if TaskPriorityQueue.in_heap t then (
+      TaskPriorityQueue.increase task_queue t;
     )
 
   (* Register a new task, calculate its candidates and make it active. Only
@@ -172,10 +175,10 @@ module Make(E : Env.S) : S with module Env = E = struct
       if update_others then (
         update_cand_lists hd sign clause cands
       );
-      let task = {lit_idx; clause; cands; active=true} in
+      let task = {lit_idx; clause; cands; heap_idx = init_heap_idx} in
       task_store := TaskStore.add (lit_idx, clause) task !task_store;
-      task_queue := TaskPriorityQueue.add !task_queue task;
-      ()
+      (* task_queue := TaskPriorityQueue.add !task_queue task; *)
+      TaskPriorityQueue.insert task_queue task
     | _ -> ( (* equation literals do not represent tasks *) )
 
   (* Update all the bookeeping information when a new clause is introduced *)
@@ -205,7 +208,6 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let lock_clause locker locked_task =
     assert(C.id locker == C.id (List.hd locked_task.cands));
-    locked_task.active <- false;
     clause_lock := Util.Int_map.update (C.id locker) (fun old_val -> 
       let locked_tasks = CCOpt.get_or ~default:[] old_val in
       Some (locked_task :: locked_tasks)
@@ -221,8 +223,8 @@ module Make(E : Env.S) : S with module Env = E = struct
         | x :: xs ->
           assert (C.id x = C.id clause);
           task.cands <- xs;
-          task.active <- true; 
-          task_queue := TaskPriorityQueue.add !task_queue task;
+          assert (not (TaskPriorityQueue.in_heap task));
+          TaskPriorityQueue.insert task_queue task
         | [] -> assert false
       ) (Util.Int_map.find (C.id clause) !clause_lock);
       clause_lock := Util.Int_map.remove (C.id clause) !clause_lock
@@ -285,7 +287,7 @@ module Make(E : Env.S) : S with module Env = E = struct
              part -- we have won as those literals will not be removed with L-resolution *)
           let is_valid =
             List.exists (fun lit' ->
-              CCOpt.is_some (CCArray.findi (fun idx lit ->
+              CCOpt.is_some (CCArray.find_map_i (fun idx lit ->
                 if idx != l_idx && 
                   L.are_opposite_subst ~subst (lit, sc_orig) (lit', sc_partner) then(
                   Some lit)
@@ -480,7 +482,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let rec process_candidates = function
         | [] -> []
         | (partner :: rest) as cands ->
-          if C.equal cl partner || validity_checker lit_idx cl partner 
+          if C.equal cl partner || C.is_redundant partner || validity_checker lit_idx cl partner 
           then process_candidates rest
           else (
             task.cands <- cands;
@@ -494,20 +496,16 @@ module Make(E : Env.S) : S with module Env = E = struct
         | [] ->
           deregister_clause cl;
           remove_from_proof_state cl
-        | rest ->
-          task.active <- false
+        | rest -> 
+          assert (not (TaskPriorityQueue.in_heap task))
       );
 
     in
 
 
     let module Q = TaskPriorityQueue in
-    while not (Q.is_empty !task_queue) do
-      begin match Q.take !task_queue with
-      | Some (q, task) -> 
-        task_queue := q;
-        process_task task;
-      | None -> assert false  end
+    while not (Q.is_empty task_queue) do
+      process_task (Q.remove_min task_queue)
     done
 
   let steps = ref 0
@@ -562,7 +560,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       ss_idx := SymSignIdx.empty;
       clause_lock := Util.Int_map.empty;
       task_store := TaskStore.empty;
-      task_queue := TaskPriorityQueue.empty
+      TaskPriorityQueue.clear task_queue;
     end;
     Signal.StopListening
 

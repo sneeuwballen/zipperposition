@@ -112,7 +112,7 @@ val cnf_of :
     including type declarations for new Skolem symbols or formulas proxies.
     Options are used to tune the behavior. *)
 
-val cnf_of_seq :
+val cnf_of_iter :
   ctx:Skolem.ctx ->
   ?opts:options list ->
   f_statement Iter.t ->

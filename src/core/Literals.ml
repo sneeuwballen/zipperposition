@@ -71,7 +71,7 @@ let depth lits =
 let vars lits =
   Iter.of_array lits
   |> Iter.flat_map Lit.Seq.vars
-  |> T.VarSet.of_seq
+  |> T.VarSet.of_iter
   |> T.VarSet.to_list
 
 let is_ground lits =
@@ -261,7 +261,7 @@ module Conv = struct
     |> Array.to_list
     |> (fun or_args ->
         let ty = TypedSTerm.Ty.prop in
-        let clause_vars = T.VarSet.of_seq (var_seq) in
+        let clause_vars = T.VarSet.of_iter (var_seq) in
         let vars = clause_vars
                    |> T.VarSet.to_list 
                    |> CCList.map (fun v -> T.Conv.to_simple_term ctx (T.var v))  in
@@ -467,7 +467,7 @@ let fold_terms ?(vars=false) ?(var_args=true) ?(fun_bodies=true) ?ty_args ~(whic
 let symbols ?(init=ID.Set.empty) ?(include_types=false) lits =
   Iter.of_array lits
   |> Iter.flat_map (Lit.Seq.symbols ~include_types)
-  |> ID.Set.add_seq init
+  |> ID.Set.add_iter init
 
 (** {3 IO} *)
 
@@ -486,7 +486,7 @@ let pp_vars_gen ~pp_var ~pp_lits out lits =
     | [] -> ()
     | l -> Format.fprintf out "forall @[%a@].@ " (Util.pp_list ~sep:" " pp_var) l
   in
-  let vars_ = Seq.vars lits |> T.VarSet.of_seq |> T.VarSet.to_list in
+  let vars_ = Seq.vars lits |> T.VarSet.of_iter |> T.VarSet.to_list in
   Format.fprintf out "@[<2>%a%a@]" pp_vars vars_ pp_lits lits
 
 let pp_vars out lits = pp_vars_gen ~pp_var:Type.pp_typed_var ~pp_lits:pp out lits
@@ -583,7 +583,7 @@ let vars_distinct lits =
 
 let ground_lits lits = 
   let counter = ref 0 in
-  let all_vars = T.VarSet.of_seq @@ Seq.vars lits in
+  let all_vars = T.VarSet.of_iter @@ Seq.vars lits in
   let gr_subst = T.VarSet.fold (fun v subst -> 
       let ty = HVar.ty v in
       Subst.FO.bind subst ((v :> InnerTerm.t HVar.t),0) (T.mk_tmp_cst ~counter ~ty,0)

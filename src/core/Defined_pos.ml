@@ -33,6 +33,6 @@ end = struct
 
   let pp out (a:t) =
     Fmt.(within "[" "]" @@ hvbox @@
-         seq @@ pair ~sep:(return ":") int pp)
-      out (IArray.to_seqi a)
+         iter @@ pair ~sep:(return ":") int pp)
+      out (IArray.to_iteri a)
 end

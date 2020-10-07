@@ -55,14 +55,14 @@ let check file =
     ?ctx:None
   >>= (fun decls ->
         decls
-        |> CCVector.to_seq
-        |> Cnf.cnf_of_seq ~ctx:(Skolem.create ())
-        |> CCVector.to_seq
+        |> CCVector.to_iter
+        |> Cnf.cnf_of_iter ~ctx:(Skolem.create ())
+        |> CCVector.to_iter
         |> Cnf.convert
         |> CCResult.return) >>= (
           fun stmts -> 
             let found_fool_subterm = ref false in
-            CCVector.to_seq stmts 
+            CCVector.to_iter stmts 
             |> Iter.flat_map Statement.Seq.terms 
             |> (fun trm ->
                 try ignore(Iter.for_all (fun t -> 
