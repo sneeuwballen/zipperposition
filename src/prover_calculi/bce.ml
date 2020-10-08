@@ -29,7 +29,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   module DEQ = CCDeque
   module SymSignIdx = Map.Make (struct 
       type t = (ID.t * bool) 
-      let compare = CCPair.compare ID.compare Bool.compare
+      let compare = CCPair.compare ID.compare CCBool.compare
   end)
   
   type logic = 
@@ -462,9 +462,11 @@ module Make(E : Env.S) : S with module Env = E = struct
           (* validity is achieved without using same_hd_lits literals *)
           let is_valid = List.exists (fun lit -> 
             assert(L.is_pos lit);
-            match L.View.as_eqn lit with
-            | Some (lhs, rhs, _) -> CC.is_eq cc lhs rhs
-            | None -> assert false
+            
+            match lit with
+            | L.Equation (lhs, rhs, _) -> CC.is_eq cc lhs rhs
+            | L.True -> true
+            | _ -> false
           ) all_pos in
           
           is_valid ||
@@ -524,10 +526,10 @@ module Make(E : Env.S) : S with module Env = E = struct
           let partner = DEQ.take_front deq in
           if C.equal cl partner || C.is_redundant partner || validity_checker lit_idx cl partner 
           then (
-            Util.debugf ~section 2 "valid-res(@[%a@], @[%a@])@." (fun k -> k C.pp cl C.pp partner);
+            Util.debugf ~section 5 "valid-res(@[%a@], @[%a@])@." (fun k -> k C.pp cl C.pp partner);
             task_is_blocked deq)
           else (
-            Util.debugf ~section 2 "blocks(@[%a@], @[%a@])@." (fun k -> k C.pp partner C.pp cl);
+            Util.debugf ~section 5 "blocks(@[%a@], @[%a@])@." (fun k -> k C.pp partner C.pp cl);
             DEQ.push_front deq partner;
             lock_clause partner task;
             false
@@ -576,7 +578,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       @ C.ClauseSet.to_list (Env.ProofState.PassiveSet.clauses ())
     in
     begin try
-      CCFormat.printf "init_cl: @[%a@]@." (CCList.pp C.pp) init_clauses;
+      Util.debugf ~section 4 "init_cl: @[%a@]@."
+        (fun k -> k (CCList.pp C.pp) init_clauses);
       
       (* build the symbol index *)
       List.iter scan_cl_lits init_clauses;
