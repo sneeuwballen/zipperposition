@@ -30,7 +30,10 @@ module Make(E : Env.S) : S with module Env = E = struct
       type t = (ID.t * bool) 
       let compare = CCPair.compare ID.compare Bool.compare
   end)
-  (* module MH = CCMutHeap.Make() *)
+  module LiteralIdx = Fingerprint.Make(struct 
+    type t = C.t
+    let compare = C.compare
+   end)
   
   type logic = 
     | NEqFO  (* nonequational FO *)
@@ -42,7 +45,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* an object representing the information necessary for
      performing a task of checking whether a clause is blocked on
      a given literals *)
-  type bce_check_task = 
+  type bce_check_task =
   {
     (* clause and index for which we are checking blockedness *)
     lit_idx : int;  
@@ -77,6 +80,8 @@ module Make(E : Env.S) : S with module Env = E = struct
   module TaskPriorityQueue = CCMutHeap.Make(TaskWrapper)
   let init_heap_idx = -1
 
+  (* Fingerprint index used to find resolvable literals in noneq FOL*)
+  let lit_idx = ref (LiteralIdx.empty ())
   (* (symbol, sign) -> clauses with the corresponding occurence *)
   let ss_idx = ref SymSignIdx.empty
   (* clause (or its id) -> all clauses that it locks *)
@@ -96,6 +101,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       logic := new_val
     )
 
+  let lit_to_term sign =
+    if sign then CCFun.id else T.Form.not_
+
   (* ignoring other fields of tasks *)
   let task_eq a b = a.lit_idx = b.lit_idx && C.equal a.clause b.clause
 
@@ -103,7 +111,9 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.flex_get k_max_symbol_occ > 0 &&
     (sym_count > Env.flex_get k_max_symbol_occ)
 
-  let register_ss_idx sym sign cl =
+  let add_lit_to_idx lit_lhs sign cl =
+    let sym = T.head_exn lit_lhs in
+
     let sym_occs sym sign =
       CCOpt.map_or ~default:0 C.ClauseSet.cardinal
         (SymSignIdx.find_opt (sym,sign) !ss_idx)
@@ -114,11 +124,30 @@ module Make(E : Env.S) : S with module Env = E = struct
     if symbol_occurrs_too_often total_sym_occs then (
       ss_idx := SymSignIdx.remove (sym, false) (SymSignIdx.remove (sym, true) !ss_idx);
       ignored_symbols := ID.Set.add sym !ignored_symbols;
-      Util.debugf ~section 1 "ignoring symbol @[%a@]" (fun k -> k ID.pp sym);
+      Util.debugf ~section 1 "ignoring symbol @[%a@]@." (fun k -> k ID.pp sym);
     ) else (
       ss_idx := SymSignIdx.update (sym, sign) (fun old ->
         Some (C.ClauseSet.add cl (CCOpt.get_or ~default:C.ClauseSet.empty old))
-      ) !ss_idx)
+      ) !ss_idx;
+      if !logic == NEqFO then (
+        lit_idx := LiteralIdx.add !lit_idx (lit_to_term sign lit_lhs) cl
+    ))
+
+  (* find all clauses for which L-resolution should be tried against literal
+     with given lhs and sign  *)
+  let find_candindates lhs sign = 
+    let hd = T.head_exn lhs in
+    if !logic = EqFO then (
+      C.ClauseSet.to_list
+        (CCOpt.get_or
+            ~default:C.ClauseSet.empty
+            (SymSignIdx.find_opt (hd, not sign) !ss_idx)))
+    else (
+      assert (!logic = NEqFO);
+      LiteralIdx.retrieve_unifiables (!lit_idx,0) (lit_to_term sign lhs,1)
+      |> Iter.map (fun (_,cl, _) -> cl)
+      |> Iter.to_list
+    )
   
   (* Scan the clause and if it is in supported logic fragment,
      store its literals in the symbol index *)
@@ -131,7 +160,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             if L.is_predicate_lit lit then (
               let hd_sym = T.head_exn lhs in
               if not (ID.Set.mem hd_sym !ignored_symbols) 
-              then register_ss_idx hd_sym sign cl
+              then add_lit_to_idx lhs sign cl
             ) else (
               (* reasoning with formulas is currently unsupported *)
               logic := Unsupported;
@@ -187,11 +216,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       assert (T.is_fo_term lhs);
       let hd = T.head_exn lhs in
       let sign = L.is_pos lit in
-      let cands =
-        C.ClauseSet.to_list
-        (CCOpt.get_or
-            ~default:C.ClauseSet.empty
-            (SymSignIdx.find_opt (hd, not sign) !ss_idx)) in
+      let cands = find_candindates lhs sign in
       if update_others then (
         update_cand_lists hd sign clause cands
       );
@@ -213,7 +238,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* remove the clause from symbol index *)
   let deregister_symbols cl =
-    CCArray.iteri (fun lit_idx lit -> 
+    CCArray.iteri (fun _ lit -> 
       match lit with 
       | L.Equation(lhs,_,_) 
         when L.is_predicate_lit lit  ->
@@ -222,7 +247,9 @@ module Make(E : Env.S) : S with module Env = E = struct
             | Some old ->
               let new_ = C.ClauseSet.remove cl old in
               CCOpt.return_if (not (C.ClauseSet.is_empty new_)) new_
-            | None -> None (*already removed*)) !ss_idx
+            | None -> None (*already removed*)) !ss_idx;
+        let sign = L.is_pos lit in
+        lit_idx := LiteralIdx.remove !lit_idx (lit_to_term sign lhs) cl;
       | _ -> ()
     ) (C.lits cl)
 
@@ -580,6 +607,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     with UnsupportedLogic ->
       (* releasing possibly used memory *)
       ss_idx := SymSignIdx.empty;
+      lit_idx := LiteralIdx.empty ();
       clause_lock := Util.Int_map.empty;
       task_store := TaskStore.empty;
       TaskPriorityQueue.clear task_queue;
