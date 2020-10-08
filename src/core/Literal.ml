@@ -126,7 +126,7 @@ let depth lit =
 
 module Set = CCSet.Make(struct type t = lit let compare = compare end)
 
-let is_pos = function
+let[@inline] is_pos = function
   | Equation (l, r, sign) -> sign
   | Int o -> Int_lit.sign o
   | False -> false

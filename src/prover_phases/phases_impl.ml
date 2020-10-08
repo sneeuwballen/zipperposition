@@ -75,6 +75,7 @@ let load_extensions =
   Extensions.register Bool_encode.extension;
   Extensions.register App_encode.extension;
   Extensions.register Eq_encode.extension;
+  Extensions.register Pure_literal_elim.extension;
 
 
   let l = Extensions.extensions () in
