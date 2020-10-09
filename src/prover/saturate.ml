@@ -38,6 +38,7 @@ let should_try_e = function
 
 let _progress = ref false (* progress bar? *)
 let _check_types = ref false
+let _max_multi_simpl = ref (-1)
 
 (* print progress (i out of steps) *)
 let print_progress i ~steps =
@@ -272,6 +273,7 @@ module Make(E : Env.S) = struct
     |> Iter.iter Env.ProofState.CQueue.register_conjecture_clause
 
   let () =
+      Env.flex_add Env.k_max_multi_simpl_depth !_max_multi_simpl;
       Signal.on_every Env.on_start check_fragment;
       Signal.on_every Env.on_start register_conjectures;
     
@@ -282,6 +284,7 @@ let () =
     [ "--progress", Arg.Set _progress, " progress bar";
       "-p", Arg.Set _progress, " alias for --progress";
       "--check-types", Arg.Set _check_types, " check types in new clauses";
+      "--max-multi-simpl-depth", Arg.Int ((:=) _max_multi_simpl), " maixmum depth of multi step simplification. -1 disables maximum depth.";
       "--try-e", Arg.String (fun path -> e_path := Some path), " try the given eprover binary on the problem";
       "--e-call-point", Arg.Float 
         (fun v -> if v > 1.0 || v < 0.0 then invalid_arg "0 <= e-call-point <= 1.0"

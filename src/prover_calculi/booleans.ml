@@ -313,6 +313,12 @@ module Make(E : Env.S) : S with module Env = E = struct
         (mk_res ~proof ~old:t ~repl:repl_pos pos_lit c) :: acc ) 
       [] bool_subterms
     )
+    |> CCFun.tap (function 
+      | Some res ->
+        Util.debugf ~section 2 "bool_hoist_simpl(@[%a@])=@. @[%a@]@." (fun k -> k C.pp c (CCList.pp C.pp) res);
+      | None -> 
+        Util.debugf ~section 2 "bool_hoist_simpl(@[%a@])= None@." (fun k -> k C.pp c)
+    )
 
   let eq_hoist (c:C.t) : C.t list =
     let proof ~prefix = 
@@ -549,7 +555,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let step = Proof.Step.inference ~rule [C.proof_parent_subst renaming (c,sc_cl) sub] in
       let res = C.create_a ~penalty:(C.penalty c) ~trail:(C.trail c) lits step in
 
-      Util.debugf ~section 1 "fluid_quant_rw:@.@[%a@] -> @.@[%a@]@." 
+      Util.debugf ~section 5 "fluid_quant_rw:@.@[%a@] -> @.@[%a@]@." 
         (fun k -> k C.pp c C.pp res);
 
       res
@@ -891,8 +897,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     let pos_builder = Position.Build.empty in
     let all_selectable = 
       Bool_selection.all_selectable_subterms ~ord ~pos_builder in
-    (* literal needs to have at least 3 nested booleans *)
-    let threshold = 3 in
+    (* literal needs to have at least 2 nested booleans *)
+    let threshold = 2 in
 
     CCArray.to_list (C.lits c)
     |> CCList.mapi (fun i l ->
@@ -907,7 +913,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     |> (function 
        | x :: xs when not (CCList.is_empty xs) ->
          (* there need to be at least two literals with deep booleans.
-            we will remain all but one (for example the first one) *)
+            we will rename all but one (for example the first one) *)
           let new_lits = CCArray.copy (C.lits c) in
           let (new_defs, new_parents) = 
             CCList.fold_left (fun (defs, parents) (idx, _) -> 
@@ -915,7 +921,7 @@ module Make(E : Env.S) : S with module Env = E = struct
               let renamer, new_defs, new_parents = rename_lit lit in
               let new_lit = Literal.mk_prop renamer (Literal.is_pos lit) in
               new_lits.(idx) <- new_lit;
-              (new_defs @ defs, new_parents @ parents) 
+              (new_defs @ defs, new_parents @ parents)
             ) ([], []) xs
           in
           let rule = Proof.Rule.mk "rename_nested_bools" in
@@ -924,7 +930,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           let renamed =
             C.create_a ~penalty:(C.penalty c) ~trail:(C.trail c) new_lits proof in
 
-          Util.debugf ~section 2 "renamed @[%a@] into@. @[%a@]@." 
+          Util.debugf ~section 1 "renamed @[%a@] into@. @[%a@]@." 
             (fun k -> k C.pp c C.pp renamed);
           
           Some (renamed :: new_defs)
@@ -1370,20 +1376,20 @@ module Make(E : Env.S) : S with module Env = E = struct
         |> OSeq.nth 0
       ) else Unif_subst.of_subst @@ Unif.FO.unify_syn (l,0) (r,0) in
     
-    Util.debugf ~section 2 "bool solving @[%a@]@."(fun k -> k C.pp c);
+    Util.debugf ~section 5 "bool solving @[%a@]@."(fun k -> k C.pp c);
 
     C.lits c
     |> CCArray.mapi (fun i lit ->
       match find_resolvable_form lit with 
       | None ->
-        Util.debugf ~section 2 "for lit %d(@[%a@]) of @[%a@] no resolvable lits found@." 
+        Util.debugf ~section 5 "for lit %d(@[%a@]) of @[%a@] no resolvable lits found@." 
           (fun k -> k i Literal.pp lit C.pp c);
         None
       | Some (l,r) ->
         let module US = Unif_subst in
         try
-          Util.debugf ~section 2 "trying lit @[%d:%a@]@."(fun k -> k i Literal.pp lit);
-          Util.debugf ~section 2 "unif problem: @[%a=?=%a@]@."(fun k -> k T.pp l T.pp r);
+          Util.debugf ~section 5 "trying lit @[%d:%a@]@."(fun k -> k i Literal.pp lit);
+          Util.debugf ~section 5 "unif problem: @[%a=?=%a@]@."(fun k -> k T.pp l T.pp r);
           let subst = unif_alg l r in
           assert(not @@ Unif_subst.has_constr subst);
           let renaming = Subst.Renaming.create () in
@@ -1398,10 +1404,10 @@ module Make(E : Env.S) : S with module Env = E = struct
               ~rule:(Proof.Rule.mk "solve_formulas")
               [C.proof_parent_subst renaming (c,0) (US.subst subst) ] in
           let res = C.create ~penalty:(C.penalty c) ~trail:(C.trail c) new_lits proof in
-          Util.debugf ~section 2 "solved by @[%a@]@."(fun k ->  k C.pp res);
+          Util.debugf ~section 5 "solved by @[%a@]@."(fun k ->  k C.pp res);
           Some res
         with _ -> 
-          Util.debugf ~section 2 "failed @." (fun k -> k);
+          Util.debugf ~section 5 "failed @." (fun k -> k);
           None)
       |> CCArray.filter_map CCFun.id
       |> CCArray.to_list
@@ -1450,8 +1456,8 @@ module Make(E : Env.S) : S with module Env = E = struct
                     |> CCList.flatten
                     |> List.map (fun c -> 
                         C.create ~penalty  ~trail (CCArray.to_list (C.lits c)) proof) in
-      Util.debugf ~section 1 "cl:@[%a@]@." (fun k-> k C.pp c);
-      Util.debugf ~section 1 " @[%a@]@." (fun k-> k (CCList.pp C.pp) clauses);
+      Util.debugf ~section 5 "cl:@[%a@]@." (fun k-> k C.pp c);
+      Util.debugf ~section 5 " @[%a@]@." (fun k-> k (CCList.pp C.pp) clauses);
       List.iteri (fun i new_c -> 
           assert((C.proof_depth c) <= C.proof_depth new_c);) clauses;
       Some (solved @clauses)
@@ -1529,9 +1535,9 @@ module Make(E : Env.S) : S with module Env = E = struct
               (as_neg_forall :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:t ~by:(interpret t' T.false_))))
               proof in
 
-          Util.debugf ~section  1 "interpret bool(@[%a@]):@.@[%a@] !!> @. @[%a@]@."  
+          Util.debugf ~section  5 "interpret bool(@[%a@]):@.@[%a@] !!> @. @[%a@]@."  
             (fun k -> k T.pp t Literals.pp (C.lits c) Literals.pp (C.lits forall_cl));
-          Util.debugf ~section  1 "interpret bool(@[%a@]):@.@[%a@] !!> @. @[%a@]@." 
+          Util.debugf ~section  5 "interpret bool(@[%a@]):@.@[%a@] !!> @. @[%a@]@." 
             (fun k -> k T.pp t Literals.pp (C.lits c) Literals.pp (C.lits forall_neg_cl));
 
           forall_cl :: forall_neg_cl :: res
