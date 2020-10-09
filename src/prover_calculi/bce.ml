@@ -368,7 +368,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           | (lhs, subst) as x :: xs ->
             check_lit lhs subst (rest @ xs) &&
             check_l_resolvents (x :: rest) xs
-          | [] -> true 
+          | [] -> true
         in
         check_l_resolvents [] unifiable
       )
@@ -526,7 +526,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           let partner = DEQ.take_front deq in
           if C.equal cl partner || C.is_redundant partner || validity_checker lit_idx cl partner 
           then (
-            Util.debugf ~section 5 "valid-res(@[%a@], @[%a@])@." (fun k -> k C.pp cl C.pp partner);
+            Util.debugf ~section 5 "valid-res(@[%a@], @[%a@](%b))@." (fun k -> k C.pp cl C.pp partner (C.is_redundant partner));
             task_is_blocked deq)
           else (
             Util.debugf ~section 5 "blocks(@[%a@], @[%a@])@." (fun k -> k C.pp partner C.pp cl);
