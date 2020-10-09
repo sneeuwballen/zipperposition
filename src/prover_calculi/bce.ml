@@ -149,14 +149,17 @@ module Make(E : Env.S) : S with module Env = E = struct
               then add_lit_to_idx lhs sign cl
             ) else (
               (* reasoning with formulas is currently unsupported *)
+              Util.debugf ~section 1 "unsupported because of @[%a@]@." (fun k -> k L.pp lit);
               logic := Unsupported;
               raise UnsupportedLogic;
             )
           ) else refine_logic EqFO
         ) else (
             logic := Unsupported; 
+            Util.debugf ~section 1 "unsupported because of @[%a@]@." (fun k -> k L.pp lit);
             raise UnsupportedLogic)
-      | L.Int _ | L.Rat _ -> 
+      | L.Int _ | L.Rat _  -> 
+        Util.debugf ~section 1 "theories are not supported@." CCFun.id;
         logic := Unsupported;
         raise UnsupportedLogic
       | _ -> ()
@@ -578,11 +581,15 @@ module Make(E : Env.S) : S with module Env = E = struct
       @ C.ClauseSet.to_list (Env.ProofState.PassiveSet.clauses ())
     in
     begin try
-      Util.debugf ~section 4 "init_cl: @[%a@]@."
+      Util.debugf ~section 1 "init_cl: @[%a@]@."
         (fun k -> k (CCList.pp C.pp) init_clauses);
       
       (* build the symbol index *)
       List.iter scan_cl_lits init_clauses;
+
+      Util.debugf ~section 1 "logic has%sequalities"
+        (fun k -> k (if !logic == EqFO then " " else " no "));
+
       (* create tasks for each clause *)
       List.iter 
         (fun cl ->
@@ -609,6 +616,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         Env.add_clause_elimination_rule ~priority:1 "BCE" eliminate_blocked_clauses
       ) else ( raise UnsupportedLogic ) (* clear all data structures *)
     with UnsupportedLogic ->
+      Util.debugf ~section 1 "logic is unsupported" CCFun.id;
       (* releasing possibly used memory *)
       ss_idx := SymSignIdx.empty;
       clause_lock := Util.Int_map.empty;
