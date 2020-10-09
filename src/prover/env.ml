@@ -610,8 +610,16 @@ module Make(X : sig
     res
 
   let multi_simplify ~depth c : (C.t * int) list option =
-    let depth_map = ref (Util.Int_map.singleton (C.id c) depth) in
-    let get_depth c = CCOpt.get_exn @@ Util.Int_map.get (C.id c) !depth_map in
+    let depth_map = 
+      ref (Util.Int_map.singleton (C.id c) depth) in
+    let [@inline] get_depth c =
+      CCOpt.get_exn @@ Util.Int_map.get (C.id c) !depth_map in
+    let [@inline] update_map c c' = 
+      let d = get_depth c in
+      depth_map := 
+        Util.Int_map.add (C.id c') d 
+          (Util.Int_map.remove (C.id c) !depth_map)
+    in
     let set_children c children =
       let d' = (get_depth c) + 1 in
       depth_map := 
@@ -623,7 +631,7 @@ module Make(X : sig
     let did_something = ref false in
     (* try rules one by one until some of them succeeds *)
     let rec try_next ~depth c rules = 
-      if flex_get k_max_multi_simpl_depth == -1 ||
+      if flex_get k_max_multi_simpl_depth != -1 &&
          depth > flex_get k_max_multi_simpl_depth 
       then None
       else (
@@ -643,7 +651,9 @@ module Make(X : sig
       let c = Queue.pop q in
       let depth = get_depth c in
       if not (C.ClauseSet.mem c !set) then (
+        let orig_c = c in
         let c, st = unary_simplify c in
+        update_map orig_c c;
         if st = `New then did_something := true;
         match try_next ~depth c (multi_simpl_rules ()) with
         | None ->
