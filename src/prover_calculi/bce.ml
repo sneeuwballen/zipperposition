@@ -581,7 +581,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       @ C.ClauseSet.to_list (Env.ProofState.PassiveSet.clauses ())
     in
     begin try
-      Util.debugf ~section 1 "init_cl: @[%a@]@."
+      Util.debugf ~section 2 "init_cl: @[%a@]@."
         (fun k -> k (CCList.pp C.pp) init_clauses);
       
       (* build the symbol index *)
