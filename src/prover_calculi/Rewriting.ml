@@ -313,7 +313,7 @@ let post_cnf stmts st =
            | _ -> true) stmts));
   (* check if there are rewrite rules *)
   let has_rw =
-    CCVector.to_seq stmts
+    CCVector.to_iter stmts
     |> Iter.exists
       (fun st -> match Statement.view st with
          | Statement.Rewrite _
@@ -398,7 +398,7 @@ let post_tying stmts st =
   if !rewrite_before_cnf then (
     CCVector.iter Statement.scan_tst_rewrite stmts;
     let has_rw =
-      CCVector.to_seq stmts
+      CCVector.to_iter stmts
       |> Iter.exists
         (fun st -> match Statement.view st with
            | Statement.Rewrite _ -> true

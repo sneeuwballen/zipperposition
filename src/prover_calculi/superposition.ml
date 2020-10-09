@@ -141,7 +141,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let ord =
     Ctx.ord ()
 
-  let has_bad_occurence_elsewhere c var pos =
+  let has_bad_occurrence_elsewhere c var pos =
     assert(T.is_var var);
     Lits.fold_terms ~ord ~subterms:true ~eligible:C.Eligible.always ~which:`All
       (C.lits c)
@@ -241,8 +241,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (* TODO(BOOL): How is this going to be extended for Boolean reasoning? *)
         |> Iter.filter (fun (t, pos) ->
           match T.view t with
-          | T.Var _ -> has_bad_occurence_elsewhere c t pos
-          | T.App(hd, [_]) when T.is_var hd -> has_bad_occurence_elsewhere c hd pos
+          | T.Var _ -> has_bad_occurrence_elsewhere c t pos
+          | T.App(hd, [_]) when T.is_var hd -> has_bad_occurrence_elsewhere c hd pos
           | _ -> false
         ) 
         |> Iter.fold
@@ -572,7 +572,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let subst = US.subst us in
       let lambdasup_vars =
         if (info.sup_kind = LambdaSup) then (
-          Term.Seq.subterms ~include_builtin:true info.u_p |> Iter.filter Term.is_var |> Term.Set.of_seq)
+          Term.Seq.subterms ~include_builtin:true info.u_p |> Iter.filter Term.is_var |> Term.Set.of_iter)
         else Term.Set.empty in
       let t' = if info.sup_kind != DupSup then 
           S.FO.apply ~shift_vars renaming subst (info.t, sc_a)
@@ -693,7 +693,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let fun_context_around_up =  Subst.FO.apply renaming subst' 
           (Lit.Pos.at info.passive_lit pos_enclosing_up, sc_p) in
       let vars = Iter.append (T.Seq.vars fun_context_around_up) (T.Seq.vars t')
-                 |> Term.VarSet.of_seq
+                 |> Term.VarSet.of_iter
                  |> Term.VarSet.to_list in
       let skolem_decls = ref [] in
       let sk_with_vars =
@@ -1071,7 +1071,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     in
     ZProf.exit_prof prof_infer_passive;
     new_clauses
-
+  
   let infer_active_complete_ho clause =
     let inf_res = infer_active_aux
         ~retrieve_from_index:(I.retrieve_unifiables_complete ~unif_alg:(Env.flex_get k_unif_alg))
@@ -1079,7 +1079,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             (* let penalty = max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause) in *)
             (* /!\ may differ from the actual penalty (by -2) *)
             let parents = [clause; with_pos.clause] in
-            Some (0, parents, OSeq.map (CCOpt.flat_map (do_sup u_p with_pos)) substs))
+            let p = max (C.penalty clause) (C.penalty with_pos.clause) in
+            Some (p, parents, OSeq.map (CCOpt.flat_map (do_sup u_p with_pos)) substs))
         clause
     in
     let stm_res = List.map (fun (penalty, parents, s) -> Stm.make ~penalty ~parents s) inf_res in
@@ -1092,7 +1093,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             (* let penalty = max (C.penalty clause) (C.penalty with_pos.C.WithPos.clause) in *)
             (* /!\ may differ from the actual penalty (by -2) *)
             let parents = [clause; with_pos.clause] in
-            Some (0, parents, OSeq.map (CCOpt.flat_map (do_sup u_p with_pos)) substs))
+            let p = max (C.penalty clause) (C.penalty with_pos.clause) in
+            Some (p, parents, OSeq.map (CCOpt.flat_map (do_sup u_p with_pos)) substs))
         clause
     in
     let stm_res = List.map (fun (penalty,parents,s) -> Stm.make ~penalty ~parents s) inf_res in
@@ -1439,8 +1441,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       ~which:`Max ~eligible ~ty_args:false (C.lits clause)
     |> Iter.filter( fun (t,pos) -> 
         match T.view t with 
-        | T.Var _ -> has_bad_occurence_elsewhere clause t pos
-        | T.App(hd, [x]) -> has_bad_occurence_elsewhere clause hd pos
+        | T.Var _ -> has_bad_occurrence_elsewhere clause t pos
+        | T.App(hd, [x]) -> has_bad_occurrence_elsewhere clause hd pos
         | _ -> false)
     |> Iter.flat_map
       (fun (u_p, passive_pos) ->
@@ -2568,7 +2570,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     Util.incr_stat stat_eq_subsumption_call;
     let res = match a with
       | [|Lit.Equation (s, t, true)|] ->
-        let res = CCArray.find (equate_lit_with s t) b in
+        let res = CCArray.find_map (equate_lit_with s t) b in
         begin match res with
           | None -> None
           | Some subst ->
@@ -3386,4 +3388,3 @@ let () =
       _sup_at_vars := false;
       _check_sup_at_var_cond := false;
   );
-

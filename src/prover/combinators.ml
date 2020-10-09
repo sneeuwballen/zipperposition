@@ -49,8 +49,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       has_lams_aux @@ C.Seq.terms c
     
     let has_lams_lits lits =
-      CCList.to_seq lits 
-      |> Iter.flat_map (SLiteral.to_seq)
+      CCList.to_iter lits 
+      |> Iter.flat_map (SLiteral.to_iter)
       |> has_lams_aux
 
     let enocde_stmt st =

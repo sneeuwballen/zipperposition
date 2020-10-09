@@ -251,7 +251,7 @@ module TPTP : sig
   include Interfaces.PRINT_DE_BRUIJN with type term := t and type t := t
   include Interfaces.PRINT with type t := t
   val pp_typed_var : t HVar.t CCFormat.printer
-  val pp_ho : CCFormat.t -> t -> unit
+  val pp_ho : ?depth:int -> CCFormat.t -> t -> unit
 
   (** {2 Basic types} *)
 

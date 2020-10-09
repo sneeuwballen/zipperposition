@@ -70,8 +70,8 @@ module type S = sig
   (** replace each element by a multiset in its own *)
 
   module Seq : sig
-    val of_seq : t -> elt Iter.t -> t
-    val to_seq : t -> elt Iter.t
+    val of_iter : t -> elt Iter.t -> t
+    val to_iter : t -> elt Iter.t
 
     val of_coeffs : t -> (elt * Z.t) Iter.t -> t
     val to_coeffs : t -> (elt * Z.t) Iter.t

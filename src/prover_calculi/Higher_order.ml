@@ -761,7 +761,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     match cl_map with
     | None -> Iter.empty
     | Some cl_map -> 
-      C.Tbl.to_seq cl_map 
+      C.Tbl.to_iter cl_map 
       |> Iter.flat_map (fun (c, l) -> 
           Iter.of_list l
           |> Iter.map (fun (t,p) -> (c,t,p)))
@@ -958,7 +958,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     (* find unshielded predicate vars *)
     let find_vars(): _ HVar.t Iter.t =
       Literals.vars (C.lits c)
-      |> CCList.to_seq
+      |> CCList.to_iter
       |> Iter.filter
         (fun v ->
            (Type.is_prop @@ Type.returns @@ HVar.ty v) &&
@@ -1073,18 +1073,18 @@ module Make(E : Env.S) : S with module Env = E = struct
             | T.App(hd, _) when T.is_var hd ->  Some (T.as_var_exn hd)
             | _ -> None in
           CCOpt.to_list (extract_var l) @ CCOpt.to_list (extract_var r))
-      |> Iter.filter (fun v -> Type.returns_prop @@ HVar.ty v && Type.is_fun @@ HVar.ty v)
-      |> T.VarSet.of_seq (* unique *)
+      |> Iter.filter (fun v -> Type.returns_prop @@ HVar.ty v)
+      |> T.VarSet.of_iter (* unique *)
     in
     if not (T.VarSet.is_empty vars) then (
       Util.debugf ~section 1 "(@[<hv2>ho.refine@ :clause %a@ :terms {@[%a@]}@])"
-        (fun k->k C.pp c (Util.pp_seq T.pp_var) (T.VarSet.to_seq vars));
+        (fun k->k C.pp c (Util.pp_iter T.pp_var) (T.VarSet.to_iter vars));
     );
     let sc_c = 0 in
     let offset = C.Seq.vars c |> T.Seq.max_var |> succ in
     begin
       vars
-      |> T.VarSet.to_seq
+      |> T.VarSet.to_iter
       |> Iter.flat_map_l
         (fun v -> HO_unif.enum_prop 
             ~enum_cache:(Env.flex_get k_prim_enum_terms) 
@@ -1229,7 +1229,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     res
 
   (* Given a clause C, project all its applied variables to base-type arguments 
-     if there is a variable occurence in which at least one of base-type arguments is
+     if there is a variable occurrence in which at least one of base-type arguments is
      not a bound variable.
      Penalty of the resulting clause is penalty of the original clause + penalty_inc *)
   let simple_projection ~penalty_inc ~max_depth c =
@@ -1325,7 +1325,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let elim_leibniz_eq_ ?(proof_constructor=Proof.Step.inference) c =
     let ord = Env.ord () in
     let eligible = C.Eligible.always in
-    let pos_pred_vars, neg_pred_vars, occurences = 
+    let pos_pred_vars, neg_pred_vars, occurrences = 
       Lits.fold_eqn ~both:false ~ord ~eligible (C.lits c)
       |> Iter.fold (fun (pos_vs,neg_vs,occ) (lhs,rhs,_,pos) ->
           let i, _ = Literals.Pos.cut pos in
@@ -1363,7 +1363,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                     Some (C.apply_subst ~proof (c,0) subst))
                 ) (CCList.mapi (fun i arg -> (i, arg)) args)
             ) else [] 
-          ) (Term.Map.to_list occurences)) in
+          ) (Term.Map.to_list occurrences)) in
     res
 
 
@@ -1591,7 +1591,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let res = Combs.maybe_conv_lams res in
       (* CCFormat.printf "orig:@[%a@]@.subst:@[%a@]@.res:@[%a@]@." C.pp cl Subst.pp subst C.pp res; *)
       res)
-    |> CCList.to_seq
+    |> CCList.to_iter
     |> Env.add_passive
 
    let recognize_injectivity c =
@@ -1769,12 +1769,12 @@ module Make(E : Env.S) : S with module Env = E = struct
 
 
   type fixed_arg_status =
-    | Always of T.t (* This argument is always the given term in all occurences *)
+    | Always of T.t (* This argument is always the given term in all occurrences *)
     | Varies        (* This argument contains different terms in differen occurrences *)
 
   type dupl_arg_status =
-    | AlwaysSameAs of int (* This argument is always the same as some other argument across occurences (links to the next arg with this property) *)
-    | Unique              (* This argument is not always the same as some other argument across occurences *)
+    | AlwaysSameAs of int (* This argument is always the same as some other argument across occurrences (links to the next arg with this property) *)
+    | Unique              (* This argument is not always the same as some other argument across occurrences *)
 
   (** Removal of fixed/duplicate arguments of variables.
       - If within a clause, there exists a variable F that's always applied
@@ -2487,7 +2487,7 @@ let extension =
   (* check if there are HO variables *)
   and check_ho vec state =
     let is_ho =
-      CCVector.to_seq vec
+      CCVector.to_iter vec
       |> Iter.exists st_contains_ho
     in
     if is_ho then (
@@ -2573,7 +2573,7 @@ let () =
          ), " enable/disable treatment of Andrews equality. inf enables it for infinte depth of clauses"
             ^ "; off disables it; number enables it for a given depth of clause";
       "--ho-def-unfold", Arg.Bool (fun v -> def_unfold_enabled_ := v), " enable ho definition unfolding";
-      "--ho-choice-inst", Arg.Bool (fun v -> _instantiate_choice_ax := v), " enable ho definition unfolding";
+      "--ho-choice-inst", Arg.Bool (fun v -> _instantiate_choice_ax := v), " enable heuristic Hilbert choice instantiation";
       "--ho-simple-projection", Arg.Int (fun v -> _simple_projection := v), 
       " enable simple projection instantiation." ^ 
       " positive argument is increase in clause penalty for the conclusion; " ^

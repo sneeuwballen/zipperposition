@@ -164,7 +164,7 @@ module VarMap = T.VarMap
 module VarSet = T.VarSet
 module VarTbl = T.VarTbl
 
-let vars_set set t = VarSet.add_seq set (Seq.vars t)
+let vars_set set t = VarSet.add_iter set (Seq.vars t)
 
 let vars t = vars_set VarSet.empty t |> VarSet.elements
 
@@ -365,10 +365,10 @@ module TPTP = struct
       Format.fprintf out "@[%a@]"
         (Util.pp_list ~sep:" > " (pp_inner depth)) l
 
-  let pp_ho out t = pp_ho_depth 0 out t
+  let pp_ho ?(depth=0) out t = pp_ho_depth depth out t
 
   let pp_typed_var out v = match view (HVar.ty v) with
-    | Builtin Term -> HVar.pp out v (* implicit *)
+    (* | Builtin Term -> HVar.pp out v implicit *)
     | _ -> Format.fprintf out "@[%a : %a@]" HVar.pp_tstp v pp (HVar.ty v)
 
   let to_string = CCFormat.to_string pp

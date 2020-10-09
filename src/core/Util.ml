@@ -275,6 +275,7 @@ let pp_pair ?(sep=", ") pa pb out (a,b) =
 let pp_sep sep out () = Format.fprintf out "%s@," sep
 let pp_list ?(sep=", ") pp = Fmt.list ~sep:(pp_sep sep) pp
 let pp_seq ?(sep=", ") pp = Fmt.seq ~sep:(pp_sep sep) pp
+let pp_iter ?(sep=", ") pp = Fmt.iter ~sep:(pp_sep sep) pp
 
 let pp_list0 ?(sep=" ") pp_x out = function
   | [] -> ()

@@ -222,7 +222,7 @@ end
 val var_occurs : var:var -> t -> bool (** [var_occurs ~var t] true iff [var] in t *)
 
 val is_ground : t -> bool (** is the term ground? (no free vars) *)
-val is_linear : t -> bool (** is the term linear? (no vars occuring multiple times) *)
+val is_linear : t -> bool (** is the term linear? (no vars occurring multiple times) *)
 val monomorphic : t -> bool (** true if the term contains no type var *)
 
 val is_beta_reducible : t -> bool

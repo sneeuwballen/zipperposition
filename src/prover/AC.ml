@@ -100,7 +100,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let find_proof s = (ID.Tbl.find tbl s).proof
 
-  let symbols () = ID.Tbl.keys tbl |> ID.Set.of_seq
+  let symbols () = ID.Tbl.keys tbl |> ID.Set.of_iter
 
   module A = T.AC(struct
       let is_ac = is_ac

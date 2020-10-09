@@ -252,7 +252,7 @@ module U = struct
   let pp out (t:state): unit =
     Format.fprintf out
       "(@[<hv2>ho_unif_pb@ %a@])"
-      (Util.pp_seq ~sep:" " pp_pb) (Iter.of_queue t.queue)
+      (Util.pp_iter ~sep:" " pp_pb) (Iter.of_queue t.queue)
 
   (** {6 normalization of pairs} *)
 

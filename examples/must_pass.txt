@@ -11,7 +11,7 @@ examples/regression/bad_set_avatar.zf --avatar=eager
 examples/regression/contextual_narrow1.zf
 examples/set_fancy.zf
 examples/simple_case.zf
-examples/loop.p --int-arith -cq=almost-bfs
+examples/loop.p --int-arith -cq=almost-bfs --ignore-orphans=false
 examples/regression/npdtree_fail.zf
 examples/regression/ho_pos.zf
 examples/ho/neg_eq1.zf

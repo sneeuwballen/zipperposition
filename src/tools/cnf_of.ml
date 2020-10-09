@@ -44,7 +44,7 @@ let print_res (decls: _ CCVector.ro_vector) : unit =
     in
     Format.printf "@[<v2>%d statements:@ %a@]@."
       (CCVector.length decls)
-      (CCVector.pp ~sep:"" ppst)
+      (CCVector.pp ~pp_sep:(CCFormat.return "@,") ppst)
       decls
   | Options.O_tptp ->
     let pp_c out c = TypedSTerm.TPTP.pp out (close_c c) in
@@ -52,7 +52,7 @@ let print_res (decls: _ CCVector.ro_vector) : unit =
       Statement.TPTP.pp pp_c T.TPTP.pp T.TPTP.pp out st
     in
     Format.printf "@[<v>%a@]@."
-      (CCVector.pp ~sep:"" ppst)
+      (CCVector.pp ~pp_sep:(CCFormat.return "@,") ppst)
       decls
   | Options.O_zf ->
     let pp_c out c = T.ZF.pp_inner out (close_c c) in
@@ -61,7 +61,7 @@ let print_res (decls: _ CCVector.ro_vector) : unit =
     in
     Format.printf "val term : type.@."; (* implicit *)
     Format.printf "@[<v>%a@]@."
-      (CCVector.pp ~sep:"" ppst)
+      (CCVector.pp ~pp_sep:(CCFormat.return "@,") ppst)
       decls
 
 (* process the given file, converting it to CNF *)
@@ -79,18 +79,18 @@ let process file =
     >|= fun st ->
     if !print_in
     then Format.printf "@[<v2>input:@ %a@]@."
-        (CCVector.pp ~sep:"" Statement.pp_input) st;
+        (CCVector.pp ~pp_sep:(CCFormat.return "@,") Statement.pp_input) st;
     let opts =
       (if !flag_distribute_exists then [Cnf.DistributeExists] else []) @
       (if !flag_disable_renaming then [Cnf.DisableRenaming] else []) @
       []
     in
-    let decls = Cnf.cnf_of_seq ~opts ~ctx:(Skolem.create()) (CCVector.to_seq st) in
-    let sigma = Cnf.type_declarations (CCVector.to_seq decls) in
+    let decls = Cnf.cnf_of_iter ~opts ~ctx:(Skolem.create()) (CCVector.to_iter st) in
+    let sigma = Cnf.type_declarations (CCVector.to_iter decls) in
     if !print_sig
     then (
       Format.printf "@[<hv2>signature:@ (@[<v>%a@]@])@."
-        (ID.Map.pp ~sep:"" ~arrow:" : " ID.pp T.pp) sigma
+        (ID.Map.pp ~pp_sep:(CCFormat.return "@,") ~pp_arrow:(CCFormat.return "@ : ") ID.pp T.pp) sigma
     );
     (* print *)
     print_res decls;

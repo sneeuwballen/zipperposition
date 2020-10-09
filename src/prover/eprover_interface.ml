@@ -134,7 +134,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let output_symdecl ~out sym ty =
     Format.fprintf out "@[thf(@['%a_type',type,@[%a@]:@ @[%a@]@]).@]@\n" 
-      ID.pp sym ID.pp_tstp sym (Type.TPTP.pp_ho) ty
+      ID.pp sym ID.pp_tstp sym (Type.TPTP.pp_ho ~depth:0) ty
 
   let output_all ?(already_defined=ID.Set.empty) ~out cl_set =
     let cl_iter = Iter.of_list cl_set in

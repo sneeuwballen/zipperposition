@@ -1436,7 +1436,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let proof = Proof.Step.simp ~rule:(Proof.Rule.mk "cnf_otf") ~tags:[Proof.Tag.T_ho] [C.proof_parent c] in
       let trail = C.trail c and penalty = C.penalty c in
       let stmt = Statement.assert_ ~proof f in
-      let cnf_vec = Cnf.convert @@ CCVector.to_seq @@ Cnf.cnf_of ~opts ~ctx:(Ctx.sk_ctx ()) stmt in
+      let cnf_vec = Cnf.convert @@ CCVector.to_iter @@ Cnf.cnf_of ~opts ~ctx:(Ctx.sk_ctx ()) stmt in
       CCVector.iter (fun cl -> 
           Statement.Seq.ty_decls cl
           |> Iter.iter (fun (id,ty) -> Ctx.declare id ty)) cnf_vec;
@@ -1629,7 +1629,7 @@ let map_propositions ~proof f =
 let is_bool t = CCOpt.equal Ty.equal (Some prop) (ty t)
 let is_T_F t = match view t with AppBuiltin((True|False),[]) -> true | _ -> false
 
-(* Modify every subterm of t by f except those at the "top". Here top is true if subterm occures under a quantifier Æ in a context where it could participate to the clausification if the surrounding context of Æ was ignored. *)
+(* Modify every subterm of t by f except those at the "top". Here top is true if subterm occurs under a quantifier Æ in a context where it could participate to the clausification if the surrounding context of Æ was ignored. *)
 let rec replaceTST f top t =
   let re = replaceTST f in
   let ty = ty_exn t in
@@ -1643,7 +1643,7 @@ let rec replaceTST f top t =
      | Match(t, cases) -> 
        match_ (re false t) (map (fun (c,vs,e) -> (c,vs, re false e)) cases)
      | Let(binds, expr) -> 
-       let_ (map(CCPair.map2 (re false)) binds) (re false expr)
+       let_ (map(CCPair.map_snd (re false)) binds) (re false expr)
      | Bind(b,x,t) -> 
        let top = Binder.equal b Binder.Forall || Binder.equal b Binder.Exists in
        bind ~ty b x (re top t)
@@ -1668,7 +1668,7 @@ let name_quantifiers stmts =
   let name_prop_Qs s = replaceTST(fun t -> match TypedSTerm.view t with
       | Bind(Binder.Forall,_,_) | Bind(Binder.Exists, _, _) ->
         changed := true;
-        let vars = Var.Set.of_seq (TypedSTerm.Seq.free_vars t) |> Var.Set.to_list in
+        let vars = Var.Set.of_iter (TypedSTerm.Seq.free_vars t) |> Var.Set.to_list in
         let qid = ID.gensym() in
         let ty = app_builtin ~ty:tType Arrow (prop :: map Var.ty vars) in
         let q = const ~ty qid in
@@ -1707,7 +1707,7 @@ let rec replace old by t =
     | App(f,ps) -> app_whnf ~ty (r f) (map r ps)
     | AppBuiltin(f,ps) -> app_builtin ~ty f (map r ps)
     | Ite(c,x,y) -> ite (r c) (r x) (r y)
-    | Let(bs,e) -> let_ (map (CCPair.map2 r) bs) (r e)
+    | Let(bs,e) -> let_ (map (CCPair.map_snd r) bs) (r e)
     | Bind(b,v,e) -> bind ~ty b v (r e)
     | _ -> t
 

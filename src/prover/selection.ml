@@ -251,7 +251,7 @@ let e_sel ~blocker ~ord lits =
 
 let e_sel2 ~blocker ~ord lits = 
   let symbols = Lits.symbols lits 
-                |> ID.Set.to_seq 
+                |> ID.Set.to_iter 
                 |> Iter.sort ~cmp:ID.compare 
                 |> Iter.to_array in
   let blocker x l = blocker x l || Lit.is_type_pred l || Lit.is_predicate_lit l in
@@ -348,7 +348,7 @@ let e_sel7 ~blocker ~ord lits =
 
 let e_sel8 ~blocker ~ord lits = 
   let symbols = Lits.symbols lits 
-                |> ID.Set.to_seq 
+                |> ID.Set.to_iter 
                 |> Iter.sort ~cmp:ID.compare 
                 |> Iter.to_array in
   let get_arity = function 
@@ -501,7 +501,7 @@ let e_sel15 ~blocker ~ord lits =
           if Lit.is_neg l && Lit.is_ground l then (
             Some (i, Lit.ho_weight l)
           ) else None)
-     |> CCList.to_seq
+     |> CCList.to_iter
      |> Iter.min ~lt:(fun (_, w1) (_, w2) -> w1 < w2)
      |> CCOpt.map (fun (i,_) -> CCBV.set sel_bv i; sel_bv))
   <+>

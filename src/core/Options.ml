@@ -60,7 +60,7 @@ let mk_debug_opts () =
             " debug level for section " ^ name))
   |> Iter.to_list
   |> CCList.cons
-    ("-d", Arg.Int (Util.Section.set_debug Util.Section.root), " alias to --debug")
+    ("-d", Arg.Int (Util.Section.set_debug Util.Section.root), " alias for --debug")
 
 (* Options that can be added by plugins *)
 let other_opts = ref []
@@ -75,11 +75,11 @@ let make () =
       Arg.Set InnerTerm.print_hashconsing_ids,
       " print each term's unique hashconsing ID"
     ; "--backtrace", switch_opt true Printexc.record_backtrace, " enable backtraces"
-    ; "-bt", switch_opt true Printexc.record_backtrace, " enable backtraces (alias to --backtrace)"
+    ; "-bt", switch_opt true Printexc.record_backtrace, " enable backtraces (alias for --backtrace)"
     ; "--no-backtrace", switch_opt false Printexc.record_backtrace, " disable backtraces"
     ; "--color", switch_opt true CCFormat.set_color_default, " enable colors"
     ; "--no-color", switch_opt false CCFormat.set_color_default, " disable colors"
-    ; "-nc", switch_opt false CCFormat.set_color_default, " alias to --no-color"
+    ; "-nc", switch_opt false CCFormat.set_color_default, " alias for --no-color"
     ; "--mem-limit", Arg.Int Util.set_memory_limit, " memory limit (in MB)"
     ; "--stats", Arg.Set _stats, " gather and print statistics"
     ; "--input", Arg.String set_in, " set input format (zf or tptp)"

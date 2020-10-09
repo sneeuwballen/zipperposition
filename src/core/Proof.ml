@@ -691,8 +691,55 @@ module S = struct
     Format.fprintf out "@]"
 
   let pp_tstp out proof =
+    let module F = TypedSTerm in
+
+    let ctx = Type.Conv.create () in
+    let conv_ty ty =
+      Type.Conv.of_simple_term_exn ctx ty
+    in
+
     let namespace = Tbl.create 8 in
+    let tydecl_out out hd ty =
+      Format.fprintf out "thf(@[@[%s@]_type, type, @[%a@]@]).@."
+        (ID.name hd) (Type.TPTP.pp_ho ~depth:0) (conv_ty ty)
+    in
+    
     Format.fprintf out "@[<v>";
+
+    
+    let constants = ref F.Set.empty in 
+    let types = ref ID.Set.empty in
+
+
+    traverse ~order:`DFS proof (
+      fun p -> 
+        let f = Result.to_form (result p) in
+        constants := 
+          F.Seq.subterms f
+          |> Iter.filter (F.is_const)
+          |> F.Set.of_iter
+          |> F.Set.union !constants;
+      
+        F.Seq.subterms f
+        |> Iter.filter_map (F.ty)
+        |> Iter.iter (fun t ->
+          match F.Ty.view t with
+          | F.Ty.Ty_app(hd, args) when not @@ ID.Set.mem hd (!types) ->
+            let ty = F.Ty.(==>) (CCList.replicate (List.length args) F.Ty.tType) F.Ty.tType in
+            tydecl_out out hd ty
+          | _ -> ()
+
+        )
+        
+    );
+    
+
+    F.Set.iter (fun cst -> 
+      match F.as_id_app  cst with 
+      | Some (hd, ty, []) ->  tydecl_out out hd ty
+      | _ -> assert false
+    ) !constants;
+
     traverse ~order:`DFS proof
       (fun p ->
          let p_name = name ~namespace p in
@@ -711,7 +758,7 @@ module S = struct
          if Result.is_stmt (result p) then (
            Format.fprintf out "%a@," (Result.pp_in Output_format.tptp) (result p)
          ) else (
-           Format.fprintf out "tff(@[%s, %s,@ @[%a@],@ @[%a@]%a@]).@,"
+           Format.fprintf out "thf(@[%s, %s,@ (@[%a@]),@ @[%a@]%a@]).@,"
              p_name role (Result.pp_in Output_format.tptp) (result p)
              Kind.pp_tstp (Step.kind @@ step p,parents) pp_infos infos
          ));
@@ -777,7 +824,7 @@ module S = struct
     Util.ksprintf_noc ~f:Util.escape_dot fmt
 
   let pp_dot_seq ~name out seq =
-    CCGraph.Dot.pp_seq
+    CCGraph.Dot.pp_all
       ~tbl:(CCGraph.mk_table ~eq:equal ~hash:hash 64)
       ~eq:equal
       ~name

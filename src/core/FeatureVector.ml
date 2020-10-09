@@ -82,7 +82,7 @@ module Make(C : Index.CLAUSE) = struct
       let filter_term t = not (T.is_app_var t) in
 
       _select_sign ~sign lits
-      |> Iter.flat_map SLiteral.to_seq
+      |> Iter.flat_map SLiteral.to_iter
       |> Iter.flat_map (T.Seq.symbols ~filter_term)
 
     let count_symb_plus symb =

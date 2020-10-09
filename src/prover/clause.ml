@@ -550,7 +550,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
             Lit.pp lit (pp_selected selected) i (pp_maxlit max) i
         in
         Format.fprintf out "[@[%a@]]"
-          (Util.pp_seq ~sep:" ∨ " pp_lit)
+          (Util.pp_iter ~sep:" ∨ " pp_lit)
           (Iter.of_array_i lits)
       )
     in
@@ -568,13 +568,13 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let pp_set out set =
     Format.fprintf out "{@[<hv>%a@]}"
-      (Util.pp_seq ~sep:"," pp)
-      (ClauseSet.to_seq set)
+      (Util.pp_iter ~sep:"," pp)
+      (ClauseSet.to_iter set)
 
   let pp_set_tstp out set =
     Format.fprintf out "@[<v>%a@]"
-      (Util.pp_seq ~sep:"," pp_tstp)
-      (ClauseSet.to_seq set)
+      (Util.pp_iter ~sep:"," pp_tstp)
+      (ClauseSet.to_iter set)
 
 
   let check_types c =

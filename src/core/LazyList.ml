@@ -30,9 +30,9 @@ let rec to_list = function
   | lazy Nil -> []
   | lazy (Cons (x, f)) -> x :: to_list f
 
-let rec to_seq res k = match res with
+let rec to_iter res k = match res with
   | lazy Nil -> ()
-  | lazy (Cons (s, f)) -> k s; to_seq f k
+  | lazy (Cons (s, f)) -> k s; to_iter f k
 
 let rec fold f acc res = match res with
   | lazy Nil -> acc
