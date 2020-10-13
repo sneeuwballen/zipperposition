@@ -162,6 +162,7 @@ module Make(E : Env.S) = struct
           );
 
           Env.do_clause_eliminate ();
+          (* assert(not (Env.C.is_redundant c)); *)
 
           (* clause might have been removed *)
           if Env.C.is_redundant c then Unknown

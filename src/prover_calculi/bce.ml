@@ -141,7 +141,11 @@ module Make(E : Env.S) : S with module Env = E = struct
     CCArray.iter (function 
       | L.Equation(lhs,rhs,_) as lit ->
         let sign = L.is_pos lit in
-        if T.is_fo_term lhs && T.is_fo_term rhs then (
+        let is_poly = 
+          not (Type.VarSet.is_empty (T.ty_vars lhs))
+          || not (Type.VarSet.is_empty (T.ty_vars lhs))
+        in
+        if not is_poly && T.is_fo_term lhs && T.is_fo_term rhs then (
           if Type.is_prop (T.ty lhs) then (
             if L.is_predicate_lit lit then (
               let hd_sym = T.head_exn lhs in
@@ -425,6 +429,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       (* add equations that correspond to computing a flat resolvent between
          original lit and the one that has new_args arguments to the head *)
       let add_flat_resolvent ~cc new_args =
+        Util.debugf ~section 10  " adding resolvent <%a>, <%a>@." 
+          (fun k -> k (CCList.pp T.pp) orig_args (CCList.pp T.pp) new_args);
+
         List.fold_left (fun acc (lhs,rhs) -> CC.mk_eq acc lhs rhs) 
           cc (List.combine orig_args new_args)
       in
@@ -495,7 +502,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         (* check if all l-resolvents are valid in polynomial time *)
         let rec check_l_resolvents others = function
           | x :: xs ->
-            let cc_with_lhs = add_flat_resolvent ~cc:orig_cc (T.args orig_lhs) in
+            let cc_with_lhs = add_flat_resolvent ~cc:orig_cc (T.args x) in
             check_lit ~cc:cc_with_lhs (others @ xs) &&
             check_l_resolvents (x :: others) xs
           | [] -> true 
@@ -539,7 +546,8 @@ module Make(E : Env.S) : S with module Env = E = struct
           ))
       in
       
-      if not (C.is_redundant task.clause || 
+      if not (C.is_empty task.clause || 
+              C.is_redundant task.clause || 
               ID.Set.mem hd_sym !ignored_symbols) then (
         match task_is_blocked task.cands with
         | true ->
@@ -630,7 +638,12 @@ module Make(E : Env.S) : S with module Env = E = struct
     Signal.on Env.on_start initialize
 
   let setup () =
-    if Env.flex_get k_enabled then register ()
+    if Env.flex_get k_enabled then (
+      if not (Env.flex_get Avatar.k_avatar_enabled) then (register ())
+      else (
+        CCFormat.printf "AVATAR is not yet compatible with BCE@."
+      )
+    )
 end
 
 let _enabled = ref false
