@@ -37,6 +37,7 @@ let k_rename_nested_bools = Flex_state.create_key ()
 let k_fluid_hoist = Flex_state.create_key ()
 let k_fluid_log_hoist = Flex_state.create_key ()
 let k_solve_formulas = Flex_state.create_key ()
+let k_replace_unsupported_quants = Flex_state.create_key ()
 
 module type S = sig
   module Env : Env.S
@@ -1603,7 +1604,9 @@ module Make(E : Env.S) : S with module Env = E = struct
         Env.add_multi_simpl_rule ~priority:100 replace_bool_vars;
         Env.add_unary_inf "replace_bool_app_vars" replace_bool_app_vars;
         Env.add_unary_inf "eq_rw" nested_eq_rw;
-        Env.add_unary_simplify replace_unsupported_quants;
+        if Env.flex_get k_replace_unsupported_quants then (
+          Env.add_unary_simplify replace_unsupported_quants
+        );
       )
 end
 
@@ -1921,6 +1924,7 @@ let _rename_nested_bools = ref false
 let _fluid_hoist = ref false
 let _fluid_log_hoist = ref false
 let _solve_formulas = ref false
+let _replace_quants = ref true
 
 
 let extension =
@@ -1942,6 +1946,7 @@ let extension =
     E.flex_add k_fluid_hoist !_fluid_hoist;
     E.flex_add k_fluid_log_hoist !_fluid_log_hoist;
     E.flex_add k_solve_formulas !_solve_formulas;
+    E.flex_add k_replace_unsupported_quants !_replace_quants;
 
     ET.setup ()
   in
@@ -1969,6 +1974,9 @@ let () =
       "--quantifier-renaming"
       , Arg.Bool (fun v -> _quant_rename := v)
       , " turn the quantifier renaming on or off";
+      "--replace-quants"
+      , Arg.Bool (fun v -> _replace_quants := v)
+      , " replace unsupported quantifiers";
       "--rename-nested-bools"
       , Arg.Bool (fun v -> _rename_nested_bools := v)
       , " rename deeply nested bool subterms";
@@ -2019,5 +2027,14 @@ let () =
                        "lambda-free-purify-extensional";
                        "fo-complete-basic"] (fun () ->
       _bool_reasoning := BoolReasoningDisabled
+  );
+  Params.add_to_modes ["ho-pragmatic";
+                       "lambda-free-intensional";
+                       "lambda-free-purify-intensional";
+                       "lambda-free-extensional";
+                       "ho-comb-complete";
+                       "lambda-free-purify-extensional";
+                       "fo-complete-basic"] (fun () ->
+      _replace_quants := false;
   );
   Extensions.register extension
