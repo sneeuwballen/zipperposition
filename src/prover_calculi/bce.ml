@@ -255,12 +255,14 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* If clause is removed from the active/passive set, then release
      the locks that it holds, and make all the locked clauses active *)
   let release_locks clause =
+    Util.debugf ~section 2 "clearing locks: @[%a@]@." (fun k -> k C.pp clause);
     try 
       List.iter (fun task ->
         assert (not (TaskPriorityQueue.in_heap task));
         assert (not (DEQ.is_empty task.cands));
         let locking_cl = DEQ.take_front task.cands in
         assert (C.id locking_cl = C.id clause);
+        Util.debugf ~section 2 " |@[%a@]|%d@." (fun k -> k C.pp task.clause task.lit_idx);
         TaskPriorityQueue.insert task_queue task
       ) (Util.Int_map.find (C.id clause) !clause_lock);
       clause_lock := Util.Int_map.remove (C.id clause) !clause_lock
@@ -534,21 +536,25 @@ module Make(E : Env.S) : S with module Env = E = struct
       let rec task_is_blocked deq =
         DEQ.is_empty deq || (
           let partner = DEQ.take_front deq in
-          if C.equal cl partner || C.is_redundant partner || validity_checker lit_idx cl partner 
+          if C.equal cl partner || C.is_redundant partner || validity_checker lit_idx cl partner
           then (
-            Util.debugf ~section 5 "valid-res(@[%a@], @[%a@](%b))@." (fun k -> k C.pp cl C.pp partner (C.is_redundant partner));
-            task_is_blocked deq)
-          else (
-            Util.debugf ~section 5 "blocks(@[%a@], @[%a@])@." (fun k -> k C.pp partner C.pp cl);
+            Util.debugf ~section 5 "valid-res(@[%a@], @[%a@](%b))@."
+              (fun k -> k C.pp cl C.pp partner (C.is_redundant partner));
+            task_is_blocked deq
+          ) else (
+            Util.debugf ~section 5 "blocks(@[%a@], @[%a@])@."
+              (fun k -> k C.pp partner C.pp cl);
             DEQ.push_front deq partner;
             lock_clause partner task;
-            false
-          ))
+            false))
       in
       
+      Util.debugf ~section 3 "working on @[%a@]|%d@." 
+          (fun k -> k C.pp task.clause task.lit_idx);
       if not (C.is_empty task.clause || 
-              C.is_redundant task.clause || 
+              C.is_redundant task.clause ||
               ID.Set.mem hd_sym !ignored_symbols) then (
+        Util.debugf ~section 3 "checking blockedness" CCFun.id;
         match task_is_blocked task.cands with
         | true ->
           deregister_clause cl;
@@ -557,7 +563,11 @@ module Make(E : Env.S) : S with module Env = E = struct
           Util.debugf ~section 2 "removed @[%a@]@." (fun k -> k C.pp cl);
         | false -> 
           assert (not (TaskPriorityQueue.in_heap task))
-      );
+      ) else (
+        Util.debugf ~section 3 "ignoring %b %b %b" 
+          (fun k -> k (C.is_empty task.clause) 
+                      (C.is_redundant task.clause) 
+                      (ID.Set.mem hd_sym !ignored_symbols) ););
 
     in
 
@@ -584,7 +594,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
 
   let initialize () =
-    let init_clauses = 
+    let init_clauses =
       C.ClauseSet.to_list (Env.ProofState.ActiveSet.clauses ())
       @ C.ClauseSet.to_list (Env.ProofState.PassiveSet.clauses ())
     in
