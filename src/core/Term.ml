@@ -742,6 +742,7 @@ let all_positions ?(filter_formula_subterms=(fun _ _ -> None))
       f (PW.make t (PB.to_pos pb))
     | AppBuiltin (hd, args) 
       when CCOpt.is_some (filter_formula_subterms hd args) ->
+      f (PW.make t (PB.to_pos pb));
       let taken_args = CCOpt.get_exn (filter_formula_subterms hd args) in
       let len = List.length args in
       let invi i = len - 1 - i in

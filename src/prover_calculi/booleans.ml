@@ -243,18 +243,23 @@ module Make(E : Env.S) : S with module Env = E = struct
                   ~eligible:(C.Eligible.res c) (C.lits c)
   
   let get_bool_eligible c =
+    Iter.append 
+      (SClause.TPSet.to_iter (C.eligible_subterms_of_bool c))
+      (get_green_eligible c)
+
+  let get_bool_nested_eligible c =
     get_green_eligible c
     |> Iter.filter (fun (_,p) -> 
       let module P = Position in
       match p with
-      | P.Arg(_, P.Left P.Stop)
-      | P.Arg(_, P.Right P.Stop) ->
-        false
+      | P.Arg(idx, P.Left P.Stop)
+      | P.Arg(idx, P.Right P.Stop) ->
+        Literal.is_neg (C.lits c).(idx)
       | _ -> true
     ) |> Iter.append (SClause.TPSet.to_iter (C.eligible_subterms_of_bool c))
 
   let get_bool_hoist_eligible c =
-    get_bool_eligible c
+    get_bool_nested_eligible c
     |> Iter.filter (fun (t,_) -> 
         let ty = T.ty t in
         (Type.is_prop ty || Type.is_var ty) &&
@@ -299,6 +304,16 @@ module Make(E : Env.S) : S with module Env = E = struct
       let t,c = handle_poly_bool_hoist t c in
       mk_res ~proof ~old:t ~repl:T.false_ (yes t) c)
     (get_bool_hoist_eligible c)
+    |> CCFun.tap (fun res -> 
+      Util.debugf ~section 1 "hoist(@[%a@])" (fun k -> k C.pp c);
+      if CCList.is_empty res then (
+        Util.debugf ~section 1 " = ∅ (%d)(%a)(%d)" 
+          (fun k -> 
+            k (Iter.length (get_green_eligible c)) 
+              (Iter.pp_seq Term.pp) (Iter.map fst (get_bool_nested_eligible c))
+              (List.length (get_bool_hoist_eligible c)));
+      ) else (Util.debugf ~section 1 " = @[%a@]" (fun k -> k (CCList.pp C.pp) res))
+    )
 
   let bool_hoist_simpl (c:C.t) : C.t list option = 
     let proof = Proof.Step.inference [C.proof_parent c]
@@ -345,6 +360,16 @@ module Make(E : Env.S) : S with module Env = E = struct
           let new_lit = Literal.mk_eq a b in
           mk_res ~proof:(proof ~prefix:"neq") ~old:t ~repl:T.true_ new_lit c
         | _ -> assert false
+    )
+    |> CCFun.tap (fun res -> 
+      Util.debugf ~section 3 "eq-hoist(@[%a@])" (fun k -> k C.pp c);
+      if CCList.is_empty res then (
+        Util.debugf ~section 3 " = ∅ (%d)(%d)(%a)" 
+          (fun k -> 
+            k (Iter.length (get_green_eligible c))
+              (Iter.length (get_bool_eligible c))
+              (Iter.pp_seq Term. pp) (Iter.map fst (get_bool_eligible c)) );
+      ) else (Util.debugf ~section 3 " = @[%a@]" (fun k -> k (CCList.pp C.pp) res))
     )
 
   let fluid_hoist (c:C.t) =

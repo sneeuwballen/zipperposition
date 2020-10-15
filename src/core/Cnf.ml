@@ -275,7 +275,9 @@ module Flatten = struct
           CCList.diagonal l
           |> List.rev_map (fun (t,u) -> T.Form.neq_or_xor t u)
         in
-        let f = T.Form.and_ ?loc:(T.loc t) l in
+        let f = 
+          if CCList.length l == 1 then List.hd l
+          else T.Form.and_ ?loc:(T.loc t) l in
         Util.debugf ~section 5 "(@[flatten.expand-distinct@ %a@ :into %a@])"
           (fun k->k T.pp t T.pp f);
         aux pos vars f

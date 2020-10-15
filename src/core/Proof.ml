@@ -700,8 +700,8 @@ module S = struct
 
     let namespace = Tbl.create 8 in
     let tydecl_out out hd ty =
-      Format.fprintf out "thf(@[@[%s@]_type, type, @[%a@]@]).@."
-        (ID.name hd) (Type.TPTP.pp_ho ~depth:0) (conv_ty ty)
+      Format.fprintf out "thf(@[@[%s@]_type, type, @[%s@] : (@[%a@])@]).@."
+        (ID.name hd) (ID.name hd) (Type.TPTP.pp_ho ~depth:0) (conv_ty ty)
     in
     
     Format.fprintf out "@[<v>";

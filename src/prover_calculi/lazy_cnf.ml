@@ -305,12 +305,12 @@ module Make(E : Env.S) : S with module Env = E = struct
     in
 
     if C.length c > 1 then (
-      fold_lits c
+      Ls.fold_eqn_simple (C.lits c)
       |> Iter.fold_while (fun _ (lhs,rhs,sign,pos) -> 
         let i,_ = Ls.Pos.cut pos in
         let lit = (C.lits c).(i) in
-        let proof_cons = 
-          Proof.Step.simp ~infos:[] 
+        let proof_cons =
+          Proof.Step.simp ~infos:[]
           ~tags:[Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth] in
         let polarity_aware = Env.flex_get k_pa_renaming in
         let should_rename = should_rename sign in
@@ -363,11 +363,20 @@ module Make(E : Env.S) : S with module Env = E = struct
               (mk_or ~proof_cons ~rule_name [T.Form.not_ lhs; T.Form.not_ rhs] c i)
               @ (mk_or ~proof_cons ~rule_name [lhs; rhs] c i)) in
           let pen_inc = 
-            if (T.is_ground lhs && T.is_ground rhs) then 0 
-            else (if T.is_app_var lhs || T.is_app_var rhs then 3 else 1) in
+            (if T.is_app_var lhs || T.is_app_var rhs then 2 
+             else if (T.is_fo_term lhs && T.is_fo_term rhs) then 1
+             else 0) in
           List.iter (fun c -> C.inc_penalty c pen_inc) new_cls;
           new_cls @ acc
         ) else acc) []
+    |> CCFun.tap (fun res -> 
+      Util.debugf ~section 1 "eq_elim(@[%a@])" (fun k -> k C.pp c);
+      if CCList.is_empty res then (
+        Util.debugf ~section 1 "=∅" CCFun.id;
+      ) else (
+        Util.debugf ~section 1 "=@[%a@]" (fun k -> k (CCList.pp C.pp) res);
+      ) 
+    )
   
   let cnf_scope c =
     fold_lits c
@@ -393,7 +402,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     if not @@ CCList.is_empty res then (
       Util.debugf ~section 1 "lazy_cnf_simp(@[%a@])=" (fun k -> k C.pp c);
       Util.debugf ~section 1 "@[%a@]@." (fun k -> k (CCList.pp C.pp) res);
-      Util.debugf ~section 1 "proof:@[%a@]@." (fun k -> k (CCList.pp (Proof.S.pp_tstp)) (List.map C.proof res));
+      Util.debugf ~section 3 "proof:@[%a@]@." (fun k -> k (CCList.pp (Proof.S.pp_tstp)) (List.map C.proof res));
       update_form_counter ~action:`Decrease c;
       CCList.iter (update_form_counter ~action:`Increase) res;
     ) else Util.debugf ~section 1 "lazy_cnf_simp(@[%a@])=Ø" (fun k -> k C.pp c);
@@ -413,7 +422,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     if !enabled then (
       (* Env.Ctx.lost_completeness (); *)
       begin match Env.flex_get k_lazy_cnf_kind with 
-      | `Inf | `Ignore -> Env.add_unary_inf "lazy_cnf" lazy_clausify_inf
+      | `Inf | `Ignore -> 
+        Env.add_unary_inf "lazy_cnf" lazy_clausify_inf
       | `Simp -> 
           Env.add_unary_inf "elim eq" clausify_eq;
           Env.add_multi_simpl_rule ~priority:5 lazy_clausify_simpl
@@ -421,7 +431,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
       (* ** IMPORTANT **
          Due to correctly set priorioty, renaming will run before simplification *)
-      if Env.flex_get k_renaming_threshold > 0 then(
+      if Env.flex_get k_renaming_threshold > 0 then (
         Env.add_multi_simpl_rule ~priority:4 rename_subformulas
       );
       if Env.flex_get k_scoping != `Off then (
