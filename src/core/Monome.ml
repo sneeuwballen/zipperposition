@@ -323,7 +323,7 @@ let fold_max ~ord f acc m =
   (* set of max terms *)
   let max =
     Seq.terms m
-    |> MT.Seq.of_seq MT.empty
+    |> MT.Seq.of_iter MT.empty
     |> MT.max_seq (Ordering.compare ord)
     |> Iter.map fst
     |> T.Seq.add_set T.Set.empty
@@ -1257,5 +1257,5 @@ module Rat = struct
     t
 
   let to_multiset m =
-    Seq.terms m |> Multisets.MT.Seq.of_seq Multisets.MT.empty
+    Seq.terms m |> Multisets.MT.Seq.of_iter Multisets.MT.empty
 end

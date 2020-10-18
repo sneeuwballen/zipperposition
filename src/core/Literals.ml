@@ -71,7 +71,7 @@ let depth lits =
 let vars lits =
   Iter.of_array lits
   |> Iter.flat_map Lit.Seq.vars
-  |> T.VarSet.of_seq
+  |> T.VarSet.of_iter
   |> T.VarSet.to_list
 
 let is_ground lits =
@@ -168,13 +168,6 @@ let is_trivial lits =
     if i = Array.length lits then false
     else
       let triv = match lits.(i) with
-        | Lit.Equation (lhs, rhs, true) when T.equal rhs T.true_ || T.equal rhs T.false_ ->
-          CCArray.exists
-            (function
-              | Lit.Equation (lhs', rhs', true) when T.equal rhs' T.true_ || T.equal rhs' T.false_ ->
-                T.equal lhs lhs' && not @@ T.equal rhs rhs'
-              | _ -> false)
-            lits
         | Lit.Equation (l, r, true) when T.equal l r -> true
         | Lit.Equation (l, r, sign) ->
           CCArray.exists
@@ -244,6 +237,12 @@ module Pos = struct
   let cut = function
     | Position.Arg (i, pos') -> i, pos'
     | p -> _fail_pos p
+
+  (* Does this position target one side of an equation? *)
+  let is_toplevel_pos = function
+    | Position.Arg (_, ((Position.Left p) | (Position.Right p))) ->
+      Position.equal p Position.stop
+    | _ -> false
 end
 
 module Conv = struct
@@ -256,11 +255,13 @@ module Conv = struct
 
   let to_tst lits = 
     let ctx = Type.Conv.create () in
+    let var_seq = Seq.vars lits in
+    Type.Conv.set_maxvar ctx (T.Seq.max_var var_seq);
     Array.map (fun t -> Lit.Conv.lit_to_tst ~ctx (Lit.Conv.to_form t)) lits 
     |> Array.to_list
     |> (fun or_args ->
         let ty = TypedSTerm.Ty.prop in
-        let clause_vars = T.VarSet.of_seq (Seq.vars lits) in
+        let clause_vars = T.VarSet.of_iter (var_seq) in
         let vars = clause_vars
                    |> T.VarSet.to_list 
                    |> CCList.map (fun v -> T.Conv.to_simple_term ctx (T.var v))  in
@@ -268,7 +269,13 @@ module Conv = struct
         TypedSTerm.close_with_vars vars disjuncts
       )
 
-  let to_s_form ?allow_free_db ?(ctx=T.Conv.create()) ?hooks lits =
+  let to_s_form ?allow_free_db ?(ctx) ?hooks lits =
+    let ctx = 
+      if CCOpt.is_some ctx then CCOpt.get_exn ctx
+      else (
+        let res = Type.Conv.create () in
+        Type.Conv.set_maxvar res (Seq.vars lits |> T.Seq.max_var);
+        res) in
     Array.to_list lits
     |> List.map (Literal.Conv.to_s_form ?hooks ?allow_free_db ~ctx)
     |> TypedSTerm.Form.or_
@@ -342,6 +349,28 @@ let fold_eqn ?(both=true) ?sign ~ord ~eligible lits k =
                 (* only one side *)
                 k (l, r, sign, Position.(arg i @@ left @@ stop))
           end
+        | Lit.Equation _
+        | Lit.Int _
+        | Lit.Rat _
+        | Lit.True
+        | Lit.False -> ()
+      end;
+      aux (i+1)
+    )
+  in
+  aux 0
+
+let fold_eqn_simple ?sign lits k =
+  let sign_ok s = match sign with
+    | None -> true
+    | Some sign -> sign = s
+  in
+  let rec aux i =
+    if i = Array.length lits then ()
+    else (
+      begin match lits.(i) with
+        | Lit.Equation (l,r,sign) when sign_ok sign ->
+          k (l, r, sign, Position.(arg i @@ left @@ stop))
         | Lit.Equation _
         | Lit.Int _
         | Lit.Rat _
@@ -438,7 +467,7 @@ let fold_terms ?(vars=false) ?(var_args=true) ?(fun_bodies=true) ?ty_args ~(whic
 let symbols ?(init=ID.Set.empty) ?(include_types=false) lits =
   Iter.of_array lits
   |> Iter.flat_map (Lit.Seq.symbols ~include_types)
-  |> ID.Set.add_seq init
+  |> ID.Set.add_iter init
 
 (** {3 IO} *)
 
@@ -457,7 +486,7 @@ let pp_vars_gen ~pp_var ~pp_lits out lits =
     | [] -> ()
     | l -> Format.fprintf out "forall @[%a@].@ " (Util.pp_list ~sep:" " pp_var) l
   in
-  let vars_ = Seq.vars lits |> T.VarSet.of_seq |> T.VarSet.to_list in
+  let vars_ = Seq.vars lits |> T.VarSet.of_iter |> T.VarSet.to_list in
   Format.fprintf out "@[<2>%a%a@]" pp_vars vars_ pp_lits lits
 
 let pp_vars out lits = pp_vars_gen ~pp_var:Type.pp_typed_var ~pp_lits:pp out lits
@@ -497,6 +526,11 @@ let is_RR_horn_clause lits =
     let hd_vars = Lit.vars lits.(i) in
     List.length hd_vars = List.length (vars lits)
   | _ -> false
+
+(** Is clause Horn and has a unique maximal literal  *)
+let is_unique_max_horn_clause ~ord lits =
+  BV.cardinal (pos lits) = 1 &&
+  BV.cardinal (maxlits ~ord lits) = 1
 
 (** Recognizes Horn clauses (at most one positive literal) *)
 let is_horn lits =
@@ -549,7 +583,7 @@ let vars_distinct lits =
 
 let ground_lits lits = 
   let counter = ref 0 in
-  let all_vars = T.VarSet.of_seq @@ Seq.vars lits in
+  let all_vars = T.VarSet.of_iter @@ Seq.vars lits in
   let gr_subst = T.VarSet.fold (fun v subst -> 
       let ty = HVar.ty v in
       Subst.FO.bind subst ((v :> InnerTerm.t HVar.t),0) (T.mk_tmp_cst ~counter ~ty,0)

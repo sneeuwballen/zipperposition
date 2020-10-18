@@ -90,7 +90,7 @@ end = struct
   let vars_of_form (f:form): var list =
     Iter.of_list f
     |> Iter.flat_map Literals.Seq.vars
-    |> T.VarSet.of_seq |> T.VarSet.to_list
+    |> T.VarSet.of_iter |> T.VarSet.to_list
 
   (* perform term narrowing in [f] *)
   let narrow_term (acc:subst_acc) (f:form): (subst_acc*form) Iter.t =

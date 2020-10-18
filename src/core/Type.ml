@@ -164,7 +164,7 @@ module VarMap = T.VarMap
 module VarSet = T.VarSet
 module VarTbl = T.VarTbl
 
-let vars_set set t = VarSet.add_seq set (Seq.vars t)
+let vars_set set t = VarSet.add_iter set (Seq.vars t)
 
 let vars t = vars_set VarSet.empty t |> VarSet.elements
 
@@ -329,10 +329,11 @@ module TPTP = struct
     | _ -> pp_tstp_rec depth out t
   and pp_l depth out l = match l with
     | [] -> assert false
-    | [ty] -> pp_tstp_rec depth out ty
+    | [ty] -> pp_inner depth out ty
     | _ ->
       Format.fprintf out "(@[%a@])"
-        (Util.pp_list ~sep:" * " (pp_tstp_rec depth)) l
+        (Util.pp_list ~sep:" * " (pp_tstp_rec depth)) l;
+      assert false
 
   let pp out t = pp_tstp_rec 0 out t
 
@@ -349,14 +350,14 @@ module TPTP = struct
     | DB i -> Format.fprintf out "Tb%d" (depth-i-1)
     | App (p, []) -> ID.pp_tstp out p
     | App (p, args) ->
-      Format.fprintf out "@[<2>%a(%a)@]" ID.pp_tstp p
-        (Util.pp_list (pp_ho_depth depth)) args
+      Format.fprintf out "@[<2>%a @@ %a @]" ID.pp_tstp p
+        (Util.pp_list ~sep:" @ " (pp_inner depth)) args
     | Fun (args, ret) ->
       Format.fprintf out "%a > %a" (pp_l depth) args (pp_inner depth) ret
     | Forall ty' ->
       Format.fprintf out "!>[Tb%d:$tType]: %a" depth (pp_inner (depth+1)) ty'
   and pp_inner depth out t = match view t with
-    | Fun _ -> Format.fprintf out "(@[%a@])" (pp_ho_depth depth) t
+    | Fun _ | App(_, _::_) -> Format.fprintf out "(@[%a@])" (pp_ho_depth depth) t
     | _ -> pp_ho_depth depth out t
   and pp_l depth out l = match l with
     | [] -> assert false
@@ -365,11 +366,11 @@ module TPTP = struct
       Format.fprintf out "@[%a@]"
         (Util.pp_list ~sep:" > " (pp_inner depth)) l
 
-  let pp_ho out t = pp_ho_depth 0 out t
+  let pp_ho ?(depth=0) out t = pp_ho_depth depth out t
 
   let pp_typed_var out v = match view (HVar.ty v) with
-    | Builtin Term -> HVar.pp out v (* implicit *)
-    | _ -> Format.fprintf out "@[%a : %a@]" HVar.pp_tstp v pp (HVar.ty v)
+    (* | Builtin Term -> HVar.pp out v implicit *)
+    | _ -> Format.fprintf out "@[%a : %a@]" HVar.pp_tstp v (pp_ho ~depth:0) (HVar.ty v)
 
   let to_string = CCFormat.to_string pp
 end
@@ -425,7 +426,7 @@ let to_string = CCFormat.to_string pp
 
 let pp_in = function
   | Output_format.O_zf -> ZF.pp
-  | Output_format.O_tptp -> TPTP.pp
+  | Output_format.O_tptp -> TPTP.pp_ho ~depth:0
   | Output_format.O_normal -> pp
   | Output_format.O_none -> CCFormat.silent
 
@@ -474,11 +475,12 @@ module Conv = struct
     mutable vars: (PT.t, t HVar.t) Var.Subst.t;
     mutable n: int;  (* counter for free vars *)
     mutable hvars: PT.t Var.t VarMap.t;
-    mutable bvars_to_db: int VarMap.t ;
+    mutable bvars_to_db: int VarMap.t;
+    mutable max_vars: int option ref;
   }
 
   let create () = { vars=Var.Subst.empty; n=0; hvars=VarMap.empty;
-                    bvars_to_db=VarMap.empty }
+                    bvars_to_db=VarMap.empty; max_vars= ref None }
 
   let enter_bvar ctx v =
     let ret_handle = VarMap.find_opt v ctx.bvars_to_db in
@@ -509,6 +511,16 @@ module Conv = struct
     let n = ctx.n in
     ctx.n <- n+1;
     HVar.make ~ty:tType n
+
+  let set_maxvar ctx i =
+    ctx.max_vars := Some (i+1);
+    ctx.n <- i+1
+
+  let get_maxvar ctx =
+    CCOpt.get_or ~default:0 (!(ctx.max_vars))
+  
+  let incr_maxvar ctx =
+    set_maxvar ctx (get_maxvar ctx + 1)
 
   exception Error of TypedSTerm.t
 

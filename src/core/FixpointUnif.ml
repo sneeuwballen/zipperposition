@@ -95,13 +95,24 @@ let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
         assert (T.DB.is_closed rigid);
         US.FO.bind subst (T.as_var_exn var, scope) (rigid, scope)) in
 
-  if US.is_empty subst then (
-    let t0',t1',scope,subst = US.FO.rename_to_new_scope ~counter t0_s t1_s in
-    driver t0' t1' scope subst)
-  else (
-    if Scoped.scope t0_s != Scoped.scope t1_s then (
-      raise (Invalid_argument "scopes should be the same"))
+  let res = 
+    if US.is_empty subst then (
+      let t0',t1',scope,subst = US.FO.rename_to_new_scope ~counter t0_s t1_s in
+      driver t0' t1' scope subst)
     else (
-      let t0', t1' = fst t0_s, fst t1_s in
-      driver t0' t1' (Scoped.scope t0_s) subst
-    )) 
+      if Scoped.scope t0_s != Scoped.scope t1_s then (
+        raise (Invalid_argument "scopes should be the same"))
+      else (
+        let t0', t1' = fst t0_s, fst t1_s in
+        driver t0' t1' (Scoped.scope t0_s) subst
+      )) in
+  let no_renaming = Subst.Renaming.none in
+  let l = Lambda.eta_reduce @@ Lambda.snf @@ Subst.FO.apply no_renaming (US.subst res) t0_s in 
+     let r = Lambda.eta_reduce @@ Lambda.snf @@ Subst.FO.apply no_renaming (US.subst res) t1_s in
+     if not ((T.equal l r) && (Type.equal (Term.ty l) (Term.ty r))) then (
+     CCFormat.printf "orig:@[%a@]=?=@[%a@]@." (Scoped.pp T.pp) t0_s (Scoped.pp T.pp) t1_s;
+     CCFormat.printf "before:@[%a@]@." US.pp subst;
+     CCFormat.printf "after:@[%a@]@." US.pp res;
+     assert(false);
+     );
+  res

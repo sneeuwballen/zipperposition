@@ -72,6 +72,7 @@ type 'a result_tc = {
   res_to_exn: 'a -> exn;
   res_compare: 'a -> 'a -> int;
   res_is_stmt: bool;
+  res_is_dead_cl: unit -> bool;
   res_pp_in: Output_format.t -> 'a CCFormat.printer;
   res_to_form: ctx:Term.Conv.ctx -> 'a -> TypedSTerm.Form.t;
   res_to_form_subst: ctx:Term.Conv.ctx -> Subst.Projection.t -> 'a -> form * inst_subst;
@@ -87,6 +88,7 @@ type step = {
   id: int; (* unique ID *)
   kind: kind;
   dist_to_goal: int option; (* distance to goal *)
+  proof_depth: int;
   parents: parent list;
   infos: UntypedAST.attr list; (* additional info *)
 }
@@ -255,7 +257,6 @@ module Kind = struct
       | Define _ -> Format.fprintf out "define([status(thm)])"
     end
 end
-
 module Result = struct
   type t = result
   type 'a tc = 'a result_tc
@@ -314,6 +315,7 @@ module Result = struct
       ~pp_in
       ?name
       ?(is_stmt=false)
+      ?(is_dead_cl= fun () -> false)
       ?(flavor=fun _ -> `Vanilla)
       () : a result_tc
     =
@@ -323,6 +325,7 @@ module Result = struct
       res_to_exn=to_exn;
       res_compare=compare;
       res_is_stmt=is_stmt;
+      res_is_dead_cl=is_dead_cl;
       res_pp_in=pp_in;
       res_to_form=to_form;
       res_to_form_subst=to_form_subst;
@@ -349,6 +352,7 @@ module Result = struct
 
   let of_form = make form_tc
   let is_stmt (Res (r,_)) = r.res_is_stmt
+  let is_dead_cl (Res (r,_)) = r.res_is_dead_cl
 end
 
 let pp_parent out = function
@@ -393,24 +397,49 @@ module Step = struct
   let is_trivial p = match p.kind with Trivial -> true | _ -> false
   let is_by_def p = match p.kind with By_def _ -> true | _ -> false
 
+  let is_inference p = match p.kind with Inference _ -> true | _ -> false
+  let is_simpl ?(name=None) p = 
+    match p.kind with
+    | Simplification(rule,_) ->
+      begin match name with 
+      | None -> true
+      | Some n -> String.equal (Rule.name rule) n
+      end
+    | _ -> false
+
   let distance_to_goal p = p.dist_to_goal
+
+  let parent_proof_depth parents =
+    List.map (fun par -> (Parent.proof par).step.proof_depth) parents
+    |> CCList.fold_left (fun acc depth -> max acc depth) 0
+
+  let count_rules ~name p =
+    let rec aux p =
+      let init = 
+        CCOpt.get_or ~default: 0 (CCOpt.map (fun r -> 
+          if CCString.equal (Rule.name r) name then 1 else 0)
+        (rule p)) in
+      List.fold_left (fun acc par -> 
+        acc + aux ((Parent.proof par).step)
+      ) init (p.parents) in 
+    aux p
 
   let get_id_ =
     let n = ref 0 in
     fun () -> CCRef.incr_then_get n
 
-  let trivial = {id=get_id_(); parents=[]; kind=Trivial; dist_to_goal=None; infos=[]; }
-  let by_def id = {id=get_id_(); parents=[]; kind=By_def id; dist_to_goal=None; infos=[]; }
+  let trivial = {id=get_id_(); parents=[]; kind=Trivial; dist_to_goal=None; proof_depth=0;  infos=[]; }
+  let by_def id = {id=get_id_(); parents=[]; kind=By_def id; dist_to_goal=None; proof_depth=0; infos=[]; }
   let intro src r =
     let dist_to_goal = match r with
       | R_goal | R_lemma -> Some 0 | _ -> None
     in
-    {id=get_id_(); parents=[]; kind=Intro(src,r); dist_to_goal; infos=[]}
+    {id=get_id_(); parents=[]; proof_depth=0; kind=Intro(src,r); dist_to_goal; infos=[]}
   let define id src parents =
-    {id=get_id_(); parents; kind=Define (id,src); dist_to_goal=None; infos=[]; }
+    {id=get_id_(); parents; kind=Define (id,src); dist_to_goal=None; proof_depth=parent_proof_depth parents; infos=[]; }
   let define_internal id parents = define id (Src.internal []) parents
   let lemma src =
-    {id=get_id_(); parents=[]; kind=Intro(src,R_lemma); dist_to_goal=Some 0; infos=[]; }
+    {id=get_id_(); parents=[]; kind=Intro(src,R_lemma); dist_to_goal=Some 0; proof_depth=0; infos=[]; }
 
   let combine_dist o p = match o, (Parent.proof p).step.dist_to_goal with
     | None, None -> None
@@ -418,17 +447,7 @@ module Step = struct
     | None, (Some _ as res) -> res
     | Some x, Some y -> Some (min x y)
 
-  let inferences_performed p =
-    let rec aux p = 
-      match p.kind with 
-      | Simplification _ -> 
-        let parents = List.map (fun par -> aux ((Parent.proof par).step)) p.parents in
-        CCOpt.get_or ~default:0 (Iter.max (Iter.of_list parents))
-      | Inference _ -> 
-        let parents = List.map (fun par -> aux ((Parent.proof par).step)) p.parents in
-        CCOpt.get_or ~default:0 (Iter.max (Iter.of_list parents)) + 1 
-      | _ -> 0 in
-    aux p
+  let inferences_performed p = p.proof_depth
 
   let rec has_ho_step p = match p.kind with
     | Simplification(_,tags)
@@ -453,7 +472,12 @@ module Step = struct
         | Inference _ -> CCOpt.map succ d
         | _ -> d
     in
-    { id=get_id_(); kind; parents; dist_to_goal; infos; }
+    let inc = 
+      match kind with 
+      | Inference (_,tag_list) when not (List.mem Tag.T_dont_increase_depth tag_list) -> 1 
+      | _ -> 0 in
+    { id=get_id_(); kind; parents; dist_to_goal; 
+      proof_depth=parent_proof_depth parents + inc; infos; }
 
   let intro src r = step_ (Intro(src,r)) []
 
@@ -471,6 +495,11 @@ module Step = struct
 
   let[@inline] dedup_tags (tgs:tag list) : tag list =
     CCList.sort_uniq ~cmp:Builtin.Tag.compare tgs
+
+  let tags p = match p.kind with
+    | Simplification(_,tags)
+    | Inference(_,tags) -> dedup_tags tags
+    | _ -> []
 
   let inference ?infos ?(tags=[]) ~rule parents =
     let tags = dedup_tags tags in
@@ -662,8 +691,82 @@ module S = struct
     Format.fprintf out "@]"
 
   let pp_tstp out proof =
+    let module F = TypedSTerm in
+
+    let ctx = Type.Conv.create () in
+    let conv_ty ty =
+      Type.Conv.of_simple_term_exn ctx ty
+    in
+
     let namespace = Tbl.create 8 in
-    Format.fprintf out "@[<v>";
+    let already_defined = ref ID.Set.empty in
+    let tydecl_out out hd ty =
+      if not (ID.Set.mem hd !already_defined) then (
+        Format.fprintf out "thf(@[@[%a@], type, @[%a@]: @[%a@]@]).@."
+          Util.pp_str_tstp (ID.name hd ^ "_type") Util.pp_str_tstp (ID.name hd) (Type.TPTP.pp_ho ~depth:0) (conv_ty ty);
+        already_defined := ID.Set.add hd !already_defined;
+      )
+    in
+
+    let declare_combinators () =
+      let decls = 
+        [(Builtin.SComb, "s_comb", "!>[A:$tType, B:$tType, C:$tType]: ((A > B > C) > (A > B) > A > C)");
+        (Builtin.CComb, "c_comb", "!>[A:$tType, B:$tType, C:$tType]: ((A > B > C) > B > A > C)");
+        (Builtin.BComb, "b_comb", "!>[A:$tType, B:$tType, C:$tType]: ((A > B) > (C > A) > C > B)");
+        (Builtin.KComb, "k_comb", "!>[A:$tType, B:$tType]: (B > A > B)");
+        (Builtin.IComb, "i_comb", "!>[A:$tType]: (A > A)")]
+      in
+      List.iter (fun (comb, name, decl) -> 
+        Format.fprintf out "thf(@[@[%a@], type, @[%s@]: @[%s@]@]).@."
+          Util.pp_str_tstp (name ^ "_type") (Builtin.TPTP.to_string comb) decl;
+      ) decls
+    in
+
+    
+    (* Format.fprintf out "@[<v>"; *)
+
+    
+    let constants = ref F.Set.empty in
+    let has_comb = ref false in
+    let types = ref ID.Set.empty in
+
+
+    traverse ~order:`DFS proof (
+      fun p -> 
+        let f = Result.to_form (result p) in
+        constants := 
+          F.Seq.subterms f
+          |> CCFun.tap (fun subterms ->
+            Iter.iter (fun st -> match F.view st with
+            | F.AppBuiltin(hd, args) -> 
+              has_comb := Builtin.is_combinator hd || !has_comb
+            | _ -> ()) subterms
+          )
+          |> Iter.filter (F.is_const)
+          |> F.Set.of_iter
+          |> F.Set.union !constants;
+      
+        F.Seq.subterms f
+        |> Iter.filter_map (F.ty)
+        |> Iter.iter (fun t ->
+          match F.Ty.view t with
+          | F.Ty.Ty_app(hd, args) when not @@ ID.Set.mem hd (!types) ->
+            let ty = F.Ty.(==>) (CCList.replicate (List.length args) F.Ty.tType) F.Ty.tType in
+            tydecl_out out hd ty
+          | _ -> ()
+
+        )
+    );
+    
+
+    F.Set.iter (fun cst -> 
+      match F.as_id_app  cst with 
+      | Some (hd, ty, []) ->  tydecl_out out hd ty
+      | _ -> assert false
+    ) !constants;
+
+    if !has_comb then declare_combinators ();
+
     traverse ~order:`DFS proof
       (fun p ->
          let p_name = name ~namespace p in
@@ -682,7 +785,7 @@ module S = struct
          if Result.is_stmt (result p) then (
            Format.fprintf out "%a@," (Result.pp_in Output_format.tptp) (result p)
          ) else (
-           Format.fprintf out "tff(@[%s, %s,@ @[%a@],@ @[%a@]%a@]).@,"
+           Format.fprintf out "thf(@[%s, %s,@ (@[%a@]),@ @[%a@]%a@]).@,"
              p_name role (Result.pp_in Output_format.tptp) (result p)
              Kind.pp_tstp (Step.kind @@ step p,parents) pp_infos infos
          ));
@@ -748,7 +851,7 @@ module S = struct
     Util.ksprintf_noc ~f:Util.escape_dot fmt
 
   let pp_dot_seq ~name out seq =
-    CCGraph.Dot.pp_seq
+    CCGraph.Dot.pp_all
       ~tbl:(CCGraph.mk_table ~eq:equal ~hash:hash 64)
       ~eq:equal
       ~name

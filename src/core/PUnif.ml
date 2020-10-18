@@ -86,7 +86,7 @@ let imitate_one ~scope ~counter  s t =
   with Not_found ->  invalid_arg "no_imits"
 
 let proj_lr ~counter ~scope ~subst s t flag max_app_projs = 
-  let hd_s, args_s = CCPair.map1 T.as_var_exn (T.as_app s) in
+  let hd_s, args_s = CCPair.map_fst T.as_var_exn (T.as_app s) in
   let argss_arr = CCArray.of_list args_s in
   let hd_t,_ = T.as_app (snd (T.open_fun t)) in
   let pref_tys, hd_ret_ty = Type.open_fun (HVar.ty hd_s) in
@@ -192,26 +192,9 @@ module Make (St : sig val st : Flex_state.t end) = struct
   module PUP = PragUnifParams 
   module SU = SolidUnif.Make(St)
 
-
   let get_option k = Flex_state.get_exn k St.st 
 
-  let skip depth = 
-    if depth > 1 then int_of_float @@ log10 (float_of_int depth) *. get_option PUP.k_skip_multiplier
-    else 0 
-
-  let max_skipped = ref 0 
-  let skip depth = 
-    if depth > !max_skipped then (
-      max_skipped := depth;
-      int_of_float ((log10 (float_of_int depth)) *. get_option PUP.k_skip_multiplier)
-    ) else (if depth!=0 then 3 else 0)
-  
-  let delay depth res =
-    if OSeq.is_empty res then OSeq.empty
-    else(
-      OSeq.append
-        (OSeq.take (skip depth) (OSeq.repeat None))
-      res)
+  let delay _ res = res
 
   (*Create all possible projection and imitation bindings. *)
   let proj_imit_lr ?(disable_imit=false) ~counter ~scope ~subst s t flag =
@@ -237,11 +220,11 @@ module Make (St : sig val st : Flex_state.t end) = struct
         with Invalid_argument s when String.equal s "no_imits" -> [] in
       (* OSeq.of_list (simp_proj @ imit_binding @ func_proj) *)
       (* OSeq.append 
-        (OSeq.of_list simp_proj)
-        (delay (get_depth flag) @@ OSeq.append (OSeq.of_list imit_binding) (OSeq.of_list func_proj)) *)
-        OSeq.append 
-          (OSeq.append (OSeq.of_list imit_binding) (OSeq.of_list simp_proj))
-          (delay (get_depth flag) (OSeq.of_list func_proj))
+         (OSeq.of_list simp_proj)
+         (delay (get_depth flag) @@ OSeq.append (OSeq.of_list imit_binding) (OSeq.of_list func_proj)) *)
+      OSeq.append 
+        (OSeq.append (OSeq.of_list simp_proj) (OSeq.of_list imit_binding) )
+        ((OSeq.of_list func_proj))
     with Invalid_argument s when String.equal s "as_var_exn" ->
       OSeq.empty
 
@@ -333,7 +316,7 @@ module Make (St : sig val st : Flex_state.t end) = struct
           let ident = 
             if get_op flag Ident < get_option PUP.k_max_identifications then (
               JP_unif.identify ~scope ~counter s t []
-              |> OSeq.map (fun x -> 
+              |> OSeq.map (fun x ->
                   let subst = U.subst x  in
                   (* variable introduced by identification *)
                   let subs_t = T.of_term_unsafe @@ fst (snd (List.hd (Subst.to_list subst))) in
@@ -387,6 +370,6 @@ module Make (St : sig val st : Flex_state.t end) = struct
     (fun x y ->
        elim_vars := IntSet.empty;
        ident_vars := IntSet.empty;
-       max_skipped := 0;
-       OSeq.map (CCOpt.map Unif_subst.of_subst) (PragUnif.unify_scoped x y))
+       let res = PragUnif.unify_scoped x y in
+       OSeq.map (CCOpt.map Unif_subst.of_subst) (res))
 end

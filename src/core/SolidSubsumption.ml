@@ -16,6 +16,16 @@ module Make (S : sig val st : Flex_state.t end) = struct
   module SU = SolidUnif.Make(S)
   let get_op k = Flex_state.get_exn k S.st
 
+  (* Multiterm is built more or less like a normal term,
+     except that at any point (at any constructor) there is an
+     alternative way to see this term -- as a bound variable corresponding
+     to some argument of a __solid pattern__.CCArray
+     
+     For example let s = F a (f b) be a solid pattern.
+     For a term t = g (f a) (f b) multiterm
+     {g} [{f} [{a,1}] {}; {f} [{b}] {0} ] {}
+     represents exponentially many ways to match term t using pattern s
+     (in this case 2*2=4) *)
   type multiterm =
     (* Application of Builtin constant to a list of multiterms.
        Third argument are possible replacements. *)
@@ -83,15 +93,18 @@ module Make (S : sig val st : Flex_state.t end) = struct
       fun_ ty (of_term body)
     | _ -> repl (TS.singleton term)
 
-  let rec pp out = function 
+  let rec pp out =
+    let sepc = CCFormat.return ",@," in
+    let sepw = CCFormat.return "@ " in
+    function 
     | AppBuiltin(b,args,repls) ->
-      CCFormat.fprintf out "|@[%a@](@[%a@])|@[%a@]|" Builtin.pp b (CCList.pp ~sep:"," pp) args (TS.pp ~sep:" " T.pp) repls;
+      CCFormat.fprintf out "|@[%a@](@[%a@])|@[%a@]|" Builtin.pp b (Util.pp_list ~sep:"," pp) args (TS.pp ~pp_sep:sepw T.pp) repls;
     | App(hds,args,repls) ->
-      CCFormat.fprintf out "|@[%a@](@[%a@])|@[%a@]|" (TS.pp ~sep:"," ~start:"{" ~stop:"}" T.pp) hds (CCList.pp ~sep:"," pp) args (TS.pp ~sep:" " T.pp) repls;
+      CCFormat.fprintf out "|{@[%a@]}(@[%a@])|@[%a@]|" (TS.pp ~pp_sep:sepc T.pp) hds (CCList.pp ~pp_sep:sepc pp) args (TS.pp ~pp_sep:sepw T.pp) repls;
     | Fun(ty,repls) ->
       CCFormat.fprintf out "|l@[%a@].@[%a@]|" Type.pp ty pp repls;
     | Repl repls ->
-      CCFormat.fprintf out "{r:@[%a@]}" (TS.pp ~sep:" " T.pp) repls
+      CCFormat.fprintf out "{r:@[%a@]}" (TS.pp ~pp_sep:sepw T.pp) repls
 
   let cover t solids : multiterm = 
     let n = List.length solids in
@@ -102,8 +115,8 @@ module Make (S : sig val st : Flex_state.t end) = struct
           (t,T.bvar ~ty:(T.ty t) (n-i-1+depth))) s_args in
       let matches_of_solids target = 
         (CCList.filter_map (fun (s, s_db) -> 
-             if T.equal s target then Some s_db else None) 
-            sols_as_db)
+            if T.equal s target then Some s_db else None) 
+          sols_as_db)
         |> TS.of_list in
       let db_hits = matches_of_solids t in
 
@@ -187,6 +200,7 @@ module Make (S : sig val st : Flex_state.t end) = struct
         begin match T.view r with 
           | AppBuiltin(b', args') 
             when Builtin.equal b b' && List.length args = List.length args' ->
+            let args, args' = Unif.norm_logical_disagreements b args args' in
             List.fold_left 
               (fun subst (l',r') ->  aux subst l' r') 
               subst (List.combine args args')
@@ -211,26 +225,31 @@ module Make (S : sig val st : Flex_state.t end) = struct
       | _ -> if T.equal l r then subst else raise SolidMatchFail 
     in
 
-    if Type.equal (T.ty pattern) (T.ty target) then aux subst pattern target
+    if Type.equal (T.ty pattern) (T.ty target) &&
+       (*if terms are first-order we should not deal with them
+         since LFHO would have already done it.  *)
+       not (T.is_fo_term pattern) &&
+       not (T.is_fo_term target) then aux subst pattern target
     else raise SolidMatchFail
 
   let normaize_clauses subsumer target =
-    let eta_exp_snf ?(f=CCFun.id) =
-      Ls.map (fun t -> f @@ Lambda.eta_expand @@ Lambda.snf @@ t) in
+    try 
+      let eta_exp_snf ?(f=CCFun.id) =
+        Ls.map (fun t -> f @@ Lambda.eta_expand @@ Lambda.snf @@ t) in
 
-    let target' = 
-      Ls.ground_lits @@ eta_exp_snf target in
+      let target' = 
+        Ls.ground_lits @@ eta_exp_snf target in
 
-    let subsumer' = eta_exp_snf ~f:(SU.solidify ~limit:false ~exception_on_error:false) subsumer in
-    (* We populate app_var_map to contain indices of all arguments that
-       should be removed *)
-    subsumer', target'
+      let subsumer' = eta_exp_snf ~f:(SU.solidify ~limit:false) subsumer in
+      (* We populate app_var_map to contain indices of all arguments that
+        should be removed *)
+      subsumer', target'
+    with PatternUnif.NotInFragment -> raise UnsupportedLiteralKind
 
   let sign l = 
     let res = 
       match l with 
-      | L.Equation (_, r, sign) ->
-        if sign && T.is_true_or_false r then T.equal r T.true_ else sign
+      | L.Equation (_, _, sign) -> sign
       | L.Int o -> Int_lit.sign o
       | L.False -> false
       | _ -> true 
@@ -331,11 +350,6 @@ module Make (S : sig val st : Flex_state.t end) = struct
       let picklist = CCBV.create ~size:(Array.length target) false in
       let target_i = CCArray.mapi (fun i l -> (i,l)) target in
       let res = aux picklist MS.empty subsumer target_i in
-      (* CCFormat.printf 
-         "subsumption[%s]:@.S_O:@[%a@]@.S_N:@[%a@]@.T_O:@[%a@]@.T_N:@[%a@]@.@." 
-          (if res then "OK" else "FAIL")
-          Ls.pp subsumer_o Ls.pp subsumer
-          Ls.pp target_o Ls.pp target; *)
       res
     ) else false
 end

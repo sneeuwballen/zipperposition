@@ -9,14 +9,13 @@
 *)
 
 
-module T = Term
 module US = Unif_subst
 
 type subst = US.t
 
 module S : sig
 
-  val apply : subst -> T.t Scoped.t -> T.t
+  val apply : subst -> Term.t Scoped.t -> Term.t
   val pp : subst CCFormat.printer
 
 end
@@ -25,13 +24,13 @@ exception NotUnifiable
 exception NotInFragment
 
 
-val eta_expand_otf : subst:subst -> scope:Scoped.scope -> Type.t list -> Type.t list -> T.t -> T.t -> T.t * T.t * Type.t list
-val norm_deref :  Unif_subst.t -> T.t Scoped.t -> T.t
+val eta_expand_otf : subst:subst -> scope:Scoped.scope -> Type.t list -> Type.t list -> Term.t -> Term.t -> Term.t * Term.t * Type.t list
+val norm_deref :  Unif_subst.t -> Term.t Scoped.t -> Term.t
 
 
 
 (* Does unification on types (or other simple constructs) and catches
    exception in case of non-unifiability *)
-val unif_simple : ?subst:Subst.t -> scope:int -> T.t -> T.t -> US.t option
+val unif_simple : ?subst:Subst.t -> scope:int -> Term.t -> Term.t -> US.t option
 
-val unify_scoped : ?subst:subst -> ?counter:int ref -> T.t Scoped.t -> T.t Scoped.t -> subst
+val unify_scoped : ?subst:subst -> ?counter:int ref -> Term.t Scoped.t -> Term.t Scoped.t -> subst

@@ -101,6 +101,6 @@ module Make(P : PAIR) = struct
          if P.equal key node.n_key && node.n_repr=None then f key node.n_value)
       t
 
-  let to_seq t f =
+  let to_iter t f =
     iter t (fun x y -> f (x,y))
 end

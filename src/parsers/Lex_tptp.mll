@@ -84,6 +84,7 @@ rule token = parse
   | '*' { STAR }
   | "<=>" { EQUIV }
   | "=>" { IMPLY }
+  | "(=>)" { IMPLYCONST }
   | "<=" { LEFT_IMPLY }
   | '~' { NOT }
   | "(~)" { NOTCONST }

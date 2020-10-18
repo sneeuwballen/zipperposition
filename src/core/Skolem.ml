@@ -112,7 +112,7 @@ let collect_vars subst f =
   in
   let is_ty_var v = T.Ty.is_tType (Var.ty v) in
   vars_seq f
-  |> Var.Set.of_seq
+  |> Var.Set.of_iter
   |> Var.Set.to_list
   |> List.partition is_ty_var
 
@@ -137,7 +137,7 @@ let skolem_form ~ctx subst var form =
   let ty = ty_forall_l tyvars (T.Ty.fun_ (List.map Var.ty vars) ty_var) in
   let prefix = "sk_" ^ Var.to_string var in
   let f = fresh_skolem_prefix ~ctx ~ty prefix in
-  let skolem_t = T.app ~ty:T.Ty.prop (T.const ~ty f) (tyvars_t @ vars_t) in
+  let skolem_t = T.app ~ty:ty_var (T.const ~ty f) (tyvars_t @ vars_t) in
   T.Subst.eval subst skolem_t
 
 let pop_new_skolem_symbols ~ctx =
@@ -164,10 +164,10 @@ let pp_definition out = function
 
 let stmt_of_form rw_rules polarity proxy proxy_id proxy_ty form proof =
   let module F = T.Form in
+  let vars = T.vars proxy in
   if rw_rules then (
     (* introduce the required definition as an axiom, with polarity as needed *)
     let rule : _ Stmt.def_rule =
-      let vars = T.vars proxy in
       let lhs, polarity, rhs = match polarity with
         | `Neg -> SLiteral.atom_false proxy, `Imply, F.not_ form
         | `Pos -> SLiteral.atom_true proxy, `Imply, form
@@ -179,11 +179,13 @@ let stmt_of_form rw_rules polarity proxy proxy_id proxy_ty form proof =
     [Stmt.def ~proof [Stmt.mk_def ~rewrite:true proxy_id proxy_ty [rule]]]
   ) else (
     (* introduce the required axiom, with polarity as needed *)
-    let f' = match polarity with
-      | `Pos -> F.imply proxy form
-      | `Neg -> F.imply form proxy
-      | `Both -> F.equiv proxy form
-    in
+    let f' = 
+      F.forall_l vars
+      (match polarity with
+        | `Pos -> F.imply proxy form
+        | `Neg -> F.imply form proxy
+        | `Both -> F.equiv proxy form)
+      in
     let proof = proof in
     [ Stmt.ty_decl ~proof proxy_id proxy_ty;
       Stmt.assert_ ~proof f'
@@ -196,7 +198,7 @@ let find_def_in_ctx ~ctx form =
       | Def_form def when not def.rw_rules -> 
         let def_form = def.form in
         let df_vars, f_vars = 
-          CCPair.map_same (fun x -> Var.Set.of_seq (T.Seq.vars x)) (def_form,form) in
+          CCPair.map_same (fun x -> Var.Set.of_iter (T.Seq.vars x)) (def_form,form) in
         if not (Var.Set.intersection_empty df_vars f_vars) then None 
         else CCOpt.map (fun subst -> def,subst) (TypedSTerm.try_alpha_renaming def_form form)
       | _ -> None) 
@@ -303,7 +305,7 @@ let define_term ?(pattern="fun_") ~ctx ~parents rules : term_definition =
          let all_vars =
            Iter.of_list (rhs::args)
            |> Iter.flat_map T.Seq.free_vars
-           |> Var.Set.of_seq |> Var.Set.to_list
+           |> Var.Set.of_iter |> Var.Set.to_list
          in
          if is_prop
          then (

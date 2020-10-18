@@ -84,11 +84,14 @@ exception Attr_prefix of string
 exception Attr_parameter of int
 (** Parameter, used for HO unif *)
 
-type skolem_kind = K_normal | K_ind (* inductive *)
+type skolem_kind = K_normal | K_after_cnf | K_ind (* inductive *)
 
 exception Attr_skolem of skolem_kind
 
 exception Attr_distinct
+
+exception Attr_comm
+exception Attr_assoc
 
 val as_infix : t -> string option
 val is_infix : t -> bool
@@ -102,7 +105,14 @@ val is_parameter : t -> bool
 val is_skolem : t -> bool
 (** [is_skolem id] returns [true] iff [id] is a Skolem symbol *)
 
+val is_postcnf_skolem : t -> bool
+(** [is_postcnf_skolem id] returns [true] iff [id] is a Skolem symbol introduced during proof search *)
+
 val as_skolem : t -> skolem_kind option
 
 val is_distinct_object : t -> bool
 (** whether the identifier is a distinct object (as defined in TPTP syntax) *)
+
+val is_comm : t -> bool
+val is_assoc : t -> bool
+val is_ac : t -> bool

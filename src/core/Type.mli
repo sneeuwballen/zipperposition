@@ -251,7 +251,7 @@ module TPTP : sig
   include Interfaces.PRINT_DE_BRUIJN with type term := t and type t := t
   include Interfaces.PRINT with type t := t
   val pp_typed_var : t HVar.t CCFormat.printer
-  val pp_ho : CCFormat.t -> t -> unit
+  val pp_ho : ?depth:int -> CCFormat.t -> t -> unit
 
   (** {2 Basic types} *)
 
@@ -284,6 +284,9 @@ module Conv : sig
   val enter_bvar : ctx -> VarMap.key -> int option
   val exit_bvar  : handle:int CCOpt.t -> ctx -> VarMap.key -> unit
   val find_bvar  : ctx -> VarMap.key -> int option
+  val get_maxvar : ctx -> int
+  val incr_maxvar : ctx -> unit
+  val set_maxvar : ctx -> int -> unit
 
 
   val of_simple_term : ctx -> TypedSTerm.t -> t option

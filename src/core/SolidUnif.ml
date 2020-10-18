@@ -46,6 +46,8 @@ module Make (St : sig val st : Flex_state.t end) = struct
       if n1 < n2 then (do_exp_otf n1 pref2 t1,t2,pref2)
       else (t1,do_exp_otf n2 pref1 t2,pref1))
 
+  (* Perform some form of lazy normalization to bring term into solid
+     form if that is possible (e.g. beta reducing applied variables) *)
   let solidify ?(limit=true) ?(exception_on_error=true) t =
     let rec aux t =
       (* right now working only on monomorphic terms *)
@@ -72,7 +74,7 @@ module Make (St : sig val st : Flex_state.t end) = struct
         let args' = List.map (fun arg -> 
             if Type.is_fun (T.ty arg) then (
               let arg = Lambda.eta_reduce arg in
-              if T.is_bvar arg || not exception_on_error then arg else raise NotInFragment
+              if (T.is_bvar arg && T.is_ground arg) || not exception_on_error then arg else raise NotInFragment
             ) else (
               let arg = Lambda.snf arg in
               if T.is_ground arg || not exception_on_error then arg else raise NotInFragment
@@ -102,16 +104,16 @@ module Make (St : sig val st : Flex_state.t end) = struct
 
     if CCList.for_all (fun l -> List.length l = 1 ) l then [CCList.flatten l]
     else (
-      let rec limit_combinations max l = 
-        if max <= 1 then CCList.map (fun l -> [List.hd l]) l
+      let rec limit_combinations max_c l = 
+        if max_c <= 1 then CCList.map (fun l -> [List.hd l]) l
         else (match l with 
             | [] -> [] 
             | x :: xs -> 
               let n = List.length x in
-              let x,max = 
-                if n >= max then x, max / n
-                else CCList.take max x, 0 in
-              x :: limit_combinations max xs) in
+              let x,max_c = 
+                if n <= max_c then x, max_c / n
+                else CCList.take (max max_c 1) x, 0 in
+              x :: limit_combinations max_c xs) in
       match combs_limit with
       | None -> aux l
       | Some max -> aux (limit_combinations max l))
@@ -125,7 +127,10 @@ module Make (St : sig val st : Flex_state.t end) = struct
       | None -> None
       | Some x -> if x < 0 then None else Some x in
 
-    let rec aux ~depth s_args t : (T.t list)  =
+    (* if we are dealing with polymorphic constant it will be of the form 
+        App(cst, tyargs) and with current design we might run into endless loop.
+        That is why we set recurse to false, to run this function at most once.  *)
+    let rec aux ?(recurse=true) ~depth s_args t : (T.t list)  =
       (* All the ways in which we can represent term t using solids *)
       let sols_as_db = List.mapi (fun i t -> 
           (t,T.bvar ~ty:(T.ty t) (n-i-1+depth))) s_args in
@@ -136,20 +141,21 @@ module Make (St : sig val st : Flex_state.t end) = struct
       let rest =
         try 
           match T.view t with
-          | AppBuiltin (hd,args) ->
+          | AppBuiltin (hd,args)  ->
             if CCList.is_empty args then [t]
             else (
               let args_combined = all_combs ~combs_limit (List.map (aux ~depth s_args) args) in
               List.map (T.app_builtin ~ty:(T.ty t) hd) args_combined
             )
-          | App(hd,args) ->
+          | App(hd,args) when recurse ->
             if Term.is_var hd then [t]
             else (
               assert(not (CCList.is_empty args));
               let hd, args = T.head_term_mono t, CCList.drop_while T.is_type args in
-              let hd_args_combined = 
-                all_combs ~combs_limit (aux ~depth s_args hd :: (List.map (aux ~depth s_args) args)) in
-              List.map (fun l -> T.app (List.hd l) (List.tl l)) hd_args_combined)
+              let covered_hd = aux ~recurse:(recurse && not (T.is_app hd)) ~depth s_args hd in
+              let covered_args = List.map (aux ~depth s_args) args in
+              let cobmined = all_combs ~combs_limit (covered_hd :: covered_args) in
+              List.map (fun l -> T.app (List.hd l) (List.tl l)) cobmined)
           | Fun _ -> 
             let ty_args, body = T.open_fun t in
             let d_inc = List.length ty_args in
@@ -172,7 +178,7 @@ module Make (St : sig val st : Flex_state.t end) = struct
 
   let collect_flex_flex ~counter ~flex_args t =
     let replace_var ~bvar_tys ~target =
-      if CCList.is_empty flex_args && CCList.is_empty (T.args target) 
+      if Type.returns_tType (T.ty target) || CCList.is_empty flex_args && CCList.is_empty (T.args target)
       then target,[]
       else (
         let bvars = 
@@ -388,6 +394,7 @@ module Make (St : sig val st : Flex_state.t end) = struct
     rf @ rest @ other
 
   let project_flex_rigid ~subst ~scope flex rigid =
+    assert(T.is_var (T.head_term flex));
     let flex_var, flex_args = T.as_var_exn @@ T.head_term flex,
                               List.mapi (fun i a -> i,a) (T.args flex) in
     let pref_tys, ret_ty = Type.open_fun @@ HVar.ty flex_var in
@@ -424,16 +431,14 @@ module Make (St : sig val st : Flex_state.t end) = struct
         let body_s', body_t', _ = eta_expand_otf ~subst:(US.subst subst) ~scope pref_s pref_t body_s body_t in
         let hd_s, args_s = T.as_app body_s' in
         let hd_t, args_t = T.as_app body_t' in
-        (* let hd_s, hd_t = CCPair.map_same (fun t -> cast_var t subst scope) (hd_s, hd_t) in                                        *)
         match T.view hd_s, T.view hd_t with 
         | (T.Var _, T.Var _) ->
-          if not (T.equal hd_s hd_t) then (
-            let subst = solve_flex_flex_diff ~subst:(US.subst subst) ~scope ~counter body_s' body_t' in
-            unify ~scope ~counter ~subst rest
-          ) else (
-            let subst = solve_flex_flex_same ~subst:(US.subst subst) ~scope ~counter body_s' body_t' in
-            unify ~scope ~counter ~subst rest
-          )
+          let solver = 
+            if not (T.equal hd_s hd_t)
+            then solve_flex_flex_diff
+            else solve_flex_flex_same in
+          let subst = solver ~subst:(US.subst subst) ~scope ~counter body_s' body_t' in
+          unify ~scope ~counter ~subst rest
         | (T.Var _, _) ->
           let projected = project_flex_rigid ~subst:(US.subst subst) ~scope body_s' body_t' in
           let covered = cover_flex_rigid ~subst:(US.subst subst) ~counter ~scope  body_s' body_t' in
@@ -448,7 +453,9 @@ module Make (St : sig val st : Flex_state.t end) = struct
             Builtin.equal hd_s hd_t &&
             List.length args_s' + List.length args_s = 
             List.length args_t' + List.length args_t ->
-          unify ~subst ~counter ~scope @@ build_constraints (args_s'@args_s)  (args_t'@args_t) rest
+          let args_lhs, args_rhs = 
+            Unif.norm_logical_disagreements hd_s (args_s'@args_s) (args_t'@args_t) in
+          unify ~subst ~counter ~scope @@ build_constraints args_lhs args_rhs rest
         | T.Const f , T.Const g when ID.equal f g && List.length args_s = List.length args_t ->
           unify ~subst ~counter ~scope @@ build_constraints args_s args_t rest
         | T.DB i, T.DB j when i = j && List.length args_s = List.length args_t ->

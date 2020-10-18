@@ -584,10 +584,10 @@ let rec infer_rec ?loc ctx (t:PT.t) : T.t =
       T.Ty.fun_ ?loc args ret
     | PT.AppBuiltin (Builtin.True, []) -> T.Form.true_
     | PT.AppBuiltin (Builtin.False, []) -> T.Form.false_
-    | PT.AppBuiltin (Builtin.And, l) ->
+    | PT.AppBuiltin (Builtin.And, l) when List.length l >= 2 ->
       let l = List.map (infer_prop_ ?loc ctx) l in
       T.Form.and_ ?loc l
-    | PT.AppBuiltin (Builtin.Or, l) ->
+    | PT.AppBuiltin (Builtin.Or, l)  when List.length l >= 2 ->
       let l = List.map (infer_prop_ ?loc ctx) l in
       T.Form.or_ ?loc l
     | PT.AppBuiltin (((Builtin.Equiv | Builtin.Xor | Builtin.Imply) as conn), [a;b]) ->
@@ -854,7 +854,7 @@ module A = UntypedAST
 module Stmt = Statement
 
 let check_vars_rhs ?loc bound rhs =
-  let vars_rhs = T.Seq.free_vars rhs |> Var.Set.of_seq in
+  let vars_rhs = T.Seq.free_vars rhs |> Var.Set.of_iter in
   (* check that all variables of [rhs] are within [lhs] *)
   let only_in_rhs = Var.Set.diff vars_rhs bound in
   if not (Var.Set.is_empty only_in_rhs) then (
@@ -864,7 +864,7 @@ let check_vars_rhs ?loc bound rhs =
 
 (* check that [vars rhs] subseteq [vars lhs] *)
 let check_vars_eqn ?loc bound lhs rhs =
-  let vars_lhs = T.Seq.free_vars lhs |> Var.Set.of_seq in
+  let vars_lhs = T.Seq.free_vars lhs |> Var.Set.of_iter in
   (* check that all variables in [lhs] are bound *)
   let not_bound = Var.Set.diff vars_lhs bound in
   if not (Var.Set.is_empty not_bound)
@@ -904,7 +904,7 @@ let rec as_def ?loc ?of_ bound t =
     Stmt.Def_term {vars;id;ty;args;rhs;as_form=t}
   and yield_prop lhs rhs pol =
     let vars =
-      SLiteral.to_seq lhs
+      SLiteral.to_iter lhs
       |> Iter.flat_map T.Seq.free_vars
       |> Var.Set.add_seq bound
       |> Var.Set.to_list

@@ -28,9 +28,6 @@ module type S = sig
 
   val select : Selection.t
 
-  val eta_normalize : Term.t -> Term.t
-  (** eta_normalize a term (expand or reduce or neutral, depending on cli options) *)
-
   val lost_completeness : unit -> unit
   (** To be called when completeness is not preserved *)
 
@@ -49,6 +46,10 @@ module type S = sig
 
   val declare : ID.t -> Type.t -> unit
   (** Declare the type of a symbol (updates signature) *)
+
+  val declare_syms : (ID.t * Type.t) list -> unit
+  (** Declare multiple symbols (more efficient that calling
+      declare function incrementally) *)
 
   val on_new_symbol : (ID.t * Type.t) Signal.t
   val on_signature_update : Signature.t Signal.t

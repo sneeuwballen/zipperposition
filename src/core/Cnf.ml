@@ -17,6 +17,7 @@ let prof_skolemize = ZProf.make "cnf.skolemize"
 
 let section = Util.Section.make "cnf"
 
+
 type term = T.t
 type type_ = T.t
 type form = F.t
@@ -50,21 +51,25 @@ let as_lit_opt t = try Some (as_lit t) with _ -> None
 (* check whether the formula is already in CNF *)
 let as_clause f = match F.view f with
   | F.Or l -> List.map as_lit l
-  | F.Not _
-  | F.True
-  | F.False
-  | F.Atom _
-  | F.Neq _
-  | F.Eq _ -> [as_lit f]
   | F.And _
   | F.Equiv _
   | F.Xor _
   | F.Imply _
   | F.Forall _
   | F.Exists _ -> not_cnf_ f
+  | F.Eq(a,b) when T.Ty.is_prop (T.ty_exn a) -> not_cnf_ f
+  | F.Neq(a,b) when T.Ty.is_prop (T.ty_exn a) -> not_cnf_ f
+  | F.Not _
+  | F.True
+  | F.False
+  | F.Atom _
+  | F.Neq _
+  | F.Eq _ -> [as_lit f]
 
 let as_cnf f = match F.view f with
   | F.Or _ -> [as_clause f]
+  | F.Eq(a,b) when T.Ty.is_prop (T.ty_exn a) -> not_cnf_ f
+  | F.Neq(a,b) when T.Ty.is_prop (T.ty_exn a) -> not_cnf_ f
   | F.Not _
   | F.True
   | F.False
@@ -77,6 +82,28 @@ let as_cnf f = match F.view f with
   | F.Imply _
   | F.Forall _
   | F.Exists _ -> not_cnf_ f
+
+let lazy_as_cnf =
+  let rec aux ~pol f =
+   match F.view f with 
+    | F.True -> if pol then [[SLiteral.true_]] else [[SLiteral.false_]]
+    | F.False -> if pol then [[SLiteral.false_]] else [[SLiteral.true_]]
+    | F.Not f' ->
+      assert (T.Ty.is_prop (T.ty_exn f'));
+      aux ~pol:(not pol) f'
+    | F.Eq(a,b) 
+    | F.Equiv(a,b) ->
+      let cons = if pol then SLiteral.eq else SLiteral.neq in
+      [[cons a b]]
+    | F.Neq(a,b)
+    | F.Xor(a,b) ->
+      let cons = if pol then SLiteral.neq else SLiteral.eq in
+      [[cons a b]]
+    | _ -> 
+      let cons = if pol then SLiteral.eq else SLiteral.neq in
+      assert(T.Ty.is_prop (T.ty_exn f));
+      [[cons f F.true_]] in
+  aux ~pol:true
 
 let is_clause f =
   try ignore (as_clause f); true
@@ -232,7 +259,7 @@ module Flatten = struct
      @param vars the variables that can be replaced in the context
      @param of_ the ID being defined, if any
   *)
-  let flatten_rec ?of_ ~should_define (ctx:Skolem.ctx)
+  let flatten_rec ?of_ ~lazy_cnf ~should_define (ctx:Skolem.ctx)
       stmt (pos:position) (vars:type_ Var.t list)(t:term): T.t t =
     (* how to name intermediate subterms? *)
     let mk_pat what = match of_ with
@@ -375,9 +402,16 @@ module Flatten = struct
               T.app_builtin ~ty:T.Ty.prop Builtin.Less [b; a];
             ]
         in aux_maybe_define ~should_define pos f
-      | T.AppBuiltin (Builtin.Eq, [a;b]) 
-        when  (T.is_fun a || T.is_fun b)
-           &&  not (T.Ty.is_prop (T.Ty.returns (T.ty_exn a)))  (* false *) ->
+      | T.AppBuiltin (Builtin.Eq, ([_;a;b]|[a;b])) when not lazy_cnf && T.Ty.is_prop (T.ty_exn a)  ->
+        (* converting equality to equivalence to ensure better CNF (that is better renaming)
+           when lazy cnf is off *)
+        (F.equiv <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
+      | T.AppBuiltin (Builtin.Eq, [a;b])
+        (* when either of a and b are formulas, and they contain HO subterms
+           it is better not to replace Lambda with Forall.
+           
+           Similarly for NEQ. *)
+        when  (T.is_fun a || T.is_fun b) &&  not lazy_cnf ->
         (* turn [f = λx. t] into [∀x. f x=t] *)
         let vars_forall, a, b = complete_eq a b in
         let t' = F.forall_l vars_forall (F.eq_or_equiv a b) in
@@ -385,12 +419,13 @@ module Flatten = struct
           (fun k->k T.pp t T.pp t');
         assert (vars_forall<>[]);
         aux pos vars t'
+      | T.AppBuiltin (Builtin.Neq, ([_;a;b]|[a;b])) when not lazy_cnf && T.Ty.is_prop (T.ty_exn a)  ->
+        (F.xor <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
       | T.AppBuiltin (Builtin.Eq, [a;b]) ->
         (F.eq <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
       (* >|= aux_maybe_define ~should_define pos *)
       | T.AppBuiltin (Builtin.Neq, [a;b]) 
-        when  (T.is_fun a || T.is_fun b) 
-           &&  not (T.Ty.is_prop (T.Ty.returns (T.ty_exn a)))   (*false*) ->
+        when  (T.is_fun a || T.is_fun b)  && not lazy_cnf ->
         (* turn [f ≠ λx. t] into [∃x. f x≠t] *)
         let vars_exist, a, b = complete_eq a b in
         let t' = F.exists_l vars_exist (F.neq_or_xor a b) in
@@ -411,10 +446,10 @@ module Flatten = struct
         (F.xor <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
       (* >|= aux_maybe_define pos *)
       | T.AppBuiltin (Builtin.And, l) ->
-        if pos = Pos_inner && CCList.length l <= 1 then return t
+        if CCList.length l <= 1 then return t
         else (F.and_ <$> map_m (aux Pos_toplevel vars) l) (*>|= aux_maybe_define pos*)
       | T.AppBuiltin (Builtin.Or, l) ->
-        if pos = Pos_inner && CCList.length l <= 1 then return t
+        if CCList.length l <= 1 then return t
         else (F.or_ <$> map_m (aux Pos_toplevel vars) l) (*>|= aux_maybe_define pos*)
       | T.AppBuiltin (Builtin.Not, [a]) ->
         (F.not_ <$> aux Pos_toplevel vars a) (*>|= aux_maybe_define pos*)
@@ -455,8 +490,8 @@ module Flatten = struct
       (fun k->k T.pp t (Util.pp_list Var.pp_fullc) vars);
     aux pos vars t
 
-  let flatten_rec_l ?of_ ~should_define ctx stmt pos vars l =
-    map_m (flatten_rec ?of_ ~should_define ctx stmt pos vars) l
+  let flatten_rec_l ?of_ ~lazy_cnf ~should_define ctx stmt pos vars l =
+    map_m (flatten_rec ?of_ ~should_define ~lazy_cnf ctx stmt pos vars) l
 end
 
 (* miniscoping (push quantifiers as deep as possible in the formula) *)
@@ -517,15 +552,19 @@ let rec nnf f =
   Util.debugf ~section 5 "@[<2>nnf of@ `@[%a@]`@]" (fun k->k T.pp f);
   match F.view f with
   | F.Atom t -> t
-  | F.Neq _
-  | F.Eq _
   | F.True
   | F.False -> f
+  | F.Neq (a,b) ->
+    if T.equal a b then F.false_ 
+    else if T.Ty.is_prop (T.ty_exn a) then nnf (T.Form.xor a b) else f
+  | F.Eq (a,b) ->
+    if T.equal a b then F.true_ 
+    else if T.Ty.is_prop (T.ty_exn a) then nnf (T.Form.equiv a b) else f
   | F.Not f' ->
     begin match F.view f' with
       | F.Not f'' -> nnf f''
-      | F.Neq (a,b) -> F.eq a b
-      | F.Eq (a,b) -> F.neq a b
+      | F.Neq (a,b) -> nnf (T.Form.eq_or_equiv a b)
+      | F.Eq (a,b) -> nnf (T.Form.neq_or_xor a b)
       | F.And l ->
         F.or_ (List.map (fun f -> nnf (F.not_ f)) l)
       | F.Or l ->
@@ -547,15 +586,26 @@ let rec nnf f =
   | F.And l -> F.and_ (List.map nnf l)
   | F.Or l -> F.or_ (List.map nnf l)
   | F.Imply (f1, f2) ->
-    nnf (F.or_ [ (F.not_ f1); f2 ])
+    if T.equal f1 F.true_ then nnf f2
+    else if T.equal f1 F.false_ then F.true_ 
+    else if T.equal f2 F.false_ then nnf (F.not_ f1)
+    else if T.equal f1 f2 then F.true_
+    else nnf (F.or_ [ (F.not_ f1); f2 ])
   | F.Equiv(f1,f2) ->
     (* equivalence with positive polarity *)
-    nnf (F.and_
-           [ F.imply f1 f2; F.imply f2 f1 ])
+    if T.equal f1 f2 then F.true_
+    else if T.equal f1 F.true_  then nnf f2
+    else if T.equal f2 F.true_  then nnf f1
+    else if T.equal f1 F.false_ then nnf (F.not_ f2)
+    else if T.equal f2 F.false_ then nnf (F.not_ f1)
+    else (
+      nnf (F.and_
+             [ F.imply f1 f2; F.imply f2 f1 ]))
   | F.Xor (f1,f2) ->
     (* equivalence with negative polarity *)
-    nnf (F.and_
-           [ F.or_ [f1; f2]; F.or_ [F.not_ f1; F.not_ f2] ])
+    if T.equal f1 f2 then F.false_
+    else (nnf (F.and_
+                 [ F.or_ [f1; f2]; F.or_ [F.not_ f1; F.not_ f2] ]))
   | F.Forall (var,f') -> F.forall var (nnf f')
   | F.Exists (var,f') -> F.exists var (nnf f')
 
@@ -673,25 +723,26 @@ let estimate_num_clauses ~pos f =
 (* atomic formula, or forall/exists/not an atomic formula (1 literal) *)
 let rec will_yield_lit f = 
   let v = F.view f in
+  let is_tf f =
+      match F.view f with
+      | F.True | F.False -> true
+      | _ -> false in
   match v with
   | F.Not f'
   | F.Exists (_, f')
   | F.Forall (_, f') -> will_yield_lit f'
+  | F.And _
+  | F.Or _
+  | F.Imply _ -> false 
+  | F.Equiv(a,b)
+  | F.Xor(a,b) -> is_tf a && is_tf b
+  | F.Eq(a,b) when T.Ty.is_prop (T.ty_exn a) -> is_tf a && is_tf b
+  | F.Neq(a,b) when T.Ty.is_prop (T.ty_exn a) -> is_tf a && is_tf b
   | F.Eq _
   | F.Neq _
   | F.Atom _
   | F.True
   | F.False -> true
-  | F.And _
-  | F.Or _
-  | F.Imply _ -> false 
-  | F.Equiv(a,b)
-  | F.Xor(a,b) -> 
-    let is_tf f =
-      match F.view f with
-      | F.True | F.False -> true
-      | _ -> false in
-    is_tf a && is_tf b
 
 
 (* introduce definitions for sub-formulas of [f], is needed. This might
@@ -746,12 +797,7 @@ let introduce_defs ~ctx ~is_pos stmt f =
       f'
     ) else f
   (* introduce definitions for subterms *)
-  and maybe_rename_subformulas ~polarity a b f = match F.view f with
-    | F.True
-    | F.False
-    | F.Atom _
-    | F.Eq _
-    | F.Neq _ -> f
+  and maybe_rename_subformulas ~polarity a b f = match F.view f with 
     | F.And l ->
       let l' =
         List.mapi
@@ -784,6 +830,17 @@ let introduce_defs ~ctx ~is_pos stmt f =
         maybe_rename ~polarity a' b' f2
       in
       F.imply f1' f2'
+    | F.Eq(f1,f2) when T.Ty.is_prop (T.ty_exn f1) ->
+      let f1' =
+        let a' = E.(a */ p false f2 +/ b */ p true f2) in
+        let b' = E.(a */ p true f2 +/ b */ p false f2) in
+        maybe_rename ~polarity:`Both a' b' f1
+      and f2' =
+        let a' = E.(a */ p false f1 +/ b */ p true f1) in
+        let b' = E.(a */ p true f1 +/ b */ p false f1) in
+        maybe_rename ~polarity:`Both a' b' f2
+      in
+      F.equiv f1' f2'
     | F.Equiv (f1, f2) ->
       let f1' =
         let a' = E.(a */ p false f2 +/ b */ p true f2) in
@@ -795,6 +852,18 @@ let introduce_defs ~ctx ~is_pos stmt f =
         maybe_rename ~polarity:`Both a' b' f2
       in
       F.equiv f1' f2'
+    | F.Neq (f1, f2) when T.Ty.is_prop (T.ty_exn f1) ->
+      (* we consider that f1 has reverted polarity *)
+      let f1' =
+        let b' = E.(a */ p false f2 +/ b */ p true f2) in
+        let a' = E.(a */ p true f2 +/ b */ p false f2) in
+        maybe_rename ~polarity:`Both a' b' f1
+      and f2' =
+        let a' = E.(a */ p true f1 +/ b */ p false f1) in
+        let b' = E.(a */ p false f1 +/ b */ p true f1) in
+        maybe_rename ~polarity:`Both a' b' f2
+      in
+      F.xor f1' f2'
     | F.Xor (f1, f2) ->
       (* we consider that f1 has reverted polarity *)
       let f1' =
@@ -811,6 +880,11 @@ let introduce_defs ~ctx ~is_pos stmt f =
       F.forall var (maybe_rename ~polarity a b f')
     | F.Exists (var, f') ->
       F.exists var (maybe_rename ~polarity a b f')
+    | F.True
+    | F.False
+    | F.Atom _
+    | F.Eq _
+    | F.Neq _ -> f
   (* product of all (p ~pos x) for x in l if idx(x) != except *)
   and prod_p ~pos l i ~except = match l with
     | [] -> E.Exactly 1
@@ -858,6 +932,7 @@ let to_cnf f =
   res
 
 type options =
+  | LazyCnf
   | DistributeExists
   | DisableRenaming
   | InitialProcessing of (form -> form) (** any processing, at the beginning *)
@@ -887,12 +962,12 @@ let pp_stmt out st = Stmt.pp T.pp T.pp_inner T.pp_inner out st
 
 (* flatten definitions, removing some constructs such as if/match,
    introducing new definitions *)
-let flatten ~ctx ~should_define seq : _ Iter.t =
+let flatten ~ctx ~lazy_cnf ~should_define seq : _ Iter.t =
   let open Flatten in
   let flatten_axiom stmt f =
     begin
       let vars, body = F.unfold_forall f in
-      flatten_rec ~should_define ctx stmt Pos_toplevel vars body >>= fun body ->
+      flatten_rec ~should_define ~lazy_cnf ctx stmt Pos_toplevel vars body >>= fun body ->
       get_subst >|= fun subst ->
       let vars = List.map (Var.update_ty ~f:(T.Subst.eval subst)) vars in
       let body = T.Subst.eval subst body in
@@ -902,9 +977,9 @@ let flatten ~ctx ~should_define seq : _ Iter.t =
   let flatten_def stmt d : _ Stmt.def_rule list = match d with
     | Stmt.Def_term {vars;id;ty;args;rhs;as_form} ->
       begin
-        flatten_rec_l ~of_:id ~should_define ctx stmt Pos_inner vars args >>= fun args ->
-        flatten_rec_l ~of_:id ~should_define ctx stmt Pos_toplevel vars args >>= fun args ->
-        flatten_rec ~of_:id ~should_define ctx stmt Pos_toplevel vars rhs >>= fun rhs ->
+        flatten_rec_l ~of_:id ~should_define ~lazy_cnf ctx stmt Pos_inner vars args >>= fun args ->
+        flatten_rec_l ~of_:id ~should_define ~lazy_cnf ctx stmt Pos_toplevel vars args >>= fun args ->
+        flatten_rec ~of_:id ~lazy_cnf ~should_define ctx stmt Pos_toplevel vars rhs >>= fun rhs ->
         get_subst >|= fun subst ->
         let args = List.map (T.Subst.eval subst) args in
         let rhs = T.Subst.eval subst rhs in
@@ -918,8 +993,8 @@ let flatten ~ctx ~should_define seq : _ Iter.t =
           | SLiteral.Atom (t,_) -> T.head t
           | _ -> None
         in
-        map_sliteral (flatten_rec ~should_define ?of_ ctx stmt Pos_inner vars) lhs >>= fun lhs ->
-        flatten_rec_l ?of_ ~should_define ctx stmt Pos_toplevel vars rhs >>= fun rhs ->
+        map_sliteral (flatten_rec ~should_define ~lazy_cnf ?of_ ctx stmt Pos_inner vars) lhs >>= fun lhs ->
+        flatten_rec_l ?of_ ~should_define ~lazy_cnf ctx stmt Pos_toplevel vars rhs >>= fun rhs ->
         get_subst >|= fun subst ->
         let lhs = SLiteral.map ~f:(T.Subst.eval subst) lhs in
         let rhs = List.map (T.Subst.eval subst) rhs in
@@ -987,8 +1062,9 @@ let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
     (* preprocessing *)
     let f = List.fold_left (|>) f preprocess in
     (* introduce definitions? *)
+
     if disable_renaming || is_clause f || is_rw stmt
-    then f
+    then (f)
     else introduce_defs ~is_pos:(not is_goal) ~ctx stmt f
   in
   let process_def stmt d = match d with
@@ -1081,7 +1157,7 @@ let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
            | l -> Iter.of_list (List.rev (new_st :: l))
          end
       )
-    |> CCVector.of_seq ?init:None
+    |> CCVector.of_iter ?init:None
   in
   ZProf.exit_prof prof_simplify_rename;
   res
@@ -1106,10 +1182,12 @@ let proof_neg stmt =
     [Stmt.as_proof_i stmt |> Proof.Parent.from]
 
 (* Transform the clauses into proper CNF; returns a list of clauses *)
-let cnf_of_seq ~ctx ?(opts=[]) (seq:Stmt.input_t Iter.t) : _ CCVector.t =
+let cnf_of_iter ~ctx ?(opts=[]) (seq:Stmt.input_t Iter.t) : _ CCVector.t =
   (* read options *)
-  let disable_renaming = List.mem DisableRenaming opts in
+  let disable_renaming = List.mem DisableRenaming opts || List.mem LazyCnf opts in
+  let lazy_cnf = List.mem LazyCnf opts in
   let preprocess =
+    T.simplify_formula ::
     CCList.filter_map
       (function InitialProcessing f -> Some f | _ -> None)
       opts
@@ -1124,16 +1202,26 @@ let cnf_of_seq ~ctx ?(opts=[]) (seq:Stmt.input_t Iter.t) : _ CCVector.t =
   in
   (* simplify and introduce definitions *)
   let v =
-    flatten ~should_define:(not disable_renaming) ~ctx seq
-    |> simplify_and_rename ~ctx ~disable_renaming ~preprocess
+    if (*List.mem LazyCnf opts*) false then CCVector.of_iter seq
+    else (
+    flatten ~lazy_cnf ~should_define:(not disable_renaming) ~ctx seq
+    |> simplify_and_rename ~ctx ~disable_renaming ~preprocess)
   in
   (* reduce the new formulas to CNF *)
   let res = CCVector.create () in
   (* convert formula into CNF, returning a list of clauses and a list of skolems *)
   let conv_form_sk f : (ID.t * type_) list * clause list =
     Util.debugf ~section 2 "@[<2>reduce@ `@[%a@]`@ to CNF@]" (fun k->k T.pp f);
+    let view_as_cnf f =
+      assert(T.Ty.is_prop (T.ty_exn f));
+      let eligible_for_lazy_cnf f =
+        List.mem LazyCnf opts && 
+        T.Seq.vars f
+        |> Iter.for_all (fun sf -> not (T.Ty.is_tType (Var.ty sf))) in
+
+      if eligible_for_lazy_cnf f then lazy_as_cnf f else as_cnf f in
     let clauses =
-      try as_cnf f
+      try view_as_cnf f
       with NotCNF _ | SLiteral.NotALit _ ->
         let f = nnf f in
         (* processing post-nnf *)
@@ -1247,7 +1335,9 @@ let cnf_of_seq ~ctx ?(opts=[]) (seq:Stmt.input_t Iter.t) : _ CCVector.t =
          CCVector.push res (Stmt.lemma ~attrs ~proof l)
        | Stmt.Goal f ->
          (* intermediate statement to represent the negation step *)
+         assert(T.Ty.is_prop (T.ty_exn f));
          let not_f = F.not_ f in
+         assert(T.Ty.is_prop (T.ty_exn not_f));
          let stmt = Stmt.neg_goal ~proof:(proof_neg stmt) ~skolems:[] [not_f] in
          (* now take the CNF of negated goal *)
          let skolems, l = conv_form_sk not_f in
@@ -1269,7 +1359,7 @@ let cnf_of_seq ~ctx ?(opts=[]) (seq:Stmt.input_t Iter.t) : _ CCVector.t =
   CCVector.freeze res
 
 let cnf_of ~ctx ?opts  st =
-  cnf_of_seq ~ctx ?opts  (Iter.return st)
+  cnf_of_iter ~ctx ?opts  (Iter.return st)
 
 let pp_f_statement out st = Statement.pp T.pp T.pp T.pp out st
 
@@ -1285,7 +1375,7 @@ let type_declarations seq =
   let open Statement in
   seq
   |> Iter.flat_map Seq.ty_decls
-  |> ID.Map.of_seq
+  |> ID.Map.of_iter
 
 let convert seq =
   let module A = UntypedAST in
@@ -1350,6 +1440,6 @@ let convert seq =
     res
   in
   Iter.map conv_statement seq
-  |> CCVector.of_seq
+  |> CCVector.of_iter
   |> CCVector.freeze
 

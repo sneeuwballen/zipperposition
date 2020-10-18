@@ -56,27 +56,224 @@ end
 
 (** {2 Constraints} *)
 
+let get_arity ~sig_ref s =
+  try 
+    snd (Signature.arity !sig_ref s)
+  with Not_found -> 0
+
+let is_post_cnf_skolem ~sig_ref s =
+  not (Signature.mem !sig_ref s)
+  || (match ID.as_skolem s with 
+      | Some ID.K_after_cnf -> true
+      | _ -> false)
+
+let on_signature_update = Signal.create()
+
+let update_signature prev_sig signature =
+  prev_sig := signature;
+  Signal.ContinueListening
+
 module Constr = struct
   type 'a t = ID.t -> ID.t -> int
     constraint 'a = [< `partial | `total]
 
-  let arity arity_of s1 s2 =
-    (* bigger arity means bigger symbol *)
-    arity_of s1 - arity_of s2
+  type prec_fun = signature:Signature.t -> ID.t Iter.t -> [`partial] t
 
-  let invfreq seq =
+  (* In the following functions, fresh symbols are made the smallest.
+     However, newer fresh symbols are placed after older fresh symbols
+     (using monotonicity of the value of ID.int)
+   *)
+
+  let arity ~signature _ s1 s2 =
+    let _sig = ref signature in
+    Signal.on on_signature_update (update_signature _sig);
+    let open CCOrd in
+    (* bigger arity means bigger symbol *)
+    - (CCBool.compare (is_post_cnf_skolem ~sig_ref:_sig s1) (is_post_cnf_skolem ~sig_ref:_sig s2))
+    <?> (CCInt.compare, get_arity ~sig_ref:_sig s1, get_arity ~sig_ref:_sig s2)
+    <?> (ID.compare, s1, s2)
+
+  let inv_arity ~signature _ s1 s2 =
+    let _sig = ref signature in
+    Signal.on on_signature_update (update_signature _sig);
+    let open CCOrd in
+    - (CCBool.compare (is_post_cnf_skolem ~sig_ref:_sig s1) (is_post_cnf_skolem ~sig_ref:_sig s2))
+    <?> (CCInt.compare, get_arity ~sig_ref:_sig s2, get_arity ~sig_ref:_sig s1)
+    <?> (ID.compare, s1, s2)
+
+  let invfreqhack ~signature seq =
+    let _sig = ref signature in
+    Signal.on on_signature_update (update_signature _sig);
+
     (* symbol -> number of occurrences of symbol in seq *)
     let tbl = ID.Tbl.create 16 in
     Iter.iter (ID.Tbl.incr tbl) seq;
-    let find_freq s = ID.Tbl.get_or ~default:0 tbl s in
+    let avg = 
+      if Iter.length seq == 0 then 10
+      else Iter.sum (ID.Tbl.values tbl) / Iter.length (ID.Tbl.values tbl) in
+    let find_freq s = ID.Tbl.get_or ~default:avg tbl s in
+    let max_unary_freq =
+      Signature.Seq.symbols signature
+      |> Iter.filter_map (fun id ->
+        if snd @@ Signature.arity signature id == 1 
+        then Some (find_freq id)
+        else None 
+      )
+      |> Iter.max
+      |> CCOpt.get_or ~default:max_int in
+    (* compare by inverse frequency (higher frequency => smaller) *)
+    let is_unary_max_freq _sig s1 =
+      Signature.mem !_sig s1
+      && get_arity ~sig_ref:_sig s1 == 1
+      && find_freq s1 == max_unary_freq in
+    
+    let is_nullary _sig s1 =
+      Signature.mem !_sig s1 
+      && get_arity ~sig_ref:_sig s1 == 0 in
+
+    fun s1 s2 ->
+      let open CCOrd in
+      (* criteria as in generate_invfreq_hack_precedence -- E source *)
+      let categorize s =
+        if is_post_cnf_skolem ~sig_ref:_sig s then (min_int, ID.id s, 0)
+        else if is_nullary _sig s then (min_int+1, - (find_freq s), ID.id s)
+        else if is_unary_max_freq _sig s then (max_int, 0, ID.id s)
+        else (- (find_freq s), get_arity ~sig_ref:_sig s, ID.id s) in
+      let (a1,a2,a3), (b1,b2,b3) = CCPair.map_same categorize (s1, s2) in
+      CCInt.compare a1 b1
+      <?> (CCInt.compare, a2, b2)
+      <?> (CCInt.compare, a3, b3)
+
+  let invfreq_constmin ~signature seq =
+    let _sig = ref signature in
+    Signal.on on_signature_update (update_signature _sig);
+
+    (* symbol -> number of occurrences of symbol in seq *)
+    let tbl = ID.Tbl.create 16 in
+    Iter.iter (ID.Tbl.incr tbl) seq;
+    let avg = 
+      if Iter.length seq == 0 then 10
+      else Iter.sum (ID.Tbl.values tbl) / Iter.length (ID.Tbl.values tbl) in
+    let find_freq s = ID.Tbl.get_or ~default:avg tbl s in
+    
+    let is_nullary _sig s1 =
+      Signature.mem !_sig s1 
+      && get_arity ~sig_ref:_sig s1 == 0 in
+
+    fun s1 s2 ->
+      let open CCOrd in
+      (* criteria as in generate_invfreq_hack_precedence -- E source *)
+      let categorize s =
+        if is_post_cnf_skolem ~sig_ref:_sig s then (min_int, ID.id s, 0)
+        else if is_nullary _sig s then (min_int+1, - (find_freq s), ID.id s)
+        else (- (find_freq s), get_arity ~sig_ref:_sig s, ID.id s) in
+      let (a1,a2,a3), (b1,b2,b3) = CCPair.map_same categorize (s1, s2) in
+      CCInt.compare a1 b1
+      <?> (CCInt.compare, a2, b2)
+      <?> (CCInt.compare, a3, b3)
+
+  let invfreqconj ~signature seq =
+    (* The set of conjecture symbols cannot increase, so we do not subscribe to
+       signature changes*)
+    let tbl = ID.Tbl.create 16 in
+    Iter.iter (ID.Tbl.incr tbl) seq;
+    let avg = 
+      if Iter.length seq == 0 then 10
+      else Iter.sum (ID.Tbl.values tbl) / Iter.length (ID.Tbl.values tbl) in
+    let find_freq s = ID.Tbl.get_or ~default:avg tbl s in
+
+    fun s1 s2 ->
+      let open CCOrd in
+      (* criteria as in generate_invfreq_hack_precedence -- E source *)
+      let categorize s =
+        if is_post_cnf_skolem ~sig_ref:(ref (signature)) s then (min_int, ID.id s, 0)
+        else 
+        ((if Signature.sym_in_conj s signature then 1 else 0),
+          find_freq s, ID.id s) in
+      let (a1,a2,a3), (b1,b2,b3) = CCPair.map_same categorize (s1, s2) in
+      CCInt.compare a1 b1
+      <?> (CCInt.compare, a2, b2)
+      <?> (CCInt.compare, a3, b3)
+
+  
+  (* symbol -> number of occurrences of symbol in seq *)
+  let invfreq ~signature seq =
+    (* Does not use the signature *)
+    let tbl = ID.Tbl.create 16 in
+    Iter.iter (ID.Tbl.incr tbl) seq;
+    let avg = 
+      if Iter.length seq == 0 then 10
+      else Iter.sum (ID.Tbl.values tbl) / Iter.length (ID.Tbl.values tbl) in
+    let find_freq s = ID.Tbl.get_or ~default:avg tbl s in
+    let sig_ref = ref signature in
     (* compare by inverse frequency (higher frequency => smaller) *)
     fun s1 s2 ->
+      let open CCOrd in
       let n1 = find_freq s1 in
       let n2 = find_freq s2 in
-      CCInt.compare n2 n1
 
-  let max l =
-    let set = ID.Set.of_list l in
+      - (CCBool.compare (is_post_cnf_skolem ~sig_ref s1) (is_post_cnf_skolem ~sig_ref s2))
+      (* post-cnf symbols have the same value of n2 and n1 *)
+      <?> (CCInt.compare, n2, n1)
+      <?> (ID.compare, s1, s2)
+  
+  let unary_first ~signature _ s1 s2 =
+    let open CCOrd in
+    
+    let _sig = ref signature in
+    Signal.on on_signature_update (update_signature _sig);
+    
+    let is_unary _sig s = get_arity ~sig_ref:_sig s == 1 in
+    let weight _sig s =
+      if is_post_cnf_skolem ~sig_ref:_sig s then min_int
+      else if is_unary _sig s then max_int
+      else if not (Signature.mem !_sig s) then max_int - 1
+      else get_arity ~sig_ref:_sig s  in
+    CCInt.compare (weight _sig s1) (weight _sig s2)
+    <?> (ID.compare, s1, s2)
+
+  let const_first ~signature _ s1 s2 =
+    let open CCOrd in
+
+    let _sig = ref signature in
+    Signal.on on_signature_update (update_signature _sig);
+
+    let is_const _sig s = get_arity ~sig_ref:_sig s == 0 in
+    let weight _sig s =
+      if is_post_cnf_skolem ~sig_ref:_sig s then min_int
+      else if not (Signature.mem !_sig s) then max_int -1
+      else if is_const _sig s then max_int
+      else get_arity ~sig_ref:_sig s  in
+    CCInt.compare (weight _sig s1) (weight _sig s2)
+    <?> (ID.compare, s1, s2)
+
+  let prec_fun_of_str name =
+    let map = [
+      ("arity", arity);
+      ("invarity", inv_arity);
+      ("invfreq", invfreq);
+      ("invfreqhack", invfreqhack);
+      ("invfreq_constmin", invfreq_constmin);
+      ("invfreq_conj", invfreqconj);
+      ("unary_first", unary_first);
+      ("const_first", const_first);
+    ] in
+    match CCList.assoc_opt ~eq:CCString.equal name map with 
+    | Some wfun -> wfun
+    | None -> 
+      let err =
+        CCFormat.sprintf "precedences are one of: (@[%a@])" 
+          (CCList.pp CCString.pp ~pp_sep:(CCFormat.return "|@,")) (List.map fst map) in
+      invalid_arg err
+
+  (* regular string ordering *)
+  let alpha a b =
+    let c = String.compare (ID.name a) (ID.name b) in
+    if c = 0
+    then ID.compare a b else c
+
+  let max ~signature l =
+    let set = ID.Set.of_iter l in
     fun s1 s2 ->
       let is_max1 = ID.Set.mem s1 set in
       let is_max2 = ID.Set.mem s2 set in
@@ -86,8 +283,8 @@ module Constr = struct
       | true, false -> 1
       | false, true -> -1
 
-  let min l =
-    let set = ID.Set.of_list l in
+  let min ~signature l =
+    let set = ID.Set.of_iter l in
     fun s1 s2 ->
       let is_min1 = ID.Set.mem s1 set in
       let is_min2 = ID.Set.mem s2 set in
@@ -96,12 +293,6 @@ module Constr = struct
       | false, false -> 0
       | true, false -> -1
       | false, true -> 1
-
-  (* regular string ordering *)
-  let alpha a b =
-    let c = String.compare (ID.name a) (ID.name b) in
-    if c = 0
-    then ID.compare a b else c
 
   let compose a b s1 s2 =
     let c = a s1 s2 in
@@ -118,6 +309,8 @@ module Constr = struct
         compose o1 o2
     in
     mk l
+
+  let compare_by ~constr a b = constr a b
 
   let make c = c
 end
@@ -256,28 +449,74 @@ let depth_occ_driver ~flip stmt_d =
   ID.Tbl.clear tbl;
   let tbl = ID.Tbl.create 16 in
   List.iteri (fun i (_,_,sym) -> ID.Tbl.add tbl sym (Weight.int (i + 5))) sorted;
-  let default = Weight.int 10 in
+  let default = Weight.int 5 in
   fun sym -> (ID.Tbl.get_or ~default tbl sym)
 
-let inv_depth_occurence =  depth_occ_driver ~flip:false
-let depth_occurence =  depth_occ_driver ~flip:true
+let inv_depth_occurrence = depth_occ_driver ~flip:false
+let depth_occurrence = depth_occ_driver ~flip:true
 
+
+let max_arity signature = 
+  Signature.Seq.symbols signature
+  |> Iter.map (fun sym -> snd @@ Signature.arity signature sym)
+  |> Iter.max |> CCOpt.get_or ~default:max_int
 
 (* weight of f = arity of f + 4 *)
-let weight_modarity ~signature a = 
-  let arity =  try snd @@ Signature.arity signature a with _ -> 10 in
-  Weight.int (arity + 4)
+let weight_modarity ~signature =
+  let _sig = ref signature in
+  Signal.on on_signature_update (update_signature _sig);
 
-let weight_invarity ~signature = 
-  let max_arity = 
+  fun a ->
+    let arity =  try snd @@ Signature.arity !_sig a with _ -> 5 in
+    Weight.int (arity + 4)
+
+let weight_arity0 ~signature =
+  let _sig = ref signature in
+  Signal.on on_signature_update (update_signature _sig);
+
+  let max_arity a b =
+    match a, b with
+    | None, x -> Some x
+    | Some (_, arity1), (_,arity2) ->
+      if arity2 > arity1 then Some b else a in
+
+  let max_sym = 
     Signature.Seq.symbols signature
-    |> Iter.map (fun sym -> snd @@ Signature.arity signature sym)
-    |> Iter.max |> CCOpt.get_or ~default:max_int in
+    |> Iter.fold (fun acc sym -> 
+        let ar = snd @@ Signature.arity signature sym in
+        max_arity acc (sym,ar)
+      ) None
+    |> CCOpt.map fst in
+  
+  function a ->
+    let res = 
+      match max_sym with 
+      | None -> get_arity ~sig_ref:_sig a + 1
+      | Some m_id -> if ID.equal m_id a then 0 else (get_arity ~sig_ref:_sig a + 1)
+    in
+    Weight.int res
+    
 
+let weight_invarity ~signature =
+  (* Depends on max arity, and cannot easily evolve during the proving *)
+  let max_a = max_arity signature in
   (fun a ->
      let arity =  try snd @@ Signature.arity signature a with _ -> 0 in
-     Weight.int (max_arity - arity + 3))
+     Weight.int (max_a - arity + 3))
 
+let weight_sq_arity ~signature =
+  let _sig = ref signature in
+  Signal.on on_signature_update (update_signature _sig);
+  fun a ->
+    let arity =  try snd @@ Signature.arity !_sig a with _ -> 2 in
+    Weight.int (arity * arity + 1)
+
+let weight_invsq_arity ~signature =
+  (* Depends on max arity, and cannot easily evolve during the proving *)
+  let max_a = max_arity signature in
+  (fun a -> 
+    let arity =  try snd @@ Signature.arity signature a with _ -> max_a / 2 in
+    Weight.int (max_a*max_a - arity * arity + 1))
 
 (* constant weight *)
 let weight_constant _ = Weight.int 4
@@ -286,7 +525,7 @@ let weight_invfreq (symbs : ID.t Iter.t) : ID.t -> Weight.t =
   let tbl = ID.Tbl.create 16 in
   Iter.iter (ID.Tbl.incr tbl) symbs;
   let max_freq = List.fold_left (max) 0 (ID.Tbl.values_list tbl) in
-  fun sym ->Weight.int (max_freq - (ID.Tbl.get_or ~default:1 tbl sym) + 5) 
+  fun sym ->Weight.int (max_freq - (ID.Tbl.get_or ~default:(max_freq/2) tbl sym) + 5) 
 
 let weight_freq (symbs : ID.t Iter.t) : ID.t -> Weight.t =
   let tbl = ID.Tbl.create 16 in
@@ -317,8 +556,53 @@ let weight_freqrank (symbs : ID.t Iter.t) : ID.t -> Weight.t =
   Iter.iteri (fun i sym -> ID.Tbl.add tbl sym (i+1)) sorted;
   (fun sym -> Weight.int (ID.Tbl.get_or ~default:10 tbl sym))
 
+(* This function takes base KBO weight function and adjusts it so
+   that defined symbols are larger than its defitnitions. *)
+let lambda_def_weight lm_w db_w base_weight lits =
+  let def_rhs lit =
+    let is_def t =
+      let hd,args = Term.as_app t in
+      Term.is_const hd && List.for_all Term.is_var args &&
+      Term.Set.cardinal (Term.Set.of_list args) = List.length args
+    in
+    
+    match lit with
+    | SLiteral.Eq(lhs,rhs) ->
+      if is_def lhs then Some (rhs, Term.head_exn lhs)
+      else if is_def rhs then Some (lhs, Term.head_exn rhs)
+      else None  
+    | _ -> None in
 
-let weight_fun_of_string ~signature s = 
+  let evaluate_weight current_evals t =
+    2*(Term.weight ~sym:(fun sy -> 
+      ID.Map.get_or sy current_evals ~default:((base_weight sy).Weight.one)
+    ) t + 
+      (Term.Seq.subterms ~include_builtin:true ~include_app_vars:true t
+      |> Iter.fold (fun acc sub -> 
+        let inc = 
+          if Term.is_fun sub then lm_w
+          else if Term.is_bvar sub then db_w
+          else 0 in
+        acc + inc ) 0))
+     in
+  
+
+
+  let id_map = 
+    Iter.fold (fun acc lit ->
+      match def_rhs lit with 
+      | Some (rhs,lhs_id) ->
+        let rhs_eval = evaluate_weight acc rhs in
+        ID.Map.update lhs_id (fun prev ->
+          Some (max (CCOpt.get_or ~default:0 prev) rhs_eval)
+        ) acc
+      | None -> acc) ID.Map.empty lits in
+
+  
+  fun sy ->
+    Weight.int (ID.Map.get_or ~default:(base_weight sy).Weight.one sy id_map)
+
+let weight_fun_of_string ~signature ~lits ~lm_w ~db_w s sd = 
   let syms_only sym_depth = 
     Iter.map fst sym_depth in
   let with_syms f sym_depth = f (syms_only sym_depth) in
@@ -330,12 +614,20 @@ let weight_fun_of_string ~signature s =
      "invfreqrank", with_syms weight_invfreqrank;
      "freqrank", with_syms weight_freqrank;
      "modarity", ignore_arg @@ weight_modarity ~signature;
+     "arity0", ignore_arg @@ weight_arity0 ~signature;
      "invarity", ignore_arg @@ weight_invarity ~signature;
-     "invdocc", inv_depth_occurence;
-     "docc", depth_occurence;
+     "sqarity", ignore_arg @@ weight_sq_arity ~signature;
+     "invsqarity", ignore_arg @@ weight_invsq_arity ~signature;
+     "invdocc", inv_depth_occurrence;
+     "docc", depth_occurrence;
      "const", ignore_arg weight_constant] in
   try
-    List.assoc s wf_map
+    begin match CCString.chop_prefix ~pre:"lambda-def-" s with 
+    | Some s ->
+      let base_weight = List.assoc s wf_map sd in
+      lambda_def_weight lm_w db_w base_weight lits
+      (* List.assoc s wf_map sd *)
+    | None -> List.assoc s wf_map sd end
   with Not_found -> invalid_arg "KBO weight function not found"
 
 (* default argument coefficients *)
@@ -375,8 +667,9 @@ let create ?(weight=weight_constant) ?(arg_coeff=arg_coeff_default)
   assert (check_inv_ res);
   res
 
-let add_list p l =
+let add_list ~signature p l =
   (* sorted insertion in snapshot *)
+  Signal.send on_signature_update signature;
   let rec insert_ id l = match l with
     | [] -> [id], true
     | id' :: l' ->
@@ -407,8 +700,6 @@ let add_list p l =
   )
 
 let add p id = add_list p [id]
-
-let add_seq p seq = Iter.iter (add p) seq
 
 let default l = create Constr.alpha l
 

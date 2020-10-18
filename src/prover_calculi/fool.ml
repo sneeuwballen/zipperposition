@@ -71,15 +71,15 @@ module Make(E : Env.S) : S with module Env = E = struct
              | T.Var _ | T.DB _ -> false
              | T.Fun _ -> assert false (* by typing *)
            end)
-      |> T.Set.of_seq
+      |> T.Set.of_iter
     in
     if not (T.Set.is_empty sub_terms) then (
       Util.debugf ~section 5
         "@[<2>in clause `@[%a@]`@ possible subterms are [@[<hv>%a@]]@]"
-        (fun k->k C.pp c (T.Set.pp ~sep:"," T.pp) sub_terms);
+        (fun k->k C.pp c (T.Set.pp ~pp_sep:(CCFormat.return ",@,") T.pp) sub_terms);
     );
     begin
-      T.Set.to_seq sub_terms
+      T.Set.to_iter sub_terms
       |> Iter.flat_map_l
         (fun sub -> [fool_param_sign ~sub true c; fool_param_sign ~sub false c])
       |> Iter.to_rev_list
@@ -99,10 +99,9 @@ module Make(E : Env.S) : S with module Env = E = struct
     |> Iter.of_array_i
     |> Iter.filter_map
       (fun (idx,lit) -> match lit with
-         | Literal.Equation (lhs, rhs, true) when  (T.equal rhs T.true_) || (T.equal rhs T.false_) ->
+         | Literal.Equation (lhs, rhs, sign) when T.equal rhs T.true_->
            begin match T.as_var lhs with
              | Some v -> 
-               let sign = T.equal rhs T.true_ in
                (* found var, replace it with [not sign] *)
                let t = if sign then T.false_ else T.true_ in
                let subst =
@@ -150,7 +149,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         ~penalty:(C.penalty c) ~trail:(C.trail c)
     in
     C.lits c
-    |> CCArray.findi
+    |> CCArray.find_map_i
       (fun i lit -> match lit with
          | Literal.Equation (a, b, false)
            when Type.is_prop (T.ty a) &&
@@ -195,7 +194,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let setup () =
     Util.debug ~section 1 "setup fool rules";
     Env.add_unary_inf "fool_param" fool_param;
-    Env.add_multi_simpl_rule rw_bool_lits;
+    Env.add_multi_simpl_rule ~priority:5 rw_bool_lits;
     Env.add_unary_inf "fool_elim_var" fool_elim_var;
     ()
 end
@@ -215,16 +214,17 @@ let extension =
 let () =
   Options.add_opts
     [ "--fool", Arg.Bool (fun v -> enabled_ := v), " enable/disable fool (first-class booleans)"  ];
-  Params.add_to_mode "ho-complete-basic" (fun () ->
-      enabled_ := false
-    );
-  Params.add_to_mode "ho-pragmatic" (fun () ->
-      enabled_ := false
-    );
-  Params.add_to_mode "ho-competitive" (fun () ->
-      enabled_ := false
-    );
-  Params.add_to_mode "fo-complete-basic" (fun () ->
-      enabled_ := false
+  Params.add_to_modes 
+    [ "ho-complete-basic"
+    ; "ho-pragmatic"
+    ; "ho-competitive"
+    ; "fo-complete-basic"
+    ; "lambda-free-intensional"
+    ; "lambda-free-extensional"
+    ; "ho-comb-complete"
+    ; "lambda-free-purify-intensional"
+    ; "lambda-free-purify-extensional"] 
+    (fun () ->
+       enabled_ := false
     );
   Extensions.register extension

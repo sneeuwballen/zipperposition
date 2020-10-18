@@ -44,6 +44,8 @@ val flag_redundant : flag (** clause has been shown to be redundant *)
 
 val flag_backward_simplified : flag (** clause has been backward simplified *)
 
+val flag_poly_arg_cong_res : flag (** clause is the result of polymorphic ArgCong *)
+
 val set_flag : flag -> t -> bool -> unit (** set boolean flag *)
 
 val get_flag : flag -> t -> bool (** get value of boolean flag *)
@@ -71,7 +73,7 @@ val pp_in : Output_format.t -> t CCFormat.printer
 
 (** {2 Proofs} *)
 
-val proof_tc : t Proof.Result.tc
+val proof_tc : t -> t Proof.Result.tc
 
 val mk_proof_res : t -> Proof.Result.t
 

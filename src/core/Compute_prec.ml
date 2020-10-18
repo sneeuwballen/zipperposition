@@ -11,6 +11,9 @@ let section = Util.Section.(make ~parent:root) "compute_prec"
 
 let _alpha_precedence = ref false
 let _custom_weights = ref ""
+let _from_prec = ref false
+let _rank = ref None
+let _kbo_const_weight = ref None
 
 type 'a parametrized = Statement.clause_t Iter.t -> 'a
 
@@ -68,13 +71,44 @@ let _add_custom_weights weights arg_coeff=
       | Failure _ | Not_found -> failwith "Syntax error in custom weights"
     ) (weights, arg_coeff) input_list
 
-let mk_precedence ~db_w ~lmb_w t seq =
+let weight_fun_of_prec ?(rank=None) ~symbols ~prec_fun =
+  let symbol_to_rank idx =
+    let sym_no = ID.Set.cardinal symbols in
+    match rank with 
+    | Some numb_ranks when sym_no > numb_ranks ->
+      let divider = sym_no / numb_ranks in
+      (idx / divider) + 1
+    | _ -> idx + 1 in
+
+  let w_tbl =
+    ID.Set.to_list symbols
+    (* inverse sorting, we want the number of *larger* symbols *)
+    |> List.sort (fun f g -> Precedence.Constr.compare_by prec_fun g f)
+    |> CCList.foldi (fun tbl idx f -> 
+        ID.Map.add f (symbol_to_rank idx) tbl) 
+       ID.Map.empty in
+
+  function id ->
+    let res = CCOpt.get_or ~default:5 (ID.Map.get id w_tbl) in
+    Precedence.Weight.int res
+
+let force_const_weight ~weight ~signature = function
+  | Some c_w ->
+    (function s ->
+      try
+        if snd (Signature.arity signature s) == 0
+        then Precedence.Weight.int c_w
+        else weight s
+      with Not_found -> weight s)
+  | None -> weight
+
+let mk_precedence ~db_w ~lmb_w ~signature t seq =
   ZProf.enter_prof prof_mk_prec;
   (* set of symbols *)
   let symbols =
     seq
     |> Iter.flat_map Statement.Seq.symbols
-    |> ID.Set.of_seq
+    |> ID.Set.of_iter
     |> ID.Set.to_list
   in
   (* constraints *)
@@ -84,11 +118,15 @@ let mk_precedence ~db_w ~lmb_w t seq =
   in
   Util.debugf ~section 2 "@[<2>%d precedence constraint(s)@]"
     (fun k->k(List.length constrs));
-  let weight = t.weight_rule seq in
-  let weight,arg_coeff = _add_custom_weights weight _default_arg_coeff in
   let constr = Precedence.Constr.compose_sort constrs in
   let constr = Precedence.Constr.compose constr t.last_constr in
   let constr = (if !_alpha_precedence then Precedence.Constr.alpha else constr) in
+  let weight = 
+    (if !_from_prec 
+     then weight_fun_of_prec ~rank:!_rank ~symbols:(ID.Set.of_list symbols) ~prec_fun:constr 
+     else t.weight_rule seq) in
+  let weight,arg_coeff = _add_custom_weights weight _default_arg_coeff in
+  let weight = force_const_weight ~weight ~signature !_kbo_const_weight in
   let p = Precedence.create ~weight ~arg_coeff ~db_w ~lmb_w constr symbols in
   (* multiset status *)
   List.iter
@@ -102,6 +140,15 @@ let () =
     [  "--alpha-precedence"
     , Arg.Set _alpha_precedence
     , " use pure alphabetical precedence"
+    ; "--kbo-weight-fun-from-precedence", 
+      Arg.Bool ((:=) _from_prec),
+      " assign to each symbol the weight equal to the number of symbols greater than it in the precedence";
+    "--kbo-weight-fun-from-precedence-rank", 
+      Arg.Int (fun i -> _rank := Some i),
+      " split the symbols from the precedence in *n* ranks"
+    ; "--kbo-const-weight", 
+      Arg.Int (fun v -> _kbo_const_weight := Some v),
+      " force the weight of constants to this value in KBO"
     ;  "--weights"
      , Arg.Set_string _custom_weights
      , " set weights, e.g. f=2,g=3,h=1, or weights and argument coefficients, e.g. f=2:3:4,g=3:2"

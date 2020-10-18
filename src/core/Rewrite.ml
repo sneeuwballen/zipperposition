@@ -81,7 +81,7 @@ let pp_term_rule out r =
   Fmt.fprintf out "@[<2>@[%a@] :=@ @[%a@]@]" T.pp r.term_lhs T.pp r.term_rhs
 
 let pp_term_rules out (s:term_rule Iter.t): unit =
-  Fmt.(within "{" "}" @@ hvbox @@ Util.pp_seq pp_term_rule) out s
+  Fmt.(within "{" "}" @@ hvbox @@ Util.pp_iter pp_term_rule) out s
 
 let pp_lit_rule out r =
   let pp_c = CCFormat.hvbox (Util.pp_list ~sep:" ∨ " Literal.pp) in
@@ -89,14 +89,14 @@ let pp_lit_rule out r =
     Literal.pp r.lit_lhs (Util.pp_list ~sep:"∧" pp_c) r.lit_rhs
 
 let pp_lit_rules out (s:lit_rule Iter.t): unit =
-  Format.fprintf out "{@[<hv>%a@]}" (Util.pp_seq pp_lit_rule) s
+  Format.fprintf out "{@[<hv>%a@]}" (Util.pp_iter pp_lit_rule) s
 
 let pp_rule out = function
   | T_rule r -> Format.fprintf out "(@[%a [T]@])" pp_term_rule r
   | L_rule l -> Format.fprintf out "(@[%a [B]@])" pp_lit_rule l
 
 let pp_rule_set out (rs: rule_set): unit =
-  Fmt.(within "{" "}" @@ hvbox @@ Util.pp_seq pp_rule) out (Rule_set.to_seq rs)
+  Fmt.(within "{" "}" @@ hvbox @@ Util.pp_iter pp_rule) out (Rule_set.to_iter rs)
 
 (** Annotation on IDs that are defined. *)
 exception Payload_defined_cst of defined_cst
@@ -113,7 +113,7 @@ module Cst_ = struct
   type t = defined_cst
 
   let rules t = t.defined_rules
-  let rules_seq t = Rule_set.to_seq (rules t)
+  let rules_seq t = Rule_set.to_iter (rules t)
 
   let rules_term_seq t : term_rule Iter.t =
     rules_seq t
@@ -211,7 +211,7 @@ module Term = struct
 
     let make_ head args term_lhs term_rhs proof =
       let term_proof =
-        Proof.Step.define head (Proof.Src.internal[]) [Proof.Parent.from proof]
+        Proof.Step.define head (Proof.Src.internal []) [Proof.Parent.from proof]
       in
       { term_head=head; term_args=args; term_arity=List.length args;
         term_lhs; term_rhs; term_proof }
@@ -239,6 +239,10 @@ module Term = struct
       );
       make_ id args lhs rhs proof
 
+    let make_rewritten ~proof ~rewrite_fun id ty args rhs : t =
+      let proof, rhs = rewrite_fun rhs in
+      make ~proof id ty args rhs
+
     let pp out r = pp_term_rule out r
 
     let conv_ ~ctx lhs rhs =
@@ -259,7 +263,7 @@ module Term = struct
 
   module Set = struct
     include TR_set
-    let pp out (s:t) = pp_term_rules out (to_seq s)
+    let pp out (s:t) = pp_term_rules out (to_iter s)
   end
   type rule_set = Set.t
 
@@ -283,7 +287,7 @@ module Term = struct
       let pp_triple out (r,subst,sc) =
         Fmt.fprintf out "(@[%a@ :with %a[%d]@])" pp_term_rule r Subst.pp subst sc
       in
-      Fmt.fprintf out "{@[<hv>%a@]}" (Util.pp_seq pp_triple) (to_seq s)
+      Fmt.fprintf out "{@[<hv>%a@]}" (Util.pp_iter pp_triple) (to_iter s)
   end
 
   (* TODO: {b long term}
@@ -383,6 +387,7 @@ module Term = struct
            closed terms to closed terms, so we can safely rewrite under λ *)
         reduce body
           (fun body' ->
+             assert (Type.equal (T.ty body) (T.ty body'));
              let t =
                if T.equal body body' then t else (T.fun_ arg body')
              in k t)
@@ -405,12 +410,13 @@ module Term = struct
     in
     reduce t0 (fun t -> t, !set)
 
-  let normalize_term ?(max_steps=1000) (t:term): term * Rule_inst_set.t =
+  let normalize_term ?(max_steps=3) (t:term): term * Rule_inst_set.t =
     ZProf.with_prof prof_term_rw (normalize_term_ max_steps) t
 
   let normalize_term_fst ?max_steps t = fst (normalize_term ?max_steps t)
 
   let narrow_term ?(subst=Unif_subst.empty) ~scope_rules:sc_r (t,sc_t): _ Iter.t =
+    let t = Lambda.snf t in
     begin match T.view t with
       | T.Const _ -> Iter.empty (* already normal form *)
       | T.App (f, _) ->
@@ -457,7 +463,7 @@ module Lit = struct
         (rhs c)
 
     let head_id c = match lhs c with
-      | Literal.Equation (lhs, rhs, true) when T.equal rhs T.true_ || T.equal rhs T.false_ ->
+      | Literal.Equation (lhs, rhs, _) when T.equal rhs T.true_ ->
         begin match T.view lhs with
           | T.Const id -> Some id
           | T.App (f, _) ->
@@ -505,7 +511,7 @@ module Lit = struct
       Iter.cons (lhs r)
         (Iter.of_list (rhs r) |> Iter.flat_map_l CCFun.id)
       |> Iter.flat_map Literal.Seq.vars
-      |> T.VarSet.of_seq |> T.VarSet.to_list
+      |> T.VarSet.of_iter |> T.VarSet.to_list
 
     let compare r1 r2: int = compare_lr r1 r2
     let pp = pp_lit_rule
@@ -518,7 +524,7 @@ module Lit = struct
       Util.debugf ~section 5 "@[<2>add rewrite rule@ `@[%a@]`@]" (fun k->k Rule.pp r);
       add r s
 
-    let pp out s = pp_lit_rules out (to_seq s)
+    let pp out s = pp_lit_rules out (to_iter s)
   end
 
   (* rules on equality *)
@@ -550,12 +556,12 @@ module Lit = struct
     end
 
   let rules_of_lit lit: rule Iter.t = match lit with
-    | Literal.Equation (lhs, rhs, true) when T.equal rhs T.true_ || T.equal rhs T.false_ ->
+    | Literal.Equation (lhs, rhs, _) when T.equal rhs T.true_ ->
       begin match T.Classic.view lhs with
         | T.Classic.App (id, _) -> rules_of_id id
         | _ -> Iter.empty
       end
-    | Literal.Equation _ -> Set.to_seq !eq_rules_
+    | Literal.Equation _ -> Set.to_iter !eq_rules_
     | _ -> Iter.empty
 
   (* find rules that can apply to this literal *)
@@ -578,7 +584,7 @@ module Lit = struct
         l
     in
     let step =
-      CCArray.findi
+      CCArray.find_map_i
         (fun i lit -> match step_lit lit with
            | None -> None
            | Some (rule,subst,tags) ->
@@ -641,7 +647,7 @@ let pseudo_rule_of_rule (r:rule): pseudo_rule = match r with
       | _ -> None
     in
     let view_lit id (lit:Literal.t) = match lit with
-      | Equation (lhs, rhs, true) when T.equal rhs T.true_ || T.equal rhs T.false_ ->
+      | Equation (lhs, rhs, sign) when T.equal rhs T.true_ ->
         view_atom id lhs
       | _ -> None
     in
@@ -649,7 +655,7 @@ let pseudo_rule_of_rule (r:rule): pseudo_rule = match r with
       Util.invalid_argf "cannot compute position for rule %a" Lit.Rule.pp r
     in
     begin match Lit.Rule.lhs r with
-      | Equation (lhs, rhs, true) when T.equal rhs T.true_ || T.equal rhs T.false_ ->
+      | Equation (lhs, rhs, sign) when T.equal rhs T.true_  ->
         begin match T.Classic.view lhs with
           | T.Classic.App (id, args) ->
             (* occurrences of literals with same [id] on RHS *)
@@ -699,7 +705,7 @@ module Rule = struct
     end
 
   let pp_zf out r = TypedSTerm.ZF.pp out (to_form r)
-  let pp_tptp out r = TypedSTerm.TPTP.pp out (to_form r)
+  let pp_tptp out r = TypedSTerm.TPTP_THF.pp out (to_form r)
 
   let pp_in = function
     | Output_format.O_normal -> pp
@@ -746,7 +752,7 @@ module Rule = struct
     Proof.Parent.from_subst renaming (proof,sc) subst
 
   let set_as_proof_parents (s:Term.Rule_inst_set.t) : Proof.parent list =
-    Term.Rule_inst_set.to_seq s
+    Term.Rule_inst_set.to_iter s
     |> Iter.map
       (fun (r,subst,sc) ->
          let proof =
@@ -771,14 +777,14 @@ module Defined_cst = struct
 
   let compute_pos id (s:rule_set) =
     let pos =
-      Rule_set.to_seq s
+      Rule_set.to_iter s
       |> Iter.map pseudo_rule_of_rule
       |> Iter.to_rev_list
       |> compute_pos_gen
     in
     Util.debugf ~section 3
       "(@[<2>defined_pos %a@ :pos (@[<hv>%a@])@])"
-      (fun k->k ID.pp id (Util.pp_seq Defined_pos.pp) (IArray.to_seq pos));
+      (fun k->k ID.pp id (Util.pp_iter Defined_pos.pp) (IArray.to_iter pos));
     pos
 
   let check_rules id rules =

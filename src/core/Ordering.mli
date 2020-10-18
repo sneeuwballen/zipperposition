@@ -30,21 +30,20 @@ val might_flip : t -> term -> term -> bool
     of tθ vs sθ cannot change when appending arguments. This function is allowed
     to overapproximate, i.e. we get no information if it returns true. *)
 
+val monotonic : t -> bool	
+(** Is the ordering fully monotonic? Is it in particular compatible with arguments,	
+    i.e., t > s ==> t a > s a *)	
+
 val precedence : t -> Precedence.t
 (** Current precedence *)
 
-val add_list : t -> ID.t list -> unit
+val add_list : signature:Signature.t -> t -> ID.t list -> unit
 (** Update precedence with symbols *)
-
-val add_seq : t -> ID.t Iter.t -> unit
-(** Update precedence with signature *)
 
 val name : t -> string
 (** Name that describes this ordering *)
 
 val clear_cache : t -> unit
-
-val normalize : (Lambda.term -> Lambda.term) ref
 
 include Interfaces.PRINT with type t := t
 
@@ -53,11 +52,24 @@ include Interfaces.PRINT with type t := t
     are simplification orderings (compatible with substitution,
     with the subterm property, and monotonic), some other are not. *)
 
-val kbo : Precedence.t -> t
+val lambda_kbo : Precedence.t -> t
 (** Knuth-Bendix simplification ordering *)
 
-val rpo6 : Precedence.t -> t
+val lambda_rpo : Precedence.t -> t
 (** Efficient implementation of RPO (recursive path ordering) *)
+
+val compose : (term -> term -> (Comparison.t*term*term)) -> t -> t
+(** Takes a function that is going to be run before the chosen order and the order.
+    If the first argument returns Comparison.Eq, then the order determined by second arg.
+    Otherwise, the result of the first argument is returned. *) 
+val lambdafree_kbo : Precedence.t -> t
+(** Knuth-Bendix simplification ordering - lambdafree version *)
+
+val lambdafree_rpo : Precedence.t -> t
+(** Efficient implementation of RPO (recursive path ordering) - lambdafree version *)
+
+val epo : Precedence.t -> t
+(** Embedding path order *)
 
 val none : t
 (** All terms are incomparable (equality still works).
@@ -80,9 +92,12 @@ val by_name : string -> Precedence.t -> t
     @raise Invalid_argument if no ordering with the given name are registered. *)
 
 val names : unit -> string list
-val default_name : string
 
 val register : string -> (Precedence.t -> t) -> unit
 (** Register a new ordering, which can depend on a precedence.
     The name must not be registered already.
     @raise Invalid_argument if the name is already used. *)
+
+(* Type-1 combinator is a combinator that is not ground
+     (see Ahmed's combinator KBO paper) *)
+val ty1comb_to_var : Term.t -> Term.t Term.Tbl.t -> Term.t

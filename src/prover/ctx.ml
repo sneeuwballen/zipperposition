@@ -19,7 +19,6 @@ module type PARAMETERS = sig
   val signature : Signature.t
   val ord : Ordering.t
   val select : Selection.t
-  val eta : [`Reduce | `Expand | `None]
   val sk_ctx : Skolem.ctx
 
 end
@@ -31,7 +30,6 @@ end
 module Make(X : PARAMETERS) = struct
   let _ord = ref X.ord
   let _select = ref X.select
-  let _eta = ref X.eta
   let _signature = ref X.signature
   let _complete = ref true
   let _sk_ctx = ref X.sk_ctx
@@ -45,10 +43,6 @@ module Make(X : PARAMETERS) = struct
   let selection_fun () = !_select
   let set_selection_fun s = _select := s
   let signature () = !_signature
-  let eta_normalize = match !_eta with
-    | `Reduce -> Lambda.eta_reduce ~full:true
-    | `Expand -> Lambda.eta_expand
-    | `None -> (fun t -> t)
 
   let on_new_symbol = Signal.create()
   let on_signature_update = Signal.create()
@@ -78,7 +72,7 @@ module Make(X : PARAMETERS) = struct
     _signature := Signature.declare !_signature symb ty;
     Signal.send on_signature_update !_signature;
     Signal.send on_new_symbol (symb,ty);
-    Ordering.add_list (ord ()) [symb];
+    Ordering.add_list ~signature:!_signature (ord ()) [symb];
     ()
 
   let add_signature signature =
@@ -95,6 +89,21 @@ module Make(X : PARAMETERS) = struct
     if is_new then declare_new_ symb (ty,false);
     ZProf.exit_prof prof_declare_sym;
     ()
+
+  let declare_syms symbs = 
+    let rec aux = function 
+    | [] -> []
+    | (sym,ty) :: syms ->
+      let is_new = not (Signature.mem !_signature sym) in
+      if is_new then (
+        _signature := Signature.declare !_signature sym ty;
+        Signal.send on_signature_update !_signature;
+        Signal.send on_new_symbol (sym,ty);
+        sym :: (aux syms)
+      ) else aux syms in
+    let new_syms = aux symbs in
+    Ordering.add_list ~signature:!_signature (ord ()) new_syms
+
 
   let set_injective_for_arg sym i = 
     let arg_bv = 

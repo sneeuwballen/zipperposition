@@ -54,6 +54,8 @@ let flag_lemma = new_flag ()
 let flag_persistent = new_flag ()
 let flag_redundant = new_flag ()
 let flag_backward_simplified = new_flag()
+let flag_poly_arg_cong_res = new_flag()
+
 
 let set_flag flag c truth =
   if truth
@@ -73,7 +75,7 @@ let pp_trail out trail =
   if not (Trail.is_empty trail)
   then
     Format.fprintf out "@ @<2>← @[<hv>%a@]"
-      (Util.pp_seq ~sep:" ⊓ " BBox.pp) (Trail.to_seq trail)
+      (Util.pp_iter ~sep:" ⊓ " BBox.pp) (Trail.to_iter trail)
 
 let pp_vars out c =
   let pp_vars out = function
@@ -91,7 +93,7 @@ let pp out c =
 
 let pp_trail_zf out trail =
   Format.fprintf out "@[<hv>%a@]"
-    (Util.pp_seq ~sep:" && " BBox.pp_zf) (Trail.to_seq trail)
+    (Util.pp_iter ~sep:" && " BBox.pp_zf) (Trail.to_iter trail)
 
 let pp_zf out c =
   if Trail.is_empty c.trail
@@ -118,8 +120,8 @@ let pp_trail_tstp out trail =
     else Format.fprintf out "@[~@ %a@]" pp_box_unsigned b
   in
   Format.fprintf out "@[<hv>%a@]"
-    (Util.pp_seq ~sep:" & " pp_box)
-    (Trail.to_seq trail)
+    (Util.pp_iter ~sep:" & " pp_box)
+    (Trail.to_iter trail)
 
 let pp_tstp out c =
   if Trail.is_empty c.trail
@@ -157,7 +159,7 @@ let to_s_form_subst ~ctx subst c : _ * _ Var.Subst.t =
   in
   f, inst_subst
 
-let proof_tc =
+let proof_tc cl  =
   Proof.Result.make_tc
     ~of_exn:(function | E_proof c -> Some c | _ -> None)
     ~to_exn:(fun c -> E_proof c)
@@ -168,10 +170,11 @@ let proof_tc =
           else `Absurd_lits
         else `Vanilla)
     ~to_form:(fun ~ctx c -> to_s_form ~allow_free_db:true ~ctx c)
+    ~is_dead_cl:(fun () -> is_redundant cl)
     ~to_form_subst:to_s_form_subst
     ~pp_in
     ()
 
-let mk_proof_res = Proof.Result.make proof_tc
+let mk_proof_res cl = Proof.Result.make (proof_tc cl) cl
 
 let adapt p c = Proof.S.adapt p (mk_proof_res c)

@@ -12,6 +12,9 @@ module type S = ClauseQueue_intf.S
 
 type profile = ClauseQueue_intf.profile
 
+let section = Util.Section.make ~parent:Const.section "clause.queue"
+
+
 let cr_var_ratio = ref 5
 let cr_var_mul   = ref 1.1
 let parameters_magnitude = ref `Large
@@ -73,13 +76,62 @@ let get_profile () = !_profile
 let set_profile p = _profile := p
 let parse_profile s = _profile := (profile_of_string s)
 let funs_to_parse = ref []
+let _ignore_orphans = ref true
+let _rel_terms_enabled = ref false
 
+let ignore_orphans () = !_ignore_orphans
 
 module Make(C : Clause_intf.S) = struct
   module C = C
 
   (* weight of a term [t], using the precedence's weight *)
   let term_weight t = Term.size t
+
+  let _related_terms = ref Term.Set.empty
+  let max_related_ = 100
+
+  let norm_app hd arg =
+    let body = Term.app hd [arg] in
+    let normalize = 
+      if Term.is_fun hd then Lambda.whnf 
+      else if Term.is_comb hd then Combinators_base.narrow 
+      else CCFun.id in
+    normalize body
+
+
+  let unroll_logical_symbols t =
+    let rec aux t = 
+      match Term.view t with
+      | AppBuiltin((Builtin.ForallConst|Builtin.ExistsConst), [x]) ->
+        let var_ty = List.hd (fst (Type.open_fun (Term.ty x))) in
+        let fresh_var = Term.var @@ HVar.fresh ~ty:var_ty () in
+        let app_x = norm_app x fresh_var in
+        aux app_x
+      | AppBuiltin(b, l) when Builtin.is_logical_binop b ->
+        List.fold_left (fun acc t -> 
+          Term.Set.union acc (aux t)
+        ) Term.Set.empty l
+      | _ -> Term.Set.singleton t in
+    aux t
+    |> Term.Set.filter (fun t -> not (Term.is_true_or_false t) && not (Term.is_const t))
+  
+  let add_related_term_ t =
+    if Term.Set.cardinal !_related_terms < max_related_ then (
+      let new_terms = unroll_logical_symbols t in
+      Util.debugf ~section 10 "addding related terms:@.@[%a@]@." 
+        (fun k -> k (Term.Set.pp Term.pp) new_terms);
+      _related_terms := Term.Set.union !_related_terms new_terms
+    )
+
+  let register_conjecture_clause cl =
+    match C.distance_to_goal cl with
+    | Some 0 
+        when !_rel_terms_enabled 
+             && Term.Set.cardinal !_related_terms < max_related_ ->
+      C.Seq.terms cl
+      |> Iter.filter (fun t -> not (Term.is_true_or_false t))
+      |> Iter.iter add_related_term_
+    | _ -> ()
 
   (** {6 Weight functions} *)
   module WeightFun = struct
@@ -131,7 +183,7 @@ module Make(C : Clause_intf.S) = struct
         int_of_float (weight c *. (1.25 ** (app_var_num c *. (1.35 ** p_depth c)))
                       *. (0.85 ** formulas_num c)
                       *. 1.05 ** t_depth c) in
-      Util.debugf 5 "[C_W:]@ @[%a@]@ :@ %d(%g, %g, %g).\n"
+      Util.debugf ~section 5 "[C_W:]@ @[%a@]@ :@ %d(%g, %g, %g).\n"
         (fun k -> k C.pp c res (app_var_num c) (formulas_num c) (p_depth c));
       res
 
@@ -158,7 +210,9 @@ module Make(C : Clause_intf.S) = struct
       let max_lits = C.maxlits (c,0) Subst.empty in
       let ord = C.Ctx.ord () in
       let res = CCArray.foldi (fun sum i lit ->
-          let term_w = (fun t -> float_of_int (Term.weight ~var:v_w ~sym:(fun _ -> f_w) t)) in
+          let term_w = (fun t -> 
+            if Term.is_true_or_false t then 0.0
+            else float_of_int (Term.weight ~var:v_w ~sym:(fun _ -> f_w) t)) in
           let w =
             match lit with
             | Lit.Equation(l,r,_) ->
@@ -187,40 +241,44 @@ module Make(C : Clause_intf.S) = struct
                 then max_t_m else 1.0 in
               let r_mul = if ord_side = Comparison.Lt || ord_side = Comparison.Incomparable
                 then max_t_m else 1.0 in
-              let t_w = l_mul *. (term_w l) +. r_mul *. (term_w r) in
+              let eq_inc = 
+                if Term.equal Term.true_ r 
+                then float_of_int (if Lit.is_pos lit then pf_w else nf_w)
+                else 0.0  in
+              let t_w = l_mul *. (term_w l) +. r_mul *. (term_w r) +. eq_inc in
               let t_w = if Lit.is_pos lit then pos_m *. t_w else t_w in
               let t_w = if CCBV.get max_lits i then max_l_m *. t_w else t_w in
               t_w
             | _ -> 1.0 in
           sum +. w
         ) 0.0 (C.lits c) in
-      int_of_float res
+      let w = int_of_float res in
+      Util.debugf ~section 3 "pnrefined(@[%a@],@[%g@])=%d@." (fun k -> k C.pp c pos_m w);
+      w
 
     let ho_weight_initial c =
       if C.proof_depth c  = 0 then 1
       else ho_weight_calc c
 
     let rec calc_tweight t sg v w c_mul =
-      match Term.view t with
-        Term.AppBuiltin (_,l) ->
-        w + List.fold_left (fun acc t -> acc +
-                                         calc_tweight t sg v w c_mul) 0 l
-      | Term.Var _ -> v
-      | Term.DB _ -> w
-      | Term.App (f, l) ->
-        let v = if Term.is_var f then 2*v else v in
-        calc_tweight f sg v w c_mul +
-        List.fold_left (fun acc t -> acc + calc_tweight t sg v w c_mul) 0 l
-      | Term.Const id -> (int_of_float ((if Signature.sym_in_conj id sg then c_mul else 1.0)*.float_of_int w))
-      | Term.Fun (_, t) -> calc_tweight t sg v w c_mul
+      match Term.view t with 
+         Term.AppBuiltin (_,l) -> 
+            w + List.fold_left (fun acc t -> acc + 
+                                    calc_tweight t sg v w c_mul) 0 l
+         | Term.Var _ -> v
+         | Term.DB _ -> w
+         | Term.App (f, l) ->
+            calc_tweight f sg v w c_mul +
+              List.fold_left (fun acc t -> acc + calc_tweight t sg v w c_mul) 0 l
+         | Term.Const id -> (int_of_float ((if Signature.sym_in_conj id sg then c_mul else 1.0)*.float_of_int w))
+         | Term.Fun (_, t) -> calc_tweight t sg v w c_mul
 
-    let calc_lweight l sg v w c_mul =
+     let calc_lweight l sg v w c_mul =
       assert (Literal.no_prop_invariant l);
       match l with
       (* Special treatment of propositions *)
-      | Lit.Equation (lhs,rhs,true) when Term.equal rhs Term.true_
-                                      || Term.equal rhs Term.false_ ->
-        calc_tweight lhs sg v w c_mul, Term.equal rhs Term.true_
+      | Lit.Equation (lhs,rhs,sign) when Term.equal rhs Term.true_ ->
+        calc_tweight lhs sg v w c_mul, sign
       | Lit.Equation (lhs,rhs,sign) -> (calc_tweight lhs sg v w c_mul +
                                         calc_tweight rhs sg v w c_mul, sign)
       | _ -> (0,false)
@@ -268,9 +326,182 @@ module Make(C : Clause_intf.S) = struct
                 1.0 /. divider
               ) else 1.0 in
             let val_ = int_of_float (goal_dist_penalty *. dist_var_penalty *. res) in
-            (Util.debugf  10 "cl: %a, w:%d\n" (fun k -> k C.pp c val_);
+            (Util.debugf ~section  3 "cl: %a, w:%d\n" (fun k -> k C.pp c val_);
              val_))
 
+    (* function inspired by Struct from the paper https://arxiv.org/abs/1606.03888 *)
+    let conj_relative_struct ~inst_penalty ~gen_penalty ~var_w ~sym_w c =
+      let pos_mul,max_mul = 2.0,1.5 in
+      let max_lits = C.maxlits (c,0) Subst.empty in
+
+      let struct_diff_weight t =
+        let module T = Term in
+        let w t =
+          float_of_int @@ Term.weight ~var:var_w ~sym:(fun _ -> sym_w) t in
+
+        let rec w_diff ~given_term ~conj_term =
+          match T.view given_term, T.view conj_term with
+          | T.Var _, T.Var _ -> 1
+          | T.Const x, T.Const y when ID.equal x y -> 1
+          | T.DB i, T.DB j when i = j -> 1
+          | T.Var _, _ -> int_of_float (inst_penalty *. (w conj_term))
+          | T.App(hd,_), _ when T.is_var hd -> 
+            int_of_float (w given_term +. inst_penalty *. (w conj_term))
+          | _, T.Var _ -> int_of_float (gen_penalty *. (w given_term))
+          | _, T.App(hd,_) when T.is_var hd -> 
+            int_of_float (w conj_term +. inst_penalty *. (w given_term))
+          | T.App(hd1, args1), T.App(hd2, args2) 
+            when T.equal hd1 hd2 && List.length args1 = List.length args2 ->
+            w_diff_l args1 args2
+          | T.AppBuiltin(hd1, args1), T.AppBuiltin(hd2, args2) 
+            when Builtin.equal hd1 hd2 && List.length args1 = List.length args2 ->
+            w_diff_l args1 args2
+          | T.Fun(ty1, body1), T.Fun(ty2, body2) 
+            when Type.equal ty1 ty2 && Type.equal (T.ty body1) (T.ty body2) ->
+            w_diff body1 body2
+          | _, _ -> 
+            int_of_float (inst_penalty *. (w conj_term) +. gen_penalty *. (w given_term))
+        and w_diff_l xs ys =
+          CCList.fold_left2 (fun acc x y -> 
+            acc + w_diff ~given_term:x ~conj_term:y) 0 xs ys in
+        
+        let t = Lambda.eta_expand t in
+        if Term.Set.is_empty !_related_terms then int_of_float (w t)
+        else (
+          Term.Set.to_iter !_related_terms
+          |> Iter.map (fun conj_term -> 
+             let conj_term = Lambda.eta_expand conj_term in
+             w_diff ~given_term:t ~conj_term)
+          |> Iter.min_exn ~lt:(fun x y -> x < y)
+        ) in
+
+
+      C.Seq.lits c
+      |> Iter.foldi (fun acc idx lit -> 
+        let is_pos = Lit.is_pos lit in
+        let is_max = CCBV.get max_lits idx in
+
+        Lit.Seq.terms lit
+        |> Iter.filter (fun t -> not (Term.is_true_or_false t))
+        |> Iter.fold (fun acc t -> 
+            let w = struct_diff_weight t in 
+            Util.debugf ~section 3 "struct(@[%a@])=%d" (fun k -> k Term.pp t w);
+            acc + w) acc
+        |> (fun res ->
+              let mul = 
+                (if is_pos then pos_mul else 1.0) *. 
+                (if is_max then max_mul else 1.0) in
+              int_of_float (mul *. (float_of_int res)))
+      ) 0
+
+    let conjecture_relative_e ~conj_mul ~fresh_mul ~f ~cst ~p ~v ~max_term_mul ~max_lit_mul ~pos_mul c =
+      let sgn = C.Ctx.signature () in
+
+      let f_weight sym ty =
+        let multipliers = 
+          (if Signature.sym_in_conj sym sgn then conj_mul else 1.0)
+          *. (if ID.is_postcnf_skolem sym then fresh_mul else 1.0) in
+        int_of_float (float_of_int (
+          if Type.returns_prop ty then p
+          else if Type.is_fun ty then f
+          else cst
+        ) *. multipliers) in
+
+      let t_weight ~mul t =
+        let rec aux t =
+          match Term.view t with 
+          | App(hd,args) -> aux_l (hd::args)
+          | AppBuiltin(b,args) -> f + aux_l args
+          | Fun(_,body) -> v + aux body
+          | DB _ | Var _ -> v
+          | Const sym -> f_weight sym (Term.ty t)
+        and aux_l xs = List.fold_left (fun acc arg -> acc + aux arg) 0 xs in
+        int_of_float (mul *. float_of_int (aux t)) in
+
+      let lit_weight is_max lit =
+        let is_pos = Lit.is_pos lit in
+        let multipliers =
+          (if is_max then max_lit_mul else 1.0) *.
+          (if is_pos then pos_mul else 1.0) in
+        let base_weight = 
+          match lit with 
+          | Literal.Equation(lhs,rhs,_) ->
+            begin match Ordering.compare (C.Ctx.ord()) lhs rhs with 
+            | Comparison.Gt ->
+              t_weight ~mul:max_term_mul lhs + t_weight ~mul:1.0 rhs
+            | Comparison.Lt ->
+              t_weight ~mul:max_term_mul rhs + t_weight ~mul:1.0 lhs
+            | _ ->
+              t_weight ~mul:1.0 lhs + t_weight ~mul:1.0 rhs
+            end
+          | _ -> 1 in
+        int_of_float (multipliers *. (float_of_int base_weight)) in
+
+      let max_lits = C.maxlits (c,0) Subst.empty in
+      C.Seq.lits c
+      |> Iter.foldi (fun acc idx lit -> 
+        let is_max = CCBV.get max_lits idx in
+        acc + lit_weight is_max lit
+      ) 0
+      |> (fun res ->
+        Util.debugf ~section 3 "cr-e(@[%a@])=%d@." (fun k -> k C.pp c res);
+        res
+      )
+
+    let diversity_weight 
+      ~var_w ~sym_w ~pos_mul ~max_t_mul ~max_l_mul
+      ~fdiff_a ~fdiff_b ~vdiff_a ~vdiff_b c =
+      
+      let ord = C.Ctx.ord () in
+
+      let mul_max_t (l,w_l) (r,w_r) =
+        match Ordering.compare ord l r with
+        | Comparison.Incomparable ->
+          (max_t_mul *. (float_of_int w_l)) +. max_t_mul *. (float_of_int w_r)
+        | Comparison.Gt ->
+          (max_t_mul *. (float_of_int w_l)) +. (float_of_int w_r)
+        | Comparison.Lt ->
+          (max_t_mul *. (float_of_int w_r)) +. (float_of_int w_l)
+        | _ -> float_of_int (w_l + w_r) in
+      
+      let max_lits = C.maxlits (c,0) Subst.empty in
+      let get_syms l r = ID.Set.union (Term.symbols l) (Term.symbols r) in
+      let get_vars l r = Term.VarSet.union (Term.vars l) (Term.vars r) in
+    
+      let res = 
+        C.Seq.lits c
+        |> Iter.foldi (fun (weight,syms,vars) idx lit -> 
+          let pos_c = if Lit.is_pos lit then pos_mul else 1.0 in
+          let max_c = if CCBV.get max_lits idx then max_l_mul else 1.0 in
+
+          match lit with
+          | Literal.Equation(l,r,_) ->
+            let w_l = Term.weight ~var:var_w ~sym:(fun _ -> sym_w) l in
+            let w_r = Term.weight ~var:var_w ~sym:(fun _ -> sym_w) r in
+            let w =  pos_c *. max_c *. mul_max_t (l,w_l) (r,w_r) in
+            assert (int_of_float w != 0);
+            (w +. weight, ID.Set.union syms (get_syms l r), Term.VarSet.union vars (get_vars l r))
+          | _ -> weight +. 1.0, syms, vars
+        ) (0.0, ID.Set.empty, Term.VarSet.empty)
+        |> (fun (w, syms, vars) ->
+            let f = float_of_int @@ ID.Set.cardinal syms in
+            let v = float_of_int @@ Term.VarSet.cardinal vars in
+
+            let f_factor = fdiff_a *. f +. fdiff_b in
+            let v_factor = vdiff_a *. v +. vdiff_b in
+            Util.debugf ~section 3 "w:%g;f:%g;v:%g" (fun k -> k w f_factor v_factor);
+            int_of_float (w +. f_factor +. v_factor  )) in
+      Util.debugf ~section 3 "diversity_weight(@[%a@])=%d@." (fun k -> k C.pp c res);
+      res
+
+
+    let _max_weight = ref (-1.0)
+    
+    let staggered ~stagger_factor c =
+      let float_weight c = float_of_int @@ C.weight c in
+      _max_weight := max (!_max_weight) (float_weight c) +. 1.0;
+
+      int_of_float @@ float_weight c /. (!_max_weight *. stagger_factor)
 
     let penalty = C.penalty
 
@@ -349,6 +580,36 @@ module Make(C : Clause_intf.S) = struct
           ; favor_goal, 1; favor_pos_unit, 1; ]
       )
 
+    (* imitation of the E function of the same name *)
+    let parse_diversity_weight s =
+      let crv_regex = Str.regexp 
+        ("diversity-weight(" ^ 
+          "\\([0-9]+\\),\\([0-9]+\\),\\([0-9]+[.]?[0-9]*\\)," ^ 
+          "\\([0-9]+[.]?[0-9]*\\),\\([0-9]+[.]?[0-9]*\\)," ^
+          "\\([+-]?[0-9]+[.]?[0-9]*\\),\\([+-]?[0-9]+[.]?[0-9]*\\)," ^
+          "\\([+-]?[0-9]+[.]?[0-9]*\\),\\([+-]?[0-9]+[.]?[0-9]*\\))") in
+      try
+        ignore(Str.search_forward crv_regex s 0);
+        
+        let sym_w = CCOpt.get_exn @@  CCInt.of_string (Str.matched_group 1 s) in
+        let var_w = CCOpt.get_exn @@ CCInt.of_string (Str.matched_group 2 s) in
+        let max_t_mul = CCFloat.of_string_exn (Str.matched_group 3 s) in
+        let max_l_mul = CCFloat.of_string_exn (Str.matched_group 4 s) in
+        let pos_mul = CCFloat.of_string_exn (Str.matched_group 5 s) in
+        let fdiff_a = CCFloat.of_string_exn (Str.matched_group 6 s) in
+        let fdiff_b = CCFloat.of_string_exn (Str.matched_group 7 s) in
+        let vdiff_a = CCFloat.of_string_exn (Str.matched_group 8 s) in
+        let vdiff_b = CCFloat.of_string_exn (Str.matched_group 9 s) in
+
+
+        diversity_weight ~sym_w ~var_w ~max_t_mul ~max_l_mul ~pos_mul 
+                         ~fdiff_a ~fdiff_b ~vdiff_a ~vdiff_b
+      with Not_found | Invalid_argument _ ->
+        invalid_arg
+          ("expected diversity-weight(" ^
+            "f_w:int,v_w:int,max_t_mul:float,max_l_mul:float,pos_mul:float," ^
+            "fdiff_a:float,fdiff_b:flaot,vdiff_a:float,vdiff_b:float)")
+
     let parse_crv s =
       let crv_regex = Str.regexp "conjecture-relative-var(\\([0-9]+[.]?[0-9]*\\),\\([lsLS]\\),\\([tfTF]\\))" in
       try
@@ -364,6 +625,44 @@ module Make(C : Clause_intf.S) = struct
       with Not_found | Invalid_argument _ ->
         invalid_arg
           "expected conjecture-relative-var(dist_var_mul:float,parameters_magnitude:l/s,goal_penalty:t/f)"
+
+    let parse_cr_e s =
+      let crv_regex = 
+        Str.regexp 
+          ("conjecture-relative-e(\\([0-9]+[.]?[0-9]*\\),\\([0-9]+[.]?[0-9]*\\),\\([0-9]+\\),\\([0-9]+\\),"
+          ^ "\\([0-9]+\\),\\([0-9]+\\),\\([0-9]+[.]?[0-9]*\\),\\([0-9]+[.]?[0-9]*\\),\\([0-9]+[.]?[0-9]*\\)" ^ ")") in
+      try
+        ignore(Str.search_forward crv_regex s 0);
+        let conj_mul = CCFloat.of_string_exn (Str.matched_group 1 s) in
+        let fresh_mul = CCFloat.of_string_exn (Str.matched_group 2 s) in
+        let f = CCOpt.get_exn @@ CCInt.of_string (Str.matched_group 3 s) in
+        let cst = CCOpt.get_exn @@  CCInt.of_string (Str.matched_group 4 s) in
+        let p = CCOpt.get_exn @@  CCInt.of_string (Str.matched_group 5 s) in
+        let v = CCOpt.get_exn @@  CCInt.of_string (Str.matched_group 6 s) in
+        let max_term_mul = CCFloat.of_string_exn (Str.matched_group 7 s) in
+        let max_lit_mul = CCFloat.of_string_exn (Str.matched_group 8 s) in
+        let pos_mul = CCFloat.of_string_exn (Str.matched_group 9 s) in
+        
+        conjecture_relative_e ~conj_mul ~fresh_mul ~f ~cst ~p ~v ~max_term_mul ~max_lit_mul ~pos_mul 
+      with Not_found | Invalid_argument _ ->
+        invalid_arg
+          ("expected conjecture-relative-e(conj_mul:float, fresh_mul:float, f:int, const:int," ^ 
+          "p:int, v:int, max_term_mul:float, max_lit_mul:float, pos_mul:float)")
+
+    let parse_cr_struct s =
+      _rel_terms_enabled := true;
+      let crs_regex = 
+        Str.regexp "conjecture-relative-struct(\\([0-9][.]?[0-9]*+\\),\\([0-9][.]?[0-9]*+\\),\\([0-9]+\\),\\([0-9]+\\))" in
+      try
+        ignore(Str.search_forward crs_regex s 0);
+        let inst_penalty = CCFloat.of_string_exn (Str.matched_group 1 s) in
+        let gen_penalty = CCFloat.of_string_exn (Str.matched_group 2 s) in
+        let var_w = CCOpt.get_exn @@ CCInt.of_string (Str.matched_group 3 s) in
+        let sym_w = CCOpt.get_exn @@  CCInt.of_string (Str.matched_group 4 s) in
+        conj_relative_struct ~inst_penalty ~gen_penalty ~var_w ~sym_w
+      with Not_found | Invalid_argument _ ->
+        invalid_arg
+          "expected conjecture-relative-struct(inst_penalty:float,gen_penalty:float,var_weight:int,sym_weight:int)"
 
     let parse_orient_lmax s =
       let or_lmax_regex =
@@ -399,19 +698,31 @@ module Make(C : Clause_intf.S) = struct
            ^ "\\([0-9]+[.]?[0-9]*\\))") in
       try
         ignore(Str.search_forward or_lmax_regex s 0);
-        let pv_w = CCOpt.get_exn (CCInt.of_string (Str.matched_group 1 s)) in
-        let pf_w = CCOpt.get_exn (CCInt.of_string (Str.matched_group 2 s)) in
-        let nv_w = CCOpt.get_exn (CCInt.of_string (Str.matched_group 2 s)) in
-        let nf_w = CCOpt.get_exn (CCInt.of_string (Str.matched_group 2 s)) in
-        let pos_m = CCFloat.of_string_exn (Str.matched_group 3 s) in
-        let max_t_m = CCFloat.of_string_exn (Str.matched_group 4 s) in
-        let max_l_m = CCFloat.of_string_exn (Str.matched_group 5 s) in
+        let pf_w = CCOpt.get_exn (CCInt.of_string (Str.matched_group 1 s)) in
+        let pv_w = CCOpt.get_exn (CCInt.of_string (Str.matched_group 2 s)) in
+        let nf_w = CCOpt.get_exn (CCInt.of_string (Str.matched_group 3 s)) in
+        let nv_w = CCOpt.get_exn (CCInt.of_string (Str.matched_group 4 s)) in
+        let max_t_m = CCFloat.of_string_exn (Str.matched_group 5 s) in
+        let max_l_m = CCFloat.of_string_exn (Str.matched_group 6 s) in
+        let pos_m = CCFloat.of_string_exn (Str.matched_group 7 s) in
         pn_refined_weight ~pv_w ~pf_w ~nv_w ~nf_w ~pos_m ~max_t_m ~max_l_m
       with Not_found | Invalid_argument _ ->
         invalid_arg @@
-        "expected pnrefined(+var_weight:int,+fun_weight:int" ^
-        "-var_weight:int,-fun_weight:int" ^
-        "pos_lit_mult:float, max_t_mult:float, max_lit_mul:float)"
+        "expected pnrefined(+fun_weight:int,+var_weight:int" ^
+        "-fun_weight:int,-var_weight:int" ^
+        "max_t_mult:float, max_lit_mul:float, pos_lit_mult:float)"
+    
+    let parse_staggered s =
+      let or_lmax_regex =
+        Str.regexp
+          ("staggered(\\([0-9]+[.]?[0-9]*\\))") in
+      try
+        ignore(Str.search_forward or_lmax_regex s 0);
+        let stagger_factor = CCFloat.of_string_exn (Str.matched_group 1 s) in
+        staggered ~stagger_factor
+      with Not_found | Invalid_argument _ ->
+        invalid_arg @@
+        "expected staggered(+stagger_factor:int)"
 
     let parse_conj_relative_cheap s =
       let or_lmax_regex =
@@ -442,18 +753,27 @@ module Make(C : Clause_intf.S) = struct
                                   ~parameters_magnitude:`Large
                                   ~goal_penalty:false );
        "conjecture-relative-var", parse_crv;
+       "conjecture-relative-struct", parse_cr_struct;
        "conjecture-relative-cheap", parse_conj_relative_cheap;
+      "conjecture-relative-e", parse_cr_e;
+       "diversity-weight", parse_diversity_weight;
        "pnrefined", parse_pnrefine;
+       "staggered", parse_staggered;
        "orient-lmax", parse_orient_lmax]
 
     let of_string s =
-      try
-        let splitted = CCString.split ~by:"(" s in
-        let name = List.hd splitted in
-        List.assoc name parsers s
-      with Not_found | Failure _ ->
-        invalid_arg (CCFormat.sprintf "unknown weight function %s" s)
+    try
+      let splitted = CCString.split ~by:"(" s in
+      let name = List.hd splitted in
+      let w = List.assoc name parsers s in
+      fun c ->
+        let res = penalize w c in
+        Util.debugf ~section 1 "@[%s(%a)@]=@[%d@]" (fun k -> k name C.pp c res);
+        res
 
+    with Not_found | Failure _ -> 
+      invalid_arg (CCFormat.sprintf "unknown weight function %s" s)
+    
   end
 
   module PriorityFun = struct
@@ -479,8 +799,11 @@ module Make(C : Clause_intf.S) = struct
     let prefer_processed c =
       if C.is_backward_simplified c then 0 else 1
 
-    let prefer_lambdas c =
-      if (C.Seq.terms c |> Iter.exists (fun t -> Iter.exists Term.is_fun (Term.Seq.subterms t)))
+    let prefer_lambdas c = 
+      if (C.Seq.terms c 
+          |> Iter.exists (fun t -> 
+              Iter.exists (fun t -> Term.is_fun t || Term.is_comb t) 
+                (Term.Seq.subterms t)))
       then 0 else 1
 
     let defer_lambdas c =
@@ -490,24 +813,100 @@ module Make(C : Clause_intf.S) = struct
       if (C.Seq.terms c |> Iter.exists (fun t -> Iter.exists Term.is_formula (Term.Seq.subterms t)))
       then 0 else 1
 
+    let prefer_bool_neq c =
+      C.Seq.lits c
+      |> Iter.map (fun lit -> match lit with
+        | Lit.Equation(lhs,rhs,false) -> 
+          if Type.is_prop (Term.ty lhs) && not (Term.is_true_or_false rhs) then (
+            2 - (List.length (List.filter Term.is_appbuiltin [lhs;rhs]))
+          ) else max_int
+        | _ -> max_int)
+      |> Iter.min
+      |> CCOpt.get_or ~default:0
+
     let prefer_easy_ho c =
+      let is_arg_cong_child c =
+        let rec aux proof =
+          let p_res, step = Proof.S.result proof, Proof.S.step proof in
+          let parents = List.map Proof.Parent.proof (Proof.Step.parents step) in
+          (* clause is not obtained by normalization *)
+
+          if Proof.Step.is_simpl step then (
+            (* Looking through single-step simplifications *)
+            match parents with 
+            | [parent] -> aux parent
+            | _ -> false 
+          ) else if Proof.Step.is_inference step then (
+            begin match Proof.Step.rule step with 
+            | Some rule -> String.equal (Proof.Rule.name rule) "ho_complete_eq"
+            | None -> false end
+          ) else false  in
+        let ans = aux (C.proof c) in
+        ans in
+
       let has_lam_eq c =
         C.Seq.lits c
         |> Iter.exists (fun l ->
             match l with
             | Literal.Equation(lhs,_,_) -> Type.is_fun (Term.ty lhs)
             | _ -> false) in
-      if has_lam_eq c || prefer_formulas c = 1 then 0
-      else if prefer_lambdas c = 1 then 1
-      else 2
+      let in_pattern_fragment c =
+        (* returns has_lambdas, is_pattern *)
+        let rec aux t =
+          match Term.view t with
+          | App(hd, args) ->
+            if (Term.is_const hd) then aux_l args 
+            else (false, List.for_all Term.is_bvar args)
+          (*           ignoring distinctness *)
+          | AppBuiltin(_, args) -> aux_l args
+          | Const _ | Var _ | DB _-> (false, true)
+          | Fun _ ->
+            let _, body = Term.open_fun t in
+            (true, snd @@ aux body)
+        and aux_l args = 
+          CCList.fold_while (fun (has_lambda, is_pattern) arg ->
+              assert(is_pattern);
+              let h_l', i_p' = aux arg in
+              if i_p' then (h_l' || has_lambda, true), `Continue
+              else (false, false), `Stop
+            ) (false,true) args in
+
+        C.Seq.terms c 
+        |> Iter.map aux
+        (* at least one subterm is functional and all subterms are patterns *)
+        |> (fun seq -> Iter.exists fst seq && Iter.for_all snd seq) in
+
+      if is_arg_cong_child c then 0
+      else if has_lam_eq c || in_pattern_fragment c then 1
+      else if prefer_formulas c == 1 then 2
+      else 3
 
     let defer_formulas c =
       - (prefer_formulas c)
 
+    let prefer_short_trail c =
+      if Trail.is_empty (C.trail c) then max_int
+      else Trail.length (C.trail c)
+    
+    let prefer_empty_trail c =
+      if Trail.is_empty (C.trail c) then 0 else 1
+
+    let prefer_long_trail c =
+      - (Trail.length (C.trail c))
+
     let prefer_fo c =
+      let rec almost_fo t = 
+        (* allows partial application, formulas and unapplied HO variables *)
+        match Term.view t with
+        | App(hd, args) ->
+          Term.is_const hd && List.for_all almost_fo args
+        | AppBuiltin(_, args) -> List.for_all almost_fo args
+        | Const _ | Var _ -> true
+        | Fun _ | DB _ -> false in
+
       let all_terms = Iter.filter (fun t-> not (Term.is_true_or_false t)) (C.Seq.terms c) in
       let num_terms = float_of_int (Iter.length all_terms) in
-      let num_fo_terms = float_of_int (Iter.filter_count Term.is_true_or_false all_terms) in
+      let num_fo_terms = float_of_int (Iter.filter_count almost_fo all_terms) in
       int_of_float @@  (1.0 -. (num_fo_terms /. num_terms)) *. 100.0
 
     let defer_fo c =
@@ -519,35 +918,177 @@ module Make(C : Clause_intf.S) = struct
     let defer_ground c =
       if C.is_ground c then 1 else 0
 
-    let defer_sos c =
+    let defer_sos c = 
       if C.proof_depth c = 0 || CCOpt.is_some (C.distance_to_goal c) then 1 else 0
+
+    let prefer_top_level_app_var c =
+      let lits = C.lits c in
+      if Array.length lits > 1 then max_int
+      else if Array.length lits = 0 then min_int
+      else (
+        let no_app_vars = 
+            Lit.Seq.terms lits.(0)
+            |> Iter.filter Term.is_app_var
+            |> Iter.length in
+        if no_app_vars = 0 then max_int else no_app_vars)
+    
+    let defer_top_level_app c =
+      - (prefer_top_level_app_var c)
+
+    let prefer_shallow_app_var c =
+      let app_var_depth t =
+        let rec aux depth t = 
+          match Term.view t with 
+          | Term.DB _ | Term.Const _ | Term.Var _ -> 0
+          | Term.Fun(_,body) -> aux (depth+1) body
+          | Term.App(hd, args) when Term.is_var hd ->
+            max depth (aux_l (depth+1) args)
+          | Term.App(hd, args) -> aux_l (depth+1) (hd :: args)
+          | Term.AppBuiltin(_, args) -> aux_l (depth+1) args
+        and aux_l depth = function
+          | [] -> min_int
+          | t :: ts -> max (aux depth t) (aux_l depth ts) 
+        in
+      aux 0 t 
+      in 
+      
+      C.Seq.terms c
+      |> Iter.map app_var_depth
+      |> Iter.max
+      |> CCOpt.get_or ~default:min_int
+
+    let by_app_var_num c =
+      C.Seq.terms c
+      |> Iter.flat_map (Term.Seq.subterms ~include_builtin:true)
+      |> Iter.filter Term.is_app_var
+      |> Iter.length
+    
+    let prefer_deep_app_var c =
+      - (prefer_shallow_app_var c)
+
+    let prefer_neg_unit c =
+      match C.lits c with 
+      | [| Literal.Equation(_,_,false) |] -> 0
+      | _ -> 1
+    
+    let defer_neg_unit c =
+      - (prefer_neg_unit c)
+
+    let by_neg_lit c =
+      abs @@
+        Array.fold_left (fun acc lit -> 
+          if Lit.is_pos lit then acc + 400
+          else if Lit.is_ground lit then acc - 3
+          else acc - 1
+        ) 0 (C.lits c)
+
+    (* defer if there are no ho subterms *)
+    let by_ho_depth ?(modifier=(fun x -> x)) ~depth_fun  c =
+      let max_opt a b =
+        match a, b with 
+        | Some x, Some y -> if x > y then a else b
+        | Some x, None -> a
+        | _ -> b in
+
+      C.Seq.terms c
+      |> Iter.fold (fun acc t -> max_opt acc (depth_fun t)) None
+      |> CCOpt.map modifier
+      |> CCOpt.get_or ~default:max_int
+
+    
+    let prefer_shallow_lambdas c = 
+      by_ho_depth ~depth_fun:Term.lambda_depth c
+    let prefer_deep_lambdas c = 
+      by_ho_depth ~depth_fun:Term.lambda_depth ~modifier:(fun x -> -x) c
+    
+    let prefer_shallow_combs c = 
+      by_ho_depth ~depth_fun:Term.comb_depth c
+    let prefer_deep_combs c = 
+      by_ho_depth ~depth_fun:Term.comb_depth ~modifier:(fun x -> -x) c
+
+    let prefer_shallow c =
+      Literals.Seq.terms (C.lits c)
+      |> Iter.map Term.depth
+      |> Iter.max
+      |> CCOpt.get_or ~default:0
+
+    let defer_shallow c =
+      - (prefer_shallow c)
+
+    (* Given a clause calculate how much was the size of it reduced (enlarged)
+       by the last normalization and prefer clauses which were reduced much
+     *)
+    let by_normalization_factor c =
+      let default = 5000 in
+
+      let norm_fact c =
+        let aux proof =
+          let p_res, step = Proof.S.result proof, Proof.S.step proof in
+          (* clause is not obtained by normalization *)
+          if not (List.mem Proof.Tag.T_ho_norm (Proof.Step.tags step)) then default
+          else (
+            assert(Proof.Step.is_simpl step);
+            let parents = List.map Proof.Parent.proof (Proof.Step.parents step) in
+            assert(List.length parents == 1);
+            let calc_w pr =
+              TypedSTerm.Seq.subterms (Proof.Result.to_form @@ Proof.S.result pr)
+              |> Iter.length
+              |> float_of_int in
+
+            let new_w = calc_w (C.proof c) in
+            let old_w = calc_w (List.hd parents) in 
+            int_of_float ((new_w /. old_w) *. (float_of_int default))
+          ) in
+        aux (C.proof c) in
+
+      let res = norm_fact c in
+      res
 
     let parsers =
       ["const", (fun _ -> const_prio);
-       "prefer-ho-steps", (fun _ -> prefer_ho_steps);
-       "prefer-sos", (fun _ -> prefer_sos);
-       "defer-sos", (fun _ -> defer_sos);
-       "prefer-goals", (fun _ -> prefer_goals);
-       "prefer-non-goals", (fun _ -> prefer_non_goals);
-       "prefer-unit-ground-non-goals", (fun _ -> prefer_unit_ground_non_goals);
-       "prefer-processed", (fun _ -> prefer_processed);
-       "prefer-lambdas", (fun _ -> prefer_lambdas);
-       "defer-lambdas", (fun _ -> defer_lambdas);
-       "prefer-formulas", (fun _ -> prefer_formulas);
-       "defer-formulas", (fun _ -> defer_formulas);
-       "prefer-easy-ho", (fun _ -> prefer_easy_ho);
-       "prefer-ground", (fun _ -> prefer_ground);
-       "defer-ground", (fun _ -> defer_ground);
-       "defer-fo", (fun _ -> defer_fo);
-       "prefer-fo", (fun _ -> prefer_fo);]
+      "prefer-ho-steps", (fun _ -> prefer_ho_steps);
+      "prefer-sos", (fun _ -> prefer_sos);
+      "defer-sos", (fun _ -> defer_sos);
+      "prefer-goals", (fun _ -> prefer_goals);
+      "prefer-non-goals", (fun _ -> prefer_non_goals);
+      "prefer-unit-ground-non-goals", (fun _ -> prefer_unit_ground_non_goals);            
+      "prefer-processed", (fun _ -> prefer_processed);
+      "prefer-lambdas", (fun _ -> prefer_lambdas);
+      "defer-lambdas", (fun _ -> defer_lambdas);
+      "prefer-formulas", (fun _ -> prefer_formulas);
+      "prefer-bool-neq", (fun _ -> prefer_bool_neq);
+      "defer-formulas", (fun _ -> defer_formulas);
+      "prefer-easy-ho", (fun _ -> prefer_easy_ho);
+      "prefer-ground", (fun _ -> prefer_ground);
+      "defer-ground", (fun _ -> defer_ground);
+      "defer-fo", (fun _ -> defer_fo);
+      "prefer-fo", (fun _ -> prefer_fo);
+      "prefer-shallow", (fun _ -> prefer_shallow);
+      "defer-shallow", (fun _ -> defer_shallow);
+      "prefer-empty-trail", (fun _ -> prefer_empty_trail);
+      "prefer-short-trail", (fun _ -> prefer_short_trail);
+      "prefer-long-trail", (fun _ -> prefer_long_trail);
+      "by-neg-lit", (fun _ -> by_neg_lit);
+      "by-app-var-num", (fun _ -> by_app_var_num);
+      "by-norm-factor", (fun _ -> by_normalization_factor);
+      "prefer-top-level-appvars", (fun _ -> prefer_top_level_app_var);
+      "defer-top-level-appvars", (fun _ -> prefer_top_level_app_var);
+      "prefer-shallow-appvars", (fun _ -> prefer_shallow_app_var);
+      "prefer-deep-appvars", (fun _ -> prefer_deep_app_var);
+      "prefer-neg-unit", (fun _ -> prefer_neg_unit);
+      "defer-neg-unit", (fun _ -> defer_neg_unit);
+      "prefer-shallow-lambdas", (fun _ -> prefer_shallow_lambdas);
+      "prefer-deep-lambdas", (fun _ -> prefer_deep_lambdas);
+      "prefer-shallow-combs", (fun _ -> prefer_shallow_combs);
+      "prefer-deep-combs", (fun _ -> prefer_deep_combs);]
 
-    let of_string s =
-      try
+    let of_string s = 
+      try 
         List.assoc (String.lowercase_ascii s) parsers s
       with Not_found ->
         let err_msg =
-          CCFormat.sprintf "unknown priortity: %s.\noptions:@ %a"
-            s (CCList.pp ~start:"{" ~stop:"}" CCString.pp) (List.map fst parsers) in
+          CCFormat.sprintf "unknown priortity: %s.\noptions:@ {@[%a@]}"
+            s (CCList.pp CCString.pp) (List.map fst parsers) in
         invalid_arg err_msg
   end
 
@@ -632,7 +1173,17 @@ module Make(C : Clause_intf.S) = struct
     let current_heap, (_,_,c) =  H.take_exn current_heap in
     Array.set q.heaps q.current_heap_idx current_heap;
 
+    let is_orphaned c =
+      !_ignore_orphans && C.is_orphaned c in
+
+    (* if clause was picked by another queue 
+       or it should be ignored, repeat clause choice.  *)
     if not (C.Tbl.mem q.tbl c) then (
+      take_first_mixed q
+    ) else if is_orphaned c then (
+      C.Tbl.remove q.tbl c;
+      Util.debugf ~section 3 "ignoring orphaned clause:@ @[%a@]@." (fun k -> k C.pp c);
+      Util.debugf ~section 4 "proof:@ @[%a@]@." (fun k -> k Proof.S.pp_tstp (C.proof c));
       take_first_mixed q
     ) else (
       C.Tbl.remove q.tbl c;
@@ -817,7 +1368,7 @@ let parse_wf_with_priority s =
     let ratio = CCOpt.get_exn (CCInt.of_string (Str.matched_group 1 s)) in
     let priority_str = CCString.trim (Str.matched_group 2 s) in
     let weight_fun = CCString.trim (Str.matched_group 3 s) in
-    funs_to_parse := (ratio, priority_str, weight_fun) :: !funs_to_parse
+    funs_to_parse := !funs_to_parse @ [(ratio, priority_str, weight_fun)]
   with Not_found | Invalid_argument _ ->
     invalid_arg
       "weight function is of the form \"ratio:int|priority:name|weight:name(options..)\""
@@ -828,30 +1379,24 @@ let () =
   Params.add_opts
     [ "--clause-queue", o,
       " choose which set of clause queues to use (for selecting next active clause)";
-      "-cq", o, " alias to --clause-queue";
+      "-cq", o, " alias for --clause-queue";
       "--add-queue", add_queue, " create a new clause evaluation queue. Its description is of the form" ^
                                 " RATIO|PRIORITY_FUN|WEIGHT_FUN";
-      "-q", add_queue, "alias to --add-queue"
+      "-q", add_queue, " alias for --add-queue";
+      "--ignore-orphans", Arg.Bool ((:=) _ignore_orphans), " whether to ignore the orphans during clause selection"
     ];
 
-  Params.add_to_mode "ho-pragmatic" (fun () ->
+  Params.add_to_modes 
+    [ "ho-pragmatic"
+    ; "ho-competitive"
+    ; "ho-complete-basic"
+    ; "fo-complete-basic"
+    ; "lambda-free-intensional"
+    ; "lambda-free-extensional"
+    ; "lambda-free-purify-intensional"
+    ; "lambda-free-purify-extensional"]
+    (fun () ->
       _profile := P_conj_rel_var;
       cr_var_ratio := 8;
       cr_var_mul   := 1.05;
     );
-  Params.add_to_mode "ho-competitive" (fun () ->
-      _profile := P_conj_rel_var;
-      cr_var_ratio := 8;
-      cr_var_mul   := 1.05;
-    );
-  Params.add_to_mode "ho-complete-basic" (fun () ->
-      _profile := P_conj_rel_var;
-      cr_var_ratio := 8;
-      cr_var_mul   := 1.05;
-    );
-  Params.add_to_mode "fo-complete-basic" (fun () ->
-      _profile := P_conj_rel_var;
-      cr_var_ratio := 8;
-      cr_var_mul   := 1.05;
-    );
-

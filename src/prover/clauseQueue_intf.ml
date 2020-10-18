@@ -17,6 +17,8 @@ type profile =
 (** {1 A priority queue of clauses, purely functional} *)
 module type S = sig
   module C : Clause_intf.S
+  
+  val register_conjecture_clause : C.t -> unit
 
   (** {6 Weight functions} *)
   module WeightFun : sig
@@ -24,6 +26,7 @@ module type S = sig
     (** attribute a weight to a clause. The smaller, the better (lightweight
         clauses will be favored). A weight must always be positive;
         the weight of the empty clause should alwyays be 0. *)
+
 
     val of_string : string -> t
     (** parse string description of weight function and return it  *)

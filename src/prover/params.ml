@@ -9,7 +9,7 @@ open Logtk
 (* TODO: params to enable/disable some preprocessing *)
 
 type t = {
-  ord : string;
+  ord : string ref;
   seed : int;
   steps : int;
   version : bool;
@@ -28,11 +28,10 @@ type t = {
   presaturate : bool; (** initial interreduction of proof state? *)
   unary_depth : int; (** Maximum successive levels of unary inferences *)
   check: bool; (** check proof *)
-  eta: [`Reduce | `Expand | `None]; (** eta conversion *)
 }
 
 let default : t = {
-  ord= "kbo";
+  ord = ref "lambda_kbo";
   seed = 1928575;
   steps = -1;
   version= false;
@@ -51,7 +50,6 @@ let default : t = {
   dot_sat= false;
   expand_def= false;
   check= false;
-  eta = `Reduce;
 }
 
 let select = ref default.select
@@ -63,10 +61,12 @@ let mode_spec () =
      fun s -> List.iter (fun f -> f ()) (Hashtbl.find_all _modes s))
 let add_to_mode mode f = 
   Hashtbl.add _modes mode f
+let add_to_modes modes f = 
+  List.iter (fun m -> add_to_mode m f) modes
 
 (** parse_args returns parameters *)
 let parse_args () =
-  let ord = ref default.ord
+  let ord = default.ord
   and seed = ref default.seed
   and steps = ref default.steps
   and version = ref default.version
@@ -83,12 +83,6 @@ let parse_args () =
   and prelude = CCVector.create()
   and files = CCVector.create ()
   and check = ref default.check
-  and eta = ref `Reduce
-  in
-  let eta_opt =
-    let set_ n = eta := n in
-    let l = [ "reduce", `Reduce; "expand", `Expand; "none", `None] in
-    Arg.Symbol (List.map fst l, fun s -> set_ (List.assoc s l))
   in
   (* special handlers *)
   let add_file s = CCVector.push files s in
@@ -117,7 +111,6 @@ let parse_args () =
     ; "--check", Arg.Set check, " check proof"
     ; "--prelude", Arg.String (CCVector.push prelude), " parse prelude file"
     ; "--no-check", Arg.Clear check, " do not check proof"
-    ; "--ho-eta", eta_opt, " eta-expansion/reduction"
     ] @ Options.make ()
   ) |> List.sort (fun (s1,_,_)(s2,_,_) -> String.compare s1 s2)
     |> Arg.align
@@ -131,7 +124,7 @@ let parse_args () =
   let prelude = CCVector.freeze prelude in
   let files = CCVector.freeze files in
   (* return parameter structure *)
-  { ord= !ord; seed = !seed; steps = !steps;
+  { ord= ord; seed = !seed; steps = !steps;
     version= !version; timeout = !timeout; prelude= prelude;
     files = files; select = !select;
     stats= ! Options._stats; def_as_rewrite= !def_as_rewrite;
@@ -139,11 +132,27 @@ let parse_args () =
     dot_file = !dot_file; dot_llproof= !dot_llproof;
     dot_check= !dot_check;
     unary_depth= !unary_depth; dot_sat= !dot_sat;
-    expand_def= !expand_def; check= !check; eta = !eta}
+    expand_def= !expand_def; check= !check}
 
 let add_opt = Options.add_opt
 let add_opts = Options.add_opts
 
 (* key used to store the parameters in Flex_state *)
 let key : t Flex_state.key = Flex_state.create_key()
+
+let () =
+  add_to_modes 
+      [ "lambda-free-intensional"
+      ; "lambda-free-extensional"
+      ; "ho-comb-complete"
+      ; "lambda-free-purify-intensional"
+      ; "lambda-free-purify-extensional"] (fun () ->
+      default.ord := "lambdafree_kbo"
+    );
+  
+  add_to_modes 
+      [ "ho-competitive"
+      ; "ho-pragmatic"] (fun () ->
+      default.ord := "lambda_kbo"
+    );
 

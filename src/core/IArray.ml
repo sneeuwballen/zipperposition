@@ -97,10 +97,10 @@ let compare cmp a b =
   in
   aux 0
 
-let to_seq a k = iter k a
-let to_seqi a k = iteri (fun i x -> k(i,x)) a
+let to_iter a k = iter k a
+let to_iteri a k = iteri (fun i x -> k(i,x)) a
 
-let of_seq s =
+let of_iter s =
   let l = ref [] in
   s (fun x -> l := x :: !l);
   Array.of_list (List.rev !l)

@@ -225,7 +225,7 @@ module Dot = struct
     end
 
   let pp_dot_seq ~name out seq =
-    CCGraph.Dot.pp_seq
+    CCGraph.Dot.pp_all
       ~tbl:(CCGraph.mk_table ~eq:equal ~hash:hash 64)
       ~eq:equal
       ~name

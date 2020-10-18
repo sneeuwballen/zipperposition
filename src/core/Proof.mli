@@ -100,6 +100,8 @@ module Kind : sig
   type t = kind
 
   val pp : t CCFormat.printer
+  val pp_tstp : Format.formatter ->
+    kind * [< `Name of string | `Theory of string ] list -> unit
 end
 
 (** {2 Source}
@@ -169,6 +171,7 @@ module Result : sig
     pp_in:(Output_format.t -> 'a CCFormat.printer) ->
     ?name:('a -> string) ->
     ?is_stmt:bool ->
+    ?is_dead_cl:(unit -> bool) ->
     ?flavor:('a -> flavor) ->
     unit ->
     'a tc
@@ -193,6 +196,7 @@ module Result : sig
   val pp_in : Output_format.t -> t CCFormat.printer
   val pp : t CCFormat.printer
   val is_stmt : t -> bool
+  val is_dead_cl : t -> unit -> bool
   val to_form : ?ctx:Term.Conv.ctx -> t -> form
 
   val to_form_subst : ?ctx:Term.Conv.ctx -> Subst.Projection.t -> t -> form * inst_subst
@@ -222,6 +226,8 @@ module Step : sig
 
   val src : t -> source option
 
+  val tags : t -> tag list
+
   val trivial : t
 
   val by_def : ID.t -> t
@@ -241,6 +247,10 @@ module Step : sig
 
   val inferences_performed : t -> int
 
+  (* count how many inferences with the given name
+     have been used in construction of the proof  *)
+  val count_rules : name:string -> t -> int
+
   val has_ho_step : t -> bool
 
   val inference : ?infos:infos -> ?tags:tag list -> rule:rule -> parent list -> t
@@ -250,6 +260,10 @@ module Step : sig
   val esa : ?infos:infos -> rule:rule -> parent list -> t
 
   val to_attrs : t -> UntypedAST.attrs
+
+  val is_inference : t -> bool
+  val is_simpl : ?name:String.t option -> step -> bool
+
 
   val is_trivial : t -> bool
   val is_by_def : t -> bool
@@ -331,6 +345,8 @@ module S : sig
   val mk_f_simp : rule:rule -> form -> parent list -> t
 
   val mk_f_esa : rule:rule -> form -> parent list -> t
+
+  val name : namespace:string Tbl.t -> t -> string
 
   val adapt : t -> Result.t -> t
 
