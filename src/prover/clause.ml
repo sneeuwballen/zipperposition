@@ -293,6 +293,18 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
           (Bool_selection.all_eligible_subterms ~ord:(Ctx.ord()) ~pos_builder:pb t)) 
       (starting_positions)
     in
+    let res =  
+      List.filter (fun (_,p) -> 
+        let module P = Position in
+        match p with
+        | P.Arg(idx, P.Left P.Stop)
+        | P.Arg(idx, P.Right P.Stop) ->
+          (match (lits c).(idx) with 
+          | Lit.Equation(_,_,false) -> true
+          | _ -> false)
+        | _ -> true
+      ) res 
+    in
 
     if CCList.is_empty res then (
       Util.debugf 1 "nothing selected for @[%a@]@." (fun k -> k Lits.pp (lits c));

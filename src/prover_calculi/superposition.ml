@@ -213,7 +213,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           sup_at_var_headed || not (T.is_var (T.head_term t)))
       |> Iter.fold
         (fun tree (t, pos) ->
-           (* Util.debugf ~section 3 "@[ Adding %a to into index %B @]" (fun k-> k T.pp t !_sup_under_lambdas); *)
+           (* Util.debugf ~section 5 "inserting:@[@[%a@]|@[%a]@]" (fun k-> k C.pp c Term.pp t); *)
            let with_pos = C.WithPos.({term=t; pos; clause=c;}) in
            f tree t with_pos)
         !_idx_sup_into;
@@ -297,7 +297,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     _idx_sup_from :=
       Lits.fold_eqn ~ord ~both:true ~sign:true
         ~eligible:(C.Eligible.param c) (C.lits c)
-      |> Iter.filter((fun (l, _, _, _) -> not (T.equal l T.false_)))
+      |> Iter.filter((fun (l, _, _, _) -> 
+        not (T.equal l T.false_) && 
+        match T.view l with
+        | T.AppBuiltin((Eq|Neq), _) -> not (Type.is_prop (T.ty l))
+        | _ -> not (T.is_formula l)
+      ))
       |> Iter.filter(fun (l, _, _, _) -> 
           sup_from_var_headed || not (T.is_app_var l))
       |> Iter.fold
@@ -413,7 +418,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let var' = S.FO.apply renaming subst (var, info.scope_passive) in
       if (not (Type.is_fun (Term.ty var')) || not (O.might_flip ord var' replacement'))
       then (
-        Util.debugf ~section 3
+        Util.debugf ~section 5
           "Cannot flip: %a = %a"
           (fun k->k T.pp var' T.pp replacement');
         false (* If the lhs vs rhs cannot flip, we don't need a sup at var *)
@@ -601,6 +606,17 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         raise @@ ExitSuperposition(msg);
       );
 
+      if T.equal t' T.false_ then (
+        match info.passive_pos with 
+        | P.Arg(_, P.Left P.Stop)
+        | P.Arg(_, P.Right P.Stop) ->
+          if not (Lit.is_pos (info.passive_lit)) then (
+            raise @@ ExitSuperposition ("negative literal must paramodulate into top-level positive position")
+          )
+        | _ -> 
+          raise @@ ExitSuperposition ("negative literal must paramodulate into top-level positive position")
+      );
+
       begin match info.passive_lit, info.passive_pos with
         | Lit.Equation (_, v, true), P.Arg(_, P.Left P.Stop)
         | Lit.Equation (v, _, true), P.Arg(_, P.Right P.Stop) ->
@@ -610,7 +626,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           let v' = S.FO.apply ~shift_vars:0 renaming subst (v, sc_p) in
           if T.equal t' v'
           then (
-            Util.debugf ~section 2 "will yield a tautology" (fun k->k);
+            Util.debugf ~section 3 "will yield a tautology" (fun k->k);
             raise (ExitSuperposition "will yield a tautology");)
         | _ -> ()
       end;
@@ -645,12 +661,15 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let s' = S.FO.apply ~shift_vars renaming subst (info.s, sc_a) in
       if (
         O.compare ord s' t' = Comp.Lt ||
-        not (Lit.Pos.is_max_term ~ord passive_lit' passive_lit_pos) ||
-        (not (BV.get (C.eligible_res (info.passive, sc_p) subst) passive_idx)
-            (* if it was an inference into selected Bool position, 
+           (* if it was an inference into selected Bool position, 
               we do not reevaluate BoolSelection on the new literal set
-              -- in 99% of cases it is selected again. *)
-         && not bool_inference) ||
+              -- in 99% of cases it is selected again,
+              and if it is Bool selected subterm position then for we do not
+              check ordering restrictions*)
+        (not bool_inference &&
+         not (Lit.Pos.is_max_term ~ord passive_lit' passive_lit_pos)) ||
+        (not bool_inference &&
+         not (BV.get (C.eligible_res (info.passive, sc_p) subst) passive_idx)) ||
         not (C.is_eligible_param (info.active, sc_a) subst ~idx:active_idx)
       ) then (
         raise (ExitSuperposition (Format.sprintf "bad ordering conditions"))
@@ -745,7 +764,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       in
       let new_clause = C.create ~trail:new_trail ~penalty new_lits proof in
       (* Format.printf "LS: %a\n" C.pp new_clause;  *)
-      Util.debugf ~section 3 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
+      Util.debugf ~section 2 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
       if (not (List.for_all (Lit.for_all Term.DB.is_closed) new_lits)) then (
         CCFormat.printf "@[<2>sup, kind %s(%d)@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a, t'=%a@]@])@ \
          (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@]"
@@ -764,7 +783,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       );
       Some new_clause
     with ExitSuperposition reason ->
-      Util.debugf ~section 3 "... cancel, %s" (fun k->k reason);
+      Util.debugf ~section 2 "... cancel, %s" (fun k->k reason);
       None
 
   (* simultaneous superposition: when rewriting D with C \lor s=t,
@@ -817,9 +836,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let s' = S.FO.apply ~shift_vars renaming subst (info.s, sc_a) in
       if (
         O.compare ord s' t' = Comp.Lt ||
-        not (Lit.Pos.is_max_term ~ord passive_lit' passive_lit_pos) ||
-        (not (BV.get (C.eligible_res (info.passive, sc_p) subst) passive_idx)
-             && not bool_inference) ||
+        (not bool_inference &&
+         not (Lit.Pos.is_max_term ~ord passive_lit' passive_lit_pos)) ||
+        (not bool_inference &&
+         not (BV.get (C.eligible_res (info.passive, sc_p) subst) passive_idx)) ||
         not (C.is_eligible_param (info.active, sc_a) subst ~idx:active_idx)
       ) then raise (ExitSuperposition "bad ordering conditions");
       (* Check for superposition at a variable *)
@@ -2496,7 +2516,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         try_permutations 0 S.empty bv;
         None
       with (SubsumptionFound subst) ->
-        Util.debugf ~section 2 "(@[<hv>subsumes@ :c1 @[%a@]@ :c2 @[%a@]@ :subst %a%a@]"
+        Util.debugf ~section 5 "(@[<hv>subsumes@ :c1 @[%a@]@ :c2 @[%a@]@ :subst %a%a@]"
           (fun k->k Lits.pp a Lits.pp b Subst.pp subst Proof.pp_tags !tags);
         Some (subst, !tags)
     )

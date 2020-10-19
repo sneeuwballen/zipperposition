@@ -247,20 +247,18 @@ module Make(E : Env.S) : S with module Env = E = struct
       (SClause.TPSet.to_iter (C.eligible_subterms_of_bool c))
       (get_green_eligible c)
 
-  let get_bool_nested_eligible c =
-    get_green_eligible c
-    |> Iter.filter (fun (_,p) -> 
+  let get_bool_hoist_eligible c =
+    get_bool_eligible c
+    |> Iter.filter (fun (t,p) ->
       let module P = Position in
       match p with
       | P.Arg(idx, P.Left P.Stop)
       | P.Arg(idx, P.Right P.Stop) ->
-        Literal.is_neg (C.lits c).(idx)
+        (match (C.lits c).(idx) with 
+          | L.Equation(_,_,false) -> true
+          | _ -> false)
       | _ -> true
-    ) |> Iter.append (SClause.TPSet.to_iter (C.eligible_subterms_of_bool c))
-
-  let get_bool_hoist_eligible c =
-    get_bool_nested_eligible c
-    |> Iter.filter (fun (t,_) -> 
+    ) |> Iter.filter (fun (t,_) -> 
         let ty = T.ty t in
         (Type.is_prop ty || Type.is_var ty) &&
         not (T.is_true_or_false t) &&
@@ -310,7 +308,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         Util.debugf ~section 1 " = ∅ (%d)(%a)(%d)" 
           (fun k -> 
             k (Iter.length (get_green_eligible c)) 
-              (Iter.pp_seq Term.pp) (Iter.map fst (get_bool_nested_eligible c))
+              (Iter.pp_seq Term.pp) (Iter.map fst (get_bool_eligible c))
               (List.length (get_bool_hoist_eligible c)));
       ) else (Util.debugf ~section 1 " = @[%a@]" (fun k -> k (CCList.pp C.pp) res))
     )
@@ -806,7 +804,6 @@ module Make(E : Env.S) : S with module Env = E = struct
     []
 
   let quantifier_rw_and_hoist (c:C.t) =
-
     let quant_rw ~at b body = 
       let proof =
       Proof.Step.simp [C.proof_parent c]

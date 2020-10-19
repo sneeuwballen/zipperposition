@@ -15,7 +15,7 @@ module T = Term
 module O = Ordering
 module Lit = Literal
 
-let section = Const.section
+let section = Util.Section.make ~parent:Const.section "phases"
 
 let _db_w = ref 1
 let _lmb_w = ref 1
@@ -345,7 +345,7 @@ let presaturate_clauses (type c)
     Env.remove_active (CCVector.to_iter c_set);
     Env.remove_passive (CCVector.to_iter c_set);
     Util.debugf ~section 2 "@[<2>%d clauses pre-saturated into:@ @[<hv>%a@]@]"
-      (fun k->k num_clauses (Util.pp_iter ~sep:" " Env.C.pp) (CCVector.to_iter c_set));
+      (fun k->k num_clauses (Util.pp_iter ~sep:" " Env.C.pp_tstp_full) (CCVector.to_iter c_set));
     Phases.return_phase (result, clauses)
   )
   else Phases.return_phase (Saturate.Unknown, c_sets)
@@ -439,7 +439,9 @@ let print_szs_result (type c) ~file
       Format.printf "%sSZS status InternalError for '%s'@." comment file;
       Util.debugf ~section 1 "error is:@ %s" (fun k->k s);
     | Saturate.Sat when Env.Ctx.is_completeness_preserved () ->
-      Format.printf "%sSZS status %s for '%s'@." comment (sat_to_str ()) file
+      Format.printf "%sSZS status %s for '%s'@." comment (sat_to_str ()) file;
+      Util.debugf ~section 1 "@[<2>saturated set:@ @[<hv>%a@]@]"
+            (fun k->k (Util.pp_iter ~sep:" " Env.C.pp_tstp_full) (Env.get_active ()))
     | Saturate.Sat ->
       Format.printf "%sSZS status GaveUp for '%s'@." comment file;
       begin match !Options.output with
