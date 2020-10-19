@@ -92,7 +92,7 @@ module Make (P : PARAMETERS) = struct
       ) else res ()
     in
 
-    let rec aux subst problem =
+    let rec aux ?(root=false) subst problem =
       let decompose args_l args_r rest flag =
         let rec zipped_with_flag = function 
           | [], [] -> []
@@ -197,14 +197,12 @@ module Make (P : PARAMETERS) = struct
             | _ -> 
               try
                 let mgu =
-                  (* if steps > 3 then None else *)
                   CCList.find_map (fun alg ->  
                       try
                         Some (alg (lhs, unifscope) (rhs, unifscope) subst)
                       with 
                       | P.NotInFragment -> None
                       | P.NotUnifiable -> 
-                      (* CCFormat.printf "@[%a@]@ =@ @[%a@] not unif@."  T.pp lhs T.pp rhs; *)
                       raise Unif.Fail
                     ) (P.frag_algs ()) in 
                 match mgu with 
@@ -240,7 +238,7 @@ module Make (P : PARAMETERS) = struct
                   |> OSeq.interleave args_unif
                   (* |> delay *)
               with Unif.Fail -> OSeq.empty) in
-    aux subst problem
+    aux ~root:true subst problem
 
   let try_lfho_unif ((s,_) as t0) ((t,_) as t1) =
     

@@ -100,6 +100,8 @@ module Kind : sig
   type t = kind
 
   val pp : t CCFormat.printer
+  val pp_tstp : Format.formatter ->
+    kind * [< `Name of string | `Theory of string ] list -> unit
 end
 
 (** {2 Source}
@@ -343,6 +345,8 @@ module S : sig
   val mk_f_simp : rule:rule -> form -> parent list -> t
 
   val mk_f_esa : rule:rule -> form -> parent list -> t
+
+  val name : namespace:string Tbl.t -> t -> string
 
   val adapt : t -> Result.t -> t
 

@@ -69,8 +69,8 @@ end
 module type ITER = sig
   type 'a t
 
-  val to_seq : 'a t -> 'a Iter.t
-  val of_seq : ?init:'a t -> 'a Iter.t -> 'a t
+  val to_iter : 'a t -> 'a Iter.t
+  val of_iter : ?init:'a t -> 'a Iter.t -> 'a t
   val to_list : 'a t -> 'a list
   val of_list : ?init:'a t -> 'a list -> 'a t
 end

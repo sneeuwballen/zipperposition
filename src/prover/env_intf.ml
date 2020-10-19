@@ -11,6 +11,8 @@ module type S = sig
   module StmQ : StreamQueue.S with module Stm = Stm
   module FormRename : FormulaRename.S with module C = C
 
+  val k_max_multi_simpl_depth : int Flex_state.key
+
   type inf_rule = C.t -> C.t list
   (** An inference returns a list of conclusions *)
 
@@ -182,7 +184,7 @@ module type S = sig
 
   (** {2 Use the Env} *)
 
-  val multi_simplify : C.t -> C.t list option
+  val multi_simplify : depth:int -> C.t -> (C.t * int) list option
   (** Can we simplify the clause into a List of simplified clauses? *)
 
   val params : Params.t
@@ -292,7 +294,8 @@ module type S = sig
 
   val all_simplify : C.t -> C.t list SimplM.t
   (** Use all simplification rules to convert a clause into a set
-      of maximally simplified clause (or [[]] if they are all trivial). *)
+      of maximally simplified clause (or [[]] if they are all trivial).
+       *)
 
   val step_init : unit -> unit
   (** call all functions registered with {!add_step_init} *)

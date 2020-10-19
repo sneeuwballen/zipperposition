@@ -520,15 +520,15 @@ let as_id_app t = match view t with
   | App ({term=Const id; ty=Some ty; _}, l) -> Some (id, ty, l)
   | _ -> None
 
-let vars t = Seq.vars t |> Var.Set.of_seq |> Var.Set.to_list
+let vars t = Seq.vars t |> Var.Set.of_iter |> Var.Set.to_list
 
-let free_vars_set t = Seq.free_vars t |> Var.Set.of_seq
-let free_vars t = Seq.free_vars t |> Var.Set.of_seq |> Var.Set.to_list
+let free_vars_set t = Seq.free_vars t |> Var.Set.of_iter
+let free_vars t = Seq.free_vars t |> Var.Set.of_iter |> Var.Set.to_list
 
 let free_vars_l l =
   Iter.of_list l
   |> Iter.flat_map Seq.free_vars
-  |> Var.Set.of_seq |> Var.Set.to_list
+  |> Var.Set.of_iter |> Var.Set.to_list
 
 let closed t = Seq.free_vars t |> Iter.is_empty
 
@@ -565,7 +565,7 @@ let map ~f ~bind:f_bind b_acc t = match view t with
   | Record (l, rest) ->
     let ty = f b_acc (ty_exn t) in
     record_flatten ?loc:t.loc ~ty
-      (List.map (CCPair.map2 (f b_acc)) l)
+      (List.map (CCPair.map_snd (f b_acc)) l)
       ~rest:(CCOpt.map (f b_acc) rest)
   | Ite (a,b,c) ->
     let a = f b_acc a in
@@ -1524,8 +1524,8 @@ let try_alpha_renaming f1 f2 =
       | _ -> fail_unif_ [f1,f2] "mismatch or unknown constructors"
   in
   try
-    let vars1 = Seq.vars f1 |> Var.Set.of_seq in
-    let vars2 = Seq.vars f2 |> Var.Set.of_seq in
+    let vars1 = Seq.vars f1 |> Var.Set.of_iter in
+    let vars2 = Seq.vars f2 |> Var.Set.of_iter in
     if Var.Set.intersection_empty vars1 vars2 then (
       let subst = aux Subst.empty [f1,f2] in
       Util.debugf ~section 5 "Alpha renaming succeeded:@ of %a@ and %a@ with subst %a"
@@ -1700,7 +1700,7 @@ end
 
 let pp_in = function
   | Output_format.O_zf -> ZF.pp
-  | Output_format.O_tptp -> TPTP.pp
+  | Output_format.O_tptp -> TPTP_THF.pp
   | Output_format.O_normal -> pp
   | Output_format.O_none -> CCFormat.silent
 

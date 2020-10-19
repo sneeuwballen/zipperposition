@@ -266,8 +266,8 @@ module Constr = struct
     | Some wfun -> wfun
     | None -> 
       let err =
-        CCFormat.sprintf "precedences are one of:@[%a@]" 
-          (CCList.pp CCString.pp ~sep:"|" ~start:"(" ~stop:")") (List.map fst map) in
+        CCFormat.sprintf "precedences are one of: (@[%a@])" 
+          (CCList.pp CCString.pp ~pp_sep:(CCFormat.return "|@,")) (List.map fst map) in
       invalid_arg err
 
   (* regular string ordering *)
@@ -277,7 +277,7 @@ module Constr = struct
     then ID.compare a b else c
 
   let max ~signature l =
-    let set = ID.Set.of_seq l in
+    let set = ID.Set.of_iter l in
     fun s1 s2 ->
       let is_max1 = ID.Set.mem s1 set in
       let is_max2 = ID.Set.mem s2 set in
@@ -288,7 +288,7 @@ module Constr = struct
       | false, true -> -1
 
   let min ~signature l =
-    let set = ID.Set.of_seq l in
+    let set = ID.Set.of_iter l in
     fun s1 s2 ->
       let is_min1 = ID.Set.mem s1 set in
       let is_min2 = ID.Set.mem s2 set in
@@ -463,8 +463,8 @@ let depth_occ_driver ~flip stmt_d =
     if is_post_cnf_skolem ~sig_ref:(ref empty_sig) sym then default_weight
     else ID.Tbl.get_or ~default tbl sym)
 
-let inv_depth_occurence =  depth_occ_driver ~flip:false
-let depth_occurence =  depth_occ_driver ~flip:true
+let inv_depth_occurrence = depth_occ_driver ~flip:false
+let depth_occurrence = depth_occ_driver ~flip:true
 
 
 let max_arity signature = 
@@ -638,8 +638,8 @@ let weight_fun_of_string ~signature ~lits ~lm_w ~db_w s sd =
      "invarity", ignore_arg @@ weight_invarity ~signature;
      "sqarity", ignore_arg @@ weight_sq_arity ~signature;
      "invsqarity", ignore_arg @@ weight_invsq_arity ~signature;
-     "invdocc", inv_depth_occurence;
-     "docc", depth_occurence;
+     "invdocc", inv_depth_occurrence;
+     "docc", depth_occurrence;
      "const", ignore_arg weight_constant] in
   try
     begin match CCString.chop_prefix ~pre:"lambda-def-" s with 

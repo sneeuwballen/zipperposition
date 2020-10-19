@@ -174,7 +174,7 @@ module Make_linexp(N : NUM) = struct
         else Fmt.fprintf out "@[<2>%a@ @<1>· %a@]" N.pp_print c pp_t t
       in
       Fmt.fprintf out "(@[<hv>%a%a@])"
-        Fmt.(seq ~sep:(return "@ + ") pp_pair)
+        Fmt.(iter ~sep:(return "@ + ") pp_pair)
         (I_map.values e.coeffs) pp_const ()
     )
 end

@@ -37,6 +37,7 @@ let k_rename_nested_bools = Flex_state.create_key ()
 let k_fluid_hoist = Flex_state.create_key ()
 let k_fluid_log_hoist = Flex_state.create_key ()
 let k_solve_formulas = Flex_state.create_key ()
+let k_replace_unsupported_quants = Flex_state.create_key ()
 
 module type S = sig
   module Env : Env.S
@@ -242,19 +243,22 @@ module Make(E : Env.S) : S with module Env = E = struct
                   ~eligible:(C.Eligible.res c) (C.lits c)
   
   let get_bool_eligible c =
-    get_green_eligible c
-    |> Iter.filter (fun (_,p) -> 
-      let module P = Position in
-      match p with
-      | P.Arg(_, P.Left P.Stop)
-      | P.Arg(_, P.Right P.Stop) ->
-        false
-      | _ -> true
-    ) |> Iter.append (SClause.TPSet.to_iter (C.eligible_subterms_of_bool c))
+    Iter.append 
+      (SClause.TPSet.to_iter (C.eligible_subterms_of_bool c))
+      (get_green_eligible c)
 
   let get_bool_hoist_eligible c =
     get_bool_eligible c
-    |> Iter.filter (fun (t,_) -> 
+    |> Iter.filter (fun (t,p) ->
+      let module P = Position in
+      match p with
+      | P.Arg(idx, P.Left P.Stop)
+      | P.Arg(idx, P.Right P.Stop) ->
+        (match (C.lits c).(idx) with 
+          | L.Equation(_,_,false) -> true
+          | _ -> false)
+      | _ -> true
+    ) |> Iter.filter (fun (t,_) -> 
         let ty = T.ty t in
         (Type.is_prop ty || Type.is_var ty) &&
         not (T.is_true_or_false t) &&
@@ -298,6 +302,16 @@ module Make(E : Env.S) : S with module Env = E = struct
       let t,c = handle_poly_bool_hoist t c in
       mk_res ~proof ~old:t ~repl:T.false_ (yes t) c)
     (get_bool_hoist_eligible c)
+    |> CCFun.tap (fun res -> 
+      Util.debugf ~section 1 "hoist(@[%a@])" (fun k -> k C.pp c);
+      if CCList.is_empty res then (
+        Util.debugf ~section 1 " = ∅ (%d)(%a)(%d)" 
+          (fun k -> 
+            k (Iter.length (get_green_eligible c)) 
+              (Iter.pp_seq Term.pp) (Iter.map fst (get_bool_eligible c))
+              (List.length (get_bool_hoist_eligible c)));
+      ) else (Util.debugf ~section 1 " = @[%a@]" (fun k -> k (CCList.pp C.pp) res))
+    )
 
   let bool_hoist_simpl (c:C.t) : C.t list option = 
     let proof = Proof.Step.inference [C.proof_parent c]
@@ -312,6 +326,12 @@ module Make(E : Env.S) : S with module Env = E = struct
         (mk_res ~proof ~old:t ~repl:repl_neg neg_lit c) ::
         (mk_res ~proof ~old:t ~repl:repl_pos pos_lit c) :: acc ) 
       [] bool_subterms
+    )
+    |> CCFun.tap (function 
+      | Some res ->
+        Util.debugf ~section 2 "bool_hoist_simpl(@[%a@])=@. @[%a@]@." (fun k -> k C.pp c (CCList.pp C.pp) res);
+      | None -> 
+        Util.debugf ~section 2 "bool_hoist_simpl(@[%a@])= None@." (fun k -> k C.pp c)
     )
 
   let eq_hoist (c:C.t) : C.t list =
@@ -338,6 +358,16 @@ module Make(E : Env.S) : S with module Env = E = struct
           let new_lit = Literal.mk_eq a b in
           mk_res ~proof:(proof ~prefix:"neq") ~old:t ~repl:T.true_ new_lit c
         | _ -> assert false
+    )
+    |> CCFun.tap (fun res -> 
+      Util.debugf ~section 3 "eq-hoist(@[%a@])" (fun k -> k C.pp c);
+      if CCList.is_empty res then (
+        Util.debugf ~section 3 " = ∅ (%d)(%d)(%a)" 
+          (fun k -> 
+            k (Iter.length (get_green_eligible c))
+              (Iter.length (get_bool_eligible c))
+              (Iter.pp_seq Term. pp) (Iter.map fst (get_bool_eligible c)) );
+      ) else (Util.debugf ~section 3 " = @[%a@]" (fun k -> k (CCList.pp C.pp) res))
     )
 
   let fluid_hoist (c:C.t) =
@@ -549,7 +579,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let step = Proof.Step.inference ~rule [C.proof_parent_subst renaming (c,sc_cl) sub] in
       let res = C.create_a ~penalty:(C.penalty c) ~trail:(C.trail c) lits step in
 
-      Util.debugf ~section 1 "fluid_quant_rw:@.@[%a@] -> @.@[%a@]@." 
+      Util.debugf ~section 5 "fluid_quant_rw:@.@[%a@] -> @.@[%a@]@." 
         (fun k -> k C.pp c C.pp res);
 
       res
@@ -774,7 +804,6 @@ module Make(E : Env.S) : S with module Env = E = struct
     []
 
   let quantifier_rw_and_hoist (c:C.t) =
-
     let quant_rw ~at b body = 
       let proof =
       Proof.Step.simp [C.proof_parent c]
@@ -891,8 +920,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     let pos_builder = Position.Build.empty in
     let all_selectable = 
       Bool_selection.all_selectable_subterms ~ord ~pos_builder in
-    (* literal needs to have at least 3 nested booleans *)
-    let threshold = 3 in
+    (* literal needs to have at least 2 nested booleans *)
+    let threshold = 2 in
 
     CCArray.to_list (C.lits c)
     |> CCList.mapi (fun i l ->
@@ -907,7 +936,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     |> (function 
        | x :: xs when not (CCList.is_empty xs) ->
          (* there need to be at least two literals with deep booleans.
-            we will remain all but one (for example the first one) *)
+            we will rename all but one (for example the first one) *)
           let new_lits = CCArray.copy (C.lits c) in
           let (new_defs, new_parents) = 
             CCList.fold_left (fun (defs, parents) (idx, _) -> 
@@ -915,7 +944,7 @@ module Make(E : Env.S) : S with module Env = E = struct
               let renamer, new_defs, new_parents = rename_lit lit in
               let new_lit = Literal.mk_prop renamer (Literal.is_pos lit) in
               new_lits.(idx) <- new_lit;
-              (new_defs @ defs, new_parents @ parents) 
+              (new_defs @ defs, new_parents @ parents)
             ) ([], []) xs
           in
           let rule = Proof.Rule.mk "rename_nested_bools" in
@@ -924,7 +953,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           let renamed =
             C.create_a ~penalty:(C.penalty c) ~trail:(C.trail c) new_lits proof in
 
-          Util.debugf ~section 2 "renamed @[%a@] into@. @[%a@]@." 
+          Util.debugf ~section 1 "renamed @[%a@] into@. @[%a@]@." 
             (fun k -> k C.pp c C.pp renamed);
           
           Some (renamed :: new_defs)
@@ -1370,20 +1399,20 @@ module Make(E : Env.S) : S with module Env = E = struct
         |> OSeq.nth 0
       ) else Unif_subst.of_subst @@ Unif.FO.unify_syn (l,0) (r,0) in
     
-    Util.debugf ~section 2 "bool solving @[%a@]@."(fun k -> k C.pp c);
+    Util.debugf ~section 5 "bool solving @[%a@]@."(fun k -> k C.pp c);
 
     C.lits c
     |> CCArray.mapi (fun i lit ->
       match find_resolvable_form lit with 
       | None ->
-        Util.debugf ~section 2 "for lit %d(@[%a@]) of @[%a@] no resolvable lits found@." 
+        Util.debugf ~section 5 "for lit %d(@[%a@]) of @[%a@] no resolvable lits found@." 
           (fun k -> k i Literal.pp lit C.pp c);
         None
       | Some (l,r) ->
         let module US = Unif_subst in
         try
-          Util.debugf ~section 2 "trying lit @[%d:%a@]@."(fun k -> k i Literal.pp lit);
-          Util.debugf ~section 2 "unif problem: @[%a=?=%a@]@."(fun k -> k T.pp l T.pp r);
+          Util.debugf ~section 5 "trying lit @[%d:%a@]@."(fun k -> k i Literal.pp lit);
+          Util.debugf ~section 5 "unif problem: @[%a=?=%a@]@."(fun k -> k T.pp l T.pp r);
           let subst = unif_alg l r in
           assert(not @@ Unif_subst.has_constr subst);
           let renaming = Subst.Renaming.create () in
@@ -1398,10 +1427,10 @@ module Make(E : Env.S) : S with module Env = E = struct
               ~rule:(Proof.Rule.mk "solve_formulas")
               [C.proof_parent_subst renaming (c,0) (US.subst subst) ] in
           let res = C.create ~penalty:(C.penalty c) ~trail:(C.trail c) new_lits proof in
-          Util.debugf ~section 2 "solved by @[%a@]@."(fun k ->  k C.pp res);
+          Util.debugf ~section 5 "solved by @[%a@]@."(fun k ->  k C.pp res);
           Some res
         with _ -> 
-          Util.debugf ~section 2 "failed @." (fun k -> k);
+          Util.debugf ~section 5 "failed @." (fun k -> k);
           None)
       |> CCArray.filter_map CCFun.id
       |> CCArray.to_list
@@ -1436,7 +1465,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let proof = Proof.Step.simp ~rule:(Proof.Rule.mk "cnf_otf") ~tags:[Proof.Tag.T_ho] [C.proof_parent c] in
       let trail = C.trail c and penalty = C.penalty c in
       let stmt = Statement.assert_ ~proof f in
-      let cnf_vec = Cnf.convert @@ CCVector.to_seq @@ Cnf.cnf_of ~opts ~ctx:(Ctx.sk_ctx ()) stmt in
+      let cnf_vec = Cnf.convert @@ CCVector.to_iter @@ Cnf.cnf_of ~opts ~ctx:(Ctx.sk_ctx ()) stmt in
       CCVector.iter (fun cl -> 
           Statement.Seq.ty_decls cl
           |> Iter.iter (fun (id,ty) -> Ctx.declare id ty)) cnf_vec;
@@ -1450,8 +1479,8 @@ module Make(E : Env.S) : S with module Env = E = struct
                     |> CCList.flatten
                     |> List.map (fun c -> 
                         C.create ~penalty  ~trail (CCArray.to_list (C.lits c)) proof) in
-      Util.debugf ~section 1 "cl:@[%a@]@." (fun k-> k C.pp c);
-      Util.debugf ~section 1 " @[%a@]@." (fun k-> k (CCList.pp C.pp) clauses);
+      Util.debugf ~section 5 "cl:@[%a@]@." (fun k-> k C.pp c);
+      Util.debugf ~section 5 " @[%a@]@." (fun k-> k (CCList.pp C.pp) clauses);
       List.iteri (fun i new_c -> 
           assert((C.proof_depth c) <= C.proof_depth new_c);) clauses;
       Some (solved @clauses)
@@ -1529,9 +1558,9 @@ module Make(E : Env.S) : S with module Env = E = struct
               (as_neg_forall :: Array.to_list(C.lits c |> Literals.map(T.replace ~old:t ~by:(interpret t' T.false_))))
               proof in
 
-          Util.debugf ~section  1 "interpret bool(@[%a@]):@.@[%a@] !!> @. @[%a@]@."  
+          Util.debugf ~section  5 "interpret bool(@[%a@]):@.@[%a@] !!> @. @[%a@]@."  
             (fun k -> k T.pp t Literals.pp (C.lits c) Literals.pp (C.lits forall_cl));
-          Util.debugf ~section  1 "interpret bool(@[%a@]):@.@[%a@] !!> @. @[%a@]@." 
+          Util.debugf ~section  5 "interpret bool(@[%a@]):@.@[%a@] !!> @. @[%a@]@." 
             (fun k -> k T.pp t Literals.pp (C.lits c) Literals.pp (C.lits forall_neg_cl));
 
           forall_cl :: forall_neg_cl :: res
@@ -1597,7 +1626,9 @@ module Make(E : Env.S) : S with module Env = E = struct
         Env.add_multi_simpl_rule ~priority:100 replace_bool_vars;
         Env.add_unary_inf "replace_bool_app_vars" replace_bool_app_vars;
         Env.add_unary_inf "eq_rw" nested_eq_rw;
-        Env.add_unary_simplify replace_unsupported_quants;
+        if Env.flex_get k_replace_unsupported_quants then (
+          Env.add_unary_simplify replace_unsupported_quants
+        );
       )
 end
 
@@ -1629,7 +1660,7 @@ let map_propositions ~proof f =
 let is_bool t = CCOpt.equal Ty.equal (Some prop) (ty t)
 let is_T_F t = match view t with AppBuiltin((True|False),[]) -> true | _ -> false
 
-(* Modify every subterm of t by f except those at the "top". Here top is true if subterm occures under a quantifier Æ in a context where it could participate to the clausification if the surrounding context of Æ was ignored. *)
+(* Modify every subterm of t by f except those at the "top". Here top is true if subterm occurs under a quantifier Æ in a context where it could participate to the clausification if the surrounding context of Æ was ignored. *)
 let rec replaceTST f top t =
   let re = replaceTST f in
   let ty = ty_exn t in
@@ -1643,7 +1674,7 @@ let rec replaceTST f top t =
      | Match(t, cases) -> 
        match_ (re false t) (map (fun (c,vs,e) -> (c,vs, re false e)) cases)
      | Let(binds, expr) -> 
-       let_ (map(CCPair.map2 (re false)) binds) (re false expr)
+       let_ (map(CCPair.map_snd (re false)) binds) (re false expr)
      | Bind(b,x,t) -> 
        let top = Binder.equal b Binder.Forall || Binder.equal b Binder.Exists in
        bind ~ty b x (re top t)
@@ -1668,7 +1699,7 @@ let name_quantifiers stmts =
   let name_prop_Qs s = replaceTST(fun t -> match TypedSTerm.view t with
       | Bind(Binder.Forall,_,_) | Bind(Binder.Exists, _, _) ->
         changed := true;
-        let vars = Var.Set.of_seq (TypedSTerm.Seq.free_vars t) |> Var.Set.to_list in
+        let vars = Var.Set.of_iter (TypedSTerm.Seq.free_vars t) |> Var.Set.to_list in
         let qid = ID.gensym() in
         let ty = app_builtin ~ty:tType Arrow (prop :: map Var.ty vars) in
         let q = const ~ty qid in
@@ -1707,7 +1738,7 @@ let rec replace old by t =
     | App(f,ps) -> app_whnf ~ty (r f) (map r ps)
     | AppBuiltin(f,ps) -> app_builtin ~ty f (map r ps)
     | Ite(c,x,y) -> ite (r c) (r x) (r y)
-    | Let(bs,e) -> let_ (map (CCPair.map2 r) bs) (r e)
+    | Let(bs,e) -> let_ (map (CCPair.map_snd r) bs) (r e)
     | Bind(b,v,e) -> bind ~ty b v (r e)
     | _ -> t
 
@@ -1915,6 +1946,7 @@ let _rename_nested_bools = ref false
 let _fluid_hoist = ref false
 let _fluid_log_hoist = ref false
 let _solve_formulas = ref false
+let _replace_quants = ref true
 
 
 let extension =
@@ -1936,6 +1968,7 @@ let extension =
     E.flex_add k_fluid_hoist !_fluid_hoist;
     E.flex_add k_fluid_log_hoist !_fluid_log_hoist;
     E.flex_add k_solve_formulas !_solve_formulas;
+    E.flex_add k_replace_unsupported_quants !_replace_quants;
 
     ET.setup ()
   in
@@ -1963,6 +1996,9 @@ let () =
       "--quantifier-renaming"
       , Arg.Bool (fun v -> _quant_rename := v)
       , " turn the quantifier renaming on or off";
+      "--replace-quants"
+      , Arg.Bool (fun v -> _replace_quants := v)
+      , " replace unsupported quantifiers";
       "--rename-nested-bools"
       , Arg.Bool (fun v -> _rename_nested_bools := v)
       , " rename deeply nested bool subterms";
@@ -2013,5 +2049,14 @@ let () =
                        "lambda-free-purify-extensional";
                        "fo-complete-basic"] (fun () ->
       _bool_reasoning := BoolReasoningDisabled
+  );
+  Params.add_to_modes ["ho-pragmatic";
+                       "lambda-free-intensional";
+                       "lambda-free-purify-intensional";
+                       "lambda-free-extensional";
+                       "ho-comb-complete";
+                       "lambda-free-purify-extensional";
+                       "fo-complete-basic"] (fun () ->
+      _replace_quants := false;
   );
   Extensions.register extension

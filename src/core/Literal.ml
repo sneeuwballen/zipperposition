@@ -368,7 +368,7 @@ module Seq = struct
     T.const ~ty:Type.(const s) s
 end
 
-let symbols ?(include_types=false) lit = Seq.symbols ~include_types lit |> ID.Set.of_seq
+let symbols ?(include_types=false) lit = Seq.symbols ~include_types lit |> ID.Set.of_iter
 
 (** Unification-like operation on components of a literal. *)
 module UnifOp = struct
@@ -398,10 +398,10 @@ let unif_lits op ~subst (lit1,sc1) (lit2,sc2) k =
     unif4 op.term ~subst l1 r1 sc1 l2 r2 sc2 (fun s -> k (s,[]))
   | Int o1, Int o2 ->
     Int_lit.generic_unif op.monomes ~subst (o1,sc1) (o2,sc2)
-      (fun s -> k(s,[Builtin.Tag.T_lia]))
+      (fun s -> k(s,[Builtin.Tag.T_lia; Builtin.Tag.T_cannot_orphan]))
   | Rat o1, Rat o2 ->
     Rat_lit.generic_unif op.monomes ~subst (o1,sc1) (o2,sc2)
-      (fun s -> k(s,[Builtin.Tag.T_lra]))
+      (fun s -> k(s,[Builtin.Tag.T_lra; Builtin.Tag.T_cannot_orphan]))
   | _, _ -> ()
 
 let variant ?(subst=S.empty) lit1 lit2 k =
@@ -484,7 +484,7 @@ let subsumes ?(subst=Subst.empty) (lit1,sc1) (lit2,sc2) k =
   | Int o1, Int o2 ->
     (* use the more specific subsumption mechanism *)
     Int_lit.subsumes ~subst (o1,sc1) (o2,sc2)
-      (fun s -> k(s,[Builtin.Tag.T_lia]))
+      (fun s -> k(s,[Builtin.Tag.T_lia; Builtin.Tag.T_cannot_orphan]))
   | Equation (l1, r1, true), Equation (l2, r2, true) ->
     _eq_subsumes ~subst l1 r1 sc1 l2 r2 sc2 (fun s -> k(s,[]))
   | _ -> matching ~subst ~pattern:(lit1,sc1) (lit2,sc2) k
@@ -566,7 +566,7 @@ let negate lit =
   | Rat o -> mk_false (Rat_lit.to_term o)
 
 let vars lit =
-  Seq.vars lit |> T.VarSet.of_seq |> T.VarSet.to_list
+  Seq.vars lit |> T.VarSet.of_iter |> T.VarSet.to_list
 
 let var_occurs v lit = match lit with
   | Equation (l,r,_) -> T.var_occurs ~var:v l || T.var_occurs ~var:v r
@@ -596,7 +596,7 @@ let to_multiset lit = match lit with
     |> Multisets.MT.Seq.of_coeffs Multisets.MT.empty
   | Rat o ->
     Rat_lit.Seq.to_multiset o |> Iter.map fst
-    |> Multisets.MT.Seq.of_seq Multisets.MT.empty
+    |> Multisets.MT.Seq.of_iter Multisets.MT.empty
 
 let is_trivial lit = 
   assert(no_prop_invariant lit);
@@ -614,9 +614,9 @@ let rec cannot_be_eq (t1:term)(t2:term): Builtin.Tag.t list option =
   let module TC = T.Classic in
   begin match TC.view t1, TC.view t2 with
     | TC.AppBuiltin (Builtin.Int z1,[]), TC.AppBuiltin (Builtin.Int z2,[]) ->
-      if Z.equal z1 z2 then None else Some [Builtin.Tag.T_lia]
+      if Z.equal z1 z2 then None else Some [Builtin.Tag.T_lia; Builtin.Tag.T_cannot_orphan]
     | TC.AppBuiltin (Builtin.Rat n1,[]), TC.AppBuiltin (Builtin.Rat n2,[]) ->
-      if Q.equal n1 n2 then None else Some [Builtin.Tag.T_lra]
+      if Q.equal n1 n2 then None else Some [Builtin.Tag.T_lra; Builtin.Tag.T_cannot_orphan]
     | TC.App (c1, l1), TC.App (c2, l2)
       when Ind_ty.is_constructor c1 && Ind_ty.is_constructor c2 ->
       (* two constructor applications cannot be equal if they
@@ -645,8 +645,8 @@ let is_absurd_tags lit =
   | Equation (l,r,true) -> cannot_be_eq l r |> CCOpt.get_or ~default:[]
   | Equation _  | False -> []
   | True -> assert false
-  | Int _ -> [Builtin.Tag.T_lia]
-  | Rat _ -> [Builtin.Tag.T_lra]
+  | Int _ -> [Builtin.Tag.T_lia; Builtin.Tag.T_cannot_orphan]
+  | Rat _ -> [Builtin.Tag.T_lra; Builtin.Tag.T_cannot_orphan]
 
 
 let fold_terms ?(position=Position.stop) ?(vars=false) ?(var_args=true) ?(fun_bodies=true) ?ty_args ~which ?(ord=Ordering.none) ~subterms lit k =
@@ -807,9 +807,9 @@ let pp_tstp out lit =
   | True -> CCFormat.string out "$true"
   | False -> CCFormat.string out "$false"
   | Equation (l, r, true) ->
-    Format.fprintf out "@[<1>%a@ = %a@]" T.TPTP.pp l T.TPTP.pp r
+    Format.fprintf out "(@[<1>%a@ = %a@])" T.TPTP.pp l T.TPTP.pp r
   | Equation (l, r, false) ->
-    Format.fprintf out "@[<1>%a@ != %a@]" T.TPTP.pp l T.TPTP.pp r
+    Format.fprintf out "(@[<1>%a@ != %a@])" T.TPTP.pp l T.TPTP.pp r
   | Int o -> Int_lit.pp_tstp out o
   | Rat o -> Rat_lit.pp_tstp out o
 

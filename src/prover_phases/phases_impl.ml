@@ -15,7 +15,7 @@ module T = Term
 module O = Ordering
 module Lit = Literal
 
-let section = Const.section
+let section = Util.Section.make ~parent:Const.section "phases"
 
 let _db_w = ref 1
 let _lmb_w = ref 1
@@ -133,8 +133,8 @@ let has_real stmt : bool =
   let module TS = TypedSTerm in
   let is_real ty = TS.equal ty TS.Ty.real in
   begin
-    CCVector.to_seq stmt
-    |> Iter.flat_map Statement.Seq.to_seq
+    CCVector.to_iter stmt
+    |> Iter.flat_map Statement.Seq.to_iter
     |> Iter.flat_map
       (function
         | `Ty ty -> Iter.return ty
@@ -145,7 +145,7 @@ let has_real stmt : bool =
 let sine_filter stmts = 
   if (!_sine_threshold < 0 || CCVector.length stmts < !_sine_threshold) then (stmts)
   else (
-    let seq = CCVector.to_seq stmts in
+    let seq = CCVector.to_iter stmts in
     let filtered = 
       Statement.sine_axiom_selector
       ~ignore_k_most_common_symbols:!_ignore_k_most_common_symbols
@@ -155,7 +155,7 @@ let sine_filter stmts =
       ~depth_start:!_sine_d_min 
       ~depth_end:!_sine_d_max 
       ~tolerance:!_sine_tolerance seq in
-    CCVector.freeze (CCVector.of_seq filtered))
+    CCVector.freeze (CCVector.of_iter filtered))
 
 let typing ~file prelude (input,stmts) =
   Phases.start_phase Phases.Typing >>= fun () ->
@@ -171,7 +171,7 @@ let typing ~file prelude (input,stmts) =
   >>?= fun stmts ->
   let stmts = sine_filter stmts in
   Util.debugf ~section 3 "@[<hv2>@{<green>typed statements@}@ %a@]"
-    (fun k->k (Util.pp_seq Statement.pp_input) (CCVector.to_seq stmts));
+    (fun k->k (Util.pp_iter Statement.pp_input) (CCVector.to_iter stmts));
   begin
     if has_real stmts then (
       Util.debug ~section 1 "problem contains $real, lost completeness";
@@ -191,9 +191,9 @@ let cnf ~sk_ctx decls =
   let opts = if !Lazy_cnf.enabled then [Cnf.LazyCnf] else [ ] in
   let stmts =
     decls
-    |> CCVector.to_seq
-    |> Cnf.cnf_of_seq ~ctx:sk_ctx ~opts
-    |> CCVector.to_seq
+    |> CCVector.to_iter
+    |> Cnf.cnf_of_iter ~ctx:sk_ctx ~opts
+    |> CCVector.to_iter
     |> apply_modifiers ~field:(fun e -> e.Extensions.post_cnf_modifiers)
     |> Cnf.convert
   in
@@ -335,17 +335,17 @@ let presaturate_clauses (type c)
   if Env.params.Params.presaturate
   then (
     Util.debug ~section 1 "presaturate initial clauses";
-    Env.add_passive (CCVector.to_seq c_sets.Clause.c_set);
+    Env.add_passive (CCVector.to_iter c_sets.Clause.c_set);
     let result, num = Sat.presaturate () in
     Util.debugf ~section 1 "initial presaturation in %d steps" (fun k->k num);
     (* pre-saturated set of clauses *)
-    let c_set = Env.get_active() |> CCVector.of_seq |> CCVector.freeze in
+    let c_set = Env.get_active() |> CCVector.of_iter |> CCVector.freeze in
     let clauses = {c_sets with Clause.c_set; } in
     (* remove clauses from [env] *)
-    Env.remove_active (CCVector.to_seq c_set);
-    Env.remove_passive (CCVector.to_seq c_set);
+    Env.remove_active (CCVector.to_iter c_set);
+    Env.remove_passive (CCVector.to_iter c_set);
     Util.debugf ~section 2 "@[<2>%d clauses pre-saturated into:@ @[<hv>%a@]@]"
-      (fun k->k num_clauses (Util.pp_seq ~sep:" " Env.C.pp) (CCVector.to_seq c_set));
+      (fun k->k num_clauses (Util.pp_iter ~sep:" " Env.C.pp_tstp_full) (CCVector.to_iter c_set));
     Phases.return_phase (result, clauses)
   )
   else Phases.return_phase (Saturate.Unknown, c_sets)
@@ -359,8 +359,8 @@ let try_to_refute (type c) (module Env : Env.S with type C.t = c) clauses result
   if not (CCVector.is_empty clauses.Clause.c_sos) then (
     Env.Ctx.lost_completeness();
   );
-  Env.add_active (CCVector.to_seq clauses.Clause.c_sos);
-  Env.add_passive (CCVector.to_seq clauses.Clause.c_set);
+  Env.add_active (CCVector.to_iter clauses.Clause.c_sos);
+  Env.add_passive (CCVector.to_iter clauses.Clause.c_set);
   let steps = if Env.params.Params.steps < 0
     then None
     else (
@@ -439,7 +439,9 @@ let print_szs_result (type c) ~file
       Format.printf "%sSZS status InternalError for '%s'@." comment file;
       Util.debugf ~section 1 "error is:@ %s" (fun k->k s);
     | Saturate.Sat when Env.Ctx.is_completeness_preserved () ->
-      Format.printf "%sSZS status %s for '%s'@." comment (sat_to_str ()) file
+      Format.printf "%sSZS status %s for '%s'@." comment (sat_to_str ()) file;
+      Util.debugf ~section 1 "@[<2>saturated set:@ @[<hv>%a@]@]"
+            (fun k->k (Util.pp_iter ~sep:" " Env.C.pp_tstp_full) (Env.get_active ()))
     | Saturate.Sat ->
       Format.printf "%sSZS status GaveUp for '%s'@." comment file;
       begin match !Options.output with
@@ -447,10 +449,10 @@ let print_szs_result (type c) ~file
         | Options.O_zf -> failwith "not implemented: printing in ZF" (* TODO *)
         | Options.O_tptp ->
           Util.debugf ~section 1 "@[<2>saturated set:@ @[<hv>%a@]@]"
-            (fun k->k (Util.pp_seq ~sep:" " Env.C.pp_tstp_full) (Env.get_active ()))
+            (fun k->k (Util.pp_iter ~sep:" " Env.C.pp_tstp_full) (Env.get_active ()))
         | Options.O_normal ->
           Util.debugf ~section 1 "@[<2>saturated set:@ @[<hv>%a@]@]"
-            (fun k->k (Util.pp_seq ~sep:" " Env.C.pp) (Env.get_active ()))
+            (fun k->k (Util.pp_iter ~sep:" " Env.C.pp) (Env.get_active ()))
       end
     | Saturate.Unsat proof ->
       (* print status then proof *)
@@ -488,7 +490,7 @@ let parse_cli =
 let syms_in_conj decls =
   let open Iter in
   decls 
-  |> CCVector.to_seq
+  |> CCVector.to_iter
   |> flat_map (fun st -> 
       let pr = Statement.proof_step st in
       if CCOpt.is_some (Proof.Step.distance_to_goal pr) then (
@@ -512,8 +514,8 @@ let process_file ?(prelude=Iter.empty) file =
   (* let stmts = Booleans.preprocess_cnf_booleans stmts in *)
   (* compute signature, precedence, ordering *)
   let conj_syms = syms_in_conj stmts in
-  let signature = Statement.signature ~conj_syms:conj_syms (CCVector.to_seq stmts) in
-  compute_prec ~signature (CCVector.to_seq stmts) >>= fun precedence ->
+  let signature = Statement.signature ~conj_syms:conj_syms (CCVector.to_iter stmts) in
+  compute_prec ~signature (CCVector.to_iter stmts) >>= fun precedence ->
   Util.debugf ~section 1 "@[<2>precedence:@ @[%a@]@]" (fun k->k Precedence.pp precedence);
   compute_ord_select precedence >>= fun (ord, select, bool_select) ->
   (* HO *)
@@ -646,7 +648,7 @@ let () =
     "--sine-take-only-defs", Arg.Bool ((:=) _take_only_defs),
     " take only axioms marked as definitions and the conjecture";
     "--sine-ignore-k-most-common-syms", Arg.Int (fun v -> _ignore_k_most_common_symbols := Some v),
-    " if conjecture symbol is within k most common occuring ones, then it will be disregarded as conjecture symbol";
+    " if conjecture symbol is within k most common occurring ones, then it will be disregarded as conjecture symbol";
     "--sine-take-conj-defs", Arg.Bool ((:=) _take_conj_defs),
     " force taking definitions of symbols ocurring in conjecture";
     "--sine", Arg.Set_int _sine_threshold,

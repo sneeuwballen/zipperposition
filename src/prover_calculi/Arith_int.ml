@@ -336,7 +336,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let all_lits = new_lit :: c_guard @ lits_a @ lits_p in
       (* build clause *)
       let proof =
-        Proof.Step.inference ~tags:[Proof.Tag.T_lia]
+        Proof.Step.inference ~tags:[Proof.Tag.T_lia; Proof.Tag.T_cannot_orphan]
           ~rule:rule_canc
           [C.proof_parent_subst renaming (info.active,s_a) subst;
            C.proof_parent_subst renaming (info.passive,s_p) subst] in
@@ -550,7 +550,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       if !did_simplify then (
         clauses := CCList.uniq ~eq:eq_c_subst !clauses;
         let proof =
-          Proof.Step.inference ~tags:[Proof.Tag.T_lia]
+          Proof.Step.inference ~tags:[Proof.Tag.T_lia; Proof.Tag.T_cannot_orphan]
             ~rule:(Proof.Rule.mk "canc_demod")
             (C.proof_parent c ::
              List.rev_map
@@ -678,7 +678,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                     let c_guard = Literal.of_unif_subst renaming us in
                     let all_lits = new_lit :: c_guard @ lits' in
                     let proof =
-                      Proof.Step.inference ~tags:[Proof.Tag.T_lia]
+                      Proof.Step.inference ~tags:[Proof.Tag.T_lia; Proof.Tag.T_cannot_orphan]
                         ~rule:(Proof.Rule.mk "cancellation")
                         [C.proof_parent_subst renaming (c,0) subst] in
                     let trail = C.trail c
@@ -1291,7 +1291,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let demod_ineq c : C.t SimplM.t =
     ZProf.enter_prof prof_arith_demod_ineq;
     let res =
-      CCArray.findi
+      CCArray.find_map_i
         (fun i lit -> match _ineq_is_absurd_by_unit c lit with
            | None -> None
            | Some trace ->
@@ -1306,7 +1306,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       | None -> SimplM.return_same c
       | Some (i,cs) ->
         let lits = CCArray.except_idx (C.lits c) i in
-        let proof = Proof.Step.simp ~tags:[Proof.Tag.T_lia]
+        let proof = Proof.Step.simp ~tags:[Proof.Tag.T_lia; Proof.Tag.T_cannot_orphan]
             ~rule:(Proof.Rule.mk "int.demod_ineq")
             (C.proof_parent c :: List.map C.proof_parent cs)
         in
@@ -1640,7 +1640,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                  assuming 0<=opp<n *)
               let m = M.add_const m Z.(rem (~- opp') n) in
               let lit = Lit.mk_divides ~sign n ~power:1 m in
-              Some (lit,[],[Proof.Tag.T_lia])
+              Some (lit,[],[Proof.Tag.T_lia; Proof.Tag.T_cannot_orphan])
             | Some _,
               T.AppBuiltin (Builtin.Int n,[]),
               T.AppBuiltin (Builtin.Int opp', [])
@@ -1648,15 +1648,15 @@ module Make(E : Env.S) : S with module Env = E = struct
               (* remainder(l1, n) = opp --> false
                  assuming opp ∉ [0.. n-1] *)
               let lit = if sign then Lit.mk_absurd else Lit.mk_tauto in
-              Some (lit,[],[Proof.Tag.T_lia])
+              Some (lit,[],[Proof.Tag.T_lia; Proof.Tag.T_cannot_orphan])
             | _ -> None
           end
         | _ ->
           begin match Monome.Int.of_term l, Monome.Int.of_term r with
             | Some m1, Some m2 ->
               if sign
-              then Some (Lit.mk_arith_eq m1 m2,[],[Proof.Tag.T_lia])
-              else Some (Lit.mk_arith_neq m1 m2,[],[Proof.Tag.T_lia])
+              then Some (Lit.mk_arith_eq m1 m2,[],[Proof.Tag.T_lia; Proof.Tag.T_cannot_orphan])
+              else Some (Lit.mk_arith_neq m1 m2,[],[Proof.Tag.T_lia; Proof.Tag.T_cannot_orphan])
             | _, None
             | None, _-> None
           end
@@ -1728,7 +1728,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* Simplification:  a < b  ----> a+1 ≤ b *)
   let canc_less_to_lesseq = function
     | Lit.Int (AL.Binary (AL.Less, m1, m2)) ->
-      Some (Lit.mk_arith_lesseq (M.succ m1) m2, [], [Proof.Tag.T_lia])
+      Some (Lit.mk_arith_lesseq (M.succ m1) m2, [], [Proof.Tag.T_lia; Proof.Tag.T_cannot_orphan])
     | _ -> None
 
   exception VarElim of int * S.t
@@ -2220,8 +2220,8 @@ let extension =
   and post_typing_action stmts state =
     let module PT = TypedSTerm in
     let has_int =
-      CCVector.to_seq stmts
-      |> Iter.flat_map Stmt.Seq.to_seq
+      CCVector.to_iter stmts
+      |> Iter.flat_map Stmt.Seq.to_iter
       |> Iter.flat_map
         (function
           | `ID _ -> Iter.empty

@@ -217,7 +217,7 @@ module Make(E : Index.EQUATION) = struct
          let prefix s = match t.star with
            | None -> s
            | Some t' -> Iter.cons ("*", t') s
-         and s2 = ID.Map.to_seq t.map
+         and s2 = ID.Map.to_iter t.map
                   |> Iter.map (fun (sym, t') -> ID.to_string sym, t')
          in
          prefix s2)
@@ -477,7 +477,7 @@ module MakeTerm(X : Set.OrderedType) = struct
          let prefix s = match t.star with
            | None -> s
            | Some t' -> Iter.cons ("*", t') s
-         and s2 = SIMap.to_seq t.map
+         and s2 = SIMap.to_iter t.map
                   |> Iter.map
                     (fun ((sym,i), t') ->
                        let label = CCFormat.sprintf "%a/%d" ID.pp sym i in

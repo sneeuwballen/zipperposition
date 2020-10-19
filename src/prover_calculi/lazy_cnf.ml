@@ -13,6 +13,7 @@ let k_rename_eq = Flex_state.create_key ()
 let k_scoping = Flex_state.create_key ()
 let k_skolem_mode = Flex_state.create_key ()
 let k_pa_renaming = Flex_state.create_key ()
+let k_only_eligible = Flex_state.create_key ()
 
 let section = Util.Section.make ~parent:Const.section "lazy_cnf"
 
@@ -56,8 +57,13 @@ module Make(E : Env.S) : S with module Env = E = struct
             | `Decrease -> Term.Tbl.decr _form_counter t
         ) terms))
 
-  let fold_lits c = 
-    Ls.fold_eqn_simple (C.lits c)
+  let fold_lits c =
+    let lits = Ls.fold_eqn_simple (C.lits c) in
+    if Env.flex_get k_only_eligible then (
+      let eligible = C.eligible_res_no_subst c in
+      Iter.filter (fun (_,_,_,p) -> CCBV.get eligible (Ls.Pos.idx p)) lits
+    ) else lits
+    
 
   let proof ~constructor ~name ~parents c =
     constructor ~rule:(Proof.Rule.mk name)
@@ -163,6 +169,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       Iter.empty
     in
 
+    let only_quants = Env.flex_get k_lazy_cnf_kind == `Ignore in
+
     fold_lits c
     |> Iter.fold_while ( fun acc (lhs, rhs, sign, pos) ->
       let i,_ = Ls.Pos.cut pos in
@@ -170,19 +178,19 @@ module Make(E : Env.S) : S with module Env = E = struct
       if L.is_predicate_lit lit then (
         Util.debugf ~section 3 "  subformula:%d:@[%a@]" (fun k -> k i L.pp lit );
         begin match T.view lhs with 
-        | T.AppBuiltin(And, l) when List.length l >= 2 ->
+        | T.AppBuiltin(And, l) when List.length l >= 2 && not only_quants->
           let rule_name = "lazy_cnf_and" in
           if sign then return acc @@ mk_and ~proof_cons l c i ~rule_name
           else return acc @@ mk_or ~proof_cons (List.map T.Form.not_ l) c i ~rule_name
-        | T.AppBuiltin(Or, l) when List.length l >= 2 ->
+        | T.AppBuiltin(Or, l) when List.length l >= 2 && not only_quants ->
           let rule_name = "lazy_cnf_or" in
           if sign then return acc @@ mk_or ~proof_cons l c i ~rule_name
           else return acc @@ mk_and ~proof_cons (List.map T.Form.not_ l) c i ~rule_name
-        | T.AppBuiltin(Imply, [a;b]) ->
+        | T.AppBuiltin(Imply, [a;b]) when not only_quants ->
           let rule_name = "lazy_cnf_imply" in
           if sign then return acc @@ mk_or ~proof_cons [T.Form.not_ a; b] c i ~rule_name
           else return acc @@ mk_and ~proof_cons [a; T.Form.not_ b] c i ~rule_name
-        | T.AppBuiltin((Equiv|Xor) as hd, [a;b]) ->
+        | T.AppBuiltin((Equiv|Xor) as hd, [a;b]) when not only_quants ->
           let hd = if sign then hd else (if hd = Equiv then Xor else Equiv) in
           if eligible_to_ignore_eq ~ignore_eq a b then continue acc
           else (
@@ -297,12 +305,12 @@ module Make(E : Env.S) : S with module Env = E = struct
     in
 
     if C.length c > 1 then (
-      fold_lits c
+      Ls.fold_eqn_simple (C.lits c)
       |> Iter.fold_while (fun _ (lhs,rhs,sign,pos) -> 
         let i,_ = Ls.Pos.cut pos in
         let lit = (C.lits c).(i) in
-        let proof_cons = 
-          Proof.Step.simp ~infos:[] 
+        let proof_cons =
+          Proof.Step.simp ~infos:[]
           ~tags:[Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth] in
         let polarity_aware = Env.flex_get k_pa_renaming in
         let should_rename = should_rename sign in
@@ -355,11 +363,20 @@ module Make(E : Env.S) : S with module Env = E = struct
               (mk_or ~proof_cons ~rule_name [T.Form.not_ lhs; T.Form.not_ rhs] c i)
               @ (mk_or ~proof_cons ~rule_name [lhs; rhs] c i)) in
           let pen_inc = 
-            if (T.is_ground lhs && T.is_ground rhs) then 0 
-            else (if T.is_app_var lhs || T.is_app_var rhs then 3 else 1) in
+            (if T.is_app_var lhs || T.is_app_var rhs then 2 
+             else if (T.is_fo_term lhs && T.is_fo_term rhs) then 1
+             else 0) in
           List.iter (fun c -> C.inc_penalty c pen_inc) new_cls;
           new_cls @ acc
         ) else acc) []
+    |> CCFun.tap (fun res -> 
+      Util.debugf ~section 1 "eq_elim(@[%a@])" (fun k -> k C.pp c);
+      if CCList.is_empty res then (
+        Util.debugf ~section 1 "=∅" CCFun.id;
+      ) else (
+        Util.debugf ~section 1 "=@[%a@]" (fun k -> k (CCList.pp C.pp) res);
+      ) 
+    )
   
   let cnf_scope c =
     fold_lits c
@@ -385,7 +402,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     if not @@ CCList.is_empty res then (
       Util.debugf ~section 1 "lazy_cnf_simp(@[%a@])=" (fun k -> k C.pp c);
       Util.debugf ~section 1 "@[%a@]@." (fun k -> k (CCList.pp C.pp) res);
-      Util.debugf ~section 1 "proof:@[%a@]@." (fun k -> k (CCList.pp (Proof.S.pp_tstp)) (List.map C.proof res));
+      Util.debugf ~section 3 "proof:@[%a@]@." (fun k -> k (CCList.pp (Proof.S.pp_tstp)) (List.map C.proof res));
       update_form_counter ~action:`Decrease c;
       CCList.iter (update_form_counter ~action:`Increase) res;
     ) else Util.debugf ~section 1 "lazy_cnf_simp(@[%a@])=Ø" (fun k -> k C.pp c);
@@ -403,18 +420,18 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let setup () =
     if !enabled then (
-      (* orders are still not really fixed for completeness *)
-      Env.Ctx.lost_completeness ();
+      (* Env.Ctx.lost_completeness (); *)
       begin match Env.flex_get k_lazy_cnf_kind with 
-      | `Inf -> Env.add_unary_inf "lazy_cnf" lazy_clausify_inf
+      | `Inf | `Ignore -> 
+        Env.add_unary_inf "lazy_cnf" lazy_clausify_inf
       | `Simp -> 
           Env.add_unary_inf "elim eq" clausify_eq;
-          Env.add_multi_simpl_rule ~priority:5 lazy_clausify_simpl 
+          Env.add_multi_simpl_rule ~priority:5 lazy_clausify_simpl
       end;
 
       (* ** IMPORTANT **
          Due to correctly set priorioty, renaming will run before simplification *)
-      if Env.flex_get k_renaming_threshold > 0 then(
+      if Env.flex_get k_renaming_threshold > 0 then (
         Env.add_multi_simpl_rule ~priority:4 rename_subformulas
       );
       if Env.flex_get k_scoping != `Off then (
@@ -429,6 +446,7 @@ let _rename_eq = ref true
 let _scoping = ref `Off
 let _skolem_mode = ref `Skolem
 let _pa_renaming = ref true
+let _only_eligible = ref false
 
 let extension =
   let register env =
@@ -440,6 +458,7 @@ let extension =
     E.flex_add k_scoping !_scoping;
     E.flex_add k_skolem_mode !_skolem_mode;
     E.flex_add k_pa_renaming !_pa_renaming;
+    E.flex_add k_only_eligible !_only_eligible;
 
     let handler f c =
       f c;
@@ -466,6 +485,7 @@ let extension =
 let () =
   Options.add_opts [
     "--lazy-cnf", Arg.Bool ((:=) enabled), " turn on lazy clausification";
+    "--lazy-cnf-only-eligible-lits", Arg.Bool ((:=) _only_eligible), " apply lazy clausification only on eligible literals";
     "--lazy-cnf-scoping", Arg.Symbol (["off"; "mini"; "maxi"], (fun str -> 
       match str with 
       | "mini" -> _scoping := `Mini
@@ -483,11 +503,12 @@ let () =
       | "skolem" -> _skolem_mode := `Skolem
       | "choice" -> _skolem_mode := `Choice
       | _ -> assert false)), " use lazy cnf as either simplification or inference";
-    "--lazy-cnf-kind", Arg.Symbol (["inf"; "simp"], (fun str -> 
+    "--lazy-cnf-kind", Arg.Symbol (["inf"; "simp"; "ignore"], (fun str -> 
       match str with 
       | "inf" -> _lazy_cnf_kind := `Inf
       | "simp" -> _lazy_cnf_kind := `Simp
-      | _ -> assert false)), " use lazy cnf as either simplification or inference";
+      | "ignore" -> _lazy_cnf_kind := `Ignore
+      | _ -> assert false)), " use lazy cnf as either simplification, inference, or let calculus clausify";
     "--lazy-cnf-rename-eq", Arg.Bool ((:=) _rename_eq), " turn on/of renaming of boolean equalities"];
 
   Params.add_to_modes ["ho-complete-basic";

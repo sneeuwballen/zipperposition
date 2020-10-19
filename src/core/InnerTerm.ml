@@ -500,29 +500,29 @@ module DB = struct
   type env = t DBEnv.t
 
   (* sequence2 of [De Bruijn, depth] pairs *)
-  let rec _to_seq ~depth t k =
+  let rec _to_iter ~depth t k =
     begin match t.ty with
       | NoType -> ()
-      | HasType ty -> _to_seq ~depth ty k
+      | HasType ty -> _to_iter ~depth ty k
     end;
     match view t with
     | DB v -> k (v,depth)
     | Var _
     | Const _ -> ()
     | Bind (_, varty, t') ->
-      _to_seq ~depth varty k;
-      _to_seq ~depth:(depth+1) t' k
+      _to_iter ~depth varty k;
+      _to_iter ~depth:(depth+1) t' k
     | AppBuiltin (_, l) ->
-      List.iter (fun t -> _to_seq ~depth t k) l
+      List.iter (fun t -> _to_iter ~depth t k) l
     | App (f, l) ->
-      _to_seq ~depth f k;
-      List.iter (fun t -> _to_seq ~depth t k) l
+      _to_iter ~depth f k;
+      List.iter (fun t -> _to_iter ~depth t k) l
 
   let[@inline] _id x = x
 
   let closed t =
     let db_calc t = 
-      _to_seq ~depth:0 t
+      _to_iter ~depth:0 t
       |> Iter.map (fun (bvar,depth) -> bvar < depth)
       |> Iter.for_all _id in
     if get_property t.props f_db_overflowed then (
@@ -538,12 +538,12 @@ module DB = struct
 
   (* check whether t contains the De Bruijn symbol n *)
   let contains t n =
-    _to_seq ~depth:0 t
+    _to_iter ~depth:0 t
     |> Iter.map (fun (bvar,depth) -> bvar=n+depth)
     |> Iter.exists _id
 
   let unbound t =
-    _to_seq ~depth:0 t
+    _to_iter ~depth:0 t
     |> Iter.filter_map
       (fun (bvar,depth) -> if bvar >= depth then Some (bvar - depth) else None)
     |> Iter.to_rev_list
@@ -897,7 +897,7 @@ let replace t ~old ~by =
 (* TODO: sort variables, so that type  variables come first *)
 
 let close_vars ~ty s t =
-  let vars = Seq.vars t |> VarSet.of_seq |> VarSet.elements in
+  let vars = Seq.vars t |> VarSet.of_iter |> VarSet.elements in
   bind_vars ~ty s vars t
 
 (* make the function closing over all the arguments *)
@@ -995,8 +995,8 @@ let type_is_unifiable (ty:t): bool = match view ty with
   | _ -> true
 
 let type_non_unifiable_tags (ty:t): _ list = match view ty with
-  | AppBuiltin (Builtin.TyInt,_) -> [Builtin.Tag.T_lia]
-  | AppBuiltin (Builtin.TyRat,_) -> [Builtin.Tag.T_lra]
+  | AppBuiltin (Builtin.TyInt,_) -> [Builtin.Tag.T_lia; Builtin.Tag.T_cannot_orphan]
+  | AppBuiltin (Builtin.TyRat,_) -> [Builtin.Tag.T_lra; Builtin.Tag.T_cannot_orphan]
   | Bind (Binder.ForallTy, _, _) -> [Builtin.Tag.T_ho]
   | _ -> []
 
@@ -1085,7 +1085,7 @@ let rec pp_depth ?(hooks=[]) depth out t =
       in
       Format.fprintf out "@[<1>%a@ @[%a@].@ %a@]"
         Binder.pp b
-        (Util.pp_seq ~sep:" " pp_tyvar)
+        (Util.pp_iter ~sep:" " pp_tyvar)
         (Iter.of_array_i (Array.of_list varty_l))
         (_pp_surrounded (depth+List.length varty_l)) t'
     | AppBuiltin (Builtin.Arrow, ([] | [_])) -> assert false
@@ -1181,7 +1181,7 @@ let rec pp_zf out t =
       in
       Format.fprintf out "@[<1>%a@ @[%a@].@ %a@]"
         Binder.ZF.pp b
-        (Util.pp_seq ~sep:" " pp_tyvar)
+        (Util.pp_iter ~sep:" " pp_tyvar)
         (Iter.of_array_i (Array.of_list varty_l))
         (_pp_surrounded (depth+List.length varty_l)) t'
     | AppBuiltin (Builtin.Arrow, ([] | [_])) -> assert false

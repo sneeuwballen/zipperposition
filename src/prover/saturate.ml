@@ -38,6 +38,7 @@ let should_try_e = function
 
 let _progress = ref false (* progress bar? *)
 let _check_types = ref false
+let _max_multi_simpl = ref (-1)
 
 (* print progress (i out of steps) *)
 let print_progress i ~steps =
@@ -115,7 +116,10 @@ module Make(E : Env.S) = struct
         Env.do_generate ~full:true ()
       in
       if Iter.is_empty clauses
-      then Sat
+      then (
+        Util.debugf ~section 2 "saturated set: @[%a@]@." 
+          (fun k -> k (Iter.pp_seq Env.C.pp_tstp_full) (Env.get_active ()));
+        Sat)
       else (
         let clauses = clauses
                       |> Iter.filter_map
@@ -126,13 +130,13 @@ module Make(E : Env.S) = struct
                            then None
                            else Some c)
                       |> Iter.to_list in
-        Util.debugf 3 ~section "@[<2>inferred @{<green>new clauses@}@ @[<v>%a@]@]"
+        Util.debugf 5 ~section "@[<2>inferred @{<green>new clauses@}@ @[<v>%a@]@]"
           (fun k->k (CCFormat.list Env.C.pp) clauses);
         Env.add_passive (Iter.of_list clauses);
         Unknown
       )
     | Some c ->
-      Util.debugf ~section 3 "@[<2>@{<green>given@} (before simplification):@ `@[%a@]`@]"
+      Util.debugf ~section 2 "@[<2>@{<green>given@} (before simplification):@ `@[%a@]`@]"
             (fun k->k Env.C.pp c);
       Util.debugf ~section 10 "@[proof:@[%a@]@]" (fun k -> k Proof.S.pp_tstp (Env.C.proof c));
       
@@ -143,7 +147,7 @@ module Make(E : Env.S) = struct
           Util.incr_stat stat_redundant_given;
           Util.debugf ~section 2 "@[<2>given clause dropped@ @[%a@]@]"
             (fun k->k Env.C.pp c);
-          Util.debugf ~section 10 "@[proof:@[%a@]@]" (fun k -> k Proof.S.pp_tstp (Env.C.proof c));
+          Util.debugf ~section 2 "@[proof:@[%a@]@]" (fun k -> k Proof.S.pp_tstp (Env.C.proof c));
           Unknown
         | l, _ when List.exists Env.C.is_empty l ->
           (* empty clause found *)
@@ -152,7 +156,7 @@ module Make(E : Env.S) = struct
         | c :: l', _ ->
           (* put clauses of [l'] back in passive set *)
 
-          Util.debugf ~section 2 "@[ remaining after simplification:@.@[%a@]@. @]" (fun k -> k (CCList.pp Env.C.pp) l');
+          Util.debugf ~section 5 "@[ remaining after simplification:@.@[%a@]@. @]" (fun k -> k (CCList.pp Env.C.pp) l');
           
           Env.add_passive (Iter.of_list l');
           (* process the clause [c] *)
@@ -166,14 +170,14 @@ module Make(E : Env.S) = struct
             (fun k->k num (Env.C.penalty c) Env.C.pp c);
           Util.debugf ~section 5 "@[proof:@[%a@]@]" (fun k -> k Proof.S.pp_tstp (Env.C.proof c));
           (* find clauses that are subsumed by given in active_set *)
-          let subsumed_active = Env.C.ClauseSet.to_seq (Env.subsumed_by c) in
+          let subsumed_active = Env.C.ClauseSet.to_iter (Env.subsumed_by c) in
           Env.remove_active subsumed_active;
           Env.remove_simpl subsumed_active;
           (* add given clause to simpl_set *)
           Env.add_simpl (Iter.singleton c);
           (* simplify active set using c *)
           let simplified_actives, newly_simplified = Env.backward_simplify c in
-          let simplified_actives = Env.C.ClauseSet.to_seq simplified_actives in
+          let simplified_actives = Env.C.ClauseSet.to_iter simplified_actives in
           (* the simplified active clauses are removed from active set and
              added to the set of new clauses. Their descendants are also removed
              from passive set *)
@@ -181,10 +185,10 @@ module Make(E : Env.S) = struct
           check_clauses_ newly_simplified;
           Env.remove_active simplified_actives;
           Env.remove_simpl simplified_actives;
-          CCVector.append_seq new_clauses newly_simplified;
+          CCVector.append_iter new_clauses newly_simplified;
 
-          Util.debugf ~section 5 "simplified_actives:@ @[%a@]@." (fun k -> k (Iter.pp_seq Env.C.pp) simplified_actives);
-          Util.debugf ~section 5 "newly_simplified:@ @[%a@]@." (fun k -> k (Iter.pp_seq Env.C.pp) newly_simplified);
+          Util.debugf ~section 2 "simplified_actives:@ @[%a@]@." (fun k -> k (Iter.pp_seq Env.C.pp) simplified_actives);
+          Util.debugf ~section 2 "newly_simplified:@ @[%a@]@." (fun k -> k (Iter.pp_seq Env.C.pp) newly_simplified);
 
           (* add given clause to active set *)
           Env.add_active (Iter.singleton c);
@@ -198,13 +202,13 @@ module Make(E : Env.S) = struct
           let inferred_clauses =
             Iter.filter_map
               (fun c ->
-                 Util.debugf ~section 4 "inferred: `@[%a@]`" (fun k->k Env.C.pp c);
+                 Util.debugf ~section 10 "inferred: `@[%a@]`" (fun k->k Env.C.pp c);
                  let c, _ = Env.forward_simplify c in
                  check_clause_ c;
                  (* keep clauses  that are not redundant *)
                  if Env.is_trivial c || Env.is_active c || Env.is_passive c
                  then (
-                   Util.debugf ~section 4 "clause `@[%a@]` is trivial, dump" (fun k->k Env.C.pp c);
+                   Util.debugf ~section 10 "clause `@[%a@]` is trivial, dump" (fun k->k Env.C.pp c);
                    Util.debugf ~section 10 "@[proof:@[%a@]@]" (fun k -> k Proof.S.pp_tstp (Env.C.proof c));
 
                    None
@@ -217,12 +221,14 @@ module Make(E : Env.S) = struct
             Iter.flat_map_l (fun c -> 
               CCOpt.get_or ~default:[c] (Env.cheap_multi_simplify c)
             ) inferred_clauses in
-          CCVector.append_seq new_clauses inferred_clauses;
-          Util.debugf ~section 2 "@[<2>inferred @{<green>new clauses@}:@ [@[<v>%a@]]@]"
-            (fun k->k (Util.pp_seq Env.C.pp) (CCVector.to_seq new_clauses));
+          CCVector.append_iter new_clauses inferred_clauses;
+          Util.debugf ~section 3 "@[<2>inferred @{<green>new clauses@}:@ [@[<v>%a@]]@]"
+            (fun k->k (Util.pp_iter Env.C.pp) (CCVector.to_iter new_clauses));
+          Util.debugf ~section 10 "@[<2>proofs:@ [@[<v>%a@]]@]"
+            (fun k->k (Util.pp_iter ~sep:";\n" Proof.S.pp_tstp) (Iter.map Env.C.proof  (CCVector.to_iter new_clauses)));
           (* add new clauses (including simplified active clauses)
              to passive set and simpl_set *)
-          Env.add_passive (CCVector.to_seq new_clauses);
+          Env.add_passive (CCVector.to_iter new_clauses);
           (* test whether the empty clause has been found *)
           match Env.get_some_empty_clause () with
           | None -> Unknown
@@ -272,6 +278,7 @@ module Make(E : Env.S) = struct
     |> Iter.iter Env.ProofState.CQueue.register_conjecture_clause
 
   let () =
+      Env.flex_add Env.k_max_multi_simpl_depth !_max_multi_simpl;
       Signal.on_every Env.on_start check_fragment;
       Signal.on_every Env.on_start register_conjectures;
     
@@ -280,8 +287,9 @@ end
 let () =
   Params.add_opts
     [ "--progress", Arg.Set _progress, " progress bar";
-      "-p", Arg.Set _progress, " alias to --progress";
+      "-p", Arg.Set _progress, " alias for --progress";
       "--check-types", Arg.Set _check_types, " check types in new clauses";
+      "--max-multi-simpl-depth", Arg.Int ((:=) _max_multi_simpl), " maixmum depth of multi step simplification. -1 disables maximum depth.";
       "--try-e", Arg.String (fun path -> e_path := Some path), " try the given eprover binary on the problem";
       "--e-call-point", Arg.Float 
         (fun v -> if v > 1.0 || v < 0.0 then invalid_arg "0 <= e-call-point <= 1.0"

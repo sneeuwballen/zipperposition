@@ -239,7 +239,7 @@ let terms_of_rule (d:_ def_rule): _ Iter.t = match d with
     Iter.of_list (rhs::args)
   | Def_form {lhs;rhs;_} ->
     Iter.cons lhs (Iter.of_list rhs |> Iter.flat_map Iter.of_list)
-    |> Iter.flat_map SLiteral.to_seq
+    |> Iter.flat_map SLiteral.to_iter
 
 let level_of_rule (d:_ def_rule): int =
   terms_of_rule d
@@ -298,10 +298,10 @@ module Seq = struct
       List.iter (fun t->k (`Term t)) (rhs::args);
     | Def_form {vars;lhs;rhs;_} ->
       List.iter (fun v->k (`Ty (Var.ty v))) vars;
-      SLiteral.to_seq lhs |> Iter.map mk_term |> Iter.iter k;
+      SLiteral.to_iter lhs |> Iter.map mk_term |> Iter.iter k;
       Iter.of_list rhs |> Iter.map mk_form |> Iter.iter k
 
-  let to_seq st k =
+  let to_iter st k =
     let decl id ty = k (`ID id); k (`Ty ty) in
     begin match view st with
       | TyDecl (id,ty) -> decl id ty;
@@ -372,28 +372,28 @@ module Seq = struct
         |> Iter.flat_map_l (fun d -> d.def_rules)
         |> Iter.flat_map_l forms_def
       | _ ->
-        to_seq st
+        to_iter st
         |> Iter.filter_map (function `Form f -> Some f | _ -> None)
     end
 
   let lits st = forms st |> Iter.flat_map Iter.of_list
 
   let terms st =
-    to_seq st
+    to_iter st
     |> Iter.flat_map
       (function
-        | `Form f -> Iter.of_list f |> Iter.flat_map SLiteral.to_seq
+        | `Form f -> Iter.of_list f |> Iter.flat_map SLiteral.to_iter
         | `Term t -> Iter.return t
         | _ -> Iter.empty)
 
   let symbols st =
-    to_seq st
+    to_iter st
     |> Iter.flat_map
       (function
         | `ID id -> Iter.return id
         | `Form f ->
           Iter.of_list f
-          |> Iter.flat_map SLiteral.to_seq
+          |> Iter.flat_map SLiteral.to_iter
           |> Iter.flat_map Term.Seq.symbols
         | `Term t -> Term.Seq.symbols t
         | `Ty ty -> Type.Seq.symbols ty)
@@ -589,7 +589,7 @@ let sine_axiom_selector
        then eliminate_long_implications ~is_goal 
        else CCFun.id)
     |> Iter.flat_map TST.Seq.symbols
-    |> ID.Set.of_seq in
+    |> ID.Set.of_iter in
 
   let symset_of_axs ~trim_implications ?(is_goal=false) axs =
     List.fold_left (fun acc c -> 
@@ -612,7 +612,7 @@ let sine_axiom_selector
   let create_trigger_map ~trim_implications ~tbl axioms = 
     let map = ID.Tbl.create (Iter.length @@ ID.Tbl.keys tbl) in
     CCList.iter (fun ax ->
-      let symset = ID.Set.to_seq @@ symset_of_ax ~trim_implications:false ax in
+      let symset = ID.Set.to_iter @@ symset_of_ax ~trim_implications:false ax in
       let min_occ = ref (max_int) in
       Iter.iter (fun id -> 
           let cnt = ID.Tbl.get_or tbl id ~default:max_int in
@@ -702,11 +702,11 @@ let sine_axiom_selector
     Util.debugf ~section 1 "most common symbols are: @[%a@]@." 
       (fun k -> k (ID.Set.pp ID.pp) most_commmon_syms);
 
-    (* now tbl contains occurences of all symbols *)
+    (* now tbl contains occurrences of all symbols *)
 
     let triggers = create_trigger_map ~trim_implications ~tbl (axioms) in
     let syms_in_conj = symset_of_axs ~trim_implications ~is_goal:true goals in
-    let conj_syms = 
+    let conj_syms =
       ID.Set.diff syms_in_conj  most_commmon_syms in
     Util.debugf ~section 2 "conj_syms:@[%a@]" (fun k -> k (ID.Set.pp ID.pp) conj_syms);
     let triggered_1 = triggered_by_syms ~triggers conj_syms in
@@ -795,6 +795,7 @@ module ZF = struct
 end
 
 module TPTP = struct
+  let namespace = Proof.S.Tbl.create 8
   let pp ppf ppt ppty out st =
     let name = name st in
     let pp_decl out (id,ty) =
@@ -802,7 +803,7 @@ module TPTP = struct
       then
         fpf out "%% (omitted type declaration for distinct object %a.)" ID.pp_tstp id
       else
-        fpf out "tff(@[%s, type,@ %a :@ @[%a@]@])." name ID.pp_tstp id ppty ty
+        fpf out "thf(@[%s, type,@ %a :@ @[%a@]@])." name ID.pp_tstp id ppty ty
     and pp_quant_vars out = function
       | [] -> ()
       | l ->
@@ -828,7 +829,7 @@ module TPTP = struct
             (Util.pp_list ~sep:" & " ppf) rhs
       in
       let pp_top_rule out r =
-        fpf out "@[<2>tff(%s, axiom,@ %a)@]." name pp_rule r
+        fpf out "@[<2>thf(%s, axiom,@ %a)@]." name pp_rule r
       in
       Util.pp_list ~sep:"" pp_top_rule out d.def_rules
     in
@@ -836,19 +837,24 @@ module TPTP = struct
     | TyDecl (id,ty) -> pp_decl out (id,ty)
     | Assert f ->
       let role = "axiom" in
-      fpf out "@[<2>tff(%a, %s,@ (@[%a@]))@]." pp_name name role ppf f
+      fpf out "@[<2>thf(%a, %s,@ (@[%a@]))@]." pp_name name role ppf f
     | Lemma l ->
       let role = "lemma" in
-      fpf out "@[<2>tff(%a, %s,@ (@[%a@]))@]." pp_name name role
+      fpf out "@[<2>thf(%a, %s,@ (@[%a@]))@]." pp_name name role
         (Util.pp_list ~sep:" & " ppf) l
     | Goal f ->
       let role = "conjecture" in
-      fpf out "@[<2>tff(%a, %s,@ (@[%a@]))@]." pp_name name role ppf f
+      fpf out "@[<2>thf(%a, %s,@ (@[%a@]))@]." pp_name name role ppf f
     | NegatedGoal (_,l) ->
       let role = "negated_conjecture" in
+      let parents = 
+        List.map (fun p -> `Name (Proof.S.name ~namespace @@ Proof.Parent.proof p))
+             (Proof.Step.parents @@ st.proof)
+      in
       List.iter
         (fun f ->
-           fpf out "@[<2>tff(%a, %s,@ (@[%a@]))@]." pp_name name role ppf f)
+           fpf out "@[<2>thf(%a, %s,@ (@[%a@]),@ @[%a@])@]." pp_name name role
+             ppf f Proof.Kind.pp_tstp (Proof.Step.kind @@ st.proof, parents))
         l
     | Def l ->
       Format.fprintf out "@[<v>";
@@ -862,11 +868,11 @@ module TPTP = struct
     | Rewrite d ->
       begin match d with
         | Def_term {id;args;rhs;_} ->
-          fpf out "@[<2>tff(%a, axiom,@ %a(%a) =@ @[%a@])@]."
+          fpf out "@[<2>thf(%a, axiom,@ %a(%a) =@ @[%a@])@]."
             pp_name name ID.pp_tstp id (Util.pp_list ~sep:", " ppt) args ppt rhs
         | Def_form {lhs;rhs;polarity=pol;_} ->
           let op = match pol with `Equiv-> "<=>" | `Imply -> "=>" in
-          fpf out "@[<2>tff(%a, axiom,@ %a %s@ (@[%a@]))@]."
+          fpf out "@[<2>thf(%a, axiom,@ %a %s@ (@[%a@]))@]."
             pp_name name (SLiteral.TPTP.pp ppt) lhs op
             (Util.pp_list ~sep:" & " ppf) rhs
       end
@@ -884,7 +890,7 @@ let pp_in pp_f pp_t pp_ty = function
 let pp_clause_in o =
   let pp_t = Term.pp_in o in
   let pp_ty = Type.pp_in o in
-  pp_in (Util.pp_list ~sep:" ∨ " (SLiteral.pp_in o pp_t)) pp_t pp_ty o
+  pp_in (Util.pp_list ~sep:" | " (SLiteral.pp_in o pp_t)) pp_t pp_ty o
 
 let pp_input_in o =
   let pp_t = TypedSTerm.pp_in o in
@@ -1069,7 +1075,7 @@ let get_rw_rule ?weight_incr:(w_i=1000000) c  =
 
   let build_from_head sym vars rhs =
     let rhs = Lambda.eta_reduce @@ Lambda.snf (fst (Rewrite.Term.normalize_term rhs)) in
-    let vars_lhs = Term.VarSet.of_seq (Iter.fold (fun acc v -> 
+    let vars_lhs = Term.VarSet.of_iter (Iter.fold (fun acc v -> 
         Iter.append acc (Term.Seq.vars v)) 
         Iter.empty (Iter.of_list vars)) in
     if not (Term.symbols rhs |> ID.Set.mem sym) &&

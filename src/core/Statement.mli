@@ -203,7 +203,7 @@ val sine_axiom_selector:
 
 
 module Seq : sig
-  val to_seq : ('f,'t,'ty) t ->
+  val to_iter : ('f,'t,'ty) t ->
     [`Term of 't | `Form of 'f | `Ty of 'ty | `ID of ID.t] Iter.t
   val ty_decls : (_, _, 'ty) t -> (ID.t * 'ty) Iter.t
   val forms : ('f, _, _) t -> 'f Iter.t

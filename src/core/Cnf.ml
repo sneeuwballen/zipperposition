@@ -275,7 +275,9 @@ module Flatten = struct
           CCList.diagonal l
           |> List.rev_map (fun (t,u) -> T.Form.neq_or_xor t u)
         in
-        let f = T.Form.and_ ?loc:(T.loc t) l in
+        let f = 
+          if CCList.length l == 1 then List.hd l
+          else T.Form.and_ ?loc:(T.loc t) l in
         Util.debugf ~section 5 "(@[flatten.expand-distinct@ %a@ :into %a@])"
           (fun k->k T.pp t T.pp f);
         aux pos vars f
@@ -1157,7 +1159,7 @@ let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
            | l -> Iter.of_list (List.rev (new_st :: l))
          end
       )
-    |> CCVector.of_seq ?init:None
+    |> CCVector.of_iter ?init:None
   in
   ZProf.exit_prof prof_simplify_rename;
   res
@@ -1182,7 +1184,7 @@ let proof_neg stmt =
     [Stmt.as_proof_i stmt |> Proof.Parent.from]
 
 (* Transform the clauses into proper CNF; returns a list of clauses *)
-let cnf_of_seq ~ctx ?(opts=[]) (seq:Stmt.input_t Iter.t) : _ CCVector.t =
+let cnf_of_iter ~ctx ?(opts=[]) (seq:Stmt.input_t Iter.t) : _ CCVector.t =
   (* read options *)
   let disable_renaming = List.mem DisableRenaming opts || List.mem LazyCnf opts in
   let lazy_cnf = List.mem LazyCnf opts in
@@ -1202,7 +1204,7 @@ let cnf_of_seq ~ctx ?(opts=[]) (seq:Stmt.input_t Iter.t) : _ CCVector.t =
   in
   (* simplify and introduce definitions *)
   let v =
-    if (*List.mem LazyCnf opts*) false then CCVector.of_seq seq
+    if (*List.mem LazyCnf opts*) false then CCVector.of_iter seq
     else (
     flatten ~lazy_cnf ~should_define:(not disable_renaming) ~ctx seq
     |> simplify_and_rename ~ctx ~disable_renaming ~preprocess)
@@ -1359,7 +1361,7 @@ let cnf_of_seq ~ctx ?(opts=[]) (seq:Stmt.input_t Iter.t) : _ CCVector.t =
   CCVector.freeze res
 
 let cnf_of ~ctx ?opts  st =
-  cnf_of_seq ~ctx ?opts  (Iter.return st)
+  cnf_of_iter ~ctx ?opts  (Iter.return st)
 
 let pp_f_statement out st = Statement.pp T.pp T.pp T.pp out st
 
@@ -1375,7 +1377,7 @@ let type_declarations seq =
   let open Statement in
   seq
   |> Iter.flat_map Seq.ty_decls
-  |> ID.Map.of_seq
+  |> ID.Map.of_iter
 
 let convert seq =
   let module A = UntypedAST in
@@ -1440,6 +1442,6 @@ let convert seq =
     res
   in
   Iter.map conv_statement seq
-  |> CCVector.of_seq
+  |> CCVector.of_iter
   |> CCVector.freeze
 

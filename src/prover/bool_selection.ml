@@ -73,7 +73,7 @@ let select_leftmost ~ord ~kind lits =
     (* if t is app_var then return the term itself, but do not recurse  *)
     if T.is_app_var t then (
       CCOpt.return_if (is_selectable ~top ~forbidden t) (t, PB.to_pos pos_builder)
-    ) else ( 
+    ) else (
       match T.view t with
       | T.App(_, args)
       | T.AppBuiltin(_, args) ->
