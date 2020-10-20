@@ -14,6 +14,7 @@ let k_scoping = Flex_state.create_key ()
 let k_skolem_mode = Flex_state.create_key ()
 let k_pa_renaming = Flex_state.create_key ()
 let k_only_eligible = Flex_state.create_key ()
+let k_penalize_eq_cnf = Flex_state.create_key ()
 
 let section = Util.Section.make ~parent:Const.section "lazy_cnf"
 
@@ -36,9 +37,27 @@ module Make(E : Env.S) : S with module Env = E = struct
   module FR = Env.FormRename
   
   let _form_counter = Term.Tbl.create 256
+  let _counted_clauses = ref Util.Int_set.empty
 
   let update_form_counter ~action c =
-    if not (FR.is_renaming_clause c) then (
+    let should_update c =
+      not (FR.is_renaming_clause c) &&
+      (* we make sure than we do not add or remove the clause twice *)
+      (match action with
+      | `Increase ->
+        if Util.Int_set.mem (C.id c) !_counted_clauses then false
+        else (
+          _counted_clauses := Util.Int_set.add (C.id c) !_counted_clauses;
+          true
+        )
+      | `Decrease -> 
+        if not (Util.Int_set.mem (C.id c) !_counted_clauses) then false
+        else (
+          _counted_clauses := Util.Int_set.remove (C.id c) !_counted_clauses;
+          true;
+        ))
+    in
+    if should_update c then (
       Ls.fold_eqn 
         ~both:false ~ord:(E.Ctx.ord ()) ~eligible:(C.Eligible.always) 
         (C.lits c)
@@ -366,7 +385,9 @@ module Make(E : Env.S) : S with module Env = E = struct
             (if T.is_app_var lhs || T.is_app_var rhs then 2 
              else if (T.is_fo_term lhs && T.is_fo_term rhs) then 1
              else 0) in
-          List.iter (fun c -> C.inc_penalty c pen_inc) new_cls;
+          if Env.flex_get k_penalize_eq_cnf then (
+            List.iter (fun c -> C.inc_penalty c pen_inc) new_cls
+          );
           new_cls @ acc
         ) else acc) []
     |> CCFun.tap (fun res -> 
@@ -420,6 +441,21 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let setup () =
     if !enabled then (
+      let handler f c =
+      f c;
+      Signal.ContinueListening in
+
+  
+      Signal.on E.ProofState.PassiveSet.on_add_clause 
+        (handler (update_form_counter ~action:`Increase));
+      Signal.on E.ProofState.ActiveSet.on_add_clause
+        (handler (update_form_counter ~action:`Increase));
+      Signal.on E.ProofState.PassiveSet.on_remove_clause
+        (handler (update_form_counter ~action:`Decrease));
+      Signal.on E.ProofState.ActiveSet.on_remove_clause
+        (handler (update_form_counter ~action:`Decrease));
+
+
       (* Env.Ctx.lost_completeness (); *)
       begin match Env.flex_get k_lazy_cnf_kind with 
       | `Inf | `Ignore -> 
@@ -447,6 +483,7 @@ let _scoping = ref `Off
 let _skolem_mode = ref `Skolem
 let _pa_renaming = ref true
 let _only_eligible = ref false
+let _clausify_eq_pen = ref false
 
 let extension =
   let register env =
@@ -459,21 +496,7 @@ let extension =
     E.flex_add k_skolem_mode !_skolem_mode;
     E.flex_add k_pa_renaming !_pa_renaming;
     E.flex_add k_only_eligible !_only_eligible;
-
-    let handler f c =
-      f c;
-      Signal.ContinueListening in
-
-    if E.flex_get k_lazy_cnf_kind == `Inf then (
-      Signal.on E.ProofState.PassiveSet.on_add_clause 
-        (handler (ET.update_form_counter ~action:`Increase));
-      Signal.on E.ProofState.ActiveSet.on_add_clause
-        (handler (ET.update_form_counter ~action:`Increase));
-      Signal.on E.ProofState.PassiveSet.on_remove_clause
-        (handler (ET.update_form_counter ~action:`Decrease));
-      Signal.on E.ProofState.ActiveSet.on_remove_clause
-        (handler (ET.update_form_counter ~action:`Decrease))
-    );
+    E.flex_add k_penalize_eq_cnf !_clausify_eq_pen;
 
     ET.setup ()
   in
@@ -509,7 +532,8 @@ let () =
       | "simp" -> _lazy_cnf_kind := `Simp
       | "ignore" -> _lazy_cnf_kind := `Ignore
       | _ -> assert false)), " use lazy cnf as either simplification, inference, or let calculus clausify";
-    "--lazy-cnf-rename-eq", Arg.Bool ((:=) _rename_eq), " turn on/of renaming of boolean equalities"];
+    "--lazy-cnf-rename-eq", Arg.Bool ((:=) _rename_eq), " turn on/of renaming of boolean equalities";
+    "--lazy-cnf-clausify-eq-penalty", Arg.Bool ((:=) _clausify_eq_pen), " turn on/of penalizing clausification of equivalences"];
 
   Params.add_to_modes ["ho-complete-basic";
                        "ho-pragmatic";
