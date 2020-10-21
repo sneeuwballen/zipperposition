@@ -512,7 +512,13 @@ module Make(E : Env.S) : S with module Env = E = struct
   let register () =
     Signal.on Env.on_start initialize
   
-  let setup () = ()
+  let setup () =
+    if Env.flex_get k_enabled then (
+      if not (Env.flex_get Avatar.k_avatar_enabled) then (register ())
+      else (
+        CCFormat.printf "AVATAR is not yet compatible with PredElim@."
+      )
+    )
 end
 
 let _enabled = ref false

@@ -666,9 +666,9 @@ let extension =
     let module E = (val env : Env.S) in
     let module BCE = Make(E) in
 
-    E.flex_add k_check_at !_check_at;
     E.flex_add k_enabled !_enabled;
     E.flex_add k_max_symbol_occ !_max_symbol_occ;
+    E.flex_add k_check_at !_check_at;
     E.flex_add k_inprocessing !_inprocessing;
     
     BCE.setup ()
