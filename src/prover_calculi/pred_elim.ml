@@ -118,8 +118,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       raise UnsupportedLogic
     | _ -> None
 
-  (* Scan the clause and if it is in supported logic fragment,
-     store its literals in the symbol index *)
   let scan_cl_lits cl =
     let num_vars = List.length @@ Literals.vars (C.lits cl) in
     let is_flat = function
@@ -170,12 +168,12 @@ module Make(E : Env.S) : S with module Env = E = struct
              is_offending := !is_offending || ID.equal sym sym'
            | None -> () )
         done;
-        let gates = if is_flat lit then ID.Set.add sym gates else gates in
         if !is_offending then (
           pos,neg,ID.Set.add sym offending,gates
-        ) else if sign then (
-          ID.Set.add sym pos,neg,offending,gates
-        ) else (pos, ID.Set.add sym neg,offending,gates)
+        ) else (
+          let gates = if is_flat lit then ID.Set.add sym gates else gates in
+          if sign then (ID.Set.add sym pos,neg,offending,gates)
+          else (pos, ID.Set.add sym neg,offending,gates))
       | _ -> acc)
     ) (ID.Set.empty, ID.Set.empty, ID.Set.empty, ID.Set.empty) (C.lits cl) in
     
@@ -196,8 +194,10 @@ module Make(E : Env.S) : S with module Env = E = struct
     in
 
     let find_and_or bin_clauses long_clauses =
-      CCList.find_map (fun long_cl -> 
-        let sym_lits, other_lits = List.partition (fun lit -> 
+      (* both AND and OR definitions are of the form (~)name \/ literals
+         and a bunch of binary clauses (~)name \/ lit   *)
+      CCList.find_map (fun long_cl ->
+        let sym_lits, other_lits = List.partition (fun lit ->
           match get_sym_sign lit with
           | Some(sym',_) -> ID.equal sym sym'
           | _ -> false
@@ -207,26 +207,28 @@ module Make(E : Env.S) : S with module Env = E = struct
         let bin_gates = CCArray.of_list bin_clauses in
         if List.length other_lits > CCArray.length bin_gates then None
         else (
+          (* bit vector remembering which binary clauses we have already used *)
           let matched = CCBV.create ~size:(CCArray.length bin_gates) false in
-          let is_gate = List.for_all (fun lit -> 
+          let is_gate = List.for_all (fun lit ->
             let found = ref false in
             let i = ref 0 in
             while not !found && !i < CCArray.length bin_gates do
               let cl = bin_gates.(!i) in
               if not (CCBV.get matched !i) then (
-                let idx_name_opt = CCArray.find_idx (fun lit -> 
+                let idx_name_opt = CCArray.find_idx (fun lit ->
                   match get_sym_sign lit with
                   | Some(sym',_) -> ID.equal sym sym'
                   | None -> false
                 ) (C.lits cl) in
                 let idx_name, _ = CCOpt.get_exn idx_name_opt in
-                let name_lit = (C.lits cl).(idx_name) in
+                let name_lit = L.negate (C.lits cl).(idx_name) in
                 let other_lit = L.negate (C.lits cl).(1 - idx_name) in
                 let is_matched = 
-                  L.variant (lit,0) (other_lit,1)
-                  |> Iter.filter (fun (subst,_) -> 
-                    L.are_opposite_subst ~subst (sym_name_lit, 0) (name_lit,1))
-                  |> Iter.is_empty
+                  not @@ Iter.is_empty
+                    (L.variant (lit,0) (other_lit,1)
+                    |> Iter.filter (fun (subst,_) -> 
+                        not @@ Iter.is_empty @@ 
+                          L.variant ~subst (sym_name_lit, 0) (name_lit,1)))
                 in
                 if is_matched then (
                   CCBV.set matched !i;
@@ -238,8 +240,8 @@ module Make(E : Env.S) : S with module Env = E = struct
           let bin_cls = CCBV.select matched bin_gates in
           if is_gate then Some(long_cl, bin_cls)
           else None))
-        long_clauses
-      in
+      long_clauses
+    in
 
     let check_and () =
       let pos_gates = filter_gates ~sign:true ~lit_num_filter:(fun n -> n >= 3) in
@@ -271,8 +273,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       )
     ) !_pred_sym_idx
     
-
-
   let do_pred_elim () = ()
 
   let initialize () =
