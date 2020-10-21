@@ -7,6 +7,8 @@ open Logtk
 open Libzipperposition
 
 let k_enabled = Flex_state.create_key ()
+let k_check_at = Flex_state.create_key ()
+let k_inprocessing = Flex_state.create_key ()
 
 let section = Util.Section.make ~parent:Const.section "pred-elim"
 
@@ -42,11 +44,12 @@ module Make(E : Env.S) : S with module Env = E = struct
     mutable possible_gates : C.ClauseSet.t;
     (* do the clauses in the possible_gates form a gate, and if so which one? *)
     mutable is_gate : (C.t list * C.t list) option;
-    (* max and min number of variables in clauses in any of the sets *)
-    mutable max_vars : int;
-    mutable min_vars : int;
+    (* square of number of different variables stored in this clause set *)
+    mutable sq_var_weight : float;
+    (* number of literals stored in this clause set *)
+    mutable num_lits : int;
     (* what was this number during the last check *)
-    mutable last_check : (int * int) option;
+    mutable last_check : (float * int) option;
     mutable heap_idx : int;
   }
 
@@ -59,7 +62,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       let card t = 
         C.ClauseSet.cardinal t.pos_cls + C.ClauseSet.cardinal t.neg_cls
       in
-      card a < card b || (card a = card b && ID.compare a.sym b.sym < 0)
+      let card_a = card a and card_b = card b in
+      card_a < card_b || (card_a = card_b && ID.compare a.sym b.sym < 0)
   end
 
   module TaskQueue = struct 
@@ -81,13 +85,16 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let mk_pred_elim_info sym =
     {
-      sym; pos_cls = C.ClauseSet.empty; neg_cls = C.ClauseSet.empty;
+      sym; pos_cls = C.ClauseSet.empty; neg_cls = C.ClauseSet.empty; 
       offending_cls=C.ClauseSet.empty; possible_gates = C.ClauseSet.empty;
-      is_gate = None; max_vars = 0; min_vars = 0; last_check = None;
-      heap_idx = -1;
+      is_gate=None; sq_var_weight=0.0; last_check=None; heap_idx=(-1); num_lits=0;
     }
   
   let _pred_sym_idx = ref ID.Map.empty
+
+  let calc_sq_var cl =
+    let n = List.length (Literals.vars (C.lits cl)) in
+    float_of_int (n * n)
 
   let get_sym_sign lit =
     match lit with
@@ -118,7 +125,26 @@ module Make(E : Env.S) : S with module Env = E = struct
       raise UnsupportedLogic
     | _ -> None
 
-  let scan_cl_lits cl =
+  let replace_clauses task clauses =
+    let remove iter =
+      Iter.iter C.mark_redundant iter;
+      Env.remove_active iter;
+      Env.remove_passive iter;
+      Env.remove_simpl iter
+    in
+    assert(C.ClauseSet.is_empty task.offending_cls);
+    remove (C.ClauseSet.to_iter task.pos_cls);
+    remove (C.ClauseSet.to_iter task.neg_cls);
+    (match task.is_gate with
+    | Some(pos_cls, neg_cls) ->
+      remove (CCList.to_iter pos_cls);
+      remove (CCList.to_iter neg_cls)
+    | None -> ());
+    Env.add_passive (CCList.to_iter clauses);
+    _pred_sym_idx := ID.Map.remove task.sym !_pred_sym_idx
+    
+
+  let scan_cl_lits ?(handle_gates=true) cl =
     let num_vars = List.length @@ Literals.vars (C.lits cl) in
     let is_flat = function
     | L.Equation(lhs,_,_) as lit ->
@@ -139,11 +165,20 @@ module Make(E : Env.S) : S with module Env = E = struct
           | `Neg ->
             entry.neg_cls <- C.ClauseSet.add cl entry.neg_cls
           | `Offending ->
-            entry.offending_cls <- C.ClauseSet.add cl entry.offending_cls
-          | `Gates -> 
-            entry.possible_gates <- C.ClauseSet.add cl entry.possible_gates end;
-          entry.max_vars <- max entry.max_vars num_vars;
-          entry.min_vars <- max entry.min_vars num_vars;
+            entry.offending_cls <- C.ClauseSet.add cl entry.offending_cls;
+            if TaskQueue.in_heap entry then (
+              TaskQueue.delete _task_queue entry
+            )
+          | `Gates ->
+            if handle_gates then(
+              entry.possible_gates <- C.ClauseSet.add cl entry.possible_gates
+            )
+          end;
+          entry.sq_var_weight <- entry.sq_var_weight +. calc_sq_var cl;
+          entry.num_lits <- entry.num_lits + C.length cl;
+          if TaskQueue.in_heap entry then (
+            TaskQueue.increase _task_queue entry
+          );
           Some entry
         ) !_pred_sym_idx
       in
@@ -176,7 +211,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           else (pos, ID.Set.add sym neg,offending,gates))
       | _ -> acc)
     ) (ID.Set.empty, ID.Set.empty, ID.Set.empty, ID.Set.empty) (C.lits cl) in
-    
+
     update_idx pos neg offending gates num_vars cl
 
   let check_if_gate task =
@@ -233,7 +268,8 @@ module Make(E : Env.S) : S with module Env = E = struct
                 if is_matched then (
                   CCBV.set matched !i;
                   found := true
-                ))
+                ));
+                incr i;
             done;
             !found
           ) other_lits in
@@ -247,7 +283,10 @@ module Make(E : Env.S) : S with module Env = E = struct
       let pos_gates = filter_gates ~sign:true ~lit_num_filter:(fun n -> n >= 3) in
       let neg_gates = filter_gates ~sign:false ~lit_num_filter:((=) 2) in
       match find_and_or neg_gates pos_gates with
-      | Some (pos_cl, neg_cls) -> 
+      | Some (pos_cl, neg_cls) ->
+        let to_remove = C.ClauseSet.of_list (pos_cl :: neg_cls) in
+        task.neg_cls <- C.ClauseSet.diff task.neg_cls to_remove;
+        task.pos_cls <- C.ClauseSet.diff task.pos_cls to_remove;
         task.is_gate <- Some([pos_cl], neg_cls);
         true
       | None -> false
@@ -257,6 +296,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       let neg_gates = filter_gates ~sign:false ~lit_num_filter:(fun n -> n >= 3) in
       match find_and_or pos_gates neg_gates with
       | Some(neg_cl, pos_cls) ->
+        let to_remove = C.ClauseSet.of_list (neg_cl :: pos_cls) in
+        task.neg_cls <- C.ClauseSet.diff task.neg_cls to_remove;
+        task.pos_cls <- C.ClauseSet.diff task.pos_cls to_remove;
         task.is_gate <- Some(pos_cls, [neg_cl]);
         true
       | None -> false
@@ -269,11 +311,158 @@ module Make(E : Env.S) : S with module Env = E = struct
     ID.Map.iter (fun _ task -> 
       check_if_gate task;
       if C.ClauseSet.is_empty task.offending_cls then (
-        TaskQueue.insert _task_queue task;
+        TaskQueue.insert _task_queue task
+    )) !_pred_sym_idx
+
+  let find_lit_by_sym sym sign cl =
+    CCOpt.get_exn (CCArray.find_map_i (fun idx lit -> 
+      match get_sym_sign lit with
+      | Some (sym', sign') when ID.equal sym sym' && sign = sign' -> 
+        Some (idx, CCOpt.get_exn (L.View.get_lhs lit))
+      | _ -> None
+    ) (C.lits cl))
+
+  let neq_resolver ~sym ~pos_cl ~neg_cl =
+    let pos_sc, neg_sc = 0, 1 in
+    let pos_idx, pos_term = find_lit_by_sym sym true pos_cl in  
+    let neg_idx, neg_term = find_lit_by_sym sym false neg_cl in
+    try
+      let subst = Unif.FO.unify_syn (pos_term, pos_sc) (neg_term, neg_sc) in
+      let renaming = Subst.Renaming.create () in
+      let lits = 
+        (List.map (fun lit -> 
+          L.apply_subst renaming subst (lit, pos_sc)) 
+        (CCArray.except_idx (C.lits pos_cl) pos_idx)) @
+        (List.map (fun lit -> 
+          L.apply_subst renaming subst (lit, neg_sc)) 
+        (CCArray.except_idx (C.lits neg_cl) neg_idx))
+      in
+      let proof =
+        Proof.Step.inference ~rule:(Proof.Rule.mk "dp-resolution") 
+          [C.proof_parent_subst renaming (pos_cl,pos_sc) subst;
+           C.proof_parent_subst renaming (neg_cl,neg_sc) subst]
+      in
+      let c = 
+        C.create ~penalty:(max (C.penalty pos_cl) (C.penalty neg_cl))
+                 ~trail:(C.trail_l [pos_cl; neg_cl]) lits proof
+      in
+      CCOpt.return_if (not (Env.is_trivial c)) c
+    with Unif.Fail -> None
+  
+  let eq_resolver ~sym ~pos_cl ~neg_cl =
+    let pos_sc, neg_sc = 0, 1 in
+    let renaming = Subst.Renaming.create () in
+    let subst = Subst.empty in
+    let pos_cl' = C.apply_subst ~renaming (pos_cl, pos_sc) subst in
+    let neg_cl' = C.apply_subst ~renaming (neg_cl, neg_sc) subst in
+    let pos_idx, pos_term = find_lit_by_sym sym true pos_cl' in  
+    let neg_idx, neg_term = find_lit_by_sym sym false neg_cl' in
+    let pos_args, neg_args = CCPair.map_same T.args (pos_term, neg_term) in
+    let lits =
+      (List.map (fun (p,n) -> L.mk_neq p n) (List.combine pos_args neg_args)) @ 
+      (CCArray.except_idx (C.lits pos_cl') pos_idx) @
+      (CCArray.except_idx (C.lits neg_cl') neg_idx)
+    in
+    let proof =
+      Proof.Step.inference ~rule:(Proof.Rule.mk "dp-resolution") 
+        [C.proof_parent_subst renaming (pos_cl,pos_sc) subst;
+          C.proof_parent_subst renaming (neg_cl,neg_sc) subst]
+    in
+    let c = 
+      C.create ~penalty:(max (C.penalty pos_cl') (C.penalty neg_cl'))
+                ~trail:(C.trail_l [pos_cl'; neg_cl']) lits proof
+    in
+    CCOpt.return_if (not (Env.is_trivial c)) c
+
+  let get_resolver () =
+    if !_logic = NEqFO then neq_resolver else eq_resolver
+
+  let calc_resolvents ~sym ~pos ~neg =
+    CCList.flat_map (fun pos_cl ->
+      CCList.filter_map (fun neg_cl -> 
+        get_resolver () ~sym ~pos_cl ~neg_cl
+      ) neg
+    ) pos 
+
+  let do_pred_elim () =
+    let process_task task =
+      assert(C.ClauseSet.is_empty task.offending_cls);
+      let pos_cls, neg_cls = 
+        CCPair.map_same C.ClauseSet.to_list (task.pos_cls, task.neg_cls)
+      in
+      let sym = task.sym in
+      let resolvents, pos_gates, neg_gates =
+        match task.is_gate with
+        | Some (pos_gates, neg_gates) ->
+          ((calc_resolvents ~sym ~pos:pos_gates ~neg:neg_cls)
+           @ (calc_resolvents ~sym ~pos:pos_cls ~neg:neg_gates)), pos_gates, neg_gates
+        | None -> calc_resolvents ~sym ~pos:pos_cls ~neg:neg_cls, [], []
+      in
+      let new_sq_var_weight, new_lit_num = 
+        List.fold_left (fun (acc_sq, acc_lit_num) cl -> 
+          acc_sq +. calc_sq_var cl, acc_lit_num + C.length cl) (0.0, 0) resolvents
+      in
+      if new_sq_var_weight <= task.sq_var_weight ||
+         new_lit_num <= task.num_lits ||
+         List.length resolvents < 
+          C.ClauseSet.cardinal task.pos_cls + C.ClauseSet.cardinal task.neg_cls +
+          List.length pos_gates + List.length neg_gates then (
+        replace_clauses task resolvents
       )
-    ) !_pred_sym_idx
-    
-  let do_pred_elim () = ()
+    in
+
+    let module Q = TaskQueue in
+    while not (Q.is_empty _task_queue) do
+      process_task (Q.remove_min _task_queue)
+    done
+
+  let react_clause_addded cl =
+    if !_logic != Unsupported then(
+      scan_cl_lits ~handle_gates:false cl;
+      Signal.ContinueListening
+    ) else Signal.StopListening
+  
+  let react_clause_removed cl =
+    if !_logic != Unsupported then (
+      let should_retry task =
+        C.ClauseSet.is_empty task.offending_cls &&
+        (match task.last_check with
+        | Some(old_sq_var_sum, old_num_lit) -> 
+          task.sq_var_weight < old_sq_var_sum || task.num_lits < old_num_lit
+        | None -> true)
+      in
+
+      let handled = ref ID.Set.empty in
+      Array.iteri (fun idx lit -> 
+        match get_sym_sign lit with
+        | Some(sym, sign) when not (ID.Set.mem sym !handled) ->
+          let is_offending = ref false in
+          for i = idx+1 to C.length cl do
+            match get_sym_sign (C.lits cl).(i) with
+            | Some (sym', sign) ->
+              is_offending := !is_offending || ID.equal sym sym'
+            | None -> ()
+          done;
+          _pred_sym_idx := ID.Map.update sym (function
+            | Some task ->
+              task.sq_var_weight <- task.sq_var_weight -. calc_sq_var cl;
+              task.num_lits <- task.num_lits - C.length cl;
+              if !is_offending then (
+                task.offending_cls <- C.ClauseSet.remove cl task.offending_cls
+              ) else if sign then (
+                task.pos_cls <- C.ClauseSet.remove cl task.pos_cls
+              ) else (
+                task.neg_cls <- C.ClauseSet.remove cl task.neg_cls
+              );
+              if not (TaskQueue.in_heap task) then (
+                if should_retry task then TaskQueue.insert _task_queue task
+              ) else (TaskQueue.decrease _task_queue task);
+              Some task
+            | None -> assert false) !_pred_sym_idx;
+        | _ -> ()
+      ) (C.lits cl);
+      Signal.ContinueListening)
+    else Signal.StopListening
 
   let initialize () =
     let init_clauses =
@@ -284,29 +473,52 @@ module Make(E : Env.S) : S with module Env = E = struct
       Util.debugf ~section 2 "init_cl: @[%a@]@."
         (fun k -> k (CCList.pp C.pp) init_clauses);
       
-      (* build the symbol index *)
-      List.iter scan_cl_lits init_clauses;
+      List.iter (fun cl -> 
+        scan_cl_lits cl;
+      ) init_clauses;
       schedule_tasks ();
-      do_pred_elim ();
 
       Util.debugf ~section 1 "logic has%sequalities"
         (fun k -> k (if !_logic == EqFO then " " else " no "));
+
+      Signal.on Env.ProofState.PassiveSet.on_add_clause react_clause_addded;
+      Signal.on Env.ProofState.PassiveSet.on_remove_clause react_clause_removed;
+      Signal.on Env.ProofState.ActiveSet.on_remove_clause react_clause_removed;
+
+      
+      Signal.on Env.on_forward_simplified (fun (c, new_state) -> 
+        if !_logic != Unsupported then (
+          ignore(react_clause_removed c);
+          begin match new_state with
+          | Some c' -> ignore(react_clause_addded c')
+          | _ -> (* c is redundant *) () end;
+          Signal.ContinueListening
+        ) else Signal.StopListening
+      );
+
+      do_pred_elim ();
+
+      if Env.flex_get k_inprocessing then (
+        Env.add_clause_elimination_rule ~priority:2 "pred_elim" do_pred_elim
+      ) else raise UnsupportedLogic
     with UnsupportedLogic ->
       Util.debugf ~section 1 "logic is unsupported" CCFun.id;
       (* releasing possibly used memory *)
+      _logic := Unsupported;
       _pred_sym_idx := ID.Map.empty
     end;
     Signal.StopListening
 
   let register () =
     Signal.on Env.on_start initialize
-
-
   
   let setup () = ()
 end
 
 let _enabled = ref false
+let _inprocessing = ref false
+let _check_at = ref 10
+
 
 let extension =
   let action env =
@@ -314,6 +526,8 @@ let extension =
     let module PredElim = Make(E) in
 
     E.flex_add k_enabled !_enabled;
+    E.flex_add k_check_at !_check_at;
+    E.flex_add k_inprocessing !_inprocessing;
     
     PredElim.setup ()
   in
@@ -324,5 +538,7 @@ let extension =
 
 let () =
   Options.add_opts [
-    "--pred-elim", Arg.Bool ((:=) _enabled), " scan clauses for AC definitions";
+    "--pred-elim", Arg.Bool ((:=) _enabled), " enable predicate elimination";
+    "--pred-elim-inprocessing", Arg.Bool ((:=) _inprocessing), " predicate elimination as inprocessing rule";
+    "--pred-elim-check-at", Arg.Int ((:=) _check_at), " when to perform predicate elimination inprocessing";
   ]
