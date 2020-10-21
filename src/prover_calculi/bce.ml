@@ -143,7 +143,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         let sign = L.is_pos lit in
         let is_poly = 
           not (Type.VarSet.is_empty (T.ty_vars lhs))
-          || not (Type.VarSet.is_empty (T.ty_vars lhs))
+          || not (Type.VarSet.is_empty (T.ty_vars rhs))
         in
         if not is_poly && T.is_fo_term lhs && T.is_fo_term rhs then (
           if Type.is_prop (T.ty lhs) then (
