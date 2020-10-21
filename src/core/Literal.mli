@@ -118,7 +118,7 @@ val are_opposite_subst : subst:Subst.t -> t Scoped.t -> t Scoped.t -> bool
 (** Literals are equal according to given substitution for variables,
     but are of opposite sign  *)
 
-val are_opposite: t -> t -> bool
+val are_opposite_same_sc: t -> t -> bool
 (** Literals are equal, but are of opposite signs *)
 
 val variant : ?subst:Subst.t -> t Scoped.t -> t Scoped.t ->

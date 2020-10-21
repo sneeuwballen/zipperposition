@@ -1248,7 +1248,7 @@ let are_opposite_subst ~subst (l1,sc1) (l2,sc2) =
   | False, False -> true
   | _ -> false
 
-let are_opposite l1 l2 =
+let are_opposite_same_sc l1 l2 =
   are_opposite_subst ~subst:Subst.empty (l1,0) (l2,0)
 
 

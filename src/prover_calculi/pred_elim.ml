@@ -23,8 +23,6 @@ module Make(E : Env.S) : S with module Env = E = struct
   module L = Literal
   module T = Term
 
-  type gate_kind = And | Or | Ite
-
   type logic = 
     | NEqFO  (* nonequational FO *)
     | EqFO (* equational FO *)
@@ -34,6 +32,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   
   type pred_elim_info =
   {
+    sym : ID.t;
     (* clauses with single pos/neg occurrence of a symbol *)
     mutable pos_cls : C.ClauseSet.t;
     mutable neg_cls : C.ClauseSet.t;
@@ -42,13 +41,35 @@ module Make(E : Env.S) : S with module Env = E = struct
     (* clauses that have the gate shape (occurs in pos/neg cls)  *)
     mutable possible_gates : C.ClauseSet.t;
     (* do the clauses in the possible_gates form a gate, and if so which one? *)
-    mutable is_gate : gate_kind option;
+    mutable is_gate : (C.t list * C.t list) option;
     (* max and min number of variables in clauses in any of the sets *)
     mutable max_vars : int;
     mutable min_vars : int;
     (* what was this number during the last check *)
     mutable last_check : (int * int) option;
+    mutable heap_idx : int;
   }
+
+  module TaskWrapper = struct
+    type t = pred_elim_info
+    let idx task = task.heap_idx
+    let set_idx task idx = 
+      task.heap_idx <- idx
+    let lt a b =
+      let card t = 
+        C.ClauseSet.cardinal t.pos_cls + C.ClauseSet.cardinal t.neg_cls
+      in
+      card a < card b || (card a = card b && ID.compare a.sym b.sym < 0)
+  end
+
+  module TaskQueue = struct 
+    include CCMutHeap.Make(TaskWrapper)
+
+    let delete q t =
+      filter q (fun t' -> ID.equal t.sym t'.sym)
+  end
+
+  let _task_queue = TaskQueue.create ()
 
   let _logic = ref NEqFO
   let refine_logic new_val =
@@ -58,50 +79,49 @@ module Make(E : Env.S) : S with module Env = E = struct
   
   let _ignored_symbols = ref ID.Set.empty
 
-  let mk_pred_elim_info () =
+  let mk_pred_elim_info sym =
     {
-      pos_cls = C.ClauseSet.empty; neg_cls = C.ClauseSet.empty;
+      sym; pos_cls = C.ClauseSet.empty; neg_cls = C.ClauseSet.empty;
       offending_cls=C.ClauseSet.empty; possible_gates = C.ClauseSet.empty;
-      is_gate = None; max_vars = 0; min_vars = 0; last_check = None
+      is_gate = None; max_vars = 0; min_vars = 0; last_check = None;
+      heap_idx = -1;
     }
   
   let _pred_sym_idx = ref ID.Map.empty
 
-  
+  let get_sym_sign lit =
+    match lit with
+    | L.Equation(lhs,rhs,_) ->
+      let sign = L.is_pos lit in
+      let is_poly = 
+        not (Type.VarSet.is_empty (T.ty_vars lhs))
+        || not (Type.VarSet.is_empty (T.ty_vars rhs))
+      in
+      if not is_poly && T.is_fo_term lhs && T.is_fo_term rhs then (
+        if Type.is_prop (T.ty lhs) then (
+          if L.is_predicate_lit lit then (
+            let hd_sym = T.head_exn lhs in
+            Some (hd_sym, sign)
+          ) else (
+            (* reasoning with formulas is currently unsupported *)
+            Util.debugf ~section 1 "unsupported because of @[%a@]@." (fun k -> k L.pp lit);
+            _logic := Unsupported;
+            raise UnsupportedLogic;
+        )) else (refine_logic EqFO; None)
+      ) else (
+        _logic := Unsupported; 
+        Util.debugf ~section 1 "unsupported because of @[%a@]@." (fun k -> k L.pp lit);
+        raise UnsupportedLogic)
+    | L.Int _ | L.Rat _  -> 
+      Util.debugf ~section 1 "theories are not supported@." CCFun.id;
+      _logic := Unsupported;
+      raise UnsupportedLogic
+    | _ -> None
+
   (* Scan the clause and if it is in supported logic fragment,
      store its literals in the symbol index *)
   let scan_cl_lits cl =
     let num_vars = List.length @@ Literals.vars (C.lits cl) in
-    let get_sym_sign lit =
-      match lit with
-      | L.Equation(lhs,rhs,_) ->
-        let sign = L.is_pos lit in
-        let is_poly = 
-          not (Type.VarSet.is_empty (T.ty_vars lhs))
-          || not (Type.VarSet.is_empty (T.ty_vars rhs))
-        in
-        if not is_poly && T.is_fo_term lhs && T.is_fo_term rhs then (
-          if Type.is_prop (T.ty lhs) then (
-            if L.is_predicate_lit lit then (
-              let hd_sym = T.head_exn lhs in
-              Some (hd_sym, sign)
-            ) else (
-              (* reasoning with formulas is currently unsupported *)
-              Util.debugf ~section 1 "unsupported because of @[%a@]@." (fun k -> k L.pp lit);
-              _logic := Unsupported;
-              raise UnsupportedLogic;
-          )) else (refine_logic EqFO; None)
-        ) else (
-          _logic := Unsupported; 
-          Util.debugf ~section 1 "unsupported because of @[%a@]@." (fun k -> k L.pp lit);
-          raise UnsupportedLogic)
-      | L.Int _ | L.Rat _  -> 
-        Util.debugf ~section 1 "theories are not supported@." CCFun.id;
-        _logic := Unsupported;
-        raise UnsupportedLogic
-      | _ -> None
-    in
-
     let is_flat = function
     | L.Equation(lhs,_,_) as lit ->
       assert (L.is_predicate_lit lit);
@@ -114,7 +134,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let update_idx pos neg offending gates num_vars cl =
       let update ~action sym =
         _pred_sym_idx := ID.Map.update sym (fun old ->
-          let entry = CCOpt.get_or ~default:(mk_pred_elim_info ()) old in
+          let entry = CCOpt.get_or ~default:(mk_pred_elim_info sym) old in
           begin match action with
           | `Pos ->
             entry.pos_cls <- C.ClauseSet.add cl entry.pos_cls
@@ -161,6 +181,100 @@ module Make(E : Env.S) : S with module Env = E = struct
     
     update_idx pos neg offending gates num_vars cl
 
+  let check_if_gate task =
+    let sym = task.sym in
+    let gates_l = C.ClauseSet.to_list task.possible_gates in
+    let filter_gates ~sign ~lit_num_filter =
+      List.filter (fun cl -> 
+        lit_num_filter (Array.length (C.lits cl)) &&
+        Array.exists (fun lit -> 
+          match get_sym_sign lit with 
+          | Some(sym', sign') -> ID.equal sym sym' && sign = sign'
+          | None -> false) 
+        (C.lits cl)
+      ) gates_l
+    in
+
+    let find_and_or bin_clauses long_clauses =
+      CCList.find_map (fun long_cl -> 
+        let sym_lits, other_lits = List.partition (fun lit -> 
+          match get_sym_sign lit with
+          | Some(sym',_) -> ID.equal sym sym'
+          | _ -> false
+        ) (CCArray.to_list @@ C.lits long_cl) in
+        assert (List.length sym_lits = 1);
+        let sym_name_lit = List.hd sym_lits in
+        let bin_gates = CCArray.of_list bin_clauses in
+        if List.length other_lits > CCArray.length bin_gates then None
+        else (
+          let matched = CCBV.create ~size:(CCArray.length bin_gates) false in
+          let is_gate = List.for_all (fun lit -> 
+            let found = ref false in
+            let i = ref 0 in
+            while not !found && !i < CCArray.length bin_gates do
+              let cl = bin_gates.(!i) in
+              if not (CCBV.get matched !i) then (
+                let idx_name_opt = CCArray.find_idx (fun lit -> 
+                  match get_sym_sign lit with
+                  | Some(sym',_) -> ID.equal sym sym'
+                  | None -> false
+                ) (C.lits cl) in
+                let idx_name, _ = CCOpt.get_exn idx_name_opt in
+                let name_lit = (C.lits cl).(idx_name) in
+                let other_lit = L.negate (C.lits cl).(1 - idx_name) in
+                let is_matched = 
+                  L.variant (lit,0) (other_lit,1)
+                  |> Iter.filter (fun (subst,_) -> 
+                    L.are_opposite_subst ~subst (sym_name_lit, 0) (name_lit,1))
+                  |> Iter.is_empty
+                in
+                if is_matched then (
+                  CCBV.set matched !i;
+                  found := true
+                ))
+            done;
+            !found
+          ) other_lits in
+          let bin_cls = CCBV.select matched bin_gates in
+          if is_gate then Some(long_cl, bin_cls)
+          else None))
+        long_clauses
+      in
+
+    let check_and () =
+      let pos_gates = filter_gates ~sign:true ~lit_num_filter:(fun n -> n >= 3) in
+      let neg_gates = filter_gates ~sign:false ~lit_num_filter:((=) 2) in
+      match find_and_or neg_gates pos_gates with
+      | Some (pos_cl, neg_cls) -> 
+        task.is_gate <- Some([pos_cl], neg_cls);
+        true
+      | None -> false
+    in
+    let check_or () =
+      let pos_gates = filter_gates ~sign:true ~lit_num_filter:((=) 2) in
+      let neg_gates = filter_gates ~sign:false ~lit_num_filter:(fun n -> n >= 3) in
+      match find_and_or pos_gates neg_gates with
+      | Some(neg_cl, pos_cls) ->
+        task.is_gate <- Some(pos_cls, [neg_cl]);
+        true
+      | None -> false
+    in
+    (* not yet implemented *)
+    let check_ite () = false in
+    ignore (check_and () || check_or () || check_ite ())
+
+  let schedule_tasks () =
+    ID.Map.iter (fun _ task -> 
+      check_if_gate task;
+      if C.ClauseSet.is_empty task.offending_cls then (
+        TaskQueue.insert _task_queue task;
+      )
+    ) !_pred_sym_idx
+    
+
+
+  let do_pred_elim () = ()
+
   let initialize () =
     let init_clauses =
       C.ClauseSet.to_list (Env.ProofState.ActiveSet.clauses ())
@@ -172,6 +286,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       
       (* build the symbol index *)
       List.iter scan_cl_lits init_clauses;
+      schedule_tasks ();
+      do_pred_elim ();
 
       Util.debugf ~section 1 "logic has%sequalities"
         (fun k -> k (if !_logic == EqFO then " " else " no "));
