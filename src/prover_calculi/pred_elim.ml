@@ -86,6 +86,9 @@ module Make(E : Env.S) : S with module Env = E = struct
      when we are sure that the clause is retained we 
      add it to the passive set *)
   let _newly_added = ref C.ClauseSet.empty
+  (* clause set containing all the registered clauses. Makes sure that
+     no clause is tracked or deleted multiple times from the system  *)
+  let _tracked = ref C.ClauseSet.empty
 
   let _logic = ref NEqFO
   let refine_logic new_val =
@@ -234,7 +237,9 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let react_clause_addded cl =
   if !_logic != Unsupported then(
-    scan_cl_lits ~handle_gates:false cl;
+    if not (C.ClauseSet.mem cl !_tracked) then (
+      _tracked := C.ClauseSet.add cl !_tracked;
+      scan_cl_lits ~handle_gates:false cl);
     Signal.ContinueListening
   ) else Signal.StopListening
   
@@ -263,7 +268,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       in
 
       let handled = ref ID.Set.empty in
-      if not (C.ClauseSet.mem cl !_newly_added) then (
+      if not (C.ClauseSet.mem cl !_newly_added) &&
+         C.ClauseSet.mem cl !_tracked then (
+        _tracked := C.ClauseSet.remove cl !_tracked;
         Array.iteri (fun idx lit -> 
           match get_sym_sign lit with
           | Some(sym, sign) when not (ID.Set.mem sym !handled) ->
@@ -288,6 +295,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                   task.neg_cls <- C.ClauseSet.remove cl task.neg_cls;
                 );
                 if not (TaskSet.mem task !_task_queue) && should_retry task then (
+                  Util.debugf ~section 1 "retrying @[%a@]@." (fun k -> k pp_task task);
                   _task_queue := TaskSet.add task !_task_queue
                 );
                 Some task
@@ -298,8 +306,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     else Signal.StopListening
 
   let replace_clauses task clauses =
-    Util.debugf ~section 2 "replacing %a" (fun k -> k ID.pp task.sym); 
-    Util.debugf ~section 2 "resolvents: @[%a@]@." (fun k -> k (CCList.pp C.pp) clauses);
+    Util.debugf ~section 3 "replacing %a" (fun k -> k ID.pp task.sym); 
+    Util.debugf ~section 3 "resolvents: @[%a@]@." (fun k -> k (CCList.pp C.pp) clauses);
     _ignored_symbols := ID.Set.add task.sym !_ignored_symbols;
     let remove iter =
       Env.remove_active iter;
@@ -568,7 +576,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       @ C.ClauseSet.to_list (Env.ProofState.PassiveSet.clauses ())
     in
     begin try
-      Util.debugf ~section 3 "init_cl: @[%a@]@."
+      Util.debugf ~section 5 "init_cl: @[%a@]@."
         (fun k -> k (CCList.pp C.pp) init_clauses);
 
       let init_clause_num = List.length init_clauses in
