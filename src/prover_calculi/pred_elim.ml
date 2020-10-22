@@ -9,6 +9,7 @@ open Libzipperposition
 let k_enabled = Flex_state.create_key ()
 let k_check_at = Flex_state.create_key ()
 let k_inprocessing = Flex_state.create_key ()
+let k_max_resolvents = Flex_state.create_key ()
 
 let section = Util.Section.make ~parent:Const.section "pred-elim"
 
@@ -53,6 +54,13 @@ module Make(E : Env.S) : S with module Env = E = struct
     mutable heap_idx : int;
   }
 
+  let pp_task out task =
+    CCFormat.fprintf out 
+      "%a {@. +: @[%a@];@. -:@[%a@];@. ?:@[%a@]@. g:@[%b@]@. v^2:@[%g@]; |l|:@[%d@]; @.}@."
+      ID.pp task.sym (C.ClauseSet.pp C.pp) task.pos_cls (C.ClauseSet.pp C.pp) task.neg_cls
+      (C.ClauseSet.pp C.pp) task.offending_cls (CCOpt.is_some task.is_gate) task.sq_var_weight
+      task.num_lits
+
   module TaskWrapper = struct
     type t = pred_elim_info
     let idx task = task.heap_idx
@@ -70,7 +78,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     include CCMutHeap.Make(TaskWrapper)
 
     let delete q t =
-      filter q (fun t' -> ID.equal t.sym t'.sym)
+      filter q (fun t' -> not (ID.equal t.sym t'.sym))
   end
 
   let _task_queue = TaskQueue.create ()
@@ -126,11 +134,14 @@ module Make(E : Env.S) : S with module Env = E = struct
     | _ -> None
 
   let replace_clauses task clauses =
+    Util.debugf ~section 1 "replacing %a" (fun k -> k ID.pp task.sym); 
+    Util.debugf ~section 1 "resolvents: @[%a@]@." (fun k -> k (CCList.pp C.pp) clauses);
+    _ignored_symbols := ID.Set.add task.sym !_ignored_symbols;
     let remove iter =
-      Iter.iter C.mark_redundant iter;
       Env.remove_active iter;
       Env.remove_passive iter;
-      Env.remove_simpl iter
+      Env.remove_simpl iter;
+      Iter.iter C.mark_redundant iter;
     in
     assert(C.ClauseSet.is_empty task.offending_cls);
     remove (C.ClauseSet.to_iter task.pos_cls);
@@ -142,7 +153,27 @@ module Make(E : Env.S) : S with module Env = E = struct
     | None -> ());
     Env.add_passive (CCList.to_iter clauses);
     _pred_sym_idx := ID.Map.remove task.sym !_pred_sym_idx
-    
+
+  let possibly_ignore_sym entry =
+    let card s = C.ClauseSet.cardinal s in
+    let possible_resolvents = 
+      match entry.is_gate with
+      | Some(pos_gates,neg_gates) ->
+        List.length pos_gates * card entry.neg_cls +
+        List.length neg_gates * card entry.pos_cls
+      | None -> 
+        card entry.neg_cls * card entry.pos_cls
+    in
+    if Env.flex_get k_max_resolvents < 0 then ()
+    else (
+      if possible_resolvents > Env.flex_get k_max_resolvents then (
+        _pred_sym_idx := ID.Map.remove entry.sym !_pred_sym_idx;
+        _ignored_symbols := ID.Set.add entry.sym !_ignored_symbols;
+        if TaskQueue.in_heap entry then (
+          TaskQueue.delete _task_queue entry
+        )
+      )
+    )
 
   let scan_cl_lits ?(handle_gates=true) cl =
     let num_vars = List.length @@ Literals.vars (C.lits cl) in
@@ -161,9 +192,11 @@ module Make(E : Env.S) : S with module Env = E = struct
           let entry = CCOpt.get_or ~default:(mk_pred_elim_info sym) old in
           begin match action with
           | `Pos ->
-            entry.pos_cls <- C.ClauseSet.add cl entry.pos_cls
+            entry.pos_cls <- C.ClauseSet.add cl entry.pos_cls;
+            possibly_ignore_sym entry;
           | `Neg ->
-            entry.neg_cls <- C.ClauseSet.add cl entry.neg_cls
+            entry.neg_cls <- C.ClauseSet.add cl entry.neg_cls;
+            possibly_ignore_sym entry;
           | `Offending ->
             entry.offending_cls <- C.ClauseSet.add cl entry.offending_cls;
             if TaskQueue.in_heap entry then (
@@ -176,16 +209,17 @@ module Make(E : Env.S) : S with module Env = E = struct
           end;
           entry.sq_var_weight <- entry.sq_var_weight +. calc_sq_var cl;
           entry.num_lits <- entry.num_lits + C.length cl;
-          if TaskQueue.in_heap entry then (
+          if TaskQueue.in_heap entry && action != `Gates then (
             TaskQueue.increase _task_queue entry
           );
           Some entry
         ) !_pred_sym_idx
       in
+
       ID.Set.iter (update ~action:`Pos) pos;
       ID.Set.iter (update ~action:`Neg) neg;
       ID.Set.iter (update ~action:`Offending) offending;
-      ID.Set.iter (update ~action:`Gates) gates
+      ID.Set.iter (update ~action:`Gates) gates;
     in
 
       
@@ -197,7 +231,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       (match get_sym_sign lit with
       | Some (sym, sign) when symbol_is_fresh sym ->
         let is_offending = ref false in
-        for i = idx+1 to (C.length cl) do
+        for i = idx+1 to (C.length cl)-1 do
           (match get_sym_sign (C.lits cl).(i) with
            | Some(sym', _) ->
              is_offending := !is_offending || ID.equal sym sym'
@@ -310,7 +344,11 @@ module Make(E : Env.S) : S with module Env = E = struct
   let schedule_tasks () =
     ID.Map.iter (fun _ task -> 
       check_if_gate task;
+
+      Util.debugf ~section 1 "initially: @[%a@]" (fun k -> k pp_task task);
+
       if C.ClauseSet.is_empty task.offending_cls then (
+        Util.debugf ~section 1 "inserting to queue" CCFun.id;
         TaskQueue.insert _task_queue task
     )) !_pred_sym_idx
 
@@ -338,11 +376,13 @@ module Make(E : Env.S) : S with module Env = E = struct
         (CCArray.except_idx (C.lits neg_cl) neg_idx))
       in
       let proof =
-        Proof.Step.inference ~rule:(Proof.Rule.mk "dp-resolution") 
+        Proof.Step.simp 
+          ~tags:[Proof.Tag.T_cannot_orphan]
+          ~rule:(Proof.Rule.mk "dp-resolution") 
           [C.proof_parent_subst renaming (pos_cl,pos_sc) subst;
            C.proof_parent_subst renaming (neg_cl,neg_sc) subst]
       in
-      let c = 
+      let c =
         C.create ~penalty:(max (C.penalty pos_cl) (C.penalty neg_cl))
                  ~trail:(C.trail_l [pos_cl; neg_cl]) lits proof
       in
@@ -364,7 +404,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       (CCArray.except_idx (C.lits neg_cl') neg_idx)
     in
     let proof =
-      Proof.Step.inference ~rule:(Proof.Rule.mk "dp-resolution") 
+      Proof.Step.simp 
+        ~tags:[Proof.Tag.T_cannot_orphan] 
+        ~rule:(Proof.Rule.mk "dp-resolution") 
         [C.proof_parent_subst renaming (pos_cl,pos_sc) subst;
           C.proof_parent_subst renaming (neg_cl,neg_sc) subst]
     in
@@ -408,12 +450,18 @@ module Make(E : Env.S) : S with module Env = E = struct
           C.ClauseSet.cardinal task.pos_cls + C.ClauseSet.cardinal task.neg_cls +
           List.length pos_gates + List.length neg_gates then (
         replace_clauses task resolvents
+      ) else (
+        task.last_check <- Some (task.sq_var_weight, task.num_lits)
       )
     in
 
     let module Q = TaskQueue in
     while not (Q.is_empty _task_queue) do
-      process_task (Q.remove_min _task_queue)
+      let task = Q.remove_min _task_queue in
+      if not (ID.Set.mem task.sym !_ignored_symbols) then(
+        Util.debugf ~section 1 "checking: @[%a@]" (fun k -> k pp_task task);
+        process_task (task)
+      )
     done
 
   let react_clause_addded cl =
@@ -426,10 +474,24 @@ module Make(E : Env.S) : S with module Env = E = struct
     if !_logic != Unsupported then (
       let should_retry task =
         C.ClauseSet.is_empty task.offending_cls &&
+        not (ID.Set.mem task.sym !_ignored_symbols) &&
         (match task.last_check with
         | Some(old_sq_var_sum, old_num_lit) -> 
           task.sq_var_weight < old_sq_var_sum || task.num_lits < old_num_lit
         | None -> true)
+      in
+
+      let handle_gate sign task cl =
+        match task.is_gate with
+        | Some(pos_cls, neg_cls) ->
+          if sign && CCList.mem ~eq:C.equal cl pos_cls
+             || (not sign) && CCList.mem ~eq:C.equal cl neg_cls then (
+            (* reintroduce gate clauses *)
+            task.pos_cls <- C.ClauseSet.add_list task.pos_cls pos_cls;
+            task.neg_cls <- C.ClauseSet.add_list task.pos_cls pos_cls;
+            task.is_gate <- None
+          )
+        | None -> ()
       in
 
       let handled = ref ID.Set.empty in
@@ -437,7 +499,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         match get_sym_sign lit with
         | Some(sym, sign) when not (ID.Set.mem sym !handled) ->
           let is_offending = ref false in
-          for i = idx+1 to C.length cl do
+          for i = idx+1 to (C.length cl) -1 do
             match get_sym_sign (C.lits cl).(i) with
             | Some (sym', sign) ->
               is_offending := !is_offending || ID.equal sym sym'
@@ -450,9 +512,11 @@ module Make(E : Env.S) : S with module Env = E = struct
               if !is_offending then (
                 task.offending_cls <- C.ClauseSet.remove cl task.offending_cls
               ) else if sign then (
-                task.pos_cls <- C.ClauseSet.remove cl task.pos_cls
+                handle_gate sign task cl;
+                task.pos_cls <- C.ClauseSet.remove cl task.pos_cls;
               ) else (
-                task.neg_cls <- C.ClauseSet.remove cl task.neg_cls
+                handle_gate sign task cl;
+                task.neg_cls <- C.ClauseSet.remove cl task.neg_cls;
               );
               if not (TaskQueue.in_heap task) then (
                 if should_retry task then TaskQueue.insert _task_queue task
@@ -476,6 +540,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       List.iter (fun cl -> 
         scan_cl_lits cl;
       ) init_clauses;
+
       schedule_tasks ();
 
       Util.debugf ~section 1 "logic has%sequalities"
@@ -524,6 +589,7 @@ end
 let _enabled = ref false
 let _inprocessing = ref false
 let _check_at = ref 10
+let _max_resolvents = ref (-1)
 
 
 let extension =
@@ -534,6 +600,7 @@ let extension =
     E.flex_add k_enabled !_enabled;
     E.flex_add k_check_at !_check_at;
     E.flex_add k_inprocessing !_inprocessing;
+    E.flex_add k_max_resolvents !_max_resolvents;
     
     PredElim.setup ()
   in
@@ -547,4 +614,5 @@ let () =
     "--pred-elim", Arg.Bool ((:=) _enabled), " enable predicate elimination";
     "--pred-elim-inprocessing", Arg.Bool ((:=) _inprocessing), " predicate elimination as inprocessing rule";
     "--pred-elim-check-at", Arg.Int ((:=) _check_at), " when to perform predicate elimination inprocessing";
+    "--pred-elim-max-resolvents", Arg.Int ((:=) _max_resolvents), " after how many resolvents to stop tracking a symbol";
   ]
