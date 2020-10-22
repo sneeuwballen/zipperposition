@@ -555,6 +555,13 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.add_passive (C.ClauseSet.to_iter !_newly_added);
     _newly_added := C.ClauseSet.empty
 
+  let steps = ref 0
+  (* driver that does that every k-th step of given-clause loop *)
+  let do_predicate_elimination () =
+    steps := (!steps + 1) mod (Env.flex_get k_check_at);
+
+    if !steps = 0 then do_pred_elim ()
+
   let initialize () =
     let init_clauses =
       C.ClauseSet.to_list (Env.ProofState.ActiveSet.clauses ())
@@ -563,6 +570,10 @@ module Make(E : Env.S) : S with module Env = E = struct
     begin try
       Util.debugf ~section 3 "init_cl: @[%a@]@."
         (fun k -> k (CCList.pp C.pp) init_clauses);
+
+      let init_clause_num = List.length init_clauses in
+
+      CCFormat.printf "%% PE start: %d@." init_clause_num;
       
       List.iter (fun cl -> 
         scan_cl_lits cl;
@@ -589,8 +600,15 @@ module Make(E : Env.S) : S with module Env = E = struct
       );
 
       do_pred_elim ();
+
+      let clause_diff =
+        init_clause_num -
+        (Iter.length (Env.get_active ()) + Iter.length (Env.get_passive ())) in
+      CCFormat.printf "%% PE eliminated: %d@." clause_diff;
+
       if Env.flex_get k_inprocessing then (
-        Env.add_clause_elimination_rule ~priority:2 "pred_elim" do_pred_elim
+        Env.add_clause_elimination_rule ~priority:2 "pred_elim" 
+          do_predicate_elimination
       ) else raise UnsupportedLogic
     with UnsupportedLogic ->
       Util.debugf ~section 1 "logic is unsupported" CCFun.id;

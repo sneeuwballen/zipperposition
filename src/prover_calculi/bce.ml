@@ -9,7 +9,7 @@ open Libzipperposition
 let k_enabled = Flex_state.create_key ()
 let k_check_at = Flex_state.create_key ()
 let k_max_symbol_occ = Flex_state.create_key ()
-let k_inprocessing = Flex_state.create_key ()
+let k_processing_kind = Flex_state.create_key ()
 
 let section = Util.Section.make ~parent:Const.section "bce"
 
@@ -519,6 +519,21 @@ module Make(E : Env.S) : S with module Env = E = struct
     if !logic == EqFO then resolvent_is_valid_eq
     else resolvent_is_valid_neq
 
+  let is_blocked cl =
+    let validity_checker = get_validity_checker () in
+    CCOpt.is_some @@ CCArray.find_map_i (fun idx lit -> 
+      match lit with
+      | L.Equation(lhs,_,_) when L.is_predicate_lit lit ->
+        let sym = T.head_exn lhs in
+        (match SymSignIdx.find_opt (sym, not (L.is_pos lit)) !ss_idx with 
+        | Some partners ->
+          if (C.ClauseSet.for_all (fun partner -> 
+            C.equal cl partner || validity_checker idx cl partner
+          ) partners) then Some idx else None
+        | None -> Some idx)
+      | _ -> None
+    ) (C.lits cl)
+
   (* function that actually performs the blocked clause elimination *)
   let do_eliminate_blocked_clauses () =
     let removed_cnt = ref 0 in
@@ -601,6 +616,10 @@ module Make(E : Env.S) : S with module Env = E = struct
     begin try
       Util.debugf ~section 2 "init_cl: @[%a@]@."
         (fun k -> k (CCList.pp C.pp) init_clauses);
+
+      let init_clause_num = List.length init_clauses in
+
+      CCFormat.printf "%% BCE start: %d@." init_clause_num;
       
       (* build the symbol index *)
       List.iter scan_cl_lits init_clauses;
@@ -618,7 +637,12 @@ module Make(E : Env.S) : S with module Env = E = struct
       (* eliminate clauses *)
       do_eliminate_blocked_clauses ();
 
-      if Env.flex_get k_inprocessing then (
+      let clause_diff =
+        init_clause_num -
+        (Iter.length (Env.get_active ()) + Iter.length (Env.get_passive ())) in
+      CCFormat.printf "%% BCE eliminated: %d@." clause_diff;
+
+      if Env.flex_get k_processing_kind = `InprocessingFull then (
         (* clauses begin their life when they are added to the passive set *)
         Signal.on_every Env.ProofState.PassiveSet.on_add_clause react_clause_addded;
         (* clauses can be calculus-removed from the active set only in DISCOUNT loop *)
@@ -632,6 +656,8 @@ module Make(E : Env.S) : S with module Env = E = struct
           | Some c' -> react_clause_addded c'
           | _ -> () (* c is redundant *));
         Env.add_clause_elimination_rule ~priority:1 "BCE" eliminate_blocked_clauses
+      ) else if Env.flex_get k_processing_kind = `InprocessingInitial then (
+        Env.add_is_trivial is_blocked;
       ) else ( raise UnsupportedLogic ) (* clear all data structures *)
     with UnsupportedLogic ->
       Util.debugf ~section 1 "logic is unsupported" CCFun.id;
@@ -657,7 +683,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 end
 
 let _enabled = ref false
-let _inprocessing = ref false
+let _processing_kind = ref `PreprocessingOnly
 let _check_at = ref 10
 let _max_symbol_occ = ref (-1) (* -1 stands for infinity *)
 
@@ -669,7 +695,7 @@ let extension =
     E.flex_add k_enabled !_enabled;
     E.flex_add k_max_symbol_occ !_max_symbol_occ;
     E.flex_add k_check_at !_check_at;
-    E.flex_add k_inprocessing !_inprocessing;
+    E.flex_add k_processing_kind !_processing_kind;
     
     BCE.setup ()
   in
@@ -681,7 +707,12 @@ let extension =
 let () =
   Options.add_opts [
     "--bce", Arg.Bool ((:=) _enabled), " scan clauses for AC definitions";
-    "--bce-inprocessing", Arg.Bool ((:=) _inprocessing), " scan clauses for AC definitions";
+    "--bce-processing-kind", Arg.Symbol (["preprocessing";"inprocessing-full";"inprocessing-initial"], (function 
+      | "preprocessing" -> _processing_kind := `PreprocessingOnly
+      | "inprocessing-full" -> _processing_kind := `InprocessingFull
+      | "inprocessing-initial" -> _processing_kind := `InprocessingInitial
+      | _ -> assert false)), 
+    " scan clauses for AC definitions";
     "--bce-check-every", Arg.Int ((:=) _check_at), " check BCE every n steps of saturation algorithm";
     "--bce-max-symbol-occurences", Arg.Int ((:=) _max_symbol_occ), " limit a given symbol to n occurences only";
   ]

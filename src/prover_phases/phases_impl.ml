@@ -439,8 +439,10 @@ let print_szs_result (type c) ~file
       Format.printf "%sSZS status InternalError for '%s'@." comment file;
       Util.debugf ~section 1 "error is:@ %s" (fun k->k s);
     | Saturate.Sat when Env.Ctx.is_completeness_preserved () ->
+      Format.printf "%% Final clauses: %d@." (Iter.length (Env.get_passive ()));
       Format.printf "%sSZS status %s for '%s'@." comment (sat_to_str ()) file
     | Saturate.Sat ->
+      Format.printf "%% Final clauses: %d@." (Iter.length (Env.get_passive ()));
       Format.printf "%sSZS status GaveUp for '%s'@." comment file;
       begin match !Options.output with
         | Options.O_none -> ()
