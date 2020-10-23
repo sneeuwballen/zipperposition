@@ -119,7 +119,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     if symbol_occurrs_too_often total_sym_occs then (
       ss_idx := SymSignIdx.remove (sym, false) (SymSignIdx.remove (sym, true) !ss_idx);
       ignored_symbols := ID.Set.add sym !ignored_symbols;
-      Util.debugf ~section 1 "ignoring symbol @[%a@]@." (fun k -> k ID.pp sym);
+      Util.debugf ~section 5 "ignoring symbol @[%a@]@." (fun k -> k ID.pp sym);
     ) else (
       ss_idx := SymSignIdx.update (sym, sign) (fun old ->
         Some (C.ClauseSet.add cl (CCOpt.get_or ~default:C.ClauseSet.empty old))
@@ -255,14 +255,14 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* If clause is removed from the active/passive set, then release
      the locks that it holds, and make all the locked clauses active *)
   let release_locks clause =
-    Util.debugf ~section 2 "clearing locks: @[%a@]@." (fun k -> k C.pp clause);
+    Util.debugf ~section 3 "clearing locks: @[%a@]@." (fun k -> k C.pp clause);
     try 
       List.iter (fun task ->
         assert (not (TaskPriorityQueue.in_heap task));
         assert (not (DEQ.is_empty task.cands));
         let locking_cl = DEQ.take_front task.cands in
         assert (C.id locking_cl = C.id clause);
-        Util.debugf ~section 2 " |@[%a@]|%d@." (fun k -> k C.pp task.clause task.lit_idx);
+        Util.debugf ~section 3 " |@[%a@]|%d@." (fun k -> k C.pp task.clause task.lit_idx);
         TaskPriorityQueue.insert task_queue task
       ) (Util.Int_map.find (C.id clause) !clause_lock);
       clause_lock := Util.Int_map.remove (C.id clause) !clause_lock
@@ -521,18 +521,27 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let is_blocked cl =
     let validity_checker = get_validity_checker () in
-    CCOpt.is_some @@ CCArray.find_map_i (fun idx lit -> 
-      match lit with
-      | L.Equation(lhs,_,_) when L.is_predicate_lit lit ->
-        let sym = T.head_exn lhs in
-        (match SymSignIdx.find_opt (sym, not (L.is_pos lit)) !ss_idx with 
-        | Some partners ->
-          if (C.ClauseSet.for_all (fun partner -> 
-            C.equal cl partner || validity_checker idx cl partner
-          ) partners) then Some idx else None
-        | None -> Some idx)
-      | _ -> None
-    ) (C.lits cl)
+    let ans =
+      CCOpt.is_some @@ CCArray.find_map_i (fun idx lit -> 
+        match lit with
+        | L.Equation(lhs,_,_) when L.is_predicate_lit lit ->
+          let sym = T.head_exn lhs in
+          (match SymSignIdx.find_opt (sym, not (L.is_pos lit)) !ss_idx with 
+          | Some partners ->
+            if (C.ClauseSet.for_all (fun partner -> 
+              C.equal cl partner || validity_checker idx cl partner
+            ) partners) 
+            then (Some idx)
+            else None
+          | None -> 
+            if not (ID.Set.mem sym !ignored_symbols) then Some idx else None)
+        | _ -> None
+      ) (C.lits cl)
+    in
+    if ans then (
+      Util.debugf ~section 1 "@[%a@] is blocked@." (fun k -> k C.pp cl);
+    );
+    ans
 
   (* function that actually performs the blocked clause elimination *)
   let do_eliminate_blocked_clauses () =
@@ -614,7 +623,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       @ C.ClauseSet.to_list (Env.ProofState.PassiveSet.clauses ())
     in
     begin try
-      Util.debugf ~section 2 "init_cl: @[%a@]@."
+      Util.debugf ~section 1 "init_cl: @[%a@]@."
         (fun k -> k (CCList.pp C.pp) init_clauses);
 
       let init_clause_num = List.length init_clauses in
