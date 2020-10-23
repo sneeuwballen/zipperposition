@@ -1134,7 +1134,7 @@ module Make(C : Clause_intf.S) = struct
     | Mixed q -> C.Tbl.length q.tbl
 
   let add q c = match q with
-    | FIFO q -> Queue.push c q
+    | FIFO q -> Queue.push c q; true
     | Mixed q ->
       if not (C.Tbl.mem q.tbl c) then (
         C.Tbl.add q.tbl c ();
@@ -1142,9 +1142,11 @@ module Make(C : Clause_intf.S) = struct
         let heaps = Array.mapi (fun i (prio,weight) ->
             let heap = Array.get q.heaps i in
             H.insert (prio,weight,c) heap) weights in
-        q.heaps <- heaps)
+        q.heaps <- heaps;
+        true) 
+      else false
 
-  let add_seq q hcs = Iter.iter (add q) hcs
+  let add_seq q hcs = Iter.iter (fun c -> ignore (add q c)) hcs
 
   let rec take_first_mixed q =
     let move_queue q =
@@ -1354,6 +1356,21 @@ module Make(C : Clause_intf.S) = struct
         ) !funs_to_parse;
       Mixed mixed
     )
+
+  let all_clauses q =
+    match q with
+    | FIFO q -> CCSeq.to_iter (Queue.to_seq q )
+    | Mixed q -> Iter.map fst (C.Tbl.to_iter q.tbl)
+
+  let remove q cl =
+    match q with 
+    | FIFO q -> invalid_arg "legacy queue, removal unsupported"
+    | Mixed q ->
+      if C.Tbl.mem q.tbl cl then (
+        C.Tbl.remove q.tbl cl;
+        true
+      ) else false
+
 
   let pp out q = CCFormat.fprintf out "queue %s" (name q)
   let to_string = CCFormat.to_string pp
