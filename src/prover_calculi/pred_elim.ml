@@ -23,6 +23,7 @@ end
 module Make(E : Env.S) : S with module Env = E = struct
   module Env = E
   module C = Env.C
+  module CS = C.ClauseSet
   module L = Literal
   module T = Term
 
@@ -37,12 +38,12 @@ module Make(E : Env.S) : S with module Env = E = struct
   {
     sym : ID.t;
     (* clauses with single pos/neg occurrence of a symbol *)
-    mutable pos_cls : C.ClauseSet.t;
-    mutable neg_cls : C.ClauseSet.t;
+    mutable pos_cls : CS.t;
+    mutable neg_cls : CS.t;
     (* clauses with multiple occurrences of a symbol *)
-    mutable offending_cls : C.ClauseSet.t;
+    mutable offending_cls : CS.t;
     (* clauses that have the gate shape (occurs in pos/neg cls)  *)
-    mutable possible_gates : C.ClauseSet.t;
+    mutable possible_gates : CS.t;
     (* do the clauses in the possible_gates form a gate, and if so which one? *)
     mutable is_gate : (C.t list * C.t list) option;
     (* square of number of different variables stored in this clause set *)
@@ -56,9 +57,9 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let pp_task out task =
     CCFormat.fprintf out 
-      "%a {@. +: @[%d@];@. -:@[%d@];@. ?:@[%d@]@. g:@[%b@]@. v^2:@[%g@]; |l|:@[%d@]; @.}@."
-      ID.pp task.sym (C.ClauseSet.cardinal task.pos_cls) (C.ClauseSet.cardinal task.neg_cls)
-      (C.ClauseSet.cardinal task.offending_cls) (CCOpt.is_some task.is_gate) task.sq_var_weight
+      "%a {@. +: @[%a@];@. -:@[%a@];@. ?:@[%a@]@. g:@[%b@]@. v^2:@[%g@]; |l|:@[%d@]; @.}@."
+      ID.pp task.sym (CS.pp C.pp) task.pos_cls (CS.pp C.pp) task.neg_cls
+      (CS.pp C.pp) task.offending_cls (CCOpt.is_some task.is_gate) task.sq_var_weight
       task.num_lits
 
   module TaskWrapper = struct
@@ -68,7 +69,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       task.heap_idx <- idx
     let lt a b =
       let card t = 
-        C.ClauseSet.cardinal t.pos_cls + C.ClauseSet.cardinal t.neg_cls
+        CS.cardinal t.pos_cls + CS.cardinal t.neg_cls
       in
       let card_a = card a and card_b = card b in
       card_a < card_b || (card_a = card_b && ID.compare a.sym b.sym < 0)
@@ -85,10 +86,10 @@ module Make(E : Env.S) : S with module Env = E = struct
      we temporarily store the clauses in this set and then
      when we are sure that the clause is retained we 
      add it to the passive set *)
-  let _newly_added = ref C.ClauseSet.empty
+  let _newly_added = ref CS.empty
   (* clause set containing all the registered clauses. Makes sure that
      no clause is tracked or deleted multiple times from the system  *)
-  let _tracked = ref C.ClauseSet.empty
+  let _tracked = ref CS.empty
 
   let _logic = ref NEqFO
   let refine_logic new_val =
@@ -100,8 +101,8 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let mk_pred_elim_info sym =
     {
-      sym; pos_cls = C.ClauseSet.empty; neg_cls = C.ClauseSet.empty; 
-      offending_cls=C.ClauseSet.empty; possible_gates = C.ClauseSet.empty;
+      sym; pos_cls = CS.empty; neg_cls = CS.empty; 
+      offending_cls=CS.empty; possible_gates = CS.empty;
       is_gate=None; sq_var_weight=0.0; last_check=None; heap_idx=(-1); num_lits=0;
     }
   
@@ -141,7 +142,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     | _ -> None
 
   let possibly_ignore_sym entry =
-    let card s = C.ClauseSet.cardinal s in
+    let card s = CS.cardinal s in
     let possible_resolvents = 
       match entry.is_gate with
       | Some(pos_gates,neg_gates) ->
@@ -178,18 +179,18 @@ module Make(E : Env.S) : S with module Env = E = struct
           let entry = CCOpt.get_or ~default:(mk_pred_elim_info sym) old in
           begin match action with
           | `Pos ->
-            entry.pos_cls <- C.ClauseSet.add cl entry.pos_cls;
+            entry.pos_cls <- CS.add cl entry.pos_cls;
           | `Neg ->
-            entry.neg_cls <- C.ClauseSet.add cl entry.neg_cls;
+            entry.neg_cls <- CS.add cl entry.neg_cls;
             possibly_ignore_sym entry;
           | `Offending ->
-            entry.offending_cls <- C.ClauseSet.add cl entry.offending_cls;
+            entry.offending_cls <- CS.add cl entry.offending_cls;
             if TaskSet.mem entry !_task_queue then (
                _task_queue := TaskSet.remove entry !_task_queue;
             )
           | `Gates ->
             if handle_gates then(
-              entry.possible_gates <- C.ClauseSet.add cl entry.possible_gates
+              entry.possible_gates <- CS.add cl entry.possible_gates
             )
           end;
           if action != `Gates then (
@@ -236,17 +237,18 @@ module Make(E : Env.S) : S with module Env = E = struct
     update_idx pos neg offending gates num_vars cl
 
   let react_clause_addded cl =
-  if !_logic != Unsupported then(
-    if not (C.ClauseSet.mem cl !_tracked) then (
-      _tracked := C.ClauseSet.add cl !_tracked;
-      scan_cl_lits ~handle_gates:false cl);
-    Signal.ContinueListening
-  ) else Signal.StopListening
+    if !_logic != Unsupported then(
+      if not (CS.mem cl !_tracked) then (
+        Util.debugf ~section 5 "added:@[%a@]" (fun k -> k C.pp cl);
+        _tracked := CS.add cl !_tracked;
+        scan_cl_lits ~handle_gates:false cl);
+      Signal.ContinueListening
+    ) else Signal.StopListening
   
   let react_clause_removed cl =
     if !_logic != Unsupported then (
       let should_retry task =
-        C.ClauseSet.is_empty task.offending_cls &&
+        CS.is_empty task.offending_cls &&
         not (ID.Set.mem task.sym !_ignored_symbols) &&
         (match task.last_check with
         | Some(old_sq_var_sum, old_num_lit) -> 
@@ -260,17 +262,17 @@ module Make(E : Env.S) : S with module Env = E = struct
           if sign && CCList.mem ~eq:C.equal cl pos_cls
              || (not sign) && CCList.mem ~eq:C.equal cl neg_cls then (
             (* reintroduce gate clauses *)
-            task.pos_cls <- C.ClauseSet.add_list task.pos_cls pos_cls;
-            task.neg_cls <- C.ClauseSet.add_list task.neg_cls neg_cls;
+            task.pos_cls <- CS.add_list task.pos_cls pos_cls;
+            task.neg_cls <- CS.add_list task.neg_cls neg_cls;
             task.is_gate <- None
           )
         | None -> ()
       in
 
       let handled = ref ID.Set.empty in
-      if not (C.ClauseSet.mem cl !_newly_added) &&
-         C.ClauseSet.mem cl !_tracked then (
-        _tracked := C.ClauseSet.remove cl !_tracked;
+      if not (CS.mem cl !_newly_added) &&
+         CS.mem cl !_tracked then (
+        _tracked := CS.remove cl !_tracked;
         Array.iteri (fun idx lit -> 
           match get_sym_sign lit with
           | Some(sym, sign) when not (ID.Set.mem sym !handled) ->
@@ -286,16 +288,16 @@ module Make(E : Env.S) : S with module Env = E = struct
                 task.sq_var_weight <- task.sq_var_weight -. calc_sq_var cl;
                 task.num_lits <- task.num_lits - C.length cl;
                 if !is_offending then (
-                  task.offending_cls <- C.ClauseSet.remove cl task.offending_cls
+                  task.offending_cls <- CS.remove cl task.offending_cls
                 ) else if sign then (
                   handle_gate sign task cl;
-                  task.pos_cls <- C.ClauseSet.remove cl task.pos_cls;
+                  task.pos_cls <- CS.remove cl task.pos_cls;
                 ) else (
                   handle_gate sign task cl;
-                  task.neg_cls <- C.ClauseSet.remove cl task.neg_cls;
+                  task.neg_cls <- CS.remove cl task.neg_cls;
                 );
                 if not (TaskSet.mem task !_task_queue) && should_retry task then (
-                  Util.debugf ~section 1 "retrying @[%a@]@." (fun k -> k pp_task task);
+                  Util.debugf ~section 10 "retrying @[%a@]@." (fun k -> k pp_task task);
                   _task_queue := TaskSet.add task !_task_queue
                 );
                 Some task
@@ -306,7 +308,6 @@ module Make(E : Env.S) : S with module Env = E = struct
     else Signal.StopListening
 
   let replace_clauses task clauses =
-    Util.debugf ~section 3 "replacing %a" (fun k -> k ID.pp task.sym); 
     Util.debugf ~section 3 "resolvents: @[%a@]@." (fun k -> k (CCList.pp C.pp) clauses);
     _ignored_symbols := ID.Set.add task.sym !_ignored_symbols;
     let remove iter =
@@ -314,29 +315,28 @@ module Make(E : Env.S) : S with module Env = E = struct
       Env.remove_passive iter;
       Env.remove_simpl iter;
       Iter.iter (fun c -> (C.mark_redundant c);
-        if C.ClauseSet.mem c !_newly_added then (
-          _newly_added := C.ClauseSet.remove c !_newly_added;
+        if CS.mem c !_newly_added then (
+          _newly_added := CS.remove c !_newly_added;
           ignore (react_clause_removed c);
         )
       ) iter;
     in
-    assert(C.ClauseSet.is_empty task.offending_cls);
-    remove (C.ClauseSet.to_iter task.pos_cls);
-    remove (C.ClauseSet.to_iter task.neg_cls);
+    assert(CS.is_empty task.offending_cls);
+    remove (CS.to_iter task.pos_cls);
+    remove (CS.to_iter task.neg_cls);
     (match task.is_gate with
     | Some(pos_cls, neg_cls) ->
       remove (CCList.to_iter pos_cls);
       remove (CCList.to_iter neg_cls)
     | None -> ());
-    (* Env.add_passive (CCList.to_iter clauses); *)
-    _newly_added := C.ClauseSet.add_list !_newly_added clauses;
+    _newly_added := CS.add_list !_newly_added clauses;
     List.iter (fun cl -> ignore (react_clause_addded cl)) clauses;
 
     _pred_sym_idx := ID.Map.remove task.sym !_pred_sym_idx
 
   let check_if_gate task =
     let sym = task.sym in
-    let gates_l = C.ClauseSet.to_list task.possible_gates in
+    let gates_l = CS.to_list task.possible_gates in
     let filter_gates ~sign ~lit_num_filter =
       List.filter (fun cl -> 
         lit_num_filter (Array.length (C.lits cl)) &&
@@ -404,9 +404,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       let neg_gates = filter_gates ~sign:false ~lit_num_filter:((=) 2) in
       match find_and_or neg_gates pos_gates with
       | Some (pos_cl, neg_cls) ->
-        let to_remove = C.ClauseSet.of_list (pos_cl :: neg_cls) in
-        task.neg_cls <- C.ClauseSet.diff task.neg_cls to_remove;
-        task.pos_cls <- C.ClauseSet.diff task.pos_cls to_remove;
+        let to_remove = CS.of_list (pos_cl :: neg_cls) in
+        task.neg_cls <- CS.diff task.neg_cls to_remove;
+        task.pos_cls <- CS.diff task.pos_cls to_remove;
         task.is_gate <- Some([pos_cl], neg_cls);
         true
       | None -> false
@@ -416,9 +416,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       let neg_gates = filter_gates ~sign:false ~lit_num_filter:(fun n -> n >= 3) in
       match find_and_or pos_gates neg_gates with
       | Some(neg_cl, pos_cls) ->
-        let to_remove = C.ClauseSet.of_list (neg_cl :: pos_cls) in
-        task.neg_cls <- C.ClauseSet.diff task.neg_cls to_remove;
-        task.pos_cls <- C.ClauseSet.diff task.pos_cls to_remove;
+        let to_remove = CS.of_list (neg_cl :: pos_cls) in
+        task.neg_cls <- CS.diff task.neg_cls to_remove;
+        task.pos_cls <- CS.diff task.pos_cls to_remove;
         task.is_gate <- Some(pos_cls, [neg_cl]);
         true
       | None -> false
@@ -431,10 +431,9 @@ module Make(E : Env.S) : S with module Env = E = struct
     ID.Map.iter (fun _ task -> 
       check_if_gate task;
 
-      Util.debugf ~section 3 "initially: @[%a@]" (fun k -> k pp_task task);
+      Util.debugf ~section 5 "initially: @[%a@]" (fun k -> k pp_task task);
 
-      if C.ClauseSet.is_empty task.offending_cls then (
-        Util.debugf ~section 3 "inserting to queue" CCFun.id;
+      if CS.is_empty task.offending_cls then (
         _task_queue := TaskSet.add task !_task_queue 
     )) !_pred_sym_idx
 
@@ -517,9 +516,9 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let do_pred_elim () =
     let process_task task =
-      assert(C.ClauseSet.is_empty task.offending_cls);
+      assert(CS.is_empty task.offending_cls);
       let pos_cls, neg_cls = 
-        CCPair.map_same C.ClauseSet.to_list (task.pos_cls, task.neg_cls)
+        CCPair.map_same CS.to_list (task.pos_cls, task.neg_cls)
       in
       let sym = task.sym in
       let resolvents, pos_gates, neg_gates =
@@ -534,16 +533,14 @@ module Make(E : Env.S) : S with module Env = E = struct
           acc_sq +. calc_sq_var cl, acc_lit_num + C.length cl) (0.0, 0) resolvents
       in
       let old_clauses =
-        C.ClauseSet.cardinal task.pos_cls + C.ClauseSet.cardinal task.neg_cls +
+        CS.cardinal task.pos_cls + CS.cardinal task.neg_cls +
         List.length pos_gates + List.length neg_gates
       in
       if new_sq_var_weight <= task.sq_var_weight ||
          new_lit_num <= task.num_lits ||
          List.length resolvents < old_clauses then (
-        Util.debugf ~section 1 "Var weight: %g / %g" (fun k -> k new_sq_var_weight task.sq_var_weight);
-        Util.debugf ~section 1 "Lit num: %d / %d" (fun k -> k new_lit_num task.num_lits);
-        Util.debugf ~section 1 "Clauses num: %d / %d" (fun k -> k (List.length resolvents) old_clauses);
-        replace_clauses task resolvents
+        Util.debugf ~section 3 "replacing: @[%a@]" (fun k -> k pp_task task);
+        replace_clauses task resolvents;
       ) else (
         task.last_check <- Some (task.sq_var_weight, task.num_lits)
       )
@@ -554,26 +551,41 @@ module Make(E : Env.S) : S with module Env = E = struct
       let task = S.min_elt !_task_queue in
       _task_queue := S.remove task !_task_queue;
       if not (ID.Set.mem task.sym !_ignored_symbols) then(
-        Util.debugf ~section 1 "checking: @[%a@]" (fun k -> k pp_task task);
+        Util.debugf ~section 5 "checking: @[%a@]" (fun k -> k pp_task task);
         process_task (task)
       )
     done;
     
     (* storing all newly computed clauses *)
-    Env.add_passive (C.ClauseSet.to_iter !_newly_added);
-    _newly_added := C.ClauseSet.empty
+    Env.add_passive (CS.to_iter !_newly_added);
+    _newly_added := CS.empty
 
   let steps = ref 0
   (* driver that does that every k-th step of given-clause loop *)
   let do_predicate_elimination () =
     steps := (!steps + 1) mod (Env.flex_get k_check_at);
 
-    if !steps = 0 then do_pred_elim ()
+    if !steps = 0 then (
+      Util.debugf ~section 2 "active:@[%a@]@." 
+      (fun k -> k (Iter.pp_seq C.pp) (Env.get_active ()));
+      Util.debugf ~section 2 "passive:@[%a@]@." 
+        (fun k -> k (Iter.pp_seq C.pp) (Env.get_passive ()));
+      Util.debugf ~section 2 "state:@[%a@]@."
+        (fun k -> k (Iter.pp_seq pp_task) (ID.Map.values !_pred_sym_idx));
+      do_pred_elim ();
+      Util.debugf ~section 2 "after:@." CCFun.id;
+      Util.debugf ~section 2 "active:@[%a@]@." 
+      (fun k -> k (Iter.pp_seq C.pp) (Env.get_active ()));
+      Util.debugf ~section 2 "passive:@[%a@]@." 
+        (fun k -> k (Iter.pp_seq C.pp) (Env.get_passive ()));
+      Util.debugf ~section 2 "state:@[%a@]@."
+        (fun k -> k (Iter.pp_seq pp_task) (ID.Map.values !_pred_sym_idx));
+    )
 
   let initialize () =
     let init_clauses =
-      C.ClauseSet.to_list (Env.ProofState.ActiveSet.clauses ())
-      @ C.ClauseSet.to_list (Env.ProofState.PassiveSet.clauses ())
+      CS.to_list (Env.ProofState.ActiveSet.clauses ())
+      @ CS.to_list (Env.ProofState.PassiveSet.clauses ())
     in
     begin try
       Util.debugf ~section 5 "init_cl: @[%a@]@."
@@ -585,29 +597,38 @@ module Make(E : Env.S) : S with module Env = E = struct
       
       List.iter (fun cl -> 
         scan_cl_lits cl;
+        _tracked := CS.add cl !_tracked;
       ) init_clauses;
 
       schedule_tasks ();
+
+      Util.debugf ~section 5 "state:@[%a@]@."
+        (fun k -> k (Iter.pp_seq pp_task) (ID.Map.values !_pred_sym_idx));
 
       Util.debugf ~section 1 "logic has%sequalities"
         (fun k -> k (if !_logic == EqFO then " " else " no "));
 
       Signal.on Env.ProofState.PassiveSet.on_add_clause react_clause_addded;
       Signal.on Env.ProofState.PassiveSet.on_remove_clause react_clause_removed;
+      Signal.on Env.ProofState.ActiveSet.on_add_clause react_clause_addded;
       Signal.on Env.ProofState.ActiveSet.on_remove_clause react_clause_removed;
-
-      
-      Signal.on Env.on_forward_simplified (fun (c, new_state) -> 
+      Signal.on_every Env.on_forward_simplified (fun (c, new_state) ->
         if !_logic != Unsupported then (
-          ignore(react_clause_removed c);
-          begin match new_state with
-          | Some c' -> ignore(react_clause_addded c')
-          | _ -> (* c is redundant *) () end;
-          Signal.ContinueListening
-        ) else Signal.StopListening
-      );
+          match new_state with
+          | Some c' ->
+            ignore(react_clause_removed c); 
+            ignore(react_clause_addded c')
+          | _ -> ignore(react_clause_removed c) (* c is redundant *)
+      ));
+
 
       do_pred_elim ();
+
+      Util.debugf ~section 5 "after elim: @[%a@]@."
+        (fun k -> k (CS.pp C.pp) (Env.ProofState.PassiveSet.clauses ()));
+      Util.debugf ~section 5 "state:@[%a@]@."
+        (fun k -> k (Iter.pp_seq pp_task) (ID.Map.values !_pred_sym_idx));
+
 
       let clause_diff =
         init_clause_num -

@@ -651,10 +651,13 @@ module Make(E : Env.S) : S with module Env = E = struct
           In this case clause can me modified or deemed redundant by forward
           modification procedures. we react accordingly.*)
         Signal.on_every Env.on_forward_simplified (fun (c, new_state) -> 
-          react_clause_removed c;
           match new_state with
-          | Some c' -> react_clause_addded c'
-          | _ -> () (* c is redundant *));
+          | Some c' ->
+            if not (C.equal c c') then (
+              react_clause_removed c; 
+              react_clause_addded c'
+            )
+          | _ -> react_clause_removed c; (* c is redundant *));
         Env.add_clause_elimination_rule ~priority:1 "BCE" eliminate_blocked_clauses
       ) else if Env.flex_get k_processing_kind = `InprocessingInitial then (
         Env.add_is_trivial is_blocked;

@@ -157,9 +157,7 @@ module Make(E : Env.S) = struct
           
           Env.add_passive (Iter.of_list l');
 
-          if state = `New then (
-            Signal.send Env.on_forward_simplified (picked_clause, Some c)
-          );
+          Signal.send Env.on_forward_simplified (picked_clause, Some c);
 
           Env.do_clause_eliminate ();
           (* assert(not (Env.C.is_redundant c)); *)
