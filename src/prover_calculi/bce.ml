@@ -534,7 +534,9 @@ module Make(E : Env.S) : S with module Env = E = struct
             then (Some idx)
             else None
           | None -> 
-            if not (ID.Set.mem sym !ignored_symbols) then Some idx else None)
+            if not (ID.Set.mem sym !ignored_symbols) 
+            then Some idx 
+            else None)
         | _ -> None
       ) (C.lits cl)
     in
