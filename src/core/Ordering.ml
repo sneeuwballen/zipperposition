@@ -90,9 +90,12 @@ module Head = struct
 
   module T = Term
 
+  type quantifier = Forall | Exists
+
   type t =
     | I of ID.t
     | B of Builtin.t
+    | Q of quantifier
     | V of var
     | DB of int
     | LAM
@@ -100,6 +103,8 @@ module Head = struct
   let pp out = function
     | I id -> ID.pp out id
     | B b -> Builtin.pp out b
+    | Q Forall -> CCString.pp out "FORALL"
+    | Q Exists -> CCString.pp out "EXISTS"
     | V x -> HVar.pp out x
     | DB i -> CCInt.pp out i
     | LAM -> CCString.pp out "LAM"
@@ -107,6 +112,9 @@ module Head = struct
   let rec term_to_head s =
     match T.view s with
     | T.App (f,_) ->          term_to_head f
+    (* The head Q is only used if there are two arguments, the type argument and the lambda-expression *)
+    | T.AppBuiltin (Builtin.ForallConst,[_;_]) -> Q Forall
+    | T.AppBuiltin (Builtin.ExistsConst,[_;_]) -> Q Exists
     | T.AppBuiltin (fid,_) -> B fid
     | T.Const fid ->          I fid
     | T.Var x ->              V x
@@ -116,6 +124,12 @@ module Head = struct
   let term_to_args s =
     match T.view s with
     | T.App (_,ss) -> ss
+    | T.AppBuiltin ((Builtin.ForallConst|Builtin.ExistsConst),[ty;lam]) ->
+      (* Under quantifiers, we ignore the lambda *)
+      begin match T.view lam with 
+      | T.Fun (ty', body) -> [ty; body]
+      | _ -> assert false
+      end
     | T.AppBuiltin (_,ss) -> ss
     (* The orderings treat lambda-expressions like a "LAM" symbol applied to the body of the lambda-expression *)
     | T.Fun (_,t) -> [t]
@@ -147,7 +161,13 @@ let prec_compare prec a b = match a,b with
       | _ -> Lt
     end
   | Head.LAM,  Head.LAM  -> Eq
-  | Head.I _,  Head.B _  -> Gt (* lam > db > id > builtin *)
+  | Head.Q Forall,  Head.Q Forall -> Eq
+  | Head.Q Exists,  Head.Q Exists -> Eq
+  | Head.Q Forall,  Head.Q Exists -> Gt
+  | Head.Q Exists,  Head.Q Forall -> Lt
+
+  (* quantifier > lam > db > id > builtin *)
+  | Head.I _,  Head.B _  -> Gt
   | Head.B _,  Head.I _  -> Lt
   | Head.DB _, Head.I _  -> Gt
   | Head.I _,  Head.DB _ -> Lt
@@ -159,6 +179,14 @@ let prec_compare prec a b = match a,b with
   | Head.I _,  Head.LAM  -> Lt
   | Head.LAM,  Head.B _  -> Gt
   | Head.B _,  Head.LAM  -> Lt
+  | Head.Q _,  Head.LAM  -> Gt
+  | Head.Q _,  Head.DB _ -> Gt
+  | Head.Q _,  Head.I _  -> Gt
+  | Head.Q _,  Head.B _  -> Gt
+  | Head.LAM,  Head.Q _  -> Lt
+  | Head.DB _, Head.Q _  -> Lt
+  | Head.I _,  Head.Q _  -> Lt
+  | Head.B _,  Head.Q _  -> Lt
 
   | Head.V x,  Head.V y -> if HVar.equal Type.equal x y then Eq else Incomparable
   | Head.V _, _ -> Incomparable
@@ -166,7 +194,6 @@ let prec_compare prec a b = match a,b with
 
 let prec_status prec = function
   | Head.I s -> Prec.status prec s
-  | Head.B Builtin.Eq -> Prec.Multiset
   | _ -> Prec.LengthLexicographic
 
 module type PARAMETERS =
@@ -174,6 +201,16 @@ sig
   val name : string
   val lambda_mode : bool
 end
+
+
+module TermBoolAsKey = struct
+  type t = term * bool
+  let equal (t1, b1) (t2, b2) = T.equal t1 t2 && CCBool.equal b1 b2
+  let hash (t, b) = Hash.combine2 (T.hash t) (Hash.bool b)
+  let compare (t1, b1) (t2, b2) = if CCBool.equal b1 b2 then T.compare t1 t2 else CCBool.compare b1 b2
+end
+
+module TermBoolTbl = CCHashtbl.Make(TermBoolAsKey)
 
 module MakeKBO (P : PARAMETERS) : ORD = struct
   let name = P.name
@@ -183,149 +220,125 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
     offset : int;
     mutable pos_counter : int;
     mutable neg_counter : int;
-    mutable balance : CCInt.t Term.Tbl.t;
+    mutable balance : CCInt.t TermBoolTbl.t;
     mutable comb2var : T.t Term.Tbl.t
   }
 
   (** create a balance for the two terms *)
   let mk_balance t1 t2 =
     let numvars = Iter.length (T.Seq.vars t1) + Iter.length (T.Seq.vars t2) in
-    { offset = 0; pos_counter = 0; neg_counter = 0; balance = Term.Tbl.create numvars;
+    { offset = 0; pos_counter = 0; neg_counter = 0; balance = TermBoolTbl.create (2 * numvars);
       comb2var = Term.Tbl.create 16 }
 
   (** add a positive variable *)
-  let add_pos_var balance var =
-    let n = Term.Tbl.get_or balance.balance var ~default:0 in
+  let add_pos_var balance var ~below_lam =
+    let n = TermBoolTbl.get_or balance.balance (var, below_lam) ~default:0 in
     if n = 0
     then balance.pos_counter <- balance.pos_counter + 1
     else (
       if n = -1 then balance.neg_counter <- balance.neg_counter - 1
     );
-    Term.Tbl.add balance.balance var (n + 1)
+    TermBoolTbl.add balance.balance (var, below_lam) (n + 1)
 
   (** add a negative variable *)
-  let add_neg_var balance var =
-    let n = Term.Tbl.get_or balance.balance var ~default:0 in
+  let add_neg_var balance var ~below_lam =
+    let n = TermBoolTbl.get_or balance.balance (var, below_lam) ~default:0 in
     if n = 0
     then balance.neg_counter <- balance.neg_counter + 1
     else (
       if n = 1 then balance.pos_counter <- balance.pos_counter - 1
     );
-    Term.Tbl.add balance.balance var (n - 1)
+    TermBoolTbl.add balance.balance (var, below_lam) (n - 1)
 
   let weight_var_headed = W.one
 
-  let weight prec = function
-    | Head.B (Builtin.ForallConst|Builtin.ExistsConst) -> W.omega
+  let weight prec ~below_lam = function
+    | Head.Q _ -> if below_lam then W.one else  W.omega
     | Head.B _ -> W.one
     | Head.I s -> Prec.weight prec s
     | Head.V _ -> weight_var_headed
     | Head.DB _ -> Prec.db_weight prec
     | Head.LAM ->  Prec.lam_weight prec
 
+  (* Overapproximation of being fluid *)
+  let is_fluid t = match T.view t with
+    | T.App (f, l) -> T.is_var f
+    | T.Fun (ty, body) -> not (T.is_ground body)
+    | _ -> false
+
   (** Higher-order KBO *)
   let rec kbo ~prec t1 t2 =
     let balance = mk_balance t1 t2 in
-    (** Update variable balance, weight balance, and check whether the term contains the variable-headed term s.
+    (** Update variable balance, weight balance, and check whether the term contains the fluid term s.
         @param pos stands for positive (is t the left term?)
         @return weight balance, was `s` found?
     *)
-    let rec balance_weight (wb:W.t) t s ~pos : W.t * bool =
+    let rec balance_weight (wb:W.t) t s ~pos ~below_lam : W.t * bool =
       let t = ty1comb_to_var t balance.comb2var in
-      match T.view t with
-      | T.Var _ ->
-        balance_weight_var wb t s ~pos
-      | T.DB i ->
-        let wb' =
-          if pos
-          then W.(wb + weight prec (Head.DB i))
-          else W.(wb - weight prec (Head.DB i)) in
-        wb', false
-      | T.Const c ->
-        let open W.Infix in
-        let wb' =
-          if pos
-          then wb + weight prec (Head.I c)
-          else wb - weight prec (Head.I c)
-        in wb', false
-      | T.App (f, l) ->
-        if P.lambda_mode && T.is_var f
-        then balance_weight_var wb t s ~pos
-        else (
-          let wb', res = balance_weight wb f s ~pos in
-          balance_weight_rec wb' l s ~pos res
-        )
-      | T.AppBuiltin (b,l) ->
-        let open W.Infix in
-        let wb' = if pos
-          then wb + weight prec (Head.B b)
-          else wb - weight prec (Head.B b)
-        in
-        balance_weight_rec wb' l s ~pos false
-      | T.Fun (_, body) ->
-        if not P.lambda_mode then invalid_arg "lambdas not allowed";
-        let open W.Infix in
-        let wb' =
-          if pos
-          then wb + weight prec Head.LAM
-          else wb - weight prec Head.LAM
-        in
-        balance_weight wb' body s ~pos
+      if T.is_var t || (P.lambda_mode && is_fluid t) then 
+        balance_weight_var wb t s ~pos ~below_lam
+      else (
+        match Head.term_to_head t, Head.term_to_args t with
+        | Head.V v, args -> 
+          let wb', res = balance_weight_var wb (T.var v) s ~pos ~below_lam in
+          balance_weight_rec wb' args s ~pos ~below_lam res
+        | h, args ->
+          let wb' =
+            if pos
+            then W.(wb + weight prec h ~below_lam)
+            else W.(wb - weight prec h ~below_lam)
+          in
+          let below_lam = (h = Head.LAM) in
+          if not P.lambda_mode && below_lam then invalid_arg "lambdas not allowed";
+          balance_weight_rec wb' args s ~pos ~below_lam false
+      )
     (** balance_weight for the case where t is an applied variable *)
-    and balance_weight_var (wb:W.t) t s ~pos : W.t * bool =
+    and balance_weight_var (wb:W.t) t s ~pos ~below_lam : W.t * bool =
+    (* TODO: count below and above lam separately *)
       if pos then (
-        add_pos_var balance t;
+        add_pos_var balance t ~below_lam;
         W.(wb + weight_var_headed), CCOpt.is_some s && (Term.equal (CCOpt.get_exn s) t)
       ) else (
-        add_neg_var balance t;
+        add_neg_var balance t ~below_lam;
         W.(wb - weight_var_headed), CCOpt.is_some s && (Term.equal (CCOpt.get_exn s) t)
       )
     (** list version of the previous one, threaded with the check result *)
-    and balance_weight_rec wb terms s ~pos res = match terms with
+    and balance_weight_rec wb terms s ~pos ~below_lam res = match terms with
       | [] -> (wb, res)
       | t::terms' ->
-        let wb', res' = balance_weight wb t s ~pos in
-        balance_weight_rec wb' terms' s ~pos (res || res')
+        let wb', res' = balance_weight wb t s ~pos ~below_lam in
+        balance_weight_rec wb' terms' s ~pos ~below_lam (res || res')
     (** lexicographic comparison *)
-    and tckbolex wb terms1 terms2 =
+    and tckbolex wb terms1 terms2 ~below_lam =
       match terms1, terms2 with
       | [], [] -> wb, Eq
       | t1::terms1', t2::terms2' ->
-        begin match tckbo wb t1 t2 with
-          | (wb', Eq) -> tckbolex wb' terms1' terms2'
+        begin match tckbo wb t1 t2 ~below_lam with
+          | (wb', Eq) -> tckbolex wb' terms1' terms2' ~below_lam
           | (wb', res) -> (* just compute the weights and return result *)
-            let wb'', _ = balance_weight_rec wb' terms1' None ~pos:true false in
-            let wb''', _ = balance_weight_rec wb'' terms2' None ~pos:false false in
+            let wb'', _ = balance_weight_rec wb' terms1' None ~pos:true ~below_lam false in
+            let wb''', _ = balance_weight_rec wb'' terms2' None ~pos:false ~below_lam false in
             wb''', res
         end
       | [], _ ->
-        let wb, _ = balance_weight_rec wb terms2 None ~pos:false false in
+        let wb, _ = balance_weight_rec wb terms2 None ~pos:false ~below_lam false in
         wb, Lt
       | _, [] ->
-        let wb, _ = balance_weight_rec wb terms1 None ~pos:true false in
+        let wb, _ = balance_weight_rec wb terms1 None ~pos:true ~below_lam false in
         wb, Gt
     (* length-lexicographic comparison *)
-    and tckbolenlex wb terms1 terms2 =
+    and tckbolenlex wb terms1 terms2 ~below_lam =
       if List.length terms1 = List.length terms2
-      then tckbolex wb terms1 terms2
+      then tckbolex wb terms1 terms2 ~below_lam
       else (
         (* just compute the weights and return result *)
-        let wb', _ = balance_weight_rec wb terms1 None ~pos:true false in
-        let wb'', _ = balance_weight_rec wb' terms2 None ~pos:false false in
+        let wb', _ = balance_weight_rec wb terms1 None ~pos:true ~below_lam false in
+        let wb'', _ = balance_weight_rec wb' terms2 None ~pos:false ~below_lam false in
         let res = if List.length terms1 > List.length terms2 then Gt else Lt in
         wb'', res
       )
-    (* commutative comparison. Not linear, must call kbo to
-       avoid breaking the weight computing invariants *)
-    and tckbocommute wb ss ts =
-      (* multiset comparison *)
-      let res = MT.compare_partial_l (kbo ~prec) ss ts in
-      (* also compute weights of subterms *)
-      let wb', _ = balance_weight_rec wb ss None ~pos:true false in
-      let wb'', _ = balance_weight_rec wb' ts None ~pos:false false in
-      wb'', res
     (* tupled version of kbo (kbo_5 of the paper) *)
-    and tckbo (wb:W.t) t1 t2 =
+    and tckbo (wb:W.t) t1 t2 ~below_lam =
       if T.equal t1 t2
       then (wb, Eq) (* do not update weight or var balance *)
       else
@@ -333,51 +346,50 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
       then (
         match Head.term_to_head t1, Head.term_to_head t2 with
         | Head.V _, Head.V _ ->
-          add_pos_var balance t1;
-          add_neg_var balance t2;
+          add_pos_var balance t1 ~below_lam;
+          add_neg_var balance t2 ~below_lam;
           (wb, Incomparable)
         | Head.V _,  _ ->
-          add_pos_var balance t1;
-          let wb', contains = balance_weight wb t2 (Some t1) ~pos:false in
+          add_pos_var balance t1 ~below_lam;
+          let wb', contains = balance_weight wb t2 (Some t1) ~pos:false ~below_lam in
           (W.(wb' + weight_var_headed), if contains then Lt else Incomparable)
         |  _, Head.V _ ->
-          add_neg_var balance t2;
-          let wb', contains = balance_weight wb t1 (Some t2) ~pos:true in
+          add_neg_var balance t2 ~below_lam;
+          let wb', contains = balance_weight wb t1 (Some t2) ~pos:true ~below_lam in
           (W.(wb' - weight_var_headed), if contains then Gt else Incomparable)
-        | h1, h2 -> tckbo_composite wb h1 h2 (Head.term_to_args t1) (Head.term_to_args t2)
+        | h1, h2 -> tckbo_composite wb h1 h2 (Head.term_to_args t1) (Head.term_to_args t2) ~below_lam
       ) 
       else (
         let t1 = ty1comb_to_var t1 balance.comb2var in 
         let t2 = ty1comb_to_var t2 balance.comb2var in
         match T.view t1, T.view t2 with
         | T.Var x, T.Var y ->
-          add_pos_var balance t1;
-          add_neg_var balance t2;
+          add_pos_var balance t1 ~below_lam;
+          add_neg_var balance t2 ~below_lam;
           (wb, Incomparable)
         | T.Var x,  _ ->
-          add_pos_var balance t1;
-          let wb', contains = balance_weight wb t2 (Some t1) ~pos:false in
+          add_pos_var balance t1 ~below_lam;
+          let wb', contains = balance_weight wb t2 (Some t1) ~pos:false ~below_lam in
           (W.(wb' + one), if contains then Lt else Incomparable)
         |  _, T.Var y ->
-          add_neg_var balance t2;
-          let wb', contains = balance_weight wb t1 (Some t2) ~pos:true in
+          add_neg_var balance t2 ~below_lam;
+          let wb', contains = balance_weight wb t1 (Some t2) ~pos:true ~below_lam in
           (W.(wb' - one), if contains then Gt else Incomparable)
         | _ -> let f, g = Head.term_to_head t1, Head.term_to_head t2 in
-          tckbo_composite wb f g (Head.term_to_args t1) (Head.term_to_args t2)
+          tckbo_composite wb f g (Head.term_to_args t1) (Head.term_to_args t2) ~below_lam
       )
-    (** tckbo, for composite terms (ie non variables). It takes a ID.t
-        and a list of subterms. *)
-    and tckbo_composite wb f g ss ts =
+    (** tckbo, for non-variable-headed terms). *)
+    and tckbo_composite wb f g ss ts ~below_lam =
       (* do the recursive computation of kbo *)
-      let wb', res = tckbo_rec wb f g ss ts in
-      let wb'' = W.(wb' + weight prec f - weight prec g) in
+      let wb', res = tckbo_rec wb f g ss ts ~below_lam in
+      let wb'' = W.(wb' + weight prec f ~below_lam - weight prec g ~below_lam) in
       if not P.lambda_mode then (
         begin match f with
-          | Head.V x -> add_pos_var balance (T.var x)
+          | Head.V x -> add_pos_var balance (T.var x) ~below_lam
           | _ -> ()
         end;
         begin match g with
-          | Head.V x -> add_neg_var balance (T.var x)
+          | Head.V x -> add_neg_var balance (T.var x) ~below_lam
           | _ -> ()
         end;
       );
@@ -397,23 +409,24 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
           else wb'', Incomparable
         | Incomparable -> wb'', Incomparable
     (* recursive comparison *)
-    and tckbo_rec wb f g ss ts =
+    and tckbo_rec wb f g ss ts ~below_lam =
+      let ss_below_lam = below_lam || f = Head.LAM in
+      let ts_below_lam = below_lam || g = Head.LAM in
       if prec_compare prec f g = Eq
       then match prec_status prec f with
-        | Prec.Multiset ->
-          tckbocommute wb ss ts
+        | Prec.Multiset -> assert false
         | Prec.Lexicographic ->
-          tckbolex wb ss ts
+          tckbolex wb ss ts ~below_lam:ss_below_lam
         | Prec.LengthLexicographic ->
-          tckbolenlex wb ss ts
+          tckbolenlex wb ss ts ~below_lam:ss_below_lam
       else (
         (* just compute variable and weight balances *)
-        let wb', _ = balance_weight_rec wb ss None ~pos:true false in
-        let wb'', _ = balance_weight_rec wb' ts None ~pos:false false in
+        let wb', _ = balance_weight_rec wb ss None ~pos:true ~below_lam:ss_below_lam false in
+        let wb'', _ = balance_weight_rec wb' ts None ~pos:false ~below_lam:ts_below_lam false in
         wb'', Incomparable
       )
     in
-    let _, res = tckbo W.zero t1 t2 in
+    let _, res = tckbo W.zero t1 t2 ~below_lam:false in
     res
 
   let compare_terms ~prec x y =
