@@ -521,8 +521,8 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let is_blocked cl =
     let validity_checker = get_validity_checker () in
-    let ans =
-      CCOpt.is_some @@ CCArray.find_map_i (fun idx lit -> 
+    let blocked_lit_idx =
+      CCArray.find_map_i (fun idx lit -> 
         match lit with
         | L.Equation(lhs,_,_) when L.is_predicate_lit lit ->
           let sym = T.head_exn lhs in
@@ -540,8 +540,11 @@ module Make(E : Env.S) : S with module Env = E = struct
         | _ -> None
       ) (C.lits cl)
     in
+    let ans = CCOpt.is_some blocked_lit_idx in
     if ans then (
-      Util.debugf ~section 1 "@[%a@] is blocked@." (fun k -> k C.pp cl);
+      Util.debugf ~section 1 "@[%a@] is blocked on @[%a@] @." 
+        (fun k -> k C.pp cl L.pp (C.lits cl).(CCOpt.get_exn blocked_lit_idx));
+      Util.debugf ~section 1 "proof:@[%a@]@." (fun k -> k Proof.S.pp_tstp (C.proof cl));
     );
     ans
 
@@ -581,12 +584,14 @@ module Make(E : Env.S) : S with module Env = E = struct
               C.is_redundant task.clause ||
               ID.Set.mem hd_sym !ignored_symbols) then (
         Util.debugf ~section 3 "checking blockedness" CCFun.id;
+        let orig_cands = CCList.filter (fun cand -> not (C.equal cl cand || C.is_redundant cand)) (CCDeque.to_list task.cands) in
         match task_is_blocked task.cands with
         | true ->
           deregister_clause cl;
           remove_from_proof_state cl;
           incr removed_cnt;
-          Util.debugf ~section 2 "removed @[%a@]@." (fun k -> k C.pp cl);
+          Util.debugf ~section 2 "removed @[%a@] (%d)@. partners: @[%a@] @." 
+            (fun k -> k C.pp cl lit_idx (CCList.pp C.pp) orig_cands)
         | false -> 
           assert (not (TaskPriorityQueue.in_heap task))
       ) else (
@@ -594,7 +599,6 @@ module Make(E : Env.S) : S with module Env = E = struct
           (fun k -> k (C.is_empty task.clause) 
                       (C.is_redundant task.clause) 
                       (ID.Set.mem hd_sym !ignored_symbols) ););
-
     in
 
 
@@ -603,14 +607,24 @@ module Make(E : Env.S) : S with module Env = E = struct
       process_task (Q.remove_min task_queue)
     done;
 
-    Util.debugf ~section 1 "bce removed %d clauses@." (fun k -> k !removed_cnt)
+    Util.debugf ~section 2 "bce removed %d clauses@." (fun k -> k !removed_cnt);
+    !removed_cnt
 
   let steps = ref 0
   (* driver that does that every k-th step of given-clause loop *)
   let eliminate_blocked_clauses () =
     steps := (!steps + 1) mod (Env.flex_get k_check_at);
 
-    if !steps = 0 then do_eliminate_blocked_clauses ()
+    if !steps = 0 then (
+      let original_cls = 
+        Iter.to_list (Iter.append (Env.get_active ()) (Env.get_passive ())) 
+      in
+      let eliminated = do_eliminate_blocked_clauses () in
+      if eliminated != 0 then (
+        Util.debugf ~section 2  "original clause set:@.@[%a@]" 
+          (fun k -> k (CCList.pp C.pp) original_cls);
+      );
+    )
 
   let react_clause_addded cl =
     add_clause cl
@@ -625,7 +639,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       @ C.ClauseSet.to_list (Env.ProofState.PassiveSet.clauses ())
     in
     begin try
-      Util.debugf ~section 1 "init_cl: @[%a@]@."
+      Util.debugf ~section 3 "init_cl: @[%a@]@."
         (fun k -> k (CCList.pp C.pp) init_clauses);
 
       let init_clause_num = List.length init_clauses in
@@ -646,7 +660,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           (C.lits cl))
       init_clauses;
       (* eliminate clauses *)
-      do_eliminate_blocked_clauses ();
+      ignore (do_eliminate_blocked_clauses ());
 
       let clause_diff =
         init_clause_num -
@@ -674,7 +688,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         Env.add_is_trivial is_blocked;
       ) else ( raise UnsupportedLogic ) (* clear all data structures *)
     with UnsupportedLogic ->
-      Util.debugf ~section 1 "logic is unsupported" CCFun.id;
+      Util.debugf ~section 2 "logic is unsupported" CCFun.id;
       (* releasing possibly used memory *)
       ss_idx := SymSignIdx.empty;
       clause_lock := Util.Int_map.empty;

@@ -230,9 +230,9 @@ let get_pred_freq ~freq_tbl l =
 let e_sel ?(blocker=(fun _ _ -> false)) ~ord lits = 
   let chooser ~freq_tbl (i,l) = 
     ((if Lit.is_pos l then 1 else 0),
-     (if Lits.is_max ~ord lits i then 0 else 100 +
-      if Lit.is_pure_var l then 0 else 10 +
-      if Lit.is_ground l then 0 else 1),
+     ((if Lits.is_max ~ord lits i then 0 else 100) +
+      (if Lit.is_pure_var l then 0 else 10) +
+      (if Lit.is_ground l then 0 else 1)),
      -(lit_sel_diff_w l),
      get_pred_freq ~freq_tbl l) in
   let freq_tbl = pred_freq ~ord lits in

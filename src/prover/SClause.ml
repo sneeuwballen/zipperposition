@@ -172,6 +172,7 @@ let proof_tc cl  =
     ~to_form:(fun ~ctx c -> to_s_form ~allow_free_db:true ~ctx c)
     ~is_dead_cl:(fun () -> is_redundant cl)
     ~to_form_subst:to_s_form_subst
+    ~name:(fun cl -> "zip_derived_cl" ^ CCInt.to_string cl.id)
     ~pp_in
     ()
 

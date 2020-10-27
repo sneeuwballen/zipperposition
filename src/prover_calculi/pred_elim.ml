@@ -539,7 +539,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       if new_sq_var_weight <= task.sq_var_weight ||
          new_lit_num <= task.num_lits ||
          List.length resolvents < old_clauses then (
-        Util.debugf ~section 3 "replacing: @[%a@]" (fun k -> k pp_task task);
+        Util.debugf ~section 1 "replacing: @[%a@] (%d/%d) " 
+          (fun k -> k ID.pp task.sym old_clauses (List.length resolvents));
         replace_clauses task resolvents;
       ) else (
         task.last_check <- Some (task.sq_var_weight, task.num_lits)
@@ -566,19 +567,19 @@ module Make(E : Env.S) : S with module Env = E = struct
     steps := (!steps + 1) mod (Env.flex_get k_check_at);
 
     if !steps = 0 then (
-      Util.debugf ~section 2 "active:@[%a@]@." 
+      Util.debugf ~section 4 "active:@[%a@]@." 
       (fun k -> k (Iter.pp_seq C.pp) (Env.get_active ()));
-      Util.debugf ~section 2 "passive:@[%a@]@." 
+      Util.debugf ~section 4 "passive:@[%a@]@." 
         (fun k -> k (Iter.pp_seq C.pp) (Env.get_passive ()));
-      Util.debugf ~section 2 "state:@[%a@]@."
+      Util.debugf ~section 4 "state:@[%a@]@."
         (fun k -> k (Iter.pp_seq pp_task) (ID.Map.values !_pred_sym_idx));
       do_pred_elim ();
-      Util.debugf ~section 2 "after:@." CCFun.id;
-      Util.debugf ~section 2 "active:@[%a@]@." 
+      Util.debugf ~section 4 "after:@." CCFun.id;
+      Util.debugf ~section 4 "active:@[%a@]@." 
       (fun k -> k (Iter.pp_seq C.pp) (Env.get_active ()));
-      Util.debugf ~section 2 "passive:@[%a@]@." 
+      Util.debugf ~section 4 "passive:@[%a@]@." 
         (fun k -> k (Iter.pp_seq C.pp) (Env.get_passive ()));
-      Util.debugf ~section 2 "state:@[%a@]@."
+      Util.debugf ~section 4 "state:@[%a@]@."
         (fun k -> k (Iter.pp_seq pp_task) (ID.Map.values !_pred_sym_idx));
     )
 
