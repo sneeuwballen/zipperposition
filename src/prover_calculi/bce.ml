@@ -590,8 +590,8 @@ module Make(E : Env.S) : S with module Env = E = struct
           deregister_clause cl;
           remove_from_proof_state cl;
           incr removed_cnt;
-          Util.debugf ~section 2 "removed @[%a@] (%d)@. partners: @[%a@] @." 
-            (fun k -> k C.pp cl lit_idx (CCList.pp C.pp) orig_cands)
+          Util.debugf ~section 2 "removed @[%a@] (%d)@.proof @[%a@]@.cands @[%a@] @." 
+            (fun k -> k C.pp cl lit_idx Proof.S.pp_tstp (C.proof cl) (CCList.pp C.pp) orig_cands)
         | false -> 
           assert (not (TaskPriorityQueue.in_heap task))
       ) else (
