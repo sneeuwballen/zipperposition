@@ -72,6 +72,7 @@ let k_dupsup = Flex_state.create_key ()
 let k_lambdasup = Flex_state.create_key ()
 let k_demod_in_var_args = Flex_state.create_key ()
 let k_lambda_demod = Flex_state.create_key ()
+let k_quant_demod = Flex_state.create_key ()
 let k_use_simultaneous_sup = Flex_state.create_key ()
 let k_unif_alg = Flex_state.create_key ()
 let k_fluidsup_penalty = Flex_state.create_key ()
@@ -320,8 +321,20 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ~eligible:C.Eligible.always (C.lits c)
       |> Iter.fold
         (fun tree (t, pos) ->
-           let with_pos = C.WithPos.( {term=t; pos; clause=c} ) in
-           f tree t with_pos)
+           match T.view t with 
+           | T.AppBuiltin(hd, [_;body]) ->
+             let tree = 
+              if Builtin.is_quantifier hd && Env.flex_get k_quant_demod then (
+               let _,unfolded = T.open_fun body in
+               let pos = P.(append pos ((P.arg 1 (P.body P.stop)))) in
+               let with_pos = C.WithPos.( {term=unfolded; pos; clause=c} ) in
+               f tree unfolded with_pos
+              ) else tree in
+             let with_pos = C.WithPos.( {term=t; pos; clause=c} ) in
+             f tree t with_pos
+           | _ ->
+             let with_pos = C.WithPos.( {term=t; pos; clause=c} ) in
+             f tree t with_pos)
         !_idx_back_demod;
     Signal.ContinueListening
 
@@ -1865,7 +1878,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
        when rewriting under quantifiers whose bodies are lambdas, we need to
        force lambda rewriting (force_lam_rw) to rewrite the quantifier body
        *)
-    and normal_form ~toplevel ?(force_lam_rw=false) t k =
+    and normal_form ~toplevel t k =
       match T.view t with
       | T.Const _ -> reduce_at_root ~toplevel t k
       | T.App (hd, l) ->
@@ -1885,20 +1898,25 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         else reduce_at_root ~toplevel t k
       | T.Fun (ty_arg, body) ->
         (* reduce under lambdas *)
-        if force_lam_rw || Env.flex_get k_lambda_demod
-        then
-          normal_form ~toplevel:false body
-            (fun body' ->
-               let u = if T.equal body body' then t else T.fun_ ty_arg body' in
-               reduce_at_root ~toplevel u k)
+        if Env.flex_get k_lambda_demod
+        then normal_form ~toplevel:false body
+              (fun body' ->
+                let u = if T.equal body body' then t else T.fun_ ty_arg body' in
+                reduce_at_root ~toplevel u k)
         else reduce_at_root ~toplevel t k (* TODO: DemodExt *)
       | T.Var _ | T.DB _ -> k t
       | T.AppBuiltin(Builtin.(ForallConst|ExistsConst) as hd, [_; body]) ->
-        let mk_quant = if hd = ForallConst then T.Form.forall else T.Form.exists in
-        normal_form ~toplevel:false ~force_lam_rw:true body
-          (fun body' ->
-            let u = if T.equal body body' then t else mk_quant body' in
-            reduce_at_root ~toplevel u k)
+        if not (Env.flex_get k_quant_demod) then (
+          reduce_at_root ~toplevel t k
+        ) else (
+          let mk_quant = if hd = ForallConst then T.Form.forall else T.Form.exists in
+          let vars,unfolded = T.open_fun body in
+          normal_form ~toplevel:false unfolded
+            (fun unfolded' ->
+              let u = 
+                if T.equal unfolded unfolded' then t 
+                else mk_quant (T.fun_l vars unfolded') in
+              reduce_at_root ~toplevel u k))
       | T.AppBuiltin (b, l) ->
         normal_form_l l
           (fun l' ->
@@ -3076,6 +3094,7 @@ let _sup_from_var_headed = ref true
 let _sup_in_var_args = ref true
 let _sup_under_lambdas = ref true
 let _lambda_demod = ref false
+let _quant_demod = ref false
 let _demod_in_var_args = ref true
 let _dot_demod_into = ref None
 let _complete_ho_unification = ref false
@@ -3148,6 +3167,7 @@ let register ~sup =
   E.flex_add k_subvarsup !_subvarsup;
   E.flex_add k_dupsup !_dupsup;
   E.flex_add k_lambdasup !_lambdasup;
+  E.flex_add k_quant_demod !_quant_demod;
   E.flex_add k_restrict_fluidsup !_restrict_fluidsup;
   E.flex_add k_check_sup_at_var_cond !_check_sup_at_var_cond;
   E.flex_add k_restrict_hidden_sup_at_vars !_restrict_hidden_sup_at_vars;
@@ -3236,6 +3256,7 @@ let () =
       "--sup-in-var-args", Arg.Bool (fun b -> _sup_in_var_args := b), " enable/disable superposition in arguments of applied variables";
       "--sup-under-lambdas", Arg.Bool (fun b -> _sup_under_lambdas := b), " enable/disable superposition in bodies of lambda-expressions";
       "--lambda-demod", Arg.Bool (fun b -> _lambda_demod := b), " enable/disable demodulation in bodies of lambda-expressions";
+      "--quant-demod", Arg.Bool (fun b -> _quant_demod := b), " enable/disable demodulation in bodies of quantifiers";
       "--demod-in-var-args", Arg.Bool (fun b -> _demod_in_var_args := b), " enable demodulation in arguments of variables";
       "--complete-ho-unif", Arg.Bool (fun b -> _complete_ho_unification := b), " enable complete higher-order unification algorithm (Jensen-Pietrzykowski)";
       "--switch-stream-extract", Arg.Bool (fun b -> _switch_stream_extraction := b), " in ho mode, switches heuristic of clause extraction from the stream queue";
