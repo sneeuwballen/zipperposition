@@ -308,6 +308,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     else Signal.StopListening
 
   let replace_clauses task clauses =
+    Util.debugf ~section 2 "replaced clauses: @[%a@]@." (fun k -> k (CS.pp C.pp) (CS.union task.pos_cls task.neg_cls));
     Util.debugf ~section 3 "resolvents: @[%a@]@." (fun k -> k (CCList.pp C.pp) clauses);
     _ignored_symbols := ID.Set.add task.sym !_ignored_symbols;
     let remove iter =
