@@ -376,6 +376,11 @@ let try_to_refute (type c) (module Env : Env.S with type C.t = c) clauses result
       Some (Util.total_time_s () +. Env.params.Params.timeout -. 0.25)
     )
   in
+  
+  Util.debugf ~section 1 "active: @[%a@]"
+    (fun k -> k (Iter.pp_seq Env.C.pp) (Env.get_active ()));
+  Util.debugf ~section 1 "passive: @[%a@]"
+    (fun k -> k (Iter.pp_seq Env.C.pp) (Env.get_passive ()));
   Signal.send Env.on_start ();
   let result, num = match result with
     | Saturate.Unsat _ -> result, 0  (* already found unsat during presaturation *)

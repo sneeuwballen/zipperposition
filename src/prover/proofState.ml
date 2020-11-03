@@ -146,7 +146,7 @@ module Make(C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
     let next () = ZProf.with_prof prof_next_passive next_ ()
 
     let remove seq = 
-      seq (fun c -> 
+      seq (fun c ->
         if CQueue.remove queue c then (
           Signal.send on_remove_clause c
         )

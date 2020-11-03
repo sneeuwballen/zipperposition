@@ -87,8 +87,8 @@ let pp_vars out c =
   pp_vars out (Literals.vars c.lits)
 
 let pp out c =
-  Format.fprintf out "@[%a@[<2>%a%a@]@]"
-    pp_vars c Literals.pp c.lits pp_trail c.trail;
+  Format.fprintf out "@[%a@[<2>%a%a@]@](%d)"
+    pp_vars c Literals.pp c.lits pp_trail c.trail c.id;
   ()
 
 let pp_trail_zf out trail =
