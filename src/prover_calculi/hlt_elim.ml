@@ -32,7 +32,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     type t = CS.t T.Tbl.t
     (* as we will maintain the invariant that each term is mapped to a single
        table, comparing the lengths suffices *)
-    let compare (a1) (a2) = Int.compare (T.Tbl.length a1) (T.Tbl.length a2)
+    let compare (a1) (a2) = compare (T.Tbl.length a1) (T.Tbl.length a2)
   end)
 
   (* index from literals that appear as conclusions to all the premises
