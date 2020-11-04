@@ -267,7 +267,33 @@ module Make(E : Env.S) : S with module Env = E = struct
     | _ -> ());
     cl_occs := Util.Int_map.remove (C.id cl) !cl_occs
   
-  let setup () = ()
+  let initialize () =
+    assert (Iter.is_empty @@ E.get_active ());
+    Iter.iter track_clause (E.get_passive ());
+
+    Signal.on_every Env.ProofState.PassiveSet.on_add_clause track_clause;
+    Signal.on_every Env.ProofState.ActiveSet.on_remove_clause untrack_clause;
+    Signal.on_every Env.on_forward_simplified (fun (c, new_state) -> 
+          match new_state with
+          | Some c' ->
+            if not (C.equal c c') then (
+              untrack_clause c; 
+              track_clause c'
+            )
+          | _ -> untrack_clause c; (* c is redundant *));
+    Signal.StopListening
+
+
+  let setup () =
+    if E.flex_get k_enabled then (
+      Signal.on Env.on_start initialize;
+
+      if not (Env.flex_get Avatar.k_avatar_enabled) then (
+        Env.add_unary_simplify simplify_cl;
+      ) else (
+        CCFormat.printf "AVATAR is not yet compatible with HLT@."
+      )
+    )
 end
 
 let max_depth_ = ref 5
@@ -281,7 +307,7 @@ let extension =
     let module HLT = Make(E) in
     E.flex_add k_enabled !enabled_;
     E.flex_add k_max_depth !max_depth_;
-    ()
+    HLT.setup ()
   in
   { Extensions.default with
       Extensions.name = "combinators";
