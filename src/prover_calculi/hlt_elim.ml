@@ -6,6 +6,8 @@ module Ty = Type
 module Lits = Literals
 module Lit = Literal
 
+let section = Util.Section.make ~parent:Const.section "hlt-elim"
+
 let k_enabled = Flex_state.create_key ()
 let k_max_depth = Flex_state.create_key ()
 
@@ -167,9 +169,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     )
 
   let insert_implication premise concl cl =
-    if not (generalization_present premise concl) then (
-      (* it will be inserted, as premise -> conclusion is not implied
-         by the set *)
+    if not (generalization_present premise concl) ||
+       T.equal premise concl then (
       remove_instances premise concl;
       add_transitive_conclusions premise concl cl;
       add_new_premise premise concl cl;
@@ -187,17 +188,20 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let track_clause cl =
     if cl_is_trackable cl then (
+      Util.debugf ~section 1 "tracking @[%a@]" (fun k -> k C.pp cl);
       insert_into_indices cl
     )
 
   let find_implication cl premise concl =
-    PremiseIdx.retrieve_specializations (!prems_, idx_sc) (premise, q_sc)
+    PremiseIdx.retrieve_generalizations (!prems_, idx_sc) (premise, q_sc)
     |> Iter.find (fun (premise', tbl, subst) -> 
       T.Tbl.to_iter tbl
       |> Iter.find (fun (concl', proofset) ->
         try
-          ignore (Unif.FO.matching ~subst ~pattern:(concl', idx_sc) (concl, q_sc));
-          Some(premise', concl', proofset)
+          if CS.mem cl proofset then None
+          else (
+            let subst = Unif.FO.matching ~subst ~pattern:(concl', idx_sc) (concl, q_sc) in
+            Some(premise', concl', proofset, subst))
         with Unif.Fail -> None)) 
 
   let do_simplify cl =
@@ -220,30 +224,33 @@ module Make(E : Env.S) : S with module Env = E = struct
                 let j_t = lit_to_term (lhs j_lit) (L.is_pos j_lit) in
                 let j_neg_t = lit_to_term ~negate:true (lhs j_lit) (L.is_pos j_lit) in
                 (match find_implication cl i_neg_t j_t with
-                | Some (lit_a, lit_b, proofset) ->
+                | Some (lit_a, lit_b, proofset, subst) when (C.length cl != 2 || not (Subst.is_renaming subst)) ->
                   raise (HiddenTauto (lit_a, lit_b, proofset))
-                | None -> 
+                | _ -> 
                   (match find_implication cl i_neg_t j_neg_t with
-                  | Some (_, _, proofset') ->
+                  | Some (_, _, proofset',_) ->
                     CCBV.reset bv j;
                     proofset := CS.union proofset' !proofset
                   | None -> () )
                 ))
             ) pred_cls)
         ) pred_cls;
-        let pred_cls_l = CCBV.select bv (CCArray.of_list pred_cls) in
-        let lit_l = pred_cls_l @ eq_cls in
-        let proof = 
-          Proof.Step.inference ~rule:(Proof.Rule.mk "hidden_literal_elimination")
-          (List.map C.proof_parent (CS.to_list !proofset))
-        in
+        
+        if CCBV.is_empty (CCBV.negate bv) then None
+        else (        
+          let pred_cls_l = CCBV.select bv (CCArray.of_list pred_cls) in
+          let lit_l = pred_cls_l @ eq_cls in
+          let proof = 
+            Proof.Step.simp ~rule:(Proof.Rule.mk "hidden_literal_elimination")
+            (List.map C.proof_parent (cl :: CS.to_list !proofset))
+          in
 
-        Some (C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof)
+          Some (C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof))
       with HiddenTauto(lit_a,lit_b,proofset) ->
-        let lit_l = CCList.map (fun t -> L.mk_prop t true) [lit_a; lit_b] in
+        let lit_l = [L.mk_prop lit_a false; L.mk_prop lit_b true] in
         let proof = 
-          Proof.Step.inference ~rule:(Proof.Rule.mk "hidden_tautology_elimination")
-          (List.map C.proof_parent (CS.to_list proofset))
+          Proof.Step.simp ~rule:(Proof.Rule.mk "hidden_tautology_elimination")
+          (List.map C.proof_parent (cl :: CS.to_list proofset))
         in
 
         Some (C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof)
@@ -259,14 +266,15 @@ module Make(E : Env.S) : S with module Env = E = struct
     | Some premises ->
       Term.Set.iter (fun premise -> 
         prems_ := PremiseIdx.update_leaf !prems_ premise (fun tbl -> 
-          T.Tbl.filter_map_inplace (fun _ proofset -> 
-            let proofset = CS.remove cl proofset in
-            if CS.is_empty proofset then None
-            else Some proofset) tbl;
+          T.Tbl.filter_map_inplace (fun concl proofset -> 
+            if CS.mem cl proofset then (
+              concls_ := ConclusionIdx.remove !concls_ concl premise;
+              None
+            ) else Some proofset ) tbl;
           T.Tbl.length tbl != 0)) premises;
     | _ -> ());
     cl_occs := Util.Int_map.remove (C.id cl) !cl_occs
-  
+
   let initialize () =
     assert (Iter.is_empty @@ E.get_active ());
     Iter.iter track_clause (E.get_passive ());
@@ -274,13 +282,13 @@ module Make(E : Env.S) : S with module Env = E = struct
     Signal.on_every Env.ProofState.PassiveSet.on_add_clause track_clause;
     Signal.on_every Env.ProofState.ActiveSet.on_remove_clause untrack_clause;
     Signal.on_every Env.on_forward_simplified (fun (c, new_state) -> 
-          match new_state with
-          | Some c' ->
-            if not (C.equal c c') then (
-              untrack_clause c; 
-              track_clause c'
-            )
-          | _ -> untrack_clause c; (* c is redundant *));
+      match new_state with
+      | Some c' ->
+        if not (C.equal c c') then (
+          untrack_clause c; 
+          track_clause c'
+        )
+      | _ -> untrack_clause c; (* c is redundant *));
     Signal.StopListening
 
 
@@ -300,8 +308,6 @@ let max_depth_ = ref 5
 let enabled_ = ref false
 
 let extension =
-  let lam2combs seq = seq in
-
   let register env =
     let module E = (val env : Env.S) in
     let module HLT = Make(E) in
@@ -310,9 +316,8 @@ let extension =
     HLT.setup ()
   in
   { Extensions.default with
-      Extensions.name = "combinators";
-      env_actions=[register];
-      post_cnf_modifiers=[lam2combs];
+      Extensions.name = "hidden literal elimination";
+      env_actions=[register]
   }
 
 let () =
