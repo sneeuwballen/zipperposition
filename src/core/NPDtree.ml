@@ -320,6 +320,10 @@ module MakeTerm(X : Set.OrderedType) = struct
     let k leaf = Leaf.remove leaf t data in
     goto_leaf trie t k
 
+  let update_leaf trie t data_filter =
+    let k leaf = Leaf.update_leaf leaf t data_filter in
+    goto_leaf trie t k
+
   let remove_ trie = CCFun.uncurry (remove trie)
   let remove_seq dt seq = Iter.fold remove_ dt seq
   let remove_list dt seq = List.fold_left remove_ dt seq
