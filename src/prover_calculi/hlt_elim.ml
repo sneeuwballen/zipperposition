@@ -189,6 +189,70 @@ module Make(E : Env.S) : S with module Env = E = struct
     if cl_is_trackable cl then (
       insert_into_indices cl
     )
+
+  let find_implication cl premise concl =
+    PremiseIdx.retrieve_specializations (!prems_, idx_sc) (premise, q_sc)
+    |> Iter.find (fun (premise', tbl, subst) -> 
+      T.Tbl.to_iter tbl
+      |> Iter.find (fun (concl', proofset) ->
+        try
+          ignore (Unif.FO.matching ~subst ~pattern:(concl', idx_sc) (concl, q_sc));
+          Some(premise', concl', proofset)
+        with Unif.Fail -> None)) 
+
+  let do_simplify cl =
+    let exception HiddenTauto of T.t * T.t * CS.t in
+
+    let pred_cls, eq_cls = 
+      List.partition (Lit.is_predicate_lit) (CCArray.to_list (C.lits cl))
+    in
+    let n = List.length pred_cls in
+    let lhs lit = CCOpt.get_exn @@ L.View.get_lhs lit in
+    if n >= 2 then (
+      try 
+        let bv = CCBV.create ~size:n true in
+        let proofset = ref CS.empty in
+        List.iteri (fun i i_lit ->
+          if CCBV.get bv i then (
+            let i_neg_t = lit_to_term ~negate:true (lhs i_lit) (L.is_pos i_lit) in
+            List.iteri (fun j j_lit ->
+              if CCBV.get bv j then (
+                let j_t = lit_to_term (lhs j_lit) (L.is_pos j_lit) in
+                let j_neg_t = lit_to_term ~negate:true (lhs j_lit) (L.is_pos j_lit) in
+                (match find_implication cl i_neg_t j_t with
+                | Some (lit_a, lit_b, proofset) ->
+                  raise (HiddenTauto (lit_a, lit_b, proofset))
+                | None -> 
+                  (match find_implication cl i_neg_t j_neg_t with
+                  | Some (_, _, proofset') ->
+                    CCBV.reset bv j;
+                    proofset := CS.union proofset' !proofset
+                  | None -> () )
+                ))
+            ) pred_cls)
+        ) pred_cls;
+        let pred_cls_l = CCBV.select bv (CCArray.of_list pred_cls) in
+        let lit_l = pred_cls_l @ eq_cls in
+        let proof = 
+          Proof.Step.inference ~rule:(Proof.Rule.mk "hidden_literal_elimination")
+          (List.map C.proof_parent (CS.to_list !proofset))
+        in
+
+        Some (C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof)
+      with HiddenTauto(lit_a,lit_b,proofset) ->
+        let lit_l = CCList.map (fun t -> L.mk_prop t true) [lit_a; lit_b] in
+        let proof = 
+          Proof.Step.inference ~rule:(Proof.Rule.mk "hidden_tautology_elimination")
+          (List.map C.proof_parent (CS.to_list proofset))
+        in
+
+        Some (C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof)
+    ) else None
+
+  let simplify_cl cl =
+    match do_simplify cl with
+    | Some cl' -> SimplM.return_new cl'
+    | None -> SimplM.return_same cl
   
   let untrack_clause cl =
     (match Util.Int_map.get (C.id cl) !cl_occs with
