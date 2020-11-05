@@ -220,7 +220,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           if CCBV.get bv i then (
             let i_neg_t = lit_to_term ~negate:true (lhs i_lit) (L.is_pos i_lit) in
             List.iteri (fun j j_lit ->
-              if CCBV.get bv j then (
+              if CCBV.get bv j && i!=j then (
                 let j_t = lit_to_term (lhs j_lit) (L.is_pos j_lit) in
                 let j_neg_t = lit_to_term ~negate:true (lhs j_lit) (L.is_pos j_lit) in
                 (match find_implication cl i_neg_t j_t with
