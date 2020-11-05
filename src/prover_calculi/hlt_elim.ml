@@ -105,8 +105,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     ) [] i)
     |> CCList.iter (fun (t, sets) ->
       prems_ := PremiseIdx.update_leaf !prems_ t (fun tbl -> 
-        T.Tbl.filter_map_inplace (fun _ proofset ->
-          (* todo this might be a possible place to remove the link from the clause index *)
+        T.Tbl.filter_map_inplace (fun concl proofset ->
+          concls_ := ConclusionIdx.remove !concls_ concl t;
           if List.exists (fun set -> CS.subset set proofset) sets then None
           else Some proofset) tbl;
         T.Tbl.length tbl == 0
@@ -114,15 +114,23 @@ module Make(E : Env.S) : S with module Env = E = struct
     )
 
   let add_transitive_conclusions premise concl cl =
+    Util.debugf ~section 2 "transitive conclusion: @[%a@] --> @[%a@]"
+      (fun k -> k T.pp premise T.pp concl);
     ConclusionIdx.retrieve_specializations (!concls_,idx_sc) (premise,q_sc)
     |> Iter.iter (fun (concl',premise',subst) -> 
       (* add implication premise' -> subst (concl) *)
+      Util.debugf ~section 2 "found: @[%a@] --> @[%a@]"
+        (fun k -> k T.pp premise' T.pp concl');
       prems_ := PremiseIdx.update_leaf !prems_ premise' (fun tbl -> 
         (match T.Tbl.get tbl concl' with
         | Some old_proofset ->
-          let proofset = CS.add cl old_proofset in
-          register_cl_term cl premise';
-          T.Tbl.add tbl (Subst.FO.apply Subst.Renaming.none subst (concl, q_sc)) proofset;
+          if CS.cardinal old_proofset < Env.flex_get k_max_depth then (
+            let proofset = CS.add cl old_proofset in
+            register_cl_term cl premise';
+            let concl = (Subst.FO.apply Subst.Renaming.none subst (concl, q_sc)) in
+            concls_ := ConclusionIdx.add !concls_ concl premise';
+            T.Tbl.add tbl concl proofset
+          )
         | None -> assert false;);
         true
       );
@@ -130,6 +138,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let triggered_conclusions tbl premise' concl cl =
     T.Tbl.add tbl concl (CS.singleton cl);
+    concls_ := ConclusionIdx.add !concls_ concl premise';
     let max_proof_size = Env.flex_get k_max_depth in
     PremiseIdx.retrieve_generalizations (!prems_, idx_sc) (concl, q_sc)
     |> Iter.iter (fun (_,tbl',subst) -> 
@@ -138,9 +147,9 @@ module Make(E : Env.S) : S with module Env = E = struct
         if C.ClauseSet.cardinal proof_set < max_proof_size then (
           let new_cls = CS.add cl proof_set in
           CS.iter (fun cl -> register_cl_term cl premise') new_cls;
-          T.Tbl.add tbl 
-            (Subst.FO.apply Subst.Renaming.none subst (t, idx_sc))
-            (new_cls)
+          let concl = (Subst.FO.apply Subst.Renaming.none subst (t, idx_sc)) in
+          concls_ := ConclusionIdx.add !concls_ concl premise';
+          T.Tbl.add tbl concl (new_cls)
         ))
     )
 
@@ -153,8 +162,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       ) in
     (match alpha_renaming with
     | Some (premise', subst) ->
-      assert(T.equal (Subst.FO.apply Subst.Renaming.none subst (premise, q_sc))
-                     premise');
       let concl = Subst.FO.apply Subst.Renaming.none subst (concl, q_sc) in
       prems_ := PremiseIdx.update_leaf !prems_ premise' (fun tbl -> 
         if not (T.Tbl.mem tbl concl) then (
@@ -169,8 +176,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     )
 
   let insert_implication premise concl cl =
-    if not (generalization_present premise concl) ||
-       T.equal premise concl then (
+    if not (generalization_present premise concl) &&
+       not (T.equal premise concl) then (
       remove_instances premise concl;
       add_transitive_conclusions premise concl cl;
       add_new_premise premise concl cl;
@@ -189,7 +196,11 @@ module Make(E : Env.S) : S with module Env = E = struct
   let track_clause cl =
     if cl_is_trackable cl then (
       Util.debugf ~section 1 "tracking @[%a@]" (fun k -> k C.pp cl);
-      insert_into_indices cl
+      insert_into_indices cl;
+      Util.debugf ~section 3 "idx_size: @[%d@]" (fun k -> k (PremiseIdx.size !prems_));
+      PremiseIdx.iter !prems_ (fun t tbl -> 
+        Util.debugf ~section 5 "@[%a@] --> @[%d@]" (fun k -> k T.pp t (T.Tbl.length tbl))
+      );
     )
 
   let find_implication cl premise concl =
@@ -257,20 +268,25 @@ module Make(E : Env.S) : S with module Env = E = struct
     ) else None
 
   let simplify_cl cl =
+    Util.debugf ~section 2 "simplifying @[%a@]" (fun k -> k C.pp cl);
     match do_simplify cl with
-    | Some cl' -> SimplM.return_new cl'
-    | None -> SimplM.return_same cl
+    | Some cl' ->
+      Util.debugf ~section 2 "success @[%a@]" (fun k -> k C.pp cl');
+      SimplM.return_new cl'
+    | None -> 
+      Util.debugf ~section 2 "failure." CCFun.id;
+      SimplM.return_same cl
   
   let untrack_clause cl =
     (match Util.Int_map.get (C.id cl) !cl_occs with
     | Some premises ->
-      Term.Set.iter (fun premise -> 
+      Term.Set.iter (fun premise ->
         prems_ := PremiseIdx.update_leaf !prems_ premise (fun tbl -> 
           T.Tbl.filter_map_inplace (fun concl proofset -> 
             if CS.mem cl proofset then (
               concls_ := ConclusionIdx.remove !concls_ concl premise;
               None
-            ) else Some proofset ) tbl;
+            ) else Some proofset) tbl;
           T.Tbl.length tbl != 0)) premises;
     | _ -> ());
     cl_occs := Util.Int_map.remove (C.id cl) !cl_occs
@@ -278,6 +294,11 @@ module Make(E : Env.S) : S with module Env = E = struct
   let initialize () =
     assert (Iter.is_empty @@ E.get_active ());
     Iter.iter track_clause (E.get_passive ());
+
+    Util.debugf ~section 1 "discovered implications:" CCFun.id;
+    PremiseIdx.iter !prems_ (fun premise tbl -> 
+      Util.debugf ~section 1 "@[%a@] --> @[%a@]" (fun k -> k T.pp premise (Iter.pp_seq T.pp) (T.Tbl.keys tbl))
+    );
 
     Signal.on_every Env.ProofState.PassiveSet.on_add_clause track_clause;
     Signal.on_every Env.ProofState.ActiveSet.on_remove_clause untrack_clause;
@@ -323,6 +344,6 @@ let extension =
 let () =
   Options.add_opts [
     "--hidden-lt-elim", Arg.Bool ((:=) enabled_), " enable/disable hidden literal and tautology elimination";
-    "--hidden-lit-max-depth", Arg.Set_int max_depth_, " max depth of binary implication graph precomputation"
+    "--hidden-lt-max-depth", Arg.Set_int max_depth_, " max depth of binary implication graph precomputation"
   ];
   Extensions.register extension
