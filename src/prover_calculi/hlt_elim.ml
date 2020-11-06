@@ -274,12 +274,16 @@ module Make(E : Env.S) : S with module Env = E = struct
 
       ConclusionIdx.retrieve_generalizations (!concls_, idx_sc) (lhs_neg, q_sc)
       |> Iter.find_map (fun (concl, premise, subst) ->
-        UnitIdx.retrieve_specializations ~subst (!units_, unit_sc) (premise, idx_sc)
+        let orig_premise = premise in
+        let premise = Subst.FO.apply Subst.Renaming.none subst (premise, idx_sc) in
+        UnitIdx.retrieve_generalizations (!units_, unit_sc) (premise, idx_sc)
         |> Iter.head
         |> CCOpt.map (fun (_, unit_cl, _) -> 
-          prems_ := PremiseIdx.update_leaf !prems_ premise (fun tbl -> 
-            proofset := CS.union (CS.add unit_cl (T.Tbl.find tbl concl)) !proofset;
-            CCBV.reset bv i;
+          prems_ := PremiseIdx.update_leaf !prems_ orig_premise (fun tbl -> 
+            let proofset' = T.Tbl.find tbl concl in
+            if not (CS.mem cl proofset') then (
+              proofset := CS.union (CS.add unit_cl (proofset')) !proofset;
+              CCBV.reset bv i);
             true
           );
         ))
