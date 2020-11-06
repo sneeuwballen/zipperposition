@@ -274,8 +274,6 @@ module Make(E : Env.S) : S with module Env = E = struct
 
       ConclusionIdx.retrieve_generalizations (!concls_, idx_sc) (lhs_neg, q_sc)
       |> Iter.find_map (fun (concl, premise, subst) ->
-        CCFormat.printf "[%a] -> [%a] (%a)@." T.pp premise T.pp concl T.pp lhs_neg;
-
         UnitIdx.retrieve_specializations ~subst (!units_, unit_sc) (premise, idx_sc)
         |> Iter.head
         |> CCOpt.map (fun (_, unit_cl, _) -> 
