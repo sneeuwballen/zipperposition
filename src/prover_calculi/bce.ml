@@ -584,14 +584,11 @@ module Make(E : Env.S) : S with module Env = E = struct
               C.is_redundant task.clause ||
               ID.Set.mem hd_sym !ignored_symbols) then (
         Util.debugf ~section 3 "checking blockedness" CCFun.id;
-        let orig_cands = CCList.filter (fun cand -> not (C.equal cl cand || C.is_redundant cand)) (CCDeque.to_list task.cands) in
         match task_is_blocked task.cands with
         | true ->
           deregister_clause cl;
           remove_from_proof_state cl;
           incr removed_cnt;
-          Util.debugf ~section 2 "removed @[%a@] (%d)@.proof @[%a@]@.cands @[%a@] @." 
-            (fun k -> k C.pp cl lit_idx Proof.S.pp_tstp (C.proof cl) (CCList.pp C.pp) orig_cands)
         | false -> 
           assert (not (TaskPriorityQueue.in_heap task))
       ) else (
