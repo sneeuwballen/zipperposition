@@ -14,6 +14,8 @@ let k_simpl_new = Flex_state.create_key ()
 let k_track_active_only = Flex_state.create_key ()
 let k_max_self_impls = Flex_state.create_key ()
 let k_unit_reduction = Flex_state.create_key ()
+let k_hte = Flex_state.create_key ()
+let k_hle = Flex_state.create_key ()
 
 
 module type S = sig
@@ -176,7 +178,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         aux !concl;
         (* PUTTING concl IN THE SCOPE OF premise' -- intentional!!! *)
         concl := Subst.FO.apply Subst.Renaming.none subst (!concl,0);
-        if T.depth !concl > 5 then (
+        if T.depth !concl > 3 then (
           (* breaking out of the loop for the very deep terms *)
           i := Env.flex_get k_max_self_impls + 1
         );
@@ -233,14 +235,14 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let track_clause cl =
     if cl_is_ht_trackable cl then (
-      Util.debugf ~section 1 "tracking @[%a@]" (fun k -> k C.pp cl);
+      Util.debugf ~section 3 "tracking @[%a@]" (fun k -> k C.pp cl);
       
       insert_into_indices cl;
       
       Util.debugf ~section 2 "idx_size: @[%d@]" (fun k -> k (PremiseIdx.size !prems_));
-      Util.debugf ~section 1 "premises:" CCFun.id;
+      Util.debugf ~section 3 "premises:" CCFun.id;
       PremiseIdx.iter !prems_ (fun t tbl -> 
-        Util.debugf ~section 1 "@[%a@] --> @[%a@]" (fun k -> k T.pp t (Iter.pp_seq T.pp) (T.Tbl.keys tbl))
+        Util.debugf ~section 2 "@[%a@] --> @[%a@]" (fun k -> k T.pp t (Iter.pp_seq T.pp) (T.Tbl.keys tbl))
       );
     ) else (
       match get_unit_predicate cl with
@@ -324,16 +326,23 @@ module Make(E : Env.S) : S with module Env = E = struct
               if CCBV.get bv j && i!=j then (
                 let j_t = lit_to_term (lhs j_lit) (L.is_pos j_lit) in
                 let j_neg_t = lit_to_term ~negate:true (lhs j_lit) (L.is_pos j_lit) in
-                (match find_implication cl i_neg_t j_t with
-                | Some (lit_a, lit_b, proofset, subst) when (C.length cl != 2 || not (Subst.is_renaming subst)) ->
-                  raise (HiddenTauto (lit_a, lit_b, proofset))
-                | _ -> 
+                if Env.flex_get k_hte then (
+                  (match find_implication cl i_neg_t j_t with
+                  | Some (lit_a, lit_b, proofset, subst) 
+                      when (C.length cl != 2 || not (Subst.is_renaming subst)) ->
+                    (* stopping further search *)
+                    raise (HiddenTauto (lit_a, lit_b, proofset))
+                  | _ -> ())
+                );
+                if Env.flex_get k_hle then (
                   (match find_implication cl i_neg_t j_neg_t with
-                  | Some (_, _, proofset',_) ->
-                    CCBV.reset bv j;
-                    proofset := CS.union proofset' !proofset
-                  | None -> () )
-                ))
+                    | Some (_, _, proofset',_) ->
+                      CCBV.reset bv j;
+                      proofset := CS.union proofset' !proofset
+                    | None -> () )
+                )
+
+                )
             ) pred_lits)
         ) pred_lits;
         
@@ -353,14 +362,17 @@ module Make(E : Env.S) : S with module Env = E = struct
           Proof.Step.simp ~rule:(Proof.Rule.mk "hidden_tautology_elimination")
           (List.map C.proof_parent (cl :: CS.to_list proofset))
         in
+        let repl = C.create ~penalty:(C.penalty cl + 1) ~trail:(C.trail cl) lit_l proof in
+        let tauto = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) [L.mk_tauto] proof in
 
-        Some (C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof)
+        E.add_passive (Iter.singleton repl);
+        Some (tauto)
     ) else None
 
   let simplify_cl cl =
     match do_simplify cl with
     | Some cl' ->
-      Util.debugf ~section 3 "simplified: @[@[%a@] --> @[%a@]@]" (fun k -> k C.pp cl C.pp cl');
+      Util.debugf ~section 1 "simplified: @[@[%a@] --> @[%a@]@]" (fun k -> k C.pp cl C.pp cl');
       SimplM.return_new cl'
     | None -> 
       SimplM.return_same cl
@@ -386,9 +398,9 @@ module Make(E : Env.S) : S with module Env = E = struct
           T.Tbl.length tbl != 0)) premises;
     | _ -> ());
     if Util.Int_map.mem (C.id cl) !cl_occs then (
-      Util.debugf ~section 1 "removed: @[%a@]." (fun k -> k C.pp cl);
+      Util.debugf ~section 3 "removed: @[%a@]." (fun k -> k C.pp cl);
       ConclusionIdx.iter !concls_ (fun premise concl -> 
-        Util.debugf ~section 1 "@[%a@] -> @[%a@]" (fun k -> k T.pp premise T.pp concl)));
+        Util.debugf ~section 3 "@[%a@] -> @[%a@]" (fun k -> k T.pp premise T.pp concl)));
     cl_occs := Util.Int_map.remove (C.id cl) !cl_occs;
     match get_unit_predicate cl with
     | Some unit ->
@@ -444,12 +456,14 @@ module Make(E : Env.S) : S with module Env = E = struct
     )
 end
 
-let max_depth_ = ref 5
+let max_depth_ = ref 3
 let enabled_ = ref false
 let simpl_new_ = ref false
-let track_active_only_ = ref false
-let max_self_impls_ = ref 2
-let unit_reduction_ = ref false
+let track_active_only_ = ref true
+let max_self_impls_ = ref 1
+let unit_reduction_ = ref true
+let hte_ = ref true
+let hle_ = ref true
 
 
 let extension =
@@ -462,6 +476,8 @@ let extension =
     E.flex_add k_track_active_only !track_active_only_;
     E.flex_add k_max_self_impls !max_self_impls_;
     E.flex_add k_unit_reduction !unit_reduction_;
+    E.flex_add k_hle !hle_;
+    E.flex_add k_hte !hte_;
     HLT.setup ()
   in
   { Extensions.default with
@@ -472,6 +488,8 @@ let extension =
 let () =
   Options.add_opts [
     "--hidden-lt-elim", Arg.Bool ((:=) enabled_), " enable/disable hidden literal and tautology elimination";
+    "--hidden-lt-elim-hle", Arg.Bool ((:=) hle_), " enable/disable hidden literal elimination (hidden-lt-elim must be on)";
+    "--hidden-lt-elim-hte", Arg.Bool ((:=) hte_), " enable/disable hidden literal tautology elimination (hidden-lt-elim must be on)";
     "--hidden-lt-max-depth", Arg.Set_int max_depth_, " max depth of binary implication graph precomputation";
     "--hidden-lt-simplify-new", Arg.Bool ((:=) simpl_new_), " apply HLTe also when moving a clause from fresh to passive";
     "--hidden-lt-track-only-active", Arg.Bool ((:=) track_active_only_), 
