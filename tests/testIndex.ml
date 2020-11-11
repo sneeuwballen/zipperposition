@@ -27,7 +27,7 @@ let gen low high =
   QCheck.Gen.(
     let t = (1 -- 7) >>= ArTerm.default_ho_fuel in
     list_size (low -- high) t >>= fun l ->
-    let seq = List.map Lambda.snf l |> T.Set.of_list |> T.Set.to_seq in
+    let seq = List.map Lambda.snf l |> T.Set.of_list |> T.Set.to_iter in
     let seq = Iter.mapi (fun i t -> t, i) seq in
     return (Iter.to_list seq)
   )

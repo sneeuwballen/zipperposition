@@ -246,13 +246,13 @@ module Make()
     else None
 
   let get_proved_lits (): Lit.Set.t =
-    Lit.Tbl.to_seq lit_tbl_
+    Lit.Tbl.to_iter lit_tbl_
     |> Iter.filter_map
       (fun (lit,_) -> match proved_at_0 lit with
          | Some true -> Some lit
          | Some false -> Some (Lit.neg lit)
          | None -> None)
-    |> Lit.Set.of_seq
+    |> Lit.Set.of_iter
 
   let pp_model_ (): unit = match last_result() with
     | Sat ->

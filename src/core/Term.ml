@@ -664,13 +664,13 @@ let comb_depth t =
 
 let monomorphic t = Iter.is_empty (Seq.ty_vars t)
 
-let max_var set = VarSet.to_seq set |> Seq.max_var
+let max_var set = VarSet.to_iter set |> Seq.max_var
 
-let min_var set = VarSet.to_seq set |> Seq.min_var
+let min_var set = VarSet.to_iter set |> Seq.min_var
 
 let add_vars tbl t = Seq.vars t (fun v -> VarTbl.replace tbl v ())
 
-let vars ts = Seq.vars ts |> VarSet.of_seq
+let vars ts = Seq.vars ts |> VarSet.of_iter
 
 let vars_prefix_order t =
   Seq.vars t
@@ -714,7 +714,7 @@ let head t =
   try Some (head_exn t)
   with Invalid_argument _-> None
 
-let ty_vars t = Seq.ty_vars t |> Type.VarSet.of_seq
+let ty_vars t = Seq.ty_vars t |> Type.VarSet.of_iter
 
 
 (** {2 Subterms and positions} *)
@@ -727,7 +727,7 @@ let replace_m t m =
   of_term_unsafe (T.replace_m (t:t:>T.t) (m:t Map.t:>T.t T.Map.t))
 
 let symbols ?(init=ID.Set.empty) t =
-  ID.Set.add_seq init (Seq.symbols t)
+  ID.Set.add_iter init (Seq.symbols t)
 
 (** Does t contains the symbol f? *)
 let contains_symbol f t =
@@ -845,7 +845,7 @@ module AC(A : AC_SPEC) = struct
   let symbols seq =
     seq
     |> Iter.flat_map seq_symbols
-    |> ID.Set.add_seq ID.Set.empty
+    |> ID.Set.add_iter ID.Set.empty
 end
 
 (** {2 Printing/parsing} *)

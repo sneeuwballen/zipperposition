@@ -352,7 +352,7 @@ let _to_coeffs lit =
    bring everything to same numerator? *)
 let to_multiset lit =
   _to_coeffs lit |> Iter.map fst
-  |> Multisets.MT.Seq.of_seq Multisets.MT.empty
+  |> Multisets.MT.Seq.of_iter Multisets.MT.empty
 
 let max_terms ~ord lit =
   let m = to_multiset lit in

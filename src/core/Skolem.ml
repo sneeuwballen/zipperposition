@@ -112,7 +112,7 @@ let collect_vars subst f =
   in
   let is_ty_var v = T.Ty.is_tType (Var.ty v) in
   vars_seq f
-  |> Var.Set.of_seq
+  |> Var.Set.of_iter
   |> Var.Set.to_list
   |> List.partition is_ty_var
 
@@ -198,7 +198,7 @@ let find_def_in_ctx ~ctx form =
       | Def_form def when not def.rw_rules -> 
         let def_form = def.form in
         let df_vars, f_vars = 
-          CCPair.map_same (fun x -> Var.Set.of_seq (T.Seq.vars x)) (def_form,form) in
+          CCPair.map_same (fun x -> Var.Set.of_iter (T.Seq.vars x)) (def_form,form) in
         if not (Var.Set.intersection_empty df_vars f_vars) then None 
         else CCOpt.map (fun subst -> def,subst) (TypedSTerm.try_alpha_renaming def_form form)
       | _ -> None) 
@@ -305,7 +305,7 @@ let define_term ?(pattern="fun_") ~ctx ~parents rules : term_definition =
          let all_vars =
            Iter.of_list (rhs::args)
            |> Iter.flat_map T.Seq.free_vars
-           |> Var.Set.of_seq |> Var.Set.to_list
+           |> Var.Set.of_iter |> Var.Set.to_list
          in
          if is_prop
          then (

@@ -44,7 +44,7 @@ let check_ordering_inv_by_subst ~gen_t ord =
     >>= fun (t1, t2) ->
     let vars = Iter.of_list [t1; t2]
       |> Iter.flat_map T.Seq.vars
-      |> T.VarSet.of_seq
+      |> T.VarSet.of_iter
     in
     (* grounding substitution *)
     let subst st = T.VarSet.fold
@@ -68,7 +68,7 @@ let check_ordering_inv_by_subst ~gen_t ord =
     (* declare symbols *)
     Iter.of_list [t1;t2]
       |> Iter.flat_map T.Seq.symbols
-      |> ID.Set.of_seq |> ID.Set.to_list
+      |> ID.Set.of_iter |> ID.Set.to_list
       |> O.add_list ~signature:!signature !ord;
     let t1' = S.apply Subst.Renaming.none subst (t1,0) in
     let t2' = S.apply Subst.Renaming.none subst (t2,0) in
@@ -88,7 +88,7 @@ let check_ordering_trans ~arb_t ord =
     (* declare symbols *)
     Iter.of_list [t1;t2;t3]
       |> Iter.flat_map T.Seq.symbols
-      |> ID.Set.of_seq |> ID.Set.to_list
+      |> ID.Set.of_iter |> ID.Set.to_list
       |> O.add_list ~signature:!signature !ord;
     (* check that instantiating variables preserves ordering *)
     let o12 = O.compare !ord t1 t2 in
@@ -110,7 +110,7 @@ let check_ordering_swap_args ~arb_t ord =
     (* declare symbols *)
     Iter.of_list [t1;t2]
       |> Iter.flat_map T.Seq.symbols
-      |> ID.Set.of_seq |> ID.Set.to_list
+      |> ID.Set.of_iter |> ID.Set.to_list
       |> O.add_list ~signature:!signature !ord;
     (* check that instantiating variables preserves ordering *)
     let o12 = O.compare !ord t1 t2 in
@@ -141,7 +141,7 @@ let check_ordering_subterm ~arb_t ord =
     (* declare symbols *)
     Iter.of_list [t]
       |> Iter.flat_map T.Seq.symbols
-      |> ID.Set.of_seq |> ID.Set.to_list
+      |> ID.Set.of_iter |> ID.Set.to_list
       |> O.add_list ~signature:!signature !ord;
     T.Seq.subterms_depth t
     |> Iter.filter_map (fun (t,i) -> if i>0 then Some t else None)

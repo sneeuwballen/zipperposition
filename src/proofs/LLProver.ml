@@ -115,7 +115,7 @@ end = struct
   }
 
   let[@inline] closed t = t.closed
-  let[@inline] to_expand t = T_set.to_seq t.to_expand
+  let[@inline] to_expand t = T_set.to_iter t.to_expand
   let[@inline] parent t = t.parent
   let[@inline] id t = t.id
   let[@inline] diseq t = Iter.of_list t.diseq
@@ -249,7 +249,7 @@ end = struct
          :to_expand (@[<hv>%a@])@])"
         b.id (is_closed b)
         (Fmt.some T.pp) b.form
-        (Util.pp_seq T.pp) (T_set.to_seq b.to_expand)
+        (Util.pp_iter T.pp) (T_set.to_iter b.to_expand)
     in
     Fmt.fprintf out "(@[<v>%a@])" (Util.pp_list pp_b) (unfold_parents b)
 end
@@ -423,7 +423,7 @@ let pp_dot out (s:final_state) : unit =
       (Iter.of_list s.open_branches)
       (Iter.of_list s.closed_branches)
   in
-  CCGraph.Dot.pp_seq
+  CCGraph.Dot.pp_all
     ~tbl
     ~eq:br_eq
     ~graph:as_graph

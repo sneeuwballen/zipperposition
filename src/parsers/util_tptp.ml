@@ -156,7 +156,7 @@ let fpf = Format.fprintf
 
 let print_into ppt oc decls =
   fpf oc "@[<v>%a@]@?"
-    (Util.pp_seq ~sep:"" (A.pp ppt))
+    (Util.pp_iter ~sep:"" (A.pp ppt))
     decls
 
 let print_into_file ppt file decls =

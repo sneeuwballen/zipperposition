@@ -1106,7 +1106,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let demod_ineq c : C.t SimplM.t =
     ZProf.enter_prof prof_rat_demod_ineq;
     let res =
-      CCArray.findi
+      CCArray.find_map_i
         (fun i lit -> match _ineq_is_absurd_by_unit c lit with
            | None -> None
            | Some trace ->
@@ -1224,7 +1224,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         end
       | _ -> None
     in
-    begin match CCArray.findi conv_lit (C.lits c) with
+    begin match CCArray.find_map_i conv_lit (C.lits c) with
       | None -> SimplM.return_same c
       | Some (i, new_lits) ->
         let lits =
@@ -1482,8 +1482,8 @@ let extension =
   and post_typing_action stmts state =
     let module PT = TypedSTerm in
     let has_rat =
-      CCVector.to_seq stmts
-      |> Iter.flat_map Stmt.Seq.to_seq
+      CCVector.to_iter stmts
+      |> Iter.flat_map Stmt.Seq.to_iter
       |> Iter.flat_map
         (function
           | `ID _ -> Iter.empty

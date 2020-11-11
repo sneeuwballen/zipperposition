@@ -368,7 +368,7 @@ module Make(C : Clause_intf.S) = struct
         let t = Lambda.eta_expand t in
         if Term.Set.is_empty !_related_terms then int_of_float (w t)
         else (
-          Term.Set.to_seq !_related_terms
+          Term.Set.to_iter !_related_terms
           |> Iter.map (fun conj_term -> 
              let conj_term = Lambda.eta_expand conj_term in
              w_diff ~given_term:t ~conj_term)
@@ -718,7 +718,7 @@ module Make(C : Clause_intf.S) = struct
           ("staggered(\\([0-9]+[.]?[0-9]*\\))") in
       try
         ignore(Str.search_forward or_lmax_regex s 0);
-        let stagger_factor = CCFloat.of_string (Str.matched_group 1 s) in
+        let stagger_factor = CCFloat.of_string_exn (Str.matched_group 1 s) in
         staggered ~stagger_factor
       with Not_found | Invalid_argument _ ->
         invalid_arg @@
@@ -1087,8 +1087,8 @@ module Make(C : Clause_intf.S) = struct
         List.assoc (String.lowercase_ascii s) parsers s
       with Not_found ->
         let err_msg =
-          CCFormat.sprintf "unknown priortity: %s.\noptions:@ %a"
-            s (CCList.pp ~start:"{" ~stop:"}" CCString.pp) (List.map fst parsers) in
+          CCFormat.sprintf "unknown priortity: %s.\noptions:@ {@[%a@]}"
+            s (CCList.pp CCString.pp) (List.map fst parsers) in
         invalid_arg err_msg
   end
 

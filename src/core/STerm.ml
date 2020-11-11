@@ -315,7 +315,7 @@ let ground t = Seq.vars t |> Iter.is_empty
 
 let close_all s t =
   let vars = Seq.free_vars t
-             |> StringSet.of_seq
+             |> StringSet.of_iter
              |> StringSet.elements
              |> List.map (fun v->V v,None)
   in

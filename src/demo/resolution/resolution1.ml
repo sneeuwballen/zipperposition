@@ -329,16 +329,16 @@ let process_file f =
 
           This algorithm is already implemented in {!Logtk}. *)
       let ctx = Skolem.create() in
-      let decls = Cnf.cnf_of_seq ~ctx (CCVector.to_seq st) in
+      let decls = Cnf.cnf_of_iter ~ctx (CCVector.to_iter st) in
       _signature :=
         CCVector.to_iter decls
         |> Cnf.type_declarations
         |> ID.Map.map (fun ty -> conv_ty ty) |> ID.Map.to_iter
-        |> Signature.Seq.of_seq;
+        |> Signature.Seq.of_iter;
       let clauses =
-        CCVector.to_seq decls
+        CCVector.to_iter decls
         |> Cnf.convert
-        |> CCVector.to_seq
+        |> CCVector.to_iter
         |> Iter.flat_map Statement.Seq.forms
         |> Iter.map Clause._of_forms
         |> Iter.to_rev_list

@@ -20,7 +20,7 @@ let pp_stmt out s =
   Statement.pp pp_t pp_t pp_t out s
 
 let pp_stmts out seq =
-  CCVector.pp ~sep:"" pp_stmt out seq
+  CCVector.pp ~pp_sep:(CCFormat.return "@,") pp_stmt out seq
 
 let declare_term out () =
   let id = ID.make "term" in

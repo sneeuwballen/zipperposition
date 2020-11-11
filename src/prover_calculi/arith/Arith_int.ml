@@ -1291,7 +1291,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let demod_ineq c : C.t SimplM.t =
     ZProf.enter_prof prof_arith_demod_ineq;
     let res =
-      CCArray.findi
+      CCArray.find_map_i
         (fun i lit -> match _ineq_is_absurd_by_unit c lit with
            | None -> None
            | Some trace ->
@@ -2220,8 +2220,8 @@ let extension =
   and post_typing_action stmts state =
     let module PT = TypedSTerm in
     let has_int =
-      CCVector.to_seq stmts
-      |> Iter.flat_map Stmt.Seq.to_seq
+      CCVector.to_iter stmts
+      |> Iter.flat_map Stmt.Seq.to_iter
       |> Iter.flat_map
         (function
           | `ID _ -> Iter.empty

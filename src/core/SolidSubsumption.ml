@@ -93,15 +93,18 @@ module Make (S : sig val st : Flex_state.t end) = struct
       fun_ ty (of_term body)
     | _ -> repl (TS.singleton term)
 
-  let rec pp out = function 
+  let rec pp out =
+    let sepc = CCFormat.return ",@," in
+    let sepw = CCFormat.return "@ " in
+    function 
     | AppBuiltin(b,args,repls) ->
-      CCFormat.fprintf out "|@[%a@](@[%a@])|@[%a@]|" Builtin.pp b (CCList.pp ~sep:"," pp) args (TS.pp ~sep:" " T.pp) repls;
+      CCFormat.fprintf out "|@[%a@](@[%a@])|@[%a@]|" Builtin.pp b (Util.pp_list ~sep:"," pp) args (TS.pp ~pp_sep:sepw T.pp) repls;
     | App(hds,args,repls) ->
-      CCFormat.fprintf out "|@[%a@](@[%a@])|@[%a@]|" (TS.pp ~sep:"," ~start:"{" ~stop:"}" T.pp) hds (CCList.pp ~sep:"," pp) args (TS.pp ~sep:" " T.pp) repls;
+      CCFormat.fprintf out "|{@[%a@]}(@[%a@])|@[%a@]|" (TS.pp ~pp_sep:sepc T.pp) hds (CCList.pp ~pp_sep:sepc pp) args (TS.pp ~pp_sep:sepw T.pp) repls;
     | Fun(ty,repls) ->
       CCFormat.fprintf out "|l@[%a@].@[%a@]|" Type.pp ty pp repls;
     | Repl repls ->
-      CCFormat.fprintf out "{r:@[%a@]}" (TS.pp ~sep:" " T.pp) repls
+      CCFormat.fprintf out "{r:@[%a@]}" (TS.pp ~pp_sep:sepw T.pp) repls
 
   let cover t solids : multiterm = 
     let n = List.length solids in
