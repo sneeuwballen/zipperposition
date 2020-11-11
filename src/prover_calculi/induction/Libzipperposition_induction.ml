@@ -11,7 +11,9 @@ module T = Term
 module Ty = Type
 module Fmt = CCFormat
 module RW = Rewrite
+module Avatar = Libzipperposition_avatar
 
+module type AVATAR = Libzipperposition_avatar.S
 module type S = Induction_intf.S
 
 type term = T.t
@@ -133,7 +135,7 @@ end = struct
 
   (* union-find for sets of clauses *)
   module UF_clauses =
-    UnionFind.Make(struct
+    Avatar.UnionFind.Make(struct
       type key = T.var
       type value = clause list
       let equal = HVar.equal Type.equal
@@ -427,7 +429,7 @@ end
 (** {2 Calculus of Induction} *)
 module Make
     (E : Env.S)
-    (A : Avatar_intf.S with module E = E)
+    (A : AVATAR with module E = E)
 = struct
   module Env = E
   module Ctx = E.Ctx
@@ -914,7 +916,7 @@ module Make
     var_always_naked f x
 
   module UF_vars =
-    UnionFind.Make(struct
+    Avatar.UnionFind.Make(struct
       type key = T.var
       type value = T.var list
       let equal = HVar.equal Type.equal

@@ -7,10 +7,6 @@
 
     This allows to retrieve clauses that (potentially) subsume
     or are subsumed by a given query clause.
-
-    This module is a modified version of {!FeatureVector},
-    with full-signature features that encompass all symbols at the
-    same time.
 *)
 
 type labels = Index_intf.labels

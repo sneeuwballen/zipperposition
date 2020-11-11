@@ -10,6 +10,8 @@ module T = Term
 module Lit = Literal
 module Fmt = CCFormat
 
+module UnionFind = UnionFind
+
 type 'a printer = Format.formatter -> 'a -> unit
 
 let section = Util.Section.make ~parent:Const.section "avatar"

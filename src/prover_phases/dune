@@ -2,6 +2,8 @@
   (name libzipperposition_phases)
   (public_name libzipperposition.phases)
   (synopsis "main for the Zipperposition theorem prover")
-  (libraries libzipperposition libzipperposition.calculi)
+  (libraries libzipperposition libzipperposition.calculi
+             libzipperposition.avatar libzipperposition.induction
+             libzipperposition.arith)
   (flags :standard -w -32)
 )

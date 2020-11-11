@@ -59,12 +59,12 @@ let load_extensions =
   Extensions.register Superposition.extension;
   Extensions.register AC.extension;
   Extensions.register Heuristics.extension;
-  Extensions.register Avatar.extension;
+  Extensions.register Libzipperposition_avatar.extension;
   Extensions.register EnumTypes.extension;
-  Extensions.register Induction.extension;
+  Extensions.register Libzipperposition_induction.extension;
   Extensions.register Rewriting.extension;
-  Extensions.register Arith_int.extension;
-  Extensions.register Arith_rat.extension;
+  Extensions.register Libzipperposition_arith.int_ext;
+  Extensions.register Libzipperposition_arith.rat_ext;
   Extensions.register Ind_types.extension;
   Extensions.register Fool.extension;
   Extensions.register Booleans.extension;

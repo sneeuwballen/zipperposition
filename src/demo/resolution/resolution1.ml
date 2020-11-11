@@ -364,7 +364,7 @@ let _set_file f = match !_file with
   | Some _ -> failwith "can only deal with one file"
 
 let main () =
-  Arg.parse !_options _set_file _help;
+  Arg.parse (Arg.align !_options) _set_file _help;
   match !_file with
   | None -> print_endline _help; exit 0
   | Some f -> process_file f

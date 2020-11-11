@@ -21,6 +21,8 @@
   (pattern ".*\\.p")
   (expect (try (run tptp-find-status) (const unknown))))
 
+(custom-tag (name gaveup))
+
 (prover
   (name zip-dev)
   (binary $cur_dir/../zipperposition.exe)
@@ -28,6 +30,7 @@
   (unsat "SZS status (Theorem|Unsatisfiable)")
   (sat "SZS status (CounterSatisfiable|Satisfiable)")
   (timeout "SZS status ResourceOut")
+  (tag gaveup "SZS status GaveUp")
   (version "git:."))
 
 (prover
@@ -37,6 +40,7 @@
   (unsat "SZS status (Theorem|Unsatisfiable)")
   (sat "SZS status (CounterSatisfiable|Satisfiable)")
   (timeout "SZS status ResourceOut")
+  (tag gaveup "SZS status GaveUp")
   (version "git:."))
 
 (task
