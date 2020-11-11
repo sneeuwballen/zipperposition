@@ -804,24 +804,39 @@ module Make(E : Env.S) : S with module Env = E = struct
     []
 
   let quantifier_rw_and_hoist (c:C.t) =
-    let quant_rw ~at b body = 
-      let proof =
-      Proof.Step.simp [C.proof_parent c]
-        ~rule:(Proof.Rule.mk ("quantifier_rw")) 
-        ~tags:[Proof.Tag.T_ho] 
+
+    let quant_rw ~at b body =
+      let quant_rw_unapplicable =
+        let module P = Pos in
+        match at with
+        | P.Arg(i, P.Left P.Stop)
+        | P.Arg(i, P.Right P.Stop) ->
+          let sign = L.is_pos ((C.lits c).(i)) in
+          (Builtin.equal b Builtin.ForallConst && sign)
+          || (Builtin.equal b Builtin.ExistsConst && not sign)
+        | _ -> false
       in
-      let body = Combs.expand body in
-      let form_for_skolem = 
-        (if b = Builtin.ForallConst then T.Form.not_ else CCFun.id) 
-        (snd @@ T.open_fun body) in
-      let sk = 
-        FR.get_skolem ~parent:c ~mode:`Skolem 
-        (T.fun_l (fst @@ T.open_fun body) form_for_skolem) in
-      let repl = T.app body [sk] in
-      let new_lits = CCArray.copy (C.lits c) in
-      Literals.Pos.replace ~at ~by:repl new_lits;
-      C.create ~trail:(C.trail c) ~penalty:(C.penalty c) 
-        (Array.to_list new_lits) proof
+
+      if quant_rw_unapplicable then None
+      else (
+        let proof =
+        Proof.Step.simp [C.proof_parent c]
+          ~rule:(Proof.Rule.mk ("quantifier_rw")) 
+          ~tags:[Proof.Tag.T_ho] 
+        in
+        let body = Combs.expand body in
+        let form_for_skolem = 
+          (if b = Builtin.ForallConst then T.Form.not_ else CCFun.id) 
+          (snd @@ T.open_fun body) in
+        let sk = 
+          FR.get_skolem ~parent:c ~mode:`Skolem 
+          (T.fun_l (fst @@ T.open_fun body) form_for_skolem) in
+        let repl = T.app body [sk] in
+        let new_lits = CCArray.copy (C.lits c) in
+        Literals.Pos.replace ~at ~by:repl new_lits;
+        Some (C.create ~trail:(C.trail c) ~penalty:(C.penalty c) 
+          (Array.to_list new_lits) proof)
+    )
     in
     
     let quant_hoist ~old b body =
@@ -852,7 +867,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     |> Iter.fold (fun acc (t,p) -> 
       match T.view t with
       | T.AppBuiltin(Builtin.(ForallConst|ExistsConst) as b, [_;body]) ->
-        quant_rw ~at:p b body :: quant_hoist ~old:t b body :: acc
+        CCList.cons_maybe (quant_rw ~at:p b body) (quant_hoist ~old:t b body :: acc)
       | _ -> acc) []
     |> (fun res -> CCOpt.return_if (not @@ CCList.is_empty res) res)
 
