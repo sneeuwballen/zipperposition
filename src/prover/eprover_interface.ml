@@ -203,12 +203,12 @@ module Make(E : Env.S) : S with module Env = E = struct
 
 
   let try_e active_set passive_set =
-    let max_others = !_max_derived in
+    let remaining_ho_clauses = ref (!_max_derived) in
 
     let take_from_set ?(converter=(fun c -> [c])) 
                       ~ignore_ids ~encoded_symbols set =
 
-      let lambdas_too_deep c=
+      let lambdas_too_deep c =
         let lambda_limit = 6 in
         C.Seq.terms c
         |> Iter.map (fun t -> 
@@ -232,7 +232,9 @@ module Make(E : Env.S) : S with module Env = E = struct
           let pd1 = C.proof_depth c1 and pd2 = C.proof_depth c2 in
           if pd1 = pd2 then CCInt.compare (C.ho_weight c1) (C.ho_weight c2)
           else CCInt.compare pd1 pd2) rest
-        |> CCList.take max_others in
+        |> CCList.take !remaining_ho_clauses in
+
+      remaining_ho_clauses := !remaining_ho_clauses - (List.length rest);
 
       let converted = 
         CCList.map (fun c -> 
