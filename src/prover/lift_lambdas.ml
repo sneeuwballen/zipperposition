@@ -99,7 +99,7 @@ let lift_lambdas_t ~parent ~counter t  =
       | Some (_,(def, lhs),subst) ->
         let lits = C.lits def in
         assert(Array.length lits = 1);
-        let lhs' = Subst.FO.apply Subst.Renaming.none subst (lhs, 1) in
+        let lhs' = Lambda.eta_reduce @@ Lambda.snf @@ Subst.FO.apply Subst.Renaming.none subst (lhs, 1) in
         lhs', (def :: reused_defs, new_defs), declared_syms
       | None -> 
         let free_vars = T.vars body' in

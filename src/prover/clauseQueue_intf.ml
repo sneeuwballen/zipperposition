@@ -122,6 +122,9 @@ module type S = sig
   val of_profile : profile -> t
   (** Select the queue corresponding to the given profile *)
 
+  val all_clauses : t -> C.t Iter.t
+  (** All clauses stored in the queue, in no particular order *)
+
   (** {6 IO} *)
 
   val pp : t CCFormat.printer

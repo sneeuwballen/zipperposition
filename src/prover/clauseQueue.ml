@@ -1355,6 +1355,11 @@ module Make(C : Clause_intf.S) = struct
       Mixed mixed
     )
 
+  let all_clauses q =
+    match q with
+    | FIFO q -> CCSeq.to_iter (Queue.to_seq q )
+    | Mixed q -> Iter.map fst (C.Tbl.to_iter q.tbl)
+
   let pp out q = CCFormat.fprintf out "queue %s" (name q)
   let to_string = CCFormat.to_string pp
 end

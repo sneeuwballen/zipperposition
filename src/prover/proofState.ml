@@ -144,6 +144,8 @@ module Make(C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
 
     let next () = ZProf.with_prof prof_next_passive next_ ()
 
+    let clauses () = C.ClauseSet.of_iter (CQueue.all_clauses queue)
+
     (* register to signal *)
     let () =
       Signal.on_every on_add_clause

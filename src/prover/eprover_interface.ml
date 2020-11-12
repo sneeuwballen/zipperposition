@@ -82,6 +82,13 @@ module Make(E : Env.S) : S with module Env = E = struct
         let err = 
           CCFormat.sprintf "%a is ho bool" T.pp t in
         raise @@ CantEncode err
+      (* type erasure for terms E can understand *)
+      | T.AppBuiltin((Builtin.Eq | Builtin.Neq), [ty;lhs;rhs]) 
+          when T.is_ground ty ->
+        sym_map, T.app_builtin ~ty:Type.prop Builtin.Eq [lhs;rhs]
+      | T.AppBuiltin((Builtin.ForallConst | Builtin.ExistsConst) as b, [ty;body]) 
+          when T.is_ground ty ->
+        sym_map, T.app_builtin ~ty:Type.prop b [body]
       | T.AppBuiltin(_, l)
       | T.App(_, l) ->
         let hd_mono, args = T.as_app_mono t in
@@ -247,7 +254,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             if IntSet.mem (C.id cl) ignore_ids then raise @@ CantEncode "skip id";
             let encoded_symbols, cl' = encode_ty_args_cl ~encoded_symbols cl in
             (cl'::acc, encoded_symbols)
-          with CantEncode reason -> 
+          with CantEncode reason ->
             Util.debugf 5 "cannot encode(%s):@.@[%a@]@." (fun k -> k reason C.pp cl);
             (acc, encoded_symbols)
         ) ([], encoded_symbols) converted in
