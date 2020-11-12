@@ -804,7 +804,6 @@ module Make(E : Env.S) : S with module Env = E = struct
     []
 
   let quantifier_rw_and_hoist (c:C.t) =
-
     let quant_rw ~at b body =
       let quant_rw_unapplicable =
         let module P = Pos in
