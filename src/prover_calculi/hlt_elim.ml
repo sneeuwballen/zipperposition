@@ -338,6 +338,12 @@ module Make(E : Env.S) : S with module Env = E = struct
                   (match find_implication cl i_neg_t j_neg_t with
                     | Some (_, _, proofset',_) ->
                       CCBV.reset bv j;
+
+                      Util.debugf ~section 1 "@[%a@] --> @[%a@]" 
+                        (fun k -> k T.pp i_neg_t T.pp j_neg_t);
+                      Util.debugf ~section 1 "used(%d): @[%a@]" 
+                        (fun k -> k j (CS.pp C.pp) proofset');
+
                       proofset := CS.union proofset' !proofset
                     | None -> () )
                 )
