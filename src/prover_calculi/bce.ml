@@ -6,12 +6,16 @@
 open Logtk
 open Libzipperposition
 
+
+
 let k_enabled = Flex_state.create_key ()
 let k_check_at = Flex_state.create_key ()
 let k_max_symbol_occ = Flex_state.create_key ()
 let k_processing_kind = Flex_state.create_key ()
 
 let section = Util.Section.make ~parent:Const.section "bce"
+
+module Avatar = Libzipperposition_avatar
 
 module type S = sig
   module Env : Env.S

@@ -13,6 +13,8 @@ let k_max_resolvents = Flex_state.create_key ()
 
 let section = Util.Section.make ~parent:Const.section "pred-elim"
 
+module A = Libzipperposition_avatar
+
 module type S = sig
   module Env : Env.S
 
@@ -641,7 +643,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   
   let setup () =
     if Env.flex_get k_enabled then (
-      if not (Env.flex_get Avatar.k_avatar_enabled) then (register ())
+      if not (Env.flex_get A.k_avatar_enabled) then (register ())
       else (
         CCFormat.printf "AVATAR is not yet compatible with PredElim@."
       )

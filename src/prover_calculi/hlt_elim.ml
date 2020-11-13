@@ -5,6 +5,7 @@ module T = Term
 module Ty = Type
 module Lits = Literals
 module Lit = Literal
+module A = Libzipperposition_avatar
 
 let section = Util.Section.make ~parent:Const.section "hlt-elim"
 
@@ -445,7 +446,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     if E.flex_get k_enabled then (
       Signal.on Env.on_start initialize;
 
-      if not (Env.flex_get Avatar.k_avatar_enabled) then (
+      if not (Env.flex_get A.k_avatar_enabled) then (
         let add_simpl = 
           if Env.flex_get k_simpl_new 
           then Env.add_basic_simplify 

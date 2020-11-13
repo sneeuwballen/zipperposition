@@ -83,9 +83,9 @@ module Make(E : Env.S) : S with module Env = E = struct
           CCFormat.sprintf "%a is ho bool" T.pp t in
         raise @@ CantEncode err
       (* type erasure for terms E can understand *)
-      | T.AppBuiltin((Builtin.Eq | Builtin.Neq), [ty;lhs;rhs]) 
+      | T.AppBuiltin((Builtin.Eq | Builtin.Neq) as b, [ty;lhs;rhs]) 
           when T.is_ground ty ->
-        sym_map, T.app_builtin ~ty:Type.prop Builtin.Eq [lhs;rhs]
+        sym_map, T.app_builtin ~ty:Type.prop b [lhs;rhs]
       | T.AppBuiltin((Builtin.ForallConst | Builtin.ExistsConst) as b, [ty;body]) 
           when T.is_ground ty ->
         sym_map, T.app_builtin ~ty:Type.prop b [body]
