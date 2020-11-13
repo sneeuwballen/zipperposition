@@ -72,8 +72,8 @@ module type S = sig
   type t
   (** A priority queue. *)
 
-  val add : t -> C.t -> unit
-  (** Add a clause to the Queue *)
+  val add : t -> C.t -> bool
+  (** Add a clause to the Queue; returns true if clause was actually added  *)
 
   val add_seq : t -> C.t Iter.t -> unit
   (** Add clauses to the queue *)
@@ -124,6 +124,11 @@ module type S = sig
 
   val all_clauses : t -> C.t Iter.t
   (** All clauses stored in the queue, in no particular order *)
+
+  val remove : t -> C.t -> bool
+  (** ignore the clause in the queue, and make sure it is never 
+      returned with the call to take_first();
+      returns true if clause was actually removed *) 
 
   (** {6 IO} *)
 

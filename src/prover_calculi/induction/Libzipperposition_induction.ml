@@ -229,7 +229,7 @@ end = struct
            else if C.is_empty c then raise (Yield_false c)
            else (
              trivial := false;
-             push_c c
+             ignore(push_c c)
            ))
         (cs g);
       (* do a few steps of saturation *)
@@ -265,7 +265,7 @@ end = struct
                   else if E.is_trivial new_c then None
                   else if C.is_empty new_c then raise (Yield_false new_c)
                   else Some new_c)
-              |> Iter.iter push_c))
+              |> Iter.iter (fun c -> ignore @@ push_c c)))
         with Not_found ->
           (* Due to orphan deletion a clause might not be found *)
           ()
