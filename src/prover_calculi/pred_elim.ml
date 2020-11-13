@@ -568,20 +568,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     steps := (!steps + 1) mod (Env.flex_get k_check_at);
 
     if !steps = 0 then (
-      Util.debugf ~section 4 "active:@[%a@]@." 
-      (fun k -> k (Iter.pp_seq C.pp) (Env.get_active ()));
-      Util.debugf ~section 4 "passive:@[%a@]@." 
-        (fun k -> k (Iter.pp_seq C.pp) (Env.get_passive ()));
-      Util.debugf ~section 4 "state:@[%a@]@."
-        (fun k -> k (Iter.pp_seq pp_task) (ID.Map.values !_pred_sym_idx));
       do_pred_elim ();
-      Util.debugf ~section 4 "after:@." CCFun.id;
-      Util.debugf ~section 4 "active:@[%a@]@." 
-      (fun k -> k (Iter.pp_seq C.pp) (Env.get_active ()));
-      Util.debugf ~section 4 "passive:@[%a@]@." 
-        (fun k -> k (Iter.pp_seq C.pp) (Env.get_passive ()));
-      Util.debugf ~section 4 "state:@[%a@]@."
-        (fun k -> k (Iter.pp_seq pp_task) (ID.Map.values !_pred_sym_idx));
     )
 
   let initialize () =
