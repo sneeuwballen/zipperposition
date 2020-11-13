@@ -41,8 +41,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   module Idx = Fingerprint.Make(struct 
     type t = T.t * ((C.t * bool) list ref)
-    let (<?>) = (CCOrd.Infix.(<?>))
-    let compare (a1,c1) (a2,c2) = (T.compare a1 a2)
+    let compare (a1,_) (a2,_) = (T.compare a1 a2)
    end)
 
   let sign_present sign = function

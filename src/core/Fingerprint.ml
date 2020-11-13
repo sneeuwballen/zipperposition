@@ -258,7 +258,7 @@ module Make(X : Set.OrderedType) = struct
   let add_list = List.fold_left add_
 
   (** remove t -> data from the trie *)
-  let remove idx t data =
+  let remove_if idx t leaf_cleaner =
     (* recursive deletion *)
     let rec recurse trie features =
       match trie, features with
@@ -280,7 +280,7 @@ module Make(X : Set.OrderedType) = struct
         then Empty
         else Node map
       | Leaf leaf, [] ->
-        let leaf = Leaf.remove leaf t data in
+        let leaf = leaf_cleaner leaf t in
         if Leaf.is_empty leaf
         then Empty
         else Leaf leaf
@@ -289,6 +289,12 @@ module Make(X : Set.OrderedType) = struct
     in
     let features = idx.fp t in  (* features of term *)
     { idx with trie = recurse idx.trie features; }
+
+  let remove idx t data =
+    remove_if idx t (fun leaf t -> Leaf.remove leaf t data)
+
+  let update_leaf idx t data_filter =
+    remove_if idx t (fun leaf t -> Leaf.update_leaf leaf t data_filter)
 
   let remove_ trie = CCFun.uncurry (remove trie)
   let remove_seq dt seq = Iter.fold remove_ dt seq

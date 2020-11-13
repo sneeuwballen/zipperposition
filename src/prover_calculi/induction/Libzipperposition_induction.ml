@@ -216,7 +216,7 @@ end = struct
       (fun k->k pp g max_steps_);
     let module CQ = E.ProofState.CQueue in
     let q = CQ.almost_bfs () in (* clauses waiting *)
-    let push_c c = CQ.add q c in
+    let push_c c = ignore (CQ.add q c) in
     let n : int ref = ref 0 in (* number of steps *)
     let trivial = ref true in
     try

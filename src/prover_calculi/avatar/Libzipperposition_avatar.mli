@@ -34,6 +34,7 @@ module Make
 
 val k_avatar : (module S) Flex_state.key
 val k_simplify_trail : bool Flex_state.key
+val k_avatar_enabled : bool Flex_state.key
 
 val get_env : (module Env.S) -> (module S)
 

@@ -114,6 +114,13 @@ val subsumes : ?subst:Subst.t -> t Scoped.t -> t Scoped.t ->
 (** More general version of {!matching}, yields [subst]
     such that [subst(lit_a) => lit_b]. *)
 
+val are_opposite_subst : subst:Subst.t -> t Scoped.t -> t Scoped.t -> bool
+(** Literals are equal according to given substitution for variables,
+    but are of opposite sign  *)
+
+val are_opposite_same_sc: t -> t -> bool
+(** Literals are equal, but are of opposite signs *)
+
 val variant : ?subst:Subst.t -> t Scoped.t -> t Scoped.t ->
   (Subst.t * Builtin.Tag.t list) Iter.t
 
@@ -286,6 +293,9 @@ module View : sig
       for propositions it will always be p, true.
       @return None for other literals
       @raise Invalid_argument if the position doesn't match the literal. *)
+  
+  val get_lhs : t -> term option
+  val get_rhs : t -> term option
 
   val get_arith : t -> Int_lit.t option
   (** Extract an arithmetic literal *)

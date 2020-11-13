@@ -96,7 +96,7 @@ let parse_args () =
     ; "--timeout", Arg.Set_float timeout, " timeout (in seconds)"
     ; "-t", Arg.Set_float timeout, " short for --timeout"
     ; "--expand-def", Arg.Set expand_def, " expand definitions"
-    ; "--presaturate", Arg.Set presaturate,
+    ; "--presaturate", Arg.Bool ((:=) presaturate),
       " pre-saturate (interreduction of) the initial clause set"
     ; "--dot", Arg.String (fun s -> dot_file := Some s) , " print final state to file in DOT"
     ; "--dot-llproof", Arg.String (fun s -> dot_llproof := Some s) , " print LLProof to file in DOT"

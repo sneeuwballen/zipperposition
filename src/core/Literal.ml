@@ -126,7 +126,7 @@ let depth lit =
 
 module Set = CCSet.Make(struct type t = lit let compare = compare end)
 
-let is_pos = function
+let[@inline] is_pos = function
   | Equation (l, r, sign) -> sign
   | Int o -> Int_lit.sign o
   | False -> false
@@ -1157,6 +1157,14 @@ module View = struct
     | Rat _, _ -> None
     | _ -> invalid_arg "get_eqn: wrong literal or position"
 
+  let get_lhs = function
+    | Equation(lhs, _, _) -> Some lhs
+    | _ -> None
+
+  let get_rhs = function
+    | Equation(_, rhs, _) -> Some rhs
+    | _ -> None
+
   let get_arith = function
     | Int o -> Some o
     | _ -> None
@@ -1225,6 +1233,24 @@ let as_pos_pure_var lit =
   match View.as_eqn lit with 
   | Some (l, r, true) when is_pure_var lit && is_pos lit -> Some(_as_var l,_as_var r)
   | _ -> None
+
+let are_opposite_subst ~subst (l1,sc1) (l2,sc2) =
+  let module UF = Unif.FO in
+  is_pos l1 != is_pos l2 &&
+  is_predicate_lit l1 = is_predicate_lit l2 &&
+  match l1, l2 with
+  | Equation(lhs, rhs, _), Equation(lhs', rhs', _) when is_predicate_lit l1 ->
+    (UF.equal ~subst (lhs, sc1) (lhs', sc2) && UF.equal ~subst (rhs, sc1) (rhs', sc2))
+    || (UF.equal ~subst (lhs, sc1) (rhs', sc2) && UF.equal ~subst (rhs, sc1) (lhs', sc2))
+  | Equation(lhs, _, _), Equation(lhs', _, _)->
+    UF.equal ~subst (lhs, sc1) (lhs', sc2)
+  | True, True -> true
+  | False, False -> true
+  | _ -> false
+
+let are_opposite_same_sc l1 l2 =
+  are_opposite_subst ~subst:Subst.empty (l1,0) (l2,0)
+
 
 let () =
   Options.add_opts
