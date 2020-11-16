@@ -297,19 +297,19 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
     (* index terms that can rewrite into other clauses *)
     _idx_sup_from :=
-      Lits.fold_eqn ~ord ~both:true ~sign:true
+      Lits.fold_eqn ~ord ~both:true
         ~eligible:(C.Eligible.param c) (C.lits c)
-      |> Iter.filter((fun (l, _, _, _) -> 
-        not (T.equal l T.false_) && 
+      |> Iter.filter( (fun (_,r,sign,_) -> sign || T.equal r T.false_))
+      |> Iter.filter((fun (l, _, _, _) ->
         match T.view l with
-        | T.AppBuiltin((Eq|Neq), _) -> not (Type.is_prop (T.ty l))
+        | T.AppBuiltin((Eq|Neq), _) -> false
         | _ -> not (T.is_formula l)
       ))
       |> Iter.filter(fun (l, _, _, _) -> 
           sup_from_var_headed || not (T.is_app_var l))
       |> Iter.fold
-        (fun tree (l, _, sign, pos) ->
-           assert sign;
+        (fun tree (l, r, sign, pos) ->
+           assert (sign || T.equal r T.false_);
            let with_pos = C.WithPos.({term=l; pos; clause=c;}) in
            f tree l with_pos)
         !_idx_sup_from ;
@@ -620,16 +620,30 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         raise @@ ExitSuperposition(msg);
       );
 
-      if T.equal t' T.false_ then (
-        match info.passive_pos with 
+
+      (
+        let exit_negative_tl =
+          ExitSuperposition ("negative literal must paramodulate " ^
+                            "into top-level positive position")
+        in
+        let exit_double_sup =
+          ExitSuperposition ("superposition could be performed in a different order")
+        in
+        match info.passive_pos with
         | P.Arg(_, P.Left P.Stop)
         | P.Arg(_, P.Right P.Stop) ->
-          if not (Lit.is_positivoid (info.passive_lit)) then (
-            raise @@ ExitSuperposition ("negative literal must paramodulate into top-level positive position")
-          )
-        | _ -> 
-          raise @@ ExitSuperposition ("negative literal must paramodulate into top-level positive position")
-      );
+          if T.equal t' T.false_ && not (Lit.is_positivoid (info.passive_lit)) then (
+            raise exit_negative_tl) 
+          else if Lit.is_positivoid info.passive_lit &&
+                    (* active clause will take the role of passive and that is how
+                       we can compute the resolvent *)
+                    C.compare info.active info.passive < 0 then (
+            raise exit_double_sup
+          );
+        | _ ->
+          if T.equal t' T.false_ then 
+            raise @@ exit_negative_tl);
+
 
       begin match info.passive_lit, info.passive_pos with
         | Lit.Equation (_, v, true), P.Arg(_, P.Left P.Stop)
@@ -944,8 +958,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
        we try to rewrite conditionally other clauses using
        non-minimal sides of every positive literal *)
     let new_clauses =
-      Lits.fold_eqn ~sign:true ~ord
-        ~both:true ~eligible (C.lits clause)
+      Lits.fold_eqn ~ord ~both:true ~eligible (C.lits clause)
+      |> Iter.filter (fun (_,t,sign,_) -> sign || T.equal t T.false_)
       |> Iter.flat_map
         (fun (s, t, _, s_pos) ->
            let do_sup u_p with_pos subst =
@@ -1029,7 +1043,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* do the inferences where clause is active; for this,
        we try to rewrite conditionally other clauses using
        non-minimal sides of every positive literal *)
-    Lits.fold_eqn ~sign:true ~ord  ~both:true ~eligible (C.lits clause)
+    Lits.fold_eqn ~ord  ~both:true ~eligible (C.lits clause)
+    |> Iter.filter (fun (_,t,sign,_) -> sign || T.equal t T.false_)
     |> Iter.flat_map
       (fun (s, t, _, s_pos) ->
          let do_lambdasup u_p with_pos subst =
@@ -1172,7 +1187,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
        non-minimal sides of every positive literal *)
     let new_clauses =
       if fluidsup_applicable clause then
-        Lits.fold_eqn ~sign:true ~ord ~both:true ~eligible (C.lits clause)
+        Lits.fold_eqn ~ord ~both:true ~eligible (C.lits clause)
+        |> Iter.filter (fun (_,t,sign,_) -> sign || T.equal t T.false_)
         |> Iter.flat_map
           (fun (s, t, _, s_pos) ->
              I.fold !_idx_fluidsup_into
@@ -1274,7 +1290,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let infer_dupsup_active clause =
     let eligible = C.Eligible.param clause in
     let new_clauses =
-      Lits.fold_eqn ~sign:true ~ord ~both:true ~eligible (C.lits clause)
+      Lits.fold_eqn ~ord ~both:true ~eligible (C.lits clause)
+      |> Iter.filter (fun (_,t,sign,_) -> sign || T.equal t T.false_)
       |> Iter.flat_map
         (fun (s, t, _, s_pos) ->
            I.fold !_idx_dupsup_into
@@ -1450,7 +1467,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   
   let infer_subvarsup_active clause =
     let eligible = C.Eligible.param clause in
-    Lits.fold_eqn ~sign:true ~ord ~both:true ~eligible (C.lits clause)
+    Lits.fold_eqn ~ord ~both:true ~eligible (C.lits clause)
+    |> Iter.filter (fun (_,t,sign,_) -> sign || T.equal t T.false_)
     |> Iter.filter(fun (_,t,_,_) -> T.is_var t || T.is_app_var t || T.is_comb t) 
     |> Iter.flat_map
       (fun (s, t, _, s_pos) ->

@@ -254,7 +254,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
             let lit' = lits'.(j) in
             (* check if both lits are still potentially eligible, and have the same
                sign if [check_sign] is true. *)
-            if Lit.is_positivoid lit = Lit.is_positivoid lit' && BV.get bv j
+            if Lit.eqn_sign lit = Lit.eqn_sign lit' && BV.get bv j
             then match Lit.Comp.compare ~ord lit lit' with
               | Comparison.Incomparable
               | Comparison.Eq -> ()     (* no further information about i-th and j-th *)
@@ -350,13 +350,13 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
           Lits.maxlits ~ord lits', lits')
         else (BV.of_list @@ Lazy.force c.max_lits, lits c) in
       (* only keep literals that are positive equations *)
-      BV.filter bv (fun i -> Lit.is_positivoid lits'.(i));
+      BV.filter bv (fun i -> Lit.eqn_sign lits'.(i) (* == true*));
       bv
     ) else
       BV.empty () (* no eligible literal when some are selected *)
 
   let is_eligible_param (c,sc) subst ~idx =
-    Lit.is_positivoid c.sclause.lits.(idx)
+    Lit.eqn_sign c.sclause.lits.(idx)
     &&
     BV.is_empty (Lazy.force c.selected)
     &&

@@ -666,7 +666,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let get_var = T.as_var_exn in
     
     Ls.fold_eqn_simple (C.lits c)
-    |> Iter.filter (fun (_,_,sign,p) ->
+    |> Iter.filter (fun (_,_,_,p) ->
       let idx = Ls.Pos.idx p in
       CCBV.get eligible idx )
     |> Iter.fold (fun acc (lhs,rhs,sign,p) -> 
