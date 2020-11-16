@@ -135,6 +135,13 @@ let is_positivoid = function
   | Int o -> Int_lit.sign o
   | False -> false
   | _ -> true
+
+let eqn_sign = function
+  | Equation (_, _, sign) -> sign
+  | Int o -> Int_lit.sign o
+  | False -> false
+  | _ -> true
+
 (* specific: for the term comparison *)
 let polarity = function
   | Int o -> Int_lit.polarity o

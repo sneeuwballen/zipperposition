@@ -37,7 +37,9 @@ val heuristic_weight : (term -> int) -> t -> int   (** heuristic difficulty to e
 
 val depth : t -> int              (** depth of literal *)
 
-val is_positivoid : t -> bool            (** is the literal positive? *)
+val eqn_sign : t -> bool          (** equation sign: T for s=t and F for s!=t *)
+
+val is_positivoid : t -> bool     (** is the literal s=t where neither s nor t are T or F or of the form s = T? *)
 
 val is_neg : t -> bool            (** is the literal negative? *)
 
