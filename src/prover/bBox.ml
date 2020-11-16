@@ -124,7 +124,7 @@ let negate_ground lits =
   match lits with
   | [| lit0 |]
     when Literal.is_ground lit0 &&
-         Literal.is_neg lit0 &&
+         Literal.is_negativoid lit0 &&
          not (Literal.is_constraint lit0) ->
     [| Literal.negate lits.(0) |], false
   | _ -> lits, true 

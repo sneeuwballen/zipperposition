@@ -491,7 +491,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       | Lit.Equation(l,r,s) -> s
       | _ -> false
 
-    let neg _ lit = Lit.is_neg lit
+    let neg _ lit = Lit.is_negativoid lit
 
     let always _ _ = true
 

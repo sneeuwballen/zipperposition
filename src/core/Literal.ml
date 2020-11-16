@@ -149,14 +149,14 @@ let polarity = function
   | l -> is_positivoid l
 
 
-let is_neg lit = not (is_positivoid lit)
+let is_negativoid lit = not (is_positivoid lit)
 
 let is_eqn = function
   | Equation _ -> true
   | _ -> false
 
 let is_eq lit = is_eqn lit && is_positivoid lit
-let is_neq lit = is_eqn lit && is_neg lit
+let is_neq lit = is_eqn lit && is_negativoid lit
 
 let is_app_var_eq = function
   | Equation (l,r,_) -> T.is_app_var l && T.is_app_var r
@@ -557,11 +557,11 @@ let apply_subst_list renaming subst (lits,sc) =
 exception Lit_is_constraint
 
 let is_ho_constraint = function
-  | Equation (l, r, _) as lit when is_neg lit -> T.is_ho_at_root l || T.is_ho_at_root r
+  | Equation (l, r, _) as lit when is_negativoid lit -> T.is_ho_at_root l || T.is_ho_at_root r
   | _ -> false
 
 let is_constraint = function
-  | Equation (t, u, _) as lit when is_neg lit -> T.is_var t || T.is_var u
+  | Equation (t, u, _) as lit when is_negativoid lit -> T.is_var t || T.is_var u
   | _ -> false
 
 let negate lit = 
@@ -715,7 +715,7 @@ let to_ho_term (lit:t): T.t option = match lit with
   | True -> Some T.true_
   | False -> Some T.false_
   | Equation (t, u, _) when is_predicate_lit lit ->
-    Some  ((if is_neg lit then T.Form.not_ else CCFun.id) t)
+    Some  ((if is_negativoid lit then T.Form.not_ else CCFun.id) t)
   | Equation (t, u, sign) ->
     Some (if sign then T.Form.eq t u else T.Form.neq t u)
   | Int _
@@ -735,7 +735,7 @@ let as_ho_predicate (lit:t) : _ option =
 let is_ho_predicate lit = CCOpt.is_some (as_ho_predicate lit)
 
 let is_ho_unif lit = match lit with
-  | Equation (t, u, _) when is_neg lit -> Term.is_ho_app t || Term.is_ho_app u
+  | Equation (t, u, _) when is_negativoid lit -> Term.is_ho_app t || Term.is_ho_app u
   | _ -> false
 
 let of_unif_subst renaming (s:Unif_subst.t) : t list =
@@ -754,7 +754,7 @@ let normalize_eq lit =
     | _ -> None 
   in
 
-  let is_neg t = CCOpt.is_some @@ as_neg t in
+  let is_negativoid t = CCOpt.is_some @@ as_neg t in
 
   let eq_builder ~pos ~neg l r =
     match as_neg l, as_neg r with
@@ -785,7 +785,7 @@ let normalize_eq lit =
           Some (CCOpt.get_or ~default:elim_not (aux elim_not))
         | _ -> None
       end
-    | Equation(lhs,rhs,sign) when is_neg lhs || is_neg rhs ->
+    | Equation(lhs,rhs,sign) when is_negativoid lhs || is_negativoid rhs ->
       assert (not (T.is_true_or_false rhs));
       Some ((if sign then mk_eq_ else mk_neq_) lhs rhs)
     | _ -> None in

@@ -1278,7 +1278,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let recognize_choice_ops c =
     let extract_not_p_x l = match l with
       | Literal.Equation(lhs,_,_) 
-        when Literal.is_neg l && Literal.is_predicate_lit l && T.is_app_var lhs ->
+        when Literal.is_negativoid l && Literal.is_predicate_lit l && T.is_app_var lhs ->
         begin match T.view lhs with
           | T.App(hd, [var]) when T.is_var var -> Some hd
           | _ -> None end
@@ -1612,7 +1612,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       match C.lits c with
       | [|lit1; lit2|] ->
         fail_on (not ((Lit.is_positivoid lit1 || Lit.is_positivoid lit2) &&
-                     (Lit.is_neg lit1 || Lit.is_neg lit2)));
+                     (Lit.is_negativoid lit1 || Lit.is_negativoid lit2)));
 
         let pos_lit,neg_lit = 
           if Lit.is_positivoid lit1 then lit1, lit2 else lit2,lit1 in

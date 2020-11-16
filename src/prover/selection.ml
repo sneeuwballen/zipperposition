@@ -24,7 +24,7 @@ let _restrict_fresh_sk_selection = ref true
 
 (* May we select this literal? *)
 let can_select_lit ~ord (lits:Lits.t) (i:int) : bool =
-  if Lit.is_neg lits.(i)
+  if Lit.is_negativoid lits.(i)
   then (
     (* Search for the (maximal) terms with variable heads.
        Returns a list of (var_head, args) pairs. *)
@@ -152,7 +152,7 @@ let max_goal ~strict ~ord lits =
 
 let ho_sel_driver lits f =
   let neg_max = CCArray.mapi (fun i l -> i,l)  lits
-                |> CCArray.filter (fun (_,l) -> Lit.is_neg l) in
+                |> CCArray.filter (fun (_,l) -> Lit.is_negativoid l) in
   if CCArray.length neg_max = 0 then BV.empty ()
   else (
     CCArray.fast_sort (fun (i, _) (j, _) -> compare (f i) (f j)) neg_max;
@@ -321,7 +321,7 @@ let e_sel5 ~blocker ~ord lits =
     (if Lit.is_ground l then 0 else 1),
     (- (lit_sel_diff_w l)),
     0 in
-  if CCArray.exists (fun l -> Lit.is_neg l && Lit.depth l <= 2) lits then (
+  if CCArray.exists (fun l -> Lit.is_negativoid l && Lit.depth l <= 2) lits then (
     weight_based_sel_driver ~ord ~blocker lits chooser 
   ) else BV.empty ()
 
@@ -415,14 +415,14 @@ let e_sel11 ~blocker ~ord lits =
   let freq_tbl = pred_freq ~ord lits in
   let blocker x l = blocker x l || Lit.is_type_pred l in
   let eqn_max_weight = function 
-  | Lit.Equation(lhs,rhs,_) as l when Lit.is_neg l ->
+  | Lit.Equation(lhs,rhs,_) as l when Lit.is_negativoid l ->
     let cmp_res = Ordering.compare ord lhs rhs in
     if cmp_res == Comparison.Gt then Term.ho_weight lhs 
     else if cmp_res == Comparison.Lt then Term.ho_weight rhs
     else Term.ho_weight lhs + Term.ho_weight rhs
   | _ -> max_int in
   let lhs_weight  = function 
-  | Lit.Equation(lhs,rhs,_) as l when Lit.is_neg l ->
+  | Lit.Equation(lhs,rhs,_) as l when Lit.is_negativoid l ->
     if Ordering.compare ord lhs rhs  == Comparison.Gt then Term.ho_weight lhs 
     else Term.ho_weight lhs
   | _ -> max_int in
@@ -434,7 +434,7 @@ let e_sel11 ~blocker ~ord lits =
     else if not (Lit.is_type_pred l) then (20, - (lhs_weight l), get_pred_freq ~freq_tbl l)
     else (max_int, max_int, max_int) in
   
-  if CCArray.exists (fun l -> Lit.is_neg l && Lit.depth l <= 2) lits then (
+  if CCArray.exists (fun l -> Lit.is_negativoid l && Lit.depth l <= 2) lits then (
     weight_based_sel_driver ~ord lits chooser ~blocker
   ) else BV.empty ()
 
@@ -489,7 +489,7 @@ let e_sel15 ~blocker ~ord lits =
   let res = 
     (* find first negative pure var lit *)
     (CCList.find_map (fun (i, l) ->
-      if Lit.is_neg l && Lit.is_pure_var l then (
+      if Lit.is_negativoid l && Lit.is_pure_var l then (
         CCBV.set sel_bv i;
         Some sel_bv
       ) else None
@@ -498,7 +498,7 @@ let e_sel15 ~blocker ~ord lits =
     (* else find smallest negative ground lit *)
     (lits_l
      |> CCList.filter_map (fun (i, l) -> 
-          if Lit.is_neg l && Lit.is_ground l then (
+          if Lit.is_negativoid l && Lit.is_ground l then (
             Some (i, Lit.ho_weight l)
           ) else None)
      |> CCList.to_iter

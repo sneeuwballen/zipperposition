@@ -105,7 +105,7 @@ let pos lits =
 let neg lits =
   let bv = BV.create ~size:(Array.length lits) false in
   for i = 0 to Array.length lits - 1 do
-    if Lit.is_neg lits.(i) then BV.set bv i
+    if Lit.is_negativoid lits.(i) then BV.set bv i
   done;
   bv
 

@@ -548,7 +548,7 @@ module Make(C : Clause_intf.S) = struct
         1+d
 
     (* check whether a literal is a ground neg lit *)
-    let is_ground_neg lit = Lit.is_neg lit && Lit.is_ground lit
+    let is_ground_neg lit = Lit.is_negativoid lit && Lit.is_ground lit
     let all_ground_neg c = CCArray.for_all is_ground_neg (C.lits c)
 
     let favor_all_neg c =
@@ -969,7 +969,7 @@ module Make(C : Clause_intf.S) = struct
 
     let prefer_neg_unit c =
       match C.lits c with 
-      | [| l |] when Lit.is_neg l -> 0
+      | [| l |] when Lit.is_negativoid l -> 0
       | _ -> 1
     
     let defer_neg_unit c =

@@ -1645,7 +1645,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let eligible = C.Eligible.(filter (function 
       | Lit.Equation(lhs,_,_) as lit ->
         Lit.is_positivoid lit ||
-        (Lit.is_neg lit && Lit.is_predicate_lit lit && T.is_app_var lhs)
+        (Lit.is_negativoid lit && Lit.is_predicate_lit lit && T.is_app_var lhs)
       | _ -> false )) in
     (* find root terms that are unifiable with s and are not in the
        literal at s_pos. Calls [k] with a position and substitution *)
@@ -2163,7 +2163,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let is_semantic_tautology_ c =
     if Array.length (C.lits c) >= 2 &&
-       CCArray.exists Lit.is_neg (C.lits c) &&
+       CCArray.exists Lit.is_negativoid (C.lits c) &&
        CCArray.exists Lit.is_positivoid (C.lits c)
     then is_semantic_tautology_real c
     else false
@@ -2869,7 +2869,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       match C.lits c with
       | [|lit1; lit2|] ->
         fail_on (not ((Lit.is_positivoid lit1 || Lit.is_positivoid lit2) &&
-                     (Lit.is_neg lit1 || Lit.is_neg lit2)));
+                     (Lit.is_negativoid lit1 || Lit.is_negativoid lit2)));
 
         let pos_lit,neg_lit = 
           if Lit.is_positivoid lit1 then lit1, lit2 else lit2,lit1 in
