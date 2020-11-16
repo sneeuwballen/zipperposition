@@ -17,6 +17,7 @@ let k_max_self_impls = Flex_state.create_key ()
 let k_unit_reduction = Flex_state.create_key ()
 let k_hte = Flex_state.create_key ()
 let k_hle = Flex_state.create_key ()
+let k_max_tracked_clauses = Flex_state.create_key ()
 
 
 module type S = sig
@@ -35,7 +36,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* index from literals to the map implied literal 
       -> clauses necessary for the proof *)
-  module PremiseIdx = NPDtree.MakeTerm(struct 
+  module PremiseIdx = Fingerprint.Make(struct 
     type t = CS.t T.Tbl.t
     (* as we will maintain the invariant that each term is mapped to a single
        table, comparing the lengths suffices *)
@@ -44,12 +45,12 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* index from literals that appear as conclusions to all the premises
      in which they appear *)
-  module ConclusionIdx = NPDtree.MakeTerm(struct 
+  module ConclusionIdx = Fingerprint.Make(struct 
     type t = T.t
     let compare = Term.compare
   end)
 
-  module UnitIdx = NPDtree.MakeTerm(struct 
+  module UnitIdx = Fingerprint.Make(struct 
     type t = C.t
     let compare = C.compare
   end)
@@ -59,6 +60,8 @@ module Make(E : Env.S) : S with module Env = E = struct
   let units_ = ref (UnitIdx.empty ())
   (* occurrences of the clause in the premise_idx *)
   let cl_occs = ref Util.Int_map.empty
+  (* clauses tracked so far *)
+  let tracked_cls = ref 0 
 
   let get_predicate lit =
     match lit with
@@ -233,12 +236,18 @@ module Make(E : Env.S) : S with module Env = E = struct
       insert_implication (lit_to_term ~negate:true b_lhs b_sign)
                          (lit_to_term a_lhs a_sign) cl
     | _ -> ()
+  
+  let limit_not_reached () =
+    let tracked = !tracked_cls in
+    let tracked_max = Env.flex_get k_max_tracked_clauses in
+    tracked_max == -1 || tracked <= tracked_max
 
   let track_clause cl =
-    if cl_is_ht_trackable cl then (
+    if cl_is_ht_trackable cl && limit_not_reached () then (
       Util.debugf ~section 3 "tracking @[%a@]" (fun k -> k C.pp cl);
       
       insert_into_indices cl;
+      incr tracked_cls;
       
       Util.debugf ~section 2 "idx_size: @[%d@]" (fun k -> k (PremiseIdx.size !prems_));
       Util.debugf ~section 3 "premises:" CCFun.id;
@@ -406,6 +415,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     | _ -> ());
     if Util.Int_map.mem (C.id cl) !cl_occs then (
       Util.debugf ~section 3 "removed: @[%a@]." (fun k -> k C.pp cl);
+      decr tracked_cls;
       ConclusionIdx.iter !concls_ (fun premise concl -> 
         Util.debugf ~section 3 "@[%a@] -> @[%a@]" (fun k -> k T.pp premise T.pp concl)));
     cl_occs := Util.Int_map.remove (C.id cl) !cl_occs;
@@ -468,6 +478,7 @@ let enabled_ = ref false
 let simpl_new_ = ref false
 let track_active_only_ = ref true
 let max_self_impls_ = ref 1
+let max_tracked_clauses = ref (-1)
 let unit_reduction_ = ref true
 let hte_ = ref true
 let hle_ = ref true
@@ -483,6 +494,7 @@ let extension =
     E.flex_add k_track_active_only !track_active_only_;
     E.flex_add k_max_self_impls !max_self_impls_;
     E.flex_add k_unit_reduction !unit_reduction_;
+    E.flex_add k_max_tracked_clauses !max_tracked_clauses;
     E.flex_add k_hle !hle_;
     E.flex_add k_hte !hte_;
     HLT.setup ()
@@ -495,6 +507,7 @@ let extension =
 let () =
   Options.add_opts [
     "--hidden-lt-elim", Arg.Bool ((:=) enabled_), " enable/disable hidden literal and tautology elimination";
+    "--hidden-lt-elim-max-tracked", Arg.Int ((:=) max_tracked_clauses), " negative value for disabling the limit";
     "--hidden-lt-elim-hle", Arg.Bool ((:=) hle_), " enable/disable hidden literal elimination (hidden-lt-elim must be on)";
     "--hidden-lt-elim-hte", Arg.Bool ((:=) hte_), " enable/disable hidden literal tautology elimination (hidden-lt-elim must be on)";
     "--hidden-lt-max-depth", Arg.Set_int max_depth_, " max depth of binary implication graph precomputation";
