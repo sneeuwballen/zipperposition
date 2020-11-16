@@ -1360,8 +1360,13 @@ module Make(C : Clause_intf.S) = struct
 
   let all_clauses q =
     match q with
-    | FIFO q -> CCSeq.to_iter (Queue.to_seq q )
+    | FIFO q -> CCSeq.to_iter (Queue.to_seq q)
     | Mixed q -> Iter.map fst (C.Tbl.to_iter q.tbl)
+
+  let mem_cl q cl =
+    match q with
+    | FIFO q -> Iter.exists (C.equal cl) (CCSeq.to_iter (Queue.to_seq q))
+    | Mixed q -> C.Tbl.mem q.tbl cl
 
   let remove q cl =
     match q with 

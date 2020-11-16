@@ -125,6 +125,9 @@ module type S = sig
   val all_clauses : t -> C.t Iter.t
   (** All clauses stored in the queue, in no particular order *)
 
+  val mem_cl : t -> C.t -> bool
+  (** is the clause present in the passive set? *)
+
   val remove : t -> C.t -> bool
   (** ignore the clause in the queue, and make sure it is never 
       returned with the call to take_first();

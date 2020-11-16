@@ -381,8 +381,7 @@ module Make(X : sig
   let is_active c =
     C.ClauseSet.mem c (ProofState.ActiveSet.clauses ())
 
-  let is_passive c =
-    C.ClauseSet.mem c (ProofState.PassiveSet.clauses ())
+  let is_passive =  ProofState.PassiveSet.is_passive
 
   let on_pred_var_elimination = Signal.create ()
   let on_pred_skolem_introduction = Signal.create ()

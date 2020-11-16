@@ -158,6 +158,9 @@ module Make(C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
           Signal.send on_add_clause c
         )
       )
+
+    let is_passive cl =
+      CQueue.mem_cl queue cl
     
     let clauses () = C.ClauseSet.of_iter (CQueue.all_clauses queue)
     let num_clauses () = CQueue.length queue
