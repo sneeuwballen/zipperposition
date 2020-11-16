@@ -240,7 +240,7 @@ let get_pred_freq ~freq_tbl lit =
 
 let e_sel ~blocker ~ord lits = 
   let chooser ~freq_tbl (i,l) = 
-    ((if Lit.is_pos l then 1 else 0),
+    ((if Lit.is_positivoid l then 1 else 0),
      (if Lits.is_max ~ord lits i then 0 else 100 +
       if Lit.is_pure_var l then 0 else 10 +
       if Lit.is_ground l then 0 else 1),
@@ -256,7 +256,7 @@ let e_sel2 ~blocker ~ord lits =
                 |> Iter.to_array in
   let blocker x l = blocker x l || Lit.is_type_pred l || Lit.is_predicate_lit l in
   let chooser (idx ,l) = 
-    let sign_val = if Lit.is_pos l then 1 else 0 in 
+    let sign_val = if Lit.is_positivoid l then 1 else 0 in 
     let diff_val = -(lit_sel_diff_w l) in
     let prec = Ordering.precedence ord in
     match l with 
@@ -283,7 +283,7 @@ let e_sel2 ~blocker ~ord lits =
 
 let e_sel3 ~blocker ~ord lits = 
   let chooser (i,l) = 
-    let sign = (if Lit.is_pos l then 1 else 0) in
+    let sign = (if Lit.is_positivoid l then 1 else 0) in
     if Lit.is_pure_var l then (
       (sign, 0, 0, 0)
     ) else if (Lit.is_ground l) then (
@@ -299,7 +299,7 @@ let e_sel4 ~blocker ~ord lits =
     let lhs = match l with
       | Lit.Equation(lhs_t,_,_) -> lhs_t
       | _ -> T.true_ (* a term to fill in *) in
-    let sign = if Lit.is_pos l then 1 else 0 in
+    let sign = if Lit.is_positivoid l then 1 else 0 in
     let hd_freq = get_pred_freq ~freq_tbl l in
     if Lit.is_ground l then (
       (sign, 0, -(T.ho_weight lhs), hd_freq) 
@@ -317,7 +317,7 @@ let e_sel4 ~blocker ~ord lits =
 
 let e_sel5 ~blocker ~ord lits =
   let chooser (i,l) =
-    (if Lit.is_pos l then 1 else 0), 
+    (if Lit.is_positivoid l then 1 else 0), 
     (if Lit.is_ground l then 0 else 1),
     (- (lit_sel_diff_w l)),
     0 in
@@ -333,7 +333,7 @@ let e_sel6 ~blocker ~ord lits =
       Ordering.compare ord l r != Comparison.Incomparable
     | _ -> true in
   let chooser (i,l) =
-    (if Lit.is_pos l then 1 else 0),
+    (if Lit.is_positivoid l then 1 else 0),
     (if is_oriented l then 0 else 1),
     (- (Lit.weight l)),
     0 in
@@ -357,7 +357,7 @@ let e_sel8 ~blocker ~ord lits =
     | _ -> 0  in
   let alpha_rank = function 
     | Lit.Equation(l,_,_) as lit when Lit.is_predicate_lit lit 
-        && Lit.is_pos lit &&  T.is_const (T.head_term l) -> 
+        && Lit.is_positivoid lit &&  T.is_const (T.head_term l) -> 
       let hd = T.head_exn l in
       (match CCArray.bsearch ~cmp:ID.compare hd symbols with
        | `At idx -> idx
@@ -366,10 +366,10 @@ let e_sel8 ~blocker ~ord lits =
   let blocker x l = blocker x l || Lit.is_type_pred l || Lit.is_predicate_lit l in
   let chooser (i,l) =
     if is_truly_equational l then (
-      (if Lit.is_pos l then 1 else 0),
+      (if Lit.is_positivoid l then 1 else 0),
       min_int, 0, lit_sel_diff_w l
     ) else (
-      (if Lit.is_pos l then 1 else 0),
+      (if Lit.is_positivoid l then 1 else 0),
       (if not (blocker i l) then -(get_arity l) else max_int), 
       alpha_rank l, lit_sel_diff_w l
     )
@@ -428,7 +428,7 @@ let e_sel11 ~blocker ~ord lits =
   | _ -> max_int in
 
   let chooser (i,l) =
-    if Lit.is_pos l then (max_int,max_int,max_int)
+    if Lit.is_positivoid l then (max_int,max_int,max_int)
     else if Lit.is_ground l then (0, lhs_weight l, get_pred_freq ~freq_tbl l)
     else if not (Lit.is_typex_pred l) then (10, eqn_max_weight l, get_pred_freq ~freq_tbl l)
     else if not (Lit.is_type_pred l) then (20, - (lhs_weight l), get_pred_freq ~freq_tbl l)
@@ -445,7 +445,7 @@ let e_sel12 ~blocker ~ord lits =
 
 let e_sel13 ~blocker ~ord lits =
    let chooser (i,l) =
-    (if Lit.is_pos l then 1 else 0), 
+    (if Lit.is_positivoid l then 1 else 0), 
     (if Lit.is_ground l then 0 else 1),
     (- (lit_sel_diff_w l)),
     0 in
@@ -470,7 +470,7 @@ let e_sel14 ~blocker ~ord lits =
       CCBV.set b i;
       max_val in
     
-    if Lit.is_pos l ||  hd_is_fresh_pred l then (block blocked i)
+    if Lit.is_positivoid l ||  hd_is_fresh_pred l then (block blocked i)
     else if Lit.is_ground l then (0, Lit.weight l, hd_freq)
     else if not (Lit.is_typex_pred l) then (10, Lit.max_term_positions ~ord l, hd_freq)
     else if not (Lit.is_type_pred l) then (20, - (Lit.ho_weight l), hd_freq)
@@ -509,7 +509,7 @@ let e_sel15 ~blocker ~ord lits =
        do not select anything *)
     (let max_lits = Literals.maxlits ~ord lits in
      if CCBV.cardinal max_lits = 1 &&
-        Lit.is_pos lits.(CCBV.first_exn max_lits) then (
+        Lit.is_positivoid lits.(CCBV.first_exn max_lits) then (
         assert(CCBV.is_empty sel_bv);
         Some sel_bv
      ) else None)
@@ -549,7 +549,7 @@ let e_sel16 ~blocker ~ord lits =
 
 let ho_sel ~blocker ~ord lits = 
   let chooser (i,l) = 
-    let sign = (if Lit.is_pos l then 1 else 0) in
+    let sign = (if Lit.is_positivoid l then 1 else 0) in
     let ground = if Lit.is_ground l then 1.0 else 1.5 in
     let has_formula = Iter.exists T.is_formula @@ Lit.Seq.terms l in
     let app_var_num = 
@@ -576,7 +576,7 @@ let ho_sel2 ~blocker ~ord lits =
     | _ -> max_int in
 
   let chooser (i,l) = 
-    let sign = (if Lit.is_pos l then 1 else 0) in
+    let sign = (if Lit.is_positivoid l then 1 else 0) in
     (sign, app_var_pen l, Lit.weight l, (if not (Lit.is_ground l) then 0 else 1))  in
   weight_based_sel_driver ~blocker ~ord lits chooser
 
@@ -605,7 +605,7 @@ let ho_sel3 ~blocker ~ord lits =
       else 100
     | _ -> max_int in 
   let chooser (i,l) = 
-    let sign = (if Lit.is_pos l then 1 else 0) in
+    let sign = (if Lit.is_positivoid l then 1 else 0) in
     let lit_pen = lit_penalty l in
     (sign, lit_pen, Lit.weight l, (if (Lit.is_ground l) then 0 else 1))  in
   weight_based_sel_driver ~ord ~blocker lits chooser

@@ -253,7 +253,7 @@ module Make (S : sig val st : Flex_state.t end) = struct
     with PatternUnif.NotInFragment -> raise UnsupportedLiteralKind
 
   let sign l = 
-    if L.is_pos l then 1 else -1
+    if L.is_positivoid l then 1 else -1
 
   let cmp_by_sign l1 l2 =
     CCOrd.int (sign l1) (sign l2)

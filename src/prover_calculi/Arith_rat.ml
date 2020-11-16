@@ -1191,7 +1191,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         Monome.Rat.of_term r >|= fun m2 ->
         i, [Lit.mk_rat_less m1 m2; Lit.mk_rat_less m2 m1]
       | Equation (lhs, rhs, _) when Lit.is_predicate_lit lit ->
-        begin match T.view lhs, Lit.is_pos lit with
+        begin match T.view lhs, Lit.is_positivoid lit with
           | T.AppBuiltin (Builtin.Less, [_; l; r]), false when type_ok l ->
             Monome.Rat.of_term l >>= fun m1 ->
             Monome.Rat.of_term r >|= fun m2 ->

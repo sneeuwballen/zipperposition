@@ -726,7 +726,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       CCList.flatten @@ List.mapi (fun j lit -> 
         if i < j then (
           match lit with 
-          | Lit.Equation(u,v,_) when Lit.is_pos lit ->
+          | Lit.Equation(u,v,_) when Lit.is_positivoid lit ->
             try_factorings (s,t) (u,v) i
             @
             try_factorings (s,t) (v,u) i 
@@ -738,7 +738,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     CCList.flatten @@ List.mapi (fun i lit ->
       match lit with
       | Lit.Equation (s,t,_) 
-        when Lit.is_pos lit &&
+        when Lit.is_positivoid lit &&
              (Env.flex_get k_ext_dec_lits != `OnlyMax ||
              BV.get maximal i) ->
         aux_eq_rest (s,t) i lits
@@ -978,8 +978,8 @@ module Make(E : Env.S) : S with module Env = E = struct
                      if List.exists (T.var_occurs ~var:v) args then (
                        raise Exit; (* [P … t[v] …] is out of scope *)
                      );
-                     others, (args, Literal.is_pos lit) :: set, 
-                     (if Literal.is_pos lit then [lit] else []) @ pos_lits
+                     others, (args, Literal.is_positivoid lit) :: set, 
+                     (if Literal.is_positivoid lit then [lit] else []) @ pos_lits
                    | _ -> lit :: others, set, pos_lits
                  end
                | _ -> lit :: others, set, pos_lits
@@ -1285,7 +1285,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       | _ -> None in
 
     let extract_p_choice_p p l = match l with 
-      | Literal.Equation(lhs,_,_) when Literal.is_pos l && Literal.is_predicate_lit l ->
+      | Literal.Equation(lhs,_,_) when Literal.is_positivoid l && Literal.is_predicate_lit l ->
         begin match T.view lhs with
           | T.App(hd, [ch_p]) when T.equal hd p ->
             begin match T.view ch_p with 
@@ -1332,7 +1332,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           let lit = (C.lits c).(i) in
           if Literal.is_predicate_lit lit && Term.is_app_var lhs then (
             let var_hd = Term.as_var_exn (Term.head_term lhs) in
-            let sign = Literal.is_pos lit in
+            let sign = Literal.is_positivoid lit in
             if sign then (Term.VarSet.add var_hd pos_vs, neg_vs, Term.Map.add lhs true occ)
             else (pos_vs, Term.VarSet.add var_hd neg_vs, Term.Map.add lhs false occ)
           ) else (pos_vs, neg_vs, occ)
@@ -1390,7 +1390,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             T.bvar ~ty idx
           in
           let mk_body ~sign i j = sign (mk_db i) (mk_db j) in
-          let sign = if Lit.is_pos lit then T.Form.neq else T.Form.eq in
+          let sign = if Lit.is_positivoid lit then T.Form.neq else T.Form.eq in
           let subst_t = T.fun_l lam_pref (mk_body ~sign i j) in
           let var = T.as_var_exn hd in
           Some (Subst.FO.bind' Subst.empty (var,0) (subst_t, 0))
@@ -1611,11 +1611,11 @@ module Make(E : Env.S) : S with module Env = E = struct
 
       match C.lits c with
       | [|lit1; lit2|] ->
-        fail_on (not ((Lit.is_pos lit1 || Lit.is_pos lit2) &&
+        fail_on (not ((Lit.is_positivoid lit1 || Lit.is_positivoid lit2) &&
                      (Lit.is_neg lit1 || Lit.is_neg lit2)));
 
         let pos_lit,neg_lit = 
-          if Lit.is_pos lit1 then lit1, lit2 else lit2,lit1 in
+          if Lit.is_positivoid lit1 then lit1, lit2 else lit2,lit1 in
        
         begin match pos_lit, neg_lit with
         | Equation(x,y,true), Equation(lhs,rhs,sign) ->

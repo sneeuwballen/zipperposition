@@ -221,7 +221,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       match C.lits cl with
       | [| Literal.Equation(lhs, rhs, _) as lit |] ->
         let res = 
-          CCList.flat_map inst_clauses_w_trigger (make_triggers lhs rhs (Literal.is_pos lit))
+          CCList.flat_map inst_clauses_w_trigger (make_triggers lhs rhs (Literal.is_positivoid lit))
         in
         res
       | _ -> []
@@ -810,7 +810,9 @@ module Make(E : Env.S) : S with module Env = E = struct
         match at with
         | P.Arg(i, P.Left P.Stop)
         | P.Arg(i, P.Right P.Stop) ->
-          let sign = L.is_pos ((C.lits c).(i)) in
+          (* CAUTION: Using is_pos to really mean is the RHS of the
+             term true or false? *)
+          let sign = L.is_positivoid ((C.lits c).(i)) in
           (Builtin.equal b Builtin.ForallConst && sign)
           || (Builtin.equal b Builtin.ExistsConst && not sign)
         | _ -> false
@@ -912,7 +914,7 @@ module Make(E : Env.S) : S with module Env = E = struct
        given literal -- renaming clauses will stop combinatorial explosion
        when hoisting boolean subterms *)
     let rename_lit lit =
-      let sign = L.is_pos lit in
+      let sign = L.is_positivoid lit in
       let polarity_aware = Env.flex_get Lazy_cnf.k_pa_renaming in
       if L.is_predicate_lit lit then (
         match lit with
@@ -956,7 +958,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             CCList.fold_left (fun (defs, parents) (idx, _) -> 
               let lit = (C.lits c).(idx) in
               let renamer, new_defs, new_parents = rename_lit lit in
-              let new_lit = Literal.mk_prop renamer (Literal.is_pos lit) in
+              let new_lit = Literal.mk_prop renamer (Literal.is_positivoid lit) in
               new_lits.(idx) <- new_lit;
               (new_defs @ defs, new_parents @ parents)
             ) ([], []) xs

@@ -129,7 +129,7 @@ let depth lit =
 
 module Set = CCSet.Make(struct type t = lit let compare = compare end)
 
-let is_pos = function
+let is_positivoid = function
   | Equation (l, r, sign) -> 
     sign && (not @@ T.equal r T.false_)
   | Int o -> Int_lit.sign o
@@ -138,16 +138,17 @@ let is_pos = function
 (* specific: for the term comparison *)
 let polarity = function
   | Int o -> Int_lit.polarity o
-  | lit -> is_pos lit
+  | Equation(_,_,s) -> s
+  | l -> is_positivoid l
 
 
-let is_neg lit = not (is_pos lit)
+let is_neg lit = not (is_positivoid lit)
 
 let is_eqn = function
   | Equation _ -> true
   | _ -> false
 
-let is_eq lit = is_eqn lit && is_pos lit
+let is_eq lit = is_eqn lit && is_positivoid lit
 let is_neq lit = is_eqn lit && is_neg lit
 
 let is_app_var_eq = function
@@ -513,7 +514,7 @@ let map f lit = map_ f lit
 
 let eqn_sign = function 
   | Equation(_,_,sign) -> sign
-  | lit -> is_pos lit
+  | lit -> is_positivoid lit
 
 let apply_subst_ ~f_term ~f_arith_lit ~f_rat subst (lit,sc) =
   match lit with
@@ -719,7 +720,7 @@ let as_ho_predicate (lit:t) : _ option =
   | Equation(lhs,rhs,_) when is_predicate_lit lit ->
     let hd_t, args_t = T.as_app lhs in
     begin match T.view hd_t, args_t with
-      | T.Var v, _::_ -> Some (v, hd_t, args_t, is_pos lit)
+      | T.Var v, _::_ -> Some (v, hd_t, args_t, is_positivoid lit)
       | _ -> None
     end
   | _ -> None
@@ -764,7 +765,7 @@ let normalize_eq lit =
     match lit with
     | Equation(lhs, rhs, _) 
       when is_predicate_lit lit ->
-      let sign = is_pos lit in
+      let sign = is_positivoid lit in
       begin match T.view lhs with 
         | T.AppBuiltin(Builtin.(Eq|Equiv), ([_;l;r] | [l;r])) -> (* first arg can be type variable *)
           let eq_cons = if sign then mk_eq_ else mk_neq_ in
@@ -790,7 +791,7 @@ let pp_debug ?(hooks=[]) out lit =
   if List.for_all (fun h -> not (h out lit)) hooks
   then (begin match lit with
       | Equation (p, t, _) when is_predicate_lit lit -> 
-        Format.fprintf out "@[%s%a@]" (if (is_pos lit) then "" else "¬") T.pp p
+        Format.fprintf out "@[%s%a@]" (if (is_positivoid lit) then "" else "¬") T.pp p
       | True -> CCFormat.string out "Τ"
       | False -> CCFormat.string out "⊥"
       | Equation (l, r, true) ->
@@ -803,7 +804,7 @@ let pp_debug ?(hooks=[]) out lit =
 let pp_tstp out lit =
   match lit with
   | Equation (p, t, _) when is_predicate_lit lit -> 
-    Format.fprintf out "%s %a" (if (is_pos lit) then "" else "~") T.TPTP.pp p
+    Format.fprintf out "%s %a" (if (is_positivoid lit) then "" else "~") T.TPTP.pp p
   | True -> CCFormat.string out "$true"
   | False -> CCFormat.string out "$false"
   | Equation (l, r, true) ->
@@ -816,7 +817,7 @@ let pp_tstp out lit =
 let pp_zf out lit =
   match lit with
   | Equation (p, t, _) when is_predicate_lit lit -> 
-    Format.fprintf out "%s %a" (if (is_pos lit) then "" else "~") T.ZF.pp p
+    Format.fprintf out "%s %a" (if (is_positivoid lit) then "" else "~") T.ZF.pp p
   | True -> CCFormat.string out "true"
   | False -> CCFormat.string out "false"
   | Equation (l, r, true) ->
@@ -1119,7 +1120,7 @@ module Conv = struct
         begin match lit with
           | Equation (l, r, _) -> 
             assert (Type.equal (Term.ty l) (Term.ty r));
-            let sign = is_pos lit in
+            let sign = is_positivoid lit in
             if Type.is_prop (Term.ty l) then (
               if T.is_true_or_false r then SLiteral.atom l sign 
               else (
@@ -1252,6 +1253,6 @@ let max_term_positions ~ord = function
 
 let as_pos_pure_var lit =
   match View.as_eqn lit with 
-  | Some (l, r, true) when is_pure_var lit && is_pos lit -> Some(_as_var l,_as_var r)
+  | Some (l, r, true) when is_pure_var lit && is_positivoid lit -> Some(_as_var l,_as_var r)
   | _ -> None
 

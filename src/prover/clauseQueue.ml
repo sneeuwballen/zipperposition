@@ -218,7 +218,7 @@ module Make(C : Clause_intf.S) = struct
             match lit with
             | Lit.Equation(l,r,_) ->
               let t_w = max (term_w l) (term_w r) in
-              let t_w = if Lit.is_pos lit then pos_m *. t_w else t_w in
+              let t_w = if Lit.is_positivoid lit then pos_m *. t_w else t_w in
               let t_w = if CCBV.get max_lits i then max_l_mul *. t_w else t_w in
               let ordered = Ordering.compare ord l r != Comparison.Incomparable in
               t_w *. (if not ordered then unord_m else 1.0)
@@ -236,7 +236,7 @@ module Make(C : Clause_intf.S) = struct
           let w =
             match lit with
             | Lit.Equation(l,r,_) ->
-              let term_w = if Lit.is_pos lit then pterm_w else nterm_w in
+              let term_w = if Lit.is_positivoid lit then pterm_w else nterm_w in
               let ord_side = Ordering.compare ord l r in
               let l_mul = if ord_side = Comparison.Gt || ord_side = Comparison.Incomparable
                 then max_t_m else 1.0 in
@@ -244,10 +244,10 @@ module Make(C : Clause_intf.S) = struct
                 then max_t_m else 1.0 in
               let eq_inc = 
                 if Term.equal Term.true_ r 
-                then float_of_int (if Lit.is_pos lit then pf_w else nf_w)
+                then float_of_int (if Lit.is_positivoid lit then pf_w else nf_w)
                 else 0.0  in
               let t_w = l_mul *. (term_w l) +. r_mul *. (term_w r) +. eq_inc in
-              let t_w = if Lit.is_pos lit then pos_m *. t_w else t_w in
+              let t_w = if Lit.is_positivoid lit then pos_m *. t_w else t_w in
               let t_w = if CCBV.get max_lits i then max_l_m *. t_w else t_w in
               t_w
             | _ -> 1.0 in
@@ -279,7 +279,7 @@ module Make(C : Clause_intf.S) = struct
       match l with
       (* Special treatment of propositions *)
       | Lit.Equation (lhs,_,_) when Lit.is_predicate_lit l ->
-        calc_tweight lhs sg v w c_mul, Lit.is_pos l
+        calc_tweight lhs sg v w c_mul, Lit.is_positivoid l
       | Lit.Equation (lhs,rhs,sign) -> (calc_tweight lhs sg v w c_mul +
                                         calc_tweight rhs sg v w c_mul, sign)
       | _ -> (0,false)
@@ -379,7 +379,7 @@ module Make(C : Clause_intf.S) = struct
 
       C.Seq.lits c
       |> Iter.foldi (fun acc idx lit -> 
-        let is_pos = Lit.is_pos lit in
+        let is_pos = Lit.is_positivoid lit in
         let is_max = CCBV.get max_lits idx in
 
         Lit.Seq.terms lit
@@ -420,7 +420,7 @@ module Make(C : Clause_intf.S) = struct
         int_of_float (mul *. float_of_int (aux t)) in
 
       let lit_weight is_max lit =
-        let is_pos = Lit.is_pos lit in
+        let is_pos = Lit.is_positivoid lit in
         let multipliers =
           (if is_max then max_lit_mul else 1.0) *.
           (if is_pos then pos_mul else 1.0) in
@@ -472,7 +472,7 @@ module Make(C : Clause_intf.S) = struct
       let res = 
         C.Seq.lits c
         |> Iter.foldi (fun (weight,syms,vars) idx lit -> 
-          let pos_c = if Lit.is_pos lit then pos_mul else 1.0 in
+          let pos_c = if Lit.is_positivoid lit then pos_mul else 1.0 in
           let max_c = if CCBV.get max_lits idx then max_l_mul else 1.0 in
 
           match lit with
@@ -512,7 +512,7 @@ module Make(C : Clause_intf.S) = struct
 
     let favor_pos_unit c =
       let is_unit_pos c = match C.lits c with
-        | [| lit |] when Lit.is_pos lit -> true
+        | [| lit |] when Lit.is_positivoid lit -> true
         | _ -> false
       in
       if is_unit_pos c then 0 else penalty_coeff_
@@ -788,10 +788,10 @@ module Make(C : Clause_intf.S) = struct
       if C.proof_depth c = 0 || CCOpt.is_some (C.distance_to_goal c) then 0 else 1
 
     let prefer_non_goals c =
-      if Iter.exists Literal.is_pos (C.Seq.lits c) then 0 else 1
+      if Iter.exists Literal.is_positivoid (C.Seq.lits c) then 0 else 1
 
     let prefer_unit_ground_non_goals c =
-      if Iter.exists Literal.is_pos (C.Seq.lits c) &&
+      if Iter.exists Literal.is_positivoid (C.Seq.lits c) &&
          C.is_unit_clause c && C.is_ground c then 0 else 1
 
     let prefer_goals c =
@@ -978,7 +978,7 @@ module Make(C : Clause_intf.S) = struct
     let by_neg_lit c =
       abs @@
         Array.fold_left (fun acc lit -> 
-          if Lit.is_pos lit then acc + 400
+          if Lit.is_positivoid lit then acc + 400
           else if Lit.is_ground lit then acc - 3
           else acc - 1
         ) 0 (C.lits c)

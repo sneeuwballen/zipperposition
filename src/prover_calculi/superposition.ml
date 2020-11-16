@@ -624,7 +624,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         match info.passive_pos with 
         | P.Arg(_, P.Left P.Stop)
         | P.Arg(_, P.Right P.Stop) ->
-          if not (Lit.is_pos (info.passive_lit)) then (
+          if not (Lit.is_positivoid (info.passive_lit)) then (
             raise @@ ExitSuperposition ("negative literal must paramodulate into top-level positive position")
           )
         | _ -> 
@@ -750,7 +750,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
       let rule =
         let r = kind_to_str info.sup_kind in
-        let sign = if Lit.is_pos passive_lit' then "+" else "-" in
+        let sign = if Lit.is_positivoid passive_lit' then "+" else "-" in
         Proof.Rule.mk (r ^ sign)
       in
       CCList.iter (fun (sym,ty) -> Ctx.declare sym ty) !skolem_decls;
@@ -877,7 +877,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let new_lits = c_guard @ lits_a @ lits_p in
       let rule =
         let r = kind_to_str info.sup_kind in
-        let sign = if Lit.is_pos passive_lit' then "+" else "-" in
+        let sign = if Lit.is_positivoid passive_lit' then "+" else "-" in
         Proof.Rule.mk ("s_" ^ r ^ sign)
       in
       let subst_is_ho = 
@@ -1644,7 +1644,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     ZProf.enter_prof prof_infer_equality_factoring;
     let eligible = C.Eligible.(filter (function 
       | Lit.Equation(lhs,_,_) as lit ->
-        Lit.is_pos lit ||
+        Lit.is_positivoid lit ||
         (Lit.is_neg lit && Lit.is_predicate_lit lit && T.is_app_var lhs)
       | _ -> false )) in
     (* find root terms that are unifiable with s and are not in the
@@ -1656,7 +1656,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
            match lit with
            | _ when i = idx -> () (* same index *)
            | Lit.Equation (u, v, _) ->
-             let sign = Lit.is_pos lit in
+             let sign = Lit.is_positivoid lit in
              if not sign && not is_pred_var then ()
              else (
                if is_pred_var && Lit.is_predicate_lit lit then (
@@ -2149,7 +2149,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let res = CCArray.exists
         (function
           (* NOTE: Based on the representation of the literals *)
-          | Lit.Equation (l, r, _) as lit when Lit.is_pos lit ->
+          | Lit.Equation (l, r, _) as lit when Lit.is_positivoid lit ->
             (* if l=r is implied by the congruence, then the clause is redundant *)
             Congruence.FO.is_eq cc l r
           | _ -> false)
@@ -2164,7 +2164,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let is_semantic_tautology_ c =
     if Array.length (C.lits c) >= 2 &&
        CCArray.exists Lit.is_neg (C.lits c) &&
-       CCArray.exists Lit.is_pos (C.lits c)
+       CCArray.exists Lit.is_positivoid (C.lits c)
     then is_semantic_tautology_real c
     else false
 
@@ -2641,7 +2641,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     Util.incr_stat stat_subsumed_in_active_set_call;
     (* if c is a single unit clause *)
     let try_eq_subsumption =
-      C.is_unit_clause c && Lit.is_pos (C.lits c).(0)
+      C.is_unit_clause c && Lit.is_positivoid (C.lits c).(0)
     in
     (* use feature vector indexing *)
     let res =
@@ -2868,11 +2868,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
       match C.lits c with
       | [|lit1; lit2|] ->
-        fail_on (not ((Lit.is_pos lit1 || Lit.is_pos lit2) &&
+        fail_on (not ((Lit.is_positivoid lit1 || Lit.is_positivoid lit2) &&
                      (Lit.is_neg lit1 || Lit.is_neg lit2)));
 
         let pos_lit,neg_lit = 
-          if Lit.is_pos lit1 then lit1, lit2 else lit2,lit1 in
+          if Lit.is_positivoid lit1 then lit1, lit2 else lit2,lit1 in
        
         begin match pos_lit, neg_lit with
         | Equation(x,y,true), Equation(lhs,rhs,sign) ->

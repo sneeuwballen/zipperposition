@@ -445,7 +445,7 @@ module Make
     | Some _
     | None -> false
 
-  let has_pos_lit_ c = CCArray.exists Literal.is_pos (C.lits c)
+  let has_pos_lit_ c = CCArray.exists Literal.is_positivoid (C.lits c)
 
   (* fresh var generator *)
   let fresh_var_gen_ (): Type.t -> T.t =
