@@ -128,7 +128,7 @@ module Head = struct
       (* Under quantifiers, we ignore the lambda *)
       begin match T.view lam with 
       | T.Fun (ty', body) -> [ty; body]
-      | _ -> assert false
+      | _ -> [ty; lam]
       end
     | T.AppBuiltin (_,ss) -> ss
     (* The orderings treat lambda-expressions like a "LAM" symbol applied to the body of the lambda-expression *)
