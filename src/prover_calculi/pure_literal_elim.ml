@@ -9,7 +9,7 @@ module IDMap = CCMap.Make(struct
   let compare (id1, sgn1) (id2, sgn2) =
     let open CCOrd in
     ID.compare id1 id2
-    <?> (Bool.compare, sgn1, sgn2)
+    <?> (CCBool.compare, sgn1, sgn2)
 end)
 
 module IntSet = Util.Int_set
@@ -212,7 +212,7 @@ let remove_pure_clauses (seq : (TST.t SLiteral.t list, TST.t, TST.t) Statement.t
     | Statement.NegatedGoal (skolems,list_of_lits) ->
       (* clauses stemming from the negated goal *)
       let new_cls = 
-        List.filter_map (fun x -> filter_if_has_pure x x) list_of_lits 
+        CCList.filter_map (fun x -> filter_if_has_pure x x) list_of_lits 
       in
       if CCList.is_empty new_cls then None
       else if List.length new_cls == List.length list_of_lits then Some stmt
