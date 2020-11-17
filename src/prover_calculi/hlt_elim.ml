@@ -36,7 +36,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* index from literals to the map implied literal 
       -> clauses necessary for the proof *)
-  module PremiseIdx = Fingerprint.Make(struct 
+  module PremiseIdx = NPDtree.MakeTerm(struct 
     type t = CS.t T.Tbl.t
     (* as we will maintain the invariant that each term is mapped to a single
        table, comparing the lengths suffices *)
@@ -45,12 +45,12 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* index from literals that appear as conclusions to all the premises
      in which they appear *)
-  module ConclusionIdx = Fingerprint.Make(struct 
+  module ConclusionIdx = NPDtree.MakeTerm(struct 
     type t = T.t
     let compare = Term.compare
   end)
 
-  module UnitIdx = Fingerprint.Make(struct 
+  module UnitIdx = NPDtree.MakeTerm(struct 
     type t = C.t
     let compare = C.compare
   end)
