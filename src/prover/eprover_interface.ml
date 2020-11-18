@@ -45,6 +45,11 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let (==>) = Type.(==>)
 
+  let init_clauses = ref C.ClauseSet.empty
+
+  let initialize () =
+    init_clauses := C.ClauseSet.of_iter (Env.get_passive ())
+
   exception CantEncode of string
 
   let output_empty_conj ~out =
@@ -70,8 +75,8 @@ module Make(E : Env.S) : S with module Env = E = struct
         raise @@ CantEncode err;
       );
       match T.view t with 
-      | T.Const _ | T.Var _ -> sym_map, t
-      | T.DB _ | T.Fun _ -> 
+      | T.Const _ | T.Var _ | T.DB _ -> sym_map, t
+      | T.Fun _ -> 
         let err = 
           CCFormat.sprintf "%a is a lambda" T.pp t in
         raise @@ CantEncode err
@@ -86,9 +91,11 @@ module Make(E : Env.S) : S with module Env = E = struct
       | T.AppBuiltin((Builtin.Eq | Builtin.Neq) as b, [ty;lhs;rhs]) 
           when T.is_ground ty ->
         sym_map, T.app_builtin ~ty:Type.prop b [lhs;rhs]
-      | T.AppBuiltin((Builtin.ForallConst | Builtin.ExistsConst) as b, [ty;body]) 
-          when T.is_ground ty ->
-        sym_map, T.app_builtin ~ty:Type.prop b [body]
+      | T.AppBuiltin((Builtin.ForallConst | Builtin.ExistsConst) as b, ([_;body]|[body]))
+          when Type.is_ground (T.ty body) ->
+        let vars, body = T.open_fun body in
+        let sym_map, body' = aux ~sym_map body in
+        sym_map, T.app_builtin ~ty:Type.prop b [T.fun_l vars body']
       | T.AppBuiltin(_, l)
       | T.App(_, l) ->
         let hd_mono, args = T.as_app_mono t in
@@ -210,61 +217,57 @@ module Make(E : Env.S) : S with module Env = E = struct
 
 
   let try_e active_set passive_set =
-    let remaining_ho_clauses = ref (!_max_derived) in
+    let lambdas_too_deep c =
+      let lambda_limit = 6 in
+      C.Seq.terms c
+      |> Iter.map (fun t -> 
+          CCOpt.get_or ~default:0 (Term.lambda_depth t))
+      |> Iter.max
+      |> CCOpt.get_or ~default:0
+      |> (fun lam_depth -> lam_depth > lambda_limit) 
+    in
 
-    let take_from_set ?(converter=(fun c -> [c])) 
-                      ~ignore_ids ~encoded_symbols set =
-
-      let lambdas_too_deep c =
-        let lambda_limit = 6 in
-        C.Seq.terms c
-        |> Iter.map (fun t -> 
-            CCOpt.get_or ~default:0 (Term.lambda_depth t))
-        |> Iter.max
-        |> CCOpt.get_or ~default:0
-        |> (fun lam_depth -> lam_depth > lambda_limit) in
-
-
-      let init, rest = 
-        Iter.to_list set
-        |> CCList.partition_map (fun c -> 
-          let p_d = C.proof_depth c in
-          if lambdas_too_deep c then `Drop
-          else if p_d = 0 then `Left c
-          else if not !_only_ho_steps || Proof.Step.has_ho_step (C.proof_step c) then `Right c
-          else `Drop
-        ) in
-      let rest = 
-        CCList.sort (fun c1 c2 ->
-          let pd1 = C.proof_depth c1 and pd2 = C.proof_depth c2 in
-          if pd1 = pd2 then CCInt.compare (C.ho_weight c1) (C.ho_weight c2)
-          else CCInt.compare pd1 pd2) rest
-        |> CCList.take !remaining_ho_clauses in
-
-      remaining_ho_clauses := !remaining_ho_clauses - (List.length rest);
-
+    let convert_clauses ~converter ~encoded_symbols iter =
       let converted = 
-        CCList.map (fun c -> 
-          CCOpt.get_or ~default:c (C.eta_reduce c)) init @ rest
-        |> CCList.flat_map converter in
+        Iter.map (fun c -> 
+          CCOpt.get_or ~default:c (C.eta_reduce c)) iter
+        |> Iter.flat_map_l converter in
 
       let encoded, encoded_symbols = 
-        CCList.fold_left (fun (acc, encoded_symbols) cl ->
+        Iter.fold (fun (acc, encoded_symbols) cl ->
           try 
-            if IntSet.mem (C.id cl) ignore_ids then raise @@ CantEncode "skip id";
             let encoded_symbols, cl' = encode_ty_args_cl ~encoded_symbols cl in
             (cl'::acc, encoded_symbols)
           with CantEncode reason ->
             Util.debugf 5 "cannot encode(%s):@.@[%a@]@." (fun k -> k reason C.pp cl);
             (acc, encoded_symbols)
         ) ([], encoded_symbols) converted in
-      encoded_symbols, encoded in
+      encoded_symbols, encoded
+    in
+    
+    let take_initial ~converter () =
+      let module CS = C.ClauseSet in
+      CS.filter (fun c -> not (lambdas_too_deep c)) !init_clauses
+      |> CS.to_iter
+      |> convert_clauses ~converter ~encoded_symbols:T.Map.empty 
+    in     
 
+    let take_ho_clauses ~converter ~encoded_symbols clauses =
+      Iter.filter (fun cl -> 
+        let pd = C.proof_depth cl in
+        pd > 0 && pd <= 5) clauses 
+      |> Iter.sort ~cmp:(fun c1 c2 ->
+        let pd1 = C.proof_depth c1 and pd2 = C.proof_depth c2 in
+        if pd1 = pd2 then CCInt.compare (C.ho_weight c1) (C.ho_weight c2)
+        else CCInt.compare pd1 pd2)
+      |> Iter.take !_max_derived
+      |> convert_clauses ~converter ~encoded_symbols
+    in
+      
     let prob_name, prob_channel = Filename.open_temp_file ~temp_dir:!_tmp_dir "e_input" "" in
     let out = Format.formatter_of_out_channel prob_channel in
 
     try
-      let encoded_symbols = Term.Map.empty in
       let converter = 
         match !_encode_lams with
         | `Ignore -> (fun c -> [c])
@@ -272,16 +275,16 @@ module Make(E : Env.S) : S with module Env = E = struct
         | _ -> (fun c ->
             let lifted = LLift.lift_lambdas c in
             if CCList.is_empty lifted then [c] else lifted) in
-      let encoded_symbols, active_set = 
-        take_from_set ~ignore_ids:IntSet.empty ~encoded_symbols ~converter active_set in
-      let ignore_ids = IntSet.of_list (List.map C.id active_set) in
-      let _, passive_set = 
-        take_from_set ~encoded_symbols ~converter ~ignore_ids passive_set in
-      let already_defined = output_all ~out active_set in
+      
+      let encoded_symbols, initial = 
+        take_initial ~converter () in
+      let _, ho_clauses = 
+        take_ho_clauses ~encoded_symbols ~converter (Iter.append active_set passive_set) in
+      let already_defined = output_all ~out initial in
       Format.fprintf out "%% -- PASSIVE -- \n";
-      ignore(output_all  ~already_defined ~out passive_set);
+      ignore(output_all  ~already_defined ~out ho_clauses);
       close_out prob_channel;
-      let cl_set = active_set @ passive_set in
+      let cl_set = initial @ ho_clauses in
 
       let res = 
         match run_e prob_name with
@@ -305,6 +308,9 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let setup () = 
     ()
+
+  let () =
+    Signal.once Env.on_start initialize;
 end
 
 let () =
