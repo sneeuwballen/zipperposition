@@ -1613,16 +1613,18 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   (* do the inference between given positions, if ordering conditions are respected *)
   let do_eq_factoring info =
     let open EqFactInfo in
-    let s = info.s and t = info.t and v = info.v in
+    let s = info.s and t = info.t and v = info.v and idx = info.active_idx in
     let us = info.subst in
     (* check whether subst(lit) is maximal, and not (subst(s) < subst(t)) *)
     let renaming = S.Renaming.create () in
     let subst = US.subst us in
+    let s' = S.FO.apply renaming subst (s, info.scope) in
 
-    if (O.compare ord (S.FO.apply renaming subst (s, info.scope))
-          (S.FO.apply renaming subst (t, info.scope)) <> Comp.Lt
-        &&
-        (C.is_eligible_param (info.clause,info.scope) subst ~idx:info.active_idx))
+    if O.compare ord s' (S.FO.apply renaming subst (t, info.scope)) <> Comp.Lt
+      && O.compare ord s' (S.FO.apply renaming subst (v, info.scope)) <> Comp.Lt
+      && CCList.for_all (fun (c, i) -> i = idx) (C.selected_lits info.clause)
+      && CCList.is_empty (C.bool_selected info.clause)
+      && C.is_maxlit (info.clause,info.scope) subst ~idx
     then (
       let subst_is_ho = 
         Subst.codomain subst
@@ -1637,7 +1639,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           [C.proof_parent_subst renaming (info.clause,0) subst]
       (* new_lits: literals of the new clause. remove active literal
          and replace it by a t!=v one, and apply subst *)
-      and new_lits = CCArray.except_idx (C.lits info.clause) info.active_idx in
+      and new_lits = CCArray.except_idx (C.lits info.clause) idx in
       let new_lits = Lit.apply_subst_list renaming subst (new_lits,info.scope) in
       let c_guard = Literal.of_unif_subst renaming us in
       let lit' = Lit.mk_neq
@@ -1665,8 +1667,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (fun i lit ->
            match lit with
            | _ when i = idx -> () (* same index *)
-           | Lit.Equation (u, v, _) ->
-             let sign = Lit.is_positivoid lit in
+           | Lit.Equation (u, v, sign) ->
              if sign then (
                k (u, v, unify (s,0) (u,0));
                k (v, u, unify (s,0) (v,0))
@@ -1678,9 +1679,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let new_clauses =
       Lits.fold_eqn ~ord ~both:true ~eligible (C.lits clause)
       |> Iter.flat_map
-        (fun (s, t, sign, s_pos) -> (* try with s=t *)
-           (* temoprary assert for current representation of predicate literals *)
-           assert (sign || T.equal s T.false_ || T.equal t T.false_);
+        (fun (s, t, _, s_pos) -> (* try with s=t *)
            let active_idx = Lits.Pos.idx s_pos in
            find_unifiable_lits active_idx s s_pos
            |> Iter.filter_map
