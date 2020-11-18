@@ -254,7 +254,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       PremiseIdx.iter !prems_ (fun t tbl -> 
         Util.debugf ~section 2 "@[%a@] --> @[%a@]" (fun k -> k T.pp t (Iter.pp_seq T.pp) (T.Tbl.keys tbl))
       );
-    ) else (
+    ) else if Env.flex_get k_unit_reduction then (
       match get_unit_predicate cl with
       | Some unit ->
         units_ := UnitIdx.add !units_ unit cl
@@ -286,7 +286,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
       (* for the literal l we are looking for implications p -> c such that
          c\sigma = ~l. Then we see if there is an unit clause p' such that
-         p\sigma\rho = p' *)
+         p\sigma = p'\rho *)
 
       ConclusionIdx.retrieve_generalizations (!concls_, idx_sc) (lhs_neg, q_sc)
       |> Iter.find_map (fun (concl, premise, subst) ->
@@ -308,7 +308,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     ) pred_lits;
     if CCBV.is_empty (CCBV.negate bv) then None
     else (
-      let pred_cls_l = CCBV.select bv (CCArray.of_list pred_lits) in
+      let pred_cls_l = List.rev (CCBV.select bv (CCArray.of_list pred_lits)) in
       let lit_l = pred_cls_l @ eq_lits in
       let proof = 
         Proof.Step.simp ~rule:(Proof.Rule.mk "unit_hidden_literal_elimination")
@@ -364,7 +364,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         
         if CCBV.is_empty (CCBV.negate bv) then None
         else (        
-          let pred_cls_l = CCBV.select bv (CCArray.of_list pred_lits) in
+          let pred_cls_l = List.rev @@ CCBV.select bv (CCArray.of_list pred_lits) in
           let lit_l = pred_cls_l @ eq_lits in
           let proof = 
             Proof.Step.simp ~rule:(Proof.Rule.mk "hidden_literal_elimination")
@@ -385,22 +385,19 @@ module Make(E : Env.S) : S with module Env = E = struct
         Some (tauto)
     ) else None
 
-  let simplify_cl cl =
-    match do_simplify cl with
+
+  let simplify_opt ~f cl =
+    match f cl with
     | Some cl' ->
       Util.debugf ~section 1 "simplified: @[@[%a@] --> @[%a@]@]" (fun k -> k C.pp cl C.pp cl');
       SimplM.return_new cl'
     | None -> 
       SimplM.return_same cl
 
-  let unit_reduction cl =
-    match do_unit_reduction cl with
-    | Some cl' ->
-      Util.debugf ~section 3 "simplified: @[@[%a@] --> @[%a@]@]" (fun k -> k C.pp cl C.pp cl');
-      SimplM.return_new cl'
-    | None -> 
-      SimplM.return_same cl
-  
+  let simplify_cl = simplify_opt ~f:do_simplify
+
+  let unit_reduction = simplify_opt ~f:do_unit_reduction
+
   let untrack_clause cl =
     (match Util.Int_map.get (C.id cl) !cl_occs with
     | Some premises ->
@@ -416,8 +413,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     if Util.Int_map.mem (C.id cl) !cl_occs then (
       Util.debugf ~section 3 "removed: @[%a@]." (fun k -> k C.pp cl);
       decr tracked_cls;
-      ConclusionIdx.iter !concls_ (fun premise concl -> 
-        Util.debugf ~section 3 "@[%a@] -> @[%a@]" (fun k -> k T.pp premise T.pp concl)));
+    );
     cl_occs := Util.Int_map.remove (C.id cl) !cl_occs;
     match get_unit_predicate cl with
     | Some unit ->
