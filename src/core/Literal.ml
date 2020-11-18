@@ -519,10 +519,6 @@ let map_ f = function
 
 let map f lit = map_ f lit
 
-let eqn_sign = function 
-  | Equation(_,_,sign) -> sign
-  | lit -> is_positivoid lit
-
 let apply_subst_ ~f_term ~f_arith_lit ~f_rat subst (lit,sc) =
   match lit with
   | Equation (l,r,sign) ->

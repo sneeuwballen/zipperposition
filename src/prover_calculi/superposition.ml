@@ -94,7 +94,6 @@ let k_check_sup_at_var_cond = Flex_state.create_key ()
 let k_restrict_hidden_sup_at_vars = Flex_state.create_key ()
 let k_bool_demod = Flex_state.create_key ()
 let k_immediate_simplification = Flex_state.create_key ()
-let k_bool_eq_fact = Flex_state.create_key ()
 let k_local_rw = Flex_state.create_key ()
 let k_destr_eq_res = Flex_state.create_key ()
 
@@ -1608,7 +1607,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       v : T.t;
       subst : US.t;
       scope : int;
-      pred_var_eq_fact : bool
     }
   end
 
@@ -1621,8 +1619,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let renaming = S.Renaming.create () in
     let subst = US.subst us in
 
-    if info.pred_var_eq_fact ||
-        (O.compare ord (S.FO.apply renaming subst (s, info.scope))
+    if (O.compare ord (S.FO.apply renaming subst (s, info.scope))
           (S.FO.apply renaming subst (t, info.scope)) <> Comp.Lt
         &&
         (C.is_eligible_param (info.clause,info.scope) subst ~idx:info.active_idx))
@@ -1660,35 +1657,19 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let infer_equality_factoring_aux ~unify ~iterate_substs clause =
     ZProf.enter_prof prof_infer_equality_factoring;
-    let eligible = C.Eligible.(filter (function 
-      | Lit.Equation(lhs,_,_) as lit ->
-        Lit.is_positivoid lit ||
-        (Lit.is_negativoid lit && Lit.is_predicate_lit lit && T.is_app_var lhs)
-      | _ -> false )) in
+    let eligible = C.Eligible.(filter Lit.eqn_sign) in
     (* find root terms that are unifiable with s and are not in the
        literal at s_pos. Calls [k] with a position and substitution *)
-    let find_unifiable_lits ~var_pred_status idx s _s_pos k =
-      let is_pred_var, pred_var_sign = var_pred_status in
+    let find_unifiable_lits idx s _s_pos k =
       Array.iteri
         (fun i lit ->
            match lit with
            | _ when i = idx -> () (* same index *)
            | Lit.Equation (u, v, _) ->
              let sign = Lit.is_positivoid lit in
-             if not sign && not is_pred_var then ()
-             else (
-               if is_pred_var && Lit.is_predicate_lit lit then (
-                 if sign == pred_var_sign then (
-                   k (u, v, unify (s,0) (u,0))
-                 ) else (
-                   let u = T.Form.not_ u in
-                   k (u, (if sign then T.false_ else T.true_),
-                      unify (s,0) (u,0))
-                 )
-               ) else if sign && ((not is_pred_var) || pred_var_sign) then (
-                 k (u, v, unify (s,0) (u,0));
-                 k (v, u, unify (s,0) (v,0))
-               );
+             if sign then (
+               k (u, v, unify (s,0) (u,0));
+               k (v, u, unify (s,0) (v,0))
              )
            | _ -> () (* ignore other literals *)
         ) (C.lits clause)
@@ -1699,20 +1680,15 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       |> Iter.flat_map
         (fun (s, t, sign, s_pos) -> (* try with s=t *)
            (* temoprary assert for current representation of predicate literals *)
-           assert (sign || 
-                  (T.equal s T.false_ && T.is_app_var t) || 
-                  (T.equal t T.false_ && T.is_app_var s));
+           assert (sign || T.equal s T.false_ || T.equal t T.false_);
            let active_idx = Lits.Pos.idx s_pos in
-           let is_var_pred =
-             Env.flex_get k_bool_eq_fact && T.is_app_var s && Type.is_prop (T.ty s) in
-           let var_pred_status = (is_var_pred, T.equal t T.true_) in
-           find_unifiable_lits ~var_pred_status active_idx s s_pos
+           find_unifiable_lits active_idx s s_pos
            |> Iter.filter_map
              (fun (u,v,substs) ->
                iterate_substs substs
                  (fun subst ->
                      let info = EqFactInfo.({
-                         clause; s; t; u; v; active_idx; subst; scope=0; pred_var_eq_fact=is_var_pred
+                         clause; s; t; u; v; active_idx; subst; scope=0
                        }) in
                    do_eq_factoring info)))
       |> Iter.to_rev_list
@@ -3155,7 +3131,6 @@ let _sort_constraints = ref false
 let _bool_demod = ref false
 let _immediate_simplification = ref false
 let _try_lfho_unif = ref true
-let _bool_eq_fact = ref true
 
 let _guard = ref 30
 let _ratio = ref 100
@@ -3209,7 +3184,6 @@ let register ~sup =
   E.flex_add k_use_semantic_tauto !_use_semantic_tauto;
   E.flex_add k_bool_demod !_bool_demod;
   E.flex_add k_immediate_simplification !_immediate_simplification;
-  E.flex_add k_bool_eq_fact !_bool_eq_fact;
 
 
   E.flex_add PragUnifParams.k_max_inferences !_max_infs;
@@ -3280,7 +3254,6 @@ let () =
       "--switch-stream-extract", Arg.Bool (fun b -> _switch_stream_extraction := b), " in ho mode, switches heuristic of clause extraction from the stream queue";
       "--fluidsup-penalty", Arg.Int (fun p -> _fluidsup_penalty := p), " penalty for FluidSup inferences";
       "--dupsup-penalty", Arg.Int (fun p -> _dupsup_penalty := p), " penalty for DupSup inferences";
-      "--bool-eq-fact", Arg.Bool ((:=) _bool_eq_fact), " turn bool eq-fact on or off";
       "--fluidsup", Arg.Bool (fun b -> _fluidsup :=b), " enable/disable FluidSup inferences (only effective when complete higher-order unification is enabled)";
       "--subvarsup", Arg.Bool ((:=) _subvarsup), " enable/disable SubVarSup inferences";
       "--lambdasup", Arg.Int (fun l -> 
