@@ -64,12 +64,11 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* clauses tracked so far *)
   let tracked_cls = ref 0
 
-  let tracking_eq () =
+  let [@inline] tracking_eq () =
     Env.flex_get k_track_eq
 
   (* constants denoting the scope of index and the query, respectively *)
   let idx_sc, q_sc = 0, 1
-
 
   let retrieve_idx ~getter (premise, q_sc) =
     match T.view premise with
@@ -94,7 +93,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let retrive_gen_unit_idx unit_sc  =
     retrieve_idx ~getter:(UnitIdx.retrieve_generalizations (!units_, unit_sc))
   
-  let get_predicate lit =
+  let [@inline] get_predicate lit =
     match lit with
     | L.Equation(lhs,_,_) when L.is_predicate_lit lit ->
       Some (lhs, Lit.is_pos lit)
@@ -102,7 +101,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       Some (T.Form.eq lhs rhs, sign)
     | _ -> None
 
-  let matching_eq ~subst ~pattern (t, sc) =
+  let [@inline] matching_eq ~subst ~pattern (t, sc) =
     try
       Unif.FO.matching ~subst ~pattern (t, sc)
     with Unif.Fail ->
@@ -113,7 +112,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         Unif.FO.matching ~subst ~pattern (T.Form.neq b a, sc)
       | _ ->  raise Unif.Fail
 
-  let flip_eq t =
+  let [@inline] flip_eq t =
     match T.view t with
     | T.AppBuiltin(Builtin.Eq, ([a;b]|[_;a;b])) when tracking_eq () ->
       T.Form.eq b a
@@ -121,7 +120,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       T.Form.neq b a
     | _ -> t
 
-  let cl_is_ht_trackable cl =
+  let [@inline] cl_is_ht_trackable cl =
     match C.lits cl with
     | [| l1; l2 |] -> 
       CCOpt.is_some (get_predicate l1) && CCOpt.is_some (get_predicate l2)
@@ -140,7 +139,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       | _ -> lhs)
     | _ -> lhs
 
-  let lit_to_term ?(negate=false) a_lhs sign =
+  let [@inline] lit_to_term ?(negate=false) a_lhs sign =
     let sign = if negate then not sign else sign in
     normalize_negations (if sign then a_lhs else T.Form.not_ a_lhs)
 
