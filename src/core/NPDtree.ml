@@ -14,6 +14,11 @@ let prof_npdtree_term_generalizations =
 let prof_npdtree_term_specializations =
   ZProf.make "NPDtree_term_specializations"
 
+let eq_proxy = ID.make "zip_eq_proxy"
+let neq_proxy = ID.make "zip_neq_proxy"
+let eq_t = T.const ~ty:Type.prop eq_proxy
+let neq_t = T.const ~ty:Type.prop neq_proxy
+
 (** {2 Term traversal} *)
 
 (** Term traversal in prefix order. This is akin to lazy transformation
@@ -25,6 +30,10 @@ type iterator = {
 }
 
 let open_term ~stack t = match T.view t with
+  | T.AppBuiltin(Builtin.Eq, ([_;a;b]|[a;b])) ->
+    Some {cur_term=eq_t; stack=[a;b]::stack;} (*treating equalities properly*)
+  | T.AppBuiltin(Builtin.Neq, ([_;a;b]|[a;b])) ->
+    Some {cur_term=neq_t; stack=[a;b]::stack;} (*treating equalities properly*)
   | T.Var _
   | T.DB _
   | T.AppBuiltin _
@@ -49,7 +58,13 @@ let view_head (t:T.t) : view_head =
     not (Unif.Ty.type_is_unifiable (T.ty t)) ||
     Type.is_fun (T.ty t) ||
     T.is_ho_app t
-  then As_star
+  then (
+    match T.view t with 
+    | T.AppBuiltin(Builtin.Eq, ([_;a;b]|[a;b])) ->
+      As_app (eq_proxy, [a;b])
+    | T.AppBuiltin(Builtin.Neq, ([_;a;b]|[a;b])) ->
+      As_app (neq_proxy, [a;b])
+    | _ -> As_star)
   else (
     let s,l = T.as_app t in
     begin match T.view s with

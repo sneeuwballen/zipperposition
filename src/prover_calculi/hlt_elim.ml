@@ -133,7 +133,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     Util.debugf ~section 5 "transitive conclusion: @[%a@] --> @[%a@]"
       (fun k -> k T.pp premise T.pp concl);
     ConclusionIdx.retrieve_specializations (!concls_,idx_sc) (premise,q_sc)
-    |> Iter.iter (fun (concl',premise',subst) -> 
+    |> Iter.iter (fun (concl',premise',subst) ->
       (* add implication premise' -> subst (concl) *)
       Util.debugf ~section 5 "found: @[%a@] --> @[%a@]"
         (fun k -> k T.pp premise' T.pp concl');
