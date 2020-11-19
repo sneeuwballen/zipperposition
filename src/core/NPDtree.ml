@@ -30,10 +30,6 @@ type iterator = {
 }
 
 let open_term ~stack t = match T.view t with
-  | T.AppBuiltin(Builtin.Eq, ([_;a;b]|[a;b])) ->
-    Some {cur_term=eq_t; stack=[a;b]::stack;} (*treating equalities properly*)
-  | T.AppBuiltin(Builtin.Neq, ([_;a;b]|[a;b])) ->
-    Some {cur_term=neq_t; stack=[a;b]::stack;} (*treating equalities properly*)
   | T.Var _
   | T.DB _
   | T.AppBuiltin _
@@ -58,13 +54,7 @@ let view_head (t:T.t) : view_head =
     not (Unif.Ty.type_is_unifiable (T.ty t)) ||
     Type.is_fun (T.ty t) ||
     T.is_ho_app t
-  then (
-    match T.view t with 
-    | T.AppBuiltin(Builtin.Eq, ([_;a;b]|[a;b])) ->
-      As_app (eq_proxy, [a;b])
-    | T.AppBuiltin(Builtin.Neq, ([_;a;b]|[a;b])) ->
-      As_app (neq_proxy, [a;b])
-    | _ -> As_star)
+  then (As_star)
   else (
     let s,l = T.as_app t in
     begin match T.view s with
@@ -465,15 +455,6 @@ module MakeTerm(X : Set.OrderedType) = struct
     with e ->
       ZProf.exit_prof prof_npdtree_term_specializations;
       raise e
-
-  (** iterate on all (term -> value) in the tree *)
-  let rec iter dt k =
-    Leaf.iter dt.leaf k;
-    begin match dt.star with
-      | None -> ()
-      | Some trie' -> iter trie' k
-    end;
-    SIMap.iter (fun _ trie' -> iter trie' k) dt.map
 
   let rec fold dt k acc =
     let acc = Leaf.fold dt.leaf acc k in

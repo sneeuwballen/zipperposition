@@ -39,4 +39,6 @@ module Make(X : Set.OrderedType) : sig
   val get_fingerprint : t -> fingerprint_fun
 
   val update_leaf : t -> Term.t -> (Leaf.elt -> bool) -> t
+
+  val pp_keys : t -> unit
 end

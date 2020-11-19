@@ -37,7 +37,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* index from literals to the map implied literal 
       -> clauses necessary for the proof *)
-  module PremiseIdx = NPDtree.MakeTerm(struct 
+  module PremiseIdx = Fingerprint.Make(struct 
     type t = CS.t T.Tbl.t
     (* as we will maintain the invariant that each term is mapped to a single
        table, comparing the lengths suffices *)
@@ -46,12 +46,12 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* index from literals that appear as conclusions to all the premises
      in which they appear *)
-  module ConclusionIdx = NPDtree.MakeTerm(struct 
+  module ConclusionIdx = Fingerprint.Make(struct 
     type t = T.t
     let compare = Term.compare
   end)
 
-  module UnitIdx = NPDtree.MakeTerm(struct 
+  module UnitIdx = Fingerprint.Make(struct 
     type t = C.t
     let compare = C.compare
   end)
@@ -182,12 +182,12 @@ module Make(E : Env.S) : S with module Env = E = struct
     )
 
   let add_transitive_conclusions premise concl cl =
-    Util.debugf ~section 5 "transitive conclusion: @[%a@] --> @[%a@]"
+    Util.debugf ~section 1 "transitive conclusion: @[%a@] --> @[%a@]"
       (fun k -> k T.pp premise T.pp concl);
     retrieve_spec_concl_idx (premise,q_sc)
     |> Iter.iter (fun (concl',premise',subst) ->
       (* add implication premise' -> subst (concl) *)
-      Util.debugf ~section 5 "found: @[%a@] --> @[%a@]"
+      Util.debugf ~section 1 "found: @[%a@] --> @[%a@]"
         (fun k -> k T.pp premise' T.pp concl');
       prems_ := PremiseIdx.update_leaf !prems_ premise' (fun tbl -> 
         (match T.Tbl.get tbl concl' with
@@ -197,6 +197,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             register_cl_term cl premise';
             let concl = (Subst.FO.apply Subst.Renaming.none subst (concl, q_sc)) in
             concls_ := ConclusionIdx.add !concls_ concl premise';
+            (* ConclusionIdx.pp_keys !concls_; *)
             T.Tbl.add tbl concl proofset
           )
         | None -> assert false;);
@@ -208,6 +209,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let aux concl =
       T.Tbl.add tbl concl (CS.singleton cl);
       concls_ := ConclusionIdx.add !concls_ concl premise';
+      (* ConclusionIdx.pp_keys !concls_; *)
       let max_proof_size = Env.flex_get k_max_depth in
       retrieve_gen_prem_idx (concl, q_sc)
       |> Iter.iter (fun (_,tbl',subst) -> 
@@ -218,6 +220,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             CS.iter (fun cl -> register_cl_term cl premise') new_cls;
             let concl = (Subst.FO.apply Subst.Renaming.none subst (t, idx_sc)) in
             concls_ := ConclusionIdx.add !concls_ concl premise';
+            (* ConclusionIdx.pp_keys !concls_; *)
             T.Tbl.add tbl concl (new_cls)
           ))
       ) in
@@ -305,9 +308,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       incr tracked_cls;
       
       Util.debugf ~section 2 "idx_size: @[%d@]" (fun k -> k (PremiseIdx.size !prems_));
-      Util.debugf ~section 3 "premises:" CCFun.id;
+      Util.debugf ~section 1 "premises:" CCFun.id;
       PremiseIdx.iter !prems_ (fun t tbl -> 
-        Util.debugf ~section 2 "@[%a@] --> @[%a@]" (fun k -> k T.pp t (Iter.pp_seq T.pp) (T.Tbl.keys tbl))
+        Util.debugf ~section 1 "@[%a@] --> @[%a@]" (fun k -> k T.pp t (Iter.pp_seq T.pp) (T.Tbl.keys tbl))
       );
     ) else if Env.flex_get k_unit_reduction then (
       match get_unit_predicate cl with
@@ -480,9 +483,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       assert (Iter.is_empty @@ E.get_active ());
       Iter.iter track_clause (E.get_passive ());
 
-      Util.debugf ~section 5 "discovered implications:" CCFun.id;
+      Util.debugf ~section 3 "discovered implications:" CCFun.id;
       PremiseIdx.iter !prems_ (fun premise tbl -> 
-        Util.debugf ~section 5 "@[%a@] --> @[%a@]" (fun k -> k T.pp premise (Iter.pp_seq T.pp) (T.Tbl.keys tbl))
+        Util.debugf ~section 3 "@[%a@] --> @[%a@]" (fun k -> k T.pp premise (Iter.pp_seq T.pp) (T.Tbl.keys tbl))
       );
 
       Signal.on_every Env.ProofState.PassiveSet.on_add_clause track_clause;

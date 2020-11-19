@@ -13,11 +13,13 @@ let prof_traverse = ZProf.make "fingerprint.traverse"
 (* a feature.
    A    = variable
    B    = below variable
-   DB i = De-Bruijn index i 
+   DB i = De-Bruijn index i
    N    = invalid position
    S c  = symbol c
+   BI s  = Built-in symbol s
 *)
-type feature = A | B | DB of int | N | S of ID.t | Ignore
+type feature = 
+  A | B | DB of int | N | S of ID.t | BI of Builtin.t | Ignore
 
 (* a fingerprint function, it computes several features of a term *)
 type fingerprint_fun = T.t -> feature list
@@ -37,6 +39,22 @@ let expand_otf_ body =
 
 (* compute a feature for a given position *)
 let rec gfpf ?(depth=0) pos t =
+  let if_and_or t = match T.view t with
+    | T.AppBuiltin(Builtin.(And | Or), _) -> true
+    | _ -> false
+  in
+
+  let unfold t = 
+    if T.is_app t then T.as_app t
+    else (
+      match T.view t with
+      | T.AppBuiltin(hd, args) -> 
+        (* return anything as a head, as it is only important that it is not a variable *)
+        T.true_, args
+      | _ -> t, []
+    )
+  in
+
   let t_ty = Term.ty t in
   let exp_args_num = List.length (Type.expected_args t_ty) in
   let _, body =  T.open_fun t in
@@ -45,8 +63,8 @@ let rec gfpf ?(depth=0) pos t =
     let body = expand_otf_ body in
     gfpf_root ~depth:(depth + exp_args_num) body
   | i::is ->
-      let hd, args = T.as_app body in
-      if T.is_appbuiltin body then Ignore
+      let hd, args = unfold body in
+      if if_and_or body then Ignore
       else (
         let args = List.filter (fun x -> not @@ T.is_type x) args in
         (*                 if we are sampling something of variable type, it might eta-expand *)
@@ -69,7 +87,7 @@ let rec gfpf ?(depth=0) pos t =
     (* A *)
 and gfpf_root ~depth t =
   match T.view t with 
-  | T.AppBuiltin(_, _) -> Ignore
+  | T.AppBuiltin(b, _) -> BI b
   (* if we are sampling under a function, it can happen that there are
      loosely bound variables that can be unified inside LambdaSup. *)
   | T.DB i -> if (i < depth) then DB i else Ignore 
@@ -79,7 +97,7 @@ and gfpf_root ~depth t =
         T.Var _ -> A
       | T.Const s -> S s
       | T.DB i    -> if (i < depth) then DB i else Ignore
-      | T.AppBuiltin(_,_) -> Ignore
+      | T.AppBuiltin(b,_) -> BI b
       | _ -> assert false)
   | T.Fun (_, _) -> assert false
 
@@ -92,6 +110,7 @@ let pp_feature out = function
   | DB i -> CCFormat.fprintf out "DB %d" i 
   | N -> CCFormat.fprintf out "N" 
   | S id -> CCFormat.fprintf out "S %a" ID.pp id
+  | BI b -> CCFormat.fprintf out "BI %a" Builtin.pp b
   | Ignore -> CCFormat.fprintf out "I"
 
 (** compute a feature vector for some positions *)
@@ -125,7 +144,8 @@ let feat_to_int_ = function
   | S _ -> 2
   | N -> 3
   | DB _ -> 4
-  | Ignore -> 5
+  | BI _ -> 5
+  | Ignore -> 6
 
 let cmp_feature f1 f2 = match f1, f2 with
   | A, A
@@ -134,6 +154,7 @@ let cmp_feature f1 f2 = match f1, f2 with
   | Ignore, Ignore
     -> 0
   | S s1, S s2 -> ID.compare s1 s2
+  | BI b1, BI b2 -> Builtin.compare b1 b2
   | DB i, DB j -> compare i j
   | _ -> feat_to_int_ f1 - feat_to_int_ f2
 
@@ -143,19 +164,23 @@ let compatible_features_unif f1 f2 =
   | S s1 -> (match f2 with
       | S s2 -> ID.equal s1 s2 
       | A | B | Ignore -> true
-      | N | DB _ -> false)
+      | N | DB _ | BI _ -> false)
+  | BI b1 -> (match f2 with
+      | BI b2 -> Builtin.equal b1 b2 
+      | A | B | Ignore -> true
+      | N | DB _ | S _ -> false)
   | Ignore -> true
   | B    -> true
   | A    -> (match f2 with
       | N  -> false
-      | DB _ | Ignore | S _ | A | B  -> true)
+      | DB _ | Ignore | S _ | A | B   | BI _ -> true)
   | DB i -> (match f2 with 
       | DB j -> i = j
       | B | A | Ignore -> true
-      | S _ | N -> false)
+      | S _ | N  | BI _ -> false)
   | N ->    (match f2 with 
       | N | B | Ignore -> true
-      | A | DB _ | S _ -> false)
+      | A | DB _ | S _ | BI _-> false)
 
 (** check whether two features are compatible for matching. *)
 let compatible_features_match f1 f2 =
@@ -164,10 +189,14 @@ let compatible_features_match f1 f2 =
       | S s2 -> ID.equal s1 s2
       | Ignore -> true 
       | _ -> false)
+  | BI b1 -> (match f2 with
+    | BI b2 -> Builtin.equal b1 b2
+    | Ignore -> true 
+    | _ -> false)
   | Ignore 
   | B    -> true
   | A    -> (match f2 with
-      | A | DB _ | S _ | Ignore -> true
+      | A | DB _ | S _ | Ignore | BI _ -> true
       | _ -> false)
   | DB i -> (match f2 with 
       | DB j -> i = j
@@ -307,6 +336,11 @@ module Make(X : Set.OrderedType) = struct
       | Leaf leaf -> Leaf.iter leaf f
     in
     iter idx.trie f
+
+  let pp_keys idx =
+    CCFormat.printf "keys@.";
+    iter idx (fun t _ -> CCFormat.printf "@[%a@]," T.pp t);
+    CCFormat.printf "@."
 
   let fold idx f acc =
     let rec fold trie f acc = match trie with
