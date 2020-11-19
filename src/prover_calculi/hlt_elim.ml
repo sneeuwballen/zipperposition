@@ -18,6 +18,7 @@ let k_unit_reduction = Flex_state.create_key ()
 let k_hte = Flex_state.create_key ()
 let k_hle = Flex_state.create_key ()
 let k_max_tracked_clauses = Flex_state.create_key ()
+let k_track_eq = Flex_state.create_key ()
 
 
 module type S = sig
@@ -61,13 +62,64 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* occurrences of the clause in the premise_idx *)
   let cl_occs = ref Util.Int_map.empty
   (* clauses tracked so far *)
-  let tracked_cls = ref 0 
+  let tracked_cls = ref 0
 
+  let tracking_eq () =
+    Env.flex_get k_track_eq
+
+  (* constants denoting the scope of index and the query, respectively *)
+  let idx_sc, q_sc = 0, 1
+
+
+  let retrieve_idx ~getter (premise, q_sc) =
+    match T.view premise with
+    | T.AppBuiltin(Builtin.Eq, ([_;a;b]|[a;b])) when tracking_eq () ->
+      Iter.append (getter (premise, q_sc)) (getter ((T.Form.eq b a), q_sc))
+    | T.AppBuiltin(Builtin.Neq, ([_;a;b]|[a;b])) when tracking_eq () ->
+      Iter.append (getter (premise, q_sc)) (getter ((T.Form.neq b a), q_sc))
+    | _ ->  getter (premise, q_sc)
+  
+  let retrive_gen_prem_idx  =
+    retrieve_idx ~getter:(PremiseIdx.retrieve_generalizations (!prems_, idx_sc))
+  
+  let retrive_spec_prem_idx  =
+    retrieve_idx ~getter:(PremiseIdx.retrieve_specializations (!prems_, idx_sc))
+  
+  let retrive_gen_concl_idx  =
+    retrieve_idx ~getter:(ConclusionIdx.retrieve_generalizations (!concls_,idx_sc))
+
+  let retrive_spec_concl_idx  =
+    retrieve_idx ~getter:(ConclusionIdx.retrieve_specializations (!concls_,idx_sc))
+  
+  let retrive_gen_unit_idx unit_sc  =
+    retrieve_idx ~getter:(UnitIdx.retrieve_generalizations (!units_, unit_sc))
+  
   let get_predicate lit =
     match lit with
     | L.Equation(lhs,_,_) when L.is_predicate_lit lit ->
       Some (lhs, Lit.is_pos lit)
+    | L.Equation(lhs,rhs,sign) when tracking_eq () ->
+      Some (T.Form.eq lhs rhs, sign)
     | _ -> None
+
+  let matching_eq ~subst ~pattern (t, sc) =
+    try
+      Unif.FO.matching ~subst ~pattern (t, sc)
+    with Unif.Fail ->
+      match T.view t with 
+      | T.AppBuiltin(Builtin.Eq, ([_;a;b]|[a;b])) when tracking_eq () ->
+        Unif.FO.matching ~subst ~pattern (T.Form.eq b a, sc)
+      | T.AppBuiltin(Builtin.Neq, ([_;a;b]|[a;b])) when tracking_eq () ->
+        Unif.FO.matching ~subst ~pattern (T.Form.neq b a, sc)
+      | _ ->  raise Unif.Fail
+
+  let flip_eq t =
+    match T.view t with
+    | T.AppBuiltin(Builtin.Eq, ([a;b]|[_;a;b])) when tracking_eq () ->
+      T.Form.eq b a
+    | T.AppBuiltin(Builtin.Neq, ([a;b]|[_;a;b])) when tracking_eq () ->
+      T.Form.neq b a
+    | _ -> t
 
   let cl_is_ht_trackable cl =
     match C.lits cl with
@@ -81,11 +133,12 @@ module Make(E : Env.S) : S with module Env = E = struct
       (match T.view t with
       | T.AppBuiltin(Builtin.Not, [s]) ->
         normalize_negations s
+      | T.AppBuiltin(Builtin.Eq, ([_;a;b]|[a;b])) ->
+        T.Form.neq a b
+      | T.AppBuiltin(Builtin.Neq, ([_;a;b]|[a;b])) ->
+        T.Form.eq a b
       | _ -> lhs)
     | _ -> lhs
-
-  (* constants denoting the scope of index and the query, respectively *)
-  let idx_sc, q_sc = 0, 1
 
   let lit_to_term ?(negate=false) a_lhs sign =
     let sign = if negate then not sign else sign in
@@ -98,22 +151,22 @@ module Make(E : Env.S) : S with module Env = E = struct
     cl_occs := Util.Int_map.add (C.id cl) premise_set !cl_occs
 
   let generalization_present premise concl =
-    PremiseIdx.retrieve_generalizations (!prems_, idx_sc) (premise, q_sc)
+    retrive_gen_prem_idx (premise, q_sc)
     |> Iter.exists (fun (_, tbl, subst) -> 
       T.Tbl.keys tbl
       |> Iter.exists (fun t ->
         try
-          ignore(Unif.FO.matching ~subst ~pattern:(t, idx_sc) (concl, q_sc));
+          ignore(matching_eq ~subst ~pattern:(t, idx_sc) (concl, q_sc));
           true
         with Unif.Fail -> false))
 
   let remove_instances premise concl =
-    PremiseIdx.retrieve_specializations (!prems_, idx_sc) (premise, q_sc)
+    retrive_spec_prem_idx (premise, q_sc)
     |> (fun i -> Iter.fold (fun tasks (t, tbl, subst) -> 
       let sets_to_remove = 
         Iter.fold (fun acc (s,cls) ->
           try
-            let subst = Unif.FO.matching ~subst ~pattern:(concl,q_sc) (s,idx_sc) in
+            let subst = matching_eq ~subst ~pattern:(concl,q_sc) (s,idx_sc) in
             if Subst.is_renaming subst then acc else cls :: acc
           with Unif.Fail -> acc
         ) [] (T.Tbl.to_iter tbl) in
@@ -132,7 +185,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let add_transitive_conclusions premise concl cl =
     Util.debugf ~section 5 "transitive conclusion: @[%a@] --> @[%a@]"
       (fun k -> k T.pp premise T.pp concl);
-    ConclusionIdx.retrieve_specializations (!concls_,idx_sc) (premise,q_sc)
+    retrive_spec_concl_idx (premise,q_sc)
     |> Iter.iter (fun (concl',premise',subst) ->
       (* add implication premise' -> subst (concl) *)
       Util.debugf ~section 5 "found: @[%a@] --> @[%a@]"
@@ -157,7 +210,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       T.Tbl.add tbl concl (CS.singleton cl);
       concls_ := ConclusionIdx.add !concls_ concl premise';
       let max_proof_size = Env.flex_get k_max_depth in
-      PremiseIdx.retrieve_generalizations (!prems_, idx_sc) (concl, q_sc)
+      retrive_gen_prem_idx (concl, q_sc)
       |> Iter.iter (fun (_,tbl',subst) -> 
         T.Tbl.to_iter tbl'
         |> Iter.iter (fun (t,proof_set) ->
@@ -195,11 +248,13 @@ module Make(E : Env.S) : S with module Env = E = struct
     match C.lits cl with
     | [| (L.Equation(lhs, _, _) as l) |] when L.is_predicate_lit l ->
       Some (lit_to_term lhs (L.is_pos l))
+    | [| L.Equation(lhs, rhs, sign) |] when tracking_eq () ->
+      Some (lit_to_term (T.Form.eq lhs rhs) (sign))
     | _ -> None
 
   let add_new_premise premise concl cl =
     let alpha_renaming = 
-      PremiseIdx.retrieve_specializations (!prems_, idx_sc) (premise, q_sc)
+      retrive_spec_prem_idx (premise, q_sc)
       |> Iter.find (fun (premise', tbl, subst) ->  
         if Subst.is_renaming subst then Some (premise', subst)
         else None
@@ -208,7 +263,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     | Some (premise', subst) ->
       let concl = Subst.FO.apply Subst.Renaming.none subst (concl, q_sc) in
       prems_ := PremiseIdx.update_leaf !prems_ premise' (fun tbl -> 
-        if not (T.Tbl.mem tbl concl) then (
+        if not (T.Tbl.mem tbl concl) && not (T.Tbl.mem tbl (flip_eq concl)) then (
           triggered_conclusions tbl premise' concl cl
         );
         true
@@ -221,7 +276,8 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let insert_implication premise concl cl =
     if not (generalization_present premise concl) &&
-       not (T.equal premise concl) then (
+       not (T.equal premise concl) &&
+       not (T.equal premise (flip_eq concl)) then (
       remove_instances premise concl;
       add_transitive_conclusions premise concl cl;
       add_new_premise premise concl cl;
@@ -262,54 +318,53 @@ module Make(E : Env.S) : S with module Env = E = struct
     )
 
   let find_implication cl premise concl =
-    PremiseIdx.retrieve_generalizations (!prems_, idx_sc) (premise, q_sc)
+    retrive_gen_prem_idx (premise, q_sc)
     |> Iter.find (fun (premise', tbl, subst) -> 
       T.Tbl.to_iter tbl
       |> Iter.find (fun (concl', proofset) ->
         try
           if CS.mem cl proofset then None
           else (
-            let subst = Unif.FO.matching ~subst ~pattern:(concl', idx_sc) (concl, q_sc) in
+            (* TODO: fix *)
+            let subst = matching_eq ~subst ~pattern:(concl', idx_sc) (concl, q_sc) in
             Some(premise', concl', proofset, subst))
         with Unif.Fail -> None)) 
 
   let do_unit_reduction cl = 
-    let pred_lits, eq_lits = 
-      List.partition (Lit.is_predicate_lit) (CCArray.to_list (C.lits cl))
-    in
-    let bv = CCBV.create ~size:(List.length pred_lits) true in
+    let bv = CCBV.create ~size:( C.length cl ) true in
     let proofset = ref (CS.empty) in
-    List.iteri (fun i lit -> 
-      let lhs, sign =  CCOpt.get_exn (L.View.get_lhs lit), L.is_pos lit in
-      let lhs_neg = lit_to_term ~negate:true lhs sign in 
-      let unit_sc = (max idx_sc q_sc) + 1 in
+    CCArray.iteri (fun i lit -> 
+      match get_predicate lit with 
+      | Some (lhs, sign) -> 
+        let lhs_neg = lit_to_term ~negate:true lhs sign in 
+        let unit_sc = (max idx_sc q_sc) + 1 in
 
-      (* for the literal l we are looking for implications p -> c such that
-         c\sigma = ~l. Then we see if there is an unit clause p' such that
-         p\sigma = p'\rho *)
+        (* for the literal l we are looking for implications p -> c such that
+          c\sigma = ~l. Then we see if there is an unit clause p' such that
+          p\sigma = p'\rho *)
 
-      ConclusionIdx.retrieve_generalizations (!concls_, idx_sc) (lhs_neg, q_sc)
-      |> Iter.find_map (fun (concl, premise, subst) ->
-        let orig_premise = premise in
-        let premise = Subst.FO.apply Subst.Renaming.none subst (premise, idx_sc) in
-        UnitIdx.retrieve_generalizations (!units_, unit_sc) (premise, idx_sc)
-        |> Iter.head
-        |> CCOpt.map (fun (_, unit_cl, _) -> 
-          prems_ := PremiseIdx.update_leaf !prems_ orig_premise (fun tbl -> 
-            let proofset' = T.Tbl.find tbl concl in
-            if not (CS.mem cl proofset') then (
-              proofset := CS.union (CS.add unit_cl (proofset')) !proofset;
-              CCBV.reset bv i);
-            true
-          );
-        ))
-      (* if nothing is found stiffle compiler warning *)
-      |> CCOpt.get_or ~default:()
-    ) pred_lits;
+        retrive_gen_concl_idx (lhs_neg, q_sc)
+        |> Iter.find_map (fun (concl, premise, subst) ->
+          let orig_premise = premise in
+          let premise = Subst.FO.apply Subst.Renaming.none subst (premise, idx_sc) in
+          retrive_gen_unit_idx unit_sc (premise, idx_sc)
+          |> Iter.head
+          |> CCOpt.map (fun (_, unit_cl, _) -> 
+            prems_ := PremiseIdx.update_leaf !prems_ orig_premise (fun tbl -> 
+              let proofset' = T.Tbl.find tbl concl in
+              if not (CS.mem cl proofset') then (
+                proofset := CS.union (CS.add unit_cl (proofset')) !proofset;
+                CCBV.reset bv i);
+              true
+            );
+          ))
+        (* if nothing is found stiffle compiler warning *)
+        |> CCOpt.get_or ~default:()
+      | None -> ()
+    ) (C.lits cl);
     if CCBV.is_empty (CCBV.negate bv) then None
     else (
-      let pred_cls_l = List.rev (CCBV.select bv (CCArray.of_list pred_lits)) in
-      let lit_l = pred_cls_l @ eq_lits in
+      let lit_l = List.rev (CCBV.select bv (C.lits cl)) in
       let proof = 
         Proof.Step.simp ~rule:(Proof.Rule.mk "unit_hidden_literal_elimination")
         (List.map C.proof_parent (cl :: CS.to_list !proofset))
@@ -320,22 +375,20 @@ module Make(E : Env.S) : S with module Env = E = struct
   let do_simplify cl =
     let exception HiddenTauto of T.t * T.t * CS.t in
 
-    let pred_lits, eq_lits = 
-      List.partition (Lit.is_predicate_lit) (CCArray.to_list (C.lits cl))
-    in
-    let n = List.length pred_lits in
-    let lhs lit = CCOpt.get_exn @@ L.View.get_lhs lit in
+    let n = C.length cl in
     if n >= 2 then (
       try 
         let bv = CCBV.create ~size:n true in
         let proofset = ref CS.empty in
-        List.iteri (fun i i_lit ->
-          if CCBV.get bv i then (
-            let i_neg_t = lit_to_term ~negate:true (lhs i_lit) (L.is_pos i_lit) in
-            List.iteri (fun j j_lit ->
-              if CCBV.get bv j && i!=j then (
-                let j_t = lit_to_term (lhs j_lit) (L.is_pos j_lit) in
-                let j_neg_t = lit_to_term ~negate:true (lhs j_lit) (L.is_pos j_lit) in
+        CCArray.iteri (fun i i_lit ->
+          match get_predicate i_lit with
+          | Some(i_lhs, i_sign) when CCBV.get bv i -> 
+            let i_neg_t = lit_to_term ~negate:true (i_lhs) (i_sign) in
+            CCArray.iteri (fun j j_lit ->
+              begin match get_predicate j_lit with
+              | Some (j_lhs, j_sign) when CCBV.get bv j && i!=j ->
+                let j_t = lit_to_term (j_lhs) (j_sign) in
+                let j_neg_t = lit_to_term ~negate:true (j_lhs) (j_sign) in
                 if Env.flex_get k_hte then (
                   (match find_implication cl i_neg_t j_t with
                   | Some (lit_a, lit_b, proofset, subst) 
@@ -357,15 +410,14 @@ module Make(E : Env.S) : S with module Env = E = struct
                       proofset := CS.union proofset' !proofset
                     | None -> () )
                 )
-
-                )
-            ) pred_lits)
-        ) pred_lits;
+              | _ -> () end
+            ) (C.lits cl)
+          | _ -> ()
+        ) (C.lits cl);
         
         if CCBV.is_empty (CCBV.negate bv) then None
         else (        
-          let pred_cls_l = List.rev @@ CCBV.select bv (CCArray.of_list pred_lits) in
-          let lit_l = pred_cls_l @ eq_lits in
+          let lit_l = List.rev @@ CCBV.select bv (C.lits cl) in
           let proof = 
             Proof.Step.simp ~rule:(Proof.Rule.mk "hidden_literal_elimination")
             (List.map C.proof_parent (cl :: CS.to_list !proofset))
@@ -478,6 +530,7 @@ let max_tracked_clauses = ref (-1)
 let unit_reduction_ = ref true
 let hte_ = ref true
 let hle_ = ref true
+let track_eq_ = ref false
 
 
 let extension =
@@ -491,6 +544,7 @@ let extension =
     E.flex_add k_max_self_impls !max_self_impls_;
     E.flex_add k_unit_reduction !unit_reduction_;
     E.flex_add k_max_tracked_clauses !max_tracked_clauses;
+    E.flex_add k_track_eq !track_eq_;
     E.flex_add k_hle !hle_;
     E.flex_add k_hte !hte_;
     HLT.setup ()
@@ -508,6 +562,7 @@ let () =
     "--hidden-lt-elim-hte", Arg.Bool ((:=) hte_), " enable/disable hidden literal tautology elimination (hidden-lt-elim must be on)";
     "--hidden-lt-max-depth", Arg.Set_int max_depth_, " max depth of binary implication graph precomputation";
     "--hidden-lt-simplify-new", Arg.Bool ((:=) simpl_new_), " apply HLTe also when moving a clause from fresh to passive";
+    "--hidden-lt-track-eq", Arg.Bool ((:=) track_eq_), " enable/disable tracking and simplifying equality literals";
     "--hidden-lt-track-only-active", Arg.Bool ((:=) track_active_only_), 
       " HLTe tracks only active clauses (by default tracks passive clauses)";
     "--hidden-lt-max-self-implications", Arg.Int ((:=) max_self_impls_), 
