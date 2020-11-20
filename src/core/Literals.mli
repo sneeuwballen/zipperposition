@@ -156,6 +156,7 @@ val fold_eqn : ?both:bool -> ?sign:bool -> ord:Ordering.t ->
   eligible:(int -> Literal.t -> bool) ->
   t -> (term * term * bool * Position.t) Iter.t
 (** fold f over all literals sides, with their positions.
+    NB: REPORTED SIGN IS THE SAME AS IF Lit.is_pos WAS CALLED!
     f is given [(left side, right side, sign, position of left side)]
     if [ord] is present, then only the max side of an oriented
       equation will be visited, otherwise they will both be explored.
