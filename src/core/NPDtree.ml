@@ -14,11 +14,6 @@ let prof_npdtree_term_generalizations =
 let prof_npdtree_term_specializations =
   ZProf.make "NPDtree_term_specializations"
 
-let eq_proxy = ID.make "zip_eq_proxy"
-let neq_proxy = ID.make "zip_neq_proxy"
-let eq_t = T.const ~ty:Type.prop eq_proxy
-let neq_t = T.const ~ty:Type.prop neq_proxy
-
 (** {2 Term traversal} *)
 
 (** Term traversal in prefix order. This is akin to lazy transformation
@@ -29,7 +24,34 @@ type iterator = {
   stack : T.t list list; (* skip: drop head, next: first of head *)
 }
 
-let open_term ~stack t = match T.view t with
+let eq_ty = 
+  Type.close_forall @@
+    Type.(==>) [Type.var_of_int 0; Type.var_of_int 0] Type.prop
+let eq_id = ID.make "zip_eq_proxy"
+let neq_id = ID.make "zip_neq_proxy"
+
+let eq_const = T.const ~ty:eq_ty eq_id
+let neq_const = T.const ~ty:eq_ty neq_id
+
+let [@inline] mk_eq a b =
+  T.app eq_const [T.of_ty (T.ty a); a; b]
+let [@inline] mk_neq a b = 
+  T.app neq_const [T.of_ty (T.ty a); a; b]
+
+
+let neg_id = ID.make "zip_neg_proxy"
+let neg_const = 
+  let ty = 
+    Type.(==>) [Type.prop] Type.prop in
+  T.const ~ty neg_id
+
+let [@inline] mk_neg f =
+  T.app neg_const [f]
+
+let rec open_term ~stack t = match T.view t with
+  | T.AppBuiltin(Eq, ([a;b]|[_;a;b])) -> open_term ~stack (mk_eq a b)
+  | T.AppBuiltin(Neq, ([a;b]|[_;a;b])) -> open_term ~stack (mk_neq a b)
+  | T.AppBuiltin(Not, [a]) -> open_term ~stack (mk_neg a)
   | T.Var _
   | T.DB _
   | T.AppBuiltin _
@@ -54,7 +76,7 @@ let view_head (t:T.t) : view_head =
     not (Unif.Ty.type_is_unifiable (T.ty t)) ||
     Type.is_fun (T.ty t) ||
     T.is_ho_app t
-  then (As_star)
+  then As_star
   else (
     let s,l = T.as_app t in
     begin match T.view s with
@@ -455,6 +477,15 @@ module MakeTerm(X : Set.OrderedType) = struct
     with e ->
       ZProf.exit_prof prof_npdtree_term_specializations;
       raise e
+
+  (** iterate on all (term -> value) in the tree *)
+  let rec iter dt k =
+    Leaf.iter dt.leaf k;
+    begin match dt.star with
+      | None -> ()
+      | Some trie' -> iter trie' k
+    end;
+    SIMap.iter (fun _ trie' -> iter trie' k) dt.map
 
   let rec fold dt k acc =
     let acc = Leaf.fold dt.leaf acc k in

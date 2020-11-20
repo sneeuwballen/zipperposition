@@ -78,16 +78,16 @@ module Make(E : Env.S) : S with module Env = E = struct
       Iter.append (getter (premise, q_sc)) (getter ((T.Form.neq b a), q_sc))
     | _ ->  getter (premise, q_sc)
   
-  let retrieve_gen_prem_idx  =
+  let retrieve_gen_prem_idx ()  =
     retrieve_idx ~getter:(PremiseIdx.retrieve_generalizations (!prems_, idx_sc))
   
-  let retrieve_spec_prem_idx  =
+  let retrieve_spec_prem_idx ()  =
     retrieve_idx ~getter:(PremiseIdx.retrieve_specializations (!prems_, idx_sc))
   
-  let retrieve_gen_concl_idx  =
+  let retrieve_gen_concl_idx ()  =
     retrieve_idx ~getter:(ConclusionIdx.retrieve_generalizations (!concls_,idx_sc))
 
-  let retrieve_spec_concl_idx  =
+  let retrieve_spec_concl_idx ()  =
     retrieve_idx ~getter:(ConclusionIdx.retrieve_specializations (!concls_,idx_sc))
   
   let retrieve_gen_unit_idx unit_sc  =
@@ -150,7 +150,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     cl_occs := Util.Int_map.add (C.id cl) premise_set !cl_occs
 
   let generalization_present premise concl =
-    retrieve_gen_prem_idx (premise, q_sc)
+    retrieve_gen_prem_idx () (premise, q_sc)
     |> Iter.exists (fun (_, tbl, subst) -> 
       T.Tbl.keys tbl
       |> Iter.exists (fun t ->
@@ -160,7 +160,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         with Unif.Fail -> false))
 
   let remove_instances premise concl =
-    retrieve_spec_prem_idx (premise, q_sc)
+    retrieve_spec_prem_idx () (premise, q_sc)
     |> (fun i -> Iter.fold (fun tasks (t, tbl, subst) -> 
       let sets_to_remove = 
         Iter.fold (fun acc (s,cls) ->
@@ -184,7 +184,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let add_transitive_conclusions premise concl cl =
     Util.debugf ~section 1 "transitive conclusion: @[%a@] --> @[%a@]"
       (fun k -> k T.pp premise T.pp concl);
-    retrieve_spec_concl_idx (premise,q_sc)
+    retrieve_spec_concl_idx () (premise,q_sc)
     |> Iter.iter (fun (concl',premise',subst) ->
       (* add implication premise' -> subst (concl) *)
       Util.debugf ~section 1 "found: @[%a@] --> @[%a@]"
@@ -211,7 +211,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       concls_ := ConclusionIdx.add !concls_ concl premise';
       (* ConclusionIdx.pp_keys !concls_; *)
       let max_proof_size = Env.flex_get k_max_depth in
-      retrieve_gen_prem_idx (concl, q_sc)
+      retrieve_gen_prem_idx () (concl, q_sc)
       |> Iter.iter (fun (_,tbl',subst) -> 
         T.Tbl.to_iter tbl'
         |> Iter.iter (fun (t,proof_set) ->
@@ -256,7 +256,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let add_new_premise premise concl cl =
     let alpha_renaming = 
-      retrieve_spec_prem_idx (premise, q_sc)
+      retrieve_spec_prem_idx () (premise, q_sc)
       |> Iter.find (fun (premise', tbl, subst) ->  
         if Subst.is_renaming subst then Some (premise', subst)
         else None
@@ -320,7 +320,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     )
 
   let find_implication cl premise concl =
-    retrieve_gen_prem_idx (premise, q_sc)
+    retrieve_gen_prem_idx () (premise, q_sc)
     |> Iter.find (fun (premise', tbl, subst) -> 
       T.Tbl.to_iter tbl
       |> Iter.find (fun (concl', proofset) ->
@@ -345,7 +345,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           c\sigma = ~l. Then we see if there is an unit clause p' such that
           p\sigma = p'\rho *)
 
-        retrieve_gen_concl_idx (lhs_neg, q_sc)
+        retrieve_gen_concl_idx () (lhs_neg, q_sc)
         |> Iter.find_map (fun (concl, premise, subst) ->
           let orig_premise = premise in
           let premise = Subst.FO.apply Subst.Renaming.none subst (premise, idx_sc) in
