@@ -37,7 +37,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* index from literals to the map implied literal 
       -> clauses necessary for the proof *)
-  module PremiseIdx = Fingerprint.Make(struct 
+  module PremiseIdx = NPDtree.MakeTerm(struct 
     type t = CS.t T.Tbl.t
     (* as we will maintain the invariant that each term is mapped to a single
        table, comparing the lengths suffices *)
@@ -46,12 +46,12 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* index from literals that appear as conclusions to all the premises
      in which they appear *)
-  module ConclusionIdx = Fingerprint.Make(struct 
+  module ConclusionIdx = NPDtree.MakeTerm(struct 
     type t = T.t
     let compare = Term.compare
   end)
 
-  module UnitIdx = Fingerprint.Make(struct 
+  module UnitIdx = NPDtree.MakeTerm(struct 
     type t = C.t
     let compare = C.compare
   end)
@@ -182,12 +182,12 @@ module Make(E : Env.S) : S with module Env = E = struct
     )
 
   let add_transitive_conclusions premise concl cl =
-    Util.debugf ~section 1 "transitive conclusion: @[%a@] --> @[%a@]"
+    Util.debugf ~section 3 "transitive conclusion: @[%a@] --> @[%a@]"
       (fun k -> k T.pp premise T.pp concl);
     retrieve_spec_concl_idx () (premise,q_sc)
     |> Iter.iter (fun (concl',premise',subst) ->
       (* add implication premise' -> subst (concl) *)
-      Util.debugf ~section 1 "found: @[%a@] --> @[%a@]"
+      Util.debugf ~section 3 "found: @[%a@] --> @[%a@]"
         (fun k -> k T.pp premise' T.pp concl');
       prems_ := PremiseIdx.update_leaf !prems_ premise' (fun tbl -> 
         (match T.Tbl.get tbl concl' with
@@ -308,9 +308,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       incr tracked_cls;
       
       Util.debugf ~section 2 "idx_size: @[%d@]" (fun k -> k (PremiseIdx.size !prems_));
-      Util.debugf ~section 1 "premises:" CCFun.id;
+      Util.debugf ~section 3 "premises:" CCFun.id;
       PremiseIdx.iter !prems_ (fun t tbl -> 
-        Util.debugf ~section 1 "@[%a@] --> @[%a@]" (fun k -> k T.pp t (Iter.pp_seq T.pp) (T.Tbl.keys tbl))
+        Util.debugf ~section 3 "@[%a@] --> @[%a@]" (fun k -> k T.pp t (Iter.pp_seq T.pp) (T.Tbl.keys tbl))
       );
     ) else if Env.flex_get k_unit_reduction then (
       match get_unit_predicate cl with
@@ -404,9 +404,9 @@ module Make(E : Env.S) : S with module Env = E = struct
                     | Some (_, _, proofset',_) ->
                       CCBV.reset bv j;
 
-                      Util.debugf ~section 1 "@[%a@] --> @[%a@]" 
+                      Util.debugf ~section 2 "@[%a@] --> @[%a@]" 
                         (fun k -> k T.pp i_neg_t T.pp j_neg_t);
-                      Util.debugf ~section 1 "used(%d): @[%a@]" 
+                      Util.debugf ~section 2 "used(%d): @[%a@]" 
                         (fun k -> k j (CS.pp C.pp) proofset');
 
                       proofset := CS.union proofset' !proofset
@@ -434,6 +434,8 @@ module Make(E : Env.S) : S with module Env = E = struct
         in
         let repl = C.create ~penalty:(C.penalty cl + 1) ~trail:(C.trail cl) lit_l proof in
         let tauto = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) [L.mk_tauto] proof in
+
+        Util.debugf ~section 1 "used @[%a@] --> @[%a@] @[(%a)@]" (fun k -> k T.pp lit_a T.pp lit_b (CS.pp C.pp) proofset);
 
         E.add_passive (Iter.singleton repl);
         Some (tauto)
