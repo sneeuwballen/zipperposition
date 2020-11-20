@@ -1618,10 +1618,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* check whether subst(lit) is maximal, and not (subst(s) < subst(t)) *)
     let renaming = S.Renaming.create () in
     let subst = US.subst us in
-    let s' = S.FO.apply renaming subst (s, info.scope) in
 
-    if O.compare ord s' (S.FO.apply renaming subst (t, info.scope)) <> Comp.Lt
-      && O.compare ord s' (S.FO.apply renaming subst (v, info.scope)) <> Comp.Lt
+    if O.compare ord (S.FO.apply renaming subst (s, info.scope)) 
+        (S.FO.apply renaming subst (t, info.scope)) <> Comp.Lt
       && CCList.for_all (fun (c, i) -> i = idx) (C.selected_lits info.clause)
       && CCList.is_empty (C.bool_selected info.clause)
       && C.is_maxlit (info.clause,info.scope) subst ~idx
