@@ -877,8 +877,6 @@ module Make(X : sig
       CCArray.of_list 
         (List.map (fun _ -> IntSet.empty) !_ss_multi_simpl_rule) in
 
-    CCFormat.printf "simplfy_begin: @[%a@]@." C.pp c;
-
     while not (Queue.is_empty q) do
       let c, depth = Queue.pop q in
       let c, st = simplify c in
@@ -919,10 +917,6 @@ module Make(X : sig
                 (* Adding descendents to blocked set *)
                 Array.set blocked_sss i (IntSet.union new_ids bs_i))
             done;
-
-            CCFormat.printf "muti-simpl(@[%a@])=@." C.pp c ;
-            List.iter (fun (c,_) -> CCFormat.printf "@[%a@],@." Proof.S.pp_tstp (C.proof c)) l;
-
 
             List.iter (fun (c,d) -> Queue.push (c,d) q) l
           | None ->
