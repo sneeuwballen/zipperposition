@@ -15,6 +15,7 @@ let k_skolem_mode = Flex_state.create_key ()
 let k_pa_renaming = Flex_state.create_key ()
 let k_only_eligible = Flex_state.create_key ()
 let k_penalize_eq_cnf = Flex_state.create_key ()
+let k_clausify_eq_max_nonint = Flex_state.create_key ()
 
 let section = Util.Section.make ~parent:Const.section "lazy_cnf"
 
@@ -82,6 +83,17 @@ module Make(E : Env.S) : S with module Env = E = struct
       let eligible = C.eligible_res_no_subst c in
       Iter.filter (fun (_,_,_,p) -> CCBV.get eligible (Ls.Pos.idx p)) lits
     ) else lits
+
+  (* if k_clausify_eq_max_nonint is disabled, then we will not clausify
+       if the max side is non-interpreted *)
+  let check_eq_cnf_ordering_conditions lhs rhs =
+    let is_noninterpeted t = CCOpt.is_some (Term.head t) in
+    let ord = E.Ctx.ord () in
+    (E.flex_get k_clausify_eq_max_nonint) ||
+    (match Ordering.compare ord lhs rhs with
+    | Comparison.Lt -> is_noninterpeted rhs
+    | Comparison.Gt -> is_noninterpeted lhs
+    | _ -> is_noninterpeted lhs || is_noninterpeted rhs)
     
 
   let proof ~constructor ~name ~parents c =
@@ -180,7 +192,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       acc, `Continue in
 
     let eligible_to_ignore_eq ~ignore_eq lhs rhs = 
-      ignore_eq && not (T.is_true_or_false lhs) && not (T.is_true_or_false rhs) in
+      (not (check_eq_cnf_ordering_conditions lhs rhs)) ||
+      (ignore_eq && not (T.is_true_or_false lhs) && not (T.is_true_or_false rhs)) in
 
     Util.debugf ~section 3 "lazy_cnf(@[%a@])@." (fun k -> k C.pp c);
 
@@ -313,7 +326,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         | [] -> false
         | x :: xs -> aux ~sign x || aux_l sign xs in
       let ans = aux ~sign f in
-      Util.debugf ~section 1 "@[%a@] will%s yield clauses@." 
+      Util.debugf ~section 3 "@[%a@] will%s yield clauses@." 
         (fun k -> k T.pp f (if ans then "" else " not"));
       ans in
 
@@ -342,9 +355,9 @@ module Make(E : Env.S) : S with module Env = E = struct
             let renamer = (if sign then CCFun.id else T.Form.not_) renamer in
             let renamed = mk_or ~proof_cons ~rule_name [renamer] c ~parents:(c :: parents) i in
             let res = renamed @ new_defs in
-            Util.debugf ~section 1 "  @[renamed subformula %d:(@[%a@])=@. @[%a@]@]@." 
+            Util.debugf ~section 3 "  @[renamed subformula %d:(@[%a@])=@. @[%a@]@]@." 
               (fun k -> k i C.pp c (CCList.pp C.pp) renamed);
-            Util.debugf ~section 1 "  new defs:@[%a@]@." 
+            Util.debugf ~section 3 "  new defs:@[%a@]@." 
               (fun k -> k (CCList.pp C.pp) new_defs);
             Some res, `Stop
           | None -> None, `Continue
@@ -357,9 +370,9 @@ module Make(E : Env.S) : S with module Env = E = struct
               let renamer = (if sign then CCFun.id else T.Form.not_) renamer in
               let renamed = mk_or ~proof_cons ~rule_name [renamer] c ~parents:(c :: parents) i in
               let res = renamed @ new_defs in
-              Util.debugf ~section 1 "  @[renamed eq %d(@[%a@]) into @[%a@]@]@." 
+              Util.debugf ~section 3 "  @[renamed eq %d(@[%a@]) into @[%a@]@]@." 
               (fun k -> k i L.pp (C.lits c).(i) (CCList.pp C.pp) renamed);
-              Util.debugf ~section 1 "  new defs:@[%a@]@." 
+              Util.debugf ~section 3 "  new defs:@[%a@]@." 
                 (fun k -> k (CCList.pp C.pp) new_defs);
                 Some res, `Stop
             | None -> None, `Continue)
@@ -373,7 +386,8 @@ module Make(E : Env.S) : S with module Env = E = struct
         let i,_ = Ls.Pos.cut pos in
         let lit = (C.lits c).(i) in
         let proof_cons = Proof.Step.inference ~infos:[] ~tags:[Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth] in
-        if not (L.is_predicate_lit lit) && Type.is_prop (T.ty lhs) then (
+        if not (L.is_predicate_lit lit) && Type.is_prop (T.ty lhs) 
+           && check_eq_cnf_ordering_conditions lhs rhs then (
           let new_cls =
             if sign then (
               mk_or ~proof_cons ~rule_name [T.Form.not_ lhs; rhs] c i 
@@ -421,12 +435,12 @@ module Make(E : Env.S) : S with module Env = E = struct
     let proof_cons = Proof.Step.simp ~infos:[] ~tags:[Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth] in
     let res = Iter.to_list @@ lazy_clausify_driver ~ignore_eq:true ~proof_cons c  in
     if not @@ CCList.is_empty res then (
-      Util.debugf ~section 1 "lazy_cnf_simp(@[%a@])=" (fun k -> k C.pp c);
-      Util.debugf ~section 1 "@[%a@]@." (fun k -> k (CCList.pp C.pp) res);
+      Util.debugf ~section 3 "lazy_cnf_simp(@[%a@])=" (fun k -> k C.pp c);
+      Util.debugf ~section 3 "@[%a@]@." (fun k -> k (CCList.pp C.pp) res);
       Util.debugf ~section 3 "proof:@[%a@]@." (fun k -> k (CCList.pp (Proof.S.pp_tstp)) (List.map C.proof res));
       update_form_counter ~action:`Decrease c;
       CCList.iter (update_form_counter ~action:`Increase) res;
-    ) else Util.debugf ~section 1 "lazy_cnf_simp(@[%a@])=Ø" (fun k -> k C.pp c);
+    ) else Util.debugf ~section 3 "lazy_cnf_simp(@[%a@])=Ø" (fun k -> k C.pp c);
     if CCList.is_empty res then None
     else (Some res)
 
@@ -484,6 +498,7 @@ let _skolem_mode = ref `Skolem
 let _pa_renaming = ref true
 let _only_eligible = ref false
 let _clausify_eq_pen = ref false
+let _clausify_eq_max_noninterpreted = ref true
 
 let extension =
   let register env =
@@ -497,6 +512,7 @@ let extension =
     E.flex_add k_pa_renaming !_pa_renaming;
     E.flex_add k_only_eligible !_only_eligible;
     E.flex_add k_penalize_eq_cnf !_clausify_eq_pen;
+    E.flex_add k_clausify_eq_max_nonint !_clausify_eq_max_noninterpreted;
 
     ET.setup ()
   in
@@ -509,6 +525,8 @@ let () =
   Options.add_opts [
     "--lazy-cnf", Arg.Bool ((:=) enabled), " turn on lazy clausification";
     "--lazy-cnf-only-eligible-lits", Arg.Bool ((:=) _only_eligible), " apply lazy clausification only on eligible literals";
+    "--lazy-cnf-clausify-max-eq", Arg.Bool ((:=) _clausify_eq_max_noninterpreted),
+      " enable/disable clausification of an EQ literal if max side is non-interpreted ";
     "--lazy-cnf-scoping", Arg.Symbol (["off"; "mini"; "maxi"], (fun str -> 
       match str with 
       | "mini" -> _scoping := `Mini

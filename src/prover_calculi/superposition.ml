@@ -96,6 +96,7 @@ let k_bool_demod = Flex_state.create_key ()
 let k_immediate_simplification = Flex_state.create_key ()
 let k_local_rw = Flex_state.create_key ()
 let k_destr_eq_res = Flex_state.create_key ()
+let k_rw_with_formulas = Flex_state.create_key ()
 
 
 
@@ -346,7 +347,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       | [| Lit.Equation (l,r,true) |] ->
         (* do not use formulas for rewriting... can have adverse
             effects on lazy cnf *)
-        if !Lazy_cnf.enabled &&
+        if (not (Env.flex_get k_rw_with_formulas ))&&
             (T.is_appbuiltin l || (T.is_appbuiltin r && not @@ T.is_true_or_false r) ) then idx
         else (
           begin match Ordering.compare ord l r with
@@ -3129,6 +3130,7 @@ let _sort_constraints = ref false
 let _bool_demod = ref false
 let _immediate_simplification = ref false
 let _try_lfho_unif = ref true
+let _rw_w_formulas = ref false
 
 let _guard = ref 30
 let _ratio = ref 100
@@ -3182,6 +3184,7 @@ let register ~sup =
   E.flex_add k_use_semantic_tauto !_use_semantic_tauto;
   E.flex_add k_bool_demod !_bool_demod;
   E.flex_add k_immediate_simplification !_immediate_simplification;
+  E.flex_add k_rw_with_formulas !_rw_w_formulas;
 
 
   E.flex_add PragUnifParams.k_max_inferences !_max_infs;
@@ -3261,6 +3264,7 @@ let () =
           _lambdasup := l), 
       " enable LambdaSup -- argument is the maximum number of skolems introduced in an inference";
       "--dupsup", Arg.Bool (fun v -> _dupsup := v), " enable/disable DupSup inferences";
+      "--rw-with-formulas", Arg.Bool (fun v -> _rw_w_formulas := v), " enable/disable rewriting with formulas";
       "--ground-before-subs", Arg.Set_int _ground_subs_check, " set the level of grounding before substitution. 0 - no grounding. 1 - only active. 2 - both.";
       "--solid-subsumption", Arg.Bool (fun v -> _solid_subsumption := v), " set solid subsumption on or off";
       "--recognize-injectivity", Arg.Bool (fun v -> _recognize_injectivity := v), " recognize injectivity axiom and axiomatize corresponding inverse";

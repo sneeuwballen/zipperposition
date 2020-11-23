@@ -303,14 +303,14 @@ module Make(E : Env.S) : S with module Env = E = struct
       mk_res ~proof ~old:t ~repl:T.false_ (yes t) c)
     (get_bool_hoist_eligible c)
     |> CCFun.tap (fun res -> 
-      Util.debugf ~section 1 "hoist(@[%a@])" (fun k -> k C.pp c);
+      Util.debugf ~section 3 "hoist(@[%a@])" (fun k -> k C.pp c);
       if CCList.is_empty res then (
-        Util.debugf ~section 1 " = ∅ (%d)(%a)(%d)" 
+        Util.debugf ~section 3 " = ∅ (%d)(%a)(%d)" 
           (fun k -> 
             k (Iter.length (get_green_eligible c)) 
               (Iter.pp_seq Term.pp) (Iter.map fst (get_bool_eligible c))
               (List.length (get_bool_hoist_eligible c)));
-      ) else (Util.debugf ~section 1 " = @[%a@]" (fun k -> k (CCList.pp C.pp) res))
+      ) else (Util.debugf ~section 3  " = @[%a@]" (fun k -> k (CCList.pp C.pp) res))
     )
 
   let bool_hoist_simpl (c:C.t) : C.t list option = 
@@ -809,7 +809,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         let module P = Pos in
         match at with
         | P.Arg(i, P.Left P.Stop)
-        | P.Arg(i, P.Right P.Stop) ->
+        | P.Arg(i, P.Right P.Stop) when L.is_predicate_lit (C.lits c).(i) ->
           (* CAUTION: Using is_pos to really mean is the RHS of the
              term true or false? *)
           let sign = L.is_positivoid ((C.lits c).(i)) in
@@ -932,23 +932,15 @@ module Make(E : Env.S) : S with module Env = E = struct
       )
     in
 
-    let ord = Ctx.ord () in
-    let pos_builder = Position.Build.empty in
-    let all_selectable = 
-      Bool_selection.all_selectable_subterms ~ord ~pos_builder in
     (* literal needs to have at least 2 nested booleans *)
     let threshold = 2 in
 
-    CCArray.to_list (C.lits c)
-    |> CCList.mapi (fun i l ->
-      let nested_bools_cnt = 
-        Literal.Seq.terms l
-        (* estimate worst case of boolean selection *)
-        |> Iter.flat_map all_selectable
-        |> Iter.length
-      in
-      (i, nested_bools_cnt))
-    |> CCList.filter (fun (_, cnt) -> cnt >= threshold)
+    C.bool_selected c
+    |> List.map (fun (_, lit_pos) -> 
+      Literals.Pos.idx lit_pos)
+    |> CCList.group_by ~hash:CCInt.hash ~eq:CCInt.equal 
+    |> List.map (fun idx_list -> (List.hd idx_list, List.length idx_list))
+    |> List.filter (fun (_, cnt) -> cnt >= threshold)
     |> (function 
        | x :: xs when not (CCList.is_empty xs) ->
          (* there need to be at least two literals with deep booleans.
@@ -969,9 +961,9 @@ module Make(E : Env.S) : S with module Env = E = struct
           let renamed =
             C.create_a ~penalty:(C.penalty c) ~trail:(C.trail c) new_lits proof in
 
-          Util.debugf ~section 1 "renamed @[%a@] into@. @[%a@]@." 
+          Util.debugf ~section 1 "renamed @[%a@] into@. @[%a@]" 
             (fun k -> k C.pp c C.pp renamed);
-          
+          Util.debugf ~section 1 "new_defs @[%a@]" (fun k -> k (CCList.pp C.pp) new_defs);
           Some (renamed :: new_defs)
        | _ -> None)
 
@@ -1620,8 +1612,8 @@ module Make(E : Env.S) : S with module Env = E = struct
 
       if Env.flex_get k_bool_reasoning = BoolHoist then (
         if Env.flex_get k_bool_hoist_simpl
-        then Env.add_multi_simpl_rule ~priority:1000 bool_hoist_simpl
-        else Env.add_unary_inf "bool_hoist" bool_hoist;
+        then Env.add_multi_simpl_rule ~priority:1000 bool_hoist_simpl;
+        Env.add_unary_inf "bool_hoist" bool_hoist;
 
         if Env.flex_get k_rename_nested_bools then (
           Env.add_multi_simpl_rule ~priority:500 rename_nested_booleans
