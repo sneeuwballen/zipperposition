@@ -841,11 +841,32 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       TPS.mem (info.u_p, info.passive_pos) (C.eligible_subterms_of_bool info.passive)
     in
     let shift_vars = if info.sup_kind = LambdaSup then 0 else -1 in
-    try
+    try     
       let renaming = S.Renaming.create () in
       let us = info.subst in
       let subst = US.subst us in
       let t' = S.FO.apply ~shift_vars renaming subst (info.t, sc_a) in
+      (let exit_negative_tl =
+          ExitSuperposition ("negative literal must paramodulate " ^
+                            "into top-level positive position")
+        in
+        let exit_double_sup =
+          ExitSuperposition ("superposition could be performed in a different order")
+        in
+        match info.passive_pos with
+        | P.Arg(_, P.Left P.Stop)
+        | P.Arg(_, P.Right P.Stop) ->
+          if T.equal t' T.false_ && not (Lit.is_positivoid (info.passive_lit)) then (
+            raise exit_negative_tl) 
+          else if Lit.is_positivoid info.passive_lit &&
+                    (* active clause will take the role of passive and that is how
+                       we can compute the resolvent *)
+                    C.compare info.active info.passive < 0 then (
+            raise exit_double_sup
+          );
+        | _ ->
+          if T.equal t' T.false_ then 
+            raise @@ exit_negative_tl);
       begin match info.passive_lit, info.passive_pos with
         | Lit.Equation (_, v, true), P.Arg(_, P.Left P.Stop)
         | Lit.Equation (v, _, true), P.Arg(_, P.Right P.Stop) ->
