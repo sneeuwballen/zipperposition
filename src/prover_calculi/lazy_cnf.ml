@@ -103,10 +103,32 @@ module Make(E : Env.S) : S with module Env = E = struct
   let rename_eq ~c ~should_rename lhs rhs sign =
     assert(Type.equal (T.ty lhs) (T.ty rhs));
     assert(Type.is_prop (T.ty lhs));
+    assert(T.is_appbuiltin lhs || T.is_appbuiltin rhs);
+    assert(not (T.is_true_or_false lhs) || (T.is_true_or_false rhs));
+
+    let yields_clauses f = 
+      match T.view f with
+      | T.AppBuiltin((Eq|Neq), [ty;_;_]) ->
+        Type.is_prop (Type.of_term_unsafe (ty :> InnerTerm.t))
+      | T.AppBuiltin(_, _) -> true
+      | _ -> false
+    in    
+
     let polarity_aware = Env.flex_get k_pa_renaming in
+    let app_sign = if sign then CCFun.id else T.Form.not_ in
     if Env.flex_get k_rename_eq 
-    then FR.rename_form ~should_rename ~polarity_aware ~c (T.Form.equiv lhs rhs) sign
-    else None
+    then (
+      if (yields_clauses lhs && yields_clauses rhs) then
+        (CCOpt.map (fun (r,d,p) -> app_sign r, d, p)
+          (FR.rename_form ~should_rename ~polarity_aware ~c (T.Form.equiv lhs rhs) sign))
+      else if yields_clauses lhs then
+        (CCOpt.map (fun (r,d,p) -> app_sign (T.Form.eq r rhs), d, p) 
+          (FR.rename_form ~should_rename ~polarity_aware:false ~c lhs sign))
+      else if yields_clauses rhs then
+        (CCOpt.map (fun (r,d,p) -> app_sign (T.Form.eq lhs r), d, p) 
+          (FR.rename_form ~should_rename ~polarity_aware:false ~c rhs sign))
+      else None
+    ) else None
 
   let mk_and ~proof_cons ~rule_name and_args c ?(parents=[c]) lit_idx =
     let lits = CCArray.except_idx (C.lits c) lit_idx in
@@ -355,9 +377,9 @@ module Make(E : Env.S) : S with module Env = E = struct
             let renamer = (if sign then CCFun.id else T.Form.not_) renamer in
             let renamed = mk_or ~proof_cons ~rule_name [renamer] c ~parents:(c :: parents) i in
             let res = renamed @ new_defs in
-            Util.debugf ~section 3 "  @[renamed subformula %d:(@[%a@])=@. @[%a@]@]@." 
+            Util.debugf ~section 1 "  @[renamed subformula %d:(@[%a@])=@. @[%a@]@]@." 
               (fun k -> k i C.pp c (CCList.pp C.pp) renamed);
-            Util.debugf ~section 3 "  new defs:@[%a@]@." 
+            Util.debugf ~section 1 "  new defs:@[%a@]@." 
               (fun k -> k (CCList.pp C.pp) new_defs);
             Some res, `Stop
           | None -> None, `Continue
@@ -367,12 +389,11 @@ module Make(E : Env.S) : S with module Env = E = struct
             | Some (renamer, new_defs, parents) ->
               let rule_name = "renaming" in
               let new_defs = clausify_defs new_defs in
-              let renamer = (if sign then CCFun.id else T.Form.not_) renamer in
               let renamed = mk_or ~proof_cons ~rule_name [renamer] c ~parents:(c :: parents) i in
               let res = renamed @ new_defs in
-              Util.debugf ~section 3 "  @[renamed eq %d(@[%a@]) into @[%a@]@]@." 
-              (fun k -> k i L.pp (C.lits c).(i) (CCList.pp C.pp) renamed);
-              Util.debugf ~section 3 "  new defs:@[%a@]@." 
+              Util.debugf ~section 1 "  @[renamed eq %d(@[%a@]) into @[%a@]@]@." 
+                (fun k -> k i L.pp (C.lits c).(i) (CCList.pp C.pp) renamed);
+              Util.debugf ~section 1 "  new defs:@[%a@]@." 
                 (fun k -> k (CCList.pp C.pp) new_defs);
                 Some res, `Stop
             | None -> None, `Continue)
@@ -405,11 +426,11 @@ module Make(E : Env.S) : S with module Env = E = struct
           new_cls @ acc
         ) else acc) []
     |> CCFun.tap (fun res -> 
-      Util.debugf ~section 1 "eq_elim(@[%a@])" (fun k -> k C.pp c);
+      Util.debugf ~section 2 "eq_elim(@[%a@])" (fun k -> k C.pp c);
       if CCList.is_empty res then (
-        Util.debugf ~section 1 "=∅" CCFun.id;
+        Util.debugf ~section 2 "=∅" CCFun.id;
       ) else (
-        Util.debugf ~section 1 "=@[%a@]" (fun k -> k (CCList.pp C.pp) res);
+        Util.debugf ~section 2 "=@[%a@]" (fun k -> k (CCList.pp C.pp) res);
       ) 
     )
   

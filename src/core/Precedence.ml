@@ -63,10 +63,10 @@ let get_arity ~sig_ref s =
 
 let is_not_fresh_sk = -1
 let is_post_cnf_skolem ~sig_ref s =
-  not (Signature.mem !sig_ref s)
+  ((not (Signature.is_empty !sig_ref)) && not (Signature.mem !sig_ref s))
   || (match ID.as_skolem s with 
     | Some ID.K_after_cnf -> true
-    | _ -> false) 
+    | _ -> false)
 
 let post_cnf_id ~sig_ref s =
   if is_post_cnf_skolem ~sig_ref s then ID.id s else is_not_fresh_sk
@@ -427,7 +427,7 @@ type weight_fun = ID.t -> Weight.t
 type arg_coeff_fun = ID.t -> int list
 
 (* constant weight *)
-let default_weight = Weight.int 2
+let default_weight = Weight.int 1
 let weight_constant _ = default_weight
 let empty_sig = Signature.empty
 
@@ -479,7 +479,7 @@ let weight_modarity ~signature =
 
   fun a ->
     let arity =  try snd @@ Signature.arity !_sig a with _ -> 5 in
-    if is_post_cnf_skolem ~sig_ref:(ref empty_sig) a then default_weight
+    if is_post_cnf_skolem ~sig_ref:_sig a then default_weight
     else Weight.int (arity + 4)
 
 let weight_arity0 ~signature =

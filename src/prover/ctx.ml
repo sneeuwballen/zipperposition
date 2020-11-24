@@ -100,6 +100,7 @@ module Make(X : PARAMETERS) = struct
       let is_new = not (Signature.mem !_signature sym) in
       if is_new then (
         _signature := Signature.declare !_signature sym ty;
+        CCFormat.printf "decalred syms@.";
         Signal.send on_signature_update !_signature;
         Signal.send on_new_symbol (sym,ty);
         sym :: (aux syms)
