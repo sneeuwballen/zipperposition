@@ -379,7 +379,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let validate_proofset_ ps = 
     match Env.flex_get k_clauses_to_track with 
     | `All -> true
-    | `Passive -> CS.for_all E.is_passive ps
+    | `Passive -> CS.for_all (fun c -> E.is_passive c || C.is_orphaned c) ps
     | `Active -> CS.for_all E.is_active ps
 
   let do_simplify cl =
@@ -441,7 +441,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
           Some (res))
       with HiddenTauto(lit_a,lit_b,proofset) ->
-        assert(validate_proofset_ proofset);
+        assert (validate_proofset_ proofset);
         let lit_l = [L.mk_prop lit_a false; L.mk_prop lit_b true] in
         let proof = 
           Proof.Step.simp ~rule:(Proof.Rule.mk "hidden_tautology_elimination")
