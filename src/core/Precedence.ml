@@ -63,10 +63,14 @@ let get_arity ~sig_ref s =
 
 let is_not_fresh_sk = -1
 let is_post_cnf_skolem ~sig_ref s =
-  ((not (Signature.is_empty !sig_ref)) && not (Signature.mem !sig_ref s))
-  || (match ID.as_skolem s with 
-    | Some ID.K_after_cnf -> true
-    | _ -> false)
+  let ans = 
+    ((not (Signature.is_empty !sig_ref)) && not (Signature.mem !sig_ref s))
+    || (match ID.as_skolem s with 
+      | Some ID.K_after_cnf -> true
+      | _ -> false)
+  in
+  (* CCFormat.printf "@[%a@] --> @[%b@]@." ID.pp s ans; *)
+  ans
 
 let post_cnf_id ~sig_ref s =
   if is_post_cnf_skolem ~sig_ref s then ID.id s else is_not_fresh_sk
