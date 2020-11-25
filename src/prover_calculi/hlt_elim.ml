@@ -12,7 +12,7 @@ let section = Util.Section.make ~parent:Const.section "hlt-elim"
 let k_enabled = Flex_state.create_key ()
 let k_max_depth = Flex_state.create_key ()
 let k_simpl_new = Flex_state.create_key ()
-let k_track_active_only = Flex_state.create_key ()
+let k_clauses_to_track = Flex_state.create_key ()
 let k_max_self_impls = Flex_state.create_key ()
 let k_unit_reduction = Flex_state.create_key ()
 let k_hte = Flex_state.create_key ()
@@ -209,6 +209,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     let aux concl =
       T.Tbl.add tbl concl (CS.singleton cl);
       concls_ := ConclusionIdx.add !concls_ concl premise';
+      register_cl_term cl premise';
+
       (* ConclusionIdx.pp_keys !concls_; *)
       let max_proof_size = Env.flex_get k_max_depth in
       retrieve_gen_prem_idx () (concl, q_sc)
@@ -374,6 +376,12 @@ module Make(E : Env.S) : S with module Env = E = struct
       Some (C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof)
     )
 
+  let validate_proofset_ ps = 
+    match Env.flex_get k_clauses_to_track with 
+    | `All -> true
+    | `Passive -> CS.for_all E.is_passive ps
+    | `Active -> CS.for_all E.is_active ps
+
   let do_simplify cl =
     let exception HiddenTauto of T.t * T.t * CS.t in
 
@@ -404,9 +412,9 @@ module Make(E : Env.S) : S with module Env = E = struct
                     | Some (_, _, proofset',_) ->
                       CCBV.reset bv j;
 
-                      Util.debugf ~section 2 "@[%a@] --> @[%a@]" 
+                      Util.debugf ~section 3 "@[%a@] --> @[%a@]" 
                         (fun k -> k T.pp i_neg_t T.pp j_neg_t);
-                      Util.debugf ~section 2 "used(%d): @[%a@]" 
+                      Util.debugf ~section 3 "used(%d): @[%a@]" 
                         (fun k -> k j (CS.pp C.pp) proofset');
 
                       proofset := CS.union proofset' !proofset
@@ -418,23 +426,32 @@ module Make(E : Env.S) : S with module Env = E = struct
         ) (C.lits cl);
         
         if CCBV.is_empty (CCBV.negate bv) then None
-        else (        
+        else (
+          assert (validate_proofset_ !proofset);
           let lit_l = List.rev @@ CCBV.select bv (C.lits cl) in
           let proof = 
             Proof.Step.simp ~rule:(Proof.Rule.mk "hidden_literal_elimination")
             (List.map C.proof_parent (cl :: CS.to_list !proofset))
           in
+          let res = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof in
 
-          Some (C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof))
+          Util.debugf ~section 1 "simplified[hle]: @[%a@] --> @[%a@]" 
+            (fun k -> k C.pp cl C.pp res);
+          Util.debugf ~section 1 "used: @[%a@]" (fun k -> k (CS.pp C.pp) !proofset);
+
+          Some (res))
       with HiddenTauto(lit_a,lit_b,proofset) ->
+        assert(validate_proofset_ proofset);
         let lit_l = [L.mk_prop lit_a false; L.mk_prop lit_b true] in
         let proof = 
           Proof.Step.simp ~rule:(Proof.Rule.mk "hidden_tautology_elimination")
           (List.map C.proof_parent (cl :: CS.to_list proofset))
         in
-        let repl = C.create ~penalty:(C.penalty cl + 1) ~trail:(C.trail cl) lit_l proof in
+        let pen_inc = if CS.cardinal proofset == 1 then 1 else 0 in
+        let repl = C.create ~penalty:(C.penalty cl + pen_inc) ~trail:(C.trail cl) lit_l proof in
         let tauto = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) [L.mk_tauto] proof in
 
+        Util.debugf ~section 1 "simplified[hte]: @[@[%a@] --> @[%a@]@]" (fun k -> k C.pp cl C.pp repl);
         Util.debugf ~section 1 "used @[%a@] --> @[%a@] @[(%a)@]" (fun k -> k T.pp lit_a T.pp lit_b (CS.pp C.pp) proofset);
 
         E.add_passive (Iter.singleton repl);
@@ -445,7 +462,6 @@ module Make(E : Env.S) : S with module Env = E = struct
   let simplify_opt ~f cl =
     match f cl with
     | Some cl' ->
-      Util.debugf ~section 1 "simplified: @[@[%a@] --> @[%a@]@]" (fun k -> k C.pp cl C.pp cl');
       SimplM.return_new cl'
     | None -> 
       SimplM.return_same cl
@@ -478,18 +494,15 @@ module Make(E : Env.S) : S with module Env = E = struct
     
 
   let initialize () =
-    if Env.flex_get k_track_active_only then (
+    let track_active () =
       Signal.on_every Env.ProofState.ActiveSet.on_add_clause track_clause;
       Signal.on_every Env.ProofState.ActiveSet.on_remove_clause untrack_clause
-    ) else (
-      assert (Iter.is_empty @@ E.get_active ());
-      Iter.iter track_clause (E.get_passive ());
-
-      Util.debugf ~section 3 "discovered implications:" CCFun.id;
-      PremiseIdx.iter !prems_ (fun premise tbl -> 
-        Util.debugf ~section 3 "@[%a@] --> @[%a@]" (fun k -> k T.pp premise (Iter.pp_seq T.pp) (T.Tbl.keys tbl))
-      );
-
+    in
+    let track_passive () =
+      Signal.on_every Env.ProofState.PassiveSet.on_add_clause track_clause;
+      Signal.on_every Env.ProofState.PassiveSet.on_remove_clause untrack_clause
+    in
+    let track_all () =
       Signal.on_every Env.ProofState.PassiveSet.on_add_clause track_clause;
       Signal.on_every Env.ProofState.ActiveSet.on_remove_clause untrack_clause;
       Signal.on_every Env.on_forward_simplified (fun (c, new_state) -> 
@@ -499,9 +512,31 @@ module Make(E : Env.S) : S with module Env = E = struct
             untrack_clause c; 
             track_clause c'
           )
-        | _ -> untrack_clause c; (* c is redundant *)));
-    
+        | _ -> untrack_clause c (* c is redundant *))
+    in
+
+    let initialize_with_passive () =
+      assert (Iter.is_empty @@ E.get_active ());
+      Iter.iter track_clause (E.get_passive ());
+
+      Util.debugf ~section 3 "discovered implications:" CCFun.id;
+      PremiseIdx.iter !prems_ (fun premise tbl -> 
+        Util.debugf ~section 3 "@[%a@] --> @[%a@]" (fun k -> k T.pp premise (Iter.pp_seq T.pp) (T.Tbl.keys tbl))
+      )
+    in
+      
+    begin match Env.flex_get k_clauses_to_track with
+    | `Passive ->
+      initialize_with_passive ();
+      track_passive ()
+    | `Active ->
+      track_active ()
+    | `All -> 
+      initialize_with_passive ();
+      track_all ()
+    end;
     Signal.StopListening
+  
 
 
   let setup () =
@@ -528,7 +563,7 @@ end
 let max_depth_ = ref 3
 let enabled_ = ref false
 let simpl_new_ = ref false
-let track_active_only_ = ref true
+let clauses_to_track_ = ref `Active
 let max_self_impls_ = ref 1
 let max_tracked_clauses = ref (-1)
 let unit_reduction_ = ref true
@@ -544,7 +579,7 @@ let extension =
     E.flex_add k_enabled !enabled_;
     E.flex_add k_max_depth !max_depth_;
     E.flex_add k_simpl_new !simpl_new_;
-    E.flex_add k_track_active_only !track_active_only_;
+    E.flex_add k_clauses_to_track !clauses_to_track_;
     E.flex_add k_max_self_impls !max_self_impls_;
     E.flex_add k_unit_reduction !unit_reduction_;
     E.flex_add k_max_tracked_clauses !max_tracked_clauses;
@@ -567,8 +602,16 @@ let () =
     "--hidden-lt-max-depth", Arg.Set_int max_depth_, " max depth of binary implication graph precomputation";
     "--hidden-lt-simplify-new", Arg.Bool ((:=) simpl_new_), " apply HLTe also when moving a clause from fresh to passive";
     "--hidden-lt-track-eq", Arg.Bool ((:=) track_eq_), " enable/disable tracking and simplifying equality literals";
-    "--hidden-lt-track-only-active", Arg.Bool ((:=) track_active_only_), 
-      " HLTe tracks only active clauses (by default tracks passive clauses)";
+    "--hidden-lt-clauses-to-track", Arg.Symbol(["all";"passive";"active"], 
+      (function 
+        | "all" ->
+          clauses_to_track_ := `All;
+        | "passive" ->
+          clauses_to_track_ := `Passive;
+        | "active" ->
+          clauses_to_track_ := `Active;
+        | _ -> ())), 
+      " what clauses to use for simplification";
     "--hidden-lt-max-self-implications", Arg.Int ((:=) max_self_impls_), 
       " how many times do we loop implications of the kind p(X) -> p(f(X)) ";
     "--hidden-lt-unit-reduction", Arg.Bool ((:=) unit_reduction_), 
