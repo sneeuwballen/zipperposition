@@ -299,6 +299,12 @@ module Make(E : Env.S) : S with module Env = E = struct
         premise, tbl, compute_is_unit tbl concl cl
       )
     in
+
+    (match is_unit with
+    | Some cs ->
+      CCFormat.printf "@[%a@] is unit (@[%a@])" T.pp premise (CS.pp C.pp) cs;
+    | None ->  ());
+
     prems_ := PremiseIdx.add !prems_ premise (tbl,is_unit)
 
   let insert_implication premise concl cl =
@@ -420,14 +426,15 @@ module Make(E : Env.S) : S with module Env = E = struct
           let i_neg_t = lit_to_term ~negate:true (i_lhs) (i_sign) in
           let unit_htr () = 
             retrieve_gen_prem_idx () (i_neg_t, q_sc)
-            |> Iter.find_map (fun (_, (_,is_unit), _) -> is_unit)
+            |> Iter.find_map (fun (_, (_,is_unit), subst) -> 
+              if Subst.is_renaming subst then None else is_unit)
           in
           let unit_hle () = 
             retrieve_gen_prem_idx () (i_t, q_sc)
             |> Iter.find_map (fun (_, (_,is_unit), _) -> is_unit)
           in
           (match unit_htr () with
-          | Some cs -> raise (UnitHTR(i_lhs, cs))
+          | Some cs -> raise (UnitHTR(i_t, cs))
           | None -> (
               match unit_hle () with
               | Some cs ->
