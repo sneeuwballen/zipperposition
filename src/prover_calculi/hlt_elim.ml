@@ -20,6 +20,7 @@ let k_hte = Flex_state.create_key ()
 let k_hle = Flex_state.create_key ()
 let k_max_tracked_clauses = Flex_state.create_key ()
 let k_track_eq = Flex_state.create_key ()
+let k_insert_only_ordered = Flex_state.create_key ()
 
 
 module type S = sig
@@ -312,11 +313,13 @@ module Make(E : Env.S) : S with module Env = E = struct
   let insert_into_indices cl =
     match CCArray.map get_predicate (C.lits cl) with
     | [| Some (a_lhs, a_sign); Some (b_lhs, b_sign) |] ->
-      (* read clause a | b as either ~a -> b or ~b -> a *)
-      insert_implication (lit_to_term ~negate:true a_lhs a_sign)
-                         (lit_to_term b_lhs b_sign) cl;
-      insert_implication (lit_to_term ~negate:true b_lhs b_sign)
-                         (lit_to_term a_lhs a_sign) cl
+      let elig = C.eligible_param (cl,0) Subst.empty in
+      if ((not (Env.flex_get k_insert_only_ordered)) || CCBV.get elig 0) then ( 
+        insert_implication (lit_to_term ~negate:true a_lhs a_sign)
+                           (lit_to_term b_lhs b_sign) cl);
+      if ((not (Env.flex_get k_insert_only_ordered)) || CCBV.get elig 1) then ( 
+        insert_implication (lit_to_term ~negate:true b_lhs b_sign)
+                           (lit_to_term a_lhs a_sign) cl)
     | _ -> ()
   
   let limit_not_reached () =
@@ -648,6 +651,7 @@ let unit_htr_ = ref true
 let hte_ = ref true
 let hle_ = ref true
 let track_eq_ = ref false
+let insert_ordered_ = ref false
 
 
 let extension =
@@ -665,6 +669,7 @@ let extension =
     E.flex_add k_track_eq !track_eq_;
     E.flex_add k_hle !hle_;
     E.flex_add k_hte !hte_;
+    E.flex_add k_insert_only_ordered !insert_ordered_;
     HLT.setup ()
   in
   { Extensions.default with
@@ -696,7 +701,8 @@ let () =
     "--hidden-lt-unit-hle", Arg.Bool ((:=) unit_hle_), 
       " do unit-triggered removal of literals ";
     "--hidden-lt-unit-htr", Arg.Bool ((:=) unit_htr_), 
-      " do unit hidden tautology removal "
-
+      " do unit hidden tautology removal ";
+    "--hidden-lt-insert-ordered", Arg.Bool ((:=) insert_ordered_), 
+      " for clauses of the form l|r where l > r then insert only ~l -> r ";
   ];
   Extensions.register extension
