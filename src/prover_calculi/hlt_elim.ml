@@ -186,6 +186,16 @@ module Make(E : Env.S) : S with module Env = E = struct
       );
     )
 
+  let compute_is_unit tbl concl cl =
+    if Env.flex_get k_unit_htr then (
+      let neg_concl = normalize_negations (T.Form.not_ concl) in
+      let neg_concl_flip = normalize_negations (T.Form.not_ (flip_eq concl)) in
+      T.Tbl.find_opt tbl neg_concl
+      |> CCOpt.(<+>) (T.Tbl.find_opt tbl neg_concl_flip)
+      |> CCOpt.(<$>) (CS.add cl)
+    ) else None
+
+
   let add_transitive_conclusions premise concl cl =
     Util.debugf ~section 3 "transitive conclusion: @[%a@] --> @[%a@]"
       (fun k -> k T.pp premise T.pp concl);
@@ -194,7 +204,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       (* add implication premise' -> subst (concl) *)
       Util.debugf ~section 3 "found: @[%a@] --> @[%a@]"
         (fun k -> k T.pp premise' T.pp concl');
-      prems_ := PremiseIdx.update_leaf !prems_ premise' (fun (tbl, _) -> 
+      let became_unit = ref None in
+      prems_ := PremiseIdx.update_leaf !prems_ premise' (fun (tbl, is_unit) -> 
         (match T.Tbl.get tbl concl' with
         | Some old_proofset ->
           if CS.cardinal old_proofset < Env.flex_get k_max_depth then (
@@ -203,11 +214,23 @@ module Make(E : Env.S) : S with module Env = E = struct
             let concl = (Subst.FO.apply Subst.Renaming.none subst (concl, q_sc)) in
             concls_ := ConclusionIdx.add !concls_ concl premise';
             (* ConclusionIdx.pp_keys !concls_; *)
-            T.Tbl.add tbl concl proofset
+            T.Tbl.add tbl concl proofset;
+            if CCOpt.is_none is_unit then (
+              match compute_is_unit tbl concl cl with
+              | Some proofset -> became_unit := Some(proofset,tbl)
+              | None -> ()
+            )
           )
         | None -> assert false;);
-        true
+        (* if by adding concl something became unit we remove
+           the leaf as the new one with updated unit status will be added *)
+        CCOpt.is_none !became_unit
       );
+      (match !became_unit with
+      | Some (ps, tbl) ->
+        ignore(PremiseIdx.update_leaf !prems_ premise' (fun (tbl, is_unit) -> assert false));
+        prems_  := PremiseIdx.add !prems_ premise' (tbl, Some ps)
+      | _ ->  ());
     )
 
   let triggered_conclusions tbl premise' concl cl =
@@ -252,13 +275,6 @@ module Make(E : Env.S) : S with module Env = E = struct
     with Unif.Fail -> 
       aux concl
 
-  let compute_is_unit tbl concl cl =
-    let neg_concl = normalize_negations (T.Form.not_ concl) in
-    let neg_concl_flip = normalize_negations (T.Form.not_ (flip_eq concl)) in
-    T.Tbl.find_opt tbl neg_concl
-    |> CCOpt.(<+>) (T.Tbl.find_opt tbl neg_concl_flip)
-    |> CCOpt.(<$>) (CS.add cl)
-
   let get_unit_predicate cl =
     match C.lits cl with
     | [| (L.Equation(lhs, _, _) as l) |] when L.is_predicate_lit l ->
@@ -275,37 +291,35 @@ module Make(E : Env.S) : S with module Env = E = struct
         else None
       ) in
 
-    let premise, tbl, is_unit = 
-      (match alpha_renaming with
-      | Some (premise', subst) ->
-        let concl = Subst.FO.apply Subst.Renaming.none subst (concl, q_sc) in
-        let tbl_ = ref (T.Tbl.create 0) in
-        let is_unit_ = ref None in
-        prems_ := PremiseIdx.update_leaf !prems_ premise' (fun (tbl,is_unit) -> 
-          if not (T.Tbl.mem tbl concl) && not (T.Tbl.mem tbl (flip_eq concl)) then (
-            triggered_conclusions tbl premise' concl cl;
-            tbl_ := tbl;
-            is_unit_ := is_unit
-          );
-          true
+    match alpha_renaming with
+    | Some (premise', subst) ->
+      let concl = Subst.FO.apply Subst.Renaming.none subst (concl, q_sc) in
+      let tbl_ = ref (T.Tbl.create 0) in
+      let became_unit = ref None in
+      prems_ := PremiseIdx.update_leaf !prems_ premise' (fun (tbl,is_unit) -> 
+        if not (T.Tbl.mem tbl concl) && not (T.Tbl.mem tbl (flip_eq concl)) then (
+          triggered_conclusions tbl premise' concl cl;
+          if CCOpt.is_none is_unit then (
+            (match compute_is_unit !tbl_ concl cl with
+            | Some ps -> became_unit := Some (ps, tbl)
+            | None -> ());
+          )
         );
-        if CCOpt.is_none !is_unit_ then (
-          is_unit_ := compute_is_unit !tbl_ concl cl;
-        );
-        premise',!tbl_,!is_unit_
-      | _ ->
-        let tbl = T.Tbl.create 64 in
-        triggered_conclusions tbl premise concl cl;
-        premise, tbl, compute_is_unit tbl concl cl
-      )
-    in
+        (* if by adding concl something became unit we remove
+           the leaf as the new one with updated unit status will be added *)
+        CCOpt.is_none !became_unit
+      );
 
-    (match is_unit with
-    | Some cs ->
-      CCFormat.printf "@[%a@] is unit (@[%a@])" T.pp premise (CS.pp C.pp) cs;
-    | None ->  ());
-
-    prems_ := PremiseIdx.add !prems_ premise (tbl,is_unit)
+      (match !became_unit with 
+      | Some (ps,tbl) ->
+        ignore(PremiseIdx.update_leaf !prems_ premise' (fun (tbl, is_unit) -> assert false));
+        prems_ := PremiseIdx.add !prems_ premise (tbl,Some ps)
+      | None -> ())
+    | _ ->
+      let tbl = T.Tbl.create 64 in
+      triggered_conclusions tbl premise concl cl;
+      prems_ := PremiseIdx.add !prems_ premise (tbl,compute_is_unit tbl concl cl)
+    
 
   let insert_implication premise concl cl =
     if not (generalization_present premise concl) &&
