@@ -552,14 +552,14 @@ module Make(E : Env.S) : S with module Env = E = struct
           Proof.Step.simp ~rule:(Proof.Rule.mk "hidden_tautology_elimination")
           (List.map C.proof_parent (cl :: CS.to_list proofset))
         in
-        let pen_inc = if CS.cardinal proofset == 1 then 1 else 0 in
-        let repl = C.create ~penalty:(C.penalty cl + pen_inc) ~trail:(C.trail cl) lit_l proof in
+        let repl = C.create ~penalty:(C.penalty cl + 1) ~trail:(C.trail cl) lit_l proof in
         let tauto = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) [L.mk_tauto] proof in
 
         Util.debugf ~section 1 "simplified[hte]: @[@[%a@] --> @[%a@]@]" (fun k -> k C.pp cl C.pp repl);
         Util.debugf ~section 1 "used @[%a@] --> @[%a@] @[(%a)@]" (fun k -> k T.pp lit_a T.pp lit_b (CS.pp C.pp) proofset);
-
-        E.add_passive (Iter.singleton repl);
+        
+        if CS.cardinal proofset != 1 then E.add_passive (Iter.singleton repl);
+        (* else the clause is subsumed *)
         Some (tauto)
     ) else None
 
