@@ -26,19 +26,13 @@ module Make(C : Clause.S) = struct
   module C = C
 
   module Idx = Fingerprint.Make(struct 
-    type t = T.t * ((C.t * bool) list ref)
+    type t = T.t * ((C.t * (bool option)) list ref)
     let (<?>) = (CCOrd.Infix.(<?>))
     let compare (a1,c1) (a2,c2) = (T.compare a1 a2)
   end)
 
   let on_pred_skolem_introduction : (C.t * Logtk.Term.t) Logtk.Signal.t = Signal.create ()
 
-  let sign_present sign = function
-    | [(c,sign1)] -> sign1 = sign
-    | [(c1, sign1);(c2, sign2)] ->
-      if sign1 = sign2 then invalid_arg "signs must be different!";
-      true
-    | _ -> invalid_arg "only one or two element lists"
 
   let _skolem_idx = ref @@ Idx.empty ()
   let _renaming_idx = ref @@ Idx.empty ()
@@ -86,6 +80,14 @@ module Make(C : Clause.S) = struct
 
   let rename_form ?(should_rename=(fun _ -> true)) ?(polarity_aware=true) ~c form sign =
     assert(Type.is_prop (T.ty form));
+    let mk_sign sign = if polarity_aware then Some sign else None in
+    let defined_with_sign sign = function 
+      | [_, Some sign'] -> sign = sign'
+      | [_, Some s; _, Some s'] -> assert(s!=s'); false
+      | [_, None] -> false
+      | _ -> invalid_arg "wrong definition state"
+    in
+
     if is_renaming_clause c || T.is_true_or_false form then None
     else (
       let gen = Iter.head @@ 
@@ -95,17 +97,40 @@ module Make(C : Clause.S) = struct
         let renamer_sub = 
           Subst.FO.apply Subst.Renaming.none subst (renamer,0) in
 
-        let renamer_sub, new_defs, parents = 
-          if sign_present sign !defined_as || not polarity_aware then (
-            (renamer_sub, [], !defined_as)
+        (* it might be that at one moment we tried to do the renaming in
+           polarity aware mode and then at the other in non-polarity aware mode *)
+        let renamer_sub, new_defs, parents =
+          (* if we are now trying to define in non-PA mode and there is already
+             a polarity aware definition -- simply insert the other polarity *)
+          if not polarity_aware && (defined_with_sign sign !defined_as || 
+                                    defined_with_sign (not sign) !defined_as) then (
+            let sign = if defined_with_sign sign !defined_as then not sign else sign  in
+            let def = mk_renaming_clause c ~polarity_aware:true ~renamer ~form:orig sign in
+            defined_as := (def,(Some sign)) :: !defined_as;
+            (renamer_sub, [def], !defined_as)
+          ) else if polarity_aware then (
+              (* if we are doing PA and the sign is present in one form or the
+              other, OK *)
+              if defined_with_sign sign !defined_as 
+                  || (match !defined_as with
+                      | [_, Some _; _, Some _] -> true
+                      | [_, None] -> true
+                      | _ -> false) then (
+                renamer_sub, [], !defined_as
+              ) else (
+                (* if the sign is missing add it*)
+                let def = mk_renaming_clause c ~polarity_aware ~renamer ~form:orig sign in
+                defined_as := (def,Some sign) :: !defined_as;
+                (renamer_sub, [def], !defined_as))
           ) else (
-            let def = mk_renaming_clause c ~polarity_aware ~renamer ~form:orig sign in
-            defined_as := (def,sign) :: !defined_as;
-            (renamer_sub, [def], !defined_as)) in
-
-          Some(renamer_sub, new_defs,
-              CCList.filter_map (fun (c, sign') ->
-                if sign != sign' then None else Some c) parents)
+            assert(match !defined_as with 
+            | [_, None] -> true
+            | [_, Some _; _, Some _] -> true
+            | _ -> false);
+            renamer_sub, [], !defined_as
+          )
+        in
+        Some(renamer_sub, new_defs, CCList.map fst parents)
       | None ->
         (* maybe we need to define it if it appears too many times *)
         if should_rename form  then (
@@ -114,7 +139,7 @@ module Make(C : Clause.S) = struct
             T.mk_fresh_skolem ~prefix:"form" free_vars Type.prop in
           Ctx.declare id ty;
           let def = mk_renaming_clause c ~renamer ~polarity_aware ~form sign in
-          _renaming_idx := Idx.add !_renaming_idx form (renamer, ref [(def,sign)]);
+          _renaming_idx := Idx.add !_renaming_idx form (renamer, ref [(def, mk_sign sign)]);
           _renamer_symbols := ID.Set.add id !_renamer_symbols;
           Some(renamer, [def], [def])
         ) else None
