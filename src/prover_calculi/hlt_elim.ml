@@ -423,13 +423,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       in
       Some (C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof)
     )
-
-  let validate_proofset_ ps = 
-    match Env.flex_get k_clauses_to_track with 
-    | `All -> true
-    | `Passive -> CS.for_all (fun c -> E.is_passive c || C.is_orphaned c) ps
-    | `Active -> CS.for_all E.is_active ps
-
+  
   let unit_simplify cl =
     let exception UnitHTR of T.t * CS.t in
     let n = C.length cl in
@@ -535,7 +529,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         
         if CCBV.is_empty (CCBV.negate bv) then None
         else (
-          assert (validate_proofset_ !proofset);
+          (* assert (validate_proofset_ !proofset); *)
           let lit_l = List.rev @@ CCBV.select bv (C.lits cl) in
           let proof = 
             Proof.Step.simp ~rule:(Proof.Rule.mk "hidden_literal_elimination")
@@ -549,20 +543,19 @@ module Make(E : Env.S) : S with module Env = E = struct
 
           Some (res))
       with HiddenTauto(lit_a,lit_b,proofset) ->
-        assert (validate_proofset_ proofset);
+        (* assert (validate_proofset_ proofset); *)
         let lit_l = [L.mk_prop lit_a false; L.mk_prop lit_b true] in
         let proof = 
           Proof.Step.simp ~rule:(Proof.Rule.mk "hidden_tautology_elimination")
           (List.map C.proof_parent (cl :: CS.to_list proofset))
         in
-        let repl = C.create ~penalty:(C.penalty cl+1) ~trail:(C.trail cl) lit_l proof in
         let tauto = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) [L.mk_tauto] proof in
-
+        let repl = C.create ~penalty:(C.penalty cl + (if CS.cardinal proofset != 1 then 0 else 1)) ~trail:(C.trail cl) lit_l proof in
+        
+        E.add_passive (Iter.singleton repl);
+        
         Util.debugf ~section 1 "simplified[hte]: @[@[%a@] --> @[%a@]@]" (fun k -> k C.pp cl C.pp repl);
         Util.debugf ~section 1 "used @[%a@] --> @[%a@] @[(%a)@]" (fun k -> k T.pp lit_a T.pp lit_b (CS.pp C.pp) proofset);
-        
-        if CS.cardinal proofset != 1 || 
-           CS.for_all E.is_passive proofset then E.add_passive (Iter.singleton repl);
         (* else the clause is subsumed *)
         Some (tauto)
     ) else None
