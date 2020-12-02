@@ -333,11 +333,14 @@ module Make(E : Env.S) : S with module Env = E = struct
   let insert_into_indices cl =
     match CCArray.map get_predicate (C.lits cl) with
     | [| Some (a_lhs, a_sign); Some (b_lhs, b_sign) |] ->
-      let elig = C.eligible_param (cl,0) Subst.empty in
-      if ((not (Env.flex_get k_insert_only_ordered)) || CCBV.get elig 0) then ( 
+      let elig = 
+        if Env.flex_get k_insert_only_ordered 
+        then C.eligible_param (cl,0) Subst.empty
+        else CCBV.create ~size:2 true in
+      if (CCBV.get elig 0) then ( 
         insert_implication (lit_to_term ~negate:true a_lhs a_sign)
                            (lit_to_term b_lhs b_sign) cl);
-      if ((not (Env.flex_get k_insert_only_ordered)) || CCBV.get elig 1) then ( 
+      if (CCBV.get elig 1) then ( 
         insert_implication (lit_to_term ~negate:true b_lhs b_sign)
                            (lit_to_term a_lhs a_sign) cl)
     | _ -> ()
@@ -552,13 +555,14 @@ module Make(E : Env.S) : S with module Env = E = struct
           Proof.Step.simp ~rule:(Proof.Rule.mk "hidden_tautology_elimination")
           (List.map C.proof_parent (cl :: CS.to_list proofset))
         in
-        let repl = C.create ~penalty:(C.penalty cl + 1) ~trail:(C.trail cl) lit_l proof in
+        let repl = C.create ~penalty:(C.penalty cl+1) ~trail:(C.trail cl) lit_l proof in
         let tauto = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) [L.mk_tauto] proof in
 
         Util.debugf ~section 1 "simplified[hte]: @[@[%a@] --> @[%a@]@]" (fun k -> k C.pp cl C.pp repl);
         Util.debugf ~section 1 "used @[%a@] --> @[%a@] @[(%a)@]" (fun k -> k T.pp lit_a T.pp lit_b (CS.pp C.pp) proofset);
         
-        if CS.cardinal proofset != 1 then E.add_passive (Iter.singleton repl);
+        if CS.cardinal proofset != 1 || 
+           CS.for_all E.is_passive proofset then E.add_passive (Iter.singleton repl);
         (* else the clause is subsumed *)
         Some (tauto)
     ) else None
