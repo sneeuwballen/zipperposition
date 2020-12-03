@@ -11,6 +11,11 @@ let k_check_at = Flex_state.create_key ()
 let k_inprocessing = Flex_state.create_key ()
 let k_max_resolvents = Flex_state.create_key ()
 
+let _enabled = ref false
+let _inprocessing = ref false
+let _check_at = ref 10
+let _max_resolvents = ref (-1)
+
 let section = Util.Section.make ~parent:Const.section "pred-elim"
 
 module A = Libzipperposition_avatar
@@ -657,6 +662,8 @@ module Make(E : Env.S) : S with module Env = E = struct
   let fixpoint_active = ref false
   let begin_fixpoint () =
     fixpoint_active := true;
+    E.flex_add k_enabled !_enabled;
+    E.flex_add k_max_resolvents !_max_resolvents;
 
     let init_clauses =
       CS.to_list (Env.ProofState.ActiveSet.clauses ())
@@ -680,8 +687,9 @@ module Make(E : Env.S) : S with module Env = E = struct
         else Signal.StopListening
       );
 
-      ignore(do_pred_elim ());
-
+      let ans = (do_pred_elim ()) in
+      Util.debugf ~section 1 "Clause number changed for %a" (fun k -> k (CCOpt.pp CCInt.pp) ans)
+      
     with UnsupportedLogic ->
       Util.debugf ~section 1 "logic is unsupported" CCFun.id;
       (* releasing possibly used memory *)
@@ -708,11 +716,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       )
     )
 end
-
-let _enabled = ref false
-let _inprocessing = ref false
-let _check_at = ref 10
-let _max_resolvents = ref (-1)
 
 
 let extension =

@@ -15,6 +15,11 @@ let k_processing_kind = Flex_state.create_key ()
 
 let section = Util.Section.make ~parent:Const.section "bce"
 
+let _enabled = ref false
+let _processing_kind = ref `PreprocessingOnly
+let _check_at = ref 10
+let _max_symbol_occ = ref (-1) (* -1 stands for infinity *)
+
 module Avatar = Libzipperposition_avatar
 
 module type S = sig
@@ -704,6 +709,8 @@ module Make(E : Env.S) : S with module Env = E = struct
   let fixpoint_active = ref false
   
   let begin_fixpoint () =
+    E.flex_add k_max_symbol_occ !_max_symbol_occ;
+
     let init_clauses =
       C.ClauseSet.to_list (Env.ProofState.ActiveSet.clauses ())
       @ C.ClauseSet.to_list (Env.ProofState.PassiveSet.clauses ())
@@ -719,14 +726,15 @@ module Make(E : Env.S) : S with module Env = E = struct
           (C.lits cl))
       init_clauses;
       (* eliminate clauses *)
-      ignore (do_eliminate_blocked_clauses ());
+      let num_eliminated =  do_eliminate_blocked_clauses () in
+      Util.debugf ~section 1 "Step eliminates %d clauses" (fun k -> k num_eliminated);
 
       Signal.on Env.ProofState.PassiveSet.on_add_clause (fun c ->
         if !fixpoint_active then (react_clause_addded c; Signal.ContinueListening)
         else Signal.StopListening
       );
       Signal.on Env.ProofState.PassiveSet.on_remove_clause (fun c ->
-        if !fixpoint_active then (react_clause_addded c; Signal.ContinueListening)
+        if !fixpoint_active then (react_clause_removed c; Signal.ContinueListening)
         else Signal.StopListening
       );
 
@@ -763,11 +771,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       )
     )
 end
-
-let _enabled = ref false
-let _processing_kind = ref `PreprocessingOnly
-let _check_at = ref 10
-let _max_symbol_occ = ref (-1) (* -1 stands for infinity *)
 
 let extension =
   let action env =

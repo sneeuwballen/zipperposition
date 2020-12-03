@@ -22,14 +22,15 @@ module Make(E : Env.S) : S with module Env = E = struct
     let done_ = ref false in
     while not !done_ do
       ignore(BCE.fixpoint_step());
-      done_ := PE.fixpoint_step ();
+      done_ := not (PE.fixpoint_step ());
     done;
 
     BCE.end_fixpoint();
     PE.end_fixpoint()
 
   let setup () =
-    if E.flex_get k_enabled then run_fixpoint ();
+    if E.flex_get k_enabled then (
+      Signal.once E.on_start run_fixpoint);
 
 end
 
