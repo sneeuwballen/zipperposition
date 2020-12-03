@@ -10,8 +10,10 @@ let k_enabled = Flex_state.create_key ()
 let k_check_at = Flex_state.create_key ()
 let k_inprocessing = Flex_state.create_key ()
 let k_max_resolvents = Flex_state.create_key ()
+let k_check_gates = Flex_state.create_key ()
 
 let _enabled = ref false
+let _check_gates = ref true
 let _inprocessing = ref false
 let _check_at = ref 10
 let _max_resolvents = ref (-1)
@@ -436,7 +438,9 @@ module Make(E : Env.S) : S with module Env = E = struct
     in
     (* not yet implemented *)
     let check_ite () = false in
-    ignore (check_and () || check_or () || check_ite ())
+    if Env.flex_get k_check_gates then (
+      ignore (check_and () || check_or () || check_ite ())
+    )
 
   let schedule_tasks () =
     ID.Map.iter (fun _ task -> 
@@ -664,6 +668,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     fixpoint_active := true;
     E.flex_add k_enabled !_enabled;
     E.flex_add k_max_resolvents !_max_resolvents;
+    E.flex_add k_check_gates !_check_gates;
 
     let init_clauses =
       CS.to_list (Env.ProofState.ActiveSet.clauses ())
@@ -727,6 +732,7 @@ let extension =
     E.flex_add k_check_at !_check_at;
     E.flex_add k_inprocessing !_inprocessing;
     E.flex_add k_max_resolvents !_max_resolvents;
+    E.flex_add k_check_gates !_check_gates;
     
     PredElim.setup ()
   in
@@ -738,6 +744,7 @@ let extension =
 let () =
   Options.add_opts [
     "--pred-elim", Arg.Bool ((:=) _enabled), " enable predicate elimination";
+    "--pred-elim-check-gates", Arg.Bool ((:=) _check_gates), " enable recognition of gate clauses";
     "--pred-elim-inprocessing", Arg.Bool ((:=) _inprocessing), " predicate elimination as inprocessing rule";
     "--pred-elim-check-at", Arg.Int ((:=) _check_at), " when to perform predicate elimination inprocessing";
     "--pred-elim-max-resolvents", Arg.Int ((:=) _max_resolvents), " after how many resolvents to stop tracking a symbol";
