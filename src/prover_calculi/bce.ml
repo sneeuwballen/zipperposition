@@ -22,6 +22,9 @@ module type S = sig
 
   (** {6 Registration} *)
   val setup : unit -> unit
+  val begin_fixpoint : unit -> unit
+  val fixpoint_step : unit -> bool
+  val end_fixpoint : unit -> unit
 end
 
 module Make(E : Env.S) : S with module Env = E = struct
@@ -546,9 +549,9 @@ module Make(E : Env.S) : S with module Env = E = struct
     in
     let ans = CCOpt.is_some blocked_lit_idx in
     if ans then (
-      Util.debugf ~section 1 "@[%a@] is blocked on @[%a@] @." 
+      Util.debugf ~section 3 "@[%a@] is blocked on @[%a@] @." 
         (fun k -> k C.pp cl L.pp (C.lits cl).(CCOpt.get_exn blocked_lit_idx));
-      Util.debugf ~section 1 "proof:@[%a@]@." (fun k -> k Proof.S.pp_tstp (C.proof cl));
+      Util.debugf ~section 3 "proof:@[%a@]@." (fun k -> k Proof.S.pp_tstp (C.proof cl));
     );
     ans
 
@@ -634,7 +637,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     deregister_clause cl
 
 
-  let initialize () =
+  let initialize_regular () =
     let init_clauses =
       C.ClauseSet.to_list (Env.ProofState.ActiveSet.clauses ())
       @ C.ClauseSet.to_list (Env.ProofState.PassiveSet.clauses ())
@@ -698,9 +701,59 @@ module Make(E : Env.S) : S with module Env = E = struct
     end;
     Signal.StopListening
 
+  let fixpoint_active = ref false
+  
+  let begin_fixpoint () =
+    let init_clauses =
+      C.ClauseSet.to_list (Env.ProofState.ActiveSet.clauses ())
+      @ C.ClauseSet.to_list (Env.ProofState.PassiveSet.clauses ())
+    in
+    begin try
+      fixpoint_active := true;
+
+      List.iter scan_cl_lits init_clauses;
+      List.iter 
+        (fun cl ->
+          CCArray.iteri (fun lit_idx _ -> 
+            register_task ~update_others:false lit_idx cl) 
+          (C.lits cl))
+      init_clauses;
+      (* eliminate clauses *)
+      ignore (do_eliminate_blocked_clauses ());
+
+      Signal.on Env.ProofState.PassiveSet.on_add_clause (fun c ->
+        if !fixpoint_active then (react_clause_addded c; Signal.ContinueListening)
+        else Signal.StopListening
+      );
+      Signal.on Env.ProofState.PassiveSet.on_remove_clause (fun c ->
+        if !fixpoint_active then (react_clause_addded c; Signal.ContinueListening)
+        else Signal.StopListening
+      );
+
+    with UnsupportedLogic ->
+      Util.debugf ~section 2 "logic is unsupported" CCFun.id;
+      (* releasing possibly used memory *)
+      ss_idx := SymSignIdx.empty;
+      clause_lock := Util.Int_map.empty;
+      task_store := TaskStore.empty;
+      TaskPriorityQueue.clear task_queue;
+      fixpoint_active := false
+    end
+
+  let fixpoint_step () =
+    let num_eliminated = do_eliminate_blocked_clauses () in
+    Util.debugf ~section 1 "Step eliminates %d clauses" (fun k -> k num_eliminated);
+    num_eliminated != 0
+
+  let end_fixpoint () =
+    ss_idx := SymSignIdx.empty;
+    clause_lock := Util.Int_map.empty;
+    task_store := TaskStore.empty;
+    TaskPriorityQueue.clear task_queue;
+    fixpoint_active := false
 
   let register () =
-    Signal.on Env.on_start initialize
+    Signal.on Env.on_start initialize_regular
 
   let setup () =
     if Env.flex_get k_enabled then (

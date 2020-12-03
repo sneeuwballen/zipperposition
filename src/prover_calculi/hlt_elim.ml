@@ -276,12 +276,14 @@ module Make(E : Env.S) : S with module Env = E = struct
       aux concl
 
   let get_unit_predicate cl =
-    match C.lits cl with
-    | [| (L.Equation(lhs, _, _) as l) |] when L.is_predicate_lit l ->
-      Some (lit_to_term lhs (L.is_pos l))
-    | [| L.Equation(lhs, rhs, sign) |] when tracking_eq () ->
-      Some (lit_to_term (T.Form.eq lhs rhs) (sign))
-    | _ -> None
+    if Trail.is_empty (C.trail cl) then (
+      match C.lits cl with
+      | [| (L.Equation(lhs, _, _) as l) |] when L.is_predicate_lit l ->
+        Some (lit_to_term lhs (L.is_pos l))
+      | [| L.Equation(lhs, rhs, sign) |] when tracking_eq () ->
+        Some (lit_to_term (T.Form.eq lhs rhs) (sign))
+      | _ -> None)
+    else None
 
   let add_new_premise premise concl cl =
     let alpha_renaming = 
@@ -613,7 +615,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         match new_state with
         | Some c' ->
           if not (C.equal c c') then (
-            untrack_clause c; 
+            (* untrack_clause c;  *)
             track_clause c'
           )
         | _ -> untrack_clause c (* c is redundant *))

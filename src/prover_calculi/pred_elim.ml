@@ -20,6 +20,9 @@ module type S = sig
 
   (** {6 Registration} *)
   val setup : unit -> unit
+  val begin_fixpoint : unit -> unit
+  val fixpoint_step : unit -> bool
+  val end_fixpoint : unit -> unit
 end
 
 module Make(E : Env.S) : S with module Env = E = struct
@@ -310,8 +313,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     else Signal.StopListening
 
   let replace_clauses task clauses =
-    Util.debugf ~section 1 "replaced clauses: @[%a@]@." (fun k -> k (CS.pp C.pp) (CS.union task.pos_cls task.neg_cls));
-    Util.debugf ~section 1 "resolvents: @[%a@]@." (fun k -> k (CCList.pp C.pp) clauses);
+    Util.debugf ~section 5 "replaced clauses: @[%a@]@." (fun k -> k (CS.pp C.pp) (CS.union task.pos_cls task.neg_cls));
+    Util.debugf ~section 5 "resolvents: @[%a@]@." (fun k -> k (CCList.pp C.pp) clauses);
     _ignored_symbols := ID.Set.add task.sym !_ignored_symbols;
     let remove iter =
       Env.remove_active iter;
@@ -518,6 +521,13 @@ module Make(E : Env.S) : S with module Env = E = struct
     ) pos 
 
   let do_pred_elim () =
+    let removed_cls = ref None in
+    let updated_removed inc =
+      match !removed_cls with
+      | None -> removed_cls := Some inc
+      | Some inc' -> removed_cls := Some (inc' + inc)
+    in
+
     let process_task task =
       assert(CS.is_empty task.offending_cls);
       let pos_cls, neg_cls = 
@@ -539,11 +549,13 @@ module Make(E : Env.S) : S with module Env = E = struct
         CS.cardinal task.pos_cls + CS.cardinal task.neg_cls +
         List.length pos_gates + List.length neg_gates
       in
+      let num_new_cls = List.length resolvents in
       if new_sq_var_weight <= task.sq_var_weight ||
          new_lit_num <= task.num_lits ||
-         List.length resolvents < old_clauses then (
-        Util.debugf ~section 1 "replacing: @[%a@] (%d/%d) " 
-          (fun k -> k ID.pp task.sym old_clauses (List.length resolvents));
+         num_new_cls < old_clauses then (
+        Util.debugf ~section 5 "replacing: @[%a@] (%d/%d) " 
+          (fun k -> k ID.pp task.sym old_clauses (num_new_cls));
+        updated_removed (old_clauses - num_new_cls);
         replace_clauses task resolvents;
       ) else (
         task.last_check <- Some (task.sq_var_weight, task.num_lits)
@@ -562,7 +574,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     
     (* storing all newly computed clauses *)
     Env.add_passive (CS.to_iter !_newly_added);
-    _newly_added := CS.empty
+    _newly_added := CS.empty;
+    !removed_cls
 
   let steps = ref 0
   (* driver that does that every k-th step of given-clause loop *)
@@ -570,7 +583,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     steps := (!steps + 1) mod (Env.flex_get k_check_at);
 
     if !steps = 0 then (
-      do_pred_elim ();
+     ignore( do_pred_elim ());
     )
 
   let initialize () =
@@ -613,7 +626,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       ));
 
 
-      do_pred_elim ();
+      ignore(do_pred_elim ());
 
       Util.debugf ~section 5 "after elim: @[%a@]@."
         (fun k -> k (CS.pp C.pp) (Env.ProofState.PassiveSet.clauses ()));
@@ -640,6 +653,52 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let register () =
     Signal.on Env.on_start initialize
+
+  let fixpoint_active = ref false
+  let begin_fixpoint () =
+    fixpoint_active := true;
+
+    let init_clauses =
+      CS.to_list (Env.ProofState.ActiveSet.clauses ())
+      @ CS.to_list (Env.ProofState.PassiveSet.clauses ())
+    in
+    begin try
+     
+      List.iter (fun cl -> 
+        scan_cl_lits cl;
+        _tracked := CS.add cl !_tracked;
+      ) init_clauses;
+
+      schedule_tasks ();
+
+      Signal.on Env.ProofState.PassiveSet.on_add_clause (fun c -> 
+        if !fixpoint_active then react_clause_addded c
+        else Signal.StopListening
+      );
+      Signal.on Env.ProofState.PassiveSet.on_remove_clause (fun c ->
+        if !fixpoint_active then react_clause_removed c
+        else Signal.StopListening
+      );
+
+      ignore(do_pred_elim ());
+
+    with UnsupportedLogic ->
+      Util.debugf ~section 1 "logic is unsupported" CCFun.id;
+      (* releasing possibly used memory *)
+      _logic := Unsupported;
+      _pred_sym_idx := ID.Map.empty
+    end
+
+  let fixpoint_step () = 
+    let ans = do_pred_elim () in
+    Util.debugf ~section 1 "Clause number changed for %a" (fun k -> k (CCOpt.pp CCInt.pp) ans);
+    CCOpt.is_some ans
+  
+  let end_fixpoint () =
+    _logic := Unsupported;
+    _pred_sym_idx := ID.Map.empty;
+    fixpoint_active := false
+
   
   let setup () =
     if Env.flex_get k_enabled then (
