@@ -786,6 +786,7 @@ let extension =
   in
   { Extensions.default with Extensions.
                          name="bce";
+                         prio = 80;
                          env_actions=[action];
   }
 

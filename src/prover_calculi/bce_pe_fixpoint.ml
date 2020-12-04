@@ -43,11 +43,12 @@ let extension =
     let module FP = Make(E) in
 
     E.flex_add k_enabled !_enabled;
-    
+
     FP.setup ()
   in
   { Extensions.default with Extensions.
-                         name="bce";
+                         name="bce_pe_fp";
+                         prio = 70;
                          env_actions=[action];
   }
 

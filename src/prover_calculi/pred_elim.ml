@@ -353,12 +353,18 @@ module Make(E : Env.S) : S with module Env = E = struct
     let filter_gates ~sign ~lit_num_filter =
       List.filter (fun cl -> 
         lit_num_filter (Array.length (C.lits cl)) &&
-        Array.exists (fun lit -> 
+        (match (CCArray.find_idx (fun lit -> 
           match get_sym_sign lit with 
           | Some(sym', sign') -> ID.equal sym sym' && sign = sign'
-          | None -> false) 
-        (C.lits cl)
-      ) gates_l
+          | None -> false) (C.lits cl)) with
+        | Some (i, lit) ->
+          let free_vars = T.VarSet.of_list (L.vars lit) in
+          CCOpt.is_none (CCArray.find_map_i (fun j lit'  ->
+            if (i=j || T.VarSet.subset (T.VarSet.of_list (L.vars lit')) free_vars) then None
+            else Some j
+          ) (C.lits cl))
+        | _ -> false))
+      gates_l
     in
 
     let find_and_or bin_clauses long_clauses =
@@ -738,6 +744,7 @@ let extension =
   in
   { Extensions.default with Extensions.
                          name="pred_elim";
+                         prio = 90;
                          env_actions=[action];
   }
 

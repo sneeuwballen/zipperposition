@@ -694,6 +694,7 @@ let extension =
   in
   { Extensions.default with
       Extensions.name = "hidden literal elimination";
+      prio = 100;
       env_actions=[register]
   }
 
