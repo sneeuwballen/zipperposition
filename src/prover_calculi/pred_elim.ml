@@ -320,8 +320,10 @@ module Make(E : Env.S) : S with module Env = E = struct
     else Signal.StopListening
 
   let replace_clauses task clauses =
-    Util.debugf ~section 5 "replaced clauses: @[%a@]@." (fun k -> k (CS.pp C.pp) (CS.union task.pos_cls task.neg_cls));
-    Util.debugf ~section 5 "resolvents: @[%a@]@." (fun k -> k (CCList.pp C.pp) clauses);
+    Util.debugf ~section 1 "replaced clauses(%a):@. regular:@[%a@]@. gates:@[%a@]@." 
+      (fun k -> k ID.pp task.sym (CS.pp C.pp) (CS.union task.pos_cls task.neg_cls) 
+                  (CCOpt.pp (CCPair.pp (CCList.pp C.pp) (CCList.pp C.pp))) task.is_gate);
+    Util.debugf ~section 1 "resolvents: @[%a@]@." (fun k -> k (CCList.pp C.pp) clauses);
     _ignored_symbols := ID.Set.add task.sym !_ignored_symbols;
     let remove iter =
       Env.remove_active iter;

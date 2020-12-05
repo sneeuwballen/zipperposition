@@ -389,31 +389,51 @@ module Make(E : Env.S) : S with module Env = E = struct
     let proofset = ref (CS.empty) in
     CCArray.iteri (fun i lit -> 
       match get_predicate lit with 
-      | Some (lhs, sign) -> 
+      | Some (lhs, sign) ->
         let lhs_neg = lit_to_term ~negate:true lhs sign in 
+        let lhs = lit_to_term lhs sign in
         let unit_sc = (max idx_sc q_sc) + 1 in
+        let (<+>) = CCOpt.(<+>) in
 
-        (* for the literal l we are looking for implications p -> c such that
-          c\sigma = ~l. Then we see if there is an unit clause p' such that
-          p\sigma = p'\rho *)
-
-        retrieve_gen_concl_idx () (lhs_neg, q_sc)
-        |> Iter.find_map (fun (concl, premise, subst) ->
-          let orig_premise = premise in
-          let premise = Subst.FO.apply Subst.Renaming.none subst (premise, idx_sc) in
-          retrieve_gen_unit_idx unit_sc (premise, idx_sc)
-          |> Iter.head
-          |> CCOpt.map (fun (_, unit_cl, _) -> 
-            prems_ := PremiseIdx.update_leaf !prems_ orig_premise (fun (tbl,_) -> 
-              let proofset' = T.Tbl.find tbl concl in
-              if not (CS.mem cl proofset') then (
-                proofset := CS.union (CS.add unit_cl (proofset')) !proofset;
-                CCBV.reset bv i);
-              true
-            );
-          ))
-        (* if nothing is found stiffle compiler warning *)
-        |> CCOpt.get_or ~default:()
+        CCOpt.get_or ~default:()
+        (
+          (* for the literal l we are looking for implications p -> c such that
+              c\sigma = ~l. Then we see if there is an unit clause p' such that
+              p\sigma = p'\rho *)
+          retrieve_gen_concl_idx () (lhs_neg, q_sc)
+          |> Iter.find_map (fun (concl, premise, subst) ->
+            let orig_premise = premise in
+            let premise = Subst.FO.apply Subst.Renaming.none subst (premise, idx_sc) in
+            retrieve_gen_unit_idx unit_sc (premise, idx_sc)
+            |> Iter.head
+            |> CCOpt.map (fun (_, unit_cl, _) -> 
+              prems_ := PremiseIdx.update_leaf !prems_ orig_premise (fun (tbl,_) -> 
+                let proofset' = T.Tbl.find tbl concl in
+                if not (CS.mem cl proofset') then (
+                  proofset := CS.union (CS.add unit_cl (proofset')) !proofset;
+                  CCBV.reset bv i);
+                true
+              );
+            ))
+        <+> (
+          (* for the literal l we are looking for implications p -> c such that
+              p\sigma = l. Then we see if there is an unit clause p' such that
+              ~c\sigma = p'\rho *)
+          retrieve_gen_prem_idx () (lhs, q_sc)
+          |> Iter.find_map ( fun (_, (tbl, _), subst) ->
+            T.Tbl.to_iter tbl
+            |> Iter.find_map (fun (concl, ps) ->
+              let concl = Subst.FO.apply Subst.Renaming.none subst (concl, idx_sc) in
+              let neg_concl = normalize_negations (T.Form.not_ concl) in
+              let unit_sc = (max idx_sc q_sc) + 1 in
+              retrieve_gen_unit_idx unit_sc (neg_concl, unit_sc)
+              |> Iter.head
+              |> CCOpt.map (fun (_, unit_cl, _) -> 
+                let proofset' = CS.add unit_cl ps in
+                if not (CS.mem cl proofset') then (
+                  proofset := CS.union proofset' !proofset;
+                  CCBV.reset bv i
+        ))))))
       | None -> ()
     ) (C.lits cl);
     if CCBV.is_empty (CCBV.negate bv) then None
@@ -497,6 +517,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         CCArray.iteri (fun i i_lit ->
           match get_predicate i_lit with
           | Some(i_lhs, i_sign) when CCBV.get bv i -> 
+            let i_t = lit_to_term (i_lhs) (i_sign) in
             let i_neg_t = lit_to_term ~negate:true (i_lhs) (i_sign) in
             CCArray.iteri (fun j j_lit ->
               begin match get_predicate j_lit with
@@ -512,8 +533,10 @@ module Make(E : Env.S) : S with module Env = E = struct
                   | _ -> ())
                 );
                 if Env.flex_get k_hle then (
-                  (match find_implication cl i_neg_t j_neg_t with
-                    | Some (_, _, proofset',_) ->
+                  let (<+>) = CCOpt.(<+>) in
+                  (match find_implication cl i_neg_t j_neg_t
+                         <+> find_implication cl j_t i_t with
+                    | Some (_, _, proofset',subst) ->
                       CCBV.reset bv j;
 
                       Util.debugf ~section 3 "@[%a@] --> @[%a@]" 
@@ -522,7 +545,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                         (fun k -> k j (CS.pp C.pp) proofset');
 
                       proofset := CS.union proofset' !proofset
-                    | None -> () )
+                    | _ -> () )
                 )
               | _ -> () end
             ) (C.lits cl)

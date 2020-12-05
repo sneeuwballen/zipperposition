@@ -16,17 +16,17 @@ module Make(E : Env.S) : S with module Env = E = struct
   module PE = Pred_elim.Make(E)
   
   let run_fixpoint () = 
-    BCE.begin_fixpoint();
     PE.begin_fixpoint();
+    BCE.begin_fixpoint();
 
     let done_ = ref false in
     while not !done_ do
-      ignore(BCE.fixpoint_step());
-      done_ := not (PE.fixpoint_step ());
+      ignore(PE.fixpoint_step());
+      done_ := not (BCE.fixpoint_step ());
     done;
 
-    BCE.end_fixpoint();
-    PE.end_fixpoint()
+    PE.end_fixpoint();
+    BCE.end_fixpoint()
 
   let setup () =
     if E.flex_get k_enabled then (
