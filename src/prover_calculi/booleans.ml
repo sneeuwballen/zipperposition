@@ -590,10 +590,10 @@ module Make(E : Env.S) : S with module Env = E = struct
 
 
   let setup () =
+    Env.add_basic_simplify normalize_equalities;
     match Env.flex_get k_bool_reasoning with 
     | BoolReasoningDisabled -> ()
     | _ ->
-      Env.add_basic_simplify normalize_equalities;
       if Env.flex_get k_simplify_bools then (
         Env.add_basic_simplify simpl_bool_subterms
       );

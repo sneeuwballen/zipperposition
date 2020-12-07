@@ -500,8 +500,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       let repl = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof in
       let tauto = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) [L.mk_tauto] proof in
 
-      Util.debugf ~section 1 "simplified[unit_htr(%a)]: @[@[%a@] --> @[%a@]@]" 
-        (fun k -> k T.pp lit_t C.pp cl C.pp repl);
+      Util.debugf ~section 1 "simplified[unit_htr(%a)]: @[@[%a@] --> @[%a@]@]@. using @[%a@]"
+        (fun k -> k T.pp lit_t C.pp cl C.pp repl (CS.pp C.pp) proofset);
 
       E.add_passive (Iter.singleton repl);
       Some (tauto)
