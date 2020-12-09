@@ -143,6 +143,7 @@ module Ctx = struct
     (* datatype ID -> list of cstors *)
     mutable new_types: (ID.t * type_) list;
     (* list of symbols whose type has been inferred recently *)
+    mutable has_ite : bool
   }
 
   let create
@@ -163,6 +164,7 @@ module Ctx = struct
       new_metas=[];
       local_vars = [];
       new_types = [];
+      has_ite = false
     } in
     ctx
 
@@ -522,7 +524,9 @@ let rec infer_rec ?loc ctx t =
       let b = infer_rec ?loc ctx b in
       let c = infer_rec ?loc ctx c in
       unify ?loc (T.ty_exn b)(T.ty_exn c);
-      T.ite ?loc a b c
+      ctx.has_ite <- true;
+      CCFormat.printf "ite term@.";
+      T.ite_term ?loc a b c
     | PT.Let (l, u) ->
       (* deal with pairs in [l] one by one *)
       let rec aux = function
@@ -1152,6 +1156,23 @@ let infer_statements_exn
       Ctx.create ?def_as_rewrite ?on_var ?on_undef ?on_shadow ~implicit_ty_args ()
     | Some c -> c
   in
+
+  let mk_ite_axioms () =
+    let ty_var = T.Ty.var (Var.make ~ty:(T.Ty.tType) (ID.make "tyvar")) in
+    let if_t_var = T.var (Var.make ~ty:ty_var (ID.make "if_t")) in
+    let if_f_var = T.var (Var.make ~ty:ty_var (ID.make "if_f")) in
+
+    let if_t = T.ite_term T.Form.true_ if_t_var if_f_var in
+    let if_f = T.ite_term T.Form.false_ if_t_var if_f_var in
+    let ite_const = T.ite_const () in 
+    let proof = (Proof.Step.define_internal (T.head_exn ite_const) []) in
+
+    let decl = Statement.ty_decl ~proof (T.head_exn ite_const) (T.ty_exn ite_const) in
+    let if_t_stm =  Statement.assert_ ~proof (T.Form.eq if_t if_t_var) in
+    let if_f_stm =  Statement.assert_ ~proof (T.Form.eq if_f if_f_var) in
+    decl :: if_t_stm :: if_f_stm :: []
+  in
+
   let res = CCVector.create () in
   Iter.iter
     (fun st ->
@@ -1160,6 +1181,9 @@ let infer_statements_exn
        List.iter (CCVector.push res) aux;
        CCVector.push res st)
     seq;
+  if ctx.has_ite then (
+    CCVector.append_list res (mk_ite_axioms ())
+  );
   CCVector.freeze res
 
 let infer_statements

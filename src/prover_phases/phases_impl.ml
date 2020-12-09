@@ -511,7 +511,7 @@ let process_file ?(prelude=Iter.empty) file =
   let sk_ctx = Skolem.create () in
   cnf ~sk_ctx transformed >>= fun stmts ->
   (* Removed it because it is painfully slow (@VISA.) *)
-  (* let stmts = Booleans.preprocess_cnf_booleans stmts in *)
+  let stmts = Booleans.preprocess_cnf_booleans stmts in
   (* compute signature, precedence, ordering *)
   let conj_syms = syms_in_conj stmts in
   let signature = Statement.signature ~conj_syms:conj_syms (CCVector.to_iter stmts) in

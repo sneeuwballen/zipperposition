@@ -1682,6 +1682,22 @@ let rec erase t = match view t with
       ~rest
   | Meta _ -> failwith "cannot erase meta"
 
+
+let ite_const () = 
+  let ite_name = ID.make "zip_internal_ite" in
+  let ty_var = Ty.var (Var.make ~ty:Ty.tType (ID.make "tyvar")) in
+  let ite_type = 
+    Ty.close_forall
+      (Ty.(==>) [Ty.prop; ty_var; ty_var] (ty_var))
+  in
+  const ~ty:ite_type ite_name
+
+let ite_term ?loc cond if_true if_false =
+  assert(Ty.equal (ty_exn if_true) (ty_exn if_false));
+  assert(Ty.is_prop (ty_exn cond));
+  app ?loc ~ty:(ty_exn if_true) (ite_const ())
+    [ty_exn if_true; cond; if_true; if_false]
+
 module TPTP = struct
   let pp out t = STerm.TPTP.pp out (erase t)
   let to_string t = STerm.TPTP.to_string (erase t)

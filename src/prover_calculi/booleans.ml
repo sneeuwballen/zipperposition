@@ -1577,6 +1577,8 @@ module Make(E : Env.S) : S with module Env = E = struct
   let setup () =
     match Env.flex_get k_bool_reasoning with 
     | BoolReasoningDisabled -> ()
+    | BoolCasesPreprocess ->
+      Env.add_unary_inf "false_elim" false_elim;
     | _ ->
       if Env.flex_get k_solve_formulas then (
         Env.add_unary_inf "solve formulas" (
@@ -1803,32 +1805,37 @@ let eager_cases_near stms =
 
   let module T = TypedSTerm in
 
-  let find_fool_subterm p =
+  let find_fool_subterm ?(free_vars=Var.Set.empty) p =
     let rec aux ~top p =
       let p_ty = T.ty_exn p in
 
+      let no_leaky_variables t = 
+        Var.Set.intersection_empty (T.free_vars_set t) free_vars
+      in
+
       let return p =
         assert(T.Ty.is_prop (T.ty_exn p));
-        assert(T.closed p);
+        assert(no_leaky_variables p);
         Some (T.Form.true_, T.Form.false_, p) in
 
       match T.view p with
       | AppBuiltin(hd, args)
-          when not top && T.closed p && T.Ty.is_prop (T.ty_exn p) &&
+          when not top && no_leaky_variables p && T.Ty.is_prop (T.ty_exn p) &&
             (* making sure it is not T or F *)
             (Builtin.is_logical_op hd ||
             Builtin.equal hd Builtin.Eq ||
             Builtin.equal hd Builtin.Neq) -> 
+        CCFormat.printf "found OK eq@.";
         return p
       | Bind((Binder.Exists | Binder.Forall), var, body)
-          when not top && T.closed p ->
+          when not top && no_leaky_variables p ->
         return p
       | Bind(Binder.Lambda, var, body) ->
         CCOpt.map (fun (body_t, body_f, s) -> 
-          assert(T.closed s);
+          assert(no_leaky_variables s);
           (T.fun_l [var] body_t, T.fun_l [var] body_f, s)
         ) (aux ~top:false body)
-      | App(hd, args) when not top && T.Ty.is_prop p_ty && T.closed p  ->
+      | App(hd, args) when not top && T.Ty.is_prop p_ty && no_leaky_variables p  ->
         return p
       | Const _ when not top && T.Ty.is_prop p_ty  ->
         return p
@@ -1857,7 +1864,7 @@ let eager_cases_near stms =
 
   
   let unroll_fool p =
-    let rec aux p = 
+    let rec aux ~vars p = 
       let p_ty = T.ty_exn p in
       match T.view p with 
       | AppBuiltin(((Builtin.Neq|Builtin.Eq) as hd), ([_;a;b]|[a;b])) when not (T.Ty.is_prop (T.ty_exn a)) ->
@@ -1867,32 +1874,32 @@ let eager_cases_near stms =
           begin match find_fool_subterm b with 
           | None -> p
           | Some(b_t, b_f, subterm) ->
-            let subterm' = aux subterm in
-            let if_true = T.Form.or_ [T.Form.not_ (subterm'); aux @@ cons a b_t] in
-            let if_false = T.Form.or_ [subterm'; aux @@ cons a b_f] in
+            let subterm' = aux ~vars subterm in
+            let if_true = T.Form.or_ [T.Form.not_ (subterm'); aux ~vars @@ cons a b_t] in
+            let if_false = T.Form.or_ [subterm'; aux ~vars @@ cons a b_f] in
             T.Form.and_ [if_true; if_false]
           end
         | Some(a_t, a_f, subterm) ->
-          let subterm' = aux subterm in
-          let if_true = T.Form.or_ [T.Form.not_ (subterm'); aux @@ cons a_t b] in
-          let if_false = T.Form.or_ [subterm'; aux @@ cons a_f b] in
+          let subterm' = aux ~vars subterm in
+          let if_true = T.Form.or_ [T.Form.not_ (subterm'); aux ~vars @@ cons a_t b] in
+          let if_false = T.Form.or_ [subterm'; aux ~vars @@ cons a_f b] in
           T.Form.and_ [if_true; if_false]
         end
       | AppBuiltin(hd, args) -> 
-        T.app_builtin ~ty:p_ty hd (List.map aux args)
+        T.app_builtin ~ty:p_ty hd (List.map (aux ~vars) args)
       | App(hd, args) ->
         begin match find_fool_subterm p with
         | Some(p_t, p_f, subterm) ->
-          let subterm' = aux subterm in
-          let if_true = T.Form.or_ [T.Form.not_ (subterm'); aux p_t] in
-          let if_false = T.Form.or_ [subterm'; aux p_f] in
+          let subterm' = aux ~vars subterm in
+          let if_true = T.Form.or_ [T.Form.not_ (subterm'); aux ~vars p_t] in
+          let if_false = T.Form.or_ [subterm'; aux ~vars p_f] in
           T.Form.and_ [if_true; if_false]
         | None -> p end
       | Bind((Binder.Exists | Binder.Forall) as b, var , body) ->
-        let body' = aux body in
+        let body' = aux ~vars:(Var.Set.add vars var) body in
         T.bind ~ty:p_ty b var body'
       | _ -> p in
-    let res = aux p in
+    let res = aux ~vars:Var.Set.empty  p in
     res in
   map_propositions ~proof (fun _ p -> [unroll_fool p]) stms
 
