@@ -156,7 +156,7 @@ module Make(E : Env.S) = struct
         | c :: l', _ ->
           (* put clauses of [l'] back in passive set *)
 
-          Util.debugf ~section 5 "@[ remaining after simplification:@.@[%a@]@. @]" (fun k -> k (CCList.pp Env.C.pp) l');
+          Util.debugf ~section 2 "@[ remaining after simplification:@.@[%a@]@. @]" (fun k -> k (CCList.pp Env.C.pp) l');
           
           Env.add_passive (Iter.of_list l');
           (* process the clause [c] *)

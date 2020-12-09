@@ -314,7 +314,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     )
 
   let bool_hoist_simpl (c:C.t) : C.t list option = 
-    let proof = Proof.Step.inference [C.proof_parent c]
+    let proof = Proof.Step.simp [C.proof_parent c]
                 ~rule:(Proof.Rule.mk "bool_hoist") ~tags:[Proof.Tag.T_ho] in
 
     let bool_subterms  = get_bool_hoist_eligible c in
