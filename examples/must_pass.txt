@@ -1,17 +1,10 @@
-examples/frontpage.zf
 examples/ac.zf
-examples/ARI114=1.p
 examples/pelletier_problems/pb34.zf
-examples/don_t_use_omega.p --avatar=off
-examples/GEG021=1.p --int-arith -cq=almost-bfs
-examples/GEG022=1.p --int-arith -cq=almost-bfs
-examples/GEG023=1.p --int-arith -cq=almost-bfs
 examples/polymorph.p
 examples/regression/bad_set_avatar.zf --avatar=eager
 examples/regression/contextual_narrow1.zf
 examples/set_fancy.zf
 examples/simple_case.zf
-examples/loop.p --int-arith -cq=almost-bfs --ignore-orphans=false
 examples/regression/npdtree_fail.zf
 examples/regression/ho_pos.zf
 examples/ho/neg_eq1.zf

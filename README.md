@@ -10,7 +10,7 @@
 
 Zipperposition is intended to be a superposition prover for full first
 order logic, plus some extensions
-(datatypes, recursive functions, arithmetic, lambda-free higher order).
+(datatypes, recursive functions, lambda-free higher order).
 The accent is on flexibility, modularity and simplicity rather than
 performance, to allow quick experimenting on automated theorem proving. It
 generates TSTP traces or graphviz files for nice graphical display.
@@ -124,7 +124,6 @@ Typical usage:
 ```
 $ zipperposition --help
 $ zipperposition problem_file [options]
-$ zipperposition --arith examples/ARI114=1.p
 $ zipperposition --dot /tmp/foo.dot examples/ind/nat1.zf
 ```
 

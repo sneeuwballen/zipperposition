@@ -231,8 +231,6 @@ module type S = sig
     val eq : t
     (** Equations *)
 
-    val arith : t
-
     val filter : (Literal.t -> bool) -> t
 
     val max : clause -> t

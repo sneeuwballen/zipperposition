@@ -414,8 +414,6 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       | Lit.Equation (_, _, true) -> true
       | _ -> false
 
-    let arith _ lit = Lit.is_arith lit
-
     let filter f _ lit = f lit
 
     let max c =

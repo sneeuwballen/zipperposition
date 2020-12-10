@@ -250,7 +250,6 @@ module Make (S : sig val st : Flex_state.t end) = struct
     let res = 
       match l with 
       | L.Equation (_, _, sign) -> sign
-      | L.Int o -> Int_lit.sign o
       | L.False -> false
       | _ -> true 
     in
@@ -305,8 +304,7 @@ module Make (S : sig val st : Flex_state.t end) = struct
           | _ -> () end
       | L.True -> begin match target with | L.True -> k subst | _ -> () end
       | L.False -> begin match target with | L.False -> k subst | _ -> () end
-      | _ -> 
-        raise UnsupportedLiteralKind end
+    end
 
   let check_subsumption_possibility subsumer target =
     let is_more_specific pattern target =

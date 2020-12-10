@@ -174,10 +174,6 @@ module Make(E : Env.S) : S with module Env = E = struct
             logic := Unsupported; 
             Util.debugf ~section 1 "unsupported because of @[%a@]@." (fun k -> k L.pp lit);
             raise UnsupportedLogic)
-      | L.Int _ | L.Rat _  -> 
-        Util.debugf ~section 1 "theories are not supported@." CCFun.id;
-        logic := Unsupported;
-        raise UnsupportedLogic
       | _ -> ()
     ) (C.lits cl)
 
