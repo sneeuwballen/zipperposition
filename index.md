@@ -13,16 +13,18 @@
   is a more up to date description of the induction and rewriting sub-systems.
 - [Superposition for Lambda-Free Higher-Order Logic](https://hal.inria.fr/hal-01904595)
   describes the newer improvements to the higher-order reasoning techniques.
+- [New Techniques for Higher-Order Superposition](https://matryoshka-project.github.io/pubs/ho_techniques.pdf) (draft)
 
 The slides of some of Simon Cruanes' talks are on [his page](https://simon.cedeela.fr/).
 
-Some papers related to combinations of Superposition, higher-order logic, Induction, etc.
-can be found on [Matryoshka's website](http://matryoshka.gforge.inria.fr/).
+Some papers related to combinations of Superposition, Higher-order logic, Induction, etc.
+can be found on [Matryoshka's website](https://matryoshka-project.github.io/).
 
 ## API Documentation
 
-- [latest](1.6)
+- [latest](2.0)
 
+- [2.0](2.0)
 - [1.6](1.6)
 - [1.5](1.5)
 - [1.3](1.3)
