@@ -11,12 +11,14 @@ let k_check_at = Flex_state.create_key ()
 let k_inprocessing = Flex_state.create_key ()
 let k_max_resolvents = Flex_state.create_key ()
 let k_check_gates = Flex_state.create_key ()
+let k_non_singular_pe = Flex_state.create_key ()
 
 let _enabled = ref false
 let _check_gates = ref true
 let _inprocessing = ref false
 let _check_at = ref 10
 let _max_resolvents = ref (-1)
+let _non_singular_pe = ref false
 
 let section = Util.Section.make ~parent:Const.section "pred-elim"
 
@@ -153,6 +155,45 @@ module Make(E : Env.S) : S with module Env = E = struct
       raise UnsupportedLogic
     | _ -> None
 
+  let remove_symbol entry =
+    _pred_sym_idx := ID.Map.remove entry.sym !_pred_sym_idx;
+    _ignored_symbols := ID.Set.add entry.sym !_ignored_symbols;
+    if TaskSet.mem entry !_task_queue then (
+      _task_queue := TaskSet.remove entry !_task_queue
+    )
+
+  let should_schedule task =
+    let eligible_for_non_singular_pe task = 
+      Env.flex_get k_non_singular_pe &&
+      (match task.is_gate with
+       | Some (pos,neg) ->
+         let limit = 
+          if Env.flex_get k_max_resolvents < 0 
+          then max_int
+          else Env.flex_get k_max_resolvents in
+         let pos_num, neg_num = List.length pos, List.length neg in
+         let max_resolvents =
+          (CS.fold (fun cl num_res -> 
+              if num_res == limit
+              then limit (*shortcut *) 
+              else (
+                let new_res = CCArray.fold (fun acc lit -> 
+                  match get_sym_sign lit with
+                  | Some (sym,sign) when ID.equal task.sym sym ->
+                    acc * (if sign then neg_num else pos_num)
+                  | _ -> acc
+                ) 1 (C.lits cl) in
+                if new_res + num_res < limit then new_res + num_res else limit 
+          )) task.offending_cls 0)
+        in
+        if max_resolvents < limit then true
+        else (remove_symbol task; false)
+       | None -> false)
+    in
+    
+    CS.is_empty task.offending_cls ||
+    eligible_for_non_singular_pe task
+
   let possibly_ignore_sym entry =
     let card s = CS.cardinal s in
     let possible_resolvents = 
@@ -165,13 +206,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     in
     if Env.flex_get k_max_resolvents < 0 then ()
     else (
-      if possible_resolvents > Env.flex_get k_max_resolvents then (
-        _pred_sym_idx := ID.Map.remove entry.sym !_pred_sym_idx;
-        _ignored_symbols := ID.Set.add entry.sym !_ignored_symbols;
-        if TaskSet.mem entry !_task_queue then (
-          _task_queue := TaskSet.remove entry !_task_queue
-        )
-      )
+      if possible_resolvents > Env.flex_get k_max_resolvents 
+      then remove_symbol entry
     )
   
   let scan_cl_lits ?(handle_gates=true) cl =
@@ -197,7 +233,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             possibly_ignore_sym entry;
           | `Offending ->
             entry.offending_cls <- CS.add cl entry.offending_cls;
-            if TaskSet.mem entry !_task_queue then (
+            if TaskSet.mem entry !_task_queue && (not (should_schedule entry)) then (
                _task_queue := TaskSet.remove entry !_task_queue;
             )
           | `Gates ->
@@ -260,7 +296,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let react_clause_removed cl =
     if !_logic != Unsupported then (
       let should_retry task =
-        CS.is_empty task.offending_cls &&
+        should_schedule task &&
         not (ID.Set.mem task.sym !_ignored_symbols) &&
         (match task.last_check with
         | Some(old_sq_var_sum, old_num_lit) -> 
@@ -312,7 +348,8 @@ module Make(E : Env.S) : S with module Env = E = struct
                   Util.debugf ~section 10 "retrying @[%a@]@." (fun k -> k pp_task task);
                   _task_queue := TaskSet.add task !_task_queue
                 );
-                Some task
+
+                CCOpt.return_if (not (ID.Set.mem task.sym !_ignored_symbols)) task
               | None -> None (*probably the symbol became ignored*) ) !_pred_sym_idx;
           | _ -> ()
         ) (C.lits cl));
@@ -336,7 +373,8 @@ module Make(E : Env.S) : S with module Env = E = struct
         )
       ) iter;
     in
-    assert(CS.is_empty task.offending_cls);
+    assert(CS.is_empty task.offending_cls || Env.flex_get k_non_singular_pe);
+    remove (CS.to_iter task.offending_cls);
     remove (CS.to_iter task.pos_cls);
     remove (CS.to_iter task.neg_cls);
     (match task.is_gate with
@@ -367,6 +405,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           ) (C.lits cl))
         | _ -> false))
       gates_l
+      |> CCList.fast_sort (fun cl cl' -> compare (C.length cl) (C.length cl'))
     in
 
     let find_and_or bin_clauses long_clauses =
@@ -434,7 +473,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     in
     let check_or () =
       let pos_gates = filter_gates ~sign:true ~lit_num_filter:((=) 2) in
-      let neg_gates = filter_gates ~sign:false ~lit_num_filter:(fun n -> n >= 3) in
+      let neg_gates = filter_gates ~sign:false ~lit_num_filter:(fun n -> n >= 2) in
+      (* checking for or will also check for equivalences p(x) <-> q(x) *)
       match find_and_or pos_gates neg_gates with
       | Some(neg_cl, pos_cls) ->
         let to_remove = CS.of_list (neg_cl :: pos_cls) in
@@ -444,6 +484,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         true
       | None -> false
     in
+
     (* not yet implemented *)
     let check_ite () = false in
     if Env.flex_get k_check_gates then (
@@ -535,7 +576,44 @@ module Make(E : Env.S) : S with module Env = E = struct
       CCList.filter_map (fun neg_cl -> 
         get_resolver () ~sym ~pos_cl ~neg_cl
       ) neg
-    ) pos 
+    ) pos
+
+  let calc_non_singular_resolvents ~sym ~pos ~neg ~offending =
+    let find_lit_by_sym_opt sym sign cl =
+      try
+        CCOpt.return (find_lit_by_sym sym sign cl)
+      with _ -> None
+    in
+
+    let rec aux has_pred no_pred =
+      (match has_pred with
+      | [] -> no_pred
+      | cl :: cls ->
+        (* for the first occurrence of the symbol p in cl,
+           we compute all possible replacements w.r.t. gate clauses.
+           If there are more symbols left, we continue with all the replacements  *)
+        let new_cls = 
+          (match find_lit_by_sym_opt sym true cl with
+          | Some _ ->
+            CCList.filter_map (fun neg_cl -> 
+              get_resolver () ~sym ~pos_cl:cl ~neg_cl) neg
+          | None ->
+            (match find_lit_by_sym_opt sym false cl with
+            | Some _ ->
+              CCList.filter_map (fun pos_cl -> 
+                get_resolver () ~sym ~pos_cl ~neg_cl:cl) pos
+            | None -> invalid_arg ""))
+        in
+        let has_lit cl =
+          let (<+>) = CCOpt.(<+>) in
+          CCOpt.is_some (find_lit_by_sym_opt sym true cl <+> 
+                         find_lit_by_sym_opt sym false cl)
+        in
+        let has_pred', no_pred' = List.partition has_lit new_cls in
+        aux (has_pred' @ cls) (no_pred' @ no_pred))
+    in
+
+    aux (CS.to_list offending) []
 
   let do_pred_elim () =
     let removed_cls = ref None in
@@ -546,7 +624,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     in
 
     let process_task task =
-      assert(CS.is_empty task.offending_cls);
+      assert(CS.is_empty task.offending_cls || Env.flex_get k_non_singular_pe);
       let pos_cls, neg_cls = 
         CCPair.map_same CS.to_list (task.pos_cls, task.neg_cls)
       in
@@ -554,9 +632,13 @@ module Make(E : Env.S) : S with module Env = E = struct
       let resolvents, pos_gates, neg_gates =
         match task.is_gate with
         | Some (pos_gates, neg_gates) ->
-          ((calc_resolvents ~sym ~pos:pos_gates ~neg:neg_cls)
+          ( (calc_non_singular_resolvents ~sym ~pos:pos_gates ~neg:neg_gates 
+                                          ~offending:task.offending_cls)
+           @ (calc_resolvents ~sym ~pos:pos_gates ~neg:neg_cls)
            @ (calc_resolvents ~sym ~pos:pos_cls ~neg:neg_gates)), pos_gates, neg_gates
-        | None -> calc_resolvents ~sym ~pos:pos_cls ~neg:neg_cls, [], []
+        | None -> 
+          assert(CS.is_empty task.offending_cls);
+          calc_resolvents ~sym ~pos:pos_cls ~neg:neg_cls, [], []
       in
       let new_sq_var_weight, new_lit_num = 
         List.fold_left (fun (acc_sq, acc_lit_num) cl -> 
@@ -564,7 +646,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       in
       let old_clauses =
         CS.cardinal task.pos_cls + CS.cardinal task.neg_cls +
-        List.length pos_gates + List.length neg_gates
+        List.length pos_gates + List.length neg_gates + 
+        CS.cardinal task.offending_cls
       in
       let num_new_cls = List.length resolvents in
       if new_sq_var_weight <= task.sq_var_weight ||
@@ -754,6 +837,7 @@ let () =
   Options.add_opts [
     "--pred-elim", Arg.Bool ((:=) _enabled), " enable predicate elimination";
     "--pred-elim-check-gates", Arg.Bool ((:=) _check_gates), " enable recognition of gate clauses";
+    "--pred-elim-non-singular", Arg.Bool ((:=) _non_singular_pe), " enable PE when gate is recognized and there are multiple occurrences of a symbol";
     "--pred-elim-inprocessing", Arg.Bool ((:=) _inprocessing), " predicate elimination as inprocessing rule";
     "--pred-elim-check-at", Arg.Int ((:=) _check_at), " when to perform predicate elimination inprocessing";
     "--pred-elim-max-resolvents", Arg.Int ((:=) _max_resolvents), " after how many resolvents to stop tracking a symbol";
