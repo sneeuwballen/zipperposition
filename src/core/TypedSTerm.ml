@@ -746,6 +746,19 @@ module Ty = struct
 
   let needs_args ty = arity ty <> (0,0)
 
+  let rec is_quantifier_free t : bool =
+    match view t with
+    | Ty_forall _ -> false
+    | Ty_builtin _ | Ty_var _ | Ty_meta _ -> true
+    | Ty_app (_, l) -> List.for_all is_quantifier_free l
+    | Ty_fun (l,ret) -> List.for_all is_quantifier_free l && is_quantifier_free ret
+    | Ty_multiset u -> is_quantifier_free u
+    | Ty_record (l, _) -> List.for_all (fun (_,t) -> is_quantifier_free t) l
+
+  let rec is_prenex ty = match view ty with
+    | Ty_forall (_,bod) -> is_prenex bod
+    | _ -> is_quantifier_free ty
+
   let is_tType = is_tType
   let is_prop t = match view t with Ty_builtin Prop -> true | _ -> false
 
