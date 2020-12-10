@@ -374,6 +374,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       ) iter;
     in
     assert(CS.is_empty task.offending_cls || Env.flex_get k_non_singular_pe);
+    if (not (CS.is_empty task.offending_cls)) then (
+      CCFormat.printf "performing non-singular PE.";
+    );
     remove (CS.to_iter task.offending_cls);
     remove (CS.to_iter task.pos_cls);
     remove (CS.to_iter task.neg_cls);
@@ -477,6 +480,10 @@ module Make(E : Env.S) : S with module Env = E = struct
       (* checking for or will also check for equivalences p(x) <-> q(x) *)
       match find_and_or pos_gates neg_gates with
       | Some(neg_cl, pos_cls) ->
+
+        CCFormat.printf "neg:@[%a@]@.pos:@[%a@]@." C.pp neg_cl (CCList.pp C.pp) pos_cls;
+
+
         let to_remove = CS.of_list (neg_cl :: pos_cls) in
         task.neg_cls <- CS.diff task.neg_cls to_remove;
         task.pos_cls <- CS.diff task.pos_cls to_remove;
@@ -824,6 +831,7 @@ let extension =
     E.flex_add k_inprocessing !_inprocessing;
     E.flex_add k_max_resolvents !_max_resolvents;
     E.flex_add k_check_gates !_check_gates;
+    E.flex_add k_non_singular_pe !_non_singular_pe;
     
     PredElim.setup ()
   in

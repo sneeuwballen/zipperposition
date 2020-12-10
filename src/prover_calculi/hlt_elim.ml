@@ -498,13 +498,11 @@ module Make(E : Env.S) : S with module Env = E = struct
         (List.map C.proof_parent (cl :: CS.to_list proofset))
       in
       let repl = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof in
-      let tauto = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) [L.mk_tauto] proof in
 
       Util.debugf ~section 1 "simplified[unit_htr(%a)]: @[@[%a@] --> @[%a@]@]@. using @[%a@]"
         (fun k -> k T.pp lit_t C.pp cl C.pp repl (CS.pp C.pp) proofset);
 
-      E.add_passive (Iter.singleton repl);
-      Some (tauto)
+      Some (repl)
   
   let unit_simplify cl =
     let exception UnitHTR of T.t * CS.t in
@@ -587,7 +585,8 @@ module Make(E : Env.S) : S with module Env = E = struct
                 if Env.flex_get k_hte then (
                   (match find_implication cl i_neg_t j_t with
                   | Some (lit_a, lit_b, proofset, subst) 
-                      when (C.length cl != 2 || not (Subst.is_renaming subst)) ->
+                      when (not (CS.mem cl proofset)) && 
+                          (C.length cl != 2 || not (Subst.is_renaming subst)) ->
                     (* stopping further search *)
                     raise (HiddenTauto (lit_a, lit_b, proofset))
                   | _ -> ())
@@ -635,9 +634,11 @@ module Make(E : Env.S) : S with module Env = E = struct
           (List.map C.proof_parent (cl :: CS.to_list proofset))
         in
         let tauto = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) [L.mk_tauto] proof in
-        let repl = C.create ~penalty:(C.penalty cl + (if CS.cardinal proofset != 1 then 0 else 1)) ~trail:(C.trail cl) lit_l proof in
+        let repl = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof in
         
-        E.add_passive (Iter.singleton repl);
+        if CS.cardinal proofset != 1 || CS.exists E.is_passive proofset then(
+          E.add_passive (Iter.singleton repl)
+        );
         
         Util.debugf ~section 1 "simplified[hte]: @[@[%a@] --> @[%a@]@]" (fun k -> k C.pp cl C.pp repl);
         Util.debugf ~section 1 "used @[%a@] --> @[%a@] @[(%a)@]" (fun k -> k T.pp lit_a T.pp lit_b (CS.pp C.pp) proofset);
