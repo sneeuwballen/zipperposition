@@ -160,6 +160,12 @@ module Ty : sig
   val needs_args : t -> bool
   (** [needs_args ty] means that [arity ty <> (0,0)] *)
 
+  val is_quantifier_free : t -> bool
+  (** [true] iff it contains no "forall ty" *)
+
+  val is_prenex : t -> bool
+  (** [true] iff prenex quantification only *)
+
   val is_tType : t -> bool
   val is_prop : t -> bool
   val returns : t -> t
