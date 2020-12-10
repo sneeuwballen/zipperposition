@@ -17,7 +17,7 @@ depends: [
   "zarith"
   "logtk" { = version }
   "libzipperposition" { = version }
-  "ocaml" {>= "4.03"}
+  "ocaml" {>= "4.07"}
 ]
 bug-reports: "https://github.com/sneeuwballen/zipperposition/issues"
 dev-repo: "git+https://github.com/sneeuwballen/zipperposition.git"

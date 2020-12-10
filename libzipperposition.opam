@@ -20,7 +20,7 @@ depends: [
   "msat" { >= "0.8.1" < "0.9" }
   "menhir" {build}
   "logtk" { = version }
-  "ocaml" {>= "4.03"}
+  "ocaml" {>= "4.07"}
 ]
 tags: [ "logic" "unification" "term" "superposition" "prover" ]
 bug-reports: "https://github.com/sneeuwballen/zipperposition/issues"
