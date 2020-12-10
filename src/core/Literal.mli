@@ -7,9 +7,6 @@
 
     A literal is an atomic formula (equality or predicate), paired with a sign
     that carries negation.
-
-    We also have special arithmetic literals that have the intuitive meaning,
-    see {!Int_lit} and {!Rat_lit} for more details.
 *)
 
 type term = Term.t
@@ -19,8 +16,6 @@ type t = private
   | True
   | False
   | Equation of term * term * bool
-  | Int of Int_lit.t
-  | Rat of Rat_lit.t
 
 val equal_com : t -> t -> bool     (** commutative equality of lits *)
 
@@ -50,21 +45,6 @@ val is_eq : t -> bool             (** is the literal of the form a = b? *)
 val is_neq : t -> bool            (** is the literal of the form a != b? *)
 val is_essentially_prop : t -> bool (** is the literal non-equational literal of type Prop *)
 
-val is_arith : t -> bool
-val is_arith_eqn : t -> bool    (** = or != *)
-
-val is_arith_eq : t -> bool
-val is_arith_neq : t -> bool
-val is_arith_ineq : t -> bool   (** < or <= *)
-
-val is_arith_less : t -> bool
-val is_arith_lesseq : t -> bool
-val is_arith_divides : t -> bool
-
-val is_rat : t -> bool
-val is_rat_eq : t -> bool
-val is_rat_less : t -> bool
-
 val mk_eq : term -> term -> t
 (** build literals. If sides so not have the same sort,
     a SortError will be raised. An ordering must be provided *)
@@ -83,21 +63,6 @@ val mk_tauto : t (** tautological literal *)
 
 val mk_absurd : t (** absurd literal, like ~ true *)
 
-val mk_arith : Int_lit.t -> t
-val mk_arith_op : Int_lit.op -> Z.t Monome.t -> Z.t Monome.t -> t
-val mk_arith_eq : Z.t Monome.t -> Z.t Monome.t -> t
-val mk_arith_neq : Z.t Monome.t -> Z.t Monome.t -> t
-val mk_arith_less : Z.t Monome.t -> Z.t Monome.t -> t
-val mk_arith_lesseq : Z.t Monome.t -> Z.t Monome.t -> t
-
-val mk_divides : ?sign:bool -> Z.t -> power:int -> Z.t Monome.t -> t
-val mk_not_divides : Z.t -> power:int -> Z.t Monome.t -> t
-
-val mk_rat : Rat_lit.t -> t
-val mk_rat_op : Rat_lit.op -> Q.t Monome.t -> Q.t Monome.t -> t
-val mk_rat_eq : Q.t Monome.t -> Q.t Monome.t -> t
-val mk_rat_less : Q.t Monome.t -> Q.t Monome.t -> t
-
 val no_prop_invariant : t -> bool
 
 val mk_constraint : term -> term -> t
@@ -113,6 +78,13 @@ val subsumes : ?subst:Subst.t -> t Scoped.t -> t Scoped.t ->
   (Subst.t * Builtin.Tag.t list) Iter.t
 (** More general version of {!matching}, yields [subst]
     such that [subst(lit_a) => lit_b]. *)
+
+val are_opposite_subst : subst:Subst.t -> t Scoped.t -> t Scoped.t -> bool
+(** Literals are equal according to given substitution for variables,
+    but are of opposite sign  *)
+
+val are_opposite_same_sc: t -> t -> bool
+(** Literals are equal, but are of opposite signs *)
 
 val variant : ?subst:Subst.t -> t Scoped.t -> t Scoped.t ->
   (Subst.t * Builtin.Tag.t list) Iter.t
@@ -157,7 +129,7 @@ val is_ground : t -> bool
 val symbols : ?include_types:bool -> t -> ID.Set.t
 val root_terms : t -> term list (** all the terms immediatly under the lit *)
 
-val to_ho_term : t -> term option
+val to_ho_term : t -> term
 (** Conversion to higher-order term using {!Term.Form} *)
 
 val as_ho_predicate : t -> (Term.var * term * term list * bool) option
@@ -180,11 +152,13 @@ val is_app_var_eq : t -> bool
 val is_type_pred : t -> bool
 val is_typex_pred : t -> bool (* like in E, type predicate with multiple variables *)
 
-val is_propositional : t -> bool
+val is_predicate_lit : t -> bool
 
 val as_inj_def : t -> (ID.t * (Term.var * Term.var) list) option
 val is_pure_var : t -> bool
 val as_pos_pure_var : t -> (Term.var * Term.var) option
+
+val max_term_positions : ord:Ordering.t -> t -> int
 
 val fold_terms :
   ?position:Position.t -> ?vars:bool -> ?var_args:bool -> ?fun_bodies:bool -> ?ty_args:bool -> 
@@ -285,23 +259,8 @@ module View : sig
       @return None for other literals
       @raise Invalid_argument if the position doesn't match the literal. *)
 
-  val get_arith : t -> Int_lit.t option
-  (** Extract an arithmetic literal *)
-
-  val focus_arith : t -> Position.t -> Int_lit.Focus.t option
-  (** Focus on a specific term in an arithmetic literal. The focused term is
-      removed from its monome, and its coefficient is returned. *)
-
-  val unfocus_arith : Int_lit.Focus.t -> t
-
-  val get_rat : t -> Rat_lit.t option
-  (** Extract an arithmetic literal *)
-
-  val focus_rat : t -> Position.t -> Rat_lit.Focus.t option
-  (** Focus on a specific term in an arithmetic literal. The focused term is
-      removed from its monome, and its coefficient is returned. *)
-
-  val unfocus_rat : Rat_lit.Focus.t -> t
+  val get_lhs : t -> term option
+  val get_rhs : t -> term option
 end
 
 (** {2 Conversions} *)
@@ -310,8 +269,7 @@ module Conv : sig
   type hook_to = t -> term SLiteral.t option
 
   val of_form : ?hooks:hook_from list -> term SLiteral.t -> t
-  (** Conversion from a formula. By default no ordering or arith theory
-      is considered.
+  (** Conversion from a formula. By default no ordering is considered.
       @raise Invalid_argument if the formula is not atomic. *)
 
   val to_form : ?hooks:hook_to list -> t -> term SLiteral.t

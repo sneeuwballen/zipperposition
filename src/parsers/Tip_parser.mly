@@ -52,6 +52,7 @@
 %token DEFINE_FUN_REC
 %token DEFINE_FUNS_REC
 %token CHECK_SAT
+%token EXIT
 
 %token <string>IDENT
 %token <string>QUOTED
@@ -214,6 +215,11 @@ stmt:
     {
       let loc = Loc.mk_pos $startpos $endpos in
       A.check_sat ~loc ()
+    }
+  | LEFT_PAREN EXIT RIGHT_PAREN
+    {
+      let loc = Loc.mk_pos $startpos $endpos in
+      A.assert_ ~loc (A.true_)
     }
   | error
     {

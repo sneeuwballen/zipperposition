@@ -143,7 +143,7 @@ module Ty : sig
   val term : t
 
   val (==>) : t list -> t -> t
-  (** Alias to {!fun_} *)
+  (** alias for {!fun_} *)
 
   val close_forall : t -> t
 
@@ -159,6 +159,12 @@ module Ty : sig
 
   val needs_args : t -> bool
   (** [needs_args ty] means that [arity ty <> (0,0)] *)
+
+  val is_quantifier_free : t -> bool
+  (** [true] iff it contains no "forall ty" *)
+
+  val is_prenex : t -> bool
+  (** [true] iff prenex quantification only *)
 
   val is_tType : t -> bool
   val is_prop : t -> bool
@@ -261,9 +267,7 @@ val free_vars_set : t -> t Var.Set.t
 val close_all : ty:t -> Binder.t -> t -> t
 (** Bind all free vars with the symbol *)
 
-val close_with_vars : t list -> t -> t
-
-val lift_lambdas : t -> (t * (t list))
+val close_with_vars : ?binder:Binder.t -> t list -> t -> t
 
 (** Generic non-recursive map *)
 val map :
@@ -290,6 +294,7 @@ module Seq : sig
   val vars : t -> t Var.t Iter.t
   val free_vars : t -> t Var.t Iter.t
   val metas : t -> meta_var Iter.t
+  val symbols : t -> ID.t Iter.t
 end
 
 (** {2 Substitutions} *)
@@ -383,6 +388,7 @@ val app_infer :
     @raise UnifyFailure if types do not correspond *)
 
 val try_alpha_renaming : t -> t -> Subst.t option
+val simplify_formula : t -> t
 
 (** {2 Conversion} *)
 

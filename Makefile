@@ -15,7 +15,7 @@ clean:
 	@dune clean
 
 doc:
-	@dune build @doc
+	@dune build @doc --profile=release
 
 install: build
 	@dune install

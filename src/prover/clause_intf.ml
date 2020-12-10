@@ -24,6 +24,8 @@ module type S = sig
   val mark_backward_simplified : t -> unit
   val is_backward_simplified : t -> bool
 
+  val is_orphaned : t -> bool
+
   (** {2 Basics} *)
 
   include Interfaces.EQ with type t := t
@@ -35,6 +37,8 @@ module type S = sig
 
   val is_ground : t -> bool
   val weight : t -> int
+  (* cached weight in terms *)
+  val ho_weight : t -> int
 
   module Tbl : CCHashtbl.S with type key = t
 
@@ -180,6 +184,8 @@ module type S = sig
 
   val penalty : t -> int
 
+  val inc_penalty : t -> int -> unit
+
   val is_unit_clause : t -> bool
   (** is the clause a unit clause? *)
 
@@ -208,7 +214,7 @@ module type S = sig
     val vars : t -> Type.t HVar.t Iter.t
   end
 
-  val apply_subst : ?proof:Proof.Step.t option -> t Scoped.t -> Subst.FO.t -> t
+  val apply_subst : ?renaming: Subst.Renaming.t -> ?proof:Proof.Step.t option -> ?penalty_inc:int option -> t Scoped.t -> Subst.FO.t -> t
 
   (** {2 Filter literals} *)
 
@@ -224,8 +230,6 @@ module type S = sig
 
     val eq : t
     (** Equations *)
-
-    val arith : t
 
     val filter : (Literal.t -> bool) -> t
 

@@ -102,6 +102,11 @@ let add_ty_vars props ty_props =
     set_property props f_has_freevars
   ) else props
 
+let add_ty_vars props ty_props =
+  if get_property ty_props f_has_freevars then (
+    set_property props f_has_freevars
+  ) else props
+
 let[@inline] view t = t.term
 let[@inline] ty t = t.ty
 let[@inline] ty_exn t = match t.ty with
@@ -273,17 +278,48 @@ let tType =
   let my_t = make_ ~props:zero ~ty:NoType (AppBuiltin(Builtin.TType, [])) in
   H.hashcons my_t
 
-let rec app_builtin ~ty b l = match b, l with
+let open_fun ty = match view ty with
+  | AppBuiltin (Builtin.Arrow, ret :: args) -> args, ret
+  | _ -> [], ty
+
+let[@inline] is_a_type t = match ty t with
+  | HasType ty -> equal ty tType
+  | NoType -> assert false
+
+let expected_args t = 
+  match view t with 
+  | AppBuiltin(Builtin.Arrow, l) -> CCList.length l-1
+  | _ -> 0
+
+let rec app_builtin ~ty b l = 
+  let prop = builtin ~ty:tType Builtin.prop in
+  
+  match b, l with
   | Builtin.Arrow, [] -> assert false
   | Builtin.Arrow, [ret] -> ret
   | Builtin.Arrow, ({term=AppBuiltin(Builtin.Arrow, ret::l1); _} :: l2) ->
     (* flatten *)
     app_builtin ~ty Builtin.Arrow (ret :: l2 @ l1)
-  | Builtin.Not, [{term=AppBuiltin(Builtin.Not,[t]); _}] -> t
+  (* will be simplified in a special proof step -- 
+     in certain cases (superposition) it eagerly simplifies the term
+     and destroys its structure *)
+  (* | Builtin.Not, [{term=AppBuiltin(Builtin.Not,[t]); _}] -> t
   | Builtin.Not, [{term=AppBuiltin(Builtin.True,[]); _}] ->
     app_builtin ~ty Builtin.False []
   | Builtin.Not, [{term=AppBuiltin(Builtin.False,[]); _}] ->
-    app_builtin ~ty Builtin.True []
+    app_builtin ~ty Builtin.True [] *)
+  | Builtin.Not, [] ->
+    let ty = app_builtin ~ty:tType Builtin.arrow [prop;prop] in
+    let my_t = make_ ~props:zero ~ty:(HasType ty) (AppBuiltin (b,[])) in
+    H.hashcons my_t
+  | (Builtin.And | Builtin.Or), l 
+    when CCList.length l < 2 && 
+         expected_args ty < 2 ->
+    let args = (if CCList.is_empty l then [prop] else []) @ [prop;prop] in
+    let ty = app_builtin ~ty:tType Builtin.arrow args in
+    let props = add_ty_vars (any_props_for_ts l) ty.props in
+    let my_t = make_ ~props ~ty:(HasType ty) (AppBuiltin (b,l)) in
+    H.hashcons my_t
   | _ ->
     let l = if Builtin.is_quantifier b then 
         List.filter (fun t -> not @@ equal (ty_exn t) tType) l else l in
@@ -291,11 +327,14 @@ let rec app_builtin ~ty b l = match b, l with
       let err_msg = CCFormat.sprintf "wrong encoding of quants: %a %d" Builtin.pp b (List.length l) in
       invalid_arg err_msg;
     );
+    assert(not (Builtin.is_quantifier b && CCList.is_empty l) ||
+           List.length @@ fst @@ open_fun ty =1);
     let props = add_ty_vars (any_props_for_ts l) ty.props in
     let my_t = make_ ~props ~ty:(HasType ty) (AppBuiltin (b,l)) in
     H.hashcons my_t
 
-let arrow l r = app_builtin ~ty:tType Builtin.arrow (r :: l)
+let arrow l r =
+  app_builtin ~ty:tType Builtin.arrow (r :: l)
 
 let app ~ty f l = match f.term, l with
   | _, [] -> f
@@ -439,29 +478,29 @@ module DB = struct
   type env = t DBEnv.t
 
   (* sequence2 of [De Bruijn, depth] pairs *)
-  let rec _to_seq ~depth t k =
+  let rec _to_iter ~depth t k =
     begin match t.ty with
       | NoType -> ()
-      | HasType ty -> _to_seq ~depth ty k
+      | HasType ty -> _to_iter ~depth ty k
     end;
     match view t with
     | DB v -> k (v,depth)
     | Var _
     | Const _ -> ()
     | Bind (_, varty, t') ->
-      _to_seq ~depth varty k;
-      _to_seq ~depth:(depth+1) t' k
+      _to_iter ~depth varty k;
+      _to_iter ~depth:(depth+1) t' k
     | AppBuiltin (_, l) ->
-      List.iter (fun t -> _to_seq ~depth t k) l
+      List.iter (fun t -> _to_iter ~depth t k) l
     | App (f, l) ->
-      _to_seq ~depth f k;
-      List.iter (fun t -> _to_seq ~depth t k) l
+      _to_iter ~depth f k;
+      List.iter (fun t -> _to_iter ~depth t k) l
 
   let[@inline] _id x = x
 
   let closed t =
     let db_calc t = 
-      _to_seq ~depth:0 t
+      _to_iter ~depth:0 t
       |> Iter.map (fun (bvar,depth) -> bvar < depth)
       |> Iter.for_all _id in
     if get_property t.props f_db_overflowed then (
@@ -477,12 +516,12 @@ module DB = struct
 
   (* check whether t contains the De Bruijn symbol n *)
   let contains t n =
-    _to_seq ~depth:0 t
+    _to_iter ~depth:0 t
     |> Iter.map (fun (bvar,depth) -> bvar=n+depth)
     |> Iter.exists _id
 
   let unbound t =
-    _to_seq ~depth:0 t
+    _to_iter ~depth:0 t
     |> Iter.filter_map
       (fun (bvar,depth) -> if bvar >= depth then Some (bvar - depth) else None)
     |> Iter.to_rev_list
@@ -836,7 +875,7 @@ let replace t ~old ~by =
 (* TODO: sort variables, so that type  variables come first *)
 
 let close_vars ~ty s t =
-  let vars = Seq.vars t |> VarSet.of_seq |> VarSet.elements in
+  let vars = Seq.vars t |> VarSet.of_iter |> VarSet.elements in
   bind_vars ~ty s vars t
 
 (* make the function closing over all the arguments *)
@@ -892,10 +931,6 @@ let open_bind_fresh2 ?(eq_ty=equal) b t1 t2 =
   in
   aux DBEnv.empty [] t1 t2
 
-let open_fun ty = match view ty with
-  | AppBuiltin (Builtin.Arrow, ret :: args) -> args, ret
-  | _ -> [], ty
-
 let rec open_poly_fun ty = match view ty with
   | Bind (Binder.ForallTy, _, ty') ->
     let i, args, ret = open_poly_fun ty' in
@@ -938,16 +973,12 @@ let type_is_unifiable (ty:t): bool = match view ty with
   | _ -> true
 
 let type_non_unifiable_tags (ty:t): _ list = match view ty with
-  | AppBuiltin (Builtin.TyInt,_) -> [Builtin.Tag.T_lia]
-  | AppBuiltin (Builtin.TyRat,_) -> [Builtin.Tag.T_lra]
+  | AppBuiltin (Builtin.TyInt,_) -> [Builtin.Tag.T_lia; Builtin.Tag.T_cannot_orphan]
+  | AppBuiltin (Builtin.TyRat,_) -> [Builtin.Tag.T_lra; Builtin.Tag.T_cannot_orphan]
   | Bind (Binder.ForallTy, _, _) -> [Builtin.Tag.T_ho]
   | _ -> []
 
 let type_is_prop t = match view t with AppBuiltin (Builtin.Prop, _) -> true | _ -> false
-
-let[@inline] is_a_type t = match ty t with
-  | HasType ty -> equal ty tType
-  | NoType -> assert false
 
 let [@inline] get_type t = match ty t with
   | HasType ty -> ty
@@ -959,11 +990,9 @@ let[@inline] as_app t = match view t with
       | AppBuiltin(b, l') -> app_builtin b ~ty:(ty_exn t) (l'@l), []
       | _ -> f, l 
     end
-  | AppBuiltin(b, l ) when Builtin.is_logical_op b && not (Builtin.is_quantifier b) ->
-    let prop = builtin ~ty:tType Builtin.Prop in
-    let args = if (Builtin.is_logical_binop b) then [prop;prop]
-      else [prop] in
-    app_builtin b ~ty:(arrow args prop) [], l 
+  | AppBuiltin(b, l) when Builtin.is_logical_op b && not (Builtin.is_quantifier b) ->
+    let args = List.map ty_exn l in
+    app_builtin b ~ty:(arrow args (ty_exn t)) [], l 
   | _ -> t, []
 
 let[@inline] as_var t = match view t with Var v -> Some v | _ -> None
@@ -991,7 +1020,7 @@ let needs_args (t:t): bool = match view t with
   | Bind (Binder.ForallTy, _, _) -> true
   | _ -> false
 
-let show_type_arguments = ref true
+let show_type_arguments = ref false
 
 let rec open_bind2 b t1 t2 = match view t1, view t2 with
   | Bind (b1', ty1, t1'), Bind (b2', ty2, t2') when b=b1' && b=b2' ->
@@ -1033,7 +1062,7 @@ let rec pp_depth ?(hooks=[]) depth out t =
       in
       Format.fprintf out "@[<1>%a@ @[%a@].@ %a@]"
         Binder.pp b
-        (Util.pp_seq ~sep:" " pp_tyvar)
+        (Util.pp_iter ~sep:" " pp_tyvar)
         (Iter.of_array_i (Array.of_list varty_l))
         (_pp_surrounded (depth+List.length varty_l)) t'
     | AppBuiltin (Builtin.Arrow, ([] | [_])) -> assert false
@@ -1043,6 +1072,15 @@ let rec pp_depth ?(hooks=[]) depth out t =
         (_pp_surrounded depth) ret
     | AppBuiltin((Builtin.ExistsConst | Builtin.ForallConst) as b, [x;body]) ->
       Format.fprintf out "%a %a. %a" Builtin.pp b (_pp depth) x (_pp depth) body;
+    | AppBuiltin((Builtin.Eq | Builtin.Neq) as b,  x :: rest) ->
+      let sep, l = 
+        if is_a_type x then (
+          CCFormat.sprintf "(%a::%a) " Builtin.pp b (_pp depth) x,rest
+        ) else (
+          CCFormat.sprintf "%a " Builtin.pp b, x :: rest
+        ) in
+      if CCList.length l = 1 then Format.fprintf out "(%a @[%a@])" Builtin.pp b (_pp depth) (List.hd l)
+      else Format.fprintf out " @[%a@]" (Util.pp_list ~sep (_pp depth)) l
     | AppBuiltin (b, ([_;a] | [a])) when Builtin.is_prefix b ->
       Format.fprintf out "@[<1>%a %a@]" Builtin.pp b (_pp depth) a
     | AppBuiltin (b, [t1;t2]) when Builtin.is_infix b ->
@@ -1051,12 +1089,16 @@ let rec pp_depth ?(hooks=[]) depth out t =
       (* always drop the type argument, it's always inferrable for builtins *)
       Format.fprintf out "(@[%a %s@ %a@])" (_pp depth) t1 (Builtin.to_string b) (_pp depth) t2
     | AppBuiltin (b, l) when Builtin.is_infix b && List.length l >= 2 ->
-      Format.printf "cc %a@." (CCFormat.Dump.list (_pp depth)) l;
       let sep = CCFormat.sprintf " %s " (Builtin.to_string b) in
       Format.fprintf out "(@[%a@])" (Util.pp_list ~sep (_pp depth)) l
     | AppBuiltin (b, []) -> Builtin.pp out b
     | AppBuiltin (b, l) ->
-      Format.fprintf out "@[%a(%a)@]" Builtin.pp b (Util.pp_list (_pp depth)) l
+      let l = 
+        if Builtin.is_combinator b && not !show_type_arguments
+        then List.filter (fun t -> not (is_tType @@ ty_exn t)) l
+        else l in
+      if CCList.is_empty l then Format.fprintf out "@[%a@]" Builtin.pp b
+      else Format.fprintf out "@[%a(%a)@]" Builtin.pp b (Util.pp_list (_pp depth)) l
     | App (f, l) ->
       (* remove type arguments unless required,
          or unless we are already printing a type *)
@@ -1116,7 +1158,7 @@ let rec pp_zf out t =
       in
       Format.fprintf out "@[<1>%a@ @[%a@].@ %a@]"
         Binder.ZF.pp b
-        (Util.pp_seq ~sep:" " pp_tyvar)
+        (Util.pp_iter ~sep:" " pp_tyvar)
         (Iter.of_array_i (Array.of_list varty_l))
         (_pp_surrounded (depth+List.length varty_l)) t'
     | AppBuiltin (Builtin.Arrow, ([] | [_])) -> assert false

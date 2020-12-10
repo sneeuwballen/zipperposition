@@ -26,7 +26,7 @@ let errorf msg = Util.errorf ~where:"sat_solver" msg
 
 let sat_dump_file_ = ref ""
 let sat_log_file = ref ""
-let sat_compact_ = ref false
+let sat_compact_ = ref true
 let sat_pp_model_ = ref false
 
 module type S = Sat_solver_intf.S
@@ -82,6 +82,7 @@ module Make()
 
   (* add clause, if not added already *)
   let add_clause_ ~proof c =
+    let open Msat in
     if not (ClauseTbl.mem clause_tbl_ c) then (
       Util.incr_stat stat_num_clauses;
       (* add new clause -> check again *)
@@ -245,13 +246,13 @@ module Make()
     else None
 
   let get_proved_lits (): Lit.Set.t =
-    Lit.Tbl.to_seq lit_tbl_
+    Lit.Tbl.to_iter lit_tbl_
     |> Iter.filter_map
       (fun (lit,_) -> match proved_at_0 lit with
          | Some true -> Some lit
          | Some false -> Some (Lit.neg lit)
          | None -> None)
-    |> Lit.Set.of_seq
+    |> Lit.Set.of_iter
 
   let pp_model_ (): unit = match last_result() with
     | Sat ->

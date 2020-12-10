@@ -237,7 +237,7 @@ let iterate ?(flex_same=false) ~scope ~counter u v l =
 (* TODO: use OSeq directly? *)
 
 
-(** {6 Unification procedure} *)
+(** {5 Unification procedure} *)
 
 (* Apply a substitution and reduce to normal form. Comparison form is actually slightly different, but eta_expand also works. *)
 let nfapply s u = S.apply s u |> Lambda.snf |> Lambda.eta_expand

@@ -428,6 +428,13 @@ module Seq = struct
          | Var v -> Some v
          | _ -> None)
 
+  let symbols t =
+    subterms t
+    |> Iter.filter_map
+      (fun t -> match view t with
+         | Const id -> Some id
+         | _ -> None)
+
   let metas t =
     subterms t
     |> Iter.filter_map
@@ -513,15 +520,15 @@ let as_id_app t = match view t with
   | App ({term=Const id; ty=Some ty; _}, l) -> Some (id, ty, l)
   | _ -> None
 
-let vars t = Seq.vars t |> Var.Set.of_seq |> Var.Set.to_list
+let vars t = Seq.vars t |> Var.Set.of_iter |> Var.Set.to_list
 
-let free_vars_set t = Seq.free_vars t |> Var.Set.of_seq
-let free_vars t = Seq.free_vars t |> Var.Set.of_seq |> Var.Set.to_list
+let free_vars_set t = Seq.free_vars t |> Var.Set.of_iter
+let free_vars t = Seq.free_vars t |> Var.Set.of_iter |> Var.Set.to_list
 
 let free_vars_l l =
   Iter.of_list l
   |> Iter.flat_map Seq.free_vars
-  |> Var.Set.of_seq |> Var.Set.to_list
+  |> Var.Set.of_iter |> Var.Set.to_list
 
 let closed t = Seq.free_vars t |> Iter.is_empty
 
@@ -529,12 +536,12 @@ let close_all ~ty s t =
   let vars = free_vars t in
   bind_list ~ty s vars t
 
-let close_with_vars vars t =
+let close_with_vars ?(binder=Binder.Forall) vars t =
   let vars = List.map (fun v -> match view v with
       | Var v -> v
       | _ -> invalid_arg "has to be a variable" ) 
       vars in
-  bind_list Binder.Forall vars t ~ty:prop
+  bind_list binder vars t ~ty:prop
 
 let unfold_fun = unfold_binder Binder.Lambda
 
@@ -558,7 +565,7 @@ let map ~f ~bind:f_bind b_acc t = match view t with
   | Record (l, rest) ->
     let ty = f b_acc (ty_exn t) in
     record_flatten ?loc:t.loc ~ty
-      (List.map (CCPair.map2 (f b_acc)) l)
+      (List.map (CCPair.map_snd (f b_acc)) l)
       ~rest:(CCOpt.map (f b_acc) rest)
   | Ite (a,b,c) ->
     let a = f b_acc a in
@@ -739,6 +746,19 @@ module Ty = struct
 
   let needs_args ty = arity ty <> (0,0)
 
+  let rec is_quantifier_free t : bool =
+    match view t with
+    | Ty_forall _ -> false
+    | Ty_builtin _ | Ty_var _ | Ty_meta _ -> true
+    | Ty_app (_, l) -> List.for_all is_quantifier_free l
+    | Ty_fun (l,ret) -> List.for_all is_quantifier_free l && is_quantifier_free ret
+    | Ty_multiset u -> is_quantifier_free u
+    | Ty_record (l, _) -> List.for_all (fun (_,t) -> is_quantifier_free t) l
+
+  let rec is_prenex ty = match view ty with
+    | Ty_forall (_,bod) -> is_prenex bod
+    | _ -> is_quantifier_free ty
+
   let is_tType = is_tType
   let is_prop t = match view t with Ty_builtin Prop -> true | _ -> false
 
@@ -799,8 +819,8 @@ module Form = struct
   let view (t:term) = match view t with
     | AppBuiltin (Builtin.True, []) -> True
     | AppBuiltin (Builtin.False, []) -> False
-    | AppBuiltin (Builtin.And, l) -> And l
-    | AppBuiltin (Builtin.Or, l) -> Or l
+    | AppBuiltin (Builtin.And, l) when Ty.is_prop (ty_exn t) -> And l
+    | AppBuiltin (Builtin.Or, l) when Ty.is_prop (ty_exn t) -> Or l
     | AppBuiltin (Builtin.Not, [f]) -> Not f
     | AppBuiltin (Builtin.Imply, [a;b]) -> Imply(a,b)
     | AppBuiltin (Builtin.Equiv, [a;b]) -> Equiv(a,b)
@@ -859,19 +879,26 @@ module Form = struct
 
   let and_ ?loc l  =
     let flattened = flatten_ `And [] l in
+    let parsing = CCOpt.is_some loc in
     match flattened with
-    | [] -> true_
-    | [t] -> t 
-    | _ ->  app_builtin ?loc ~ty:Ty.prop Builtin.And (flattened)
+    | [] when not parsing -> true_
+    | [t] when not parsing -> t 
+    | _ -> 
+      app_builtin ?loc ~ty:Ty.prop Builtin.And 
+        (if parsing then l else flattened)
 
   let or_ ?loc l = 
     let flattened = flatten_ `Or [] l in
+    let parsing = CCOpt.is_some loc in
     match flattened with
-    | [] -> false_
-    | [t] -> t 
-    | _ ->  app_builtin ?loc ~ty:Ty.prop Builtin.Or (flattened)
+    | [] when not parsing -> false_
+    | [t] when not parsing -> t 
+    | _ ->  app_builtin ?loc ~ty:Ty.prop Builtin.Or 
+      (if parsing then l else flattened)
 
-  let not_ ?loc f = app_builtin ?loc ~ty:Ty.prop Builtin.Not [f]
+  let not_ ?loc f = 
+    assert(Ty.is_prop (ty_exn f));
+    app_builtin ?loc ~ty:Ty.prop Builtin.Not [f]
 
   let forall ?loc v t = bind ?loc ~ty:Ty.prop Binder.Forall v t
   let exists ?loc v t = bind ?loc ~ty:Ty.prop Binder.Exists v t
@@ -962,11 +989,12 @@ module Subst = struct
       | None ->
         var ?loc:t.loc (Var.update_ty v ~f:(eval_ ~recursive ~rename_binders subst))
       | Some t' ->
-        if not (t != t') then (
-          Format.printf "faulty subst:@ %a.\n" pp subst;
-          assert(false);
-        );
-        if recursive then (eval_ ~recursive ~rename_binders subst t') else (t')
+        if recursive 
+        then (
+          assert (t != t');
+          eval_ ~recursive ~rename_binders subst t'
+        ) 
+        else (t')
     end
   and eval_binders ~rename_binders ~recursive ~t subst v =
     subst, match view (eval_var ~recursive ~rename_binders ~t subst v) with
@@ -1042,86 +1070,6 @@ let rectify ?(cnt=ref 0) ?(subst=Subst.empty) t =
 
 let rectify_l ?(cnt=ref 0) ?(subst=Subst.empty)  ls =
   rec_aux_l ~cnt ~subst ls
-
-
-let rec lift_lambdas  f =
-  let aux = lift_lambdas  in
-  let ty = ty_exn f in
-  match view f with 
-  | Var _ | Const _ -> (f,[])
-  | App (hd, fs) -> 
-    let hd', hd_def = aux hd in
-    let fs', all_defs = 
-      List.fold_right (fun f (args, defs) -> 
-          let f', new_defs = aux f in
-          (f'::args, new_defs @ defs)) fs ([],hd_def) in
-    if not (CCList.is_empty all_defs) then (
-      app ~ty hd' fs', all_defs
-    ) else f, []
-  | Bind(Binder.Lambda, _, _) ->  
-    let vars, body = unfold_binder Binder.Lambda f in
-    assert(not @@ CCList.is_empty vars);
-    let body', new_defs = aux body in
-    let var_set = Var.Set.of_list vars in
-    let free_vars = 
-      Var.Set.diff (Var.Set.of_seq (Seq.free_vars body')) var_set
-      |> Var.Set.to_list in
-    let replacement, def = 
-      define_lambda_of  ~bound:vars ~free:free_vars body' in
-    replacement, def :: new_defs
-  | Bind(b, v, body) ->  
-    let body', new_defs = aux body in
-    if not (CCList.is_empty new_defs) then (
-      bind ~ty b v body', new_defs
-    ) else f,[]
-  | AppBuiltin(b, fs) ->
-    let fs', all_defs = 
-      List.fold_right (fun f (args, defs) -> 
-          let f', new_defs = aux f in
-          (f'::args, new_defs @ defs)) fs ([],[]) in
-    if not (CCList.is_empty all_defs) then (
-      app_builtin ~ty b fs', all_defs
-    ) else f, []
-  | _ -> invalid_arg "not implemented yet"
-and define_lambda_of ~bound ~free body =
-  let cnt = ref 0 in  
-  let rec_free, rectifier = rectify_l ~cnt (List.rev_map var free) in
-  let rec_bound, rectifier = rectify_l ~cnt ~subst:rectifier (List.rev_map var bound) in
-  let rec_body, recitifier = rectify ~cnt ~subst:rectifier body in
-
-  let eval_vars vs  = List.map (fun v -> 
-      match view (Subst.eval recitifier v) with 
-      | Var v -> v
-      | _ -> invalid_arg "substitution is not a rectifier")  vs in
-  let rec_bound = eval_vars rec_bound and rec_free = eval_vars rec_free in
-  let closed  = fun_l (rec_free @ rec_bound) rec_body in
-  let args = List.map (fun v -> var v) (free @ bound) in
-
-  let def_opt = 
-    (* old versions of OCaml do not support Tbl.find_opt *)
-    if Tbl.mem _lam_ids closed 
-    then Some (Tbl.find _lam_ids closed)
-    else None in
-
-  match def_opt with 
-  | Some (id,def) ->
-    fst @@ apply_to_new_hd id free bound body args, def
-  | None ->
-    let lam_id = CCRef.get_then_incr _l_counter in
-    let lam_name = "#ll_" ^ CCInt.to_string lam_id in
-    let new_id = ID.make lam_name in
-    let (_, def) as res = apply_to_new_hd new_id free bound body args in
-    Tbl.add _lam_ids closed (new_id,def);
-    res
-and apply_to_new_hd new_id free bound body args =
-  let body_ty = ty_exn body in
-  let ll_sym_ty = Ty.mk_fun_ (List.map ty_exn args) body_ty in
-  let lam_const = const ~ty:ll_sym_ty new_id in
-  let replacement_ty =  Ty.mk_fun_ (List.map Var.ty free) body_ty in
-  let replacement = app ~ty:replacement_ty lam_const (List.map (fun v -> var v) free) in
-  let new_pred = app ~ty:body_ty lam_const args in
-  let def_form = Form.forall_l (free @ bound) (Form.eq_or_equiv new_pred body) in
-  replacement,def_form
 
 
 (* apply and reduce *)
@@ -1577,8 +1525,8 @@ let try_alpha_renaming f1 f2 =
       | _ -> fail_unif_ [f1,f2] "mismatch or unknown constructors"
   in
   try
-    let vars1 = Seq.vars f1 |> Var.Set.of_seq in
-    let vars2 = Seq.vars f2 |> Var.Set.of_seq in
+    let vars1 = Seq.vars f1 |> Var.Set.of_iter in
+    let vars2 = Seq.vars f2 |> Var.Set.of_iter in
     if Var.Set.intersection_empty vars1 vars2 then (
       let subst = aux Subst.empty [f1,f2] in
       Util.debugf ~section 5 "Alpha renaming succeeded:@ of %a@ and %a@ with subst %a"
@@ -1589,6 +1537,108 @@ let try_alpha_renaming f1 f2 =
     Util.debugf ~section 1 "Alpha renaming failed: %s@ %a"
       (fun k -> k msg pp_stack st);
     None
+
+(* 
+  Perform rewritings of this form
+    A | A -> A; A | ~ A -> T; A | T -> T; A | F -> A
+    A & A -> A; A & ~ A -> F; A & T -> A; A & F -> F
+    ~T -> F        ~F -> T
+    A <=> ~A -> F; A <=> A -> T  A <=> F -> ~A  A <=> T -> A
+    P <~> P -> ~(P<->P)
+    A => ~A -> F; A <-> A => T  A <-> F => ~A  A <-> T => A *)
+let simplify_formula t =
+  let module F = Form in
+  let simplify_and_or t b l =
+    let exists_double args =
+      let pos, neg = 
+        CCList.partition_map (fun t -> 
+            match view t with 
+            | AppBuiltin(Builtin.Not, [s]) -> `Right s
+            | _ -> `Left t) args
+        |> CCPair.map_same Set.of_list in
+      not (Set.is_empty (Set.inter pos neg)) in
+
+      let netural_el, absorbing_el = 
+        if b = Builtin.And then F.true_,F.false_ else (F.false_,F.true_) in
+
+      let l' = CCList.sort_uniq ~cmp:compare l in
+
+      if exists_double l || List.exists (equal absorbing_el) l then absorbing_el
+      else (
+        let l' = List.filter (fun s -> not (equal s netural_el)) l' in
+        if List.length l = List.length l' then t
+        else (
+          if CCList.is_empty l' then netural_el
+          else (if List.length l' = 1 then List.hd l'
+                else app_builtin ~ty:(prop) b l')
+        ))
+  in
+
+  let simpl_and_or_imp premise conclusion =
+    (* if premise is of the form a1 /\ ... /\ an
+       and the conclusion of the form b1 \/ ... \/ bm
+       and if the intersection of {a1, ..., an} and {b1, ..., bm}
+       is not empty then simplify the implication into T  *)
+    let premise_terms =
+      match view premise with
+      | AppBuiltin(And, l) -> l
+      | _ -> [premise] in
+    let conc_terms = 
+      match view conclusion with
+      | AppBuiltin(Or, l) -> l
+      | _ -> [conclusion] in
+    let is_true = 
+      List.exists (fun c -> List.exists (equal c) premise_terms) conc_terms in
+    if is_true then Some F.true_ else None in
+
+  let rec aux t =
+    let ty = ty_exn t in
+    match view t with 
+    | AppBuiltin( ((And|Or) as b) , args) when Ty.is_prop ty ->
+      simplify_and_or t b (List.map aux args)
+    | AppBuiltin( Not, [s]) ->
+      begin match view s with
+      | AppBuiltin(Not, [u]) -> aux u
+      | AppBuiltin(True,[]) -> F.false_
+      | AppBuiltin(False, []) -> F.true_
+      | _ -> app_builtin  ~ty Not [aux s] end
+    | AppBuiltin( (Eq|Equiv) as b, [x;y]) when Ty.is_prop (ty_exn x) ->
+      assert(Ty.is_prop (ty_exn y));
+      let x = aux x and y  = aux y in
+      if equal x y then F.true_
+      else if equal x F.true_  then y
+      else if equal x F.false_ then F.not_ y
+      else if equal y F.true_ then x
+      else if equal y F.false_ then F.not_ x
+      else if equal x (F.not_ y) || equal y (F.not_ x) then F.false_
+      else app_builtin ~ty b [x;y]
+    | AppBuiltin( (Neq|Xor), [x;y]) when Ty.is_prop (ty_exn x) ->
+      aux (F.not_ (F.eq_or_equiv x y))
+    | AppBuiltin( Imply, [x;y]) ->
+      let x = aux x and y  = aux y in
+      begin match simpl_and_or_imp x y with
+      | Some res -> res
+      | None ->
+        if equal x y then F.true_
+        else if equal x F.true_  then y
+        else if equal x F.false_ then F.true_
+        else if equal y F.true_ then F.true_
+        else if equal y F.false_ then F.not_ x
+        else if equal x (F.not_ y) then y
+        else if equal y (F.not_ x) then y
+        else app_builtin ~ty Imply [x;y] end
+    | AppBuiltin( (Neq|Xor), [x;y]) when Ty.is_prop (ty_exn x) ->
+      aux (F.not_ (F.eq_or_equiv x y))
+    | AppBuiltin(b, args) ->
+      app_builtin ~ty b (List.map aux args)
+    | App (hd, args) ->
+      app ~ty (aux hd) (List.map aux args)
+    | Bind (s, v, body) ->
+      bind ~ty s v (aux body)
+    | _ -> t in
+  
+  let res = aux t in
+  res
 
 
 (** {2 Conversion} *)
@@ -1651,7 +1701,7 @@ end
 
 let pp_in = function
   | Output_format.O_zf -> ZF.pp
-  | Output_format.O_tptp -> TPTP.pp
+  | Output_format.O_tptp -> TPTP_THF.pp
   | Output_format.O_normal -> pp
   | Output_format.O_none -> CCFormat.silent
 

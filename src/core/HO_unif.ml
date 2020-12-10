@@ -33,45 +33,54 @@ let term_arity args =
   |> Util.take_drop_while (fun t -> T.is_type t)
   |> CCPair.map List.length List.length
 
-let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~offset : (Subst.t * penalty) list =
+let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~signature ~offset : (Subst.t * penalty) list =
   let ty_v = HVar.ty v in
   let n, ty_args, ty_ret = Type.open_poly_fun ty_v in
   assert (Type.is_prop ty_ret);
+  let project ~db_vars db_i =
+    let db_ty_args, _ = Type.open_fun (T.ty db_i) in
+    let new_args = List.mapi (fun i ty_arg -> 
+      let var_ty = Type.arrow ty_args ty_arg in
+      T.app (T.var (HVar.make ~ty:var_ty (offset+i+1))) db_vars
+    ) db_ty_args in
+    T.app db_i new_args in
   if n>0 then [] (* FIXME: what to do? *)
   else (
     (* local variables to build the λ-term *)
     let vars = List.mapi (fun i ty -> HVar.make ~ty i) ty_args in
     (* projection with "¬": [λvars. ¬ (F vars)] *)
     let l_not = match mode with
-      | `None | `TF -> []
       | `Neg | `Full | `Pragmatic ->
         let f = HVar.make offset ~ty:ty_v in
         [T.fun_of_fvars vars
-           (T.Form.not_ (T.app (T.var f) (List.map T.var vars)))]
+          (T.Form.not_ (T.app (T.var f) (List.map T.var vars)))]
+      | _ -> []
     (* projection with "∧": [λvars. (F1 vars) ∧ (F2 vars)] *)
     and l_and = match mode with
-      | `Neg | `None | `Pragmatic | `TF -> []
-      | `Full ->
+      | `Full | `And ->
         let f = HVar.make offset ~ty:ty_v in
         let g = HVar.make (offset+1) ~ty:ty_v in
         [T.fun_of_fvars vars
            (T.Form.and_
               (T.app (T.var f) (List.map T.var vars))
               (T.app (T.var g) (List.map T.var vars)))]
+      | _ -> []
     and l_or = match mode with
-      | `Neg | `None | `Pragmatic | `TF -> []
-      | `Full ->
+      | `Full | `Or ->
         let f = HVar.make offset ~ty:ty_v in
         let g = HVar.make (offset+1) ~ty:ty_v in
         [T.fun_of_fvars vars
            (T.Form.or_
               (T.app (T.var f) (List.map T.var vars))
               (T.app (T.var g) (List.map T.var vars)))]
+      | _ -> []
     (* projection with "=": [λvars. (F1 vars) = (F2 vars)]
        where [F1 : Πa. ty_args -> a] *)
-    and l_eq = match mode with
-      | `Neg | `Pragmatic | `None | `TF -> []
-      | `Full ->
+    and l_eq = 
+      let n = List.length vars in
+      let db_vars = List.mapi (fun i ty -> T.bvar ~ty (n-i-1)) ty_args in
+      match mode with
+      | `Full | `Eq ->
         let a = HVar.make offset ~ty:Type.tType in
         let ty_fun = Type.arrow ty_args (Type.var a) in
         let f = HVar.make (offset+1) ~ty:ty_fun in
@@ -79,17 +88,21 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~offset : (Subst.t 
         [T.fun_of_fvars vars
            (T.Form.eq
               (T.app (T.var f) (List.map T.var vars))
-              (T.app (T.var g) (List.map T.var vars)))]
-    and l_false = match mode with
-      | `None  -> []
-      | `Neg | `Pragmatic | `Full | `TF  ->
-        [T.fun_of_fvars vars T.false_]
-    and l_true = match mode with
-      | `None -> []
-      | `Neg | `Pragmatic | `Full | `TF ->
-        [T.fun_of_fvars vars T.true_]
+              (T.app (T.var g) (List.map T.var vars)))] @
+        (CCList.flat_map_i (fun i db_i -> 
+          CCList.flat_map_i (fun j db_j ->
+            if i < j && Type.equal (T.ty db_i) (T.ty db_j) then (
+              [T.fun_l ty_args (T.Form.eq (project ~db_vars db_i) (project ~db_vars db_j));
+               T.fun_l ty_args (T.Form.neq (project ~db_vars db_i) (project ~db_vars db_j));]
+            ) else []
+          ) db_vars
+        ) db_vars)
+      | _ -> []
+    (* generate true and false in any case *)
+    and l_false =  [T.fun_of_fvars vars T.false_]
+    and l_true =  [T.fun_of_fvars vars T.true_]
     and l_quants = match mode with
-      | `Full ->
+      | `Full | `Quants ->
         let n = List.length ty_args in
         CCList.mapi (fun i ty -> 
             if Type.is_fun ty && Type.returns_prop ty then (
@@ -108,56 +121,103 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~offset : (Subst.t 
         |> CCList.fold_left (fun acc opt -> match opt with 
             | Some (x,y) -> x :: y :: acc 
             | None -> acc) [] 
-      (* [] *)
+      | _ -> []
+    and l_symbols = 
+      match mode with 
+      | `Pragmatic ->
+        let syms_of_var_ty = Signature.find_by_type signature ty_v in
+        ID.Set.fold (fun sym acc -> Term.const ~ty:ty_v sym :: acc ) syms_of_var_ty []
+      | `Full -> 
+        let syms_of_var_ty = Signature.find_by_type signature ty_v in
+        let arg_tys, ret_ty = Type.open_fun ty_v in 
+        let bvars = 
+          snd @@ List.fold_right (fun ty (idx, res) -> 
+              (idx+1, T.bvar ~ty idx :: res)) arg_tys (0, []) in
+        let fresh_vars = List.mapi (fun i ty -> 
+            let var_ty = Type.arrow arg_tys ty in
+            T.app (T.var (HVar.make ~ty:var_ty (offset+i))) bvars
+          ) arg_tys in
+        ID.Set.fold (fun sym acc -> 
+            (T.fun_l arg_tys (Term.app (Term.const ~ty:ty_v sym) fresh_vars)) :: acc) 
+          syms_of_var_ty []
       | _ -> []
     and l_simpl_op = match mode with
-      | `Pragmatic -> 
+      | `Pragmatic | `Simple -> 
         let n = List.length vars in
         let db_vars = List.mapi (fun i ty -> T.bvar ~ty (n-i-1)) ty_args in
         CCList.mapi (fun i db_i ->
-            let projs = if Type.is_prop (Term.ty db_i) then (
-                [T.fun_l ty_args db_i]
-              ) else [] in
-            let log_ops = 
-              CCList.mapi (fun j db_j ->
-                  if i < j && Type.equal (T.ty db_i) (T.ty db_j) then (
-                    let res = [T.fun_l ty_args (T.Form.eq db_i db_j);
-                               T.fun_l ty_args (T.Form.neq db_i db_j);] in
-                    if Type.is_prop (T.ty db_i) then
-                      res @
-                      [T.fun_l ty_args (T.Form.and_ db_i db_j);
-                       T.fun_l ty_args (T.Form.or_ db_i db_j);]
-                    else res
-                  )
-                  else []) 
-                db_vars
-              |> CCList.flatten in
-            projs @ log_ops) 
+          let projs = if Type.returns_prop (Term.ty db_i) then (
+              [T.fun_l ty_args (project ~db_vars db_i)]
+            ) else [] in
+          let log_ops = 
+            CCList.mapi (fun j db_j ->
+                if i < j && Type.equal (T.ty db_i) (T.ty db_j) then (
+                  let res = [T.fun_l ty_args (T.Form.eq (db_i) (db_j));
+                             T.fun_l ty_args (T.Form.neq (db_i) (db_j));] in
+                  if Type.returns_prop (T.ty db_i) then
+                    res @
+                    [T.fun_l ty_args (T.Form.and_ (project ~db_vars db_i) (project ~db_vars db_j));
+                     T.fun_l ty_args (T.Form.or_ (project ~db_vars db_i) (project ~db_vars db_j));]
+                  else res
+                ) else []) 
+              db_vars
+            |> CCList.flatten in
+          projs @ log_ops) 
           db_vars
         |> CCList.flatten
       | _ -> []
+    and l_combinators = match mode with
+      | `Combinators -> 
+        let (==>) = Type.arrow in
+        let o = Type.prop in
+        let fresh_ty = Type.var (HVar.make ~ty:Type.tType offset) in 
+        let symbols = [
+          T.true_, 0; 
+          T.false_, 0;
+          T.app_builtin ~ty:([o;o] ==> o) Builtin.And [],1;
+          T.app_builtin ~ty:([o;o] ==> o) Builtin.Or [],1;
+          T.app_builtin ~ty:([o] ==> o) Builtin.Not [],1;
+          T.app_builtin ~ty:([fresh_ty; fresh_ty] ==> o) Builtin.Eq [],1;
+          T.app_builtin ~ty:([[fresh_ty] ==> o] ==> o) Builtin.ForallConst [],1;
+          T.app_builtin ~ty:([[fresh_ty] ==> o] ==> o) Builtin.ExistsConst [],1;
+        ] in
+        
+        List.fold_left (fun res (op,penalty) -> 
+          try
+            (Unif.FO.unify_syn (T.var v, sc_v) (op, sc_v),penalty)::res
+          with Unif.Fail -> res
+        ) [] symbols
+      | _ -> []
 
     in
-    CCList.flat_map
-      (fun (ts,penalty) -> 
-         List.map (fun t -> 
-             assert (T.DB.is_closed t);
+    let lambdas = 
+      CCList.flat_map
+        (fun (ts,penalty) -> 
+          List.map (fun t -> 
+              assert (T.DB.is_closed t);
 
-             (* Caching of primitive enumeration terms, so that trigger-based instantiation
-                does not catch them. *)
-             let cached_t = Subst.FO.canonize_all_vars t in
-             enum_cache := Term.Set.add cached_t !enum_cache;
-             let subst = Subst.FO.bind' Subst.empty (v,sc_v) (t,sc_v) in
-             (subst, penalty) )ts ) 
-      [ l_not, 3;
-        l_and, 10;
-        l_or, 10;
-        l_eq,  5;
-        l_false, 1;
-        l_true, 1;
-        l_simpl_op, 2;
-        l_quants, 10;
-      ]
+              (* Caching of primitive enumeration terms, so that trigger-based instantiation
+                  does not catch them. *)
+              let cached_t = Subst.FO.canonize_all_vars t in
+              enum_cache := Term.Set.add cached_t !enum_cache;
+              let subst = Subst.FO.bind' Subst.empty (v,sc_v) (t,sc_v) in
+              (subst, penalty) )ts ) 
+        [ l_not, 1;
+          l_and, (if mode == `Full then 2 else 1);
+          l_or, (if mode == `Full then 2 else 1);
+          l_eq,  1;
+          l_false, (if mode == `Full then 1 else 0);
+          l_true, (if mode == `Full then 1 else 0);
+          l_simpl_op, 1;
+          (* 
+            Disable symbols -- combinator modes will pick it up better
+            l_symbols, (if mode == `Pragmatic then 1 else 3); 
+          *)
+          l_quants, 2;
+        ] in
+        ignore(l_symbols); (* stiffle compiler warning -- symbols might be reintroduced *)
+    let combs = l_combinators in
+    if mode == `Combinators then combs else lambdas
   )
 
 let pp_pair out ((env,t,u):pair) =
@@ -192,9 +252,9 @@ module U = struct
   let pp out (t:state): unit =
     Format.fprintf out
       "(@[<hv2>ho_unif_pb@ %a@])"
-      (Util.pp_seq ~sep:" " pp_pb) (Iter.of_queue t.queue)
+      (Util.pp_iter ~sep:" " pp_pb) (Iter.of_queue t.queue)
 
-  (** {6 normalization of pairs} *)
+  (** {5 normalization of pairs} *)
 
   type pair_kind =
     | P_rigid_rigid
@@ -265,7 +325,7 @@ module U = struct
         Some { pb with pairs; }
     end
 
-  (** {6 Main loop} *)
+  (** {5 Main loop} *)
 
   let mk_fresh_var offset ty = offset+1, HVar.make offset ~ty
 

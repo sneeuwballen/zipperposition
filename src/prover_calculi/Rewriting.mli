@@ -7,7 +7,7 @@
 open Libzipperposition
 
 module Make(E : Env_intf.S) : sig
-  val setup : ?ctx_narrow:bool -> has_rw:bool -> unit -> unit
+  val setup : ?ctx_narrow:bool -> narrowing:bool -> has_rw:bool -> unit -> unit
 end
 
 val unfold_def_before_cnf :  ((Logtk.TypedSTerm.t, Logtk.TypedSTerm.t, Logtk.TypedSTerm.t) Logtk.Statement.t, 'c) CCVector.t ->

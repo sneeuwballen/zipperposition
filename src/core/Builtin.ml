@@ -3,6 +3,8 @@
 
 (** {1 Builtin Objects} *)
 
+let _t_bigger_false = ref false;
+
 module Fmt = CCFormat
 
 type t =
@@ -59,14 +61,20 @@ type t =
   | Greatereq
   | Box_opaque (** hint not to open this formula *)
   | Pseudo_de_bruijn of int (** magic to embed De Bruijn indices in normal terms *)
+  | BComb
+  | CComb
+  | IComb
+  | KComb
+  | SComb
+
   | Distinct
 
 type t_ = t
 
 let to_int_ = function
-  (* True < false for the completeness of (HO case) FOOL paramodulation: C[b] ⟹ b ∨ C[false]. The opposite way required b=false would simplify b≠true (aka ¬b) which doesn't rewrite. *)
-  | True -> 0
-  | False -> 1
+  (* True > false for the completeness of (HO case) FOOL paramodulation: C[b] ⟹ b ∨ C[false]. The opposite way required b=false would simplify b≠true (aka ¬b) which doesn't rewrite. *)
+  | True -> if !_t_bigger_false then 1 else 0
+  | False -> if !_t_bigger_false then 0 else 1
   | Not -> 2
   | And -> 3
   | Or -> 4
@@ -117,8 +125,15 @@ let to_int_ = function
   | Box_opaque -> 60
   | TyReal -> 70
   | Real _ -> 71
+  | BComb -> 80
+  | CComb -> 81
+  | IComb -> 82
+  | KComb -> 83
+  | SComb -> 84
   | Pseudo_de_bruijn _ -> 100
   | Distinct -> 110
+
+let as_int = to_int_
 
 let compare a b = match a, b with
   | Int i, Int j -> Z.compare i j
@@ -147,6 +162,10 @@ let is_logical_op = function
 let is_logical_binop = function
   |And|Or|Imply|Xor|Equiv -> true
   |_->false
+
+let is_flattened_logical = function
+  |And|Or -> true
+  |_ -> false
 
 let is_quantifier = function 
   |ForallConst|ExistsConst -> true
@@ -212,6 +231,11 @@ let to_string s = match s with
   | Greater -> ">"
   | Greatereq -> "≥"
   | Box_opaque -> "<box>"
+  | BComb -> "B"
+  | CComb -> "C"
+  | IComb -> "I"
+  | KComb -> "K"
+  | SComb -> "S"
   | Pseudo_de_bruijn i -> Printf.sprintf "db_%d" i
   | Distinct -> "distinct"
 
@@ -235,6 +259,10 @@ let fixity = function
 
 let is_prefix o = fixity o = Prefix
 let is_infix o = match fixity o with Infix_nary | Infix_binary -> true | Prefix -> false
+
+let is_combinator = function 
+  | BComb | CComb | IComb | KComb | SComb -> true
+  | _ -> false
 
 let ty = function
   | Int _ -> `Int
@@ -276,11 +304,15 @@ module Tag = struct
     | T_lia (** integer arith *)
     | T_lra (** rational arith *)
     | T_ho (** higher order *)
+    | T_live_cnf (** live cnf *)
+    | T_ho_norm (** higher-order normalization *)
+    | T_dont_increase_depth (** an inference rule that makes a clause more first-order and should not be counted in the proof depth.  *)
     | T_ext (** extensionality *)
     | T_ind (** induction *)
     | T_data (** datatypes *)
     | T_distinct (** distinct constants *)
     | T_ac of ID.t (** AC symbols *)
+    | T_cannot_orphan
 
   let compare = Pervasives.compare
 
@@ -288,11 +320,15 @@ module Tag = struct
     | T_lia -> Fmt.string out "lia"
     | T_lra -> Fmt.string out "lra"
     | T_ho -> Fmt.string out "ho"
+    | T_live_cnf -> Fmt.string out "live_cnf"
+    | T_ho_norm -> Fmt.string out "ho_norm"
+    | T_dont_increase_depth -> Fmt.string out "dont_increase_depth"
     | T_ext -> Fmt.string out "extensionality"
     | T_ind -> Fmt.string out "ind"
     | T_data -> Fmt.string out "data"
     | T_distinct -> Fmt.string out "distinct_constants"
     | T_ac id -> Fmt.fprintf out "(ac %a)" ID.pp_full id
+    | T_cannot_orphan -> Fmt.fprintf out "cannot orphan"
 end
 
 
@@ -377,6 +413,11 @@ module TPTP = struct
     | Lesseq -> "$lesseq"
     | Greater -> "$greater"
     | Greatereq -> "$greatereq"
+    | BComb -> "'#B'"
+    | CComb -> "'#C'"
+    | IComb -> "'#I'"
+    | KComb -> "'#K'"
+    | SComb -> "'#S'"
     | Box_opaque -> "$$box"
     | Pseudo_de_bruijn i -> Printf.sprintf "$$db_%d" i
     | Distinct -> "$distinct"
@@ -421,6 +462,11 @@ module TPTP = struct
     | "$lesseq" -> Lesseq
     | "$greater" -> Greater
     | "$greatereq" -> Greatereq
+    | "#B" -> BComb
+    | "#S" -> SComb
+    | "#C" -> CComb
+    | "#K" -> KComb
+    | "#I" -> IComb
     | "$distinct" -> Distinct
     | _ -> raise NotABuiltin
 
@@ -439,7 +485,7 @@ module TPTP = struct
     with NotABuiltin -> None
 
   (* TODO add the other ones *)
-  let connectives = Set.of_seq
+  let connectives = Set.of_iter
       (Iter.of_list [ and_; or_; equiv; imply; ])
 
   let is_connective = function
@@ -714,6 +760,11 @@ module ZF = struct
     | Lesseq -> "<="
     | Greater -> ">"
     | Greatereq -> ">="
+    | BComb -> "B"
+    | CComb -> "C"
+    | IComb -> "I"
+    | KComb -> "K"
+    | SComb -> "S"
     | Box_opaque -> "<box>"
     | Pseudo_de_bruijn i -> Printf.sprintf "<db %d>" i
     | Distinct -> "distinct"

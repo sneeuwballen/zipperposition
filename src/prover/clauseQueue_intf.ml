@@ -17,13 +17,16 @@ type profile =
 (** {1 A priority queue of clauses, purely functional} *)
 module type S = sig
   module C : Clause_intf.S
+  
+  val register_conjecture_clause : C.t -> unit
 
-  (** {6 Weight functions} *)
+  (** {5 Weight functions} *)
   module WeightFun : sig
     type t = C.t -> int
     (** attribute a weight to a clause. The smaller, the better (lightweight
         clauses will be favored). A weight must always be positive;
         the weight of the empty clause should alwyays be 0. *)
+
 
     val of_string : string -> t
     (** parse string description of weight function and return it  *)
@@ -69,8 +72,8 @@ module type S = sig
   type t
   (** A priority queue. *)
 
-  val add : t -> C.t -> unit
-  (** Add a clause to the Queue *)
+  val add : t -> C.t -> bool
+  (** Add a clause to the Queue; returns true if clause was actually added  *)
 
   val add_seq : t -> C.t Iter.t -> unit
   (** Add clauses to the queue *)
@@ -87,7 +90,7 @@ module type S = sig
   val name : t -> string
   (** Name of the implementation/role of the queue *)
 
-  (** {6 Available Queues} *)
+  (** {5 Available Queues} *)
 
   (* val make : ratio:int -> weight:(C.t -> int) -> string -> t
      (** Bring your own implementation of queue.
@@ -119,7 +122,18 @@ module type S = sig
   val of_profile : profile -> t
   (** Select the queue corresponding to the given profile *)
 
-  (** {6 IO} *)
+  val all_clauses : t -> C.t Iter.t
+  (** All clauses stored in the queue, in no particular order *)
+
+  val mem_cl : t -> C.t -> bool
+  (** is the clause present in the passive set? *)
+
+  val remove : t -> C.t -> bool
+  (** ignore the clause in the queue, and make sure it is never 
+      returned with the call to take_first();
+      returns true if clause was actually removed *) 
+
+  (** {5 IO} *)
 
   val pp : t CCFormat.printer
   val to_string : t -> string

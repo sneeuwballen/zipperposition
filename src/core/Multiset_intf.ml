@@ -70,8 +70,8 @@ module type S = sig
   (** replace each element by a multiset in its own *)
 
   module Seq : sig
-    val of_seq : t -> elt Iter.t -> t
-    val to_seq : t -> elt Iter.t
+    val of_iter : t -> elt Iter.t -> t
+    val to_iter : t -> elt Iter.t
 
     val of_coeffs : t -> (elt * Z.t) Iter.t -> t
     val to_coeffs : t -> (elt * Z.t) Iter.t
@@ -119,7 +119,7 @@ module type S = sig
   (** Remove common elements from the multisets. For instance,
       on [{1,1,2}] and [{1,2,2,3}], [cancel] will return [({1}, {2,3})] *)
 
-  (** {6 Comparisons}
+  (** {5 Comparisons}
 
       In the following, the comparison function must be equality-compatible
       with [E.compare]. In other words, if [E.compare x y = 0] then

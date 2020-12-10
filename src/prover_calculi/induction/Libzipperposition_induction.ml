@@ -166,7 +166,7 @@ end = struct
          end)
       (cs g);
     let all_clusters =
-      (UF_clauses.to_seq uf |> Iter.map snd |> Iter.to_rev_list)
+      (UF_clauses.to_iter uf |> Iter.map snd |> Iter.to_rev_list)
       @ !ground_
     in
     let new_goals = List.rev_map of_form all_clusters in
@@ -216,7 +216,7 @@ end = struct
       (fun k->k pp g max_steps_);
     let module CQ = E.ProofState.CQueue in
     let q = CQ.almost_bfs () in (* clauses waiting *)
-    let push_c c = CQ.add q c in
+    let push_c c = ignore (CQ.add q c) in
     let n : int ref = ref 0 in (* number of steps *)
     let trivial = ref true in
     try
@@ -229,44 +229,46 @@ end = struct
            else if C.is_empty c then raise (Yield_false c)
            else (
              trivial := false;
-             push_c c
+             ignore(push_c c)
            ))
         (cs g);
       (* do a few steps of saturation *)
       while not (CQ.is_empty q) && !n < max_steps_ do
-        incr n;
-        let c = CQ.take_first q in
-        let c, _ = E.unary_simplify c in
-        (* check for empty clause *)
-        if C.comes_from_goal c then () (* ignore, a valid lemma might contradict goal *)
-        else if C.is_empty c && Trail.is_empty (C.trail c) then raise (Yield_false c)
-        else if E.is_trivial c then ()
-        else (
-          trivial := false; (* at least one clause does not simplify to [true] *)
-          (* now make inferences with [c] and push non-trivial clauses to [q],
-             if needed *)
-          if !n + 2 < max_steps_ then (
-            let new_c =
-              Iter.append
-                (E.do_binary_inferences c)
-                (E.do_unary_inferences c)
-            in
-            new_c
-            |> Iter.filter_map
-              (fun new_c ->
-                 let new_c, _ = E.unary_simplify new_c in
-                 (* discard trivial/conditional clauses, or clauses coming
-                    from goals (as they might be true lemmas but contradict
-                    the negated goal, which makes them even more useful);
-                    also scan for empty clauses *)
-                 if C.comes_from_goal new_c then None
-                 else if not (Trail.is_empty (C.trail new_c)) then None
-                 else if E.is_trivial new_c then None
-                 else if C.is_empty new_c then raise (Yield_false new_c)
-                 else Some new_c)
-            |> Iter.iter push_c
-          )
-        )
+        try 
+          incr n;
+          let c = CQ.take_first q in
+          let c, _ = E.unary_simplify c in
+          (* check for empty clause *)
+          if C.comes_from_goal c then () (* ignore, a valid lemma might contradict goal *)
+          else if C.is_empty c && Trail.is_empty (C.trail c) then raise (Yield_false c)
+          else if E.is_trivial c then ()
+          else (
+            trivial := false; (* at least one clause does not simplify to [true] *)
+            (* now make inferences with [c] and push non-trivial clauses to [q],
+              if needed *)
+            if !n + 2 < max_steps_ then (
+              let new_c =
+                Iter.append
+                  (E.do_binary_inferences c)
+                  (E.do_unary_inferences c)
+              in
+              new_c
+              |> Iter.filter_map
+                (fun new_c ->
+                  let new_c, _ = E.unary_simplify new_c in
+                  (* discard trivial/conditional clauses, or clauses coming
+                      from goals (as they might be true lemmas but contradict
+                      the negated goal, which makes them even more useful);
+                      also scan for empty clauses *)
+                  if C.comes_from_goal new_c then None
+                  else if not (Trail.is_empty (C.trail new_c)) then None
+                  else if E.is_trivial new_c then None
+                  else if C.is_empty new_c then raise (Yield_false new_c)
+                  else Some new_c)
+              |> Iter.iter (fun c -> ignore @@ push_c c)))
+        with Not_found ->
+          (* Due to orphan deletion a clause might not be found *)
+          ()
       done;
       Util.debugf ~section 2
         "@[<2>lemma @[%a@]@ apparently not absurd (after %d steps; trivial:%B)@]"
@@ -750,7 +752,6 @@ module Make
         | Literal.Equation (l,r,_) ->
           let check_t t = T.is_var t || not (T.var_occurs ~var:x t) in
           check_t l && check_t r
-        | Literal.Int _ | Literal.Rat _ -> false
         | Literal.True | Literal.False -> true)
 
   let active_subterms_form (f:Cut_form.t): T.t Iter.t =
@@ -806,7 +807,7 @@ module Make
           let m =
             let offset =
               Cut_form.vars f
-              |> T.VarSet.to_seq
+              |> T.VarSet.to_iter
               |> Iter.map HVar.id
               |> Iter.max |> CCOpt.get_or ~default:0 |> succ
             in
@@ -818,7 +819,7 @@ module Make
                    (function
                      | P_active, pos, t when term_is_var v t -> Some (pos, T.var v')
                      | _ -> None)
-                 |> Position.Map.add_seq m)
+                 |> Position.Map.add_iter m)
               Position.Map.empty vars
           in
           let f' = Cut_form.Pos.replace_many f m in
@@ -871,7 +872,7 @@ module Make
              (* introduce variable for [t] *)
              let v =
                Cut_form.vars f
-               |> T.VarSet.to_seq
+               |> T.VarSet.to_iter
                |> Iter.map HVar.id
                |> Iter.max |> CCOpt.get_or ~default:0 |> succ
                |> HVar.make ~ty:(T.ty t)
@@ -882,7 +883,7 @@ module Make
                  (function
                    | pos, u when T.equal t u -> Some (pos, T.var v)
                    | _ -> None)
-               |> Position.Map.of_seq
+               |> Position.Map.of_iter
              in
              let f' = Cut_form.Pos.replace_many f m in
              Util.debugf ~section 4
@@ -989,7 +990,7 @@ module Make
            | _ -> ())
     end;
     let res =
-      UF_vars.to_seq uf
+      UF_vars.to_iter uf
       |> Iter.map snd
       |> Iter.filter_map
         (fun vars ->
@@ -1154,7 +1155,7 @@ module Make
     and no_pos_lemma_in_trail () =
       Iter.of_list clauses
       |> Iter.map C.trail
-      |> Iter.flat_map Trail.to_seq
+      |> Iter.flat_map Trail.to_iter
       |> Iter.for_all
         (fun lit -> not (BoolLit.sign lit && BBox.is_lemma lit))
     in
@@ -1241,7 +1242,7 @@ module Make
   (* checks whether the trail is trivial, that is, it contains
      two literals [i = t1] and [i = t2] with [t1], [t2] distinct cover set cases *)
   let trail_is_trivial_cases trail =
-    let seq = Trail.to_seq trail in
+    let seq = Trail.to_iter trail in
     (* all boolean literals that express paths *)
     let relevant_cases = Iter.filter_map BoolBox.as_case seq in
     (* are there two distinct incompatible cases in the trail? *)
@@ -1265,7 +1266,7 @@ module Make
   (* make trails with several lemmas in them trivial, so that we have to wait
      for a lemma to be proved before we can  use it to prove another lemma *)
   let trail_is_trivial_lemmas trail =
-    let seq = Trail.to_seq trail in
+    let seq = Trail.to_iter trail in
     (* all boolean literals that express paths *)
     let relevant_cases =
       seq
@@ -1384,15 +1385,16 @@ let () =
     ; "--no-ind-gen-var", Arg.Clear gen_var, " do not generalize on variables"
     ; "--no-ind-gen-term", Arg.Clear gen_term, " do not generalize on terms"
     ];
-  Params.add_to_mode "ho-complete-basic" (fun () ->
-      enabled_ := false
-    );
-  Params.add_to_mode "ho-pragmatic" (fun () ->
-      enabled_ := false
-    );
-  Params.add_to_mode "ho-competitive" (fun () ->
-      enabled_ := false
-    );
-  Params.add_to_mode "fo-complete-basic" (fun () ->
-      enabled_ := false
+  Params.add_to_modes 
+    [ "ho-complete-basic"
+    ; "ho-pragmatic"
+    ; "ho-competitive"
+    ; "fo-complete-basic"
+    ; "lambda-free-intensional"
+    ; "lambda-free-extensional"
+    ; "ho-comb-complete"
+    ; "lambda-free-purify-intensional"
+    ; "lambda-free-purify-extensional"] 
+    (fun () ->
+       enabled_ := false
     );

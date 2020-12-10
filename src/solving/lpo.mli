@@ -5,7 +5,7 @@
 
 open Logtk
 
-(** {6 Constraints} *)
+(** {5 Constraints} *)
 
 module Constraint : sig
   type expr = ID.t
@@ -61,7 +61,7 @@ val solve_multiple : Constraint.t list -> Solution.t LazyList.t
 (** A lazy list of partial orders over symbols, that satisfy the given
     list of constraints *)
 
-(** {6 Search for a LPO ordering} *)
+(** {5 Search for a LPO ordering} *)
 
 module FO : sig
   type term = Term.t

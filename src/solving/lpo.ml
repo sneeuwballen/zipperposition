@@ -9,7 +9,7 @@ module SI = Msat.Solver_intf
 
 let section = Util.Section.(make ~parent:(make "solving") "lpo")
 
-(** {6 Constraints} *)
+(** {5 Constraints} *)
 
 module Constraint = struct
   type expr = ID.t
@@ -274,7 +274,7 @@ module MakeSolver(X : sig end) = struct
     let symbols =
       Iter.of_list l
       |> Iter.flat_map C.Seq.exprs
-      |> ID.Set.of_seq
+      |> ID.Set.of_iter
       |> ID.Set.elements
     in
     let num = List.length symbols in
@@ -323,7 +323,7 @@ let solve_multiple l =
   let module S = MakeSolver(struct end) in
   S.solve_list l
 
-(** {6 LPO} *)
+(** {5 LPO} *)
 
 (* constraint that some term in [l] is bigger than [b] *)
 let any_bigger ~orient_lpo l b  = match l with

@@ -31,15 +31,21 @@ module MakeLeaf(X : Set.OrderedType) : LEAF with type elt = X.t = struct
     let set = S.add data set in
     T.Map.add t set leaf
 
-  let remove leaf t data =
+  let remove_if leaf t set_filter =
     try
       let set = T.Map.find t leaf in
-      let set = S.remove data set in
+      let set = set_filter set in
       if S.is_empty set
       then T.Map.remove t leaf
       else T.Map.add t set leaf
     with Not_found ->
       leaf
+
+  let remove leaf t data =
+    remove_if leaf t (fun set -> S.remove data set)
+
+  let update_leaf leaf t data_filter =
+    remove_if leaf t (fun set -> S.filter data_filter set)
 
   let is_empty = T.Map.is_empty
 

@@ -45,22 +45,26 @@ module Constr : sig
         equivalence classes, within which all symbols are equal, but
         symbols of distinct equivalence classes are always ordered. *)
 
+  type prec_fun = signature:Signature.t -> ID.t Iter.t -> [`partial] t
+
   (* TODO: sth based on order of the type. Higher-order functions should
      be bigger than first-order functions, so that ghd() works fine
      with types in KBO *)
 
-  val arity : (ID.t -> int) -> [`partial] t
+  val arity : prec_fun
   (** decreasing arity constraint (big arity => high in precedence) *)
 
-  val invfreq : ID.t Iter.t -> [`partial] t
+  val invfreq : prec_fun
   (** symbols with high frequency are smaller. Elements of unknown
       frequency are assumed to have a frequency of 0. *)
 
-  val max : ID.t list -> [`partial] t
+  val max : prec_fun
   (** maximal symbols, in decreasing order *)
 
-  val min : ID.t list -> [`partial] t
+  val min : prec_fun
   (** minimal symbols, in decreasing order *)
+
+  val prec_fun_of_str : string -> prec_fun
 
   val alpha : [`total] t
   (** alphabetic ordering on symbols, themselves bigger than builtin *)
@@ -73,6 +77,10 @@ module Constr : sig
   (** [compose_sort l] sorts the list by increasing priority (the lower,
       the earlier an ordering is applied, and therefore the more
       impact it has) before composing *)
+
+  val compare_by : constr: ('a t) ->  ID.t -> ID.t -> int
+  (** [compare_by ~constr a b returns the result of comparing symbols
+       a and b using constr]  *)
 
   val make : (ID.t -> ID.t -> int) -> [`partial] t
   (** Create a new partial order.
@@ -116,10 +124,8 @@ val lam_weight : t -> Weight.t
 val arg_coeff : t -> ID.t -> int -> int
 (** Nth argument coefficient of a symbol (for KBO with argument coefficients). *)
 
-val add_list : t -> ID.t list -> unit
+val add_list : signature:Signature.t -> t -> ID.t list -> unit
 (** Update the precedence with the given symbols *)
-
-val add_seq : t -> ID.t Iter.t -> unit
 
 val declare_status : t -> ID.t -> symbol_status -> unit
 (** Change the status of the given precedence
@@ -144,7 +150,9 @@ val weight_freq : ID.t Iter.t -> weight_fun
 val weight_invfreqrank : ID.t Iter.t -> weight_fun
 val weight_freqrank : ID.t Iter.t -> weight_fun
 
-val weight_fun_of_string : signature:Signature.t -> string -> (ID.t * int) Iter.t -> weight_fun
+val weight_fun_of_string : signature:Signature.t -> lits: Term.t SLiteral.t Iter.t -> 
+                           lm_w : int -> db_w : int ->
+                           string -> (ID.t * int) Iter.t -> weight_fun
 
 val set_weight : t -> weight_fun -> unit
 (** Change the weight function of the precedence

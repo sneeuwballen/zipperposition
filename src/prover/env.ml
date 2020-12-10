@@ -9,6 +9,7 @@ module T = Term
 module Lit = Literal
 module Lits = Literals
 module P = Proof
+module IntSet = Set.Make(CCInt)
 
 let section = Util.Section.make ~parent:Const.section "env"
 
@@ -45,6 +46,10 @@ module Make(X : sig
 
   type generate_rule = full:bool -> unit -> C.t list
   (** Generation of clauses regardless of current clause *)
+
+  type clause_elim_rule = unit -> unit
+  (** Eliminates clauses from the proof state using algorithms
+      like blocked clause elimination and similar *)
 
   type binary_inf_rule = inf_rule
   type unary_inf_rule = inf_rule
@@ -92,6 +97,7 @@ module Make(X : sig
   (** (maybe) rewrite a clause to a set of clauses.
       Must return [None] if the clause is unmodified *)
 
+  type immediate_simplification_rule = C.t -> C.t Iter.t -> C.t Iter.t option
   type 'a conversion_result =
     | CR_skip (** rule didn't fire *)
     | CR_drop (** remove the clause from proof state *)
@@ -106,6 +112,7 @@ module Make(X : sig
   let _unary_rules : (string * unary_inf_rule) list ref = ref []
   let _rewrite_rules : (string * term_rewrite_rule) list ref = ref []
   let _norm_rule : term_norm_rule ref = ref (fun _ -> None)
+  let _norm_name : string ref = ref "lambda normalize"
   let _lit_rules : (string * lit_rewrite_rule) list ref = ref []
   let _basic_simplify : simplify_rule list ref = ref []
   let _unary_simplify : simplify_rule list ref = ref []
@@ -117,15 +124,20 @@ module Make(X : sig
   let _is_trivial_trail : is_trivial_trail_rule list ref = ref []
   let _is_trivial : is_trivial_rule list ref = ref []
   let _empty_clauses = ref C.ClauseSet.empty
-  let _multi_simpl_rule : multi_simpl_rule list ref = ref []
-  let _ss_multi_simpl_rule : multi_simpl_rule ref = ref (fun _ -> None)
-  let _generate_rules : (string * generate_rule) list ref = ref []
+  let _multi_simpl_rule : (int * multi_simpl_rule) list ref = ref []
+  let _cheap_msr : multi_simpl_rule list ref = ref []
+  let _ss_multi_simpl_rule : multi_simpl_rule list ref = ref []
+  let _generate_rules : (int * string * generate_rule) list ref = ref []
+  let _cl_elim_rules : (int * string * clause_elim_rule) list ref = ref []
   let _clause_conversion_rules : clause_conversion_rule list ref = ref []
   let _step_init = ref []
+  let _fragment_checks = ref []
+  let _immediate_simpl : immediate_simplification_rule list ref = ref []
 
   let on_start = Signal.create()
   let on_input_statement = Signal.create()
   let on_empty_clause = Signal.create ()
+  let on_forward_simplified = Signal.create()
 
   (** {2 Basic operations} *)
 
@@ -156,10 +168,10 @@ module Make(X : sig
   let remove_simpl = ProofState.SimplSet.remove
 
   let get_passive () =
-    ProofState.PassiveSet.clauses () |> C.ClauseSet.to_seq
+    ProofState.PassiveSet.clauses () |> C.ClauseSet.to_iter
 
   let get_active () =
-    ProofState.ActiveSet.clauses () |> C.ClauseSet.to_seq
+    ProofState.ActiveSet.clauses () |> C.ClauseSet.to_iter
 
   let add_binary_inf name rule =
     if not (List.mem_assoc name !_binary_rules)
@@ -169,9 +181,22 @@ module Make(X : sig
     if not (List.mem_assoc name !_unary_rules)
     then _unary_rules := (name, rule) :: !_unary_rules
 
-  let add_generate name rule =
-    if not (List.mem_assoc name !_generate_rules)
-    then _generate_rules := (name, rule) :: !_generate_rules
+  let _add_prioritized ~store ~priority name rule = 
+    if not (List.mem name (List.map (fun (_,n,_) -> n) !store))
+    then (
+      let cmp (p1,n1,r1) (p2,n2,r2) =
+        let open CCOrd in
+        CCInt.compare p2 p1
+        <?> (CCString.compare, n2, n1) in
+
+      store := CCList.sorted_insert ~cmp (priority,name,rule) !store)
+
+  let add_generate ~priority name rule =
+    _add_prioritized ~store:_generate_rules ~priority name rule
+
+  let add_clause_elimination_rule ~priority name rule =
+    _add_prioritized ~store:_cl_elim_rules ~priority name rule
+
 
   let add_rw_simplify r =
     _rw_simplify := r :: !_rw_simplify
@@ -204,7 +229,11 @@ module Make(X : sig
     Util.debugf ~section 1 "[ Adding rule %s to env ]" (fun k-> k name);
     _rewrite_rules := (name, rule) :: !_rewrite_rules
 
-  let set_ho_normalization_rule rule =
+  let add_immediate_simpl_rule rule =
+    _immediate_simpl := rule :: !_immediate_simpl
+
+  let set_ho_normalization_rule name rule =
+    _norm_name := name;
     _norm_rule := rule
 
   let get_ho_normalization_rule () =
@@ -213,11 +242,19 @@ module Make(X : sig
   let add_lit_rule name rule =
     _lit_rules := (name, rule) :: !_lit_rules
 
-  let add_multi_simpl_rule rule =
-    _multi_simpl_rule := rule :: !_multi_simpl_rule
+  let add_multi_simpl_rule ~priority rule =
+    _multi_simpl_rule := 
+      CCList.sorted_insert ~cmp:(fun (p1,_) (p2,_) -> CCInt.compare p1 p2) 
+        (priority,rule) !_multi_simpl_rule
 
-  let set_single_step_multi_simpl_rule rule =
-    _ss_multi_simpl_rule := rule
+  let multi_simpl_rules () =
+    List.map snd !_multi_simpl_rule
+  
+  let add_cheap_multi_simpl_rule rule =
+    _cheap_msr := rule :: !_cheap_msr
+
+  let add_single_step_multi_simpl_rule rule =
+    _ss_multi_simpl_rule := rule :: !_ss_multi_simpl_rule
 
   let cr_skip = CR_skip
   let cr_add x = CR_add x
@@ -227,6 +264,10 @@ module Make(X : sig
     _clause_conversion_rules := r :: !_clause_conversion_rules
 
   let add_step_init f = _step_init := f :: !_step_init
+
+  let add_fragment_check f = _fragment_checks := f :: !_fragment_checks
+
+  let check_fragment c = CCList.for_all (fun f -> f c) !_fragment_checks
 
   let params = X.params
 
@@ -290,14 +331,22 @@ module Make(X : sig
 
   let do_generate ~full () =
     let clauses =
-      List.fold_left
-        (fun acc (name,g) ->
+      CCList.fold_while
+        (fun acc (_,name,g) ->
            Util.debugf ~section 3 "apply generating rule %s (full: %b)" (fun k->k name full);
-           List.rev_append (g ~full ()) acc)
+           (* We are trying low effort generating functions first.
+              If they find an empty clause -- then we do not go on to
+              full effort generating functions *)
+           let from_g  = g ~full () in
+           let status = if List.exists C.is_empty from_g then `Stop else `Continue in
+           List.rev_append (from_g) acc, status)
         []
         !_generate_rules
     in
     Iter.of_list clauses
+  
+  let do_clause_eliminate () =
+    List.iter (fun (_, _, elim_procedure) -> elim_procedure ()) !_cl_elim_rules
 
   let is_trivial_trail trail = match !_is_trivial_trail with
     | [] -> false
@@ -320,11 +369,22 @@ module Make(X : sig
       res
     )
 
+  let immediate_simplify given immediate =
+    let rec aux = function 
+    | [] -> immediate
+    | f :: fs ->
+      match f given immediate with 
+      | Some res -> res
+      | None -> aux fs in
+    aux !_immediate_simpl
+
   let is_active c =
     C.ClauseSet.mem c (ProofState.ActiveSet.clauses ())
 
-  let is_passive c =
-    C.ClauseSet.mem c (ProofState.PassiveSet.clauses ())
+  let is_passive =  ProofState.PassiveSet.is_passive
+
+  let on_pred_var_elimination = Signal.create ()
+  let on_pred_skolem_introduction = Signal.create ()
 
   module StrSet = CCSet.Make(String)
 
@@ -387,9 +447,9 @@ module Make(X : sig
     else (
       C.mark_redundant c;
       (* FIXME: put the rules as parameters *)
-      let rule = Proof.Rule.mk "lambda-normalize" in
+      let rule = Proof.Rule.mk !_norm_name in
       let proof =
-        Proof.Step.simp ~rule
+        Proof.Step.simp ~rule  ~tags:[Proof.Tag.T_ho_norm]
           ([C.proof_parent c])
       in
       let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) lits' proof in
@@ -553,7 +613,7 @@ module Make(X : sig
       if not (C.ClauseSet.mem c !set) then (
         let c, st = unary_simplify c in
         if st = `New then did_something := true;
-        match try_next c !_multi_simpl_rule with
+        match try_next c (multi_simpl_rules ()) with
         | None ->
           (* keep the clause! *)
           set := C.ClauseSet.add c !set;
@@ -597,7 +657,7 @@ module Make(X : sig
             rw_simplify >>=
             unary_simplify >|= fun c ->
             if not (Lits.equal_com (C.lits c) (C.lits old_c)) then (
-              Util.debugf ~section 2 "@[clause `@[%a@]`@ simplified into `@[%a@]`@]"
+              Util.debugf ~section 1 "@[clause `@[%a@]`@ simplified into `@[%a@]`@]"
                 (fun k->k C.pp old_c C.pp c);
             );
             c)
@@ -661,6 +721,34 @@ module Make(X : sig
   let forward_simplify c =
     let open SimplM.Infix in
     ho_normalize c >>= rewrite >>= rw_simplify >>= unary_simplify
+
+  let _apply_multi_rules ~rule_list c = 
+    let rec apply_rules ~rules c =
+      match rules with
+      | [] -> None
+      | r :: rs ->
+        CCOpt.or_lazy ~else_:(fun () -> apply_rules rs c) (r c) in
+    
+    let q = Queue.create () in
+    Queue.add c q;
+    let res = ref [] in
+    let any_simplified = ref false in
+
+    while not (Queue.is_empty q) do
+      let c = Queue.pop q in
+      match apply_rules ~rules:rule_list c with
+      | None -> res := c :: !res
+      | Some simplified ->
+        any_simplified := true;
+        List.iter (fun c -> Queue.add c q) simplified;
+    done;
+
+    (!res, !any_simplified)
+
+  let cheap_multi_simplify c = 
+    let res,any_simplified = _apply_multi_rules ~rule_list:!_cheap_msr c in
+
+    if any_simplified then Some res else None
 
   (** generate all clauses from inferences *)
   let generate given =
@@ -735,29 +823,67 @@ module Make(X : sig
     let did_simplify = ref false in
     let set = ref C.ClauseSet.empty in
     let q = Queue.create () in
-    let c, st = simplify c in
-    if st=`New then did_simplify := true;
-    let single_step_simplified = !_ss_multi_simpl_rule c in
-    begin
-      match single_step_simplified with
-      | None -> Queue.push c q;
-      | Some l -> did_simplify := true;
-        List.iter (fun res -> Queue.push res q) l
-    end;
+    Queue.push c q;
+    let blocked_sss = 
+      CCArray.of_list 
+        (List.map (fun _ -> IntSet.empty) !_ss_multi_simpl_rule) in
+
     while not (Queue.is_empty q) do
       let c = Queue.pop q in
       let c, st = simplify c in
       if st=`New then did_simplify := true;
       if is_trivial c || is_redundant c
       then ()
-      else match multi_simplify c with
-        | None ->
-          (* clause has reached fixpoint *)
-          set := C.ClauseSet.add c !set
-        | Some l ->
-          (* continue processing *)
-          did_simplify := true;
-          List.iter (fun c -> Queue.push c q) l
+      else (
+        (* A list of single step rules works like this:
+           Each rule can be applied to a clause which is not
+           a descendent of a clause to which the rule has already been applied!
+
+           For each rule, we keep the set of clauses that the rule has been applied on
+           an their descendents. Then, we apply a rule on a clause not in this set.
+         *)
+        let single_step_simplified c =
+          let rec aux i = function 
+          | [] -> None
+          | rule :: rs ->
+            let block_set = blocked_sss.(i) in
+            if IntSet.mem (C.id c) block_set then aux (i+1) rs
+            else (
+              match rule c with 
+              | None -> aux (i+1) rs
+              | Some l' -> Some(i, l')
+            ) in
+          aux 0 !_ss_multi_simpl_rule in 
+
+          match multi_simplify c with
+          | None ->
+            begin match single_step_simplified c with 
+            | None ->
+              set := C.ClauseSet.add c !set;
+            | Some (i,l) ->
+              did_simplify := true;
+              let new_ids = IntSet.of_list (List.map C.id l) in
+              List.iter (fun res ->
+                (* Blocking descdendents for i *)
+                Array.set blocked_sss i (IntSet.union new_ids blocked_sss.(i));
+              Queue.push res q) l 
+            end
+            (* clause has reached fixpoint *)
+          | Some l ->
+            (* continue processing *)
+            did_simplify := true;
+            let new_ids = IntSet.of_list (List.map C.id l) in
+
+            (* non-functional for efficiency *)
+            for i = 0 to (List.length !_ss_multi_simpl_rule) -1 do
+              let bs_i = blocked_sss.(i) in
+              if IntSet.mem (C.id c) bs_i then (
+                (* Adding descendents to blocked set *)
+                Array.set blocked_sss i (IntSet.union new_ids bs_i))
+            done;
+
+            List.iter (fun c -> Queue.push c q) l;
+    );
     done;
     let res = C.ClauseSet.to_list !set in
     ZProf.exit_prof prof_all_simplify;
@@ -808,8 +934,9 @@ module Make(X : sig
     Util.debugf ~section 1
       "@[<v>@[<2>clauses:@ @[<v>%a@]@]@ @[<2>sos:@ @[<v>%a@]@]@]"
       (fun k->k
-          (Util.pp_seq ~sep:" " C.pp) (CCVector.to_seq c_set)
-          (Util.pp_seq ~sep:" " C.pp) (CCVector.to_seq c_sos));
+          (Util.pp_iter ~sep:" " C.pp) (CCVector.to_iter c_set)
+          (Util.pp_iter ~sep:" " C.pp) (CCVector.to_iter c_sos));
+    Util.debugf ~section 1 "end@." CCFun.id;
     let c_set = CCVector.freeze c_set in
     let c_sos = CCVector.freeze c_sos in
     { Clause.c_set; c_sos; }

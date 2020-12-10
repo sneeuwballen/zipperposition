@@ -11,7 +11,7 @@ module type S = sig
   module CQueue : ClauseQueue.S with module C = C and type C.t = C.t
   (** Priority queues on clauses *)
 
-  (** {6 Useful Index structures} *)
+  (** {5 Useful Index structures} *)
 
   module TermIndex : Index.TERM_IDX with type elt = C.WithPos.t
   module UnitIndex : Index.UNIT_IDX
@@ -19,7 +19,7 @@ module type S = sig
      and type E.rhs = Term.t
   module SubsumptionIndex : Index.SUBSUMPTION_IDX with type C.t = C.t
 
-  (** {6 Common Interface for Sets} *)
+  (** {5 Common Interface for Sets} *)
 
   module type CLAUSE_SET = sig
     val on_add_clause : C.t Signal.t
@@ -52,6 +52,9 @@ module type S = sig
     val clauses : unit -> C.ClauseSet.t
     (** Current set of clauses *)
 
+    val is_passive : C.t -> bool
+    (** is the given clause passive *)
+
     val queue : CQueue.t
     (** Current state of the clause queue *)
 
@@ -61,7 +64,7 @@ module type S = sig
     val num_clauses : unit -> int
   end
 
-  (** {6 Misc} *)
+  (** {5 Misc} *)
 
   type stats = int * int * int
   (** statistics on the state (num active, num passive, num simplification) *)

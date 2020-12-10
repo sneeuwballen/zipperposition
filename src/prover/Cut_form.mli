@@ -93,5 +93,5 @@ module FV_tbl(X : Map.OrderedType) : sig
 
   val get : t -> cut_form -> value option
 
-  val to_seq : t -> (cut_form * X.t) Iter.t
+  val to_iter : t -> (cut_form * X.t) Iter.t
 end

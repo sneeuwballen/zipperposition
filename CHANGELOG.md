@@ -77,7 +77,7 @@
 - add `--check-types` for checking types deeply in new clauses
 - Add ExistsConst (??) and ForallConst (!!) to TPTP parser
 - TPTP parser: allow function types as THF terms
-- add cli option `-bt` (alias to `--backtraces`)
+- add cli option `-bt` (alias for `--backtraces`)
 - completion of equalities with λ-abstractions as RHS in type inference
 - THF parser: allow for `@` applications in types
 - cli flag for ext_pos

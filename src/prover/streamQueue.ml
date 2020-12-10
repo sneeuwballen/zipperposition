@@ -4,6 +4,8 @@
 (** {1 A priority queue of streams} *)
 
 open Logtk
+let section = Util.Section.make ~parent:Const.section "stmq"
+
 module type S = StreamQueue_intf.S
 
 module type ARG = sig
@@ -13,12 +15,13 @@ end
 
 let k_guard = Flex_state.create_key ()
 let k_ratio = Flex_state.create_key ()
+let k_clause_num = Flex_state.create_key ()
 
 module Make(A : ARG) = struct
   module Stm = A.Stm
   module E = A.Env
 
-  (** {6 Weight functions} *)
+  (** {5 Weight functions} *)
   module WeightFun = struct
     type t = Stm.t -> int
 
@@ -113,24 +116,26 @@ module Make(A : ARG) = struct
   let take_first q =
     assert (q.guard >= 0);
     _take_first q.guard q
-  
+
   let take_fair tries q =
     q.time_before_fair <- q.ratio;
     (* TODO: the heap is fully traversed two times, can both operations be done with one traversal? *)
     (* q.hp <- H.filter (fun (_,s) -> not (Stm.is_empty s)) q.hp;
-    H.fold (fun res (_,s) -> Stm.drip s :: res) [] q.hp *)
+       H.fold (fun res (_,s) -> Stm.drip s :: res) [] q.hp *)
     q.fair_tries <- q.fair_tries + 1;
     (* H.fold (fun res (_,s) -> Stm.drip s :: res) [] q.hp *)
     let all_stms = CCList.sort (fun (_,s) (_,s') -> CCInt.compare (Stm.id s) (Stm.id s')) (H.to_list q.hp) in
     let to_drip, rest = CCList.take_drop tries all_stms in
     let dripped = CCList.filter_map (fun (_, s) ->
-      try
-        Some (Stm.drip s, s)
-      with Stm.Empty_Stream -> None) to_drip in
+        try
+          Some (Stm.drip s, s)
+        with Stm.Empty_Stream -> None) to_drip in
     let new_stms = (List.map (fun (_,s) -> Stm.penalty s, s) dripped) @ rest in
     q.hp <- H.of_list new_stms;
     q.stm_nb <- List.length new_stms;
-    List.map fst dripped
+    let taken = List.map fst dripped in
+    Util.debugf ~section 1 "taken clauses: @[%a@]@." (fun k -> k (CCList.pp (CCOpt.pp Stm.C.pp)) taken);
+    taken
 
 
   let rec take_fair_anyway q =
@@ -151,12 +156,24 @@ module Make(A : ARG) = struct
       with
       | Not_found -> prev_res
 
+  let clauses_to_take q =
+    let max_clause = E.flex_get k_clause_num in
+    if max_clause < 0 then q.stm_nb
+    else min max_clause q.stm_nb
+
   let take_stm_nb q =
-    if q.time_before_fair = 0 then take_fair (q.fair_tries+1) q 
-    else (
-      q.time_before_fair <- q.time_before_fair - 1;
-      _take_nb q q.stm_nb []
-    )
+    let n = clauses_to_take q in
+    let taken =
+      if q.time_before_fair = 0 then take_fair (q.fair_tries+1) q 
+      else (
+        q.time_before_fair <- q.time_before_fair - 1;
+        (* Only extract clauses if the minimal stream weight is low *)
+        if not (H.is_empty q.hp) && fst (H.find_min_exn q.hp) <= 50
+        then _take_nb q n [] 
+        else []
+      ) in
+    Util.debugf ~section 1 "taken clauses: @[%a@]@." (fun k -> k (CCList.pp (CCOpt.pp Stm.C.pp)) taken);
+    taken
 
   let rec _take_stm_nb_fix_stm q n res =
     if n = 0 || H.is_empty q.hp then res
@@ -179,10 +196,11 @@ module Make(A : ARG) = struct
         _take_stm_nb_fix_stm q n' (res'@res)
 
   let take_stm_nb_fix_stm q =
+    let n = clauses_to_take q in
     if q.time_before_fair = 0 then take_fair (q.fair_tries+1) q
     else (
       q.time_before_fair <- q.time_before_fair - 1;
-      _take_stm_nb_fix_stm q q.stm_nb []
+      _take_stm_nb_fix_stm q n []
     )
 
 

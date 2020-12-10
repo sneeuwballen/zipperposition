@@ -20,9 +20,17 @@ let section = Const.section
 let _db_w = ref 1
 let _lmb_w = ref 1
 let _kbo_wf = ref "invfreqrank"
-let _lift_lambdas = ref false
+let _prec_fun = ref "invfreq"
+let _trim_implications = ref false
+let _take_only_defs = ref false
+let _ignore_k_most_common_symbols = ref None
+let _take_conj_defs = ref true
+let _sine_d_min = ref 1
+let _sine_d_max = ref 5
+let _sine_tolerance = ref 1.5
+let _sine_threshold = ref (-1)
 
-(* setup an alarm for abrupt stop *)
+(** setup an alarm for abrupt stop *)
 let setup_alarm timeout =
   let handler _ =
     Format.printf "%% SZS status ResourceOut@.";
@@ -45,20 +53,30 @@ let print_version ~params =
 let load_extensions =
   let open Libzipperposition_calculi in
   Phases.start_phase Phases.LoadExtensions >>= fun () ->
+  Extensions.register Lazy_cnf.extension;
+  Extensions.register Combinators.extension;
+  Extensions.register Higher_order.extension;
   Extensions.register Superposition.extension;
+  Extensions.register Bce_pe_fixpoint.extension;
+  Extensions.register Bce.extension;
+  Extensions.register Pred_elim.extension;
+  Extensions.register Hlt_elim.extension;
   Extensions.register AC.extension;
   Extensions.register Heuristics.extension;
   Extensions.register Libzipperposition_avatar.extension;
   Extensions.register EnumTypes.extension;
   Extensions.register Libzipperposition_induction.extension;
   Extensions.register Rewriting.extension;
-  Extensions.register Libzipperposition_arith.int_ext;
-  Extensions.register Libzipperposition_arith.rat_ext;
   Extensions.register Ind_types.extension;
   Extensions.register Fool.extension;
   Extensions.register Booleans.extension;
-  Extensions.register Higher_order.extension;
+  Extensions.register Lift_lambdas.extension;
+  Extensions.register Bool_encode.extension;
   Extensions.register App_encode.extension;
+  Extensions.register Eq_encode.extension;
+  Extensions.register Pure_literal_elim.extension;
+
+
   let l = Extensions.extensions () in
   Phases.return_phase l
 
@@ -111,19 +129,34 @@ let parse_file file =
     ~x:parsed >>= fun () ->
   Phases.return_phase (input,parsed)
 
-let has_real stmt : bool =
+let has_arith stmt : bool =
   let module TS = TypedSTerm in
-  let is_real ty = TS.equal ty TS.Ty.real in
+  let is_arith ty = TS.equal ty TS.Ty.real || TS.equal ty TS.Ty.int in
   begin
     CCVector.to_iter stmt
-    |> Iter.flat_map Statement.Seq.to_seq
+    |> Iter.flat_map Statement.Seq.to_iter
     |> Iter.flat_map
       (function
         | `Ty ty -> Iter.return ty
         | `Term t | `Form t -> TS.Seq.subterms t |> Iter.filter_map TS.ty
         | `ID _ -> Iter.empty)
-    |> Iter.exists is_real
+    |> Iter.exists is_arith
   end
+
+let sine_filter stmts =
+  if (!_sine_threshold < 0 || CCVector.length stmts < !_sine_threshold) then (stmts)
+  else (
+    let seq = CCVector.to_iter stmts in
+    let filtered = 
+      Statement.sine_axiom_selector
+      ~ignore_k_most_common_symbols:!_ignore_k_most_common_symbols
+      ~take_conj_defs:!_take_conj_defs
+      ~take_only_defs:!_take_only_defs
+      ~trim_implications:!_trim_implications
+      ~depth_start:!_sine_d_min 
+      ~depth_end:!_sine_d_max 
+      ~tolerance:!_sine_tolerance seq in
+    CCVector.freeze (CCVector.of_iter filtered))
 
 let typing ~file prelude (input,stmts) =
   Phases.start_phase Phases.Typing >>= fun () ->
@@ -137,11 +170,15 @@ let typing ~file prelude (input,stmts) =
     ~def_as_rewrite ?ctx:None ~file
     (Iter.append prelude stmts)
   >>?= fun stmts ->
+  let stmts = sine_filter stmts in
   Util.debugf ~section 3 "@[<hv2>@{<green>typed statements@}@ %a@]"
-    (fun k->k (Util.pp_seq Statement.pp_input) (CCVector.to_seq stmts));
+    (fun k->k (Util.pp_iter Statement.pp_input) (CCVector.to_iter stmts));
   begin
-    if has_real stmts then (
-      Util.debug ~section 1 "problem contains $real, lost completeness";
+    if has_arith stmts then (
+      Util.debug ~section 1 "problem contains arithmetic, lost completeness";
+      Phases.set_key Ctx.Key.lost_completeness true
+    ) else if !_sine_threshold >= 0 then (
+      Util.debug ~section 1 "sine is applied, lost completeness";
       Phases.set_key Ctx.Key.lost_completeness true
     ) else Phases.return ()
   end >>= fun () ->
@@ -152,13 +189,12 @@ let typing ~file prelude (input,stmts) =
 (* obtain clauses  *)
 let cnf ~sk_ctx decls =
   Phases.start_phase Phases.CNF >>= fun () ->
+  let opts = if !Lazy_cnf.enabled then [Cnf.LazyCnf] else [ ] in
   let stmts =
     decls
-    |> CCVector.to_seq
-    |> (if not !_lift_lambdas then CCFun.id
-        else Iter.flat_map Statement.lift_lambdas)
-    |> Cnf.cnf_of_seq ~ctx:sk_ctx
-    |> CCVector.to_seq
+    |> CCVector.to_iter
+    |> Cnf.cnf_of_iter ~ctx:sk_ctx ~opts
+    |> CCVector.to_iter
     |> apply_modifiers ~field:(fun e -> e.Extensions.post_cnf_modifiers)
     |> Cnf.convert
   in
@@ -181,30 +217,29 @@ let compute_prec ~signature stmts =
     |> Compute_prec.add_constr 10 Classify_cst.prec_constr
     |> Compute_prec.set_weight_rule (
       fun stmts -> 
-        let sym_depth = 
+        let sym_depth =
           stmts 
-          |> Iter.flat_map Statement.Seq.terms 
+          |> Iter.flat_map Statement.Seq.terms
           |> Iter.flat_map (fun t -> Term.Seq.subterms_depth t
                                      |> Iter.filter_map (fun (st,d) -> 
                                          CCOpt.map (fun id -> (id,d)) (Term.head st)))  in
-        Precedence.weight_fun_of_string ~signature !_kbo_wf sym_depth)
+        let lits = Iter.flat_map (Statement.Seq.lits) stmts in
+        Precedence.weight_fun_of_string ~signature ~lits ~lm_w:!_lmb_w ~db_w:!_db_w !_kbo_wf sym_depth)
     (* |> Compute_prec.set_weight_rule (fun _ -> Classify_cst.weight_fun) *)
 
     (* use "invfreq", with low priority *)
     |> Compute_prec.add_constr_rule 90
       (fun seq ->
-         seq
-         |> Iter.flat_map Statement.Seq.terms
-         |> Iter.flat_map Term.Seq.symbols
-         |> Precedence.Constr.invfreq)
+        let syms = Signature.Seq.symbols signature in
+        Precedence.Constr.prec_fun_of_str !_prec_fun ~signature syms)
   in
-  let prec = Compute_prec.mk_precedence ~db_w:!_db_w ~lmb_w:!_lmb_w cp stmts in
+  let prec = Compute_prec.mk_precedence ~signature ~db_w:!_db_w ~lmb_w:!_lmb_w cp stmts in
   Phases.return_phase prec
 
 let compute_ord_select precedence =
   Phases.start_phase Phases.Compute_ord_select >>= fun () ->
   Phases.get_key Params.key >>= fun params ->
-  let ord = Ordering.by_name params.Params.ord precedence in
+  let ord = Ordering.by_name !(params.Params.ord) precedence in
   Util.debugf ~section 2 "@[<2>ordering %s@]" (fun k->k (Ordering.name ord));
   let select = Selection.from_string ~ord params.Params.select in
   do_extensions ~field:(fun e->e.Extensions.ord_select_actions)
@@ -212,13 +247,12 @@ let compute_ord_select precedence =
   Util.debugf ~section 2 "@[<2>selection function:@ %s@]" (fun k->k params.Params.select);
   Phases.return_phase (ord, select)
 
-let make_ctx ~signature ~ord ~select ~eta ~sk_ctx () =
+let make_ctx ~signature ~ord ~select ~sk_ctx () =
   Phases.start_phase Phases.MakeCtx >>= fun () ->
   let module Res = struct
     let signature = signature
     let ord = ord
     let select = select
-    let eta = eta
     let sk_ctx = sk_ctx
   end in
   let module MyCtx = Ctx.Make(Res) in
@@ -300,17 +334,17 @@ let presaturate_clauses (type c)
   if Env.params.Params.presaturate
   then (
     Util.debug ~section 1 "presaturate initial clauses";
-    Env.add_passive (CCVector.to_seq c_sets.Clause.c_set);
+    Env.add_passive (CCVector.to_iter c_sets.Clause.c_set);
     let result, num = Sat.presaturate () in
     Util.debugf ~section 1 "initial presaturation in %d steps" (fun k->k num);
     (* pre-saturated set of clauses *)
-    let c_set = Env.get_active() |> CCVector.of_seq |> CCVector.freeze in
+    let c_set = Env.get_active() |> CCVector.of_iter |> CCVector.freeze in
     let clauses = {c_sets with Clause.c_set; } in
     (* remove clauses from [env] *)
-    Env.remove_active (CCVector.to_seq c_set);
-    Env.remove_passive (CCVector.to_seq c_set);
+    Env.remove_active (CCVector.to_iter c_set);
+    Env.remove_passive (CCVector.to_iter c_set);
     Util.debugf ~section 2 "@[<2>%d clauses pre-saturated into:@ @[<hv>%a@]@]"
-      (fun k->k num_clauses (Util.pp_seq ~sep:" " Env.C.pp) (CCVector.to_seq c_set));
+      (fun k->k num_clauses (Util.pp_iter ~sep:" " Env.C.pp) (CCVector.to_iter c_set));
     Phases.return_phase (result, clauses)
   )
   else Phases.return_phase (Saturate.Unknown, c_sets)
@@ -324,8 +358,8 @@ let try_to_refute (type c) (module Env : Env.S with type C.t = c) clauses result
   if not (CCVector.is_empty clauses.Clause.c_sos) then (
     Env.Ctx.lost_completeness();
   );
-  Env.add_active (CCVector.to_seq clauses.Clause.c_sos);
-  Env.add_passive (CCVector.to_seq clauses.Clause.c_set);
+  Env.add_active (CCVector.to_iter clauses.Clause.c_sos);
+  Env.add_passive (CCVector.to_iter clauses.Clause.c_set);
   let steps = if Env.params.Params.steps < 0
     then None
     else (
@@ -341,6 +375,11 @@ let try_to_refute (type c) (module Env : Env.S with type C.t = c) clauses result
       Some (Util.total_time_s () +. Env.params.Params.timeout -. 0.25)
     )
   in
+  
+  Util.debugf ~section 1 "active: @[%a@]"
+    (fun k -> k (Iter.pp_seq Env.C.pp) (Env.get_active ()));
+  Util.debugf ~section 1 "passive: @[%a@]"
+    (fun k -> k (Iter.pp_seq Env.C.pp) (Env.get_passive ()));
   Signal.send Env.on_start ();
   let result, num = match result with
     | Saturate.Unsat _ -> result, 0  (* already found unsat during presaturation *)
@@ -404,18 +443,20 @@ let print_szs_result (type c) ~file
       Format.printf "%sSZS status InternalError for '%s'@." comment file;
       Util.debugf ~section 1 "error is:@ %s" (fun k->k s);
     | Saturate.Sat when Env.Ctx.is_completeness_preserved () ->
+      Format.printf "%% Final clauses: %d@." (Iter.length (Env.get_active ()));
       Format.printf "%sSZS status %s for '%s'@." comment (sat_to_str ()) file
     | Saturate.Sat ->
+      Format.printf "%% Final clauses: %d@." (Iter.length (Env.get_active ()));
       Format.printf "%sSZS status GaveUp for '%s'@." comment file;
       begin match !Options.output with
         | Options.O_none -> ()
         | Options.O_zf -> failwith "not implemented: printing in ZF" (* TODO *)
         | Options.O_tptp ->
           Util.debugf ~section 1 "@[<2>saturated set:@ @[<hv>%a@]@]"
-            (fun k->k (Util.pp_seq ~sep:" " Env.C.pp_tstp_full) (Env.get_active ()))
+            (fun k->k (Util.pp_iter ~sep:" " Env.C.pp_tstp_full) (Env.get_active ()))
         | Options.O_normal ->
           Util.debugf ~section 1 "@[<2>saturated set:@ @[<hv>%a@]@]"
-            (fun k->k (Util.pp_seq ~sep:" " Env.C.pp) (Env.get_active ()))
+            (fun k->k (Util.pp_iter ~sep:" " Env.C.pp) (Env.get_active ()))
       end
     | Saturate.Unsat proof ->
       (* print status then proof *)
@@ -453,7 +494,7 @@ let parse_cli =
 let syms_in_conj decls =
   let open Iter in
   decls 
-  |> CCVector.to_seq
+  |> CCVector.to_iter
   |> flat_map (fun st -> 
       let pr = Statement.proof_step st in
       if CCOpt.is_some (Proof.Step.distance_to_goal pr) then (
@@ -470,27 +511,21 @@ let process_file ?(prelude=Iter.empty) file =
   let has_goal = has_goal_decls_ decls in
   Util.debugf ~section 1 "parsed %d declarations (%s goal(s))"
     (fun k->k (CCVector.length decls) (if has_goal then "some" else "no"));
-  (* Hooks exist but they can't be used to add statements. 
-     Hence naming quantifiers inside terms is done directly here. 
-     Without this Type.Conv.Error occures so the naming is done unconditionally. *)
-  let quant_transformer = 
-    if !Booleans._quant_rename then Booleans.preprocess_booleans 
-    else CCFun.id in
-  let transformed = Rewriting.unfold_def_before_cnf (quant_transformer decls) in
-  let sk_ctx = Skolem.create () in 
+  let transformed = Booleans.preprocess_booleans (Rewriting.unfold_def_before_cnf decls) in
+  let sk_ctx = Skolem.create () in
   cnf ~sk_ctx transformed >>= fun stmts ->
-  let stmts = Booleans.preprocess_cnf_booleans stmts in
+  (* Removed it because it is painfully slow (@VISA.) *)
+  (* let stmts = Booleans.preprocess_cnf_booleans stmts in *)
   (* compute signature, precedence, ordering *)
   let conj_syms = syms_in_conj stmts in
-  let signature = Statement.signature ~conj_syms:conj_syms (CCVector.to_seq stmts) in
-  compute_prec ~signature (CCVector.to_seq stmts) >>= fun precedence ->
+  let signature = Statement.signature ~conj_syms:conj_syms (CCVector.to_iter stmts) in
+  compute_prec ~signature (CCVector.to_iter stmts) >>= fun precedence ->
   Util.debugf ~section 1 "@[<2>precedence:@ @[%a@]@]" (fun k->k Precedence.pp precedence);
   compute_ord_select precedence >>= fun (ord, select) ->
   (* HO *)
   Phases.get_key Params.key >>= fun params ->
-  let eta = params.Params.eta in
   (* build the context and env *)
-  make_ctx ~signature ~ord ~select ~eta ~sk_ctx () >>= fun ctx ->
+  make_ctx ~signature ~ord ~select ~sk_ctx () >>= fun ctx ->
   make_env ~params ~ctx stmts >>= fun (Phases.Env_clauses (env,clauses)) ->
   (* main workload *)
   has_goal_ := has_goal; (* FIXME: should be computed at Env initialization *)
@@ -598,18 +633,31 @@ let main ?setup_gc:(gc=true) ?params file =
 let () = 
   let open Libzipperposition in
   Params.add_opts [
-    "--de-bruijn-weight"
-  , Arg.Set_int _db_w
-  , " Set weight of de Bruijn index for KBO";
-    "--lift-lambdas"
-  , Arg.Bool (fun v -> _lift_lambdas := v)
-  , " Turn lambda lifting on or off.";
-    "--lambda-weight"
-  , Arg.Set_int _lmb_w
-  , " Set weight of lambda symbol for KBO";
-    "--kbo-weight-fun"
-  , Arg.Set_string _kbo_wf
-  , " Set the function for symbol weight calculation.";
+    "--de-bruijn-weight", Arg.Set_int _db_w, 
+    " Set weight of de Bruijn index for KBO";
+    "--lambda-weight", Arg.Set_int _lmb_w,
+    " Set weight of lambda symbol for KBO";
+    "--kbo-weight-fun", Arg.Set_string _kbo_wf,
+    " Set the function for symbol weight calculation.";
+    "--prec-gen-fun", Arg.Set_string _prec_fun,
+    " Set the function used for precedence generation";
+    "--sine-depth-min", Arg.Int (fun v ->  if !_sine_threshold == (-1) then _sine_threshold:=100; _sine_d_min := v),
+    " Turn on SinE with threshold and set min SinE depth.";
+    "--sine-depth-max", Arg.Int (fun v ->  if !_sine_threshold == (-1) then _sine_threshold:=100; _sine_d_max := v),
+    " Turn on SinE with threshold and set max SinE depth.";
+    "--sine-tolerance", Arg.Float (fun v ->  if !_sine_threshold == (-1) then _sine_threshold:=100; _sine_tolerance := v),
+    " Turn on SinE with threshold of 100 and set SinE symbol tolerance.";
+    "--sine-trim-implications", Arg.Bool ((:=) _trim_implications),
+    " trim long implications while getting symbols from conjecture";
+    "--sine-take-only-defs", Arg.Bool ((:=) _take_only_defs),
+    " take only axioms marked as definitions and the conjecture";
+    "--sine-ignore-k-most-common-syms", Arg.Int (fun v -> _ignore_k_most_common_symbols := Some v),
+    " if conjecture symbol is within k most common occurring ones, then it will be disregarded as conjecture symbol";
+    "--sine-take-conj-defs", Arg.Bool ((:=) _take_conj_defs),
+    " force taking definitions of symbols ocurring in conjecture";
+    "--sine", Arg.Set_int _sine_threshold,
+    " Set SinE axiom number threshold (negative number turns it off)" ^
+    " with default settings: depth in range 1-5 and tolerance 1.5"
   ];
 
   Params.add_to_mode "ho-pragmatic" (fun () ->

@@ -13,6 +13,9 @@ module IdMap = ID.Map
 module US = Unif_subst
 module TST = TypedSTerm
 
+let section = Util.Section.make "stm"
+
+
 (** A datatype declaration *)
 type 'ty data = {
   data_id: ID.t;
@@ -128,7 +131,8 @@ let map_data ~ty:fty d =
         d.data_cstors;
   }
 
-let map_def_rule ~form:fform ~term:fterm ~ty:fty d = match d with
+let map_def_rule ~form:fform ~term:fterm ~ty:fty d = 
+  match d with
   | Def_term {vars;id;ty;args;rhs;as_form} ->
     let vars = List.map (Var.update_ty ~f:fty) vars in
     Def_term {vars;id;ty=fty ty;args=List.map fterm args;
@@ -202,7 +206,11 @@ let conv_rule_i ~proof (r:_ def_rule) = match r with
     let ty = Type.Conv.of_simple_term_exn ctx ty in
     let args = List.map (Term.Conv.of_simple_term_exn ctx) args in
     let rhs = Lambda.snf (Term.Conv.of_simple_term_exn ctx rhs) in
-    let rule = Rewrite.Term.Rule.make id ty args rhs ~proof in
+    let rhs_rewritten, rw_rules = Rewrite.Term.normalize_term rhs in
+       let proof_parents = Proof.Parent.from proof :: Rewrite.Rule.set_as_proof_parents rw_rules in
+       let form = Proof.Result.to_form (Proof.S.result proof) in
+       let proof = Proof.S.mk_f (Proof.Step.simp ~rule:(Proof.Rule.mk "simplify_rw_rule") proof_parents) form in
+    let rule = Rewrite.Term.Rule.make id ty args (rhs) ~proof in
     Rewrite.T_rule rule
   | Def_form {lhs;rhs;_} ->
     let ctx = Type.Conv.create () in
@@ -229,7 +237,7 @@ let terms_of_rule (d:_ def_rule): _ Iter.t = match d with
     Iter.of_list (rhs::args)
   | Def_form {lhs;rhs;_} ->
     Iter.cons lhs (Iter.of_list rhs |> Iter.flat_map Iter.of_list)
-    |> Iter.flat_map SLiteral.to_seq
+    |> Iter.flat_map SLiteral.to_iter
 
 let level_of_rule (d:_ def_rule): int =
   terms_of_rule d
@@ -288,10 +296,10 @@ module Seq = struct
       List.iter (fun t->k (`Term t)) (rhs::args);
     | Def_form {vars;lhs;rhs;_} ->
       List.iter (fun v->k (`Ty (Var.ty v))) vars;
-      SLiteral.to_seq lhs |> Iter.map mk_term |> Iter.iter k;
+      SLiteral.to_iter lhs |> Iter.map mk_term |> Iter.iter k;
       Iter.of_list rhs |> Iter.map mk_form |> Iter.iter k
 
-  let to_seq st k =
+  let to_iter st k =
     let decl id ty = k (`ID id); k (`Ty ty) in
     begin match view st with
       | TyDecl (id,ty) -> decl id ty;
@@ -362,28 +370,28 @@ module Seq = struct
         |> Iter.flat_map_l (fun d -> d.def_rules)
         |> Iter.flat_map_l forms_def
       | _ ->
-        to_seq st
+        to_iter st
         |> Iter.filter_map (function `Form f -> Some f | _ -> None)
     end
 
   let lits st = forms st |> Iter.flat_map Iter.of_list
 
   let terms st =
-    to_seq st
+    to_iter st
     |> Iter.flat_map
       (function
-        | `Form f -> Iter.of_list f |> Iter.flat_map SLiteral.to_seq
+        | `Form f -> Iter.of_list f |> Iter.flat_map SLiteral.to_iter
         | `Term t -> Iter.return t
         | _ -> Iter.empty)
 
   let symbols st =
-    to_seq st
+    to_iter st
     |> Iter.flat_map
       (function
         | `ID id -> Iter.return id
         | `Form f ->
           Iter.of_list f
-          |> Iter.flat_map SLiteral.to_seq
+          |> Iter.flat_map SLiteral.to_iter
           |> Iter.flat_map Term.Seq.symbols
         | `Term t -> Term.Seq.symbols t
         | `Ty ty -> Type.Seq.symbols ty)
@@ -525,75 +533,213 @@ let name (st:(_,_,_)t) : string =
       s
   end
 
-let lift_lambdas st = 
-  let get_tydecl_from_def ~proof def =
-    let _, body = TST.unfold_binder Binder.Forall def in
-    match TST.view body with
-    | TST.AppBuiltin(b, [lhs;_])
-      when Builtin.equal b Builtin.Eq || Builtin.equal b Builtin.Equiv ->
-      begin match TST.view lhs with
-        | TST.App(hd, _) when TST.is_const hd ->
-          let hd_id = TST.head_exn hd in
-          let ty = TST.ty_exn hd in
-          ty_decl ~proof hd_id ty 
-        | _ -> invalid_arg "wrong encoding of def" end
-    | _ -> invalid_arg "wrong encoding of def" in
 
-  let ll_proof_step st f new_defs =
-    let rule = Proof.Rule.mk "lift_lambdas" in
-    let parents  = Proof.Step.parents (proof_step st) @ 
-                   CCList.flat_map (fun d -> Proof.Step.parents @@ Proof.S.step @@ Proof.S.mk_f_trivial d) new_defs in
-    (* Proof.Step.simp ~tags ~rule (Proof.Step.parents (proof_step st))  *)
-    let step = Proof.S.mk_f_simp ~rule f parents in
-    Proof.S.step step in
+module AsKey = struct
+  type t = input_t
+  let equal a b = compare a b = 0
+  let hash a = a.id
+  let compare = compare
+end
 
-  let assert_defs def = 
-    let step = Proof.Step.intro (Proof.Src.internal []) Proof.R_assert in
-    let proof = Proof.S.step (Proof.S.mk_f step def) in
-    [get_tydecl_from_def ~proof def; assert_ ~proof def] in
+module InpStmSet = Set.Make(AsKey)
+module RW = Rewrite
+module DC = RW.Defined_cst
 
-  let stmt_parents = Proof.Step.parents (proof_step st) in
-  let res = begin match view st with
-    | Assert f -> 
-      let f', new_defs =  TST.lift_lambdas f in
-      (if CCList.is_empty new_defs then Iter.singleton st
-       else (assert_ ~proof:(ll_proof_step st f new_defs) f') :: (CCList.flat_map assert_defs new_defs)
-            |> Iter.of_list)
-    | Lemma fs ->
-      let fs', defs = List.fold_right (fun f (ffs, ddefs) -> 
-          let f', new_defs = TST.lift_lambdas f in
-          f' :: ffs, new_defs @ ddefs
-        ) fs ([], []) in
-      if CCList.is_empty defs then Iter.singleton st
+let sine_axiom_selector
+  ?(ignore_k_most_common_symbols=None)
+  ?(take_conj_defs=true)
+  ?(take_only_defs=false) 
+  ?(trim_implications=false) 
+  ?(depth_start=1) 
+  ?(depth_end=3) 
+  ?(tolerance=2.0) formulas =
+  let formulas = Iter.to_list formulas in
+
+  let eliminate_long_implications ~is_goal f =
+      let _elim_long_imps f =
+        let rec aux f =
+          match TST.Form.view f with
+          | TST.Form.Imply(lhs, rhs) ->
+            let is_form t = 
+              match TST.Form.view t with 
+              | Atom _ -> false
+              | _ -> true in
+            if not (is_form lhs) then (
+              let premises, concl = aux rhs in
+              lhs::premises, concl
+            ) else ([], f)
+          | _ -> ([], f) in
+        let premises, concl = aux f in
+        if CCList.length premises > 5 
+        then (
+          Util.debugf ~section 2 "trimmed @[%a@] into @[%a@]@." 
+            (fun k -> k TST.pp f TST.pp concl);
+          concl)
+        else f in
+
+      if not is_goal then f
+      else _elim_long_imps f in
+
+  let symset_of_ax ~trim_implications ?(is_goal=false) ax =
+     Seq.forms ax
+    |> Iter.map 
+      (if trim_implications 
+       then eliminate_long_implications ~is_goal 
+       else CCFun.id)
+    |> Iter.flat_map TST.Seq.symbols
+    |> ID.Set.of_iter in
+
+  let symset_of_axs ~trim_implications ?(is_goal=false) axs =
+    List.fold_left (fun acc c -> 
+      ID.Set.union acc (symset_of_ax ~trim_implications ~is_goal c)) 
+    ID.Set.empty axs in
+
+  let triggered_by_syms ~triggers syms =
+    ID.Set.fold (fun id acc -> 
+        let axs = ID.Tbl.get_or triggers id ~default:InpStmSet.empty in
+        (InpStmSet.elements axs) @ acc) 
+      syms [] in
+
+  let count_occ ~tbl ax = 
+    symset_of_ax ~trim_implications:false ax
+    |> ID.Set.iter (fun k ->
+        ID.Tbl.update tbl ~f:(fun _ vopt -> match vopt with
+            | Some v -> Some (v+1)
+            | None -> Some 1) ~k) in
+
+  let create_trigger_map ~trim_implications ~tbl axioms = 
+    let map = ID.Tbl.create (Iter.length @@ ID.Tbl.keys tbl) in
+    CCList.iter (fun ax ->
+      let symset = ID.Set.to_iter @@ symset_of_ax ~trim_implications:false ax in
+      let min_occ = ref (max_int) in
+      Iter.iter (fun id -> 
+          let cnt = ID.Tbl.get_or tbl id ~default:max_int in
+          if cnt < !min_occ && (not trim_implications || cnt != 1) then min_occ := cnt;
+        ) symset;
+      (* now we calculate trigger map based on the min_occ *)
+      let threshold = int_of_float @@ tolerance *. (float_of_int !min_occ) in
+      Iter.iter (fun id -> 
+          let cnt = ID.Tbl.get_or tbl id ~default:max_int in
+          if cnt <= threshold then (
+            ID.Tbl.update ~f:(fun k vopt -> 
+                match vopt with 
+                | Some ax_set -> Some (InpStmSet.add ax ax_set)
+                | None -> Some (InpStmSet.singleton ax)) ~k:id map)) symset) 
+      axioms;
+    map in
+
+  let ids_to_defs_compute defs =
+    let rec aux map d = 
+      let update_map map id stm =
+        let prev = ID.Map.get_or ~default:InpStmSet.empty id map in
+        ID.Map.add id (InpStmSet.add stm prev) map in
+
+      match view d with
+      | Def l ->
+        List.fold_left
+          (fun map {def_id; _} -> update_map map def_id d)
+        map l;
+      | Rewrite r ->
+          begin match r with 
+          | Def_term {id;_} -> update_map map id d
+          | Def_form {lhs;rhs;polarity=pol;_} ->
+            begin match lhs with 
+            | Atom(t,_) -> 
+              begin match TST.head t with 
+              | Some hd -> update_map map hd d
+              | None -> map 
+              end
+            | _ -> map 
+            end
+          end
+      | _ -> map in
+    List.fold_left (fun map d -> aux map d) ID.Map.empty defs in
+
+
+  let  categorize_formulas forms =
+    let rec do_categorize (defs, helpers, axioms, conjs) f =
+      match view f with 
+      | Def _ | Rewrite _ -> (f::defs, helpers, axioms, conjs)
+      | Assert _ -> (defs, helpers, f::axioms, conjs)
+      | Goal _ | NegatedGoal _ -> (defs, helpers, axioms, f :: conjs)
+      | _ -> (defs, f::helpers, axioms, conjs) in
+    
+    let rec aux acc = function
+    | [] -> acc
+    | x :: xs -> aux (do_categorize acc x) xs in
+    
+    aux ([],[],[],[]) forms in
+
+  let defs,helper_axioms,axioms,goals = 
+    categorize_formulas formulas in
+
+  if take_only_defs then (
+    let res = helper_axioms @ defs @ goals in
+    Util.debugf ~section 2 "taken %d/%d axioms:@[%a@]@." 
+      (fun k -> k (List.length res) (List.length axioms) (CCList.pp CCString.pp) (List.map name res));
+    Iter.of_list res
+  ) else (
+
+    let axioms = defs @ axioms in
+
+    let ids_to_defs = ids_to_defs_compute defs in
+    
+    let tbl = ID.Tbl.create 1024 in
+    List.iter (count_occ ~tbl) axioms;
+
+    let most_commmon_syms = 
+      match ignore_k_most_common_symbols with
+      | None -> ID.Set.empty
+      | Some k ->
+        ID.Tbl.to_list tbl
+        |> CCList.sort (fun (s1, occ1) (s2, occ2) -> CCInt.compare occ2 occ1)
+        |> CCList.take k
+        |> CCList.map fst
+        |> ID.Set.of_list in
+    
+    Util.debugf ~section 1 "most common symbols are: @[%a@]@." 
+      (fun k -> k (ID.Set.pp ID.pp) most_commmon_syms);
+
+    (* now tbl contains occurrences of all symbols *)
+
+    let triggers = create_trigger_map ~trim_implications ~tbl (axioms) in
+    let syms_in_conj = symset_of_axs ~trim_implications ~is_goal:true goals in
+    let conj_syms =
+      ID.Set.diff syms_in_conj  most_commmon_syms in
+    Util.debugf ~section 2 "conj_syms:@[%a@]" (fun k -> k (ID.Set.pp ID.pp) conj_syms);
+    let triggered_1 = triggered_by_syms ~triggers conj_syms in
+
+    let rec take_axs k processed_syms k_triggered_axs = 
+      if k >= depth_end then []
       else (
-        let rule = Proof.Rule.mk "lift_lambdas" in
-        let fs_parents = (List.map (fun f ->
-            Proof.Parent.from (Proof.S.mk_f_esa ~rule f stmt_parents)) fs) in
-        let proof = Proof.Step.simp ~rule fs_parents in
-        (lemma ~proof fs') :: (CCList.flat_map assert_defs defs)
-        |> Iter.of_list)
-    | Goal f ->
-      let f', new_defs =  TST.lift_lambdas f in
-      if CCList.is_empty new_defs then Iter.singleton st
-      else ((goal ~proof:(ll_proof_step st f new_defs) f') ::  (CCList.flat_map assert_defs new_defs)
-            |> Iter.of_list)
-    | NegatedGoal (skolems,fs) ->
-      let fs', defs = List.fold_right (fun f (ffs, ddefs) -> 
-          let f', new_defs = TST.lift_lambdas f in
-          f' :: ffs, new_defs @ ddefs
-        ) fs ([], []) in
-      if CCList.is_empty defs then Iter.singleton st
-      else (
-        let rule = Proof.Rule.mk "lift_lambdas" in
-        let fs_parents = (List.map (fun f -> 
-            Proof.Parent.from (Proof.S.mk_f_esa ~rule f stmt_parents)) fs) in
-        let proof = Proof.Step.simp ~rule fs_parents in
-        (neg_goal ~proof ~skolems fs' :: (CCList.flat_map assert_defs defs))
-        |> Iter.of_list)
-    | _ -> Iter.singleton st end in
-  Util.debugf 1 "Lambda lifted:@ @[%a@]\n" (fun k -> k pp_input st);
-  Util.debugf 1 "into @ @[%a@]\n" (fun k -> k (CCList.pp pp_input) (Iter.to_list res));
-  res
+        let taken = if k >= depth_start then k_triggered_axs else [] in
+        let new_syms = symset_of_axs ~trim_implications:false k_triggered_axs in
+        let unprocessed = ID.Set.diff new_syms processed_syms in
+        let k_p_1_triggered_ax = triggered_by_syms ~triggers unprocessed in
+        taken @ (take_axs (k+1) (ID.Set.union processed_syms unprocessed) k_p_1_triggered_ax)) 
+    in
+
+    let conj_defined_syms =
+      if take_conj_defs then (
+        ID.Set.fold (fun s_id conj_defs -> 
+          InpStmSet.union conj_defs
+            (ID.Map.get_or ~default:InpStmSet.empty s_id ids_to_defs)
+        ) conj_syms (InpStmSet.empty))
+      else InpStmSet.empty
+    in
+
+    let taken_axs = 
+      CCList.sort_uniq ~cmp:compare
+        ((InpStmSet.elements conj_defined_syms) @
+        (take_axs 1 conj_syms triggered_1)) in
+
+    Util.debugf ~section 2 "taken %d/%d axioms:@ @[%a@]@." 
+      (fun k -> k (List.length taken_axs) (List.length axioms) (CCList.pp CCString.pp) (List.map name taken_axs));
+    Util.debugf ~section 2 "take_conj_defs:%b@." (fun k -> k take_conj_defs);
+
+    let res = helper_axioms @ taken_axs @ goals in
+    Iter.of_list (res)
+  )
 
 module ZF = struct
   module UA = UntypedAST.A
@@ -647,6 +793,7 @@ module ZF = struct
 end
 
 module TPTP = struct
+  let namespace = Proof.S.Tbl.create 8
   let pp ppf ppt ppty out st =
     let name = name st in
     let pp_decl out (id,ty) =
@@ -654,7 +801,7 @@ module TPTP = struct
       then
         fpf out "%% (omitted type declaration for distinct object %a.)" ID.pp_tstp id
       else
-        fpf out "tff(@[%s, type,@ %a :@ @[%a@]@])." name ID.pp_tstp id ppty ty
+        fpf out "thf(@[%s, type,@ %a :@ @[%a@]@])." name ID.pp_tstp id ppty ty
     and pp_quant_vars out = function
       | [] -> ()
       | l ->
@@ -672,15 +819,15 @@ module TPTP = struct
       in
       let pp_rule out = function
         | Def_term {vars;id;args;rhs;_} ->
-          fpf out "%a(@[%a%a@] =@ %a)" pp_quant_vars vars ID.pp_tstp id pp_args args ppt rhs
+          fpf out "%a (@[%a%a@] =@ %a)" pp_quant_vars vars ID.pp_tstp id pp_args args ppt rhs
         | Def_form {vars;lhs;rhs;polarity=pol;_} ->
-          let op = match pol with `Equiv-> "<=>" | `Imply -> "=>" in
+          let op = match pol with `Equiv-> "=" | `Imply -> "=>" in
           fpf out "%a(@[%a@] %s@ (@[<hv>%a@]))"
             pp_quant_vars vars (SLiteral.pp ppt) lhs op
             (Util.pp_list ~sep:" & " ppf) rhs
       in
       let pp_top_rule out r =
-        fpf out "@[<2>tff(%s, axiom,@ %a)@]." name pp_rule r
+        fpf out "@[<2>thf(%s, axiom,@ (%a))@]." name pp_rule r
       in
       Util.pp_list ~sep:"" pp_top_rule out d.def_rules
     in
@@ -688,19 +835,24 @@ module TPTP = struct
     | TyDecl (id,ty) -> pp_decl out (id,ty)
     | Assert f ->
       let role = "axiom" in
-      fpf out "@[<2>tff(%a, %s,@ (@[%a@]))@]." pp_name name role ppf f
+      fpf out "@[<2>thf(%a, %s,@ (@[%a@]))@]." pp_name name role ppf f
     | Lemma l ->
       let role = "lemma" in
-      fpf out "@[<2>tff(%a, %s,@ (@[%a@]))@]." pp_name name role
+      fpf out "@[<2>thf(%a, %s,@ (@[%a@]))@]." pp_name name role
         (Util.pp_list ~sep:" & " ppf) l
     | Goal f ->
       let role = "conjecture" in
-      fpf out "@[<2>tff(%a, %s,@ (@[%a@]))@]." pp_name name role ppf f
+      fpf out "@[<2>thf(%a, %s,@ (@[%a@]))@]." pp_name name role ppf f
     | NegatedGoal (_,l) ->
       let role = "negated_conjecture" in
+      let parents = 
+        List.map (fun p -> `Name (Proof.S.name ~namespace @@ Proof.Parent.proof p))
+             (Proof.Step.parents @@ st.proof)
+      in
       List.iter
         (fun f ->
-           fpf out "@[<2>tff(%a, %s,@ (@[%a@]))@]." pp_name name role ppf f)
+           fpf out "@[<2>thf(%a, %s,@ (@[%a@]),@ @[%a@])@]." pp_name name role
+             ppf f Proof.Kind.pp_tstp (Proof.Step.kind @@ st.proof, parents))
         l
     | Def l ->
       Format.fprintf out "@[<v>";
@@ -714,11 +866,13 @@ module TPTP = struct
     | Rewrite d ->
       begin match d with
         | Def_term {id;args;rhs;_} ->
-          fpf out "@[<2>tff(%a, axiom,@ %a(%a) =@ @[%a@])@]."
-            pp_name name ID.pp_tstp id (Util.pp_list ~sep:", " ppt) args ppt rhs
+          fpf out "@[<2>thf(%a, axiom,((@ %a %s %a) =@ (@[%a@])))@]."
+            pp_name name ID.pp_tstp id 
+            (if CCList.is_empty args then "" else "@")
+            (Util.pp_list ~sep:"@ " ppt) args ppt rhs
         | Def_form {lhs;rhs;polarity=pol;_} ->
-          let op = match pol with `Equiv-> "<=>" | `Imply -> "=>" in
-          fpf out "@[<2>tff(%a, axiom,@ %a %s@ (@[%a@]))@]."
+          let op = match pol with `Equiv-> "=" | `Imply -> "=>" in
+          fpf out "@[<2>thf(%a, axiom,@ %a %s@ (@[%a@]))@]."
             pp_name name (SLiteral.TPTP.pp ppt) lhs op
             (Util.pp_list ~sep:" & " ppf) rhs
       end
@@ -736,7 +890,7 @@ let pp_in pp_f pp_t pp_ty = function
 let pp_clause_in o =
   let pp_t = Term.pp_in o in
   let pp_ty = Type.pp_in o in
-  pp_in (Util.pp_list ~sep:" ∨ " (SLiteral.pp_in o pp_t)) pp_t pp_ty o
+  pp_in (Util.pp_list ~sep:" | " (SLiteral.pp_in o pp_t)) pp_t pp_ty o
 
 let pp_input_in o =
   let pp_t = TypedSTerm.pp_in o in
@@ -921,7 +1075,7 @@ let get_rw_rule ?weight_incr:(w_i=1000000) c  =
 
   let build_from_head sym vars rhs =
     let rhs = Lambda.eta_reduce @@ Lambda.snf (fst (Rewrite.Term.normalize_term rhs)) in
-    let vars_lhs = Term.VarSet.of_seq (Iter.fold (fun acc v -> 
+    let vars_lhs = Term.VarSet.of_iter (Iter.fold (fun acc v -> 
         Iter.append acc (Term.Seq.vars v)) 
         Iter.empty (Iter.of_list vars)) in
     if not (Term.symbols rhs |> ID.Set.mem sym) &&
@@ -967,4 +1121,3 @@ let get_rw_rule ?weight_incr:(w_i=1000000) c  =
               conv_terms_rw t2 t1 else None)
     | _ -> None
   else None
-

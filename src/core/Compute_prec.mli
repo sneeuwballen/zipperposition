@@ -35,7 +35,7 @@ val add_status : (ID.t * Precedence.symbol_status) list -> t -> t
 (** Parameters db_w and lmb_w correspond to the weight de-Bruijn
     and lambda abstraction given for computation of KBO. *)  
 val mk_precedence :
-  db_w:int -> lmb_w:int -> t ->
+  db_w:int -> lmb_w:int -> signature:Signature.t -> t ->
   Statement.clause_t Iter.t ->
   Precedence.t
 (** Make a precedence *)

@@ -216,6 +216,14 @@ let is_fun t = match T.view t with
   | T.Bind (Binder.Lambda, _, _) -> true
   | _ -> false
 
+
+let hd_is_comb = Builtin.is_combinator
+
+let [@inline] is_comb t =
+  match view t with
+  | AppBuiltin(hd, _) when hd_is_comb hd -> true
+  | _ -> false
+
 let is_app t = match T.view t with
   | T.Const _
   | T.App _ -> true
@@ -254,17 +262,35 @@ let head_term_mono t = match view t with
   | App (f,l) ->
     let l1 = CCList.take_while is_type l in
     app f l1 (* re-apply to type parameters *)
-  | AppBuiltin(b, l) when not (Builtin.is_quantifier b) ->
+  | AppBuiltin(b, l) ->
     let ty_args, args = CCList.partition is_type l in
     let ty = Type.arrow (List.map ty args) (ty t) in 
     app_builtin ~ty b ty_args
-  | AppBuiltin(b, l) ->
-    assert(Builtin.is_quantifier b);
-    assert(Type.is_prop @@ ty t);
-    assert(List.length l = 1);
-    let ty = Type.arrow [ty (List.hd l)] Type.prop in
-    app_builtin ~ty b []
   | _ -> t
+
+let as_app_mono t = match view t with
+  | App (f,l) ->
+    assert(match view f with AppBuiltin _ -> false | _ -> true);
+    let l1,l2 = CCList.partition is_type l in
+    app f l1, l2 (* re-apply to type parameters *)
+  | AppBuiltin((Builtin.Eq | Builtin.Neq) as b, (x :: rest as l)) ->
+    let l = if is_type x then rest else l in
+    begin match l with
+    | y :: _ ->
+      let eq_ty = Type.arrow [ty y; ty y] Type.prop in
+      app_builtin ~ty:eq_ty b [], l
+    | [] ->
+      assert(is_type x);
+      let eq_ty = 
+        Type.arrow [Type.of_term_unsafe (x:>InnerTerm.t); 
+                    Type.of_term_unsafe (x:>InnerTerm.t)] Type.prop in
+      app_builtin ~ty:eq_ty b [], [] end
+  | AppBuiltin(b, l) ->
+    let ty_args, args = CCList.partition is_type l in
+    let ty = Type.arrow (List.map ty args) (ty t) in 
+    app_builtin ~ty b ty_args, args
+  | _ -> t, []
+
 
 let is_ho_var t = match view t with
   | Var v -> Type.needs_args (HVar.ty v)
@@ -369,16 +395,17 @@ module Seq = struct
     in
     aux t
 
-  let subterms ?(include_builtin=false) ?(ignore_head=false) t k =
+  let subterms ?(include_builtin=false) ?(include_app_vars=true) ?(ignore_head=false) t k =
     let rec aux t =
       k t;
       match view t with
       | AppBuiltin (_, l) -> if include_builtin then List.iter aux l;
       | Const _
       | Var _
-      | DB _ -> ()
-      | Fun (_, u) -> aux u
+      | DB _  -> ()
+      | App (f, l) when not include_app_vars && T.is_var f -> ()
       | App (f, l) -> if not ignore_head then aux f; List.iter aux l
+      | Fun (_, u) -> aux u
     in
     aux t
 
@@ -433,8 +460,8 @@ module Seq = struct
          | _ -> None)
 end
 
-
 let has_ho_subterm t =
+  not (equal true_ t) && not (equal false_ t) &&
   Seq.subterms ~include_builtin:true ~ignore_head:true t
   |> Iter.exists (fun st -> 
       not (T.equal st t) &&
@@ -501,27 +528,32 @@ let is_linear t =
 let rec in_pfho_fragment t =
   match view t with
   | Var _ -> if (not (type_ok (ty t))) then
-      (raise (Failure (CCFormat.sprintf "Variable has wrong type [%a]" T.pp t)))
+      (raise (Failure (CCFormat.sprintf "Variable has out-of-fragment type [%a]" T.pp t)))
     else true
-  | Const sym -> if (List.for_all type_ok (Type.expected_args (ty t))) then true
-    else (raise (Failure (CCFormat.sprintf "Constant has wrong type [%a] " ID.pp sym)))
+  | Const sym -> if (top_level_exception t || type_ok (ty t)) then true
+    else (raise (Failure (CCFormat.sprintf "Constant has out-of-fragment type [%a] " ID.pp sym)))
   | AppBuiltin( _, l)
-  | App (_, l) -> let hd = head_term t in
-    let hd_is_skolem = match as_const hd with
-      | Some sym -> ID.is_skolem sym
-      | None -> false in
-    (* If the head is a variable or skolem, the return type must be ok. 
-       But if the head is a constant, we want to allow predicate symbols. *)
-    if((not (is_var hd || hd_is_skolem) || type_ok (ty t)) && 
+  | App (_, l) -> 
+    if((top_level_exception t || type_ok (ty t)) && 
        List.map ty l |> List.for_all type_ok
        && List.for_all in_pfho_fragment l) then true
-    else (raise (Failure (CCFormat.sprintf "Arugment of a term has wrong type [%a]" T.pp t)))
+    else (raise (Failure (CCFormat.sprintf "Argument of a term has out-of-fragment type [%a:%a]" T.pp t Type.pp (ty t))))
   | Fun (var_t, body) -> if(type_ok (var_t) &&
                             type_ok (ty body) &&
                             in_pfho_fragment body) then true
-    else (raise (Failure (CCFormat.sprintf "Lambda body has wrong type [%a]" T.pp t)))
+    else (raise (Failure (CCFormat.sprintf "Lambda body has out-of-fragment type [%a]" T.pp t)))
   | DB _ -> if(type_ok (ty t)) then true
-    else (raise (Failure "Bound variable has wrong type"))
+    else (raise (Failure "Bound variable has out-of-fragment type"))
+and top_level_exception t =
+  (* If the head is a variable or skolem, the type must be ok. 
+    But if the head is a constant, we want to allow predicate symbols. *)
+  let hd = head_term t in
+  let hd_is_skolem = match as_const hd with
+    | Some sym -> ID.is_skolem sym
+    | None -> false in
+  if is_var hd || hd_is_skolem then false
+  else if Type.equal (ty t) (Type.prop) then true
+  else false
 and type_ok ty_ =
   not (Type.Seq.sub ty_ |> Iter.exists (fun t -> Type.equal t (Type.prop) || Type.equal t (Type.rat) || Type.equal t (Type.int)))
 
@@ -531,31 +563,116 @@ let in_lfho_fragment t =
   (fun subts ->
      if Iter.for_all (fun subt -> not (is_fun subt)) subts
      then true
-     else raise (Failure "has lambda"))
+     else raise (Failure "Term contains a lambda"))
 
 let rec is_fo_term t =
   match view t with
-  | Var _ -> not @@ Type.is_fun @@ ty t
-  | AppBuiltin _ -> false
+  | Var _ -> not (Type.is_fun (ty t) || Type.is_prop (ty t))
+  | AppBuiltin _ -> equal t true_ || equal t false_
   | App (hd, l) -> 
-    not (Type.is_fun (ty t)) && T.is_const hd && List.for_all is_fo_term l
+    not (Type.is_fun (ty t)) 
+      && T.is_const hd 
+      && List.for_all (fun t -> not (Type.is_prop (ty t) || Type.is_fun (ty t)) && is_fo_term t) l
   | Const _ -> not (Type.is_fun (ty t))
   | _ -> false
 
+let in_fool_fragment t =
+  let fool_subterm_found = ref false in
+
+  let rec aux ~top t =
+    if not top && Type.is_prop (ty t) then (
+      fool_subterm_found := true
+    );
+
+    not (Type.is_fun (ty t)) &&
+    (match view t with
+     | AppBuiltin (b, l) ->
+       if Builtin.is_logical_op b || 
+          Builtin.equal Builtin.Eq b || Builtin.equal Builtin.Neq b then (
+         fool_subterm_found := true;
+         List.for_all (aux ~top:false) l
+       ) else (Builtin.equal Builtin.True b || Builtin.equal Builtin.False b)
+     | App (hd, l) -> T.is_const hd && List.for_all (aux ~top:false) l
+     | Var _ ->
+       if Type.is_prop (ty t) then fool_subterm_found := true;
+       true
+     | Const _ -> true
+     | _ -> false) in
+  if not (aux ~top:true t) then (
+    let err_msg = CCFormat.sprintf "%a is not a fool term" T.pp t in
+    raise (Failure(err_msg))
+  );
+  true, !fool_subterm_found
+
 let is_true_or_false t = match view t with
-  | AppBuiltin(b, []) -> 
+  | AppBuiltin(b, _) -> 
     CCList.mem ~eq:Builtin.equal b [Builtin.True; Builtin.False];
   | _ -> false
 
+let inc_depth = function 
+    | None -> Some 0
+    | Some x -> Some (x + 1)
+
+let max_d a b =
+  match a with 
+  | None -> b
+  | Some x ->
+    (match b with
+    | Some y when y > x -> b
+    | _ -> a)
+
+let max_d_l =
+  let rec max_d_l_aux acc = function 
+  | [] -> acc
+  | x :: xs -> max_d_l_aux (max_d x acc) xs in
+  max_d_l_aux None
+
+let lambda_depth t =
+  let rec aux acc t =
+    match view t with
+    | AppBuiltin(_,l) -> max_d_l (List.map (aux acc) l)
+    | App (hd, l) -> max_d_l (List.map (aux acc) (hd::l))
+    | Fun (_,u) -> aux (inc_depth acc) u 
+    | Var _ | DB _ | Const _ -> acc in
+  let res = aux None t in
+  (* CCFormat.printf "l_depth(@[%a@])=@[%a@]@." T.pp t (CCOpt.pp CCInt.pp) res; *)
+  res
+
+let comb_depth t =
+  (* comb streak is true if while traversing the term, we went
+     only through terms that have combinators for heads *)
+  let rec aux ~comb_streak acc t =
+    match view t with
+    | AppBuiltin(b,l) when Builtin.is_combinator b ->
+      let acc, comb_streak =  
+        if comb_streak then (
+          (* if up to this point we have been seeing only combinators,
+            do not increase the depth *)
+          acc, comb_streak
+        ) else (
+          (* new comb_streak begins *)
+          inc_depth acc, true
+        ) in
+      
+      max_d_l (List.map (aux ~comb_streak acc) l)
+    | AppBuiltin(_,l) -> max_d_l (List.map (aux ~comb_streak:false acc) l)
+    | App (hd, l) -> max_d_l (List.map (aux ~comb_streak:false acc) (hd::l))
+    | Fun (_,u) -> invalid_arg "lambdas should have been removed."
+    | Var _ | DB _ | Const _ -> acc in
+
+  let res = aux ~comb_streak:false None t in
+  (* CCFormat.printf "c_depth(@[%a@])=@[%a@]@." T.pp t (CCOpt.pp CCInt.pp) res; *)
+  res
+
 let monomorphic t = Iter.is_empty (Seq.ty_vars t)
 
-let max_var set = VarSet.to_seq set |> Seq.max_var
+let max_var set = VarSet.to_iter set |> Seq.max_var
 
-let min_var set = VarSet.to_seq set |> Seq.min_var
+let min_var set = VarSet.to_iter set |> Seq.min_var
 
 let add_vars tbl t = Seq.vars t (fun v -> VarTbl.replace tbl v ())
 
-let vars ts = Seq.vars ts |> VarSet.of_seq
+let vars ts = Seq.vars ts |> VarSet.of_iter
 
 let vars_prefix_order t =
   Seq.vars t
@@ -566,13 +683,13 @@ let depth t = Seq.subterms_depth t |> Iter.map snd |> Iter.fold max 0
 
 (* @param vars the free variables the parameter must depend upon
    @param ty_ret the return type *)
-let mk_fresh_skolem =
-  let n = ref 0 in
+let n = ref 0
+let mk_fresh_skolem ?(prefix="_fresh_sk") =
   fun vars ty_ret ->
     let i = CCRef.incr_then_get n in
     (** fresh skolem **)
-    let id = ID.makef "#fsk%d" i in
-    ID.set_payload id (ID.Attr_skolem ID.K_normal);
+    let id = ID.makef "#%s%d" prefix i in
+    ID.set_payload id (ID.Attr_skolem ID.K_after_cnf);
     let ty_vars, vars =
       List.partition (fun v -> Type.is_tType (HVar.ty v)) vars
     in
@@ -599,18 +716,10 @@ let head t =
   try Some (head_exn t)
   with Invalid_argument _-> None
 
-let ty_vars t = Seq.ty_vars t |> Type.VarSet.of_seq
+let ty_vars t = Seq.ty_vars t |> Type.VarSet.of_iter
 
 
 (** {2 Subterms and positions} *)
-
-module Pos = struct
-  let at t pos = of_term_unsafe (T.Pos.at (t :> T.t) pos)
-
-  let replace t pos ~by =
-    assert (Type.equal (at t pos |> ty) (ty by));
-    of_term_unsafe (T.Pos.replace (t:>T.t) pos ~by:(by:>T.t))
-end
 
 let replace t ~old ~by =
   assert (Type.equal (ty by) (ty old));
@@ -620,7 +729,7 @@ let replace_m t m =
   of_term_unsafe (T.replace_m (t:t:>T.t) (m:t Map.t:>T.t T.Map.t))
 
 let symbols ?(init=ID.Set.empty) t =
-  ID.Set.add_seq init (Seq.symbols t)
+  ID.Set.add_iter init (Seq.symbols t)
 
 (** Does t contains the symbol f? *)
 let contains_symbol f t =
@@ -738,7 +847,7 @@ module AC(A : AC_SPEC) = struct
   let symbols seq =
     seq
     |> Iter.flat_map seq_symbols
-    |> ID.Set.add_seq ID.Set.empty
+    |> ID.Set.add_iter ID.Set.empty
 end
 
 (** {2 Printing/parsing} *)
@@ -798,11 +907,11 @@ module Form = struct
 
   let and_l = function
     | [] -> true_
-    | [t] -> t
+    | [t] -> assert (Type.is_prop (ty t)); t
     | a :: tail -> List.fold_left and_ a tail
   let or_l = function
     | [] -> false_
-    | [t] -> t
+    | [t] -> assert (Type.is_prop (ty t)); t
     | a :: tail -> List.fold_left or_ a tail
 
   let forall t =
@@ -812,6 +921,15 @@ module Form = struct
   let exists t =
     assert(Type.is_fun (ty t) && Type.returns_prop (ty t));
     app_builtin ~ty:Type.prop Builtin.ExistsConst [t]
+
+  let equiv f g =
+    app_builtin ~ty:Type.prop Builtin.Equiv [f; g]
+
+  let xor f g =
+    app_builtin ~ty:Type.prop Builtin.Xor [f; g]
+
+  let imply f g =
+    app_builtin ~ty:Type.prop Builtin.Imply [f; g]
 end
 
 (** {2 Arith} *)
@@ -963,45 +1081,55 @@ module TPTP = struct
   let pp_depth ?hooks:_ depth out t =
     let depth = ref depth in
     (* recursive printing *)
+
     let rec pp_rec out t = match view t with
       | DB i ->
         Format.fprintf out "Y%d" (!depth - i - 1);
         (* print type of term *)
-        if !print_all_types && not (Type.equal (ty t) Type.TPTP.i)
-        then Format.fprintf out ":%a" (Type.TPTP.pp_depth !depth) (ty t)
       | AppBuiltin (b,[]) -> Builtin.TPTP.pp out b
+      | AppBuiltin (b, ([tyarg;t;u])) when Builtin.TPTP.is_infix b && is_type tyarg ->
+        Format.fprintf out "(@[(%a) %a@ (%a)@])" pp_rec t Builtin.TPTP.pp b pp_rec u
       | AppBuiltin (b, ([t;u])) when Builtin.TPTP.is_infix b ->
-        Format.fprintf out "(@[%a %a@ %a@])" pp_rec t Builtin.TPTP.pp b pp_rec u
-      | AppBuiltin (b, l) when Builtin.TPTP.fixity b = Builtin.Infix_nary ->
-        Format.fprintf out "(@[%a@])"
-          (Util.pp_list ~sep:(Builtin.TPTP.to_string b) pp_rec) l
+        Format.fprintf out "(@[(%a) %a@ (%a)@])" pp_rec t Builtin.TPTP.pp b pp_rec u
+      | AppBuiltin (b, l) when List.length l >= 2 && Builtin.is_infix b ->
+        let sep = CCFormat.sprintf " %s " (Builtin.TPTP.to_string b) in
+        Format.fprintf out "(@[%a@])" (Util.pp_list ~sep pp_enclosed) l
       | AppBuiltin (b,l) ->
-        Format.fprintf out "(@[<hov2>%a@ %a@])" Builtin.TPTP.pp b (Util.pp_list pp_rec) l
+        (* erasing types for TH0 *)
+        let l = CCList.filter (fun t -> not (Type.is_tType (ty t))) l in
+        if CCList.is_empty l then Format.fprintf out "@[%a@]" Builtin.TPTP.pp b 
+        else (
+          Format.fprintf out "(@[(%a) @@ %a@])" Builtin.TPTP.pp b (Util.pp_list ~sep:" @ " pp_enclosed) l
+        )
       | Const s -> ID.pp_tstp out s
-      | App (f, l) ->
-        Format.fprintf out "@[<hov2>%a(@,%a)@]" pp_rec f
-          (Util.pp_list ~sep:", " pp_rec) l
+      | App (f, l) -> Format.fprintf out "%a" (Util.pp_list ~sep:" @ " pp_enclosed) (f::l)
       | Fun _ ->
         let ty_args, bod = as_fun t in
         let vars = List.mapi (fun i ty -> i+ !depth, ty) ty_args in
         let pp_db out (i,ty) =
-          Format.fprintf out "Y%d : %a" i Type.TPTP.pp ty
+          Format.fprintf out "Y%d : %a" i (Type.TPTP.pp_ho ~depth:!depth) ty
         in
         let old_d = !depth in
         depth := !depth + List.length ty_args;
-        Format.fprintf out "(@[<hv2>^[@[%a@]]:@ %a@])"
+        Format.fprintf out "(@[<hv2>^[@[%a@]]:@ (@[%a@])@])"
           (Util.pp_list ~sep:"," pp_db) vars pp_rec bod;
         depth := old_d;
-      | Var i ->
-        Format.fprintf out "X%d" (HVar.id i);
-        (* print type of term *)
-        if !print_all_types && not (Type.equal (ty t) Type.TPTP.i) then (
-          Format.fprintf out ":%a" (Type.TPTP.pp_depth !depth) (ty t);
-        )
+      | Var i -> Format.fprintf out "X%d" (HVar.id i);
+    and pp_enclosed out t =
+      if Type.is_tType (ty t) then (
+        let ty = Type.of_term_unsafe (t :> T.t) in
+        Format.printf "(@[%a@])" (Type.TPTP.pp_ho ~depth:!depth) ty
+      ) else (
+        match view t with 
+        | App _ | AppBuiltin _ ->
+          Format.fprintf out "(@[%a@])" pp_rec t
+        | _ -> pp_rec out t
+      )
     in
     pp_rec out t
 
-  let pp buf t = pp_depth 0 buf t
+  let pp buf t = 
+    Format.fprintf buf "(@[%a@])" (pp_depth 0)  t
   let to_string = CCFormat.to_string pp
 end
 
@@ -1017,6 +1145,19 @@ let pp_in = function
   | Output_format.O_none -> CCFormat.silent
 
 (** {2 Conversions} *)
+
+module Pos = struct
+  let at t pos = of_term_unsafe (T.Pos.at (t :> T.t) pos)
+
+  let replace t pos ~by =
+    if not (Type.equal (at t pos |> ty) (ty by)) then (
+      CCFormat.printf "t:@[%a:%a@]@." pp (at t pos) Type.pp (at t pos |> ty);
+      CCFormat.printf "by:@[%a:%a@]@." pp (by) Type.pp (ty by);
+      assert false;
+    );
+    of_term_unsafe (T.Pos.replace (t:>T.t) pos ~by:(by:>T.t))
+end
+
 
 module Conv = struct
   module PT = TypedSTerm
@@ -1083,6 +1224,7 @@ module Conv = struct
           PT.Var_tbl.replace tbl v (!depth,ty_arg);
           incr depth;
           let ty_b = Type.Conv.of_simple_term_exn ctx (PT.ty_exn body) in
+          assert(Type.is_prop ty_b);
           let body = fun_ ty_arg (aux body) in
           decr depth;
           if CCOpt.is_some previous then PT.Var_tbl.replace tbl v (CCOpt.get_exn previous)
@@ -1106,7 +1248,8 @@ module Conv = struct
   let to_simple_term ?(allow_free_db=false) ?(env=DBEnv.empty) ctx t =
     let module ST = TypedSTerm in
     let n = ref 0 in
-    let max_var = ref ((Seq.vars t |> Seq.max_var) + 1) in
+    let max_t = max ((Seq.vars t |> Seq.max_var) + 1) (Type.Conv.get_maxvar ctx) in
+    Type.Conv.set_maxvar ctx max_t;
     let orig_term = t in
     let rec aux_t env t =
       match view t with
@@ -1138,13 +1281,13 @@ module Conv = struct
           Util.error ~where:"Term" err_msg;
         ) else (
           let fresh_vars = List.map (fun ty -> 
-              incr max_var;
-              var_of_int ~ty !max_var) ty_args in
+              Type.Conv.incr_maxvar ctx;
+              var_of_int ~ty (Type.Conv.get_maxvar ctx)) ty_args in
           let replacement = DBEnv.push_l_rev DBEnv.empty fresh_vars in
           let body  = DB.eval replacement fun_body in
           let remaining_vars = List.map (fun ty ->
-              incr max_var;
-              var_of_int ~ty !max_var) (Type.expected_args (ty fun_body)) in
+              Type.Conv.incr_maxvar ctx;
+              var_of_int ~ty (Type.Conv.get_maxvar ctx)) (Type.expected_args (ty fun_body)) in
           let body = app body remaining_vars in
           let vars_converted = List.map convert_var (fresh_vars @ remaining_vars) in
           List.fold_right (fun v acc ->
@@ -1169,7 +1312,8 @@ module Conv = struct
       | _ -> invalid_arg "expected variable" 
 
     in
-    aux_t env t
+    let res = aux_t env t in
+    res
 end
 
 let rebuild_rec t =
@@ -1197,97 +1341,12 @@ let rebuild_rec t =
   in
   aux [] t
 
-let compl_in_l l =
-  let pos, neg = 
-    CCList.partition_map (fun t -> 
-        match view t with 
-        | AppBuiltin(Builtin.Not, [s]) -> `Right s
-        | _ -> `Left t) l
-    |> CCPair.map_same Set.of_list in
-  not (Set.is_empty (Set.inter pos neg))
-
-
-let simplify_bools t =
-  let simplify_and_or t b l =
-    let res = 
-      assert(b = Builtin.And || b = Builtin.Or);
-      let netural_el, absorbing_el = 
-        if b = Builtin.And then true_,false_ else (false_,true_) in
-
-      if compl_in_l l || List.exists (equal absorbing_el) l then absorbing_el
-      else (
-        let l' = List.filter (fun s -> not (equal s netural_el)) l in
-        if List.length l = List.length l' then t
-        else (
-          if CCList.is_empty l' then netural_el
-          else (if List.length l' = 1 then List.hd l'
-                else app_builtin ~ty:(Type.prop) b l')
-        )) 
-    in
-    res 
-  in
-
-  let rec aux t =
-    match view t with 
-    | DB _ | Const _ | Var _ -> t
-    | Fun(ty, body) ->
-      let body' = aux body in
-      if equal body body' then t
-      else fun_ ty body'
-    | App(hd, args) ->
-      let hd' = aux hd and  args' = List.map aux args in
-      if equal hd hd' && same_l args args' then t
-      else app hd' args'
-    | AppBuiltin(Builtin.And, l) when List.length l > 1 ->
-      let l' = List.map aux l in
-      let t = if same_l l l' then t 
-        else app_builtin ~ty:(Type.prop) Builtin.And l' in
-      simplify_and_or t Builtin.And l'
-    | AppBuiltin(Builtin.Or, l) when List.length l > 1 ->
-      let l' = List.map aux l in
-      let t = if same_l l l' then t 
-        else app_builtin ~ty:(Type.prop) Builtin.Or l' in
-      simplify_and_or t Builtin.Or l'
-    | AppBuiltin(Builtin.Not, [s]) ->
-      if equal s true_ then false_
-      else 
-      if equal s false_ then true_
-      else (
-        match view s with 
-        | AppBuiltin(Builtin.Not, [s']) -> aux s'
-        | _ ->  
-          let s' = aux s in
-          if equal s s' then t else
-            app_builtin ~ty:(Type.prop) Builtin.Not [s'] 
-      )
-    | AppBuiltin(Builtin.Imply, [p;c]) ->
-      if T.equal p true_ then aux c
-      else if T.equal p false_ then true_
-      else (
-        let p',c' = aux p, aux c in
-        if equal p p' && equal c c' then t 
-        else app_builtin ~ty:(ty t) Builtin.Imply [p';c'])
-    | AppBuiltin(hd, [a;b]) 
-      when hd = Builtin.Eq || hd = Builtin.Equiv ->
-      if equal a b then true_ else (
-        let a',b' = aux a, aux b in
-        if equal a a' && equal b b' then t 
-        else app_builtin ~ty:(ty t) hd [a';b']
-      )
-    | AppBuiltin(hd, [a;b])
-      when hd = Builtin.Neq || hd = Builtin.Xor ->
-      if equal a b then false_ else (
-        let a',b' = aux a, aux b in
-        if equal a a' && equal b b' then t 
-        else app_builtin ~ty:(ty t) hd [a';b']
-      )
-    | AppBuiltin(hd, args) ->
-      let args' = List.map aux args in
-      if same_l args args' then t
-      else app_builtin ~ty:(ty t) hd args' in  
-  aux t
-
 let rec normalize_bools t =
+  let weight_cmp s t =
+    let (<?>) = CCOrd.(<?>) in
+    (T.ho_weight s - T.ho_weight t)
+    <?> (CCInt.compare, (T.hash s), (T.hash t)) in
+
   match view t with 
   | DB _ | Const _ | Var _ -> t
   | Fun(ty, body) ->
@@ -1300,11 +1359,8 @@ let rec normalize_bools t =
     else app hd' args'
   | AppBuiltin((Builtin.And|Builtin.Or) as b, l) -> 
     let l' = List.map normalize_bools l in
-    let sorted = 
-      List.combine l' (List.map T.size l')
-      |> List.fast_sort (fun x y -> CCInt.compare (snd x) (snd y))
-      |> List.map fst in
-    if same_l l l' && same_l l' sorted then t
+    let sorted = List.fast_sort weight_cmp l' in
+    if same_l l sorted then t
     else app_builtin ~ty:Type.prop b sorted
   | AppBuiltin((Builtin.Eq|Builtin.Neq|Builtin.Xor|Builtin.Equiv) as b, ([_;x;y] as l) )
   | AppBuiltin((Builtin.Eq|Builtin.Neq|Builtin.Xor|Builtin.Equiv) as b, ([x;y] as l)) -> 
@@ -1314,7 +1370,7 @@ let rec normalize_bools t =
       | x :: xs -> x :: swap_last_two xs in
     let x', y' = normalize_bools x, normalize_bools y in
     let l = if List.length l = 3 then List.hd l :: x' :: [y'] else x' :: [y'] in
-    if T.size x' > T.size y' then (
+    if weight_cmp x' y' < 0 then (
       app_builtin ~ty:Type.prop b (swap_last_two l)
     ) else if T.equal x x' && T.equal y y' then t 
     else app_builtin ~ty:Type.prop b l

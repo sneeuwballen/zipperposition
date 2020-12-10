@@ -137,9 +137,9 @@ val pp_bindings : t CCFormat.printer
 val fold : ('a -> var Scoped.t -> term Scoped.t -> 'a) -> 'a -> t -> 'a
 val iter : (var Scoped.t -> term Scoped.t -> unit) -> t -> unit
 
-val to_seq : t -> (var Scoped.t * term Scoped.t) Iter.t
+val to_iter : t -> (var Scoped.t * term Scoped.t) Iter.t
 val to_list : t -> (var Scoped.t * term Scoped.t) list
-val of_seq : ?init:t -> (var Scoped.t * term Scoped.t) Iter.t -> t
+val of_iter : ?init:t -> (var Scoped.t * term Scoped.t) Iter.t -> t
 val of_list : ?init:t -> (var Scoped.t * term Scoped.t) list -> t
 
 (** {2 Applying a substitution} *)

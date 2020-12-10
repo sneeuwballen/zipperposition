@@ -333,10 +333,16 @@ end
 
 (** {2 Hindley-Milner} *)
 
-(* TODO: check, afterwards, that types:
-   - do not contain metas variables
-   - are closed
-*)
+(* fails if [ty] is not a prenex type *)
+let check_ty_prenex ?loc ty =
+  if not @@ T.Ty.is_prenex ty then (
+    error_ ?loc "non-prenex type %a" T.pp ty
+  )
+
+let check_ty_quantifier_free ?loc ty =
+  if not @@ T.Ty.is_quantifier_free ty then (
+    error_ ?loc "type %a@ must be quantifier-free" T.pp ty
+  )
 
 (* convert the typed variables into proper variables [vars'], call [f vars'],
    and then exit the scope of [vars'] *)
@@ -584,10 +590,10 @@ let rec infer_rec ?loc ctx (t:PT.t) : T.t =
       T.Ty.fun_ ?loc args ret
     | PT.AppBuiltin (Builtin.True, []) -> T.Form.true_
     | PT.AppBuiltin (Builtin.False, []) -> T.Form.false_
-    | PT.AppBuiltin (Builtin.And, l) ->
+    | PT.AppBuiltin (Builtin.And, l) when List.length l >= 2 ->
       let l = List.map (infer_prop_ ?loc ctx) l in
       T.Form.and_ ?loc l
-    | PT.AppBuiltin (Builtin.Or, l) ->
+    | PT.AppBuiltin (Builtin.Or, l)  when List.length l >= 2 ->
       let l = List.map (infer_prop_ ?loc ctx) l in
       T.Form.or_ ?loc l
     | PT.AppBuiltin (((Builtin.Equiv | Builtin.Xor | Builtin.Imply) as conn), [a;b]) ->
@@ -633,6 +639,7 @@ let rec infer_rec ?loc ctx (t:PT.t) : T.t =
         ~f:(fun vars' ->
             let t' = infer_rec ?loc ctx t' in
             let ty = T.Ty.fun_ ?loc (List.map Var.ty vars') (T.ty_exn t') in
+            check_ty_quantifier_free ?loc ty;
             T.bind_list ?loc ~ty Binder.Lambda vars' t')
     | PT.Bind (Binder.ForallTy, vars, t') ->
       with_non_inferred_typed_vars ?loc ctx vars
@@ -854,7 +861,7 @@ module A = UntypedAST
 module Stmt = Statement
 
 let check_vars_rhs ?loc bound rhs =
-  let vars_rhs = T.Seq.free_vars rhs |> Var.Set.of_seq in
+  let vars_rhs = T.Seq.free_vars rhs |> Var.Set.of_iter in
   (* check that all variables of [rhs] are within [lhs] *)
   let only_in_rhs = Var.Set.diff vars_rhs bound in
   if not (Var.Set.is_empty only_in_rhs) then (
@@ -864,7 +871,7 @@ let check_vars_rhs ?loc bound rhs =
 
 (* check that [vars rhs] subseteq [vars lhs] *)
 let check_vars_eqn ?loc bound lhs rhs =
-  let vars_lhs = T.Seq.free_vars lhs |> Var.Set.of_seq in
+  let vars_lhs = T.Seq.free_vars lhs |> Var.Set.of_iter in
   (* check that all variables in [lhs] are bound *)
   let not_bound = Var.Set.diff vars_lhs bound in
   if not (Var.Set.is_empty not_bound)
@@ -897,6 +904,7 @@ let rec as_def ?loc ?of_ bound t =
           T.pp t ID.pp id ID.pp id' ID.pp id ID.pp id;
       | _ -> ()
     end;
+    check_ty_prenex ?loc ty;
     if T.Ty.returns_tType ty then (
       error_ ?loc
         "in definition of %a,@ equality between types is forbidden" ID.pp id;
@@ -904,7 +912,7 @@ let rec as_def ?loc ?of_ bound t =
     Stmt.Def_term {vars;id;ty;args;rhs;as_form=t}
   and yield_prop lhs rhs pol =
     let vars =
-      SLiteral.to_seq lhs
+      SLiteral.to_iter lhs
       |> Iter.flat_map T.Seq.free_vars
       |> Var.Set.add_seq bound
       |> Var.Set.to_list
@@ -969,6 +977,7 @@ let infer_defs ?loc ctx (l:A.def list): (_,_,_) Stmt.def list =
       (fun d ->
          let id = ID.make d.A.def_id in
          let ty = infer_ty_exn ctx d.A.def_ty in
+         check_ty_prenex ?loc ty;
          (* cannot return [Type] *)
          if T.Ty.returns_tType ty then (
            error_ ?loc
@@ -1027,6 +1036,7 @@ let infer_statement_exn ?(file="<no file>") ctx st =
          TODO: warning if it shadows? *)
       let id = ID.make s in
       let ty = infer_ty_exn ctx ty in
+      check_ty_prenex ?loc ty;
       Ctx.declare ?loc ctx id ty;
       set_notation id st.A.attrs;
       Stmt.ty_decl ~attrs ~proof:(Proof.Step.intro src Proof.R_decl) id ty

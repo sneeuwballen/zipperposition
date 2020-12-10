@@ -77,7 +77,7 @@ module type S = sig
   (** Instantiate variables whose type is a known enumerated type,
       with all cases of this type. *)
 
-  (** {6 Registration} *)
+  (** {5 Registration} *)
 
   val setup : unit -> unit
   (** Register rules in the environment *)
@@ -529,7 +529,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let setup () =
     if !_enable then (
       Util.debug ~section  1 "register handling of enumerated types";
-      Env.add_multi_simpl_rule instantiate_vars;
+      Env.add_multi_simpl_rule ~priority:5 instantiate_vars;
       Env.add_is_trivial is_trivial;
       (* look in input statements  for inductive types *)
       Signal.on_every Env.on_input_statement _detect_stmt;

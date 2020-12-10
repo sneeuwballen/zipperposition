@@ -15,6 +15,10 @@ module type S = sig
   (** Generation of clauses regardless of current clause.
       @param full if true, perform more thorough checks *)
 
+  type clause_elim_rule = unit -> unit
+  (** Eliminates clauses from the proof state using algorithms
+      like blocked clause elimination and similar *)
+
   type binary_inf_rule = inf_rule
   type unary_inf_rule = inf_rule
 
@@ -40,6 +44,12 @@ module type S = sig
   (** find redundant clauses in [ProofState.ActiveSet] w.r.t the clause.
        first param is the set of already known redundant clause, the rule
        should add clauses to it *)
+
+  type immediate_simplification_rule = C.t -> C.t Iter.t -> C.t Iter.t option
+  (** Following Kotelnikov's iProver superposition implementation, try to simplify
+      given clause (first argument) using a set of clauses (second argument).
+      If simplification suceeded, then a set of clauses to be injected
+      into passive set is returned. *)
 
   type is_trivial_trail_rule = Trail.t -> bool
   (** Rule that checks whether the trail is trivial (a tautology) *)
@@ -123,12 +133,17 @@ module type S = sig
   val add_unary_simplify : simplify_rule -> unit
   (** Add unary simplification rule (not dependent on proof state)  *)
 
-  val add_multi_simpl_rule : multi_simpl_rule -> unit
+  val add_multi_simpl_rule : priority:int -> multi_simpl_rule -> unit
   (** Add a multi-clause simplification rule *)
 
-  val set_single_step_multi_simpl_rule : multi_simpl_rule -> unit
+  val add_single_step_multi_simpl_rule : multi_simpl_rule -> unit
   (** Add a multi-clause simplification rule, that is going to be applied
       only once, not in a fixed-point manner *)
+
+  val add_cheap_multi_simpl_rule : multi_simpl_rule -> unit
+  (** Add an efficient multi-clause simplification rule,
+      that will be used to simplify newly generated clauses
+      when they are moved from unprocessed to passive set. *)
 
   val add_is_trivial_trail : is_trivial_trail_rule -> unit
   (** Add tautology detection rule *)
@@ -139,15 +154,21 @@ module type S = sig
   val add_rewrite_rule : string -> term_rewrite_rule -> unit
   (** Add a term rewrite rule *)
 
-  val set_ho_normalization_rule : term_norm_rule -> unit
+  val set_ho_normalization_rule : string -> term_norm_rule -> unit
   (** Add a ho norm rule *)
 
   val get_ho_normalization_rule : unit -> term_norm_rule
 
+  val add_immediate_simpl_rule : immediate_simplification_rule -> unit
+
   val add_lit_rule : string -> lit_rewrite_rule -> unit
   (** Add a literal rewrite rule *)
 
-  val add_generate : string -> generate_rule -> unit
+  val add_generate : priority:int -> string -> generate_rule -> unit
+  (** Add a generation rule with assigned priority.
+      Rules with higher priority will be tried first. *) 
+
+  val add_clause_elimination_rule : priority:int -> string -> clause_elim_rule -> unit
 
   val cr_skip : _ conversion_result
   val cr_return : 'a -> 'a conversion_result
@@ -157,6 +178,10 @@ module type S = sig
 
   val add_step_init : (unit -> unit) -> unit
   (** add a function to call before each saturation step *)
+
+  val add_fragment_check : (C.t -> bool) -> unit
+
+  val check_fragment : C.t -> bool
 
   (** {2 Use the Env} *)
 
@@ -179,6 +204,11 @@ module type S = sig
 
   val on_input_statement : Statement.clause_t Signal.t
   (** Triggered on every input statement *)
+
+  val on_forward_simplified : (C.t * (C.t option)) Signal.t
+  (** Triggered when after the clause set is fully forward-simplified.
+      First argument is the original clause c and the second one is Some c'
+      if c simplifies into c' or None if c is deemed redundant *)
 
   val convert_input_statements :
     Statement.clause_t CCVector.ro_vector -> C.t Clause.sets
@@ -215,6 +245,10 @@ module type S = sig
   val do_generate : full:bool -> unit -> C.t Iter.t
   (** do generating inferences *)
 
+  val do_clause_eliminate : unit -> unit
+  (** changes the proof state by running registered clause elimination procedures
+      and removing all the eliminated clauses from the proof state *)
+
   val is_trivial_trail : Trail.t -> bool
   (** Check whether the trail is trivial *)
 
@@ -249,6 +283,14 @@ module type S = sig
   val forward_simplify : simplify_rule
   (** Simplify the clause w.r.t to the active set and experts *)
 
+  val cheap_multi_simplify : C.t -> C.t list option
+  (** Cheap simplifications that can result in multiple clauses (e.g. AVATAR splitting) *)
+
+  val immediate_simplify : C.t -> C.t Iter.t -> (C.t Iter.t)
+  (** Simplify given clause using its children. Given clause is
+      removed from active set and result of this rule is added to passive set,
+      if any of the registered rules suceeded *)
+
   val generate : C.t -> C.t Iter.t
   (** Perform all generating inferences *)
 
@@ -279,4 +321,13 @@ module type S = sig
   val flex_get : 'a Flex_state.key -> 'a
   (** [flex_get k] is the same as [Flex_state.get_exn k (flex_state ())].
       @raise Not_found if the key is not present *)
+
+  (* The following signals are raised only existentially  *)
+  val on_pred_var_elimination : (C.t * Term.t) Signal.t
+  (** this signal is raised if a formula that universally quantifies
+      a predicate removes that predicate and rules that want to instantiate it
+      early should listen to this *)
+
+  val on_pred_skolem_introduction : (C.t * Term.t) Signal.t
+  (** this signal is raised when a predicate Skolem is introduced  *)
 end

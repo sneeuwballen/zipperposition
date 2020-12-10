@@ -27,6 +27,7 @@ let rewrite_before_cnf = ref false
 module Key = struct
   let has_rw = Flex_state.create_key()
   let ctx_narrow = Flex_state.create_key()
+  let narrow = Flex_state.create_key()
 end
 
 let simpl_term t =
@@ -39,7 +40,7 @@ let simpl_term t =
       RW.Rule.set_as_proof_parents rules
     in
 
-    Util.debugf ~section 2
+    Util.debugf ~section 3
       "@[<2>@{<green> simpl rewrite@} `@[%a@]`@ :into `@[%a@]`@ :using %a@]"
       (fun k->k T.pp t T.pp t' RW.Term.Rule_inst_set.pp rules);
     Some (t',proof)
@@ -60,27 +61,21 @@ module Make(E : Env_intf.S) = struct
     |> Iter.flat_map
       (fun (u_p, passive_pos) ->
          RW.Term.narrow_term ~scope_rules:sc_rule (u_p,sc_c)
-         |> Iter.map
+         |> Iter.filter_map
            (fun (rule,us) ->
-              let i, _ = Literals.Pos.cut passive_pos in
               let renaming = Subst.Renaming.create() in
               let subst = Unif_subst.subst us in
               let c_guard = Literal.of_unif_subst renaming us in
               (* side literals *)
               let lits_passive = C.lits c in
-              let lits_passive =
+              let lits' =
                 Literals.apply_subst renaming subst (lits_passive,sc_c) in
-              let lits' = CCArray.except_idx lits_passive i in
               (* substitute in rule *)
               let rhs =
                 Subst.FO.apply renaming subst (RW.Term.Rule.rhs rule, sc_rule)
-              and lhs =
-                Subst.FO.apply renaming subst (RW.Term.Rule.lhs rule, sc_rule)
               in
               (* literal in which narrowing took place: replace lhs by rhs *)
-              let new_lit =
-                Literal.replace lits_passive.(i) ~old:lhs ~by:rhs
-              in
+              Literals.Pos.replace lits' ~at:passive_pos ~by:rhs;
               (* make new clause *)
               Util.incr_stat stat_narrowing_term;
               let proof =
@@ -91,13 +86,14 @@ module Make(E : Env_intf.S) = struct
                   ~rule:(Proof.Rule.mk "narrow") in
               let c' =
                 C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
-                  (new_lit :: c_guard @ lits') proof
+                  (c_guard @ CCArray.to_list lits') proof
               in
+              
               Util.debugf ~section 3
                 "@[<2>term narrowing:@ from `@[%a@]`@ to `@[%a@]`@ \
                  using rule `%a`@ and subst @[%a@]@]"
                 (fun k->k C.pp c C.pp c' RW.Term.Rule.pp rule Unif_subst.pp us);
-              c'
+              Some c'
            )
       )
     |> Iter.to_rev_list
@@ -291,20 +287,22 @@ module Make(E : Env_intf.S) = struct
   let contextual_narrowing c =
     ZProf.with_prof prof_ctx_narrowing contextual_narrowing_ c
 
-  let setup ?(ctx_narrow=true) ~has_rw () =
+  let setup ?(ctx_narrow=true) ~narrowing ~has_rw () =
     Util.debug ~section 1 "register Rewriting to Env...";
     E.add_rewrite_rule "rewrite_defs" simpl_term;
-    E.add_binary_inf "narrow_term_defs" narrow_term_passive;
+    if narrowing then (
+      E.add_binary_inf "narrow_term_defs" narrow_term_passive;
+      E.add_unary_inf "narrow_lit_defs" narrow_lits);
     if ctx_narrow then (
       E.add_binary_inf "ctx_narrow" contextual_narrowing;
     );
     if has_rw then  E.Ctx.lost_completeness ();
-    E.add_multi_simpl_rule simpl_clause;
-    E.add_unary_inf "narrow_lit_defs" narrow_lits;
+    E.add_multi_simpl_rule ~priority:5 simpl_clause;
     ()
 end
 
 let ctx_narrow_ = ref true
+let narrowing = ref true
 
 let post_cnf stmts st =
   CCVector.iter Statement.scan_stmt_for_defined_cst 
@@ -312,10 +310,10 @@ let post_cnf stmts st =
      else (
        CCVector.filter (fun st -> match Statement.view st with
            | Statement.Rewrite _ -> false
-           | _ -> false) stmts));
+           | _ -> true) stmts));
   (* check if there are rewrite rules *)
   let has_rw =
-    CCVector.to_seq stmts
+    CCVector.to_iter stmts
     |> Iter.exists
       (fun st -> match Statement.view st with
          | Statement.Rewrite _
@@ -384,9 +382,11 @@ let rewrite_tst_stmt stmt =
 
 let unfold_def_before_cnf stmts =
   if !rewrite_before_cnf then (
-    CCVector.map (fun stmt -> 
+    let cnt = ref 0 in
+    CCVector.map (fun stmt ->
+        incr cnt; 
         let res = rewrite_tst_stmt stmt in
-        (* CCFormat.printf "rewriting @[%a@] into @[%a@]@." Statement.pp_input stmt Statement.pp_input res; *)
+        Util.debugf ~section 1 "rewriting @[%a@]:@. @[%a@]@." (fun k -> k Statement.pp_input stmt Statement.pp_input res);
         res
       ) stmts
   ) else stmts
@@ -395,7 +395,7 @@ let post_tying stmts st =
   if !rewrite_before_cnf then (
     CCVector.iter Statement.scan_tst_rewrite stmts;
     let has_rw =
-      CCVector.to_seq stmts
+      CCVector.to_iter stmts
       |> Iter.exists
         (fun st -> match Statement.view st with
            | Statement.Rewrite _ -> true
@@ -408,7 +408,10 @@ let normalize_simpl (module E : Env_intf.S) =
   let module M = Make(E) in
   let has_rw = E.flex_get Key.has_rw in
   E.flex_add Key.ctx_narrow !ctx_narrow_;
-  M.setup ~has_rw ~ctx_narrow:!ctx_narrow_ ()
+  E.flex_add Key.narrow !narrowing;
+
+  M.setup ~has_rw ~narrowing:!narrowing 
+                  ~ctx_narrow:!ctx_narrow_ ()
 
 let extension =
   let open Extensions in
@@ -423,4 +426,18 @@ let () = Options.add_opts
     [ "--rw-ctx-narrow", Arg.Set ctx_narrow_, " enable contextual narrowing";
       "--no-rw-ctx-narrow", Arg.Clear ctx_narrow_, " disable contextual narrowing";
       "--rewrite-before-cnf", Arg.Bool (fun v -> rewrite_before_cnf := v), " enable/disable rewriting before CNF"
-    ]
+    ];
+    Params.add_to_modes 
+    [ "ho-complete-basic"
+    ; "ho-pragmatic"
+    ; "ho-competitive"
+    ; "fo-complete-basic"
+    ; "lambda-free-intensional"
+    ; "lambda-free-extensional"
+    ; "ho-comb-complete"
+    ; "lambda-free-purify-intensional"
+    ; "lambda-free-purify-extensional"] 
+    (fun () ->
+      narrowing := false;
+      ctx_narrow_ := false;
+    );

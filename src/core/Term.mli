@@ -138,9 +138,23 @@ val is_type : t -> bool (** Does it have type [tType]? *)
 val in_pfho_fragment : t -> bool
 val in_lfho_fragment : t -> bool
 val is_fo_term : t -> bool
+val in_fool_fragment : t -> (bool * bool)
 val is_true_or_false : t -> bool
 
-val mk_fresh_skolem : var list -> Type.t -> (ID.t*Type.t) * t
+
+(** If term has no lambdas reutrn None;
+   otherwise, return Some d where d is the
+   maximal level of lambda nestings *)
+val lambda_depth : t -> int option
+
+(** combinatory equivalent to lambda_depth *)
+val comb_depth : t -> int option
+
+
+val hd_is_comb: Builtin.t -> bool
+val is_comb : t -> bool
+
+val mk_fresh_skolem : ?prefix:string -> var list -> Type.t -> (ID.t*Type.t) * t
 
 val as_const : t -> ID.t option
 val as_const_exn : t -> ID.t
@@ -153,6 +167,11 @@ val as_app : t -> t * t list
 (** [as_app t] decomposes [t] into a head (non-application) and arguments,
     such as [(let f,l = as_app t in app f l) = t] *)
 
+val as_app_mono : t -> t * t list
+(** [as_app t] decomposes [t] into a head (possibly applied to type arguments) 
+    and arguments, such as [(let f,l = as_app t in app f l) = t] *)
+
+
 val as_fun : t -> Type.t list * t
 (** Open functions *)
 
@@ -161,6 +180,9 @@ val head_term : t -> t
 
 val head_term_mono : t -> t
 (** head term, but still with type arguments *)
+
+val as_app_mono : t -> (t * (t list))
+(** head term, but still with type arguments and the remaining arguments *)
 
 val args : t -> t list
 (** [args t = snd (as_app t)] *)
@@ -184,7 +206,7 @@ module VarTbl : CCHashtbl.S with type key = var
 
 module Seq : sig
   val vars : t -> var Iter.t
-  val subterms : ?include_builtin:bool -> ?ignore_head:bool -> t -> t Iter.t
+  val subterms : ?include_builtin:bool -> ?include_app_vars:bool -> ?ignore_head:bool -> t -> t Iter.t
   val subterms_depth : ?filter_term:(t -> bool) -> t -> (t * int) Iter.t  (* subterms with their depth *)
   val symbols : ?include_types:bool -> ?filter_term:(t -> bool) -> t -> ID.t Iter.t
   val max_var : var Iter.t -> int (** max var *)
@@ -199,7 +221,7 @@ end
 val var_occurs : var:var -> t -> bool (** [var_occurs ~var t] true iff [var] in t *)
 
 val is_ground : t -> bool (** is the term ground? (no free vars) *)
-val is_linear : t -> bool (** is the term linear? (no vars occuring multiple times) *)
+val is_linear : t -> bool (** is the term linear? (no vars occurring multiple times) *)
 val monomorphic : t -> bool (** true if the term contains no type var *)
 
 val is_beta_reducible : t -> bool
@@ -223,7 +245,6 @@ val head_exn : t -> ID.t (** head ID.t (or Invalid_argument) *)
 
 val size : t -> int (** Size (number of nodes) *)
 
-val simplify_bools : t -> t
 (* Sort the arguments to logical operators using their weights
    in an attempt to make more terms unifiable. *)
 val normalize_bools : t -> t
@@ -360,6 +381,9 @@ val debugf : Format.formatter -> t -> unit
 
 module Form : sig
   val not_ : t -> t
+  val equiv : t -> t -> t
+  val xor : t -> t -> t
+  val imply : t -> t -> t
   val eq : t -> t -> t
   val neq : t -> t -> t
   val and_ : t -> t -> t

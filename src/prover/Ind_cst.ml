@@ -35,7 +35,7 @@ type t = {
 
 exception Payload_cst of t
 
-(** {6 Inductive Constants} *)
+(** {5 Inductive Constants} *)
 
 let to_term c = Term.const ~ty:c.cst_ty c.cst_id
 let id c = c.cst_id
@@ -75,7 +75,7 @@ let is_sub c = c.cst_is_sub
 
 let id_is_sub id = id_as_cst id |> CCOpt.map_or ~default:false is_sub
 
-(** {6 Creation of Coverset and Cst} *)
+(** {5 Creation of Coverset and Cst} *)
 
 let n_ = ref 0
 

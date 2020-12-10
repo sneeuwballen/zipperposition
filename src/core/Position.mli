@@ -8,8 +8,8 @@
     Typically, we use positions to refer to a particular occurrence of
     a term in another (bigger) term, or in a literal, or in a clause.
 
-    A pair of {term,clause,literal} + position represents a  context,
-    that is, a {term,clause,literal} with a hole at the given position,
+    A pair of [{term,clause,literal}] + position represents a  context,
+    that is, a [{term,clause,literal}] with a hole at the given position,
     where we can put a different term.
 *)
 
@@ -32,6 +32,8 @@ val right : t -> t
 val head : t -> t
 val body : t -> t
 val arg : int -> t -> t
+
+val size : t -> int
 
 val opp : t -> t
 (** Opposite position, when it makes sense (left/right) *)

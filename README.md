@@ -1,4 +1,4 @@
-# Zipperposition [![build status](https://api.travis-ci.org/sneeuwballen/zipperposition.svg?branch=master)](https://travis-ci.org/sneeuwballen/zipperposition)
+# Zipperposition [![build status](https://api.travis-ci.org/sneeuwballen/zipperposition.svg?branch=master)](https://travis-ci.org/sneeuwballen/zipperposition) ![build (gh)](https://github.com/sneeuwballen/zipperposition/workflows/build/badge.svg)
 
 - Automated theorem prover for first-order logic with equality and theories.
 - Logic toolkit (`logtk`), designed primarily
@@ -10,7 +10,7 @@
 
 Zipperposition is intended to be a superposition prover for full first
 order logic, plus some extensions
-(datatypes, recursive functions, arithmetic, lambda-free higher order).
+(datatypes, recursive functions, lambda-free higher order).
 The accent is on flexibility, modularity and simplicity rather than
 performance, to allow quick experimenting on automated theorem proving. It
 generates TSTP traces or graphviz files for nice graphical display.
@@ -29,9 +29,9 @@ Superposition-based theorem proving is an active field of research, so
 there is a lot of literature about it; for this implementation the main references
 for the base calculus are:
 
-* the chapter _paramodulation-based theorem proving_ of the _handbook of automated reasoning_,
-* the paper _E: a brainiac theorem prover_ that describes the [E prover](http://eprover.org) by S.Schulz,
-* the paper _Superposition with equivalence reasoning and delayed clause normal form transformation_ by H.Ganzinger and J.Stuber
+* the chapter _Paramodulation-based theorem proving_ of the _Handbook of Automated Reasoning_,
+* the paper _E: a brainiac theorem prover_ that describes the [E prover](http://eprover.org) by S. Schulz,
+* the paper _Superposition with equivalence reasoning and delayed clause normal form transformation_ by H. Ganzinger and J. Stuber
 
 **Disclaimer**: Note that the prover is a research project.
 Please don't use it to drive your personal nuclear power plant, nor as a
@@ -124,7 +124,6 @@ Typical usage:
 ```
 $ zipperposition --help
 $ zipperposition problem_file [options]
-$ zipperposition --arith examples/ARI114=1.p
 $ zipperposition --dot /tmp/foo.dot examples/ind/nat1.zf
 ```
 

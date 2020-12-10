@@ -32,9 +32,17 @@ let flag_cut_introduced = SClause.new_flag()
 module type S = Avatar_intf.S
 
 let k_avatar : (module S) Flex_state.key = Flex_state.create_key ()
+let k_avatar_enabled = Flex_state.create_key ()
 let k_show_lemmas : bool Flex_state.key = Flex_state.create_key()
 let k_simplify_trail : bool Flex_state.key = Flex_state.create_key()
 let k_back_simplify_trail : bool Flex_state.key = Flex_state.create_key()
+let k_abstract_known_singletons : bool Flex_state.key = Flex_state.create_key()
+let k_split_only_initial : bool Flex_state.key = Flex_state.create_key()
+let k_split_only_goals : bool Flex_state.key = Flex_state.create_key()
+let k_split_only_ground : bool Flex_state.key = Flex_state.create_key()
+let k_max_trail_size : int Flex_state.key = Flex_state.create_key()
+let k_infer_from_components : bool Flex_state.key = Flex_state.create_key()
+
 
 module Make(E : Env.S)(Sat : Sat_solver.S)
 = struct
@@ -61,7 +69,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
        two variables occur in the same literal.  *)
     let uf_vars =
       C.Seq.vars c
-      |> T.VarSet.of_seq
+      |> T.VarSet.of_iter
       |> T.VarSet.to_list
       |> UF.create
     (* set of ground literals (each one is its own component) *)
@@ -91,16 +99,35 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     Lit.Set.iter (fun lit -> components := [lit] :: !components) !cluster_ground;
     UF.iter uf_vars (fun _ comp -> components := Lit.Set.to_list comp :: !components);
 
+    let proof =
+      Proof.Step.esa
+        [Proof.Parent.from @@ C.proof c] in
+    let bool_guard =
+      C.trail c
+      |> Trail.to_list
+      |> List.map Trail.Lit.neg in
+
     begin match !components with
       | [] -> assert (Array.length lits=0); None
-      | [_] -> None
+      | [lits] ->
+        if E.flex_get k_abstract_known_singletons then (
+          let lits = Array.of_list lits in
+          let bool_name = BBox.find_boolean_lit lits in
+          CCOpt.iter (fun bool_lit -> 
+              (* asserting Trail -> bool_name *)
+              if List.for_all (fun bg -> 
+                  BBox.Lit.equal (BBox.Lit.neg bg) bool_lit)
+                  bool_guard then (
+                (* ignoring tautoligies *)
+                Sat.add_clause ~proof:(proof ~rule:(Proof.Rule.mk "recognize_known")) 
+                  (bool_lit :: bool_guard));
+            ) bool_name
+        );
+        None
       | _::_ ->
         (* do a simplification! *)
         Util.incr_stat stat_splits;
-        let proof =
-          Proof.Step.esa ~rule:(Proof.Rule.mk "split")
-            [Proof.Parent.from @@ C.proof c]
-        in
+
         (* elements of the trail to keep *)
         let keep_trail =
           C.trail c |> Trail.filter BBox.must_be_kept
@@ -114,22 +141,18 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
                  (fun k->k Literals.pp lits BBox.pp bool_name);
                (* new trail: add the new one *)
                let trail = Trail.add bool_name keep_trail in
-               let c = C.create_a ~trail ~penalty:(C.penalty c) lits proof in
+               let c = C.create_a ~trail ~penalty:(C.penalty c) lits (proof ~rule:(Proof.Rule.mk "split")) in
                c, bool_name)
             !components
         in
         let clauses, bool_clause = List.split clauses_and_names in
-        Util.debugf ~section 4 "@[split of @[%a@]@ yields @[%a@]@]"
+        Util.debugf ~section 2 "@[split of @[%a@]@ yields @[%a@]@]"
           (fun k->k C.pp c (Util.pp_list C.pp) clauses);
         (* add boolean constraint: trail(c) => bigor_{name in clauses} name *)
-        let bool_guard =
-          C.trail c
-          |> Trail.to_list
-          |> List.map Trail.Lit.neg
-        in
+
         let bool_clause = List.append bool_clause bool_guard in
-        Sat.add_clause ~proof bool_clause;
-        Util.debugf ~section 4 "@[constraint clause is @[%a@]@]"
+        Sat.add_clause ~proof:(proof ~rule:(Proof.Rule.mk "split")) bool_clause;
+        Util.debugf ~section 2 "@[constraint clause is @[%a@]@]"
           (fun k->k BBox.pp_bclause bool_clause);
         (* return the clauses *)
         Some clauses
@@ -138,11 +161,29 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
   (* Avatar splitting *)
   let split c =
     ZProf.enter_prof prof_splits;
-    let res =
-      if Array.length (C.lits c) <= 1 || Literals.is_trivial (C.lits c)
-      then None
-      else simplify_split_ c
-    in
+
+    let should_split c = 
+      (not @@ Literals.is_trivial (C.lits c)) &&
+      (not @@ E.flex_get k_split_only_initial || C.proof_depth c == 0) &&
+      (not @@ E.flex_get k_split_only_ground || C.is_ground c) &&
+      (not @@ E.flex_get k_split_only_goals || 
+       CCOpt.get_or ~default:(-1) (C.distance_to_goal c) >= 0) &&
+      (not @@ E.flex_get k_abstract_known_singletons ||
+       Array.length (C.lits c) != 0) &&
+      (E.flex_get k_abstract_known_singletons ||
+       Array.length (C.lits c) > 1) &&
+      (E.flex_get k_max_trail_size < 0 || 
+       Trail.length (C.trail c) <= E.flex_get k_max_trail_size) in
+
+    let res = if (should_split c) then simplify_split_ c else None in
+    
+    (match res with 
+    | None -> Util.debugf ~section 1 "Clause @[%a@] cannot be split@." (fun k -> k C.pp c);
+    | Some res ->
+      Util.debugf ~section 1 "Clause @[%a@] split into:@.@[%a@]@." 
+        (fun k -> k C.pp c (CCList.pp C.pp) res));
+
+
     ZProf.exit_prof prof_splits;
     res
 
@@ -151,7 +192,10 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
 
   (* if c.lits = [], negate c.trail *)
   let check_empty c =
-    if Array.length (C.lits c) = 0 && !filter_absurd_trails_ (C.trail c)
+    (* trail can be empty if clause is simplified into empty clause *)
+    if Array.length (C.lits c) = 0 
+       && not (Trail.is_empty (C.trail c))
+       && !filter_absurd_trails_ (C.trail c)
     then (
       assert (not (Trail.is_empty (C.trail c)));
       let b_clause =
@@ -163,12 +207,36 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
         (fun k->k C.pp c (C.id c) BBox.pp_bclause b_clause);
       Sat.add_clause ~proof:(C.proof_step c) b_clause;
     );
-    [] (* never infers anything! *)
+    if Array.length (C.lits c) = 0 &&
+       E.flex_get k_infer_from_components && 
+       Trail.length (C.trail c) = 1 then (
+      let bool_lit = List.hd (Trail.to_list (C.trail c)) in
+      let negate = if BBox.Lit.sign bool_lit then Lit.negate else CCFun.id in
+      match BBox.as_lits bool_lit with 
+      | Some lits ->
+        let skolemizer = 
+          Literals.vars lits
+          |> List.map (fun v -> 
+              (v, 0), (snd @@ Term.mk_fresh_skolem [] (HVar.ty v), 0))
+          |> Subst.FO.of_list' in
+        let lits' = 
+          Literals.apply_subst Subst.Renaming.none skolemizer (lits,0)
+          |> CCArray.to_list in
+        let proof = 
+          Proof.Step.inference ~rule:(Proof.Rule.mk "ground_avatar") [C.proof_parent c] in
+        List.map (fun lit ->
+            C.create ~penalty:(C.penalty c) ~trail:Trail.empty 
+              [negate lit] proof 
+          ) lits'
+      | None -> []
+    ) else [] (* never infers anything -- 
+                 if ground empty avatar clauses 
+                 are not added to the proof state. *)
 
   (* check whether the trail is false and will remain so *)
   let trail_is_trivial_ (trail:Trail.t): bool =
     let res =
-      Trail.to_seq trail
+      Trail.to_iter trail
       |> Iter.find_map
         (fun lit ->
            try match Sat.valuation_level lit with
@@ -275,7 +343,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
   let backward_simplify_trails (_:C.t): C.ClauseSet.t =
     if Sat.last_result () = Sat_solver.Sat && new_proved_lits () then (
       E.ProofState.ActiveSet.clauses ()
-      |> C.ClauseSet.to_seq
+      |> C.ClauseSet.to_iter
       |> Iter.filter (fun c -> not (Trail.is_empty @@ C.trail c))
       |> Iter.filter
         (fun c ->
@@ -289,7 +357,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
                "(@[<2>backward_simplify_trail@ %a@])" (fun k->k C.pp c);
            );
            ok)
-      |> C.ClauseSet.of_seq
+      |> C.ClauseSet.of_iter
     ) else C.ClauseSet.empty
 
   let skolem_count_ = ref 0
@@ -536,17 +604,41 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
     ZProf.exit_prof prof_check;
     res
 
-  let register ~split:do_split () =
-    Util.debugf ~section:Const.section 2 "register extension Avatar (split: %B)"
-      (fun k->k do_split);
+  let register ~split_kind () =
+    let split_to_str = function
+      | `Lazy -> "lazy"
+      | `Eager -> "eager"
+      | `Off -> "off" in
+
+    Util.debugf ~section:Const.section 2 "register extension Avatar (split: %s)"
+      (fun k->k (split_to_str split_kind));
     Sat.set_printer BBox.pp;
-    if do_split then (
-      E.add_multi_simpl_rule split;
-    );
+    (match split_kind with
+    | `Lazy -> E.add_multi_simpl_rule ~priority:0 split
+    | `Eager -> 
+      E.add_cheap_multi_simpl_rule split;
+      (* this rule is used to interfere with lazy clausification *)
+      E.add_multi_simpl_rule ~priority:0 split
+    | `Off -> ());
+    
     E.add_unary_inf "avatar_check_empty" check_empty;
-    E.add_generate "avatar_check_sat" check_satisfiability;
-    E.add_generate "avatar.lemmas" inf_new_lemmas;
+    E.add_generate ~priority:1000 "avatar_check_sat" check_satisfiability;
+    E.add_generate ~priority:100 "avatar.lemmas" inf_new_lemmas;
     E.add_clause_conversion convert_lemma;
+
+    if split_kind != `Off then 
+      Signal.on E.on_start (fun () -> 
+        E.get_passive ()
+        |> Iter.iter (fun cl ->
+          match split cl with 
+          | None -> ()
+          | Some splitted ->
+            E.remove_passive (Iter.singleton cl);
+            E.add_passive (Iter.of_list splitted)
+        );
+
+      Signal.ContinueListening
+    );
     E.add_is_trivial_trail trail_is_trivial;
     if E.flex_get k_simplify_trail then (
       E.add_unary_simplify simplify_trail;
@@ -564,10 +656,17 @@ end
 
 let get_env (module E : Env.S) : (module S) = E.flex_get k_avatar
 
-let enabled_ = ref true
+let avatar_kind = ref `Lazy
 let show_lemmas_ = ref false
 let simplify_trail_ = ref true
 let back_simplify_trail_ = ref true
+let abstract_known_singletons = ref false
+let split_only_initial = ref false
+let split_only_goals = ref false
+let split_only_ground = ref false
+let max_trail_size = ref (-1)
+let infer_from_components = ref false
+
 
 let extension =
   let action env =
@@ -580,30 +679,56 @@ let extension =
     E.flex_add k_show_lemmas !show_lemmas_;
     E.flex_add k_simplify_trail !simplify_trail_;
     E.flex_add k_back_simplify_trail !back_simplify_trail_;
+    E.flex_add k_abstract_known_singletons !abstract_known_singletons;
+    E.flex_add k_split_only_initial !split_only_initial;
+    E.flex_add k_split_only_goals !split_only_goals;
+    E.flex_add k_split_only_ground !split_only_ground;
+    E.flex_add k_max_trail_size !max_trail_size;
+    E.flex_add k_infer_from_components !infer_from_components;
+    E.flex_add k_avatar_enabled (!avatar_kind != `Off);
+
     Util.debug 1 "enable Avatar";
-    A.register ~split:!enabled_ ()
+    A.register ~split_kind:!avatar_kind ()
   in
   Extensions.({default with name="avatar"; env_actions=[action]})
 
 let () =
   Params.add_opts
-    [ "--avatar", Arg.Set enabled_, " enable Avatar splitting"
-    ; "--no-avatar", Arg.Clear enabled_, " disable Avatar splitting"
+    [ "--avatar", Arg.Symbol (["lazy";"eager";"off"],
+        (fun s -> match s with 
+          | "lazy" -> avatar_kind := `Lazy
+          | "eager" -> avatar_kind := `Eager
+          | "off" -> avatar_kind := `Off
+          | _ -> assert false)), " enable Avatar splitting"
     ; "--print-lemmas", Arg.Set show_lemmas_, " show status of Avatar lemmas"
     ; "--avatar-simp-trail", Arg.Set simplify_trail_, " simplify boolean trails in Avatar"
     ; "--no-avatar-simp-trail", Arg.Clear simplify_trail_, " do not simplify boolean trails in Avatar"
     ; "--avatar-backward-simp-trail", Arg.Set back_simplify_trail_, " backward-simplify boolean trails in Avatar"
     ; "--no-avatar-backward-simp-trail", Arg.Clear back_simplify_trail_, " do not backward-simplify boolean trails in Avatar"
+    ; "--abstract-known-singletons", Arg.Bool (fun b -> abstract_known_singletons :=  b), 
+      " if a clause C <- [|A1, ..., An|] cannot be split, but its component is " ^
+      " C is known, then add \\neg A1 \\lor ... \\lor \\neg An \\lor [| C |] to the " ^
+      " set of SAT clauses."
+    ; "--split-only-initial", Arg.Bool (fun b -> split_only_initial :=  b), " split only initial clauses"
+    ; "--split-only-goals", Arg.Bool (fun b -> split_only_goals :=  b), " split only clauses that interacted with goal"
+    ; "--split-only-ground", Arg.Bool ((:=) split_only_ground), " split only ground clauses"
+    ; "--max-trail-size", Arg.Int (fun v -> max_trail_size := v), 
+      " sets the limit of the trail size that a clause can have to be splittable. " ^
+      " Negative value sets the limit to infinity"
+    ; "--infer-from-components", Arg.Bool (fun b -> infer_from_components := b), 
+      " when empty clause \bot <- A is infered, if A has only one component,
+        skolemize and negate the component and add it to the proof state. "
     ];
-  Params.add_to_mode "ho-complete-basic" (fun () ->
-      enabled_ := false
-    );
-  Params.add_to_mode "ho-pragmatic" (fun () ->
-      enabled_ := false
-    );
-  Params.add_to_mode "ho-competitive" (fun () ->
-      enabled_ := false
-    );
-  Params.add_to_mode "fo-complete-basic" (fun () ->
-      enabled_ := false
+  Params.add_to_modes 
+    [ "ho-complete-basic"
+    ; "ho-pragmatic"
+    ; "ho-competitive"
+    ; "fo-complete-basic"
+    ; "lambda-free-intensional"
+    ; "lambda-free-extensional"
+    ; "ho-comb-complete"
+    ; "lambda-free-purify-intensional"
+    ; "lambda-free-purify-extensional"] 
+    (fun () ->
+       avatar_kind := `Off
     );

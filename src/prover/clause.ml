@@ -40,7 +40,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   type t = {
     sclause : sclause;
-    penalty: int; (** heuristic penalty *)
+    mutable penalty: int; (** heuristic penalty *)
     selected : BV.t Lazy.t; (** bitvector for selected lits*)
     max_lits : int list Lazy.t; (** bitvector for maximal lits *)
     mutable proof : proof_step; (** Proof of the clause *)
@@ -72,12 +72,16 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let is_ground c = Literals.is_ground c.sclause.lits
 
   let weight c = Lits.weight c.sclause.lits
+  let ho_weight c = 
+    Lits.Seq.terms c.sclause.lits
+    |> Iter.fold (fun acc t -> T.ho_weight t + acc) 0
 
   let trail c = c.sclause.trail
   let has_trail c = not (Trail.is_empty c.sclause.trail)
   let trail_subsumes c1 c2 = Trail.subsumes c1.sclause.trail c2.sclause.trail
   let is_active c ~v = Trail.is_active c.sclause.trail ~v
   let penalty c = c.penalty
+  let inc_penalty c inc = c.penalty <- c.penalty + inc
 
   let trail_l = function
     | [] -> Trail.empty
@@ -365,11 +369,14 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     let vars c = terms c |> Iter.flat_map T.Seq.vars
   end
 
-  let apply_subst ?(proof=None) (c,sc) subst =
+  let apply_subst ?(renaming) ?(proof=None) ?(penalty_inc=None) (c,sc) subst =
     let lits = lits c in
-    let new_lits = _apply_subst_no_simpl subst (lits, sc) in
+    let renaming = CCOpt.get_or ~default:(S.Renaming.create ()) renaming in
+    let new_lits = Literals.apply_subst renaming  subst (lits, sc) in
     let proof_step = CCOpt.get_or ~default:(proof_step c) proof in
-    create ~trail:(trail c) ~penalty:(penalty c) (CCArray.to_list new_lits) proof_step
+    (* increase can be negative if we perform a simplification *)
+    let penalty = max ((CCOpt.get_or ~default:0 penalty_inc) + (penalty c)) 1 in
+    create ~trail:(trail c) ~penalty (CCArray.to_list new_lits) proof_step
 
 
   let ground_clause c =
@@ -377,6 +384,19 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     let proof_step = proof_step c in
     create ~trail:(trail c) ~penalty:(penalty c) new_lits proof_step
 
+  let is_orphaned c =
+    let aux proof =
+      let p_res, step = Proof.S.result proof, Proof.S.step proof in
+      (* we reached the root *)
+      if Proof.Result.is_stmt p_res then false
+      else (
+        Proof.Step.is_inference step &&
+        not (List.mem Proof.Tag.T_cannot_orphan (Proof.Step.tags step)) &&
+        List.exists (fun pr ->
+          Proof.Result.is_dead_cl (Proof.S.result pr) ())
+        (List.map Proof.Parent.proof (Proof.Step.parents step))) 
+    in
+    not (is_empty c) && aux (proof c)
   (** {2 Filter literals} *)
 
   module Eligible = struct
@@ -393,8 +413,6 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     let eq _ lit = match lit with
       | Lit.Equation (_, _, true) -> true
       | _ -> false
-
-    let arith _ lit = Lit.is_arith lit
 
     let filter f _ lit = f lit
 
@@ -478,14 +496,14 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
             Lit.pp lit (pp_selected selected) i (pp_maxlit max) i
         in
         Format.fprintf out "[@[%a@]]"
-          (Util.pp_seq ~sep:" ∨ " pp_lit)
+          (Util.pp_iter ~sep:" ∨ " pp_lit)
           (Iter.of_array_i lits)
       )
     in
-    Format.fprintf out "@[%a@[<2>%a%a@]@]/id:%d/depth:%d"
+    Format.fprintf out "@[%a@[<2>%a%a@]@]/id:%d/depth:%d/penalty:%d/red:%b"
       SClause.pp_vars c.sclause pp_lits c.sclause.lits
       SClause.pp_trail c.sclause.trail c.sclause.id
-      (proof_depth c);
+      (proof_depth c) (penalty c) (is_redundant c);
     ()
 
   let pp_tstp out c = SClause.pp_tstp out c.sclause
@@ -496,13 +514,13 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let pp_set out set =
     Format.fprintf out "{@[<hv>%a@]}"
-      (Util.pp_seq ~sep:"," pp)
-      (ClauseSet.to_seq set)
+      (Util.pp_iter ~sep:"," pp)
+      (ClauseSet.to_iter set)
 
   let pp_set_tstp out set =
     Format.fprintf out "@[<v>%a@]"
-      (Util.pp_seq ~sep:"," pp_tstp)
-      (ClauseSet.to_seq set)
+      (Util.pp_iter ~sep:"," pp_tstp)
+      (ClauseSet.to_iter set)
 
 
   let check_types c =

@@ -3,14 +3,22 @@
 
 (** {1 Booleans} *)
 open Libzipperposition
+open Logtk
 
 val _quant_rename : bool ref
+
+type reasoning_kind    = 
+    BoolReasoningDisabled | BoolCasesInference | BoolCasesDisabled 
+  | BoolCasesSimplification | BoolCasesKeepParent
+  | BoolCasesPreprocess
+
+val k_bool_reasoning : reasoning_kind Flex_state.key
 
 module type S = sig
   module Env : Env.S
   module C : module type of Env.C
 
-  (** {6 Registration} *)
+  (** {5 Registration} *)
 
   val setup : unit -> unit
   (** Register rules in the environment *)

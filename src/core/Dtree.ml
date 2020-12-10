@@ -268,7 +268,7 @@ module Make(E : Index.EQUATION) = struct
     !n
 
   let _as_graph =
-    CCGraph.make (fun trie -> CharMap.to_seq trie.map)
+    CCGraph.make (fun trie -> CharMap.to_iter trie.map)
 
   (* TODO: print leaf itself *)
 

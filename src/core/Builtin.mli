@@ -10,6 +10,8 @@
 
     @since 1.5 *)
 
+val _t_bigger_false : bool ref
+
 type t =
   | Not
   | And
@@ -64,6 +66,11 @@ type t =
   | Greatereq
   | Box_opaque (** hint not to open this formula *)
   | Pseudo_de_bruijn of int (** magic to embed De Bruijn indices in normal terms *)
+  | BComb (** BCIKS combinators *)
+  | CComb
+  | IComb
+  | KComb
+  | SComb
   | Distinct
 
 include Interfaces.HASH with type t := t
@@ -103,7 +110,9 @@ val is_arith : t -> bool
 (** Any arithmetic operator, or constant *)
 val is_logical_op : t -> bool
 val is_logical_binop : t -> bool
+val is_flattened_logical : t -> bool
 val is_quantifier : t -> bool
+val is_combinator : t -> bool
 val true_ : t
 val false_ : t
 val eq : t
@@ -130,6 +139,8 @@ val wildcard : t    (** $_ for type inference *)
 val multiset : t    (** type of multisets *)
 
 val grounding : t
+
+val as_int : t -> int
 
 module Arith : sig
   val floor : t
@@ -173,11 +184,15 @@ module Tag : sig
     | T_lia (** integer arith *)
     | T_lra (** rational arith *)
     | T_ho (** higher order *)
+    | T_live_cnf (** live_cnf *)
+    | T_ho_norm (** higher-order normalization *)
+    | T_dont_increase_depth (** don't increase depth  *)
     | T_ext (** extensionality *)
     | T_ind (** induction *)
     | T_data (** datatypes *)
     | T_distinct (** distinct constants *)
     | T_ac of ID.t (** AC symbol *)
+    | T_cannot_orphan
 
   val compare : t -> t -> int
   val pp : t CCFormat.printer
