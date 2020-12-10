@@ -904,7 +904,7 @@ let rec as_def ?loc ?of_ bound t =
           T.pp t ID.pp id ID.pp id' ID.pp id ID.pp id;
       | _ -> ()
     end;
-    check_ty_quantifier_free ?loc ty;
+    check_ty_prenex ?loc ty;
     if T.Ty.returns_tType ty then (
       error_ ?loc
         "in definition of %a,@ equality between types is forbidden" ID.pp id;
