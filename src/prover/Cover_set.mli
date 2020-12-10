@@ -14,7 +14,7 @@ type case
 
 type t
 
-(** {6 Inductive Case}
+(** {5 Inductive Case}
 
     An inductive case is a term that belongs to the coverset of some
     inductive constant. The inductive constant must fall into one

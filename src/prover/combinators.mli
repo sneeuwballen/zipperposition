@@ -1,11 +1,10 @@
-open Extensions
 open Logtk
 
 module type S = sig
   module Env : Env.S
   module C : module type of Env.C
 
-  (** {6 Registration} *)
+  (** {5 Registration} *)
 
   val setup : unit -> unit
   (* Converts lambdas to combinators 

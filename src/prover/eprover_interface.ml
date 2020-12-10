@@ -13,7 +13,7 @@ exception PolymorphismDetected
 module type S = sig
   module Env : Env.S
 
-  (** {6 Registration} *)
+  (** {5 Registration} *)
 
 
   val set_e_bin : string -> unit

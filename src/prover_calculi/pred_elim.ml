@@ -25,7 +25,7 @@ module A = Libzipperposition_avatar
 module type S = sig
   module Env : Env.S
 
-  (** {6 Registration} *)
+  (** {5 Registration} *)
   val setup : unit -> unit
   val begin_fixpoint : unit -> unit
   val fixpoint_step : unit -> bool

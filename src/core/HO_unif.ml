@@ -254,7 +254,7 @@ module U = struct
       "(@[<hv2>ho_unif_pb@ %a@])"
       (Util.pp_iter ~sep:" " pp_pb) (Iter.of_queue t.queue)
 
-  (** {6 normalization of pairs} *)
+  (** {5 normalization of pairs} *)
 
   type pair_kind =
     | P_rigid_rigid
@@ -325,7 +325,7 @@ module U = struct
         Some { pb with pairs; }
     end
 
-  (** {6 Main loop} *)
+  (** {5 Main loop} *)
 
   let mk_fresh_var offset ty = offset+1, HVar.make offset ~ty
 

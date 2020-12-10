@@ -24,7 +24,7 @@ and projector = private {
   p_cstor: constructor lazy_t;
 }
 
-(** {6 Inductive Types} *)
+(** {5 Inductive Types} *)
 
 (** An inductive type, along with its set of constructors *)
 type t = private {
@@ -76,7 +76,7 @@ val is_recursive : t -> bool
 
 val proof : t -> Proof.t
 
-(** {6 Constructors} *)
+(** {5 Constructors} *)
 
 val mk_constructor : ID.t -> Type.t -> (Type.t * (ID.t * Type.t)) list -> constructor
 
@@ -95,7 +95,7 @@ val contains_inductive_types : Term.t -> bool
 (** [true] iff the term contains at least one subterm with
     an inductive type *)
 
-(** {6 Projectors} *)
+(** {5 Projectors} *)
 
 val projector_id: projector -> ID.t
 val projector_ty: projector -> Type.t

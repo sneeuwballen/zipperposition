@@ -21,7 +21,7 @@ module Make(A : ARG) = struct
   module Stm = A.Stm
   module E = A.Env
 
-  (** {6 Weight functions} *)
+  (** {5 Weight functions} *)
   module WeightFun = struct
     type t = Stm.t -> int
 

@@ -1,7 +1,7 @@
 
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
-(** {6 Generic multisets} *)
+(** {5 Generic multisets} *)
 
 module type S = Multiset_intf.S
 

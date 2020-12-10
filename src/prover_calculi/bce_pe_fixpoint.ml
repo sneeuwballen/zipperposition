@@ -6,7 +6,7 @@ let k_enabled = Flex_state.create_key ()
 module type S = sig
   module Env : Env.S
 
-  (** {6 Registration} *)
+  (** {5 Registration} *)
   val setup : unit -> unit
 end
 

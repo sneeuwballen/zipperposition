@@ -131,14 +131,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       module Env = Env end)
   module Bools = Booleans.Make(Env)
 
-  (** {6 Stream queue} *)
+  (** {5 Stream queue} *)
   let k_stmq = Flex_state.create_key ()
   let _cc_simpl = ref (Congruence.FO.create ~size:256 ())
 
 
   let _stmq () = Env.flex_get k_stmq
 
-  (** {6 Index Management} *)
+  (** {5 Index Management} *)
 
   let _idx_sup_into = ref (TermIndex.empty ())
   let _idx_lambdasup_into = ref (TermIndex.empty ())
@@ -613,7 +613,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       (_update_simpl UnitIdx.remove);
     ()
 
-  (** {6 Inference Rules} *)
+  (** {5 Inference Rules} *)
 
   (* ----------------------------------------------------------------------
    * Superposition rule

@@ -1,7 +1,7 @@
 
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
-(** {6 Simple Proof checker for TSTP} *)
+(** {5 Simple Proof checker for TSTP} *)
 
 open Logtk
 open Logtk_parsers

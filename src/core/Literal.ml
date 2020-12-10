@@ -712,7 +712,6 @@ module Pos = struct
     in invalid_arg msg
 
   let split lit pos =
-    let module AL = Int_lit in
     match lit, pos with
     | True, P.Stop ->
       {lit_pos=P.stop; term_pos=P.stop; term=T.true_; }
@@ -733,7 +732,6 @@ module Pos = struct
     T.Pos.at s.term s.term_pos
 
   let replace lit ~at ~by =
-    let module AL = Int_lit in
     match lit, at with
     | Equation (l, r, sign), P.Left pos' ->
       let cons = if sign then mk_eq else mk_neq in
@@ -751,7 +749,6 @@ module Pos = struct
   let term_pos lit pos = snd (cut lit pos)
 
   let is_max_term ~ord lit pos =
-    let module AL = Int_lit in
     match lit, pos with
     | Equation (l, r, _), P.Left _ ->
       Ordering.compare ord l r <> Comparison.Lt

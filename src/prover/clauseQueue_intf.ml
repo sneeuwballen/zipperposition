@@ -20,7 +20,7 @@ module type S = sig
   
   val register_conjecture_clause : C.t -> unit
 
-  (** {6 Weight functions} *)
+  (** {5 Weight functions} *)
   module WeightFun : sig
     type t = C.t -> int
     (** attribute a weight to a clause. The smaller, the better (lightweight
@@ -90,7 +90,7 @@ module type S = sig
   val name : t -> string
   (** Name of the implementation/role of the queue *)
 
-  (** {6 Available Queues} *)
+  (** {5 Available Queues} *)
 
   (* val make : ratio:int -> weight:(C.t -> int) -> string -> t
      (** Bring your own implementation of queue.
@@ -133,7 +133,7 @@ module type S = sig
       returned with the call to take_first();
       returns true if clause was actually removed *) 
 
-  (** {6 IO} *)
+  (** {5 IO} *)
 
   val pp : t CCFormat.printer
   val to_string : t -> string
