@@ -333,10 +333,16 @@ end
 
 (** {2 Hindley-Milner} *)
 
-(* TODO: check, afterwards, that types:
-   - do not contain metas variables
-   - are closed
-*)
+(* fails if [ty] is not a prenex type *)
+let check_ty_prenex ?loc ty =
+  if not @@ T.Ty.is_prenex ty then (
+    error_ ?loc "non-prenex type %a" T.pp ty
+  )
+
+let check_ty_quantifier_free ?loc ty =
+  if not @@ T.Ty.is_quantifier_free ty then (
+    error_ ?loc "type %a@ must be quantifier-free" T.pp ty
+  )
 
 (* convert the typed variables into proper variables [vars'], call [f vars'],
    and then exit the scope of [vars'] *)
@@ -633,6 +639,7 @@ let rec infer_rec ?loc ctx (t:PT.t) : T.t =
         ~f:(fun vars' ->
             let t' = infer_rec ?loc ctx t' in
             let ty = T.Ty.fun_ ?loc (List.map Var.ty vars') (T.ty_exn t') in
+            check_ty_quantifier_free ?loc ty;
             T.bind_list ?loc ~ty Binder.Lambda vars' t')
     | PT.Bind (Binder.ForallTy, vars, t') ->
       with_non_inferred_typed_vars ?loc ctx vars
@@ -897,6 +904,7 @@ let rec as_def ?loc ?of_ bound t =
           T.pp t ID.pp id ID.pp id' ID.pp id ID.pp id;
       | _ -> ()
     end;
+    check_ty_prenex ?loc ty;
     if T.Ty.returns_tType ty then (
       error_ ?loc
         "in definition of %a,@ equality between types is forbidden" ID.pp id;
@@ -969,6 +977,7 @@ let infer_defs ?loc ctx (l:A.def list): (_,_,_) Stmt.def list =
       (fun d ->
          let id = ID.make d.A.def_id in
          let ty = infer_ty_exn ctx d.A.def_ty in
+         check_ty_prenex ?loc ty;
          (* cannot return [Type] *)
          if T.Ty.returns_tType ty then (
            error_ ?loc
@@ -1027,6 +1036,7 @@ let infer_statement_exn ?(file="<no file>") ctx st =
          TODO: warning if it shadows? *)
       let id = ID.make s in
       let ty = infer_ty_exn ctx ty in
+      check_ty_prenex ?loc ty;
       Ctx.declare ?loc ctx id ty;
       set_notation id st.A.attrs;
       Stmt.ty_decl ~attrs ~proof:(Proof.Step.intro src Proof.R_decl) id ty
