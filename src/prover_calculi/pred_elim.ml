@@ -312,6 +312,11 @@ module Make(E : Env.S) : S with module Env = E = struct
             (* reintroduce gate clauses *)
             task.pos_cls <- CS.add_list task.pos_cls pos_cls;
             task.neg_cls <- CS.add_list task.neg_cls neg_cls;
+            if Env.flex_get k_non_singular_pe &&
+               TaskSet.mem task !_task_queue &&
+               not (CS.is_empty task.offending_cls) then (
+              _task_queue := TaskSet.remove task !_task_queue
+            );
             task.is_gate <- None
           )
         | None -> ()
@@ -374,9 +379,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       ) iter;
     in
     assert(CS.is_empty task.offending_cls || Env.flex_get k_non_singular_pe);
-    if (not (CS.is_empty task.offending_cls)) then (
-      CCFormat.printf "performing non-singular PE.";
-    );
     remove (CS.to_iter task.offending_cls);
     remove (CS.to_iter task.pos_cls);
     remove (CS.to_iter task.neg_cls);
@@ -480,10 +482,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       (* checking for or will also check for equivalences p(x) <-> q(x) *)
       match find_and_or pos_gates neg_gates with
       | Some(neg_cl, pos_cls) ->
-
-        CCFormat.printf "neg:@[%a@]@.pos:@[%a@]@." C.pp neg_cl (CCList.pp C.pp) pos_cls;
-
-
         let to_remove = CS.of_list (neg_cl :: pos_cls) in
         task.neg_cls <- CS.diff task.neg_cls to_remove;
         task.pos_cls <- CS.diff task.pos_cls to_remove;
@@ -504,7 +502,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
       Util.debugf ~section 5 "initially: @[%a@]" (fun k -> k pp_task task);
 
-      if CS.is_empty task.offending_cls then (
+      if should_schedule task then (
         _task_queue := TaskSet.add task !_task_queue 
     )) !_pred_sym_idx
 
