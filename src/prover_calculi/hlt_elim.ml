@@ -384,12 +384,14 @@ module Make(E : Env.S) : S with module Env = E = struct
             Some(premise', concl', proofset, subst))
         with Unif.Fail -> None)) 
 
+  exception ClauseTooLarge
   let do_propagated_simpl cl = 
     let bv = CCBV.create ~size:( C.length cl ) true in
     let proofset = ref (CS.empty) in
     let exception PropagatedHTE of T.t * CS.t in
     let is_unit = C.length cl == 1 in
     try
+      if C.length cl > 5 then raise ClauseTooLarge;
       CCArray.iteri (fun i lit -> 
         match get_predicate lit with 
         | Some (lhs, sign) ->
@@ -502,14 +504,17 @@ module Make(E : Env.S) : S with module Env = E = struct
       Util.debugf ~section 1 "simplified[unit_htr(%a)]: @[@[%a@] --> @[%a@]@]@. using @[%a@]"
         (fun k -> k T.pp lit_t C.pp cl C.pp repl (CS.pp C.pp) proofset);
 
+      E.add_passive (Iter.singleton repl);
       Some (repl)
+    | ClauseTooLarge -> None
   
   let unit_simplify cl =
     let exception UnitHTR of T.t * CS.t in
     let n = C.length cl in
     let bv = CCBV.create ~size:n true in
     let proofset = ref CS.empty in
-    try 
+    try
+      if C.length cl > 5 then raise ClauseTooLarge;
       CCArray.iteri (fun i i_lit ->
         match get_predicate i_lit with
         | Some(i_lhs, i_sign) ->
@@ -556,19 +561,18 @@ module Make(E : Env.S) : S with module Env = E = struct
         (List.map C.proof_parent (cl :: CS.to_list proofset))
       in
       let repl = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof in
-      let tauto = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) [L.mk_tauto] proof in
 
       Util.debugf ~section 1 "simplified[unit_htr(%a)]: @[@[%a@] --> @[%a@]@]" 
         (fun k -> k T.pp lit_t C.pp cl C.pp repl);
 
-      E.add_passive (Iter.singleton repl);
-      Some (tauto)
+      Some (repl)
+    | ClauseTooLarge -> None
 
   let do_hte_hle cl =
     let exception HiddenTauto of T.t * T.t * CS.t in
 
     let n = C.length cl in
-    if n >= 2 then (
+    if n >= 2 && n < 5 then (
       try 
         let bv = CCBV.create ~size:n true in
         let proofset = ref CS.empty in
@@ -633,17 +637,13 @@ module Make(E : Env.S) : S with module Env = E = struct
           Proof.Step.simp ~rule:(Proof.Rule.mk "hidden_tautology_elimination")
           (List.map C.proof_parent (cl :: CS.to_list proofset))
         in
-        let tauto = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) [L.mk_tauto] proof in
         let repl = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof in
-        
-        if CS.cardinal proofset != 1 || CS.exists E.is_passive proofset then(
-          E.add_passive (Iter.singleton repl)
-        );
-        
+        let tauto = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) [L.mk_tauto] proof in
         Util.debugf ~section 1 "simplified[hte]: @[@[%a@] --> @[%a@]@]" (fun k -> k C.pp cl C.pp repl);
         Util.debugf ~section 1 "used @[%a@] --> @[%a@] @[(%a)@]" (fun k -> k T.pp lit_a T.pp lit_b (CS.pp C.pp) proofset);
-        (* else the clause is subsumed *)
-        Some (tauto)
+        if CS.cardinal proofset != 1
+        then Env.add_passive (Iter.singleton repl); (* else the clause is subsumed by an active binary one *)
+        Some tauto
     ) else None
 
 
