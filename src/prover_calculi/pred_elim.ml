@@ -465,7 +465,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     in
 
     let check_and () =
-      let pos_gates = filter_gates ~sign:true ~lit_num_filter:(fun n -> n >= 3) in
+      let pos_gates = filter_gates ~sign:true ~lit_num_filter:(fun n -> n > 2) in
       let neg_gates = filter_gates ~sign:false ~lit_num_filter:((=) 2) in
       match find_and_or neg_gates pos_gates with
       | Some (pos_cl, neg_cls) ->
@@ -478,7 +478,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     in
     let check_or () =
       let pos_gates = filter_gates ~sign:true ~lit_num_filter:((=) 2) in
-      let neg_gates = filter_gates ~sign:false ~lit_num_filter:(fun n -> n >= 2) in
+      let neg_gates = filter_gates ~sign:false ~lit_num_filter:(fun n -> n > 2) in
       (* checking for or will also check for equivalences p(x) <-> q(x) *)
       match find_and_or pos_gates neg_gates with
       | Some(neg_cl, pos_cls) ->
