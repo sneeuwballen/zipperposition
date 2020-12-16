@@ -699,15 +699,35 @@ module S = struct
     in
 
     let namespace = Tbl.create 8 in
+    let already_defined = ref ID.Set.empty in
     let tydecl_out out hd ty =
-      Format.fprintf out "thf(@[@[%s@]_type, type, @[%s@] : (@[%a@])@]).@."
-        (ID.name hd) (ID.name hd) (Type.TPTP.pp_ho ~depth:0) (conv_ty ty)
+      if not (ID.Set.mem hd !already_defined) then (
+        Format.fprintf out "thf(@[@[%a@], type, @[%a@]: @[%a@]@]).@."
+          Util.pp_str_tstp (ID.name hd ^ "_type") Util.pp_str_tstp (ID.name hd) (Type.TPTP.pp_ho ~depth:0) (conv_ty ty);
+        already_defined := ID.Set.add hd !already_defined;
+      )
     in
-    
-    Format.fprintf out "@[<v>";
+
+    let declare_combinators () =
+      let decls = 
+        [(Builtin.SComb, "s_comb", "!>[A:$tType, B:$tType, C:$tType]: ((A > B > C) > (A > B) > A > C)");
+        (Builtin.CComb, "c_comb", "!>[A:$tType, B:$tType, C:$tType]: ((A > B > C) > B > A > C)");
+        (Builtin.BComb, "b_comb", "!>[A:$tType, B:$tType, C:$tType]: ((A > B) > (C > A) > C > B)");
+        (Builtin.KComb, "k_comb", "!>[A:$tType, B:$tType]: (B > A > B)");
+        (Builtin.IComb, "i_comb", "!>[A:$tType]: (A > A)")]
+      in
+      List.iter (fun (comb, name, decl) -> 
+        Format.fprintf out "thf(@[@[%a@], type, @[%s@]: @[%s@]@]).@."
+          Util.pp_str_tstp (name ^ "_type") (Builtin.TPTP.to_string comb) decl;
+      ) decls
+    in
 
     
-    let constants = ref F.Set.empty in 
+    (* Format.fprintf out "@[<v>"; *)
+
+    
+    let constants = ref F.Set.empty in
+    let has_comb = ref false in
     let types = ref ID.Set.empty in
 
 
@@ -716,6 +736,12 @@ module S = struct
         let f = Result.to_form (result p) in
         constants := 
           F.Seq.subterms f
+          |> CCFun.tap (fun subterms ->
+            Iter.iter (fun st -> match F.view st with
+            | F.AppBuiltin(hd, args) -> 
+              has_comb := Builtin.is_combinator hd || !has_comb
+            | _ -> ()) subterms
+          )
           |> Iter.filter (F.is_const)
           |> F.Set.of_iter
           |> F.Set.union !constants;
@@ -730,7 +756,6 @@ module S = struct
           | _ -> ()
 
         )
-        
     );
     
 
@@ -739,6 +764,8 @@ module S = struct
       | Some (hd, ty, []) ->  tydecl_out out hd ty
       | _ -> assert false
     ) !constants;
+
+    if !has_comb then declare_combinators ();
 
     traverse ~order:`DFS proof
       (fun p ->

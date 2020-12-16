@@ -531,7 +531,6 @@ let rec infer_rec ?loc ctx t =
       let c = infer_rec ?loc ctx c in
       unify ?loc (T.ty_exn b)(T.ty_exn c);
       ctx.has_ite <- true;
-      CCFormat.printf "ite term@.";
       T.ite_term ?loc a b c
     | PT.Let (l, u) ->
       (* deal with pairs in [l] one by one *)
