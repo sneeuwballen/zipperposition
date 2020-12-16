@@ -291,6 +291,7 @@ let () =
       "--check-types", Arg.Set _check_types, " check types in new clauses";
       "--max-multi-simpl-depth", Arg.Int ((:=) _max_multi_simpl), " maixmum depth of multi step simplification. -1 disables maximum depth.";
       "--try-e", Arg.String (fun path -> e_path := Some path), " try the given eprover binary on the problem";
+      "--disable-e", Arg.Unit (fun () -> e_path := None), " disable E background reasoner";
       "--e-call-point", Arg.Float 
         (fun v -> if v > 1.0 || v < 0.0 then invalid_arg "0 <= e-call-point <= 1.0"
                   else e_call_point := v), 

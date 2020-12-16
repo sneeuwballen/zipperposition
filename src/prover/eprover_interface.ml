@@ -314,7 +314,6 @@ let () =
       )), " how to treat lambdas when giving problem to E";
       "--tmp-dir", Arg.String (fun v -> _tmp_dir := v), " scratch directory for running E";
       "--e-timeout", Arg.Set_int _timeout, " set E prover timeout.";
-      "--disable-e", Arg.Unit (fun () -> e_bin := None), " disable E background reasoner";
       "--e-only-ho-steps", Arg.Bool ((:=) _only_ho_steps), " translate only HO proof steps to E";
       "--e-max-derived", Arg.Set_int _max_derived, " set the limit of clauses that are derived by Zipperposition and given to E";
       "--e-auto", Arg.Bool (fun v -> _e_auto := v), " If set to on eprover will not run in autoschedule, but in auto mode"]
