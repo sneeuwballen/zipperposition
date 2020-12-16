@@ -84,11 +84,6 @@ val record_flatten : ?loc:location -> ty:t -> (string*t) list -> rest:t option -
 (** Build a record with possibly a row variable.
     @raise IllFormedTerm if the [rest] is not either a record or a variable. *)
 
-val ite_const : unit -> t
-val ite_term : ?loc:location -> t -> t -> t -> t
-(* Make a term with distinguished ite ID symbol where
-   the first arg is the condition and the other two are branches. *)
-
 
 val fun_l : ?loc:location -> t Var.t list -> t -> t
 

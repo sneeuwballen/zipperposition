@@ -143,7 +143,7 @@ module Ctx = struct
     (* datatype ID -> list of cstors *)
     mutable new_types: (ID.t * type_) list;
     (* list of symbols whose type has been inferred recently *)
-    mutable has_ite : bool
+    mutable ite_map : T.t T.Map.t
   }
 
   let create
@@ -164,7 +164,7 @@ module Ctx = struct
       new_metas=[];
       local_vars = [];
       new_types = [];
-      has_ite = false
+      ite_map = T.Map.empty
     } in
     ctx
 
@@ -477,6 +477,7 @@ let apply_ty_to_metas ?loc ctx (ty:T.Ty.t): T.Ty.t list * T.Ty.t =
   let ty = apply_unify ctx ~allow_open:true ?loc ty metas in
   metas, ty
 
+
 (* infer a type for [t], possibly updating [ctx]. Also returns a
    continuation to build a typed term. *)
 let rec infer_rec ?loc ctx t =
@@ -529,9 +530,25 @@ let rec infer_rec ?loc ctx t =
       let a = infer_prop_ ?loc ctx a in
       let b = infer_rec ?loc ctx b in
       let c = infer_rec ?loc ctx c in
+      unify ?loc (T.ty_exn a) (T.Ty.prop);
       unify ?loc (T.ty_exn b)(T.ty_exn c);
-      ctx.has_ite <- true;
-      T.ite_term ?loc a b c
+      let mk_ite arg_ty =
+        let id = ID.make (CCFormat.sprintf "zip_internal_ite_%a" T.pp arg_ty) in
+        let ty = T.Ty.(==>) [T.Ty.prop; arg_ty; arg_ty] arg_ty in
+        T.const ~ty id, ty
+      in
+
+      let hd_const = 
+        match T.Map.find_opt (T.ty_exn b) ctx.ite_map with
+        | Some hd -> hd
+        | None ->
+          let hd, ty = mk_ite (T.ty_exn b) in
+          ctx.ite_map <- T.Map.add ty hd ctx.ite_map;
+          hd
+      in
+
+
+      T.app ?loc ~ty:(T.ty_exn b) hd_const [a; b; c]
     | PT.Let (l, u) ->
       (* deal with pairs in [l] one by one *)
       let rec aux = function
@@ -1166,20 +1183,21 @@ let infer_statements_exn
     | Some c -> c
   in
 
-  let mk_ite_axioms () =
-    let ty_var = T.Ty.var (Var.make ~ty:(T.Ty.tType) (ID.make "tyvar")) in
-    let if_t_var = T.var (Var.make ~ty:ty_var (ID.make "if_t")) in
-    let if_f_var = T.var (Var.make ~ty:ty_var (ID.make "if_f")) in
+  let mk_ite_axioms maps =
+    let mk_typed_axioms ~ty ~hd acc =
+      let if_t_var = T.var (Var.make ~ty (ID.make "if_t")) in
+      let if_f_var = T.var (Var.make ~ty (ID.make "if_f")) in
 
-    let if_t = T.ite_term T.Form.true_ if_t_var if_f_var in
-    let if_f = T.ite_term T.Form.false_ if_t_var if_f_var in
-    let ite_const = T.ite_const () in 
-    let proof = (Proof.Step.define_internal (T.head_exn ite_const) []) in
+      let if_t = T.app ~ty hd [T.Form.true_; if_t_var; if_f_var] in
+      let if_f = T.app ~ty hd [T.Form.false_; if_t_var; if_f_var] in
+      let proof = (Proof.Step.define_internal (T.head_exn hd) []) in
 
-    let decl = Statement.ty_decl ~proof (T.head_exn ite_const) (T.ty_exn ite_const) in
-    let if_t_stm =  Statement.assert_ ~proof (T.Form.eq if_t if_t_var) in
-    let if_f_stm =  Statement.assert_ ~proof (T.Form.eq if_f if_f_var) in
-    decl :: if_t_stm :: if_f_stm :: []
+      let decl = Statement.ty_decl ~proof (T.head_exn hd) (T.ty_exn hd) in
+      let if_t_stm =  Statement.assert_ ~proof (T.Form.eq if_t if_t_var) in
+      let if_f_stm =  Statement.assert_ ~proof (T.Form.eq if_f if_f_var) in
+      decl :: if_t_stm :: if_f_stm :: acc
+    in
+    T.Map.fold (fun ty hd acc -> mk_typed_axioms ~ty:(T.Ty.returns ty) ~hd acc) maps []
   in
 
   let res = CCVector.create () in
@@ -1190,8 +1208,8 @@ let infer_statements_exn
        List.iter (CCVector.push res) aux;
        CCVector.push res st)
     seq;
-  if ctx.has_ite then (
-    CCVector.append_list res (mk_ite_axioms ())
+  if not (T.Map.is_empty ctx.ite_map) then (
+    CCVector.append_list res (mk_ite_axioms ctx.ite_map)
   );
   CCVector.freeze res
 
