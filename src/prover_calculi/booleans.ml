@@ -397,7 +397,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           Proof.Rule.mk ("fluid_" ^ (if sign then "bool_" else "loob_") ^ "hoist") in
         let proof = Proof.Step.inference ~rule [C.proof_parent_subst renaming (c,sc_cl) sub] in
         let res = 
-          C.create ~penalty:(C.penalty c + 1) ~trail:(C.trail c)
+          C.create ~penalty:(C.penalty c + 2) ~trail:(C.trail c)
             (new_lit :: CCArray.to_list (C.lits c')) proof in
         Some res
       ) else None
@@ -435,7 +435,7 @@ module Make(E : Env.S) : S with module Env = E = struct
               ) us_opt
             )
           in
-          let stm_res = Env.Stm.make ~penalty:(C.penalty c) ~parents:[c] unif_seq in
+          let stm_res = Env.Stm.make ~penalty:(C.penalty c + 2) ~parents:[c] unif_seq in
           Env.StmQ.add (Env.get_stm_queue ()) stm_res;
           []
         ) else acc
@@ -501,7 +501,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       in
       let rule = Proof.Rule.mk "fluid_log_symbol_hoist" in
       let step = Proof.Step.inference ~rule [C.proof_parent_subst renaming (c,sc_cl) sub] in
-      C.create ~penalty:(C.penalty c) ~trail:(C.trail c) new_lits step
+      C.create ~penalty:(C.penalty c + 2) ~trail:(C.trail c) new_lits step
     in
 
     let eligible = C.Eligible.res c in
@@ -533,7 +533,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                     Some (mk_res sub pos p)        
                 )))
             in
-            let stm_res = Env.Stm.make ~penalty:(C.penalty c) ~parents:[c] seq in
+            let stm_res = Env.Stm.make ~penalty:(C.penalty c + 2) ~parents:[c] seq in
             Env.StmQ.add (Env.get_stm_queue ()) stm_res;
           ) partners;          
         ) app_vars
@@ -577,7 +577,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
       let rule = Proof.Rule.mk "fluid_quant_rw" in
       let step = Proof.Step.inference ~rule [C.proof_parent_subst renaming (c,sc_cl) sub] in
-      let res = C.create_a ~penalty:(C.penalty c) ~trail:(C.trail c) lits step in
+      let res = C.create_a ~penalty:(C.penalty c + 2) ~trail:(C.trail c) lits step in
 
       Util.debugf ~section 5 "fluid_quant_rw:@.@[%a@] -> @.@[%a@]@." 
         (fun k -> k C.pp c C.pp res);
@@ -614,7 +614,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                     Some (mk_res sub pos p)
                 )))
             in
-            let stm_res = Env.Stm.make ~penalty:(C.penalty c) ~parents:[c] seq in
+            let stm_res = Env.Stm.make ~penalty:(C.penalty c + 2) ~parents:[c] seq in
             Env.StmQ.add (Env.get_stm_queue ()) stm_res;
           ) partners;          
         ) app_vars

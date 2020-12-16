@@ -166,7 +166,7 @@ let prec_compare prec a b = match a,b with
   | Head.Q Forall,  Head.Q Exists -> Gt
   | Head.Q Exists,  Head.Q Forall -> Lt
 
-  (* quantifier > lam > db > id > builtin *)
+  (* lam > db > quantifier > symbols > bot > top *)
   | Head.I _,  Head.B _  -> Gt
   | Head.B _,  Head.I _  -> Lt
   | Head.DB _, Head.I _  -> Gt
@@ -179,12 +179,12 @@ let prec_compare prec a b = match a,b with
   | Head.I _,  Head.LAM  -> Lt
   | Head.LAM,  Head.B _  -> Gt
   | Head.B _,  Head.LAM  -> Lt
-  | Head.Q _,  Head.LAM  -> Gt
-  | Head.Q _,  Head.DB _ -> Gt
+  | Head.Q _,  Head.LAM  -> Lt
+  | Head.Q _,  Head.DB _ -> Lt
   | Head.Q _,  Head.I _  -> Gt
   | Head.Q _,  Head.B _  -> Gt
-  | Head.LAM,  Head.Q _  -> Lt
-  | Head.DB _, Head.Q _  -> Lt
+  | Head.LAM,  Head.Q _  -> Gt
+  | Head.DB _, Head.Q _  -> Gt
   | Head.I _,  Head.Q _  -> Lt
   | Head.B _,  Head.Q _  -> Lt
 

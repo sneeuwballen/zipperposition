@@ -48,6 +48,7 @@ let k_ext_neg_lit = Flex_state.create_key ()
 let k_neg_ext = Flex_state.create_key ()
 let k_neg_ext_as_simpl = Flex_state.create_key ()
 let k_ext_axiom_penalty = Flex_state.create_key ()
+let k_choice_axiom_penalty = Flex_state.create_key ()
 let k_instantiate_choice_ax = Flex_state.create_key ()
 let k_elim_leibniz_eq = Flex_state.create_key ()
 let k_elim_andrews_eq = Flex_state.create_key ()
@@ -1553,9 +1554,9 @@ module Make(E : Env.S) : S with module Env = E = struct
     let y_diff = Term.app y [Term.app diff [T.of_ty alpha; T.of_ty beta; x; y]] in
     let lits = [Literal.mk_eq x y; Literal.mk_neq x_diff y_diff] in
     Env.C.create ~penalty:(Env.flex_get k_ext_axiom_penalty) ~trail:Trail.empty 
-      lits Proof.Step.trivial
+                 lits Proof.Step.trivial
 
-  let choice_clause =
+  let mk_choice_clause () =
     let choice_id = ID.make("zf_choice") in
     let alpha_var = HVar.make ~ty:Type.tType 0 in
     let alpha = Type.var alpha_var in
@@ -1568,7 +1569,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     let p_choice = Term.app p [Term.app choice [p]] (* p (choice p) *) in
     (* ~ (p x) | p (choice p) *)
     let lits = [Literal.mk_prop px false; Literal.mk_prop p_choice true] in
-    Env.C.create ~penalty:1 ~trail:Trail.empty lits Proof.Step.trivial
+    Env.C.create ~penalty:(Env.flex_get k_choice_axiom_penalty)
+                 ~trail:Trail.empty lits Proof.Step.trivial
 
   let early_bird_prim_enum cl var =
     assert(T.is_var var);
@@ -2331,7 +2333,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       if Env.flex_get k_ext_axiom then
         Env.ProofState.PassiveSet.add (Iter.singleton (mk_extensionality_clause ())) ;
       if Env.flex_get k_choice_axiom then
-        Env.ProofState.PassiveSet.add (Iter.singleton choice_clause);
+        Env.ProofState.PassiveSet.add (Iter.singleton (mk_choice_clause ()));
     );
     ()
 end
@@ -2404,6 +2406,7 @@ let _ext_neg_lit = ref false
 let _neg_ext = ref true
 let _neg_ext_as_simpl = ref false
 let _ext_axiom_penalty = ref 5
+let _choice_axiom_penalty = ref 1
 let _huet_style = ref false
 let _cons_elim = ref true
 let _imit_first = ref false
@@ -2443,6 +2446,7 @@ let extension =
     E.flex_add k_neg_ext !_neg_ext;
     E.flex_add k_neg_ext_as_simpl !_neg_ext_as_simpl;
     E.flex_add k_ext_axiom_penalty !_ext_axiom_penalty;
+    E.flex_add k_choice_axiom_penalty !_choice_axiom_penalty;
     E.flex_add k_instantiate_choice_ax !_instantiate_choice_ax;
     E.flex_add k_elim_leibniz_eq !_elim_leibniz_eq;
     E.flex_add k_elim_andrews_eq !_elim_andrews_eq;
@@ -2542,6 +2546,7 @@ let () =
       "--ho-resolve-flex-flex", Arg.Bool ((:=) _resolve_flex_flex), " eagerly remove non-essential flex-flex constraints";
       "--ho-ext-axiom", Arg.Bool (fun v -> _ext_axiom := v), " enable/disable extensionality axiom";
       "--ho-choice-axiom", Arg.Bool (fun v -> _choice_axiom := v), " enable choice axiom";
+      "--ho-choice-axiom-penalty", Arg.Int (fun v -> _choice_axiom_penalty := v), " choice axiom penalty";
       "--ho-ext-pos", Arg.Bool (fun v -> _ext_pos := v), " enable/disable positive extensionality rule";
       "--ho-neg-ext", Arg.Bool (fun v -> _neg_ext := v), " turn NegExt on or off";
       "--ho-neg-ext-simpl", Arg.Bool (fun v -> _neg_ext_as_simpl := v), " turn NegExt as simplification rule on or off";

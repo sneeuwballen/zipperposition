@@ -3165,7 +3165,7 @@ let unif_params_to_def () =
   _max_rigid_imitations := 2;
   _max_identifications := 0;
   _max_elims           := 0;
-  _max_infs := -1
+  _max_infs := 6
 
 let register ~sup =
   let module Sup = (val sup : S) in
@@ -3295,10 +3295,10 @@ let () =
       "--ho-unif-level",
       Arg.Symbol (["full-framework";"full"; "pragmatic-framework";], (fun str ->
           _unif_alg := if (String.equal "full" str) then `OldJP
-            else if (String.equal "full-framework" str) then (
-              unif_params_to_def ();
-              `NewJPFull)
-            else if (String.equal "pragmatic-framework" str) then `NewJPPragmatic
+            else if (String.equal "full-framework" str) then (`NewJPFull)
+            else if (String.equal "pragmatic-framework" str) then (
+            unif_params_to_def (); 
+            `NewJPPragmatic)
             else invalid_arg "unknown argument")), "set the level of HO unification";
       "--ho-imitation-first",Arg.Bool (fun v -> _imit_first:=v), " Use imitation rule before projection rule";
       "--ho-unif-logop-mode",Arg.Symbol (["conservative"; "pragmatic"; "off"], 
