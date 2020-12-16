@@ -2619,6 +2619,7 @@ let () =
       def_unfold_enabled_ := false;
       force_enabled_ := true;
       _ext_axiom := true;
+      _choice_axiom := true;
       _ext_neg_lit := false;
       _neg_ext := true;
       _neg_ext_as_simpl := false;
