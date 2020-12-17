@@ -60,6 +60,8 @@ module Make(E : Env.S) : S with module Env = E = struct
   module HO = Higher_order.Make(Env)
   module LazyCNF = Lazy_cnf.Make(Env)
   module FR = Env.FormRename
+  module Stm = Env.Stm
+  module StmQ = Env.StmQ
 
   let (=~),(/~) = Literal.mk_eq, Literal.mk_neq
   let (@:) = T.app_builtin ~ty:Type.prop
@@ -1335,22 +1337,7 @@ module Make(E : Env.S) : S with module Env = E = struct
      If which is `OnlyPositive then _only_ literals of the form s = t
      are rewritten into s != ~t and then unified. Else, both negative
      and positive literals are unified  *)
-  let solve_bool_formulas ~which c =
-    let module PUnif = 
-      PUnif.Make(struct 
-        let st = 
-          Env.flex_state ()
-          |> Flex_state.add PragUnifParams.k_fixpoint_decider true
-          |> Flex_state.add PragUnifParams.k_pattern_decider true
-          |> Flex_state.add PragUnifParams.k_solid_decider true
-          |> Flex_state.add PragUnifParams.k_max_inferences 1
-          |> Flex_state.add PragUnifParams.k_max_depth 4
-          |> Flex_state.add PragUnifParams.k_max_app_projections 2
-          |> Flex_state.add PragUnifParams.k_max_rigid_imitations 2
-          |> Flex_state.add PragUnifParams.k_max_elims 0
-          |> Flex_state.add PragUnifParams.k_max_identifications 0
-        end) in
-    
+  let solve_bool_formulas ~which c =    
     let normalize_not t =
       let rec aux t = 
         match T.view t with
@@ -1401,10 +1388,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     
     let unif_alg l r =
       if not (Env.flex_get Combinators.k_enable_combinators) then (
-        PUnif.unify_scoped (l,0) (r,0)
-        |> OSeq.filter_map CCFun.id
-        |> OSeq.nth 0
-      ) else Unif_subst.of_subst @@ Unif.FO.unify_syn (l,0) (r,0) in
+        Env.flex_get Superposition.k_unif_alg (l,0) (r,0)
+      ) else OSeq.return (Some (Unif.FO.unify_full (l,0) (r,0))) in
     
     Util.debugf ~section 5 "bool solving @[%a@]@."(fun k -> k C.pp c);
 
@@ -1420,22 +1405,31 @@ module Make(E : Env.S) : S with module Env = E = struct
         try
           Util.debugf ~section 5 "trying lit @[%d:%a@]@."(fun k -> k i Literal.pp lit);
           Util.debugf ~section 5 "unif problem: @[%a=?=%a@]@."(fun k -> k T.pp l T.pp r);
-          let subst = unif_alg l r in
-          assert(not @@ Unif_subst.has_constr subst);
-          let renaming = Subst.Renaming.create () in
-          let new_lits =
-            CCArray.except_idx (C.lits c) i
-            |> CCArray.of_list
-            |> (fun l -> 
-                Literals.apply_subst renaming (US.subst subst) (l,0))
-            |> CCArray.to_list in
-          let proof = 
-            Proof.Step.simp ~tags:[Proof.Tag.T_ho]
-              ~rule:(Proof.Rule.mk "solve_formulas")
-              [C.proof_parent_subst renaming (c,0) (US.subst subst) ] in
-          let res = C.create ~penalty:(C.penalty c) ~trail:(C.trail c) new_lits proof in
-          Util.debugf ~section 5 "solved by @[%a@]@."(fun k ->  k C.pp res);
-          Some res
+          let stm = 
+            unif_alg l r
+            |> OSeq.map (CCOpt.map (fun subst -> 
+              let renaming = Subst.Renaming.create () in
+              let new_lits =
+                CCArray.except_idx (C.lits c) i
+                |> CCArray.of_list
+                |> (fun l -> 
+                    Literals.apply_subst renaming (US.subst subst) (l,0))
+                |> CCArray.to_list in
+              let proof = 
+                Proof.Step.simp ~tags:[Proof.Tag.T_ho]
+                  ~rule:(Proof.Rule.mk "solve_formulas")
+                  [C.proof_parent_subst renaming (c,0) (US.subst subst) ] in
+              let res = C.create ~penalty:(C.penalty c) ~trail:(C.trail c) new_lits proof in
+              Util.debugf ~section 5 "solved by @[%a@]@."(fun k ->  k C.pp res);
+              res  
+            ))
+          in
+          match stm () with
+          | OSeq.Cons(hd, rest) ->
+            let stm = Stm.make ~penalty:(C.penalty c) ~parents:[c] rest in
+            StmQ.add (Env.get_stm_queue ()) stm;
+            hd
+          | OSeq.Nil -> None
         with _ -> 
           Util.debugf ~section 5 "failed @." (fun k -> k);
           None)
