@@ -2000,9 +2000,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let neqs, others =
       CCArray.fold_left (fun (neq_map, others) lit ->
         match lit with
-        | Literal.Equation(lhs,rhs,sign) ->
+        | Literal.Equation(lhs,rhs,sign) when not (T.is_var (T.head_term lhs)) &&
+                                              not (T.is_var (T.head_term rhs)) ->
           (* NOTE: based on the representation of the literals! *)
-          if sign && T.is_true_or_false rhs && not (T.is_var lhs) then (
+          if sign && T.is_true_or_false rhs && (not (T.is_var lhs)) then (
             let negate t = if T.equal t T.true_ then T.false_ else T.true_ in
             (T.Map.add lhs (negate rhs) neq_map, others)
           ) else if not sign then (
@@ -3404,7 +3405,7 @@ let () =
     _sup_in_var_args := true;
     _unif_logop_mode := `Conservative;
     _demod_in_var_args := true;
-    (* _local_rw := `GreenContext; *)
+    _local_rw := `GreenContext;
     _dupsup := false;
     _complete_ho_unification := false;
     _destr_eq_res := false;

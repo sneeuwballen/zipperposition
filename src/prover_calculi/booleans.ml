@@ -1955,7 +1955,7 @@ let _rename_nested_bools = ref false
 let _fluid_hoist = ref false
 let _fluid_log_hoist = ref false
 let _solve_formulas = ref false
-let _replace_quants = ref true
+let _replace_quants = ref false
 
 
 let extension =
@@ -2068,6 +2068,7 @@ let () =
                        "lambda-free-purify-intensional";
                        "lambda-free-extensional";
                        "ho-comb-complete";
+                       "ho-competititve";
                        "lambda-free-purify-extensional";
                        "fo-complete-basic"] (fun () ->
       _replace_quants := false;

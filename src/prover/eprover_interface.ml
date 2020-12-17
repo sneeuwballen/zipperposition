@@ -90,12 +90,14 @@ module Make(E : Env.S) : S with module Env = E = struct
       (* type erasure for terms E can understand *)
       | T.AppBuiltin((Builtin.Eq | Builtin.Neq) as b, [ty;lhs;rhs]) 
           when T.is_ground ty ->
-        sym_map, T.app_builtin ~ty:Type.prop b [lhs;rhs]
-      | T.AppBuiltin((Builtin.ForallConst | Builtin.ExistsConst) as b, ([_;body]|[body]))
+        let sym_map, lhs' = aux ~sym_map lhs in
+        let sym_map, rhs' = aux ~sym_map rhs in
+        sym_map, T.app_builtin ~ty:Type.prop b [ty;lhs';rhs']
+      | T.AppBuiltin((Builtin.ForallConst | Builtin.ExistsConst) as b, ([q;body]))
           when Type.is_ground (T.ty body) ->
         let vars, body = T.open_fun body in
         let sym_map, body' = aux ~sym_map body in
-        sym_map, T.app_builtin ~ty:Type.prop b [T.fun_l vars body']
+        sym_map, T.app_builtin ~ty:Type.prop b [q;T.fun_l vars body']
       | T.AppBuiltin(_, l)
       | T.App(_, l) ->
         let hd_mono, args = T.as_app_mono t in
