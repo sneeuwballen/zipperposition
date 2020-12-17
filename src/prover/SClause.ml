@@ -96,8 +96,8 @@ let pp_vars out c =
   pp_vars out (Literals.vars c.lits)
 
 let pp out c =
-  Format.fprintf out "@[%a@[<2>%a%a@]@]"
-    pp_vars c Literals.pp c.lits pp_trail c.trail;
+  Format.fprintf out "@[%a@[<2>%a%a@]@](%d)"
+    pp_vars c Literals.pp c.lits pp_trail c.trail c.id;
   ()
 
 let pp_trail_zf out trail =
@@ -181,6 +181,7 @@ let proof_tc cl  =
     ~to_form:(fun ~ctx c -> to_s_form ~allow_free_db:true ~ctx c)
     ~is_dead_cl:(fun () -> is_redundant cl)
     ~to_form_subst:to_s_form_subst
+    ~name:(fun cl -> "zip_derived_cl" ^ CCInt.to_string cl.id)
     ~pp_in
     ()
 

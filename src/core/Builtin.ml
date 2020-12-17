@@ -417,11 +417,11 @@ module TPTP = struct
     | Lesseq -> "$lesseq"
     | Greater -> "$greater"
     | Greatereq -> "$greatereq"
-    | BComb -> "$B"
-    | CComb -> "$C"
-    | IComb -> "$I"
-    | KComb -> "$K"
-    | SComb -> "$S"
+    | BComb -> "'#B'"
+    | CComb -> "'#C'"
+    | IComb -> "'#I'"
+    | KComb -> "'#K'"
+    | SComb -> "'#S'"
     | Box_opaque -> "$$box"
     | Pseudo_de_bruijn i -> Printf.sprintf "$$db_%d" i
     | Distinct -> "$distinct"
@@ -467,11 +467,11 @@ module TPTP = struct
     | "$lesseq" -> Lesseq
     | "$greater" -> Greater
     | "$greatereq" -> Greatereq
-    | "$B" -> BComb
-    | "$S" -> SComb
-    | "$C" -> CComb
-    | "$K" -> KComb
-    | "$I" -> IComb
+    | "#B" -> BComb
+    | "#S" -> SComb
+    | "#C" -> CComb
+    | "#K" -> KComb
+    | "#I" -> IComb
     | "$distinct" -> Distinct
     | _ -> raise NotABuiltin
 

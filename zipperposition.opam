@@ -14,7 +14,7 @@ depends: [
   "zarith"
   "logtk" { = version }
   "libzipperposition" { = version }
-  "containers" { >= "1.0" }
+  "containers" { >= "2.8" }
   "iter" { >= "1.2" }
   "oseq"
   "dune" { >= "1.11" }

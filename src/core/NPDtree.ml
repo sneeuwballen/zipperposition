@@ -24,7 +24,34 @@ type iterator = {
   stack : T.t list list; (* skip: drop head, next: first of head *)
 }
 
-let open_term ~stack t = match T.view t with
+let eq_ty = 
+  Type.close_forall @@
+    Type.(==>) [Type.var_of_int 0; Type.var_of_int 0] Type.prop
+let eq_id = ID.make "zip_eq_proxy"
+let neq_id = ID.make "zip_neq_proxy"
+
+let eq_const = T.const ~ty:eq_ty eq_id
+let neq_const = T.const ~ty:eq_ty neq_id
+
+let [@inline] mk_eq a b =
+  T.app eq_const [T.of_ty (T.ty a); a; b]
+let [@inline] mk_neq a b = 
+  T.app neq_const [T.of_ty (T.ty a); a; b]
+
+
+let neg_id = ID.make "zip_neg_proxy"
+let neg_const = 
+  let ty = 
+    Type.(==>) [Type.prop] Type.prop in
+  T.const ~ty neg_id
+
+let [@inline] mk_neg f =
+  T.app neg_const [f]
+
+let rec open_term ~stack t = match T.view t with
+  | T.AppBuiltin(Eq, ([a;b]|[_;a;b])) -> open_term ~stack (mk_eq a b)
+  | T.AppBuiltin(Neq, ([a;b]|[_;a;b])) -> open_term ~stack (mk_neq a b)
+  | T.AppBuiltin(Not, [a]) -> open_term ~stack (mk_neg a)
   | T.Var _
   | T.DB _
   | T.AppBuiltin _
@@ -318,6 +345,10 @@ module MakeTerm(X : Set.OrderedType) = struct
 
   let remove trie t data =
     let k leaf = Leaf.remove leaf t data in
+    goto_leaf trie t k
+
+  let update_leaf trie t data_filter =
+    let k leaf = Leaf.update_leaf leaf t data_filter in
     goto_leaf trie t k
 
   let remove_ trie = CCFun.uncurry (remove trie)

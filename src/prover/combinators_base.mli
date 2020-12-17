@@ -9,7 +9,6 @@ val mk_k: ?args:Term.t list -> alpha:Term.t -> beta:Term.t -> Term.t
 val mk_i: ?args:Term.t list -> alpha:Term.t -> Term.t
 
 
-
 val bunder_optimizations: (Term.t -> Term.t option) list
 val curry_optimizations: (Term.t -> Term.t option) list
 val narrow_rules: (Term.t -> Term.t option) list

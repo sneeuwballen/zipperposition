@@ -164,10 +164,10 @@ let pp_definition out = function
 
 let stmt_of_form rw_rules polarity proxy proxy_id proxy_ty form proof =
   let module F = T.Form in
+  let vars = T.vars proxy in
   if rw_rules then (
     (* introduce the required definition as an axiom, with polarity as needed *)
     let rule : _ Stmt.def_rule =
-      let vars = T.vars proxy in
       let lhs, polarity, rhs = match polarity with
         | `Neg -> SLiteral.atom_false proxy, `Imply, F.not_ form
         | `Pos -> SLiteral.atom_true proxy, `Imply, form
@@ -179,11 +179,13 @@ let stmt_of_form rw_rules polarity proxy proxy_id proxy_ty form proof =
     [Stmt.def ~proof [Stmt.mk_def ~rewrite:true proxy_id proxy_ty [rule]]]
   ) else (
     (* introduce the required axiom, with polarity as needed *)
-    let f' = match polarity with
-      | `Pos -> F.imply proxy form
-      | `Neg -> F.imply form proxy
-      | `Both -> F.equiv proxy form
-    in
+    let f' = 
+      F.forall_l vars
+      (match polarity with
+        | `Pos -> F.imply proxy form
+        | `Neg -> F.imply form proxy
+        | `Both -> F.equiv proxy form)
+      in
     let proof = proof in
     [ Stmt.ty_decl ~proof proxy_id proxy_ty;
       Stmt.assert_ ~proof f'

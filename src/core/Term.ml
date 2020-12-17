@@ -556,10 +556,12 @@ let in_lfho_fragment t =
 
 let rec is_fo_term t =
   match view t with
-  | Var _ -> not @@ Type.is_fun @@ ty t
-  | AppBuiltin _ -> false
+  | Var _ -> not (Type.is_fun (ty t) || Type.is_prop (ty t))
+  | AppBuiltin _ -> equal t true_ || equal t false_
   | App (hd, l) -> 
-    not (Type.is_fun (ty t)) && T.is_const hd && List.for_all is_fo_term l
+    not (Type.is_fun (ty t)) 
+      && T.is_const hd 
+      && List.for_all (fun t -> not (Type.is_prop (ty t) || Type.is_fun (ty t)) && is_fo_term t) l
   | Const _ -> not (Type.is_fun (ty t))
   | _ -> false
 
@@ -1101,7 +1103,7 @@ module TPTP = struct
         (* print type of term *)
       | AppBuiltin (b,[]) -> Builtin.TPTP.pp out b
       | AppBuiltin (b, ([tyarg;t;u])) when Builtin.TPTP.is_infix b && is_type tyarg ->
-        Format.fprintf out "(@[%a %a@ %a@])" pp_rec t Builtin.TPTP.pp b pp_rec u
+        Format.fprintf out "(@[(%a) %a@ (%a)@])" pp_rec t Builtin.TPTP.pp b pp_rec u
       | AppBuiltin (b, ([t;u])) when Builtin.TPTP.is_infix b ->
         Format.fprintf out "(@[(%a) %a@ (%a)@])" pp_rec t Builtin.TPTP.pp b pp_rec u
       | AppBuiltin (b, l) when List.length l >= 2 && Builtin.is_infix b ->
@@ -1124,7 +1126,7 @@ module TPTP = struct
         in
         let old_d = !depth in
         depth := !depth + List.length ty_args;
-        Format.fprintf out "(@[<hv2>^[@[%a@]]:@ %a@])"
+        Format.fprintf out "(@[<hv2>^[@[%a@]]:@ (@[%a@])@])"
           (Util.pp_list ~sep:"," pp_db) vars pp_rec bod;
         depth := old_d;
       | Var i -> Format.fprintf out "X%d" (HVar.id i);

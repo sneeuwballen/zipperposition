@@ -11,6 +11,7 @@ module type LEAF = sig
   val empty : t
   val add : t -> term -> elt -> t
   val remove : t -> term -> elt -> t
+  val update_leaf : t -> term -> (elt -> bool) -> t
   val is_empty : t -> bool
   val iter : t -> (term -> elt -> unit) -> unit
   val fold : t -> 'a -> ('a -> term -> elt -> 'a) -> 'a
@@ -57,6 +58,7 @@ module type TERM_IDX = sig
   val add_list : t -> (term * elt) list -> t
 
   val remove : t -> term -> elt -> t
+  val update_leaf : t -> term -> (elt -> bool) -> t
   val remove_seq : t -> (term * elt) Iter.t -> t
   val remove_list : t -> (term * elt) list -> t
 

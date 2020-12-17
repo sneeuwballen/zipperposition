@@ -138,17 +138,33 @@ module Make(C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
         try 
           let x = CQueue.take_first queue in
           Signal.send on_remove_clause x;
+          clauses_ := C.ClauseSet.remove x !clauses_;
           Some x
         with Not_found -> None
       )
 
     let next () = ZProf.with_prof prof_next_passive next_ ()
 
-    (* register to signal *)
-    let () =
-      Signal.on_every on_add_clause
-        (fun c -> CQueue.add queue c);
-      ()
+    let remove seq = 
+      seq (fun c ->
+        if CQueue.remove queue c then (
+          Signal.send on_remove_clause c
+        )
+      )
+    
+    let add seq =
+      seq (fun c -> 
+        if CQueue.add queue c then (
+          Signal.send on_add_clause c
+        )
+      )
+
+    let is_passive cl =
+      CQueue.mem_cl queue cl
+    
+    let clauses () = C.ClauseSet.of_iter (CQueue.all_clauses queue)
+    let num_clauses () = CQueue.length queue
+
   end
 
   type stats = int * int * int

@@ -1569,6 +1569,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       []
 
   let setup () =
+    (* Env.add_basic_simplify normalize_equalities; put into superposition right now *)
     match Env.flex_get k_bool_reasoning with 
     | BoolReasoningDisabled -> ()
     | BoolCasesPreprocess ->

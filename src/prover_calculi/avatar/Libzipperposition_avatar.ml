@@ -10,6 +10,8 @@ module T = Term
 module Lit = Literal
 module Fmt = CCFormat
 
+module UnionFind = UnionFind
+
 type 'a printer = Format.formatter -> 'a -> unit
 
 let section = Util.Section.make ~parent:Const.section "avatar"
@@ -30,6 +32,7 @@ let flag_cut_introduced = SClause.new_flag()
 module type S = Avatar_intf.S
 
 let k_avatar : (module S) Flex_state.key = Flex_state.create_key ()
+let k_avatar_enabled = Flex_state.create_key ()
 let k_show_lemmas : bool Flex_state.key = Flex_state.create_key()
 let k_simplify_trail : bool Flex_state.key = Flex_state.create_key()
 let k_back_simplify_trail : bool Flex_state.key = Flex_state.create_key()
@@ -682,6 +685,7 @@ let extension =
     E.flex_add k_split_only_ground !split_only_ground;
     E.flex_add k_max_trail_size !max_trail_size;
     E.flex_add k_infer_from_components !infer_from_components;
+    E.flex_add k_avatar_enabled (!avatar_kind != `Off);
 
     Util.debug 1 "enable Avatar";
     A.register ~split_kind:!avatar_kind ()

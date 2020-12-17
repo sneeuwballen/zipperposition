@@ -11,7 +11,9 @@ module T = Term
 module Ty = Type
 module Fmt = CCFormat
 module RW = Rewrite
+module Avatar = Libzipperposition_avatar
 
+module type AVATAR = Libzipperposition_avatar.S
 module type S = Induction_intf.S
 
 type term = T.t
@@ -133,7 +135,7 @@ end = struct
 
   (* union-find for sets of clauses *)
   module UF_clauses =
-    UnionFind.Make(struct
+    Avatar.UnionFind.Make(struct
       type key = T.var
       type value = clause list
       let equal = HVar.equal Type.equal
@@ -214,7 +216,7 @@ end = struct
       (fun k->k pp g max_steps_);
     let module CQ = E.ProofState.CQueue in
     let q = CQ.almost_bfs () in (* clauses waiting *)
-    let push_c c = CQ.add q c in
+    let push_c c = ignore (CQ.add q c) in
     let n : int ref = ref 0 in (* number of steps *)
     let trivial = ref true in
     try
@@ -227,7 +229,7 @@ end = struct
            else if C.is_empty c then raise (Yield_false c)
            else (
              trivial := false;
-             push_c c
+             ignore(push_c c)
            ))
         (cs g);
       (* do a few steps of saturation *)
@@ -263,7 +265,7 @@ end = struct
                   else if E.is_trivial new_c then None
                   else if C.is_empty new_c then raise (Yield_false new_c)
                   else Some new_c)
-              |> Iter.iter push_c))
+              |> Iter.iter (fun c -> ignore @@ push_c c)))
         with Not_found ->
           (* Due to orphan deletion a clause might not be found *)
           ()
@@ -427,7 +429,7 @@ end
 (** {2 Calculus of Induction} *)
 module Make
     (E : Env.S)
-    (A : Avatar_intf.S with module E = E)
+    (A : AVATAR with module E = E)
 = struct
   module Env = E
   module Ctx = E.Ctx
@@ -914,7 +916,7 @@ module Make
     var_always_naked f x
 
   module UF_vars =
-    UnionFind.Make(struct
+    Avatar.UnionFind.Make(struct
       type key = T.var
       type value = T.var list
       let equal = HVar.equal Type.equal

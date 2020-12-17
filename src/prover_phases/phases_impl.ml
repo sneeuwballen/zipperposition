@@ -57,14 +57,18 @@ let load_extensions =
   Extensions.register Combinators.extension;
   Extensions.register Higher_order.extension;
   Extensions.register Superposition.extension;
+  Extensions.register Bce_pe_fixpoint.extension;
+  Extensions.register Bce.extension;
+  Extensions.register Pred_elim.extension;
+  Extensions.register Hlt_elim.extension;
   Extensions.register AC.extension;
   Extensions.register Heuristics.extension;
-  Extensions.register Avatar.extension;
+  Extensions.register Libzipperposition_avatar.extension;
   Extensions.register EnumTypes.extension;
-  Extensions.register Induction.extension;
+  Extensions.register Libzipperposition_induction.extension;
   Extensions.register Rewriting.extension;
-  Extensions.register Arith_int.extension;
-  Extensions.register Arith_rat.extension;
+  Extensions.register Libzipperposition_arith.int_ext;
+  Extensions.register Libzipperposition_arith.rat_ext;
   Extensions.register Ind_types.extension;
   Extensions.register Fool.extension;
   Extensions.register Booleans.extension;
@@ -75,6 +79,7 @@ let load_extensions =
   Extensions.register Bool_encode.extension;
   Extensions.register App_encode.extension;
   Extensions.register Eq_encode.extension;
+  Extensions.register Pure_literal_elim.extension;
 
 
   let l = Extensions.extensions () in
@@ -376,6 +381,11 @@ let try_to_refute (type c) (module Env : Env.S with type C.t = c) clauses result
       Some (Util.total_time_s () +. Env.params.Params.timeout -. 0.25)
     )
   in
+  
+  Util.debugf ~section 1 "active: @[%a@]"
+    (fun k -> k (Iter.pp_seq Env.C.pp) (Env.get_active ()));
+  Util.debugf ~section 1 "passive: @[%a@]"
+    (fun k -> k (Iter.pp_seq Env.C.pp) (Env.get_passive ()));
   Signal.send Env.on_start ();
   let result, num = match result with
     | Saturate.Unsat _ -> result, 0  (* already found unsat during presaturation *)
@@ -439,10 +449,12 @@ let print_szs_result (type c) ~file
       Format.printf "%sSZS status InternalError for '%s'@." comment file;
       Util.debugf ~section 1 "error is:@ %s" (fun k->k s);
     | Saturate.Sat when Env.Ctx.is_completeness_preserved () ->
+      Format.printf "%% Final clauses: %d@." (Iter.length (Env.get_active ()));
       Format.printf "%sSZS status %s for '%s'@." comment (sat_to_str ()) file;
       Util.debugf ~section 1 "@[<2>saturated set:@ @[<hv>%a@]@]"
             (fun k->k (Util.pp_iter ~sep:" " Env.C.pp_tstp_full) (Env.get_active ()))
     | Saturate.Sat ->
+      Format.printf "%% Final clauses: %d@." (Iter.length (Env.get_active ()));
       Format.printf "%sSZS status GaveUp for '%s'@." comment file;
       begin match !Options.output with
         | Options.O_none -> ()

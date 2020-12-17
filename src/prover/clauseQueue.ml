@@ -254,7 +254,7 @@ module Make(C : Clause_intf.S) = struct
           sum +. w
         ) 0.0 (C.lits c) in
       let w = int_of_float res in
-      Util.debugf ~section 3 "pnrefined(@[%a@],@[%g@])=%d@." (fun k -> k C.pp c pos_m w);
+      Util.debugf ~section 5 "pnrefined(@[%a@],@[%g@])=%d@." (fun k -> k C.pp c pos_m w);
       w
 
     let ho_weight_initial c =
@@ -327,7 +327,7 @@ module Make(C : Clause_intf.S) = struct
                 1.0 /. divider
               ) else 1.0 in
             let val_ = int_of_float (goal_dist_penalty *. dist_var_penalty *. res) in
-            (Util.debugf ~section  3 "cl: %a, w:%d\n" (fun k -> k C.pp c val_);
+            (Util.debugf ~section  5 "cl: %a, w:%d\n" (fun k -> k C.pp c val_);
              val_))
 
     (* function inspired by Struct from the paper https://arxiv.org/abs/1606.03888 *)
@@ -386,7 +386,7 @@ module Make(C : Clause_intf.S) = struct
         |> Iter.filter (fun t -> not (Term.is_true_or_false t))
         |> Iter.fold (fun acc t -> 
             let w = struct_diff_weight t in 
-            Util.debugf ~section 3 "struct(@[%a@])=%d" (fun k -> k Term.pp t w);
+            Util.debugf ~section 5 "struct(@[%a@])=%d" (fun k -> k Term.pp t w);
             acc + w) acc
         |> (fun res ->
               let mul = 
@@ -445,7 +445,7 @@ module Make(C : Clause_intf.S) = struct
         acc + lit_weight is_max lit
       ) 0
       |> (fun res ->
-        Util.debugf ~section 3 "cr-e(@[%a@])=%d@." (fun k -> k C.pp c res);
+        Util.debugf ~section 5 "cr-e(@[%a@])=%d@." (fun k -> k C.pp c res);
         res
       )
 
@@ -490,9 +490,9 @@ module Make(C : Clause_intf.S) = struct
 
             let f_factor = fdiff_a *. f +. fdiff_b in
             let v_factor = vdiff_a *. v +. vdiff_b in
-            Util.debugf ~section 3 "w:%g;f:%g;v:%g" (fun k -> k w f_factor v_factor);
+            Util.debugf ~section 5 "w:%g;f:%g;v:%g" (fun k -> k w f_factor v_factor);
             int_of_float (w +. f_factor +. v_factor  )) in
-      Util.debugf ~section 3 "diversity_weight(@[%a@])=%d@." (fun k -> k C.pp c res);
+      Util.debugf ~section 5 "diversity_weight(@[%a@])=%d@." (fun k -> k C.pp c res);
       res
 
 
@@ -756,7 +756,7 @@ module Make(C : Clause_intf.S) = struct
        "conjecture-relative-var", parse_crv;
        "conjecture-relative-struct", parse_cr_struct;
        "conjecture-relative-cheap", parse_conj_relative_cheap;
-      "conjecture-relative-e", parse_cr_e;
+       "conjecture-relative-e", parse_cr_e;
        "diversity-weight", parse_diversity_weight;
        "pnrefined", parse_pnrefine;
        "staggered", parse_staggered;
@@ -769,7 +769,7 @@ module Make(C : Clause_intf.S) = struct
       let w = List.assoc name parsers s in
       fun c ->
         let res = penalize w c in
-        Util.debugf ~section 1 "@[%s(%a)@]=@[%d@]" (fun k -> k name C.pp c res);
+        Util.debugf ~section 5 "@[%s(%a)@]=@[%d@]" (fun k -> k name C.pp c res);
         res
 
     with Not_found | Failure _ -> 
@@ -1135,7 +1135,7 @@ module Make(C : Clause_intf.S) = struct
     | Mixed q -> C.Tbl.length q.tbl
 
   let add q c = match q with
-    | FIFO q -> Queue.push c q
+    | FIFO q -> Queue.push c q; true
     | Mixed q ->
       if not (C.Tbl.mem q.tbl c) then (
         C.Tbl.add q.tbl c ();
@@ -1143,9 +1143,11 @@ module Make(C : Clause_intf.S) = struct
         let heaps = Array.mapi (fun i (prio,weight) ->
             let heap = Array.get q.heaps i in
             H.insert (prio,weight,c) heap) weights in
-        q.heaps <- heaps)
+        q.heaps <- heaps;
+        true) 
+      else false
 
-  let add_seq q hcs = Iter.iter (add q) hcs
+  let add_seq q hcs = Iter.iter (fun c -> ignore (add q c)) hcs
 
   let rec take_first_mixed q =
     let move_queue q =
@@ -1175,16 +1177,17 @@ module Make(C : Clause_intf.S) = struct
     Array.set q.heaps q.current_heap_idx current_heap;
 
     let is_orphaned c =
-      !_ignoring_orphans && C.is_orphaned c in
+      (!_ignoring_orphans && C.is_orphaned c) || C.is_redundant c in
 
     (* if clause was picked by another queue 
        or it should be ignored, repeat clause choice.  *)
     if not (C.Tbl.mem q.tbl c) then (
+      Util.debugf ~section 1 "clause is not in the table:@ @[%a@]@." (fun k -> k C.pp c);
       take_first_mixed q
     ) else if is_orphaned c then (
       C.Tbl.remove q.tbl c;
-      Util.debugf ~section 3 "ignoring orphaned clause:@ @[%a@]@." (fun k -> k C.pp c);
-      Util.debugf ~section 4 "proof:@ @[%a@]@." (fun k -> k Proof.S.pp_tstp (C.proof c));
+      Util.debugf ~section 1"ignoring orphaned clause:@ @[%a@]@." (fun k -> k C.pp c);
+      Util.debugf ~section 5 "proof:@ @[%a@]@." (fun k -> k Proof.S.pp_tstp (C.proof c));
       take_first_mixed q
     ) else (
       C.Tbl.remove q.tbl c;
@@ -1355,6 +1358,26 @@ module Make(C : Clause_intf.S) = struct
         ) !funs_to_parse;
       Mixed mixed
     )
+
+  let all_clauses q =
+    match q with
+    | FIFO q -> CCSeq.to_iter (Queue.to_seq q)
+    | Mixed q -> Iter.map fst (C.Tbl.to_iter q.tbl)
+
+  let mem_cl q cl =
+    match q with
+    | FIFO q -> Iter.exists (C.equal cl) (CCSeq.to_iter (Queue.to_seq q))
+    | Mixed q -> C.Tbl.mem q.tbl cl
+
+  let remove q cl =
+    match q with 
+    | FIFO q -> invalid_arg "legacy queue, removal unsupported"
+    | Mixed q ->
+      if C.Tbl.mem q.tbl cl then (
+        C.Tbl.remove q.tbl cl;
+        true
+      ) else false
+
 
   let pp out q = CCFormat.fprintf out "queue %s" (name q)
   let to_string = CCFormat.to_string pp

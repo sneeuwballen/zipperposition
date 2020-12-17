@@ -477,10 +477,8 @@ let apply_ty_to_metas ?loc ctx (ty:T.Ty.t): T.Ty.t list * T.Ty.t =
   let ty = apply_unify ctx ~allow_open:true ?loc ty metas in
   metas, ty
 
-
-(* infer a type for [t], possibly updating [ctx]. Also returns a
-   continuation to build a typed term. *)
-let rec infer_rec ?loc ctx t =
+(* infer a type for [t], possibly updating [ctx] and binding meta-variables. *)
+let rec infer_rec ?loc ctx (t:PT.t) : T.t =
   let open Loc.Infix in
   let loc = PT.loc t <+> loc in
   let t' = match PT.view t with
@@ -735,7 +733,7 @@ let rec infer_rec ?loc ctx t =
     (fun k->k PT.pp t T.pp t' T.pp (T.ty_exn t'));
   t'
 
-and infer_app ?loc ctx id ty_id l =
+and infer_app ?loc ctx id ty_id (l:PT.t list) : T.t =
   let l = add_implicit_params ctx ty_id l in
   (* infer types for arguments *)
   let l = List.map (infer_rec ?loc ctx) l in
@@ -836,7 +834,7 @@ and infer_match ?loc ctx ~ty_matched t data (l:PT.match_branch list)
   end
 
 (* infer a term, and force its type to [prop] *)
-and infer_prop_ ?loc ctx t =
+and infer_prop_ ?loc ctx t : T.t =
   let t = infer_rec ?loc ctx t in
   unify ?loc (T.ty_exn t) T.Ty.prop;
   t

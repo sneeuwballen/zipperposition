@@ -61,6 +61,10 @@ module Make(X : sig
   type generate_rule = full:bool -> unit -> C.t list
   (** Generation of clauses regardless of current clause *)
 
+  type clause_elim_rule = unit -> unit
+  (** Eliminates clauses from the proof state using algorithms
+      like blocked clause elimination and similar *)
+
   type binary_inf_rule = inf_rule
   type unary_inf_rule = inf_rule
 
@@ -138,6 +142,7 @@ module Make(X : sig
   let _cheap_msr : multi_simpl_rule list ref = ref []
   let _ss_multi_simpl_rule : multi_simpl_rule list ref = ref []
   let _generate_rules : (int * string * generate_rule) list ref = ref []
+  let _cl_elim_rules : (int * string * clause_elim_rule) list ref = ref []
   let _clause_conversion_rules : clause_conversion_rule list ref = ref []
   let _step_init = ref []
   let _fragment_checks = ref []
@@ -147,6 +152,7 @@ module Make(X : sig
   let on_start = Signal.create()
   let on_input_statement = Signal.create()
   let on_empty_clause = Signal.create ()
+  let on_forward_simplified = Signal.create()
 
   (** {2 Basic operations} *)
 
@@ -199,15 +205,22 @@ module Make(X : sig
     if not (List.mem_assoc name !_unary_rules)
     then _unary_rules := (name, rule) :: !_unary_rules
 
-  let add_generate ~priority name rule =
-    if not (List.mem name (List.map (fun (_,n,_) -> n) !_generate_rules))
+  let _add_prioritized ~store ~priority name rule = 
+    if not (List.mem name (List.map (fun (_,n,_) -> n) !store))
     then (
       let cmp (p1,n1,r1) (p2,n2,r2) =
         let open CCOrd in
         CCInt.compare p2 p1
         <?> (CCString.compare, n2, n1) in
 
-      _generate_rules := CCList.sorted_insert ~cmp (priority,name,rule) !_generate_rules )
+      store := CCList.sorted_insert ~cmp (priority,name,rule) !store)
+
+  let add_generate ~priority name rule =
+    _add_prioritized ~store:_generate_rules ~priority name rule
+
+  let add_clause_elimination_rule ~priority name rule =
+    _add_prioritized ~store:_cl_elim_rules ~priority name rule
+
 
   let add_rw_simplify r =
     _rw_simplify := r :: !_rw_simplify
@@ -360,6 +373,9 @@ module Make(X : sig
         !_generate_rules
     in
     Iter.of_list clauses
+  
+  let do_clause_eliminate () =
+    List.iter (fun (_, _, elim_procedure) -> elim_procedure ()) !_cl_elim_rules
 
   let is_trivial_trail trail = match !_is_trivial_trail with
     | [] -> false
@@ -394,8 +410,7 @@ module Make(X : sig
   let is_active c =
     C.ClauseSet.mem c (ProofState.ActiveSet.clauses ())
 
-  let is_passive c =
-    C.ClauseSet.mem c (ProofState.PassiveSet.clauses ())
+  let is_passive =  ProofState.PassiveSet.is_passive
 
   let on_pred_var_elimination = Signal.create ()
   

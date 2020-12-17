@@ -52,6 +52,9 @@ module type S = sig
     val clauses : unit -> C.ClauseSet.t
     (** Current set of clauses *)
 
+    val is_passive : C.t -> bool
+    (** is the given clause passive *)
+
     val queue : CQueue.t
     (** Current state of the clause queue *)
 

@@ -99,7 +99,7 @@ let lift_lambdas_t ~parent ~counter t  =
       | Some (_,(def, lhs),subst) ->
         let lits = C.lits def in
         assert(Array.length lits = 1);
-        let lhs' = Subst.FO.apply Subst.Renaming.none subst (lhs, 1) in
+        let lhs' = Lambda.eta_reduce @@ Lambda.snf @@ Subst.FO.apply Subst.Renaming.none subst (lhs, 1) in
         lhs', (def :: reused_defs, new_defs), declared_syms
       | None -> 
         let free_vars = T.vars body' in
@@ -147,6 +147,14 @@ let lift_lambdas_t ~parent ~counter t  =
       assert(not (T.is_fun hd));
       let l', new_defs, declared_syms = aux_l l in
       (if T.same_l l l' then t else (T.app hd l')), new_defs, declared_syms
+    | T.AppBuiltin((Builtin.ExistsConst|Builtin.ForallConst) as b, [q_body])
+        when T.is_fun q_body ->
+      let vars, body = T.open_fun q_body in
+      let body', new_defs, declared_syms = aux body in
+      let mk_q b = 
+        if Builtin.equal b ExistsConst then T.Form.exists else T.Form.forall in
+      (if T.equal body body' then t else mk_q b (T.fun_l vars body')), 
+        new_defs, declared_syms
     | T.AppBuiltin(b, l) ->
       let l', new_defs, declared_syms = aux_l l in
       (if T.same_l l l' then t else T.app_builtin ~ty:(T.ty t) b l'), 
