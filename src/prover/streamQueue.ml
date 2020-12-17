@@ -10,7 +10,7 @@ module type S = StreamQueue_intf.S
 
 module type ARG = sig
   module Stm : Stream.S
-  val state: unit -> Flex_state.t
+  module Env : Env.S
 end
 
 let k_guard = Flex_state.create_key ()
@@ -19,9 +19,7 @@ let k_clause_num = Flex_state.create_key ()
 
 module Make(A : ARG) = struct
   module Stm = A.Stm
-
-  let get_op k = Flex_state.get_exn k (A.state ())
-
+  module E = A.Env
 
   (** {6 Weight functions} *)
   module WeightFun = struct
@@ -119,11 +117,6 @@ module Make(A : ARG) = struct
     assert (q.guard >= 0);
     _take_first q.guard q
 
-  
-  let is_empty_clause = function 
-      | None -> false
-      | Some cl -> Stm.C.is_empty cl 
-
   let take_fair tries q =
     q.time_before_fair <- q.ratio;
     (* TODO: the heap is fully traversed two times, can both operations be done with one traversal? *)
@@ -133,22 +126,14 @@ module Make(A : ARG) = struct
     (* H.fold (fun res (_,s) -> Stm.drip s :: res) [] q.hp *)
     let all_stms = CCList.sort (fun (_,s) (_,s') -> CCInt.compare (Stm.id s) (Stm.id s')) (H.to_list q.hp) in
     let to_drip, rest = CCList.take_drop tries all_stms in
-    let dripped =
-      let rec consume_until_empty acc = function
-        | [] -> acc
-        | (_,s) :: s_rest -> 
-          try
-            let result = Stm.drip s in
-            if not (is_empty_clause result) then consume_until_empty ((result, s) :: acc) s_rest
-            else ((result,s) :: acc) @ (List.map (fun (_,s) -> None, s) s_rest)
-          with Stm.Empty_Stream -> consume_until_empty acc s_rest
-      in
-      consume_until_empty [] to_drip
-    in
+    let dripped = CCList.filter_map (fun (_, s) ->
+        try
+          Some (Stm.drip s, s)
+        with Stm.Empty_Stream -> None) to_drip in
     let new_stms = (List.map (fun (_,s) -> Stm.penalty s, s) dripped) @ rest in
     q.hp <- H.of_list new_stms;
     q.stm_nb <- List.length new_stms;
-    let taken = List.rev_map fst dripped in
+    let taken = List.map fst dripped in
     Util.debugf ~section 1 "taken clauses: @[%a@]@." (fun k -> k (CCList.pp (CCOpt.pp Stm.C.pp)) taken);
     taken
 
@@ -162,20 +147,17 @@ module Make(A : ARG) = struct
         q.time_before_fair <- q.ratio;
         List.map CCOpt.return res)
     )
-    
+
   let rec _take_nb q nb prev_res =
     if H.is_empty q.hp || nb = 0 then prev_res
     else
       try
-        let res = (take_first q) in
-        (* if empty clause is found do not go futher *)
-        if is_empty_clause res then res::prev_res
-        else _take_nb q (nb-1) (res::prev_res)
+        _take_nb q (nb-1) ((take_first q)::prev_res)
       with
       | Not_found -> prev_res
 
   let clauses_to_take q =
-    let max_clause = get_op k_clause_num in
+    let max_clause = E.flex_get k_clause_num in
     if max_clause < 0 then q.stm_nb
     else min max_clause q.stm_nb
 
@@ -227,7 +209,7 @@ module Make(A : ARG) = struct
   let default () : t =
     let open WeightFun in
     let weight = penalty in
-    make ~guard:(get_op k_guard)  ~ratio:(get_op k_ratio) ~weight "default"
+    make ~guard:(E.flex_get k_guard)  ~ratio:(E.flex_get k_ratio) ~weight "default"
 
   let pp out q = CCFormat.fprintf out "queue %s" (name q)
   let to_string = CCFormat.to_string pp

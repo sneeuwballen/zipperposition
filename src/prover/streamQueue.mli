@@ -15,7 +15,7 @@ module type S = StreamQueue_intf.S
 
 module type ARG = sig
   module Stm : Stream.S
-  val state: unit -> Flex_state.t
+  module Env : Env.S
 end
 
 val k_guard : int Flex_state.key

@@ -17,8 +17,7 @@ val profile_of_string : string -> profile
 val get_profile : unit -> profile
 val set_profile : profile -> unit
 
-val ignoring_orphans : unit -> bool
-val disable_ignoring_orphans : unit -> unit
+val ignore_orphans : unit -> bool
 
 module type S = ClauseQueue_intf.S
 

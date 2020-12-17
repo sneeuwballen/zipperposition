@@ -71,7 +71,7 @@ module Make(A:ARG) = struct
   let drip s =
     let orig_penalty = s.penalty in
     let res = 
-      if ClauseQueue.ignoring_orphans () && is_orphaned s then (
+      if ClauseQueue.ignore_orphans () && is_orphaned s then (
         s.penalty <- max_int;
         s.stm <- OSeq.empty;
         raise Empty_Stream

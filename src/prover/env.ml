@@ -39,21 +39,7 @@ module Make(X : sig
   module Ctx = X.Ctx
   module C = Clause.Make(Ctx)
   module ProofState = ProofState.Make(C)
-  module FormRename = FormulaRename.Make(C)
 
-  let flex_state_ = ref X.flex_state
-  let flex_state () = !flex_state_
-
-  let k_max_multi_simpl_depth = Flex_state.create_key ()
-
-  module Stm = Stream.Make(struct
-      module Ctx = Ctx
-      module C = C
-    end)
-  module StmQ = StreamQueue.Make(struct
-      module Stm = Stm
-      let state = fun () ->  !flex_state_
-  end)
 
   type inf_rule = C.t -> C.t list
   (** An inference returns a list of conclusions *)
@@ -143,21 +129,11 @@ module Make(X : sig
   let _fragment_checks = ref []
   let _immediate_simpl : immediate_simplification_rule list ref = ref []
 
-
   let on_start = Signal.create()
   let on_input_statement = Signal.create()
   let on_empty_clause = Signal.create ()
 
   (** {2 Basic operations} *)
-
-  let _queue = ref None
-
-  let get_stm_queue () =
-    match !_queue with
-    | None ->
-      _queue := Some (StmQ.default ());
-      CCOpt.get_exn (!_queue);
-    | Some q -> q 
 
   let add_empty c =
     assert (C.is_empty c);
@@ -301,11 +277,6 @@ module Make(X : sig
   let pp_full out () =
     Format.fprintf out "@[<hv2>env(state:@ %a@,)@]" ProofState.debug ()
 
-  (** {2 Misc} *)
-  let update_flex_state f = CCRef.update f flex_state_
-  let flex_add k v = flex_state_ := Flex_state.add k v !flex_state_
-  let flex_get k = Flex_state.get_exn k !flex_state_
-
   (** {2 High level operations} *)
 
   type stats = int * int * int
@@ -398,7 +369,8 @@ module Make(X : sig
     C.ClauseSet.mem c (ProofState.PassiveSet.clauses ())
 
   let on_pred_var_elimination = Signal.create ()
-  
+  let on_pred_skolem_introduction = Signal.create ()
+
   module StrSet = CCSet.Make(String)
 
   (** Apply rewrite rules AND evaluation functions *)
@@ -541,7 +513,6 @@ module Make(X : sig
     let open SimplM.Infix in
     fix_simpl c
       ~f:(fun c ->
-          ho_normalize c >>= fun c ->
           basic_simplify c >>= fun c ->
           (* first, rewrite terms *)
           ho_normalize c >>= fun c ->
@@ -592,8 +563,7 @@ module Make(X : sig
     let res = fix_simpl c
         ~f:(fun c ->
             let old_c = c in
-            ho_normalize c >>=
-            basic_simplify >>=
+            basic_simplify c >>=
             (* simplify with unit clauses, then all active clauses *)
             ho_normalize >>=
             rewrite >>=
@@ -609,39 +579,15 @@ module Make(X : sig
     ZProf.exit_prof prof_simplify;
     res
 
-  let multi_simplify ~depth c : (C.t * int) list option =
-    let depth_map = 
-      ref (Util.Int_map.singleton (C.id c) depth) in
-    let [@inline] get_depth c =
-      CCOpt.get_exn @@ Util.Int_map.get (C.id c) !depth_map in
-    let [@inline] update_map c c' = 
-      let d = get_depth c in
-      depth_map := 
-        Util.Int_map.add (C.id c') d 
-          (Util.Int_map.remove (C.id c) !depth_map)
-    in
-    let set_children c children =
-      let d' = (get_depth c) + 1 in
-      depth_map := 
-        List.fold_left (fun map child -> 
-          Util.Int_map.add (C.id child) d' map
-        ) !depth_map children
-    in
-
+  let multi_simplify c : C.t list option =
     let did_something = ref false in
     (* try rules one by one until some of them succeeds *)
-    let rec try_next ~depth c rules = 
-      if flex_get k_max_multi_simpl_depth != -1 &&
-         depth > flex_get k_max_multi_simpl_depth 
-      then None
-      else (
-        match rules with
-        | [] -> None
-        | r::rules' ->
-          match r c with
-          | Some l -> Some l
-          | None -> try_next ~depth c rules'
-      )
+    let rec try_next c rules = match rules with
+      | [] -> None
+      | r::rules' ->
+        match r c with
+        | Some l -> Some l
+        | None -> try_next c rules'
     in
     (* fixpoint of [try_next] *)
     let set = ref C.ClauseSet.empty in
@@ -649,26 +595,22 @@ module Make(X : sig
     Queue.push c q;
     while not (Queue.is_empty q) do
       let c = Queue.pop q in
-      let depth = get_depth c in
       if not (C.ClauseSet.mem c !set) then (
-        let orig_c = c in
         let c, st = unary_simplify c in
-        update_map orig_c c;
         if st = `New then did_something := true;
-        match try_next ~depth c (multi_simpl_rules ()) with
+        match try_next c (multi_simpl_rules ()) with
         | None ->
           (* keep the clause! *)
           set := C.ClauseSet.add c !set;
         | Some l ->
           did_something := true;
-          set_children c l;
           List.iter (fun c -> Queue.push c q) l;
       )
     done;
     if !did_something
     then (
       C.mark_redundant c;
-      Some (List.map (fun c -> (c, get_depth c)) (C.ClauseSet.to_list !set))
+      Some (C.ClauseSet.to_list !set)
     )
     else None
 
@@ -693,8 +635,7 @@ module Make(X : sig
       fix_simpl c
         ~f:(fun c ->
             let old_c = c in
-            ho_normalize c >>=
-            basic_simplify >>=
+            basic_simplify c >>=
             (* simplify with unit clauses, then all active clauses *)
             ho_normalize >>=
             rewrite >>=
@@ -861,24 +802,19 @@ module Make(X : sig
     res
 
   (** Use all simplification rules to convert a clause into a list of
-      maximally simplified clauses.
-      
-      Stop applying mutlti_simpl rules after a certain depth.
-      Especially dangerous rules are the ones that do boolean hoisting
-      as simplification
-  *)
+      maximally simplified clauses *)
   let all_simplify c =
     ZProf.enter_prof prof_all_simplify;
     let did_simplify = ref false in
     let set = ref C.ClauseSet.empty in
     let q = Queue.create () in
-    Queue.push (c,0) q;
+    Queue.push c q;
     let blocked_sss = 
       CCArray.of_list 
         (List.map (fun _ -> IntSet.empty) !_ss_multi_simpl_rule) in
 
     while not (Queue.is_empty q) do
-      let c, depth = Queue.pop q in
+      let c = Queue.pop q in
       let c, st = simplify c in
       if st=`New then did_simplify := true;
       if is_trivial c || is_redundant c
@@ -904,21 +840,7 @@ module Make(X : sig
             ) in
           aux 0 !_ss_multi_simpl_rule in 
 
-          match multi_simplify ~depth c with
-          | Some l ->
-            (* continue processing *)
-            did_simplify := true;
-            let new_ids = IntSet.of_list (List.map (fun (c, _) -> C.id c) l) in
-
-            (* non-functional for efficiency *)
-            for i = 0 to (List.length !_ss_multi_simpl_rule) -1 do
-              let bs_i = blocked_sss.(i) in
-              if IntSet.mem (C.id c) bs_i then (
-                (* Adding descendents to blocked set *)
-                Array.set blocked_sss i (IntSet.union new_ids bs_i))
-            done;
-
-            List.iter (fun (c,d) -> Queue.push (c,d) q) l
+          match multi_simplify c with
           | None ->
             begin match single_step_simplified c with 
             | None ->
@@ -929,10 +851,23 @@ module Make(X : sig
               List.iter (fun res ->
                 (* Blocking descdendents for i *)
                 Array.set blocked_sss i (IntSet.union new_ids blocked_sss.(i));
-              CCFormat.printf "single-step-simpl(@[%a@])=@[%a@]@." C.pp c (CCList.pp C.pp) (l);
-              Queue.push (res,depth) q) l 
+              Queue.push res q) l 
             end
             (* clause has reached fixpoint *)
+          | Some l ->
+            (* continue processing *)
+            did_simplify := true;
+            let new_ids = IntSet.of_list (List.map C.id l) in
+
+            (* non-functional for efficiency *)
+            for i = 0 to (List.length !_ss_multi_simpl_rule) -1 do
+              let bs_i = blocked_sss.(i) in
+              if IntSet.mem (C.id c) bs_i then (
+                (* Adding descendents to blocked set *)
+                Array.set blocked_sss i (IntSet.union new_ids bs_i))
+            done;
+
+            List.iter (fun c -> Queue.push c q) l;
     );
     done;
     let res = C.ClauseSet.to_list !set in
@@ -990,5 +925,13 @@ module Make(X : sig
     let c_set = CCVector.freeze c_set in
     let c_sos = CCVector.freeze c_sos in
     { Clause.c_set; c_sos; }
+
+  (** {2 Misc} *)
+
+  let flex_state_ = ref X.flex_state
+  let flex_state () = !flex_state_
+  let update_flex_state f = CCRef.update f flex_state_
+  let flex_add k v = flex_state_ := Flex_state.add k v !flex_state_
+  let flex_get k = Flex_state.get_exn k !flex_state_
 end
 

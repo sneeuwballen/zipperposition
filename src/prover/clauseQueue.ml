@@ -76,11 +76,10 @@ let get_profile () = !_profile
 let set_profile p = _profile := p
 let parse_profile s = _profile := (profile_of_string s)
 let funs_to_parse = ref []
-let _ignoring_orphans = ref true
+let _ignore_orphans = ref true
 let _rel_terms_enabled = ref false
 
-let ignoring_orphans () = !_ignoring_orphans
-let disable_ignoring_orphans () = _ignoring_orphans := false
+let ignore_orphans () = !_ignore_orphans
 
 module Make(C : Clause_intf.S) = struct
   module C = C
@@ -103,7 +102,7 @@ module Make(C : Clause_intf.S) = struct
   let unroll_logical_symbols t =
     let rec aux t = 
       match Term.view t with
-      | AppBuiltin((Builtin.ForallConst|Builtin.ExistsConst), [_;x]) ->
+      | AppBuiltin((Builtin.ForallConst|Builtin.ExistsConst), [x]) ->
         let var_ty = List.hd (fst (Type.open_fun (Term.ty x))) in
         let fresh_var = Term.var @@ HVar.fresh ~ty:var_ty () in
         let app_x = norm_app x fresh_var in
@@ -218,7 +217,7 @@ module Make(C : Clause_intf.S) = struct
             match lit with
             | Lit.Equation(l,r,_) ->
               let t_w = max (term_w l) (term_w r) in
-              let t_w = if Lit.is_positivoid lit then pos_m *. t_w else t_w in
+              let t_w = if Lit.is_pos lit then pos_m *. t_w else t_w in
               let t_w = if CCBV.get max_lits i then max_l_mul *. t_w else t_w in
               let ordered = Ordering.compare ord l r != Comparison.Incomparable in
               t_w *. (if not ordered then unord_m else 1.0)
@@ -236,7 +235,7 @@ module Make(C : Clause_intf.S) = struct
           let w =
             match lit with
             | Lit.Equation(l,r,_) ->
-              let term_w = if Lit.is_positivoid lit then pterm_w else nterm_w in
+              let term_w = if Lit.is_pos lit then pterm_w else nterm_w in
               let ord_side = Ordering.compare ord l r in
               let l_mul = if ord_side = Comparison.Gt || ord_side = Comparison.Incomparable
                 then max_t_m else 1.0 in
@@ -244,17 +243,17 @@ module Make(C : Clause_intf.S) = struct
                 then max_t_m else 1.0 in
               let eq_inc = 
                 if Term.equal Term.true_ r 
-                then float_of_int (if Lit.is_positivoid lit then pf_w else nf_w)
+                then float_of_int (if Lit.is_pos lit then pf_w else nf_w)
                 else 0.0  in
               let t_w = l_mul *. (term_w l) +. r_mul *. (term_w r) +. eq_inc in
-              let t_w = if Lit.is_positivoid lit then pos_m *. t_w else t_w in
+              let t_w = if Lit.is_pos lit then pos_m *. t_w else t_w in
               let t_w = if CCBV.get max_lits i then max_l_m *. t_w else t_w in
               t_w
             | _ -> 1.0 in
           sum +. w
         ) 0.0 (C.lits c) in
       let w = int_of_float res in
-      Util.debugf ~section 3 "pnrefined(@[%a@],@[%g@])=%d@." (fun k -> k C.pp c pos_m w);
+      Util.debugf ~section 5 "pnrefined(@[%a@],@[%g@])=%d@." (fun k -> k C.pp c pos_m w);
       w
 
     let ho_weight_initial c =
@@ -278,8 +277,8 @@ module Make(C : Clause_intf.S) = struct
       assert (Literal.no_prop_invariant l);
       match l with
       (* Special treatment of propositions *)
-      | Lit.Equation (lhs,_,_) when Lit.is_predicate_lit l ->
-        calc_tweight lhs sg v w c_mul, Lit.is_positivoid l
+      | Lit.Equation (lhs,rhs,sign) when Term.equal rhs Term.true_ ->
+        calc_tweight lhs sg v w c_mul, sign
       | Lit.Equation (lhs,rhs,sign) -> (calc_tweight lhs sg v w c_mul +
                                         calc_tweight rhs sg v w c_mul, sign)
       | _ -> (0,false)
@@ -327,7 +326,7 @@ module Make(C : Clause_intf.S) = struct
                 1.0 /. divider
               ) else 1.0 in
             let val_ = int_of_float (goal_dist_penalty *. dist_var_penalty *. res) in
-            (Util.debugf ~section  3 "cl: %a, w:%d\n" (fun k -> k C.pp c val_);
+            (Util.debugf ~section  5 "cl: %a, w:%d\n" (fun k -> k C.pp c val_);
              val_))
 
     (* function inspired by Struct from the paper https://arxiv.org/abs/1606.03888 *)
@@ -379,14 +378,14 @@ module Make(C : Clause_intf.S) = struct
 
       C.Seq.lits c
       |> Iter.foldi (fun acc idx lit -> 
-        let is_pos = Lit.is_positivoid lit in
+        let is_pos = Lit.is_pos lit in
         let is_max = CCBV.get max_lits idx in
 
         Lit.Seq.terms lit
         |> Iter.filter (fun t -> not (Term.is_true_or_false t))
         |> Iter.fold (fun acc t -> 
             let w = struct_diff_weight t in 
-            Util.debugf ~section 3 "struct(@[%a@])=%d" (fun k -> k Term.pp t w);
+            Util.debugf ~section 5 "struct(@[%a@])=%d" (fun k -> k Term.pp t w);
             acc + w) acc
         |> (fun res ->
               let mul = 
@@ -420,7 +419,7 @@ module Make(C : Clause_intf.S) = struct
         int_of_float (mul *. float_of_int (aux t)) in
 
       let lit_weight is_max lit =
-        let is_pos = Lit.is_positivoid lit in
+        let is_pos = Lit.is_pos lit in
         let multipliers =
           (if is_max then max_lit_mul else 1.0) *.
           (if is_pos then pos_mul else 1.0) in
@@ -445,7 +444,7 @@ module Make(C : Clause_intf.S) = struct
         acc + lit_weight is_max lit
       ) 0
       |> (fun res ->
-        Util.debugf ~section 3 "cr-e(@[%a@])=%d@." (fun k -> k C.pp c res);
+        Util.debugf ~section 5 "cr-e(@[%a@])=%d@." (fun k -> k C.pp c res);
         res
       )
 
@@ -472,7 +471,7 @@ module Make(C : Clause_intf.S) = struct
       let res = 
         C.Seq.lits c
         |> Iter.foldi (fun (weight,syms,vars) idx lit -> 
-          let pos_c = if Lit.is_positivoid lit then pos_mul else 1.0 in
+          let pos_c = if Lit.is_pos lit then pos_mul else 1.0 in
           let max_c = if CCBV.get max_lits idx then max_l_mul else 1.0 in
 
           match lit with
@@ -490,9 +489,9 @@ module Make(C : Clause_intf.S) = struct
 
             let f_factor = fdiff_a *. f +. fdiff_b in
             let v_factor = vdiff_a *. v +. vdiff_b in
-            Util.debugf ~section 3 "w:%g;f:%g;v:%g" (fun k -> k w f_factor v_factor);
+            Util.debugf ~section 5 "w:%g;f:%g;v:%g" (fun k -> k w f_factor v_factor);
             int_of_float (w +. f_factor +. v_factor  )) in
-      Util.debugf ~section 3 "diversity_weight(@[%a@])=%d@." (fun k -> k C.pp c res);
+      Util.debugf ~section 5 "diversity_weight(@[%a@])=%d@." (fun k -> k C.pp c res);
       res
 
 
@@ -512,7 +511,7 @@ module Make(C : Clause_intf.S) = struct
 
     let favor_pos_unit c =
       let is_unit_pos c = match C.lits c with
-        | [| lit |] when Lit.is_positivoid lit -> true
+        | [| lit |] when Lit.is_pos lit -> true
         | _ -> false
       in
       if is_unit_pos c then 0 else penalty_coeff_
@@ -548,7 +547,7 @@ module Make(C : Clause_intf.S) = struct
         1+d
 
     (* check whether a literal is a ground neg lit *)
-    let is_ground_neg lit = Lit.is_negativoid lit && Lit.is_ground lit
+    let is_ground_neg lit = Lit.is_neg lit && Lit.is_ground lit
     let all_ground_neg c = CCArray.for_all is_ground_neg (C.lits c)
 
     let favor_all_neg c =
@@ -756,7 +755,7 @@ module Make(C : Clause_intf.S) = struct
        "conjecture-relative-var", parse_crv;
        "conjecture-relative-struct", parse_cr_struct;
        "conjecture-relative-cheap", parse_conj_relative_cheap;
-      "conjecture-relative-e", parse_cr_e;
+       "conjecture-relative-e", parse_cr_e;
        "diversity-weight", parse_diversity_weight;
        "pnrefined", parse_pnrefine;
        "staggered", parse_staggered;
@@ -769,7 +768,7 @@ module Make(C : Clause_intf.S) = struct
       let w = List.assoc name parsers s in
       fun c ->
         let res = penalize w c in
-        Util.debugf ~section 1 "@[%s(%a)@]=@[%d@]" (fun k -> k name C.pp c res);
+        Util.debugf ~section 5 "@[%s(%a)@]=@[%d@]" (fun k -> k name C.pp c res);
         res
 
     with Not_found | Failure _ -> 
@@ -788,10 +787,10 @@ module Make(C : Clause_intf.S) = struct
       if C.proof_depth c = 0 || CCOpt.is_some (C.distance_to_goal c) then 0 else 1
 
     let prefer_non_goals c =
-      if Iter.exists Literal.is_positivoid (C.Seq.lits c) then 0 else 1
+      if Iter.exists Literal.is_pos (C.Seq.lits c) then 0 else 1
 
     let prefer_unit_ground_non_goals c =
-      if Iter.exists Literal.is_positivoid (C.Seq.lits c) &&
+      if Iter.exists Literal.is_pos (C.Seq.lits c) &&
          C.is_unit_clause c && C.is_ground c then 0 else 1
 
     let prefer_goals c =
@@ -969,7 +968,7 @@ module Make(C : Clause_intf.S) = struct
 
     let prefer_neg_unit c =
       match C.lits c with 
-      | [| l |] when Lit.is_negativoid l -> 0
+      | [| Literal.Equation(_,_,false) |] -> 0
       | _ -> 1
     
     let defer_neg_unit c =
@@ -978,7 +977,7 @@ module Make(C : Clause_intf.S) = struct
     let by_neg_lit c =
       abs @@
         Array.fold_left (fun acc lit -> 
-          if Lit.is_positivoid lit then acc + 400
+          if Lit.is_pos lit then acc + 400
           else if Lit.is_ground lit then acc - 3
           else acc - 1
         ) 0 (C.lits c)
@@ -1135,7 +1134,7 @@ module Make(C : Clause_intf.S) = struct
     | Mixed q -> C.Tbl.length q.tbl
 
   let add q c = match q with
-    | FIFO q -> Queue.push c q
+    | FIFO q -> Queue.push c q; true
     | Mixed q ->
       if not (C.Tbl.mem q.tbl c) then (
         C.Tbl.add q.tbl c ();
@@ -1143,9 +1142,11 @@ module Make(C : Clause_intf.S) = struct
         let heaps = Array.mapi (fun i (prio,weight) ->
             let heap = Array.get q.heaps i in
             H.insert (prio,weight,c) heap) weights in
-        q.heaps <- heaps)
+        q.heaps <- heaps;
+        true) 
+      else false
 
-  let add_seq q hcs = Iter.iter (add q) hcs
+  let add_seq q hcs = Iter.iter (fun c -> ignore (add q c)) hcs
 
   let rec take_first_mixed q =
     let move_queue q =
@@ -1175,16 +1176,17 @@ module Make(C : Clause_intf.S) = struct
     Array.set q.heaps q.current_heap_idx current_heap;
 
     let is_orphaned c =
-      !_ignoring_orphans && C.is_orphaned c in
+      (!_ignore_orphans && C.is_orphaned c) || C.is_redundant c in
 
     (* if clause was picked by another queue 
        or it should be ignored, repeat clause choice.  *)
     if not (C.Tbl.mem q.tbl c) then (
+      Util.debugf ~section 1 "clause is not in the table:@ @[%a@]@." (fun k -> k C.pp c);
       take_first_mixed q
     ) else if is_orphaned c then (
       C.Tbl.remove q.tbl c;
-      Util.debugf ~section 3 "ignoring orphaned clause:@ @[%a@]@." (fun k -> k C.pp c);
-      Util.debugf ~section 4 "proof:@ @[%a@]@." (fun k -> k Proof.S.pp_tstp (C.proof c));
+      Util.debugf ~section 1"ignoring orphaned clause:@ @[%a@]@." (fun k -> k C.pp c);
+      Util.debugf ~section 5 "proof:@ @[%a@]@." (fun k -> k Proof.S.pp_tstp (C.proof c));
       take_first_mixed q
     ) else (
       C.Tbl.remove q.tbl c;
@@ -1356,6 +1358,21 @@ module Make(C : Clause_intf.S) = struct
       Mixed mixed
     )
 
+  let all_clauses q =
+    match q with
+    | FIFO q -> CCSeq.to_iter (Queue.to_seq q )
+    | Mixed q -> Iter.map fst (C.Tbl.to_iter q.tbl)
+
+  let remove q cl =
+    match q with 
+    | FIFO q -> invalid_arg "legacy queue, removal unsupported"
+    | Mixed q ->
+      if C.Tbl.mem q.tbl cl then (
+        C.Tbl.remove q.tbl cl;
+        true
+      ) else false
+
+
   let pp out q = CCFormat.fprintf out "queue %s" (name q)
   let to_string = CCFormat.to_string pp
 end
@@ -1383,8 +1400,8 @@ let () =
       "-cq", o, " alias for --clause-queue";
       "--add-queue", add_queue, " create a new clause evaluation queue. Its description is of the form" ^
                                 " RATIO|PRIORITY_FUN|WEIGHT_FUN";
-      "-q", add_queue, "alias to --add-queue";
-      "--ignore-orphans", Arg.Bool ((:=) _ignoring_orphans), " whether to ignore the orphans during clause selection"
+      "-q", add_queue, " alias for --add-queue";
+      "--ignore-orphans", Arg.Bool ((:=) _ignore_orphans), " whether to ignore the orphans during clause selection"
     ];
 
   Params.add_to_modes 

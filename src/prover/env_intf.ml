@@ -7,11 +7,6 @@ module type S = sig
   module Ctx : Ctx.S
   module C : Clause.S with module Ctx = Ctx
   module ProofState : ProofState.S with module C = C and module Ctx = Ctx
-  module Stm : Stream.S with module C = C
-  module StmQ : StreamQueue.S with module Stm = Stm
-  module FormRename : FormulaRename.S with module C = C
-
-  val k_max_multi_simpl_depth : int Flex_state.key
 
   type inf_rule = C.t -> C.t list
   (** An inference returns a list of conclusions *)
@@ -184,7 +179,7 @@ module type S = sig
 
   (** {2 Use the Env} *)
 
-  val multi_simplify : depth:int -> C.t -> (C.t * int) list option
+  val multi_simplify : C.t -> C.t list option
   (** Can we simplify the clause into a List of simplified clauses? *)
 
   val params : Params.t
@@ -223,8 +218,6 @@ module type S = sig
 
   type stats = int * int * int
   (** statistics on clauses : num active, num passive, num simplification *)
-
-  val get_stm_queue : unit -> StmQ.t
 
   val stats : unit -> stats
   (** Compute stats *)
@@ -294,8 +287,7 @@ module type S = sig
 
   val all_simplify : C.t -> C.t list SimplM.t
   (** Use all simplification rules to convert a clause into a set
-      of maximally simplified clause (or [[]] if they are all trivial).
-       *)
+      of maximally simplified clause (or [[]] if they are all trivial). *)
 
   val step_init : unit -> unit
   (** call all functions registered with {!add_step_init} *)
@@ -320,4 +312,7 @@ module type S = sig
   (** this signal is raised if a formula that universally quantifies
       a predicate removes that predicate and rules that want to instantiate it
       early should listen to this *)
+
+  val on_pred_skolem_introduction : (C.t * Term.t) Signal.t
+  (** this signal is raised when a predicate Skolem is introduced  *)
 end
