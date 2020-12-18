@@ -1606,6 +1606,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         Env.add_unary_inf "interpret boolean functions" interpret_boolean_functions;
       );
 
+      Env.add_unary_inf "false_elim" false_elim;
       if Env.flex_get k_bool_reasoning = BoolHoist then (
         if Env.flex_get k_bool_hoist_simpl
         then Env.add_multi_simpl_rule ~priority:1000 bool_hoist_simpl;
@@ -1624,7 +1625,6 @@ module Make(E : Env.S) : S with module Env = E = struct
           Env.add_unary_inf "fluid_quant_rw" fluid_quant_rw;
         );
 
-        Env.add_unary_inf "false_elim" false_elim;
         Env.add_unary_inf "formula_hoist" eq_hoist;
         Env.add_multi_simpl_rule ~priority:90 quantifier_rw_and_hoist;
         Env.add_multi_simpl_rule ~priority:100 replace_bool_vars;
