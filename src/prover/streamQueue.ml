@@ -124,7 +124,7 @@ module Make(A : ARG) = struct
       | None -> false
       | Some cl -> Stm.C.is_empty cl 
 
-  let take_fair tries q =
+  let take_fair ?(full=false) tries q =
     q.time_before_fair <- q.ratio;
     (* TODO: the heap is fully traversed two times, can both operations be done with one traversal? *)
     (* q.hp <- H.filter (fun (_,s) -> not (Stm.is_empty s)) q.hp;
@@ -133,17 +133,20 @@ module Make(A : ARG) = struct
     (* H.fold (fun res (_,s) -> Stm.drip s :: res) [] q.hp *)
     let all_stms = CCList.sort (fun (_,s) (_,s') -> CCInt.compare (Stm.id s) (Stm.id s')) (H.to_list q.hp) in
     let to_drip, rest = CCList.take_drop tries all_stms in
+    
     let dripped =
       let rec consume_until_empty acc = function
         | [] -> acc
         | (_,s) :: s_rest -> 
-          try
+          if Stm.is_empty s then consume_until_empty acc s_rest
+          else (
             let result = Stm.drip s in
-            if not (is_empty_clause result) then consume_until_empty ((result, s) :: acc) s_rest
-            else ((result,s) :: acc) @ (List.map (fun (_,s) -> None, s) s_rest)
-          with Stm.Empty_Stream -> consume_until_empty acc s_rest
+            if (is_empty_clause result) || (full && CCOpt.is_some result) 
+            then ((result,s) :: acc) @ (List.map (fun (_,s) -> None, s) s_rest)
+            else consume_until_empty ((result, s) :: acc) s_rest
+          ) 
       in
-      consume_until_empty [] to_drip
+      (consume_until_empty [@tailrec]) [] to_drip
     in
     let new_stms = (List.map (fun (_,s) -> Stm.penalty s, s) dripped) @ rest in
     q.hp <- H.of_list new_stms;
@@ -156,7 +159,7 @@ module Make(A : ARG) = struct
   let rec take_fair_anyway q =
     if H.is_empty q.hp then [None]
     else (
-      let res = CCList.filter_map CCFun.id (take_fair (H.size q.hp) q) in
+      let res = CCList.filter_map CCFun.id (take_fair ~full:true (H.size q.hp) q) in
       if CCList.is_empty res then take_fair_anyway q
       else (
         q.time_before_fair <- q.ratio;

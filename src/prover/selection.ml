@@ -189,7 +189,7 @@ let prefer_app_var ~ord lits =
 let weight_based_sel_driver ?(blocker=(fun _ _ -> false)) ~ord lits f =
   let min_lit = 
     CCArray.to_iter lits
-    |> Iter.mapi (fun i l -> f (i,l), i)
+    |> Iter.mapi (fun i l -> f (i,Literal.map (fun t -> Lambda.eta_reduce @@ Lambda.snf t) l), i)
     |> Iter.sort
     |> Iter.find_map (fun (_,i) ->
       let lit = lits.(i) in
