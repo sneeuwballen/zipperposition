@@ -137,14 +137,13 @@ module Make(A : ARG) = struct
     let dripped =
       let rec consume_until_empty acc = function
         | [] -> acc
-        | (_,s) :: s_rest -> 
-          if Stm.is_empty s then consume_until_empty acc s_rest
-          else (
-            let result = Stm.drip s in
+        | (_,s) :: s_rest ->
+          match Stm.drip s with
+          | result -> 
             if (is_empty_clause result) || (full && CCOpt.is_some result) 
             then ((result,s) :: acc) @ (List.map (fun (_,s) -> None, s) s_rest)
-            else consume_until_empty ((result, s) :: acc) s_rest
-          ) 
+            else (consume_until_empty [@tailrec]) ((result, s) :: acc) s_rest
+          | exception Stm.Empty_Stream -> (consume_until_empty [@tailrec]) acc s_rest
       in
       (consume_until_empty [@tailrec]) [] to_drip
     in

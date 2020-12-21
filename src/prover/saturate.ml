@@ -149,7 +149,7 @@ module Make(E : Env.S) = struct
           Util.debugf ~section 2 "@[@{<Yellow>### step %5d ###@}@]"(fun k->k num);
           Util.debugf ~section 1 "@[<2>given clause dropped@ @[%a@]@]"
             (fun k->k Env.C.pp c);
-          Util.debugf ~section 2 "@[proof:@[%a@]@]" (fun k -> k Proof.S.pp_zf (Env.C.proof c));
+          Util.debugf ~section 1 "@[proof:@[%a@]@]" (fun k -> k Proof.S.pp_zf (Env.C.proof c));
           Signal.send Env.on_forward_simplified (c, None);
           Unknown
         | l, _ when List.exists Env.C.is_empty l ->
@@ -235,7 +235,7 @@ module Make(E : Env.S) = struct
                 CCOpt.get_or ~default:[c] (Env.cheap_multi_simplify c)
               ) inferred_clauses in
             CCVector.append_iter new_clauses inferred_clauses;
-            Util.debugf ~section 1 "@[<2>inferred @{<green>new clauses@}:@ [@[<v>%a@]]@]"
+            Util.debugf ~section 2 "@[<2>inferred @{<green>new clauses@}:@ [@[<v>%a@]]@]"
               (fun k->k (Util.pp_iter Env.C.pp) (CCVector.to_iter new_clauses));
             (* add new clauses (including simplified active clauses)
               to passive set and simpl_set *)

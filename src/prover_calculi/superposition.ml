@@ -1643,7 +1643,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let renaming = S.Renaming.create () in
     let subst = US.subst us in
 
-    if ((Env.flex_get k_pred_var_eq_fact && info.is_pred_var_eq_fact && C.proof_depth info.clause < 2) ||
+    if ((Env.flex_get k_pred_var_eq_fact 
+          && info.is_pred_var_eq_fact 
+          && C.proof_depth info.clause == 0
+          && not (T.is_true_or_false t)) ||
         (O.compare ord (S.FO.apply renaming subst (s, info.scope)) 
         (S.FO.apply renaming subst (t, info.scope)) <> Comp.Lt
         && CCList.for_all (fun (c, i) -> i = idx) (C.selected_lits info.clause)
