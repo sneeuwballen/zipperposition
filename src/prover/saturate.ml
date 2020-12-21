@@ -137,7 +137,7 @@ module Make(E : Env.S) = struct
       )
     | Some c ->
       let picked_clause = c in
-      Util.debugf ~section 2 "@[<2>@{<green>given@} (before simplification):@ `@[%a@]`@]"
+      Util.debugf ~section 1 "@[<2>@{<green>given@} (before simplification):@ `@[%a@]`@]"
             (fun k->k Env.C.pp c);
       Util.debugf ~section 10 "@[proof:@[%a@]@]" (fun k -> k Proof.S.pp_tstp (Env.C.proof c));
       
@@ -235,7 +235,7 @@ module Make(E : Env.S) = struct
                 CCOpt.get_or ~default:[c] (Env.cheap_multi_simplify c)
               ) inferred_clauses in
             CCVector.append_iter new_clauses inferred_clauses;
-            Util.debugf ~section 2 "@[<2>inferred @{<green>new clauses@}:@ [@[<v>%a@]]@]"
+            Util.debugf ~section 1 "@[<2>inferred @{<green>new clauses@}:@ [@[<v>%a@]]@]"
               (fun k->k (Util.pp_iter Env.C.pp) (CCVector.to_iter new_clauses));
             (* add new clauses (including simplified active clauses)
               to passive set and simpl_set *)

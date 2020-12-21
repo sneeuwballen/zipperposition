@@ -97,6 +97,7 @@ let k_immediate_simplification = Flex_state.create_key ()
 let k_local_rw = Flex_state.create_key ()
 let k_destr_eq_res = Flex_state.create_key ()
 let k_rw_with_formulas = Flex_state.create_key ()
+let k_pred_var_eq_fact = Flex_state.create_key ()
 
 
 
@@ -596,7 +597,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let t' = if info.sup_kind != DupSup then 
           S.FO.apply ~shift_vars renaming subst (info.t, sc_a)
         else dup_sup_apply_subst info.t sc_a sc_p subst renaming in
-      Util.debugf ~section 1
+      Util.debugf ~section 2
         "@[<2>sup, kind %s(%d)@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a, t'=%a@]@])@ \
          (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@]"
         (fun k->k (kind_to_str info.sup_kind) (Term.Set.cardinal lambdasup_vars) C.pp info.active sc_a T.pp info.s T.pp info.t
@@ -1499,7 +1500,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               let active_pos = C.WithPos.{term=s; pos=s_pos; clause} in
               match do_subvarsup ~passive_pos:with_pos ~active_pos with
               | Some c -> 
-                Util.debugf ~section 1 "svs: @[%a@]@. @[%a@]. @[%a@]@." 
+                Util.debugf ~section 2 "svs: @[%a@]@. @[%a@]. @[%a@]@." 
                   (fun k -> k C.pp clause C.pp with_pos.clause C.pp c);
                 Iter.cons c acc
               | None -> acc)
@@ -1526,7 +1527,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
               | Some(l,r,_) when T.is_var r || T.is_app_var r || T.is_comb r->
                 begin match do_subvarsup ~passive_pos ~active_pos:with_pos with
                 | Some c -> 
-                  Util.debugf ~section 1 "svs: @[%a@]@. @[%a@]. @[%a@]@." 
+                  Util.debugf ~section 2 "svs: @[%a@]@. @[%a@]. @[%a@]@." 
                     (fun k -> k C.pp with_pos.clause C.pp clause C.pp c);
                   Iter.cons c acc
                 | None -> acc end
@@ -1574,7 +1575,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                   [C.proof_parent_subst renaming (clause,0) subst] in
               let new_clause = C.create ~trail ~penalty (c_guard@new_lits) proof in
               (* CCFormat.printf "success: @[%a@]@." C.pp new_clause; *)
-              Util.debugf ~section 1 "@[<hv2>equality resolution on@ @[%a@]@ yields @[%a@],\n subst @[%a@]@]"
+              Util.debugf ~section 2 "@[<hv2>equality resolution on@ @[%a@]@ yields @[%a@],\n subst @[%a@]@]"
                 (fun k->k C.pp clause C.pp new_clause US.pp us);
               Some new_clause
             ) else None
@@ -1623,6 +1624,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     type t = {
       clause : C.t;
       active_idx : int;
+      is_pred_var_eq_fact : bool;
       s : T.t;
       t : T.t;
       u : T.t;
@@ -1641,11 +1643,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let renaming = S.Renaming.create () in
     let subst = US.subst us in
 
-    if O.compare ord (S.FO.apply renaming subst (s, info.scope)) 
+    if ((Env.flex_get k_pred_var_eq_fact && info.is_pred_var_eq_fact && C.proof_depth info.clause < 2) ||
+        (O.compare ord (S.FO.apply renaming subst (s, info.scope)) 
         (S.FO.apply renaming subst (t, info.scope)) <> Comp.Lt
-      && CCList.for_all (fun (c, i) -> i = idx) (C.selected_lits info.clause)
-      && CCList.is_empty (C.bool_selected info.clause)
-      && C.is_maxlit (info.clause,info.scope) subst ~idx
+        && CCList.for_all (fun (c, i) -> i = idx) (C.selected_lits info.clause)
+        && CCList.is_empty (C.bool_selected info.clause)
+        && C.is_maxlit (info.clause,info.scope) subst ~idx))
     then (
       let subst_is_ho = 
         Subst.codomain subst
@@ -1672,7 +1675,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let new_clause =
         C.create ~trail:(C.trail info.clause) ~penalty new_lits proof
       in
-      Util.debugf ~section 3 "@[<hv2>equality factoring on@ @[%a@]@ yields @[%a@]@]"
+      Util.debugf ~section 1 "@[<hv2>equality factoring on@ @[%a@]@ yields @[%a@]@]"
         (fun k->k C.pp info.clause C.pp new_clause);
 
       Some new_clause
@@ -1705,10 +1708,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
            find_unifiable_lits active_idx s s_pos
            |> Iter.filter_map
              (fun (u,v,substs) ->
+               let is_pred_var_eq_fact =
+                (T.is_app_var s && Type.is_prop (T.ty s))
+                || (T.is_app_var u && Type.is_prop (T.ty u))
+               in
                iterate_substs substs
                  (fun subst ->
                      let info = EqFactInfo.({
-                         clause; s; t; u; v; active_idx; subst; scope=0
+                         clause; s; t; u; v; active_idx; subst; scope=0; is_pred_var_eq_fact;
                        }) in
                    do_eq_factoring info)))
       |> Iter.to_rev_list
@@ -2000,8 +2007,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let neqs, others =
       CCArray.fold_left (fun (neq_map, others) lit ->
         match lit with
-        | Literal.Equation(lhs,rhs,sign) when not (T.is_var (T.head_term lhs)) &&
-                                              not (T.is_var (T.head_term rhs)) ->
+        | Literal.Equation(lhs,rhs,sign) ->
           (* NOTE: based on the representation of the literals! *)
           if sign && T.is_true_or_false rhs && (not (T.is_var lhs)) then (
             let negate t = if T.equal t T.true_ then T.false_ else T.true_ in
@@ -2079,7 +2085,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         let new_lits = CCArray.to_list new_lits in
         let proof = Proof.Step.simp [C.proof_parent c] ~rule:(Proof.Rule.mk "local_rewriting") in
         let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
-        Util.debugf ~section 1 "local_rw(@[%a@]):@.@[%a@]@." (fun k -> k C.pp c C.pp new_c);
+        Util.debugf ~section 2 "local_rw(@[%a@]):@.@[%a@]@." (fun k -> k C.pp c C.pp new_c);
         SimplM.return_new new_c
       )
     with Invalid_argument err ->
@@ -2172,7 +2178,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     in
     if res then (
       Util.incr_stat stat_semantic_tautology;
-      Util.debugf ~section 1 "@[@[%a@]@ is a semantic tautology@]" (fun k->k C.pp c);
+      Util.debugf ~section 2 "@[@[%a@]@ is a semantic tautology@]" (fun k->k C.pp c);
     );
     res
 
@@ -2643,7 +2649,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                subsumes (C.lits c') (C.lits c)
              ) in
            if res  then (
-            Util.debugf ~section 1 "@[<2>@[%a@]@ subsumed by @[%a@]@]" (fun k->k C.pp c C.pp c');
+            Util.debugf ~section 2 "@[<2>@[%a@]@ subsumed by @[%a@]@]" (fun k->k C.pp c C.pp c');
             Util.incr_stat stat_clauses_subsumed;
            );
            res)
@@ -2853,7 +2859,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           C.mark_redundant c;
           Env.remove_active (Iter.singleton c);
           Env.remove_simpl (Iter.singleton c);
-          Util.debugf ~section 1 "immediate subsume @[%a@]@." (fun k -> k C.pp c);
+          Util.debugf ~section 2 "immediate subsume @[%a@]@." (fun k -> k C.pp c);
           Some c'
         ) else None))
     |> (function 
@@ -2946,7 +2952,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           Ctx.declare sk_id sk_ty;
           let new_clause = 
             C.create ~trail:(C.trail c) ~penalty:(C.penalty c) inv_lit proof in
-          Util.debugf ~section 1 "Injectivity recognized: %a |---| %a" 
+          Util.debugf ~section 2 "Injectivity recognized: %a |---| %a" 
             (fun k -> k C.pp c C.pp new_clause);
           [new_clause]
         | _ -> assert false; end
@@ -3153,6 +3159,7 @@ let _bool_demod = ref false
 let _immediate_simplification = ref false
 let _try_lfho_unif = ref true
 let _rw_w_formulas = ref false
+let _pred_var_eq_fact = ref false
 
 let _guard = ref 30
 let _ratio = ref 100
@@ -3226,6 +3233,7 @@ let register ~sup =
   E.flex_add PragUnifParams.k_use_weight_for_solid_subsumption !_use_weight_for_solid_subsumption;
   E.flex_add PragUnifParams.k_sort_constraints !_sort_constraints;
   E.flex_add PragUnifParams.k_try_lfho !_try_lfho_unif;
+  E.flex_add k_pred_var_eq_fact !_pred_var_eq_fact;
 
   E.flex_add StreamQueue.k_guard !_guard;
   E.flex_add StreamQueue.k_ratio !_ratio;
@@ -3322,6 +3330,7 @@ let () =
       "--stream-queue-ratio", Arg.Set_int _ratio, "set value of ratio for streamQueue";
       "--bool-demod", Arg.Bool ((:=) _bool_demod), " turn BoolDemod on/off";
       "--destr-eq-res", Arg.Bool ((:=) _destr_eq_res), " turn destructive equality resolution on/off";
+      "--pred-var-eq-fact", Arg.Bool ((:=) _pred_var_eq_fact), " force equality factoring when one side is applied variable";
       "--local-rw", Arg.Symbol (["any-context"; "green-context"; "off"], (fun opt -> 
         match opt with
         | "any-context" -> _local_rw := `AnyContext
@@ -3364,6 +3373,7 @@ let () =
       _complete_ho_unification := true;
       _unif_alg := `NewJPPragmatic;
       _sup_at_var_headed := true;
+      _pred_var_eq_fact := false;
       _lambdasup := -1;
       _dupsup := false;
       _max_infs := 4;
@@ -3385,6 +3395,7 @@ let () =
       _unif_alg := `NewJPFull;
       _local_rw := `GreenContext;
       _sup_at_var_headed := true;
+      _pred_var_eq_fact := true;
       _lambdasup := -1;
       _dupsup := false;
       _fluidsup := false;

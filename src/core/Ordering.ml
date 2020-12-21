@@ -200,6 +200,7 @@ module type PARAMETERS =
 sig
   val name : string
   val lambda_mode : bool
+  val ignore_deep_quants : bool
 end
 
 
@@ -253,7 +254,7 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
   let weight_var_headed = W.one
 
   let weight prec ~below_lam = function
-    | Head.Q _ -> if below_lam then W.one else  W.omega
+    | Head.Q _ -> if P.ignore_deep_quants && below_lam then W.one else  W.omega
     | Head.B _ -> W.one
     | Head.I s -> Prec.weight prec s
     | Head.V _ -> weight_var_headed
@@ -805,14 +806,16 @@ let map f { cache_compare=_; compare; prec; name; might_flip; cache_might_flip=_
   let might_flip prec a b = CCCache.with_cache cache_might_flip (fun (a, b) -> might_flip prec (f a) (f b)) (a,b) in
   { cache_compare; compare; prec; name; might_flip; cache_might_flip; monotonic }
 
-let lambda_kbo prec =
+let lambda_kbo ignore_quans_under_lam prec =
   let module KBO = MakeKBO(struct 
       let name = "lambda_kbo"
-      let lambda_mode = true 
+      let lambda_mode = true
+      let ignore_deep_quants = ignore_quans_under_lam
     end) in
   let cache_compare = mk_cache 256 in
   let compare prec a b = CCCache.with_cache cache_compare
-      (fun (a, b) -> KBO.compare_terms ~prec a b) (a,b)
+      (fun (a, b) -> 
+        KBO.compare_terms ~prec a b) (a,b)
   in
   let cache_might_flip = mk_cache 256 in
   let might_flip prec a b = CCCache.with_cache cache_might_flip
@@ -825,7 +828,8 @@ let lambda_kbo prec =
 let lambdafree_kbo prec =
   let module KBO = MakeKBO(struct 
       let name = "lambdafree_kbo"
-      let lambda_mode = false 
+      let lambda_mode = false
+      let ignore_deep_quants = true
     end) in
   let cache_compare = mk_cache 256 in
   let compare prec a b = CCCache.with_cache cache_compare
@@ -841,7 +845,8 @@ let lambdafree_kbo prec =
 let lambdafree_rpo prec =
   let module RPO = MakeRPO(struct 
       let name = "lambdafree_rpo"
-      let lambda_mode = false 
+      let lambda_mode = false
+      let ignore_deep_quants = true
     end) in
   let cache_compare = mk_cache 256 in
   let compare prec a b = CCCache.with_cache cache_compare
@@ -857,7 +862,8 @@ let lambdafree_rpo prec =
 let lambda_rpo prec =
   let module RPO = MakeRPO(struct 
       let name = "lambda_rpo"
-      let lambda_mode = true 
+      let lambda_mode = true
+      let ignore_deep_quants = true
     end) in
   let cache_compare = mk_cache 256 in
   let compare prec a b = CCCache.with_cache cache_compare
@@ -927,7 +933,8 @@ let subterm =
 let tbl_ =
   let h = Hashtbl.create 5 in
   Hashtbl.add h "lambdafree_kbo" lambdafree_kbo;
-  Hashtbl.add h "lambda_kbo" lambda_kbo;
+  Hashtbl.add h "lambda_kbo" (lambda_kbo false);
+  Hashtbl.add h "lambda_kbo_complete" (lambda_kbo true);
   Hashtbl.add h "lambdafree_rpo" lambdafree_rpo;
   Hashtbl.add h "lambda_rpo" lambda_rpo;
   Hashtbl.add h "epo" epo;

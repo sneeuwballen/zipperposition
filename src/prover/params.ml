@@ -152,6 +152,9 @@ let () =
       ; "lambda-free-purify-extensional"] (fun () ->
       default.ord := "lambdafree_kbo"
     );
+
+  add_to_mode "ho-complete-basic" 
+    (fun () -> default.ord := "lambda_kbo_complete");
   
   add_to_modes 
       [ "ho-competitive"
