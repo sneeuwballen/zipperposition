@@ -122,11 +122,9 @@ let mk_ ~ord ~(f:Lits.t -> BV.t) (lits:Lits.t) : BV.t =
     if should_select then (
       let bv = f lits in
       assert (validate_fun_ ~ord lits bv);
-      CCFormat.printf "selected in (@[%a@]): @[%a@]@." Lits.pp lits BV.pp bv;
       bv
     ) else (
       (*Util.debugf ~section 5 "(@[should-not-select@ %a@])" (fun k->k Lits.pp lits);*)
-      CCFormat.printf "there is nothing to select for (@[%a@])@." Lits.pp lits;
       BV.empty ()
     )
   )

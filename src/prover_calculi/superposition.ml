@@ -3176,7 +3176,7 @@ let unif_params_to_def () =
   _max_depth := 2;
   _max_app_projections := 1;
   _max_rigid_imitations := 2;
-  _max_identifications := 0;
+  _max_identifications := 1;
   _max_elims           := 0;
   _max_infs := 6
 
