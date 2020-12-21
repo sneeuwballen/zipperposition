@@ -111,7 +111,7 @@ exception Attr_prefix of string
 
 exception Attr_parameter of int
 
-type skolem_kind = K_normal | K_after_cnf | K_ind (* inductive *)
+type skolem_kind = K_normal | K_after_cnf | K_lazy_cnf | K_ind (* inductive *)
 
 exception Attr_skolem of skolem_kind
 
@@ -143,6 +143,13 @@ let is_postcnf_skolem id =
     ~f:(function
         | Attr_skolem K_after_cnf -> true
         | _ -> false)
+
+let is_lazycnf_skolem id =
+  payload_pred id
+    ~f:(function
+        | Attr_skolem K_lazy_cnf -> true
+        | _ -> false)
+
 
 let as_skolem id =
   payload_find id

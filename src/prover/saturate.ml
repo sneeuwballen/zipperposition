@@ -149,7 +149,7 @@ module Make(E : Env.S) = struct
           Util.debugf ~section 2 "@[@{<Yellow>### step %5d ###@}@]"(fun k->k num);
           Util.debugf ~section 1 "@[<2>given clause dropped@ @[%a@]@]"
             (fun k->k Env.C.pp c);
-          Util.debugf ~section 1 "@[proof:@[%a@]@]" (fun k -> k Proof.S.pp_zf (Env.C.proof c));
+          Util.debugf ~section 2 "@[proof:@[%a@]@]" (fun k -> k Proof.S.pp_zf (Env.C.proof c));
           Signal.send Env.on_forward_simplified (c, None);
           Unknown
         | l, _ when List.exists Env.C.is_empty l ->

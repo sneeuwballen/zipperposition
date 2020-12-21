@@ -701,8 +701,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
          not (BV.get (C.eligible_res (info.passive, sc_p) subst) passive_idx)) ||
         not (C.is_eligible_param (info.active, sc_a) subst ~idx:active_idx)
       ) then (
-        raise (ExitSuperposition (Format.sprintf "bad ordering conditions"))
-        );
+        raise (ExitSuperposition 
+          (CCFormat.sprintf "bad ordering conditions: %a"
+           BV.pp (C.eligible_res (info.passive, sc_p) subst))
+        ));
       (* Check for superposition at a variable *)
       if info.sup_kind != FluidSup then
         if not @@ Env.flex_get k_sup_at_vars then
@@ -3164,9 +3166,9 @@ let _try_lfho_unif = ref true
 let _rw_w_formulas = ref false
 let _pred_var_eq_fact = ref false
 
-let _guard = ref 30
-let _ratio = ref 100
-let _clause_num = ref (-1)
+let _guard = ref 20
+let _ratio = ref 70
+let _clause_num = ref 7
 
 let key = Flex_state.create_key ()
 

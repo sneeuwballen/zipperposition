@@ -93,7 +93,7 @@ let can_select_lit ~ord (lits:Lits.t) (i:int) : bool =
         match lits.(i) with
         | Lit.Equation(lhs,rhs,_) when Lit.is_predicate_lit lits.(i) ->
           (match T.as_const (T.head_term lhs) with 
-           | Some sym -> not (ID.is_postcnf_skolem sym)
+           | Some sym -> not ((ID.is_postcnf_skolem sym) && not (ID.is_lazycnf_skolem sym))
            | _ -> true)
         | _ -> true
       )
@@ -122,9 +122,11 @@ let mk_ ~ord ~(f:Lits.t -> BV.t) (lits:Lits.t) : BV.t =
     if should_select then (
       let bv = f lits in
       assert (validate_fun_ ~ord lits bv);
+      CCFormat.printf "selected in (@[%a@]): @[%a@]@." Lits.pp lits BV.pp bv;
       bv
     ) else (
       (*Util.debugf ~section 5 "(@[should-not-select@ %a@])" (fun k->k Lits.pp lits);*)
+      CCFormat.printf "there is nothing to select for (@[%a@])@." Lits.pp lits;
       BV.empty ()
     )
   )
