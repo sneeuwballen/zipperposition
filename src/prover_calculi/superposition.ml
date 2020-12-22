@@ -3166,9 +3166,9 @@ let _try_lfho_unif = ref true
 let _rw_w_formulas = ref false
 let _pred_var_eq_fact = ref false
 
-let _guard = ref 20
-let _ratio = ref 70
-let _clause_num = ref 7
+let _guard = ref 30
+let _ratio = ref 100
+let _clause_num = ref (-1)
 
 let key = Flex_state.create_key ()
 
