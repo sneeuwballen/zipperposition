@@ -1469,7 +1469,10 @@ module Make(E : Env.S) : S with module Env = E = struct
       let cnf_vec = Cnf.convert @@ CCVector.to_iter @@ Cnf.cnf_of ~opts ~ctx:(Ctx.sk_ctx ()) stmt in
       CCVector.iter (fun cl -> 
           Statement.Seq.ty_decls cl
-          |> Iter.iter (fun (id,ty) -> Ctx.declare id ty)) cnf_vec;
+          |> Iter.iter (fun (id,ty) -> 
+            Ctx.declare id ty; 
+            ID.set_payload id (ID.Attr_skolem ID.K_after_cnf)
+          )) cnf_vec;
       let solved = 
         if Env.flex_get k_solve_formulas then (
           CCOpt.get_or ~default:[] (solve_bool_formulas ~which:`All c))

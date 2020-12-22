@@ -487,7 +487,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let ext_rule_eligible cl =
     Env.flex_get k_ext_rules_max_depth < 0 ||
-    C.proof_depth cl <= Env.flex_get k_ext_rules_max_depth
+    C.proof_depth cl < Env.flex_get k_ext_rules_max_depth
 
   let update_ext_dec_indices f c =
     let ord = Ctx.ord () in
