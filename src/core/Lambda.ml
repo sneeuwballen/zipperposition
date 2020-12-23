@@ -5,8 +5,6 @@
 
 let prof_whnf = ZProf.make "term.whnf"
 let prof_snf = ZProf.make "term.snf"
-let prof_eta_expand = ZProf.make "term.eta_expand"
-let prof_eta_reduce = ZProf.make "term.eta_reduce"
 
 let section = Util.Section.make "lambdas"
 
@@ -130,7 +128,7 @@ module Inner = struct
         end) 
     else t
 
-  let eta_expand_rec t =
+  let eta_expand t =
     let rec aux t = match T.ty t with
       | T.NoType -> t
       | T.HasType ty ->
@@ -176,7 +174,7 @@ module Inner = struct
     aux t
 
   (* compute eta-reduced normal form *)
-  let eta_reduce_aux ?(full=true) t =      
+  let eta_reduce ?(full=true) t =      
     let q_reduce ~pref_len t =
       let hd, args = T.as_app t in
       let n = List.length args in
@@ -255,10 +253,6 @@ module Inner = struct
   let snf t =
     let t' = ZProf.with_prof prof_snf snf_rec t in
     t'
-
-  let eta_expand t = ZProf.with_prof prof_eta_expand eta_expand_rec t
-
-  let eta_reduce ?(full=true) t = ZProf.with_prof prof_eta_reduce (eta_reduce_aux ~full) t
 
 end
 

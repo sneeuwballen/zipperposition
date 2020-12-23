@@ -57,9 +57,6 @@ type 'a sequence = ('a -> unit) -> unit
 
 let section = Util.Section.make "unif"
 
-let prof_unify = ZProf.make "unify"
-let prof_matching = ZProf.make "matching"
-
 let fail () = raise Fail
 
 let _allow_pattern_unif = ref true
@@ -992,10 +989,7 @@ module Inner = struct
     with Fail -> false
 
   let unify_full ?(subst=US.empty) a b : unif_subst =
-    ZProf.with_prof prof_unify
-      (fun () -> 
-        unif_rec ~root:true ~op:O_unify ~bvars:B_vars.empty subst a b
-        ) ()
+    unif_rec ~root:true ~op:O_unify ~bvars:B_vars.empty subst a b
 
   let unify_syn ?(subst=Subst.empty) a b : Subst.t =
     let subst = US.of_subst subst in
@@ -1007,16 +1001,13 @@ module Inner = struct
   let matching ?(subst=Subst.empty) ~pattern b =
     if Scoped.same_scope pattern b then invalid_arg "Unif.matching: same scopes";
     let scope = Scoped.scope b in
-    ZProf.with_prof prof_matching
-      (fun () ->
-         let subst = US.of_subst subst in
-         let subst =
-           unif_rec subst pattern b
-             ~root:true ~op:(O_match_protect (P_scope scope)) ~bvars:B_vars.empty
-         in
-         assert (not @@ US.has_constr subst);
-         US.subst subst)
-      ()
+    let subst = US.of_subst subst in
+    let subst =
+      unif_rec subst pattern b
+        ~root:true ~op:(O_match_protect (P_scope scope)) ~bvars:B_vars.empty
+    in
+    assert (not @@ US.has_constr subst);
+    US.subst subst
 
   let matching_same_scope
       ?(protect=Iter.empty) ?(subst=S.empty) ~scope ~pattern b =
@@ -1024,17 +1015,14 @@ module Inner = struct
        free variables of [b] *)
     let protect = Iter.append protect (T.Seq.vars b) in
     let blocked = T.VarSet.of_iter protect in
-    ZProf.with_prof prof_matching
-      (fun () ->
-         let subst = US.of_subst subst in
-         let subst =
-           unif_rec
-             subst (Scoped.make pattern scope) (Scoped.make b scope)
-             ~op:(O_match_protect (P_vars blocked)) ~root:true ~bvars:B_vars.empty
-         in
-         assert (not @@ US.has_constr subst);
-         US.subst subst)
-      ()
+    let subst = US.of_subst subst in
+    let subst =
+      unif_rec
+        subst (Scoped.make pattern scope) (Scoped.make b scope)
+        ~op:(O_match_protect (P_vars blocked)) ~root:true ~bvars:B_vars.empty
+    in
+    assert (not @@ US.has_constr subst);
+    US.subst subst
 
   let matching_adapt_scope ?protect ?subst ~pattern t =
     if Scoped.same_scope pattern t
