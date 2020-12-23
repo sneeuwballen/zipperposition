@@ -132,24 +132,24 @@ let _to_multiset_with_idx lits =
 
 (* TODO: optimize! quite a bottleneck on pb47.p with NoSelection *)
 let maxlits_l ~ord lits =
-  ZProf.enter_prof prof_maxlits;
+  let _span = ZProf.enter_prof prof_maxlits in
   let m = _to_multiset_with_idx lits in
   let max = MLI.max_seq (_compare_lit_with_idx ~ord) m
             |> Iter.map fst
             |> Iter.to_list
   in
-  ZProf.exit_prof prof_maxlits;
+  ZProf.exit_prof _span;
   max
 
 let maxlits ~ord lits =
-  ZProf.enter_prof prof_maxlits;
+  let _span = ZProf.enter_prof prof_maxlits in
   let m = _to_multiset_with_idx lits in
   let max = MLI.max_seq (_compare_lit_with_idx ~ord) m
             |> Iter.map (fun (x,_) -> snd x)
             |> Iter.to_list
             |> BV.of_list
   in
-  ZProf.exit_prof prof_maxlits;
+  ZProf.exit_prof _span;
   max
 
 let is_max ~ord lits =

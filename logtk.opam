@@ -16,6 +16,7 @@ depends: [
   "oseq" { >= "0.3" & < "0.4" }
   "containers" { >= "3.0" & < "4.0" }
   "containers-data" { >= "3.0" & < "4.0" }
+  "mtime"
   "iter" { >= "1.2" }
   "menhir" {build}
   "dune" { >= "1.11" }

@@ -240,9 +240,7 @@ module Inner = struct
     t'
 
   let whnf t =
-    ZProf.enter_prof prof_whnf;
-    let t' = whnf_term t in
-    ZProf.exit_prof prof_whnf;
+    let t' = ZProf.with_prof prof_whnf whnf_term t in
     t'
 
 
@@ -255,9 +253,7 @@ module Inner = struct
     { st with args = st.args @ args; ty; }
 
   let snf t =
-    ZProf.enter_prof prof_snf;
-    let t' = snf_rec t in
-    ZProf.exit_prof prof_snf;
+    let t' = ZProf.with_prof prof_snf snf_rec t in
     t'
 
   let eta_expand t = ZProf.with_prof prof_eta_expand eta_expand_rec t

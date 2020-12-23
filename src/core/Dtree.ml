@@ -193,7 +193,7 @@ module Make(E : Index.EQUATION) = struct
     Iter.fold remove dt seq
 
   let retrieve ?(subst=S.empty) ~sign dt t k =
-    ZProf.enter_prof prof_dtree_retrieve;
+    let _span = ZProf.enter_prof prof_dtree_retrieve in
     (* recursive traversal of the trie, following paths compatible with t *)
     let rec traverse trie iter subst =
       match iter with
@@ -252,7 +252,7 @@ module Make(E : Index.EQUATION) = struct
           trie.map
     in
     traverse (fst dt) (iterate (fst t)) subst;
-    ZProf.exit_prof prof_dtree_retrieve;
+    ZProf.exit_prof _span;
     ()
 
   (** iterate on all (term -> value) in the tree *)

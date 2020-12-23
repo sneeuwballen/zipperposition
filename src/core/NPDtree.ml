@@ -184,7 +184,7 @@ module Make(E : Index.EQUATION) = struct
   let remove_seq dt seq = Iter.fold remove dt seq
 
   let retrieve ?(subst=S.empty) ~sign dt t k =
-    ZProf.enter_prof prof_npdtree_retrieve;
+    let _span = ZProf.enter_prof prof_npdtree_retrieve in
     (* extended callback *)
     let k' (t', eqn, subst) =
       let _, r, sign' = E.extract eqn in
@@ -194,9 +194,7 @@ module Make(E : Index.EQUATION) = struct
     let rec traverse trie iter =
       match iter with
       | None ->
-        ZProf.exit_prof prof_npdtree_retrieve;
         Leaf.fold_match ~subst (Scoped.set dt trie.leaf) t k';
-        ZProf.enter_prof prof_npdtree_retrieve;
       | Some i ->
         match view_head i.cur_term with
         | As_star ->
@@ -219,9 +217,9 @@ module Make(E : Index.EQUATION) = struct
     in
     try
       traverse (fst dt) (iterate (fst t));
-      ZProf.exit_prof prof_npdtree_retrieve;
+      ZProf.exit_prof _span;
     with e ->
-      ZProf.exit_prof prof_npdtree_retrieve;
+      ZProf.exit_prof _span;
       raise e
 
   (** iterate on all (term -> value) in the tree *)
@@ -375,13 +373,11 @@ module MakeTerm(X : Set.OrderedType) = struct
     skip trie 1 k
 
   let retrieve_unifiables_aux fold_unify dt t k =
-    ZProf.enter_prof prof_npdtree_term_unify;
+    let _span = ZProf.enter_prof prof_npdtree_term_unify in
     (* recursive traversal of the trie, following paths compatible with t *)
     let rec traverse trie iter = match iter with
       | None ->
-        ZProf.exit_prof prof_npdtree_term_unify;
         fold_unify (Scoped.set dt trie.leaf) t k;
-        ZProf.enter_prof prof_npdtree_term_unify;
       | Some i ->
         match view_head i.cur_term with
         | As_star ->
@@ -403,9 +399,9 @@ module MakeTerm(X : Set.OrderedType) = struct
     in
     try
       traverse (fst dt) (iterate (fst t));
-      ZProf.exit_prof prof_npdtree_term_unify;
+      ZProf.exit_prof _span;
     with e ->
-      ZProf.exit_prof prof_npdtree_term_unify;
+      ZProf.exit_prof _span;
       raise e
   
   let retrieve_unifiables = retrieve_unifiables_aux (Leaf.fold_unify)
@@ -413,13 +409,11 @@ module MakeTerm(X : Set.OrderedType) = struct
   let retrieve_unifiables_complete ?(unif_alg=JP_unif.unify_scoped) = retrieve_unifiables_aux (Leaf.fold_unify_complete ~unif_alg) 
 
   let retrieve_generalizations ?(subst=S.empty) dt t k =
-    ZProf.enter_prof prof_npdtree_term_generalizations;
+    let _span = ZProf.enter_prof prof_npdtree_term_generalizations in
     (* recursive traversal of the trie, following paths compatible with t *)
     let rec traverse trie iter = match iter with
       | None ->
-        ZProf.exit_prof prof_npdtree_term_generalizations;
         Leaf.fold_match ~subst (Scoped.set dt trie.leaf) t k;
-        ZProf.enter_prof prof_npdtree_term_generalizations;
       | Some i ->
         match view_head i.cur_term with
         | As_star ->
@@ -443,19 +437,17 @@ module MakeTerm(X : Set.OrderedType) = struct
     in
     try
       traverse (fst dt) (iterate (fst t));
-      ZProf.exit_prof prof_npdtree_term_generalizations;
+      ZProf.exit_prof _span;
     with e ->
-      ZProf.exit_prof prof_npdtree_term_generalizations;
+      ZProf.exit_prof _span;
       raise e
 
   let retrieve_specializations ?(subst=S.empty) dt t k =
-    ZProf.enter_prof prof_npdtree_term_specializations;
+    let _span = ZProf.enter_prof prof_npdtree_term_specializations in
     (* recursive traversal of the trie, following paths compatible with t *)
     let rec traverse trie iter = match iter with
       | None ->
-        ZProf.exit_prof prof_npdtree_term_specializations;
         Leaf.fold_matched ~subst (Scoped.set dt trie.leaf) t k;
-        ZProf.enter_prof prof_npdtree_term_specializations;
       | Some i ->
         match view_head i.cur_term with
         | As_star ->
@@ -473,9 +465,9 @@ module MakeTerm(X : Set.OrderedType) = struct
     in
     try
       traverse (fst dt) (iterate (fst t));
-      ZProf.exit_prof prof_npdtree_term_specializations;
+      ZProf.exit_prof _span;
     with e ->
-      ZProf.exit_prof prof_npdtree_term_specializations;
+      ZProf.exit_prof _span;
       raise e
 
   (** iterate on all (term -> value) in the tree *)
