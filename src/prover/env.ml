@@ -20,9 +20,12 @@ let prof_generate_unary = ZProf.make "env.generate_unary"
 let prof_generate_binary = ZProf.make "env.generate_binary"
 let prof_back_simplify = ZProf.make "env.back_simplify"
 let prof_simplify = ZProf.make "env.simplify"
+let prof_multi_simplify = ZProf.make "env.multi_simplify"
+let prof_fwd_simplify = ZProf.make "env.fwd_simplify"
 let prof_all_simplify = ZProf.make "env.all_simplify"
 let prof_is_redundant = ZProf.make "env.is_redundant"
 let prof_subsumed_by = ZProf.make "env.subsumed_by"
+let prof_cheap_multi = ZProf.make "env.cheap_multi_simp"
 
 (** {2 Signature} *)
 module type S = Env_intf.S
@@ -595,6 +598,7 @@ module Make(X : sig
     res
 
   let multi_simplify c : C.t list option =
+    let _span = ZProf.enter_prof prof_multi_simplify in
     let did_something = ref false in
     (* try rules one by one until some of them succeeds *)
     let rec try_next c rules = match rules with
@@ -622,6 +626,7 @@ module Make(X : sig
           List.iter (fun c -> Queue.push c q) l;
       )
     done;
+    ZProf.exit_prof _span;
     if !did_something
     then (
       C.mark_redundant c;
@@ -720,7 +725,10 @@ module Make(X : sig
   (** Simplify the clause w.r.t to the active set *)
   let forward_simplify c =
     let open SimplM.Infix in
-    ho_normalize c >>= rewrite >>= rw_simplify >>= unary_simplify
+    let _span = ZProf.enter_prof prof_fwd_simplify in
+    let res = ho_normalize c >>= rewrite >>= rw_simplify >>= unary_simplify in
+    ZProf.exit_prof _span;
+    res
 
   let _apply_multi_rules ~rule_list c = 
     let rec apply_rules ~rules c =
@@ -746,7 +754,9 @@ module Make(X : sig
     (!res, !any_simplified)
 
   let cheap_multi_simplify c = 
+    let _span = ZProf.enter_prof prof_cheap_multi in
     let res,any_simplified = _apply_multi_rules ~rule_list:!_cheap_msr c in
+    ZProf.exit_prof _span;
 
     if any_simplified then Some res else None
 
