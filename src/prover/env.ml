@@ -327,6 +327,25 @@ module Make(X : sig
 
   let next_passive = ProofState.PassiveSet.next
 
+  let should_force_stream_eval () =
+    flex_get PragUnifParams.k_unif_alg_is_terminating &&
+    not (flex_get PragUnifParams.k_schedule_inferences)
+
+  let get_finite_infs streams =
+    assert(flex_get PragUnifParams.k_unif_alg_is_terminating);
+
+    let apply_max_infs s =
+      let max_infs = flex_get PragUnifParams.k_max_inferences in
+      if max_infs < 0 then s else OSeq.take max_infs s
+    in
+
+    CCList.flat_map (fun s -> 
+      OSeq.filter_map CCFun.id s
+      |> apply_max_infs
+      |> OSeq.to_rev_list
+    ) streams
+
+
   (** do binary inferences that involve the given clause *)
   let do_binary_inferences c =
     ZProf.enter_prof prof_generate_binary;

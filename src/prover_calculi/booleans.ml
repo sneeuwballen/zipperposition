@@ -437,9 +437,12 @@ module Make(E : Env.S) : S with module Env = E = struct
               ) us_opt
             )
           in
-          let stm_res = Env.Stm.make ~penalty:(C.penalty c + 2) ~parents:[c] unif_seq in
-          Env.StmQ.add (Env.get_stm_queue ()) stm_res;
-          []
+          if Env.should_force_stream_eval () then (
+            (Env.get_finite_infs [unif_seq]) @ acc 
+          ) else (
+            let stm_res = Env.Stm.make ~penalty:(C.penalty c + 2) ~parents:[c] unif_seq in
+            Env.StmQ.add (Env.get_stm_queue ()) stm_res;
+            acc)
         ) else acc
     ) [] iter)
 
@@ -508,7 +511,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
     let eligible = C.Eligible.res c in
     Literals.fold_lits ~eligible (C.lits c)
-    |> Iter.iter (fun (lit, idx) ->
+    |> Iter.fold (fun acc (lit, idx) ->
       let lit_pos = PB.arg idx PB.empty in
       match lit with
       | Literal.Equation(u, v, true) 
@@ -520,8 +523,8 @@ module Make(E : Env.S) : S with module Env = E = struct
                                           (v, PB.to_pos (PB.right lit_pos))]
           else []
         in
-        List.iter (fun (var, pos) -> 
-          List.iter (fun p -> 
+        List.fold_left (fun acc (var, pos) -> 
+          List.fold_left (fun acc p -> 
             let seq = 
               get_unif_alg () (p.unif_partner, sc_partner) (var, sc_cl)
               |> OSeq.filter_map (
@@ -535,13 +538,17 @@ module Make(E : Env.S) : S with module Env = E = struct
                     Some (mk_res sub pos p)        
                 )))
             in
-            let stm_res = Env.Stm.make ~penalty:(C.penalty c + 2) ~parents:[c] seq in
-            Env.StmQ.add (Env.get_stm_queue ()) stm_res;
-          ) partners;          
-        ) app_vars
-      | _ -> ()
-    );
-    []
+            
+            if Env.should_force_stream_eval () then (
+              Env.get_finite_infs [seq] @ acc
+            ) else (
+              let stm_res = Env.Stm.make ~penalty:(C.penalty c + 2) ~parents:[c] seq in
+              Env.StmQ.add (Env.get_stm_queue ()) stm_res;
+              acc)
+          ) acc partners;
+        ) acc app_vars
+      | _ -> acc
+    ) []
 
   (* Fluid version of (Forall|Exists)RW *)
   let fluid_quant_rw  (c:C.t) =    
@@ -589,7 +596,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
     let eligible = C.Eligible.res c in
     Literals.fold_lits ~eligible (C.lits c)
-    |> Iter.iter (fun (lit, idx) ->
+    |> Iter.fold (fun acc (lit, idx) ->
       let lit_pos = PB.arg idx PB.empty in
       match lit with
       | Literal.Equation(u, v, true) 
@@ -601,8 +608,8 @@ module Make(E : Env.S) : S with module Env = E = struct
                                           (v, PB.to_pos (PB.right lit_pos))]
           else []
         in
-        List.iter (fun (var, pos) -> 
-          List.iter (fun p -> 
+        List.fold_left (fun acc (var, pos) -> 
+          List.fold_left (fun acc p -> 
             let seq = 
               get_unif_alg () (p.unif_partner, sc_partner) (var, sc_cl)
               |> OSeq.filter_map (
@@ -616,13 +623,16 @@ module Make(E : Env.S) : S with module Env = E = struct
                     Some (mk_res sub pos p)
                 )))
             in
-            let stm_res = Env.Stm.make ~penalty:(C.penalty c + 2) ~parents:[c] seq in
-            Env.StmQ.add (Env.get_stm_queue ()) stm_res;
-          ) partners;          
-        ) app_vars
-      | _ -> ()
-    );
-    []
+            if Env.should_force_stream_eval () then (
+              Env.get_finite_infs [seq] @ acc
+            ) else (
+              let stm_res = Env.Stm.make ~penalty:(C.penalty c + 2) ~parents:[c] seq in
+              Env.StmQ.add (Env.get_stm_queue ()) stm_res;
+              acc)
+          ) acc partners;          
+        ) acc app_vars
+      | _ -> acc
+    ) []
 
   let false_elim c =
     let module S = Subst.FO in
@@ -660,8 +670,13 @@ module Make(E : Env.S) : S with module Env = E = struct
                 Some (res)
             )))
         in
-      let stm_res = Env.Stm.make ~penalty:(C.penalty c) ~parents:[c] seq in
-      Env.StmQ.add (Env.get_stm_queue ()) stm_res;
+      if Env.should_force_stream_eval () then (
+        Env.get_finite_infs [seq]
+      ) else (
+        let stm_res = Env.Stm.make ~penalty:(C.penalty c) ~parents:[c] seq in
+        Env.StmQ.add (Env.get_stm_queue ()) stm_res;
+        []
+      )
     in
 
     let eligible = C.eligible_res (c, 0) Subst.empty in
@@ -679,16 +694,14 @@ module Make(E : Env.S) : S with module Env = E = struct
             S.bind' Subst.empty (get_var lhs, 0) (T.false_, 0) in
           add_immediate acc sub idx
         ) else if T.is_app_var lhs then (
-          schedule lhs T.false_ idx;
-          acc
+          schedule lhs T.false_ idx @ acc
         ) else acc
       ) else if T.equal T.false_ rhs then (
         if T.is_var lhs then (
           let sub = S.bind' Subst.empty (get_var lhs, 0) (T.true_, 0) in
           add_immediate acc sub idx
         ) else if T.is_app_var lhs then (
-          schedule lhs T.true_ idx;
-          acc
+          schedule lhs T.true_ idx @ acc
         ) else acc
       ) else if T.is_var (T.head_term lhs) 
                 && T.is_var (T.head_term rhs)
@@ -710,9 +723,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             let t_eq_f = T.Form.eq T.true_ T.false_ in
             let f_eq_t = T.Form.eq T.false_ T.true_ in
           
-            schedule l_eq_r t_eq_f idx;
-            schedule l_eq_r f_eq_t idx;
-            acc
+            schedule l_eq_r t_eq_f idx @ schedule l_eq_r f_eq_t idx @ acc
           )
       ) else acc
     ) []
@@ -782,9 +793,9 @@ module Make(E : Env.S) : S with module Env = E = struct
         | T.AppBuiltin(hd, args) 
           when (Builtin.is_logical_binop hd || hd = Builtin.Not) ->
           find_eligible_app_var args
-        | _ -> None)) 
-    |> CCOpt.iter (fun t -> 
-      List.iter (fun target -> 
+        | _ -> None))
+    |> CCOpt.map (fun t -> 
+      List.fold_left (fun acc target -> 
         let seq =
           get_unif_alg () (t, 0) (target, 0)
           |> OSeq.filter_map (
@@ -800,10 +811,14 @@ module Make(E : Env.S) : S with module Env = E = struct
                 Some (res)
               ))
         in
-      let stm_res = Env.Stm.make ~penalty:(C.penalty c) ~parents:[c] seq in
-      Env.StmQ.add (Env.get_stm_queue ()) stm_res;
-      ) [T.true_; T.false_]);
-    []
+      if Env.should_force_stream_eval () then (
+        Env.get_finite_infs [seq] @ acc 
+      ) else (
+        let stm_res = Env.Stm.make ~penalty:(C.penalty c) ~parents:[c] seq in
+        Env.StmQ.add (Env.get_stm_queue ()) stm_res;
+        acc)
+      ) [] [T.true_; T.false_])
+    |> CCOpt.get_or ~default:[]
 
   let quantifier_rw_and_hoist (c:C.t) =
     let quant_rw ~at b body =
@@ -904,10 +919,15 @@ module Make(E : Env.S) : S with module Env = E = struct
                 C.create ~penalty:(C.penalty c) ~trail:(C.trail c) new_lits proof
               ) unif_subst_opt))
       | _ -> None)
-    |> Iter.iter (fun clause_seq -> 
+    |> Iter.flat_map_l (fun clause_seq ->
+      if Env.should_force_stream_eval () then (
+        Env.get_finite_infs [clause_seq]
+      ) else (
       let stm_res = Env.Stm.make ~penalty:(C.penalty c) ~parents:[c] clause_seq in
-      Env.StmQ.add (Env.get_stm_queue ()) stm_res);
-    []
+      Env.StmQ.add (Env.get_stm_queue ()) stm_res;
+      []
+    ))
+    |> Iter.to_rev_list
 
   let rename_nested_booleans c =
     let module L = Literal in

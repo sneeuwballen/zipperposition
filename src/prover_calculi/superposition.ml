@@ -84,7 +84,7 @@ let k_dot_sup_from = Flex_state.create_key ()
 let k_dot_simpl = Flex_state.create_key ()
 let k_dot_demod_into = Flex_state.create_key ()
 let k_recognize_injectivity = Flex_state.create_key ()
-let k_complete_ho_unification = Flex_state.create_key ()
+let k_ho_basic_rules = Flex_state.create_key ()
 let k_max_infs = Flex_state.create_key ()
 let k_switch_stream_extraction = Flex_state.create_key ()
 let k_dont_simplify = Flex_state.create_key ()
@@ -144,6 +144,21 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let ord =
     Ctx.ord ()
 
+  let force_getting_cl streams = 
+    let rec aux ((clauses, streams) as acc) = function 
+      | [] -> acc
+      | (penalty, parents, stm) :: xs ->
+        begin
+          match stm () with
+          | OSeq.Nil -> aux acc xs 
+          | OSeq.Cons((Some cl), stm') ->
+            aux (cl::clauses, (Stm.make ~penalty ~parents stm')::streams) xs
+          | OSeq.Cons(None, stm') ->
+            aux (clauses, (Stm.make ~penalty ~parents stm')::streams) xs
+        end 
+    in
+    aux ([], []) streams
+  
   let has_bad_occurrence_elsewhere c var pos =
     assert(T.is_var var);
     Lits.fold_terms ~ord ~subterms:true ~eligible:C.Eligible.always ~which:`All
@@ -1152,8 +1167,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             Some (p, parents, OSeq.map (CCOpt.flat_map (do_sup u_p with_pos)) substs))
         clause
     in
-    let stm_res = List.map (fun (penalty, parents, s) -> Stm.make ~penalty ~parents s) inf_res in
-    StmQ.add_lst (Env.get_stm_queue ()) stm_res; []
+
+    let clauses, streams = force_getting_cl inf_res in
+    StmQ.add_lst (Env.get_stm_queue ()) streams; 
+    clauses
 
   let infer_passive_complete_ho clause =
     let inf_res = infer_passive_aux
@@ -1166,8 +1183,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             Some (p, parents, OSeq.map (CCOpt.flat_map (do_sup u_p with_pos)) substs))
         clause
     in
-    let stm_res = List.map (fun (penalty,parents,s) -> Stm.make ~penalty ~parents s) inf_res in
-    StmQ.add_lst (Env.get_stm_queue ()) stm_res; []
+    
+    let clauses, streams = force_getting_cl inf_res in
+    StmQ.add_lst (Env.get_stm_queue ()) streams; 
+    clauses
 
   let infer_active_pragmatic_ho max_unifs clause =
     let inf_res = infer_active_aux
@@ -1245,10 +1264,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         |> Iter.to_rev_list
       else []
     in
-    let stm_res = List.map (fun (p,s,parents) -> Stm.make ~penalty:p ~parents s) new_clauses in
-    StmQ.add_lst (Env.get_stm_queue ()) stm_res;
-    ZProf.exit_prof prof_infer_fluidsup_active;
-    []
+    if Env.should_force_stream_eval () then (
+      Env.get_finite_infs (List.map (fun (_,x,_) -> x) new_clauses) 
+    ) else (
+      let stm_res = List.map (fun (p,s,parents) -> Stm.make ~penalty:p ~parents s) new_clauses in
+      StmQ.add_lst (Env.get_stm_queue ()) stm_res;
+      ZProf.exit_prof prof_infer_fluidsup_active;
+      [])
 
   let infer_fluidsup_passive clause =
     ZProf.enter_prof prof_infer_fluidsup_passive;
@@ -1298,10 +1320,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         |> Iter.to_rev_list
       else []
     in
-    let stm_res = List.map (fun (p,s,parents) -> Stm.make ~penalty:p ~parents s) new_clauses in
-    StmQ.add_lst (Env.get_stm_queue ()) stm_res;
-    ZProf.exit_prof prof_infer_fluidsup_passive;
-    []
+    if Env.should_force_stream_eval () then (
+      Env.get_finite_infs (List.map (fun (_,x,_) -> x) new_clauses)
+    ) else (
+      let stm_res = List.map (fun (p,s,parents) -> Stm.make ~penalty:p ~parents s) new_clauses in
+      StmQ.add_lst (Env.get_stm_queue ()) stm_res;
+      ZProf.exit_prof prof_infer_fluidsup_passive;
+      []
+    )
 
   (* ----------------------------------------------------------------------
    * DupSup rule (Lightweight superposition at applied variables)
@@ -1367,10 +1393,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         )
       |> Iter.to_rev_list
     in
-    let stm_res = List.map (fun (p,s,parents) -> Stm.make ~penalty:p ~parents s) new_clauses in
-    StmQ.add_lst (Env.get_stm_queue ()) stm_res;
-    ZProf.exit_prof prof_infer_fluidsup_active;
-    []
+    if Env.should_force_stream_eval () then (
+      Env.get_finite_infs (List.map (fun (_,x,_) -> x) new_clauses)
+    ) else (
+      let stm_res = List.map (fun (p,s,parents) -> Stm.make ~penalty:p ~parents s) new_clauses in
+      StmQ.add_lst (Env.get_stm_queue ()) stm_res;
+      ZProf.exit_prof prof_infer_fluidsup_active;
+      []
+    )
 
   let infer_dupsup_passive clause =
     ZProf.enter_prof prof_infer_fluidsup_passive;
@@ -1438,10 +1468,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         )
       |> Iter.to_rev_list
     in
-    let stm_res = List.map (fun (p,s,parents) -> Stm.make ~penalty:p ~parents s) new_clauses in
-    StmQ.add_lst (Env.get_stm_queue ()) stm_res;
-    ZProf.exit_prof prof_infer_fluidsup_passive;
-    []
+    if Env.should_force_stream_eval () then (
+      Env.get_finite_infs (List.map (fun (_,x,_) -> x) new_clauses)
+    ) else (
+      let stm_res = List.map (fun (p,s,parents) -> Stm.make ~penalty:p ~parents s) new_clauses in
+      StmQ.add_lst (Env.get_stm_queue ()) stm_res;
+      ZProf.exit_prof prof_infer_fluidsup_passive;
+      [])
 
   (* ----------------------------------------------------------------------
    * SubVarSup rules
@@ -1599,8 +1632,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ~iterate_substs:(fun substs do_eq_res -> Some (OSeq.map (CCOpt.flat_map do_eq_res) substs))
         clause
     in
-    let stm_res = List.map (Stm.make ~penalty:(0) ~parents:[clause]) inf_res in
-    StmQ.add_lst (Env.get_stm_queue ()) stm_res; []
+    let cls, stm_res = force_getting_cl (List.map (fun stm -> C.penalty clause, [clause], stm)  inf_res) in
+    StmQ.add_lst (Env.get_stm_queue ()) stm_res; 
+    cls
 
   let infer_equality_resolution_pragmatic_ho max_unifs clause =
     let inf_res = infer_equality_resolution_aux
@@ -1738,8 +1772,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ~iterate_substs:(fun substs do_eq_fact -> Some (OSeq.map (CCOpt.flat_map do_eq_fact) substs))
         clause
     in
-    let stm_res = List.map (Stm.make ~penalty:(0) ~parents:[clause]) inf_res in
-    StmQ.add_lst (Env.get_stm_queue ()) stm_res; []
+    let cls, stm_res = force_getting_cl (List.map (fun stm -> C.penalty clause, [clause], stm)  inf_res) in
+    StmQ.add_lst (Env.get_stm_queue ()) stm_res;
+    cls
 
   let infer_equality_factoring_pragmatic_ho max_unifs clause =
     let inf_res = infer_equality_factoring_aux
@@ -3049,16 +3084,15 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       Env.add_unary_inf "recognize injectivity" recognize_injectivity;
     );
 
-    if Env.flex_get k_complete_ho_unification
+    if Env.flex_get k_ho_basic_rules
     then (
-      if (Env.flex_get k_max_infs) = -1 then (
+      if (Env.flex_get k_max_infs) < 0 then (
         Env.add_binary_inf "superposition_passive" infer_passive_complete_ho;
         Env.add_binary_inf "superposition_active" infer_active_complete_ho;
         Env.add_unary_inf "equality_factoring" infer_equality_factoring_complete_ho;
         Env.add_unary_inf "equality_resolution" infer_equality_resolution_complete_ho;
       )
       else (
-        assert((Env.flex_get k_max_infs) > 0);
         Env.add_binary_inf "superposition_passive" (infer_passive_pragmatic_ho (Env.flex_get k_max_infs));
         Env.add_binary_inf "superposition_active" (infer_active_pragmatic_ho (Env.flex_get k_max_infs));
         Env.add_unary_inf "equality_factoring" (infer_equality_factoring_pragmatic_ho (Env.flex_get k_max_infs));
@@ -3119,7 +3153,7 @@ let _lambda_demod = ref false
 let _quant_demod = ref false
 let _demod_in_var_args = ref true
 let _dot_demod_into = ref None
-let _complete_ho_unification = ref false
+let _ho_basic_rules = ref false
 let _switch_stream_extraction = ref false
 let _fluidsup_penalty = ref 9
 let _dupsup_penalty = ref 2
@@ -3161,6 +3195,7 @@ let _immediate_simplification = ref false
 let _try_lfho_unif = ref true
 let _rw_w_formulas = ref false
 let _pred_var_eq_fact = ref false
+let _schedule_infs = ref true
 
 let _guard = ref 30
 let _ratio = ref 100
@@ -3172,7 +3207,7 @@ let unif_params_to_def () =
   _max_depth := 2;
   _max_app_projections := 1;
   _max_rigid_imitations := 2;
-  _max_identifications := 1;
+  _max_identifications := 0;
   _max_elims           := 0;
   _max_infs := 5
 
@@ -3181,6 +3216,8 @@ let register ~sup =
   let module E = Sup.Env in
 
   E.update_flex_state (Flex_state.add key sup);
+  (* in general all unif algs in Zip are terminating, except for JP *)
+  E.flex_add PragUnifParams.k_unif_alg_is_terminating true;
   E.flex_add k_sup_at_vars !_sup_at_vars;
   E.flex_add k_sup_in_var_args !_sup_in_var_args;
   E.flex_add k_sup_under_lambdas !_sup_under_lambdas;
@@ -3207,7 +3244,7 @@ let register ~sup =
   E.flex_add k_dot_simpl !_dot_simpl;
   E.flex_add k_dot_demod_into !_dot_demod_into;
   E.flex_add k_recognize_injectivity !_recognize_injectivity;
-  E.flex_add k_complete_ho_unification !_complete_ho_unification;
+  E.flex_add k_ho_basic_rules !_ho_basic_rules;
   E.flex_add k_max_infs !_max_infs;
   E.flex_add k_switch_stream_extraction !_switch_stream_extraction;
   E.flex_add k_dont_simplify !_dont_simplify;
@@ -3234,6 +3271,7 @@ let register ~sup =
   E.flex_add PragUnifParams.k_use_weight_for_solid_subsumption !_use_weight_for_solid_subsumption;
   E.flex_add PragUnifParams.k_sort_constraints !_sort_constraints;
   E.flex_add PragUnifParams.k_try_lfho !_try_lfho_unif;
+  E.flex_add PragUnifParams.k_schedule_inferences !_schedule_infs;
   E.flex_add k_pred_var_eq_fact !_pred_var_eq_fact;
 
   E.flex_add StreamQueue.k_guard !_guard;
@@ -3246,9 +3284,15 @@ let register ~sup =
   let module JPF = JPFull.Make(struct let st = E.flex_state () end) in
   let module JPP = PUnif.Make(struct let st = E.flex_state () end) in
   begin match !_unif_alg with 
-    | `OldJP -> E.flex_add k_unif_alg JP_unif.unify_scoped
-    | `NewJPFull -> E.flex_add k_unif_alg JPF.unify_scoped
-    | `NewJPPragmatic -> E.flex_add k_unif_alg JPP.unify_scoped end
+    | `OldJP -> 
+      E.flex_add k_unif_alg JP_unif.unify_scoped;
+      E.flex_add PragUnifParams.k_unif_alg_is_terminating false;
+    | `NewJPFull -> 
+      E.flex_add k_unif_alg JPF.unify_scoped;
+      E.flex_add PragUnifParams.k_unif_alg_is_terminating false;
+    | `NewJPPragmatic -> 
+      E.flex_add k_unif_alg JPP.unify_scoped
+       end
 
 (* TODO: move DOT index printing into the extension *)
 
@@ -3282,7 +3326,7 @@ let () =
       "--lambda-demod", Arg.Bool (fun b -> _lambda_demod := b), " enable/disable demodulation in bodies of lambda-expressions";
       "--quant-demod", Arg.Bool (fun b -> _quant_demod := b), " enable/disable demodulation in bodies of quantifiers";
       "--demod-in-var-args", Arg.Bool (fun b -> _demod_in_var_args := b), " enable demodulation in arguments of variables";
-      "--complete-ho-unif", Arg.Bool (fun b -> _complete_ho_unification := b), " enable complete higher-order unification algorithm (Jensen-Pietrzykowski)";
+      "--ho-basic-rules", Arg.Bool (fun b -> _ho_basic_rules := b), " enable/disable HO version of base superposition calculus rules";
       "--switch-stream-extract", Arg.Bool (fun b -> _switch_stream_extraction := b), " in ho mode, switches heuristic of clause extraction from the stream queue";
       "--fluidsup-penalty", Arg.Int (fun p -> _fluidsup_penalty := p), " penalty for FluidSup inferences";
       "--dupsup-penalty", Arg.Int (fun p -> _dupsup_penalty := p), " penalty for DupSup inferences";
@@ -3330,6 +3374,7 @@ let () =
       "--stream-queue-guard", Arg.Set_int _guard, "set value of guard for streamQueue";
       "--stream-queue-ratio", Arg.Set_int _ratio, "set value of ratio for streamQueue";
       "--bool-demod", Arg.Bool ((:=) _bool_demod), " turn BoolDemod on/off";
+      "--schedule-inferences", Arg.Bool ((:=) _schedule_infs), " schedule inferences into streams even when terminating unification is used";
       "--destr-eq-res", Arg.Bool ((:=) _destr_eq_res), " turn destructive equality resolution on/off";
       "--pred-var-eq-fact", Arg.Bool ((:=) _pred_var_eq_fact), " force equality factoring when one side is applied variable";
       "--local-rw", Arg.Symbol (["any-context"; "green-context"; "off"], (fun opt -> 
@@ -3357,7 +3402,7 @@ let () =
       _sup_under_lambdas := false;
       _lambda_demod := false;
       _demod_in_var_args := false;
-      _complete_ho_unification := true;
+      _ho_basic_rules := true;
       _sup_at_var_headed := false;
       _unif_alg := `NewJPFull;
       _lambdasup := -1;
@@ -3371,7 +3416,7 @@ let () =
       _lambda_demod := false;
       _local_rw := `GreenContext;
       _demod_in_var_args := false;
-      _complete_ho_unification := true;
+      _ho_basic_rules := true;
       _unif_alg := `NewJPPragmatic;
       _sup_at_var_headed := true;
       _pred_var_eq_fact := false;
@@ -3392,7 +3437,7 @@ let () =
       _sup_under_lambdas := false;
       _lambda_demod := false;
       _demod_in_var_args := false;
-      _complete_ho_unification := true;
+      _ho_basic_rules := true;
       _unif_alg := `NewJPFull;
       _local_rw := `GreenContext;
       _sup_at_var_headed := true;
@@ -3419,7 +3464,7 @@ let () =
     _demod_in_var_args := true;
     _local_rw := `GreenContext;
     _dupsup := false;
-    _complete_ho_unification := false;
+    _ho_basic_rules := false;
     _destr_eq_res := false;
     _lambdasup := -1;
     _fluidsup := false;

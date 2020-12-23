@@ -222,21 +222,24 @@ module Make (P : PARAMETERS) = struct
                   let all_oracles = 
                     P.pb_oracle (body_lhs, unifscope) (body_rhs, unifscope) flag subst unifscope in
 
-                  OSeq.map (fun sub_flag_opt ->
-                      match sub_flag_opt with 
-                      | None -> 
-                        (* CCFormat.printf " (%d) substitution says None@." id; *)
-                        OSeq.return None
-                      | Some (sub', flag') ->
-                        try
-                          let subst' = Subst.merge subst sub' in
-                          incr bind_cnt;
-                          delay !bind_cnt (fun () -> aux subst' ((lhs,rhs,flag') :: rest) ())
-                        with Subst.InconsistentBinding _ ->
-                          OSeq.return None) all_oracles
-                  |> OSeq.merge
-                  |> OSeq.interleave args_unif
-                  (* |> delay *)
+                  let res = 
+                    OSeq.map (fun sub_flag_opt ->
+                        match sub_flag_opt with 
+                        | None -> 
+                          (* CCFormat.printf " (%d) substitution says None@." id; *)
+                          OSeq.return None
+                        | Some (sub', flag') ->
+                          try
+                            let subst' = Subst.merge subst sub' in
+                            incr bind_cnt;
+                            delay !bind_cnt (fun () -> aux subst' ((lhs,rhs,flag') :: rest) ())
+                          with Subst.InconsistentBinding _ ->
+                            OSeq.return None) all_oracles
+                    |> OSeq.merge
+                    |> OSeq.interleave args_unif
+                  in
+                  if !bind_cnt = 0 && root then (OSeq.cons None res) else res
+                  
               with Unif.Fail -> OSeq.empty) in
     aux ~root:true subst problem
 

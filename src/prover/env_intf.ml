@@ -237,6 +237,14 @@ module type S = sig
 
   val get_stm_queue : unit -> StmQ.t
 
+  val should_force_stream_eval : unit -> bool
+  (** checks if finite unification is used and whether the user wants
+      to force storing all conclusions in the queues *)
+
+  val get_finite_infs : 'a option OSeq.t CCList.t -> 'a CCList.t
+  (** get finitely many conclusions from inference stream.
+      NB: requires the use of terminating unification algorithms *)
+
   val stats : unit -> stats
   (** Compute stats *)
 

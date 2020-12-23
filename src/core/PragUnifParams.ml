@@ -14,6 +14,8 @@ let k_fixpoint_decider = Flex_state.create_key ()
 let k_solidification_limit = Flex_state.create_key ()
 
 let k_max_inferences = Flex_state.create_key ()
+let k_unif_alg_is_terminating = Flex_state.create_key ()
+let k_schedule_inferences = Flex_state.create_key ()
 
 let k_max_unifs_solid_ff = Flex_state.create_key ()
 let k_use_weight_for_solid_subsumption = Flex_state.create_key ()

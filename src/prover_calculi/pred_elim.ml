@@ -162,7 +162,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       _task_queue := TaskSet.remove entry !_task_queue
     )
 
-  let should_schedule task =
+  let should_force_stream_eval task =
     let eligible_for_non_singular_pe task = 
       Env.flex_get k_non_singular_pe &&
       (match task.is_gate with
@@ -233,7 +233,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             possibly_ignore_sym entry;
           | `Offending ->
             entry.offending_cls <- CS.add cl entry.offending_cls;
-            if TaskSet.mem entry !_task_queue && (not (should_schedule entry)) then (
+            if TaskSet.mem entry !_task_queue && (not (should_force_stream_eval entry)) then (
                _task_queue := TaskSet.remove entry !_task_queue;
             )
           | `Gates ->
@@ -296,7 +296,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let react_clause_removed cl =
     if !_logic != Unsupported then (
       let should_retry task =
-        should_schedule task &&
+        should_force_stream_eval task &&
         not (ID.Set.mem task.sym !_ignored_symbols) &&
         (match task.last_check with
         | Some(old_sq_var_sum, old_num_lit) -> 
@@ -502,7 +502,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
       Util.debugf ~section 5 "initially: @[%a@]" (fun k -> k pp_task task);
 
-      if should_schedule task then (
+      if should_force_stream_eval task then (
         _task_queue := TaskSet.add task !_task_queue 
     )) !_pred_sym_idx
 
