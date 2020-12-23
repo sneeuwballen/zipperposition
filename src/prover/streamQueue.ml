@@ -135,19 +135,21 @@ module Make(A : ARG) = struct
     let to_drip, rest = CCList.take_drop tries all_stms in
     
     let dripped =
-      let rec consume_until_empty acc = function
+      let rec consume_until_empty n acc = function
         | [] -> acc
         | (_,s) :: s_rest ->
           match Stm.drip s with
-          | result -> 
-            if (is_empty_clause result) || (full && CCOpt.is_some result) 
-            then ((result,s) :: acc) @ (List.map (fun (_,s) -> None, s) s_rest)
-            else (consume_until_empty [@tailrec]) ((result, s) :: acc) s_rest
-          | exception Stm.Empty_Stream -> (consume_until_empty [@tailrec]) acc s_rest
+          | result ->
+            let n = n + (if CCOpt.is_some result then 1 else 0) in
+            let limit_reached = (*get_op k_clause_num > 0 && n < get_op k_clause_num*) false in
+            if (is_empty_clause result) || (full && limit_reached) 
+            then List.rev_append ((result,s) :: acc) (CCList.rev_map (fun (_,s) -> None, s) s_rest)
+            else (consume_until_empty [@tailrec]) n ((result, s) :: acc) s_rest
+          | exception Stm.Empty_Stream -> (consume_until_empty [@tailrec]) n acc s_rest
       in
-      (consume_until_empty [@tailrec]) [] to_drip
+      (consume_until_empty [@tailrec]) 0 [] to_drip
     in
-    let new_stms = (List.map (fun (_,s) -> Stm.penalty s, s) dripped) @ rest in
+    let new_stms = List.rev_append (List.rev_map (fun (_,s) -> Stm.penalty s, s) dripped) rest in
     q.hp <- H.of_list new_stms;
     q.stm_nb <- List.length new_stms;
     let taken = List.rev_map fst dripped in
@@ -162,7 +164,7 @@ module Make(A : ARG) = struct
       if CCList.is_empty res then take_fair_anyway q
       else (
         q.time_before_fair <- q.ratio;
-        List.map CCOpt.return res)
+        List.rev_map CCOpt.return res)
     )
     
   let rec _take_nb q nb prev_res =
@@ -183,18 +185,15 @@ module Make(A : ARG) = struct
 
   let take_stm_nb q =
     let n = clauses_to_take q in
-    let taken =
-      if q.time_before_fair = 0 then take_fair (q.fair_tries+1) q 
-      else (
-        q.time_before_fair <- q.time_before_fair - 1;
-        (* Only extract clauses if the minimal stream weight is low *)
-        if not (H.is_empty q.hp) && fst (H.find_min_exn q.hp) <= 30
-        then _take_nb q n [] 
-        else []
-      ) in
-    Util.debugf ~section 1 "taken clauses: @[%a@]@." (fun k -> k (CCList.pp (CCOpt.pp Stm.C.pp)) taken);
-    taken
-
+    if q.time_before_fair = 0 then take_fair (q.fair_tries+1) q 
+    else (
+      q.time_before_fair <- q.time_before_fair - 1;
+      (* Only extract clauses if the minimal stream weight is low *)
+      if not (H.is_empty q.hp) && fst (H.find_min_exn q.hp) <= 50
+      then _take_nb q n [] 
+      else []
+    )
+  
   let rec _take_stm_nb_fix_stm q n res =
     if n = 0 || H.is_empty q.hp then res
     else

@@ -700,11 +700,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (not bool_inference &&
          not (BV.get (C.eligible_res (info.passive, sc_p) subst) passive_idx)) ||
         not (C.is_eligible_param (info.active, sc_a) subst ~idx:active_idx)
-      ) then (
-        raise (ExitSuperposition 
-          (CCFormat.sprintf "bad ordering conditions: %a"
-           BV.pp (C.eligible_res (info.passive, sc_p) subst))
-        ));
+      ) then (raise (ExitSuperposition "bad ordering conditions"));
       (* Check for superposition at a variable *)
       if info.sup_kind != FluidSup then
         if not @@ Env.flex_get k_sup_at_vars then
@@ -1647,7 +1643,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
     if ((Env.flex_get k_pred_var_eq_fact 
           && info.is_pred_var_eq_fact 
-          && C.proof_depth info.clause == 0
+          && C.proof_depth info.clause < 2
           && not (T.is_true_or_false t)) ||
         (O.compare ord (S.FO.apply renaming subst (s, info.scope)) 
         (S.FO.apply renaming subst (t, info.scope)) <> Comp.Lt
@@ -3178,7 +3174,7 @@ let unif_params_to_def () =
   _max_rigid_imitations := 2;
   _max_identifications := 1;
   _max_elims           := 0;
-  _max_infs := 6
+  _max_infs := 5
 
 let register ~sup =
   let module Sup = (val sup : S) in
