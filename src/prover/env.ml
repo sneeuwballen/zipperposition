@@ -329,7 +329,8 @@ module Make(X : sig
 
   let should_force_stream_eval () =
     flex_get PragUnifParams.k_unif_alg_is_terminating &&
-    not (flex_get PragUnifParams.k_schedule_inferences)
+    not (flex_get PragUnifParams.k_schedule_inferences) &&
+    flex_get PragUnifParams.k_max_inferences > 0
 
   let get_finite_infs streams =
     assert(flex_get PragUnifParams.k_unif_alg_is_terminating);

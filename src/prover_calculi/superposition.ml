@@ -1168,9 +1168,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         clause
     in
 
-    let clauses, streams = force_getting_cl inf_res in
-    StmQ.add_lst (Env.get_stm_queue ()) streams; 
-    clauses
+    if Env.should_force_stream_eval () then (
+      Env.get_finite_infs (List.map (fun (_,_,x) -> x) inf_res)
+    ) else(
+      let clauses, streams = force_getting_cl inf_res in
+      StmQ.add_lst (Env.get_stm_queue ()) streams; 
+      clauses
+    )
 
   let infer_passive_complete_ho clause =
     let inf_res = infer_passive_aux
@@ -1184,34 +1188,15 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         clause
     in
     
-    let clauses, streams = force_getting_cl inf_res in
-    StmQ.add_lst (Env.get_stm_queue ()) streams; 
-    clauses
+    if Env.should_force_stream_eval () then (
+      Env.get_finite_infs (List.map (fun (_,_,x) -> x) inf_res)
+    ) else (
+      let clauses, streams = force_getting_cl inf_res in
+      StmQ.add_lst (Env.get_stm_queue ()) streams; 
+      clauses
+    )
 
-  let infer_active_pragmatic_ho max_unifs clause =
-    let inf_res = infer_active_aux
-        ~retrieve_from_index:(I.retrieve_unifiables_complete ~unif_alg:(Env.flex_get k_unif_alg))
-        ~process_retrieved:(fun do_sup (u_p, with_pos, substs) ->
-            let all_substs = OSeq.to_list @@ OSeq.take max_unifs @@ OSeq.filter_map CCFun.id substs   in
-            let res = List.map (fun subst -> do_sup u_p with_pos subst) all_substs in
-            Some res
-          )
-        clause
-    in
-    inf_res |> CCList.flatten |> List.filter CCOpt.is_some  |> List.map CCOpt.get_exn
-
-  let infer_passive_pragmatic_ho max_unifs clause =
-    let inf_res = infer_passive_aux
-        ~retrieve_from_index:(I.retrieve_unifiables_complete ~unif_alg:(Env.flex_get k_unif_alg))
-        ~process_retrieved:(fun do_sup (u_p, with_pos, substs) ->
-            let all_substs = OSeq.to_list @@ OSeq.take max_unifs @@ OSeq.filter_map CCFun.id substs   in
-            let res = List.map (fun subst -> do_sup u_p with_pos subst) all_substs in
-            Some res   
-          )
-        clause
-    in
-    inf_res |> CCList.flatten |> List.filter CCOpt.is_some  |> List.map CCOpt.get_exn
-
+  
   (* ----------------------------------------------------------------------
    * FluidSup rule (Superposition at applied variables)
    * ---------------------------------------------------------------------- *)
@@ -1632,21 +1617,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ~iterate_substs:(fun substs do_eq_res -> Some (OSeq.map (CCOpt.flat_map do_eq_res) substs))
         clause
     in
-    let cls, stm_res = force_getting_cl (List.map (fun stm -> C.penalty clause, [clause], stm)  inf_res) in
-    StmQ.add_lst (Env.get_stm_queue ()) stm_res; 
-    cls
-
-  let infer_equality_resolution_pragmatic_ho max_unifs clause =
-    let inf_res = infer_equality_resolution_aux
-        ~unify:(Env.flex_get k_unif_alg)
-        ~iterate_substs:(fun substs do_eq_res ->
-            (* Some (OSeq.map (CCOpt.flat_map do_eq_res) substs) *)
-            let all_substs = OSeq.to_list @@ OSeq.take max_unifs @@ OSeq.filter_map CCFun.id substs   in
-            let res = List.map (fun subst -> do_eq_res subst) all_substs in
-            Some res)
-        clause
-    in
-    inf_res |> CCList.flatten |> List.filter CCOpt.is_some  |> List.map CCOpt.get_exn
+    if Env.should_force_stream_eval () then (
+      Env.get_finite_infs inf_res
+    ) else (
+      let cls, stm_res = force_getting_cl (List.map (fun stm -> 
+        C.penalty clause, [clause], stm)  inf_res) in
+      StmQ.add_lst (Env.get_stm_queue ()) stm_res; 
+      cls)
 
   (* ----------------------------------------------------------------------
    * Equality Factoring rule
@@ -1772,21 +1749,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ~iterate_substs:(fun substs do_eq_fact -> Some (OSeq.map (CCOpt.flat_map do_eq_fact) substs))
         clause
     in
-    let cls, stm_res = force_getting_cl (List.map (fun stm -> C.penalty clause, [clause], stm)  inf_res) in
-    StmQ.add_lst (Env.get_stm_queue ()) stm_res;
-    cls
-
-  let infer_equality_factoring_pragmatic_ho max_unifs clause =
-    let inf_res = infer_equality_factoring_aux
-        ~unify:(Env.flex_get k_unif_alg)
-        ~iterate_substs:(fun substs do_eq_fact ->
-            (* Some (OSeq.map (CCOpt.flat_map do_eq_fact) substs) *)
-            let all_substs = OSeq.to_list @@ OSeq.take max_unifs @@ OSeq.filter_map CCFun.id substs in
-            let res = List.map (fun subst -> do_eq_fact subst) all_substs in
-            Some res)
-        clause
-    in
-    inf_res |> CCList.flatten |> List.filter CCOpt.is_some  |> List.map CCOpt.get_exn
+    if Env.should_force_stream_eval () then (
+      Env.get_finite_infs inf_res
+    ) else (
+      let cls, stm_res = force_getting_cl (List.map (fun stm -> 
+        C.penalty clause, [clause], stm)  inf_res) in
+      StmQ.add_lst (Env.get_stm_queue ()) stm_res;
+      cls)
 
   (* ----------------------------------------------------------------------
    * extraction of a clause from the stream queue (HO feature)
@@ -3086,19 +3055,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
     if Env.flex_get k_ho_basic_rules
     then (
-      if (Env.flex_get k_max_infs) < 0 then (
-        Env.add_binary_inf "superposition_passive" infer_passive_complete_ho;
-        Env.add_binary_inf "superposition_active" infer_active_complete_ho;
-        Env.add_unary_inf "equality_factoring" infer_equality_factoring_complete_ho;
-        Env.add_unary_inf "equality_resolution" infer_equality_resolution_complete_ho;
-      )
-      else (
-        Env.add_binary_inf "superposition_passive" (infer_passive_pragmatic_ho (Env.flex_get k_max_infs));
-        Env.add_binary_inf "superposition_active" (infer_active_pragmatic_ho (Env.flex_get k_max_infs));
-        Env.add_unary_inf "equality_factoring" (infer_equality_factoring_pragmatic_ho (Env.flex_get k_max_infs));
-        Env.add_unary_inf "equality_resolution" (infer_equality_resolution_pragmatic_ho (Env.flex_get k_max_infs));
-      );
-
+      Env.add_binary_inf "superposition_passive" infer_passive_complete_ho;
+      Env.add_binary_inf "superposition_active" infer_active_complete_ho;
+      Env.add_unary_inf "equality_factoring" infer_equality_factoring_complete_ho;
+      Env.add_unary_inf "equality_resolution" infer_equality_resolution_complete_ho;
+    
       if Env.flex_get k_fluidsup then (
         Env.add_binary_inf "fluidsup_passive" infer_fluidsup_passive;
         Env.add_binary_inf "fluidsup_active" infer_fluidsup_active;

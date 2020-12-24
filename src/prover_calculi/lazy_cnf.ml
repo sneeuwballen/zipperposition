@@ -76,6 +76,9 @@ module Make(E : Env.S) : S with module Env = E = struct
             | `Increase -> Term.Tbl.incr _form_counter t
             | `Decrease -> Term.Tbl.decr _form_counter t
         ) terms))
+    else (
+      (* CCFormat.printf "not updating @[%a@]@." C.pp c; *)
+    )
 
   let fold_lits c =
     let lits = Ls.fold_eqn_simple (C.lits c) in
@@ -355,52 +358,51 @@ module Make(E : Env.S) : S with module Env = E = struct
       ans in
 
       let num_occurences = Term.Tbl.get_or _form_counter f ~default:0 in
+      (* CCFormat.printf "|@[%a@]| = %d@." T.pp f num_occurences; *)
       num_occurences >= Env.flex_get k_renaming_threshold &&
       (not (FR.is_renaming_clause c)) &&
       will_yield_claues f
     in
 
-    if C.length c > 1 then (
-      Ls.fold_eqn_simple (C.lits c)
-      |> Iter.fold_while (fun _ (lhs,rhs,sign,pos) -> 
-        let i,_ = Ls.Pos.cut pos in
-        let lit = (C.lits c).(i) in
-        let proof_cons =
-          Proof.Step.simp ~infos:[]
-          ~tags:[Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth] in
-        let polarity_aware = Env.flex_get k_pa_renaming in
-        let should_rename = should_rename sign in
-        if L.is_predicate_lit lit && T.is_appbuiltin lhs then (
-          match FR.rename_form ~should_rename ~polarity_aware ~c lhs sign with
+    Ls.fold_eqn_simple (C.lits c)
+    |> Iter.fold_while (fun _ (lhs,rhs,sign,pos) -> 
+      let i,_ = Ls.Pos.cut pos in
+      let lit = (C.lits c).(i) in
+      let proof_cons =
+        Proof.Step.simp ~infos:[]
+        ~tags:[Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth] in
+      let polarity_aware = Env.flex_get k_pa_renaming in
+      let should_rename = should_rename sign in
+      if L.is_predicate_lit lit && T.is_appbuiltin lhs then (
+        match FR.rename_form ~should_rename ~polarity_aware ~c lhs sign with
+        | Some (renamer, new_defs, parents) ->
+          Term.Tbl.remove _form_counter lhs;
+          let rule_name = "renaming" in
+          let new_defs = clausify_defs new_defs in
+          let renamer = (if sign then CCFun.id else T.Form.not_) renamer in
+          let renamed = mk_or ~proof_cons ~rule_name [renamer] c ~parents:(c :: parents) i in
+          let res = renamed @ new_defs in
+          Util.debugf ~section 1 "  @[renamed subformula %d:(@[%a@])=@. @[%a@]@]@." 
+            (fun k -> k i C.pp c (CCList.pp C.pp) renamed);
+          Util.debugf ~section 1 "  new defs:@[%a@]@." 
+            (fun k -> k (CCList.pp C.pp) new_defs);
+          Some res, `Stop
+        | None -> None, `Continue
+      ) else if Type.is_prop (T.ty lhs) && not (L.is_predicate_lit lit) &&
+              (T.is_appbuiltin lhs || T.is_appbuiltin rhs) then (
+          match rename_eq ~should_rename ~c lhs rhs sign with
           | Some (renamer, new_defs, parents) ->
-            Term.Tbl.remove _form_counter lhs;
             let rule_name = "renaming" in
             let new_defs = clausify_defs new_defs in
-            let renamer = (if sign then CCFun.id else T.Form.not_) renamer in
             let renamed = mk_or ~proof_cons ~rule_name [renamer] c ~parents:(c :: parents) i in
             let res = renamed @ new_defs in
-            Util.debugf ~section 1 "  @[renamed subformula %d:(@[%a@])=@. @[%a@]@]@." 
-              (fun k -> k i C.pp c (CCList.pp C.pp) renamed);
+            Util.debugf ~section 1 "  @[renamed eq %d(@[%a@]) into @[%a@]@]@." 
+              (fun k -> k i L.pp (C.lits c).(i) (CCList.pp C.pp) renamed);
             Util.debugf ~section 1 "  new defs:@[%a@]@." 
               (fun k -> k (CCList.pp C.pp) new_defs);
-            Some res, `Stop
-          | None -> None, `Continue
-        ) else if Type.is_prop (T.ty lhs) && not (L.is_predicate_lit lit) &&
-                (T.is_appbuiltin lhs || T.is_appbuiltin rhs) then (
-            match rename_eq ~should_rename ~c lhs rhs sign with
-            | Some (renamer, new_defs, parents) ->
-              let rule_name = "renaming" in
-              let new_defs = clausify_defs new_defs in
-              let renamed = mk_or ~proof_cons ~rule_name [renamer] c ~parents:(c :: parents) i in
-              let res = renamed @ new_defs in
-              Util.debugf ~section 1 "  @[renamed eq %d(@[%a@]) into @[%a@]@]@." 
-                (fun k -> k i L.pp (C.lits c).(i) (CCList.pp C.pp) renamed);
-              Util.debugf ~section 1 "  new defs:@[%a@]@." 
-                (fun k -> k (CCList.pp C.pp) new_defs);
-                Some res, `Stop
-            | None -> None, `Continue)
-          else None, `Continue) None
-    ) else None
+              Some res, `Stop
+          | None -> None, `Continue)
+        else None, `Continue) None
   
   let clausify_eq c =
     let rule_name = "eq_elim" in
@@ -419,9 +421,9 @@ module Make(E : Env.S) : S with module Env = E = struct
               (mk_or ~proof_cons ~rule_name [T.Form.not_ lhs; T.Form.not_ rhs] c i)
               @ (mk_or ~proof_cons ~rule_name [lhs; rhs] c i)) in
           let pen_inc = 
-            (if T.is_app_var lhs || T.is_app_var rhs then 2 
-             else if (T.is_fo_term lhs && T.is_fo_term rhs) then 1
-             else 0) in
+            if (T.is_ground lhs && T.is_ground rhs) then 0 
+            else (if T.is_app_var lhs || T.is_app_var rhs then 3 else 1) 
+          in
           if Env.flex_get k_penalize_eq_cnf then (
             List.iter (fun c -> C.inc_penalty c pen_inc) new_cls
           );

@@ -423,8 +423,7 @@ let e_sel11 ~blocker ~ord lits =
   | _ -> max_int in
   let lhs_weight  = function 
   | Lit.Equation(lhs,rhs,_) as l when Lit.is_negativoid l ->
-    if Ordering.compare ord lhs rhs  == Comparison.Gt then Term.ho_weight lhs 
-    else Term.ho_weight lhs
+    Term.ho_weight lhs
   | _ -> max_int in
 
   let chooser (i,l) =
