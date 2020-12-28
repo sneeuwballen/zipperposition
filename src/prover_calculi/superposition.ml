@@ -231,7 +231,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           sup_at_var_headed || not (T.is_var (T.head_term t)))
       |> Iter.fold
         (fun tree (t, pos) ->
-           (* Util.debugf ~section 5 "inserting:@[@[%a@]|@[%a]@]" (fun k-> k C.pp c Term.pp t); *)
+           (* Util.debugf ~section 1 "inserting(into):@[@[%a@]|@[%a]@]" (fun k-> k C.pp c Term.pp t); *)
            let with_pos = C.WithPos.({term=t; pos; clause=c;}) in
            f tree t with_pos)
         !_idx_sup_into;
@@ -327,6 +327,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (fun tree (l, r, sign, pos) ->
            assert (sign || T.equal r T.false_);
            let with_pos = C.WithPos.({term=l; pos; clause=c;}) in
+           (* Util.debugf ~section 1 "inserting(from):@[@[%a@]|@[%a]@]" (fun k-> k C.pp c Term.pp l); *)
            f tree l with_pos)
         !_idx_sup_from ;
     (* terms that can be demodulated: all subterms (but vars) *)
@@ -837,7 +838,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     Util.incr_stat stat_superposition_call;
     let sc_a = info.scope_active in
     let sc_p = info.scope_passive in
-    Util.debugf ~section 3
+    Util.debugf ~section 2
       "@[<hv2>simultaneous sup@ \
        @[<2>active@ %a[%d]@ s=@[%a@]@ t=@[%a@]@]@ \
        @[<2>passive@ %a[%d]@ passive_lit=@[%a@]@ p=@[%a@]@]@ with subst=@[%a@]@]"
@@ -947,11 +948,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         + (if US.has_constr info.subst then 1 else 0)
       in
       let new_clause = C.create ~trail:new_trail ~penalty new_lits proof in
-      Util.debugf ~section 3 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
+      Util.debugf ~section 2 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
       assert(C.lits new_clause |> Literals.vars_distinct);
       Some new_clause
     with ExitSuperposition reason ->
-      Util.debugf ~section 3 "@[... cancel, %s@]" (fun k->k reason);
+      Util.debugf ~section 2 "@[... cancel, %s@]" (fun k->k reason);
       None
 
   (* choose between regular and simultaneous superposition *)
@@ -1884,11 +1885,16 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                      else S.bind subst (v, cur_sc) 
                          (InnerTerm.var (HVar.fresh ~ty:(HVar.ty v) ()), cur_sc)) 
                    subst in
-               Util.debugf ~section 3
+               Util.debugf ~section 2
                  "@[<2>demod(%d):@ rewrite `@[%a@]`@ into `@[%a@]`@ resulting `@[%a@]`@ nf `@[%a@]` using %a[%d]@]"
                  (fun k->k (C.id c) T.pp t T.pp r T.pp r' T.pp (Lambda.snf r') Subst.pp subst cur_sc);
                Some r'
-             ) else None)
+             ) else (
+             
+             Util.debugf ~section 2 "demodulation of @[%a@] using @[%a@]=@[%a@] failed@."
+              (fun k -> k T.pp t T.pp l T.pp r);
+
+             None))
       in
       begin match step with
         | None -> k t (* not found any match, normal form found *)
@@ -1977,6 +1983,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let lits = Array.mapi demod_lit (C.lits c) in
     if CCList.is_empty st.demod_clauses then (
       (* no rewriting performed *)
+      (* Util.debugf ~section 1 "did not demod @[%a@]@." (fun k -> k C.pp c); *)
       SimplM.return_same c
     ) else (
       assert (not (Lits.equal_com lits (C.lits c)));

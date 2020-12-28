@@ -545,21 +545,21 @@ let rec infer_rec ?loc ctx (t:PT.t) : T.t =
           hd
       in
 
-
       T.app ?loc ~ty:(T.ty_exn b) hd_const [a; b; c]
     | PT.Let (l, u) ->
-      (* deal with pairs in [l] one by one *)
-      let rec aux = function
-        | [] -> infer_rec ?loc ctx u
-        | (v,t) :: tail ->
-          let t = infer_rec ?loc ctx t in
-          with_typed_var_ ctx ?loc ~infer_ty:(fun ?loc:_ _ ty -> ty)
-            (v, Some (T.ty_exn t))
-            ~f:(fun v ->
-                let body = aux tail in
-                T.let_ ?loc [v, t] body)
+      let vars, terms = (List.fold_left (fun (vars,ts) (v,t) -> 
+        let t = infer_rec ?loc ctx t in
+        (v, Some (T.ty_exn t)) :: vars, t::ts
+      ) ([], []) l)
+      |> CCPair.map List.rev List.rev in
+      let res = 
+        with_typed_vars_ ?loc ctx vars  ~infer_ty:(fun ?loc:_ _ ty -> ty)
+          ~f:(fun vars' ->
+              let u' = infer_rec ?loc ctx u in
+              let bound_vars = CCList.combine vars' terms in
+              T.let_ ?loc bound_vars u')
       in
-      aux l
+      res
     | PT.Match (u, l) ->
       let u = infer_rec ?loc ctx u in
       let ty_u = T.ty_exn u in

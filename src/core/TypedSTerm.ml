@@ -230,8 +230,8 @@ let rec pp out t = match view t with
   | Ite (a,b,c) ->
     Format.fprintf out "@[<2>if %a@ then %a@ else %a@]" pp a pp b pp c
   | Let (l, u) ->
-    let pp_binding out (v,t) = Format.fprintf out "@[%a := %a@]" Var.pp v pp t in
-    Format.fprintf out "@[<2>let %a@ in %a@]"
+    let pp_binding out (v,t) = Format.fprintf out "@[%a := %a@]" Var.pp_fullc v pp t in
+    Format.fprintf out "@[<2>let %a@ in (%a)@]"
       (Util.pp_list ~sep:" and " pp_binding) l pp u
   | Match (u, l) ->
     let pp_branch out (c,vars,rhs) =
