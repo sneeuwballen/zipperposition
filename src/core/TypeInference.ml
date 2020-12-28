@@ -536,12 +536,12 @@ let rec infer_rec ?loc ctx (t:PT.t) : T.t =
         T.const ~ty id, ty
       in
 
-      let hd_const = 
+      let hd_const =
         match T.Map.find_opt (T.ty_exn b) ctx.ite_map with
         | Some hd -> hd
         | None ->
           let hd, ty = mk_ite (T.ty_exn b) in
-          ctx.ite_map <- T.Map.add ty hd ctx.ite_map;
+          ctx.ite_map <- T.Map.add (T.ty_exn b) hd ctx.ite_map;
           hd
       in
 
@@ -1195,7 +1195,7 @@ let infer_statements_exn
       let if_f_stm =  Statement.assert_ ~proof (T.Form.eq if_f if_f_var) in
       decl :: if_t_stm :: if_f_stm :: acc
     in
-    T.Map.fold (fun ty hd acc -> mk_typed_axioms ~ty:(T.Ty.returns ty) ~hd acc) maps []
+    T.Map.fold (fun ty hd acc -> mk_typed_axioms ~ty ~hd acc) maps []
   in
 
   let res = CCVector.create () in
