@@ -3416,7 +3416,7 @@ let () =
     );
   Params.add_to_mode "fo-complete-basic" (fun () ->
       _use_simultaneous_sup := false;
-      _local_rw := `GreenContext;
+      _local_rw := `Off;
       _destr_eq_res := false;
       _unif_logop_mode := `Conservative
     );
