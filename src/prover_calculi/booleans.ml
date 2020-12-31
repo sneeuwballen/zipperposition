@@ -885,7 +885,9 @@ module Make(E : Env.S) : S with module Env = E = struct
     |> Iter.fold (fun acc (t,p) -> 
       match T.view t with
       | T.AppBuiltin(Builtin.(ForallConst|ExistsConst) as b, [_;body]) ->
-        CCList.cons_maybe (quant_rw ~at:p b body) (quant_hoist ~old:t b body :: acc)
+        let hoisted = quant_hoist ~old:t b body in
+        let rest = if CCArray.exists Literal.is_trivial (C.lits hoisted) then acc else hoisted :: acc in
+        CCList.cons_maybe (quant_rw ~at:p b body) (rest)
       | _ -> acc) []
     |> (fun res -> CCOpt.return_if (not @@ CCList.is_empty res) res)
 
