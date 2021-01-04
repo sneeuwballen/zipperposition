@@ -440,7 +440,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           if Env.should_force_stream_eval () then (
             (Env.get_finite_infs [unif_seq]) @ acc 
           ) else (
-            let stm_res = Env.Stm.make ~penalty:(C.penalty c + 2) ~parents:[c] unif_seq in
+            let stm_res = Env.Stm.make ~penalty:(C.penalty c + 2) ~parents:[c] (Env.apply_max_infs unif_seq) in
             Env.StmQ.add (Env.get_stm_queue ()) stm_res;
             acc)
         ) else acc
@@ -542,7 +542,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             if Env.should_force_stream_eval () then (
               Env.get_finite_infs [seq] @ acc
             ) else (
-              let stm_res = Env.Stm.make ~penalty:(C.penalty c + 2) ~parents:[c] seq in
+              let stm_res = Env.Stm.make ~penalty:(C.penalty c + 2) ~parents:[c] (Env.apply_max_infs seq) in
               Env.StmQ.add (Env.get_stm_queue ()) stm_res;
               acc)
           ) acc partners;
@@ -577,7 +577,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let repl_sub =
         Lambda.eta_reduce ~expand_quant @@ Lambda.snf @@
           Subst.FO.apply renaming sub (partner.repl, sc_partner) in
-      let sk = FR.get_skolem ~parent:c ~mode:`Skolem repl_sub in
+      let sk = FR.get_skolem ~parent:c ~mode:`SkolemRecycle repl_sub in
       let y_sk = 
         T.app (Subst.FO.apply renaming sub (y_quant, sc_partner)) [sk]
       in
@@ -626,7 +626,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             if Env.should_force_stream_eval () then (
               Env.get_finite_infs [seq] @ acc
             ) else (
-              let stm_res = Env.Stm.make ~penalty:(C.penalty c + 2) ~parents:[c] seq in
+              let stm_res = Env.Stm.make ~penalty:(C.penalty c + 2) ~parents:[c] (Env.apply_max_infs  seq) in
               Env.StmQ.add (Env.get_stm_queue ()) stm_res;
               acc)
           ) acc partners;          
@@ -673,7 +673,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       if Env.should_force_stream_eval () then (
         Env.get_finite_infs [seq]
       ) else (
-        let stm_res = Env.Stm.make ~penalty:(C.penalty c) ~parents:[c] seq in
+        let stm_res = Env.Stm.make ~penalty:(C.penalty c) ~parents:[c] (Env.apply_max_infs seq) in
         Env.StmQ.add (Env.get_stm_queue ()) stm_res;
         []
       )
@@ -814,7 +814,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       if Env.should_force_stream_eval () then (
         Env.get_finite_infs [seq] @ acc 
       ) else (
-        let stm_res = Env.Stm.make ~penalty:(C.penalty c) ~parents:[c] seq in
+        let stm_res = Env.Stm.make ~penalty:(C.penalty c) ~parents:[c] (Env.apply_max_infs seq) in
         Env.StmQ.add (Env.get_stm_queue ()) stm_res;
         acc)
       ) [] [T.true_; T.false_])
@@ -847,7 +847,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           (if b = Builtin.ForallConst then T.Form.not_ else CCFun.id) 
           (snd @@ T.open_fun body) in
         let sk = 
-          FR.get_skolem ~parent:c ~mode:`Skolem 
+          FR.get_skolem ~parent:c ~mode:`SkolemRecycle
           (T.fun_l (fst @@ T.open_fun body) form_for_skolem) in
         let repl = T.app body [sk] in
         let new_lits = CCArray.copy (C.lits c) in
@@ -925,7 +925,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       if Env.should_force_stream_eval () then (
         Env.get_finite_infs [clause_seq]
       ) else (
-      let stm_res = Env.Stm.make ~penalty:(C.penalty c) ~parents:[c] clause_seq in
+      let stm_res = Env.Stm.make ~penalty:(C.penalty c) ~parents:[c] (Env.apply_max_infs clause_seq) in
       Env.StmQ.add (Env.get_stm_queue ()) stm_res;
       []
     ))

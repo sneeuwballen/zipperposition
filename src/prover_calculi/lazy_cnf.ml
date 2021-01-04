@@ -519,7 +519,7 @@ let _lazy_cnf_kind = ref `Simp
 let _renaming_threshold = ref 8
 let _rename_eq = ref true
 let _scoping = ref `Off
-let _skolem_mode = ref `Skolem
+let _skolem_mode = ref `SkolemRecycle
 let _pa_renaming = ref true
 let _only_eligible = ref false
 let _clausify_eq_pen = ref false
@@ -564,9 +564,10 @@ let () =
     "--polarity-aware-renaming"
     , Arg.Bool (fun v -> _pa_renaming := v)
     , " enable/disable polarity aware renaming (introducing clause with only one definition polarity)";    
-    "--lazy-cnf-skolem-mode", Arg.Symbol (["skolem"; "choice"], (fun str -> 
+    "--lazy-cnf-skolem-mode", Arg.Symbol (["skolem-recycle"; "skolem-fresh"; "choice"], (fun str -> 
       match str with 
-      | "skolem" -> _skolem_mode := `Skolem
+      | "skolem-recycle" -> _skolem_mode := `SkolemRecycle
+      | "skolem-fresh" -> _skolem_mode := `SkolemAlwaysFresh
       | "choice" -> _skolem_mode := `Choice
       | _ -> assert false)), " use lazy cnf as either simplification or inference";
     "--lazy-cnf-kind", Arg.Symbol (["inf"; "simp"; "ignore"], (fun str -> 

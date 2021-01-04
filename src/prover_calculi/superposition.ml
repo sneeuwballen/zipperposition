@@ -144,7 +144,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let ord =
     Ctx.ord ()
 
-  let force_getting_cl streams = 
+  let force_getting_cl streams =
     let rec aux ((clauses, streams) as acc) = function 
       | [] -> acc
       | (penalty, parents, stm) :: xs ->
@@ -152,9 +152,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           match stm () with
           | OSeq.Nil -> aux acc xs 
           | OSeq.Cons((Some cl), stm') ->
-            aux (cl::clauses, (Stm.make ~penalty ~parents stm')::streams) xs
+            aux (cl::clauses, (Stm.make ~penalty ~parents (Env.apply_max_infs stm'))::streams) xs
           | OSeq.Cons(None, stm') ->
-            aux (clauses, (Stm.make ~penalty ~parents stm')::streams) xs
+            aux (clauses, (Stm.make ~penalty ~parents (Env.apply_max_infs stm'))::streams) xs
         end 
     in
     aux ([], []) streams
@@ -1253,7 +1253,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     if Env.should_force_stream_eval () then (
       Env.get_finite_infs (List.map (fun (_,x,_) -> x) new_clauses) 
     ) else (
-      let stm_res = List.map (fun (p,s,parents) -> Stm.make ~penalty:p ~parents s) new_clauses in
+      let stm_res = List.map (fun (p,s,parents) -> Stm.make ~penalty:p ~parents (Env.apply_max_infs s)) new_clauses in
       StmQ.add_lst (Env.get_stm_queue ()) stm_res;
       ZProf.exit_prof prof_infer_fluidsup_active;
       [])
@@ -1309,7 +1309,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     if Env.should_force_stream_eval () then (
       Env.get_finite_infs (List.map (fun (_,x,_) -> x) new_clauses)
     ) else (
-      let stm_res = List.map (fun (p,s,parents) -> Stm.make ~penalty:p ~parents s) new_clauses in
+      let stm_res = List.map (fun (p,s,parents) -> Stm.make ~penalty:p ~parents (Env.apply_max_infs s)) new_clauses in
       StmQ.add_lst (Env.get_stm_queue ()) stm_res;
       ZProf.exit_prof prof_infer_fluidsup_passive;
       []
@@ -1382,7 +1382,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     if Env.should_force_stream_eval () then (
       Env.get_finite_infs (List.map (fun (_,x,_) -> x) new_clauses)
     ) else (
-      let stm_res = List.map (fun (p,s,parents) -> Stm.make ~penalty:p ~parents s) new_clauses in
+      let stm_res = List.map (fun (p,s,parents) -> Stm.make ~penalty:p ~parents (Env.apply_max_infs  s)) new_clauses in
       StmQ.add_lst (Env.get_stm_queue ()) stm_res;
       ZProf.exit_prof prof_infer_fluidsup_active;
       []
@@ -1457,7 +1457,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     if Env.should_force_stream_eval () then (
       Env.get_finite_infs (List.map (fun (_,x,_) -> x) new_clauses)
     ) else (
-      let stm_res = List.map (fun (p,s,parents) -> Stm.make ~penalty:p ~parents s) new_clauses in
+      let stm_res = List.map (fun (p,s,parents) -> Stm.make ~penalty:p ~parents (Env.apply_max_infs s)) new_clauses in
       StmQ.add_lst (Env.get_stm_queue ()) stm_res;
       ZProf.exit_prof prof_infer_fluidsup_passive;
       [])

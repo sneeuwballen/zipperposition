@@ -332,6 +332,14 @@ module Make(X : sig
     not (flex_get PragUnifParams.k_schedule_inferences) &&
     flex_get PragUnifParams.k_max_inferences > 0
 
+  let apply_max_infs stream =
+    if flex_get PragUnifParams.k_unif_alg_is_terminating &&
+       flex_get PragUnifParams.k_max_inferences > 0 then (
+      OSeq.filter_map CCFun.id stream
+      |> OSeq.take (flex_get PragUnifParams.k_max_inferences)
+      |> OSeq.map CCOpt.return
+    ) else stream  
+
   let get_finite_infs streams =
     assert(flex_get PragUnifParams.k_unif_alg_is_terminating);
 
@@ -964,7 +972,6 @@ module Make(X : sig
               List.iter (fun res ->
                 (* Blocking descdendents for i *)
                 Array.set blocked_sss i (IntSet.union new_ids blocked_sss.(i));
-              CCFormat.printf "single-step-simpl(@[%a@])=@[%a@]@." C.pp c (CCList.pp C.pp) (l);
               Queue.push (res,depth) q) l 
             end
             (* clause has reached fixpoint *)

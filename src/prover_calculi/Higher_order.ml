@@ -386,7 +386,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         in
 
         assert(T.DB.is_closed body);
-        FR.get_skolem ~parent:c ~mode:`Skolem body
+        FR.get_skolem ~parent:c ~mode:`SkolemRecycle body
       in    
 
 

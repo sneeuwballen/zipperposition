@@ -18,11 +18,11 @@ module type S = sig
     ?polarity_aware:bool ->
     c:C.t ->
     T.t -> bool -> (T.t * C.t list * C.t list) option
-  val get_skolem : parent:C.t -> mode:[< `Choice | `Skolem ] -> T.t -> T.t
+  val get_skolem : parent:C.t -> mode:[< `Choice | `SkolemRecycle | `SkolemAlwaysFresh  ] -> T.t -> T.t
 end
 
 module Make(C : Clause.S) = struct
-  module Ctx = C.Ctx
+module Ctx = C.Ctx
   module C = C
 
   module Idx = Fingerprint.Make(struct 
@@ -150,21 +150,28 @@ module Make(C : Clause.S) = struct
     let var_tys, _ = Type.open_fun (T.ty f) in
     assert(List.length var_tys = 1);
     let ret_ty = List.hd var_tys in
+
+    let mk_skolem () =
+      let free_vars_l = 
+          T.VarSet.to_list (T.VarSet.of_iter free_vars) in
+      let (id,ty), t = T.mk_fresh_skolem ~prefix:"sk" free_vars_l ret_ty in
+      Ctx.declare id ty;
+      Signal.send on_pred_skolem_introduction (parent, t);
+      t
+    in 
+
     match mode with 
-    | `Skolem ->
+    | `SkolemRecycle ->
       let gen = Iter.head @@ 
       Idx.retrieve_generalizations (!_skolem_idx, 0) (f, 1) in
       begin match gen with 
       | Some (orig, (skolem, _), subst) ->
         Subst.FO.apply Subst.Renaming.none subst (skolem,0) 
       | None ->
-        let free_vars_l = 
-            T.VarSet.to_list (T.VarSet.of_iter free_vars) in
-        let (id,ty), t = T.mk_fresh_skolem ~prefix:"sk" free_vars_l ret_ty in
-        Ctx.declare id ty;
-        Signal.send on_pred_skolem_introduction (parent, t);
+        let t = mk_skolem () in  
         _skolem_idx := Idx.add !_skolem_idx f (t, ref[]);
         t end
+    | `SkolemAlwaysFresh -> mk_skolem ()
     | `Choice -> T.Form.choice f
 
 end

@@ -39,7 +39,7 @@ module type S = sig
     \url{http://matryoshka.gforge.inria.fr/pubs/ho_bools_paper.pdf}
     
   *)
-  val get_skolem : parent:C.t -> mode:[< `Choice | `Skolem ] -> T.t -> T.t
+  val get_skolem : parent:C.t -> mode:[< `Choice | `SkolemRecycle | `SkolemAlwaysFresh ] -> T.t -> T.t
   (** `get_skolem ~parent ~mode f` computes a ``Skolem'' term 
      for a formula f. This is either real Skolem term of Choice symbol applied to f,
      depending on the mode  *)
