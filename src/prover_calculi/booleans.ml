@@ -75,7 +75,15 @@ module Make(E : Env.S) : S with module Env = E = struct
     if Env.flex_get Combinators.k_enable_combinators
     then (fun _ _ -> OSeq.empty)
     else Env.flex_get Superposition.k_unif_alg
-  
+
+  let get_unif_alg_l () =
+    if Env.flex_get Combinators.k_enable_combinators
+    then (fun _ _ -> OSeq.empty)
+    else (
+      let (module U) = Superposition.get_unif_module (module E) in
+      U.unify_scoped_l
+    )
+
   let get_triggers c =
     let ord = Ctx.ord () in
     let trivial_trigger t =
@@ -779,25 +787,37 @@ module Make(E : Env.S) : S with module Env = E = struct
       in
 
     let is_var_headed t = T.is_var (T.head_term t) in
-    let find_eligible_app_var xs =
-      if not (List.for_all is_var_headed xs) then None
-      else CCList.find_opt T.is_app_var xs
+    let is_eligible xs =
+      CCOpt.return_if ((List.for_all is_var_headed xs) && (List.exists T.is_app_var xs)) xs
     in
 
-    get_bool_eligible c
-    |> Iter.find_map (fun (t,_) ->
-        (match T.view t with
-        | T.AppBuiltin(Builtin.(Eq|Neq), [_;a;b]) when Type.is_prop (T.ty a) ->
-          (* tyarg does not have to be a variable *)
-          find_eligible_app_var [a;b]
-        | T.AppBuiltin(hd, args) 
-          when (Builtin.is_logical_binop hd || hd = Builtin.Not) ->
-          find_eligible_app_var args
-        | _ -> None))
-    |> CCOpt.map (fun t -> 
-      List.fold_left (fun acc target -> 
-        let seq =
-          get_unif_alg () (t, 0) (target, 0)
+    let create_targets n =
+      let rec aux = function 
+        | 0 -> []
+        | 1 -> [[T.true_]; [T.false_]]
+        | n -> 
+          let rest = aux (n-1) in
+          List.rev_append (List.rev_map (List.cons T.true_) rest)
+                          (List.rev_map (List.cons T.false_) rest)
+      in
+      aux n
+    in 
+
+    let stms = 
+      get_bool_eligible c
+      |> Iter.filter_map (fun (t,_) ->
+          (
+          match T.view t with
+          | T.AppBuiltin((Eq|Neq), [_;a;b]) when Type.is_prop (T.ty a) ->
+            (* tyarg does not have to be a variable *)
+            is_eligible [a;b]
+          | T.AppBuiltin(hd, args)
+            when (Builtin.is_logical_binop hd || hd = Builtin.Not) && Type.is_prop (T.ty t) ->
+            is_eligible args
+          | _ -> None))
+      |> Iter.flat_map_l (fun (args) -> 
+        List.map (fun target -> 
+          get_unif_alg_l () (args, 0) (target, 0)
           |> OSeq.filter_map (
               CCOpt.map (fun us -> 
                 assert(not (Unif_subst.has_constr us));
@@ -809,16 +829,18 @@ module Make(E : Env.S) : S with module Env = E = struct
                 in
                 (* not eligible under substitution *)
                 Some (res)
-              ))
-        in
-      if Env.should_force_stream_eval () then (
-        Env.get_finite_infs [seq] @ acc 
-      ) else (
-        let stm_res = Env.Stm.make ~penalty:(C.penalty c) ~parents:[c] (Env.apply_max_infs seq) in
-        Env.StmQ.add (Env.get_stm_queue ()) stm_res;
-        acc)
-      ) [] [T.true_; T.false_])
-    |> CCOpt.get_or ~default:[]
+              ))) (create_targets (List.length args)))
+        |> Iter.to_list
+    in
+    if Env.should_force_stream_eval () then (
+      Env.get_finite_infs stms 
+    ) else (
+      Env.StmQ.add_lst (Env.get_stm_queue ()) (
+        List.map (fun seq -> 
+          Env.Stm.make ~penalty:(C.penalty c) ~parents:[c] (Env.apply_max_infs seq)) stms
+      );
+      []
+    )
 
   let quantifier_rw_and_hoist (c:C.t) =
     let quant_rw ~at b body =
@@ -1641,23 +1663,23 @@ module Make(E : Env.S) : S with module Env = E = struct
           Env.add_multi_simpl_rule ~priority:500 rename_nested_booleans
         );
 
-        if Env.flex_get k_fluid_hoist then (
-          Env.add_unary_inf "fluid_hoist" fluid_hoist
-        );
-
-        if Env.flex_get k_fluid_log_hoist then (
-          Env.add_unary_inf "fluid_log_hoist" fluid_log_hoist;
-          Env.add_unary_inf "fluid_quant_rw" fluid_quant_rw;
-        );
-
         Env.add_unary_inf "formula_hoist" eq_hoist;
-        Env.add_multi_simpl_rule ~priority:90 quantifier_rw_and_hoist;
         Env.add_multi_simpl_rule ~priority:100 replace_bool_vars;
-        Env.add_unary_inf "replace_bool_app_vars" replace_bool_app_vars;
+        Env.add_multi_simpl_rule ~priority:90 quantifier_rw_and_hoist;
         Env.add_unary_inf "eq_rw" nested_eq_rw;
-        if Env.flex_get k_replace_unsupported_quants then (
-          Env.add_unary_simplify replace_unsupported_quants
-        );
+
+        if Env.flex_get Superposition.k_ho_basic_rules then (
+          Env.add_unary_inf "replace_bool_app_vars" replace_bool_app_vars;
+          if Env.flex_get k_fluid_hoist then (
+            Env.add_unary_inf "fluid_hoist" fluid_hoist
+          );
+          if Env.flex_get k_fluid_log_hoist then (
+            Env.add_unary_inf "fluid_log_hoist" fluid_log_hoist;
+            Env.add_unary_inf "fluid_quant_rw" fluid_quant_rw;
+          );
+          if Env.flex_get k_replace_unsupported_quants then (
+            Env.add_unary_simplify replace_unsupported_quants
+          ));
       )
 end
 

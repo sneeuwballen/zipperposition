@@ -67,6 +67,10 @@ module Make (S : sig val st: Flex_state.t end) = struct
   let renamer ~counter t0s t1s = 
     let lhs,rhs, unifscope, us = U.FO.rename_to_new_scope ~counter t0s t1s in
     lhs,rhs,unifscope,U.subst us
+  
+  let renamer_l ~counter t0s t1s = 
+    let lhs,rhs, unifscope, us = U.FO.rename_l_to_new_scope ~counter t0s t1s in
+    lhs,rhs,unifscope,U.subst us
 
   let deciders ~counter () =
     let pattern = 
@@ -131,6 +135,7 @@ module Make (S : sig val st: Flex_state.t end) = struct
       let flex_state = S.st 
       let init_flag = (0:flag_type)
       let identify_scope = renamer ~counter
+      let identify_scope_l = renamer_l ~counter
       let frag_algs = deciders ~counter
       let pb_oracle s t (f:flag_type) _ scope = 
         oracle ~counter ~scope s t f
@@ -141,4 +146,25 @@ module Make (S : sig val st: Flex_state.t end) = struct
        elim_vars := IntSet.empty;
        ident_vars := IntSet.empty;
        OSeq.map (CCOpt.map Unif_subst.of_subst) (JPFull.unify_scoped x y))
+  
+  let unify_scoped_l =  
+    let counter = ref 0 in
+
+    let module JPFullParams = struct
+      exception NotInFragment = PatternUnif.NotInFragment
+      exception NotUnifiable = PatternUnif.NotUnifiable
+      type flag_type = int
+      let flex_state = S.st 
+      let init_flag = (0:flag_type)
+      let identify_scope = renamer ~counter
+      let identify_scope_l = renamer_l ~counter
+      let frag_algs = deciders ~counter
+      let pb_oracle s t (f:flag_type) _ scope = oracle ~counter ~scope s t f
+    end in
+
+    let module JPFull = UnifFramework.Make(JPFullParams) in
+    (fun x y ->
+       elim_vars := IntSet.empty;
+       ident_vars := IntSet.empty;
+       OSeq.map (CCOpt.map Unif_subst.of_subst) (JPFull.unify_scoped_l x y))
 end

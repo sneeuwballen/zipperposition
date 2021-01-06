@@ -64,6 +64,10 @@ module FO : sig
     Term.t Scoped.t -> 
     Term.t Scoped.t ->
     Term.t * Term.t * Scoped.scope * t
+  val rename_l_to_new_scope : counter:int ref -> 
+    Term.t list Scoped.t -> 
+    Term.t list Scoped.t ->
+    Term.t list * Term.t list * Scoped.scope * t
 end
 
 include Interfaces.HASH with type t := t

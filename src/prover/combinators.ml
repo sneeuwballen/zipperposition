@@ -340,6 +340,7 @@ let extension =
   { Extensions.default with
       Extensions.name = "combinators";
       env_actions=[register];
+      prio=3;
       post_cnf_modifiers=[lam2combs];
   }
 

@@ -1,4 +1,5 @@
 module S = Subst
+module US = Unif_subst
 module LL = OSeq
 module T = Term
 module U = Unif
@@ -12,8 +13,19 @@ module type PARAMETERS = sig
   val init_flag : flag_type
   val flex_state : Flex_state.t
   val identify_scope : T.t Scoped.t -> T.t Scoped.t -> T.t * T.t * Scoped.scope * S.t
+  val identify_scope_l : T.t list Scoped.t -> T.t list Scoped.t -> T.t list * T.t list * Scoped.scope * S.t
   val frag_algs : unit -> (T.t Scoped.t -> T.t Scoped.t -> S.t -> S.t list) list
   val pb_oracle : (T.t Scoped.t -> T.t Scoped.t -> flag_type -> S.t -> Scoped.scope -> (S.t * flag_type) option LL.t)
+end
+
+module type S = sig 
+  val unify_scoped : T.t Scoped.t -> T.t Scoped.t -> S.FO.t option OSeq.t
+  val unify_scoped_l : T.t list Scoped.t -> T.t list Scoped.t -> S.FO.t option OSeq.t
+end
+
+module type US = sig 
+  val unify_scoped : T.t Scoped.t -> T.t Scoped.t -> US.t option OSeq.t
+  val unify_scoped_l : T.t list Scoped.t -> T.t list Scoped.t -> US.t option OSeq.t
 end
 
 module Make (P : PARAMETERS) = struct 
@@ -299,5 +311,15 @@ module Make (P : PARAMETERS) = struct
           CCFormat.printf "new:@[%a:%a@]@.=?=@.@[%a:%a@]@." T.pp l Type.pp (T.ty l) T.pp r Type.pp (T.ty r);
           assert(false)
         ); subst) opt)
-    with Unif.Fail -> OSeq.empty    
+    with Unif.Fail -> OSeq.empty
+
+  let unify_scoped_l t0s t1s =
+    let lhs,rhs,unifscope,subst = P.identify_scope_l t0s t1s in
+    let problem = List.map (fun (a,b) -> (a,b,P.init_flag)) (List.combine lhs rhs) in 
+
+    let id = CCRef.get_then_incr problem_id in
+    let bind_cnt = ref 0 in
+    try
+      do_unif ~bind_cnt ~id problem subst unifscope
+    with Unif.Fail -> OSeq.empty
 end

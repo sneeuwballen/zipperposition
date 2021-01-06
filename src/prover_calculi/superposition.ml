@@ -75,6 +75,7 @@ let k_lambda_demod = Flex_state.create_key ()
 let k_quant_demod = Flex_state.create_key ()
 let k_use_simultaneous_sup = Flex_state.create_key ()
 let k_unif_alg = Flex_state.create_key ()
+let k_unif_module : (module UnifFramework.US) Flex_state.key = Flex_state.create_key ()
 let k_fluidsup_penalty = Flex_state.create_key ()
 let k_dupsup_penalty = Flex_state.create_key ()
 let k_ground_subs_check = Flex_state.create_key ()
@@ -102,6 +103,9 @@ let k_pred_var_eq_fact = Flex_state.create_key ()
 
 
 let _NO_LAMSUP = -1
+
+let get_unif_module (module E : Env.S) : (module UnifFramework.US) = E.flex_get k_unif_module
+
 
 
 module Make(Env : Env.S) : S with module Env = Env = struct
@@ -3171,6 +3175,7 @@ let _clause_num = ref (-1)
 
 let key = Flex_state.create_key ()
 
+
 let unif_params_to_def () =
   _max_depth := 2;
   _max_app_projections := 1;
@@ -3251,6 +3256,7 @@ let register ~sup =
 
   let module JPF = JPFull.Make(struct let st = E.flex_state () end) in
   let module JPP = PUnif.Make(struct let st = E.flex_state () end) in
+  E.flex_add k_unif_module (module JPF : UnifFramework.US);
   begin match !_unif_alg with 
     | `OldJP -> 
       E.flex_add k_unif_alg JP_unif.unify_scoped;
@@ -3259,7 +3265,8 @@ let register ~sup =
       E.flex_add k_unif_alg JPF.unify_scoped;
       E.flex_add PragUnifParams.k_unif_alg_is_terminating false;
     | `NewJPPragmatic -> 
-      E.flex_add k_unif_alg JPP.unify_scoped
+      E.flex_add k_unif_alg JPP.unify_scoped;
+      E.flex_add k_unif_module (module JPP : UnifFramework.US);
        end
 
 (* TODO: move DOT index printing into the extension *)
@@ -3273,6 +3280,7 @@ let extension =
   in
   { Extensions.default with Extensions.
                          name="superposition";
+                         prio=5;
                          env_actions = [action];
   }
 
@@ -3418,7 +3426,8 @@ let () =
       _use_simultaneous_sup := false;
       _local_rw := `Off;
       _destr_eq_res := false;
-      _unif_logop_mode := `Conservative
+      _unif_logop_mode := `Conservative;
+      _schedule_infs := false;
     );
   Params.add_to_modes 
     [ "lambda-free-intensional"

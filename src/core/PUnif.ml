@@ -276,6 +276,10 @@ module Make (St : sig val st : Flex_state.t end) = struct
     let lhs,rhs, unifscope, us = U.FO.rename_to_new_scope ~counter t0s t1s in
     lhs,rhs,unifscope,U.subst us
 
+  let renamer_l ~counter t0s t1s = 
+    let lhs,rhs, unifscope, us = U.FO.rename_l_to_new_scope ~counter t0s t1s in
+    lhs,rhs,unifscope,U.subst us
+
   let deciders ~counter () =
     let pattern = 
       if get_option PUP.k_pattern_decider then 
@@ -360,6 +364,7 @@ module Make (St : sig val st : Flex_state.t end) = struct
       let flex_state = St.st
       let init_flag = (Int32.zero:flag_type)
       let identify_scope = renamer ~counter
+      let identify_scope_l = renamer_l ~counter
       let frag_algs = deciders ~counter (*[]*)
       let pb_oracle s t (f:flag_type) subst scope = 
         oracle ~counter ~scope ~subst s t f
@@ -370,5 +375,28 @@ module Make (St : sig val st : Flex_state.t end) = struct
        elim_vars := IntSet.empty;
        ident_vars := IntSet.empty;
        let res = PragUnif.unify_scoped x y in
+       OSeq.map (CCOpt.map Unif_subst.of_subst) (res))
+
+  let unify_scoped_l =  
+    let counter = ref 0 in
+
+    let module PragUnifParams = struct
+      exception NotInFragment = PatternUnif.NotInFragment
+      exception NotUnifiable = PatternUnif.NotUnifiable
+      type flag_type = int32
+      let flex_state = St.st
+      let init_flag = (Int32.zero:flag_type)
+      let identify_scope = renamer ~counter
+      let identify_scope_l = renamer_l ~counter
+      let frag_algs = deciders ~counter (*[]*)
+      let pb_oracle s t (f:flag_type) subst scope = 
+        oracle ~counter ~scope ~subst s t f
+    end in
+
+    let module PragUnif = UnifFramework.Make(PragUnifParams) in
+    (fun x y ->
+       elim_vars := IntSet.empty;
+       ident_vars := IntSet.empty;
+       let res = PragUnif.unify_scoped_l x y in
        OSeq.map (CCOpt.map Unif_subst.of_subst) (res))
 end
