@@ -241,10 +241,6 @@ module type S = sig
   (** checks if finite unification is used and whether the user wants
       to force storing all conclusions in the queues *)
 
-  val apply_max_infs : 'a option OSeq.t -> 'a option OSeq.t
-  (** if the inference limit is set, this function will take only
-      up to the specified numeber of clauses from the stream.
-      NB: requires the use of terminating unification algorithms *)
 
   val get_finite_infs : 'a option OSeq.t CCList.t -> 'a CCList.t
   (** get finitely many conclusions from inference stream.

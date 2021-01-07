@@ -95,7 +95,12 @@ module Make (P : PARAMETERS) = struct
     | T.AppBuiltin _ ->  not @@ T.is_appbuiltin t
     | _ -> false
 
-  let do_unif ~bind_cnt ~id problem subst unifscope =
+  let do_unif ~bind_cnt ~hits_cnt problem subst unifscope =
+    let max_infs = 
+      if Flex_state.get_exn PUP.k_max_inferences P.flex_state < 0 then max_int
+      else Flex_state.get_exn PUP.k_max_inferences P.flex_state
+    in
+
     let delay steps res () =
       let skipper = 
         int_of_float (Flex_state.get_exn PUP.k_skip_multiplier P.flex_state) in
@@ -166,8 +171,11 @@ module Make (P : PARAMETERS) = struct
         let new_prob = decompose args_l args_r rest flag in
         (fun () -> aux subst new_prob ()) in
 
-      match problem with 
-      | [] -> OSeq.return (Some subst)
+      match problem with
+      | _ when !hits_cnt > max_infs -> OSeq.empty 
+      | [] -> 
+        incr hits_cnt;
+        OSeq.return (Some subst)
       | (lhs, rhs, flag) :: rest ->
         match PatternUnif.unif_simple ~subst ~scope:unifscope 
                 (T.of_ty (T.ty lhs)) (T.of_ty (T.ty rhs)) with 
@@ -237,9 +245,7 @@ module Make (P : PARAMETERS) = struct
                   let res = 
                     OSeq.map (fun sub_flag_opt ->
                         match sub_flag_opt with 
-                        | None -> 
-                          (* CCFormat.printf " (%d) substitution says None@." id; *)
-                          OSeq.return None
+                        | None -> OSeq.return None
                         | Some (sub', flag') ->
                           try
                             let subst' = Subst.merge subst sub' in
@@ -295,12 +301,12 @@ module Make (P : PARAMETERS) = struct
   let unify_scoped t0s t1s =
     let lhs,rhs,unifscope,subst = P.identify_scope t0s t1s in
 
-    let id = CCRef.get_then_incr problem_id in
-    let bind_cnt = ref 0 in
+    let bind_cnt = ref 0 in (* number of created binders *)
+    let hits_cnt = ref 0 in (* number of unifiers found *)
     try
       OSeq.append 
         (try_lfho_unif t0s t1s)
-        (do_unif ~bind_cnt ~id [(lhs,rhs,P.init_flag)] subst unifscope)
+        (do_unif ~bind_cnt ~hits_cnt [(lhs,rhs,P.init_flag)] subst unifscope)
       |> OSeq.map (fun opt -> CCOpt.map (fun subst ->
         let norm t = T.normalize_bools @@ Lambda.eta_expand @@ Lambda.snf t in
         let l = norm @@ S.FO.apply Subst.Renaming.none subst t0s in 
@@ -317,9 +323,9 @@ module Make (P : PARAMETERS) = struct
     let lhs,rhs,unifscope,subst = P.identify_scope_l t0s t1s in
     let problem = List.map (fun (a,b) -> (a,b,P.init_flag)) (List.combine lhs rhs) in 
 
-    let id = CCRef.get_then_incr problem_id in
-    let bind_cnt = ref 0 in
+    let bind_cnt = ref 0 in (* number of created binders *)
+    let hits_cnt = ref 0 in (* number of unifiers found *)
     try
-      do_unif ~bind_cnt ~id problem subst unifscope
+      do_unif ~bind_cnt ~hits_cnt problem subst unifscope
     with Unif.Fail -> OSeq.empty
 end

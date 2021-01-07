@@ -448,7 +448,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           if Env.should_force_stream_eval () then (
             (Env.get_finite_infs [unif_seq]) @ acc 
           ) else (
-            let stm_res = Env.Stm.make ~penalty:(C.penalty c + 2) ~parents:[c] (Env.apply_max_infs unif_seq) in
+            let stm_res = Env.Stm.make ~penalty:(C.penalty c + 2) ~parents:[c] (unif_seq) in
             Env.StmQ.add (Env.get_stm_queue ()) stm_res;
             acc)
         ) else acc
@@ -550,7 +550,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             if Env.should_force_stream_eval () then (
               Env.get_finite_infs [seq] @ acc
             ) else (
-              let stm_res = Env.Stm.make ~penalty:(C.penalty c + 2) ~parents:[c] (Env.apply_max_infs seq) in
+              let stm_res = Env.Stm.make ~penalty:(C.penalty c + 2) ~parents:[c] (seq) in
               Env.StmQ.add (Env.get_stm_queue ()) stm_res;
               acc)
           ) acc partners;
@@ -634,7 +634,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             if Env.should_force_stream_eval () then (
               Env.get_finite_infs [seq] @ acc
             ) else (
-              let stm_res = Env.Stm.make ~penalty:(C.penalty c + 2) ~parents:[c] (Env.apply_max_infs  seq) in
+              let stm_res = Env.Stm.make ~penalty:(C.penalty c + 2) ~parents:[c] ( seq) in
               Env.StmQ.add (Env.get_stm_queue ()) stm_res;
               acc)
           ) acc partners;          
@@ -681,7 +681,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       if Env.should_force_stream_eval () then (
         Env.get_finite_infs [seq]
       ) else (
-        let stm_res = Env.Stm.make ~penalty:(C.penalty c) ~parents:[c] (Env.apply_max_infs seq) in
+        let stm_res = Env.Stm.make ~penalty:(C.penalty c) ~parents:[c] (seq) in
         Env.StmQ.add (Env.get_stm_queue ()) stm_res;
         []
       )
@@ -837,7 +837,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     ) else (
       Env.StmQ.add_lst (Env.get_stm_queue ()) (
         List.map (fun seq -> 
-          Env.Stm.make ~penalty:(C.penalty c) ~parents:[c] (Env.apply_max_infs seq)) stms
+          Env.Stm.make ~penalty:(C.penalty c) ~parents:[c] (seq)) stms
       );
       []
     )
@@ -947,7 +947,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       if Env.should_force_stream_eval () then (
         Env.get_finite_infs [clause_seq]
       ) else (
-      let stm_res = Env.Stm.make ~penalty:(C.penalty c) ~parents:[c] (Env.apply_max_infs clause_seq) in
+      let stm_res = Env.Stm.make ~penalty:(C.penalty c) ~parents:[c] (clause_seq) in
       Env.StmQ.add (Env.get_stm_queue ()) stm_res;
       []
     ))

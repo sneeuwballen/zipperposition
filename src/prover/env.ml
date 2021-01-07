@@ -332,26 +332,13 @@ module Make(X : sig
     not (flex_get PragUnifParams.k_schedule_inferences) &&
     flex_get PragUnifParams.k_max_inferences > 0
 
-  let apply_max_infs stream =
-    if flex_get PragUnifParams.k_unif_alg_is_terminating &&
-       flex_get PragUnifParams.k_max_inferences > 0 then (
-      OSeq.filter_map CCFun.id stream
-      |> OSeq.take (flex_get PragUnifParams.k_max_inferences)
-      |> OSeq.map CCOpt.return
-    ) else stream  
 
   let get_finite_infs streams =
     assert(flex_get PragUnifParams.k_unif_alg_is_terminating);
 
-    let apply_max_infs s =
-      let max_infs = flex_get PragUnifParams.k_max_inferences in
-      if max_infs < 0 then s else OSeq.take max_infs s
-    in
 
     CCList.flat_map (fun s -> 
-      OSeq.filter_map CCFun.id s
-      |> apply_max_infs
-      |> OSeq.to_rev_list
+      OSeq.to_rev_list @@ OSeq.filter_map CCFun.id s
     ) streams
 
 
