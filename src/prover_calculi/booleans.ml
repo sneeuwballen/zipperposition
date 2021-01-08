@@ -89,10 +89,21 @@ module Make(E : Env.S) : S with module Env = E = struct
     let trivial_trigger t =
       let body = snd @@ T.open_fun t in
       T.is_var body || T.is_true_or_false body in
+    
+    let rec get_terms t k =
+      if T.DB.is_closed t then k t;
 
-    Literals.fold_terms ~ord ~subterms:true ~eligible:C.Eligible.always 
-      ~which:`All (C.lits c) ~fun_bodies:false 
-    |> Iter.filter_map (fun (t,p) -> 
+      match T.view t with
+      | T.App(hd, args) -> List.iter (fun t -> get_terms t k) (args)
+      | T.AppBuiltin((And|Or|Not|Imply|Eq|Neq|Equiv|Xor), args) ->
+        List.iter (fun t -> get_terms t k) (args)
+      | _ -> ()
+    in
+
+    Literals.fold_terms ~ord ~subterms:false ~eligible:C.Eligible.always 
+      ~which:`All (C.lits c) ~fun_bodies:false
+    |> Iter.flat_map (fun (t, p) -> get_terms t)
+    |> Iter.filter_map (fun t -> 
         let ty = Term.ty t and hd = Term.head_term t in
         let cached_t = Subst.FO.canonize_all_vars t in
         if not (Term.Set.mem cached_t !Higher_order.prim_enum_terms) &&

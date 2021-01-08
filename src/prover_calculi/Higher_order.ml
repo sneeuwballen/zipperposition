@@ -52,6 +52,7 @@ let k_choice_axiom_penalty = Flex_state.create_key ()
 let k_instantiate_choice_ax = Flex_state.create_key ()
 let k_elim_leibniz_eq = Flex_state.create_key ()
 let k_elim_andrews_eq = Flex_state.create_key ()
+let k_elim_andrews_eq_simpl = Flex_state.create_key ()
 let k_prune_arg_fun = Flex_state.create_key ()
 let k_prim_enum_terms = Flex_state.create_key ()
 let k_simple_projection = Flex_state.create_key ()
@@ -1414,6 +1415,13 @@ module Make(E : Env.S) : S with module Env = E = struct
     if C.proof_depth c < Env.flex_get k_elim_andrews_eq then (
       elim_andrews_eq_ c
     ) else []
+  
+  let elim_andrews_equality_simpls c =
+    if C.proof_depth c < Env.flex_get k_elim_andrews_eq then (
+      let res = elim_andrews_eq_ c in
+      CCOpt.return_if (not (CCList.is_empty res)) res
+    ) else None
+  
 
   let pp_pairs_ out =
     let open CCFormat in
@@ -2254,7 +2262,9 @@ module Make(E : Env.S) : S with module Env = E = struct
         Env.add_unary_inf "ho_elim_leibniz_eq" elim_leibniz_equality
       );
       if Env.flex_get k_elim_andrews_eq > 0 then (
-        Env.add_unary_inf "ho_elim_leibniz_eq" elim_andrews_equality
+        if Env.flex_get k_elim_andrews_eq_simpl then (
+          Env.add_multi_simpl_rule ~priority:100 elim_andrews_equality_simpls
+        ) else Env.add_unary_inf "ho_elim_leibniz_eq" elim_andrews_equality
       );
 
       if Env.flex_get k_instantiate_choice_ax then (
@@ -2415,6 +2425,7 @@ let _var_solve = ref false
 let _instantiate_choice_ax = ref false
 let _elim_leibniz_eq = ref (-1)
 let _elim_andrews_eq = ref (-1)
+let _elim_andrews_eq_simpl = ref (false)
 let _prune_arg_fun = ref `NoPrune
 let _check_lambda_free = ref `False
 let prim_enum_terms = ref Term.Set.empty
@@ -2450,6 +2461,7 @@ let extension =
     E.flex_add k_instantiate_choice_ax !_instantiate_choice_ax;
     E.flex_add k_elim_leibniz_eq !_elim_leibniz_eq;
     E.flex_add k_elim_andrews_eq !_elim_andrews_eq;
+    E.flex_add k_elim_andrews_eq_simpl !_elim_andrews_eq_simpl;
     E.flex_add k_prune_arg_fun !_prune_arg_fun;
     E.flex_add k_prim_enum_terms prim_enum_terms;
     E.flex_add k_simple_projection !_simple_projection;
@@ -2577,6 +2589,7 @@ let () =
           | Some x -> _elim_andrews_eq := x
          ), " enable/disable treatment of Andrews equality. inf enables it for infinte depth of clauses"
             ^ "; off disables it; number enables it for a given depth of clause";
+      "--ho-elim-andrews-simpl", Arg.Bool ((:=) _elim_andrews_eq_simpl), " use Andrews equality replacement as simplification ";
       "--ho-def-unfold", Arg.Bool (fun v -> def_unfold_enabled_ := v), " enable ho definition unfolding";
       "--ho-choice-inst", Arg.Bool (fun v -> _instantiate_choice_ax := v), " enable heuristic Hilbert choice instantiation";
       "--ho-simple-projection", Arg.Int (fun v -> _simple_projection := v), 
