@@ -32,6 +32,7 @@ let k_nnf = Flex_state.create_key ()
 let k_simplify_bools = Flex_state.create_key ()
 let k_trigger_bool_inst = Flex_state.create_key ()
 let k_trigger_bool_ind = Flex_state.create_key ()
+let k_include_quants = Flex_state.create_key ()
 let k_bool_hoist_simpl = Flex_state.create_key ()
 let k_rename_nested_bools = Flex_state.create_key ()
 let k_fluid_hoist = Flex_state.create_key ()
@@ -97,6 +98,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       | T.App(hd, args) -> List.iter (fun t -> get_terms t k) (args)
       | T.AppBuiltin((And|Or|Not|Imply|Eq|Neq|Equiv|Xor), args) ->
         List.iter (fun t -> get_terms t k) (args)
+      | T.AppBuiltin((ForallConst|ExistsConst), [_; body]) -> 
+        if Env.flex_get k_include_quants then k body
       | _ -> ()
     in
 
@@ -107,8 +110,8 @@ module Make(E : Env.S) : S with module Env = E = struct
         let ty = Term.ty t and hd = Term.head_term t in
         let cached_t = Subst.FO.canonize_all_vars t in
         if not (Term.Set.mem cached_t !Higher_order.prim_enum_terms) &&
-           Type.is_fun ty && Type.returns_prop ty && not (Term.is_var hd) &&
-           not (trivial_trigger t) then (
+          Type.is_fun ty && Type.returns_prop ty && not (Term.is_var hd) &&
+          not (trivial_trigger t) then (
           Some t
         ) else None
       )
@@ -2008,6 +2011,7 @@ let _nnf = ref false
 let _simplify_bools = ref true
 let _trigger_bool_inst = ref (-1)
 let _trigger_bool_ind = ref (-1)
+let _include_quants = ref true
 let _bool_hoist_simpl = ref false
 let _rename_nested_bools = ref false
 let _fluid_hoist = ref false
@@ -2030,6 +2034,7 @@ let extension =
     E.flex_add k_simplify_bools !_simplify_bools;
     E.flex_add k_trigger_bool_inst !_trigger_bool_inst;
     E.flex_add k_trigger_bool_ind !_trigger_bool_ind;
+    E.flex_add k_include_quants !_include_quants;
     E.flex_add k_bool_hoist_simpl !_bool_hoist_simpl;
     E.flex_add k_rename_nested_bools !_rename_nested_bools;
     E.flex_add k_fluid_hoist !_fluid_hoist;
@@ -2073,6 +2078,8 @@ let () =
       , " abstract away constants from the goal and use them to trigger axioms of induction";
       "--trigger-bool-inst", Arg.Set_int _trigger_bool_inst
         , " instantiate predicate variables with boolean terms already in the proof state. Argument is the maximal proof depth of predicate variable";
+      "--trigger-bool-include-quants", Arg.Bool ((:=) _include_quants)
+        , " include lambdas directly under a quant in consdieration";
       "--disable-simplifying-cnf",
         Arg.Set _cnf_non_simpl,
         " implement cnf on-the-fly as an inference rule";

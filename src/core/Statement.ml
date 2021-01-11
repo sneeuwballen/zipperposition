@@ -675,73 +675,65 @@ let sine_axiom_selector
   let defs,helper_axioms,axioms,goals = 
     categorize_formulas formulas in
 
-  if take_only_defs then (
-    let res = helper_axioms @ defs @ goals in
-    Util.debugf ~section 2 "taken %d/%d axioms:@[%a@]@." 
-      (fun k -> k (List.length res) (List.length axioms) (CCList.pp CCString.pp) (List.map name res));
-    Iter.of_list res
-  ) else (
+  let axioms = if take_only_defs then defs else defs @ axioms in
 
-    let axioms = defs @ axioms in
+  let ids_to_defs = ids_to_defs_compute defs in
+  
+  let tbl = ID.Tbl.create 1024 in
+  List.iter (count_occ ~tbl) axioms;
 
-    let ids_to_defs = ids_to_defs_compute defs in
-    
-    let tbl = ID.Tbl.create 1024 in
-    List.iter (count_occ ~tbl) axioms;
+  let most_commmon_syms = 
+    match ignore_k_most_common_symbols with
+    | None -> ID.Set.empty
+    | Some k ->
+      ID.Tbl.to_list tbl
+      |> CCList.sort (fun (s1, occ1) (s2, occ2) -> CCInt.compare occ2 occ1)
+      |> CCList.take k
+      |> CCList.map fst
+      |> ID.Set.of_list in
+  
+  Util.debugf ~section 1 "most common symbols are: @[%a@]@." 
+    (fun k -> k (ID.Set.pp ID.pp) most_commmon_syms);
 
-    let most_commmon_syms = 
-      match ignore_k_most_common_symbols with
-      | None -> ID.Set.empty
-      | Some k ->
-        ID.Tbl.to_list tbl
-        |> CCList.sort (fun (s1, occ1) (s2, occ2) -> CCInt.compare occ2 occ1)
-        |> CCList.take k
-        |> CCList.map fst
-        |> ID.Set.of_list in
-    
-    Util.debugf ~section 1 "most common symbols are: @[%a@]@." 
-      (fun k -> k (ID.Set.pp ID.pp) most_commmon_syms);
+  (* now tbl contains occurrences of all symbols *)
 
-    (* now tbl contains occurrences of all symbols *)
+  let triggers = create_trigger_map ~trim_implications ~tbl (axioms) in
+  let syms_in_conj = symset_of_axs ~trim_implications ~is_goal:true goals in
+  let conj_syms =
+    ID.Set.diff syms_in_conj  most_commmon_syms in
+  Util.debugf ~section 2 "conj_syms:@[%a@]" (fun k -> k (ID.Set.pp ID.pp) conj_syms);
+  let triggered_1 = triggered_by_syms ~triggers conj_syms in
 
-    let triggers = create_trigger_map ~trim_implications ~tbl (axioms) in
-    let syms_in_conj = symset_of_axs ~trim_implications ~is_goal:true goals in
-    let conj_syms =
-      ID.Set.diff syms_in_conj  most_commmon_syms in
-    Util.debugf ~section 2 "conj_syms:@[%a@]" (fun k -> k (ID.Set.pp ID.pp) conj_syms);
-    let triggered_1 = triggered_by_syms ~triggers conj_syms in
+  let rec take_axs k processed_syms k_triggered_axs = 
+    if k >= depth_end then []
+    else (
+      let taken = if k >= depth_start then k_triggered_axs else [] in
+      let new_syms = symset_of_axs ~trim_implications:false k_triggered_axs in
+      let unprocessed = ID.Set.diff new_syms processed_syms in
+      let k_p_1_triggered_ax = triggered_by_syms ~triggers unprocessed in
+      taken @ (take_axs (k+1) (ID.Set.union processed_syms unprocessed) k_p_1_triggered_ax)) 
+  in
 
-    let rec take_axs k processed_syms k_triggered_axs = 
-      if k >= depth_end then []
-      else (
-        let taken = if k >= depth_start then k_triggered_axs else [] in
-        let new_syms = symset_of_axs ~trim_implications:false k_triggered_axs in
-        let unprocessed = ID.Set.diff new_syms processed_syms in
-        let k_p_1_triggered_ax = triggered_by_syms ~triggers unprocessed in
-        taken @ (take_axs (k+1) (ID.Set.union processed_syms unprocessed) k_p_1_triggered_ax)) 
-    in
+  let conj_defined_syms =
+    if take_conj_defs then (
+      ID.Set.fold (fun s_id conj_defs -> 
+        InpStmSet.union conj_defs
+          (ID.Map.get_or ~default:InpStmSet.empty s_id ids_to_defs)
+      ) conj_syms (InpStmSet.empty))
+    else InpStmSet.empty
+  in
 
-    let conj_defined_syms =
-      if take_conj_defs then (
-        ID.Set.fold (fun s_id conj_defs -> 
-          InpStmSet.union conj_defs
-            (ID.Map.get_or ~default:InpStmSet.empty s_id ids_to_defs)
-        ) conj_syms (InpStmSet.empty))
-      else InpStmSet.empty
-    in
+  let taken_axs = 
+    CCList.sort_uniq ~cmp:compare
+      ((InpStmSet.elements conj_defined_syms) @
+      (take_axs 1 conj_syms triggered_1)) in
 
-    let taken_axs = 
-      CCList.sort_uniq ~cmp:compare
-        ((InpStmSet.elements conj_defined_syms) @
-        (take_axs 1 conj_syms triggered_1)) in
+  Util.debugf ~section 2 "taken %d/%d axioms:@ @[%a@]@." 
+    (fun k -> k (List.length taken_axs) (List.length axioms) (CCList.pp CCString.pp) (List.map name taken_axs));
+  Util.debugf ~section 2 "take_conj_defs:%b@." (fun k -> k take_conj_defs);
 
-    Util.debugf ~section 2 "taken %d/%d axioms:@ @[%a@]@." 
-      (fun k -> k (List.length taken_axs) (List.length axioms) (CCList.pp CCString.pp) (List.map name taken_axs));
-    Util.debugf ~section 2 "take_conj_defs:%b@." (fun k -> k take_conj_defs);
-
-    let res = helper_axioms @ taken_axs @ goals in
-    Iter.of_list (res)
-  )
+  let res = helper_axioms @ taken_axs @ goals in
+  Iter.of_list (res)
 
 module ZF = struct
   module UA = UntypedAST.A
