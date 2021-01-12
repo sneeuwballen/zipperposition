@@ -93,20 +93,11 @@ module Make(X : PARAMETERS) = struct
     ZProf.exit_prof prof_declare_sym;
     ()
 
-  let declare_syms symbs = 
-    let rec aux = function 
-    | [] -> []
-    | (sym,ty) :: syms ->
-      let is_new = not (Signature.mem !_signature sym) in
-      if is_new then (
-        _signature := Signature.declare !_signature sym ty;
-        Signal.send on_signature_update !_signature;
-        Signal.send on_new_symbol (sym,ty);
-        sym :: (aux syms)
-      ) else aux syms in
-    let new_syms = aux symbs in
-    Ordering.add_list ~signature:!_signature (ord ()) new_syms
-
+  let declare_syms l =
+    List.iter (fun (symb,ty) -> _signature := Signature.declare !_signature symb ty) l;
+    Signal.send on_signature_update !_signature;
+    List.iter (Signal.send on_new_symbol) l;
+    Ordering.add_list ~signature:!_signature (ord ()) (List.map fst l)
 
   let set_injective_for_arg sym i = 
     let arg_bv = 

@@ -2078,7 +2078,7 @@ let () =
       , " abstract away constants from the goal and use them to trigger axioms of induction";
       "--trigger-bool-inst", Arg.Set_int _trigger_bool_inst
         , " instantiate predicate variables with boolean terms already in the proof state. Argument is the maximal proof depth of predicate variable";
-      "--trigger-bool-include-quants", Arg.Bool ((:=) _include_quants)
+    "--trigger-bool-include-quants", Arg.Bool ((:=) _include_quants)
         , " include lambdas directly under a quant in consdieration";
       "--disable-simplifying-cnf",
         Arg.Set _cnf_non_simpl,

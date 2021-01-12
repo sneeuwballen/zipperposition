@@ -12,6 +12,7 @@ let k_renaming_threshold = Flex_state.create_key ()
 let k_rename_eq = Flex_state.create_key ()
 let k_scoping = Flex_state.create_key ()
 let k_skolem_mode = Flex_state.create_key ()
+let k_enum_bool_funs = Flex_state.create_key ()
 let k_pa_renaming = Flex_state.create_key ()
 let k_only_eligible = Flex_state.create_key ()
 let k_penalize_eq_cnf = Flex_state.create_key ()
@@ -97,6 +98,79 @@ module Make(E : Env.S) : S with module Env = E = struct
     | Comparison.Lt -> is_noninterpeted rhs
     | Comparison.Gt -> is_noninterpeted lhs
     | _ -> is_noninterpeted lhs || is_noninterpeted rhs)
+
+    let _ty_map = Type.Tbl.create 16
+
+  let init_ty_map () =
+    Type.Tbl.add _ty_map Type.prop [T.true_; T.false_]
+
+  let rec enum_bool_funs ~ty =
+    assert(Iter.for_all (fun ty -> Type.is_fun ty || Type.is_prop ty) (Type.Seq.sub ty));
+
+    let insert_defining_clauses id sym arg_combs table = 
+      List.iteri (fun i arg_comb ->
+        let lhs = T.app sym arg_comb in
+        let rhs = table.(i) in
+        let lits = [Literal.mk_eq lhs rhs] in
+        let proof = Proof.Step.define_internal id [] in
+        let res = C.create ~penalty:1 ~trail:Trail.empty lits proof in
+        Util.debugf ~section 2 "defining: @[%a@]@." (fun k -> k C.pp res);
+        Env.add_passive (Iter.singleton res)
+      ) (arg_combs)
+    in
+
+    let create_members arg_ms ret_m =
+      assert(not (CCList.is_empty ret_m));
+
+      let arg_combinations = CCList.cartesian_product arg_ms in
+      let arg_comb_num = List.fold_left (fun acc a -> acc * (List.length a)) 1 arg_ms in
+      let fun_table = CCArray.create arg_comb_num (List.hd ret_m) in
+
+      let iter_funs () = 
+        let rec aux i k =
+          if i == arg_comb_num then k fun_table
+          else (
+            List.iter (fun x ->
+              fun_table.(i) <- x;
+              aux (i+1) k
+            ) ret_m )
+        in
+        aux 0
+      in
+
+      let prefix = "finite_domain_fun" in
+
+      iter_funs ()
+      |> Iter.map (fun table -> 
+        let ((id, id_ty), fresh_sym) = Term.mk_fresh_skolem ~prefix [] ty in
+        insert_defining_clauses id fresh_sym arg_combinations table;
+        (* let stm = definition_stream id fresh_sym arg_combinations table in
+        let stm_res = Env.Stm.make ~penalty:(1) ~parents:[] (stm) in
+        Env.StmQ.add (Env.get_stm_queue ()) stm_res;  *)
+        Util.debugf ~section 2 "declaring %a" (fun k -> k ID.pp id);
+        fresh_sym
+      )
+      |> Iter.to_list
+    in
+
+    if Type.Tbl.length _ty_map == 0 then init_ty_map ();
+
+    try
+      Type.Tbl.find _ty_map ty
+    with Not_found ->
+      let args, ret = Type.open_fun ty in
+      let arg_members = List.map (fun ty -> enum_bool_funs ~ty) args in
+      let ret_members = enum_bool_funs ~ty:ret in
+      Util.debugf ~section 1 "started declaring members of @[%a@]@." (fun k -> k Type.pp ty);
+      let new_members = create_members arg_members ret_members in
+      Util.debugf ~section 1 "done declaring members of @[%a@]@." (fun k -> k Type.pp ty);
+
+      Type.Tbl.add _ty_map ty new_members;
+
+      Env.Ctx.declare_syms (List.map (fun t -> T.head_exn t, T.ty t) new_members);
+      Util.debugf ~section 1 "members of type @[%a@]@. >@[%a@]" 
+        (fun k -> k Type.pp ty (CCList.pp T.pp) new_members);
+      new_members
     
 
   let proof ~constructor ~name ~parents c =
@@ -269,6 +343,9 @@ module Make(E : Env.S) : S with module Env = E = struct
           let var_tys, body =  T.open_fun f in
           assert(List.length var_tys = 1);
           let var_ty = List.hd var_tys in
+          if Env.flex_get k_enum_bool_funs && Type.Seq.has_bools_only var_ty then (
+            ignore (enum_bool_funs ~ty:var_ty)
+          );
           let hd, f =
             if sign then hd,f
             else ((if hd=ForallConst then ExistsConst else ForallConst),
@@ -312,7 +389,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       ) else continue acc) (init)
 
   let rename_subformulas c =
-    Util.debugf ~section 2 "lazy-cnf-rename(@[%a@])@." (fun k -> k C.pp c);
+    Util.debugf ~section 3 "lazy-cnf-rename(@[%a@])@." (fun k -> k C.pp c);
     let proof_cons = 
       Proof.Step.simp ~infos:[] 
                       ~tags:[Proof.Tag.T_live_cnf;
@@ -382,9 +459,9 @@ module Make(E : Env.S) : S with module Env = E = struct
           let renamer = (if sign then CCFun.id else T.Form.not_) renamer in
           let renamed = mk_or ~proof_cons ~rule_name [renamer] c ~parents:(c :: parents) i in
           let res = renamed @ new_defs in
-          Util.debugf ~section 1 "  @[renamed subformula %d:(@[%a@])=@. @[%a@]@]@." 
+          Util.debugf ~section 3 "  @[renamed subformula %d:(@[%a@])=@. @[%a@]@]@." 
             (fun k -> k i C.pp c (CCList.pp C.pp) renamed);
-          Util.debugf ~section 1 "  new defs:@[%a@]@." 
+          Util.debugf ~section 3 "  new defs:@[%a@]@." 
             (fun k -> k (CCList.pp C.pp) new_defs);
           Some res, `Stop
         | None -> None, `Continue
@@ -396,9 +473,9 @@ module Make(E : Env.S) : S with module Env = E = struct
             let new_defs = clausify_defs new_defs in
             let renamed = mk_or ~proof_cons ~rule_name [renamer] c ~parents:(c :: parents) i in
             let res = renamed @ new_defs in
-            Util.debugf ~section 1 "  @[renamed eq %d(@[%a@]) into @[%a@]@]@." 
+            Util.debugf ~section 3 "  @[renamed eq %d(@[%a@]) into @[%a@]@]@." 
               (fun k -> k i L.pp (C.lits c).(i) (CCList.pp C.pp) renamed);
-            Util.debugf ~section 1 "  new defs:@[%a@]@." 
+            Util.debugf ~section 3 "  new defs:@[%a@]@." 
               (fun k -> k (CCList.pp C.pp) new_defs);
               Some res, `Stop
           | None -> None, `Continue)
@@ -430,11 +507,11 @@ module Make(E : Env.S) : S with module Env = E = struct
           new_cls @ acc
         ) else acc) []
     |> CCFun.tap (fun res -> 
-      Util.debugf ~section 2 "eq_elim(@[%a@])" (fun k -> k C.pp c);
+      Util.debugf ~section 3 "eq_elim(@[%a@])" (fun k -> k C.pp c);
       if CCList.is_empty res then (
-        Util.debugf ~section 2 "=∅" CCFun.id;
+        Util.debugf ~section 3 "=∅" CCFun.id;
       ) else (
-        Util.debugf ~section 2 "=@[%a@]" (fun k -> k (CCList.pp C.pp) res);
+        Util.debugf ~section 3 "=@[%a@]" (fun k -> k (CCList.pp C.pp) res);
       ) 
     )
   
@@ -518,6 +595,7 @@ end
 let _lazy_cnf_kind = ref `Simp
 let _renaming_threshold = ref 8
 let _rename_eq = ref true
+let _enum_bool_funs = ref false
 let _scoping = ref `Off
 let _skolem_mode = ref `SkolemRecycle
 let _pa_renaming = ref true
@@ -530,6 +608,7 @@ let extension =
     let module E = (val env : Env.S) in
     let module ET = Make(E) in
     E.flex_add k_lazy_cnf_kind !_lazy_cnf_kind;
+    E.flex_add k_enum_bool_funs !_enum_bool_funs;
     E.flex_add k_renaming_threshold !_renaming_threshold;
     E.flex_add k_rename_eq !_rename_eq;
     E.flex_add k_scoping !_scoping;
@@ -577,6 +656,7 @@ let () =
       | "ignore" -> _lazy_cnf_kind := `Ignore
       | _ -> assert false)), " use lazy cnf as either simplification, inference, or let calculus clausify";
     "--lazy-cnf-rename-eq", Arg.Bool ((:=) _rename_eq), " turn on/of renaming of boolean equalities";
+    "--enum-bool-funs", Arg.Bool ((:=) _enum_bool_funs), " enumerate all functions over Boolean domain (up to the order of the problem)";
     "--lazy-cnf-clausify-eq-penalty", Arg.Bool ((:=) _clausify_eq_pen), " turn on/of penalizing clausification of equivalences"];
 
   Params.add_to_modes ["ho-complete-basic";

@@ -158,6 +158,9 @@ module Seq = struct
   let add_set = T.Seq.add_set
   let max_var = T.Seq.max_var
   let min_var = T.Seq.min_var
+  let has_bools_only t =
+    T.Seq.subterms t
+    |> Iter.for_all (fun ty -> is_fun ty || is_prop ty)
 end
 
 module VarMap = T.VarMap

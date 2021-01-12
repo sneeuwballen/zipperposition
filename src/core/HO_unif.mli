@@ -11,6 +11,7 @@ type penalty = int
 val enum_prop :
   ?mode:[`And | `Or | `Neg |`Quants | `TF | `Eq | `Combinators | `Full
          | `Pragmatic | `Simple | `None] ->
+  ?add_var:bool ->
   Term.var Scoped.t ->
   enum_cache: Term.Set.t ref ->
   signature: Signature.t ->

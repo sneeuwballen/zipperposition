@@ -692,29 +692,40 @@ let create ?(weight=weight_constant) ?(arg_coeff=arg_coeff_default)
 
 let add_list ~signature p l =
   (* sorted insertion in snapshot *)
-  Signal.send on_signature_update signature;
+  (* Signal.send on_signature_update signature; *)
   let rec insert_ id l = match l with
-    | [] -> [id], true
+    | [] -> [id]
     | id' :: l' ->
       let c = p.constr id id' in
       if c=0 then (
         assert (ID.equal id id'); (* total order *)
-        l, false  (* not new *)
+        l  (* not new *)
       )
-      else if c<0 then id :: l, true
+      else if c<0 then id :: l
       else
-        let l', ret = insert_ id l' in
-        id' :: l', ret
+        let l' = insert_ id l' in
+        id' :: l'
   in
   (* compute new snapshot, but only update precedence if any of the symbols is new *)
-  let snapshot, is_new =
+  let mk_snapshot l =
     List.fold_left
-      (fun (snap,new_) id ->
-         let snap,new_' = insert_ id snap in
-         snap, new_ || new_')
-      (p.snapshot,false) l
+      (fun (snap) id ->
+         insert_ id snap)
+      (p.snapshot) l
   in
-  if is_new then (
+  let is_new_sym id =
+    if Lazy.is_val p.tbl then ID.Tbl.mem (Lazy.force p.tbl) id
+    else List.mem id p.snapshot
+  in
+
+  let l = List.filter is_new_sym l in
+  let cutoff = 30 in
+  let snapshot = 
+    if CCList.length l < cutoff then mk_snapshot l
+    else (List.fast_sort p.constr ( p.snapshot @ l))
+  in
+
+  if not (CCList.is_empty l) then (
     Util.debugf ~section 4 "@[<v>old prec: @[%a@]@,new prec: @[%a@]@]"
       (fun k->k (Util.pp_list ID.pp) p.snapshot (Util.pp_list ID.pp) snapshot);
     assert (check_inv_ p);

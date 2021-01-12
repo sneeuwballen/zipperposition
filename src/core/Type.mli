@@ -138,6 +138,7 @@ module Seq : sig
   val add_set : Set.t -> t Iter.t -> Set.t
   val max_var : t HVar.t Iter.t -> int
   val min_var : t HVar.t Iter.t -> int
+  val has_bools_only : t -> bool
 end
 
 (** {2 Utils} *)

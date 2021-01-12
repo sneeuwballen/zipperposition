@@ -63,6 +63,7 @@ let k_eta = Flex_state.create_key()
 let k_diff_const = Flex_state.create_key()
 let k_generalize_choice_trigger = Flex_state.create_key ()
 let k_prim_enum_simpl = Flex_state.create_key ()
+let k_prim_enum_add_var = Flex_state.create_key ()
 let k_prim_enum_early_bird = Flex_state.create_key ()
 let k_resolve_flex_flex = Flex_state.create_key ()
 let k_arg_cong = Flex_state.create_key ()
@@ -1089,6 +1090,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       |> T.VarSet.to_iter
       |> Iter.flat_map_l
         (fun v -> HO_unif.enum_prop 
+            ~add_var:(Env.flex_get k_prim_enum_add_var)
             ~enum_cache:(Env.flex_get k_prim_enum_terms) 
             ~signature:(Ctx.signature ())
             ~mode ~offset (v,sc_c))
@@ -1584,10 +1586,11 @@ module Make(E : Env.S) : S with module Env = E = struct
     assert(T.is_var var);
     let offset = C.Seq.vars cl |> T.Seq.max_var |> succ in
     let mode = Env.flex_get k_ho_prim_mode in
+    let add_var = Env.flex_get k_prim_enum_add_var in
     let sc = 0 in
     
     HO_unif.enum_prop 
-      ~enum_cache:(Env.flex_get k_prim_enum_terms) 
+      ~enum_cache:(Env.flex_get k_prim_enum_terms) ~add_var
       ~signature:(Ctx.signature ()) ~mode ~offset (T.as_var_exn var,sc)
     |> CCList.map (fun (subst,p) -> 
       let renaming = Subst.Renaming.create () in
@@ -2435,6 +2438,7 @@ let _purify_applied_vars = ref `None
 let _eta = ref `Reduce
 let _generalize_choice_trigger = ref false
 let _prim_enum_simpl = ref false
+let _prim_enum_add_var = ref false
 let _prim_enum_early_bird = ref false
 let _resolve_flex_flex = ref false
 let _ground_app_vars = ref `Off
@@ -2471,6 +2475,7 @@ let extension =
     E.flex_add k_eta !_eta;
     E.flex_add k_generalize_choice_trigger !_generalize_choice_trigger;
     E.flex_add k_prim_enum_simpl !_prim_enum_simpl;
+    E.flex_add k_prim_enum_add_var !_prim_enum_add_var;
     E.flex_add k_prim_enum_early_bird !_prim_enum_early_bird;
     E.flex_add k_resolve_flex_flex !_resolve_flex_flex;
     E.flex_add k_ground_app_vars !_ground_app_vars;
@@ -2554,6 +2559,7 @@ let () =
       "--ho-prim-enum", set_prim_mode_, " set HO primitive enum mode";
       "--ho-prim-max", Arg.Set_int prim_max_penalty, " max penalty for HO primitive enum";
       "--ho-prim-enum-simpl", Arg.Bool ((:=) _prim_enum_simpl), " use primitive enumeration as simplification rule";
+      "--ho-prim-enum-add-var", Arg.Bool ((:=) _prim_enum_add_var), " turn an instantiation %x. t into %x. (F x | t)";
       "--ho-prim-enum-early-bird", Arg.Bool ((:=) _prim_enum_early_bird), " use early-bird primitive enumeration (requires lazy CNF)";
       "--ho-resolve-flex-flex", Arg.Bool ((:=) _resolve_flex_flex), " eagerly remove non-essential flex-flex constraints";
       "--ho-ext-axiom", Arg.Bool (fun v -> _ext_axiom := v), " enable/disable extensionality axiom";
