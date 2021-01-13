@@ -13,6 +13,7 @@ let k_rename_eq = Flex_state.create_key ()
 let k_scoping = Flex_state.create_key ()
 let k_skolem_mode = Flex_state.create_key ()
 let k_enum_bool_funs = Flex_state.create_key ()
+let k_replace_bool_fun_quants = Flex_state.create_key ()
 let k_pa_renaming = Flex_state.create_key ()
 let k_only_eligible = Flex_state.create_key ()
 let k_penalize_eq_cnf = Flex_state.create_key ()
@@ -114,7 +115,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         let lits = [Literal.mk_eq lhs rhs] in
         let proof = Proof.Step.define_internal id [] in
         let res = C.create ~penalty:1 ~trail:Trail.empty lits proof in
-        Util.debugf ~section 2 "defining: @[%a@]@." (fun k -> k C.pp res);
+        Util.debugf ~section 1 "defining: @[%a@]@." (fun k -> k C.pp res);
         Env.add_passive (Iter.singleton res)
       ) (arg_combs)
     in
@@ -161,9 +162,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let args, ret = Type.open_fun ty in
       let arg_members = List.map (fun ty -> enum_bool_funs ~ty) args in
       let ret_members = enum_bool_funs ~ty:ret in
-      Util.debugf ~section 1 "started declaring members of @[%a@]@." (fun k -> k Type.pp ty);
       let new_members = create_members arg_members ret_members in
-      Util.debugf ~section 1 "done declaring members of @[%a@]@." (fun k -> k Type.pp ty);
 
       Type.Tbl.add _ty_map ty new_members;
 
@@ -343,9 +342,6 @@ module Make(E : Env.S) : S with module Env = E = struct
           let var_tys, body =  T.open_fun f in
           assert(List.length var_tys = 1);
           let var_ty = List.hd var_tys in
-          if Env.flex_get k_enum_bool_funs && Type.Seq.has_bools_only var_ty then (
-            ignore (enum_bool_funs ~ty:var_ty)
-          );
           let hd, f =
             if sign then hd,f
             else ((if hd=ForallConst then ExistsConst else ForallConst),
@@ -361,7 +357,7 @@ module Make(E : Env.S) : S with module Env = E = struct
               |> CCFun.tap (fun t -> 
                 ID.set_payload (T.head_exn t) (ID.Attr_skolem ID.K_lazy_cnf))) 
           in
-        let expand_quant = not @@ Env.flex_get Combinators.k_enable_combinators in
+          let expand_quant = not @@ Env.flex_get Combinators.k_enable_combinators in
           let res = Lambda.eta_reduce ~expand_quant @@ Lambda.snf @@ T.app f [subst_term] in
           assert(Type.is_prop (T.ty res));
           let res_cl = mk_or ~proof_cons ~rule_name [res] c i in
@@ -370,7 +366,17 @@ module Make(E : Env.S) : S with module Env = E = struct
             assert (T.is_var subst_term);
             Signal.send Env.on_pred_var_elimination (List.hd res_cl, subst_term)
           );
-          return acc res_cl
+
+          if Env.flex_get k_enum_bool_funs && Type.Seq.has_bools_only var_ty then (
+            let repls = enum_bool_funs ~ty:var_ty in
+            if Env.flex_get k_replace_bool_fun_quants then (
+              let bodies = List.map (fun r -> 
+                Lambda.eta_reduce @@ Lambda.whnf (T.app f [r])) repls in
+              return acc @@
+                 (if hd == ForallConst then mk_and ~proof_cons ~rule_name:"_inst_quant" bodies c i
+                  else mk_or ~proof_cons ~rule_name:"_inst_quant" bodies c i)
+            ) else return acc res_cl
+          ) else return acc res_cl
         | _ -> continue acc end
       ) else if Type.is_prop (T.ty lhs) && not (L.is_predicate_lit lit) then (
           let rule_name = 
@@ -596,6 +602,7 @@ let _lazy_cnf_kind = ref `Simp
 let _renaming_threshold = ref 8
 let _rename_eq = ref true
 let _enum_bool_funs = ref false
+let _replace_bool_fun_quant = ref false
 let _scoping = ref `Off
 let _skolem_mode = ref `SkolemRecycle
 let _pa_renaming = ref true
@@ -609,6 +616,7 @@ let extension =
     let module ET = Make(E) in
     E.flex_add k_lazy_cnf_kind !_lazy_cnf_kind;
     E.flex_add k_enum_bool_funs !_enum_bool_funs;
+    E.flex_add k_replace_bool_fun_quants !_replace_bool_fun_quant;
     E.flex_add k_renaming_threshold !_renaming_threshold;
     E.flex_add k_rename_eq !_rename_eq;
     E.flex_add k_scoping !_scoping;
@@ -657,6 +665,7 @@ let () =
       | _ -> assert false)), " use lazy cnf as either simplification, inference, or let calculus clausify";
     "--lazy-cnf-rename-eq", Arg.Bool ((:=) _rename_eq), " turn on/of renaming of boolean equalities";
     "--enum-bool-funs", Arg.Bool ((:=) _enum_bool_funs), " enumerate all functions over Boolean domain (up to the order of the problem)";
+    "--replace-bool-quant-fun", Arg.Bool ((:=) _replace_bool_fun_quant), " replace Boolean fun quantifier with all possible values";
     "--lazy-cnf-clausify-eq-penalty", Arg.Bool ((:=) _clausify_eq_pen), " turn on/of penalizing clausification of equivalences"];
 
   Params.add_to_modes ["ho-complete-basic";
