@@ -476,6 +476,9 @@ let weight ?(var=1) ?(sym=fun _ -> 1) t =
   let rec weight t = match view t with
     | Var _
     | DB _ -> var
+    | AppBuiltin ((ForallConst|ExistsConst), [_;body]) ->
+      let _, body = open_fun body in
+      1 + weight body
     | AppBuiltin (_,l)
     | App (_, l) -> List.fold_left (fun s t' -> s + weight t') 1 l
     | Fun (_, u) -> 1 + weight u
