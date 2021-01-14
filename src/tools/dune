@@ -2,10 +2,10 @@
 (executables
   (names
     type_check cnf_of tptp_to_zf
-    proof_check_tstp fo_detector fool_detector)
+    proof_check_tstp fo_detector fool_detector check_finite_domain)
   (public_names
     zipper_type_check zipper_cnf_of zipper_tptp_to_zf
-    zipper_proof_check_tstp zipper_fo_detector zipper_fool_detector)
+    zipper_proof_check_tstp zipper_fo_detector zipper_fool_detector zipper_fd_detector)
   (modes native)
   (promote (until-clean) (into ../..))
   (libraries logtk logtk.parsers)

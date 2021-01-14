@@ -6,8 +6,10 @@ module Ls = Literals
 module T = Term
 
 let enabled = ref false
+let _eager_lcnf = ref false
 
 let k_lazy_cnf_kind = Flex_state.create_key ()
+let k_lazy_cnf_eager = Flex_state.create_key ()
 let k_renaming_threshold = Flex_state.create_key ()
 let k_rename_eq = Flex_state.create_key ()
 let k_scoping = Flex_state.create_key ()
@@ -584,13 +586,19 @@ module Make(E : Env.S) : S with module Env = E = struct
         Env.add_unary_inf "lazy_cnf" lazy_clausify_inf
       | `Simp -> 
           Env.add_unary_inf "elim eq" clausify_eq;
-          Env.add_multi_simpl_rule ~priority:5 lazy_clausify_simpl
+          Env.add_multi_simpl_rule ~priority:5 lazy_clausify_simpl;
+          if Env.flex_get k_lazy_cnf_eager then (
+            Env.add_cheap_multi_simpl_rule lazy_clausify_simpl;
+          )
       end;
 
       (* ** IMPORTANT **
          Due to correctly set priorioty, renaming will run before simplification *)
       if Env.flex_get k_renaming_threshold > 0 then (
-        Env.add_multi_simpl_rule ~priority:4 rename_subformulas
+        Env.add_multi_simpl_rule ~priority:4 rename_subformulas;
+        if Env.flex_get k_lazy_cnf_eager then (
+          Env.add_cheap_multi_simpl_rule rename_subformulas;
+        )
       );
       if Env.flex_get k_scoping != `Off then (
         Env.add_multi_simpl_rule ~priority:3 cnf_scope;
@@ -615,6 +623,7 @@ let extension =
     let module E = (val env : Env.S) in
     let module ET = Make(E) in
     E.flex_add k_lazy_cnf_kind !_lazy_cnf_kind;
+    E.flex_add k_lazy_cnf_eager !_eager_lcnf;
     E.flex_add k_enum_bool_funs !_enum_bool_funs;
     E.flex_add k_replace_bool_fun_quants !_replace_bool_fun_quant;
     E.flex_add k_renaming_threshold !_renaming_threshold;
@@ -636,6 +645,7 @@ let extension =
 let () =
   Options.add_opts [
     "--lazy-cnf", Arg.Bool ((:=) enabled), " turn on lazy clausification";
+    "--lazy-cnf-eager", Arg.Bool ((:=) _eager_lcnf), " apply the rule to every newly created clause";
     "--lazy-cnf-only-eligible-lits", Arg.Bool ((:=) _only_eligible), " apply lazy clausification only on eligible literals";
     "--lazy-cnf-clausify-max-eq", Arg.Bool ((:=) _clausify_eq_max_noninterpreted),
       " enable/disable clausification of an EQ literal if max side is non-interpreted ";
