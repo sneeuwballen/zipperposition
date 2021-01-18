@@ -658,7 +658,7 @@ let sine_axiom_selector
     List.fold_left (fun map d -> aux map d) ID.Map.empty defs in
 
 
-  let  categorize_formulas forms =
+  let categorize_formulas forms =
     let rec do_categorize (defs, helpers, axioms, conjs) f =
       match view f with 
       | Def _ | Rewrite _ -> (f::defs, helpers, axioms, conjs)
@@ -692,7 +692,7 @@ let sine_axiom_selector
       |> CCList.map fst
       |> ID.Set.of_list in
   
-  Util.debugf ~section 1 "most common symbols are: @[%a@]@." 
+  Util.debugf ~section 2 "most common symbols are: @[%a@]@." 
     (fun k -> k (ID.Set.pp ID.pp) most_commmon_syms);
 
   (* now tbl contains occurrences of all symbols *)
@@ -701,8 +701,16 @@ let sine_axiom_selector
   let syms_in_conj = symset_of_axs ~trim_implications ~is_goal:true goals in
   let conj_syms =
     ID.Set.diff syms_in_conj  most_commmon_syms in
-  Util.debugf ~section 2 "conj_syms:@[%a@]" (fun k -> k (ID.Set.pp ID.pp) conj_syms);
+  Util.debugf ~section 1 "conj_syms:@[%a@]" (fun k -> k (ID.Set.pp ID.pp) conj_syms);
   let triggered_1 = triggered_by_syms ~triggers conj_syms in
+
+  ID.Tbl.iter (fun id set -> 
+    Util.debugf ~section 1 "@[%a/%d@] > @[%a@]" (fun k -> k ID.pp id (ID.id id) (CCList.pp CCString.pp) (List.map name (InpStmSet.elements set)))
+  ) triggers; 
+
+  Util.debugf ~section 1 "layer 0" CCFun.id;
+  Util.debugf ~section 1 "symbols: @[%a@]" (fun k -> k (ID.Set.pp ID.pp) conj_syms);
+  Util.debugf ~section 1 "axs: @[%a@]" (fun k -> k (CCList.pp CCString.pp) (List.map name triggered_1));
 
   let rec take_axs k processed_syms k_triggered_axs = 
     if k >= depth_end then []
@@ -711,6 +719,9 @@ let sine_axiom_selector
       let new_syms = symset_of_axs ~trim_implications:false k_triggered_axs in
       let unprocessed = ID.Set.diff new_syms processed_syms in
       let k_p_1_triggered_ax = triggered_by_syms ~triggers unprocessed in
+      Util.debugf ~section 1 "layer @[%d@]" (fun c -> c k );
+      Util.debugf ~section 1 "symbols: @[%a@]" (fun k -> k (ID.Set.pp ID.pp) unprocessed);
+      Util.debugf ~section 1 "axs: @[%a@]" (fun k -> k (CCList.pp CCString.pp) (List.map name k_p_1_triggered_ax));
       taken @ (take_axs (k+1) (ID.Set.union processed_syms unprocessed) k_p_1_triggered_ax)) 
   in
 
@@ -728,7 +739,7 @@ let sine_axiom_selector
       ((InpStmSet.elements conj_defined_syms) @
       (take_axs 1 conj_syms triggered_1)) in
 
-  Util.debugf ~section 2 "taken %d/%d axioms:@ @[%a@]@." 
+  Util.debugf ~section 1 "taken %d/%d axioms:@ @[%a@]@." 
     (fun k -> k (List.length taken_axs) (List.length axioms) (CCList.pp CCString.pp) (List.map name taken_axs));
   Util.debugf ~section 2 "take_conj_defs:%b@." (fun k -> k take_conj_defs);
 

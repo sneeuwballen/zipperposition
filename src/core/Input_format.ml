@@ -3,6 +3,8 @@
 
 (** {1 Input Format} *)
 
+let shadow_mode = ref (None : (bool option))
+
 type t =
   | I_tptp
   | I_zf
@@ -29,11 +31,14 @@ let on_undef_id (i:t) = match i with
   | I_zf -> `Fail
 
 (** What to do when we have a shadowing decl? *)
-let on_shadow (i:t) = match i with
-  | I_dk -> `Ignore
-  | I_tptp
-  | I_tip
-  | I_zf -> `Warn
+let on_shadow (i:t) = 
+  match !shadow_mode with 
+  | None ->  (match i with
+    | I_dk -> `Ignore
+    | I_tptp
+    | I_tip
+    | I_zf -> `Warn)
+  | Some b -> if b then `Warn else `Ignore
 
 (** what to do when we have a variable without a type declaration? *)
 let on_var (i:t) = match i with

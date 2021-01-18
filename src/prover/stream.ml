@@ -63,7 +63,7 @@ module Make(A:ARG) = struct
       max 2 (s.hits-16)
     | Some c ->
       s.hits <- s.hits +1;
-      max (C.penalty c) (s.hits-64) 
+      (C.penalty c) * (max 1 (s.hits-64)) 
 
   let is_orphaned s =
     List.exists C.is_redundant s.parents

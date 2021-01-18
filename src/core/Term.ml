@@ -473,16 +473,18 @@ let rec size t = match view t with
   | Const _ -> 1
 
 let weight ?(var=1) ?(sym=fun _ -> 1) t =
-  let rec weight t = match view t with
+  let rec weight t = 
+    if Type.is_tType (ty t) then 0
+    else (match view t with
     | Var _
     | DB _ -> var
     | AppBuiltin ((ForallConst|ExistsConst), [_;body]) ->
       let _, body = open_fun body in
       1 + weight body
-    | AppBuiltin (_,l)
-    | App (_, l) -> List.fold_left (fun s t' -> s + weight t') 1 l
+    | AppBuiltin (_,l) -> List.fold_left (fun s t' -> s + weight t') 1 l
+    | App (hd, l) -> List.fold_left (fun s t' -> s + weight t') (weight hd) l
     | Fun (_, u) -> 1 + weight u
-    | Const s -> sym s
+    | Const s -> sym s)
   in weight t
 
 let ho_weight = T.ho_weight

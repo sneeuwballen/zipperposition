@@ -410,10 +410,9 @@ module Make(C : Clause_intf.S) = struct
 
       let t_weight ~mul t =
         let rec aux t =
+          if Type.is_tType (Term.ty t) then 0 else
           match Term.view t with 
           | App(hd,args) -> aux_l (hd::args)
-          | AppBuiltin((ForallConst|ExistsConst), [_; body]) ->
-            1 + aux (snd @@ Term.open_fun (body))
           | AppBuiltin(b,args) -> f + aux_l args
           | Fun(_,body) -> v + aux body
           | DB _ | Var _ -> v
