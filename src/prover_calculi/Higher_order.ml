@@ -616,6 +616,10 @@ module Make(E : Env.S) : S with module Env = E = struct
       let app_subst subst =
         if not unify then (fun (s,_) -> s)
         else Subst.FO.apply Subst.Renaming.none (US.subst subst) in
+      
+      let init_subst = Unif.Ty.unify_syn ~subst:(US.subst init_subst) 
+                        ((T.ty (app_subst init_subst (orig_s, s_sc))), unifscope) 
+                        ((T.ty (app_subst init_subst (orig_t, t_sc))), unifscope) in
 
       (* Filter out the pairs that are easy to unify *)
       let diss = 
@@ -625,10 +629,23 @@ module Make(E : Env.S) : S with module Env = E = struct
             (* polymorphism is currently not supported *)
             raise StopSearch
           );
+          
+          let app_ty r s ty sc = Subst.Ty.apply r s (ty,sc) in
           match cheap_unify ~subst (si',unifscope) (ti', unifscope) with
-          | Some subst' -> dis_acc, subst'
-          | None -> (si,ti) :: dis_acc, subst)
-        ([],init_subst) (diss) in
+          | Some subst' -> 
+            assert (
+              let r = Subst.Renaming.create () in
+              let s = Unif_subst.subst subst' in
+              Type.equal (app_ty r s (T.ty si') unifscope) (app_ty r s (T.ty ti') unifscope) 
+            );
+            dis_acc, subst'
+          | None ->
+            assert (
+              let r = Subst.Renaming.create () in
+              let s = Unif_subst.subst subst in
+              Type.equal (app_ty r s (T.ty si) s_sc) (app_ty r s (T.ty ti) t_sc) );
+            (si,ti) :: dis_acc, subst)
+        ([],US.of_subst init_subst) (diss) in
 
 
       (* If no constraints are left or all of pairs are flex-flex
@@ -642,9 +659,9 @@ module Make(E : Env.S) : S with module Env = E = struct
          List.exists (fun (si,_) -> not (t_type_is_ho si)) (fst diss) then (
            raise StopSearch
         );
-
       Some diss
     with StopSearch -> None
+        | Unif.Fail -> None
 
   
     let ext_inst ~parents (s,s_sc) (t,t_sc) =
