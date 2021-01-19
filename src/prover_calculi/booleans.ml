@@ -35,6 +35,7 @@ let k_trigger_bool_ind = Flex_state.create_key ()
 let k_include_quants = Flex_state.create_key ()
 let k_bool_hoist_simpl = Flex_state.create_key ()
 let k_rename_nested_bools = Flex_state.create_key ()
+let k_bool_app_var_repl = Flex_state.create_key ()
 let k_fluid_hoist = Flex_state.create_key ()
 let k_fluid_log_hoist = Flex_state.create_key ()
 let k_solve_formulas = Flex_state.create_key ()
@@ -1683,7 +1684,9 @@ module Make(E : Env.S) : S with module Env = E = struct
         Env.add_unary_inf "eq_rw" nested_eq_rw;
 
         if Env.flex_get Superposition.k_ho_basic_rules then (
-          Env.add_unary_inf "replace_bool_app_vars" replace_bool_app_vars;
+          if Env.flex_get k_bool_app_var_repl then (
+            Env.add_unary_inf "replace_bool_app_vars" replace_bool_app_vars
+          );
           if Env.flex_get k_fluid_hoist then (
             Env.add_unary_inf "fluid_hoist" fluid_hoist
           );
@@ -2015,6 +2018,7 @@ let _include_quants = ref true
 let _bool_hoist_simpl = ref false
 let _rename_nested_bools = ref false
 let _fluid_hoist = ref false
+let _bool_app_var_repl = ref false
 let _fluid_log_hoist = ref false
 let _solve_formulas = ref false
 let _replace_quants = ref false
@@ -2038,6 +2042,7 @@ let extension =
     E.flex_add k_bool_hoist_simpl !_bool_hoist_simpl;
     E.flex_add k_rename_nested_bools !_rename_nested_bools;
     E.flex_add k_fluid_hoist !_fluid_hoist;
+    E.flex_add k_bool_app_var_repl !_bool_app_var_repl;
     E.flex_add k_fluid_log_hoist !_fluid_log_hoist;
     E.flex_add k_solve_formulas !_solve_formulas;
     E.flex_add k_replace_unsupported_quants !_replace_quants;
@@ -2071,6 +2076,9 @@ let () =
       "--replace-quants"
       , Arg.Bool (fun v -> _replace_quants := v)
       , " replace unsupported quantifiers";
+      "--replace-bool-app-vars"
+      , Arg.Bool (fun v -> _bool_app_var_repl := v)
+      , " unify applied variables with combinations of T and F";
       "--rename-nested-bools"
       , Arg.Bool (fun v -> _rename_nested_bools := v)
       , " rename deeply nested bool subterms";
@@ -2126,6 +2134,7 @@ let () =
   Params.add_to_mode "ho-complete-basic" (fun () -> 
     _bool_reasoning := BoolHoist;
     _fluid_hoist := true;
+    _bool_app_var_repl := true;
     _fluid_log_hoist := true;
     _replace_quants := true);
   Params.add_to_modes ["ho-pragmatic";
