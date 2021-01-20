@@ -12,6 +12,8 @@ let k_inprocessing = Flex_state.create_key ()
 let k_max_resolvents = Flex_state.create_key ()
 let k_check_gates = Flex_state.create_key ()
 let k_non_singular_pe = Flex_state.create_key ()
+let k_measure_fun = Flex_state.create_key ()
+let k_relax_val = Flex_state.create_key ()
 
 let _enabled = ref false
 let _check_gates = ref true
@@ -19,6 +21,17 @@ let _inprocessing = ref false
 let _check_at = ref 10
 let _max_resolvents = ref (-1)
 let _non_singular_pe = ref false
+let _relax_val = ref 0
+
+let kk_measure _ new_mu old_mu new_lit_num old_lit_num _ _ =
+  old_lit_num > new_lit_num && old_mu > new_mu
+
+let relaxed_measure relax new_mu old_mu new_lit_num old_lit_num new_cl_num old_cl_num =
+  old_lit_num >= new_lit_num-relax ||
+  old_cl_num >= new_cl_num-relax ||    
+  old_mu >= old_mu
+
+let _measure = ref relaxed_measure
 
 let section = Util.Section.make ~parent:Const.section "pred-elim"
 
@@ -620,6 +633,9 @@ module Make(E : Env.S) : S with module Env = E = struct
 
     aux (CS.to_list offending) []
 
+  let measure_decreases () =
+    Env.flex_get k_measure_fun
+
   let do_pred_elim () =
     let removed_cls = ref None in
     let updated_removed inc =
@@ -655,9 +671,11 @@ module Make(E : Env.S) : S with module Env = E = struct
         CS.cardinal task.offending_cls
       in
       let num_new_cls = List.length resolvents in
-      if new_sq_var_weight <= task.sq_var_weight ||
-         new_lit_num <= task.num_lits ||
-         num_new_cls < old_clauses then (
+      if measure_decreases () 
+          (Env.flex_get k_relax_val)
+          new_sq_var_weight task.sq_var_weight 
+          new_lit_num task.num_lits 
+          num_new_cls old_clauses then (
         Util.debugf ~section 5 "replacing: @[%a@] (%d/%d) " 
           (fun k -> k ID.pp task.sym old_clauses (num_new_cls));
         updated_removed (old_clauses - num_new_cls);
@@ -830,6 +848,8 @@ let extension =
     E.flex_add k_max_resolvents !_max_resolvents;
     E.flex_add k_check_gates !_check_gates;
     E.flex_add k_non_singular_pe !_non_singular_pe;
+    E.flex_add k_measure_fun !_measure;
+    E.flex_add k_relax_val !_relax_val;
     
     PredElim.setup ()
   in
@@ -843,6 +863,11 @@ let () =
   Options.add_opts [
     "--pred-elim", Arg.Bool ((:=) _enabled), " enable predicate elimination";
     "--pred-elim-check-gates", Arg.Bool ((:=) _check_gates), " enable recognition of gate clauses";
+    "--pred-elim-relax-value", Arg.Int ((:=) _relax_val), " value of relax constant for our new measure";
+    "--pred-elim-measure-fun", Arg.Symbol (["kk"; "relaxed"], (function
+      | "kk" -> _measure := kk_measure;
+      | "relaxed" -> _measure := relaxed_measure;
+      | _ -> invalid_arg "unknown measure function" )), " use either standard Korovin-Khasidashvili measure or our relaxed measure for measuring the proof state size";
     "--pred-elim-non-singular", Arg.Bool ((:=) _non_singular_pe), " enable PE when gate is recognized and there are multiple occurrences of a symbol";
     "--pred-elim-inprocessing", Arg.Bool ((:=) _inprocessing), " predicate elimination as inprocessing rule";
     "--pred-elim-check-at", Arg.Int ((:=) _check_at), " when to perform predicate elimination inprocessing";
