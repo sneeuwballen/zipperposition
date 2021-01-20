@@ -1421,7 +1421,9 @@ let () =
     ; "lambda-free-purify-intensional"
     ; "lambda-free-purify-extensional"]
     (fun () ->
-      _profile := P_conj_rel_var;
-      cr_var_ratio := 8;
-      cr_var_mul   := 1.05;
+      if CCList.is_empty !funs_to_parse then (
+        _profile := P_conj_rel_var;
+        cr_var_ratio := 8;
+        cr_var_mul   := 1.05;
+      )
     );
