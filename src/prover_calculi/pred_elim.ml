@@ -14,6 +14,7 @@ let k_check_gates = Flex_state.create_key ()
 let k_non_singular_pe = Flex_state.create_key ()
 let k_measure_fun = Flex_state.create_key ()
 let k_relax_val = Flex_state.create_key ()
+let k_prefer_spe = Flex_state.create_key ()
 
 let _enabled = ref false
 let _check_gates = ref true
@@ -22,6 +23,7 @@ let _check_at = ref 10
 let _max_resolvents = ref (-1)
 let _non_singular_pe = ref false
 let _relax_val = ref 0
+let _prefer_spe = ref false
 
 let kk_measure _ new_mu old_mu new_lit_num old_lit_num _ _ =
   old_lit_num > new_lit_num && old_mu > new_mu
@@ -30,6 +32,9 @@ let relaxed_measure relax new_mu old_mu new_lit_num old_lit_num new_cl_num old_c
   old_lit_num >= new_lit_num-relax ||
   old_cl_num >= new_cl_num-relax ||    
   old_mu >= old_mu
+
+let conservative_measure relax new_mu old_mu new_lit_num old_lit_num new_cl_num old_cl_num =
+ (old_lit_num >= new_lit_num - relax) 
 
 let _measure = ref relaxed_measure
 
@@ -84,9 +89,9 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let pp_task out task =
     CCFormat.fprintf out 
-      "%a {@. +: @[%a@];@. -:@[%a@];@. ?:@[%a@]@. g:@[%b@]@. v^2:@[%g@]; |l|:@[%d@]; @.}@."
+      "%a {@. +: @[%a@];@. -:@[%a@];@. ?:@[%a@]@. g:@[%a@]@. v^2:@[%g@]; |l|:@[%d@]; @.}@."
       ID.pp task.sym (CS.pp C.pp) task.pos_cls (CS.pp C.pp) task.neg_cls
-      (CS.pp C.pp) task.offending_cls (CCOpt.is_some task.is_gate) task.sq_var_weight
+      (CS.pp C.pp) task.offending_cls (CCOpt.pp (CCPair.pp (CCList.pp C.pp) (CCList.pp C.pp))) task.is_gate task.sq_var_weight
       task.num_lits
 
   module TaskWrapper = struct
@@ -375,10 +380,10 @@ module Make(E : Env.S) : S with module Env = E = struct
     else Signal.StopListening
 
   let replace_clauses task clauses =
-    Util.debugf ~section 1 "replaced clauses(%a):@. regular:@[%a@]@. gates:@[%a@]@." 
+    Util.debugf ~section 2 "replaced clauses(%a):@. regular:@[%a@]@. gates:@[%a@]@." 
       (fun k -> k ID.pp task.sym (CS.pp C.pp) (CS.union task.pos_cls task.neg_cls) 
                   (CCOpt.pp (CCPair.pp (CCList.pp C.pp) (CCList.pp C.pp))) task.is_gate);
-    Util.debugf ~section 1 "resolvents: @[%a@]@." (fun k -> k (CCList.pp C.pp) clauses);
+    Util.debugf ~section 2 "resolvents: @[%a@]@." (fun k -> k (CCList.pp C.pp) clauses);
     _ignored_symbols := ID.Set.add task.sym !_ignored_symbols;
     let remove iter =
       Env.remove_active iter;
@@ -477,30 +482,34 @@ module Make(E : Env.S) : S with module Env = E = struct
       long_clauses
     in
 
+    let diff_vars_cnt cl =
+      List.length @@ Literals.vars (C.lits cl)
+    in
+
     let check_and () =
       let pos_gates = filter_gates ~sign:true ~lit_num_filter:(fun n -> n > 2) in
       let neg_gates = filter_gates ~sign:false ~lit_num_filter:((=) 2) in
       match find_and_or neg_gates pos_gates with
-      | Some (pos_cl, neg_cls) ->
+      | Some (pos_cl, neg_cls) when (diff_vars_cnt pos_cl <= 3) ->
         let to_remove = CS.of_list (pos_cl :: neg_cls) in
         task.neg_cls <- CS.diff task.neg_cls to_remove;
         task.pos_cls <- CS.diff task.pos_cls to_remove;
         task.is_gate <- Some([pos_cl], neg_cls);
         true
-      | None -> false
+      | _ -> false
     in
     let check_or () =
       let pos_gates = filter_gates ~sign:true ~lit_num_filter:((=) 2) in
       let neg_gates = filter_gates ~sign:false ~lit_num_filter:(fun n -> n > 2) in
       (* checking for or will also check for equivalences p(x) <-> q(x) *)
       match find_and_or pos_gates neg_gates with
-      | Some(neg_cl, pos_cls) ->
+      | Some(neg_cl, pos_cls) when (diff_vars_cnt neg_cl <= 3) ->
         let to_remove = CS.of_list (neg_cl :: pos_cls) in
         task.neg_cls <- CS.diff task.neg_cls to_remove;
         task.pos_cls <- CS.diff task.pos_cls to_remove;
         task.is_gate <- Some(pos_cls, [neg_cl]);
         true
-      | None -> false
+      | _ -> false
     in
 
     (* not yet implemented *)
@@ -560,29 +569,56 @@ module Make(E : Env.S) : S with module Env = E = struct
     with Unif.Fail -> None
   
   let eq_resolver ~sym ~pos_cl ~neg_cl =
+    let handle_distinct_vars xs sc_x ys sc_y =
+      let is_unique xs = 
+        List.for_all (Term.is_var) xs &&
+        CCList.length (CCList.sort_uniq ~cmp:T.compare xs)
+          == CCList.length xs
+      in
+      let mk_subst vars sc_vars terms sc_terms =
+        List.fold_left (fun subst (v,t) -> 
+          Subst.FO.bind' subst (T.as_var_exn v, sc_vars) (t, sc_terms)
+        ) Subst.empty (CCList.combine vars terms)
+      in
+
+      if is_unique xs then Some (mk_subst xs sc_x ys sc_y) 
+      else if is_unique ys then Some (mk_subst ys sc_y xs sc_x) 
+      else None
+    in
+
     let pos_sc, neg_sc = 0, 1 in
     let renaming = Subst.Renaming.create () in
-    let subst = Subst.empty in
-    let pos_cl' = C.apply_subst ~renaming (pos_cl, pos_sc) subst in
-    let neg_cl' = C.apply_subst ~renaming (neg_cl, neg_sc) subst in
-    let pos_idx, pos_term = find_lit_by_sym sym true pos_cl' in  
-    let neg_idx, neg_term = find_lit_by_sym sym false neg_cl' in
+    let pos_idx, pos_term = find_lit_by_sym sym true pos_cl in  
+    let neg_idx, neg_term = find_lit_by_sym sym false neg_cl in
     let pos_args, neg_args = CCPair.map_same T.args (pos_term, neg_term) in
-    let lits =
-      (List.map (fun (p,n) -> L.mk_neq p n) (List.combine pos_args neg_args)) @ 
-      (CCArray.except_idx (C.lits pos_cl') pos_idx) @
-      (CCArray.except_idx (C.lits neg_cl') neg_idx)
-    in
-    let proof =
+    let proof subst renaming =
       Proof.Step.simp 
         ~tags:[Proof.Tag.T_cannot_orphan] 
         ~rule:(Proof.Rule.mk "dp-resolution") 
         [C.proof_parent_subst renaming (pos_cl,pos_sc) subst;
-          C.proof_parent_subst renaming (neg_cl,neg_sc) subst]
+         C.proof_parent_subst renaming (neg_cl,neg_sc) subst]
     in
-    let c = 
-      C.create ~penalty:(max (C.penalty pos_cl') (C.penalty neg_cl'))
-                ~trail:(C.trail_l [pos_cl'; neg_cl']) lits proof
+    let c =
+      match handle_distinct_vars pos_args pos_sc neg_args neg_sc with
+      | Some subst ->
+        let pos_lits = Literals.apply_subst renaming subst (C.lits pos_cl, pos_sc) in
+        let neg_lits = Literals.apply_subst renaming subst (C.lits neg_cl, neg_sc) in
+        let lits = (CCArray.except_idx pos_lits pos_idx) @ (CCArray.except_idx neg_lits  neg_idx) in
+        C.create ~penalty:(max (C.penalty pos_cl) (C.penalty neg_cl))
+                  ~trail:(C.trail_l [pos_cl; neg_cl]) lits (proof subst renaming) 
+      | None ->
+        let subst = Subst.empty in
+        let pos_cl' = C.apply_subst ~renaming (pos_cl, pos_sc) subst in
+        let neg_cl' = C.apply_subst ~renaming (neg_cl, neg_sc) subst in    
+        let apply t = Subst.FO.apply renaming subst t in  
+        let lits =
+          (List.map (fun (p,n) -> L.mk_neq (apply (p, pos_sc)) (apply (n, neg_sc))) 
+          (List.combine pos_args neg_args)) @ 
+          (CCArray.except_idx (C.lits pos_cl') pos_idx) @
+          (CCArray.except_idx (C.lits neg_cl') neg_idx)
+        in
+        C.create ~penalty:(max (C.penalty pos_cl') (C.penalty neg_cl'))
+                  ~trail:(C.trail_l [pos_cl'; neg_cl']) lits (proof subst renaming)
     in
     CCOpt.return_if (not (is_tauto c)) c
 
@@ -591,7 +627,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let calc_resolvents ~sym ~pos ~neg =
     CCList.flat_map (fun pos_cl ->
-      CCList.filter_map (fun neg_cl -> 
+      CCList.filter_map (fun neg_cl ->
         get_resolver () ~sym ~pos_cl ~neg_cl
       ) neg
     ) pos
@@ -650,21 +686,43 @@ module Make(E : Env.S) : S with module Env = E = struct
         CCPair.map_same CS.to_list (task.pos_cls, task.neg_cls)
       in
       let sym = task.sym in
+      let calc_new_stats resolvents = 
+        List.fold_left (fun (acc_sq, acc_lit_num) cl -> 
+          acc_sq +. calc_sq_var cl, acc_lit_num + C.length cl) (0.0, 0) resolvents
+      in
       let resolvents, pos_gates, neg_gates =
         match task.is_gate with
         | Some (pos_gates, neg_gates) ->
-          ( (calc_non_singular_resolvents ~sym ~pos:pos_gates ~neg:neg_gates 
-                                          ~offending:task.offending_cls)
-           @ (calc_resolvents ~sym ~pos:pos_gates ~neg:neg_cls)
-           @ (calc_resolvents ~sym ~pos:pos_cls ~neg:neg_gates)), pos_gates, neg_gates
+          if Env.flex_get k_prefer_spe && CS.is_empty task.offending_cls then (
+            let results = 
+              (calc_resolvents ~sym ~pos:pos_gates ~neg:neg_cls)
+              @ (calc_resolvents ~sym ~pos:pos_cls ~neg:neg_gates)
+              @ (calc_resolvents ~sym ~pos:pos_cls ~neg:neg_cls)
+            in
+            let new_sq_var_weight, new_lit_num = calc_new_stats results in
+            let new_cls = List.length results in
+            let old_cls = CS.cardinal task.pos_cls + CS.cardinal task.neg_cls +
+                          List.length pos_gates + List.length neg_gates
+            in 
+            if measure_decreases () 
+              (Env.flex_get k_relax_val)
+              new_sq_var_weight task.sq_var_weight 
+              new_lit_num task.num_lits 
+              new_cls old_cls 
+            then (results, pos_gates, neg_gates)
+            else (
+              (calc_resolvents ~sym ~pos:pos_gates ~neg:neg_cls)
+                @ (calc_resolvents ~sym ~pos:pos_cls ~neg:neg_gates), pos_gates, neg_gates
+            )) else 
+              ((calc_non_singular_resolvents ~sym ~pos:pos_gates ~neg:neg_gates 
+                                            ~offending:task.offending_cls)
+              @ (calc_resolvents ~sym ~pos:pos_gates ~neg:neg_cls)
+              @ (calc_resolvents ~sym ~pos:pos_cls ~neg:neg_gates)), pos_gates, neg_gates
         | None -> 
           assert(CS.is_empty task.offending_cls);
           calc_resolvents ~sym ~pos:pos_cls ~neg:neg_cls, [], []
       in
-      let new_sq_var_weight, new_lit_num = 
-        List.fold_left (fun (acc_sq, acc_lit_num) cl -> 
-          acc_sq +. calc_sq_var cl, acc_lit_num + C.length cl) (0.0, 0) resolvents
-      in
+      let new_sq_var_weight, new_lit_num = calc_new_stats resolvents in
       let old_clauses =
         CS.cardinal task.pos_cls + CS.cardinal task.neg_cls +
         List.length pos_gates + List.length neg_gates + 
@@ -676,8 +734,9 @@ module Make(E : Env.S) : S with module Env = E = struct
           new_sq_var_weight task.sq_var_weight 
           new_lit_num task.num_lits 
           num_new_cls old_clauses then (
-        Util.debugf ~section 5 "replacing: @[%a@] (%d/%d) " 
+        Util.debugf ~section 1 "replacing: @[%a@] (%d/%d) " 
           (fun k -> k ID.pp task.sym old_clauses (num_new_cls));
+        Util.debugf ~section 1 "task info: @[%a@]" (fun k -> k pp_task task);
         updated_removed (old_clauses - num_new_cls);
         replace_clauses task resolvents;
       ) else (
@@ -807,7 +866,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       );
 
       let ans = (do_pred_elim ()) in
-      Util.debugf ~section 1 "Clause number changed for %a" (fun k -> k (CCOpt.pp CCInt.pp) ans)
+      Util.debugf ~section 2 "Clause number changed for %a" (fun k -> k (CCOpt.pp CCInt.pp) ans)
       
     with UnsupportedLogic ->
       Util.debugf ~section 1 "logic is unsupported" CCFun.id;
@@ -841,7 +900,6 @@ let extension =
   let action env =
     let module E = (val env : Env.S) in
     let module PredElim = Make(E) in
-
     E.flex_add k_enabled !_enabled;
     E.flex_add k_check_at !_check_at;
     E.flex_add k_inprocessing !_inprocessing;
@@ -850,12 +908,12 @@ let extension =
     E.flex_add k_non_singular_pe !_non_singular_pe;
     E.flex_add k_measure_fun !_measure;
     E.flex_add k_relax_val !_relax_val;
-    
+    E.flex_add k_prefer_spe !_prefer_spe;
     PredElim.setup ()
   in
   { Extensions.default with Extensions.
                          name="pred_elim";
-                         prio = 90;
+                         prio = 50;
                          env_actions=[action];
   }
 
@@ -863,10 +921,12 @@ let () =
   Options.add_opts [
     "--pred-elim", Arg.Bool ((:=) _enabled), " enable predicate elimination";
     "--pred-elim-check-gates", Arg.Bool ((:=) _check_gates), " enable recognition of gate clauses";
+    "--pred-elim-prefer-spe", Arg.Bool ((:=) _prefer_spe), " try DPE only when SPE fails";
     "--pred-elim-relax-value", Arg.Int ((:=) _relax_val), " value of relax constant for our new measure";
-    "--pred-elim-measure-fun", Arg.Symbol (["kk"; "relaxed"], (function
+    "--pred-elim-measure-fun", Arg.Symbol (["kk"; "relaxed"; "conservative"], (function
       | "kk" -> _measure := kk_measure;
       | "relaxed" -> _measure := relaxed_measure;
+      | "conservative" -> _measure := conservative_measure;
       | _ -> invalid_arg "unknown measure function" )), " use either standard Korovin-Khasidashvili measure or our relaxed measure for measuring the proof state size";
     "--pred-elim-non-singular", Arg.Bool ((:=) _non_singular_pe), " enable PE when gate is recognized and there are multiple occurrences of a symbol";
     "--pred-elim-inprocessing", Arg.Bool ((:=) _inprocessing), " predicate elimination as inprocessing rule";

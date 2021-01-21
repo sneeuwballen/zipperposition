@@ -779,17 +779,15 @@ let extension =
   let action env =
     let module E = (val env : Env.S) in
     let module BCE = Make(E) in
-
     E.flex_add k_enabled !_enabled;
     E.flex_add k_max_symbol_occ !_max_symbol_occ;
     E.flex_add k_check_at !_check_at;
-    E.flex_add k_processing_kind !_processing_kind;
-    
+    E.flex_add k_processing_kind !_processing_kind;    
     BCE.setup ()
   in
   { Extensions.default with Extensions.
                          name="bce";
-                         prio = 80;
+                         prio = 40;
                          env_actions=[action];
   }
 
