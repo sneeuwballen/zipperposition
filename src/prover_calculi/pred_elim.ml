@@ -12,7 +12,6 @@ let k_inprocessing = Flex_state.create_key ()
 let k_max_resolvents = Flex_state.create_key ()
 let k_check_gates = Flex_state.create_key ()
 let k_non_singular_pe = Flex_state.create_key ()
-let k_measure_fun = Flex_state.create_key ()
 let k_relax_val = Flex_state.create_key ()
 let k_prefer_spe = Flex_state.create_key ()
 
@@ -24,19 +23,8 @@ let _max_resolvents = ref (-1)
 let _non_singular_pe = ref false
 let _relax_val = ref 0
 let _prefer_spe = ref false
+let _measure_name = ref "relaxed"
 
-let kk_measure _ new_mu old_mu new_lit_num old_lit_num _ _ =
-  old_lit_num > new_lit_num && old_mu > new_mu
-
-let relaxed_measure relax new_mu old_mu new_lit_num old_lit_num new_cl_num old_cl_num =
-  old_lit_num >= new_lit_num-relax ||
-  old_cl_num >= new_cl_num-relax ||    
-  old_mu >= old_mu
-
-let conservative_measure relax new_mu old_mu new_lit_num old_lit_num new_cl_num old_cl_num =
- (old_lit_num >= new_lit_num - relax) 
-
-let _measure = ref relaxed_measure
 
 let section = Util.Section.make ~parent:Const.section "pred-elim"
 
@@ -85,14 +73,35 @@ module Make(E : Env.S) : S with module Env = E = struct
     (* what was this number during the last check *)
     mutable last_check : (float * int) option;
     mutable heap_idx : int;
+    mutable deleted  : bool;
   }
+
+  let card t =
+    CS.cardinal t.pos_cls + CS.cardinal t.neg_cls +
+    (match t.is_gate with
+    | None -> 0
+    | Some (p, n) -> List.length p + List.length n)
+    + CS.cardinal t.offending_cls
 
   let pp_task out task =
     CCFormat.fprintf out 
-      "%a {@. +: @[%a@];@. -:@[%a@];@. ?:@[%a@]@. g:@[%a@]@. v^2:@[%g@]; |l|:@[%d@]; @.}@."
+      "%a {@. +: @[%a@];@. -:@[%a@];@. ?:@[%a@]@. g:@[%a@]@. v^2:@[%g@]; |l|:@[%d@]; |%a|:@[%d@]; h_idx: @[%d@] @.}@."
       ID.pp task.sym (CS.pp C.pp) task.pos_cls (CS.pp C.pp) task.neg_cls
       (CS.pp C.pp) task.offending_cls (CCOpt.pp (CCPair.pp (CCList.pp C.pp) (CCList.pp C.pp))) task.is_gate task.sq_var_weight
-      task.num_lits
+      task.num_lits ID.pp task.sym (card task) task.heap_idx
+
+  let copy_task t = 
+    let c = {
+      sym = t.sym; pos_cls = CS.empty; neg_cls = CS.empty; offending_cls = CS.empty;
+      possible_gates = CS.empty; is_gate = None; sq_var_weight = 0.0;
+      num_lits = 0; last_check = None; heap_idx = -1; deleted = false;
+    } in
+    c.pos_cls <- t.pos_cls; c.neg_cls <- t.neg_cls; 
+    c.offending_cls <- t.offending_cls; c.possible_gates <- t.possible_gates;
+    c.sq_var_weight <- t.sq_var_weight; c.num_lits <- t.num_lits;
+    c.last_check <- t.last_check; c.heap_idx <- t.heap_idx;
+    c
+
 
   module TaskWrapper = struct
     type t = pred_elim_info
@@ -100,19 +109,46 @@ module Make(E : Env.S) : S with module Env = E = struct
     let set_idx task idx = 
       task.heap_idx <- idx
     let lt a b =
-      let card t = 
-        CS.cardinal t.pos_cls + CS.cardinal t.neg_cls
-      in
-      let card_a = card a and card_b = card b in
-      card_a < card_b || (card_a = card_b && ID.compare a.sym b.sym < 0)
+      assert((not a.deleted) || (not b.deleted));
+      if not a.deleted && not b.deleted then (
+          let open CCOrd in
+          (compare (card a) (card b)
+          <?> (compare, (not (CCOpt.is_some a.is_gate)), (not (CCOpt.is_some b.is_gate)))
+          <?> (compare, a.num_lits, b.num_lits)
+          <?> (compare, a.sq_var_weight, b.sq_var_weight)
+          <?> (ID.compare, a.sym, b.sym)) < 0
+       )
+      else (a.deleted)
   end
 
-  module TaskSet = CCSet.Make(struct
-    type t = pred_elim_info
-    let compare t1 t2 = ID.compare t1.sym t2.sym
-  end)
+  module TaskSet = struct  
+    include MyHeap.Make(TaskWrapper) 
 
-  let _task_queue = ref TaskSet.empty
+    (* a trick to remove an element in O(log (n)):
+       make it the smallest, remove the smallest -- ugly hack*)
+    let remove_el h el =
+      assert (in_heap el);
+      el.deleted <- true; (* implicitly makes it the smallest *)
+      decrease h el;
+      let min_el = remove_min h in
+      assert(ID.equal min_el.sym el.sym);
+      el.deleted <- false (* clear it for the next insertion *)
+
+      
+
+    let update h ~old ~new_ =
+      assert(ID.equal old.sym new_.sym);
+      assert(old.heap_idx == new_.heap_idx);
+      assert(in_heap new_ && in_heap old);
+
+      if TaskWrapper.lt new_ old then (decrease h new_) 
+      else if TaskWrapper.lt old new_ then  (increase h new_)
+      else ()
+  end
+
+  let k_measure_fun = Flex_state.create_key ()
+
+  let _task_queue = TaskSet.create ()
   (* an optimization -- profiler showed that much time is spent in
      doing evaluation queue functions for added clauses -- instead
      we temporarily store the clauses in this set and then
@@ -135,14 +171,10 @@ module Make(E : Env.S) : S with module Env = E = struct
     {
       sym; pos_cls = CS.empty; neg_cls = CS.empty; 
       offending_cls=CS.empty; possible_gates = CS.empty;
-      is_gate=None; sq_var_weight=0.0; last_check=None; heap_idx=(-1); num_lits=0;
+      is_gate=None; sq_var_weight=0.0; last_check=None; heap_idx=(-1); num_lits=0; deleted=false;
     }
   
   let _pred_sym_idx = ref ID.Map.empty
-
-  let calc_sq_var cl =
-    let n = List.length (Literals.vars (C.lits cl)) in
-    float_of_int (n * n)
 
   let get_sym_sign lit =
     match lit with
@@ -176,9 +208,43 @@ module Make(E : Env.S) : S with module Env = E = struct
   let remove_symbol entry =
     _pred_sym_idx := ID.Map.remove entry.sym !_pred_sym_idx;
     _ignored_symbols := ID.Set.add entry.sym !_ignored_symbols;
-    if TaskSet.mem entry !_task_queue then (
-      _task_queue := TaskSet.remove entry !_task_queue
+    if TaskSet.in_heap entry then (
+      TaskSet.remove_el _task_queue entry 
     )
+
+  let calc_sq_var cl =
+    let n = List.length (Literals.vars (C.lits cl)) in
+    float_of_int (n * n)
+
+  let calc_new_stats resolvents = 
+    List.fold_left (fun (acc_sq, acc_lit_num) cl -> 
+      acc_sq +. calc_sq_var cl, acc_lit_num + C.length cl) (0.0, 0) resolvents
+  
+  let calc_num_cls task = 
+    CS.cardinal task.pos_cls + CS.cardinal task.neg_cls +
+    (match task.is_gate with
+    | None -> 0
+    | Some(ps, ns) -> List.length ps + List.length ns) +
+    CS.cardinal task.offending_cls
+  
+  let kk_measure relax task resolvents =
+    let new_mu, new_lit_num = calc_new_stats resolvents in
+    task.num_lits > new_lit_num && task.sq_var_weight > new_mu
+
+  let relaxed_measure relax task resolvents =
+    let (new_mu, new_lit_num), new_cl_num =
+      calc_new_stats resolvents, List.length resolvents in
+    task.num_lits > new_lit_num-relax ||
+    calc_num_cls task > new_cl_num-relax ||    
+    task.sq_var_weight > new_mu
+
+  let conservative_measure relax task resolvents =
+   let (_, new_lit_num) = calc_new_stats resolvents in
+   CS.cardinal (CS.filter C.is_unit_clause task.pos_cls) >= 2 ||
+   CS.cardinal (CS.filter C.is_unit_clause task.neg_cls) >= 2 ||
+   task.num_lits > new_lit_num - relax
+
+  let _measure = ref relaxed_measure
 
   let should_schedule task =
     let eligible_for_non_singular_pe task = 
@@ -243,6 +309,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let update ~action sym =
         _pred_sym_idx := ID.Map.update sym (fun old ->
           let entry = CCOpt.get_or ~default:(mk_pred_elim_info sym) old in
+          let old_ = copy_task entry in
           begin match action with
           | `Pos ->
             entry.pos_cls <- CS.add cl entry.pos_cls;
@@ -251,8 +318,8 @@ module Make(E : Env.S) : S with module Env = E = struct
             possibly_ignore_sym entry;
           | `Offending ->
             entry.offending_cls <- CS.add cl entry.offending_cls;
-            if TaskSet.mem entry !_task_queue && (not (should_schedule entry)) then (
-               _task_queue := TaskSet.remove entry !_task_queue;
+            if TaskSet.in_heap entry && (not (should_schedule entry)) then (
+               TaskSet.remove_el _task_queue entry;
             )
           | `Gates ->
             if handle_gates then(
@@ -264,6 +331,9 @@ module Make(E : Env.S) : S with module Env = E = struct
             entry.num_lits <- entry.num_lits + C.length cl
           );
           possibly_ignore_sym entry;
+          if TaskSet.in_heap old_ && TaskSet.in_heap entry then (
+            TaskSet.update _task_queue ~old:old_ ~new_:entry
+          );
           if ID.Set.mem entry.sym !_ignored_symbols 
           then None 
           else Some entry
@@ -331,9 +401,9 @@ module Make(E : Env.S) : S with module Env = E = struct
             task.pos_cls <- CS.add_list task.pos_cls pos_cls;
             task.neg_cls <- CS.add_list task.neg_cls neg_cls;
             if Env.flex_get k_non_singular_pe &&
-               TaskSet.mem task !_task_queue &&
+               TaskSet.in_heap task &&
                not (CS.is_empty task.offending_cls) then (
-              _task_queue := TaskSet.remove task !_task_queue
+              TaskSet.remove_el _task_queue task 
             );
             task.is_gate <- None
           )
@@ -356,6 +426,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             done;
             _pred_sym_idx := ID.Map.update sym (function
               | Some task ->
+                let old = copy_task task in
                 task.sq_var_weight <- task.sq_var_weight -. calc_sq_var cl;
                 task.num_lits <- task.num_lits - C.length cl;
                 if !is_offending then (
@@ -367,9 +438,13 @@ module Make(E : Env.S) : S with module Env = E = struct
                   handle_gate sign task cl;
                   task.neg_cls <- CS.remove cl task.neg_cls;
                 );
-                if not (TaskSet.mem task !_task_queue) && should_retry task then (
+                if not (TaskSet.in_heap task) && should_retry task then (
                   Util.debugf ~section 10 "retrying @[%a@]@." (fun k -> k pp_task task);
-                  _task_queue := TaskSet.add task !_task_queue
+                  TaskSet.insert _task_queue task;
+                );
+
+                if TaskSet.in_heap old && TaskSet.in_heap task then (
+                  TaskSet.update _task_queue ~new_:task ~old;
                 );
 
                 CCOpt.return_if (not (ID.Set.mem task.sym !_ignored_symbols)) task
@@ -525,7 +600,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       Util.debugf ~section 5 "initially: @[%a@]" (fun k -> k pp_task task);
 
       if should_schedule task then (
-        _task_queue := TaskSet.add task !_task_queue 
+        TaskSet.insert _task_queue task  
     )) !_pred_sym_idx
 
   let find_lit_by_sym sym sign cl =
@@ -686,11 +761,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         CCPair.map_same CS.to_list (task.pos_cls, task.neg_cls)
       in
       let sym = task.sym in
-      let calc_new_stats resolvents = 
-        List.fold_left (fun (acc_sq, acc_lit_num) cl -> 
-          acc_sq +. calc_sq_var cl, acc_lit_num + C.length cl) (0.0, 0) resolvents
-      in
-      let resolvents, pos_gates, neg_gates =
+      let resolvents =
         match task.is_gate with
         | Some (pos_gates, neg_gates) ->
           if Env.flex_get k_prefer_spe && CS.is_empty task.offending_cls then (
@@ -699,45 +770,25 @@ module Make(E : Env.S) : S with module Env = E = struct
               @ (calc_resolvents ~sym ~pos:pos_cls ~neg:neg_gates)
               @ (calc_resolvents ~sym ~pos:pos_cls ~neg:neg_cls)
             in
-            let new_sq_var_weight, new_lit_num = calc_new_stats results in
-            let new_cls = List.length results in
-            let old_cls = CS.cardinal task.pos_cls + CS.cardinal task.neg_cls +
-                          List.length pos_gates + List.length neg_gates
-            in 
-            if measure_decreases () 
-              (Env.flex_get k_relax_val)
-              new_sq_var_weight task.sq_var_weight 
-              new_lit_num task.num_lits 
-              new_cls old_cls 
-            then (results, pos_gates, neg_gates)
+            
+            if measure_decreases () (Env.flex_get k_relax_val) task results
+            then (results)
             else (
               (calc_resolvents ~sym ~pos:pos_gates ~neg:neg_cls)
-                @ (calc_resolvents ~sym ~pos:pos_cls ~neg:neg_gates), pos_gates, neg_gates
-            )) else 
-              ((calc_non_singular_resolvents ~sym ~pos:pos_gates ~neg:neg_gates 
-                                            ~offending:task.offending_cls)
-              @ (calc_resolvents ~sym ~pos:pos_gates ~neg:neg_cls)
-              @ (calc_resolvents ~sym ~pos:pos_cls ~neg:neg_gates)), pos_gates, neg_gates
+                @ (calc_resolvents ~sym ~pos:pos_cls ~neg:neg_gates)
+          )) 
+          else 
+            ((calc_non_singular_resolvents ~sym ~pos:pos_gates ~neg:neg_gates 
+                                          ~offending:task.offending_cls)
+            @ (calc_resolvents ~sym ~pos:pos_gates ~neg:neg_cls)
+            @ (calc_resolvents ~sym ~pos:pos_cls ~neg:neg_gates))
         | None -> 
           assert(CS.is_empty task.offending_cls);
-          calc_resolvents ~sym ~pos:pos_cls ~neg:neg_cls, [], []
+          calc_resolvents ~sym ~pos:pos_cls ~neg:neg_cls
       in
-      let new_sq_var_weight, new_lit_num = calc_new_stats resolvents in
-      let old_clauses =
-        CS.cardinal task.pos_cls + CS.cardinal task.neg_cls +
-        List.length pos_gates + List.length neg_gates + 
-        CS.cardinal task.offending_cls
-      in
-      let num_new_cls = List.length resolvents in
-      if measure_decreases () 
-          (Env.flex_get k_relax_val)
-          new_sq_var_weight task.sq_var_weight 
-          new_lit_num task.num_lits 
-          num_new_cls old_clauses then (
-        Util.debugf ~section 1 "replacing: @[%a@] (%d/%d) " 
-          (fun k -> k ID.pp task.sym old_clauses (num_new_cls));
+      if measure_decreases () (Env.flex_get k_relax_val) task resolvents then (
         Util.debugf ~section 1 "task info: @[%a@]" (fun k -> k pp_task task);
-        updated_removed (old_clauses - num_new_cls);
+        updated_removed (calc_num_cls task - List.length resolvents);
         replace_clauses task resolvents;
       ) else (
         task.last_check <- Some (task.sq_var_weight, task.num_lits)
@@ -745,13 +796,13 @@ module Make(E : Env.S) : S with module Env = E = struct
     in
 
     let module S = TaskSet in
-    while not (S.is_empty !_task_queue) do
-      let task = S.min_elt !_task_queue in
-      _task_queue := S.remove task !_task_queue;
+    while not (S.is_empty _task_queue) do
+      let task = S.remove_min _task_queue in
+      
       if not (ID.Set.mem task.sym !_ignored_symbols) then(
         Util.debugf ~section 5 "checking: @[%a@]" (fun k -> k pp_task task);
         process_task (task)
-      )
+      );
     done;
     
     (* storing all newly computed clauses *)
@@ -887,6 +938,12 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   
   let setup () =
+    Env.flex_add k_measure_fun (match !_measure_name with 
+      | "kk" -> kk_measure
+      | "relaxed" -> relaxed_measure
+      | "conservative" -> conservative_measure
+      | _ -> invalid_arg "measure function not found");
+
     if Env.flex_get k_enabled then (
       if not (Env.flex_get A.k_avatar_enabled) then (register ())
       else (
@@ -906,7 +963,6 @@ let extension =
     E.flex_add k_max_resolvents !_max_resolvents;
     E.flex_add k_check_gates !_check_gates;
     E.flex_add k_non_singular_pe !_non_singular_pe;
-    E.flex_add k_measure_fun !_measure;
     E.flex_add k_relax_val !_relax_val;
     E.flex_add k_prefer_spe !_prefer_spe;
     PredElim.setup ()
@@ -923,11 +979,7 @@ let () =
     "--pred-elim-check-gates", Arg.Bool ((:=) _check_gates), " enable recognition of gate clauses";
     "--pred-elim-prefer-spe", Arg.Bool ((:=) _prefer_spe), " try DPE only when SPE fails";
     "--pred-elim-relax-value", Arg.Int ((:=) _relax_val), " value of relax constant for our new measure";
-    "--pred-elim-measure-fun", Arg.Symbol (["kk"; "relaxed"; "conservative"], (function
-      | "kk" -> _measure := kk_measure;
-      | "relaxed" -> _measure := relaxed_measure;
-      | "conservative" -> _measure := conservative_measure;
-      | _ -> invalid_arg "unknown measure function" )), " use either standard Korovin-Khasidashvili measure or our relaxed measure for measuring the proof state size";
+    "--pred-elim-measure-fun", Arg.Symbol (["kk"; "relaxed"; "conservative"], ((:=) _measure_name)), " use either standard Korovin-Khasidashvili measure or our relaxed measure for measuring the proof state size";
     "--pred-elim-non-singular", Arg.Bool ((:=) _non_singular_pe), " enable PE when gate is recognized and there are multiple occurrences of a symbol";
     "--pred-elim-inprocessing", Arg.Bool ((:=) _inprocessing), " predicate elimination as inprocessing rule";
     "--pred-elim-check-at", Arg.Int ((:=) _check_at), " when to perform predicate elimination inprocessing";

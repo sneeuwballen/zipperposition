@@ -75,14 +75,14 @@ module Make(E : Env.S) : S with module Env = E = struct
   module TaskWrapper = struct
     type t = bce_check_task
     let idx task = task.heap_idx
-    let set_idx task idx = 
+    let set_idx task idx =
       task.heap_idx <- idx
     let lt a b =
       (DEQ.length a.cands < DEQ.length b.cands)
-      || (DEQ.length a.cands = DEQ.length b.cands 
+      || (DEQ.length a.cands = DEQ.length b.cands
             && CCInt.compare (C.id a.clause) (C.id b.clause) < 0)
-      || (DEQ.length a.cands = DEQ.length b.cands 
-            && CCInt.compare (C.id a.clause) (C.id b.clause) = 0 
+      || (DEQ.length a.cands = DEQ.length b.cands
+            && CCInt.compare (C.id a.clause) (C.id b.clause) = 0
             && a.lit_idx < b.lit_idx)
   end
 
