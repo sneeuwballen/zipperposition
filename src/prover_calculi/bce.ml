@@ -12,6 +12,7 @@ let k_enabled = Flex_state.create_key ()
 let k_check_at = Flex_state.create_key ()
 let k_max_symbol_occ = Flex_state.create_key ()
 let k_processing_kind = Flex_state.create_key ()
+let k_fp_mode = Flex_state.create_key ()
 
 let section = Util.Section.make ~parent:Const.section "bce"
 
@@ -26,7 +27,7 @@ module type S = sig
   module Env : Env.S
 
   (** {6 Registration} *)
-  val setup : unit -> unit
+  val setup : ?in_fp_mode:bool -> unit -> unit
   val begin_fixpoint : unit -> unit
   val fixpoint_step : unit -> bool
   val end_fixpoint : unit -> unit
@@ -233,7 +234,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* Update all the bookeeping information when a new clause is introduced *)
   let add_clause cl =
-    try 
+    try
       scan_cl_lits cl;
       CCArray.iteri (fun lit_idx _ -> register_task lit_idx cl) (C.lits cl)
     with UnsupportedLogic ->
@@ -679,7 +680,8 @@ module Make(E : Env.S) : S with module Env = E = struct
         (Iter.length (Env.get_active ()) + Iter.length (Env.get_passive ())) in
       CCFormat.printf "%% BCE eliminated: %d@." clause_diff;
 
-      if Env.flex_get k_processing_kind = `InprocessingFull then (
+      if Env.flex_get k_processing_kind = `InprocessingFull || Env.flex_get k_fp_mode then (
+        Env.Ctx.lost_completeness ();
         (* clauses begin their life when they are added to the passive set *)
         Signal.on_every Env.ProofState.PassiveSet.on_add_clause react_clause_addded;
         (* clauses can be calculus-removed from the active set only in DISCOUNT loop *)
@@ -695,7 +697,8 @@ module Make(E : Env.S) : S with module Env = E = struct
               react_clause_addded c'
             )
           | _ -> react_clause_removed c; (* c is redundant *));
-        Env.add_clause_elimination_rule ~priority:1 "BCE" eliminate_blocked_clauses
+          if not @@ Env.flex_get k_fp_mode then (
+            Env.add_clause_elimination_rule ~priority:1 "BCE" eliminate_blocked_clauses)
       ) else if Env.flex_get k_processing_kind = `InprocessingInitial then (
         Env.add_is_trivial is_blocked;
       ) else ( raise UnsupportedLogic ) (* clear all data structures *)
@@ -732,6 +735,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       let num_eliminated =  do_eliminate_blocked_clauses () in
       Util.debugf ~section 1 "Step eliminates %d clauses" (fun k -> k num_eliminated);
 
+      CCFormat.printf "%% BCE start fixpoint: @[%d@]@." num_eliminated;
+
       Signal.on Env.ProofState.PassiveSet.on_add_clause (fun c ->
         if !fixpoint_active then (react_clause_addded c; Signal.ContinueListening)
         else Signal.StopListening
@@ -754,6 +759,9 @@ module Make(E : Env.S) : S with module Env = E = struct
   let fixpoint_step () =
     let num_eliminated = do_eliminate_blocked_clauses () in
     Util.debugf ~section 1 "Step eliminates %d clauses" (fun k -> k num_eliminated);
+    if num_eliminated != 0 then (
+      CCFormat.printf "%% BCE fixpoint: %d@." num_eliminated
+    );
     num_eliminated != 0
 
   let end_fixpoint () =
@@ -766,8 +774,9 @@ module Make(E : Env.S) : S with module Env = E = struct
   let register () =
     Signal.on Env.on_start initialize_regular
 
-  let setup () =
+  let setup ?(in_fp_mode=false) () =
     if Env.flex_get k_enabled then (
+      Env.flex_add k_fp_mode in_fp_mode;
       if not (Env.flex_get Avatar.k_avatar_enabled) then (register ())
       else (
         CCFormat.printf "AVATAR is not yet compatible with BCE@."

@@ -14,6 +14,7 @@ let k_check_gates = Flex_state.create_key ()
 let k_non_singular_pe = Flex_state.create_key ()
 let k_relax_val = Flex_state.create_key ()
 let k_prefer_spe = Flex_state.create_key ()
+let k_fp_mode = Flex_state.create_key ()
 
 let _enabled = ref false
 let _check_gates = ref true
@@ -34,7 +35,7 @@ module type S = sig
   module Env : Env.S
 
   (** {6 Registration} *)
-  val setup : unit -> unit
+  val setup : ?in_fp_mode:bool -> unit -> unit
   val begin_fixpoint : unit -> unit
   val fixpoint_step : unit -> bool
   val end_fixpoint : unit -> unit
@@ -853,7 +854,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         if !_logic != Unsupported then (
           match new_state with
           | Some c' ->
-            ignore(react_clause_removed c); 
+            ignore(react_clause_removed c);
             ignore(react_clause_addded c')
           | _ -> ignore(react_clause_removed c) (* c is redundant *)
       ));
@@ -873,9 +874,10 @@ module Make(E : Env.S) : S with module Env = E = struct
       CCFormat.printf "%% PE eliminated: %d@." clause_diff;
 
       if Env.flex_get k_inprocessing then (
+        Env.Ctx.lost_completeness ();
         Env.add_clause_elimination_rule ~priority:2 "pred_elim" 
           do_predicate_elimination
-      ) else raise UnsupportedLogic
+      ) else if not @@ Env.flex_get k_fp_mode then raise UnsupportedLogic
     with UnsupportedLogic ->
       Util.debugf ~section 1 "logic is unsupported" CCFun.id;
       (* releasing possibly used memory *)
@@ -893,6 +895,11 @@ module Make(E : Env.S) : S with module Env = E = struct
     E.flex_add k_enabled !_enabled;
     E.flex_add k_max_resolvents !_max_resolvents;
     E.flex_add k_check_gates !_check_gates;
+    Env.flex_add k_measure_fun (match !_measure_name with 
+      | "kk" -> kk_measure
+      | "relaxed" -> relaxed_measure
+      | "conservative" -> conservative_measure
+      | _ -> invalid_arg "measure function not found");
 
     let init_clauses =
       CS.to_list (Env.ProofState.ActiveSet.clauses ())
@@ -917,6 +924,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       );
 
       let ans = (do_pred_elim ()) in
+      CCFormat.printf "%% PE start fixpoint: @[%a@]@." (CCOpt.pp CCInt.pp) ans;
       Util.debugf ~section 2 "Clause number changed for %a" (fun k -> k (CCOpt.pp CCInt.pp) ans)
       
     with UnsupportedLogic ->
@@ -929,6 +937,9 @@ module Make(E : Env.S) : S with module Env = E = struct
   let fixpoint_step () = 
     let ans = do_pred_elim () in
     Util.debugf ~section 1 "Clause number changed for %a" (fun k -> k (CCOpt.pp CCInt.pp) ans);
+    if CCOpt.is_some ans then (
+      CCFormat.printf "%% PE fixpoint: %d@." (CCOpt.get_exn ans)
+    );
     CCOpt.is_some ans
   
   let end_fixpoint () =
@@ -937,12 +948,13 @@ module Make(E : Env.S) : S with module Env = E = struct
     fixpoint_active := false
 
   
-  let setup () =
+  let setup ?(in_fp_mode=false) () =
     Env.flex_add k_measure_fun (match !_measure_name with 
       | "kk" -> kk_measure
       | "relaxed" -> relaxed_measure
       | "conservative" -> conservative_measure
       | _ -> invalid_arg "measure function not found");
+    Env.flex_add k_fp_mode in_fp_mode;
 
     if Env.flex_get k_enabled then (
       if not (Env.flex_get A.k_avatar_enabled) then (register ())
