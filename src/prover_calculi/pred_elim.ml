@@ -77,19 +77,33 @@ module Make(E : Env.S) : S with module Env = E = struct
     mutable deleted  : bool;
   }
 
-  let card t =
-    CS.cardinal t.pos_cls + CS.cardinal t.neg_cls +
+  let possible_resolvents_num t =
     (match t.is_gate with
-    | None -> 0
-    | Some (p, n) -> List.length p + List.length n)
+    | Some (p,n) ->
+      List.length p * CS.cardinal t.neg_cls +
+      List.length n * CS.cardinal t.pos_cls
+    | None ->
+      CS.cardinal t.neg_cls * CS.cardinal t.pos_cls) 
     + CS.cardinal t.offending_cls
+  
+  let num_ground_units t =
+    CS.cardinal (CS.filter (fun c -> C.is_unit_clause c && C.is_ground c) t.neg_cls) +
+    CS.cardinal (CS.filter (fun c -> C.is_unit_clause c && C.is_ground c) t.pos_cls) +
+    CS.cardinal (CS.filter (fun c -> C.is_unit_clause c && C.is_ground c) t.offending_cls) +
+    match t.is_gate with
+    | Some(p,n) ->
+      List.length (List.filter (fun c -> C.is_unit_clause c && C.is_ground c) p) +
+      List.length (List.filter (fun c -> C.is_unit_clause c && C.is_ground c) n)
+    | None -> 0
+
+
 
   let pp_task out task =
     CCFormat.fprintf out 
       "%a {@. +: @[%a@];@. -:@[%a@];@. ?:@[%a@]@. g:@[%a@]@. v^2:@[%g@]; |l|:@[%d@]; |%a|:@[%d@]; h_idx: @[%d@] @.}@."
       ID.pp task.sym (CS.pp C.pp) task.pos_cls (CS.pp C.pp) task.neg_cls
       (CS.pp C.pp) task.offending_cls (CCOpt.pp (CCPair.pp (CCList.pp C.pp) (CCList.pp C.pp))) task.is_gate task.sq_var_weight
-      task.num_lits ID.pp task.sym (card task) task.heap_idx
+      task.num_lits ID.pp task.sym (possible_resolvents_num task) task.heap_idx
 
   let copy_task t = 
     let c = {
@@ -113,11 +127,12 @@ module Make(E : Env.S) : S with module Env = E = struct
       assert((not a.deleted) || (not b.deleted));
       if not a.deleted && not b.deleted then (
           let open CCOrd in
-          (compare (card a) (card b)
+          (compare (possible_resolvents_num a) (possible_resolvents_num b)
+          <?> (compare, (num_ground_units a), (num_ground_units b)
           <?> (compare, (not (CCOpt.is_some a.is_gate)), (not (CCOpt.is_some b.is_gate)))
-          <?> (compare, a.num_lits, b.num_lits)
           <?> (compare, a.sq_var_weight, b.sq_var_weight)
-          <?> (ID.compare, a.sym, b.sym)) < 0
+          <?> (compare, a.num_lits, b.num_lits)
+          <?> (ID.compare, a.sym, b.sym)) < 0)
        )
       else (a.deleted)
   end
