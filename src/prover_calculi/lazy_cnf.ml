@@ -284,7 +284,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       miniscope b f
     | _ -> None
 
-  let lazy_clausify_driver ?(ignore_eq=false) ~proof_cons c =
+  let lazy_clausify_driver ?(ignore_eq=false) ?(force_clausification=false) ~proof_cons c =
     let return acc l =
       Iter.append acc (Iter.of_list l), `Stop in
     
@@ -301,7 +301,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       Iter.empty
     in
 
-    let only_quants = Env.flex_get k_lazy_cnf_kind == `Ignore in
+    let only_quants = (not force_clausification) && Env.flex_get k_lazy_cnf_kind == `Ignore in
 
     fold_lits c
     |> Iter.fold_while ( fun acc (lhs, rhs, sign, pos) ->
@@ -405,7 +405,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     
     let clausify_defs new_defs =
       List.fold_left (fun acc c -> 
-        lazy_clausify_driver ~ignore_eq:false ~proof_cons c
+        lazy_clausify_driver ~ignore_eq:false ~force_clausification:true ~proof_cons c
         |> Iter.to_list
         |> (fun l -> if CCList.is_empty l then c :: acc else l @ acc)
       ) [] new_defs

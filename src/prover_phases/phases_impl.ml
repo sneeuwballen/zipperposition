@@ -450,6 +450,7 @@ let print_szs_result (type c) ~file
       Util.debugf ~section 1 "error is:@ %s" (fun k->k s);
     | Saturate.Sat when Env.Ctx.is_completeness_preserved () ->
       Format.printf "%% Final clauses: %d@." (Iter.length (Env.get_active ()));
+      Format.printf "Clauses:@.@[%a@]@." (Iter.pp_seq ~sep:"\n" Env.C.pp) (Env.get_active ());
       Format.printf "%sSZS status %s for '%s'@." comment (sat_to_str ()) file;
       Util.debugf ~section 1 "@[<2>saturated set:@ @[<hv>%a@]@]"
             (fun k->k (Util.pp_iter ~sep:" " Env.C.pp_tstp_full) (Env.get_active ()))
