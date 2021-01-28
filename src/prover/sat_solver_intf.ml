@@ -73,6 +73,6 @@ module type S = sig
 
   val setup: unit -> unit
 
-  val clear: unit -> unit 
+  val clear: ?size:[ `Big | `Small | `Tiny ] -> unit -> unit
   (** Reset the SAT solver state *)
 end

@@ -591,12 +591,14 @@ module Make(E : Env.S) : S with module Env = E = struct
   let check_if_gate task =
     let sym = task.sym in
     let gates_l = CS.to_list task.possible_gates in
-    let filter_gates ~sign ~lit_num_filter =
-      List.filter (fun cl -> 
+    let filter_gates ?(sign=None) ~lit_num_filter gates_l =
+      List.filter (fun cl ->
+        not (is_tauto cl) &&
         lit_num_filter (Array.length (C.lits cl)) &&
         (match (CCArray.find_idx (fun lit -> 
           match get_sym_sign lit with 
-          | Some(sym', sign') -> ID.equal sym sym' && sign = sign'
+          | Some(sym', sign') -> ID.equal sym sym' && 
+                                 ((CCOpt.is_none sign) || CCOpt.get_exn sign == sign')
           | None -> false) (C.lits cl)) with
         | Some (i, lit) ->
           let free_vars = T.VarSet.of_list (L.vars lit) in
@@ -664,8 +666,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     in
 
     let check_and () =
-      let pos_gates = filter_gates ~sign:true ~lit_num_filter:(fun n -> n > 2) in
-      let neg_gates = filter_gates ~sign:false ~lit_num_filter:((=) 2) in
+      let pos_gates = filter_gates ~sign:(Some true) ~lit_num_filter:(fun n -> n > 2) gates_l in
+      let neg_gates = filter_gates ~sign:(Some false) ~lit_num_filter:((=) 2) gates_l in
       match find_and_or neg_gates pos_gates with
       | Some (pos_cl, neg_cls) when (diff_vars_cnt pos_cl <= 3) ->
         let to_remove = CS.of_list (pos_cl :: neg_cls) in
@@ -676,8 +678,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       | _ -> false
     in
     let check_or () =
-      let pos_gates = filter_gates ~sign:true ~lit_num_filter:((=) 2) in
-      let neg_gates = filter_gates ~sign:false ~lit_num_filter:(fun n -> n > 2) in
+      let pos_gates = filter_gates ~sign:(Some true) ~lit_num_filter:((=) 2) gates_l in
+      let neg_gates = filter_gates ~sign:(Some false) ~lit_num_filter:(fun n -> n > 2) gates_l in
       (* checking for or will also check for equivalences p(x) <-> q(x) *)
       match find_and_or pos_gates neg_gates with
       | Some(neg_cl, pos_cls) when (diff_vars_cnt neg_cl <= 3) ->
@@ -726,23 +728,24 @@ module Make(E : Env.S) : S with module Env = E = struct
         
 
       let find_definition_set cls =
-        List.iter (fun (i,lits,c) -> 
-          CCArray.except_idx lits i
-          |> List.map BBox.inject_lit
+        List.iter (fun (i,lits,c) ->
+          List.filter_map BBox.inject_lit (CCArray.to_list lits)
           |> SAT.add_clause ~proof:(C.proof_step c)
         ) cls;
         (match SAT.check ~full:true () with
         | Sat_solver.Unsat proof -> 
           let proof = Proof.S.step (SAT.get_proof ()) in
-          let parents = List.map Proof.Parent.proof (Proof.Step.parents proof) in
+          let parents = List.map (fun p -> Proof.S.step @@ Proof.Parent.proof p) (Proof.Step.parents proof) in
+          Util.debugf ~section 5 "SAT prover found unsat set: %d@." (fun k -> k  (CCList.length parents));
           let used_cls = List.filter_map (fun (_,_,cl) -> 
-            CCOpt.return_if (CCList.mem ~eq:Proof.S.equal (C.proof cl) parents) cl) cls  in
+            CCOpt.return_if (CCList.mem ~eq:Proof.Step.equal (C.proof_step cl) parents) cl) cls  in
+          Util.debugf ~section 5 "used clauses: @[%a@]@." (fun k -> k (CCList.pp C.pp) used_cls);
           split_clauses used_cls
         | _ -> None)
         
       in
 
-
+      let gates_l = filter_gates ~lit_num_filter:(fun _ -> true) gates_l in
       match gates_l with 
       | x :: xs ->
         (* we will standardize all clauses by the first name literal in x *)
@@ -752,10 +755,16 @@ module Make(E : Env.S) : S with module Env = E = struct
               if ID.equal task.sym (T.head_exn lhs) then Some(i,lhs) else None
             | _ -> None) (C.lits x)) 
         in
-        let cls = (i,C.lits x,x) :: (CCList.filter_map (rename_clause ~name_lit) xs) in
+        let cls = 
+          (i,CCArray.of_list @@ CCArray.except_idx (C.lits x) i,x)
+            :: (CCList.filter_map (rename_clause ~name_lit) xs) in
         (match find_definition_set cls with
         | Some (core_pos,core_neg) ->
           let to_remove = CS.of_list (core_pos @ core_neg) in
+          Util.debugf ~section 3 "semantic pos def: @[%a@]@."
+            (fun k -> k (CCList.pp C.pp) core_pos);
+          Util.debugf ~section 3 "semantic neg def: @[%a@]@."
+            (fun k -> k (CCList.pp C.pp) core_neg);
           task.neg_cls <- CS.diff task.neg_cls to_remove;
           task.pos_cls <- CS.diff task.pos_cls to_remove;
           task.is_gate <- Some(core_pos, core_neg);
@@ -777,9 +786,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     ID.Map.iter (fun _ task -> 
       check_if_gate task;
 
-      Util.debugf ~section 5 "initially: @[%a@]" (fun k -> k pp_task task);
-
       if should_schedule task then (
+        Util.debugf ~section 5 "inserting: @[%a@]" (fun k -> k pp_task task);
         TaskSet.insert _task_queue task  
     )) !_pred_sym_idx
 

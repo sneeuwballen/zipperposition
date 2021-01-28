@@ -38,11 +38,11 @@ val inject_lits : Literals.t -> t
     The boolean literal can be negative is the argument is a
     unary negative clause *)
 
-val inject_lit : Literal.t -> t
+val inject_lit : Literal.t -> t option
 (** Converts a single literal into a boolean literal. Syntactically
     the same literal will be given exactly the same boolean literal.
     Negation of this literal will get negation of the boolean literal.
-    Supports equality. *)
+    Supports equality. Returns None for unsupported literals *)
 
 val inject_lemma : Cut_form.t -> t
 (** Make a new literal from this formula that we are going to cut

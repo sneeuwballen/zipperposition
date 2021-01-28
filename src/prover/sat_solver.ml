@@ -329,12 +329,12 @@ module Make()
     if !sat_pp_model_ then at_exit pp_model_;
     ()
   
-  let clear () =
+  let clear ?(size=`Big) () =
     Queue.clear queue_;
     must_check := true;
     ClauseTbl.clear clause_tbl_;
     Lit.Tbl.clear lit_tbl_;
-    solver := Solver.create ~size:`Big ()
+    solver := Solver.create ~size ()
 end
 
 let set_compact b = sat_compact_ := b

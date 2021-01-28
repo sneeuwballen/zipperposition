@@ -161,23 +161,27 @@ let inject_lits_ lits  =
   end
 
 let inject_lit lit =
+  let exception CantConvert in
   let lit_to_term lit =
     match lit with
     | Literal.Equation(lhs, _, _) when Literal.is_predicate_lit lit -> lhs
     | Literal.Equation(lhs, rhs, _) ->
       if Term.compare lhs rhs < 0 then Term.Form.eq lhs rhs
       else Term.Form.eq rhs lhs
-    | _ -> invalid_arg "not implemented"
+    | Literal.False -> raise CantConvert
+    | _ -> invalid_arg "unknown literal"
   in
 
-
-  begin match Term.Tbl.find_opt _term_set (lit_to_term lit) with
-  | Some t -> Lit.apply_sign (Literal.is_pos lit) t
-  | None ->
-    let term = lit_to_term lit in
-    let bool_lit = Lit.make (Fresh) in
-    Term.Tbl.add _term_set term bool_lit;
-    Lit.apply_sign (Literal.is_pos lit) bool_lit end
+  try 
+    CCOpt.return @@
+      begin match Term.Tbl.find_opt _term_set (lit_to_term lit) with
+      | Some t -> Lit.apply_sign (Literal.is_pos lit) t
+      | None ->
+        let term = lit_to_term lit in
+        let bool_lit = Lit.make (Fresh) in
+        Term.Tbl.add _term_set term bool_lit;
+        Lit.apply_sign (Literal.is_pos lit) bool_lit end
+  with CantConvert ->None
 
 let inject_lits lits =
   ZProf.with_prof prof_inject_lits inject_lits_ lits
