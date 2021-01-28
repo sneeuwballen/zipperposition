@@ -120,6 +120,8 @@ exception Attr_distinct
 exception Attr_comm
 exception Attr_assoc
 
+exception Attr_cnf_def
+
 let as_infix = payload_find ~f:(function Attr_infix s->Some s | _ -> None)
 let is_infix id = as_infix id |> CCOpt.is_some
 let as_prefix = payload_find ~f:(function Attr_prefix s->Some s | _ -> None)

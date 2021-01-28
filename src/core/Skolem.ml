@@ -214,6 +214,7 @@ let define_form ?(pattern="zip_tseitin") ~ctx ~rw_rules ~polarity ~parents form 
     let ty = ty_forall_l tyvars (T.Ty.fun_ (List.map Var.ty vars) T.Ty.prop) in
     (* not a skolem (but a defined term). Will be defined, not declared. *)
     let f = fresh_id ~start0:true ~ctx pattern in
+    ID.set_payload f ID.Attr_cnf_def;
     let proxy = T.app ~ty:T.Ty.prop (T.const ~ty f) (tyvars_t @ vars_t) in
     let proof = Proof.Step.define_internal f parents in
     (* register the new definition *)

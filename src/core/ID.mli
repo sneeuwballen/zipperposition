@@ -93,6 +93,9 @@ exception Attr_distinct
 exception Attr_comm
 exception Attr_assoc
 
+exception Attr_cnf_def
+(* Symbol is a name introduced during CNF *)
+
 val as_infix : t -> string option
 val is_infix : t -> bool
 

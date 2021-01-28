@@ -11,6 +11,8 @@ let k_check_at = Flex_state.create_key ()
 let k_inprocessing = Flex_state.create_key ()
 let k_max_resolvents = Flex_state.create_key ()
 let k_check_gates = Flex_state.create_key ()
+let k_only_original_gates = Flex_state.create_key ()
+let k_check_gates_semantically = Flex_state.create_key ()
 let k_non_singular_pe = Flex_state.create_key ()
 let k_relax_val = Flex_state.create_key ()
 let k_prefer_spe = Flex_state.create_key ()
@@ -25,6 +27,8 @@ let _non_singular_pe = ref false
 let _relax_val = ref 0
 let _prefer_spe = ref false
 let _measure_name = ref "relaxed"
+let _original_gates_only = ref false
+let _check_semantically = ref false
 
 
 let section = Util.Section.make ~parent:Const.section "pred-elim"
@@ -47,6 +51,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   module CS = C.ClauseSet
   module L = Literal
   module T = Term
+  module SAT = Sat_solver.Make ()
 
   type logic = 
     | NEqFO  (* nonequational FO *)
@@ -85,9 +90,12 @@ module Make(E : Env.S) : S with module Env = E = struct
     + CS.cardinal t.offending_cls
 
   let pp_task out task =
+    let original = ID.payload_pred 
+        ~f:(function  ID.Attr_cnf_def -> true 
+                      | _ -> false) task.sym in
     CCFormat.fprintf out 
-      "%a {@. +: @[%a@];@. -:@[%a@];@. ?:@[%a@]@. g:@[%a@]@. v^2:@[%g@]; |l|:@[%d@]; |%a|:@[%d@]; h_idx: @[%d@] @.}@."
-      ID.pp task.sym (CS.pp C.pp) task.pos_cls (CS.pp C.pp) task.neg_cls
+      "%a(%b) {@. +: @[%a@];@. -:@[%a@];@. ?:@[%a@]@. g:@[%a@]@. v^2:@[%g@]; |l|:@[%d@]; |%a|:@[%d@]; h_idx: @[%d@] @.}@."
+      ID.pp task.sym original (CS.pp C.pp) task.pos_cls (CS.pp C.pp) task.neg_cls
       (CS.pp C.pp) task.offending_cls (CCOpt.pp (CCPair.pp (CCList.pp C.pp) (CCList.pp C.pp))) task.is_gate task.sq_var_weight
       task.num_lits ID.pp task.sym (card task) task.heap_idx
 
@@ -468,9 +476,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       Iter.iter (fun c -> (C.mark_redundant c);
         if CS.mem c !_newly_added then (
           _newly_added := CS.remove c !_newly_added;
-          ignore (react_clause_removed c);
-        )
-      ) iter;
+          ignore (react_clause_removed c);)) 
+      iter;
     in
     assert(CS.is_empty task.offending_cls || Env.flex_get k_non_singular_pe);
     remove (CS.to_iter task.offending_cls);
@@ -485,6 +492,101 @@ module Make(E : Env.S) : S with module Env = E = struct
     List.iter (fun cl -> ignore (react_clause_addded cl)) clauses;
 
     _pred_sym_idx := ID.Map.remove task.sym !_pred_sym_idx
+
+
+  let is_tauto c =
+    Literals.is_trivial (C.lits c) || Trail.is_trivial (C.trail c)
+
+  let find_lit_by_sym sym sign cl =
+    CCOpt.get_exn (CCArray.find_map_i (fun idx lit -> 
+      match get_sym_sign lit with
+      | Some (sym', sign') when ID.equal sym sym' && sign = sign' -> 
+        Some (idx, CCOpt.get_exn (L.View.get_lhs lit))
+      | _ -> None
+    ) (C.lits cl))
+
+  let neq_resolver ~sym ~pos_cl ~neg_cl =
+    let pos_sc, neg_sc = 0, 1 in
+    let pos_idx, pos_term = find_lit_by_sym sym true pos_cl in  
+    let neg_idx, neg_term = find_lit_by_sym sym false neg_cl in
+    try
+      let subst = Unif.FO.unify_syn (pos_term, pos_sc) (neg_term, neg_sc) in
+      let renaming = Subst.Renaming.create () in
+      let lits = 
+        (List.map (fun lit -> 
+          L.apply_subst renaming subst (lit, pos_sc)) 
+        (CCArray.except_idx (C.lits pos_cl) pos_idx)) @
+        (List.map (fun lit -> 
+          L.apply_subst renaming subst (lit, neg_sc)) 
+        (CCArray.except_idx (C.lits neg_cl) neg_idx))
+      in
+      let proof =
+        Proof.Step.simp 
+          ~tags:[Proof.Tag.T_cannot_orphan]
+          ~rule:(Proof.Rule.mk "dp-resolution") 
+          [C.proof_parent_subst renaming (pos_cl,pos_sc) subst;
+           C.proof_parent_subst renaming (neg_cl,neg_sc) subst]
+      in
+      let c =
+        C.create ~penalty:(max (C.penalty pos_cl) (C.penalty neg_cl))
+                 ~trail:(C.trail_l [pos_cl; neg_cl]) lits proof
+      in
+      CCOpt.return_if (not (is_tauto c)) c
+    with Unif.Fail -> None
+  
+  let eq_resolver ~sym ~pos_cl ~neg_cl =
+    let handle_distinct_vars xs sc_x ys sc_y =
+      let is_unique xs = 
+        List.for_all (Term.is_var) xs &&
+        CCList.length (CCList.sort_uniq ~cmp:T.compare xs)
+          == CCList.length xs
+      in
+      let mk_subst vars sc_vars terms sc_terms =
+        List.fold_left (fun subst (v,t) -> 
+          Subst.FO.bind' subst (T.as_var_exn v, sc_vars) (t, sc_terms)
+        ) Subst.empty (CCList.combine vars terms)
+      in
+
+      if is_unique xs then Some (mk_subst xs sc_x ys sc_y) 
+      else if is_unique ys then Some (mk_subst ys sc_y xs sc_x) 
+      else None
+    in
+
+    let pos_sc, neg_sc = 0, 1 in
+    let renaming = Subst.Renaming.create () in
+    let pos_idx, pos_term = find_lit_by_sym sym true pos_cl in  
+    let neg_idx, neg_term = find_lit_by_sym sym false neg_cl in
+    let pos_args, neg_args = CCPair.map_same T.args (pos_term, neg_term) in
+    let proof subst renaming =
+      Proof.Step.simp 
+        ~tags:[Proof.Tag.T_cannot_orphan] 
+        ~rule:(Proof.Rule.mk "dp-resolution") 
+        [C.proof_parent_subst renaming (pos_cl,pos_sc) subst;
+         C.proof_parent_subst renaming (neg_cl,neg_sc) subst]
+    in
+    let c =
+      match handle_distinct_vars pos_args pos_sc neg_args neg_sc with
+      | Some subst ->
+        let pos_lits = Literals.apply_subst renaming subst (C.lits pos_cl, pos_sc) in
+        let neg_lits = Literals.apply_subst renaming subst (C.lits neg_cl, neg_sc) in
+        let lits = (CCArray.except_idx pos_lits pos_idx) @ (CCArray.except_idx neg_lits  neg_idx) in
+        C.create ~penalty:(max (C.penalty pos_cl) (C.penalty neg_cl))
+                  ~trail:(C.trail_l [pos_cl; neg_cl]) lits (proof subst renaming) 
+      | None ->
+        let subst = Subst.empty in
+        let pos_cl' = C.apply_subst ~renaming (pos_cl, pos_sc) subst in
+        let neg_cl' = C.apply_subst ~renaming (neg_cl, neg_sc) subst in    
+        let apply t = Subst.FO.apply renaming subst t in  
+        let lits =
+          (List.map (fun (p,n) -> L.mk_neq (apply (p, pos_sc)) (apply (n, neg_sc))) 
+          (List.combine pos_args neg_args)) @ 
+          (CCArray.except_idx (C.lits pos_cl') pos_idx) @
+          (CCArray.except_idx (C.lits neg_cl') neg_idx)
+        in
+        C.create ~penalty:(max (C.penalty pos_cl') (C.penalty neg_cl'))
+                  ~trail:(C.trail_l [pos_cl'; neg_cl']) lits (proof subst renaming)
+    in
+    CCOpt.return_if (not (is_tauto c)) c
 
   let check_if_gate task =
     let sym = task.sym in
@@ -503,8 +605,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             else Some j
           ) (C.lits cl))
         | _ -> false))
-      gates_l
-      |> CCList.fast_sort (fun cl cl' -> compare (C.length cl) (C.length cl'))
+      (CCList.fast_sort (fun cl cl' -> compare (C.length cl) (C.length cl')) gates_l)
     in
 
     let find_and_or bin_clauses long_clauses =
@@ -590,9 +691,87 @@ module Make(E : Env.S) : S with module Env = E = struct
 
     (* not yet implemented *)
     let check_ite () = false in
-    if Env.flex_get k_check_gates then (
-      ignore (check_and () || check_or () || check_ite ())
-    )
+    let check_sat () =
+      SAT.clear ();
+      let orig_sc,new_sc = 0,1 in
+      let rename_clause ~name_lit c =
+        let lits = C.lits c in
+        CCArray.find_map_i (fun i lit ->
+          match lit with 
+          | L.Equation(lhs,_,_) when L.is_predicate_lit lit ->
+            begin try
+              let subst = Unif.FO.variant (lhs, new_sc) (name_lit, orig_sc) in
+              let lits = Literals.apply_subst Subst.Renaming.none subst 
+                ((CCArray.of_list (CCArray.except_idx lits i)), new_sc) in
+              Some (i,lits,c)
+            with Unif.Fail -> None end
+          | _ -> None) lits
+      in
+
+      let split_clauses used_cls =
+        let pos_cls, neg_cls = CCList.partition (fun cl ->
+          CCArray.exists (fun lit -> 
+            match get_sym_sign lit with
+            | Some(id,sign) -> ID.equal id task.sym && sign
+            | _ -> false) (C.lits cl)
+        ) used_cls
+        in
+        if List.exists (fun pos_cl -> 
+          List.exists (fun neg_cl -> 
+            CCOpt.is_some @@ 
+              neq_resolver ~sym:task.sym ~pos_cl ~neg_cl) neg_cls
+        ) pos_cls then None
+        else Some (pos_cls, neg_cls)
+      in
+        
+
+      let find_definition_set cls =
+        List.iter (fun (i,lits,c) -> 
+          CCArray.except_idx lits i
+          |> List.map BBox.inject_lit
+          |> SAT.add_clause ~proof:(C.proof_step c)
+        ) cls;
+        (match SAT.check ~full:true () with
+        | Sat_solver.Unsat proof -> 
+          let proof = Proof.S.step (SAT.get_proof ()) in
+          let parents = List.map Proof.Parent.proof (Proof.Step.parents proof) in
+          let used_cls = List.filter_map (fun (_,_,cl) -> 
+            CCOpt.return_if (CCList.mem ~eq:Proof.S.equal (C.proof cl) parents) cl) cls  in
+          split_clauses used_cls
+        | _ -> None)
+        
+      in
+
+
+      match gates_l with 
+      | x :: xs ->
+        (* we will standardize all clauses by the first name literal in x *)
+        let i,name_lit = CCOpt.get_exn (CCArray.find_map_i (fun i lit -> 
+            match lit with 
+            | L.Equation(lhs,rhs,_) when L.is_predicate_lit lit -> 
+              if ID.equal task.sym (T.head_exn lhs) then Some(i,lhs) else None
+            | _ -> None) (C.lits x)) 
+        in
+        let cls = (i,C.lits x,x) :: (CCList.filter_map (rename_clause ~name_lit) xs) in
+        (match find_definition_set cls with
+        | Some (core_pos,core_neg) ->
+          let to_remove = CS.of_list (core_pos @ core_neg) in
+          task.neg_cls <- CS.diff task.neg_cls to_remove;
+          task.pos_cls <- CS.diff task.pos_cls to_remove;
+          task.is_gate <- Some(core_pos, core_neg);
+          true
+        | _ -> false)
+      | _ -> false
+    in
+    if Env.flex_get k_check_gates &&
+       ((not (Env.flex_get k_only_original_gates)) 
+          || not @@ ID.payload_pred 
+              ~f:(function 
+                    ID.Attr_cnf_def -> true 
+                    | _ -> false)
+              task.sym) then (
+      if Env.flex_get k_check_gates_semantically then ignore (check_sat ())
+      else ignore (check_and () || check_or () || check_ite ()))
 
   let schedule_tasks () =
     ID.Map.iter (fun _ task -> 
@@ -603,100 +782,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       if should_schedule task then (
         TaskSet.insert _task_queue task  
     )) !_pred_sym_idx
-
-  let find_lit_by_sym sym sign cl =
-    CCOpt.get_exn (CCArray.find_map_i (fun idx lit -> 
-      match get_sym_sign lit with
-      | Some (sym', sign') when ID.equal sym sym' && sign = sign' -> 
-        Some (idx, CCOpt.get_exn (L.View.get_lhs lit))
-      | _ -> None
-    ) (C.lits cl))
-
-  let is_tauto c =
-    Literals.is_trivial (C.lits c) || Trail.is_trivial (C.trail c)
-
-  let neq_resolver ~sym ~pos_cl ~neg_cl =
-    let pos_sc, neg_sc = 0, 1 in
-    let pos_idx, pos_term = find_lit_by_sym sym true pos_cl in  
-    let neg_idx, neg_term = find_lit_by_sym sym false neg_cl in
-    try
-      let subst = Unif.FO.unify_syn (pos_term, pos_sc) (neg_term, neg_sc) in
-      let renaming = Subst.Renaming.create () in
-      let lits = 
-        (List.map (fun lit -> 
-          L.apply_subst renaming subst (lit, pos_sc)) 
-        (CCArray.except_idx (C.lits pos_cl) pos_idx)) @
-        (List.map (fun lit -> 
-          L.apply_subst renaming subst (lit, neg_sc)) 
-        (CCArray.except_idx (C.lits neg_cl) neg_idx))
-      in
-      let proof =
-        Proof.Step.simp 
-          ~tags:[Proof.Tag.T_cannot_orphan]
-          ~rule:(Proof.Rule.mk "dp-resolution") 
-          [C.proof_parent_subst renaming (pos_cl,pos_sc) subst;
-           C.proof_parent_subst renaming (neg_cl,neg_sc) subst]
-      in
-      let c =
-        C.create ~penalty:(max (C.penalty pos_cl) (C.penalty neg_cl))
-                 ~trail:(C.trail_l [pos_cl; neg_cl]) lits proof
-      in
-      CCOpt.return_if (not (is_tauto c)) c
-    with Unif.Fail -> None
-  
-  let eq_resolver ~sym ~pos_cl ~neg_cl =
-    let handle_distinct_vars xs sc_x ys sc_y =
-      let is_unique xs = 
-        List.for_all (Term.is_var) xs &&
-        CCList.length (CCList.sort_uniq ~cmp:T.compare xs)
-          == CCList.length xs
-      in
-      let mk_subst vars sc_vars terms sc_terms =
-        List.fold_left (fun subst (v,t) -> 
-          Subst.FO.bind' subst (T.as_var_exn v, sc_vars) (t, sc_terms)
-        ) Subst.empty (CCList.combine vars terms)
-      in
-
-      if is_unique xs then Some (mk_subst xs sc_x ys sc_y) 
-      else if is_unique ys then Some (mk_subst ys sc_y xs sc_x) 
-      else None
-    in
-
-    let pos_sc, neg_sc = 0, 1 in
-    let renaming = Subst.Renaming.create () in
-    let pos_idx, pos_term = find_lit_by_sym sym true pos_cl in  
-    let neg_idx, neg_term = find_lit_by_sym sym false neg_cl in
-    let pos_args, neg_args = CCPair.map_same T.args (pos_term, neg_term) in
-    let proof subst renaming =
-      Proof.Step.simp 
-        ~tags:[Proof.Tag.T_cannot_orphan] 
-        ~rule:(Proof.Rule.mk "dp-resolution") 
-        [C.proof_parent_subst renaming (pos_cl,pos_sc) subst;
-         C.proof_parent_subst renaming (neg_cl,neg_sc) subst]
-    in
-    let c =
-      match handle_distinct_vars pos_args pos_sc neg_args neg_sc with
-      | Some subst ->
-        let pos_lits = Literals.apply_subst renaming subst (C.lits pos_cl, pos_sc) in
-        let neg_lits = Literals.apply_subst renaming subst (C.lits neg_cl, neg_sc) in
-        let lits = (CCArray.except_idx pos_lits pos_idx) @ (CCArray.except_idx neg_lits  neg_idx) in
-        C.create ~penalty:(max (C.penalty pos_cl) (C.penalty neg_cl))
-                  ~trail:(C.trail_l [pos_cl; neg_cl]) lits (proof subst renaming) 
-      | None ->
-        let subst = Subst.empty in
-        let pos_cl' = C.apply_subst ~renaming (pos_cl, pos_sc) subst in
-        let neg_cl' = C.apply_subst ~renaming (neg_cl, neg_sc) subst in    
-        let apply t = Subst.FO.apply renaming subst t in  
-        let lits =
-          (List.map (fun (p,n) -> L.mk_neq (apply (p, pos_sc)) (apply (n, neg_sc))) 
-          (List.combine pos_args neg_args)) @ 
-          (CCArray.except_idx (C.lits pos_cl') pos_idx) @
-          (CCArray.except_idx (C.lits neg_cl') neg_idx)
-        in
-        C.create ~penalty:(max (C.penalty pos_cl') (C.penalty neg_cl'))
-                  ~trail:(C.trail_l [pos_cl'; neg_cl']) lits (proof subst renaming)
-    in
-    CCOpt.return_if (not (is_tauto c)) c
 
   let get_resolver () =
     if !_logic = NEqFO then neq_resolver else eq_resolver
@@ -895,6 +980,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     E.flex_add k_enabled !_enabled;
     E.flex_add k_max_resolvents !_max_resolvents;
     E.flex_add k_check_gates !_check_gates;
+    E.flex_add k_only_original_gates !_original_gates_only;
     Env.flex_add k_measure_fun (match !_measure_name with 
       | "kk" -> kk_measure
       | "relaxed" -> relaxed_measure
@@ -974,6 +1060,8 @@ let extension =
     E.flex_add k_inprocessing !_inprocessing;
     E.flex_add k_max_resolvents !_max_resolvents;
     E.flex_add k_check_gates !_check_gates;
+    E.flex_add k_only_original_gates !_original_gates_only;
+    E.flex_add k_check_gates_semantically !_check_semantically;
     E.flex_add k_non_singular_pe !_non_singular_pe;
     E.flex_add k_relax_val !_relax_val;
     E.flex_add k_prefer_spe !_prefer_spe;
@@ -989,6 +1077,8 @@ let () =
   Options.add_opts [
     "--pred-elim", Arg.Bool ((:=) _enabled), " enable predicate elimination";
     "--pred-elim-check-gates", Arg.Bool ((:=) _check_gates), " enable recognition of gate clauses";
+    "--pred-elim-only-original-gates", Arg.Bool ((:=) _original_gates_only), " recognize only gates that are not introduced by Zipperposition";
+    "--pred-elim-check-gates-semantically", Arg.Bool ((:=) _check_semantically), " recognize gates semantically, as described in our SAT techniques paper";
     "--pred-elim-prefer-spe", Arg.Bool ((:=) _prefer_spe), " try DPE only when SPE fails";
     "--pred-elim-relax-value", Arg.Int ((:=) _relax_val), " value of relax constant for our new measure";
     "--pred-elim-measure-fun", Arg.Symbol (["kk"; "relaxed"; "conservative"], ((:=) _measure_name)), " use either standard Korovin-Khasidashvili measure or our relaxed measure for measuring the proof state size";
