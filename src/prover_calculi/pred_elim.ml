@@ -744,8 +744,11 @@ module Make(E : Env.S) : S with module Env = E = struct
         | _ -> None)
         
       in
-
-      let gates_l = filter_gates ~lit_num_filter:(fun _ -> true) gates_l in
+      let is_def = function
+        | (Literal.Equation(lhs,_,_) as lit) when Literal.is_predicate_lit lit ->
+          CCOpt.is_some (Term.head lhs) && List.for_all T.is_var (T.args lhs)
+        | _ -> false
+      in
       match gates_l with 
       | x :: xs ->
         (* we will standardize all clauses by the first name literal in x *)
@@ -761,14 +764,20 @@ module Make(E : Env.S) : S with module Env = E = struct
         (match find_definition_set cls with
         | Some (core_pos,core_neg) ->
           let to_remove = CS.of_list (core_pos @ core_neg) in
-          Util.debugf ~section 3 "semantic pos def: @[%a@]@."
+          if CS.cardinal to_remove != 2 || 
+             (* if there are two clauses then they must be of the form p(X,Y) <-> q(X,Y) *)
+             CS.for_all (fun c -> C.length c == 2 &&
+                                  CCArray.for_all is_def (C.lits c)) 
+             to_remove then (
+            Util.debugf ~section 3 "semantic pos def: @[%a@]@."
             (fun k -> k (CCList.pp C.pp) core_pos);
-          Util.debugf ~section 3 "semantic neg def: @[%a@]@."
-            (fun k -> k (CCList.pp C.pp) core_neg);
-          task.neg_cls <- CS.diff task.neg_cls to_remove;
-          task.pos_cls <- CS.diff task.pos_cls to_remove;
-          task.is_gate <- Some(core_pos, core_neg);
-          true
+            Util.debugf ~section 3 "semantic neg def: @[%a@]@."
+              (fun k -> k (CCList.pp C.pp) core_neg);
+            task.neg_cls <- CS.diff task.neg_cls to_remove;
+            task.pos_cls <- CS.diff task.pos_cls to_remove;
+            task.is_gate <- Some(core_pos, core_neg);
+            true
+          ) else false
         | _ -> false)
       | _ -> false
     in
