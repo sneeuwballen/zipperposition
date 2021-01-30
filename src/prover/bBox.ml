@@ -169,7 +169,9 @@ let inject_lit lit =
       if Term.compare lhs rhs < 0 then Term.Form.eq lhs rhs
       else Term.Form.eq rhs lhs
     | Literal.False -> raise CantConvert
-    | _ -> invalid_arg "unknown literal"
+    | _ -> 
+    CCFormat.printf "lit: @[%a@]@." Literal.pp lit;
+    invalid_arg "unknown literal"
   in
 
   try 

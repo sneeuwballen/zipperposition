@@ -12,6 +12,7 @@ let k_inprocessing = Flex_state.create_key ()
 let k_max_resolvents = Flex_state.create_key ()
 let k_check_gates = Flex_state.create_key ()
 let k_only_original_gates = Flex_state.create_key ()
+let k_only_non_conjecture_gates = Flex_state.create_key ()
 let k_check_gates_semantically = Flex_state.create_key ()
 let k_non_singular_pe = Flex_state.create_key ()
 let k_relax_val = Flex_state.create_key ()
@@ -28,6 +29,7 @@ let _relax_val = ref 0
 let _prefer_spe = ref false
 let _measure_name = ref "relaxed"
 let _original_gates_only = ref false
+let _only_non_conj_gates = ref false
 let _check_semantically = ref false
 
 
@@ -729,8 +731,9 @@ module Make(E : Env.S) : S with module Env = E = struct
 
       let find_definition_set cls =
         List.iter (fun (i,lits,c) ->
-          List.filter_map BBox.inject_lit (CCArray.to_list lits)
-          |> SAT.add_clause ~proof:(C.proof_step c)
+          if not (is_tauto c) then (
+            List.filter_map BBox.inject_lit (CCArray.to_list lits)
+            |> SAT.add_clause ~proof:(C.proof_step c))
         ) cls;
         (match SAT.check ~full:true () with
         | Sat_solver.Unsat proof -> 
@@ -787,7 +790,9 @@ module Make(E : Env.S) : S with module Env = E = struct
               ~f:(function 
                     ID.Attr_cnf_def -> true 
                     | _ -> false)
-              task.sym) then (
+              task.sym) &&
+        ((not (Env.flex_get k_only_non_conjecture_gates)) 
+          || not @@ Signature.sym_in_conj task.sym (Env.signature ())) then (
       if Env.flex_get k_check_gates_semantically then ignore (check_sat ())
       else ignore (check_and () || check_or () || check_ite ()))
 
@@ -998,6 +1003,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     E.flex_add k_max_resolvents !_max_resolvents;
     E.flex_add k_check_gates !_check_gates;
     E.flex_add k_only_original_gates !_original_gates_only;
+    E.flex_add k_only_non_conjecture_gates !_only_non_conj_gates;
     Env.flex_add k_measure_fun (match !_measure_name with 
       | "kk" -> kk_measure
       | "relaxed" -> relaxed_measure
@@ -1078,6 +1084,7 @@ let extension =
     E.flex_add k_max_resolvents !_max_resolvents;
     E.flex_add k_check_gates !_check_gates;
     E.flex_add k_only_original_gates !_original_gates_only;
+    E.flex_add k_only_non_conjecture_gates !_only_non_conj_gates;
     E.flex_add k_check_gates_semantically !_check_semantically;
     E.flex_add k_non_singular_pe !_non_singular_pe;
     E.flex_add k_relax_val !_relax_val;
@@ -1096,6 +1103,7 @@ let () =
     "--pred-elim-check-gates", Arg.Bool ((:=) _check_gates), " enable recognition of gate clauses";
     "--pred-elim-only-original-gates", Arg.Bool ((:=) _original_gates_only), " recognize only gates that are not introduced by Zipperposition";
     "--pred-elim-check-gates-semantically", Arg.Bool ((:=) _check_semantically), " recognize gates semantically, as described in our SAT techniques paper";
+    "--pred-elin-only-non-conjecture-gates", Arg.Bool ((:=) _only_non_conj_gates), " recognize only non-conjecture symbols as possible gates";
     "--pred-elim-prefer-spe", Arg.Bool ((:=) _prefer_spe), " try DPE only when SPE fails";
     "--pred-elim-relax-value", Arg.Int ((:=) _relax_val), " value of relax constant for our new measure";
     "--pred-elim-measure-fun", Arg.Symbol (["kk"; "relaxed"; "conservative"], ((:=) _measure_name)), " use either standard Korovin-Khasidashvili measure or our relaxed measure for measuring the proof state size";
