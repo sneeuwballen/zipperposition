@@ -36,6 +36,7 @@ let _check_semantically = ref false
 let section = Util.Section.make ~parent:Const.section "pred-elim"
 
 module A = Libzipperposition_avatar
+module OrigEnv = Env
 
 module type S = sig
   module Env : Env.S
@@ -46,6 +47,21 @@ module type S = sig
   val fixpoint_step : unit -> bool
   val end_fixpoint : unit -> unit
 end
+
+let register_parameters env =
+  let module E = (val env : Env.S) in
+  E.flex_add k_enabled !_enabled;
+  E.flex_add k_check_at !_check_at;
+  E.flex_add k_inprocessing !_inprocessing;
+  E.flex_add k_max_resolvents !_max_resolvents;
+  E.flex_add k_check_gates !_check_gates;
+  E.flex_add k_only_original_gates !_original_gates_only;
+  E.flex_add k_only_non_conjecture_gates !_only_non_conj_gates;
+  E.flex_add k_check_gates_semantically !_check_semantically;
+  E.flex_add k_non_singular_pe !_non_singular_pe;
+  E.flex_add k_relax_val !_relax_val;
+  E.flex_add k_prefer_spe !_prefer_spe
+
 
 module Make(E : Env.S) : S with module Env = E = struct
   module Env = E
@@ -999,11 +1015,10 @@ module Make(E : Env.S) : S with module Env = E = struct
   let fixpoint_active = ref false
   let begin_fixpoint () =
     fixpoint_active := true;
-    E.flex_add k_enabled !_enabled;
-    E.flex_add k_max_resolvents !_max_resolvents;
-    E.flex_add k_check_gates !_check_gates;
-    E.flex_add k_only_original_gates !_original_gates_only;
-    E.flex_add k_only_non_conjecture_gates !_only_non_conj_gates;
+    let env = (module E : OrigEnv.S) in
+    register_parameters env;
+    (*  has to be called after register parameters as 
+        measure functions are not visible outside the module *)
     Env.flex_add k_measure_fun (match !_measure_name with 
       | "kk" -> kk_measure
       | "relaxed" -> relaxed_measure
@@ -1043,7 +1058,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       _pred_sym_idx := ID.Map.empty
     end
 
-  let fixpoint_step () = 
+  let fixpoint_step () =
+    CCFormat.printf "relax val: %d@." (Env.flex_get k_relax_val);
     let ans = do_pred_elim () in
     Util.debugf ~section 1 "Clause number changed for %a" (fun k -> k (CCOpt.pp CCInt.pp) ans);
     if CCOpt.is_some ans then (
@@ -1058,12 +1074,12 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   
   let setup ?(in_fp_mode=false) () =
+    Env.flex_add k_fp_mode in_fp_mode;
     Env.flex_add k_measure_fun (match !_measure_name with 
       | "kk" -> kk_measure
       | "relaxed" -> relaxed_measure
       | "conservative" -> conservative_measure
       | _ -> invalid_arg "measure function not found");
-    Env.flex_add k_fp_mode in_fp_mode;
 
     if Env.flex_get k_enabled then (
       if not (Env.flex_get A.k_avatar_enabled) then (register ())
@@ -1073,22 +1089,11 @@ module Make(E : Env.S) : S with module Env = E = struct
     )
 end
 
-
 let extension =
   let action env =
     let module E = (val env : Env.S) in
+    register_parameters env;
     let module PredElim = Make(E) in
-    E.flex_add k_enabled !_enabled;
-    E.flex_add k_check_at !_check_at;
-    E.flex_add k_inprocessing !_inprocessing;
-    E.flex_add k_max_resolvents !_max_resolvents;
-    E.flex_add k_check_gates !_check_gates;
-    E.flex_add k_only_original_gates !_original_gates_only;
-    E.flex_add k_only_non_conjecture_gates !_only_non_conj_gates;
-    E.flex_add k_check_gates_semantically !_check_semantically;
-    E.flex_add k_non_singular_pe !_non_singular_pe;
-    E.flex_add k_relax_val !_relax_val;
-    E.flex_add k_prefer_spe !_prefer_spe;
     PredElim.setup ()
   in
   { Extensions.default with Extensions.
