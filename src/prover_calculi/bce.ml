@@ -44,6 +44,10 @@ module Make(E : Env.S) : S with module Env = E = struct
       type t = (ID.t * bool) 
       let compare = CCPair.compare ID.compare CCBool.compare
   end)
+
+
+  let k_removed_active = Flex_state.create_key ()
+  let k_removed_passive = Flex_state.create_key ()
   
   type logic = 
     | NEqFO  (* nonequational FO *)
@@ -289,8 +293,18 @@ module Make(E : Env.S) : S with module Env = E = struct
     deregister_symbols clause;
     release_locks clause
 
-  let remove_from_proof_state clause = 
-    C.mark_redundant clause;
+  let remove_from_proof_state clause =
+    if Env.flex_get k_processing_kind != `InprocessingSat then ( 
+      C.mark_redundant clause
+    );
+    begin 
+      try
+        if Env.is_active clause then (
+          C.Tbl.add (Env.flex_get k_removed_active) clause ();
+        ) else if Env.is_passive clause then (
+          C.Tbl.add (Env.flex_get k_removed_passive) clause ();
+        )
+    with _ -> () end;
     Env.remove_active (Iter.singleton clause);
     Env.remove_passive (Iter.singleton clause);
     Env.remove_simpl (Iter.singleton clause)
@@ -646,6 +660,25 @@ module Make(E : Env.S) : S with module Env = E = struct
     deregister_clause cl
 
 
+  let do_bce_sat () =
+    C.Tbl.clear (Env.flex_get k_removed_active);
+    C.Tbl.clear (Env.flex_get k_removed_passive);
+
+    ignore @@ do_eliminate_blocked_clauses ();
+
+    if Env.ProofState.ActiveSet.num_clauses () = 0
+       && Env.ProofState.PassiveSet.num_clauses () = 0 then (
+      CCFormat.printf "%% BCE inprocessing removed all clauses"
+    ) else (
+      (* reinserting removed clauses *)
+      let removed_actives = C.Tbl.keys (Env.flex_get k_removed_active) in
+      let removed_passives = C.Tbl.keys (Env.flex_get k_removed_active) in
+      Env.add_active removed_actives;
+      Env.add_simpl removed_actives;
+      Env.add_passive removed_passives;
+    )
+
+
   let initialize_regular () =
     let init_clauses =
       C.ClauseSet.to_list (Env.ProofState.ActiveSet.clauses ())
@@ -680,8 +713,12 @@ module Make(E : Env.S) : S with module Env = E = struct
         (Iter.length (Env.get_active ()) + Iter.length (Env.get_passive ())) in
       CCFormat.printf "%% BCE eliminated: %d@." clause_diff;
 
-      if Env.flex_get k_processing_kind = `InprocessingFull || Env.flex_get k_fp_mode then (
-        Env.Ctx.lost_completeness ();
+      if Env.flex_get k_processing_kind != `PreprocessingOnly || Env.flex_get k_fp_mode then (
+        if Env.flex_get k_processing_kind == `InprocessingFull then(
+          Env.Ctx.lost_completeness ()
+        );
+        Env.flex_add k_removed_active (C.Tbl.create 256);
+        Env.flex_add k_removed_passive (C.Tbl.create 256);
         (* clauses begin their life when they are added to the passive set *)
         Signal.on_every Env.ProofState.PassiveSet.on_add_clause react_clause_addded;
         (* clauses can be calculus-removed from the active set only in DISCOUNT loop *)
@@ -698,9 +735,9 @@ module Make(E : Env.S) : S with module Env = E = struct
             )
           | _ -> react_clause_removed c; (* c is redundant *));
           if not @@ Env.flex_get k_fp_mode then (
-            Env.add_clause_elimination_rule ~priority:1 "BCE" eliminate_blocked_clauses)
-      ) else if Env.flex_get k_processing_kind = `InprocessingInitial then (
-        Env.add_is_trivial is_blocked;
+            if Env.flex_get k_processing_kind = `InprocessingFull then( 
+              Env.add_clause_elimination_rule ~priority:1 "BCE" eliminate_blocked_clauses
+            )else (Env.add_clause_elimination_rule ~priority:1 "BCE_SAT" do_bce_sat))
       ) else ( raise UnsupportedLogic ) (* clear all data structures *)
     with UnsupportedLogic ->
       Util.debugf ~section 2 "logic is unsupported" CCFun.id;
@@ -803,10 +840,10 @@ let extension =
 let () =
   Options.add_opts [
     "--bce", Arg.Bool ((:=) _enabled), " scan clauses for AC definitions";
-    "--bce-processing-kind", Arg.Symbol (["preprocessing";"inprocessing-full";"inprocessing-initial"], (function 
+    "--bce-processing-kind", Arg.Symbol (["preprocessing";"inprocessing-full";"inprocessing-sat"], (function 
       | "preprocessing" -> _processing_kind := `PreprocessingOnly
       | "inprocessing-full" -> _processing_kind := `InprocessingFull
-      | "inprocessing-initial" -> _processing_kind := `InprocessingInitial
+      | "inprocessing-sat" -> _processing_kind := `InprocessingSat
       | _ -> assert false)), 
     " scan clauses for AC definitions";
     "--bce-check-every", Arg.Int ((:=) _check_at), " check BCE every n steps of saturation algorithm";
