@@ -653,6 +653,11 @@ module Make(E : Env.S) : S with module Env = E = struct
       );
     )
 
+  let eliminate_bce_sat () =
+    steps := (!steps + 1) mod (Env.flex_get k_check_at)
+
+    if !steps = 0 then do_bce_sat ()
+
   let react_clause_addded cl =
     add_clause cl
 
@@ -737,7 +742,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           if not @@ Env.flex_get k_fp_mode then (
             if Env.flex_get k_processing_kind = `InprocessingFull then( 
               Env.add_clause_elimination_rule ~priority:1 "BCE" eliminate_blocked_clauses
-            )else (Env.add_clause_elimination_rule ~priority:1 "BCE_SAT" do_bce_sat))
+            )else (Env.add_clause_elimination_rule ~priority:1 "BCE_SAT" eliminate_bce_sat))
       ) else ( raise UnsupportedLogic ) (* clear all data structures *)
     with UnsupportedLogic ->
       Util.debugf ~section 2 "logic is unsupported" CCFun.id;
