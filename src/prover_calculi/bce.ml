@@ -48,6 +48,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let k_removed_active = Flex_state.create_key ()
   let k_removed_passive = Flex_state.create_key ()
+  let k_bce_sat_tracked = Flex_state.create_key ()
   
   type logic = 
     | NEqFO  (* nonequational FO *)
@@ -294,9 +295,6 @@ module Make(E : Env.S) : S with module Env = E = struct
     release_locks clause
 
   let remove_from_proof_state clause =
-    if Env.flex_get k_processing_kind != `InprocessingSat then ( 
-      C.mark_redundant clause
-    );
     begin 
       try
         if Env.is_active clause then (
@@ -304,7 +302,16 @@ module Make(E : Env.S) : S with module Env = E = struct
         ) else if Env.is_passive clause then (
           C.Tbl.add (Env.flex_get k_removed_passive) clause ();
         )
-    with _ -> () end;
+    with _ ->
+      (* we are in the preprocessing phase, so we can mark the clause *) 
+      C.mark_redundant clause
+      end;
+    if Env.flex_get k_processing_kind != `InprocessingSat then ( 
+      C.mark_redundant clause
+      (* if we are doing the inprocessing in SAT mode, we cannot
+         mark the clauses as redunant, since they might have to be returned
+         to the proof state. *)
+    );
     Env.remove_active (Iter.singleton clause);
     Env.remove_passive (Iter.singleton clause);
     Env.remove_simpl (Iter.singleton clause)
@@ -614,8 +621,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         (* let original_partners = CCDeque.to_list task.cands in *)
         match task_is_blocked task.cands with
         | true ->
-          Util.debugf ~section 1 "removed(%d): @[%a@]" (fun k -> k task.lit_idx C.pp cl);
-          (* Util.debugf ~section 1 "partners: @[%a@]" (fun k -> k (CCList.pp C.pp) original_partners); *)
+          Util.debugf ~section 2 "removed(%d): @[%a@]" (fun k -> k task.lit_idx C.pp cl);
           deregister_clause cl;
           remove_from_proof_state cl;
           incr removed_cnt;
@@ -653,35 +659,39 @@ module Make(E : Env.S) : S with module Env = E = struct
       );
     )
 
-  let eliminate_bce_sat () =
-    steps := (!steps + 1) mod (Env.flex_get k_check_at)
-
-    if !steps = 0 then do_bce_sat ()
-
   let react_clause_addded cl =
     add_clause cl
 
   let react_clause_removed cl =
     deregister_clause cl
 
-
   let do_bce_sat () =
     C.Tbl.clear (Env.flex_get k_removed_active);
     C.Tbl.clear (Env.flex_get k_removed_passive);
+    
+    Util.debugf ~section 1 "new BCE-SAT attempt" CCFun.id;
 
     ignore @@ do_eliminate_blocked_clauses ();
 
-    if Env.ProofState.ActiveSet.num_clauses () = 0
-       && Env.ProofState.PassiveSet.num_clauses () = 0 then (
+
+    if C.Tbl.length (Env.flex_get k_bce_sat_tracked) == 0 then (
       CCFormat.printf "%% BCE inprocessing removed all clauses"
     ) else (
       (* reinserting removed clauses *)
       let removed_actives = C.Tbl.keys (Env.flex_get k_removed_active) in
-      let removed_passives = C.Tbl.keys (Env.flex_get k_removed_active) in
+      let removed_passives = C.Tbl.keys (Env.flex_get k_removed_passive) in
+      Util.debugf ~section 1 "reinserting %d/%d clauses" (fun k -> 
+        k (Iter.length removed_actives + Iter.length removed_passives)
+          (C.Tbl.length (Env.flex_get k_bce_sat_tracked)));
       Env.add_active removed_actives;
       Env.add_simpl removed_actives;
       Env.add_passive removed_passives;
     )
+
+  let eliminate_bce_sat () =
+    steps := (!steps + 1) mod (Env.flex_get k_check_at);
+
+    if !steps = 0 then do_bce_sat ()
 
 
   let initialize_regular () =
@@ -719,30 +729,58 @@ module Make(E : Env.S) : S with module Env = E = struct
       CCFormat.printf "%% BCE eliminated: %d@." clause_diff;
 
       if Env.flex_get k_processing_kind != `PreprocessingOnly || Env.flex_get k_fp_mode then (
-        if Env.flex_get k_processing_kind == `InprocessingFull then(
+        if Env.flex_get k_processing_kind == `InprocessingFull then (
           Env.Ctx.lost_completeness ()
         );
-        Env.flex_add k_removed_active (C.Tbl.create 256);
-        Env.flex_add k_removed_passive (C.Tbl.create 256);
-        (* clauses begin their life when they are added to the passive set *)
-        Signal.on_every Env.ProofState.PassiveSet.on_add_clause react_clause_addded;
-        (* clauses can be calculus-removed from the active set only in DISCOUNT loop *)
-        Signal.on_every Env.ProofState.ActiveSet.on_remove_clause react_clause_removed;
-        (* Clauses are removed from the passive set when they are moved to active.
-          In this case clause can me modified or deemed redundant by forward
-          modification procedures. we react accordingly.*)
-        Signal.on_every Env.on_forward_simplified (fun (c, new_state) -> 
-          match new_state with
-          | Some c' ->
-            if not (C.equal c c') then (
-              react_clause_removed c; 
-              react_clause_addded c'
-            )
-          | _ -> react_clause_removed c; (* c is redundant *));
-          if not @@ Env.flex_get k_fp_mode then (
-            if Env.flex_get k_processing_kind = `InprocessingFull then( 
-              Env.add_clause_elimination_rule ~priority:1 "BCE" eliminate_blocked_clauses
-            )else (Env.add_clause_elimination_rule ~priority:1 "BCE_SAT" eliminate_bce_sat))
+
+        if Env.flex_get k_processing_kind == `InprocessingSat then (
+          Env.flex_add k_removed_active (C.Tbl.create 256);
+          Env.flex_add k_removed_passive (C.Tbl.create 256);
+          Env.flex_add k_bce_sat_tracked (C.Tbl.create 256);
+          
+          let add_cl_sat cl =
+            C.Tbl.add (Env.flex_get k_bce_sat_tracked) cl ();
+            react_clause_addded cl
+          in
+          let remove_cl_sat cl =
+            C.Tbl.remove (Env.flex_get k_bce_sat_tracked) cl;
+            react_clause_removed cl
+          in
+
+          Env.ProofState.PassiveSet.clauses ()
+          |> C.ClauseSet.to_iter
+          |> Iter.iter (fun cl -> C.Tbl.add (Env.flex_get k_bce_sat_tracked) cl ());
+
+
+          Signal.on_every Env.ProofState.PassiveSet.on_add_clause (fun cl -> 
+            if C.proof_depth cl = 0 then add_cl_sat cl
+          );
+          Signal.on_every Env.ProofState.PassiveSet.on_remove_clause remove_cl_sat;
+          Signal.on_every Env.on_forward_simplified (fun (_,state) ->
+            CCOpt.iter (add_cl_sat) state);
+          Signal.on_every Env.ProofState.ActiveSet.on_remove_clause remove_cl_sat;
+        ) else (
+          (* clauses begin their life when they are added to the passive set *)
+          Signal.on_every Env.ProofState.PassiveSet.on_add_clause react_clause_addded;
+          (* clauses can be calculus-removed from the active set only in DISCOUNT loop *)
+          Signal.on_every Env.ProofState.ActiveSet.on_remove_clause react_clause_removed;
+          (* Clauses are removed from the passive set when they are moved to active.
+            In this case clause can me modified or deemed redundant by forward
+            modification procedures. we react accordingly.*)
+          Signal.on_every Env.on_forward_simplified (fun (c, new_state) -> 
+            match new_state with
+            | Some c' ->
+              if not (C.equal c c') then (
+                react_clause_removed c; 
+                react_clause_addded c'
+              )
+            | _ -> react_clause_removed c; (* c is redundant *));
+        );
+        if not @@ Env.flex_get k_fp_mode then (
+          if Env.flex_get k_processing_kind = `InprocessingFull then( 
+            Env.add_clause_elimination_rule ~priority:1 "BCE" eliminate_blocked_clauses
+          )else (Env.add_clause_elimination_rule ~priority:1 "BCE_SAT" eliminate_bce_sat)
+        )
       ) else ( raise UnsupportedLogic ) (* clear all data structures *)
     with UnsupportedLogic ->
       Util.debugf ~section 2 "logic is unsupported" CCFun.id;

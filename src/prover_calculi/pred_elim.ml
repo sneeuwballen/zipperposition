@@ -256,7 +256,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   
   let kk_measure relax task resolvents =
     let new_mu, new_lit_num = calc_new_stats resolvents in
-    task.num_lits > new_lit_num && task.sq_var_weight > new_mu
+    task.num_lits >= new_lit_num && task.sq_var_weight >= new_mu
 
   let relaxed_measure relax task resolvents =
     let (new_mu, new_lit_num), new_cl_num =
@@ -997,7 +997,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       CCFormat.printf "%% PE eliminated: %d@." clause_diff;
 
       if Env.flex_get k_inprocessing then (
-        Env.Ctx.lost_completeness ();
+        (* Env.Ctx.lost_completeness (); *)
         Env.add_clause_elimination_rule ~priority:2 "pred_elim" 
           do_predicate_elimination
       ) else if not @@ Env.flex_get k_fp_mode then raise UnsupportedLogic
