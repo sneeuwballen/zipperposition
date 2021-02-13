@@ -74,6 +74,43 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* constants denoting the scope of index and the query, respectively *)
   let idx_sc, q_sc = 0, 1
 
+  (* iterate over the parts of the common context of the term --
+     EXCLUDING THE EMPTY CONTEXT *)
+  let iter_ctx a b k =
+    let common_arg xs ys =
+      let rec aux acc xs ys =
+        match xs with 
+        | x :: xs' ->
+          begin match ys with
+          | y :: ys' ->
+            if (not (T.equal x y)) && CCOpt.is_none acc then (
+              aux (Some (x,y)) xs' ys'
+            ) else if T.equal x y then aux acc xs' ys'
+            else None
+          | _ -> assert false
+          end
+        | _ -> 
+          (assert (CCList.is_empty ys)); 
+          acc
+      in
+      aux None xs ys
+    in
+
+    let rec aux a b = 
+      match T.view a, T.view b with
+      | T.App(hda, argsa), T.App(hdb, argsb) 
+        when Type.equal (T.ty a) (T.ty b) ->
+        if T.is_const hda && T.equal hda hdb then (
+          match common_arg argsa argsb with 
+          | Some (a, b) -> 
+            k (a, b);
+            aux a b
+          | None -> ()
+        )
+      | _ -> ()
+    in
+    aux a b
+
   let retrieve_idx ~getter (premise, q_sc) =
     match T.view premise with
     | T.AppBuiltin(Builtin.Eq, ([_;a;b]|[a;b])) when tracking_eq () ->
@@ -105,13 +142,30 @@ module Make(E : Env.S) : S with module Env = E = struct
       Some (T.Form.eq lhs rhs, sign)
     | _ -> None
 
-  let [@inline] matching_eq ~subst ~pattern (t, sc) =
+  let [@inline] matching_eq ?(decompose=false) ~subst ~pattern (t, sc) =
+    let try_decompositions ?(cons=T.Form.eq) a b =
+      iter_ctx a b
+      |> Iter.find (fun (a, b) -> 
+        try
+          Some (Unif.FO.matching ~subst ~pattern (cons a b, sc))
+        with Unif.Fail ->
+          begin 
+            try
+              Some (Unif.FO.matching ~subst ~pattern (cons b a, sc))
+            with Unif.Fail -> None
+          end)
+      |> (function | Some unif -> unif | _ -> raise Unif.Fail)    
+    in
+
     try
       Unif.FO.matching ~subst ~pattern (t, sc)
     with Unif.Fail ->
       match T.view t with 
       | T.AppBuiltin(Builtin.Eq, ([_;a;b]|[a;b])) when tracking_eq () ->
-        Unif.FO.matching ~subst ~pattern (T.Form.eq b a, sc)
+        begin try 
+          Unif.FO.matching ~subst ~pattern (T.Form.eq b a, sc)
+        with Unif.Fail when decompose ->
+          try_decompositions a b end
       | T.AppBuiltin(Builtin.Neq, ([_;a;b]|[a;b])) when tracking_eq () ->
         Unif.FO.matching ~subst ~pattern (T.Form.neq b a, sc)
       | _ ->  raise Unif.Fail
@@ -179,7 +233,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     |> CCList.iter (fun (t, sets) ->
       prems_ := PremiseIdx.update_leaf !prems_ t (fun (tbl, _) -> 
         T.Tbl.filter_map_inplace (fun concl proofset ->
-          concls_ := ConclusionIdx.remove !concls_ concl t;
+          concls_ := ConclusionIdx !concls_ concl t;
           if List.exists (fun set -> CS.subset set proofset) sets then None
           else Some proofset) tbl;
         T.Tbl.length tbl == 0
@@ -237,6 +291,15 @@ module Make(E : Env.S) : S with module Env = E = struct
     let aux concl =
       T.Tbl.add tbl concl (CS.singleton cl);
       concls_ := ConclusionIdx.add !concls_ concl premise';
+      (match T.view concl with
+      | T.AppBuiltin(Builtin.Neq, ([_;a;b] | [a;b])) ->
+        iter_ctx a b
+        |> Iter.iter (fun (a,b) -> 
+          let new_neq = T.Form.neq a b in
+          T.Tbl.add tbl new_neq (CS.singleton cl);
+          concls_ := ConclusionIdx.add !concls_ new_neq premise';
+        );
+      | _ -> ());
       register_cl_term cl premise';
 
       let max_proof_size = Env.flex_get k_max_depth in
@@ -379,8 +442,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         try
           if CS.mem cl proofset then None
           else (
-            (* TODO: fix *)
-            let subst = matching_eq ~subst ~pattern:(concl', idx_sc) (concl, q_sc) in
+            let subst = matching_eq ~decompose:true ~subst ~pattern:(concl', idx_sc) (concl, q_sc) in
             Some(premise', concl', proofset, subst))
         with Unif.Fail -> None)) 
 
