@@ -3344,15 +3344,6 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     ZProf.exit_prof prof_subsumption_in_set;
     res
 
-  (* Number of equational lits. Used as an estimation for the difficulty of the subsumption
-     check for this clause. *)
-  let num_equational lits =
-    Array.fold_left
-      (fun acc lit -> match lit with
-         | Lit.Equation _ -> acc+1
-         | _ -> acc
-      ) 0 lits
-
   (* ----------------------------------------------------------------------
    * contextual literal cutting
    * ---------------------------------------------------------------------- *)
@@ -3361,7 +3352,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let rec contextual_literal_cutting_rec c =
     let open SimplM.Infix in
     if Array.length (C.lits c) <= 1
-    || num_equational (C.lits c) > 3
+    || Lits.num_equational (C.lits c) > 3
     || Array.length (C.lits c) > 8
     then SimplM.return_same c
     else (
@@ -3442,7 +3433,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let rec condensation_rec c =
     let open SimplM.Infix in
     if Array.length (C.lits c) <= 1
-    || num_equational (C.lits c) > 3
+    || Lits.num_equational (C.lits c) > 3
     || Array.length (C.lits c) > 8
     then SimplM.return_same c
     else

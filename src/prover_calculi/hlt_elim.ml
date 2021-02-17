@@ -233,7 +233,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     |> CCList.iter (fun (t, sets) ->
       prems_ := PremiseIdx.update_leaf !prems_ t (fun (tbl, _) -> 
         T.Tbl.filter_map_inplace (fun concl proofset ->
-          concls_ := ConclusionIdx !concls_ concl t;
+          concls_ := ConclusionIdx.remove !concls_ concl t;
           if List.exists (fun set -> CS.subset set proofset) sets then None
           else Some proofset) tbl;
         T.Tbl.length tbl == 0
@@ -453,7 +453,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     let exception PropagatedHTE of T.t * CS.t in
     let is_unit = C.length cl == 1 in
     try
-      if C.length cl > 5 then raise ClauseTooLarge;
+      if Lits.num_equational (C.lits cl) > 3
+         || Array.length (C.lits cl) > 8 then raise ClauseTooLarge;
       CCArray.iteri (fun i lit -> 
         match get_predicate lit with 
         | Some (lhs, sign) ->
@@ -576,7 +577,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     let bv = CCBV.create ~size:n true in
     let proofset = ref CS.empty in
     try
-      if C.length cl > 5 then raise ClauseTooLarge;
+      if Lits.num_equational (C.lits cl) > 3
+         || Array.length (C.lits cl) > 8 then raise ClauseTooLarge;
       CCArray.iteri (fun i i_lit ->
         match get_predicate i_lit with
         | Some(i_lhs, i_sign) ->
@@ -634,7 +636,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     let exception HiddenTauto of T.t * T.t * CS.t in
 
     let n = C.length cl in
-    if n >= 2 && n < 5 then (
+    if Lits.num_equational (C.lits cl) <= 3
+      || Array.length (C.lits cl) <= 7 then (
       try 
         let bv = CCBV.create ~size:n true in
         let proofset = ref CS.empty in
@@ -679,7 +682,6 @@ module Make(E : Env.S) : S with module Env = E = struct
         
         if CCBV.is_empty (CCBV.negate bv) then None
         else (
-          (* assert (validate_proofset_ !proofset); *)
           let lit_l = List.rev @@ CCBV.select bv (C.lits cl) in
           let proof = 
             Proof.Step.simp ~rule:(Proof.Rule.mk "hidden_literal_elimination")
@@ -708,6 +710,43 @@ module Make(E : Env.S) : S with module Env = E = struct
         Some tauto
     ) else None
 
+  let do_context_simplification cl =
+    let lits_to_keep = CCBV.create ~size:(C.length cl) true in
+    let exception StopIteration in
+    CCArray.iteri (fun i lit ->
+      if CCBV.get lits_to_keep i && not (Lit.is_predicate_lit lit) then (
+        try 
+          CCArray.iteri (fun j lit' -> 
+            if i!=j && CCBV.get lits_to_keep j && not (Lit.is_predicate_lit lit')
+                && Lit.is_pos lit = Lit.is_pos lit' then (
+              match Lit.View.as_eqn lit, Lit.View.as_eqn lit' with
+              | Some(s,t,sign), Some(ctx_s, ctx_t, _) ->
+                iter_ctx ctx_s ctx_t (fun (s',t') -> 
+                  if (T.equal s s' && T.equal t t') || 
+                    (T.equal s t' && T.equal t s') then (
+                    if sign then  (
+                      (* if we found a pair of literals i:s=t and j:u[s]=u[t] 
+                        then we remove the first one *)
+                      CCBV.reset lits_to_keep i;
+                      raise StopIteration;
+                    ) else (CCBV.reset lits_to_keep j)
+                    (* else the pair is i:s!=t and j:u[s]!=u[t] and the literal j
+                      can be removed *)
+                  ))
+              | _ -> ()
+            )) (C.lits cl);
+        with StopIteration -> ()
+      )) (C.lits cl);
+    if CCBV.is_empty (CCBV.negate lits_to_keep) then None
+    else (
+      let lit_l = List.rev @@ CCBV.select lits_to_keep (C.lits cl) in
+      let proof = 
+        Proof.Step.simp 
+          ~rule:(Proof.Rule.mk "eq_context_simplification") 
+          ([C.proof_parent cl])
+      in
+      let res = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof in
+      Some (res))
 
   let simplify_opt ~f cl =
     match f cl with
@@ -721,6 +760,8 @@ module Make(E : Env.S) : S with module Env = E = struct
   let propagated_hle_hte = simplify_opt ~f:do_propagated_simpl
 
   let unit_htr = simplify_opt ~f:unit_simplify
+
+  let ctx_simpl = simplify_opt ~f:do_context_simplification
 
   let untrack_clause cl =
     (match Util.Int_map.get (C.id cl) !cl_occs with
@@ -798,9 +839,10 @@ module Make(E : Env.S) : S with module Env = E = struct
         if Env.flex_get k_simpl_new 
         then Env.add_basic_simplify 
         else Env.add_active_simplify
-      in  
+      in
 
       add_simpl simplify_cl;
+      if Env.flex_get k_track_eq then (add_simpl ctx_simpl);
       if Env.flex_get k_unit_propagated_hle then (add_simpl propagated_hle_hte);
       if Env.flex_get k_unit_htr then (add_simpl unit_htr)
     )

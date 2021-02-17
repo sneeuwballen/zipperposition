@@ -591,3 +591,11 @@ let ground_lits lits =
   let res = apply_subst Subst.Renaming.none gr_subst (lits,0)  in
   assert(Iter.for_all T.is_ground @@ Seq.terms res);
   res
+
+let num_predicate lits = 
+  let cnt = ref 0 in
+  CCArray.iter (fun l -> if Lit.is_predicate_lit l then incr cnt) lits;
+  !cnt
+
+let num_equational lits = 
+  CCArray.length lits - num_predicate lits
