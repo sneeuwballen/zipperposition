@@ -381,7 +381,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         prems_ := PremiseIdx.add !prems_ premise (tbl,Some ps)
       | None -> ())
     | _ ->
-      let tbl = T.Tbl.create 64 in
+      let tbl = T.Tbl.create 54 in
       triggered_conclusions tbl premise concl cl;
       prems_ := PremiseIdx.add !prems_ premise (tbl,compute_is_unit tbl concl cl)
     
@@ -453,8 +453,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let exception PropagatedHTE of T.t * CS.t in
     let is_unit = C.length cl == 1 in
     try
-      if Lits.num_equational (C.lits cl) > 3
-         || Array.length (C.lits cl) > 8 then raise ClauseTooLarge;
+      if Lits.num_equational (C.lits cl) > 3 || Array.length (C.lits cl) > 5 then raise ClauseTooLarge;
       CCArray.iteri (fun i lit -> 
         match get_predicate lit with 
         | Some (lhs, sign) ->
@@ -577,8 +576,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let bv = CCBV.create ~size:n true in
     let proofset = ref CS.empty in
     try
-      if Lits.num_equational (C.lits cl) > 3
-         || Array.length (C.lits cl) > 8 then raise ClauseTooLarge;
+      if Lits.num_equational (C.lits cl) > 3 || Array.length (C.lits cl) > 5 then raise ClauseTooLarge;
       CCArray.iteri (fun i i_lit ->
         match get_predicate i_lit with
         | Some(i_lhs, i_sign) ->
@@ -636,8 +634,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let exception HiddenTauto of T.t * T.t * CS.t in
 
     let n = C.length cl in
-    if Lits.num_equational (C.lits cl) <= 3
-      || Array.length (C.lits cl) <= 7 then (
+    if Lits.num_equational (C.lits cl) <= 3 && n <= 5 then (
       try 
         let bv = CCBV.create ~size:n true in
         let proofset = ref CS.empty in
