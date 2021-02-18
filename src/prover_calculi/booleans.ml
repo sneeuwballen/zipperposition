@@ -1223,17 +1223,16 @@ module Make(E : Env.S) : S with module Env = E = struct
 
       let rec aux t =
         match T.view t with
-        | Fun(_, body) -> not @@ has_loosely_bound_0 t
-        | App(hd, args) when T.is_const hd ->
-          List.for_all aux args
+        | Fun(_, body) -> not (has_loosely_bound_0 t)
         | App(hd, args) ->
-          assert (not @@ T.is_fun hd);
-          List.for_all (fun t -> not @@ has_loosely_bound_0 t) (hd :: args )
-        | AppBuiltin(hd, args) ->
-          List.for_all aux args
+          if T.is_const hd then List.for_all aux args
+          else (
+            not (List.exists has_loosely_bound_0 (hd::args))
+          )
+        | AppBuiltin(hd, args) -> List.for_all aux args
         | _ -> true
       in
-      aux (Lambda.eta_reduce @@ Lambda.snf @@ q_body)
+      aux q_body
     in
 
     let rec aux t =
@@ -1286,18 +1285,18 @@ module Make(E : Env.S) : S with module Env = E = struct
       | DB _ | Const _ | Var _ -> t
     in
     if Env.flex_get Combinators.k_enable_combinators then t 
-    else aux t
+    else aux (Lambda.eta_reduce @@ Lambda.snf t)
 
   let replace_unsupported_quants c =
     let new_lits = Literals.map fix_unsupported_quant (C.lits c) in
     if Literals.equal (C.lits c) new_lits then (
-      SimplM.return_same c
+      None
     ) else (
       let proof = Proof.Step.simp [C.proof_parent c] 
           ~rule:(Proof.Rule.mk "replace unsupported quants") in
       let new_ = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) 
           (Array.to_list new_lits) proof in
-      SimplM.return_new new_
+      Some new_
     )
 
   let simpl_bool_subterms c =
@@ -1695,7 +1694,15 @@ module Make(E : Env.S) : S with module Env = E = struct
             Env.add_unary_inf "fluid_quant_rw" fluid_quant_rw;
           );
           if Env.flex_get k_replace_unsupported_quants then (
-            Env.add_unary_simplify replace_unsupported_quants
+            Signal.once Env.on_start (fun () -> 
+              Env.ProofState.PassiveSet.clauses ()
+               |> C.ClauseSet.iter (fun cl -> 
+                match replace_unsupported_quants cl with
+                | None -> ()
+                | Some new_ -> 
+                  Env.remove_passive (Iter.singleton cl); 
+                  Env.add_passive (Iter.singleton new_);
+              ));          
           ));
       )
 end
