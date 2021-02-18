@@ -446,14 +446,15 @@ module Make(E : Env.S) : S with module Env = E = struct
             Some(premise', concl', proofset, subst))
         with Unif.Fail -> None)) 
 
-  exception ClauseTooLarge
+  exception RuleNotApplicable
   let do_propagated_simpl cl = 
     let bv = CCBV.create ~size:( C.length cl ) true in
     let proofset = ref (CS.empty) in
     let exception PropagatedHTE of T.t * CS.t in
     let is_unit = C.length cl == 1 in
     try
-      if Array.length (C.lits cl) > 4 then raise ClauseTooLarge;
+      if Lits.num_equational (C.lits cl) > 3 ||
+         Array.length (C.lits cl) > 8 then raise RuleNotApplicable;
       CCArray.iteri (fun i lit -> 
         match get_predicate lit with 
         | Some (lhs, sign) ->
@@ -568,7 +569,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
       (* E.add_passive (Iter.singleton repl); *)
       Some (repl)
-    | ClauseTooLarge -> None
+    | RuleNotApplicable -> None
   
   let unit_simplify cl =
     let exception UnitHTR of T.t * CS.t in
@@ -576,7 +577,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let bv = CCBV.create ~size:n true in
     let proofset = ref CS.empty in
     try
-      if Lits.num_equational (C.lits cl) > 3 || Array.length (C.lits cl) > 5 then raise ClauseTooLarge;
+      if Lits.num_equational (C.lits cl) > 3 || Array.length (C.lits cl) > 8 then raise RuleNotApplicable;
       CCArray.iteri (fun i i_lit ->
         match get_predicate i_lit with
         | Some(i_lhs, i_sign) ->
@@ -616,7 +617,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         Util.debugf ~section 1 "used: @[%a@]" (fun k -> k (CS.pp C.pp) !proofset);
 
         Some (res))
-    with UnitHTR(lit_t, proofset) ->
+    with UnitHTR(lit_t, proofset) when n!=1 ->
       let lit_l = [L.mk_prop lit_t true] in
       let proof = 
         Proof.Step.simp ~rule:(Proof.Rule.mk "unit_htr")
@@ -628,13 +629,13 @@ module Make(E : Env.S) : S with module Env = E = struct
         (fun k -> k T.pp lit_t C.pp cl C.pp repl);
 
       Some (repl)
-    | ClauseTooLarge -> None
+    | _ -> None
 
   let do_hte_hle cl =
     let exception HiddenTauto of T.t * T.t * CS.t in
 
     let n = C.length cl in
-    if Lits.num_equational (C.lits cl) <= 3 && n <= 5 then (
+    if Lits.num_equational (C.lits cl) <= 3 && n <= 8 then (
       try 
         let bv = CCBV.create ~size:n true in
         let proofset = ref CS.empty in
@@ -747,6 +748,10 @@ module Make(E : Env.S) : S with module Env = E = struct
   let simplify_opt ~f cl =
     match f cl with
     | Some cl' ->
+      if((Literals.equal_com (C.lits cl) (C.lits cl'))) then (
+        CCFormat.printf "proof: @[%a@]@." Proof.S.pp_tstp (C.proof cl');
+        assert false;
+      );
       SimplM.return_new cl'
     | None -> 
       SimplM.return_same cl
