@@ -454,7 +454,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let is_unit = C.length cl == 1 in
     try
       if Lits.num_equational (C.lits cl) > 3 ||
-         Array.length (C.lits cl) > 8 then raise RuleNotApplicable;
+         Array.length (C.lits cl) > 6 then raise RuleNotApplicable;
       CCArray.iteri (fun i lit -> 
         match get_predicate lit with 
         | Some (lhs, sign) ->
@@ -577,7 +577,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let bv = CCBV.create ~size:n true in
     let proofset = ref CS.empty in
     try
-      if Lits.num_equational (C.lits cl) > 3 || Array.length (C.lits cl) > 8 then raise RuleNotApplicable;
+      if Lits.num_equational (C.lits cl) > 3 || Array.length (C.lits cl) > 6 then raise RuleNotApplicable;
       CCArray.iteri (fun i i_lit ->
         match get_predicate i_lit with
         | Some(i_lhs, i_sign) ->
@@ -635,7 +635,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let exception HiddenTauto of T.t * T.t * CS.t in
 
     let n = C.length cl in
-    if Lits.num_equational (C.lits cl) <= 3 && n <= 8 then (
+    if Lits.num_equational (C.lits cl) <= 3 && n <= 6 then (
       try 
         let bv = CCBV.create ~size:n true in
         let proofset = ref CS.empty in
