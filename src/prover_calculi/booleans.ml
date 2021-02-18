@@ -1220,7 +1220,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       let has_loosely_bound_0 t =
         List.mem 0 (T.DB.unbound t)
       in
-
       let rec aux t =
         match T.view t with
         | Fun(_, body) -> not (has_loosely_bound_0 t)
@@ -1232,7 +1231,8 @@ module Make(E : Env.S) : S with module Env = E = struct
         | AppBuiltin(hd, args) -> List.for_all aux args
         | _ -> true
       in
-      aux q_body
+      let res = aux q_body in
+      res
     in
 
     let rec aux t =
@@ -1631,6 +1631,16 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let setup () =
     (* Env.add_basic_simplify normalize_equalities; put into superposition right now *)
+    if Env.flex_get k_replace_unsupported_quants then (
+      Signal.once Env.on_start (fun () -> 
+        Env.ProofState.PassiveSet.clauses ()
+          |> C.ClauseSet.iter (fun cl -> 
+          match replace_unsupported_quants cl with
+          | None -> ()
+          | Some new_ -> 
+            Env.remove_passive (Iter.singleton cl); 
+            Env.add_passive (Iter.singleton new_);
+        )););
     match Env.flex_get k_bool_reasoning with 
     | BoolReasoningDisabled -> ()
     | BoolCasesPreprocess ->
@@ -1693,17 +1703,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             Env.add_unary_inf "fluid_log_hoist" fluid_log_hoist;
             Env.add_unary_inf "fluid_quant_rw" fluid_quant_rw;
           );
-          if Env.flex_get k_replace_unsupported_quants then (
-            Signal.once Env.on_start (fun () -> 
-              Env.ProofState.PassiveSet.clauses ()
-               |> C.ClauseSet.iter (fun cl -> 
-                match replace_unsupported_quants cl with
-                | None -> ()
-                | Some new_ -> 
-                  Env.remove_passive (Iter.singleton cl); 
-                  Env.add_passive (Iter.singleton new_);
-              ));          
-          ));
+        );
       )
 end
 
