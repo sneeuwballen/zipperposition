@@ -453,7 +453,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let exception PropagatedHTE of T.t * CS.t in
     let is_unit = C.length cl == 1 in
     try
-      if Lits.num_equational (C.lits cl) > 3 || Array.length (C.lits cl) > 5 then raise ClauseTooLarge;
+      if Array.length (C.lits cl) > 4 then raise ClauseTooLarge;
       CCArray.iteri (fun i lit -> 
         match get_predicate lit with 
         | Some (lhs, sign) ->
@@ -480,9 +480,6 @@ module Make(E : Env.S) : S with module Env = E = struct
                   prems_ := PremiseIdx.update_leaf !prems_ orig_premise (fun (tbl,_) -> 
                     let proofset' = CS.add unit_cl (T.Tbl.find tbl concl) in
                     if not (CS.mem cl proofset') then (
-                      CCFormat.printf "reducing @[%a@] to %d@." C.pp cl i;
-                      CCFormat.printf "proof set: @[%a@]@." (CS.pp C.pp) proofset';
-
                       raise (PropagatedHTE(lhs, proofset'));
                     );
                     true
@@ -695,7 +692,6 @@ module Make(E : Env.S) : S with module Env = E = struct
 
           Some (res))
       with HiddenTauto(lit_a,lit_b,proofset) ->
-        (* assert (validate_proofset_ proofset); *)
         let lit_l = [L.mk_prop lit_a false; L.mk_prop lit_b true] in
         let proof = 
           Proof.Step.simp ~rule:(Proof.Rule.mk "hidden_tautology_elimination")
@@ -802,7 +798,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         match new_state with
         | Some c' ->
           if not (C.equal c c') then (
-            (* untrack_clause c;  *)
+            untrack_clause c; 
             track_clause c'
           )
         | _ -> untrack_clause c (* c is redundant *))
