@@ -480,6 +480,9 @@ module Make(E : Env.S) : S with module Env = E = struct
                   prems_ := PremiseIdx.update_leaf !prems_ orig_premise (fun (tbl,_) -> 
                     let proofset' = CS.add unit_cl (T.Tbl.find tbl concl) in
                     if not (CS.mem cl proofset') then (
+                      CCFormat.printf "reducing @[%a@] to %d@." C.pp cl i;
+                      CCFormat.printf "proof set: @[%a@]@." (CS.pp C.pp) proofset';
+
                       raise (PropagatedHTE(lhs, proofset'));
                     );
                     true
@@ -566,7 +569,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       Util.debugf ~section 1 "simplified[unit_htr(%a)]: @[@[%a@] --> @[%a@]@]@. using @[%a@]"
         (fun k -> k T.pp lit_t C.pp cl C.pp repl (CS.pp C.pp) proofset);
 
-      E.add_passive (Iter.singleton repl);
+      (* E.add_passive (Iter.singleton repl); *)
       Some (repl)
     | ClauseTooLarge -> None
   
