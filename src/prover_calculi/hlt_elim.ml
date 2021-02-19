@@ -434,6 +434,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       | None -> ()
     )
 
+  let make_tauto ~proof =
+    C.create ~penalty:1 ~trail:Trail.empty [Literal.mk_tauto] proof
+
   let find_implication cl premise concl =
     retrieve_gen_prem_idx () (premise, q_sc)
     |> Iter.find (fun (premise', (tbl,_), subst) -> 
@@ -453,8 +456,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     let exception PropagatedHTE of T.t * CS.t in
     let is_unit = C.length cl == 1 in
     try
-      if Lits.num_equational (C.lits cl) > 3 ||
-         Array.length (C.lits cl) > 6 then raise RuleNotApplicable;
+      if Lits.num_equational (C.lits cl) > 3 || Array.length (C.lits cl) > 5 
+      then raise RuleNotApplicable;
       CCArray.iteri (fun i lit -> 
         match get_predicate lit with 
         | Some (lhs, sign) ->
@@ -577,7 +580,9 @@ module Make(E : Env.S) : S with module Env = E = struct
     let bv = CCBV.create ~size:n true in
     let proofset = ref CS.empty in
     try
-      if Lits.num_equational (C.lits cl) > 3 || Array.length (C.lits cl) > 6 then raise RuleNotApplicable;
+      if Lits.num_equational (C.lits cl) > 3 || Array.length (C.lits cl) > 5 
+      then raise RuleNotApplicable;
+
       CCArray.iteri (fun i i_lit ->
         match get_predicate i_lit with
         | Some(i_lhs, i_sign) ->
@@ -635,7 +640,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let exception HiddenTauto of T.t * T.t * CS.t in
 
     let n = C.length cl in
-    if Lits.num_equational (C.lits cl) <= 3 && n <= 6 then (
+    if Lits.num_equational (C.lits cl) <= 3 && n <= 5 then (
       try 
         let bv = CCBV.create ~size:n true in
         let proofset = ref CS.empty in
@@ -699,12 +704,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           (List.map C.proof_parent (cl :: CS.to_list proofset))
         in
         let repl = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof in
-        let tauto = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) [L.mk_tauto] proof in
-        Util.debugf ~section 1 "simplified[hte]: @[@[%a@] --> @[%a@]@]" (fun k -> k C.pp cl C.pp repl);
-        Util.debugf ~section 1 "used @[%a@] --> @[%a@] @[(%a)@]" (fun k -> k T.pp lit_a T.pp lit_b (CS.pp C.pp) proofset);
-        if CS.cardinal proofset != 1
-        then Env.add_passive (Iter.singleton repl); (* else the clause is subsumed by an active binary one *)
-        Some tauto
+        Some repl
     ) else None
 
   let do_context_simplification cl =
@@ -747,14 +747,8 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let simplify_opt ~f cl =
     match f cl with
-    | Some cl' ->
-      if((Literals.equal_com (C.lits cl) (C.lits cl'))) then (
-        CCFormat.printf "proof: @[%a@]@." Proof.S.pp_tstp (C.proof cl');
-        assert false;
-      );
-      SimplM.return_new cl'
-    | None -> 
-      SimplM.return_same cl
+    | Some cl' -> SimplM.return_new cl'
+    | None -> SimplM.return_same cl
 
   let simplify_cl = simplify_opt ~f:do_hte_hle
 
