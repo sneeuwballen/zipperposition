@@ -74,6 +74,9 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* constants denoting the scope of index and the query, respectively *)
   let idx_sc, q_sc = 0, 1
 
+  let app_subst ?(sc=idx_sc) ~subst t =
+    Subst.FO.apply Subst.Renaming.none subst (t,sc)
+
   (* iterate over the parts of the common context of the term --
      EXCLUDING THE EMPTY CONTEXT *)
   let iter_ctx a b k =
@@ -250,9 +253,12 @@ module Make(E : Env.S) : S with module Env = E = struct
     ) else None
 
 
-  let add_transitive_conclusions premise concl cl =
+  (* find already stored implications a -> b such that premise\sigma = b.
+     Then, store the implication a -> concl\sigma   *)
+  let extend_concl premise concl cl =
     Util.debugf ~section 3 "transitive conclusion: @[%a@] --> @[%a@]"
       (fun k -> k T.pp premise T.pp concl);
+    let to_add_concl = ref [] in
     retrieve_spec_concl_idx () (premise,q_sc)
     |> Iter.iter (fun (concl',premise',subst) ->
       (* add implication premise' -> subst (concl) *)
@@ -266,7 +272,9 @@ module Make(E : Env.S) : S with module Env = E = struct
             let proofset = CS.add cl old_proofset in
             register_cl_term cl premise';
             let concl = (Subst.FO.apply Subst.Renaming.none subst (concl, q_sc)) in
-            concls_ := ConclusionIdx.add !concls_ concl premise';
+            (* concls_ := ConclusionIdx.add !concls_ concl premise'; 
+               To avoid adding to the same object we are iterating over *)
+            to_add_concl := (concl, premise') :: !to_add_concl;
             (* ConclusionIdx.pp_keys !concls_; *)
             T.Tbl.add tbl concl proofset;
             if CCOpt.is_none is_unit then (
@@ -285,16 +293,18 @@ module Make(E : Env.S) : S with module Env = E = struct
         ignore(PremiseIdx.update_leaf !prems_ premise' (fun (tbl, is_unit) -> assert false));
         prems_  := PremiseIdx.add !prems_ premise' (tbl, Some ps)
       | _ ->  ());
-    )
+    );
+    concls_ :=  ConclusionIdx.add_list !concls_ !to_add_concl
 
-  let triggered_conclusions tbl premise' concl cl =
+  (*  *)
+  let extend_premise tbl premise' concl cl =
     let aux concl =
       T.Tbl.add tbl concl (CS.singleton cl);
       concls_ := ConclusionIdx.add !concls_ concl premise';
       (match T.view concl with
       | T.AppBuiltin(Builtin.Neq, ([_;a;b] | [a;b])) ->
         iter_ctx a b
-        |> Iter.iter (fun (a,b) -> 
+        |> Iter.iter (fun (a,b) ->
           let new_neq = T.Form.neq a b in
           T.Tbl.add tbl new_neq (CS.singleton cl);
           concls_ := ConclusionIdx.add !concls_ new_neq premise';
@@ -305,6 +315,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let max_proof_size = Env.flex_get k_max_depth in
       retrieve_gen_prem_idx () (concl, q_sc)
       |> Iter.iter (fun (_,(tbl', _),subst) -> 
+        let to_add = ref [] in
         T.Tbl.to_iter tbl'
         |> Iter.iter (fun (t,proof_set) ->
           if C.ClauseSet.cardinal proof_set < max_proof_size then (
@@ -312,9 +323,9 @@ module Make(E : Env.S) : S with module Env = E = struct
             CS.iter (fun cl -> register_cl_term cl premise') new_cls;
             let concl = (Subst.FO.apply Subst.Renaming.none subst (t, idx_sc)) in
             concls_ := ConclusionIdx.add !concls_ concl premise';
-            (* ConclusionIdx.pp_keys !concls_; *)
-            T.Tbl.add tbl concl (new_cls)
-          ))
+            to_add := (concl, new_cls) :: !to_add;
+          ));
+        CCList.iter (fun (c,n) -> T.Tbl.add tbl c n) !to_add
       ) in
     
     try
@@ -359,13 +370,12 @@ module Make(E : Env.S) : S with module Env = E = struct
     match alpha_renaming with
     | Some (premise', subst) ->
       let concl = Subst.FO.apply Subst.Renaming.none subst (concl, q_sc) in
-      let tbl_ = ref (T.Tbl.create 0) in
       let became_unit = ref None in
       prems_ := PremiseIdx.update_leaf !prems_ premise' (fun (tbl,is_unit) -> 
         if not (T.Tbl.mem tbl concl) && not (T.Tbl.mem tbl (flip_eq concl)) then (
-          triggered_conclusions tbl premise' concl cl;
+          extend_premise tbl premise' concl cl;
           if CCOpt.is_none is_unit then (
-            (match compute_is_unit !tbl_ concl cl with
+            (match compute_is_unit tbl concl cl with
             | Some ps -> became_unit := Some (ps, tbl)
             | None -> ());
           )
@@ -382,7 +392,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       | None -> ())
     | _ ->
       let tbl = T.Tbl.create 54 in
-      triggered_conclusions tbl premise concl cl;
+      extend_premise tbl premise concl cl;
       prems_ := PremiseIdx.add !prems_ premise (tbl,compute_is_unit tbl concl cl)
     
 
@@ -391,7 +401,7 @@ module Make(E : Env.S) : S with module Env = E = struct
        not (T.equal premise concl) &&
        not (T.equal premise (flip_eq concl)) then (
       remove_instances premise concl;
-      add_transitive_conclusions premise concl cl;
+      extend_concl premise concl cl;
       add_new_premise premise concl cl;
     )
 
@@ -453,10 +463,10 @@ module Make(E : Env.S) : S with module Env = E = struct
   let do_propagated_simpl cl = 
     let bv = CCBV.create ~size:( C.length cl ) true in
     let proofset = ref (CS.empty) in
-    let exception PropagatedHTE of T.t * CS.t in
+    let exception PropagatedHTE of int * CS.t in
     let is_unit = C.length cl == 1 in
     try
-      if Lits.num_equational (C.lits cl) > 3 || Array.length (C.lits cl) > 5 
+      if Lits.num_equational (C.lits cl) > 3 || Array.length (C.lits cl) > 7 
       then raise RuleNotApplicable;
       CCArray.iteri (fun i lit -> 
         match get_predicate lit with 
@@ -484,7 +494,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                   prems_ := PremiseIdx.update_leaf !prems_ orig_premise (fun (tbl,_) -> 
                     let proofset' = CS.add unit_cl (T.Tbl.find tbl concl) in
                     if not (CS.mem cl proofset') then (
-                      raise (PropagatedHTE(lhs, proofset'));
+                      raise (PropagatedHTE(i, proofset'));
                     );
                     true
                   );
@@ -505,7 +515,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                   |> CCOpt.map (fun (_, unit_cl, _) -> 
                     let proofset' = CS.add unit_cl ps in
                     if not (CS.mem cl proofset') then (
-                      raise (PropagatedHTE(lhs, proofset'));
+                      raise (PropagatedHTE(i, proofset'));
             )))))));
 
           (* checking if we can kill the literal i *)
@@ -559,28 +569,28 @@ module Make(E : Env.S) : S with module Env = E = struct
         in
         Some (C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof)
       )
-    with PropagatedHTE(lit_t, proofset) ->
-      let lit_l = [L.mk_prop lit_t true] in
+    with PropagatedHTE(i, proofset) ->
+      let lit_l = [CCArray.get (C.lits cl) i] in
       let proof = 
         Proof.Step.simp ~rule:(Proof.Rule.mk "propagated_htr")
         (List.map C.proof_parent (cl :: CS.to_list proofset))
       in
       let repl = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof in
 
-      Util.debugf ~section 1 "simplified[unit_htr(%a)]: @[@[%a@] --> @[%a@]@]@. using @[%a@]"
-        (fun k -> k T.pp lit_t C.pp cl C.pp repl (CS.pp C.pp) proofset);
+      Util.debugf ~section 1 "simplified[unit_htr]: @[@[%a@] --> @[%a@]@]@. using @[%a@]"
+        (fun k -> k C.pp cl C.pp repl (CS.pp C.pp) proofset);
 
       (* E.add_passive (Iter.singleton repl); *)
       Some (repl)
     | RuleNotApplicable -> None
   
   let unit_simplify cl =
-    let exception UnitHTR of T.t * CS.t in
+    let exception UnitHTR of int * CS.t in
     let n = C.length cl in
     let bv = CCBV.create ~size:n true in
     let proofset = ref CS.empty in
     try
-      if Lits.num_equational (C.lits cl) > 3 || Array.length (C.lits cl) > 5 
+      if Lits.num_equational (C.lits cl) > 3 || Array.length (C.lits cl) > 7 
       then raise RuleNotApplicable;
 
       CCArray.iteri (fun i i_lit ->
@@ -598,7 +608,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             |> Iter.find_map (fun (_, (_,is_unit), _) -> is_unit)
           in
           (match unit_htr () with
-          | Some cs -> raise (UnitHTR(i_t, cs))
+          | Some cs -> raise (UnitHTR(i, cs))
           | None -> (
               match unit_hle () with
               | Some cs ->
@@ -617,30 +627,30 @@ module Make(E : Env.S) : S with module Env = E = struct
         in
         let res = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof in
 
-        Util.debugf ~section 1 "simplified[hle]: @[%a@] --> @[%a@]" 
+        Util.debugf ~section 2 "simplified[hle]: @[%a@] --> @[%a@]" 
           (fun k -> k C.pp cl C.pp res);
-        Util.debugf ~section 1 "used: @[%a@]" (fun k -> k (CS.pp C.pp) !proofset);
+        Util.debugf ~section 2 "used: @[%a@]" (fun k -> k (CS.pp C.pp) !proofset);
 
         Some (res))
-    with UnitHTR(lit_t, proofset) when n!=1 ->
-      let lit_l = [L.mk_prop lit_t true] in
+    with UnitHTR(i, proofset) when n!=1 ->
+      let lit_l = [CCArray.get (C.lits cl) i] in
       let proof = 
         Proof.Step.simp ~rule:(Proof.Rule.mk "unit_htr")
         (List.map C.proof_parent (cl :: CS.to_list proofset))
       in
       let repl = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof in
 
-      Util.debugf ~section 1 "simplified[unit_htr(%a)]: @[@[%a@] --> @[%a@]@]" 
-        (fun k -> k T.pp lit_t C.pp cl C.pp repl);
+      Util.debugf ~section 1 "simplified[unit_htr]: @[@[%a@] --> @[%a@]@]" 
+        (fun k -> k C.pp cl C.pp repl);
 
       Some (repl)
     | _ -> None
 
   let do_hte_hle cl =
-    let exception HiddenTauto of T.t * T.t * CS.t in
+    let exception HiddenTauto of int * int * CS.t in
 
     let n = C.length cl in
-    if Lits.num_equational (C.lits cl) <= 3 && n <= 5 then (
+    if Lits.num_equational (C.lits cl) <= 3 && n <= 7 then (
       try 
         let bv = CCBV.create ~size:n true in
         let proofset = ref CS.empty in
@@ -654,13 +664,13 @@ module Make(E : Env.S) : S with module Env = E = struct
               | Some (j_lhs, j_sign) when CCBV.get bv j && i!=j ->
                 let j_t = lit_to_term (j_lhs) (j_sign) in
                 let j_neg_t = lit_to_term ~negate:true (j_lhs) (j_sign) in
-                if Env.flex_get k_hte then (
+                if Env.flex_get k_hte && C.length cl != 2 then (
                   (match find_implication cl i_neg_t j_t with
                   | Some (lit_a, lit_b, proofset, subst) 
                       when (not (CS.mem cl proofset)) && 
                           (C.length cl != 2 || not (Subst.is_renaming subst)) ->
                     (* stopping further search *)
-                    raise (HiddenTauto (lit_a, lit_b, proofset))
+                    raise (HiddenTauto (i, j, proofset))
                   | _ -> ())
                 );
                 if Env.flex_get k_hle then (
@@ -692,19 +702,23 @@ module Make(E : Env.S) : S with module Env = E = struct
           in
           let res = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof in
 
-          Util.debugf ~section 1 "simplified[hle]: @[%a@] --> @[%a@]" 
+          Util.debugf ~section 2 "simplified[hle]: @[%a@] --> @[%a@]" 
             (fun k -> k C.pp cl C.pp res);
-          Util.debugf ~section 1 "used: @[%a@]" (fun k -> k (CS.pp C.pp) !proofset);
+          Util.debugf ~section 2 "used: @[%a@]" (fun k -> k (CS.pp C.pp) !proofset);
 
           Some (res))
-      with HiddenTauto(lit_a,lit_b,proofset) ->
-        let lit_l = [L.mk_prop lit_a false; L.mk_prop lit_b true] in
+      with HiddenTauto(i,j,proofset) ->
+        let lit_l = [CCArray.get (C.lits cl) i; CCArray.get (C.lits cl) j] in
         let proof = 
           Proof.Step.simp ~rule:(Proof.Rule.mk "hidden_tautology_elimination")
           (List.map C.proof_parent (cl :: CS.to_list proofset))
         in
-        let repl = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof in
-        Some repl
+        Some (C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof)
+        |> CCFun.tap (function
+          | Some res ->
+            Util.debugf ~section 1 "HTR(@[%a@])=@[%a@]@. > @[%a@]" 
+              (fun k -> k C.pp cl C.pp res (CS.pp C.pp) proofset);
+          | _ -> ())
     ) else None
 
   let do_context_simplification cl =
