@@ -60,7 +60,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let compare = C.compare
   end)
 
-  module PropagatedLitsIdx = NPDtree.MakeTerm(struct 
+  module PropagatedLitsIdx = Fingerprint.Make(struct 
     type t = CS.t
     let compare = CS.compare
   end)
@@ -69,10 +69,15 @@ module Make(E : Env.S) : S with module Env = E = struct
   let concls_ = ref (ConclusionIdx.empty ())
   let units_ = ref (UnitIdx.empty ())
   let propagated_ = ref (PropagatedLitsIdx.empty ())
+  let propagated_size_ = ref 0 
   (* occurrences of the clause in the prems_ and propagated_ *)
   let cl_occs = ref Util.Int_map.empty
   (* clauses tracked so far *)
   let tracked_cls = ref 0
+
+  let should_update_propagated () =
+    Env.flex_get k_unit_propagated_hle &&
+    !propagated_size_ <= (2 * Env.flex_get k_max_tracked_clauses)
 
   let [@inline] tracking_eq () =
     Env.flex_get k_track_eq
@@ -220,33 +225,35 @@ module Make(E : Env.S) : S with module Env = E = struct
     in
     cl_occs := Util.Int_map.add (C.id cl) (premises, Term.Set.add premise propagated) !cl_occs
 
-  let register_prop_lit lit_t cl cs =
+  let register_propagated_lit lit_t cl cs =
     let has_renaming = ref false in
     let to_remove = ref [] in
     retrieve_idx ~getter:(PropagatedLitsIdx.retrieve_specializations (!propagated_, idx_sc)) (lit_t,q_sc)
     |> Iter.iter (fun (t, _, subst) ->
       if Subst.is_renaming subst then has_renaming := true
-      else to_remove := t :: !to_remove
+      else (to_remove := t :: !to_remove; decr propagated_size_)
     );
     List.iter (fun t -> propagated_ := 
       PropagatedLitsIdx.update_leaf !propagated_ t (fun _ -> false)) 
     !to_remove;
+    assert (!propagated_size_ >= 0);
     if not !has_renaming then (
       let proofset = CS.add cl cs in
       CS.iter (fun c -> register_cl_propagated c lit_t) proofset;
-      propagated_ := PropagatedLitsIdx.add !propagated_ lit_t proofset
+      propagated_ := PropagatedLitsIdx.add !propagated_ lit_t proofset;
+      incr propagated_size_
     )
 
+  let cnt = ref 0 
   let react_unit_added unit_cl unit_term =
-    retrieve_idx ~getter:(PremiseIdx.retrieve_unifiables (!prems_, idx_sc)) (unit_term, q_sc)
-    |> Iter.iter (fun (_, (concls,_), subst) ->
-      let subst = Unif_subst.subst subst in
-      T.Tbl.to_iter concls
-      |> Iter.iter (fun (concl,cs) -> 
-        let concl = Subst.FO.apply Subst.Renaming.none subst (concl, idx_sc) in
-        register_prop_lit concl unit_cl cs))
-
-
+    if should_update_propagated () then (
+      retrieve_idx ~getter:(PremiseIdx.retrieve_unifiables (!prems_, idx_sc)) (unit_term, q_sc)
+      |> Iter.iter (fun (_, (concls,_), subst) ->
+        let subst = Unif_subst.subst subst in
+        T.Tbl.to_iter concls
+        |> Iter.iter (fun (concl,cs) -> 
+          let concl = Subst.FO.apply Subst.Renaming.none subst (concl, idx_sc) in
+          register_propagated_lit concl unit_cl cs)))
 
   let generalization_present premise concl =
     retrieve_gen_prem_idx () (premise, q_sc)
@@ -310,11 +317,14 @@ module Make(E : Env.S) : S with module Env = E = struct
             register_cl_premise cl premise';
             let concl = (Subst.FO.apply Subst.Renaming.none subst (concl, q_sc)) in
 
-            retrieve_idx ~getter:(UnitIdx.retrieve_unifiables (!units_, idx_sc)) (premise', q_sc)
-            |> Iter.iter (fun (_, cl, subst) -> 
-              let subst = Unif_subst.subst subst in
-              let concl = Subst.FO.apply Subst.Renaming.none subst (concl, q_sc) in
-              register_prop_lit concl cl proofset 
+            if should_update_propagated () then (
+              retrieve_idx ~getter:(UnitIdx.retrieve_unifiables (!units_, idx_sc)) 
+                (premise', q_sc)
+              |> Iter.iter (fun (_, cl, subst) -> 
+                let subst = Unif_subst.subst subst in
+                let concl = Subst.FO.apply Subst.Renaming.none subst (concl, q_sc) in
+                register_propagated_lit concl cl proofset 
+              );
             );
 
             (* To avoid adding to the same object we are iterating over *)
@@ -418,13 +428,16 @@ module Make(E : Env.S) : S with module Env = E = struct
       prems_ := PremiseIdx.update_leaf !prems_ premise' (fun (tbl,is_unit) -> 
         if not (T.Tbl.mem tbl concl) && not (T.Tbl.mem tbl (flip_eq concl)) then (
           extend_premise tbl premise' concl cl;
-          retrieve_idx ~getter:(UnitIdx.retrieve_unifiables (!units_, idx_sc)) (premise', q_sc)
-          |> Iter.iter (fun (_, cl, subst) -> 
-            Iter.iter (fun (concl, ps) -> 
-              let subst = Unif_subst.subst subst in
-              let concl = Subst.FO.apply Subst.Renaming.none subst (concl, q_sc) in
-              register_prop_lit concl cl ps
-            ) (T.Tbl.to_iter tbl);
+          if should_update_propagated () then (
+            retrieve_idx ~getter:(UnitIdx.retrieve_unifiables (!units_, idx_sc)) 
+              (premise', q_sc)
+            |> Iter.iter (fun (_, cl, subst) -> 
+              Iter.iter (fun (concl, ps) -> 
+                let subst = Unif_subst.subst subst in
+                let concl = Subst.FO.apply Subst.Renaming.none subst (concl, q_sc) in
+                register_propagated_lit concl cl ps
+              ) (T.Tbl.to_iter tbl);
+            );
           );
           if CCOpt.is_none is_unit then (
             (match compute_is_unit tbl concl cl with
@@ -445,13 +458,16 @@ module Make(E : Env.S) : S with module Env = E = struct
     | _ ->
       let tbl = T.Tbl.create 54 in
       extend_premise tbl premise concl cl;
-      retrieve_idx ~getter:(UnitIdx.retrieve_unifiables (!units_, idx_sc)) (premise, q_sc)
-      |> Iter.iter (fun (_, cl, subst) -> 
-        Iter.iter (fun (concl, ps) -> 
-          let subst = Unif_subst.subst subst in
-          let concl = Subst.FO.apply Subst.Renaming.none subst (concl, q_sc) in
-          register_prop_lit concl cl ps
-        ) (T.Tbl.to_iter tbl);
+      if should_update_propagated () then (
+        retrieve_idx ~getter:(UnitIdx.retrieve_unifiables (!units_, idx_sc)) 
+          (premise, q_sc)
+        |> Iter.iter (fun (_, cl, subst) -> 
+          Iter.iter (fun (concl, ps) -> 
+            let subst = Unif_subst.subst subst in
+            let concl = Subst.FO.apply Subst.Renaming.none subst (concl, q_sc) in
+            register_propagated_lit concl cl ps
+          ) (T.Tbl.to_iter tbl);
+        );
       );
       prems_ := PremiseIdx.add !prems_ premise (tbl,compute_is_unit tbl concl cl)
     
@@ -534,9 +550,11 @@ module Make(E : Env.S) : S with module Env = E = struct
           let i_t = lit_to_term (i_lhs) (i_sign) in
           let i_neg_t = lit_to_term ~negate:true (i_lhs) (i_sign) in
           
-          retrieve_idx ~getter:(PropagatedLitsIdx.retrieve_generalizations (!propagated_, idx_sc)) (i_t, q_sc)
-          |> Iter.head
-          |> CCOpt.iter (fun (_,ps,_) -> raise (UnitHTR(i,ps)));
+          if n!=1 then (
+            retrieve_idx ~getter:(PropagatedLitsIdx.retrieve_generalizations (!propagated_, idx_sc)) 
+              (i_t, q_sc)
+            |> Iter.head
+            |> CCOpt.iter (fun (_,ps,_) -> raise (UnitHTR(i,ps))));
 
           retrieve_idx ~getter:(PropagatedLitsIdx.retrieve_generalizations (!propagated_, idx_sc)) (i_neg_t, q_sc)
           |> Iter.head
