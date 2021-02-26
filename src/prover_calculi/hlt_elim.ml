@@ -77,7 +77,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let should_update_propagated () =
     Env.flex_get k_unit_propagated_hle &&
-    !propagated_size_ <= (4 * Env.flex_get k_max_tracked_clauses)
+    !propagated_size_ <= (2 * Env.flex_get k_max_tracked_clauses)
 
   let [@inline] tracking_eq () =
     Env.flex_get k_track_eq
@@ -513,7 +513,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       PremiseIdx.iter !prems_ (fun t (tbl,_) -> 
         Util.debugf ~section 3 "@[%a@] --> @[%a@]" (fun k -> k T.pp t (Iter.pp_seq T.pp) (T.Tbl.keys tbl))
       );
-    ) else if should_update_propagated () then (
+    ) else if Env.flex_get k_unit_propagated_hle then (
       match get_unit_predicate cl with
       | Some unit ->
         react_unit_added cl unit;
@@ -573,9 +573,9 @@ module Make(E : Env.S) : S with module Env = E = struct
         in
         let res = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof in
 
-        Util.debugf ~section 1 "simplified[fle]: @[%a@] --> @[%a@]" 
+        Util.debugf ~section 2 "simplified[fle]: @[%a@] --> @[%a@]" 
           (fun k -> k C.pp cl C.pp res);
-        Util.debugf ~section 1 "used: @[%a@]" (fun k -> k (CS.pp C.pp) !proofset);
+        Util.debugf ~section 2 "used: @[%a@]" (fun k -> k (CS.pp C.pp) !proofset);
 
         Some (res))
 
