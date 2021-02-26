@@ -65,8 +65,10 @@ module Make(E : Env.S) : S with module Env = E = struct
   let units_ = ref (UnitIdx.empty ())
   (* occurrences of the clause in the premise_idx *)
   let cl_occs = ref Util.Int_map.empty
-  (* clauses tracked so far *)
-  let tracked_cls = ref 0
+  (* binary clauses tracked so far *)
+  let tracked_binary = ref 0
+  (* binary clauses tracked so far *)
+  let tracked_unary = ref 0
 
   let [@inline] tracking_eq () =
     Env.flex_get k_track_eq
@@ -391,7 +393,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         prems_ := PremiseIdx.add !prems_ premise (tbl,Some ps)
       | None -> ())
     | _ ->
-      let tbl = T.Tbl.create 54 in
+      let tbl = T.Tbl.create 64 in
       extend_premise tbl premise concl cl;
       prems_ := PremiseIdx.add !prems_ premise (tbl,compute_is_unit tbl concl cl)
     
@@ -420,27 +422,40 @@ module Make(E : Env.S) : S with module Env = E = struct
                            (lit_to_term a_lhs a_sign) cl)
     | _ -> ()
   
-  let limit_not_reached () =
-    let tracked = !tracked_cls in
+  let can_track_bin_cl cl =
+    let tracked = !tracked_binary in
     let tracked_max = Env.flex_get k_max_tracked_clauses in
-    tracked_max == -1 || tracked <= tracked_max
+    cl_is_ht_trackable cl &&
+    ((Env.flex_get k_clauses_to_track == `All && (Env.is_active cl)) ||
+    tracked_max == -1 || tracked <= tracked_max)
+  
+  let can_track_unary_cl cl =
+    let tracked = !tracked_unary in
+    let tracked_max = 2*Env.flex_get k_max_tracked_clauses in
+    Env.flex_get k_unit_propagated_hle &&
+    ((Env.flex_get k_clauses_to_track == `All && (Env.is_active cl)) ||
+    tracked_max == -1 || tracked <= tracked_max)
+
 
   let track_clause cl =
-    if cl_is_ht_trackable cl && limit_not_reached () then (
+    if can_track_bin_cl cl then (
       Util.debugf ~section 3 "tracking @[%a@]" (fun k -> k C.pp cl);
       
       insert_into_indices cl;
-      incr tracked_cls;
+      if not (Env.flex_get k_clauses_to_track == `All && Env.is_active cl )
+      then incr tracked_binary;
       
       Util.debugf ~section 2 "idx_size: @[%d@]" (fun k -> k (PremiseIdx.size !prems_));
       Util.debugf ~section 3 "premises:" CCFun.id;
       PremiseIdx.iter !prems_ (fun t (tbl,_) -> 
         Util.debugf ~section 3 "@[%a@] --> @[%a@]" (fun k -> k T.pp t (Iter.pp_seq T.pp) (T.Tbl.keys tbl))
       );
-    ) else if Env.flex_get k_unit_propagated_hle then (
+    ) else if can_track_unary_cl cl then (
       match get_unit_predicate cl with
       | Some unit ->
-        units_ := UnitIdx.add !units_ unit cl
+        units_ := UnitIdx.add !units_ unit cl;
+        if not (Env.flex_get k_clauses_to_track == `All && Env.is_active cl) 
+        then incr tracked_unary
       | None -> ()
     )
 
@@ -474,7 +489,6 @@ module Make(E : Env.S) : S with module Env = E = struct
           let lhs_neg = lit_to_term ~negate:true lhs sign in 
           let lhs = lit_to_term lhs sign in
           let unit_sc = (max idx_sc q_sc) + 1 in
-          let (<+>) = CCOpt.(<+>) in
 
           (* checking if we can replace the clause with the literal i  *)
           if is_unit then ()
@@ -498,25 +512,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                     );
                     true
                   );
-                ))
-            <+> (
-              (* for the literal l we are looking for implications p -> c such that
-                  p\sigma = ~l. Then we see if there is an unit clause p' such that
-                  ~c\sigma = p'\rho *)
-              retrieve_gen_prem_idx () (lhs_neg, q_sc)
-              |> Iter.find_map ( fun (premise, (tbl, _), subst) ->
-                T.Tbl.to_iter tbl
-                |> Iter.find_map (fun (concl, ps) ->
-                  let concl = Subst.FO.apply Subst.Renaming.none subst (concl, idx_sc) in
-                  let neg_concl = normalize_negations (T.Form.not_ concl) in
-                  let unit_sc = (max idx_sc q_sc) + 1 in
-                  retrieve_gen_unit_idx unit_sc (neg_concl, idx_sc)
-                  |> Iter.head
-                  |> CCOpt.map (fun (_, unit_cl, _) -> 
-                    let proofset' = CS.add unit_cl ps in
-                    if not (CS.mem cl proofset') then (
-                      raise (PropagatedHTE(i, proofset'));
-            )))))));
+                ))));
 
           (* checking if we can kill the literal i *)
           CCOpt.get_or ~default:()
@@ -537,27 +533,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                     proofset := CS.union (CS.add unit_cl (proofset')) !proofset;
                     CCBV.reset bv i);
                   true
-                );
-              ))
-          <+> (
-            (* for the literal l we are looking for implications p -> c such that
-                p\sigma = l. Then we see if there is an unit clause p' such that
-                ~c\sigma = p'\rho *)
-            retrieve_gen_prem_idx () (lhs, q_sc)
-            |> Iter.find_map ( fun (_, (tbl, _), subst) ->
-              T.Tbl.to_iter tbl
-              |> Iter.find_map (fun (concl, ps) ->
-                let concl = Subst.FO.apply Subst.Renaming.none subst (concl, idx_sc) in
-                let neg_concl = normalize_negations (T.Form.not_ concl) in
-                let unit_sc = (max idx_sc q_sc) + 1 in
-                retrieve_gen_unit_idx unit_sc (neg_concl, idx_sc)
-                |> Iter.head
-                |> CCOpt.map (fun (_, unit_cl, _) -> 
-                  let proofset' = CS.add unit_cl ps in
-                  if not (CS.mem cl proofset') then (
-                    proofset := CS.union proofset' !proofset;
-                    CCBV.reset bv i
-          ))))))
+                ))))
         | None -> ()
       ) (C.lits cl);
       if CCBV.is_empty (CCBV.negate bv) then None
@@ -786,12 +762,15 @@ module Make(E : Env.S) : S with module Env = E = struct
     | _ -> ());
     if Util.Int_map.mem (C.id cl) !cl_occs then (
       Util.debugf ~section 3 "removed: @[%a@]." (fun k -> k C.pp cl);
-      decr tracked_cls;
+      if not (Env.flex_get k_clauses_to_track == `All && Env.is_active cl) 
+      then decr tracked_binary;
     );
     cl_occs := Util.Int_map.remove (C.id cl) !cl_occs;
     match get_unit_predicate cl with
     | Some unit ->
-      units_ := UnitIdx.remove !units_ unit cl 
+      units_ := UnitIdx.remove !units_ unit cl;
+      if not (Env.flex_get k_clauses_to_track == `All && Env.is_active cl)
+      then decr tracked_unary;
     | None -> ()
     
 
