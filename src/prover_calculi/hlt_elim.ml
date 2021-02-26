@@ -229,8 +229,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       else to_remove := t :: !to_remove
     );
     List.iter (fun t -> propagated_ := 
-      PropagatedLitsIdx.update_leaf !propagated_ t (fun _ -> false)) 
-    !to_remove;
+      PropagatedLitsIdx.update_leaf !propagated_ t (fun _ -> false)) !to_remove;
     if not !has_renaming then (
       let proofset = CS.add cl cs in
       CS.iter (fun c -> register_cl_propagated c lit_t) proofset;
@@ -445,14 +444,6 @@ module Make(E : Env.S) : S with module Env = E = struct
     | _ ->
       let tbl = T.Tbl.create 54 in
       extend_premise tbl premise concl cl;
-      retrieve_idx ~getter:(UnitIdx.retrieve_unifiables (!units_, idx_sc)) (premise, q_sc)
-      |> Iter.iter (fun (_, cl, subst) -> 
-        Iter.iter (fun (concl, ps) -> 
-          let subst = Unif_subst.subst subst in
-          let concl = Subst.FO.apply Subst.Renaming.none subst (concl, q_sc) in
-          register_prop_lit concl cl ps
-        ) (T.Tbl.to_iter tbl);
-      );
       prems_ := PremiseIdx.add !prems_ premise (tbl,compute_is_unit tbl concl cl)
     
 
@@ -522,60 +513,11 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   exception RuleNotApplicable
 
-  let do_propagated_simpl cl =
-    let n = C.length cl in
-    let bv = CCBV.create ~size:n true in
-    let exception UnitHTR of int * CS.t in
-    let proofset = ref CS.empty in
-    try
-      CCArray.iteri (fun i lit -> 
-        match get_predicate lit with
-        | Some (i_lhs, i_sign) ->
-          let i_t = lit_to_term (i_lhs) (i_sign) in
-          let i_neg_t = lit_to_term ~negate:true (i_lhs) (i_sign) in
-          
-          retrieve_idx ~getter:(PropagatedLitsIdx.retrieve_generalizations (!propagated_, idx_sc)) (i_t, q_sc)
-          |> Iter.head
-          |> CCOpt.iter (fun (_,ps,_) -> raise (UnitHTR(i,ps)));
-
-          retrieve_idx ~getter:(PropagatedLitsIdx.retrieve_generalizations (!propagated_, idx_sc)) (i_neg_t, q_sc)
-          |> Iter.head
-          |> CCOpt.iter (fun (_,ps,_) -> 
-            proofset := CS.union ps !proofset;
-            CCBV.reset bv i)
-        | None -> ()
-      ) (C.lits cl);
-
-      if CCBV.is_empty (CCBV.negate bv) then None
-      else (
-        let lit_l = List.rev @@ CCBV.select bv (C.lits cl) in
-        let proof = 
-          Proof.Step.simp ~rule:(Proof.Rule.mk "fle")
-          (List.map C.proof_parent (cl :: CS.to_list !proofset))
-        in
-        let res = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof in
-
-        Util.debugf ~section 2 "simplified[fle]: @[%a@] --> @[%a@]" 
-          (fun k -> k C.pp cl C.pp res);
-        Util.debugf ~section 2 "used: @[%a@]" (fun k -> k (CS.pp C.pp) !proofset);
-
-        Some (res))
-
-    with UnitHTR(idx, ps) -> 
-      let lit_l = [CCArray.get (C.lits cl) idx] in
-      let proof =
-        Proof.Step.simp ~rule:(Proof.Rule.mk "flr")
-        (List.map C.proof_parent (cl :: CS.to_list ps))
-      in
-      let repl = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof in
-
-      Util.debugf ~section 2 "simplified[unit_htr]: @[@[%a@] --> @[%a@]@]" 
-        (fun k -> k C.pp cl C.pp repl);
-
-      Some (repl)
+  let do_propagated_simpl cl = 
+    invalid_arg " to be reimplemented "
   
-  let flr_fle cl =
-    let exception FLR of int * CS.t in
+  let unit_simplify cl =
+    let exception UnitHTR of int * CS.t in
     let n = C.length cl in
     let bv = CCBV.create ~size:n true in
     let proofset = ref CS.empty in
@@ -598,7 +540,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             |> Iter.find_map (fun (_, (_,is_unit), _) -> is_unit)
           in
           (match unit_htr () with
-          | Some cs -> raise (FLR(i, cs))
+          | Some cs -> raise (UnitHTR(i, cs))
           | None -> (
               match unit_hle () with
               | Some cs ->
@@ -612,7 +554,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       else (
         let lit_l = List.rev @@ CCBV.select bv (C.lits cl) in
         let proof = 
-          Proof.Step.simp ~rule:(Proof.Rule.mk "fle")
+          Proof.Step.simp ~rule:(Proof.Rule.mk "unit_hle")
           (List.map C.proof_parent (cl :: CS.to_list !proofset))
         in
         let res = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof in
@@ -622,10 +564,10 @@ module Make(E : Env.S) : S with module Env = E = struct
         Util.debugf ~section 2 "used: @[%a@]" (fun k -> k (CS.pp C.pp) !proofset);
 
         Some (res))
-    with FLR(i, proofset) when n!=1 ->
+    with UnitHTR(i, proofset) when n!=1 ->
       let lit_l = [CCArray.get (C.lits cl) i] in
       let proof = 
-        Proof.Step.simp ~rule:(Proof.Rule.mk "flr")
+        Proof.Step.simp ~rule:(Proof.Rule.mk "unit_htr")
         (List.map C.proof_parent (cl :: CS.to_list proofset))
       in
       let repl = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof in
@@ -758,7 +700,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let propagated_hle_hte = simplify_opt ~f:do_propagated_simpl
 
-  let unit_htr = simplify_opt ~f:flr_fle
+  let unit_htr = simplify_opt ~f:unit_simplify
 
   let ctx_simpl = simplify_opt ~f:do_context_simplification
 
