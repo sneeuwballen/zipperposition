@@ -430,7 +430,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let can_track_unary_cl cl =
     Env.flex_get k_unit_propagated_hle &&
     (Env.flex_get k_max_tracked_clauses == -1 || 
-     !tracked_unary <= 2*Env.flex_get k_max_tracked_clauses)
+     !tracked_unary <= 4*Env.flex_get k_max_tracked_clauses)
 
 
   let track_clause cl =
@@ -900,7 +900,7 @@ let extension =
   in
   { Extensions.default with
       Extensions.name = "hidden literal elimination";
-      prio = 100;
+      prio = 45;
       env_actions=[register]
   }
 
