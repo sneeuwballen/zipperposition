@@ -423,18 +423,14 @@ module Make(E : Env.S) : S with module Env = E = struct
     | _ -> ()
   
   let can_track_bin_cl cl =
-    let tracked = !tracked_binary in
-    let tracked_max = Env.flex_get k_max_tracked_clauses in
     cl_is_ht_trackable cl &&
-    ((Env.flex_get k_clauses_to_track == `All && (Env.is_active cl)) ||
-    tracked_max == -1 || tracked <= tracked_max)
+    (Env.flex_get k_max_tracked_clauses == -1 || 
+     !tracked_binary <= Env.flex_get k_max_tracked_clauses)
   
   let can_track_unary_cl cl =
-    let tracked = !tracked_unary in
-    let tracked_max = 2*Env.flex_get k_max_tracked_clauses in
     Env.flex_get k_unit_propagated_hle &&
-    ((Env.flex_get k_clauses_to_track == `All && (Env.is_active cl)) ||
-    tracked_max == -1 || tracked <= tracked_max)
+    (Env.flex_get k_max_tracked_clauses == -1 || 
+     !tracked_unary <= 2*Env.flex_get k_max_tracked_clauses)
 
 
   let track_clause cl =
@@ -442,8 +438,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       Util.debugf ~section 3 "tracking @[%a@]" (fun k -> k C.pp cl);
       
       insert_into_indices cl;
-      if not (Env.flex_get k_clauses_to_track == `All && Env.is_active cl )
-      then incr tracked_binary;
+      incr tracked_binary;
       
       Util.debugf ~section 2 "idx_size: @[%d@]" (fun k -> k (PremiseIdx.size !prems_));
       Util.debugf ~section 3 "premises:" CCFun.id;
@@ -454,8 +449,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       match get_unit_predicate cl with
       | Some unit ->
         units_ := UnitIdx.add !units_ unit cl;
-        if not (Env.flex_get k_clauses_to_track == `All && Env.is_active cl) 
-        then incr tracked_unary
+        incr tracked_unary
       | None -> ()
     )
 
@@ -480,6 +474,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let proofset = ref (CS.empty) in
     let exception PropagatedHTE of int * CS.t in
     let is_unit = C.length cl == 1 in
+    let (<+>) = CCOpt.(<+>) in
     try
       if Lits.num_equational (C.lits cl) > 3 || Array.length (C.lits cl) > 7 
       then raise RuleNotApplicable;
@@ -512,7 +507,25 @@ module Make(E : Env.S) : S with module Env = E = struct
                     );
                     true
                   );
-                ))));
+                ))
+            <+> (
+              (* for the literal l we are looking for implications p -> c such that
+                  p\sigma = ~l. Then we see if there is an unit clause p' such that
+                  ~c\sigma = p'\rho *)
+              retrieve_gen_prem_idx () (lhs_neg, q_sc)
+              |> Iter.find_map ( fun (premise, (tbl, _), subst) ->
+                T.Tbl.to_iter tbl
+                |> Iter.find_map (fun (concl, ps) ->
+                  let concl = Subst.FO.apply Subst.Renaming.none subst (concl, idx_sc) in
+                  let neg_concl = normalize_negations (T.Form.not_ concl) in
+                  let unit_sc = (max idx_sc q_sc) + 1 in
+                  retrieve_gen_unit_idx unit_sc (neg_concl, idx_sc)
+                  |> Iter.head
+                  |> CCOpt.map (fun (_, unit_cl, _) -> 
+                    let proofset' = CS.add unit_cl ps in
+                    if not (CS.mem cl proofset') then (
+                      raise (PropagatedHTE(i, proofset'));
+            )))))));
 
           (* checking if we can kill the literal i *)
           CCOpt.get_or ~default:()
@@ -533,7 +546,26 @@ module Make(E : Env.S) : S with module Env = E = struct
                     proofset := CS.union (CS.add unit_cl (proofset')) !proofset;
                     CCBV.reset bv i);
                   true
-                ))))
+                )))
+          <+> (
+            (* for the literal l we are looking for implications p -> c such that
+                p\sigma = l. Then we see if there is an unit clause p' such that
+                ~c\sigma = p'\rho *)
+            retrieve_gen_prem_idx () (lhs, q_sc)
+            |> Iter.find_map ( fun (_, (tbl, _), subst) ->
+              T.Tbl.to_iter tbl
+              |> Iter.find_map (fun (concl, ps) ->
+                let concl = Subst.FO.apply Subst.Renaming.none subst (concl, idx_sc) in
+                let neg_concl = normalize_negations (T.Form.not_ concl) in
+                let unit_sc = (max idx_sc q_sc) + 1 in
+                retrieve_gen_unit_idx unit_sc (neg_concl, idx_sc)
+                |> Iter.head
+                |> CCOpt.map (fun (_, unit_cl, _) -> 
+                  let proofset' = CS.add unit_cl ps in
+                  if not (CS.mem cl proofset') then (
+                    proofset := CS.union proofset' !proofset;
+                    CCBV.reset bv i
+          ))))))
         | None -> ()
       ) (C.lits cl);
       if CCBV.is_empty (CCBV.negate bv) then None
@@ -762,15 +794,13 @@ module Make(E : Env.S) : S with module Env = E = struct
     | _ -> ());
     if Util.Int_map.mem (C.id cl) !cl_occs then (
       Util.debugf ~section 3 "removed: @[%a@]." (fun k -> k C.pp cl);
-      if not (Env.flex_get k_clauses_to_track == `All && Env.is_active cl) 
-      then decr tracked_binary;
+      decr tracked_binary;
     );
     cl_occs := Util.Int_map.remove (C.id cl) !cl_occs;
     match get_unit_predicate cl with
     | Some unit ->
       units_ := UnitIdx.remove !units_ unit cl;
-      if not (Env.flex_get k_clauses_to_track == `All && Env.is_active cl)
-      then decr tracked_unary;
+      decr tracked_unary;
     | None -> ()
     
 
