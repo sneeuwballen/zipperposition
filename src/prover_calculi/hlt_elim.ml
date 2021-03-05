@@ -60,7 +60,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let compare = C.compare
   end)
 
-  module PropagatedLitsIdx = Fingerprint.Make(struct 
+  module PropagatedLitsIdx = NPDtree.MakeTerm(struct 
     type t = CS.t
     let compare = CS.compare
   end)
@@ -85,7 +85,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let should_update_propagated () =
     Env.flex_get k_unit_propagated_hle &&
-    !propagated_size_ <= (2 * Env.flex_get k_max_tracked_clauses)
+    !propagated_size_ <= (Env.flex_get k_max_tracked_clauses)
 
   let app_subst ?(sc=idx_sc) ~subst t =
     Subst.FO.apply Subst.Renaming.none subst (t,sc)
@@ -342,14 +342,16 @@ module Make(E : Env.S) : S with module Env = E = struct
                 match compute_is_unit tbl concl cl with
                 | Some proofset -> became_unit := Some(proofset,tbl)
                 | None -> ());
-              if should_update_propagated () then (
+              (* if should_update_propagated () then (
                 retrieve_idx ~getter:(UnitIdx.retrieve_unifiables (!units_, idx_sc)) 
                   (premise', q_sc)
                 |> Iter.iter (fun (_, cl, subst) -> 
                   let subst = Unif_subst.subst subst in
                   let concl = Subst.FO.apply Subst.Renaming.none subst (concl, q_sc) in
                   register_propagated_lit concl cl proofset 
-                ))))
+                ))
+                 *)
+                ))
         | None -> assert false;);
         (* if by adding concl something became unit we remove
            the leaf as the new one with updated unit status will be added *)
@@ -441,7 +443,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         if not (T.Tbl.mem tbl concl) && not (T.Tbl.mem tbl (flip_eq concl)) &&
            T.Tbl.length tbl <= 128  then (
           extend_premise tbl premise' concl cl;
-          if should_update_propagated () then (
+          (* if should_update_propagated () then (
             retrieve_idx ~getter:(UnitIdx.retrieve_unifiables (!units_, idx_sc)) 
               (premise', q_sc)
             |> Iter.iter (fun (_, cl, subst) -> 
@@ -449,7 +451,8 @@ module Make(E : Env.S) : S with module Env = E = struct
                 let subst = Unif_subst.subst subst in
                 let concl = Subst.FO.apply Subst.Renaming.none subst (concl, q_sc) in
                 register_propagated_lit concl cl ps
-              ) (T.Tbl.to_iter tbl)));
+              ) (T.Tbl.to_iter tbl)
+              )); *)
           if CCOpt.is_none is_unit then (
             (match compute_is_unit tbl concl cl with
             | Some ps -> became_unit := Some (ps, tbl)
@@ -561,6 +564,11 @@ module Make(E : Env.S) : S with module Env = E = struct
   let make_tauto ~proof =
     C.create ~penalty:1 ~trail:Trail.empty [Literal.mk_tauto] proof
 
+  let penalize_hidden_tautology cl = 
+    if not @@ ID.Set.exists (fun id -> Signature.sym_in_conj id (Env.signature ())) 
+      (C.symbols (Iter.singleton cl)) 
+    then (C.inc_penalty cl 1)
+
   let find_implication cl premise concl =
     retrieve_gen_prem_idx () (premise, q_sc)
     |> Iter.find (fun (premise', (tbl,_), subst) -> 
@@ -604,7 +612,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       else (
         let lit_l = List.rev @@ CCBV.select bv (C.lits cl) in
         let proof = 
-          Proof.Step.simp ~rule:(Proof.Rule.mk "fle")
+          Proof.Step.simp ~rule:(Proof.Rule.mk "unit_hle")
           (List.map C.proof_parent (cl :: CS.to_list !proofset))
         in
         let res = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof in
@@ -618,10 +626,11 @@ module Make(E : Env.S) : S with module Env = E = struct
     with UnitHTR(idx, ps) -> 
       let lit_l = [CCArray.get (C.lits cl) idx] in
       let proof =
-        Proof.Step.simp ~rule:(Proof.Rule.mk "flr")
+        Proof.Step.simp ~rule:(Proof.Rule.mk "unit_htr")
         (List.map C.proof_parent (cl :: CS.to_list ps))
       in
       let repl = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof in
+      penalize_hidden_tautology repl;
 
       Util.debugf ~section 2 "simplified[unit_htr]: @[@[%a@] --> @[%a@]@]" 
         (fun k -> k C.pp cl C.pp repl);
@@ -683,6 +692,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         (List.map C.proof_parent (cl :: CS.to_list proofset))
       in
       let repl = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof in
+      penalize_hidden_tautology repl;
 
       Util.debugf ~section 2 "simplified[ftr]: @[@[%a@] --> @[%a@]@]" 
         (fun k -> k C.pp cl C.pp repl);
@@ -758,8 +768,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           (List.map C.proof_parent (cl :: CS.to_list proofset))
         in
         let repl = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof in 
-        if not @@ ID.Set.exists (fun id -> Signature.sym_in_conj id (Env.signature ())) 
-          (C.symbols (Iter.singleton repl)) then (C.inc_penalty repl 1);
+        penalize_hidden_tautology repl;
         Some repl 
         |> CCFun.tap (function
           | Some res ->
