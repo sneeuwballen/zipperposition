@@ -60,9 +60,16 @@ module Make(E : Env.S) : S with module Env = E = struct
     let compare = C.compare
   end)
 
+  module PropagatedLitsIdx = Fingerprint.Make(struct 
+    type t = CS.t
+    let compare = CS.compare
+  end)
+
   let prems_ = ref (PremiseIdx.empty ())
   let concls_ = ref (ConclusionIdx.empty ())
   let units_ = ref (UnitIdx.empty ())
+  let propagated_ = ref (PropagatedLitsIdx.empty ())
+  let propagated_size_ = ref 0
   (* occurrences of the clause in the premise_idx *)
   let cl_occs = ref Util.Int_map.empty
   (* binary clauses tracked so far *)
@@ -76,11 +83,15 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* constants denoting the scope of index and the query, respectively *)
   let idx_sc, q_sc = 0, 1
 
+  let should_update_propagated () =
+    Env.flex_get k_unit_propagated_hle &&
+    !propagated_size_ <= (2 * Env.flex_get k_max_tracked_clauses)
+
   let app_subst ?(sc=idx_sc) ~subst t =
     Subst.FO.apply Subst.Renaming.none subst (t,sc)
 
   let register_conclusion ~tbl ~premise concl proofset =
-    if not @@ T.Tbl.mem tbl concl then (
+    if not @@ T.Tbl.mem tbl concl && T.depth concl <= 4 then (
       T.Tbl.add tbl concl proofset;
       concls_ := ConclusionIdx.add !concls_ concl premise) 
 
@@ -213,10 +224,55 @@ module Make(E : Env.S) : S with module Env = E = struct
     normalize_negations (if sign then a_lhs else T.Form.not_ a_lhs)
 
   let register_cl_term cl premise =
-    let premise_set = 
-      Term.Set.add premise
-      (Util.Int_map.get_or ~default:Term.Set.empty (C.id cl) !cl_occs) in
-    cl_occs := Util.Int_map.add (C.id cl) premise_set !cl_occs
+    let premises, propagated = 
+      Util.Int_map.get_or ~default:(Term.Set.empty, Term.Set.empty) (C.id cl) !cl_occs
+    in
+    cl_occs := Util.Int_map.add (C.id cl) ((Term.Set.add premise premises), propagated) !cl_occs
+  
+  let register_cl_propagated cl premise =
+    let premises, propagated = 
+      Util.Int_map.get_or ~default:(Term.Set.empty, Term.Set.empty) (C.id cl) !cl_occs
+    in
+    cl_occs := Util.Int_map.add (C.id cl) (premises, Term.Set.add premise propagated) !cl_occs
+
+  let register_propagated_lit lit_t cl cs =
+    let has_renaming = ref false in
+    let to_remove = ref Term.Set.empty in
+
+    
+    retrieve_idx ~getter:(PropagatedLitsIdx.retrieve_specializations (!propagated_, idx_sc)) (lit_t,q_sc)
+    |> Iter.iter (fun (t, _, subst) ->
+      if Subst.is_renaming subst then has_renaming := true
+      else (to_remove := Term.Set.add t !to_remove;)
+    );
+    if not @@ Term.Set.is_empty !to_remove then (
+      Util.debugf ~section 2 "removing: @[%a@]" (fun k -> k (Term.Set.pp T.pp) !to_remove));
+    Term.Set.iter (fun t -> 
+      decr propagated_size_;
+      propagated_ := 
+        PropagatedLitsIdx.update_leaf !propagated_ t (fun _ -> false)) 
+    !to_remove;
+
+    if not (!propagated_size_ >= 0) then (
+      CCFormat.printf "prop size: %d@." !propagated_size_;
+      assert false
+    );
+    if not !has_renaming then (
+      let proofset = CS.add cl cs in
+      CS.iter (fun c -> register_cl_propagated c lit_t) proofset;
+      propagated_ := PropagatedLitsIdx.add !propagated_ lit_t proofset;
+      incr propagated_size_
+    )
+  
+  let react_unit_added unit_cl unit_term =
+    if should_update_propagated () then (
+      retrieve_idx ~getter:(PremiseIdx.retrieve_unifiables (!prems_, idx_sc)) (unit_term, q_sc)
+      |> Iter.iter (fun (_, (concls,_), subst) ->
+        let subst = Unif_subst.subst subst in
+        T.Tbl.to_iter concls
+        |> Iter.iter (fun (concl,cs) -> 
+          let concl = Subst.FO.apply Subst.Renaming.none subst (concl, idx_sc) in
+          register_propagated_lit concl unit_cl cs)))
 
   let generalization_present premise concl =
     retrieve_gen_prem_idx () (premise, q_sc)
@@ -278,16 +334,22 @@ module Make(E : Env.S) : S with module Env = E = struct
         | Some old_proofset ->
           if CS.cardinal old_proofset < Env.flex_get k_max_depth then (
             let concl = (Subst.FO.apply Subst.Renaming.none subst (concl, q_sc)) in
-            if not @@ T.Tbl.mem tbl concl then(
+            if not @@ T.Tbl.mem tbl concl && T.depth concl <= 4 && T.Tbl.length tbl <= 128 then(
               let proofset = CS.add cl old_proofset in
               register_cl_term cl premise';
               to_add_concl := (concl, premise', proofset, tbl) :: !to_add_concl;
               if CCOpt.is_none is_unit then (
                 match compute_is_unit tbl concl cl with
                 | Some proofset -> became_unit := Some(proofset,tbl)
-                | None -> ()
-              ))
-          )
+                | None -> ());
+              if should_update_propagated () then (
+                retrieve_idx ~getter:(UnitIdx.retrieve_unifiables (!units_, idx_sc)) 
+                  (premise', q_sc)
+                |> Iter.iter (fun (_, cl, subst) -> 
+                  let subst = Unif_subst.subst subst in
+                  let concl = Subst.FO.apply Subst.Renaming.none subst (concl, q_sc) in
+                  register_propagated_lit concl cl proofset 
+                ))))
         | None -> assert false;);
         (* if by adding concl something became unit we remove
            the leaf as the new one with updated unit status will be added *)
@@ -323,10 +385,11 @@ module Make(E : Env.S) : S with module Env = E = struct
         T.Tbl.to_iter tbl'
         |> Iter.iter (fun (t,proof_set) ->
           if C.ClauseSet.cardinal proof_set < max_proof_size then (
-            let new_cls = CS.add cl proof_set in
-            CS.iter (fun cl -> register_cl_term cl premise') new_cls;
             let concl = (Subst.FO.apply Subst.Renaming.none subst (t, idx_sc)) in
-            to_add := (concl, new_cls) :: !to_add;
+            if T.depth concl <= 4 then (
+              let new_cls = CS.add cl proof_set in
+              CS.iter (fun cl -> register_cl_term cl premise') new_cls;
+              to_add := (concl, new_cls) :: !to_add);
           ));
         CCList.iter (fun (c,n) -> register_conclusion ~tbl ~premise:premise' c n) !to_add
       ) in
@@ -375,8 +438,18 @@ module Make(E : Env.S) : S with module Env = E = struct
       let concl = Subst.FO.apply Subst.Renaming.none subst (concl, q_sc) in
       let became_unit = ref None in
       prems_ := PremiseIdx.update_leaf !prems_ premise' (fun (tbl,is_unit) -> 
-        if not (T.Tbl.mem tbl concl) && not (T.Tbl.mem tbl (flip_eq concl)) then (
+        if not (T.Tbl.mem tbl concl) && not (T.Tbl.mem tbl (flip_eq concl)) &&
+           T.Tbl.length tbl <= 128  then (
           extend_premise tbl premise' concl cl;
+          if should_update_propagated () then (
+            retrieve_idx ~getter:(UnitIdx.retrieve_unifiables (!units_, idx_sc)) 
+              (premise', q_sc)
+            |> Iter.iter (fun (_, cl, subst) -> 
+              Iter.iter (fun (concl, ps) -> 
+                let subst = Unif_subst.subst subst in
+                let concl = Subst.FO.apply Subst.Renaming.none subst (concl, q_sc) in
+                register_propagated_lit concl cl ps
+              ) (T.Tbl.to_iter tbl)));
           if CCOpt.is_none is_unit then (
             (match compute_is_unit tbl concl cl with
             | Some ps -> became_unit := Some (ps, tbl)
@@ -396,16 +469,40 @@ module Make(E : Env.S) : S with module Env = E = struct
     | _ ->
       let tbl = T.Tbl.create 64 in
       extend_premise tbl premise concl cl;
+      if should_update_propagated () then (
+        retrieve_idx ~getter:(UnitIdx.retrieve_unifiables (!units_, idx_sc)) 
+          (premise, q_sc)
+        |> Iter.iter (fun (_, cl, subst) -> 
+          Iter.iter (fun (concl, ps) -> 
+            let subst = Unif_subst.subst subst in
+            let concl = Subst.FO.apply Subst.Renaming.none subst (concl, q_sc) in
+            register_propagated_lit concl cl ps
+          ) (T.Tbl.to_iter tbl);
+        );
+      );
+
       prems_ := PremiseIdx.add !prems_ premise (tbl,compute_is_unit tbl concl cl)
     
+
+  let normalize_variables premise concl = 
+    let to_rename = T.VarSet.diff (T.vars concl) (T.vars premise) in
+    if T.VarSet.is_empty to_rename then premise,concl
+    else (
+      let renamer = T.VarSet.fold (fun var subst ->
+        let ty = HVar.ty var in
+        Subst.FO.bind' subst (var, 0) (T.var (HVar.fresh ~ty ()), 0)
+      ) to_rename Subst.empty in
+      premise, Subst.FO.apply Subst.Renaming.none renamer (concl,0)
+    )
 
   let max_t_depth = 3 
   let insert_implication premise concl cl =
     if T.depth premise <= max_t_depth && T.depth concl <= max_t_depth &&
-       not (generalization_present premise concl) &&
        not (T.equal premise concl) &&
-       not (T.equal premise (flip_eq concl)) then (
+       not (T.equal premise (flip_eq concl) &&
+       not (generalization_present premise concl)) then (
       Util.debugf ~section 3 "inserting @[%a@] -> @[%a@]" (fun k -> k T.pp premise T.pp concl);
+      let premise, concl = normalize_variables premise concl in
       remove_instances premise concl;
       extend_concl premise concl cl;
       add_new_premise premise concl cl;
@@ -443,9 +540,8 @@ module Make(E : Env.S) : S with module Env = E = struct
         Util.debugf ~section 2 "idx_size: @[%d@]" (fun k -> k (PremiseIdx.size !prems_));
         Util.debugf ~section 2 "premises:" CCFun.id;
         PremiseIdx.iter !prems_ (fun t (tbl,_) -> 
-          Util.debugf ~section 2 "@[%a@] --> [@[%a@]]" (fun k -> k T.pp t (Iter.pp_seq (fun out (t,v) -> 
-            CCFormat.fprintf out "@[%a@]/@[%a@]" T.pp t (Iter.pp_seq CCInt.pp) (Iter.map C.id (CS.to_iter v))
-          )) (T.Tbl.to_iter tbl))
+          Util.debugf ~section 2 "@[%a@]:%d --> [@[%a@]]" (fun k -> k T.pp t 
+          (T.Tbl.length tbl) (Iter.pp_seq CCInt.pp) (Iter.map T.depth @@ T.Tbl.keys tbl) )
       ));
     if can_track_bin_cl cl then (
       Util.debugf ~section 2 "tracking @[%a@]" (fun k -> k C.pp cl);
@@ -456,6 +552,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       match get_unit_predicate cl with
       | Some unit ->
         units_ := UnitIdx.add !units_ unit cl;
+        react_unit_added cl unit;
         incr tracked_unary
       | None -> ()
     );
@@ -477,131 +574,59 @@ module Make(E : Env.S) : S with module Env = E = struct
         with Unif.Fail -> None)) 
 
   exception RuleNotApplicable
-  let do_propagated_simpl cl = 
-    let bv = CCBV.create ~size:( C.length cl ) true in
-    let proofset = ref (CS.empty) in
-    let exception PropagatedHTE of int * CS.t in
-    let is_unit = C.length cl == 1 in
-    let (<+>) = CCOpt.(<+>) in
+  let do_propagated_simpl cl =
+    let n = C.length cl in
+    let bv = CCBV.create ~size:n true in
+    let exception UnitHTR of int * CS.t in
+    let proofset = ref CS.empty in
     try
-      if Lits.num_equational (C.lits cl) > 3 || Array.length (C.lits cl) > 7 
-      then raise RuleNotApplicable;
       CCArray.iteri (fun i lit -> 
-        match get_predicate lit with 
-        | Some (lhs, sign) ->
-          let lhs_neg = lit_to_term ~negate:true lhs sign in 
-          let lhs = lit_to_term lhs sign in
-          let unit_sc = (max idx_sc q_sc) + 1 in
+        match get_predicate lit with
+        | Some (i_lhs, i_sign) ->
+          let i_t = lit_to_term (i_lhs) (i_sign) in
+          let i_neg_t = lit_to_term ~negate:true (i_lhs) (i_sign) in
+          
+          if n!=1 then (
+            retrieve_idx ~getter:(PropagatedLitsIdx.retrieve_generalizations (!propagated_, idx_sc)) 
+              (i_t, q_sc)
+            |> Iter.head
+            |> CCOpt.iter (fun (_,ps,_) -> raise (UnitHTR(i,ps))));
 
-          (* checking if we can replace the clause with the literal i  *)
-          if is_unit then ()
-          else (
-            CCOpt.get_or ~default:()
-            (
-              (* for the literal l we are looking for implications p -> c such that
-                  c\sigma = l. Then we see if there is an unit clause p' such that
-                  p\sigma = p'\rho *)
-              retrieve_gen_concl_idx () (lhs, q_sc)
-              |> Iter.find_map (fun (concl, premise, subst) ->
-                let orig_premise = premise in
-                let premise = Subst.FO.apply Subst.Renaming.none subst (premise, idx_sc) in
-                retrieve_gen_unit_idx unit_sc (premise, idx_sc)
-                |> Iter.head
-                |> CCOpt.map (fun (_, unit_cl, _) -> 
-                  prems_ := PremiseIdx.update_leaf !prems_ orig_premise (fun (tbl,_) -> 
-                    let proofset' = CS.add unit_cl (T.Tbl.find tbl concl) in
-                    if not (CS.mem cl proofset') then (
-                      raise (PropagatedHTE(i, proofset'));
-                    );
-                    true
-                  );
-                ))
-            <+> (
-              (* for the literal l we are looking for implications p -> c such that
-                  p\sigma = ~l. Then we see if there is an unit clause p' such that
-                  ~c\sigma = p'\rho *)
-              retrieve_gen_prem_idx () (lhs_neg, q_sc)
-              |> Iter.find_map ( fun (premise, (tbl, _), subst) ->
-                T.Tbl.to_iter tbl
-                |> Iter.find_map (fun (concl, ps) ->
-                  let concl = Subst.FO.apply Subst.Renaming.none subst (concl, idx_sc) in
-                  let neg_concl = normalize_negations (T.Form.not_ concl) in
-                  let unit_sc = (max idx_sc q_sc) + 1 in
-                  retrieve_gen_unit_idx unit_sc (neg_concl, idx_sc)
-                  |> Iter.head
-                  |> CCOpt.map (fun (_, unit_cl, _) -> 
-                    let proofset' = CS.add unit_cl ps in
-                    if not (CS.mem cl proofset') then (
-                      raise (PropagatedHTE(i, proofset'));
-            )))))));
-
-          (* checking if we can kill the literal i *)
-          CCOpt.get_or ~default:()
-          (
-            (* for the literal l we are looking for implications p -> c such that
-                c\sigma = ~l. Then we see if there is an unit clause p' such that
-                p\sigma = p'\rho *)
-            retrieve_gen_concl_idx () (lhs_neg, q_sc)
-            |> Iter.find_map (fun (concl, premise, subst) ->
-              let orig_premise = premise in
-              let premise = Subst.FO.apply Subst.Renaming.none subst (premise, idx_sc) in
-              retrieve_gen_unit_idx unit_sc (premise, idx_sc)
-              |> Iter.head
-              |> CCOpt.map (fun (_, unit_cl, _) -> 
-                prems_ := PremiseIdx.update_leaf !prems_ orig_premise (fun (tbl,_) -> 
-                  let proofset' = T.Tbl.find tbl concl in
-                  if not (CS.mem cl proofset') then (
-                    proofset := CS.union (CS.add unit_cl (proofset')) !proofset;
-                    CCBV.reset bv i);
-                  true
-                )))
-          <+> (
-            (* for the literal l we are looking for implications p -> c such that
-                p\sigma = l. Then we see if there is an unit clause p' such that
-                ~c\sigma = p'\rho *)
-            retrieve_gen_prem_idx () (lhs, q_sc)
-            |> Iter.find_map ( fun (_, (tbl, _), subst) ->
-              T.Tbl.to_iter tbl
-              |> Iter.find_map (fun (concl, ps) ->
-                let concl = Subst.FO.apply Subst.Renaming.none subst (concl, idx_sc) in
-                let neg_concl = normalize_negations (T.Form.not_ concl) in
-                let unit_sc = (max idx_sc q_sc) + 1 in
-                retrieve_gen_unit_idx unit_sc (neg_concl, idx_sc)
-                |> Iter.head
-                |> CCOpt.map (fun (_, unit_cl, _) -> 
-                  let proofset' = CS.add unit_cl ps in
-                  if not (CS.mem cl proofset') then (
-                    proofset := CS.union proofset' !proofset;
-                    CCBV.reset bv i
-          ))))))
+          retrieve_idx ~getter:(PropagatedLitsIdx.retrieve_generalizations (!propagated_, idx_sc)) (i_neg_t, q_sc)
+          |> Iter.head
+          |> CCOpt.iter (fun (_,ps,_) -> 
+            proofset := CS.union ps !proofset;
+            CCBV.reset bv i)
         | None -> ()
       ) (C.lits cl);
+
       if CCBV.is_empty (CCBV.negate bv) then None
       else (
-        let lit_l = List.rev (CCBV.select bv (C.lits cl)) in
+        let lit_l = List.rev @@ CCBV.select bv (C.lits cl) in
         let proof = 
-          Proof.Step.simp ~rule:(Proof.Rule.mk "propagated_hle")
+          Proof.Step.simp ~rule:(Proof.Rule.mk "fle")
           (List.map C.proof_parent (cl :: CS.to_list !proofset))
         in
         let res = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof in
 
-        Util.debugf ~section 1 "simplified[unit_hle]: @[@[%a@] --> @[%a@]@]@. using @[%a@]"
-          (fun k -> k C.pp cl C.pp res (CS.pp C.pp) !proofset);
-        Some (res)
-      )
-    with PropagatedHTE(i, proofset) ->
-      let lit_l = [CCArray.get (C.lits cl) i] in
-      let proof = 
-        Proof.Step.simp ~rule:(Proof.Rule.mk "propagated_htr")
-        (List.map C.proof_parent (cl :: CS.to_list proofset))
+        Util.debugf ~section 2 "simplified[fle]: @[%a@] --> @[%a@]" 
+          (fun k -> k C.pp cl C.pp res);
+        Util.debugf ~section 2 "used: @[%a@]" (fun k -> k (CS.pp C.pp) !proofset);
+
+        Some (res))
+
+    with UnitHTR(idx, ps) -> 
+      let lit_l = [CCArray.get (C.lits cl) idx] in
+      let proof =
+        Proof.Step.simp ~rule:(Proof.Rule.mk "flr")
+        (List.map C.proof_parent (cl :: CS.to_list ps))
       in
       let repl = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof in
 
-      Util.debugf ~section 1 "simplified[unit_htr]: @[@[%a@] --> @[%a@]@]@. using @[%a@]"
-        (fun k -> k C.pp cl C.pp repl (CS.pp C.pp) proofset);
+      Util.debugf ~section 2 "simplified[unit_htr]: @[@[%a@] --> @[%a@]@]" 
+        (fun k -> k C.pp cl C.pp repl);
 
       Some (repl)
-    | RuleNotApplicable -> None
   
   let unit_simplify cl =
     let exception UnitHTR of int * CS.t in
@@ -646,7 +671,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         in
         let res = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof in
 
-        Util.debugf ~section 1 "simplified[fle]: @[%a@] --> @[%a@]" 
+        Util.debugf ~section 2 "simplified[fle]: @[%a@] --> @[%a@]" 
           (fun k -> k C.pp cl C.pp res);
         Util.debugf ~section 2 "used: @[%a@]" (fun k -> k (CS.pp C.pp) !proofset);
 
@@ -659,7 +684,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       in
       let repl = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof in
 
-      Util.debugf ~section 1 "simplified[ftr]: @[@[%a@] --> @[%a@]@]" 
+      Util.debugf ~section 2 "simplified[ftr]: @[@[%a@] --> @[%a@]@]" 
         (fun k -> k C.pp cl C.pp repl);
 
       Some (repl)
@@ -721,7 +746,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           in
           let res = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof in
 
-          Util.debugf ~section 1 "simplified[hle]: @[%a@] --> @[%a@]" 
+          Util.debugf ~section 2 "simplified[hle]: @[%a@] --> @[%a@]" 
             (fun k -> k C.pp cl C.pp res);
           Util.debugf ~section 2 "used: @[%a@]" (fun k -> k (CS.pp C.pp) !proofset);
 
@@ -738,7 +763,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         Some repl 
         |> CCFun.tap (function
           | Some res ->
-            Util.debugf ~section 1 "HTR(@[%a@])=@[%a@]@. > @[%a@]" 
+            Util.debugf ~section 2 "HTR(@[%a@])=@[%a@]@. > @[%a@]" 
               (fun k -> k C.pp cl C.pp res (CS.pp C.pp) proofset);
           | _ -> ()
         )
@@ -797,7 +822,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let untrack_clause cl =
     (match Util.Int_map.get (C.id cl) !cl_occs with
-    | Some premises ->
+    | Some (premises, propagated) ->
       Term.Set.iter (fun premise ->
         prems_ := PremiseIdx.update_leaf !prems_ premise (fun (tbl,_) -> 
           T.Tbl.filter_map_inplace (fun concl proofset -> 
@@ -806,6 +831,11 @@ module Make(E : Env.S) : S with module Env = E = struct
               None
             ) else Some proofset) tbl;
           T.Tbl.length tbl != 0)) premises;
+      Term.Set.iter (fun prop_lit -> 
+        propagated_ := PropagatedLitsIdx.update_leaf !propagated_ prop_lit (fun cs ->
+        if (not @@ CS.mem cl cs) then (decr propagated_size_; false) else true
+        )
+      ) propagated
     | _ -> ());
     if Util.Int_map.mem (C.id cl) !cl_occs then (
       Util.debugf ~section 3 "removed: @[%a@]." (fun k -> k C.pp cl);
