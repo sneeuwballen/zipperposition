@@ -21,6 +21,8 @@ let k_hle = Flex_state.create_key ()
 let k_max_tracked_clauses = Flex_state.create_key ()
 let k_track_eq = Flex_state.create_key ()
 let k_insert_only_ordered = Flex_state.create_key ()
+let k_heartbeat_steps = Flex_state.create_key ()
+let k_heartbeat_disabled_hlbe = Flex_state.create_key ()
 
 
 module type S = sig
@@ -65,6 +67,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     let compare = CS.compare
   end)
 
+  exception RuleNotApplicable
+
   let prems_ = ref (PremiseIdx.empty ())
   let concls_ = ref (ConclusionIdx.empty ())
   let units_ = ref (UnitIdx.empty ())
@@ -76,6 +80,8 @@ module Make(E : Env.S) : S with module Env = E = struct
   let tracked_binary = ref 0
   (* binary clauses tracked so far *)
   let tracked_unary = ref 0
+  (* HLBE heartbeat will be set as soons as one rule modifies a clause *)
+  let heartbeat_ = ref false
 
   let [@inline] tracking_eq () =
     Env.flex_get k_track_eq
@@ -539,27 +545,31 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let steps = ref 0
   let track_clause cl =
-    if !steps mod 256 = 0 then (
-        Util.debugf ~section 2 "idx_size: @[%d@]" (fun k -> k (PremiseIdx.size !prems_));
-        Util.debugf ~section 2 "premises:" CCFun.id;
-        PremiseIdx.iter !prems_ (fun t (tbl,_) -> 
-          Util.debugf ~section 2 "@[%a@]:%d --> [@[%a@]]" (fun k -> k T.pp t 
-          (T.Tbl.length tbl) (Iter.pp_seq CCInt.pp) (Iter.map T.depth @@ T.Tbl.keys tbl) )
-      ));
-    if can_track_bin_cl cl then (
-      Util.debugf ~section 2 "tracking @[%a@]" (fun k -> k C.pp cl);
-      
-      insert_into_indices cl;
-      incr tracked_binary;
-    ) else if can_track_unary_cl cl then (
-      match get_unit_predicate cl with
-      | Some unit ->
-        units_ := UnitIdx.add !units_ unit cl;
-        react_unit_added cl unit;
-        incr tracked_unary
-      | None -> ()
-    );
-    incr steps
+    try
+      incr steps;
+      if Env.flex_get k_heartbeat_disabled_hlbe then raise RuleNotApplicable;
+      (match Env.flex_get k_heartbeat_steps with
+      | Some h_steps when !steps mod h_steps = 0 ->
+        if !heartbeat_ then heartbeat_ := false
+        else (
+          Env.flex_add k_heartbeat_disabled_hlbe true;
+          raise RuleNotApplicable;
+        )
+      | _ -> ());
+
+      if can_track_bin_cl cl then (
+        Util.debugf ~section 2 "tracking @[%a@]" (fun k -> k C.pp cl);
+        
+        insert_into_indices cl;
+        incr tracked_binary;
+      ) else if can_track_unary_cl cl then (
+        match get_unit_predicate cl with
+        | Some unit ->
+          units_ := UnitIdx.add !units_ unit cl;
+          react_unit_added cl unit;
+          incr tracked_unary
+        | None -> ());
+    with RuleNotApplicable -> ()
 
   let make_tauto ~proof =
     C.create ~penalty:1 ~trail:Trail.empty [Literal.mk_tauto] proof
@@ -581,13 +591,14 @@ module Make(E : Env.S) : S with module Env = E = struct
             Some(premise', concl', proofset, subst))
         with Unif.Fail -> None)) 
 
-  exception RuleNotApplicable
   let do_propagated_simpl cl =
     let n = C.length cl in
     let bv = CCBV.create ~size:n true in
     let exception UnitHTR of int * CS.t in
     let proofset = ref CS.empty in
     try
+      if Env.flex_get k_heartbeat_disabled_hlbe then raise RuleNotApplicable;
+      if n>6 then raise RuleNotApplicable;
       CCArray.iteri (fun i lit -> 
         match get_predicate lit with
         | Some (i_lhs, i_sign) ->
@@ -636,6 +647,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         (fun k -> k C.pp cl C.pp repl);
 
       Some (repl)
+    | RuleNotApplicable -> None
   
   let unit_simplify cl =
     let exception UnitHTR of int * CS.t in
@@ -643,8 +655,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     let bv = CCBV.create ~size:n true in
     let proofset = ref CS.empty in
     try
-      if Lits.num_equational (C.lits cl) > 3 || Array.length (C.lits cl) > 7 
-      then raise RuleNotApplicable;
+      if Env.flex_get k_heartbeat_disabled_hlbe then raise RuleNotApplicable;
+      if Array.length (C.lits cl) > 6 then raise RuleNotApplicable;
 
       CCArray.iteri (fun i i_lit ->
         match get_predicate i_lit with
@@ -704,79 +716,80 @@ module Make(E : Env.S) : S with module Env = E = struct
     let exception HiddenTauto of int * int * CS.t in
 
     let n = C.length cl in
-    if Lits.num_equational (C.lits cl) <= 3 && n <= 7 then (
-      try 
-        let bv = CCBV.create ~size:n true in
-        let proofset = ref CS.empty in
-        CCArray.iteri (fun i i_lit ->
-          match get_predicate i_lit with
-          | Some(i_lhs, i_sign) when CCBV.get bv i -> 
-            let i_t = lit_to_term (i_lhs) (i_sign) in
-            let i_neg_t = lit_to_term ~negate:true (i_lhs) (i_sign) in
-            CCArray.iteri (fun j j_lit ->
-              begin match get_predicate j_lit with
-              | Some (j_lhs, j_sign) when CCBV.get bv j && i!=j ->
-                let j_t = lit_to_term (j_lhs) (j_sign) in
-                let j_neg_t = lit_to_term ~negate:true (j_lhs) (j_sign) in
-                if Env.flex_get k_hte && C.length cl != 2 then (
-                  (match find_implication cl i_neg_t j_t with
-                  | Some (lit_a, lit_b, proofset, subst) 
-                      when (not (CS.mem cl proofset)) && 
-                          (C.length cl != 2 || not (Subst.is_renaming subst)) ->
-                    (* stopping further search *)
-                    raise (HiddenTauto (i, j, proofset))
-                  | _ -> ())
-                );
-                if Env.flex_get k_hle then (
-                  let (<+>) = CCOpt.(<+>) in
-                  (match find_implication cl i_neg_t j_neg_t
-                         <+> find_implication cl j_t i_t with
-                    | Some (_, _, proofset',subst) ->
-                      CCBV.reset bv j;
+    try
+      if Env.flex_get k_heartbeat_disabled_hlbe then raise RuleNotApplicable;
+      if n > 6 then raise RuleNotApplicable; 
+      let bv = CCBV.create ~size:n true in
+      let proofset = ref CS.empty in
+      CCArray.iteri (fun i i_lit ->
+        match get_predicate i_lit with
+        | Some(i_lhs, i_sign) when CCBV.get bv i -> 
+          let i_t = lit_to_term (i_lhs) (i_sign) in
+          let i_neg_t = lit_to_term ~negate:true (i_lhs) (i_sign) in
+          CCArray.iteri (fun j j_lit ->
+            begin match get_predicate j_lit with
+            | Some (j_lhs, j_sign) when CCBV.get bv j && i!=j ->
+              let j_t = lit_to_term (j_lhs) (j_sign) in
+              let j_neg_t = lit_to_term ~negate:true (j_lhs) (j_sign) in
+              if Env.flex_get k_hte && C.length cl != 2 then (
+                (match find_implication cl i_neg_t j_t with
+                | Some (lit_a, lit_b, proofset, subst) 
+                    when (not (CS.mem cl proofset)) && 
+                        (C.length cl != 2 || not (Subst.is_renaming subst)) ->
+                  (* stopping further search *)
+                  raise (HiddenTauto (i, j, proofset))
+                | _ -> ())
+              );
+              if Env.flex_get k_hle then (
+                let (<+>) = CCOpt.(<+>) in
+                (match find_implication cl i_neg_t j_neg_t
+                        <+> find_implication cl j_t i_t with
+                  | Some (_, _, proofset',subst) ->
+                    CCBV.reset bv j;
 
-                      Util.debugf ~section 3 "@[%a@] --> @[%a@]" 
-                        (fun k -> k T.pp i_neg_t T.pp j_neg_t);
-                      Util.debugf ~section 3 "used(%d): @[%a@]" 
-                        (fun k -> k j (CS.pp C.pp) proofset');
+                    Util.debugf ~section 3 "@[%a@] --> @[%a@]" 
+                      (fun k -> k T.pp i_neg_t T.pp j_neg_t);
+                    Util.debugf ~section 3 "used(%d): @[%a@]" 
+                      (fun k -> k j (CS.pp C.pp) proofset');
 
-                      proofset := CS.union proofset' !proofset
-                    | _ -> () )
-                )
-              | _ -> () end
-            ) (C.lits cl)
-          | _ -> ()
-        ) (C.lits cl);
-        
-        if CCBV.is_empty (CCBV.negate bv) then None
-        else (
-          let lit_l = List.rev @@ CCBV.select bv (C.lits cl) in
-          let proof = 
-            Proof.Step.simp ~rule:(Proof.Rule.mk "hidden_literal_elimination")
-            (List.map C.proof_parent (cl :: CS.to_list !proofset))
-          in
-          let res = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof in
-
-          Util.debugf ~section 2 "simplified[hle]: @[%a@] --> @[%a@]" 
-            (fun k -> k C.pp cl C.pp res);
-          Util.debugf ~section 2 "used: @[%a@]" (fun k -> k (CS.pp C.pp) !proofset);
-
-          Some (res))
-      with HiddenTauto(i,j,proofset) ->
-        let lit_l = [CCArray.get (C.lits cl) i; CCArray.get (C.lits cl) j] in
+                    proofset := CS.union proofset' !proofset
+                  | _ -> () )
+              )
+            | _ -> () end
+          ) (C.lits cl)
+        | _ -> ()
+      ) (C.lits cl);
+      
+      if CCBV.is_empty (CCBV.negate bv) then None
+      else (
+        let lit_l = List.rev @@ CCBV.select bv (C.lits cl) in
         let proof = 
-          Proof.Step.simp ~rule:(Proof.Rule.mk "hidden_tautology_elimination")
-          (List.map C.proof_parent (cl :: CS.to_list proofset))
+          Proof.Step.simp ~rule:(Proof.Rule.mk "hidden_literal_elimination")
+          (List.map C.proof_parent (cl :: CS.to_list !proofset))
         in
-        let repl = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof in 
-        penalize_hidden_tautology repl;
-        Some repl 
-        |> CCFun.tap (function
-          | Some res ->
-            Util.debugf ~section 2 "HTR(@[%a@])=@[%a@]@. > @[%a@]" 
-              (fun k -> k C.pp cl C.pp res (CS.pp C.pp) proofset);
-          | _ -> ()
-        )
-    ) else None
+        let res = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof in
+
+        Util.debugf ~section 2 "simplified[hle]: @[%a@] --> @[%a@]" 
+          (fun k -> k C.pp cl C.pp res);
+        Util.debugf ~section 2 "used: @[%a@]" (fun k -> k (CS.pp C.pp) !proofset);
+
+        Some (res))
+    with HiddenTauto(i,j,proofset) ->
+      let lit_l = [CCArray.get (C.lits cl) i; CCArray.get (C.lits cl) j] in
+      let proof = 
+        Proof.Step.simp ~rule:(Proof.Rule.mk "hidden_tautology_elimination")
+        (List.map C.proof_parent (cl :: CS.to_list proofset))
+      in
+      let repl = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof in 
+      penalize_hidden_tautology repl;
+      Some repl 
+      |> CCFun.tap (function
+        | Some res ->
+          Util.debugf ~section 2 "HTR(@[%a@])=@[%a@]@. > @[%a@]" 
+            (fun k -> k C.pp cl C.pp res (CS.pp C.pp) proofset);
+        | _ -> ())
+    | RuleNotApplicable -> None
+
 
   let do_context_simplification cl =
     let lits_to_keep = CCBV.create ~size:(C.length cl) true in
@@ -821,11 +834,15 @@ module Make(E : Env.S) : S with module Env = E = struct
     | Some cl' -> SimplM.return_new cl'
     | None -> SimplM.return_same cl
 
-  let simplify_cl = simplify_opt ~f:do_hte_hle
+  let [@inline] check_heartbeat arg =
+    if CCOpt.is_some arg then heartbeat_ := true;
+    arg 
 
-  let propagated_hle_hte = simplify_opt ~f:do_propagated_simpl
+  let simplify_cl = simplify_opt ~f:(fun a -> check_heartbeat @@ do_hte_hle a)
 
-  let unit_htr = simplify_opt ~f:unit_simplify
+  let propagated_hle_hte = simplify_opt ~f:(fun a -> check_heartbeat @@ do_propagated_simpl a)
+
+  let unit_htr = simplify_opt ~f:(fun a -> check_heartbeat @@ unit_simplify a)
 
   let ctx_simpl = simplify_opt ~f:do_context_simplification
 
@@ -932,6 +949,7 @@ let hte_ = ref true
 let hle_ = ref true
 let track_eq_ = ref false
 let insert_ordered_ = ref false
+let heartbeat_steps = ref None
 
 
 let extension =
@@ -950,6 +968,8 @@ let extension =
     E.flex_add k_hle !hle_;
     E.flex_add k_hte !hte_;
     E.flex_add k_insert_only_ordered !insert_ordered_;
+    E.flex_add k_heartbeat_steps !heartbeat_steps;
+    E.flex_add k_heartbeat_disabled_hlbe false;
     HLT.setup ()
   in
   { Extensions.default with
@@ -967,6 +987,9 @@ let () =
     "--hidden-lt-max-depth", Arg.Set_int max_depth_, " max depth of binary implication graph precomputation";
     "--hidden-lt-simplify-new", Arg.Bool ((:=) simpl_new_), " apply HLTe also when moving a clause from fresh to passive";
     "--hidden-lt-track-eq", Arg.Bool ((:=) track_eq_), " enable/disable tracking and simplifying equality literals";
+    "--hidden-lt-heartbeat", Arg.Int (fun v -> heartbeat_steps := Some v), 
+      " when set to n, every n steps it will be checked if any HLBE simplification is performed." ^
+      " If not, any HLBE will be disabled.";
     "--hidden-lt-clauses-to-track", Arg.Symbol(["all";"passive";"active"], 
       (function 
         | "all" ->
