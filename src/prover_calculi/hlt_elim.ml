@@ -16,8 +16,8 @@ let k_clauses_to_track = Flex_state.create_key ()
 let k_max_self_impls = Flex_state.create_key ()
 let k_unit_propagated_hle = Flex_state.create_key ()
 let k_unit_htr = Flex_state.create_key ()
-let k_hte = Flex_state.create_key ()
-let k_hle = Flex_state.create_key ()
+let k_reduce_tautologies = Flex_state.create_key ()
+let k_delete_lits = Flex_state.create_key ()
 let k_max_tracked_clauses = Flex_state.create_key ()
 let k_track_eq = Flex_state.create_key ()
 let k_insert_only_ordered = Flex_state.create_key ()
@@ -565,7 +565,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       ) else if can_track_unary_cl cl then (
         match get_unit_predicate cl with
         | Some unit ->
-          units_ := UnitIdx.add !units_ unit cl;
           react_unit_added cl unit;
           incr tracked_unary
         | None -> ());
@@ -591,7 +590,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             Some(premise', concl', proofset, subst))
         with Unif.Fail -> None)) 
 
-  let do_propagated_simpl cl =
+  let do_unit_hle_htr cl =
     let n = C.length cl in
     let bv = CCBV.create ~size:n true in
     let exception UnitHTR of int * CS.t in
@@ -605,17 +604,18 @@ module Make(E : Env.S) : S with module Env = E = struct
           let i_t = lit_to_term (i_lhs) (i_sign) in
           let i_neg_t = lit_to_term ~negate:true (i_lhs) (i_sign) in
           
-          if n!=1 then (
+          if n!=1 && Env.flex_get k_reduce_tautologies then (
             retrieve_idx ~getter:(PropagatedLitsIdx.retrieve_generalizations (!propagated_, idx_sc)) 
               (i_t, q_sc)
             |> Iter.head
             |> CCOpt.iter (fun (_,ps,_) -> raise (UnitHTR(i,ps))));
 
-          retrieve_idx ~getter:(PropagatedLitsIdx.retrieve_generalizations (!propagated_, idx_sc)) (i_neg_t, q_sc)
-          |> Iter.head
-          |> CCOpt.iter (fun (_,ps,_) -> 
-            proofset := CS.union ps !proofset;
-            CCBV.reset bv i)
+          if Env.flex_get k_delete_lits then (
+            retrieve_idx ~getter:(PropagatedLitsIdx.retrieve_generalizations (!propagated_, idx_sc)) (i_neg_t, q_sc)
+            |> Iter.head
+            |> CCOpt.iter (fun (_,ps,_) -> 
+              proofset := CS.union ps !proofset;
+              CCBV.reset bv i))
         | None -> ()
       ) (C.lits cl);
 
@@ -649,7 +649,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       Some (repl)
     | RuleNotApplicable -> None
   
-  let unit_simplify cl =
+  let do_fle_ftr cl =
     let exception UnitHTR of int * CS.t in
     let n = C.length cl in
     let bv = CCBV.create ~size:n true in
@@ -663,14 +663,18 @@ module Make(E : Env.S) : S with module Env = E = struct
         | Some(i_lhs, i_sign) ->
           let i_t = lit_to_term (i_lhs) (i_sign) in
           let i_neg_t = lit_to_term ~negate:true (i_lhs) (i_sign) in
-          let unit_htr () = 
-            retrieve_gen_prem_idx () (i_neg_t, q_sc)
-            |> Iter.find_map (fun (_, (_,is_unit), subst) -> 
-              if Subst.is_renaming subst then None else is_unit)
+          let unit_htr () =
+            if Env.flex_get k_reduce_tautologies then (
+              retrieve_gen_prem_idx () (i_neg_t, q_sc)
+              |> Iter.find_map (fun (_, (_,is_unit), subst) -> 
+                if Subst.is_renaming subst then None else is_unit))
+            else None
           in
-          let unit_hle () = 
-            retrieve_gen_prem_idx () (i_t, q_sc)
-            |> Iter.find_map (fun (_, (_,is_unit), _) -> is_unit)
+          let unit_hle () =
+            if Env.flex_get k_delete_lits then ( 
+              retrieve_gen_prem_idx () (i_t, q_sc)
+              |> Iter.find_map (fun (_, (_,is_unit), _) -> is_unit))
+            else None
           in
           (match unit_htr () with
           | Some cs -> raise (UnitHTR(i, cs))
@@ -731,7 +735,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             | Some (j_lhs, j_sign) when CCBV.get bv j && i!=j ->
               let j_t = lit_to_term (j_lhs) (j_sign) in
               let j_neg_t = lit_to_term ~negate:true (j_lhs) (j_sign) in
-              if Env.flex_get k_hte && C.length cl != 2 then (
+              if Env.flex_get k_reduce_tautologies && C.length cl != 2 then (
                 (match find_implication cl i_neg_t j_t with
                 | Some (lit_a, lit_b, proofset, subst) 
                     when (not (CS.mem cl proofset)) && 
@@ -740,7 +744,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                   raise (HiddenTauto (i, j, proofset))
                 | _ -> ())
               );
-              if Env.flex_get k_hle then (
+              if Env.flex_get k_delete_lits then (
                 let (<+>) = CCOpt.(<+>) in
                 (match find_implication cl i_neg_t j_neg_t
                         <+> find_implication cl j_t i_t with
@@ -838,11 +842,11 @@ module Make(E : Env.S) : S with module Env = E = struct
     if CCOpt.is_some arg then heartbeat_ := true;
     arg 
 
-  let simplify_cl = simplify_opt ~f:(fun a -> check_heartbeat @@ do_hte_hle a)
+  let hle_htr = simplify_opt ~f:(fun a -> check_heartbeat @@ do_hte_hle a)
 
-  let propagated_hle_hte = simplify_opt ~f:(fun a -> check_heartbeat @@ do_propagated_simpl a)
+  let unit_hle_htr = simplify_opt ~f:(fun a -> check_heartbeat @@ do_unit_hle_htr a)
 
-  let unit_htr = simplify_opt ~f:(fun a -> check_heartbeat @@ unit_simplify a)
+  let fle_ftr = simplify_opt ~f:(fun a -> check_heartbeat @@ do_fle_ftr a)
 
   let ctx_simpl = simplify_opt ~f:do_context_simplification
 
@@ -930,10 +934,10 @@ module Make(E : Env.S) : S with module Env = E = struct
         else Env.add_active_simplify
       in
 
-      add_simpl simplify_cl;
-      if Env.flex_get k_track_eq then (add_simpl ctx_simpl);
-      if Env.flex_get k_unit_propagated_hle then (add_simpl propagated_hle_hte);
-      if Env.flex_get k_unit_htr then (add_simpl unit_htr)
+      add_simpl hle_htr;
+      add_simpl ctx_simpl;
+      if Env.flex_get k_unit_propagated_hle then (add_simpl unit_hle_htr);
+      if Env.flex_get k_unit_htr then (add_simpl fle_ftr)
     )
 end
 
@@ -965,8 +969,8 @@ let extension =
     E.flex_add k_unit_htr !unit_htr_;
     E.flex_add k_max_tracked_clauses !max_tracked_clauses;
     E.flex_add k_track_eq !track_eq_;
-    E.flex_add k_hle !hle_;
-    E.flex_add k_hte !hte_;
+    E.flex_add k_delete_lits !hle_;
+    E.flex_add k_reduce_tautologies !hte_;
     E.flex_add k_insert_only_ordered !insert_ordered_;
     E.flex_add k_heartbeat_steps !heartbeat_steps;
     E.flex_add k_heartbeat_disabled_hlbe false;
@@ -980,17 +984,17 @@ let extension =
 
 let () =
   Options.add_opts [
-    "--hidden-lt-elim", Arg.Bool ((:=) enabled_), " enable/disable hidden literal and tautology elimination";
-    "--hidden-lt-elim-max-tracked", Arg.Int ((:=) max_tracked_clauses), " negative value for disabling the limit";
-    "--hidden-lt-elim-hle", Arg.Bool ((:=) hle_), " enable/disable hidden literal elimination (hidden-lt-elim must be on)";
-    "--hidden-lt-elim-hte", Arg.Bool ((:=) hte_), " enable/disable hidden literal tautology elimination (hidden-lt-elim must be on)";
-    "--hidden-lt-max-depth", Arg.Set_int max_depth_, " max depth of binary implication graph precomputation";
-    "--hidden-lt-simplify-new", Arg.Bool ((:=) simpl_new_), " apply HLTe also when moving a clause from fresh to passive";
-    "--hidden-lt-track-eq", Arg.Bool ((:=) track_eq_), " enable/disable tracking and simplifying equality literals";
-    "--hidden-lt-heartbeat", Arg.Int (fun v -> heartbeat_steps := Some v), 
+    "--hlbe-elim", Arg.Bool ((:=) enabled_), " enable/disable hidden literal and tautology elimination";
+    "--hlbe-elim-max-tracked", Arg.Int ((:=) max_tracked_clauses), " negative value for disabling the limit";
+    "--hlbe-elim-lits", Arg.Bool ((:=) hle_), " remove literals using HLBE (hidden-lt-elim must be on)";
+    "--hlbe-reduce-tautologies", Arg.Bool ((:=) hte_), " reduce tautologies using HLBE (hidden-lt-elim must be on)";
+    "--hlbe-max-depth", Arg.Set_int max_depth_, " max depth of binary implication graph precomputation";
+    "--hlbe-simplify-new", Arg.Bool ((:=) simpl_new_), " apply HLTe also when moving a clause from fresh to passive";
+    "--hlbe-track-eq", Arg.Bool ((:=) track_eq_), " enable/disable tracking and simplifying equality literals";
+    "--hlbe-heartbeat", Arg.Int (fun v -> heartbeat_steps := Some v), 
       " when set to n, every n steps it will be checked if any HLBE simplification is performed." ^
       " If not, any HLBE will be disabled.";
-    "--hidden-lt-clauses-to-track", Arg.Symbol(["all";"passive";"active"], 
+    "--hlbe-clauses-to-track", Arg.Symbol(["all";"passive";"active"], 
       (function 
         | "all" ->
           clauses_to_track_ := `All;
@@ -1000,13 +1004,13 @@ let () =
           clauses_to_track_ := `Active;
         | _ -> ())), 
       " what clauses to use for simplification";
-    "--hidden-lt-max-self-implications", Arg.Int ((:=) max_self_impls_), 
+    "--hlbe-max-self-implications", Arg.Int ((:=) max_self_impls_), 
       " how many times do we loop implications of the kind p(X) -> p(f(X)) ";
-    "--hidden-lt-propagated-hle", Arg.Bool ((:=) propagated_hle), 
+    "--hlbe-unit-rules", Arg.Bool ((:=) propagated_hle), 
       " do unit-triggered removal of literals ";
-    "--hidden-lt-unit-htr", Arg.Bool ((:=) unit_htr_), 
-      " do unit hidden tautology removal ";
-    "--hidden-lt-insert-ordered", Arg.Bool ((:=) insert_ordered_), 
+    "--hlbe-fle-ftr", Arg.Bool ((:=) unit_htr_), 
+      " enable/disable rules based on failed literals ";
+    "--hlbe-insert-ordered", Arg.Bool ((:=) insert_ordered_), 
       " for clauses of the form l|r where l > r then insert only ~l -> r ";
   ];
   Extensions.register extension
