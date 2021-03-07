@@ -546,12 +546,12 @@ module Make(E : Env.S) : S with module Env = E = struct
   let steps = ref 0
   let track_clause cl =
     try
-      incr steps;
       if Env.flex_get k_heartbeat_disabled_hlbe then raise RuleNotApplicable;
       (match Env.flex_get k_heartbeat_steps with
-      | Some h_steps when !steps mod h_steps = 0 ->
+      | Some h_steps when !steps!=0 && !steps mod h_steps = 0 ->
         if !heartbeat_ then heartbeat_ := false
         else (
+          CCFormat.printf "disabling heartbeat %d@." !steps;
           Env.flex_add k_heartbeat_disabled_hlbe true;
           raise RuleNotApplicable;
         )
@@ -882,16 +882,19 @@ module Make(E : Env.S) : S with module Env = E = struct
   let initialize () =
     let track_active () =
       Signal.on_every Env.ProofState.ActiveSet.on_add_clause track_clause;
-      Signal.on_every Env.ProofState.ActiveSet.on_remove_clause untrack_clause
+      Signal.on_every Env.ProofState.ActiveSet.on_remove_clause untrack_clause;
+      Signal.on_every Env.on_forward_simplified (fun (_, _) -> incr steps);
     in
     let track_passive () =
       Signal.on_every Env.ProofState.PassiveSet.on_add_clause track_clause;
-      Signal.on_every Env.ProofState.PassiveSet.on_remove_clause untrack_clause
+      Signal.on_every Env.ProofState.PassiveSet.on_remove_clause untrack_clause;
+      Signal.on_every Env.on_forward_simplified (fun (_, _) -> incr steps)
     in
     let track_all () =
       Signal.on_every Env.ProofState.PassiveSet.on_add_clause track_clause;
       Signal.on_every Env.ProofState.ActiveSet.on_remove_clause untrack_clause;
       Signal.on_every Env.on_forward_simplified (fun (c, new_state) -> 
+        incr steps;
         match new_state with
         | Some c' ->
           if not (C.equal c c') then (
