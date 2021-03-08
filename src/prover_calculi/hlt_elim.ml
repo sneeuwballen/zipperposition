@@ -15,7 +15,6 @@ let k_simpl_new = Flex_state.create_key ()
 let k_clauses_to_track = Flex_state.create_key ()
 let k_max_self_impls = Flex_state.create_key ()
 let k_unit_propagated_hle = Flex_state.create_key ()
-let k_unit_htr = Flex_state.create_key ()
 let k_reduce_tautologies = Flex_state.create_key ()
 let k_delete_lits = Flex_state.create_key ()
 let k_max_tracked_clauses = Flex_state.create_key ()
@@ -44,7 +43,7 @@ module Make(E : Env.S) : S with module Env = E = struct
      with an additional field storing whether there are literals
      l, \neg l in the set of implied literals*)
   module PremiseIdx = NPDtree.MakeTerm(struct 
-    type t = (CS.t T.Tbl.t) * (CS.t option)
+    type t = (CS.t T.Tbl.t) * bool
     (* as we will maintain the invariant that each term is mapped to a single
        table, comparing the lengths suffices *)
     let compare (a1,_) (a2,_) = compare (T.Tbl.length a1) (T.Tbl.length a2)
@@ -62,9 +61,10 @@ module Make(E : Env.S) : S with module Env = E = struct
     let compare = C.compare
   end)
 
+  type propagation_kind = Failed | UnitPropagated 
   module PropagatedLitsIdx = NPDtree.MakeTerm(struct 
-    type t = CS.t
-    let compare = CS.compare
+    type t = CS.t * propagation_kind
+    let compare (a,_) (b,_) = CS.compare a b
   end)
 
   exception RuleNotApplicable
@@ -241,7 +241,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     in
     cl_occs := Util.Int_map.add (C.id cl) (premises, Term.Set.add premise propagated) !cl_occs
 
-  let register_propagated_lit lit_t cl cs =
+  let register_propagated_lit ~prop_kind lit_t cl cs =
     let has_renaming = ref false in
     let to_remove = ref Term.Set.empty in
 
@@ -266,7 +266,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     if not !has_renaming then (
       let proofset = CS.add cl cs in
       CS.iter (fun c -> register_cl_propagated c lit_t) proofset;
-      propagated_ := PropagatedLitsIdx.add !propagated_ lit_t proofset;
+      propagated_ := PropagatedLitsIdx.add !propagated_ lit_t (proofset, prop_kind);
       incr propagated_size_
     )
   
@@ -278,7 +278,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         T.Tbl.to_iter concls
         |> Iter.iter (fun (concl,cs) -> 
           let concl = Subst.FO.apply Subst.Renaming.none subst (concl, idx_sc) in
-          register_propagated_lit concl unit_cl cs)))
+          register_propagated_lit ~prop_kind:UnitPropagated concl unit_cl cs)))
 
   let generalization_present premise concl =
     retrieve_gen_prem_idx () (premise, q_sc)
@@ -314,13 +314,11 @@ module Make(E : Env.S) : S with module Env = E = struct
     )
 
   let compute_is_unit tbl concl cl =
-    if Env.flex_get k_unit_htr then (
-      let neg_concl = normalize_negations (T.Form.not_ concl) in
-      let neg_concl_flip = normalize_negations (T.Form.not_ (flip_eq concl)) in
-      T.Tbl.find_opt tbl neg_concl
-      |> CCOpt.(<+>) (T.Tbl.find_opt tbl neg_concl_flip)
-      |> CCOpt.(<$>) (CS.add cl)
-    ) else None
+    let neg_concl = normalize_negations (T.Form.not_ concl) in
+    let neg_concl_flip = normalize_negations (T.Form.not_ (flip_eq concl)) in
+    T.Tbl.find_opt tbl neg_concl
+    |> CCOpt.(<+>) (T.Tbl.find_opt tbl neg_concl_flip)
+    |> CCOpt.(<$>) (CS.add cl)
 
 
   (* find already stored implications a -> b such that premise\sigma = b.
@@ -334,7 +332,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       (* add implication premise' -> subst (concl) *)
       Util.debugf ~section 3 "found: @[%a@] --> @[%a@]"
         (fun k -> k T.pp premise' T.pp concl');
-      let became_unit = ref None in
       prems_ := PremiseIdx.update_leaf !prems_ premise' (fun (tbl, is_unit) -> 
         (match T.Tbl.get tbl concl' with
         | Some old_proofset ->
@@ -343,36 +340,24 @@ module Make(E : Env.S) : S with module Env = E = struct
             if not @@ T.Tbl.mem tbl concl && T.depth concl <= 4 && T.Tbl.length tbl <= 128 then(
               let proofset = CS.add cl old_proofset in
               register_cl_term cl premise';
-              to_add_concl := (concl, premise', proofset, tbl) :: !to_add_concl;
-              if CCOpt.is_none is_unit then (
-                match compute_is_unit tbl concl cl with
-                | Some proofset -> became_unit := Some(proofset,tbl)
-                | None -> ());
-              (* if should_update_propagated () then (
-                retrieve_idx ~getter:(UnitIdx.retrieve_unifiables (!units_, idx_sc)) 
-                  (premise', q_sc)
-                |> Iter.iter (fun (_, cl, subst) -> 
-                  let subst = Unif_subst.subst subst in
-                  let concl = Subst.FO.apply Subst.Renaming.none subst (concl, q_sc) in
-                  register_propagated_lit concl cl proofset 
-                ))
-                 *)
-                ))
+              to_add_concl := (concl, premise', proofset, tbl) :: !to_add_concl))
         | None -> assert false;);
         (* if by adding concl something became unit we remove
            the leaf as the new one with updated unit status will be added *)
-        CCOpt.is_none !became_unit
-      );
-      (match !became_unit with
-      | Some (ps, tbl) ->
-        ignore(PremiseIdx.update_leaf !prems_ premise' (fun (tbl, is_unit) -> assert false));
-        prems_  := PremiseIdx.add !prems_ premise' (tbl, Some ps)
-      | _ ->  ());
-    );
-    CCList.iter (fun (c,premise,ps,tbl) -> 
-      register_conclusion ~tbl ~premise c ps) !to_add_concl
+        true
+      ));
     
-  (*  *)
+    CCList.iter (fun (c,premise,ps,tbl) -> 
+      register_conclusion ~tbl ~premise c ps) !to_add_concl;
+    (* checking if the literal became unit *)
+    CCList.iter (fun (c,premise,ps,tbl) -> 
+      match compute_is_unit tbl c cl with
+      | Some ps ->
+        prems_  := PremiseIdx.add !prems_ premise (tbl, true);
+        register_propagated_lit ~prop_kind:Failed premise cl ps
+      | _ -> ()
+    ) !to_add_concl
+
   let extend_premise tbl premise' concl cl =
     let aux concl =
       register_conclusion ~tbl ~premise:premise' concl (CS.singleton cl);
@@ -381,8 +366,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         iter_ctx a b
         |> Iter.iter (fun (a,b) ->
           let new_neq = T.Form.neq a b in
-          register_conclusion ~tbl ~premise:premise' new_neq (CS.singleton cl)
-        );
+          register_conclusion ~tbl ~premise:premise' new_neq (CS.singleton cl));
       | _ -> ());
       register_cl_term cl premise';
 
@@ -399,7 +383,8 @@ module Make(E : Env.S) : S with module Env = E = struct
               CS.iter (fun cl -> register_cl_term cl premise') new_cls;
               to_add := (concl, new_cls) :: !to_add);
           ));
-        CCList.iter (fun (c,n) -> register_conclusion ~tbl ~premise:premise' c n) !to_add
+        CCList.iter (fun (c,n) -> 
+          register_conclusion ~tbl ~premise:premise' c n) !to_add
       ) in
     
     try
@@ -449,17 +434,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         if not (T.Tbl.mem tbl concl) && not (T.Tbl.mem tbl (flip_eq concl)) &&
            T.Tbl.length tbl <= 128  then (
           extend_premise tbl premise' concl cl;
-          (* if should_update_propagated () then (
-            retrieve_idx ~getter:(UnitIdx.retrieve_unifiables (!units_, idx_sc)) 
-              (premise', q_sc)
-            |> Iter.iter (fun (_, cl, subst) -> 
-              Iter.iter (fun (concl, ps) -> 
-                let subst = Unif_subst.subst subst in
-                let concl = Subst.FO.apply Subst.Renaming.none subst (concl, q_sc) in
-                register_propagated_lit concl cl ps
-              ) (T.Tbl.to_iter tbl)
-              )); *)
-          if CCOpt.is_none is_unit then (
+          if not is_unit then (
             (match compute_is_unit tbl concl cl with
             | Some ps -> became_unit := Some (ps, tbl)
             | None -> ());
@@ -473,24 +448,18 @@ module Make(E : Env.S) : S with module Env = E = struct
       (match !became_unit with 
       | Some (ps,tbl) ->
         ignore(PremiseIdx.update_leaf !prems_ premise' (fun (tbl, is_unit) -> assert false));
-        prems_ := PremiseIdx.add !prems_ premise (tbl,Some ps)
+        prems_ := PremiseIdx.add !prems_ premise (tbl,true);
+        register_propagated_lit ~prop_kind:Failed premise' cl ps 
       | None -> ())
     | _ ->
       let tbl = T.Tbl.create 64 in
       extend_premise tbl premise concl cl;
-      if should_update_propagated () then (
-        retrieve_idx ~getter:(UnitIdx.retrieve_unifiables (!units_, idx_sc)) 
-          (premise, q_sc)
-        |> Iter.iter (fun (_, cl, subst) -> 
-          Iter.iter (fun (concl, ps) -> 
-            let subst = Unif_subst.subst subst in
-            let concl = Subst.FO.apply Subst.Renaming.none subst (concl, q_sc) in
-            register_propagated_lit concl cl ps
-          ) (T.Tbl.to_iter tbl);
-        );
-      );
-
-      prems_ := PremiseIdx.add !prems_ premise (tbl,compute_is_unit tbl concl cl)
+      match compute_is_unit tbl concl cl with 
+      | Some ps -> 
+        prems_ := PremiseIdx.add !prems_ premise (tbl,true);
+        register_propagated_lit ~prop_kind:Failed premise cl ps 
+      | None -> prems_ := PremiseIdx.add !prems_ premise (tbl,false)
+      
     
 
   let normalize_variables premise concl = 
@@ -593,7 +562,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let do_unit_hle_htr cl =
     let n = C.length cl in
     let bv = CCBV.create ~size:n true in
-    let exception UnitHTR of int * CS.t in
+    let exception UnitHTR of int * (CS.t * propagation_kind) in
     let proofset = ref CS.empty in
     try
       if Env.flex_get k_heartbeat_disabled_hlbe then raise RuleNotApplicable;
@@ -613,7 +582,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           if Env.flex_get k_delete_lits then (
             retrieve_idx ~getter:(PropagatedLitsIdx.retrieve_generalizations (!propagated_, idx_sc)) (i_neg_t, q_sc)
             |> Iter.head
-            |> CCOpt.iter (fun (_,ps,_) -> 
+            |> CCOpt.iter (fun (_,(ps, _),_) -> 
               proofset := CS.union ps !proofset;
               CCBV.reset bv i))
         | None -> ()
@@ -623,7 +592,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       else (
         let lit_l = List.rev @@ CCBV.select bv (C.lits cl) in
         let proof = 
-          Proof.Step.simp ~rule:(Proof.Rule.mk "unit_hle")
+          Proof.Step.simp ~rule:(Proof.Rule.mk "unit_hle/fle")
           (List.map C.proof_parent (cl :: CS.to_list !proofset))
         in
         let res = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof in
@@ -634,10 +603,10 @@ module Make(E : Env.S) : S with module Env = E = struct
 
         Some (res))
 
-    with UnitHTR(idx, ps) -> 
+    with UnitHTR(idx, (ps, prop_kind)) -> 
       let lit_l = [CCArray.get (C.lits cl) idx] in
       let proof =
-        Proof.Step.simp ~rule:(Proof.Rule.mk "unit_htr")
+        Proof.Step.simp ~rule:(Proof.Rule.mk (if prop_kind = Failed then "ftr" else "unit_htr"))
         (List.map C.proof_parent (cl :: CS.to_list ps))
       in
       let repl = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof in
@@ -648,73 +617,6 @@ module Make(E : Env.S) : S with module Env = E = struct
 
       Some (repl)
     | RuleNotApplicable -> None
-  
-  let do_fle_ftr cl =
-    let exception UnitHTR of int * CS.t in
-    let n = C.length cl in
-    let bv = CCBV.create ~size:n true in
-    let proofset = ref CS.empty in
-    try
-      if Env.flex_get k_heartbeat_disabled_hlbe then raise RuleNotApplicable;
-      if Array.length (C.lits cl) > 6 then raise RuleNotApplicable;
-
-      CCArray.iteri (fun i i_lit ->
-        match get_predicate i_lit with
-        | Some(i_lhs, i_sign) ->
-          let i_t = lit_to_term (i_lhs) (i_sign) in
-          let i_neg_t = lit_to_term ~negate:true (i_lhs) (i_sign) in
-          let unit_htr () =
-            if Env.flex_get k_reduce_tautologies then (
-              retrieve_gen_prem_idx () (i_neg_t, q_sc)
-              |> Iter.find_map (fun (_, (_,is_unit), subst) -> 
-                if Subst.is_renaming subst then None else is_unit))
-            else None
-          in
-          let unit_hle () =
-            if Env.flex_get k_delete_lits then ( 
-              retrieve_gen_prem_idx () (i_t, q_sc)
-              |> Iter.find_map (fun (_, (_,is_unit), _) -> is_unit))
-            else None
-          in
-          (match unit_htr () with
-          | Some cs -> raise (UnitHTR(i, cs))
-          | None -> (
-              match unit_hle () with
-              | Some cs ->
-                CCBV.reset bv i;
-                proofset := CS.union cs !proofset
-              | None -> ()
-          ))
-        | None -> ()
-      ) (C.lits cl);
-      if CCBV.is_empty (CCBV.negate bv) then None
-      else (
-        let lit_l = List.rev @@ CCBV.select bv (C.lits cl) in
-        let proof = 
-          Proof.Step.simp ~rule:(Proof.Rule.mk "fle")
-          (List.map C.proof_parent (cl :: CS.to_list !proofset))
-        in
-        let res = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof in
-
-        Util.debugf ~section 2 "simplified[fle]: @[%a@] --> @[%a@]" 
-          (fun k -> k C.pp cl C.pp res);
-        Util.debugf ~section 2 "used: @[%a@]" (fun k -> k (CS.pp C.pp) !proofset);
-
-        Some (res))
-    with UnitHTR(i, proofset) when n!=1 ->
-      let lit_l = [CCArray.get (C.lits cl) i] in
-      let proof = 
-        Proof.Step.simp ~rule:(Proof.Rule.mk "ftr")
-        (List.map C.proof_parent (cl :: CS.to_list proofset))
-      in
-      let repl = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof in
-      penalize_hidden_tautology repl;
-
-      Util.debugf ~section 2 "simplified[ftr]: @[@[%a@] --> @[%a@]@]" 
-        (fun k -> k C.pp cl C.pp repl);
-
-      Some (repl)
-    | _ -> None
 
   let do_hte_hle cl =
     let exception HiddenTauto of int * int * CS.t in
@@ -846,8 +748,6 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let unit_hle_htr = simplify_opt ~f:(fun a -> check_heartbeat @@ do_unit_hle_htr a)
 
-  let fle_ftr = simplify_opt ~f:(fun a -> check_heartbeat @@ do_fle_ftr a)
-
   let ctx_simpl = simplify_opt ~f:do_context_simplification
 
   let untrack_clause cl =
@@ -862,7 +762,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             ) else Some proofset) tbl;
           T.Tbl.length tbl != 0)) premises;
       Term.Set.iter (fun prop_lit -> 
-        propagated_ := PropagatedLitsIdx.update_leaf !propagated_ prop_lit (fun cs ->
+        propagated_ := PropagatedLitsIdx.update_leaf !propagated_ prop_lit (fun (cs, _) ->
         if (not @@ CS.mem cl cs) then (decr propagated_size_; false) else true
         )
       ) propagated
@@ -940,7 +840,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       add_simpl hle_htr;
       add_simpl ctx_simpl;
       if Env.flex_get k_unit_propagated_hle then (add_simpl unit_hle_htr);
-      if Env.flex_get k_unit_htr then (add_simpl fle_ftr)
     )
 end
 
@@ -951,7 +850,6 @@ let clauses_to_track_ = ref `Active
 let max_self_impls_ = ref 1
 let max_tracked_clauses = ref (-1)
 let propagated_hle = ref true
-let unit_htr_ = ref true
 let hte_ = ref true
 let hle_ = ref true
 let track_eq_ = ref false
@@ -969,7 +867,6 @@ let extension =
     E.flex_add k_clauses_to_track !clauses_to_track_;
     E.flex_add k_max_self_impls !max_self_impls_;
     E.flex_add k_unit_propagated_hle !propagated_hle;
-    E.flex_add k_unit_htr !unit_htr_;
     E.flex_add k_max_tracked_clauses !max_tracked_clauses;
     E.flex_add k_track_eq !track_eq_;
     E.flex_add k_delete_lits !hle_;
@@ -1011,8 +908,6 @@ let () =
       " how many times do we loop implications of the kind p(X) -> p(f(X)) ";
     "--hlbe-unit-rules", Arg.Bool ((:=) propagated_hle), 
       " do unit-triggered removal of literals ";
-    "--hlbe-fle-ftr", Arg.Bool ((:=) unit_htr_), 
-      " enable/disable rules based on failed literals ";
     "--hlbe-insert-ordered", Arg.Bool ((:=) insert_ordered_), 
       " for clauses of the form l|r where l > r then insert only ~l -> r ";
   ];
