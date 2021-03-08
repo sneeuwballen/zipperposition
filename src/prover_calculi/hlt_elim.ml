@@ -22,7 +22,7 @@ let k_track_eq = Flex_state.create_key ()
 let k_insert_only_ordered = Flex_state.create_key ()
 let k_heartbeat_steps = Flex_state.create_key ()
 let k_heartbeat_disabled_hlbe = Flex_state.create_key ()
-
+let k_max_imp_entries = Flex_state.create_key ()
 
 module type S = sig
   module Env : Env.S
@@ -327,6 +327,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     Util.debugf ~section 3 "transitive conclusion: @[%a@] --> @[%a@]"
       (fun k -> k T.pp premise T.pp concl);
     let to_add_concl = ref [] in
+    let max_imps = Env.flex_get k_max_imp_entries in
     retrieve_spec_concl_idx () (premise,q_sc)
     |> Iter.iter (fun (concl',premise',subst) ->
       (* add implication premise' -> subst (concl) *)
@@ -337,7 +338,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         | Some old_proofset ->
           if CS.cardinal old_proofset < Env.flex_get k_max_depth then (
             let concl = (Subst.FO.apply Subst.Renaming.none subst (concl, q_sc)) in
-            if not @@ T.Tbl.mem tbl concl && T.depth concl <= 4 && T.Tbl.length tbl <= 128 then(
+            if not @@ T.Tbl.mem tbl concl && T.depth concl <= 4 && T.Tbl.length tbl <= max_imps then(
               let proofset = CS.add cl old_proofset in
               register_cl_term cl premise';
               to_add_concl := (concl, premise', proofset, tbl) :: !to_add_concl))
@@ -855,6 +856,7 @@ let hle_ = ref true
 let track_eq_ = ref false
 let insert_ordered_ = ref false
 let heartbeat_steps = ref None
+let max_imp_ = ref 128
 
 
 let extension =
@@ -874,6 +876,7 @@ let extension =
     E.flex_add k_insert_only_ordered !insert_ordered_;
     E.flex_add k_heartbeat_steps !heartbeat_steps;
     E.flex_add k_heartbeat_disabled_hlbe false;
+    E.flex_add k_max_imp_entries !max_imp_;
     HLT.setup ()
   in
   { Extensions.default with
@@ -910,5 +913,7 @@ let () =
       " do unit-triggered removal of literals ";
     "--hlbe-insert-ordered", Arg.Bool ((:=) insert_ordered_), 
       " for clauses of the form l|r where l > r then insert only ~l -> r ";
+    "--hlbe-max-entries", Arg.Int ((:=) max_imp_), 
+      " maximal number of entries stored for each element mapped by implication map ";
   ];
   Extensions.register extension
