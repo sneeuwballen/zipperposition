@@ -569,7 +569,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let proofset = ref CS.empty in
     try
       if Env.flex_get k_heartbeat_disabled_hlbe then raise RuleNotApplicable;
-      if n>6 then raise RuleNotApplicable;
+      if n>7 then raise RuleNotApplicable;
       CCArray.iteri (fun i lit -> 
         match get_predicate lit with
         | Some (i_lhs, i_sign) ->
@@ -627,7 +627,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let n = C.length cl in
     try
       if Env.flex_get k_heartbeat_disabled_hlbe then raise RuleNotApplicable;
-      if n > 6 then raise RuleNotApplicable; 
+      if n > 7 then raise RuleNotApplicable; 
       let bv = CCBV.create ~size:n true in
       let proofset = ref CS.empty in
       CCArray.iteri (fun i i_lit ->
@@ -858,7 +858,7 @@ let hle_ = ref true
 let track_eq_ = ref false
 let insert_ordered_ = ref false
 let heartbeat_steps = ref None
-let max_imp_ = ref 128
+let max_imp_ = ref 32
 
 
 let extension =
