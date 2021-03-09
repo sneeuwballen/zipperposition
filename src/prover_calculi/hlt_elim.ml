@@ -858,7 +858,7 @@ let hle_ = ref true
 let track_eq_ = ref false
 let insert_ordered_ = ref false
 let heartbeat_steps = ref None
-let max_imp_ = ref 32
+let max_imp_ = ref 48
 
 
 let extension =
