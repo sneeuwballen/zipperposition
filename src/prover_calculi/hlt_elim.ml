@@ -320,7 +320,6 @@ module Make(E : Env.S) : S with module Env = E = struct
     |> CCOpt.(<+>) (T.Tbl.find_opt tbl neg_concl_flip)
     |> CCOpt.(<$>) (CS.add cl)
 
-
   (* find already stored implications a -> b such that premise\sigma = b.
      Then, store the implication a -> concl\sigma   *)
   let extend_concl premise concl cl =
@@ -355,7 +354,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       match compute_is_unit tbl c cl with
       | Some ps ->
         prems_  := PremiseIdx.add !prems_ premise (tbl, true);
-        register_propagated_lit ~prop_kind:Failed premise cl ps
+        let neg_prem = normalize_negations (T.Form.not_ premise) in
+        register_propagated_lit ~prop_kind:Failed neg_prem cl ps
       | _ -> ()
     ) !to_add_concl
 
@@ -433,7 +433,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let became_unit = ref None in
       prems_ := PremiseIdx.update_leaf !prems_ premise' (fun (tbl,is_unit) -> 
         if not (T.Tbl.mem tbl concl) && not (T.Tbl.mem tbl (flip_eq concl)) &&
-           T.Tbl.length tbl <= 128  then (
+           T.Tbl.length tbl <= Env.flex_get k_max_imp_entries  then (
           extend_premise tbl premise' concl cl;
           if not is_unit then (
             (match compute_is_unit tbl concl cl with
@@ -449,16 +449,18 @@ module Make(E : Env.S) : S with module Env = E = struct
       (match !became_unit with 
       | Some (ps,tbl) ->
         ignore(PremiseIdx.update_leaf !prems_ premise' (fun (tbl, is_unit) -> assert false));
-        prems_ := PremiseIdx.add !prems_ premise (tbl,true);
-        register_propagated_lit ~prop_kind:Failed premise' cl ps 
+        prems_ := PremiseIdx.add !prems_ premise' (tbl,true);
+        let neg_prem = normalize_negations (T.Form.not_ premise') in
+        register_propagated_lit ~prop_kind:Failed neg_prem cl ps
       | None -> ())
     | _ ->
       let tbl = T.Tbl.create 64 in
       extend_premise tbl premise concl cl;
       match compute_is_unit tbl concl cl with 
-      | Some ps -> 
+      | Some ps ->
         prems_ := PremiseIdx.add !prems_ premise (tbl,true);
-        register_propagated_lit ~prop_kind:Failed premise cl ps 
+        let neg_prem = normalize_negations (T.Form.not_ premise) in
+        register_propagated_lit ~prop_kind:Failed neg_prem cl ps 
       | None -> prems_ := PremiseIdx.add !prems_ premise (tbl,false)
       
     
