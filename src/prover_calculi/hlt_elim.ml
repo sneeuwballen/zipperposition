@@ -23,6 +23,8 @@ let k_insert_only_ordered = Flex_state.create_key ()
 let k_heartbeat_steps = Flex_state.create_key ()
 let k_heartbeat_disabled_hlbe = Flex_state.create_key ()
 let k_max_imp_entries = Flex_state.create_key ()
+let k_basic_rules = Flex_state.create_key ()
+let k_penalize_tautologies = Flex_state.create_key ()
 
 module type S = sig
   module Env : Env.S
@@ -82,6 +84,9 @@ module Make(E : Env.S) : S with module Env = E = struct
   let tracked_unary = ref 0
   (* HLBE heartbeat will be set as soons as one rule modifies a clause *)
   let heartbeat_ = ref false
+
+  let is_tauto c =
+    Literals.is_trivial (C.lits c) || Trail.is_trivial (C.trail c)
 
   let [@inline] tracking_eq () =
     Env.flex_get k_track_eq
@@ -528,7 +533,6 @@ module Make(E : Env.S) : S with module Env = E = struct
           raise RuleNotApplicable;
         )
       | _ -> ());
-
       if can_track_bin_cl cl then (
         Util.debugf ~section 2 "tracking @[%a@]" (fun k -> k C.pp cl);
         
@@ -546,9 +550,10 @@ module Make(E : Env.S) : S with module Env = E = struct
     C.create ~penalty:1 ~trail:Trail.empty [Literal.mk_tauto] proof
 
   let penalize_hidden_tautology cl = 
-    if not @@ ID.Set.exists (fun id -> Signature.sym_in_conj id (Env.signature ())) 
+    if Env.flex_get k_penalize_tautologies &&
+       not @@ ID.Set.exists (fun id -> Signature.sym_in_conj id (Env.signature ())) 
       (C.symbols (Iter.singleton cl)) 
-    then (C.inc_penalty cl 1)
+    then (C.inc_penalty cl (C.length cl - 1))
 
   let find_implication cl premise concl =
     retrieve_gen_prem_idx () (premise, q_sc)
@@ -629,6 +634,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       if Env.flex_get k_heartbeat_disabled_hlbe then raise RuleNotApplicable;
       if n > 7 then raise RuleNotApplicable; 
       let bv = CCBV.create ~size:n true in
+      let (<+>) = CCOpt.(<+>) in
       let proofset = ref CS.empty in
       CCArray.iteri (fun i i_lit ->
         match get_predicate i_lit with
@@ -641,7 +647,8 @@ module Make(E : Env.S) : S with module Env = E = struct
               let j_t = lit_to_term (j_lhs) (j_sign) in
               let j_neg_t = lit_to_term ~negate:true (j_lhs) (j_sign) in
               if Env.flex_get k_reduce_tautologies && C.length cl != 2 then (
-                (match find_implication cl i_neg_t j_t with
+                (match find_implication cl i_neg_t j_t
+                       <+> find_implication cl j_neg_t i_t with
                 | Some (lit_a, lit_b, proofset, subst) 
                     when (not (CS.mem cl proofset)) && 
                         (C.length cl != 2 || not (Subst.is_renaming subst)) ->
@@ -650,7 +657,6 @@ module Make(E : Env.S) : S with module Env = E = struct
                 | _ -> ())
               );
               if Env.flex_get k_delete_lits then (
-                let (<+>) = CCOpt.(<+>) in
                 (match find_implication cl i_neg_t j_neg_t
                         <+> find_implication cl j_t i_t with
                   | Some (_, _, proofset',subst) ->
@@ -739,9 +745,11 @@ module Make(E : Env.S) : S with module Env = E = struct
       Some (res))
 
   let simplify_opt ~f cl =
-    match f cl with
+    (* other rules will take care of this *)
+    if is_tauto cl then (SimplM.return_same cl)
+    else (match f cl with
     | Some cl' -> SimplM.return_new cl'
-    | None -> SimplM.return_same cl
+    | None -> SimplM.return_same cl)
 
   let [@inline] check_heartbeat arg =
     if CCOpt.is_some arg then heartbeat_ := true;
@@ -840,7 +848,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         else Env.add_active_simplify
       in
 
-      add_simpl hle_htr;
+      if Env.flex_get k_basic_rules then add_simpl hle_htr;
       add_simpl ctx_simpl;
       if Env.flex_get k_unit_propagated_hle then (add_simpl unit_hle_htr);
     )
@@ -859,7 +867,8 @@ let track_eq_ = ref false
 let insert_ordered_ = ref false
 let heartbeat_steps = ref None
 let max_imp_ = ref 48
-
+let basic_rules_ = ref true
+let penalize_tautologies_ = ref true
 
 let extension =
   let register env =
@@ -879,6 +888,8 @@ let extension =
     E.flex_add k_heartbeat_steps !heartbeat_steps;
     E.flex_add k_heartbeat_disabled_hlbe false;
     E.flex_add k_max_imp_entries !max_imp_;
+    E.flex_add k_basic_rules !basic_rules_;
+    E.flex_add k_penalize_tautologies !penalize_tautologies_;
     HLT.setup ()
   in
   { Extensions.default with
@@ -917,5 +928,7 @@ let () =
       " for clauses of the form l|r where l > r then insert only ~l -> r ";
     "--hlbe-max-entries", Arg.Int ((:=) max_imp_), 
       " maximal number of entries stored for each element mapped by implication map ";
+    "--hlbe-basic-rules", Arg.Bool ((:=) basic_rules_), " enable/disable basic (non unit) rules HLE and HTR";
+    "--hlbe-penalize-tautologies", Arg.Bool ((:=) penalize_tautologies_), " penalize hidden tautologies"
   ];
   Extensions.register extension
