@@ -30,7 +30,7 @@ depopts: [
 ]
 conflicts: [
   "msat" { < "0.8.1" }
-  "msat" { >= "0.9" }
+  "msat" { >= "0.10" }
 ]
 tags: [ "logic" "unification" "term" ]
 bug-reports: "https://github.com/sneeuwballen/zipperposition/issues"
