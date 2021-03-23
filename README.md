@@ -131,7 +131,7 @@ to run the prover. Help is available with the option `--help`.
 For instance,
 
 ```
-$ zipperposition examples/pelletier_problems/pb47.p --ord rpo6 --timeout 30
+$ zipperposition examples/pelletier_problems/pb47.p --timeout 30
 ```
 
 To build the library, documentation, and tools, type in a terminal located in
