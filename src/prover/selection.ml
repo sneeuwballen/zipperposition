@@ -522,6 +522,18 @@ let e_sel16 ~ord lits =
       | _ -> (max_int,max_int,max_int) in
   weight_based_sel_driver ~ord lits chooser ~blocker:(fun i _ -> CCBV.get blocked i)
 
+let e_sel17 ~ord lits =
+  let res = CCBV.create ~size:(Array.length lits) false in 
+  if CCBV.cardinal (Literals.maxlits ~ord lits) > 1 then (
+    let chooser (i,l) =
+      (if Lit.is_pos l then 1 else 0), 
+      (if Lit.is_ground l then 0 else 1),
+      (- (lit_sel_diff_w l)),
+      0 
+    in
+    weight_based_sel_driver ~ord lits chooser
+  ) else res
+
 let ho_sel ~ord lits = 
   let chooser (i,l) = 
     let sign = (if Lit.is_pos l then 1 else 0) in
@@ -627,6 +639,7 @@ let l =
       "e-selection14", e_sel14;
       "e-selection15", e_sel15;
       "e-selection16", e_sel16;
+      "e-selection17", e_sel17;
       "ho-selection", ho_sel;
       "ho-selection2", ho_sel2;
       "ho-selection3", ho_sel3;
