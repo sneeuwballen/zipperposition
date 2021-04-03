@@ -138,11 +138,11 @@ let same_l_gen l1 l2 =
 
 let _hash_ty t = match t.ty with
   | NoType -> 1
-  | HasType ty -> Hash.combine2 2 ty.id
+  | HasType ty -> Hash.combine2 2 (Hash.int ty.id)
 
 let _hash_norec t = match view t with
-  | Var v -> Hash.combine2 1 (HVar.hash v)
-  | DB v -> Hash.combine2 2 (Hash.int v)
+  | Var v -> Hash.combine3 1 (HVar.hash v) (hash v.ty)
+  | DB v -> Hash.combine3 2 (Hash.int v) (_hash_ty t)
   | Bind (b, varty, t') ->
     Hash.combine4 3 (Binder.hash b)(hash varty)(hash t')
   | Const s -> Hash.combine2 4 (ID.hash s)

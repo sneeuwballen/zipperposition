@@ -31,7 +31,8 @@ module Make(X : HashedType) = struct
   type elt = X.t
 
   let count_ = ref 0
-  let tbl : H.t = H.create 4_096
+(*   let tbl : H.t = H.create 4_096 *)
+  let tbl : H.t = H.create 128
 
   let hashcons x =
     let x' = H.merge tbl x in
