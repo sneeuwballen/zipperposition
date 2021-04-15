@@ -125,7 +125,7 @@ module Inner = struct
       | T.HasType ty ->
         let n, ty_args, ty_ret = T.open_poly_fun ty in
         if n!=0 then t (* polymorhpic eta expansion not implemented *)
-        else
+        else (
           (* first, WHNF *)
           let t = whnf_term t in
           (* see how many arguments are missing, and what type *)
@@ -160,7 +160,9 @@ module Inner = struct
                 let body_reduced = aux body' in
                 if body' = body_reduced then body else T.bind ~ty ~varty b body_reduced
             in
-            T.fun_l ty_args body)
+            T.fun_l ty_args body
+          )
+        )
     in
     aux t
 
