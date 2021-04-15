@@ -225,11 +225,7 @@ and depth_l l = List.fold_left (fun d t -> max d (depth t)) 0 l
 
 let open_fun = T.open_fun
 let open_poly_fun = T.open_poly_fun
-
-let returns ty =
-  let _, _, ret = open_poly_fun ty in
-  ret
-
+let returns ty = T.returns ty
 let returns_prop ty = is_prop (returns ty)
 let returns_tType ty = is_tType (returns ty)
 
