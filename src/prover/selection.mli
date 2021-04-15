@@ -94,6 +94,10 @@ val e_sel16 : blocker:(int -> Literal.t -> bool) -> ord:Ordering.t -> t
 (** Selection function  identical to E's 
     SelectCQArNT *)
 
+val e_sel17 : blocker:(int -> Literal.t -> bool) -> ord:Ordering.t -> t
+(** Selection function  identical to E's 
+    SelectUnlessUniqMaxOptimalLiteral *)
+
 val ho_sel  : blocker:(int -> Literal.t -> bool) -> ord:Ordering.t -> t
 (** Selection function that tries to take 
     into account the number of nested applied variables.

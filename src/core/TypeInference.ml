@@ -16,6 +16,8 @@ module Fmt = CCFormat
 let prof_infer = ZProf.make "TypeInference.infer"
 let section = Util.Section.(make "ty-infer")
 
+let _rw_forms_only = ref false
+
 type 'a or_error = ('a, string) CCResult.t
 
 type type_ = TypedSTerm.t
@@ -1084,7 +1086,11 @@ let infer_statement_exn ?(file="<no file>") ctx st =
     | A.Rewrite t ->
       let t =  infer_prop_ ctx t in
       let def = as_def ?loc Var.Set.empty t in
-      Stmt.rewrite ~proof:(Proof.Step.intro src Proof.R_def) def
+      (match def with 
+      | Stmt.Def_term {vars;id;ty;args;rhs;as_form} when 
+        !_rw_forms_only && (not (T.Ty.returns_prop ty)) ->
+        Stmt.assert_ ~attrs ~proof:(Proof.Step.intro src Proof.R_assert) t
+      | _ -> Stmt.rewrite ~proof:(Proof.Step.intro src Proof.R_def) def)
     | A.Data l ->
       (* declare the inductive types *)
       let data_types =
@@ -1219,3 +1225,10 @@ let infer_statements
       (infer_statements_exn ?def_as_rewrite ?on_var ?on_undef
          ?on_shadow ?ctx ?file ~implicit_ty_args seq)
   with e -> Err.of_exn_trace e
+
+let () =
+  Options.add_opts
+    [ "--tptp-rewrite-formulas-only", Arg.Bool(fun v -> _rw_forms_only := v),
+      "turn definitions of symbols that return Boolean type to
+       rewrite only"
+    ]

@@ -2512,12 +2512,6 @@ let extension =
           E.C.Seq.terms c |> Iter.for_all Term.in_lfho_fragment
         );
     
-    Signal.on_every E.on_start (fun () -> 
-      if not !Unif._unif_bool 
-      then print_endline 
-        ("To remain in the chosen logic fragment, " ^
-        "unification with booleans has been disabled."));
-
     if E.flex_get k_some_ho || !force_enabled_ then (
       let module ET = Make(E) in
       ET.setup ()
