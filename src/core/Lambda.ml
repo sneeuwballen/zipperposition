@@ -8,15 +8,6 @@ let prof_snf = ZProf.make "term.snf"
 
 let section = Util.Section.make "lambdas"
 
-
-
-module OptionSet = Set.Make(
-  struct 
-    let compare x y = Pervasives.compare x y
-    type t = int option
-  end)
-
-
 module Inner = struct
   module T = InnerTerm
 
@@ -301,9 +292,13 @@ let rec is_lambda_pattern t = match T.view (whnf t) with
     else List.for_all is_lambda_pattern args 
   | T.Fun (_, body) -> is_lambda_pattern body
 and all_distinct_bound args =
-  List.map (fun arg -> match T.view (eta_reduce arg) with T.DB i -> Some i | _ -> None) args
-  |> OptionSet.of_list
-  |> (fun set -> not (OptionSet.mem None set) && OptionSet.cardinal set = List.length args)
+  try
+    List.map (fun arg ->
+        match T.view (eta_reduce arg) with
+        | T.DB i -> i | _ -> raise Exit) args
+    |> Util.Int_set.of_list
+    |> (fun set -> Util.Int_set.cardinal set = List.length args)
+  with Exit -> false
 
 let rec is_properly_encoded t = match T.view t with
   | Var _ | DB _ | Const _ -> true
