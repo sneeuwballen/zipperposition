@@ -89,7 +89,7 @@ let clause_size = Vector "clause_size"
 let pos_lits = Vector "pos_lits" (*OK*)
 let neg_lits = Vector "neg_lits"
 let pos_t_depth = Vector "pos_lit_term_depth"
-let neg_t_depth = Vector "neg_lit_term_tdepth"
+let neg_t_depth = Vector "neg_lit_term_depth"
 
 let all_features = [num_forms; num_unit_form; num_def_form  ; num_pred_atoms  ; num_prop_atoms; 
                     num_eq_atoms; num_var_atoms; f_depth; num_distinct_syms; num_singleton_vars; 
@@ -195,12 +195,12 @@ let update_form_statistics f =
   TypedSTerm.Seq.vars f
   |> Iter.iter (fun var -> 
     let id = Var.id var in
-    ID.Tbl.add vars id (1 + ID.Tbl.get_or ~default:0 vars id)
+    ID.Tbl.replace vars id (1 + ID.Tbl.get_or ~default:0 vars id)
   );
 
   ID.Tbl.iter (fun key num ->  
     (* once when it is quantified, and once in the body. *)
-    if num=2 then incr_counter num_singleton_vars;
+    if num=1 then (incr_counter num_singleton_vars);
   ) vars;
 
   traverse_formula f
