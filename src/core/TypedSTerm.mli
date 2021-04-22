@@ -172,6 +172,7 @@ module Ty : sig
   val returns : t -> t
   val returns_tType : t -> bool
   val returns_prop : t -> bool
+  val order : t -> int
 end
 
 val sort_ty_vars_first : t Var.t list -> t Var.t list
@@ -390,6 +391,7 @@ val app_infer :
 
 val try_alpha_renaming : t -> t -> Subst.t option
 val simplify_formula : t -> t
+val depth : t -> int
 
 (** {2 Conversion} *)
 

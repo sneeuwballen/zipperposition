@@ -687,6 +687,16 @@ module Ty = struct
 
   let (==>) args ret = fun_ args ret
 
+  let order ty : int =
+  let rec aux ty = match view ty with
+    | Ty_forall (_, ty) -> aux ty
+    | Ty_fun (l, ret) ->
+      List.fold_left (fun o arg -> max o (1 + aux arg)) (aux ret) l
+    | Ty_app (_, l) -> List.fold_left (fun o arg -> max o (aux arg)) 0 l
+    | _ -> 0
+  in
+  max 1 (aux ty)  (* never less than 1 *)
+
   let close_forall t = close_all ~ty:tType Binder.ForallTy t
 
   let unfold t =
@@ -1694,6 +1704,17 @@ let rec erase t = match view t with
       (List.map (fun (n,t) -> n, erase t) l)
       ~rest
   | Meta _ -> failwith "cannot erase meta"
+
+let rec depth t = match view t with
+| Var _  | Meta _ | Const _ -> 0
+| App (f, l) -> depth_l (f::l)
+| Bind (b,v,t) -> 1 + depth t
+| AppBuiltin (b, l) -> depth_l l
+| Ite (a,b,c) -> depth_l [a;b;c]
+| Match (u, l) -> 1 + depth u
+| _ -> failwith "not implemented"
+and depth_l l = 
+  1 + List.fold_left (fun acc t -> max acc (depth t)) 0 l 
 
 
 module TPTP = struct
