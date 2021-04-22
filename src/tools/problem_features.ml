@@ -15,7 +15,13 @@ let get_f_name = function
   | Counter x -> x
   | Vector x -> x
 
-module StrTbl = CCHashtbl.Make(CCString)
+module StrKey = struct
+  type t = string
+  let equal = CCString.equal
+  let hash = CCString.hash
+  let compare = CCString.compare
+end
+module StrTbl = CCHashtbl.Make(StrKey)
 
 let cnt_map = StrTbl.create 64
 let vec_map = StrTbl.create 64
@@ -32,10 +38,10 @@ let rec is_unit form =
 let update feature value =
   match feature with
   | Counter name ->
-    StrTbl.add cnt_map name
+    StrTbl.replace cnt_map name
            ((StrTbl.get_or cnt_map name ~default:0) + value)
   | Vector name ->
-    StrTbl.add vec_map name
+    StrTbl.replace vec_map name
            (value :: (StrTbl.get_or vec_map name ~default:[]))
 
 let update_vec feature value =
@@ -57,34 +63,20 @@ let num_pred_atoms = Counter "num_predicate_atoms" (*OK*)
 let num_prop_atoms = Counter "num_prop_atoms" (*OK*)
 let num_eq_atoms = Counter "num_equational_atoms" (*OK*)
 let num_var_atoms = Counter "num_variable_atoms" (*OK*)
-let f_depth = Vector "f_depth" (*OK*)
-(*
-let max_f_depth = "max_formula_depth"
-let avg_f_depth = "average_formula_depth" *)
+let f_depth = Vector "formula_depth" (*OK*)
 let num_distinct_syms = Counter "num_distinct_non_var_syms" (*OK*)
 let num_singleton_vars = Counter "num_singleton_vars" (* OK *)
 let num_forall_quants = Counter "num_universal_quants" (*OK*)
 let num_exists_quants = Counter "num_exists_quant" (*OK*)
 let num_lambda_binders = Counter "num_lambda_binders" (*OK*)
 let pred_arity = Vector "predicate_arity" (*OK*)
-(* let min_pred_arity = "min_predicate_arity"
-let max_pred_arity = "max_predicate_arity" *)
 let num_functions = Counter "num_fun_syms" (*OK*)
 let num_constants = Counter "num_consts" (*OK*)
-let fun_arity = Vector "f_arity" (*OK*)
-(* let min_fun_arity = "min_fun_arity"
-let max_fun_arity = "max_fun_arity" *)
-let t_depth = Vector "t_depth" (*OK*)
-(* let max_t_depth = "max_term_depth"
-let avg_t_depth = "averge_term_depth" *)
-let ftype_order = Vector "ftype_order" (* OK *)
-(* let max_ftype_order = "max_ftype_order"
-let avg_ftype_order = "avg_ftype_order" *)
-let vtype_order = Vector "vtype_order" (*OK*)
-(* let max_vtype_order = "max_vtype_order"
-let avg_vtype_order = "avg_vtype_order" *)
+let fun_arity = Vector "function_sym_arity" (*OK*)
+let t_depth = Vector "term_depth" (*OK*)
+let ftype_order = Vector "fun_type_order"
+let vtype_order = Vector "var_type_order" (*OK*)
 let lam_depth = Vector "lam_depth" (*OK*)
-(* let avg_lam_depth   = "avg_lam_depth" *)
 let num_quant_pred_vars = Counter "num_quant_pred_vars" (*OK*)
 let num_nested_bools = Counter "num_nested_bools" (*OK*)
 let num_logical_connectives = Counter "num_log_connectives" (*OK*)
@@ -93,21 +85,19 @@ let num_logical_connectives = Counter "num_log_connectives" (*OK*)
 let num_clauses  = Counter "num_clauses" (*OK*)
 let num_non_horn = Counter "num_non_horn" (*OK*)
 let num_unit_clauses = Counter "num_unit_clauses" (* OK*)
-let clause_size = Vector "clause_size" (*OK*)
-(* let max_clause_size = "max_clause_size"
-let avg_clause_size = "avg_clause_size" *)
+let clause_size = Vector "clause_size"
 let pos_lits = Vector "pos_lits" (*OK*)
-(* let max_pos_lits = "max_pos_lits"
-let avg_pos_lits = "avg_pos_lits" *)
 let neg_lits = Vector "neg_lits"
-(* let max_neg_lits = "max_neg_lits"
-let avg_neg_lits = "avg_neg_lits" *)
-let pos_t_depth = Vector "pos_tdepth"
-(* let max_pos_tdepth = "max_pos_tdepth"
-let avg_pos_tdepth = "avg_pos_tdepth" *)
-let neg_t_depth = Vector "neg_tdepth"
-(* let max_neg_tdepth = "max_neg_lits"
-let avg_neg_tdepth = "avg_neg_lits" *)
+let pos_t_depth = Vector "pos_lit_term_depth"
+let neg_t_depth = Vector "neg_lit_term_tdepth"
+
+let all_features = [num_forms; num_unit_form; num_def_form  ; num_pred_atoms  ; num_prop_atoms; 
+                    num_eq_atoms; num_var_atoms; f_depth; num_distinct_syms; num_singleton_vars; 
+                    num_forall_quants; num_exists_quants; num_lambda_binders; pred_arity;
+                    num_functions; num_constants  ; fun_arity; t_depth; ftype_order; vtype_order;
+                    lam_depth; num_quant_pred_vars; num_nested_bools; num_logical_connectives;
+                    num_clauses ; num_non_horn; num_unit_clauses; clause_size; pos_lits; 
+                    neg_lits; pos_t_depth; neg_t_depth]
 
 
 module T = TypedSTerm
@@ -121,38 +111,40 @@ let traverse_term t =
   if(T.Ty.is_prop (T.ty_exn t)) then (
     incr_counter num_pred_atoms;
     if(T.is_const t) then (incr_counter num_prop_atoms)
-  )
+  );
 
   let rec aux top t =
-  if (not top) && T.Ty.is_prop (T.ty_exn t) then (
-    incr_counter num_nested_bools
-  );
-  match T.view t with
-  | Var _  | Meta _ 
-  | Const _ -> ()
-  | AppBuiltin (b, l) ->
-    if Builtin.is_logical_op b then (incr_counter num_logical_connectives);
-    List.iter (aux true) l
-  | App (hd, l) -> List.iter (aux false) (hd::l)
-  | Bind (b,v,t) -> 
-    if Binder.equal b Binder.Lambda then (
-      incr_counter num_lambda_binders;
-      update_vec lam_depth (T.depth t + 1)
-    )
-    else if Binder.equal b Binder.Forall || Binder.equal b Binder.exists then (
-      if Binder.equal b Binder.Forall then (
-        incr_counter num_forall_quants;
-      ) else if Binder.equal b Binder.Exists then (
-        incr_counter num_exists_quants
-      );
-      let var_order = 
-        (if snd @@ T.Ty.arity @@ Var.ty v != 0 then 1 else 0)
-        + T.Ty.order (Var.ty v) in
-      update_vec vtype_order var_order;
-      if (T.Ty.returns_prop (Var.ty v)) then incr_counter num_quant_pred_vars
+    if (not top) && T.Ty.is_prop (T.ty_exn t) then (
+      incr_counter num_nested_bools
     );
-    aux true t
-  | _ -> failwith "not implemented"
+    match T.view t with
+    | Var _  | Meta _ 
+    | Const _ -> ()
+    | AppBuiltin (b, l) ->
+      if Builtin.is_logical_op b then (incr_counter num_logical_connectives);
+      List.iter (aux true) l
+    | App (hd, l) -> List.iter (aux false) (hd::l)
+    | Bind (b,v,t) -> 
+      if Binder.equal b Binder.Lambda then (
+        incr_counter num_lambda_binders;
+        update_vec lam_depth (T.depth t + 1)
+      )
+      else if Binder.equal b Binder.Forall || Binder.equal b Binder.exists then (
+        if Binder.equal b Binder.Forall then (
+          incr_counter num_forall_quants;
+        ) else if Binder.equal b Binder.Exists then (
+          incr_counter num_exists_quants
+        );
+        let var_order = 
+          (if snd @@ T.Ty.arity @@ Var.ty v != 0 then 1 else 0)
+          + T.Ty.order (Var.ty v) in
+        update_vec vtype_order var_order;
+        if (T.Ty.returns_prop (Var.ty v)) then incr_counter num_quant_pred_vars
+      );
+      aux true t
+    | _ -> failwith "not implemented"
+  in
+  aux true t
 
 
 let rec traverse_formula f =
@@ -248,27 +240,33 @@ let collect_formula_features stmts =
 let collect_clause_features clauses =
   Cnf.convert @@ CCVector.to_iter (clauses)
   |> CCVector.iter (fun cl ->
-    let lits = Iter.to_list @@ Statement.Seq.lits cl in
+    let lits = 
+      Iter.to_list @@ 
+      Iter.filter (fun l -> not (SLiteral.is_true l) && not (SLiteral.is_false l)) 
+      (Statement.Seq.lits cl) in
     let n = List.length lits in
-    let is_horn = List.length (List.filter SLiteral.is_pos lits) <= 1 in
-    incr_counter num_clauses;
-    if not is_horn then incr_counter num_non_horn;
-    if n == 1 then incr_counter num_unit_clauses;
-    update_vec clause_size n;
-    update_vec pos_lits (List.length (List.filter SLiteral.is_pos lits));
-    update_vec neg_lits (List.length (List.filter SLiteral.is_neg lits));
-    List.iter (function 
-    | SLiteral.Atom(t,sign) ->
-      if sign then update_vec pos_t_depth (Term.depth t) else
-      update_vec neg_t_depth (Term.depth t)
-    | SLiteral.Eq(lhs, rhs) ->
-      update_vec pos_t_depth (Term.depth lhs);
-      update_vec pos_t_depth (Term.depth rhs)
-    | SLiteral.Neq(lhs, rhs) ->
-      update_vec neg_t_depth (Term.depth lhs);
-      update_vec neg_t_depth (Term.depth rhs)
-    | _ -> ()
-    ) lits
+    if (n > 0) then (
+      let is_horn = List.length (List.filter SLiteral.is_pos lits) <= 1 in
+      incr_counter num_clauses;
+      if not is_horn then incr_counter num_non_horn;
+      if n == 1 then incr_counter num_unit_clauses;
+      update_vec clause_size n;
+      update_vec pos_lits (List.length (List.filter SLiteral.is_pos lits));
+      update_vec neg_lits (List.length (List.filter SLiteral.is_neg lits));
+      List.iter (function 
+      | SLiteral.Atom(t,sign) ->
+        if sign then update_vec pos_t_depth (Term.depth t) else
+        update_vec neg_t_depth (Term.depth t)
+      | SLiteral.Eq(lhs, rhs) ->
+        update_vec pos_t_depth (Term.depth lhs);
+        update_vec pos_t_depth (Term.depth rhs)
+      | SLiteral.Neq(lhs, rhs) ->
+        update_vec neg_t_depth (Term.depth lhs);
+        update_vec neg_t_depth (Term.depth rhs)
+      | _ -> ()
+      ) lits
+    )
+    
   )
 
 
@@ -302,9 +300,20 @@ let process file =
 
   in match res with
   | CCResult.Ok () ->
+    List.iter (function
+      | Counter n ->
+        if CCOpt.is_none (StrTbl.get cnt_map n) then (
+          StrTbl.replace cnt_map n 0)
+      | Vector n ->
+        if CCOpt.is_none (StrTbl.get vec_map n) then (
+          StrTbl.replace vec_map n [-1]
+        )) all_features;
+    
+    
     let res_map = StrTbl.create 128 in
+    
     StrTbl.iter (fun key val_ -> 
-      StrTbl.add res_map key (float_of_int val_)
+      StrTbl.replace res_map key (float_of_int val_)
     ) cnt_map;
 
     StrTbl.iter (fun key val_ -> 
@@ -313,16 +322,23 @@ let process file =
       let min_v = float_of_int (Iter.min_exn iter_val) in
       let avg_v = (float_of_int (Iter.sum iter_val)) 
                   /. (float_of_int (Iter.length iter_val)) in
-      StrTbl.add res_map ("max_" ^ key) max_v;
-      StrTbl.add res_map ("min_" ^ key) min_v;
-      StrTbl.add res_map ("min_" ^ key) avg_v;
+      StrTbl.replace res_map ("max_" ^ key) max_v;
+      StrTbl.replace res_map ("min_" ^ key) min_v;
+      StrTbl.replace res_map ("avg_" ^ key) avg_v;
     ) vec_map;
 
-    CCFormat.printf "%a"  
-      (StrTbl.pp ~pp_start:(CCFormat.return "{") 
-                 ~pp_stop:(CCFormat.return "}") 
-                 ~pp_sep:(CCFormat.return ",") 
-                 ~pp_arrow:(CCFormat.return ":") CCString.pp CCFloat.pp) res_map;
+    let sorted =
+      List.sort (fun (a,_) (b,_) -> CCString.compare a b) (StrTbl.to_list res_map)
+    in
+
+    CCFormat.printf "@[%a@]@." 
+      (CCList.pp 
+        ~pp_start:(CCFormat.return "{@.")
+        ~pp_stop:(CCFormat.return "@.}")
+        ~pp_sep:(CCFormat.return ",@.") (fun out (key, val_) ->  
+      CCFormat.printf "  %s : %f" key val_
+    )) sorted
+
 
   | CCResult.Error msg ->
     print_endline msg;
@@ -337,7 +353,8 @@ let main () =
   files := List.rev !files;
   List.iter process !files;
   begin match !Options.output with
-  | Options.O_normal -> Format.printf "%% @{<Green>success!@}@.";
+  | Options.O_normal ->  ()
+    (* Format.printf "%% @{<Green>success!@}@."; *)
   | _ -> ()
   end;
   ()
