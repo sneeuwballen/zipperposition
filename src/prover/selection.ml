@@ -622,8 +622,8 @@ let ho_sel3 ~blocker ~ord lits =
   weight_based_sel_driver ~ord ~blocker lits chooser
 
 let ho_sel4 ~blocker ~ord =
-  e_sel3 ~ord ~blocker:(fun _ -> function 
-    | Literal.Equation(lhs,rhs,_) -> T.is_app_var lhs || T.is_app_var rhs
+  e_sel3 ~ord ~blocker:(fun i -> function 
+    | Literal.Equation(lhs,rhs,_) as lit -> blocker i lit || T.is_app_var lhs || T.is_app_var rhs
     | _ -> false)
 
 let ho_sel5 ~blocker ~ord =

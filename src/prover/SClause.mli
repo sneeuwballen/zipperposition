@@ -38,6 +38,8 @@ val to_s_form :
 
 (** {2 Flags} *)
 
+val flag_initial : flag (** clause comes from the input *)
+
 val flag_lemma : flag (** clause is a lemma *)
 
 val flag_persistent : flag (** clause cannot be redundant *)

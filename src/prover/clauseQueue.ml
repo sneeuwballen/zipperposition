@@ -243,7 +243,7 @@ module Make(C : Clause_intf.S) = struct
               let r_mul = if ord_side = Comparison.Lt || ord_side = Comparison.Incomparable
                 then max_t_m else 1.0 in
               let eq_inc = 
-                if Term.equal Term.true_ r 
+                if not (Lit.is_predicate_lit lit)
                 then float_of_int (if Lit.is_positivoid lit then pf_w else nf_w)
                 else 0.0  in
               let t_w = l_mul *. (term_w l) +. r_mul *. (term_w r) +. eq_inc in
@@ -786,7 +786,7 @@ module Make(C : Clause_intf.S) = struct
     let prefer_ho_steps c = if Proof.Step.has_ho_step (C.proof_step c) then 0 else 1
 
     let prefer_sos c =
-      if C.proof_depth c = 0 || CCOpt.is_some (C.distance_to_goal c) then 0 else 1
+      if C.get_flag SClause.flag_initial c || CCOpt.is_some (C.distance_to_goal c) then 0 else 1
 
     let prefer_non_goals c =
       if Iter.exists Literal.is_positivoid (C.Seq.lits c) then 0 else 1

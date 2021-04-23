@@ -1004,6 +1004,7 @@ module Make(X : sig
     CCVector.iter
       (fun st ->
          let cs = conv_clause_ !_clause_conversion_rules st in
+         List.iter (fun c -> C.set_flag (SClause.flag_initial) c true ) cs;
          begin match Statement.view st with
            | Statement.Assert _ when has_sos_attr st ->
              CCVector.append_list c_sos cs
