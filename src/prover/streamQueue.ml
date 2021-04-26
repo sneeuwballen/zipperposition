@@ -95,17 +95,18 @@ module Make(A : ARG) = struct
       let dripped = ref None in
       let i = ref 0 in
       let reduced_hp, (w, s) = H.take_exn q.hp in
+      q.stm_nb <- q.stm_nb - 1;
       while CCOpt.is_none !dripped && !i <= guard do
         try
           dripped := Stm.drip s;
-          incr i
+          incr i;
         with Stm.Empty_Stream ->
-          assert (q.stm_nb > 0);
-          q.stm_nb <- q.stm_nb - 1;
-          i := guard (* break out of the loop *)
+          assert (q.stm_nb >= 0);
+          i := guard + 1 (* break out of the loop *)
       done;
       q.hp <- if Stm.is_empty s then reduced_hp 
-              else H.insert (q.weight s , s) reduced_hp;
+              else (q.stm_nb <- q.stm_nb + 1;
+                    H.insert (q.weight s , s) reduced_hp);
       !dripped
     )
 
