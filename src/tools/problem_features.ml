@@ -336,7 +336,7 @@ let process file =
         ~pp_start:(CCFormat.return "{@.")
         ~pp_stop:(CCFormat.return "@.}")
         ~pp_sep:(CCFormat.return ",@.") (fun out (key, val_) ->  
-      CCFormat.printf "  %s : %f" key val_
+      CCFormat.printf "  \"%s\" : %f" key val_
     )) sorted
 
 
