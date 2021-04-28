@@ -3177,6 +3177,7 @@ let _try_lfho_unif = ref true
 let _rw_w_formulas = ref false
 let _pred_var_eq_fact = ref false
 let _schedule_infs = ref true
+let _force_limit = ref 3
 
 let _guard = ref 30
 let _ratio = ref 100
@@ -3255,6 +3256,7 @@ let register ~sup =
   E.flex_add PragUnifParams.k_try_lfho !_try_lfho_unif;
   E.flex_add PragUnifParams.k_schedule_inferences !_schedule_infs;
   E.flex_add k_pred_var_eq_fact !_pred_var_eq_fact;
+  E.flex_add k_force_limit !_force_limit;
 
   E.flex_add StreamQueue.k_guard !_guard;
   E.flex_add StreamQueue.k_ratio !_ratio;
@@ -3374,7 +3376,9 @@ let () =
       "--stream-clause-num", Arg.Set_int _clause_num, "how many clauses to take from streamQueue; by default as many as there are streams";
       "--ho-sort-constraints", Arg.Bool (fun b -> _sort_constraints := b), "sort constraints in unification algorithm by weight";
       "--check-sup-at-var-cond", Arg.Bool (fun b -> _check_sup_at_var_cond := b), " enable/disable superposition at variable monotonicity check";
-      "--restrict-hidden-sup-at-vars", Arg.Bool (fun b -> _restrict_hidden_sup_at_vars :=	b), " enable/disable hidden superposition at variables only under certain ordering conditions"
+      "--restrict-hidden-sup-at-vars", Arg.Bool (fun b -> _restrict_hidden_sup_at_vars :=	b), " enable/disable hidden superposition at variables only under certain ordering conditions";
+      "--stream-force-limit", Arg.Int((:=) _force_limit), " number of attempts to get a clause when the stream is just created";
+
     ];
 
   Params.add_to_mode "ho-complete-basic" (fun () ->
