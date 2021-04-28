@@ -148,18 +148,26 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let ord =
     Ctx.ord ()
 
-  let force_getting_cl streams =
+  let force_getting_cl streams =    
     let rec aux ((clauses, streams) as acc) = function 
       | [] -> acc
       | (penalty, parents, stm) :: xs ->
-        begin
-          match stm () with
-          | OSeq.Nil -> aux acc xs 
-          | OSeq.Cons((Some cl), stm') ->
-            aux (cl::clauses, (Stm.make ~penalty ~parents (stm'))::streams) xs
-          | OSeq.Cons(None, stm') ->
-            aux (clauses, (Stm.make ~penalty ~parents (stm'))::streams) xs
-        end 
+          let rec drip_stream i stm =
+            let mk_stm stm = Stm.make ~penalty ~parents stm in
+            if i = 0 then aux (clauses, (mk_stm stm) :: streams) xs
+            else (
+              match stm() with
+              | OSeq.Nil -> aux acc xs
+              | OSeq.Cons((Some cl), stm') ->
+                aux (cl::clauses, (mk_stm stm') :: streams) xs
+              | OSeq.Cons(None, stm') ->
+                drip_stream (i-1) stm'
+            )
+          in
+
+          (* let limit = max 1 ((Env.flex_get StreamQueue.k_guard) / ) in *)
+          let limit = Env.flex_get k_force_limit in
+          drip_stream limit stm
     in
     aux ([], []) streams
   
