@@ -23,7 +23,8 @@ module Make(A:ARG) = struct
     id : int; (** unique ID of the stream *)
     parents : C.t list; (** parent clauses for inference generating this stream *)
     mutable penalty: int; (** heuristic penalty, increased by every drip *)
-    mutable hits : int; (** how many attemts to retrieve unifier were there  *)
+    mutable failed_attempts : int; (** attempts in which no clause was returned  *)
+    mutable succ_attempts : int; (** attempts in which a clause was returned  *)
     mutable stm : C.t option OSeq.t; (** the stream itself *)
   }
 
@@ -34,14 +35,16 @@ module Make(A:ARG) = struct
 
   (** {2 Basics} *)
 
+  let total_hits s = s.failed_attempts + s.succ_attempts
+
   let make ?penalty:(p=1) ~parents s =
     Util.incr_stat stat_stream_create;
     let id = !id_count_ in
     incr id_count_;
-    { id; penalty = p; hits=0; stm = s; parents }
+    { id; penalty = p; failed_attempts=0; succ_attempts = 0; stm = s; parents }
 
   let pp out s =
-    Format.fprintf out "stm %i/%i/%i" s.id s.penalty s.hits;
+    Format.fprintf out "stm %i/%i/%i/%i" s.id s.penalty s.failed_attempts s.succ_attempts;
     ()
 
   let equal s1 s2 = s1.id = s2.id
@@ -59,11 +62,12 @@ module Make(A:ARG) = struct
 
   let clause_penalty s = function 
     | None ->
-      s.hits <- s.hits +1;
-      max 2 (s.hits-16)
+      s.failed_attempts <- s.failed_attempts +1;
+      max (int_of_float (2.0 ** (float_of_int s.succ_attempts))) (total_hits s - 16)
     | Some c ->
-      s.hits <- s.hits +1;
-      (C.penalty c) * (max 1 (s.hits-64)) 
+      s.succ_attempts <- s.succ_attempts +1;
+      if s.succ_attempts > 2 then  (C.penalty c) * (max 1 (total_hits s - 64))
+      else 1
 
   let is_orphaned s =
     List.exists C.is_redundant s.parents
