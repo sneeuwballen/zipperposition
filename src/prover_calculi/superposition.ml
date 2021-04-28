@@ -99,6 +99,7 @@ let k_local_rw = Flex_state.create_key ()
 let k_destr_eq_res = Flex_state.create_key ()
 let k_rw_with_formulas = Flex_state.create_key ()
 let k_pred_var_eq_fact = Flex_state.create_key ()
+let k_force_limit = Flex_state.create_key ()
 
 
 
