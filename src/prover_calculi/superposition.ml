@@ -100,6 +100,7 @@ let k_destr_eq_res = Flex_state.create_key ()
 let k_rw_with_formulas = Flex_state.create_key ()
 let k_pred_var_eq_fact = Flex_state.create_key ()
 let k_force_limit = Flex_state.create_key ()
+let k_formula_simplify_reflect = Flex_state.create_key ()
 
 
 
@@ -2327,6 +2328,88 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   exception FoundMatch of T.t * C.t * S.t
 
+  let formula_simplify_reflect c =
+    let q_sc,idx_sc = 0,1 in
+    let used_units = ref C.ClauseSet.empty in
+
+    let do_sr t =
+      let simplify ~sign lhs rhs =
+        let (<+>) = CCOpt.(<+>) in
+        let top_level ~sign ~repl lhs rhs = 
+          UnitIdx.retrieve ~sign (!_idx_simpl, idx_sc) (lhs, q_sc)
+          |> Iter.find_map (fun (_, rhs', (_,_,_,c'), subst) ->
+              if C.trail_subsumes c' c then (
+                try
+                  ignore(Unif.FO.matching ~subst ~pattern:(rhs', idx_sc) (rhs, q_sc));
+                  used_units := C.ClauseSet.add c' !used_units;
+                  Some repl
+                with _ -> None
+              ) else None)
+        in
+        let nested lhs rhs =
+          T.Seq.common_contexts lhs rhs
+          |> Iter.find_map (fun (lhs, rhs) ->
+            top_level ~sign:true ~repl:(if sign then T.true_ else T.false_) lhs rhs
+            <+> top_level ~sign:true ~repl:(if sign then T.true_ else T.false_) rhs lhs
+          )
+        in
+
+        top_level ~sign ~repl:T.true_ lhs rhs
+        <+> top_level ~sign:(not sign) ~repl:T.false_ lhs rhs
+        <+> top_level ~sign ~repl:T.true_ rhs lhs
+        <+> top_level ~sign:(not sign) ~repl:T.false_ rhs lhs
+        <+> nested lhs rhs
+      in
+
+      let rec aux t =
+        match T.view t with
+        | T.App(hd, args) ->
+          let args' = List.map aux args in
+          if T.same_l args args' then t
+          else T.app hd args'
+        | T.AppBuiltin((Eq|Neq|Equiv|Xor) as hd, ([_; x; y]|[x;y]))
+          when T.DB.is_closed x && T.DB.is_closed y ->
+          let (x',y') = CCPair.map_same aux (x,y) in
+          let sign = Builtin.equal Eq hd || Builtin.equal Equiv hd in
+          begin match simplify ~sign x' y' with
+          | Some t -> t
+          | None -> 
+            if (not ((T.equal x x') && (T.equal y y'))) then (
+              if(Builtin.equal hd Eq) then T.Form.eq x' y'
+              else if (Builtin.equal hd Neq) then T.Form.neq x' y'
+              else T.app_builtin ~ty:(T.ty t) hd [x'; y']
+            ) else t 
+          end
+        | T.AppBuiltin(hd, args) when not (Builtin.is_quantifier hd) ->
+          let args' = List.map aux args in
+          if T.same_l args args' then t
+          else T.app_builtin ~ty:(T.ty t) hd args'
+        | T.Fun(ty, body) ->
+          let body' = aux body in
+          if T.equal body body' then t
+          else T.fun_ ty body'
+        | _ -> t
+      in
+      aux t
+    in
+
+    if Env.flex_get k_formula_simplify_reflect && !Lazy_cnf.enabled then(
+      let lits = List.map (function 
+        | Lit.Equation(lhs,rhs,sign) ->
+          Lit.mk_lit (do_sr lhs) (do_sr rhs) sign
+        | x -> x
+      ) (CCArray.to_list @@ C.lits c) in
+      if (not @@ C.ClauseSet.is_empty !used_units) then (
+        let parents = List.map C.proof_parent (C.ClauseSet.to_list !used_units) in
+        let proof =
+          Proof.Step.simp ~rule:(Proof.Rule.mk "inner_simplify_reflect")
+            ((C.proof_parent c)::parents) in
+        let trail = C.trail c and penalty = C.penalty c in
+        let new_c = C.create ~trail ~penalty lits proof in
+        SimplM.return_new new_c
+      ) else (SimplM.return_same c)
+    ) else (SimplM.return_same c)
+
   let positive_simplify_reflect c =
     ZProf.enter_prof prof_pos_simplify_reflect;
     (* iterate through literals and try to resolve negative ones *)
@@ -3042,6 +3125,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       >>= basic_simplify
       >>= positive_simplify_reflect
       >>= negative_simplify_reflect
+      >>= formula_simplify_reflect
     and active_simplify c =
       condensation c
       >>= contextual_literal_cutting
@@ -3178,6 +3262,7 @@ let _rw_w_formulas = ref false
 let _pred_var_eq_fact = ref false
 let _schedule_infs = ref true
 let _force_limit = ref 3
+let _formula_sr = ref true
 
 let _guard = ref 30
 let _ratio = ref 100
@@ -3257,6 +3342,7 @@ let register ~sup =
   E.flex_add PragUnifParams.k_schedule_inferences !_schedule_infs;
   E.flex_add k_pred_var_eq_fact !_pred_var_eq_fact;
   E.flex_add k_force_limit !_force_limit;
+  E.flex_add k_formula_simplify_reflect !_formula_sr;
 
   E.flex_add StreamQueue.k_guard !_guard;
   E.flex_add StreamQueue.k_ratio !_ratio;
@@ -3378,7 +3464,7 @@ let () =
       "--check-sup-at-var-cond", Arg.Bool (fun b -> _check_sup_at_var_cond := b), " enable/disable superposition at variable monotonicity check";
       "--restrict-hidden-sup-at-vars", Arg.Bool (fun b -> _restrict_hidden_sup_at_vars :=	b), " enable/disable hidden superposition at variables only under certain ordering conditions";
       "--stream-force-limit", Arg.Int((:=) _force_limit), " number of attempts to get a clause when the stream is just created";
-
+      "--formula-simplify-reflect", Arg.Bool((:=) _formula_sr), " apply simplify reflect on the formula level";
     ];
 
   Params.add_to_mode "ho-complete-basic" (fun () ->

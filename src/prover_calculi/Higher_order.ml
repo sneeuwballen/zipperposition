@@ -62,7 +62,6 @@ let k_purify_applied_vars = Flex_state.create_key()
 let k_eta = Flex_state.create_key()
 let k_diff_const = Flex_state.create_key()
 let k_generalize_choice_trigger = Flex_state.create_key ()
-let k_prim_enum_simpl = Flex_state.create_key ()
 let k_prim_enum_add_var = Flex_state.create_key ()
 let k_prim_enum_early_bird = Flex_state.create_key ()
 let k_resolve_flex_flex = Flex_state.create_key ()
@@ -1113,7 +1112,6 @@ module Make(E : Env.S) : S with module Env = E = struct
             ~mode ~offset (v,sc_c))
       |> Iter.map
         (fun (subst,penalty) ->
-          let penalty = if Env.flex_get k_prim_enum_simpl then 0 else penalty in
           let renaming = Subst.Renaming.create() in
           let lits = Literals.apply_subst renaming subst (C.lits c,sc_c) in
           let proof =
@@ -2349,10 +2347,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       if not (Env.flex_get k_prim_enum_early_bird) then (
         begin match Env.flex_get k_ho_prim_mode with
           | `None -> ()
-          | mode ->
-            if Env.flex_get k_prim_enum_simpl then (
-              Env.add_single_step_multi_simpl_rule (prim_enum_simpl ~mode)
-            ) else Env.add_unary_inf "ho_prim_enum" (prim_enum ~mode);
+          | mode -> Env.add_unary_inf "ho_prim_enum" (prim_enum ~mode);
         end
       ) else (
         Signal.on Env.on_pred_var_elimination (fun (cl,var) ->
@@ -2491,7 +2486,6 @@ let extension =
     E.flex_add k_purify_applied_vars !_purify_applied_vars;
     E.flex_add k_eta !_eta;
     E.flex_add k_generalize_choice_trigger !_generalize_choice_trigger;
-    E.flex_add k_prim_enum_simpl !_prim_enum_simpl;
     E.flex_add k_prim_enum_add_var !_prim_enum_add_var;
     E.flex_add k_prim_enum_early_bird !_prim_enum_early_bird;
     E.flex_add k_resolve_flex_flex !_resolve_flex_flex;
@@ -2569,7 +2563,6 @@ let () =
       "--ho-elim-pred-var", Arg.Bool (fun b -> _elim_pred_var := b), " disable predicate variable elimination";
       "--ho-prim-enum", set_prim_mode_, " set HO primitive enum mode";
       "--ho-prim-max", Arg.Set_int prim_max_penalty, " max penalty for HO primitive enum";
-      "--ho-prim-enum-simpl", Arg.Bool ((:=) _prim_enum_simpl), " use primitive enumeration as simplification rule";
       "--ho-prim-enum-add-var", Arg.Bool ((:=) _prim_enum_add_var), " turn an instantiation %x. t into %x. (F x | t)";
       "--ho-prim-enum-early-bird", Arg.Bool ((:=) _prim_enum_early_bird), " use early-bird primitive enumeration (requires lazy CNF)";
       "--ho-resolve-flex-flex", Arg.Bool ((:=) _resolve_flex_flex), " eagerly remove non-essential flex-flex constraints";

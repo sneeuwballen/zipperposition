@@ -140,7 +140,6 @@ module Make(X : sig
   let _empty_clauses = ref C.ClauseSet.empty
   let _multi_simpl_rule : (int * multi_simpl_rule) list ref = ref []
   let _cheap_msr : multi_simpl_rule list ref = ref []
-  let _ss_multi_simpl_rule : multi_simpl_rule list ref = ref []
   let _generate_rules : (int * string * generate_rule) list ref = ref []
   let _cl_elim_rules : (int * string * clause_elim_rule) list ref = ref []
   let _clause_conversion_rules : clause_conversion_rule list ref = ref []
@@ -276,9 +275,6 @@ module Make(X : sig
   
   let add_cheap_multi_simpl_rule rule =
     _cheap_msr := rule :: !_cheap_msr
-
-  let add_single_step_multi_simpl_rule rule =
-    _ss_multi_simpl_rule := rule :: !_ss_multi_simpl_rule
 
   let cr_skip = CR_skip
   let cr_add x = CR_add x
@@ -620,21 +616,21 @@ module Make(X : sig
     let open SimplM.Infix in
     ZProf.enter_prof prof_simplify;
     let res = fix_simpl c
-        ~f:(fun c ->
-            let old_c = c in
-            ho_normalize c >>=
-            basic_simplify >>=
-            (* simplify with unit clauses, then all active clauses *)
-            ho_normalize >>=
-            rewrite >>=
-            rw_simplify >>=
-            unary_simplify >>=
-            active_simplify >|= fun c ->
-            if not (Lits.equal_com (C.lits c) (C.lits old_c))
-            then
-              Util.debugf ~section 2 "@[clause `@[%a@]`@ simplified into `@[%a@]`@]"
-                (fun k->k C.pp old_c C.pp c);
-            c)
+      ~f:(fun c ->
+          let old_c = c in
+          ho_normalize c >>=
+          basic_simplify >>=
+          (* simplify with unit clauses, then all active clauses *)
+          ho_normalize >>=
+          rewrite >>=
+          rw_simplify >>=
+          unary_simplify >>=
+          active_simplify >|= fun c ->
+          if not (Lits.equal_com (C.lits c) (C.lits old_c))
+          then
+            Util.debugf ~section 2 "@[clause `@[%a@]`@ simplified into `@[%a@]`@]"
+              (fun k->k C.pp old_c C.pp c);
+          c)
     in
     ZProf.exit_prof prof_simplify;
     res
@@ -657,6 +653,7 @@ module Make(X : sig
           Util.Int_map.add (C.id child) d' map
         ) !depth_map children
     in
+    let init_cl = c in
 
     let did_something = ref false in
     (* try rules one by one until some of them succeeds *)
@@ -682,7 +679,7 @@ module Make(X : sig
       let depth = get_depth c in
       if not (C.ClauseSet.mem c !set) then (
         let orig_c = c in
-        let c, st = unary_simplify c in
+        let c, st = if C.equal c init_cl then SimplM.return_same c else simplify c in
         update_map orig_c c;
         if st = `New then did_something := true;
         match try_next ~depth c (multi_simpl_rules ()) with
@@ -903,13 +900,10 @@ module Make(X : sig
     let set = ref C.ClauseSet.empty in
     let q = Queue.create () in
     Queue.push (c,0) q;
-    let blocked_sss = 
-      CCArray.of_list 
-        (List.map (fun _ -> IntSet.empty) !_ss_multi_simpl_rule) in
 
     while not (Queue.is_empty q) do
       let c, depth = Queue.pop q in
-      let c, st = simplify c in
+      let c, st = if depth == 0 then simplify c else SimplM.return_same c in
       if st=`New then did_simplify := true;
       if is_trivial c || is_redundant c
       then ()
@@ -921,47 +915,14 @@ module Make(X : sig
            For each rule, we keep the set of clauses that the rule has been applied on
            an their descendents. Then, we apply a rule on a clause not in this set.
          *)
-        let single_step_simplified c =
-          let rec aux i = function 
-          | [] -> None
-          | rule :: rs ->
-            let block_set = blocked_sss.(i) in
-            if IntSet.mem (C.id c) block_set then aux (i+1) rs
-            else (
-              match rule c with 
-              | None -> aux (i+1) rs
-              | Some l' -> Some(i, l')
-            ) in
-          aux 0 !_ss_multi_simpl_rule in 
-
           match multi_simplify ~depth c with
           | Some l ->
             (* continue processing *)
             did_simplify := true;
-            let new_ids = IntSet.of_list (List.map (fun (c, _) -> C.id c) l) in
-
-            (* non-functional for efficiency *)
-            for i = 0 to (List.length !_ss_multi_simpl_rule) -1 do
-              let bs_i = blocked_sss.(i) in
-              if IntSet.mem (C.id c) bs_i then (
-                (* Adding descendents to blocked set *)
-                Array.set blocked_sss i (IntSet.union new_ids bs_i))
-            done;
-
             List.iter (fun (c,d) -> Queue.push (c,d) q) l
           | None ->
-            begin match single_step_simplified c with 
-            | None ->
-              set := C.ClauseSet.add c !set;
-            | Some (i,l) ->
-              did_simplify := true;
-              let new_ids = IntSet.of_list (List.map C.id l) in
-              List.iter (fun res ->
-                (* Blocking descdendents for i *)
-                Array.set blocked_sss i (IntSet.union new_ids blocked_sss.(i));
-              Queue.push (res,depth) q) l 
-            end
             (* clause has reached fixpoint *)
+            set := C.ClauseSet.add c !set;
     );
     done;
     let res = C.ClauseSet.to_list !set in

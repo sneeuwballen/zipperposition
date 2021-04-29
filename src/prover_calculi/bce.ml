@@ -590,8 +590,6 @@ module Make(E : Env.S) : S with module Env = E = struct
             false))
       in
       
-      Util.debugf ~section 3 "working on @[%a@]|%d@." 
-          (fun k -> k C.pp task.clause task.lit_idx);
       if not (C.is_empty task.clause || 
               C.is_redundant task.clause ||
               ID.Set.mem hd_sym !ignored_symbols) then (

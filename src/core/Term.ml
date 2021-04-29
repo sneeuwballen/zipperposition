@@ -447,6 +447,41 @@ module Seq = struct
       (fun t -> match T.view t with
          | T.Const s -> Some (s, ty t)
          | _ -> None)
+
+  let common_contexts a b k =
+    let common_arg xs ys =
+      let rec aux acc xs ys =
+        match xs with 
+        | x :: xs' ->
+          begin match ys with
+          | y :: ys' ->
+            if (not (equal x y)) && CCOpt.is_none acc then (
+              aux (Some (x,y)) xs' ys'
+            ) else if equal x y then aux acc xs' ys'
+            else None
+          | _ -> assert false
+          end
+        | _ -> 
+          (assert (CCList.is_empty ys)); 
+          acc
+      in
+      aux None xs ys
+    in
+
+    let rec aux a b = 
+      match view a, view b with
+      | App(hda, argsa), App(hdb, argsb) 
+        when Type.equal (ty a) (ty b) ->
+        if is_const hda && equal hda hdb then (
+          match common_arg argsa argsb with 
+          | Some (a, b) -> 
+            k (a, b);
+            aux a b
+          | None -> ()
+        )
+      | _ -> ()
+    in
+    aux a b
 end
 
 let has_ho_subterm t =

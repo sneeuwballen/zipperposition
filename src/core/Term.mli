@@ -217,6 +217,9 @@ module Seq : sig
   val ty_vars : t -> var Iter.t
   val typed_symbols : t -> (ID.t * Type.t) Iter.t
   val add_set : Set.t -> t Iter.t -> Set.t
+  (* given terms s and t, iterate over all terms s' t'
+     such that s = u[s'] and t = u[t'] and u is non-empty context *)
+  val common_contexts : t -> t -> (t * t) Iter.t
 end
 
 val var_occurs : var:var -> t -> bool (** [var_occurs ~var t] true iff [var] in t *)

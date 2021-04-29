@@ -141,9 +141,6 @@ module type S = sig
   val add_multi_simpl_rule : priority:int -> multi_simpl_rule -> unit
   (** Add a multi-clause simplification rule *)
 
-  val add_single_step_multi_simpl_rule : multi_simpl_rule -> unit
-  (** Add a multi-clause simplification rule, that is going to be applied
-      only once, not in a fixed-point manner *)
 
   val add_cheap_multi_simpl_rule : multi_simpl_rule -> unit
   (** Add an efficient multi-clause simplification rule,
