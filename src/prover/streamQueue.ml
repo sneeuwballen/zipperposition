@@ -89,25 +89,30 @@ module Make(A : ARG) = struct
 
   let add_lst q sl = List.iter (add q) sl
 
-  let _take_first guard q =
-    if H.is_empty q.hp then None
+  let rec _take_first guard q =
+    if H.is_empty q.hp then None (* TODO: replace with cheaper test q.stm_nb = 0 ? *)
     else (
+      if guard = 0 then raise Not_found;
       let dripped = ref None in
-      let i = ref 0 in
       let reduced_hp, (w, s) = H.take_exn q.hp in
-      q.stm_nb <- q.stm_nb - 1;
-      while CCOpt.is_none !dripped && !i <= guard do
-        try
-          dripped := Stm.drip s;
-          incr i;
-        with Stm.Empty_Stream ->
-          assert (q.stm_nb >= 0);
-          i := guard + 1 (* break out of the loop *)
-      done;
-      q.hp <- if Stm.is_empty s then reduced_hp 
-              else (q.stm_nb <- q.stm_nb + 1;
-                    H.insert (q.weight s , s) reduced_hp);
-      !dripped
+      let new_hp =
+        (
+          try
+            dripped := Stm.drip s;
+            H.insert (q.weight s , s) reduced_hp
+          (* No matter if a clause or None is dripped the penalty is the same:
+             TODO: should the penalty be higher when None is dripped? *)
+          with
+          | Stm.Empty_Stream ->
+            assert (q.stm_nb > 0); (* TODO: stronger but more costly assert using H.size ?*)
+            q.stm_nb <- q.stm_nb - 1;
+            reduced_hp
+        ) in
+      q.hp <- new_hp;
+      match !dripped with
+      | None -> _take_first (guard-1) q
+      | Some _ ->
+        !dripped
     )
 
   let take_first q =

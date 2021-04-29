@@ -4,12 +4,11 @@ module type S = sig
   module Ctx : Ctx.S
   module C : Clause.S with module Ctx = Ctx
 
-  type t = {
+  type t = private {
     id : int; (** unique ID of the stream *)
     parents : C.t list; (** parent clauses for inference generating this stream *)
-    mutable penalty: int; (** heuristic penalty, increased by every drip *)
-    mutable failed_attempts : int; (** attempts in which no clause was returned  *)
-    mutable succ_attempts : int; (** attempts in which a clause was returned  *)
+    mutable penalty: int; (** heuristic penalty *)
+    mutable hits: int; (** how many attemts to retrieve unifier were there  *)
     mutable stm : C.t option OSeq.t; (** the stream itself *)
   }
 
