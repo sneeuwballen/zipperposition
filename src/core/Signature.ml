@@ -115,7 +115,6 @@ let sym_in_conj s sgn =
 let set_sym_in_conj s signature =
   let t = find_exn signature s in
   let sym_map = ID.Map.add s (t, true) signature.sym_map in
-  CCFormat.printf "in conjecture: %s@." (ID.name s);
   {signature with sym_map}
 
 module Seq = struct
