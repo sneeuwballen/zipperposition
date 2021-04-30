@@ -24,6 +24,3 @@ val all_eligible_subterms : ord:Ordering.t -> pos_builder:PB.t -> T.t -> (T.t * 
 
 val from_string : ord:Ordering.t -> string -> t
 (** selection function from string (may fail) *)
-
-val all : unit -> string list
-(** available names for selection functions *)

@@ -1,6 +1,8 @@
 
 open Logtk
 
+let section = Util.Section.make ~parent:Const.section "bool_sel"
+
 module Lit = Literal
 module Pos = Position
 module PB = Pos.Build
@@ -166,7 +168,7 @@ let get_selectable_w_ctx ~ord lits =
   let open CCOpt in
   let forbidden = get_forbidden_vars ~ord lits in
 
-  let selectable_with_ctx ?(forbidden=T.VarSet.empty) ~ord ~pos_builder t ctx k =
+  let selectable_with_ctx ?(forbidden=T.VarSet.empty) ~block_top ~ord ~pos_builder t ctx k =
     let negate_sgn ctx =
       let sgn = get_sgn_ctx ctx in
       if sgn == pos_ctx then neg_ctx 
@@ -175,7 +177,8 @@ let get_selectable_w_ctx ~ord lits =
     in
 
     let rec aux_term ~top ~pos_builder t ctx k =
-      if is_selectable ~forbidden ~top t then (k (t, ctx, PB.to_pos pos_builder));
+      if is_selectable ~forbidden ~top:(top && block_top) t 
+      then (k (t, ctx, PB.to_pos pos_builder));
 
       if T.is_app_var t then ( (* only green subterms are eligible *) )
       else (
@@ -196,7 +199,7 @@ let get_selectable_w_ctx ~ord lits =
           aux_term_args ~idx:(List.length args - 1) ~pos_builder args under_equiv_ctx k
         | T.AppBuiltin(Builtin.Not, [t]) ->
           let ctx = (negate_sgn ctx) lor neg_sym_ctx in
-          aux_term ~top ~pos_builder:(PB.arg 0 pos_builder) t ctx k
+          aux_term ~top:false ~pos_builder:(PB.arg 0 pos_builder) t ctx k
         | T.AppBuiltin(Builtin.And, args) ->
           let ctx = (get_sgn_ctx ctx) lor and_ctx in
           aux_term_args ~idx:(List.length args - 1) ~pos_builder args ctx k
@@ -204,10 +207,10 @@ let get_selectable_w_ctx ~ord lits =
           let ctx = (get_sgn_ctx ctx) lor or_ctx in
           aux_term_args ~idx:(List.length args - 1) ~pos_builder args ctx k
         | T.AppBuiltin(Builtin.Imply, [p;c]) ->
-          let ctx = (negate_sgn ctx) lor premise_ctx in
-          aux_term ~top ~pos_builder:(PB.arg 1 pos_builder) p ctx k;
-          let ctx = (get_sgn_ctx ctx) lor consequent_ctx in
-          aux_term ~top ~pos_builder:(PB.arg 0 pos_builder) c ctx k;
+          let ctx_p = (negate_sgn ctx) lor premise_ctx in
+          aux_term ~top:false ~pos_builder:(PB.arg 1 pos_builder) p ctx_p k;
+          let ctx_c = (get_sgn_ctx ctx) lor consequent_ctx in
+          aux_term ~top:false ~pos_builder:(PB.arg 0 pos_builder) c ctx_c k;
         | T.AppBuiltin(hd, args) when not (Builtin.is_quantifier hd) ->
           aux_term_args ~idx:(List.length args - 1) ~pos_builder args ctx k
         | _ -> ())
@@ -226,18 +229,18 @@ let get_selectable_w_ctx ~ord lits =
     if idx < Array.length lits then (
       let pos_builder = PB.arg idx (PB.empty) in
       match lits.(idx) with
-      | Lit.Equation (lhs,rhs,_) as lit ->
+      | Lit.Equation (lhs,rhs,sign) as lit ->
         let ctx_sign = if Lit.is_predicate_lit lit then 
                           (if Lit.is_positivoid lit then pos_ctx else neg_ctx) 
                        else under_equiv_ctx in
         begin match Ordering.compare ord lhs rhs with
           | Comparison.Lt ->
-            selectable_with_ctx ~ord ~forbidden ~pos_builder:(PB.right pos_builder) rhs ctx_sign k
+            selectable_with_ctx ~block_top:sign ~ord ~forbidden ~pos_builder:(PB.right pos_builder) rhs ctx_sign k
           | Comparison.Gt ->
-            selectable_with_ctx ~ord ~forbidden ~pos_builder:(PB.left pos_builder) lhs ctx_sign k
+            selectable_with_ctx ~block_top:sign ~ord ~forbidden ~pos_builder:(PB.left pos_builder) lhs ctx_sign k
           | _ ->
-            selectable_with_ctx ~ord ~forbidden ~pos_builder:(PB.left pos_builder) lhs ctx_sign k;
-            selectable_with_ctx ~ord ~forbidden ~pos_builder:(PB.right pos_builder) rhs ctx_sign k
+            selectable_with_ctx ~block_top:sign ~ord ~forbidden ~pos_builder:(PB.left pos_builder) lhs ctx_sign k;
+            selectable_with_ctx ~block_top:sign ~ord ~forbidden ~pos_builder:(PB.right pos_builder) rhs ctx_sign k
         end;
         aux_lits (idx+1) k
       | _ -> aux_lits (idx+1) k)
@@ -252,7 +255,19 @@ let by_size ~ord ~kind lits =
   |> CCOpt.map_or ~default:[] (fun (t,ctx,pos) -> [(t,pos)])
 
 let by_context_weight_combination ~ord ~ctx_fun ~weight_fun lits =
+    let bin_of_int d =
+    if d < 0 then invalid_arg "bin_of_int" else
+    if d = 0 then "0" else
+    let rec aux acc d =
+      if d = 0 then acc else
+      aux (string_of_int (d land 1) :: acc) (d lsr 1)
+    in
+    String.concat "" (aux [] d)
+    in
+
   get_selectable_w_ctx ~ord lits
+  |> Iter.map (fun ((t,ctx,_) as arg) ->
+    Util.debugf ~section 1 "selectable @[%a/%8s@]@." (fun k -> k T.pp t (bin_of_int ctx)); arg)
   |> Iter.min ~lt:(fun (s,ctx_s,_) (t,ctx_t,_) -> 
     CCOrd.(<?>) (ctx_fun ctx_s ctx_t) (weight_fun lits, s, t) < 0)
   |> CCOpt.map_or ~default:[] (fun (t,ctx,pos) -> [(t,pos)])
@@ -382,20 +397,23 @@ let parse_combined_function ~ord s =
           (CCList.pp ~pp_sep:(CCFormat.return "|") CCString.pp)
           (List.map fst ctx_funs)
 
-let from_string ~ord name =
-  try 
-    (List.assoc name fun_names) ~ord
-  with _ ->
-    try
-      parse_combined_function ~ord name
+let from_string ~ord name lits =
+  let res =
+    (try 
+      (List.assoc name fun_names) ~ord
     with _ ->
-      invalid_arg (name ^ " is not a valid bool selection name")
-
-let all =
-  let names_only = List.map fst fun_names in
-  fun () -> names_only
+      try
+        parse_combined_function ~ord name
+      with _ ->
+        invalid_arg (name ^ " is not a valid bool selection name"))
+  in
+  res lits
+  |> CCFun.tap (fun l ->
+    Util.debugf ~section 2 "bool_select(@[%a@])=@.@[%a@]@."
+      (fun k-> k Literals.pp lits (CCList.pp Term.pp) (List.map fst l))
+  )
 
 let () =
   let set_bselect s = Params.bool_select := s in
   Params.add_opts
-    [ "--bool-select", Arg.Symbol (all(), set_bselect), " set boolean literal selection function"];
+    [ "--bool-select", Arg.String(set_bselect), " set boolean literal selection function"];
