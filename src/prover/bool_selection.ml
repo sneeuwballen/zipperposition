@@ -168,7 +168,7 @@ let get_selectable_w_ctx ~ord lits =
   let open CCOpt in
   let forbidden = get_forbidden_vars ~ord lits in
 
-  let selectable_with_ctx ?(forbidden=T.VarSet.empty) ~block_top ~ord ~pos_builder t ctx k =
+  let selectable_with_ctx ?(forbidden=T.VarSet.empty) ~block_top ~ord ~pos_builder t ctx log_depth k =
     let negate_sgn ctx =
       let sgn = get_sgn_ctx ctx in
       if sgn == pos_ctx then neg_ctx 
@@ -176,9 +176,9 @@ let get_selectable_w_ctx ~ord lits =
       else under_equiv_ctx 
     in
 
-    let rec aux_term ~top ~pos_builder t ctx k =
+    let rec aux_term ~top ~pos_builder t ctx log_depth k =
       if is_selectable ~forbidden ~top:(top && block_top) t 
-      then (k (t, ctx, PB.to_pos pos_builder));
+      then (k (t, (ctx, log_depth), PB.to_pos pos_builder));
 
       if T.is_app_var t then ( (* only green subterms are eligible *) )
       else (
@@ -189,40 +189,40 @@ let get_selectable_w_ctx ~ord lits =
           let offset = List.length l - 2 in (*skipping possible tyarg*)
           (match Ordering.compare ord a b with 
             | Comparison.Lt ->
-              aux_term ~top:false ~pos_builder:(PB.arg (inv_idx l (1+offset)) pos_builder) b ctx k
+              aux_term ~top:false ~pos_builder:(PB.arg (inv_idx l (1+offset)) pos_builder) b ctx (log_depth + 1) k
             | Comparison.Gt ->
-              aux_term ~top:false ~pos_builder:(PB.arg (inv_idx l offset) pos_builder) a ctx k
+              aux_term ~top:false ~pos_builder:(PB.arg (inv_idx l offset) pos_builder) a ctx (log_depth + 1) k
             | _ ->
-              aux_term ~top:false ~pos_builder:(PB.arg (inv_idx l (1+offset)) pos_builder) b ctx k;
-              aux_term ~top:false ~pos_builder:(PB.arg (inv_idx l offset) pos_builder) a ctx k)
+              aux_term ~top:false ~pos_builder:(PB.arg (inv_idx l (1+offset)) pos_builder) b ctx (log_depth + 1) k;
+              aux_term ~top:false ~pos_builder:(PB.arg (inv_idx l offset) pos_builder) a ctx (log_depth + 1) k)
         | T.App(_, args) -> 
-          aux_term_args ~idx:(List.length args - 1) ~pos_builder args under_equiv_ctx k
+          aux_term_args ~idx:(List.length args - 1) ~pos_builder args under_equiv_ctx log_depth k
         | T.AppBuiltin(Builtin.Not, [t]) ->
           let ctx = (negate_sgn ctx) lor neg_sym_ctx in
-          aux_term ~top:false ~pos_builder:(PB.arg 0 pos_builder) t ctx k
+          aux_term ~top:false ~pos_builder:(PB.arg 0 pos_builder) t ctx (log_depth + 1) k
         | T.AppBuiltin(Builtin.And, args) ->
           let ctx = (get_sgn_ctx ctx) lor and_ctx in
-          aux_term_args ~idx:(List.length args - 1) ~pos_builder args ctx k
+          aux_term_args ~idx:(List.length args - 1) ~pos_builder args ctx  (log_depth + 1)k
         | T.AppBuiltin(Builtin.Or, args) ->
           let ctx = (get_sgn_ctx ctx) lor or_ctx in
-          aux_term_args ~idx:(List.length args - 1) ~pos_builder args ctx k
+          aux_term_args ~idx:(List.length args - 1) ~pos_builder args ctx (log_depth + 1) k
         | T.AppBuiltin(Builtin.Imply, [p;c]) ->
           let ctx_p = (negate_sgn ctx) lor premise_ctx in
-          aux_term ~top:false ~pos_builder:(PB.arg 1 pos_builder) p ctx_p k;
+          aux_term ~top:false ~pos_builder:(PB.arg 1 pos_builder) p ctx_p (log_depth + 1) k;
           let ctx_c = (get_sgn_ctx ctx) lor consequent_ctx in
-          aux_term ~top:false ~pos_builder:(PB.arg 0 pos_builder) c ctx_c k;
+          aux_term ~top:false ~pos_builder:(PB.arg 0 pos_builder) c ctx_c (log_depth + 1) k;
         | T.AppBuiltin(hd, args) when not (Builtin.is_quantifier hd) ->
-          aux_term_args ~idx:(List.length args - 1) ~pos_builder args ctx k
+          aux_term_args ~idx:(List.length args - 1) ~pos_builder args ctx log_depth k
         | _ -> ())
-    and aux_term_args ~idx ~pos_builder args ctx k = 
+    and aux_term_args ~idx ~pos_builder args ctx log_depth k = 
       match args with
       | [] -> ()
       | x :: xs ->
         assert (idx >= 0);
-        (aux_term ~top:false ~pos_builder:(PB.arg idx pos_builder) x ctx k);
-        (aux_term_args ~idx:(idx-1) ~pos_builder xs ctx k)
+        (aux_term ~top:false ~pos_builder:(PB.arg idx pos_builder) x ctx log_depth k);
+        (aux_term_args ~idx:(idx-1) ~pos_builder xs ctx log_depth k)
     in
-    aux_term ~top:true ~pos_builder t ctx k
+    aux_term ~top:true ~pos_builder t ctx log_depth k
   in
 
   let rec aux_lits idx k =
@@ -235,12 +235,12 @@ let get_selectable_w_ctx ~ord lits =
                        else under_equiv_ctx in
         begin match Ordering.compare ord lhs rhs with
           | Comparison.Lt ->
-            selectable_with_ctx ~block_top:sign ~ord ~forbidden ~pos_builder:(PB.right pos_builder) rhs ctx_sign k
+            selectable_with_ctx ~block_top:sign ~ord ~forbidden ~pos_builder:(PB.right pos_builder) rhs ctx_sign 0 k
           | Comparison.Gt ->
-            selectable_with_ctx ~block_top:sign ~ord ~forbidden ~pos_builder:(PB.left pos_builder) lhs ctx_sign k
+            selectable_with_ctx ~block_top:sign ~ord ~forbidden ~pos_builder:(PB.left pos_builder) lhs ctx_sign 0 k
           | _ ->
-            selectable_with_ctx ~block_top:sign ~ord ~forbidden ~pos_builder:(PB.left pos_builder) lhs ctx_sign k;
-            selectable_with_ctx ~block_top:sign ~ord ~forbidden ~pos_builder:(PB.right pos_builder) rhs ctx_sign k
+            selectable_with_ctx ~block_top:sign ~ord ~forbidden ~pos_builder:(PB.left pos_builder) lhs ctx_sign 0 k;
+            selectable_with_ctx ~block_top:sign ~ord ~forbidden ~pos_builder:(PB.right pos_builder) rhs ctx_sign 0 k
         end;
         aux_lits (idx+1) k
       | _ -> aux_lits (idx+1) k)
@@ -266,7 +266,7 @@ let by_context_weight_combination ~ord ~ctx_fun ~weight_fun lits =
     in
 
   get_selectable_w_ctx ~ord lits
-  |> Iter.map (fun ((t,ctx,_) as arg) ->
+  |> Iter.map (fun ((t,(ctx,_),_) as arg) ->
     Util.debugf ~section 1 "selectable @[%a/%8s@]@." (fun k -> k T.pp t (bin_of_int ctx)); arg)
   |> Iter.min ~lt:(fun (s,ctx_s,_) (t,ctx_t,_) -> 
     CCOrd.(<?>) (ctx_fun ctx_s ctx_t) (weight_fun lits, s, t) < 0)
@@ -318,33 +318,39 @@ let sel3 =
     <?> (compare, T.is_app_var s, T.is_app_var t) (* defer app vars *)
     <?> (compare, T.ho_weight s, T.ho_weight t) (* by weight *)
 
-let prefer_pos_ctx ctx1 ctx2 =
+let prefer_pos_ctx (ctx1,_) (ctx2,_) =
   compare (get_sgn_ctx ctx1 != pos_ctx)
           (get_sgn_ctx ctx2 != pos_ctx)
 
-let prefer_neg_ctx ctx1 ctx2 =
+let prefer_neg_ctx (ctx1,_) (ctx2,_) =
   compare (get_sgn_ctx ctx1 != neg_ctx)
           (get_sgn_ctx ctx2 != neg_ctx)
 
-let prefer_and_arg ctx1 ctx2 =
+let prefer_and_arg (ctx1,_) (ctx2,_) =
   compare (get_arg_ctx ctx1 != and_ctx)
           (get_arg_ctx ctx2 != and_ctx)
 
-let prefer_or_arg ctx1 ctx2 =
+let prefer_or_arg (ctx1,_) (ctx2,_) =
   compare (get_arg_ctx ctx1 != or_ctx)
           (get_arg_ctx ctx2 != or_ctx)
 
-let prefer_neg_arg ctx1 ctx2 =
+let prefer_neg_arg (ctx1,_) (ctx2,_) =
   compare (get_arg_ctx ctx1 != neg_sym_ctx)
           (get_arg_ctx ctx2 != neg_sym_ctx)
 
-let prefer_premises_arg ctx1 ctx2 =
+let prefer_premises_arg (ctx1,_) (ctx2,_) =
   compare (get_arg_ctx ctx1 != premise_ctx)
           (get_arg_ctx ctx2 != premise_ctx)
 
-let prefer_concl_arg ctx1 ctx2 =
+let prefer_concl_arg (ctx1,_) (ctx2,_) =
   compare (get_arg_ctx ctx1 != consequent_ctx)
           (get_arg_ctx ctx2 != consequent_ctx)
+
+let prefer_deep_log (_,log_d1) (_, log_d2) =
+  compare (-log_d1) (-log_d2)
+
+let prefer_shallow_log (_,log_d1) (_, log_d2) =
+  compare (log_d1) (log_d2)
 
 
 let leftmost_innermost ~ord lits =
@@ -375,6 +381,8 @@ let parse_combined_function ~ord s =
     ("neg_arg_ctx", prefer_neg_arg);
     ("antecedent_ctx", prefer_premises_arg);
     ("consequent_ctx", prefer_concl_arg);
+    ("deep_log_ctx", prefer_deep_log);
+    ("shallow_log_ctx", prefer_shallow_log);
   ] in
 
   let or_lmax_regex =
