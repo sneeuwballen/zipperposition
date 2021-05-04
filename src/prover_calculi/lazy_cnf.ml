@@ -356,8 +356,9 @@ module Make(E : Env.S) : S with module Env = E = struct
               T.var @@ HVar.make ~ty:var_ty var_id
             ) else (
               FR.get_skolem ~parent:c ~mode:(Env.flex_get k_skolem_mode) f
-              |> CCFun.tap (fun t -> 
-                ID.set_payload (T.head_exn t) (ID.Attr_skolem ID.K_lazy_cnf))) 
+              |> CCFun.tap (fun t ->
+                CCOpt.iter (fun hd_id -> 
+                ID.set_payload (hd_id) (ID.Attr_skolem ID.K_lazy_cnf)) (T.head t))) 
           in
           let expand_quant = not @@ Env.flex_get Combinators.k_enable_combinators in
           let res = Lambda.eta_reduce ~expand_quant @@ Lambda.snf @@ T.app f [subst_term] in

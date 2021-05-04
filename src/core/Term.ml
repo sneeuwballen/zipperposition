@@ -971,11 +971,10 @@ module Form = struct
   let choice t =
     let ty = ty t in
     assert (Type.is_fun ty);
-    let args,_ = Type.open_fun ty in
-    let alpha_to_prop = List.hd args in
-    assert(Type.is_fun alpha_to_prop);
-    let alpha = List.hd (fst (Type.open_fun alpha_to_prop)) in
-    app_builtin Builtin.ChoiceConst ~ty [of_ty alpha; t]
+    let args,ret = Type.open_fun ty in
+    assert (Type.is_prop ret);
+    let alpha = List.hd args in
+    app_builtin Builtin.ChoiceConst ~ty:alpha [of_ty alpha; t]
 
   let equiv f g =
     app_builtin ~ty:Type.prop Builtin.Equiv [f; g]

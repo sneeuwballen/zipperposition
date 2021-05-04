@@ -692,7 +692,7 @@ let sine_axiom_selector
       |> CCList.map fst
       |> ID.Set.of_list in
   
-  Util.debugf ~section 2 "most common symbols are: @[%a@]@." 
+  Util.debugf ~section 3 "most common symbols are: @[%a@]@." 
     (fun k -> k (ID.Set.pp ID.pp) most_commmon_syms);
 
   (* now tbl contains occurrences of all symbols *)
@@ -708,9 +708,9 @@ let sine_axiom_selector
     Util.debugf ~section 1 "@[%a/%d@] > @[%a@]" (fun k -> k ID.pp id (ID.id id) (CCList.pp CCString.pp) (List.map name (InpStmSet.elements set)))
   ) triggers; 
 
-  Util.debugf ~section 1 "layer 0" CCFun.id;
-  Util.debugf ~section 1 "symbols: @[%a@]" (fun k -> k (ID.Set.pp ID.pp) conj_syms);
-  Util.debugf ~section 1 "axs: @[%a@]" (fun k -> k (CCList.pp CCString.pp) (List.map name triggered_1));
+  Util.debugf ~section 2 "layer 0" CCFun.id;
+  Util.debugf ~section 2 "symbols: @[%a@]" (fun k -> k (ID.Set.pp ID.pp) conj_syms);
+  Util.debugf ~section 2 "axs: @[%a@]" (fun k -> k (CCList.pp CCString.pp) (List.map name triggered_1));
 
   let rec take_axs k processed_syms k_triggered_axs = 
     if k >= depth_end then []
@@ -719,9 +719,9 @@ let sine_axiom_selector
       let new_syms = symset_of_axs ~trim_implications:false k_triggered_axs in
       let unprocessed = ID.Set.diff new_syms processed_syms in
       let k_p_1_triggered_ax = triggered_by_syms ~triggers unprocessed in
-      Util.debugf ~section 1 "layer @[%d@]" (fun c -> c k );
-      Util.debugf ~section 1 "symbols: @[%a@]" (fun k -> k (ID.Set.pp ID.pp) unprocessed);
-      Util.debugf ~section 1 "axs: @[%a@]" (fun k -> k (CCList.pp CCString.pp) (List.map name k_p_1_triggered_ax));
+      Util.debugf ~section 2 "layer @[%d@]" (fun c -> c k );
+      Util.debugf ~section 2 "symbols: @[%a@]" (fun k -> k (ID.Set.pp ID.pp) unprocessed);
+      Util.debugf ~section 2 "axs: @[%a@]" (fun k -> k (CCList.pp CCString.pp) (List.map name k_p_1_triggered_ax));
       taken @ (take_axs (k+1) (ID.Set.union processed_syms unprocessed) k_p_1_triggered_ax)) 
   in
 
