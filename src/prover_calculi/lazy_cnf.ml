@@ -119,7 +119,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         let lits = [Literal.mk_eq lhs rhs] in
         let proof = Proof.Step.define_internal id [] in
         let res = C.create ~penalty:1 ~trail:Trail.empty lits proof in
-        Util.debugf ~section 1 "defining: @[%a@]@." (fun k -> k C.pp res);
+        Util.debugf ~section 2 "defining: @[%a@]@." (fun k -> k C.pp res);
         Env.add_passive (Iter.singleton res)
       ) (arg_combs)
     in
@@ -171,7 +171,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       Type.Tbl.add _ty_map ty new_members;
 
       Env.Ctx.declare_syms (List.map (fun t -> T.head_exn t, T.ty t) new_members);
-      Util.debugf ~section 1 "members of type @[%a@]@. >@[%a@]" 
+      Util.debugf ~section 2 "members of type @[%a@]@. >@[%a@]" 
         (fun k -> k Type.pp ty (CCList.pp T.pp) new_members);
       new_members
   
@@ -200,8 +200,9 @@ module Make(E : Env.S) : S with module Env = E = struct
           aux true (T.Form.and_ (T.Form.or_ (T.Form.not_ a) (T.Form.not_ b)) 
                                 (T.Form.or_ a b))
         )
-      | T.AppBuiltin((ForallConst|ExistsConst),[_;a]) ->
-        aux sign a
+      | T.AppBuiltin((ForallConst|ExistsConst),[_;body]) ->
+        let _,body = T.open_fun body in
+        aux sign body
       | _ -> 1
     and sum_l sign xs =
       List.fold_left (fun acc f -> 
@@ -213,12 +214,16 @@ module Make(E : Env.S) : S with module Env = E = struct
       ) 1 xs
     in
     try 
-      ignore (aux sign f);
+      let estimate = aux sign f in
+      Util.debugf ~section 1 "estimate(%b, @[%a@])=@[%d@]@." (fun k -> k sign T.pp f estimate);
       true
-    with TooManyClauses -> false
+    with TooManyClauses -> 
+      Util.debugf ~section 1 "estimate(%b, @[%a@])=too many@." (fun k -> k sign T.pp f);
+      false
   
   let check_size_limits sign f =
     let limit = Env.flex_get k_simp_limit in
+    Util.debugf ~section 1 "checking limit: %d@." (fun k -> k limit);
     Env.flex_get k_lazy_cnf_kind != `Simp ||
     limit < 0 || 
     estimate_num_clauses sign limit f
@@ -353,8 +358,8 @@ module Make(E : Env.S) : S with module Env = E = struct
 
     let should_clausify sign f = 
       force_clausification || 
-      Env.flex_get k_lazy_cnf_kind != `Ignore ||
-      check_size_limits sign f in
+      (Env.flex_get k_lazy_cnf_kind != `Ignore &&
+      check_size_limits sign f) in
 
     fold_lits c
     |> Iter.fold_while ( fun acc (lhs, rhs, sign, pos) ->
