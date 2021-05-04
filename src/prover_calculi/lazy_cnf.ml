@@ -667,6 +667,9 @@ module Make(E : Env.S) : S with module Env = E = struct
         Env.add_unary_inf "lazy_cnf" lazy_clausify_inf
       | `Simp -> 
           Env.add_unary_inf "elim eq" clausify_eq;
+          if not (Env.flex_get k_clausify_implications) then (
+            Env.add_unary_inf "inf_imp" clausify_imp
+          );
           Env.add_multi_simpl_rule ~priority:5 lazy_clausify_simpl;
           if Env.flex_get k_lazy_cnf_eager then (
             Env.add_cheap_multi_simpl_rule lazy_clausify_simpl;
