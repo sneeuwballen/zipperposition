@@ -20,6 +20,8 @@ let k_pa_renaming = Flex_state.create_key ()
 let k_only_eligible = Flex_state.create_key ()
 let k_penalize_eq_cnf = Flex_state.create_key ()
 let k_clausify_eq_max_nonint = Flex_state.create_key ()
+let k_clausify_implications = Flex_state.create_key ()
+let k_simp_limit = Flex_state.create_key ()
 
 let section = Util.Section.make ~parent:Const.section "lazy_cnf"
 
@@ -102,7 +104,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     | Comparison.Gt -> is_noninterpeted lhs
     | _ -> is_noninterpeted lhs || is_noninterpeted rhs)
 
-    let _ty_map = Type.Tbl.create 16
+  let _ty_map = Type.Tbl.create 16
 
   let init_ty_map () =
     Type.Tbl.add _ty_map Type.prop [T.true_; T.false_]
@@ -172,6 +174,54 @@ module Make(E : Env.S) : S with module Env = E = struct
       Util.debugf ~section 1 "members of type @[%a@]@. >@[%a@]" 
         (fun k -> k Type.pp ty (CCList.pp T.pp) new_members);
       new_members
+  
+  let estimate_num_clauses sign limit f =
+    let exception TooManyClauses in
+    let check_cl_size size = 
+      if size>limit then raise TooManyClauses;
+      size
+    in
+    let rec aux sign f =
+      match T.view f with
+      | T.AppBuiltin(Not, [f]) ->
+        aux (not sign)  f
+      | T.AppBuiltin(And, l) ->
+        if sign then sum_l sign l else prod_l sign l
+      | T.AppBuiltin(Or, l) ->
+        if sign then prod_l sign l else sum_l sign l
+      | T.AppBuiltin(Imply, [a;b]) ->
+        if sign then prod_l true [T.Form.not_ a; b] 
+        else sum_l true [a; T.Form.not_ b]
+      | T.AppBuiltin((Eq|Equiv|Neq|Xor) as hd, ([_;a;b]|[a;b])) when Type.is_prop (T.ty a) ->
+        if Builtin.equal Eq hd || Builtin.equal Equiv hd then (
+          aux true (T.Form.and_ (T.Form.or_ (T.Form.not_ a) b) 
+                                (T.Form.or_ (T.Form.not_ b) a))
+        ) else (
+          aux true (T.Form.and_ (T.Form.or_ (T.Form.not_ a) (T.Form.not_ b)) 
+                                (T.Form.or_ a b))
+        )
+      | T.AppBuiltin((ForallConst|ExistsConst),[_;a]) ->
+        aux sign a
+      | _ -> 1
+    and sum_l sign xs =
+      List.fold_left (fun acc f -> 
+        check_cl_size @@ acc + aux sign f
+      ) 0 xs
+    and prod_l sign xs =
+      List.fold_left (fun acc f -> 
+        check_cl_size @@ (acc * (aux sign f))
+      ) 1 xs
+    in
+    try 
+      ignore (aux sign f);
+      true
+    with TooManyClauses -> false
+  
+  let check_size_limits sign f =
+    let limit = Env.flex_get k_simp_limit in
+    Env.flex_get k_lazy_cnf_kind != `Simp ||
+    limit < 0 || 
+    estimate_num_clauses sign limit f
     
 
   let proof ~constructor ~name ~parents c =
@@ -301,7 +351,10 @@ module Make(E : Env.S) : S with module Env = E = struct
       Iter.empty
     in
 
-    let only_quants = (not force_clausification) && Env.flex_get k_lazy_cnf_kind == `Ignore in
+    let should_clausify sign f = 
+      force_clausification || 
+      Env.flex_get k_lazy_cnf_kind != `Ignore ||
+      check_size_limits sign f in
 
     fold_lits c
     |> Iter.fold_while ( fun acc (lhs, rhs, sign, pos) ->
@@ -310,19 +363,24 @@ module Make(E : Env.S) : S with module Env = E = struct
       if L.is_predicate_lit lit then (
         Util.debugf ~section 3 "  subformula:%d:@[%a@]" (fun k -> k i L.pp lit );
         begin match T.view lhs with 
-        | T.AppBuiltin(And, l) when List.length l >= 2 && not only_quants->
+        | T.AppBuiltin(And, l) when List.length l >= 2 && should_clausify sign lhs->
           let rule_name = "lazy_cnf_and" in
           if sign then return acc @@ mk_and ~proof_cons l c i ~rule_name
           else return acc @@ mk_or ~proof_cons (List.map T.Form.not_ l) c i ~rule_name
-        | T.AppBuiltin(Or, l) when List.length l >= 2 && not only_quants ->
+        | T.AppBuiltin(Or, l) when List.length l >= 2 && should_clausify sign lhs ->
           let rule_name = "lazy_cnf_or" in
           if sign then return acc @@ mk_or ~proof_cons l c i ~rule_name
           else return acc @@ mk_and ~proof_cons (List.map T.Form.not_ l) c i ~rule_name
-        | T.AppBuiltin(Imply, [a;b]) when not only_quants ->
+        | T.AppBuiltin(Imply, [a;b]) when should_clausify sign lhs ->
           let rule_name = "lazy_cnf_imply" in
-          if sign then return acc @@ mk_or ~proof_cons [T.Form.not_ a; b] c i ~rule_name
+          if sign then (
+            if force_clausification || 
+               Env.flex_get k_lazy_cnf_kind != `Simp ||
+               Env.flex_get k_clausify_implications
+            then return acc @@ mk_or ~proof_cons [T.Form.not_ a; b] c i ~rule_name
+            else continue acc )
           else return acc @@ mk_and ~proof_cons [a; T.Form.not_ b] c i ~rule_name
-        | T.AppBuiltin((Equiv|Xor) as hd, [a;b]) when not only_quants ->
+        | T.AppBuiltin((Equiv|Xor) as hd, [a;b]) when should_clausify sign lhs ->
           let hd = if sign then hd else (if hd = Equiv then Xor else Equiv) in
           if eligible_to_ignore_eq ~ignore_eq a b then continue acc
           else (
@@ -386,7 +444,9 @@ module Make(E : Env.S) : S with module Env = E = struct
             CCFormat.sprintf "lazy_cnf_%s" (if sign then "equiv" else "xor") in
           
           Util.debugf ~section 3 "  subeq:%d:@[%a %s= %a@]" (fun k -> k i T.pp lhs (if sign then "" else "~") T.pp rhs );
-          if eligible_to_ignore_eq ~ignore_eq lhs rhs then continue acc
+          if eligible_to_ignore_eq ~ignore_eq lhs rhs
+             || not (check_size_limits sign (T.Form.equiv lhs rhs)) 
+             then continue acc
           else if sign then (
             return acc @@ (
               mk_or ~proof_cons ~rule_name [T.Form.not_ lhs; rhs] c i 
@@ -488,7 +548,7 @@ module Make(E : Env.S) : S with module Env = E = struct
               (fun k -> k (CCList.pp C.pp) new_defs);
               Some res, `Stop
           | None -> None, `Continue)
-        else None, `Continue) None
+        else None, `Continue) None   
   
   let clausify_eq c =
     let rule_name = "eq_elim" in
@@ -498,7 +558,8 @@ module Make(E : Env.S) : S with module Env = E = struct
         let lit = (C.lits c).(i) in
         let proof_cons = Proof.Step.inference ~infos:[] ~tags:[Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth] in
         if not (L.is_predicate_lit lit) && Type.is_prop (T.ty lhs) 
-           && check_eq_cnf_ordering_conditions lhs rhs then (
+           && check_eq_cnf_ordering_conditions lhs rhs
+           && check_size_limits sign (T.Form.equiv lhs rhs) then (
           let new_cls =
             if sign then (
               mk_or ~proof_cons ~rule_name [T.Form.not_ lhs; rhs] c i 
@@ -523,6 +584,25 @@ module Make(E : Env.S) : S with module Env = E = struct
         Util.debugf ~section 3 "=@[%a@]" (fun k -> k (CCList.pp C.pp) res);
       ) 
     )
+
+  let clausify_imp c =
+    let rule_name = "imp_elim" in
+    fold_lits c
+    |> Iter.fold (fun acc (lhs,rhs,sign,pos) -> 
+        let i,_ = Ls.Pos.cut pos in
+        let lit = (C.lits c).(i) in
+        let proof_cons = Proof.Step.inference ~infos:[] ~tags:[Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth] in
+        if (L.is_predicate_lit lit) && Type.is_prop (T.ty lhs) &&
+            L.is_positivoid lit  then (
+          match lit with
+          | L.Equation(lhs, rhs, true) when T.equal T.true_ rhs ->
+            begin match T.view lhs with
+            | T.AppBuiltin(Imply, [prem;concl]) ->
+              (mk_or ~proof_cons ~rule_name [T.Form.not_ prem; concl] c i) @ acc
+            | _ -> acc
+            end
+          | _ -> acc
+        ) else acc) []
   
   let cnf_scope c =
     fold_lits c
@@ -618,6 +698,8 @@ let _pa_renaming = ref true
 let _only_eligible = ref false
 let _clausify_eq_pen = ref false
 let _clausify_eq_max_noninterpreted = ref true
+let _clausify_impls = ref true
+let _simp_limit = ref (-1)
 
 let extension =
   let register env =
@@ -635,6 +717,8 @@ let extension =
     E.flex_add k_only_eligible !_only_eligible;
     E.flex_add k_penalize_eq_cnf !_clausify_eq_pen;
     E.flex_add k_clausify_eq_max_nonint !_clausify_eq_max_noninterpreted;
+    E.flex_add k_simp_limit !_simp_limit;
+    E.flex_add k_clausify_implications !_clausify_impls;
 
     ET.setup ()
   in
@@ -650,6 +734,11 @@ let () =
     "--lazy-cnf-only-eligible-lits", Arg.Bool ((:=) _only_eligible), " apply lazy clausification only on eligible literals";
     "--lazy-cnf-clausify-max-eq", Arg.Bool ((:=) _clausify_eq_max_noninterpreted),
       " enable/disable clausification of an EQ literal if max side is non-interpreted ";
+    "--lazy-cnf-clausify-implications", Arg.Bool ((:=) _clausify_impls),
+       " apply simplifying clausification to implications";
+    "--lazy-cnf-simp-depth-limit", Arg.Int ((:=) _simp_limit),
+       " apply simplifying clausification only to formulas that would yield less than N" ^
+       " clauses; negative value is interpreted as infinity" ;
     "--lazy-cnf-scoping", Arg.Symbol (["off"; "mini"; "maxi"], (fun str -> 
       match str with 
       | "mini" -> _scoping := `Mini
