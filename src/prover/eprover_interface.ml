@@ -30,7 +30,8 @@ let _only_ho_steps = ref true
 
 let e_bin = ref (None : string option)
 
-let regex_refutation = Str.regexp ".*SZS output start CNFRefutation.*" 
+let regex_refutation_begin = Str.regexp ".*SZS output start CNFRefutation.*" 
+let regex_refutation_end = Str.regexp ".*SZS output end CNFRefutation.*" 
 let reg_thf_clause = Str.regexp "thf(zip_cl_\\([0-9]+\\),.*"
 
 module IntSet = CCSet.Make(CCInt)
@@ -191,33 +192,31 @@ module Make(E : Env.S) : S with module Env = E = struct
       let cmd = 
         CCFormat.sprintf "timeout %d %s --pos-ext=all --neg-ext=all %s --cpu-limit=%d %s -s -p" 
           (to_+2) e_path prob_path to_ (if !_e_auto then "--auto" else "--auto-schedule") in
-      CCFormat.printf "%% Running : %s.@." cmd;
       let process_channel = Unix.open_process_in cmd in
-      let _,status = Unix.wait () in
-      begin match status with
-        | WEXITED _ ->
-          let refutation_found = ref false in
-          (try 
-             while not !refutation_found do 
-               let line = input_line process_channel in
-               if Str.string_match regex_refutation line 0 then 
-                 refutation_found := true;
-             done;
-             if !refutation_found then (
-               let clause_ids = ref [] in
-               (try 
-                  while true do 
-                    let line = input_line process_channel in
-                    flush_all ();
-                    if Str.string_match reg_thf_clause line 0 then (
-                      let id = CCInt.of_string (Str.matched_group 1 line) in
-                      clause_ids := CCOpt.get_exn id :: !clause_ids;)
-                  done;
-                  Some !clause_ids
-                with End_of_file -> Some !clause_ids)
-             ) else None
-           with End_of_file -> None;)
-        | _ -> None end
+      let refutation_found = ref false in
+      (try 
+          while not !refutation_found do 
+            let line = input_line process_channel in
+            if Str.string_match regex_refutation_begin line 0 then 
+              refutation_found := true;
+          done;
+          if !refutation_found then (
+            let clause_ids = ref [] in
+            (try 
+              while true do 
+                let line = input_line process_channel in
+                flush_all ();
+                if Str.string_match reg_thf_clause line 0 then (
+                  let id = CCInt.of_string (Str.matched_group 1 line) in
+                  clause_ids := CCOpt.get_exn id :: !clause_ids;)
+                else if Str.string_match regex_refutation_end line 0 then (
+                  raise End_of_file
+                )
+              done;
+              Some !clause_ids
+            with End_of_file -> Some !clause_ids)
+          ) else None
+        with End_of_file -> None)
     | None ->
       invalid_arg "cannot run E if E binary is not set up"
 
