@@ -194,6 +194,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           (to_+2) e_path prob_path to_ (if !_e_auto then "--auto" else "--auto-schedule") in
       let process_channel = Unix.open_process_in cmd in
       let refutation_found = ref false in
+      let res = 
       (try 
           while not !refutation_found do 
             let line = input_line process_channel in
@@ -217,6 +218,9 @@ module Make(E : Env.S) : S with module Env = E = struct
             with End_of_file -> Some !clause_ids)
           ) else None
         with End_of_file -> None)
+      in
+      close_in process_channel;
+      res
     | None ->
       invalid_arg "cannot run E if E binary is not set up"
 
