@@ -2431,7 +2431,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let kept_lits = CCBV.create ~size:(C.length c) true in
       let premises = 
         CCArray.foldi (fun premises i lit   -> 
-          let add_new_prems lhs rhs = 
+          let find_simplifying_premise lhs rhs = 
             begin match is_simplified lhs rhs with
             | Some prems -> 
               CCBV.reset kept_lits i;
@@ -2440,9 +2440,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           in
           
           match lit with
-          | Lit.Equation(lhs, rhs, false) -> add_new_prems lhs rhs
+          | Lit.Equation(lhs, rhs, false) -> find_simplifying_premise lhs rhs
           | Lit.Equation(lhs, rhs, true) when T.equal T.false_ rhs ->
-            add_new_prems lhs T.true_
+            find_simplifying_premise lhs T.true_
           | _ -> premises
         ) (C.ClauseSet.empty) (C.lits c)
       in
@@ -3348,6 +3348,7 @@ let register ~sup =
 
   E.flex_add k_local_rw !_local_rw;
   E.flex_add k_destr_eq_res !_destr_eq_res;
+  E.flex_add k_strong_sr !_strong_sr;
 
   let module JPF = JPFull.Make(struct let st = E.flex_state () end) in
   let module JPP = PUnif.Make(struct let st = E.flex_state () end) in
