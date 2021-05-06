@@ -49,7 +49,7 @@ module TEF = struct
 
   let setup_ = lazy (
     if Lazy.force tef_ then (
-      let oc = Unix.open_process_out "gzip - --stdout > trace.json.gz" in
+      let oc = Unix.open_process_out "zstd --fast -q -z -f - -o trace.json.zst" in
       output_char oc '[';
       at_exit (fun () -> teardown_ oc);
       out_ := Some oc
@@ -71,7 +71,7 @@ module TEF = struct
     let pid = Unix.getpid() in
     emit_sep_ oc;
     Printf.fprintf oc
-      {json|{"pid": %d,"cat":"","dur": %.2f,"ts": %.2f,"name":"%s","ph":"X"}|json}
+      {json|{"pid": %d,"tid":1,"cat":"","dur": %.2f,"ts": %.2f,"name":"%s","ph":"X"}|json}
       pid dur ts prof.prof_name;
     ()
 
