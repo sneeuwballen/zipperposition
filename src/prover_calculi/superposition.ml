@@ -2517,42 +2517,17 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let rec iterate_lits acc lits clauses = match lits with
       | [] -> List.rev acc, clauses
       | (Lit.Equation (s, t, true) as lit)::lits' ->
-        begin match can_refute s t, can_refute t s with
-          | None, None -> (* keep literal *)
+        begin match can_refute s t with
+          | None -> (* keep literal *)
             iterate_lits (lit::acc) lits' clauses
-          | Some new_clause, _ | _, Some new_clause -> (* drop literal, remember clause *)
+          | Some new_clause -> (* drop literal, remember clause *)
             iterate_lits acc lits' (new_clause :: clauses)
         end
       | lit::lits' -> iterate_lits (lit::acc) lits' clauses
     (* try to remove the literal using a negative unit clause *)
     and can_refute s t =
-      try
-        UnitIdx.retrieve ~sign:false (!_idx_simpl,1) (s,0)
-        |> Iter.iter
-          (fun (l, r, (_,_,_,c'), subst) ->
-             (* if not  (Unif.FO.equal ~subst (l, 1) (s, 0)) then (
-               CCFormat.printf "l:@[%a@], r:@[%a@]@." T.pp l T.pp s;
-               CCFormat.printf "subst: @[%a@]@." Subst.pp subst;
-               assert false;
-             ); *)
-             let norm t =
-              let t = Subst.FO.apply Subst.Renaming.none subst t in
-              Lambda.eta_reduce ~expand_quant:false @@ Lambda.snf t in
-             assert(Term.equal (norm (l,1)) (norm (s,0)));
-             Util.debugf ~section 3 "@[neg_reflect trying to eliminate@ @[%a=%a@]@ with @[%a@]@]"
-               (fun k->k T.pp s T.pp t C.pp c');
-             if C.trail_subsumes c' c && Unif.FO.equal ~subst (r, 1) (t, 0)
-             then begin
-               (* TODO: useless? *)
-               let subst = Unif.FO.matching ~subst ~pattern:(r, 1) (t, 0) in
-               Util.debugf ~section 3 "@[neg_reflect eliminates@ @[%a=%a@]@ with @[%a@]@]"
-                 (fun k->k T.pp s T.pp t C.pp c');
-               raise (FoundMatch (r, c', subst)) (* success *)
-             end
-          );
-        None (* no match *)
-      with FoundMatch (_r, c', subst) ->
-        Some (C.proof_parent_subst Subst.Renaming.none (c',1) subst) (* success *)
+      equatable ~sign:false ~cl:c s t
+      |> CCOpt.map C.proof_parent
     in
     (* fold over literals *)
     let lits, premises = iterate_lits [] (C.lits c |> Array.to_list) [] in
