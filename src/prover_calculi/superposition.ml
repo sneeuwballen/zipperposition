@@ -101,6 +101,7 @@ let k_rw_with_formulas = Flex_state.create_key ()
 let k_pred_var_eq_fact = Flex_state.create_key ()
 let k_force_limit = Flex_state.create_key ()
 let k_formula_simplify_reflect = Flex_state.create_key ()
+let k_strong_sr = Flex_state.create_key ()
 
 
 
@@ -2410,84 +2411,105 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       ) else (SimplM.return_same c)
     ) else (SimplM.return_same c)
 
+  let equatable ~sign ~cl s t  =
+    let idx_sc, q_sc = 1, 0 in
+    let (<+>) = CCOpt.(<+>) in
+    let aux s t =
+      UnitIdx.retrieve ~sign (!_idx_simpl, idx_sc) (s, q_sc)
+      |> Iter.find_map (fun (_, rhs, (_,_,_,c'), subst) ->
+          if C.trail_subsumes c' cl then (
+            try
+              ignore(Unif.FO.matching ~subst ~pattern:(rhs, idx_sc) (t, q_sc));
+              Some c'
+            with _ -> None
+          ) else None)
+    in
+    aux s t <+> aux t s
+
   let positive_simplify_reflect c =
+    let driver ~is_simplified c =
+      let kept_lits = CCBV.create ~size:(C.length c) true in
+      let premises = 
+        CCArray.foldi (fun premises i lit   -> 
+          let add_new_prems lhs rhs = 
+            begin match is_simplified lhs rhs with
+            | Some prems -> 
+              CCBV.reset kept_lits i;
+              C.ClauseSet.union premises prems
+            | None -> premises end
+          in
+          
+          match lit with
+          | Lit.Equation(lhs, rhs, false) -> add_new_prems lhs rhs
+          | Lit.Equation(lhs, rhs, true) when T.equal T.false_ rhs ->
+            add_new_prems lhs T.true_
+          | _ -> premises
+        ) (C.ClauseSet.empty) (C.lits c)
+      in
+      CCOpt.return_if (not (CCBV.is_empty (CCBV.negate kept_lits)))
+        (CCBV.select kept_lits (C.lits c), premises)
+    in
+
+    let strong_sr_pair lhs rhs =
+      let tasks = Queue.create () in
+      let exception CantSimplify in
+      try
+        Queue.push (lhs, rhs) tasks;
+        let premises = ref C.ClauseSet.empty in
+        while not (Queue.is_empty tasks) do
+          let s,t = Queue.pop tasks in
+          if not (T.equal s t) then (
+            match equatable ~sign:true ~cl:c s t with
+            | Some cl -> premises := C.ClauseSet.add cl !premises
+            | None -> 
+              begin match T.view s, T.view t with
+              | T.App(hd_s, args_s), T.App(hd_t, args_t)
+                when T.is_const hd_s && T.equal hd_s hd_t ->
+                CCList.iter (fun pair -> Queue.push pair tasks) 
+                  (List.combine args_s args_t) 
+              | T.AppBuiltin(hd_s, args_s), T.AppBuiltin(hd_t, args_t)
+                when Builtin.equal hd_s hd_t && 
+                    CCList.length args_s = CCList.length args_t ->
+                CCList.iter (fun pair -> Queue.push pair tasks) 
+                  (List.combine args_s args_t) 
+              | _ -> raise CantSimplify end
+          )
+        done;
+        Some !premises
+      with CantSimplify -> None
+    in
+
+    let regular_sr_pair lhs rhs =
+      if T.equal lhs rhs then Some (C.ClauseSet.empty)
+      else match equatable ~sign:true ~cl:c lhs rhs with
+           | Some cl -> Some (C.ClauseSet.singleton cl)
+           | None -> (T.Seq.common_contexts lhs rhs 
+                     |> Iter.find_map (fun (a,b) -> equatable ~sign:true ~cl:c a b)
+                     |> CCOpt.map C.ClauseSet.singleton)
+    in
+
+    let do_strong_sr = driver ~is_simplified:strong_sr_pair in
+    let do_regular_sr = driver ~is_simplified:regular_sr_pair in
+    
+    let simplifier =
+      if Env.flex_get k_strong_sr then do_strong_sr else do_regular_sr
+    in
     ZProf.enter_prof prof_pos_simplify_reflect;
     (* iterate through literals and try to resolve negative ones *)
-    let rec iterate_lits acc lits clauses = match lits with
-      | [] -> List.rev acc, clauses
-      | (Lit.Equation (s, t, false) as lit)::lits' ->
-        begin match equatable_terms clauses s t with
-          | None -> (* keep literal *)
-            iterate_lits (lit::acc) lits' clauses
-          | Some new_clauses -> (* drop literal, remember clauses *)
-            iterate_lits acc lits' new_clauses
-        end
-      | lit::lits' -> iterate_lits (lit::acc) lits' clauses
-    (* try to make the terms equal using some positive unit clauses
-       from active_set *)
-    and equatable_terms clauses t1 t2 =
-      match T.Classic.view t1, T.Classic.view t2 with
-      | _ when T.equal t1 t2 -> Some clauses  (* trivial *)
-      | T.Classic.App (f, ss), T.Classic.App (g, ts)
-        when ID.equal f g && List.length ss = List.length ts ->
-        (* try to make the terms equal directly *)
-        begin match equate_root clauses t1 t2 with
-          | None -> (* otherwise try to make subterms pairwise equal *)
-            let ok, clauses = List.fold_left2
-                (fun (ok, clauses) t1' t2' ->
-                   if ok
-                   then match equatable_terms clauses t1' t2' with
-                     | None -> false, []
-                     | Some clauses -> true, clauses
-                   else false, [])
-                (true, clauses) ss ts
-            in
-            if ok then Some clauses else None
-          | Some clauses -> Some clauses
-        end
-      | _ -> equate_root clauses t1 t2 (* try to solve it with a unit equality *)
-    (* try to equate terms with a positive unit clause that match them *)
-    and equate_root clauses t1 t2 =
-      try
-        UnitIdx.retrieve ~sign:true (!_idx_simpl,1)(t1,0)
-        |> Iter.iter
-          (fun (l,r,(_,_,_,c'),subst) ->
-             let app_sub t = 
-              Term.normalize_bools @@ Lambda.eta_expand @@ Lambda.snf @@ 
-                Subst.FO.apply Subst.Renaming.none subst t in
-             assert(T.equal (app_sub (l,1)) (app_sub (t1, 0)));
-             if C.trail_subsumes c' c &&
-                Term.equal (app_sub (r,1)) (app_sub (t2,0))
-             then begin
-               (* t1!=t2 is refuted by l\sigma = r\sigma *)
-               Util.debugf ~section 4
-                 "@[<2>equate @[%a@]@ and @[%a@]@ using @[%a@]@]"
-                 (fun k->k T.pp t1 T.pp t2 C.pp c');
-               raise (FoundMatch (r, c', subst)) (* success *)
-             end
-          );
-        None (* no match *)
-      with FoundMatch (_r, c', subst) ->
-        Some (C.proof_parent_subst Subst.Renaming.none (c',1) subst :: clauses)  (* success *)
-    in
-    (* fold over literals *)
-    let lits, premises = iterate_lits [] (C.lits c |> Array.to_list) [] in
-    if List.length lits = Array.length (C.lits c)
-    then (
-      (* no literal removed, keep c *)
+    match simplifier c with
+    | None -> 
       ZProf.exit_prof prof_pos_simplify_reflect;
       SimplM.return_same c
-    ) else (
+    | Some (new_lits,premises) ->
       let proof =
         Proof.Step.simp ~rule:(Proof.Rule.mk "simplify_reflect+")
-          (C.proof_parent c::premises) in
+          (List.map C.proof_parent (c::(C.ClauseSet.to_list premises))) in
       let trail = C.trail c and penalty = C.penalty c in
-      let new_c = C.create ~trail ~penalty lits proof in
+      let new_c = C.create ~trail ~penalty new_lits proof in
       Util.debugf ~section 3 "@[@[%a@]@ pos_simplify_reflect into @[%a@]@]"
         (fun k->k C.pp c C.pp new_c);
       ZProf.exit_prof prof_pos_simplify_reflect;
       SimplM.return_new new_c
-    )
 
   let negative_simplify_reflect c =
     ZProf.enter_prof prof_neg_simplify_reflect;
@@ -3263,6 +3285,7 @@ let _pred_var_eq_fact = ref false
 let _schedule_infs = ref true
 let _force_limit = ref 3
 let _formula_sr = ref true
+let _strong_sr = ref false
 
 let _guard = ref 30
 let _ratio = ref 100
@@ -3465,6 +3488,7 @@ let () =
       "--restrict-hidden-sup-at-vars", Arg.Bool (fun b -> _restrict_hidden_sup_at_vars :=	b), " enable/disable hidden superposition at variables only under certain ordering conditions";
       "--stream-force-limit", Arg.Int((:=) _force_limit), " number of attempts to get a clause when the stream is just created";
       "--formula-simplify-reflect", Arg.Bool((:=) _formula_sr), " apply simplify reflect on the formula level";
+      "--strong-simplify-reflect", Arg.Bool((:=) _strong_sr), " full effort simplify reflect -- tries to find an equation for each pair of subterms";
     ];
 
   Params.add_to_mode "ho-complete-basic" (fun () ->
