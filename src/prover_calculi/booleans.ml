@@ -40,6 +40,7 @@ let k_fluid_hoist = Flex_state.create_key ()
 let k_fluid_log_hoist = Flex_state.create_key ()
 let k_solve_formulas = Flex_state.create_key ()
 let k_replace_unsupported_quants = Flex_state.create_key ()
+let k_disable_ho_bool_unif = Flex_state.create_key ()
 
 module type S = sig
   module Env : Env.S
@@ -74,12 +75,12 @@ module Make(E : Env.S) : S with module Env = E = struct
   let _cls_w_pred_vars = ref (Type.Map.empty) (* type --> (clause,var) *)
   
   let get_unif_alg () =
-    if Env.flex_get Combinators.k_enable_combinators
+    if Env.flex_get k_disable_ho_bool_unif
     then (fun _ _ -> OSeq.empty)
     else Env.flex_get Superposition.k_unif_alg
 
   let get_unif_alg_l () =
-    if Env.flex_get Combinators.k_enable_combinators
+    if Env.flex_get k_disable_ho_bool_unif
     then (fun _ _ -> OSeq.empty)
     else (
       let (module U) = Superposition.get_unif_module (module E) in
@@ -2029,6 +2030,7 @@ let _bool_app_var_repl = ref false
 let _fluid_log_hoist = ref false
 let _solve_formulas = ref false
 let _replace_quants = ref false
+let _disable_ho_unif = ref false
 
 
 let extension =
@@ -2053,6 +2055,7 @@ let extension =
     E.flex_add k_fluid_log_hoist !_fluid_log_hoist;
     E.flex_add k_solve_formulas !_solve_formulas;
     E.flex_add k_replace_unsupported_quants !_replace_quants;
+    E.flex_add k_disable_ho_bool_unif !_disable_ho_unif;
 
     ET.setup ()
   in
@@ -2153,5 +2156,12 @@ let () =
                        "lambda-free-purify-extensional";
                        "fo-complete-basic"] (fun () ->
       _replace_quants := false;
+  );
+  Params.add_to_modes ["lambda-free-intensional";
+                       "lambda-free-purify-intensional";
+                       "lambda-free-extensional";
+                       "ho-comb-complete";
+                       "lambda-free-purify-extensional"] (fun () -> 
+    _disable_ho_unif := true
   );
   Extensions.register extension

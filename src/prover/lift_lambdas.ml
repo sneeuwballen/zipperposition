@@ -188,7 +188,7 @@ let lift_lambdas_t ~parent ~counter t  =
       let xs', (xs_reused_defs, xs_new_defs), declared_symss = aux_l xs in
       x' :: xs', (x_reused_defs @ xs_reused_defs, x_new_defs @ xs_new_defs), declared_syms @ declared_symss in
   Util.debugf ~section 1 "lifting @[%a@]@." (fun k -> k T.pp t);
-  let res, defs, declared_syms =  aux t in
+  let res, defs, declared_syms =  aux (Lambda.snf @@ t) in
   Ctx.declare_syms declared_syms;
   (res,defs)
 
@@ -210,7 +210,7 @@ let lift_lambdas_t ~parent ~counter t  =
           | _ -> lit::acc, (reused_defs, new_defs)
        ) l ([],([],[]))) in
 
-    if CCList.is_empty reused_defs && CCList.is_empty new_defs then []
+    if Literals.equal (Array.of_list lits) (C.lits cl)  then []
     else (
       let proof = 
         Proof.Step.simp 
@@ -260,6 +260,7 @@ let extension =
   in
   { Extensions.default with
     Extensions.name = "lift_lambdas";
+    prio=1;
     env_actions=[register];
   }
 
