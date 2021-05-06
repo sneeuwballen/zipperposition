@@ -511,6 +511,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let pp_tstp_full out c = SClause.pp_tstp_full out c.sclause
 
   let to_string = CCFormat.to_string pp
+  let to_string_tstp = CCFormat.to_string pp_tstp
 
   let pp_set out set =
     Format.fprintf out "{@[<hv>%a@]}"
