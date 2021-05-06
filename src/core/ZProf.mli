@@ -15,4 +15,6 @@ val exit_prof : span -> unit (** Exit the profiler *)
 
 val with_prof : t -> ('a -> 'b) -> 'a -> 'b
 
+val message : (unit -> string) -> unit
+
 val setup : unit -> unit

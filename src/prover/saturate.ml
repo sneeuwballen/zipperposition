@@ -142,6 +142,7 @@ module Make(E : Env.S) = struct
       Util.debugf ~section 2 "@[<2>@{<green>given@} (before simplification):@ `@[%a@]`@]"
             (fun k->k Env.C.pp c);
       Util.debugf ~section 10 "@[proof:@[%a@]@]" (fun k -> k Proof.S.pp_tstp (Env.C.proof c));
+      ZProf.message (fun () -> Format.asprintf "given: %a" Env.C.pp_tstp c);
 
       check_clause_ c;
       Util.incr_stat stat_steps;

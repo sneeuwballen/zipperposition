@@ -71,16 +71,16 @@ module TEF = struct
     let pid = Unix.getpid() in
     emit_sep_ oc;
     Printf.fprintf oc
-      {json|{"pid": %d,"tid":1,"cat":"","dur": %.2f,"ts": %.2f,"name":"%s","ph":"X"}|json}
+      {json|{"pid": %d,"tid":1,"dur": %.2f,"ts": %.2f,"name":"%s","ph":"X"}|json}
       pid dur ts prof.prof_name;
     ()
 
-  let emit_instant_event oc (prof:t) ~ts () : unit =
+  let emit_instant_event oc ~ts ~msg () : unit =
     let pid = Unix.getpid() in
     emit_sep_ oc;
     Printf.fprintf oc
-      {json|{"pid": %d,"cat":"","ts": %.2f,"name":"%s","ph":"I"}|json}
-      pid ts prof.prof_name;
+      {json|{"pid": %d,"tid":1,"ts": %.2f,"name":%S,"ph":"I"}|json}
+      pid ts msg;
     ()
 
   let teardown () =
@@ -149,6 +149,19 @@ let[@inline] exit_prof span =
   match span with
   | No_span -> ()
   | Span {start; prof} -> exit_with_ prof start
+
+let message_real_ f =
+  match !TEF.out_ with
+  | None -> ()
+  | Some oc ->
+    let ts = Util.get_time_mon_us() in
+    let msg = f() in
+    TEF.emit_instant_event oc ~ts ~msg ()
+
+let[@inline] message f =
+  if __prof && Lazy.force active_ then (
+    message_real_ f
+  )
 
 let with_prof_active_ p f x =
   let span = enter_prof p in
