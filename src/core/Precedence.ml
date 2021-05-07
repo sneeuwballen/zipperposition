@@ -588,6 +588,7 @@ let weight_freqrank (symbs : ID.t Iter.t) : ID.t -> Weight.t =
 let lambda_def_weight lm_w db_w base_weight clauses =
   let definition_map = ID.Tbl.create 64 in
   let dependencies = ID.Tbl.create 64 in
+  let module VS = T.VarSet in
 
   let find_def lhs rhs =
     let try_extracting lhs rhs =
@@ -596,12 +597,12 @@ let lambda_def_weight lm_w db_w base_weight clauses =
         CCOpt.return_if (T.is_ground rhs) (id, rhs)
       | T.App(hd, args) when T.is_const hd ->
         if List.for_all T.is_var args then (
-          let var_set = T.VarSet.of_list (List.map T.as_var_exn args) in
-          if (T.VarSet.cardinal var_set == List.length args &&
+          let var_set = VS.of_list (List.map T.as_var_exn args) in
+          if (VS.cardinal var_set == List.length args &&
              T.Seq.subterms ~include_builtin:true ~include_app_vars:true rhs
              |> Iter.filter (T.is_app_var)
              |> Iter.is_empty &&
-             Iter.length (T.Seq.vars rhs) == T.VarSet.cardinal (T.vars rhs))  then (
+             Iter.length (T.Seq.vars rhs) == VS.cardinal (T.vars rhs))  then (
             Some (T.head_exn hd, rhs)
           ) else None
         ) else None
@@ -646,8 +647,8 @@ let lambda_def_weight lm_w db_w base_weight clauses =
         begin match find_def lhs rhs with
         | Some(hd_id, r) ->
           ID.Tbl.update definition_map ~f:(fun _ -> 
-            function None -> Some [(hd_id,r)]
-                     | Some res -> Some ((hd_id,r) :: res)
+            function None -> Some [r]
+                     | Some res -> Some (r :: res)
             ) ~k:hd_id;
           Term.Seq.symbols r
           |> Iter.iter (fun k -> 
@@ -682,7 +683,7 @@ let lambda_def_weight lm_w db_w base_weight clauses =
         (Weight.(+)) acc (aux t)
       ) Weight.zero l
     in
-    Weight.mult_one 2 (aux t)
+    (Weight.(+)) (Weight.mult_one 2 (aux t)) (Weight.one)
   in
 
 
@@ -690,11 +691,13 @@ let lambda_def_weight lm_w db_w base_weight clauses =
     topological_sort dependencies
     |> CCList.iter (fun id ->
       let w = Iter.max_exn ~lt:(fun x y -> Weight.compare x y < 0)
-        (Iter.map (fun (_, r) -> eval_weight ~weights r) 
+        (Iter.map (eval_weight ~weights) 
           (Iter.of_list @@ ID.Tbl.get_or ~default:[] definition_map id)) in
       ID.Tbl.add weights id w
     )
   with Loop -> ((* could not sort *)));
+
+  ID.Tbl.clear dependencies;
 
   fun sy ->
     if is_post_cnf_skolem ~sig_ref:(ref empty_sig) sy then default_weight
