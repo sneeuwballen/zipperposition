@@ -1,6 +1,6 @@
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
-(** {1 Simple Typed Terms}. *)
+(** {1 Simple Typed Terms} *)
 
 (** Similar to {!STerm}, but this time the terms are properly
     scoped (using {!Var}) and typed.

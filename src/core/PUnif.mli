@@ -5,7 +5,7 @@
 (** Provides plug-in module for UnifFramework.ml that implements
     pragmatic restriction of the unification algorithm described 
     in the paper Efficient Full Higher-Order Unification
-    \url{http://matryoshka.gforge.inria.fr/pubs/hounif_paper.pdf} *)
+    {{:http://matryoshka.gforge.inria.fr/pubs/hounif_paper.pdf} (paper)} *)
 
 module IntSet : CCSet.S with type elt = CCInt.t
 
@@ -15,4 +15,6 @@ val proj_hs : counter:int ref -> scope:Scoped.scope -> flex:Term.t -> Term.t -> 
 
 module Make (S : sig val st : Flex_state.t end) : sig
   val unify_scoped : Term.t Scoped.t -> Term.t Scoped.t -> Unif_subst.t option OSeq.t
-end 
+  (** [unify_scoped t1 t2] yields a stream of unifiers, with [None] interspersed
+      regularly to make sure each call to {!OSeq.next} completes in finite time. *)
+end

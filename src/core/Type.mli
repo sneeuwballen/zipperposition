@@ -245,7 +245,7 @@ val pp_typed_var : t HVar.t CCFormat.printer
 val mangle : t -> string
 val pp_mangle : t CCFormat.printer
 
-(** {2 TPTP} specific printer and types *)
+(** {2 TPTP-specific printer and types} *)
 
 module TPTP : sig
   include Interfaces.PRINT_DE_BRUIJN with type term := t and type t := t

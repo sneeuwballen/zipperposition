@@ -41,12 +41,12 @@ module type S = sig
    *     (meaning that the clause is searched for only when the
    *     time_before_drip counter reaches 0), or raise Not_found.
    *     Guarded recursion: can't loop forever
-   *     @raises Not_found in the guard is reached *\) *)
+   *     @raise Not_found in the guard is reached *\) *)
 
   val take_first : t -> Stm.C.t option
   (** Attempts to take a clause out of the queue.
       Guarded recursion: can't loop forever
-      @raises Not_found in the guard is reached *)
+      @raise Not_found in the guard is reached *)
 
   val take_fair_anyway: t -> Stm.C.t option list
   (** Takes clauses from the queue in a fair manner.

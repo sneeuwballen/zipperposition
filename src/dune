@@ -10,3 +10,5 @@
  (deps    main/zipperposition.exe test_must_pass.sh (source_tree ../examples/))
  (action  (run ./test_must_pass.sh ./main/zipperposition.exe)))
 
+;(documentation
+;  (package logtk))

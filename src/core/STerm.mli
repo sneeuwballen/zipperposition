@@ -1,6 +1,6 @@
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-(** {1 Simple Terms}. *)
+(** {1 Simple Terms} *)
 
 (** Simple terms, that are not hashconsed, nor typed.
 
