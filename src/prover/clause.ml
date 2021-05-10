@@ -373,6 +373,8 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   (** Indexed list of selected literals *)
   let selected_lits c = BV.selecti (Lazy.force c.selected) c.sclause.lits
 
+  let selected_lits_bv c = Lazy.force c.selected
+
   let bool_selected c  = Lazy.force c.bool_selected
 
   (** is the clause a unit clause? *)

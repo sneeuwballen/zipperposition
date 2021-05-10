@@ -363,7 +363,12 @@ let e_sel8 ~blocker ~ord lits =
        | `At idx -> idx
        | _       -> max_int)
     | _ -> max_int  in
-  let blocker x l = blocker x l || Lit.is_type_pred l || Lit.is_predicate_lit l in
+  let is_propositional = function
+  | (Lit.Equation(lhs, _, _) as l) ->
+    Lit.is_predicate_lit l && T.is_const lhs
+  | _ -> false
+  in
+  let blocker x l = blocker x l || Lit.is_type_pred l || is_propositional l in
   let chooser (i,l) =
     if is_truly_equational l then (
       (if Lit.is_positivoid l then 1 else 0),

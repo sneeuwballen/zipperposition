@@ -119,7 +119,7 @@ module Make(C : Clause_intf.S) = struct
   let add_related_term_ t =
     if Term.Set.cardinal !_related_terms < max_related_ then (
       let new_terms = unroll_logical_symbols t in
-      Util.debugf ~section 10 "addding related terms:@.@[%a@]@." 
+      Util.debugf ~section 20 "addding related terms:@.@[%a@]@." 
         (fun k -> k (Term.Set.pp Term.pp) new_terms);
       _related_terms := Term.Set.union !_related_terms new_terms
     )
@@ -155,7 +155,7 @@ module Make(C : Clause_intf.S) = struct
       let w_lits = weight_lits_ (C.lits c) in
       w_lits * Array.length (C.lits c) + _depth_ty
 
-    let  ho_weight_calc c =
+    let ho_weight_calc c =
       let all_terms c =
         C.Seq.terms c
         |> Iter.flat_map (Term.Seq.subterms ~include_builtin:true) in
@@ -208,7 +208,9 @@ module Make(C : Clause_intf.S) = struct
         ) 0 (C.lits c)
 
     let orient_lmax_weight ~v_w ~f_w ~pos_m ~unord_m ~max_l_mul c =
-      let max_lits = C.maxlits (c,0) Subst.empty in
+      let max_lits = 
+        if C.has_selected_lits c then C.selected_lits_bv c
+        else C.maxlits (c,0) Subst.empty in
       let ord = C.Ctx.ord () in
       let res = CCArray.foldi (fun sum i lit ->
           let term_w = (fun t -> 
@@ -228,7 +230,9 @@ module Make(C : Clause_intf.S) = struct
       int_of_float res
 
     let pn_refined_weight ~pv_w ~pf_w ~nv_w ~nf_w ~max_t_m ~max_l_m ~pos_m c =
-      let max_lits = C.maxlits (c,0) Subst.empty in
+      let max_lits = 
+        if C.has_selected_lits c then C.selected_lits_bv c
+        else C.maxlits (c,0) Subst.empty in
       let ord = C.Ctx.ord () in
       let res = CCArray.foldi (fun sum i lit ->
           let pterm_w = (fun t -> float_of_int (Term.weight ~var:pv_w ~sym:(fun _ -> pf_w) t)) in
@@ -296,7 +300,9 @@ module Make(C : Clause_intf.S) = struct
 
     let conj_relative ?(distinct_vars_mul=(-1.0)) ?(parameters_magnitude=`Large) ?(goal_penalty=false) c =
       let sgn = C.Ctx.signature () in
-      let max_lits = C.maxlits (c,0) Subst.empty in
+      let max_lits = 
+        if C.has_selected_lits c then C.selected_lits_bv c       
+        else C.maxlits (c,0) Subst.empty in
       let pos_mul, max_mul, v,f =
         match parameters_magnitude with
         |`Large -> (1.5,1.5,100,100)
@@ -333,7 +339,9 @@ module Make(C : Clause_intf.S) = struct
     (* function inspired by Struct from the paper https://arxiv.org/abs/1606.03888 *)
     let conj_relative_struct ~inst_penalty ~gen_penalty ~var_w ~sym_w c =
       let pos_mul,max_mul = 2.0,1.5 in
-      let max_lits = C.maxlits (c,0) Subst.empty in
+      let max_lits = 
+        if C.has_selected_lits c then C.selected_lits_bv c
+        else C.maxlits (c,0) Subst.empty in
 
       let struct_diff_weight t =
         let module T = Term in
@@ -439,7 +447,9 @@ module Make(C : Clause_intf.S) = struct
           | _ -> 1 in
         int_of_float (multipliers *. (float_of_int base_weight)) in
 
-      let max_lits = C.maxlits (c,0) Subst.empty in
+      let max_lits = 
+        if C.has_selected_lits c then C.selected_lits_bv c
+        else C.maxlits (c,0) Subst.empty in
       C.Seq.lits c
       |> Iter.foldi (fun acc idx lit -> 
         let is_max = CCBV.get max_lits idx in
@@ -466,7 +476,9 @@ module Make(C : Clause_intf.S) = struct
           (max_t_mul *. (float_of_int w_r)) +. (float_of_int w_l)
         | _ -> float_of_int (w_l + w_r) in
       
-      let max_lits = C.maxlits (c,0) Subst.empty in
+      let max_lits = 
+        if C.has_selected_lits c then C.selected_lits_bv c
+        else C.maxlits (c,0) Subst.empty in
       let get_syms l r = ID.Set.union (Term.symbols l) (Term.symbols r) in
       let get_vars l r = Term.VarSet.union (Term.vars l) (Term.vars r) in
     
@@ -770,7 +782,7 @@ module Make(C : Clause_intf.S) = struct
       let w = List.assoc name parsers s in
       fun c ->
         let res = penalize w c in
-        Util.debugf ~section 5 "@[%s(%a)@]=@[%d@]" (fun k -> k name C.pp c res);
+        Util.debugf ~section 2 "@[%s(%a)@]=@[%d@]" (fun k -> k name C.pp c res);
         res
 
     with Not_found | Failure _ -> 
@@ -786,7 +798,7 @@ module Make(C : Clause_intf.S) = struct
     let prefer_ho_steps c = if Proof.Step.has_ho_step (C.proof_step c) then 0 else 1
 
     let prefer_sos c =
-      if C.get_flag SClause.flag_initial c || CCOpt.is_some (C.distance_to_goal c) then 0 else 1
+      if C.proof_depth c = 0 || CCOpt.is_some (C.distance_to_goal c) then 0 else 1
 
     let prefer_non_goals c =
       if Iter.exists Literal.is_positivoid (C.Seq.lits c) then 0 else 1
@@ -1086,7 +1098,12 @@ module Make(C : Clause_intf.S) = struct
 
     let of_string s = 
       try 
-        List.assoc (String.lowercase_ascii s) parsers s
+        let f =  List.assoc (String.lowercase_ascii s) parsers s in
+        (fun c -> 
+          let p = f c in
+          Util.debugf ~section 2 " prio(%a)=%d" (fun k -> k C.pp c p);
+          p
+        )
       with Not_found ->
         let err_msg =
           CCFormat.sprintf "unknown priortity: %s.\noptions:@ {@[%a@]}"
@@ -1152,12 +1169,9 @@ module Make(C : Clause_intf.S) = struct
 
   let rec take_first_mixed q =
     let move_queue q =
-      if q.current_step < q.ratios_limit then (
-        (* we still have to pick from current heap *)
-        q.current_step <- q.current_step + 1;
-      ) else (
+      q.current_step <- q.current_step + 1;
+      if q.current_step >= q.ratios_limit then (
         (* we have to choose the next heap *)
-
         if (q.current_heap_idx + 1 = Array.length (q.heaps)) then (
           (* cycled through all the heaps, starting over  *)
           q.current_heap_idx <- 0;
@@ -1165,7 +1179,6 @@ module Make(C : Clause_intf.S) = struct
           q.ratios_limit <- Array.get q.ratios 0;
         ) else (
           (* moving to the next heap  *)
-          q.current_step <- q.current_step + 1;
           q.current_heap_idx <- q.current_heap_idx + 1;
           q.ratios_limit <- q.ratios_limit + (Array.get q.ratios q.current_heap_idx)
         )
@@ -1183,14 +1196,15 @@ module Make(C : Clause_intf.S) = struct
     (* if clause was picked by another queue 
        or it should be ignored, repeat clause choice.  *)
     if not (C.Tbl.mem q.tbl c) then (
-      Util.debugf ~section 1 "clause is not in the table:@ @[%a@]@." (fun k -> k C.pp c);
+      Util.debugf ~section 2 "clause is not in the table:@ @[%a@]@." (fun k -> k C.pp c);
       take_first_mixed q
     ) else if is_orphaned c then (
       C.Tbl.remove q.tbl c;
-      Util.debugf ~section 1"ignoring orphaned clause:@ @[%a@]@." (fun k -> k C.pp c);
+      Util.debugf ~section 2"ignoring orphaned clause:@ @[%a@]@." (fun k -> k C.pp c);
       Util.debugf ~section 5 "proof:@ @[%a@]@." (fun k -> k Proof.S.pp_tstp (C.proof c));
       take_first_mixed q
     ) else (
+      Util.debugf ~section 1 "q:%d" (fun k -> k q.current_heap_idx);
       C.Tbl.remove q.tbl c;
       move_queue q;
       c
