@@ -248,16 +248,17 @@ let compute_ord_select precedence =
   let select = Selection.from_string ~ord params.Params.select in
   let bool_select = Bool_selection.from_string ~ord params.Params.bool_select in
   do_extensions ~field:(fun e->e.Extensions.ord_select_actions)
-    ~x:(ord,select) >>= fun () ->
+    ~x:(ord,(fst select)) >>= fun () ->
   Util.debugf ~section 2 "@[<2>selection function:@ %s@]" (fun k->k params.Params.select);
   Phases.return_phase (ord, select, bool_select)
 
 let make_ctx ~signature ~ord ~select ~bool_select ~sk_ctx () =
+  let (select_fun, is_complete) = select in
   Phases.start_phase Phases.MakeCtx >>= fun () ->
   let module Res = struct
     let signature = signature
     let ord = ord
-    let select = select
+    let select = select_fun
     let bool_select = bool_select
     let sk_ctx = sk_ctx
   end in
@@ -265,7 +266,10 @@ let make_ctx ~signature ~ord ~select ~bool_select ~sk_ctx () =
   let ctx = (module MyCtx : Ctx_intf.S) in
   Phases.get >>= fun st ->
   (* did any previous extension break completeness? *)
-  let lost_comp = Flex_state.get_or ~or_:false Ctx.Key.lost_completeness st in
+  let lost_comp = 
+    Flex_state.get_or ~or_:false Ctx.Key.lost_completeness st
+    || not (is_complete)
+  in
   if lost_comp then MyCtx.lost_completeness ();
   do_extensions ~field:(fun e->e.Extensions.ctx_actions)
     ~x:ctx >>= fun () ->

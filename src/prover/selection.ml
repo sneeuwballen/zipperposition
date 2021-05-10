@@ -186,14 +186,14 @@ let prefer_app_var ~ord lits =
       ho_sel_driver lits prefer_av_feature
     )
 
-let weight_based_sel_driver ?(blocker=(fun _ _ -> false)) ~ord lits f =
+let weight_based_sel_driver ?(blocker=(fun _ _ -> false)) ~can_sel ~ord lits f =
   let min_lit = 
     CCArray.to_iter lits
     |> Iter.mapi (fun i l -> f (i,l), i)
     |> Iter.sort
     |> Iter.find_map (fun (_,i) ->
       let lit = lits.(i) in
-      if can_select_lit ~ord lits i && not (blocker i lit) 
+      if can_sel ~ord lits i && not (blocker i lit) 
       then Some (lit,i)
       else None) in
   match min_lit with
@@ -247,7 +247,7 @@ let e_sel ~blocker ~ord lits =
      -(lit_sel_diff_w l),
      get_pred_freq ~freq_tbl l) in
   let freq_tbl = pred_freq ~ord lits in
-  weight_based_sel_driver ~ord lits (chooser ~freq_tbl) ~blocker
+  weight_based_sel_driver ~can_sel:can_select_lit ~ord lits (chooser ~freq_tbl) ~blocker
 
 let e_sel2 ~blocker ~ord lits = 
   let symbols = Lits.symbols lits 
@@ -279,7 +279,7 @@ let e_sel2 ~blocker ~ord lits =
         (sign_val, -prec_weight, alpha_rank, diff_val)
       )
     | _ -> (sign_val,max_int,max_int,diff_val) (* won't be chosen *) in
-  weight_based_sel_driver ~ord ~blocker lits chooser
+  weight_based_sel_driver ~can_sel:can_select_lit ~ord ~blocker lits chooser
 
 let e_sel3 ~blocker ~ord lits = 
   let chooser (i,l) = 
@@ -291,7 +291,7 @@ let e_sel3 ~blocker ~ord lits =
     ) else (
       (sign, 20, - (lit_sel_diff_w l) , 0)
     ) in
-  weight_based_sel_driver ~ord ~blocker lits chooser 
+  weight_based_sel_driver ~can_sel:can_select_lit ~ord ~blocker lits chooser 
 
 let e_sel4 ~blocker ~ord lits =
   let freq_tbl = pred_freq ~ord lits in
@@ -313,7 +313,7 @@ let e_sel4 ~blocker ~ord lits =
       (sign, 20, -(T.ho_weight lhs), hd_freq)
     ) else (sign, max_int, max_int, max_int) in
   let blocker x l = blocker x l || Lit.is_type_pred l in
-  weight_based_sel_driver ~ord ~blocker lits chooser 
+  weight_based_sel_driver ~can_sel:can_select_lit ~ord ~blocker lits chooser 
 
 let e_sel5 ~blocker ~ord lits =
   let chooser (i,l) =
@@ -322,7 +322,7 @@ let e_sel5 ~blocker ~ord lits =
     (- (lit_sel_diff_w l)),
     0 in
   if CCArray.exists (fun l -> Lit.is_negativoid l && Lit.depth l <= 2) lits then (
-    weight_based_sel_driver ~ord ~blocker lits chooser 
+    weight_based_sel_driver ~can_sel:can_select_lit ~ord ~blocker lits chooser 
   ) else BV.empty ()
 
 let e_sel6 ~blocker ~ord lits =
@@ -338,7 +338,7 @@ let e_sel6 ~blocker ~ord lits =
     (- (Lit.weight l)),
     0 in
   let blocker x t = blocker x t || not @@ is_oriented t in
-  weight_based_sel_driver ~ord lits chooser ~blocker
+  weight_based_sel_driver  ~can_sel:can_select_lit ~ord lits chooser ~blocker
 
 let e_sel7 ~blocker ~ord lits = 
   (* SelectComplexExceptRRHorn *)
@@ -374,7 +374,7 @@ let e_sel8 ~blocker ~ord lits =
       alpha_rank l, lit_sel_diff_w l
     )
   in
-  weight_based_sel_driver ~ord lits chooser ~blocker
+  weight_based_sel_driver ~can_sel:can_select_lit ~ord lits chooser ~blocker
 
 let e_sel9 ~blocker ~ord lits =
   (* SelectLargestOrientable *)
@@ -400,7 +400,7 @@ let e_sel9 ~blocker ~ord lits =
     (lhs_head_arity l),
     (lhs_head_alpha l),
     0 in
-  weight_based_sel_driver ~ord ~blocker lits chooser
+  weight_based_sel_driver ~can_sel:can_select_lit ~ord ~blocker lits chooser
 
 let e_sel10 ~blocker ~ord lits =
   mk_ ~ord lits ~f:(fun lits ->
@@ -434,7 +434,7 @@ let e_sel11 ~blocker ~ord lits =
     else (max_int, max_int, max_int) in
   
   if CCArray.exists (fun l -> Lit.is_negativoid l && Lit.depth l <= 2) lits then (
-    weight_based_sel_driver ~ord lits chooser ~blocker
+    weight_based_sel_driver ~can_sel:can_select_lit ~ord lits chooser ~blocker
   ) else BV.empty ()
 
 let e_sel12 ~blocker ~ord lits =
@@ -448,7 +448,7 @@ let e_sel13 ~blocker ~ord lits =
     (if Lit.is_ground l then 0 else 1),
     (- (lit_sel_diff_w l)),
     0 in
-  weight_based_sel_driver ~ord ~blocker lits chooser
+  weight_based_sel_driver ~can_sel:can_select_lit ~ord ~blocker lits chooser
 
 let e_sel14 ~blocker ~ord lits =
   let freq_tbl = pred_freq ~ord lits in
@@ -479,7 +479,7 @@ let e_sel14 ~blocker ~ord lits =
     blocker i l ||
     CCBV.get blocked i in
 
-  weight_based_sel_driver ~ord lits chooser ~blocker:(blocker blocked)
+  weight_based_sel_driver ~can_sel:can_select_lit ~ord lits chooser ~blocker:(blocker blocked)
 
 let e_sel15 ~blocker ~ord lits =
   let (<+>) = CCOpt.Infix.(<+>)  in
@@ -544,7 +544,8 @@ let e_sel16 ~blocker ~ord lits =
         let hd_arity = List.length (Type.expected_args (T.ty (Term.head_term lhs))) in
         (-hd_arity, hd_val, lit_sel_diff_w l))
       | _ -> (max_int,max_int,max_int) in
-  weight_based_sel_driver ~ord lits chooser ~blocker:(fun i l -> blocker i l || CCBV.get blocked i)
+  weight_based_sel_driver ~can_sel:can_select_lit ~ord lits chooser 
+                          ~blocker:(fun i l -> blocker i l || CCBV.get blocked i)
 
 let e_sel17 ~blocker ~ord lits =
   let res = CCBV.create ~size:(Array.length lits) false in 
@@ -555,7 +556,7 @@ let e_sel17 ~blocker ~ord lits =
       (- (lit_sel_diff_w l)),
       0 
     in
-    weight_based_sel_driver ~blocker ~ord lits chooser
+    weight_based_sel_driver ~can_sel:can_select_lit ~blocker ~ord lits chooser
   ) else res
 
 let ho_sel ~blocker ~ord lits = 
@@ -573,7 +574,7 @@ let ho_sel ~blocker ~ord lits =
     (sign, 
      (if has_formula then 1 else 0),
      int_of_float (weight *. ((1.2) ** app_var_num) /. ground),  0)  in
-  weight_based_sel_driver ~ord ~blocker lits chooser
+  weight_based_sel_driver ~can_sel:can_select_lit ~ord ~blocker lits chooser
 
 let ho_sel2 ~blocker ~ord lits =
   let app_var_pen l =
@@ -589,7 +590,7 @@ let ho_sel2 ~blocker ~ord lits =
   let chooser (i,l) = 
     let sign = (if Lit.is_positivoid l then 1 else 0) in
     (sign, app_var_pen l, Lit.weight l, (if not (Lit.is_ground l) then 0 else 1))  in
-  weight_based_sel_driver ~blocker ~ord lits chooser
+  weight_based_sel_driver ~can_sel:can_select_lit ~blocker ~ord lits chooser
 
 let ho_sel3 ~blocker ~ord lits =
   let lit_penalty = function
@@ -619,7 +620,7 @@ let ho_sel3 ~blocker ~ord lits =
     let sign = (if Lit.is_positivoid l then 1 else 0) in
     let lit_pen = lit_penalty l in
     (sign, lit_pen, Lit.weight l, (if (Lit.is_ground l) then 0 else 1))  in
-  weight_based_sel_driver ~ord ~blocker lits chooser
+  weight_based_sel_driver ~can_sel:can_select_lit ~ord ~blocker lits chooser
 
 let ho_sel4 ~blocker ~ord =
   e_sel3 ~ord ~blocker:(fun i -> function 
@@ -642,45 +643,45 @@ let except_RR_horn (p:parametrized) ~strict ~ord lits =
 let default = max_goal ~strict:true
 
 let bool_blockable ~blocker = 
-  [ "e-selection", e_sel ~blocker;
-    "e-selection2", e_sel2 ~blocker;
-    "e-selection3", e_sel3 ~blocker;
-    "e-selection4", e_sel4 ~blocker;
-    "e-selection5", e_sel5 ~blocker;
-    "e-selection6", e_sel6 ~blocker;
-    "e-selection7", e_sel7 ~blocker;
-    "e-selection8", e_sel8 ~blocker;
-    "e-selection9", e_sel9 ~blocker;
-    "e-selection10", e_sel10 ~blocker;
-    "e-selection11", e_sel11 ~blocker;
-    "e-selection12", e_sel12 ~blocker;
-    "e-selection13", e_sel13 ~blocker;
-    "e-selection14", e_sel14 ~blocker;
-    "e-selection15", e_sel15 ~blocker;
-    "e-selection16", e_sel16 ~blocker;
-    "e-selection17", e_sel17 ~blocker;
-    "ho-selection", ho_sel ~blocker;
-    "ho-selection2", ho_sel2 ~blocker;
-    "ho-selection3", ho_sel3 ~blocker;
-    "ho-selection4", ho_sel4 ~blocker;
-    "ho-selection5", ho_sel5 ~blocker;
+  [ "e-selection", (e_sel ~blocker, true);
+    "e-selection2", (e_sel2 ~blocker, true);
+    "e-selection3", (e_sel3 ~blocker, true);
+    "e-selection4", (e_sel4 ~blocker, true);
+    "e-selection5", (e_sel5 ~blocker, true);
+    "e-selection6", (e_sel6 ~blocker, true);
+    "e-selection7", (e_sel7 ~blocker, true);
+    "e-selection8", (e_sel8 ~blocker, true);
+    "e-selection9", (e_sel9 ~blocker, true);
+    "e-selection10", (e_sel10 ~blocker, true);
+    "e-selection11", (e_sel11 ~blocker, true);
+    "e-selection12", (e_sel12 ~blocker, true);
+    "e-selection13", (e_sel13 ~blocker, true);
+    "e-selection14", (e_sel14 ~blocker, true);
+    "e-selection15", (e_sel15 ~blocker, true);
+    "e-selection16", (e_sel16 ~blocker, true);
+    "e-selection17", (e_sel17 ~blocker, true);
+    "ho-selection",  (ho_sel ~blocker, true);
+    "ho-selection2", (ho_sel2 ~blocker, true);
+    "ho-selection3", (ho_sel3 ~blocker, true);
+    "ho-selection4", (ho_sel4 ~blocker, true);
+    "ho-selection5", (ho_sel5 ~blocker, true);
   ]
 
 let l =
   let basics =
-    [ "NoSelection", (fun ~ord:_ -> no_select);
-      "default", default;
-      "avoid_app_var", avoid_app_var;
-      "prefer_app_var", prefer_app_var;
+    [ "NoSelection", ((fun ~ord:_ -> no_select), true);
+      "default", (default, true);
+      "avoid_app_var", (avoid_app_var, true);
+      "prefer_app_var", (prefer_app_var, true);
     ]
   and by_ord =
     CCList.flat_map
-      (fun (name,p) ->
-         [ name, (fun ~ord -> p ~strict:true ~ord);
-           name ^ "NS", (fun ~ord -> p ~strict:false ~ord);
+      (fun (name,(p,c)) ->
+         [ name, ((fun ~ord -> p ~strict:true ~ord), c);
+           name ^ "NS", ((fun ~ord -> p ~strict:false ~ord),c);
          ])
-      [ "MaxGoal", max_goal;
-        "MaxGoalExceptRRHorn", except_RR_horn max_goal;
+      [ "MaxGoal", (max_goal, true);
+        "MaxGoalExceptRRHorn", (except_RR_horn max_goal, true);
       ]
   in
   let b (i:int) (l:Lit.t) = false in
@@ -689,7 +690,9 @@ let l =
 
 let from_string ~ord s =
   let from_list name l =
-    try (List.assoc name l) ~ord
+    try 
+      let fun_, is_complete = (List.assoc name l) in
+      fun_ ~ord, is_complete
     with Not_found ->
       failwith ("no such selection function: "^s)
   in

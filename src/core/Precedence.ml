@@ -599,10 +599,10 @@ let lambda_def_weight lm_w db_w base_weight clauses =
         if List.for_all T.is_var args then (
           let var_set = VS.of_list (List.map T.as_var_exn args) in
           if (VS.cardinal var_set == List.length args &&
-             T.Seq.subterms ~include_builtin:true ~include_app_vars:true rhs
-             |> Iter.filter (T.is_app_var)
-             |> Iter.is_empty &&
-             Iter.length (T.Seq.vars rhs) == VS.cardinal (T.vars rhs))  then (
+            (T.Seq.subterms ~include_builtin:true ~include_app_vars:true rhs
+            |> Iter.filter (T.is_app_var)
+            |> Iter.is_empty) &&
+            Iter.length (T.Seq.vars rhs) == VS.cardinal (T.vars rhs))  then (
             Some (T.head_exn hd, rhs)
           ) else None
         ) else None
@@ -613,7 +613,7 @@ let lambda_def_weight lm_w db_w base_weight clauses =
   in
 
   let exception Loop in
-  let topological_sort dependencies = 
+  let topological_sort ~all_nodes dependencies = 
     let unvisited = ref (ID.Set.of_iter (ID.Tbl.keys dependencies)) in
     let visiting = ref ID.Set.empty in
     let visited = ref ID.Set.empty in
@@ -637,18 +637,23 @@ let lambda_def_weight lm_w db_w base_weight clauses =
       visit (ID.Set.choose !unvisited) 
     done;
 
-    !sorted
+    Util.debugf ~section 1 "top sorted: @[%a@]@." (fun k -> k (CCList.pp ID.pp) !sorted);
+
+    let no_deps = ID.Set.to_list (ID.Set.diff all_nodes (ID.Set.of_list !sorted)) in
+    no_deps @ !sorted
   in
 
   Iter.iter (fun cl -> 
+    Util.debugf ~section 2 "working on %a" (fun k -> k (Iter.pp_seq (SLiteral.pp T.pp)) cl);
     if Iter.length cl == 1 then (
       match Iter.head_exn cl with
       | SLiteral.Eq(lhs, rhs) ->
         begin match find_def lhs rhs with
         | Some(hd_id, r) ->
+          Util.debugf ~section 2 "is_def: %a := %a" (fun k -> k T.pp lhs T.pp rhs);
           ID.Tbl.update definition_map ~f:(fun _ -> 
             function None -> Some [r]
-                     | Some res -> Some (r :: res)
+                    | Some res -> Some (r :: res)
             ) ~k:hd_id;
           Term.Seq.symbols r
           |> Iter.iter (fun k -> 
@@ -657,7 +662,7 @@ let lambda_def_weight lm_w db_w base_weight clauses =
                                 None -> Some [hd_id]
                                 | Some res -> Some (hd_id :: res))
                           ~k)
-        | _ -> () end
+        | _ -> (Util.debugf ~section 2 "is not def: %a := %a" (fun k -> k T.pp lhs T.pp rhs);) end
       | _ -> ()
     )
   ) clauses;
@@ -670,7 +675,7 @@ let lambda_def_weight lm_w db_w base_weight clauses =
       | Term.DB _ -> Weight.int db_w
       | Term.Var _ -> Weight.one
       | Term.Const id ->
-       ID.Tbl.get_or weights id ~default:(base_weight id)
+      ID.Tbl.get_or weights id ~default:(base_weight id)
       | Term.Fun(_,body) -> (Weight.(+)) (Weight.int lm_w) (aux body)
       | Term.App(hd, args) -> aux_l (hd :: args)
       | Term.AppBuiltin(hd, args) ->
@@ -687,17 +692,22 @@ let lambda_def_weight lm_w db_w base_weight clauses =
   in
 
 
-  (try 
-    topological_sort dependencies
+  (try
+
+
+    (topological_sort ~all_nodes:(ID.Set.of_iter (ID.Tbl.keys definition_map))  
+                      dependencies)
     |> CCList.iter (fun id ->
-      let w = Iter.max_exn ~lt:(fun x y -> Weight.compare x y < 0)
+      let w_opt = Iter.max ~lt:(fun x y -> Weight.compare x y < 0)
         (Iter.map (eval_weight ~weights) 
           (Iter.of_list @@ ID.Tbl.get_or ~default:[] definition_map id)) in
-      ID.Tbl.add weights id w
+      match w_opt with
+      | Some w -> 
+        Util.debugf ~section 1 "lambda weight lift of %a = %a" (fun k -> k ID.pp id Weight.pp w);
+        ID.Tbl.add weights id w
+      | None -> ()
     )
-  with Loop -> ((* could not sort *)));
-
-  ID.Tbl.clear dependencies;
+  with Loop -> (Util.debugf ~section 1 "warning looped" (fun k -> k); ));
 
   fun sy ->
     if is_post_cnf_skolem ~sig_ref:(ref empty_sig) sy then default_weight
