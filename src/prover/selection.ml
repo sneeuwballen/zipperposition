@@ -186,17 +186,18 @@ let prefer_app_var ~ord lits =
       ho_sel_driver lits prefer_av_feature
     )
 
+let find_min_lit ~blocker ~can_sel ~ord ~chooser lits =
+  CCArray.to_iter lits
+  |> Iter.mapi (fun i l -> chooser (i,l), i)
+  |> Iter.sort
+  |> Iter.find_map (fun (_,i) ->
+    let lit = lits.(i) in
+    if can_sel ~ord lits i && not (blocker i lit) 
+    then Some (lit,i)
+    else None)
+
 let weight_based_sel_driver ?(blocker=(fun _ _ -> false)) ~can_sel ~ord lits f =
-  let min_lit = 
-    CCArray.to_iter lits
-    |> Iter.mapi (fun i l -> f (i,l), i)
-    |> Iter.sort
-    |> Iter.find_map (fun (_,i) ->
-      let lit = lits.(i) in
-      if can_sel ~ord lits i && not (blocker i lit) 
-      then Some (lit,i)
-      else None) in
-  match min_lit with
+  match find_min_lit ~blocker ~can_sel ~ord ~chooser:f lits with
   | None -> BV.empty ()
   | Some (_, idx) ->
     assert(can_select_lit ~ord lits idx);
@@ -563,6 +564,50 @@ let e_sel17 ~blocker ~ord lits =
     in
     weight_based_sel_driver ~can_sel:can_select_lit ~blocker ~ord lits chooser
   ) else res
+
+let can_sel_pos ~ord = fun _ _ -> true
+
+let make_complete ~ord lits select_bv =
+  assert(CCBV.length select_bv == CCArray.length lits);
+  if not (CCBV.is_empty select_bv) && 
+     not (CCBV.is_empty (CCBV.negate select_bv)) then (
+    (* selecting either all or none literals is OK *)
+
+    let has_selectable_lit = ref false in
+    CCArray.iteri (fun i _ -> 
+      if CCBV.get select_bv i && can_select_lit ~ord lits i then (
+        has_selectable_lit := true
+      )
+    ) lits;
+
+    if not !has_selectable_lit then (
+      (* we need to make sure that there is at least one selectable
+         literal. after we have assured that -> anything extra is selectable
+         (including positive literals) *)
+      CCBV.clear select_bv;
+    )
+  );
+  select_bv
+
+let pos_e_sel1 ~blocker ~ord lits =
+  let chooser (i,l) =
+    (Lit.is_positivoid l, 
+     (match l with
+     | Literal.Equation(lhs,rhs,_) -> 
+       Ordering.compare ord lhs rhs == Comparison.Incomparable
+     | _ -> true),
+     Lit.ho_weight l)
+  in
+  let res = CCBV.create ~size:(CCArray.length lits) false in
+  begin match find_min_lit ~blocker ~can_sel:can_sel_pos ~ord ~chooser lits with
+  | Some (l,idx) ->
+    if Lit.is_negativoid l then ( 
+      CCBV.set res idx;
+      CCArray.iteri (fun i lit -> 
+        if Lit.is_positivoid lit then CCBV.set res i) lits
+    ) else CCBV.negate_self res
+  | None -> () end;
+  make_complete lits res
 
 let ho_sel ~blocker ~ord lits = 
   let chooser (i,l) = 
