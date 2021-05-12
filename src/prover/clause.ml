@@ -254,7 +254,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
             let lit' = lits'.(j) in
             (* check if both lits are still potentially eligible, and have the same
                sign if [check_sign] is true. *)
-            if Lit.eqn_sign lit = Lit.eqn_sign lit' && BV.get bv j
+            if Lit.is_positivoid lit = Lit.is_positivoid lit' && BV.get bv j
             then match Lit.Comp.compare ~ord lit lit' with
               | Comparison.Incomparable
               | Comparison.Eq -> ()     (* no further information about i-th and j-th *)

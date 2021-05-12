@@ -731,7 +731,15 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (not bool_inference &&
          not (BV.get (C.eligible_res (info.passive, sc_p) subst) passive_idx)) ||
         not (C.is_eligible_param (info.active, sc_a) subst ~idx:active_idx)
-      ) then (raise (ExitSuperposition "bad ordering conditions"));
+      ) then (
+        let c1 = O.compare ord s' t' = Comp.Lt in
+        let c2 = not bool_inference &&
+                 not (Lit.Pos.is_max_term ~ord passive_lit' passive_lit_pos)in
+        let c3 = not bool_inference &&
+                 not (BV.get (C.eligible_res (info.passive, sc_p) subst) passive_idx) in
+        let c4 = not (C.is_eligible_param (info.active, sc_a) subst ~idx:active_idx) in        
+        raise (ExitSuperposition (
+          CCFormat.sprintf "bad ordering conditions %b %b %b %b" c1 c2 c3 c4)));
       (* Check for superposition at a variable *)
       if info.sup_kind != FluidSup then
         if not @@ Env.flex_get k_sup_at_vars then

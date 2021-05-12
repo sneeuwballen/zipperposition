@@ -555,33 +555,30 @@ let weight_freq (symbs : ID.t Iter.t) : ID.t -> Weight.t =
     if is_post_cnf_skolem ~sig_ref:(ref empty_sig) sym then default_weight
     else Weight.int ((ID.Tbl.get_or ~default:10 tbl sym) + 5) 
 
-let weight_invfreqrank (symbs : ID.t Iter.t) : ID.t -> Weight.t =
+let weight_rank ~flip (symbs : ID.t Iter.t) : ID.t -> Weight.t =
   let tbl = ID.Tbl.create 16 in
   Iter.iter (ID.Tbl.incr tbl) symbs;
   let sorted = 
-    Iter.sort ~cmp:(fun s1 s2 -> 
-        CCInt.compare (ID.Tbl.get_or tbl ~default:0 s1) 
-          (ID.Tbl.get_or tbl ~default:0 s2)) symbs in
-  ID.Tbl.clear tbl;
-  let tbl = ID.Tbl.create 16 in
-  Iter.iteri (fun i (sym:ID.t) -> ID.Tbl.add tbl sym (i+1)) sorted;
+    CCList.sort (fun s1 s2 ->
+        let w_s1 = ID.Tbl.get_or tbl ~default:0 s1 in
+        let w_s2 = ID.Tbl.get_or tbl ~default:0 s2 in
+        if flip then CCInt.compare w_s2 w_s1 else CCInt.compare w_s1 w_s2) (ID.Tbl.keys_list tbl) in
+  let prev_step = ref (-1) in
+  let w = ref 0 in
+  List.iter (fun (sym:ID.t) -> 
+    let num_occs = ID.Tbl.get_or tbl sym ~default:0 in
+    if num_occs != !prev_step then (
+      prev_step := num_occs;
+      incr w
+    );
+    ID.Tbl.replace tbl sym !w) sorted;
+
   (fun sym -> 
     if is_post_cnf_skolem ~sig_ref:(ref empty_sig) sym then default_weight
     else Weight.int (ID.Tbl.get_or ~default:10 tbl sym))
 
-
-let weight_freqrank (symbs : ID.t Iter.t) : ID.t -> Weight.t =
-  let tbl = ID.Tbl.create 16 in
-  Iter.iter (ID.Tbl.incr tbl) symbs;
-  let sorted = 
-    Iter.sort ~cmp:(fun s1 s2 -> 
-        CCInt.compare (ID.Tbl.get_or tbl ~default:0 s2) 
-          (ID.Tbl.get_or tbl ~default:0 s1)) symbs in
-  ID.Tbl.clear tbl;
-  Iter.iteri (fun i sym -> ID.Tbl.add tbl sym (i+1)) sorted;
-  (fun sym -> 
-    if is_post_cnf_skolem ~sig_ref:(ref empty_sig) sym then default_weight
-    else Weight.int (ID.Tbl.get_or ~default:10 tbl sym))
+let weight_invfreqrank = weight_rank ~flip:true
+let weight_freqrank = weight_rank ~flip:false
 
 (* This function takes base KBO weight function and adjusts it so
    that defined symbols are larger than its defitnitions. *)

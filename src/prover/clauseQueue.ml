@@ -229,6 +229,18 @@ module Make(C : Clause_intf.S) = struct
         ) 0.0 (C.lits c) in
       int_of_float res
 
+    let clauseweight ~fw ~vw ~pos_lit_mul c =
+      let eval_t = Term.weight ~var:vw  ~sym:(fun _ -> fw) in
+
+      CCArray.fold (fun acc lit -> match lit with
+        | Lit.Equation(lhs,rhs,_) ->
+          let lit_w = (eval_t lhs + eval_t rhs) in
+          let mul = (if Lit.is_positivoid lit then pos_lit_mul else 1.0) in
+          acc + (int_of_float ((float_of_int lit_w) *. mul))
+        | _ -> acc
+      ) 0 (C.lits c)
+
+
     let pn_refined_weight ~pv_w ~pf_w ~nv_w ~nf_w ~max_t_m ~max_l_m ~pos_m c =
       let max_lits = 
         if C.has_selected_lits c then C.selected_lits_bv c
@@ -726,6 +738,21 @@ module Make(C : Clause_intf.S) = struct
         "-fun_weight:int,-var_weight:int" ^
         "max_t_mult:float, max_lit_mul:float, pos_lit_mult:float)"
     
+    let parse_clauseweight s =
+      let or_lmax_regex =
+        Str.regexp
+          ("clauseweight(\\([0-9]+\\),\\([0-9]+\\),\\([0-9]+[.]?[0-9]*\\)") in
+      try
+        ignore(Str.search_forward or_lmax_regex s 0);
+        let fw = CCOpt.get_exn (CCInt.of_string (Str.matched_group 1 s)) in
+        let vw = CCOpt.get_exn (CCInt.of_string (Str.matched_group 2 s)) in
+        let pos_lit_mul = CCFloat.of_string_exn (Str.matched_group 3 s) in
+        clauseweight ~fw ~vw ~pos_lit_mul
+      with Not_found | Invalid_argument _ ->
+        invalid_arg @@
+        "expected clauseweight(+fun_weight:int,+var_weight:int," ^
+        "pos_lit_mult:float)"
+    
     let parse_staggered s =
       let or_lmax_regex =
         Str.regexp
@@ -773,6 +800,7 @@ module Make(C : Clause_intf.S) = struct
        "diversity-weight", parse_diversity_weight;
        "pnrefined", parse_pnrefine;
        "staggered", parse_staggered;
+       "clauseweight", parse_clauseweight;
        "orient-lmax", parse_orient_lmax]
 
     let of_string s =
