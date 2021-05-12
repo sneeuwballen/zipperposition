@@ -607,7 +607,7 @@ let pos_e_sel1 ~blocker ~ord lits =
         if Lit.is_positivoid lit then CCBV.set res i) lits
     ) else CCBV.negate_self res
   | None -> () end;
-  make_complete lits res
+  make_complete ~ord lits res
 
 let ho_sel ~blocker ~ord lits = 
   let chooser (i,l) = 
@@ -715,6 +715,7 @@ let bool_blockable ~blocker =
     "ho-selection3", (ho_sel3 ~blocker, true);
     "ho-selection4", (ho_sel4 ~blocker, true);
     "ho-selection5", (ho_sel5 ~blocker, true);
+    "pos-e-selection1", (pos_e_sel1 ~blocker, true);
   ]
 
 let l =
