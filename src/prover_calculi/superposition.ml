@@ -2815,7 +2815,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let rec contextual_literal_cutting_rec c =
     let open SimplM.Infix in
     if Array.length (C.lits c) <= 1
-    || num_equational (C.lits c) > 3
+    || Lits.num_equational (C.lits c) > 3
     || Array.length (C.lits c) > 8
     then SimplM.return_same c
     else (
@@ -2896,7 +2896,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let rec condensation_rec c =
     let open SimplM.Infix in
     if Array.length (C.lits c) <= 1
-    || num_equational (C.lits c) > 3
+    || Lits.num_equational (C.lits c) > 3
     || Array.length (C.lits c) > 8
     then SimplM.return_same c
     else

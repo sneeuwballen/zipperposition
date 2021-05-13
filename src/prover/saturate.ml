@@ -180,9 +180,6 @@ module Make(E : Env.S) = struct
             Util.debugf ~section 2 "@[@{<Yellow>### step %5d ###@}@]"(fun k->k num);
             Util.debugf ~section 1 "@[<2>@{<green>given@} (%d steps, penalty %d):@ `@[%a@]`@]"
               (fun k->k num (Env.C.penalty c) Env.C.pp c);
-            Util.debugf ~section 2 "@[eligible_param: %a, eligible_res: %a]" 
-              (fun k -> k CCBV.pp (Env.C.eligible_param (c,0) Subst.empty) 
-                          CCBV.pp (Env.C.eligible_res_no_subst c));
             Util.debugf ~section 3 "@[proof:@[%a@]@]" (fun k -> k Proof.S.pp_tstp (Env.C.proof c));
             (* find clauses that are subsumed by given in active_set *)
             let subsumed_active = Env.C.ClauseSet.to_iter (Env.subsumed_by c) in

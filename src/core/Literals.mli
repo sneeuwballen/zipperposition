@@ -231,3 +231,9 @@ val unshielded_vars : ?filter:(Term.var -> bool) -> t -> Term.var list
 val vars_distinct : t -> bool
 
 val ground_lits : t -> t
+
+val num_predicate : t -> int
+(** Number of non-predicate literals *)
+
+val num_equational : t -> int
+(** Number of non-predicate literals *)
