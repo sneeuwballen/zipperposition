@@ -75,7 +75,15 @@ module Make(E : Env.S) : S with module Env = E = struct
   type logic = 
     | NEqFO  (* nonequational FO *)
     | EqFO (* equational FO *)
+    | NonAppVarHo (* higher-order logic, but at the top level
+                     each literal has only (fully applied)
+                     function symbols *)
     | Unsupported   (* HO or FO with theories *)
+  
+  let log_to_int = 
+    [(NEqFO, 0); (EqFO, 1); (NonAppVarHo, 2); (Unsupported, 3)]
+  let log_compare (l1:logic) (l2:logic) =
+    compare (List.assoc l1 log_to_int) (List.assoc l2 log_to_int)
 
   exception UnsupportedLogic
   
@@ -193,6 +201,10 @@ module Make(E : Env.S) : S with module Env = E = struct
       _logic := new_val
     )
   
+  let logic_to_str = function
+    | EqFO -> "eq" | NEqFO -> "neq" | NonAppVarHo -> "non_appvar"
+    | Unsupported -> "unsupported"
+  
   let _ignored_symbols = ref ID.Set.empty
 
   let mk_pred_elim_info sym =
@@ -212,8 +224,15 @@ module Make(E : Env.S) : S with module Env = E = struct
         not (Type.VarSet.is_empty (T.ty_vars lhs))
         || not (Type.VarSet.is_empty (T.ty_vars rhs))
       in
-      if not is_poly && T.is_fo_term lhs && T.is_fo_term rhs then (
+      if not is_poly && not (Type.is_fun (T.ty lhs)) then (
         if Type.is_prop (T.ty lhs) then (
+           if not (CCOpt.is_some (T.head lhs)) then (
+             raise UnsupportedLogic;
+           );
+
+          if not (Term.is_fo_term lhs) then (
+            refine_logic NonAppVarHo;
+          );
           if L.is_predicate_lit lit then (
             let hd_sym = T.head_exn lhs in
             Some (hd_sym, sign)
@@ -222,7 +241,8 @@ module Make(E : Env.S) : S with module Env = E = struct
             Util.debugf ~section 1 "unsupported because of @[%a@]@." (fun k -> k L.pp lit);
             _logic := Unsupported;
             raise UnsupportedLogic;
-        )) else (refine_logic EqFO; None)
+        )) else (if T.is_fo_term lhs && T.is_fo_term rhs then refine_logic EqFO
+                 else refine_logic NonAppVarHo; None)
       ) else (
         _logic := Unsupported; 
         Util.debugf ~section 1 "unsupported because of @[%a@]@." (fun k -> k L.pp lit);
@@ -275,7 +295,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let _measure = ref relaxed_measure
 
   let should_schedule task =
-    let eligible_for_non_singular_pe task = 
+    let eligible_for_non_singular_pe task =
       Env.flex_get k_non_singular_pe &&
       (match task.is_gate with
        | Some (pos,neg) ->
@@ -323,6 +343,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     )
   
   let scan_cl_lits ?(handle_gates=true) cl =
+    if !_logic == Unsupported then raise UnsupportedLogic;
+
     let num_vars = List.length @@ Literals.vars (C.lits cl) in
     let is_flat = function
     | L.Equation(lhs,_,_) as lit ->
@@ -374,31 +396,34 @@ module Make(E : Env.S) : S with module Env = E = struct
       ID.Set.iter (update ~action:`Gates) gates;
     in
 
-      
-    let pos,neg,offending,gates = CCArray.foldi (fun ((pos,neg,offending,gates) as acc) idx lit ->
-      let symbol_is_fresh sym =
-        not (ID.Set.mem sym pos) && not (ID.Set.mem sym neg) &&
-        not (ID.Set.mem sym offending) && not (ID.Set.mem sym !_ignored_symbols)
-      in
-      (match get_sym_sign lit with
-      | Some (sym, sign) when symbol_is_fresh sym ->
-        let is_offending = ref false in
-        for i = idx+1 to (C.length cl)-1 do
-          (match get_sym_sign (C.lits cl).(i) with
-           | Some(sym', _) ->
-             is_offending := !is_offending || ID.equal sym sym'
-           | None -> () )
-        done;
-        if !is_offending then (
-          pos,neg,ID.Set.add sym offending,gates
-        ) else (
-          let gates = if is_flat lit then ID.Set.add sym gates else gates in
-          if sign then (ID.Set.add sym pos,neg,offending,gates)
-          else (pos, ID.Set.add sym neg,offending,gates))
-      | _ -> acc)
-    ) (ID.Set.empty, ID.Set.empty, ID.Set.empty, ID.Set.empty) (C.lits cl) in
+    try   
+      let pos,neg,offending,gates = CCArray.foldi (fun ((pos,neg,offending,gates) as acc) idx lit ->
+        let symbol_is_fresh sym =
+          not (ID.Set.mem sym pos) && not (ID.Set.mem sym neg) &&
+          not (ID.Set.mem sym offending) && not (ID.Set.mem sym !_ignored_symbols)
+        in
+        (match get_sym_sign lit with
+        | Some (sym, sign) when symbol_is_fresh sym ->
+          let is_offending = ref false in
+          for i = idx+1 to (C.length cl)-1 do
+            (match get_sym_sign (C.lits cl).(i) with
+            | Some(sym', _) ->
+              is_offending := !is_offending || ID.equal sym sym'
+            | None -> () )
+          done;
+          if !is_offending then (
+            pos,neg,ID.Set.add sym offending,gates
+          ) else (
+            let gates = if is_flat lit then ID.Set.add sym gates else gates in
+            if sign then (ID.Set.add sym pos,neg,offending,gates)
+            else (pos, ID.Set.add sym neg,offending,gates))
+        | _ -> acc)
+      ) (ID.Set.empty, ID.Set.empty, ID.Set.empty, ID.Set.empty) (C.lits cl) in
 
-    update_idx pos neg offending gates num_vars cl
+      update_idx pos neg offending gates num_vars cl
+    with UnsupportedLogic ->
+      refine_logic Unsupported;
+      TaskSet.clear _task_queue
 
   let react_clause_addded cl =
     if !_logic != Unsupported then(
@@ -823,7 +848,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     )) !_pred_sym_idx
 
   let get_resolver () =
-    if !_logic = NEqFO then neq_resolver else eq_resolver
+    if !_logic == NEqFO then neq_resolver else eq_resolver
 
   let calc_resolvents ~sym ~pos ~neg =
     CCList.flat_map (fun pos_cl ->
@@ -961,6 +986,12 @@ module Make(E : Env.S) : S with module Env = E = struct
         scan_cl_lits cl;
         _tracked := CS.add cl !_tracked;
       ) init_clauses;
+
+      CCFormat.printf "logic: %s@." (logic_to_str !_logic);
+
+      if !_logic == Unsupported then (
+        raise UnsupportedLogic
+      );
 
       schedule_tasks ();
 

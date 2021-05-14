@@ -53,7 +53,15 @@ module Make(E : Env.S) : S with module Env = E = struct
   type logic = 
     | NEqFO  (* nonequational FO *)
     | EqFO (* equational FO *)
+    | NonAppVarHo (* higher-order logic, but at the top level
+                     each literal has only (fully applied)
+                     function symbols *)
     | Unsupported   (* HO or FO with theories *)
+  
+  let log_to_int = 
+    [(NEqFO, 0); (EqFO, 1); (NonAppVarHo, 2); (Unsupported, 3)]
+  let log_compare (l1:logic) (l2:logic) =
+    compare (List.assoc l1 log_to_int) (List.assoc l2 log_to_int)
 
   exception UnsupportedLogic
   
@@ -110,8 +118,11 @@ module Make(E : Env.S) : S with module Env = E = struct
   let logic = ref NEqFO
 
   let refine_logic new_val =
-    if !logic != Unsupported then (
-      logic := new_val
+    if log_compare new_val !logic > 0 then (
+      logic := new_val;
+      if (new_val == NonAppVarHo) then (
+        Env.Ctx.lost_completeness ()
+      );
     )
 
   let lit_to_term sign =
@@ -163,22 +174,27 @@ module Make(E : Env.S) : S with module Env = E = struct
           not (Type.VarSet.is_empty (T.ty_vars lhs))
           || not (Type.VarSet.is_empty (T.ty_vars rhs))
         in
-        if not is_poly && T.is_fo_term lhs && T.is_fo_term rhs then (
+        if not is_poly && not (Type.is_fun (T.ty lhs)) then (
           if Type.is_prop (T.ty lhs) then (
-            if L.is_predicate_lit lit then (
+            if L.is_predicate_lit lit && CCOpt.is_some (T.head lhs) then (
+              if not (T.is_fo_term lhs) then (
+                refine_logic NonAppVarHo
+              );
               let hd_sym = T.head_exn lhs in
               if not (ID.Set.mem hd_sym !ignored_symbols) 
               then add_lit_to_idx lhs sign cl
             ) else (
               (* reasoning with formulas is currently unsupported *)
-              Util.debugf ~section 1 "unsupported because of @[%a@]@." (fun k -> k L.pp lit);
+              Util.debugf ~section 1 "unsupported because of formula @[%a@]@." (fun k -> k L.pp lit);
               logic := Unsupported;
               raise UnsupportedLogic;
             )
-          ) else refine_logic EqFO
+          ) else (
+            if T.is_fo_term lhs && T.is_fo_term rhs then refine_logic EqFO
+            else refine_logic NonAppVarHo)
         ) else (
             logic := Unsupported; 
-            Util.debugf ~section 1 "unsupported because of @[%a@]@." (fun k -> k L.pp lit);
+            Util.debugf ~section 1 "unsupported because of functional literal @[%a@]@." (fun k -> k L.pp lit);
             raise UnsupportedLogic)
       | L.Int _ | L.Rat _  -> 
         Util.debugf ~section 1 "theories are not supported@." CCFun.id;
@@ -240,12 +256,13 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* Update all the bookeeping information when a new clause is introduced *)
   let add_clause cl =
     try
+      if !logic == Unsupported then raise UnsupportedLogic;
+
       scan_cl_lits cl;
       CCArray.iteri (fun lit_idx _ -> register_task lit_idx cl) (C.lits cl)
     with UnsupportedLogic ->
-      (* if the initial problem had only supported features (FO logic),
-         it cannot jump out of the fragment *)
-      invalid_arg "jumped out of the supported logic fragment"
+      refine_logic Unsupported;
+      TaskPriorityQueue.clear task_queue
 
   (* remove the clause from symbol index *)
   let deregister_symbols cl =
@@ -550,7 +567,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let get_validity_checker () =
     assert (!logic != Unsupported);
-    if !logic == EqFO then resolvent_is_valid_eq
+    if !logic != NEqFO then resolvent_is_valid_eq
     else resolvent_is_valid_neq
 
   let is_blocked cl =
@@ -781,7 +798,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         )
       ) else ( raise UnsupportedLogic ) (* clear all data structures *)
     with UnsupportedLogic ->
-      Util.debugf ~section 2 "logic is unsupported" CCFun.id;
+      Util.debugf ~section 1 "logic is unsupported" CCFun.id;
       (* releasing possibly used memory *)
       ss_idx := SymSignIdx.empty;
       clause_lock := Util.Int_map.empty;
@@ -811,7 +828,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       init_clauses;
       (* eliminate clauses *)
       let num_eliminated =  do_eliminate_blocked_clauses () in
-      Util.debugf ~section 1 "Step eliminates %d clauses" (fun k -> k num_eliminated);
+      Util.debugf ~section 2"Step eliminates %d clauses" (fun k -> k num_eliminated);
 
       CCFormat.printf "%% BCE start fixpoint: @[%d@]@." num_eliminated;
 

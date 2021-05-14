@@ -103,7 +103,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let register_conclusion ~tbl ~premise concl proofset =
     if not @@ T.Tbl.mem tbl concl && T.depth concl <= 4 then (
-      T.Tbl.add tbl concl proofset;
+      T.Tbl.replace tbl concl proofset;
       concls_ := ConclusionIdx.add !concls_ concl premise) 
 
   (* iterate over the parts of the common context of the term --
@@ -335,8 +335,6 @@ module Make(E : Env.S) : S with module Env = E = struct
     retrieve_spec_concl_idx () (premise,q_sc)
     |> Iter.iter (fun (concl',premise',subst) ->
       (* add implication premise' -> subst (concl) *)
-      Util.debugf ~section 3 "found: @[%a@] --> @[%a@]"
-        (fun k -> k T.pp premise' T.pp concl');
       prems_ := PremiseIdx.update_leaf !prems_ premise' (fun (tbl, is_unit) -> 
         (match T.Tbl.get tbl concl' with
         | Some old_proofset ->
