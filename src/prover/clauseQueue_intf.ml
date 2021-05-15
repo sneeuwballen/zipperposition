@@ -20,6 +20,7 @@ module type S = sig
   
   val register_conjecture_clause : C.t -> unit
 
+  val on_proof_state_init : (C.t Iter.t) Logtk.Signal.t
   (** {6 Weight functions} *)
   module WeightFun : sig
     type t = C.t -> int

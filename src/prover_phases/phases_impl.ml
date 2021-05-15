@@ -290,6 +290,8 @@ let make_env ~ctx:(module Ctx : Ctx_intf.S) ~params stmts =
     (fun e -> List.iter (fun f -> f env1) e.Extensions.env_actions);
   (* convert statements to clauses *)
   let c_sets = MyEnv.convert_input_statements stmts in
+  Signal.send (MyEnv.ProofState.CQueue.on_proof_state_init)
+    (Iter.append (CCVector.to_iter (c_sets.c_set)) (CCVector.to_iter (c_sets.c_sos)));
   let env2 = (module MyEnv : Env.S with type C.t = MyEnv.C.t) in
   Phases.return_phase (Phases.Env_clauses (env2, c_sets))
 

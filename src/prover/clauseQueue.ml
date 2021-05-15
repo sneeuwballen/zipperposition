@@ -91,6 +91,8 @@ module Make(C : Clause_intf.S) = struct
   let _related_terms = ref Term.Set.empty
   let max_related_ = 100
 
+  let on_proof_state_init = Signal.create ()
+
   let norm_app hd arg =
     let body = Term.app hd [arg] in
     let normalize = 
@@ -738,6 +740,120 @@ module Make(C : Clause_intf.S) = struct
         "-fun_weight:int,-var_weight:int" ^
         "max_t_mult:float, max_lit_mul:float, pos_lit_mult:float)"
     
+    let _f_weights = ID.Tbl.create 100
+    let _default = ref (-1)
+
+    let calc_poly base x ~c ~lin ~sq =
+      base * 
+        (int_of_float (c +. (lin *. (float_of_int x)) 
+                         +. (sq  *. (float_of_int (x*x))) ))
+
+
+    let rel_weight ~vw ~max_t_mul ~max_lit_mul ~pos_lit_mul c =
+      let max_lits = 
+          if C.has_selected_lits c then C.selected_lits_bv c
+          else C.maxlits (c,0) Subst.empty in
+      let ord = C.Ctx.ord () in
+      let res = CCArray.foldi (fun sum i lit ->
+        assert(!_default != (-1));
+        
+        let w =
+          match lit with
+          | Lit.Equation(l,r,_) ->
+            let term_w () t =
+              float_of_int @@
+                Term.weight ~var:vw ~sym:(fun id -> ID.Tbl.get_or _f_weights ~default:!_default id) t in
+            let ord_side = Ordering.compare ord l r in
+            let l_mul = if ord_side = Comparison.Gt || ord_side = Comparison.Incomparable
+                        then max_t_mul else 1.0 in
+            let r_mul = if ord_side = Comparison.Lt || ord_side = Comparison.Incomparable
+                        then max_t_mul else 1.0 in
+            let t_w = l_mul *. (term_w () l) +. r_mul *. (term_w () r)in
+            let t_w = if Lit.is_positivoid lit then pos_lit_mul *. t_w else t_w in
+            let t_w = if CCBV.get max_lits i then max_lit_mul *. t_w else t_w in
+            t_w
+          | _ -> 1.0 in
+        sum +. w) 0.0 (C.lits c) in
+      int_of_float res
+
+    let parse_rel_lvl_weight s =
+      let r_str = "rel_lvl_weight(\\([0-9]+[.]?[0-9]*\\),\\([0-9]+[.]?[0-9]*\\),\\([0-9]+[.]?[0-9]*\\)," ^
+            "\\([0-9]+\\),\\([0-9]+\\),\\([0-9]+\\),\\([0-9]+\\),\\([0-9]+\\)," ^
+            "\\([0-9]+[.]?[0-9]*\\),\\([0-9]+[.]?[0-9]*\\),\\([0-9]+[.]?[0-9]*\\))" in
+      let rel_w_regex = Str.regexp r_str in
+      try
+        ignore(Str.search_forward rel_w_regex s 0);
+        let l_poly_const = CCFloat.of_string_exn (Str.matched_group 1 s) in
+        let l_poly_lin = CCFloat.of_string_exn (Str.matched_group 2 s) in
+        let l_poly_sq = CCFloat.of_string_exn (Str.matched_group 3 s) in
+        let def_l = CCOpt.get_exn (CCInt.of_string (Str.matched_group 4 s)) in
+        let fw = CCOpt.get_exn (CCInt.of_string (Str.matched_group 5 s)) in
+        let cw = CCOpt.get_exn (CCInt.of_string (Str.matched_group 6 s)) in
+        let pw = CCOpt.get_exn (CCInt.of_string (Str.matched_group 7 s)) in
+        let vw = CCOpt.get_exn (CCInt.of_string (Str.matched_group 8 s)) in
+        let max_t_mul = CCFloat.of_string_exn (Str.matched_group 9 s) in
+        let max_lit_mul = CCFloat.of_string_exn (Str.matched_group 10 s) in
+        let pos_lit_mul = CCFloat.of_string_exn (Str.matched_group 11 s) in
+
+      Signal.once on_proof_state_init (fun cls ->
+          let goals, axs = Iter.fold (fun (goals, axs) cl ->
+            match C.distance_to_goal cl with
+            | Some _ -> ((cl::goals), axs)
+            | None -> (goals, (cl::axs))
+          ) ([],[]) cls in
+
+          let goal_syms = C.symbols (Iter.of_list goals) in
+
+          CCFormat.printf "goal syms: @[%a@]@." (ID.Set.pp ID.pp) goal_syms;
+          
+          let cl_map = ID.Tbl.create 100 in
+          List.iter (fun cl ->
+            C.symbols (Iter.singleton cl)
+            |> ID.Set.iter (fun k -> 
+              ID.Tbl.update cl_map ~f:(fun _ -> function
+                | Some old -> Some (cl :: old)
+                | None ->  Some [cl]) ~k
+            )) axs;
+
+          let rec fill_levels syms_at_level level =
+            ID.Set.iter (fun id -> 
+              assert(not (ID.Tbl.mem _f_weights id));
+              ID.Tbl.replace _f_weights id level) syms_at_level;
+            let new_syms = ID.Set.fold (fun id new_syms ->
+              let cls = ID.Tbl.get_or ~default:[] cl_map id in
+              ID.Set.fold (fun id acc ->
+                if not (ID.Tbl.mem _f_weights id) then (ID.Set.add id acc)
+                else acc
+              ) (C.symbols (Iter.of_list cls)) new_syms
+            ) syms_at_level ID.Set.empty in
+            if not (ID.Set.is_empty new_syms) then fill_levels new_syms (level+1)
+            else level
+          in
+
+
+          let max_lvl = fill_levels goal_syms 1 in
+          _default := calc_poly ~c:l_poly_const ~lin:l_poly_lin ~sq:l_poly_sq 
+                        (max cw (max pw fw)) (def_l + max_lvl);
+          
+          CCFormat.printf "fweights(%d): @[%a@]@." max_lvl (ID.Tbl.pp ID.pp CCInt.pp) _f_weights;
+
+          ID.Tbl.filter_map_inplace (fun id lvl -> 
+            let ty = Signature.find_exn (C.Ctx.signature ()) id in
+            let base = if Type.returns_prop ty then pw
+                      else if Type.is_fun ty then fw
+                      else cw in
+            let v = calc_poly ~c:l_poly_const ~lin:l_poly_lin ~sq:l_poly_sq base lvl in
+            Some v ) _f_weights;
+          
+          CCFormat.printf "fweights(%d): @[%a@]@." max_lvl (ID.Tbl.pp ID.pp CCInt.pp) _f_weights;
+        );
+        rel_weight ~vw ~max_t_mul ~max_lit_mul ~pos_lit_mul
+      with Not_found | Invalid_argument _ ->
+        invalid_arg @@
+        "expected rel_lev_weight(poly_const:float,,poly_lin:float,poly_sq:float," ^
+            "def_l:int, fun_w:int, const_w:int, pred_w:int, var_w:int," ^
+            "max_t_mul:float,max_lit_mul:float,pos_lit_mul:float)"
+
     let parse_clauseweight s =
       let or_lmax_regex =
         Str.regexp
@@ -799,6 +915,7 @@ module Make(C : Clause_intf.S) = struct
        "conjecture-relative-e", parse_cr_e;
        "diversity-weight", parse_diversity_weight;
        "pnrefined", parse_pnrefine;
+       "rel_lvl_weight", parse_rel_lvl_weight;
        "staggered", parse_staggered;
        "clauseweight", parse_clauseweight;
        "orient-lmax", parse_orient_lmax]
@@ -1195,7 +1312,13 @@ module Make(C : Clause_intf.S) = struct
 
   let add_seq q hcs = Iter.iter (fun c -> ignore (add q c)) hcs
 
+  let _initialized = ref false
   let rec take_first_mixed q =
+    if (not !_initialized) then (
+      _initialized := true;
+      Signal.send on_proof_state_init (C.Tbl.keys q.tbl);
+    );
+
     let move_queue q =
       q.current_step <- q.current_step + 1;
       if q.current_step >= q.ratios_limit then (
