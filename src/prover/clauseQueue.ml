@@ -776,6 +776,29 @@ module Make(C : Clause_intf.S) = struct
         sum +. w) 0.0 (C.lits c) in
       int_of_float res
 
+    let conj_pref_weight (module PW : PrefWeight.S) ~max_t_mul ~max_lit_mul ~pos_lit_mul c =
+      let max_lits = 
+          if C.has_selected_lits c then C.selected_lits_bv c
+          else C.maxlits (c,0) Subst.empty in
+      let ord = C.Ctx.ord () in
+      let res = CCArray.foldi (fun sum i lit ->     
+        let w =
+          match lit with
+          | Lit.Equation(l,r,_) ->
+            let tw t = float_of_int (PW.calc_pref_weight t) in
+            let ord_side = Ordering.compare ord l r in
+            let l_mul = if ord_side = Comparison.Gt || ord_side = Comparison.Incomparable
+                        then max_t_mul else 1.0 in
+            let r_mul = if ord_side = Comparison.Lt || ord_side = Comparison.Incomparable
+                        then max_t_mul else 1.0 in
+            let t_w = l_mul *. (tw l) +. r_mul *. (tw r)in
+            let t_w = if Lit.is_positivoid lit then pos_lit_mul *. t_w else t_w in
+            let t_w = if CCBV.get max_lits i then max_lit_mul *. t_w else t_w in
+            t_w
+          | _ -> 1.0 in
+        sum +. w) 0.0 (C.lits c) in
+      int_of_float res
+
     let parse_rel_lvl_weight s =
       let r_str = "rel_lvl_weight(\\([0-9]+[.]?[0-9]*\\),\\([0-9]+[.]?[0-9]*\\),\\([0-9]+[.]?[0-9]*\\)," ^
             "\\([0-9]+\\),\\([0-9]+\\),\\([0-9]+\\),\\([0-9]+\\),\\([0-9]+\\)," ^
@@ -854,6 +877,48 @@ module Make(C : Clause_intf.S) = struct
             "def_l:int, fun_w:int, const_w:int, pred_w:int, var_w:int," ^
             "max_t_mul:float,max_lit_mul:float,pos_lit_mul:float)"
 
+    let parse_conj_pref_weight s =
+      let r_str = "conj_pref_weight(\\([0-9]+[.]?[0-9]*\\),\\([0-9]+[.]?[0-9]*\\),"^
+                  "\\([0-9]+[.]?[0-9]*\\),\\([0-9]+[.]?[0-9]*\\),\\([0-9]+[.]?[0-9]*\\))" in
+      let rel_w_regex = Str.regexp r_str in
+      try
+        ignore(Str.search_forward rel_w_regex s 0);
+        let match_w = CCFloat.of_string_exn (Str.matched_group 1 s) in
+        let miss_w = CCFloat.of_string_exn (Str.matched_group 2 s) in
+        let max_t_mul = CCFloat.of_string_exn (Str.matched_group 3 s) in
+        let max_lit_mul = CCFloat.of_string_exn (Str.matched_group 4 s) in
+        let pos_lit_mul = CCFloat.of_string_exn (Str.matched_group 5 s) in
+        let module PW = PrefWeight.Make(struct  
+          let match_weight = match_w
+          let miss_weight = miss_w
+        end) in
+
+        Signal.once on_proof_state_init (fun cls ->
+          Iter.iter (fun cl -> 
+            match C.distance_to_goal cl with
+            | Some 0 -> 
+              C.Seq.lits cl
+              |> Iter.iter (function
+                | Literal.Equation(lhs, rhs, _) as l ->
+                  (if Lit.is_predicate_lit l then (
+                    Term.Seq.subterms ~include_builtin:true lhs
+                  ) else (
+                    Iter.append (Term.Seq.subterms ~include_builtin:true lhs)
+                                (Term.Seq.subterms ~include_builtin:true rhs)))
+                  |> Iter.iter (fun t -> 
+                    if (not (Term.is_type t)) then PW.insert_term t
+                  )
+                | _ -> ()
+              )
+            | _ -> ()
+          ) cls;
+        );
+        conj_pref_weight (module PW : PrefWeight.S) ~max_t_mul ~max_lit_mul ~pos_lit_mul
+      with Not_found | Invalid_argument _ ->
+        invalid_arg @@
+        "expected conj_pref_weight(match_weight:float,miss_weight:float,"^
+        "max_t_mul:float,max_lit_mul:float,pos_lit_mul:float)"
+
     let parse_clauseweight s =
       let or_lmax_regex =
         Str.regexp
@@ -913,6 +978,7 @@ module Make(C : Clause_intf.S) = struct
        "conjecture-relative-struct", parse_cr_struct;
        "conjecture-relative-cheap", parse_conj_relative_cheap;
        "conjecture-relative-e", parse_cr_e;
+       "conj_pref_weight", parse_conj_pref_weight;
        "diversity-weight", parse_diversity_weight;
        "pnrefined", parse_pnrefine;
        "rel_lvl_weight", parse_rel_lvl_weight;

@@ -5,6 +5,11 @@
 
 module T = Term
 
+module type S = sig 
+    val insert_term : Term.t -> unit
+    val calc_pref_weight : Term.t -> int
+end
+
 type node_tag =
   | Var
   | Sym of ID.t
@@ -95,8 +100,4 @@ end) = struct
       CCPair.map_same (float_of_int)
         (aux 0 !_trie [Lambda.eta_expand (Lambda.snf t)]) in
     int_of_float (P.match_weight *. matches +. P.miss_weight *. fails)
-
-  
-
-
 end
