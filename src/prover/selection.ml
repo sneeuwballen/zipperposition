@@ -678,6 +678,28 @@ let pos_e_sel2 ~blocker ~ord lits =
     make_complete ~ord lits res
   )
 
+let pos_e_sel3 ~blocker ~ord lits =
+  let chooser (i,l) =
+    ((if Lit.is_positivoid l then 1 else 0),
+     (if Lit.is_pure_var l then i else max_int), (* select first pure var lit*)
+     (if Lit.is_ground l then (-(Lit.ho_weight l)) else max_int),
+     - (lit_sel_diff_w l))
+  in
+
+  if CCArray.length (CCArray.filter Lit.is_positivoid lits) <= 1 then (CCBV.empty ())
+  else (
+    let res = CCBV.create ~size:(CCArray.length lits) false in
+    begin match find_min_lit ~blocker ~can_sel:can_sel_pos ~ord ~chooser lits with
+    | Some (l,idx) when Lit.is_negativoid l ->
+      if not (Lit.is_pure_var l) && not (Lit.is_ground l) then ( 
+        CCBV.set res idx;
+        CCArray.iteri (fun i lit -> 
+          if Lit.is_positivoid lit then CCBV.set res i) lits
+      ) else CCBV.negate_self res
+    | _ -> () end;
+    make_complete ~ord lits res
+  )
+
 let ho_sel ~blocker ~ord lits = 
   let chooser (i,l) = 
     let sign = (if Lit.is_positivoid l then 1 else 0) in
@@ -788,6 +810,7 @@ let bool_blockable ~blocker =
     "ho-selection5", (ho_sel5 ~blocker, true);
     "pos-e-selection1", (pos_e_sel1 ~blocker, false); (*PSelectUnlessUniqMaxSmallestOrientable*)
     "pos-e-selection2", (pos_e_sel2 ~blocker, false); (*PSelectComplexExceptUniqMaxPosHorn*)
+    "pos-e-selection3", (pos_e_sel3 ~blocker, false); (*PSelectComplexExceptUniqMaxHorn*)
   ]
 
 let l =

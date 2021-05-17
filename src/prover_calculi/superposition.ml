@@ -1889,8 +1889,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                  "@[<hv2>demod(%d):@ @[<hv>t=%a[%d],@ l=%a[%d],@ r=%a[%d]@],@ subst=@[%a@]@]"
                  (fun k->k (C.id c) T.pp t 0 T.pp l cur_sc T.pp r cur_sc S.pp subst);
 
-               let t' = norm_b t in
-               let l' = norm_b @@ Subst.FO.apply Subst.Renaming.none subst (l,cur_sc) in               
+               let t' = Lambda.eta_expand @@ norm_b t in
+               let l' = Lambda.eta_expand @@ norm_b @@ Subst.FO.apply Subst.Renaming.none subst (l,cur_sc) in               
                (* sanity checks *)
                assert (Type.equal (T.ty l) (T.ty r));
                assert (T.equal l' t');

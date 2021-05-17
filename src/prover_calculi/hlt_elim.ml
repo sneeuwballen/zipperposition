@@ -814,7 +814,6 @@ module Make(E : Env.S) : S with module Env = E = struct
     in
 
     let initialize_with_passive () =
-      assert (Iter.is_empty @@ E.get_active ());
       Iter.iter track_clause (E.get_passive ());
 
       Util.debugf ~section 3 "discovered implications:" CCFun.id;

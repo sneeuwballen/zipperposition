@@ -826,8 +826,6 @@ module Make(C : Clause_intf.S) = struct
           ) ([],[]) cls in
 
           let goal_syms = C.symbols (Iter.of_list goals) in
-
-          CCFormat.printf "goal syms: @[%a@]@." (ID.Set.pp ID.pp) goal_syms;
           
           let cl_map = ID.Tbl.create 100 in
           List.iter (fun cl ->
@@ -853,22 +851,17 @@ module Make(C : Clause_intf.S) = struct
             else level
           in
 
-
           let max_lvl = fill_levels goal_syms 1 in
           _default := calc_poly ~c:l_poly_const ~lin:l_poly_lin ~sq:l_poly_sq 
                         (max cw (max pw fw)) (def_l + max_lvl);
           
-          CCFormat.printf "fweights(%d): @[%a@]@." max_lvl (ID.Tbl.pp ID.pp CCInt.pp) _f_weights;
-
           ID.Tbl.filter_map_inplace (fun id lvl -> 
             let ty = Signature.find_exn (C.Ctx.signature ()) id in
             let base = if Type.returns_prop ty then pw
                       else if Type.is_fun ty then fw
                       else cw in
             let v = calc_poly ~c:l_poly_const ~lin:l_poly_lin ~sq:l_poly_sq base lvl in
-            Some v ) _f_weights;
-          
-          CCFormat.printf "fweights(%d): @[%a@]@." max_lvl (ID.Tbl.pp ID.pp CCInt.pp) _f_weights;
+            Some v ) _f_weights;          
         );
         rel_weight ~vw ~max_t_mul ~max_lit_mul ~pos_lit_mul
       with Not_found | Invalid_argument _ ->
@@ -1016,6 +1009,10 @@ module Make(C : Clause_intf.S) = struct
 
     let prefer_unit_ground_non_goals c =
       if Iter.exists Literal.is_positivoid (C.Seq.lits c) &&
+         C.is_unit_clause c && C.is_ground c then 0 else 1
+    
+    let prefer_unit_ground_goals c =
+      if not (Iter.exists Literal.is_positivoid (C.Seq.lits c)) &&
          C.is_unit_clause c && C.is_ground c then 0 else 1
 
     let prefer_goals c =
@@ -1276,7 +1273,8 @@ module Make(C : Clause_intf.S) = struct
       "defer-sos", (fun _ -> defer_sos);
       "prefer-goals", (fun _ -> prefer_goals);
       "prefer-non-goals", (fun _ -> prefer_non_goals);
-      "prefer-unit-ground-non-goals", (fun _ -> prefer_unit_ground_non_goals);            
+      "prefer-unit-ground-goals", (fun _ -> prefer_unit_ground_goals);
+      "prefer-unit-ground-non-goals", (fun _ -> prefer_unit_ground_non_goals);     
       "prefer-processed", (fun _ -> prefer_processed);
       "prefer-lambdas", (fun _ -> prefer_lambdas);
       "defer-lambdas", (fun _ -> defer_lambdas);

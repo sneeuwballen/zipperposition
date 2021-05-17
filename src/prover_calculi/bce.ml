@@ -240,7 +240,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     | L.Equation (lhs, rhs, _) as lit 
       when L.is_predicate_lit lit
             && not (ID.Set.mem (T.head_exn lhs) !ignored_symbols) ->
-      assert (T.is_fo_term lhs);
+      (* assert (T.is_fo_term lhs); *)
       let hd = T.head_exn lhs in
       let sign = L.is_positivoid lit in
       let cands = find_candindates lhs sign in

@@ -10,6 +10,9 @@ module type S = sig
     val calc_pref_weight : Term.t -> int
 end
 
+let section = Util.Section.make "pref.weight"
+
+
 type node_tag =
   | Var
   | Sym of ID.t
@@ -99,5 +102,6 @@ end) = struct
     let matches, fails = 
       CCPair.map_same (float_of_int)
         (aux 0 !_trie [Lambda.eta_expand (Lambda.snf t)]) in
+    Util.debugf ~section 1 "(%a, %g, %g)" (fun k -> k T.pp t matches fails);
     int_of_float (P.match_weight *. matches +. P.miss_weight *. fails)
 end
