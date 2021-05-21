@@ -517,6 +517,20 @@ let syms_in_conj decls =
         Statement.Seq.symbols st
       ) else empty)
 
+let syms_in_conj_f decls =
+  CCVector.fold (fun acc f -> 
+    match Statement.view f with
+    | Statement.Goal _
+    | Statement.NegatedGoal _ ->
+      Statement.Seq.forms f
+      |> Iter.map (Statement.eliminate_long_implications ~is_goal:true)
+      |> Iter.flat_map TypedSTerm.Seq.symbols
+      |> Iter.append acc
+    | _ -> acc
+  ) Iter.empty decls
+  |> ID.Set.of_iter 
+  |> ID.Set.to_iter
+
 (* Process the given file (try to solve it) *)
 let process_file ?(prelude=Iter.empty) file =
   start_file file >>= fun () ->
@@ -525,6 +539,8 @@ let process_file ?(prelude=Iter.empty) file =
   (* declare inductive types and constants *)
   CCVector.iter Statement.scan_simple_stmt_for_ind_ty decls;
   let has_goal = has_goal_decls_ decls in
+  let conj_syms = syms_in_conj_f decls in
+  Util.debugf ~section 1 "conj syms: @[%a@]@." (fun k -> k (Iter.pp_seq ID.pp) conj_syms );
   Util.debugf ~section 2 "parsed %d declarations (%s goal(s))"
     (fun k->k (CCVector.length decls) (if has_goal then "some" else "no"));
   let transformed = Booleans.preprocess_booleans (Rewriting.unfold_def_before_cnf decls) in
@@ -533,7 +549,6 @@ let process_file ?(prelude=Iter.empty) file =
   (* Removed it because it is painfully slow (@VISA.) *)
   let stmts = Booleans.preprocess_cnf_booleans stmts in
   (* compute signature, precedence, ordering *)
-  let conj_syms = syms_in_conj stmts in
   let signature = Statement.signature ~conj_syms:conj_syms (CCVector.to_iter stmts) in
   compute_prec ~signature (CCVector.to_iter stmts) >>= fun precedence ->
   Util.debugf ~section 2 "@[<2>precedence:@ @[%a@]@]" (fun k->k Precedence.pp precedence);

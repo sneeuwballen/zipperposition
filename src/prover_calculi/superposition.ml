@@ -2557,6 +2557,49 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       SimplM.return_new new_c
     )
 
+  type sgn = Lit of bool | Eqn
+  let flex_resolve c =
+    let exception CantFlexResolve in
+    try
+      let sgn_map = T.Tbl.create 8 in
+
+      if (C.length c == 0) then raise CantFlexResolve;
+
+      Array.iter (function 
+        | Literal.Equation(lhs, rhs, _) as lit ->
+          if (Lit.is_predicate_lit lit) then (
+            assert(T.is_true_or_false rhs);
+            if (T.is_var (T.head_term lhs)) then(
+              let hd = T.head_term lhs in
+              match T.Tbl.get sgn_map hd with
+              | None -> T.Tbl.add sgn_map hd (Lit (Lit.is_positivoid lit))
+              | Some (Lit sgn) when sgn == Lit.is_positivoid lit ->  ()
+              | _ -> raise CantFlexResolve
+            ) else raise CantFlexResolve) 
+          else if Lit.is_positivoid lit then (raise CantFlexResolve)
+          else (
+            let hd_lhs, hd_rhs = CCPair.map_same T.head_term (lhs,rhs) in
+            if (T.is_var hd_lhs) && (T.is_var hd_rhs) then (
+              match T.Tbl.get sgn_map hd_lhs, T.Tbl.get sgn_map hd_rhs with
+              | None, None | Some(Eqn), None
+              | None, Some(Eqn) | Some(Eqn), Some(Eqn) ->
+                T.Tbl.replace sgn_map hd_lhs Eqn;
+                T.Tbl.replace sgn_map hd_rhs Eqn;
+              | _ -> raise CantFlexResolve
+            ) else raise CantFlexResolve
+          )
+        | False -> ()
+        | _ -> raise CantFlexResolve
+      ) (C.lits c);
+
+      let new_cl = 
+        C.create ~trail:(C.trail c) [] 
+                  (Proof.Step.simp ~rule:(Proof.Rule.mk "flex_resolve") [C.proof_parent c])
+                  ~penalty:1 in
+      SimplM.return_new new_cl
+    with CantFlexResolve -> SimplM.return_same c
+  
+
   (* ----------------------------------------------------------------------
    * subsumption
    * ---------------------------------------------------------------------- *)
@@ -3142,6 +3185,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     and is_trivial = is_tautology in
 
     Env.add_basic_simplify normalize_equalities;
+    Env.add_basic_simplify flex_resolve;
     if Env.flex_get k_local_rw != `Off then (
       Env.add_basic_simplify local_rewrite
     );

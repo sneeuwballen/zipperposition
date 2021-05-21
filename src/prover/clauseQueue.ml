@@ -474,6 +474,60 @@ module Make(C : Clause_intf.S) = struct
         res
       )
 
+    let dag_weight ~fweight ~vweight ~pos_multiplier ~dup_weight ~pos_use_dag 
+                   ~pos_t_reset ~pos_eqn_reset ~neg_use_dag 
+                   ~neg_t_reset ~neg_eqn_reset ~pos_neg_reset c =
+      let _tbl = Term.Tbl.create (128) in
+
+      let calc_w use_dag reset_lit reset_term lit = 
+        let term_dag_w reset t =
+          if reset then Term.Tbl.clear _tbl;
+
+          let rec aux t =
+            if Term.Tbl.mem _tbl t then dup_weight
+            else (
+              Term.Tbl.replace _tbl t ();
+              match Term.view t with
+              | Term.App(hd, args) -> aux_l (hd::args)
+              | Term.AppBuiltin(hd, args) -> fweight + aux_l args
+              | Term.Fun(_, body) -> vweight + aux body
+              | Term.Var _ | Term.DB _ -> vweight
+              | Term.Const _ -> fweight
+            )
+          and aux_l l = List.fold_left (fun acc t -> acc + aux t) 0 l in
+          aux t
+        in
+        let lit_t_w = Term.weight ~var:vweight ~sym:(fun _ -> fweight) in
+
+        let t_w reset_t = if use_dag then term_dag_w reset_t else lit_t_w in
+        
+        if reset_lit then Term.Tbl.clear _tbl;
+
+        let p_m = if Lit.is_positivoid lit then pos_multiplier else 1.0 in
+        match lit with
+        | Lit.Equation(lhs,rhs,_) ->
+          int_of_float (p_m *. (float_of_int (t_w false lhs + t_w reset_term rhs)))
+        | _ -> 0
+      in
+
+
+      
+      let _w = ref 0 in
+      CCArray.iter (fun lit -> 
+        if Lit.is_positivoid lit then (
+          _w := !_w + calc_w pos_use_dag pos_eqn_reset pos_t_reset lit)
+      ) (C.lits c);
+
+      if pos_neg_reset then (Term.Tbl.clear _tbl);
+
+      CCArray.iter (fun lit -> 
+        if Lit.is_negativoid lit then (
+          _w := !_w + calc_w neg_use_dag neg_eqn_reset neg_t_reset lit)
+      ) (C.lits c);
+
+      !_w
+
+
     let diversity_weight 
       ~var_w ~sym_w ~pos_mul ~max_t_mul ~max_l_mul
       ~fdiff_a ~fdiff_b ~vdiff_a ~vdiff_b c =
@@ -650,6 +704,30 @@ module Make(C : Clause_intf.S) = struct
           Str.matched_group 3 s |> CCString.trim |> String.lowercase_ascii
           |> CCString.prefix ~pre:"t" in
         conj_relative ~distinct_vars_mul ~parameters_magnitude ~goal_penalty
+      with Not_found | Invalid_argument _ ->
+        invalid_arg
+          "expected conjecture-relative-var(dist_var_mul:float,parameters_magnitude:l/s,goal_penalty:t/f)"
+    
+    let parse_dag_weight s =
+      let crv_regex = Str.regexp ("dagweight(\\([0-9]+\\),\\([0-9]+\\),\\([0-9]+[.]?[0-9]*\\),\\([0-9]+\\)," ^
+                                 "\\([tfTF]\\),\\([tfTF]\\),\\([tfTF]\\),\\([tfTF]\\),"^
+                                 "\\([tfTF]\\),\\([tfTF]\\),\\([tfTF]\\))") in
+      try
+        ignore(Str.search_forward crv_regex s 0);
+        let parse_bool s = CCString.prefix ~pre:"t" (String.lowercase_ascii s) in
+        let fweight = CCOpt.get_exn @@  CCInt.of_string (Str.matched_group 1 s) in
+        let vweight = CCOpt.get_exn @@  CCInt.of_string (Str.matched_group 2 s) in
+        let pos_multiplier = CCFloat.of_string_exn (Str.matched_group 3 s) in
+        let dup_weight = CCOpt.get_exn @@  CCInt.of_string (Str.matched_group 4 s) in
+        let pos_use_dag = parse_bool @@ Str.matched_group 5 s in
+        let pos_t_reset = parse_bool @@ Str.matched_group 6 s in
+        let pos_eqn_reset = parse_bool @@ Str.matched_group 7 s in
+        let neg_use_dag = parse_bool @@ Str.matched_group 8 s in
+        let neg_t_reset = parse_bool @@ Str.matched_group 9 s in
+        let neg_eqn_reset = parse_bool @@ Str.matched_group 10 s in
+        let pos_neg_reset = parse_bool @@ Str.matched_group 11 s in
+        dag_weight ~fweight ~vweight ~pos_multiplier ~dup_weight ~pos_use_dag 
+                   ~pos_t_reset ~pos_eqn_reset ~neg_use_dag ~neg_t_reset ~neg_eqn_reset ~pos_neg_reset
       with Not_found | Invalid_argument _ ->
         invalid_arg
           "expected conjecture-relative-var(dist_var_mul:float,parameters_magnitude:l/s,goal_penalty:t/f)"
