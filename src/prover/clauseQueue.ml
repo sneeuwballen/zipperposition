@@ -730,7 +730,9 @@ module Make(C : Clause_intf.S) = struct
                    ~pos_t_reset ~pos_eqn_reset ~neg_use_dag ~neg_t_reset ~neg_eqn_reset ~pos_neg_reset
       with Not_found | Invalid_argument _ ->
         invalid_arg
-          "expected conjecture-relative-var(dist_var_mul:float,parameters_magnitude:l/s,goal_penalty:t/f)"
+          ("expected dagweight(fweight,vweight,pos_mul,dup_weight," ^
+                                 "pos_use_dag,pos_t_reset,pos_eqn_reset,neg_use_dag,"^
+                                 "neg_t_reset,neg_eqn_reset,pos_neg_reset)")
 
     let parse_cr_e s =
       let crv_regex = 
@@ -1055,6 +1057,7 @@ module Make(C : Clause_intf.S) = struct
        "rel_lvl_weight", parse_rel_lvl_weight;
        "staggered", parse_staggered;
        "clauseweight", parse_clauseweight;
+       "dagweight", parse_dag_weight;
        "orient-lmax", parse_orient_lmax]
 
     let of_string s =

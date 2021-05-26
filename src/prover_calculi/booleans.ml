@@ -423,7 +423,10 @@ module Make(E : Env.S) : S with module Env = E = struct
           Proof.Rule.mk ("fluid_" ^ (if sign then "bool_" else "loob_") ^ "hoist") in
         let proof = Proof.Step.inference ~rule [C.proof_parent_subst renaming (c,sc_cl) sub] in
         let res = 
-          C.create ~penalty:(C.penalty c + 2) ~trail:(C.trail c)
+          C.create ~penalty:(C.penalty c + 
+                             (C.proof_depth c) + 
+                             (if Proof.Step.has_ho_step (C.proof_step c) then 3 else 1))
+                   ~trail:(C.trail c)
             (new_lit :: CCArray.to_list (C.lits c')) proof in
         Some res
       ) else None
@@ -530,7 +533,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       in
       let rule = Proof.Rule.mk "fluid_log_symbol_hoist" in
       let step = Proof.Step.inference ~rule [C.proof_parent_subst renaming (c,sc_cl) sub] in
-      C.create ~penalty:(C.penalty c + 2) ~trail:(C.trail c) new_lits step
+      C.create ~penalty:(C.penalty c + 
+                         (C.proof_depth c) + 
+                         (if Proof.Step.has_ho_step (C.proof_step c) then 2 else 0)) ~trail:(C.trail c) new_lits step
     in
 
     let eligible = C.Eligible.res c in

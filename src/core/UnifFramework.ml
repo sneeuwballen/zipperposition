@@ -6,6 +6,8 @@ module U = Unif
 module Q = CCDeque
 module PUP = PragUnifParams
 
+let section = Util.Section.make "unif.framework"
+
 module type PARAMETERS = sig
   exception NotInFragment
   exception NotUnifiable
@@ -221,15 +223,26 @@ module Make (P : PARAMETERS) = struct
                       try
                         Some (alg (lhs, unifscope) (rhs, unifscope) subst)
                       with 
-                      | P.NotInFragment -> None
-                      | P.NotUnifiable -> 
-                      raise Unif.Fail
+                      | P.NotInFragment -> 
+                        Util.debugf ~section 1 
+                          "@[%a@] =?= @[%a@] (subst @[%a@]) is not in fragment" 
+                            (fun k -> k T.pp lhs T.pp rhs Subst.pp subst);
+                        None
+                      | P.NotUnifiable ->
+                        Util.debugf ~section 1 
+                          "@[%a@] =?= @[%a@] (subst @[%a@]) is not unif" 
+                            (fun k -> k T.pp lhs T.pp rhs Subst.pp subst);
+                        raise Unif.Fail
                     ) (P.frag_algs ()) in 
                 match mgu with 
                 | Some substs ->
                   (* We assume that the substitution was augmented so that it is mgu for
                       lhs and rhs *)
-                  CCList.map (fun sub () -> aux sub rest ()) substs
+                  CCList.map (fun sub () -> 
+                    Util.debugf ~section 1 
+                      "@[%a@] =?= @[%a@] (subst @[%a@]) has unif @[%a@]" 
+                        (fun k -> k T.pp lhs T.pp rhs Subst.pp subst Subst.pp sub);
+                    aux sub rest ()) substs
                   |> OSeq.of_list
                   |> OSeq.merge
                 | None ->

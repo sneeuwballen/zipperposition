@@ -70,6 +70,7 @@ let k_ext_dec_lits = Flex_state.create_key ()
 let k_ext_rules_max_depth = Flex_state.create_key ()
 let k_ext_rules_kind = Flex_state.create_key ()
 let k_ho_disagremeents = Flex_state.create_key ()
+let k_add_ite_axioms = Flex_state.create_key ()
 
 
 type prune_kind = [`NoPrune | `OldPrune | `PruneAllCovers | `PruneMaxCover]
@@ -1378,7 +1379,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                     let subst = Subst.FO.bind' (Subst.empty) (var_hd, 0) (subs_term, 0) in
                     let rule = Proof.Rule.mk ("elim_leibniz_eq_" ^ (if sign then "+" else "-")) in
                     let tags = [Proof.Tag.T_ho] in
-                    let proof = Some (proof_constructor ~rule ~tags [C.proof_parent c]) in
+                    let proof = Some (proof_constructor ~rule ~tags [C.proof_parent_subst Subst.Renaming.none (c,0) subst]) in
                     Some (C.apply_subst ~proof (c,0) subst))
                 ) (CCList.mapi (fun i arg -> (i, arg)) args)
             ) else [] 
@@ -1594,8 +1595,27 @@ module Make(E : Env.S) : S with module Env = E = struct
     let p_choice = Term.app p [Term.app choice [p]] (* p (choice p) *) in
     (* ~ (p x) | p (choice p) *)
     let lits = [Literal.mk_prop px false; Literal.mk_prop p_choice true] in
+    Env.Ctx.declare choice_id choice_type;
     Env.C.create ~penalty:(Env.flex_get k_choice_axiom_penalty)
                  ~trail:Trail.empty lits Proof.Step.trivial
+  
+  let mk_ite_clauses () =
+    let ite_id = ID.make("zf_ite") in
+    let alpha = Type.var (HVar.make ~ty:Type.tType 0) in
+    let ite_ty = Type.arrow [Type.prop; alpha; alpha] alpha in
+    let ite_const = Term.const ~ty:ite_ty ite_id in
+    let x = Term.var (HVar.make ~ty:alpha 1) in
+    let y = Term.var (HVar.make ~ty:alpha 2) in
+    let if_t = T.app ite_const [T.true_; x; y] in
+    let if_f = T.app ite_const [T.false_; x; y] in
+    let if_t_cl = 
+      C.create ~penalty:1 ~trail:Trail.empty [Lit.mk_eq if_t x]
+               Proof.Step.trivial in
+    let if_f_cl = 
+      C.create ~penalty:1 ~trail:Trail.empty [Lit.mk_eq if_f y]
+               Proof.Step.trivial in
+    Env.Ctx.declare ite_id ite_ty;
+    Iter.of_list [if_t_cl; if_f_cl]
 
   let early_bird_prim_enum cl var =
     assert(T.is_var var);
@@ -2355,11 +2375,14 @@ module Make(E : Env.S) : S with module Env = E = struct
           Signal.ContinueListening
         )
       );
-      if Env.flex_get k_ext_axiom then
-        Env.ProofState.PassiveSet.add (Iter.singleton (mk_extensionality_clause ())) ;
-      if Env.flex_get k_choice_axiom then
-        Env.ProofState.PassiveSet.add (Iter.singleton (mk_choice_clause ()));
-    );
+      Signal.once Env.on_start (fun () -> 
+        if Env.flex_get k_ext_axiom then(
+          Env.ProofState.PassiveSet.add (Iter.singleton (mk_extensionality_clause ()))) ;
+        if Env.flex_get k_choice_axiom then(
+          Env.ProofState.PassiveSet.add (Iter.singleton (mk_choice_clause ())));
+        if Env.flex_get k_add_ite_axioms then(
+          Env.ProofState.PassiveSet.add (mk_ite_clauses ()));
+      ));
     ()
 end
 
@@ -2459,6 +2482,7 @@ let ext_rules_max_depth = ref (-1)
 let ext_rules_kind = ref (`Off)
 let _ext_dec_lits = ref `All
 let _ho_disagremeents = ref `SomeHo
+let _ite_axioms = ref false
 
 let extension =
   let register env =
@@ -2496,6 +2520,7 @@ let extension =
     E.flex_add k_ext_dec_lits !_ext_dec_lits;
     E.flex_add k_ext_rules_max_depth !ext_rules_max_depth;
     E.flex_add k_ext_rules_kind !ext_rules_kind;
+    E.flex_add k_add_ite_axioms !_ite_axioms;
 
 
     if E.flex_get k_check_lambda_free = `Only 
@@ -2634,6 +2659,7 @@ let () =
         | "both" -> ext_rules_kind := `Both
         |  _ -> assert false)),
         " Chooses the kind of extensionality rules to use";
+      "--ite-axioms", Arg.Bool ((:=) _ite_axioms), " include if-then-else definition axioms";
       "--ext-decompose-lits", Arg.Symbol (["all";"max"], (fun str -> 
           _ext_dec_lits := if String.equal str "all" then `All else `OnlyMax))
       , " Sets the maximal number of literals clause can have for ExtDec inference.";
