@@ -66,6 +66,7 @@ let k_prim_enum_add_var = Flex_state.create_key ()
 let k_prim_enum_early_bird = Flex_state.create_key ()
 let k_resolve_flex_flex = Flex_state.create_key ()
 let k_arg_cong = Flex_state.create_key ()
+let k_arg_cong_simpl = Flex_state.create_key ()
 let k_ext_dec_lits = Flex_state.create_key ()
 let k_ext_rules_max_depth = Flex_state.create_key ()
 let k_ext_rules_kind = Flex_state.create_key ()
@@ -239,67 +240,6 @@ module Make(E : Env.S) : S with module Env = E = struct
         (fun k->k Literal.pp lit Literal.pp new_lit);
       Some (new_lit,[],[Proof.Tag.T_ho; Proof.Tag.T_ext])
     | _ -> None
-
-
-  (* positive extensionality `m x = n x --> m = n` *)
-  let ext_pos ?(only_unit=true) (c:C.t): C.t list =
-    (* CCFormat.printf "EP: %b\n" only_unit; *)
-    let is_eligible = C.Eligible.always in
-    let expand_quant = not @@ Env.flex_get Combinators.k_enable_combinators in
-    if not only_unit || C.lits c |> CCArray.length = 1 then 
-      C.lits c
-      |> CCArray.mapi (fun i l ->
-          let l = Literal.map (fun t -> Lambda.eta_reduce ~expand_quant ~full:true t) l in
-          match l with 
-          | Literal.Equation (t1,t2,true) 
-            when is_eligible i l ->
-            let f1, l1 = T.as_app t1 in
-            let f2, l2 = T.as_app t2 in
-            begin match List.rev l1, List.rev l2 with
-              | last1 :: l1, last2 :: l2 ->
-                begin match T.view last1, T.view last2 with
-                  | T.Var x, T.Var y
-                    when HVar.equal Type.equal x y &&
-                         not (Type.is_tType (HVar.ty x)) &&
-                         Iter.of_list
-                           [Iter.doubleton f1 f2;
-                            Iter.of_list l1;
-                            Iter.of_list l2]
-                         |> Iter.flatten
-                         |> Iter.flat_map T.Seq.vars
-                         |> Iter.for_all
-                           (fun v' -> not (HVar.equal Type.equal v' x)) ->
-                    (* it works! *)
-                    let new_lit =
-                      Literal.mk_eq
-                        (T.app f1 (List.rev l1))
-                        (T.app f2 (List.rev l2))
-                    in
-                    let new_lits = C.lits c |> CCArray.to_list |>
-                                   List.mapi (fun j l -> if i = j then new_lit else l) in
-                    let proof =
-                      Proof.Step.inference [C.proof_parent c]
-                        ~rule:(Proof.Rule.mk "ho_ext_pos")
-                        ~tags:[Proof.Tag.T_ho; Proof.Tag.T_ext]
-                    in
-                    let new_c =
-                      C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c)
-                    in
-                    (* Format.printf "@[EP: @[%a@] => @[%a@]@].\n" C.pp c C.pp new_c; *)
-                    (* Format.force_newline (); *)
-                    Util.incr_stat stat_ext_pos;
-                    Util.debugf ~section 4
-                      "(@[ext_pos@ :clause %a@ :yields %a@])"
-                      (fun k->k C.pp c C.pp new_c);
-                    Some new_c
-                  | _,_ -> None
-                end
-              | _ -> None
-            end
-          | _ -> None)
-      |> CCArray.filter_map (fun x -> x)
-      |> CCArray.to_list
-    else []
 
   let ext_pos_general ?(all_lits = false) (c:C.t) : C.t list =
     let eligible = if all_lits then C.Eligible.always else C.Eligible.param c in
@@ -1815,6 +1755,26 @@ module Make(E : Env.S) : S with module Env = E = struct
       );
       new_c
 
+  let arg_cong_simpl c =
+    let var_offset = ref (C.Seq.vars c |> Type.Seq.max_var |> succ) in
+    let simplified = ref false in
+    let new_lits = Array.map(function
+      | Lit.Equation(lhs, rhs, sign) when sign && Type.is_fun (T.ty lhs) ->
+        let tyargs = fst (Type.open_fun (T.ty lhs)) in
+        simplified := true;
+        let vars = List.map (fun ty -> 
+          incr var_offset;
+          T.var @@ HVar.make ~ty (!var_offset)) tyargs in
+        let lhs',rhs' = T.app lhs vars, T.app rhs vars in
+        Lit.mk_eq lhs' rhs'
+      | x -> x) (C.lits c) in
+    if not !simplified then SimplM.return_same c
+    else (
+      let proof = Proof.Step.simp ~rule:(Proof.Rule.mk "arg_cong_simpl") [C.proof_parent c] in
+      SimplM.return_new 
+        (C.create_a ~penalty:(C.penalty c) ~trail:(C.trail c) new_lits proof)
+    )
+
 
   type fixed_arg_status =
     | Always of T.t (* This argument is always the given term in all occurrences *)
@@ -2277,7 +2237,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       );
 
 
-      if Env.flex_get k_arg_cong then ( 
+      if Env.flex_get k_arg_cong_simpl then (
+        Env.add_basic_simplify arg_cong_simpl;
+      )else if Env.flex_get k_arg_cong then ( 
         Env.add_unary_inf "ho_complete_eq" complete_eq_args
       );
 
@@ -2478,6 +2440,7 @@ let _prim_enum_early_bird = ref false
 let _resolve_flex_flex = ref false
 let _ground_app_vars = ref `Off
 let _arg_cong = ref true
+let _arg_cong_simpl = ref false
 let ext_rules_max_depth = ref (-1)
 let ext_rules_kind = ref (`Off)
 let _ext_dec_lits = ref `All
@@ -2515,6 +2478,7 @@ let extension =
     E.flex_add k_resolve_flex_flex !_resolve_flex_flex;
     E.flex_add k_ground_app_vars !_ground_app_vars;
     E.flex_add k_arg_cong !_arg_cong;
+    E.flex_add k_arg_cong_simpl !_arg_cong_simpl;
 
     E.flex_add k_ho_disagremeents !_ho_disagremeents;
     E.flex_add k_ext_dec_lits !_ext_dec_lits;
@@ -2584,6 +2548,7 @@ let () =
     [ "--ho", Arg.Bool (fun b -> enabled_ := b), " enable/disable HO reasoning";
       "--force-ho", Arg.Bool  (fun b -> force_enabled_ := b), " enable/disable HO reasoning even if the problem is first-order";
       "--arg-cong", Arg.Bool (fun v -> _arg_cong := v), " enable/disable ArgCong"; 
+      "--arg-cong-simpl", Arg.Bool (fun v -> _arg_cong_simpl := v), " enable/disable ArgCong as a simplification rule"; 
       "--ho-unif", Arg.Bool (fun v -> enable_unif_ := v), " enable full HO unification";
       "--ho-elim-pred-var", Arg.Bool (fun b -> _elim_pred_var := b), " disable predicate variable elimination";
       "--ho-prim-enum", set_prim_mode_, " set HO primitive enum mode";
