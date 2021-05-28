@@ -395,7 +395,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     else compute_results new_lits_map
 
   let neg_ext_simpl (c:C.t) : C.t SimplM.t =
-    let is_eligible = C.Eligible.res c in 
+    let is_eligible = C.Eligible.always in 
     let applied_neg_ext = ref false in
     let new_lits = 
       C.lits c
@@ -2218,6 +2218,13 @@ module Make(E : Env.S) : S with module Env = E = struct
       Util.debug ~section 1 "setup HO rules";
       Env.Ctx.lost_completeness();
 
+      if(Env.flex_get k_neg_ext_as_simpl) then (
+        Env.add_unary_simplify neg_ext_simpl;
+      )
+      else if(Env.flex_get k_neg_ext) then (
+        Env.add_unary_inf "neg_ext" neg_ext 
+      );
+
       if Env.flex_get k_ext_rules_kind == `ExtFamily ||
         Env.flex_get k_ext_rules_kind == `Both then (
         Env.add_binary_inf "ext_dec_act" ext_sup_act;
@@ -2304,13 +2311,6 @@ module Make(E : Env.S) : S with module Env = E = struct
         in
         Env.set_ho_normalization_rule "ho_norm" ho_norm);
       
-
-      if(Env.flex_get k_neg_ext) then (
-        Env.add_unary_inf "neg_ext" neg_ext 
-      )
-      else if(Env.flex_get k_neg_ext_as_simpl) then (
-        Env.add_unary_simplify neg_ext_simpl;
-      );
 
       if(Env.flex_get k_purify_applied_vars != `None) then (
         Env.add_unary_simplify purify_applied_variable

@@ -166,6 +166,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     
   let handle_new_pred_var_clause (clause,var) =
     assert(T.is_var var);
+    assert(Type.returns_prop (T.ty var));
     let ty = T.ty var in
     Type.Map.get_or ~default:[] ty !_trigger_bools
     |> CCList.map (fun trigger -> instantiate_w_bool ~clause ~var ~trigger)
@@ -913,13 +914,20 @@ module Make(E : Env.S) : S with module Env = E = struct
         let fresh_var  = HVar.fresh ~ty:var_ty () in
         T.var fresh_var
       in
+      let subst_t = fresh_var ~body in
       match b with 
       | Builtin.ForallConst ->
-        let new_lit = yes (T.app body [fresh_var ~body]) in
-        mk_res ~proof:(proof ~prefix:"forall") ~old ~repl:T.false_ new_lit c
+        let new_lit = yes (T.app body [subst_t]) in
+        let res = mk_res ~proof:(proof ~prefix:"forall") ~old ~repl:T.false_ new_lit c in
+        if Type.returns_prop (T.ty subst_t) then (
+          Signal.send Env.on_pred_var_elimination (res, subst_t));
+        res
       | Builtin.ExistsConst ->
-        let new_lit = no (T.app body [fresh_var ~body]) in
-        mk_res ~proof:(proof ~prefix:"exists") ~old ~repl:T.true_ new_lit c
+        let new_lit = no (T.app body [subst_t]) in
+        let res = mk_res ~proof:(proof ~prefix:"exists") ~old ~repl:T.true_ new_lit c in
+        if Type.returns_prop (T.ty subst_t) then (
+          Signal.send Env.on_pred_var_elimination (res, subst_t));
+        res
       | _ -> assert false
     in
         

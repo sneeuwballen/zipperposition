@@ -200,7 +200,7 @@ module Make(E : Env.S) = struct
             CCVector.append_iter new_clauses newly_simplified;
 
             if not (Iter.is_empty simplified_actives) then
-              Util.debugf ~section 3 "simplified_actives:@ @[%a@]@." (fun k -> k (Iter.pp_seq Env.C.pp) simplified_actives);
+              Util.debugf ~section 1 "simplified_actives:@ @[%a@]@." (fun k -> k (Iter.pp_seq Env.C.pp) simplified_actives);
             Util.debugf ~section 5 "newly_simplified:@ @[%a@]@." (fun k -> k (Iter.pp_seq Env.C.pp) newly_simplified);
 
             (* add given clause to active set *)
