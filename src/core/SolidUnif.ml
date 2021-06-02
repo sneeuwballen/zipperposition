@@ -471,7 +471,9 @@ module Make (St : sig val st : Flex_state.t end) = struct
 
   let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
     try 
-      let res = 
+      let res =
+        if T.is_type (fst t0_s) then raise NotInFragment;
+
         if US.is_empty subst then (
           let t0',t1',scope,subst = US.FO.rename_to_new_scope ~counter t0_s t1_s in
           if var_conditions t0' t1' then (

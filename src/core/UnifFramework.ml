@@ -192,7 +192,13 @@ module Make (P : PARAMETERS) = struct
             eta_expand_otf ~subst ~scope:unifscope pref_lhs pref_rhs body_lhs body_rhs in
           let (hd_lhs, args_lhs), (hd_rhs, args_rhs) = T.as_app body_lhs, T.as_app body_rhs in
 
-          if T.equal body_lhs body_rhs then (
+          if Term.is_type lhs then (
+            assert(Term.is_type rhs);
+            try
+              let subst = Unif.FO.unify_syn ~subst:(subst) (lhs, unifscope) (rhs, unifscope) in
+              aux subst rest
+            with Unif.Fail -> OSeq.empty
+          ) else if T.equal body_lhs body_rhs then (
             aux subst rest
           ) else (
             match T.view hd_lhs, T.view hd_rhs with

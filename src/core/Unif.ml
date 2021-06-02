@@ -700,7 +700,7 @@ module Inner = struct
         let tags = T.type_non_unifiable_tags (T.ty_exn t1) in
         delay ~tags () (* push pair as a constraint, because of typing. *)
       | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when 
-          Builtin.equal s1 s2 ->
+          Builtin.equal s1 s2 && (not (Type.is_fun (Type.of_term_unsafe @@ T.ty_exn t1))) ->
         let l1,l2 = if sc1 = sc2 then (norm_logical_inner s1 l1 l2) else l1, l2 in
         unif_list  ~op ~bvars subst l1 sc1 l2 sc2
       | _, _ -> raise Fail
