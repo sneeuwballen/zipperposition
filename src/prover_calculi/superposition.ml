@@ -2359,8 +2359,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           T.Seq.common_contexts lhs rhs
           |> Iter.find_map (fun (lhs, rhs) ->
             top_level ~sign:true ~repl:(if sign then T.true_ else T.false_) lhs rhs
-            <+> top_level ~sign:true ~repl:(if sign then T.true_ else T.false_) rhs lhs
-          )
+            <+> top_level ~sign:true ~repl:(if sign then T.true_ else T.false_) rhs lhs)
         in
 
         top_level ~sign ~repl:T.true_ lhs rhs
@@ -2377,14 +2376,16 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           if T.same_l args args' then t
           else T.app hd args'
         | T.AppBuiltin((Eq|Neq|Equiv|Xor) as hd, ([_; x; y]|[x;y]))
-          when T.DB.is_closed x && T.DB.is_closed y ->
+          when Type.is_prop (T.ty t) && T.DB.is_closed x && T.DB.is_closed y ->
           let (x',y') = CCPair.map_same aux (x,y) in
+          assert(Type.equal (T.ty x) (T.ty x'));
+          assert(Type.equal (T.ty y) (T.ty y'));
           let sign = Builtin.equal Eq hd || Builtin.equal Equiv hd in
           begin match simplify ~sign x' y' with
           | Some t -> t
-          | None -> 
+          | None ->
             if (not ((T.equal x x') && (T.equal y y'))) then (
-              if(Builtin.equal hd Eq) then T.Form.eq x' y'
+              if (Builtin.equal hd Eq) then T.Form.eq x' y'
               else if (Builtin.equal hd Neq) then T.Form.neq x' y'
               else T.app_builtin ~ty:(T.ty t) hd [x'; y']
             ) else t 

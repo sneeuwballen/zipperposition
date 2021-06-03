@@ -23,6 +23,7 @@ let k_clausify_eq_max_nonint = Flex_state.create_key ()
 let k_clausify_implications = Flex_state.create_key ()
 let k_simp_limit = Flex_state.create_key ()
 let k_simplify_quant = Flex_state.create_key ()
+let k_inf_quant = Flex_state.create_key ()
 
 let section = Util.Section.make ~parent:Const.section "lazy_cnf"
 
@@ -429,7 +430,9 @@ module Make(E : Env.S) : S with module Env = E = struct
                 mk_or ~proof_cons ~rule_name [T.Form.not_ a; T.Form.not_ b] c i 
                 @ mk_or ~proof_cons ~rule_name [a; b] c i
                 )))
-        | T.AppBuiltin((ForallConst|ExistsConst) as hd, [_; f]) ->
+        | T.AppBuiltin((ForallConst|ExistsConst) as hd, [_; f]) 
+            when Env.flex_get k_lazy_cnf_kind != `Simp || 
+                 not (Env.flex_get k_inf_quant) ->
           let var_offset = T.Seq.max_var (C.Seq.vars c) + 1 in 
           let res, hd, subst_term, rule_name = clausify_quant ~parent:c ~var_offset ~sign ~quant_body:f ~quant_hd:hd in
           assert(Type.is_prop (T.ty res));
@@ -470,11 +473,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                 @ mk_or ~proof_cons ~rule_name [lhs; rhs] c i ))
       ) else continue acc) (init)
 
-  let reduce_quantifiers c =
-    let proof_cons = 
-      Proof.Step.simp ~infos:[] 
-                      ~tags:[Proof.Tag.T_live_cnf;
-                             Proof.Tag.T_dont_increase_depth] in
+  let clausify_quants ~proof_cons c =
     C.lits c
     |> CCArray.find_map_i (fun i -> function 
       | Literal.Equation(lhs, _, _) as lit 
@@ -494,6 +493,13 @@ module Make(E : Env.S) : S with module Env = E = struct
           Some (res_cl)
         | _ -> None end
       | _-> None)
+
+  let reduce_quantifiers c =
+    let proof_cons = 
+      Proof.Step.simp ~infos:[] 
+                      ~tags:[Proof.Tag.T_live_cnf;
+                             Proof.Tag.T_dont_increase_depth] in
+    clausify_quants ~proof_cons c
     |> CCOpt.map_or ~default:(SimplM.return_same c) (SimplM.return_new)
 
 
@@ -590,6 +596,13 @@ module Make(E : Env.S) : S with module Env = E = struct
           | None -> None, `Continue)
         else None, `Continue) None   
   
+  let inf_quantifiers c =
+    let proof_cons = 
+      Proof.Step.inference ~infos:[] 
+                      ~tags:[Proof.Tag.T_live_cnf;
+                             Proof.Tag.T_dont_increase_depth] in
+    CCOpt.map_or ~default:[] (fun c -> [c]) @@ clausify_quants ~proof_cons c
+
   let clausify_eq c =
     let rule_name = "eq_elim" in
     fold_lits c
@@ -713,6 +726,9 @@ module Make(E : Env.S) : S with module Env = E = struct
           if not (Env.flex_get k_clausify_implications) then (
             Env.add_unary_inf "inf_imp" clausify_imp
           );
+          if Env.flex_get k_inf_quant then (
+            Env.add_unary_inf "inf_quant" inf_quantifiers;
+          );
           Env.add_multi_simpl_rule ~priority:5 lazy_clausify_simpl;
           if Env.flex_get k_lazy_cnf_eager then (
             Env.add_cheap_multi_simpl_rule lazy_clausify_simpl;
@@ -747,6 +763,7 @@ let _clausify_eq_max_noninterpreted = ref true
 let _clausify_impls = ref true
 let _simp_limit = ref (-1)
 let _simp_quant = ref false
+let _inf_quant = ref false
 
 let extension =
   let register env =
@@ -767,6 +784,7 @@ let extension =
     E.flex_add k_simp_limit !_simp_limit;
     E.flex_add k_clausify_implications !_clausify_impls;
     E.flex_add k_simplify_quant !_simp_quant;
+    E.flex_add k_inf_quant !_inf_quant;
 
     ET.setup ()
   in
@@ -813,6 +831,7 @@ let () =
       | _ -> assert false)), " use lazy cnf as either simplification, inference, or let calculus clausify";
     "--lazy-cnf-rename-eq", Arg.Bool ((:=) _rename_eq), " turn on/of renaming of boolean equalities";
     "--lazy-cnf-simplify-quant", Arg.Bool ((:=) _simp_quant), " when non-simplifying clausification is used, clausify quantifiers in a simplifying manner";
+    "--lazy-cnf-inf-quant", Arg.Bool ((:=) _inf_quant), " when simplifying clausification is used, clausify quantifiers in a non-simplifying manner";
     "--enum-bool-funs", Arg.Bool ((:=) _enum_bool_funs), " enumerate all functions over Boolean domain (up to the order of the problem)";
     "--replace-bool-quant-fun", Arg.Bool ((:=) _replace_bool_fun_quant), " replace Boolean fun quantifier with all possible values";
     "--lazy-cnf-clausify-eq-penalty", Arg.Bool ((:=) _clausify_eq_pen), " turn on/of penalizing clausification of equivalences"];
