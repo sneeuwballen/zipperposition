@@ -83,14 +83,15 @@ let[@inline] is_backward_simplified c = get_flag flag_backward_simplified c
 let pp_trail out trail =
   if not (Trail.is_empty trail)
   then
-    Format.fprintf out "@ @<2>← @[<hv>%a@]"
+    Format.fprintf out "@ @<2><- @[<hv>%a@]"
       (Util.pp_iter ~sep:" ⊓ " BBox.pp) (Trail.to_iter trail)
 
 let pp_vars out c =
   let pp_vars out = function
     | [] -> ()
     | l ->
-      Format.fprintf out "forall @[%a@].@ "
+      (* Appears to trigger only when --output=default (TODO verify). If not, printing of ∀ should depend on the --output. *)
+      Format.fprintf out "∀ @[%a@].@ "
         (Util.pp_list ~sep:" " Type.pp_typed_var) l
   in
   pp_vars out (Literals.vars c.lits)

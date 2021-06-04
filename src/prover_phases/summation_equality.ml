@@ -1,3 +1,4 @@
+(* open Batteries opam install batteries + edit src/core/dune *)
 open Logtk
 open Logtk_parsers
 open Logtk_proofs
@@ -7,24 +8,18 @@ open Phases_impl
 (* open Phases.Infix *)
 open CCVector
 open CCFun
+open Literal
 module B = Builtin
 open Monome
 open Type
 open Term
 
-let pr = print_endline
-(* open Phases *)
-
-(* let saturate env clauses =
-  (* let ()= Phases_impl.process_file () in *)
-  let result, clauses' = Phases_impl.presaturate_clauses env clauses in
-  Phases_impl.try_to_refute env clauses' result *)
-
+let (~..)x = print_endline(Batteries.dump x); x
 
 module MakeSumSolver(MainEnv: Env.S) = struct
-  (* module Env = Env *)
+  (* module Env = MainEnv *)
   module C = MainEnv.C
-  (* module Ctx = Env.Ctx *)
+  (* module Ctx = MainEnv.Ctx *)
 
   let clauseset clauselist = {Clause.c_set= of_list clauselist; c_sos= of_list[]}
 
@@ -62,34 +57,73 @@ probe=1+m
 N[gn] = N[fn] + [gn]
 (N-1) [gn+f0] = N[fn] *)
 
-  let demo_proof _ =
-    let have name par ty = snd(mk_fresh_skolem ~prefix:name [] (arrow par ty)) in
-    let (@) = app in
-    let (@?) = app_builtin ~ty:prop in
-    let (@:) = app_builtin ~ty:int in
-    let plus1 n = B.Sum@:[n; B.Int Z.one @:[]] in
-    let _0 = B.Int Z.zero @:[] in
-    let (=<) a b = B.Lesseq@?[a;b] in
-    let (&) a b = B.And@?[a;b] in
+  let demo_proof c =
+    let constants = Hashtbl.create 0 in
+    let have ?(infix=false) name par ty = match Hashtbl.find_opt constants name with
+    | None ->
+      let i = ID.make name in
+      if infix then ID.set_payload i (ID.Attr_infix name);
+      let c = const (arrow par ty) i in
+      Hashtbl.add constants name c; c
+    | Some c -> c in
+    let ( * ) = app in
+    let ( *?) = app_builtin ~ty:prop in
+    let ( *:) = app_builtin ~ty:int in
+    let plus1 n = B.Sum*:[n; B.Int Z.one *:[]] in
+    let _0 = B.Int Z.zero *:[] in
+    let (=<) a b = B.Lesseq*?[a;b] in
+    let (&) a b = B.And*?[a;b] in
+    let _Z = builtin ~ty:tType B.ty_int in
+    (* let (=~) a b = B.Eq*?[builtin ~ty:tType B.ty_int; a; b] in *)
+    let int2 = arrow [int] int in
+    let int3 = arrow [int2] int2 in
+    let miinus = have "−₂" ~infix:true [int3; int3] int3 in
+    let (++) a b = have "+" ~infix:true [int2; int2] int2 *[a;b] in
+    let (--) a b = have "−" ~infix:true [int2; int2] int2 *[a;b] in
     let j = var % HVar.make ~ty:int in
     let s = var % HVar.make ~ty:(arrow [int] prop) in
-    let box b = Literal.mk_prop (have "box" [prop] prop @[b]) true in
+    let j0to = fun_of_fvars[HVar.make ~ty:int 0] in
+    let box b = mk_prop (have "box" [prop] prop *[b]) true in
     let xx = have "probe" [] int in
+    let sum = have "∑" [arrow [int] prop; arrow [int] int;] int in
+    let _I = have "id" [int2] int2 in
     let f = have "f" [int] int in
     let g = have "g" [int] int in
     let m = have "m" [] int in
     let upto = have "upto" [int;int] prop in
     let diff = have "diff" [arrow [int] prop; arrow [int] prop; int] prop in
+    let mm = have "M" [arrow [int] int; int] int in
 
-    let m_in_N = step "given" [] [Literal.mk_arith_lesseq (Int.const Z.zero) (Int.singleton Z.one m)] in
-    let upto_def = step "given" [] [Literal.mk_eq (upto@[j 0; j 1]) (_0 =< j 1 & j 1 =< j 0)] in
-    let diff_def = step "given" [] [Literal.mk_eq (diff@[s 0; s 1; j 0]) (s 0 @[j 0] & B.Not@?[s 1 @[j 0]])] in
+    let m_in_N = step "given" [] [mk_arith_lesseq (Int.const Z.zero) (Int.singleton Z.one m)] in
+    let upto_def = step "given" [] [mk_eq (upto*[j 0; j 1]) (_0 =< j 1 & j 1 =< j 0)] in
+    let diff_def = step "given" [] [mk_eq (diff*[s 0; s 1; j 0]) (s 0 *[j 0] & B.Not*?[s 1 *[j 0]])] in
 
-    let enum1 = step "helper" [] [box(diff@[upto@[m]; upto@[plus1 m]; xx])] in
-    let enum2 = step "rewrite" [enum1; diff_def] [box(upto@[m;xx] & B.Not@?[upto@[plus1 m; xx]])] in
-    let enum3 = step "rewrite" [enum2; upto_def] [box((_0=<xx & xx=<m) & B.Not@?[_0=<xx & xx=< plus1 m])] in
-    let enum4 = step "≤-simp" [enum3; m_in_N] [box(B.Eq@?[xx; plus1 m])] in
-    [step "TODO" [enum4] []]
+    let enum1 = step "helper" [] [box(diff*[upto*[m]; upto*[plus1 m]; xx])] in
+    let enum2 = step "rewrite" [enum1; diff_def] [box(upto*[m;xx] & B.Not*?[upto*[plus1 m; xx]])] in
+    let enum3 = step "rewrite" [enum2; upto_def] [box((_0=<xx & xx=<m) & B.Not*?[_0=<xx & xx=< plus1 m])] in
+    let enum4 = step "≤-simp" [enum3; m_in_N] [box(B.Eq*?[_Z; plus1 m; xx])] in
+    let enum'1 = step "helper" [] [box(diff*[upto*[plus1 m]; upto*[m]; xx])] in
+    let enum'2 = step "rewrite" [enum'1; diff_def] [box(upto*[plus1 m; xx] & B.Not*?[upto*[m; xx]])] in
+    let enum'3 = step "rewrite" [enum'2; upto_def] [box((_0=<xx & xx=< plus1 m) & B.Not*?[_0=<xx & xx=<m])] in
+    let enum'4 = step "≤-simp" [enum'3; m_in_N] [box(B.False*?[])] in
+    let sumf = j0to(sum*[upto*[j 0]; f]) in
+    let deltaM = step "sum domain split" [enum4; enum'4] [mk_eq
+      (miinus*[mm;_I; sumf])
+      (j0to(sum*[app_builtin ~ty:(arrow [int] prop) B.Eq [_Z; plus1(j 0)]; f]))] in
+    let sumf_def' = step "sum singletons" [deltaM] [mk_eq (miinus*[mm;_I; sumf]) (mm*[f])] in
+    
+    let g_def = step "given" [] [mk_eq (g*[plus1(j 0)]) (B.Sum*:[f*[plus1(j 0)]; g*[j 0]])] in
+    let g_def' = step "operator format" [g_def] [mk_eq (mm*[g]) (mm*[f] ++ g)] in
+    let gf0 = g++j0to(f*[_0]) in
+    let gf0_1st = step "sup (additive)" [g_def'] [mk_eq (mm*[gf0] -- j0to(f*[_0])) (mm*[f])] in
+    let gf0_def' = step "arithmetic" [gf0_1st] [mk_eq (miinus*[mm;_I; gf0]) (mm*[f])] in
+
+    let sumf_gf0_1st = step "sup (additive)" [sumf_def'; gf0_def'] [mk_eq (mm*[sumf--gf0] -- mm*[f] ++ mm*[f]) (sumf--gf0)] in
+    let sumf_gf0_def' = step "arithmetic" [sumf_gf0_1st] [mk_eq (miinus*[mm;_I; sumf--gf0]) (j0to _0)] in
+    
+    let goal = step "negated goal" [] [mk_neq (sum*[upto*[m]; f]) (Sum*:[g*[m]; f*[_0]])] in
+    let initials_only = step "induction (step +1 from 0)" [sumf_gf0_def'; goal] [mk_neq (sum*[upto*[_0]; f]) (Sum*:[g*[_0]; f*[_0]])] in
+    [step "TODO" [initials_only] []]
     
   let inference_function clause =
     (* Printf.printf "%a" Clause.pp clause; *)
@@ -117,7 +151,9 @@ let env(module Parent: Env.S) =
 let extension ={
   Extensions.default with
   name = "∑";
-  env_actions = [fun env -> let module I= MakeSumSolver(val env: Env.S) in()];
+  env_actions = [fun env ->
+    let module E= (val env) in (* Solves: “The parameter cannot be eliminated in the result type.” *)
+    let module I= MakeSumSolver(E) in()];
 }
 
 (* 

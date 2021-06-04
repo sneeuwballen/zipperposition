@@ -4,7 +4,7 @@
   (name logtk)
   (public_name logtk)
   (synopsis "core data structures and algorithms for Logtk")
-  (libraries containers containers-data iter oseq zarith unix)
+  (libraries containers containers-data iter oseq zarith unix batteries)
   (flags :standard -w -32-50)
   (c_names util_stubs)
   (c_flags -Wextra -Wno-unused-parameter)

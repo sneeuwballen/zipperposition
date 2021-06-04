@@ -557,27 +557,6 @@ module ArithOp = struct
     | Rat n -> Q.equal n Q.minus_one
     | s -> _ty_mismatch "not a number: %a" pp s
 
-  let floor s = match s with
-    | Int _ -> s
-    | Rat n -> mk_int (Q.to_bigint n)
-    | s -> _ty_mismatch "not a numeric constant: %a" pp s
-
-  let ceiling s = match s with
-    | Int _ -> s
-    | Rat _ -> failwith "Q.ceiling: not implemented" (* TODO *)
-    | s -> _ty_mismatch "not a numeric constant: %a" pp s
-
-  let truncate s = match s with
-    | Int _ -> s
-    | Rat n when Q.sign n >= 0 -> mk_int (Q.to_bigint n)
-    | Rat _ -> failwith "Q.truncate: not implemented" (* TODO *)
-    | s -> _ty_mismatch "not a numeric constant: %a" pp s
-
-  let round s = match s with
-    | Int _ -> s
-    | Rat _ -> failwith "Q.round: not implemented" (* TODO *)
-    | s -> _ty_mismatch "not a numeric constant: %a" pp s
-
   let prec s = match s with
     | Int n -> mk_int Z.(n - one)
     | Rat n -> mk_rat Q.(n - one)
@@ -612,6 +591,30 @@ module ArithOp = struct
     | Int n1, Int n2 -> mk_int Z.(n1 * n2)
     | Rat n1, Rat n2 -> mk_rat Q.(n1 * n2)
     | _ -> err2_ s1 s2
+
+  let truncate s = match s with
+    | Int _ -> s
+    | Rat n -> mk_int(Q.to_bigint n) (* to_bigint truncates; go to source to read its documentation *)
+    | s -> _ty_mismatch "not a numeric constant: %a" pp s
+
+  let floor s = match s with
+    | Int _ -> s
+    | Rat n when Q.(n > zero) or Q.den n = Z.one -> mk_int(Q.to_bigint n)
+    | Rat n -> mk_int Z.(Q.to_bigint n - one)
+    | s -> _ty_mismatch "not a numeric constant: %a" pp s
+
+  let ceiling s = match s with
+    | Int _ -> s
+    | _ -> uminus(floor(uminus s))
+
+  let round s = match s with
+    | Int _ -> s
+    (* Half integers round to even as per http://www.tptp.org/TPTP/TR/TPTPTR.shtml#Arithmetic *)
+    | Rat n when Q.den n = Z.of_int 2 ->
+      let k = Z.(Q.num n asr 1) in (* n=k+½ *)
+      mk_int Z.(if is_even k then k else k+one)
+    | Rat n -> floor(Rat Q.(n + 1//2))
+    | s -> _ty_mismatch "not a numeric constant: %a" pp s
 
   let quotient s1 s2 = match s1, s2 with
     | Int n1, Int n2 ->
