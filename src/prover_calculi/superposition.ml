@@ -680,7 +680,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           );
         | _ ->
           if T.equal t' T.false_ && (
-            (Env.flex_get k_superpose_w_formulas) &&
+            not (Env.flex_get k_superpose_w_formulas) ||
             not @@ T.is_appbuiltin info.s
           ) then 
             raise @@ exit_negative_tl);
