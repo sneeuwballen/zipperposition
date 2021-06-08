@@ -352,6 +352,8 @@ let prefer_deep_log (_,log_d1) (_, log_d2) =
 let prefer_shallow_log (_,log_d1) (_, log_d2) =
   compare (log_d1) (log_d2)
 
+let discard_ctx _ _ = 0
+
 
 let leftmost_innermost ~ord lits =
   select_leftmost ~ord ~kind:`Inner lits
@@ -374,6 +376,7 @@ let fun_names =
 let parse_combined_function ~ord s =
   let sel_funs = [sel1; sel2; sel3] in
   let ctx_funs = [
+    ("any_ctx", discard_ctx);
     ("pos_ctx", prefer_pos_ctx);
     ("neg_ctx", prefer_neg_ctx);
     ("and_arg_ctx", prefer_and_arg);
