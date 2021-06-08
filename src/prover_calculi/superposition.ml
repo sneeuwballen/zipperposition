@@ -102,6 +102,7 @@ let k_pred_var_eq_fact = Flex_state.create_key ()
 let k_force_limit = Flex_state.create_key ()
 let k_formula_simplify_reflect = Flex_state.create_key ()
 let k_strong_sr = Flex_state.create_key ()
+let k_superpose_w_formulas = Flex_state.create_key ()
 
 
 
@@ -246,7 +247,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           sup_at_var_headed || not (T.is_var (T.head_term t)))
       |> Iter.fold
         (fun tree (t, pos) ->
-           (* Util.debugf ~section 1 "inserting(into):@[@[%a@]|@[%a]@]" (fun k-> k C.pp c Term.pp t); *)
+           Util.debugf ~section 2 "inserting(into):@[@[%a@]|@[%a]@]" (fun k-> k C.pp c Term.pp t);
            let with_pos = C.WithPos.({term=t; pos; clause=c;}) in
            f tree t with_pos)
         !_idx_sup_into;
@@ -332,9 +333,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ~eligible:(C.Eligible.param c) (C.lits c)
       |> Iter.filter( (fun (_,r,sign,_) -> sign || T.equal r T.false_))
       |> Iter.filter((fun (l, _, _, _) ->
-        match T.view l with
+        (Env.flex_get k_superpose_w_formulas) || 
+        begin match T.view l with
         | T.AppBuiltin((Eq|Neq), _) -> false
-        | _ -> not (T.is_formula l)
+        | _ -> not (T.is_formula l) end
       ))
       |> Iter.filter(fun (l, _, _, _) -> 
           sup_from_var_headed || not (T.is_app_var l))
@@ -342,7 +344,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (fun tree (l, r, sign, pos) ->
            assert (sign || T.equal r T.false_);
            let with_pos = C.WithPos.({term=l; pos; clause=c;}) in
-           (* Util.debugf ~section 1 "inserting(from):@[@[%a@]|@[%a]@]" (fun k-> k C.pp c Term.pp l); *)
+           Util.debugf ~section 2 "inserting(from):@[@[%a@]|@[%a]@]" (fun k-> k C.pp c Term.pp l);
            f tree l with_pos)
         !_idx_sup_from ;
     (* terms that can be demodulated: all subterms (but vars) *)
@@ -628,7 +630,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let t' = if info.sup_kind != DupSup then 
           S.FO.apply ~shift_vars renaming subst (info.t, sc_a)
         else dup_sup_apply_subst info.t sc_a sc_p subst renaming in
-      Util.debugf ~section 2
+      Util.debugf ~section 1
         "@[<2>sup, kind %s(%d)@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a, t'=%a@]@])@ \
          (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@]"
         (fun k->k (kind_to_str info.sup_kind) (Term.Set.cardinal lambdasup_vars) C.pp info.active sc_a T.pp info.s T.pp info.t
@@ -664,8 +666,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         match info.passive_pos with
         | P.Arg(_, P.Left P.Stop)
         | P.Arg(_, P.Right P.Stop) ->
-          if T.equal t' T.false_ && not (Lit.is_positivoid (info.passive_lit)) then (
-            raise exit_negative_tl) 
+          if T.equal t' T.false_ then (
+            if (not (Env.flex_get k_superpose_w_formulas) && 
+                not (Lit.is_positivoid (info.passive_lit))) ||
+                (Env.flex_get k_superpose_w_formulas && 
+                 not (T.is_appbuiltin info.s))
+            then (raise exit_negative_tl)) 
           else if Lit.is_positivoid info.passive_lit &&
                     (* active clause will take the role of passive and that is how
                        we can compute the resolvent *)
@@ -673,7 +679,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             raise exit_double_sup
           );
         | _ ->
-          if T.equal t' T.false_ then 
+          if T.equal t' T.false_ && (
+            (Env.flex_get k_superpose_w_formulas) &&
+            not @@ T.is_appbuiltin info.s
+          ) then 
             raise @@ exit_negative_tl);
 
 
@@ -830,7 +839,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       in
       let new_clause = C.create ~trail:new_trail ~penalty new_lits proof in
       (* Format.printf "LS: %a\n" C.pp new_clause;  *)
-      Util.debugf ~section 2 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
+      Util.debugf ~section 1 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
       if (not (List.for_all (Lit.for_all Term.DB.is_closed) new_lits)) then (
         CCFormat.printf "@[<2>sup, kind %s(%d)@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a, t'=%a@]@])@ \
          (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@]"
@@ -849,7 +858,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       );
       Some new_clause
     with ExitSuperposition reason ->
-      Util.debugf ~section 2 "... cancel, %s" (fun k->k reason);
+      Util.debugf ~section 1 "... cancel, %s" (fun k->k reason);
       None
 
   (* simultaneous superposition: when rewriting D with C \lor s=t,
@@ -1711,7 +1720,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let new_clause =
         C.create ~trail:(C.trail info.clause) ~penalty new_lits proof
       in
-      Util.debugf ~section 1 "@[<hv2>equality factoring on@ @[%a@]@ yields @[%a@]@]"
+      Util.debugf ~section 3 "@[<hv2>equality factoring on@ @[%a@]@ yields @[%a@]@]"
         (fun k->k C.pp info.clause C.pp new_clause);
 
       Some new_clause
@@ -3314,6 +3323,8 @@ let _schedule_infs = ref true
 let _force_limit = ref 3
 let _formula_sr = ref true
 let _strong_sr = ref false
+let _superposition_with_formulas = ref false
+
 
 let _guard = ref 30
 let _ratio = ref 100
@@ -3394,6 +3405,7 @@ let register ~sup =
   E.flex_add k_pred_var_eq_fact !_pred_var_eq_fact;
   E.flex_add k_force_limit !_force_limit;
   E.flex_add k_formula_simplify_reflect !_formula_sr;
+  E.flex_add k_superpose_w_formulas !_superposition_with_formulas;
 
   E.flex_add StreamQueue.k_guard !_guard;
   E.flex_add StreamQueue.k_ratio !_ratio;
@@ -3517,6 +3529,8 @@ let () =
       "--restrict-hidden-sup-at-vars", Arg.Bool (fun b -> _restrict_hidden_sup_at_vars :=	b), " enable/disable hidden superposition at variables only under certain ordering conditions";
       "--stream-force-limit", Arg.Int((:=) _force_limit), " number of attempts to get a clause when the stream is just created";
       "--formula-simplify-reflect", Arg.Bool((:=) _formula_sr), " apply simplify reflect on the formula level";
+      "--superposition-with-formulas", Arg.Bool((:=) _superposition_with_formulas), 
+        " enable superposition from (negative) formulas into any subterm";
       "--strong-simplify-reflect", Arg.Bool((:=) _strong_sr), " full effort simplify reflect -- tries to find an equation for each pair of subterms";
     ];
 
