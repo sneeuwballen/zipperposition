@@ -268,6 +268,7 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
     | _ -> false
 
   (** Higher-order KBO *)
+  exception UnsupportedTerm
   let rec kbo ~prec t1 t2 =
     let balance = mk_balance t1 t2 in
     (** Update variable balance, weight balance, and check whether the term contains the fluid term s.
@@ -290,7 +291,7 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
             else W.(wb - weight prec h ~below_lam)
           in
           let below_lam = (h = Head.LAM) in
-          if not P.lambda_mode && below_lam then invalid_arg "lambdas not allowed";
+          if not P.lambda_mode && below_lam then raise UnsupportedTerm;
           balance_weight_rec wb' args s ~pos ~below_lam false
       )
     (** balance_weight for the case where t is an applied variable *)
@@ -432,9 +433,12 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
 
   let compare_terms ~prec x y =
     ZProf.enter_prof prof_kbo;
-    let compare = kbo ~prec x y in
+    let res = 
+      (try 
+        kbo ~prec x y
+      with UnsupportedTerm -> Incomparable) in
     ZProf.exit_prof prof_kbo;
-    compare
+    res
 
   (* The ordering might flip if one side is a lambda-expression *)
   let might_flip _ s t = T.is_fun s || T.is_fun t

@@ -124,7 +124,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     &&
     (
       match lit with
-      | Lit.Equation (l, r, true) -> has_ac_ids_ l r && A.equal l r
+      | Lit.Equation (l, r, true) -> not (Type.is_fun (T.ty l)) && has_ac_ids_ l r && A.equal l r
       | _ -> false
     )
 
@@ -150,7 +150,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let lits =
         List.filter
           (fun lit -> match lit with
-             | Literal.Equation (l, r, false) ->
+             | Literal.Equation (l, r, false) when (not (Type.is_fun (T.ty l))) ->
                not (has_ac_ids_ l r && A.equal l r)
              | _ -> true)
           lits

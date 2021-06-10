@@ -751,8 +751,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           CCFormat.sprintf "bad ordering conditions %b %b %b %b" c1 c2 c3 c4)));
       (* Check for superposition at a variable *)
       if info.sup_kind != FluidSup then
-        if not @@ Env.flex_get k_sup_at_vars then
-          assert (not (T.is_var info.u_p))
+        if not @@ Env.flex_get k_sup_at_vars then(
+          if (T.is_var info.u_p) then raise (ExitSuperposition ("sup at var position"));
+        )
         else if T.is_var info.u_p && not (sup_at_var_condition info info.u_p info.t) then (
           Util.debugf ~section 3 "superposition at variable" (fun k->k);
           raise (ExitSuperposition "superposition at variable");
@@ -940,8 +941,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       ) then raise (ExitSuperposition "bad ordering conditions");
       (* Check for superposition at a variable *)
       if info.sup_kind != FluidSup then
-        if not @@ Env.flex_get k_sup_at_vars then
-          assert (not (T.is_var info.u_p))
+        if not @@ Env.flex_get k_sup_at_vars then(
+          if (T.is_var info.u_p) then raise (ExitSuperposition ("sup at var position"));
+        )
         else if T.is_var info.u_p && not (sup_at_var_condition info info.u_p info.t) then
           raise (ExitSuperposition "superposition at variable");
       (* ordering constraints are ok, build new active lits (excepted s=t) *)
