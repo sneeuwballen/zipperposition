@@ -34,11 +34,17 @@ module MakeSumSolver(MainEnv: Env.S) = struct
       let env1 = (module SubEnv: Env.S with type C.t='Ct) in
       env1
 
-  (* let steproof text parents = (Proof.Step.inference ~tags:[] ~rule:(Proof.Rule.mk text) (List.map (fun p -> C.proof_parent_subst (Subst.Renaming.create()) (p,0) Subst.empty) parents)) *)
-
   let step text parents lits =
-    C.create lits ~penalty:1 ~trail:(C.trail_l[]) (Proof.Step.inference ~tags:[] ~rule:(Proof.Rule.mk text) (List.map (fun p -> C.proof_parent_subst (Subst.Renaming.create()) (p,0) Subst.empty) parents))
+    C.create lits ~penalty:1 ~trail:(C.trail_l[]) (if parents=[]
+    then (if text="goal" then Proof.Step.goal' else Proof.Step.assert') ~file:"" ~name:text ()
+    else Proof.Step.inference ~tags:[] ~rule:(Proof.Rule.mk text) (List.map (fun p -> C.proof_parent_subst (Subst.Renaming.create()) (p,0) Subst.empty) parents))
   
+(* 
+box(x∈S) ⊢ box⊥∨x∈S, box⊤∨x∉S
+β⇔x∈S clausifies to β∨x∉S, ¬β∨x∈S
+Should not select ¬β ⟹ prefer first with box⊥ (β̅) and box⊤ (β) atomic, positive and small.
+*)
+
 (* abstract "∀m≥0"
 —
 upto m \ upto(1+m) = {}	by ≤-simp from upto, diff
@@ -92,17 +98,18 @@ N[gn] = N[fn] + [gn]
     let m = have "m" [] int in
     let upto = have "upto" [int;int] prop in
     let diff = have "diff" [arrow [int] prop; arrow [int] prop; int] prop in
-    let mm = have "M" [arrow [int] int; int] int in
+    let mm = have "T⁺¹" [arrow [int] int; int] int in
 
     let m_in_N = step "given" [] [mk_arith_lesseq (Int.const Z.zero) (Int.singleton Z.one m)] in
     let upto_def = step "given" [] [mk_eq (upto*[j 0; j 1]) (_0 =< j 1 & j 1 =< j 0)] in
     let diff_def = step "given" [] [mk_eq (diff*[s 0; s 1; j 0]) (s 0 *[j 0] & B.Not*?[s 1 *[j 0]])] in
+    let goal = step "goal" [] [mk_neq (sum*[upto*[m]; f]) (Sum*:[g*[m]; f*[_0]])] in
 
-    let enum1 = step "helper" [] [box(diff*[upto*[m]; upto*[plus1 m]; xx])] in
+    let enum1 = step "start enumeration" [goal] [box(diff*[upto*[m]; upto*[plus1 m]; xx])] in
     let enum2 = step "rewrite" [enum1; diff_def] [box(upto*[m;xx] & B.Not*?[upto*[plus1 m; xx]])] in
     let enum3 = step "rewrite" [enum2; upto_def] [box((_0=<xx & xx=<m) & B.Not*?[_0=<xx & xx=< plus1 m])] in
     let enum4 = step "≤-simp" [enum3; m_in_N] [box(B.Eq*?[_Z; plus1 m; xx])] in
-    let enum'1 = step "helper" [] [box(diff*[upto*[plus1 m]; upto*[m]; xx])] in
+    let enum'1 = step "start enumeration" [goal] [box(diff*[upto*[plus1 m]; upto*[m]; xx])] in
     let enum'2 = step "rewrite" [enum'1; diff_def] [box(upto*[plus1 m; xx] & B.Not*?[upto*[m; xx]])] in
     let enum'3 = step "rewrite" [enum'2; upto_def] [box((_0=<xx & xx=< plus1 m) & B.Not*?[_0=<xx & xx=<m])] in
     let enum'4 = step "≤-simp" [enum'3; m_in_N] [box(B.False*?[])] in
@@ -112,6 +119,7 @@ N[gn] = N[fn] + [gn]
       (j0to(sum*[app_builtin ~ty:(arrow [int] prop) B.Eq [_Z; plus1(j 0)]; f]))] in
     let sumf_def' = step "sum singletons" [deltaM] [mk_eq (miinus*[mm;_I; sumf]) (mm*[f])] in
     
+    let g0_0 = step "given" [] [mk_eq (g*[_0]) _0] in
     let g_def = step "given" [] [mk_eq (g*[plus1(j 0)]) (B.Sum*:[f*[plus1(j 0)]; g*[j 0]])] in
     let g_def' = step "operator format" [g_def] [mk_eq (mm*[g]) (mm*[f] ++ g)] in
     let gf0 = g++j0to(f*[_0]) in
@@ -120,10 +128,15 @@ N[gn] = N[fn] + [gn]
 
     let sumf_gf0_1st = step "sup (additive)" [sumf_def'; gf0_def'] [mk_eq (mm*[sumf--gf0] -- mm*[f] ++ mm*[f]) (sumf--gf0)] in
     let sumf_gf0_def' = step "arithmetic" [sumf_gf0_1st] [mk_eq (miinus*[mm;_I; sumf--gf0]) (j0to _0)] in
-    
-    let goal = step "negated goal" [] [mk_neq (sum*[upto*[m]; f]) (Sum*:[g*[m]; f*[_0]])] in
     let initials_only = step "induction (step +1 from 0)" [sumf_gf0_def'; goal] [mk_neq (sum*[upto*[_0]; f]) (Sum*:[g*[_0]; f*[_0]])] in
-    [step "TODO" [initials_only] []]
+
+    let enum_1 = step "start enumeration" [initials_only] [box(upto*[_0;xx])] in
+    let enum_2 = step "rewrite" [enum_1; upto_def] [box(_0=<xx & xx=<_0)] in
+    let enum_3 = step "≤-simp" [enum_2] [box(B.Eq*?[_Z;_0;xx])] in
+    let goal_f0_g0f0 = step "sum singletons" [initials_only; enum_3] [mk_neq (f*[_0]) (Sum*:[g*[_0]; f*[_0]])] in
+    let goal_0_g0 = step "arithmetic" [goal_f0_g0f0] [mk_neq _0 (g*[_0])] in
+    let contradiction = step "sup" [g0_0; goal_0_g0] [] in
+    [contradiction]
     
   let inference_function clause =
     (* Printf.printf "%a" Clause.pp clause; *)
