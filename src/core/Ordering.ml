@@ -810,7 +810,7 @@ let map f { cache_compare=_; compare; prec; name; might_flip; cache_might_flip=_
   let might_flip prec a b = CCCache.with_cache cache_might_flip (fun (a, b) -> might_flip prec (f a) (f b)) (a,b) in
   { cache_compare; compare; prec; name; might_flip; cache_might_flip; monotonic }
 
-let lambda_kbo ignore_quans_under_lam prec =
+let lambda_kbo ~ignore_quans_under_lam prec =
   let module KBO = MakeKBO(struct 
       let name = "lambda_kbo"
       let lambda_mode = true
@@ -937,8 +937,8 @@ let subterm =
 let tbl_ =
   let h = Hashtbl.create 5 in
   Hashtbl.add h "lambdafree_kbo" lambdafree_kbo;
-  Hashtbl.add h "lambda_kbo" (lambda_kbo false);
-  Hashtbl.add h "lambda_kbo_complete" (lambda_kbo true);
+  Hashtbl.add h "lambda_kbo" (lambda_kbo ~ignore_quans_under_lam:false);
+  Hashtbl.add h "lambda_kbo_complete" (lambda_kbo ~ignore_quans_under_lam:true);
   Hashtbl.add h "lambdafree_rpo" lambdafree_rpo;
   Hashtbl.add h "lambda_rpo" lambda_rpo;
   Hashtbl.add h "epo" epo;

@@ -52,7 +52,7 @@ include Interfaces.PRINT with type t := t
     are simplification orderings (compatible with substitution,
     with the subterm property, and monotonic), some other are not. *)
 
-val lambda_kbo : bool -> Precedence.t -> t
+val lambda_kbo : ignore_quans_under_lam:bool -> Precedence.t -> t
 (** Knuth-Bendix simplification ordering *)
 
 val lambda_rpo : Precedence.t -> t
