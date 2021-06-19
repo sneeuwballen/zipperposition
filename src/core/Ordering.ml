@@ -201,7 +201,7 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
     else (
       if n = -1 then balance.neg_counter <- balance.neg_counter - 1
     );
-    Term.Tbl.add balance.balance var (n + 1)
+    Term.Tbl.replace balance.balance var (n + 1)
 
   (** add a negative variable *)
   let add_neg_var balance var =
@@ -211,7 +211,7 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
     else (
       if n = 1 then balance.pos_counter <- balance.pos_counter - 1
     );
-    Term.Tbl.add balance.balance var (n - 1)
+    Term.Tbl.replace balance.balance var (n - 1)
 
   let weight_var_headed = W.one
 
