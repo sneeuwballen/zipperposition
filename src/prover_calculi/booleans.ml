@@ -42,6 +42,8 @@ let k_solve_formulas = Flex_state.create_key ()
 let k_replace_unsupported_quants = Flex_state.create_key ()
 let k_disable_ho_bool_unif = Flex_state.create_key ()
 let k_generalize_trigger = Flex_state.create_key ()
+let k_bool_triggers_only = Flex_state.create_key ()
+
 
 module type S = sig
   module Env : Env.S
@@ -139,7 +141,8 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let inst_clauses_w_trigger t =
     let triggers = Type.Map.get_or ~default:[] (T.ty t) !_trigger_bools in
-    if not (CCList.mem ~eq:T.equal t triggers) then (
+    if not (CCList.mem ~eq:T.equal t triggers) &&
+       (not (Env.flex_get k_bool_triggers_only) || Type.returns_prop (T.ty t)) then (
       _trigger_bools := Type.Map.update (T.ty t) (function 
         | None -> Some [t]
         | Some res -> Some (t :: res)
@@ -2070,6 +2073,8 @@ let _fluid_log_hoist = ref false
 let _solve_formulas = ref false
 let _replace_quants = ref false
 let _disable_ho_unif = ref false
+let _bool_triggers_only = ref (false)
+
 
 
 let extension =
@@ -2096,6 +2101,7 @@ let extension =
     E.flex_add k_replace_unsupported_quants !_replace_quants;
     E.flex_add k_disable_ho_bool_unif !_disable_ho_unif;
     E.flex_add k_generalize_trigger !_generalize_trigger;
+    E.flex_add k_bool_triggers_only !_bool_triggers_only;
 
     ET.setup ()
   in
@@ -2136,6 +2142,8 @@ let () =
       , " abstract away constants from the goal and use them to trigger axioms of induction";
       "--trigger-bool-inst", Arg.Set_int _trigger_bool_inst
         , " instantiate predicate variables with boolean terms already in the proof state. Argument is the maximal proof depth of predicate variable";
+      "--trigger-bool-inst-prop-only", Arg.Bool ((:=) _bool_triggers_only)
+        , " make sure that lambdas are REALLY only of Boolean type";
       "--trigger-bool-include-quants", Arg.Bool ((:=) _include_quants)
         , " include lambdas directly under a quant in consdieration";
       "--trigger-bool-generalize", Arg.Symbol (["off"; "neg"; "var" ], (fun s -> 
