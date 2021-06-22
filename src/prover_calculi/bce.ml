@@ -468,16 +468,17 @@ module Make(E : Env.S) : S with module Env = E = struct
           ) else None) (if orig_sign then all_pos else all_neg)
       in
       (* equational theory induced by all the negative literals *)
-      let orig_cc =
+      let orig_cc = lazy (
         List.fold_left (fun acc lit -> 
           assert (L.is_neg lit);
           let lhs,rhs,_ = CCOpt.get_exn @@ L.View.as_eqn lit in
           CC.mk_eq acc lhs rhs
         ) (CC.create ~size:16 ()) all_neg
-      in
+      ) in
 
       if CCList.is_empty same_hd_lits then true (* no L-resolvent possible *)
       else (
+        let lazy orig_cc = orig_cc in
         let rec check_lit ~cc rest =
           (* validity is achieved without using same_hd_lits literals *)
           let is_valid = List.exists (fun lit -> 

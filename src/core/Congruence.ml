@@ -9,23 +9,28 @@ module type S = Congruence_intf.S
 
 module type TERM = sig
   type t
+  type head
 
   val equal : t -> t -> bool
 
   val hash : t -> int
 
-  val subterms : t -> t list
-  (** Subterms of the term (possibly empty list) *)
+  val equal_head : head -> head -> bool
 
-  val update_subterms : t -> t list -> t
-  (** Replace immediate subterms by the given list.
-      This is used to test for equality *)
+  val hash_head : head -> int
+
+  val as_app : t -> (head * t list) option
+  (** Subterms of the term (possibly empty list) *)
 
   val pp : t CCFormat.printer
 end
 
 module Make(T : TERM) = struct
   type term = T.t
+  type head = T.head
+
+  (* signature of an application, where all the terms are representatives *)
+  type signature = head * term list
 
   module H = CCPersistentHashtbl.Make(struct
       type t = term
@@ -33,15 +38,23 @@ module Make(T : TERM) = struct
       let hash = T.hash
     end)
 
+  module Sig_tbl = CCPersistentHashtbl.Make(struct
+      type t = signature
+      let equal = CCEqual.pair T.equal_head (CCEqual.list T.equal)
+      let hash = Hash.pair T.hash_head (Hash.list T.hash)
+    end)
+
   (** Maps terms to their list of immediate parents, and current
       representative *)
   type t = {
     parents: term list H.t; (* parent terms *)
+    sig_tbl: term Sig_tbl.t;
     mutable next: term H.t; (* pointer towards representative *)
   }
 
-  let create ?(size=64) () = {
+  let create ?(size=32) () = {
     parents=H.create size;
+    sig_tbl=Sig_tbl.create size;
     next=H.create size;
   }
 
@@ -181,17 +194,14 @@ module FO = Make(struct
     module T = Term
 
     type t = T.t
+    type head = ID.t
     let equal = T.equal
     let hash = T.hash
+    let equal_head = ID.equal
+    let hash_head = ID.hash
     let pp = T.pp
 
     let subterms t = match T.Classic.view t with
-      | T.Classic.App (_, l) -> l
-      | _ -> []
-
-    let update_subterms t l = match T.view t, l with
-      | T.App (hd, l), l' when List.length l = List.length l' ->
-        T.app hd l'
-      | _, [] -> t
-      | _ -> assert false
+      | T.Classic.App (f, l) -> Some (f, l)
+      | _ -> None
   end)
