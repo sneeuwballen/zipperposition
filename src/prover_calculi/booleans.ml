@@ -41,6 +41,7 @@ let k_fluid_log_hoist = Flex_state.create_key ()
 let k_solve_formulas = Flex_state.create_key ()
 let k_replace_unsupported_quants = Flex_state.create_key ()
 let k_disable_ho_bool_unif = Flex_state.create_key ()
+let k_generalize_trigger = Flex_state.create_key ()
 
 module type S = sig
   module Env : Env.S
@@ -149,9 +150,33 @@ module Make(E : Env.S) : S with module Env = E = struct
     ) else []
 
   let insert_new_trigger t =
-    inst_clauses_w_trigger t
-    |> CCList.to_iter
-    |> Env.add_passive
+    let do_insert t = 
+      inst_clauses_w_trigger t
+      |> CCList.to_iter
+      |> Env.add_passive
+    in
+    do_insert t;
+    if (Type.returns_prop (T.ty t)) then (
+      let t = Lambda.eta_expand t in
+      match Env.flex_get k_generalize_trigger with 
+      | `Neg ->
+        let vars, body = T.open_fun t in
+        if not (Type.is_prop (T.ty body)) then (
+          CCFormat.printf "%a:%a@." T.pp body Type.pp (T.ty body);        
+          assert (false);
+        );
+        do_insert (T.fun_l vars (T.Form.not_ body))
+      | `Var ->
+        let vars, body = T.open_fun t in
+        assert(Type.is_prop (T.ty body));
+        let n = List.length vars in
+        let dbs = List.mapi (fun i ty -> T.bvar ~ty (n-i-1)) vars in
+        let var_ty = Type.(==>) (vars @ [Type.prop]) Type.prop in
+        let var = T.var (HVar.fresh ~ty:var_ty ()) in
+        do_insert (T.fun_l vars (T.app var (dbs@[body])))
+      | _ -> ()
+    )
+    
 
   let update_triggers cl =
     (* if triggered boolean instantiation is off
@@ -2035,6 +2060,7 @@ let _nnf = ref false
 let _simplify_bools = ref true
 let _trigger_bool_inst = ref (-1)
 let _trigger_bool_ind = ref (-1)
+let _generalize_trigger = ref (`Off)
 let _include_quants = ref true
 let _bool_hoist_simpl = ref false
 let _rename_nested_bools = ref false
@@ -2069,6 +2095,7 @@ let extension =
     E.flex_add k_solve_formulas !_solve_formulas;
     E.flex_add k_replace_unsupported_quants !_replace_quants;
     E.flex_add k_disable_ho_bool_unif !_disable_ho_unif;
+    E.flex_add k_generalize_trigger !_generalize_trigger;
 
     ET.setup ()
   in
@@ -2109,8 +2136,16 @@ let () =
       , " abstract away constants from the goal and use them to trigger axioms of induction";
       "--trigger-bool-inst", Arg.Set_int _trigger_bool_inst
         , " instantiate predicate variables with boolean terms already in the proof state. Argument is the maximal proof depth of predicate variable";
-    "--trigger-bool-include-quants", Arg.Bool ((:=) _include_quants)
+      "--trigger-bool-include-quants", Arg.Bool ((:=) _include_quants)
         , " include lambdas directly under a quant in consdieration";
+      "--trigger-bool-generalize", Arg.Symbol (["off"; "neg"; "var" ], (fun s -> 
+          _generalize_trigger := (match s with 
+          | "off" -> `Off
+          | "neg" -> `Neg
+          | "var" -> `Var
+          | _ -> invalid_arg "off, neg or var are the only options")  
+      )), " generalize the trigger: neg adds the negation before the trigger body, " ^
+          " and var applies the body to a fresh variable";
       "--disable-simplifying-cnf",
         Arg.Set _cnf_non_simpl,
         " implement cnf on-the-fly as an inference rule";
