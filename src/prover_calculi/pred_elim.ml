@@ -778,7 +778,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             |> SAT.add_clause ~proof:(C.proof_step c))
         ) cls;
         (match SAT.check ~full:true () with
-        | Sat_solver.Unsat proof -> 
+        | Sat_solver.Unsat _ -> 
           let proof = Proof.S.step (SAT.get_proof ()) in
           let parents = List.map (fun p -> Proof.S.step @@ Proof.Parent.proof p) (Proof.Step.parents proof) in
           Util.debugf ~section 5 "SAT prover found unsat set: %d@." (fun k -> k  (CCList.length parents));
