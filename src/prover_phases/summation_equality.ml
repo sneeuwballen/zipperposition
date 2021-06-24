@@ -42,7 +42,7 @@ module MakeSumSolver(MainEnv: Env.S) = struct
 (* 
 box(x∈S) ⊢ box⊥∨x∈S, box⊤∨x∉S
 β⇔x∈S clausifies to β∨x∉S, ¬β∨x∈S
-Should not select ¬β ⟹ prefer first with box⊥ (β̅) and box⊤ (β) atomic, positive and small.
+Must not select ¬β (or with β̅ := ¬β clauses β̅∨β∨... should be deleted as tautologies).
 *)
 
 (* abstract "∀m≥0"
@@ -81,16 +81,19 @@ N[gn] = N[fn] + [gn]
     let (&) a b = B.And*?[a;b] in
     let _Z = builtin ~ty:tType B.ty_int in
     (* let (=~) a b = B.Eq*?[builtin ~ty:tType B.ty_int; a; b] in *)
+    let (=<.) a b = mk_arith_lesseq (Int.singleton Z.one a) (Int.singleton Z.one b) in
+    let (<.) a b = mk_arith_less (Int.singleton Z.one a) (Int.singleton Z.one b) in
     let int2 = arrow [int] int in
-    let int3 = arrow [int2] int2 in
-    let miinus = have "−₂" ~infix:true [int3; int3] int3 in
+    (* let int3 = arrow [int2] int2 in *)
+    (* let miinus = have "−₂" ~infix:true [int3; int3] int3 in *)
     let (++) a b = have "+" ~infix:true [int2; int2] int2 *[a;b] in
     let (--) a b = have "−" ~infix:true [int2; int2] int2 *[a;b] in
     let j = var % HVar.make ~ty:int in
     let s = var % HVar.make ~ty:(arrow [int] prop) in
     let j0to = fun_of_fvars[HVar.make ~ty:int 0] in
-    let box b = mk_prop (have "box" [prop] prop *[b]) true in
+    (* let box b = mk_prop (have "box" [prop] prop *[b]) true in *)
     let xx = have "probe" [] int in
+    let bb = have "𝕓" [] prop in
     let sum = have "∑" [arrow [int] prop; arrow [int] int;] int in
     let _I = have "id" [int2] int2 in
     let f = have "f" [int] int in
@@ -98,42 +101,61 @@ N[gn] = N[fn] + [gn]
     let m = have "m" [] int in
     let upto = have "upto" [int;int] prop in
     let diff = have "diff" [arrow [int] prop; arrow [int] prop; int] prop in
-    let mm = have "T⁺¹" [arrow [int] int; int] int in
+    let mm = have "D⁺¹" [int2] int2 in
+    let mm_1 f = have "(D⁺¹ − id)" [int2] int2 *[f] in
 
+    (* Start clauses *)
     let m_in_N = step "given" [] [mk_arith_lesseq (Int.const Z.zero) (Int.singleton Z.one m)] in
     let upto_def = step "given" [] [mk_eq (upto*[j 0; j 1]) (_0 =< j 1 & j 1 =< j 0)] in
     let diff_def = step "given" [] [mk_eq (diff*[s 0; s 1; j 0]) (s 0 *[j 0] & B.Not*?[s 1 *[j 0]])] in
     let goal = step "goal" [] [mk_neq (sum*[upto*[m]; f]) (Sum*:[g*[m]; f*[_0]])] in
 
-    let enum1 = step "start enumeration" [goal] [box(diff*[upto*[m]; upto*[plus1 m]; xx])] in
-    let enum2 = step "rewrite" [enum1; diff_def] [box(upto*[m;xx] & B.Not*?[upto*[plus1 m; xx]])] in
-    let enum3 = step "rewrite" [enum2; upto_def] [box((_0=<xx & xx=<m) & B.Not*?[_0=<xx & xx=< plus1 m])] in
-    let enum4 = step "≤-simp" [enum3; m_in_N] [box(B.Eq*?[_Z; plus1 m; xx])] in
-    let enum'1 = step "start enumeration" [goal] [box(diff*[upto*[plus1 m]; upto*[m]; xx])] in
-    let enum'2 = step "rewrite" [enum'1; diff_def] [box(upto*[plus1 m; xx] & B.Not*?[upto*[m; xx]])] in
-    let enum'3 = step "rewrite" [enum'2; upto_def] [box((_0=<xx & xx=< plus1 m) & B.Not*?[_0=<xx & xx=<m])] in
-    let enum'4 = step "≤-simp" [enum'3; m_in_N] [box(B.False*?[])] in
+    (* Enumerate upto m \ upto(m+1) =∅ *)
+    let enumO1 = step "start enumeration" [goal] [mk_eq (diff*[upto*[m]; upto*[plus1 m]; xx]) bb] in
+    let enumO2 = step "rewrite" [enumO1; diff_def] [mk_eq (upto*[m;xx] & B.Not*?[upto*[plus1 m; xx]]) bb] in
+    let enumO3 = step "rewrite" [enumO2; upto_def] [mk_eq ((_0=<xx & xx=<m) & B.Not*?[_0=<xx & xx=< plus1 m]) bb] in
+    let enumO4a = step "clausify" [enumO3] [xx =<. m; mk_prop bb false] in
+    let enumO4b = step "clausify" [enumO3] [_0 =<. xx; mk_prop bb false] in
+    let enumO4c = step "clausify" [enumO3] [xx <. _0; plus1 m =<. xx; mk_prop bb false] in
+    let enumO5 = step "lin. arith." [enumO4a;enumO4b;enumO4c] [mk_prop bb false] in
+    (* Enumerate upto(m+1) \ upto m ={m+1} *)
+    let enumI1 = step "start enumeration" [goal] [mk_eq (diff*[upto*[plus1 m]; upto*[m]; xx]) bb] in
+    let enumI2 = step "rewrite" [enumI1; diff_def] [mk_eq (upto*[plus1 m; xx] & B.Not*?[upto*[m; xx]]) bb] in
+    let enumI3 = step "rewrite" [enumI2; upto_def] [mk_eq ((_0=<xx & xx=< plus1 m) & B.Not*?[_0=<xx & xx=<m]) bb] in
+    let enumI4a = step "clausify" [enumI3] [xx =<. (plus1 m); mk_prop bb false] in
+    let enumI4b = step "clausify" [enumI3] [_0 =<. xx; mk_prop bb false] in
+    let enumI4c = step "clausify" [enumI3] [xx <. _0; m <. xx; mk_prop bb false] in
+    let enumI4' = step "clausify" [enumI3] [xx <. _0; plus1 m <. xx; xx =<. m; mk_prop bb true] in
+    let enumI5a = step "lin. arith." [enumI4a;enumI4b;enumI4c] [mk_eq xx (plus1 m); mk_prop bb false] in
+    let enumI5' = step "lin. arith." [enumI4'; m_in_N] [mk_neq xx (plus1 m); mk_prop bb true] in
+    (* Use the enumerations *)
     let sumf = j0to(sum*[upto*[j 0]; f]) in
-    let deltaM = step "sum domain split" [enum4; enum'4] [mk_eq
-      (miinus*[mm;_I; sumf])
+    let deltaM = step "near-commute D⁺¹" [enumO5; enumI5a; enumI5'] [mk_eq (mm_1 sumf)
       (j0to(sum*[app_builtin ~ty:(arrow [int] prop) B.Eq [_Z; plus1(j 0)]; f]))] in
-    let sumf_def' = step "sum singletons" [deltaM] [mk_eq (miinus*[mm;_I; sumf]) (mm*[f])] in
+    let sumf_def' = step "sum singletons" [deltaM] [mk_eq (mm_1 sumf) (mm*[f])] in
     
+    (* Derive (D⁺¹-1)(g+f0) = D⁺¹f *)
     let g0_0 = step "given" [] [mk_eq (g*[_0]) _0] in
     let g_def = step "given" [] [mk_eq (g*[plus1(j 0)]) (B.Sum*:[f*[plus1(j 0)]; g*[j 0]])] in
-    let g_def' = step "operator format" [g_def] [mk_eq (mm*[g]) (mm*[f] ++ g)] in
+    let g_def' = step "operator form" [g_def] [mk_eq (mm*[g]) (mm*[f] ++ g)] in
     let gf0 = g++j0to(f*[_0]) in
-    let gf0_1st = step "sup (additive)" [g_def'] [mk_eq (mm*[gf0] -- j0to(f*[_0])) (mm*[f])] in
-    let gf0_def' = step "arithmetic" [gf0_1st] [mk_eq (miinus*[mm;_I; gf0]) (mm*[f])] in
+    let gf0_1st = step "sup (additive)" [g_def'] [mk_eq (mm*[gf0]) (gf0 ++ mm*[f])] in
+    let gf0_def' = step "arithmetic" [gf0_1st] [mk_eq (mm_1 gf0) (mm*[f])] in
 
+    (* Derive final (D⁺¹-1) ... = 0 and use induction. *)
     let sumf_gf0_1st = step "sup (additive)" [sumf_def'; gf0_def'] [mk_eq (mm*[sumf--gf0] -- mm*[f] ++ mm*[f]) (sumf--gf0)] in
-    let sumf_gf0_def' = step "arithmetic" [sumf_gf0_1st] [mk_eq (miinus*[mm;_I; sumf--gf0]) (j0to _0)] in
+    let sumf_gf0_def' = step "arithmetic" [sumf_gf0_1st] [mk_eq (mm_1(sumf--gf0)) (j0to _0)] in
     let initials_only = step "induction (step +1 from 0)" [sumf_gf0_def'; goal] [mk_neq (sum*[upto*[_0]; f]) (Sum*:[g*[_0]; f*[_0]])] in
 
-    let enum_1 = step "start enumeration" [initials_only] [box(upto*[_0;xx])] in
-    let enum_2 = step "rewrite" [enum_1; upto_def] [box(_0=<xx & xx=<_0)] in
-    let enum_3 = step "≤-simp" [enum_2] [box(B.Eq*?[_Z;_0;xx])] in
-    let goal_f0_g0f0 = step "sum singletons" [initials_only; enum_3] [mk_neq (f*[_0]) (Sum*:[g*[_0]; f*[_0]])] in
+    (* Finish base case by computing ∑{0}f = f0. *)
+    let enum01 = step "start enumeration" [initials_only] [mk_eq (upto*[_0;xx]) bb] in
+    let enum02 = step "rewrite" [enum01; upto_def] [mk_eq (_0=<xx & xx=<_0) bb] in
+    let enum03a = step "clausify" [enum02] [_0 =<. xx; mk_prop bb false] in
+    let enum03b = step "clausify" [enum02] [xx =<. _0; mk_prop bb false] in
+    let enum03' = step "clausify" [enum02] [_0 <. xx; xx <. _0; mk_prop bb true] in
+    let enum04a = step "lin. arith." [enum03a;enum03b] [mk_eq xx _0; mk_prop bb false] in
+    let enum04' = step "lin. arith." [enum03'] [mk_neq xx _0; mk_prop bb true] in
+    let goal_f0_g0f0 = step "sum singletons" [initials_only; enum04a; enum04'] [mk_neq (f*[_0]) (Sum*:[g*[_0]; f*[_0]])] in
     let goal_0_g0 = step "arithmetic" [goal_f0_g0f0] [mk_neq _0 (g*[_0])] in
     let contradiction = step "sup" [g0_0; goal_0_g0] [] in
     [contradiction]
