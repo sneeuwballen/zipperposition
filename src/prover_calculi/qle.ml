@@ -5,6 +5,8 @@
 open Logtk
 open Libzipperposition
 
+module A = Libzipperposition_avatar
+
 module type S = sig
   module Env : Env.S
   val setup : unit -> unit
@@ -20,6 +22,11 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let do_qle cs =
     (* TODO: Check first-orderness of problem. *)
+
+    let add_SAT_clause c =
+      CCFormat.printf "add %a\n" (CCList.pp SAT.Lit.pp) c;
+      SAT.add_clause ~proof:Proof.Step.trivial c
+    in
     let pred_of_lit lit =
       match lit with
       | L.Equation(lhs, rhs, true) ->
@@ -41,7 +48,9 @@ module Make(E : Env.S) : S with module Env = E = struct
        variable associated with lJ (sign and predicate symbol) and wJ is the
        variable associated with its negation. *)
     CS.iter (fun c ->
+      CCFormat.printf "----> %a\n" C.pp c; (* ### *)
       let pred_subcl = CCArray.filter_map pred_of_lit (C.lits c) in
+      CCFormat.printf "-----> %d\n" (Array.length pred_subcl); (* ### *)
       Array.iter (fun (_, pred) ->
           if not (ID.Tbl.mem all_syms pred) then
             ID.Tbl.replace all_syms pred (BBox.make_fresh (), BBox.make_fresh ()))
@@ -56,14 +65,13 @@ module Make(E : Env.S) : S with module Env = E = struct
                 |> (if make_lit_pos then (fun lit -> lit) else SAT.Lit.neg))
           pred_subcl
           |> Array.to_list
-          |> SAT.add_clause ~proof:Proof.Step.trivial)
+          |> add_SAT_clause)
         pred_subcl) cs;
-    CCFormat.printf "%a@." (ID.Tbl.pp ID.pp (CCPair.pp SAT.Lit.pp SAT.Lit.pp))
+    CCFormat.printf "%a\n" (ID.Tbl.pp ID.pp (CCPair.pp SAT.Lit.pp SAT.Lit.pp))
       all_syms;
     (* For each predicate p, generate a SAT clause ~p+ \/ ~p-. *)
     Iter.iter (fun (pos_var, neg_var) ->
-        SAT.add_clause ~proof:Proof.Step.trivial
-          [SAT.Lit.neg pos_var; SAT.Lit.neg neg_var])
+        add_SAT_clause [SAT.Lit.neg pos_var; SAT.Lit.neg neg_var])
       (ID.Tbl.values all_syms);
 
     let fixed_syms = ID.Tbl.create 32 in
@@ -72,20 +80,20 @@ module Make(E : Env.S) : S with module Env = E = struct
     (* Generate a SAT clause p1+ \/ p1- \/ ... \/ pN+ \/ pN-, where the pIs are
        the loose predicate symbols (initially all). *)
     let generate_nontrivial_solution_SAT_clause () =
-      SAT.add_clause ~proof:Proof.Step.trivial
-        (CCList.flat_map (fun (pos_var, neg_var) -> [pos_var; neg_var])
-          (CCList.of_iter (ID.Tbl.values loose_syms)))
+      add_SAT_clause (CCList.flat_map
+        (fun (pos_var, neg_var) -> [pos_var; neg_var])
+        (CCList.of_iter (ID.Tbl.values loose_syms)))
     in
 
     let rec maximize_valuation () =
       Iter.iter (fun (pred, (pos_var, neg_var)) ->
           if SAT.valuation pos_var then (
-            SAT.add_clause ~proof:Proof.Step.trivial [pos_var];
+            add_SAT_clause [pos_var];
             ID.Tbl.replace fixed_syms pred pos_var;
             ID.Tbl.remove loose_syms pred
           );
           if SAT.valuation neg_var then (
-            SAT.add_clause ~proof:Proof.Step.trivial [neg_var];
+            add_SAT_clause [neg_var];
             ID.Tbl.replace fixed_syms pred neg_var;
             ID.Tbl.remove loose_syms pred
           ))
@@ -98,16 +106,21 @@ module Make(E : Env.S) : S with module Env = E = struct
     generate_nontrivial_solution_SAT_clause ();
     (match SAT.check ~full:true () with
     | Sat_solver.Sat ->
-      CCFormat.printf "SATISFIABLE\n";
+      CCFormat.printf "Satisfiable\n";
       maximize_valuation ();
+      CCFormat.printf "Solution:\n";
       Iter.iter (fun var -> CCFormat.printf "%a\n" SAT.Lit.pp var)
         (ID.Tbl.values fixed_syms)
     | _ -> ());
     SAT.clear ()
 
-  let setup () =
+  let register () =
     Signal.once Env.on_start
       (fun () -> do_qle (CS.of_iter (Env.get_passive ())))
+  let setup () =
+    if not (Env.flex_get A.k_avatar_enabled) then (register ())
+    else
+      CCFormat.printf "AVATAR is not yet compatible with QLE@."
 end
 
 let extension =
