@@ -34,7 +34,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         else None
       | _ -> None
     in
-    let syms = ID.Tbl.create 128 in
+    let all_syms = ID.Tbl.create 128 in
     SAT.clear ();
     (* For each clause l1 \/ ... \/ lN (ignoring equality literals), generate N
        SAT clauses v1 \/ ... \/ vI-1 \/ ~wI \/ vI+1 \/ ... \/ vN, where vJ is the
@@ -43,15 +43,15 @@ module Make(E : Env.S) : S with module Env = E = struct
     CS.iter (fun c ->
       let pred_subcl = CCArray.filter_map pred_of_lit (C.lits c) in
       Array.iter (fun (_, pred) ->
-          if not (ID.Tbl.mem syms pred) then
-            ID.Tbl.replace syms pred (BBox.make_fresh (), BBox.make_fresh ()))
+          if not (ID.Tbl.mem all_syms pred) then
+            ID.Tbl.replace all_syms pred (BBox.make_fresh (), BBox.make_fresh ()))
         pred_subcl;
       Array.iter (fun special ->
             Array.map (fun ((pol, pred) as lit) ->
               let (make_lit_pos, use_pos_var) =
                 if lit = special then (false, not pol) else (true, pol)
               in
-              let (pos_var, neg_var) = ID.Tbl.find syms pred in
+              let (pos_var, neg_var) = ID.Tbl.find all_syms pred in
                 (if use_pos_var then pos_var else neg_var)
                 |> (if make_lit_pos then (fun lit -> lit) else SAT.Lit.neg))
           pred_subcl
@@ -59,23 +59,49 @@ module Make(E : Env.S) : S with module Env = E = struct
           |> SAT.add_clause ~proof:Proof.Step.trivial)
         pred_subcl) cs;
     CCFormat.printf "%a@." (ID.Tbl.pp ID.pp (CCPair.pp SAT.Lit.pp SAT.Lit.pp))
-      syms;
+      all_syms;
     (* For each predicate p, generate a SAT clause ~p+ \/ ~p-. *)
     Iter.iter (fun (pos_var, neg_var) ->
         SAT.add_clause ~proof:Proof.Step.trivial
           [SAT.Lit.neg pos_var; SAT.Lit.neg neg_var])
-      (ID.Tbl.values syms);
-    (* Generate a SAT clause p1+ \/ p1- \/ ... \/ pN+ \/ pN-. *)
-    SAT.add_clause ~proof:Proof.Step.trivial
-      (CCList.flat_map (fun (pos_var, neg_var) -> [pos_var; neg_var])
-        (CCList.of_iter (ID.Tbl.values syms)));
+      (ID.Tbl.values all_syms);
+
+    let fixed_syms = ID.Tbl.create 32 in
+    let loose_syms = ID.Tbl.copy all_syms in
+
+    (* Generate a SAT clause p1+ \/ p1- \/ ... \/ pN+ \/ pN-, where the pIs are
+       the loose predicate symbols (initially all). *)
+    let generate_nontrivial_solution_SAT_clause () =
+      SAT.add_clause ~proof:Proof.Step.trivial
+        (CCList.flat_map (fun (pos_var, neg_var) -> [pos_var; neg_var])
+          (CCList.of_iter (ID.Tbl.values loose_syms)))
+    in
+
+    let rec maximize_valuation () =
+      Iter.iter (fun (pred, (pos_var, neg_var)) ->
+          if SAT.valuation pos_var then (
+            SAT.add_clause ~proof:Proof.Step.trivial [pos_var];
+            ID.Tbl.replace fixed_syms pred pos_var;
+            ID.Tbl.remove loose_syms pred
+          );
+          if SAT.valuation neg_var then (
+            SAT.add_clause ~proof:Proof.Step.trivial [neg_var];
+            ID.Tbl.replace fixed_syms pred neg_var;
+            ID.Tbl.remove loose_syms pred
+          ))
+        (ID.Tbl.to_iter loose_syms);
+      generate_nontrivial_solution_SAT_clause ();
+      (match SAT.check ~full:true () with
+      | Sat_solver.Sat -> maximize_valuation ()
+      | _ -> ())
+    in
+    generate_nontrivial_solution_SAT_clause ();
     (match SAT.check ~full:true () with
     | Sat_solver.Sat ->
       CCFormat.printf "SATISFIABLE\n";
-      Iter.iter (fun (pos_var, neg_var) ->
-          CCFormat.printf "%a%b\n" SAT.Lit.pp pos_var (SAT.valuation pos_var);
-          CCFormat.printf "%a%b\n" SAT.Lit.pp neg_var (SAT.valuation neg_var))
-        (ID.Tbl.values syms)
+      maximize_valuation ();
+      Iter.iter (fun var -> CCFormat.printf "%a\n" SAT.Lit.pp var)
+        (ID.Tbl.values fixed_syms)
     | _ -> ());
     SAT.clear ()
 
