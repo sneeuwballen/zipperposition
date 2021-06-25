@@ -31,23 +31,16 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.remove_simpl (Iter.singleton c)
 
   let do_qle cs =
-    (* TODO: Check first-orderness of problem. *)
-
     let add_SAT_clause c =
       CCFormat.printf "add %a\n" (CCList.pp SAT.Lit.pp) c;
       SAT.add_clause ~proof:Proof.Step.trivial c
     in
     let pred_of_lit lit =
       match lit with
-      | L.Equation (lhs, rhs, true) ->
+      | L.Equation (lhs, _, _) when L.is_predicate_lit lit ->
         if (T.is_const (T.head_term lhs)) then
           let sym = T.as_const_exn (T.head_term lhs) in
-          if Term.equal Term.true_ rhs then
-            Some (true, sym)
-          else if Term.equal Term.false_ rhs then
-            Some (false, sym)
-          else
-            None
+          Some (L.is_positivoid lit, sym)
         else None
       | _ -> None
     in
@@ -59,26 +52,52 @@ module Make(E : Env.S) : S with module Env = E = struct
        the variable associated with lJ (sign and predicate symbol) and wJ is the
        variable associated with its negation. *)
     CS.iter (fun c ->
-      CCFormat.printf "----> %a\n" C.pp c;
-      let pred_subcl = CCArray.filter_map pred_of_lit (C.lits c) in
-      CCFormat.printf "-----> %d\n" (Array.length pred_subcl);
-      Array.iter (fun (_, pred) ->
-          if not (ID.Tbl.mem all_syms pred) then
-            ID.Tbl.replace all_syms pred
-              (BBox.make_fresh (), BBox.make_fresh ()))
-        pred_subcl;
-      Array.iter (fun special ->
-            Array.map (fun ((pol, pred) as lit) ->
-              let (make_lit_pos, use_pos_var) =
-                if lit = special then (false, not pol) else (true, pol)
-              in
-              let (pos_var, neg_var) = ID.Tbl.find all_syms pred in
-                (if use_pos_var then pos_var else neg_var)
-                |> (if make_lit_pos then (fun lit -> lit) else SAT.Lit.neg))
-          pred_subcl
-          |> Array.to_list
-          |> add_SAT_clause)
-        pred_subcl) cs;
+        CCFormat.printf "----> %a\n" C.pp c;
+        let pred_subcl = CCArray.filter_map pred_of_lit (C.lits c) in
+        CCFormat.printf "-----> %d\n" (Array.length pred_subcl);
+
+        (* Create p+, p- variables for each predicate symbol p. *)
+        Array.iter (fun (_, pred) ->
+            if not (ID.Tbl.mem all_syms pred) then
+              ID.Tbl.replace all_syms pred
+                (BBox.make_fresh (), BBox.make_fresh ()))
+          pred_subcl;
+        (* Create a number of SAT clauses for each clause. *)
+        Array.iter (fun special ->
+              Array.map (fun ((pol, pred) as lit) ->
+                let (make_lit_pos, use_pos_var) =
+                  if lit = special then (false, not pol) else (true, pol)
+                in
+                let (pos_var, neg_var) = ID.Tbl.find all_syms pred in
+                  (if use_pos_var then pos_var else neg_var)
+                  |> (if make_lit_pos then (fun lit -> lit) else SAT.Lit.neg))
+            pred_subcl
+            |> Array.to_list
+            |> add_SAT_clause)
+          pred_subcl)
+        cs;
+    (* Detect problematic higher-order features and forget about some predicate
+       symbols if necessary. *)
+    CS.iter (fun c ->
+        let forget_syms = Iter.iter (fun bad ->
+          ID.Tbl.update all_syms ~f:(fun _ _ -> None) ~k:bad)
+        in
+        Array.iter (fun lit ->
+            match lit with
+            | L.Equation (lhs, _, _) when L.is_predicate_lit lit ->
+              if (T.is_const (T.head_term lhs)) then
+                let bad_syms =
+                  Iter.flat_map T.Seq.symbols (Iter.of_list (T.args lhs)) in
+                forget_syms bad_syms
+              else
+                forget_syms (T.Seq.symbols lhs)
+            | L.Equation (lhs, rhs, _) ->
+              forget_syms (T.Seq.symbols lhs);
+              forget_syms (T.Seq.symbols rhs)
+            | _ -> ())
+          (C.lits c))
+      cs;
+
     CCFormat.printf "@[%a@]\n"
         (ID.Tbl.pp ID.pp (CCPair.pp SAT.Lit.pp SAT.Lit.pp))
       all_syms;
@@ -173,8 +192,8 @@ let extension =
   in
   { Extensions.default with Extensions.
                          name = "qle";
-                         prio = 50;
-                         env_actions = [action];
+                         prio = 45;
+                         env_actions = [action]
   }
 
 let () =
