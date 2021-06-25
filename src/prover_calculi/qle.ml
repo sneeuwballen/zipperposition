@@ -6,8 +6,8 @@ open Logtk
 open Libzipperposition
 
 let k_enabled = Flex_state.create_key ()
-(* let k_inprocessing = Flex_state.create_key () *)
-(* let k_check_at = Flex_state.create_key () *)
+let k_inprocessing = Flex_state.create_key ()
+let k_check_at = Flex_state.create_key ()
 
 module A = Libzipperposition_avatar
 
@@ -30,7 +30,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.remove_passive (Iter.singleton c);
     Env.remove_simpl (Iter.singleton c)
 
-  let do_qle cs =
+  let do_qle c_iter =
     let add_SAT_clause c =
       (* CCFormat.printf "add SAT clause %a\n" (CCList.pp SAT.Lit.pp) c; *)
       SAT.add_clause ~proof:Proof.Step.trivial c
@@ -51,7 +51,7 @@ module Make(E : Env.S) : S with module Env = E = struct
        SAT clauses v1 \/ ... \/ vI-1 \/ ~wI \/ vI+1 \/ ... \/ vN, where vJ is
        the variable associated with lJ (sign and predicate symbol) and wJ is the
        variable associated with its negation. *)
-    CS.iter (fun c ->
+    Iter.iter (fun c ->
         let pred_subcl = CCArray.filter_map pred_of_lit (C.lits c) in
 
         (* Create p+, p- variables for each predicate symbol p. *)
@@ -73,10 +73,10 @@ module Make(E : Env.S) : S with module Env = E = struct
             |> Array.to_list
             |> add_SAT_clause)
           pred_subcl)
-        cs;
+        c_iter;
     (* Detect problematic higher-order features and forget about some predicate
        symbols if necessary. *)
-    CS.iter (fun c ->
+    Iter.iter (fun c ->
         let forget_syms = Iter.iter (fun bad ->
           ID.Tbl.update all_syms ~f:(fun _ _ -> None) ~k:bad)
         in
@@ -94,7 +94,7 @@ module Make(E : Env.S) : S with module Env = E = struct
               forget_syms (T.Seq.symbols rhs)
             | _ -> ())
           (C.lits c))
-      cs;
+      c_iter;
 
     (* CCFormat.printf "@[%a@]\n"
           (ID.Tbl.pp ID.pp (CCPair.pp SAT.Lit.pp SAT.Lit.pp))
@@ -146,9 +146,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       let contains_quasipure_sym c =
         CCArray.exists is_quasipure_lit (C.lits c)
       in
-      CS.iter (fun c ->
+      Iter.iter (fun c ->
           if contains_quasipure_sym c then remove_from_proof_state c)
-        cs
+        c_iter
     in
 
     generate_nontrivial_solution_SAT_clause ();
@@ -162,18 +162,27 @@ module Make(E : Env.S) : S with module Env = E = struct
     | _ -> ());
     SAT.clear ()
 
+  let get_clauses () = Iter.append (Env.get_passive ()) (Env.get_active ())
+
+  let steps = ref 0
+  let inprocessing () =
+    if !steps = 0 then do_qle (get_clauses ());
+    steps := (!steps + 1) mod Env.flex_get k_check_at
+
   let setup () =
     if E.flex_get k_enabled then
       if not (Env.flex_get A.k_avatar_enabled) then
-        Signal.once Env.on_start
-          (fun () -> do_qle (CS.of_iter (Env.get_passive ())))
+        if E.flex_get k_inprocessing then
+          E.add_clause_elimination_rule ~priority:4 "qle" inprocessing
+        else
+          Signal.once Env.on_start (fun () -> do_qle (get_clauses ()))
       else
         CCFormat.printf "AVATAR is not yet compatible with QLE@."
 end
 
 let _enabled = ref false
-(* let _inprocessing = ref false *)
-(* let _check_at = ref 10 *)
+let _inprocessing = ref false
+let _check_at = ref 100
 
 let extension =
   let action env =
@@ -181,20 +190,19 @@ let extension =
     let module QLE = Make(E) in
 
     E.flex_add k_enabled !_enabled;
-    (* E.flex_add k_inprocessing !_inprocessing; *)
+    E.flex_add k_inprocessing !_inprocessing;
+    E.flex_add k_check_at !_check_at;
     QLE.setup ()
   in
   { Extensions.default with Extensions.
                          name = "qle";
-                         prio = 45;
+                         prio = 40;
                          env_actions = [action]
   }
 
 let () =
   Options.add_opts [
     "--qle", Arg.Bool ((:=) _enabled), " enable QLE";
-(*
     "--qle-inprocessing", Arg.Bool ((:=) _inprocessing), " enable QLE as inprocessing rule";
     "--qle-check-at", Arg.Int ((:=) _check_at), " QLE inprocessing periodicity";
-*)
   ]

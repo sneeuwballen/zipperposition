@@ -35,12 +35,12 @@ module Make(E : Env.S) : S with module Env = E = struct
     if !steps = 0 then (
       let done_ = ref false in
       while not !done_ do
-        ignore( PE.fixpoint_step ());
+        ignore (PE.fixpoint_step ());
         done_ := not (BCE.fixpoint_step ())
       done;
     );
 
-    steps := (!steps + 1) mod (Env.flex_get k_check_at)
+    steps := (!steps + 1) mod Env.flex_get k_check_at
 
   let setup () =
     if E.flex_get k_enabled then (
@@ -51,7 +51,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         BCE.setup ~in_fp_mode:true ();
         Env.Ctx.lost_completeness ();
         E.add_clause_elimination_rule ~priority:5 "bce-pe-fp" inprocessing;
-      ) else (Signal.once E.on_start run_fixpoint));
+      ) else Signal.once E.on_start run_fixpoint);
 
 end
 
