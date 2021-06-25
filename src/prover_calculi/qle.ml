@@ -32,7 +32,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let do_qle cs =
     let add_SAT_clause c =
-      CCFormat.printf "add %a\n" (CCList.pp SAT.Lit.pp) c;
+      (* CCFormat.printf "add SAT clause %a\n" (CCList.pp SAT.Lit.pp) c; *)
       SAT.add_clause ~proof:Proof.Step.trivial c
     in
     let pred_of_lit lit =
@@ -52,9 +52,7 @@ module Make(E : Env.S) : S with module Env = E = struct
        the variable associated with lJ (sign and predicate symbol) and wJ is the
        variable associated with its negation. *)
     CS.iter (fun c ->
-        CCFormat.printf "----> %a\n" C.pp c;
         let pred_subcl = CCArray.filter_map pred_of_lit (C.lits c) in
-        CCFormat.printf "-----> %d\n" (Array.length pred_subcl);
 
         (* Create p+, p- variables for each predicate symbol p. *)
         Array.iter (fun (_, pred) ->
@@ -98,9 +96,9 @@ module Make(E : Env.S) : S with module Env = E = struct
           (C.lits c))
       cs;
 
-    CCFormat.printf "@[%a@]\n"
-        (ID.Tbl.pp ID.pp (CCPair.pp SAT.Lit.pp SAT.Lit.pp))
-      all_syms;
+    (* CCFormat.printf "@[%a@]\n"
+          (ID.Tbl.pp ID.pp (CCPair.pp SAT.Lit.pp SAT.Lit.pp))
+      all_syms; *)
     (* For each predicate p, generate a SAT clause ~p+ \/ ~p-. *)
     Iter.iter (fun (pos_var, neg_var) ->
         add_SAT_clause [SAT.Lit.neg pos_var; SAT.Lit.neg neg_var])
@@ -149,21 +147,17 @@ module Make(E : Env.S) : S with module Env = E = struct
         CCArray.exists is_quasipure_lit (C.lits c)
       in
       CS.iter (fun c ->
-          if contains_quasipure_sym c then (
-            CCFormat.printf "Removing %a\n" C.pp c;
-            remove_from_proof_state c
-          ))
+          if contains_quasipure_sym c then remove_from_proof_state c)
         cs
     in
 
     generate_nontrivial_solution_SAT_clause ();
     (match SAT.check ~full:true () with
     | Sat_solver.Sat ->
-      CCFormat.printf "Satisfiable\n";
       maximize_valuation ();
-      CCFormat.printf "Solution:\n";
-      Iter.iter (fun var -> CCFormat.printf "%a\n" SAT.Lit.pp var)
-        (ID.Tbl.values quasipure_syms);
+      (* CCFormat.printf "Solution:\n";
+         Iter.iter (fun var -> CCFormat.printf "%a\n" SAT.Lit.pp var)
+           (ID.Tbl.values quasipure_syms); *)
       filter_clauses ()
     | _ -> ());
     SAT.clear ()
