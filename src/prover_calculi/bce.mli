@@ -10,7 +10,6 @@ val k_enabled : bool Logtk.Flex_state.key
 module type S = sig
   module Env : Env.S
   val setup : ?in_fp_mode:bool -> unit -> unit
-  val remove_from_proof_state : Env.C.t -> unit
   val begin_fixpoint : unit -> unit
   val fixpoint_step : unit -> bool
   val end_fixpoint : unit -> unit

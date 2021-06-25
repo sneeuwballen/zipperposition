@@ -23,7 +23,12 @@ module Make(E : Env.S) : S with module Env = E = struct
   module L = Literal
   module T = Term
   module SAT = Sat_solver.Make ()
-  module BCE = Bce.Make(E)
+
+  let remove_from_proof_state c =
+    C.mark_redundant c;
+    Env.remove_active (Iter.singleton c);
+    Env.remove_passive (Iter.singleton c);
+    Env.remove_simpl (Iter.singleton c)
 
   let do_qle cs =
     (* TODO: Check first-orderness of problem. *)
@@ -50,8 +55,8 @@ module Make(E : Env.S) : S with module Env = E = struct
 
     SAT.clear ();
     (* For each clause l1 \/ ... \/ lN (ignoring equality literals), generate N
-       SAT clauses v1 \/ ... \/ vI-1 \/ ~wI \/ vI+1 \/ ... \/ vN, where vJ is the
-       variable associated with lJ (sign and predicate symbol) and wJ is the
+       SAT clauses v1 \/ ... \/ vI-1 \/ ~wI \/ vI+1 \/ ... \/ vN, where vJ is
+       the variable associated with lJ (sign and predicate symbol) and wJ is the
        variable associated with its negation. *)
     CS.iter (fun c ->
       CCFormat.printf "----> %a\n" C.pp c;
@@ -59,7 +64,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       CCFormat.printf "-----> %d\n" (Array.length pred_subcl);
       Array.iter (fun (_, pred) ->
           if not (ID.Tbl.mem all_syms pred) then
-            ID.Tbl.replace all_syms pred (BBox.make_fresh (), BBox.make_fresh ()))
+            ID.Tbl.replace all_syms pred
+              (BBox.make_fresh (), BBox.make_fresh ()))
         pred_subcl;
       Array.iter (fun special ->
             Array.map (fun ((pol, pred) as lit) ->
@@ -73,7 +79,8 @@ module Make(E : Env.S) : S with module Env = E = struct
           |> Array.to_list
           |> add_SAT_clause)
         pred_subcl) cs;
-    CCFormat.printf "%a\n" (ID.Tbl.pp ID.pp (CCPair.pp SAT.Lit.pp SAT.Lit.pp))
+    CCFormat.printf "@[%a@]\n"
+        (ID.Tbl.pp ID.pp (CCPair.pp SAT.Lit.pp SAT.Lit.pp))
       all_syms;
     (* For each predicate p, generate a SAT clause ~p+ \/ ~p-. *)
     Iter.iter (fun (pos_var, neg_var) ->
@@ -125,7 +132,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       CS.iter (fun c ->
           if contains_quasipure_sym c then (
             CCFormat.printf "Removing %a\n" C.pp c;
-            BCE.remove_from_proof_state c
+            remove_from_proof_state c
           ))
         cs
     in

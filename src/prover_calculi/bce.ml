@@ -28,7 +28,6 @@ module type S = sig
 
   (** {6 Registration} *)
   val setup : ?in_fp_mode:bool -> unit -> unit
-  val remove_from_proof_state : Env.C.t -> unit
   val begin_fixpoint : unit -> unit
   val fixpoint_step : unit -> bool
   val end_fixpoint : unit -> unit
