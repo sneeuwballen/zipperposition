@@ -82,4 +82,3 @@ let () =
     "--bce-pe-fixpoint-inprocessing", Arg.Bool ((:=) _inprocessing), " enable BCE/PE fixpoint as inprocessing rule";
     "--bce-pe-fixpoint-check-at", Arg.Int ((:=) _check_at), " BCE/PE fixpoint inprocessing periodicity";
   ]
-

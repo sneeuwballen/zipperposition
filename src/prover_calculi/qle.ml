@@ -5,6 +5,10 @@
 open Logtk
 open Libzipperposition
 
+let k_enabled = Flex_state.create_key ()
+(* let k_inprocessing = Flex_state.create_key () *)
+(* let k_check_at = Flex_state.create_key () *)
+
 module A = Libzipperposition_avatar
 
 module type S = sig
@@ -138,20 +142,26 @@ module Make(E : Env.S) : S with module Env = E = struct
     | _ -> ());
     SAT.clear ()
 
-  let register () =
-    Signal.once Env.on_start
-      (fun () -> do_qle (CS.of_iter (Env.get_passive ())))
   let setup () =
-    if not (Env.flex_get A.k_avatar_enabled) then (register ())
-    else
-      CCFormat.printf "AVATAR is not yet compatible with QLE@."
+    if E.flex_get k_enabled then
+      if not (Env.flex_get A.k_avatar_enabled) then
+        Signal.once Env.on_start
+          (fun () -> do_qle (CS.of_iter (Env.get_passive ())))
+      else
+        CCFormat.printf "AVATAR is not yet compatible with QLE@."
 end
+
+let _enabled = ref false
+(* let _inprocessing = ref false *)
+(* let _check_at = ref 10 *)
 
 let extension =
   let action env =
     let module E = (val env : Env.S) in
     let module QLE = Make(E) in
 
+    E.flex_add k_enabled !_enabled;
+    (* E.flex_add k_inprocessing !_inprocessing; *)
     QLE.setup ()
   in
   { Extensions.default with Extensions.
@@ -159,3 +169,12 @@ let extension =
                          prio = 50;
                          env_actions = [action];
   }
+
+let () =
+  Options.add_opts [
+    "--qle", Arg.Bool ((:=) _enabled), " enable QLE";
+(*
+    "--qle-inprocessing", Arg.Bool ((:=) _inprocessing), " enable QLE as inprocessing rule";
+    "--qle-check-at", Arg.Int ((:=) _check_at), " QLE inprocessing periodicity";
+*)
+  ]
