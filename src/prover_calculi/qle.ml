@@ -8,6 +8,7 @@ open Libzipperposition
 let k_enabled = Flex_state.create_key ()
 let k_inprocessing = Flex_state.create_key ()
 let k_check_at = Flex_state.create_key ()
+let k_pure_only = Flex_state.create_key ()
 
 module A = Libzipperposition_avatar
 
@@ -30,7 +31,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.remove_passive (Iter.singleton c);
     Env.remove_simpl (Iter.singleton c)
 
-  let do_qle c_iter =
+  let do_qle pure_only c_iter =
     let add_SAT_clause c =
       (* CCFormat.printf "add SAT clause %a\n" (CCList.pp SAT.Lit.pp) c; *)
       SAT.add_clause ~proof:Proof.Step.trivial c
@@ -47,12 +48,34 @@ module Make(E : Env.S) : S with module Env = E = struct
     let all_syms = ID.Tbl.create 128 in
 
     SAT.clear ();
-    (* For each clause l1 \/ ... \/ lN (ignoring equality literals), generate N
-       SAT clauses v1 \/ ... \/ vI-1 \/ ~wI \/ vI+1 \/ ... \/ vN, where vJ is
-       the variable associated with lJ (sign and predicate symbol) and wJ is the
-       variable associated with its negation. *)
+
+    (* For each clause l1 \/ ... \/ lN (ignoring equality literals), if
+       pure_only is false, generate N SAT clauses
+       v1 \/ ... \/ vI-1 \/ ~wI \/ vI+1 \/ ... \/ vN,
+       where vJ is the variable associated with lJ (sign and predicate symbol)
+       and wJ is the variable associated with its negation.
+
+       If pure_only is true, generate N SAT clauses ~wI. *)
     Iter.iter (fun c ->
         let pred_subcl = CCArray.filter_map pred_of_lit (C.lits c) in
+
+        let mk_pure_clauses (pol, pred) =
+          let (pos_var, neg_var) = ID.Tbl.find all_syms pred in
+          [SAT.Lit.neg (if not pol then pos_var else neg_var)]
+          |> add_SAT_clause
+        in
+        let mk_quasipure_clauses special =
+          Array.map (fun ((pol, pred) as lit) ->
+              let (make_lit_pos, use_pos_var) =
+                if lit = special then (false, not pol) else (true, pol)
+              in
+              let (pos_var, neg_var) = ID.Tbl.find all_syms pred in
+                (if use_pos_var then pos_var else neg_var)
+                |> (if make_lit_pos then (fun lit -> lit) else SAT.Lit.neg))
+            pred_subcl
+          |> Array.to_list
+          |> add_SAT_clause
+        in
 
         (* Create p+, p- variables for each predicate symbol p. *)
         Array.iter (fun (_, pred) ->
@@ -60,20 +83,11 @@ module Make(E : Env.S) : S with module Env = E = struct
               ID.Tbl.replace all_syms pred
                 (BBox.make_fresh (), BBox.make_fresh ()))
           pred_subcl;
+
         (* Create a number of SAT clauses for each clause. *)
-        Array.iter (fun special ->
-              Array.map (fun ((pol, pred) as lit) ->
-                let (make_lit_pos, use_pos_var) =
-                  if lit = special then (false, not pol) else (true, pol)
-                in
-                let (pos_var, neg_var) = ID.Tbl.find all_syms pred in
-                  (if use_pos_var then pos_var else neg_var)
-                  |> (if make_lit_pos then (fun lit -> lit) else SAT.Lit.neg))
-            pred_subcl
-            |> Array.to_list
-            |> add_SAT_clause)
+        Array.iter (if pure_only then mk_pure_clauses else mk_quasipure_clauses)
           pred_subcl)
-        c_iter;
+      c_iter;
     (* Detect problematic higher-order features and forget about some predicate
        symbols if necessary. *)
     Iter.iter (fun c ->
@@ -166,7 +180,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let steps = ref 0
   let inprocessing () =
-    if !steps = 0 then do_qle (get_clauses ());
+    if !steps = 0 then do_qle (E.flex_get k_pure_only) (get_clauses ());
     steps := (!steps + 1) mod Env.flex_get k_check_at
 
   let setup () =
@@ -175,7 +189,8 @@ module Make(E : Env.S) : S with module Env = E = struct
         if E.flex_get k_inprocessing then
           E.add_clause_elimination_rule ~priority:4 "qle" inprocessing
         else
-          Signal.once Env.on_start (fun () -> do_qle (get_clauses ()))
+          Signal.once Env.on_start (fun () ->
+            do_qle (E.flex_get k_pure_only) (get_clauses ()))
       else
         CCFormat.printf "AVATAR is not yet compatible with QLE@."
 end
@@ -183,6 +198,7 @@ end
 let _enabled = ref false
 let _inprocessing = ref false
 let _check_at = ref 100
+let _pure_only = ref false
 
 let extension =
   let action env =
@@ -192,6 +208,7 @@ let extension =
     E.flex_add k_enabled !_enabled;
     E.flex_add k_inprocessing !_inprocessing;
     E.flex_add k_check_at !_check_at;
+    E.flex_add k_pure_only !_pure_only;
     QLE.setup ()
   in
   { Extensions.default with Extensions.
@@ -205,4 +222,5 @@ let () =
     "--qle", Arg.Bool ((:=) _enabled), " enable QLE";
     "--qle-inprocessing", Arg.Bool ((:=) _inprocessing), " enable QLE as inprocessing rule";
     "--qle-check-at", Arg.Int ((:=) _check_at), " QLE inprocessing periodicity";
+    "--qle-pure-only", Arg.Bool ((:=) _pure_only), " enable PLE";
   ]
