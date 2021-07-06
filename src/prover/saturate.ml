@@ -109,6 +109,7 @@ module Make(E : Env.S) = struct
   let given_clause_step ?(generating=true) num =
     E.step_init();
     (* select next given clause *)
+    Env.do_clause_eliminate ();
     match Env.next_passive () with
     | None ->
       (* final check: might generate other clauses *)
@@ -165,7 +166,6 @@ module Make(E : Env.S) = struct
 
           Signal.send Env.on_forward_simplified (picked_clause, Some c);
 
-          Env.do_clause_eliminate ();
           (* assert(not (Env.C.is_redundant c)); *)
 
           (* clause might have been removed *)

@@ -10,6 +10,8 @@ let k_inprocessing = Flex_state.create_key ()
 let k_check_at = Flex_state.create_key ()
 let k_pure_only = Flex_state.create_key ()
 
+let section = Util.Section.make ~parent:Const.section "qle"
+
 module A = Libzipperposition_avatar
 
 module type S = sig
@@ -26,14 +28,17 @@ module Make(E : Env.S) : S with module Env = E = struct
   module SAT = Sat_solver.Make ()
 
   let remove_from_proof_state c =
+    Util.debugf ~section 1 "removing @[%a@]" (fun k -> k C.pp c);
+
     C.mark_redundant c;
     Env.remove_active (Iter.singleton c);
     Env.remove_passive (Iter.singleton c);
     Env.remove_simpl (Iter.singleton c)
 
   let do_qle pure_only c_iter =
+    Util.debugf ~section 2 "init: @[%a@]@." (fun k -> k (Iter.pp_seq C.pp) c_iter);
+
     let add_SAT_clause c =
-      (* CCFormat.printf "add SAT clause %a\n" (CCList.pp SAT.Lit.pp) c; *)
       SAT.add_clause ~proof:Proof.Step.trivial c
     in
     let pred_of_lit lit =
@@ -110,9 +115,6 @@ module Make(E : Env.S) : S with module Env = E = struct
           (C.lits c))
       c_iter;
 
-    (* CCFormat.printf "@[%a@]\n"
-          (ID.Tbl.pp ID.pp (CCPair.pp SAT.Lit.pp SAT.Lit.pp))
-      all_syms; *)
     (* For each predicate p, generate a SAT clause ~p+ \/ ~p-. *)
     Iter.iter (fun (pos_var, neg_var) ->
         add_SAT_clause [SAT.Lit.neg pos_var; SAT.Lit.neg neg_var])
@@ -160,27 +162,29 @@ module Make(E : Env.S) : S with module Env = E = struct
       let contains_quasipure_sym c =
         CCArray.exists is_quasipure_lit (C.lits c)
       in
+      Util.debugf ~section 1 "quasipure syms: @[%a@]" (fun k -> k (CCList.pp ID.pp) (ID.Tbl.keys_list quasipure_syms));
       Iter.iter (fun c ->
           if contains_quasipure_sym c then remove_from_proof_state c)
         c_iter
     in
 
+    Util.debugf ~section 1 "In do_qle()@." CCFun.id;
     generate_nontrivial_solution_SAT_clause ();
     (match SAT.check ~full:true () with
     | Sat_solver.Sat ->
+      Util.debugf ~section 1 "Maximizing()@." CCFun.id;
       maximize_valuation ();
-      (* CCFormat.printf "Solution:\n";
-         Iter.iter (fun var -> CCFormat.printf "%a\n" SAT.Lit.pp var)
-           (ID.Tbl.values quasipure_syms); *)
       filter_clauses ()
-    | _ -> ());
+    | _ -> Util.debugf ~section 1 "Unsat()@." CCFun.id; ());
     SAT.clear ()
 
   let get_clauses () = Iter.append (Env.get_passive ()) (Env.get_active ())
 
   let steps = ref 0
   let inprocessing () =
-    if !steps = 0 then do_qle (E.flex_get k_pure_only) (get_clauses ());
+    if !steps = 0 then (
+      Util.debugf ~section 1 "doing inprocessing@." CCFun.id;
+      do_qle (E.flex_get k_pure_only) (get_clauses ()));
     steps := (!steps + 1) mod Env.flex_get k_check_at
 
   let setup () =
