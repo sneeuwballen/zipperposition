@@ -48,6 +48,17 @@ let equal_com l1 l2 =
   | Int o1, Int o2 -> Int_lit.equal_com o1 o2
   | _ -> equal l1 l2  (* regular comparison *)
 
+module HashLiteral: Hashtbl.HashedType with type t = lit = struct
+  type t = lit
+  let equal = equal_com
+  let h seed op a b = Hashtbl.(Hash.combine3 seed (hash op) (hash a + hash b))
+  let hash l = match l with
+    | Equation(a,b,sign) -> h 1 sign a b
+    | Int(Binary(op,a,b)) -> h 2 op a b
+    | Rat l -> h 3 l.op l.left l.right
+    | _ -> Hashtbl.hash l
+end
+
 let no_prop_invariant = 
   function 
   | Equation (lhs,rhs,sign) -> 

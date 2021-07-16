@@ -22,13 +22,15 @@ type t = private
   | Int of Int_lit.t
   | Rat of Rat_lit.t
 
+module HashLiteral: Hashtbl.HashedType with type t = t (** commutative hash function for literals *)
+
 val equal_com : t -> t -> bool     (** commutative equality of lits *)
 
 val compare : t -> t -> int     (** lexicographic comparison of literals *)
 
 include Interfaces.HASH with type t := t
 
-val hash : t -> int               (** hashing of literal *)
+val hash : t -> int               (** asymmetric hashing of literal *)
 
 val weight : t -> int             (** weight of the lit (sum of weights of terms) *)
 val ho_weight : t -> int          (** ho weight of the lit (sum of weights of terms,
