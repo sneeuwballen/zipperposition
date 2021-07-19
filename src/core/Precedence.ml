@@ -641,8 +641,8 @@ let lambda_def_weight lm_w db_w base_weight clauses =
   in
 
   Iter.iter (fun cl -> 
-    Util.debugf ~section 2 "working on %a" (fun k -> k (Iter.pp_seq (SLiteral.pp T.pp)) cl);
     if Iter.length cl == 1 then (
+      Util.debugf ~section 2 "working on %a" (fun k -> k (Iter.pp_seq (SLiteral.pp T.pp)) cl);
       match Iter.head_exn cl with
       | SLiteral.Eq(lhs, rhs) ->
         begin match find_def lhs rhs with
