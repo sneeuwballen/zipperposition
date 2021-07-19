@@ -97,6 +97,9 @@ let _term_set = Term.Tbl.create 16
 let dummy_payload = Fresh
 let dummy_t = Lit.make dummy_payload
 
+let make_fresh () =
+  Lit.make dummy_payload
+
 let _retrieve_alpha_equiv lits =
   FV_components.retrieve_alpha_equiv_c !_clause_set (lits,dummy_payload,dummy_t)
 

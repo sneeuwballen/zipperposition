@@ -769,20 +769,20 @@ module Make(E : Env.S) : S with module Env = E = struct
         ) pos_cls then None
         else Some (pos_cls, neg_cls)
       in
-        
+
 
       let find_definition_set cls =
         List.iter (fun (i,lits,c) ->
           if not (is_tauto c) then (
-            List.filter_map BBox.inject_lit (CCArray.to_list lits)
+            CCList.filter_map BBox.inject_lit (CCArray.to_list lits)
             |> SAT.add_clause ~proof:(C.proof_step c))
         ) cls;
         (match SAT.check ~full:true () with
-        | Sat_solver.Unsat proof -> 
+        | Sat_solver.Unsat _ -> 
           let proof = Proof.S.step (SAT.get_proof ()) in
           let parents = List.map (fun p -> Proof.S.step @@ Proof.Parent.proof p) (Proof.Step.parents proof) in
           Util.debugf ~section 5 "SAT prover found unsat set: %d@." (fun k -> k  (CCList.length parents));
-          let used_cls = List.filter_map (fun (_,_,cl) -> 
+          let used_cls = CCList.filter_map (fun (_,_,cl) -> 
             CCOpt.return_if (CCList.mem ~eq:Proof.Step.equal (C.proof_step cl) parents) cl) cls  in
           Util.debugf ~section 5 "used clauses: @[%a@]@." (fun k -> k (CCList.pp C.pp) used_cls);
           split_clauses used_cls

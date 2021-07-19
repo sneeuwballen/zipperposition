@@ -312,7 +312,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     release_locks clause
 
   let remove_from_proof_state clause =
-    begin 
+    begin
       try
         if Env.is_active clause then (
           C.Tbl.add (Env.flex_get k_removed_active) clause ();
@@ -326,7 +326,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     if Env.flex_get k_processing_kind != `InprocessingSat then ( 
       C.mark_redundant clause
       (* if we are doing the inprocessing in SAT mode, we cannot
-         mark the clauses as redunant, since they might have to be returned
+         mark the clauses as redundant, since they might have to be returned
          to the proof state. *)
     );
     Env.remove_active (Iter.singleton clause);
