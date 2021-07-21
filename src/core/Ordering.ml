@@ -810,9 +810,9 @@ let map f { cache_compare=_; compare; prec; name; might_flip; cache_might_flip=_
   let might_flip prec a b = CCCache.with_cache cache_might_flip (fun (a, b) -> might_flip prec (f a) (f b)) (a,b) in
   { cache_compare; compare; prec; name; might_flip; cache_might_flip; monotonic }
 
-let lambda_kbo ~ignore_quans_under_lam prec =
+let derived_ho_kbo ~ignore_quans_under_lam prec =
   let module KBO = MakeKBO(struct 
-      let name = "lambda_kbo"
+      let name = "derived_ho_kbo"
       let lambda_mode = true
       let ignore_deep_quants = ignore_quans_under_lam
     end) in
@@ -863,9 +863,9 @@ let lambdafree_rpo prec =
   let monotonic = false in
   { cache_compare; compare; name=RPO.name; prec; might_flip; cache_might_flip; monotonic }
 
-let lambda_rpo prec =
+let derived_ho_rpo prec =
   let module RPO = MakeRPO(struct 
-      let name = "lambda_rpo"
+      let name = "derived_ho_rpo"
       let lambda_mode = true
       let ignore_deep_quants = true
     end) in
@@ -937,10 +937,10 @@ let subterm =
 let tbl_ =
   let h = Hashtbl.create 5 in
   Hashtbl.add h "lambdafree_kbo" lambdafree_kbo;
-  Hashtbl.add h "lambda_kbo" (lambda_kbo ~ignore_quans_under_lam:false);
-  Hashtbl.add h "lambda_kbo_complete" (lambda_kbo ~ignore_quans_under_lam:true);
+  Hashtbl.add h "derived_ho_kbo" (derived_ho_kbo ~ignore_quans_under_lam:false);
+  Hashtbl.add h "derived_ho_kbo_complete" (derived_ho_kbo ~ignore_quans_under_lam:true);
   Hashtbl.add h "lambdafree_rpo" lambdafree_rpo;
-  Hashtbl.add h "lambda_rpo" lambda_rpo;
+  Hashtbl.add h "derived_ho_rpo" derived_ho_rpo;
   Hashtbl.add h "epo" epo;
   Hashtbl.add h "lambdafree_kbo_coeff" lambdafree_kbo_coeff;
   Hashtbl.add h "none" (fun _ -> none);
@@ -948,7 +948,7 @@ let tbl_ =
   h
 
 let default_of_list l =
-  lambda_rpo (Prec.default l)
+  derived_ho_rpo (Prec.default l)
 
 let names () = CCHashtbl.keys_list tbl_
 

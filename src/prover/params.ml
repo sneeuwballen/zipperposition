@@ -32,7 +32,7 @@ type t = {
 }
 
 let default : t = {
-  ord = ref "lambda_kbo";
+  ord = ref "derived_ho_kbo";
   seed = 1928575;
   steps = -1;
   version= false;
@@ -154,11 +154,10 @@ let () =
     );
 
   add_to_mode "ho-complete-basic" 
-    (fun () -> default.ord := "lambda_kbo_complete");
+    (fun () -> default.ord := "derived_ho_kbo_complete");
   
   add_to_modes 
       [ "ho-competitive"
       ; "ho-pragmatic"] (fun () ->
-      default.ord := "lambda_kbo";
+      default.ord := "derived_ho_kbo";
     );
-

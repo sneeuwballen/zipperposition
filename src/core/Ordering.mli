@@ -52,21 +52,21 @@ include Interfaces.PRINT with type t := t
     are simplification orderings (compatible with substitution,
     with the subterm property, and monotonic), some other are not. *)
 
-val lambda_kbo : ignore_quans_under_lam:bool -> Precedence.t -> t
-(** Knuth-Bendix simplification ordering *)
+val derived_ho_kbo : ignore_quans_under_lam:bool -> Precedence.t -> t
+(** Higher-order Knuth-Bendix ordering derived via an encoding *)
 
-val lambda_rpo : Precedence.t -> t
-(** Efficient implementation of RPO (recursive path ordering) *)
+val derived_ho_rpo : Precedence.t -> t
+(** Higher-order recursive path ordering derived via an encoding *)
 
 val compose : (term -> term -> (Comparison.t*term*term)) -> t -> t
 (** Takes a function that is going to be run before the chosen order and the order.
     If the first argument returns Comparison.Eq, then the order determined by second arg.
     Otherwise, the result of the first argument is returned. *) 
 val lambdafree_kbo : Precedence.t -> t
-(** Knuth-Bendix simplification ordering - lambdafree version *)
+(** Knuth-Bendix ordering - lambda-free version *)
 
 val lambdafree_rpo : Precedence.t -> t
-(** Efficient implementation of RPO (recursive path ordering) - lambdafree version *)
+(** Recursive path ordering - lambdafree version *)
 
 val epo : Precedence.t -> t
 (** Embedding path order *)

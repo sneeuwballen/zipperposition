@@ -151,8 +151,8 @@ let check_ordering_subterm ~arb_t ord =
   in
   QCheck.Test.make ~count ~long_factor ~name arb prop
 
-let test_lambda_rpo = "ordering.lambda_rpo", `Quick, fun () ->
-  let ord = O.lambda_rpo (Precedence.default [a_; b_; c_; f_; g_; h_]) in
+let test_derived_ho_rpo = "ordering.derived_ho_rpo", `Quick, fun () ->
+  let ord = O.derived_ho_rpo (Precedence.default [a_; b_; c_; f_; g_; h_]) in
   let compare = O.compare ord in
 
   (* x a <> x b *)
@@ -227,10 +227,10 @@ let test_lambdafree_rpo = "ordering.lambdafree_rpo", `Quick, fun () ->
   let b = Term.const ~ty b_ in
   Alcotest.(check comp_test) "f a a > f b" (compare (Term.app f [a;a]) (Term.app f [b])) Comparison.Gt
 
-let test_lambda_kbo = "ordering.lambda_kbo", `Quick, fun () ->
+let test_derived_ho_kbo = "ordering.derived_ho_kbo", `Quick, fun () ->
   (* alphabetical precedence, h has weight 2, all other symbols weight 1*)
   let weight id = (if id=h_ then Precedence.Weight.add Precedence.Weight.one Precedence.Weight.one else Precedence.Weight.one) in
-  let ord = O.lambda_kbo ~ignore_quans_under_lam:true
+  let ord = O.derived_ho_kbo ~ignore_quans_under_lam:true
       (Precedence.create ~weight Precedence.Constr.alpha [a_; b_; c_; f_; g_; h_]) in
   let compare = O.compare ord in
 
@@ -299,7 +299,7 @@ let test_lambda_kbo = "ordering.lambda_kbo", `Quick, fun () ->
   let zero = T.const ~ty zero_ in
   let ty1 = Term.of_ty ty in
   let ty2 = Term.of_ty (Type.app funty_ [ty; ty]) in
-  let ord = O.lambda_kbo ~ignore_quans_under_lam:true
+  let ord = O.derived_ho_kbo ~ignore_quans_under_lam:true
       (Precedence.create ~weight Precedence.Constr.alpha [add_; app_; funty_; k_; s_; zero_]) in
   let x = Term.var (HVar.fresh ~ty ()) in
   let y = Term.var (HVar.fresh ~ty ()) in
@@ -367,8 +367,8 @@ let test_lambdafree_kbo = "ordering.lambdafree_kbo", `Quick, fun () ->
 
 
 let suite =
-  [ test_lambda_rpo;
-    test_lambda_kbo;
+  [ test_derived_ho_rpo;
+    test_derived_ho_kbo;
     test_lambdafree_rpo;
     test_lambdafree_kbo
   ]
@@ -382,8 +382,8 @@ let props =
          check_ordering_subterm ~arb_t:ArTerm.default_ho o;
        ])
     [
-      O.lambda_kbo ~ignore_quans_under_lam:true (Precedence.default []);
-      O.lambda_rpo (Precedence.default []);
+      O.derived_ho_kbo ~ignore_quans_under_lam:true (Precedence.default []);
+      O.derived_ho_rpo (Precedence.default []);
     ]
   @
   CCList.flat_map
