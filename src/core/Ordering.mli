@@ -99,5 +99,5 @@ val register : string -> (Precedence.t -> t) -> unit
     @raise Invalid_argument if the name is already used. *)
 
 (* Type-1 combinator is a combinator that is not ground
-     (see Ahmed's combinator KBO paper) *)
+     (see Bhayat and Reger's combinator KBO paper) *)
 val ty1comb_to_var : Term.t -> Term.t Term.Tbl.t -> Term.t

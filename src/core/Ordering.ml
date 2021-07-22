@@ -12,12 +12,13 @@ let prof_rpo = ZProf.make "compare_rpo"
 let prof_kbo = ZProf.make "compare_kbo"
 let prof_epo = ZProf.make "compare_epo"
 let prof_lambdafree_kbo_coeff = ZProf.make "compare_lambdafree_kbo_coeff"
+let prof_lambda_kbo = ZProf.make "compare_lambda_kbo"
 
 module T = Term
 module TC = Term.Classic
 
 let mk_cache n =
-  let hash (a,b) = Hash.combine3 42 (T.hash a) (T.hash b) in
+  let hash (a, b) = Hash.combine3 42 (T.hash a) (T.hash b) in
   CCCache.replacing
     ~eq:(fun (a1,b1)(a2,b2) -> T.equal a1 a2 && T.equal b1 b2)
     ~hash
@@ -52,7 +53,7 @@ let add_list ~signature ord l = Prec.add_list ~signature ord.prec l
 
 let name ord = ord.name
 
-let clear_cache ord = CCCache.clear ord.cache_compare;  CCCache.clear ord.cache_might_flip
+let clear_cache ord = CCCache.clear ord.cache_compare; CCCache.clear ord.cache_might_flip
 
 let pp out ord =
   Format.fprintf out "%s(@[%a@])" ord.name Prec.pp ord.prec
@@ -60,7 +61,7 @@ let pp out ord =
 let to_string ord = CCFormat.to_string pp ord
 
 (* Type-1 combinator is a combinator that is not ground
-    (see Ahmed's combinator KBO paper) *)
+    (see Bhayat and Reger's combinator KBO paper) *)
 let ty1comb_to_var t balance =
   if T.is_comb t && not (T.is_ground t) then (
     match T.Tbl.find_opt balance t with
@@ -203,7 +204,6 @@ sig
   val ignore_deep_quants : bool
 end
 
-
 module TermBoolAsKey = struct
   type t = term * bool
   let equal (t1, b1) (t2, b2) = T.equal t1 t2 && CCBool.equal b1 b2
@@ -218,7 +218,6 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
 
   (** used to keep track of the balance of variables *)
   type var_balance = {
-    offset : int;
     mutable pos_counter : int;
     mutable neg_counter : int;
     mutable balance : CCInt.t TermBoolTbl.t;
@@ -228,7 +227,7 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
   (** create a balance for the two terms *)
   let mk_balance t1 t2 =
     let numvars = Iter.length (T.Seq.vars t1) + Iter.length (T.Seq.vars t2) in
-    { offset = 0; pos_counter = 0; neg_counter = 0; balance = TermBoolTbl.create (2 * numvars);
+    { pos_counter = 0; neg_counter = 0; balance = TermBoolTbl.create (2 * numvars);
       comb2var = Term.Tbl.create 16 }
 
   (** add a positive variable *)
@@ -444,10 +443,9 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
   let might_flip _ s t = T.is_fun s || T.is_fun t
 end
 
-(** Lambda-free higher-order RPO.
-    hopefully more efficient (polynomial) implementation of LPO,
-    following the paper "things to know when implementing LPO" by Löchner.
-    We adapt here the implementation clpo6 with some multiset symbols (=) *)
+(** Hopefully more efficient (polynomial) implementation of LPO,
+    following the paper "Things to Know when Implementing LPO" by Löchner.
+    We adapt here the implementation clpo6 with some multiset symbols (=). *)
 module MakeRPO (P : PARAMETERS) : ORD = struct
   let name = P.name
 
@@ -647,7 +645,6 @@ end
 module LambdaFreeKBOCoeff : ORD = struct
   let name = "lambdafree_kbo_coeff"
 
-
   module Weight_indet = struct
     type var = Type.t HVar.t
 
@@ -799,6 +796,29 @@ module LambdaFreeKBOCoeff : ORD = struct
       | _ -> assert false
 end
 
+module Polynomial = struct
+  module Polynomial = CCHashtbl.Make(struct
+      type t = int list
+      let equal = CCList.equal Int.equal
+      let hash = (Hash.list (fun x -> x))
+    end)
+
+  let mk_key = List.sort
+end
+
+module LambdaKBO : ORD = struct
+  let name = "lambda_kbo"
+
+  let compare_terms ~prec s t =
+    ZProf.enter_prof prof_lambda_kbo;
+    let res = Incomparable in
+    ZProf.exit_prof prof_lambda_kbo;
+    res
+
+  (* The ordering might flip if one side is a lambda-expression *)
+  let might_flip _ s t = T.is_fun s || T.is_fun t
+end
+
 (** {2 Value interface} *)
 
 let dummy_cache_ = CCCache.dummy
@@ -806,8 +826,8 @@ let dummy_cache_ = CCCache.dummy
 let map f { cache_compare=_; compare; prec; name; might_flip; cache_might_flip=_; monotonic } =
   let cache_compare = mk_cache 256 in
   let cache_might_flip = mk_cache 256 in
-  let compare prec a b = CCCache.with_cache cache_compare (fun (a, b) -> compare prec (f a) (f b)) (a,b) in
-  let might_flip prec a b = CCCache.with_cache cache_might_flip (fun (a, b) -> might_flip prec (f a) (f b)) (a,b) in
+  let compare prec a b = CCCache.with_cache cache_compare (fun (a, b) -> compare prec (f a) (f b)) (a, b) in
+  let might_flip prec a b = CCCache.with_cache cache_might_flip (fun (a, b) -> might_flip prec (f a) (f b)) (a, b) in
   { cache_compare; compare; prec; name; might_flip; cache_might_flip; monotonic }
 
 let derived_ho_kbo ~ignore_quans_under_lam prec =
@@ -819,11 +839,11 @@ let derived_ho_kbo ~ignore_quans_under_lam prec =
   let cache_compare = mk_cache 256 in
   let compare prec a b = CCCache.with_cache cache_compare
       (fun (a, b) -> 
-        KBO.compare_terms ~prec a b) (a,b)
+        KBO.compare_terms ~prec a b) (a, b)
   in
   let cache_might_flip = mk_cache 256 in
   let might_flip prec a b = CCCache.with_cache cache_might_flip
-      (fun (a, b) -> KBO.might_flip prec a b) (a,b)
+      (fun (a, b) -> KBO.might_flip prec a b) (a, b)
   in
   let normalize t = Lambda.eta_reduce t |> Lambda.snf in
   let monotonic = false in
@@ -837,11 +857,11 @@ let lambdafree_kbo prec =
     end) in
   let cache_compare = mk_cache 256 in
   let compare prec a b = CCCache.with_cache cache_compare
-      (fun (a, b) -> KBO.compare_terms ~prec a b) (a,b)
+      (fun (a, b) -> KBO.compare_terms ~prec a b) (a, b)
   in
   let cache_might_flip = mk_cache 256 in
   let might_flip prec a b = CCCache.with_cache cache_might_flip
-      (fun (a, b) -> KBO.might_flip prec a b) (a,b)
+      (fun (a, b) -> KBO.might_flip prec a b) (a, b)
   in
   let monotonic = true in
   { cache_compare; compare; name=KBO.name; prec; might_flip; cache_might_flip; monotonic }
@@ -854,11 +874,11 @@ let lambdafree_rpo prec =
     end) in
   let cache_compare = mk_cache 256 in
   let compare prec a b = CCCache.with_cache cache_compare
-      (fun (a, b) -> RPO.compare_terms ~prec a b) (a,b)
+      (fun (a, b) -> RPO.compare_terms ~prec a b) (a, b)
   in
   let cache_might_flip = mk_cache 256 in
   let might_flip prec a b = CCCache.with_cache cache_might_flip
-      (fun (a, b) -> RPO.might_flip prec a b) (a,b)
+      (fun (a, b) -> RPO.might_flip prec a b) (a, b)
   in
   let monotonic = false in
   { cache_compare; compare; name=RPO.name; prec; might_flip; cache_might_flip; monotonic }
@@ -871,11 +891,11 @@ let derived_ho_rpo prec =
     end) in
   let cache_compare = mk_cache 256 in
   let compare prec a b = CCCache.with_cache cache_compare
-      (fun (a, b) -> RPO.compare_terms ~prec a b) (a,b)
+      (fun (a, b) -> RPO.compare_terms ~prec a b) (a, b)
   in
   let cache_might_flip = mk_cache 256 in
   let might_flip prec a b = CCCache.with_cache cache_might_flip
-      (fun (a, b) -> RPO.might_flip prec a b) (a,b)
+      (fun (a, b) -> RPO.might_flip prec a b) (a, b)
   in
   let monotonic = false in
   { cache_compare; compare; name=RPO.name; prec; might_flip; cache_might_flip; monotonic }
@@ -899,7 +919,7 @@ let epo prec =
   let cache_compare = mk_cache 256 in
   (* TODO: make internal EPO cache accessible here ? **)
   let compare prec a b = CCCache.with_cache cache_compare
-      (fun (a, b) -> EPO.compare_terms ~prec a b) (a,b)
+      (fun (a, b) -> EPO.compare_terms ~prec a b) (a, b)
   in
   let cache_might_flip = dummy_cache_ in
   let might_flip = EPO.might_flip in
@@ -908,12 +928,22 @@ let epo prec =
 let lambdafree_kbo_coeff prec =
   let cache_compare = mk_cache 256 in
   let compare prec a b = CCCache.with_cache cache_compare
-      (fun (a, b) -> LambdaFreeKBOCoeff.compare_terms ~prec a b) (a,b)
+      (fun (a, b) -> LambdaFreeKBOCoeff.compare_terms ~prec a b) (a, b)
   in
   let cache_might_flip = mk_cache 256 in
   let might_flip prec a b = CCCache.with_cache cache_might_flip
-      (fun (a, b) -> LambdaFreeKBOCoeff.might_flip prec a b) (a,b) in
+      (fun (a, b) -> LambdaFreeKBOCoeff.might_flip prec a b) (a, b) in
   { cache_compare; compare; name=LambdaFreeKBOCoeff.name; prec; might_flip; cache_might_flip; monotonic=false }
+
+let lambda_kbo prec =
+  let cache_compare = mk_cache 256 in
+  let compare prec a b = CCCache.with_cache cache_compare
+      (fun (a, b) -> LambdaKBO.compare_terms ~prec a b) (a, b)
+  in
+  let cache_might_flip = mk_cache 256 in
+  let might_flip prec a b = CCCache.with_cache cache_might_flip
+      (fun (a, b) -> LambdaKBO.might_flip prec a b) (a, b) in
+  { cache_compare; compare; name=LambdaKBO.name; prec; might_flip; cache_might_flip; monotonic=false }
 
 let none =
   let compare _ t1 t2 = if T.equal t1 t2 then Eq else Incomparable in
@@ -935,7 +965,7 @@ let subterm =
 (** {2 Global table of orders} *)
 
 let tbl_ =
-  let h = Hashtbl.create 5 in
+  let h = Hashtbl.create 16 in
   Hashtbl.add h "lambdafree_kbo" lambdafree_kbo;
   Hashtbl.add h "derived_ho_kbo" (derived_ho_kbo ~ignore_quans_under_lam:false);
   Hashtbl.add h "derived_ho_kbo_complete" (derived_ho_kbo ~ignore_quans_under_lam:true);
@@ -943,6 +973,7 @@ let tbl_ =
   Hashtbl.add h "derived_ho_rpo" derived_ho_rpo;
   Hashtbl.add h "epo" epo;
   Hashtbl.add h "lambdafree_kbo_coeff" lambdafree_kbo_coeff;
+  Hashtbl.add h "lambda_kbo" lambda_kbo;
   Hashtbl.add h "none" (fun _ -> none);
   Hashtbl.add h "subterm" (fun _ -> subterm);
   h
