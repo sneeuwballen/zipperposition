@@ -3,6 +3,25 @@
 
 (** {1 Partial Ordering values} *)
 
+(** {2 Combined nonstrict-strict partial orders} *)
+
+type nonstrict_t = NLt | NLeq | NEq | NGeq | NGt | NIncomparable
+
+type nonstrict_comparison = nonstrict_t
+let equal : nonstrict_t -> nonstrict_t -> bool = Pervasives.(=)
+
+let to_string = function
+  | NLt -> "=<="
+  | NLeq -> "<=="
+  | NEq -> "==="
+  | NGeq -> "==>"
+  | NGt -> "=>="
+  | NIncomparable -> "=?="
+
+let pp out c = CCFormat.string out (to_string c)
+
+(** {2 Strict partial orders} *)
+
 type t = Lt | Eq | Gt | Incomparable
 (** partial order *)
 
@@ -11,11 +30,23 @@ let equal : t -> t -> bool = Pervasives.(=)
 
 let to_string = function
   | Lt -> "=<="
-  | Gt -> "=>="
   | Eq -> "==="
+  | Gt -> "=>="
   | Incomparable -> "=?="
 
 let pp out c = CCFormat.string out (to_string c)
+
+let strict_of_nonstrict cmp = match cmp with
+  | NLt -> Lt
+  | NEq -> Eq
+  | NGt -> Gt
+  | NLeq | NGeq | NIncomparable -> Incomparable
+
+let nonstrict_of_strict cmp = match cmp with
+  | Lt -> NLt
+  | Eq -> NEq
+  | Gt -> NGt
+  | Incomparable -> NIncomparable
 
 let combine cmp1 cmp2 = match cmp1, cmp2 with
   | Eq, Eq

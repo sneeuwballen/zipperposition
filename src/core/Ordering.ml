@@ -803,17 +803,48 @@ module Polynomial = struct
       let hash = (Hash.list (fun x -> x))
     end)
 
-  let mk_key = List.sort
+  let mk_key = List.sort CCInt.compare
+
+  let create_zero_polynomial () = Polynomial.create 16
+
+  let add_monomial poly coeff vars =
+    if coeff != 0 then (
+      let key = mk_key vars in
+      match Polynomial.find_opt poly key with
+      | None -> Polynomial.add poly key coeff
+      | Some old_coeff ->
+        if old_coeff + coeff = 0 then Polynomial.remove poly key
+        else Polynomial.add poly key (old_coeff + coeff)
+    )
+
+  let multiply_coeffs poly coeff =
+    Polynomial.filter_map_inplace (fun _ -> fun old_coeff ->
+      Some (coeff * old_coeff))
+
+  let negate_polynomial poly =
+    multiply_coeffs poly (-1)
+
+  let multiply_vars poly vars =
+    let old_poly = Polynomial.copy poly in
+    Polynomial.clear poly;
+    Polynomial.iter (fun key -> fun coeff ->
+      Polynomial.add poly (key @ vars) coeff) old_poly
+
+  let add_polynomial poly =
+    Polynomial.iter (fun key -> fun coeff -> add_monomial poly coeff key)
 end
 
 module LambdaKBO : ORD = struct
   let name = "lambda_kbo"
 
-  let compare_terms ~prec s t =
+  let nonstrict_compare_terms ~prec s t =
     ZProf.enter_prof prof_lambda_kbo;
-    let res = Incomparable in
+    let res = NIncomparable in
     ZProf.exit_prof prof_lambda_kbo;
     res
+
+  let compare_terms ~prec s t =
+    strict_of_nonstrict (nonstrict_compare_terms ~prec s t)
 
   (* The ordering might flip if one side is a lambda-expression *)
   let might_flip _ s t = T.is_fun s || T.is_fun t

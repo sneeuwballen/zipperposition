@@ -3,8 +3,19 @@
 
 (** {1 Partial Ordering values} *)
 
+(** {2 Combined nonstrict-strict partial orders} *)
+
+type nonstrict_t = NLt | NLeq | NEq | NGeq | NGt | NIncomparable
+
+type nonstrict_comparison = nonstrict_t
+
+val equal : nonstrict_t -> nonstrict_t -> bool
+
+include Interfaces.PRINT with type t := nonstrict_t
+
+(** {2 Strict partial orders} *)
+
 type t = Lt | Eq | Gt | Incomparable
-(** partial order *)
 
 type comparison = t
 
@@ -12,8 +23,13 @@ val equal : t -> t -> bool
 
 include Interfaces.PRINT with type t := t
 
+val strict_of_nonstrict : nonstrict_t -> t
+(* Cast a nonstrict comparison value to a strict one. *)
+val nonstrict_of_strict : t -> nonstrict_t
+(* Cast a strict comparison value to a nonstrict one. *)
+
 val combine : t -> t -> t
-(** combine two partial comparisons, that are assumed to be
+(** Combine two partial comparisons, that are assumed to be
     compatible, ie they do not order differently if
     Incomparable is not one of the values.
     @raise Invalid_argument if the comparisons are inconsistent. *)
