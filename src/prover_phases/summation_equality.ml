@@ -16,142 +16,234 @@ module B = Builtin
 open Monome
 open Type
 open Term
+open Stdlib
 
 let (~..)x = print_endline(Batteries.dump x); x
 
-module Ore = struct
-type monomial = (term*int)list
-type poly = monomial array
+let (~=) x _ = x
+let (%%>) = compose_binop
+let (%>>) f g x y = g(f x y)
 
-(*
-int - mul
-mon var mul
-exp var mul
-coef vars mul
-sh var dis
-neg var dis
-mul var dis
-dis vars dis
-*)
-type atoms = {exp:int; vars: int list; id:[
-  `Mul of [`Z of term |`Mono |`Exp of term |`Other of term] |
-  `Dis of [`Shift of term |`Refl |`Scale of int(*>0*) |`Other of term]]}
+let ( *** ) c1 c2 (x1,x2) (y1,y2) = match c1 x1 y1 with 0 -> c2 x2 y2 | r -> r
 
-let _Z z = app_builtin ~ty:int (Int(Z.of_int z)) []
-let _Z' z = {id= `Mul(`Z(_Z z)); vars=[]; exp=1}
-
-let base_mul m w =
-  let c = true in
-  let mvar = List.hd m.vars in
-  let mul_like c' n v =
-    if n=v then
-      if m.vars=w.vars then
-        let exp = m.exp + w.exp in if exp=0 then [] else [{m with exp}]
-      else if c' && Stdlib.compare m.vars w.vars > 0 then [w;m] else [m;w]
-    else if c' && compare n v > 0 then [w;m] else [m;w]
-  in
-  let exception Result of Type.t in
-  let displace_w op par = match w with {exp; vars; id= `Mul(`Other v)}
-    -> {exp; vars; id= `Mul(`Other(
-      let ty = try let _= Seq.subterms ~include_builtin:true v (fun t -> match view t with Var{ty;id} when id=mvar -> raise(Result ty) | _->()) in int(*irrelevant*) with Result ty -> ty in
-      let old = var(HVar.make ty mvar) in
-      replace ~old ~by:(app_builtin ~ty op (old::par)) v))}
-    |_-> assert false
-  in
-  match m.id, w.id with
-  (* equal form *)
-  |`Mul(`Z n), `Mul(`Z v) -> [{m with id=`Mul(`Z(app_builtin ~ty:int Product [n;v]))}]
-  |`Mul(`Exp n), `Mul(`Exp v)
-  |`Mul(`Other n), `Mul(`Other v) -> mul_like c n v
-  |`Dis(`Shift n), `Dis(`Shift v) -> mul_like true n v
-  |`Dis(`Scale n), `Dis(`Scale v) -> mul_like true (_Z n) (_Z v)
-  (* classic commutators *)
-  |`Dis(`Shift n), `Mul`Mono when c -> [w;m] (* TODO additive terms? *)
-  |`Dis(`Shift n), `Mul(`Exp v) when c -> [] (* TODO vⁿ *)
-  (* ℤ-scaling *)
-  |`Dis`Refl, `Mul`Mono -> [_Z'(-1); w; m]
-  |`Dis`Refl, (`Mul(`Exp v)|`Dis(`Shift v))  -> [{w with exp= -w.exp}; m] (* reflection has exponent 1 *)
-  |`Dis(`Scale n), `Mul`Mono -> [_Z' n; w; m]
-  |`Dis(`Scale n), (`Mul(`Exp v)|`Dis(`Shift v)) when m.exp>0 -> [{w with exp= Batteries.Int.pow n m.exp * w.exp}; m]
-  (* (∘d) (×f) = (× f∘d) (∘d) *)
-  |`Dis(`Shift n),	`Mul(`Other v) -> [displace_w Sum[n]; m]
-  |`Dis`Refl,	`Mul(`Other v) -> [displace_w Uminus[]; m]
-  |`Dis(`Scale n),	`Mul(`Other v) -> [displace_w Product[_Z n]; m]
-  (* commutatives *)
-  | _, `Mul(`Z _)
-  |`Dis`Refl, `Dis(`Scale _) -> [w;m]
-  |(`Mul(`Exp n), `Mul`Mono
-  |`Mul(`Other n), `Mul _) when c ->[w;m]
-  |`Dis(`Other n), _ when not(List.mem mvar w.vars) -> [w;m]
-  (* good as is *)
-  | _ -> [m;w]
-
-(* ℤ<n<xⁿ<other<N₊₁<Nₓ₂<N₋<other *)
-(* let weight = function
-|`Mul(`Z t) -> 10, t
-|`Mul `Mono -> 11, DB 0
-|`Mul(`Exp t) -> 12, t
-|`Mul(`Other t) -> 13, t
-|`Dis(`Shift t) -> 20, t
-|`Dis `Refl -> 21, DB 0
-|`Dis(`Scale t) -> 22, DB t (* bypass type incompatibility *)
-|`Dis(`Other t) -> 23, t
-let weighting x y =
-  let x1,x2 = weight x in
-  let y1,y2 = weight y in
-  if x1<y1 then Lt else
-  if x1>y1 then Gt else
-
-  match x.value, y.value with
-  | Mul _, Dis _ -> Lt
-  | 
-  | x,y -> match weighting y x with Lt->Gt | Gt->Lt | w->w
-
-type indeterminates = {
-  mutable multiplicative_commutators: int list}
-let indeterminates = {
-  multiplicative_commutators = []
-} *)
+let rec lex_list c = curry(function
+| [], [] -> 0
+| [], _ -> 1
+| _, [] -> -1
+| x::xx, y::yy -> (c *** lex_list c) (x,xx) (y,yy))
 
 
-let (><) = (@)
-let rec (^) m = function 0 -> [] | e -> m >< m^e
+(* debug print *)
+(* let patterns = Hashtbl.create 0
+let i x = let x=repr x in if is_int x then [magic x] else let s=size x in tag x :: List.(map magic (init s (fun a->a)));;*)
+module Debug = struct
+open List
+open Obj
+type any
 
-let commute _ _ = true
-let weighting _ _ = Eq
+(* helper *)
+let test (c:int) f x = let x = repr x in
+  if is_int x then 0 <= magic x && magic x < c
+  else f(tag x, init (size x) (magic(field x)))
 
-(* Given monomials m1,m2, find f1,f2 s.t. f1><m1 = f2><m2 =: “lcm m1 m2”. *)
-let rec lcm_factors m1 m2 = try match m1,m2 with
-  | (x1,e1)::_, (x2,e2)::_ ->
-    (* Compute heavest factors f1,f2 from the heavest indeterminates x1,x2. *)
-    let f1,f2 = match weighting x1 x2 with
-    | Eq -> [x1, max(e2-e1)0], [x2, max(e1-e2)0] (* e.g. A²BC³, B³C⁵ ↦ C⁵⁻³, C⁰ *)
-    | Lt -> [x2,e2], [] (* e.g. A²B, B³C⁵ ↦ C⁵, 1 *)
-    | Gt -> [], [x1,e1]
-    | Incomparable -> raise Exit
-    in(match f1><m1, f2><m2 with
-    (* After update by factors f1,f2, check that the heavest indeterminates y1,y2 now cancel, and recurse to lighter ones. Note that y1=y2 guards againts Some wrong result regardless of f1,f2. Hence e.g. case e1<0 or e2<0 needs no checks. *)
-    | y1::n1, y2::n2 when y1=y2 -> (match lcm_factors n1 n2 with
-      | Some(k1,k2) -> Some(k1><f1, k2><f2)
-      | _ -> raise Exit)
-    | _ -> raise Exit)
-  | m1,m2 -> Some(m2,m1) (* another is 1 *)
-  with Exit -> None
-(* at the leading monome level:
-nxⁿ = xⁿn
-Nn = nN
-Nxⁿ = x⬝xⁿN
-~n = - n~
-~N = N⁻¹~
-~xⁿ = x⁻ⁿ~
-𝟚n = 2 n𝟚
-𝟚N = NN𝟚
-𝟚xⁿ = xⁿxⁿ𝟚
-𝟚~ = ~𝟚
-*)
+let test_tag tag f = test 0 (fun(tag',data) -> tag=tag' && f data)
 
+(* Main building blocks of type test functions *)
+
+let any _ = true (* especially exceptions at the moment *)
+let int x = is_int(repr x)
+
+(* Test an algebraic data type: c is the number of constant constructors, and ttt is a list of lists of type tests for the parameters of other constructors, in order of appearence. *)
+let union c ttt = test c (fun(tag,data) ->
+  tag < length ttt &&
+  let tt = nth ttt tag in
+  length tt = length data &&
+  for_all2 id tt data)
+
+let rec list t = union 1 [[t; list t]]
+
+(* Test flat tuples and records: tt is a list of type test for the components, in order of appearence. *)
+let tuple tt = test_tag 0 (fun data -> length tt = length data && for_all2 id tt data)
+let array t = test_tag 0 (for_all t)
+let string x = test_tag string_tag any x
+let custom x = test_tag custom_tag any x (* e.g. int32 *)
+let lazy_any x = test_tag lazy_tag any x
+let lazy_force t x = test_tag lazy_tag ~=(t(Lazy.force(magic x))) x
+
+(* arbitrary precision *)
+let integer x = int x or custom x
+let rational x = tuple[integer; integer] x
+
+let builtin x = union 57 [[integer]; [rational]; [int]] x
+let rec term x = tuple[view; union 1 [[term]]; int; any; custom; lazy_force int] x
+and view x = union 0 [
+  [tuple[int;term]]; (* HVar *)
+  [int];
+  [union 4 []; term; term];
+  [tuple[int; string; list any]]; (* ID *)
+  [term; list term];
+  [builtin; list term]] x
+
+let base = function `Mono -> true | `Exp t |`Move t -> term t | _-> false
+let power x = tuple[base;int;int] x
+let monomial x = tuple[term; list power; term] x
+let poly x = array monomial x
+
+
+(* Registering adhoc polymorphic pretty printers *)
+
+let string_printers: ((any -> bool) * (any -> string)) list ref = ref[]
+
+let add_pp type_test to_string = string_printers := (type_test, to_string % magic) :: !string_printers
+
+let pp x =
+  let exception Result of string in
+  try magic!string_printers |> List.iter(fun(type_test, to_string) ->
+    if type_test x then raise(Result(to_string x)));
+    Batteries.dump x
+  with Result s -> s
+(* Sprinkle ~< in front of expressions you want to trace—often without rebracketing! *)
+let (~<)x = print_endline(pp x); x
+let (>~<) msg x = print_endline(msg ^" "^ pp x); x;;
+
+add_pp integer Z.to_string;
+add_pp rational Q.to_string;
+add_pp string id;
+add_pp term Term.to_string;
 
 end
+
+
+module Ore = struct
+type power = {base:[`Mono |`Exp of term |`Move of term]; var:int; exp:int}
+type monomial =
+    (* Example: (¾-2/a) ⬝ m³2ⁿ⁵aⁿ ⬝ M₊ₐ²N₊₁⁴ ⬝ f(m,n)  (= (¾-2/a) m³ 2⁵ⁿ aⁿ f(m+2a, n+4)) *)
+    term * power list * term
+type poly = monomial array
+
+let look_old, look_new = "0123456789-zyxwvutsr", String.split_on_char ' ' "⁰ ¹ ² ³ ⁴ ⁵ ⁶ ⁷ ⁸ ⁹ ⁻ ᶻ ʸ ˣ ʷ ᵛ ᵘ ᵗ ˢ ʳ"
+let super = String.to_seq %> List.of_seq %> List.map(fun c -> match String.index_opt look_old c with
+  | None -> String.make 1 c
+  | Some i -> List.nth look_new i) %> String.concat""
+
+let varstr n = String.make 1 (Char.chr(122 - n))
+let varStr n = String.make 1 (Char.chr(90 - n))
+
+let pp_power{base;var;exp} = match base with
+|`Mono -> varstr var ^ super(string_of_int exp)
+|`Exp t -> Term.to_string t ^ super(varstr var ^ string_of_int exp)
+|`Move t -> varStr var ^ super(string_of_int exp)
+
+let pp_mono(c,m,f) = Term.to_string c ^ String.concat"" (List.map pp_power m) ^ Term.to_string f
+
+let pp p = Array.(if length p = 0 then "0" else String.concat " + " (to_list(map pp_mono p)))
+
+
+(* Coefficient arithmetic. TODO use general simplification instead of or in addition to special casing ℤ constants. *)
+
+let _Z z = app_builtin ~ty:int (Int z) []
+let _z = _Z % Z.of_int
+
+let if_Z fZ f' t s = match view t, view s with
+| AppBuiltin(Int t', _), AppBuiltin(Int s', _) -> fZ t' s'
+| _ -> f' t s
+
+let (-|-) = if_Z (Z.(+)%>>_Z) (fun t s -> app_builtin ~ty:(ty t) Sum [t;s])
+let (><) = if_Z (Z.( * )%>>_Z) (fun t s -> app_builtin ~ty:(ty t) Product [t;s])
+let rec (^) t = function 0 -> _z 1 | e -> t >< t^(e-1)
+
+let lcm_coefs = if_Z Z.(fun t s -> let l r = _Z(divexact (lcm t s) r) in l t, l s) (fun t s -> s,t)
+
+
+(* Comparison functions for powers, monomials *)
+
+let rank x = (match x.base with
+  |`Mono -> 0, _z 0
+  |`Exp t -> 1, t
+  |`Move t -> 2, t
+), x.var
+
+let compare_rank = rank %%> ((-) *** Term.compare) *** (-)
+
+let mono_total_deg = List.fold_left (fun d x -> d + x.exp) 0
+let deg v = List.fold_left (fun d x -> if v.base=x.base && v.var=x.var then d + x.exp else d) 0
+
+(* TODO Make this double purpose: “term order” as by-product? *)
+let compare_mono = (fun(c,m,f) -> mono_total_deg m, (m, (f, c))) %%> (-) *** lex_list compare_rank *** Term.compare *** Term.compare
+
+(* Arithmetic of polynomials etc. Main operations to superpose polynomials are: addition, multiplication by monomial, and pre-lcm of monomials. *)
+
+let poly0 = Array.of_list[]
+let set_exp x e = if e=0 then [] else [{x with exp=e}]
+
+(* Make a polynomial by summing list of full monomials. *)
+let sum_monomials =
+  let rec sum_sorted = function
+  | (c,n,f)::(c',n',f')::more when n=n' && f=f' -> sum_sorted((c-|-c', n, f)::more)
+  | (c,n,f)::more when c = _z 0 -> sum_sorted more
+  | m::more -> m:: sum_sorted more
+  | [] -> []
+  in
+  Array.of_list % sum_sorted % List.sort(flip compare_mono)
+
+(* polynomial + polynomial *)
+let (++) p r = sum_monomials Array.(to_list p @ to_list r)
+
+(* constant × polynomial *)
+let ( *:) a = if a = _z 0 then ~=poly0 else Array.map(fun(c,m,f) -> (a><c, m, f))
+
+(* monomial × polynomial *)
+let ( **:) mon =
+  let open List in
+  (* Multiply (coefficient, monomial, reversed monomial) triplet. Result is a list of monomials. Remember that the lists representing monomials are in reverse visual order. *)
+  let rec mul o=o|> flatten % map(function
+  | (coef, m), [] -> [coef, m]
+  | (coef, []), m_rev -> [coef, rev m_rev]
+  | (coef, n::m), v::w_rev -> match compare_rank n v with
+    (* merge n, v *)
+    | 0 -> [coef, rev w_rev @ set_exp v (n.exp+v.exp) @ m]
+    (* right order *)
+    | c when c<0 -> [coef, rev w_rev @ [n;v] @ m]
+    (* commute n, v *)
+    | _ -> let (&) m a = map(fun n -> (n,a)) m in
+      let s = n.var=v.var in
+      match n.base, v.base with
+      |`Move n', `Exp v' when s -> mul(mul[(coef >< v' ^ n.exp*v.exp, m), [n;v]] & w_rev)
+      |`Move n', `Mono when s -> mul(
+        (* c D₊ₐⁿ dᵛ = c (d+na)ᵛ D₊ₐⁿ = ∑k∈[0,v]: c(ᵛₖ)(na)ᵛ⁻ᵏ dᵏ D₊ₐⁿ *)
+        mul(init(v.exp+1)id |> map(fun k ->
+          (coef >< _Z Z.(bin (of_int v.exp) k) >< (_z n.exp >< n')^(v.exp-k), m), n :: set_exp v k)
+        ) & w_rev)
+      | _ -> mul(mul[(coef, m), [n;v]] & w_rev))
+  in
+  sum_monomials % flatten % map(fun(c,m,f) -> mul[(c, mon), rev m] |> map(fun(c',m') -> c',m',f)) % Array.to_list
+
+
+(* Given monomials m1,m2, find f1,f2 s.t. f1⬝m1 ≈ f2⬝m2 upto coefficients and lower order terms. *)
+let rec lcm_factors m1 m2 = match m1,m2 with
+  | [],_ | _,[] -> m2,m1
+  | x1::n1, x2::n2 ->
+    let e = x1.exp - x2.exp in
+    match compare_rank x1 x2 with
+    | 0 -> let f1,f2 = lcm_factors n1 n2 in
+      (* e.g. A²BC⁵, B³C² ⇒ add C⁰, C⁵⁻² to lcm_ A²B, B³ *)
+      set_exp x1 (max (-e) 0) @ f1, set_exp x2 (max e 0) @ f2
+    | r when r<0 ->
+      (* e.g. A²B, B³C² ⇒ add C², 1 to lcm_ A²B, B³ *)
+      let f1,f2 = lcm_factors (x1::n1) n2 in x2::f1, f2
+    | _ -> let f1,f2 = lcm_factors n1 (x2::n2) in f1, x1::f2
+
+
+let superpose p1 p2 =
+  let f1, f2 = ((fun(_,m,_)->m) %%> lcm_factors) p1.(0) p2.(0) in
+  let p'1, p'2 = f1**:p1, f2**:p2 in
+  let a1, a2 = ((fun(c,_,_)->c) %%> lcm_coefs) p'1.(0) p'2.(0) in
+  a1*:p'1 ++ (_z(-1)><a2)*:p'2
+
+end
+
+
+
 
 module MakeSumSolver(MainEnv: Env.S) = struct
 (* module Env = MainEnv *)
@@ -162,7 +254,18 @@ let polyform_cache =
   let module NoMemoryLeakMap = Weak.Make(HashLiteral) in
   NoMemoryLeakMap.create 0
 
+let polyform l = None
+
+let fake_poly_lit = const ~ty:int % ID.make % Ore.pp
+
 let clauseset clauselist = {Clause.c_set= of_list clauselist; c_sos= of_list[]}
+
+let superpose_poly l1 = match polyform l1 with
+| None -> ~=[]
+| Some p1 ->
+  fun l2 -> match polyform l2 with
+  | None -> []
+  | Some p2 -> [fake_poly_lit(Ore.superpose p1 p2)]
 
 module SubEnv = Env.Make(struct
     module Ctx = MainEnv.Ctx
