@@ -47,9 +47,6 @@ type ('a, 'b) combination
 (** Lexicographic combination of comparators. It is, roughly,
     equivalent to ['a -> 'a -> 'b] *)
 
-val (>>>) : 'a comparator -> ('b, 'c) combination -> ('a, 'b -> 'b -> 'c) combination
-(** Lexicographic combination starting with the given function *)
-
 val last : 'a comparator -> ('a, t) combination
 (** Last comparator *)
 

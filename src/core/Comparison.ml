@@ -64,14 +64,6 @@ let last f = {
   ignore = (fun res _ _ -> res);
 }
 
-let (>>>) f g = {
-  call = (fun x y -> match f x y with
-      | Incomparable -> g.call
-      | res -> g.ignore res
-    );
-  ignore = (fun res _ _ -> g.ignore res);
-}
-
 let call f x y = f.call x y
 
 let dominates f l1 l2 =
