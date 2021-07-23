@@ -797,19 +797,32 @@ module LambdaFreeKBOCoeff : ORD = struct
 end
 
 module Polynomial = struct
+  type unknown =
+    | EtaUnknown of ID.t (* h *)
+    | WeightUnknown of term (* w *)
+    | CoeffUnknown of term * int (* k *)
+
+  let equal : unknown -> unknown -> bool = Pervasives.(=)
+  let compare : unknown -> unknown -> int = Pervasives.compare
+
+  let hash_unknown unk = match unk with
+    | EtaUnknown id -> ID.hash id
+    | WeightUnknown t -> Term.hash t
+    | CoeffUnknown (t, i) -> Term.hash t + i + 1
+
   module Polynomial = CCHashtbl.Make(struct
-      type t = int list
-      let equal = CCList.equal Int.equal
-      let hash = (Hash.list (fun x -> x))
+      type t = unknown list
+      let equal = CCList.equal equal
+      let hash = (Hash.list hash_unknown)
     end)
 
-  let mk_key = List.sort CCInt.compare
+  let mk_key = List.sort compare
 
   let create_zero_polynomial () = Polynomial.create 16
 
-  let add_monomial poly coeff vars =
+  let add_monomial poly coeff unks =
     if coeff != 0 then (
-      let key = mk_key vars in
+      let key = mk_key unks in
       match Polynomial.find_opt poly key with
       | None -> Polynomial.add poly key coeff
       | Some old_coeff ->
@@ -824,11 +837,11 @@ module Polynomial = struct
   let negate_polynomial poly =
     multiply_coeffs poly (-1)
 
-  let multiply_vars poly vars =
+  let multiply_unknowns poly unks =
     let old_poly = Polynomial.copy poly in
     Polynomial.clear poly;
     Polynomial.iter (fun key -> fun coeff ->
-      Polynomial.add poly (key @ vars) coeff) old_poly
+      Polynomial.add poly (key @ unks) coeff) old_poly
 
   let add_polynomial poly =
     Polynomial.iter (fun key -> fun coeff -> add_monomial poly coeff key)
