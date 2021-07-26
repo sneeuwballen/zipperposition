@@ -4,7 +4,7 @@
   (name logtk)
   (public_name logtk)
   (synopsis "core data structures and algorithms for Logtk")
-  (libraries containers containers-data iter oseq zarith
+  (libraries containers containers-data iter oseq
              unix mtime mtime.clock.os logtk.arith)
   (flags :standard -w -32-50 -open Logtk_arith)
   (c_names util_stubs)
