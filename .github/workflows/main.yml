@@ -1,19 +1,27 @@
 name: build
-on: [push]
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
 jobs:
   run:
     name: Build
     runs-on: ${{ matrix.operating-system }}
     strategy:
       matrix:
-        #operating-system: [macos-latest, ubuntu-latest, windows-latest]
-        operating-system: [ubuntu-latest]
-        ocaml-version: [ '4.07.0' ]
+        #os: [macos-latest, ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest]
+        ocaml-compiler:
+          - 4.07.x
+          - 4.12.x
     steps:
-    - uses: actions/checkout@master
-    - uses: avsm/setup-ocaml@master
+    - uses: actions/checkout@v2
+    - uses: ocaml/setup-ocaml@v2
       with:
-        ocaml-version: ${{ matrix.ocaml-version }}
+        ocaml-compiler: ${{ matrix.ocaml-compiler }}
     - run: opam pin -n .
     - run: opam depext -yt zipperposition
     - run: opam install -t . --deps-only
