@@ -92,7 +92,7 @@ module Make(E : Map.OrderedType) = struct
       !m
 
     let to_iter (m:t) k =
-      M.iter (fun x n -> for _i=1 to Z.to_int n do k x; done) m
+      M.iter (fun x n -> for _i=1 to Z.to_int_exn n do k x; done) m
 
     let of_coeffs m seq =
       let m = ref m in

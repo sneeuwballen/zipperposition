@@ -1,8 +1,9 @@
 
 (executable
   (name run_tests)
-  (libraries logtk logtk.parsers logtk.arbitrary iter qcheck-core qcheck-alcotest alcotest)
-  (flags :standard -warn-error -3 -w -3-50 -color always))
+  (libraries logtk logtk.parsers logtk.arbitrary logtk.arith
+             iter qcheck-core qcheck-alcotest alcotest)
+  (flags :standard -warn-error -3 -w -3-50 -color always -open Logtk_arith))
 
 (alias
  (name    runtest)
