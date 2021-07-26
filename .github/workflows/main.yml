@@ -9,7 +9,7 @@ on:
 jobs:
   run:
     name: Build
-    runs-on: ${{ matrix.operating-system }}
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         #os: [macos-latest, ubuntu-latest, windows-latest]
