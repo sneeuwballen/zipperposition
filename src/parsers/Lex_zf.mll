@@ -68,6 +68,7 @@ rule token = parse
   | "pi" { PI }
   | "if" { IF }
   | "let" { LET }
+  | "with" { WITH }
   | "in" { IN }
   | "then" { THEN }
   | "else" { ELSE }

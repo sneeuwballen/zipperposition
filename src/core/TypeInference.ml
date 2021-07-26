@@ -539,6 +539,17 @@ let rec infer_rec ?loc ctx (t:PT.t) : T.t =
                 T.let_ ?loc [v, t] body)
       in
       aux l
+    | PT.With (l, u) ->
+      let vars =
+        List.map
+          (fun (v,ty) ->
+             let ty = infer_ty_ ?loc ctx ty in
+             v, Some ty)
+          l
+      in
+      (* add vars in scope, but just return [u] *)
+      with_typed_vars_ ctx ?loc ~infer_ty:(fun ?loc:_ _ ty -> ty) vars
+        ~f:(fun _vars -> infer_rec ?loc ctx u)
     | PT.Match (u, l) ->
       let u = infer_rec ?loc ctx u in
       let ty_u = T.ty_exn u in
