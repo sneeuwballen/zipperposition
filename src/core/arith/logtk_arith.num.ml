@@ -29,12 +29,12 @@ module Z = struct
   let leq a b = compare_big_int a b <= 0
   let gt a b = compare_big_int a b > 0
   let lt a b = compare_big_int a b < 0
-  let hash : t -> int = Hashtbl.hash
+  let hash x = Hashtbl.hash (to_string x)
   let rem = mod_big_int
   let div_rem a b = div a b, rem a b
   let abs = abs_big_int
   let compare = compare_big_int
-  let equal = (=)
+  let equal = eq_big_int
   let neg = minus_big_int
   let pp_print out n = Format.fprintf out "%s" (string_of_big_int n)
 end
@@ -60,7 +60,7 @@ module Q = struct
   let leq = le_ratio
   let geq = ge_ratio
   let pp_print out n = Format.fprintf out "%s" (to_string n)
-  let hash : t -> int = Hashtbl.hash
+  let hash x = Hashtbl.hash (to_string x)
   let neg = minus_ratio
   let equal = eq_ratio
   let compare = compare_ratio
