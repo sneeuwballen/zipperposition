@@ -7,6 +7,7 @@
  (name    runtest)
  (package zipperposition)
  (locks   /tlock)
+ (enabled_if (= %{ocaml-config:os_type} Unix))
  (deps    main/zipperposition.exe test_must_pass.sh (source_tree ../examples/))
  (action  (run ./test_must_pass.sh ./main/zipperposition.exe)))
 
