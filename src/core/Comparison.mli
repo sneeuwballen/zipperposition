@@ -5,7 +5,7 @@
 
 (** {2 Combined nonstrict-strict partial orders} *)
 
-type nonstrict_t = NLt | NLeq | NEq | NGeq | NGt | NIncomparable
+type nonstrict_t = NsLt | NsLeq | NsEq | NsGeq | NsGt | NsIncomparable
 
 type nonstrict_comparison = nonstrict_t
 

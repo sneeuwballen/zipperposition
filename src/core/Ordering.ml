@@ -253,7 +253,7 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
   let weight_var_headed = W.one
 
   let weight prec ~below_lam = function
-    | Head.Q _ -> if P.ignore_deep_quants && below_lam then W.one else  W.omega
+    | Head.Q _ -> if P.ignore_deep_quants && below_lam then W.one else W.omega
     | Head.B _ -> W.one
     | Head.I s -> Prec.weight prec s
     | Head.V _ -> weight_var_headed
@@ -796,46 +796,46 @@ module LambdaFreeKBOCoeff : ORD = struct
       | _ -> assert false
 end
 
+(* This imperative polynomial data structure is designed to offer efficient
+complexity. *)
 module Polynomial = struct
   type unknown =
-    | EtaUnknown of ID.t (* h *)
-    | WeightUnknown of term (* w *)
-    | CoeffUnknown of term * int (* k *)
+    | EtaUnknown of Type.t HVar.t  (* h *)
+    | WeightUnknown of term  (* w *)
+    | CoeffUnknown of term * int  (* k *)
 
   let equal : unknown -> unknown -> bool = Pervasives.(=)
   let compare : unknown -> unknown -> int = Pervasives.compare
 
-  let hash_unknown unk = match unk with
-    | EtaUnknown id -> ID.hash id
+  let hash unk = match unk with
+    | EtaUnknown var -> HVar.hash var
     | WeightUnknown t -> Term.hash t
     | CoeffUnknown (t, i) -> Term.hash t + i + 1
 
   module Polynomial = CCHashtbl.Make(struct
       type t = unknown list
       let equal = CCList.equal equal
-      let hash = (Hash.list hash_unknown)
+      let hash = Hash.list hash
     end)
 
   let mk_key = List.sort compare
 
-  let create_zero_polynomial () = Polynomial.create 16
+  let create_zero () = Polynomial.create 16
 
   let add_monomial poly coeff unks =
-    if coeff != 0 then (
+    if coeff != W.zero then (
       let key = mk_key unks in
       match Polynomial.find_opt poly key with
       | None -> Polynomial.add poly key coeff
       | Some old_coeff ->
-        if old_coeff + coeff = 0 then Polynomial.remove poly key
-        else Polynomial.add poly key (old_coeff + coeff)
+        let sum = W.add old_coeff coeff in
+        if sum = W.zero then Polynomial.remove poly key
+        else Polynomial.add poly key sum
     )
 
-  let multiply_coeffs poly coeff =
+  let multiply_coeffs poly k =
     Polynomial.filter_map_inplace (fun _ -> fun old_coeff ->
-      Some (coeff * old_coeff))
-
-  let negate_polynomial poly =
-    multiply_coeffs poly (-1)
+      Some (W.mult k old_coeff)) poly
 
   let multiply_unknowns poly unks =
     let old_poly = Polynomial.copy poly in
@@ -845,14 +845,184 @@ module Polynomial = struct
 
   let add_polynomial poly =
     Polynomial.iter (fun key -> fun coeff -> add_monomial poly coeff key)
+
+  let subtract_polynomial poly =
+    Polynomial.iter (fun key -> fun coeff ->
+      add_monomial poly (W.mult (-1) coeff) key)
+
+  let for_all_coeffs p poly =
+    Polynomial.fold (fun _ -> fun coeff -> fun res -> res && p coeff) poly true
+
+  let constant_monomial poly =
+    match Polynomial.find_opt poly [] with
+    | None -> W.zero
+    | Some coeff -> coeff
 end
 
 module LambdaKBO : ORD = struct
   let name = "lambda_kbo"
 
-  let nonstrict_compare_terms ~prec s t =
+  let compare_types t_ty s_ty =
+    if t_ty = s_ty then
+      NsEq
+    else
+      NsEq
+
+  let add_monomial w sign coeff unks =
+    Polynomial.add_monomial w (W.mult sign coeff) unks
+
+  let add_polynomial w sign w' =
+    (if sign > 0 then Polynomial.add_polynomial
+     else Polynomial.subtract_polynomial) w w'
+
+  let rec add_weight_of ~prec bound_tys w sign t =
+    let add_weights_of w args =
+      List.iter (add_weight_of ~prec bound_tys w sign) args
+    in
+    let add_eta_extra_of w ty = match Type.view ty with
+      | Var var -> add_monomial w sign W.one [Polynomial.EtaUnknown var]
+      | _ -> ()
+    in
+    let (hd_tyargs, args) = T.as_app_mono t in
+    let (hd, _) = T.as_app hd_tyargs in
+
+    match T.view hd with
+    | AppBuiltin (_, bargs) -> add_weights_of w (bargs @ args)
+    | DB i ->
+      add_monomial w sign W.one [];
+      add_weights_of w args;
+      add_eta_extra_of w (List.nth bound_tys i)
+    | Var _ ->
+      (let dummy = hd (* use the variable itself for missing arguments *) in
+       let categorize_var_arg (hd_some_args, extra_args) arg arg_ty =
+         if Type.is_tType arg_ty || Type.is_var arg_ty
+             || Type.is_fun arg_ty then
+           (Term.app hd_some_args [arg], extra_args)
+         else
+           (Term.app hd_some_args [dummy], arg :: extra_args)
+       in
+       let rec normalize_consts t = match T.view t with
+         | AppBuiltin (b, bargs) ->
+           Term.app_builtin ~ty:(Term.ty t) b (List.map normalize_consts bargs)
+         | Const fid ->
+           let fid' = ID.make (W.to_string (Prec.weight prec fid)) in
+           Term.const ~ty:(Term.ty t) fid'
+         | Fun (ty, body) -> Term.fun_ ty (normalize_consts body)
+         | App (s, ts) ->
+           Term.app (normalize_consts s) (List.map normalize_consts ts)
+         | _ -> t
+       in
+       let hd_ty = Term.ty hd in
+       let (arg_tys, _) = Type.open_fun hd_ty in
+       let (hd_some_args, extra_args) =
+          List.fold_left2 categorize_var_arg (hd, []) args arg_tys in
+       let normal_hd_some_args = normalize_consts hd_some_args in
+       add_monomial w sign W.one [];
+       add_monomial w sign W.one
+         [Polynomial.WeightUnknown normal_hd_some_args];
+       let add_weight_of_extra_arg i arg =
+         let w' = Polynomial.create_zero () in
+         add_weight_of ~prec bound_tys w' sign arg;
+         add_monomial w' (-1 * sign) W.one [];
+         Polynomial.multiply_unknowns w'
+           [Polynomial.CoeffUnknown (normal_hd_some_args, i + 1)];
+         add_polynomial w sign w'
+       in
+       List.iteri add_weight_of_extra_arg extra_args)
+    | Const fid ->
+      add_monomial w sign (Prec.weight prec fid) [];
+      add_weights_of w args;
+      add_eta_extra_of w (Term.ty t)
+    | Fun (ty, body) ->
+      add_monomial w sign W.one [];
+      add_weight_of ~prec (ty :: bound_tys) w sign body
+    | App _ -> ()  (* impossible *)
+
+  let rec merge_with_NsGeq cmp = match cmp with
+    | NsLt | NsLeq -> NsIncomparable
+    | NsEq -> NsGeq
+    | _ -> cmp
+
+  let rec merge_with_NsLeq cmp = match cmp with
+    | NsGt | NsGeq -> NsIncomparable
+    | NsEq -> NsLeq
+    | _ -> cmp
+
+  let rec lex_ext_data f ys xs = match ys, xs with
+    | [], [] -> ([], NsEq)
+    | y :: ys, x :: xs ->
+      (match f y x with
+       | (w, NsGeq) ->
+         let (ws, cmp) = lex_ext_data f ys xs in
+           (w :: ws, merge_with_NsGeq cmp)
+       | (w, NsEq) ->
+         let (ws, cmp) = lex_ext_data f ys xs in
+           (w :: ws, cmp)
+       | (w, NsLeq) ->
+         let (ws, cmp) = lex_ext_data f ys xs in
+           (w :: ws, merge_with_NsLeq cmp)
+       | (w, cmp) -> ([w], cmp))
+    | _, _ -> ([], NsIncomparable)  (* impossible *)
+
+  let analyze_weight_diff w =
+    match Polynomial.for_all_coeffs (fun coeff -> W.sign coeff >= 0) w,
+      Polynomial.for_all_coeffs (fun coeff -> W.sign coeff <= 0) w with
+    | false, false -> NsIncomparable
+    | true, false -> if W.sign (Polynomial.constant_monomial w) > 0 then NsGt else NsGeq
+    | false, true -> if W.sign (Polynomial.constant_monomial w) < 0 then NsLt else NsLeq
+    | true, true -> NsEq
+
+  let consider_weight w cmp =
+    (w,
+     match analyze_weight_diff w with
+     | NsGeq -> merge_with_NsGeq cmp
+     | NsEq -> cmp
+     | NsLeq -> merge_with_NsLeq cmp
+     | cmp' -> cmp')
+
+  let consider_weight_diff_of ~prec t s cmp =
+    let w = Polynomial.create_zero () in
+    add_weight_of ~prec [] w (+1) t;
+    add_weight_of ~prec [] w (-1) s;
+    consider_weight w cmp
+
+  let rec process_args ~prec ts ss =
+    let w = Polynomial.create_zero () in
+    let (ws, cmp) = lex_ext_data (process_terms ~prec) ts ss in
+    let m = List.length ws in
+    List.iter (add_polynomial w (+1)) ws;
+    List.iter2 (fun t -> fun s ->
+        add_weight_of ~prec [] w (+1) t;
+        add_weight_of ~prec [] w (-1) s)
+      (CCList.drop m ts) (CCList.drop m ss);
+    consider_weight w cmp
+  and process_terms ~prec t s =
+    let (t_hd_tyargs, t_args) = T.as_app_mono t in
+    let (t_hd, _) = T.as_app t_hd_tyargs in
+    let (s_hd_tyargs, s_args) = T.as_app_mono s in
+    let (s_hd, _) = T.as_app s_hd_tyargs in
+    match T.view t_hd, T.view s_hd with
+    | Fun (t_ty, t_body), Fun (s_ty, s_body) ->
+      (match compare_types t_ty s_ty with
+       | NsEq -> process_terms ~prec t_body s_body
+       | cmp -> consider_weight_diff_of ~prec t_body s_body cmp)
+    | _ -> consider_weight (Polynomial.create_zero ())(*FIXME*) NsIncomparable
+
+(*
+    | AppBuiltin (_, bargs) ->
+    | DB i ->
+    | Var _ ->
+    | Const fid ->
+    | Fun (ty, body) ->
+    | App _ -> ()  (* impossible *)
+*)
+
+  let nonstrict_compare_terms ~prec s0 t0 =
     ZProf.enter_prof prof_lambda_kbo;
-    let res = NIncomparable in
+    let s = Lambda.eta_expand s0 in
+    let t = Lambda.eta_expand t0 in
+
+    let res = NsIncomparable in
     ZProf.exit_prof prof_lambda_kbo;
     res
 

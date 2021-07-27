@@ -26,7 +26,7 @@ module Weight = struct
   let make omega one = {omega; one}
 
   let int i : t = make 0 i
-  let zero = int  0
+  let zero = int 0
   let one = int 1
   let omega : t = make 1 0
   let omega_plus i : t = make 1 i
