@@ -862,18 +862,25 @@ end
 module LambdaKBO : ORD = struct
   let name = "lambda_kbo"
 
-  let compare_types t_ty s_ty =
-    if t_ty = s_ty then
-      NsEq
-    else
-      NsEq
-
   let add_monomial w sign coeff unks =
     Polynomial.add_monomial w (W.mult sign coeff) unks
 
   let add_polynomial w sign w' =
     (if sign > 0 then Polynomial.add_polynomial
      else Polynomial.subtract_polynomial) w w'
+
+  module Type_KBO = MakeKBO(struct
+      let name = "type_kbo"
+      let lambda_mode = false
+      let ignore_deep_quants = true
+    end)
+
+  let compare_type_terms ~prec ty_t ty_s =
+    Comparison.nonstrict_of_strict (Type_KBO.compare_terms ~prec:prec ty_t ty_s)
+
+  let compare_types ~prec t_ty s_ty =
+    if t_ty = s_ty then NsEq
+    else NsIncomparable  (* imprecise but fast *)
 
   let rec add_weight_of ~prec bound_tys w sign t =
     let add_weights_of w args =
@@ -948,19 +955,29 @@ module LambdaKBO : ORD = struct
     | NsEq -> NsLeq
     | _ -> cmp
 
+  let rec lex_ext f ys xs = match ys, xs with
+    | [], [] -> NsEq
+    | y :: ys, x :: xs ->
+      (match f y x with
+       | NsGeq -> merge_with_NsGeq (lex_ext f ys xs)
+       | NsEq -> lex_ext f ys xs
+       | NsLeq -> merge_with_NsLeq (lex_ext f ys xs)
+       | cmp -> cmp)
+    | _, _ -> NsIncomparable  (* impossible *)
+
   let rec lex_ext_data f ys xs = match ys, xs with
     | [], [] -> ([], NsEq)
     | y :: ys, x :: xs ->
       (match f y x with
        | (w, NsGeq) ->
          let (ws, cmp) = lex_ext_data f ys xs in
-           (w :: ws, merge_with_NsGeq cmp)
+         (w :: ws, merge_with_NsGeq cmp)
        | (w, NsEq) ->
          let (ws, cmp) = lex_ext_data f ys xs in
-           (w :: ws, cmp)
+         (w :: ws, cmp)
        | (w, NsLeq) ->
          let (ws, cmp) = lex_ext_data f ys xs in
-           (w :: ws, merge_with_NsLeq cmp)
+         (w :: ws, merge_with_NsLeq cmp)
        | (w, cmp) -> ([w], cmp))
     | _, _ -> ([], NsIncomparable)  (* impossible *)
 
@@ -998,31 +1015,48 @@ module LambdaKBO : ORD = struct
     consider_weight w cmp
   and process_terms ~prec t s =
     let (t_hd_tyargs, t_args) = T.as_app_mono t in
-    let (t_hd, _) = T.as_app t_hd_tyargs in
+    let (t_hd, t_tyargs) = T.as_app t_hd_tyargs in
     let (s_hd_tyargs, s_args) = T.as_app_mono s in
-    let (s_hd, _) = T.as_app s_hd_tyargs in
+    let (s_hd, s_tyargs) = T.as_app s_hd_tyargs in
     match T.view t_hd, T.view s_hd with
+    | Var y, Var x ->
+      consider_weight_diff_of ~prec t s (if y = x then NsEq else NsIncomparable)
+    | Var _, _ | _, Var _ -> consider_weight_diff_of ~prec t s NsIncomparable
     | Fun (t_ty, t_body), Fun (s_ty, s_body) ->
-      (match compare_types t_ty s_ty with
+      (match compare_types ~prec t_ty s_ty with
        | NsEq -> process_terms ~prec t_body s_body
        | cmp -> consider_weight_diff_of ~prec t_body s_body cmp)
-    | _ -> consider_weight (Polynomial.create_zero ())(*FIXME*) NsIncomparable
-
-(*
-    | AppBuiltin (_, bargs) ->
-    | DB i ->
-    | Var _ ->
-    | Const fid ->
-    | Fun (ty, body) ->
-    | App _ -> ()  (* impossible *)
-*)
+    | Fun _, (DB _|Const _|AppBuiltin _) -> consider_weight_diff_of ~prec t s NsGt
+    | DB _, Fun _ -> consider_weight_diff_of ~prec t s NsLt
+    | DB j, DB i ->
+      if j > i then consider_weight_diff_of ~prec t s NsGt
+      else if j < i then consider_weight_diff_of ~prec t s NsLt
+      else process_args ~prec t_args s_args
+    | DB _, (Const _|AppBuiltin _) -> consider_weight_diff_of ~prec t s NsGt
+    | Const _, (Fun _|DB _) -> consider_weight_diff_of ~prec t s NsLt
+    | Const gid, Const fid ->
+      (match Prec.compare prec gid fid with
+       | 0 ->
+         (match lex_ext (compare_type_terms ~prec) t_tyargs s_tyargs with
+          | NsEq -> process_args ~prec t_args s_args
+          | cmp -> consider_weight_diff_of ~prec t s cmp)
+       | n when n > 0 -> consider_weight_diff_of ~prec t s NsGt
+       | _ -> consider_weight_diff_of ~prec t s NsLt)
+    | Const _, AppBuiltin _ -> consider_weight_diff_of ~prec t s NsGt
+    | AppBuiltin _, (Fun _|DB _|Const _) -> consider_weight_diff_of ~prec t s NsLt
+    | AppBuiltin (t_b, t_bargs), AppBuiltin (s_b, s_bargs) ->
+      (match Builtin.compare t_b s_b with
+       | 0 -> process_args ~prec (t_bargs @ t_tyargs @ t_args)
+         (s_bargs @ s_tyargs @ s_args)
+       | n when n > 0 -> consider_weight_diff_of ~prec t s NsGt
+       | _ -> consider_weight_diff_of ~prec t s NsLt)
+    | _, _ -> assert false
 
   let nonstrict_compare_terms ~prec s0 t0 =
     ZProf.enter_prof prof_lambda_kbo;
     let s = Lambda.eta_expand s0 in
     let t = Lambda.eta_expand t0 in
-
-    let res = NsIncomparable in
+    let (_, res) = process_terms ~prec t s in
     ZProf.exit_prof prof_lambda_kbo;
     res
 

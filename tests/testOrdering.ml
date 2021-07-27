@@ -228,7 +228,7 @@ let test_lambdafree_rpo = "ordering.lambdafree_rpo", `Quick, fun () ->
   Alcotest.(check comp_test) "f a a > f b" (compare (Term.app f [a;a]) (Term.app f [b])) Comparison.Gt
 
 let test_derived_ho_kbo = "ordering.derived_ho_kbo", `Quick, fun () ->
-  (* alphabetical precedence, h has weight 2, all other symbols weight 1*)
+  (* alphabetical precedence, h has weight 2, all other symbols weight 1 *)
   let weight id = (if id=h_ then Precedence.Weight.add Precedence.Weight.one Precedence.Weight.one else Precedence.Weight.one) in
   let ord = O.derived_ho_kbo ~ignore_quans_under_lam:true
       (Precedence.create ~weight Precedence.Constr.alpha [a_; b_; c_; f_; g_; h_]) in
@@ -365,12 +365,106 @@ let test_lambdafree_kbo = "ordering.lambdafree_kbo", `Quick, fun () ->
           (T.app app [ty1; ty1; T.app app [ty1; ty2; add; x]; T.app app [ty1; ty1; s; y]])
       ) Comparison.Gt
 
+(* based on test_derived_ho_kbo *)
+let test_lambda_kbo = "ordering.lambda_kbo", `Quick, fun () ->
+  (* alphabetical precedence, h has weight 2, all other symbols weight 1 *)
+  let weight id = (if id=h_ then Precedence.Weight.add Precedence.Weight.one Precedence.Weight.one else Precedence.Weight.one) in
+  let ord = O.lambda_kbo
+      (Precedence.create ~weight Precedence.Constr.alpha [a_; b_; c_; f_; g_; h_]) in
+  let compare = O.compare ord in
+
+  (* h (x y) > f a (x y) *)
+  let f = Term.const ~ty:(Type.arrow [ty; ty] ty) f_ in
+  let h = Term.const ~ty:(Type.arrow [ty] ty) h_ in
+  let a = Term.const ~ty a_ in
+  let x = Term.var (HVar.fresh ~ty:(Type.arrow [ty] ty) ()) in
+  let y = Term.var (HVar.fresh ~ty ()) in
+  Alcotest.(check comp_test) "h (x y) > f y (x a)"
+    (compare (Term.app h [Term.app x [y]]) (Term.app f [a; Term.app x [y]])) Comparison.Gt;
+
+  (* forall x. x > h a a a *)
+  let h = Term.const ~ty:(Type.arrow [ty;ty;ty] ty) h_ in
+  let a = Term.const ~ty a_ in
+  Alcotest.(check comp_test) "forall x. x > h a a a"
+    (compare 
+      (Term.app_builtin ~ty:Type.prop Builtin.ForallConst [Term.of_ty Type.prop; Term.fun_l [Type.prop] (Term.bvar ~ty:Type.prop 0)]) 
+      (Term.app h [a;a;a])) Comparison.Gt;
+
+  (* fun y. forall x. x < h a a a *)
+  let h = Term.const ~ty:(Type.arrow [ty;ty;ty] ty) h_ in
+  let a = Term.const ~ty a_ in
+  Alcotest.(check comp_test) "fun y. forall x. x < h a a a"
+    (compare 
+      (Term.fun_l [ty]
+        (Term.app_builtin ~ty:Type.prop Builtin.ForallConst [Term.of_ty Type.prop; Term.fun_l [Type.prop] (Term.bvar ~ty:Type.prop 0)]) 
+      )
+      (Term.app h [a;a;a])) Comparison.Lt;
+
+  (* fun y. z <> z (Variables above and below lambdas need to be treated as if they were different variables) *)
+  let z = Term.var (HVar.fresh ~ty ()) in
+  Alcotest.(check comp_test) "fun y. z <> z"
+    (compare (Term.fun_l [ty] z) z) Comparison.Incomparable;
+
+  (* f z > z *)
+  let f = Term.const ~ty:(Type.arrow [ty] ty) f_ in
+  let z = Term.var (HVar.fresh ~ty ()) in
+  Alcotest.(check comp_test) "f z > z"
+    (compare (Term.app f [z]) z) Comparison.Gt;
+
+  (* z a <> z (Because of fluidity) *)
+  let a = Term.const ~ty a_ in
+  let z = Term.var (HVar.fresh ~ty:(Type.arrow [ty] ty) ()) in
+  Alcotest.(check comp_test) "z a <> z"
+    (compare (Term.app z [a]) z) Comparison.Incomparable;
+
+  (* lam x. z x a <> z (Because of fluidity) *)
+  let a = Term.const ~ty a_ in
+  let z = Term.var (HVar.fresh ~ty:(Type.arrow [ty; ty] ty) ()) in
+  Alcotest.(check comp_test) "lam x. z x a <> z"
+    (compare (Term.fun_l [ty] (Term.app z [Term.bvar ~ty 0; a])) z) Comparison.Incomparable;
+
+  (* polymorphic example *)
+  let funty_ = (ID.make "funty") in
+  let appty = Type.forall_n 2 (Type.arrow [Type.app funty_ [Type.bvar 1; Type.bvar 0]; Type.bvar 1] (Type.bvar 0)) in
+  let app_ = ID.make "app" in
+  let app = T.const ~ty:appty app_ in
+  let add_ = ID.make "add" in
+  let add = T.const ~ty:(Type.app funty_ [ty;Type.app funty_ [ty;ty]]) add_ in
+  let s_ = ID.make "s" in
+  let s = T.const ~ty:(Type.app funty_ [ty;ty]) s_ in
+  let k_ = ID.make "k" in
+  let k = T.const ~ty k_ in
+  let zero_ = ID.make "zero" in
+  let zero = T.const ~ty zero_ in
+  let ty1 = Term.of_ty ty in
+  let ty2 = Term.of_ty (Type.app funty_ [ty; ty]) in
+  let ord = O.lambda_kbo
+      (Precedence.create ~weight Precedence.Constr.alpha [add_; app_; funty_; k_; s_; zero_]) in
+  let x = Term.var (HVar.fresh ~ty ()) in
+  let y = Term.var (HVar.fresh ~ty ()) in
+  let compare = O.compare ord in
+  (*app (app add (app s zero)) k > app (app add zero)(app s k)*)
+  Alcotest.(check comp_test)
+    "… > …"
+    (compare
+                  (T.app app [ty1; ty1; T.app app [ty1; ty2; add; (T.app app [ty1; ty1; s; zero])]; k])
+                  (T.app app [ty1; ty1; T.app app [ty1; ty2; add; zero]; T.app app [ty1; ty1; s; k]])
+               ) Comparison.Gt;
+  (*app (app add (app s x)) y > app (app add x)(app s y)*)
+  Alcotest.(check comp_test) 
+    "… > …"
+   (compare
+                   (T.app app [ty1; ty1; T.app app [ty1; ty2; add; (T.app app [ty1; ty1; s; x])]; y])
+                   (T.app app [ty1; ty1; T.app app [ty1; ty2; add; x]; T.app app [ty1; ty1; s; y]])
+                ) Comparison.Gt
+
 
 let suite =
   [ test_derived_ho_rpo;
     test_derived_ho_kbo;
     test_lambdafree_rpo;
-    test_lambdafree_kbo
+    test_lambdafree_kbo;
+    test_lambda_kbo;
   ]
 
 let props =
@@ -384,6 +478,7 @@ let props =
     [
       O.derived_ho_kbo ~ignore_quans_under_lam:true (Precedence.default []);
       O.derived_ho_rpo (Precedence.default []);
+      O.lambda_kbo (Precedence.default []);
     ]
   @
   CCList.flat_map
