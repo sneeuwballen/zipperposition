@@ -506,8 +506,14 @@ let check_unify_makes_eq  =
     try
       let subst = Unif.FO.unify_syn (t1,0) (t2,1) in
       if Unif.FO.equal ~subst (t1,0) (t2,1) then true
-      else QCheck.Test.fail_reportf
-          "subst=%a,@ t1=`%a`,@ t2=`%a`" Subst.pp subst T.ZF.pp t1 T.ZF.pp t2
+      else (
+        let renaming = Subst.Renaming.create() in
+        QCheck.Test.fail_reportf
+          "subst=%a,@ t1=`%a`,@ t2=`%a`,@ t1σ=`%a`,@ t2σ=`%a`"
+          Subst.pp subst T.ZF.pp t1 T.ZF.pp t2
+          T.ZF.pp (Subst.FO.apply renaming subst (t1,0))
+          T.ZF.pp (Subst.FO.apply renaming subst (t2,1))
+      )
     with Unif.Fail -> QCheck.assume_fail()
   in
   QCheck.Test.make ~long_factor:20 ~count:15_000 ~name gen prop
