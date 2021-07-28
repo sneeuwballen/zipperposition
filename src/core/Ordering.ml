@@ -142,7 +142,7 @@ end
 (** {3 Ordering implementations} *)
 
 (* compare the two heads (ID or builtin or variable) using the precedence *)
-let prec_compare prec a b = match a,b with
+let prec_compare prec a b = match a, b with
   | Head.I a, Head.I b ->
     begin match Prec.compare prec a b with
       | 0 -> Eq
@@ -486,7 +486,7 @@ module MakeRPO (P : PARAMETERS) : ORD = struct
     end
   (* try to dominate all the terms in ts by s; but by subterm property
      if some t' in ts is >= s then s < t=g(ts) *)
-  and cMA ~prec s ts = match ts with
+  and cMA ~prec s = function
     | [] -> Gt
     | t::ts' ->
       (match rpo6 ~prec s t with
@@ -807,15 +807,31 @@ module Polynomial = struct
   let equal : unknown -> unknown -> bool = Pervasives.(=)
   let compare : unknown -> unknown -> int = Pervasives.compare
 
-  let hash unk = match unk with
+  let hash_unknown = function
     | EtaUnknown var -> HVar.hash var
     | WeightUnknown t -> Term.hash t
     | CoeffUnknown (t, i) -> Term.hash t + i + 1
 
+  let pp_unknown out = function
+    | EtaUnknown var ->
+      Format.pp_print_string out "h_{";
+      HVar.pp out var;
+      Format.pp_print_string out "}"
+    | WeightUnknown t ->
+      Format.pp_print_string out "w_{";
+      Term.pp out t;
+      Format.pp_print_string out "}"
+    | CoeffUnknown (t, i) ->
+      Format.pp_print_string out "k_{";
+      Term.pp out t;
+      Format.pp_print_string out ",";
+      Format.pp_print_int out i;
+      Format.pp_print_string out "}"
+
   module Polynomial = CCHashtbl.Make(struct
       type t = unknown list
       let equal = CCList.equal equal
-      let hash = Hash.list hash
+      let hash = Hash.list hash_unknown
     end)
 
   let mk_key = List.sort compare
@@ -830,33 +846,48 @@ module Polynomial = struct
       | Some old_coeff ->
         let sum = W.add old_coeff coeff in
         if sum = W.zero then Polynomial.remove poly key
-        else Polynomial.add poly key sum
+        else Polynomial.replace poly key sum
     )
 
   let multiply_coeffs poly k =
-    Polynomial.filter_map_inplace (fun _ -> fun old_coeff ->
+    Polynomial.filter_map_inplace (fun _ old_coeff ->
       Some (W.mult k old_coeff)) poly
 
   let multiply_unknowns poly unks =
     let old_poly = Polynomial.copy poly in
     Polynomial.clear poly;
-    Polynomial.iter (fun key -> fun coeff ->
+    Polynomial.iter (fun key coeff ->
       Polynomial.add poly (key @ unks) coeff) old_poly
 
   let add_polynomial poly =
-    Polynomial.iter (fun key -> fun coeff -> add_monomial poly coeff key)
+    Polynomial.iter (fun key coeff -> add_monomial poly coeff key)
 
   let subtract_polynomial poly =
-    Polynomial.iter (fun key -> fun coeff ->
+    Polynomial.iter (fun key coeff ->
       add_monomial poly (W.mult (-1) coeff) key)
 
   let for_all_coeffs p poly =
-    Polynomial.fold (fun _ -> fun coeff -> fun res -> res && p coeff) poly true
+    Polynomial.fold (fun _ coeff res -> res && p coeff) poly true
 
   let constant_monomial poly =
     match Polynomial.find_opt poly [] with
     | None -> W.zero
     | Some coeff -> coeff
+
+  let pp out poly =
+    let first = ref true in
+    Polynomial.iter (fun key coeff ->
+         if !first then first := false else Format.pp_print_string out " + ";
+         Format.pp_print_string out "(";
+         W.pp out coeff;
+         Format.pp_print_string out ")";
+         if not (CCList.is_empty key) then (
+           Format.pp_print_string out "*";
+           CCList.pp ~pp_sep:(fun out () -> Format.pp_print_string out "*")
+             pp_unknown out key)
+         )
+      poly;
+    if !first then Format.pp_print_string out "0"
 end
 
 module LambdaKBO : ORD = struct
@@ -900,13 +931,16 @@ module LambdaKBO : ORD = struct
       add_weights_of w args;
       add_eta_extra_of w (List.nth bound_tys i)
     | Var _ ->
-      (let dummy = hd (* use the variable itself for missing arguments *) in
+      (let mk_placeholder_var ty =
+         Term.var (HVar.fresh ~ty ())
+       in
        let categorize_var_arg (hd_some_args, extra_args) arg arg_ty =
          if Type.is_tType arg_ty || Type.is_var arg_ty
              || Type.is_fun arg_ty then
            (Term.app hd_some_args [arg], extra_args)
          else
-           (Term.app hd_some_args [dummy], arg :: extra_args)
+           (Term.app hd_some_args [mk_placeholder_var arg_ty],
+            arg :: extra_args)
        in
        let rec normalize_consts t = match T.view t with
          | AppBuiltin (b, bargs) ->
@@ -945,15 +979,20 @@ module LambdaKBO : ORD = struct
       add_weight_of ~prec (ty :: bound_tys) w sign body
     | App _ -> ()  (* impossible *)
 
-  let rec merge_with_NsGeq cmp = match cmp with
+  let merge_with_NsGeq = function
     | NsLt | NsLeq -> NsIncomparable
     | NsEq -> NsGeq
-    | _ -> cmp
+    | cmp -> cmp
 
-  let rec merge_with_NsLeq cmp = match cmp with
+  let merge_with_NsLeq = function
     | NsGt | NsGeq -> NsIncomparable
     | NsEq -> NsLeq
-    | _ -> cmp
+    | cmp -> cmp
+
+  let nonstrict = function
+    | NsGt -> NsGeq
+    | NsLt -> NsLeq
+    | cmp -> cmp
 
   let rec lex_ext f ys xs = match ys, xs with
     | [], [] -> NsEq
@@ -980,6 +1019,11 @@ module LambdaKBO : ORD = struct
          (w :: ws, merge_with_NsLeq cmp)
        | (w, cmp) -> ([w], cmp))
     | _, _ -> ([], NsIncomparable)  (* impossible *)
+
+  let cw_ext_data f =
+    lex_ext_data (fun y x ->
+      let (w, cmp) = f y x in
+      (w, nonstrict cmp))
 
   let analyze_weight_diff w =
     match Polynomial.for_all_coeffs (fun coeff -> W.sign coeff >= 0) w,
@@ -1008,10 +1052,15 @@ module LambdaKBO : ORD = struct
     let (ws, cmp) = lex_ext_data (process_terms ~prec) ts ss in
     let m = List.length ws in
     List.iter (add_polynomial w (+1)) ws;
-    List.iter2 (fun t -> fun s ->
+    List.iter2 (fun t s ->
         add_weight_of ~prec [] w (+1) t;
         add_weight_of ~prec [] w (-1) s)
       (CCList.drop m ts) (CCList.drop m ss);
+    consider_weight w cmp
+  and process_var_args ~prec ts ss =
+    let w = Polynomial.create_zero () in
+    let (ws, cmp) = cw_ext_data (process_terms ~prec) ts ss in
+    List.iter (add_polynomial w (+1)) ws;
     consider_weight w cmp
   and process_terms ~prec t s =
     let (t_hd_tyargs, t_args) = T.as_app_mono t in
@@ -1019,8 +1068,8 @@ module LambdaKBO : ORD = struct
     let (s_hd_tyargs, s_args) = T.as_app_mono s in
     let (s_hd, s_tyargs) = T.as_app s_hd_tyargs in
     match T.view t_hd, T.view s_hd with
-    | Var y, Var x ->
-      consider_weight_diff_of ~prec t s (if y = x then NsEq else NsIncomparable)
+    | Var y, Var x when HVar.id y = HVar.id x ->
+      process_var_args ~prec t_args s_args
     | Var _, _ | _, Var _ -> consider_weight_diff_of ~prec t s NsIncomparable
     | Fun (t_ty, t_body), Fun (s_ty, s_body) ->
       (match compare_types ~prec t_ty s_ty with
@@ -1052,13 +1101,14 @@ module LambdaKBO : ORD = struct
        | _ -> consider_weight_diff_of ~prec t s NsLt)
     | _, _ -> assert false
 
-  let nonstrict_compare_terms ~prec s0 t0 =
+  let nonstrict_compare_terms ~prec t0 s0 =
     ZProf.enter_prof prof_lambda_kbo;
-    let s = Lambda.eta_expand s0 in
     let t = Lambda.eta_expand t0 in
-    let (_, res) = process_terms ~prec t s in
+    let s = Lambda.eta_expand s0 in
+    let (w, cmp) = process_terms ~prec t s in
+    CCFormat.printf "DEBUG weight %a\n" Polynomial.pp w;
     ZProf.exit_prof prof_lambda_kbo;
-    res
+    cmp
 
   let compare_terms ~prec s t =
     strict_of_nonstrict (nonstrict_compare_terms ~prec s t)
