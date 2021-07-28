@@ -196,6 +196,8 @@ module Make(X : sig
   let get_active () =
     ProofState.ActiveSet.clauses () |> C.ClauseSet.to_iter
 
+  let get_clauses () = Iter.append (get_active ()) (get_passive ())
+
   let add_binary_inf name rule =
     if not (List.mem_assoc name !_binary_rules)
     then _binary_rules := (name, rule) :: !_binary_rules
