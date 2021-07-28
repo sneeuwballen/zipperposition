@@ -478,7 +478,7 @@ let test_lambda_kbo = "ordering.lambda_kbo", `Quick, fun () ->
   let x = Term.var (HVar.fresh ~ty ()) in
   let y = Term.var (HVar.fresh ~ty:(Type.arrow [ty; ty] ty) ()) in
   Alcotest.(check comp_test) "c < f (Y X a) b"
-    Comparison.Lt (compare c (Term.app f [Term.app y [x; a]]));
+    Comparison.Lt (compare c (Term.app f [Term.app y [x; a]; b]));
 
   (* b > a *)
   let a = Term.const ~ty a_ in
@@ -486,12 +486,33 @@ let test_lambda_kbo = "ordering.lambda_kbo", `Quick, fun () ->
   Alcotest.(check comp_test) "b > a"
     Comparison.Incomparable (compare b a);
 
-  (* z b <> z a (should be >=) *)
+  (* f b > f a *)
+  let a = Term.const ~ty a_ in
+  let b = Term.const ~ty b_ in
+  let f = Term.const ~ty:(Type.arrow [ty] ty) f_ in
+  Alcotest.(check comp_test) "f b > f a"
+    Comparison.Incomparable (compare (Term.app f [b]) (Term.app f [a]));
+
+  (* f b a > f a b *)
+  let a = Term.const ~ty a_ in
+  let b = Term.const ~ty b_ in
+  let f = Term.const ~ty:(Type.arrow [ty; ty] ty) f_ in
+  Alcotest.(check comp_test) "f b a > f a b"
+    Comparison.Incomparable (compare (Term.app f [b; a]) (Term.app f [a; b]));
+
+  (* z b <> z a (should be >= with a nonstrict order) *)
   let a = Term.const ~ty a_ in
   let b = Term.const ~ty b_ in
   let z = Term.var (HVar.fresh ~ty:(Type.arrow [ty] ty) ()) in
   Alcotest.(check comp_test) "z b <> z a"
-    Comparison.Incomparable (compare (Term.app z [b]) (Term.app z [a]))
+    Comparison.Incomparable (compare (Term.app z [b]) (Term.app z [a]));
+
+  (* z b a <> z a b (should really be <>) *)
+  let a = Term.const ~ty a_ in
+  let b = Term.const ~ty b_ in
+  let z = Term.var (HVar.fresh ~ty:(Type.arrow [ty; ty] ty) ()) in
+  Alcotest.(check comp_test) "z b a <> z a b"
+    Comparison.Incomparable (compare (Term.app z [b; a]) (Term.app z [a; b]))
 
 let suite =
   [ test_derived_ho_rpo;
