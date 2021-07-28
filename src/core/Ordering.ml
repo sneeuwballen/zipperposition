@@ -860,6 +860,9 @@ module Polynomial = struct
         else Polynomial.replace poly key sum
     )
 
+  let add poly =
+    Polynomial.iter (fun key coeff -> add_monomial poly coeff key)
+
   let multiply_coeffs poly k =
     Polynomial.filter_map_inplace (fun _ old_coeff ->
       Some (W.mult k old_coeff)) poly
@@ -869,13 +872,6 @@ module Polynomial = struct
     Polynomial.clear poly;
     Polynomial.iter (fun key coeff ->
       Polynomial.add poly (key @ unks) coeff) old_poly
-
-  let add_polynomial poly =
-    Polynomial.iter (fun key coeff -> add_monomial poly coeff key)
-
-  let subtract_polynomial poly =
-    Polynomial.iter (fun key coeff ->
-      add_monomial poly (W.mult (-1) coeff) key)
 
   let for_all_coeffs p poly =
     Polynomial.fold (fun _ coeff res -> res && p coeff) poly true
@@ -906,10 +902,6 @@ module LambdaKBO : ORD = struct
 
   let add_monomial w sign coeff unks =
     Polynomial.add_monomial w (W.mult sign coeff) unks
-
-  let add_polynomial w sign w' =
-    (if sign > 0 then Polynomial.add_polynomial
-     else Polynomial.subtract_polynomial) w w'
 
   module Type_KBO = MakeKBO(struct
       let name = "type_kbo"
@@ -979,7 +971,7 @@ module LambdaKBO : ORD = struct
          add_monomial w' (-1 * sign) W.one [];
          Polynomial.multiply_unknowns w'
            [Polynomial.CoeffUnknown (normal_hd_some_args, i + 1)];
-         add_polynomial w sign w'
+         Polynomial.add w w'
        in
        List.iteri add_weight_of_extra_arg extra_args)
     | Const fid ->
@@ -1057,7 +1049,7 @@ module LambdaKBO : ORD = struct
     let w = Polynomial.create_zero () in
     let (ws, cmp) = lex_ext_data (process_terms ~prec bound_tys) ts ss in
     let m = List.length ws in
-    List.iter (add_polynomial w (+1)) ws;
+    List.iter (Polynomial.add w) ws;
     List.iter2 (fun t s ->
         add_weight_of ~prec bound_tys w (+1) t;
         add_weight_of ~prec bound_tys w (-1) s)
@@ -1066,7 +1058,7 @@ module LambdaKBO : ORD = struct
   and process_var_args ~prec bound_tys ts ss =
     let w = Polynomial.create_zero () in
     let (ws, cmp) = cw_ext_data (process_terms ~prec bound_tys) ts ss in
-    List.iter (add_polynomial w (+1)) ws;
+    List.iter (Polynomial.add w) ws;
     consider_weight w cmp
   and process_terms ~prec bound_tys t s =
     let (t_hd_tyargs, t_args) = T.as_app_mono t in
@@ -1123,11 +1115,7 @@ module LambdaKBO : ORD = struct
     ZProf.enter_prof prof_lambda_kbo;
     let t = Lambda.eta_expand t0 in
     let s = Lambda.eta_expand s0 in
-(*###*)
-CCFormat.printf "T = %a\n" T.pp t;
-CCFormat.printf "S = %a\n" T.pp s;
     let (w, cmp) = process_terms ~prec [] t s in
-CCFormat.printf "DEBUG weight %a\n" Polynomial.pp w;
     ZProf.exit_prof prof_lambda_kbo;
     cmp
 

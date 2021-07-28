@@ -466,8 +466,18 @@ let test_lambda_kbo = "ordering.lambda_kbo", `Quick, fun () ->
     (compare
                    (T.app app [ty1; ty1; T.app app [ty1; ty2; add; (T.app app [ty1; ty1; s; x])]; y])
                    (T.app app [ty1; ty1; T.app app [ty1; ty2; add; x]; T.app app [ty1; ty1; s; y]])
-                )
+                );
 
+  (* new examples *)
+  (* c < f (Y X a) b *)
+  let f = Term.const ~ty:(Type.arrow [ty; ty] ty) f_ in
+  let a = Term.const ~ty a_ in
+  let b = Term.const ~ty b_ in
+  let c = Term.const ~ty c_ in
+  let x = Term.var (HVar.fresh ~ty ()) in
+  let y = Term.var (HVar.fresh ~ty:(Type.arrow [ty; ty] ty) ()) in
+  Alcotest.(check comp_test) "c < f (Y X a) b"
+    Comparison.Lt (compare c (Term.app f [Term.app y [x; a]]))
 
 let suite =
   [ test_derived_ho_rpo;

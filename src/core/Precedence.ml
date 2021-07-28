@@ -32,7 +32,7 @@ module Weight = struct
   let omega_plus i : t = make 1 i
 
   let mult c a : t = {omega = a.omega * c; one = a.one * c}
-  let mult_one c a : t = {a with one = a.one *c}
+  let mult_one c a : t = {a with one = a.one * c}
 
   let add a b: t = {omega=a.omega+b.omega; one=a.one+b.one}
   let diff a b: t = {omega=a.omega-b.omega; one=a.one-b.one}
