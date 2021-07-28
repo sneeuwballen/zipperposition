@@ -371,7 +371,7 @@ let test_lambdafree_kbo = "ordering.lambdafree_kbo", `Quick, fun () ->
           (T.app app [ty1; ty1; T.app app [ty1; ty2; add; x]; T.app app [ty1; ty1; s; y]])
       )
 
-(* based on test_derived_ho_kbo *)
+(* adapted from test_derived_ho_kbo *)
 let test_lambda_kbo = "ordering.lambda_kbo", `Quick, fun () ->
   (* alphabetical precedence, h has weight 2, all other symbols weight 1 *)
   let weight id = (if id=h_ then Precedence.Weight.add Precedence.Weight.one Precedence.Weight.one else Precedence.Weight.one) in
@@ -385,21 +385,14 @@ let test_lambda_kbo = "ordering.lambda_kbo", `Quick, fun () ->
   let a = Term.const ~ty a_ in
   let x = Term.var (HVar.fresh ~ty:(Type.arrow [ty] ty) ()) in
   let y = Term.var (HVar.fresh ~ty ()) in
-CCFormat.printf "HERE4\n";(*###*)
-  let z = Term.view y (*###*) in
-CCFormat.printf "HERE4b\n";(*###*)
-  Alcotest.(check comp_test) "h y = h y"
-    Comparison.Eq (compare y y);
-CCFormat.printf "HERE5\n";(*###*)
   Alcotest.(check comp_test) "h (x y) > f a (x y)"
     Comparison.Gt (compare (Term.app h [Term.app x [y]]) (Term.app f [a; Term.app x [y]]));
-CCFormat.printf "HERE6\n";(*###*)
 
-  (* forall x. x > h a a a *)
+  (* forall x. x < h a a a (cf. derived_ho_kbo) *)
   let h = Term.const ~ty:(Type.arrow [ty;ty;ty] ty) h_ in
   let a = Term.const ~ty a_ in
-  Alcotest.(check comp_test) "forall x. x > h a a a"
-    Comparison.Gt
+  Alcotest.(check comp_test) "forall x. x < h a a a"
+    Comparison.Lt
     (compare 
       (Term.app_builtin ~ty:Type.prop Builtin.ForallConst [Term.of_ty Type.prop; Term.fun_l [Type.prop] (Term.bvar ~ty:Type.prop 0)]) 
       (Term.app h [a;a;a]));
@@ -415,10 +408,10 @@ CCFormat.printf "HERE6\n";(*###*)
       )
       (Term.app h [a;a;a]));
 
-  (* fun y. z <> z (Variables above and below lambdas need to be treated as if they were different variables) *)
+  (* fun y. z > z (cf. derived_ho_kbo) *)
   let z = Term.var (HVar.fresh ~ty ()) in
-  Alcotest.(check comp_test) "fun y. z <> z"
-    Comparison.Incomparable (compare (Term.fun_l [ty] z) z);
+  Alcotest.(check comp_test) "fun y. z > z"
+    Comparison.Gt (compare (Term.fun_l [ty] z) z);
 
   (* f z > z *)
   let f = Term.const ~ty:(Type.arrow [ty] ty) f_ in
@@ -426,17 +419,17 @@ CCFormat.printf "HERE6\n";(*###*)
   Alcotest.(check comp_test) "f z > z"
     Comparison.Gt (compare (Term.app f [z]) z);
 
-  (* z a <> z (Because of fluidity) *)
+  (* z a < z *)
   let a = Term.const ~ty a_ in
   let z = Term.var (HVar.fresh ~ty:(Type.arrow [ty] ty) ()) in
-  Alcotest.(check comp_test) "z a <> z"
-    Comparison.Incomparable (compare (Term.app z [a]) z);
+  Alcotest.(check comp_test) "z a < z"
+    Comparison.Lt (compare (Term.app z [a]) z);
 
-  (* lam x. z x a <> z (Because of fluidity) *)
+  (* lam x. z x a < z *)
   let a = Term.const ~ty a_ in
   let z = Term.var (HVar.fresh ~ty:(Type.arrow [ty; ty] ty) ()) in
-  Alcotest.(check comp_test) "lam x. z x a <> z"
-    Comparison.Incomparable (compare (Term.fun_l [ty] (Term.app z [Term.bvar ~ty 0; a])) z);
+  Alcotest.(check comp_test) "lam x. z x a < z"
+    Comparison.Lt (compare (Term.fun_l [ty] (Term.app z [Term.bvar ~ty 0; a])) z);
 
   (* polymorphic example *)
   let funty_ = (ID.make "funty") in

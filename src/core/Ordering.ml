@@ -804,8 +804,19 @@ module Polynomial = struct
     | WeightUnknown of term  (* w *)
     | CoeffUnknown of term * int  (* k *)
 
-  let equal : unknown -> unknown -> bool = Pervasives.(=)
-  let compare : unknown -> unknown -> int = Pervasives.compare
+  let compare unk2 unk1 = match unk2, unk1 with
+  | EtaUnknown y, EtaUnknown x -> HVar.compare Type.compare y x
+  | EtaUnknown _, _ -> +1
+  | _, EtaUnknown _ -> -1
+  | WeightUnknown t, WeightUnknown s -> T.compare t s
+  | WeightUnknown _, _ -> +1
+  | _, WeightUnknown _ -> -1
+  | CoeffUnknown (t, j), CoeffUnknown (s, i) ->
+    (match T.compare t s with
+     | 0 -> Int.compare j i
+     | n -> n)
+
+  let equal unk1 (unk2 : unknown) = (compare unk2 unk1 = 0)
 
   let hash_unknown = function
     | EtaUnknown var -> HVar.hash var
@@ -906,11 +917,13 @@ module LambdaKBO : ORD = struct
       let ignore_deep_quants = true
     end)
 
+  let dummy_var = HVar.fresh ~ty:Type.tType ()
+
   let compare_type_terms ~prec ty_t ty_s =
     Comparison.nonstrict_of_strict (Type_KBO.compare_terms ~prec:prec ty_t ty_s)
 
   let compare_types ~prec t_ty s_ty =
-    if t_ty = s_ty then NsEq
+    if Type.compare t_ty s_ty = 0 then NsEq
     else NsIncomparable  (* imprecise but fast *)
 
   let rec add_weight_of ~prec bound_tys w sign t =
@@ -932,11 +945,10 @@ module LambdaKBO : ORD = struct
       add_eta_extra_of w (List.nth bound_tys i)
     | Var _ ->
       (let mk_placeholder_var ty =
-         Term.var (HVar.fresh ~ty ())
+         Term.var (HVar.cast ~ty dummy_var)
        in
        let categorize_var_arg (hd_some_args, extra_args) arg arg_ty =
-         if Type.is_tType arg_ty || Type.is_var arg_ty
-             || Type.is_fun arg_ty then
+         if Type.is_var arg_ty || Type.is_fun arg_ty then
            (Term.app hd_some_args [arg], extra_args)
          else
            (Term.app hd_some_args [mk_placeholder_var arg_ty],
@@ -1041,72 +1053,81 @@ module LambdaKBO : ORD = struct
      | NsLeq -> merge_with_NsLeq cmp
      | cmp' -> cmp')
 
-  let consider_weight_diff_of ~prec t s cmp =
+  let rec process_args n ~prec bound_tys ts ss =
     let w = Polynomial.create_zero () in
-    add_weight_of ~prec [] w (+1) t;
-    add_weight_of ~prec [] w (-1) s;
-    consider_weight w cmp
-
-  let rec process_args ~prec ts ss =
-    let w = Polynomial.create_zero () in
-    let (ws, cmp) = lex_ext_data (process_terms ~prec) ts ss in
+    let (ws, cmp) = lex_ext_data (process_terms ~prec bound_tys) ts ss in
     let m = List.length ws in
     List.iter (add_polynomial w (+1)) ws;
     List.iter2 (fun t s ->
-        add_weight_of ~prec [] w (+1) t;
-        add_weight_of ~prec [] w (-1) s)
+        add_weight_of ~prec bound_tys w (+1) t;
+        add_weight_of ~prec bound_tys w (-1) s)
       (CCList.drop m ts) (CCList.drop m ss);
     consider_weight w cmp
-  and process_var_args ~prec ts ss =
+  and process_var_args ~prec bound_tys ts ss =
     let w = Polynomial.create_zero () in
-    let (ws, cmp) = cw_ext_data (process_terms ~prec) ts ss in
+    let (ws, cmp) = cw_ext_data (process_terms ~prec bound_tys) ts ss in
     List.iter (add_polynomial w (+1)) ws;
     consider_weight w cmp
-  and process_terms ~prec t s =
+  and process_terms ~prec bound_tys t s =
     let (t_hd_tyargs, t_args) = T.as_app_mono t in
     let (t_hd, t_tyargs) = T.as_app t_hd_tyargs in
     let (s_hd_tyargs, s_args) = T.as_app_mono s in
     let (s_hd, s_tyargs) = T.as_app s_hd_tyargs in
     match T.view t_hd, T.view s_hd with
     | Var y, Var x when HVar.id y = HVar.id x ->
-      process_var_args ~prec t_args s_args
-    | Var _, _ | _, Var _ -> consider_weight_diff_of ~prec t s NsIncomparable
+      process_var_args ~prec bound_tys t_args s_args
+    | Var _, _ | _, Var _ ->
+      consider_weights_of ~prec bound_tys t s NsIncomparable
     | Fun (t_ty, t_body), Fun (s_ty, s_body) ->
       (match compare_types ~prec t_ty s_ty with
-       | NsEq -> process_terms ~prec t_body s_body
-       | cmp -> consider_weight_diff_of ~prec t_body s_body cmp)
-    | Fun _, (DB _|Const _|AppBuiltin _) -> consider_weight_diff_of ~prec t s NsGt
-    | DB _, Fun _ -> consider_weight_diff_of ~prec t s NsLt
+       | NsEq -> process_terms ~prec (t_ty :: bound_tys) t_body s_body
+       | cmp -> consider_weights_of ~prec bound_tys t_body s_body cmp)
+    | Fun _, (DB _|Const _|AppBuiltin _) ->
+      consider_weights_of ~prec bound_tys t s NsGt
+    | DB _, Fun _ -> consider_weights_of ~prec bound_tys t s NsLt
     | DB j, DB i ->
-      if j > i then consider_weight_diff_of ~prec t s NsGt
-      else if j < i then consider_weight_diff_of ~prec t s NsLt
-      else process_args ~prec t_args s_args
-    | DB _, (Const _|AppBuiltin _) -> consider_weight_diff_of ~prec t s NsGt
-    | Const _, (Fun _|DB _) -> consider_weight_diff_of ~prec t s NsLt
+      if j > i then consider_weights_of ~prec bound_tys t s NsGt
+      else if j < i then consider_weights_of ~prec bound_tys t s NsLt
+      else process_args 1 ~prec bound_tys t_args s_args
+    | DB _, (Const _|AppBuiltin _) ->
+      consider_weights_of ~prec bound_tys t s NsGt
+    | Const _, (Fun _|DB _) -> consider_weights_of ~prec bound_tys t s NsLt
     | Const gid, Const fid ->
-      (match Prec.compare prec gid fid with
-       | 0 ->
-         (match lex_ext (compare_type_terms ~prec) t_tyargs s_tyargs with
-          | NsEq -> process_args ~prec t_args s_args
-          | cmp -> consider_weight_diff_of ~prec t s cmp)
-       | n when n > 0 -> consider_weight_diff_of ~prec t s NsGt
-       | _ -> consider_weight_diff_of ~prec t s NsLt)
-    | Const _, AppBuiltin _ -> consider_weight_diff_of ~prec t s NsGt
-    | AppBuiltin _, (Fun _|DB _|Const _) -> consider_weight_diff_of ~prec t s NsLt
+      if ID.id gid = ID.id fid then
+        match lex_ext (compare_type_terms ~prec) t_tyargs s_tyargs with
+        | NsEq -> process_args 2 ~prec bound_tys t_args s_args
+        | cmp -> consider_weights_of ~prec bound_tys t s cmp
+      else
+        consider_weights_of ~prec bound_tys t s
+          (match Prec.compare prec gid fid with
+           | 0 -> NsIncomparable
+           | n when n > 0 -> NsGt
+           | _ -> NsLt)
+    | Const _, AppBuiltin _ -> consider_weights_of ~prec bound_tys t s NsGt
+    | AppBuiltin _, (Fun _|DB _|Const _) ->
+      consider_weights_of ~prec bound_tys t s NsLt
     | AppBuiltin (t_b, t_bargs), AppBuiltin (s_b, s_bargs) ->
       (match Builtin.compare t_b s_b with
-       | 0 -> process_args ~prec (t_bargs @ t_tyargs @ t_args)
+       | 0 -> process_args 3 ~prec bound_tys (t_bargs @ t_tyargs @ t_args)
          (s_bargs @ s_tyargs @ s_args)
-       | n when n > 0 -> consider_weight_diff_of ~prec t s NsGt
-       | _ -> consider_weight_diff_of ~prec t s NsLt)
+       | n when n > 0 -> consider_weights_of ~prec bound_tys t s NsGt
+       | _ -> consider_weights_of ~prec bound_tys t s NsLt)
     | _, _ -> assert false
+  and consider_weights_of ~prec bound_tys t s cmp =
+    let w = Polynomial.create_zero () in
+    add_weight_of ~prec bound_tys w (+1) t;
+    add_weight_of ~prec bound_tys w (-1) s;
+    consider_weight w cmp
 
   let nonstrict_compare_terms ~prec t0 s0 =
     ZProf.enter_prof prof_lambda_kbo;
     let t = Lambda.eta_expand t0 in
     let s = Lambda.eta_expand s0 in
-    let (w, cmp) = process_terms ~prec t s in
-    CCFormat.printf "DEBUG weight %a\n" Polynomial.pp w;
+(*###*)
+CCFormat.printf "T = %a\n" T.pp t;
+CCFormat.printf "S = %a\n" T.pp s;
+    let (w, cmp) = process_terms ~prec [] t s in
+CCFormat.printf "DEBUG weight %a\n" Polynomial.pp w;
     ZProf.exit_prof prof_lambda_kbo;
     cmp
 
