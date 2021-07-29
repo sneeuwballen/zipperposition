@@ -36,7 +36,7 @@ let compare lits1 lits2 = CCArray.compare Lit.compare lits1 lits2
 
 let compare_multiset ~ord (l1:t) (l2:t) =
   let module M = Multiset.Make(Literal) in
-  M.compare_partial_nonstrict_l (Literal.Comp.compare ~ord)
+  M.compare_partial_l (Literal.Comp.compare ~ord)
     (Array.to_list l1) (Array.to_list l2)
 
 let hash lits = Hash.array Lit.hash lits
@@ -122,7 +122,8 @@ let _compare_lit_with_idx ~ord (lit1,i1) (lit2,i2) =
   else (
     let c = Lit.Comp.compare ~ord lit1 lit2 in
     (* two occurrences of one lit should be incomparable (and therefore maximal) *)
-    if c = Comparison.Nonstrict.Eq then Comparison.Nonstrict.Incomparable else c
+    if c = Comparison.Eq then Comparison.Nonstrict.Incomparable
+    else Comparison.to_nonstrict c
   )
 
 let _to_multiset_with_idx lits =

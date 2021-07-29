@@ -12,10 +12,10 @@ type comparison = t
 let equal : t -> t -> bool = Pervasives.(=)
 
 let to_string = function
-  | Lt -> "=<="
-  | Eq -> "==="
-  | Gt -> "=>="
-  | Incomparable -> "=?="
+  | Lt -> "<"
+  | Eq -> "="
+  | Gt -> ">"
+  | Incomparable -> "<?>"
 
 let pp out c = CCFormat.string out (to_string c)
 
@@ -97,12 +97,12 @@ type comparison = t
 let equal : t -> t -> bool = Pervasives.(=)
 
 let to_string = function
-  | Lt -> "=<="
-  | Leq -> "<=="
-  | Eq -> "==="
-  | Geq -> "==>"
-  | Gt -> "=>="
-  | Incomparable -> "=?="
+  | Lt -> "<"
+  | Leq -> "<="
+  | Eq -> "="
+  | Geq -> ">="
+  | Gt -> ">"
+  | Incomparable -> "<?>"
 
 let pp out c = CCFormat.string out (to_string c)
 
@@ -136,6 +136,11 @@ let merge_with_Leq = function
 let smooth = function
   | Gt -> Geq
   | Lt -> Leq
+  | cmp -> cmp
+
+let sharpen = function
+  | Geq -> Gt
+  | Leq -> Lt
   | cmp -> cmp
 
 type 'a comparator = 'a -> 'a -> t

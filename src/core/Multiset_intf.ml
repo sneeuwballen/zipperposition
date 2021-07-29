@@ -131,7 +131,7 @@ module type S = sig
   val compare_partial :
     (elt -> elt -> Comparison.t) -> t -> t -> Comparison.t
   val compare_partial_nonstrict :
-    (elt -> elt -> Comparison.Nonstrict.t) -> t -> t -> Comparison.Nonstrict.t
+    (elt -> elt -> Comparison.Nonstrict.t) -> t -> t -> Comparison.t
   (** Compare two multisets with the multiset extension of the
       given ordering. This ordering is total iff the element
       ordering is. *)
@@ -155,7 +155,7 @@ module type S = sig
     elt list -> elt list -> Comparison.t
   val compare_partial_nonstrict_l :
     (elt -> elt -> Comparison.Nonstrict.t) ->
-    elt list -> elt list -> Comparison.Nonstrict.t
+    elt list -> elt list -> Comparison.t
   (** Compare two multisets represented as list of elements *)
 
   val pp : elt CCFormat.printer -> t CCFormat.printer

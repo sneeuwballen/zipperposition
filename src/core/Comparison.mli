@@ -87,7 +87,12 @@ module Nonstrict : sig
 
   val merge_with_Geq : t -> t
   val merge_with_Leq : t -> t
+  (** Combine a comparison value with Geq or Leq. *)
+
   val smooth : t -> t
+  (** Replace Gt by Geq and Lt by Leq. *)
+  val sharpen : t -> t
+  (** Replace Geq by Gt and Leq by Lt. *)
 
   type 'a comparator = 'a -> 'a -> t
 
@@ -97,6 +102,7 @@ end
 
 val is_Gt_or_Geq : Nonstrict.t -> bool
 val is_Lt_or_Leq : Nonstrict.t -> bool
+(** Test for two constructors at once. *)
 
 val of_nonstrict : Nonstrict.t -> t
 (* Cast a nonstrict comparison value to a strict one. *)

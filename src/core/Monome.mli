@@ -318,7 +318,7 @@ module Int : sig
   val compare :
     (term -> term -> Comparison.t) -> t -> t -> Comparison.t
   val compare_nonstrict :
-    (term -> term -> Comparison.Nonstrict.t) -> t -> t -> Comparison.Nonstrict.t
+    (term -> term -> Comparison.Nonstrict.t) -> t -> t -> Comparison.t
   (** Compare monomes as if they were multisets of terms, the coefficient
       in front of a term being its multiplicity. *)
 

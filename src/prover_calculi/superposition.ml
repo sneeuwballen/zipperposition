@@ -508,7 +508,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           let passive_fresh_var = Lits.apply_subst Subst.Renaming.none (US.subst subst_fresh_var) (C.lits info.passive, info.scope_passive) in
           let subst_replacement = Unif.FO.bind subst (fresh_var, info.scope_passive) (replacement, info.scope_active) in
           let passive_t'_lits = Lits.apply_subst renaming subst_replacement (passive_fresh_var, info.scope_passive) in
-          if Comparison.is_Gt_or_Geq (Lits.compare_multiset ~ord passive'_lits passive_t'_lits)
+          if Lits.compare_multiset ~ord passive'_lits passive_t'_lits = Comparison.Gt
           then (
             Util.debugf ~section 3
               "Sup at var condition is not fulfilled because: %a >= %a"

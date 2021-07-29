@@ -256,10 +256,10 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
                sign if [check_sign] is true. *)
             if Lit.is_positivoid lit = Lit.is_positivoid lit' && BV.get bv j
             then match Lit.Comp.compare ~ord lit lit' with
-              | Comparison.Nonstrict.Incomparable
+              | Comparison.Incomparable
               | Eq -> ()     (* no further information about i-th and j-th *)
-              | Gt | Geq -> BV.reset bv j  (* j-th cannot be max *)
-              | Lt | Leq -> BV.reset bv i  (* i-th cannot be max *)
+              | Gt -> BV.reset bv j  (* j-th cannot be max *)
+              | Lt -> BV.reset bv i  (* i-th cannot be max *)
           done;
       done;
       bv

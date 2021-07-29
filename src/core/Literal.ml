@@ -884,7 +884,7 @@ module Comp = struct
       let t1' = CCList.fold_right T.Set.add t1 T.Set.empty
       and t2' = CCList.fold_right T.Set.add t2 T.Set.empty in
       if T.Set.equal t1' t2'
-      then C.Nonstrict.Eq (* next criterion *)
+      then C.Eq (* next criterion *)
       else Incomparable
     | true, true -> assert false
     | true, false -> Gt
@@ -896,7 +896,7 @@ module Comp = struct
     let p2 = polarity l2 in
     match p1, p2 with
     | true, true
-    | false, false -> C.Nonstrict.Eq
+    | false, false -> C.Eq
     | true, false -> Lt
     | false, true -> Gt
 
@@ -914,7 +914,7 @@ module Comp = struct
       | Rat {Rat_lit.op=Rat_lit.Less; _} -> 21
       | Equation _ -> 30
     in
-    C.Nonstrict.of_total (Pervasives.compare (_to_int l1) (_to_int l2))
+    C.of_total (Pervasives.compare (_to_int l1) (_to_int l2))
 
   (* by multiset of terms *)
   let _cmp_by_term_multiset ~ord l1 l2 =
@@ -938,13 +938,13 @@ module Comp = struct
       let module MI = Monome.Int in
       let left = Multisets.MMT.doubleton (MI.to_multiset x1) (MI.to_multiset y1) in
       let right = Multisets.MMT.doubleton (MI.to_multiset x2) (MI.to_multiset y2) in
-      Multisets.MMT.compare_partial_nonstrict
+      Multisets.MMT.compare_partial
         (Multisets.MT.compare_partial_nonstrict (Ordering.compare ord))
         left right
     | Int(AL.Divides d1), Int(AL.Divides d2) ->
       assert (d1.AL.sign=d2.AL.sign);
       let c = Z.compare d1.AL.num d2.AL.num in
-      if c <> 0 then C.Nonstrict.of_total c  (* live in totally distinct Z/nZ *)
+      if c <> 0 then C.of_total c  (* live in totally distinct Z/nZ *)
       else
       if is_ground l1 && is_ground l2
       then
@@ -962,7 +962,7 @@ module Comp = struct
       assert false
 
   let compare ~ord l1 l2 =
-    let f = Comparison.Nonstrict.(
+    let f = Comparison.(
         _cmp_by_maxterms ~ord @>>
         _cmp_by_polarity @>>
         _cmp_by_kind @>>

@@ -169,7 +169,7 @@ module Make(E : Map.OrderedType) = struct
         let m1'', m2'' = cancel_l m1 m2' in
         m1'', (x2,n2)::m2''
 
-  let compare_partial_nonstrict f m1 m2 =
+  let compare_partial f m1 m2 =
     let m1, m2 = cancel_l (to_list m1) (to_list m2) in
     (* for now we can break the sorted list invariant. We look for some
        element of [m1] or [m2] that isn't dominated by any element of
@@ -182,7 +182,7 @@ module Make(E : Map.OrderedType) = struct
         (* max2 is true if some terms are not dominated within m2 *)
         let max2 = max2 || m2<>[] in
         begin match max1, max2 with
-          | true, true -> Comparison.Nonstrict.Incomparable
+          | true, true -> Comparison.Incomparable
           | true, false -> Gt
           | false, true -> Lt
           | false, false ->
@@ -202,7 +202,7 @@ module Make(E : Map.OrderedType) = struct
         check_left ~neq ~max1:true m1' ~max2 rest2
       | (x2,n2)::m2' ->
         begin match f x1 x2 with
-          | Comparison.Nonstrict.Eq ->
+          | Comparison.Eq ->
             let c = Z.compare n1 n2 in
             if c < 0
             then (* remove x1 *)
@@ -212,7 +212,7 @@ module Make(E : Map.OrderedType) = struct
               filter_with ~neq ~max1 x1 Z.(n1-n2) m1' ~max2 m2' rest2
             else (* remove both *)
               check_left ~neq ~max1 m1' ~max2 (List.rev_append m2' rest2)
-          | Leq | Geq | Incomparable ->
+          | Incomparable ->
             (* keep both *)
             filter_with ~neq ~max1 x1 n1 m1' ~max2 m2' ((x2,n2)::rest2)
           | Gt ->
@@ -225,9 +225,9 @@ module Make(E : Map.OrderedType) = struct
     in
     check_left ~neq:false ~max1:false m1 ~max2:false m2
 
-  let compare_partial f m1 m2 =
-    Comparison.of_nonstrict (compare_partial_nonstrict
-      (fun k1 k2 -> Comparison.to_nonstrict (f k1 k2)) m1 m2)
+  let compare_partial_nonstrict f m1 m2 =
+    compare_partial (fun k1 k2 ->
+      Comparison.of_nonstrict (Comparison.Nonstrict.sharpen (f k1 k2))) m1 m2
 
   let compare_l m1 m2 =
     let rec aux m1 m2 = match m1, m2 with
@@ -295,12 +295,11 @@ module Make(E : Map.OrderedType) = struct
     max_seq f (of_list l)
     |> Iter.fold (fun acc (x, _) -> x :: acc) []
 
+  let compare_partial_l f l1 l2 =
+    compare_partial f (of_list l1) (of_list l2)
+
   let compare_partial_nonstrict_l f l1 l2 =
     compare_partial_nonstrict f (of_list l1) (of_list l2)
-
-  let compare_partial_l f l1 l2 =
-    Comparison.of_nonstrict (compare_partial_nonstrict_l
-      (fun k1 k2 -> Comparison.to_nonstrict (f k1 k2)) l1 l2)
 
   let pp pp_x out m =
     let pp_p out (x,n) = Format.fprintf out "%a: %s" pp_x x (Z.to_string n) in
