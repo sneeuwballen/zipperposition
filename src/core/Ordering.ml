@@ -1105,7 +1105,7 @@ module LambdaKBO : ORD = struct
     cmp
 
   (* The ordering might flip if one side is a lambda-expression *)
-  let might_flip _ s t = T.is_fun s || T.is_fun t
+  let might_flip _ t s = T.is_fun t || T.is_fun s
 end
 
 (** {2 Value interface} *)

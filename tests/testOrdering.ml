@@ -22,7 +22,7 @@ let f_ = ID.make "f"
 let g_ = ID.make "g"
 let h_ = ID.make "h"
 
-let ty = Type.int
+let ty = Type.term
 
 (* [more_specific cm1 cm2] is true if [cmp2] is compatible with, and possibly
     more accurate, than [cmp1]. For instance, Incomparable/Gt is ok, but
@@ -242,6 +242,50 @@ let test_derived_ho_kbo = "ordering.derived_ho_kbo", `Quick, fun () ->
       (Precedence.create ~weight Precedence.Constr.alpha [a_; b_; c_; f_; g_; h_]) in
   let compare = O.compare ord in
 
+  (* b > a *)
+  let a = Term.const ~ty a_ in
+  let b = Term.const ~ty b_ in
+  Alcotest.(check comp_test) "b > a"
+    Comparison.Nonstrict.Gt (compare b a);
+
+  (* f b > f a *)
+  let a = Term.const ~ty a_ in
+  let b = Term.const ~ty b_ in
+  let f = Term.const ~ty:(Type.arrow [ty] ty) f_ in
+  Alcotest.(check comp_test) "f b > f a"
+    Comparison.Nonstrict.Gt (compare (Term.app f [b]) (Term.app f [a]));
+
+  (* f b a > f a b *)
+  let a = Term.const ~ty a_ in
+  let b = Term.const ~ty b_ in
+  let f = Term.const ~ty:(Type.arrow [ty; ty] ty) f_ in
+  Alcotest.(check comp_test) "f b a > f a b"
+    Comparison.Nonstrict.Gt (compare (Term.app f [b; a]) (Term.app f [a; b]));
+
+  (* z b <> z a *)
+  let a = Term.const ~ty a_ in
+  let b = Term.const ~ty b_ in
+  let z = Term.var (HVar.fresh ~ty:(Type.arrow [ty] ty) ()) in
+  Alcotest.(check comp_test) "z b <> z a"
+    Comparison.Nonstrict.Incomparable (compare (Term.app z [b]) (Term.app z [a]));
+
+  (* z b a <> z a b *)
+  let a = Term.const ~ty a_ in
+  let b = Term.const ~ty b_ in
+  let z = Term.var (HVar.fresh ~ty:(Type.arrow [ty; ty] ty) ()) in
+  Alcotest.(check comp_test) "z b a <> z a b"
+    Comparison.Nonstrict.Incomparable (compare (Term.app z [b; a]) (Term.app z [a; b]));
+
+  (* c < f (Y X a) b *)
+  let f = Term.const ~ty:(Type.arrow [ty; ty] ty) f_ in
+  let a = Term.const ~ty a_ in
+  let b = Term.const ~ty b_ in
+  let c = Term.const ~ty c_ in
+  let x = Term.var (HVar.fresh ~ty ()) in
+  let y = Term.var (HVar.fresh ~ty:(Type.arrow [ty; ty] ty) ()) in
+  Alcotest.(check comp_test) "c < f (Y X a) b"
+    Comparison.Nonstrict.Lt (compare c (Term.app f [Term.app y [x; a]; b]));
+
   (* h (x y) > f a (x y) *)
   let f = Term.const ~ty:(Type.arrow [ty; ty] ty) f_ in
   let h = Term.const ~ty:(Type.arrow [ty] ty) h_ in
@@ -387,6 +431,54 @@ let test_lambda_kbo = "ordering.lambda_kbo", `Quick, fun () ->
       (Precedence.create ~weight Precedence.Constr.alpha [a_; b_; c_; f_; g_; h_]) in
   let compare = O.compare ord in
 
+  (* b > a *)
+  let a = Term.const ~ty a_ in
+  let b = Term.const ~ty b_ in
+  Alcotest.(check comp_test) "b > a"
+    Comparison.Nonstrict.Gt (compare b a);
+
+  (* f b > f a *)
+  let a = Term.const ~ty a_ in
+  let b = Term.const ~ty b_ in
+  let f = Term.const ~ty:(Type.arrow [ty] ty) f_ in
+  Alcotest.(check comp_test) "f b > f a"
+    Comparison.Nonstrict.Gt (compare (Term.app f [b]) (Term.app f [a]));
+
+  (* f b a > f a b *)
+  let a = Term.const ~ty a_ in
+  let b = Term.const ~ty b_ in
+  let f = Term.const ~ty:(Type.arrow [ty; ty] ty) f_ in
+  Alcotest.(check comp_test) "f b a > f a b"
+    Comparison.Nonstrict.Gt (compare (Term.app f [b; a]) (Term.app f [a; b]));
+
+  (* z b >= z a *)
+  let a = Term.const ~ty a_ in
+  let b = Term.const ~ty b_ in
+  let z = Term.var (HVar.fresh ~ty:(Type.arrow [ty] ty) ()) in
+  Alcotest.(check comp_test) "z b >= z a"
+    Comparison.Nonstrict.Geq (compare (Term.app z [b]) (Term.app z [a]));
+
+  (* z b a <> z a b *)
+  let a = Term.const ~ty a_ in
+  let b = Term.const ~ty b_ in
+  let z = Term.var (HVar.fresh ~ty:(Type.arrow [ty; ty] ty) ()) in
+  Alcotest.(check comp_test) "z b a <> z a b"
+    Comparison.Nonstrict.Incomparable (compare (Term.app z [b; a]) (Term.app z [a; b]));
+
+  (* c < f (Y X a) b *)
+  let f = Term.const ~ty:(Type.arrow [ty; ty] ty) f_ in
+  let a = Term.const ~ty a_ in
+  let b = Term.const ~ty b_ in
+  let c = Term.const ~ty c_ in
+  let x = Term.var (HVar.fresh ~ty ()) in
+  let y = Term.var (HVar.fresh ~ty:(Type.arrow [ty; ty] ty) ()) in
+  Alcotest.(check comp_test) "c < f (Y X a) b"
+    Comparison.Nonstrict.Lt (compare c (Term.app f [Term.app y [x; a]; b]));
+
+  (* maximal sides of a literal *)
+
+  (* maximal literals *)
+
   (* h (x y) > f a (x y) *)
   let f = Term.const ~ty:(Type.arrow [ty; ty] ty) f_ in
   let h = Term.const ~ty:(Type.arrow [ty] ty) h_ in
@@ -474,53 +566,7 @@ let test_lambda_kbo = "ordering.lambda_kbo", `Quick, fun () ->
     (compare
                    (T.app app [ty1; ty1; T.app app [ty1; ty2; add; (T.app app [ty1; ty1; s; x])]; y])
                    (T.app app [ty1; ty1; T.app app [ty1; ty2; add; x]; T.app app [ty1; ty1; s; y]])
-                );
-
-  (* new examples *)
-
-  (* c < f (Y X a) b *)
-  let f = Term.const ~ty:(Type.arrow [ty; ty] ty) f_ in
-  let a = Term.const ~ty a_ in
-  let b = Term.const ~ty b_ in
-  let c = Term.const ~ty c_ in
-  let x = Term.var (HVar.fresh ~ty ()) in
-  let y = Term.var (HVar.fresh ~ty:(Type.arrow [ty; ty] ty) ()) in
-  Alcotest.(check comp_test) "c < f (Y X a) b"
-    Comparison.Nonstrict.Lt (compare c (Term.app f [Term.app y [x; a]; b]));
-
-  (* b > a *)
-  let a = Term.const ~ty a_ in
-  let b = Term.const ~ty b_ in
-  Alcotest.(check comp_test) "b > a"
-    Comparison.Nonstrict.Incomparable (compare b a);
-
-  (* f b > f a *)
-  let a = Term.const ~ty a_ in
-  let b = Term.const ~ty b_ in
-  let f = Term.const ~ty:(Type.arrow [ty] ty) f_ in
-  Alcotest.(check comp_test) "f b > f a"
-    Comparison.Nonstrict.Incomparable (compare (Term.app f [b]) (Term.app f [a]));
-
-  (* f b a > f a b *)
-  let a = Term.const ~ty a_ in
-  let b = Term.const ~ty b_ in
-  let f = Term.const ~ty:(Type.arrow [ty; ty] ty) f_ in
-  Alcotest.(check comp_test) "f b a > f a b"
-    Comparison.Nonstrict.Incomparable (compare (Term.app f [b; a]) (Term.app f [a; b]));
-
-  (* z b <> z a (should be >= with a nonstrict order) *)
-  let a = Term.const ~ty a_ in
-  let b = Term.const ~ty b_ in
-  let z = Term.var (HVar.fresh ~ty:(Type.arrow [ty] ty) ()) in
-  Alcotest.(check comp_test) "z b <> z a"
-    Comparison.Nonstrict.Incomparable (compare (Term.app z [b]) (Term.app z [a]));
-
-  (* z b a <> z a b (should really be <>) *)
-  let a = Term.const ~ty a_ in
-  let b = Term.const ~ty b_ in
-  let z = Term.var (HVar.fresh ~ty:(Type.arrow [ty; ty] ty) ()) in
-  Alcotest.(check comp_test) "z b a <> z a b"
-    Comparison.Nonstrict.Incomparable (compare (Term.app z [b; a]) (Term.app z [a; b]))
+                )
 
 let suite =
   [ test_derived_ho_rpo;
