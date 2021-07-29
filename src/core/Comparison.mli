@@ -3,16 +3,6 @@
 
 (** {1 Partial Ordering values} *)
 
-(** {2 Combined nonstrict-strict partial orders} *)
-
-type nonstrict_t = NsLt | NsLeq | NsEq | NsGeq | NsGt | NsIncomparable
-
-type nonstrict_comparison = nonstrict_t
-
-val equal : nonstrict_t -> nonstrict_t -> bool
-
-include Interfaces.PRINT with type t := nonstrict_t
-
 (** {2 Strict partial orders} *)
 
 type t = Lt | Eq | Gt | Incomparable
@@ -22,11 +12,6 @@ type comparison = t
 val equal : t -> t -> bool
 
 include Interfaces.PRINT with type t := t
-
-val strict_of_nonstrict : nonstrict_t -> t
-(* Cast a nonstrict comparison value to a strict one. *)
-val nonstrict_of_strict : t -> nonstrict_t
-(* Cast a strict comparison value to a nonstrict one. *)
 
 val combine : t -> t -> t
 (** Combine two partial comparisons, that are assumed to be
@@ -78,3 +63,42 @@ module type PARTIAL_ORD = sig
 
   val partial_cmp : t -> t -> comparison
 end
+
+(** {2 Combined nonstrict-strict partial orders} *)
+
+module Nonstrict : sig
+  type t = Lt | Leq | Eq | Geq | Gt | Incomparable
+
+  type comparison = t
+
+  val equal : t -> t -> bool
+
+  include Interfaces.PRINT with type t := t
+
+  val opp : t -> t
+  (** Opposite of the relation: a R b becomes b R a *)
+
+  val to_total : t -> int
+  (** Conversion to a total ordering. Geq, Leq, and Incomparable are translated
+      to 0 (equal). *)
+
+  val of_total : int -> t
+  (** Conversion from a total order *)
+
+  val merge_with_Geq : t -> t
+  val merge_with_Leq : t -> t
+  val smooth : t -> t
+
+  type 'a comparator = 'a -> 'a -> t
+
+  val (@>>) : 'a comparator -> 'a comparator -> 'a comparator
+  (** Combination of comparators that work on the same values. *)
+end
+
+val is_Gt_or_Geq : Nonstrict.t -> bool
+val is_Lt_or_Leq : Nonstrict.t -> bool
+
+val of_nonstrict : Nonstrict.t -> t
+(* Cast a nonstrict comparison value to a strict one. *)
+val to_nonstrict : t -> Nonstrict.t
+(* Cast a strict comparison value to a nonstrict one. *)

@@ -660,12 +660,12 @@ let fold_terms ?(position=Position.stop) ?(vars=false) ?(var_args=true) ?(fun_bo
   let filter_formula_subterms hd args =
     let open Builtin in
     match which with 
-    | `Max -> 
+    | `Max ->
       (match hd, args with 
       | (Eq|Neq|Xor|Equiv), ([_;a;b]|[a;b]) ->
         (match Ordering.compare ord a b with 
-        | Comparison.Lt -> Some [List.length args - 1]
-        | Comparison.Gt -> Some [List.length args - 2]
+        | Comparison.Nonstrict.Lt | Leq -> Some [List.length args - 1]
+        | Gt | Geq -> Some [List.length args - 2]
         | _ -> None)
       | (ForallConst|ExistsConst), [_;_] ->
         Some []
@@ -688,11 +688,11 @@ let fold_terms ?(position=Position.stop) ?(vars=false) ?(var_args=true) ?(fun_bo
           at_term ~pos:P.(append position (right stop)) r
         | `Max ->
           begin match Ordering.compare ord l r with
-            | Comparison.Gt ->
+            | Comparison.Nonstrict.Gt | Geq ->
               at_term ~pos:P.(append position (left stop)) l
-            | Comparison.Lt ->
+            | Lt | Leq ->
               at_term ~pos:P.(append position (right stop)) r
-            | Comparison.Eq | Comparison.Incomparable ->
+            | Eq | Incomparable ->
               (* visit both sides, they are both (potentially) maximal *)
               at_term ~pos:P.(append position (left stop)) l;
               at_term ~pos:P.(append position (right stop)) r
@@ -845,11 +845,10 @@ module Comp = struct
 
   let _maxterms2 ~ord l r =
     match O.compare ord l r with
-    | C.Gt -> [l]
-    | C.Lt -> [r]
-    | C.Eq -> [l]
-    | C.Incomparable -> 
-      [l; r]
+    | C.Nonstrict.Gt | Geq -> [l]
+    | Lt | Leq -> [r]
+    | Eq -> [l]
+    | Incomparable ->  [l; r]
 
   (* maximal terms of the literal *)
   let max_terms ~ord lit =
@@ -875,9 +874,7 @@ module Comp = struct
 
   (* is there an element of [l1] that dominates all elements of [l2]? *)
   let _some_term_dominates f l1 l2 =
-    List.exists
-      (fun x -> List.for_all (fun y -> f x y = Comparison.Gt) l2)
-      l1
+    List.exists (fun x -> List.for_all (fun y -> C.is_Gt_or_Geq (f x y)) l2) l1
 
   let _cmp_by_maxterms ~ord l1 l2 =
     let t1 = max_terms ~ord l1 and t2 = max_terms ~ord l2 in
@@ -887,11 +884,11 @@ module Comp = struct
       let t1' = CCList.fold_right T.Set.add t1 T.Set.empty
       and t2' = CCList.fold_right T.Set.add t2 T.Set.empty in
       if T.Set.equal t1' t2'
-      then C.Eq (* next criterion *)
-      else C.Incomparable
+      then C.Nonstrict.Eq (* next criterion *)
+      else Incomparable
     | true, true -> assert false
-    | true, false -> C.Gt
-    | false, true -> C.Lt
+    | true, false -> Gt
+    | false, true -> Lt
 
   (* negative literals dominate *)
   let _cmp_by_polarity l1 l2 =
@@ -899,9 +896,9 @@ module Comp = struct
     let p2 = polarity l2 in
     match p1, p2 with
     | true, true
-    | false, false -> Comparison.Eq
-    | true, false -> Comparison.Lt
-    | false, true -> Comparison.Gt
+    | false, false -> C.Nonstrict.Eq
+    | true, false -> Lt
+    | false, true -> Gt
 
   let _cmp_by_kind l1 l2 =
     let open Int_lit in
@@ -917,12 +914,12 @@ module Comp = struct
       | Rat {Rat_lit.op=Rat_lit.Less; _} -> 21
       | Equation _ -> 30
     in
-    C.of_total (Pervasives.compare (_to_int l1) (_to_int l2))
+    C.Nonstrict.of_total (Pervasives.compare (_to_int l1) (_to_int l2))
 
   (* by multiset of terms *)
   let _cmp_by_term_multiset ~ord l1 l2 =
     let m1 = to_multiset l1 and m2 = to_multiset l2 in
-    Multisets.MT.compare_partial (Ordering.compare ord) m1 m2
+    Multisets.MT.compare_partial_nonstrict (Ordering.compare ord) m1 m2
 
   let _cmp_specific ~ord l1 l2 =
     match l1, l2 with
@@ -941,31 +938,31 @@ module Comp = struct
       let module MI = Monome.Int in
       let left = Multisets.MMT.doubleton (MI.to_multiset x1) (MI.to_multiset y1) in
       let right = Multisets.MMT.doubleton (MI.to_multiset x2) (MI.to_multiset y2) in
-      Multisets.MMT.compare_partial
-        (Multisets.MT.compare_partial (Ordering.compare ord))
+      Multisets.MMT.compare_partial_nonstrict
+        (Multisets.MT.compare_partial_nonstrict (Ordering.compare ord))
         left right
     | Int(AL.Divides d1), Int(AL.Divides d2) ->
       assert (d1.AL.sign=d2.AL.sign);
       let c = Z.compare d1.AL.num d2.AL.num in
-      if c <> 0 then C.of_total c  (* live in totally distinct Z/nZ *)
+      if c <> 0 then C.Nonstrict.of_total c  (* live in totally distinct Z/nZ *)
       else
       if is_ground l1 && is_ground l2
       then
-        C.Incomparable
+        Incomparable
         (* TODO: Bezout-normalize, then actually compare Monomes. *)
-      else C.Incomparable
+      else Incomparable
     | Rat {Rat_lit.op=o1;left=l1;right=r1}, Rat {Rat_lit.op=o2;left=l2;right=r2} ->
       assert (o1=o2);
       let module M = Monome.Rat in
       let m1 = Multisets.MT.union (M.to_multiset l1) (M.to_multiset r1) in
       let m2 = Multisets.MT.union (M.to_multiset l2) (M.to_multiset r2) in
-      Multisets.MT.compare_partial (Ordering.compare ord) m1 m2
+      Multisets.MT.compare_partial_nonstrict (Ordering.compare ord) m1 m2
     | _, _ ->
       Util.debugf 5 "(@[bad_compare %a %a@])" (fun k->k pp l1 pp l2);
       assert false
 
   let compare ~ord l1 l2 =
-    let f = Comparison.(
+    let f = Comparison.Nonstrict.(
         _cmp_by_maxterms ~ord @>>
         _cmp_by_polarity @>>
         _cmp_by_kind @>>
@@ -1065,25 +1062,23 @@ module Pos = struct
   let is_max_term ~ord lit pos =
     let module AL = Int_lit in
     match lit, pos with
-    | Equation (l, r, _), P.Left _ ->
-      Ordering.compare ord l r <> Comparison.Lt
-    | Equation (l, r, _), P.Right _ ->
-      Ordering.compare ord r l <> Comparison.Lt
+    | Equation (l, r, _), P.Left _ -> not (Comparison.is_Lt_or_Leq (Ordering.compare ord l r))
+    | Equation (l, r, _), P.Right _ -> not (Comparison.is_Lt_or_Leq (Ordering.compare ord r l))
     | Int (AL.Binary(_, _m1, _m2)), _ ->
       (* [t] dominates all atomic terms? *)
       let t = root_term lit pos in
-      Iter.for_all
-        (fun t' -> Ordering.compare ord t t' <> Comparison.Lt)
+      Iter.for_all (fun t' ->
+          not (Comparison.is_Lt_or_Leq (Ordering.compare ord t t')))
         (Seq.terms lit)
     | Int (AL.Divides d), _ ->
       let t = root_term lit pos in
-      Iter.for_all
-        (fun t' -> Ordering.compare ord t t' <> Comparison.Lt)
+      Iter.for_all (fun t' ->
+          not (Comparison.is_Lt_or_Leq (Ordering.compare ord t t')))
         (Monome.Seq.terms d.AL.monome)
     | Rat _, _ ->
       let t = root_term lit pos in
-      Iter.for_all
-        (fun t' -> Ordering.compare ord t t' <> Comparison.Lt)
+      Iter.for_all (fun t' ->
+          not (Comparison.is_Lt_or_Leq (Ordering.compare ord t t')))
         (Seq.terms lit)
     | True, _
     | False, _ -> true  (* why not. *)
@@ -1256,15 +1251,16 @@ let is_pure_var lit =
 let max_term_positions ~ord = function
   | Equation (lhs, rhs, _) ->
     begin match Ordering.compare ord lhs rhs with 
-    | Comparison.Gt -> Term.ho_weight lhs
-    | Comparison.Lt -> Term.ho_weight rhs
+    | Comparison.Nonstrict.Gt | Geq -> Term.ho_weight lhs
+    | Lt | Leq -> Term.ho_weight rhs
     | _ -> Term.ho_weight lhs + Term.ho_weight rhs
     end
   | _ -> 1
 
 let as_pos_pure_var lit =
   match View.as_eqn lit with 
-  | Some (l, r, true) when is_pure_var lit && is_positivoid lit -> Some(_as_var l,_as_var r)
+  | Some (l, r, true) when is_pure_var lit && is_positivoid lit ->
+    Some (_as_var l, _as_var r)
   | _ -> None
 
 let are_opposite_subst ~subst (l1,sc1) (l2,sc2) =
@@ -1272,10 +1268,10 @@ let are_opposite_subst ~subst (l1,sc1) (l2,sc2) =
   is_positivoid l1 != is_positivoid l2 &&
   is_predicate_lit l1 = is_predicate_lit l2 &&
   match l1, l2 with
-  | Equation(lhs, rhs, _), Equation(lhs', rhs', _) when is_predicate_lit l1 ->
+  | Equation (lhs, rhs, _), Equation (lhs', rhs', _) when is_predicate_lit l1 ->
     (UF.equal ~subst (lhs, sc1) (lhs', sc2) && UF.equal ~subst (rhs, sc1) (rhs', sc2))
     || (UF.equal ~subst (lhs, sc1) (rhs', sc2) && UF.equal ~subst (rhs, sc1) (lhs', sc2))
-  | Equation(lhs, _, _), Equation(lhs', _, _)->
+  | Equation (lhs, _, _), Equation (lhs', _, _)->
     UF.equal ~subst (lhs, sc1) (lhs', sc2)
   | True, True -> true
   | False, False -> true
@@ -1283,4 +1279,3 @@ let are_opposite_subst ~subst (l1,sc1) (l2,sc2) =
 
 let are_opposite_same_sc l1 l2 =
   are_opposite_subst ~subst:Subst.empty (l1,0) (l2,0)
-

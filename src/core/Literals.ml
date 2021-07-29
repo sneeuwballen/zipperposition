@@ -34,9 +34,9 @@ let equal_com lits1 lits2 =
 
 let compare lits1 lits2 = CCArray.compare Lit.compare lits1 lits2
 
-let compare_multiset ~ord (l1:t) (l2:t) : Comparison.t =
+let compare_multiset ~ord (l1:t) (l2:t) =
   let module M = Multiset.Make(Literal) in
-  M.compare_partial_l (Literal.Comp.compare ~ord)
+  M.compare_partial_nonstrict_l (Literal.Comp.compare ~ord)
     (Array.to_list l1) (Array.to_list l2)
 
 let hash lits = Hash.array Lit.hash lits
@@ -118,11 +118,11 @@ module MLI = Multiset.Make(struct
 
 let _compare_lit_with_idx ~ord (lit1,i1) (lit2,i2) =
   if i1=i2
-  then Comparison.Eq (* ignore collisions *)
+  then Comparison.Nonstrict.Eq (* ignore collisions *)
   else (
     let c = Lit.Comp.compare ~ord lit1 lit2 in
     (* two occurrences of one lit should be incomparable (and therefore maximal) *)
-    if c = Comparison.Eq then Comparison.Incomparable else c
+    if c = Comparison.Nonstrict.Eq then Comparison.Nonstrict.Incomparable else c
   )
 
 let _to_multiset_with_idx lits =
@@ -347,12 +347,12 @@ let fold_eqn ?(both=true) ?sign ~ord ~eligible lits k =
       begin match lits.(i) with
         | Lit.Equation (l,r,_) when sign_ok sign ->
           begin match Ordering.compare ord l r with
-            | Comparison.Gt ->
+            | Comparison.Nonstrict.Gt | Geq ->
               k (l, r, sign, Position.(arg i @@ left @@ stop))
-            | Comparison.Lt ->
+            | Lt | Leq ->
               k (r, l, sign, Position.(arg i @@ right @@ stop))
-            | Comparison.Eq
-            | Comparison.Incomparable ->
+            | Eq
+            | Incomparable ->
               if both
               then (
                 (* visit both sides of the equation *)
@@ -600,7 +600,7 @@ let ground_lits lits =
       Subst.FO.bind subst ((v :> InnerTerm.t HVar.t),0) (T.mk_tmp_cst ~counter ~ty,0)
     ) all_vars Subst.empty in
   let res = apply_subst Subst.Renaming.none gr_subst (lits,0)  in
-  assert(Iter.for_all T.is_ground @@ Seq.terms res);
+  assert (Iter.for_all T.is_ground @@ Seq.terms res);
   res
 
 let num_predicate lits = 

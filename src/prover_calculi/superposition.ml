@@ -385,14 +385,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             (T.is_appbuiltin l || (T.is_appbuiltin r && not @@ T.is_true_or_false r) ) then idx
         else (
           begin match Ordering.compare ord l r with
-            | Comparison.Gt ->
+            | Comparison.Nonstrict.Gt | Geq ->
               f idx (l,r,true,c)
-            | Comparison.Lt ->
+            | Lt | Leq ->
               f idx (r,l,true,c)
-            | Comparison.Incomparable ->
+            | Incomparable ->
               let idx = f idx (l,r,true,c) in
               f idx (r,l,true,c)
-            | Comparison.Eq -> idx  (* no modif *)
+            | Eq -> idx  (* no modif *)
           end)
       | [| Lit.Equation (l,r,false) |] -> f idx (l,r,false,c)
       | _ -> idx
@@ -508,7 +508,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           let passive_fresh_var = Lits.apply_subst Subst.Renaming.none (US.subst subst_fresh_var) (C.lits info.passive, info.scope_passive) in
           let subst_replacement = Unif.FO.bind subst (fresh_var, info.scope_passive) (replacement, info.scope_active) in
           let passive_t'_lits = Lits.apply_subst renaming subst_replacement (passive_fresh_var, info.scope_passive) in
-          if Lits.compare_multiset ~ord passive'_lits passive_t'_lits = Comp.Gt
+          if Comparison.is_Gt_or_Geq (Lits.compare_multiset ~ord passive'_lits passive_t'_lits)
           then (
             Util.debugf ~section 3
               "Sup at var condition is not fulfilled because: %a >= %a"
@@ -729,7 +729,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       if Env.is_trivial_trail new_trail then raise (ExitSuperposition "trivial trail");
       let s' = S.FO.apply ~shift_vars renaming subst (info.s, sc_a) in
       if (
-        O.compare ord s' t' = Comp.Lt ||
+        Comp.is_Lt_or_Leq (O.compare ord s' t') ||
            (* if it was an inference into selected Bool position, 
               we do not reevaluate BoolSelection on the new literal set
               -- in 99% of cases it is selected again,
@@ -741,7 +741,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
          not (BV.get (C.eligible_res (info.passive, sc_p) subst) passive_idx)) ||
         not (C.is_eligible_param (info.active, sc_a) subst ~idx:active_idx)
       ) then (
-        let c1 = O.compare ord s' t' = Comp.Lt in
+        let c1 = Comp.is_Lt_or_Leq (O.compare ord s' t') in
         let c2 = not bool_inference &&
                  not (Lit.Pos.is_max_term ~ord passive_lit' passive_lit_pos)in
         let c3 = not bool_inference &&
@@ -932,7 +932,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       if Env.is_trivial_trail new_trail then raise (ExitSuperposition "trivial trail");
       let s' = S.FO.apply ~shift_vars renaming subst (info.s, sc_a) in
       if (
-        O.compare ord s' t' = Comp.Lt ||
+        Comp.is_Lt_or_Leq (O.compare ord s' t') ||
         (not bool_inference &&
          not (Lit.Pos.is_max_term ~ord passive_lit' passive_lit_pos)) ||
         (not bool_inference &&
@@ -1691,8 +1691,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           && info.is_pred_var_eq_fact 
           && C.proof_depth info.clause < 2
           && not (T.is_true_or_false t)) ||
-        (O.compare ord (S.FO.apply renaming subst (s, info.scope)) 
-        (S.FO.apply renaming subst (t, info.scope)) <> Comp.Lt
+        not (Comp.is_Lt_or_Leq (O.compare ord
+          (S.FO.apply renaming subst (s, info.scope)) 
+          (S.FO.apply renaming subst (t, info.scope)))
         && CCList.for_all (fun (c, i) -> i = idx) (C.selected_lits info.clause)
         && CCList.is_empty (C.bool_selected info.clause)
         && C.is_maxlit (info.clause,info.scope) subst ~idx))
@@ -1883,22 +1884,22 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                 (* - The rewriting clause is smaller than the rewritten clause *)
                 (not toplevel ||
                 C.lits c |> CCArray.exists (fun lit -> Lit.Seq.terms lit |> 
-                  Iter.exists (fun s -> O.compare ord s t == Comp.Gt)) ||
+                  Iter.exists (fun s -> Comp.is_Gt_or_Geq (O.compare ord s t))) ||
                 C.lits c |> CCArray.exists (fun lit -> match Literal.View.as_eqn lit with
                     | Some (litl, litr, true) -> 
-                      T.equal t litl && O.compare ord litr r' == Comp.Gt || 
-                      T.equal t litr && O.compare ord litl r' == Comp.Gt
+                      T.equal t litl && Comp.is_Gt_or_Geq (O.compare ord litr r') || 
+                      T.equal t litr && Comp.is_Gt_or_Geq (O.compare ord litl r')
                     | Some (litl, litr, false) -> T.equal t litl || T.equal t litr
                     | None -> false)
                 ) &&
                 (* - subst(l) > subst(r) *)
-                (O.compare ord
-                   (S.FO.apply Subst.Renaming.none subst (l,cur_sc))
-                   (S.FO.apply Subst.Renaming.none subst (r,cur_sc)) = Comp.Gt)
+                Comp.is_Gt_or_Geq (O.compare ord
+                  (S.FO.apply Subst.Renaming.none subst (l, cur_sc))
+                  (S.FO.apply Subst.Renaming.none subst (r, cur_sc)))
              then (
                Util.debugf ~section 3
                  "@[<hv2>demod(%d):@ @[<hv>t=%a[%d],@ l=%a[%d],@ r=%a[%d]@],@ subst=@[%a@]@]"
-                 (fun k->k (C.id c) T.pp t 0 T.pp l cur_sc T.pp r cur_sc S.pp subst);
+                 (fun k -> k (C.id c) T.pp t 0 T.pp l cur_sc T.pp r cur_sc S.pp subst);
 
                let t' = Lambda.eta_expand @@ norm_b t in
                let l' = Lambda.eta_expand @@ norm_b @@ Subst.FO.apply Subst.Renaming.none subst (l,cur_sc) in               
@@ -2166,11 +2167,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (fun set (_t',with_pos,subst) ->
            let c = with_pos.C.WithPos.clause in
            (* subst(l) matches t' and is > subst(r), very likely to rewrite! *)
-           if (C.trail_subsumes c given && (oriented ||
-                                            O.compare ord
-                                              (S.FO.apply renaming subst (l,0))
-                                              (S.FO.apply renaming subst (r,0)) = Comp.Gt
-                                           )
+           if (C.trail_subsumes c given
+               && (oriented ||
+                   Comp.is_Gt_or_Geq (O.compare ord
+                     (S.FO.apply renaming subst (l, 0))
+                     (S.FO.apply renaming subst (r, 0))))
               )
            then  (* add the clause to the set, it may be rewritten by l -> r *)
              C.ClauseSet.add c set
@@ -2180,8 +2181,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let set' = match C.lits given with
       | [|Lit.Equation (l,r,true) |] ->
         begin match Ordering.compare ord l r with
-          | Comp.Gt -> recurse ~oriented:true set l r
-          | Comp.Lt -> recurse ~oriented:true set r l
+          | Comparison.Nonstrict.Gt | Geq -> recurse ~oriented:true set l r
+          | Lt | Leq -> recurse ~oriented:true set r l
           | _ ->
             let set' = recurse ~oriented:false set l r in
             recurse ~oriented:false set' r l

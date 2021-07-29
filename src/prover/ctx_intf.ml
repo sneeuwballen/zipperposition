@@ -23,7 +23,7 @@ module type S = sig
 
   (** {2 Utils} *)
 
-  val compare : Term.t -> Term.t -> Comparison.t
+  val compare : Term.t -> Term.t -> Comparison.Nonstrict.t
   (** Compare two terms *)
 
   val select : Selection.t
@@ -73,4 +73,3 @@ module type S = sig
     val to_form : Literal.t -> Term.t SLiteral.t
   end
 end
-

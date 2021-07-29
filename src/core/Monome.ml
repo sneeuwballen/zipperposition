@@ -460,10 +460,9 @@ module Focus = struct
     else Format.fprintf out "[%a] + %a" pp_focused t pp t.rest
 
   let is_max ~ord mf =
-    List.for_all
-      (fun (_, t) -> match Ordering.compare ord mf.term t with
-         | Comparison.Lt -> false  (* [t > mf.term] *)
-         | _ -> true)
+    List.for_all (fun (_, t) ->
+        (* [t > mf.term] *)
+        not (Comparison.is_Lt_or_Leq (Ordering.compare ord mf.term t)))
       mf.rest.terms
 
   let fold_m ~pos m acc f =
@@ -832,10 +831,11 @@ module Int = struct
   let to_multiset m =
     Seq.coeffs_swap m |> Multisets.MT.Seq.of_coeffs Multisets.MT.empty
 
-  (* multiset-like comparison *)
   let compare f m1 m2 =
-    let m1 = to_multiset m1 and m2 = to_multiset m2 in
-    Multisets.MT.compare_partial f m1 m2
+    Multisets.MT.compare_partial f (to_multiset m1) (to_multiset m2)
+
+  let compare_nonstrict f m1 m2 =
+    Multisets.MT.compare_partial_nonstrict f (to_multiset m1) (to_multiset m2)
 
   (** {2 Specific to Int} *)
 

@@ -12,9 +12,9 @@ let m_test = Alcotest.testable (M.pp Fmt.int) M.equal
 let z_test = Alcotest.testable Z.pp_print Z.equal
 
 let f x y =
-  if x = y then Comparison.Eq
-  else if x < y then Comparison.Lt
-  else Comparison.Gt
+  if x = y then Comparison.Nonstrict.Eq
+  else if x < y then Lt
+  else Gt
 
 let test_max = "multiset.max", `Quick, fun()->
   let m = M.of_list [1;2;2;3;1] in
@@ -23,8 +23,8 @@ let test_max = "multiset.max", `Quick, fun()->
 let test_compare = "multiset.compare", `Quick, fun()->
   let m1 = M.of_list [1;1;2;3] in
   let m2 = M.of_list [1;2;2;3] in
-  Alcotest.(check (module Comparison)) "must be lt"
-    Comparison.Lt (M.compare_partial f m1 m2);
+  Alcotest.(check (module Comparison.Nonstrict)) "must be lt"
+    Comparison.Nonstrict.Lt (M.compare_partial_nonstrict f m1 m2);
   Alcotest.(check bool) "ord" true (M.compare m1 m2 < 0);
   ()
 
@@ -74,6 +74,8 @@ let partial_ord (x:int) y =
   if x=y then Comparison.Eq
   else if (x/5=y/5 && x mod 5 <> y mod 5) then Comparison.Incomparable
   else CCInt.compare (x/5) (y/5) |> Comparison.of_total
+
+let partial_ord_nonstrict x y = Comparison.to_nonstrict (partial_ord x y)
 
 let compare_partial_sym =
   let prop (m1,m2) =
@@ -125,8 +127,9 @@ let compare_partial_trans =
 
 let max_seq_correct =
   let prop m =
-    let l1 = M.max_seq partial_ord m |> Iter.map fst |> Iter.to_list in
-    let l2 = M.to_list m |> List.map fst |> List.filter (fun x -> M.is_max partial_ord x m) in
+    let l1 = M.max_seq partial_ord_nonstrict m |> Iter.map fst |> Iter.to_list in
+    let l2 = M.to_list m |> List.map fst
+      |> List.filter (fun x -> M.is_max partial_ord_nonstrict x m) in
     if l1=l2 then true
     else Q.Test.fail_reportf "@[max_seq %a,@ max %a@]"
         CCFormat.Dump.(list int) l1
@@ -139,7 +142,7 @@ let max_is_max =
   let gen = Q.(map M.of_list (list small_int)) in
   let gen = Q.set_print pp gen in
   let prop m =
-    let f x y = Comparison.of_total (Pervasives.compare x y) in
+    let f x y = Comparison.Nonstrict.of_total (Pervasives.compare x y) in
     let l = M.max f m |> M.to_list |> List.map fst in
     List.for_all (fun x -> M.is_max f x m) l
   in

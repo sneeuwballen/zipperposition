@@ -3,23 +3,6 @@
 
 (** {1 Partial Ordering values} *)
 
-(** {2 Combined nonstrict-strict partial orders} *)
-
-type nonstrict_t = NsLt | NsLeq | NsEq | NsGeq | NsGt | NsIncomparable
-
-type nonstrict_comparison = nonstrict_t
-let equal : nonstrict_t -> nonstrict_t -> bool = Pervasives.(=)
-
-let to_string = function
-  | NsLt -> "=<="
-  | NsLeq -> "<=="
-  | NsEq -> "==="
-  | NsGeq -> "==>"
-  | NsGt -> "=>="
-  | NsIncomparable -> "=?="
-
-let pp out c = CCFormat.string out (to_string c)
-
 (** {2 Strict partial orders} *)
 
 type t = Lt | Eq | Gt | Incomparable
@@ -35,18 +18,6 @@ let to_string = function
   | Incomparable -> "=?="
 
 let pp out c = CCFormat.string out (to_string c)
-
-let strict_of_nonstrict cmp = match cmp with
-  | NsLt -> Lt
-  | NsEq -> Eq
-  | NsGt -> Gt
-  | NsLeq | NsGeq | NsIncomparable -> Incomparable
-
-let nonstrict_of_strict cmp = match cmp with
-  | Lt -> NsLt
-  | Eq -> NsEq
-  | Gt -> NsGt
-  | Incomparable -> NsIncomparable
 
 let combine cmp1 cmp2 = match cmp1, cmp2 with
   | Eq, Eq
@@ -85,7 +56,7 @@ let (@>>) f g x y =
   | Eq -> g x y
   | res -> res
 
-type ('a,'b) combination = {
+type ('a, 'b) combination = {
   call : 'a -> 'a -> 'b;
   ignore : t -> 'a -> 'a -> 'b;
 }
@@ -115,3 +86,85 @@ module type PARTIAL_ORD = sig
 
   val partial_cmp : t -> t -> comparison
 end
+
+(** {2 Combined nonstrict-strict partial orders} *)
+
+module Nonstrict = struct
+
+type t = Lt | Leq | Eq | Geq | Gt | Incomparable
+
+type comparison = t
+let equal : t -> t -> bool = Pervasives.(=)
+
+let to_string = function
+  | Lt -> "=<="
+  | Leq -> "<=="
+  | Eq -> "==="
+  | Geq -> "==>"
+  | Gt -> "=>="
+  | Incomparable -> "=?="
+
+let pp out c = CCFormat.string out (to_string c)
+
+let opp cmp = match cmp with
+  | Eq | Incomparable -> cmp
+  | Lt -> Gt
+  | Gt -> Lt
+  | Leq -> Geq
+  | Geq -> Leq
+
+let to_total ord = match ord with
+  | Lt -> -1
+  | Gt -> 1
+  | Geq | Leq | Eq | Incomparable -> 0
+
+let of_total ord = match ord with
+  | 0 -> Eq
+  | x when x > 0 -> Gt
+  | _ -> Lt
+
+let merge_with_Geq = function
+  | Lt | Leq -> Incomparable
+  | Eq -> Geq
+  | cmp -> cmp
+
+let merge_with_Leq = function
+  | Gt | Geq -> Incomparable
+  | Eq -> Leq
+  | cmp -> cmp
+
+let smooth = function
+  | Gt -> Geq
+  | Lt -> Leq
+  | cmp -> cmp
+
+type 'a comparator = 'a -> 'a -> t
+
+let (@>>) f g x y =
+  match f x y with
+  | Geq -> merge_with_Geq (g x y)
+  | Eq -> g x y
+  | Leq -> merge_with_Leq (g x y)
+  | cmp -> cmp
+
+end
+
+let is_Gt_or_Geq = function
+  | Nonstrict.Gt | Geq -> true
+  | _ -> false
+
+let is_Lt_or_Leq = function
+  | Nonstrict.Lt | Leq -> true
+  | _ -> false
+
+let of_nonstrict = function
+  | Nonstrict.Lt -> Lt
+  | Eq -> Eq
+  | Gt -> Gt
+  | Leq | Geq | Incomparable -> Incomparable
+
+let to_nonstrict = function
+  | Lt -> Nonstrict.Lt
+  | Eq -> Eq
+  | Gt -> Gt
+  | Incomparable -> Incomparable

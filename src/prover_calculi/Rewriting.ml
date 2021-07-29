@@ -218,7 +218,9 @@ module Make(E : Env_intf.S) = struct
       let c_guard = Literal.of_unif_subst renaming us in
       let s' = Subst.FO.apply renaming subst (s,sc_a) in
       let t' = Subst.FO.apply renaming subst (t,sc_a) in
-      if Ordering.compare ord s' t' <> Comparison.Lt then (
+      match Ordering.compare ord s' t' with
+      | Comparison.Nonstrict.Lt | Leq -> None
+      | _ ->
         Util.incr_stat stat_ctx_narrowing;
         rule_clauses
         |> List.map
@@ -256,7 +258,6 @@ module Make(E : Env_intf.S) = struct
                (fun k->k RW.Rule.pp rule sc_p C.pp c sc_a P.pp rule_pos Subst.pp subst C.pp new_c);
              new_c)
         |> CCOpt.return
-      ) else None
     in
     ctx_narrow_find (s,sc_a) sc_p
     |> Iter.fold

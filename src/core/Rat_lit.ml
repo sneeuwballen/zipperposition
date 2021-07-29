@@ -452,8 +452,8 @@ module Focus = struct
     | Right (_, m, mf) ->
       let t = MF.term mf in
       let terms = Iter.append (M.Seq.terms m) (MF.rest mf |> M.Seq.terms) in
-      Iter.for_all
-        (fun t' -> Ordering.compare ord t t' <> Comparison.Lt)
+      Iter.for_all (fun t' ->
+          not (Comparison.is_Lt_or_Leq (Ordering.compare ord t t')))
         terms
 
   (* is the focused term maximal in the arithmetic literal? *)
@@ -461,12 +461,12 @@ module Focus = struct
     | Left (_, mf, m)
     | Right (_, m, mf) ->
       let t = MF.term mf in
-      Iter.for_all
-        (fun t' -> Ordering.compare ord t t' = Comparison.Gt)
+      Iter.for_all (fun t' ->
+          Comparison.is_Gt_or_Geq (Ordering.compare ord t t'))
         (M.Seq.terms m)
       &&
-      Iter.for_all
-        (fun t' -> Ordering.compare ord t t' = Comparison.Gt)
+      Iter.for_all (fun t' ->
+          Comparison.is_Gt_or_Geq (Ordering.compare ord t t'))
         (MF.rest mf |> M.Seq.terms)
 
   let map_lit ~f_m ~f_mf lit = match lit with

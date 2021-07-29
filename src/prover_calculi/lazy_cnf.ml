@@ -96,14 +96,14 @@ module Make(E : Env.S) : S with module Env = E = struct
     ) else lits
 
   (* if k_clausify_eq_max_nonint is disabled, then we will not clausify
-       if the max side is non-interpreted *)
+     if the max side is non-interpreted *)
   let check_eq_cnf_ordering_conditions lhs rhs =
     let is_noninterpeted t = CCOpt.is_some (Term.head t) in
     let ord = E.Ctx.ord () in
     (E.flex_get k_clausify_eq_max_nonint) ||
     (match Ordering.compare ord lhs rhs with
-    | Comparison.Lt -> is_noninterpeted rhs
-    | Comparison.Gt -> is_noninterpeted lhs
+    | Comparison.Nonstrict.Lt | Leq -> is_noninterpeted rhs
+    | Gt | Geq -> is_noninterpeted lhs
     | _ -> is_noninterpeted lhs || is_noninterpeted rhs)
 
   let _ty_map = Type.Tbl.create 16

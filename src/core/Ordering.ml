@@ -29,8 +29,8 @@ type term = T.t
 (** {2 Type definitions} *)
 
 type t = {
-  cache_compare : (T.t * T.t, Comparison.t) CCCache.t;
-  compare : Prec.t -> term -> term -> Comparison.t;
+  cache_compare : (T.t * T.t, Comparison.Nonstrict.t) CCCache.t;
+  compare : Prec.t -> term -> term -> Comparison.Nonstrict.t;
   prec : Prec.t;
   name : string;
   cache_might_flip : (T.t * T.t, bool) CCCache.t;
@@ -79,7 +79,7 @@ module type ORD = sig
    * - stable for instantiation
    * - compatible with function contexts
    * - total on ground terms *)
-  val compare_terms : prec:Prec.t -> term -> term -> Comparison.t
+  val compare_terms : prec:Prec.t -> term -> term -> Comparison.Nonstrict.t
 
   val might_flip : Prec.t -> term -> term -> bool
 
@@ -437,7 +437,7 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
         kbo ~prec x y
       with UnsupportedTerm -> Incomparable) in
     ZProf.exit_prof prof_kbo;
-    res
+    to_nonstrict res
 
   (* The ordering might flip if one side is a lambda-expression *)
   let might_flip _ s t = T.is_fun s || T.is_fun t
@@ -537,7 +537,7 @@ module MakeRPO (P : PARAMETERS) : ORD = struct
     ZProf.enter_prof prof_rpo;
     let compare = rpo6 ~prec x y in
     ZProf.exit_prof prof_rpo;
-    compare
+    to_nonstrict compare
 
   (* The ordering might flip if one side is a lambda-expression or if the order is established using the subterm rule *)
   let might_flip prec t s =
@@ -636,7 +636,7 @@ module EPO : ORD = struct
     ZProf.enter_prof prof_epo;
     let compare = epo ~prec (x,[]) (y,[]) in
     ZProf.exit_prof prof_epo;
-    compare
+    to_nonstrict compare
 
   let might_flip _ _ _ = false
 end
@@ -770,7 +770,7 @@ module LambdaFreeKBOCoeff : ORD = struct
     ZProf.enter_prof prof_lambdafree_kbo_coeff;
     let compare = lfhokbo_arg_coeff ~prec x y in
     ZProf.exit_prof prof_lambdafree_kbo_coeff;
-    compare
+    to_nonstrict compare
 
   let might_flip prec t s =
     (* Terms can flip if they have different argument coefficients for remaining arguments. *)
@@ -912,11 +912,11 @@ module LambdaKBO : ORD = struct
   let dummy_var = HVar.fresh ~ty:Type.tType ()
 
   let compare_type_terms ~prec ty_t ty_s =
-    Comparison.nonstrict_of_strict (Type_KBO.compare_terms ~prec:prec ty_t ty_s)
+    Type_KBO.compare_terms ~prec:prec ty_t ty_s
 
   let compare_types ~prec t_ty s_ty =
-    if Type.compare t_ty s_ty = 0 then NsEq
-    else NsIncomparable  (* imprecise but fast *)
+    if Type.compare t_ty s_ty = 0 then Nonstrict.Eq
+    else Incomparable  (* imprecise but fast *)
 
   let rec add_weight_of ~prec bound_tys w sign t =
     let add_weights_of w args =
@@ -983,66 +983,51 @@ module LambdaKBO : ORD = struct
       add_weight_of ~prec (ty :: bound_tys) w sign body
     | App _ -> ()  (* impossible *)
 
-  let merge_with_NsGeq = function
-    | NsLt | NsLeq -> NsIncomparable
-    | NsEq -> NsGeq
-    | cmp -> cmp
-
-  let merge_with_NsLeq = function
-    | NsGt | NsGeq -> NsIncomparable
-    | NsEq -> NsLeq
-    | cmp -> cmp
-
-  let nonstrict = function
-    | NsGt -> NsGeq
-    | NsLt -> NsLeq
-    | cmp -> cmp
-
   let rec lex_ext f ys xs = match ys, xs with
-    | [], [] -> NsEq
+    | [], [] -> Nonstrict.Eq
     | y :: ys, x :: xs ->
       (match f y x with
-       | NsGeq -> merge_with_NsGeq (lex_ext f ys xs)
-       | NsEq -> lex_ext f ys xs
-       | NsLeq -> merge_with_NsLeq (lex_ext f ys xs)
+       | Nonstrict.Geq -> Comparison.Nonstrict.merge_with_Geq (lex_ext f ys xs)
+       | Eq -> lex_ext f ys xs
+       | Leq -> Comparison.Nonstrict.merge_with_Leq (lex_ext f ys xs)
        | cmp -> cmp)
-    | _, _ -> NsIncomparable  (* impossible *)
+    | _, _ -> Incomparable  (* impossible *)
 
   let rec lex_ext_data f ys xs = match ys, xs with
-    | [], [] -> ([], NsEq)
+    | [], [] -> ([], Nonstrict.Eq)
     | y :: ys, x :: xs ->
       (match f y x with
-       | (w, NsGeq) ->
+       | (w, Nonstrict.Geq) ->
          let (ws, cmp) = lex_ext_data f ys xs in
-         (w :: ws, merge_with_NsGeq cmp)
-       | (w, NsEq) ->
+         (w :: ws, Comparison.Nonstrict.merge_with_Geq cmp)
+       | (w, Eq) ->
          let (ws, cmp) = lex_ext_data f ys xs in
          (w :: ws, cmp)
-       | (w, NsLeq) ->
+       | (w, Leq) ->
          let (ws, cmp) = lex_ext_data f ys xs in
-         (w :: ws, merge_with_NsLeq cmp)
+         (w :: ws, Comparison.Nonstrict.merge_with_Leq cmp)
        | (w, cmp) -> ([w], cmp))
-    | _, _ -> ([], NsIncomparable)  (* impossible *)
+    | _, _ -> ([], Incomparable)  (* impossible *)
 
   let cw_ext_data f =
     lex_ext_data (fun y x ->
       let (w, cmp) = f y x in
-      (w, nonstrict cmp))
+      (w, Comparison.Nonstrict.smooth cmp))
 
   let analyze_weight_diff w =
     match Polynomial.for_all_coeffs (fun coeff -> W.sign coeff >= 0) w,
       Polynomial.for_all_coeffs (fun coeff -> W.sign coeff <= 0) w with
-    | false, false -> NsIncomparable
-    | true, false -> if W.sign (Polynomial.constant_monomial w) > 0 then NsGt else NsGeq
-    | false, true -> if W.sign (Polynomial.constant_monomial w) < 0 then NsLt else NsLeq
-    | true, true -> NsEq
+    | false, false -> Nonstrict.Incomparable
+    | true, false -> if W.sign (Polynomial.constant_monomial w) > 0 then Gt else Geq
+    | false, true -> if W.sign (Polynomial.constant_monomial w) < 0 then Lt else Leq
+    | true, true -> Eq
 
   let consider_weight w cmp =
     (w,
      match analyze_weight_diff w with
-     | NsGeq -> merge_with_NsGeq cmp
-     | NsEq -> cmp
-     | NsLeq -> merge_with_NsLeq cmp
+     | Geq -> Comparison.Nonstrict.merge_with_Geq cmp
+     | Eq -> cmp
+     | Leq -> Comparison.Nonstrict.merge_with_Leq cmp
      | cmp' -> cmp')
 
   let rec process_args n ~prec bound_tys ts ss =
@@ -1069,41 +1054,41 @@ module LambdaKBO : ORD = struct
     | Var y, Var x when HVar.id y = HVar.id x ->
       process_var_args ~prec bound_tys t_args s_args
     | Var _, _ | _, Var _ ->
-      consider_weights_of ~prec bound_tys t s NsIncomparable
+      consider_weights_of ~prec bound_tys t s Nonstrict.Incomparable
     | Fun (t_ty, t_body), Fun (s_ty, s_body) ->
       (match compare_types ~prec t_ty s_ty with
-       | NsEq -> process_terms ~prec (t_ty :: bound_tys) t_body s_body
+       | Eq -> process_terms ~prec (t_ty :: bound_tys) t_body s_body
        | cmp -> consider_weights_of ~prec bound_tys t_body s_body cmp)
     | Fun _, (DB _|Const _|AppBuiltin _) ->
-      consider_weights_of ~prec bound_tys t s NsGt
-    | DB _, Fun _ -> consider_weights_of ~prec bound_tys t s NsLt
+      consider_weights_of ~prec bound_tys t s Gt
+    | DB _, Fun _ -> consider_weights_of ~prec bound_tys t s Lt
     | DB j, DB i ->
-      if j > i then consider_weights_of ~prec bound_tys t s NsGt
-      else if j < i then consider_weights_of ~prec bound_tys t s NsLt
+      if j > i then consider_weights_of ~prec bound_tys t s Gt
+      else if j < i then consider_weights_of ~prec bound_tys t s Lt
       else process_args 1 ~prec bound_tys t_args s_args
     | DB _, (Const _|AppBuiltin _) ->
-      consider_weights_of ~prec bound_tys t s NsGt
-    | Const _, (Fun _|DB _) -> consider_weights_of ~prec bound_tys t s NsLt
+      consider_weights_of ~prec bound_tys t s Gt
+    | Const _, (Fun _|DB _) -> consider_weights_of ~prec bound_tys t s Lt
     | Const gid, Const fid ->
       if ID.id gid = ID.id fid then
         match lex_ext (compare_type_terms ~prec) t_tyargs s_tyargs with
-        | NsEq -> process_args 2 ~prec bound_tys t_args s_args
+        | Eq -> process_args 2 ~prec bound_tys t_args s_args
         | cmp -> consider_weights_of ~prec bound_tys t s cmp
       else
         consider_weights_of ~prec bound_tys t s
           (match Prec.compare prec gid fid with
-           | 0 -> NsIncomparable
-           | n when n > 0 -> NsGt
-           | _ -> NsLt)
-    | Const _, AppBuiltin _ -> consider_weights_of ~prec bound_tys t s NsGt
+           | 0 -> Incomparable
+           | n when n > 0 -> Gt
+           | _ -> Lt)
+    | Const _, AppBuiltin _ -> consider_weights_of ~prec bound_tys t s Gt
     | AppBuiltin _, (Fun _|DB _|Const _) ->
-      consider_weights_of ~prec bound_tys t s NsLt
+      consider_weights_of ~prec bound_tys t s Lt
     | AppBuiltin (t_b, t_bargs), AppBuiltin (s_b, s_bargs) ->
       (match Builtin.compare t_b s_b with
        | 0 -> process_args 3 ~prec bound_tys (t_bargs @ t_tyargs @ t_args)
          (s_bargs @ s_tyargs @ s_args)
-       | n when n > 0 -> consider_weights_of ~prec bound_tys t s NsGt
-       | _ -> consider_weights_of ~prec bound_tys t s NsLt)
+       | n when n > 0 -> consider_weights_of ~prec bound_tys t s Gt
+       | _ -> consider_weights_of ~prec bound_tys t s Lt)
     | _, _ -> assert false
   and consider_weights_of ~prec bound_tys t s cmp =
     let w = Polynomial.create_zero () in
@@ -1111,16 +1096,13 @@ module LambdaKBO : ORD = struct
     add_weight_of ~prec bound_tys w (-1) s;
     consider_weight w cmp
 
-  let nonstrict_compare_terms ~prec t0 s0 =
+  let compare_terms ~prec t0 s0 =
     ZProf.enter_prof prof_lambda_kbo;
     let t = Lambda.eta_expand t0 in
     let s = Lambda.eta_expand s0 in
     let (w, cmp) = process_terms ~prec [] t s in
     ZProf.exit_prof prof_lambda_kbo;
     cmp
-
-  let compare_terms ~prec s t =
-    strict_of_nonstrict (nonstrict_compare_terms ~prec s t)
 
   (* The ordering might flip if one side is a lambda-expression *)
   let might_flip _ s t = T.is_fun s || T.is_fun t
@@ -1211,14 +1193,12 @@ let compose f ord =
   {ord with 
     compare = 
       fun prec a b ->
-        (* CCFormat.printf "kbo: @[%a@]<?>@[%a@]@." T.pp a T.pp b; *)
         let f_res,a',b' = f a b in
-        (* CCFormat.printf "f_res: @[%a@]@." Comparison.pp f_res; *)
-        if Comparison.equal Comparison.Eq f_res then (
-          let res = ord.compare prec a' b' in
-          (* CCFormat.printf "res: @[%a@]@." Comparison.pp res; *)
-          res
-        ) else f_res
+        match f_res with
+        | Nonstrict.Geq -> Comparison.Nonstrict.merge_with_Geq (ord.compare prec a' b')
+        | Eq -> ord.compare prec a' b'
+        | Leq -> Comparison.Nonstrict.merge_with_Leq (ord.compare prec a' b')
+        | _ -> f_res
       }
 
 let dummy_cache_ = CCCache.dummy
@@ -1253,14 +1233,14 @@ let lambda_kbo prec =
   { cache_compare; compare; name=LambdaKBO.name; prec; might_flip; cache_might_flip; monotonic=false }
 
 let none =
-  let compare _ t1 t2 = if T.equal t1 t2 then Eq else Incomparable in
+  let compare _ t1 t2 = if T.equal t1 t2 then Nonstrict.Eq else Incomparable in
   let might_flip _ _ _ = false in
   let monotonic = true in
   { cache_compare=dummy_cache_; compare; prec=Prec.default []; name="none"; might_flip; cache_might_flip=dummy_cache_; monotonic}
 
 let subterm =
   let compare _ t1 t2 =
-    if T.equal t1 t2 then Eq
+    if T.equal t1 t2 then Nonstrict.Eq
     else if T.subterm ~sub:t1 t2 then Lt
     else if T.subterm ~sub:t2 t1 then Gt
     else Incomparable
