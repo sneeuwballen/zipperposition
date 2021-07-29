@@ -69,7 +69,7 @@ end
 module Nonstrict : sig
   type t = Lt | Leq | Eq | Geq | Gt | Incomparable
 
-  type comparison = t
+  type nonstrict_comparison = t
 
   val equal : t -> t -> bool
 
@@ -91,7 +91,7 @@ module Nonstrict : sig
 
   val smooth : t -> t
   (** Replace Gt by Geq and Lt by Leq. *)
-  val sharpen : t -> t
+  val sharpen : t -> comparison
   (** Replace Geq by Gt and Leq by Lt. *)
 
   type 'a comparator = 'a -> 'a -> t

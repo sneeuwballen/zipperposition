@@ -575,7 +575,6 @@ let test_lambda_kbo = "ordering.lambda_kbo", `Quick, fun () ->
   Alcotest.(check comp_test_strict) "f b (z b) = z b >= f b (z a) = z a"
     Comparison.Gt (Literal.Comp.compare ~ord fbzb_eq_zb fbza_eq_za);
 
-(*
   (* f b (z a) = b <?> f b (z b) = a *)
   let a = Term.const ~ty a_ in
   let b = Term.const ~ty b_ in
@@ -585,7 +584,6 @@ let test_lambda_kbo = "ordering.lambda_kbo", `Quick, fun () ->
   let fbzb_eq_a = Literal.mk_eq (Term.app f [b; Term.app z [b]]) a in
   Alcotest.(check comp_test_strict) "f b (z a) = b <?> f b (z b) = a"
     Comparison.Incomparable (Literal.Comp.compare ~ord fbza_eq_b fbzb_eq_a);
-*)
 
   (* polymorphic example *)
 

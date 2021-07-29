@@ -93,7 +93,7 @@ module Nonstrict = struct
 
 type t = Lt | Leq | Eq | Geq | Gt | Incomparable
 
-type comparison = t
+type nonstrict_comparison = t
 let equal : t -> t -> bool = Pervasives.(=)
 
 let to_string = function
@@ -139,9 +139,10 @@ let smooth = function
   | cmp -> cmp
 
 let sharpen = function
-  | Geq -> Gt
-  | Leq -> Lt
-  | cmp -> cmp
+  | Gt | Geq -> (Gt : comparison)
+  | Eq -> Eq
+  | Lt | Leq -> Lt
+  | Incomparable -> Incomparable
 
 type 'a comparator = 'a -> 'a -> t
 

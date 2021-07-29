@@ -873,22 +873,25 @@ module Comp = struct
   *)
 
   (* is there an element of [l1] that dominates all elements of [l2]? *)
-  let _some_term_dominates f l1 l2 =
-    List.exists (fun x -> List.for_all (fun y -> C.is_Gt_or_Geq (f x y)) l2) l1
+  let _find_dominator f ts1 ts2 =
+    if List.exists (fun x -> List.for_all (fun y -> f x y = C.Nonstrict.Gt) ts2) ts1 then
+      C.Nonstrict.Gt
+    else
+      C.Nonstrict.Incomparable
 
-  let _cmp_by_maxterms ~ord l1 l2 =
-    let t1 = max_terms ~ord l1 and t2 = max_terms ~ord l2 in
+  let _cmp_by_terms ~ord l1 l2 =
+    let ts1 = max_terms ~ord l1 and ts2 = max_terms ~ord l2 in
     let f = Ordering.compare ord in
-    match _some_term_dominates f t1 t2, _some_term_dominates f t2 t1 with
-    | false, false ->
-      let t1' = CCList.fold_right T.Set.add t1 T.Set.empty
-      and t2' = CCList.fold_right T.Set.add t2 T.Set.empty in
-      if T.Set.equal t1' t2'
-      then C.Eq (* next criterion *)
+    match _find_dominator f ts1 ts2, _find_dominator f ts2 ts1 with
+    | C.Nonstrict.Incomparable, Incomparable ->
+      let set1 = CCList.fold_right T.Set.add ts1 T.Set.empty
+      and set2 = CCList.fold_right T.Set.add ts2 T.Set.empty in
+      if T.Set.equal set1 set2
+      then C.Nonstrict.Eq
       else Incomparable
-    | true, true -> assert false
-    | true, false -> Gt
-    | false, true -> Lt
+    | Gt, Incomparable -> Gt
+    | Incomparable, Gt -> Lt
+    | _, _ -> assert false
 
   (* negative literals dominate *)
   let _cmp_by_polarity l1 l2 =
@@ -896,7 +899,7 @@ module Comp = struct
     let p2 = polarity l2 in
     match p1, p2 with
     | true, true
-    | false, false -> C.Eq
+    | false, false -> C.Nonstrict.Eq
     | true, false -> Lt
     | false, true -> Gt
 
@@ -914,12 +917,12 @@ module Comp = struct
       | Rat {Rat_lit.op=Rat_lit.Less; _} -> 21
       | Equation _ -> 30
     in
-    C.of_total (Pervasives.compare (_to_int l1) (_to_int l2))
+    C.Nonstrict.of_total (Pervasives.compare (_to_int l1) (_to_int l2))
 
   (* by multiset of terms *)
   let _cmp_by_term_multiset ~ord l1 l2 =
     let m1 = to_multiset l1 and m2 = to_multiset l2 in
-    Multisets.MT.compare_partial_nonstrict (Ordering.compare ord) m1 m2
+    C.to_nonstrict (Multisets.MT.compare_partial_nonstrict (Ordering.compare ord) m1 m2)
 
   let _cmp_specific ~ord l1 l2 =
     match l1, l2 with
@@ -938,37 +941,38 @@ module Comp = struct
       let module MI = Monome.Int in
       let left = Multisets.MMT.doubleton (MI.to_multiset x1) (MI.to_multiset y1) in
       let right = Multisets.MMT.doubleton (MI.to_multiset x2) (MI.to_multiset y2) in
-      Multisets.MMT.compare_partial
-        (Multisets.MT.compare_partial_nonstrict (Ordering.compare ord))
-        left right
+      C.to_nonstrict (Multisets.MMT.compare_partial
+          (Multisets.MT.compare_partial_nonstrict (Ordering.compare ord))
+        left right)
     | Int(AL.Divides d1), Int(AL.Divides d2) ->
       assert (d1.AL.sign=d2.AL.sign);
       let c = Z.compare d1.AL.num d2.AL.num in
-      if c <> 0 then C.of_total c  (* live in totally distinct Z/nZ *)
-      else
-      if is_ground l1 && is_ground l2
-      then
+      if c <> 0 then
+        C.Nonstrict.of_total c  (* live in totally distinct Z/nZ *)
+      else if is_ground l1 && is_ground l2 then
         Incomparable
         (* TODO: Bezout-normalize, then actually compare Monomes. *)
-      else Incomparable
+      else
+        Incomparable
     | Rat {Rat_lit.op=o1;left=l1;right=r1}, Rat {Rat_lit.op=o2;left=l2;right=r2} ->
       assert (o1=o2);
       let module M = Monome.Rat in
       let m1 = Multisets.MT.union (M.to_multiset l1) (M.to_multiset r1) in
       let m2 = Multisets.MT.union (M.to_multiset l2) (M.to_multiset r2) in
-      Multisets.MT.compare_partial_nonstrict (Ordering.compare ord) m1 m2
+      C.to_nonstrict (Multisets.MT.compare_partial_nonstrict
+        (Ordering.compare ord) m1 m2)
     | _, _ ->
       Util.debugf 5 "(@[bad_compare %a %a@])" (fun k->k pp l1 pp l2);
       assert false
 
   let compare ~ord l1 l2 =
-    let f = Comparison.(
-        _cmp_by_maxterms ~ord @>>
+    let f = C.Nonstrict.(
+        _cmp_by_terms ~ord @>>
         _cmp_by_polarity @>>
         _cmp_by_kind @>>
         _cmp_specific ~ord
       ) in
-    let res = f l1 l2 in
+    let res = C.Nonstrict.sharpen (f l1 l2) in
     res
 end
 
