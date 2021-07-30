@@ -865,32 +865,77 @@ module Comp = struct
 
   (* general comparison is a bit complicated.
      - First we compare literals l1 and l2
-        by their (set of potential) maximal terms.
+        by their (set of potential) maximal terms
      - then by their polarity (neg > pos)
      - then by their kind (regular equation/prop on bottom)
      - then, l1 and l2 must be of the same kind, so we use a
         kind-specific comparison.
   *)
 
-  (* is there an element of [l1] that dominates all elements of [l2]? *)
-  let _find_dominator f ts1 ts2 =
-    if List.exists (fun x -> List.for_all (fun y -> f x y = C.Nonstrict.Gt) ts2) ts1 then
+  type dominator_result =
+    | NoDominators
+    | NonstrictDominators of T.t list
+    | StrictDominators
+
+  (* Is there an element of the first list that dominates all elements of the
+     second list? *)
+  let rec _find_dominators f ts1 ts2 = match ts1 with
+    | [] -> NoDominators
+    | t :: ts1 ->
+      let cmps = List.map (fun y -> f t y) ts2 in
+      if List.for_all (fun cmp -> cmp = C.Nonstrict.Gt) cmps then
+        StrictDominators
+      else if List.for_all C.is_Gt_or_Geq cmps then
+        (match _find_dominators f ts1 ts2 with
+         | NoDominators -> NonstrictDominators [t]
+         | NonstrictDominators ts -> NonstrictDominators (t :: ts)
+         | StrictDominators -> StrictDominators)
+      else
+        _find_dominators f ts1 ts2
+
+  let _subtract ~eq l1 l2 =
+    let rec sub acc l1 l2 = match l2 with
+      | [] -> List.rev acc
+      | x :: xs when not (CCList.mem ~eq x l1) -> sub (x :: acc) l1 xs
+      | _ :: xs -> sub acc l1 xs
+    in sub [] l1 l2
+
+  (* When the dominator is nonstrict, we must also check the other sides of the
+     literals. For example, the literals f b (Y b) = a and f b (Y a) = b should
+     be incomparable using the lambda KBO. *)
+  let _continue_with_nonmax_terms ~ord f doms1 l1 maxs2 l2 =
+    let ts1 = CCList.of_iter (Seq.terms l1)
+    and ts2 = CCList.of_iter (Seq.terms l2) in
+    let others1 = _subtract ~eq:T.equal doms1 ts1 in
+    let others2 = match maxs2 with
+      | [max2] -> CCList.remove ~eq:T.equal ~key:max2 ts2
+      | _ -> ts2
+    in
+    (* Imagine all the possible ways (and then some) in which the other terms of
+       literals could be compared, and check how they might act as tiebreaker
+       for Geq on a pair of max terms. *)
+    let cmps = CCList.product f others1 others2 in
+    if List.for_all (C.Nonstrict.equal C.Nonstrict.Gt) cmps then
       C.Nonstrict.Gt
+    else if List.for_all C.is_Gt_or_Geq_or_Eq cmps then
+      Geq
     else
-      C.Nonstrict.Incomparable
+      Incomparable
 
   let _cmp_by_terms ~ord l1 l2 =
-    let ts1 = max_terms ~ord l1 and ts2 = max_terms ~ord l2 in
+    let maxs1 = max_terms ~ord l1 and maxs2 = max_terms ~ord l2 in
     let f = Ordering.compare ord in
-    match _find_dominator f ts1 ts2, _find_dominator f ts2 ts1 with
-    | C.Nonstrict.Incomparable, Incomparable ->
-      let set1 = CCList.fold_right T.Set.add ts1 T.Set.empty
-      and set2 = CCList.fold_right T.Set.add ts2 T.Set.empty in
-      if T.Set.equal set1 set2
-      then C.Nonstrict.Eq
-      else Incomparable
-    | Gt, Incomparable -> Gt
-    | Incomparable, Gt -> Lt
+    match _find_dominators f maxs1 maxs2, _find_dominators f maxs2 maxs1 with
+    | NoDominators, NoDominators ->
+      let set1 = CCList.fold_right T.Set.add maxs1 T.Set.empty
+      and set2 = CCList.fold_right T.Set.add maxs2 T.Set.empty in
+      if T.Set.equal set1 set2 then C.Nonstrict.Eq else Incomparable
+    | StrictDominators, NoDominators -> Gt
+    | NoDominators, StrictDominators -> Lt
+    | NonstrictDominators doms1, NoDominators ->
+      _continue_with_nonmax_terms ~ord f doms1 l1 maxs2 l2
+    | NoDominators, NonstrictDominators doms2 ->
+      _continue_with_nonmax_terms ~ord f doms2 l2 maxs1 l1
     | _, _ -> assert false
 
   (* negative literals dominate *)

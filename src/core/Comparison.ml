@@ -159,8 +159,16 @@ let is_Gt_or_Geq = function
   | Nonstrict.Gt | Geq -> true
   | _ -> false
 
+let is_Gt_or_Geq_or_Eq = function
+  | Nonstrict.Gt | Geq | Eq -> true
+  | _ -> false
+
 let is_Lt_or_Leq = function
   | Nonstrict.Lt | Leq -> true
+  | _ -> false
+
+let is_Lt_or_Leq_or_Eq = function
+  | Nonstrict.Lt | Leq | Eq -> true
   | _ -> false
 
 let of_nonstrict = function

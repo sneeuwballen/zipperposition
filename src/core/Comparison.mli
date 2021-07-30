@@ -101,8 +101,10 @@ module Nonstrict : sig
 end
 
 val is_Gt_or_Geq : Nonstrict.t -> bool
+val is_Gt_or_Geq_or_Eq : Nonstrict.t -> bool
 val is_Lt_or_Leq : Nonstrict.t -> bool
-(** Test for two constructors at once. *)
+val is_Lt_or_Leq_or_Eq : Nonstrict.t -> bool
+(** Test for several constructors at once. *)
 
 val of_nonstrict : Nonstrict.t -> t
 (* Cast a nonstrict comparison value to a strict one. *)
