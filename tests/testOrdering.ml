@@ -338,6 +338,17 @@ let test_derived_ho_kbo = "ordering.derived_ho_kbo", `Quick, fun () ->
   Alcotest.(check comp_test) "lam x. z x a <=>? z"
     Comparison.Nonstrict.Incomparable (compare (Term.fun_l [ty] (Term.app z [Term.bvar ~ty 0; a])) z);
 
+  (* complexity *)
+  let rec pow n f x =
+    if n = 0 then x else pow (n - 1) f (f x)
+  in
+  let a = Term.const ~ty a_ in
+  let b = Term.const ~ty b_ in
+  let f = Term.const ~ty:(Type.arrow [ty] ty) f_ in
+  let n = 10000 in
+  Alcotest.(check comp_test) "f^n b > f^n a"
+    Comparison.Nonstrict.Gt (compare (pow n (fun t -> Term.app f [t]) b) (pow n (fun t -> Term.app f [t]) a));
+
   (* polymorphic example *)
   let funty_ = (ID.make "funty") in
   let appty = Type.forall_n 2 (Type.arrow [Type.app funty_ [Type.bvar 1; Type.bvar 0]; Type.bvar 1] (Type.bvar 0)) in
@@ -526,6 +537,17 @@ let test_lambda_kbo = "ordering.lambda_kbo", `Quick, fun () ->
   let z = Term.var (HVar.fresh ~ty:(Type.arrow [ty; ty] ty) ()) in
   Alcotest.(check comp_test) "lam x. z x a < z"
     Comparison.Nonstrict.Lt (compare (Term.fun_l [ty] (Term.app z [Term.bvar ~ty 0; a])) z);
+
+  (* complexity *)
+  let rec pow n f x =
+    if n = 0 then x else pow (n - 1) f (f x)
+  in
+  let a = Term.const ~ty a_ in
+  let b = Term.const ~ty b_ in
+  let f = Term.const ~ty:(Type.arrow [ty] ty) f_ in
+  let n = 10000 in
+  Alcotest.(check comp_test) "f^n b > f^n a"
+    Comparison.Nonstrict.Gt (compare (pow n (fun t -> Term.app f [t]) b) (pow n (fun t -> Term.app f [t]) a));
 
   (* maximal sides of a literal *)
 
