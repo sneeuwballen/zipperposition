@@ -930,8 +930,10 @@ module Comp = struct
       let set1 = CCList.fold_right T.Set.add maxs1 T.Set.empty
       and set2 = CCList.fold_right T.Set.add maxs2 T.Set.empty in
       if T.Set.equal set1 set2 then C.Nonstrict.Eq else Incomparable
-    | StrictDominators, NoDominators -> Gt
-    | NoDominators, StrictDominators -> Lt
+    | StrictDominators, NoDominators ->
+      Gt
+    | NoDominators, StrictDominators ->
+      Lt
     | NonstrictDominators doms1, NoDominators ->
       _continue_with_nonmax_terms ~ord f doms1 l1 maxs2 l2
     | NoDominators, NonstrictDominators doms2 ->
@@ -1010,14 +1012,16 @@ module Comp = struct
       Util.debugf 5 "(@[bad_compare %a %a@])" (fun k->k pp l1 pp l2);
       assert false
 
-  let compare ~ord l1 l2 =
-    let f = C.Nonstrict.(
-        _cmp_by_terms ~ord @>>
-        _cmp_by_polarity @>>
-        _cmp_by_kind @>>
-        _cmp_specific ~ord
-      ) in
-    C.Nonstrict.sharpen (f l1 l2)
+  let compare ~ord =
+    C.Nonstrict.(
+      ((_cmp_by_terms ~ord @>>
+        _cmp_by_polarity) @>>
+       _cmp_by_kind) @>>!
+       (* If _cmp_by_terms returns Geq, it has already checked the other
+          literals and there is no need to continue with _cmp_specific. *)
+      _cmp_specific ~ord
+    )
+
 end
 
 module Pos = struct

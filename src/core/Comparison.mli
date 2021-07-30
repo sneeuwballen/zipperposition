@@ -91,12 +91,11 @@ module Nonstrict : sig
 
   val smooth : t -> t
   (** Replace Gt by Geq and Lt by Leq. *)
-  val sharpen : t -> comparison
-  (** Replace Geq by Gt and Leq by Lt. *)
 
   type 'a comparator = 'a -> 'a -> t
 
   val (@>>) : 'a comparator -> 'a comparator -> 'a comparator
+  val (@>>!) : 'a comparator -> 'a comparator -> 'a comparator
   (** Combination of comparators that work on the same values. *)
 end
 

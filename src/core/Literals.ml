@@ -32,11 +32,11 @@ let equal_com lits1 lits2 =
   then false
   else check 0
 
-let compare lits1 lits2 = CCArray.compare Lit.compare lits1 lits2
+let compare = CCArray.compare Lit.compare
 
 let compare_multiset ~ord (l1:t) (l2:t) =
   let module M = Multiset.Make(Literal) in
-  M.compare_partial_l (Literal.Comp.compare ~ord)
+  M.compare_partial_nonstrict_l (Literal.Comp.compare ~ord)
     (Array.to_list l1) (Array.to_list l2)
 
 let hash lits = Hash.array Lit.hash lits
@@ -117,13 +117,13 @@ module MLI = Multiset.Make(struct
   end)
 
 let _compare_lit_with_idx ~ord (lit1,i1) (lit2,i2) =
-  if i1=i2
+  if i1 = i2
   then Comparison.Nonstrict.Eq (* ignore collisions *)
   else (
     let c = Lit.Comp.compare ~ord lit1 lit2 in
     (* two occurrences of one lit should be incomparable (and therefore maximal) *)
-    if c = Comparison.Eq then Incomparable
-    else Comparison.to_nonstrict c
+    if c = Comparison.Nonstrict.Eq then Incomparable
+    else c
   )
 
 let _to_multiset_with_idx lits =

@@ -54,7 +54,7 @@ let (++) = lexico
 let (@>>) f g x y =
   match f x y with
   | Eq -> g x y
-  | res -> res
+  | cmp -> cmp
 
 type ('a, 'b) combination = {
   call : 'a -> 'a -> 'b;
@@ -63,7 +63,7 @@ type ('a, 'b) combination = {
 
 let last f = {
   call = f;
-  ignore = (fun res _ _ -> res);
+  ignore = (fun cmp _ _ -> cmp);
 }
 
 let call f x y = f.call x y
@@ -138,12 +138,6 @@ let smooth = function
   | Lt -> Leq
   | cmp -> cmp
 
-let sharpen = function
-  | Gt | Geq -> (Gt : comparison)
-  | Eq -> Eq
-  | Lt | Leq -> Lt
-  | Incomparable -> Incomparable
-
 type 'a comparator = 'a -> 'a -> t
 
 let (@>>) f g x y =
@@ -151,6 +145,11 @@ let (@>>) f g x y =
   | Geq -> merge_with_Geq (g x y)
   | Eq -> g x y
   | Leq -> merge_with_Leq (g x y)
+  | cmp -> cmp
+
+let (@>>!) f g x y =
+  match f x y with
+  | Eq -> g x y
   | cmp -> cmp
 
 end

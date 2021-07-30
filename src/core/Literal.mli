@@ -224,7 +224,7 @@ module Comp : sig
   val max_terms : ord:Ordering.t -> t -> term list
   (** Maximal terms of the literal *)
 
-  val compare : ord:Ordering.t -> t -> t -> Comparison.t
+  val compare : ord:Ordering.t -> t -> t -> Comparison.Nonstrict.t
   (** partial comparison of literals under the given term ordering *)
 end
 
