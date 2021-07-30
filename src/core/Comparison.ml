@@ -15,7 +15,7 @@ let to_string = function
   | Lt -> "<"
   | Eq -> "="
   | Gt -> ">"
-  | Incomparable -> "<?>"
+  | Incomparable -> "<=>?"
 
 let pp out c = CCFormat.string out (to_string c)
 
@@ -102,7 +102,7 @@ let to_string = function
   | Eq -> "="
   | Geq -> ">="
   | Gt -> ">"
-  | Incomparable -> "<?>"
+  | Incomparable -> "<=>?"
 
 let pp out c = CCFormat.string out (to_string c)
 

@@ -226,7 +226,7 @@ module Make(E : Map.OrderedType) = struct
     check_left ~neq:false ~max1:false m1 ~max2:false m2
 
   let compare_partial_nonstrict f =
-    compare_partial (fun k1 k2 -> Comparison.Nonstrict.sharpen (f k1 k2))
+    compare_partial (fun k1 k2 -> Comparison.of_nonstrict (f k1 k2))
 
   let compare_l m1 m2 =
     let rec aux m1 m2 = match m1, m2 with
