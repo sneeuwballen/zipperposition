@@ -985,16 +985,19 @@ module LambdaKBO : ORD = struct
 
   let rec lex_ext f ys xs = match ys, xs with
     | [], [] -> Nonstrict.Eq
+    | [], _ :: _ -> Nonstrict.Lt
+    | _ :: _, [] -> Nonstrict.Gt
     | y :: ys, x :: xs ->
       (match f y x with
        | Nonstrict.Geq -> Comparison.Nonstrict.merge_with_Geq (lex_ext f ys xs)
        | Eq -> lex_ext f ys xs
        | Leq -> Comparison.Nonstrict.merge_with_Leq (lex_ext f ys xs)
        | cmp -> cmp)
-    | _, _ -> Incomparable  (* impossible *)
 
   let rec lex_ext_data f ys xs = match ys, xs with
     | [], [] -> ([], Nonstrict.Eq)
+    | [], _ :: _ -> ([], Nonstrict.Lt)
+    | _ :: _, [] -> ([], Nonstrict.Gt)
     | y :: ys, x :: xs ->
       (match f y x with
        | (w, Nonstrict.Geq) ->
@@ -1007,7 +1010,6 @@ module LambdaKBO : ORD = struct
          let (ws, cmp) = lex_ext_data f ys xs in
          (w :: ws, Comparison.Nonstrict.merge_with_Leq cmp)
        | (w, cmp) -> ([w], cmp))
-    | _, _ -> ([], Incomparable)  (* impossible *)
 
   let cw_ext_data f =
     lex_ext_data (fun y x ->
@@ -1030,15 +1032,13 @@ module LambdaKBO : ORD = struct
      | Leq -> Comparison.Nonstrict.merge_with_Leq cmp
      | cmp' -> cmp')
 
-  let rec process_args n ~prec bound_tys ts ss =
+  let rec process_args ~prec bound_tys ts ss =
     let w = Polynomial.create_zero () in
     let (ws, cmp) = lex_ext_data (process_terms ~prec bound_tys) ts ss in
     let m = List.length ws in
     List.iter (Polynomial.add w) ws;
-    List.iter2 (fun t s ->
-        add_weight_of ~prec bound_tys w (+1) t;
-        add_weight_of ~prec bound_tys w (-1) s)
-      (CCList.drop m ts) (CCList.drop m ss);
+    List.iter (add_weight_of ~prec bound_tys w (+1)) (CCList.drop m ts);
+    List.iter (add_weight_of ~prec bound_tys w (-1)) (CCList.drop m ss);
     consider_weight w cmp
   and process_var_args ~prec bound_tys ts ss =
     let w = Polynomial.create_zero () in
@@ -1065,14 +1065,14 @@ module LambdaKBO : ORD = struct
     | DB j, DB i ->
       if j > i then consider_weights_of ~prec bound_tys t s Gt
       else if j < i then consider_weights_of ~prec bound_tys t s Lt
-      else process_args 1 ~prec bound_tys t_args s_args
+      else process_args ~prec bound_tys t_args s_args
     | DB _, (Const _|AppBuiltin _) ->
       consider_weights_of ~prec bound_tys t s Gt
     | Const _, (Fun _|DB _) -> consider_weights_of ~prec bound_tys t s Lt
     | Const gid, Const fid ->
       if ID.id gid = ID.id fid then
         match lex_ext (compare_type_terms ~prec) t_tyargs s_tyargs with
-        | Eq -> process_args 2 ~prec bound_tys t_args s_args
+        | Eq -> process_args ~prec bound_tys t_args s_args
         | cmp -> consider_weights_of ~prec bound_tys t s cmp
       else
         consider_weights_of ~prec bound_tys t s
@@ -1085,7 +1085,7 @@ module LambdaKBO : ORD = struct
       consider_weights_of ~prec bound_tys t s Lt
     | AppBuiltin (t_b, t_bargs), AppBuiltin (s_b, s_bargs) ->
       (match Builtin.compare t_b s_b with
-       | 0 -> process_args 3 ~prec bound_tys (t_bargs @ t_tyargs @ t_args)
+       | 0 -> process_args ~prec bound_tys (t_bargs @ t_tyargs @ t_args)
          (s_bargs @ s_tyargs @ s_args)
        | n when n > 0 -> consider_weights_of ~prec bound_tys t s Gt
        | _ -> consider_weights_of ~prec bound_tys t s Lt)
