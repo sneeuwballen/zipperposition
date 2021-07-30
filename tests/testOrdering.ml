@@ -554,7 +554,7 @@ let test_lambda_kbo = "ordering.lambda_kbo", `Quick, fun () ->
 
   (* maximal literals *)
 
-  (* f b (z b) = b > f b (z a) = a *)
+  (* (f b (z b) = b) > (f b (z a) = a) *)
   let a = Term.const ~ty a_ in
   let b = Term.const ~ty b_ in
   let f = Term.const ~ty:(Type.arrow [ty; ty] ty) f_ in
@@ -564,7 +564,17 @@ let test_lambda_kbo = "ordering.lambda_kbo", `Quick, fun () ->
   Alcotest.(check comp_test) "f b (z b) = b > f b (z a) = a"
     Comparison.Nonstrict.Gt (Literal.Comp.compare ~ord fbzb_eq_b fbza_eq_a);
 
-  (* f b (z b) = z b >= f b (z a) = z a *)
+  (* (f b (z b) = f b (z a)) > (f b (z a) = a) *)
+  let a = Term.const ~ty a_ in
+  let b = Term.const ~ty b_ in
+  let f = Term.const ~ty:(Type.arrow [ty; ty] ty) f_ in
+  let z = Term.var (HVar.fresh ~ty:(Type.arrow [ty] ty) ()) in
+  let fbzb_eq_fbza = Literal.mk_eq (Term.app f [b; Term.app z [b]]) (Term.app f [b; Term.app z [a]]) in
+  let fbza_eq_a = Literal.mk_eq (Term.app f [b; Term.app z [a]]) a in
+  Alcotest.(check comp_test) "f b (z b) = f b (z a) > f b (z a) = a"
+    Comparison.Nonstrict.Gt (Literal.Comp.compare ~ord fbzb_eq_fbza fbza_eq_a);
+
+  (* (f b (z b) = z b) >= (f b (z a) = z a) *)
   let a = Term.const ~ty a_ in
   let b = Term.const ~ty b_ in
   let f = Term.const ~ty:(Type.arrow [ty; ty] ty) f_ in
@@ -574,7 +584,7 @@ let test_lambda_kbo = "ordering.lambda_kbo", `Quick, fun () ->
   Alcotest.(check comp_test) "f b (z b) = z b >= f b (z a) = z a"
     Comparison.Nonstrict.Geq (Literal.Comp.compare ~ord fbzb_eq_zb fbza_eq_za);
 
-  (* f b (z a) = b <=>? f b (z b) = a *)
+  (* (f b (z a) = b) <=>? (f b (z b) = a) *)
   let a = Term.const ~ty a_ in
   let b = Term.const ~ty b_ in
   let f = Term.const ~ty:(Type.arrow [ty; ty] ty) f_ in

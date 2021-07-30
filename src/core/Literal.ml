@@ -1017,8 +1017,8 @@ module Comp = struct
       ((_cmp_by_terms ~ord @>>
         _cmp_by_polarity) @>>
        _cmp_by_kind) @>>!
-       (* If _cmp_by_terms returns Geq, it has already checked the other
-          literals and there is no need to continue with _cmp_specific. *)
+      (* If _cmp_by_terms returns Geq, it has already checked the other
+         literals and there is no need to continue with _cmp_specific. *)
       _cmp_specific ~ord
     )
 
