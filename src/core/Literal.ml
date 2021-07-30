@@ -907,7 +907,7 @@ module Comp = struct
     let ts1 = CCList.of_iter (Seq.terms l1)
     and ts2 = CCList.of_iter (Seq.terms l2) in
     let others1 = _subtract ~eq:T.equal doms1 ts1 in
-    let others2 = match maxs2 with
+    let others2 = match CCList.uniq ~eq:T.equal maxs2 with
       | [max2] -> CCList.remove ~eq:T.equal ~key:max2 ts2
       | _ -> ts2
     in
