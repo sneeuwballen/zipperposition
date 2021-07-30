@@ -878,12 +878,12 @@ module Focus = struct
       let t = MF.term mf in
       let terms = Iter.append (M.Seq.terms m) (MF.rest mf |> M.Seq.terms) in
       Iter.for_all
-        (fun t' -> Ordering.compare ord t t' <> Comparison.Nonstrict.Lt)
+        (fun t' -> not (Comparison.is_Lt_or_Leq (Ordering.compare ord t t')))
         terms
     | Div d ->
       let t = MF.term d.monome in
       Iter.for_all
-        (fun t' -> Ordering.compare ord t t' <> Comparison.Nonstrict.Lt)
+        (fun t' -> not (Comparison.is_Lt_or_Leq (Ordering.compare ord t t')))
         (MF.rest d.monome |> M.Seq.terms)
 
   (* is the focused term maximal in the arithmetic literal? *)
