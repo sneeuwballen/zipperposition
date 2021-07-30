@@ -27,3 +27,8 @@ jobs:
     - run: opam install -t . --deps-only
     - run: opam exec -- dune build @install --profile=release
     - run: opam exec -- dune runtest --profile=release
+    - uses: actions/upload-artifact@master
+      with:
+        name: zipperposition-bin-${{ matrix.os }}-${{ matrix.ocaml-compiler }}.exe
+        path: _build/default/src/main/zipperposition.exe
+
