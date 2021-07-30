@@ -1092,15 +1092,20 @@ module LambdaKBO : ORD = struct
     | _, _ -> assert false
   and consider_weights_of ~prec bound_tys t s cmp =
     let w = Polynomial.create_zero () in
-    add_weight_of ~prec bound_tys w (+1) t;
-    add_weight_of ~prec bound_tys w (-1) s;
+    if not (Term.equal t s) then (
+      add_weight_of ~prec bound_tys w (+1) t;
+      add_weight_of ~prec bound_tys w (-1) s
+    );
     consider_weight w cmp
 
   let compare_terms ~prec t0 s0 =
     ZProf.enter_prof prof_lambda_kbo;
-    let t = Lambda.eta_expand t0 in
-    let s = Lambda.eta_expand s0 in
-    let (w, cmp) = process_terms ~prec [] t s in
+    let t = Lambda.eta_expand t0
+    and s = Lambda.eta_expand s0 in
+    let cmp =
+      if Term.equal t s then Nonstrict.Eq
+      else snd (process_terms ~prec [] t s)
+    in
     ZProf.exit_prof prof_lambda_kbo;
     cmp
 
