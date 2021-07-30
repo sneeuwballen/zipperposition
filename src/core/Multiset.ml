@@ -255,11 +255,7 @@ module Make(E : Map.OrderedType) = struct
   let compare m1 m2 = compare_l (to_list m1) (to_list m2)
 
   let is_max f x m =
-    M.for_all
-      (fun y _ -> match f x y with
-         | Comparison.Nonstrict.Lt | Leq -> false
-         | _ -> true)
-      m
+    M.for_all (fun y _ -> not (Comparison.is_Lt_or_Leq (f x y))) m
 
   (* iterate on the max elements *)
   let max_seq f (m:t) k =

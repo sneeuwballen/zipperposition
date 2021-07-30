@@ -385,7 +385,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             (T.is_appbuiltin l || (T.is_appbuiltin r && not @@ T.is_true_or_false r) ) then idx
         else (
           begin match Ordering.compare ord l r with
-            | Comparison.Nonstrict.Gt | Geq ->
+            | Comp.Nonstrict.Gt | Geq ->
               f idx (l,r,true,c)
             | Lt | Leq ->
               f idx (r,l,true,c)
@@ -508,7 +508,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           let passive_fresh_var = Lits.apply_subst Subst.Renaming.none (US.subst subst_fresh_var) (C.lits info.passive, info.scope_passive) in
           let subst_replacement = Unif.FO.bind subst (fresh_var, info.scope_passive) (replacement, info.scope_active) in
           let passive_t'_lits = Lits.apply_subst renaming subst_replacement (passive_fresh_var, info.scope_passive) in
-          if Lits.compare_multiset ~ord passive'_lits passive_t'_lits = Comparison.Gt
+          if Lits.compare_multiset ~ord passive'_lits passive_t'_lits = Comp.Gt
           then (
             Util.debugf ~section 3
               "Sup at var condition is not fulfilled because: %a >= %a"
@@ -1692,7 +1692,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           && C.proof_depth info.clause < 2
           && not (T.is_true_or_false t)) ||
         not (Comp.is_Lt_or_Leq (O.compare ord
-          (S.FO.apply renaming subst (s, info.scope)) 
+          (S.FO.apply renaming subst (s, info.scope))
           (S.FO.apply renaming subst (t, info.scope)))
         && CCList.for_all (fun (c, i) -> i = idx) (C.selected_lits info.clause)
         && CCList.is_empty (C.bool_selected info.clause)
@@ -2181,7 +2181,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let set' = match C.lits given with
       | [|Lit.Equation (l,r,true) |] ->
         begin match Ordering.compare ord l r with
-          | Comparison.Nonstrict.Gt | Geq -> recurse ~oriented:true set l r
+          | Comp.Nonstrict.Gt | Geq -> recurse ~oriented:true set l r
           | Lt | Leq -> recurse ~oriented:true set r l
           | _ ->
             let set' = recurse ~oriented:false set l r in

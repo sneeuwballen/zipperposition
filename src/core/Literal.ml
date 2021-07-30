@@ -563,7 +563,7 @@ let is_constraint = function
 let negate lit = 
   assert(no_prop_invariant lit);
   match lit with
-  | Equation (l,r,sign) ->  mk_lit l r (not sign)
+  | Equation (l,r,sign) -> mk_lit l r (not sign)
   | True -> False
   | False -> True
   | Int o -> Int (Int_lit.negate o)
@@ -848,7 +848,7 @@ module Comp = struct
     | C.Nonstrict.Gt | Geq -> [l]
     | Lt | Leq -> [r]
     | Eq -> [l]
-    | Incomparable ->  [l; r]
+    | Incomparable -> [l; r]
 
   (* maximal terms of the literal *)
   let max_terms ~ord lit =
@@ -1017,8 +1017,7 @@ module Comp = struct
         _cmp_by_kind @>>
         _cmp_specific ~ord
       ) in
-    let res = C.Nonstrict.sharpen (f l1 l2) in
-    res
+    C.Nonstrict.sharpen (f l1 l2)
 end
 
 module Pos = struct
@@ -1111,8 +1110,10 @@ module Pos = struct
   let is_max_term ~ord lit pos =
     let module AL = Int_lit in
     match lit, pos with
-    | Equation (l, r, _), P.Left _ -> not (Comparison.is_Lt_or_Leq (Ordering.compare ord l r))
-    | Equation (l, r, _), P.Right _ -> not (Comparison.is_Lt_or_Leq (Ordering.compare ord r l))
+    | Equation (l, r, _), P.Left _ ->
+      not (Comparison.is_Lt_or_Leq (Ordering.compare ord l r))
+    | Equation (l, r, _), P.Right _ ->
+      not (Comparison.is_Lt_or_Leq (Ordering.compare ord r l))
     | Int (AL.Binary(_, _m1, _m2)), _ ->
       (* [t] dominates all atomic terms? *)
       let t = root_term lit pos in

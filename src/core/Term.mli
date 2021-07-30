@@ -168,7 +168,7 @@ val as_app : t -> t * t list
     such as [(let f,l = as_app t in app f l) = t] *)
 
 val as_app_mono : t -> t * t list
-(** [as_app_mono t] decomposes [t] into a head (possibly applied to type arguments) 
+(** [as_app_mono t] decomposes [t] into a head (possibly applied to type arguments)
     and arguments, such as [(let f,l = as_app_mono t in app f l) = t] *)
 
 val as_fun : t -> Type.t list * t
@@ -265,7 +265,7 @@ val weight : ?var:int -> ?sym:(ID.t -> int) -> t -> int
     @param sym function from ID.ts to their weight (default [const 1])
     @since 0.5.3 *)
 
-val ho_weight : t -> int 
+val ho_weight : t -> int
 
 val ty_vars : t -> Type.VarSet.t
 (** Set of free type variables *)

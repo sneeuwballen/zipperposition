@@ -113,7 +113,7 @@ let neg lits =
 module MLI = Multiset.Make(struct
     type t = Lit.t * int
     let compare (l1,i1)(l2,i2) =
-      if i1=i2 then Lit.compare l1 l2 else Pervasives.compare i1 i2
+      if i1 = i2 then Lit.compare l1 l2 else Pervasives.compare i1 i2
   end)
 
 let _compare_lit_with_idx ~ord (lit1,i1) (lit2,i2) =
@@ -122,7 +122,7 @@ let _compare_lit_with_idx ~ord (lit1,i1) (lit2,i2) =
   else (
     let c = Lit.Comp.compare ~ord lit1 lit2 in
     (* two occurrences of one lit should be incomparable (and therefore maximal) *)
-    if c = Comparison.Eq then Comparison.Nonstrict.Incomparable
+    if c = Comparison.Eq then Incomparable
     else Comparison.to_nonstrict c
   )
 
