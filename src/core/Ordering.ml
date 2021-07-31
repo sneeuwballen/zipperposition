@@ -29,8 +29,8 @@ type term = T.t
 (** {2 Type definitions} *)
 
 type t = {
-  cache_compare : (T.t * T.t, Comparison.Nonstrict.t) CCCache.t;
-  compare : Prec.t -> term -> term -> Comparison.Nonstrict.t;
+  cache_compare : (T.t * T.t, Nonstrict.t) CCCache.t;
+  compare : Prec.t -> term -> term -> Nonstrict.t;
   prec : Prec.t;
   name : string;
   cache_might_flip : (T.t * T.t, bool) CCCache.t;
@@ -79,7 +79,7 @@ module type ORD = sig
    * - stable for instantiation
    * - compatible with function contexts
    * - total on ground terms *)
-  val compare_terms : prec:Prec.t -> term -> term -> Comparison.Nonstrict.t
+  val compare_terms : prec:Prec.t -> term -> term -> Nonstrict.t
 
   val might_flip : Prec.t -> term -> term -> bool
 
@@ -983,38 +983,50 @@ module LambdaKBO : ORD = struct
       add_weight_of ~prec (ty :: bound_tys) w sign body
     | App _ -> ()  (* impossible *)
 
-  let rec lex_ext f ys xs = match ys, xs with
-    | [], [] -> Nonstrict.Eq
-    | [], _ :: _ -> Nonstrict.Lt
-    | _ :: _, [] -> Nonstrict.Gt
-    | y :: ys, x :: xs ->
-      (match f y x with
-       | Nonstrict.Geq -> Comparison.Nonstrict.merge_with_Geq (lex_ext f ys xs)
-       | Eq -> lex_ext f ys xs
-       | Leq -> Comparison.Nonstrict.merge_with_Leq (lex_ext f ys xs)
-       | cmp -> cmp)
+  let length_lex_ext f ys xs =
+    let rec lex ys xs = match ys, xs with
+      | [], [] -> Nonstrict.Eq
+      | y :: ys, x :: xs ->
+        (match f y x with
+        | Nonstrict.Geq -> Nonstrict.merge_with_Geq (lex ys xs)
+        | Eq -> lex ys xs
+        | Leq -> Nonstrict.merge_with_Leq (lex ys xs)
+        | cmp -> cmp)
+      | _, _ -> assert false
+    in
+      match Int.compare (List.length ys) (List.length xs) with
+      | 0 -> lex ys xs
+      | n -> if n > 0 then Nonstrict.Gt else Lt
 
-  let rec lex_ext_data f ys xs = match ys, xs with
-    | [], [] -> ([], Nonstrict.Eq)
-    | [], _ :: _ -> ([], Nonstrict.Lt)
-    | _ :: _, [] -> ([], Nonstrict.Gt)
-    | y :: ys, x :: xs ->
-      (match f y x with
-       | (w, Nonstrict.Geq) ->
-         let (ws, cmp) = lex_ext_data f ys xs in
-         (w :: ws, Comparison.Nonstrict.merge_with_Geq cmp)
-       | (w, Eq) ->
-         let (ws, cmp) = lex_ext_data f ys xs in
-         (w :: ws, cmp)
-       | (w, Leq) ->
-         let (ws, cmp) = lex_ext_data f ys xs in
-         (w :: ws, Comparison.Nonstrict.merge_with_Leq cmp)
-       | (w, cmp) -> ([w], cmp))
+  let length_lex_ext_data f ys xs =
+    let rec lex ys xs = match ys, xs with
+      | [], [] -> ([], Nonstrict.Eq)
+      | y :: ys, x :: xs ->
+        (match f y x with
+        | (w, Nonstrict.Geq) ->
+          let (ws, cmp) = lex ys xs in
+          (w :: ws, Nonstrict.merge_with_Geq cmp)
+        | (w, Eq) ->
+          let (ws, cmp) = lex ys xs in
+          (w :: ws, cmp)
+        | (w, Leq) ->
+          let (ws, cmp) = lex ys xs in
+          (w :: ws, Nonstrict.merge_with_Leq cmp)
+        | (w, cmp) -> ([w], cmp))
+      | _, _ -> assert false
+    in
+      match Int.compare (List.length ys) (List.length xs) with
+      | 0 -> lex ys xs
+      | n -> ([], if n > 0 then Nonstrict.Gt else Lt)
 
-  let cw_ext_data f =
-    lex_ext_data (fun y x ->
-      let (w, cmp) = f y x in
-      (w, Comparison.Nonstrict.smooth cmp))
+  let cw_ext_data f ys xs =
+    if List.length ys = List.length xs then
+      length_lex_ext_data (fun y x ->
+          let (w, cmp) = f y x in
+          (w, Nonstrict.smooth cmp))
+        ys xs
+    else
+      ([], Nonstrict.Incomparable)
 
   let analyze_weight_diff w =
     match Polynomial.for_all_coeffs (fun coeff -> W.sign coeff >= 0) w,
@@ -1027,14 +1039,14 @@ module LambdaKBO : ORD = struct
   let consider_weight w cmp =
     (w,
      match analyze_weight_diff w with
-     | Geq -> Comparison.Nonstrict.merge_with_Geq cmp
+     | Geq -> Nonstrict.merge_with_Geq cmp
      | Eq -> cmp
-     | Leq -> Comparison.Nonstrict.merge_with_Leq cmp
+     | Leq -> Nonstrict.merge_with_Leq cmp
      | cmp' -> cmp')
 
   let rec process_args ~prec bound_tys ts ss =
     let w = Polynomial.create_zero () in
-    let (ws, cmp) = lex_ext_data (process_terms ~prec bound_tys) ts ss in
+    let (ws, cmp) = length_lex_ext_data (process_terms ~prec bound_tys) ts ss in
     let m = List.length ws in
     List.iter (Polynomial.add w) ws;
     List.iter (add_weight_of ~prec bound_tys w (+1)) (CCList.drop m ts);
@@ -1071,7 +1083,7 @@ module LambdaKBO : ORD = struct
     | Const _, (Fun _|DB _) -> consider_weights_of ~prec bound_tys t s Lt
     | Const gid, Const fid ->
       if ID.id gid = ID.id fid then
-        match lex_ext (compare_type_terms ~prec) t_tyargs s_tyargs with
+        match length_lex_ext (compare_type_terms ~prec) t_tyargs s_tyargs with
         | Eq -> process_args ~prec bound_tys t_args s_args
         | cmp -> consider_weights_of ~prec bound_tys t s cmp
       else
@@ -1200,9 +1212,9 @@ let compose f ord =
       fun prec a b ->
         let f_res,a',b' = f a b in
         match f_res with
-        | Nonstrict.Geq -> Comparison.Nonstrict.merge_with_Geq (ord.compare prec a' b')
+        | Nonstrict.Geq -> Nonstrict.merge_with_Geq (ord.compare prec a' b')
         | Eq -> ord.compare prec a' b'
-        | Leq -> Comparison.Nonstrict.merge_with_Leq (ord.compare prec a' b')
+        | Leq -> Nonstrict.merge_with_Leq (ord.compare prec a' b')
         | _ -> f_res
       }
 
