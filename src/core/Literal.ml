@@ -915,7 +915,8 @@ module Comp = struct
        literals could be compared, and check how they might act as tiebreaker
        for Geq on a pair of max terms. *)
     let cmps = CCList.product f others1 others2 in
-    if List.for_all (C.Nonstrict.equal C.Nonstrict.Gt) cmps then
+    if not (CCList.is_empty cmps)
+        && List.for_all (C.Nonstrict.equal C.Nonstrict.Gt) cmps then
       C.Nonstrict.Gt
     else if List.for_all C.is_Gt_or_Geq_or_Eq cmps then
       Geq
