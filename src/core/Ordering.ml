@@ -930,7 +930,9 @@ module LambdaKBO : ORD = struct
     let (hd, _) = T.as_app hd_tyargs in
 
     match T.view hd with
-    | AppBuiltin (_, bargs) -> add_weights_of w (bargs @ args)
+    | AppBuiltin (_, bargs) ->
+      add_monomial w sign W.one [];
+      add_weights_of w (bargs @ args)
     | DB i ->
       add_monomial w sign W.one [];
       add_weights_of w args;
@@ -960,7 +962,7 @@ module LambdaKBO : ORD = struct
        let hd_ty = Term.ty hd in
        let (arg_tys, _) = Type.open_fun hd_ty in
        let (hd_some_args, extra_args) =
-          List.fold_left2 categorize_var_arg (hd, []) args arg_tys in
+         List.fold_left2 categorize_var_arg (hd, []) args arg_tys in
        let normal_hd_some_args = normalize_consts hd_some_args in
        add_monomial w sign W.one [];
        add_monomial w sign W.one
