@@ -1019,14 +1019,10 @@ module LambdaKBO : ORD = struct
       | 0 -> lex ys xs
       | n -> ([], if n > 0 then Nonstrict.Gt else Lt)
 
-  let cw_ext_data f ys xs =
-    if List.length ys = List.length xs then
-      length_lex_ext_data (fun y x ->
-          let (w, cmp) = f y x in
-          (w, Nonstrict.smooth cmp))
-        ys xs
-    else
-      ([], Nonstrict.Incomparable)
+  let cw_ext_data f =
+    length_lex_ext_data (fun y x ->
+      let (w, cmp) = f y x in
+      (w, Nonstrict.smooth cmp))
 
   let analyze_weight_diff w =
     match Polynomial.for_all_coeffs (fun coeff -> W.sign coeff >= 0) w,
