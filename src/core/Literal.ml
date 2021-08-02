@@ -142,13 +142,6 @@ let eqn_sign = function
   | False -> false
   | _ -> true
 
-(* specific: for the term comparison *)
-let polarity = function
-  | Int o -> Int_lit.polarity o
-  | Equation(_,_,s) -> s
-  | l -> is_positivoid l
-
-
 let is_negativoid lit = not (is_positivoid lit)
 
 let is_eqn = function
@@ -854,9 +847,6 @@ module Comp = struct
   let max_terms ~ord lit =
     (* assert(no_prop_invariant lit); *)
     match lit with
-    | Equation (l, r, _) when is_predicate_lit lit ->
-      let l = Lambda.whnf l in
-      if T.is_app_var l then [l;r] else [l]
     | Equation (l, r, _) -> _maxterms2 ~ord l r
     | Int a -> Int_lit.max_terms ~ord a
     | Rat a -> Rat_lit.max_terms ~ord a
@@ -908,8 +898,8 @@ module Comp = struct
 
   (* negative literals dominate *)
   let _cmp_by_polarity l1 l2 =
-    let p1 = polarity l1 in
-    let p2 = polarity l2 in
+    let p1 = is_positivoid l1 in
+    let p2 = is_positivoid l2 in
     match p1, p2 with
     | true, true
     | false, false -> C.Nonstrict.Eq
