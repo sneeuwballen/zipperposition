@@ -177,10 +177,10 @@ module Make(E : Map.OrderedType) = struct
        elements of the multset.
        @param max1 true if there is a maximal elt in [m1] (not < than anything in m2)
        @param neq true if the sets can't be equal *)
-    let rec check_left ~neq ~max1 m1 ~max2 m2 = match m1 with
+    let rec check_left ~neq ~max1 m1 m2 = match m1 with
       | [] ->
-        (* max2 is true if some terms are not dominated within m2 *)
-        let max2 = max2 || m2<>[] in
+        (* max2 true if there is a maximal elt in [m2] (not < than anything in m1) *)
+        let max2 = m2 <> [] in
         begin match max1, max2 with
           | true, true -> Comparison.Incomparable
           | true, false -> Gt
@@ -193,37 +193,37 @@ module Make(E : Map.OrderedType) = struct
       | (x1,n1)::m1' ->
         (* remove terms of [m2] that are dominated by [x1] *)
         assert (Z.sign n1 > 0);
-        filter_with ~neq ~max1 x1 n1 m1' ~max2 m2 []
-    and filter_with ~neq ~max1 x1 n1 m1' ~max2 m2 rest2 = match m2 with
+        filter_with ~neq ~max1 x1 n1 m1' m2 []
+    and filter_with ~neq ~max1 x1 n1 m1' m2 rest2 = match m2 with
       | _ when Z.sign n1 <= 0 ->
-        check_left ~neq ~max1 m1' ~max2 m2 (* all [x1] exhausted *)
+        check_left ~neq ~max1 m1' m2 (* all [x1] exhausted *)
       | [] ->
         (* [x1] is not dominated *)
-        check_left ~neq ~max1:true m1' ~max2 rest2
+        check_left ~neq ~max1:true m1' rest2
       | (x2,n2)::m2' ->
         begin match f x1 x2 with
           | Comparison.Eq ->
             let c = Z.compare n1 n2 in
             if c < 0
             then (* remove x1 *)
-              check_left ~neq ~max1 m1' ~max2 ((x2, Z.(n2-n1)) :: List.rev_append m2' rest2)
+              check_left ~neq ~max1 m1' ((x2, Z.(n2-n1)) :: List.rev_append m2' rest2)
             else if c > 0
             then (* remove x2 *)
-              filter_with ~neq ~max1 x1 Z.(n1-n2) m1' ~max2 m2' rest2
+              filter_with ~neq ~max1 x1 Z.(n1-n2) m1' m2' rest2
             else (* remove both *)
-              check_left ~neq ~max1 m1' ~max2 (List.rev_append m2' rest2)
+              check_left ~neq ~max1 m1' (List.rev_append m2' rest2)
           | Incomparable ->
             (* keep both *)
-            filter_with ~neq ~max1 x1 n1 m1' ~max2 m2' ((x2,n2)::rest2)
+            filter_with ~neq ~max1 x1 n1 m1' m2' ((x2,n2)::rest2)
           | Gt ->
             (* remove x2 *)
-            filter_with ~neq:true ~max1 x1 n1 m1' ~max2 m2' rest2
+            filter_with ~neq:true ~max1 x1 n1 m1' m2' rest2
           | Lt ->
             (* remove x1 *)
-            check_left ~neq:true ~max1 m1' ~max2 (List.rev_append m2 rest2)
+            check_left ~neq:true ~max1 m1' (List.rev_append m2 rest2)
         end
     in
-    check_left ~neq:false ~max1:false m1 ~max2:false m2
+    check_left ~neq:false ~max1:false m1 m2
 
   let compare_partial_nonstrict f =
     compare_partial (fun k1 k2 -> Comparison.of_nonstrict (f k1 k2))
