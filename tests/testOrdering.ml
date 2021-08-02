@@ -504,11 +504,11 @@ let test_lambda_kbo = "ordering.lambda_kbo", `Quick, fun () ->
       (Term.app_builtin ~ty:Type.prop Builtin.ForallConst [Term.of_ty Type.prop; Term.fun_l [Type.prop] (Term.bvar ~ty:Type.prop 0)]) 
       (Term.app h [a;a;a]));
 
-  (* fun y. forall x. x < h a a a *)
+  (* fun y. forall x. x > h a a a (cf. derived_ho_kbo) *)
   let h = Term.const ~ty:(Type.arrow [ty;ty;ty] ty) h_ in
   let a = Term.const ~ty a_ in
-  Alcotest.(check comp_test) "fun y. forall x. x < h a a a"
-    Comparison.Nonstrict.Lt
+  Alcotest.(check comp_test) "fun y. forall x. x > h a a a"
+    Comparison.Nonstrict.Gt
     (compare 
       (Term.fun_l [ty]
         (Term.app_builtin ~ty:Type.prop Builtin.ForallConst [Term.of_ty Type.prop; Term.fun_l [Type.prop] (Term.bvar ~ty:Type.prop 0)]) 
@@ -537,6 +537,20 @@ let test_lambda_kbo = "ordering.lambda_kbo", `Quick, fun () ->
   let z = Term.var (HVar.fresh ~ty:(Type.arrow [ty; ty] ty) ()) in
   Alcotest.(check comp_test) "lam x. z x a < z"
     Comparison.Nonstrict.Lt (compare (Term.fun_l [ty] (Term.app z [Term.bvar ~ty 0; a])) z);
+
+  (* z a <=>? false *)
+  let a = Term.const ~ty a_ in
+  let z = Term.var (HVar.fresh ~ty:(Type.arrow [ty] ty) ()) in
+  Alcotest.(check comp_test) "z a <=>? false"
+    Comparison.Nonstrict.Incomparable (compare (Term.app z [a])
+      (Term.app_builtin ~ty:Type.prop Builtin.False []));
+
+  (* z a >= true *)
+  let a = Term.const ~ty a_ in
+  let z = Term.var (HVar.fresh ~ty:(Type.arrow [ty] ty) ()) in
+  Alcotest.(check comp_test) "z a >= true"
+    Comparison.Nonstrict.Geq (compare (Term.app z [a])
+      (Term.app_builtin ~ty:Type.prop Builtin.True []));
 
   (* complexity *)
   let rec pow n f x =
