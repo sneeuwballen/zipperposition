@@ -1115,8 +1115,8 @@ module LambdaKBO : ORD = struct
 
   let compare_terms ~prec t0 s0 =
     ZProf.enter_prof prof_lambda_kbo;
-    let t = Lambda.eta_expand t0
-    and s = Lambda.eta_expand s0 in
+    let t = Lambda.eta_expand (Lambda.snf t0)
+    and s = Lambda.eta_expand (Lambda.snf s0) in
     let cmp =
       if Term.equal t s then Nonstrict.Eq
       else snd (process_terms ~prec [] t s)
