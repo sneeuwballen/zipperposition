@@ -146,7 +146,7 @@ let norm subst scope t =
    on variable (which has to be applied to a sequence of distinct bound
    variables). The target term can be any term.  
 *)
-let rec build_term ?(depth=0) ~all_args ~subst ~scope ~counter var bvar_map t =
+let rec build_term ?(depth=0) ~subst ~scope ~counter var bvar_map t =
   let rec args_same ls1 ls2  = 
     match ls1, ls2 with
     | ((Some x)::xs), (y::ys) ->
@@ -165,7 +165,7 @@ let rec build_term ?(depth=0) ~all_args ~subst ~scope ~counter var bvar_map t =
       )
       else (t', subst)
     ) 
-    else build_term ~all_args ~subst ~scope ~counter ~depth var bvar_map t'  
+    else build_term ~subst ~scope ~counter ~depth var bvar_map t'  
   | T.Const _ -> (t, subst)
   | T.App (hd, args) ->
     if T.is_var hd then (
@@ -181,7 +181,7 @@ let rec build_term ?(depth=0) ~all_args ~subst ~scope ~counter var bvar_map t =
         let new_args, subst =
           List.fold_right (fun arg (l, subst) -> (
                 try (
-                  let arg', subst = build_term ~all_args ~depth ~subst ~scope ~counter 
+                  let arg', subst = build_term ~depth ~subst ~scope ~counter 
                       var bvar_map arg in
                   Some arg' :: l, subst)
                 with  Failure _ ->  None :: l, subst)) 
@@ -221,22 +221,21 @@ let rec build_term ?(depth=0) ~all_args ~subst ~scope ~counter var bvar_map t =
                      List.map (fun t -> S.apply subst (t,scope)) args in
           T.app hd' args
         ) in
-        build_term ~all_args ~depth ~subst ~scope ~counter var bvar_map t'           
+        build_term ~depth ~subst ~scope ~counter var bvar_map t'           
       )
     ) else (
-      let new_hd, subst = build_term ~all_args ~depth ~subst ~scope ~counter var bvar_map hd in 
+      let new_hd, subst = build_term ~depth ~subst ~scope ~counter var bvar_map hd in 
       let new_args, subst =
         List.fold_right (fun arg (l, subst) ->
-            let arg', subst = build_term ~all_args ~depth ~subst ~scope ~counter var bvar_map arg in
+            let arg', subst = build_term ~depth ~subst ~scope ~counter var bvar_map arg in
             arg' :: l, subst 
           ) args ([], subst) in
       if T.equal new_hd hd && List.for_all2 T.equal args new_args then t,subst
       else T.app new_hd new_args, subst
     )
   | T.Fun(ty, body) -> 
-    let b', subst = build_term ~all_args  ~depth:(depth+1) ~subst ~scope ~counter var bvar_map body in
-    (* let new_ty = S.apply_ty subst (ty,scope) in *)
-    if T.equal b' body (*&& Type.equal new_ty ty*) then t,subst
+    let b', subst = build_term  ~depth:(depth+1) ~subst ~scope ~counter var bvar_map body in
+    if T.equal b' body then t,subst
     else T.fun_ ty  b', subst
   | T.DB i -> 
     if i < depth then t,subst
@@ -253,7 +252,7 @@ let rec build_term ?(depth=0) ~all_args ~subst ~scope ~counter var bvar_map t =
   | T.AppBuiltin(b,args) ->
     let new_args, subst =
       List.fold_right (fun arg (l, subst) ->
-          let arg', subst = build_term ~all_args ~depth ~subst ~scope ~counter var bvar_map arg in
+          let arg', subst = build_term ~depth ~subst ~scope ~counter var bvar_map arg in
           arg' :: l, subst 
         ) args ([], subst) in
     if List.for_all2 T.equal args new_args then t,subst
@@ -406,10 +405,10 @@ and flex_rigid ~pref_l ~subst ~counter ~scope flex rigid =
     raise NotInFragment;
 
   let bvars = CCOpt.get_exn bvars in
-  let all_args = List.length pref_l = Array.length bvars in
+  (* let all_args = List.length pref_l = Array.length bvars in *)
   try
     let matrix, subst = 
-      build_term ~all_args ~subst ~scope ~counter hd bvars rigid in
+      build_term ~subst ~scope ~counter hd bvars rigid in
     let new_subs_val = T.fun_l (List.map Term.ty args) matrix in
     US.FO.bind subst (T.as_var_exn hd, scope) (new_subs_val, scope)
   with Failure _ -> raise NotUnifiable
