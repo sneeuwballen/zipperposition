@@ -147,11 +147,6 @@ let (@>>) f g x y =
   | Leq -> merge_with_Leq (g x y)
   | cmp -> cmp
 
-let (@>>!) f g x y =
-  match f x y with
-  | Eq -> g x y
-  | cmp -> cmp
-
 end
 
 let is_Gt_or_Geq = function

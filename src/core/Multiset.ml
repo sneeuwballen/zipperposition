@@ -177,7 +177,7 @@ module Make(E : Map.OrderedType) = struct
        elements of the multset.
        @param max1 true if there is a maximal elt in [m1] (not < than anything in m2)
        @param neq true if the sets can't be equal *)
-    let rec check_left ~neq ~max1  m1 ~max2 m2 = match m1 with
+    let rec check_left ~neq ~max1 m1 ~max2 m2 = match m1 with
       | [] ->
         (* max2 is true if some terms are not dominated within m2 *)
         let max2 = max2 || m2<>[] in

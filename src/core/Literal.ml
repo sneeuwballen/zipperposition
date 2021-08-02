@@ -711,7 +711,7 @@ let to_ho_term (lit:t): T.t option = match lit with
   | True -> Some T.true_
   | False -> Some T.false_
   | Equation (t, u, _) when is_predicate_lit lit ->
-    Some  ((if is_negativoid lit then T.Form.not_ else CCFun.id) t)
+    Some ((if is_negativoid lit then T.Form.not_ else CCFun.id) t)
   | Equation (t, u, sign) ->
     Some (if sign then T.Form.eq t u else T.Form.neq t u)
   | Int _
@@ -873,72 +873,37 @@ module Comp = struct
   *)
 
   type dominator_result =
-    | NoDominators
-    | NonstrictDominators of T.t list
-    | StrictDominators
+    | NoDominator
+    | NonstrictDominator
+    | StrictDominator
 
   (* Is there an element of the first list that dominates all elements of the
      second list? *)
   let rec _find_dominators f ts1 ts2 = match ts1 with
-    | [] -> NoDominators
+    | [] -> NoDominator
     | t :: ts1 ->
       let cmps = List.map (fun y -> f t y) ts2 in
       if List.for_all (fun cmp -> cmp = C.Nonstrict.Gt) cmps then
-        StrictDominators
+        StrictDominator
       else if List.for_all C.is_Gt_or_Geq cmps then
         (match _find_dominators f ts1 ts2 with
-         | NoDominators -> NonstrictDominators [t]
-         | NonstrictDominators ts -> NonstrictDominators (t :: ts)
-         | StrictDominators -> StrictDominators)
+         | StrictDominator -> StrictDominator
+         | _ -> NonstrictDominator)
       else
         _find_dominators f ts1 ts2
 
-  let _subtract ~eq l1 l2 =
-    let rec sub acc l1 l2 = match l2 with
-      | [] -> List.rev acc
-      | x :: xs when not (CCList.mem ~eq x l1) -> sub (x :: acc) l1 xs
-      | _ :: xs -> sub acc l1 xs
-    in sub [] l1 l2
-
-  (* When the dominator is nonstrict, we must also check the other sides of the
-     literals. For example, the literals f b (Y b) = a and f b (Y a) = b should
-     be incomparable using the lambda KBO. *)
-  let _continue_with_nonmax_terms ~ord f doms1 l1 maxs2 l2 =
-    let ts1 = CCList.of_iter (Seq.terms l1)
-    and ts2 = CCList.of_iter (Seq.terms l2) in
-    let others1 = _subtract ~eq:T.equal doms1 ts1 in
-    let others2 = match CCList.uniq ~eq:T.equal maxs2 with
-      | [max2] -> CCList.remove ~eq:T.equal ~key:max2 ts2
-      | _ -> ts2
-    in
-    (* Imagine all the possible ways (and then some) in which the other terms of
-       literals could be compared, and check how they might act as tiebreaker
-       for Geq on a pair of max terms. *)
-    let cmps = CCList.product f others1 others2 in
-    if not (CCList.is_empty cmps)
-        && List.for_all (C.Nonstrict.equal C.Nonstrict.Gt) cmps then
-      C.Nonstrict.Gt
-    else if List.for_all C.is_Gt_or_Geq_or_Eq cmps then
-      Geq
-    else
-      Incomparable
-
-  let _cmp_by_terms ~ord l1 l2 =
+  let _cmp_by_maxterms ~ord l1 l2 =
     let maxs1 = max_terms ~ord l1 and maxs2 = max_terms ~ord l2 in
     let f = Ordering.compare ord in
     match _find_dominators f maxs1 maxs2, _find_dominators f maxs2 maxs1 with
-    | NoDominators, NoDominators ->
+    | NoDominator, NoDominator ->
       let set1 = CCList.fold_right T.Set.add maxs1 T.Set.empty
       and set2 = CCList.fold_right T.Set.add maxs2 T.Set.empty in
       if T.Set.equal set1 set2 then C.Nonstrict.Eq else Incomparable
-    | StrictDominators, NoDominators ->
-      Gt
-    | NoDominators, StrictDominators ->
-      Lt
-    | NonstrictDominators doms1, NoDominators ->
-      _continue_with_nonmax_terms ~ord f doms1 l1 maxs2 l2
-    | NoDominators, NonstrictDominators doms2 ->
-      _continue_with_nonmax_terms ~ord f doms2 l2 maxs1 l1
+    | StrictDominator, NoDominator -> Gt
+    | NoDominator, StrictDominator -> Lt
+    | NonstrictDominator, NoDominator -> Geq
+    | NoDominator, NonstrictDominator -> Leq
     | _, _ -> assert false
 
   (* negative literals dominate *)
@@ -1015,11 +980,9 @@ module Comp = struct
 
   let compare ~ord =
     C.Nonstrict.(
-      ((_cmp_by_terms ~ord @>>
-        _cmp_by_polarity) @>>
-       _cmp_by_kind) @>>!
-      (* If _cmp_by_terms returns Geq, it has already checked the other
-         literals and there is no need to continue with _cmp_specific. *)
+      _cmp_by_maxterms ~ord @>>
+      _cmp_by_polarity @>>
+      _cmp_by_kind @>>
       _cmp_specific ~ord
     )
 

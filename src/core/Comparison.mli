@@ -95,7 +95,6 @@ module Nonstrict : sig
   type 'a comparator = 'a -> 'a -> t
 
   val (@>>) : 'a comparator -> 'a comparator -> 'a comparator
-  val (@>>!) : 'a comparator -> 'a comparator -> 'a comparator
   (** Combination of comparators that work on the same values. *)
 end
 
