@@ -552,6 +552,25 @@ let test_lambda_kbo = "ordering.lambda_kbo", `Quick, fun () ->
     Comparison.Nonstrict.Geq (compare (Term.app z [a])
       (Term.app_builtin ~ty:Type.prop Builtin.True []));
 
+  (* y (z a) <=>? z (y a) *)
+  let a = Term.const ~ty a_ in
+  let y = Term.var (HVar.fresh ~ty:(Type.arrow [ty] ty) ()) in
+  let z = Term.var (HVar.fresh ~ty:(Type.arrow [ty] ty) ()) in
+  Alcotest.(check comp_test) "y (z a) <=>? z (y a)"
+    Comparison.Nonstrict.Incomparable (compare
+      (Term.app y [Term.app z [a]])
+      (Term.app z [Term.app y [a]]));
+
+  (* f (y (z a)) <=>? z (y a) *)
+  let a = Term.const ~ty a_ in
+  let f = Term.const ~ty:(Type.arrow [ty] ty) f_ in
+  let y = Term.var (HVar.fresh ~ty:(Type.arrow [ty] ty) ()) in
+  let z = Term.var (HVar.fresh ~ty:(Type.arrow [ty] ty) ()) in
+  Alcotest.(check comp_test) "f (y (z a)) < z (y a)"
+    Comparison.Nonstrict.Incomparable (compare
+      (Term.app f [Term.app y [Term.app z [a]]])
+      (Term.app z [Term.app y [a]]));
+
   (* complexity *)
   let rec pow n f x =
     if n = 0 then x else pow (n - 1) f (f x)
