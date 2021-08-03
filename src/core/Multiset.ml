@@ -368,7 +368,7 @@ module Make(E : Map.OrderedType) = struct
   let compare m1 m2 = compare_l (to_list m1) (to_list m2)
 
   let is_max f x m =
-    M.for_all (fun y _ -> not (f x y = Comparison.Nonstrict.Lt)) m
+    M.for_all (fun y _ -> not (Comparison.is_Lt_or_Leq (f x y))) m
 
   (* iterate on the max elements *)
   let max_seq f (m:t) k =
@@ -380,15 +380,15 @@ module Make(E : Map.OrderedType) = struct
         let n' =
           M.fold
             (fun y n' acc -> match f x y with
-               | Comparison.Nonstrict.Lt -> raise Exit
+               | Comparison.Nonstrict.Lt | Leq -> raise Exit
                | Eq ->
                  (* merge [x] and [y] together *)
                  m := M.remove y !m;
                  Z.(acc+n')
-               | Gt ->
+               | Gt | Geq ->
                  m := M.remove y !m;
                  acc (* remove [y] *)
-               | Leq | Geq | Incomparable -> acc)
+               | Incomparable -> acc)
             !m n
         in
         k (x, n')
