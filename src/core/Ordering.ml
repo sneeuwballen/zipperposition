@@ -1034,7 +1034,7 @@ module LambdaKBO : ORD = struct
     | false, true -> if W.sign (Polynomial.constant_monomial w) < 0 then Lt else Leq
     | true, true -> Eq
 
-  let note_weight w cmp =
+  let consider_weight w cmp =
     (w,
      match analyze_weight_diff w with
      | Geq -> Nonstrict.merge_with_Geq cmp
@@ -1049,12 +1049,12 @@ module LambdaKBO : ORD = struct
     List.iter (Polynomial.add w) ws;
     List.iter (add_weight_of ~prec bound_tys w (+1)) (CCList.drop m ts);
     List.iter (add_weight_of ~prec bound_tys w (-1)) (CCList.drop m ss);
-    note_weight w cmp
+    consider_weight w cmp
   and process_var_args ~prec bound_tys ts ss =
     let w = Polynomial.create_zero () in
     let (ws, cmp) = cw_ext_data (process_terms ~prec bound_tys) ts ss in
     List.iter (Polynomial.add w) ws;
-    note_weight w cmp
+    consider_weight w cmp
   and process_terms ~prec bound_tys t s =
     let (t_hd_tyargs, t_args) = T.as_app_mono t in
     let (t_hd, t_tyargs) = T.as_app t_hd_tyargs in
@@ -1064,63 +1064,58 @@ module LambdaKBO : ORD = struct
     | Var y, Var x when HVar.id y = HVar.id x ->
       process_var_args ~prec bound_tys t_args s_args
     | Var _, AppBuiltin (b, _) ->
-      note_weights_of ~prec bound_tys t s
+      consider_weights_of ~prec bound_tys t s
         (if Builtin.as_int b = 0 then Nonstrict.Geq else Nonstrict.Incomparable)
     | AppBuiltin (b, _), Var _ ->
-      note_weights_of ~prec bound_tys t s
+      consider_weights_of ~prec bound_tys t s
         (if Builtin.as_int b = 0 then Nonstrict.Leq else Nonstrict.Incomparable)
     | Var _, _ | _, Var _ ->
-      note_weights_of ~prec bound_tys t s Nonstrict.Incomparable
+      consider_weights_of ~prec bound_tys t s Nonstrict.Incomparable
     | Fun (t_ty, t_body), Fun (s_ty, s_body) ->
       (match compare_types ~prec t_ty s_ty with
        | Eq -> process_terms ~prec (t_ty :: bound_tys) t_body s_body
-       | cmp -> note_weights_of ~prec (t_ty :: bound_tys) t_body s_body cmp)
+       | cmp -> consider_weights_of ~prec (t_ty :: bound_tys) t_body s_body cmp)
     | Fun _, (DB _|Const _|AppBuiltin _) ->
-      note_weights_of ~prec bound_tys t s Gt
-    | DB _, Fun _ -> note_weights_of ~prec bound_tys t s Lt
+      consider_weights_of ~prec bound_tys t s Gt
+    | DB _, Fun _ -> consider_weights_of ~prec bound_tys t s Lt
     | DB j, DB i ->
-      if j > i then note_weights_of ~prec bound_tys t s Gt
-      else if j < i then note_weights_of ~prec bound_tys t s Lt
+      if j > i then consider_weights_of ~prec bound_tys t s Gt
+      else if j < i then consider_weights_of ~prec bound_tys t s Lt
       else process_args ~prec bound_tys t_args s_args
-    | DB _, (Const _|AppBuiltin _) -> note_weights_of ~prec bound_tys t s Gt
-    | Const _, (Fun _|DB _) -> note_weights_of ~prec bound_tys t s Lt
+    | DB _, (Const _|AppBuiltin _) -> consider_weights_of ~prec bound_tys t s Gt
+    | Const _, (Fun _|DB _) -> consider_weights_of ~prec bound_tys t s Lt
     | Const gid, Const fid ->
       if ID.id gid = ID.id fid then
         match length_lex_ext (compare_type_terms ~prec) t_tyargs s_tyargs with
         | Eq -> process_args ~prec bound_tys t_args s_args
-        | cmp -> note_weights_of ~prec bound_tys t s cmp
+        | cmp -> consider_weights_of ~prec bound_tys t s cmp
       else
-        note_weights_of ~prec bound_tys t s
+        consider_weights_of ~prec bound_tys t s
           (match Prec.compare prec gid fid with
            | 0 -> Incomparable
            | n when n > 0 -> Gt
            | _ -> Lt)
-    | Const _, AppBuiltin _ -> note_weights_of ~prec bound_tys t s Gt
+    | Const _, AppBuiltin _ -> consider_weights_of ~prec bound_tys t s Gt
     | AppBuiltin _, (Fun _|DB _|Const _) ->
-      note_weights_of ~prec bound_tys t s Lt
+      consider_weights_of ~prec bound_tys t s Lt
     | AppBuiltin (t_b, t_bargs), AppBuiltin (s_b, s_bargs) ->
       (match Builtin.compare t_b s_b with
        | 0 -> process_args ~prec bound_tys (t_bargs @ t_tyargs @ t_args)
          (s_bargs @ s_tyargs @ s_args)
-       | n when n > 0 -> note_weights_of ~prec bound_tys t s Gt
-       | _ -> note_weights_of ~prec bound_tys t s Lt)
+       | n when n > 0 -> consider_weights_of ~prec bound_tys t s Gt
+       | _ -> consider_weights_of ~prec bound_tys t s Lt)
     | _, _ -> assert false
-  and note_weights_of ~prec bound_tys t s cmp =
+  and consider_weights_of ~prec bound_tys t s cmp =
     let w = Polynomial.create_zero () in
-    if not (Term.equal t s) then (
-      add_weight_of ~prec bound_tys w (+1) t;
-      add_weight_of ~prec bound_tys w (-1) s
-    );
-    note_weight w cmp
+    add_weight_of ~prec bound_tys w (+1) t;
+    add_weight_of ~prec bound_tys w (-1) s;
+    consider_weight w cmp
 
   let compare_terms ~prec t0 s0 =
     ZProf.enter_prof prof_lambda_kbo;
     let t = Lambda.eta_expand (Lambda.snf t0)
     and s = Lambda.eta_expand (Lambda.snf s0) in
-    let cmp =
-      if Term.equal t s then Nonstrict.Eq
-      else snd (process_terms ~prec [] t s)
-    in
+    let (_, cmp) = process_terms ~prec [] t s in
     ZProf.exit_prof prof_lambda_kbo;
     cmp
 
