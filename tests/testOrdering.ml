@@ -597,7 +597,7 @@ let test_lambda_kbo = "ordering.lambda_kbo", `Quick, fun () ->
   let z = Term.var (HVar.fresh ~ty:(Type.arrow [ty] ty) ()) in
   let fbzb_eq_b = Literal.mk_eq (Term.app f [b; Term.app z [b]]) b in
   let fbza_eq_a = Literal.mk_eq (Term.app f [b; Term.app z [a]]) a in
-  Alcotest.(check comp_test) "f b (z b) = b > f b (z a) = a"
+  Alcotest.(check comp_test) "(f b (z b) = b) > (f b (z a) = a)"
     Comparison.Nonstrict.Gt (Literal.Comp.compare ~ord fbzb_eq_b fbza_eq_a);
 
   (* (f b (z b) = f b (z a)) > (f b (z a) = a) *)
@@ -607,8 +607,19 @@ let test_lambda_kbo = "ordering.lambda_kbo", `Quick, fun () ->
   let z = Term.var (HVar.fresh ~ty:(Type.arrow [ty] ty) ()) in
   let fbzb_eq_fbza = Literal.mk_eq (Term.app f [b; Term.app z [b]]) (Term.app f [b; Term.app z [a]]) in
   let fbza_eq_a = Literal.mk_eq (Term.app f [b; Term.app z [a]]) a in
-  Alcotest.(check comp_test) "f b (z b) = f b (z a) > f b (z a) = a"
+  Alcotest.(check comp_test) "(f b (z b) = f b (z a)) > (f b (z a) = a)"
     Comparison.Nonstrict.Gt (Literal.Comp.compare ~ord fbzb_eq_fbza fbza_eq_a);
+
+  (* (f b (z b) = y b) >= (f b (z a) = y a) *)
+  let a = Term.const ~ty a_ in
+  let b = Term.const ~ty b_ in
+  let f = Term.const ~ty:(Type.arrow [ty; ty] ty) f_ in
+  let y = Term.var (HVar.fresh ~ty:(Type.arrow [ty] ty) ()) in
+  let z = Term.var (HVar.fresh ~ty:(Type.arrow [ty] ty) ()) in
+  let fbzb_eq_yb = Literal.mk_eq (Term.app f [b; Term.app z [b]]) (Term.app y [b]) in
+  let fbza_eq_ya = Literal.mk_eq (Term.app f [b; Term.app z [a]]) (Term.app y [a]) in
+  Alcotest.(check comp_test) "(f b (z b) = y b) >= (f b (z a) = y a)"
+    Comparison.Nonstrict.Geq (Literal.Comp.compare ~ord fbzb_eq_yb fbza_eq_ya);
 
   (* (f b (z b) = z b) >= (f b (z a) = z a) *)
   let a = Term.const ~ty a_ in
@@ -617,7 +628,7 @@ let test_lambda_kbo = "ordering.lambda_kbo", `Quick, fun () ->
   let z = Term.var (HVar.fresh ~ty:(Type.arrow [ty] ty) ()) in
   let fbzb_eq_zb = Literal.mk_eq (Term.app f [b; Term.app z [b]]) (Term.app z [b]) in
   let fbza_eq_za = Literal.mk_eq (Term.app f [b; Term.app z [a]]) (Term.app z [a]) in
-  Alcotest.(check comp_test) "f b (z b) = z b >= f b (z a) = z a"
+  Alcotest.(check comp_test) "(f b (z b) = z b) >= (f b (z a) = z a)"
     Comparison.Nonstrict.Geq (Literal.Comp.compare ~ord fbzb_eq_zb fbza_eq_za);
 
   (* (f b (z a) = b) <=>? (f b (z b) = a) *)

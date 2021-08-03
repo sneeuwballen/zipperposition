@@ -863,37 +863,47 @@ module Comp = struct
   *)
 
   type dominator_result =
-    | NoDominator
+    | NoDominator of bool
     | NonstrictDominator
     | StrictDominator
 
   (* Is there an element of the first list that dominates all elements of the
      second list? *)
-  let rec _find_dominators f ts1 ts2 = match ts1 with
-    | [] -> NoDominator
+  let rec _find_dominators ~met_geq_or_leq f ts1 ts2 = match ts1 with
+    | [] -> NoDominator met_geq_or_leq
     | t :: ts1 ->
       let cmps = List.map (fun y -> f t y) ts2 in
       if List.for_all (fun cmp -> cmp = C.Nonstrict.Gt) cmps then
         StrictDominator
       else if List.for_all C.is_Gt_or_Geq cmps then
-        (match _find_dominators f ts1 ts2 with
+        (match _find_dominators ~met_geq_or_leq f ts1 ts2 with
          | StrictDominator -> StrictDominator
          | _ -> NonstrictDominator)
       else
-        _find_dominators f ts1 ts2
+        let met_geq_or_leq' = met_geq_or_leq
+          || List.exists (fun cmp -> cmp = C.Nonstrict.Geq || cmp = C.Nonstrict.Leq) cmps in
+        _find_dominators ~met_geq_or_leq:met_geq_or_leq' f ts1 ts2
 
   let _cmp_by_maxterms ~ord l1 l2 =
     let maxs1 = max_terms ~ord l1 and maxs2 = max_terms ~ord l2 in
     let f = Ordering.compare ord in
-    match _find_dominators f maxs1 maxs2, _find_dominators f maxs2 maxs1 with
-    | NoDominator, NoDominator ->
-      let set1 = CCList.fold_right T.Set.add maxs1 T.Set.empty
-      and set2 = CCList.fold_right T.Set.add maxs2 T.Set.empty in
-      if T.Set.equal set1 set2 then C.Nonstrict.Eq else Incomparable
-    | StrictDominator, NoDominator -> Gt
-    | NoDominator, StrictDominator -> Lt
-    | NonstrictDominator, NoDominator -> Geq
-    | NoDominator, NonstrictDominator -> Leq
+    match _find_dominators ~met_geq_or_leq:false f maxs1 maxs2,
+          _find_dominators ~met_geq_or_leq:false f maxs2 maxs1 with
+    | NoDominator met_geq_or_leq1, NoDominator met_geq_or_leq2 ->
+      if met_geq_or_leq1 || met_geq_or_leq2 then
+        C.Nonstrict.Eq  (* check next criterion *)
+      else
+        let set1 = CCList.fold_right T.Set.add maxs1 T.Set.empty
+        and set2 = CCList.fold_right T.Set.add maxs2 T.Set.empty in
+        if T.Set.equal set1 set2 then
+          Eq  (* check next criterion *)
+        else
+          (* no need to continue; [_cmp_specific] will fail anyway *)
+          Incomparable
+    | StrictDominator, NoDominator _ -> Gt
+    | NoDominator _, StrictDominator -> Lt
+    | NonstrictDominator, NoDominator _ -> Geq
+    | NoDominator _, NonstrictDominator -> Leq
     | _, _ -> assert false
 
   (* negative literals dominate *)
@@ -964,7 +974,7 @@ module Comp = struct
       let m2 = Multisets.MT.union (M.to_multiset l2) (M.to_multiset r2) in
       Multisets.MT.compare_partial_nonstrict (Ordering.compare ord) m1 m2
     | _, _ ->
-      Util.debugf 5 "(@[bad_compare %a %a@])" (fun k->k pp l1 pp l2);
+      Util.debugf 5 "(@[bad_compare %a %a@])" (fun k -> k pp l1 pp l2);
       assert false
 
   let compare ~ord =

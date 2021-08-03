@@ -23,8 +23,8 @@ let test_max = "multiset.max", `Quick, fun()->
 let test_compare = "multiset.compare", `Quick, fun()->
   let m1 = M.of_list [1;1;2;3] in
   let m2 = M.of_list [1;2;2;3] in
-  Alcotest.(check (module Comparison)) "must be lt"
-    Comparison.Lt (M.compare_partial_nonstrict f m1 m2);
+  Alcotest.(check (module Comparison.Nonstrict)) "must be lt"
+    Comparison.Nonstrict.Lt (M.compare_partial_nonstrict f m1 m2);
   Alcotest.(check bool) "ord" true (M.compare m1 m2 < 0);
   ()
 

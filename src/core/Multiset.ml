@@ -174,36 +174,7 @@ module Make(E : Map.OrderedType) = struct
         let m1'', m2'' = cancel_l m1 m2' in
         m1'', (x2,n2)::m2''
 
-  (* Given two multisets [maxs1] and [maxs2] of nonstrict comparable elements,
-     look for a permultation so that [maxs1] and [maxs2] can be enumerated as
-     [[y1, ..., yn]] and [[xn, ..., xm]] with [n >= m] and [y_i >= x_i] for
-     every [i <= m]. Since the order is partial, in the worst case all
-     permutations must be tried. To alleviate this, we immediately give up if
-     [m] or [n] is larger than a fixed threshold. Many of these comparisons will
-     be between literals, which contain only two elements. *)
-  let try_nonstrict f len1 maxs1 len2 maxs2 =
-    if len1 > 4 || len2 > 4 then
-      (* avoid explosition *)
-      Comparison.Nonstrict.Incomparable
-    else
-      let rec try_all maxs1 maxs2 = match maxs1 with
-          [] -> true
-        | x1 :: maxs1' ->
-          let rec try_x1 seen2 rest2 = match rest2 with
-            | [] -> false
-            | (x2 :: rest2) ->
-              if Comparison.is_Gt_or_Geq_or_Eq (f x1 x2)
-                  && try_all maxs1' (List.rev_append seen2 rest2) then
-                true
-              else
-                try_x1 (x2 :: seen2) rest2
-          in
-          try_x1 [] maxs2
-      in
-      if try_all maxs1 maxs2 then Geq else Incomparable
-
-
-  let compare_partial_nonstrict f m1 m2 =
+  let do_compare_partial_strict ~met_geq_or_leq f m1 m2 =
     let m1, m2 = cancel_l (to_list m1) (to_list m2) in
     (* for now we can break the sorted list invariant. We look for some
        element of [m1] or [m2] that isn't dominated by any element of
@@ -211,64 +182,160 @@ module Make(E : Map.OrderedType) = struct
        elements of the multset.
        @param max1 true if there is a maximal elt in [m1] (not < than anything in m2)
        @param neq true if the sets can't be equal *)
-    let rec check_left ~neq ~maxs1 m1 m2 = match m1 with
+    let rec check_left ~met_gt ~met_lt ~maxs1 m1 m2 = match m1 with
       | [] ->
         let maxs2 = m2 in
         begin match maxs1, maxs2 with
           | [], [] ->
-            if neq (* can't be equal? *)
+            if met_gt || met_lt (* can't be equal? *)
             then Comparison.Nonstrict.Incomparable
             else Eq
           | [], _ -> Lt
           | _, [] -> Gt
-          | _, _ ->
-            let maxs1 = list_of_coeffs maxs1 and maxs2 = list_of_coeffs maxs2 in
-            let len1 = List.length maxs1 and len2 = List.length maxs2 in
-            begin match Int.compare len1 len2 with
-              | 0 ->
-                begin match try_nonstrict f len2 maxs2 len1 maxs1 with
-                  | Comparison.Nonstrict.Eq ->
-                    try_nonstrict f len1 maxs1 len2 maxs2
-                  | cmp -> cmp
-                end
-              | n when n < 0 -> try_nonstrict f len2 maxs2 len1 maxs1
-              | _ -> try_nonstrict f len1 maxs1 len2 maxs2
-            end
+          | _, _ -> Incomparable
         end
       | (x1,n1)::m1' ->
         (* remove terms of [m2] that are dominated by [x1] *)
         assert (Z.sign n1 > 0);
-        filter_with ~neq ~maxs1 x1 n1 m1' m2 []
-    and filter_with ~neq ~maxs1 x1 n1 m1' m2 rest2 = match m2 with
+        filter_with ~met_gt ~met_lt ~maxs1 x1 n1 m1' m2 []
+    and filter_with ~met_gt ~met_lt ~maxs1 x1 n1 m1' m2 seen2 = match m2 with
       | _ when Z.sign n1 <= 0 ->
-        check_left ~neq ~maxs1 m1' m2 (* all [x1] exhausted *)
+        check_left ~met_gt ~met_lt ~maxs1 m1' m2 (* all [x1] exhausted *)
       | [] ->
         (* [x1] is not dominated *)
-        check_left ~neq ~maxs1:((x1,n1) :: maxs1) m1' rest2
+        check_left ~met_gt ~met_lt ~maxs1:((x1,n1) :: maxs1) m1' seen2
       | (x2,n2)::m2' ->
         begin match f x1 x2 with
           | Comparison.Nonstrict.Eq ->
             let c = Z.compare n1 n2 in
             if c < 0
             then (* remove x1 *)
-              check_left ~neq ~maxs1 m1' ((x2, Z.(n2-n1)) :: List.rev_append m2' rest2)
+              check_left ~met_gt ~met_lt ~maxs1 m1'
+                ((x2, Z.(n2-n1)) :: List.rev_append m2' seen2)
             else if c > 0
-            then (* remove x2 *)
-              filter_with ~neq ~maxs1 x1 Z.(n1-n2) m1' m2' rest2
+            then (* remove [x2] *)
+              filter_with ~met_gt ~met_lt ~maxs1 x1 Z.(n1-n2) m1' m2' seen2
             else (* remove both *)
-              check_left ~neq ~maxs1 m1' (List.rev_append m2' rest2)
-          | Geq | Leq | Incomparable ->
+              check_left ~met_gt ~met_lt ~maxs1 m1'
+                (List.rev_append m2' seen2)
+          | Geq | Leq ->
             (* keep both *)
-            filter_with ~neq ~maxs1 x1 n1 m1' m2' ((x2,n2)::rest2)
+            met_geq_or_leq := true;
+            filter_with ~met_gt ~met_lt ~maxs1 x1 n1 m1' m2' ((x2,n2)::seen2)
+          | Incomparable ->
+            (* keep both *)
+            filter_with ~met_gt ~met_lt ~maxs1 x1 n1 m1' m2' ((x2,n2)::seen2)
           | Gt ->
-            (* remove x2 *)
-            filter_with ~neq:true ~maxs1 x1 n1 m1' m2' rest2
+            (* remove [x2] *)
+            filter_with ~met_gt:true ~met_lt ~maxs1 x1 n1 m1' m2' seen2
           | Lt ->
             (* remove x1 *)
-            check_left ~neq:true ~maxs1 m1' (List.rev_append m2 rest2)
+            check_left ~met_gt ~met_lt:true ~maxs1 m1' (List.rev_append m2 seen2)
         end
     in
-    check_left ~neq:false ~maxs1:[] m1 m2
+    check_left ~met_gt:false ~met_lt:false ~maxs1:[] m1 m2
+
+  (* Given two multisets [m1] and [m2] of nonstrict comparable elements,
+     look for a permultation so that [m1] and [m2] can be enumerated as
+     [[y1, ..., yn]] and [[xn, ..., xm]] with [n >= m] and [y_i >= x_i] for
+     every [i <= m]. Since the order is partial, in the worst case all
+     permutations must be tried. To alleviate this, we immediately give up if
+     [m] or [n] is larger than a fixed threshold. Many of these comparisons will
+     be between literals, which typically contain only two elements. *)
+  let find_geq_mates f m1 m2 =
+    let len1 = List.length m1 and len2 = List.length m2 in
+    if len1 < len2 then
+      false
+    else if len1 > 4 then
+      (* avoid explosition *)
+      false
+    else
+      let rec find_mates m1 m2 = match m2 with
+          [] -> true
+        | x2 :: m2' ->
+          let rec find_mate_for_x2 seen1 m1 = match m1 with
+            | [] -> false
+            | (x1 :: m1') ->
+              if f x1 x2 = Comparison.Nonstrict.Geq
+                  && find_mates (List.rev_append seen1 m1') m2' then
+                true
+              else
+                find_mate_for_x2 (x1 :: seen1) m1'
+          in
+          find_mate_for_x2 [] m1
+      in
+      find_mates m1 m2
+
+  (* The code is based on that of [do_compare_partial_strict]. It is inpired by
+     Definition 2.2 of Thiemann, Allais, and Nagele, "On the formalization of
+     termination techniques based on multiset orderings". Due to the algorithmic
+     complexity of the problem, this code is not designed to be complete.
+
+     The multiset [m1] is partitioned into a set of "dominators" consisting of
+     those elements that were found to strictly domiate a "dominated" element of
+     [m2]. The remaining elements of [m1] and [m2] are put in [left1] and
+     [left2], and we must look for an injection from [left2] to [left1] such that
+     the element from [m2] is nonstrictly dominated. If this fails, we try to find
+     an injection between [m2] and [m1] instead. *)
+  let do_geq_partial_slow f m1 m2 =
+    let m1, m2 = cancel_l (to_list m1) (to_list m2) in
+    let rec check_left ~met_gt ~left1 see1 left2 = match see1 with
+      | [] ->
+        if find_geq_mates f (list_of_coeffs left1) (list_of_coeffs left2) then
+          if met_gt then  (* any [m2] element strictly dominated? *)
+            Comparison.Nonstrict.Gt
+          else
+            Geq
+        else
+          (* try a nonstrict comparison instead *)
+          if met_gt
+              && find_geq_mates f (list_of_coeffs m1) (list_of_coeffs m2) then
+            Geq
+          else
+            Incomparable
+      | (x1,n1)::see1' ->
+        (* remove terms of [left2] that are dominated by [x1] *)
+        assert (Z.sign n1 > 0);
+        filter_with ~met_gt ~met_x1_gt:false ~left1 x1 n1 see1' left2 []
+    and filter_with ~met_gt ~met_x1_gt ~left1 x1 n1 m1' m2 seen2 = match m2 with
+      | _ when Z.sign n1 <= 0 ->
+        check_left ~met_gt ~left1 m1' m2 (* all [x1] exhausted *)
+      | [] ->
+        let left1' = if met_x1_gt then left1 else (x1,n1) :: left1 in
+        check_left ~met_gt ~left1:left1' m1' seen2
+      | (x2,n2)::m2' ->
+        begin match f x1 x2 with
+          | Comparison.Nonstrict.Eq ->
+            let c = Z.compare n1 n2 in
+            if c < 0
+            then (* remove x1 *)
+              check_left ~met_gt ~left1 m1'
+                ((x2, Z.(n2-n1)) :: List.rev_append m2' seen2)
+            else if c > 0
+            then (* remove [x2] *)
+              filter_with ~met_gt ~met_x1_gt ~left1 x1 Z.(n1-n2) m1' m2' seen2
+            else (* remove both *)
+              check_left ~met_gt ~left1 m1' (List.rev_append m2' seen2)
+          | Lt | Geq | Leq | Incomparable ->
+            (* keep both *)
+            filter_with ~met_gt ~met_x1_gt ~left1 x1 n1 m1' m2' ((x2,n2)::seen2)
+          | Gt ->
+            (* remove [x2] *)
+            filter_with ~met_gt:true ~met_x1_gt:true ~left1 x1 n1 m1' m2' seen2
+        end
+    in
+    check_left ~met_gt:false ~left1:[] m1 m2
+
+  let compare_partial_nonstrict f m1 m2 =
+    let met_geq_or_leq = ref false in
+    match do_compare_partial_strict ~met_geq_or_leq f m1 m2, !met_geq_or_leq with
+    | Comparison.Nonstrict.Incomparable, true ->
+      begin match do_geq_partial_slow f m1 m2 with
+        | Comparison.Nonstrict.Incomparable ->
+          Comparison.Nonstrict.opp (do_geq_partial_slow f m2 m1)
+        | cmp -> cmp
+      end
+    | cmp, _ -> cmp
 
   let compare_partial f m1 m2 =
     Comparison.of_nonstrict (compare_partial_nonstrict (fun k1 k2 ->
