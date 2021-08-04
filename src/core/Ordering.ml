@@ -839,51 +839,73 @@ module Polynomial = struct
       Format.pp_print_int out i;
       Format.pp_print_string out "}"
 
-  module Polynomial = CCHashtbl.Make(struct
+  module H = CCHashtbl.Make(struct
       type t = unknown list
       let equal = CCList.equal equal
       let hash = Hash.list hash_unknown
     end)
 
+  type polynomial = {
+    mutable hashtbl : W.t H.t;
+    mutable pos_counter : int;
+    mutable neg_counter : int;
+  }
+
   let mk_key = List.sort compare
 
-  let create_zero () = Polynomial.create 16
+  let incr_counter poly sign k =
+    if sign > 0 then poly.pos_counter <- poly.pos_counter + k
+    else if sign < 0 then poly.neg_counter <- poly.neg_counter + k
+
+  let create_zero () =
+    {hashtbl = H.create 16;
+     pos_counter = 0;
+     neg_counter = 0}
 
   let add_monomial poly coeff unks =
     if coeff != W.zero then (
       let key = mk_key unks in
-      match Polynomial.find_opt poly key with
-      | None -> Polynomial.add poly key coeff
+      match H.find_opt poly.hashtbl key with
+      | None ->
+        H.add poly.hashtbl key coeff;
+        incr_counter poly (W.sign coeff) (+1)
       | Some old_coeff ->
         let sum = W.add old_coeff coeff in
-        if sum = W.zero then Polynomial.remove poly key
-        else Polynomial.replace poly key sum
+        if sum = W.zero then
+          H.remove poly.hashtbl key
+        else
+          H.replace poly.hashtbl key sum;
+        incr_counter poly (W.sign old_coeff) (-1);
+        incr_counter poly (W.sign sum) (+1)
     )
 
-  let add poly =
-    Polynomial.iter (fun key coeff -> add_monomial poly coeff key)
+  let add poly1 poly2 =
+    H.iter (fun key coeff -> add_monomial poly1 coeff key) poly2.hashtbl
 
   let multiply_coeffs poly k =
-    Polynomial.filter_map_inplace (fun _ old_coeff ->
-      Some (W.mult k old_coeff)) poly
+    H.filter_map_inplace (fun _ old_coeff ->
+      Some (W.mult k old_coeff)) poly.hashtbl
 
   let multiply_unknowns poly unks =
-    let old_poly = Polynomial.copy poly in
-    Polynomial.clear poly;
-    Polynomial.iter (fun key coeff ->
-      Polynomial.add poly (List.rev_append unks key) coeff) old_poly
+    let old_hashtbl = H.copy poly.hashtbl in
+    H.clear poly.hashtbl;
+    H.iter (fun key coeff ->
+      H.add poly.hashtbl (List.rev_append unks key) coeff) old_hashtbl
 
-  let for_all_coeffs p poly =
-    Polynomial.fold (fun _ coeff res -> res && p coeff) poly true
+  let all_coeffs_nonnegative poly =
+    poly.neg_counter = 0
+
+  let all_coeffs_nonpositive poly =
+    poly.pos_counter = 0
 
   let constant_monomial poly =
-    match Polynomial.find_opt poly [] with
+    match H.find_opt poly.hashtbl [] with
     | None -> W.zero
     | Some coeff -> coeff
 
   let pp out poly =
     let first = ref true in
-    Polynomial.iter (fun key coeff ->
+    H.iter (fun key coeff ->
          if !first then first := false else Format.pp_print_string out " + ";
          Format.pp_print_string out "(";
          W.pp out coeff;
@@ -893,8 +915,9 @@ module Polynomial = struct
            CCList.pp ~pp_sep:(fun out () -> Format.pp_print_string out "*")
              pp_unknown out key)
          )
-      poly;
-    if !first then Format.pp_print_string out "0"
+      poly.hashtbl;
+    if !first then Format.pp_print_string out "0";
+    CCFormat.printf " [%d %d]" poly.pos_counter poly.neg_counter
 end
 
 module LambdaKBO : ORD = struct
@@ -1028,8 +1051,8 @@ module LambdaKBO : ORD = struct
       (w, Nonstrict.smooth cmp))
 
   let analyze_weight_diff w =
-    match Polynomial.for_all_coeffs (fun coeff -> W.sign coeff >= 0) w,
-      Polynomial.for_all_coeffs (fun coeff -> W.sign coeff <= 0) w with
+    match Polynomial.all_coeffs_nonnegative w,
+      Polynomial.all_coeffs_nonpositive w with
     | false, false -> Nonstrict.Incomparable
     | true, false -> if W.sign (Polynomial.constant_monomial w) > 0 then Gt else Geq
     | false, true -> if W.sign (Polynomial.constant_monomial w) < 0 then Lt else Leq
