@@ -871,7 +871,7 @@ module Polynomial = struct
     let old_poly = Polynomial.copy poly in
     Polynomial.clear poly;
     Polynomial.iter (fun key coeff ->
-      Polynomial.add poly (key @ unks) coeff) old_poly
+      Polynomial.add poly (List.rev_append unks key) coeff) old_poly
 
   let for_all_coeffs p poly =
     Polynomial.fold (fun _ coeff res -> res && p coeff) poly true
@@ -932,7 +932,8 @@ module LambdaKBO : ORD = struct
     match T.view hd with
     | AppBuiltin (_, bargs) ->
       add_monomial w sign W.one [];
-      add_weights_of w (bargs @ args)
+      add_weights_of w bargs;
+      add_weights_of w args
     | DB i ->
       add_monomial w sign W.one [];
       add_weights_of w args;
@@ -1116,6 +1117,7 @@ module LambdaKBO : ORD = struct
     let t = Lambda.eta_expand (Lambda.snf t0)
     and s = Lambda.eta_expand (Lambda.snf s0) in
     let (_, cmp) = process_terms ~prec [] t s in
+    (* CCFormat.printf "KBO %a vs. %a ~> %a, %a" T.pp t T.pp s Polynomial.pp w Comparison.Nonstrict.pp cmp; *)
     ZProf.exit_prof prof_lambda_kbo;
     cmp
 
