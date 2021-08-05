@@ -502,11 +502,11 @@ let test_lambda_kbo = "ordering.lambda_kbo", `Quick, fun () ->
   Alcotest.(check comp_test) "h (x y) > f a (x y)"
     Comparison.Nonstrict.Gt (compare (Term.app h [Term.app x [y]]) (Term.app f [a; Term.app x [y]]));
 
-  (* forall x. x < h a a a (cf. derived_ho_kbo) *)
+  (* forall x. x > h a a a *)
   let h = Term.const ~ty:(Type.arrow [ty;ty;ty] ty) h_ in
   let a = Term.const ~ty a_ in
-  Alcotest.(check comp_test) "forall x. x < h a a a"
-    Comparison.Nonstrict.Lt
+  Alcotest.(check comp_test) "forall x. x > h a a a"
+    Comparison.Nonstrict.Gt
     (compare 
       (Term.app_builtin ~ty:Type.prop Builtin.ForallConst [Term.of_ty Type.prop; Term.fun_l [Type.prop] (Term.bvar ~ty:Type.prop 0)]) 
       (Term.app h [a;a;a]));
@@ -518,7 +518,7 @@ let test_lambda_kbo = "ordering.lambda_kbo", `Quick, fun () ->
     Comparison.Nonstrict.Gt
     (compare 
       (Term.fun_l [ty]
-        (Term.app_builtin ~ty:Type.prop Builtin.ForallConst [Term.of_ty Type.prop; Term.fun_l [Type.prop] (Term.bvar ~ty:Type.prop 0)]) 
+        (Term.app_builtin ~ty:Type.prop Builtin.ForallConst [Term.of_ty Type.prop; Term.fun_l [Type.prop] (Term.bvar ~ty:Type.prop 0)])
       )
       (Term.app h [a;a;a]));
 
