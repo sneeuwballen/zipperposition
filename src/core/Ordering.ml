@@ -1305,6 +1305,17 @@ let lambda_kbo prec =
       (fun (a, b) -> LambdaKBO.might_flip prec a b) (a, b) in
   { cache_compare; compare; name=LambdaKBO.name; prec; might_flip; cache_might_flip; monotonic=false }
 
+(* ### For debugging only. *)
+let strict_lambda_kbo prec =
+  let cache_compare = mk_cache 256 in
+  let compare prec a b = CCCache.with_cache cache_compare
+      (fun (a, b) -> Comparison.to_nonstrict (Comparison.of_nonstrict (LambdaKBO.compare_terms ~prec a b))) (a, b)
+  in
+  let cache_might_flip = mk_cache 256 in
+  let might_flip prec a b = CCCache.with_cache cache_might_flip
+      (fun (a, b) -> LambdaKBO.might_flip prec a b) (a, b) in
+  { cache_compare; compare; name=LambdaKBO.name; prec; might_flip; cache_might_flip; monotonic=false }
+
 let none =
   let compare _ t1 t2 = if T.equal t1 t2 then Nonstrict.Eq else Incomparable in
   let might_flip _ _ _ = false in
@@ -1334,6 +1345,7 @@ let tbl_ =
   Hashtbl.add h "epo" epo;
   Hashtbl.add h "lambdafree_kbo_coeff" lambdafree_kbo_coeff;
   Hashtbl.add h "lambda_kbo" lambda_kbo;
+  Hashtbl.add h "strict_lambda_kbo" strict_lambda_kbo;
   Hashtbl.add h "none" (fun _ -> none);
   Hashtbl.add h "subterm" (fun _ -> subterm);
   h
