@@ -846,7 +846,7 @@ module Polynomial = struct
     end)
 
   type polynomial = {
-    mutable hashtbl : W.t H.t;
+    mutable hashtbl : W.t H.t option;
     mutable pos_counter : int;
     mutable neg_counter : int;
   }
@@ -858,39 +858,47 @@ module Polynomial = struct
     else if sign < 0 then poly.neg_counter <- poly.neg_counter + k
 
   let create_zero () =
-    {hashtbl = H.create 16;
+    {hashtbl = None;
      pos_counter = 0;
      neg_counter = 0}
 
+  let ensure poly =
+    if Option.is_none poly.hashtbl then
+      poly.hashtbl <- Some (H.create 16)
+
   let add_monomial poly coeff unks =
     if coeff != W.zero then (
+      ensure poly;
       let key = mk_key unks in
-      match H.find_opt poly.hashtbl key with
+      match H.find_opt (Option.get poly.hashtbl) key with
       | None ->
-        H.add poly.hashtbl key coeff;
+        H.add (Option.get poly.hashtbl) key coeff;
         incr_counter poly (W.sign coeff) (+1)
       | Some old_coeff ->
         let sum = W.add old_coeff coeff in
         if sum = W.zero then
-          H.remove poly.hashtbl key
+          H.remove (Option.get poly.hashtbl) key
         else
-          H.replace poly.hashtbl key sum;
+          H.replace (Option.get poly.hashtbl) key sum;
         incr_counter poly (W.sign old_coeff) (-1);
         incr_counter poly (W.sign sum) (+1)
     )
 
   let add poly1 poly2 =
-    H.iter (fun key coeff -> add_monomial poly1 coeff key) poly2.hashtbl
-
-  let multiply_coeffs poly k =
-    H.filter_map_inplace (fun _ old_coeff ->
-      Some (W.mult k old_coeff)) poly.hashtbl
+    if Option.is_some poly2.hashtbl then (
+      ensure poly1;
+      H.iter (fun key coeff -> add_monomial poly1 coeff key)
+        (Option.get poly2.hashtbl)
+    )
 
   let multiply_unknowns poly unks =
-    let old_hashtbl = H.copy poly.hashtbl in
-    H.clear poly.hashtbl;
-    H.iter (fun key coeff ->
-      H.add poly.hashtbl (List.rev_append unks key) coeff) old_hashtbl
+    if Option.is_some poly.hashtbl then (
+      let old_hashtbl = H.copy (Option.get poly.hashtbl) in
+      H.clear (Option.get poly.hashtbl);
+      H.iter (fun key coeff ->
+          H.add (Option.get poly.hashtbl) (List.rev_append unks key) coeff)
+        old_hashtbl
+    )
 
   let all_coeffs_nonnegative poly =
     poly.neg_counter = 0
@@ -899,23 +907,27 @@ module Polynomial = struct
     poly.pos_counter = 0
 
   let constant_monomial poly =
-    match H.find_opt poly.hashtbl [] with
-    | None -> W.zero
-    | Some coeff -> coeff
+    if Option.is_none poly.hashtbl then
+      W.zero
+    else
+      match H.find_opt (Option.get poly.hashtbl) [] with
+      | None -> W.zero
+      | Some coeff -> coeff
 
   let pp out poly =
     let first = ref true in
-    H.iter (fun key coeff ->
-         if !first then first := false else Format.pp_print_string out " + ";
-         Format.pp_print_string out "(";
-         W.pp out coeff;
-         Format.pp_print_string out ")";
-         if not (CCList.is_empty key) then (
-           Format.pp_print_string out "*";
-           CCList.pp ~pp_sep:(fun out () -> Format.pp_print_string out "*")
-             pp_unknown out key)
-         )
-      poly.hashtbl;
+    if Option.is_some poly.hashtbl then
+      H.iter (fun key coeff ->
+          if !first then first := false else Format.pp_print_string out " + ";
+          Format.pp_print_string out "(";
+          W.pp out coeff;
+          Format.pp_print_string out ")";
+          if not (CCList.is_empty key) then (
+            Format.pp_print_string out "*";
+            CCList.pp ~pp_sep:(fun out () -> Format.pp_print_string out "*")
+              pp_unknown out key
+          ))
+        (Option.get poly.hashtbl);
     if !first then Format.pp_print_string out "0";
     CCFormat.printf " [%d %d]" poly.pos_counter poly.neg_counter
 end
@@ -1022,9 +1034,9 @@ module LambdaKBO : ORD = struct
         | cmp -> cmp)
       | _, _ -> assert false
     in
-      match Int.compare (List.length ys) (List.length xs) with
-      | 0 -> lex ys xs
-      | n -> if n > 0 then Nonstrict.Gt else Lt
+    match Int.compare (List.length ys) (List.length xs) with
+    | 0 -> lex ys xs
+    | n -> if n > 0 then Nonstrict.Gt else Lt
 
   let length_lex_ext_data f ys xs =
     let rec lex ys xs = match ys, xs with
@@ -1043,9 +1055,9 @@ module LambdaKBO : ORD = struct
         | (w, cmp) -> ([w], cmp))
       | _, _ -> assert false
     in
-      match Int.compare (List.length ys) (List.length xs) with
-      | 0 -> lex ys xs
-      | n -> ([], if n > 0 then Nonstrict.Gt else Lt)
+    match Int.compare (List.length ys) (List.length xs) with
+    | 0 -> lex ys xs
+    | n -> ([], if n > 0 then Nonstrict.Gt else Lt)
 
   let cw_ext_data f =
     length_lex_ext_data (fun y x ->
@@ -1070,17 +1082,27 @@ module LambdaKBO : ORD = struct
 
   let rec process_args ~prec bound_tys ts ss =
     let w = Polynomial.create_zero () in
-    let (ws, cmp) = length_lex_ext_data (process_terms ~prec bound_tys) ts ss in
-    let m = List.length ws in
-    List.iter (Polynomial.add w) ws;
-    List.iter (add_weight_of ~prec bound_tys w (+1)) (CCList.drop m ts);
-    List.iter (add_weight_of ~prec bound_tys w (-1)) (CCList.drop m ss);
-    consider_weight w cmp
+    (* both comparisons are needed because connectives have variable arity *)
+    if CCList.is_empty ts && CCList.is_empty ss then
+      (w, Nonstrict.Eq)
+    else (
+      let (ws, cmp) = length_lex_ext_data (process_terms ~prec bound_tys) ts ss in
+      let m = List.length ws in
+      List.iter (Polynomial.add w) ws;
+      List.iter (add_weight_of ~prec bound_tys w (+1)) (CCList.drop m ts);
+      List.iter (add_weight_of ~prec bound_tys w (-1)) (CCList.drop m ss);
+      consider_weight w cmp
+    )
   and process_var_args ~prec bound_tys ts ss =
     let w = Polynomial.create_zero () in
-    let (ws, cmp) = cw_ext_data (process_terms ~prec bound_tys) ts ss in
-    List.iter (Polynomial.add w) ws;
-    consider_weight w cmp
+    (* only a single list needs to be checked thanks to eta-expansion *)
+    if CCList.is_empty ts then
+      (w, Nonstrict.Eq)
+    else (
+      let (ws, cmp) = cw_ext_data (process_terms ~prec bound_tys) ts ss in
+      List.iter (Polynomial.add w) ws;
+      consider_weight w cmp
+    )
   and process_terms ~prec bound_tys t s =
     let (t_hd_tyargs, t_args) = T.as_app_mono t in
     let (t_hd, t_tyargs) = T.as_app t_hd_tyargs in
