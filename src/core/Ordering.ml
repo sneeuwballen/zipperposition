@@ -974,46 +974,50 @@ module LambdaKBO : ORD = struct
       add_weights_of w args;
       add_eta_extra_of w (List.nth bound_tys i)
     | Var _ ->
-      (let mk_placeholder_var ty =
-         if Option.is_none (!dummy_var) then
-           dummy_var := Some (HVar.fresh ~ty:Type.tType ());
-         Term.var (HVar.cast ~ty (Option.get (!dummy_var)))
-       in
-       let categorize_var_arg (hd_some_args, extra_args) arg arg_ty =
-         if Type.is_var arg_ty || Type.is_fun arg_ty then
-           (Term.app hd_some_args [arg], extra_args)
-         else
-           (Term.app hd_some_args [mk_placeholder_var arg_ty],
+      if CCList.is_empty args then (
+        add_monomial w sign W.one [];
+        add_monomial w sign W.one [Polynomial.WeightUnknown hd]
+      ) else (
+        let mk_placeholder_var ty =
+          if Option.is_none (!dummy_var) then
+            dummy_var := Some (HVar.fresh ~ty:Type.tType ());
+          Term.var (HVar.cast ~ty (Option.get (!dummy_var)))
+        in
+        let rec normalize_consts t = match T.view t with
+          | AppBuiltin (b, bargs) ->
+            Term.app_builtin ~ty:(Term.ty t) b (List.map normalize_consts bargs)
+          | Const fid ->
+            let fid' = ID.make (W.to_string (Prec.weight prec fid)) in
+            Term.const ~ty:(Term.ty t) fid'
+          | Fun (ty, body) -> Term.fun_ ty (normalize_consts body)
+          | App (s, ts) ->
+            Term.app (normalize_consts s) (List.map normalize_consts ts)
+          | _ -> t
+        in
+        let categorize_var_arg (hd_some_args, extra_args) arg arg_ty =
+          if Type.is_var arg_ty || Type.is_fun arg_ty then
+            (Term.app hd_some_args [normalize_consts arg], extra_args)
+          else
+            (Term.app hd_some_args [mk_placeholder_var arg_ty],
             arg :: extra_args)
-       in
-       let rec normalize_consts t = match T.view t with
-         | AppBuiltin (b, bargs) ->
-           Term.app_builtin ~ty:(Term.ty t) b (List.map normalize_consts bargs)
-         | Const fid ->
-           let fid' = ID.make (W.to_string (Prec.weight prec fid)) in
-           Term.const ~ty:(Term.ty t) fid'
-         | Fun (ty, body) -> Term.fun_ ty (normalize_consts body)
-         | App (s, ts) ->
-           Term.app (normalize_consts s) (List.map normalize_consts ts)
-         | _ -> t
-       in
-       let hd_ty = Term.ty hd in
-       let (arg_tys, _) = Type.open_fun hd_ty in
-       let (hd_some_args, extra_args) =
-         List.fold_left2 categorize_var_arg (hd, []) args arg_tys in
-       let normal_hd_some_args = normalize_consts hd_some_args in
-       add_monomial w sign W.one [];
-       add_monomial w sign W.one
-         [Polynomial.WeightUnknown normal_hd_some_args];
-       let add_weight_of_extra_arg i arg =
-         let w' = Polynomial.create_zero () in
-         add_weight_of ~prec bound_tys w' sign arg;
-         add_monomial w' (-1 * sign) W.one [];
-         Polynomial.multiply_unknowns w'
-           [Polynomial.CoeffUnknown (normal_hd_some_args, i + 1)];
-         Polynomial.add w w'
-       in
-       List.iteri add_weight_of_extra_arg extra_args)
+        in
+        let hd_ty = Term.ty hd in
+        let (arg_tys, _) = Type.open_fun hd_ty in
+        let (hd_some_args, extra_args) =
+          List.fold_left2 categorize_var_arg (hd, []) args arg_tys
+        in
+        let add_weight_of_extra_arg i arg =
+          let w' = Polynomial.create_zero () in
+          add_weight_of ~prec bound_tys w' sign arg;
+          add_monomial w' (-1 * sign) W.one [];
+          Polynomial.multiply_unknowns w'
+            [Polynomial.CoeffUnknown (hd_some_args, i + 1)];
+          Polynomial.add w w'
+        in
+        add_monomial w sign W.one [];
+        add_monomial w sign W.one [Polynomial.WeightUnknown hd_some_args];
+        List.iteri add_weight_of_extra_arg extra_args
+      )
     | Const fid ->
       add_monomial w sign (Prec.weight prec fid) [];
       add_weights_of w args;
