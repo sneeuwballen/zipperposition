@@ -932,10 +932,10 @@ module LambdaKBO : ORD = struct
       let ignore_deep_quants = true
     end)
 
-  let dummy_var = HVar.fresh ~ty:Type.tType ()
+  let dummy_var = ref None
 
-  let compare_type_terms ~prec ty_t ty_s =
-    Type_KBO.compare_terms ~prec:prec ty_t ty_s
+  let compare_type_terms ~prec =
+    Type_KBO.compare_terms ~prec
 
   let compare_types ~prec t_ty s_ty =
     if Type.compare t_ty s_ty = 0 then Nonstrict.Eq
@@ -963,7 +963,9 @@ module LambdaKBO : ORD = struct
       add_eta_extra_of w (List.nth bound_tys i)
     | Var _ ->
       (let mk_placeholder_var ty =
-         Term.var (HVar.cast ~ty dummy_var)
+         if Option.is_none (!dummy_var) then
+           dummy_var := Some (HVar.fresh ~ty:Type.tType ());
+         Term.var (HVar.cast ~ty (Option.get (!dummy_var)))
        in
        let categorize_var_arg (hd_some_args, extra_args) arg arg_ty =
          if Type.is_var arg_ty || Type.is_fun arg_ty then
