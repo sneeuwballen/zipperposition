@@ -796,8 +796,8 @@ module LambdaFreeKBOCoeff : ORD = struct
       | _ -> assert false
 end
 
-(* This imperative polynomial data structure is designed to offer efficient
-complexity. *)
+(* This imperative polynomial data structure is designed to offer good
+   algorithmic complexity. *)
 module Polynomial = struct
   type unknown =
     | EtaUnknown of Type.t HVar.t  (* h *)
@@ -961,12 +961,17 @@ module LambdaKBO : ORD = struct
       | Var var -> add_monomial w sign W.one [Polynomial.EtaUnknown var]
       | _ -> ()
     in
+    let is_quantifier b =
+      b = Builtin.ForallConst || b = Builtin.ExistsConst
+    in
     let (hd_tyargs, args) = T.as_app_mono t in
     let (hd, _) = T.as_app hd_tyargs in
-
     match T.view hd with
-    | AppBuiltin (_, bargs) ->
-      add_monomial w sign W.one [];
+    | AppBuiltin (b, bargs) ->
+      (* We give a weight of [omega] to quantifiers as an attempt to honor
+         the property that a quantified formula is larger than its instances
+         most of the time. The lambda KBO cannot always fulfill it. *)
+      add_monomial w sign (if is_quantifier b then W.omega else W.one) [];
       add_weights_of w bargs;
       add_weights_of w args
     | DB i ->
