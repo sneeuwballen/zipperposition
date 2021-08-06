@@ -1089,6 +1089,14 @@ module LambdaKBO : ORD = struct
      | Leq -> Nonstrict.merge_with_Leq cmp
      | cmp' -> cmp')
 
+  let partition_leading p =
+    let rec part acc xs =
+      match xs with
+      | x :: xs' when p x -> part (x :: acc) xs'
+      | _ -> (List.rev acc, xs)
+    in
+    part []
+
   let rec process_args ~prec bound_tys ts ss =
     let w = Polynomial.create_zero () in
     (* both comparisons are needed because connectives have variable arity *)
@@ -1113,10 +1121,10 @@ module LambdaKBO : ORD = struct
       consider_weight w cmp
     )
   and process_terms ~prec bound_tys t s =
-    let (t_hd_tyargs, t_args) = T.as_app_mono t in
-    let (t_hd, t_tyargs) = T.as_app t_hd_tyargs in
-    let (s_hd_tyargs, s_args) = T.as_app_mono s in
-    let (s_hd, s_tyargs) = T.as_app s_hd_tyargs in
+    let (t_hd, t_all_args) = T.as_app t in
+    let (t_tyargs, t_args) = partition_leading Term.is_type t_all_args in
+    let (s_hd, s_all_args) = T.as_app s in
+    let (s_tyargs, s_args) = partition_leading Term.is_type s_all_args in
     match T.view t_hd, T.view s_hd with
     | Var y, Var x when HVar.id y = HVar.id x ->
       process_var_args ~prec bound_tys t_args s_args
