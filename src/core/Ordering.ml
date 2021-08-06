@@ -939,6 +939,19 @@ module LambdaKBO : ORD = struct
     if Type.compare t_ty s_ty = 0 then Nonstrict.Eq
     else Incomparable  (* imprecise but fast *)
 
+  let partition_leading p =
+    let rec part acc xs =
+      match xs with
+      | x :: xs' when p x -> part (x :: acc) xs'
+      | _ -> (List.rev acc, xs)
+    in
+    part []
+
+  let break_term_up u =
+    match T.view u with
+    | T.App (hd, all_args) -> (hd, partition_leading Term.is_type all_args)
+    | _ -> (u, ([], []))
+
   let rec add_weight_of ~prec bound_tys w sign t =
     let add_weights_of w args =
       List.iter (add_weight_of ~prec bound_tys w sign) args
@@ -950,8 +963,7 @@ module LambdaKBO : ORD = struct
     let is_quantifier b =
       b = Builtin.ForallConst || b = Builtin.ExistsConst
     in
-    let (hd_tyargs, args) = T.as_app_mono t in
-    let (hd, _) = T.as_app hd_tyargs in
+    let (hd, (_, args)) = break_term_up t in
     match T.view hd with
     | AppBuiltin (b, bargs) ->
       (* We give a weight of [omega] to quantifiers as an attempt to honor
@@ -1075,14 +1087,6 @@ module LambdaKBO : ORD = struct
      | Leq -> Nonstrict.merge_with_Leq cmp
      | cmp' -> cmp')
 
-  let partition_leading p =
-    let rec part acc xs =
-      match xs with
-      | x :: xs' when p x -> part (x :: acc) xs'
-      | _ -> (List.rev acc, xs)
-    in
-    part []
-
   let rec process_args ~prec bound_tys ts ss =
     let w = Polynomial.create_zero () in
     (* both comparisons are needed because connectives have variable arity *)
@@ -1107,13 +1111,8 @@ module LambdaKBO : ORD = struct
       consider_weight w cmp
     )
   and process_terms ~prec bound_tys t s =
-    let break_up u =
-      match T.view u with
-      | T.App (hd, all_args) -> (hd, partition_leading Term.is_type all_args)
-      | _ -> (u, ([], []))
-    in
-    let (t_hd, (t_tyargs, t_args)) = break_up t in
-    let (s_hd, (s_tyargs, s_args)) = break_up s in
+    let (t_hd, (t_tyargs, t_args)) = break_term_up t in
+    let (s_hd, (s_tyargs, s_args)) = break_term_up s in
     match T.view t_hd, T.view s_hd with
     | Var y, Var x when HVar.id y = HVar.id x ->
       process_var_args ~prec bound_tys t_args s_args
