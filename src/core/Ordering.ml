@@ -1121,10 +1121,13 @@ module LambdaKBO : ORD = struct
       consider_weight w cmp
     )
   and process_terms ~prec bound_tys t s =
-    let (t_hd, t_all_args) = T.as_app t in
-    let (t_tyargs, t_args) = partition_leading Term.is_type t_all_args in
-    let (s_hd, s_all_args) = T.as_app s in
-    let (s_tyargs, s_args) = partition_leading Term.is_type s_all_args in
+    let break_up u =
+      match T.view u with
+      | T.App (hd, all_args) -> (hd, partition_leading Term.is_type all_args)
+      | _ -> (u, ([], []))
+    in
+    let (t_hd, (t_tyargs, t_args)) = break_up t in
+    let (s_hd, (s_tyargs, s_args)) = break_up s in
     match T.view t_hd, T.view s_hd with
     | Var y, Var x when HVar.id y = HVar.id x ->
       process_var_args ~prec bound_tys t_args s_args
