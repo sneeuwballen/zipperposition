@@ -1170,8 +1170,10 @@ module LambdaKBO : ORD = struct
 
   let compare_terms ~prec t0 s0 =
     ZProf.enter_prof prof_lambda_kbo;
-    let t = Lambda.eta_expand (Lambda.snf t0)
-    and s = Lambda.eta_expand (Lambda.snf s0) in
+    let normalize u0 =
+      if Term.is_fo_term u0 then u0 else Lambda.eta_expand (Lambda.snf u0)
+    in
+    let t = normalize t0 and s = normalize s0 in
     let (_, cmp) = process_terms ~prec [] t s in
     (* CCFormat.printf "KBO %a vs. %a ~> %a, %a" T.pp t T.pp s Polynomial.pp w Comparison.Nonstrict.pp cmp; *)
     ZProf.exit_prof prof_lambda_kbo;
