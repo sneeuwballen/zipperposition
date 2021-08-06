@@ -865,6 +865,15 @@ module Polynomial = struct
      pos_counter = 0;
      neg_counter = 0}
 
+  let is_zero poly =
+    poly.pos_counter + poly.neg_counter = 0
+
+  let all_coeffs_nonnegative poly =
+    poly.neg_counter = 0
+
+  let all_coeffs_nonpositive poly =
+    poly.pos_counter = 0
+
   let add_monomial poly coeff unks =
     if coeff != W.zero then (
       let key = mk_key unks in
@@ -883,7 +892,8 @@ module Polynomial = struct
     )
 
   let add poly1 poly2 =
-    H.iter (fun key coeff -> add_monomial poly1 coeff key) poly2.hashtbl
+    if not (is_zero poly2) then
+      H.iter (fun key coeff -> add_monomial poly1 coeff key) poly2.hashtbl
 
   let multiply_unknowns poly unks =
     let old_hashtbl = H.copy poly.hashtbl in
@@ -891,12 +901,6 @@ module Polynomial = struct
     H.iter (fun key coeff ->
         H.add poly.hashtbl (List.rev_append unks key) coeff)
       old_hashtbl
-
-  let all_coeffs_nonnegative poly =
-    poly.neg_counter = 0
-
-  let all_coeffs_nonpositive poly =
-    poly.pos_counter = 0
 
   let constant_monomial poly =
     match H.find_opt poly.hashtbl [] with
@@ -972,7 +976,7 @@ module LambdaKBO : ORD = struct
          honor the desideratum that a quantified formula should be larger than
          its instances. *)
       add_monomial w sign
-        (if not (CCList.is_empty bound_tys) && is_quantifier b then W.omega
+        (if CCList.is_empty bound_tys && is_quantifier b then W.omega
          else W.one)
         [];
       add_weights_of w bargs;
