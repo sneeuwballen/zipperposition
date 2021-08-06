@@ -880,8 +880,7 @@ module Polynomial = struct
     )
 
   let add poly1 poly2 =
-    H.iter (fun key coeff -> add_monomial poly1 coeff key)
-      poly2.hashtbl
+    H.iter (fun key coeff -> add_monomial poly1 coeff key) poly2.hashtbl
 
   let multiply_unknowns poly unks =
     let old_hashtbl = H.copy poly.hashtbl in
@@ -953,8 +952,8 @@ module LambdaKBO : ORD = struct
     | _ -> (u, ([], []))
 
   let rec add_weight_of ~prec bound_tys w sign t =
-    let add_weights_of w args =
-      List.iter (add_weight_of ~prec bound_tys w sign) args
+    let add_weights_of w =
+      List.iter (add_weight_of ~prec bound_tys w sign)
     in
     let add_eta_extra_of w ty = match Type.view ty with
       | Var var -> add_monomial w sign W.one [Polynomial.EtaUnknown var]
