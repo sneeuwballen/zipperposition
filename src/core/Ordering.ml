@@ -851,7 +851,10 @@ module Polynomial = struct
     mutable neg_counter : int;
   }
 
-  let mk_key = List.sort compare
+  let mk_key = function
+    | [] -> []
+    | [unk] -> [unk]
+    | unks -> List.sort compare unks
 
   let incr_counter poly sign k =
     if sign > 0 then poly.pos_counter <- poly.pos_counter + k
