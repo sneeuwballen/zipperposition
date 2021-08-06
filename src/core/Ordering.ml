@@ -846,7 +846,7 @@ module Polynomial = struct
     end)
 
   type polynomial = {
-    mutable hashtbl : W.t H.t option;
+    mutable hashtbl : W.t H.t;
     mutable pos_counter : int;
     mutable neg_counter : int;
   }
@@ -858,47 +858,37 @@ module Polynomial = struct
     else if sign < 0 then poly.neg_counter <- poly.neg_counter + k
 
   let create_zero () =
-    {hashtbl = None;
+    {hashtbl = H.create 16;
      pos_counter = 0;
      neg_counter = 0}
 
-  let ensure poly =
-    if Option.is_none poly.hashtbl then
-      poly.hashtbl <- Some (H.create 16)
-
   let add_monomial poly coeff unks =
     if coeff != W.zero then (
-      ensure poly;
       let key = mk_key unks in
-      match H.find_opt (Option.get poly.hashtbl) key with
+      match H.find_opt poly.hashtbl key with
       | None ->
-        H.add (Option.get poly.hashtbl) key coeff;
+        H.add poly.hashtbl key coeff;
         incr_counter poly (W.sign coeff) (+1)
       | Some old_coeff ->
         let sum = W.add old_coeff coeff in
         if sum = W.zero then
-          H.remove (Option.get poly.hashtbl) key
+          H.remove poly.hashtbl key
         else
-          H.replace (Option.get poly.hashtbl) key sum;
+          H.replace poly.hashtbl key sum;
         incr_counter poly (W.sign old_coeff) (-1);
         incr_counter poly (W.sign sum) (+1)
     )
 
   let add poly1 poly2 =
-    if Option.is_some poly2.hashtbl then (
-      ensure poly1;
-      H.iter (fun key coeff -> add_monomial poly1 coeff key)
-        (Option.get poly2.hashtbl)
-    )
+    H.iter (fun key coeff -> add_monomial poly1 coeff key)
+      poly2.hashtbl
 
   let multiply_unknowns poly unks =
-    if Option.is_some poly.hashtbl then (
-      let old_hashtbl = H.copy (Option.get poly.hashtbl) in
-      H.clear (Option.get poly.hashtbl);
-      H.iter (fun key coeff ->
-          H.add (Option.get poly.hashtbl) (List.rev_append unks key) coeff)
-        old_hashtbl
-    )
+    let old_hashtbl = H.copy poly.hashtbl in
+    H.clear poly.hashtbl;
+    H.iter (fun key coeff ->
+        H.add poly.hashtbl (List.rev_append unks key) coeff)
+      old_hashtbl
 
   let all_coeffs_nonnegative poly =
     poly.neg_counter = 0
@@ -907,27 +897,23 @@ module Polynomial = struct
     poly.pos_counter = 0
 
   let constant_monomial poly =
-    if Option.is_none poly.hashtbl then
-      W.zero
-    else
-      match H.find_opt (Option.get poly.hashtbl) [] with
-      | None -> W.zero
-      | Some coeff -> coeff
+    match H.find_opt poly.hashtbl [] with
+    | None -> W.zero
+    | Some coeff -> coeff
 
   let pp out poly =
     let first = ref true in
-    if Option.is_some poly.hashtbl then
-      H.iter (fun key coeff ->
-          if !first then first := false else Format.pp_print_string out " + ";
-          Format.pp_print_string out "(";
-          W.pp out coeff;
-          Format.pp_print_string out ")";
-          if not (CCList.is_empty key) then (
-            Format.pp_print_string out "*";
-            CCList.pp ~pp_sep:(fun out () -> Format.pp_print_string out "*")
-              pp_unknown out key
-          ))
-        (Option.get poly.hashtbl);
+    H.iter (fun key coeff ->
+        if !first then first := false else Format.pp_print_string out " + ";
+        Format.pp_print_string out "(";
+        W.pp out coeff;
+        Format.pp_print_string out ")";
+        if not (CCList.is_empty key) then (
+          Format.pp_print_string out "*";
+          CCList.pp ~pp_sep:(fun out () -> Format.pp_print_string out "*")
+            pp_unknown out key
+        ))
+      poly.hashtbl;
     if !first then Format.pp_print_string out "0";
     CCFormat.printf " [%d %d]" poly.pos_counter poly.neg_counter
 end
