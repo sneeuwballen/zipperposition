@@ -27,7 +27,8 @@ let enable_profiling b =
     Util.errorf ~where:"zprof"
       "profiling has been deactivated at compile time. \
        Change `ZProf.__prof` and recompile."
-  )
+  ) else
+    active_ := b
 
 let profilers = ref []
 
