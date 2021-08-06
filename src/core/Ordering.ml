@@ -1084,8 +1084,10 @@ module LambdaKBO : ORD = struct
     match Polynomial.all_coeffs_nonnegative w,
       Polynomial.all_coeffs_nonpositive w with
     | false, false -> Nonstrict.Incomparable
-    | true, false -> if W.sign (Polynomial.constant_monomial w) > 0 then Gt else Geq
-    | false, true -> if W.sign (Polynomial.constant_monomial w) < 0 then Lt else Leq
+    | true, false ->
+      if W.sign (Polynomial.constant_monomial w) > 0 then Gt else Geq
+    | false, true ->
+      if W.sign (Polynomial.constant_monomial w) < 0 then Lt else Leq
     | true, true -> Eq
 
   let consider_weight w cmp =
@@ -1102,7 +1104,9 @@ module LambdaKBO : ORD = struct
     if CCList.is_empty ts && CCList.is_empty ss then
       (w, Nonstrict.Eq)
     else (
-      let (ws, cmp) = length_lex_ext_data (process_terms ~prec bound_tys) ts ss in
+      let (ws, cmp) =
+        length_lex_ext_data (process_terms ~prec bound_tys) ts ss
+      in
       let m = List.length ws in
       List.iter (Polynomial.add w) ws;
       List.iter (add_weight_of ~prec bound_tys w (+1)) (CCList.drop m ts);
