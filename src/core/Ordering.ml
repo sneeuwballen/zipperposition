@@ -1003,17 +1003,7 @@ module LambdaKBO : ORD = struct
             Term.var (HVar.cast ~ty var)
           | Some var -> Term.var (HVar.cast ~ty var)
         in
-        let rec normalize_consts t = match T.view t with
-          | AppBuiltin (b, bargs) ->
-            Term.app_builtin ~ty:(Term.ty t) b (List.map normalize_consts bargs)
-          | Const fid ->
-            let fid' = ID.make (W.to_string (Prec.weight prec fid)) in
-            Term.const ~ty:(Term.ty t) fid'
-          | Fun (ty, body) -> Term.fun_ ty (normalize_consts body)
-          | App (s, ts) ->
-            Term.app (normalize_consts s) (List.map normalize_consts ts)
-          | _ -> t
-        in
+        let rec normalize_consts t = t in
         let categorize_var_arg (hd_some_args, extra_args) arg arg_ty =
           if Type.is_var arg_ty || Type.is_fun arg_ty then
             (Term.app hd_some_args [normalize_consts arg], extra_args)
