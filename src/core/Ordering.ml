@@ -813,7 +813,7 @@ module Polynomial = struct
   | _, WeightUnknown _ -> -1
   | CoeffUnknown (t, j), CoeffUnknown (s, i) ->
     (match T.compare t s with
-     | 0 -> Int.compare j i
+     | 0 -> CCInt.compare j i
      | n -> n)
 
   let equal unk1 (unk2 : unknown) = (compare unk2 unk1 = 0)
@@ -991,9 +991,12 @@ module LambdaKBO : ORD = struct
         add_monomial w sign W.one [Polynomial.WeightUnknown hd]
       ) else (
         let mk_placeholder_var ty =
-          if Option.is_none (!dummy_var) then
-            dummy_var := Some (HVar.fresh ~ty:Type.tType ());
-          Term.var (HVar.cast ~ty (Option.get (!dummy_var)))
+          match !dummy_var with
+          | None ->
+            let var = HVar.fresh ~ty:Type.tType () in
+            dummy_var := Some var;
+            Term.var (HVar.cast ~ty var)
+          | Some var -> Term.var (HVar.cast ~ty var)
         in
         let rec normalize_consts t = match T.view t with
           | AppBuiltin (b, bargs) ->
@@ -1050,7 +1053,7 @@ module LambdaKBO : ORD = struct
         | cmp -> cmp)
       | _, _ -> assert false
     in
-    match Int.compare (List.length ys) (List.length xs) with
+    match CCInt.compare (List.length ys) (List.length xs) with
     | 0 -> lex ys xs
     | n -> if n > 0 then Nonstrict.Gt else Lt
 
@@ -1071,7 +1074,7 @@ module LambdaKBO : ORD = struct
         | (w, cmp) -> ([w], cmp))
       | _, _ -> assert false
     in
-    match Int.compare (List.length ys) (List.length xs) with
+    match CCInt.compare (List.length ys) (List.length xs) with
     | 0 -> lex ys xs
     | n -> ([], if n > 0 then Nonstrict.Gt else Lt)
 
