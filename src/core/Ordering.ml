@@ -941,8 +941,6 @@ module LambdaKBO : ORD = struct
       let ignore_deep_quants = true
     end)
 
-  let dummy_var = ref None
-
   let compare_type_terms ~prec =
     Type_KBO.compare_terms ~prec
 
@@ -990,41 +988,37 @@ module LambdaKBO : ORD = struct
       add_monomial w sign W.one [];
       add_weights_of w args;
       add_eta_extra_of w (List.nth bound_tys i)
-    | Var _ ->
+    | Var var ->
       if CCList.is_empty args then (
         add_monomial w sign W.one [];
         add_monomial w sign W.one [Polynomial.WeightUnknown hd]
       ) else (
         let mk_placeholder_var ty =
-          match !dummy_var with
-          | None ->
-            let var = HVar.fresh ~ty:Type.tType () in
-            dummy_var := Some var;
-            Term.var (HVar.cast ~ty var)
-          | Some var -> Term.var (HVar.cast ~ty var)
+          Term.var (HVar.cast ~ty var)
         in
-        let rec normalize_consts t = t in
-        let categorize_var_arg (hd_some_args, extra_args) arg arg_ty =
+        let normalize_consts t = t in
+        let categorize_var_arg (some_args, extra_args) arg arg_ty =
           if Type.is_var arg_ty || Type.is_fun arg_ty then
-            (Term.app hd_some_args [normalize_consts arg], extra_args)
+            (normalize_consts arg :: some_args, extra_args)
           else
-            (Term.app hd_some_args [mk_placeholder_var arg_ty],
-            arg :: extra_args)
+            (mk_placeholder_var arg_ty :: some_args,
+             arg :: extra_args)
         in
         let (arg_tys, _) = Type.open_fun (Term.ty hd) in
-        let (hd_some_args, extra_args) =
-          List.fold_left2 categorize_var_arg (hd, []) args arg_tys
+        let (some_args, extra_args) =
+          List.fold_left2 categorize_var_arg ([], []) args arg_tys
         in
+        let var_some_args = T.app hd some_args in
         let add_weight_of_extra_arg i arg =
           let w' = Polynomial.create_zero () in
           add_weight_of ~prec bound_tys w' sign arg;
           add_monomial w' (-1 * sign) W.one [];
           Polynomial.multiply_unknowns w'
-            [Polynomial.CoeffUnknown (hd_some_args, i + 1)];
+            [Polynomial.CoeffUnknown (var_some_args, i + 1)];
           Polynomial.add w w'
         in
         add_monomial w sign W.one [];
-        add_monomial w sign W.one [Polynomial.WeightUnknown hd_some_args];
+        add_monomial w sign W.one [Polynomial.WeightUnknown var_some_args];
         List.iteri add_weight_of_extra_arg extra_args
       )
     | Const fid ->
