@@ -865,6 +865,11 @@ module Polynomial = struct
      pos_counter = 0;
      neg_counter = 0}
 
+  let copy poly =
+    {hashtbl = H.copy poly.hashtbl;
+     pos_counter = poly.pos_counter;
+     neg_counter = poly.neg_counter}
+
   let is_zero poly =
     poly.pos_counter + poly.neg_counter = 0
 
@@ -1016,8 +1021,7 @@ module LambdaKBO : ORD = struct
             (Term.app hd_some_args [mk_placeholder_var arg_ty],
             arg :: extra_args)
         in
-        let hd_ty = Term.ty hd in
-        let (arg_tys, _) = Type.open_fun hd_ty in
+        let (arg_tys, _) = Type.open_fun (Term.ty hd) in
         let (hd_some_args, extra_args) =
           List.fold_left2 categorize_var_arg (hd, []) args arg_tys
         in
@@ -1116,22 +1120,45 @@ module LambdaKBO : ORD = struct
       List.iter (add_weight_of ~prec bound_tys w (-1)) (CCList.drop m ss);
       consider_weight w cmp
     )
-  and process_var_args ~prec bound_tys ts ss =
-    let w = Polynomial.create_zero () in
-    (* only a single list needs to be checked thanks to eta-expansion *)
-    if CCList.is_empty ts then
-      (w, Nonstrict.Eq)
-    else (
-      let (ws, cmp) = cw_ext_data (process_terms ~prec bound_tys) ts ss in
-      List.iter (Polynomial.add w) ws;
-      consider_weight w cmp
-    )
   and process_terms ~prec bound_tys t s =
     let (t_hd, (t_tyargs, t_args)) = break_term_up t in
     let (s_hd, (s_tyargs, s_args)) = break_term_up s in
     match T.view t_hd, T.view s_hd with
     | Var y, Var x when HVar.id y = HVar.id x ->
-      process_var_args ~prec bound_tys t_args s_args
+      let w = Polynomial.create_zero () in
+      (* only a single list needs to be checked thanks to eta-expansion *)
+      if CCList.is_empty t_args then
+        (w, Nonstrict.Eq)
+      else (
+        let categorize_var_arg (some_args, extra_args) arg arg_ty =
+          if Type.is_var arg_ty || Type.is_fun arg_ty then
+            (arg :: some_args, extra_args)
+          else
+            (some_args, arg :: extra_args)
+        in
+        let (arg_tys, _) = Type.open_fun (Term.ty t_hd) in
+        let (some_t_args, extra_t_args) =
+          List.fold_left2 categorize_var_arg ([], []) t_args arg_tys
+        and (some_s_args, extra_s_args) =
+          List.fold_left2 categorize_var_arg ([], []) s_args arg_tys
+        in
+        if CCList.equal T.equal some_t_args some_s_args then
+          let var_some_args = T.app t_hd some_t_args in
+          let (arg_ws, cmp) =
+            cw_ext_data (process_terms ~prec bound_tys)
+              extra_t_args extra_s_args
+          in
+          let add_weight_of_extra_arg i arg_w =
+            let arg_w' = Polynomial.copy arg_w in
+            Polynomial.multiply_unknowns arg_w'
+              [Polynomial.CoeffUnknown (var_some_args, i + 1)];
+            Polynomial.add w arg_w'
+          in
+          List.iteri add_weight_of_extra_arg arg_ws;
+          consider_weight w cmp
+        else
+          consider_weights_of ~prec bound_tys t s Nonstrict.Incomparable
+      )
     | Var _, AppBuiltin (b, _) ->
       consider_weights_of ~prec bound_tys t s
         (if Builtin.as_int b = 0 then Nonstrict.Geq else Nonstrict.Incomparable)
