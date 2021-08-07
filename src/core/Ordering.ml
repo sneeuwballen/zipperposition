@@ -865,11 +865,6 @@ module Polynomial = struct
      pos_counter = 0;
      neg_counter = 0}
 
-  let copy poly =
-    {hashtbl = H.copy poly.hashtbl;
-     pos_counter = poly.pos_counter;
-     neg_counter = poly.neg_counter}
-
   let is_zero poly =
     poly.pos_counter + poly.neg_counter = 0
 
@@ -901,11 +896,12 @@ module Polynomial = struct
       H.iter (fun key coeff -> add_monomial poly1 coeff key) poly2.hashtbl
 
   let multiply_unknowns poly unks =
-    let old_hashtbl = H.copy poly.hashtbl in
-    H.clear poly.hashtbl;
-    H.iter (fun key coeff ->
-        H.add poly.hashtbl (List.rev_append unks key) coeff)
-      old_hashtbl
+    if not (CCList.is_empty unks) then
+      let old_hashtbl = poly.hashtbl in
+      poly.hashtbl <- H.create 16;
+      H.iter (fun key coeff ->
+          H.add poly.hashtbl (mk_key (List.rev_append unks key)) coeff)
+        old_hashtbl
 
   let constant_monomial poly =
     match H.find_opt poly.hashtbl [] with
@@ -1133,10 +1129,9 @@ module LambdaKBO : ORD = struct
               extra_t_args extra_s_args
           in
           let add_weight_of_extra_arg i arg_w =
-            let arg_w' = Polynomial.copy arg_w in
-            Polynomial.multiply_unknowns arg_w'
+            Polynomial.multiply_unknowns arg_w
               [Polynomial.CoeffUnknown (var_some_args, i + 1)];
-            Polynomial.add w arg_w'
+            Polynomial.add w arg_w
           in
           List.iteri add_weight_of_extra_arg arg_ws;
           consider_weight w cmp
