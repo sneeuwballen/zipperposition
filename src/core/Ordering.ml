@@ -1168,12 +1168,8 @@ module LambdaKBO : ORD = struct
     add_weight_of ~prec bound_tys w (-1) s;
     consider_weight w cmp
 
-  let compare_terms ~prec t0 s0 =
+  let compare_terms ~prec t s =
     ZProf.enter_prof prof_lambda_kbo;
-    let normalize u0 =
-      if Term.is_fo_term u0 then u0 else Lambda.eta_expand (Lambda.snf u0)
-    in
-    let t = normalize t0 and s = normalize s0 in
     let (_, cmp) = process_terms ~prec [] t s in
     (* CCFormat.printf "KBO %a vs. %a ~> %a, %a" T.pp t T.pp s Polynomial.pp w Comparison.Nonstrict.pp cmp; *)
     ZProf.exit_prof prof_lambda_kbo;
@@ -1305,18 +1301,11 @@ let lambda_kbo prec =
   let cache_might_flip = mk_cache 256 in
   let might_flip prec a b = CCCache.with_cache cache_might_flip
       (fun (a, b) -> LambdaKBO.might_flip prec a b) (a, b) in
-  { cache_compare; compare; name=LambdaKBO.name; prec; might_flip; cache_might_flip; monotonic=false }
-
-(* ### For debugging only. *)
-let strict_lambda_kbo prec =
-  let cache_compare = mk_cache 256 in
-  let compare prec a b = CCCache.with_cache cache_compare
-      (fun (a, b) -> Comparison.to_nonstrict (Comparison.of_nonstrict (LambdaKBO.compare_terms ~prec a b))) (a, b)
+  let normalize t =
+    if Term.is_fo_term t then t else Lambda.eta_expand (Lambda.snf t)
   in
-  let cache_might_flip = mk_cache 256 in
-  let might_flip prec a b = CCCache.with_cache cache_might_flip
-      (fun (a, b) -> LambdaKBO.might_flip prec a b) (a, b) in
-  { cache_compare; compare; name=LambdaKBO.name; prec; might_flip; cache_might_flip; monotonic=false }
+  let monotonic = false in
+  map normalize { cache_compare; compare; name=LambdaKBO.name; prec; might_flip; cache_might_flip; monotonic }
 
 let none =
   let compare _ t1 t2 = if T.equal t1 t2 then Nonstrict.Eq else Incomparable in
@@ -1347,7 +1336,6 @@ let tbl_ =
   Hashtbl.add h "epo" epo;
   Hashtbl.add h "lambdafree_kbo_coeff" lambdafree_kbo_coeff;
   Hashtbl.add h "lambda_kbo" lambda_kbo;
-  Hashtbl.add h "strict_lambda_kbo" strict_lambda_kbo;
   Hashtbl.add h "none" (fun _ -> none);
   Hashtbl.add h "subterm" (fun _ -> subterm);
   h
