@@ -18,6 +18,8 @@ let long_factor = 10
 let a_ = ID.make "a"
 let b_ = ID.make "b"
 let c_ = ID.make "c"
+let d_ = ID.make "d"
+let e_ = ID.make "e"
 let f_ = ID.make "f"
 let g_ = ID.make "g"
 let h_ = ID.make "h"
@@ -160,7 +162,7 @@ let check_ordering_subterm ~arb_t ord =
   QCheck.Test.make ~count ~long_factor ~name arb prop
 
 let test_derived_ho_rpo = "ordering.derived_ho_rpo", `Quick, fun () ->
-  let ord = O.derived_ho_rpo (Precedence.default [a_; b_; c_; f_; g_; h_]) in
+  let ord = O.derived_ho_rpo (Precedence.default [a_; b_; c_; d_; e_; f_; g_; h_]) in
   let compare = O.compare ord in
 
   (* x a <=>? x b *)
@@ -201,7 +203,7 @@ let test_derived_ho_rpo = "ordering.derived_ho_rpo", `Quick, fun () ->
   Alcotest.(check comp_test) "f a a > f b" Comparison.Nonstrict.Gt (compare (Term.app f [a;a]) (Term.app f [b]))
 
 let test_lambdafree_rpo = "ordering.lambdafree_rpo", `Quick, fun () ->
-  let ord = O.lambdafree_rpo (Precedence.default [a_; b_; c_; f_; g_; h_]) in
+  let ord = O.lambdafree_rpo (Precedence.default [a_; b_; c_; d_; e_; f_; g_; h_]) in
   let compare = O.compare ord in
 
   (* x a < x b *)
@@ -239,7 +241,7 @@ let test_derived_ho_kbo = "ordering.derived_ho_kbo", `Quick, fun () ->
   (* alphabetical precedence, h has weight 2, all other symbols weight 1 *)
   let weight id = (if id=h_ then Precedence.Weight.add Precedence.Weight.one Precedence.Weight.one else Precedence.Weight.one) in
   let ord = O.derived_ho_kbo ~ignore_quans_under_lam:true
-      (Precedence.create ~weight Precedence.Constr.alpha [a_; b_; c_; f_; g_; h_]) in
+      (Precedence.create ~weight Precedence.Constr.alpha [a_; b_; c_; d_; e_; f_; g_; h_]) in
   let compare = O.compare ord in
 
   (* b > a *)
@@ -389,7 +391,7 @@ let test_derived_ho_kbo = "ordering.derived_ho_kbo", `Quick, fun () ->
 let test_lambdafree_kbo = "ordering.lambdafree_kbo", `Quick, fun () ->
   (* alphabetical precedence, h has weight 2, all other symbols weight 1*)
   let weight id = (if id=h_ then Precedence.Weight.add Precedence.Weight.one Precedence.Weight.one else Precedence.Weight.one) in
-  let ord = O.lambdafree_kbo (Precedence.create ~weight Precedence.Constr.alpha [a_; b_; c_; f_; g_; h_]) in
+  let ord = O.lambdafree_kbo (Precedence.create ~weight Precedence.Constr.alpha [a_; b_; c_; d_; e_; f_; g_; h_]) in
   let compare = O.compare ord in
 
   (* h (x y) > f y (x a) *)
@@ -439,7 +441,7 @@ let test_lambda_kbo = "ordering.lambda_kbo", `Quick, fun () ->
   (* alphabetical precedence, h has weight 2, all other symbols weight 1 *)
   let weight id = (if id=h_ then Precedence.Weight.add Precedence.Weight.one Precedence.Weight.one else Precedence.Weight.one) in
   let ord = O.lambda_kbo
-      (Precedence.create ~weight Precedence.Constr.alpha [a_; b_; c_; f_; g_; h_]) in
+      (Precedence.create ~weight Precedence.Constr.alpha [a_; b_; c_; d_; e_; f_; g_; h_]) in
   let compare = O.compare ord in
 
   (* b > a *)
@@ -482,6 +484,16 @@ let test_lambda_kbo = "ordering.lambda_kbo", `Quick, fun () ->
   let z = Term.var (HVar.fresh ~ty:(Type.arrow [Type.arrow [ty] ty] ty) ()) in
   Alcotest.(check comp_test) "z h <=>? z f"
     Comparison.Nonstrict.Incomparable (compare (Term.app z [h]) (Term.app z [f]));
+
+  (* z b c e >= z a c d *)
+  let a = Term.const ~ty a_ in
+  let b = Term.const ~ty b_ in
+  let c = Term.const ~ty c_ in
+  let d = Term.const ~ty d_ in
+  let e = Term.const ~ty e_ in
+  let z = Term.var (HVar.fresh ~ty:(Type.arrow [ty; ty; ty] ty) ()) in
+  Alcotest.(check comp_test) "z b c e >= z a c d"
+    Comparison.Nonstrict.Geq (compare (Term.app z [b; c; e]) (Term.app z [a; c; d]));
 
   (* z b a <=>? z a b *)
   let a = Term.const ~ty a_ in
