@@ -818,6 +818,11 @@ module Polynomial = struct
 
   let equal unk1 (unk2 : unknown) = (compare unk2 unk1 = 0)
 
+  let hash_unknown = function
+    | EtaUnknown var -> HVar.hash var
+    | WeightUnknown t -> Term.hash t
+    | CoeffUnknown (t, i) -> Term.hash t + i + 1
+
   let pp_unknown out = function
     | EtaUnknown var ->
       Format.pp_print_string out "h_{";
@@ -834,8 +839,14 @@ module Polynomial = struct
       Format.pp_print_int out i;
       Format.pp_print_string out "}"
 
+  module H = CCHashtbl.Make(struct
+      type t = unknown list
+      let equal = CCList.equal equal
+      let hash = Hash.list hash_unknown
+    end)
+
   type polynomial = {
-    mutable monomials : (unknown list * W.t) list;
+    mutable hashtbl : W.t H.t;
     mutable pos_counter : int;
     mutable neg_counter : int;
   }
@@ -850,9 +861,12 @@ module Polynomial = struct
     else if sign < 0 then poly.neg_counter <- poly.neg_counter + k
 
   let create_zero () =
-    {monomials = [];
+    {hashtbl = H.create 16;
      pos_counter = 0;
      neg_counter = 0}
+
+  let is_zero poly =
+    poly.pos_counter + poly.neg_counter = 0
 
   let all_coeffs_nonnegative poly =
     poly.neg_counter = 0
@@ -863,36 +877,40 @@ module Polynomial = struct
   let add_monomial poly coeff unks =
     if coeff != W.zero then (
       let key = mk_key unks in
-      match List.assoc_opt key poly.monomials with
+      match H.find_opt poly.hashtbl key with
       | None ->
-        poly.monomials <- (key, coeff) :: poly.monomials;
+        H.add poly.hashtbl key coeff;
         incr_counter poly (W.sign coeff) (+1)
       | Some old_coeff ->
-        let coeff' = W.add old_coeff coeff in
-        poly.monomials <- List.remove_assoc key poly.monomials;
-        if coeff' <> W.zero then
-          poly.monomials <- (key, coeff') :: poly.monomials;
+        let sum = W.add old_coeff coeff in
+        if sum = W.zero then
+          H.remove poly.hashtbl key
+        else
+          H.replace poly.hashtbl key sum;
         incr_counter poly (W.sign old_coeff) (-1);
-        incr_counter poly (W.sign coeff') (+1)
+        incr_counter poly (W.sign sum) (+1)
     )
 
   let add poly1 poly2 =
-    List.iter (fun (key, coeff) -> add_monomial poly1 coeff key) poly2.monomials
+    if not (is_zero poly2) then
+      H.iter (fun key coeff -> add_monomial poly1 coeff key) poly2.hashtbl
 
   let multiply_unknowns poly unks =
     if not (CCList.is_empty unks) then
-      poly.monomials <-
-        List.map (fun (key, coeff) -> (mk_key (List.rev_append unks key), coeff))
-          poly.monomials
+      let old_hashtbl = poly.hashtbl in
+      poly.hashtbl <- H.create 16;
+      H.iter (fun key coeff ->
+          H.add poly.hashtbl (mk_key (List.rev_append unks key)) coeff)
+        old_hashtbl
 
   let constant_monomial poly =
-    match List.assoc_opt [] poly.monomials with
+    match H.find_opt poly.hashtbl [] with
     | None -> W.zero
     | Some coeff -> coeff
 
   let pp out poly =
     let first = ref true in
-    List.iter (fun (key, coeff) ->
+    H.iter (fun key coeff ->
         if !first then first := false else Format.pp_print_string out " + ";
         Format.pp_print_string out "(";
         W.pp out coeff;
@@ -902,7 +920,7 @@ module Polynomial = struct
           CCList.pp ~pp_sep:(fun out () -> Format.pp_print_string out "*")
             pp_unknown out key
         ))
-      poly.monomials;
+      poly.hashtbl;
     if !first then Format.pp_print_string out "0";
     CCFormat.printf " [%d %d]" poly.pos_counter poly.neg_counter
 end
