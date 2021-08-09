@@ -971,13 +971,10 @@ module LambdaKBO : ORD = struct
     let (hd, (_, args)) = break_term_up t in
     match T.view hd with
     | AppBuiltin (b, bargs) ->
-      (* We give a weight of omega to quantifiers under lambdas as an attempt to
-         honor the desideratum that a quantified formula should be larger than
-         its instances. *)
-      add_monomial w sign
-        (if CCList.is_empty bound_tys && is_quantifier b then W.omega
-         else W.one)
-        [];
+      (* We give a weight of omega to quantifiers to partly offer the
+         desideratum that a quantified formula should be larger than its
+         instances. *)
+      add_monomial w sign (if is_quantifier b then W.omega else W.one) [];
       add_weights_of w bargs;
       add_weights_of w args
     | DB i ->
