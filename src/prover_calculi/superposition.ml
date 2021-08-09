@@ -1691,12 +1691,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           && info.is_pred_var_eq_fact 
           && C.proof_depth info.clause < 2
           && not (T.is_true_or_false t)) ||
-        not (Comp.is_Lt_or_Leq (O.compare ord
-          (S.FO.apply renaming subst (s, info.scope))
-          (S.FO.apply renaming subst (t, info.scope)))
-        && CCList.for_all (fun (c, i) -> i = idx) (C.selected_lits info.clause)
-        && CCList.is_empty (C.bool_selected info.clause)
-        && C.is_maxlit (info.clause,info.scope) subst ~idx))
+        (not (Comp.is_Lt_or_Leq (O.compare ord
+           (S.FO.apply renaming subst (s, info.scope))
+           (S.FO.apply renaming subst (t, info.scope))))
+         && CCList.for_all (fun (c, i) -> i = idx) (C.selected_lits info.clause)
+         && CCList.is_empty (C.bool_selected info.clause)
+         && C.is_maxlit (info.clause,info.scope) subst ~idx))
     then (
       let subst_is_ho = 
         Subst.codomain subst
