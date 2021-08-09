@@ -328,14 +328,15 @@ module Make(E : Map.OrderedType) = struct
 
   let compare_partial_nonstrict f m1 m2 =
     let met_geq_or_leq = ref false in
-    match do_compare_partial_strict ~met_geq_or_leq f m1 m2, !met_geq_or_leq with
+    let cmp = do_compare_partial_strict ~met_geq_or_leq f m1 m2 in
+    match cmp, !met_geq_or_leq with
     | Comparison.Nonstrict.Incomparable, true ->
       begin match do_geq_partial_slow f m1 m2 with
         | Comparison.Nonstrict.Incomparable ->
           Comparison.Nonstrict.opp (do_geq_partial_slow f m2 m1)
         | cmp -> cmp
       end
-    | cmp, _ -> cmp
+    | _, _ -> cmp
 
   let compare_partial f m1 m2 =
     Comparison.of_nonstrict (compare_partial_nonstrict (fun k1 k2 ->

@@ -462,11 +462,11 @@ module Focus = struct
     | Right (_, m, mf) ->
       let t = MF.term mf in
       Iter.for_all
-        (fun t' -> Ordering.compare ord t t' = Comparison.Nonstrict.Gt)
+        (fun t' -> Comparison.is_Gt_or_Geq (Ordering.compare ord t t'))
         (M.Seq.terms m)
       &&
       Iter.for_all
-        (fun t' -> Ordering.compare ord t t' = Comparison.Nonstrict.Gt)
+        (fun t' -> Comparison.is_Gt_or_Geq (Ordering.compare ord t t'))
         (MF.rest mf |> M.Seq.terms)
 
   let map_lit ~f_m ~f_mf lit = match lit with

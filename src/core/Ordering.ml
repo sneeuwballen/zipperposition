@@ -797,7 +797,7 @@ module LambdaFreeKBOCoeff : ORD = struct
 end
 
 (* This imperative polynomial data structure is designed to offer good
-   algorithmic complexity. *)
+   performance. *)
 module Polynomial = struct
   type unknown =
     | EtaUnknown of Type.t HVar.t  (* h *)
