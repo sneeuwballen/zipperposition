@@ -968,6 +968,12 @@ module LambdaKBO : ORD = struct
       WH.add weight_id_hashtbl w id;
       id
 
+  (* The ordering might flip if one eta-reduced side is a lambda-expression. *)
+  let wont_flip t0 s0 =
+    (not (T.is_fun t0) && not (T.is_fun s0)) ||
+    (let t = Lambda.eta_reduce t0 and s = Lambda.eta_reduce s0 in
+     not (T.is_fun t) && not (T.is_fun s))
+
   let partition_leading p =
     let rec part acc xs =
       match xs with
@@ -980,6 +986,27 @@ module LambdaKBO : ORD = struct
     match T.view u with
     | T.App (hd, all_args) -> (hd, partition_leading Term.is_type all_args)
     | _ -> (u, ([], []))
+
+  let mk_placeholder_var ty var =
+    Term.var (HVar.cast ~ty var)
+
+  let rec normalize_consts ~prec t = match T.view t with
+    | AppBuiltin (b, bargs) ->
+      Term.app_builtin ~ty:(Term.ty t) b
+        (List.map (normalize_consts ~prec) bargs)
+    | Const fid ->
+      let fid' = id_of_weight (Prec.weight prec fid) in
+      Term.const ~ty:(Term.ty t) fid'
+    | Fun (ty, body) -> Term.fun_ ty (normalize_consts ~prec body)
+    | App (s, ts) ->
+      Term.app (normalize_consts ~prec s) (List.map (normalize_consts ~prec) ts)
+    | _ -> t
+
+  let categorize_var_arg var (some_args, extra_args) arg arg_ty =
+    if Type.is_var arg_ty || Type.is_fun arg_ty then
+      (arg :: some_args, extra_args)
+    else
+      (mk_placeholder_var arg_ty var :: some_args, arg :: extra_args)
 
   let rec add_weight_of ~prec bound_tys w sign t =
     let add_weights_of w =
@@ -1010,42 +1037,23 @@ module LambdaKBO : ORD = struct
         add_monomial w sign W.one [];
         add_monomial w sign W.one [Polynomial.WeightUnknown hd]
       ) else (
-        let mk_placeholder_var ty =
-          Term.var (HVar.cast ~ty var)
-        in
-        let rec normalize_consts t = match T.view t with
-          | AppBuiltin (b, bargs) ->
-            Term.app_builtin ~ty:(Term.ty t) b (List.map normalize_consts bargs)
-          | Const fid ->
-            let fid' = id_of_weight (Prec.weight prec fid) in
-            Term.const ~ty:(Term.ty t) fid'
-          | Fun (ty, body) -> Term.fun_ ty (normalize_consts body)
-          | App (s, ts) ->
-            Term.app (normalize_consts s) (List.map normalize_consts ts)
-          | _ -> t
-        in
-        let categorize_var_arg (some_args, extra_args) arg arg_ty =
-          if Type.is_var arg_ty || Type.is_fun arg_ty then
-            (normalize_consts arg :: some_args, extra_args)
-          else
-            (mk_placeholder_var arg_ty :: some_args,
-             arg :: extra_args)
-        in
         let (arg_tys, _) = Type.open_fun (Term.ty hd) in
         let (some_args, extra_args) =
-          List.fold_left2 categorize_var_arg ([], []) args arg_tys
+          List.fold_left2 (categorize_var_arg var) ([], []) args arg_tys
         in
-        let var_some_args = T.app hd some_args in
+        let some_normal_args = List.map (normalize_consts ~prec) some_args in
+        let var_some_normal_args = T.app hd some_normal_args in
         let add_weight_of_extra_arg i arg =
           let w' = Polynomial.create_zero () in
           add_weight_of ~prec bound_tys w' sign arg;
           add_monomial w' (-1 * sign) W.one [];
           Polynomial.multiply_unknowns w'
-            [Polynomial.CoeffUnknown (var_some_args, i + 1)];
+            [Polynomial.CoeffUnknown (var_some_normal_args, i + 1)];
           Polynomial.add w w'
         in
         add_monomial w sign W.one [];
-        add_monomial w sign W.one [Polynomial.WeightUnknown var_some_args];
+        add_monomial w sign W.one
+          [Polynomial.WeightUnknown var_some_normal_args];
         List.iteri add_weight_of_extra_arg extra_args
       )
     | Const fid ->
@@ -1141,30 +1149,30 @@ module LambdaKBO : ORD = struct
       if CCList.is_empty t_args then
         (w, Nonstrict.Eq)
       else (
-        let categorize_var_arg (some_args, extra_args) arg arg_ty =
-          if Type.is_var arg_ty || Type.is_fun arg_ty then
-            (arg :: some_args, extra_args)
-          else
-            (some_args, arg :: extra_args)
-        in
         let (arg_tys, _) = Type.open_fun (Term.ty t_hd) in
         let (some_t_args, extra_t_args) =
-          List.fold_left2 categorize_var_arg ([], []) t_args arg_tys
-        and (some_s_args, extra_s_args) =
-          List.fold_left2 categorize_var_arg ([], []) s_args arg_tys
+          List.fold_left2 (categorize_var_arg y) ([], []) t_args arg_tys
         in
-        if CCList.equal T.equal some_t_args some_s_args then
-          let var_some_args = T.app t_hd some_t_args in
+        let (some_s_args, extra_s_args) =
+          List.fold_left2 (categorize_var_arg y) ([], []) s_args arg_tys
+        in
+        let some_normal_t_args = List.map (normalize_consts ~prec) some_t_args
+        and some_normal_s_args = List.map (normalize_consts ~prec) some_s_args
+        in
+        if CCList.equal T.equal some_normal_t_args some_normal_s_args
+           && CCList.for_all2 wont_flip some_t_args some_s_args then
+          let var_some_normal_args = T.app t_hd some_normal_t_args in
           let (arg_ws, cmp) =
             cw_ext_data (process_terms ~prec bound_tys)
-              extra_t_args extra_s_args
+              (some_t_args @ extra_t_args) (some_s_args @ extra_s_args)
           in
+          let extra_arg_ws = CCList.drop (List.length some_t_args) arg_ws in
           let add_weight_of_extra_arg i arg_w =
             Polynomial.multiply_unknowns arg_w
-              [Polynomial.CoeffUnknown (var_some_args, i + 1)];
+              [Polynomial.CoeffUnknown (var_some_normal_args, i + 1)];
             Polynomial.add w arg_w
           in
-          List.iteri add_weight_of_extra_arg arg_ws;
+          List.iteri add_weight_of_extra_arg extra_arg_ws;
           consider_weight w cmp
         else
           consider_weights_of ~prec bound_tys t s Nonstrict.Incomparable
@@ -1224,20 +1232,21 @@ module LambdaKBO : ORD = struct
     ZProf.exit_prof prof_lambda_kbo;
     cmp
 
-  (* The ordering might flip if one side is a lambda-expression *)
-  let might_flip _ t s = T.is_fun t || T.is_fun s
+  let might_flip _ t s = not (wont_flip t s)
 end
 
 (** {2 Value interface} *)
 
 let dummy_cache_ = CCCache.dummy
 
-let map f { cache_compare=_; compare; prec; name; might_flip; cache_might_flip=_; monotonic } =
+let map2 f g { cache_compare=_; compare; prec; name; might_flip; cache_might_flip=_; monotonic } =
   let cache_compare = mk_cache 256 in
   let cache_might_flip = mk_cache 256 in
   let compare prec a b = CCCache.with_cache cache_compare (fun (a, b) -> compare prec (f a) (f b)) (a, b) in
-  let might_flip prec a b = CCCache.with_cache cache_might_flip (fun (a, b) -> might_flip prec (f a) (f b)) (a, b) in
+  let might_flip prec a b = CCCache.with_cache cache_might_flip (fun (a, b) -> might_flip prec (g a) (g b)) (a, b) in
   { cache_compare; compare; prec; name; might_flip; cache_might_flip; monotonic }
+
+let map f ord = map2 f f ord
 
 let derived_ho_kbo ~ignore_quans_under_lam prec =
   let module KBO = MakeKBO(struct 
@@ -1350,11 +1359,15 @@ let lambda_kbo prec =
   let cache_might_flip = mk_cache 256 in
   let might_flip prec a b = CCCache.with_cache cache_might_flip
       (fun (a, b) -> LambdaKBO.might_flip prec a b) (a, b) in
-  let normalize t =
+  let normalize_cmp t =
     if Term.is_fo_term t then t else Lambda.eta_expand (Lambda.snf t)
   in
+  let normalize_flip t =
+    if Term.is_fo_term t then t else Lambda.snf t
+  in
   let monotonic = false in
-  map normalize { cache_compare; compare; name=LambdaKBO.name; prec; might_flip; cache_might_flip; monotonic }
+  map2 normalize_cmp normalize_flip
+    { cache_compare; compare; name=LambdaKBO.name; prec; might_flip; cache_might_flip; monotonic }
 
 let none =
   let compare _ t1 t2 = if T.equal t1 t2 then Nonstrict.Eq else Incomparable in

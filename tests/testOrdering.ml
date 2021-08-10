@@ -471,12 +471,12 @@ let test_lambda_kbo = "ordering.lambda_kbo", `Quick, fun () ->
   Alcotest.(check comp_test) "z b >= z a"
     Comparison.Nonstrict.Geq (compare (Term.app z [b]) (Term.app z [a]));
 
-  (* z g <=>? z f (could be improved to >=) *)
+  (* z g >= z f *)
   let f = Term.const ~ty:(Type.arrow [ty] ty) f_ in
   let g = Term.const ~ty:(Type.arrow [ty] ty) g_ in
   let z = Term.var (HVar.fresh ~ty:(Type.arrow [Type.arrow [ty] ty] ty) ()) in
-  Alcotest.(check comp_test) "z g <=>? z f"
-    Comparison.Nonstrict.Incomparable (compare (Term.app z [g]) (Term.app z [f]));
+  Alcotest.(check comp_test) "z g >= z f"
+    Comparison.Nonstrict.Geq (compare (Term.app z [g]) (Term.app z [f]));
 
   (* z h <=>? z f (due to weight difference) *)
   let f = Term.const ~ty:(Type.arrow [ty] ty) f_ in
