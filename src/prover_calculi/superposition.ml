@@ -385,7 +385,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             (T.is_appbuiltin l || (T.is_appbuiltin r && not @@ T.is_true_or_false r) ) then idx
         else (
           begin match Ordering.compare ord l r with
-            | Comp.Nonstrict.Gt | Geq ->
+            | Comp.Gt | Geq ->
               f idx (l,r,true,c)
             | Lt | Leq ->
               f idx (r,l,true,c)
@@ -2181,7 +2181,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let set' = match C.lits given with
       | [|Lit.Equation (l,r,true) |] ->
         begin match Ordering.compare ord l r with
-          | Comp.Nonstrict.Gt | Geq -> recurse ~oriented:true set l r
+          | Comp.Gt | Geq -> recurse ~oriented:true set l r
           | Lt | Leq -> recurse ~oriented:true set r l
           | _ ->
             let set' = recurse ~oriented:false set l r in

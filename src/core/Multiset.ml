@@ -188,7 +188,7 @@ module Make(E : Map.OrderedType) = struct
         begin match maxs1, maxs2 with
           | [], [] ->
             if met_gt || met_lt (* can't be equal? *)
-            then Comparison.Nonstrict.Incomparable
+            then Comparison.Incomparable
             else Eq
           | [], _ -> Lt
           | _, [] -> Gt
@@ -206,7 +206,7 @@ module Make(E : Map.OrderedType) = struct
         check_left ~met_gt ~met_lt ~maxs1:((x1,n1) :: maxs1) m1' seen2
       | (x2,n2)::m2' ->
         begin match f x1 x2 with
-          | Comparison.Nonstrict.Eq ->
+          | Comparison.Eq ->
             let c = Z.compare n1 n2 in
             if c < 0
             then (* remove x1 *)
@@ -256,7 +256,7 @@ module Make(E : Map.OrderedType) = struct
           let rec find_mate_for_x2 seen1 m1 = match m1 with
             | [] -> false
             | (x1 :: m1') ->
-              if f x1 x2 = Comparison.Nonstrict.Geq
+              if f x1 x2 = Comparison.Geq
                   && find_mates (List.rev_append seen1 m1') m2' then
                 true
               else
@@ -283,7 +283,7 @@ module Make(E : Map.OrderedType) = struct
       | [] ->
         if find_geq_mates f (list_of_coeffs left1) (list_of_coeffs left2) then
           if met_gt then  (* any [m2] element strictly dominated? *)
-            Comparison.Nonstrict.Gt
+            Comparison.Gt
           else
             Geq
         else
@@ -305,7 +305,7 @@ module Make(E : Map.OrderedType) = struct
         check_left ~met_gt ~left1:left1' m1' seen2
       | (x2,n2)::m2' ->
         begin match f x1 x2 with
-          | Comparison.Nonstrict.Eq ->
+          | Comparison.Eq ->
             let c = Z.compare n1 n2 in
             if c < 0
             then (* remove x1 *)
@@ -330,10 +330,10 @@ module Make(E : Map.OrderedType) = struct
     let met_geq_or_leq = ref false in
     let cmp = do_compare_partial_strict ~met_geq_or_leq f m1 m2 in
     match cmp, !met_geq_or_leq with
-    | Comparison.Nonstrict.Incomparable, true ->
+    | Comparison.Incomparable, true ->
       begin match do_geq_partial_slow f m1 m2 with
-        | Comparison.Nonstrict.Incomparable ->
-          Comparison.Nonstrict.opp (do_geq_partial_slow f m2 m1)
+        | Comparison.Incomparable ->
+          Comparison.opp (do_geq_partial_slow f m2 m1)
         | cmp -> cmp
       end
     | _, _ -> cmp
@@ -377,7 +377,7 @@ module Make(E : Map.OrderedType) = struct
         let n' =
           M.fold
             (fun y n' acc -> match f x y with
-               | Comparison.Nonstrict.Lt | Leq -> raise Exit
+               | Comparison.Lt | Leq -> raise Exit
                | Eq ->
                  (* merge [x] and [y] together *)
                  m := M.remove y !m;

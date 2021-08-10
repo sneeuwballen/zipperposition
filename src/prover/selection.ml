@@ -339,7 +339,7 @@ let e_sel6 ~blocker ~ord lits =
   let is_oriented lit = 
     match lit with
     | Lit.Equation(l,r,_) ->
-      Ordering.compare ord l r != Comparison.Nonstrict.Incomparable
+      Ordering.compare ord l r != Comparison.Incomparable
     | _ -> true in
   let chooser (i,l) =
     (if Lit.is_positivoid l then 1 else 0),
@@ -426,7 +426,7 @@ let e_sel11 ~blocker ~ord lits =
   | Lit.Equation(lhs,rhs,_) as l when Lit.is_negativoid l ->
     let cmp_res = Ordering.compare ord lhs rhs in
     (match cmp_res with
-     | Comparison.Nonstrict.Gt | Geq -> Term.ho_weight lhs
+     | Comparison.Gt | Geq -> Term.ho_weight lhs
      | Lt | Leq -> Term.ho_weight rhs
      | _ -> Term.ho_weight lhs + Term.ho_weight rhs)
   | _ -> max_int in
@@ -636,7 +636,7 @@ let pos_e_sel1 ~blocker ~ord lits =
     (Lit.is_positivoid l,
      (match l with
      | Literal.Equation(lhs,rhs,_) -> 
-       Ordering.compare ord lhs rhs == Comparison.Nonstrict.Incomparable
+       Ordering.compare ord lhs rhs == Comparison.Incomparable
      | _ -> true),
      Lit.ho_weight l)
   in

@@ -225,7 +225,7 @@ module Make(C : Clause_intf.S) = struct
               let t_w = if Lit.is_positivoid lit then pos_m *. t_w else t_w in
               let t_w = if CCBV.get max_lits i then max_l_mul *. t_w else t_w in
               let ordered =
-                Ordering.compare ord l r != Comparison.Nonstrict.Incomparable in
+                Ordering.compare ord l r != Comparison.Incomparable in
               t_w *. (if not ordered then unord_m else 1.0)
             | _ -> 1.0 in
           sum +. w
@@ -258,11 +258,11 @@ module Make(C : Clause_intf.S) = struct
               let term_w = if Lit.is_positivoid lit then pterm_w else nterm_w in
               let ord_side = Ordering.compare ord l r in
               let l_mul = match ord_side with
-                | Comparison.Nonstrict.Gt | Geq | Incomparable -> max_t_m
+                | Comparison.Gt | Geq | Incomparable -> max_t_m
                 | _ -> 1.0
               in
               let r_mul = match ord_side with
-                | Comparison.Nonstrict.Lt | Leq | Incomparable -> max_t_m
+                | Comparison.Lt | Leq | Incomparable -> max_t_m
                 | _ -> 1.0
               in
               let eq_inc = 
@@ -456,7 +456,7 @@ module Make(C : Clause_intf.S) = struct
           match lit with 
           | Literal.Equation(lhs,rhs,_) ->
             begin match Ordering.compare (C.Ctx.ord ()) lhs rhs with 
-            | Comparison.Nonstrict.Gt | Geq ->
+            | Comparison.Gt | Geq ->
               t_weight ~mul:max_term_mul lhs + t_weight ~mul:1.0 rhs
             | Lt | Leq ->
               t_weight ~mul:max_term_mul rhs + t_weight ~mul:1.0 lhs
@@ -541,7 +541,7 @@ module Make(C : Clause_intf.S) = struct
 
       let mul_max_t (l,w_l) (r,w_r) =
         match Ordering.compare ord l r with
-        | Comparison.Nonstrict.Incomparable ->
+        | Comparison.Incomparable ->
           (max_t_mul *. float_of_int w_l) +. max_t_mul *. float_of_int w_r
         | Gt | Geq ->
           (max_t_mul *. float_of_int w_l) +. float_of_int w_r
@@ -850,11 +850,11 @@ module Make(C : Clause_intf.S) = struct
                 Term.weight ~var:vw ~sym:(fun id -> ID.Tbl.get_or _f_weights ~default:!_default id) t in
             let ord_side = Ordering.compare ord l r in
             let l_mul = match ord_side with
-              | Comparison.Nonstrict.Gt | Geq | Incomparable -> max_t_mul
+              | Comparison.Gt | Geq | Incomparable -> max_t_mul
               | _ -> 1.0
             in
             let r_mul = match ord_side with
-              | Comparison.Nonstrict.Lt | Leq | Incomparable -> max_t_mul
+              | Comparison.Lt | Leq | Incomparable -> max_t_mul
               | _ -> 1.0
             in
             let t_w = l_mul *. term_w () l +. r_mul *. term_w () r in
@@ -877,11 +877,11 @@ module Make(C : Clause_intf.S) = struct
             let tw t = float_of_int (PW.calc_pref_weight t) in
             let ord_side = Ordering.compare ord l r in
             let l_mul = match ord_side with
-              | Comparison.Nonstrict.Gt | Geq | Incomparable -> max_t_mul
+              | Comparison.Gt | Geq | Incomparable -> max_t_mul
               | _ -> 1.0
             in
             let r_mul = match ord_side with
-              | Comparison.Nonstrict.Lt | Leq | Incomparable -> max_t_mul
+              | Comparison.Lt | Leq | Incomparable -> max_t_mul
               | _ -> 1.0
             in
             let t_w = l_mul *. (tw l) +. r_mul *. (tw r)in

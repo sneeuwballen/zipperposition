@@ -12,7 +12,7 @@ let m_test = Alcotest.testable (M.pp Fmt.int) M.equal
 let z_test = Alcotest.testable Z.pp_print Z.equal
 
 let f x y =
-  if x = y then Comparison.Nonstrict.Eq
+  if x = y then Comparison.Eq
   else if x < y then Lt
   else Gt
 
@@ -23,8 +23,8 @@ let test_max = "multiset.max", `Quick, fun()->
 let test_compare = "multiset.compare", `Quick, fun()->
   let m1 = M.of_list [1;1;2;3] in
   let m2 = M.of_list [1;2;2;3] in
-  Alcotest.(check (module Comparison.Nonstrict)) "must be lt"
-    Comparison.Nonstrict.Lt (M.compare_partial_nonstrict f m1 m2);
+  Alcotest.(check (module Comparison)) "must be lt"
+    Comparison.Lt (M.compare_partial_nonstrict f m1 m2);
   Alcotest.(check bool) "ord" true (M.compare m1 m2 < 0);
   ()
 
@@ -59,8 +59,8 @@ let gen1 =
 let compare_and_partial =
   (* "naive" comparison function (using the general ordering on multisets) *)
   let compare' m1 m2 =
-    let f x y = Comparison.Nonstrict.of_total (CCInt.compare x y) in
-    Comparison.Nonstrict.to_total (M.compare_partial_nonstrict f m1 m2)
+    let f x y = Comparison.of_total (CCInt.compare x y) in
+    Comparison.to_total (M.compare_partial_nonstrict f m1 m2)
   in
   let prop (m1,m2) =
     _sign (compare' m1 m2) = _sign (M.compare m1 m2)
@@ -71,17 +71,17 @@ let compare_and_partial =
 
 (* partial order for tests *)
 let partial_ord_nonstrict (x:int) y =
-  if x=y then Comparison.Nonstrict.Eq
+  if x=y then Comparison.Eq
   else if (x/5=y/5 && x mod 5 <> y mod 5) then Incomparable
-  else CCInt.compare (x/5) (y/5) |> Comparison.Nonstrict.of_total
+  else CCInt.compare (x/5) (y/5) |> Comparison.of_total
 
 let compare_partial_sym =
   let prop (m1,m2) =
     let c1 = M.compare_partial_nonstrict partial_ord_nonstrict m1 m2 in
-    let c2 =  Comparison.Nonstrict.opp (M.compare_partial_nonstrict partial_ord_nonstrict m2 m1) in
+    let c2 =  Comparison.opp (M.compare_partial_nonstrict partial_ord_nonstrict m2 m1) in
     if c1=c2 
     then true
-    else Q.Test.fail_reportf "comparison: %a vs %a" Comparison.Nonstrict.pp c1 Comparison.Nonstrict.pp c2
+    else Q.Test.fail_reportf "comparison: %a vs %a" Comparison.pp c1 Comparison.pp c2
   in
   QCheck.Test.make
     ~name:"multiset_compare_partial_sym" ~long_factor:3 ~count:13_000
@@ -93,9 +93,9 @@ let compare_partial_trans =
     let c2 = M.compare_partial_nonstrict partial_ord_nonstrict m2 m3 in
     let c3 = M.compare_partial_nonstrict partial_ord_nonstrict m1 m3 in
     begin match c1, c2, c3 with
-      | Comparison.Nonstrict.Incomparable, _, _
-      | _, Comparison.Nonstrict.Incomparable, _
-      | _, _, Comparison.Nonstrict.Incomparable
+      | Comparison.Incomparable, _, _
+      | _, Comparison.Incomparable, _
+      | _, _, Comparison.Incomparable
       | Leq, _, _
       | _, Leq, _
       | _, _, Leq
@@ -122,7 +122,7 @@ let compare_partial_trans =
       | Eq, Eq, (Lt | Gt)
         ->
         Q.Test.fail_reportf
-          "comp %a %a %a" Comparison.Nonstrict.pp c1 Comparison.Nonstrict.pp c2 Comparison.Nonstrict.pp c3
+          "comp %a %a %a" Comparison.pp c1 Comparison.pp c2 Comparison.pp c3
     end
   in
   QCheck.Test.make
@@ -146,7 +146,7 @@ let max_is_max =
   let gen = Q.(map M.of_list (list small_int)) in
   let gen = Q.set_print pp gen in
   let prop m =
-    let f x y = Comparison.Nonstrict.of_total (Pervasives.compare x y) in
+    let f x y = Comparison.of_total (Pervasives.compare x y) in
     let l = M.max f m |> M.to_list |> List.map fst in
     List.for_all (fun x -> M.is_max f x m) l
   in

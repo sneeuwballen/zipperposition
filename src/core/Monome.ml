@@ -271,13 +271,13 @@ let comparison m1 m2 =
       depends on the model/instance *)
   let m = difference m1 m2 in
   match is_const m, m.num.sign m.const with
-  | false, _ -> Comparison.Nonstrict.Incomparable
+  | false, _ -> Comparison.Incomparable
   | true, 0 -> Eq
   | true, n when n < 0 -> Lt
   | true, _ -> Gt
 
 let dominates ~strict m1 m2 = match comparison m1 m2 with
-  | Comparison.Nonstrict.Eq -> not strict
+  | Comparison.Eq -> not strict
   | Gt | Geq -> true
   | Lt | Leq | Incomparable -> false
 

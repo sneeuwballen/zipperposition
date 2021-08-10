@@ -81,7 +81,7 @@ let select_leftmost ~ord ~kind lits =
       | Lit.Equation(lhs,rhs,_) ->
         let in_literal = 
           match Ordering.compare ord lhs rhs with 
-          | Comparison.Nonstrict.Lt | Leq ->
+          | Comparison.Lt | Leq ->
             (aux_term ~top:true ~pos_builder:(PB.right pos_builder) rhs)
           | Gt | Geq ->
             (aux_term ~top:true ~pos_builder:(PB.left pos_builder) lhs)
@@ -133,7 +133,7 @@ let collect_green_subterms_ ~forbidden ~filter ~ord ~pos_builder t k =
         (* only going to the larger side of the (dis)equation *)
         let offset = List.length l - 2 in (*skipping possible tyarg*)
         (match Ordering.compare ord a b with 
-          | Comparison.Nonstrict.Lt | Leq ->
+          | Comparison.Lt | Leq ->
             aux_term ~top:false ~pos_builder:(PB.arg (inv_idx l (1+offset)) pos_builder) b k
           | Gt | Geq ->
             aux_term ~top:false ~pos_builder:(PB.arg (inv_idx l offset) pos_builder) a k
@@ -188,7 +188,7 @@ let get_selectable_w_ctx ~ord lits =
           let ctx = under_equiv_ctx in
           let offset = List.length l - 2 in (*skipping possible tyarg*)
           (match Ordering.compare ord a b with 
-            | Comparison.Nonstrict.Lt | Leq ->
+            | Comparison.Lt | Leq ->
               aux_term ~top:false ~pos_builder:(PB.arg (inv_idx l (1+offset)) pos_builder) b ctx (log_depth + 1) k
             | Gt | Geq ->
               aux_term ~top:false ~pos_builder:(PB.arg (inv_idx l offset) pos_builder) a ctx (log_depth + 1) k
@@ -234,7 +234,7 @@ let get_selectable_w_ctx ~ord lits =
                           (if Lit.is_positivoid lit then pos_ctx else neg_ctx) 
                        else under_equiv_ctx in
         begin match Ordering.compare ord lhs rhs with
-          | Comparison.Nonstrict.Lt | Leq ->
+          | Comparison.Lt | Leq ->
             selectable_with_ctx ~block_top:sign ~ord ~forbidden ~pos_builder:(PB.right pos_builder) rhs ctx_sign 0 k
           | Gt | Geq ->
             selectable_with_ctx ~block_top:sign ~ord ~forbidden ~pos_builder:(PB.left pos_builder) lhs ctx_sign 0 k

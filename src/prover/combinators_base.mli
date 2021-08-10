@@ -16,6 +16,6 @@ val abf : rules:(Term.t -> Term.t option) list -> Logtk.Lambda.term -> Term.t
 val comb2lam : Term.t -> Term.t
 val comb_normalize : Term.t -> Term.t CCOpt.t
 val cmp_by_max_weak_r_len :
-  Term.t -> Term.t -> Logtk.Comparison.Nonstrict.t * Term.t * Term.t
+  Term.t -> Term.t -> Logtk.Comparison.t * Term.t * Term.t
 
 val narrow: Term.t -> Term.t

@@ -5,8 +5,6 @@
 
 (** {2 Combined nonstrict-strict partial orders} *)
 
-module Nonstrict = struct
-
 type t = Lt | Leq | Eq | Geq | Gt | Incomparable
 
 type nonstrict_comparison = t
@@ -63,20 +61,18 @@ let (@>>) f g x y =
   | Leq -> merge_with_Leq (g x y)
   | cmp -> cmp
 
-end
-
 let is_Gt_or_Geq = function
-  | Nonstrict.Gt | Geq -> true
+  | Gt | Geq -> true
   | _ -> false
 
 let is_Gt_or_Geq_or_Eq = function
-  | Nonstrict.Gt | Geq | Eq -> true
+  | Gt | Geq | Eq -> true
   | _ -> false
 
 let is_Lt_or_Leq = function
-  | Nonstrict.Lt | Leq -> true
+  | Lt | Leq -> true
   | _ -> false
 
 let is_Lt_or_Leq_or_Eq = function
-  | Nonstrict.Lt | Leq | Eq -> true
+  | Lt | Leq | Eq -> true
   | _ -> false

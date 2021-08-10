@@ -22,7 +22,7 @@ type t
 
 type ordering = t
 
-val compare : t -> term -> term -> Comparison.Nonstrict.t
+val compare : t -> term -> term -> Comparison.t
 (** Compare two terms using the given ordering *)
 
 val might_flip : t -> term -> term -> bool
@@ -58,7 +58,7 @@ val derived_ho_kbo : ignore_quans_under_lam:bool -> Precedence.t -> t
 val derived_ho_rpo : Precedence.t -> t
 (** Higher-order recursive path ordering derived via an encoding *)
 
-val compose : (term -> term -> Comparison.Nonstrict.t * term * term) -> t -> t
+val compose : (term -> term -> Comparison.t * term * term) -> t -> t
 (** Takes a function that is going to be run before the chosen order and the
     order. For example, if the first argument returns Eq, then the order is
     determined by the second argument, and otherwise the result of the first

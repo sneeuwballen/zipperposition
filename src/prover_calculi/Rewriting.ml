@@ -219,7 +219,7 @@ module Make(E : Env_intf.S) = struct
       let s' = Subst.FO.apply renaming subst (s,sc_a) in
       let t' = Subst.FO.apply renaming subst (t,sc_a) in
       match Ordering.compare ord s' t' with
-      | Comparison.Nonstrict.Lt | Leq -> None
+      | Comparison.Lt | Leq -> None
       | _ ->
         Util.incr_stat stat_ctx_narrowing;
         rule_clauses

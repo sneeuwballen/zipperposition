@@ -547,12 +547,12 @@ let cmp_by_max_weak_r_len t1 t2 =
   let t1_len = max_weak_reduction_length add_pos_var ~state t1 in
   let t2_len = max_weak_reduction_length add_neg_var ~state t2 in
   if t1_len > t2_len then (
-    if state.neg_counter > 0 then return Comparison.Nonstrict.Incomparable
-    else return Comparison.Nonstrict.Gt
+    if state.neg_counter > 0 then return Comparison.Incomparable
+    else return Comparison.Gt
   ) else if t1_len < t2_len then (
-    if state.pos_counter > 0 then return Comparison.Nonstrict.Incomparable
-    else return Comparison.Nonstrict.Lt
-  ) else return Comparison.Nonstrict.Eq
+    if state.pos_counter > 0 then return Comparison.Incomparable
+    else return Comparison.Lt
+  ) else return Comparison.Eq
 
 (* Assumes beta-reduced, eta-short term *)
 let abf ~rules t =

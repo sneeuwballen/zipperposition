@@ -102,7 +102,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let ord = E.Ctx.ord () in
     (E.flex_get k_clausify_eq_max_nonint) ||
     (match Ordering.compare ord lhs rhs with
-    | Comparison.Nonstrict.Lt | Leq -> is_noninterpeted rhs
+    | Comparison.Lt | Leq -> is_noninterpeted rhs
     | Gt | Geq -> is_noninterpeted lhs
     | _ -> is_noninterpeted lhs || is_noninterpeted rhs)
 

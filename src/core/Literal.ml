@@ -657,7 +657,7 @@ let fold_terms ?(position=Position.stop) ?(vars=false) ?(var_args=true) ?(fun_bo
       (match hd, args with 
       | (Eq|Neq|Xor|Equiv), ([_;a;b]|[a;b]) ->
         (match Ordering.compare ord a b with 
-        | Comparison.Nonstrict.Lt | Leq -> Some [List.length args - 1]
+        | Comparison.Lt | Leq -> Some [List.length args - 1]
         | Gt | Geq -> Some [List.length args - 2]
         | _ -> None)
       | (ForallConst|ExistsConst), [_;_] ->
@@ -681,7 +681,7 @@ let fold_terms ?(position=Position.stop) ?(vars=false) ?(var_args=true) ?(fun_bo
           at_term ~pos:P.(append position (right stop)) r
         | `Max ->
           begin match Ordering.compare ord l r with
-            | Comparison.Nonstrict.Gt | Geq ->
+            | Comparison.Gt | Geq ->
               at_term ~pos:P.(append position (left stop)) l
             | Lt | Leq ->
               at_term ~pos:P.(append position (right stop)) r
@@ -838,7 +838,7 @@ module Comp = struct
 
   let _maxterms2 ~ord l r =
     match O.compare ord l r with
-    | C.Nonstrict.Gt | Geq -> [l]
+    | C.Gt | Geq -> [l]
     | Lt | Leq -> [r]
     | Eq -> [l]
     | Incomparable -> [l; r]
@@ -873,7 +873,7 @@ module Comp = struct
     | [] -> NoDominator met_geq_or_leq
     | t :: ts1 ->
       let cmps = List.map (fun y -> f t y) ts2 in
-      if List.for_all (fun cmp -> cmp = C.Nonstrict.Gt) cmps then
+      if List.for_all (fun cmp -> cmp = C.Gt) cmps then
         StrictDominator
       else if List.for_all C.is_Gt_or_Geq cmps then
         (match _find_dominators ~met_geq_or_leq f ts1 ts2 with
@@ -881,7 +881,7 @@ module Comp = struct
          | _ -> NonstrictDominator)
       else
         let met_geq_or_leq' = met_geq_or_leq
-          || List.exists (fun cmp -> cmp = C.Nonstrict.Geq || cmp = C.Nonstrict.Leq) cmps in
+          || List.exists (fun cmp -> cmp = C.Geq || cmp = C.Leq) cmps in
         _find_dominators ~met_geq_or_leq:met_geq_or_leq' f ts1 ts2
 
   let _cmp_by_maxterms ~ord l1 l2 =
@@ -891,7 +891,7 @@ module Comp = struct
           _find_dominators ~met_geq_or_leq:false f maxs2 maxs1 with
     | NoDominator met_geq_or_leq1, NoDominator met_geq_or_leq2 ->
       if met_geq_or_leq1 || met_geq_or_leq2 then
-        C.Nonstrict.Eq  (* check next criterion *)
+        C.Eq  (* check next criterion *)
       else
         let set1 = CCList.fold_right T.Set.add maxs1 T.Set.empty
         and set2 = CCList.fold_right T.Set.add maxs2 T.Set.empty in
@@ -912,7 +912,7 @@ module Comp = struct
     let p2 = is_positivoid l2 in
     match p1, p2 with
     | true, true
-    | false, false -> C.Nonstrict.Eq
+    | false, false -> C.Eq
     | true, false -> Lt
     | false, true -> Gt
 
@@ -930,7 +930,7 @@ module Comp = struct
       | Rat {Rat_lit.op=Rat_lit.Less; _} -> 21
       | Equation _ -> 30
     in
-    C.Nonstrict.of_total (Pervasives.compare (_to_int l1) (_to_int l2))
+    C.of_total (Pervasives.compare (_to_int l1) (_to_int l2))
 
   (* by multiset of terms *)
   let _cmp_by_term_multiset ~ord l1 l2 =
@@ -961,7 +961,7 @@ module Comp = struct
       assert (d1.AL.sign=d2.AL.sign);
       let c = Z.compare d1.AL.num d2.AL.num in
       if c <> 0 then
-        C.Nonstrict.of_total c  (* live in totally distinct Z/nZ *)
+        C.of_total c  (* live in totally distinct Z/nZ *)
       else if is_ground l1 && is_ground l2 then
         Incomparable
         (* TODO: Bezout-normalize, then actually compare Monomes. *)
@@ -978,7 +978,7 @@ module Comp = struct
       assert false
 
   let compare ~ord =
-    C.Nonstrict.(
+    C.(
       _cmp_by_maxterms ~ord @>>
       _cmp_by_polarity @>>
       _cmp_by_kind @>>
@@ -1268,7 +1268,7 @@ let is_pure_var lit =
 let max_term_positions ~ord = function
   | Equation (lhs, rhs, _) ->
     begin match Ordering.compare ord lhs rhs with 
-    | Comparison.Nonstrict.Gt | Geq -> Term.ho_weight lhs
+    | Comparison.Gt | Geq -> Term.ho_weight lhs
     | Lt | Leq -> Term.ho_weight rhs
     | _ -> Term.ho_weight lhs + Term.ho_weight rhs
     end

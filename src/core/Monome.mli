@@ -91,7 +91,7 @@ val sum_list : 'a t list -> 'a t
 (** Sum of a list.
     @raise Failure if the list is empty *)
 
-val comparison : 'a t -> 'a t -> Comparison.Nonstrict.t
+val comparison : 'a t -> 'a t -> Comparison.t
 (** Try to compare two monomes. They may not be comparable (ie on some
     points, or in some models, one will be bigger), but some pairs of
     monomes are:
@@ -316,7 +316,7 @@ module Int : sig
       @raise Invalid_argument if [t] does not belong to [m1] or [m2] *)
 
   val compare_nonstrict :
-    (term -> term -> Comparison.Nonstrict.t) -> t -> t -> Comparison.Nonstrict.t
+    (term -> term -> Comparison.t) -> t -> t -> Comparison.t
   (** Compare monomes as if they were multisets of terms, the coefficient
       in front of a term being its multiplicity. *)
 

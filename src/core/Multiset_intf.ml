@@ -123,34 +123,32 @@ module type S = sig
 
       In the following, the comparison function must be equality-compatible
       with [E.compare]. In other words, if [E.compare x y = 0] then
-      [f x y = Comparison.Nonstrict.Eq] must hold. *)
+      [f x y = Comparison.Eq] must hold. *)
 
   val compare : t -> t -> int
   (** Compare two multisets with the multiset extension of {!E.compare} *)
 
   val compare_partial_nonstrict :
-    (elt -> elt -> Comparison.Nonstrict.t) -> t -> t -> Comparison.Nonstrict.t
+    (elt -> elt -> Comparison.t) -> t -> t -> Comparison.t
   (** Compare two multisets with the multiset extension of the
       given ordering. This ordering is total iff the element
       ordering is. *)
 
-  val is_max : (elt -> elt -> Comparison.Nonstrict.t) -> elt -> t -> bool
+  val is_max : (elt -> elt -> Comparison.t) -> elt -> t -> bool
   (** Is the given element maximal (ie not dominated by any
       other element) within the multiset? *)
 
-  val max : (elt -> elt -> Comparison.Nonstrict.t) -> t -> t
+  val max : (elt -> elt -> Comparison.t) -> t -> t
   (** Maximal elements of the multiset, w.r.t the given ordering. *)
 
-  val max_seq :
-    (elt -> elt -> Comparison.Nonstrict.t) -> t -> (elt * Z.t) Iter.t
+  val max_seq : (elt -> elt -> Comparison.t) -> t -> (elt * Z.t) Iter.t
   (** Fold on maximal elements *)
 
-  val max_l : (elt -> elt -> Comparison.Nonstrict.t) -> elt list -> elt list
+  val max_l : (elt -> elt -> Comparison.t) -> elt list -> elt list
   (** Maximal elements of a list *)
 
   val compare_partial_nonstrict_l :
-    (elt -> elt -> Comparison.Nonstrict.t) ->
-    elt list -> elt list -> Comparison.Nonstrict.t
+    (elt -> elt -> Comparison.t) -> elt list -> elt list -> Comparison.t
   (** Compare two multisets represented as list of elements *)
 
   val pp : elt CCFormat.printer -> t CCFormat.printer

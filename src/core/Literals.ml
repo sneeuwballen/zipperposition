@@ -118,11 +118,11 @@ module MLI = Multiset.Make(struct
 
 let _compare_lit_with_idx ~ord (lit1,i1) (lit2,i2) =
   if i1 = i2
-  then Comparison.Nonstrict.Eq (* ignore collisions *)
+  then Comparison.Eq (* ignore collisions *)
   else (
     let c = Lit.Comp.compare ~ord lit1 lit2 in
     (* two occurrences of one lit should be incomparable (and therefore maximal) *)
-    if c = Comparison.Nonstrict.Eq then Incomparable
+    if c = Comparison.Eq then Incomparable
     else c
   )
 
@@ -348,7 +348,7 @@ let fold_eqn ?(both=true) ?sign ~ord ~eligible lits k =
       begin match lits.(i) with
         | Lit.Equation (l,r,_) when sign_ok sign ->
           begin match Ordering.compare ord l r with
-            | Comparison.Nonstrict.Gt | Geq ->
+            | Comparison.Gt | Geq ->
               k (l, r, sign, Position.(arg i @@ left @@ stop))
             | Lt | Leq ->
               k (r, l, sign, Position.(arg i @@ right @@ stop))
