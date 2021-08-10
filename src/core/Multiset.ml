@@ -266,18 +266,18 @@ module Make(E : Map.OrderedType) = struct
       in
       find_mates m1 m2
 
-  (* The code is based on that of [do_compare_partial_strict]. It is inpired by
+  (* The code is based on that of [do_compare_partial_strict]. It is inspired by
      Definition 2.2 of Thiemann, Allais, and Nagele, "On the formalization of
      termination techniques based on multiset orderings". Due to the algorithmic
-     complexity of the problem, this code is not designed to be complete.
+     complexity of the problem, this function is not designed to be complete.
 
      The multiset [m1] is partitioned into a set of "dominators" consisting of
      those elements that were found to strictly domiate a "dominated" element of
      [m2]. The remaining elements of [m1] and [m2] are put in [left1] and
-     [left2], and we must look for an injection from [left2] to [left1] such that
-     the element from [m2] is nonstrictly dominated. If this fails, we try to find
-     an injection between [m2] and [m1] instead. *)
-  let do_geq_partial_slow f m1 m2 =
+     [left2], and we must look for an injection from [left2] to [left1] such
+     that the element from [m2] is nonstrictly dominated. If this fails, we look
+     for an injection between [m2] and [m1] instead. *)
+  let do_geq_partial f m1 m2 =
     let m1, m2 = cancel_l (to_list m1) (to_list m2) in
     let rec check_left ~met_gt ~left1 see1 left2 = match see1 with
       | [] ->
@@ -331,9 +331,9 @@ module Make(E : Map.OrderedType) = struct
     let cmp = do_compare_partial_strict ~met_geq_or_leq f m1 m2 in
     match cmp, !met_geq_or_leq with
     | Comparison.Incomparable, true ->
-      begin match do_geq_partial_slow f m1 m2 with
+      begin match do_geq_partial f m1 m2 with
         | Comparison.Incomparable ->
-          Comparison.opp (do_geq_partial_slow f m2 m1)
+          Comparison.opp (do_geq_partial f m2 m1)
         | cmp -> cmp
       end
     | _, _ -> cmp
