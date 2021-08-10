@@ -999,9 +999,9 @@ module LambdaKBO : ORD = struct
     else
       (mk_placeholder_var arg_ty var :: some_args, arg :: extra_args)
 
-  let rec add_weight_of ~prec bound_tys w sign t =
+  let rec add_weight_of ~prec w sign t =
     let add_weights_of w =
-      List.iter (add_weight_of ~prec bound_tys w sign)
+      List.iter (add_weight_of ~prec w sign)
     in
     let add_eta_extra_of w ty = match Type.view ty with
       | Var var -> add_monomial w sign W.one [Polynomial.EtaUnknown var]
@@ -1022,7 +1022,7 @@ module LambdaKBO : ORD = struct
     | DB i ->
       add_monomial w sign W.one [];
       add_weights_of w args;
-      add_eta_extra_of w (List.nth bound_tys i)
+      add_eta_extra_of w (Term.ty hd)
     | Var var ->
       if CCList.is_empty args then (
         add_monomial w sign W.one [];
@@ -1036,7 +1036,7 @@ module LambdaKBO : ORD = struct
         let var_some_normal_args = T.app hd some_normal_args in
         let add_weight_of_extra_arg i arg =
           let w' = Polynomial.create_zero () in
-          add_weight_of ~prec bound_tys w' sign arg;
+          add_weight_of ~prec w' sign arg;
           add_monomial w' (-1 * sign) W.one [];
           Polynomial.multiply_unknowns w'
             [Polynomial.CoeffUnknown (var_some_normal_args, i + 1)];
@@ -1053,7 +1053,7 @@ module LambdaKBO : ORD = struct
       add_eta_extra_of w (Term.ty t)
     | Fun (ty, body) ->
       add_monomial w sign W.one [];
-      add_weight_of ~prec (ty :: bound_tys) w sign body
+      add_weight_of ~prec w sign body
     | App _ -> ()  (* impossible *)
 
   let length_lex_ext f ys xs =
@@ -1115,22 +1115,22 @@ module LambdaKBO : ORD = struct
      | Leq -> C.merge_with_Leq cmp
      | cmp' -> cmp')
 
-  let rec process_args ~prec bound_tys ts ss =
+  let rec process_args ~prec ts ss =
     let w = Polynomial.create_zero () in
     (* both comparisons are needed because connectives have variable arity *)
     if CCList.is_empty ts && CCList.is_empty ss then
       (w, C.Eq)
     else (
       let (ws, cmp) =
-        length_lex_ext_data (process_terms ~prec bound_tys) ts ss
+        length_lex_ext_data (process_terms ~prec) ts ss
       in
       let m = List.length ws in
       List.iter (Polynomial.add w) ws;
-      List.iter (add_weight_of ~prec bound_tys w (+1)) (CCList.drop m ts);
-      List.iter (add_weight_of ~prec bound_tys w (-1)) (CCList.drop m ss);
+      List.iter (add_weight_of ~prec w (+1)) (CCList.drop m ts);
+      List.iter (add_weight_of ~prec w (-1)) (CCList.drop m ss);
       consider_weight w cmp
     )
-  and process_terms ~prec bound_tys t s =
+  and process_terms ~prec t s =
     let (t_hd, (t_tyargs, t_args)) = break_term_up t in
     let (s_hd, (s_tyargs, s_args)) = break_term_up s in
     match T.view t_hd, T.view s_hd with
@@ -1154,7 +1154,7 @@ module LambdaKBO : ORD = struct
            && CCList.for_all2 wont_flip some_t_args some_s_args then
           let var_some_normal_args = T.app t_hd some_normal_t_args in
           let (arg_ws, cmp) =
-            cw_ext_data (process_terms ~prec bound_tys)
+            cw_ext_data (process_terms ~prec)
               (some_t_args @ extra_t_args) (some_s_args @ extra_s_args)
           in
           let extra_arg_ws = CCList.drop (List.length some_t_args) arg_ws in
@@ -1166,60 +1166,61 @@ module LambdaKBO : ORD = struct
           List.iteri add_weight_of_extra_arg extra_arg_ws;
           consider_weight w cmp
         else
-          consider_weights_of ~prec bound_tys t s C.Incomparable
+          consider_weights_of ~prec t s C.Incomparable
       )
     | Var _, AppBuiltin (b, _) ->
-      consider_weights_of ~prec bound_tys t s
+      consider_weights_of ~prec t s
         (if Builtin.as_int b = 0 then C.Geq else C.Incomparable)
     | AppBuiltin (b, _), Var _ ->
-      consider_weights_of ~prec bound_tys t s
+      consider_weights_of ~prec t s
         (if Builtin.as_int b = 0 then C.Leq else C.Incomparable)
     | Var _, _ | _, Var _ ->
-      consider_weights_of ~prec bound_tys t s C.Incomparable
+      consider_weights_of ~prec t s C.Incomparable
     | Fun (t_ty, t_body), Fun (s_ty, s_body) ->
       (match compare_types ~prec t_ty s_ty with
-       | Eq -> process_terms ~prec (t_ty :: bound_tys) t_body s_body
-       | cmp -> consider_weights_of ~prec bound_tys t s cmp)
+       | Eq -> process_terms ~prec t_body s_body
+       | cmp -> consider_weights_of ~prec t_body s_body cmp)
     | Fun _, (DB _|Const _|AppBuiltin _) ->
-      consider_weights_of ~prec bound_tys t s Gt
-    | DB _, Fun _ -> consider_weights_of ~prec bound_tys t s Lt
+      consider_weights_of ~prec t s Gt
+    | DB _, Fun _ -> consider_weights_of ~prec t s Lt
     | DB j, DB i ->
-      if j > i then consider_weights_of ~prec bound_tys t s Gt
-      else if j < i then consider_weights_of ~prec bound_tys t s Lt
-      else process_args ~prec bound_tys t_args s_args
-    | DB _, (Const _|AppBuiltin _) -> consider_weights_of ~prec bound_tys t s Gt
-    | Const _, (Fun _|DB _) -> consider_weights_of ~prec bound_tys t s Lt
+      if j > i then consider_weights_of ~prec t s Gt
+      else if j < i then consider_weights_of ~prec t s Lt
+      else process_args ~prec t_args s_args
+    | DB _, (Const _|AppBuiltin _) -> consider_weights_of ~prec t s Gt
+    | Const _, (Fun _|DB _) -> consider_weights_of ~prec t s Lt
     | Const gid, Const fid ->
       if ID.id gid = ID.id fid then
         match length_lex_ext (compare_type_terms ~prec) t_tyargs s_tyargs with
-        | Eq -> process_args ~prec bound_tys t_args s_args
-        | cmp -> consider_weights_of ~prec bound_tys t s cmp
+        | Eq -> process_args ~prec t_args s_args
+        | cmp -> consider_weights_of ~prec t s cmp
       else
-        consider_weights_of ~prec bound_tys t s
+        consider_weights_of ~prec t s
           (match Prec.compare prec gid fid with
            | 0 -> Incomparable
            | n when n > 0 -> Gt
            | _ -> Lt)
-    | Const _, AppBuiltin _ -> consider_weights_of ~prec bound_tys t s Gt
+    | Const _, AppBuiltin _ -> consider_weights_of ~prec t s Gt
     | AppBuiltin _, (Fun _|DB _|Const _) ->
-      consider_weights_of ~prec bound_tys t s Lt
+      consider_weights_of ~prec t s Lt
     | AppBuiltin (t_b, t_bargs), AppBuiltin (s_b, s_bargs) ->
       (match Builtin.compare t_b s_b with
-       | 0 -> process_args ~prec bound_tys (t_bargs @ t_tyargs @ t_args)
+       | 0 -> process_args ~prec (t_bargs @ t_tyargs @ t_args)
          (s_bargs @ s_tyargs @ s_args)
-       | n when n > 0 -> consider_weights_of ~prec bound_tys t s Gt
-       | _ -> consider_weights_of ~prec bound_tys t s Lt)
+       | n when n > 0 -> consider_weights_of ~prec t s Gt
+       | _ -> consider_weights_of ~prec t s Lt)
     | _, _ -> assert false
-  and consider_weights_of ~prec bound_tys t s cmp =
+  and consider_weights_of ~prec t s cmp =
     let w = Polynomial.create_zero () in
-    add_weight_of ~prec bound_tys w (+1) t;
-    add_weight_of ~prec bound_tys w (-1) s;
+    add_weight_of ~prec w (+1) t;
+    add_weight_of ~prec w (-1) s;
     consider_weight w cmp
 
   let compare_terms ~prec t s =
     ZProf.enter_prof prof_lambda_kbo;
-    let (_, cmp) = process_terms ~prec [] t s in
-    (* CCFormat.printf "KBO %a vs. %a ~> %a, %a" T.pp t T.pp s Polynomial.pp w Comparison.pp cmp; *)
+    (* CCFormat.printf "LambdaKBO@.%a@.vs.@.%a@." T.pp t T.pp s; *)
+    let (_ (* w *), cmp) = process_terms ~prec t s in
+    (* CCFormat.printf "LambdaKBO@.%a@.vs.@.%a@.%a@.%a@." T.pp t T.pp s Polynomial.pp w Comparison.pp cmp; *)
     ZProf.exit_prof prof_lambda_kbo;
     cmp
 
