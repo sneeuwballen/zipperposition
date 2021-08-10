@@ -993,7 +993,7 @@ module LambdaKBO : ORD = struct
       Term.app (normalize_consts ~prec s) (List.map (normalize_consts ~prec) ts)
     | _ -> t
 
-  let categorize_var_arg var (some_args, extra_args) arg arg_ty =
+  let categorize_var_arg var arg arg_ty (some_args, extra_args) =
     if Type.is_var arg_ty || Type.is_fun arg_ty then
       (arg :: some_args, extra_args)
     else
@@ -1030,7 +1030,7 @@ module LambdaKBO : ORD = struct
       ) else (
         let (arg_tys, _) = Type.open_fun (Term.ty hd) in
         let (some_args, extra_args) =
-          List.fold_left2 (categorize_var_arg var) ([], []) args arg_tys
+          List.fold_right2 (categorize_var_arg var) args arg_tys ([], [])
         in
         let some_normal_args = List.map (normalize_consts ~prec) some_args in
         let var_some_normal_args = T.app hd some_normal_args in
@@ -1142,10 +1142,10 @@ module LambdaKBO : ORD = struct
       else (
         let (arg_tys, _) = Type.open_fun (Term.ty t_hd) in
         let (some_t_args, extra_t_args) =
-          List.fold_left2 (categorize_var_arg y) ([], []) t_args arg_tys
+          List.fold_right2 (categorize_var_arg y) t_args arg_tys ([], [])
         in
         let (some_s_args, extra_s_args) =
-          List.fold_left2 (categorize_var_arg y) ([], []) s_args arg_tys
+          List.fold_right2 (categorize_var_arg y) s_args arg_tys ([], [])
         in
         let some_normal_t_args = List.map (normalize_consts ~prec) some_t_args
         and some_normal_s_args = List.map (normalize_consts ~prec) some_s_args
