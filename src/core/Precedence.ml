@@ -37,6 +37,9 @@ module Weight = struct
   let add a b: t = {omega=a.omega+b.omega; one=a.one+b.one}
   let diff a b: t = {omega=a.omega-b.omega; one=a.one-b.one}
 
+  let hash a =
+    a.omega * 991 + a.one
+
   module Infix = struct
     let (+) = add
     let (-) = diff

@@ -839,14 +839,14 @@ module Polynomial = struct
       Format.pp_print_int out i;
       Format.pp_print_string out "}"
 
-  module H = CCHashtbl.Make(struct
+  module ULH = CCHashtbl.Make(struct
       type t = unknown list
       let equal = CCList.equal equal
       let hash = Hash.list hash_unknown
     end)
 
   type polynomial = {
-    mutable hashtbl : W.t H.t;
+    mutable hashtbl : W.t ULH.t;
     mutable pos_counter : int;
     mutable neg_counter : int;
   }
@@ -861,7 +861,7 @@ module Polynomial = struct
     else if sign < 0 then poly.neg_counter <- poly.neg_counter + k
 
   let create_zero () =
-    {hashtbl = H.create 16;
+    {hashtbl = ULH.create 16;
      pos_counter = 0;
      neg_counter = 0}
 
@@ -877,40 +877,40 @@ module Polynomial = struct
   let add_monomial poly coeff unks =
     if coeff != W.zero then (
       let key = mk_key unks in
-      match H.find_opt poly.hashtbl key with
+      match ULH.find_opt poly.hashtbl key with
       | None ->
-        H.add poly.hashtbl key coeff;
+        ULH.add poly.hashtbl key coeff;
         incr_counter poly (W.sign coeff) (+1)
       | Some old_coeff ->
         let sum = W.add old_coeff coeff in
         if sum = W.zero then
-          H.remove poly.hashtbl key
+          ULH.remove poly.hashtbl key
         else
-          H.replace poly.hashtbl key sum;
+          ULH.replace poly.hashtbl key sum;
         incr_counter poly (W.sign old_coeff) (-1);
         incr_counter poly (W.sign sum) (+1)
     )
 
   let add poly1 poly2 =
     if not (is_zero poly2) then
-      H.iter (fun key coeff -> add_monomial poly1 coeff key) poly2.hashtbl
+      ULH.iter (fun key coeff -> add_monomial poly1 coeff key) poly2.hashtbl
 
   let multiply_unknowns poly unks =
     if not (CCList.is_empty unks) then
       let old_hashtbl = poly.hashtbl in
-      poly.hashtbl <- H.create 16;
-      H.iter (fun key coeff ->
-          H.add poly.hashtbl (mk_key (List.rev_append unks key)) coeff)
+      poly.hashtbl <- ULH.create 16;
+      ULH.iter (fun key coeff ->
+          ULH.add poly.hashtbl (mk_key (List.rev_append unks key)) coeff)
         old_hashtbl
 
   let constant_monomial poly =
-    match H.find_opt poly.hashtbl [] with
+    match ULH.find_opt poly.hashtbl [] with
     | None -> W.zero
     | Some coeff -> coeff
 
   let pp out poly =
     let first = ref true in
-    H.iter (fun key coeff ->
+    ULH.iter (fun key coeff ->
         if !first then first := false else Format.pp_print_string out " + ";
         Format.pp_print_string out "(";
         W.pp out coeff;
@@ -951,6 +951,22 @@ module LambdaKBO : ORD = struct
   let compare_types ~prec t_ty s_ty =
     if Type.compare t_ty s_ty = 0 then Nonstrict.Eq
     else compare_type_terms ~prec (term_of_type t_ty) (term_of_type s_ty)
+
+  module WH = CCHashtbl.Make(struct
+      type t = W.t
+      let equal = Pervasives.(=)
+      let hash = W.hash
+    end)
+
+  let weight_id_hashtbl = WH.create 16
+
+  let id_of_weight w =
+    match WH.find_opt weight_id_hashtbl w with
+    | Some id -> id
+    | None ->
+      let id = ID.make (W.to_string w) in
+      WH.add weight_id_hashtbl w id;
+      id
 
   let partition_leading p =
     let rec part acc xs =
@@ -997,7 +1013,17 @@ module LambdaKBO : ORD = struct
         let mk_placeholder_var ty =
           Term.var (HVar.cast ~ty var)
         in
-        let normalize_consts t = t in
+        let rec normalize_consts t = match T.view t with
+          | AppBuiltin (b, bargs) ->
+            Term.app_builtin ~ty:(Term.ty t) b (List.map normalize_consts bargs)
+          | Const fid ->
+            let fid' = id_of_weight (Prec.weight prec fid) in
+            Term.const ~ty:(Term.ty t) fid'
+          | Fun (ty, body) -> Term.fun_ ty (normalize_consts body)
+          | App (s, ts) ->
+            Term.app (normalize_consts s) (List.map normalize_consts ts)
+          | _ -> t
+        in
         let categorize_var_arg (some_args, extra_args) arg arg_ty =
           if Type.is_var arg_ty || Type.is_fun arg_ty then
             (normalize_consts arg :: some_args, extra_args)

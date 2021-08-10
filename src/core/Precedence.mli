@@ -24,6 +24,8 @@ module Weight : sig
   val diff : t -> t -> t
   val mult : int -> t -> t
 
+  val hash : t -> int
+
   module Infix : sig
     val ( + ) : t -> t -> t
     val ( - ) : t -> t -> t
