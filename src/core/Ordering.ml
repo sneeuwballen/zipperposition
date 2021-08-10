@@ -1179,7 +1179,7 @@ module LambdaKBO : ORD = struct
     | Fun (t_ty, t_body), Fun (s_ty, s_body) ->
       (match compare_types ~prec t_ty s_ty with
        | Eq -> process_terms ~prec (t_ty :: bound_tys) t_body s_body
-       | cmp -> consider_weights_of ~prec (t_ty :: bound_tys) t_body s_body cmp)
+       | cmp -> consider_weights_of ~prec bound_tys t s cmp)
     | Fun _, (DB _|Const _|AppBuiltin _) ->
       consider_weights_of ~prec bound_tys t s Gt
     | DB _, Fun _ -> consider_weights_of ~prec bound_tys t s Lt
