@@ -937,20 +937,11 @@ module LambdaKBO : ORD = struct
       let ignore_deep_quants = true
     end)
 
-  let rec term_of_type ty = match Type.view ty with
-    | Builtin b -> T.builtin ~ty:Type.tType (Type.builtin_conv b)
-    | Var var -> T.var var
-    | DB i -> T.bvar ~ty:Type.tType i
-    | App (tid, tys) -> T.app (T.const ~ty:Type.tType tid) (List.map term_of_type tys)
-    | Fun (tys, ty) -> T.app_builtin ~ty:Type.tType Builtin.Arrow (List.map term_of_type (tys @ [ty]))
-    | Forall ty -> T.app_builtin ~ty:Type.tType Builtin.ForallConst [term_of_type ty]
-
   let compare_type_terms ~prec =
     Type_KBO.compare_terms ~prec
 
   let compare_types ~prec t_ty s_ty =
-    if Type.compare t_ty s_ty = 0 then C.Eq
-    else compare_type_terms ~prec (term_of_type t_ty) (term_of_type s_ty)
+    compare_type_terms ~prec (Term.of_ty t_ty) (Term.of_ty s_ty)
 
   module WH = CCHashtbl.Make(struct
       type t = W.t
