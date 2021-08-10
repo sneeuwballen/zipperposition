@@ -70,12 +70,10 @@ let compare_and_partial =
     (Q.pair gen1 gen1) prop
 
 (* partial order for tests *)
-let partial_ord (x:int) y =
-  if x=y then Comparison.Eq
-  else if (x/5=y/5 && x mod 5 <> y mod 5) then Comparison.Incomparable
-  else CCInt.compare (x/5) (y/5) |> Comparison.of_total
-
-let partial_ord_nonstrict x y = Comparison.to_nonstrict (partial_ord x y)
+let partial_ord_nonstrict (x:int) y =
+  if x=y then Comparison.Nonstrict.Eq
+  else if (x/5=y/5 && x mod 5 <> y mod 5) then Incomparable
+  else CCInt.compare (x/5) (y/5) |> Comparison.Nonstrict.of_total
 
 let compare_partial_sym =
   let prop (m1,m2) =
