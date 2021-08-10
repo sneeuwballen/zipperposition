@@ -338,10 +338,6 @@ module Make(E : Map.OrderedType) = struct
       end
     | _, _ -> cmp
 
-  let compare_partial f m1 m2 =
-    Comparison.of_nonstrict (compare_partial_nonstrict (fun k1 k2 ->
-      Comparison.to_nonstrict (f k1 k2)) m1 m2)
-
   let compare_l m1 m2 =
     let rec aux m1 m2 = match m1, m2 with
       | [], [] -> 0
@@ -403,9 +399,6 @@ module Make(E : Map.OrderedType) = struct
   let max_l f l =
     max_seq f (of_list l)
     |> Iter.fold (fun acc (x, _) -> x :: acc) []
-
-  let compare_partial_l f l1 l2 =
-    compare_partial f (of_list l1) (of_list l2)
 
   let compare_partial_nonstrict_l f l1 l2 =
     compare_partial_nonstrict f (of_list l1) (of_list l2)

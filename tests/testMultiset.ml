@@ -59,8 +59,8 @@ let gen1 =
 let compare_and_partial =
   (* "naive" comparison function (using the general ordering on multisets) *)
   let compare' m1 m2 =
-    let f x y = Comparison.of_total (CCInt.compare x y) in
-    Comparison.to_total (M.compare_partial f m1 m2)
+    let f x y = Comparison.Nonstrict.of_total (CCInt.compare x y) in
+    Comparison.Nonstrict.to_total (M.compare_partial_nonstrict f m1 m2)
   in
   let prop (m1,m2) =
     _sign (compare' m1 m2) = _sign (M.compare m1 m2)
@@ -79,11 +79,11 @@ let partial_ord_nonstrict x y = Comparison.to_nonstrict (partial_ord x y)
 
 let compare_partial_sym =
   let prop (m1,m2) =
-    let c1 = M.compare_partial partial_ord m1 m2 in
-    let c2 =  Comparison.opp (M.compare_partial partial_ord m2 m1) in
+    let c1 = M.compare_partial_nonstrict partial_ord_nonstrict m1 m2 in
+    let c2 =  Comparison.Nonstrict.opp (M.compare_partial_nonstrict partial_ord_nonstrict m2 m1) in
     if c1=c2 
     then true
-    else Q.Test.fail_reportf "comparison: %a vs %a" Comparison.pp c1 Comparison.pp c2
+    else Q.Test.fail_reportf "comparison: %a vs %a" Comparison.Nonstrict.pp c1 Comparison.Nonstrict.pp c2
   in
   QCheck.Test.make
     ~name:"multiset_compare_partial_sym" ~long_factor:3 ~count:13_000
@@ -91,34 +91,40 @@ let compare_partial_sym =
 
 let compare_partial_trans =
   let prop (m1,m2,m3) =
-    let c1 = M.compare_partial partial_ord m1 m2 in
-    let c2 = M.compare_partial partial_ord m2 m3 in
-    let c3 = M.compare_partial partial_ord m1 m3 in
-    begin match c1,c2, c3 with
-      | Comparison.Incomparable, _, _
-      | _, Comparison.Incomparable, _
-      | _, _, Comparison.Incomparable
-      | Comparison.Lt, Comparison.Gt, _
-      | Comparison.Gt, Comparison.Lt, _ -> Q.assume_fail()  (* ignore *)
-      | Comparison.Eq, Comparison.Eq, Comparison.Eq -> true
-      | Comparison.Gt, Comparison.Gt, Comparison.Gt
-      | Comparison.Gt, Comparison.Eq, Comparison.Gt
-      | Comparison.Eq, Comparison.Gt, Comparison.Gt -> true
-      | Comparison.Lt, Comparison.Lt, Comparison.Lt
-      | Comparison.Lt, Comparison.Eq, Comparison.Lt
-      | Comparison.Eq, Comparison.Lt, Comparison.Lt -> true
-      | Comparison.Lt, _, Comparison.Eq
-      | Comparison.Gt, _, Comparison.Eq
-      | _, Comparison.Lt, Comparison.Eq
-      | _, Comparison.Gt, Comparison.Eq
-      | (Comparison.Eq | Comparison.Lt), Comparison.Lt, Comparison.Gt
-      | (Comparison.Eq | Comparison.Gt), Comparison.Gt, Comparison.Lt
-      | Comparison.Lt, Comparison.Eq, Comparison.Gt
-      | Comparison.Gt, Comparison.Eq, Comparison.Lt
-      | Comparison.Eq, Comparison.Eq, (Comparison.Lt | Comparison.Gt)
+    let c1 = M.compare_partial_nonstrict partial_ord_nonstrict m1 m2 in
+    let c2 = M.compare_partial_nonstrict partial_ord_nonstrict m2 m3 in
+    let c3 = M.compare_partial_nonstrict partial_ord_nonstrict m1 m3 in
+    begin match c1, c2, c3 with
+      | Comparison.Nonstrict.Incomparable, _, _
+      | _, Comparison.Nonstrict.Incomparable, _
+      | _, _, Comparison.Nonstrict.Incomparable
+      | Leq, _, _
+      | _, Leq, _
+      | _, _, Leq
+      | Geq, _, _
+      | _, Geq, _
+      | _, _, Geq
+      | Lt, Gt, _
+      | Gt, Lt, _ -> Q.assume_fail()  (* ignore *)
+      | Eq, Eq, Eq -> true
+      | Gt, Gt, Gt
+      | Gt, Eq, Gt
+      | Eq, Gt, Gt -> true
+      | Lt, Lt, Lt
+      | Lt, Eq, Lt
+      | Eq, Lt, Lt -> true
+      | Lt, _, Eq
+      | Gt, _, Eq
+      | _, Lt, Eq
+      | _, Gt, Eq
+      | (Eq | Lt), Lt, Gt
+      | (Eq | Gt), Gt, Lt
+      | Lt, Eq, Gt
+      | Gt, Eq, Lt
+      | Eq, Eq, (Lt | Gt)
         ->
         Q.Test.fail_reportf
-          "comp %a %a %a" Comparison.pp c1 Comparison.pp c2 Comparison.pp c3
+          "comp %a %a %a" Comparison.Nonstrict.pp c1 Comparison.Nonstrict.pp c2 Comparison.Nonstrict.pp c3
     end
   in
   QCheck.Test.make

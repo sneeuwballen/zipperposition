@@ -6,7 +6,7 @@ module Prec = Precedence
 module MT = Multiset.Make(Term)
 module W = Precedence.Weight
 
-open Comparison
+module C = Comparison
 
 let prof_rpo = ZProf.make "compare_rpo"
 let prof_kbo = ZProf.make "compare_kbo"
@@ -29,8 +29,8 @@ type term = T.t
 (** {2 Type definitions} *)
 
 type t = {
-  cache_compare : (T.t * T.t, Nonstrict.t) CCCache.t;
-  compare : Prec.t -> term -> term -> Nonstrict.t;
+  cache_compare : (T.t * T.t, C.Nonstrict.t) CCCache.t;
+  compare : Prec.t -> term -> term -> C.Nonstrict.t;
   prec : Prec.t;
   name : string;
   cache_might_flip : (T.t * T.t, bool) CCCache.t;
@@ -79,7 +79,7 @@ module type ORD = sig
    * - stable for instantiation
    * - compatible with function contexts
    * - total on ground terms *)
-  val compare_terms : prec:Prec.t -> term -> term -> Nonstrict.t
+  val compare_terms : prec:Prec.t -> term -> term -> C.Nonstrict.t
 
   val might_flip : Prec.t -> term -> term -> bool
 
@@ -145,7 +145,7 @@ end
 let prec_compare prec a b = match a, b with
   | Head.I a, Head.I b ->
     begin match Prec.compare prec a b with
-      | 0 -> Eq
+      | 0 -> C.Nonstrict.Eq
       | n when n > 0 -> Gt
       | _ -> Lt
     end
@@ -312,10 +312,10 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
     (** lexicographic comparison *)
     and tckbolex wb terms1 terms2 ~below_lam =
       match terms1, terms2 with
-      | [], [] -> wb, Eq
+      | [], [] -> wb, C.Nonstrict.Eq
       | t1::terms1', t2::terms2' ->
         begin match tckbo wb t1 t2 ~below_lam with
-          | (wb', Eq) -> tckbolex wb' terms1' terms2' ~below_lam
+          | (wb', C.Nonstrict.Eq) -> tckbolex wb' terms1' terms2' ~below_lam
           | (wb', res) -> (* just compute the weights and return result *)
             let wb'', _ = balance_weight_rec wb' terms1' None ~pos:true ~below_lam false in
             let wb''', _ = balance_weight_rec wb'' terms2' None ~pos:false ~below_lam false in
@@ -335,13 +335,13 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
         (* just compute the weights and return result *)
         let wb', _ = balance_weight_rec wb terms1 None ~pos:true ~below_lam false in
         let wb'', _ = balance_weight_rec wb' terms2 None ~pos:false ~below_lam false in
-        let res = if List.length terms1 > List.length terms2 then Gt else Lt in
+        let res = if List.length terms1 > List.length terms2 then C.Nonstrict.Gt else Lt in
         wb'', res
       )
     (* tupled version of kbo (kbo_5 of the paper) *)
     and tckbo (wb:W.t) t1 t2 ~below_lam =
       if T.equal t1 t2
-      then (wb, Eq) (* do not update weight or var balance *)
+      then (wb, C.Nonstrict.Eq) (* do not update weight or var balance *)
       else
       if P.lambda_mode 
       then (
@@ -367,7 +367,7 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
         | T.Var x, T.Var y ->
           add_pos_var balance t1 ~below_lam;
           add_neg_var balance t2 ~below_lam;
-          (wb, Incomparable)
+          (wb, C.Nonstrict.Incomparable)
         | T.Var x,  _ ->
           add_pos_var balance t1 ~below_lam;
           let wb', contains = balance_weight wb t2 (Some t1) ~pos:false ~below_lam in
@@ -395,25 +395,25 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
         end;
       );
       (* check variable condition *)
-      let g_or_n = if balance.neg_counter = 0 then Gt else Incomparable
-      and l_or_n = if balance.pos_counter = 0 then Lt else Incomparable in
+      let g_or_n = if balance.neg_counter = 0 then C.Nonstrict.Gt else Incomparable
+      and l_or_n = if balance.pos_counter = 0 then C.Nonstrict.Lt else Incomparable in
       (* lexicographic product of weight and precedence *)
       if W.sign wb'' > 0 then wb'', g_or_n
       else if W.sign wb'' < 0 then wb'', l_or_n
       else match prec_compare prec f g with
-        | Gt -> wb'', g_or_n
+        | C.Nonstrict.Gt -> wb'', g_or_n
         | Lt ->  wb'', l_or_n
         | Eq ->
-          if res = Eq then wb'', Eq
+          if res = C.Nonstrict.Eq then wb'', Eq
           else if res = Lt then wb'', l_or_n
           else if res = Gt then wb'', g_or_n
           else wb'', Incomparable
-        | Incomparable -> wb'', Incomparable
+        | _ -> wb'', Incomparable
     (* recursive comparison *)
     and tckbo_rec wb f g ss ts ~below_lam =
       let ss_below_lam = below_lam || f = Head.LAM in
       let ts_below_lam = below_lam || g = Head.LAM in
-      if prec_compare prec f g = Eq
+      if prec_compare prec f g = C.Nonstrict.Eq
       then match prec_status prec f with
         | Prec.Multiset -> assert false
         | Prec.Lexicographic ->
@@ -424,7 +424,7 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
         (* just compute variable and weight balances *)
         let wb', _ = balance_weight_rec wb ss None ~pos:true ~below_lam:ss_below_lam false in
         let wb'', _ = balance_weight_rec wb' ts None ~pos:false ~below_lam:ts_below_lam false in
-        wb'', Incomparable
+        wb'', C.Nonstrict.Incomparable
       )
     in
     let _, res = tckbo W.zero t1 t2 ~below_lam:false in
@@ -437,7 +437,7 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
         kbo ~prec x y
       with UnsupportedTerm -> Incomparable) in
     ZProf.exit_prof prof_kbo;
-    to_nonstrict res
+    res
 
   (* The ordering might flip if one side is a lambda-expression *)
   let might_flip _ s t = T.is_fun s || T.is_fun t
@@ -451,7 +451,7 @@ module MakeRPO (P : PARAMETERS) : ORD = struct
 
   (* recursive path ordering *)
   let rec rpo6 ~prec s t =
-    if T.equal s t then Eq else (  (* equality test is cheap *)
+    if T.equal s t then C.Nonstrict.Eq else (  (* equality test is cheap *)
       if P.lambda_mode then (
         match Head.term_to_head s, Head.term_to_head t with
         | Head.V _, Head.V _ -> Incomparable
@@ -481,8 +481,8 @@ module MakeRPO (P : PARAMETERS) : ORD = struct
           | Prec.LengthLexicographic ->  cLLMA ~prec s t ss ts
         end
       | Gt -> cMA ~prec s ts
-      | Lt -> Comparison.opp (cMA ~prec t ss)
-      | Incomparable -> cAA ~prec s t ss ts
+      | Lt -> C.Nonstrict.opp (cMA ~prec t ss)
+      | _ -> cAA ~prec s t ss ts
     end
   (* try to dominate all the terms in ts by s; but by subterm property
      if some t' in ts is >= s then s < t=g(ts) *)
@@ -490,17 +490,17 @@ module MakeRPO (P : PARAMETERS) : ORD = struct
     | [] -> Gt
     | t::ts' ->
       (match rpo6 ~prec s t with
-       | Gt -> cMA ~prec s ts'
+       | C.Nonstrict.Gt -> cMA ~prec s ts'
        | Eq | Lt -> Lt
-       | Incomparable -> Comparison.opp (alpha ~prec ts' s))
+       | _ -> C.Nonstrict.opp (alpha ~prec ts' s))
   (* lexicographic comparison of s=f(ss), and t=f(ts) *)
   and cLMA ~prec s t ss ts = match ss, ts with
     | si::ss', ti::ts' ->
       begin match rpo6 ~prec si ti with
-        | Eq -> cLMA ~prec s t ss' ts'
+        | C.Nonstrict.Eq -> cLMA ~prec s t ss' ts'
         | Gt -> cMA ~prec s ts' (* just need s to dominate the remaining elements *)
-        | Lt -> Comparison.opp (cMA ~prec t ss')
-        | Incomparable -> cAA ~prec s t ss' ts'
+        | Lt -> C.Nonstrict.opp (cMA ~prec t ss')
+        | _ -> cAA ~prec s t ss' ts'
       end
     | [], [] -> Eq
     | [], _::_ -> Lt
@@ -512,18 +512,18 @@ module MakeRPO (P : PARAMETERS) : ORD = struct
     else if List.length ss > List.length ts then
       cMA ~prec s ts
     else
-      Comparison.opp (cMA ~prec t ss)
+      C.Nonstrict.opp (cMA ~prec t ss)
   (* multiset comparison of subterms (not optimized) *)
   and cMultiset ~prec s t ss ts =
-    match MT.compare_partial_l (rpo6 ~prec) ss ts with
-    | Eq | Incomparable -> Incomparable
-    | Gt -> cMA ~prec s ts
-    | Lt -> Comparison.opp (cMA ~prec t ss)
+    match MT.compare_partial_nonstrict_l (rpo6 ~prec) ss ts with
+    | C.Nonstrict.Gt -> cMA ~prec s ts
+    | Lt -> C.Nonstrict.opp (cMA ~prec t ss)
+    | _ -> Incomparable
   (* bidirectional comparison by subterm property (bidirectional alpha) *)
   and cAA ~prec s t ss ts =
     match alpha ~prec ss t with
     | Gt -> Gt
-    | Incomparable -> Comparison.opp (alpha ~prec ts s)
+    | Incomparable -> C.Nonstrict.opp (alpha ~prec ts s)
     | _ -> assert false
   (* if some s in ss is >= t, then s > t by subterm property and transitivity *)
   and alpha ~prec ss t = match ss with
@@ -531,13 +531,13 @@ module MakeRPO (P : PARAMETERS) : ORD = struct
     | s::ss' ->
       (match rpo6 ~prec s t with
        | Eq | Gt -> Gt
-       | Incomparable | Lt -> alpha ~prec ss' t)
+       | _ -> alpha ~prec ss' t)
 
   let compare_terms ~prec x y =
     ZProf.enter_prof prof_rpo;
     let compare = rpo6 ~prec x y in
     ZProf.exit_prof prof_rpo;
-    to_nonstrict compare
+    compare
 
   (* The ordering might flip if one side is a lambda-expression or if the order is established using the subterm rule *)
   let might_flip prec t s =
@@ -563,7 +563,7 @@ module EPO : ORD = struct
       512
   and epo_behind_cache ~prec (t,tt) (s,ss) = 
     if T.equal t s && CCList.length tt = CCList.length ss && CCList.for_all2 T.equal tt ss 
-    then Eq 
+    then C.Nonstrict.Eq 
     else 
       begin match (T.view t,tt), (T.view s,ss) with
         | (T.Var _, []), (T.Var _, []) -> Incomparable
@@ -589,7 +589,7 @@ module EPO : ORD = struct
         in
         begin match g with
           | Head.V _ -> 
-            if c = Gt then epo_check_e4     ~prec (t,tt) (s,ss) (g,gg) (f,ff) else
+            if c = C.Nonstrict.Gt then epo_check_e4     ~prec (t,tt) (s,ss) (g,gg) (f,ff) else
             if c = Lt then epo_check_e4_inv ~prec (t,tt) (s,ss) (g,gg) (f,ff) else
               epo_check_e1 ~prec (t,tt) (s,ss) (g,gg) (f,ff)
           | _ -> 
@@ -597,7 +597,7 @@ module EPO : ORD = struct
             if c = Lt then epo_check_e2_e3_inv ~prec (t,tt) (s,ss) (g,gg) (f,ff) else
               epo_check_e1 ~prec (t,tt) (s,ss) (g,gg) (f,ff)
         end
-      | Incomparable -> epo_check_e1 ~prec (t,tt) (s,ss) (g,gg) (f,ff)
+      | _ -> epo_check_e1 ~prec (t,tt) (s,ss) (g,gg) (f,ff)
     end
   and epo_check_e1 ~prec (t,tt) (s,ss) (g,gg) (f,ff) =
     if gg != [] && (let c = epo ~prec (s,ss) (chop (g,gg)) in c = Lt || c = Eq) then Gt else
@@ -636,7 +636,7 @@ module EPO : ORD = struct
     ZProf.enter_prof prof_epo;
     let compare = epo ~prec (x,[]) (y,[]) in
     ZProf.exit_prof prof_epo;
-    to_nonstrict compare
+    compare
 
   let might_flip _ _ _ = false
 end
@@ -710,15 +710,15 @@ module LambdaFreeKBOCoeff : ORD = struct
   let rec lfhokbo_arg_coeff ~prec t s =
     (* lexicographic comparison *)
     let rec lfhokbo_lex ts ss = match ts, ss with
-      | [], [] -> Eq
+      | [], [] -> C.Nonstrict.Eq
       | _ :: _, [] -> Gt
       | [] , _ :: _ -> Lt
       | t0 :: t_rest , s0 :: s_rest ->
         begin match lfhokbo_arg_coeff ~prec t0 s0 with
-          | Gt -> Gt
+          | C.Nonstrict.Gt -> Gt
           | Lt -> Lt
           | Eq -> lfhokbo_lex t_rest s_rest
-          | Incomparable -> Incomparable
+          | _ -> Incomparable
         end
     in
     let lfhokbo_lenlex ts ss =
@@ -733,13 +733,7 @@ module LambdaFreeKBOCoeff : ORD = struct
     (* compare t = g tt and s = f ss (assuming they have the same weight) *)
     let lfhokbo_composite g f ts ss =
       match prec_compare prec g f with
-        | Incomparable -> (* try rule C2 *)
-          let hd_ts_s = lfhokbo_arg_coeff ~prec (List.hd ts) s in
-          let hd_ss_t = lfhokbo_arg_coeff ~prec (List.hd ss) t in
-          if List.length ts = 1 && (hd_ts_s = Gt || hd_ts_s = Eq) then Gt else
-          if List.length ss = 1 && (hd_ss_t = Gt || hd_ss_t = Eq) then Lt else
-            Incomparable
-        | Gt -> Gt (* by rule C3 *)
+        | Gt -> C.Nonstrict.Gt (* by rule C3 *)
         | Lt -> Lt (* by rule C3 inversed *)
         | Eq -> (* try rule C4 *)
           begin match prec_status prec g with
@@ -747,6 +741,12 @@ module LambdaFreeKBOCoeff : ORD = struct
             | Prec.LengthLexicographic -> lfhokbo_lenlex ts ss
             | _ -> assert false
           end
+        | _ -> (* try rule C2 *)
+          let hd_ts_s = lfhokbo_arg_coeff ~prec (List.hd ts) s in
+          let hd_ss_t = lfhokbo_arg_coeff ~prec (List.hd ss) t in
+          if List.length ts = 1 && (hd_ts_s = Gt || hd_ts_s = Eq) then Gt else
+          if List.length ss = 1 && (hd_ss_t = Gt || hd_ss_t = Eq) then Lt else
+            Incomparable
     in
     (* compare t and s assuming they have the same weight *)
     let lfhokbo_same_weight t s =
@@ -770,7 +770,7 @@ module LambdaFreeKBOCoeff : ORD = struct
     ZProf.enter_prof prof_lambdafree_kbo_coeff;
     let compare = lfhokbo_arg_coeff ~prec x y in
     ZProf.exit_prof prof_lambdafree_kbo_coeff;
-    to_nonstrict compare
+    compare
 
   let might_flip prec t s =
     (* Terms can flip if they have different argument coefficients for remaining arguments. *)
@@ -949,7 +949,7 @@ module LambdaKBO : ORD = struct
     Type_KBO.compare_terms ~prec
 
   let compare_types ~prec t_ty s_ty =
-    if Type.compare t_ty s_ty = 0 then Nonstrict.Eq
+    if Type.compare t_ty s_ty = 0 then C.Nonstrict.Eq
     else compare_type_terms ~prec (term_of_type t_ty) (term_of_type s_ty)
 
   module WH = CCHashtbl.Make(struct
@@ -1067,49 +1067,49 @@ module LambdaKBO : ORD = struct
 
   let length_lex_ext f ys xs =
     let rec lex ys xs = match ys, xs with
-      | [], [] -> Nonstrict.Eq
+      | [], [] -> C.Nonstrict.Eq
       | y :: ys, x :: xs ->
         (match f y x with
-        | Nonstrict.Geq -> Nonstrict.merge_with_Geq (lex ys xs)
+        | C.Nonstrict.Geq -> C.Nonstrict.merge_with_Geq (lex ys xs)
         | Eq -> lex ys xs
-        | Leq -> Nonstrict.merge_with_Leq (lex ys xs)
+        | Leq -> C.Nonstrict.merge_with_Leq (lex ys xs)
         | cmp -> cmp)
       | _, _ -> assert false
     in
     match CCInt.compare (List.length ys) (List.length xs) with
     | 0 -> lex ys xs
-    | n -> if n > 0 then Nonstrict.Gt else Lt
+    | n -> if n > 0 then C.Nonstrict.Gt else Lt
 
   let length_lex_ext_data f ys xs =
     let rec lex ys xs = match ys, xs with
-      | [], [] -> ([], Nonstrict.Eq)
+      | [], [] -> ([], C.Nonstrict.Eq)
       | y :: ys, x :: xs ->
         (match f y x with
-        | (w, Nonstrict.Geq) ->
+        | (w, C.Nonstrict.Geq) ->
           let (ws, cmp) = lex ys xs in
-          (w :: ws, Nonstrict.merge_with_Geq cmp)
+          (w :: ws, C.Nonstrict.merge_with_Geq cmp)
         | (w, Eq) ->
           let (ws, cmp) = lex ys xs in
           (w :: ws, cmp)
         | (w, Leq) ->
           let (ws, cmp) = lex ys xs in
-          (w :: ws, Nonstrict.merge_with_Leq cmp)
+          (w :: ws, C.Nonstrict.merge_with_Leq cmp)
         | (w, cmp) -> ([w], cmp))
       | _, _ -> assert false
     in
     match CCInt.compare (List.length ys) (List.length xs) with
     | 0 -> lex ys xs
-    | n -> ([], if n > 0 then Nonstrict.Gt else Lt)
+    | n -> ([], if n > 0 then C.Nonstrict.Gt else Lt)
 
   let cw_ext_data f =
     length_lex_ext_data (fun y x ->
       let (w, cmp) = f y x in
-      (w, Nonstrict.smooth cmp))
+      (w, C.Nonstrict.smooth cmp))
 
   let analyze_weight_diff w =
     match Polynomial.all_coeffs_nonnegative w,
       Polynomial.all_coeffs_nonpositive w with
-    | false, false -> Nonstrict.Incomparable
+    | false, false -> C.Nonstrict.Incomparable
     | true, false ->
       if W.sign (Polynomial.constant_monomial w) > 0 then Gt else Geq
     | false, true ->
@@ -1119,16 +1119,16 @@ module LambdaKBO : ORD = struct
   let consider_weight w cmp =
     (w,
      match analyze_weight_diff w with
-     | Geq -> Nonstrict.merge_with_Geq cmp
+     | Geq -> C.Nonstrict.merge_with_Geq cmp
      | Eq -> cmp
-     | Leq -> Nonstrict.merge_with_Leq cmp
+     | Leq -> C.Nonstrict.merge_with_Leq cmp
      | cmp' -> cmp')
 
   let rec process_args ~prec bound_tys ts ss =
     let w = Polynomial.create_zero () in
     (* both comparisons are needed because connectives have variable arity *)
     if CCList.is_empty ts && CCList.is_empty ss then
-      (w, Nonstrict.Eq)
+      (w, C.Nonstrict.Eq)
     else (
       let (ws, cmp) =
         length_lex_ext_data (process_terms ~prec bound_tys) ts ss
@@ -1147,7 +1147,7 @@ module LambdaKBO : ORD = struct
       let w = Polynomial.create_zero () in
       (* only a single list needs to be checked thanks to eta-expansion *)
       if CCList.is_empty t_args then
-        (w, Nonstrict.Eq)
+        (w, C.Nonstrict.Eq)
       else (
         let (arg_tys, _) = Type.open_fun (Term.ty t_hd) in
         let (some_t_args, extra_t_args) =
@@ -1175,16 +1175,16 @@ module LambdaKBO : ORD = struct
           List.iteri add_weight_of_extra_arg extra_arg_ws;
           consider_weight w cmp
         else
-          consider_weights_of ~prec bound_tys t s Nonstrict.Incomparable
+          consider_weights_of ~prec bound_tys t s C.Nonstrict.Incomparable
       )
     | Var _, AppBuiltin (b, _) ->
       consider_weights_of ~prec bound_tys t s
-        (if Builtin.as_int b = 0 then Nonstrict.Geq else Nonstrict.Incomparable)
+        (if Builtin.as_int b = 0 then C.Nonstrict.Geq else C.Nonstrict.Incomparable)
     | AppBuiltin (b, _), Var _ ->
       consider_weights_of ~prec bound_tys t s
-        (if Builtin.as_int b = 0 then Nonstrict.Leq else Nonstrict.Incomparable)
+        (if Builtin.as_int b = 0 then C.Nonstrict.Leq else C.Nonstrict.Incomparable)
     | Var _, _ | _, Var _ ->
-      consider_weights_of ~prec bound_tys t s Nonstrict.Incomparable
+      consider_weights_of ~prec bound_tys t s C.Nonstrict.Incomparable
     | Fun (t_ty, t_body), Fun (s_ty, s_body) ->
       (match compare_types ~prec t_ty s_ty with
        | Eq -> process_terms ~prec (t_ty :: bound_tys) t_body s_body
@@ -1324,9 +1324,9 @@ let compose f ord =
       fun prec a b ->
         let f_res,a',b' = f a b in
         match f_res with
-        | Nonstrict.Geq -> Nonstrict.merge_with_Geq (ord.compare prec a' b')
+        | C.Nonstrict.Geq -> C.Nonstrict.merge_with_Geq (ord.compare prec a' b')
         | Eq -> ord.compare prec a' b'
-        | Leq -> Nonstrict.merge_with_Leq (ord.compare prec a' b')
+        | Leq -> C.Nonstrict.merge_with_Leq (ord.compare prec a' b')
         | _ -> f_res
       }
 
@@ -1370,14 +1370,14 @@ let lambda_kbo prec =
     { cache_compare; compare; name=LambdaKBO.name; prec; might_flip; cache_might_flip; monotonic }
 
 let none =
-  let compare _ t1 t2 = if T.equal t1 t2 then Nonstrict.Eq else Incomparable in
+  let compare _ t1 t2 = if T.equal t1 t2 then C.Nonstrict.Eq else Incomparable in
   let might_flip _ _ _ = false in
   let monotonic = true in
   { cache_compare=dummy_cache_; compare; prec=Prec.default []; name="none"; might_flip; cache_might_flip=dummy_cache_; monotonic}
 
 let subterm =
   let compare _ t1 t2 =
-    if T.equal t1 t2 then Nonstrict.Eq
+    if T.equal t1 t2 then C.Nonstrict.Eq
     else if T.subterm ~sub:t1 t2 then Lt
     else if T.subterm ~sub:t2 t1 then Gt
     else Incomparable

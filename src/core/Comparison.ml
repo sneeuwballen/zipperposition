@@ -51,11 +51,6 @@ type 'a comparator = 'a -> 'a -> t
 
 let (++) = lexico
 
-let (@>>) f g x y =
-  match f x y with
-  | Eq -> g x y
-  | cmp -> cmp
-
 type ('a, 'b) combination = {
   call : 'a -> 'a -> 'b;
   ignore : t -> 'a -> 'a -> 'b;

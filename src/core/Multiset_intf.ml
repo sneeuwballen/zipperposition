@@ -123,13 +123,11 @@ module type S = sig
 
       In the following, the comparison function must be equality-compatible
       with [E.compare]. In other words, if [E.compare x y = 0] then
-      [f x y = Comparison.Eq] must hold. *)
+      [f x y = Comparison.Nonstrict.Eq] must hold. *)
 
   val compare : t -> t -> int
   (** Compare two multisets with the multiset extension of {!E.compare} *)
 
-  val compare_partial :
-    (elt -> elt -> Comparison.t) -> t -> t -> Comparison.t
   val compare_partial_nonstrict :
     (elt -> elt -> Comparison.Nonstrict.t) -> t -> t -> Comparison.Nonstrict.t
   (** Compare two multisets with the multiset extension of the
@@ -150,9 +148,6 @@ module type S = sig
   val max_l : (elt -> elt -> Comparison.Nonstrict.t) -> elt list -> elt list
   (** Maximal elements of a list *)
 
-  val compare_partial_l :
-    (elt -> elt -> Comparison.t) ->
-    elt list -> elt list -> Comparison.t
   val compare_partial_nonstrict_l :
     (elt -> elt -> Comparison.Nonstrict.t) ->
     elt list -> elt list -> Comparison.Nonstrict.t

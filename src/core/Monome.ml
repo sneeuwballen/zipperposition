@@ -271,15 +271,15 @@ let comparison m1 m2 =
       depends on the model/instance *)
   let m = difference m1 m2 in
   match is_const m, m.num.sign m.const with
-  | false, _ -> Comparison.Incomparable
-  | true, 0 -> Comparison.Eq
-  | true, n when n < 0 -> Comparison.Lt
-  | true, _ -> Comparison.Gt
+  | false, _ -> Comparison.Nonstrict.Incomparable
+  | true, 0 -> Eq
+  | true, n when n < 0 -> Lt
+  | true, _ -> Gt
 
 let dominates ~strict m1 m2 = match comparison m1 m2 with
-  | Comparison.Eq -> not strict
-  | Comparison.Gt -> true
-  | Comparison.Lt | Comparison.Incomparable -> false
+  | Comparison.Nonstrict.Eq -> not strict
+  | Gt | Geq -> true
+  | Lt | Leq | Incomparable -> false
 
 let split m =
   let const1, const2 = if m.num.sign m.const >= 0
@@ -830,9 +830,6 @@ module Int = struct
 
   let to_multiset m =
     Seq.coeffs_swap m |> Multisets.MT.Seq.of_coeffs Multisets.MT.empty
-
-  let compare f m1 m2 =
-    Multisets.MT.compare_partial f (to_multiset m1) (to_multiset m2)
 
   let compare_nonstrict f m1 m2 =
     Multisets.MT.compare_partial_nonstrict f (to_multiset m1) (to_multiset m2)
