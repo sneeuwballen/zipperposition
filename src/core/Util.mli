@@ -13,8 +13,8 @@
 val total_time_s : unit -> float
 (** time elapsed since start of program, in seconds *)
 
-val get_time_mon_ : unit -> float
-(** A "monotonic" clock (TODO! right now, just unix clock) *)
+val get_time_mon_us : unit -> float
+(** A monotonic clock, in microseconds *)
 
 (** {2 Misc} *)
 

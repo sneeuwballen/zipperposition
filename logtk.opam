@@ -2,7 +2,7 @@ opam-version: "2.0"
 maintainer: "simon.cruanes.2007@m4x.org"
 authors: ["Simon Cruanes" "Petar Vukmirovic" "Alexander Bentkamp" "Sophie Tourret" "Visa Nummelin"]
 homepage: "https://github.com/sneeuwballen/zipperposition"
-version: "1.6"
+version: "2.0"
 synopsis: "Core types and algorithms for logic"
 build: [
   ["dune" "build" "-p" name "-j" jobs]
@@ -12,24 +12,25 @@ build: [
 depends: [
   "base-bytes"
   "base-unix"
-  "zarith"
+  ("zarith" | "num")
   "oseq" { >= "0.3" & < "0.4" }
   "containers" { >= "3.0" & < "4.0" }
   "containers-data" { >= "3.0" & < "4.0" }
+  "mtime"
   "iter" { >= "1.2" }
   "menhir" {build}
-  "dune" { >= "1.1" }
+  "dune" { >= "1.11" }
   "alcotest" {with-test}
   "qcheck-core" {with-test & >= "0.9"}
   "qcheck-alcotest" {with-test & >= "0.9"}
-  "ocaml" {>= "4.03"}
+  "ocaml" {>= "4.07"}
 ]
 depopts: [
   "msat"
 ]
 conflicts: [
   "msat" { < "0.8.1" }
-  "msat" { >= "0.9" }
+  "msat" { >= "0.10" }
 ]
 tags: [ "logic" "unification" "term" ]
 bug-reports: "https://github.com/sneeuwballen/zipperposition/issues"

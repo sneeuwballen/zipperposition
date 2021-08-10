@@ -11,7 +11,7 @@
     In this context, {b generalizing} type variables means that if some ID.t
     whose type was unknown and its type still contains variables after the
     type inference, those variables are quantified instead of being bound to
-    a default type (typically {!.Type.i}).
+    a default type (typically {!Type.i}).
 
     For instance: say [f] is not declared and occurs in the term [f(f(nil))]
     with the declared constructor [nil : list(A)]. The inferred type for

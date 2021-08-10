@@ -701,14 +701,15 @@ module ArithOp = struct
   let divisors n =
     if (Z.leq n Z.zero)
     then raise (Invalid_argument "prime_factors: expected number > 0")
-    else try
-        let n = Z.to_int n in
+    else
+      match Z.to_int_exn n with
+      | n ->
         let l = ref [] in
         for i = 2 to n/2 do
           if i < n && n mod i = 0 then l := i :: !l
         done;
         List.rev_map Z.of_int !l
-      with Z.Overflow -> []  (* too big *)
+      | exception _ -> []  (* too big *)
 end
 
 module ZF = struct

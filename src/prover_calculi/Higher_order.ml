@@ -81,7 +81,7 @@ module type S = sig
   module Env : Env.S
   module C : module type of Env.C
 
-  (** {6 Registration} *)
+  (** {5 Registration} *)
 
   val setup : unit -> unit
   (** Register rules in the environment *)
@@ -1440,9 +1440,9 @@ module Make(E : Env.S) : S with module Env = E = struct
             | lit -> `Right lit)
       in
       assert (pairs <> []);
-      ZProf.enter_prof prof_ho_unif;
+      let _span = ZProf.enter_prof prof_ho_unif in
       let r = ho_unif_real_ c pairs others in
-      ZProf.exit_prof prof_ho_unif;
+      ZProf.exit_prof _span;
       r
     ) else []
 

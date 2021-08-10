@@ -20,9 +20,12 @@ let prof_generate_unary = ZProf.make "env.generate_unary"
 let prof_generate_binary = ZProf.make "env.generate_binary"
 let prof_back_simplify = ZProf.make "env.back_simplify"
 let prof_simplify = ZProf.make "env.simplify"
+let prof_multi_simplify = ZProf.make "env.multi_simplify"
+let prof_fwd_simplify = ZProf.make "env.fwd_simplify"
 let prof_all_simplify = ZProf.make "env.all_simplify"
 let prof_is_redundant = ZProf.make "env.is_redundant"
 let prof_subsumed_by = ZProf.make "env.subsumed_by"
+let prof_cheap_multi = ZProf.make "env.cheap_multi_simp"
 
 (** {2 Signature} *)
 module type S = Env_intf.S
@@ -340,7 +343,7 @@ module Make(X : sig
 
   (** do binary inferences that involve the given clause *)
   let do_binary_inferences c =
-    ZProf.enter_prof prof_generate_binary;
+    let _span = ZProf.enter_prof prof_generate_binary in
     Util.debugf ~section 5 "@[<2>do binary inferences with current active set:@ `@[%a@]`@]"
       (fun k->k C.pp_set (ProofState.ActiveSet.clauses ()));
     (* apply every inference rule *)
@@ -352,12 +355,12 @@ module Make(X : sig
            List.rev_append new_clauses acc)
         [] !_binary_rules
     in
-    ZProf.exit_prof prof_generate_binary;
+    ZProf.exit_prof _span;
     Iter.of_list clauses
 
   (** do unary inferences for the given clause *)
   let do_unary_inferences c =
-    ZProf.enter_prof prof_generate_unary;
+    let _span = ZProf.enter_prof prof_generate_unary in
     Util.debug ~section 3 "do unary inferences";
     (* apply every inference rule *)
     let clauses = List.fold_left
@@ -366,7 +369,7 @@ module Make(X : sig
            let new_clauses = rule c in
            List.rev_append new_clauses acc)
         [] !_unary_rules in
-    ZProf.exit_prof prof_generate_unary;
+    ZProf.exit_prof _span;
     Iter.of_list clauses
 
   let do_generate ~full () =
@@ -614,7 +617,7 @@ module Make(X : sig
 
   let simplify c =
     let open SimplM.Infix in
-    ZProf.enter_prof prof_simplify;
+    let _span = ZProf.enter_prof prof_simplify in
     let res = fix_simpl c
       ~f:(fun c ->
           let old_c = c in
@@ -632,10 +635,11 @@ module Make(X : sig
               (fun k->k C.pp old_c C.pp c);
           c)
     in
-    ZProf.exit_prof prof_simplify;
+    ZProf.exit_prof _span;
     res
 
   let multi_simplify ~depth c : (C.t * int) list option =
+    let _span = ZProf.enter_prof prof_multi_simplify in
     let depth_map = 
       ref (Util.Int_map.singleton (C.id c) depth) in
     let [@inline] get_depth c =
@@ -692,6 +696,7 @@ module Make(X : sig
           List.iter (fun c -> Queue.push c q) l;
       )
     done;
+    ZProf.exit_prof _span;
     if !did_something
     then (
       C.mark_redundant c;
@@ -712,7 +717,7 @@ module Make(X : sig
 
   (* Perform backward simplification with the given clause *)
   let backward_simplify given =
-    ZProf.enter_prof prof_back_simplify;
+    let _span = ZProf.enter_prof prof_back_simplify in
     (* set of candidate clauses, that may be unit-simplifiable *)
     let candidates = backward_simplify_find_candidates given in
     let back_simplify c =
@@ -755,7 +760,7 @@ module Make(X : sig
            end)
         candidates (C.ClauseSet.empty, [])
     in
-    ZProf.exit_prof prof_back_simplify;
+    ZProf.exit_prof _span;
     before, Iter.of_list after
 
   let simplify_active_with f =
@@ -791,7 +796,10 @@ module Make(X : sig
   (** Simplify the clause w.r.t to the active set *)
   let forward_simplify c =
     let open SimplM.Infix in
-    ho_normalize c >>= rewrite >>= rw_simplify >>= unary_simplify
+    let _span = ZProf.enter_prof prof_fwd_simplify in
+    let res = ho_normalize c >>= rewrite >>= rw_simplify >>= unary_simplify in
+    ZProf.exit_prof _span;
+    res
 
   let _apply_multi_rules ~rule_list c = 
     let rec apply_rules ~rules c =
@@ -817,13 +825,15 @@ module Make(X : sig
     (!res, !any_simplified)
 
   let cheap_multi_simplify c = 
+    let _span = ZProf.enter_prof prof_cheap_multi in
     let res,any_simplified = _apply_multi_rules ~rule_list:!_cheap_msr c in
+    ZProf.exit_prof _span;
 
     if any_simplified then Some res else None
 
   (** generate all clauses from inferences *)
   let generate given =
-    ZProf.enter_prof prof_generate;
+    let _span = ZProf.enter_prof prof_generate in
     (* binary clauses *)
     let binary_clauses = do_binary_inferences given in
     (* unary inferences *)
@@ -855,7 +865,7 @@ module Make(X : sig
           (append binary_clauses other_clauses))
     in
     Util.add_stat stat_inferred (Iter.length result);
-    ZProf.exit_prof prof_generate;
+    ZProf.exit_prof _span;
     result
 
   (* check whether the clause is redundant w.r.t the current active_set *)
@@ -875,7 +885,7 @@ module Make(X : sig
 
   (** find redundant clauses in current active_set *)
   let subsumed_by c =
-    ZProf.enter_prof prof_subsumed_by;
+    let _span = ZProf.enter_prof prof_subsumed_by in
     let res =
       List.fold_left
         (fun set rule -> rule set c)
@@ -884,7 +894,7 @@ module Make(X : sig
     in
     (* all those clauses are redundant *)
     C.ClauseSet.iter C.mark_redundant res;
-    ZProf.exit_prof prof_subsumed_by;
+    ZProf.exit_prof _span;
     res
 
   (** Use all simplification rules to convert a clause into a list of
@@ -895,7 +905,7 @@ module Make(X : sig
       as simplification
   *)
   let all_simplify c =
-    ZProf.enter_prof prof_all_simplify;
+    let _span = ZProf.enter_prof prof_all_simplify in
     let did_simplify = ref false in
     let set = ref C.ClauseSet.empty in
     let q = Queue.create () in
@@ -926,7 +936,7 @@ module Make(X : sig
     );
     done;
     let res = C.ClauseSet.to_list !set in
-    ZProf.exit_prof prof_all_simplify;
+    ZProf.exit_prof _span;
     if !did_simplify
     then SimplM.return_new res
     else SimplM.return_same res

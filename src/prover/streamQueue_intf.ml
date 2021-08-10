@@ -3,12 +3,10 @@
 
 (** {1 A priority queue of streams} *)
 
-open Logtk
-
 module type S = sig
   module Stm : Stream_intf.S
 
-  (** {6 Weight functions} *)
+  (** {5 Weight functions} *)
   module WeightFun : sig
     type t = Stm.t -> int
     (** attribute a weight to a stream. The smaller, the better (lightweight
@@ -43,12 +41,12 @@ module type S = sig
    *     (meaning that the clause is searched for only when the
    *     time_before_drip counter reaches 0), or raise Not_found.
    *     Guarded recursion: can't loop forever
-   *     @raises Not_found in the guard is reached *\) *)
+   *     @raise Not_found in the guard is reached *\) *)
 
   val take_first : t -> Stm.C.t option
   (** Attempts to take a clause out of the queue.
       Guarded recursion: can't loop forever
-      @raises Not_found in the guard is reached *)
+      @raise Not_found in the guard is reached *)
 
   val take_fair_anyway: t -> Stm.C.t option list
   (** Takes clauses from the queue in a fair manner.
@@ -66,7 +64,7 @@ module type S = sig
   val name : t -> string
   (** Name of the implementation/role of the queue *)
 
-  (** {6 Available Queues} *)
+  (** {5 Available Queues} *)
 
   val make : guard:int -> ratio:int -> weight:(Stm.t -> int) -> string -> t
   (** Creates a priority queue that uses [weight] to sort streams.
@@ -78,7 +76,7 @@ module type S = sig
   val default : unit -> t
   (** Obtain the default queue *)
 
-  (** {6 IO} *)
+  (** {5 IO} *)
 
   val pp : t CCFormat.printer
   val to_string : t -> string

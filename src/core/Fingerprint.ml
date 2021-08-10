@@ -358,7 +358,7 @@ module Make(X : Set.OrderedType) = struct
 
   (** fold on parts of the trie that are compatible with features *)
   let traverse ~compatible idx features k =
-    ZProf.enter_prof prof_traverse;
+    let _span = ZProf.enter_prof prof_traverse in
     (* fold on the trie *)
     let rec recurse trie features =
       match trie, features with
@@ -376,9 +376,9 @@ module Make(X : Set.OrderedType) = struct
     in
     try
       recurse idx.trie features;
-      ZProf.exit_prof prof_traverse;
+      ZProf.exit_prof _span;
     with e ->
-      ZProf.exit_prof prof_traverse;
+      ZProf.exit_prof _span;
       raise e
 
   let retrieve_unifiables_aux fold_unify (idx,sc_idx) t k =

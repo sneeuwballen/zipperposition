@@ -562,6 +562,17 @@ let rec infer_rec ?loc ctx (t:PT.t) : T.t =
               T.let_ ?loc bound_vars u')
       in
       res
+    | PT.With (l, u) ->
+      let vars =
+        List.map
+          (fun (v,ty) ->
+             let ty = infer_ty_ ?loc ctx ty in
+             v, Some ty)
+          l
+      in
+      (* add vars in scope, but just return [u] *)
+      with_typed_vars_ ctx ?loc ~infer_ty:(fun ?loc:_ _ ty -> ty) vars
+        ~f:(fun _vars -> infer_rec ?loc ctx u)
     | PT.Match (u, l) ->
       let u = infer_rec ?loc ctx u in
       let ty_u = T.ty_exn u in
@@ -842,14 +853,14 @@ and infer_prop_ ?loc ctx t : T.t =
   t
 
 let infer_exn ctx t =
-  ZProf.enter_prof prof_infer;
+  let _span = ZProf.enter_prof prof_infer in
   Util.debugf ~section 50 "@[<2>infer type of@ `@[%a@]`@]" (fun k->k PT.pp t);
   try
     let t = infer_rec ctx t in
-    ZProf.exit_prof prof_infer;
+    ZProf.exit_prof _span;
     t
   with e ->
-    ZProf.exit_prof prof_infer;
+    ZProf.exit_prof _span;
     raise e
 
 let infer ctx t =
@@ -858,14 +869,14 @@ let infer ctx t =
     Err.of_exn_trace e
 
 let infer_clause_exn ctx c =
-  ZProf.enter_prof prof_infer;
+  let _span = ZProf.enter_prof prof_infer in
   try
     let c = List.map (infer_prop_ ctx) c in
     Ctx.exit_scope ctx;
-    ZProf.exit_prof prof_infer;
+    ZProf.exit_prof _span;
     c
   with e ->
-    ZProf.exit_prof prof_infer;
+    ZProf.exit_prof _span;
     raise e
 
 let infer_prop_exn ctx t =

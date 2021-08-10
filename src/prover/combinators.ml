@@ -28,7 +28,7 @@ module type S = sig
   module Env : Env.S
   module C : module type of Env.C
 
-  (** {6 Registration} *)
+  (** {5 Registration} *)
   val setup : unit -> unit
   val maybe_conv_lams : Env.C.t -> Env.C.t
   val force_conv_lams : Env.C.t -> Env.C.t

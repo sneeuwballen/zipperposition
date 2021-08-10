@@ -3,8 +3,8 @@
   (name logtk_proofs)
   (public_name logtk.proofs)
   (synopsis "proofs for logtk")
-  (libraries containers logtk)
-  (flags :standard -w -32)
+  (libraries containers logtk logtk.arith)
+  (flags :standard -w -32 -open Logtk_arith)
 )
 
 

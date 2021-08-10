@@ -1,4 +1,4 @@
-# Zipperposition [![build status](https://api.travis-ci.org/sneeuwballen/zipperposition.svg?branch=master)](https://travis-ci.org/sneeuwballen/zipperposition) ![build (gh)](https://github.com/sneeuwballen/zipperposition/workflows/build/badge.svg)
+# Zipperposition ![build (gh)](https://github.com/sneeuwballen/zipperposition/workflows/build/badge.svg)
 
 - Automated theorem prover for first-order logic with equality and theories.
 - Logic toolkit (`logtk`), designed primarily
@@ -10,7 +10,7 @@
 
 Zipperposition is intended to be a superposition prover for full first
 order logic, plus some extensions
-(datatypes, recursive functions, arithmetic, lambda-free higher order).
+(datatypes, recursive functions, lambda-free higher order).
 The accent is on flexibility, modularity and simplicity rather than
 performance, to allow quick experimenting on automated theorem proving. It
 generates TSTP traces or graphviz files for nice graphical display.
@@ -124,7 +124,6 @@ Typical usage:
 ```
 $ zipperposition --help
 $ zipperposition problem_file [options]
-$ zipperposition --arith examples/ARI114=1.p
 $ zipperposition --dot /tmp/foo.dot examples/ind/nat1.zf
 ```
 
@@ -132,7 +131,7 @@ to run the prover. Help is available with the option `--help`.
 For instance,
 
 ```
-$ zipperposition examples/pelletier_problems/pb47.p --ord rpo6 --timeout 30
+$ zipperposition examples/pelletier_problems/pb47.p --timeout 30
 ```
 
 To build the library, documentation, and tools, type in a terminal located in

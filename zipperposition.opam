@@ -2,7 +2,7 @@ opam-version: "2.0"
 maintainer: "simon.cruanes.2007@m4x.org"
 authors: ["Simon Cruanes" "Petar Vukmirovic" "Alexander Bentkamp" "Sophie Tourret" "Visa Nummelin"]
 homepage: "https://github.com/sneeuwballen/zipperposition"
-version: "1.6"
+version: "2.0"
 synopsis: "A fully automatic theorem prover for typed higher-order and beyond"
 build: [
   ["dune" "build" "-p" name "-j" jobs]
@@ -11,16 +11,15 @@ build: [
 ]
 depends: [
   "base-unix"
-  "zarith"
   "logtk" { = version }
   "libzipperposition" { = version }
-  "containers" { >= "2.8" }
+  "containers" { >= "3.0" & < "4.0" }
   "iter" { >= "1.2" }
   "oseq"
   "dune" { >= "1.11" }
-  "msat" { >= "0.8" < "0.9" }
+  "msat" { >= "0.8" < "0.10" }
   "menhir" {build}
-  "ocaml" {>= "4.03"}
+  "ocaml" {>= "4.07"}
 ]
 tags: [ "logic" "unification" "term" "superposition" "prover" ]
 bug-reports: "https://github.com/sneeuwballen/zipperposition/issues"

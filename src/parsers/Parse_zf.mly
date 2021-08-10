@@ -284,6 +284,12 @@ term:
       let loc = L.mk_pos $startpos $endpos in
       T.lambda ~loc vars t
     }
+  | WITH vars=mandatory_typed_var_list DOT t=term
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      let vars = List.map (fun (v,ty) -> T.V v, ty) vars in
+      T.with_ ~loc vars t
+    }
   | t=apply_term ARROW u=term
     {
       let loc = L.mk_pos $startpos $endpos in

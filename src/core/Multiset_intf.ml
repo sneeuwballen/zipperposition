@@ -119,7 +119,7 @@ module type S = sig
   (** Remove common elements from the multisets. For instance,
       on [{1,1,2}] and [{1,2,2,3}], [cancel] will return [({1}, {2,3})] *)
 
-  (** {6 Comparisons}
+  (** {5 Comparisons}
 
       In the following, the comparison function must be equality-compatible
       with [E.compare]. In other words, if [E.compare x y = 0] then

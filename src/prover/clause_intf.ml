@@ -243,8 +243,6 @@ module type S = sig
     val eq : t
     (** Equations *)
 
-    val arith : t
-
     val filter : (Literal.t -> bool) -> t
 
     val max : clause -> t
@@ -308,6 +306,7 @@ module type S = sig
   val pp_tstp_full : t CCFormat.printer  (** Print in a cnf() statement *)
 
   val to_string : t -> string (** Debug printing to a  string *)
+  val to_string_tstp : t -> string
 
   val pp_set : ClauseSet.t CCFormat.printer
   val pp_set_tstp : ClauseSet.t CCFormat.printer

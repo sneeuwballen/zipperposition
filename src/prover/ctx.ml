@@ -79,18 +79,18 @@ module Make(X : PARAMETERS) = struct
     ()
 
   let add_signature signature =
-    ZProf.enter_prof prof_add_signature;
+    let _span = ZProf.enter_prof prof_add_signature in
     let _diff = Signature.diff signature !_signature in
     (* declare new symbols *)
     Signature.iter _diff declare_new_;
-    ZProf.exit_prof prof_add_signature;
+    ZProf.exit_prof _span;
     ()
 
   let declare symb ty =
-    ZProf.enter_prof prof_declare_sym;
+    let _span = ZProf.enter_prof prof_declare_sym in
     let is_new = not (Signature.mem !_signature symb) in
     if is_new then declare_new_ symb (ty,false);
-    ZProf.exit_prof prof_declare_sym;
+    ZProf.exit_prof _span;
     ()
 
   let declare_syms l =

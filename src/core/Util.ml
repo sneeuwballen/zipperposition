@@ -8,16 +8,13 @@ module Fmt = CCFormat
 
 type timestamp = float
 
-let timestamp_sub a b = a -. b
-let timestamp_add a b = a +. b
-let timestamp_cmp = CCFloat.compare
+let start_ = Mtime_clock.now()
 
-let get_time_mon_() : timestamp = Unix.gettimeofday()
+let get_time_mon_us () : timestamp =
+  let t = Mtime_clock.now() in
+  Mtime.Span.to_us (Mtime.span start_ t)
 
-let start_ = get_time_mon_()
-
-let total_time_s () = timestamp_sub (get_time_mon_()) start_
-let start_time () = start_
+let total_time_s () = get_time_mon_us () *. 1e-6
 
 (** {2 Misc} *)
 

@@ -415,7 +415,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       (_update_simpl UnitIdx.remove);
     ()
 
-  (** {6 Inference Rules} *)
+  (** {5 Inference Rules} *)
 
   (* ----------------------------------------------------------------------
    * Superposition rule
@@ -1020,7 +1020,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     else do_classic_superposition info
 
   let infer_active_aux ~retrieve_from_index ~process_retrieved clause =
-    ZProf.enter_prof prof_infer_active;
+    let _span = ZProf.enter_prof prof_infer_active in
     (* no literal can be eligible for paramodulation if some are selected.
        This checks if inferences with i-th literal are needed? *)
     let eligible = C.Eligible.param clause in
@@ -1053,11 +1053,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       |> Iter.to_rev_list
 
     in
-    ZProf.exit_prof prof_infer_active;
+    ZProf.exit_prof _span;
     new_clauses
 
   let infer_passive_aux ~retrieve_from_index ~process_retrieved clause =
-    ZProf.enter_prof prof_infer_passive;
+    let _span = ZProf.enter_prof prof_infer_passive in
     (* perform inference on this lit? *)
     let eligible = C.Eligible.(res clause) in
     (* do the inferences in which clause is passive (rewritten),
@@ -1097,7 +1097,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         )
       |> Iter.to_rev_list
     in
-    ZProf.exit_prof prof_infer_passive;
+    ZProf.exit_prof _span;
     new_clauses
 
   let infer_active clause =
@@ -1143,6 +1143,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       clause
 
   let infer_lambdasup_into clause =
+    let _span = ZProf.enter_prof prof_infer_active in
     (* perform inference on this lit? *)
     let eligible = C.Eligible.(res clause) in
     (* do the inferences in which clause is passive (rewritten),
@@ -1188,7 +1189,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
            |> Iter.filter_map (fun (t,p,s) -> do_sup t p s))
       |> Iter.to_rev_list
     in
-    ZProf.exit_prof prof_infer_passive;
+    ZProf.exit_prof _span;
     new_clauses
   
   let infer_active_complete_ho clause =
@@ -1237,7 +1238,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
    * ---------------------------------------------------------------------- *)
 
   let infer_fluidsup_active clause =
-    ZProf.enter_prof prof_infer_fluidsup_active;
+    let _span = ZProf.enter_prof prof_infer_fluidsup_active in
     (* no literal can be eligible for paramodulation if some are selected.
        This checks if inferences with i-th literal are needed? *)
     let eligible = C.Eligible.param clause in
@@ -1289,11 +1290,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     ) else (
       let stm_res = List.map (fun (p,s,parents) -> Stm.make ~penalty:p ~parents (s)) new_clauses in
       StmQ.add_lst (Env.get_stm_queue ()) stm_res;
-      ZProf.exit_prof prof_infer_fluidsup_active;
+      ZProf.exit_prof _span;
       [])
 
   let infer_fluidsup_passive clause =
-    ZProf.enter_prof prof_infer_fluidsup_passive;
+    let _span = ZProf.enter_prof prof_infer_fluidsup_passive in
     (* perform inference on this lit? *)
     let eligible = C.Eligible.(res clause) in
     (* do the inferences in which clause is passive (rewritten),
@@ -1345,7 +1346,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     ) else (
       let stm_res = List.map (fun (p,s,parents) -> Stm.make ~penalty:p ~parents (s)) new_clauses in
       StmQ.add_lst (Env.get_stm_queue ()) stm_res;
-      ZProf.exit_prof prof_infer_fluidsup_passive;
+      ZProf.exit_prof _span;
       []
     )
 
@@ -1354,6 +1355,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
    * ---------------------------------------------------------------------- *)
 
   let infer_dupsup_active clause =
+    let _span = ZProf.enter_prof prof_infer_active in
     let eligible = C.Eligible.param clause in
     let new_clauses =
       Lits.fold_eqn ~ord ~both:true ~eligible (C.lits clause)
@@ -1418,12 +1420,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     ) else (
       let stm_res = List.map (fun (p,s,parents) -> Stm.make ~penalty:p ~parents ( s)) new_clauses in
       StmQ.add_lst (Env.get_stm_queue ()) stm_res;
-      ZProf.exit_prof prof_infer_fluidsup_active;
+      ZProf.exit_prof _span;
       []
     )
 
   let infer_dupsup_passive clause =
-    ZProf.enter_prof prof_infer_fluidsup_passive;
+    let _span = ZProf.enter_prof prof_infer_fluidsup_passive in
     (* perform inference on this lit? *)
     let eligible = C.Eligible.(res clause) in
     (* do the inferences in which clause is passive (rewritten),
@@ -1493,7 +1495,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     ) else (
       let stm_res = List.map (fun (p,s,parents) -> Stm.make ~penalty:p ~parents (s)) new_clauses in
       StmQ.add_lst (Env.get_stm_queue ()) stm_res;
-      ZProf.exit_prof prof_infer_fluidsup_passive;
+      ZProf.exit_prof _span;
       [])
 
   (* ----------------------------------------------------------------------
@@ -1593,7 +1595,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
    * ---------------------------------------------------------------------- *)
 
   let infer_equality_resolution_aux ~unify ~iterate_substs clause =
-    ZProf.enter_prof prof_infer_equality_resolution;
+    let _span = ZProf.enter_prof prof_infer_equality_resolution in
     let eligible = C.Eligible.filter (fun lit -> not @@ Lit.is_predicate_lit lit) in
     (* iterate on those literals *)
     let new_clauses =
@@ -1636,7 +1638,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         )
       |> Iter.to_rev_list
     in
-    ZProf.exit_prof prof_infer_equality_resolution;
+    ZProf.exit_prof _span;
     new_clauses
 
   let infer_equality_resolution c =
@@ -1729,7 +1731,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     ) else(None)
 
   let infer_equality_factoring_aux ~unify ~iterate_substs clause =
-    ZProf.enter_prof prof_infer_equality_factoring;
+    let _span = ZProf.enter_prof prof_infer_equality_factoring in
     let eligible = C.Eligible.(filter Lit.eqn_sign) in
     (* find root terms that are unifiable with s and are not in the
        literal at s_pos. Calls [k] with a position and substitution *)
@@ -1767,7 +1769,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                    do_eq_factoring info)))
       |> Iter.to_rev_list
     in
-    ZProf.exit_prof prof_infer_equality_factoring;
+    ZProf.exit_prof _span;
     new_clauses
 
   let infer_equality_factoring c =
@@ -1797,7 +1799,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
    * ---------------------------------------------------------------------- *)
 
   let extract_from_stream_queue ~full () =
-    ZProf.enter_prof prof_queues;
+    let _span = ZProf.enter_prof prof_queues in
     let cl =
       if full then
         StmQ.take_fair_anyway (Env.get_stm_queue ())
@@ -1805,13 +1807,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         StmQ.take_stm_nb (Env.get_stm_queue ())
     in
     let opt_res = CCOpt.sequence_l (List.filter CCOpt.is_some cl)  in
-    ZProf.exit_prof prof_queues;
+    ZProf.exit_prof _span;
     match opt_res with
     | None -> []
     | Some l ->  l
 
   let extract_from_stream_queue_fix_stm ~full () =
-    ZProf.enter_prof prof_queues;
+    let _span = ZProf.enter_prof prof_queues in
     let cl =
       if full then
         StmQ.take_fair_anyway (Env.get_stm_queue ())
@@ -1819,7 +1821,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         StmQ.take_stm_nb_fix_stm (Env.get_stm_queue ())
     in
     let opt_res = CCOpt.sequence_l (List.filter CCOpt.is_some cl) in
-    ZProf.exit_prof prof_queues;
+    ZProf.exit_prof _span;
     match opt_res with
     | None -> []
     | Some l -> l
@@ -2157,7 +2159,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   (** Find clauses that [given] may demodulate, add them to set *)
   let backward_demodulate set given =
-    ZProf.enter_prof prof_back_demodulate;
+    let _span = ZProf.enter_prof prof_back_demodulate in
     let renaming = Subst.Renaming.create () in
     (* find clauses that might be rewritten by l -> r *)
     let recurse ~oriented set l r =
@@ -2189,7 +2191,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         end
       | _ -> set
     in
-    ZProf.exit_prof prof_back_demodulate;
+    ZProf.exit_prof _span;
     set'
 
   let is_tautology c =
@@ -2245,7 +2247,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     if C.get_flag flag_simplified c
     then SimplM.return_same c
     else (
-      ZProf.enter_prof prof_basic_simplify;
+      let _span = ZProf.enter_prof prof_basic_simplify in
       Util.incr_stat stat_basic_simplify_calls;
       let lits = C.lits c in
       let has_changed = ref false in
@@ -2309,7 +2311,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       in
       let new_lits = CCList.uniq ~eq:Lit.equal_com new_lits in
       if not !has_changed && List.length new_lits = Array.length lits then (
-        ZProf.exit_prof prof_basic_simplify;
+        ZProf.exit_prof _span;
         C.set_flag flag_simplified c true;
         SimplM.return_same c  (* no simplification *)
       ) else (
@@ -2328,7 +2330,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           "@[<>@[%a@]@ @[<2>basic_simplifies into@ @[%a@]@]@ with @[%a@]@]"
           (fun k->k C.pp c C.pp new_clause US.pp !us);
         Util.incr_stat stat_basic_simplify;
-        ZProf.exit_prof prof_basic_simplify;
+        ZProf.exit_prof _span;
         SimplM.return_new new_clause
       )
     )
@@ -2514,11 +2516,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let simplifier =
       if Env.flex_get k_strong_sr then do_strong_sr else do_regular_sr
     in
-    ZProf.enter_prof prof_pos_simplify_reflect;
+    let _span = ZProf.enter_prof prof_pos_simplify_reflect in
     (* iterate through literals and try to resolve negative ones *)
     match simplifier c with
     | None -> 
-      ZProf.exit_prof prof_pos_simplify_reflect;
+      ZProf.exit_prof _span;
       SimplM.return_same c
     | Some (new_lits,premises) ->
       let proof =
@@ -2528,11 +2530,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let new_c = C.create ~trail ~penalty new_lits proof in
       Util.debugf ~section 3 "@[@[%a@]@ pos_simplify_reflect into @[%a@]@]"
         (fun k->k C.pp c C.pp new_c);
-      ZProf.exit_prof prof_pos_simplify_reflect;
+      ZProf.exit_prof _span;
       SimplM.return_new new_c
 
   let negative_simplify_reflect c =
-    ZProf.enter_prof prof_neg_simplify_reflect;
+    let _span = ZProf.enter_prof prof_neg_simplify_reflect in
     (* iterate through literals and try to resolve positive ones *)
     let rec iterate_lits acc lits clauses = match lits with
       | [] -> List.rev acc, clauses
@@ -2554,7 +2556,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     if List.length lits = Array.length (C.lits c)
     then (
       (* no literal removed *)
-      ZProf.exit_prof prof_neg_simplify_reflect;
+      ZProf.exit_prof _span;
       Util.debug ~section 3 "neg_reflect did not simplify the clause";
       SimplM.return_same c
     ) else (
@@ -2565,7 +2567,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) lits proof in
       Util.debugf ~section 3 "@[@[%a@]@ neg_simplify_reflect into @[%a@]@]"
         (fun k->k C.pp c C.pp new_c);
-      ZProf.exit_prof prof_neg_simplify_reflect;
+      ZProf.exit_prof _span;
       SimplM.return_new new_c
     )
 
@@ -2714,7 +2716,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     )
 
   let subsumes_with a b =
-    ZProf.enter_prof prof_subsumption;
+    let _span = ZProf.enter_prof prof_subsumption in
     Util.incr_stat stat_subsumption_call;
     let (c_a, _), (c_b, _) = a,b in
     let w_a = CCArray.fold (fun acc l -> acc + Lit.weight l) 0 c_a in
@@ -2723,7 +2725,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     if w_a = w_b && Literals.equal_com c_a c_b then Some (Subst.empty, [])
     else (
       let res = if w_a <= w_b then subsumes_with_ a b else None in
-      ZProf.exit_prof prof_subsumption;
+      ZProf.exit_prof _span;
       res
     )
 
@@ -2778,7 +2780,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       end
     in
     (* check for each literal *)
-    ZProf.enter_prof prof_eq_subsumption;
+    let _span = ZProf.enter_prof prof_eq_subsumption in
     Util.incr_stat stat_eq_subsumption_call;
     let res = match a with
       | [|Lit.Equation (s, t, true)|] ->
@@ -2793,13 +2795,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         end
       | _ -> None (* only a positive unit clause unit-subsumes a clause *)
     in
-    ZProf.exit_prof prof_eq_subsumption;
+    ZProf.exit_prof _span;
     res
 
   let eq_subsumes a b = CCOpt.is_some (eq_subsumes_with (a,1) (b,0))
 
   let subsumed_by_active_set c =
-    ZProf.enter_prof prof_subsumption_set;
+    let _span = ZProf.enter_prof prof_subsumption_set in
     Util.incr_stat stat_subsumed_by_active_set_call;
     (* if there is an equation in c, try equality subsumption *)
     let try_eq_subsumption = CCArray.exists Lit.is_eqn (C.lits c) in
@@ -2822,11 +2824,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
            );
            res)
     in
-    ZProf.exit_prof prof_subsumption_set;
+    ZProf.exit_prof _span;
     res
 
   let subsumed_in_active_set acc c =
-    ZProf.enter_prof prof_subsumption_in_set;
+    let _span = ZProf.enter_prof prof_subsumption_in_set in
     Util.incr_stat stat_subsumed_in_active_set_call;
     (* if c is a single unit clause *)
     let try_eq_subsumption =
@@ -2851,7 +2853,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
            else res)
         acc
     in
-    ZProf.exit_prof prof_subsumption_in_set;
+    ZProf.exit_prof _span;
     res
 
   (* Number of equational lits. Used as an estimation for the difficulty of the subsumption
@@ -2931,9 +2933,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     )
 
   let contextual_literal_cutting c =
-    ZProf.enter_prof prof_clc;
-    let res = contextual_literal_cutting_rec c in
-    ZProf.exit_prof prof_clc;
+    let res = ZProf.with_prof prof_clc contextual_literal_cutting_rec c in
     res
 
   (* ----------------------------------------------------------------------
