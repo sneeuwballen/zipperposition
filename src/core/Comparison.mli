@@ -7,7 +7,7 @@
 
 type t = Lt | Leq | Eq | Geq | Gt | Incomparable
 
-type nonstrict_comparison = t
+type comparison = t
 
 val equal : t -> t -> bool
 

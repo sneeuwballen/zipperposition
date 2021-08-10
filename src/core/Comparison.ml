@@ -7,7 +7,7 @@
 
 type t = Lt | Leq | Eq | Geq | Gt | Incomparable
 
-type nonstrict_comparison = t
+type comparison = t
 let equal : t -> t -> bool = Pervasives.(=)
 
 let to_string = function

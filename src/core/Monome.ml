@@ -831,8 +831,8 @@ module Int = struct
   let to_multiset m =
     Seq.coeffs_swap m |> Multisets.MT.Seq.of_coeffs Multisets.MT.empty
 
-  let compare_nonstrict f m1 m2 =
-    Multisets.MT.compare_partial_nonstrict f (to_multiset m1) (to_multiset m2)
+  let compare f m1 m2 =
+    Multisets.MT.compare_partial f (to_multiset m1) (to_multiset m2)
 
   (** {2 Specific to Int} *)
 

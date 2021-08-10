@@ -326,7 +326,7 @@ module Make(E : Map.OrderedType) = struct
     in
     check_left ~met_gt:false ~left1:[] m1 m2
 
-  let compare_partial_nonstrict f m1 m2 =
+  let compare_partial f m1 m2 =
     let met_geq_or_leq = ref false in
     let cmp = do_compare_partial_strict ~met_geq_or_leq f m1 m2 in
     match cmp, !met_geq_or_leq with
@@ -400,8 +400,8 @@ module Make(E : Map.OrderedType) = struct
     max_seq f (of_list l)
     |> Iter.fold (fun acc (x, _) -> x :: acc) []
 
-  let compare_partial_nonstrict_l f l1 l2 =
-    compare_partial_nonstrict f (of_list l1) (of_list l2)
+  let compare_partial_l f l1 l2 =
+    compare_partial f (of_list l1) (of_list l2)
 
   let pp pp_x out m =
     let pp_p out (x,n) = Format.fprintf out "%a: %s" pp_x x (Z.to_string n) in

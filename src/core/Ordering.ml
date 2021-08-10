@@ -515,7 +515,7 @@ module MakeRPO (P : PARAMETERS) : ORD = struct
       C.opp (cMA ~prec t ss)
   (* multiset comparison of subterms (not optimized) *)
   and cMultiset ~prec s t ss ts =
-    match MT.compare_partial_nonstrict_l (rpo6 ~prec) ss ts with
+    match MT.compare_partial_l (rpo6 ~prec) ss ts with
     | C.Gt -> cMA ~prec s ts
     | Lt -> C.opp (cMA ~prec t ss)
     | _ -> Incomparable

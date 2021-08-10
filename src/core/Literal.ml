@@ -934,7 +934,7 @@ module Comp = struct
 
   (* by multiset of terms *)
   let _cmp_by_term_multiset ~ord l1 l2 =
-    Multisets.MT.compare_partial_nonstrict (Ordering.compare ord)
+    Multisets.MT.compare_partial (Ordering.compare ord)
       (to_multiset l1) (to_multiset l2)
 
   let _cmp_specific ~ord l1 l2 =
@@ -954,8 +954,8 @@ module Comp = struct
       let module MI = Monome.Int in
       let left = Multisets.MMT.doubleton (MI.to_multiset x1) (MI.to_multiset y1) in
       let right = Multisets.MMT.doubleton (MI.to_multiset x2) (MI.to_multiset y2) in
-      Multisets.MMT.compare_partial_nonstrict
-          (Multisets.MT.compare_partial_nonstrict (Ordering.compare ord))
+      Multisets.MMT.compare_partial
+          (Multisets.MT.compare_partial (Ordering.compare ord))
         left right
     | Int(AL.Divides d1), Int(AL.Divides d2) ->
       assert (d1.AL.sign=d2.AL.sign);
@@ -972,7 +972,7 @@ module Comp = struct
       let module M = Monome.Rat in
       let m1 = Multisets.MT.union (M.to_multiset l1) (M.to_multiset r1) in
       let m2 = Multisets.MT.union (M.to_multiset l2) (M.to_multiset r2) in
-      Multisets.MT.compare_partial_nonstrict (Ordering.compare ord) m1 m2
+      Multisets.MT.compare_partial (Ordering.compare ord) m1 m2
     | _, _ ->
       Util.debugf 5 "(@[bad_compare %a %a@])" (fun k -> k pp l1 pp l2);
       assert false

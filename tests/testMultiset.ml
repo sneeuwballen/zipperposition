@@ -24,7 +24,7 @@ let test_compare = "multiset.compare", `Quick, fun()->
   let m1 = M.of_list [1;1;2;3] in
   let m2 = M.of_list [1;2;2;3] in
   Alcotest.(check (module Comparison)) "must be lt"
-    Comparison.Lt (M.compare_partial_nonstrict f m1 m2);
+    Comparison.Lt (M.compare_partial f m1 m2);
   Alcotest.(check bool) "ord" true (M.compare m1 m2 < 0);
   ()
 
@@ -60,7 +60,7 @@ let compare_and_partial =
   (* "naive" comparison function (using the general ordering on multisets) *)
   let compare' m1 m2 =
     let f x y = Comparison.of_total (CCInt.compare x y) in
-    Comparison.to_total (M.compare_partial_nonstrict f m1 m2)
+    Comparison.to_total (M.compare_partial f m1 m2)
   in
   let prop (m1,m2) =
     _sign (compare' m1 m2) = _sign (M.compare m1 m2)
@@ -70,15 +70,15 @@ let compare_and_partial =
     (Q.pair gen1 gen1) prop
 
 (* partial order for tests *)
-let partial_ord_nonstrict (x:int) y =
+let partial_ord (x:int) y =
   if x=y then Comparison.Eq
   else if (x/5=y/5 && x mod 5 <> y mod 5) then Incomparable
   else CCInt.compare (x/5) (y/5) |> Comparison.of_total
 
 let compare_partial_sym =
   let prop (m1,m2) =
-    let c1 = M.compare_partial_nonstrict partial_ord_nonstrict m1 m2 in
-    let c2 =  Comparison.opp (M.compare_partial_nonstrict partial_ord_nonstrict m2 m1) in
+    let c1 = M.compare_partial partial_ord m1 m2 in
+    let c2 =  Comparison.opp (M.compare_partial partial_ord m2 m1) in
     if c1=c2 
     then true
     else Q.Test.fail_reportf "comparison: %a vs %a" Comparison.pp c1 Comparison.pp c2
@@ -89,9 +89,9 @@ let compare_partial_sym =
 
 let compare_partial_trans =
   let prop (m1,m2,m3) =
-    let c1 = M.compare_partial_nonstrict partial_ord_nonstrict m1 m2 in
-    let c2 = M.compare_partial_nonstrict partial_ord_nonstrict m2 m3 in
-    let c3 = M.compare_partial_nonstrict partial_ord_nonstrict m1 m3 in
+    let c1 = M.compare_partial partial_ord m1 m2 in
+    let c2 = M.compare_partial partial_ord m2 m3 in
+    let c3 = M.compare_partial partial_ord m1 m3 in
     begin match c1, c2, c3 with
       | Comparison.Incomparable, _, _
       | _, Comparison.Incomparable, _
@@ -131,9 +131,9 @@ let compare_partial_trans =
 
 let max_seq_correct =
   let prop m =
-    let l1 = M.max_seq partial_ord_nonstrict m |> Iter.map fst |> Iter.to_list in
+    let l1 = M.max_seq partial_ord m |> Iter.map fst |> Iter.to_list in
     let l2 = M.to_list m |> List.map fst
-      |> List.filter (fun x -> M.is_max partial_ord_nonstrict x m) in
+      |> List.filter (fun x -> M.is_max partial_ord x m) in
     if l1=l2 then true
     else Q.Test.fail_reportf "@[max_seq %a,@ max %a@]"
         CCFormat.Dump.(list int) l1

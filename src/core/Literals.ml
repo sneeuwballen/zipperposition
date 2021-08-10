@@ -36,7 +36,7 @@ let compare = CCArray.compare Lit.compare
 
 let compare_multiset ~ord (l1:t) (l2:t) =
   let module M = Multiset.Make(Literal) in
-  M.compare_partial_nonstrict_l (Literal.Comp.compare ~ord)
+  M.compare_partial_l (Literal.Comp.compare ~ord)
     (Array.to_list l1) (Array.to_list l2)
 
 let hash lits = Hash.array Lit.hash lits

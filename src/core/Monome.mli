@@ -315,8 +315,7 @@ module Int : sig
       some constants, so that their coefficient for [t] is the same.
       @raise Invalid_argument if [t] does not belong to [m1] or [m2] *)
 
-  val compare_nonstrict :
-    (term -> term -> Comparison.t) -> t -> t -> Comparison.t
+  val compare : (term -> term -> Comparison.t) -> t -> t -> Comparison.t
   (** Compare monomes as if they were multisets of terms, the coefficient
       in front of a term being its multiplicity. *)
 

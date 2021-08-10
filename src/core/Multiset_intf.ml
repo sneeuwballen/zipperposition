@@ -128,8 +128,7 @@ module type S = sig
   val compare : t -> t -> int
   (** Compare two multisets with the multiset extension of {!E.compare} *)
 
-  val compare_partial_nonstrict :
-    (elt -> elt -> Comparison.t) -> t -> t -> Comparison.t
+  val compare_partial : (elt -> elt -> Comparison.t) -> t -> t -> Comparison.t
   (** Compare two multisets with the multiset extension of the
       given ordering. This ordering is total iff the element
       ordering is. *)
@@ -147,7 +146,7 @@ module type S = sig
   val max_l : (elt -> elt -> Comparison.t) -> elt list -> elt list
   (** Maximal elements of a list *)
 
-  val compare_partial_nonstrict_l :
+  val compare_partial_l :
     (elt -> elt -> Comparison.t) -> elt list -> elt list -> Comparison.t
   (** Compare two multisets represented as list of elements *)
 
