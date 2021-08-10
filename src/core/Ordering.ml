@@ -928,6 +928,9 @@ end
 module LambdaKBO : ORD = struct
   let name = "lambda_kbo"
 
+  (* for debugging *)
+  let crude_applied_vars = false
+
   let add_monomial w sign coeff unks =
     Polynomial.add_monomial w (W.mult sign coeff) unks
 
@@ -981,20 +984,24 @@ module LambdaKBO : ORD = struct
   let mk_placeholder_var ty var =
     Term.var (HVar.cast ~ty var)
 
-  let rec normalize_consts ~prec t = match T.view t with
-    | AppBuiltin (b, bargs) ->
-      Term.app_builtin ~ty:(Term.ty t) b
-        (List.map (normalize_consts ~prec) bargs)
-    | Const fid ->
-      let fid' = id_of_weight (Prec.weight prec fid) in
-      Term.const ~ty:(Term.ty t) fid'
-    | Fun (ty, body) -> Term.fun_ ty (normalize_consts ~prec body)
-    | App (s, ts) ->
-      Term.app (normalize_consts ~prec s) (List.map (normalize_consts ~prec) ts)
-    | _ -> t
+  let rec normalize_consts ~prec t =
+    if crude_applied_vars then
+      t
+    else
+      match T.view t with
+      | AppBuiltin (b, bargs) ->
+        Term.app_builtin ~ty:(Term.ty t) b
+          (List.map (normalize_consts ~prec) bargs)
+      | Const fid ->
+        let fid' = id_of_weight (Prec.weight prec fid) in
+        Term.const ~ty:(Term.ty t) fid'
+      | Fun (ty, body) -> Term.fun_ ty (normalize_consts ~prec body)
+      | App (s, ts) ->
+        Term.app (normalize_consts ~prec s) (List.map (normalize_consts ~prec) ts)
+      | _ -> t
 
   let categorize_var_arg var arg arg_ty (some_args, extra_args) =
-    if Type.is_var arg_ty || Type.is_fun arg_ty then
+    if crude_applied_vars || Type.is_var arg_ty || Type.is_fun arg_ty then
       (arg :: some_args, extra_args)
     else
       (mk_placeholder_var arg_ty var :: some_args, arg :: extra_args)
