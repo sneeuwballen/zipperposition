@@ -801,18 +801,18 @@ end
 module Polynomial = struct
   type unknown =
     | EtaUnknown of Type.t HVar.t  (* h *)
-    | WeightUnknown of term  (* w *)
-    | CoeffUnknown of term * int  (* k *)
+    | WeightUnknown of term list  (* w *)
+    | CoeffUnknown of term list * int  (* k *)
 
   let compare unk2 unk1 = match unk2, unk1 with
   | EtaUnknown y, EtaUnknown x -> HVar.compare Type.compare y x
   | EtaUnknown _, _ -> +1
   | _, EtaUnknown _ -> -1
-  | WeightUnknown t, WeightUnknown s -> T.compare t s
+  | WeightUnknown ts, WeightUnknown ss -> CCList.compare T.compare ts ss
   | WeightUnknown _, _ -> +1
   | _, WeightUnknown _ -> -1
-  | CoeffUnknown (t, j), CoeffUnknown (s, i) ->
-    (match T.compare t s with
+  | CoeffUnknown (ts, j), CoeffUnknown (ss, i) ->
+    (match CCList.compare T.compare ts ss with
      | 0 -> CCInt.compare j i
      | n -> n)
 
@@ -820,21 +820,21 @@ module Polynomial = struct
 
   let hash_unknown = function
     | EtaUnknown var -> HVar.hash var
-    | WeightUnknown t -> Term.hash t
-    | CoeffUnknown (t, i) -> Term.hash t + i + 1
+    | WeightUnknown ts -> Hash.list Term.hash ts
+    | CoeffUnknown (ts, i) -> Hash.list Term.hash ts + i + 1
 
   let pp_unknown out = function
     | EtaUnknown var ->
       Format.pp_print_string out "h_{";
       HVar.pp out var;
       Format.pp_print_string out "}"
-    | WeightUnknown t ->
+    | WeightUnknown ts ->
       Format.pp_print_string out "w_{";
-      Term.pp out t;
+      CCList.pp Term.pp out ts;
       Format.pp_print_string out "}"
-    | CoeffUnknown (t, i) ->
+    | CoeffUnknown (ts, i) ->
       Format.pp_print_string out "k_{";
-      Term.pp out t;
+      CCList.pp Term.pp out ts;
       Format.pp_print_string out ",";
       Format.pp_print_int out i;
       Format.pp_print_string out "}"
@@ -1045,25 +1045,24 @@ module LambdaKBO : ORD = struct
     | Var var ->
       if CCList.is_empty args then (
         add_monomial w sign W.one [];
-        add_monomial w sign W.one [Polynomial.WeightUnknown hd]
+        add_monomial w sign W.one [Polynomial.WeightUnknown [hd]]
       ) else (
         let (arg_tys, _) = Type.open_fun (Term.ty hd) in
         let (some_args, extra_args) =
           List.fold_right2 (categorize_var_arg var) args arg_tys ([], [])
         in
         let some_normal_args = List.map (normalize_consts ~prec) some_args in
-        let var_some_normal_args = T.app hd some_normal_args in
         let add_weight_of_extra_arg i arg =
           let w' = Polynomial.create_zero () in
           add_weight_of ~prec w' sign arg;
           add_monomial w' (-1 * sign) W.one [];
           Polynomial.multiply_unknowns w'
-            [Polynomial.CoeffUnknown (var_some_normal_args, i + 1)];
+            [Polynomial.CoeffUnknown (hd :: some_normal_args, i + 1)];
           Polynomial.add w w'
         in
         add_monomial w sign W.one [];
         add_monomial w sign W.one
-          [Polynomial.WeightUnknown var_some_normal_args];
+          [Polynomial.WeightUnknown (hd :: some_normal_args)];
         List.iteri add_weight_of_extra_arg extra_args
       )
     | Const fid ->
@@ -1171,7 +1170,6 @@ module LambdaKBO : ORD = struct
         in
         if CCList.equal T.equal some_normal_t_args some_normal_s_args
            && CCList.for_all2 cant_flip some_t_args some_s_args then
-          let var_some_normal_args = T.app t_hd some_normal_t_args in
           let (arg_ws, cmp) =
             cw_ext_data (process_terms ~prec)
               (some_t_args @ extra_t_args) (some_s_args @ extra_s_args)
@@ -1179,7 +1177,7 @@ module LambdaKBO : ORD = struct
           let extra_arg_ws = CCList.drop (List.length some_t_args) arg_ws in
           let add_weight_of_extra_arg i arg_w =
             Polynomial.multiply_unknowns arg_w
-              [Polynomial.CoeffUnknown (var_some_normal_args, i + 1)];
+              [Polynomial.CoeffUnknown (t_hd :: some_normal_t_args, i + 1)];
             Polynomial.add w arg_w
           in
           List.iteri add_weight_of_extra_arg extra_arg_ws;
