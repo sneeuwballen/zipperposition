@@ -1010,9 +1010,6 @@ module LambdaKBO : ORD = struct
       (some_args, arg :: extra_args)
 
   let rec add_weight_of ~prec w sign t =
-    let add_weights_of w =
-      List.iter (add_weight_of ~prec w sign)
-    in
     let add_eta_extra_of w ty = match Type.view ty with
       | Var var ->
         add_monomial w sign (W.add (Prec.lam_weight prec) (Prec.db_weight prec))
@@ -1029,11 +1026,11 @@ module LambdaKBO : ORD = struct
          desideratum that a quantified formula should be larger than its
          instances. *)
       add_monomial w sign (if is_quantifier b then W.omega else W.one) [];
-      add_weights_of w bargs;
-      add_weights_of w args
+      List.iter (add_weight_of ~prec w sign) bargs;
+      List.iter (add_weight_of ~prec w sign) args
     | DB i ->
       add_monomial w sign (Prec.db_weight prec) [];
-      add_weights_of w args;
+      List.iter (add_weight_of ~prec w sign) args;
       add_eta_extra_of w (Term.ty hd)
     | Var var ->
       if CCList.is_empty args then (
@@ -1058,7 +1055,10 @@ module LambdaKBO : ORD = struct
       )
     | Const fid ->
       add_monomial w sign (Prec.weight prec fid) [];
-      add_weights_of w args;
+      (* we abuse the meaning of the word "sign" below *)
+      List.iteri (fun i arg ->
+          add_weight_of ~prec w (sign * Prec.arg_coeff prec fid i) arg)
+        args;
       add_eta_extra_of w (Term.ty t)
     | Fun (_, body) ->
       add_monomial w sign (Prec.lam_weight prec) [];
