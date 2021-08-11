@@ -990,8 +990,8 @@ module LambdaKBO : ORD = struct
     | _ -> false
 
   (* The ordering might flip if one eta-reduced side is a lambda-expression. *)
-  let cant_flip t s =
-    is_stable t && is_stable s
+  let cannot_flip t s =
+    T.equal t s || (is_stable t && is_stable s)
 
   let rec normalize_consts ~prec t =
     if crude_applied_vars then
@@ -1020,7 +1020,9 @@ module LambdaKBO : ORD = struct
       List.iter (add_weight_of ~prec w sign)
     in
     let add_eta_extra_of w ty = match Type.view ty with
-      | Var var -> add_monomial w sign W.one [Polynomial.EtaUnknown var]
+      | Var var ->
+        add_monomial w sign (W.add (Prec.lam_weight prec) (Prec.db_weight prec))
+          [Polynomial.EtaUnknown var]
       | _ -> ()
     in
     let is_quantifier b =
@@ -1036,12 +1038,12 @@ module LambdaKBO : ORD = struct
       add_weights_of w bargs;
       add_weights_of w args
     | DB i ->
-      add_monomial w sign W.one [];
+      add_monomial w sign (Prec.db_weight prec) [];
       add_weights_of w args;
       add_eta_extra_of w (Term.ty hd)
     | Var var ->
       if CCList.is_empty args then (
-        add_monomial w sign W.one [];
+        add_monomial w sign (Prec.lam_weight prec) [];
         add_monomial w sign W.one [Polynomial.WeightUnknown [hd]]
       ) else (
         let (arg_tys, _) = Type.open_fun (Term.ty hd) in
@@ -1052,12 +1054,12 @@ module LambdaKBO : ORD = struct
         let add_weight_of_extra_arg i arg =
           let w' = Polynomial.create_zero () in
           add_weight_of ~prec w' sign arg;
-          add_monomial w' (-1 * sign) W.one [];
+          add_monomial w' (-1 * sign) (Prec.db_weight prec) [];
           Polynomial.multiply_unknowns w'
             [Polynomial.CoeffUnknown (hd :: some_normal_args, i + 1)];
           Polynomial.add w w'
         in
-        add_monomial w sign W.one [];
+        add_monomial w sign (Prec.lam_weight prec) [];
         add_monomial w sign W.one
           [Polynomial.WeightUnknown (hd :: some_normal_args)];
         List.iteri add_weight_of_extra_arg extra_args
@@ -1067,7 +1069,7 @@ module LambdaKBO : ORD = struct
       add_weights_of w args;
       add_eta_extra_of w (Term.ty t)
     | Fun (ty, body) ->
-      add_monomial w sign W.one [];
+      add_monomial w sign (Prec.lam_weight prec) [];
       add_weight_of ~prec w sign body
     | App _ -> ()  (* impossible *)
 
@@ -1166,7 +1168,7 @@ module LambdaKBO : ORD = struct
         and some_normal_s_args = List.map (normalize_consts ~prec) some_s_args
         in
         if CCList.equal T.equal some_normal_t_args some_normal_s_args
-           && CCList.for_all2 cant_flip some_t_args some_s_args then
+           && CCList.for_all2 cannot_flip some_t_args some_s_args then
           let (arg_ws, cmp) =
             cw_ext_data (process_terms ~prec)
               (some_t_args @ extra_t_args) (some_s_args @ extra_s_args)
@@ -1211,7 +1213,7 @@ module LambdaKBO : ORD = struct
       else
         consider_weights_of ~prec t s
           (match Prec.compare prec gid fid with
-           | 0 -> Incomparable
+           | 0 -> C.of_total (ID.compare gid fid)  (* fallback *)
            | n when n > 0 -> Gt
            | _ -> Lt)
     | Const _, AppBuiltin _ -> consider_weights_of ~prec t s Gt
@@ -1234,11 +1236,11 @@ module LambdaKBO : ORD = struct
     ZProf.enter_prof prof_lambda_kbo;
     (* CCFormat.printf "LambdaKBO@.%a@.vs.@.%a@." T.pp t T.pp s; *)
     let (_ (* w *), cmp) = process_terms ~prec t s in
-    (* CCFormat.printf "LambdaKBO@.%a@.vs.@.%a@.%a@.%a@." T.pp t T.pp s Polynomial.pp w Comparison.pp cmp; *)
+    (* CCFormat.printf "Result: %a %a@." Comparison.pp cmp Polynomial.pp w; *)
     ZProf.exit_prof prof_lambda_kbo;
     cmp
 
-  let might_flip _ t s = not (cant_flip t s)
+  let might_flip _ t s = not (cannot_flip t s)
 end
 
 (** {2 Value interface} *)
