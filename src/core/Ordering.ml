@@ -962,12 +962,6 @@ module LambdaKBO : ORD = struct
       WH.add weight_id_hashtbl w id;
       id
 
-  (* The ordering might flip if one eta-reduced side is a lambda-expression. *)
-  let wont_flip t0 s0 =
-    (not (T.is_fun t0) && not (T.is_fun s0)) ||
-    (let t = Lambda.eta_reduce t0 and s = Lambda.eta_reduce s0 in
-     not (T.is_fun t) && not (T.is_fun s))
-
   let partition_leading p =
     let rec part acc xs =
       match xs with
@@ -980,6 +974,24 @@ module LambdaKBO : ORD = struct
     match T.view u with
     | T.App (hd, all_args) -> (hd, partition_leading Term.is_type all_args)
     | _ -> (u, ([], []))
+
+  let is_stable t =
+    match T.view (fst (break_term_up t)) with
+    | T.AppBuiltin _
+    | T.DB _
+    | T.Const _ -> true
+    | T.Fun _ ->
+      begin match T.view (fst (break_term_up (Lambda.eta_reduce t))) with
+      | T.AppBuiltin _
+      | T.DB _
+      | T.Const _ -> true
+      | _ -> false
+      end
+    | _ -> false
+
+  (* The ordering might flip if one eta-reduced side is a lambda-expression. *)
+  let cant_flip t s =
+    is_stable t && is_stable s
 
   let mk_placeholder_var ty var =
     Term.var (HVar.cast ~ty var)
@@ -1158,7 +1170,7 @@ module LambdaKBO : ORD = struct
         and some_normal_s_args = List.map (normalize_consts ~prec) some_s_args
         in
         if CCList.equal T.equal some_normal_t_args some_normal_s_args
-           && CCList.for_all2 wont_flip some_t_args some_s_args then
+           && CCList.for_all2 cant_flip some_t_args some_s_args then
           let var_some_normal_args = T.app t_hd some_normal_t_args in
           let (arg_ws, cmp) =
             cw_ext_data (process_terms ~prec)
@@ -1231,7 +1243,7 @@ module LambdaKBO : ORD = struct
     ZProf.exit_prof prof_lambda_kbo;
     cmp
 
-  let might_flip _ t s = not (wont_flip t s)
+  let might_flip _ t s = not (cant_flip t s)
 end
 
 (** {2 Value interface} *)
