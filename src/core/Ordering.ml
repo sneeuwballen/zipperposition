@@ -993,9 +993,6 @@ module LambdaKBO : ORD = struct
   let cant_flip t s =
     is_stable t && is_stable s
 
-  let mk_placeholder_var ty var =
-    Term.var (HVar.cast ~ty var)
-
   let rec normalize_consts ~prec t =
     if crude_applied_vars then
       t
@@ -1016,7 +1013,7 @@ module LambdaKBO : ORD = struct
     if crude_applied_vars || Type.is_var arg_ty || Type.is_fun arg_ty then
       (arg :: some_args, extra_args)
     else
-      (mk_placeholder_var arg_ty var :: some_args, arg :: extra_args)
+      (some_args, arg :: extra_args)
 
   let rec add_weight_of ~prec w sign t =
     let add_weights_of w =
