@@ -928,6 +928,10 @@ end
 module LambdaKBO : ORD = struct
   let name = "lambda_kbo"
 
+  (* We ignore [Prec.db_weight] to get better arithmetic for applied
+     variables. *)
+  let my_db_weight = W.one
+
   let add_monomial w sign coeff unks =
     Polynomial.add_monomial w (W.mult sign coeff) unks
 
@@ -1012,7 +1016,7 @@ module LambdaKBO : ORD = struct
   let rec add_weight_of ~prec w sign t =
     let add_eta_extra_of w ty = match Type.view ty with
       | Var var ->
-        add_monomial w sign (W.add (Prec.lam_weight prec) (Prec.db_weight prec))
+        add_monomial w sign (W.add (Prec.lam_weight prec) my_db_weight)
           [Polynomial.EtaUnknown var]
       | _ -> ()
     in
@@ -1029,7 +1033,7 @@ module LambdaKBO : ORD = struct
       List.iter (add_weight_of ~prec w sign) bargs;
       List.iter (add_weight_of ~prec w sign) args
     | DB i ->
-      add_monomial w sign (Prec.db_weight prec) [];
+      add_monomial w sign my_db_weight [];
       List.iter (add_weight_of ~prec w sign) args;
       add_eta_extra_of w (Term.ty hd)
     | Var var ->
@@ -1045,10 +1049,12 @@ module LambdaKBO : ORD = struct
         let add_weight_of_extra_arg i arg =
           let w' = Polynomial.create_zero () in
           add_weight_of ~prec w' sign arg;
+          add_monomial w' (-1 * sign) my_db_weight [];
           Polynomial.multiply_unknowns w'
             [Polynomial.CoeffUnknown (hd :: some_normal_args, i + 1)];
           Polynomial.add w w'
         in
+        add_monomial w sign W.one [];
         add_monomial w sign W.one
           [Polynomial.WeightUnknown (hd :: some_normal_args)];
         List.iteri add_weight_of_extra_arg extra_args
