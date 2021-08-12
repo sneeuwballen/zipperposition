@@ -3,6 +3,7 @@
 (** {1 Some helpers} *)
 
 module Fmt = CCFormat
+open CCFun.Infix
 
 (** {2 Time facilities} *)
 
@@ -19,7 +20,121 @@ let start_ = get_time_mon_()
 let total_time_s () = timestamp_sub (get_time_mon_()) start_
 let start_time () = start_
 
-(** {2 Misc} *)
+(** {2 Stand-alone convenience functions} *)
+
+let finally ~do_ f =
+  try
+    let x = f () in
+    do_ ();
+    x
+  with e ->
+    do_ ();
+    raise e
+
+let pp_pair ?(sep=", ") pa pb out (a,b) =
+  Format.fprintf out "@[%a%s%a@]" pa a sep pb b
+
+let pp_sep sep out () = Format.fprintf out "%s@," sep
+let pp_list ?(sep=", ") pp = Fmt.list ~sep:(pp_sep sep) pp
+let pp_seq ?(sep=", ") pp = Fmt.seq ~sep:(pp_sep sep) pp
+let pp_iter ?(sep=", ") pp = Fmt.iter ~sep:(pp_sep sep) pp
+
+let pp_list0 ?(sep=" ") pp_x out = function
+  | [] -> ()
+  | l -> Format.fprintf out " %a" (pp_list ~sep pp_x) l
+
+let tstp_needs_escaping s =
+  assert (s<>"");
+  s.[0] = '_' ||
+  CCString.exists (function ' ' | '#' | '$' | '+' | '-' | '/' -> true | _ -> false) s
+
+let pp_str_tstp out s =
+  CCFormat.string out (if tstp_needs_escaping s then "'" ^ String.escaped s ^ "'" else s)
+
+let pp_var_tstp out s = pp_str_tstp out (CCString.capitalize_ascii s)
+
+let ord_option c o1 o2 = match o1, o2 with
+  | None, None -> 0
+  | None, Some _ -> -1
+  | Some _, None -> 1
+  | Some x1, Some x2 -> c x1 x2
+
+let for_all_2 p x y = CCList.(length x = length y && for_all2 p x y)
+
+let take_drop_while f l = CCList.take_while f l, CCList.drop_while f l
+
+(* cartesian product of lists of lists *)
+let map_product ~f l =
+  let product a b =
+    List.fold_left
+      (fun acc1 l1 -> List.fold_left
+          (fun acc2 l2 -> (List.rev_append l1 l2) :: acc2)
+          acc1 b)
+      [] a
+  in
+  match l with
+  | [] -> []
+  | l1 :: tail ->
+    List.fold_left
+      (fun acc x -> product (f x) acc)
+      (f l1)
+      tail
+
+let seq_map_l ~f l =
+  let rec aux l yield = match l with
+    | [] -> yield []
+    | x :: tail ->
+      let ys = f x in
+      List.iter
+        (fun y -> aux tail (fun l -> yield (y::l)))
+        ys
+  in
+  aux l
+
+let seq_zipi seq k =
+  let i = ref 0 in
+  seq (fun x -> k (!i, x); incr i)
+
+let invalid_argf msg = Fmt.ksprintf msg ~f:invalid_arg
+let failwithf msg = Fmt.ksprintf msg ~f:failwith
+
+module Int_map = CCMap.Make(CCInt)
+module Int_set = CCSet.Make(CCInt)
+
+let escape_dot s =
+  let b = Buffer.create (String.length s + 5) in
+  String.iter
+    (fun c ->
+       begin match c with
+         | '|' | '\\' | '{' | '}' | '<' | '>' | '"' ->
+           Buffer.add_char b '\\'; Buffer.add_char b c
+         | '\n' -> Buffer.add_string b "\\l"; (* left justify *)
+         | _ -> Buffer.add_char b c
+       end)
+    s;
+  Buffer.contents b
+
+let concat_view separator view = String.concat separator % List.map view
+
+let superscript_table = Array.of_list(String.split_on_char ' '
+"⁽ ⁾ * ⁺ , ⁻ ᐧ ᐟ ⁰ ¹ ² ³ ⁴ ⁵ ⁶ ⁷ ⁸ ⁹ : ; ᑉ ⁼ > ˀ @ ᴬ ᴮ ᕪ ᴰ ᴱ ᣘ ᴳ ᴴ ᴵ ᴶ ᴷ ᴸ ᴹ ᴺ ᴼ ᴾ ᶲ ᴿ ᔆ ᵀ ᵁ ⱽ ᵂ ᕁ ˠ ᙆ [ ᐠ ] ᣔ ᗮ ` ᵃ ᵇ ᶜ ᵈ ᵉ ᶠ ᵍ ʰ ⁱ ʲ ᵏ ˡ ᵐ ⁿ ᵒ ᵖ ᵠ ʳ ˢ ᵗ ᵘ ᵛ ʷ ˣ ʸ ᶻ")
+
+let superscript = concat_view "" (fun c -> superscript_table.(Char.code c - 40)) % List.of_seq % String.to_seq
+
+let caller_file_line d =
+  let open String in
+  (* get_callstack d can contain >d frames due to inlining *)
+  let frame = map(function '\\'->'/' | c->c) (List.nth (split_on_char '\n' Printexc.(raw_backtrace_to_string(get_callstack(d+2)))) (d+1)) in
+  (* s = [_ ^ c1 ^]? between c1 c2 s ^ c2 ^ _ searched backwards *)
+  let between c1 c2 s =
+    match rindex_opt s c2 with None -> "??"(* no stack trace *)  | Some j2 ->
+    let j1 = match rindex_from_opt s (j2-1) c1 with None -> 0 | Some j -> j+1 in
+    sub s j1 (j2-j1)
+  in
+  between '/' '.' (between '"' '"' frame) ^ between ',' ',' frame
+
+
+(** {2 Debug and error printing} *)
 
 (** Debug section *)
 module Section = struct
@@ -178,6 +293,33 @@ let pp_pos pos =
   let open Lexing in
   Printf.sprintf "line %d, column %d" pos.pos_lnum (pos.pos_cnum - pos.pos_bol)
 
+
+module UntypedPrint = struct
+  open Obj
+  type any (* Typing technicality: Dynamic tests lead to many free type variables which are problematic with the value restriction of OCaml. Hence there's "any" to replace some. *)
+
+  (* Internal list associating string converters to dynamic types. Modified by the below add_pp only. *)
+  let string_printers: ((any -> bool) * (any -> string)) list ref = ref[]
+
+  let add_pp type_test to_string = string_printers := (type_test, to_string % magic) :: !string_printers
+
+  let str x =
+    let exception Result of string in
+    try magic !string_printers |> List.iter(fun(type_test, to_string) ->
+      if is_int(repr x) then raise(Result(string_of_int(magic x))); (* prioritize int's *)
+      if type_test x then raise(Result(to_string x)));
+    Batteries.dump x
+    with Result s -> s
+
+  (* Print message msg followed by FILE line LINE of the caller's caller. *)
+  let print_with_caller msg = print_endline(msg ^ "\t" ^ caller_file_line 2 ^ if String.length msg < 55(*rough*) then "" else "\n")
+
+  (* Sprinkle these in front of expressions you want to trace—often without rebracketing! *)
+  let (~<)x = print_with_caller(str x); x
+  let (|<) info x = print_with_caller(info ^" "^ str x); x
+end
+
+
 external set_memory_limit_stub : int -> unit = "logtk_set_memory_limit"
 
 let set_memory_limit n =
@@ -257,98 +399,6 @@ module Flag = struct
     gen := 2*n;
     n
 end
-
-(** {2 Others} *)
-
-let finally ~do_ f =
-  try
-    let x = f () in
-    do_ ();
-    x
-  with e ->
-    do_ ();
-    raise e
-
-let pp_pair ?(sep=", ") pa pb out (a,b) =
-  Format.fprintf out "@[%a%s%a@]" pa a sep pb b
-
-let pp_sep sep out () = Format.fprintf out "%s@," sep
-let pp_list ?(sep=", ") pp = Fmt.list ~sep:(pp_sep sep) pp
-let pp_seq ?(sep=", ") pp = Fmt.seq ~sep:(pp_sep sep) pp
-let pp_iter ?(sep=", ") pp = Fmt.iter ~sep:(pp_sep sep) pp
-
-let pp_list0 ?(sep=" ") pp_x out = function
-  | [] -> ()
-  | l -> Format.fprintf out " %a" (pp_list ~sep pp_x) l
-
-let tstp_needs_escaping s =
-  assert (s<>"");
-  s.[0] = '_' ||
-  CCString.exists (function ' ' | '#' | '$' | '+' | '-' | '/' -> true | _ -> false) s
-
-let pp_str_tstp out s =
-  CCFormat.string out (if tstp_needs_escaping s then "'" ^ String.escaped s ^ "'" else s)
-
-let pp_var_tstp out s = pp_str_tstp out (CCString.capitalize_ascii s)
-
-let ord_option c o1 o2 = match o1, o2 with
-  | None, None -> 0
-  | None, Some _ -> -1
-  | Some _, None -> 1
-  | Some x1, Some x2 -> c x1 x2
-
-let take_drop_while f l = CCList.take_while f l, CCList.drop_while f l
-
-(* cartesian product of lists of lists *)
-let map_product ~f l =
-  let product a b =
-    List.fold_left
-      (fun acc1 l1 -> List.fold_left
-          (fun acc2 l2 -> (List.rev_append l1 l2) :: acc2)
-          acc1 b)
-      [] a
-  in
-  match l with
-  | [] -> []
-  | l1 :: tail ->
-    List.fold_left
-      (fun acc x -> product (f x) acc)
-      (f l1)
-      tail
-
-let seq_map_l ~f l =
-  let rec aux l yield = match l with
-    | [] -> yield []
-    | x :: tail ->
-      let ys = f x in
-      List.iter
-        (fun y -> aux tail (fun l -> yield (y::l)))
-        ys
-  in
-  aux l
-
-let seq_zipi seq k =
-  let i = ref 0 in
-  seq (fun x -> k (!i, x); incr i)
-
-let invalid_argf msg = Fmt.ksprintf msg ~f:invalid_arg
-let failwithf msg = Fmt.ksprintf msg ~f:failwith
-
-module Int_map = CCMap.Make(CCInt)
-module Int_set = CCSet.Make(CCInt)
-
-let escape_dot s =
-  let b = Buffer.create (String.length s + 5) in
-  String.iter
-    (fun c ->
-       begin match c with
-         | '|' | '\\' | '{' | '}' | '<' | '>' | '"' ->
-           Buffer.add_char b '\\'; Buffer.add_char b c
-         | '\n' -> Buffer.add_string b "\\l"; (* left justify *)
-         | _ -> Buffer.add_char b c
-       end)
-    s;
-  Buffer.contents b
 
 (** {2 File utils} *)
 

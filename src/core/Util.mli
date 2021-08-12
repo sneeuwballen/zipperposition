@@ -16,7 +16,68 @@ val total_time_s : unit -> float
 val get_time_mon_ : unit -> float
 (** A "monotonic" clock (TODO! right now, just unix clock) *)
 
-(** {2 Misc} *)
+(** {2 Stand-alone convenience functions} *)
+
+val finally : do_:(unit -> unit) -> (unit -> 'a) -> 'a
+(** [finally ~do_ f] calls [f ()] and returns its result. If it raises, the
+    same exception is raised; in {b any} case, [do_ ()] is called after
+    [f ()] terminates. *)
+
+val pp_pair :
+  ?sep:string -> 'a CCFormat.printer -> 'b CCFormat.printer -> ('a * 'b) CCFormat.printer
+
+val pp_list : ?sep:string -> 'a CCFormat.printer -> 'a list CCFormat.printer
+(** Print a list without begin/end separators *)
+
+val pp_seq : ?sep:string -> 'a CCFormat.printer -> 'a Seq.t CCFormat.printer
+val pp_iter: ?sep:string -> 'a CCFormat.printer -> 'a Iter.t CCFormat.printer
+
+val pp_list0 : ?sep:string -> 'a CCFormat.printer -> 'a list CCFormat.printer
+(** Print a list with a whitespace in front if it's non empty, or
+    does nothing if the list is empty
+    Default separator is " " *)
+
+val tstp_needs_escaping: string -> bool
+(** Is this name a proper TSTP identifier, or does it need ' ' around it? *)
+
+val pp_str_tstp : string CCFormat.printer (** possibly escaping *)
+
+val pp_var_tstp : string CCFormat.printer
+
+val ord_option : 'a CCOrd.t -> 'a option CCOrd.t
+
+val for_all_2 : ('a -> 'b -> bool) -> 'a list -> 'b list -> bool
+(** for_all_2 p a b ⟺ length a = length b && for_all2 p a b *)
+
+(* TODO: use containers' at some point *)
+val take_drop_while : ('a -> bool) -> 'a list -> 'a list * 'a list
+
+val map_product : f:('a -> 'b list list) -> 'a list -> 'b list list
+
+val seq_map_l : f:('a -> 'b list) -> 'a list -> 'b list Iter.t
+val seq_zipi : 'a Iter.t -> (int * 'a) Iter.t
+
+val invalid_argf: ('a, Format.formatter, unit, 'b) format4 -> 'a
+val failwithf : ('a, Format.formatter, unit, 'b) format4 -> 'a
+
+module Int_map : CCMap.S with type key = int
+module Int_set : CCSet.S with type elt = int
+
+val escape_dot : string -> string
+(** String escaping for graphviz *)
+
+val concat_view : string -> ('a -> string) -> 'a list -> string
+(** concat_view separator view = String.concat separator ∘ map view *)
+
+val superscript : string -> string
+(** Raise all characters of a string to superscripts. Error on unsupported characters; refer to these:
+⁽ ⁾ * ⁺ , ⁻ ᐧ ᐟ ⁰ ¹ ² ³ ⁴ ⁵ ⁶ ⁷ ⁸ ⁹ : ; ᑉ ⁼ > ˀ @ ᴬ ᴮ ᕪ ᴰ ᴱ ᣘ ᴳ ᴴ ᴵ ᴶ ᴷ ᴸ ᴹ ᴺ ᴼ ᴾ ᶲ ᴿ ᔆ ᵀ ᵁ ⱽ ᵂ ᕁ ˠ ᙆ [ ᐠ ] ᣔ ᗮ ` ᵃ ᵇ ᶜ ᵈ ᵉ ᶠ ᵍ ʰ ⁱ ʲ ᵏ ˡ ᵐ ⁿ ᵒ ᵖ ᵠ ʳ ˢ ᵗ ᵘ ᵛ ʷ ˣ ʸ ᶻ *)
+
+val caller_file_line : int -> string
+(** Return string "FILE line LINE" locating the caller at the given depth d. So d=0 tells where you wrote caller_file_line 0, and d=1 tells who called your function, etc. This is based on stack traces that—beware—might omit the relevant call site, e.g. root calls in anonymous functions. *)
+
+
+(** {2 Debug and error printing} *)
 
 (** Debug section *)
 module Section : sig
@@ -96,6 +157,23 @@ val errorf : where:string -> ('b, Format.formatter, unit, 'a) format4 -> 'b
 
 val pp_pos : Lexing.position -> string
 
+module UntypedPrint : sig
+(** Adhoc polymorphic debug printing. Usage: open Util.UntypedPrint; then sprinkle ~< or "message"|< in front of expressions you want to trace—often without rebracketing! To register a new string conversion rule edit the file TypeTests.ml. That file and this module are for debugging only: they rely on the unstable Obj (OCaml's reflection) module and are not 100 % safe from segmentation faults. *)
+  type any
+  (** type for values of forgotten type *)
+
+  val (~<) : 'a -> 'a
+  (** Prefix an expression with ~< to trace it together with location. *)
+  val (|<) : string -> 'a -> 'a
+  (** Prefix an expression with [message|<] to trace it together with [message] and location. *)
+
+  val str : 'a -> string
+  (** Adhoc polymorphic to_string *)
+
+  val add_pp : (any -> bool) -> ('a -> string) -> unit
+  (** Call add_pp t p registers a string converter p to be used when printing untyped values passing the type test t. Affects str, ~< and |<. The p should accept any input x for which t x is true because otherwise a segmentation fault can occur. Printers registered later take precedence. This function is used in the file TypeTests.ml. *)
+end
+
 val set_memory_limit : int -> unit
 (** Limit the amount of memory available to the process (in MB) *)
 
@@ -151,53 +229,6 @@ module Flag : sig
   val get_new : gen -> int
   (** New flag from the generator (2*previous flag) *)
 end
-
-(** {2 Others} *)
-
-val finally : do_:(unit -> unit) -> (unit -> 'a) -> 'a
-(** [finally ~do_ f] calls [f ()] and returns its result. If it raises, the
-    same exception is raised; in {b any} case, [do_ ()] is called after
-    [f ()] terminates. *)
-
-val pp_pair :
-  ?sep:string -> 'a CCFormat.printer -> 'b CCFormat.printer -> ('a * 'b) CCFormat.printer
-
-val pp_list : ?sep:string -> 'a CCFormat.printer -> 'a list CCFormat.printer
-(** Print a list without begin/end separators *)
-
-val pp_seq : ?sep:string -> 'a CCFormat.printer -> 'a Seq.t CCFormat.printer
-val pp_iter: ?sep:string -> 'a CCFormat.printer -> 'a Iter.t CCFormat.printer
-
-val pp_list0 : ?sep:string -> 'a CCFormat.printer -> 'a list CCFormat.printer
-(** Print a list with a whitespace in front if it's non empty, or
-    does nothing if the list is empty
-    Default separator is " " *)
-
-val tstp_needs_escaping: string -> bool
-(** Is this name a proper TSTP identifier, or does it need ' ' around it? *)
-
-val pp_str_tstp : string CCFormat.printer (** possibly escaping *)
-
-val pp_var_tstp : string CCFormat.printer
-
-val ord_option : 'a CCOrd.t -> 'a option CCOrd.t
-
-(* TODO: use containers' at some point *)
-val take_drop_while : ('a -> bool) -> 'a list -> 'a list * 'a list
-
-val map_product : f:('a -> 'b list list) -> 'a list -> 'b list list
-
-val seq_map_l : f:('a -> 'b list) -> 'a list -> 'b list Iter.t
-val seq_zipi : 'a Iter.t -> (int * 'a) Iter.t
-
-val invalid_argf: ('a, Format.formatter, unit, 'b) format4 -> 'a
-val failwithf : ('a, Format.formatter, unit, 'b) format4 -> 'a
-
-module Int_map : CCMap.S with type key = int
-module Int_set : CCSet.S with type elt = int
-
-val escape_dot : string -> string
-(** String escaping for graphviz *)
 
 (** {2 File utils} *)
 

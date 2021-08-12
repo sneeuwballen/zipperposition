@@ -36,7 +36,7 @@ let load_extensions =
     Bool_encode.extension;
     App_encode.extension;
     Eq_encode.extension;
-    Pure_literal_elim.extension;
+    TypeTests.extension;
   ] in
   Phases.return_phase (Extensions.extensions ())
 

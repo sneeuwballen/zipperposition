@@ -4,6 +4,7 @@
 (** {1 Phases of the Prover} *)
 
 open Logtk
+open Util
 open Libzipperposition
 module E = CCResult
 

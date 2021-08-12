@@ -7,6 +7,8 @@ open Phases_impl
 open Comparison
 (* open Libzipperposition_calculi *)
 (* open Phases.Infix *)
+open Util
+open Util.UntypedPrint
 open CCArray
 open CCVector
 open CCFun
@@ -33,8 +35,6 @@ let rec lex_list c = curry(function
 | _, [] -> -1
 | x::xx, y::yy -> (c *** lex_list c) (x,xx) (y,yy))
 
-let for_all_2 p x y = List.(length x = length y && for_all2 p x y)
-
 
 (* make constants for debugging *)
 let constants = Hashtbl.create 0
@@ -48,239 +48,6 @@ let have ?(infix=false) name par ty = match Hashtbl.find_opt constants name with
 
 
 
-(* debug print *)
-module Debug = struct
-open List
-open Obj
-type any (* Typing technicality: Dynamic tests lead to many free type variables which are problematic with the value restriction of OCaml. Hence there's "any" to replace some, and all type tests take an explicit parameter. *)
-
-(* A dynamic type test is a predicate 'a->bool. Since types are erased, same data can have multiple types. But if a type test T on data X is succesful, then at least X can be (magic) cast to T safely. The below tests are accure in this sense, or preserve accuracy, except the unsafe tests integer/Z.t, rational/Q.t and lazy_or. There's no test combinators for polymorphic variants and exceptions—they can be safely and accurately tested by pattern matching. *)
-module TypeTests = struct
-(* helpers *)
-let fields x = init (size(repr x)) (magic(field(repr x)))
-
-let test (c:int) f x = let x = magic x in if is_int x then 0<=x && x<c else f(tag x, fields x)
-
-let test_tag tag f = test 0 (fun(tag',data) -> tag=tag' && f data)
-
-
-(* Type tests for builtin types and type constructs *)
-
-let any _ = true (* especially exceptions at the moment *)
-let int x = is_int(repr x)
-
-(* Test an algebraic data type: c is the number of constant constructors, and ttt is a list of lists of type tests for the parameters of other constructors, in order of appearence. *)
-let union c ttt = test c (fun(tag,data) -> tag < length ttt && for_all_2 id (nth ttt tag) data)
-let enum c = union c []
-
-let rec list t x = union 1 [[t; list t]] x
-(* Warning: using opt(tuple[...]) instead of union 1 [[...]] is a hideous error! *)
-let opt t = union 1 [[t]]
-
-(* Test flat tuples and records: tt is a list of type tests for the components, in order of appearence. *)
-let tuple tt = test_tag 0 (for_all_2 id tt)
-let array t = test_tag 0 (for_all t)
-let string x = test_tag string_tag any x
-let func x = test_tag closure_tag any x
-let custom x = test_tag custom_tag any x (* e.g. int32, big Z.t *)
-(* Use lazy_force unless there's values that cannot be eagerly computed or you never need the lazy value. The lazy_or does not check the type of an unevaluated expression.
-Reference: https://stackoverflow.com/questions/56746374/how-does-ocaml-represent-lazy-values-at-runtime *)
-let lazy_aid f t x = test_tag lazy_tag f x or test_tag forward_tag (t % hd) x or t x
-let lazy_or t = lazy_aid any t
-let lazy_force t x = lazy_aid (fun _-> t(Lazy.force(magic x))) t x
-(* First field of an object would be “class” and second an “id”. E.g. modules might be objects in addition to being at least tuples and closures.
-Open questions: Is class always string? Is id always int? Is there ever more fields? Which OCaml concepts translate to objects? *)
-let object0 x = test_tag object_tag (for_all_2 id [string;int]) x
-let exception' x = object0 x or test_tag 0 (object0 % hd) x
-
-(* Common non-primitive types *)
-
-(* Test for the default Map of OCaml which as a type is also the same as CCMap. *)
-let rec ccmap key t x = union 1 [[ccmap key t; key; t; ccmap key t; int]] x
-(* Test for the default Set of OCaml which as a type is also the same as CCSet. *)
-let rec ccset t x = union 1 [[ccset t; t; ccset t; int]] x
-let ccbv x = tuple[array int; int] x
-
-(* arbitrary precision types—unsafe! *)
-let integer x = int x or custom x
-let rational x = tuple[integer; integer] x
-
-(* Types specific to Zipperposition *)
-
-let builtin x = union 57 [[integer]; [rational]; [int]] x
-let an_id x = tuple[int; string; list exception'] x
-let hvar t = tuple[int;t]
-let rec term x = tuple[view; opt term; int; exception'; custom; lazy_force int] x
-and view x = union 0 [
-  [hvar term];
-  [int];
-  [enum 4; term; term];
-  [an_id];
-  [term; list term];
-  [builtin; list term]] x
-let tvar x = hvar term x
-
-let num_class t = tuple[
-  term;
-  func;func;func;func;func;func;
-  t;t;
-  func;func;func;func;func;func;func;func;func]
-let monome t = tuple[num_class t; t; list(tuple[t;term])]
-let int_literal x = union 0 [
-  [enum 4; monome integer; monome integer];
-  [tuple[integer; int; monome integer; enum 2]]] x
-let rat_literal x = tuple[enum 2; monome rational; monome rational] x
-let literal x = union 2 [[term; term; enum 2]; [int_literal]; [rat_literal]] x
-let literals x = array literal x
-
-let theory_tag x = union 11 [[an_id]] x
-let parse_location x = tuple[string; int; int; int; int] x
-let from_file x = tuple[string; opt string; opt parse_location] x
-let rec attrs x = list(union 0 [[string; attrs]; [string]; [attrs]]) x
-let source x = tuple[int; union 0 [[from_file; attrs]; [attrs]]] x
-let kind x = union 1 [
-  [source; enum 5];
-  [string; list theory_tag];
-  [string; list theory_tag];
-  [string];
-  [an_id; source];
-  [an_id]] x
-
-let scoped t = tuple[t;int]
-let subst x = ccmap (scoped tvar) (scoped term) x
-let renaming x = union 1 [[ccmap (scoped tvar) tvar; int]] x
-let subst_projection x = tuple[int; subst; renaming] x
-let inf_result x = tuple[tuple[
-  int; func;func;func; union 2 []; func;func;func;func; opt func; func
-]; exception'] x
-
-let rec proof_step x = tuple[int; kind; opt int; int; list parent; attrs] x
-and parent x = union 0 [[proof]; [proof; subst_projection]] x
-and proof x = tuple[proof_step; inf_result] x
-
-let rec constructor x = tuple[an_id; term; list(tuple[term; projector])] x
-and projector x = tuple[an_id; term; int; lazy_force constructor] x
-let ind_type x = tuple[an_id; list tvar; term; list constructor; lazy_force(enum 2); proof] x
-let ind_cst x = tuple[an_id; list term; term; ind_type; enum 2; int] x
-let inductive_case x = tuple[ind_cst; term; (function`Base|`Rec->true|_->false); list ind_cst; list(tuple[an_id;term])] x
-
-let rec position x = union 1 [[position]; [position]; [position]; [position]; [int;position]; [position]] x
-let cut_form x = tuple[ccset tvar; list literals] x
-let payload x = union 1 [[literals]; [cut_form]; [list inductive_case]] x
-let trail x = ccset(tuple[int; payload; any(*TODO What should this be? See bool_lit.ml line 20*)]) x
-let sclause x = tuple[int; literals; trail; int] x
-let clause x = tuple[
-  sclause;
-  int; 
-  lazy_force ccbv;
-  lazy_force(list(tuple[term; position]));
-  lazy_force(list int);
-  proof_step;
-  opt ccbv;
-  opt(ccset(tuple[term; position]))] x
-
-let szs_status x = union 3 [[proof]; [string]] x
-let or_error t = union 0 [[t]; [string]]
-let exn_pair x = tuple[tuple[object0;int]; exception'] x
-let flex_state x = ccmap int exn_pair x
-let run's_result x = or_error(tuple[flex_state; szs_status]) x
-
-let p_base = function `Mono -> true | `Exp t |`Move t -> term t | _-> false
-let power x = tuple[p_base;int;int] x
-let monomial x = tuple[term; list power; term] x
-let polynomial x = array monomial x
-end
-open TypeTests
-
-
-let concat_view separator view = String.concat separator % map view
-
-let superscript_table = Array.of_list(String.split_on_char ' '
-"⁽ ⁾ * ⁺ , ⁻ ᐧ ᐟ ⁰ ¹ ² ³ ⁴ ⁵ ⁶ ⁷ ⁸ ⁹ : ; ᑉ ⁼ > ˀ @ ᴬ ᴮ ᕪ ᴰ ᴱ ᣘ ᴳ ᴴ ᴵ ᴶ ᴷ ᴸ ᴹ ᴺ ᴼ ᴾ ᶲ ᴿ ᔆ ᵀ ᵁ ⱽ ᵂ ᕁ ˠ ᙆ [ ᐠ ] ᣔ ᗮ ` ᵃ ᵇ ᶜ ᵈ ᵉ ᶠ ᵍ ʰ ⁱ ʲ ᵏ ˡ ᵐ ⁿ ᵒ ᵖ ᵠ ʳ ˢ ᵗ ᵘ ᵛ ʷ ˣ ʸ ᶻ")
-(* Raise all characters of a string to superscripts. Error if impossible; see the above list. *)
-let superscript = concat_view "" (fun c -> superscript_table.(Char.code c - 40)) % of_seq % String.to_seq
-
-(* Print message msg followed by FILE line LINE of the caller's caller. This is based on stack traces, and unfortunately the relevant call site might not show up as some times happens with anonymous functions. *)
-let print_with_caller msg =
-  let open String in
-  (* get_callstack 3 can contain >3 frames due to inlining *)
-  let frame = map(function '\\'->'/' | c->c) (nth (split_on_char '\n' Printexc.(raw_backtrace_to_string(get_callstack 3))) 2) in
-  (* s = [_ ^ c1 ^]? between c1 c2 s ^ c2 ^ _ searched backwards *)
-  let between c1 c2 s =
-    match rindex_opt s c2 with None -> "??"(* no stack trace *)  | Some j2 ->
-    let j1 = match rindex_from_opt s (j2-1) c1 with None -> 0 | Some j -> j+1 in
-    sub s j1 (j2-j1)
-  in
-  print_endline(msg ^ "\t"
-    ^ between '/' '.' (between '"' '"' frame) ^ between ',' ',' frame
-    ^ if length msg < 55(*rough*) then "" else "\n")
-
-
-(* Registering and using adhoc polymorphic pretty printers *)
-
-let string_printers: ((any -> bool) * (any -> string)) list ref = ref[]
-
-let add_pp type_test to_string = string_printers := (type_test, to_string % magic) :: !string_printers
-
-let str x =
-  let exception Result of string in
-  try magic!string_printers |> iter(fun(type_test, to_string) ->
-    if int x then raise(Result(string_of_int(magic x))); (* prioritize *)
-    if type_test x then raise(Result(to_string x)));
-  Batteries.dump x
-  with Result s -> s
-
-(* Sprinkle these in front of expressions you want to trace—often without rebracketing! *)
-let (~<)x = print_with_caller(str x); x
-let (|<) info x = print_with_caller(info ^" "^ str x); x;;
-
-
-(* Overly general assignments first so they end up to the bottom of the printer stack. *)
-add_pp (test 0 (fun(tag,data) -> tag < no_scan_tag && not(mem tag [lazy_tag; closure_tag; infix_tag])))
-  (fun x -> 
-    superscript(str(size x)) (* Prepend length of data tuple for easier exploration. *)
-    ^ (match tag x with 0-> "" | t-> "tag" ^ str t) (* Omit multipurpose default tag 0. *)
-    ^ "("^ concat_view ", " str (fields x) ^")");
-
-add_pp (list any) (fun l -> "["^ concat_view "; " str l ^"]");
-
-add_pp (ccset any) (
-  let rec to_list s = if s == repr 0 then [] else to_list(field s 0) @ field s 1 :: to_list(field s 2) in
-  fun s -> "{"^ concat_view ", " str (to_list s) ^"}");
-
-add_pp (test_tag forward_tag any) (str % Lazy.force);
-
-add_pp run's_result (function
-| CCResult.Error info -> "🚫 "^info
-| CCResult.Ok(state, res) ->
-  Saturate.(match res with
-    | Unsat proof -> Proof.S.pp_in Options.O_none Format.std_formatter proof; "\n"
-    | Sat -> "Satisfiable"
-    | Unknown -> "Unknown"
-    | Error info -> "OK but "^info
-    | Timeout -> "Timeout"
-  )^" – with flex_state {"^( (* Don't know if useful but print flex_state anyway. *)
-    CCHet.Map.to_list %> concat_view "; " (fun(CCHet.Pair(k,e)) -> str e)
-  ) state ^"}");
-
-add_pp exception' Printexc.(fun e ->
-  exn_slot_name e ^"#"^ str(exn_slot_id e) ^ if tuple[any;any] e then
-    "("^ concat_view ", " str (tl(fields e)) ^")"
-  else "");
-
-add_pp string (fun s -> if String.trim s = "" or int_of_string_opt s != None then "“"^s^"”" else s);
-add_pp subst Subst.to_string;
-add_pp term Term.to_string;
-add_pp literal Literal.to_string;
-(* add_pp integer Z.to_string; *)
-(* add_pp rational Q.to_string; *)
-
-end
-open Debug
-
-
-
-
 (* Given an inference L¹,L²⊢σC, create and put into use an inference  L¹∨D¹, L²∨D² ⊢ σ(C∨D¹∨D²) , where literals L¹ and L² must be eligible. Allow multiple conclusions. *)
 let on_eligible_literals(type c)(module Env: Env.S with type C.t=c) name literal_inference =
   let module C = Env.C in
@@ -290,7 +57,7 @@ let on_eligible_literals(type c)(module Env: Env.S with type C.t=c) name literal
     (* TODO compute eligible literals only once *)
     fold_lits ~eligible:(C.Eligible.res c1) c1_lits |> Iter.flat_map(fun(l1,pos1) ->
     fold_lits ~eligible:(C.Eligible.res c2) c2_lits |> Iter.flat_map_l(fun(l2,pos2) ->
-      "OUT"|< literal_inference l1 l2 |> List.map(fun(infered, subst) ->
+      literal_inference l1 l2 |> List.map(fun(infered, subst) ->
         let c1_no_l1 = apply_subst_list rename subst (except_idx c1_lits pos1, 0) in
         let c2_no_l2 = apply_subst_list rename subst (except_idx c2_lits pos2, 1) in
         C.create (infered @ c1_no_l1 @ c2_no_l2)
@@ -300,17 +67,19 @@ let on_eligible_literals(type c)(module Env: Env.S with type C.t=c) name literal
     ))) |> Iter.to_rev_list
   in
   Env.add_binary_inf name (fun c ->
+    "Active clauses (given first)"|< Iter.to_rev_list(Env.get_active());
     (* TODO use an indexing data structure *)
     Iter.flat_map_l (lifted_inference c) (Env.get_active())
     |> Iter.to_rev_list
   )
+
 
 (* K,L ⊢ᵧ K,L' ⟹ C∨K, D∨L ⊢ C∨K, D∨L' given γC⊆D and C≺K *)
 let add_simplify_in_context(type c)(module Env: Env.S with type C.t=c) name literal_inference =
   let module C = Env.C in
   let open SimplM.Infix in
   let lifted_inference c1 c2 =
-    if c1 == c2 then (c2,`Same) else
+    if ~<c1 == ~<c2 then c2,`Same else
     let exception Changed of C.t in
     let rename = Subst.Renaming.create() in
     let c1_lits = C.lits c1 and c2_lits = C.lits c2 in
@@ -329,11 +98,13 @@ let add_simplify_in_context(type c)(module Env: Env.S with type C.t=c) name lite
           ~trail:(C.trail c2)
           (Proof.Step.simp ~tags:[] ~rule:(Proof.Rule.mk name) (List.map (fun c -> C.proof_parent_subst rename c subst) [c2,1; c1,0]))))
       | None -> ()
-    )); (c2,`Same)
-    with Changed c2' -> ~<(c2',`New)
+    )); c2,`Same
+    with Changed c2' -> c2',`New
   in
   (* Note: keep "fun c ->" so that Env.get_active() is recomputed. TODO indexing *)
-  Env.add_rw_simplify(fun c -> SimplM.app_list Iter.(to_rev_list(map lifted_inference (Env.get_active()))) c);
+  let rule = fun c -> SimplM.app_list Iter.(to_rev_list(map lifted_inference (Env.get_active()))) 
+   (str(Iter.to_rev_list(Env.get_active()))|<c) in
+  Env.add_rw_simplify(rule);
   Env.add_backward_simplify(fun c -> C.ClauseSet.of_iter(Env.get_active()))
 
 
@@ -353,29 +124,24 @@ let oper_arg(_,_,f) = f
 let varstr n = String.make 1 (Char.chr(122 - n))
 let varStr n = String.make 1 (Char.chr(90 - n))
 
-let pp_power{base;var;exp} = match base with
+let power_to_string{base;var;exp} = match base with
 |`Mono -> varstr var ^ superscript(string_of_int exp)
 |`Exp t -> Term.to_string t ^ superscript(varstr var ^ string_of_int exp)
 |`Move t -> varStr var ^ superscript(string_of_int exp)
 
-let pp_mono(c,m,f) = match (match str c with "1"->"" | "-1"->"-" | c'->c') ^ concat_view "" pp_power (List.rev m) ^ str f with ""->"1" | "-"->"-1" | s->s
+let mono_to_string(c,m,f) = match (match str c with "1"->"" | "-1"->"-" | c'->c') ^ concat_view "" power_to_string (List.rev m) ^ str f with ""->"1" | "-"->"-1" | s->s
 
-let pp p = Array.(if length p = 0 then "0" else concat_view " + "  pp_mono (to_list p))
-
-let _= let open TypeTests in
-add_pp power pp_power;
-add_pp monomial pp_mono;
-add_pp polynomial pp
-
-let _Z z = app_builtin ~ty:int (Int z) []
-let _z = _Z % Z.of_int
+let poly_to_string p = Array.(if length p = 0 then "0" else concat_view " + "  mono_to_string (to_list p))
 
 
 (* Coefficient arithmetic. TODO use general simplification instead of or in addition to special casing ℤ constants. *)
 
-let if_Z fZ f' t s = match view t, view s with
-| AppBuiltin(Int t', _), AppBuiltin(Int s', _) -> fZ t' s'
-| _ -> f' t s
+let _Z z = app_builtin ~ty:int (Int z) []
+let _z = _Z % Z.of_int
+
+let if_Z fZ f' t' s' = match view t', view s' with
+| AppBuiltin(Int t, _), AppBuiltin(Int s, _) -> fZ t s
+| _ -> f' t' s'
 
 let (-|-) = if_Z (Z.(+)%>>_Z) (fun t s -> app_builtin ~ty:(ty t) Sum [t;s])
 let (><) = if_Z (Z.( * )%>>_Z) (fun t s -> app_builtin ~ty:(ty t) Product [t;s])
@@ -492,12 +258,13 @@ let rec div_factor m1 m2 = CCOpt.(match m1,m2 with
 
 
 let superpose p1 p2 =
-  if oper_arg p1.(0) != oper_arg p2.(0) then [] else[
+  if oper_arg p1.(0) != oper_arg p2.(0) then [] else
   let f1, f2 = (oper_powers %%> lcm_factors) p1.(0) p2.(0) in
   let p'1, p'2 = f1**:p1, f2**:p2 in
   let a1, a2 = ((fun(c,_,_)->c) %%> lcm_coefs) p'1.(0) p'2.(0) in
-  a1*:p'1 ++ (_z(-1)><a2)*:p'2]
+  [a1*:p'1 ++ (_z(-1)><a2)*:p'2]
 
+(* Try rewrite leading monomial of p by r. *)
 let leadrewrite r p =
   if oper_arg r.(0) != oper_arg p.(0) then None else
   match (oper_powers %%> div_factor) r.(0) p.(0) with
@@ -527,7 +294,7 @@ module MakeSumSolver(MainEnv: Env.S) = struct
 (* module Env = MainEnv *)
 module C = MainEnv.C
 (* module Ctx = MainEnv.Ctx *)
-let _= add_pp TypeTests.clause (CCFormat.to_string C.pp_tstp)
+(* let _= add_pp TypeTests.clause (CCFormat.to_string C.pp_tstp) *)
 
 let polyform, fake_poly_lit =
   (* Set up an automatically garbage collected cache for polyform. *)
@@ -558,7 +325,7 @@ let polyform, fake_poly_lit =
   (* fake_poly_lit *)
   fun p -> 
     if p = Ore._0 then mk_tauto else
-    let l = mk_eq (const ~ty:int (ID.make(Ore.pp p))) (Ore._z 0) in
+    let l = mk_eq (const ~ty:int (ID.make(Ore.poly_to_string p))) (Ore._z 0) in
     NoMemoryLeakMap.add cache l p;
     l
 
@@ -591,7 +358,7 @@ end) (* Cannot be local to below because type C.t = PolyEnv.C.t escapes that sco
 let indeterminate_elimination_environment() =
     let env = (module PolyEnv: Env.S with type C.t='Ct) in
     let module C = PolyEnv.C in
-    on_eligible_literals env "sup. poly." superpose_poly;
+    (* on_eligible_literals env "sup. poly." superpose_poly; *)
     add_simplify_in_context env "lead rewrite" rewrite_poly;
     PolyEnv.add_is_trivial ((=)(Array.of_list[mk_tauto]) % C.lits);
     let export: PolyEnv.C.t -> MainEnv.C.t = Obj.magic in (* TODO *)
@@ -631,22 +398,25 @@ let test_hook clause =
   );
   
   let _ = saturate subenv Ore.({Clause.c_set= of_list[
+    eq0"z 5"; eq0"z 2 + -1.";
     (* eq0"3.z 19"; eq0"3.z 9 + 1."; *)
     (* eq0"x + y + -1.z"; eq0"x 2 + y 2 + -1.z 2"; *)
     (* eq0"y 2 x + -1.x + -1.y"; eq0"y 1 x 2 + -1.x + -1."; *)
     (* eq0"x 2 + 3.x + 1."; eq0"y 2 + 3.y + 1."; eq0"x 5 + y 5"; *)
     
-    (* eq0"2.n 2 N 2 + -1.n 1 N + 3."; eq0"N 3 + 2.n 1 N";  *)
-    (* eq0"2.n 1 N + -1.m + 3."; eq0"N 1 M + 2.m"; *)
+    (* eq0"2.n 2 N 2 + -1.n 1 N + 3."; eq0"N 3 + 2.n 1 N";  *) 
+    (* eq0"2.n 1 N + -1.m + 3."; eq0"N 1 M + 2.m"; *) 
     
-    eq0"X'S* + -1.'S* + -1.X'f"; eq0"'h + -1.'S* + 'g*";
-    eq0"X'g* + -1.'g* + -1.X'f"; 
+    (* eq0"X'S* + -1.'S* + -1.X'f"; eq0"'h + -1.'S* + 'g*";  *)
+    (* eq0"X'g* + -1.'g* + -1.X'f"; *)
     (* eq0"-1.X 2'g* + 'g* + X 2'f + X'f"; *)
     
-    (* eq0"x 1 X'(ˣᵧ) + -1.y 1 X'(ˣᵧ) + X'(ˣᵧ) + -1.x'(ˣᵧ) + -1.'(ˣᵧ)"; eq0"y 1 Y'(ˣᵧ) + Y'(ˣᵧ) + -1.x'(ˣᵧ) + y'(ˣᵧ)"; eq0"'f` + -1.y 2'(ˣᵧ)"; *)
     (* eq0"Y'⬝2ʸ + -2.'⬝2ʸ"; eq0"-4.'g` + y 2'⬝2ʸ + y'⬝2ʸ"; *)
+    (* eq0"x 1 X'(ˣᵧ) + -1.y 1 X'(ˣᵧ) + X'(ˣᵧ) + -1.x'(ˣᵧ) + -1.'(ˣᵧ)"; eq0"y 1 Y'(ˣᵧ) + Y'(ˣᵧ) + -1.x'(ˣᵧ) + y'(ˣᵧ)"; eq0"'f` + -1.y 2'(ˣᵧ)"; *)
     (* Change priority for ↓ *)
     (* eq0"x 1 X'f + -1.y 1 X'f + X'f + -1.x'f + -1.'f"; eq0"y 2 Y'f + -1.y 1 x'f + y 2'f + -1.x'f + y'f"; *)
+
+    (* eq0"-1.x 2 X 2'∑f+-2.x 1 X 2'∑f+-1.X 2'∑f + 3.x 2 X'∑f+9.x 1 X'∑f+6.X'∑f + -2.x 2'∑f+-6.x'∑f+-4.'∑f"; eq0"x 1 X'g + -2.x'g + -4.'g"; eq0"'h` + -1.'∑f + 'g"; *)
     eq0'[Ore._0]]; c_sos= of_list[]}) in
   [step "" (Iter.to_rev_list(get_clauses())) []]
 
@@ -767,44 +537,22 @@ let demo_proof c =
   [contradiction]
 
 (* Setup to do when MakeSumSolver(...) is called. *);;
-  (* MainEnv.add_binary_inf "poly. sup." poly_sup; *)
   (* MainEnv.add_unary_inf "demo" demo_proof *)
   MainEnv.add_unary_inf "test" test_hook
 end
 
-let env(module Parent: Env.S) =
-  let module NewEnvironment = Env.Make(struct
-    module Ctx = Parent.Ctx
-    let params = Parent.params
-    let flex_state = Parent.flex_state()
-  end) in
-  let env1 = (module NewEnvironment: Env.S) in
-  env1
+
+(* Is this extension enabled? Set by a command line option. *)
+let sum_by_recurrences = ref true
 
 (* Define name and setup action required to registration of this extension in libzipperposition_phases.ml *)
 let extension ={
   Extensions.default with
   name = "∑";
-  env_actions = [fun env ->
+  env_actions = [fun env -> if !sum_by_recurrences then
     let module E= (val env) in (* Solves error: “The parameter cannot be eliminated in the result type.” *)
     let module I= MakeSumSolver(E) in()];
-}
-
-(* 
-let make_env ~ctx:(module Ctx : Ctx_intf.S) ~params stmts =
-  Phases.start_phase Phases.MakeEnv >>= fun () ->
-  Phases.get >>= fun state ->
-  let module MyEnv = Env.Make(struct
-      module Ctx = Ctx
-      let params = params
-      let flex_state = state
-    end) in
-  let env1 = (module MyEnv : Env.S) in
-  (* use extensions to customize env *)
-  Extensions.extensions ()
-  |> List.iter
-    (fun e -> List.iter (fun f -> f env1) e.Extensions.env_actions);
-  (* convert statements to clauses *)
-  let c_sets = MyEnv.convert_input_statements stmts in
-  let env2 = (module MyEnv : Env.S with type C.t = MyEnv.C.t) in
-  Phases.return_phase (Phases.Env_clauses (env2, c_sets)) *)
+};;
+Options.add_opts[
+  "--sum-by-recurrences", Arg.Bool((:=)sum_by_recurrences), " use holonomic sequence methods for sums (∑) in algebras"
+]
