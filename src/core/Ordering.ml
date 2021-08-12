@@ -1161,13 +1161,14 @@ module LambdaKBO : ORD = struct
         let (some_s_args, extra_s_args) =
           List.fold_right2 (categorize_var_arg y) s_args arg_tys ([], [])
         in
-        if CCList.equal T.equal some_t_args some_s_args then
+        let some_normal_t_args = List.map (normalize_consts ~prec) some_t_args
+        and some_normal_s_args = List.map (normalize_consts ~prec) some_s_args
+        in
+        if CCList.equal T.equal some_normal_t_args some_normal_s_args
+           && CCList.for_all2 cannot_flip some_t_args some_s_args then
           let (arg_ws, cmp) =
             cw_ext_data (process_terms ~prec)
               (some_t_args @ extra_t_args) (some_s_args @ extra_s_args)
-          in
-          let some_normal_t_args =
-            List.map (normalize_consts ~prec) some_t_args
           in
           let extra_arg_ws = CCList.drop (List.length some_t_args) arg_ws in
           let add_weight_of_extra_arg i arg_w =
