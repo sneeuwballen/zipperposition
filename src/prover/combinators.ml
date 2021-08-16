@@ -81,7 +81,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let tyvarB = HVar.fresh ~ty:Ty.tType ()
     let tyvarC = HVar.fresh ~ty:Ty.tType ()
 
-    let type_of_vars ?(args=[]) ~ret =
+    let type_of_vars ~args ~ret =
       let open Ty in
       if CCList.is_empty args then Ty.var ret
       else List.map Ty.var args ==> Ty.var ret
