@@ -72,6 +72,34 @@ let ty1comb_to_var t balance =
         fresh_var
   ) else t
 
+let partition_leading p =
+  let rec part acc xs =
+    match xs with
+    | x :: xs' when p x -> part (x :: acc) xs'
+    | _ -> (List.rev acc, xs)
+  in
+  part []
+
+let break_term_up u =
+  match T.view u with
+  | T.App (hd, all_args) -> (hd, partition_leading Term.is_type all_args)
+  | _ -> (u, ([], []))
+
+let is_eta_reduced_term_stable_wrt_flip t =
+  match T.view (fst (break_term_up t)) with
+  | T.AppBuiltin _
+  | T.DB _
+  | T.Const _ -> true
+  | _ -> false
+
+let is_term_stable_wrt_flip t =
+  match T.view (fst (break_term_up t)) with
+  | T.AppBuiltin _
+  | T.DB _
+  | T.Const _ -> true
+  | T.Fun _ -> is_eta_reduced_term_stable_wrt_flip (Lambda.eta_reduce t)
+  | _ -> false
+
 (** Common internal interface for orderings *)
 
 module type ORD = sig
@@ -439,8 +467,10 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
     ZProf.exit_prof prof_kbo;
     res
 
-  (* The ordering might flip if one side is a lambda-expression *)
-  let might_flip _ s t = T.is_fun s || T.is_fun t
+  let might_flip _ s t =
+    not (T.equal t s)
+    && (not (is_eta_reduced_term_stable_wrt_flip t)
+        || not (is_eta_reduced_term_stable_wrt_flip s))
 end
 
 (** Hopefully more efficient (polynomial) implementation of LPO,
@@ -539,13 +569,16 @@ module MakeRPO (P : PARAMETERS) : ORD = struct
     ZProf.exit_prof prof_rpo;
     compare
 
-  (* The ordering might flip if one side is a lambda-expression or if the order is established using the subterm rule *)
+  (* The ordering might flip if one side is a lambda-expression or
+     variable-headed or if the order is established using the subterm rule *)
   let might_flip prec t s =
-    T.is_fun t || T.is_fun s ||
-    let c = rpo6 ~prec t s in
-    c = Incomparable ||
-    c = Gt && alpha ~prec (Head.term_to_args t) s = Gt ||
-    c = Lt && alpha ~prec (Head.term_to_args s) t = Gt
+    not (T.equal t s)
+    && (not (is_eta_reduced_term_stable_wrt_flip t)
+        || not (is_eta_reduced_term_stable_wrt_flip s))
+        || let c = rpo6 ~prec t s in
+           c = Incomparable
+           || c = Gt && alpha ~prec (Head.term_to_args t) s = Gt
+           || c = Lt && alpha ~prec (Head.term_to_args s) t = Gt
 end
 
 module EPO : ORD = struct
@@ -792,7 +825,7 @@ module LambdaFreeKBOCoeff : ORD = struct
              Prec.arg_coeff prec g (id_arity g - i) != Prec.arg_coeff prec f (id_arity f - i)
           )
           CCList.(0 --^ term_arity)
-      | Head.V _, Head.I _ | Head.I _, Head.V _ -> true
+      | Head.V _, _ | _, Head.V _ -> true
       | _ -> assert false
 end
 
@@ -963,36 +996,9 @@ module LambdaKBO : ORD = struct
       WH.add weight_id_hashtbl w id;
       id
 
-  let partition_leading p =
-    let rec part acc xs =
-      match xs with
-      | x :: xs' when p x -> part (x :: acc) xs'
-      | _ -> (List.rev acc, xs)
-    in
-    part []
-
-  let break_term_up u =
-    match T.view u with
-    | T.App (hd, all_args) -> (hd, partition_leading Term.is_type all_args)
-    | _ -> (u, ([], []))
-
-  let is_stable t =
-    match T.view (fst (break_term_up t)) with
-    | T.AppBuiltin _
-    | T.DB _
-    | T.Const _ -> true
-    | T.Fun _ ->
-      begin match T.view (fst (break_term_up (Lambda.eta_reduce t))) with
-      | T.AppBuiltin _
-      | T.DB _
-      | T.Const _ -> true
-      | _ -> false
-      end
-    | _ -> false
-
   (* The ordering might flip if one eta-reduced side is a lambda-expression. *)
   let cannot_flip t s =
-    T.equal t s || (is_stable t && is_stable s)
+    T.equal t s || (is_term_stable_wrt_flip t && is_term_stable_wrt_flip s)
 
   let rec normalize_consts ~prec t =
     match T.view t with
