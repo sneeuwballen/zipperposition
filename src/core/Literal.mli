@@ -32,9 +32,11 @@ val heuristic_weight : (term -> int) -> t -> int   (** heuristic difficulty to e
 
 val depth : t -> int              (** depth of literal *)
 
-val is_pos : t -> bool            (** is the literal positive? *)
+val eqn_sign : t -> bool          (** equation sign: T for s=t and F for s!=t *)
 
-val is_neg : t -> bool            (** is the literal negative? *)
+val is_positivoid : t -> bool     (** is the literal s=t where neither s nor t are T or F or of the form s = T? *)
+
+val is_negativoid : t -> bool     (** is the literal of the form s!=t or of the form s = F *)
 
 val is_eqn : t -> bool            (** is the literal a proper (in)equation or prop? *)
 
@@ -43,7 +45,6 @@ val is_prop : t -> bool           (** is the literal a boolean proposition? *)
 val is_eq : t -> bool             (** is the literal of the form a = b? *)
 
 val is_neq : t -> bool            (** is the literal of the form a != b? *)
-val is_essentially_prop : t -> bool (** is the literal non-equational literal of type Prop *)
 
 val mk_eq : term -> term -> t
 (** build literals. If sides so not have the same sort,
@@ -129,7 +130,7 @@ val is_ground : t -> bool
 val symbols : ?include_types:bool -> t -> ID.Set.t
 val root_terms : t -> term list (** all the terms immediatly under the lit *)
 
-val to_ho_term : t -> term
+val to_ho_term : t -> term option
 (** Conversion to higher-order term using {!Term.Form} *)
 
 val as_ho_predicate : t -> (Term.var * term * term list * bool) option

@@ -12,6 +12,7 @@ let k_enabled = Flex_state.create_key ()
 let k_check_at = Flex_state.create_key ()
 let k_max_symbol_occ = Flex_state.create_key ()
 let k_processing_kind = Flex_state.create_key ()
+let k_fp_mode = Flex_state.create_key ()
 
 let section = Util.Section.make ~parent:Const.section "bce"
 
@@ -25,8 +26,8 @@ module Avatar = Libzipperposition_avatar
 module type S = sig
   module Env : Env.S
 
-  (** {5 Registration} *)
-  val setup : unit -> unit
+  (** {6 Registration} *)
+  val setup : ?in_fp_mode:bool -> unit -> unit
   val begin_fixpoint : unit -> unit
   val fixpoint_step : unit -> bool
   val end_fixpoint : unit -> unit
@@ -43,11 +44,24 @@ module Make(E : Env.S) : S with module Env = E = struct
       type t = (ID.t * bool) 
       let compare = CCPair.compare ID.compare CCBool.compare
   end)
+
+
+  let k_removed_active = Flex_state.create_key ()
+  let k_removed_passive = Flex_state.create_key ()
+  let k_bce_sat_tracked = Flex_state.create_key ()
   
   type logic = 
     | NEqFO  (* nonequational FO *)
     | EqFO (* equational FO *)
+    | NonAppVarHo (* higher-order logic, but at the top level
+                     each literal has only (fully applied)
+                     function symbols *)
     | Unsupported   (* HO or FO with theories *)
+  
+  let log_to_int = 
+    [(NEqFO, 0); (EqFO, 1); (NonAppVarHo, 2); (Unsupported, 3)]
+  let log_compare (l1:logic) (l2:logic) =
+    compare (List.assoc l1 log_to_int) (List.assoc l2 log_to_int)
 
   exception UnsupportedLogic
   
@@ -75,14 +89,14 @@ module Make(E : Env.S) : S with module Env = E = struct
   module TaskWrapper = struct
     type t = bce_check_task
     let idx task = task.heap_idx
-    let set_idx task idx = 
+    let set_idx task idx =
       task.heap_idx <- idx
     let lt a b =
       (DEQ.length a.cands < DEQ.length b.cands)
-      || (DEQ.length a.cands = DEQ.length b.cands 
+      || (DEQ.length a.cands = DEQ.length b.cands
             && CCInt.compare (C.id a.clause) (C.id b.clause) < 0)
-      || (DEQ.length a.cands = DEQ.length b.cands 
-            && CCInt.compare (C.id a.clause) (C.id b.clause) = 0 
+      || (DEQ.length a.cands = DEQ.length b.cands
+            && CCInt.compare (C.id a.clause) (C.id b.clause) = 0
             && a.lit_idx < b.lit_idx)
   end
 
@@ -104,8 +118,11 @@ module Make(E : Env.S) : S with module Env = E = struct
   let logic = ref NEqFO
 
   let refine_logic new_val =
-    if !logic != Unsupported then (
-      logic := new_val
+    if log_compare new_val !logic > 0 then (
+      logic := new_val;
+      if (new_val == NonAppVarHo) then (
+        Env.Ctx.lost_completeness ()
+      );
     )
 
   let lit_to_term sign =
@@ -152,27 +169,32 @@ module Make(E : Env.S) : S with module Env = E = struct
   let scan_cl_lits cl =
     CCArray.iter (function 
       | L.Equation(lhs,rhs,_) as lit ->
-        let sign = L.is_pos lit in
+        let sign = L.is_positivoid lit in
         let is_poly = 
           not (Type.VarSet.is_empty (T.ty_vars lhs))
           || not (Type.VarSet.is_empty (T.ty_vars rhs))
         in
-        if not is_poly && T.is_fo_term lhs && T.is_fo_term rhs then (
+        if not is_poly && not (Type.is_fun (T.ty lhs)) then (
           if Type.is_prop (T.ty lhs) then (
-            if L.is_predicate_lit lit then (
+            if L.is_predicate_lit lit && CCOpt.is_some (T.head lhs) then (
+              if not (T.is_fo_term lhs) then (
+                refine_logic NonAppVarHo
+              );
               let hd_sym = T.head_exn lhs in
               if not (ID.Set.mem hd_sym !ignored_symbols) 
               then add_lit_to_idx lhs sign cl
             ) else (
               (* reasoning with formulas is currently unsupported *)
-              Util.debugf ~section 1 "unsupported because of @[%a@]@." (fun k -> k L.pp lit);
+              Util.debugf ~section 1 "unsupported because of formula @[%a@]@." (fun k -> k L.pp lit);
               logic := Unsupported;
               raise UnsupportedLogic;
             )
-          ) else refine_logic EqFO
+          ) else (
+            if T.is_fo_term lhs && T.is_fo_term rhs then refine_logic EqFO
+            else refine_logic NonAppVarHo)
         ) else (
             logic := Unsupported; 
-            Util.debugf ~section 1 "unsupported because of @[%a@]@." (fun k -> k L.pp lit);
+            Util.debugf ~section 1 "unsupported because of functional literal @[%a@]@." (fun k -> k L.pp lit);
             raise UnsupportedLogic)
       | _ -> ()
     ) (C.lits cl)
@@ -203,7 +225,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             | L.Equation(lhs,_,_)
               when L.is_predicate_lit lit  &&
                   ID.equal (T.head_exn lhs) hd &&
-                  sign != L.is_pos lit ->
+                  sign != L.is_positivoid lit ->
               add_candidates lit_idx cand [clause]
             | _ -> ()
           ) (C.lits cand))
@@ -214,9 +236,9 @@ module Make(E : Env.S) : S with module Env = E = struct
     | L.Equation (lhs, rhs, _) as lit 
       when L.is_predicate_lit lit
             && not (ID.Set.mem (T.head_exn lhs) !ignored_symbols) ->
-      assert (T.is_fo_term lhs);
+      (* assert (T.is_fo_term lhs); *)
       let hd = T.head_exn lhs in
-      let sign = L.is_pos lit in
+      let sign = L.is_positivoid lit in
       let cands = find_candindates lhs sign in
       if update_others then (
         update_cand_lists hd sign clause cands
@@ -229,13 +251,14 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* Update all the bookeeping information when a new clause is introduced *)
   let add_clause cl =
-    try 
+    try
+      if !logic == Unsupported then raise UnsupportedLogic;
+
       scan_cl_lits cl;
       CCArray.iteri (fun lit_idx _ -> register_task lit_idx cl) (C.lits cl)
     with UnsupportedLogic ->
-      (* if the initial problem had only supported features (FO logic),
-         it cannot jump out of the fragment *)
-      invalid_arg "jumped out of the supported logic fragment"
+      refine_logic Unsupported;
+      TaskPriorityQueue.clear task_queue
 
   (* remove the clause from symbol index *)
   let deregister_symbols cl =
@@ -244,7 +267,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       | L.Equation(lhs,_,_) 
         when L.is_predicate_lit lit  ->
         ss_idx :=
-          SymSignIdx.update (T.head_exn lhs, L.is_pos lit) (function
+          SymSignIdx.update (T.head_exn lhs, L.is_positivoid lit) (function
             | Some old ->
               let new_ = C.ClauseSet.remove cl old in
               CCOpt.return_if (not (C.ClauseSet.is_empty new_)) new_
@@ -284,8 +307,24 @@ module Make(E : Env.S) : S with module Env = E = struct
     deregister_symbols clause;
     release_locks clause
 
-  let remove_from_proof_state clause = 
-    C.mark_redundant clause;
+  let remove_from_proof_state clause =
+    begin
+      try
+        if Env.is_active clause then (
+          C.Tbl.add (Env.flex_get k_removed_active) clause ();
+        ) else if Env.is_passive clause then (
+          C.Tbl.add (Env.flex_get k_removed_passive) clause ();
+        )
+    with _ ->
+      (* we are in the preprocessing phase, so we can mark the clause *) 
+      C.mark_redundant clause
+      end;
+    if Env.flex_get k_processing_kind != `InprocessingSat then ( 
+      C.mark_redundant clause
+      (* if we are doing the inprocessing in SAT mode, we cannot
+         mark the clauses as redundant, since they might have to be returned
+         to the proof state. *)
+    );
     Env.remove_active (Iter.singleton clause);
     Env.remove_passive (Iter.singleton clause);
     Env.remove_simpl (Iter.singleton clause)
@@ -304,7 +343,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         match lit with
         | L.Equation(lhs', _, _) 
           when L.is_predicate_lit lit 
-               && L.is_pos lit != sign ->
+               && L.is_positivoid lit != sign ->
           begin try
             let subst = Unif.FO.unify_syn (lhs, sc_orig) (lhs', sc_partner) in
             (lhs', subst) :: unifiable, others
@@ -314,11 +353,11 @@ module Make(E : Env.S) : S with module Env = E = struct
     in
 
     let check_resolvents l_idx orig_cl (unifiable, nonunifiable) =
-      let orig_sign = L.is_pos ((C.lits orig_cl).(l_idx)) in
+      let orig_sign = L.is_positivoid ((C.lits orig_cl).(l_idx)) in
       (* literals against which unifiable part of the clause needs to be checked *)
       let for_tautology_checking =
         List.filter (fun (lit, _) -> 
-          L.is_pos lit = orig_sign 
+          L.is_positivoid lit = orig_sign 
           && L.is_predicate_lit lit) 
         ( (List.map (fun x -> x,sc_orig) (CCArray.except_idx (C.lits orig_cl) l_idx)) @  
            List.map (fun x -> x, sc_partner) nonunifiable ) 
@@ -395,7 +434,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let lhs, sign = 
       match lit with
       | L.Equation(lhs, _, _) when L.is_predicate_lit lit ->
-        (lhs, L.is_pos lit)
+        (lhs, L.is_positivoid lit)
       | _ -> assert false (* literal must be eligible for BCE *)
     in
     check_resolvents lit_idx orig_cl (split_partner lhs sign partner)
@@ -418,7 +457,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         match lit with
         | L.Equation(lhs', _, _) 
           when L.is_predicate_lit lit 
-               && L.is_pos lit != sign 
+               && L.is_positivoid lit != sign 
                && ID.equal (T.head_exn lhs) (T.head_exn lhs') ->      
           lhs' :: same_hds, others
         | _ -> same_hds, lit :: others
@@ -429,7 +468,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let orig_lhs, orig_sign = 
       match lit with
       | L.Equation(lhs, _, _) when L.is_predicate_lit lit ->
-        (lhs, L.is_pos lit)
+        (lhs, L.is_positivoid lit)
       | _ -> assert false (* literal must be eligible for BCE *)
     in
     
@@ -448,9 +487,9 @@ module Make(E : Env.S) : S with module Env = E = struct
 
       (* calculating positive, that is negative literals in both clauses *)
       let orig_pos, orig_neg = 
-        CCList.partition L.is_pos (CCArray.except_idx (C.lits orig_cl) l_idx) in
+        CCList.partition L.is_positivoid (CCArray.except_idx (C.lits orig_cl) l_idx) in
       let partner_pos, partner_neg = 
-        CCList.partition L.is_pos (diff_hd_lits)
+        CCList.partition L.is_positivoid (diff_hd_lits)
       in
       let all_pos = orig_pos @ partner_pos in
       let all_neg = orig_neg @ partner_neg in
@@ -459,7 +498,7 @@ module Make(E : Env.S) : S with module Env = E = struct
          with literals of the same head, but opposite side from either clause *)
       let for_congruence_testing =
         CCList.filter_map (fun lit -> 
-          if L.is_predicate_lit lit && L.is_pos lit = orig_sign then (
+          if L.is_predicate_lit lit && L.is_positivoid lit = orig_sign then (
             CCOpt.flat_map (fun t -> 
               CCOpt.return_if 
                 (ID.equal (T.head_exn t) (T.head_exn orig_lhs)) 
@@ -470,7 +509,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       (* equational theory induced by all the negative literals *)
       let orig_cc =
         List.fold_left (fun acc lit -> 
-          assert (L.is_neg lit);
+          assert (L.is_negativoid lit);
           let lhs,rhs,_ = CCOpt.get_exn @@ L.View.as_eqn lit in
           CC.mk_eq acc lhs rhs
         ) (CC.create ~size:16 ()) all_neg
@@ -481,7 +520,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         let rec check_lit ~cc rest =
           (* validity is achieved without using same_hd_lits literals *)
           let is_valid = List.exists (fun lit -> 
-            assert(L.is_pos lit);
+            assert(L.is_positivoid lit);
             
             match lit with
             | L.Equation (lhs, rhs, _) -> CC.is_eq cc lhs rhs
@@ -524,7 +563,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let get_validity_checker () =
     assert (!logic != Unsupported);
-    if !logic == EqFO then resolvent_is_valid_eq
+    if !logic != NEqFO then resolvent_is_valid_eq
     else resolvent_is_valid_neq
 
   let is_blocked cl =
@@ -534,7 +573,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         match lit with
         | L.Equation(lhs,_,_) when L.is_predicate_lit lit ->
           let sym = T.head_exn lhs in
-          (match SymSignIdx.find_opt (sym, not (L.is_pos lit)) !ss_idx with 
+          (match SymSignIdx.find_opt (sym, not (L.is_positivoid lit)) !ss_idx with 
           | Some partners ->
             if (C.ClauseSet.for_all (fun partner -> 
               C.equal cl partner || validity_checker idx cl partner
@@ -586,8 +625,6 @@ module Make(E : Env.S) : S with module Env = E = struct
             false))
       in
       
-      Util.debugf ~section 3 "working on @[%a@]|%d@." 
-          (fun k -> k C.pp task.clause task.lit_idx);
       if not (C.is_empty task.clause || 
               C.is_redundant task.clause ||
               ID.Set.mem hd_sym !ignored_symbols) then (
@@ -595,8 +632,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         (* let original_partners = CCDeque.to_list task.cands in *)
         match task_is_blocked task.cands with
         | true ->
-          Util.debugf ~section 1 "removed(%d): @[%a@]" (fun k -> k task.lit_idx C.pp cl);
-          (* Util.debugf ~section 1 "partners: @[%a@]" (fun k -> k (CCList.pp C.pp) original_partners); *)
+          Util.debugf ~section 2 "removed(%d): @[%a@]" (fun k -> k task.lit_idx C.pp cl);
           deregister_clause cl;
           remove_from_proof_state cl;
           incr removed_cnt;
@@ -640,6 +676,34 @@ module Make(E : Env.S) : S with module Env = E = struct
   let react_clause_removed cl =
     deregister_clause cl
 
+  let do_bce_sat () =
+    C.Tbl.clear (Env.flex_get k_removed_active);
+    C.Tbl.clear (Env.flex_get k_removed_passive);
+    
+    Util.debugf ~section 1 "new BCE-SAT attempt" CCFun.id;
+
+    ignore @@ do_eliminate_blocked_clauses ();
+
+
+    if C.Tbl.length (Env.flex_get k_bce_sat_tracked) == 0 then (
+      CCFormat.printf "%% BCE inprocessing removed all clauses"
+    ) else (
+      (* reinserting removed clauses *)
+      let removed_actives = C.Tbl.keys (Env.flex_get k_removed_active) in
+      let removed_passives = C.Tbl.keys (Env.flex_get k_removed_passive) in
+      Util.debugf ~section 1 "reinserting %d/%d clauses" (fun k -> 
+        k (Iter.length removed_actives + Iter.length removed_passives)
+          (C.Tbl.length (Env.flex_get k_bce_sat_tracked)));
+      Env.add_active removed_actives;
+      Env.add_simpl removed_actives;
+      Env.add_passive removed_passives;
+    )
+
+  let eliminate_bce_sat () =
+    steps := (!steps + 1) mod (Env.flex_get k_check_at);
+
+    if !steps = 0 then do_bce_sat ()
+
 
   let initialize_regular () =
     let init_clauses =
@@ -675,28 +739,62 @@ module Make(E : Env.S) : S with module Env = E = struct
         (Iter.length (Env.get_active ()) + Iter.length (Env.get_passive ())) in
       CCFormat.printf "%% BCE eliminated: %d@." clause_diff;
 
-      if Env.flex_get k_processing_kind = `InprocessingFull then (
-        (* clauses begin their life when they are added to the passive set *)
-        Signal.on_every Env.ProofState.PassiveSet.on_add_clause react_clause_addded;
-        (* clauses can be calculus-removed from the active set only in DISCOUNT loop *)
-        Signal.on_every Env.ProofState.ActiveSet.on_remove_clause react_clause_removed;
-        (* Clauses are removed from the passive set when they are moved to active.
-          In this case clause can me modified or deemed redundant by forward
-          modification procedures. we react accordingly.*)
-        Signal.on_every Env.on_forward_simplified (fun (c, new_state) -> 
-          match new_state with
-          | Some c' ->
-            if not (C.equal c c') then (
-              react_clause_removed c; 
-              react_clause_addded c'
-            )
-          | _ -> react_clause_removed c; (* c is redundant *));
-        Env.add_clause_elimination_rule ~priority:1 "BCE" eliminate_blocked_clauses
-      ) else if Env.flex_get k_processing_kind = `InprocessingInitial then (
-        Env.add_is_trivial is_blocked;
+      if Env.flex_get k_processing_kind != `PreprocessingOnly || Env.flex_get k_fp_mode then (
+        if Env.flex_get k_processing_kind == `InprocessingFull then (
+          Env.Ctx.lost_completeness ()
+        );
+
+        if Env.flex_get k_processing_kind == `InprocessingSat then (
+          Env.flex_add k_removed_active (C.Tbl.create 256);
+          Env.flex_add k_removed_passive (C.Tbl.create 256);
+          Env.flex_add k_bce_sat_tracked (C.Tbl.create 256);
+          
+          let add_cl_sat cl =
+            C.Tbl.add (Env.flex_get k_bce_sat_tracked) cl ();
+            react_clause_addded cl
+          in
+          let remove_cl_sat cl =
+            C.Tbl.remove (Env.flex_get k_bce_sat_tracked) cl;
+            react_clause_removed cl
+          in
+
+          Env.ProofState.PassiveSet.clauses ()
+          |> C.ClauseSet.to_iter
+          |> Iter.iter (fun cl -> C.Tbl.add (Env.flex_get k_bce_sat_tracked) cl ());
+
+
+          Signal.on_every Env.ProofState.PassiveSet.on_add_clause (fun cl -> 
+            if C.proof_depth cl = 0 then add_cl_sat cl
+          );
+          Signal.on_every Env.ProofState.PassiveSet.on_remove_clause remove_cl_sat;
+          Signal.on_every Env.on_forward_simplified (fun (_,state) ->
+            CCOpt.iter (add_cl_sat) state);
+          Signal.on_every Env.ProofState.ActiveSet.on_remove_clause remove_cl_sat;
+        ) else (
+          (* clauses begin their life when they are added to the passive set *)
+          Signal.on_every Env.ProofState.PassiveSet.on_add_clause react_clause_addded;
+          (* clauses can be calculus-removed from the active set only in DISCOUNT loop *)
+          Signal.on_every Env.ProofState.ActiveSet.on_remove_clause react_clause_removed;
+          (* Clauses are removed from the passive set when they are moved to active.
+            In this case clause can me modified or deemed redundant by forward
+            modification procedures. we react accordingly.*)
+          Signal.on_every Env.on_forward_simplified (fun (c, new_state) -> 
+            match new_state with
+            | Some c' ->
+              if not (C.equal c c') then (
+                react_clause_removed c; 
+                react_clause_addded c'
+              )
+            | _ -> react_clause_removed c; (* c is redundant *));
+        );
+        if not @@ Env.flex_get k_fp_mode then (
+          if Env.flex_get k_processing_kind = `InprocessingFull then( 
+            Env.add_clause_elimination_rule ~priority:1 "BCE" eliminate_blocked_clauses
+          )else (Env.add_clause_elimination_rule ~priority:1 "BCE_SAT" eliminate_bce_sat)
+        )
       ) else ( raise UnsupportedLogic ) (* clear all data structures *)
     with UnsupportedLogic ->
-      Util.debugf ~section 2 "logic is unsupported" CCFun.id;
+      Util.debugf ~section 1 "logic is unsupported" CCFun.id;
       (* releasing possibly used memory *)
       ss_idx := SymSignIdx.empty;
       clause_lock := Util.Int_map.empty;
@@ -726,7 +824,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       init_clauses;
       (* eliminate clauses *)
       let num_eliminated =  do_eliminate_blocked_clauses () in
-      Util.debugf ~section 1 "Step eliminates %d clauses" (fun k -> k num_eliminated);
+      Util.debugf ~section 2"Step eliminates %d clauses" (fun k -> k num_eliminated);
+
+      CCFormat.printf "%% BCE start fixpoint: @[%d@]@." num_eliminated;
 
       Signal.on Env.ProofState.PassiveSet.on_add_clause (fun c ->
         if !fixpoint_active then (react_clause_addded c; Signal.ContinueListening)
@@ -750,6 +850,9 @@ module Make(E : Env.S) : S with module Env = E = struct
   let fixpoint_step () =
     let num_eliminated = do_eliminate_blocked_clauses () in
     Util.debugf ~section 1 "Step eliminates %d clauses" (fun k -> k num_eliminated);
+    if num_eliminated != 0 then (
+      CCFormat.printf "%% BCE fixpoint: %d@." num_eliminated
+    );
     num_eliminated != 0
 
   let end_fixpoint () =
@@ -762,8 +865,9 @@ module Make(E : Env.S) : S with module Env = E = struct
   let register () =
     Signal.on Env.on_start initialize_regular
 
-  let setup () =
+  let setup ?(in_fp_mode=false) () =
     if Env.flex_get k_enabled then (
+      Env.flex_add k_fp_mode in_fp_mode;
       if not (Env.flex_get Avatar.k_avatar_enabled) then (register ())
       else (
         CCFormat.printf "AVATAR is not yet compatible with BCE@."
@@ -775,27 +879,25 @@ let extension =
   let action env =
     let module E = (val env : Env.S) in
     let module BCE = Make(E) in
-
     E.flex_add k_enabled !_enabled;
     E.flex_add k_max_symbol_occ !_max_symbol_occ;
     E.flex_add k_check_at !_check_at;
-    E.flex_add k_processing_kind !_processing_kind;
-    
+    E.flex_add k_processing_kind !_processing_kind;    
     BCE.setup ()
   in
   { Extensions.default with Extensions.
                          name="bce";
-                         prio = 80;
+                         prio = 40;
                          env_actions=[action];
   }
 
 let () =
   Options.add_opts [
     "--bce", Arg.Bool ((:=) _enabled), " scan clauses for AC definitions";
-    "--bce-processing-kind", Arg.Symbol (["preprocessing";"inprocessing-full";"inprocessing-initial"], (function 
+    "--bce-processing-kind", Arg.Symbol (["preprocessing";"inprocessing-full";"inprocessing-sat"], (function 
       | "preprocessing" -> _processing_kind := `PreprocessingOnly
       | "inprocessing-full" -> _processing_kind := `InprocessingFull
-      | "inprocessing-initial" -> _processing_kind := `InprocessingInitial
+      | "inprocessing-sat" -> _processing_kind := `InprocessingSat
       | _ -> assert false)), 
     " scan clauses for AC definitions";
     "--bce-check-every", Arg.Int ((:=) _check_at), " check BCE every n steps of saturation algorithm";

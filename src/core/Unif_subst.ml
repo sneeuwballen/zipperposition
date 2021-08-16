@@ -50,6 +50,7 @@ module FO = struct
   let deref s t = Subst.FO.deref s.subst t
   let singleton v t = bind empty v t
 
+  (* did not use rename_l_to_new_scope for efficiency *)
   let rename_to_new_scope ~counter (t0, scope0) (t1, scope1) =
     let apply s t = Subst.FO.apply Subst.Renaming.none (subst s) t in
     let apply_ty s ty = Subst.Ty.apply Subst.Renaming.none (subst s) ty in
@@ -66,6 +67,28 @@ module FO = struct
     let subst = Term.Seq.vars t0 |> Iter.fold (add_renaming scope0) subst in
     let subst = Term.Seq.vars t1 |> Iter.fold (add_renaming scope1) subst in
     let t0', t1' = apply subst (t0, scope0), apply subst (t1, scope1) in
+    t0', t1', new_scope, subst
+
+  let rename_l_to_new_scope ~counter (t0s, scope0) (t1s, scope1) =
+    let apply s t = Subst.FO.apply Subst.Renaming.none (subst s) t in
+    let apply_ty s ty = Subst.Ty.apply Subst.Renaming.none (subst s) ty in
+    let new_scope = if scope0 < scope1 then scope1 + 1 else scope0 + 1 in
+    let add_renaming scope subst v =
+      if mem subst (v,scope) 
+      then subst
+      else 
+        let ty = apply_ty subst (HVar.ty v, scope) in
+        let newvar = Term.var (H.fresh_cnt ~counter ~ty ()) in
+        bind subst (v,scope) (newvar, new_scope) 
+    in
+    let subst = empty in
+
+    let collect_vars = List.fold_left (fun acc t -> Iter.append (Term.Seq.vars t) acc ) Iter.empty in
+
+    let subst = collect_vars t0s |> Iter.fold (add_renaming scope0) subst in
+    let subst = collect_vars t1s |> Iter.fold (add_renaming scope1) subst in
+    let t0', t1' = List.map (fun t0 -> apply subst (t0, scope0)) t0s,
+                   List.map (fun t1 -> apply subst (t1, scope1)) t1s  in
     t0', t1', new_scope, subst
 end
 

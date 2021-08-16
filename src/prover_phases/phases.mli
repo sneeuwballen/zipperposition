@@ -45,7 +45,7 @@ type ('ret, 'before, 'after) phase =
   | Compute_prec :
       (Precedence.t, [`CNF], [`Precedence]) phase
   | Compute_ord_select :
-      (Ordering.t * Selection.t, [`Precedence], [`Compute_ord_select]) phase
+      (Ordering.t * Selection.t * Bool_selection.t, [`Precedence], [`Compute_ord_select]) phase
   (* compute orderign and selection function *)
 
   | MakeCtx : ((module Ctx.S), [`Compute_ord_select], [`MakeCtx]) phase

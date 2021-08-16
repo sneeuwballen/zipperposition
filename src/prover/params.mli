@@ -10,6 +10,7 @@ type t = {
   prelude : (string, CCVector.ro) CCVector.t;
   files : (string, CCVector.ro) CCVector.t;
   select : string; (** name of the selection function *)
+  bool_select: string; (** name of the boolean selection function *)
   dot_file : string option; (** file to print the final state in *)
   dot_llproof: string option; (** file to print llproof *)
   dot_sat : bool; (** Print saturated set into DOT? *)
@@ -37,4 +38,5 @@ val key : t Flex_state.key
 
 (**/**)
 val select : string ref
+val bool_select : string ref
 (**/**)

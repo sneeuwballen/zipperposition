@@ -39,6 +39,7 @@ let should_try_e = function
 
 let _progress = ref false (* progress bar? *)
 let _check_types = ref false
+let _max_multi_simpl = ref (-1)
 
 (* print progress (i out of steps) *)
 let print_progress i ~steps =
@@ -87,6 +88,7 @@ module Make(E : Env.S) = struct
   let[@inline] check_clause_ c = 
     if !_check_types then Env.C.check_types c;
     assert (Env.C.Seq.terms c |> Iter.for_all Term.DB.is_closed);
+    assert (Env.C.Seq.terms c |> Iter.for_all Term.is_properly_encoded);
     if not (Env.C.lits c |> Literals.vars_distinct) then (
       CCFormat.printf "Vars not distinct: @[%a@].@." Env.C.pp_tstp c;
       CCFormat.printf "proof:@[%a@].@." Proof.S.pp_normal (Env.C.proof c);
@@ -109,6 +111,7 @@ module Make(E : Env.S) = struct
     let _span = ZProf.enter_prof prof_step in
     E.step_init();
     (* select next given clause *)
+    Env.do_clause_eliminate ();
     match Env.next_passive () with
     | None ->
       (* final check: might generate other clauses *)
@@ -117,9 +120,8 @@ module Make(E : Env.S) = struct
       in
       if Iter.is_empty clauses
       then (
-        Util.debugf ~section 1 "final clauses: @[%a@]" 
-          (fun k -> k (Iter.pp_seq Env.C.pp) (Env.get_active ()));
-        ZProf.exit_prof _span;
+        Util.debugf ~section 3 "saturated set: @[%a@]@." 
+          (fun k -> k (Iter.pp_seq Env.C.pp_tstp_full) (Env.get_active ()));
         Sat)
       else (
         let clauses = clauses
@@ -131,7 +133,7 @@ module Make(E : Env.S) = struct
                            then None
                            else Some c)
                       |> Iter.to_list in
-        Util.debugf 3 ~section "@[<2>inferred @{<green>new clauses@}@ @[<v>%a@]@]"
+        Util.debugf 5 ~section "@[<2>inferred @{<green>new clauses@}@ @[<v>%a@]@]"
           (fun k->k (CCFormat.list Env.C.pp) clauses);
         Env.add_passive (Iter.of_list clauses);
         ZProf.exit_prof _span;
@@ -139,7 +141,7 @@ module Make(E : Env.S) = struct
       )
     | Some c ->
       let picked_clause = c in
-      Util.debugf ~section 2 "@[<2>@{<green>given@} (before simplification):@ `@[%a@]`@]"
+      Util.debugf ~section 3 "@[<2>@{<green>given@} (before simplification):@ `@[%a@]`@]"
             (fun k->k Env.C.pp c);
       Util.debugf ~section 10 "@[proof:@[%a@]@]" (fun k -> k Proof.S.pp_tstp (Env.C.proof c));
       ZProf.message (fun () -> Format.asprintf "given: %a" Env.C.pp_tstp c);
@@ -149,10 +151,10 @@ module Make(E : Env.S) = struct
       begin match Env.all_simplify c with
         | [], _ ->
           Util.incr_stat stat_redundant_given;
-          Util.debugf ~section 1 "@[@{<Yellow>### step %5d ###@}@]"(fun k->k num);
+          Util.debugf ~section 2 "@[@{<Yellow>### step %5d ###@}@]"(fun k->k num);
           Util.debugf ~section 1 "@[<2>given clause dropped@ @[%a@]@]"
             (fun k->k Env.C.pp c);
-          Util.debugf ~section 10 "@[proof:@[%a@]@]" (fun k -> k Proof.S.pp_zf (Env.C.proof c));
+          Util.debugf ~section 3 "@[proof:@[%a@]@]" (fun k -> k Proof.S.pp_zf (Env.C.proof c));
           Signal.send Env.on_forward_simplified (c, None);
           ZProf.exit_prof _span;
           Unknown
@@ -164,13 +166,12 @@ module Make(E : Env.S) = struct
           Unsat proof
         | c :: l', state ->
           (* put clauses of [l'] back in passive set *)
-          Util.debugf ~section 2 "@[ remaining after simplification:@.@[%a@]@. @]" (fun k -> k (CCList.pp Env.C.pp) l');
-
+          Util.debugf ~section 3 "@[ remaining after simplification:@.@[%a@]@. @]" (fun k -> k (CCList.pp Env.C.pp) l');
+          
           Env.add_passive (Iter.of_list l');
 
           Signal.send Env.on_forward_simplified (picked_clause, Some c);
 
-          Env.do_clause_eliminate ();
           (* assert(not (Env.C.is_redundant c)); *)
 
           (* clause might have been removed *)
@@ -184,7 +185,7 @@ module Make(E : Env.S) = struct
             (* assert (not (Env.is_redundant c)); *)
             (* process the given clause! *)
             Util.incr_stat stat_processed_given;
-            Util.debugf ~section 1 "@[@{<Yellow>### step %5d ###@}@]"(fun k->k num);
+            Util.debugf ~section 2 "@[@{<Yellow>### step %5d ###@}@]"(fun k->k num);
             Util.debugf ~section 1 "@[<2>@{<green>given@} (%d steps, penalty %d):@ `@[%a@]`@]"
               (fun k->k num (Env.C.penalty c) Env.C.pp c);
             Util.debugf ~section 3 "@[proof:@[%a@]@]" (fun k -> k Proof.S.pp_tstp (Env.C.proof c));
@@ -242,7 +243,7 @@ module Make(E : Env.S) = struct
                 CCOpt.get_or ~default:[c] (Env.cheap_multi_simplify c)
               ) inferred_clauses in
             CCVector.append_iter new_clauses inferred_clauses;
-            Util.debugf ~section 1 "@[<2>inferred @{<green>new clauses@}:@ [@[<v>%a@]]@]"
+            Util.debugf ~section 2 "@[<2>inferred @{<green>new clauses@}:@ [@[<v>%a@]]@]"
               (fun k->k (Util.pp_iter Env.C.pp) (CCVector.to_iter new_clauses));
             (* add new clauses (including simplified active clauses)
               to passive set and simpl_set *)
@@ -262,10 +263,6 @@ module Make(E : Env.S) = struct
     if CCOpt.is_some !e_path then (
       EInterface.set_e_bin (CCOpt.get_exn !e_path)
     );
-
-    Util.debugf ~section 1 "init@.active:@[%a@]@.passive:@[%a@]"
-      (fun k -> k (Iter.pp_seq Env.C.pp_tstp_full) (Env.get_active ()) 
-                  (Iter.pp_seq Env.C.pp_tstp_full) (Env.get_passive ()));
 
     (* num: number of steps done so far *)
     let rec do_step num =
@@ -305,6 +302,7 @@ module Make(E : Env.S) = struct
     |> Iter.iter Env.ProofState.CQueue.register_conjecture_clause
 
   let () =
+      Env.flex_add Env.k_max_multi_simpl_depth !_max_multi_simpl;
       Signal.on_every Env.on_start check_fragment;
       Signal.on_every Env.on_start register_conjectures;
     
@@ -315,7 +313,9 @@ let () =
     [ "--progress", Arg.Set _progress, " progress bar";
       "-p", Arg.Set _progress, " alias for --progress";
       "--check-types", Arg.Set _check_types, " check types in new clauses";
+      "--max-multi-simpl-depth", Arg.Int ((:=) _max_multi_simpl), " maixmum depth of multi step simplification. -1 disables maximum depth.";
       "--try-e", Arg.String (fun path -> e_path := Some path), " try the given eprover binary on the problem";
+      "--disable-e", Arg.Unit (fun () -> e_path := None), " disable E background reasoner";
       "--e-call-point", Arg.Float 
         (fun v -> if v > 1.0 || v < 0.0 then invalid_arg "0 <= e-call-point <= 1.0"
                   else e_call_point := v), 

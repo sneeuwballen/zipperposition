@@ -42,7 +42,21 @@ module Make(X : sig
   module Ctx = X.Ctx
   module C = Clause.Make(Ctx)
   module ProofState = ProofState.Make(C)
+  module FormRename = FormulaRename.Make(C)
 
+  let flex_state_ = ref X.flex_state
+  let flex_state () = !flex_state_
+
+  let k_max_multi_simpl_depth = Flex_state.create_key ()
+
+  module Stm = Stream.Make(struct
+      module Ctx = Ctx
+      module C = C
+    end)
+  module StmQ = StreamQueue.Make(struct
+      module Stm = Stm
+      let state = fun () ->  !flex_state_
+  end)
 
   type inf_rule = C.t -> C.t list
   (** An inference returns a list of conclusions *)
@@ -129,7 +143,6 @@ module Make(X : sig
   let _empty_clauses = ref C.ClauseSet.empty
   let _multi_simpl_rule : (int * multi_simpl_rule) list ref = ref []
   let _cheap_msr : multi_simpl_rule list ref = ref []
-  let _ss_multi_simpl_rule : multi_simpl_rule list ref = ref []
   let _generate_rules : (int * string * generate_rule) list ref = ref []
   let _cl_elim_rules : (int * string * clause_elim_rule) list ref = ref []
   let _clause_conversion_rules : clause_conversion_rule list ref = ref []
@@ -137,12 +150,22 @@ module Make(X : sig
   let _fragment_checks = ref []
   let _immediate_simpl : immediate_simplification_rule list ref = ref []
 
+
   let on_start = Signal.create()
   let on_input_statement = Signal.create()
   let on_empty_clause = Signal.create ()
   let on_forward_simplified = Signal.create()
 
   (** {2 Basic operations} *)
+
+  let _queue = ref None
+
+  let get_stm_queue () =
+    match !_queue with
+    | None ->
+      _queue := Some (StmQ.default ());
+      CCOpt.get_exn (!_queue);
+    | Some q -> q 
 
   let add_empty c =
     assert (C.is_empty c);
@@ -256,9 +279,6 @@ module Make(X : sig
   let add_cheap_multi_simpl_rule rule =
     _cheap_msr := rule :: !_cheap_msr
 
-  let add_single_step_multi_simpl_rule rule =
-    _ss_multi_simpl_rule := rule :: !_ss_multi_simpl_rule
-
   let cr_skip = CR_skip
   let cr_add x = CR_add x
   let cr_return x = CR_return x
@@ -293,6 +313,11 @@ module Make(X : sig
   let pp_full out () =
     Format.fprintf out "@[<hv2>env(state:@ %a@,)@]" ProofState.debug ()
 
+  (** {2 Misc} *)
+  let update_flex_state f = CCRef.update f flex_state_
+  let flex_add k v = flex_state_ := Flex_state.add k v !flex_state_
+  let flex_get k = Flex_state.get_exn k !flex_state_
+
   (** {2 High level operations} *)
 
   type stats = int * int * int
@@ -300,6 +325,21 @@ module Make(X : sig
   let stats = ProofState.stats
 
   let next_passive = ProofState.PassiveSet.next
+
+  let should_force_stream_eval () =
+    flex_get PragUnifParams.k_unif_alg_is_terminating &&
+    not (flex_get PragUnifParams.k_schedule_inferences) &&
+    flex_get PragUnifParams.k_max_inferences > 0
+
+
+  let get_finite_infs streams =
+    assert(flex_get PragUnifParams.k_unif_alg_is_terminating);
+
+
+    CCList.flat_map (fun s -> 
+      OSeq.to_rev_list @@ OSeq.filter_map CCFun.id s
+    ) streams
+
 
   (** do binary inferences that involve the given clause *)
   let do_binary_inferences c =
@@ -387,8 +427,7 @@ module Make(X : sig
   let is_passive =  ProofState.PassiveSet.is_passive
 
   let on_pred_var_elimination = Signal.create ()
-  let on_pred_skolem_introduction = Signal.create ()
-
+  
   module StrSet = CCSet.Make(String)
 
   (** Apply rewrite rules AND evaluation functions *)
@@ -531,6 +570,7 @@ module Make(X : sig
     let open SimplM.Infix in
     fix_simpl c
       ~f:(fun c ->
+          ho_normalize c >>= fun c ->
           basic_simplify c >>= fun c ->
           (* first, rewrite terms *)
           ho_normalize c >>= fun c ->
@@ -579,34 +619,60 @@ module Make(X : sig
     let open SimplM.Infix in
     let _span = ZProf.enter_prof prof_simplify in
     let res = fix_simpl c
-        ~f:(fun c ->
-            let old_c = c in
-            basic_simplify c >>=
-            (* simplify with unit clauses, then all active clauses *)
-            ho_normalize >>=
-            rewrite >>=
-            rw_simplify >>=
-            unary_simplify >>=
-            active_simplify >|= fun c ->
-            if not (Lits.equal_com (C.lits c) (C.lits old_c))
-            then
-              Util.debugf ~section 2 "@[clause `@[%a@]`@ simplified into `@[%a@]`@]"
-                (fun k->k C.pp old_c C.pp c);
-            c)
+      ~f:(fun c ->
+          let old_c = c in
+          ho_normalize c >>=
+          basic_simplify >>=
+          (* simplify with unit clauses, then all active clauses *)
+          ho_normalize >>=
+          rewrite >>=
+          rw_simplify >>=
+          unary_simplify >>=
+          active_simplify >|= fun c ->
+          if not (Lits.equal_com (C.lits c) (C.lits old_c))
+          then
+            Util.debugf ~section 2 "@[clause `@[%a@]`@ simplified into `@[%a@]`@]"
+              (fun k->k C.pp old_c C.pp c);
+          c)
     in
     ZProf.exit_prof _span;
     res
 
-  let multi_simplify c : C.t list option =
+  let multi_simplify ~depth c : (C.t * int) list option =
     let _span = ZProf.enter_prof prof_multi_simplify in
+    let depth_map = 
+      ref (Util.Int_map.singleton (C.id c) depth) in
+    let [@inline] get_depth c =
+      CCOpt.get_exn @@ Util.Int_map.get (C.id c) !depth_map in
+    let [@inline] update_map c c' = 
+      let d = get_depth c in
+      depth_map := 
+        Util.Int_map.add (C.id c') d 
+          (Util.Int_map.remove (C.id c) !depth_map)
+    in
+    let set_children c children =
+      let d' = (get_depth c) + 1 in
+      depth_map := 
+        List.fold_left (fun map child -> 
+          Util.Int_map.add (C.id child) d' map
+        ) !depth_map children
+    in
+    let init_cl = c in
+
     let did_something = ref false in
     (* try rules one by one until some of them succeeds *)
-    let rec try_next c rules = match rules with
-      | [] -> None
-      | r::rules' ->
-        match r c with
-        | Some l -> Some l
-        | None -> try_next c rules'
+    let rec try_next ~depth c rules = 
+      if flex_get k_max_multi_simpl_depth != -1 &&
+         depth > flex_get k_max_multi_simpl_depth 
+      then None
+      else (
+        match rules with
+        | [] -> None
+        | r::rules' ->
+          match r c with
+          | Some l -> Some l
+          | None -> try_next ~depth c rules'
+      )
     in
     (* fixpoint of [try_next] *)
     let set = ref C.ClauseSet.empty in
@@ -614,15 +680,19 @@ module Make(X : sig
     Queue.push c q;
     while not (Queue.is_empty q) do
       let c = Queue.pop q in
+      let depth = get_depth c in
       if not (C.ClauseSet.mem c !set) then (
-        let c, st = unary_simplify c in
+        let orig_c = c in
+        let c, st = if C.equal c init_cl then SimplM.return_same c else simplify c in
+        update_map orig_c c;
         if st = `New then did_something := true;
-        match try_next c (multi_simpl_rules ()) with
+        match try_next ~depth c (multi_simpl_rules ()) with
         | None ->
           (* keep the clause! *)
           set := C.ClauseSet.add c !set;
         | Some l ->
           did_something := true;
+          set_children c l;
           List.iter (fun c -> Queue.push c q) l;
       )
     done;
@@ -630,7 +700,7 @@ module Make(X : sig
     if !did_something
     then (
       C.mark_redundant c;
-      Some (C.ClauseSet.to_list !set)
+      Some (List.map (fun c -> (c, get_depth c)) (C.ClauseSet.to_list !set))
     )
     else None
 
@@ -655,7 +725,8 @@ module Make(X : sig
       fix_simpl c
         ~f:(fun c ->
             let old_c = c in
-            basic_simplify c >>=
+            ho_normalize c >>=
+            basic_simplify >>=
             (* simplify with unit clauses, then all active clauses *)
             ho_normalize >>=
             rewrite >>=
@@ -827,20 +898,22 @@ module Make(X : sig
     res
 
   (** Use all simplification rules to convert a clause into a list of
-      maximally simplified clauses *)
+      maximally simplified clauses.
+      
+      Stop applying mutlti_simpl rules after a certain depth.
+      Especially dangerous rules are the ones that do boolean hoisting
+      as simplification
+  *)
   let all_simplify c =
     let _span = ZProf.enter_prof prof_all_simplify in
     let did_simplify = ref false in
     let set = ref C.ClauseSet.empty in
     let q = Queue.create () in
-    Queue.push c q;
-    let blocked_sss = 
-      CCArray.of_list 
-        (List.map (fun _ -> IntSet.empty) !_ss_multi_simpl_rule) in
+    Queue.push (c,0) q;
 
     while not (Queue.is_empty q) do
-      let c = Queue.pop q in
-      let c, st = simplify c in
+      let c, depth = Queue.pop q in
+      let c, st = if depth == 0 then simplify c else SimplM.return_same c in
       if st=`New then did_simplify := true;
       if is_trivial c || is_redundant c
       then ()
@@ -852,47 +925,14 @@ module Make(X : sig
            For each rule, we keep the set of clauses that the rule has been applied on
            an their descendents. Then, we apply a rule on a clause not in this set.
          *)
-        let single_step_simplified c =
-          let rec aux i = function 
-          | [] -> None
-          | rule :: rs ->
-            let block_set = blocked_sss.(i) in
-            if IntSet.mem (C.id c) block_set then aux (i+1) rs
-            else (
-              match rule c with 
-              | None -> aux (i+1) rs
-              | Some l' -> Some(i, l')
-            ) in
-          aux 0 !_ss_multi_simpl_rule in 
-
-          match multi_simplify c with
-          | None ->
-            begin match single_step_simplified c with 
-            | None ->
-              set := C.ClauseSet.add c !set;
-            | Some (i,l) ->
-              did_simplify := true;
-              let new_ids = IntSet.of_list (List.map C.id l) in
-              List.iter (fun res ->
-                (* Blocking descdendents for i *)
-                Array.set blocked_sss i (IntSet.union new_ids blocked_sss.(i));
-              Queue.push res q) l 
-            end
-            (* clause has reached fixpoint *)
+          match multi_simplify ~depth c with
           | Some l ->
             (* continue processing *)
             did_simplify := true;
-            let new_ids = IntSet.of_list (List.map C.id l) in
-
-            (* non-functional for efficiency *)
-            for i = 0 to (List.length !_ss_multi_simpl_rule) -1 do
-              let bs_i = blocked_sss.(i) in
-              if IntSet.mem (C.id c) bs_i then (
-                (* Adding descendents to blocked set *)
-                Array.set blocked_sss i (IntSet.union new_ids bs_i))
-            done;
-
-            List.iter (fun c -> Queue.push c q) l;
+            List.iter (fun (c,d) -> Queue.push (c,d) q) l
+          | None ->
+            (* clause has reached fixpoint *)
+            set := C.ClauseSet.add c !set;
     );
     done;
     let res = C.ClauseSet.to_list !set in
@@ -935,6 +975,7 @@ module Make(X : sig
     CCVector.iter
       (fun st ->
          let cs = conv_clause_ !_clause_conversion_rules st in
+         List.iter (fun c -> C.set_flag (SClause.flag_initial) c true ) cs;
          begin match Statement.view st with
            | Statement.Assert _ when has_sos_attr st ->
              CCVector.append_list c_sos cs
@@ -950,13 +991,5 @@ module Make(X : sig
     let c_set = CCVector.freeze c_set in
     let c_sos = CCVector.freeze c_sos in
     { Clause.c_set; c_sos; }
-
-  (** {2 Misc} *)
-
-  let flex_state_ = ref X.flex_state
-  let flex_state () = !flex_state_
-  let update_flex_state f = CCRef.update f flex_state_
-  let flex_add k v = flex_state_ := Flex_state.add k v !flex_state_
-  let flex_get k = Flex_state.get_exn k !flex_state_
 end
 

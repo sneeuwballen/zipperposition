@@ -19,6 +19,7 @@ module type PARAMETERS = sig
   val signature : Signature.t
   val ord : Ordering.t
   val select : Selection.t
+  val bool_select : Bool_selection.t
   val sk_ctx : Skolem.ctx
 
 end
@@ -30,6 +31,7 @@ end
 module Make(X : PARAMETERS) = struct
   let _ord = ref X.ord
   let _select = ref X.select
+  let _b_select = ref X.bool_select
   let _signature = ref X.signature
   let _complete = ref true
   let _sk_ctx = ref X.sk_ctx
@@ -58,6 +60,7 @@ module Make(X : PARAMETERS) = struct
   let compare t1 t2 = Ordering.compare !_ord t1 t2
 
   let select lits = !_select lits
+  let bool_select lits = !_b_select lits
 
   let lost_completeness () =
     if !_complete then Util.debug ~section:Const.section 1 "completeness is lost";
@@ -90,20 +93,11 @@ module Make(X : PARAMETERS) = struct
     ZProf.exit_prof _span;
     ()
 
-  let declare_syms symbs = 
-    let rec aux = function 
-    | [] -> []
-    | (sym,ty) :: syms ->
-      let is_new = not (Signature.mem !_signature sym) in
-      if is_new then (
-        _signature := Signature.declare !_signature sym ty;
-        Signal.send on_signature_update !_signature;
-        Signal.send on_new_symbol (sym,ty);
-        sym :: (aux syms)
-      ) else aux syms in
-    let new_syms = aux symbs in
-    Ordering.add_list ~signature:!_signature (ord ()) new_syms
-
+  let declare_syms l =
+    List.iter (fun (symb,ty) -> _signature := Signature.declare !_signature symb ty) l;
+    Signal.send on_signature_update !_signature;
+    List.iter (Signal.send on_new_symbol) l;
+    Ordering.add_list ~signature:!_signature (ord ()) (List.map fst l)
 
   let set_injective_for_arg sym i = 
     let arg_bv = 

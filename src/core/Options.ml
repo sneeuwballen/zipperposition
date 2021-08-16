@@ -78,6 +78,7 @@ let make () =
     ; "-bt", switch_opt true Printexc.record_backtrace, " enable backtraces (alias for --backtrace)"
     ; "--no-backtrace", switch_opt false Printexc.record_backtrace, " disable backtraces"
     ; "--color", switch_opt true CCFormat.set_color_default, " enable colors"
+    ; "--symbol-shadowing", Arg.Bool (fun b -> (Input_format.shadow_mode := Some b)), " ignore default format symbol shadowing and set it to given value"
     ; "--no-color", switch_opt false CCFormat.set_color_default, " disable colors"
     ; "-nc", switch_opt false CCFormat.set_color_default, " alias for --no-color"
     ; "--mem-limit", Arg.Int Util.set_memory_limit, " memory limit (in MB)"

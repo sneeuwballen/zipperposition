@@ -42,6 +42,8 @@
 
 %token AT /* @ */
 %token LAMBDA /* ^ */
+%token CHOICE_BINDER /* @+ */
+%token CHOICE_CONST /* @@+ */
 
 %token AND
 %token NOTAND
@@ -66,6 +68,7 @@
 %token IMPLYCONST
 
 %token UNDERSCORE
+%token ITE
 
 %token <string> LOWER_WORD
 %token <string> UPPER_WORD
@@ -213,14 +216,6 @@ quantified_formula:
 unitary_infix_formula:
   | f=unitary_formula { f }
   | l=unitary_atomic_formula op=infix_connective r=unitary_formula { op l r }
-  | LEFT_PAREN AND RIGHT_PAREN op=infix_connective r=unitary_formula { 
-    let loc = L.mk_pos $startpos $endpos in
-    let and_arg = PT.and_ ?loc:(Some loc) [] in
-    op and_arg r }
-  | l=unitary_atomic_formula op=infix_connective LEFT_PAREN AND RIGHT_PAREN { 
-    let loc = L.mk_pos $startpos $endpos in
-    let and_arg = PT.and_ ?loc:(Some loc) [] in
-    op l and_arg }
 
 unary_formula:
   | f=unitary_infix_formula { f }
@@ -238,16 +233,6 @@ unary_formula:
     {
      let loc = L.mk_pos $startpos $endpos in
      o ?loc:(Some loc) f
-    }
-  | LEFT_PAREN AND RIGHT_PAREN
-    {
-      let loc = L.mk_pos $startpos $endpos in
-      PT.and_ ?loc:(Some loc) []
-    }
-  | LEFT_PAREN VLINE RIGHT_PAREN
-    {
-      let loc = L.mk_pos $startpos $endpos in
-      PT.or_ ?loc:(Some loc) []
     }
   | EQUAL AT f1=unary_formula AT f2=unary_formula 
     {
@@ -279,16 +264,6 @@ nonassoc_binary_formula:
     {
       let loc = L.mk_pos $startpos $endpos in
       o ?loc:(Some loc) l r
-    }
-  | LEFT_PAREN AND RIGHT_PAREN AT l=unary_formula AT r=unary_formula
-    {
-      let loc = L.mk_pos $startpos $endpos in
-      PT.and_ ?loc:(Some loc) [l; r]
-    }
-  | LEFT_PAREN VLINE RIGHT_PAREN AT l=unary_formula AT r=unary_formula
-    {
-      let loc = L.mk_pos $startpos $endpos in
-      PT.or_ ?loc:(Some loc) [l; r]
     }
   | l=unary_formula o=binary_connective r=unary_formula
     {
@@ -331,6 +306,10 @@ type_arg: l=assoc_binary_formula_aux(ARROW) {
   | FORALL { PT.forall }
   | EXISTS { PT.exists }
   | LAMBDA { PT.lambda }
+  | CHOICE_BINDER { fun ?loc vars body -> 
+                      PT.app_builtin ?loc Builtin.ChoiceConst 
+                        [PT.lambda ?loc vars body] 
+                  }
 %inline unary_connective:
   | NOT { PT.not_ }
 
@@ -368,6 +347,10 @@ plain_term:
       let loc = L.mk_pos $startpos $endpos in
       PT.app ~loc f args
     }
+  | ITE LEFT_PAREN cond=formula COMMA t=formula COMMA f=formula RIGHT_PAREN {
+    let loc = L.mk_pos $startpos $endpos in
+    PT.ite ~loc cond t f
+  }
 
 atomic_term:
   | s=atomic_word
@@ -390,6 +373,11 @@ defined_atom:
   | n=INTEGER { PT.int_ (Z.of_string n) }
   | n=RATIONAL { PT.rat (Q.of_string n) }
   | n=REAL { PT.real n }
+  | CHOICE_CONST 
+    {
+      let loc = L.mk_pos $startpos $endpos in
+      PT.app_builtin ~loc Builtin.ChoiceConst []
+    }
   | s=DISTINCT_OBJECT
     {
       let loc = L.mk_pos $startpos $endpos in
@@ -507,6 +495,9 @@ atomic_defined_word:
   | IMPLYCONST { PT.builtin Builtin.Imply }
   | EXISTSCONST { PT.builtin Builtin.ExistsConst }
   | FORALLCONST { PT.builtin Builtin.ForallConst }
+  | LEFT_PAREN EQUAL RIGHT_PAREN {PT.builtin Builtin.Eq}
+  | LEFT_PAREN AND RIGHT_PAREN {PT.builtin Builtin.And}
+  | LEFT_PAREN VLINE RIGHT_PAREN {PT.builtin Builtin.Or}
   | WILDCARD { PT.wildcard }
 
 defined_ty:

@@ -84,6 +84,7 @@ val record_flatten : ?loc:location -> ty:t -> (string*t) list -> rest:t option -
 (** Build a record with possibly a row variable.
     @raise IllFormedTerm if the [rest] is not either a record or a variable. *)
 
+
 val fun_l : ?loc:location -> t Var.t list -> t -> t
 
 val of_string : ?loc:location -> ty:t -> string -> t
@@ -171,6 +172,7 @@ module Ty : sig
   val returns : t -> t
   val returns_tType : t -> bool
   val returns_prop : t -> bool
+  val order : t -> int
 end
 
 val sort_ty_vars_first : t Var.t list -> t Var.t list
@@ -389,6 +391,7 @@ val app_infer :
 
 val try_alpha_renaming : t -> t -> Subst.t option
 val simplify_formula : t -> t
+val depth : t -> int
 
 (** {2 Conversion} *)
 

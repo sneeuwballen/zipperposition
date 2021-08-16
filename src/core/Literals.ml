@@ -97,7 +97,7 @@ let map f lits =
 let pos lits =
   let bv = BV.create ~size:(Array.length lits) false in
   for i = 0 to Array.length lits - 1 do
-    if Lit.is_pos lits.(i) then BV.set bv i
+    if Lit.is_positivoid lits.(i) then BV.set bv i
   done;
   bv
 
@@ -105,7 +105,7 @@ let pos lits =
 let neg lits =
   let bv = BV.create ~size:(Array.length lits) false in
   for i = 0 to Array.length lits - 1 do
-    if Lit.is_neg lits.(i) then BV.set bv i
+    if Lit.is_negativoid lits.(i) then BV.set bv i
   done;
   bv
 
@@ -167,15 +167,27 @@ let is_trivial lits =
   let rec check_multi lits i =
     if i = Array.length lits then false
     else
-      let triv = match lits.(i) with
+      let lit = lits.(i) in
+      let triv = match lit with
         | Lit.Equation (l, r, true) when T.equal l r -> true
         | Lit.Equation (l, r, sign) ->
-          CCArray.exists
-            (function
-              | Lit.Equation (l', r', sign') when sign = not sign' ->
-                (T.equal l l' && T.equal r r') || (T.equal l r' && T.equal l' r)
-              | _ -> false)
-            lits
+          if Lit.is_predicate_lit lit then (
+            let sign = Lit.is_positivoid lit in
+            CCArray.exists
+              (function
+                | Lit.Equation (l', _, _) as lit' when Lit.is_predicate_lit lit' ->
+                  let sign' = Lit.is_positivoid lit' in
+                  sign != sign' && T.equal l l'
+                | _ -> false)
+              lits
+          )
+          else (
+            CCArray.exists
+              (function
+                | Lit.Equation (l', r', sign') when sign = not sign' ->
+                  (T.equal l l' && T.equal r r') || (T.equal l r' && T.equal l' r)
+                | _ -> false)
+              lits)
         | lit -> Lit.is_trivial lit
       in
       triv || check_multi lits (i+1)
@@ -315,8 +327,9 @@ let fold_eqn ?(both=true) ?sign ~ord ~eligible lits k =
     if i = Array.length lits then ()
     else if not (eligible i lits.(i)) then aux (i+1)
     else (
+      let sign = Lit.is_positivoid lits.(i) in
       begin match lits.(i) with
-        | Lit.Equation (l,r,sign) when sign_ok sign ->
+        | Lit.Equation (l,r,_) when sign_ok sign ->
           begin match Ordering.compare ord l r with
             | Comparison.Gt ->
               k (l, r, sign, Position.(arg i @@ left @@ stop))
@@ -350,8 +363,11 @@ let fold_eqn_simple ?sign lits k =
   let rec aux i =
     if i = Array.length lits then ()
     else (
+      (* IMPORTANT: Returning the computed sign (positivoid vs negativoid)
+         rather than the sign stored in the equation *)
+      let sign = Lit.is_positivoid lits.(i) in
       begin match lits.(i) with
-        | Lit.Equation (l,r,sign) when sign_ok sign ->
+        | Lit.Equation (l,r,_) when sign_ok sign ->
           k (l, r, sign, Position.(arg i @@ left @@ stop))
         | Lit.Equation _
         | Lit.True
@@ -451,11 +467,6 @@ let is_horn lits =
   let bv = pos lits in
   BV.cardinal bv <= 1
 
-let is_pos_eq lits =
-  match lits with
-  | [| Lit.Equation (l,r,true) |] -> Some (l,r)
-  | [| Lit.True |] -> Some (T.true_, T.true_)
-  | _ -> None
 
 (** {2 Shielded Variables} *)
 
@@ -505,3 +516,11 @@ let ground_lits lits =
   let res = apply_subst Subst.Renaming.none gr_subst (lits,0)  in
   assert(Iter.for_all T.is_ground @@ Seq.terms res);
   res
+
+let num_predicate lits = 
+  let cnt = ref 0 in
+  CCArray.iter (fun l -> if Lit.is_predicate_lit l then incr cnt) lits;
+  !cnt
+
+let num_equational lits = 
+  CCArray.length lits - num_predicate lits

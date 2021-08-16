@@ -60,7 +60,7 @@ let [@inline] mk_comb comb_head ty ty_args args =
 
 (* make S combinator with the type:
   Παβγ. (α→β→γ) → (α→β) → α → γ *)
-let mk_s ?(args=[]) ~alpha ~beta ~gamma =
+let mk_s ~args ~alpha ~beta ~gamma =
   let ty = Ty.apply ty_s [Type.of_term_unsafe (alpha : Term.t :> InnerTerm.t);
                           Type.of_term_unsafe (beta : Term.t :> InnerTerm.t);
                           Type.of_term_unsafe (gamma : Term.t :> InnerTerm.t);] in
@@ -68,7 +68,7 @@ let mk_s ?(args=[]) ~alpha ~beta ~gamma =
 
 (* make C combinator with the type:
   Παβγ. (α→β→γ) → β → α → γ *)
-let mk_c ?(args=[]) ~alpha ~beta ~gamma =
+let mk_c ~args ~alpha ~beta ~gamma =
   let ty = Ty.apply ty_c [Type.of_term_unsafe (alpha : Term.t :> InnerTerm.t);
                           Type.of_term_unsafe (beta : Term.t :> InnerTerm.t);
                           Type.of_term_unsafe (gamma : Term.t :> InnerTerm.t);] in
@@ -76,7 +76,7 @@ let mk_c ?(args=[]) ~alpha ~beta ~gamma =
 
 (* make B combinator with the type:
   Παβγ. (α→β) → (γ→α) → γ → β *)
-let mk_b ?(args=[]) ~alpha ~beta ~gamma =
+let mk_b ~args ~alpha ~beta ~gamma =
   let ty = Ty.apply ty_b [Type.of_term_unsafe (alpha : Term.t :> InnerTerm.t);
                           Type.of_term_unsafe (beta : Term.t :> InnerTerm.t);
                           Type.of_term_unsafe (gamma : Term.t :> InnerTerm.t);]  in
@@ -84,14 +84,14 @@ let mk_b ?(args=[]) ~alpha ~beta ~gamma =
 
 (* make K combinator with the type:
   Παβ. β → α → β *)
-let mk_k ?(args=[]) ~alpha ~beta =
+let mk_k ~args ~alpha ~beta =
   let ty = Ty.apply ty_k [Type.of_term_unsafe (alpha : Term.t :> InnerTerm.t);
                           Type.of_term_unsafe (beta : Term.t :> InnerTerm.t)] in
   mk_comb Builtin.KComb ty [alpha;beta] args
 
 (* make I combinator with the type:
   Πα. α → α *)
-let mk_i ?(args=[]) ~alpha =
+let mk_i ~args ~alpha =
   let ty = Ty.apply ty_i [Type.of_term_unsafe (alpha : Term.t :> InnerTerm.t)] in
   mk_comb Builtin.IComb ty [alpha] args
 
@@ -461,12 +461,12 @@ let add_neg_var state var =
   );
   Term.Tbl.add state.balance var (n - 1)
 
-let max_weak_reduction_length var_handler ~state t =
+let max_weak_reduction_length var_handler ~state orig_t =
   let rec aux t  = 
     match T.view t with
     | T.DB _ | T.Fun _ ->
       let err_msg = 
-        CCFormat.sprintf "lambdas should be removed:@[%a@]@." T.pp t in
+        CCFormat.sprintf "lambdas should be removed@.orig:@[%a@];subterm:@[%a@]@." T.pp orig_t T.pp t in
       invalid_arg err_msg
     | T.Const _ -> 0
     | T.Var _ ->
@@ -503,7 +503,7 @@ let max_weak_reduction_length var_handler ~state t =
     let t' = apply_rw_rules ~rules:narrow_rules t in
     assert (not @@ T.equal t' t);
     t'; in
-  aux t
+  aux orig_t
 
 let cmp_by_max_weak_r_len t1 t2 =
   let numvars = Iter.length (T.Seq.vars t1) + Iter.length (T.Seq.vars t2) in
@@ -602,7 +602,7 @@ let abf ~rules t =
       let body' = aux body in
       abstract ~bvar_ty:(Term.of_ty ty) body'
     | _ ->  t in
-  let reduced = Lambda.eta_reduce @@ Lambda.snf @@ t in
+  let reduced = Lambda.eta_reduce ~expand_quant:false @@ Lambda.snf @@ t in
   let res = aux reduced in
   (* CCFormat.printf "abf(@[%a@])=" T.pp reduced;
   CCFormat.printf "@.   @[%a@]@." T.pp res; *)
@@ -660,7 +660,7 @@ let comb2lam t =
           T.fun_l (ty_args -| 1) (T.bvar ~ty:(ty_args -- 0) 0)
         | _ -> assert false
         end in
-      let res = Lambda.eta_reduce (Lambda.snf (T.app lam args')) in
+      let res = Lambda.eta_reduce ~expand_quant:false @@ Lambda.snf @@ T.app lam args' in
       assert (Type.equal (T.ty t) (T.ty res));
       res
     | T.AppBuiltin(b, args) ->

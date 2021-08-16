@@ -11,7 +11,6 @@ build: [
 depends: [
   "base-bytes"
   "base-unix"
-  "zarith"
   "logtk" { = version }
   "containers" { >= "3.1" & < "4.0" }
   "containers-data" { >= "3.1" & < "4.0" }

@@ -12,7 +12,7 @@ build: [
 depends: [
   "base-bytes"
   "base-unix"
-  "zarith"
+  ("zarith" | "num")
   "oseq" { >= "0.3" & < "0.4" }
   "containers" { >= "3.0" & < "4.0" }
   "containers-data" { >= "3.0" & < "4.0" }

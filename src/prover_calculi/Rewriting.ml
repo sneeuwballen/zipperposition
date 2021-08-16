@@ -384,10 +384,13 @@ let unfold_def_before_cnf stmts =
   if !rewrite_before_cnf then (
     let cnt = ref 0 in
     CCVector.map (fun stmt ->
-        incr cnt; 
-        let res = rewrite_tst_stmt stmt in
-        Util.debugf ~section 1 "rewriting @[%a@]:@. @[%a@]@." (fun k -> k Statement.pp_input stmt Statement.pp_input res);
-        res
+        incr cnt;
+        try  
+          rewrite_tst_stmt stmt
+        with Type.Conv.Error t ->
+          Util.debugf ~section 1 "@[%a@] cannot be converted because it uses unsupported features (such as ite, let and others)" 
+            (fun k -> k Statement.pp_input stmt);
+          stmt
       ) stmts
   ) else stmts
 

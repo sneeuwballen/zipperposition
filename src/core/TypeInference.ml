@@ -16,6 +16,8 @@ module Fmt = CCFormat
 let prof_infer = ZProf.make "TypeInference.infer"
 let section = Util.Section.(make "ty-infer")
 
+let _rw_forms_only = ref false
+
 type 'a or_error = ('a, string) CCResult.t
 
 type type_ = TypedSTerm.t
@@ -71,6 +73,7 @@ module TyBuiltin = struct
   let ty1op = T.Ty.(forall a ([a_] ==> a_))
   let ty2op_to_i = T.Ty.([int;int] ==> int)
   let hobinder = T.Ty.(forall a ([[a_] ==> prop] ==> prop))
+  let choice_ty = T.Ty.(forall a ([[a_] ==> prop] ==> a_))
 
   let ty_exn = function
     | Builtin.True -> T.Ty.prop
@@ -108,6 +111,7 @@ module TyBuiltin = struct
     | Builtin.To_rat -> T.Ty.(forall a ([a_] ==> rat))
     | Builtin.Is_int -> T.Ty.(forall a ([a_] ==> prop))
     | Builtin.Is_rat -> T.Ty.(forall a ([a_] ==> prop))
+    | Builtin.ChoiceConst -> choice_ty
     | _ -> invalid_arg "TyBuiltin.ty_exn"
 
   let ty x = try Some (ty_exn x) with _ -> None
@@ -141,6 +145,7 @@ module Ctx = struct
     (* datatype ID -> list of cstors *)
     mutable new_types: (ID.t * type_) list;
     (* list of symbols whose type has been inferred recently *)
+    mutable ite_map : T.t T.Map.t
   }
 
   let create
@@ -161,6 +166,7 @@ module Ctx = struct
       new_metas=[];
       local_vars = [];
       new_types = [];
+      ite_map = T.Map.empty
     } in
     ctx
 
@@ -524,21 +530,49 @@ let rec infer_rec ?loc ctx (t:PT.t) : T.t =
       let a = infer_prop_ ?loc ctx a in
       let b = infer_rec ?loc ctx b in
       let c = infer_rec ?loc ctx c in
+      unify ?loc (T.ty_exn a) (T.Ty.prop);
       unify ?loc (T.ty_exn b)(T.ty_exn c);
-      T.ite ?loc a b c
-    | PT.Let (l, u) ->
-      (* deal with pairs in [l] one by one *)
-      let rec aux = function
-        | [] -> infer_rec ?loc ctx u
-        | (v,t) :: tail ->
-          let t = infer_rec ?loc ctx t in
-          with_typed_var_ ctx ?loc ~infer_ty:(fun ?loc:_ _ ty -> ty)
-            (v, Some (T.ty_exn t))
-            ~f:(fun v ->
-                let body = aux tail in
-                T.let_ ?loc [v, t] body)
+      let mk_ite arg_ty =
+        let id = ID.make (CCFormat.sprintf "zip_internal_ite_%a" T.pp arg_ty) in
+        let ty = T.Ty.(==>) [T.Ty.prop; arg_ty; arg_ty] arg_ty in
+        T.const ~ty id, ty
       in
-      aux l
+
+      let hd_const =
+        match T.Map.find_opt (T.ty_exn b) ctx.ite_map with
+        | Some hd -> hd
+        | None ->
+          let hd, ty = mk_ite (T.ty_exn b) in
+          ctx.ite_map <- T.Map.add (T.ty_exn b) hd ctx.ite_map;
+          hd
+      in
+
+      T.app ?loc ~ty:(T.ty_exn b) hd_const [a; b; c]
+    | PT.Let (l, u) ->
+      let vars, terms = (List.fold_left (fun (vars,ts) (v,t) -> 
+        let t = infer_rec ?loc ctx t in
+        (v, Some (T.ty_exn t)) :: vars, t::ts
+      ) ([], []) l)
+      |> CCPair.map List.rev List.rev in
+      let res = 
+        with_typed_vars_ ?loc ctx vars  ~infer_ty:(fun ?loc:_ _ ty -> ty)
+          ~f:(fun vars' ->
+              let u' = infer_rec ?loc ctx u in
+              let bound_vars = CCList.combine vars' terms in
+              T.let_ ?loc bound_vars u')
+      in
+      res
+    | PT.With (l, u) ->
+      let vars =
+        List.map
+          (fun (v,ty) ->
+             let ty = infer_ty_ ?loc ctx ty in
+             v, Some ty)
+          l
+      in
+      (* add vars in scope, but just return [u] *)
+      with_typed_vars_ ctx ?loc ~infer_ty:(fun ?loc:_ _ ty -> ty) vars
+        ~f:(fun _vars -> infer_rec ?loc ctx u)
     | PT.Match (u, l) ->
       let u = infer_rec ?loc ctx u in
       let ty_u = T.ty_exn u in
@@ -669,6 +703,16 @@ let rec infer_rec ?loc ctx (t:PT.t) : T.t =
       let x = match l with x::_ -> x | _ -> assert false in
       List.iter (fun y -> unify ?loc (T.ty_exn x) (T.ty_exn y)) l;
       T.app_builtin ?loc ~ty:T.Ty.prop Builtin.Distinct l
+    | PT.AppBuiltin (Builtin.ChoiceConst, [t]) when PT.is_lam t ->
+      let t = infer_rec ?loc ctx t in
+      let ty = T.ty_exn t in
+      let _,alpha_l,_ = T.Ty.unfold ty in
+      if (CCList.length alpha_l != 1) then (
+         error_ ?loc "choice binder takes only one variable";
+      );
+      let alpha = List.hd alpha_l in
+      (* reapplying type argument and reusing lambda binder *)
+      T.app_builtin ?loc ~ty:alpha Builtin.ChoiceConst [alpha; t]
     | PT.AppBuiltin (b,l) ->
       begin match TyBuiltin.ty b with
         | None ->
@@ -681,6 +725,9 @@ let rec infer_rec ?loc ctx (t:PT.t) : T.t =
           let l = List.map (infer_rec ?loc ctx) l in
           let l =
             if i>0 && List.length l = j
+                   (* if some type arguments are already given, then the term
+                      might be partially applied *)
+                   && List.for_all (fun t -> not (T.Ty.is_tType (T.ty_exn t))) l
             then (
               Util.debugf ~section 50
                 "@[<2>add %d implicit type arguments to@ `@[<1>%a@ (%a)@]`@]"
@@ -690,6 +737,7 @@ let rec infer_rec ?loc ctx (t:PT.t) : T.t =
               metas @ l
             ) else l
           in
+
           let ty = apply_unify ctx ~allow_open:true ?loc ty_b l in
           T.app_builtin ?loc ~ty b l
       end
@@ -942,7 +990,7 @@ let rec as_def ?loc ?of_ bound t =
       let lhs = SLiteral.of_form lhs in
       let pol = if op=Builtin.Equiv then `Equiv else `Imply in
       yield_prop lhs rhs pol
-    | T.AppBuiltin (Builtin.Eq, [lhs;rhs]) ->
+    | T.AppBuiltin (Builtin.Eq, [_;lhs;rhs]) ->
       check_vars_eqn ?loc bound lhs rhs;
       begin match T.view lhs with
         | T.Const id ->
@@ -1049,7 +1097,11 @@ let infer_statement_exn ?(file="<no file>") ctx st =
     | A.Rewrite t ->
       let t =  infer_prop_ ctx t in
       let def = as_def ?loc Var.Set.empty t in
-      Stmt.rewrite ~proof:(Proof.Step.intro src Proof.R_def) def
+      (match def with 
+      | Stmt.Def_term {vars;id;ty;args;rhs;as_form} when 
+        !_rw_forms_only && (not (T.Ty.returns_prop ty)) ->
+        Stmt.assert_ ~attrs ~proof:(Proof.Step.intro src Proof.R_assert) t
+      | _ -> Stmt.rewrite ~proof:(Proof.Step.intro src Proof.R_def) def)
     | A.Data l ->
       (* declare the inductive types *)
       let data_types =
@@ -1145,6 +1197,24 @@ let infer_statements_exn
       Ctx.create ?def_as_rewrite ?on_var ?on_undef ?on_shadow ~implicit_ty_args ()
     | Some c -> c
   in
+
+  let mk_ite_axioms maps =
+    let mk_typed_axioms ~ty ~hd acc =
+      let if_t_var = T.var (Var.make ~ty (ID.make "if_t")) in
+      let if_f_var = T.var (Var.make ~ty (ID.make "if_f")) in
+
+      let if_t = T.app ~ty hd [T.Form.true_; if_t_var; if_f_var] in
+      let if_f = T.app ~ty hd [T.Form.false_; if_t_var; if_f_var] in
+      let proof = (Proof.Step.define_internal (T.head_exn hd) []) in
+
+      let decl = Statement.ty_decl ~proof (T.head_exn hd) (T.ty_exn hd) in
+      let if_t_stm =  Statement.assert_ ~proof (T.Form.eq if_t if_t_var) in
+      let if_f_stm =  Statement.assert_ ~proof (T.Form.eq if_f if_f_var) in
+      decl :: if_t_stm :: if_f_stm :: acc
+    in
+    T.Map.fold (fun ty hd acc -> mk_typed_axioms ~ty ~hd acc) maps []
+  in
+
   let res = CCVector.create () in
   Iter.iter
     (fun st ->
@@ -1153,6 +1223,9 @@ let infer_statements_exn
        List.iter (CCVector.push res) aux;
        CCVector.push res st)
     seq;
+  if not (T.Map.is_empty ctx.ite_map) then (
+    CCVector.append_list res (mk_ite_axioms ctx.ite_map)
+  );
   CCVector.freeze res
 
 let infer_statements
@@ -1163,3 +1236,10 @@ let infer_statements
       (infer_statements_exn ?def_as_rewrite ?on_var ?on_undef
          ?on_shadow ?ctx ?file ~implicit_ty_args seq)
   with e -> Err.of_exn_trace e
+
+let () =
+  Options.add_opts
+    [ "--tptp-rewrite-formulas-only", Arg.Bool(fun v -> _rw_forms_only := v),
+      "turn definitions of symbols that return Boolean type to
+       rewrite only"
+    ]

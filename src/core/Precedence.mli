@@ -150,7 +150,7 @@ val weight_freq : ID.t Iter.t -> weight_fun
 val weight_invfreqrank : ID.t Iter.t -> weight_fun
 val weight_freqrank : ID.t Iter.t -> weight_fun
 
-val weight_fun_of_string : signature:Signature.t -> lits: Term.t SLiteral.t Iter.t -> 
+val weight_fun_of_string : signature:Signature.t -> clauses: (Term.t SLiteral.t Iter.t) Iter.t -> 
                            lm_w : int -> db_w : int ->
                            string -> (ID.t * int) Iter.t -> weight_fun
 

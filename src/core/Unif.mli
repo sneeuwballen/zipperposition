@@ -16,7 +16,9 @@ exception Fail
 val _allow_pattern_unif : bool ref
 val _unif_bool : bool ref
 
-val norm_logical_disagreements : Builtin.t -> Term.t list -> Term.t list -> Term.t list * Term.t list
+val norm_logical_disagreements : 
+  ?mode:[< `Conservative | `Off | `Pragmatic > `Conservative ] ->
+  Builtin.t -> Term.t list -> Term.t list -> Term.t list * Term.t list
 
 val occurs_check : depth:int -> subst ->
   InnerTerm.t HVar.t Scoped.t -> InnerTerm.t Scoped.t -> bool

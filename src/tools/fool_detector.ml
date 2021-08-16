@@ -36,7 +36,7 @@ let classify_stm f =
             List.mem hd (Builtin.[True; False; Eq; Neq])) in
           aux_l ~top args
         | Ite(cond, cond_true, cond_false) ->
-          aux_l ~top [cond;cond_true;cond_false]
+          refine (aux_l ~top [cond; cond_true;cond_false]) InFOOL
         | Let(var_def_pairs, body) ->
           let t_vars = List.map (fun p -> T.var (fst p)) var_def_pairs in
           let defs = List.map snd var_def_pairs in
@@ -45,7 +45,7 @@ let classify_stm f =
           aux_l ~top [T.var var; body]
         | _ -> OutsideFOOL in
       if not top && Ty.is_prop ty 
-      then refine res InFOOL 
+      then refine res InFOOL
       else res)
   and aux_l ~top = function
   | [] -> PureFO
@@ -53,12 +53,11 @@ let classify_stm f =
     CCList.fold_left (fun acc y -> 
       refine acc (aux ~top y)
     ) (aux ~top x) xs in
-  
   aux ~top:true f
 
-let statement_kind smt = 
+let statement_kind smt =
   Statement.Seq.forms smt
-  |> Iter.fold_while (fun acc f -> 
+  |> Iter.fold_while (fun acc f ->
     let res = refine acc (classify_stm f) in
     let continue = if res == OutsideFOOL then `Stop else `Continue in
     res, continue
@@ -66,19 +65,24 @@ let statement_kind smt =
 
 
 let process file =
-  let exception Stop of string in 
+  let exception Stop of string in
 
   try
-    let input = Input_format.I_tptp in
-    let parse = Util_tptp.parse_file ~recursive:true file in
-    Util.debugf 5 "Parse: %s" (fun k -> k (match parse with | CCResult.Error e -> e | CCResult.Ok _ -> "OK"));
-    let ast = Iter.map Util_tptp.to_ast (CCResult.get_exn parse) in
+    let input = Parsing_utils.input_of_file file in
+    let parsed = Parsing_utils.parse_file input file in
+    (match parsed with 
+      | CCResult.Error e -> raise (Stop (CCString.replace ~sub:"\n" ~by:"  " e))
+      | _ -> ());
+    let ast = CCResult.get_exn (parsed) in
     let typed_ast = TypeInference.infer_statements ?ctx:None
         ~on_var:(Input_format.on_var input)
         ~on_undef:(Input_format.on_undef_id input)
         ~on_shadow:(Input_format.on_shadow input)
         ~implicit_ty_args:false ast in
     Util.debugf 5 "Parse: %s" (fun k -> k (match typed_ast with | CCResult.Error e -> e | CCResult.Ok _ -> "OK"));
+    (match typed_ast with 
+      | CCResult.Error e -> raise (Stop (CCString.replace ~sub:"\n" ~by:"  " e))
+      | _ -> ());
     let fool_found = ref false in
     CCVector.to_iter (CCResult.get_exn typed_ast)
     |> Iter.iter (fun stm ->

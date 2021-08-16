@@ -1,9 +1,12 @@
 module S = Subst
+module US = Unif_subst
 module LL = OSeq
 module T = Term
 module U = Unif
 module Q = CCDeque
 module PUP = PragUnifParams
+
+let section = Util.Section.make "unif.framework"
 
 module type PARAMETERS = sig
   exception NotInFragment
@@ -12,37 +15,20 @@ module type PARAMETERS = sig
   val init_flag : flag_type
   val flex_state : Flex_state.t
   val identify_scope : T.t Scoped.t -> T.t Scoped.t -> T.t * T.t * Scoped.scope * S.t
+  val identify_scope_l : T.t list Scoped.t -> T.t list Scoped.t -> T.t list * T.t list * Scoped.scope * S.t
   val frag_algs : unit -> (T.t Scoped.t -> T.t Scoped.t -> S.t -> S.t list) list
   val pb_oracle : (T.t Scoped.t -> T.t Scoped.t -> flag_type -> S.t -> Scoped.scope -> (S.t * flag_type) option LL.t)
-  val oracle_composer : (Subst.t option OSeq.t) OSeq.t -> Subst.t option OSeq.t
 end
 
-(* Given a sequence of sequences (i.e., a generator) A
-       take one element from the A[0],
-       then one element from A[1] and A[0]
-       then one element from A[2],A[1] and A[0], etc.. *)
-let take_fair gens =
-  (* Take one element from A[0],A[1],...,A[k-1] *)
-  let rec take_first_k k acc gens =
-    if k = 0 then (acc, gens)
-    else (match gens () with 
-        | OSeq.Nil -> (acc, OSeq.empty)
-        | OSeq.Cons(x,xs) ->
-          begin match x () with 
-            | OSeq.Nil ->
-              take_first_k (k-1) acc xs
-            | OSeq.Cons(y, ys) ->
-              let taken, new_gens = take_first_k (k-1) (OSeq.cons y acc) xs in
-              (taken, OSeq.cons ys new_gens) end) in
+module type S = sig 
+  val unify_scoped : T.t Scoped.t -> T.t Scoped.t -> S.FO.t option OSeq.t
+  val unify_scoped_l : T.t list Scoped.t -> T.t list Scoped.t -> S.FO.t option OSeq.t
+end
 
-  (* Take one element from A[0],A[1],...A[i-1]
-      and then take one element from A[0],A[1],...,A[i]   *)
-  let rec aux i gens =
-    let taken, new_gens = take_first_k i OSeq.empty gens in
-    if OSeq.is_empty new_gens then taken
-    else (OSeq.append taken (function () -> aux (i+1) new_gens ())) 
-  in
-  aux 1 gens
+module type US = sig 
+  val unify_scoped : T.t Scoped.t -> T.t Scoped.t -> US.t option OSeq.t
+  val unify_scoped_l : T.t list Scoped.t -> T.t list Scoped.t -> US.t option OSeq.t
+end
 
 module Make (P : PARAMETERS) = struct 
   exception PolymorphismDetected
@@ -111,14 +97,18 @@ module Make (P : PARAMETERS) = struct
     | T.AppBuiltin _ ->  not @@ T.is_appbuiltin t
     | _ -> false
 
-  let do_unif ~bind_cnt problem subst unifscope =
-    let delay res =
+  let do_unif ~bind_cnt ~hits_cnt problem subst unifscope =
+    let max_infs = 
+      if Flex_state.get_exn PUP.k_max_inferences P.flex_state < 0 then max_int
+      else Flex_state.get_exn PUP.k_max_inferences P.flex_state
+    in
+
+    let delay steps res () =
       let skipper = 
         int_of_float (Flex_state.get_exn PUP.k_skip_multiplier P.flex_state) in
-      if !bind_cnt mod skipper == 0 then (
-        let none_count = !bind_cnt / skipper in
-        OSeq.append (OSeq.take none_count (OSeq.repeat None)) res
-      ) else res 
+      if steps !=0 && steps mod skipper == 0 then (
+        OSeq.append (OSeq.of_list (CCList.replicate (steps / skipper) None)) res ()
+      ) else res ()
     in
 
     let rec aux ?(root=false) subst problem =
@@ -181,10 +171,13 @@ module Make (P : PARAMETERS) = struct
 
       let decompose_and_cont ?(inc_step=0) args_l args_r rest flag subst =
         let new_prob = decompose args_l args_r rest flag in
-        aux subst new_prob in
+        (fun () -> aux subst new_prob ()) in
 
-      match problem with 
-      | [] -> OSeq.return (Some subst)
+      match problem with
+      | _ when !hits_cnt > max_infs -> OSeq.empty 
+      | [] -> 
+        incr hits_cnt;
+        OSeq.return (Some subst)
       | (lhs, rhs, flag) :: rest ->
         match PatternUnif.unif_simple ~subst ~scope:unifscope 
                 (T.of_ty (T.ty lhs)) (T.of_ty (T.ty rhs)) with 
@@ -199,7 +192,13 @@ module Make (P : PARAMETERS) = struct
             eta_expand_otf ~subst ~scope:unifscope pref_lhs pref_rhs body_lhs body_rhs in
           let (hd_lhs, args_lhs), (hd_rhs, args_rhs) = T.as_app body_lhs, T.as_app body_rhs in
 
-          if T.equal body_lhs body_rhs then (
+          if Term.is_type lhs then (
+            assert(Term.is_type rhs);
+            try
+              let subst = Unif.FO.unify_syn ~subst:(subst) (lhs, unifscope) (rhs, unifscope) in
+              aux subst rest
+            with Unif.Fail -> OSeq.empty
+          ) else if T.equal body_lhs body_rhs then (
             aux subst rest
           ) else (
             match T.view hd_lhs, T.view hd_rhs with
@@ -212,10 +211,15 @@ module Make (P : PARAMETERS) = struct
               else OSeq.empty
             | T.AppBuiltin(b1, args1), T.AppBuiltin(b2, args2) ->
               let args_lhs = args_lhs @ args1 and args_rhs = args_rhs @ args2 in
-              if Builtin.equal b1 b2 && List.length args_lhs = List.length args_rhs then (
-                let args_lhs, args_rhs = 
-                  Unif.norm_logical_disagreements b1 args_lhs args_rhs in
-                decompose_and_cont (args_lhs) (args_rhs) rest flag subst
+              if Builtin.equal b1 b2 then (
+                try
+                  let mode = Flex_state.get_exn PragUnifParams.k_logop_mode P.flex_state in
+                  let args_lhs, args_rhs = 
+                    Unif.norm_logical_disagreements ~mode b1 args_lhs args_rhs in
+                  if List.length args_lhs = List.length args_rhs then 
+                    decompose_and_cont (args_lhs) (args_rhs) rest flag subst
+                  else OSeq.empty
+                with Unif.Fail -> OSeq.empty
               ) else OSeq.empty
             | _ when different_rigid_heads hd_lhs hd_rhs -> OSeq.empty
             | _ -> 
@@ -225,27 +229,39 @@ module Make (P : PARAMETERS) = struct
                       try
                         Some (alg (lhs, unifscope) (rhs, unifscope) subst)
                       with 
-                      | P.NotInFragment -> None
-                      | P.NotUnifiable -> 
-                      raise Unif.Fail
+                      | P.NotInFragment -> 
+                        Util.debugf ~section 1 
+                          "@[%a@] =?= @[%a@] (subst @[%a@]) is not in fragment" 
+                            (fun k -> k T.pp lhs T.pp rhs Subst.pp subst);
+                        None
+                      | P.NotUnifiable ->
+                        Util.debugf ~section 1 
+                          "@[%a@] =?= @[%a@] (subst @[%a@]) is not unif" 
+                            (fun k -> k T.pp lhs T.pp rhs Subst.pp subst);
+                        raise Unif.Fail
                     ) (P.frag_algs ()) in 
                 match mgu with 
                 | Some substs ->
                   (* We assume that the substitution was augmented so that it is mgu for
                       lhs and rhs *)
-                  CCList.map (fun sub () -> aux sub rest ()) substs
+                  CCList.map (fun sub () -> 
+                    Util.debugf ~section 1 
+                      "@[%a@] =?= @[%a@] (subst @[%a@]) has unif @[%a@]" 
+                        (fun k -> k T.pp lhs T.pp rhs Subst.pp subst Subst.pp sub);
+                    aux sub rest ()) substs
                   |> OSeq.of_list
-                  |> P.oracle_composer
+                  |> OSeq.merge
                 | None ->
                   let args_unif =
-                    if T.is_var hd_lhs && T.is_var hd_rhs && T.equal hd_lhs hd_rhs then
-                      decompose_and_cont args_lhs args_rhs rest flag subst
+                    if T.is_var hd_lhs && T.is_var hd_rhs && T.equal hd_lhs hd_rhs then(
+                      incr bind_cnt;
+                      delay !bind_cnt (fun () -> decompose_and_cont args_lhs args_rhs rest flag subst ()))
                     else OSeq.empty in
 
                   let all_oracles = 
                     P.pb_oracle (body_lhs, unifscope) (body_rhs, unifscope) flag subst unifscope in
 
-                  let oracle_unifs = 
+                  let res = 
                     OSeq.map (fun sub_flag_opt ->
                         match sub_flag_opt with 
                         | None -> OSeq.return None
@@ -253,14 +269,14 @@ module Make (P : PARAMETERS) = struct
                           try
                             let subst' = Subst.merge subst sub' in
                             incr bind_cnt;
-                            delay (fun () -> aux subst' ((lhs,rhs,flag') :: rest) ())
+                            delay !bind_cnt (fun () -> aux subst' ((lhs,rhs,flag') :: rest) ())
                           with Subst.InconsistentBinding _ ->
-                            OSeq.empty) all_oracles
-                    |> P.oracle_composer in
-
-                  let interleaved = OSeq.interleave oracle_unifs args_unif in
-
-                  if !bind_cnt = 0 && root then (OSeq.cons None interleaved) else interleaved
+                            OSeq.return None) all_oracles
+                    |> OSeq.merge
+                    |> OSeq.interleave args_unif
+                  in
+                  if !bind_cnt = 0 && root then (OSeq.cons None res) else res
+                  
               with Unif.Fail -> OSeq.empty) in
     aux ~root:true subst problem
 
@@ -299,14 +315,17 @@ module Make (P : PARAMETERS) = struct
     ) else OSeq.empty
 
 
+  let problem_id = ref 0
 
   let unify_scoped t0s t1s =
     let lhs,rhs,unifscope,subst = P.identify_scope t0s t1s in
-    let bind_cnt = ref 0 in
+
+    let bind_cnt = ref 0 in (* number of created binders *)
+    let hits_cnt = ref 0 in (* number of unifiers found *)
     try
       OSeq.append 
         (try_lfho_unif t0s t1s)
-        (do_unif ~bind_cnt [(lhs,rhs,P.init_flag)] subst unifscope)
+        (do_unif ~bind_cnt ~hits_cnt [(lhs,rhs,P.init_flag)] subst unifscope)
       |> OSeq.map (fun opt -> CCOpt.map (fun subst ->
         let norm t = T.normalize_bools @@ Lambda.eta_expand @@ Lambda.snf t in
         let l = norm @@ S.FO.apply Subst.Renaming.none subst t0s in 
@@ -317,5 +336,15 @@ module Make (P : PARAMETERS) = struct
           CCFormat.printf "new:@[%a:%a@]@.=?=@.@[%a:%a@]@." T.pp l Type.pp (T.ty l) T.pp r Type.pp (T.ty r);
           assert(false)
         ); subst) opt)
-    with Unif.Fail -> OSeq.empty    
+    with Unif.Fail -> OSeq.empty
+
+  let unify_scoped_l t0s t1s =
+    let lhs,rhs,unifscope,subst = P.identify_scope_l t0s t1s in
+    let problem = List.map (fun (a,b) -> (a,b,P.init_flag)) (List.combine lhs rhs) in 
+
+    let bind_cnt = ref 0 in (* number of created binders *)
+    let hits_cnt = ref 0 in (* number of unifiers found *)
+    try
+      do_unif ~bind_cnt ~hits_cnt problem subst unifscope
+    with Unif.Fail -> OSeq.empty
 end

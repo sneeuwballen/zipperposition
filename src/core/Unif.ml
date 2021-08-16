@@ -9,8 +9,7 @@ module US = Unif_subst
 
 exception Fail
 
-let norm_logical_disagreements b args args' : _ list * _ list =
-  assert(List.length args = List.length args');
+let norm_logical_disagreements ?(mode=`Conservative) b args args' : _ list * _ list =
   let sort =
     CCList.sort (fun t1 t2 ->
       let (<?>) = CCOrd.(<?>) in
@@ -35,13 +34,57 @@ let norm_logical_disagreements b args args' : _ list * _ list =
       <?> (CCInt.compare, Term.hash t1, Term.hash t2))  in
 
   if Builtin.is_flattened_logical b then (
-    let a_set, a'_set = CCPair.map_same Term.Set.of_list (args,args') in
-    let uniq_a, uniq_a' = Term.Set.diff a_set a'_set, Term.Set.diff a'_set a_set in
-    let args, args' =
-      if Term.Set.cardinal uniq_a = Term.Set.cardinal uniq_a' then
-        CCPair.map_same Term.Set.to_list (uniq_a, uniq_a')
-      else args, args' in
-    sort args, sort args')
+    assert (not @@ CCList.is_empty args);
+    assert (not @@ CCList.is_empty args');
+
+    match mode with 
+    | `Conservative ->
+      if List.length args > List.length args' then (
+        let n = List.length args' in
+        let a_main, a_rest = CCList.take_drop (n-1) args in
+        let a'_main, a'_rest = CCList.take_drop (n-1) args' in
+        assert(List.length a'_rest = 1);
+        Term.app_builtin ~ty:Type.prop b a_rest :: (a_main),
+        a'_rest @ (a'_main)
+      ) else if  (List.length args' > List.length args) then (
+        let n = List.length args in
+        let a_main, a_rest = CCList.take_drop (n-1) args in
+        let a'_main, a'_rest = CCList.take_drop (n-1) args' in
+        assert(List.length a_rest = 1);
+        Term.app_builtin ~ty:Type.prop b a'_rest :: (a'_main),
+        a_rest @ (a_main)
+      ) else (args, args')
+    | `Pragmatic ->
+      let a_set, a'_set = CCPair.map_same Term.Set.of_list (args,args') in
+      let uniq_a, uniq_a' = Term.Set.diff a_set a'_set, Term.Set.diff a'_set a_set in
+        (* if both lists are empty, then the terms are logically equivalent *)
+        if Term.Set.is_empty uniq_a && Term.Set.is_empty uniq_a' then ([],[])
+        else if Term.Set.is_empty uniq_a || Term.Set.is_empty uniq_a' then (
+          (* if one list is empty, but the other one is not, then 
+             we have extra arguments in one of the lists -- not unifiable*)
+          raise Fail
+        ) else if Term.Set.cardinal uniq_a > Term.Set.cardinal uniq_a' then (
+          let n = Term.Set.cardinal uniq_a' in
+          let (a,a') = CCPair.map_same 
+            (fun s -> sort @@ Term.Set.to_list s) (uniq_a, uniq_a') in
+          let a_main, a_rest = CCList.take_drop (n-1) a in
+          let a'_main, a'_rest = CCList.take_drop (n-1) a' in
+          assert(List.length a'_rest = 1);
+          Term.app_builtin ~ty:Type.prop b a_rest :: (a_main),
+          a'_rest @ (a'_main)
+        ) else if Term.Set.cardinal uniq_a' > Term.Set.cardinal uniq_a then (
+          let n = Term.Set.cardinal uniq_a in
+          let (a,a') = CCPair.map_same 
+            (fun s -> sort @@ Term.Set.to_list s) (uniq_a, uniq_a') in
+          let a_main, a_rest = CCList.take_drop (n-1) a in
+          let a'_main, a'_rest = CCList.take_drop (n-1) a' in
+          assert(List.length a_rest = 1);
+          Term.app_builtin ~ty:Type.prop b a'_rest :: (a'_main),
+          a_rest @ (a_main)
+        ) else CCPair.map_same (fun s -> sort @@ Term.Set.to_list s) (uniq_a, uniq_a')
+    | `Off ->
+      if List.length args = List.length args' then (args,args') else raise Fail
+    )
   else (args, args')
 
 let norm_logical_inner b args args' = 
@@ -222,14 +265,14 @@ module Inner = struct
 
   (* public "bind" function that performs occur check *)
   let bind ?(check=true) subst v t =
-    if check && occurs_check ~depth:0 subst v t
+    if (check && occurs_check ~depth:0 subst v t) || not (T.DB.closed (fst t))
     then fail()
     else if S.mem subst v then fail()
     else S.bind subst v t
 
   (* public "update" function to replace a binding (with occur check) *)
   let update ?(check=true) subst v t =
-    if check && occurs_check ~depth:0 subst v t
+    if (check && occurs_check ~depth:0 subst v t) || not (T.DB.closed (fst t))
     then fail()
     else if not (S.mem subst v) then fail()
     else S.update subst v t
@@ -655,14 +698,14 @@ module Inner = struct
         delay ~tags () (* push pair as a constraint, because of typing. *)
       | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when 
           Builtin.equal s1 s2 ->
-        let l1,l2 = if sc1 = sc2 && List.length l1 = List.length l2 then (norm_logical_inner s1 l1 l2) else l1, l2 in
+        let l1,l2 = if sc1 = sc2 && (not (Type.is_fun (Type.of_term_unsafe @@ T.ty_exn t1))) then (norm_logical_inner s1 l1 l2) else l1, l2 in
         unif_list  ~op ~bvars subst l1 sc1 l2 sc2
       | _, _ -> raise Fail
     end
 
   and unif_vars ~op subst t1 sc1 t2 sc2 : unif_subst =
     (* Util.debugf ~section 4 "var_binidng: %a =?= %a" (fun k-> k T.pp t1 T.pp t2); *)
-    let t1,t2 = CCPair.map_same (fun t -> ((Lambda.eta_reduce t) :> InnerTerm.t)) (Term.of_term_unsafe t1,Term.of_term_unsafe t2) in
+    let t1,t2 = CCPair.map_same (fun t -> ((Lambda.eta_reduce ~expand_quant:false t) :> InnerTerm.t)) (Term.of_term_unsafe t1,Term.of_term_unsafe t2) in
     begin match T.view t1, T.view t2, op with
       | T.Var v1, T.Var v2, O_equal ->
         if HVar.equal T.equal v1 v2 && sc1=sc2

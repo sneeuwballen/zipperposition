@@ -7,6 +7,22 @@
 #include <string.h>
 #include <stdio.h>
 #include <sys/time.h>
+
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+
+CAMLprim value logtk_set_memory_limit(value megabytes) {
+  CAMLparam0();
+  CAMLreturn (Val_unit);
+}
+
+CAMLprim value logtk_set_time_limit(value t) {
+  CAMLparam0();
+  CAMLreturn (Val_unit);
+}
+
+#else
+
+
 #include <sys/resource.h>
 
 CAMLprim value logtk_set_memory_limit(value megabytes)
@@ -52,3 +68,5 @@ CAMLprim value logtk_set_time_limit(value t)
 
   CAMLreturn (Val_unit);
 }
+
+#endif

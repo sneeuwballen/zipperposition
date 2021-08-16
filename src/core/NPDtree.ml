@@ -42,8 +42,8 @@ let [@inline] mk_neg f =
   T.app neg_const [f]
 
 let rec open_term ~stack t = match T.view t with
-  | T.AppBuiltin(Eq, ([a;b]|[_;a;b])) -> open_term ~stack (mk_eq a b)
-  | T.AppBuiltin(Neq, ([a;b]|[_;a;b])) -> open_term ~stack (mk_neq a b)
+  | T.AppBuiltin(Eq, ([a;b]|[_;a;b])) when Type.is_prop (T.ty t) -> open_term ~stack (mk_eq a b)
+  | T.AppBuiltin(Neq, ([a;b]|[_;a;b])) when Type.is_prop (T.ty t) -> open_term ~stack (mk_neq a b)
   | T.AppBuiltin(Not, [a]) -> open_term ~stack (mk_neg a)
   | T.Var _
   | T.DB _

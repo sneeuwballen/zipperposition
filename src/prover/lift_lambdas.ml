@@ -27,6 +27,32 @@ module Make(E : Env.S) : S with module Env = E = struct
       (C.compare a c) <?> (T.compare, b, d)
    end)
 
+
+  let clausify_def c : C.t list =
+    match C.lits c with 
+    | [| Literal.Equation(l,r,_) |] 
+        when Type.is_prop (T.ty l) && not (T.equal l r) &&
+             ((not (T.equal r T.true_) && not (T.equal r T.false_))
+             || T.is_formula l || T.is_formula r) ->
+      let f = Literals.Conv.to_tst (C.lits c) in
+      let proof = Proof.Step.simp ~rule:(Proof.Rule.mk "clausify_def") ~tags:[Proof.Tag.T_ho] [C.proof_parent c] in
+      let trail = C.trail c and penalty = C.penalty c in
+      let stmt = Statement.assert_ ~proof f in
+      let cnf_vec = Cnf.convert @@ CCVector.to_iter @@ Cnf.cnf_of ~ctx:(Ctx.sk_ctx ()) stmt in
+      CCVector.iter (fun cl -> 
+          Statement.Seq.ty_decls cl
+          |> Iter.iter (fun (id,ty) -> 
+            Ctx.declare id ty; 
+            ID.set_payload id (ID.Attr_skolem ID.K_after_cnf)
+          )) cnf_vec;
+
+      CCVector.map (C.of_statement ~convert_defs:true) cnf_vec
+      |> CCVector.to_list 
+      |> CCList.flatten
+      |> List.map (fun c -> 
+          C.create ~penalty  ~trail (CCArray.to_list (C.lits c)) proof)
+    | _ -> [c]
+
   let setup () = ()
   
   let sc t = (t, 0)
@@ -130,10 +156,6 @@ let lift_lambdas_t ~parent ~counter t  =
               let lits = [Literal.mk_eq lhs rhs] in
               let proof = Proof.Step.define_internal id [C.proof_parent parent; C.proof_parent def] in
               let lift_rel = C.create ~penalty:1 ~trail:Trail.empty lits proof in
-
-              (* CCFormat.printf "Relationship between@.@[%a@]@ and@ @[%a@]@ is @.@[%a@]@." 
-                  C.pp lift_def C.pp def C.pp lift_rel; *)
-
               lift_rel :: acc)
             else acc
           ) [lift_def] in
@@ -147,7 +169,7 @@ let lift_lambdas_t ~parent ~counter t  =
       assert(not (T.is_fun hd));
       let l', new_defs, declared_syms = aux_l l in
       (if T.same_l l l' then t else (T.app hd l')), new_defs, declared_syms
-    | T.AppBuiltin((Builtin.ExistsConst|Builtin.ForallConst) as b, [q_body])
+    | T.AppBuiltin((Builtin.ExistsConst|Builtin.ForallConst) as b, [_;q_body])
         when T.is_fun q_body ->
       let vars, body = T.open_fun q_body in
       let body', new_defs, declared_syms = aux body in
@@ -166,7 +188,7 @@ let lift_lambdas_t ~parent ~counter t  =
       let xs', (xs_reused_defs, xs_new_defs), declared_symss = aux_l xs in
       x' :: xs', (x_reused_defs @ xs_reused_defs, x_new_defs @ xs_new_defs), declared_syms @ declared_symss in
   Util.debugf ~section 1 "lifting @[%a@]@." (fun k -> k T.pp t);
-  let res, defs, declared_syms =  aux t in
+  let res, defs, declared_syms =  aux (Lambda.snf @@ t) in
   Ctx.declare_syms declared_syms;
   (res,defs)
 
@@ -188,7 +210,7 @@ let lift_lambdas_t ~parent ~counter t  =
           | _ -> lit::acc, (reused_defs, new_defs)
        ) l ([],([],[]))) in
 
-    if CCList.is_empty reused_defs && CCList.is_empty new_defs then []
+    if Literals.equal (Array.of_list lits) (C.lits cl)  then []
     else (
       let proof = 
         Proof.Step.simp 
@@ -207,7 +229,7 @@ let lift_lambdas_t ~parent ~counter t  =
       None)
     else (
       Util.debugf ~section 1 "lifting(@[%a@])@. = @[%a@]" (fun k -> k C.pp cl (CCList.pp C.pp) res);
-      Some res)
+      Some (CCList.flat_map clausify_def res))
 
   
   let lift_lambdas_cnf st =
@@ -238,6 +260,7 @@ let extension =
   in
   { Extensions.default with
     Extensions.name = "lift_lambdas";
+    prio=1;
     env_actions=[register];
   }
 

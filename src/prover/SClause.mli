@@ -4,6 +4,8 @@
 
 open Logtk
 
+module TPSet : CCSet.S with type elt = (Term.t * Position.t)
+
 type flag
 
 type t = private {
@@ -35,6 +37,8 @@ val to_s_form :
   t -> TypedSTerm.Form.t
 
 (** {2 Flags} *)
+
+val flag_initial : flag (** clause comes from the input *)
 
 val flag_lemma : flag (** clause is a lemma *)
 

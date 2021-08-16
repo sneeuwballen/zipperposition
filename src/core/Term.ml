@@ -114,7 +114,8 @@ let var_of_int ~ty i =
 
 let builtin ~ty b = T.builtin ~ty:(ty : Type.t :> T.t) b
 
-let app_builtin ~ty b l = T.app_builtin ~ty:(ty : Type.t :> T.t) b l
+let app_builtin ~ty b l = 
+  T.app_builtin ~ty:(ty : Type.t :> T.t) b l
 
 let bvar ~ty i =
   assert (i >= 0);
@@ -268,18 +269,6 @@ let as_app_mono t = match view t with
     assert(match view f with AppBuiltin _ -> false | _ -> true);
     let l1,l2 = CCList.partition is_type l in
     app f l1, l2 (* re-apply to type parameters *)
-  | AppBuiltin((Builtin.Eq | Builtin.Neq) as b, (x :: rest as l)) ->
-    let l = if is_type x then rest else l in
-    begin match l with
-    | y :: _ ->
-      let eq_ty = Type.arrow [ty y; ty y] Type.prop in
-      app_builtin ~ty:eq_ty b [], l
-    | [] ->
-      assert(is_type x);
-      let eq_ty = 
-        Type.arrow [Type.of_term_unsafe (x:>InnerTerm.t); 
-                    Type.of_term_unsafe (x:>InnerTerm.t)] Type.prop in
-      app_builtin ~ty:eq_ty b [], [] end
   | AppBuiltin(b, l) ->
     let ty_args, args = CCList.partition is_type l in
     let ty = Type.arrow (List.map ty args) (ty t) in 
@@ -453,6 +442,41 @@ module Seq = struct
       (fun t -> match T.view t with
          | T.Const s -> Some (s, ty t)
          | _ -> None)
+
+  let common_contexts a b k =
+    let common_arg xs ys =
+      let rec aux acc xs ys =
+        match xs with 
+        | x :: xs' ->
+          begin match ys with
+          | y :: ys' ->
+            if (not (equal x y)) && CCOpt.is_none acc then (
+              aux (Some (x,y)) xs' ys'
+            ) else if equal x y then aux acc xs' ys'
+            else None
+          | _ -> assert false
+          end
+        | _ -> 
+          (assert (CCList.is_empty ys)); 
+          acc
+      in
+      aux None xs ys
+    in
+
+    let rec aux a b = 
+      match view a, view b with
+      | App(hda, argsa), App(hdb, argsb) 
+        when Type.equal (ty a) (ty b) ->
+        if is_const hda && equal hda hdb then (
+          match common_arg argsa argsb with 
+          | Some (a, b) -> 
+            k (a, b);
+            aux a b
+          | None -> ()
+        )
+      | _ -> ()
+    in
+    aux a b
 end
 
 let has_ho_subterm t =
@@ -464,7 +488,7 @@ let has_ho_subterm t =
 
 let close_quantifier b ty_args body =
   CCList.fold_right (fun ty acc -> 
-      app_builtin ~ty:Type.prop b [fun_ ty acc])
+      app_builtin ~ty:Type.prop b [(ty : Type.t :> T.t); fun_ ty acc])
     ty_args body
 
 let var_occurs ~var t =
@@ -479,13 +503,18 @@ let rec size t = match view t with
   | Const _ -> 1
 
 let weight ?(var=1) ?(sym=fun _ -> 1) t =
-  let rec weight t = match view t with
+  let rec weight t = 
+    if Type.is_tType (ty t) then 0
+    else (match view t with
     | Var _
     | DB _ -> var
-    | AppBuiltin (_,l)
-    | App (_, l) -> List.fold_left (fun s t' -> s + weight t') 1 l
+    | AppBuiltin ((ForallConst|ExistsConst), [_;body]) ->
+      let _, body = open_fun body in
+      1 + weight body
+    | AppBuiltin (_,l) -> List.fold_left (fun s t' -> s + weight t') 1 l
+    | App (hd, l) -> List.fold_left (fun s t' -> s + weight t') (weight hd) l
     | Fun (_, u) -> 1 + weight u
-    | Const s -> sym s
+    | Const s -> sym s)
   in weight t
 
 let ho_weight = T.ho_weight
@@ -732,7 +761,9 @@ let contains_symbol f t =
 
 (** {2 Fold} *)
 
-let all_positions ?(vars=false) ?(ty_args=true) ?(var_args=true) ?(fun_bodies=true) ?(pos=Position.stop) t f =
+let all_positions ?(filter_formula_subterms=(fun _ _ -> None)) 
+                  ?(vars=false) ?(ty_args=true) ?(var_args=true)
+                  ?(fun_bodies=true) ?(pos=Position.stop) t f =
   let rec aux pb t = match view t with
     | Var _ | DB _ ->
       if vars && (ty_args || not (Type.is_tType (ty t)))
@@ -746,6 +777,17 @@ let all_positions ?(vars=false) ?(ty_args=true) ?(var_args=true) ?(fun_bodies=tr
       then aux (PB.body pb) u
     | App (head, _) when not var_args && T.is_var head ->
       f (PW.make t (PB.to_pos pb))
+    | AppBuiltin (hd, args) 
+      when CCOpt.is_some (filter_formula_subterms hd args) ->
+      f (PW.make t (PB.to_pos pb));
+      let taken_args = CCOpt.get_exn (filter_formula_subterms hd args) in
+      let len = List.length args in
+      let invi i = len - 1 - i in
+      List.iter
+        (fun i ->
+           (* if [t'] is a type parameter and [not ty_args], ignore *)
+           aux (PB.arg (invi i) pb) (List.nth args i))
+        taken_args
     | AppBuiltin (_, args)
     | App (_, args) ->
       if ty_args || not (Type.is_tType (ty t)) then (
@@ -791,7 +833,8 @@ module AC(A : AC_SPEC) = struct
       | T.Const _
       | T.Var _
       | T.DB _ -> t
-      | T.App (f, l) when T.is_const f && A.is_ac (head_exn f) ->
+      | T.App (f, l) when T.is_const f && A.is_ac (head_exn f) 
+                          && (not (Type.is_fun @@ Type.of_term_unsafe @@ T.ty_exn t)) ->
         let l = flatten (head_exn f) l in
         let tyargs, l = split_args_ ~ty:(ty f) l in
         let l = List.map normalize l in
@@ -805,7 +848,8 @@ module AC(A : AC_SPEC) = struct
               x l'
           | [] -> assert false
         end
-      | T.App (f, l) when T.is_const f && A.is_comm (head_exn f) ->
+      | T.App (f, l) when not (Type.is_fun @@ Type.of_term_unsafe @@ T.ty_exn t) && 
+                          T.is_const f && A.is_comm (head_exn f) ->
         let tyargs, l = split_args_ ~ty:(ty f) l in
         begin match l with
           | [a;b] ->
@@ -911,11 +955,23 @@ module Form = struct
 
   let forall t =
     assert(Type.is_fun (ty t) && Type.returns_prop (ty t));
-    app_builtin ~ty:Type.prop Builtin.ForallConst [t]
+    let ty_args, ret_ty = Type.open_fun (ty t) in
+    assert(List.length ty_args = 1);
+    app_builtin ~ty:Type.prop Builtin.ForallConst [of_ty (List.hd ty_args); t]
 
   let exists t =
     assert(Type.is_fun (ty t) && Type.returns_prop (ty t));
-    app_builtin ~ty:Type.prop Builtin.ExistsConst [t]
+    let ty_args, ret_ty = Type.open_fun (ty t) in
+    assert(List.length ty_args = 1);
+    app_builtin ~ty:Type.prop Builtin.ExistsConst [of_ty (List.hd ty_args); t]
+
+  let choice t =
+    let ty = ty t in
+    assert (Type.is_fun ty);
+    let args,ret = Type.open_fun ty in
+    assert (Type.is_prop ret);
+    let alpha = List.hd args in
+    app_builtin Builtin.ChoiceConst ~ty:alpha [of_ty alpha; t]
 
   let equiv f g =
     app_builtin ~ty:Type.prop Builtin.Equiv [f; g]
@@ -1224,7 +1280,7 @@ module Conv = struct
           decr depth;
           if CCOpt.is_some previous then PT.Var_tbl.replace tbl v (CCOpt.get_exn previous)
           else PT.Var_tbl.remove tbl v;
-          app_builtin ~ty:ty_b b [body])
+          app_builtin ~ty:ty_b b [of_ty ty_arg; body])
       | PT.Meta _
       | PT.Record _
       | PT.Ite _
@@ -1262,10 +1318,9 @@ module Conv = struct
       | App (f,l) ->
         ST.app ~ty:(aux_ty (ty t))
           (aux_t env f) (List.map (aux_t env) l)
-      | AppBuiltin (b,[body]) when Builtin.equal b Builtin.ForallConst ||
-                                   Builtin.equal b Builtin.ExistsConst ->
-        let b = if Builtin.equal b Builtin.ForallConst 
-          then Binder.Forall else Binder.Exists in
+      | AppBuiltin (b,[_;body]) when Builtin.equal b Builtin.ForallConst ||
+                                     Builtin.equal b Builtin.ExistsConst ->
+        let b = if Builtin.equal b Builtin.ForallConst then Binder.Forall else Binder.Exists in
         let ty_args, fun_body = open_fun body in 
 
         if is_true_or_false fun_body then (
@@ -1352,13 +1407,17 @@ let rec normalize_bools t =
     let hd' = normalize_bools hd and  args' = List.map normalize_bools args in
     if equal hd hd' && same_l args args' then t
     else app hd' args'
-  | AppBuiltin((Builtin.And|Builtin.Or) as b, l) -> 
+  | AppBuiltin((Builtin.And|Builtin.Or) as b, l) ->
     let l' = List.map normalize_bools l in
-    let sorted = List.fast_sort weight_cmp l' in
-    if same_l l sorted then t
-    else app_builtin ~ty:Type.prop b sorted
+    let sorted = CCList.sort_uniq ~cmp:weight_cmp l' in
+    if List.length l = List.length sorted && same_l l sorted then t
+    else (
+      if Type.is_prop (ty t) && List.length sorted = 1 then (
+        List.hd sorted
+      ) else app_builtin ~ty:Type.prop b sorted
+    )
   | AppBuiltin((Builtin.Eq|Builtin.Neq|Builtin.Xor|Builtin.Equiv) as b, ([_;x;y] as l) )
-  | AppBuiltin((Builtin.Eq|Builtin.Neq|Builtin.Xor|Builtin.Equiv) as b, ([x;y] as l)) -> 
+  | AppBuiltin((Builtin.Eq|Builtin.Neq|Builtin.Xor|Builtin.Equiv) as b, ([x;y] as l)) when not (is_type x) -> 
     let rec swap_last_two l = match l with
       | [] | [_] -> l
       | [x;y] -> [y;x]
@@ -1373,6 +1432,28 @@ let rec normalize_bools t =
     let l' = List.map normalize_bools l in
     if same_l l' l then t
     else app_builtin ~ty:(ty t) hd l'
+
+let rec is_properly_encoded t = match view t with
+  | Var _ | DB _ | Const _ -> true
+  | AppBuiltin (hd,l) when Builtin.equal hd Builtin.ForallConst 
+                        || Builtin.equal hd Builtin.ExistsConst ->
+    let res = begin match l with
+    | [tyarg] ->
+      Type.is_tType (ty tyarg)
+    | [tyarg; body] -> 
+      let t_ty = ty body in
+      let tyargs, ret_ty = Type.open_fun t_ty in
+      Type.is_tType (ty tyarg) && List.length tyargs = 1  &&
+      Type.equal (Type.of_term_unsafe (tyarg :> InnerTerm.t)) (List.hd tyargs) && 
+      Type.is_prop ret_ty
+    | _ -> false end in
+    (* if not res then CCFormat.printf "Failed for %a.\n" T.pp t; *)
+    res
+  | AppBuiltin(Builtin.(Eq|Neq), l) ->
+    List.length l >= 1 && Type.is_tType (ty (List.hd l))
+  | AppBuiltin(_,l) -> List.for_all is_properly_encoded l
+  | App (hd, l) -> List.for_all is_properly_encoded (hd::l)
+  | Fun (_,u) -> is_properly_encoded u
 
 let () =
   Options.add_opts [

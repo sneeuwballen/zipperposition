@@ -275,7 +275,11 @@ let rec unify ~scope ~counter ~subst = function
       let s', t' = norm_deref subst (s,scope), norm_deref subst (t,scope) in
       (* rotating to get naked variables on the lhs *)
 
-      if not (Term.equal s' t') then (
+      if Term.is_type s' then (
+        assert(Term.is_type t');
+        let subst = Unif.FO.unify_syn ~subst:(US.subst subst) (s', scope) (t', scope) in
+        unify ~scope ~counter ~subst:(US.of_subst subst) rest
+      ) else if not (Term.equal s' t') then (
         let pref_s, body_s = T.open_fun s' in
         let pref_t, body_t = T.open_fun t' in 
         let body_s', body_t', pref_l = eta_expand_otf ~subst ~scope pref_s pref_t body_s body_t in
@@ -297,12 +301,13 @@ let rec unify ~scope ~counter ~subst = function
         | T.Const f , T.Const g when ID.equal f g && List.length args_s = List.length args_t ->
           unify ~subst ~counter ~scope @@ build_constraints args_s args_t rest
         | T.AppBuiltin(hd_s, args_s'), T.AppBuiltin(hd_t, args_t') when
-            Builtin.equal hd_s hd_t &&
-            List.length args_s' + List.length args_s = 
-            List.length args_t' + List.length args_t ->
-          let args_lhs,args_rhs = 
-            Unif.norm_logical_disagreements hd_s (args_s@args_s') (args_t@args_t') in
-          unify ~subst ~counter ~scope @@ build_constraints args_lhs args_rhs rest
+            Builtin.equal hd_s hd_t ->
+          (try
+            let args_lhs,args_rhs = 
+              Unif.norm_logical_disagreements ~mode:`Pragmatic hd_s (args_s@args_s') (args_t@args_t') in
+            unify ~subst ~counter ~scope @@ build_constraints args_lhs args_rhs rest
+          with Unif.Fail -> raise NotUnifiable
+               | Invalid_argument _ -> CCFormat.printf "%a = %a" T.pp s' T.pp t'; assert false)
         | T.DB i, T.DB j when i = j && List.length args_s = List.length args_t ->
           (* assert (List.length args_s = List.length args_t); *)
           unify ~subst ~counter ~scope @@ build_constraints args_s args_t rest
@@ -432,9 +437,14 @@ let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
   let l = norm @@ S.apply res t0_s in 
   let r = norm @@ S.apply res t1_s in
   if not ((T.equal l r) && (Type.equal (Term.ty l) (Term.ty r))) then (
-  CCFormat.printf "orig:@[%a@]=?=@[%a@]@." (Scoped.pp T.pp) t0_s (Scoped.pp T.pp) t1_s;
-  CCFormat.printf "before:@[%a@]@." US.pp subst;
-  CCFormat.printf "after:@[%a@]@." US.pp res;
-  assert(false);
+    CCFormat.printf "orig:@[%a@]=?=@[%a@]@." (Scoped.pp T.pp) t0_s (Scoped.pp T.pp) t1_s;
+    CCFormat.printf "new:@[%a:%b@]=?=@[%a:%b@]@." 
+      T.pp l 
+      (InnerTerm.is_eta_reducible (l:>InnerTerm.t))
+      T.pp r
+      (InnerTerm.is_eta_reducible (r:>InnerTerm.t));
+    CCFormat.printf "before:@[%a@]@." US.pp subst;
+    CCFormat.printf "after:@[%a@]@." US.pp res;
+    assert(false);
   );
   res

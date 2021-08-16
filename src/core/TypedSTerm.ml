@@ -100,7 +100,7 @@ let rec hash t =
     t.hash <- h;
     h
   )
-and hash_rec_ t = match t.term with
+and hash_rec_ t = match view t with
   | Var s -> Hash.combine2 1 (Var.hash s)
   | Const s -> Hash.combine2 2 (ID.hash s)
   | App (s, l) -> Hash.combine3 3 (hash s) (Hash.list hash l)
@@ -230,8 +230,8 @@ let rec pp out t = match view t with
   | Ite (a,b,c) ->
     Format.fprintf out "@[<2>if %a@ then %a@ else %a@]" pp a pp b pp c
   | Let (l, u) ->
-    let pp_binding out (v,t) = Format.fprintf out "@[%a := %a@]" Var.pp v pp t in
-    Format.fprintf out "@[<2>let %a@ in %a@]"
+    let pp_binding out (v,t) = Format.fprintf out "@[%a := %a@]" Var.pp_fullc v pp t in
+    Format.fprintf out "@[<2>let %a@ in (%a)@]"
       (Util.pp_list ~sep:" and " pp_binding) l pp u
   | Match (u, l) ->
     let pp_branch out (c,vars,rhs) =
@@ -687,6 +687,16 @@ module Ty = struct
 
   let (==>) args ret = fun_ args ret
 
+  let order ty : int =
+  let rec aux ty = match view ty with
+    | Ty_forall (_, ty) -> aux ty
+    | Ty_fun (l, ret) ->
+      List.fold_left (fun o arg -> max o (1 + aux arg)) (aux ret) l
+    | Ty_app (_, l) -> List.fold_left (fun o arg -> max o (aux arg)) 0 l
+    | _ -> 0
+  in
+  max 1 (aux ty)  (* never less than 1 *)
+
   let close_forall t = close_all ~ty:tType Binder.ForallTy t
 
   let unfold t =
@@ -825,8 +835,16 @@ module Form = struct
     | AppBuiltin (Builtin.Imply, [a;b]) -> Imply(a,b)
     | AppBuiltin (Builtin.Equiv, [a;b]) -> Equiv(a,b)
     | AppBuiltin (Builtin.Xor, [a;b]) -> Xor(a,b)
-    | AppBuiltin (Builtin.Eq, [a;b]) -> Eq(a,b)
-    | AppBuiltin (Builtin.Neq, [a;b]) -> Neq(a,b)
+    | AppBuiltin (Builtin.(Eq|Neq) as hd, l) when Ty.is_prop (ty_exn t) -> 
+      begin match l with 
+      | ([x]|[x;_]) ->
+        if not (Ty.is_tType (ty_exn x)) then (
+          let args = CCFormat.sprintf "@[%a@]" (CCList.pp (pp) ) l in
+          invalid_arg ("type argument missing for equality: " ^ args)
+        ) else (Atom t)
+      | [x;l;r] -> if hd = Builtin.Eq then Eq(l,r) else Neq(l,r)
+      | _ -> invalid_arg "equality encoded wrongly" 
+      end
     | Bind(Binder.Forall, v, t) -> Forall (v,t)
     | Bind(Binder.Exists, v, t) -> Exists (v,t)
     | Bind((Binder.ForallTy | Binder.Lambda), _, _) -> assert false
@@ -846,8 +864,12 @@ module Form = struct
   let true_ = builtin ~ty:Ty.prop Builtin.True
   let false_ = builtin ~ty:Ty.prop Builtin.False
   let atom t = t
-  let eq ?loc a b = app_builtin ?loc ~ty:Ty.prop Builtin.Eq [a;b]
-  let neq ?loc a b = app_builtin ?loc ~ty:Ty.prop Builtin.Neq [a;b]
+  let eq ?loc a b = 
+    assert (not (is_tType (ty_exn a)));
+    app_builtin ?loc ~ty:Ty.prop Builtin.Eq [ty_exn a; a; b]
+  let neq ?loc a b = 
+    assert (not (is_tType (ty_exn a)));
+    app_builtin ?loc ~ty:Ty.prop Builtin.Neq [ty_exn a; a; b]
   let equiv ?loc a b = app_builtin ?loc ~ty:Ty.prop Builtin.Equiv [a;b]
   let xor ?loc a b = app_builtin ?loc ~ty:Ty.prop Builtin.Xor [a;b]
   let ite = ite
@@ -1682,6 +1704,18 @@ let rec erase t = match view t with
       (List.map (fun (n,t) -> n, erase t) l)
       ~rest
   | Meta _ -> failwith "cannot erase meta"
+
+let rec depth t = match view t with
+| Var _  | Meta _ | Const _ -> 0
+| App (f, l) -> depth_l (f::l)
+| Bind (b,v,t) -> 1 + depth t
+| AppBuiltin (b, l) -> depth_l l
+| Ite (a,b,c) -> depth_l [a;b;c]
+| Match (u, l) -> 1 + depth u
+| _ -> failwith "not implemented"
+and depth_l l = 
+  1 + List.fold_left (fun acc t -> max acc (depth t)) 0 l 
+
 
 module TPTP = struct
   let pp out t = STerm.TPTP.pp out (erase t)

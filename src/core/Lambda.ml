@@ -5,6 +5,8 @@
 
 let prof_whnf = ZProf.make "term.whnf"
 let prof_snf = ZProf.make "term.snf"
+let prof_eta_expand = ZProf.make "term.eta_expand"
+let prof_eta_reduce = ZProf.make "term.eta_reduce"
 
 let section = Util.Section.make "lambdas"
 
@@ -30,11 +32,12 @@ module Inner = struct
       { st with head=f; args=List.rev_append l st.args; }
     | T.AppBuiltin (b, l) ->
       (* the arguments in [l] might contain variables *)
+      let ty_args, l = List.partition T.is_a_type l in
       let arg_tys = List.rev_map T.ty_exn l in
       let ret_ty = T.ty_exn st.head in
       let ty = T.arrow arg_tys ret_ty in
       let l = List.rev_map (eval_in_env_ st.env) l in
-      { st with head=T.app_builtin ~ty b []; args=List.rev_append l st.args; }
+      { st with head=T.app_builtin ~ty b ty_args; args=List.rev_append l st.args; }
     | _ -> st
 
   let st_of_term ~env ~ty t = {head=t; args=[]; env; ty; } |> normalize
@@ -119,7 +122,8 @@ module Inner = struct
         end) 
     else t
 
-  let eta_expand t =
+  (* if top_level_only is true, then eta_expand will not recurse *)
+  let eta_expand_rec ?(top_level_only=false) t =
     let rec aux t = match T.ty t with
       | T.NoType -> t
       | T.HasType ty ->
@@ -144,7 +148,7 @@ module Inner = struct
               List.mapi (fun i ty_arg -> T.bvar (n_missing-i-1) ~ty:ty_arg) missing_args
             in
             T.fun_l ty_args (aux (T.app ~ty:ty_ret body dbvars))
-          ) else (
+          ) else if not top_level_only then (
             let ty = T.ty_exn body in
             (* traverse body *)
             let body = match T.view body with
@@ -161,13 +165,12 @@ module Inner = struct
                 if body' = body_reduced then body else T.bind ~ty ~varty b body_reduced
             in
             T.fun_l ty_args body
-          )
-        )
+          ) else t)
     in
     aux t
 
   (* compute eta-reduced normal form *)
-  let eta_reduce ?(full=true) t =      
+  let eta_reduce_aux ?(expand_quant=true) ?(full=true) t =      
     let q_reduce ~pref_len t =
       let hd, args = T.as_app t in
       let n = List.length args in
@@ -199,7 +202,7 @@ module Inner = struct
         ) else 0, t
       ) in
     let rec aux t =
-      if T.has_lambda t then (      
+      if T.is_eta_reducible t then (      
         match T.ty t with
         | T.NoType -> t
         | T.HasType ty ->
@@ -221,9 +224,20 @@ module Inner = struct
               let l' = List.map aux l in
               if T.equal f f' && T.same_l l l'
               then t
-              else T.app ~ty (aux f) (List.map aux l)
+              else T.app ~ty f' l'
+            | T.AppBuiltin (Builtin.(ExistsConst|ForallConst) as hd, [tyarg;body])
+              when expand_quant ->
+              (* top-level eta expand body of the quantifier *)
+              let body' = eta_expand_rec ~top_level_only:true body in
+              let pref, matrix = T.open_bind Binder.Lambda body' in
+              (* reduce everything underneath the body *)
+              let matrix' = aux matrix in
+              let body' = T.fun_l pref matrix' in
+              if T.equal body' body then t
+              else T.app_builtin ~ty:(T.ty_exn t) hd [tyarg; body']
             | T.AppBuiltin (b,l) ->
-              T.app_builtin ~ty b (List.map aux l)
+              let l' = List.map aux l in
+              if T.same_l l l' then t else T.app_builtin ~ty b l'
           end)
       else t
     in
@@ -246,6 +260,11 @@ module Inner = struct
   let snf t =
     let t' = ZProf.with_prof prof_snf snf_rec t in
     t'
+
+  let eta_expand t = ZProf.with_prof prof_eta_expand eta_expand_rec t
+
+  let eta_reduce ?(expand_quant=true) ?(full=true) t =
+    ZProf.with_prof prof_eta_reduce (eta_reduce_aux ~expand_quant ~full) t
 
 end
 
@@ -278,8 +297,8 @@ let eta_expand t =
 (*|> CCFun.tap (fun t' ->
   if t != t' then Format.printf "@[eta_expand `%a`@ into `%a`@]@." T.pp t T.pp t')*)
 
-let eta_reduce ?(full=true) t =
-  Inner.eta_reduce ~full (t:T.t :> IT.t) |> T.of_term_unsafe
+let eta_reduce ?(expand_quant=true) ?(full=true) t =
+  Inner.eta_reduce ~full ~expand_quant (t:T.t :> IT.t) |> T.of_term_unsafe
 (*|> CCFun.tap (fun t' ->
   if t != t' then Format.printf "@[eta_reduce `%a`@ into `%a`@]@." T.pp t T.pp t')*)
 
@@ -302,16 +321,4 @@ and all_distinct_bound args =
     |> (fun set -> Util.Int_set.cardinal set = List.length args)
   with Exit -> false
 
-let rec is_properly_encoded t = match T.view t with
-  | Var _ | DB _ | Const _ -> true
-  | AppBuiltin (hd,l) when Builtin.equal hd Builtin.ForallConst 
-                        || Builtin.equal hd Builtin.ExistsConst ->
-    let res = begin match l with
-    | [body] -> let ty = Term.ty body in
-      Type.is_fun ty && Type.returns_prop ty
-    | _ -> false end in
-    (* if not res then CCFormat.printf "Failed for %a.\n" T.pp t; *)
-    res
-  | AppBuiltin(_,l) -> List.for_all is_properly_encoded l
-  | App (hd, l) -> List.for_all is_properly_encoded (hd::l)
-  | Fun (_,u) -> is_properly_encoded u
+

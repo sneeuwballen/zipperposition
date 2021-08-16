@@ -32,6 +32,7 @@ type t =
   | Term
   | ForallConst (** constant for simulating forall *)
   | ExistsConst (** constant for simulating exists *)
+  | ChoiceConst
   | Grounding (** used for inst-gen *)
   | TyInt
   | TyRat

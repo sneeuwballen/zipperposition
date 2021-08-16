@@ -275,7 +275,9 @@ module Flatten = struct
           CCList.diagonal l
           |> List.rev_map (fun (t,u) -> T.Form.neq_or_xor t u)
         in
-        let f = T.Form.and_ ?loc:(T.loc t) l in
+        let f = 
+          if CCList.length l == 1 then List.hd l
+          else T.Form.and_ ?loc:(T.loc t) l in
         Util.debugf ~section 5 "(@[flatten.expand-distinct@ %a@ :into %a@])"
           (fun k->k T.pp t T.pp f);
         aux pos vars f
@@ -393,7 +395,7 @@ module Flatten = struct
         aux pos vars (T.app_builtin ~ty:T.Ty.prop Builtin.Less [ty;b;a])
       | T.AppBuiltin (Builtin.Greatereq, [ty;a;b]) when T.equal T.Ty.rat (T.ty_exn a) ->
         aux pos vars (T.app_builtin ~ty:T.Ty.prop Builtin.Lesseq [ty;b;a])
-      | T.AppBuiltin (Builtin.Neq, [a;b]) when T.equal T.Ty.rat (T.ty_exn a) ->
+      | T.AppBuiltin (Builtin.Neq, [_;a;b]) when T.equal T.Ty.rat (T.ty_exn a) ->
         (* rat: a!=b -> a<b ∨ a>b *)
         aux Pos_toplevel vars a >>= fun a ->
         aux Pos_toplevel vars b >|= fun b ->
@@ -402,11 +404,11 @@ module Flatten = struct
               T.app_builtin ~ty:T.Ty.prop Builtin.Less [b; a];
             ]
         in aux_maybe_define ~should_define pos f
-      | T.AppBuiltin (Builtin.Eq, ([_;a;b]|[a;b])) when not lazy_cnf && T.Ty.is_prop (T.ty_exn a)  ->
+      | T.AppBuiltin (Builtin.Eq, ([_;a;b])) when not lazy_cnf && T.Ty.is_prop (T.ty_exn a)  ->
         (* converting equality to equivalence to ensure better CNF (that is better renaming)
            when lazy cnf is off *)
         (F.equiv <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
-      | T.AppBuiltin (Builtin.Eq, [a;b])
+      | T.AppBuiltin (Builtin.Eq, [_;a;b])
         (* when either of a and b are formulas, and they contain HO subterms
            it is better not to replace Lambda with Forall.
            
@@ -419,12 +421,12 @@ module Flatten = struct
           (fun k->k T.pp t T.pp t');
         assert (vars_forall<>[]);
         aux pos vars t'
-      | T.AppBuiltin (Builtin.Neq, ([_;a;b]|[a;b])) when not lazy_cnf && T.Ty.is_prop (T.ty_exn a)  ->
+      | T.AppBuiltin (Builtin.Neq, ([_;a;b])) when not lazy_cnf && T.Ty.is_prop (T.ty_exn a)  ->
         (F.xor <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
-      | T.AppBuiltin (Builtin.Eq, [a;b]) ->
+      | T.AppBuiltin (Builtin.Eq, [_;a;b]) ->
         (F.eq <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
       (* >|= aux_maybe_define ~should_define pos *)
-      | T.AppBuiltin (Builtin.Neq, [a;b]) 
+      | T.AppBuiltin (Builtin.Neq, [_;a;b]) 
         when  (T.is_fun a || T.is_fun b)  && not lazy_cnf ->
         (* turn [f ≠ λx. t] into [∃x. f x≠t] *)
         let vars_exist, a, b = complete_eq a b in
@@ -433,7 +435,7 @@ module Flatten = struct
           (fun k->k T.pp t T.pp t');
         assert (vars_exist<>[]);
         aux pos vars t'
-      | T.AppBuiltin (Builtin.Neq, [a;b]) ->
+      | T.AppBuiltin (Builtin.Neq, [_;a;b]) ->
         (F.neq <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b)
       (* >|= aux_maybe_define pos *)
       | T.AppBuiltin (Builtin.Imply, [a;b]) ->
@@ -1378,19 +1380,17 @@ let type_declarations seq =
 let convert seq =
   let module A = UntypedAST in
   (* used for conversion *)
-  let t_ctx = Term.Conv.create() in
-  let ty_ctx = Type.Conv.create() in
-  let conv_t = Term.Conv.of_simple_term_exn t_ctx in
-  let conv_ty = Type.Conv.of_simple_term_exn ty_ctx in
-  let conv_def = function
+  let conv_t t_ctx = Term.Conv.of_simple_term_exn t_ctx in
+  let conv_ty ty_ctx = Type.Conv.of_simple_term_exn ty_ctx in
+  let conv_def t_ctx ty_ctx = function
     | Stmt.Def_term {vars;id;ty;args;rhs;as_form} ->
-      let vars = List.map (Var.update_ty ~f:conv_ty) vars in
-      let as_form = List.map (SLiteral.map ~f:conv_t) as_form in
-      Stmt.Def_term{vars;id;ty=conv_ty ty;args=List.map conv_t args;
-                    rhs=conv_t rhs;as_form}
+      let vars = List.map (Var.update_ty ~f:(conv_ty ty_ctx)) vars in
+      let as_form = List.map (SLiteral.map ~f:(conv_t t_ctx)) as_form in
+      Stmt.Def_term{vars;id;ty=(conv_ty ty_ctx) ty;args=List.map (conv_t t_ctx) args;
+                    rhs=(conv_t t_ctx) rhs;as_form}
     | Stmt.Def_form {vars;lhs;rhs;polarity;_} ->
-      let vars = List.map (Var.update_ty ~f:conv_ty) vars in
-      let lhs = SLiteral.map ~f:conv_t lhs in
+      let vars = List.map (Var.update_ty ~f:(conv_ty ty_ctx)) vars in
+      let lhs = SLiteral.map ~f:(conv_t t_ctx) lhs in
       let rhs = List.map (clause_to_fo ~ctx:t_ctx) rhs in
       let as_form = List.map (fun rhs -> lhs :: rhs) rhs in
       Stmt.Def_form { vars;lhs;rhs;polarity;as_form}
@@ -1398,6 +1398,8 @@ let convert seq =
   let conv_statement st =
     Util.debugf ~section 3
       "@[<2>@{<yellow>convert@}@ `@[%a@]`@]" (fun k->k pp_c_statement st);
+    let t_ctx = Term.Conv.create() in
+    let ty_ctx = Type.Conv.create() in
     let attrs = Stmt.attrs st in
     let proof = Stmt.proof_step st in
     let res = match Stmt.view st with
@@ -1405,7 +1407,7 @@ let convert seq =
         let c = clause_to_fo ~ctx:t_ctx c in
         Stmt.goal ~attrs ~proof c
       | Stmt.NegatedGoal (sk,l) ->
-        let skolems = List.map (fun (id,ty)->id, conv_ty ty) sk in
+        let skolems = List.map (fun (id,ty)->id, (conv_ty ty_ctx) ty) sk in
         let l = List.map (clause_to_fo ~ctx:t_ctx) l in
         Stmt.neg_goal ~attrs ~proof ~skolems l
       | Stmt.Lemma l ->
@@ -1415,21 +1417,21 @@ let convert seq =
         let c = clause_to_fo ~ctx:t_ctx c in
         Stmt.assert_ ~attrs ~proof c
       | Stmt.Data l ->
-        let l = List.map (Stmt.map_data ~ty:conv_ty) l in
+        let l = List.map (Stmt.map_data ~ty:(conv_ty ty_ctx)) l in
         Stmt.data ~attrs ~proof l
       | Stmt.Def l ->
         let l =
           List.map
             (fun d ->
-               Stmt.map_def d ~term:conv_t ~ty:conv_ty
+               Stmt.map_def d ~term:(conv_t t_ctx) ~ty:(conv_ty ty_ctx)
                  ~form:(clause_to_fo ~ctx:t_ctx))
             l
         in
         Stmt.def ~attrs ~proof l
       | Stmt.Rewrite d ->
-        Stmt.rewrite ~attrs ~proof (conv_def d)
+        Stmt.rewrite ~attrs ~proof (conv_def t_ctx ty_ctx d)
       | Stmt.TyDecl (id, ty) ->
-        let ty = conv_ty ty in
+        let ty = conv_ty ty_ctx ty in
         Stmt.ty_decl ~attrs ~proof id ty
     in
     Util.debugf ~section 3

@@ -690,7 +690,7 @@ let extension =
     Util.debug 1 "enable Avatar";
     A.register ~split_kind:!avatar_kind ()
   in
-  Extensions.({default with name="avatar"; env_actions=[action]})
+  Extensions.({default with name="avatar"; env_actions=[action]; prio=10})
 
 let () =
   Params.add_opts

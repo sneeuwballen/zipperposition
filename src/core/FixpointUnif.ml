@@ -95,7 +95,9 @@ let unify_scoped ?(subst=US.empty) ?(counter = ref 0) t0_s t1_s =
         assert (T.DB.is_closed rigid);
         US.FO.bind subst (T.as_var_exn var, scope) (rigid, scope)) in
 
-  let res = 
+  let res =
+    if T.is_type (fst t0_s) then raise DontKnow;
+
     if US.is_empty subst then (
       let t0',t1',scope,subst = US.FO.rename_to_new_scope ~counter t0_s t1_s in
       driver t0' t1' scope subst)

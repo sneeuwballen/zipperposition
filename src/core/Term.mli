@@ -197,6 +197,7 @@ val of_ty : Type.t -> t
 (** Upcast from type *)
 
 val mk_tmp_cst : counter:int ref -> ty:Type.t -> t
+val is_properly_encoded : t -> bool
 
 module VarSet : CCSet.S with type elt = var
 module VarMap : CCMap.S with type key = var
@@ -216,6 +217,9 @@ module Seq : sig
   val ty_vars : t -> var Iter.t
   val typed_symbols : t -> (ID.t * Type.t) Iter.t
   val add_set : Set.t -> t Iter.t -> Set.t
+  (* given terms s and t, iterate over all terms s' t'
+     such that s = u[s'] and t = u[t'] and u is non-empty context *)
+  val common_contexts : t -> t -> (t * t) Iter.t
 end
 
 val var_occurs : var:var -> t -> bool (** [var_occurs ~var t] true iff [var] in t *)
@@ -316,6 +320,7 @@ val contains_symbol : ID.t -> t -> bool
 (** High level fold-like combinators *)
 
 val all_positions :
+  ?filter_formula_subterms:(Builtin.t -> t list -> int list CCOpt.t) ->
   ?vars:bool -> ?ty_args:bool -> ?var_args:bool -> ?fun_bodies:bool -> ?pos:Position.t ->
   t -> t Position.With.t Iter.t
 (** Iterate on all sub-terms with their position.
@@ -392,6 +397,7 @@ module Form : sig
   val or_l : t list -> t
   val forall : t -> t
   val exists : t -> t
+  val choice : t -> t
 end
 
 (** {2 Arith} *)

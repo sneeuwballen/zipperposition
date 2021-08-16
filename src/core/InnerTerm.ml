@@ -18,16 +18,18 @@ let (~~~) = I.lognot
 let f_has_freevars = I.one 
 let f_is_beta_reducible = f_has_freevars <<< 1
 
-(* From 16th bit onwards, we will keep the maximum 
-   De Bruijn variable seen so far. *)
-
 (* If DB has more than 16 bits (very unlikely),
    then we set a bit that forces to recompute the property *)
 let f_db_overflowed = f_is_beta_reducible <<< 1
+
+let f_has_lams = f_db_overflowed <<< 1
+let f_has_quant = f_has_lams <<< 1
+
+(* From 16th bit onwards, we will keep the maximum 
+   De Bruijn variable seen so far. *)
 let f_db_mask = (~~~ zero) <<< 16
 let max_db = I.to_int (f_db_mask >>> 16)
 
-let f_has_lams = f_db_overflowed <<< 1
 
 let set_property props prop_flag =
   props ||| prop_flag
@@ -56,7 +58,7 @@ let get_max_db props =
   I.to_int ((props &&& f_db_mask) >>> 16)
 
 (* Properties that should be set if they are set for ANY of the subterms *)
-let any_props = f_is_beta_reducible ||| f_has_freevars ||| f_has_lams
+let any_props = f_is_beta_reducible ||| f_has_freevars ||| f_has_lams ||| f_has_quant
 (* Properties that should be set if they are set for ALL of the subterms *)
 let all_props = zero (* currently no props like that -- is_closed computed
                         by looking at the value of max_db *)
@@ -65,6 +67,7 @@ let debug_props out props =
   CCFormat.fprintf out "db:%d" (get_max_db props);
   CCFormat.fprintf out " h_fv:%b" (get_property props f_has_freevars);
   CCFormat.fprintf out " h_l:%b" (get_property props f_has_lams);
+  CCFormat.fprintf out " h_q:%b" (get_property props f_has_quant);
   CCFormat.fprintf out " beta_r:%b@." (get_property props f_is_beta_reducible);
 
 type t = {
@@ -291,8 +294,35 @@ let expected_args t =
   | AppBuiltin(Builtin.Arrow, l) -> CCList.length l-1
   | _ -> 0
 
+let rec debugf out t = match view t with
+  | AppBuiltin (b,[]) -> Builtin.pp out b
+  | AppBuiltin (b,l) ->
+    Format.fprintf out "(@[<1>%a@ %a@])" Builtin.pp b (Util.pp_list debugf) l
+  | Var i -> HVar.pp out i
+  | DB i -> Format.fprintf out "Y%d" i
+  | Const s -> ID.pp out s
+  | App (_, []) -> assert false
+  | App (s, l) ->
+    Format.fprintf out "(@[<1>%a@ %a@])" debugf s (Util.pp_list debugf) l
+  | Bind (b, varty,t') ->
+    Format.fprintf out "(@[<1>%a@ %a@ %a@])"
+      Binder.pp b debugf varty debugf t'
+
+let flatten_and_or b l =
+  let rec aux acc = function 
+    | [] -> List.rev acc
+    | x :: xs ->
+      match view x with 
+      | AppBuiltin(b', ys) when Builtin.equal b b' ->
+        aux acc (ys @ xs)
+      | _ -> aux (x::acc) xs 
+  in
+  if Builtin.is_flattened_logical b then aux [] l
+  else l
+
 let rec app_builtin ~ty b l = 
   let prop = builtin ~ty:tType Builtin.prop in
+  let l = flatten_and_or b l in
   
   match b, l with
   | Builtin.Arrow, [] -> assert false
@@ -300,14 +330,6 @@ let rec app_builtin ~ty b l =
   | Builtin.Arrow, ({term=AppBuiltin(Builtin.Arrow, ret::l1); _} :: l2) ->
     (* flatten *)
     app_builtin ~ty Builtin.Arrow (ret :: l2 @ l1)
-  (* will be simplified in a special proof step -- 
-     in certain cases (superposition) it eagerly simplifies the term
-     and destroys its structure *)
-  (* | Builtin.Not, [{term=AppBuiltin(Builtin.Not,[t]); _}] -> t
-  | Builtin.Not, [{term=AppBuiltin(Builtin.True,[]); _}] ->
-    app_builtin ~ty Builtin.False []
-  | Builtin.Not, [{term=AppBuiltin(Builtin.False,[]); _}] ->
-    app_builtin ~ty Builtin.True [] *)
   | Builtin.Not, [] ->
     let ty = app_builtin ~ty:tType Builtin.arrow [prop;prop] in
     let my_t = make_ ~props:zero ~ty:(HasType ty) (AppBuiltin (b,[])) in
@@ -321,15 +343,20 @@ let rec app_builtin ~ty b l =
     let my_t = make_ ~props ~ty:(HasType ty) (AppBuiltin (b,l)) in
     H.hashcons my_t
   | _ ->
-    let l = if Builtin.is_quantifier b then 
-        List.filter (fun t -> not @@ equal (ty_exn t) tType) l else l in
-    if Builtin.is_quantifier b  && CCList.length l > 1 then (
-      let err_msg = CCFormat.sprintf "wrong encoding of quants: %a %d" Builtin.pp b (List.length l) in
-      invalid_arg err_msg;
-    );
-    assert(not (Builtin.is_quantifier b && CCList.is_empty l) ||
-           List.length @@ fst @@ open_fun ty =1);
+    assert (not (List.mem b Builtin.[Eq;Neq;ForallConst;ExistsConst]) ||
+            List.length l >= 1 &&
+            is_a_type (List.hd l));
+    let ty = 
+      if Builtin.is_quantifier b && List.length l = 2 then (
+        (* reassing the type if other parts of the code assigned it wrong *)
+        prop
+      ) else ty in
+
     let props = add_ty_vars (any_props_for_ts l) ty.props in
+    let props = 
+      if Builtin.is_quantifier b && List.length l = 2 then (
+        set_property props f_has_quant
+      ) else props in
     let my_t = make_ ~props ~ty:(HasType ty) (AppBuiltin (b,l)) in
     H.hashcons my_t
 
@@ -347,26 +374,30 @@ let app ~ty f l = match f.term, l with
     let my_t = make_ ~props ~ty:(HasType ty) (App (f1,flattened)) in
     H.hashcons my_t
   | AppBuiltin (f1, l1), _ ->
-    (* flatten *)
-    let flattened = l1 @ l in
+    let t_args = flatten_and_or f1 l1 @ l in
     let ty =
-      if Builtin.is_logical_op f1 then (
+      if Builtin.is_logical_op f1 && not (Builtin.is_quantifier f1) then (
         let prop = builtin ~ty:tType Builtin.Prop in
 
         let args,_ = open_fun ty in
         if List.length args > 0 then (
           ty
         ) else if Builtin.is_logical_binop f1 then (
-          if List.length flattened >= 2 then prop
-          else (if List.length flattened = 1 then arrow [prop] prop
+          if List.length t_args >= 2 then prop
+          else (if List.length t_args = 1 then arrow [prop] prop
                 else arrow [prop;prop] prop)
         ) else (
-          if List.length flattened = 1 then prop
+          if List.length t_args = 1 then prop
           else arrow [prop] prop
         ))
       else ty in
-    let props = add_ty_vars (any_props_for_ts flattened) ty.props in
-    let my_t = make_ ~props ~ty:(HasType ty) (AppBuiltin (f1,flattened)) in
+    let props = add_ty_vars (any_props_for_ts t_args) ty.props in
+    let props = 
+      if Builtin.is_quantifier f1 && List.length t_args = 2 then (
+        set_property props f_has_quant
+      ) else props 
+    in
+    let my_t = make_ ~props ~ty:(HasType ty) (AppBuiltin (f1,t_args)) in
     H.hashcons my_t
   | _ ->
     let props = add_ty_vars (any_props_for_ts (f :: l)) ty.props in
@@ -450,21 +481,12 @@ module VarTbl = CCHashtbl.Make(HVarKey)
 
 (** {3 Basic Printer} *)
 
-let rec debugf out t = match view t with
-  | AppBuiltin (b,[]) -> Builtin.pp out b
-  | AppBuiltin (b,l) ->
-    Format.fprintf out "(@[<1>%a@ %a@])" Builtin.pp b (Util.pp_list debugf) l
-  | Var i -> HVar.pp out i
-  | DB i -> Format.fprintf out "Y%d" i
-  | Const s -> ID.pp out s
-  | App (_, []) -> assert false
-  | App (s, l) ->
-    Format.fprintf out "(@[<1>%a@ %a@])" debugf s (Util.pp_list debugf) l
-  | Bind (b, varty,t') ->
-    Format.fprintf out "(@[<1>%a@ %a@ %a@])"
-      Binder.pp b debugf varty debugf t'
-
 let[@inline] has_lambda t =
+  get_property t.props f_has_lams
+
+let[@inline] is_eta_reducible t =
+  (* if it has a quantifier -- we have to expand *)
+  get_property t.props f_has_quant ||
   get_property t.props f_has_lams
 
 let[@inline] is_beta_reducible t =
@@ -996,9 +1018,10 @@ let[@inline] as_app t = match view t with
       | AppBuiltin(b, l') -> app_builtin b ~ty:(ty_exn t) (l'@l), []
       | _ -> f, l 
     end
-  | AppBuiltin(b, l) when Builtin.is_logical_op b && not (Builtin.is_quantifier b) ->
-    let args = List.map ty_exn l in
-    app_builtin b ~ty:(arrow args (ty_exn t)) [], l 
+  | AppBuiltin(b, l) when (not (Builtin.is_quantifier b)) ->
+    let ty_args, args = CCList.partition is_a_type l in
+    let ty = arrow (List.map ty_exn args) (ty_exn t) in 
+    app_builtin ~ty b ty_args, args
   | _ -> t, []
 
 let[@inline] as_var t = match view t with Var v -> Some v | _ -> None

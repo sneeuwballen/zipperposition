@@ -17,6 +17,7 @@ type t = {
   prelude : (string, CCVector.ro) CCVector.t;
   files : (string, CCVector.ro) CCVector.t;
   select : string; (** name of the selection function *)
+  bool_select: string; (** name of the boolean selection function *)
   dot_file : string option; (** file to print the final state in *)
   dot_llproof: string option; (** file to print llproof *)
   dot_sat : bool; (** Print saturated set into DOT? *)
@@ -39,6 +40,7 @@ let default : t = {
   prelude= CCVector.create() |> CCVector.freeze;
   files = CCVector.create() |> CCVector.freeze;
   select = "default";
+  bool_select = "none";
   stats= !Options._stats;
   def_as_rewrite= true;
   presaturate = false;
@@ -53,6 +55,7 @@ let default : t = {
 }
 
 let select = ref default.select
+let bool_select = ref default.bool_select
 
 let _modes = Hashtbl.create 10
 let mode_spec () =
@@ -126,7 +129,7 @@ let parse_args () =
   (* return parameter structure *)
   { ord= ord; seed = !seed; steps = !steps;
     version= !version; timeout = !timeout; prelude= prelude;
-    files = files; select = !select;
+    files = files; select = !select; bool_select = !bool_select;
     stats= ! Options._stats; def_as_rewrite= !def_as_rewrite;
     presaturate = !presaturate; dot_all_roots= !dot_all_roots;
     dot_file = !dot_file; dot_llproof= !dot_llproof;
@@ -149,10 +152,13 @@ let () =
       ; "lambda-free-purify-extensional"] (fun () ->
       default.ord := "lambdafree_kbo"
     );
+
+  add_to_mode "ho-complete-basic" 
+    (fun () -> default.ord := "lambda_kbo_complete");
   
   add_to_modes 
       [ "ho-competitive"
       ; "ho-pragmatic"] (fun () ->
-      default.ord := "lambda_kbo"
+      default.ord := "lambda_kbo";
     );
 

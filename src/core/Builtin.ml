@@ -27,6 +27,7 @@ type t =
   | Term
   | ForallConst (** constant for simulating forall *)
   | ExistsConst (** constant for simulating exists *)
+  | ChoiceConst (** choice constant *)
   | Grounding (** used for inst-gen *)
   | TyInt
   | TyRat
@@ -121,6 +122,7 @@ let to_int_ = function
   | Greatereq -> 46
   | ForallConst -> 47
   | ExistsConst -> 48
+  | ChoiceConst -> 49
   | Grounding -> 50
   | Box_opaque -> 60
   | TyReal -> 70
@@ -201,6 +203,7 @@ let to_string s = match s with
   | Term -> "ι"
   | ForallConst -> "·∀"
   | ExistsConst -> "·∃"
+  | ChoiceConst -> "·ε"
   | Grounding -> "★"
   | TyInt -> "int"
   | TyRat -> "rat"
@@ -381,6 +384,7 @@ module TPTP = struct
     | Multiset -> failwith "cannot print this symbol in TPTP"
     | ForallConst -> "!!"
     | ExistsConst -> "??"
+    | ChoiceConst -> "$$choice"
     | Grounding -> "$$ground"
     | TyInt -> "$int"
     | TyRat -> "$rat"
@@ -435,6 +439,7 @@ module TPTP = struct
     | "$o" -> Prop
     | "!!" -> ForallConst
     | "??" -> ExistsConst
+    | "$$choice" -> ChoiceConst
     | "$int" -> TyInt
     | "$rat" -> TyRat
     | "$floor" -> Floor
@@ -696,14 +701,15 @@ module ArithOp = struct
   let divisors n =
     if (Z.leq n Z.zero)
     then raise (Invalid_argument "prime_factors: expected number > 0")
-    else try
-        let n = Z.to_int n in
+    else
+      match Z.to_int_exn n with
+      | n ->
         let l = ref [] in
         for i = 2 to n/2 do
           if i < n && n mod i = 0 then l := i :: !l
         done;
         List.rev_map Z.of_int !l
-      with Z.Overflow -> []  (* too big *)
+      | exception _ -> []  (* too big *)
 end
 
 module ZF = struct
@@ -727,6 +733,7 @@ module ZF = struct
     | Multiset -> failwith "cannot print this symbol in ZF"
     | ForallConst -> "!!"
     | ExistsConst -> "??"
+    | ChoiceConst -> "$choice"
     | Grounding -> "$$grounding"
     | TyInt -> "int"
     | TyRat -> "rat"

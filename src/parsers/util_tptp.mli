@@ -11,6 +11,9 @@ type 'a or_error = ('a, string) CCResult.t
 type untyped = STerm.t
 type typed = TypedSTerm.t
 
+val enable_def_as_rewrite : bool ref
+
+
 exception Error of string
 
 (** {2 Printing/Parsing} *)

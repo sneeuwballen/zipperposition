@@ -39,6 +39,10 @@
 %token AS
 %token AT
 
+%token EXCL
+%token NAMED
+%token PATTERN
+
 %token DATA
 %token ASSERT
 %token LEMMA
@@ -276,11 +280,19 @@ term:
   | s=QUOTED { A.const s }
   | s=IDENT { A.const s }
   | t=composite_term { t }
+  | t=term_w_attributes { t }
   | error
     {
       let loc = Loc.mk_pos $startpos $endpos in
       A.parse_errorf ~loc "expected term"
     }
+
+attr:
+  | NAMED IDENT { () }
+  | PATTERN term { () }
+
+term_w_attributes:
+  | LEFT_PAREN EXCL t=term attr+ RIGHT_PAREN { t }
 
 composite_term:
   | LEFT_PAREN t=term RIGHT_PAREN { t }

@@ -150,6 +150,7 @@ val fold_eqn : ?both:bool -> ?sign:bool -> ord:Ordering.t ->
   eligible:(int -> Literal.t -> bool) ->
   t -> (term * term * bool * Position.t) Iter.t
 (** fold f over all literals sides, with their positions.
+    NB: REPORTED SIGN IS THE SAME AS IF Lit.is_pos WAS CALLED!
     f is given [(left side, right side, sign, position of left side)]
     if [ord] is present, then only the max side of an oriented
       equation will be visited, otherwise they will both be explored.
@@ -191,10 +192,6 @@ val is_horn : t -> bool
 val is_unique_max_horn_clause : ord:Ordering.t -> t -> bool
 (** Recognized whether the clause is a Range-Restricted Horn clause *)
 
-
-val is_pos_eq : t -> (term * term) option
-(** Recognize whether the clause is a positive unit equality. *)
-
 (** {2 Shielded Variables} *)
 
 val is_shielded : Term.var -> t -> bool
@@ -206,3 +203,9 @@ val unshielded_vars : ?filter:(Term.var -> bool) -> t -> Term.var list
 val vars_distinct : t -> bool
 
 val ground_lits : t -> t
+
+val num_predicate : t -> int
+(** Number of non-predicate literals *)
+
+val num_equational : t -> int
+(** Number of non-predicate literals *)

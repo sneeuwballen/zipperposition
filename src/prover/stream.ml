@@ -63,7 +63,7 @@ module Make(A:ARG) = struct
       max 2 (s.hits-16)
     | Some c ->
       s.hits <- s.hits +1;
-      max (C.penalty c) (s.hits-64) 
+      (C.penalty c) * (max 1 (s.hits-64)) 
 
   let is_orphaned s =
     List.exists C.is_redundant s.parents
@@ -71,7 +71,7 @@ module Make(A:ARG) = struct
   let drip s =
     let orig_penalty = s.penalty in
     let res = 
-      if ClauseQueue.ignore_orphans () && is_orphaned s then (
+      if ClauseQueue.ignoring_orphans () && is_orphaned s then (
         s.penalty <- max_int;
         s.stm <- OSeq.empty;
         raise Empty_Stream
@@ -85,7 +85,8 @@ module Make(A:ARG) = struct
           let cl_p = (clause_penalty s hd) in
           s.penalty <-  s.penalty + cl_p;
           hd) in
-    Util.debugf ~section 1 "drip:%d->@[%a@]:@. @[%a@]@." (fun k -> k orig_penalty pp s (CCOpt.pp C.pp) res);
+    if CCOpt.is_some res then 
+      Util.debugf ~section 1 "drip:%d/%d->@[%a@]:@. @[%a@]@." (fun k -> k orig_penalty s.hits pp s (CCOpt.pp C.pp) res);
     res
 
   let drip_n s n guard =

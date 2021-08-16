@@ -27,10 +27,12 @@ let _timeout = ref 11
 let _e_auto = ref false
 let _max_derived = ref 16
 let _only_ho_steps = ref true
+let _sort_by_weight_only = ref false
 
 let e_bin = ref (None : string option)
 
-let regex_refutation = Str.regexp ".*SZS output start CNFRefutation.*" 
+let regex_refutation_begin = Str.regexp ".*SZS output start CNFRefutation.*" 
+let regex_refutation_end = Str.regexp ".*SZS output end CNFRefutation.*" 
 let reg_thf_clause = Str.regexp "thf(zip_cl_\\([0-9]+\\),.*"
 
 module IntSet = CCSet.Make(CCInt)
@@ -90,12 +92,14 @@ module Make(E : Env.S) : S with module Env = E = struct
       (* type erasure for terms E can understand *)
       | T.AppBuiltin((Builtin.Eq | Builtin.Neq) as b, [ty;lhs;rhs]) 
           when T.is_ground ty ->
-        sym_map, T.app_builtin ~ty:Type.prop b [lhs;rhs]
-      | T.AppBuiltin((Builtin.ForallConst | Builtin.ExistsConst) as b, ([_;body]|[body]))
+        let sym_map, lhs' = aux ~sym_map lhs in
+        let sym_map, rhs' = aux ~sym_map rhs in
+        sym_map, T.app_builtin ~ty:Type.prop b [ty;lhs';rhs']
+      | T.AppBuiltin((Builtin.ForallConst | Builtin.ExistsConst) as b, ([q;body]))
           when Type.is_ground (T.ty body) ->
         let vars, body = T.open_fun body in
         let sym_map, body' = aux ~sym_map body in
-        sym_map, T.app_builtin ~ty:Type.prop b [T.fun_l vars body']
+        sym_map, T.app_builtin ~ty:Type.prop b [q;T.fun_l vars body']
       | T.AppBuiltin(_, l)
       | T.App(_, l) ->
         let hd_mono, args = T.as_app_mono t in
@@ -157,14 +161,15 @@ module Make(E : Env.S) : S with module Env = E = struct
                |> ID.Set.to_list
     in
     (* first printing type declarations, and only then the types *)
-    CCList.fold_right (fun sym acc -> 
+    CCList.fold_right (fun sym acc ->
         let ty = Ctx.find_signature_exn sym in
         if Type.is_tType ty then (
           output_symdecl ~out sym ty;
           acc
         ) else (
-          if (((Type.Seq.sub ty) |> Iter.exists (Type.is_tType))) then
+          if (((Type.Seq.sub ty) |> Iter.exists (Type.is_tType))) then (
             raise PolymorphismDetected;
+          );
           Iter.cons (sym, ty) acc
         )
       ) syms Iter.empty
@@ -176,7 +181,10 @@ module Make(E : Env.S) : S with module Env = E = struct
     ID.Set.of_list syms
 
   let set_e_bin path =
-    e_bin := Some path 
+    e_bin := Some path
+
+  let disable_e () =
+    e_bin := None 
 
   let run_e prob_path =
     match !e_bin with 
@@ -185,33 +193,35 @@ module Make(E : Env.S) : S with module Env = E = struct
       let cmd = 
         CCFormat.sprintf "timeout %d %s --pos-ext=all --neg-ext=all %s --cpu-limit=%d %s -s -p" 
           (to_+2) e_path prob_path to_ (if !_e_auto then "--auto" else "--auto-schedule") in
-      CCFormat.printf "%% Running : %s.@." cmd;
       let process_channel = Unix.open_process_in cmd in
-      let _,status = Unix.wait () in
-      begin match status with
-        | WEXITED _ ->
-          let refutation_found = ref false in
-          (try 
-             while not !refutation_found do 
-               let line = input_line process_channel in
-               if Str.string_match regex_refutation line 0 then 
-                 refutation_found := true;
-             done;
-             if !refutation_found then (
-               let clause_ids = ref [] in
-               (try 
-                  while true do 
-                    let line = input_line process_channel in
-                    flush_all ();
-                    if Str.string_match reg_thf_clause line 0 then (
-                      let id = CCInt.of_string (Str.matched_group 1 line) in
-                      clause_ids := CCOpt.get_exn id :: !clause_ids;)
-                  done;
-                  Some !clause_ids
-                with End_of_file -> Some !clause_ids)
-             ) else None
-           with End_of_file -> None;)
-        | _ -> None end
+      let refutation_found = ref false in
+      let res = 
+      (try 
+          while not !refutation_found do 
+            let line = input_line process_channel in
+            if Str.string_match regex_refutation_begin line 0 then 
+              refutation_found := true;
+          done;
+          if !refutation_found then (
+            let clause_ids = ref [] in
+            (try 
+              while true do 
+                let line = input_line process_channel in
+                flush_all ();
+                if Str.string_match reg_thf_clause line 0 then (
+                  let id = CCInt.of_string (Str.matched_group 1 line) in
+                  clause_ids := CCOpt.get_exn id :: !clause_ids;)
+                else if Str.string_match regex_refutation_end line 0 then (
+                  raise End_of_file
+                )
+              done;
+              Some !clause_ids
+            with End_of_file -> Some !clause_ids)
+          ) else None
+        with End_of_file -> None)
+      in
+      close_in process_channel;
+      res
     | None ->
       invalid_arg "cannot run E if E binary is not set up"
 
@@ -258,7 +268,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         pd > 0 && pd <= 5) clauses 
       |> Iter.sort ~cmp:(fun c1 c2 ->
         let pd1 = C.proof_depth c1 and pd2 = C.proof_depth c2 in
-        if pd1 = pd2 then CCInt.compare (C.ho_weight c1) (C.ho_weight c2)
+        if pd1 = pd2 || !_sort_by_weight_only then CCInt.compare (C.ho_weight c1) (C.ho_weight c2)
         else CCInt.compare pd1 pd2)
       |> Iter.take !_max_derived
       |> convert_clauses ~converter ~encoded_symbols
@@ -325,6 +335,7 @@ let () =
       )), " how to treat lambdas when giving problem to E";
       "--tmp-dir", Arg.String (fun v -> _tmp_dir := v), " scratch directory for running E";
       "--e-timeout", Arg.Set_int _timeout, " set E prover timeout.";
+      "--e-sort-by-weight-only", Arg.Bool ((:=) _sort_by_weight_only), " order the clauses only by the weight, not by the proof depth.";
       "--e-only-ho-steps", Arg.Bool ((:=) _only_ho_steps), " translate only HO proof steps to E";
       "--e-max-derived", Arg.Set_int _max_derived, " set the limit of clauses that are derived by Zipperposition and given to E";
       "--e-auto", Arg.Bool (fun v -> _e_auto := v), " If set to on eprover will not run in autoschedule, but in auto mode"]

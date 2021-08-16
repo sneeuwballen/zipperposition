@@ -203,7 +203,7 @@ let app_encode_stmt stmt =
         Statement.map_def ~form:app_encode_lits 
                           ~term:(app_encode_term true) 
                           ~ty:app_encode_ty in
-      Statement.def ~proof (List.map map_single defs)
+    Statement.def ~proof (List.map map_single defs)
   | Statement.Rewrite def ->
     let new_def = 
         Statement.map_def_rule ~form:app_encode_lits 

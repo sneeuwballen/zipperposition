@@ -8,8 +8,6 @@ module type S = sig
   module Env : Env.S
   module C : module type of Env.C with type t = Env.C.t
   module PS : module type of Env.ProofState with type C.t = Env.C.t
-  module Stm : Stream.S with module C = Env.C
-  module StmQ : StreamQueue.S with module Stm = Stm
 
   (** {5 Term Indices} *)
 

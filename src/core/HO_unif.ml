@@ -33,7 +33,16 @@ let term_arity args =
   |> Util.take_drop_while (fun t -> T.is_type t)
   |> CCPair.map List.length List.length
 
-let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~signature ~offset : (Subst.t * penalty) list =
+let add_var_to_term t =
+  let prefix,matrix_r = Term.open_fun (Lambda.eta_expand t) in
+  let fresh_var = HVar.fresh ~ty:(Type.arrow prefix Type.prop) () in
+  let n = List.length prefix in
+  let bvars = List.mapi (fun i ty -> T.bvar ~ty (n-i-1)) prefix in
+  let matrix_l = T.app (T.var fresh_var) bvars in
+  T.fun_l prefix (T.Form.or_ matrix_l matrix_r)
+
+let enum_prop ?(mode=`Full) ?(add_var=false) ((v:Term.var), sc_v) 
+  ~enum_cache ~signature ~offset  : (Subst.t * penalty) list =
   let ty_v = HVar.ty v in
   let n, ty_args, ty_ret = Type.open_poly_fun ty_v in
   assert (Type.is_prop ty_ret);
@@ -114,8 +123,8 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~signature ~offset 
               let exists = T.close_quantifier Builtin.ExistsConst arg_typeargs form_body in
               let forall, exists = CCPair.map_same (T.fun_l ty_args) (forall, exists) in
               assert(T.DB.is_closed forall && T.DB.is_closed exists);
-              assert(Lambda.is_properly_encoded forall);
-              assert(Lambda.is_properly_encoded exists);
+              assert(Term.is_properly_encoded forall);
+              assert(Term.is_properly_encoded exists);
               Some (forall, exists))
             else None) ty_args
         |> CCList.fold_left (fun acc opt -> match opt with 
@@ -177,9 +186,9 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~signature ~offset 
           T.app_builtin ~ty:([o;o] ==> o) Builtin.And [],1;
           T.app_builtin ~ty:([o;o] ==> o) Builtin.Or [],1;
           T.app_builtin ~ty:([o] ==> o) Builtin.Not [],1;
-          T.app_builtin ~ty:([fresh_ty; fresh_ty] ==> o) Builtin.Eq [],1;
-          T.app_builtin ~ty:([[fresh_ty] ==> o] ==> o) Builtin.ForallConst [],1;
-          T.app_builtin ~ty:([[fresh_ty] ==> o] ==> o) Builtin.ExistsConst [],1;
+          T.app_builtin ~ty:([fresh_ty; fresh_ty] ==> o) Builtin.Eq [T.of_ty fresh_ty],1;
+          T.app_builtin ~ty:([[fresh_ty] ==> o] ==> o) Builtin.ForallConst [T.of_ty fresh_ty],1;
+          T.app_builtin ~ty:([[fresh_ty] ==> o] ==> o) Builtin.ExistsConst [T.of_ty fresh_ty],1;
         ] in
         
         List.fold_left (fun res (op,penalty) -> 
@@ -190,7 +199,7 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~signature ~offset 
       | _ -> []
 
     in
-    let lambdas = 
+    let lambdas =
       CCList.flat_map
         (fun (ts,penalty) -> 
           List.map (fun t -> 
@@ -200,6 +209,7 @@ let enum_prop ?(mode=`Full) ((v:Term.var), sc_v) ~enum_cache ~signature ~offset 
                   does not catch them. *)
               let cached_t = Subst.FO.canonize_all_vars t in
               enum_cache := Term.Set.add cached_t !enum_cache;
+              let t = if add_var then add_var_to_term t else t in 
               let subst = Subst.FO.bind' Subst.empty (v,sc_v) (t,sc_v) in
               (subst, penalty) )ts ) 
         [ l_not, 1;

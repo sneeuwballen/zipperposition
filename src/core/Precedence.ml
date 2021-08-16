@@ -3,6 +3,8 @@
 
 (** {1 Precedence (total ordering) on symbols} *)
 
+module T = Term
+
 type symbol_status =
   | Multiset
   | Lexicographic
@@ -30,6 +32,7 @@ module Weight = struct
   let omega_plus i : t = make 1 i
 
   let mult c a : t = {omega = a.omega * c; one = a.one * c}
+  let mult_one c a : t = {a with one = a.one *c}
 
   let add a b: t = {omega=a.omega+b.omega; one=a.one+b.one}
   let diff a b: t = {omega=a.omega-b.omega; one=a.one-b.one}
@@ -61,11 +64,18 @@ let get_arity ~sig_ref s =
     snd (Signature.arity !sig_ref s)
   with Not_found -> 0
 
+let is_not_fresh_sk = -1
 let is_post_cnf_skolem ~sig_ref s =
-  not (Signature.mem !sig_ref s)
-  || (match ID.as_skolem s with 
+  let ans = 
+    ((not (Signature.is_empty !sig_ref)) && not (Signature.mem !sig_ref s))
+    || (match ID.as_skolem s with 
       | Some ID.K_after_cnf -> true
       | _ -> false)
+  in
+  ans
+
+let post_cnf_id ~sig_ref s =
+  if is_post_cnf_skolem ~sig_ref s then ID.id s else is_not_fresh_sk
 
 let on_signature_update = Signal.create()
 
@@ -89,7 +99,7 @@ module Constr = struct
     Signal.on on_signature_update (update_signature _sig);
     let open CCOrd in
     (* bigger arity means bigger symbol *)
-    - (CCBool.compare (is_post_cnf_skolem ~sig_ref:_sig s1) (is_post_cnf_skolem ~sig_ref:_sig s2))
+    - (CCInt.compare (post_cnf_id ~sig_ref:_sig s1) (post_cnf_id ~sig_ref:_sig s2))
     <?> (CCInt.compare, get_arity ~sig_ref:_sig s1, get_arity ~sig_ref:_sig s2)
     <?> (ID.compare, s1, s2)
 
@@ -97,7 +107,7 @@ module Constr = struct
     let _sig = ref signature in
     Signal.on on_signature_update (update_signature _sig);
     let open CCOrd in
-    - (CCBool.compare (is_post_cnf_skolem ~sig_ref:_sig s1) (is_post_cnf_skolem ~sig_ref:_sig s2))
+    - (CCInt.compare (post_cnf_id ~sig_ref:_sig s1) (post_cnf_id ~sig_ref:_sig s2))
     <?> (CCInt.compare, get_arity ~sig_ref:_sig s2, get_arity ~sig_ref:_sig s1)
     <?> (ID.compare, s1, s2)
 
@@ -212,7 +222,7 @@ module Constr = struct
       let n1 = find_freq s1 in
       let n2 = find_freq s2 in
 
-      - (CCBool.compare (is_post_cnf_skolem ~sig_ref s1) (is_post_cnf_skolem ~sig_ref s2))
+      - (CCInt.compare (post_cnf_id ~sig_ref s1) (post_cnf_id ~sig_ref s2))
       (* post-cnf symbols have the same value of n2 and n1 *)
       <?> (CCInt.compare, n2, n1)
       <?> (ID.compare, s1, s2)
@@ -422,6 +432,11 @@ let mk_tbl_ l =
 type weight_fun = ID.t -> Weight.t
 type arg_coeff_fun = ID.t -> int list
 
+(* constant weight *)
+let default_weight = Weight.int 1
+let weight_constant _ = default_weight
+let empty_sig = Signature.empty
+
 let depth_occ_driver ~flip stmt_d =
   let tbl = ID.Tbl.create 16 in
   Iter.iter (fun (sym,d) -> 
@@ -450,7 +465,9 @@ let depth_occ_driver ~flip stmt_d =
   let tbl = ID.Tbl.create 16 in
   List.iteri (fun i (_,_,sym) -> ID.Tbl.add tbl sym (Weight.int (i + 5))) sorted;
   let default = Weight.int 5 in
-  fun sym -> (ID.Tbl.get_or ~default tbl sym)
+  fun sym -> (
+    if is_post_cnf_skolem ~sig_ref:(ref empty_sig) sym then default_weight
+    else ID.Tbl.get_or ~default tbl sym)
 
 let inv_depth_occurrence = depth_occ_driver ~flip:false
 let depth_occurrence = depth_occ_driver ~flip:true
@@ -468,7 +485,8 @@ let weight_modarity ~signature =
 
   fun a ->
     let arity =  try snd @@ Signature.arity !_sig a with _ -> 5 in
-    Weight.int (arity + 4)
+    if is_post_cnf_skolem ~sig_ref:_sig a then default_weight
+    else Weight.int (arity + 4)
 
 let weight_arity0 ~signature =
   let _sig = ref signature in
@@ -483,8 +501,7 @@ let weight_arity0 ~signature =
   let max_sym = 
     Signature.Seq.symbols signature
     |> Iter.fold (fun acc sym -> 
-        let ar = snd @@ Signature.arity signature sym in
-        max_arity acc (sym,ar)
+        max_arity acc (sym,ID.id sym)
       ) None
     |> CCOpt.map fst in
   
@@ -492,9 +509,11 @@ let weight_arity0 ~signature =
     let res = 
       match max_sym with 
       | None -> get_arity ~sig_ref:_sig a + 1
-      | Some m_id -> if ID.equal m_id a then 0 else (get_arity ~sig_ref:_sig a + 1)
+      (* no access to the precedence, cannot compute max symbol -- cannot assign 0 *)
+      | Some m_id -> if ID.equal m_id a then 1 else (get_arity ~sig_ref:_sig a + 1)
     in
-    Weight.int res
+    if is_post_cnf_skolem ~sig_ref:(ref empty_sig) a then default_weight
+    else Weight.int res
     
 
 let weight_invarity ~signature =
@@ -502,107 +521,197 @@ let weight_invarity ~signature =
   let max_a = max_arity signature in
   (fun a ->
      let arity =  try snd @@ Signature.arity signature a with _ -> 0 in
-     Weight.int (max_a - arity + 3))
+     if is_post_cnf_skolem ~sig_ref:(ref empty_sig) a then default_weight
+     else Weight.int (max_a - arity + 3))
 
 let weight_sq_arity ~signature =
   let _sig = ref signature in
   Signal.on on_signature_update (update_signature _sig);
   fun a ->
     let arity =  try snd @@ Signature.arity !_sig a with _ -> 2 in
-    Weight.int (arity * arity + 1)
+    if is_post_cnf_skolem ~sig_ref:(ref empty_sig) a then default_weight
+    else Weight.int (arity * arity + 1)
 
 let weight_invsq_arity ~signature =
   (* Depends on max arity, and cannot easily evolve during the proving *)
   let max_a = max_arity signature in
   (fun a -> 
     let arity =  try snd @@ Signature.arity signature a with _ -> max_a / 2 in
-    Weight.int (max_a*max_a - arity * arity + 1))
-
-(* constant weight *)
-let weight_constant _ = Weight.int 4
+    if is_post_cnf_skolem ~sig_ref:(ref empty_sig) a then default_weight
+    else Weight.int (max_a*max_a - arity * arity + 1))
 
 let weight_invfreq (symbs : ID.t Iter.t) : ID.t -> Weight.t =
   let tbl = ID.Tbl.create 16 in
   Iter.iter (ID.Tbl.incr tbl) symbs;
   let max_freq = List.fold_left (max) 0 (ID.Tbl.values_list tbl) in
-  fun sym ->Weight.int (max_freq - (ID.Tbl.get_or ~default:(max_freq/2) tbl sym) + 5) 
+  fun sym ->
+    if is_post_cnf_skolem ~sig_ref:(ref empty_sig) sym then default_weight
+    else Weight.int (max_freq - (ID.Tbl.get_or ~default:(max_freq/2) tbl sym) + 5) 
 
 let weight_freq (symbs : ID.t Iter.t) : ID.t -> Weight.t =
   let tbl = ID.Tbl.create 16 in
   Iter.iter (ID.Tbl.incr tbl) symbs;
-  fun sym ->Weight.int ((ID.Tbl.get_or ~default:10 tbl sym) + 5) 
+  fun sym -> 
+    if is_post_cnf_skolem ~sig_ref:(ref empty_sig) sym then default_weight
+    else Weight.int ((ID.Tbl.get_or ~default:10 tbl sym) + 5) 
 
-let weight_invfreqrank (symbs : ID.t Iter.t) : ID.t -> Weight.t =
+let weight_rank ~flip (symbs : ID.t Iter.t) : ID.t -> Weight.t =
   let tbl = ID.Tbl.create 16 in
   Iter.iter (ID.Tbl.incr tbl) symbs;
   let sorted = 
-    Iter.sort ~cmp:(fun s1 s2 -> 
-        CCInt.compare (ID.Tbl.get_or tbl ~default:0 s1) 
-          (ID.Tbl.get_or tbl ~default:0 s2)) symbs in
-  ID.Tbl.clear tbl;
-  let tbl = ID.Tbl.create 16 in
-  Iter.iteri (fun i (sym:ID.t) -> ID.Tbl.add tbl sym (i+1)) sorted;
-  (fun sym -> Weight.int (ID.Tbl.get_or ~default:10 tbl sym))
+    CCList.sort (fun s1 s2 ->
+        let w_s1 = ID.Tbl.get_or tbl ~default:0 s1 in
+        let w_s2 = ID.Tbl.get_or tbl ~default:0 s2 in
+        if flip then CCInt.compare w_s2 w_s1 else CCInt.compare w_s1 w_s2) (ID.Tbl.keys_list tbl) in
+  let prev_step = ref (-1) in
+  let w = ref 0 in
+  List.iter (fun (sym:ID.t) -> 
+    let num_occs = ID.Tbl.get_or tbl sym ~default:0 in
+    if num_occs != !prev_step then (
+      prev_step := num_occs;
+      incr w
+    );
+    ID.Tbl.replace tbl sym !w) sorted;
 
+  (fun sym -> 
+    if is_post_cnf_skolem ~sig_ref:(ref empty_sig) sym then default_weight
+    else Weight.int (ID.Tbl.get_or ~default:10 tbl sym))
 
-let weight_freqrank (symbs : ID.t Iter.t) : ID.t -> Weight.t =
-  let tbl = ID.Tbl.create 16 in
-  Iter.iter (ID.Tbl.incr tbl) symbs;
-  let sorted = 
-    Iter.sort ~cmp:(fun s1 s2 -> 
-        CCInt.compare (ID.Tbl.get_or tbl ~default:0 s2) 
-          (ID.Tbl.get_or tbl ~default:0 s1)) symbs in
-  ID.Tbl.clear tbl;
-  Iter.iteri (fun i sym -> ID.Tbl.add tbl sym (i+1)) sorted;
-  (fun sym -> Weight.int (ID.Tbl.get_or ~default:10 tbl sym))
+let weight_invfreqrank = weight_rank ~flip:true
+let weight_freqrank = weight_rank ~flip:false
 
 (* This function takes base KBO weight function and adjusts it so
    that defined symbols are larger than its defitnitions. *)
-let lambda_def_weight lm_w db_w base_weight lits =
-  let def_rhs lit =
-    let is_def t =
-      let hd,args = Term.as_app t in
-      Term.is_const hd && List.for_all Term.is_var args &&
-      Term.Set.cardinal (Term.Set.of_list args) = List.length args
+let lambda_def_weight lm_w db_w base_weight clauses =
+  let definition_map = ID.Tbl.create 64 in
+  let dependencies = ID.Tbl.create 64 in
+  let module VS = T.VarSet in
+
+  let find_def lhs rhs =
+    let try_extracting lhs rhs =
+      match T.view lhs with
+      | T.Const id ->
+        CCOpt.return_if (T.is_ground rhs) (id, rhs)
+      | T.App(hd, args) when T.is_const hd ->
+        if List.for_all T.is_var args then (
+          let var_set = VS.of_list (List.map T.as_var_exn args) in
+          if (VS.cardinal var_set == List.length args &&
+            (T.Seq.subterms ~include_builtin:true ~include_app_vars:true rhs
+            |> Iter.filter (T.is_app_var)
+            |> Iter.is_empty) &&
+            Iter.length (T.Seq.vars rhs) == VS.cardinal (T.vars rhs))  then (
+            Some (T.head_exn hd, rhs)
+          ) else None
+        ) else None
+      | _ -> None
     in
-    
-    match lit with
-    | SLiteral.Eq(lhs,rhs) ->
-      if is_def lhs then Some (rhs, Term.head_exn lhs)
-      else if is_def rhs then Some (lhs, Term.head_exn rhs)
-      else None  
-    | _ -> None in
+    let (<+>) = CCOpt.(<+>) in
+    try_extracting lhs rhs <+> try_extracting rhs lhs
+  in
 
-  let evaluate_weight current_evals t =
-    2*(Term.weight ~sym:(fun sy -> 
-      ID.Map.get_or sy current_evals ~default:((base_weight sy).Weight.one)
-    ) t + 
-      (Term.Seq.subterms ~include_builtin:true ~include_app_vars:true t
-      |> Iter.fold (fun acc sub -> 
-        let inc = 
-          if Term.is_fun sub then lm_w
-          else if Term.is_bvar sub then db_w
-          else 0 in
-        acc + inc ) 0))
-     in
-  
+  let exception Loop in
+  let topological_sort ~all_nodes dependencies = 
+    let unvisited = ref (ID.Set.of_iter (ID.Tbl.keys dependencies)) in
+    let visiting = ref ID.Set.empty in
+    let visited = ref ID.Set.empty in
+    let sorted = ref [] in
+
+    let rec visit id =
+      if not (ID.Set.mem id !visited) then (
+        if ID.Set.mem id !visiting then raise Loop;
+
+        visiting := ID.Set.add id !visiting;
+        List.iter visit (ID.Tbl.get_or ~default:[] dependencies id);
+
+        visited := ID.Set.add id !visited;
+        visiting := ID.Set.remove id !visiting;
+        unvisited := ID.Set.remove id !unvisited;
+        sorted := id :: !sorted
+      )
+    in
+
+    while (not (ID.Set.is_empty !unvisited)) do
+      visit (ID.Set.choose !unvisited) 
+    done;
+
+    Util.debugf ~section 1 "top sorted: @[%a@]@." (fun k -> k (CCList.pp ID.pp) !sorted);
+
+    let no_deps = ID.Set.to_list (ID.Set.diff all_nodes (ID.Set.of_list !sorted)) in
+    no_deps @ !sorted
+  in
+
+  Iter.iter (fun cl -> 
+    if Iter.length cl == 1 then (
+      Util.debugf ~section 2 "working on %a" (fun k -> k (Iter.pp_seq (SLiteral.pp T.pp)) cl);
+      match Iter.head_exn cl with
+      | SLiteral.Eq(lhs, rhs) ->
+        begin match find_def lhs rhs with
+        | Some(hd_id, r) ->
+          Util.debugf ~section 2 "is_def: %a := %a" (fun k -> k T.pp lhs T.pp rhs);
+          ID.Tbl.update definition_map ~f:(fun _ -> 
+            function None -> Some [r]
+                    | Some res -> Some (r :: res)
+            ) ~k:hd_id;
+          Term.Seq.symbols r
+          |> Iter.iter (fun k -> 
+            ID.Tbl.update dependencies 
+                          ~f:(fun _ -> function 
+                                None -> Some [hd_id]
+                                | Some res -> Some (hd_id :: res))
+                          ~k)
+        | _ -> (Util.debugf ~section 2 "is not def: %a := %a" (fun k -> k T.pp lhs T.pp rhs);) end
+      | _ -> ()
+    )
+  ) clauses;
+
+  let weights = ID.Tbl.create 64 in
+
+  let eval_weight ~weights t =
+    let rec aux t =
+      match Term.view t with
+      | Term.DB _ -> Weight.int db_w
+      | Term.Var _ -> Weight.one
+      | Term.Const id ->
+      ID.Tbl.get_or weights id ~default:(base_weight id)
+      | Term.Fun(_,body) -> (Weight.(+)) (Weight.int lm_w) (aux body)
+      | Term.App(hd, args) -> aux_l (hd :: args)
+      | Term.AppBuiltin(hd, args) ->
+        (Weight.(+))
+          (if (Builtin.is_quantifier hd) then Weight.omega else Weight.one)
+          (aux_l args)
+    and aux_l = function [] -> Weight.zero
+      | [x] -> aux x
+      | l -> List.fold_left (fun acc t -> 
+        (Weight.(+)) acc (aux t)
+      ) Weight.zero l
+    in
+    (Weight.(+)) (Weight.mult_one 2 (aux t)) (Weight.one)
+  in
 
 
-  let id_map = 
-    Iter.fold (fun acc lit ->
-      match def_rhs lit with 
-      | Some (rhs,lhs_id) ->
-        let rhs_eval = evaluate_weight acc rhs in
-        ID.Map.update lhs_id (fun prev ->
-          Some (max (CCOpt.get_or ~default:0 prev) rhs_eval)
-        ) acc
-      | None -> acc) ID.Map.empty lits in
+  (try
 
-  
+
+    (topological_sort ~all_nodes:(ID.Set.of_iter (ID.Tbl.keys definition_map))  
+                      dependencies)
+    |> CCList.iter (fun id ->
+      let w_opt = Iter.max ~lt:(fun x y -> Weight.compare x y < 0)
+        (Iter.map (eval_weight ~weights) 
+          (Iter.of_list @@ ID.Tbl.get_or ~default:[] definition_map id)) in
+      match w_opt with
+      | Some w -> 
+        Util.debugf ~section 1 "lambda weight lift of %a = %a" (fun k -> k ID.pp id Weight.pp w);
+        ID.Tbl.add weights id w
+      | None -> ()
+    )
+  with Loop -> (Util.debugf ~section 1 "warning looped" (fun k -> k); ));
+
   fun sy ->
-    Weight.int (ID.Map.get_or ~default:(base_weight sy).Weight.one sy id_map)
+    if is_post_cnf_skolem ~sig_ref:(ref empty_sig) sy then default_weight
+    else (ID.Tbl.get_or ~default:(base_weight sy) weights sy)
+  
 
-let weight_fun_of_string ~signature ~lits ~lm_w ~db_w s sd = 
+let weight_fun_of_string ~signature ~clauses ~lm_w ~db_w s sd = 
   let syms_only sym_depth = 
     Iter.map fst sym_depth in
   let with_syms f sym_depth = f (syms_only sym_depth) in
@@ -625,7 +734,7 @@ let weight_fun_of_string ~signature ~lits ~lm_w ~db_w s sd =
     begin match CCString.chop_prefix ~pre:"lambda-def-" s with 
     | Some s ->
       let base_weight = List.assoc s wf_map sd in
-      lambda_def_weight lm_w db_w base_weight lits
+      lambda_def_weight lm_w db_w base_weight clauses
       (* List.assoc s wf_map sd *)
     | None -> List.assoc s wf_map sd end
   with Not_found -> invalid_arg "KBO weight function not found"
@@ -669,29 +778,40 @@ let create ?(weight=weight_constant) ?(arg_coeff=arg_coeff_default)
 
 let add_list ~signature p l =
   (* sorted insertion in snapshot *)
-  Signal.send on_signature_update signature;
+  (* Signal.send on_signature_update signature; *)
   let rec insert_ id l = match l with
-    | [] -> [id], true
+    | [] -> [id]
     | id' :: l' ->
       let c = p.constr id id' in
       if c=0 then (
         assert (ID.equal id id'); (* total order *)
-        l, false  (* not new *)
+        l  (* not new *)
       )
-      else if c<0 then id :: l, true
+      else if c<0 then id :: l
       else
-        let l', ret = insert_ id l' in
-        id' :: l', ret
+        let l' = insert_ id l' in
+        id' :: l'
   in
   (* compute new snapshot, but only update precedence if any of the symbols is new *)
-  let snapshot, is_new =
+  let mk_snapshot l =
     List.fold_left
-      (fun (snap,new_) id ->
-         let snap,new_' = insert_ id snap in
-         snap, new_ || new_')
-      (p.snapshot,false) l
+      (fun (snap) id ->
+         insert_ id snap)
+      (p.snapshot) l
   in
-  if is_new then (
+  let is_new_sym id =
+    if Lazy.is_val p.tbl then ID.Tbl.mem (Lazy.force p.tbl) id
+    else List.mem id p.snapshot
+  in
+
+  let l = List.filter is_new_sym l in
+  let cutoff = 30 in
+  let snapshot = 
+    if CCList.length l < cutoff then mk_snapshot l
+    else (List.fast_sort p.constr ( p.snapshot @ l))
+  in
+
+  if not (CCList.is_empty l) then (
     Util.debugf ~section 4 "@[<v>old prec: @[%a@]@,new prec: @[%a@]@]"
       (fun k->k (Util.pp_list ID.pp) p.snapshot (Util.pp_list ID.pp) snapshot);
     assert (check_inv_ p);

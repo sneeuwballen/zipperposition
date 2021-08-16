@@ -25,14 +25,12 @@ val eta_expand : term -> term
 (** Traverse the term, eta-expanding all sub-terms.
     A term [t : a -> b] becomes [fun (x:a). t x] *)
 
-val eta_reduce : ?full:bool -> term -> term
+val eta_reduce : ?expand_quant:bool -> ?full:bool -> term -> term
 (** Traverse the term, eta-reducing all sub-terms.
     A term [fun x. t x] where [x ∉ vars(t)] becomes [t].
     If full is false, it eta-reduces only at the top level (default: true) *)
 
 val is_lambda_pattern : term -> bool
-
-val is_properly_encoded : term -> bool
 
 
 (** Low level interface *)
@@ -45,7 +43,7 @@ module Inner : sig
 
   val eta_expand : term -> term
 
-  val eta_reduce : ?full:bool -> term -> term
+  val eta_reduce : ?expand_quant:bool -> ?full:bool -> term -> term
 
   val beta_red_head : term -> term
 end

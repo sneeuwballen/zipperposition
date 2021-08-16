@@ -8,6 +8,8 @@ open Libzipperposition
 
 module BV = CCBV
 module T = Term
+module Lit = Literal
+module US = Unif_subst
 module Lits = Literals
 
 module IntSet = Set.Make(CCInt)
@@ -27,11 +29,15 @@ let stat_elim_pred = Util.mk_stat "ho.elim_pred.steps"
 let stat_ho_unif = Util.mk_stat "ho.unif.calls"
 let stat_ho_unif_steps = Util.mk_stat "ho.unif.steps"
 let stat_neg_ext = Util.mk_stat "ho.neg_ext_success"
+let stat_ext_dec = Util.mk_stat "sup.ext_dec calls"
+let stat_ext_inst = Util.mk_stat "sup.ext_inst calls"
 
 
 let prof_eq_res = ZProf.make "ho.eq_res"
 let prof_eq_res_syn = ZProf.make "ho.eq_res_syntactic"
+let prof_ext_dec = ZProf.make "sup.ext_dec"
 let prof_ho_unif = ZProf.make "ho.unif"
+let stat_complete_eq = Util.mk_stat "ho.complete_eq.steps"
 
 let k_ext_pos = Flex_state.create_key ()
 let k_ext_pos_all_lits = Flex_state.create_key ()
@@ -42,8 +48,11 @@ let k_ext_neg_lit = Flex_state.create_key ()
 let k_neg_ext = Flex_state.create_key ()
 let k_neg_ext_as_simpl = Flex_state.create_key ()
 let k_ext_axiom_penalty = Flex_state.create_key ()
+let k_choice_axiom_penalty = Flex_state.create_key ()
 let k_instantiate_choice_ax = Flex_state.create_key ()
 let k_elim_leibniz_eq = Flex_state.create_key ()
+let k_elim_andrews_eq = Flex_state.create_key ()
+let k_elim_andrews_eq_simpl = Flex_state.create_key ()
 let k_prune_arg_fun = Flex_state.create_key ()
 let k_prim_enum_terms = Flex_state.create_key ()
 let k_simple_projection = Flex_state.create_key ()
@@ -52,11 +61,17 @@ let k_check_lambda_free = Flex_state.create_key ()
 let k_purify_applied_vars = Flex_state.create_key()
 let k_eta = Flex_state.create_key()
 let k_diff_const = Flex_state.create_key()
-let k_use_diff_for_neg_ext = Flex_state.create_key()
 let k_generalize_choice_trigger = Flex_state.create_key ()
-let k_prim_enum_simpl = Flex_state.create_key ()
+let k_prim_enum_add_var = Flex_state.create_key ()
 let k_prim_enum_early_bird = Flex_state.create_key ()
 let k_resolve_flex_flex = Flex_state.create_key ()
+let k_arg_cong = Flex_state.create_key ()
+let k_arg_cong_simpl = Flex_state.create_key ()
+let k_ext_dec_lits = Flex_state.create_key ()
+let k_ext_rules_max_depth = Flex_state.create_key ()
+let k_ext_rules_kind = Flex_state.create_key ()
+let k_ho_disagremeents = Flex_state.create_key ()
+let k_add_ite_axioms = Flex_state.create_key ()
 
 
 type prune_kind = [`NoPrune | `OldPrune | `PruneAllCovers | `PruneMaxCover]
@@ -91,7 +106,9 @@ module Make(E : Env.S) : S with module Env = E = struct
   module C = Env.C
   module Ctx = Env.Ctx
   module Combs = Combinators.Make(E)
-
+  module Stm = E.Stm
+  module StmQ = E.StmQ
+  module FR = E.FormRename
 
   (* index for ext-neg, to ensure α-equivalent negative equations have the same skolems *)
   module FV_ext_neg_lit = FV_tree.Make(struct
@@ -102,6 +119,9 @@ module Make(E : Env.S) : S with module Env = E = struct
     end)
 
   let idx_ext_neg_lit_ : FV_ext_neg_lit.t ref = ref (FV_ext_neg_lit.empty())
+  let _ext_dec_from_idx = ref (ID.Map.empty)
+  let _ext_dec_into_idx = ref (ID.Map.empty)
+
 
   (* retrieve skolems for this literal, if any *)
   let find_skolems_ (lit:Literal.t) : T.t list option =
@@ -127,7 +147,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let extract_hd_vars = function
       | Literal.Equation(lhs,rhs,false) ->
         VS.of_list [T.as_var_exn (T.head_term lhs);
-                          T.as_var_exn (T.head_term rhs)]
+                    T.as_var_exn (T.head_term rhs)]
       | _ -> assert false
     in
 
@@ -221,68 +241,10 @@ module Make(E : Env.S) : S with module Env = E = struct
       Some (new_lit,[],[Proof.Tag.T_ho; Proof.Tag.T_ext])
     | _ -> None
 
-
-  (* positive extensionality `m x = n x --> m = n` *)
-  let ext_pos ?(only_unit=true) (c:C.t): C.t list =
-    (* CCFormat.printf "EP: %b\n" only_unit; *)
-    let is_eligible = C.Eligible.always in
-    if not only_unit || C.lits c |> CCArray.length = 1 then 
-      C.lits c
-      |> CCArray.mapi (fun i l ->
-          let l = Literal.map (fun t -> Lambda.eta_reduce ~full:true t) l in
-          match l with 
-          | Literal.Equation (t1,t2,true) 
-            when is_eligible i l ->
-            let f1, l1 = T.as_app t1 in
-            let f2, l2 = T.as_app t2 in
-            begin match List.rev l1, List.rev l2 with
-              | last1 :: l1, last2 :: l2 ->
-                begin match T.view last1, T.view last2 with
-                  | T.Var x, T.Var y
-                    when HVar.equal Type.equal x y &&
-                         not (Type.is_tType (HVar.ty x)) &&
-                         Iter.of_list
-                           [Iter.doubleton f1 f2;
-                            Iter.of_list l1;
-                            Iter.of_list l2]
-                         |> Iter.flatten
-                         |> Iter.flat_map T.Seq.vars
-                         |> Iter.for_all
-                           (fun v' -> not (HVar.equal Type.equal v' x)) ->
-                    (* it works! *)
-                    let new_lit =
-                      Literal.mk_eq
-                        (T.app f1 (List.rev l1))
-                        (T.app f2 (List.rev l2))
-                    in
-                    let new_lits = C.lits c |> CCArray.to_list |>
-                                   List.mapi (fun j l -> if i = j then new_lit else l) in
-                    let proof =
-                      Proof.Step.inference [C.proof_parent c]
-                        ~rule:(Proof.Rule.mk "ho_ext_pos")
-                        ~tags:[Proof.Tag.T_ho; Proof.Tag.T_ext]
-                    in
-                    let new_c =
-                      C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c)
-                    in
-                    (* Format.printf "@[EP: @[%a@] => @[%a@]@].\n" C.pp c C.pp new_c; *)
-                    (* Format.force_newline (); *)
-                    Util.incr_stat stat_ext_pos;
-                    Util.debugf ~section 4
-                      "(@[ext_pos@ :clause %a@ :yields %a@])"
-                      (fun k->k C.pp c C.pp new_c);
-                    Some new_c
-                  | _,_ -> None
-                end
-              | _ -> None
-            end
-          | _ -> None)
-      |> CCArray.filter_map (fun x -> x)
-      |> CCArray.to_list
-    else []
-
   let ext_pos_general ?(all_lits = false) (c:C.t) : C.t list =
     let eligible = if all_lits then C.Eligible.always else C.Eligible.param c in
+    let expand_quant = not @@ Env.flex_get Combinators.k_enable_combinators in
+
     (* Remove recursively variables at the end of the literal t = s if possible.
        e.g. ext_pos_lit (f X Y) (g X Y) other_lits = [f X = g X, f = g]
        if X and Y do not appear in other_lits *)
@@ -320,7 +282,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       |> Iter.filter (fun (idx,lit) -> eligible idx lit)
       |> Iter.flat_map_l
         (fun (lit_idx,lit) ->
-           let lit = Literal.map (fun t -> Lambda.eta_reduce t) lit in
+           let lit = Literal.map (fun t -> Lambda.eta_reduce ~expand_quant t) lit in
            match lit with
            | Literal.Equation (t, s, true) ->
              ext_pos_lit t s (CCArray.except_idx (C.lits c) lit_idx)
@@ -350,62 +312,90 @@ module Make(E : Env.S) : S with module Env = E = struct
     new_clauses
 
   let neg_ext (c:C.t) : C.t list =
-    let diff_const = Env.flex_get k_diff_const in
+    let get_new_lits lhs rhs =
+      let calc_skolem lhs rhs =
+        let (pref_l, body_l), (pref_r, body_r) =
+          CCPair.map_same T.open_fun (lhs, rhs) 
+        in
+        assert (CCList.equal Type.equal pref_l pref_r);
+        assert (not (CCList.is_empty pref_l));
+        let hd_var, rest_vars = CCList.hd_tl pref_l in
 
-    let rec app_diff_exhaustively s t = function 
-    | alpha :: beta :: [] ->
-      let diff_s_t = T.app diff_const [T.of_ty alpha;T.of_ty beta;s;t] in
-      T.app s [diff_s_t], T.app t [diff_s_t]
-    | alpha :: ((beta :: rest) as xs) ->
-      assert(not @@ CCList.is_empty rest);
-      let rest', ret = CCList.take_drop (List.length rest -1) rest in
-      assert(List.length ret = 1);
-      let new_beta = Type.arrow (beta::rest') (List.hd ret) in
-      let diff_s_t = T.app diff_const [T.of_ty alpha;T.of_ty new_beta;s;t] in
-      app_diff_exhaustively (T.app s [diff_s_t]) (T.app t [diff_s_t]) xs
-    | _ -> invalid_arg "argument must be a function type" in
+        let body = 
+          T.fun_ hd_var @@ CCList.fold_right (fun ty body -> 
+            T.Form.exists (T.fun_ ty body)
+          ) rest_vars (T.Form.neq body_l body_r)
+        in
 
-    let is_eligible = C.Eligible.res c in 
-    C.lits c
-    |> CCArray.mapi (fun i l -> 
-        match l with 
-        | Literal.Equation (lhs,rhs,false) 
-          when is_eligible i l && Type.is_fun @@ T.ty lhs ->
-          let arg_types, ret_ty = Type.open_fun (T.ty lhs) in
-          let free_vars = Literal.vars l in
-          let skolem_decls = ref [] in
-          let new_lits = CCList.map (fun (j,x) -> 
-              if i!=j then x
-              else (
-                let lhs,rhs = 
-                if Env.flex_get k_use_diff_for_neg_ext then (
-                  app_diff_exhaustively lhs rhs (arg_types @ [ret_ty])
-                )
-                else (
-                  let skolems = List.map (fun ty -> 
-                      let sk, res =  T.mk_fresh_skolem free_vars ty in
-                      skolem_decls := sk :: !skolem_decls;
-                      res) arg_types in
-                  T.app lhs skolems, T.app rhs skolems) in
-                Literal.mk_neq lhs rhs)
-            ) (C.lits c |> Array.mapi (fun j x -> (j,x)) |> Array.to_list) in
-          declare_skolems !skolem_decls;
-          let proof =
-            Proof.Step.inference [C.proof_parent c] 
-              ~rule:(Proof.Rule.mk "neg_ext")
-              ~tags:[Proof.Tag.T_ho; Proof.Tag.T_ext; Proof.Tag.T_dont_increase_depth]
+        assert(T.DB.is_closed body);
+        FR.get_skolem ~parent:c ~mode:`SkolemRecycle body
+      in    
+
+
+      assert (Type.is_fun (T.ty lhs));
+      let lhs, rhs = CCPair.map_same Combs.expand (lhs,rhs) in
+      
+      let rec aux acc lhs rhs =
+        assert (Type.equal (T.ty lhs) (T.ty rhs));
+        if not (Type.is_fun (T.ty lhs)) then acc
+        else (
+          let sk = calc_skolem lhs rhs in
+          let penalty =
+            if List.length (fst @@ Type.open_fun (T.ty lhs)) = 1 then 0 else 1 
           in
-          let new_c =
-            C.create new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c) in
-          Util.debugf 1 ~section "NegExt: @[%a@] => @[%a@].\n" (fun k -> k C.pp c C.pp new_c);
-          Util.incr_stat stat_neg_ext;
-          Some new_c
-        | _ -> None)
-    |> CCArray.filter_map (fun x -> x)
-    |> CCArray.to_list
+          let lhs', rhs' = 
+            CCPair.map_same (fun hd -> Lambda.whnf @@ T.app hd [sk]) (lhs,rhs)
+          in
+          let new_lit = Lit.mk_neq lhs' rhs' in
+          aux ((new_lit,penalty)::acc) lhs' rhs'
+        )
+      in
+      aux [] lhs rhs in
+
+    let mk_clause ~lits ~penalty =
+      let proof =
+        Proof.Step.inference [C.proof_parent c] 
+          ~rule:(Proof.Rule.mk "neg_ext")
+          ~tags:[Proof.Tag.T_ho; Proof.Tag.T_ext; Proof.Tag.T_dont_increase_depth]
+      in
+      let new_c =
+        C.create ~penalty:(C.penalty c + penalty) ~trail:(C.trail c)
+        (CCArray.to_list lits) proof in
+      Util.debugf 1 ~section "NegExt: @[%a@] => @[%a@].\n" 
+        (fun k -> k C.pp c C.pp new_c);
+      Util.incr_stat stat_neg_ext;
+      new_c
+    in
+
+    let eligible = C.Eligible.res c in
+    let new_lits_map =
+      IntMap.to_list @@
+        CCArray.foldi (fun new_lits idx lit -> 
+          match lit with 
+          | Literal.Equation (lhs,rhs,false) 
+            when eligible idx lit && Type.is_fun @@ T.ty lhs ->
+            IntMap.add idx (get_new_lits lhs rhs) new_lits
+          | _ -> new_lits
+        ) IntMap.empty (C.lits c)
+    in
+
+    let compute_results lits_map =
+      let lit_arr = CCArray.copy (C.lits c) in
+      let rec aux penalty = function
+        | [] -> [mk_clause ~lits:lit_arr ~penalty]
+        | (idx, repls) :: rest ->
+          CCList.flat_map (fun (repl, p) ->
+            lit_arr.(idx) <- repl;
+            aux (penalty+p) rest
+          ) repls
+      in
+      aux 0 lits_map
+    in
+    if CCList.is_empty new_lits_map then [] 
+    else compute_results new_lits_map
 
   let neg_ext_simpl (c:C.t) : C.t SimplM.t =
-    let is_eligible = C.Eligible.res c in 
+    let is_eligible = C.Eligible.always in 
     let applied_neg_ext = ref false in
     let new_lits = 
       C.lits c
@@ -435,6 +425,494 @@ module Make(E : Env.S) : S with module Env = E = struct
       SimplM.return_new c'
     )
 
+  let ord = Ctx.ord ()
+
+  let ext_rule_eligible cl =
+    Env.flex_get k_ext_rules_max_depth < 0 ||
+    C.proof_depth cl < Env.flex_get k_ext_rules_max_depth
+
+  let update_ext_dec_indices f c =
+    let ord = Ctx.ord () in
+    let which, eligible = if Env.flex_get k_ext_dec_lits = `OnlyMax 
+      then `Max, C.Eligible.res c else `All, C.Eligible.always in
+    if Env.flex_get k_ext_rules_kind != `Off &&
+      ext_rule_eligible c then (
+      Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false ~ty_args:false 
+        ~ord ~which ~subterms:true ~eligible (C.lits c)
+      |> Iter.filter (fun (t, _) ->
+          not (T.is_var t) || T.is_ho_var t)
+      |> Iter.filter (fun (t, _) ->
+          not (T.is_var (T.head_term t)) &&
+          T.is_const (T.head_term t) && Term.has_ho_subterm t)
+      |> Iter.iter
+        (fun (t, pos) ->
+          f _ext_dec_into_idx (c,pos,t));
+
+      let eligible = if Env.flex_get k_ext_dec_lits = `OnlyMax then C.Eligible.param c 
+        else C.Eligible.always in
+      Lits.fold_eqn ~ord ~both:true ~sign:true ~eligible (C.lits c)
+      |> Iter.iter
+        (fun (l, _, sign, pos) ->
+          assert sign;
+          let hd,_ = T.as_app l in
+          if T.is_const hd && Term.has_ho_subterm l then (
+            f _ext_dec_from_idx (c,pos,l)
+          )));
+    Signal.ContinueListening
+
+
+  let t_type_is_ho s =
+      Type.is_prop (T.ty s) || Type.is_fun (T.ty s)
+
+  (* Given terms s and t, identify maximal common context u
+     such that s = u[s1,...,sn] and t = u[t1,...,tn]. Then,
+     if some of the disagrements are solvable by a weak
+     unification algorihtm (e.g., pattern or fixpoint), filter
+     them out and create the unifying substitution. Based on
+     k_ho_disagremeents at least one or all of s1...sn have
+     to be of functional/boolean type *)
+  let find_ho_disagremeents ?(unify=true) (orig_s,s_sc) (orig_t,t_sc) =
+    let open CCFun in
+    let exception StopSearch in
+    let counter = ref 0 in
+
+    let cheap_unify ~subst (s,s_sc) (t,t_sc) =
+      let unif_alg =
+        if Env.flex_get Combinators.k_enable_combinators then
+           (fun s t -> Unif_subst.of_subst @@ Unif.FO.unify_syn ~subst:(Unif_subst.subst subst) s t)
+        else if T.is_var s || T.is_var t then (
+          FixpointUnif.unify_scoped ~subst ~counter
+        ) else PatternUnif.unify_scoped ~subst ~counter in
+      
+      try
+        if not unify then None
+        else Some (unif_alg (s,s_sc) (t,t_sc))
+      with PatternUnif.NotInFragment | PatternUnif.NotUnifiable | Unif.Fail ->
+        None
+    in
+    
+    let rec find_diss ~top s t =
+      let return ~top res = if top then [] else res in
+
+      if T.equal s t && (s_sc == t_sc || T.is_ground s) then []
+      else (
+        match T.view s, T.view t with
+        | T.App(s_hd, s_args), T.App(t_hd, t_args) 
+            when T.is_const s_hd ->
+          let (s_hd, s_args), (t_hd, t_args) = 
+            CCPair.map_same T.as_app_mono (s,t) in
+          if T.equal s_hd t_hd then find_diss_l s_args t_args
+          else return ~top [s,t]
+        | T.App(s_hd, s_args), T.App(t_hd, t_args) 
+            when not (T.equal s_hd t_hd)
+                 && T.is_const s_hd && T.is_const t_hd ->
+          (* trying to find prefix subterm that is the differing context *)
+          let (s_hd, s_args), (t_hd, t_args) = 
+            CCPair.map_same T.as_app_mono (s,t) in
+
+          let lhs,rhs,args_lhs,args_rhs = 
+            if List.length s_args > List.length t_args then (
+              let taken,dropped = 
+                CCList.take_drop (List.length s_args - List.length t_args) s_args in
+              T.app s_hd taken, t_hd, dropped, t_args
+            ) else (
+              let taken,dropped = 
+                CCList.take_drop (List.length t_args - List.length s_args) t_args in
+              s_hd, T.app t_hd taken, s_args, dropped
+            ) in
+          if T.same_l args_lhs args_rhs && s_sc == t_sc then ([lhs,rhs])
+          else return ~top [s,t]
+        | _ -> return ~top [s,t])
+    and find_diss_l xs ys =
+      match xs,ys with
+      | [],[] -> []
+      | x :: xxs, y :: yys -> find_diss ~top:false x y @ find_diss_l xxs yys
+      | _ -> invalid_arg "args must be of the same length" in
+    
+    try
+      if not (Type.equal (T.ty orig_s) (T.ty orig_t)) then raise StopSearch;
+
+      if T.is_true_or_false orig_s || T.is_true_or_false orig_t then raise StopSearch;
+
+      let norm = 
+        if Env.flex_get Combinators.k_enable_combinators
+        then CCFun.id 
+        else Lambda.eta_expand in
+
+      let diss = find_diss ~top:true (norm orig_s) (norm orig_t) in
+      let hd_is_var t = 
+        let _,body = T.open_fun t in
+        T.is_var @@ T.head_term body in
+      
+      if CCList.is_empty diss 
+          || List.for_all (fun (s,t) -> hd_is_var s || hd_is_var t) diss
+          || List.for_all (fun (s,_) -> not @@ t_type_is_ho s) diss then (
+          raise StopSearch
+      );
+
+      let _,_,unifscope,init_subst =
+        if not unify then (orig_s,orig_t,0,US.empty)
+        else US.FO.rename_to_new_scope ~counter (orig_s,s_sc) (orig_t,t_sc) in
+      let app_subst subst =
+        if not unify then (fun (s,_) -> s)
+        else Subst.FO.apply Subst.Renaming.none (US.subst subst) in
+      
+      let init_subst = Unif.Ty.unify_syn ~subst:(US.subst init_subst) 
+                        ((T.ty (app_subst init_subst (orig_s, s_sc))), unifscope) 
+                        ((T.ty (app_subst init_subst (orig_t, t_sc))), unifscope) in
+
+      (* Filter out the pairs that are easy to unify *)
+      let diss = 
+        List.fold_left (fun (dis_acc, subst) (si, ti) ->
+          let si',ti' = CCPair.map_same (app_subst subst) ((si,s_sc), (ti,t_sc)) in
+          if not (Type.is_ground (T.ty si')) || not (Type.is_ground (T.ty ti')) then (
+            (* polymorphism is currently not supported *)
+            raise StopSearch
+          );
+          
+          let app_ty r s ty sc = Subst.Ty.apply r s (ty,sc) in
+          match cheap_unify ~subst (si',unifscope) (ti', unifscope) with
+          | Some subst' -> 
+            assert (
+              let r = Subst.Renaming.create () in
+              let s = Unif_subst.subst subst' in
+              Type.equal (app_ty r s (T.ty si') unifscope) (app_ty r s (T.ty ti') unifscope) 
+            );
+            dis_acc, subst'
+          | None ->
+            assert (
+              let r = Subst.Renaming.create () in
+              let s = Unif_subst.subst subst in
+              Type.equal (app_ty r s (T.ty si) s_sc) (app_ty r s (T.ty ti) t_sc) );
+            (si,ti) :: dis_acc, subst)
+        ([],US.of_subst init_subst) (diss) in
+
+
+      (* If no constraints are left or all of pairs are flex-flex
+         or all of pairs are FO then we could have done all of 
+         this with HO unification or FO superposition *)
+      if (CCList.is_empty (fst diss)) then (
+          raise StopSearch
+      );
+
+      if Env.flex_get k_ho_disagremeents == `AllHo &&
+         List.exists (fun (si,_) -> not (t_type_is_ho si)) (fst diss) then (
+           raise StopSearch
+        );
+      Some diss
+    with StopSearch -> None
+        | Unif.Fail -> None
+
+  
+    let ext_inst ~parents (s,s_sc) (t,t_sc) =
+      assert(not (CCList.is_empty parents));
+      assert(CCList.length parents != 2 || s_sc != t_sc);
+
+      let renaming = Subst.Renaming.create () in
+      let apply_subst = Subst.FO.apply renaming Subst.empty  in
+      let s, t = apply_subst (s,s_sc), apply_subst (t,t_sc) in
+      assert(Type.equal (T.ty s) (T.ty t));
+      assert(Type.is_fun (T.ty s));
+      
+      let ty_args, ret  = Type.open_fun (T.ty s) in
+      let alpha = T.of_ty @@ List.hd ty_args in
+      let beta = T.of_ty @@ Type.arrow (List.tl ty_args) ret in
+      let diff_const = Env.flex_get k_diff_const in
+      
+      let diff_s_t = T.app diff_const [alpha; beta; s; t] in
+      let s_diff, t_diff = T.app s [diff_s_t], T.app t [diff_s_t] in
+
+      let neg_lit = Lit.mk_neq s_diff t_diff in
+      let pos_lit = Lit.mk_eq s t in
+      let new_lits = [neg_lit; pos_lit] in
+
+      let proof =
+            Proof.Step.inference (List.map C.proof_parent parents)
+              ~rule:(Proof.Rule.mk "ext_inst") in
+      let penalty = List.fold_left max 1 (List.map C.penalty parents) in
+
+      C.create ~trail:(C.trail_l parents) ~penalty new_lits proof
+
+  let do_ext_inst ~parents ((from_t,sc_f) as s) ((into_t,sc_t) as t) =
+    match find_ho_disagremeents ~unify:false s t  with
+    | Some (disagreements, subst) -> 
+      assert (US.is_empty subst);
+      let ho_dis = List.filter (fun (s,t) -> Type.is_fun (T.ty s)) disagreements in
+      (* assert (not (CCList.is_empty ho_dis)); *)
+
+      CCList.map (fun (lhs,rhs) -> ext_inst ~parents (lhs,sc_f) (rhs,sc_t)) ho_dis
+    | None -> []
+
+  let ext_inst_or_family_eqfact cl =
+    let try_ext_eq_fact (s,t) (u,v) idx =
+      let sc = 0 in
+      match find_ho_disagremeents (s,sc) (u,sc) with
+      | Some (disagrements, subst) ->
+        assert(not (US.has_constr subst));
+        let subst = US.subst subst in
+        let dis_lits = List.map (fun (a,b) -> Lit.mk_neq a b) disagrements in
+        let new_lits = 
+          dis_lits @ ((Lit.mk_neq t v) :: CCArray.except_idx (C.lits cl) idx)
+          |> CCArray.of_list
+          |> (fun lits ->
+                Literals.apply_subst (Subst.Renaming.create ()) subst (lits, sc))
+          |> CCArray.to_list in
+        let proof =
+          Proof.Step.inference [C.proof_parent cl] 
+            ~rule:(Proof.Rule.mk "ext_eqfact") in
+        (* ext_eqfact is rarely used *)
+        let new_c = C.create ~trail:(C.trail cl) ~penalty:(C.penalty cl + (C.proof_depth cl)) new_lits proof in
+        [new_c]
+      | None -> [] in
+
+    let try_ext_eq_factinst (s,_) (u,_) =
+      do_ext_inst ~parents:[cl] (s,0) (u,0) in
+
+    let try_factorings (s,t) (u,v) idx =
+      let ext_family = 
+        if (Env.flex_get k_ext_rules_kind = `Both ||
+           Env.flex_get k_ext_rules_kind = `ExtFamily) then (
+          try_ext_eq_fact (s,t) (u,v) idx
+        ) else [] in
+      
+      let ext_inst = 
+        if (Env.flex_get k_ext_rules_kind = `Both ||
+           Env.flex_get k_ext_rules_kind = `ExtInst) then (
+          try_ext_eq_factinst (s,t) (u,v)
+        ) else [] in
+      ext_inst @ ext_family in
+
+    let aux_eq_rest (s,t) i lits = 
+      CCList.flatten @@ List.mapi (fun j lit -> 
+        if i < j then (
+          match lit with 
+          | Lit.Equation(u,v,_) when Lit.is_positivoid lit ->
+            try_factorings (s,t) (u,v) i
+            @
+            try_factorings (s,t) (v,u) i 
+          | _ -> []
+        ) else []) lits in
+
+    let lits = CCArray.to_list (C.lits cl) in
+    let maximal = C.eligible_param (cl,0) Subst.empty in
+    CCList.flatten @@ List.mapi (fun i lit ->
+      match lit with
+      | Lit.Equation (s,t,_) 
+        when Lit.is_positivoid lit &&
+             (Env.flex_get k_ext_dec_lits != `OnlyMax ||
+             BV.get maximal i) ->
+        aux_eq_rest (s,t) i lits
+      | _ -> []
+    ) lits
+
+  (* Given a "from"-clause C \/ f t1 ... tn = s  and 
+     "into"-clause D \/ f u1 .. un (~)= v, where some of the t_i 
+     (and consequently u_i) are of functional type, construct
+     a clause C \/ D \/ t1 ~= u1 \/ ... tn ~= un \/ s (~)= v.
+
+     Intuitively, we are waiting for efficient extensionality rules
+     to kick in and fix the problem of not being able to paramodulate
+     with this equation.
+
+     Currently with no restrictions or indexing. After initial evaluation,
+     will find ways to restrict it somehow. *)
+  let retrieve_from_extdec_idx idx id = 
+    let cl_map = ID.Map.find_opt id idx in
+    match cl_map with
+    | None -> Iter.empty
+    | Some cl_map -> 
+      C.Tbl.to_iter cl_map 
+      |> Iter.flat_map (fun (c, l) -> 
+          Iter.of_list l
+          |> Iter.map (fun (t,p) -> (c,t,p)))
+
+  let do_ext_sup from_c from_p from_t into_c into_p into_t = 
+    let sc_f, sc_i = 0, 1 in
+    if Type.equal (Term.ty from_t) (Term.ty into_t) &&
+       not (C.id from_c = C.id into_c && Position.equal from_p into_p) then (
+
+      match find_ho_disagremeents (from_t, sc_f) (into_t, sc_i) with 
+      | Some (disagreements, subst) ->
+        assert(not @@ US.has_constr subst);        
+        let renaming = Subst.Renaming.create () in
+        let subst = US.subst subst in
+        let lits_f = Lits.apply_subst renaming subst (C.lits from_c, sc_f) in
+        let lits_i = Lits.apply_subst renaming subst (C.lits into_c, sc_i) in
+        
+        let app_subst renaming scoped_t =
+          Subst.FO.apply renaming subst scoped_t in
+        
+        let new_neq_lits = 
+          List.map (fun (arg_f, arg_i) ->
+            Lit.mk_neq (app_subst renaming (arg_f, sc_f)) (app_subst renaming (arg_i, sc_i))) 
+          disagreements  in
+
+        
+        let (i, pos_f) = Lits.Pos.cut from_p in
+        let from_s = Lits.Pos.at lits_f (Position.arg i (Position.opp pos_f)) in
+        Lits.Pos.replace lits_i ~at:into_p ~by:(from_s);
+        let new_lits = new_neq_lits @ CCArray.except_idx lits_f i  @ CCArray.to_list lits_i in
+        let trail = C.trail_l [from_c; into_c] in
+        let penalty = max (C.penalty from_c) (C.penalty into_c) in
+        let tags = [Proof.Tag.T_ho] in
+        let proof =
+          Proof.Step.inference
+            [C.proof_parent_subst renaming (from_c, sc_f) subst;
+              C.proof_parent_subst renaming  (into_c, sc_i) subst] 
+            ~rule:(Proof.Rule.mk "ext_sup") ~tags in
+        let new_c = C.create ~trail ~penalty new_lits proof in
+        Some new_c
+      | None -> None
+    ) else None
+
+  let ext_sup_act given =
+    if ext_rule_eligible given then (
+      let eligible = 
+        if Env.flex_get k_ext_dec_lits = `OnlyMax then C.Eligible.param given else C.Eligible.always in
+      Lits.fold_eqn ~ord ~both:true ~sign:true ~eligible (C.lits given)
+      |> Iter.flat_map (fun (l,_,sign,pos) ->
+          let hd,args = T.as_app l in
+          if T.is_const hd && T.has_ho_subterm l then (
+            let inf_partners = retrieve_from_extdec_idx !_ext_dec_into_idx (T.as_const_exn hd) in
+            Iter.map (fun (into_c,into_t, into_p) -> 
+                do_ext_sup given pos l into_c into_p into_t) inf_partners)
+          else Iter.empty)
+      |> Iter.filter_map CCFun.id
+      |> Iter.to_list)
+    else []
+
+  let ext_sup_pas given =
+    if ext_rule_eligible given then ( 
+      let which, eligible =
+        if Env.flex_get k_ext_dec_lits = `OnlyMax then `Max, C.Eligible.res given 
+        else `All, C.Eligible.always in
+      Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false ~ty_args:false 
+        ~ord ~which ~subterms:true ~eligible (C.lits given)
+      |> Iter.flat_map (fun (t,p) ->
+          let hd, args = T.as_app t in
+          if T.is_const hd && T.has_ho_subterm t  then (
+            let inf_partners = retrieve_from_extdec_idx !_ext_dec_from_idx (T.as_const_exn hd) in
+            Iter.map (fun (from_c,from_t, from_p) -> 
+                do_ext_sup from_c from_p from_t given p t) inf_partners) 
+          else Iter.empty))
+      |> Iter.filter_map CCFun.id
+      |> Iter.to_list
+    else []
+
+  let ext_inst_sup_act given =
+    if ext_rule_eligible given then (
+      let eligible =
+        if Env.flex_get k_ext_dec_lits = `OnlyMax then C.Eligible.param given else C.Eligible.always in
+      Lits.fold_eqn ~ord ~both:true ~sign:true ~eligible (C.lits given)
+      |> Iter.flat_map (fun (l,_,sign,pos) ->
+          let hd,args = T.as_app l in
+          if T.is_const hd && T.has_ho_subterm l then (
+            let inf_partners = retrieve_from_extdec_idx !_ext_dec_into_idx (T.as_const_exn hd) in
+            Iter.map (fun (into_c,into_t, _) -> 
+              do_ext_inst ~parents:[given;into_c] (l, 0) (into_t, 1)
+          ) inf_partners)
+          else Iter.empty)
+      |> Iter.to_list
+      |> CCList.flatten)
+    else []
+
+  let ext_inst_sup_pas given =
+    if ext_rule_eligible given then ( 
+      let which, eligible =
+        if Env.flex_get k_ext_dec_lits = `OnlyMax then `Max, C.Eligible.res given 
+        else `All, C.Eligible.always in
+      Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false ~ty_args:false 
+        ~ord ~which ~subterms:true ~eligible (C.lits given)
+      |> Iter.flat_map (fun (t,p) ->
+          let hd, args = T.as_app t in
+          if T.is_const hd && T.has_ho_subterm t  then (
+            Iter.map (fun (from_c,from_t, from_p) -> 
+              do_ext_inst ~parents:[from_c; given] (from_t,0) (t,1))
+            (retrieve_from_extdec_idx !_ext_dec_from_idx (T.as_const_exn hd)))
+          else Iter.empty))
+      |> Iter.to_list
+      |> CCList.flatten
+    else []
+
+  let ext_eqres_aux c =
+    let eligible = C.Eligible.always in
+
+    if ext_rule_eligible c then (
+      let res = 
+        Literals.fold_eqn (C.lits c) ~eligible ~ord ~both:false ~sign:false
+        |> Iter.to_list
+        |> CCList.filter_map (fun (lhs,rhs,sign,pos) ->
+            assert(sign = false);
+            let idx = Lits.Pos.idx pos in
+            if Env.flex_get k_ext_dec_lits != `OnlyMax ||
+               BV.get (C.eligible_res_no_subst c) idx then (
+              let sc = 0 in
+              match find_ho_disagremeents (lhs,sc) (rhs, sc) with
+              | Some (disagremeents, subst) ->
+                let new_neq_lits =
+                  List.map (fun (s,t) -> Lit.mk_neq s t) disagremeents in
+                let i, _ = Literals.Pos.cut pos in
+                let new_lits =
+                  (Array.of_list @@ new_neq_lits @ CCArray.except_idx (C.lits c) i, sc)
+                  |> Literals.apply_subst (Subst.Renaming.create()) (US.subst subst)
+                  |> Array.to_list in
+                let proof =
+                  Proof.Step.inference [C.proof_parent c] ~rule:(Proof.Rule.mk "ext_eqres") in
+                let new_c =
+                  C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
+                Some new_c
+              | _ -> None)
+            else None)
+        in
+      Util.incr_stat stat_ext_dec;
+      res
+    ) else []
+
+  let ext_inst_eqres c =
+    let eligible = C.Eligible.always in
+    if ext_rule_eligible c then (
+      let res = 
+        Literals.fold_eqn (C.lits c) ~eligible ~ord ~both:false ~sign:false
+        |> Iter.to_list
+        |> CCList.flat_map (fun (lhs,rhs,sign,pos) ->
+            assert(sign = false);
+            let idx = Lits.Pos.idx pos in
+            if Env.flex_get k_ext_dec_lits != `OnlyMax ||
+               BV.get (C.eligible_res_no_subst c) idx then (
+              do_ext_inst ~parents:[c] (lhs,0) (rhs,0))
+            else [])
+        in
+      Util.incr_stat stat_ext_inst;
+      res
+    ) else []
+
+  let ext_eqres given = 
+    ZProf.with_prof prof_ext_dec ext_eqres_aux given
+
+  let insert_into_ext_dec_index index (c,pos,t) =
+    let key = T.head_exn t in
+    let clause_map = ID.Map.find_opt key !index in
+    let clause_map = match clause_map with 
+      | None -> C.Tbl.create 8
+      | Some res -> res in
+    let all_pos =
+      (try 
+         (t,pos) :: (C.Tbl.find clause_map c)
+       with _ -> 
+         [(t,pos)]) in
+    C.Tbl.replace clause_map c all_pos;
+    index := ID.Map.add key clause_map !index
+
+  let remove_from_ext_dec_index index (c,_,t) =
+    let key = T.head_exn t in
+    let clause_map = ID.Map.find_opt key !index in
+    match clause_map with
+    | None -> Util.debugf ~section 1 "all clauses allready deleted." CCFun.id
+    | Some res -> (
+        C.Tbl.remove res c;
+        index := ID.Map.add key res !index
+      )
+
   (* try to eliminate a predicate variable in one fell swoop *)
   let elim_pred_variable ?(proof_constructor=Proof.Step.inference) (c:C.t) : C.t list =
     (* find unshielded predicate vars *)
@@ -452,7 +930,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         Array.fold_left
           (fun (others,set,pos_lits) lit ->
              begin match lit with
-               | Literal.Equation (lhs, rhs, sign) when T.equal rhs T.true_->
+               | Literal.Equation (lhs, rhs, _) when Literal.is_predicate_lit lit->
                  let f, args = T.as_app lhs in
                  begin match T.view f with
                    | T.Var q when HVar.equal Type.equal v q ->
@@ -460,8 +938,8 @@ module Make(E : Env.S) : S with module Env = E = struct
                      if List.exists (T.var_occurs ~var:v) args then (
                        raise Exit; (* [P … t[v] …] is out of scope *)
                      );
-                     others, (args, sign) :: set, 
-                     (if sign then [lit] else []) @ pos_lits
+                     others, (args, Literal.is_positivoid lit) :: set, 
+                     (if Literal.is_positivoid lit then [lit] else []) @ pos_lits
                    | _ -> lit :: others, set, pos_lits
                  end
                | _ -> lit :: others, set, pos_lits
@@ -569,12 +1047,12 @@ module Make(E : Env.S) : S with module Env = E = struct
       |> T.VarSet.to_iter
       |> Iter.flat_map_l
         (fun v -> HO_unif.enum_prop 
+            ~add_var:(Env.flex_get k_prim_enum_add_var)
             ~enum_cache:(Env.flex_get k_prim_enum_terms) 
             ~signature:(Ctx.signature ())
             ~mode ~offset (v,sc_c))
       |> Iter.map
         (fun (subst,penalty) ->
-          let penalty = if Env.flex_get k_prim_enum_simpl then 0 else penalty in
           let renaming = Subst.Renaming.create() in
           let lits = Literals.apply_subst renaming subst (C.lits c,sc_c) in
           let proof =
@@ -617,6 +1095,8 @@ module Make(E : Env.S) : S with module Env = E = struct
         Type.is_fun ty && List.length (Type.expected_args ty) = 1 &&
         Type.equal (Term.ty t) (List.hd (Type.expected_args ty)) &&
         Type.returns_prop ty && T.DB.is_closed t
+      | T.AppBuiltin(Builtin.ChoiceConst, l) -> 
+        CCList.length l == 2 && T.DB.is_closed t
       | _ -> false in
 
     let neg_trigger t =
@@ -653,26 +1133,26 @@ module Make(E : Env.S) : S with module Env = E = struct
         proof_constructor ~tags:[Proof.Tag.T_cannot_orphan] 
                           ~rule:(Proof.Rule.mk ("inst_choice" ^ arg_str)) 
                           parents in
-      C.create ~penalty:1 ~trail:Trail.empty new_lits proof in
+      C.create ~penalty:1 ~trail:Trail.empty new_lits proof
+    in
 
-
-    let new_choice_op ty =
-      let choice_ty_name = "#_choice_" ^ 
-                           CCInt.to_string (CCRef.get_then_incr new_choice_counter) in
-      let new_ch_id = ID.make choice_ty_name in
-      let new_ch_const = T.const new_ch_id ~ty in
-      Ctx.add_signature (Signature.declare (C.Ctx.signature ()) new_ch_id ty);
-      Util.debugf 1 "new choice for type %a: %a(%a).\n" 
-        (fun k -> k Type.pp ty T.pp new_ch_const Type.pp (T.ty new_ch_const));
-      choice_ops := Term.Map.add new_ch_const None !choice_ops;
-      new_ch_const in
+    let choice_of_ty ty =
+      assert (Type.is_fun ty);
+      let args,_ = Type.open_fun ty in
+      let alpha_to_prop = List.hd args in
+      assert(Type.is_fun alpha_to_prop);
+      let alpha = List.hd (fst (Type.open_fun alpha_to_prop)) in
+      let res = T.app_builtin Builtin.ChoiceConst ~ty [T.of_ty alpha] in
+      res 
+    in
 
     (* def_clause is the clause that defined the symbol hd *)
-    let generate_instances ~def_clause hd arg =
+    let generate_instances_of_hd ~def_clause hd arg =
       choice_inst_of_hd ~def_clause hd arg 
       :: choice_inst_of_hd ~def_clause hd (neg_trigger arg)
       :: (if not @@  Env.flex_get k_generalize_choice_trigger then []
-          else [choice_inst_of_hd ~def_clause hd (generalize_trigger arg)]) in
+          else [choice_inst_of_hd ~def_clause hd (generalize_trigger arg)]) 
+    in
 
     let build_choice_inst t =
       match T.view t with
@@ -682,20 +1162,31 @@ module Make(E : Env.S) : S with module Env = E = struct
           let choice_ops = 
             Term.Map.filter (fun t _ -> Type.equal (Term.ty t) hd_ty) !choice_ops
             |> Term.Map.to_list
-            |> (fun l -> if CCList.is_empty l then [new_choice_op hd_ty, None] else l) in
-          CCList.flat_map (fun (hd,def_clause) -> generate_instances ~def_clause hd arg) 
+            |> (fun l -> if CCList.is_empty l then [choice_of_ty hd_ty, None] else l) in
+          CCList.flat_map (fun (hd,def_clause) -> generate_instances_of_hd ~def_clause hd arg) 
             choice_ops
         ) else (
           match Term.Map.find_opt hd !choice_ops with
-          | Some def_clause ->  generate_instances ~def_clause hd arg
+          | Some def_clause ->  generate_instances_of_hd ~def_clause hd arg
           | None -> [])
+      | T.AppBuiltin(ChoiceConst, [ty_arg;ch_arg]) ->
+        let ty = Type.arrow [T.ty ch_arg] (T.ty t) in
+        let hd = T.app_builtin ~ty ChoiceConst [ty_arg] in
+        generate_instances_of_hd ~def_clause:None hd ch_arg
       | _ -> assert (false) in
 
-    C.Seq.terms c 
-    |> Iter.flat_map (Term.Seq.subterms ~include_builtin:true)
-    |> Iter.filter is_choice_subterm
-    |> Iter.flat_map_l build_choice_inst
-    |> Iter.to_list
+    let res = 
+      C.Seq.terms c 
+      |> Iter.flat_map (Term.Seq.subterms ~include_builtin:true)
+      |> Iter.filter is_choice_subterm
+      |> Iter.flat_map_l build_choice_inst
+      |> Iter.to_list
+    in
+    if not (CCList.is_empty res) then (
+      Util.debugf ~section 1 "inst(@[%a@])=@.@[%a@]@." 
+        (fun k -> k C.pp c (CCList.pp C.pp) res);
+    );
+    res
 
   (* Given a clause C, project all its applied variables to base-type arguments 
      if there is a variable occurrence in which at least one of base-type arguments is
@@ -746,14 +1237,15 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let recognize_choice_ops c =
     let extract_not_p_x l = match l with
-      | Literal.Equation(lhs,rhs,false) when T.equal T.true_ rhs && T.is_app_var lhs ->
+      | Literal.Equation(lhs,_,_) 
+        when Literal.is_negativoid l && Literal.is_predicate_lit l && T.is_app_var lhs ->
         begin match T.view lhs with
           | T.App(hd, [var]) when T.is_var var -> Some hd
           | _ -> None end
       | _ -> None in
 
     let extract_p_choice_p p l = match l with 
-      | Literal.Equation(lhs,rhs,true) when T.equal T.true_ rhs ->
+      | Literal.Equation(lhs,_,_) when Literal.is_positivoid l && Literal.is_predicate_lit l ->
         begin match T.view lhs with
           | T.App(hd, [ch_p]) when T.equal hd p ->
             begin match T.view ch_p with 
@@ -795,9 +1287,12 @@ module Make(E : Env.S) : S with module Env = E = struct
     let eligible = C.Eligible.always in
     let pos_pred_vars, neg_pred_vars, occurrences = 
       Lits.fold_eqn ~both:false ~ord ~eligible (C.lits c)
-      |> Iter.fold (fun (pos_vs,neg_vs,occ) (lhs,rhs,sign,_) -> 
-          if Type.is_prop (Term.ty lhs) && Term.is_app_var lhs && T.equal T.true_ rhs then (
+      |> Iter.fold (fun (pos_vs,neg_vs,occ) (lhs,rhs,_,pos) ->
+          let i, _ = Literals.Pos.cut pos in
+          let lit = (C.lits c).(i) in
+          if Literal.is_predicate_lit lit && Term.is_app_var lhs then (
             let var_hd = Term.as_var_exn (Term.head_term lhs) in
+            let sign = Literal.is_positivoid lit in
             if sign then (Term.VarSet.add var_hd pos_vs, neg_vs, Term.Map.add lhs true occ)
             else (pos_vs, Term.VarSet.add var_hd neg_vs, Term.Map.add lhs false occ)
           ) else (pos_vs, neg_vs, occ)
@@ -824,7 +1319,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                     let subst = Subst.FO.bind' (Subst.empty) (var_hd, 0) (subs_term, 0) in
                     let rule = Proof.Rule.mk ("elim_leibniz_eq_" ^ (if sign then "+" else "-")) in
                     let tags = [Proof.Tag.T_ho] in
-                    let proof = Some (proof_constructor ~rule ~tags [C.proof_parent c]) in
+                    let proof = Some (proof_constructor ~rule ~tags [C.proof_parent_subst Subst.Renaming.none (c,0) subst]) in
                     Some (C.apply_subst ~proof (c,0) subst))
                 ) (CCList.mapi (fun i arg -> (i, arg)) args)
             ) else [] 
@@ -837,6 +1332,54 @@ module Make(E : Env.S) : S with module Env = E = struct
       elim_leibniz_eq_ c
     ) else []
 
+  let elim_andrews_eq_ ?(proof_constructor=Proof.Step.inference) c =
+    let ord = Env.ord () in
+    let eligible = C.Eligible.always in
+    Lits.fold_eqn ~both:false ~ord ~eligible (C.lits c)
+    |> Iter.fold (fun cmd_list (lhs,rhs,_,pos) ->
+      let i, _ = Lits.Pos.cut pos in
+      let lit = (C.lits c).(i) in
+      if Lit.is_predicate_lit lit && T.is_app_var lhs then (
+        let hd, args = T.as_app lhs in
+        assert (T.is_var hd);
+        let lam_pref, _ = Type.open_fun (T.ty hd) in
+        let return i j  =
+          let mk_db idx = 
+            let ty = List.nth lam_pref idx in
+            let idx = (List.length lam_pref) - idx - 1 in
+            T.bvar ~ty idx
+          in
+          let mk_body ~sign i j = sign (mk_db i) (mk_db j) in
+          let sign = if Lit.is_positivoid lit then T.Form.neq else T.Form.eq in
+          let subst_t = T.fun_l lam_pref (mk_body ~sign i j) in
+          let var = T.as_var_exn hd in
+          Some (Subst.FO.bind' Subst.empty (var,0) (subst_t, 0))
+        in
+        (CCList.filter_map CCFun.id @@ 
+          CCList.flat_map_i (fun i arg_i ->
+            CCList.mapi (fun j arg_j -> 
+              if j > i && T.equal arg_i arg_j then return i j else None
+            ) args
+          ) args) @ cmd_list
+        ) else cmd_list) ([])
+    |> List.map (fun subst -> 
+      let rule = Proof.Rule.mk "elim_andrews_eq" in
+      let tags = [Proof.Tag.T_ho] in
+      let proof = Some (proof_constructor ~rule ~tags [C.proof_parent c]) in
+      C.apply_subst ~proof (c,0) subst
+    )
+
+  let elim_andrews_equality c =
+    if C.proof_depth c < Env.flex_get k_elim_andrews_eq then (
+      elim_andrews_eq_ c
+    ) else []
+  
+  let elim_andrews_equality_simpls c =
+    if C.proof_depth c < Env.flex_get k_elim_andrews_eq then (
+      let res = elim_andrews_eq_ c in
+      CCOpt.return_if (not (CCList.is_empty res)) res
+    ) else None
+  
 
   let pp_pairs_ out =
     let open CCFormat in
@@ -919,7 +1462,10 @@ module Make(E : Env.S) : S with module Env = E = struct
     )
 
   let eta_normalize () = match Env.flex_get k_eta with
-    | `Reduce -> Lambda.eta_reduce ~full:true
+    | `Reduce -> 
+      Lambda.eta_reduce 
+        ~expand_quant:(not @@ Env.flex_get Combinators.k_enable_combinators) 
+        ~full:true
     | `Expand -> Lambda.eta_expand
     | `None -> (fun t -> t)
 
@@ -974,9 +1520,9 @@ module Make(E : Env.S) : S with module Env = E = struct
     let y_diff = Term.app y [Term.app diff [T.of_ty alpha; T.of_ty beta; x; y]] in
     let lits = [Literal.mk_eq x y; Literal.mk_neq x_diff y_diff] in
     Env.C.create ~penalty:(Env.flex_get k_ext_axiom_penalty) ~trail:Trail.empty 
-      lits Proof.Step.trivial
+                 lits Proof.Step.trivial
 
-  let choice_clause =
+  let mk_choice_clause () =
     let choice_id = ID.make("zf_choice") in
     let alpha_var = HVar.make ~ty:Type.tType 0 in
     let alpha = Type.var alpha_var in
@@ -989,21 +1535,42 @@ module Make(E : Env.S) : S with module Env = E = struct
     let p_choice = Term.app p [Term.app choice [p]] (* p (choice p) *) in
     (* ~ (p x) | p (choice p) *)
     let lits = [Literal.mk_prop px false; Literal.mk_prop p_choice true] in
-    Env.C.create ~penalty:1 ~trail:Trail.empty lits Proof.Step.trivial
+    Env.Ctx.declare choice_id choice_type;
+    Env.C.create ~penalty:(Env.flex_get k_choice_axiom_penalty)
+                 ~trail:Trail.empty lits Proof.Step.trivial
+  
+  let mk_ite_clauses () =
+    let ite_id = ID.make("zf_ite") in
+    let alpha = Type.var (HVar.make ~ty:Type.tType 0) in
+    let ite_ty = Type.arrow [Type.prop; alpha; alpha] alpha in
+    let ite_const = Term.const ~ty:ite_ty ite_id in
+    let x = Term.var (HVar.make ~ty:alpha 1) in
+    let y = Term.var (HVar.make ~ty:alpha 2) in
+    let if_t = T.app ite_const [T.true_; x; y] in
+    let if_f = T.app ite_const [T.false_; x; y] in
+    let if_t_cl = 
+      C.create ~penalty:1 ~trail:Trail.empty [Lit.mk_eq if_t x]
+               Proof.Step.trivial in
+    let if_f_cl = 
+      C.create ~penalty:1 ~trail:Trail.empty [Lit.mk_eq if_f y]
+               Proof.Step.trivial in
+    Env.Ctx.declare ite_id ite_ty;
+    Iter.of_list [if_t_cl; if_f_cl]
 
   let early_bird_prim_enum cl var =
     assert(T.is_var var);
     let offset = C.Seq.vars cl |> T.Seq.max_var |> succ in
     let mode = Env.flex_get k_ho_prim_mode in
+    let add_var = Env.flex_get k_prim_enum_add_var in
     let sc = 0 in
     
     HO_unif.enum_prop 
-      ~enum_cache:(Env.flex_get k_prim_enum_terms) 
+      ~enum_cache:(Env.flex_get k_prim_enum_terms) ~add_var
       ~signature:(Ctx.signature ()) ~mode ~offset (T.as_var_exn var,sc)
     |> CCList.map (fun (subst,p) -> 
       let renaming = Subst.Renaming.create () in
       let lits = Literals.apply_subst renaming subst (C.lits cl, sc) in
-      let lits = Literals.map (fun t -> Lambda.eta_reduce @@ Lambda.snf t) lits in
+      let lits = Literals.map (fun t -> Lambda.snf t) lits in
       let proof =
         Proof.Step.inference ~rule:(Proof.Rule.mk "ho.refine.early.bird") 
           ~tags:[Proof.Tag.T_ho; Proof.Tag.T_cannot_orphan]
@@ -1014,6 +1581,200 @@ module Make(E : Env.S) : S with module Env = E = struct
       res)
     |> CCList.to_iter
     |> Env.add_passive
+
+   let recognize_injectivity c =
+    let exception Fail in
+    let module Lit = Literal in
+
+    (* avoiding cascading if-then-elses *)
+    let fail_on condition =
+      if condition then raise Fail in
+
+    let find_in_args var args =
+      fst @@ CCOpt.get_or ~default:(-1, T.true_)
+        (CCList.find_idx (T.equal var) args) in
+
+    try 
+      fail_on (C.length c != 2);
+
+      match C.lits c with
+      | [|lit1; lit2|] ->
+        fail_on (not ((Lit.is_positivoid lit1 || Lit.is_positivoid lit2) &&
+                     (Lit.is_negativoid lit1 || Lit.is_negativoid lit2)));
+
+        let pos_lit,neg_lit = 
+          if Lit.is_positivoid lit1 then lit1, lit2 else lit2,lit1 in
+       
+        begin match pos_lit, neg_lit with
+        | Equation(x,y,true), Equation(lhs,rhs,sign) ->
+          fail_on (not (T.is_var x && T.is_var y));
+          fail_on (T.equal x y);
+
+          let (hd_lhs, lhs_args), (hd_rhs, rhs_args) = 
+            CCPair.map_same T.as_app_mono (lhs,rhs) in
+          
+          fail_on (not (T.is_const hd_lhs && T.is_const hd_rhs));
+          fail_on (not (T.equal hd_lhs hd_rhs));
+          fail_on (not (List.length lhs_args == List.length rhs_args));
+
+          fail_on (not ((find_in_args x lhs_args) != (-1) ||
+                        (find_in_args x rhs_args) != (-1)));
+          fail_on (not ((find_in_args y lhs_args) != (-1) ||
+                        (find_in_args y rhs_args) != (-1)));
+          
+          (* reorient equations so that x appears in lhs *)
+          let lhs,rhs,lhs_args,rhs_args =
+            if find_in_args x lhs_args != -1 
+            then (lhs, rhs, lhs_args, rhs_args)
+            else (rhs, lhs, rhs_args, lhs_args) in
+
+          fail_on (find_in_args x lhs_args != find_in_args y rhs_args);
+          
+          let same_vars, diff_eqns = List.fold_left (fun (same, diff) (s,t) -> 
+            fail_on (not (T.is_var s && T.is_var t));
+            if T.equal s t then (s :: same, diff)
+            else (same, (s,t)::diff)
+          ) ([],[]) (List.combine lhs_args rhs_args) in
+
+          let same_set = T.Set.of_list same_vars in
+          let diff_lhs_set, diff_rhs_set = 
+            CCPair.map_same T.Set.of_list (CCList.split diff_eqns) in
+          
+          (* variables in each group are unique *)
+          fail_on (List.length same_vars != T.Set.cardinal same_set);
+          fail_on (List.length diff_eqns != T.Set.cardinal diff_lhs_set);
+          fail_on (List.length diff_eqns != T.Set.cardinal diff_rhs_set);
+
+          (* variable groups do not intersect *)
+          fail_on (not (T.Set.is_empty (T.Set.inter diff_lhs_set diff_rhs_set)));
+          fail_on (not (T.Set.is_empty (T.Set.inter diff_lhs_set same_set)));
+          fail_on (not (T.Set.is_empty (T.Set.inter diff_rhs_set same_set)));
+
+          let (sk_id, sk_ty),inv_sk = 
+            Term.mk_fresh_skolem 
+              (List.map T.as_var_exn same_vars) 
+              (Type.arrow [T.ty lhs] (T.ty x)) in
+          let inv_sk = T.app inv_sk [lhs] in
+          let inv_lit = [Lit.mk_eq inv_sk x] in
+
+           let proof = Proof.Step.inference ~rule:(Proof.Rule.mk "inj_rec") 
+              [C.proof_parent c] in
+          Ctx.declare sk_id sk_ty;
+          let new_clause = 
+            C.create ~trail:(C.trail c) ~penalty:(C.penalty c) inv_lit proof in
+          Util.debugf ~section 1 "Injectivity recognized: %a |---| %a" 
+            (fun k -> k C.pp c C.pp new_clause);
+          [new_clause]
+        | _ -> assert false; end
+      | _ -> assert false;
+    with Fail -> []
+
+  (* complete [f = g] into [f x1…xn = g x1…xn] for each [n ≥ 1] *)
+  let complete_eq_args (c:C.t) : C.t list =
+    let var_offset = C.Seq.vars c |> Type.Seq.max_var |> succ in
+    let eligible = C.Eligible.param c in
+    let aux ?(start=1) ~poly lits lit_idx t u =
+      let n_ty_args, ty_args, _ = Type.open_poly_fun (T.ty t) in
+      assert (n_ty_args = 0);
+      assert (ty_args <> []);
+      let vars =
+        List.mapi
+          (fun i ty -> T.var @@ HVar.make ~ty (i+var_offset))
+          ty_args
+      in
+      CCList.(start -- List.length vars)
+      |> List.map
+        (fun prefix_len ->
+          let vars_prefix = CCList.take prefix_len vars in
+          let new_lit = Literal.mk_eq (T.app t vars_prefix) (T.app u vars_prefix) in
+          let new_lits = new_lit :: CCArray.except_idx lits lit_idx in
+          let proof =
+            Proof.Step.inference [C.proof_parent c]
+              (* THIS NAME IS USED IN HEURISTICS -- CHANGE CAREFULLY! *)
+              ~rule:(Proof.Rule.mk "ho_complete_eq")
+              ~tags:[Proof.Tag.T_ho;Proof.Tag.T_dont_increase_depth]
+          in
+          let penalty = C.penalty c + (if poly then 1 else 0) in
+          let new_c =
+            C.create new_lits proof ~penalty ~trail:(C.trail c) in
+
+          if poly then (
+            C.set_flag SClause.flag_poly_arg_cong_res new_c true;
+          );
+
+          new_c)
+      in
+
+      let is_poly_arg_cong_res = C.get_flag SClause.flag_poly_arg_cong_res c in
+      let new_c =
+
+        C.lits c
+        |> Iter.of_array |> Util.seq_zipi
+        |> Iter.filter (fun (idx,lit) -> eligible idx lit)
+        |> Iter.flat_map_l
+          (fun (lit_idx,lit) -> match lit with
+            | Literal.Equation (t, u, true) when Type.is_fun (T.ty t) ->
+              aux ~poly:false (C.lits c) lit_idx t u
+            | Literal.Equation (t, u, true) 
+              when Type.is_var (T.ty t) && not is_poly_arg_cong_res ->
+              (* A polymorphic variable might be functional on the ground level *)
+              let ty_args = 
+                OSeq.iterate [Type.var @@ HVar.fresh ~ty:Type.tType ()] 
+                  (fun types_w -> 
+                    Type.var (HVar.fresh ~ty:Type.tType ()) :: types_w) in
+              let res = 
+                ty_args
+                |> OSeq.mapi (fun arrarg_idx arrow_args ->
+                    let var = Type.as_var_exn (T.ty t) in
+                    let funty = 
+                      T.of_ty 
+                        (Type.arrow arrow_args (Type.var (HVar.fresh ~ty:Type.tType ()))) in
+                    let subst = Unif_subst.FO.singleton (var,0) (funty,0) in
+                    let renaming, subst = Subst.Renaming.none, Unif_subst.subst subst in
+                    let lits' = Lits.apply_subst renaming subst (C.lits c, 0) in
+                    let t' = Subst.FO.apply renaming subst (t, 0) in
+                    let u' = Subst.FO.apply renaming subst (u, 0) in
+                    let new_cl = aux ~poly:true ~start:(arrarg_idx+1) lits' lit_idx t' u' in
+                    assert(List.length new_cl == 1);
+                    List.hd new_cl
+                ) in
+              let first_two, rest = 
+                OSeq.take 2 res, OSeq.map CCOpt.return (OSeq.drop 2 res) in
+              let stm =  Stm.make ~penalty:(C.penalty c + 20) ~parents:[c] rest in
+              StmQ.add (Env.get_stm_queue ()) stm;
+              
+              OSeq.to_list first_two
+            | _ -> [])
+        |> Iter.to_rev_list
+      in
+      if new_c<>[] then (
+        Util.add_stat stat_complete_eq (List.length new_c);
+        Util.debugf ~section 4
+          "(@[complete-eq@ :clause %a@ :yields (@[<hv>%a@])@])"
+          (fun k->k C.pp c (Util.pp_list ~sep:" " C.pp) new_c);
+      );
+      new_c
+
+  let arg_cong_simpl c =
+    let var_offset = ref (C.Seq.vars c |> Type.Seq.max_var |> succ) in
+    let simplified = ref false in
+    let new_lits = Array.map(function
+      | Lit.Equation(lhs, rhs, sign) when sign && Type.is_fun (T.ty lhs) ->
+        let tyargs = fst (Type.open_fun (T.ty lhs)) in
+        simplified := true;
+        let vars = List.map (fun ty -> 
+          incr var_offset;
+          T.var @@ HVar.make ~ty (!var_offset)) tyargs in
+        let lhs',rhs' = T.app lhs vars, T.app rhs vars in
+        Lit.mk_eq lhs' rhs'
+      | x -> x) (C.lits c) in
+    if not !simplified then SimplM.return_same c
+    else (
+      let proof = Proof.Step.simp ~rule:(Proof.Rule.mk "arg_cong_simpl") [C.proof_parent c] in
+      SimplM.return_new 
+        (C.create_a ~penalty:(C.penalty c) ~trail:(C.trail c) new_lits proof)
+    )
+
 
   type fixed_arg_status =
     | Always of T.t (* This argument is always the given term in all occurrences *)
@@ -1177,7 +1938,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     C.lits c
     |> Literals.map (fun t -> Combs.expand t) (* to make sure that DB indices are everywhere the same *)
     |> Literals.fold_terms ~vars:true ~ty_args:false ~which:`All ~ord:Ordering.none 
-      ~subterms:true  ~eligible:(fun _ _ -> true)
+                           ~subterms:true  ~eligible:(fun _ _ -> true)
     |> Iter.iter
       (fun (t,_) ->
          let head, _ = T.as_app t in
@@ -1443,6 +2204,12 @@ module Make(E : Env.S) : S with module Env = E = struct
         SimplM.return_new new_clause
     end
 
+  let () =
+    Signal.on E.ProofState.ActiveSet.on_add_clause 
+      (fun c -> update_ext_dec_indices insert_into_ext_dec_index c);
+    Signal.on E.ProofState.ActiveSet.on_remove_clause 
+      (fun c -> update_ext_dec_indices remove_from_ext_dec_index c)
+
   let setup () =
     mk_diff_const ();
     if not (Env.flex_get k_enabled) then (
@@ -1450,6 +2217,38 @@ module Make(E : Env.S) : S with module Env = E = struct
     ) else (
       Util.debug ~section 1 "setup HO rules";
       Env.Ctx.lost_completeness();
+
+      if(Env.flex_get k_neg_ext_as_simpl) then (
+        Env.add_unary_simplify neg_ext_simpl;
+      )
+      else if(Env.flex_get k_neg_ext) then (
+        Env.add_unary_inf "neg_ext" neg_ext 
+      );
+
+      if Env.flex_get k_ext_rules_kind == `ExtFamily ||
+        Env.flex_get k_ext_rules_kind == `Both then (
+        Env.add_binary_inf "ext_dec_act" ext_sup_act;
+        Env.add_binary_inf "ext_dec_pas" ext_sup_pas;
+        Env.add_unary_inf "ext_eqres_dec" ext_eqres;
+      );
+
+      if Env.flex_get k_ext_rules_kind = `ExtInst ||
+        Env.flex_get k_ext_rules_kind = `Both then (
+        Env.add_binary_inf "ext_dec_act" ext_inst_sup_act;
+        Env.add_binary_inf "ext_dec_pas" ext_inst_sup_pas;
+        Env.add_unary_inf "ext_eqres_dec" ext_inst_eqres;
+      );
+
+      if Env.flex_get k_ext_rules_kind != `Off then (
+        Env.add_unary_inf "ext_eqfact_both" ext_inst_or_family_eqfact;
+      );
+
+
+      if Env.flex_get k_arg_cong_simpl then (
+        Env.add_basic_simplify arg_cong_simpl;
+      )else if Env.flex_get k_arg_cong then ( 
+        Env.add_unary_inf "ho_complete_eq" complete_eq_args
+      );
 
       if Env.flex_get k_resolve_flex_flex then (
         Env.add_basic_simplify remove_ff_constraints
@@ -1468,6 +2267,11 @@ module Make(E : Env.S) : S with module Env = E = struct
 
       if Env.flex_get k_elim_leibniz_eq > 0 then (
         Env.add_unary_inf "ho_elim_leibniz_eq" elim_leibniz_equality
+      );
+      if Env.flex_get k_elim_andrews_eq > 0 then (
+        if Env.flex_get k_elim_andrews_eq_simpl then (
+          Env.add_multi_simpl_rule ~priority:100 elim_andrews_equality_simpls
+        ) else Env.add_unary_inf "ho_elim_leibniz_eq" elim_andrews_equality
       );
 
       if Env.flex_get k_instantiate_choice_ax then (
@@ -1508,13 +2312,6 @@ module Make(E : Env.S) : S with module Env = E = struct
         Env.set_ho_normalization_rule "ho_norm" ho_norm);
       
 
-      if(Env.flex_get k_neg_ext) then (
-        Env.add_unary_inf "neg_ext" neg_ext 
-      )
-      else if(Env.flex_get k_neg_ext_as_simpl) then (
-        Env.add_unary_simplify neg_ext_simpl;
-      );
-
       if(Env.flex_get k_purify_applied_vars != `None) then (
         Env.add_unary_simplify purify_applied_variable
       );
@@ -1532,10 +2329,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       if not (Env.flex_get k_prim_enum_early_bird) then (
         begin match Env.flex_get k_ho_prim_mode with
           | `None -> ()
-          | mode ->
-            if Env.flex_get k_prim_enum_simpl then (
-              Env.add_single_step_multi_simpl_rule (prim_enum_simpl ~mode)
-            ) else Env.add_unary_inf "ho_prim_enum" (prim_enum ~mode);
+          | mode -> Env.add_unary_inf "ho_prim_enum" (prim_enum ~mode);
         end
       ) else (
         Signal.on Env.on_pred_var_elimination (fun (cl,var) ->
@@ -1543,11 +2337,14 @@ module Make(E : Env.S) : S with module Env = E = struct
           Signal.ContinueListening
         )
       );
-      if Env.flex_get k_ext_axiom then
-        Env.ProofState.PassiveSet.add (Iter.singleton (mk_extensionality_clause ())) ;
-      if Env.flex_get k_choice_axiom then
-        Env.ProofState.PassiveSet.add (Iter.singleton choice_clause);
-    );
+      Signal.once Env.on_start (fun () -> 
+        if Env.flex_get k_ext_axiom then(
+          Env.ProofState.PassiveSet.add (Iter.singleton (mk_extensionality_clause ()))) ;
+        if Env.flex_get k_choice_axiom then(
+          Env.ProofState.PassiveSet.add (Iter.singleton (mk_choice_clause ())));
+        if Env.flex_get k_add_ite_axioms then(
+          Env.ProofState.PassiveSet.add (mk_ite_clauses ()));
+      ));
     ()
 end
 
@@ -1619,6 +2416,7 @@ let _ext_neg_lit = ref false
 let _neg_ext = ref true
 let _neg_ext_as_simpl = ref false
 let _ext_axiom_penalty = ref 5
+let _choice_axiom_penalty = ref 1
 let _huet_style = ref false
 let _cons_elim = ref true
 let _imit_first = ref false
@@ -1626,20 +2424,28 @@ let _compose_subs = ref false
 let _var_solve = ref false
 let _instantiate_choice_ax = ref false
 let _elim_leibniz_eq = ref (-1)
+let _elim_andrews_eq = ref (-1)
+let _elim_andrews_eq_simpl = ref (false)
 let _prune_arg_fun = ref `NoPrune
 let _check_lambda_free = ref `False
 let prim_enum_terms = ref Term.Set.empty
-let _oracle_composer = ref (OSeq.merge :> (Logtk.Subst.t option OSeq.t OSeq.t -> Logtk.Subst.t option OSeq.t))
 let _simple_projection = ref (-1)
 let _simple_projection_md = ref 2
 let _purify_applied_vars = ref `None
 let _eta = ref `Reduce
-let _use_diff_for_neg_ext = ref false
 let _generalize_choice_trigger = ref false
 let _prim_enum_simpl = ref false
+let _prim_enum_add_var = ref false
 let _prim_enum_early_bird = ref false
 let _resolve_flex_flex = ref false
 let _ground_app_vars = ref `Off
+let _arg_cong = ref true
+let _arg_cong_simpl = ref false
+let ext_rules_max_depth = ref (-1)
+let ext_rules_kind = ref (`Off)
+let _ext_dec_lits = ref `All
+let _ho_disagremeents = ref `SomeHo
+let _ite_axioms = ref false
 
 let extension =
   let register env =
@@ -1654,8 +2460,11 @@ let extension =
     E.flex_add k_neg_ext !_neg_ext;
     E.flex_add k_neg_ext_as_simpl !_neg_ext_as_simpl;
     E.flex_add k_ext_axiom_penalty !_ext_axiom_penalty;
+    E.flex_add k_choice_axiom_penalty !_choice_axiom_penalty;
     E.flex_add k_instantiate_choice_ax !_instantiate_choice_ax;
     E.flex_add k_elim_leibniz_eq !_elim_leibniz_eq;
+    E.flex_add k_elim_andrews_eq !_elim_andrews_eq;
+    E.flex_add k_elim_andrews_eq_simpl !_elim_andrews_eq_simpl;
     E.flex_add k_prune_arg_fun !_prune_arg_fun;
     E.flex_add k_prim_enum_terms prim_enum_terms;
     E.flex_add k_simple_projection !_simple_projection;
@@ -1663,12 +2472,19 @@ let extension =
     E.flex_add k_check_lambda_free !_check_lambda_free;
     E.flex_add k_purify_applied_vars !_purify_applied_vars;
     E.flex_add k_eta !_eta;
-    E.flex_add k_use_diff_for_neg_ext !_use_diff_for_neg_ext;
     E.flex_add k_generalize_choice_trigger !_generalize_choice_trigger;
-    E.flex_add k_prim_enum_simpl !_prim_enum_simpl;
+    E.flex_add k_prim_enum_add_var !_prim_enum_add_var;
     E.flex_add k_prim_enum_early_bird !_prim_enum_early_bird;
     E.flex_add k_resolve_flex_flex !_resolve_flex_flex;
     E.flex_add k_ground_app_vars !_ground_app_vars;
+    E.flex_add k_arg_cong !_arg_cong;
+    E.flex_add k_arg_cong_simpl !_arg_cong_simpl;
+
+    E.flex_add k_ho_disagremeents !_ho_disagremeents;
+    E.flex_add k_ext_dec_lits !_ext_dec_lits;
+    E.flex_add k_ext_rules_max_depth !ext_rules_max_depth;
+    E.flex_add k_ext_rules_kind !ext_rules_kind;
+    E.flex_add k_add_ite_axioms !_ite_axioms;
 
 
     if E.flex_get k_check_lambda_free = `Only 
@@ -1679,12 +2495,6 @@ let extension =
           E.C.Seq.terms c |> Iter.for_all Term.in_lfho_fragment
         );
     
-    Signal.on_every E.on_start (fun () -> 
-      if not !Unif._unif_bool 
-      then print_endline 
-        ("To remain in the chosen logic fragment, " ^
-        "unification with booleans has been disabled."));
-
     if E.flex_get k_some_ho || !force_enabled_ then (
       let module ET = Make(E) in
       ET.setup ()
@@ -1712,7 +2522,6 @@ let extension =
     state
     |> Flex_state.add k_some_ho is_ho
     |> Flex_state.add k_enabled !enabled_
-    |> Flex_state.add PragUnifParams.k_oracle_composer !_oracle_composer
     |> Flex_state.add k_enable_def_unfold !def_unfold_enabled_
     |> Flex_state.add k_enable_ho_unif (!enabled_ && !enable_unif_)
     |> Flex_state.add k_ho_prim_mode (if !enabled_ then !prim_mode_ else `None)
@@ -1738,18 +2547,18 @@ let () =
   Options.add_opts
     [ "--ho", Arg.Bool (fun b -> enabled_ := b), " enable/disable HO reasoning";
       "--force-ho", Arg.Bool  (fun b -> force_enabled_ := b), " enable/disable HO reasoning even if the problem is first-order";
+      "--arg-cong", Arg.Bool (fun v -> _arg_cong := v), " enable/disable ArgCong"; 
+      "--arg-cong-simpl", Arg.Bool (fun v -> _arg_cong_simpl := v), " enable/disable ArgCong as a simplification rule"; 
       "--ho-unif", Arg.Bool (fun v -> enable_unif_ := v), " enable full HO unification";
       "--ho-elim-pred-var", Arg.Bool (fun b -> _elim_pred_var := b), " disable predicate variable elimination";
       "--ho-prim-enum", set_prim_mode_, " set HO primitive enum mode";
       "--ho-prim-max", Arg.Set_int prim_max_penalty, " max penalty for HO primitive enum";
-      "--ho-prim-enum-simpl", Arg.Bool ((:=) _prim_enum_simpl), " use primitive enumeration as simplification rule";
+      "--ho-prim-enum-add-var", Arg.Bool ((:=) _prim_enum_add_var), " turn an instantiation %x. t into %x. (F x | t)";
       "--ho-prim-enum-early-bird", Arg.Bool ((:=) _prim_enum_early_bird), " use early-bird primitive enumeration (requires lazy CNF)";
       "--ho-resolve-flex-flex", Arg.Bool ((:=) _resolve_flex_flex), " eagerly remove non-essential flex-flex constraints";
-      "--ho-oracle-composer", Arg.Symbol (["merge";"fair"], (fun s -> 
-          if s = "merge" then _oracle_composer := (OSeq.merge :> (Logtk.Subst.t option OSeq.t OSeq.t -> Logtk.Subst.t option OSeq.t))
-          else _oracle_composer := UnifFramework.take_fair)), " choose either OSeq.merge or Unif.take_fair as the composer";
       "--ho-ext-axiom", Arg.Bool (fun v -> _ext_axiom := v), " enable/disable extensionality axiom";
       "--ho-choice-axiom", Arg.Bool (fun v -> _choice_axiom := v), " enable choice axiom";
+      "--ho-choice-axiom-penalty", Arg.Int (fun v -> _choice_axiom_penalty := v), " choice axiom penalty";
       "--ho-ext-pos", Arg.Bool (fun v -> _ext_pos := v), " enable/disable positive extensionality rule";
       "--ho-neg-ext", Arg.Bool (fun v -> _neg_ext := v), " turn NegExt on or off";
       "--ho-neg-ext-simpl", Arg.Bool (fun v -> _neg_ext_as_simpl := v), " turn NegExt as simplification rule on or off";
@@ -1770,6 +2579,17 @@ let () =
           | Some x -> _elim_leibniz_eq := x
          ), " enable/disable treatment of Leibniz equality. inf enables it for infinte depth of clauses"
             ^ "; off disables it; number enables it for a given depth of clause";
+      "--ho-elim-andrews", Arg.String (fun v -> 
+        match v with 
+        | "inf" ->  _elim_andrews_eq := max_int
+        | "off" -> _elim_andrews_eq := -1
+        | _ ->
+          match CCInt.of_string v with
+          | None -> invalid_arg "number expected for --ho-elim-leibniz"
+          | Some x -> _elim_andrews_eq := x
+         ), " enable/disable treatment of Andrews equality. inf enables it for infinte depth of clauses"
+            ^ "; off disables it; number enables it for a given depth of clause";
+      "--ho-elim-andrews-simpl", Arg.Bool ((:=) _elim_andrews_eq_simpl), " use Andrews equality replacement as simplification ";
       "--ho-def-unfold", Arg.Bool (fun v -> def_unfold_enabled_ := v), " enable ho definition unfolding";
       "--ho-choice-inst", Arg.Bool (fun v -> _instantiate_choice_ax := v), " enable heuristic Hilbert choice instantiation";
       "--ho-simple-projection", Arg.Int (fun v -> _simple_projection := v), 
@@ -1789,18 +2609,36 @@ let () =
           | "fresh" -> _ground_app_vars := `Fresh
           | "all" -> _ground_app_vars := `All
           | _ -> assert false)), " ground all applied variables to either all constants of the right type in signature or a fresh constant";
-      "--ho-use-diff-for-neg-ext", Arg.Bool ((:=) _use_diff_for_neg_ext), " use diff constant for NegExt rule instead of fresh skolem";
       "--ho-generalize-choice-trigger", Arg.Bool ((:=) _generalize_choice_trigger), " apply choice trigger to a fresh variable";
       "--check-lambda-free", Arg.Symbol (["true";"false";"only"], fun s -> match s with 
         | "true" -> _check_lambda_free := `True
         | "only" -> _check_lambda_free := `Only
         | _ -> _check_lambda_free := `False), "check whether problem belongs to lambda-free ('only' will abort after the check)";
+      "--ext-rules-max-depth", Arg.Set_int ext_rules_max_depth, 
+        " Sets the maximal proof depth of the clause eligible for Ext-* or ExtInst inferences";
+      "--ext-rules", Arg.Symbol (["off"; "ext-inst"; "ext-family"; "both"], (
+        function 
+        | "off" -> ext_rules_kind := `Off; ext_rules_max_depth:=-1;
+        | "ext-inst" -> ext_rules_kind := `ExtInst;
+        | "ext-family" -> ext_rules_kind := `ExtFamily;
+        | "both" -> ext_rules_kind := `Both
+        |  _ -> assert false)),
+        " Chooses the kind of extensionality rules to use";
+      "--ite-axioms", Arg.Bool ((:=) _ite_axioms), " include if-then-else definition axioms";
+      "--ext-decompose-lits", Arg.Symbol (["all";"max"], (fun str -> 
+          _ext_dec_lits := if String.equal str "all" then `All else `OnlyMax))
+      , " Sets the maximal number of literals clause can have for ExtDec inference.";
+      "--ext-decompose-ho-disagreements", Arg.Symbol (["all-ho";"some-ho"], (fun str -> 
+          _ho_disagremeents := if String.equal str "all-ho" then `AllHo else `SomeHo))
+      , " Perform Ext-Sup, Ext-EqFact, or Ext-EqRes rules only when all disagreements are HO" ^
+        " or when there exists a HO disagremeent";
     ];
   Params.add_to_mode "ho-complete-basic" (fun () ->
       enabled_ := true;
       def_unfold_enabled_ := false;
       force_enabled_ := true;
       _ext_axiom := true;
+      _choice_axiom := true;
       _ext_neg_lit := false;
       _neg_ext := true;
       _neg_ext_as_simpl := false;
@@ -1862,6 +2700,7 @@ let () =
   Params.add_to_mode "fo-complete-basic" (fun () ->
       enabled_ := false;
       _resolve_flex_flex := false;
+      _arg_cong := false;
       Unif._allow_pattern_unif := false;
       Unif._unif_bool := false;
     );

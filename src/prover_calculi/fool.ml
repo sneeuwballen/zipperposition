@@ -98,12 +98,15 @@ module Make(E : Env.S) : S with module Env = E = struct
     C.lits c
     |> Iter.of_array_i
     |> Iter.filter_map
-      (fun (idx,lit) -> match lit with
-         | Literal.Equation (lhs, rhs, sign) when T.equal rhs T.true_->
+      (fun (idx,lit) -> 
+        assert(Literal.no_prop_invariant lit);
+        match lit with
+         (* NOTE: -- Relies on the representation of literals  -- *)
+         | Literal.Equation (lhs, rhs, true) when T.is_true_or_false rhs ->
            begin match T.as_var lhs with
              | Some v -> 
                (* found var, replace it with [not sign] *)
-               let t = if sign then T.false_ else T.true_ in
+               let t = if T.equal rhs T.true_ then T.false_ else T.true_ in
                let subst =
                  Subst.FO.of_list' [(v,0), (t,0)]
                in
@@ -124,7 +127,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                Util.incr_stat stat_elim_var;
                Util.debugf ~section 3
                  "(@[elim_pred_var@ :var %a :into %B@ :clause %a@ :yield %a@])"
-                 (fun k->k T.pp_var v (not sign) C.pp c C.pp new_c);
+                 (fun k->k T.pp_var v (T.equal rhs T.true_) C.pp c C.pp new_c);
                Some new_c
              | _ -> None
            end
@@ -159,8 +162,9 @@ module Make(E : Env.S) : S with module Env = E = struct
            let c_pos = Literal.mk_true a :: Literal.mk_true b :: lits |> mk_c in
            let c_neg = Literal.mk_false a :: Literal.mk_false b :: lits |> mk_c in
            Some [c_pos; c_neg]
-         | Literal.Equation (lhs, rhs, true) 
-           when  (T.equal rhs T.true_) || (T.equal rhs T.false_) ->
+         | Literal.Equation (lhs, rhs, true)
+           when (T.equal rhs T.true_) || (T.equal rhs T.false_) ->
+           (* NOTE: based on literal representation *)
            (* see if there is some CNF to do here *)
            let sign = T.equal rhs T.true_ in
            begin match T.view lhs, sign with

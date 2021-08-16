@@ -38,6 +38,7 @@ and view =
   | Ite of t * t * t
   | Match of t * match_branch list
   | Let of (var * t) list * t
+  | With of (var * t) list * t
   | Bind of Binder.t * typed_var list * t (** bind n variables *)
   | List of t list (** special constructor for lists *)
   | Record of (string * t) list * var option (** extensible record *)
@@ -67,6 +68,7 @@ val bind : ?loc:location -> Binder.t -> typed_var list -> t -> t
 val ite : ?loc:location -> t -> t -> t -> t
 val match_ : ?loc:location -> t -> match_branch list -> t
 val let_ : ?loc:location -> (var * t) list -> t -> t
+val with_ : ?loc:location -> (var * t) list -> t -> t
 val list_ : ?loc:location -> t list -> t
 val nil : t
 val record : ?loc:location -> (string*t) list -> rest:var option -> t
@@ -76,6 +78,7 @@ val wildcard : t
 
 val is_app : t -> bool
 val is_var : t -> bool
+val is_lam : t -> bool
 
 val true_ : t
 val false_ : t

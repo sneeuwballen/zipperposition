@@ -27,6 +27,9 @@ val dummy : t
 
 val pp_payload : payload CCFormat.printer
 
+val make_fresh : unit -> t
+(** Create a fresh new boolean variable as a positive literal. *)
+
 val find_boolean_lit : Literals.t -> t option
 (** Find a boolean literal that abstracts given clause component and 
     the new sign of the abstracted literal. If no boolean literal exists,
@@ -37,6 +40,12 @@ val inject_lits : Literals.t -> t
     to the same literal unless it is alpha-equivalent to this one.
     The boolean literal can be negative is the argument is a
     unary negative clause *)
+
+val inject_lit : Literal.t -> t option
+(** Convert a single literal into a boolean literal. Syntactically
+    the same literal will be given exactly the same boolean literal.
+    Negation of this literal will get negation of the boolean literal.
+    Supports equality. Returns None for unsupported literals *)
 
 val inject_lemma : Cut_form.t -> t
 (** Make a new literal from this formula that we are going to cut

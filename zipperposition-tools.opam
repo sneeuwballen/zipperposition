@@ -14,7 +14,6 @@ depends: [
   "iter" { >= "1.2" }
   "oseq" { >= "0.2" }
   "msat" { >= "0.8" < "0.10" }
-  "zarith"
   "logtk" { = version }
   "libzipperposition" { = version }
   "ocaml" {>= "4.07"}

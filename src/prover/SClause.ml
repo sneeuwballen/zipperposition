@@ -3,6 +3,15 @@
 
 open Logtk
 
+module TPAsKey = struct
+  type t = (Term.t * Position.t)
+  let equal = (fun (_,p1) (_,p2) -> Position.equal p1 p2)
+  let hash = (fun (_,p1) -> Position.hash p1)
+  let compare = (fun (_,p1) (_,p2) -> Position.compare p1 p2)
+end
+module TPSet = CCSet.Make(TPAsKey)
+
+
 type flag = int
 
 type t = {
@@ -55,7 +64,7 @@ let flag_persistent = new_flag ()
 let flag_redundant = new_flag ()
 let flag_backward_simplified = new_flag()
 let flag_poly_arg_cong_res = new_flag()
-
+let flag_initial = new_flag ()
 
 let set_flag flag c truth =
   if truth

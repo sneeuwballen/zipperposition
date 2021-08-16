@@ -231,7 +231,7 @@ let iterate ?(flex_same=false) ~scope ~counter u v l =
                    | _ -> OSeq.return None)
            )
          (* Append some "None"s to delay the substitutions containing long w tuples *)
-         |> (fun seq -> OSeq.append seq (OSeq.take 50 (OSeq.repeat None)))
+         |> (fun seq -> OSeq.append (OSeq.take 50 (OSeq.repeat None)) seq)
       )
 
 (* TODO: use OSeq directly? *)

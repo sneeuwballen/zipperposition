@@ -170,6 +170,12 @@ module type S = sig
       is positive, no literal is selecteed, and the literal
       is maximal among literals of [subst(clause)]. *)
 
+  val eligible_subterms_of_bool : t -> SClause.TPSet.t
+  (** 
+    Set that contains positions of selected Booleans and their
+    eligible green subterms.
+  *)
+
   val is_eligible_param : t Scoped.t -> Subst.t -> idx:int -> bool
   (** Check whether the [idx]-th literal is eligible for paramodulation *)
 
@@ -181,6 +187,12 @@ module type S = sig
 
   val selected_lits : t -> (Literal.t * int) list
   (** get the list of selected literals *)
+
+  val selected_lits_bv : t -> CCBV.t
+  (** get the bv of selected literals *)
+
+  val bool_selected : t -> (Term.t * Logtk.Position.t) list
+  (** get the list of selected Bool subterms *)
 
   val penalty : t -> int
 
