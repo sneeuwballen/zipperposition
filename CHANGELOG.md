@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.1
+
+- add `logtk.arith` sub-library, using either zarith or num
+- implemented QLE pure_only mode to get PLE
+- implemented inprocessing for QLE
+- proper implementation of quantifier preprocessing
+- pure literal elimination
+- support for polymorphic bool hoist
+- support for nested booleans renaming
+
+- profiling that emits catapult traces (if env contains `TEF=1`)
+
+## 2.0
+
+- JP HO unification
+- higher-order calculus (see Matryoshka)
+- require at least OCaml 4.07 (for `seq` functions)
+- remove all arithmetic handling from [Cru 2015]
+- in type inference, enforce that type declarations are prenex polymorphic
+
 ## 1.5.1
 
 - compatibility with ocaml 4.08
