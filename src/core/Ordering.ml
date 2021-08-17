@@ -13,6 +13,7 @@ let prof_kbo = ZProf.make "compare_kbo"
 let prof_epo = ZProf.make "compare_epo"
 let prof_lambdafree_kbo_coeff = ZProf.make "compare_lambdafree_kbo_coeff"
 let prof_lambda_kbo = ZProf.make "compare_lambda_kbo"
+let prof_lambda_lpo = ZProf.make "compare_lambda_lpo"
 
 module T = Term
 module TC = Term.Classic
@@ -1257,6 +1258,14 @@ module LambdaKBO : ORD = struct
   let might_flip _ t s = not (cannot_flip t s)
 end
 
+module LambdaLPO : ORD = struct
+  let name = "lambda_lpo"
+
+  let compare_terms ~prec t s = C.Incomparable (*###*)
+
+  let might_flip _ t s = false (*###*)
+end
+
 (** {2 Value interface} *)
 
 let dummy_cache_ = CCCache.dummy
@@ -1391,6 +1400,24 @@ let lambda_kbo prec =
   map2 normalize_cmp normalize_flip
     { cache_compare; compare; name=LambdaKBO.name; prec; might_flip; cache_might_flip; monotonic }
 
+let lambda_lpo prec =
+  let cache_compare = mk_cache 256 in
+  let compare prec a b = CCCache.with_cache cache_compare
+      (fun (a, b) -> LambdaLPO.compare_terms ~prec a b) (a, b)
+  in
+  let cache_might_flip = mk_cache 256 in
+  let might_flip prec a b = CCCache.with_cache cache_might_flip
+      (fun (a, b) -> LambdaLPO.might_flip prec a b) (a, b) in
+  let normalize_cmp t =
+    if Term.is_fo_term t then t else Lambda.eta_expand (Lambda.snf t)
+  in
+  let normalize_flip t =
+    if Term.is_fo_term t then t else Lambda.snf t
+  in
+  let monotonic = false in
+  map2 normalize_cmp normalize_flip
+    { cache_compare; compare; name=LambdaLPO.name; prec; might_flip; cache_might_flip; monotonic }
+
 let none =
   let compare _ t1 t2 = if T.equal t1 t2 then C.Eq else Incomparable in
   let might_flip _ _ _ = false in
@@ -1420,6 +1447,7 @@ let tbl_ =
   Hashtbl.add h "epo" epo;
   Hashtbl.add h "lambdafree_kbo_coeff" lambdafree_kbo_coeff;
   Hashtbl.add h "lambda_kbo" lambda_kbo;
+  Hashtbl.add h "lambda_lpo" lambda_lpo;
   Hashtbl.add h "none" (fun _ -> none);
   Hashtbl.add h "subterm" (fun _ -> subterm);
   h
