@@ -1284,7 +1284,8 @@ module LambdaLPO : ORD = struct
         && not (check_subs ~prec [s] t)
         && not (check_subs ~prec [t] s))
   and check_subs ~prec ts s =
-    List.exists (fun t -> C.is_Gt_or_Geq_or_Eq (do_compare_terms ~prec t s)) ts
+    List.exists (fun ti -> C.is_Gt_or_Geq_or_Eq (do_compare_terms ~prec ti s))
+      ts
   and compare_subs_both_ways ~prec t ts s ss =
     if check_subs ~prec ts s then C.Gt
     else if check_subs ~prec ss t then C.Lt
@@ -1373,7 +1374,7 @@ module LambdaLPO : ORD = struct
          | n when n > 0 -> compare_rest ~prec t s_args
          | _ -> C.opp (compare_rest ~prec s t_args))
     | AppBuiltin (t_b, t_bargs), Var _ ->
-      if Builtin.as_int t_b = 0 then C.Geq
+      if Builtin.as_int t_b = 0 then C.Leq
       else if check_subs ~prec (List.rev_append t_bargs t_args) s then C.Gt
       else C.Incomparable
     | AppBuiltin (_, t_bargs), (Fun _|DB _|Const _) ->
