@@ -73,6 +73,9 @@ let ty1comb_to_var t balance =
         fresh_var
   ) else t
 
+let is_problematic_type ty =
+  Type.is_var ty || Type.is_fun ty
+
 let partition_leading p =
   let rec part acc xs =
     match xs with
@@ -967,6 +970,50 @@ module Polynomial = struct
     CCFormat.printf " [%d %d]" poly.pos_counter poly.neg_counter
 end
 
+let length_lex_ext f ys xs =
+  let rec lex ys xs = match ys, xs with
+    | [], [] -> C.Eq
+    | y :: ys, x :: xs ->
+      (match f y x with
+      | C.Geq -> C.merge_with_Geq (lex ys xs)
+      | Eq -> lex ys xs
+      | Leq -> C.merge_with_Leq (lex ys xs)
+      | cmp -> cmp)
+    | _, _ -> assert false
+  in
+  match CCInt.compare (List.length ys) (List.length xs) with
+  | 0 -> lex ys xs
+  | n -> if n > 0 then C.Gt else Lt
+
+let length_lex_ext_data f ys xs =
+  let rec lex ys xs = match ys, xs with
+    | [], [] -> ([], C.Eq)
+    | y :: ys, x :: xs ->
+      (match f y x with
+      | (w, C.Geq) ->
+        let (ws, cmp) = lex ys xs in
+        (w :: ws, C.merge_with_Geq cmp)
+      | (w, Eq) ->
+        let (ws, cmp) = lex ys xs in
+        (w :: ws, cmp)
+      | (w, Leq) ->
+        let (ws, cmp) = lex ys xs in
+        (w :: ws, C.merge_with_Leq cmp)
+      | (w, cmp) -> ([w], cmp))
+    | _, _ -> assert false
+  in
+  match CCInt.compare (List.length ys) (List.length xs) with
+  | 0 -> lex ys xs
+  | n -> ([], if n > 0 then C.Gt else Lt)
+
+let cw_ext f =
+  length_lex_ext (fun y x -> C.smooth (f y x))
+
+let cw_ext_data f =
+  length_lex_ext_data (fun y x ->
+    let (w, cmp) = f y x in
+    (w, C.smooth cmp))
+
 module LambdaKBO : ORD = struct
   let name = "lambda_kbo"
 
@@ -1026,10 +1073,8 @@ module LambdaKBO : ORD = struct
     | _ -> t
 
   let categorize_var_arg var arg arg_ty (some_args, extra_args) =
-    if Type.is_var arg_ty || Type.is_fun arg_ty then
-      (arg :: some_args, extra_args)
-    else
-      (some_args, arg :: extra_args)
+    if is_problematic_type arg_ty then (arg :: some_args, extra_args)
+    else (some_args, arg :: extra_args)
 
   let rec add_weight_of ~prec w sign t =
     let add_eta_extra_of w ty = match Type.view ty with
@@ -1089,47 +1134,6 @@ module LambdaKBO : ORD = struct
       add_weight_of ~prec w sign body
     | App _ -> ()  (* impossible *)
 
-  let length_lex_ext f ys xs =
-    let rec lex ys xs = match ys, xs with
-      | [], [] -> C.Eq
-      | y :: ys, x :: xs ->
-        (match f y x with
-        | C.Geq -> C.merge_with_Geq (lex ys xs)
-        | Eq -> lex ys xs
-        | Leq -> C.merge_with_Leq (lex ys xs)
-        | cmp -> cmp)
-      | _, _ -> assert false
-    in
-    match CCInt.compare (List.length ys) (List.length xs) with
-    | 0 -> lex ys xs
-    | n -> if n > 0 then C.Gt else Lt
-
-  let length_lex_ext_data f ys xs =
-    let rec lex ys xs = match ys, xs with
-      | [], [] -> ([], C.Eq)
-      | y :: ys, x :: xs ->
-        (match f y x with
-        | (w, C.Geq) ->
-          let (ws, cmp) = lex ys xs in
-          (w :: ws, C.merge_with_Geq cmp)
-        | (w, Eq) ->
-          let (ws, cmp) = lex ys xs in
-          (w :: ws, cmp)
-        | (w, Leq) ->
-          let (ws, cmp) = lex ys xs in
-          (w :: ws, C.merge_with_Leq cmp)
-        | (w, cmp) -> ([w], cmp))
-      | _, _ -> assert false
-    in
-    match CCInt.compare (List.length ys) (List.length xs) with
-    | 0 -> lex ys xs
-    | n -> ([], if n > 0 then C.Gt else Lt)
-
-  let cw_ext_data f =
-    length_lex_ext_data (fun y x ->
-      let (w, cmp) = f y x in
-      (w, C.smooth cmp))
-
   let analyze_weight_diff w =
     match Polynomial.all_coeffs_nonnegative w,
       Polynomial.all_coeffs_nonpositive w with
@@ -1184,10 +1188,7 @@ module LambdaKBO : ORD = struct
         in
         if CCList.equal T.equal some_normal_t_args some_normal_s_args
            && CCList.for_all2 cannot_flip some_t_args some_s_args then
-          let (arg_ws, cmp) =
-            cw_ext_data (process_terms ~prec)
-              (some_t_args @ extra_t_args) (some_s_args @ extra_s_args)
-          in
+          let (arg_ws, cmp) = cw_ext_data (process_terms ~prec) t_args s_args in
           let extra_arg_ws = CCList.drop (List.length some_t_args) arg_ws in
           let add_weight_of_extra_arg i arg_w =
             Polynomial.multiply_unknowns arg_w
@@ -1261,9 +1262,132 @@ end
 module LambdaLPO : ORD = struct
   let name = "lambda_lpo"
 
-  let compare_terms ~prec t s = C.Incomparable (*###*)
+  module Type_RPO = MakeRPO(struct
+      let name = "type_rpo"
+      let lambda_mode = false
+      let ignore_deep_quants = true
+    end)
 
-  let might_flip _ t s = false (*###*)
+  let compare_type_terms ~prec =
+    Type_RPO.compare_terms ~prec
+
+  let compare_types ~prec t_ty s_ty =
+    compare_type_terms ~prec (Term.of_ty t_ty) (Term.of_ty s_ty)
+
+  let cannot_flip t s =
+    T.equal t s
+    || not (is_problematic_type (Term.ty t) && is_problematic_type (Term.ty s))
+
+  let rec check_subs ~prec ts s =
+    List.exists (fun t -> C.is_Gt_or_Geq_or_Eq (compare_terms ~prec t s)) ts
+  and check_subs_both_ways ~prec t ts s ss =
+    if check_subs ~prec ts s then C.Gt
+    else if check_subs ~prec ss t then C.Lt
+    else C.Incomparable
+  and compare_rest ~prec t ss =
+    match ss with
+    | [] -> C.Gt
+    | s :: ss' ->
+      (match compare_terms ~prec t s with
+       | C.Gt -> compare_rest ~prec t ss'
+       | C.Eq | C.Leq | C.Lt -> C.Lt
+       | C.Geq | C.Incomparable ->
+         if check_subs ~prec ss' t then C.Lt else C.Incomparable)
+  and compare_regular_args ~prec t ts s ss =
+    match ts, ss with
+    | [], [] -> C.Eq
+    | t :: ts', s :: ss' ->
+      (match compare_terms ~prec t s with
+       | C.Gt -> compare_rest ~prec t ss'
+       | C.Geq -> C.merge_with_Geq (compare_regular_args ~prec t ts' s ss')
+       | C.Eq -> compare_regular_args ~prec t ts' s ss'
+       | C.Leq -> C.merge_with_Leq (compare_regular_args ~prec t ts' s ss')
+       | C.Lt -> C.opp (compare_rest ~prec s ts')
+       | C.Incomparable -> check_subs_both_ways ~prec t ts' s ss')
+    | _, _ -> assert false
+  and compare_args ~prec t vs ts s us ss =
+    match vs, us with
+    | [], [] -> compare_regular_args ~prec t ts s ss
+    | v :: vs', u :: us' ->
+      (match compare_terms ~prec v u with
+       | C.Gt -> compare_rest ~prec t ss
+       | C.Geq -> C.merge_with_Geq (compare_args ~prec t vs' ts s us' ss)
+       | C.Eq -> compare_args ~prec t vs' ts s us' ss
+       | C.Leq -> C.merge_with_Leq (compare_args ~prec t vs' ts s us' ss)
+       | C.Lt -> C.opp (compare_rest ~prec s ts)
+       | C.Incomparable -> check_subs_both_ways ~prec t ts s ss)
+    | _, _ -> assert false
+  and compare_terms ~prec t s =
+    let (t_hd, (t_tyargs, t_args)) = break_term_up t in
+    let (s_hd, (s_tyargs, s_args)) = break_term_up s in
+    match T.view t_hd, T.view s_hd with
+    | Var y, Var x ->
+      if HVar.id y = HVar.id x && List.for_all2 cannot_flip t_args s_args then
+        cw_ext (compare_terms ~prec) t_args s_args
+      else
+        C.Incomparable
+    | Var _, Fun (_, s_body) ->
+      if check_subs ~prec [s_body] t then C.Lt else C.Incomparable
+    | Var _, (DB _|Const _) ->
+      if check_subs ~prec s_args t then C.Lt else C.Incomparable
+    | Var _, AppBuiltin (s_b, s_bargs) ->
+      if Builtin.as_int s_b = 0 then C.Geq
+      else if check_subs ~prec (List.rev_append s_bargs s_args) t then C.Lt
+      else C.Incomparable
+    | Fun (_, t_body), Var _ ->
+      if check_subs ~prec [t_body] s then C.Gt else C.Incomparable
+    | Fun (t_ty, t_body), Fun (s_ty, s_body) ->
+      (match compare_types ~prec t_ty s_ty with
+       | Gt -> compare_rest ~prec t [s_body]
+       | Eq -> compare_terms ~prec t_body s_body
+       | Lt -> C.opp (compare_rest ~prec s [t_body])
+       | _ -> check_subs_both_ways ~prec t [t_body] s [s_body])
+    | Fun _, (DB _|Const _) -> compare_rest ~prec t s_args
+    | (Fun _|DB _|Const _), AppBuiltin (_, s_bargs) ->
+      compare_rest ~prec t (List.rev_append s_bargs s_args)
+    | (DB _|Const _), Var _ ->
+      if check_subs ~prec t_args s then C.Gt else C.Incomparable
+    | (DB _|Const _), Fun _ -> C.opp (compare_rest ~prec s t_args)
+    | DB n, DB m ->
+      if n > m then compare_rest ~prec t s_args
+      else if n = m then compare_regular_args ~prec t t_args s s_args
+      else C.opp (compare_rest ~prec s t_args)
+    | DB _, Const _ -> compare_rest ~prec t s_args
+    | Const _, DB _ -> C.opp (compare_rest ~prec s t_args)
+    | Const gid, Const fid ->
+      if ID.id gid = ID.id fid then
+        (match length_lex_ext (compare_type_terms ~prec) t_tyargs s_tyargs with
+         | Gt -> compare_rest ~prec t s_args
+         | Eq -> compare_args ~prec t [] t_args s [] s_args
+         | Lt -> C.opp (compare_rest ~prec s t_args)
+         | _ -> check_subs_both_ways ~prec t t_args s s_args)
+      else
+        (match Prec.compare prec gid fid with
+         | 0 -> check_subs_both_ways ~prec t t_args s s_args
+         | n when n > 0 -> compare_rest ~prec t s_args
+         | _ -> C.opp (compare_rest ~prec s t_args))
+    | AppBuiltin (t_b, t_bargs), Var _ ->
+      if Builtin.as_int t_b = 0 then C.Geq
+      else if check_subs ~prec (List.rev_append t_bargs t_args) s then C.Gt
+      else C.Incomparable
+    | AppBuiltin (_, t_bargs), (Fun _|DB _|Const _) ->
+      C.opp (compare_rest ~prec s (List.rev_append t_bargs t_args))
+    | AppBuiltin (t_b, t_bargs), AppBuiltin (s_b, s_bargs) ->
+      let all_t_args = t_bargs @ t_tyargs @ t_args
+      and all_s_args = s_bargs @ s_tyargs @ s_args in
+      (match Int.compare (Builtin.as_int t_b) (Builtin.as_int s_b) with
+       | 0 ->
+        (match Int.compare (List.length all_t_args) (List.length all_s_args)
+         with
+         | 0 -> compare_args ~prec t [] all_t_args s [] all_s_args
+         | n when n > 0 -> compare_rest ~prec t all_s_args
+         | _ -> C.opp (compare_rest ~prec s all_t_args))
+       | n when n > 0 -> compare_rest ~prec t all_s_args
+       | _ -> C.opp (compare_rest ~prec s all_t_args))
+    | App _, _ | _, App _ -> assert false
+
+  let might_flip _ t s =
+    not (cannot_flip t s)
 end
 
 (** {2 Value interface} *)
