@@ -472,10 +472,10 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
     res
 
   let cannot_flip s t =
+    assert (Type.equal (Term.ty s) (Term.ty t));
     T.equal s t
     || (is_eta_reduced_term_stable_wrt_flip s
-        && is_eta_reduced_term_stable_wrt_flip t
-        && Type.equal (Term.ty s) (Term.ty t))
+        && is_eta_reduced_term_stable_wrt_flip t)
 
   let might_flip _ s t =
     not (cannot_flip s t)
@@ -578,19 +578,20 @@ module MakeRPO (P : PARAMETERS) : ORD = struct
     compare
 
   (* The ordering might flip if one side is a lambda-expression or
-     variable-headed or if the order is established using the subterm rule *)
-  let cannot_flip prec s t =
+     variable-headed or if the orientation is established using the subterm
+     rule. *)
+  let cannot_flip ~prec s t =
+    assert (Type.equal (Term.ty s) (Term.ty t));
     T.equal s t
     || (is_eta_reduced_term_stable_wrt_flip s
         && is_eta_reduced_term_stable_wrt_flip t
-        && Type.equal (Term.ty s) (Term.ty t)
-        && not (let c = rpo6 ~prec t s in
+        && not (let c = rpo6 ~prec s t in
           c = Incomparable
-          || c = Gt && alpha ~prec (Head.term_to_args t) s = Gt
-          || c = Lt && alpha ~prec (Head.term_to_args s) t = Gt))
+          || c = Gt && alpha ~prec (Head.term_to_args s) t = Gt
+          || c = Lt && alpha ~prec (Head.term_to_args t) s = Gt))
 
   let might_flip prec s t =
-    not (cannot_flip prec s t)
+    not (cannot_flip ~prec s t)
 end
 
 module EPO : ORD = struct
@@ -1054,10 +1055,8 @@ module LambdaKBO : ORD = struct
 
   (* The ordering might flip if one eta-reduced side is a lambda-expression. *)
   let cannot_flip t s =
-    T.equal t s
-    || (is_term_stable_wrt_flip t
-        && is_term_stable_wrt_flip s
-        && Type.equal (Term.ty t) (Term.ty s))
+    assert (Type.equal (Term.ty t) (Term.ty s));
+    T.equal t s || (is_term_stable_wrt_flip t && is_term_stable_wrt_flip s)
 
   let rec normalize_consts ~prec t =
     match T.view t with
@@ -1254,7 +1253,8 @@ module LambdaKBO : ORD = struct
     ZProf.exit_prof prof_lambda_kbo;
     cmp
 
-  let might_flip _ t s = not (cannot_flip t s)
+  let might_flip _ t s =
+    not (cannot_flip t s)
 end
 
 module LambdaLPO : ORD = struct
@@ -1272,11 +1272,21 @@ module LambdaLPO : ORD = struct
   let compare_types ~prec t_ty s_ty =
     compare_type_terms ~prec (Term.of_ty t_ty) (Term.of_ty s_ty)
 
-  let cannot_flip t s =
-    T.equal t s
-    || not (is_problematic_type (Term.ty t) && is_problematic_type (Term.ty s))
-
-  let rec check_subs ~prec ts s =
+  (* The ordering might flip if one side is a lambda-expression or
+     variable-headed or if the orientation is established using the subterm
+     rule. *)
+  let rec cannot_flip ~prec s t =
+    assert (Type.equal (Term.ty t) (Term.ty s));
+    not (is_problematic_type (Term.ty t))
+    || T.equal s t
+    || (is_eta_reduced_term_stable_wrt_flip s
+        && is_eta_reduced_term_stable_wrt_flip t
+        && (match do_compare_terms ~prec t s with
+            | C.Incomparable -> false
+            | Gt -> not (check_subs ~prec [t] s)
+            | Geq | Eq | Leq -> true
+            | Lt -> not (check_subs ~prec [s] t)))
+  and check_subs ~prec ts s =
     List.exists (fun t -> C.is_Gt_or_Geq_or_Eq (do_compare_terms ~prec t s)) ts
   and check_subs_both_ways ~prec t ts s ss =
     if check_subs ~prec ts s then C.Gt
@@ -1320,7 +1330,8 @@ module LambdaLPO : ORD = struct
     let (s_hd, (s_tyargs, s_args)) = break_term_up s in
     match T.view t_hd, T.view s_hd with
     | Var y, Var x ->
-      if HVar.id y = HVar.id x && List.for_all2 cannot_flip t_args s_args then
+      if HVar.id y = HVar.id x
+         && List.for_all2 (cannot_flip ~prec) t_args s_args then
         cw_ext (do_compare_terms ~prec) t_args s_args
       else
         C.Incomparable
@@ -1390,8 +1401,8 @@ module LambdaLPO : ORD = struct
     ZProf.exit_prof prof_lambda_lpo;
     cmp
 
-  let might_flip _ t s =
-    not (cannot_flip t s)
+  let might_flip prec t s =
+    not (cannot_flip ~prec t s)
 end
 
 (** {2 Value interface} *)
