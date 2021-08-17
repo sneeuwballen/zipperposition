@@ -467,10 +467,14 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
     ZProf.exit_prof prof_kbo;
     res
 
+  let cannot_flip s t =
+    T.equal s t
+    || (is_eta_reduced_term_stable_wrt_flip s
+        && is_eta_reduced_term_stable_wrt_flip t
+        && Type.equal (Term.ty s) (Term.ty t))
+
   let might_flip _ s t =
-    not (T.equal t s)
-    && (not (is_eta_reduced_term_stable_wrt_flip t)
-        || not (is_eta_reduced_term_stable_wrt_flip s))
+    not (cannot_flip s t)
 end
 
 (** Hopefully more efficient (polynomial) implementation of LPO,
@@ -571,14 +575,18 @@ module MakeRPO (P : PARAMETERS) : ORD = struct
 
   (* The ordering might flip if one side is a lambda-expression or
      variable-headed or if the order is established using the subterm rule *)
-  let might_flip prec t s =
-    not (T.equal t s)
-    && (not (is_eta_reduced_term_stable_wrt_flip t)
-        || not (is_eta_reduced_term_stable_wrt_flip s))
-        || let c = rpo6 ~prec t s in
-           c = Incomparable
-           || c = Gt && alpha ~prec (Head.term_to_args t) s = Gt
-           || c = Lt && alpha ~prec (Head.term_to_args s) t = Gt
+  let cannot_flip prec s t =
+    T.equal s t
+    || (is_eta_reduced_term_stable_wrt_flip s
+        && is_eta_reduced_term_stable_wrt_flip t
+        && Type.equal (Term.ty s) (Term.ty t)
+        && not (let c = rpo6 ~prec t s in
+          c = Incomparable
+          || c = Gt && alpha ~prec (Head.term_to_args t) s = Gt
+          || c = Lt && alpha ~prec (Head.term_to_args s) t = Gt))
+
+  let might_flip prec s t =
+    not (cannot_flip prec s t)
 end
 
 module EPO : ORD = struct
@@ -807,7 +815,7 @@ module LambdaFreeKBOCoeff : ORD = struct
 
   let might_flip prec t s =
     (* Terms can flip if they have different argument coefficients for remaining arguments. *)
-    assert (Term.ty t = Term.ty s);
+    assert (Type.equal (Term.ty t) (Term.ty s));
     let term_arity =
       match Type.arity (Term.ty t) with
         | Type.NoArity ->
@@ -998,7 +1006,10 @@ module LambdaKBO : ORD = struct
 
   (* The ordering might flip if one eta-reduced side is a lambda-expression. *)
   let cannot_flip t s =
-    T.equal t s || (is_term_stable_wrt_flip t && is_term_stable_wrt_flip s)
+    T.equal t s
+    || (is_term_stable_wrt_flip t
+        && is_term_stable_wrt_flip s
+        && Type.equal (Term.ty t) (Term.ty s))
 
   let rec normalize_consts ~prec t =
     match T.view t with
