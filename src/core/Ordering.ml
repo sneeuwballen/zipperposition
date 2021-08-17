@@ -1275,20 +1275,17 @@ module LambdaLPO : ORD = struct
   (* The ordering might flip if one side is a lambda-expression or
      variable-headed or if the orientation is established using the subterm
      rule. *)
-  let rec cannot_flip ~prec s t =
+  let rec cannot_flip ~prec t s =
     assert (Type.equal (Term.ty t) (Term.ty s));
     not (is_problematic_type (Term.ty t))
-    || T.equal s t
-    || (is_eta_reduced_term_stable_wrt_flip s
-        && is_eta_reduced_term_stable_wrt_flip t
-        && (match do_compare_terms ~prec t s with
-            | C.Incomparable -> false
-            | Gt -> not (check_subs ~prec [t] s)
-            | Geq | Eq | Leq -> true
-            | Lt -> not (check_subs ~prec [s] t)))
+    || T.equal t s
+    || (is_eta_reduced_term_stable_wrt_flip t
+        && is_eta_reduced_term_stable_wrt_flip s
+        && not (check_subs ~prec [s] t)
+        && not (check_subs ~prec [t] s))
   and check_subs ~prec ts s =
     List.exists (fun t -> C.is_Gt_or_Geq_or_Eq (do_compare_terms ~prec t s)) ts
-  and check_subs_both_ways ~prec t ts s ss =
+  and compare_subs_both_ways ~prec t ts s ss =
     if check_subs ~prec ts s then C.Gt
     else if check_subs ~prec ss t then C.Lt
     else C.Incomparable
@@ -1311,7 +1308,7 @@ module LambdaLPO : ORD = struct
        | C.Eq -> compare_regular_args ~prec t ts' s ss'
        | C.Leq -> C.merge_with_Leq (compare_regular_args ~prec t ts' s ss')
        | C.Lt -> C.opp (compare_rest ~prec s ts')
-       | C.Incomparable -> check_subs_both_ways ~prec t ts' s ss')
+       | C.Incomparable -> compare_subs_both_ways ~prec t ts' s ss')
     | _, _ -> assert false
   and compare_args ~prec t vs ts s us ss =
     match vs, us with
@@ -1323,7 +1320,7 @@ module LambdaLPO : ORD = struct
        | C.Eq -> compare_args ~prec t vs' ts s us' ss
        | C.Leq -> C.merge_with_Leq (compare_args ~prec t vs' ts s us' ss)
        | C.Lt -> C.opp (compare_rest ~prec s ts)
-       | C.Incomparable -> check_subs_both_ways ~prec t ts s ss)
+       | C.Incomparable -> compare_subs_both_ways ~prec t ts s ss)
     | _, _ -> assert false
   and do_compare_terms ~prec t s =
     let (t_hd, (t_tyargs, t_args)) = break_term_up t in
@@ -1350,7 +1347,7 @@ module LambdaLPO : ORD = struct
        | Gt -> compare_rest ~prec t [s_body]
        | Eq -> do_compare_terms ~prec t_body s_body
        | Lt -> C.opp (compare_rest ~prec s [t_body])
-       | _ -> check_subs_both_ways ~prec t [t_body] s [s_body])
+       | _ -> compare_subs_both_ways ~prec t [t_body] s [s_body])
     | Fun _, (DB _|Const _) -> compare_rest ~prec t s_args
     | (Fun _|DB _|Const _), AppBuiltin (_, s_bargs) ->
       compare_rest ~prec t (List.rev_append s_bargs s_args)
@@ -1369,10 +1366,10 @@ module LambdaLPO : ORD = struct
          | Gt -> compare_rest ~prec t s_args
          | Eq -> compare_args ~prec t [] t_args s [] s_args
          | Lt -> C.opp (compare_rest ~prec s t_args)
-         | _ -> check_subs_both_ways ~prec t t_args s s_args)
+         | _ -> compare_subs_both_ways ~prec t t_args s s_args)
       else
         (match Prec.compare prec gid fid with
-         | 0 -> check_subs_both_ways ~prec t t_args s s_args
+         | 0 -> compare_subs_both_ways ~prec t t_args s s_args
          | n when n > 0 -> compare_rest ~prec t s_args
          | _ -> C.opp (compare_rest ~prec s t_args))
     | AppBuiltin (t_b, t_bargs), Var _ ->
