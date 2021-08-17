@@ -1285,8 +1285,8 @@ module LambdaLPO : ORD = struct
   and compare_rest ~prec t ss =
     match ss with
     | [] -> C.Gt
-    | s :: ss' ->
-      (match do_compare_terms ~prec t s with
+    | si :: ss' ->
+      (match do_compare_terms ~prec t si with
        | C.Gt -> compare_rest ~prec t ss'
        | C.Eq | C.Leq | C.Lt -> C.Lt
        | C.Geq | C.Incomparable ->
@@ -1294,8 +1294,8 @@ module LambdaLPO : ORD = struct
   and compare_regular_args ~prec t ts s ss =
     match ts, ss with
     | [], [] -> C.Eq
-    | t :: ts', s :: ss' ->
-      (match do_compare_terms ~prec t s with
+    | ti :: ts', si :: ss' ->
+      (match do_compare_terms ~prec ti si with
        | C.Gt -> compare_rest ~prec t ss'
        | C.Geq -> C.merge_with_Geq (compare_regular_args ~prec t ts' s ss')
        | C.Eq -> compare_regular_args ~prec t ts' s ss'
@@ -1306,8 +1306,8 @@ module LambdaLPO : ORD = struct
   and compare_args ~prec t vs ts s us ss =
     match vs, us with
     | [], [] -> compare_regular_args ~prec t ts s ss
-    | v :: vs', u :: us' ->
-      (match do_compare_terms ~prec v u with
+    | vi :: vs', ui :: us' ->
+      (match do_compare_terms ~prec vi ui with
        | C.Gt -> compare_rest ~prec t ss
        | C.Geq -> C.merge_with_Geq (compare_args ~prec t vs' ts s us' ss)
        | C.Eq -> compare_args ~prec t vs' ts s us' ss
