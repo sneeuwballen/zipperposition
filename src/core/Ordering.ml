@@ -1279,8 +1279,8 @@ module LambdaLPO : ORD = struct
     assert (Type.equal (Term.ty t) (Term.ty s));
     not (is_problematic_type (Term.ty t))
     || T.equal t s
-    || (is_eta_reduced_term_stable_wrt_flip t
-        && is_eta_reduced_term_stable_wrt_flip s
+    || (is_term_stable_wrt_flip t
+        && is_term_stable_wrt_flip s
         && not (check_subs ~prec [s] t)
         && not (check_subs ~prec [t] s))
   and check_subs ~prec ts s =
