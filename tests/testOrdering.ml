@@ -171,7 +171,7 @@ let test_derived_ho_rpo = "ordering.derived_ho_rpo", `Quick, fun () ->
   let x = Term.var (HVar.fresh ~ty:(Type.arrow [ty] ty) ()) in
   Alcotest.(check comp_test) "x a <=>? x b" Comparison.Incomparable (compare (Term.app x [a]) (Term.app x [b]));
 
-  (* f x y is incomparable with  x y *)
+  (* f x y is incomparable with x y *)
   let f = Term.const ~ty:(Type.arrow [(Type.arrow [ty] ty); ty] ty) f_ in
   let x = Term.var (HVar.fresh ~ty:(Type.arrow [ty] ty) ()) in
   let y = Term.var (HVar.fresh ~ty ()) in
@@ -196,7 +196,7 @@ let test_derived_ho_rpo = "ordering.derived_ho_rpo", `Quick, fun () ->
   let a = Term.const ~ty a_ in
   Alcotest.(check comp_test) "f (x a) > x a" Comparison.Gt (compare (Term.app f [Term.app x [a]]) (Term.app x [a]));
 
-  (* f a a > f b  ( test for length-lexicographic extension ) *)
+  (* f a a > f b (test for length-lexicographic extension) *)
   let f = Term.const ~ty:(Type.arrow [ty; ty] ty) f_ in
   let a = Term.const ~ty a_ in
   let b = Term.const ~ty b_ in
@@ -212,11 +212,11 @@ let test_lambdafree_rpo = "ordering.lambdafree_rpo", `Quick, fun () ->
   let x = Term.var (HVar.fresh ~ty:(Type.arrow [ty] ty) ()) in
   Alcotest.(check comp_test) "x a < x b" Comparison.Lt (compare (Term.app x [a]) (Term.app x [b]));
 
-  (* f x y is incomparable with  x y *)
+  (* f x y is incomparable with x y *)
   let f = Term.const ~ty:(Type.arrow [(Type.arrow [ty] ty); ty] ty) f_ in
   let x = Term.var (HVar.fresh ~ty:(Type.arrow [ty] ty) ()) in
   let y = Term.var (HVar.fresh ~ty ()) in
-  Alcotest.(check comp_test) "f x y is incomparable with  x y" Comparison.Incomparable (compare (Term.app f [x;y]) (Term.app x [y]));
+  Alcotest.(check comp_test) "f x y is incomparable with x y" Comparison.Incomparable (compare (Term.app f [x;y]) (Term.app x [y]));
 
   (* g x > f x x *)
   let f = Term.const ~ty:(Type.arrow [ty; ty] ty) f_ in
@@ -231,7 +231,7 @@ let test_lambdafree_rpo = "ordering.lambdafree_rpo", `Quick, fun () ->
   let b = Term.const ~ty b_ in
   Alcotest.(check comp_test) "f (x b) > x a" Comparison.Gt (compare (Term.app f [Term.app x [b]]) (Term.app x [a]));
 
-  (* f a a > f b  ( test for length-lexicographic extension ) *)
+  (* f a a > f b (test for length-lexicographic extension) *)
   let f = Term.const ~ty:(Type.arrow [ty; ty] ty) f_ in
   let a = Term.const ~ty a_ in
   let b = Term.const ~ty b_ in
@@ -436,7 +436,6 @@ let test_lambdafree_kbo = "ordering.lambdafree_kbo", `Quick, fun () ->
           (T.app app [ty1; ty1; T.app app [ty1; ty2; add; x]; T.app app [ty1; ty1; s; y]])
       )
 
-(* adapted from test_derived_ho_kbo *)
 let test_lambda_kbo = "ordering.lambda_kbo", `Quick, fun () ->
   (* alphabetical precedence, h has weight 2, all other symbols weight 1 *)
   let weight id = (if id=h_ then Precedence.Weight.add Precedence.Weight.one Precedence.Weight.one else Precedence.Weight.one) in
@@ -724,12 +723,60 @@ let test_lambda_kbo = "ordering.lambda_kbo", `Quick, fun () ->
                    (T.app app [ty1; ty1; T.app app [ty1; ty2; add; x]; T.app app [ty1; ty1; s; y]])
                 )
 
+let test_lambda_lpo = "ordering.lambda_lpo", `Quick, fun () ->
+  let ord = O.lambda_lpo (Precedence.default [a_; b_; c_; d_; e_; f_; g_; h_]) in
+  let compare = O.compare ord in
+
+  (* x a <= x b *)
+  let a = Term.const ~ty a_ in
+  let b = Term.const ~ty b_ in
+  let x = Term.var (HVar.fresh ~ty:(Type.arrow [ty] ty) ()) in
+  Alcotest.(check comp_test) "x a <= x b"
+    Comparison.Leq (compare (Term.app x [a]) (Term.app x [b]));
+
+  (* f x y is incomparable with x y *)
+  let f = Term.const ~ty:(Type.arrow [(Type.arrow [ty] ty); ty] ty) f_ in
+  let x = Term.var (HVar.fresh ~ty:(Type.arrow [ty] ty) ()) in
+  let y = Term.var (HVar.fresh ~ty ()) in
+  Alcotest.(check comp_test) "f x y <=>? x y"
+    Comparison.Incomparable (compare (Term.app f [x;y]) (Term.app x [y]));
+
+  (* g x > f x x *)
+  let f = Term.const ~ty:(Type.arrow [ty; ty] ty) f_ in
+  let g = Term.const ~ty:(Type.arrow [ty] ty) g_ in
+  let x = Term.var (HVar.fresh ~ty ()) in
+  Alcotest.(check comp_test) "g x > f x x"
+    Comparison.Gt (compare (Term.app g [x]) (Term.app f [x; x]));
+
+  (* f (x b) > x a *)
+  let f = Term.const ~ty:(Type.arrow [ty] ty) f_ in
+  let x = Term.var (HVar.fresh ~ty:(Type.arrow [ty] ty)  ()) in
+  let a = Term.const ~ty a_ in
+  let b = Term.const ~ty b_ in
+  Alcotest.(check comp_test) "f (x b) > x a"
+    Comparison.Gt (compare (Term.app f [Term.app x [b]]) (Term.app x [a]));
+
+  (* f (x a) > x a *)
+  let f = Term.const ~ty:(Type.arrow [ty] ty) f_ in
+  let x = Term.var (HVar.fresh ~ty:(Type.arrow [ty] ty)  ()) in
+  let a = Term.const ~ty a_ in
+  Alcotest.(check comp_test) "f (x a) > x a"
+    Comparison.Gt (compare (Term.app f [Term.app x [a]]) (Term.app x [a]));
+
+  (* f b b < f a (test for eta-expansion) *)
+  let f = Term.const ~ty:(Type.arrow [ty; ty] ty) f_ in
+  let a = Term.const ~ty a_ in
+  let b = Term.const ~ty b_ in
+  Alcotest.(check comp_test) "f b b < f a"
+    Comparison.Lt (compare (Term.app f [b; b]) (Term.app f [a]))
+
 let suite =
   [ test_derived_ho_rpo;
     test_derived_ho_kbo;
     test_lambdafree_rpo;
     test_lambdafree_kbo;
     test_lambda_kbo;
+    test_lambda_lpo;
   ]
 
 let props =

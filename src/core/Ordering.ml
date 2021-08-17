@@ -1250,9 +1250,7 @@ module LambdaKBO : ORD = struct
 
   let compare_terms ~prec t s =
     ZProf.enter_prof prof_lambda_kbo;
-    (* CCFormat.printf "LambdaKBO@.%a@.vs.@.%a@." T.pp t T.pp s; *)
-    let (_ (* w *), cmp) = process_terms ~prec t s in
-    (* CCFormat.printf "Result: %a %a@." Comparison.pp cmp Polynomial.pp w; *)
+    let (_, cmp) = process_terms ~prec t s in
     ZProf.exit_prof prof_lambda_kbo;
     cmp
 
@@ -1279,7 +1277,7 @@ module LambdaLPO : ORD = struct
     || not (is_problematic_type (Term.ty t) && is_problematic_type (Term.ty s))
 
   let rec check_subs ~prec ts s =
-    List.exists (fun t -> C.is_Gt_or_Geq_or_Eq (compare_terms ~prec t s)) ts
+    List.exists (fun t -> C.is_Gt_or_Geq_or_Eq (do_compare_terms ~prec t s)) ts
   and check_subs_both_ways ~prec t ts s ss =
     if check_subs ~prec ts s then C.Gt
     else if check_subs ~prec ss t then C.Lt
@@ -1288,7 +1286,7 @@ module LambdaLPO : ORD = struct
     match ss with
     | [] -> C.Gt
     | s :: ss' ->
-      (match compare_terms ~prec t s with
+      (match do_compare_terms ~prec t s with
        | C.Gt -> compare_rest ~prec t ss'
        | C.Eq | C.Leq | C.Lt -> C.Lt
        | C.Geq | C.Incomparable ->
@@ -1297,7 +1295,7 @@ module LambdaLPO : ORD = struct
     match ts, ss with
     | [], [] -> C.Eq
     | t :: ts', s :: ss' ->
-      (match compare_terms ~prec t s with
+      (match do_compare_terms ~prec t s with
        | C.Gt -> compare_rest ~prec t ss'
        | C.Geq -> C.merge_with_Geq (compare_regular_args ~prec t ts' s ss')
        | C.Eq -> compare_regular_args ~prec t ts' s ss'
@@ -1309,7 +1307,7 @@ module LambdaLPO : ORD = struct
     match vs, us with
     | [], [] -> compare_regular_args ~prec t ts s ss
     | v :: vs', u :: us' ->
-      (match compare_terms ~prec v u with
+      (match do_compare_terms ~prec v u with
        | C.Gt -> compare_rest ~prec t ss
        | C.Geq -> C.merge_with_Geq (compare_args ~prec t vs' ts s us' ss)
        | C.Eq -> compare_args ~prec t vs' ts s us' ss
@@ -1317,13 +1315,13 @@ module LambdaLPO : ORD = struct
        | C.Lt -> C.opp (compare_rest ~prec s ts)
        | C.Incomparable -> check_subs_both_ways ~prec t ts s ss)
     | _, _ -> assert false
-  and compare_terms ~prec t s =
+  and do_compare_terms ~prec t s =
     let (t_hd, (t_tyargs, t_args)) = break_term_up t in
     let (s_hd, (s_tyargs, s_args)) = break_term_up s in
     match T.view t_hd, T.view s_hd with
     | Var y, Var x ->
       if HVar.id y = HVar.id x && List.for_all2 cannot_flip t_args s_args then
-        cw_ext (compare_terms ~prec) t_args s_args
+        cw_ext (do_compare_terms ~prec) t_args s_args
       else
         C.Incomparable
     | Var _, Fun (_, s_body) ->
@@ -1339,7 +1337,7 @@ module LambdaLPO : ORD = struct
     | Fun (t_ty, t_body), Fun (s_ty, s_body) ->
       (match compare_types ~prec t_ty s_ty with
        | Gt -> compare_rest ~prec t [s_body]
-       | Eq -> compare_terms ~prec t_body s_body
+       | Eq -> do_compare_terms ~prec t_body s_body
        | Lt -> C.opp (compare_rest ~prec s [t_body])
        | _ -> check_subs_both_ways ~prec t [t_body] s [s_body])
     | Fun _, (DB _|Const _) -> compare_rest ~prec t s_args
@@ -1385,6 +1383,12 @@ module LambdaLPO : ORD = struct
        | n when n > 0 -> compare_rest ~prec t all_s_args
        | _ -> C.opp (compare_rest ~prec s all_t_args))
     | App _, _ | _, App _ -> assert false
+
+  let compare_terms ~prec t s =
+    ZProf.enter_prof prof_lambda_lpo;
+    let cmp = do_compare_terms ~prec t s in
+    ZProf.exit_prof prof_lambda_lpo;
+    cmp
 
   let might_flip _ t s =
     not (cannot_flip t s)

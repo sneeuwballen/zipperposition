@@ -72,6 +72,9 @@ val lambdafree_rpo : Precedence.t -> t
 val lambda_kbo : Precedence.t -> t
 (** Knuth-Bendix ordering - lambda version *)
 
+val lambda_lpo : Precedence.t -> t
+(** Lexicographic path ordering - lambda version *)
+
 val epo : Precedence.t -> t
 (** Embedding path order *)
 
