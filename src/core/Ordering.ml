@@ -1381,9 +1381,9 @@ module LambdaLPO : ORD = struct
     | AppBuiltin (t_b, t_bargs), AppBuiltin (s_b, s_bargs) ->
       let all_t_args = t_bargs @ t_tyargs @ t_args
       and all_s_args = s_bargs @ s_tyargs @ s_args in
-      (match Int.compare (Builtin.as_int t_b) (Builtin.as_int s_b) with
+      (match CCInt.compare (Builtin.as_int t_b) (Builtin.as_int s_b) with
        | 0 ->
-        (match Int.compare (List.length all_t_args) (List.length all_s_args)
+        (match CCInt.compare (List.length all_t_args) (List.length all_s_args)
          with
          | 0 -> compare_args ~prec t [] all_t_args s [] all_s_args
          | n when n > 0 -> compare_rest ~prec t all_s_args
