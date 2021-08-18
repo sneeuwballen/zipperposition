@@ -598,14 +598,6 @@ to use the image:
 <details>
 Now we use dune, it should simplify the process compared to oasis.
 
-- merge `dev` into `master`:
-  `git checkout master; git merge dev`
-
-- `make clean all` (to rerun tests, etc. see if merge was ok)
-
-- merge `master` into `stable` (branch with only releases):
-  `git checkout stable; git merge master --no-ff`
-
 - edit `*.opam` files to update the version number (field `version`).
 
 - `git commit -a -m "prepare for <version>"` (to save the changes on the stable branch)
