@@ -971,7 +971,7 @@ module Polynomial = struct
     CCFormat.printf " [%d %d]" poly.pos_counter poly.neg_counter
 end
 
-let length_lex_ext f ys xs =
+let same_length_lex_ext f ys xs =
   let rec lex ys xs = match ys, xs with
     | [], [] -> C.Eq
     | y :: ys, x :: xs ->
@@ -986,7 +986,7 @@ let length_lex_ext f ys xs =
   | 0 -> lex ys xs
   | n -> if n > 0 then C.Gt else Lt
 
-let length_lex_ext_data f ys xs =
+let same_length_lex_ext_data f ys xs =
   let rec lex ys xs = match ys, xs with
     | [], [] -> ([], C.Eq)
     | y :: ys, x :: xs ->
@@ -1007,13 +1007,20 @@ let length_lex_ext_data f ys xs =
   | 0 -> lex ys xs
   | n -> ([], if n > 0 then C.Gt else Lt)
 
-let cw_ext f =
-  length_lex_ext (fun y x -> C.smooth (f y x))
+let cw_ext f ys xs =
+  if List.length ys = List.length xs then
+    same_length_lex_ext (fun y x -> C.smooth (f y x)) ys xs
+  else
+    C.Incomparable
 
-let cw_ext_data f =
-  length_lex_ext_data (fun y x ->
-    let (w, cmp) = f y x in
-    (w, C.smooth cmp))
+let cw_ext_data f ys xs =
+  if List.length ys = List.length xs then
+    same_length_lex_ext_data (fun y x ->
+        let (w, cmp) = f y x in
+        (w, C.smooth cmp))
+      ys xs
+  else
+    ([], C.Incomparable)
 
 module LambdaKBO : ORD = struct
   let name = "lambda_kbo"
@@ -1157,7 +1164,7 @@ module LambdaKBO : ORD = struct
     if CCList.is_empty ts && CCList.is_empty ss then
       (w, C.Eq)
     else (
-      let (ws, cmp) = length_lex_ext_data (process_terms ~prec) ts ss
+      let (ws, cmp) = same_length_lex_ext_data (process_terms ~prec) ts ss
       in
       let m = List.length ws in
       List.iter (Polynomial.add w) ws;
@@ -1222,7 +1229,8 @@ module LambdaKBO : ORD = struct
     | Const _, (Fun _|DB _) -> consider_weights_of ~prec t s Lt
     | Const gid, Const fid ->
       if ID.id gid = ID.id fid then
-        match length_lex_ext (compare_type_terms ~prec) t_tyargs s_tyargs with
+        match same_length_lex_ext (compare_type_terms ~prec) t_tyargs s_tyargs
+        with
         | Eq -> process_args ~prec t_args s_args
         | cmp -> consider_weights_of ~prec t s cmp
       else
@@ -1365,7 +1373,8 @@ module LambdaLPO : ORD = struct
     | Const _, DB _ -> C.opp (compare_rest ~prec s t_args)
     | Const gid, Const fid ->
       if ID.id gid = ID.id fid then
-        (match length_lex_ext (compare_type_terms ~prec) t_tyargs s_tyargs with
+        (match same_length_lex_ext (compare_type_terms ~prec) t_tyargs s_tyargs
+         with
          | Gt -> compare_rest ~prec t s_args
          | Eq -> compare_args ~prec t [] t_args s [] s_args
          | Lt -> C.opp (compare_rest ~prec s t_args)
