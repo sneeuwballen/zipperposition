@@ -1281,8 +1281,10 @@ module LambdaLPO : ORD = struct
     || T.equal t s
     || (is_term_stable_wrt_flip t
         && is_term_stable_wrt_flip s
-        && not (check_subs ~prec [s] t)
-        && not (check_subs ~prec [t] s))
+        && not (let cmp = do_compare_terms ~prec t s in
+             cmp = C.Incomparable
+             || (cmp = C.Gt && check_subs ~prec [t] s)
+             || (cmp = C.Lt && check_subs ~prec [s] t)))
   and check_subs ~prec ts s =
     List.exists (fun ti -> C.is_Gt_or_Geq_or_Eq (do_compare_terms ~prec ti s))
       ts
@@ -1370,7 +1372,12 @@ module LambdaLPO : ORD = struct
          | _ -> compare_subs_both_ways ~prec t t_args s s_args)
       else
         (match Prec.compare prec gid fid with
-         | 0 -> compare_subs_both_ways ~prec t t_args s s_args
+         | 0 ->
+           (* fallback *)
+           (match ID.compare gid fid with
+            | 0 -> assert false
+            | n when n > 0 -> compare_rest ~prec t s_args
+            | _ -> C.opp (compare_rest ~prec s t_args))
          | n when n > 0 -> compare_rest ~prec t s_args
          | _ -> C.opp (compare_rest ~prec s t_args))
     | AppBuiltin (t_b, t_bargs), Var _ ->
