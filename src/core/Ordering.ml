@@ -1228,17 +1228,17 @@ module LambdaKBO : ORD = struct
     | DB _, (Const _|AppBuiltin _) -> consider_weights_of ~prec t s Gt
     | Const _, (Fun _|DB _) -> consider_weights_of ~prec t s Lt
     | Const gid, Const fid ->
-      if ID.id gid = ID.id fid then
-        match same_length_lex_ext (compare_type_terms ~prec) t_tyargs s_tyargs
-        with
-        | Eq -> process_args ~prec t_args s_args
-        | cmp -> consider_weights_of ~prec t s cmp
-      else
-        consider_weights_of ~prec t s
-          (match Prec.compare prec gid fid with
-           | 0 -> C.of_total (ID.compare gid fid)  (* fallback *)
-           | n when n > 0 -> Gt
-           | _ -> Lt)
+      (match Prec.compare prec gid fid with
+       | 0 ->
+         (match ID.compare gid fid with
+          | 0 ->
+            (match same_length_lex_ext (compare_type_terms ~prec)
+               t_tyargs s_tyargs with
+             | Eq -> process_args ~prec t_args s_args
+             | cmp -> consider_weights_of ~prec t s cmp)
+          | n -> consider_weights_of ~prec t s (C.of_total n))
+       | n when n > 0 -> consider_weights_of ~prec t s Gt
+       | _ -> consider_weights_of ~prec t s Lt)
     | Const _, AppBuiltin _ -> consider_weights_of ~prec t s Gt
     | AppBuiltin _, (Fun _|DB _|Const _) -> consider_weights_of ~prec t s Lt
     | AppBuiltin (t_b, t_bargs), AppBuiltin (s_b, s_bargs) ->
@@ -1321,18 +1321,6 @@ module LambdaLPO : ORD = struct
        | C.Lt -> C.opp (compare_rest ~prec s ts')
        | C.Incomparable -> compare_subs_both_ways ~prec t ts' s ss')
     | _, _ -> assert false
-  and compare_args ~prec t vs ts s us ss =
-    match vs, us with
-    | [], [] -> compare_regular_args ~prec t ts s ss
-    | vi :: vs', ui :: us' ->
-      (match do_compare_terms ~prec vi ui with
-       | C.Gt -> compare_rest ~prec t ss
-       | C.Geq -> C.merge_with_Geq (compare_args ~prec t vs' ts s us' ss)
-       | C.Eq -> compare_args ~prec t vs' ts s us' ss
-       | C.Leq -> C.merge_with_Leq (compare_args ~prec t vs' ts s us' ss)
-       | C.Lt -> C.opp (compare_rest ~prec s ts)
-       | C.Incomparable -> compare_subs_both_ways ~prec t ts s ss)
-    | _, _ -> assert false
   and do_compare_terms ~prec t s =
     let (t_hd, (t_tyargs, t_args)) = break_term_up t in
     let (s_hd, (s_tyargs, s_args)) = break_term_up s in
@@ -1372,23 +1360,20 @@ module LambdaLPO : ORD = struct
     | DB _, Const _ -> compare_rest ~prec t s_args
     | Const _, DB _ -> C.opp (compare_rest ~prec s t_args)
     | Const gid, Const fid ->
-      if ID.id gid = ID.id fid then
-        (match same_length_lex_ext (compare_type_terms ~prec) t_tyargs s_tyargs
-         with
-         | Gt -> compare_rest ~prec t s_args
-         | Eq -> compare_args ~prec t [] t_args s [] s_args
-         | Lt -> C.opp (compare_rest ~prec s t_args)
-         | _ -> compare_subs_both_ways ~prec t t_args s s_args)
-      else
-        (match Prec.compare prec gid fid with
-         | 0 ->
-           (* fallback *)
-           (match ID.compare gid fid with
-            | 0 -> assert false
-            | n when n > 0 -> compare_rest ~prec t s_args
-            | _ -> C.opp (compare_rest ~prec s t_args))
-         | n when n > 0 -> compare_rest ~prec t s_args
-         | _ -> C.opp (compare_rest ~prec s t_args))
+      (match Prec.compare prec gid fid with
+       | 0 ->
+         (match ID.compare gid fid with
+          | 0 ->
+           (match same_length_lex_ext (compare_type_terms ~prec)
+              t_tyargs s_tyargs with
+            | Gt -> compare_rest ~prec t s_args
+            | Eq -> compare_regular_args ~prec t t_args s s_args
+            | Lt -> C.opp (compare_rest ~prec s t_args)
+            | _ -> compare_subs_both_ways ~prec t t_args s s_args)
+          | n when n > 0 -> compare_rest ~prec t s_args
+          | _ -> C.opp (compare_rest ~prec s t_args))
+       | n when n > 0 -> compare_rest ~prec t s_args
+       | _ -> C.opp (compare_rest ~prec s t_args))
     | AppBuiltin (t_b, t_bargs), Var _ ->
       if Builtin.as_int t_b = 0 then C.Leq
       else if check_subs ~prec (List.rev_append t_bargs t_args) s then C.Gt
@@ -1402,7 +1387,7 @@ module LambdaLPO : ORD = struct
        | 0 ->
         (match CCInt.compare (List.length all_t_args) (List.length all_s_args)
          with
-         | 0 -> compare_args ~prec t [] all_t_args s [] all_s_args
+         | 0 -> compare_regular_args ~prec t all_t_args s all_s_args
          | n when n > 0 -> compare_rest ~prec t all_s_args
          | _ -> C.opp (compare_rest ~prec s all_t_args))
        | n when n > 0 -> compare_rest ~prec t all_s_args
