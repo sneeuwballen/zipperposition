@@ -1104,7 +1104,7 @@ module LambdaKBO : ORD = struct
     | DB i ->
       add_monomial w sign my_db_weight [];
       List.iter (add_weight_of ~prec w sign) args;
-      add_eta_extra_of w (Term.ty hd)
+      add_eta_extra_of w (Term.ty t)
     | Var var ->
       if CCList.is_empty args then (
         add_monomial w sign W.one [];
@@ -1126,7 +1126,8 @@ module LambdaKBO : ORD = struct
         add_monomial w sign W.one [];
         add_monomial w sign W.one
           [Polynomial.WeightUnknown (hd :: some_normal_args)];
-        List.iteri add_weight_of_extra_arg extra_args
+        List.iteri add_weight_of_extra_arg extra_args;
+        add_eta_extra_of w (Term.ty t)
       )
     | Const fid ->
       add_monomial w sign (Prec.weight prec fid) [];
