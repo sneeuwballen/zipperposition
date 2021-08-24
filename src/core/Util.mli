@@ -163,15 +163,16 @@ module UntypedPrint : sig
   (** type for values of forgotten type *)
 
   val (~<) : 'a -> 'a
-  (** Prefix an expression with ~< to trace it together with location. *)
+  (** Prefix an expression with ~< to trace it together with its location and stack depth. *)
+
   val (|<) : string -> 'a -> 'a
-  (** Prefix an expression with [message|<] to trace it together with [message] and location. *)
+  (** Prefix an expression with [message|<] to trace it together with [message], location and stack depth. *)
 
   val str : 'a -> string
   (** Adhoc polymorphic to_string *)
 
   val add_pp : (any -> bool) -> ('a -> string) -> unit
-  (** Call add_pp t p registers a string converter p to be used when printing untyped values passing the type test t. Affects str, ~< and |<. The p should accept any input x for which t x is true because otherwise a segmentation fault can occur. Printers registered later take precedence. This function is used in the file TypeTests.ml. *)
+  (** Call add_pp t p registers a string converter p to be used when printing untyped values passing the type test t. Affects str, ~< and |<. The p should accept any input x for which t x is true because otherwise a segmentation fault can occur. Printers registered later take precedence. This function is used in the file TypeTests.ml. *)
 end
 
 val set_memory_limit : int -> unit

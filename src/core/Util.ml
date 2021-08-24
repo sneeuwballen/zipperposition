@@ -304,15 +304,15 @@ module UntypedPrint = struct
   let add_pp type_test to_string = string_printers := (type_test, to_string % magic) :: !string_printers
 
   let str x =
-    let exception Result of string in
-    try magic !string_printers |> List.iter(fun(type_test, to_string) ->
-      if is_int(repr x) then raise(Result(string_of_int(magic x))); (* prioritize int's *)
-      if type_test x then raise(Result(to_string x)));
-    Batteries.dump x
-    with Result s -> s
+    let rec loop = function [] -> assert false (* TypeTests.ml registers generic converter *)
+    | (type_test, to_string)::printers ->
+      if is_int(repr x) then string_of_int(magic x) (* prioritize int's *)
+      else if type_test x then to_string x
+      else loop printers
+    in loop(magic !string_printers)
 
-  (* Print message msg followed by FILE line LINE of the caller's caller. *)
-  let print_with_caller msg = print_endline(msg ^ "\t" ^ caller_file_line 2 ^ if String.length msg < 55(*rough*) then "" else "\n")
+  (* Print message msg followed by ⛓️CALLDEPTH FILE line LINE of the caller's caller. *)
+  let print_with_caller msg = print_endline(msg ^"\t⛓️"^ str Printexc.(raw_backtrace_length(get_callstack 9999)) ^" "^ caller_file_line 2 ^ if String.length msg < 55(*rough*) then "" else "\n")
 
   (* Sprinkle these in front of expressions you want to trace—often without rebracketing! *)
   let (~<)x = print_with_caller(str x); x

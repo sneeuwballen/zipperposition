@@ -109,48 +109,71 @@ module type CLAUSE = sig
       then [labels c] is a subset of [labels d] *)
 end
 
-module type SUBSUMPTION_IDX = sig
+module type GENERAL_IDX = sig
+  (** An index is a set from which it is fast to query potential generalizations, specializations and/or equivalents to a given element. Meaning of generalization is defined by the concrete instance. Specialization is the opposite of generalization, and equivalence means to both generalize and specialize. A feature vector index particularly, is usually imperfect, so that queries may return excess elements. See FV_tree.ml for an implementation. This interface currently omits unifiability because feature vectors are useless filters to that. *)
+
   type t
+  type element
+  
+  val name : string
+  (** Informal name of index type *)
+
+  val add : t -> element -> t
+  (** Add element to index. It won't be duplicated. *)
+
+  val add_seq : t -> element Iter.t -> t
+  val add_list : t -> element list -> t
+  (** Repeated addition. Equivalent to Iter.fold add / List.fold_left add *)
+
+  val remove : t -> element -> t
+  (** Remove element from index, if present. *)
+
+  val remove_seq : t -> element Iter.t -> t
+  (** Repeated removal. Equivalent to Iter.fold remove *)
+
+  val retrieve_generalizations : t -> element -> element Iter.t
+  (** Find at least all generalizations but usually also some non-generalizations. Meaning of generalization and (im)perfectness of retrieval depend on the concrete index instance. *)
+
+  val retrieve_specializations : t -> element -> element Iter.t
+  (** Find at least all specializations but usually also some non-specializations. Meaning of specialization and (im)perfectness of retrieval depend on the concrete index instance. *)
+
+  val retrieve_equivalents : t -> element -> element Iter.t
+  (** Find at least all equivalent elements but usually also some more. Meaning of equivalence and (im)perfectness of retrieval depend on the concrete index instance. *)
+
+  val iter : t -> element Iter.t
+
+  val fold : ('a -> element -> 'a) -> 'a -> t -> 'a
+end
+
+module type SUBSUMPTION_IDX = sig
+  (* type t *)
 
   module C : CLAUSE
 
-  val name : string
+  include GENERAL_IDX with type element = C.t
 
   val empty : unit -> t
   (** Empty index *)
-
-  val add : t -> C.t -> t
-  (** Index the clause *)
-
-  val add_seq : t -> C.t Iter.t -> t
-  val add_list : t -> C.t list -> t
-
-  val remove : t -> C.t -> t
-  (** Un-index the clause *)
-
-  val remove_seq : t -> C.t Iter.t -> t
 
   val retrieve_subsuming : t -> lits -> labels -> C.t Iter.t
   (** Fold on a set of indexed candidate clauses, that may subsume
       the given clause. *)
 
   val retrieve_subsuming_c : t -> C.t -> C.t Iter.t
+  (** Alias of retrieve_generalizations *)
 
   val retrieve_subsumed : t -> lits -> labels -> C.t Iter.t
   (** Fold on a set of indexed candidate clauses, that may be subsumed by
       the given clause *)
 
   val retrieve_subsumed_c : t -> C.t -> C.t Iter.t
+  (** Alias of retrieve_specializations *)
 
   val retrieve_alpha_equiv : t -> lits -> labels -> C.t Iter.t
   (** Retrieve clauses that are potentially alpha-equivalent to the given clause *)
 
   val retrieve_alpha_equiv_c : t -> C.t -> C.t Iter.t
-  (** Retrieve clauses that are potentially alpha-equivalent to the given clause *)
-
-  val iter : t -> C.t Iter.t
-
-  val fold : ('a -> C.t -> 'a) -> 'a -> t -> 'a
+  (** Retrieve clauses that are potentially alpha-equivalent to the given clause. Alias of retrieve_equivalents *)
 end
 
 module type EQUATION = sig

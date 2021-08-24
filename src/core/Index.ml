@@ -97,6 +97,10 @@ module MakeLeaf(X : Set.OrderedType) : LEAF with type elt = X.t = struct
       leaf
 end
 
+(** {2 Index without fixed element type} *)
+
+module type GENERAL_IDX = Index_intf.GENERAL_IDX
+
 (** {2 Term index} *)
 
 module type TERM_IDX = Index_intf.TERM_IDX

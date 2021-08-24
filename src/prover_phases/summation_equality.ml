@@ -103,8 +103,11 @@ let add_simplify_in_context(type c)(module Env: Env.S with type C.t=c) name lite
   in
   (* Note: keep "fun c ->" so that Env.get_active() is recomputed. TODO indexing *)
   let rule = fun c -> SimplM.app_list Iter.(to_rev_list(map lifted_inference (Env.get_active()))) 
-   (str(Iter.to_rev_list(Env.get_active()))|<c) in
+   ("Clauses "^str(Iter.to_rev_list(Env.get_clauses()))^" try simplify"|<c) in
   Env.add_rw_simplify(rule);
+  (* must access simplified given clause through an index *)
+  (* Signal.on_every Env.ProofState.SimplSet.on_add_clause id; *)
+  (* Signal.on_every Env.ProofState.SimplSet.on_remove_clause id; *)
   Env.add_backward_simplify(fun c -> C.ClauseSet.of_iter(Env.get_active()))
 
 
@@ -134,7 +137,7 @@ let mono_to_string(c,m,f) = match (match str c with "1"->"" | "-1"->"-" | c'->c'
 let poly_to_string p = Array.(if length p = 0 then "0" else concat_view " + "  mono_to_string (to_list p))
 
 
-(* Coefficient arithmetic. TODO use general simplification instead of or in addition to special casing ℤ constants. *)
+(* Coefficient arithmetic: Integer constants are simplified but other simplification—which likely depends on the proof state—is left to the user. *)
 
 let _Z z = app_builtin ~ty:int (Int z) []
 let _z = _Z % Z.of_int
@@ -146,6 +149,10 @@ let if_Z fZ f' t' s' = match view t', view s' with
 let (-|-) = if_Z (Z.(+)%>>_Z) (fun t s -> app_builtin ~ty:(ty t) Sum [t;s])
 let (><) = if_Z (Z.( * )%>>_Z) (fun t s -> app_builtin ~ty:(ty t) Product [t;s])
 let rec (^) t = function 0-> _z 1 | 1-> t | e-> t >< t^(e-1)
+
+let (^^) t e = match view e with
+| AppBuiltin(Int e', _) -> t ^ Z.to_int e'
+| _ -> raise(Failure(Printf.sprintf "Unsupported operation: symbolic exponent %a in coefficient of a polynomial." ~=Term.to_string e))
 
 let lcm_coefs t' s' = if t'==s' then _z 1, _z 1 else if_Z Z.(fun t s -> let l r = _Z(divexact (lcm t s) r) in l t, l s) (fun t s -> s,t) t' s'
 
@@ -179,11 +186,14 @@ let redefine_elimination_priority all_polynomials priority =
   all_polynomials(Array.sort(flip compare_mono))
 
 
-(* Arithmetic of polynomials etc. Main operations to superpose polynomials are: addition, multiplication by monomial, and pre-lcm of monomials. *)
+(* Arithmetic of polynomials etc. Main operations to superpose polynomials are: addition, multiplication by monomial, and lcm of monomials upto leading term. *)
 
 let _0 = Array.of_list[]
 
 let set_exp x e = if e=0 then [] else [{x with exp=e}]
+
+(* Very specific auxiliarity: modify non-zero polynomial's leading monomial to 0. *)
+let lead_0 p = Array.set p 0 (_z 0, [], _z 0); p
 
 (* Equality of powers. Differs from plain (=) because of the terms inside. *)
 let (=^) m w = m.exp=w.exp && m.var=w.var && match m.base, w.base with
@@ -205,7 +215,7 @@ let sum_monomials =
 let (++) p r = sum_monomials Array.(to_list p @ to_list r)
 
 (* constant × polynomial *)
-let ( *:) a = if a == _z 1 then id else if a == _z 0 then ~=_0 else Array.map(fun(c,m,f) -> (a><c, m, f))
+let ( *:) a = Array.map(fun(c,m,f) -> (a><c, m, f))
 
 (* monomial × polynomial *)
 let ( **:) mon =
@@ -222,7 +232,7 @@ let ( **:) mon =
     (* commute n > v *)
     | _ -> let (&) m a = map(fun n -> (n,a)) m in
       match n.base, v.base with
-      |`Move n', `Exp v' when n.var=v.var -> mul(mul[(coef >< v' ^ n.exp*v.exp, m), [v;n]] & w_rev)
+      |`Move n', `Exp v' when n.var=v.var -> mul(mul[(coef >< (v'^^n') ^ n.exp*v.exp, m), [v;n]] & w_rev)
       |`Move n', `Mono when n.var=v.var -> mul(
         (* Binomial formula: c D₊ₐⁿ dᵛ = c (d+na)ᵛ D₊ₐⁿ = ∑k∈[0,v]: c(ᵛₖ)(na)ᵛ⁻ᵏ dᵏ D₊ₐⁿ *)
         mul(init(v.exp+1)id |> map(fun k ->
@@ -257,23 +267,43 @@ let rec div_factor m1 m2 = CCOpt.(match m1,m2 with
   | _ -> CCList.cons x2 <$> div_factor (x1::n1) n2)
 
 
+(* Calculate superposition between two polynomials pⱼ (j=1,2) that represent equations m⬝pⱼ=0 where m runs over all monomials. A result is m₁p₁ - m₂p₂ where mⱼ are least monomials such that leading terms in mⱼpⱼ equal. Leading monomials cancel but others are not simplified. Currently result is unique, if superposition is possible. *)
 let superpose p1 p2 =
-  if oper_arg p1.(0) != oper_arg p2.(0) then [] else
+  if p1=_0 or p2=_0 or oper_arg p1.(0) != oper_arg p2.(0) then [] else
   let f1, f2 = (oper_powers %%> lcm_factors) p1.(0) p2.(0) in
   let p'1, p'2 = f1**:p1, f2**:p2 in
   let a1, a2 = ((fun(c,_,_)->c) %%> lcm_coefs) p'1.(0) p'2.(0) in
-  [a1*:p'1 ++ (_z(-1)><a2)*:p'2]
+  [lead_0(a1*:p'1) ++ lead_0((_z(-1)><a2)*:p'2)]
 
 (* Try rewrite leading monomial of p by r. *)
 let leadrewrite r p =
-  if oper_arg r.(0) != oper_arg p.(0) then None else
+  if r=_0 or p=_0 or oper_arg r.(0) != oper_arg p.(0) then None else
   match (oper_powers %%> div_factor) r.(0) p.(0) with
   | Some f -> let r' = f**:r in
     let a1,a2 = ((fun(c,_,_)->c) %%> lcm_coefs) p.(0) r'.(0) in
     (* TODO check that a1 is invertible *)
-    Some(a1*:p ++ (_z(-1)><a2)*:r')
+    Some(lead_0(a1*:p) ++ lead_0((_z(-1)><a2)*:r'))
   | _ -> None
 
+
+module LeadRewriteIndex = FV_tree.FV_IDX(struct
+  type t = poly
+  let compare = Stdlib.compare (* just for usage in sets *)
+  type feature_func = poly -> int
+  let compute_feature f p = FV_tree.N(f p)
+end)
+
+(* A feature vector index for rewriting which tests various sums of operator degrees *)
+let make_index() =
+  let sum value p = List.(fold_left (+) 0 (map value (oper_powers p.(0)))) in
+  LeadRewriteIndex.empty_with'[
+    ("total degree", fun p -> mono_total_deg(oper_powers p.(0)));
+    "shift degree", sum(function {base=`Move _; exp} -> exp | _ -> 0);
+    "coefficient degree", sum(function {base=`Mono; exp} -> exp | _ -> 0);
+    "exponential degree", sum(function {base=`Exp _; exp} -> exp | _ -> 0);
+    "var. 1 degree", sum(function {var=1; exp} -> exp | _ -> 0);
+    (* then: multiset of indeterminates... except that only ID multisets are supported *)
+  ]
 
 
 (* quick manual data entry *)
