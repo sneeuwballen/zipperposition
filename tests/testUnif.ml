@@ -70,7 +70,7 @@ let () =
      val f_ho: (term -> term ) -> term.
      val f_ho2: (term -> term ) -> (term -> term) -> term.
      val g_ho: (term -> term -> term) -> term.
-     val p_ho2: (term -> term ) -> (term -> term) -> prop.
+     val p_ho2: (term -> term) -> (term -> term) -> prop.
      val p_prop: (prop -> prop) -> prop.
      val a_poly : pi a. a -> a.
      val f_poly : pi a b. (a -> b) -> (a -> b) -> a.
@@ -244,6 +244,12 @@ end = struct
       raise e
 end
 
+let equal_after_sub ~subst (t1,sc1)(t2,sc2) =
+  let renaming = Subst.Renaming.create() in
+  let t1 = Subst.FO.apply renaming subst (t1,sc1) |> Lambda.snf |> Lambda.eta_reduce in
+  let t2 = Subst.FO.apply renaming subst (t2,sc2) |> Lambda.snf |> Lambda.eta_reduce in
+  T.equal t1 t2
+
 let check_variant ?(msg="") t u =
   if Unif.FO.are_variant t u then ()
   else (
@@ -300,14 +306,13 @@ let check_unifiable ?(negated=false) t u actions : unit Alcotest.test_case =
         check_matches ~msg (u |> Lambda.snf |> Lambda.eta_reduce) t';
 
         (* the important thing is that after unification, the terms are
-          equal under substitution (t'=u'). Unif.FO.equal does not work properly,
-          so it is being disabled. *)
-        (* if not (Unif.FO.equal ~subst (t,0) (u,1)) then (
+          equal under substitution (t'=u'). . *)
+        if not (equal_after_sub ~subst (t,0) (u,1)) then (
           Alcotest.failf
             "@[terms unify but are not equal under subst=%a,@ \
              t1=`%a`,@ t2=`%a`,@ t1σ=`%a`,@ t2σ=`%a`"
              Subst.pp subst T.ZF.pp t T.ZF.pp u T.ZF.pp t' T.ZF.pp u'
-        ); *)
+        );
 
         CCList.iter (check_action t u t' renaming subst) actions
       )
@@ -458,9 +463,39 @@ let reg_matching1 = "regression matching", `Quick, fun () ->
       Alcotest.failf
         "@[<hv>`%a`@ and `%a@ should not match@]" T.ZF.pp t1 T.ZF.pp t2
     with Unif.Fail -> ();
-  ) 
+  )
 
-let suite_unif2 = [ reg_matching1; ]
+let reg_unif_makes_eq = Printf.sprintf "regression %d" __LINE__, `Quick, fun () ->
+    let t1 = pterm
+        {|with (Foo:term -> term).
+          Foo
+          (f_ho2
+            (fun (Y0:term). a)
+            (fun (Y0:term).
+              (f_ho2 (fun (Y1:term). (Foo Y1)) (fun (Y1:term). X))))|}
+    and t2 = pterm "with (Bar:term-> term). (Bar X)" in
+    let subst = Unif.FO.unify_syn (t1,0) (t2,1) in
+    if not (equal_after_sub ~subst (t1,0) (t2,1)) then (
+      Alcotest.failf "not equal";
+    );
+    ()
+
+let reg_stack_overflow = "reg_stack_overflow1", `Quick, fun () ->
+  let t = pterm
+      {|with (F0 F1 G:term ->term) (P3:term->prop->term).
+      F1 (P3 (f (F0 c) (F2 e c))
+      (p_ho2 (fun (Y0:term). d) (fun (Y0:term). (G Y0))))|}
+  in
+  if not (equal_after_sub ~subst:Subst.empty (t,0)(t,0)) then (
+    Alcotest.failf "not eq";
+  );
+  ()
+
+let suite_unif2 = [
+  reg_matching1;
+  reg_stack_overflow;
+  reg_unif_makes_eq;
+]
 
 let suite = suite_unif1 @ suite_unif2
 
@@ -516,7 +551,8 @@ let check_unify_makes_eq  =
   let prop (t1, t2) =
     try
       let subst = Unif.FO.unify_syn (t1,0) (t2,1) in
-      if Unif.FO.equal ~subst (t1,0) (t2,1) then true
+      (* if Unif.FO.equal ~subst (t1,0) (t2,1) then true*)
+      if equal_after_sub ~subst (t1,0) (t2,1) then true
       else (
         let renaming = Subst.Renaming.create() in
         QCheck.Test.fail_reportf
@@ -533,7 +569,7 @@ let check_equal =
   let gen = gen_t in
   let name = "unif_term_self_equal" in
   let prop t =
-    Unif.FO.equal ~subst:Subst.empty (t,0) (t,0)
+    equal_after_sub ~subst:Subst.empty (t,0) (t,0)
   in
   QCheck.Test.make ~long_factor:20 ~count:2_000 ~name gen prop
 
