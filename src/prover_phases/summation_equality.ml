@@ -67,7 +67,6 @@ let on_eligible_literals(type c)(module Env: Env.S with type C.t=c) name literal
     ))) |> Iter.to_rev_list
   in
   Env.add_binary_inf name (fun c ->
-    "Active clauses (given first)"|< Iter.to_rev_list(Env.get_active());
     (* TODO use an indexing data structure *)
     Iter.flat_map_l (lifted_inference c) (Env.get_active())
     |> Iter.to_rev_list
@@ -75,11 +74,18 @@ let on_eligible_literals(type c)(module Env: Env.S with type C.t=c) name literal
 
 
 (* K,L ⊢ᵧ K,L' ⟹ C∨K, D∨L ⊢ C∨K, D∨L' given γC⊆D and C≺K *)
-let add_simplify_in_context(type c)(module Env: Env.S with type C.t=c) name literal_inference =
+let add_simplify_in_context
+  (type c)(module Env: Env.S with type C.t=c) 
+  name
+  literal_inference 
+  (type i)(module Index: Index_intf.GENERAL_IDX with type element=c and type t=i)
+  ?key_to_index
+  initial_index
+=
   let module C = Env.C in
   let open SimplM.Infix in
   let lifted_inference c1 c2 =
-    if ~<c1 == ~<c2 then c2,`Same else
+    if c1 == c2 then c2,`Same else
     let exception Changed of C.t in
     let rename = Subst.Renaming.create() in
     let c1_lits = C.lits c1 and c2_lits = C.lits c2 in
@@ -101,14 +107,19 @@ let add_simplify_in_context(type c)(module Env: Env.S with type C.t=c) name lite
     )); c2,`Same
     with Changed c2' -> c2',`New
   in
-  (* Note: keep "fun c ->" so that Env.get_active() is recomputed. TODO indexing *)
-  let rule = fun c -> SimplM.app_list Iter.(to_rev_list(map lifted_inference (Env.get_active()))) 
-   ("Clauses "^str(Iter.to_rev_list(Env.get_clauses()))^" try simplify"|<c) in
-  Env.add_rw_simplify(rule);
-  (* must access simplified given clause through an index *)
-  (* Signal.on_every Env.ProofState.SimplSet.on_add_clause id; *)
-  (* Signal.on_every Env.ProofState.SimplSet.on_remove_clause id; *)
-  Env.add_backward_simplify(fun c -> C.ClauseSet.of_iter(Env.get_active()))
+  let index_key = CCOpt.get_lazy Flex_state.create_key key_to_index in
+  Env.flex_add index_key initial_index;
+  let index act c = act (Env.flex_get index_key) c in
+  
+  Env.add_rw_simplify(fun c -> SimplM.app_list Iter.(to_rev_list(map lifted_inference (index Index.retrieve_generalizations c))) c);
+  Env.add_backward_simplify(C.ClauseSet.of_iter % index Index.retrieve_specializations);
+  let open Env.ProofState in
+  let update_index when' how' = Signal.on_every when' (Env.flex_add index_key % index how') in
+  (* update_index ActiveSet.on_add_clause Index.add; *)
+  (* update_index ActiveSet.on_remove_clause Index.remove; *)
+  update_index SimplSet.on_add_clause Index.add;
+  update_index SimplSet.on_remove_clause Index.remove;
+    (* (fun i c -> if Iter.exists((==)c) (Env.get_active()) then i else Index.remove i c) *)
 
 
 
@@ -175,7 +186,7 @@ let compare_rank = rank %%> ((-) *** Term.compare) *** (-)
 let compare_power = (fun x -> x,x.exp) %%> compare_rank *** (-)
 
 let compare_mono = (fun(c,m,f) -> !elimination_priority m f, (mono_total_deg m, (m, (f, c)))) %%>
-  (-) *** (-) *** lex_list compare_power *** Term.compare *** Term.compare
+  (-) *** (-) *** flip(lex_list compare_power) *** Term.compare *** Term.compare
 
 (* Update the given polynomials to follow the given new default elimination priority. Other existing polynomials become garbage and must not be used!
  The elimination priority overrides the default comparison order of monomials (which is a total degree lexicographic one). This can be used to derive equations without certain indeterminate powers or operands by saturation. For example {n²m+m², nm²} with n≺m ... TODO
@@ -286,17 +297,19 @@ let leadrewrite r p =
   | _ -> None
 
 
-module LeadRewriteIndex = FV_tree.FV_IDX(struct
-  type t = poly
-  let compare = Stdlib.compare (* just for usage in sets *)
+module type View = sig type t type v val view: t -> v option end
+(* Create index from mapping clause→polynomial, and instantiate by empty_with' default_features. *)
+module LeadRewriteIndex(P: View with type v=poly) = FV_tree.FV_IDX(struct
+  type t = P.t
+  let compare = P.view %%> Stdlib.compare (* just for usage in sets *)
   type feature_func = poly -> int
-  let compute_feature f p = FV_tree.N(f p)
+  let compute_feature f p = match P.view p with Some p when p!=_0 -> Some(FV_tree.N(f p)) | _->None
 end)
 
-(* A feature vector index for rewriting which tests various sums of operator degrees *)
-let make_index() =
+(* Features for a rewriting index testing various sums of operator degrees. Only for ≠0 polynomials. *)
+let default_features =
   let sum value p = List.(fold_left (+) 0 (map value (oper_powers p.(0)))) in
-  LeadRewriteIndex.empty_with'[
+  [
     ("total degree", fun p -> mono_total_deg(oper_powers p.(0)));
     "shift degree", sum(function {base=`Move _; exp} -> exp | _ -> 0);
     "coefficient degree", sum(function {base=`Mono; exp} -> exp | _ -> 0);
@@ -326,7 +339,7 @@ module C = MainEnv.C
 (* module Ctx = MainEnv.Ctx *)
 (* let _= add_pp TypeTests.clause (CCFormat.to_string C.pp_tstp) *)
 
-let polyform, fake_poly_lit =
+let (polyform: Literal.t -> Ore.poly option), fake_poly_lit =
   (* Set up an automatically garbage collected cache for polyform. *)
   let module Hash_lit_to_poly: Hashtbl.HashedType with type t = Literal.t = struct
     type t = Literal.t 
@@ -388,11 +401,17 @@ end) (* Cannot be local to below because type C.t = PolyEnv.C.t escapes that sco
 let indeterminate_elimination_environment() =
     let env = (module PolyEnv: Env.S with type C.t='Ct) in
     let module C = PolyEnv.C in
-    (* on_eligible_literals env "sup. poly." superpose_poly; *)
-    add_simplify_in_context env "lead rewrite" rewrite_poly;
+    let module LRI = Ore.LeadRewriteIndex(struct type t=C.t type v=Ore.poly
+      let view c = match Literals.maxlits_l ~ord:(PolyEnv.ord()) (C.lits c) with
+      | [largest,_] -> polyform largest
+      | _ -> None
+    end) in
+    add_simplify_in_context env "lead rewrite" rewrite_poly 
+      (module LRI) (LRI.empty_with' Ore.default_features);
+    on_eligible_literals env "sup. poly." superpose_poly;
     PolyEnv.add_is_trivial ((=)(Array.of_list[mk_tauto]) % C.lits);
-    let export: PolyEnv.C.t -> MainEnv.C.t = Obj.magic in (* TODO *)
-    env, Iter.map export % PolyEnv.get_clauses, PolyEnv.get_active
+    let export: PolyEnv.C.t Iter.t -> MainEnv.C.t Iter.t = Obj.magic in (* TODO *)
+    env, export% PolyEnv.get_clauses, export% PolyEnv.get_active
 
 let saturate env cc = Phases.(run(
   let (^) label thread = start_phase label >>= return_phase >>= ~=thread in
@@ -427,27 +446,28 @@ let test_hook clause =
     !e *)
   );
   
-  let _ = saturate subenv Ore.({Clause.c_set= of_list[
-    eq0"z 5"; eq0"z 2 + -1.";
+  let _ = saturate subenv Ore.({Clause.c_set= of_list([
+    (* eq0"z 5"; eq0"z 2 + -1."; *)
     (* eq0"3.z 19"; eq0"3.z 9 + 1."; *)
     (* eq0"x + y + -1.z"; eq0"x 2 + y 2 + -1.z 2"; *)
     (* eq0"y 2 x + -1.x + -1.y"; eq0"y 1 x 2 + -1.x + -1."; *)
     (* eq0"x 2 + 3.x + 1."; eq0"y 2 + 3.y + 1."; eq0"x 5 + y 5"; *)
     
-    (* eq0"2.n 2 N 2 + -1.n 1 N + 3."; eq0"N 3 + 2.n 1 N";  *) 
-    (* eq0"2.n 1 N + -1.m + 3."; eq0"N 1 M + 2.m"; *) 
+    (* eq0"2.n 1 N + -1.m + 3."; eq0"N 1 M + 2.m";  *)
+    (* eq0"2.n 2 N 2 + -1.n 1 N + 3."; eq0"N 3 + 2.n 1 N";   *)
     
     (* eq0"X'S* + -1.'S* + -1.X'f"; eq0"'h + -1.'S* + 'g*";  *)
     (* eq0"X'g* + -1.'g* + -1.X'f"; *)
     (* eq0"-1.X 2'g* + 'g* + X 2'f + X'f"; *)
     
     (* eq0"Y'⬝2ʸ + -2.'⬝2ʸ"; eq0"-4.'g` + y 2'⬝2ʸ + y'⬝2ʸ"; *)
-    (* eq0"x 1 X'(ˣᵧ) + -1.y 1 X'(ˣᵧ) + X'(ˣᵧ) + -1.x'(ˣᵧ) + -1.'(ˣᵧ)"; eq0"y 1 Y'(ˣᵧ) + Y'(ˣᵧ) + -1.x'(ˣᵧ) + y'(ˣᵧ)"; eq0"'f` + -1.y 2'(ˣᵧ)"; *)
+    (* with degREVlex below got 50× slower to ≈1s *)
+    eq0"x 1 X'(ˣᵧ) + -1.y 1 X'(ˣᵧ) + X'(ˣᵧ) + -1.x'(ˣᵧ) + -1.'(ˣᵧ)"; eq0"y 1 Y'(ˣᵧ) + Y'(ˣᵧ) + -1.x'(ˣᵧ) + y'(ˣᵧ)"; eq0"'f` + -1.y 2'(ˣᵧ)";
     (* Change priority for ↓ *)
     (* eq0"x 1 X'f + -1.y 1 X'f + X'f + -1.x'f + -1.'f"; eq0"y 2 Y'f + -1.y 1 x'f + y 2'f + -1.x'f + y'f"; *)
 
     (* eq0"-1.x 2 X 2'∑f+-2.x 1 X 2'∑f+-1.X 2'∑f + 3.x 2 X'∑f+9.x 1 X'∑f+6.X'∑f + -2.x 2'∑f+-6.x'∑f+-4.'∑f"; eq0"x 1 X'g + -2.x'g + -4.'g"; eq0"'h` + -1.'∑f + 'g"; *)
-    eq0'[Ore._0]]; c_sos= of_list[]}) in
+    eq0'[Ore._0]] |> CCList.remove_at_idx(-1)); c_sos= of_list[]}) in
   [step "" (Iter.to_rev_list(get_clauses())) []]
 
 

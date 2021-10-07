@@ -1,4 +1,4 @@
-
+open Util.UntypedPrint
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Feature Vector indexing} *)
@@ -29,7 +29,7 @@ let mk_l s = L s
 module type HasFeatures = sig
   include Set.OrderedType
   type feature_func
-  val compute_feature : feature_func -> t -> feature
+  val compute_feature : feature_func -> t -> feature option
 end
 
 module Feature : sig
@@ -188,25 +188,29 @@ module FV_IDX(Element: HasFeatures) = struct
 
   let feature_funs idx = idx.funs
 
-  let compute_fv ff e = IArray.map (fun f -> Element.compute_feature f.f e) ff
+  let compute_fv ff e =
+    try Some(IArray.map (fun f -> CCOpt.get_exn(Element.compute_feature f.f e)) ff)
+    with Invalid_argument _ -> None
 
   let add idx c =
     (* feature vector of [c] *)
-    let fv = compute_fv idx.funs c in
-    (* insertion *)
-    let k set = TrieLeaf (C_set.add c set) in
-    let trie' = goto_leaf idx.trie fv k in
-    { idx with trie=trie'; }
+    match compute_fv idx.funs c with
+    | None -> idx
+    | Some fv -> (* insertion *)
+      let k set = TrieLeaf (C_set.add c set) in
+      let trie' = goto_leaf idx.trie fv k in
+      { idx with trie=trie'; }
 
   let add_seq = Iter.fold add
   let add_list = List.fold_left add
 
   let remove idx c =
-    let fv = compute_fv idx.funs c in
-    (* remove [c] from the trie *)
-    let k set = TrieLeaf (C_set.remove c set) in
-    let trie' = goto_leaf idx.trie fv k in
-    { idx with trie=trie'; }
+    match compute_fv idx.funs c with
+    | None -> idx
+    | Some fv -> (* remove [c] from the trie *)
+      let k set = TrieLeaf (C_set.remove c set) in
+      let trie' = goto_leaf idx.trie fv k in
+      { idx with trie=trie'; }
 
   let remove_seq idx seq = Iter.fold remove idx seq
 
@@ -231,7 +235,9 @@ module FV_IDX(Element: HasFeatures) = struct
 
   (* Private patch between retrieve_—which is reused to Make subsumption index—and the public interface. *)
   let retrieve_subject_to query idx element =
-    retrieve_ idx (compute_fv idx.funs element)
+    match compute_fv idx.funs element with
+    | None -> Iter.empty
+    | Some fv -> retrieve_ idx fv
       ~check:(fun ~feat_query ~feat_tree -> query feat_tree feat_query)
 
   let retrieve_generalizations = retrieve_subject_to Feature.leq
@@ -262,7 +268,7 @@ module Make(C: Index_intf.CLAUSE) = struct
     include C
     (* Instead of packed clause, already literals and labels suffice to compute features. *)
     type feature_func = Index_intf.lits -> Index_intf.labels -> feature
-    let compute_feature f c = f (C.to_lits c) (C.labels c)
+    let compute_feature f c = Some(f (C.to_lits c) (C.labels c))
   end
   (* The functionality from the general implementation will be extended with default empty() and unpacked retrieval interface. *)
   include FV_IDX(Featureful_C)
@@ -411,6 +417,8 @@ module Make(C: Index_intf.CLAUSE) = struct
     ]
   
   let empty () = empty_with default_feature_funs
+
+  let compute_fv f e = CCOpt.get_exn(compute_fv f e)
 
   
   (* Private patch between the retrieve_ from FV_IDX and the public interface. We cannot use only public interface of FV_IDX because that takes its elements (clauses) as whole while we want to retrieve by their parts (lits & labels) and only have destructors from C:CLAUSE. *)

@@ -25,8 +25,8 @@ type feature_vector = feature IArray.t
 module type HasFeatures = sig
   include Set.OrderedType (* order is only for usage in sets *)
   type feature_func
-  val compute_feature : feature_func -> t -> feature
-  (** HasFeatures: This module allows base feature vector index FV_IDX to be parameterized by internal type of the feature functions it uses. This in turn allows to simultaneously reuse retrieval logic from FV_IDX and change the query type to be different from the type of the indexed elements. For example subsuming clauses may be queried directly by literals and labels bypassing the clause construction. (Note that modules HasFeatures and CLAUSE provide only a destructive view to their data. ) *)
+  val compute_feature : feature_func -> t -> feature option
+  (** HasFeatures: This module allows base feature vector index FV_IDX to be parameterized by internal type of the feature functions it uses. This in turn allows to simultaneously reuse retrieval logic from FV_IDX and change the query type to be different from the type of the indexed elements. For example subsuming clauses may be queried directly by literals and labels bypassing the clause construction. (Note that modules HasFeatures and CLAUSE provide only a destructive view to their data. ) If compute_feature f e = None for any feature f, the element e won't be added to the index and its queries find nothing. *)
 end
 
 
@@ -41,7 +41,7 @@ module FV_IDX(Element: HasFeatures) : sig
   val empty_with : feature_funs -> t
   (** Create index with custom features. They are tried in given order so place coarse and cheap ones first. (There is no default features for general feature vector index.) *)
 
-  val compute_fv : feature_funs -> element -> feature_vector
+  val compute_fv : feature_funs -> element -> feature_vector option
   (** Given feature functions and an element, compute its feature vector. *)
 
   val feature_funs : t -> feature_funs

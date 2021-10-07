@@ -110,7 +110,7 @@ module type CLAUSE = sig
 end
 
 module type GENERAL_IDX = sig
-  (** An index is a set from which it is fast to query potential generalizations, specializations and/or equivalents to a given element. Meaning of generalization is defined by the concrete instance. Specialization is the opposite of generalization, and equivalence means to both generalize and specialize. A feature vector index particularly, is usually imperfect, so that queries may return excess elements. See FV_tree.ml for an implementation. This interface currently omits unifiability because feature vectors are useless filters to that. *)
+  (** An index is a set from which it is fast to query potential generalizations, specializations and/or equivalents to a given element. Meaning of generalization is defined by the concrete instance. Specialization is the opposite of generalization, and equivalence means to both generalize and specialize. A feature vector index particularly, is usually imperfect, so that queries may return excess elements. See FV_tree.ml for an implementation. This interface currently omits unifiability because feature vectors are ineffective filters to that. *)
 
   type t
   type element
@@ -119,7 +119,7 @@ module type GENERAL_IDX = sig
   (** Informal name of index type *)
 
   val add : t -> element -> t
-  (** Add element to index. It won't be duplicated. *)
+  (** Add element to index. It won't be duplicated. Some index may decide to ignore this operation! Ignoring is useful to filter clauses that can never participate to the inference, which the index is for, or to save memory if the inference is optional. *)
 
   val add_seq : t -> element Iter.t -> t
   val add_list : t -> element list -> t
