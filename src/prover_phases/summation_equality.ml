@@ -132,6 +132,7 @@ type monomial =
     term * power list * term
 type poly = monomial array
 
+let oper_coef(c,_,_) = c
 let oper_powers(_,m,_) = m
 let oper_arg(_,_,f) = f
 
@@ -196,10 +197,17 @@ let redefine_elimination_priority all_polynomials priority =
   elimination_priority := priority;
   all_polynomials(Array.sort(flip compare_mono))
 
+(* An elimination priority function. For example: elim_oper_args[t,2; s,1; r,1] to eliminate terms t,s,r with priority among them in t. *)
+let elim_oper_args weights = ~=Hashtbl.(CCOpt.get_or ~default:0 % find_opt(of_seq(List.to_seq weights)))
+
+(* An elimination priority to indeterminates assigned by the given weight function. Example use: elim_indeterminate(function{base=`Mono;var=2}->1|_->0). Ignore the exp field of the tested indeterminate. *)
+let rec elim_indeterminate weight m _ = List.fold_left (fun pr x -> pr + weight x * x.exp) 0 m
 
 (* Arithmetic of polynomials etc. Main operations to superpose polynomials are: addition, multiplication by monomial, and lcm of monomials upto leading term. *)
 
-let _0 = Array.of_list[]
+let _0 = [||]
+
+let one t = [|_z 1, [], t|]
 
 let set_exp x e = if e=0 then [] else [{x with exp=e}]
 
@@ -227,6 +235,9 @@ let (++) p r = sum_monomials Array.(to_list p @ to_list r)
 
 (* constant × polynomial *)
 let ( *:) a = Array.map(fun(c,m,f) -> (a><c, m, f))
+
+(* polynomial - polynomial *)
+let (--) p r = p ++ _z(-1)*:r
 
 (* monomial × polynomial *)
 let ( **:) mon =
@@ -283,19 +294,28 @@ let superpose p1 p2 =
   if p1=_0 or p2=_0 or oper_arg p1.(0) != oper_arg p2.(0) then [] else
   let f1, f2 = (oper_powers %%> lcm_factors) p1.(0) p2.(0) in
   let p'1, p'2 = f1**:p1, f2**:p2 in
-  let a1, a2 = ((fun(c,_,_)->c) %%> lcm_coefs) p'1.(0) p'2.(0) in
-  [lead_0(a1*:p'1) ++ lead_0((_z(-1)><a2)*:p'2)]
+  let a1, a2 = (oper_coef %%> lcm_coefs) p'1.(0) p'2.(0) in
+  [lead_0(a1*:p'1) -- lead_0(a2*:p'2)]
 
 (* Try rewrite leading monomial of p by r. *)
 let leadrewrite r p =
   if r=_0 or p=_0 or oper_arg r.(0) != oper_arg p.(0) then None else
   match (oper_powers %%> div_factor) r.(0) p.(0) with
   | Some f -> let r' = f**:r in
-    let a1,a2 = ((fun(c,_,_)->c) %%> lcm_coefs) p.(0) r'.(0) in
+    let a1,a2 = (oper_coef %%> lcm_coefs) p.(0) r'.(0) in
     (* TODO check that a1 is invertible *)
-    Some(lead_0(a1*:p) ++ lead_0((_z(-1)><a2)*:r'))
+    Some(lead_0(a1*:p) -- lead_0(a2*:r'))
   | _ -> None
 
+
+(* Find r,q s.t. p = (x-a)q + r when given number constant a, indeterminate x, and polynomial p whose indeterminates commute with x. Note that r is "p evaluated at x=a". *)
+let rec left_divide_by_deg1_monic a x p = 
+  if p=_0 then _0,_0 else
+  match div_factor (oper_powers p.(0)) [x] with
+  | Some f ->
+    let r,q' = left_divide_by_deg1_monic a x (p -- f**:[|_z 1, [x], oper_arg p.(0); a, [], oper_arg p.(0)|]) in
+    r, q'++f**:[|_z 1, [], oper_arg p.(0)|]
+  | None -> p,_0
 
 module type View = sig type t type v val view: t -> v option end
 (* Create index from mapping clause→polynomial, and instantiate by empty_with' default_features. *)
@@ -319,6 +339,24 @@ let default_features =
   ]
 
 
+(* Embedding polynomials to terms and literals. Does not preserve equality. *)
+
+let term0 = const ~ty:term (ID.make "𝟬")
+
+exception RepresentingPolynomial of poly
+
+let poly_as_lit_term_id ?name p =
+  (* TODO Control how ordering treats the term. *)
+  let id = ID.make(CCOpt.get_lazy(fun()-> poly_to_string p) name) in
+  ID.set_payload id (RepresentingPolynomial p);
+  let term = const ~ty:term id in
+  mk_eq term0 term, term, id
+
+let poly_of_term t = match view t with Const id -> ID.payload_find ~f:(function RepresentingPolynomial p -> Some p |_->None) id |_->None
+
+let poly_of_lit = function Equation(t,p,true) when t==term0 -> poly_of_term p |_->None
+
+
 (* quick manual data entry *)
 let _p s = let is_low c = String.lowercase c = c in
   let rec go = function
@@ -334,100 +372,119 @@ end
 
 
 module MakeSumSolver(MainEnv: Env.S) = struct
-(* module Env = MainEnv *)
 module C = MainEnv.C
 (* module Ctx = MainEnv.Ctx *)
-(* let _= add_pp TypeTests.clause (CCFormat.to_string C.pp_tstp) *)
 
-let (polyform: Literal.t -> Ore.poly option), fake_poly_lit =
-  (* Set up an automatically garbage collected cache for polyform. *)
-  let module Hash_lit_to_poly: Hashtbl.HashedType with type t = Literal.t = struct
-    type t = Literal.t 
-    let equal =  equal_com
-    let h seed op a b = Hash.combine3 seed (Hashtbl.hash op) (a + b)
-    let hash =  function
-    | Equation(a,b,sign) -> (Term.hash %%> h 1 sign) a b
-    | Int(Binary(op,a,b)) -> (Monome.hash %%> h 2 op) a b
-    | Rat l -> (Monome.hash %%> h 3 l.op) l.left l.right
-    | l -> Literal.hash l
-  end in
-  let module NoMemoryLeakMap = Hashtbl.Make(Hash_lit_to_poly) in
-  let cache = NoMemoryLeakMap.create 0 in
-  (* Principle: cache _0 to denote failed conversion when the conversion test was expensive. *)
-  (* polyform *)
-  Ore.(fun l -> match NoMemoryLeakMap.find_opt cache l with
-  | Some p -> CCOpt.if_((<>)_0) p
-  | None ->
-    (* let result p = NoMemoryLeakMap.add cache (l,p); CCOpt.if_((<>)_0) p in *)
-    (* Actual work: test if literal l has polynomial form. *)
-    match l with
-    | Equation(a,b,true) -> None
-    | Int(Binary(Equal,a,b)) -> None
-    | Rat{op=Equal; left=a; right=b} -> None (* TODO simplify every Rat to Int *)
-    | _ -> None),
-  (* fake_poly_lit *)
-  fun p -> 
-    if p = Ore._0 then mk_tauto else
-    let l = mk_eq (const ~ty:int (ID.make(Ore.poly_to_string p))) (Ore._z 0) in
-    NoMemoryLeakMap.add cache l p;
-    l
+let polyliteral p = if p = Ore._0 then mk_tauto else (fun(l,_,_)->l) (Ore.poly_as_lit_term_id p)
 
+let definitional_poly_clause p = C.create [polyliteral p] ~penalty:1 ~trail:(C.trail_l[]) Proof.Step.trivial
 
-let clauseset clauselist = {Clause.c_set= of_list clauselist; c_sos= of_list[]}
+let polys_in = Iter.(concat % map(filter_map Ore.poly_of_lit % of_array % C.lits))
 
-let superpose_poly l1 = match polyform l1 with
-| None -> ~=[]
+let polys_of_2_lits no yes l1 = match Ore.poly_of_lit l1 with
+| None -> ~=no
 | Some p1 ->
-  fun l2 -> match polyform l2 with
-  | None -> []
-  | Some p2 -> List.filter((!=)[mk_tauto] % fst) (List.map(fun p -> [fake_poly_lit p], Subst.empty) (Ore.superpose p1 p2))
+  fun l2 -> match Ore.poly_of_lit l2 with
+  | None -> no
+  | Some p2 -> yes p1 p2
 
-let rewrite_poly l1 = match polyform l1 with
-| None -> ~=None
-| Some p1 ->
-  fun l2 -> match polyform l2 with
-  | None -> None
-  | Some p2 -> CCOpt.map(fun p -> [fake_poly_lit p], Subst.empty) (Ore.leadrewrite p1 p2)
+let superpose_poly = polys_of_2_lits [] (Ore.superpose %>> List.map(fun p -> [polyliteral p], Subst.empty))
+
+let rewrite_poly = polys_of_2_lits None (Ore.leadrewrite %>> CCOpt.map(fun p -> [polyliteral p], Subst.empty))
 
 
-module PolyEnv: Env.S = Env.Make(struct
-  module Ctx = MainEnv.Ctx
-  (* module C = MainEnv.C *)
-  let params = MainEnv.params
-  let flex_state = MainEnv.flex_state()
-  let export: C.t -> MainEnv.C.t = id
-
-end) (* Cannot be local to below because type C.t = PolyEnv.C.t escapes that scope. *)
-let indeterminate_elimination_environment() =
-    let env = (module PolyEnv: Env.S with type C.t='Ct) in
-    let module C = PolyEnv.C in
-    let module LRI = Ore.LeadRewriteIndex(struct type t=C.t type v=Ore.poly
-      let view c = match Literals.maxlits_l ~ord:(PolyEnv.ord()) (C.lits c) with
-      | [largest,_] -> polyform largest
-      | _ -> None
-    end) in
-    add_simplify_in_context env "lead rewrite" rewrite_poly 
-      (module LRI) (LRI.empty_with' Ore.default_features);
-    on_eligible_literals env "sup. poly." superpose_poly;
-    PolyEnv.add_is_trivial ((=)(Array.of_list[mk_tauto]) % C.lits);
-    let export: PolyEnv.C.t Iter.t -> MainEnv.C.t Iter.t = Obj.magic in (* TODO *)
-    env, export% PolyEnv.get_clauses, export% PolyEnv.get_active
-
-let saturate env cc = Phases.(run(
+let saturate_in env cc = Phases.(run(
   let (^) label thread = start_phase label >>= return_phase >>= ~=thread in
   Parse_CLI^LoadExtensions^Parse_prelude^Start_file^Parse_file^Typing^CNF^Compute_prec^Compute_ord_select^MakeCtx^MakeEnv^
-  Phases_impl.refute_or_saturate env cc >>= fun result ->
-  start_phase Exit >>= ~=(return_phase result)))
+  Phases_impl.refute_or_saturate env {Clause.c_set= of_list cc; c_sos= of_list []}
+  >>= fun result -> start_phase Exit >>= ~=(return_phase result)))
 
 
+let make_polynomial_environment() =
+  let module PolyEnv = (val (module Env.Make(struct
+      module Ctx = MainEnv.Ctx
+      let params = MainEnv.params
+      let flex_state = MainEnv.flex_state()
+    end) : Env.S)
+  (* Env.Make assigns the clause module Env.C as a function of Ctx only. Hence it is safe to cast the clauses of PolyEnv to share the type of the clauses of MainEnv. This in turn is necessary to initialize PolyEnv with clauses from MainEnv. *)
+  |> Obj.magic : Env.S with type C.t = MainEnv.C.t)
+  in
+  let env = (module PolyEnv: Env.S with type C.t = MainEnv.C.t) in
+  
+  let module LRI = Ore.LeadRewriteIndex(struct type t=C.t type v=Ore.poly
+    let view c = match Literals.maxlits_l ~ord:(PolyEnv.ord()) (C.lits c) with
+    | [largest,_] -> Ore.poly_of_lit largest
+    | _ -> None
+  end) in
+  add_simplify_in_context env "lead rewrite" rewrite_poly 
+    (module LRI) (LRI.empty_with' Ore.default_features);
+  PolyEnv.add_is_trivial (Array.mem mk_tauto % C.lits);
+  env,
+  fun clauses -> match saturate_in env (Iter.to_rev_list clauses) with
+    | Error e -> raise(Failure e)
+    | Ok(_, Unsat _) -> PolyEnv.C.ClauseSet.to_iter(PolyEnv.get_empty_clauses())
+    | _ -> PolyEnv.get_clauses()
+
+
+(* Filter eligible non-trivial polynomial recurrences by the given condition. *)
+let filter_recurrences ok_poly = Iter.filter(fun c ->
+  try fold_lits ~eligible:(C.Eligible.res c) (C.lits c) Ore.(fun(l,_) ->
+    match poly_of_lit l with
+    | Some p -> if p!=_0 && ok_poly p then raise Exit
+    | _ -> ());
+  false
+  with Exit -> true)
+
+(* Filter those clauses that have eligible polynomial with leading term M t where some monomial M operates on an OK term t. *)
+let filter_recurrences_of ok_terms = filter_recurrences(fun p -> ok_terms(Ore.oper_arg p.(0)))
+
+
+let propagate_rec_plus t s ?(sum= app_builtin ~ty:(ty t) Sum [t;s]) =
+  let rec_t_s = filter_recurrences_of (fun r -> r==t or r==s) (MainEnv.get_clauses()) in
+  let env, saturate = make_polynomial_environment() in
+  on_eligible_literals env "sup. poly." superpose_poly;
+  (* TODO set exact inferences on env *)
+  Ore.redefine_elimination_priority (polys_in rec_t_s) (Ore.elim_oper_args[t,2; s,2; sum,1]);
+  Iter.cons (definitional_poly_clause Ore.(one sum -- one t -- one s)) rec_t_s
+  |> saturate
+  |> filter_recurrences_of((==)sum)
+  |> MainEnv.add_passive
+
+let propagate_rec_times t s ?(product= app_builtin ~ty:(ty t) Product [t;s]) =
+  let rec_t_s = filter_recurrences_of (fun r -> r==t or r==s) (MainEnv.get_clauses()) in
+  (* Iter.cons (definitional_poly_clause(one product --  *)
+  (* Computing Krull dimension: Max size of a set S of indeterminates s.t. following. A leading element of basis is interprated as a set of its indeterminates A. Demand A⊈S for all such A. *)
+  ()
+
+let propagate_rec_sum sum_index t ~sum =
+  let rec_t = filter_recurrences_of ((==)t) (MainEnv.get_clauses()) in
+  let env, saturate = make_polynomial_environment() in
+  (* TODO also eliminate non-near-bijective `Move *)
+  Ore.redefine_elimination_priority (polys_in rec_t) (Ore.elim_indeterminate(function
+    | {base=`Move _} -> 0
+    | x -> if x.var = sum_index then 1 else 0));
+  let prerec_sum = saturate rec_t 
+  |> filter_recurrences(Array.for_all(fun(_,m,_) -> m |> List.for_all(function
+    | {Ore.base=`Move _} -> true
+    | x -> x.var != sum_index)))
+  in
+  (* TODO Transform all legal recurrences or just the one but not those which are not considered by the above filtering. That means extracting from a clause and then extracting recurrence's terms which operate to the ∑. *)
+  (* let rec_sum = Iter.map Ore.(left_divide_by_deg1_monic (_z 1) {base=`Move(_z 1); var=sum_index; exp=1}) prerec_sum in *)
+  ()
+  (* Steps:
+  saturate the summed-over variable away
+  apply near-bijective transformations (X ↦ 1) —needs division by (X-1)
+  apply near-commutation transformations (∑Pf → P∑f)
+   *)
+  
 let step text parents lits =
   C.create lits ~penalty:1 ~trail:(C.trail_l[]) (if parents=[]
   then (if text="goal" then Proof.Step.goal' else Proof.Step.assert') ~file:"" ~name:text ()
   else Proof.Step.inference ~tags:[] ~rule:(Proof.Rule.mk text) (List.map (fun p -> C.proof_parent_subst (Subst.Renaming.create()) (p,0) Subst.empty) parents))
   
 let test_hook clause =
-  let subenv, get_clauses, get_active = indeterminate_elimination_environment() in
-  let eq0' p = PolyEnv.C.create (List.map fake_poly_lit p) ~penalty:1 ~trail:(C.trail_l[]) (Proof.Step.assert' ~file:"" ~name:"" ()) in
+  let subenv, saturate = make_polynomial_environment() in
+  let eq0' p = C.create (List.map polyliteral p) ~penalty:1 ~trail:(C.trail_l[]) (Proof.Step.assert' ~file:"" ~name:"" ()) in
   let split_or k d s = match String.split_on_char k s with
   | [a;b] -> a,b | [a] -> if k='.' then d,a else a,d | _ -> raise Exit in
   let eq0 ss = eq0'[Ore._P(List.map(fun cmt ->
@@ -446,7 +503,7 @@ let test_hook clause =
     !e *)
   );
   
-  let _ = saturate subenv Ore.({Clause.c_set= of_list([
+  let _ = saturate_in subenv Ore.([
     (* eq0"z 5"; eq0"z 2 + -1."; *)
     (* eq0"3.z 19"; eq0"3.z 9 + 1."; *)
     (* eq0"x + y + -1.z"; eq0"x 2 + y 2 + -1.z 2"; *)
@@ -467,8 +524,9 @@ let test_hook clause =
     (* eq0"x 1 X'f + -1.y 1 X'f + X'f + -1.x'f + -1.'f"; eq0"y 2 Y'f + -1.y 1 x'f + y 2'f + -1.x'f + y'f"; *)
 
     (* eq0"-1.x 2 X 2'∑f+-2.x 1 X 2'∑f+-1.X 2'∑f + 3.x 2 X'∑f+9.x 1 X'∑f+6.X'∑f + -2.x 2'∑f+-6.x'∑f+-4.'∑f"; eq0"x 1 X'g + -2.x'g + -4.'g"; eq0"'h` + -1.'∑f + 'g"; *)
-    eq0'[Ore._0]] |> CCList.remove_at_idx(-1)); c_sos= of_list[]}) in
-  [step "" (Iter.to_rev_list(get_clauses())) []]
+    eq0'[Ore._0]] |> CCList.remove_at_idx(-1)) in
+  let module SubEnv = (val subenv) in
+  [step "" (Iter.to_rev_list(SubEnv.get_clauses())) []]
 
 
 
