@@ -1159,6 +1159,18 @@ module LambdaKBO : ORD = struct
      | Leq -> C.merge_with_Leq cmp
      | cmp' -> cmp')
 
+  let is_more_polymorphic t s =
+    match Type.view (Term.ty t), Type.view (Term.ty s) with
+    | Var y, Var x -> HVar.id y = HVar.id x
+    | _, Var _ -> false
+    | _, _ -> true
+
+  let consider_poly t s cmp =
+    match cmp with
+    | C.Gt | Geq -> if is_more_polymorphic t s then cmp else Incomparable
+    | Lt | Leq -> if is_more_polymorphic s t then cmp else Incomparable
+    | _ -> cmp
+
   let rec process_args ~prec ts ss =
     let w = Polynomial.create_zero () in
     (* both comparisons are needed because connectives have variable arity *)
@@ -1205,28 +1217,28 @@ module LambdaKBO : ORD = struct
           List.iteri add_weight_of_extra_arg extra_arg_ws;
           consider_weight w cmp
         else
-          consider_weights_of ~prec t s C.Incomparable
+          consider_weights_poly ~prec t s C.Incomparable
       )
     | Var _, AppBuiltin (b, _) ->
-      consider_weights_of ~prec t s
+      consider_weights_poly ~prec t s
         (if Builtin.as_int b = 0 then C.Geq else C.Incomparable)
     | AppBuiltin (b, _), Var _ ->
-      consider_weights_of ~prec t s
+      consider_weights_poly ~prec t s
         (if Builtin.as_int b = 0 then C.Leq else C.Incomparable)
     | Var _, _ | _, Var _ ->
-      consider_weights_of ~prec t s C.Incomparable
+      consider_weights_poly ~prec t s C.Incomparable
     | Fun (t_ty, t_body), Fun (s_ty, s_body) ->
       (match compare_types ~prec t_ty s_ty with
        | Eq -> process_terms ~prec t_body s_body
-       | cmp -> consider_weights_of ~prec t_body s_body cmp)
-    | Fun _, (DB _|Const _|AppBuiltin _) -> consider_weights_of ~prec t s Gt
-    | DB _, Fun _ -> consider_weights_of ~prec t s Lt
+       | cmp -> consider_weights_poly ~prec t_body s_body cmp)
+    | Fun _, (DB _|Const _|AppBuiltin _) -> consider_weights_poly ~prec t s Gt
+    | DB _, Fun _ -> consider_weights_poly ~prec t s Lt
     | DB j, DB i ->
-      if j > i then consider_weights_of ~prec t s Gt
-      else if j < i then consider_weights_of ~prec t s Lt
+      if j > i then consider_weights_poly ~prec t s Gt
+      else if j < i then consider_weights_poly ~prec t s Lt
       else process_args ~prec t_args s_args
-    | DB _, (Const _|AppBuiltin _) -> consider_weights_of ~prec t s Gt
-    | Const _, (Fun _|DB _) -> consider_weights_of ~prec t s Lt
+    | DB _, (Const _|AppBuiltin _) -> consider_weights_poly ~prec t s Gt
+    | Const _, (Fun _|DB _) -> consider_weights_poly ~prec t s Lt
     | Const gid, Const fid ->
       (match Prec.compare prec gid fid with
        | 0 ->
@@ -1235,25 +1247,25 @@ module LambdaKBO : ORD = struct
             (match same_length_lex_ext (compare_type_terms ~prec)
                t_tyargs s_tyargs with
              | Eq -> process_args ~prec t_args s_args
-             | cmp -> consider_weights_of ~prec t s cmp)
-          | n -> consider_weights_of ~prec t s (C.of_total n))
-       | n when n > 0 -> consider_weights_of ~prec t s Gt
-       | _ -> consider_weights_of ~prec t s Lt)
-    | Const _, AppBuiltin _ -> consider_weights_of ~prec t s Gt
-    | AppBuiltin _, (Fun _|DB _|Const _) -> consider_weights_of ~prec t s Lt
+             | cmp -> consider_weights_poly ~prec t s cmp)
+          | n -> consider_weights_poly ~prec t s (C.of_total n))
+       | n when n > 0 -> consider_weights_poly ~prec t s Gt
+       | _ -> consider_weights_poly ~prec t s Lt)
+    | Const _, AppBuiltin _ -> consider_weights_poly ~prec t s Gt
+    | AppBuiltin _, (Fun _|DB _|Const _) -> consider_weights_poly ~prec t s Lt
     | AppBuiltin (t_b, t_bargs), AppBuiltin (s_b, s_bargs) ->
       (match Builtin.compare t_b s_b with
        | 0 ->
          process_args ~prec (t_bargs @ t_tyargs @ t_args)
            (s_bargs @ s_tyargs @ s_args)
-       | n when n > 0 -> consider_weights_of ~prec t s Gt
-       | _ -> consider_weights_of ~prec t s Lt)
+       | n when n > 0 -> consider_weights_poly ~prec t s Gt
+       | _ -> consider_weights_poly ~prec t s Lt)
     | _, _ -> assert false
-  and consider_weights_of ~prec t s cmp =
+  and consider_weights_poly ~prec t s cmp =
     let w = Polynomial.create_zero () in
     add_weight_of ~prec w (+1) t;
     add_weight_of ~prec w (-1) s;
-    consider_weight w cmp
+    consider_weight w (consider_poly t s cmp)
 
   let compare_terms ~prec t s =
     ZProf.enter_prof prof_lambda_kbo;
