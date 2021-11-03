@@ -1352,8 +1352,6 @@ module LambdaLPO : ORD = struct
       else C.Incomparable
     | (Const _|DB _), Var _ ->
       if check_subs ~prec t_args s then C.Gt else C.Incomparable
-    | Const _, AppBuiltin (_, s_bargs) ->
-      compare_rest ~prec t (List.rev_append s_bargs s_args)
     | Const gid, Const fid ->
       (match Prec.compare prec gid fid with
        | 0 ->
@@ -1369,6 +1367,8 @@ module LambdaLPO : ORD = struct
           | _ -> C.opp (compare_rest ~prec s t_args))
        | n when n > 0 -> compare_rest ~prec t s_args
        | _ -> C.opp (compare_rest ~prec s t_args))
+    | Const _, AppBuiltin (_, s_bargs) ->
+      compare_rest ~prec t (List.rev_append s_bargs s_args)
     | (Const _|AppBuiltin _), DB _ -> compare_rest ~prec t s_args
     | (Const _|AppBuiltin _|DB _), Fun (_, s_body) ->
       compare_rest ~prec t [s_body]
