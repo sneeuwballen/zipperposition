@@ -783,12 +783,12 @@ let test_lambda_lpo = "ordering.lambda_lpo", `Quick, fun () ->
   Alcotest.(check comp_test) "f (x a) > x a"
     Comparison.Gt (compare (Term.app f [Term.app x [a]]) (Term.app x [a]));
 
-  (* f b b < f a (test for eta-expansion) *)
+  (* f b b > f a (test for eta-expansion) *)
   let f = Term.const ~ty:(Type.arrow [ty; ty] ty) f_ in
   let a = Term.const ~ty a_ in
   let b = Term.const ~ty b_ in
-  Alcotest.(check comp_test) "f b b < f a"
-    Comparison.Lt (compare (Term.app f [b; b]) (Term.app f [a]));
+  Alcotest.(check comp_test) "f b b > f a"
+    Comparison.Gt (compare (Term.app f [b; b]) (Term.app f [a]));
 
   (* z g <=>? z f *)
   let f = Term.const ~ty:(Type.arrow [ty] ty) f_ in
@@ -833,20 +833,20 @@ let test_lambda_lpo = "ordering.lambda_lpo", `Quick, fun () ->
   Alcotest.(check comp_test) "h (x y) > f a (x y)"
     Comparison.Gt (compare (Term.app h [Term.app x [y]]) (Term.app f [a; Term.app x [y]]));
 
-  (* forall x. x > h a a a *)
+  (* forall x. x < h a a a *)
   let h = Term.const ~ty:(Type.arrow [ty;ty;ty] ty) h_ in
   let a = Term.const ~ty a_ in
-  Alcotest.(check comp_test) "forall x. x > h a a a"
-    Comparison.Gt
+  Alcotest.(check comp_test) "forall x. x < h a a a"
+    Comparison.Lt
     (compare 
       (Term.app_builtin ~ty:Type.prop Builtin.ForallConst [Term.of_ty Type.prop; Term.fun_l [Type.prop] (Term.bvar ~ty:Type.prop 0)]) 
       (Term.app h [a;a;a]));
 
-  (* fun y. forall x. x > h a a a *)
+  (* fun y. forall x. x < h a a a *)
   let h = Term.const ~ty:(Type.arrow [ty;ty;ty] ty) h_ in
   let a = Term.const ~ty a_ in
-  Alcotest.(check comp_test) "fun y. forall x. x > h a a a"
-    Comparison.Gt
+  Alcotest.(check comp_test) "fun y. forall x. x < h a a a"
+    Comparison.Lt
     (compare 
       (Term.fun_l [ty]
         (Term.app_builtin ~ty:Type.prop Builtin.ForallConst [Term.of_ty Type.prop; Term.fun_l [Type.prop] (Term.bvar ~ty:Type.prop 0)])
@@ -864,17 +864,17 @@ let test_lambda_lpo = "ordering.lambda_lpo", `Quick, fun () ->
   Alcotest.(check comp_test) "f z > z"
     Comparison.Gt (compare (Term.app f [z]) z);
 
-  (* z a < z *)
+  (* z a <=>? z *)
   let a = Term.const ~ty a_ in
   let z = Term.var (HVar.fresh ~ty:(Type.arrow [ty] ty) ()) in
-  Alcotest.(check comp_test) "z a < z"
-    Comparison.Lt (compare (Term.app z [a]) z);
+  Alcotest.(check comp_test) "z a <=>? z"
+    Comparison.Incomparable (compare (Term.app z [a]) z);
 
-  (* lam x. z x a < z *)
+  (* lam x y. z x a >= z *)
   let a = Term.const ~ty a_ in
   let z = Term.var (HVar.fresh ~ty:(Type.arrow [ty; ty] ty) ()) in
-  Alcotest.(check comp_test) "lam x. z x a < z"
-    Comparison.Lt (compare (Term.fun_l [ty] (Term.app z [Term.bvar ~ty 0; a])) z);
+  Alcotest.(check comp_test) "lam x y. z x a >= z"
+    Comparison.Geq (compare (Term.fun_l [ty] (Term.fun_l [ty] (Term.app z [Term.bvar ~ty 1; a]))) z);
 
   (* z a <=>? false *)
   let a = Term.const ~ty a_ in
@@ -883,11 +883,11 @@ let test_lambda_lpo = "ordering.lambda_lpo", `Quick, fun () ->
     Comparison.Incomparable (compare (Term.app z [a])
       (Term.app_builtin ~ty:Type.prop Builtin.False []));
 
-  (* z a >= true *)
+  (* z a <=>? true *)
   let a = Term.const ~ty a_ in
   let z = Term.var (HVar.fresh ~ty:(Type.arrow [ty] ty) ()) in
-  Alcotest.(check comp_test) "z a >= true"
-    Comparison.Geq (compare (Term.app z [a])
+  Alcotest.(check comp_test) "z a <=>? true"
+    Comparison.Incomparable (compare (Term.app z [a])
       (Term.app_builtin ~ty:Type.prop Builtin.True []));
 
   (* y (z a) <=>? z (y a) *)
