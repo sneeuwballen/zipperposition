@@ -1022,6 +1022,18 @@ let cw_ext_data f ys xs =
   else
     ([], C.Incomparable)
 
+let is_more_polymorphic t s =
+  match Type.view (Term.ty t), Type.view (Term.ty s) with
+  | Var y, Var x -> HVar.id y = HVar.id x
+  | _, Var _ -> false
+  | _, _ -> true
+
+let consider_poly t s cmp =
+  match cmp with
+  | C.Gt | Geq -> if is_more_polymorphic t s then cmp else Incomparable
+  | Lt | Leq -> if is_more_polymorphic s t then cmp else Incomparable
+  | _ -> cmp
+
 module LambdaKBO : ORD = struct
   let name = "lambda_kbo"
 
@@ -1158,18 +1170,6 @@ module LambdaKBO : ORD = struct
      | Eq -> cmp
      | Leq -> C.merge_with_Leq cmp
      | cmp' -> cmp')
-
-  let is_more_polymorphic t s =
-    match Type.view (Term.ty t), Type.view (Term.ty s) with
-    | Var y, Var x -> HVar.id y = HVar.id x
-    | _, Var _ -> false
-    | _, _ -> true
-
-  let consider_poly t s cmp =
-    match cmp with
-    | C.Gt | Geq -> if is_more_polymorphic t s then cmp else Incomparable
-    | Lt | Leq -> if is_more_polymorphic s t then cmp else Incomparable
-    | _ -> cmp
 
   let rec process_args ~prec ts ss =
     let w = Polynomial.create_zero () in
@@ -1348,29 +1348,12 @@ module LambdaLPO : ORD = struct
     | Var _, (DB _|Const _) ->
       if check_subs ~prec s_args t then C.Lt else C.Incomparable
     | Var _, AppBuiltin (s_b, s_bargs) ->
-      if Builtin.as_int s_b = 0 then C.Geq
-      else if check_subs ~prec (List.rev_append s_bargs s_args) t then C.Lt
+      if check_subs ~prec (List.rev_append s_bargs s_args) t then C.Lt
       else C.Incomparable
-    | Fun (_, t_body), Var _ ->
-      if check_subs ~prec [t_body] s then C.Gt else C.Incomparable
-    | Fun (t_ty, t_body), Fun (s_ty, s_body) ->
-      (match compare_types ~prec t_ty s_ty with
-       | Gt -> compare_rest ~prec t [s_body]
-       | Eq -> do_compare_terms ~prec t_body s_body
-       | Lt -> C.opp (compare_rest ~prec s [t_body])
-       | _ -> compare_subs_both_ways ~prec t [t_body] s [s_body])
-    | Fun _, (DB _|Const _) -> compare_rest ~prec t s_args
-    | (Fun _|DB _|Const _), AppBuiltin (_, s_bargs) ->
-      compare_rest ~prec t (List.rev_append s_bargs s_args)
-    | (DB _|Const _), Var _ ->
+    | (Const _|DB _), Var _ ->
       if check_subs ~prec t_args s then C.Gt else C.Incomparable
-    | (DB _|Const _), Fun _ -> C.opp (compare_rest ~prec s t_args)
-    | DB n, DB m ->
-      if n > m then compare_rest ~prec t s_args
-      else if n = m then compare_regular_args ~prec t t_args s s_args
-      else C.opp (compare_rest ~prec s t_args)
-    | DB _, Const _ -> compare_rest ~prec t s_args
-    | Const _, DB _ -> C.opp (compare_rest ~prec s t_args)
+    | Const _, AppBuiltin (_, s_bargs) ->
+      compare_rest ~prec t (List.rev_append s_bargs s_args)
     | Const gid, Const fid ->
       (match Prec.compare prec gid fid with
        | 0 ->
@@ -1386,11 +1369,13 @@ module LambdaLPO : ORD = struct
           | _ -> C.opp (compare_rest ~prec s t_args))
        | n when n > 0 -> compare_rest ~prec t s_args
        | _ -> C.opp (compare_rest ~prec s t_args))
+    | (Const _|AppBuiltin _), DB _ -> compare_rest ~prec t s_args
+    | (Const _|AppBuiltin _|DB _), Fun (_, s_body) ->
+      compare_rest ~prec t [s_body]
     | AppBuiltin (t_b, t_bargs), Var _ ->
-      if Builtin.as_int t_b = 0 then C.Leq
-      else if check_subs ~prec (List.rev_append t_bargs t_args) s then C.Gt
+      if check_subs ~prec (List.rev_append t_bargs t_args) s then C.Gt
       else C.Incomparable
-    | AppBuiltin (_, t_bargs), (Fun _|DB _|Const _) ->
+    | AppBuiltin (_, t_bargs), Const _ ->
       C.opp (compare_rest ~prec s (List.rev_append t_bargs t_args))
     | AppBuiltin (t_b, t_bargs), AppBuiltin (s_b, s_bargs) ->
       let all_t_args = t_bargs @ t_tyargs @ t_args
@@ -1404,6 +1389,21 @@ module LambdaLPO : ORD = struct
          | _ -> C.opp (compare_rest ~prec s all_t_args))
        | n when n > 0 -> compare_rest ~prec t all_s_args
        | _ -> C.opp (compare_rest ~prec s all_t_args))
+    | DB _, (Const _|AppBuiltin _) -> C.opp (compare_rest ~prec s t_args)
+    | DB j, DB i ->
+      if j > i then consider_poly t s (compare_rest ~prec t s_args)
+      else if j = i then compare_regular_args ~prec t t_args s s_args
+      else consider_poly t s (C.opp (compare_rest ~prec s t_args))
+    | Fun (_, t_body), Var _ ->
+      if check_subs ~prec [t_body] s then C.Gt else C.Incomparable
+    | Fun (_, t_body), (Const _|AppBuiltin _|DB _) ->
+      C.opp (compare_rest ~prec s [t_body])
+    | Fun (t_ty, t_body), Fun (s_ty, s_body) ->
+      (match compare_types ~prec t_ty s_ty with
+       | Gt -> compare_rest ~prec t [s_body]
+       | Eq -> do_compare_terms ~prec t_body s_body
+       | Lt -> C.opp (compare_rest ~prec s [t_body])
+       | _ -> compare_subs_both_ways ~prec t [t_body] s [s_body])
     | App _, _ | _, App _ -> assert false
 
   let compare_terms ~prec t s =
