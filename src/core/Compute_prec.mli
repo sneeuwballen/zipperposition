@@ -29,6 +29,9 @@ val add_constr_rule :
 val set_weight_rule : Precedence.weight_fun parametrized -> t -> t
 (** Choose the way weights are computed *)
 
+val update_weight_rule : (Precedence.weight_fun -> Precedence.weight_fun parametrized) -> t -> t
+(** Modify the way KBO weights are computed *)
+
 val add_status : (ID.t * Precedence.symbol_status) list -> t -> t
 (** Specify explicitly the status of some symbols *)
 

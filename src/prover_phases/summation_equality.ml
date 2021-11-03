@@ -3,12 +3,14 @@ open Logtk
 open Logtk_parsers
 open Logtk_proofs
 open Libzipperposition
+open Libzipperposition_calculi
 open Phases_impl
-open Comparison
-(* open Libzipperposition_calculi *)
-(* open Phases.Infix *)
 open Util
 open Util.UntypedPrint
+open Precedence.Weight
+open Comparison
+open CCCache
+open CCOpt
 open CCArray
 open CCVector
 open CCList
@@ -37,6 +39,10 @@ let rec lex_list c = curry(function
 | x::xx, y::yy -> (c *** lex_list c) (x,xx) (y,yy))
 
 
+let with_cache_2 c f = curry(with_cache_rec c (uncurry % f % curry))
+let with_cache_3 c f = curry(with_cache_2 c (uncurry % f % curry))
+
+
 (* make constants for debugging *)
 let constants = Hashtbl.create 0
 let have ?(infix=false) name par ty = match Hashtbl.find_opt constants name with
@@ -55,7 +61,6 @@ let on_eligible_literals(type c)(module Env: Env.S with type C.t=c) name literal
   let lifted_inference c1 c2 =
     let rename = Subst.Renaming.create() in
     let c1_lits = C.lits c1 and c2_lits = C.lits c2 in
-    (* TODO compute eligible literals only once *)
     fold_lits ~eligible:(C.Eligible.res c1) c1_lits |> Iter.flat_map(fun(l1,pos1) ->
     fold_lits ~eligible:(C.Eligible.res c2) c2_lits |> Iter.flat_map_l(fun(l2,pos2) ->
       literal_inference l1 l2 |> List.map(fun(infered, subst) ->
@@ -68,7 +73,6 @@ let on_eligible_literals(type c)(module Env: Env.S with type C.t=c) name literal
     ))) |> Iter.to_rev_list
   in
   Env.add_binary_inf name (fun c ->
-    (* TODO use an indexing data structure *)
     Iter.flat_map_l (lifted_inference c) (Env.get_active())
     |> Iter.to_rev_list
   )
@@ -84,36 +88,48 @@ let add_simplify_in_context
   initial_index
 =
   let module C = Env.C in
-  let open SimplM.Infix in
+  (* Define an inference on clauses lifting the given literal_inference. *)
   let lifted_inference c1 c2 =
-    if c1 == c2 then c2,`Same else
-    let exception Changed of C.t in
-    let rename = Subst.Renaming.create() in
+    let open SimplM.Infix in
     let c1_lits = C.lits c1 and c2_lits = C.lits c2 in
-    (* TODO compute eligible literals only once *)
-    (* TODO find largest, not just max *)
-    try fold_lits ~eligible:(C.Eligible.max c1) c1_lits (fun(l1,pos1) ->
-    fold_lits ~eligible:~= ~=true c2_lits (fun(l2,pos2) ->
-      if Trail.subsumes (C.trail c1) (C.trail c2) then
+    (* Test partly alternative subsumption to early exit. *)
+    if c1==c2 or not(Trail.subsumes (C.trail c1) (C.trail c2)) or Array.length c1_lits > Array.length c2_lits then c2,`Same else
+    let rename = Subst.Renaming.create() in
+    let exception Changed of C.t in try
+    (* With the largest literal of c1 simplify any literal of c2. *)
+    match maxlits_l ~ord:(Env.ord()) c1_lits with
+    | [l1,pos1] -> fold_lits ~eligible:~= ~=true c2_lits (fun(l2,pos2) ->
       match literal_inference l1 l2 with
-      | Some(simplified, subst) ->
-        (* TODO check alternative subsumption *)
-        (* let c1_no_l1 = apply_subst_list rename subst (except_idx c1_lits pos1, 0) in *)
-        let c2_no_l2 = apply_subst_list rename subst (except_idx c2_lits pos2, 1) in
-        raise(Changed(C.create (simplified @ c2_no_l2)
-          ~penalty:(C.penalty c2)
-          ~trail:(C.trail c2)
-          (Proof.Step.simp ~tags:[] ~rule:(Proof.Rule.mk name) (List.map (fun c -> C.proof_parent_subst rename c subst) [c2,1; c1,0]))))
       | None -> ()
-    )); c2,`Same
+      | Some(simplified, subst) ->
+        let c1_no_l1 = apply_subst_list rename subst (except_idx c1_lits pos1, 0) in
+        let c2_no_l2 = except_idx c2_lits pos2 in
+        let module S = Superposition.Make(Env) in
+        (* Applying subst put c1 to the same scope as c2. *)
+        match S.subsumes_with (Array.of_list c1_no_l1, 0) (Array.of_list c2_no_l2, 0) with
+        (* Subsumption test does not see variables in l2, which must not be specialized, and hence we check that they are not bound by subst'. *)
+        | Some(subst', tags) when
+          Iter.for_all(fun(v,_) -> Literal.for_all(not % var_occurs ~var:(cast_var_unsafe v)) l2) (Subst.domain subst')
+        ->
+          let composed = Subst.(fold (fun s x t -> (if mem s x then update else bind) s x (apply rename subst' t, 0)) subst' subst) in
+          raise(Changed(C.create (simplified @ c2_no_l2)
+            ~penalty:(C.penalty c2)
+            ~trail:(C.trail c2)
+            (Proof.Step.simp ~tags ~rule:(Proof.Rule.mk name) (List.map (fun c -> C.proof_parent_subst rename c composed) [c2,1; c1,0]))))
+        | _ -> ()
+      ); c2,`Same
+    | _ -> c2,`Same
     with Changed c2' -> c2',`New
   in
-  let index_key = CCOpt.get_lazy Flex_state.create_key key_to_index in
+  (* Store index in flex state. *)
+  let index_key = get_lazy Flex_state.create_key key_to_index in
   Env.flex_add index_key initial_index;
   let index act c = act (Env.flex_get index_key) c in
-  
+  (* Register the inference. *)
   Env.add_rw_simplify(fun c -> SimplM.app_list Iter.(to_rev_list(map lifted_inference (index Index.retrieve_generalizations c))) c);
+  (* Register a filter to find active clauses that can be simplified by a “given” clause. It is then upto the inference above to access the “given” clause even when it got simplified. This is possible (only) by having an index that remembers the “given” clause. *)
   Env.add_backward_simplify(C.ClauseSet.of_iter % index Index.retrieve_specializations);
+  (* Keep the index up to date. *)
   let open Env.ProofState in
   let update_index when' how' = Signal.on_every when' (Env.flex_add index_key % index how') in
   (* update_index ActiveSet.on_add_clause Index.add; *)
@@ -170,24 +186,25 @@ let (^^) t e = match view e with
 
 (* let lcm_coefs t' s' = if t'==s' then _z 1, _z 1 else if_Q Z.(fun t s -> let l r = _Z(divexact (lcm t s) r) in l t, l s) (fun t s -> s,t) t' s' *)
 
-(* Given polynomial with ℚ constant coefficients, compute its multiple with collectively coprime ℤ coefficients. Otherwise no change. *)
-let normalize p = try
-  (* Obviously correct one would be: lcm denominators → multiply → gcd numerators → divide. However the multiplication can be postponed. Namely if pⁿ is in prime decomposition of the lcm, then it comes from a coefficient a/pⁿb with p∤a and hence p∤gcd either way. *)
-  let num_gcd, den_lcm = fold_left (fun (num_gcd, den_lcm) (c,_,_) -> match view c with
-    | AppBuiltin(Rat c, _) -> Z.(gcd num_gcd (Q.num c), lcm den_lcm (Q.den c))
-    | _ -> raise Exit
-  ) Z.(one,one) p in
-  p |> List.map(fun(c,m,f)-> (_Z Z.(match view c with
-    | AppBuiltin(Rat c, _) -> Q.num c / num_gcd  *  den_lcm / Q.den c
-    | _ -> assert false (*already Exit above*)), m, f))
-with Exit -> p
-
-
 (* Assume valid inputs and work in a ring, consequently denominators are invertible and may be ignored. The default focuses on integers and unnecessarily fails for e.g. 0.5 / 2. *)
 let coefficient_division = ref(if_Q Q.(fun t s -> if Z.divisible (num t) (num s) then Some(_Q(t/s)) else None) ~= ~=None)
 let (/) a b = !coefficient_division a b
 (* Depending on the context inversion of e.g. 3 may (like in ℝ) or may not (like in ℤ/9ℤ) be possible. Hence the user supplies division operation for coefficients of the polynomials. Default operation assumes only a ring and works with integers. *)
 let redefine_coefficient_division = (:=)coefficient_division
+
+
+(* Given polynomial with ℚ constant coefficients, compute its multiple with collectively coprime ℤ coefficients. Otherwise no change. *)
+let normalize p = try
+  (* Obviously correct one would be: lcm denominators -> multiply -> gcd numerators -> divide. However the multiplication can be postponed. Namely if pⁿ is in prime decomposition of the lcm, then it comes from a coefficient a/pⁿb with p∤a and hence p∤gcd either way. *)
+  let num_gcd, den_lcm = fold_left (fun (num_gcd, den_lcm) (c,_,_) -> match view c with
+    | AppBuiltin(Rat c, _) -> Z.(gcd num_gcd (Q.num c), lcm den_lcm (Q.den c))
+    | _ -> raise(Invalid_argument "This will be catched.")
+  ) Z.(one,one) p in
+  let inv_gcd = get_exn(_z 1 / _Z num_gcd) in
+  p |> List.map(fun(c,m,f)-> (inv_gcd >< _Z Z.(match view c with
+    | AppBuiltin(Rat c, _) -> Q.num c * den_lcm / Q.den c
+    | _ -> assert false (*above invalidated already*)), m, f))
+with Invalid_argument _ -> p
 
 
 let mono_total_deg = fold_left (fun d x -> d + x.exp) 0
@@ -211,19 +228,19 @@ let compare_mono = (fun(c,m,f) -> !elimination_priority m f, (mono_total_deg m, 
   (-) *** (-) *** flip(lex_list compare_power) *** Term.compare *** Term.compare
 
 (* Update the given polynomials to follow the given new default elimination priority. Other existing polynomials become garbage and must not be used!
- The elimination priority overrides the default comparison order of monomials (which is a total degree lexicographic one). This can be used to derive equations without certain indeterminate powers or operands by saturation. For example {n²m+m², nm²} with n≺m ... TODO
- Parameters to priority are list of operator powers and operand term. The elimination preordering must extend divisibility: if monomial M=K⬝N then M has ≥ priority than N. Constant priority (default) leaves the tie-breaking total degree ordering unchanged.
- Desing: Having a global switch like this has drawbacks. Namely saturations of polynomial equations cannot be (easily) nested, parallelised or paused-and-resumed. Usual solution would be to substitute the module by a functor taking the elimination priority as parameter. However the global switch is normally simpler to use because operations like superpose and leadrewrite can be repackaged without passing any extra parameters even when the priority needs to vary. *)
+ The elimination priority overrides the default comparison order of monomials (which is a total degree reverse lexicographic one). This can be used to derive equations without certain indeterminate powers or operands by saturation. For example from the total degree saturated set {m²+n-1, n²+m+1} using instead n²≺m one derives (-n²-1)²+n-1 = n(n³+2n+1) which is independent of m.
+ Parameters to priority are list of operator powers and operand term. The elimination preordering must extend divisibility: if monomial M=K⬝N then M has >= priority than N. Constant priority (default) leaves the tie-breaking total degree ordering unchanged. See elim_oper_args and elim_indeterminate for other basic options.
+ Desing: Having a global switch like this has drawbacks. Namely saturations of polynomial equations cannot be (easily) nested, parallelised or paused-and-resumed. Scalable solution would be to substitute the module by a functor taking the elimination priority as parameter. However that'd be complicated to use because polynomials and/or their operations had to explicitely carry the ordering. *)
 let redefine_elimination_priority all_polynomials priority =
   elimination_priority := priority;
   let list_mutate_workaround f p = let p',b = Obj.magic(f p, p) in b.(0)<-p'.(0); b.(1)<-p'.(1) in (*TODO FIX*)
   all_polynomials(sort(flip compare_mono) |>list_mutate_workaround)
 
 (* An elimination priority function. For example: elim_oper_args[t,2; s,1; r,1] to eliminate terms t,s,r with priority among them in t. *)
-let elim_oper_args weights = ~=Hashtbl.(CCOpt.get_or ~default:0 % find_opt(of_seq(List.to_seq weights)))
+let elim_oper_args weights = ~=Hashtbl.(get_or ~default:0 % find_opt(of_seq(List.to_seq weights)))
 
-(* An elimination priority to indeterminates assigned by the given weight function. Example use: elim_indeterminate(function{base=`Mono;var=2}->1|_->0). Ignore the exp field of the tested indeterminate. *)
-let rec elim_indeterminate weight m _ = fold_left (fun pr x -> pr + weight x * x.exp) 0 m
+(* An elimination priority to indeterminates assigned by the given weight function. Example use: elim_indeterminate(function({base=`Mono;var=2},arg)->1|_->0). Ignore the exp field of the tested indeterminate. *)
+let rec elim_indeterminate weight m f = fold_left (fun pr x -> pr + weight(x,f) * x.exp) 0 m
 
 
 (* Arithmetic of polynomials etc. Main operations to superpose polynomials are: addition, multiplication by monomial, and lcm of monomials upto leading term. *)
@@ -240,7 +257,10 @@ let (=^) m w = m.exp=w.exp && m.var=w.var && match m.base, w.base with
   | n, v -> n == v (* meaning both =`Mono *)
 
 (* Uniquely list indeterminates of a polynomial. *)
-let indeterminates = fold_left (fun list (_,m,_) -> sorted_merge_uniq ~cmp:(flip compare_power) list (flat_map (set_exp 1) m)) []
+let indeterminates ?(target= ~=true) = []|>fold_left(fun list (_,m,f) ->
+  if not(target f) then list
+  else sorted_merge_uniq ~cmp:(flip compare_power) list (flat_map (set_exp 1) m))
+
 
 (* Make a polynomial by summing list of full monomials. *)
 let sum_monomials =
@@ -294,10 +314,10 @@ let rec lcm_factors m1 m2 = match m1,m2 with
     let e = x1.exp - x2.exp in
     match compare_rank x1 x2 with
     | 0 -> let f1,f2 = lcm_factors n1 n2 in
-      (* e.g. A²BC⁵, B³C² ⇒ add C⁰, C⁵⁻² to lcm_ A²B, B³ *)
+      (* e.g. A²BC⁵, B³C² => add C⁰, C⁵⁻² to lcm_ A²B, B³ *)
       set_exp(max (-e) 0) x1 @ f1, set_exp(max e 0) x2 @ f2
     | r when r<0 ->
-      (* e.g. A²B, B³C² ⇒ add C², 1 to lcm_ A²B, B³ *)
+      (* e.g. A²B, B³C² => add C², 1 to lcm_ A²B, B³ *)
       let f1,f2 = lcm_factors (x1::n1) n2 in x2::f1, f2
     | _ -> let f1,f2 = lcm_factors n1 (x2::n2) in f1, x1::f2
 
@@ -316,7 +336,7 @@ let rec div_factor m1 m2 = CCOpt.(match m1,m2 with
 let separate (c,m,f) p nomatch act =
   let rec find_cmf r = function
   | [] -> nomatch
-  | (c',m',f' as k)::p' -> CCOpt.(try if f != f' then find_cmf (k::r) p' else
+  | (c',m',f' as k)::p' -> (try if f != f' then find_cmf (k::r) p' else
     let m = match m with
     | [n] when n.exp<0 -> [get_exn(find_opt(fun n' -> n' =^ hd(set_exp n'.exp n)) m')]
     | _ -> m
@@ -358,7 +378,7 @@ let rec substitute_division old by arg p =
 
 
 module type View = sig type t type v val view: t -> v option end
-(* Create index from mapping clause→polynomial, and instantiate by empty_with' default_features. *)
+(* Create index from mapping clause->polynomial, and instantiate by empty_with' default_features. *)
 module LeadRewriteIndex(P: View with type v=poly) = FV_tree.FV_IDX(struct
   type t = P.t
   let compare = P.view %%> Stdlib.compare (* just for usage in sets *)
@@ -366,7 +386,7 @@ module LeadRewriteIndex(P: View with type v=poly) = FV_tree.FV_IDX(struct
   let compute_feature f p = match P.view p with Some p when p!=_0 -> Some(FV_tree.N(f p)) | _->None
 end)
 
-(* Features for a rewriting index testing various sums of operator degrees. Only for ≠0 polynomials. *)
+(* Features for a rewriting index testing various sums of operator degrees. Only for <>0 polynomials. *)
 let default_features =
   let sum value p = List.(fold_left (+) 0 (map value (oper_powers (hd p)))) in
   [
@@ -383,18 +403,21 @@ let default_features =
 
 let term0 = const ~ty:term (ID.make "𝟬")
 
-exception RepresentingPolynomial of poly
+exception RepresentingPolynomial of poly * Precedence.Weight.t
 
-let poly_as_lit_term_id ?name p =
-  (* TODO Control how ordering treats the term. *)
-  let id = ID.make(CCOpt.get_lazy(fun()-> poly_to_string p) name) in
-  ID.set_payload id (RepresentingPolynomial p);
+let poly_as_lit_term_id ?name ?(weight=omega) p =
+  let id = ID.make(get_lazy(fun()-> poly_to_string p) name) in
+  ID.set_payload id (RepresentingPolynomial(p, weight));
   let term = const ~ty:term id in
   mk_eq term0 term, term, id
 
-let poly_of_term t = match view t with Const id -> ID.payload_find ~f:(function RepresentingPolynomial p -> Some p |_->None) id |_->None
+let poly_of_id = ID.payload_find ~f:(function RepresentingPolynomial(p,_) -> Some p |_->None)
+
+let poly_of_term t = match view t with Const id -> poly_of_id id |_->None
 
 let poly_of_lit = function Equation(t,p,true) when t==term0 -> poly_of_term p |_->None
+
+let polyweight_of_id = ID.payload_find ~f:(function RepresentingPolynomial(_,w) -> Some w |_->None)
 
 
 (* quick manual data entry *)
@@ -411,9 +434,19 @@ end
 
 
 
+
+
 module MakeSumSolver(MainEnv: Env.S) = struct
 module C = MainEnv.C
 (* module Ctx = MainEnv.Ctx *)
+
+let koe =
+  let module P = Precedence in
+  let open P.Weight in
+  let p = MainEnv.precedence() in
+  P.set_weight p (fun id -> omega_plus 3);
+  ()
+    (* weight ~sym:(P.omega P.weight p) *)
 
 let polyliteral p = if p = Ore._0 then mk_tauto else (fun(l,_,_)->l) (Ore.poly_as_lit_term_id p)
 
@@ -487,14 +520,18 @@ let filter_recurrences ok_poly = Iter.filter(fun c ->
 let filter_recurrences_of ok_terms = filter_recurrences(ok_terms % Ore.oper_arg % hd)
 
 
-let near_bijectivity_error set var' = Ore.(function
+(* Cache specific f. Used twice below. *)
+let cache_aid f =
+  let eq ((set,var),x) ((set',var'),x') = set==set' && var=var' && Ore.(x=^x') in
+   with_cache_3 (lru 16 ~eq) ~=f
+
+let near_bijectivity_error = cache_aid Ore.(fun (set:Term.t) var' -> function
 | {var; base=`Move s} when var=var' -> Some ~=_0
-| {var} when var=var' -> raise(Invalid_argument "never near bijective")
+| {var} when var=var' -> None
 | _ -> Some ~=_0)
 
-
-let near_commutation_error set var' = Ore.(function
-| {var} when var=var' -> raise(Invalid_argument "never near commutative")
+let near_commutation_error = cache_aid Ore.(fun (set:Term.t) var' -> function
+| {var} when var=var' -> None
 | {var; base=`Move s} -> Some ~=_0
 | _ -> Some ~=_0)
 
@@ -519,43 +556,42 @@ let propagate_rec_times t s ?(product= app_builtin ~ty:(ty t) Product [t;s]) () 
 let propagate_rec_sum sum_index set t ~sum () =
   let rec_t = filter_recurrences_of ((==)t) (MainEnv.get_clauses()) in
   let env, saturate = make_polynomial_environment() in
-  (* TODO also eliminate non-near-bijective `Move *)
-  let is_sum_friendly = function
-  | {Ore.base=`Move _} -> true
-  | x -> x.var != sum_index
+  let is_sum_friendly x = match x with
+  | {Ore.base=`Move _} -> None != (if x.var=sum_index then near_bijectivity_error else near_commutation_error) set sum_index x
+  | _ -> x.var != sum_index
   in
-  Ore.redefine_elimination_priority (polys_in rec_t) (Ore.elim_indeterminate(fun x -> if is_sum_friendly x then 0 else 1));
+  Ore.redefine_elimination_priority (polys_in rec_t) (Ore.elim_indeterminate(fun(x,s)-> if is_sum_friendly x or s!=t then 0 else 1));
   saturate rec_t 
-  |> filter_recurrences List.(for_all(fun(_,m,_) -> for_all is_sum_friendly m))
-  |> Iter.map Ore.(fun c -> match view_poly_clause c with
-    | None -> assert false (* clause has polynomial after above filtering *)
-    | Some(p, lits) ->
-      let p = fold_left (fun p m -> match near_bijectivity_error set sum_index m with
-      | None -> p (* TODO None means not nearly bijective ⟹ we must pass this clause *)
-      | Some e ->
-        let r,q = substitute_division [m] (_z 1) t p in
-        e q ++ r (* Note: ensure t ∉ e q *)
-      ) p (indeterminates p)
+  |> filter_recurrences List.(for_all(for_all is_sum_friendly % Ore.oper_powers))
+  |> Iter.map Ore.(fun c ->
+    (* Defined due to above filtering ⟹ get_exn OK *)
+    let p, lits = get_exn(view_poly_clause c) in
+    let p = fold_left (fun p m ->
+      (* Defined as m operates to t & filtered above *)
+      let e = get_exn(near_bijectivity_error set sum_index m) in
+      let r,q = substitute_division [m] (_z 1) t p in
+      e q ++ r
+    ) p (indeterminates ~target:((==)t) p)
+    in
+    let p = fold_left (fun p m ->
+      (* Defined as m operates to t & filtered above *)
+      let e = get_exn(near_commutation_error set sum_index m) in
+      let m_to a = set_exp a m in
+      (* TODO Incorrect: Near commutation error e is defined by ∑ₙMf(n,m,k) - M∑ₙf(n,m,k) = eᴹ(n↦f(n,m,k)) = e₁f(n₁,m,k) +...+ eⱼf(nⱼ,m,k) for a single move-indeterminate M. Pointwise multiplication commutes with ∑ₙ (at this point n-dependent multiplication has been filtered out). Near commutation error can then be computed for general operator polynomial by recursively factoring indeterminates from left. Right factoring might work too because moves commute. However ∑ₙMKf - MK∑ₙf = eᴹKf + Meᴷf whereas below now gives Keᴹf + Meᴷf, and eᴹK<>Keᴹ may happen if the range of n depends on both m and k. *)
+      let rec near_commute p = separate (hd(m_to(-1) **:_1 t)) p p (fun (c,n) (_,mm,_) p' ->
+        let a = (hd mm).exp in
+        (* cn Mᵃ t ↦ ∑ᵢ₊ⱼ₌ₐ₋₁ cn Mⁱ e Mʲ t *)
+        p' ++ c*: n**: fold_left (fun s j -> s ++ m_to(a-1-j) **: e(m_to j **:_1 t)) _0 (init a id))
       in
-      let p = fold_left (fun p m -> match near_commutation_error set sum_index m with
-      | None -> p (* same as above! *)
-      | Some e ->
-        let m_to a = set_exp a m in
-        (* TODO Incorrect: Near commutation error e is defined by ∑ₙMf(n,m,k) - M∑ₙf(n,m,k) = eᴹ(n↦f(n,m,k)) = e₁f(n₁,m,k) +...+ eⱼf(nⱼ,m,k) for a single move-indeterminate M. Pointwise multiplication commutes with ∑ₙ (at this point n-dependent multiplication has been filtered out). Near commutation error can then be computed for general operator polynomial by recursively factoring indeterminates from left. Right factoring might work too because moves commute. However ∑ₙMKf - MK∑ₙf = eᴹKf + Meᴷf whereas below now gives Keᴹf + Meᴷf, and eᴹK≠Keᴹ may happen if the range of n depends on both m and k. *)
-        let rec near_commute p = separate (hd(m_to(-1) **:_1 t)) p p (fun (c,n) (_,mm,_) p' ->
-          let a = (hd mm).exp in
-          (* cn Mᵃ t ↦ ∑ᵢ₊ⱼ₌ₐ₋₁ cn Mⁱ e Mʲ t *)
-          p' ++ c*: n**: fold_left (fun s j -> s ++ m_to(a-1-j) **: e(m_to j **:_1 t)) _0 (init a id))
-        in
-        near_commute p
-      ) p (indeterminates p)
-      in
-      let rec t_to_sum p = separate (_z 1, [], t) p p (fun (c,m) _ p' -> c*:m**:_1 sum ++ t_to_sum p')
-      in
-      C.create_a ~penalty:(C.penalty c) ~trail:(C.trail c)
-        (CCArray.append [|polyliteral(t_to_sum p)|] lits)
-        (Proof.Step.inference ~rule:(Proof.Rule.mk "pull recurrence out of sum") (parents_as_such [c]))
-    )
+      near_commute p
+    ) p (indeterminates ~target:((==)t) p)
+    in
+    let rec t_to_sum p = separate (_z 1, [], t) p p (fun (c,m) _ p' -> c*:m**:_1 sum ++ t_to_sum p')
+    in
+    C.create_a ~penalty:(C.penalty c) ~trail:(C.trail c)
+      (CCArray.append [|polyliteral(t_to_sum p)|] lits)
+      (Proof.Step.inference ~rule:(Proof.Rule.mk "pull recurrence out of sum") (parents_as_such [c]))
+  )
   |> MainEnv.add_passive
 
 
@@ -619,17 +655,17 @@ box(x∈S) ⊢ box⊥∨x∈S, box⊤∨x∉S
 Must not select ¬β (or with β̅ := ¬β clauses β̅∨β∨... should be deleted as tautologies).
 *)
 
-(* abstract "∀m≥0"
+(* abstract "∀m>=0"
 —
-upto m \ upto(1+m) = {}	by ≤-simp from upto, diff
-upto(1+m) \ upto m = {1+m}	by ≤-simp from upto, diff, m≥0
+upto m \ upto(1+m) = {}	by <=-simp from upto, diff
+upto(1+m) \ upto m = {1+m}	by <=-simp from upto, diff, m>=0
 —
 probe ∈ upto(1+m) \ upto m
 ↓ by diff
 upto(1+m) probe && ~ upto m probe
 ↓ by upto
-many ≤'s	m≥0
-↓ by ≤-simp	↓
+many <='s	m>=0
+↓ by <=-simp	↓
 probe=1+m
 —
 (M-1) [sum(upto m) f] = f(1+m) = M[fm]
@@ -735,14 +771,23 @@ end
 (* Is this extension enabled? Set by a command line option. *)
 let sum_by_recurrences = ref true
 
-(* Define name and setup action required to registration of this extension in libzipperposition_phases.ml *)
+(* Define name and setup actions required to registration of this extension in libzipperposition_phases.ml *)
 let extension ={
   Extensions.default with
   name = "∑";
   env_actions = [fun env -> if !sum_by_recurrences then
-    let module E= (val env) in (* Solves error: “The parameter cannot be eliminated in the result type.” *)
-    let module I= MakeSumSolver(E) in()];
+    let module E = (val env) in (* Uninlined solves error: “The parameter cannot be eliminated in the result type.” *)
+    let module I = MakeSumSolver(E) in()];
+  
+  prec_actions = Compute_prec.[fun state ->
+    add_constr 0 (* priority 0=high—we affect only specific symbols *)
+    (Precedence.Constr.make Ore.(fun a b -> match poly_of_id a, poly_of_id b with
+      | None, Some _ -> 1
+      | Some _, None -> -1
+      | _ -> 0
+    ))%
+    update_weight_rule(fun wf _ id -> get_lazy (fun()-> wf id) (Ore.polyweight_of_id id))];
 };;
 Options.add_opts[
-  "--sum-by-recurrences", Arg.Bool((:=)sum_by_recurrences), " use holonomic sequence methods for sums (∑) in algebras"
+  "--sum-by-recurrences", Arg.Bool((:=)sum_by_recurrences), " use holonomic sequence methods for sums (∑) in algebras";
 ]

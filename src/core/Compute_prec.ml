@@ -46,6 +46,10 @@ let add_constr_rule p r t = { t with constr_rules = (p, r) :: t.constr_rules }
 
 let set_weight_rule r t = { t with weight_rule = r }
 
+let update_weight_rule u t =
+  let old_rule = t.weight_rule in
+  { t with weight_rule = fun c -> u (old_rule c) c }
+
 let add_status l t = { t with status = List.rev_append l t.status }
 
 (* Add weights specified by the user using the cli option *)
