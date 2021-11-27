@@ -25,22 +25,22 @@
 
 (prover
   (name zip-dev)
-  (binary $cur_dir/../zipperposition.exe)
   (cmd "$cur_dir/../zipperposition.exe $file --timeout $timeout --mem-limit $memory --output none")
   (unsat "SZS status (Theorem|Unsatisfiable)")
   (sat "SZS status (CounterSatisfiable|Satisfiable)")
   (timeout "SZS status ResourceOut")
-  (tag gaveup "SZS status GaveUp")
+  (tags
+    ((gaveup "SZS status GaveUp")))
   (version "git:."))
 
 (prover
   (name zip-dev-check)
-  (binary $cur_dir/../zipperposition.exe)
   (cmd "$cur_dir/../zipperposition.exe $file --timeout $timeout --mem-limit $memory --output none --check")
   (unsat "SZS status (Theorem|Unsatisfiable)")
   (sat "SZS status (CounterSatisfiable|Satisfiable)")
   (timeout "SZS status ResourceOut")
-  (tag gaveup "SZS status GaveUp")
+  (tags
+    ((gaveup "SZS status GaveUp")))
   (version "git:."))
 
 (task
@@ -50,4 +50,4 @@
       (provers zip-dev) ; zip-dev-check)
       (timeout 10)
       (memory 2000)
-      (dirs))))
+      (dirs ()))))
