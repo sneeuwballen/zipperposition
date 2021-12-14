@@ -36,6 +36,7 @@ type term = Term.t
 
 
     instantiation of variables:
+    {[
 
        C[x] where x:tau unshielded     enum(tau, x in t1....tm)
     -----------------------------------------------------------
@@ -49,6 +50,7 @@ type term = Term.t
            f(x1...xk)=t1\sigma or .... or f(x1...xk) = tm\sigma
     where sigma = {x -> f(x1...xk)}
 
+    ]}
 *)
 
 exception Error of string
@@ -85,7 +87,7 @@ module type S = sig
   (** Instantiate variables whose type is a known enumerated type,
       with all cases of this type. *)
 
-  (** {6 Registration} *)
+  (** {5 Registration} *)
 
   val setup : unit -> unit
   (** Register rules in the environment *)

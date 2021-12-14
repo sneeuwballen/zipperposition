@@ -68,19 +68,14 @@ let load_extensions =
   Extensions.register EnumTypes.extension;
   Extensions.register Libzipperposition_induction.extension;
   Extensions.register Rewriting.extension;
-  Extensions.register Libzipperposition_arith.int_ext;
-  Extensions.register Libzipperposition_arith.rat_ext;
   Extensions.register Ind_types.extension;
   Extensions.register Fool.extension;
   Extensions.register Booleans.extension;
   Extensions.register Lift_lambdas.extension;
-
-
   Extensions.register Pure_literal_elim.extension;
   Extensions.register Bool_encode.extension;
   Extensions.register App_encode.extension;
   Extensions.register Eq_encode.extension;
-  Extensions.register Pure_literal_elim.extension;
 
 
   let l = Extensions.extensions () in
@@ -135,9 +130,9 @@ let parse_file file =
     ~x:parsed >>= fun () ->
   Phases.return_phase (input,parsed)
 
-let has_real stmt : bool =
+let has_arith stmt : bool =
   let module TS = TypedSTerm in
-  let is_real ty = TS.equal ty TS.Ty.real in
+  let is_arith ty = TS.equal ty TS.Ty.real || TS.equal ty TS.Ty.int in
   begin
     CCVector.to_iter stmt
     |> Iter.flat_map Statement.Seq.to_iter
@@ -146,9 +141,10 @@ let has_real stmt : bool =
         | `Ty ty -> Iter.return ty
         | `Term t | `Form t -> TS.Seq.subterms t |> Iter.filter_map TS.ty
         | `ID _ -> Iter.empty)
-    |> Iter.exists is_real
+    |> Iter.exists is_arith
   end
-let sine_filter stmts = 
+
+let sine_filter stmts =
   if (!_sine_threshold < 0 || CCVector.length stmts < !_sine_threshold) then (stmts)
   else (
     let seq = CCVector.to_iter stmts in
@@ -179,8 +175,8 @@ let typing ~file prelude (input,stmts) =
   Util.debugf ~section 3 "@[<hv2>@{<green>typed statements@}@ %a@]"
     (fun k->k (Util.pp_iter Statement.pp_input) (CCVector.to_iter stmts));
   begin
-    if has_real stmts then (
-      Util.debug ~section 2 "problem contains $real, lost completeness";
+    if has_arith stmts then (
+      Util.debug ~section 1 "problem contains arithmetic, lost completeness";
       Phases.set_key Ctx.Key.lost_completeness true
     ) else if !_sine_threshold >= 0 then (
       Util.debug ~section 2 "sine is applied, lost completeness";

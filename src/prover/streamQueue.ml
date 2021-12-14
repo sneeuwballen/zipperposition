@@ -23,7 +23,7 @@ module Make(A : ARG) = struct
   let get_op k = Flex_state.get_exn k (A.state ())
 
 
-  (** {6 Weight functions} *)
+  (** {5 Weight functions} *)
   module WeightFun = struct
     type t = Stm.t -> int
 

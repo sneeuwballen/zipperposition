@@ -6,8 +6,6 @@ module ST = InnerTerm
 module T = Term
 module S = Subst
 
-let prof_dtree_retrieve = ZProf.make "dtree_retrieve"
-
 (** {2 Term traversal}
 
     Term traversal in prefix order. This is akin to lazy transformation
@@ -193,7 +191,6 @@ module Make(E : Index.EQUATION) = struct
     Iter.fold remove dt seq
 
   let retrieve ?(subst=S.empty) ~sign dt t k =
-    ZProf.enter_prof prof_dtree_retrieve;
     (* recursive traversal of the trie, following paths compatible with t *)
     let rec traverse trie iter subst =
       match iter with
@@ -252,7 +249,6 @@ module Make(E : Index.EQUATION) = struct
           trie.map
     in
     traverse (fst dt) (iterate (fst t)) subst;
-    ZProf.exit_prof prof_dtree_retrieve;
     ()
 
   (** iterate on all (term -> value) in the tree *)

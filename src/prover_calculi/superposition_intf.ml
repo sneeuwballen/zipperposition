@@ -9,7 +9,7 @@ module type S = sig
   module C : module type of Env.C with type t = Env.C.t
   module PS : module type of Env.ProofState with type C.t = Env.C.t
 
-  (** {6 Term Indices} *)
+  (** {5 Term Indices} *)
 
   val idx_sup_into : unit -> PS.TermIndex.t
   (** index for superposition into the set *)
@@ -20,7 +20,7 @@ module type S = sig
   val idx_fv : unit -> PS.SubsumptionIndex.t
   (** index for subsumption *)
 
-  (** {6 Inference Rules} *)
+  (** {5 Inference Rules} *)
 
   val infer_active: Env.binary_inf_rule
   (** superposition where given clause is active *)
@@ -32,7 +32,7 @@ module type S = sig
 
   val infer_equality_factoring: Env.unary_inf_rule
 
-  (** {6 Extraction of clauses from the queue (HO feature)} *)
+  (** {5 Extraction of clauses from the queue (HO feature)} *)
 
   val extract_from_stream_queue: Env.generate_rule
   (** Extracts at most as many clauses from the stream queue as there are
@@ -43,7 +43,7 @@ module type S = sig
   (** Same as [extract_from_stream_queue] with a different extraction heuristic
       If possible, all clauses are taken from the first stream *)
 
-  (** {6 Simplifications rules} *)
+  (** {5 Simplifications rules} *)
 
   val is_tautology : C.t -> bool
   (** Check whether the clause is a (syntactic) tautology, ie whether
@@ -84,7 +84,7 @@ module type S = sig
   val condensation : Env.simplify_rule
   (** condensation *)
 
-  (** {6 Registration} *)
+  (** {5 Registration} *)
 
   val register : unit -> unit
   (** Register rules in the environment *)

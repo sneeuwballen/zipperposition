@@ -136,7 +136,7 @@ module Make(C : Clause_intf.S) = struct
       |> Iter.iter add_related_term_
     | _ -> ()
 
-  (** {6 Weight functions} *)
+  (** {5 Weight functions} *)
   module WeightFun = struct
     type t = C.t -> int
 
@@ -1548,7 +1548,7 @@ module Make(C : Clause_intf.S) = struct
     | FIFO _ -> "bfs"
     | Mixed q -> "mixed"
 
-  (** {6 Combination of queues} *)
+  (** {5 Combination of queues} *)
 
   let const_prioritize_fun wf =
     (fun c -> wf c, 1)

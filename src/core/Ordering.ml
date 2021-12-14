@@ -165,7 +165,7 @@ module Head = struct
       end
     | T.AppBuiltin (_,ss) -> ss
     (* The orderings treat lambda-expressions like a "LAM" symbol applied to the body of the lambda-expression *)
-    | T.Fun (_,t) -> [t]
+    | T.Fun (ty,t) -> [T.of_ty ty; t]
     | _ -> []
 
   let to_string = CCFormat.to_string pp
@@ -463,12 +463,12 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
     res
 
   let compare_terms ~prec x y =
-    ZProf.enter_prof prof_kbo;
+    let _span = ZProf.enter_prof prof_kbo in
     let res = 
       (try 
         kbo ~prec x y
       with UnsupportedTerm -> Incomparable) in
-    ZProf.exit_prof prof_kbo;
+    ZProf.exit_prof _span;
     res
 
   let cannot_flip s t =
@@ -572,9 +572,9 @@ module MakeRPO (P : PARAMETERS) : ORD = struct
        | _ -> alpha ~prec ss' t)
 
   let compare_terms ~prec x y =
-    ZProf.enter_prof prof_rpo;
+    let _span = ZProf.enter_prof prof_rpo in
     let compare = rpo6 ~prec x y in
-    ZProf.exit_prof prof_rpo;
+    ZProf.exit_prof _span;
     compare
 
   (* The ordering might flip if one side is a lambda-expression or
@@ -679,9 +679,9 @@ module EPO : ORD = struct
     | [], (_ :: _) -> Lt
 
   let compare_terms ~prec x y = 
-    ZProf.enter_prof prof_epo;
+    let _span = ZProf.enter_prof prof_epo in
     let compare = epo ~prec (x,[]) (y,[]) in
-    ZProf.exit_prof prof_epo;
+    ZProf.exit_prof _span;
     compare
 
   let might_flip _ _ _ = false
@@ -813,9 +813,9 @@ module LambdaFreeKBOCoeff : ORD = struct
     )
 
   let compare_terms ~prec x y =
-    ZProf.enter_prof prof_lambdafree_kbo_coeff;
+    let _span = ZProf.enter_prof prof_lambdafree_kbo_coeff in
     let compare = lfhokbo_arg_coeff ~prec x y in
-    ZProf.exit_prof prof_lambdafree_kbo_coeff;
+    ZProf.exit_prof _span;
     compare
 
   let might_flip prec t s =
@@ -1268,9 +1268,9 @@ module LambdaKBO : ORD = struct
     consider_weight w (consider_poly t s cmp)
 
   let compare_terms ~prec t s =
-    ZProf.enter_prof prof_lambda_kbo;
+    let _span = ZProf.enter_prof prof_lambda_kbo in
     let (_, cmp) = process_terms ~prec t s in
-    ZProf.exit_prof prof_lambda_kbo;
+    ZProf.exit_prof _span;
     cmp
 
   let might_flip _ t s =
@@ -1407,9 +1407,9 @@ module LambdaLPO : ORD = struct
     | App _, _ | _, App _ -> assert false
 
   let compare_terms ~prec t s =
-    ZProf.enter_prof prof_lambda_lpo;
+    let _span = ZProf.enter_prof prof_lambda_lpo in
     let cmp = do_compare_terms ~prec t s in
-    ZProf.exit_prof prof_lambda_lpo;
+    ZProf.exit_prof _span;
     cmp
 
   let might_flip prec t s =

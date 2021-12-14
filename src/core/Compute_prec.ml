@@ -103,7 +103,7 @@ let force_const_weight ~weight ~signature = function
   | None -> weight
 
 let mk_precedence ~db_w ~lmb_w ~signature t seq =
-  ZProf.enter_prof prof_mk_prec;
+  let _span = ZProf.enter_prof prof_mk_prec in
   (* set of symbols *)
   let symbols =
     seq
@@ -132,7 +132,7 @@ let mk_precedence ~db_w ~lmb_w ~signature t seq =
   List.iter
     (fun (s,status) -> Precedence.declare_status p s status)
     t.status;
-  ZProf.exit_prof prof_mk_prec;
+  ZProf.exit_prof _span;
   p
 
 let () =

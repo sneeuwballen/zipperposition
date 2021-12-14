@@ -15,7 +15,7 @@ clean:
 	@dune clean
 
 doc:
-	@dune build @doc
+	@dune build @doc --profile=release
 
 install: build
 	@dune install
@@ -38,6 +38,9 @@ test-qcheck:
 test-long:
 	@echo "run qcheck tests with --long"
 	@QCHECK_LONG=1 ./tests/run_tests.sh test qcheck
+
+test-reg1:
+	@QCHECK_SEED=712032581 ./tests/run_tests.sh test qcheck
 
 test-unit:
 	@./tests/run_tests.sh test units

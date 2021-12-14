@@ -363,7 +363,7 @@ let prove (a:form list) (b:form) =
     "(@[@{<yellow>llprover.prove@}@ :hyps (@[<hv>%a@])@ :concl %a@])"
     (fun k->k (Util.pp_list T.pp) a T.pp b);
   Util.incr_stat stat_solve;
-  ZProf.enter_prof prof_check;
+  let _span = ZProf.enter_prof prof_check in
   (* prove [a ∧ -b ⇒ ⊥] *)
   let b_init = Branch.add (Branch.root()) (F.not_ b :: a) in
   let tab = {
@@ -372,7 +372,7 @@ let prove (a:form list) (b:form) =
     saturated=None;
   } in
   let res = solve_ tab in
-  ZProf.exit_prof prof_check;
+  ZProf.exit_prof _span;
   res, tab
 
 let pp_stats out (s:final_state) =

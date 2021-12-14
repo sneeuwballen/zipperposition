@@ -1,4 +1,3 @@
-examples/frontpage.zf
 examples/ac.zf
 examples/pelletier_problems/pb34.zf
 examples/polymorph.p

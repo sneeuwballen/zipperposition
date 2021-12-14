@@ -28,7 +28,7 @@ module type S = sig
   module Env : Env.S
   module C : module type of Env.C
 
-  (** {6 Registration} *)
+  (** {5 Registration} *)
   val setup : unit -> unit
   val maybe_conv_lams : Env.C.t -> Env.C.t
   val force_conv_lams : Env.C.t -> Env.C.t
@@ -81,7 +81,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let tyvarB = HVar.fresh ~ty:Ty.tType ()
     let tyvarC = HVar.fresh ~ty:Ty.tType ()
 
-    let type_of_vars ?(args=[]) ~ret =
+    let type_of_vars ~args ~ret =
       let open Ty in
       if CCList.is_empty args then Ty.var ret
       else List.map Ty.var args ==> Ty.var ret

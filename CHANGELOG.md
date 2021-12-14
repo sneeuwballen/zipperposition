@@ -1,5 +1,44 @@
 # Changelog
 
+## 2.1
+
+- add `logtk.arith` sub-library, using either zarith or num
+- implemented two new calculi (with corresponding term orders):
+    1. Superposition with first-class  Booleans [https://link.springer.com/chapter/10.1007/978-3-030-79876-5_22]
+    2. Superposition for full HOL [https://link.springer.com/chapter/10.1007/978-3-030-79876-5_23]
+- old 'Case' rules are removed and replaced with corresponding 'BoolHoist' rules
+- a new system for selection of Boolean subterms (--bool-select)
+- many modes for Boolean reasoning (--boolean-reasoning)
+- a whole set of SAT-inspired pre- and inprocessing techniques:
+    1. Blocked clause elimination
+    2. Nonsingular predicate elimination with definition set recognition
+    3. Hidden literal elimination
+    4. Quasipure literal elimination
+- fixed various issues in handling clause weight, priority and literal selection heuristics
+- improved communication with backend
+- better (complete) support for renaming common subformulas
+- profiling that emits catapult traces (if env contains `TEF=1`)
+
+## 2.0
+
+- new complete HO unification algorithm [https://drops.dagstuhl.de/opus/volltexte/2020/12327]
+- new system for handling dynamic clausification (--lazy-cnf options)
+- many new clause weight, clause priority and literal heuristics (see help for full list)
+- added SinE algorithm and made it work with higher-order problems
+- added triggered Boolean instantiation (--trigger-bool-inst)
+- added support for Bhayat and Reger's combinatory calculus (with corresponding order)
+  [https://link.springer.com/chapter/10.1007%2F978-3-030-51074-9_16]
+- improved Leibniz and Andrews equality elimination
+- new modes for primitive instantiation
+- added support for "Boolean" equality resolution and factoring 
+  [https://matryoshka-project.github.io/pubs/ho_bools_paper.pdf]
+- added support for non-native treatment of equality predicate (--eq-encode)
+- added "early bird" modes (during dynamic clausification) 
+  for primitive instantiation (--ho-prim-enum-early-bird)
+- require at least OCaml 4.07 (for `seq` functions)
+- remove all arithmetic handling from [Cru 2015]
+- in type inference, enforce that type declarations are prenex polymorphic
+
 ## 1.5.1
 
 - compatibility with ocaml 4.08

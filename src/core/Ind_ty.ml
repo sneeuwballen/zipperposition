@@ -22,7 +22,7 @@ and projector = {
   p_cstor: constructor lazy_t;
 }
 
-(** {6 Inductive Types} *)
+(** {5 Inductive Types} *)
 
 (** An inductive type, along with its set of constructors *)
 type t = {
@@ -192,7 +192,7 @@ let declare_ty id ~ty_vars constructors ~proof =
   ID.set_payload id (Payload_ind_type ity);
   ity
 
-(** {6 Constructors} *)
+(** {5 Constructors} *)
 
 let mk_constructor id ty args =
   let rec c = lazy (
@@ -224,7 +224,7 @@ let contains_inductive_types t =
   T.Seq.subterms t
   |> Iter.exists (fun t -> is_inductive_type (T.ty t))
 
-(** {6 Projectors} *)
+(** {5 Projectors} *)
 
 let projector_id p = p.p_id
 let projector_ty p = p.p_ty

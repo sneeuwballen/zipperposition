@@ -239,7 +239,7 @@ let test_lambdafree_rpo = "ordering.lambdafree_rpo", `Quick, fun () ->
 
 let test_derived_ho_kbo = "ordering.derived_ho_kbo", `Quick, fun () ->
   (* alphabetical precedence, h has weight 2, all other symbols weight 1 *)
-  let weight id = (if id=h_ then Precedence.Weight.add Precedence.Weight.one Precedence.Weight.one else Precedence.Weight.one) in
+  let weight id = (if ID.equal id h_ then Precedence.Weight.add Precedence.Weight.one Precedence.Weight.one else Precedence.Weight.one) in
   let ord = O.derived_ho_kbo ~ignore_quans_under_lam:true
       (Precedence.create ~weight Precedence.Constr.alpha [a_; b_; c_; d_; e_; f_; g_; h_]) in
   let compare = O.compare ord in
@@ -301,21 +301,17 @@ let test_derived_ho_kbo = "ordering.derived_ho_kbo", `Quick, fun () ->
   let h = Term.const ~ty:(Type.arrow [ty;ty;ty] ty) h_ in
   let a = Term.const ~ty a_ in
   Alcotest.(check comp_test) "forall x. x > h a a a"
-    Comparison.Gt
     (compare 
       (Term.app_builtin ~ty:Type.prop Builtin.ForallConst [Term.of_ty Type.prop; Term.fun_l [Type.prop] (Term.bvar ~ty:Type.prop 0)]) 
-      (Term.app h [a;a;a]));
+      (Term.app h [a;a;a]))
+      Comparison.Gt;
 
-  (* fun y. forall x. x < h a a a *)
-  let h = Term.const ~ty:(Type.arrow [ty;ty;ty] ty) h_ in
-  let a = Term.const ~ty a_ in
-  Alcotest.(check comp_test) "fun y. forall x. x < h a a a"
-    Comparison.Lt
-    (compare 
-      (Term.fun_l [ty]
-        (Term.app_builtin ~ty:Type.prop Builtin.ForallConst [Term.of_ty Type.prop; Term.fun_l [Type.prop] (Term.bvar ~ty:Type.prop 0)]) 
-      )
-      (Term.app h [a;a;a]));
+  (* fun y. forall x. x < forall x. x *)
+  let forall_x_x = 
+    (Term.app_builtin ~ty:Type.prop Builtin.ForallConst [Term.of_ty Type.prop; Term.fun_l [Type.prop] (Term.bvar ~ty:Type.prop 0)])
+  in
+  Alcotest.(check comp_test) "fun y. forall x. x < forall x. x"
+    (compare (Term.fun_l [ty] (forall_x_x)) (forall_x_x)) Comparison.Lt;
 
   (* fun y. z <=>? z (Variables above and below lambdas need to be treated as if they were different variables) *)
   let z = Term.var (HVar.fresh ~ty ()) in

@@ -91,7 +91,7 @@ module type S = sig
   val name : t -> string
   (** Name of the implementation/role of the queue *)
 
-  (** {6 Available Queues} *)
+  (** {5 Available Queues} *)
 
   (* val make : ratio:int -> weight:(C.t -> int) -> string -> t
      (** Bring your own implementation of queue.
@@ -134,7 +134,7 @@ module type S = sig
       returned with the call to take_first();
       returns true if clause was actually removed *) 
 
-  (** {6 IO} *)
+  (** {5 IO} *)
 
   val pp : t CCFormat.printer
   val to_string : t -> string

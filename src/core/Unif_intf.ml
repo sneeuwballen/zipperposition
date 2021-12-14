@@ -69,6 +69,7 @@ module type S = sig
   (** [equal subst t1 s1 t2 s2] returns [true] iff the two terms
       are equal under the given substitution, i.e. if applying the
       substitution will return the same term. *)
+  [@@deprecated "this function doesn't work anymore on HO terms"]
 
   val are_unifiable_full : term -> term -> bool
   (** Unifiable with some additional constraints? *)

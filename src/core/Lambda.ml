@@ -10,15 +10,6 @@ let prof_eta_reduce = ZProf.make "term.eta_reduce"
 
 let section = Util.Section.make "lambdas"
 
-
-
-module OptionSet = Set.Make(
-  struct 
-    let compare x y = Pervasives.compare x y
-    type t = int option
-  end)
-
-
 module Inner = struct
   module T = InnerTerm
 
@@ -138,7 +129,7 @@ module Inner = struct
       | T.HasType ty ->
         let n, ty_args, ty_ret = T.open_poly_fun ty in
         if n!=0 then t (* polymorhpic eta expansion not implemented *)
-        else
+        else (
           (* first, WHNF *)
           let t = whnf_term t in
           (* see how many arguments are missing, and what type *)
@@ -174,7 +165,7 @@ module Inner = struct
                 if body' = body_reduced then body else T.bind ~ty ~varty b body_reduced
             in
             T.fun_l ty_args body
-          ) else t
+          ) else t)
     in
     aux t
 
@@ -254,9 +245,7 @@ module Inner = struct
     t'
 
   let whnf t =
-    ZProf.enter_prof prof_whnf;
-    let t' = whnf_term t in
-    ZProf.exit_prof prof_whnf;
+    let t' = ZProf.with_prof prof_whnf whnf_term t in
     t'
 
 
@@ -269,9 +258,7 @@ module Inner = struct
     { st with args = st.args @ args; ty; }
 
   let snf t =
-    ZProf.enter_prof prof_snf;
-    let t' = snf_rec t in
-    ZProf.exit_prof prof_snf;
+    let t' = ZProf.with_prof prof_snf snf_rec t in
     t'
 
   let eta_expand t = ZProf.with_prof prof_eta_expand eta_expand_rec t
@@ -326,8 +313,12 @@ let rec is_lambda_pattern t = match T.view (whnf t) with
     else List.for_all is_lambda_pattern args 
   | T.Fun (_, body) -> is_lambda_pattern body
 and all_distinct_bound args =
-  List.map (fun arg -> match T.view (eta_reduce arg) with T.DB i -> Some i | _ -> None) args
-  |> OptionSet.of_list
-  |> (fun set -> not (OptionSet.mem None set) && OptionSet.cardinal set = List.length args)
+  try
+    List.map (fun arg ->
+        match T.view (eta_reduce arg) with
+        | T.DB i -> i | _ -> raise Exit) args
+    |> Util.Int_set.of_list
+    |> (fun set -> Util.Int_set.cardinal set = List.length args)
+  with Exit -> false
 
 
