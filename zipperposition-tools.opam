@@ -17,7 +17,7 @@ depends: [
   "msat" { >= "0.8" < "0.10" }
   "logtk" { = version }
   "libzipperposition" { = version }
-  "ocaml" {>= "4.07"}
+  "ocaml" {>= "4.08"}
 ]
 bug-reports: "https://github.com/sneeuwballen/zipperposition/issues"
 dev-repo: "git+https://github.com/sneeuwballen/zipperposition.git"

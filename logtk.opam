@@ -24,7 +24,7 @@ depends: [
   "alcotest" {with-test}
   "qcheck-core" {with-test & >= "0.9"}
   "qcheck-alcotest" {with-test & >= "0.9"}
-  "ocaml" {>= "4.07"}
+  "ocaml" {>= "4.08"}
 ]
 depopts: [
   "msat"
