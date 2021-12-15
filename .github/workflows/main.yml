@@ -13,7 +13,7 @@ jobs:
         #os: [macos-latest, ubuntu-latest, windows-latest]
         os: [ubuntu-latest, windows-latest]
         ocaml-compiler:
-          - 4.07.x
+          - 4.08.x
           - 4.12.x
     steps:
     - uses: actions/checkout@v2
