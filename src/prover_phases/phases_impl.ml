@@ -132,16 +132,20 @@ let parse_file file =
 
 let has_arith stmt : bool =
   let module TS = TypedSTerm in
-  let is_arith ty = TS.equal ty TS.Ty.real || TS.equal ty TS.Ty.int in
+  let ty_is_arith ty =
+    TS.equal ty TS.Ty.real ||
+    TS.equal ty TS.Ty.rat ||
+    TS.equal ty TS.Ty.int in
   begin
     CCVector.to_iter stmt
     |> Iter.flat_map Statement.Seq.to_iter
     |> Iter.flat_map
       (function
         | `Ty ty -> Iter.return ty
-        | `Term t | `Form t -> TS.Seq.subterms t |> Iter.filter_map TS.ty
+        | `Term t | `Form t ->
+          TS.Seq.subterms t |> Iter.filter_map TS.ty
         | `ID _ -> Iter.empty)
-    |> Iter.exists is_arith
+    |> Iter.exists ty_is_arith
   end
 
 let sine_filter stmts =
