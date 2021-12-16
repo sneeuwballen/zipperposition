@@ -17,7 +17,7 @@
   (expect (try (run zip-find-expect) (run tptp-find-status) (const unknown))))
 
 (dir
-  (path $home/workspace/TPTP-v6.1.0//)
+  (path $home/w/TPTP-v6.1.0//)
   (pattern ".*\\.p")
   (expect (try (run tptp-find-status) (const unknown))))
 

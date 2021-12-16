@@ -11,6 +11,7 @@
 
 (menhir
   ;(flags (--infer))
+  (infer false)
   (modules Parse_tptp Parse_zf Parse_dk Tip_parser))
 
 (ocamllex
