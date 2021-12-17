@@ -2,9 +2,14 @@
 /*  Copyright 2014 Ali Assaf */
 /*  Copyright 2014 Raphaël Cauderlier */
 %{
-open Logtk
-module T = Ast_dk
-module L = ParseLocation
+
+  open Logtk
+
+  open struct
+    module T = Ast_dk
+    module L = ParseLocation
+  end
+
 %}
 %token <string> ID QID NUMBER
 %token COLON DOT DOUBLE_ARROW DEF ARROW
