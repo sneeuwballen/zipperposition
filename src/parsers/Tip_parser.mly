@@ -9,8 +9,11 @@
 
 %{
   open Logtk
-  module A = Tip_ast
-  module Loc = ParseLocation
+
+  open struct
+    module A = Tip_ast
+    module Loc = ParseLocation
+  end
 
 %}
 

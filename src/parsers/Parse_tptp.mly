@@ -6,9 +6,11 @@
 %{
   open Logtk
 
-  module L = ParseLocation
-  module PT = STerm
-  module A = Ast_tptp
+  open struct
+    module L = ParseLocation
+    module PT = STerm
+    module A = Ast_tptp
+  end
 
   let remove_quotes s =
     assert (s.[0] = '\'' && s.[String.length s - 1] = '\'');
@@ -197,7 +199,7 @@ app_formula:
       let loc = L.mk_pos $startpos $endpos in
       PT.app ~loc f [t]
     }
-  
+
 unitary_formula:
   | f=quantified_formula { f }
   | f=unitary_atomic_formula { f }
@@ -234,12 +236,12 @@ unary_formula:
      let loc = L.mk_pos $startpos $endpos in
      o ?loc:(Some loc) f
     }
-  | EQUAL AT f1=unary_formula AT f2=unary_formula 
+  | EQUAL AT f1=unary_formula AT f2=unary_formula
     {
-      let loc = L.mk_pos $startpos $endpos in 
+      let loc = L.mk_pos $startpos $endpos in
       PT.eq ?loc:(Some loc) f1 f2
     }
-  
+
 binary_formula:
   | f=nonassoc_binary_formula { f }
   | f=assoc_binary_formula { f }
@@ -306,9 +308,9 @@ type_arg: l=assoc_binary_formula_aux(ARROW) {
   | FORALL { PT.forall }
   | EXISTS { PT.exists }
   | LAMBDA { PT.lambda }
-  | CHOICE_BINDER { fun ?loc vars body -> 
-                      PT.app_builtin ?loc Builtin.ChoiceConst 
-                        [PT.lambda ?loc vars body] 
+  | CHOICE_BINDER { fun ?loc vars body ->
+                      PT.app_builtin ?loc Builtin.ChoiceConst
+                        [PT.lambda ?loc vars body]
                   }
 %inline unary_connective:
   | NOT { PT.not_ }
@@ -373,7 +375,7 @@ defined_atom:
   | n=INTEGER { PT.int_ (Z.of_string n) }
   | n=RATIONAL { PT.rat (Q.of_string n) }
   | n=REAL { PT.real n }
-  | CHOICE_CONST 
+  | CHOICE_CONST
     {
       let loc = L.mk_pos $startpos $endpos in
       PT.app_builtin ~loc Builtin.ChoiceConst []

@@ -6,9 +6,11 @@
 %{
   open Logtk
 
-  module L = ParseLocation
-  module A = UntypedAST
-  module T = A.T
+  open struct
+    module L = ParseLocation
+    module A = UntypedAST
+    module T = A.T
+  end
 
   let unquote s =
     assert (s <> "");
@@ -418,4 +420,3 @@ statement:
     }
 
 %%
-
