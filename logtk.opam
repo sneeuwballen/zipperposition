@@ -14,7 +14,7 @@ depends: [
   "base-bytes"
   "base-unix"
   ("zarith" | "num")
-  "oseq" { >= "0.3" & < "0.4" }
+  "oseq" { >= "0.3" & < "0.5" }
   "containers" { >= "3.0" & < "4.0" }
   "containers-data" { >= "3.0" & < "4.0" }
   "mtime" { >= "1.0" }
