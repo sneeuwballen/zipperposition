@@ -783,7 +783,7 @@ module Int = struct
         let sum = List.fold_left
             (fun sum (coeff, _t') ->
                assert (num.sign coeff <> 0);
-               mk_sum coeff t sum
+               mk_sum coeff _t' sum
             ) sum rest
         in
         (* add the constant (if needed) *)
