@@ -47,10 +47,10 @@ let debug_has_type t x =
 let fields x = init (size(repr x)) (magic(field(repr x)))
 
 let test (c:int) f x = let x = magic x in debug_root x (
-  if is_int x then 0<=x && x<c else
+  if is_int x then 0<=x & x<c else
   let t = tag x in f(t, if t=out_of_heap_tag or t=unaligned_tag then [] else fields x))
 
-let test_tag tag f = test 0 (fun(tag',data) -> tag=tag' && f data)
+let test_tag tag f = test 0 (fun(tag',data) -> tag=tag' & f data)
 
 
 (* Type tests for builtin types and type constructs *)
@@ -59,7 +59,7 @@ let any _ = true
 let int x = debug_root x (is_int(repr x))
 
 (* Test an algebraic data type: c is the number of constant constructors, and ttt is a list of lists of type tests for the parameters of other constructors, all in order of appearence. *)
-let union c ttt = test c (fun(tag,data) -> tag < length ttt && for_all_2 id (nth ttt tag) data)
+let union c ttt = test c (fun(tag,data) -> tag < length ttt & for_all_2 id (nth ttt tag) data)
 let enum c = union c []
 
 let rec list t x = union 1 [[t; list t]] x
@@ -68,7 +68,7 @@ let opt t = union 1 [[t]]
 
 let bool x = enum 2 x
 (* Test flat tuples and records: tt is a list of type tests for the components, in order of appearence, and ~st is an optional extra condition for inter-field invariants after tt was succesful. *)
-let tuple tt ?(st= ~=true) x = test_tag 0 (for_all_2 id tt) x && st(magic x)
+let tuple tt ?(st= ~=true) x = test_tag 0 (for_all_2 id tt) x & st(magic x)
 let decimal x = test_tag double_tag any x
 let array t = test_tag (if t==decimal then double_array_tag else 0) (for_all t)
 let string x = test_tag string_tag any x
@@ -82,7 +82,7 @@ let lazy_force t x = lazy_aid (fun _-> t(Lazy.force(magic x))) t x
 (* First field of an object would be “class” and second an “id”. E.g. modules might be objects in addition to being at least tuples and closures.
 Open questions: Is class always string? Is id always int? Is there ever more fields? Which OCaml concepts translate to objects? *)
 let object0 x = test_tag object_tag (for_all_2 id [string;int]) x
-let exception' x = object0 x or test_tag 0 (object0 % hd) x
+let exception' x = object0 x or test_tag 0 (function y::_-> object0 y |_->false) x
 
 (* Common non-primitive types *)
 
@@ -91,9 +91,9 @@ let rec ccmap key t x = union 1 [[ccmap key t; key; t; ccmap key t; int]] x
 (* Test for the default Set of OCaml which as a type is also the same as CCSet. *)
 let rec ccset t x = union 1 [[ccset t; t; ccset t; int]] x
 let ccbv x = tuple[array int; int] x
-let ccvector t = tuple[int; array t] ~st:(fun(s,a)-> size a >= s && s >= 0)
+let ccvector t = tuple[int; array t] ~st:(fun(s,a)-> size a >= s & s >= 0)
 let rec bucketlist k v x = union 1 [[k; v; bucketlist k v]] x
-let hashtbl k v = tuple[int; array(bucketlist k v); int; int] ~st:(fun(s,a,_,_) -> size a >= s && s >= 0)
+let hashtbl k v = tuple[int; array(bucketlist k v); int; int] ~st:(fun(s,a,_,_) -> size a >= s & s >= 0)
 
 (* arbitrary precision types—unsafe! *)
 let integer x = int x or custom x
@@ -106,13 +106,13 @@ let an_id x = tuple[int; string; list exception'] x
 let hvar t = tuple[int;t]
 let rec term x = tuple[view; opt term; int; exception'; custom; lazy_force int] x
 and view x = union 0 [
-  [hvar term];
+  [tvar];
   [int];
   [enum 4; term; term];
   [an_id];
   [term; list term];
   [builtin; list term]] x
-let tvar x = hvar term x
+and tvar x = hvar term x
 
 let num_class t = tuple[
   term;
@@ -222,8 +222,6 @@ add_pp (test 0 (fun(tag,_) -> tag < no_scan_tag)) (fun x ->
   ^ (match tag x with 0-> "" | t-> "tag" ^ str t) (* Omit multipurpose default tag 0. *)
   ^ "("^ clever_view "," str (fields x) ^")");
 
-add_pp (hashtbl any any) (fun t -> "{"^ clever_view ";" (fun(k,v)-> str k ^"↦ "^ str v) (List.of_seq(Hashtbl.to_seq t)) ^"}");
-
 add_pp (ccvector any) (CCVector.to_string ~start:"ᵛᵉᶜ⟨" ~stop:"⟩" str);
 
 add_pp (list any) (fun l -> "["^ clever_view ";" str l ^"]");
@@ -231,6 +229,9 @@ add_pp (list any) (fun l -> "["^ clever_view ";" str l ^"]");
 add_pp (ccset any) (
   let rec to_list s = if s == repr 0 then [] else to_list(field s 0) @ field s 1 :: to_list(field s 2) in
   fun s -> "{"^ clever_view "," str (to_list s) ^"}");
+
+add_pp (hashtbl any any) Hashtbl.(fun t -> "{"^if length t = 0 then "↦̸ }" else
+  clever_view ";" (fun(k,v)-> str k ^"↦ "^ str v) (List.of_seq(to_seq t)) ^"}");
 
 (* already evaluated lazy values *)
 add_pp (test_tag forward_tag any) (str % Lazy.force);
@@ -241,7 +242,7 @@ add_pp (lazy_or ~=false) ~="lazy";
 add_pp (test 0 (fun(tag,_) -> tag=closure_tag or tag=infix_tag)) (fun f -> 
   match fields f with
   (* First field is code pointer and subsequent are captured parameters and auxiliarities. The separated case of int+pointer often occurs as the last field, and is made less noisy. *)
-  | [_;n;f] when int n && tag f = out_of_heap_tag -> "function" ^ str n
+  | [_;n;f] when int n & tag f = out_of_heap_tag -> "function" ^ str n
   | _::p::pp -> "closure("^ clever_view "," str (p::pp) ^")"
   | _ -> "function");
 
@@ -265,8 +266,11 @@ add_pp exception' Printexc.(fun e ->
   else "");
 
 add_pp decimal string_of_float;
+(* Quote number and invisible strings. *)
 add_pp string (fun s -> if None != int_of_string_opt(String.trim s ^ "0") then "“"^s^"”" else s);
-add_pp (sliteral term) ((^)"ᔆᴸⁱᵗ" % SLiteral.to_string Term.pp);
+(* Do not print list [term] as SLiteral ¬term. *)
+add_pp (fun x -> sliteral term x & not(list any x)) ((^)"ᔆᴸⁱᵗ" % SLiteral.to_string Term.pp);
+add_pp tvar HVar.to_string;
 add_pp subst Subst.to_string;
 add_pp term Term.to_string;
 add_pp literal Literal.to_string;

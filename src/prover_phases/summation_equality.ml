@@ -9,21 +9,31 @@ open Util
 open Util.UntypedPrint
 open Precedence.Weight
 open Comparison
+open Monome
+open Literals
+open Literal.Conv
+open Literal
 open CCCache
 open CCOpt
 open CCArray
 open CCVector
 open CCList
 open CCFun
-module H = Hashtbl
-open Literals
-open Literal.Conv
-open Literal
 module B = Builtin
-open Monome
 open Type
 open Term
 open Stdlib
+module H = Hashtbl
+module HT = Hashtbl.Make(struct
+  type t = term
+  let equal = (==)
+  let hash = Term.hash
+end)
+module HV = Hashtbl.Make(struct
+  type t = Term.var
+  let equal = (==)
+  let hash = HVar.hash
+end)
 
 let (~=) x _ = x
 let (@@) = CCPair.map_same
@@ -50,8 +60,10 @@ let sum_array = Array.fold_left (+) 0
 let (|->) i v a = a.(i)<-v; a
 let (|=>) i v = (i|->v) % Array.copy
 
+let index_of p l = fst(get_exn(find_idx p l))
+
 (* Search hash table by value instead of by key. *)
-let search_hash ?(eq=(=)) table value = H.fold (fun k v found -> if found=None && eq value v then Some k else found) table None
+let search_hash ?(eq=(=)) table value = H.fold (fun k v found -> if found=None & eq value v then Some k else found) table None
 
 let with_cache_2 c f = curry(with_cache_rec c (uncurry % f % curry))
 let with_cache_3 c f = curry(with_cache_2 c (uncurry % f % curry))
@@ -79,13 +91,13 @@ let on_eligible_literals(type c)(module Env: Env.S with type C.t=c) name literal
     let c1_lits, c2_lits = C.lits@@(c1,c2) in
     fold_lits ~eligible:(C.Eligible.res c1) c1_lits |> Iter.flat_map(fun(l1,pos1) ->
     fold_lits ~eligible:(C.Eligible.res c2) c2_lits |> Iter.flat_map_l(fun(l2,pos2) ->
-      literal_inference l1 l2 |> List.map(fun(infered, subst) ->
+      literal_inference l1 l2 |> map(fun(infered, subst) ->
         let c1_no_l1 = apply_subst_list rename subst (except_idx c1_lits pos1, 0) in
         let c2_no_l2 = apply_subst_list rename subst (except_idx c2_lits pos2, 1) in
         C.create (infered @ c1_no_l1 @ c2_no_l2)
           ~penalty:(max (C.penalty c1) (C.penalty c2))
           ~trail:(C.trail_l[c1;c2])
-          (Proof.Step.inference ~tags:[] ~rule:(Proof.Rule.mk name) (List.map (fun c -> C.proof_parent_subst rename c subst) [c1,0; c2,1]))
+          Proof.(Step.inference ~tags:[] ~rule:(Rule.mk name) (map (fun c -> C.proof_parent_subst rename c subst) [c1,0; c2,1]))
     ))) |> Iter.to_rev_list
   in
   Env.add_binary_inf name (fun c ->
@@ -131,7 +143,7 @@ let add_simplify_in_context
           raise(Changed(C.create (simplified @ c2_no_l2)
             ~penalty:(C.penalty c2)
             ~trail:(C.trail c2)
-            (Proof.Step.simp ~tags ~rule:(Proof.Rule.mk name) (List.map (fun c -> C.proof_parent_subst rename c composed) [c2,1; c1,0]))))
+            Proof.(Step.simp ~tags ~rule:(Rule.mk name) (map (fun c -> C.proof_parent_subst rename c composed) [c2,1; c1,0]))))
         | _ -> ()
       ); c2,`Same
     | _ -> c2,`Same
@@ -178,7 +190,7 @@ let _z = _Z % Z.of_int
 let coordinate_count = ref 0
 let fold_coordinates o f = fold_left f o (init !coordinate_count id)
 
-let make_powers = Array.init !coordinate_count
+let make_powers f = Array.init !coordinate_count f
 let (+^) = Array.map2(+)
 
 (* Make normalized Product-shift of monomial. (Multiplication must commute.) *)
@@ -189,15 +201,21 @@ let product(s,f, z,g) = if compare f g < 0
 
 let varstr name1 n = String.make 1 Char.(chr(code name1 - n))
 
+let termstr t = (flip String.iter (to_string t)
+  |> Iter.filter((!=)' ')
+  |> Iter.to_string ~sep:"̲" (String.make 1)
+)^"̲"
+
 let powers_to_string name1 = String.concat "" % Array.to_list % Array.mapi(fun var -> function
 | 0 -> ""
+| 1 -> varstr name1 var
 | exp -> varstr name1 var ^ superscript(string_of_int exp))
 
 let shifts_to_string = function
 | One -> ""
-| Shift(s,f) -> powers_to_string 'Z' s ^ str f
-| Product(s1,f1, s2,f2) -> powers_to_string 'Z' s1 ^ str f1 ^"⬝"^ powers_to_string 'Z' s2 ^ str f2
-| Diagonal _ -> raise TODO
+| Shift(s,f) -> powers_to_string 'Z' s ^ termstr f
+| Product(s1,f1, s2,f2) -> powers_to_string 'Z' s1 ^ termstr f1 ^"⬝"^ powers_to_string 'Z' s2 ^ termstr f2
+| Diagonal(sub, dup, s,f) -> "{"^ varstr 'z' sub ^"↦ "^ varstr 'z' dup ^"}"^ powers_to_string 'Z' s ^ termstr f
 
 let mono_to_string(c,m,f) = match (match str c with "1"->"" | "-1"->"-" | c'->c') ^ powers_to_string 'z' m ^ shifts_to_string f with ""->"1" | "-"->"-1" | s->s
 
@@ -267,37 +285,43 @@ let _1 t = [Z.one, power0(), Shift(power0(), t)]
 let _1x1 t s = [Z.one, power0(), product(power0(), t, power0(), s)]
 
 let equal_shifts s z = s==z or match s,z with
-| Shift(s,f), Shift(z,g) -> s=z && f==g
-| Product(s1,f1, s2,f2), Product(z1,g1, z2,g2) -> s1=z1 && f1==g1 && s2=z2 && f2==g2
-| Diagonal(a,b,s,f), Diagonal(c,d,z,g) -> a=c && b=d && s=z && f==g
+| Shift(s,f), Shift(z,g) -> s=z & f==g
+| Product(s1,f1, s2,f2), Product(z1,g1, z2,g2) -> s1=z1 & f1==g1 & s2=z2 & f2==g2
+| Diagonal(a,b,s,f), Diagonal(c,d,z,g) -> a=c & b=d & s=z & f==g
 | _ -> false
 let (=^) = equal_shifts
 
 let sum_monomials =
   let rec sum_same = function
   | (o,m,s)::p when is0 o -> sum_same p
-  | (c,m,s)::(a,n,z)::p when m=n && s=^z -> sum_same(Z.(c+a,m,s)::p)
+  | (c,m,s)::(a,n,z)::p when m=n & s=^z -> sum_same(Z.(c+a,m,s)::p)
   | cms::p -> cms :: sum_same p
   | [] -> []
   in
   sum_same % sort rev_cmp_mono
 
-let map_monomials f = sum_monomials % flat_map f
+let map_monomials k = sum_monomials % flat_map k
+
+let map_terms k = map_monomials(fun(c,m,s) -> [c, m, match s with
+| One -> One
+| Shift(s,f) -> Shift(s, k f)
+| Product(s,f,z,g) -> product(s, k f, z, k g)
+| Diagonal(sub,dup,s,f) -> Diagonal(sub, dup, s, k f)])
 
 type polysubst = Z.t * powers * shifts
 
-let shift_multiplier s m = CCList.(let rec loop out = function
+let shift_multiplier s m = (let rec loop out = function
   | 0::ss, m::mm -> loop (map (cons(Z.one,m)) out) (ss,mm)
   | s::ss, m::mm -> loop (concat(init(m+1) (fun n -> map (cons(Z.(bin (of_int m) n * of_int s**n) , m-n)) out))) (ss,mm)
   | _ -> out
-  in loop [] Array.(to_list s, to_list m) |> map(fun l -> fold_left Z.(fun a (c,_) -> c*a) Z.one l, Array.of_list(rev_map snd l)))
+  in loop [[]] Array.(to_list s, to_list m) |> map(fun l -> fold_left Z.(fun a (c,_) -> c*a) Z.one l, Array.of_list(rev_map snd l)))
 
 let substiply(c,m,x) = map_monomials(fun(a,n,z) ->
   let s = match x with
   | Shift(s,_) | Product(_,_,s,_) | Diagonal(_,_,s,_) -> s
   | _ -> assert false
   in
-  shift_multiplier s n |> List.map(fun(b,sn)->
+  shift_multiplier s n |> map(fun(b,sn)->
   (match x with Diagonal(sub, dup, _,_) ->
     sn.(dup) <- sn.(dup)+sn.(sub);
     sn.(sub) <- 0;
@@ -312,7 +336,7 @@ let substiply(c,m,x) = map_monomials(fun(a,n,z) ->
   | Shift(z,f), _ -> Shift(s+^z,f)
   | Product(z1,f1, z2,f2), Shift _ -> Product(s+^z1, f1, s+^z2, f2)
   | Diagonal(sub, dup, z,f), Shift _ ->
-    assert(s.(sub)=0);
+    if s.(sub)>0 then raise MonomialIncompatibility; (* Note: this might signal bug? *)
     s.(sub) <- s.(dup);
     let result = Diagonal(sub, dup, s+^z, f) in
     s.(sub) <- 0;
@@ -330,10 +354,10 @@ let rec mgu_shift s s' =
     require(f==f');
     (fun u -> Shift(u,f)) @@ mgu_pow s s'
   | Product(s1,f1, s2,f2), Product(z1,g1, z2,g2) ->
-    require(f1==g1 && f2==g2 && s1+^z2 = s2+^z1);
+    require(f1==g1 & f2==g2 & s1+^z2 = s2+^z1);
     (fun u -> Shift(u,f1)) @@ mgu_pow s1 z1
   | Diagonal(i,j,s,f), Diagonal(i',j',s',f') ->
-    require(i=i' && j=j' && f==f' && s.(i)-s.(j) = s'.(i)-s'.(j));
+    require(i=i' & j=j' & f==f' & s.(i)-s.(j) = s'.(i)-s'.(j));
     (fun u -> Shift((i|->0)u,f)) @@ mgu_pow s s'
   | Product(s1,f1,s2,f2), Shift(s',f') ->
     if f'==f1 then(
@@ -351,7 +375,7 @@ let rec mgu_shift s s' =
     u'.(sub) <- u'.(sub) + h - u.(sub);
     u'.(dup) <- u'.(dup) + h - u.(dup);
     u.(sub) <- h; u.(dup) <- h;
-    Shift(u,f), Diagonal(sub, dup, u,f)
+    Shift(u,f), Diagonal(sub, dup, u',f)
   | Shift _, _ -> CCPair.swap(mgu_shift s' s)
   | _ -> raise MonomialIncompatibility
 
@@ -363,7 +387,7 @@ let rec mgu (c,m,s) (c',m',s') =
   (uc,um,us), (uc',um',us')
 
 let (|~>) general special = match mgu general special with
-| (c,m,s), (i, o, Shift(o',_)) when Z.(equal one (abs i)) && sum_array(o+^o') = 0 -> Z.(i*c,m,s)
+| (c,m,s), (i, o, Shift(o',_)) when Z.(equal one (abs i)) & sum_array(o+^o') = 0 -> Z.(i*c,m,s)
 | _ -> raise MonomialIncompatibility
 
 
@@ -371,7 +395,7 @@ let (|~>) general special = match mgu general special with
 let (++) p r = sum_monomials(p@r)
 
 (* constant × polynomial *)
-let ( *:) a = if is0 a then ~=_0 else List.map Z.(fun(c,m,s) -> a*c,m,s)
+let ( *:) a = if is0 a then ~=_0 else map Z.(fun(c,m,s) -> a*c,m,s)
 
 (* polynomial - polynomial *)
 let (--) p r = p ++ Z.of_int(-1)*:r
@@ -387,7 +411,7 @@ let superpose p p' =
 (* Try rewrite leading monomial of p by r. *)
 let leadrewrite r p =
   if r=_0 or p=_0 then None else try
-    Some(p -- substiply (hd r |~> hd p) r)
+    Some(p -- (substiply (hd r |~> hd p) r))
   with MonomialIncompatibility -> None
 
 
@@ -412,7 +436,7 @@ let separate (c,m,f) p nomatch act =
 
 
 let reparameterise structured_substitutes = map_monomials(fun(c,m,s)->
-  structured_substitutes |> List.map(fun(var, base, scales) ->
+  structured_substitutes |> map(fun(var, base, scales) ->
     if sum_list scales = 0 then
       Z.(of_int base**m.(var) * c, (var|=>0)m, s)
     else
@@ -512,7 +536,7 @@ module C = MainEnv.C
 (* module Ctx = MainEnv.Ctx *)
 module R = RecurrencePolynomial
 
-let parents_as_such = List.map (fun p -> C.proof_parent_subst (Subst.Renaming.create()) (p,0) Subst.empty)
+let parents_as_such = map (fun p -> C.proof_parent_subst (Subst.Renaming.create()) (p,0) Subst.empty)
 
 let polyliteral p = if p = R._0 then mk_tauto else (fun(l,_,_)->l) (R.poly_as_lit_term_id p)
 
@@ -532,7 +556,7 @@ let polys_of_2_lits no yes l1 = match R.poly_of_lit l1 with
   | None -> no
   | Some p2 -> yes p1 p2
 
-let superpose_poly = polys_of_2_lits [] (R.superpose %>> List.map(fun p -> [polyliteral p], Subst.empty))
+let superpose_poly = polys_of_2_lits [] (R.superpose %>> map(fun p -> [polyliteral p], Subst.empty))
 
 let rewrite_poly = polys_of_2_lits None (R.leadrewrite %>> CCOpt.map(fun p -> [polyliteral p], Subst.empty))
 
@@ -565,68 +589,116 @@ let make_polynomial_environment() =
   on_eligible_literals env "sup. poly." superpose_poly;
   PolyEnv.add_is_trivial (Array.mem mk_tauto % C.lits);
   env,
-  fun clauses -> match saturate_in env (Iter.to_rev_list clauses) with
+  fun clauses -> 
+    
+    match saturate_in env (Iter.to_rev_list clauses) with
     | Error e -> raise(Failure e)
     | Ok(_, Unsat _) -> PolyEnv.C.ClauseSet.to_iter(PolyEnv.get_empty_clauses())
     | Ok _ -> PolyEnv.get_clauses()
 
 
-let var_term_table = H.create 6
+let coords = ref []
+(* TODO choose one of these to use *)
+(* let var_term_table = H.create 6
 let var_term = H.find var_term_table
 let var_index term = match search_hash ~eq:(==) var_term_table term with
 | Some v -> v
 | None ->
   let new_index = H.length var_term_table in
   H.add var_term_table new_index term;
-  new_index
-
+  new_index *)
+let var_index term = index_of ((==)term) !coords
+let var_term index = nth !coords index
 
 let is_summation s = match view s with
 | Const{name="sum"} -> true
 | _ -> false
 
 let to_Z t = match view t with
-| AppBuiltin(B.Int z, []) -> Some z
-| _ -> None
+| AppBuiltin(B.Int z, []) -> z
+| _ -> raise Exit
+let is_Z t = try snd(to_Z t, true) with Exit -> false
+let to_int = Z.to_int % to_Z
 
-let is_atom t = to_Z t != None or ty t == int && match view t with
-| App(f,x) -> List.for_all ((!=)None % to_Z) x
+(* Explicit integer constant or simple constant suitable as a coordinate variable. *)
+let is_atom t = is_Z t or ty t == int & match view t with
+| Const _ -> true
+| App(f,x) -> for_all is_Z x
 | _ -> false
 
-let is_free t = ty t == int && is_var t
+let is_free t = ty t == int & is_var t
 
-let recurrence_table = H.create 32
-let add_recurrence t r = H.add recurrence_table t
-  (match H.find_opt recurrence_table t with
+let recurrence_table = HT.create 32
+let add_recurrence t r = HT.add recurrence_table t
+  (match HT.find_opt recurrence_table t with
   | None -> [r]
   | Some old_r -> r::old_r)
 
 
-let rec term_to_poly coords t =
+type encoding_phase_info = {coords: term list; symbols: term list; specialise: term HV.t}
+
+let trivC = C.create ~penalty:1 ~trail:(C.trail_l[]) [Literal.mk_tauto] Proof.Step.trivial
+let feed = MainEnv.FormRename.get_skolem ~parent:trivC ~mode:`SkolemRecycle
+
+let no_plus = map(fun s -> match view s with
+| AppBuiltin(B.Sum, [_;x;y]) when is_Z x -> y
+| AppBuiltin(B.Sum, [_;x;y]) when is_Z y -> x
+| _ -> s)
+
+let rec term_to_poly info t =
   if ty t != int then raise Exit;
   match view t with
   | AppBuiltin(B.(Sum|Difference) as op, [_;x;y]) ->
-    R.(if op=B.Sum then (++) else (--)) (term_to_poly coords x) (term_to_poly coords y)
-  | AppBuiltin(B.Product, [_;c;x]) -> R.(match to_Z c with
-    | Some const -> const *: term_to_poly coords x
-    | None -> raise TODO)
-  | _ when memq t coords ->
-    R.[Z.one, Array.of_list(List.mapi(fun i s -> if s==t then 1 else 0) coords), One]
-  | App(f,p) when List.for_all(fun x -> memq x coords or is_free x) p ->
+    R.(if op=B.Sum then (++) else (--)) (term_to_poly info x) (term_to_poly info y)
+  | AppBuiltin(B.Product, [_;c;x]) -> R.(try to_Z c *: term_to_poly info x
+    with Exit -> raise TODO)
+  | AppBuiltin(B.Int n, _) ->
+    if R.is0 n then [] else R.[n, power0(), One]
+  | _ when memq t info.coords ->
+    R.[Z.one, Array.of_list(mapi(fun i s -> if s==t then 1 else 0) info.coords), One]
+  | App(f,p) when exists (Unif.FO.matches ~pattern:(app f (no_plus p))) info.symbols ->
+    to_iter info.symbols (fun s -> try
+      Unif.FO.matching_same_scope ~scope:0 ~pattern:(app f (no_plus p)) s
+      |> Subst.iter(fun (v,_) (b,_) -> HV.add info.specialise (cast_var_unsafe v) (of_term_unsafe b))
+    with Unif.Fail -> ());
     R._1 t
-    (* ...except that free var.s must be specialized consistently! *)
+  | App(f,p) when for_all(flip memq info.coords) p ->
+    R._1 t
   | _ -> raise Exit
 
-let equation_to_recpoly coords literal = match to_form literal with SLiteral.Eq(t,s) ->
-  (try Some R.(term_to_poly coords t -- term_to_poly coords s)
+let equation_to_recpoly info literal = match to_form literal with SLiteral.Eq(t,s) ->
+  (try Some R.(term_to_poly info t -- term_to_poly info s)
   with Exit -> None)
 |_->None
 
 (* Associate the clause as a recurrence polynomial to appropriate terms. To be used in initialization. *)
-let register_if_clause_is_recurrence coords clause =
-  fold_lits ~eligible:(C.Eligible.res clause) (C.lits clause) (fun(lit,place)->
-    equation_to_recpoly coords lit |> CCOpt.iter(fun p ->
-      R.terms_in p |> List.iter(flip add_recurrence (replace_lit_by_poly clause place p))))
+let register_if_clause_is_recurrence info clause =
+  fold_lits ~eligible:(C.Eligible.res clause) (C.lits clause) Subst.(fun(lit,place)->
+    equation_to_recpoly info lit |> CCOpt.iter List.(fun p ->
+      let pair_with (v:Term.var) (x:Term.t) : var Scoped.t * term Scoped.t = ((v:>var),0), ((x:>term),0) in
+      let substs = HV.to_seq_keys info.specialise
+      |> of_seq_rev
+      |> sort_uniq(HVar.compare Type.compare)
+      |> map_product_l(fun v -> map(pair_with v) (sort_uniq Term.compare (HV.find_all info.specialise v)))
+      |> map of_list in
+      substs |> iter R.(fun s ->
+        let s' t = of_term_unsafe(apply (Renaming.create()) s ((t:Term.t:>term),0)) in
+        let sp = R.map_terms s' p
+        |> map_monomials(fun(c,m,s)-> [c, m, match s with
+        | Shift(z,g) ->
+          let z = Array.copy z in
+          let g' = match view(s' g) with
+          | App(f,p) -> app f (p |> map(fun t -> match view t with
+            | AppBuiltin(B.Sum, [_;x;y]) when is_Z x ->
+              z.(index_of ((==)y) info.coords) <- to_int x; y
+            (* symmetric copy *)
+            | AppBuiltin(B.Sum, [_;y;x]) when is_Z x ->
+              z.(index_of ((==)y) info.coords) <- to_int x; y
+            | _ -> t))
+          | _ -> raise TODO in
+          Shift(z,g')
+        | s -> s]) in
+        terms_in sp |> iter(flip add_recurrence (replace_lit_by_poly clause place sp)))))
 
 
 (* Try to separate non-trivial eligible recurrence and the rest of the literals from the given clause. *)
@@ -640,7 +712,7 @@ let view_poly_clause c = fold_lits ~eligible:(C.Eligible.res c) (C.lits c)
 let filter_recurrences ok_poly = Iter.filter(fun c ->
   fold_lits ~eligible:(C.Eligible.res c) (C.lits c)
     |> Iter.exists R.(fun(l,_) -> match poly_of_lit l with
-      | Some p -> p!=_0 && ok_poly p
+      | Some p -> p!=_0 & ok_poly p
       | _ -> false))
 
 (* Filter those clauses that have eligible polynomial with leading term M t where some monomial M operates on an OK term t. *)
@@ -649,24 +721,30 @@ let filter_recurrences_of ok_term = filter_recurrences R.(hd %> function
   | _ -> false)
 
 
-let rec recurrences_of t = match H.find_opt recurrence_table t with
+let rec recurrences_of t = match HT.find_opt recurrence_table t with
 | Some r -> r
 | None ->
   let r = Iter.to_rev_list(match view t with
   | AppBuiltin(B.Sum, [_;x;y]) -> propagate_affine x y t
   | AppBuiltin(B.Difference, [_;x;y]) -> propagate_affine x ~coef2:Z.minus_one y t
+  (* TODO symmetric copy *)
+  | AppBuiltin(B.Product, [_;x;y]) when is_Z x -> propagate_affine ~coef1:(to_Z x) x (R._z 0) t
+  | AppBuiltin(B.Product, [_;x;y]) when is_atom x -> raise TODO
   | AppBuiltin(B.Product, [_;x;y]) -> propagate_times x y t
-  | App(s,x) when is_summation s -> propagate_sum (hd x) 0 (hd(tl x)) t
+  | App(s,[m;f]) when is_summation s -> propagate_sum m (var_index(feed f)) (app f [feed f]) t
   | _ -> Iter.empty)
   in
-  H.add recurrence_table t r;
+  HT.add recurrence_table t r;
   r
 
 and propagate_affine ?(coef1=Z.one) t ?(coef2=Z.one) s t_plus_s =
   let env, saturate = make_polynomial_environment() in
   R.redefine_elimination_priority(R.elim_oper_args[t,2; s,2; t_plus_s,1]);
+  let poly x = R.(if is_Z x then [to_Z x, power0(), One]
+    else if is_atom x then [Z.one, (var_index x |-> 1)(power0()), One]
+    else _1 x) in
   Iter.of_list(recurrences_of t @ recurrences_of s)
-  |> Iter.cons(definitional_poly_clause R.(_1 t_plus_s -- coef1*: _1 t -- coef2*: _1 s))
+  |> Iter.cons(definitional_poly_clause R.(_1 t_plus_s -- coef1*: poly t -- coef2*: poly s))
   |> saturate
   |> filter_recurrences_of((==)t_plus_s)
 
@@ -715,6 +793,7 @@ and propagate_times t s t_x_s =
 and propagate_sum set sum_var s sum =
   let env, saturate = make_polynomial_environment() in
   let bad = ref[] in
+  let nice = ref true in
   let sum_fobic = function
   | (_,_,t) when t!=s -> 0
   | (`Mul,v,_) when v=sum_var -> 1
@@ -727,7 +806,7 @@ and propagate_sum set sum_var s sum =
   let rec_of_sum_with_bad_terms = Iter.of_list(recurrences_of s)
   |> saturate
   |> filter_recurrences R.(fun p -> fold_coordinates true (fun pass v ->
-    pass && List.for_all(function
+    pass & for_all(function
       | _, m, One -> true
       | _, m, Shift(s,f) -> 0 = m.(v)*sum_fobic(`Mul,v,f) + s.(v)*sum_fobic(`Shift,v,f)
       | _ -> false
@@ -742,35 +821,42 @@ and propagate_sum set sum_var s sum =
       e q ++ r
       (* Pull out shifts w.r.t. all remaining variables. Multipliers get pulled out implicitly. *)
       |> flip fold_coordinates (fun p v -> p |> map_monomials(function
-        | c, m, Shift(z,s') when s'==s ->
+        | c, m, Shift(z,t) as cmZt ->
           let e = near_commutation_error v set sum_var in
           (* Cut z into two at v. Important to get ∑ₙMK - MK∑ₙ = eᴹK + Meᴷ right. *)
           let outZ, inZ = power0(), power0() in
           blit z 0 outZ 0 v;
           blit z v inZ v (!coordinate_count - v);
           (* c m outZ Vᵃ inZ t ↦ ∑ᵢ₊ⱼ₌ₐ₋₁ c m outZ Vʲ e(Vⁱ inZ t) *)
-          concat(init z.(v) (fun j ->
-            substiply (c, m, Shift((v|->j) outZ, s)) (e [Z.one, power0(), Shift((v|->z.(v)-1-j) inZ, s)])))
+          cmZt :: concat(init z.(v) (fun j ->
+            substiply (c, m, Shift((v|->j) outZ, t)) (e [Z.one, power0(), Shift((v|->z.(v)-1-j) inZ, t)])))
         | other -> [other]
       ))
       (* Replace s by sum=∑s, and record excess terms to eliminate later. *)
       |> map_monomials(fun(c,m,z) -> [c, m, match z with
         | One -> raise TODO (* ∑m over the set *)
         | Shift(z,s') when s'==s -> Shift(z,sum)
+        (* | Diagonal(_,_,_,s') when s'==s -> nice:=false; z *)
         | Shift(_,f) | Diagonal(_,_,_,f) -> bad:= add_nodup ~eq:(==) f !bad; z
+        (* | _ -> z]) *)
         | _ -> assert false])
     in
     C.create_a ~penalty:(C.penalty c) ~trail:(C.trail c)
       (Array.append [|polyliteral p'|] lits)
       Proof.(Step.inference ~rule:(Rule.mk "pull recurrence out of sum") (parents_as_such [c]))
-  ) in
+  )
+  (* Force the iteration through to decide necessity of resaturation. *)
+  |> Iter.persistent in
   if !bad=[] then rec_of_sum_with_bad_terms else(
-    R.redefine_elimination_priority(R.elim_oper_args(List.map(fun f -> f,1)!bad));
+    R.redefine_elimination_priority(R.elim_oper_args((sum,1)::map(fun f -> f,2)!bad));
     Iter.of_list(flat_map recurrences_of !bad)
+    (* Iter.of_list(recurrences_of s) *)
     |> Iter.append rec_of_sum_with_bad_terms
     |> saturate
-    |> filter_recurrences_of((==)sum)
   )
+  |> filter_recurrences R.(fun r ->
+    exists(function _,_,Shift(_,sm) when sm==sum ->true | _->false) r
+    & for_all(function _,_,Shift(_,t) when subterm ~sub:(var_term sum_var) t ->false | _->true) r)
 
 (* For set S, sum_var n, defined by ∑ⁿ⁼ᔆ(N-1) and maps n↦(S Δ NS) *)
 and near_bijectivity_error set var = near_either_error var set var
@@ -778,12 +864,12 @@ and near_bijectivity_error set var = near_either_error var set var
 and near_commutation_error v = near_either_error v
 
 and near_either_error =
-  let eq ((v,s),n) ((v',s'),n') = v=v' && s==s' && n=n' in
+  let eq ((v,s),n) ((v',s'),n') = v=v' & s==s' & n=n' in
   with_cache_3 (lru 16 ~eq) ~=R.(fun op_var set sum_var ->
     (* TODO actually deduce end_points by superposition from op_var, set, sum_var *)
     let end_points =
       if op_var = sum_var then [1,1,`Dup(var_index set); -1,1,`None]
-      else if op_var = var_index set then [1,1,`Dup op_var]
+      else if op_var = var_index set then [-1,1,`Dup op_var]
       else []
     in
     map_monomials(fun(c,m,s) ->
@@ -793,8 +879,11 @@ and near_either_error =
       | Shift(s,f) -> end_points |> flat_map(fun(sign, base, scale) ->
         let c = Z.( * ) (Z.of_int sign) c in
         match scale with
-        |`None -> [c, m, Shift((sum_var|=>0) s, app f [_z base] (*sum_var↦base*))]
-        |`Dup var -> [c, m, Diagonal(sum_var, var, (sum_var |=> s.(sum_var)+base) s, f)]
+        |`None -> [c, m, Shift((sum_var|=>0) s, replace ~old:(var_term sum_var) ~by:(_z base) f (*sum_var↦base*))]
+        |`Dup var ->
+          [c, m, if subterm ~sub:(var_term var) f
+            then Diagonal(sum_var, var, (sum_var |=> s.(sum_var)+base) s, f)
+            else Shift((var |-> s.(sum_var)+base) ((sum_var|=>0) s), replace ~old:(var_term sum_var) ~by:(var_term var) f)]
         | _ -> raise TODO)
       | _ -> assert false))
 
@@ -808,15 +897,36 @@ let try_prove_sum_equality clause = match
       let main_expr = app_builtin ~ty:int B.Difference [of_ty int; lhs; rhs] in
       let open Term.Set in
       let coord_set, sym_set = ref empty, ref empty in
-      Term.Seq.subterms main_expr (fun t ->
-        if to_Z t == None then
+      let rec walk t  = if not(is_Z t) & ty t == int then
+        if is_atom t then coord_set <:> add t
+        else match view t with
+        | AppBuiltin(B.(Sum|Difference|Product), [_;x;y]) -> walk x; walk y
+        | App(s, [m;f]) when is_summation s -> walk m; walk(app f [feed f])
+        | App(f,x) -> List.iter walk x; if List.for_all is_atom x then sym_set <:> add t
+        | _ -> ()
+      in
+      walk main_expr;
+      (* Term.Seq.subterms ~include_builtin:true main_expr (fun t ->
+        if not(is_Z t) then
           if is_atom t then coord_set <:> add t
           else if ty t == int then match view t with
           | App(f,x) -> if List.for_all is_atom x then sym_set <:> add t
-          | _ -> ());
+          | _ -> ()); *)
       (* TODO better initialization *)
-      MainEnv.get_clauses() (register_if_clause_is_recurrence(to_list !coord_set));
+      R.coordinate_count := cardinal !coord_set;
+      MainEnv.get_clauses() (register_if_clause_is_recurrence{
+        coords = to_list !coord_set;
+        symbols = to_list !sym_set;
+        specialise = HV.create 4});
+      coords := to_list !coord_set;
+      to_iter !sym_set (fun s -> match view s with App(_,x) ->
+        to_iter(diff !coord_set (of_list x)) (fun v -> add_recurrence s R.(
+          let v_const = [Z.one, power0(), Shift((var_index v |-> 1)(power0()), s)] -- _1 s in
+          C.create [polyliteral v_const] ~penalty:1 ~trail:(C.trail_l[])
+            Proof.(Step.inference [] ~rule:(Rule.mk "constantness"))))
+        |_-> assert false);
       let r = recurrences_of main_expr in
+      ~<recurrence_table;
       print_endline("Refuting "^ str lit);
       print_endline "Final recurrences:";
       List.iter (print_endline%str) r;
@@ -832,7 +942,7 @@ with
 let step text parents lits =
   C.create lits ~penalty:1 ~trail:(C.trail_l[]) (if parents=[]
   then (if text="goal" then Proof.Step.goal' else Proof.Step.assert') ~file:"" ~name:text ()
-  else Proof.Step.inference ~tags:[] ~rule:(Proof.Rule.mk text) (List.map (fun p -> C.proof_parent_subst (Subst.Renaming.create()) (p,0) Subst.empty) parents))
+  else Proof.Step.inference ~tags:[] ~rule:(Proof.Rule.mk text) (map (fun p -> C.proof_parent_subst (Subst.Renaming.create()) (p,0) Subst.empty) parents))
 
 
 (*
