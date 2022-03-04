@@ -1,5 +1,5 @@
-(* A dynamic type test is a predicate 'a->bool. They work by traversing the term structure. Since types are erased, same data can have multiple types. But if a type test T on data X is succesful, then at least X can be (magic) cast to T safely. The below tests are accure in this sense, or preserve accuracy, except the unsafe tests integer/Z.t, rational/Q.t and lazy_or. There's no test combinators for polymorphic variants and exceptions—they can be safely and accurately tested by pattern matching.
- Currently this file contains all definitions of type tests and their associations to string printers. It is easy to disable this debugging by never registering the corresponding extension. Another design would be to scatter the type tests next to the corresponding real type definitions. That'd be easier to maintain unless it can need an inter-file-cyclic reference. But does it ever? *)
+(* A dynamic type test is a predicate 'a->bool. They work by traversing the term structure. Since types are erased, same data can have multiple types. But if a type test T on data X is succesful, then at least X can be (magic) cast to T safely. Safety means no segmentation fault but risks custom invariants. The below tests are accure in this sense, or preserve accuracy, except the unsafe tests integer/Z.t, rational/Q.t and lazy_or. There's no test combinators for polymorphic variants and exceptions—they can be accurately tested by pattern matching.
+ Currently this file contains all definitions of type tests and their associations to string printers. It is hence easy to disable this debugging by never registering the corresponding extension. Another design would be to scatter the type tests next to the corresponding real type definitions. That'd reduce the risk of forgetting to update a test along side its corresponding type. *)
 
 open Logtk
 open Libzipperposition
@@ -10,7 +10,7 @@ open Util
 open Util.UntypedPrint
 open CCFun
 
-(* Self-debugging TODO this is difficult to use if cyclic dependency occurs *)
+(* Self-debugging — Note: to use debug_has_type you might have to cut cyclic dependency by temporary edits. Moving registration of printers to a new file offers a possible solution. *)
 
 let debug_typing_fail = ref `Off
 (* The root type test combinators are annotated by this to record their last failure. *)
@@ -38,7 +38,7 @@ let debug_has_type t x =
         "\n\nStack trace of the last corresponding test:\n" ^ Printexc.raw_backtrace_to_string trace
       | _(*`On *) ->
         "\n\nThe failing subtest is a custom one such as pattern match. You must locate it by other means, sorry."
-      )^"\n\nPress enter to continue the run. . .");
+      )^"\n\nPress enter to continue the run . . .");
     let _=read_line() in x)
 
 
@@ -68,7 +68,8 @@ let opt t = union 1 [[t]]
 
 let bool x = enum 2 x
 (* Test flat tuples and records: tt is a list of type tests for the components, in order of appearence, and ~st is an optional extra condition for inter-field invariants after tt was succesful. *)
-let tuple tt ?(st= ~=true) x = test_tag 0 (for_all_2 id tt) x & st(magic x)
+let tuple tt ?(st=fun _->true) x = test_tag 0 (for_all_2 id tt) x
+  & debug_root x (st(magic x))
 let decimal x = test_tag double_tag any x
 let array t = test_tag (if t==decimal then double_array_tag else 0) (for_all t)
 let string x = test_tag string_tag any x
@@ -93,7 +94,7 @@ let rec ccset t x = union 1 [[ccset t; t; ccset t; int]] x
 let ccbv x = tuple[array int; int] x
 let ccvector t = tuple[int; array t] ~st:(fun(s,a)-> size a >= s & s >= 0)
 let rec bucketlist k v x = union 1 [[k; v; bucketlist k v]] x
-let hashtbl k v = tuple[int; array(bucketlist k v); int; int] ~st:(fun(s,a,_,_) -> size a >= s & s >= 0)
+let hashtbl k v = tuple[int; array(bucketlist k v); int; int] ~st:(fun(s,a,_,_) -> size a >= s/2 & s >= 0)
 
 (* arbitrary precision types—unsafe! *)
 let integer x = int x or custom x
@@ -236,7 +237,7 @@ add_pp (hashtbl any any) Hashtbl.(fun t -> "{"^if length t = 0 then "↦̸ }" el
 (* already evaluated lazy values *)
 add_pp (test_tag forward_tag any) (str % Lazy.force);
 
-add_pp (lazy_or ~=false) ~="lazy";
+add_pp (lazy_or(fun _->false)) (fun _->"lazy");
 
 (* The infix_tag is for mutually recursive functions acording to a comment on https://github.com/ocaml/ocaml/issues/7810 *)
 add_pp (test 0 (fun(tag,_) -> tag=closure_tag or tag=infix_tag)) (fun f -> 
