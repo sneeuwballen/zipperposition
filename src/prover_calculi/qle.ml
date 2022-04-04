@@ -93,11 +93,29 @@ module Make(E : Env.S) : S with module Env = E = struct
         Array.iter (if pure_only then mk_pure_clauses else mk_quasipure_clauses)
           pred_subcl)
       c_iter;
-    (* Detect problematic higher-order features and forget about some predicate
-       symbols if necessary. *)
+
+    (* Make sure that deep, higher-order occurrences of predicate symbols are
+       protected by other symbols. If pure_only is true, prevent such symbols
+       from being (quasi)pure. *)
     Iter.iter (fun c ->
-        let forget_syms = Iter.iter (fun bad ->
-          ID.Tbl.update all_syms ~f:(fun _ _ -> None) ~k:bad)
+        let forget_or_protect_syms = Iter.iter (fun bad ->
+          if ID.Tbl.mem all_syms bad then
+            if pure_only then
+              ID.Tbl.update all_syms ~f:(fun _ _ -> None) ~k:bad
+            else
+              let (bad_pos_var, bad_neg_var) = ID.Tbl.find all_syms bad in
+              let mk_clause bad_var =
+                Array.append
+                  (Array.make 1 (SAT.Lit.neg bad_var))
+                  (Array.map (fun (pol, pred) ->
+                    let (pos_var, neg_var) = ID.Tbl.find all_syms pred in
+                      (if pol then pos_var else neg_var))
+                      (CCArray.filter_map pred_of_lit (C.lits c)))
+                |> Array.to_list
+                |> add_SAT_clause
+              in
+              mk_clause bad_pos_var;
+              mk_clause bad_neg_var)
         in
         Array.iter (fun lit ->
             match lit with
@@ -105,12 +123,12 @@ module Make(E : Env.S) : S with module Env = E = struct
               if (T.is_const (T.head_term lhs)) then
                 let bad_syms =
                   Iter.flat_map T.Seq.symbols (Iter.of_list (T.args lhs)) in
-                forget_syms bad_syms
+                forget_or_protect_syms bad_syms
               else
-                forget_syms (T.Seq.symbols lhs)
+                forget_or_protect_syms (T.Seq.symbols lhs)
             | L.Equation (lhs, rhs, _) ->
-              forget_syms (T.Seq.symbols lhs);
-              forget_syms (T.Seq.symbols rhs)
+              forget_or_protect_syms (T.Seq.symbols lhs);
+              forget_or_protect_syms (T.Seq.symbols rhs)
             | _ -> ())
           (C.lits c))
       c_iter;
@@ -162,7 +180,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       let contains_quasipure_sym c =
         CCArray.exists is_quasipure_lit (C.lits c)
       in
-      Util.debugf ~section 1 "quasipure syms: @[%a@]" (fun k -> k (CCList.pp ID.pp) (ID.Tbl.keys_list quasipure_syms));
+      Util.debugf ~section 1
+        (if pure_only then "pure syms: @[%a@]" else "quasipure syms: @[%a@]")
+        (fun k -> k (CCList.pp ID.pp) (ID.Tbl.keys_list quasipure_syms));
       Iter.iter (fun c ->
           if contains_quasipure_sym c then remove_from_proof_state c)
         c_iter
@@ -224,7 +244,7 @@ let extension =
 let () =
   Options.add_opts [
     "--qle", Arg.Bool ((:=) _enabled), " enable QLE";
-    "--qle-inprocessing", Arg.Bool ((:=) _inprocessing), " enable QLE as inprocessing rule";
+    "--qle-inprocessing", Arg.Bool ((:=) _inprocessing), " QLE as inprocessing rule";
     "--qle-check-at", Arg.Int ((:=) _check_at), " QLE inprocessing periodicity";
-    "--qle-pure-only", Arg.Bool ((:=) _pure_only), " enable PLE";
+    "--qle-pure-only", Arg.Bool ((:=) _pure_only), " restrict QLE to pure literals";
   ]
