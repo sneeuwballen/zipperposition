@@ -43,7 +43,7 @@ This project is licensed under the BSD2 license. See the `LICENSE` file.
 
 ## Build
 
-Zipperposition requires OCaml >= 4.03.0, and some libraries that are
+Zipperposition requires OCaml >= 4.08.0, and some libraries that are
 available on opam.
 
 ### Via opam
@@ -540,20 +540,21 @@ $ ssh -p 3022 bob@127.0.0.1
 bob@127.0.0.1's password: bob
 ```
 
-Initialize OPAM. Install OCaml 4.05 and the dependencies of Zipperposition (Look in the file `opam` to see which dependencies you need to install).
+Initialize OPAM. Install OCaml 4.12.
 
 ```
 $ opam init
-$ opam switch 4.05.0+flambda
+$ opam switch create 4.12.2
 $ eval `opam config env`
-$ opam install dune zarith containers sequence msat menhir
 ```
 
-Clone Zipperposition and compile it:
+Clone Zipperposition, install its dependencies (which can be found `opam` files),
+the build the project:
 
 ```
 $ git clone https://github.com/sneeuwballen/zipperposition.git --branch dev
 $ cd zipperposition
+$ opam install . --deps-only
 $ make
 ```
 
@@ -570,7 +571,7 @@ As described [in the StarExec documentation](https://www.starexec.org/starexec/s
 ```
 #!/bin/sh
 
-./zipperposition.native -o tptp "$1" \
+./zipperposition.exe -o tptp "$1" \
   --timeout "$STAREXEC_WALLCLOCK_LIMIT" \
   --mem-limit "$STAREXEC_MAX_MEM"
 ```
