@@ -160,4 +160,111 @@ lemma
   (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
   oops
 
+(* Same as 1–8 above, but more polymorphic *)
+
+sledgehammer_params [type_enc = poly_native_higher_fool]
+
+axiomatization
+  C :: bool and
+  D :: bool and
+  a :: 'a and
+  b :: 'a and
+  blue :: "'a \<Rightarrow> bool" and
+  cyan :: "'a \<Rightarrow> bool" and
+  gray :: "'a \<Rightarrow> bool" and
+  green :: "'a \<Rightarrow> bool" and
+  red :: "'a \<Rightarrow> bool" and
+  yellow :: "'a \<Rightarrow> bool" and
+  p :: 'a and
+  q :: 'a and
+  s :: 'a and
+  t :: 'a and
+  u :: 'a and
+  z :: nat
+
+(* 17. HLE *)
+lemma assms_17:
+  "cyan z \<longrightarrow> blue z"
+  "cyan z \<longrightarrow> green z"
+  "cyan z \<or> blue z \<or> yellow z"
+  sorry
+
+lemma False
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms_17) *)
+  oops
+
+(* 18. FLE *)
+lemma assms_18:
+  "blue z \<longrightarrow> cyan z"
+  "blue z \<longrightarrow> \<not> cyan z"
+  "blue z \<or> yellow z"
+  sorry
+
+lemma False
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms_18) *)
+  oops
+
+(* 19. CongHLE+ *)
+lemma assms_19:
+  "(s :: nat) = t \<or> u (s :: nat) (a :: nat) = u (t :: nat) (a :: nat) \<or> C"
+  sorry
+
+lemma False
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms_19) *)
+  oops
+
+(* 20. CongHLE- *)
+lemma assms_20:
+  "(s :: nat) \<noteq> t \<or> u (s :: nat) (a :: nat) \<noteq> u (t :: nat) (a :: nat) \<or> C"
+  sorry
+
+lemma False
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms_20) *)
+  oops
+
+(* 21. UnitHLE *)
+lemma assms_21:
+  "\<forall>x. p x a"
+  "p (b :: nat) a \<longrightarrow> \<not> q"
+  "q \<or> C \<or> D"
+  sorry
+
+lemma False
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms_21) *)
+  oops
+
+(* 22. HTR *)
+lemma assms_22:
+  "\<not> green z \<longrightarrow> gray z"
+  "gray z \<longrightarrow> blue z"
+  "green z \<or> blue z \<or> yellow z \<or> red z"
+  sorry
+
+lemma False
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms_22) *)
+  oops
+
+(* 23. FLR *)
+lemma assms_23:
+  "cyan z \<longrightarrow> blue z"
+  "\<not> cyan z \<longrightarrow> green z"
+  "green z \<longrightarrow> blue z"
+  "blue z \<or> C \<or> D"
+  sorry
+
+lemma False
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms_23) *)
+  oops
+
+lemma assms_24:
+  "\<forall>x. p x a"
+  "p b a \<longrightarrow> q"
+  "q \<or> C \<or> D"
+  sorry
+
+(* 24. UnitHTR *)
+lemma False
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms_24) *)
+  oops
+
 end
