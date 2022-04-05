@@ -243,7 +243,7 @@ let extension =
 
 let () =
   Options.add_opts [
-    "--qle", Arg.Bool ((:=) _enabled), " enable QLE";
+    "--qle", Arg.Bool ((:=) _enabled), " enable/disable QLE";
     "--qle-inprocessing", Arg.Bool ((:=) _inprocessing), " QLE as inprocessing rule";
     "--qle-check-at", Arg.Int ((:=) _check_at), " QLE inprocessing periodicity";
     "--qle-pure-only", Arg.Bool ((:=) _pure_only), " restrict QLE to pure literals";

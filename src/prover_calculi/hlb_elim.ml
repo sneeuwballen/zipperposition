@@ -249,7 +249,6 @@ module Make(E : Env.S) : S with module Env = E = struct
   let register_propagated_lit ~prop_kind lit_t cl cs =
     let has_renaming = ref false in
     let to_remove = ref Term.Set.empty in
-
     
     retrieve_idx ~getter:(PropagatedLitsIdx.retrieve_specializations (!propagated_, idx_sc)) (lit_t,q_sc)
     |> Iter.iter (fun (t, _, subst) ->
@@ -465,8 +464,6 @@ module Make(E : Env.S) : S with module Env = E = struct
         let neg_prem = normalize_negations (T.Form.not_ premise) in
         register_propagated_lit ~prop_kind:Failed neg_prem cl ps 
       | None -> prems_ := PremiseIdx.add !prems_ premise (tbl,false)
-      
-    
 
   let normalize_variables premise concl = 
     let to_rename = T.VarSet.diff (T.vars concl) (T.vars premise) in
@@ -516,7 +513,6 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.flex_get k_unit_propagated_hle &&
     (Env.flex_get k_max_tracked_clauses == -1 || 
      !tracked_unary <= 4*Env.flex_get k_max_tracked_clauses)
-
 
   let steps = ref 0
   let track_clause cl =
@@ -703,7 +699,6 @@ module Make(E : Env.S) : S with module Env = E = struct
         | _ -> ())
     | RuleNotApplicable -> None
 
-
   let do_context_simplification cl =
     let lits_to_keep = CCBV.create ~size:(C.length cl) true in
     let exception StopIteration in
@@ -786,7 +781,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       units_ := UnitIdx.remove !units_ unit cl;
       decr tracked_unary;
     | None -> ()
-    
 
   let initialize () =
     let track_active () =
@@ -834,8 +828,6 @@ module Make(E : Env.S) : S with module Env = E = struct
     end;
     Signal.StopListening
   
-
-
   let setup () =
     if E.flex_get k_enabled then (
       Signal.on Env.on_start initialize;
