@@ -4,24 +4,26 @@ theory QLE
   imports Main
 begin
 
-(* p and q are quasipure *)
+(* 1. p and q are quasipure *)
 lemma
   assumes
     "p x \<or> q a x"
     "p (f x)"
     "\<not> q a a"
   shows False
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
   oops
 
-(* p is quasipure *)
+(* 2. p is quasipure *)
 lemma
   assumes
     "p a"
     "\<not> p x \<or> p (f x)"
   shows False
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
   oops
 
-(* p and q are quasipure *)
+(* 3. p and q are quasipure *)
 lemma
   assumes
     "p a"
@@ -29,9 +31,10 @@ lemma
     "\<not> q (f a)"
     "\<not> p x \<or> \<not> q (h p (p b))"
   shows False
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
   oops
 
-(* \<emptyset> is quasipure *)
+(* 4. \<emptyset> is quasipure *)
 lemma
   assumes
     "p a"
@@ -39,9 +42,10 @@ lemma
     "\<not> q p"
     "r"
   shows False
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
   oops
 
-(* \<emptyset> is quasipure *)
+(* 5. \<emptyset> is quasipure *)
 lemma
   assumes
     "p a"
@@ -49,7 +53,7 @@ lemma
     "\<not> (p = q)"
     "r"
   shows False
-  sledgehammer [zipperposition, overlord, dont_slice] (assms)
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
   oops
 
 end
