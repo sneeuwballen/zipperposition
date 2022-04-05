@@ -157,7 +157,7 @@ lemma
     "p (\<lambda>y. y b) a \<longrightarrow> q"
     "q \<or> C \<or> D"
   shows False
-  sledgehammer [zipperposition, overlord, dont_slice] (assms)
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
   oops
 
 end
