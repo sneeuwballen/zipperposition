@@ -599,7 +599,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         in
         let res = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof in
 
-        Util.debugf ~section 2 "simplified[fle]: @[%a@] --> @[%a@]" 
+        Util.debugf ~section 2 "simplified[unit_hle/fle]: @[%a@] --> @[%a@]" 
           (fun k -> k C.pp cl C.pp res);
         Util.debugf ~section 2 "used: @[%a@]" (fun k -> k (CS.pp C.pp) !proofset);
 
