@@ -614,7 +614,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       let repl = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof in
       penalize_hidden_tautology repl;
 
-      Util.debugf ~section 2 "simplified[unit_htr]: @[@[%a@] --> @[%a@]@]" 
+      Util.debugf ~section 2
+        (if prop_kind = Failed then "simplified[ftr]: @[@[%a@] --> @[%a@]@]"
+         else "simplified[unit_htr]: @[@[%a@] --> @[%a@]@]")
         (fun k -> k C.pp cl C.pp repl);
 
       Some (repl)
