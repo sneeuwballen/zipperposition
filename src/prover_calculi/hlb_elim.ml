@@ -7,7 +7,7 @@ module Lits = Literals
 module Lit = Literal
 module A = Libzipperposition_avatar
 
-let section = Util.Section.make ~parent:Const.section "hlt-elim"
+let section = Util.Section.make ~parent:Const.section "hlb-elim"
 
 let k_enabled = Flex_state.create_key ()
 let k_max_depth = Flex_state.create_key ()

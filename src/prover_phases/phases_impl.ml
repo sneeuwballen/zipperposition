@@ -61,7 +61,7 @@ let load_extensions =
   Extensions.register Bce.extension;
   Extensions.register Pred_elim.extension;
   Extensions.register Qle.extension;
-  Extensions.register Hlt_elim.extension;
+  Extensions.register Hlb_elim.extension;
   Extensions.register AC.extension;
   Extensions.register Heuristics.extension;
   Extensions.register Libzipperposition_avatar.extension;
