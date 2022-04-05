@@ -96,7 +96,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
     (* Make sure that deep, higher-order occurrences of predicate symbols are
        protected by other symbols. If pure_only is true, prevent such symbols
-       from being (quasi)pure. *)
+       from being pure. *)
     Iter.iter (fun c ->
         let forget_or_protect_syms = Iter.iter (fun bad ->
           if ID.Tbl.mem all_syms bad then
