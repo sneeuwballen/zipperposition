@@ -891,10 +891,10 @@ let () =
   Options.add_opts [
     "--hlbe-elim", Arg.Bool ((:=) enabled_), " enable/disable hidden literal and tautology elimination";
     "--hlbe-elim-max-tracked", Arg.Int ((:=) max_tracked_clauses), " negative value for disabling the limit";
-    "--hlbe-elim-lits", Arg.Bool ((:=) hle_), " remove literals using HLBE (hidden-lt-elim must be on)";
-    "--hlbe-reduce-tautologies", Arg.Bool ((:=) hte_), " reduce tautologies using HLBE (hidden-lt-elim must be on)";
+    "--hlbe-elim-lits", Arg.Bool ((:=) hle_), " remove literals using HLBE (--hlbe-elim must be on)";
+    "--hlbe-reduce-tautologies", Arg.Bool ((:=) hte_), " reduce tautologies using HLBE (--hlbe-elim must be on)";
     "--hlbe-max-depth", Arg.Set_int max_depth_, " max depth of binary implication graph precomputation";
-    "--hlbe-simplify-new", Arg.Bool ((:=) simpl_new_), " apply HLTe also when moving a clause from fresh to passive";
+    "--hlbe-simplify-new", Arg.Bool ((:=) simpl_new_), " apply HLBE also when moving a clause from fresh to passive";
     "--hlbe-track-eq", Arg.Bool ((:=) track_eq_), " enable/disable tracking and simplifying equality literals";
     "--hlbe-heartbeat", Arg.Int (fun v -> heartbeat_steps := Some v), 
       " when set to n, every n steps it will be checked if any HLBE simplification is performed." ^
