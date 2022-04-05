@@ -608,14 +608,14 @@ module Make(E : Env.S) : S with module Env = E = struct
     with UnitHTR(idx, (ps, prop_kind)) -> 
       let lit_l = [CCArray.get (C.lits cl) idx] in
       let proof =
-        Proof.Step.simp ~rule:(Proof.Rule.mk (if prop_kind = Failed then "ftr" else "unit_htr"))
+        Proof.Step.simp ~rule:(Proof.Rule.mk (if prop_kind = Failed then "flr" else "unit_htr"))
         (List.map C.proof_parent (cl :: CS.to_list ps))
       in
       let repl = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof in
       penalize_hidden_tautology repl;
 
       Util.debugf ~section 2
-        (if prop_kind = Failed then "simplified[ftr]: @[@[%a@] --> @[%a@]@]"
+        (if prop_kind = Failed then "simplified[flr]: @[@[%a@] --> @[%a@]@]"
          else "simplified[unit_htr]: @[@[%a@] --> @[%a@]@]")
         (fun k -> k C.pp cl C.pp repl);
 
