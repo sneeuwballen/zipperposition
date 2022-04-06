@@ -1,19 +1,16 @@
-FROM ocaml/opam2:alpine-3.8-ocaml-4.06 as build
+FROM ocaml/opam:alpine-3.15-ocaml-4.12-flambda as build
 # init and set perms
 WORKDIR /zipper/build
 RUN sudo apk update
 RUN sudo chown opam: /zipper/build
+COPY --chown=opam:nogroup *.opam Makefile dune-project ./
 # deps
-RUN eval `opam config env` && \
-    cd /home/opam/opam-repository && \
-    git pull && \
-    opam update && \
+RUN eval `opam env` && \
     opam depext -i zarith && \
-    opam install dune zarith containers iter msat menhir oseq
+    opam install logtk libzipperposition zipperposition --deps-only
 # main build
 COPY --chown=opam:nogroup src ./src
-COPY --chown=opam:nogroup *.opam Makefile dune-project ./
-RUN eval `opam config env` && \
+RUN eval `opam env` && \
     make build && \
     cp _build/default/src/main/zipperposition.exe ./zipperposition
 
