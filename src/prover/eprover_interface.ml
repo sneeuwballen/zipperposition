@@ -6,7 +6,7 @@
 open Logtk
 
 let _tmp_dir = ref "/tmp"
-let _encode_lams = ref `Ignore
+let _encode_lams = ref `Keep
 
 exception PolymorphismDetected
 
@@ -78,10 +78,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       );
       match T.view t with 
       | T.Const _ | T.Var _ | T.DB _ -> sym_map, t
-      | T.Fun _ -> 
-        let err = 
-          CCFormat.sprintf "%a is a lambda" T.pp t in
-        raise @@ CantEncode err
+      | T.Fun (ty, body) ->
+        let sym_map', body' = aux ~sym_map body in
+        sym_map', T.fun_ ty body'
       | T.AppBuiltin(b,_) when (Builtin.is_logical_op b 
                                 || b == Builtin.Eq 
                                 || b = Builtin.Neq)
@@ -280,7 +279,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     try
       let converter = 
         match !_encode_lams with
-        | `Ignore -> (fun c -> [c])
+        | `Keep -> (fun c -> [c])
+        | `Drop -> (fun c -> if Iter.exists T.has_lambda (C.Seq.terms c) then [] else [c])
         | `Combs ->  (fun c -> ([Combs.force_conv_lams c] :> C.t list))
         | _ -> (fun c ->
             let lifted = LLift.lift_lambdas c in
@@ -326,9 +326,10 @@ end
 let () =
   Options.add_opts
     [ "--e-encode-lambdas", 
-        Arg.Symbol (["ignore"; "lift"; "combs"], (fun str -> 
-          match str with 
-          | "ignore" -> _encode_lams := `Ignore
+        Arg.Symbol (["keep"; "drop"; "lift"; "combs"], (fun str -> 
+          match str with
+          | "keep" -> _encode_lams := `Keep
+          | "drop" -> _encode_lams := `Drop
           | "lift" -> _encode_lams := `Lift
           | "combs" -> _encode_lams := `Combs
           | _ -> assert false
