@@ -495,12 +495,10 @@ module TPTP_THF = struct
   let rec pp out t = match t.term with
     | Var v -> pp_var out v
     | Const s -> pp_id out s
-    | AppBuiltin (Builtin.And, l) ->
-      if CCList.is_empty l then Format.fprintf out "%s" "(&)"
-      else  Util.pp_list ~sep:" & " pp_force_surrounded out l
-    | AppBuiltin (Builtin.Or, l) ->
-      if CCList.is_empty l then Format.fprintf out "%s" "(|)"
-      else  Util.pp_list ~sep:" | " pp_force_surrounded out l
+    | AppBuiltin (Builtin.And, l) when List.length l >= 2 ->
+      Util.pp_list ~sep:" & " pp_force_surrounded out l
+    | AppBuiltin (Builtin.Or, l) when List.length l >= 2 ->
+      Util.pp_list ~sep:" | " pp_force_surrounded out l
     | AppBuiltin (Builtin.Not, [a]) ->
       Format.fprintf out "@[~@[%a@]@]" pp_force_surrounded a
     | AppBuiltin (Builtin.Imply, [a;b]) ->
@@ -513,6 +511,10 @@ module TPTP_THF = struct
       Format.fprintf out "@[%a =@ %a@]" pp_force_surrounded a pp_force_surrounded b
     | AppBuiltin (Builtin.Neq, ([_;a;b] | [a;b])) ->
       Format.fprintf out "@[%a !=@ %a@]" pp_force_surrounded a pp_force_surrounded b
+    | AppBuiltin (b, []) when b == Builtin.Not || Builtin.is_logical_binop b ->
+      Format.fprintf out "(%a)" Builtin.TPTP.pp b
+    | AppBuiltin (b, [a]) when Builtin.is_logical_binop b ->
+      Format.fprintf out "(%a) @@ (%a)" Builtin.TPTP.pp b pp a
     | AppBuiltin (Builtin.Arrow, [ret;a]) ->
       Format.fprintf out "@[%a >@ %a@]" pp_surrounded a pp ret
     | AppBuiltin (Builtin.Arrow, ret::l) ->

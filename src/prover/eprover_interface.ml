@@ -81,9 +81,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       | T.Fun (ty, body) ->
         let sym_map', body' = aux ~sym_map body in
         sym_map', T.fun_ ty body'
-      | T.AppBuiltin(b,_) when (Builtin.is_logical_op b 
-                                || b == Builtin.Eq 
-                                || b = Builtin.Neq)
+      | T.AppBuiltin(b,_) when (b == Builtin.Eq || b == Builtin.Neq)
                           && not (Type.is_prop (T.ty t)) -> 
         let err = 
           CCFormat.sprintf "%a is ho bool" T.pp t in
@@ -166,7 +164,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           output_symdecl ~out sym ty;
           acc
         ) else (
-          if (((Type.Seq.sub ty) |> Iter.exists (Type.is_tType))) then (
+          if Type.Seq.sub ty |> Iter.exists Type.is_tType then (
             raise PolymorphismDetected;
           );
           Iter.cons (sym, ty) acc
