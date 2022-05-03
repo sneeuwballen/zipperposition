@@ -1144,14 +1144,15 @@ let () =
     "--pred-elim", Arg.Bool ((:=) _enabled), " enable predicate elimination";
     "--pred-elim-relax-value", Arg.Int ((:=) _relax_val), " value of relax constant for our new measure";
     "--pred-elim-measure-fun", Arg.Symbol (["kk"; "relaxed"; "conservative"], ((:=) _measure_name)), 
-      " use either standard Korovin-Khasidashvili measure or our relaxed measure for measuring the proof state size";
+      " use either standard Khasidashvili-Korovin measure or our relaxed measure for measuring the proof state size";
     "--pred-elim-check-gates", Arg.Bool ((:=) _check_gates), " enable recognition of gate clauses";
     "--pred-elim-only-original-gates", Arg.Bool ((:=) _original_gates_only), " recognize only gates that are not introduced by Zipperposition";
     "--pred-elim-check-gates-semantically", Arg.Bool ((:=) _check_semantically), " recognize gates semantically, as described in our SAT techniques paper";
-    "--pred-elin-only-non-conjecture-gates", Arg.Bool ((:=) _only_non_conj_gates), " recognize only non-conjecture symbols as possible gates";
+    "--pred-elim-only-non-conjecture-gates", Arg.Bool ((:=) _only_non_conj_gates), " recognize only non-conjecture symbols as possible gates";
+    "--pred-elin-only-non-conjecture-gates", Arg.Bool ((:=) _only_non_conj_gates), " alias for --pred-elim-only-non-conjecture-gates";
     "--pred-elim-prefer-spe", Arg.Bool ((:=) _prefer_spe), " try DPE only when SPE fails";
     "--pred-elim-relax-value", Arg.Int ((:=) _relax_val), " value of relax constant for our new measure";
-    "--pred-elim-measure-fun", Arg.Symbol (["kk"; "relaxed"; "conservative"], ((:=) _measure_name)), " use either standard Korovin-Khasidashvili measure or our relaxed measure for measuring the proof state size";
+    "--pred-elim-measure-fun", Arg.Symbol (["kk"; "relaxed"; "conservative"], ((:=) _measure_name)), " use either standard Khasidashvili-Korovin measure or our relaxed measure for measuring the proof state size";
     "--pred-elim-non-singular", Arg.Bool ((:=) _non_singular_pe), " enable PE when gate is recognized and there are multiple occurrences of a symbol";
     "--pred-elim-inprocessing", Arg.Bool ((:=) _inprocessing), " predicate elimination as inprocessing rule";
     "--pred-elim-check-at", Arg.Int ((:=) _check_at), " when to perform predicate elimination inprocessing";
