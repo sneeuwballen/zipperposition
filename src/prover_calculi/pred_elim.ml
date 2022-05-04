@@ -73,11 +73,11 @@ module Make(E : Env.S) : S with module Env = E = struct
   module SAT = Sat_solver.Make ()
 
   type logic = 
-    | NEqFO  (* nonequational FO *)
-    | Eq (* equational FO or HO *)
+    | Nonequational  (* nonequational monomorphic FO without theories *)
+    | Equational
   
   let log_to_int = 
-    [(NEqFO, 0); (Eq, 1)]
+    [(Nonequational, 0); (Equational, 1)]
   let log_compare (l1:logic) (l2:logic) =
     compare (List.assoc l1 log_to_int) (List.assoc l2 log_to_int)
   
@@ -190,12 +190,10 @@ module Make(E : Env.S) : S with module Env = E = struct
   let _tracked = ref CS.empty
 
   let _done = ref false
-  let _logic = ref NEqFO
-  let refine_logic new_val =
-    _logic := new_val
+  let _logic = ref Nonequational
   
   let logic_to_str = function
-    | Eq -> "eq" | NEqFO -> "neq"
+    | Equational -> "eq" | Nonequational -> "neq"
 
   let _ignored_symbols = ref ID.Set.empty
 
@@ -216,11 +214,10 @@ module Make(E : Env.S) : S with module Env = E = struct
         None
       else if Type.is_prop (T.ty lhs) then (
         if L.is_predicate_lit lit then (
-          let hd_sym = T.head_exn lhs in
-          Some (hd_sym, sign)
+          CCOpt.map (fun hd_sym -> (hd_sym, sign)) (T.head lhs)
         ) else (
           None;
-      )) else (refine_logic Eq; None)
+      )) else (_logic := Equational; None)
     | _ -> None
 
   let remove_symbol entry =
@@ -313,6 +310,31 @@ module Make(E : Env.S) : S with module Env = E = struct
     )
   
   let scan_cl_lits ?(handle_gates=true) cl =
+    let is_ho_type ty =
+      let args, _ = Type.open_fun ty in
+      List.exists (fun ty -> Type.is_fun ty || Type.is_prop ty) args
+    in
+    let rec exists_equational_feature t =
+      match T.view t with
+      | T.Const _ -> is_ho_type (T.ty t)
+      | T.Var var -> not (Type.is_ground (HVar.ty var)) || Type.order (HVar.ty var) > 1
+      | T.App (f, l) ->
+        List.exists (fun t -> Type.is_tType (T.ty t)) l ||
+        List.exists exists_equational_feature (f :: l)
+      | T.AppBuiltin _ -> true
+      | T.Fun _ -> true
+      | T.DB _ -> assert false
+    in
+    (* Higher-order logic and theories are always equational. *)
+    let check_equational_features cl =
+      if !_logic == Nonequational then (
+        if Iter.exists exists_equational_feature (C.Seq.terms cl) then
+          _logic := Equational
+      )
+    in
+
+    check_equational_features cl;
+
     let num_vars = List.length @@ Literals.vars (C.lits cl) in
     let is_flat = function
     | L.Equation(lhs,_,_) as lit ->
@@ -827,7 +849,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     )) !_pred_sym_idx
 
   let get_resolver () =
-    if !_logic == NEqFO then neq_resolver else eq_resolver
+    if !_logic == Nonequational then neq_resolver else eq_resolver
 
   let calc_resolvents ~sym ~pos ~neg =
     CCList.flat_map (fun pos_cl ->
@@ -973,7 +995,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       (fun k -> k (Iter.pp_seq pp_task) (ID.Map.values !_pred_sym_idx));
 
     Util.debugf ~section 1 "logic has%sequalities"
-      (fun k -> k (if !_logic == Eq then " " else " no "));
+      (fun k -> k (if !_logic == Equational then " " else " no "));
 
     Signal.on Env.ProofState.PassiveSet.on_add_clause react_clause_addded;
     Signal.on Env.ProofState.PassiveSet.on_remove_clause react_clause_removed;
