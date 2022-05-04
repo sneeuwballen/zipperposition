@@ -622,7 +622,9 @@ module Make(E : Env.S) : S with module Env = E = struct
           let neg_cl' = C.apply_subst ~renaming (neg_cl, neg_sc) subst in    
           let apply t = Subst.FO.apply renaming subst t in  
           let lits =
-            (List.map (fun (p,n) -> L.mk_neq (apply (p, pos_sc)) (apply (n, neg_sc))) 
+            (List.filter_map (fun (p,n) ->
+               let lhs = apply (p, pos_sc) and rhs = apply (n, neg_sc) in
+               if Term.equal lhs rhs then None else Some (L.mk_neq lhs rhs))
             (List.combine pos_args neg_args)) @ 
             (CCArray.except_idx (C.lits pos_cl') pos_idx) @
             (CCArray.except_idx (C.lits neg_cl') neg_idx)

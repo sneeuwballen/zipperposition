@@ -229,7 +229,7 @@ lemma
     "\<not> p (\<lambda>x. f x) \<or> q w"
     "x = y"
   shows False
-  sledgehammer [zipperposition, overlord, dont_slice] (assms)
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
   oops
 
 (* 19. SPE should eliminate p *)
