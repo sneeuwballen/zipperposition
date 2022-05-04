@@ -74,18 +74,12 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   type logic = 
     | NEqFO  (* nonequational FO *)
-    | EqFO (* equational FO *)
-    | NonAppVarHo (* higher-order logic, but at the top level
-                     each literal has only (fully applied)
-                     function symbols *)
-    | Unsupported   (* HO or FO with theories *)
+    | Eq (* equational FO or HO *)
   
   let log_to_int = 
-    [(NEqFO, 0); (EqFO, 1); (NonAppVarHo, 2); (Unsupported, 3)]
+    [(NEqFO, 0); (Eq, 1)]
   let log_compare (l1:logic) (l2:logic) =
     compare (List.assoc l1 log_to_int) (List.assoc l2 log_to_int)
-
-  exception UnsupportedLogic
   
   type pred_elim_info =
   {
@@ -195,16 +189,14 @@ module Make(E : Env.S) : S with module Env = E = struct
      no clause is tracked or deleted multiple times from the system  *)
   let _tracked = ref CS.empty
 
+  let _done = ref false
   let _logic = ref NEqFO
   let refine_logic new_val =
-    if !_logic != Unsupported then (
-      _logic := new_val
-    )
+    _logic := new_val
   
   let logic_to_str = function
-    | EqFO -> "eq" | NEqFO -> "neq" | NonAppVarHo -> "non_appvar"
-    | Unsupported -> "unsupported"
-  
+    | Eq -> "eq" | NEqFO -> "neq"
+
   let _ignored_symbols = ref ID.Set.empty
 
   let mk_pred_elim_info sym =
@@ -220,33 +212,15 @@ module Make(E : Env.S) : S with module Env = E = struct
     match lit with
     | L.Equation(lhs,rhs,_) ->
       let sign = L.is_positivoid lit in
-      let is_poly = 
-        not (Type.VarSet.is_empty (T.ty_vars lhs))
-        || not (Type.VarSet.is_empty (T.ty_vars rhs))
-      in
-      if not is_poly && not (Type.is_fun (T.ty lhs)) then (
-        if Type.is_prop (T.ty lhs) then (
-           if not (CCOpt.is_some (T.head lhs)) then (
-             raise UnsupportedLogic;
-           );
-
-          if not (Term.is_fo_term lhs) then (
-            refine_logic NonAppVarHo;
-          );
-          if L.is_predicate_lit lit then (
-            let hd_sym = T.head_exn lhs in
-            Some (hd_sym, sign)
-          ) else (
-            (* reasoning with formulas is currently unsupported *)
-            Util.debugf ~section 1 "unsupported because of @[%a@]@." (fun k -> k L.pp lit);
-            _logic := Unsupported;
-            raise UnsupportedLogic;
-        )) else (if T.is_fo_term lhs && T.is_fo_term rhs then refine_logic EqFO
-                 else refine_logic NonAppVarHo; None)
-      ) else (
-        _logic := Unsupported; 
-        Util.debugf ~section 1 "unsupported because of @[%a@]@." (fun k -> k L.pp lit);
-        raise UnsupportedLogic)
+      if Type.is_fun (T.ty lhs) then
+        None
+      else if Type.is_prop (T.ty lhs) then (
+        if L.is_predicate_lit lit then (
+          let hd_sym = T.head_exn lhs in
+          Some (hd_sym, sign)
+        ) else (
+          None;
+      )) else (refine_logic Eq; None)
     | _ -> None
 
   let remove_symbol entry =
@@ -339,8 +313,6 @@ module Make(E : Env.S) : S with module Env = E = struct
     )
   
   let scan_cl_lits ?(handle_gates=true) cl =
-    if !_logic == Unsupported then raise UnsupportedLogic;
-
     let num_vars = List.length @@ Literals.vars (C.lits cl) in
     let is_flat = function
     | L.Equation(lhs,_,_) as lit ->
@@ -391,38 +363,45 @@ module Make(E : Env.S) : S with module Env = E = struct
       ID.Set.iter (update ~action:`Offending) offending;
       ID.Set.iter (update ~action:`Gates) gates;
     in
+    let is_poly_safe idx lits =
+      let all = Iter.filter (fun var -> Type.is_tType (HVar.ty var)) (Literals.Seq.vars lits) in
+      let at_idx =
+        Iter.filter (fun var -> Type.is_tType (HVar.ty var)) (Literal.Seq.vars lits.(idx)) in
+      Iter.for_all (fun ty_var -> Iter.exists (HVar.equal Type.equal ty_var) at_idx) all
+    in
+    let is_sym_duplicated sym idx lits =
+      let is_offending = ref false in
+      for i = idx + 1 to C.length cl - 1 do
+        (match get_sym_sign (C.lits cl).(i) with
+        | Some (sym', _) ->
+          is_offending := !is_offending || ID.equal sym sym'
+        | None -> ())
+      done;
+      !is_offending
+    in
 
-    try   
-      let pos,neg,offending,gates = CCArray.foldi (fun ((pos,neg,offending,gates) as acc) idx lit ->
-        let symbol_is_fresh sym =
-          not (ID.Set.mem sym pos) && not (ID.Set.mem sym neg) &&
-          not (ID.Set.mem sym offending) && not (ID.Set.mem sym !_ignored_symbols)
-        in
-        (match get_sym_sign lit with
-        | Some (sym, sign) when symbol_is_fresh sym ->
-          let is_offending = ref false in
-          for i = idx+1 to (C.length cl)-1 do
-            (match get_sym_sign (C.lits cl).(i) with
-            | Some(sym', _) ->
-              is_offending := !is_offending || ID.equal sym sym'
-            | None -> () )
-          done;
-          if !is_offending then (
-            pos,neg,ID.Set.add sym offending,gates
-          ) else (
-            let gates = if is_flat lit then ID.Set.add sym gates else gates in
-            if sign then (ID.Set.add sym pos,neg,offending,gates)
-            else (pos, ID.Set.add sym neg,offending,gates))
-        | _ -> acc)
-      ) (ID.Set.empty, ID.Set.empty, ID.Set.empty, ID.Set.empty) (C.lits cl) in
+    let pos,neg,offending,gates =
+      CCArray.foldi (fun ((pos,neg,offending,gates) as acc) idx lit ->
+      let symbol_is_fresh sym =
+        not (ID.Set.mem sym pos) && not (ID.Set.mem sym neg) &&
+        not (ID.Set.mem sym offending) && not (ID.Set.mem sym !_ignored_symbols)
+      in
+      (match get_sym_sign lit with
+      | Some (sym, sign) when symbol_is_fresh sym ->
+        let is_offending = not (is_poly_safe idx (C.lits cl)) || is_sym_duplicated sym idx (C.lits cl) in
+        if is_offending then (
+          pos,neg,ID.Set.add sym offending,gates
+        ) else (
+          let gates = if is_flat lit then ID.Set.add sym gates else gates in
+          if sign then (ID.Set.add sym pos,neg,offending,gates)
+          else (pos, ID.Set.add sym neg,offending,gates))
+      | _ -> acc)
+    ) (ID.Set.empty, ID.Set.empty, ID.Set.empty, ID.Set.empty) (C.lits cl) in
 
-      update_idx pos neg offending gates num_vars cl
-    with UnsupportedLogic ->
-      refine_logic Unsupported;
-      TaskSet.clear _task_queue
+    update_idx pos neg offending gates num_vars cl
 
   let react_clause_addded cl =
-    if !_logic != Unsupported then(
+    if not !_done then(
       if not (CS.mem cl !_tracked) then (
         Util.debugf ~section 5 "added:@[%a@]" (fun k -> k C.pp cl);
         _tracked := CS.add cl !_tracked;
@@ -431,7 +410,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     ) else Signal.StopListening
   
   let react_clause_removed cl =
-    if !_logic != Unsupported then (
+    if not !_done then (
       let should_retry task =
         should_schedule task &&
         not (ID.Set.mem task.sym !_ignored_symbols) &&
@@ -575,7 +554,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     with Unif.Fail -> None
   
   let eq_resolver ~sym ~pos_cl ~neg_cl =
-    let handle_distinct_vars xs sc_x ys sc_y =
+    let handle_distinct_vars subst xs sc_x ys sc_y =
       let is_unique xs = 
         List.for_all (Term.is_var) xs &&
         CCList.length (CCList.sort_uniq ~cmp:T.compare xs)
@@ -584,7 +563,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let mk_subst vars sc_vars terms sc_terms =
         List.fold_left (fun subst (v,t) -> 
           Subst.FO.bind' subst (T.as_var_exn v, sc_vars) (t, sc_terms)
-        ) Subst.empty (CCList.combine vars terms)
+        ) subst (CCList.combine vars terms)
       in
 
       if is_unique xs then Some (mk_subst xs sc_x ys sc_y) 
@@ -593,40 +572,44 @@ module Make(E : Env.S) : S with module Env = E = struct
     in
 
     let pos_sc, neg_sc = 0, 1 in
-    let renaming = Subst.Renaming.create () in
     let pos_idx, pos_term = find_lit_by_sym sym true pos_cl in  
     let neg_idx, neg_term = find_lit_by_sym sym false neg_cl in
-    let pos_args, neg_args = CCPair.map_same T.args (pos_term, neg_term) in
-    let proof subst renaming =
-      Proof.Step.simp 
-        ~tags:[Proof.Tag.T_cannot_orphan] 
-        ~rule:(Proof.Rule.mk "dp-resolution") 
-        [C.proof_parent_subst renaming (pos_cl,pos_sc) subst;
-         C.proof_parent_subst renaming (neg_cl,neg_sc) subst]
-    in
-    let c =
-      match handle_distinct_vars pos_args pos_sc neg_args neg_sc with
-      | Some subst ->
-        let pos_lits = Literals.apply_subst renaming subst (C.lits pos_cl, pos_sc) in
-        let neg_lits = Literals.apply_subst renaming subst (C.lits neg_cl, neg_sc) in
-        let lits = (CCArray.except_idx pos_lits pos_idx) @ (CCArray.except_idx neg_lits  neg_idx) in
-        C.create ~penalty:(max (C.penalty pos_cl) (C.penalty neg_cl))
-                  ~trail:(C.trail_l [pos_cl; neg_cl]) lits (proof subst renaming) 
-      | None ->
-        let subst = Subst.empty in
-        let pos_cl' = C.apply_subst ~renaming (pos_cl, pos_sc) subst in
-        let neg_cl' = C.apply_subst ~renaming (neg_cl, neg_sc) subst in    
-        let apply t = Subst.FO.apply renaming subst t in  
-        let lits =
-          (List.map (fun (p,n) -> L.mk_neq (apply (p, pos_sc)) (apply (n, neg_sc))) 
-          (List.combine pos_args neg_args)) @ 
-          (CCArray.except_idx (C.lits pos_cl') pos_idx) @
-          (CCArray.except_idx (C.lits neg_cl') neg_idx)
-        in
-        C.create ~penalty:(max (C.penalty pos_cl') (C.penalty neg_cl'))
-                  ~trail:(C.trail_l [pos_cl'; neg_cl']) lits (proof subst renaming)
-    in
-    CCOpt.return_if (not (is_tauto c)) c
+    let (pos_head, pos_args), (neg_head, neg_args) =
+      CCPair.map_same T.as_app_mono (pos_term, neg_term) in
+    try
+      let ty_subst = Unif.FO.unify_syn (pos_head, pos_sc) (neg_head, neg_sc) in
+      let renaming = Subst.Renaming.create () in
+      let proof subst renaming =
+        Proof.Step.simp 
+          ~tags:[Proof.Tag.T_cannot_orphan] 
+          ~rule:(Proof.Rule.mk "dp-resolution") 
+          [C.proof_parent_subst renaming (pos_cl,pos_sc) subst;
+          C.proof_parent_subst renaming (neg_cl,neg_sc) subst]
+      in
+      let c =
+        match handle_distinct_vars ty_subst pos_args pos_sc neg_args neg_sc with
+        | Some subst ->
+          let pos_lits = Literals.apply_subst renaming subst (C.lits pos_cl, pos_sc) in
+          let neg_lits = Literals.apply_subst renaming subst (C.lits neg_cl, neg_sc) in
+          let lits = (CCArray.except_idx pos_lits pos_idx) @ (CCArray.except_idx neg_lits neg_idx) in
+          C.create ~penalty:(max (C.penalty pos_cl) (C.penalty neg_cl))
+                    ~trail:(C.trail_l [pos_cl; neg_cl]) lits (proof subst renaming) 
+        | None ->
+          let subst = ty_subst in
+          let pos_cl' = C.apply_subst ~renaming (pos_cl, pos_sc) subst in
+          let neg_cl' = C.apply_subst ~renaming (neg_cl, neg_sc) subst in    
+          let apply t = Subst.FO.apply renaming subst t in  
+          let lits =
+            (List.map (fun (p,n) -> L.mk_neq (apply (p, pos_sc)) (apply (n, neg_sc))) 
+            (List.combine pos_args neg_args)) @ 
+            (CCArray.except_idx (C.lits pos_cl') pos_idx) @
+            (CCArray.except_idx (C.lits neg_cl') neg_idx)
+          in
+          C.create ~penalty:(max (C.penalty pos_cl') (C.penalty neg_cl'))
+                    ~trail:(C.trail_l [pos_cl'; neg_cl']) lits (proof subst renaming)
+      in
+      CCOpt.return_if (not (is_tauto c)) c
+    with Unif.Fail -> None
 
   let check_if_gate task =
     let sym = task.sym in
@@ -970,72 +953,65 @@ module Make(E : Env.S) : S with module Env = E = struct
       CS.to_list (Env.ProofState.ActiveSet.clauses ())
       @ CS.to_list (Env.ProofState.PassiveSet.clauses ())
     in
-    begin try
-      Util.debugf ~section 5 "init_cl: @[%a@]@."
-        (fun k -> k (CCList.pp C.pp) init_clauses);
+    Util.debugf ~section 5 "init_cl: @[%a@]@."
+      (fun k -> k (CCList.pp C.pp) init_clauses);
 
-      let init_clause_num = List.length init_clauses in
+    let init_clause_num = List.length init_clauses in
 
-      CCFormat.printf "%% PE start: %d@." init_clause_num;
-      
-      List.iter (fun cl -> 
-        scan_cl_lits cl;
-        _tracked := CS.add cl !_tracked;
-      ) init_clauses;
+    CCFormat.printf "%% PE start: %d@." init_clause_num;
+    
+    List.iter (fun cl -> 
+      scan_cl_lits cl;
+      _tracked := CS.add cl !_tracked;
+    ) init_clauses;
 
-      CCFormat.printf "logic: %s@." (logic_to_str !_logic);
+    CCFormat.printf "logic: %s@." (logic_to_str !_logic);
 
-      if !_logic == Unsupported then (
-        raise UnsupportedLogic
-      );
+    schedule_tasks ();
 
-      schedule_tasks ();
+    Util.debugf ~section 5 "state:@[%a@]@."
+      (fun k -> k (Iter.pp_seq pp_task) (ID.Map.values !_pred_sym_idx));
 
-      Util.debugf ~section 5 "state:@[%a@]@."
-        (fun k -> k (Iter.pp_seq pp_task) (ID.Map.values !_pred_sym_idx));
+    Util.debugf ~section 1 "logic has%sequalities"
+      (fun k -> k (if !_logic == Eq then " " else " no "));
 
-      Util.debugf ~section 1 "logic has%sequalities"
-        (fun k -> k (if !_logic == EqFO then " " else " no "));
-
-      Signal.on Env.ProofState.PassiveSet.on_add_clause react_clause_addded;
-      Signal.on Env.ProofState.PassiveSet.on_remove_clause react_clause_removed;
-      Signal.on Env.ProofState.ActiveSet.on_add_clause react_clause_addded;
-      Signal.on Env.ProofState.ActiveSet.on_remove_clause react_clause_removed;
-      Signal.on_every Env.on_forward_simplified (fun (c, new_state) ->
-        if !_logic != Unsupported then (
-          match new_state with
-          | Some c' ->
-            ignore(react_clause_removed c);
-            ignore(react_clause_addded c')
-          | _ -> ignore(react_clause_removed c) (* c is redundant *)
-      ));
+    Signal.on Env.ProofState.PassiveSet.on_add_clause react_clause_addded;
+    Signal.on Env.ProofState.PassiveSet.on_remove_clause react_clause_removed;
+    Signal.on Env.ProofState.ActiveSet.on_add_clause react_clause_addded;
+    Signal.on Env.ProofState.ActiveSet.on_remove_clause react_clause_removed;
+    Signal.on_every Env.on_forward_simplified (fun (c, new_state) ->
+      if not !_done then (
+        match new_state with
+        | Some c' ->
+          ignore(react_clause_removed c);
+          ignore(react_clause_addded c')
+        | _ -> ignore(react_clause_removed c) (* c is redundant *)
+    ));
 
 
-      ignore(do_pred_elim ());
+    ignore(do_pred_elim ());
 
-      Util.debugf ~section 5 "after elim: @[%a@]@."
-        (fun k -> k (CS.pp C.pp) (Env.ProofState.PassiveSet.clauses ()));
-      Util.debugf ~section 5 "state:@[%a@]@."
-        (fun k -> k (Iter.pp_seq pp_task) (ID.Map.values !_pred_sym_idx));
+    Util.debugf ~section 5 "after elim: @[%a@]@."
+      (fun k -> k (CS.pp C.pp) (Env.ProofState.PassiveSet.clauses ()));
+    Util.debugf ~section 5 "state:@[%a@]@."
+      (fun k -> k (Iter.pp_seq pp_task) (ID.Map.values !_pred_sym_idx));
 
 
-      let clause_diff =
-        init_clause_num -
-        (Iter.length (Env.get_active ()) + Iter.length (Env.get_passive ())) in
-      CCFormat.printf "%% PE eliminated: %d@." clause_diff;
+    let clause_diff =
+      init_clause_num -
+      (Iter.length (Env.get_active ()) + Iter.length (Env.get_passive ())) in
+    CCFormat.printf "%% PE eliminated: %d@." clause_diff;
 
-      if Env.flex_get k_inprocessing then (
-        (* Env.Ctx.lost_completeness (); *)
-        Env.add_clause_elimination_rule ~priority:2 "pred_elim" 
-          do_predicate_elimination
-      ) else if not @@ Env.flex_get k_fp_mode then raise UnsupportedLogic
-    with UnsupportedLogic ->
-      Util.debugf ~section 1 "logic is unsupported" CCFun.id;
+    if Env.flex_get k_inprocessing then (
+      (* Env.Ctx.lost_completeness (); *)
+      Env.add_clause_elimination_rule ~priority:2 "pred_elim" 
+        do_predicate_elimination
+    ) else if not @@ Env.flex_get k_fp_mode then
+      Util.debugf ~section 1 "processing is done" CCFun.id;
       (* releasing possibly used memory *)
-      _logic := Unsupported;
-      _pred_sym_idx := ID.Map.empty
-    end;
-    Signal.StopListening
+      _done := true;
+      _pred_sym_idx := ID.Map.empty;
+      Signal.StopListening
 
   let register () =
     Signal.on Env.on_start initialize
@@ -1057,34 +1033,26 @@ module Make(E : Env.S) : S with module Env = E = struct
       CS.to_list (Env.ProofState.ActiveSet.clauses ())
       @ CS.to_list (Env.ProofState.PassiveSet.clauses ())
     in
-    begin try
      
-      List.iter (fun cl -> 
-        scan_cl_lits cl;
-        _tracked := CS.add cl !_tracked;
-      ) init_clauses;
+    List.iter (fun cl -> 
+      scan_cl_lits cl;
+      _tracked := CS.add cl !_tracked;
+    ) init_clauses;
 
-      schedule_tasks ();
+    schedule_tasks ();
 
-      Signal.on Env.ProofState.PassiveSet.on_add_clause (fun c -> 
-        if !fixpoint_active then react_clause_addded c
-        else Signal.StopListening
-      );
-      Signal.on Env.ProofState.PassiveSet.on_remove_clause (fun c ->
-        if !fixpoint_active then react_clause_removed c
-        else Signal.StopListening
-      );
+    Signal.on Env.ProofState.PassiveSet.on_add_clause (fun c -> 
+      if !fixpoint_active then react_clause_addded c
+      else Signal.StopListening
+    );
+    Signal.on Env.ProofState.PassiveSet.on_remove_clause (fun c ->
+      if !fixpoint_active then react_clause_removed c
+      else Signal.StopListening
+    );
 
-      let ans = (do_pred_elim ()) in
-      CCFormat.printf "%% PE start fixpoint: @[%a@]@." (CCOpt.pp CCInt.pp) ans;
-      Util.debugf ~section 2 "Clause number changed for %a" (fun k -> k (CCOpt.pp CCInt.pp) ans)
-      
-    with UnsupportedLogic ->
-      Util.debugf ~section 1 "logic is unsupported" CCFun.id;
-      (* releasing possibly used memory *)
-      _logic := Unsupported;
-      _pred_sym_idx := ID.Map.empty
-    end
+    let ans = (do_pred_elim ()) in
+    CCFormat.printf "%% PE start fixpoint: @[%a@]@." (CCOpt.pp CCInt.pp) ans;
+    Util.debugf ~section 2 "Clause number changed for %a" (fun k -> k (CCOpt.pp CCInt.pp) ans)
 
   let fixpoint_step () =
     CCFormat.printf "relax val: %d@." (Env.flex_get k_relax_val);
@@ -1096,7 +1064,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     CCOpt.is_some ans
   
   let end_fixpoint () =
-    _logic := Unsupported;
+    _done := true;
     _pred_sym_idx := ID.Map.empty;
     fixpoint_active := false
 
