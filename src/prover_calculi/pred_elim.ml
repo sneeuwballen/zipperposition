@@ -420,9 +420,29 @@ module Make(E : Env.S) : S with module Env = E = struct
       | _ -> acc)
     ) (ID.Set.empty, ID.Set.empty, ID.Set.empty, ID.Set.empty) (C.lits cl) in
 
+    let is_pred_like_type ty =
+      Type.returns_prop ty || Type.is_forall ty
+    in
+    let add_pred_syms_of_term syms t =
+      Iter.fold (fun syms u ->
+          if T.is_const u && is_pred_like_type (Term.ty u) then ID.Set.add (T.as_const_exn u) syms
+          else syms)
+        syms
+        (T.Seq.subterms ~include_builtin:true ~include_app_vars:true ~ignore_head:false t)
+    in
+    let add_deep_pred_syms_of_lit syms lit =
+      match lit with
+      | Literal.Equation (lhs, _, _) when Literal.is_predicate_lit lit ->
+        List.fold_left add_pred_syms_of_term syms (T.args lhs)
+      | _ -> Iter.fold add_pred_syms_of_term syms (Literal.Seq.terms lit)
+    in
+
+    let offending = ID.Set.union
+      (CCArray.fold add_deep_pred_syms_of_lit ID.Set.empty (C.lits cl)) offending in
+
     update_idx pos neg offending gates num_vars cl
 
-  let react_clause_addded cl =
+  let react_clause_added cl =
     if not !_done then(
       if not (CS.mem cl !_tracked) then (
         Util.debugf ~section 5 "added:@[%a@]" (fun k -> k C.pp cl);
@@ -442,11 +462,11 @@ module Make(E : Env.S) : S with module Env = E = struct
         | None -> true)
       in
 
-      let handle_gate sign task cl =
+      let handle_gate task cl =
         match task.is_gate with
         | Some(pos_cls, neg_cls) ->
-          if sign && CCList.mem ~eq:C.equal cl pos_cls
-             || (not sign) && CCList.mem ~eq:C.equal cl neg_cls then (
+          if CCList.mem ~eq:C.equal cl pos_cls
+             || CCList.mem ~eq:C.equal cl neg_cls then (
             (* reintroduce gate clauses *)
             task.pos_cls <- CS.add_list task.pos_cls pos_cls;
             task.neg_cls <- CS.add_list task.neg_cls neg_cls;
@@ -460,34 +480,27 @@ module Make(E : Env.S) : S with module Env = E = struct
         | None -> ()
       in
 
-      let handled = ref ID.Set.empty in
       if not (CS.mem cl !_newly_added) &&
          CS.mem cl !_tracked then (
         _tracked := CS.remove cl !_tracked;
-        Array.iteri (fun idx lit -> 
-          match get_sym_sign lit with
-          | Some(sym, sign) when not (ID.Set.mem sym !handled) ->
-            let is_offending = ref false in
-            for i = idx+1 to (C.length cl) -1 do
-              match get_sym_sign (C.lits cl).(i) with
-              | Some (sym', sign) ->
-                is_offending := !is_offending || ID.equal sym sym'
-              | None -> ()
-            done;
-            _pred_sym_idx := ID.Map.update sym (function
-              | Some task ->
-                let old = copy_task task in
+        ID.Set.iter (fun sym -> 
+          _pred_sym_idx := ID.Map.update sym (function
+            | Some task ->
+              let mem_gate cl is_gate =
+                match is_gate with
+                | Some (pos_cls, neg_cls) ->
+                  CCList.mem ~eq:C.equal cl pos_cls || CCList.mem ~eq:C.equal cl neg_cls
+                | None -> false
+              in
+              let old = copy_task task in
+              if CS.mem cl task.offending_cls || mem_gate cl task.is_gate ||
+                 CS.mem cl task.pos_cls || CS.mem cl task.neg_cls then
+                task.offending_cls <- CS.remove cl task.offending_cls;
+                handle_gate task cl;
+                task.pos_cls <- CS.remove cl task.pos_cls;
+                task.neg_cls <- CS.remove cl task.neg_cls;
                 task.sq_var_weight <- task.sq_var_weight -. calc_sq_var cl;
                 task.num_lits <- task.num_lits - C.length cl;
-                if !is_offending then (
-                  task.offending_cls <- CS.remove cl task.offending_cls
-                ) else if sign then (
-                  handle_gate sign task cl;
-                  task.pos_cls <- CS.remove cl task.pos_cls;
-                ) else (
-                  handle_gate sign task cl;
-                  task.neg_cls <- CS.remove cl task.neg_cls;
-                );
                 if not (TaskSet.in_heap task) && should_retry task then (
                   Util.debugf ~section 10 "retrying @[%a@]@." (fun k -> k pp_task task);
                   TaskSet.insert _task_queue task;
@@ -496,11 +509,9 @@ module Make(E : Env.S) : S with module Env = E = struct
                 if TaskSet.in_heap old && TaskSet.in_heap task then (
                   TaskSet.update _task_queue ~new_:task ~old;
                 );
-
-                CCOpt.return_if (not (ID.Set.mem task.sym !_ignored_symbols)) task
-              | None -> None (*probably the symbol became ignored*) ) !_pred_sym_idx;
-          | _ -> ()
-        ) (C.lits cl));
+              CCOpt.return_if (not (ID.Set.mem task.sym !_ignored_symbols)) task
+            | None -> None) !_pred_sym_idx
+        ) (C.symbols (Iter.singleton cl)));
       Signal.ContinueListening)
     else Signal.StopListening
 
@@ -530,7 +541,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       remove (CCList.to_iter neg_cls)
     | None -> ());
     _newly_added := CS.add_list !_newly_added clauses;
-    List.iter (fun cl -> ignore (react_clause_addded cl)) clauses;
+    List.iter (fun cl -> ignore (react_clause_added cl)) clauses;
 
     _pred_sym_idx := ID.Map.remove task.sym !_pred_sym_idx
 
@@ -999,16 +1010,16 @@ module Make(E : Env.S) : S with module Env = E = struct
     Util.debugf ~section 1 "logic has%sequalities"
       (fun k -> k (if !_logic == Equational then " " else " no "));
 
-    Signal.on Env.ProofState.PassiveSet.on_add_clause react_clause_addded;
+    Signal.on Env.ProofState.PassiveSet.on_add_clause react_clause_added;
     Signal.on Env.ProofState.PassiveSet.on_remove_clause react_clause_removed;
-    Signal.on Env.ProofState.ActiveSet.on_add_clause react_clause_addded;
+    Signal.on Env.ProofState.ActiveSet.on_add_clause react_clause_added;
     Signal.on Env.ProofState.ActiveSet.on_remove_clause react_clause_removed;
     Signal.on_every Env.on_forward_simplified (fun (c, new_state) ->
       if not !_done then (
         match new_state with
         | Some c' ->
           ignore(react_clause_removed c);
-          ignore(react_clause_addded c')
+          ignore(react_clause_added c')
         | _ -> ignore(react_clause_removed c) (* c is redundant *)
     ));
 
@@ -1066,7 +1077,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     schedule_tasks ();
 
     Signal.on Env.ProofState.PassiveSet.on_add_clause (fun c -> 
-      if !fixpoint_active then react_clause_addded c
+      if !fixpoint_active then react_clause_added c
       else Signal.StopListening
     );
     Signal.on Env.ProofState.PassiveSet.on_remove_clause (fun c ->
