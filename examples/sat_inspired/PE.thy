@@ -139,7 +139,7 @@ lemma assms_11:
   sorry
 
 lemma False
-  sledgehammer [zipperposition, overlord, dont_slice] (assms_11)
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms_11) *)
   oops
 
 end
