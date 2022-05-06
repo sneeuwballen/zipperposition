@@ -102,6 +102,15 @@ fun_decl:
     RIGHT_PAREN
     { let args, ret = tup in tyvars, f, args, ret }
 
+const_ty:
+  | ty=ty { [], ty }
+  | LEFT_PAREN
+      PAR
+      LEFT_PAREN tyvars=tyvar* RIGHT_PAREN
+      ty=ty
+    RIGHT_PAREN
+    { tyvars, ty }
+
 fun_def_ty:
   | LEFT_PAREN args=typed_var* RIGHT_PAREN
     ret=ty
@@ -193,10 +202,11 @@ stmt:
       let tyvars, f, args, ret = tup in
       A.decl_fun ~loc ~tyvars f args ret
     }
-  | LEFT_PAREN DECLARE_CONST f=IDENT ty=ty RIGHT_PAREN
+  | LEFT_PAREN DECLARE_CONST f=IDENT const_ty=const_ty RIGHT_PAREN
     {
       let loc = Loc.mk_pos $startpos $endpos in
-      A.decl_fun ~loc ~tyvars:[] f [] ty
+      let tyvars, ty = const_ty in
+      A.decl_fun ~loc ~tyvars f [] ty
     }
   | LEFT_PAREN DEFINE_FUN f=fun_rec RIGHT_PAREN
     {
