@@ -35,8 +35,7 @@
 %token EQ
 %token IF
 %token MATCH
-%token CASE
-%token DEFAULT
+%token UNDERSCORE
 %token FUN
 %token LET
 %token AS
@@ -47,9 +46,10 @@
 %token PATTERN
 
 %token DATA
+%token DATAS
 %token ASSERT
 %token LEMMA
-%token ASSERT_NOT
+%token PROVE
 %token FORALL
 %token EXISTS
 %token DECLARE_SORT
@@ -84,63 +84,57 @@ cstor:
   | LEFT_PAREN c=IDENT l=cstor_arg+ RIGHT_PAREN
     { A.mk_cstor c l }
 
-data:
+dataselem:
   | LEFT_PAREN s=IDENT l=cstor+ RIGHT_PAREN { s,l }
 
-fun_def_mono:
-  | f=IDENT
-    LEFT_PAREN args=typed_var* RIGHT_PAREN
-    ret=ty
-    { f, args, ret }
-
 fun_decl_mono:
-  | f=IDENT
-    LEFT_PAREN args=ty* RIGHT_PAREN
+  | LEFT_PAREN args=ty* RIGHT_PAREN
     ret=ty
-    { f, args, ret }
+    { args, ret }
 
 fun_decl:
-  | tup=fun_decl_mono { let f, args, ret = tup in [], f, args, ret }
-  | LEFT_PAREN
+  | f=IDENT tup=fun_decl_mono { let args, ret = tup in [], f, args, ret }
+  | f=IDENT
+    LEFT_PAREN
       PAR
       LEFT_PAREN tyvars=tyvar* RIGHT_PAREN
       LEFT_PAREN tup=fun_decl_mono RIGHT_PAREN
     RIGHT_PAREN
-    { let f, args, ret = tup in tyvars, f, args, ret }
+    { let args, ret = tup in tyvars, f, args, ret }
 
-fun_rec:
-  | tup=fun_def_mono body=term
-    {
-      let f, args, ret = tup in
-      A.mk_fun_rec ~ty_vars:[] f args ret body
-    }
-  | LEFT_PAREN
+fun_def_ty:
+  | LEFT_PAREN args=typed_var* RIGHT_PAREN
+    ret=ty
+    { args, ret }
+
+fun_def:
+  | f=IDENT
+    ty=fun_def_ty
+    { let args, ret = ty in [], f, args, ret }
+  | f=IDENT
+    LEFT_PAREN
       PAR
       LEFT_PAREN l=tyvar* RIGHT_PAREN
-      LEFT_PAREN tup=fun_def_mono body=term RIGHT_PAREN
+      LEFT_PAREN ty=fun_def_ty RIGHT_PAREN
     RIGHT_PAREN
+    { let args, ret = ty in l, f, args, ret }
+
+fun_rec:
+  | tup=fun_def
+    body=term
     {
-      let f, args, ret = tup in
+      let l, f, args, ret = tup in
       A.mk_fun_rec ~ty_vars:l f args ret body
     }
 
-funs_rec_decl:
-  | LEFT_PAREN tup=fun_def_mono RIGHT_PAREN
+funs_rec:
+  | LEFT_PAREN tup=fun_def RIGHT_PAREN
     {
-      let f, args, ret = tup in
-      A.mk_fun_decl ~ty_vars:[] f args ret
-    }
-  | LEFT_PAREN
-      PAR
-      LEFT_PAREN l=tyvar* RIGHT_PAREN
-      LEFT_PAREN tup=fun_def_mono RIGHT_PAREN
-    RIGHT_PAREN
-    {
-      let f, args, ret = tup in
+      let l, f, args, ret = tup in
       A.mk_fun_decl ~ty_vars:l f args ret
     }
 
-assert_not:
+prove:
   | LEFT_PAREN
       PAR LEFT_PAREN tyvars=tyvar+ RIGHT_PAREN t=term
     RIGHT_PAREN
@@ -168,13 +162,30 @@ stmt:
       with Failure _ ->
         A.parse_errorf ~loc "expected arity to be an integer, not `%s`" n
     }
-  | LEFT_PAREN DATA
-      LEFT_PAREN vars=tyvar* RIGHT_PAREN
-      LEFT_PAREN l=data+ RIGHT_PAREN
+  | LEFT_PAREN DATA name=IDENT
+      LEFT_PAREN
+        PAR LEFT_PAREN tyvars=tyvar* RIGHT_PAREN
+        LEFT_PAREN cstors=cstor+ RIGHT_PAREN
+      RIGHT_PAREN
     RIGHT_PAREN
     {
       let loc = Loc.mk_pos $startpos $endpos in
-      A.data ~loc vars l
+      A.data ~loc tyvars name cstors
+    }
+  | LEFT_PAREN DATA name=IDENT
+      LEFT_PAREN cstors=cstor+ RIGHT_PAREN
+    RIGHT_PAREN
+    {
+      let loc = Loc.mk_pos $startpos $endpos in
+      A.data ~loc [] name cstors
+    }
+  | LEFT_PAREN DATAS
+      LEFT_PAREN vars=tyvar* RIGHT_PAREN
+      LEFT_PAREN l=dataselem+ RIGHT_PAREN
+    RIGHT_PAREN
+    {
+      let loc = Loc.mk_pos $startpos $endpos in
+      A.datas ~loc vars l
     }
   | LEFT_PAREN DECLARE_FUN tup=fun_decl RIGHT_PAREN
     {
@@ -202,7 +213,7 @@ stmt:
     }
   | LEFT_PAREN
     DEFINE_FUNS_REC
-      LEFT_PAREN decls=funs_rec_decl+ RIGHT_PAREN
+      LEFT_PAREN decls=funs_rec+ RIGHT_PAREN
       LEFT_PAREN bodies=term+ RIGHT_PAREN
     RIGHT_PAREN
     {
@@ -210,13 +221,13 @@ stmt:
       A.funs_rec ~loc decls bodies
     }
   | LEFT_PAREN
-    ASSERT_NOT
-    tup=assert_not
+    PROVE
+    tup=prove
     RIGHT_PAREN
     {
       let loc = Loc.mk_pos $startpos $endpos in
       let ty_vars, f = tup in
-      A.assert_not ~loc ~ty_vars f
+      A.prove ~loc ~ty_vars f
     }
   | LEFT_PAREN CHECK_SAT RIGHT_PAREN
     {
@@ -258,19 +269,17 @@ typed_var:
 
 case:
   | LEFT_PAREN
-      CASE
       c=IDENT
       rhs=term
     RIGHT_PAREN
     { A.Match_case (c, [], rhs) }
   | LEFT_PAREN
-      CASE
       LEFT_PAREN c=IDENT vars=var+ RIGHT_PAREN
       rhs=term
     RIGHT_PAREN
     { A.Match_case (c, vars, rhs) }
   | LEFT_PAREN
-     CASE DEFAULT rhs=term
+     UNDERSCORE rhs=term
     RIGHT_PAREN
     { A.Match_default rhs }
 
@@ -307,12 +316,15 @@ composite_term:
   | LEFT_PAREN EQ a=term b=term RIGHT_PAREN { A.eq a b }
   | LEFT_PAREN ARROW a=term b=term RIGHT_PAREN { A.imply a b }
   | LEFT_PAREN f=IDENT args=term+ RIGHT_PAREN { A.app f args }
+  | LEFT_PAREN UNDERSCORE f=IDENT args=term+ RIGHT_PAREN { A.app f args }
   | LEFT_PAREN f=composite_term args=term+ RIGHT_PAREN { A.ho_app_l f args }
   | LEFT_PAREN AT f=term arg=term RIGHT_PAREN { A.ho_app f arg }
   | LEFT_PAREN
       MATCH
       lhs=term
-      l=case+
+      LEFT_PAREN
+        l=case+
+      RIGHT_PAREN
     RIGHT_PAREN
     { A.match_ lhs l }
   | LEFT_PAREN

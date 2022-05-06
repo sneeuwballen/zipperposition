@@ -44,8 +44,7 @@ rule token = parse
   | "ite" { IF }
   | "as" { AS }
   | "match" { MATCH }
-  | "case" { CASE }
-  | "default" { DEFAULT }
+  | "_" { UNDERSCORE }
   | "lambda" { FUN }
   | "let" { LET }
   | "par" { PAR }
@@ -55,10 +54,11 @@ rule token = parse
   | "!" { EXCL }
   | ":named" { NAMED }
   | ":pattern" { PATTERN }
-  | "declare-datatypes" { DATA }
+  | "declare-datatype" { DATA }
+  | "declare-datatypes" { DATAS }
   | "assert" { ASSERT }
   | "lemma" { LEMMA }
-  | "assert-not" { ASSERT_NOT }
+  | "prove" { PROVE }
   | "declare-sort" { DECLARE_SORT }
   | "declare-fun" { DECLARE_FUN }
   | "declare-const" { DECLARE_CONST }

@@ -204,13 +204,30 @@ let convert (st:A.statement): UA.statement list =
   | A.Stmt_lemma t ->
     let t = conv_term t in
     [UA.lemma ?loc t]
-  | A.Stmt_assert_not (tyvars,g) ->
+  | A.Stmt_prove (tyvars,g) ->
     (* goal *)
     let tyvars = List.map conv_tyvar tyvars in
     let g = conv_term g in
     let g = T.forall ?loc tyvars g in
     [UA.goal ?loc g]
-  | A.Stmt_data (tyvars, l) ->
+  | A.Stmt_data (tyvars, name, cstors) ->
+    let cstors =
+      List.map
+        (fun c ->
+          let args =
+            c.A.cstor_args
+            |> List.map (CCPair.map CCOpt.return conv_ty) in
+          c.A.cstor_name, args)
+        cstors
+    in
+    let l = [{UA.
+      data_name=name;
+      data_vars=tyvars;
+      data_cstors=cstors;
+    }]
+    in
+    [UA.data ?loc l]
+  | A.Stmt_datas (tyvars, l) ->
     let l = List.map
         (fun (id, cstors) ->
            let cstors =

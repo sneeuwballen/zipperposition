@@ -85,10 +85,11 @@ and stmt =
   | Stmt_fun_def of fun_def
   | Stmt_fun_rec of fun_def
   | Stmt_funs_rec of funs_rec_def
-  | Stmt_data of ty_var list * (string * cstor list) list
+  | Stmt_data of ty_var list * string * cstor list
+  | Stmt_datas of ty_var list * (string * cstor list) list
   | Stmt_assert of term
   | Stmt_lemma of term
-  | Stmt_assert_not of ty_var list * term
+  | Stmt_prove of ty_var list * term
   | Stmt_check_sat
 
 let ty_bool = Ty_bool
@@ -137,10 +138,11 @@ let decl_fun ?loc ~tyvars f ty_args ty_ret =
 let fun_def ?loc fr = _mk ?loc (Stmt_fun_def fr)
 let fun_rec ?loc fr = _mk ?loc (Stmt_fun_rec fr)
 let funs_rec ?loc decls bodies = _mk ?loc (Stmt_funs_rec {fsr_decls=decls; fsr_bodies=bodies})
-let data ?loc tyvars l = _mk ?loc (Stmt_data (tyvars,l))
+let data ?loc tyvars name constrs = _mk ?loc (Stmt_data (tyvars,name,constrs))
+let datas ?loc tyvars l = _mk ?loc (Stmt_datas (tyvars,l))
 let assert_ ?loc t = _mk ?loc (Stmt_assert t)
 let lemma ?loc t = _mk ?loc (Stmt_lemma t)
-let assert_not ?loc ~ty_vars t = _mk ?loc (Stmt_assert_not (ty_vars, t))
+let prove ?loc ~ty_vars t = _mk ?loc (Stmt_prove (ty_vars, t))
 let check_sat ?loc () = _mk ?loc Stmt_check_sat
 
 let loc t = t.loc
@@ -180,11 +182,11 @@ let rec pp_term out (t:term) = match t with
   | HO_app (a,b) -> fpf out "(@[<1>@@@ %a@ %a@])" pp_term a pp_term b
   | Match (lhs,cases) ->
     let pp_case out = function
-      | Match_default rhs -> fpf out "(@[<2>case default@ %a@])" pp_term rhs
+      | Match_default rhs -> fpf out "(@[<2>_@ %a@])" pp_term rhs
       | Match_case (c,[],rhs) ->
-        fpf out "(@[<2>case %s@ %a@])" c pp_term rhs
+        fpf out "(@[<2>%s@ %a@])" c pp_term rhs
       | Match_case (c,vars,rhs) ->
-        fpf out "(@[<2>case@ (@[%s@ %a@])@ %a@])" c (pp_list pp_str) vars pp_term rhs
+        fpf out "(@[<2>(@[%s@ %a@])@ %a@])" c (pp_list pp_str) vars pp_term rhs
     in
     fpf out "(@[<1>match@ %a@ @[<v>%a@]@])" pp_term lhs
       (pp_list pp_case) cases
@@ -223,8 +225,8 @@ let pp_stmt out (st:statement) = match view st with
   | Stmt_decl_sort (s,n) -> fpf out "(@[declare-sort@ %s %d@])" s n
   | Stmt_assert t -> fpf out "(@[assert@ %a@])" pp_term t
   | Stmt_lemma t -> fpf out "(@[lemma@ %a@])" pp_term t
-  | Stmt_assert_not (ty_vars,t) ->
-    fpf out "(@[assert-not@ %a@])" (pp_par pp_term) (ty_vars,t)
+  | Stmt_prove (ty_vars,t) ->
+    fpf out "(@[prove@ %a@])" (pp_par pp_term) (ty_vars,t)
   | Stmt_decl d ->
     fpf out "(@[declare-fun@ %a@])"
       (pp_par (pp_fun_decl pp_ty)) (d.fun_ty_vars,d)
@@ -238,7 +240,16 @@ let pp_stmt out (st:statement) = match view st with
     let pp_decl' out d = fpf out "(@[<2>%a@])" (pp_fun_decl pp_typed_var) d in
     fpf out "(@[<hv2>define-funs-rec@ (@[<v>%a@])@ (@[<v>%a@])@])"
       (pp_list pp_decl') fsr.fsr_decls (pp_list pp_term) fsr.fsr_bodies
-  | Stmt_data (tyvars,l) ->
+  | Stmt_data (tyvars,name,cstors) ->
+    let pp_cstor_arg out (sel,ty) = fpf out "(@[%s %a@])" sel pp_ty ty in
+    let pp_cstor out c =
+      if c.cstor_args = []
+      then fpf out "(%s)" c.cstor_name
+      else fpf out "(@[<1>%s@ %a@])" c.cstor_name (pp_list pp_cstor_arg) c.cstor_args
+    in
+    fpf out "(@[<hv2>declare-datatype@ %s@ (par@ (@[%a@])@ (@[<v>%a@])@]))"
+      name (pp_list pp_tyvar) tyvars (pp_list pp_cstor) cstors
+  | Stmt_datas (tyvars,l) ->
     let pp_cstor_arg out (sel,ty) = fpf out "(@[%s %a@])" sel pp_ty ty in
     let pp_cstor out c =
       if c.cstor_args = []
