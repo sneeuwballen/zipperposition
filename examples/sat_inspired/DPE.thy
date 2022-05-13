@@ -184,7 +184,8 @@ lemma
     "\<And>z. z e \<or> p (\<lambda>x. f x x) b"
     "b = c"
   shows False
-  sledgehammer [zipperposition, overlord, dont_slice] (assms)
+  (* FIXME: Zipperposition core-dumps *)
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
   oops
 
 (* 15. DPE should eliminate p *)
