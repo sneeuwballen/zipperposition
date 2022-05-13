@@ -87,7 +87,7 @@ lemma
 
 (* The same, but this time polymorphic *)
 
-sledgehammer_params[type_enc = poly_native_higher_fool]
+sledgehammer_params [type_enc = poly_native_higher_fool]
 
 axiomatization
   f :: "'a \<Rightarrow> 'a" and
@@ -142,8 +142,6 @@ lemma False
   (* sledgehammer [zipperposition, overlord, dont_slice] (assms_11) *)
   oops
 
-(* FIXME: Make 12-14 polymorphic. *)
-
 (* 12. SPE should eliminate p *)
 lemma assms_12:
   "p (one :: 'a) \<or> f (one :: 'a) = (two :: 'a)"
@@ -187,6 +185,8 @@ lemma
   oops
 
 (* The same, but this time higher-order *)
+
+sledgehammer_params [type_enc = mono_native_higher_fool]
 
 (* 15. SPE should eliminate p *)
 lemma

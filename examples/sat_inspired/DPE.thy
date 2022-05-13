@@ -62,7 +62,7 @@ lemma
 
 (* The same, but this time polymorphic *)
 
-sledgehammer_params[type_enc = poly_native_higher_fool]
+sledgehammer_params [type_enc = poly_native_higher_fool]
 
 axiomatization
   a b :: 'a and
@@ -129,6 +129,76 @@ lemma assms_10:
 
 lemma False
   (* sledgehammer [zipperposition, overlord, dont_slice] (assms_10) *)
+  oops
+
+(* The same, but this time higher-order *)
+
+sledgehammer_params [type_enc = mono_native_higher_fool]
+
+(* 11. DPE should eliminate p *)
+lemma
+  fixes a b p q r
+  assumes
+    "\<And>x y. \<not> p x y \<or> q (\<lambda>y. y x) \<or> r y \<or> y a"
+    "\<And>x y. p x y \<or> \<not> q (\<lambda>y. y x)"
+    "\<And>x y. p x y \<or> \<not> r y"
+    "\<And>x y. p x y \<or> \<not> y a"
+  shows False
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
+  oops
+
+(* 12. DPE should eliminate p *)
+lemma
+  fixes a b p q r
+  assumes
+    "\<And>x y. \<not> p x y \<or> q (\<lambda>y. y x) \<or> r y \<or> y a"
+    "\<And>x y. p x y \<or> \<not> q (\<lambda>y. y x)"
+    "\<And>x y. p x y \<or> \<not> r y"
+    "\<And>x y. p x y \<or> \<not> y a"
+    "\<And>z. z e \<or> p (\<lambda>x. f x x) b"
+  shows False
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
+  oops
+
+(* 13. DPE should eliminate p *)
+lemma
+  fixes a b p q r
+  assumes
+    "\<And>x y. \<not> p x y \<or> q (\<lambda>y. y x) \<or> r y \<or> y a"
+    "\<And>x y. p x y \<or> \<not> q (\<lambda>y. y x)"
+    "\<And>x y. p x y \<or> \<not> r y"
+    "\<And>x y. p x y \<or> \<not> y a"
+    "a = b"
+  shows False
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
+  oops
+
+(* 14. DPE should eliminate p *)
+lemma
+  fixes a b p q r
+  assumes
+    "\<And>x y. \<not> p x y \<or> q (\<lambda>y. y x) \<or> r y \<or> y a"
+    "\<And>x y. p x y \<or> \<not> q (\<lambda>y. y x)"
+    "\<And>x y. p x y \<or> \<not> r y"
+    "\<And>x y. p x y \<or> \<not> y a"
+    "\<And>z. z e \<or> p (\<lambda>x. f x x) b"
+    "b = c"
+  shows False
+  sledgehammer [zipperposition, overlord, dont_slice] (assms)
+  oops
+
+(* 15. DPE should eliminate p *)
+lemma
+  fixes a b p q r
+  assumes
+    "\<And>x y. \<not> p x y \<or> q (\<lambda>y. y x) \<or> r y \<or> y a"
+    "\<And>x y. p x y \<or> \<not> q (\<lambda>y. y x)"
+    "\<And>x y. p x y \<or> \<not> r y"
+    "\<And>x y. p x y \<or> \<not> y a"
+    "\<And>z. z e \<or> p (\<lambda>x. f x x) b \<or> \<not> p c d"
+    "b = c"
+  shows False
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
   oops
 
 end
