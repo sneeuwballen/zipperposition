@@ -92,7 +92,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     (* clauses that have the gate shape (occurs in pos/neg cls)  *)
     mutable possible_gates : CS.t;
     (* do the clauses in the possible_gates form a gate, and if so which one? *)
-    mutable is_gate : (C.t list * C.t list) option;
+    mutable maybe_gate : (C.t list * C.t list) option;
     (* square of number of different variables stored in this clause set *)
     mutable sq_var_weight : float;
     (* number of literals stored in this clause set *)
@@ -103,12 +103,28 @@ module Make(E : Env.S) : S with module Env = E = struct
     mutable deleted  : bool;
   }
 
-  let card t =
-    CS.cardinal t.pos_cls + CS.cardinal t.neg_cls +
-    (match t.is_gate with
-    | None -> 0
-    | Some (p, n) -> List.length p + List.length n)
-    + CS.cardinal t.offending_cls
+  (* This formula estimates the difference in the number of clauses after and before carrying out
+     the task. This formula is imperfect in the case where gates are used and offending_cls is
+     nonempty. This occurs rarely in practice because nonsingular predicate elimination, which
+     would lead to offending_cls's being nonempty, is disabled by default. *)
+  let estimated_gain t =
+    let old =
+      CS.cardinal t.pos_cls + CS.cardinal t.neg_cls +
+      (match t.maybe_gate with
+      | None -> 0
+      | Some (p, n) -> List.length p + List.length n)
+      + CS.cardinal t.offending_cls
+    in
+    let new_ =
+      (match t.maybe_gate with
+        None ->
+        assert (CS.is_empty t.offending_cls);
+        CS.cardinal t.pos_cls * CS.cardinal t.neg_cls
+      | Some (p, n) ->
+        List.length p * (CS.cardinal t.neg_cls + CS.cardinal t.offending_cls)
+        + (CS.cardinal t.pos_cls + CS.cardinal t.offending_cls) * List.length n)
+    in
+    new_ - old
 
   let pp_task out task =
     let original = ID.payload_pred 
@@ -117,13 +133,13 @@ module Make(E : Env.S) : S with module Env = E = struct
     CCFormat.fprintf out 
       "%a(%b) {@. +: @[%a@];@. -:@[%a@];@. ?:@[%a@]@. g:@[%a@]@. v^2:@[%g@]; |l|:@[%d@]; |%a|:@[%d@]; h_idx: @[%d@] @.}@."
       ID.pp task.sym original (CS.pp C.pp) task.pos_cls (CS.pp C.pp) task.neg_cls
-      (CS.pp C.pp) task.offending_cls (CCOpt.pp (CCPair.pp (CCList.pp C.pp) (CCList.pp C.pp))) task.is_gate task.sq_var_weight
-      task.num_lits ID.pp task.sym (card task) task.heap_idx
+      (CS.pp C.pp) task.offending_cls (CCOpt.pp (CCPair.pp (CCList.pp C.pp) (CCList.pp C.pp))) task.maybe_gate task.sq_var_weight
+      task.num_lits ID.pp task.sym (estimated_gain task) task.heap_idx
 
   let copy_task t = 
     let c = {
       sym = t.sym; pos_cls = CS.empty; neg_cls = CS.empty; offending_cls = CS.empty;
-      possible_gates = CS.empty; is_gate = None; sq_var_weight = 0.0;
+      possible_gates = CS.empty; maybe_gate = None; sq_var_weight = 0.0;
       num_lits = 0; last_check = None; heap_idx = -1; deleted = false;
     } in
     c.pos_cls <- t.pos_cls; c.neg_cls <- t.neg_cls; 
@@ -142,8 +158,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       assert((not a.deleted) || (not b.deleted));
       if not a.deleted && not b.deleted then (
           let open CCOrd in
-          (compare (card a) (card b)
-          <?> (compare, (not (CCOpt.is_some a.is_gate)), (not (CCOpt.is_some b.is_gate)))
+          (compare (not (CCOpt.is_some a.maybe_gate)) (not (CCOpt.is_some b.maybe_gate))
+          <?> (compare, estimated_gain a, estimated_gain b)
           <?> (compare, a.num_lits, b.num_lits)
           <?> (compare, a.sq_var_weight, b.sq_var_weight)
           <?> (ID.compare, a.sym, b.sym)) < 0
@@ -201,7 +217,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     {
       sym; pos_cls = CS.empty; neg_cls = CS.empty; 
       offending_cls=CS.empty; possible_gates = CS.empty;
-      is_gate=None; sq_var_weight=0.0; last_check=None; heap_idx=(-1); num_lits=0; deleted=false;
+      maybe_gate=None; sq_var_weight=0.0; last_check=None; heap_idx=(-1); num_lits=0; deleted=false;
     }
   
   let _pred_sym_idx = ref ID.Map.empty
@@ -237,7 +253,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   
   let calc_num_cls task = 
     CS.cardinal task.pos_cls + CS.cardinal task.neg_cls +
-    (match task.is_gate with
+    (match task.maybe_gate with
     | None -> 0
     | Some(ps, ns) -> List.length ps + List.length ns) +
     CS.cardinal task.offending_cls
@@ -264,7 +280,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let should_schedule task =
     let eligible_for_non_singular_pe task =
       Env.flex_get k_non_singular_pe &&
-      (match task.is_gate with
+      (match task.maybe_gate with
        | Some (pos,neg) ->
          let limit = 
           if Env.flex_get k_max_resolvents < 0 
@@ -274,7 +290,7 @@ module Make(E : Env.S) : S with module Env = E = struct
          let max_resolvents =
           (CS.fold (fun cl num_res -> 
               if num_res == limit
-              then limit (*shortcut *) 
+              then limit (* shortcut *) 
               else (
                 let new_res = CCArray.fold (fun acc lit -> 
                   match get_sym_sign lit with
@@ -296,7 +312,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let possibly_ignore_sym entry =
     let card s = CS.cardinal s in
     let possible_resolvents = 
-      match entry.is_gate with
+      match entry.maybe_gate with
       | Some(pos_gates,neg_gates) ->
         List.length pos_gates * card entry.neg_cls +
         List.length neg_gates * card entry.pos_cls
@@ -463,7 +479,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       in
 
       let handle_gate task cl =
-        match task.is_gate with
+        match task.maybe_gate with
         | Some(pos_cls, neg_cls) ->
           if CCList.mem ~eq:C.equal cl pos_cls
              || CCList.mem ~eq:C.equal cl neg_cls then (
@@ -475,7 +491,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                not (CS.is_empty task.offending_cls) then (
               TaskSet.remove_el _task_queue task 
             );
-            task.is_gate <- None
+            task.maybe_gate <- None
           )
         | None -> ()
       in
@@ -486,14 +502,14 @@ module Make(E : Env.S) : S with module Env = E = struct
         ID.Set.iter (fun sym -> 
           _pred_sym_idx := ID.Map.update sym (function
             | Some task ->
-              let mem_gate cl is_gate =
-                match is_gate with
+              let mem_gate cl maybe_gate =
+                match maybe_gate with
                 | Some (pos_cls, neg_cls) ->
                   CCList.mem ~eq:C.equal cl pos_cls || CCList.mem ~eq:C.equal cl neg_cls
                 | None -> false
               in
               let old = copy_task task in
-              if CS.mem cl task.offending_cls || mem_gate cl task.is_gate ||
+              if CS.mem cl task.offending_cls || mem_gate cl task.maybe_gate ||
                  CS.mem cl task.pos_cls || CS.mem cl task.neg_cls then
                 task.offending_cls <- CS.remove cl task.offending_cls;
                 handle_gate task cl;
@@ -518,7 +534,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let replace_clauses task clauses =
     Util.debugf ~section 2 "replaced clauses(%a):@. regular:@[%a@]@. gates:@[%a@]@." 
       (fun k -> k ID.pp task.sym (CS.pp C.pp) (CS.union task.pos_cls task.neg_cls) 
-                  (CCOpt.pp (CCPair.pp (CCList.pp C.pp) (CCList.pp C.pp))) task.is_gate);
+                  (CCOpt.pp (CCPair.pp (CCList.pp C.pp) (CCList.pp C.pp))) task.maybe_gate);
     Util.debugf ~section 2 "resolvents: @[%a@]@." (fun k -> k (CCList.pp C.pp) clauses);
     _ignored_symbols := ID.Set.add task.sym !_ignored_symbols;
     let remove iter =
@@ -535,7 +551,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     remove (CS.to_iter task.offending_cls);
     remove (CS.to_iter task.pos_cls);
     remove (CS.to_iter task.neg_cls);
-    (match task.is_gate with
+    (match task.maybe_gate with
     | Some(pos_cls, neg_cls) ->
       remove (CCList.to_iter pos_cls);
       remove (CCList.to_iter neg_cls)
@@ -684,7 +700,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         else (
           (* bit vector remembering which binary clauses we have already used *)
           let matched = CCBV.create ~size:(CCArray.length bin_gates) false in
-          let is_gate = List.for_all (fun lit ->
+          let maybe_gate = List.for_all (fun lit ->
             let found = ref false in
             let i = ref 0 in
             while not !found && !i < CCArray.length bin_gates do
@@ -714,7 +730,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             !found
           ) other_lits in
           let bin_cls = CCBV.select matched bin_gates in
-          if is_gate then Some(long_cl, bin_cls)
+          if maybe_gate then Some(long_cl, bin_cls)
           else None))
       long_clauses
     in
@@ -731,7 +747,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         let to_remove = CS.of_list (pos_cl :: neg_cls) in
         task.neg_cls <- CS.diff task.neg_cls to_remove;
         task.pos_cls <- CS.diff task.pos_cls to_remove;
-        task.is_gate <- Some([pos_cl], neg_cls);
+        task.maybe_gate <- Some([pos_cl], neg_cls);
         true
       | _ -> false
     in
@@ -744,7 +760,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         let to_remove = CS.of_list (neg_cl :: pos_cls) in
         task.neg_cls <- CS.diff task.neg_cls to_remove;
         task.pos_cls <- CS.diff task.pos_cls to_remove;
-        task.is_gate <- Some(pos_cls, [neg_cl]);
+        task.maybe_gate <- Some(pos_cls, [neg_cl]);
         true
       | _ -> false
     in
@@ -834,7 +850,7 @@ module Make(E : Env.S) : S with module Env = E = struct
               (fun k -> k (CCList.pp C.pp) core_neg);
             task.neg_cls <- CS.diff task.neg_cls to_remove;
             task.pos_cls <- CS.diff task.pos_cls to_remove;
-            task.is_gate <- Some(core_pos, core_neg);
+            task.maybe_gate <- Some(core_pos, core_neg);
             true
           ) else false
         | _ -> false)
@@ -926,7 +942,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       in
       let sym = task.sym in
       let resolvents =
-        match task.is_gate with
+        match task.maybe_gate with
         | Some (pos_gates, neg_gates) ->
           if Env.flex_get k_prefer_spe && CS.is_empty task.offending_cls then (
             let results = 

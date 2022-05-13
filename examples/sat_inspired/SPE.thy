@@ -1,6 +1,6 @@
-(* Isabelle/HOL file used to generate pe*.p. *)
+(* Isabelle/HOL file used to generate spe*.p. *)
 
-theory PE
+theory SPE
   imports Main
 begin
 
