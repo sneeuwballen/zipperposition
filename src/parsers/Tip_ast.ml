@@ -33,6 +33,7 @@ type term =
   | False
   | Const of string
   | App of string * term list
+  | App_poly of string * ty list * term list (* application with explicit polymorphic type arguments *)
   | HO_app of term * term (* higher-order application *)
   | Match of term * match_branch list
   | If of term * term * term
@@ -102,6 +103,7 @@ let true_ = True
 let false_ = False
 let const s = Const s
 let app f l = App (f,l)
+let app_poly f tys l = App_poly (f,tys,l)
 let ho_app a b = HO_app (a,b)
 let ho_app_l a l = List.fold_left ho_app a l
 let match_ u l = Match (u,l)
@@ -179,6 +181,7 @@ let rec pp_term out (t:term) = match t with
   | False -> pp_str out "false"
   | Const s -> pp_str out s
   | App (f,l) -> fpf out "(@[<1>%s@ %a@])" f (pp_list pp_term) l
+  | App_poly (f,tys,l) -> fpf out "(@[<1>_@ %s@ %a@ %a@])" f (pp_list pp_ty) tys (pp_list pp_term) l
   | HO_app (a,b) -> fpf out "(@[<1>@@@ %a@ %a@])" pp_term a pp_term b
   | Match (lhs,cases) ->
     let pp_case out = function

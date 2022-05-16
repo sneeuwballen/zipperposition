@@ -327,6 +327,7 @@ composite_term:
   | LEFT_PAREN ARROW a=term b=term RIGHT_PAREN { A.imply a b }
   | LEFT_PAREN f=IDENT args=term+ RIGHT_PAREN { A.app f args }
   | LEFT_PAREN UNDERSCORE f=IDENT args=term+ RIGHT_PAREN { A.app f args }
+  | LEFT_PAREN UNDERSCORE f=IDENT ty_args=ty* args=term* RIGHT_PAREN { A.app_poly f ty_args args }
   | LEFT_PAREN f=composite_term args=term+ RIGHT_PAREN { A.ho_app_l f args }
   | LEFT_PAREN AT f=term arg=term RIGHT_PAREN { A.ho_app f arg }
   | LEFT_PAREN

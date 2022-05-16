@@ -110,6 +110,10 @@ let rec conv_term (t:A.term): T.t =
       | "div", [a;b] -> T.app_builtin BA.quotient_e [a;b]
       | _ -> T.app_const f l
     end
+  | A.App_poly (f,tys,l) ->
+    let tys = List.map conv_ty tys in
+    let l = List.map conv_term l in
+    T.app_const f (List.append tys l)
   | A.HO_app (a,b) ->
     app (conv_term a) (conv_term b)
   | A.If (a,b,c) ->
