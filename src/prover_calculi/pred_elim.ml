@@ -158,8 +158,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       assert((not a.deleted) || (not b.deleted));
       if not a.deleted && not b.deleted then (
           let open CCOrd in
-          (compare (not (CCOpt.is_some a.maybe_gate)) (not (CCOpt.is_some b.maybe_gate))
-          <?> (compare, estimated_gain a, estimated_gain b)
+          (compare (estimated_gain a) (estimated_gain b)
+          <?> (compare, not (CCOpt.is_some a.maybe_gate), not (CCOpt.is_some b.maybe_gate))
           <?> (compare, a.num_lits, b.num_lits)
           <?> (compare, a.sq_var_weight, b.sq_var_weight)
           <?> (ID.compare, a.sym, b.sym)) < 0
