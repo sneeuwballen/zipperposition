@@ -830,7 +830,10 @@ module Make(E : Env.S) : S with module Env = E = struct
         let i,name_lit = CCOpt.get_exn (CCArray.find_map_i (fun i lit -> 
             match lit with 
             | L.Equation(lhs,rhs,_) when L.is_predicate_lit lit -> 
-              if ID.equal task.sym (T.head_exn lhs) then Some(i,lhs) else None
+              begin match T.head lhs with
+              | Some head -> if ID.equal task.sym head then Some (i, lhs) else None
+              | None -> None
+              end
             | _ -> None) (C.lits x)) 
         in
         let cls = 
