@@ -184,7 +184,6 @@ lemma
     "\<And>z. z e \<or> p (\<lambda>x. f x x) b"
     "b = c"
   shows False
-  (* FIXME: Zipperposition core-dumps *)
   (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
   oops
 
@@ -199,6 +198,74 @@ lemma
     "\<And>z. z e \<or> p (\<lambda>x. f x x) b \<or> \<not> p c d"
     "b = c"
   shows False
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
+  oops
+
+(* The same, but this time very higher-order, with deep and partial applications *)
+
+(* 16. DPE should eliminate p *)
+lemma
+  fixes a b p q r
+  assumes
+    "\<And>x y. \<not> p x y \<or> q (\<lambda>y. y x) \<or> r y \<or> y a"
+    "\<And>x y. p x y \<or> \<not> q (\<lambda>y. y x)"
+    "\<And>x y. p x y \<or> \<not> r y"
+    "\<And>x y. p x y \<or> \<not> y a"
+  shows "s p \<and> t (p a) \<and> u (p a c)"
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
+  oops
+
+(* 17. DPE should eliminate p *)
+lemma
+  fixes a b p q r
+  assumes
+    "\<And>x y. \<not> p x y \<or> q (\<lambda>y. y x) \<or> r y \<or> y a"
+    "\<And>x y. p x y \<or> \<not> q (\<lambda>y. y x)"
+    "\<And>x y. p x y \<or> \<not> r y"
+    "\<And>x y. p x y \<or> \<not> y a"
+    "\<And>z. z e \<or> p (\<lambda>x. f x x) b"
+  shows "s p \<and> t (p a) \<and> u (p a c)"
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
+  oops
+
+(* 18. DPE should eliminate p *)
+lemma
+  fixes a b p q r
+  assumes
+    "\<And>x y. \<not> p x y \<or> q (\<lambda>y. y x) \<or> r y \<or> y a"
+    "\<And>x y. p x y \<or> \<not> q (\<lambda>y. y x)"
+    "\<And>x y. p x y \<or> \<not> r y"
+    "\<And>x y. p x y \<or> \<not> y a"
+    "a = b"
+  shows "s p \<and> t (p a) \<and> u (p a c)"
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
+  oops
+
+(* 19. DPE should eliminate p *)
+lemma
+  fixes a b p q r
+  assumes
+    "\<And>x y. \<not> p x y \<or> q (\<lambda>y. y x) \<or> r y \<or> y a"
+    "\<And>x y. p x y \<or> \<not> q (\<lambda>y. y x)"
+    "\<And>x y. p x y \<or> \<not> r y"
+    "\<And>x y. p x y \<or> \<not> y a"
+    "\<And>z. z e \<or> p (\<lambda>x. f x x) b"
+    "b = c"
+  shows "s p \<and> t (p a) \<and> u (p a c)"
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
+  oops
+
+(* 20. DPE should eliminate p *)
+lemma
+  fixes a b p q r
+  assumes
+    "\<And>x y. \<not> p x y \<or> q (\<lambda>y. y x) \<or> r y \<or> y a"
+    "\<And>x y. p x y \<or> \<not> q (\<lambda>y. y x)"
+    "\<And>x y. p x y \<or> \<not> r y"
+    "\<And>x y. p x y \<or> \<not> y a"
+    "\<And>z. z e \<or> p (\<lambda>x. f x x) b \<or> \<not> p c d"
+    "b = c"
+  shows "s p \<and> t (p a') \<and> u (p a' c')"
   (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
   oops
 
