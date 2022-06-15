@@ -65,12 +65,10 @@ lemma
 sledgehammer_params [type_enc = poly_native_higher_fool]
 
 axiomatization
-  a b :: 'a and
+  a b e :: 'a and
   p :: "'a \<Rightarrow> 'b \<Rightarrow> bool" and
-  q :: "'a \<Rightarrow> bool" and
-  r :: "'a \<Rightarrow> bool"
-
-(* FIXME: Regenerate 6 to 20 and make sure they discover a gate. *)
+  q :: "'a \<Rightarrow> 'a" and
+  r :: "'a \<Rightarrow> 'a"
 
 (* 6. DPE should eliminate p *)
 lemma assms_6:
@@ -213,7 +211,7 @@ lemma
     "\<And>x y. p x y \<or> q (\<lambda>y. y x) \<noteq> e"
     "\<And>x y. p x y \<or> r y \<noteq> e"
     "\<And>x y. p x y \<or> \<not> y a"
-  shows "s p \<and> t (p a) \<and> u (p a c)"
+  shows "s p = e \<and> t (p a) = e \<and> u (p a c) = e"
   (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
   oops
 
@@ -226,7 +224,7 @@ lemma
     "\<And>x y. p x y \<or> r y \<noteq> e"
     "\<And>x y. p x y \<or> \<not> y a"
     "\<And>z. z e \<or> p (\<lambda>x. f x x) b"
-  shows "s p \<and> t (p a) \<and> u (p a c)"
+  shows "s p = e \<and> t (p a) = e \<and> u (p a c) = e"
   (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
   oops
 
@@ -239,7 +237,7 @@ lemma
     "\<And>x y. p x y \<or> r y \<noteq> e"
     "\<And>x y. p x y \<or> \<not> y a"
     "a = b"
-  shows "s p \<and> t (p a) \<and> u (p a c)"
+  shows "s p = e \<and> t (p a) = e \<and> u (p a c) = e"
   (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
   oops
 
@@ -253,7 +251,7 @@ lemma
     "\<And>x y. p x y \<or> \<not> y a"
     "\<And>z. z e \<or> p (\<lambda>x. f x x) b"
     "b = c"
-  shows "s p \<and> t (p a) \<and> u (p a c)"
+  shows "s p = e \<and> t (p a) = e \<and> u (p a c) = e"
   (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
   oops
 
@@ -268,7 +266,7 @@ lemma
     "\<And>z. z e \<or> p (\<lambda>x. f x x) b \<or> \<not> p c d"
     "b = c"
   shows "s p = e \<and> t (p a') = e \<and> u (p a' c') = e"
-  (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
+  sledgehammer [zipperposition, overlord, dont_slice] (assms)
   oops
 
 end
