@@ -7,9 +7,9 @@ begin
 (* 1. DPE should eliminate p *)
 lemma
   assumes
-    "\<And>x y. \<not> p x y \<or> q x \<or> r y"
-    "\<And>x y. p x y \<or> \<not> q x"
-    "\<And>x y. p x y \<or> \<not> r y"
+    "\<And>x y. \<not> p x y \<or> q x = e \<or> r y = e"
+    "\<And>x y. p x y \<or> q x \<noteq> e"
+    "\<And>x y. p x y \<or> r y \<noteq> e"
   shows False
   (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
   oops
@@ -17,9 +17,9 @@ lemma
 (* 2. DPE should eliminate p *)
 lemma
   assumes
-    "\<And>x y. \<not> p x y \<or> q x \<or> r y"
-    "\<And>x y. p x y \<or> \<not> q x"
-    "\<And>x y. p x y \<or> \<not> r y"
+    "\<And>x y. \<not> p x y \<or> q x = e \<or> r y = e"
+    "\<And>x y. p x y \<or> q x \<noteq> e"
+    "\<And>x y. p x y \<or> r y \<noteq> e"
     "p a b"
   shows False
   (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
@@ -28,9 +28,9 @@ lemma
 (* 3. DPE should eliminate p *)
 lemma
   assumes
-    "\<And>x y. \<not> p x y \<or> q x \<or> r y"
-    "\<And>x y. p x y \<or> \<not> q x"
-    "\<And>x y. p x y \<or> \<not> r y"
+    "\<And>x y. \<not> p x y \<or> q x = e \<or> r y = e"
+    "\<And>x y. p x y \<or> q x \<noteq> e"
+    "\<And>x y. p x y \<or> r y \<noteq> e"
     "a = b"
   shows False
   (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
@@ -39,9 +39,9 @@ lemma
 (* 4. DPE should eliminate p *)
 lemma
   assumes
-    "\<And>x y. \<not> p x y \<or> q x \<or> r y"
-    "\<And>x y. p x y \<or> \<not> q x"
-    "\<And>x y. p x y \<or> \<not> r y"
+    "\<And>x y. \<not> p x y \<or> q x = e \<or> r y = e"
+    "\<And>x y. p x y \<or> q x \<noteq> e"
+    "\<And>x y. p x y \<or> r y \<noteq> e"
     "p a b"
     "a = b"
   shows False
@@ -51,9 +51,9 @@ lemma
 (* 5. DPE should eliminate p *)
 lemma
   assumes
-    "\<And>x y. \<not> p x y \<or> q x \<or> r y"
-    "\<And>x y. p x y \<or> \<not> q x"
-    "\<And>x y. p x y \<or> \<not> r y"
+    "\<And>x y. \<not> p x y \<or> q x = e \<or> r y = e"
+    "\<And>x y. p x y \<or> q x \<noteq> e"
+    "\<And>x y. p x y \<or> r y \<noteq> e"
     "p a b \<or> \<not> p c d"
     "a = b"
   shows False
@@ -70,11 +70,13 @@ axiomatization
   q :: "'a \<Rightarrow> bool" and
   r :: "'a \<Rightarrow> bool"
 
+(* FIXME: Regenerate 6 to 20 and make sure they discover a gate. *)
+
 (* 6. DPE should eliminate p *)
 lemma assms_6:
-  "\<And>x y. \<not> p x y \<or> q x \<or> r y"
-  "\<And>x y. p x y \<or> \<not> q x"
-  "\<And>x y. p x y \<or> \<not> r y"
+  "\<And>x y. \<not> p x y \<or> q x = e \<or> r y = e"
+  "\<And>x y. p x y \<or> q x \<noteq> e"
+  "\<And>x y. p x y \<or> r y \<noteq> e"
   sorry
 
 lemma False
@@ -83,9 +85,9 @@ lemma False
 
 (* 7. DPE should eliminate p *)
 lemma assms_7:
-  "\<And>x y. \<not> p x y \<or> q x \<or> r y"
-  "\<And>x y. p x y \<or> \<not> q x"
-  "\<And>x y. p x y \<or> \<not> r y"
+  "\<And>x y. \<not> p x y \<or> q x = e \<or> r y = e"
+  "\<And>x y. p x y \<or> q x \<noteq> e"
+  "\<And>x y. p x y \<or> r y \<noteq> e"
   "p (a :: 'a option) b"
   sorry
 
@@ -95,9 +97,9 @@ lemma False
 
 (* 8. DPE should eliminate p *)
 lemma assms_8:
-  "\<And>x y. \<not> p x y \<or> q x \<or> r y"
-  "\<And>x y. p x y \<or> \<not> q x"
-  "\<And>x y. p x y \<or> \<not> r y"
+  "\<And>x y. \<not> p x y \<or> q x = e \<or> r y = e"
+  "\<And>x y. p x y \<or> q x \<noteq> e"
+  "\<And>x y. p x y \<or> r y \<noteq> e"
   "a = b"
   sorry
 
@@ -107,9 +109,9 @@ lemma False
 
 (* 9. DPE should eliminate p *)
 lemma assms_9:
-  "\<And>x y. \<not> p x y \<or> q x \<or> r y"
-  "\<And>x y. p x y \<or> \<not> q x"
-  "\<And>x y. p x y \<or> \<not> r y"
+  "\<And>x y. \<not> p x y \<or> q x = e \<or> r y = e"
+  "\<And>x y. p x y \<or> q x \<noteq> e"
+  "\<And>x y. p x y \<or> r y \<noteq> e"
   "p (a :: 'a option) b"
   "a = b"
   sorry
@@ -120,9 +122,9 @@ lemma False
 
 (* 10. DPE should eliminate p *)
 lemma assms_10:
-  "\<And>x y. \<not> p x y \<or> q x \<or> r y"
-  "\<And>x y. p x y \<or> \<not> q x"
-  "\<And>x y. p x y \<or> \<not> r y"
+  "\<And>x y. \<not> p x y \<or> q x = e \<or> r y = e"
+  "\<And>x y. p x y \<or> q x \<noteq> e"
+  "\<And>x y. p x y \<or> r y \<noteq> e"
   "p (a :: 'a option) b \<or> \<not> p (c :: 'b \<times> 'c list) (d :: nat)"
   "a = b"
   sorry
@@ -139,9 +141,9 @@ sledgehammer_params [type_enc = mono_native_higher_fool]
 lemma
   fixes a b p q r
   assumes
-    "\<And>x y. \<not> p x y \<or> q (\<lambda>y. y x) \<or> r y \<or> y a"
-    "\<And>x y. p x y \<or> \<not> q (\<lambda>y. y x)"
-    "\<And>x y. p x y \<or> \<not> r y"
+    "\<And>x y. \<not> p x y \<or> q (\<lambda>y. y x) = e \<or> r y = e \<or> y a"
+    "\<And>x y. p x y \<or> q (\<lambda>y. y x) \<noteq> e"
+    "\<And>x y. p x y \<or> r y \<noteq> e"
     "\<And>x y. p x y \<or> \<not> y a"
   shows False
   (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
@@ -151,9 +153,9 @@ lemma
 lemma
   fixes a b p q r
   assumes
-    "\<And>x y. \<not> p x y \<or> q (\<lambda>y. y x) \<or> r y \<or> y a"
-    "\<And>x y. p x y \<or> \<not> q (\<lambda>y. y x)"
-    "\<And>x y. p x y \<or> \<not> r y"
+    "\<And>x y. \<not> p x y \<or> q (\<lambda>y. y x) = e \<or> r y = e \<or> y a"
+    "\<And>x y. p x y \<or> q (\<lambda>y. y x) \<noteq> e"
+    "\<And>x y. p x y \<or> r y \<noteq> e"
     "\<And>x y. p x y \<or> \<not> y a"
     "\<And>z. z e \<or> p (\<lambda>x. f x x) b"
   shows False
@@ -164,9 +166,9 @@ lemma
 lemma
   fixes a b p q r
   assumes
-    "\<And>x y. \<not> p x y \<or> q (\<lambda>y. y x) \<or> r y \<or> y a"
-    "\<And>x y. p x y \<or> \<not> q (\<lambda>y. y x)"
-    "\<And>x y. p x y \<or> \<not> r y"
+    "\<And>x y. \<not> p x y \<or> q (\<lambda>y. y x) = e \<or> r y = e \<or> y a"
+    "\<And>x y. p x y \<or> q (\<lambda>y. y x) \<noteq> e"
+    "\<And>x y. p x y \<or> r y \<noteq> e"
     "\<And>x y. p x y \<or> \<not> y a"
     "a = b"
   shows False
@@ -177,9 +179,9 @@ lemma
 lemma
   fixes a b p q r
   assumes
-    "\<And>x y. \<not> p x y \<or> q (\<lambda>y. y x) \<or> r y \<or> y a"
-    "\<And>x y. p x y \<or> \<not> q (\<lambda>y. y x)"
-    "\<And>x y. p x y \<or> \<not> r y"
+    "\<And>x y. \<not> p x y \<or> q (\<lambda>y. y x) = e \<or> r y = e \<or> y a"
+    "\<And>x y. p x y \<or> q (\<lambda>y. y x) \<noteq> e"
+    "\<And>x y. p x y \<or> r y \<noteq> e"
     "\<And>x y. p x y \<or> \<not> y a"
     "\<And>z. z e \<or> p (\<lambda>x. f x x) b"
     "b = c"
@@ -191,9 +193,9 @@ lemma
 lemma
   fixes a b p q r
   assumes
-    "\<And>x y. \<not> p x y \<or> q (\<lambda>y. y x) \<or> r y \<or> y a"
-    "\<And>x y. p x y \<or> \<not> q (\<lambda>y. y x)"
-    "\<And>x y. p x y \<or> \<not> r y"
+    "\<And>x y. \<not> p x y \<or> q (\<lambda>y. y x) = e \<or> r y = e \<or> y a"
+    "\<And>x y. p x y \<or> q (\<lambda>y. y x) \<noteq> e"
+    "\<And>x y. p x y \<or> r y \<noteq> e"
     "\<And>x y. p x y \<or> \<not> y a"
     "\<And>z. z e \<or> p (\<lambda>x. f x x) b \<or> \<not> p c d"
     "b = c"
@@ -207,9 +209,9 @@ lemma
 lemma
   fixes a b p q r
   assumes
-    "\<And>x y. \<not> p x y \<or> q (\<lambda>y. y x) \<or> r y \<or> y a"
-    "\<And>x y. p x y \<or> \<not> q (\<lambda>y. y x)"
-    "\<And>x y. p x y \<or> \<not> r y"
+    "\<And>x y. \<not> p x y \<or> q (\<lambda>y. y x) = e \<or> r y = e \<or> y a"
+    "\<And>x y. p x y \<or> q (\<lambda>y. y x) \<noteq> e"
+    "\<And>x y. p x y \<or> r y \<noteq> e"
     "\<And>x y. p x y \<or> \<not> y a"
   shows "s p \<and> t (p a) \<and> u (p a c)"
   (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
@@ -219,9 +221,9 @@ lemma
 lemma
   fixes a b p q r
   assumes
-    "\<And>x y. \<not> p x y \<or> q (\<lambda>y. y x) \<or> r y \<or> y a"
-    "\<And>x y. p x y \<or> \<not> q (\<lambda>y. y x)"
-    "\<And>x y. p x y \<or> \<not> r y"
+    "\<And>x y. \<not> p x y \<or> q (\<lambda>y. y x) = e \<or> r y = e \<or> y a"
+    "\<And>x y. p x y \<or> q (\<lambda>y. y x) \<noteq> e"
+    "\<And>x y. p x y \<or> r y \<noteq> e"
     "\<And>x y. p x y \<or> \<not> y a"
     "\<And>z. z e \<or> p (\<lambda>x. f x x) b"
   shows "s p \<and> t (p a) \<and> u (p a c)"
@@ -232,9 +234,9 @@ lemma
 lemma
   fixes a b p q r
   assumes
-    "\<And>x y. \<not> p x y \<or> q (\<lambda>y. y x) \<or> r y \<or> y a"
-    "\<And>x y. p x y \<or> \<not> q (\<lambda>y. y x)"
-    "\<And>x y. p x y \<or> \<not> r y"
+    "\<And>x y. \<not> p x y \<or> q (\<lambda>y. y x) = e \<or> r y = e \<or> y a"
+    "\<And>x y. p x y \<or> q (\<lambda>y. y x) \<noteq> e"
+    "\<And>x y. p x y \<or> r y \<noteq> e"
     "\<And>x y. p x y \<or> \<not> y a"
     "a = b"
   shows "s p \<and> t (p a) \<and> u (p a c)"
@@ -245,9 +247,9 @@ lemma
 lemma
   fixes a b p q r
   assumes
-    "\<And>x y. \<not> p x y \<or> q (\<lambda>y. y x) \<or> r y \<or> y a"
-    "\<And>x y. p x y \<or> \<not> q (\<lambda>y. y x)"
-    "\<And>x y. p x y \<or> \<not> r y"
+    "\<And>x y. \<not> p x y \<or> q (\<lambda>y. y x) = e \<or> r y = e \<or> y a"
+    "\<And>x y. p x y \<or> q (\<lambda>y. y x) \<noteq> e"
+    "\<And>x y. p x y \<or> r y \<noteq> e"
     "\<And>x y. p x y \<or> \<not> y a"
     "\<And>z. z e \<or> p (\<lambda>x. f x x) b"
     "b = c"
@@ -257,15 +259,15 @@ lemma
 
 (* 20. DPE should eliminate p *)
 lemma
-  fixes a b p q r
+  fixes a b e p q r
   assumes
-    "\<And>x y. \<not> p x y \<or> q (\<lambda>y. y x) \<or> r y \<or> y a"
-    "\<And>x y. p x y \<or> \<not> q (\<lambda>y. y x)"
-    "\<And>x y. p x y \<or> \<not> r y"
+    "\<And>x y. \<not> p x y \<or> q (\<lambda>y. y x) = e \<or> r y = e \<or> y a"
+    "\<And>x y. p x y \<or> q (\<lambda>y. y x) \<noteq> e"
+    "\<And>x y. p x y \<or> r y \<noteq> e"
     "\<And>x y. p x y \<or> \<not> y a"
     "\<And>z. z e \<or> p (\<lambda>x. f x x) b \<or> \<not> p c d"
     "b = c"
-  shows "s p \<and> t (p a') \<and> u (p a' c')"
+  shows "s p = e \<and> t (p a') = e \<and> u (p a' c') = e"
   (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
   oops
 

@@ -118,8 +118,10 @@ module Make(E : Env.S) : S with module Env = E = struct
     let new_ =
       (match t.maybe_gate with
         None ->
-        assert (CS.is_empty t.offending_cls);
-        CS.cardinal t.pos_cls * CS.cardinal t.neg_cls
+        if CS.is_empty t.offending_cls then
+          CS.cardinal t.pos_cls * CS.cardinal t.neg_cls
+        else
+          old
       | Some (p, n) ->
         List.length p * (CS.cardinal t.neg_cls + CS.cardinal t.offending_cls)
         + (CS.cardinal t.pos_cls + CS.cardinal t.offending_cls) * List.length n)
@@ -591,7 +593,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let proof =
         Proof.Step.simp 
           ~tags:[Proof.Tag.T_cannot_orphan]
-          ~rule:(Proof.Rule.mk "dp-resolution") 
+          ~rule:(Proof.Rule.mk "dp_resolution") 
           [C.proof_parent_subst renaming (pos_cl,pos_sc) subst;
            C.proof_parent_subst renaming (neg_cl,neg_sc) subst]
       in
@@ -631,7 +633,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let proof subst renaming =
         Proof.Step.simp 
           ~tags:[Proof.Tag.T_cannot_orphan] 
-          ~rule:(Proof.Rule.mk "dp-resolution") 
+          ~rule:(Proof.Rule.mk "dp_resolution") 
           [C.proof_parent_subst renaming (pos_cl,pos_sc) subst;
           C.proof_parent_subst renaming (neg_cl,neg_sc) subst]
       in
@@ -920,15 +922,12 @@ module Make(E : Env.S) : S with module Env = E = struct
       let _, hd_t = find_lit_by_sym sym true hd_pos in
       let vars = Term.args hd_t in
       let tl_pos_renamed = List.map (rename_pos_sym_vars vars) tl_pos in
-      Util.debugf ~section 1 "RENAMED: @[%a@]" (fun k -> k (CCList.pp C.pp) tl_pos_renamed);
 
       let contexts = List.map (fun cl ->
           term_of_lits (List.filter (fun lit -> not (is_sym_lit lit)) (Array.to_list (C.lits cl))))
         (hd_pos :: tl_pos_renamed)
       in
       let body = T.Form.or_l (List.map T.Form.not_ contexts) in
-      Util.debugf ~section 1 "BODY: @[%a@]" (fun k -> k T.pp body);
-      Util.debugf ~section 1 "VARS: @[%a@]" (fun k -> k (CCList.pp T.pp) vars);
       T.fun_of_fvars (List.map T.as_var_exn vars) body
     in
 
@@ -945,7 +944,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let proof =
         Proof.Step.simp
           ~tags:[Proof.Tag.T_ho; Proof.Tag.T_cannot_orphan]
-          ~rule:(Proof.Rule.mk "pred-inlining")
+          ~rule:(Proof.Rule.mk "pred_inlining")
           (List.map C.proof_parent (cl :: pos @ neg))
       in
       C.create ~penalty:(C.penalty cl) ~trail:(C.trail_l (cl :: pos @ neg)) new_lits proof
