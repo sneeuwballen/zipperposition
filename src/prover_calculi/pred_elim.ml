@@ -580,7 +580,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     try
       let subst = Unif.FO.unify_syn (pos_term, pos_sc) (neg_term, neg_sc) in
       let renaming = Subst.Renaming.create () in
-      let lits = 
+      let lits =
         (List.map (fun lit -> 
           L.apply_subst renaming subst (lit, pos_sc)) 
         (CCArray.except_idx (C.lits pos_cl) pos_idx)) @
@@ -891,35 +891,92 @@ module Make(E : Env.S) : S with module Env = E = struct
     ) pos
 
   let calc_non_singular_resolvents ~sym ~pos ~neg ~offending =
-    let find_lit_by_sym_opt sym sign cl =
+    let find_lit_by_sym_opt sign cl =
       try
         CCOpt.return (find_lit_by_sym sym sign cl)
       with _ -> None
+    in
+
+    let rename_pos_sym_vars new_vars cl =
+      let _, t = find_lit_by_sym sym true cl in
+      let sym_ty = Option.get (Signature.find (Env.signature ()) sym) in
+      let sym_cst = Term.const ~ty:sym_ty sym in
+      let new_t = Term.app sym_cst new_vars in
+      let subst = Unif.FO.matching ~pattern:(t, 0) (new_t, 1) in
+      C.apply_subst ~renaming:Subst.Renaming.none (cl, 0) subst
+    in
+
+    let lambda_term_for_sym hd_pos tl_pos =
+      let is_sym_lit lit =
+        match get_sym_sign lit with
+        | Some (sym', _) when ID.equal sym sym' -> true
+        | _ -> false
+      in
+      let term_of_lits lits =
+        T.Form.or_l (List.map L.to_ho_term lits)
+      in
+
+      (* steal the variables from the first positive clause *)
+      let _, hd_t = find_lit_by_sym sym true hd_pos in
+      let vars = Term.args hd_t in
+      let tl_pos_renamed = List.map (rename_pos_sym_vars vars) tl_pos in
+      Util.debugf ~section 1 "RENAMED: @[%a@]" (fun k -> k (CCList.pp C.pp) tl_pos_renamed);
+
+      let contexts = List.map (fun cl ->
+          term_of_lits (List.filter (fun lit -> not (is_sym_lit lit)) (Array.to_list (C.lits cl))))
+        (hd_pos :: tl_pos_renamed)
+      in
+      let body = T.Form.or_l (List.map T.Form.not_ contexts) in
+      Util.debugf ~section 1 "BODY: @[%a@]" (fun k -> k T.pp body);
+      Util.debugf ~section 1 "VARS: @[%a@]" (fun k -> k (CCList.pp T.pp) vars);
+      T.fun_of_fvars (List.map T.as_var_exn vars) body
+    in
+
+    (* TODO: Lambda.eta_reduce *)
+    let replace_sym pos neg lam cl =
+      let sym_ty = Option.get (Signature.find (Env.signature ()) sym) in
+      let sym_cst = Term.const ~ty:sym_ty sym in
+      let lits = Array.to_list (C.lits cl) in
+
+      let replace_by_lambda t =
+        T.replace ~old:sym_cst ~by:lam t
+      in
+      let new_lits = List.map (Literal.map replace_by_lambda) lits in
+      let proof =
+        Proof.Step.simp
+          ~tags:[Proof.Tag.T_ho; Proof.Tag.T_cannot_orphan]
+          ~rule:(Proof.Rule.mk "pred-inlining")
+          (List.map C.proof_parent (cl :: pos @ neg))
+      in
+      C.create ~penalty:(C.penalty cl) ~trail:(C.trail_l (cl :: pos @ neg)) new_lits proof
     in
 
     let rec aux has_pred no_pred =
       (match has_pred with
       | [] -> no_pred
       | cl :: cls ->
-        (* for the first occurrence of the symbol p in cl,
-           we compute all possible replacements w.r.t. gate clauses.
-           If there are more symbols left, we continue with all the replacements  *)
+        (* For the first positive or negative p-literal in cl, we compute all possible replacements
+           w.r.t. gate clauses. If there are more symbols left, we continue with all the
+           replacements. Occurrences of p deep inside the term are replaced by a suitable
+           lambda-term. *)
         let new_cls = 
-          (match find_lit_by_sym_opt sym true cl with
+          (match find_lit_by_sym_opt true cl with
           | Some _ ->
             CCList.filter_map (fun neg_cl -> 
               get_resolver () ~sym ~pos_cl:cl ~neg_cl) neg
           | None ->
-            (match find_lit_by_sym_opt sym false cl with
+            (match find_lit_by_sym_opt false cl with
             | Some _ ->
               CCList.filter_map (fun pos_cl -> 
                 get_resolver () ~sym ~pos_cl ~neg_cl:cl) pos
-            | None -> invalid_arg ""))
+            | None ->
+              let lam = lambda_term_for_sym (List.hd pos) (List.tl pos) in
+              [replace_sym pos neg lam cl]))
         in
         let has_lit cl =
           let (<+>) = CCOpt.(<+>) in
-          CCOpt.is_some (find_lit_by_sym_opt sym true cl <+> 
-                         find_lit_by_sym_opt sym false cl)
+          CCOpt.is_some (find_lit_by_sym_opt true cl <+>
+                         find_lit_by_sym_opt false cl)
         in
         let has_pred', no_pred' = List.partition has_lit new_cls in
         aux (has_pred' @ cls) (no_pred' @ no_pred))

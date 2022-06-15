@@ -130,7 +130,7 @@ val is_ground : t -> bool
 val symbols : ?include_types:bool -> t -> ID.Set.t
 val root_terms : t -> term list (** all the terms immediatly under the lit *)
 
-val to_ho_term : t -> term option
+val to_ho_term : t -> term
 (** Conversion to higher-order term using {!Term.Form} *)
 
 val as_ho_predicate : t -> (Term.var * term * term list * bool) option

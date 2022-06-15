@@ -506,13 +506,13 @@ let fold_terms ?(position=Position.stop) ?(vars=false) ?(var_args=true) ?(fun_bo
   end
 
 (* try to convert a literal into a term *)
-let to_ho_term (lit:t): T.t option = match lit with
-  | True -> Some T.true_
-  | False -> Some T.false_
+let to_ho_term (lit:t): T.t = match lit with
+  | True -> T.true_
+  | False -> T.false_
   | Equation (t, u, _) when is_predicate_lit lit ->
-    Some ((if is_negativoid lit then T.Form.not_ else CCFun.id) t)
+    (if is_negativoid lit then T.Form.not_ else CCFun.id) t
   | Equation (t, u, sign) ->
-    Some (if sign then T.Form.eq t u else T.Form.neq t u)
+    if sign then T.Form.eq t u else T.Form.neq t u
 
 let as_ho_predicate (lit:t) : _ option = 
   assert(no_prop_invariant lit);
