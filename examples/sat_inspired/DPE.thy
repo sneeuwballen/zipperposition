@@ -273,23 +273,23 @@ lemma
 
 sledgehammer_params [type_enc = poly_native_higher_fool]
 
-(* 21. DPE should eliminate p *)
+(* FIXME: This should contain lambdas (cf. 16, 22, etc.) *)
+(* FIXME: The problem for 21 makes Zipperposition crash *)
 
+(* 21. DPE should eliminate p *)
 lemma assms_21:
-  "\<And>x y. \<not> p x y \<or> q (\<lambda>y. y x) = e \<or> r y = e \<or> y a"
-  "\<And>x y. p x y \<or> q (\<lambda>y. y x) \<noteq> e"
+  "\<And>x y. \<not> p x y \<or> q x = e \<or> r y = e"
+  "\<And>x y. p x y \<or> q x \<noteq> e"
   "\<And>x y. p x y \<or> r y \<noteq> e"
-  "\<And>x y. p x y \<or> \<not> y a"
   sorry
 
 (* FIXME: 21 and below don't work *)
 
 lemma "s p = e \<and> t (p a) = e \<and> u (p a c) = e"
-  (* sledgehammer [zipperposition, overlord, dont_slice] (assms_21) *)
+  sledgehammer [zipperposition, overlord, dont_slice] (assms_21)
   oops
 
 (* 22. DPE should eliminate p *)
-
 lemma assms_22:
   "\<And>x y. \<not> p x y \<or> q (\<lambda>y. y x) = e \<or> r y = e \<or> y a"
   "\<And>x y. p x y \<or> q (\<lambda>y. y x) \<noteq> e"
@@ -303,7 +303,6 @@ lemma "s p = e \<and> t (p a) = e \<and> u (p a c) = e"
   oops
 
 (* 23. DPE should eliminate p *)
-
 lemma assms_23:
   "\<And>x y. \<not> p x y \<or> q (\<lambda>y. y x) = e \<or> r y = e \<or> y a"
   "\<And>x y. p x y \<or> q (\<lambda>y. y x) \<noteq> e"
@@ -317,7 +316,6 @@ lemma "s p = e \<and> t (p a) = e \<and> u (p a c) = e"
   oops
 
 (* 24. DPE should eliminate p *)
-
 lemma assms_24:
   "\<And>x y. \<not> p x y \<or> q (\<lambda>y. y x) = e \<or> r y = e \<or> y a"
   "\<And>x y. p x y \<or> q (\<lambda>y. y x) \<noteq> e"
@@ -332,7 +330,6 @@ lemma "s p = e \<and> t (p a) = e \<and> u (p a c) = e"
   oops
 
 (* 25. DPE should eliminate p *)
-
 lemma assms_25:
   "\<And>x y. \<not> p x y \<or> q (\<lambda>y. y x) = e \<or> r y = e \<or> y a"
   "\<And>x y. p x y \<or> q (\<lambda>y. y x) \<noteq> e"
