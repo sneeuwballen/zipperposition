@@ -964,13 +964,13 @@ let are_opposite_subst ~subst (l1,sc1) (l2,sc2) =
   is_positivoid l1 != is_positivoid l2 &&
   is_predicate_lit l1 = is_predicate_lit l2 &&
   match l1, l2 with
-  | Equation (lhs, rhs, _), Equation (lhs', rhs', _) when is_predicate_lit l1 ->
+  | Equation (lhs, _, _), Equation (lhs', _, _) when is_predicate_lit l1 ->
+    UF.equal ~subst (lhs, sc1) (lhs', sc2)
+  | Equation (lhs, rhs, _), Equation (lhs', rhs', _) ->
     (UF.equal ~subst (lhs, sc1) (lhs', sc2) && UF.equal ~subst (rhs, sc1) (rhs', sc2))
     || (UF.equal ~subst (lhs, sc1) (rhs', sc2) && UF.equal ~subst (rhs, sc1) (lhs', sc2))
-  | Equation (lhs, _, _), Equation (lhs', _, _)->
-    UF.equal ~subst (lhs, sc1) (lhs', sc2)
-  | True, True -> true
-  | False, False -> true
+  | True, False -> true
+  | False, True -> true
   | _ -> false
 
 let are_opposite_same_sc l1 l2 =

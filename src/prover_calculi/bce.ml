@@ -373,18 +373,18 @@ module Make(E : Env.S) : S with module Env = E = struct
           let is_valid =
             List.exists (fun lit' ->
               CCOpt.is_some (CCArray.find_map_i (fun idx lit ->
-                if idx != l_idx && 
+                if idx != l_idx &&
                   L.are_opposite_subst ~subst (lit, sc_orig) (lit', sc_partner) then(
-                  Some lit)
-                else None) 
+                  Some ())
+                else None)
               (C.lits orig_cl))
              ) nonunifiable in
 
           Util.debugf ~section 30 
-            "check: @. lit: @[%a@]@. unif:@[%a@]@. non_unif @[%a@]@. partner_cl: @[%a@]@."
+            "check: @. lit: @[%a@]@. unif: @[%a@]@. non_unif: @[%a@]@. partner_cl: @[%a@]@."
             (fun k -> k L.pp ((C.lits orig_cl).(l_idx)) (CCList.pp T.pp) 
                              (List.map fst unifiable) 
-                             (CCList.pp L.pp) nonunifiable C.pp partner  );
+                             (CCList.pp L.pp) nonunifiable C.pp partner);
           
           is_valid ||
           (not (CCList.is_empty rest) && (
@@ -618,7 +618,7 @@ module Make(E : Env.S) : S with module Env = E = struct
               (fun k -> k C.pp cl C.pp partner (C.is_redundant partner));
             task_is_blocked deq
           ) else (
-            Util.debugf ~section 5 "blocks(@[%a@], @[%a@])@."
+            Util.debugf ~section 5 "maybe-invalid-res(@[%a@], @[%a@])@."
               (fun k -> k C.pp partner C.pp cl);
             DEQ.push_front deq partner;
             lock_clause partner task;
