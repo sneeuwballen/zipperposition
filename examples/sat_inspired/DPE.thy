@@ -273,8 +273,6 @@ lemma
 
 sledgehammer_params [type_enc = poly_native_higher_fool]
 
-(* FIXME: The problem for 21 makes Zipperposition crash *)
-
 (* 21. DPE should eliminate p *)
 lemma assms_21:
   "\<And>x y. \<not> p (x :: 'a) (y :: 'b) \<or> q (\<lambda>y. y x :: 'b) = e \<or> r y = e"

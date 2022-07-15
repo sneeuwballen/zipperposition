@@ -921,26 +921,44 @@ module Make(E : Env.S) : S with module Env = E = struct
       (* steal the variables from the first positive clause *)
       let _, hd_t = find_lit_by_sym sym true hd_pos in
       let vars = Term.args hd_t in
-      let tl_pos_renamed = List.map (rename_pos_sym_vars vars) tl_pos in
+      let ty_vars, tm_vars = CCList.partition T.is_type vars in
 
-      let contexts = List.map (fun cl ->
+      let tl_pos_renamed = List.map (rename_pos_sym_vars vars) tl_pos in
+      let leftovers = List.map (fun cl ->
           term_of_lits (List.filter (fun lit -> not (is_sym_lit lit)) (Array.to_list (C.lits cl))))
         (hd_pos :: tl_pos_renamed)
       in
-      let body = T.Form.or_l (List.map T.Form.not_ contexts) in
-      T.fun_of_fvars (List.map T.as_var_exn vars) body
+      let body = T.Form.or_l (List.map T.Form.not_ leftovers) in
+      (ty_vars, T.fun_of_fvars (List.map T.as_var_exn tm_vars) body)
     in
 
-    (* TODO: Lambda.eta_reduce *)
-    let replace_sym pos neg lam cl =
-      let sym_ty = Option.get (Signature.find (Env.signature ()) sym) in
-      let sym_cst = Term.const ~ty:sym_ty sym in
-      let lits = Array.to_list (C.lits cl) in
-
-      let replace_by_lambda t =
-        T.replace ~old:sym_cst ~by:lam t
+    let replace_sym pos neg (ty_vars, lam) cl =
+      let rec replace_by_lam t =
+        match T.view t with
+        | AppBuiltin (b, l) -> T.app_builtin ~ty:(T.ty t) b (List.map replace_by_lam l)
+        | Var v -> t
+        | DB i -> t
+        | App (f, l) ->
+          begin match T.view f with
+          | Const s ->
+            if ID.equal s sym then
+              let num_ty_args = List.length ty_vars in
+              let (ty_args, tm_args) = CCList.take_drop num_ty_args l in
+              let subst = List.fold_left2
+                (fun subst var arg -> Subst.FO.bind' subst (T.as_var_exn var, 0) (arg, 0))
+                Subst.empty ty_vars ty_args
+              in
+              let lam' = Subst.FO.apply Subst.Renaming.none subst (lam, 0) in
+              T.app lam' (List.map replace_by_lam tm_args)
+            else
+              T.app f (List.map replace_by_lam l)
+          | _ -> T.app f (List.map replace_by_lam l)
+          end
+        | Const s -> if ID.equal s sym then lam else t
+        | Fun (ty, t') -> T.fun_ ty (replace_by_lam t')
       in
-      let new_lits = List.map (Literal.map replace_by_lambda) lits in
+      let lits = Array.to_list (C.lits cl) in
+      let new_lits = List.map (Literal.map replace_by_lam) lits in
       let proof =
         Proof.Step.simp
           ~tags:[Proof.Tag.T_ho; Proof.Tag.T_cannot_orphan]
@@ -969,8 +987,8 @@ module Make(E : Env.S) : S with module Env = E = struct
               CCList.filter_map (fun pos_cl -> 
                 get_resolver () ~sym ~pos_cl ~neg_cl:cl) pos
             | None ->
-              let lam = lambda_term_for_sym (List.hd pos) (List.tl pos) in
-              [replace_sym pos neg lam cl]))
+              let (ty_vars, lam) = lambda_term_for_sym (List.hd pos) (List.tl pos) in
+              [replace_sym pos neg (ty_vars, lam) cl]))
         in
         let has_lit cl =
           let (<+>) = CCOpt.(<+>) in
