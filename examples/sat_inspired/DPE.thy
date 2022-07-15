@@ -269,7 +269,7 @@ lemma
   (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
   oops
 
-(* The same, but this time polymorphic *)
+(* Finally, one polymorphic example *)
 
 sledgehammer_params [type_enc = poly_native_higher_fool]
 
@@ -277,67 +277,13 @@ sledgehammer_params [type_enc = poly_native_higher_fool]
 
 (* 21. DPE should eliminate p *)
 lemma assms_21:
-  "\<And>x y. \<not> p x y \<or> q (\<lambda>y. y x) = e \<or> r y = e"
-  "\<And>x y. p x y \<or> q x \<noteq> e"
+  "\<And>x y. \<not> p (x :: 'a) (y :: 'b) \<or> q (\<lambda>y. y x :: 'b) = e \<or> r y = e"
+  "\<And>x y. p (x :: 'a) (y :: 'b) \<or> q (\<lambda>y. y x :: 'b) \<noteq> e"
   "\<And>x y. p x y \<or> r y \<noteq> e"
   sorry
 
 lemma "s p = e \<and> t (p a) = e \<and> u (p a c) = e"
   (* sledgehammer [zipperposition, overlord, dont_slice] (assms_21) *)
-  oops
-
-(* 22. DPE should eliminate p *)
-lemma assms_22:
-  "\<And>x y. \<not> p x y \<or> q (\<lambda>y. y x) = e \<or> r y = e \<or> y a"
-  "\<And>x y. p x y \<or> q (\<lambda>y. y x) \<noteq> e"
-  "\<And>x y. p x y \<or> r y \<noteq> e"
-  "\<And>x y. p x y \<or> \<not> y a"
-  "\<And>z. z e \<or> p (\<lambda>x. f x x) b"
-  sorry
-
-lemma "s p = e \<and> t (p a) = e \<and> u (p a c) = e"
-  (* sledgehammer [zipperposition, overlord, dont_slice] (assms_22) *)
-  oops
-
-(* 23. DPE should eliminate p *)
-lemma assms_23:
-  "\<And>x y. \<not> p x y \<or> q (\<lambda>y. y x) = e \<or> r y = e \<or> y a"
-  "\<And>x y. p x y \<or> q (\<lambda>y. y x) \<noteq> e"
-  "\<And>x y. p x y \<or> r y \<noteq> e"
-  "\<And>x y. p x y \<or> \<not> y a"
-  "a = b"
-  sorry
-
-lemma "s p = e \<and> t (p a) = e \<and> u (p a c) = e"
-  (* sledgehammer [zipperposition, overlord, dont_slice] (assms_23) *)
-  oops
-
-(* 24. DPE should eliminate p *)
-lemma assms_24:
-  "\<And>x y. \<not> p x y \<or> q (\<lambda>y. y x) = e \<or> r y = e \<or> y a"
-  "\<And>x y. p x y \<or> q (\<lambda>y. y x) \<noteq> e"
-  "\<And>x y. p x y \<or> r y \<noteq> e"
-  "\<And>x y. p x y \<or> \<not> y a"
-  "\<And>z. z e \<or> p (\<lambda>x. f x x) b"
-  "b = c"
-  sorry
-
-lemma "s p = e \<and> t (p a) = e \<and> u (p a c) = e"
-  (* sledgehammer [zipperposition, overlord, dont_slice] (assms_24) *)
-  oops
-
-(* 25. DPE should eliminate p *)
-lemma assms_25:
-  "\<And>x y. \<not> p x y \<or> q (\<lambda>y. y x) = e \<or> r y = e \<or> y a"
-  "\<And>x y. p x y \<or> q (\<lambda>y. y x) \<noteq> e"
-  "\<And>x y. p x y \<or> r y \<noteq> e"
-  "\<And>x y. p x y \<or> \<not> y a"
-  "\<And>z. z e \<or> p (\<lambda>x. f x x) b \<or> \<not> p c d"
-  "b = c"
-  sorry
-
-lemma "s p = e \<and> t (p a') = e \<and> u (p a' c') = e"
-  sledgehammer [zipperposition, overlord, dont_slice] (assms_25)
   oops
 
 end
