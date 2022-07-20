@@ -59,7 +59,7 @@ lemma
     "\<And>x. \<not> p x \<or> q x \<or> \<not> q a"
     "p a"
   shows False
-  sledgehammer [zipperposition, overlord, dont_slice] (assms)
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
   oops
 
 (* 7. neither clause is blocked *)
