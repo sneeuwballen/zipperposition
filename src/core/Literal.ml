@@ -958,20 +958,3 @@ let as_pos_pure_var lit =
   | Some (l, r, true) when is_pure_var lit && is_positivoid lit ->
     Some (_as_var l, _as_var r)
   | _ -> None
-
-let are_opposite_subst ~subst (l1,sc1) (l2,sc2) =
-  let module UF = Unif.FO in
-  is_positivoid l1 != is_positivoid l2 &&
-  is_predicate_lit l1 = is_predicate_lit l2 &&
-  match l1, l2 with
-  | Equation (lhs, _, _), Equation (lhs', _, _) when is_predicate_lit l1 ->
-    UF.equal ~subst (lhs, sc1) (lhs', sc2)
-  | Equation (lhs, rhs, _), Equation (lhs', rhs', _) ->
-    (UF.equal ~subst (lhs, sc1) (lhs', sc2) && UF.equal ~subst (rhs, sc1) (rhs', sc2))
-    || (UF.equal ~subst (lhs, sc1) (rhs', sc2) && UF.equal ~subst (rhs, sc1) (lhs', sc2))
-  | True, False -> true
-  | False, True -> true
-  | _ -> false
-
-let are_opposite_same_sc l1 l2 =
-  are_opposite_subst ~subst:Subst.empty (l1,0) (l2,0)

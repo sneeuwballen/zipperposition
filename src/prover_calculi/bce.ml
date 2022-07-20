@@ -329,7 +329,6 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.remove_passive (Iter.singleton clause);
     Env.remove_simpl (Iter.singleton clause)
   
-  
   (* checks whether all L-resolvents between orig_cl on literal with index
      lit_idx and partner are valid   *)
   let resolvent_is_valid_neq lit_idx orig_cl partner =
@@ -352,6 +351,21 @@ module Make(E : Env.S) : S with module Env = E = struct
       ) ([], []) (C.lits partner)
     in
 
+    let are_opposite_lits_up_to ~subst (l1,sc1) (l2,sc2) =
+      let module UF = Unif.FO in
+      L.is_positivoid l1 != L.is_positivoid l2 &&
+      L.is_predicate_lit l1 = L.is_predicate_lit l2 &&
+      match l1, l2 with
+      | Equation (lhs, _, _), Equation (lhs', _, _) when L.is_predicate_lit l1 ->
+        UF.equal ~subst (lhs, sc1) (lhs', sc2)
+      | Equation (lhs, rhs, _), Equation (lhs', rhs', _) ->
+        (UF.equal ~subst (lhs, sc1) (lhs', sc2) && UF.equal ~subst (rhs, sc1) (rhs', sc2))
+        || (UF.equal ~subst (lhs, sc1) (rhs', sc2) && UF.equal ~subst (rhs, sc1) (lhs', sc2))
+      | True, False -> true
+      | False, True -> true
+      | _ -> false
+    in
+
     let check_resolvents l_idx orig_cl (unifiable, nonunifiable) =
       let orig_sign = L.is_positivoid ((C.lits orig_cl).(l_idx)) in
       (* literals against which unifiable part of the clause needs to be checked *)
@@ -359,8 +373,8 @@ module Make(E : Env.S) : S with module Env = E = struct
         List.filter (fun (lit, _) -> 
           L.is_positivoid lit = orig_sign 
           && L.is_predicate_lit lit) 
-        ( (List.map (fun x -> x,sc_orig) (CCArray.except_idx (C.lits orig_cl) l_idx)) @  
-           List.map (fun x -> x, sc_partner) nonunifiable ) 
+        ((List.map (fun x -> x,sc_orig) (CCArray.except_idx (C.lits orig_cl) l_idx)) @  
+         List.map (fun x -> x, sc_partner) nonunifiable)
       in
       if CCList.is_empty unifiable then true
       else (
@@ -370,11 +384,11 @@ module Make(E : Env.S) : S with module Env = E = struct
         let rec check_lit lhs subst rest =
           (* if clause is valid because there are opposite literals in nonunifiable
              part -- we have won as those literals will not be removed with L-resolution *)
-          let is_valid =
+          let is_valid_compl_lits =
             List.exists (fun lit' ->
               CCOpt.is_some (CCArray.find_map_i (fun idx lit ->
                 if idx != l_idx &&
-                  L.are_opposite_subst ~subst (lit, sc_orig) (lit', sc_partner) then(
+                  are_opposite_lits_up_to ~subst (lit, sc_orig) (lit', sc_partner) then(
                   Some ())
                 else None)
               (C.lits orig_cl))
@@ -386,7 +400,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                              (List.map fst unifiable) 
                              (CCList.pp L.pp) nonunifiable C.pp partner);
           
-          is_valid ||
+          is_valid_compl_lits ||
           (not (CCList.is_empty rest) && (
             (* else, we do L-resolution with the unifiable part extended *)
             let contrasting, rest' =
@@ -396,7 +410,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                     let lhs'  = CCOpt.get_exn (L.View.get_lhs lit) in
                     Unif.FO.equal ~subst (lhs',sc) (lhs, sc_partner)
                   )
-                  (for_tautology_checking)))  
+                  for_tautology_checking))  
               rest 
             in
 
@@ -449,9 +463,9 @@ module Make(E : Env.S) : S with module Env = E = struct
        are being computed and the API will not take care of that for us *)
     let orig_cl = C.apply_subst ~renaming (orig_cl, sc_orig) Subst.empty in
     let partner = C.apply_subst ~renaming (partner, sc_partner) Subst.empty in
-    
-    (* splitting into parts that have the same head and the sign as the literal
-       in the original clause and the other ones  *)
+
+    (* splitting into parts that have the same head and the opposite sign as the
+       literal in the original clause and the other ones  *)
     let split_partner lhs sign partner =
       CCArray.foldi (fun (same_hds, others) idx lit ->
         match lit with
@@ -471,8 +485,23 @@ module Make(E : Env.S) : S with module Env = E = struct
         (lhs, L.is_positivoid lit)
       | _ -> assert false (* literal must be eligible for BCE *)
     in
-    
-    let check_resolvents l_idx orig_cl (same_hd_lits, diff_hd_lits) =
+
+    let are_opposite_lits_up_to ~cc l1 l2 =
+      let module UF = Unif.FO in
+      L.is_positivoid l1 != L.is_positivoid l2 &&
+      L.is_predicate_lit l1 = L.is_predicate_lit l2 &&
+      match l1, l2 with
+      | Equation (lhs, _, _), Equation (lhs', _, _) when L.is_predicate_lit l1 ->
+        CC.is_eq cc lhs lhs'
+      | Equation (lhs, rhs, _), Equation (lhs', rhs', _) ->
+        (CC.is_eq cc lhs lhs' && CC.is_eq cc rhs rhs')
+        || (CC.is_eq cc lhs rhs' && CC.is_eq cc rhs lhs')
+      | True, False -> true
+      | False, True -> true
+      | _ -> false
+    in
+
+    let check_resolvents l_idx orig_cl (same_hd_atms, diff_hd_lits) =
       let orig_args = T.args @@ CCOpt.get_exn @@ (L.View.get_lhs (C.lits orig_cl).(l_idx)) in
 
       (* add equations that correspond to computing a flat resolvent between
@@ -485,17 +514,17 @@ module Make(E : Env.S) : S with module Env = E = struct
           cc (List.combine orig_args new_args)
       in
 
-      (* calculating positive, that is negative literals in both clauses *)
+      (* calculating positive resp. negative literals in both clauses *)
       let orig_pos, orig_neg = 
         CCList.partition L.is_positivoid (CCArray.except_idx (C.lits orig_cl) l_idx) in
       let partner_pos, partner_neg = 
-        CCList.partition L.is_positivoid (diff_hd_lits)
+        CCList.partition L.is_positivoid diff_hd_lits
       in
       let all_pos = orig_pos @ partner_pos in
       let all_neg = orig_neg @ partner_neg in
 
-      (* Literals from same_hd_lits part might need to be tested for congruence
-         with literals of the same head, but opposite side from either clause *)
+      (* Literals from same_hd_atms part might need to be tested for congruence
+         with literals of the same head, but opposite sign from either clause *)
       let for_congruence_testing =
         CCList.filter_map (fun lit -> 
           if L.is_predicate_lit lit && L.is_positivoid lit = orig_sign then (
@@ -515,11 +544,11 @@ module Make(E : Env.S) : S with module Env = E = struct
         ) (CC.create ~size:16 ()) all_neg
       in
 
-      if CCList.is_empty same_hd_lits then true (* no L-resolvent possible *)
+      if CCList.is_empty same_hd_atms then true (* no L-resolvent possible *)
       else (
         let rec check_lit ~cc rest =
-          (* validity is achieved without using same_hd_lits literals *)
-          let is_valid = List.exists (fun lit -> 
+          (* validity is achieved without using same_hd_atms literals *)
+          let is_valid_single_lit = List.exists (fun lit -> 
             assert(L.is_positivoid lit);
             
             match lit with
@@ -527,18 +556,30 @@ module Make(E : Env.S) : S with module Env = E = struct
             | L.True -> true
             | _ -> false
           ) all_pos in
-          
-          is_valid ||
+
+          (* if clause is valid because there are opposite literals in nonunifiable
+             part -- we have won as those literals will not be removed with L-resolution *)
+          let is_valid_compl_lits =
+            List.exists (fun lit' ->
+              CCOpt.is_some (CCArray.find_map_i (fun idx lit ->
+                if idx != l_idx &&
+                  are_opposite_lits_up_to ~cc lit lit' then(
+                  Some ())
+                else None)
+              (C.lits orig_cl))
+             ) diff_hd_lits in
+
+          is_valid_single_lit || is_valid_compl_lits ||
           (
             not (CCList.is_empty rest) && (
               let congruent, rest = List.partition (fun lhs -> 
                   List.exists (fun lhs' -> CC.is_eq cc lhs lhs') for_congruence_testing
-                ) rest 
+                ) rest
               in
               (* clause is not valid *)
               if CCList.is_empty congruent then false
               else (
-                (* validity is achieved using literals from same_hd_lits, let's
+                (* validity is achieved using literals from same_hd_atms, let's
                    see what happens when they are removed as part of flat
                    L-resolvent computation*)
                 let cc = 
@@ -550,13 +591,13 @@ module Make(E : Env.S) : S with module Env = E = struct
         in
         (* check if all l-resolvents are valid in polynomial time *)
         let rec check_l_resolvents others = function
-          | x :: xs ->
-            let cc_with_lhs = add_flat_resolvent ~cc:orig_cc (T.args x) in
-            check_lit ~cc:cc_with_lhs (others @ xs) &&
-            check_l_resolvents (x :: others) xs
+          | t :: ts ->
+            let cc_with_lhs = add_flat_resolvent ~cc:orig_cc (T.args t) in
+            check_lit ~cc:cc_with_lhs (others @ ts) &&
+            check_l_resolvents (t :: others) ts
           | [] -> true 
         in
-        check_l_resolvents [] same_hd_lits
+        check_l_resolvents [] same_hd_atms
       )
     in
     check_resolvents lit_idx orig_cl (split_partner orig_lhs orig_sign partner)
