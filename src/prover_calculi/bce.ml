@@ -51,15 +51,13 @@ module Make(E : Env.S) : S with module Env = E = struct
   let k_bce_sat_tracked = Flex_state.create_key ()
   
   type logic = 
-    | NEqFO  (* nonequational FO *)
-    | EqFO (* equational FO *)
-    | NonAppVarHo (* higher-order logic, but at the top level
-                     each literal has only (fully applied)
-                     function symbols *)
-    | Unsupported   (* HO or FO with theories *)
+    | NonequationalFO   (* nonequational FO *)
+    | EquationalFO      (* equational FO *)
+    | EquationalHO      (* equational HO *)
+    | Unsupported
   
   let log_to_int = 
-    [(NEqFO, 0); (EqFO, 1); (NonAppVarHo, 2); (Unsupported, 3)]
+    [(NonequationalFO, 0); (EquationalFO, 1); (EquationalHO, 2); (Unsupported, 3)]
   let log_compare (l1:logic) (l2:logic) =
     compare (List.assoc l1 log_to_int) (List.assoc l2 log_to_int)
 
@@ -115,15 +113,11 @@ module Make(E : Env.S) : S with module Env = E = struct
   let ignored_symbols = ref ID.Set.empty
   
   (* assuming the weakest logic *)
-  let logic = ref NEqFO
+  let logic = ref NonequationalFO
 
   let refine_logic new_val =
-    if log_compare new_val !logic > 0 then (
-      logic := new_val;
-      if (new_val == NonAppVarHo) then (
-        Env.Ctx.lost_completeness ()
-      );
-    )
+    if log_compare new_val !logic > 0 then
+      logic := new_val
 
   let lit_to_term sign =
     if sign then CCFun.id else T.Form.not_
@@ -178,24 +172,19 @@ module Make(E : Env.S) : S with module Env = E = struct
           if Type.is_prop (T.ty lhs) then (
             if L.is_predicate_lit lit && CCOpt.is_some (T.head lhs) then (
               if not (T.is_fo_term lhs) then (
-                refine_logic NonAppVarHo
+                refine_logic EquationalHO
               );
               let hd_sym = T.head_exn lhs in
               if not (ID.Set.mem hd_sym !ignored_symbols) 
               then add_lit_to_idx lhs sign cl
             ) else (
-              (* reasoning with formulas is currently unsupported *)
-              Util.debugf ~section 1 "unsupported because of formula @[%a@]@." (fun k -> k L.pp lit);
-              logic := Unsupported;
-              raise UnsupportedLogic;
+              refine_logic EquationalHO
             )
           ) else (
-            if T.is_fo_term lhs && T.is_fo_term rhs then refine_logic EqFO
-            else refine_logic NonAppVarHo)
-        ) else (
-            logic := Unsupported; 
-            Util.debugf ~section 1 "unsupported because of functional literal @[%a@]@." (fun k -> k L.pp lit);
-            raise UnsupportedLogic)
+            if T.is_fo_term lhs && T.is_fo_term rhs then refine_logic EquationalFO
+            else refine_logic EquationalHO)
+        ) else
+          logic := EquationalHO
       | _ -> ()
     ) (C.lits cl)
 
@@ -604,7 +593,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let get_validity_checker () =
     assert (!logic != Unsupported);
-    if !logic != NEqFO then resolvent_is_valid_eq
+    if !logic != NonequationalFO then resolvent_is_valid_eq
     else resolvent_is_valid_neq
 
   let is_blocked cl =
@@ -763,7 +752,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       List.iter scan_cl_lits init_clauses;
 
       Util.debugf ~section 1 "logic has%sequalities"
-        (fun k -> k (if !logic == EqFO then " " else " no "));
+        (fun k -> k (if !logic == NonequationalFO then " no " else " "));
 
       (* create tasks for each clause *)
       List.iter 
