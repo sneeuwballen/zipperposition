@@ -99,4 +99,116 @@ lemma
   (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
   oops
 
+(* The same, but this time polymorphic *)
+
+sledgehammer_params [type_enc = poly_native_higher_fool]
+
+axiomatization
+  a b p q r :: 'a
+
+(* 11. both clauses are blocked *)
+lemma assms_11:
+  "\<not> p \<or> q"
+  "p \<or> \<not> q"
+  sorry
+
+lemma False
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms_11) *)
+  oops
+
+(* 12. the first two clauses are blocked *)
+lemma assms_12:
+  "\<not> p \<or> q"
+  "p \<or> \<not> q"
+  "a = b"
+  sorry
+
+lemma False
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms_12) *)
+  oops
+
+(* 13. the first two clauses are blocked *)
+lemma assms_13:
+  "\<not> p (a :: nat) \<or> q (a :: nat)"
+  "p (b :: nat) \<or> \<not> q (b :: nat)"
+  "(a :: nat) = (b :: nat)"
+  sorry
+
+lemma False
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms_13) *)
+  oops
+
+(* 14. the first two clauses are blocked *)
+lemma assms_14:
+  "\<not> p (a :: nat) \<or> q (a :: nat)"
+  "p (b :: nat) \<or> \<not> q (b :: nat)"
+  "c = d"
+  sorry
+
+lemma False
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms_14) *)
+  oops
+
+(* 15. no clauses are blocked *)
+lemma assms_15:
+  "\<not> p (a :: nat) \<or> q (a :: nat)"
+  "p (b :: nat) \<or> \<not> q (c :: nat)"
+  "d = e"
+  sorry
+
+lemma False
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms_15) *)
+  oops
+
+(* 16. both clauses are blocked *)
+lemma assms_16:
+  "\<And>x. \<not> p x \<or> q x \<or> \<not> q a"
+  "p a"
+  sorry
+
+lemma False
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms_16) *)
+  oops
+
+(* 17. neither clause is blocked *)
+lemma assms_17:
+  "p \<noteq> (a :: nat) \<or> q = (a :: nat)"
+  "p = (a :: nat) \<or> q \<noteq> (a :: nat)"
+  sorry
+
+lemma False
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms_17) *)
+  oops
+
+(* 18. all three clauses are blocked *)
+lemma assms_18:
+  "\<not> p \<or> q"
+  "p \<or> \<not> q"
+  "\<not> r \<or> a = b"
+  sorry
+
+lemma False
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms_18) *)
+  oops
+
+(* 19. neither clause is blocked *)
+lemma assms_19:
+  "\<And>(x :: nat) (y :: nat). p x y \<or> p y x"
+  "\<And>(x :: nat) (y :: nat). \<not> p x y \<or> \<not> p y x"
+  sorry
+
+lemma False
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms_19) *)
+  oops
+
+(* 20. both clauses are blocked *)
+lemma assms_20:
+  "p (a :: nat) \<or> p (b :: nat) \<or> \<not> q"
+  "\<And>x. \<not> p (x :: nat) \<or> q"
+  sorry
+
+lemma False
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms_20) *)
+  oops
+
 end
