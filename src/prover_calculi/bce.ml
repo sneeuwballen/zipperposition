@@ -611,7 +611,21 @@ module Make(E : Env.S) : S with module Env = E = struct
       let cl = task.clause in
       let lit_idx = task.lit_idx in
       let hd_sym = 
-        T.head_exn @@ CCOpt.get_exn @@ L.View.get_lhs (C.lits task.clause).(lit_idx)
+        T.head_exn @@ CCOpt.get_exn @@ L.View.get_lhs (C.lits cl).(lit_idx)
+      in
+      let is_alone_with_polarity () =
+        let sign = L.is_positivoid (C.lits cl).(lit_idx) in
+        Option.is_none (CCArray.find_map_i (fun idx' lit' ->
+          if idx' == lit_idx then
+            None
+          else
+            match lit' with
+            | L.Equation (lhs', _, _) when L.is_predicate_lit lit' ->
+              let sym' = T.head lhs' in
+              let sign' = L.is_positivoid lit' in
+              if sym' == Some hd_sym && sign' == sign then Some lit' else None
+            | _ -> None
+        ) (C.lits cl))
       in
       let validity_checker = get_validity_checker () in
       
@@ -631,9 +645,10 @@ module Make(E : Env.S) : S with module Env = E = struct
             false))
       in
       
-      if not (C.is_empty task.clause || 
-              C.is_redundant task.clause ||
-              ID.Set.mem hd_sym !ignored_symbols) then (
+      if not (C.is_empty cl || 
+              C.is_redundant cl ||
+              ID.Set.mem hd_sym !ignored_symbols ||
+              (!logic == EquationalHO && not (is_alone_with_polarity ()))) then (
         Util.debugf ~section 3 "checking blockedness" CCFun.id;
         (* let original_partners = CCDeque.to_list task.cands in *)
         match task_is_blocked task.cands with
