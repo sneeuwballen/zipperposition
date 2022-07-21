@@ -211,4 +211,61 @@ lemma False
   (* sledgehammer [zipperposition, overlord, dont_slice] (assms_20) *)
   oops
 
+(* Same as 1–5, but this time higher-order *)
+
+(* 21. both clauses are blocked *)
+lemma
+  fixes p q a
+  assumes
+    "\<And>y. \<not> p (\<lambda>x. x) \<or> q \<or> y a"
+    "p (\<lambda>x. x) \<or> \<not> q"
+  shows False
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
+  oops
+
+(* 22. the first two clauses are blocked *)
+lemma
+  fixes p q a b
+  assumes
+    "\<And>y. \<not> p (\<lambda>x. x) \<or> q \<or> y a"
+    "p (\<lambda>x. x) \<or> \<not> q"
+    "a = b"
+  shows False
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
+  oops
+
+(* 23. the first two clauses are blocked *)
+lemma
+  fixes p q a b
+  assumes
+    "\<And>y. \<not> p (\<lambda>x. x) a \<or> q a \<or> y a"
+    "p (\<lambda>x. x) b \<or> \<not> q b"
+    "a = b"
+  shows False
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
+  oops
+
+(* 24. the first two clauses are blocked *)
+lemma
+  fixes p q a b c d
+  assumes
+    "\<And>y. \<not> p (\<lambda>x. x) a \<or> q a \<or> y a"
+    "p (\<lambda>x. x) b \<or> \<not> q b"
+    "c = d"
+  shows False
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
+  oops
+
+(* 25. no clauses are blocked *)
+lemma
+  fixes p q a b c d e
+  assumes
+    "\<And>y. \<not> p (\<lambda>x. x) a \<or> q a \<or> y a"
+    "p (\<lambda>x. x) b \<or> \<not> q c"
+    "d = e"
+  shows False
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
+  oops
+
+
 end

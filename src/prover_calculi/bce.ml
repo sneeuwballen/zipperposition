@@ -151,12 +151,11 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   (* find all clauses for which L-resolution should be tried against literal
      with given lhs and sign  *)
-  let find_candindates lhs sign = 
-    let hd = T.head_exn lhs in
-      C.ClauseSet.to_list
-        (CCOpt.get_or
-            ~default:C.ClauseSet.empty
-          (SymSignIdx.find_opt (hd, not sign) !ss_idx))
+  let find_candidates hd sign = 
+    C.ClauseSet.to_list
+      (CCOpt.get_or
+          ~default:C.ClauseSet.empty
+        (SymSignIdx.find_opt (hd, not sign) !ss_idx))
   
   (* Scan the clause and if it is in supported logic fragment,
      store its literals in the symbol index *)
@@ -170,7 +169,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         in
         if not is_poly && not (Type.is_fun (T.ty lhs)) then (
           if Type.is_prop (T.ty lhs) then (
-            if L.is_predicate_lit lit && CCOpt.is_some (T.head lhs) then (
+            if L.is_predicate_lit lit && Option.is_some (T.head lhs) then (
               if not (T.is_fo_term lhs) then (
                 refine_logic EquationalHO
               );
@@ -213,7 +212,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             match lit with
             | L.Equation(lhs,_,_)
               when L.is_predicate_lit lit  &&
-                  ID.equal (T.head_exn lhs) hd &&
+                  Option.equal ID.equal (T.head lhs) (Some hd) &&
                   sign != L.is_positivoid lit ->
               add_candidates lit_idx cand [clause]
             | _ -> ()
@@ -224,11 +223,13 @@ module Make(E : Env.S) : S with module Env = E = struct
     match (C.lits clause).(lit_idx) with
     | L.Equation (lhs, rhs, _) as lit 
       when L.is_predicate_lit lit
-            && not (ID.Set.mem (T.head_exn lhs) !ignored_symbols) ->
+            && (match T.head lhs with
+                | Some hd -> not (ID.Set.mem hd !ignored_symbols)
+                | None -> false) ->
       (* assert (T.is_fo_term lhs); *)
       let hd = T.head_exn lhs in
       let sign = L.is_positivoid lit in
-      let cands = find_candindates lhs sign in
+      let cands = find_candidates hd sign in
       if update_others then (
         update_cand_lists hd sign clause cands
       );
@@ -254,7 +255,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     CCArray.iteri (fun _ lit -> 
       match lit with 
       | L.Equation(lhs,_,_) 
-        when L.is_predicate_lit lit  ->
+        when L.is_predicate_lit lit && Option.is_some (T.head lhs) ->
         ss_idx :=
           SymSignIdx.update (T.head_exn lhs, L.is_positivoid lit) (function
             | Some old ->
@@ -461,7 +462,9 @@ module Make(E : Env.S) : S with module Env = E = struct
         | L.Equation(lhs', _, _) 
           when L.is_predicate_lit lit 
                && L.is_positivoid lit != sign 
-               && ID.equal (T.head_exn lhs) (T.head_exn lhs') ->      
+               && (match T.head lhs, T.head lhs' with
+                   | Some hd, Some hd' -> ID.equal hd hd'
+                   | _ -> false) ->      
           lhs' :: same_hds, others
         | _ -> same_hds, lit :: others
       ) ([], []) (C.lits partner)
@@ -519,7 +522,9 @@ module Make(E : Env.S) : S with module Env = E = struct
           if L.is_predicate_lit lit && L.is_positivoid lit = orig_sign then (
             CCOpt.flat_map (fun t -> 
               CCOpt.return_if 
-                (ID.equal (T.head_exn t) (T.head_exn orig_lhs)) 
+                (match T.head t, T.head orig_lhs with
+                 | Some hd, Some hd' -> ID.equal hd hd'
+                 | _ -> false)
                 t) 
             (L.View.get_lhs lit)
           ) else None) (if orig_sign then all_pos else all_neg)
@@ -593,27 +598,41 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let get_validity_checker () =
     assert (!logic != Unsupported);
-    if !logic != NonequationalFO then resolvent_is_valid_eq
-    else resolvent_is_valid_neq
+    if !logic == NonequationalFO then resolvent_is_valid_neq
+    else resolvent_is_valid_eq
 
   let is_blocked cl =
     let validity_checker = get_validity_checker () in
+    let is_lonely_with_polarity idx sym sign =
+      Option.is_none (CCArray.find_map_i (fun idx' lit' ->
+        match lit' with
+        | L.Equation (lhs', _, _) when L.is_predicate_lit lit' ->
+          let sym' = T.head lhs' in
+          let sign' = L.is_positivoid lit' in
+          if sym' == Some sym && sign' == sign then Some lit' else None
+        | _ -> None
+      ) (C.lits cl))
+    in
     let blocked_lit_idx =
       CCArray.find_map_i (fun idx lit -> 
         match lit with
-        | L.Equation(lhs,_,_) when L.is_predicate_lit lit ->
+        | L.Equation(lhs,_,_) when L.is_predicate_lit lit && Option.is_some (T.head lhs) ->
           let sym = T.head_exn lhs in
-          (match SymSignIdx.find_opt (sym, not (L.is_positivoid lit)) !ss_idx with 
-          | Some partners ->
-            if (C.ClauseSet.for_all (fun partner -> 
-              C.equal cl partner || validity_checker idx cl partner
-            ) partners) 
-            then (Some idx)
-            else None
-          | None -> 
-            if not (ID.Set.mem sym !ignored_symbols) 
-            then Some idx 
-            else None)
+          if !logic == EquationalHO &&
+             not (is_lonely_with_polarity idx sym (L.is_positivoid lit)) then
+             None
+          else
+            (match SymSignIdx.find_opt (sym, not (L.is_positivoid lit)) !ss_idx with 
+            | Some partners ->
+              if (C.ClauseSet.for_all (fun partner -> 
+                C.equal cl partner || validity_checker idx cl partner
+              ) partners) 
+              then Some idx
+              else None
+            | None -> 
+              if not (ID.Set.mem sym !ignored_symbols) 
+              then Some idx 
+              else None)
         | _ -> None
       ) (C.lits cl)
     in
