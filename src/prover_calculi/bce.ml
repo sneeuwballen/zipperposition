@@ -116,12 +116,8 @@ module Make(E : Env.S) : S with module Env = E = struct
   let logic = ref NonequationalFO
 
   let refine_logic new_val =
-    if log_compare new_val !logic > 0 then (
-      logic := new_val;
-      if (new_val == EquationalHO) then (
-        Env.Ctx.lost_completeness ()
-      )
-    )
+    if log_compare new_val !logic > 0 then
+      logic := new_val
 
   let lit_to_term sign =
     if sign then CCFun.id else T.Form.not_
@@ -181,10 +177,7 @@ module Make(E : Env.S) : S with module Env = E = struct
               if not (ID.Set.mem hd_sym !ignored_symbols) 
               then add_lit_to_idx lhs sign cl
             ) else (
-              (* reasoning with formulas is currently unsupported *)
-              Util.debugf ~section 1 "unsupported because of formula @[%a@]@." (fun k -> k L.pp lit);
-              logic := Unsupported;
-              raise UnsupportedLogic;
+              refine_logic EquationalHO
             )
           ) else (
             if T.is_fo_term lhs && T.is_fo_term rhs then refine_logic EquationalFO
@@ -620,6 +613,20 @@ module Make(E : Env.S) : S with module Env = E = struct
       let hd_sym = 
         T.head_exn @@ CCOpt.get_exn @@ L.View.get_lhs (C.lits cl).(lit_idx)
       in
+      let is_alone_with_polarity () =
+        let sign = L.is_positivoid (C.lits cl).(lit_idx) in
+        Option.is_none (CCArray.find_map_i (fun idx' lit' ->
+          if idx' == lit_idx then
+            None
+          else
+            match lit' with
+            | L.Equation (lhs', _, _) when L.is_predicate_lit lit' ->
+              let sym' = T.head lhs' in
+              let sign' = L.is_positivoid lit' in
+              if sym' == Some hd_sym && sign' == sign then Some lit' else None
+            | _ -> None
+        ) (C.lits cl))
+      in
       let validity_checker = get_validity_checker () in
       
       let rec task_is_blocked deq =
@@ -640,7 +647,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       
       if not (C.is_empty cl || 
               C.is_redundant cl ||
-              ID.Set.mem hd_sym !ignored_symbols) then (
+              ID.Set.mem hd_sym !ignored_symbols ||
+              (!logic == EquationalHO && not (is_alone_with_polarity ()))) then (
         Util.debugf ~section 3 "checking blockedness" CCFun.id;
         (* let original_partners = CCDeque.to_list task.cands in *)
         match task_is_blocked task.cands with
