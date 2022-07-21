@@ -109,12 +109,14 @@ lemma
 sledgehammer_params [type_enc = poly_native_higher_fool]
 
 axiomatization
-  a b p q r :: 'a
+  a b p0 q0 r0 :: 'a and
+  p q :: "'a \<Rightarrow> bool" and
+  p2 q2 :: "'a \<Rightarrow> 'b \<Rightarrow> bool"
 
 (* 11. both clauses are blocked *)
 lemma assms_11:
-  "\<not> p \<or> q"
-  "p \<or> \<not> q"
+  "\<not> p0 \<or> q0"
+  "p0 \<or> \<not> q0"
   sorry
 
 lemma False
@@ -123,8 +125,8 @@ lemma False
 
 (* 12. the first two clauses are blocked *)
 lemma assms_12:
-  "\<not> p \<or> q"
-  "p \<or> \<not> q"
+  "\<not> p0 \<or> q0"
+  "p0 \<or> \<not> q0"
   "a = b"
   sorry
 
@@ -177,8 +179,8 @@ lemma False
 
 (* 17. neither clause is blocked *)
 lemma assms_17:
-  "p \<noteq> (a :: nat) \<or> q = (a :: nat)"
-  "p = (a :: nat) \<or> q \<noteq> (a :: nat)"
+  "p0 \<noteq> (a :: nat) \<or> q0 = (a :: nat)"
+  "p0 = (a :: nat) \<or> q0 \<noteq> (a :: nat)"
   sorry
 
 lemma False
@@ -187,9 +189,9 @@ lemma False
 
 (* 18. all three clauses are blocked *)
 lemma assms_18:
-  "\<not> p \<or> q"
-  "p \<or> \<not> q"
-  "\<not> r \<or> a = b"
+  "\<not> p0 \<or> q0"
+  "p0 \<or> \<not> q0"
+  "\<not> r0 \<or> (a :: nat) = (b :: nat)"
   sorry
 
 lemma False
@@ -198,8 +200,8 @@ lemma False
 
 (* 19. neither clause is blocked *)
 lemma assms_19:
-  "\<And>(x :: nat) (y :: nat). p x y \<or> p y x"
-  "\<And>(x :: nat) (y :: nat). \<not> p x y \<or> \<not> p y x"
+  "\<And>(x :: nat) (y :: nat). p2 x y \<or> p2 y x"
+  "\<And>(x :: nat) (y :: nat). \<not> p2 x y \<or> \<not> p2 y x"
   sorry
 
 lemma False
@@ -208,8 +210,8 @@ lemma False
 
 (* 20. both clauses are blocked *)
 lemma assms_20:
-  "p (a :: nat) \<or> p (b :: nat) \<or> \<not> q"
-  "\<And>x. \<not> p (x :: nat) \<or> q"
+  "p (a :: nat) \<or> p (b :: nat) \<or> \<not> q0"
+  "\<And>x. \<not> p (x :: nat) \<or> q0"
   sorry
 
 lemma False
@@ -280,8 +282,8 @@ sledgehammer_params [type_enc = poly_native_higher_fool]
 
 (* 26. both clauses are blocked *)
 lemma assms_26:
-  "\<And>y. \<not> p (\<lambda>x. x :: nat) \<or> q \<or> y (a :: nat)"
-  "p (\<lambda>x. x :: nat) \<or> \<not> q"
+  "\<And>y. \<not> p (\<lambda>x. x :: nat) \<or> q0 \<or> y (a :: nat)"
+  "p (\<lambda>x. x :: nat) \<or> \<not> q0"
   sorry
 
 lemma False
@@ -290,8 +292,8 @@ lemma False
 
 (* 27. the first two clauses are blocked *)
 lemma assms_27:
-  "\<And>y. \<not> p (\<lambda>x. x :: nat) \<or> q \<or> y (a :: nat)"
-  "p (\<lambda>x. x :: nat) \<or> \<not> q"
+  "\<And>y. \<not> p (\<lambda>x. x :: nat) \<or> q0 \<or> y (a :: nat)"
+  "p (\<lambda>x. x :: nat) \<or> \<not> q0"
   "a = b"
   sorry
 
@@ -301,8 +303,9 @@ lemma False
 
 (* 28. only the second clause is blocked *)
 lemma assms_28:
-  "\<And>y. \<not> p (\<lambda>x. x :: nat) (c :: nat) \<or> \<not> p (\<lambda>x. x) (a :: nat) \<or> q (c :: nat) \<or> q (a :: nat) \<or> y a"
-  "p (\<lambda>x. x :: nat) (b :: nat) \<or> \<not> q (b :: nat)"
+  "\<And>y. \<not> p2 (\<lambda>x. x :: nat) (c :: nat) \<or> \<not> p2 (\<lambda>x. x) (a :: nat) \<or>
+     q (c :: nat) \<or> q (a :: nat) \<or> y a"
+  "p2 (\<lambda>x. x :: nat) (b :: nat) \<or> \<not> q (b :: nat)"
   "(a :: nat) = (b :: nat)"
   sorry
 
@@ -312,8 +315,8 @@ lemma False
 
 (* 29. the first two clauses are blocked *)
 lemma assms_29:
-  "\<And>y. \<not> p (\<lambda>x. x :: nat) (a :: nat) \<or> q (a :: nat) \<or> y a"
-  "p (\<lambda>x. x :: nat) (b :: nat) \<or> \<not> q (b :: nat)"
+  "\<And>y. \<not> p2 (\<lambda>x. x :: nat) (a :: nat) \<or> q (a :: nat) \<or> y a"
+  "p2 (\<lambda>x. x :: nat) (b :: nat) \<or> \<not> q (b :: nat)"
   "c = d"
   sorry
 
@@ -323,8 +326,8 @@ lemma False
 
 (* 30. no clauses are blocked *)
 lemma assms_30:
-  "\<And>y. \<not> p (\<lambda>x. x :: nat) (a :: nat) \<or> q (a :: nat) \<or> y a"
-  "p (\<lambda>x. x :: nat) (b :: nat) \<or> \<not> q (c :: nat)"
+  "\<And>y. \<not> p2 (\<lambda>x. x :: nat) (a :: nat) \<or> q (a :: nat) \<or> y a"
+  "p2 (\<lambda>x. x :: nat) (b :: nat) \<or> \<not> q (c :: nat)"
   "d = e"
   sorry
 
