@@ -26,7 +26,7 @@ lemma
 (* 3. the first two clauses are blocked *)
 lemma
   assumes
-    "\<not> p c \<or> \<not> p a \<or> q a"
+    "\<not> p c \<or> \<not> p a \<or> q c \<or> q a"
     "p b \<or> \<not> q b"
     "a = b"
   shows False
@@ -129,7 +129,7 @@ lemma False
 
 (* 13. the first two clauses are blocked *)
 lemma assms_13:
-  "\<not> p (c :: nat) \<or> \<not> p (a :: nat) \<or> q (a :: nat)"
+  "\<not> p (c :: nat) \<or> \<not> p (a :: nat) \<or> q (c :: nat) \<or> q (a :: nat)"
   "p (b :: nat) \<or> \<not> q (b :: nat)"
   "(a :: nat) = (b :: nat)"
   sorry
@@ -211,7 +211,9 @@ lemma False
   (* sledgehammer [zipperposition, overlord, dont_slice] (assms_20) *)
   oops
 
-(* Same as 1–5, but this time higher-order *)
+(* Similar to 1–5, but this time higher-order *)
+
+sledgehammer_params [type_enc = mono_native_higher_fool]
 
 (* 21. both clauses are blocked *)
 lemma
@@ -234,16 +236,15 @@ lemma
   (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
   oops
 
-(* FIXME *)
-(* 23. no clauses are blocked (because of the extra "\<not> p" in the first clause) *)
+(* 23. only the second clause is blocked *)
 lemma
   fixes p q a b
   assumes
-    "\<And>y. \<not> p (\<lambda>x. x) c \<or> \<not> p (\<lambda>x. x) a \<or> q a \<or> y a"
+    "\<And>y. \<not> p (\<lambda>x. x) c \<or> \<not> p (\<lambda>x. x) a \<or> q c \<or> q a \<or> y a"
     "p (\<lambda>x. x) b \<or> \<not> q b"
     "a = b"
   shows False
-  (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
+  sledgehammer [zipperposition, overlord, dont_slice] (assms)
   oops
 
 (* 24. the first two clauses are blocked *)
@@ -270,6 +271,8 @@ lemma
 
 (* The same, but this time polymorphic *)
 
+sledgehammer_params [type_enc = poly_native_higher_fool]
+
 (* 26. both clauses are blocked *)
 lemma assms_26:
   "\<And>y. \<not> p (\<lambda>x. x) \<or> q \<or> y a"
@@ -291,16 +294,15 @@ lemma False
   (* sledgehammer [zipperposition, overlord, dont_slice] (assms_27) *)
   oops
 
-(* FIXME *)
-(* 28. no clauses are blocked (because of the extra "\<not> p" in the first clause) *)
+(* 28. only the second clause is blocked *)
 lemma assms_28:
-  "\<And>y. \<not> p (\<lambda>x. x) (c :: nat) \<or> \<not> p (\<lambda>x. x) (a :: nat) \<or> q (a :: nat) \<or> y a"
+  "\<And>y. \<not> p (\<lambda>x. x) (c :: nat) \<or> \<not> p (\<lambda>x. x) (a :: nat) \<or> q (c :: nat) \<or> q (a :: nat) \<or> y a"
   "p (\<lambda>x. x) (b :: nat) \<or> \<not> q (b :: nat)"
   "(a :: nat) = (b :: nat)"
   sorry
 
 lemma False
-  (* sledgehammer [zipperposition, overlord, dont_slice] (assms_28) *)
+  sledgehammer [zipperposition, overlord, dont_slice] (assms_28)
   oops
 
 (* 29. the first two clauses are blocked *)

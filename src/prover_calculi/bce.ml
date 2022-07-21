@@ -623,7 +623,8 @@ module Make(E : Env.S) : S with module Env = E = struct
             | L.Equation (lhs', _, _) when L.is_predicate_lit lit' ->
               let sym' = T.head lhs' in
               let sign' = L.is_positivoid lit' in
-              if sym' == Some hd_sym && sign' == sign then Some lit' else None
+              if Option.equal ID.equal sym' (Some hd_sym) && sign' == sign then Some lit'
+              else None
             | _ -> None
         ) (C.lits cl))
       in
