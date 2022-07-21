@@ -101,7 +101,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   module TaskPriorityQueue = CCMutHeap.Make(TaskWrapper)
   let init_heap_idx = -1
 
-  (* (symbol, sign) -> clauses with the corresponding occurence *)
+  (* (symbol, sign) -> clauses with the corresponding occurrence *)
   let ss_idx = ref SymSignIdx.empty
   (* clause (or its id) -> all clauses that it locks *)
   let clause_lock = ref Util.Int_map.empty
@@ -111,7 +111,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let task_queue = TaskPriorityQueue.create ()
   (* a set containing symbols for which BCE will not be tried *)
   let ignored_symbols = ref ID.Set.empty
-  
+
   (* assuming the weakest logic *)
   let logic = ref NonequationalFO
 
@@ -125,28 +125,30 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* ignoring other fields of tasks *)
   let task_eq a b = a.lit_idx = b.lit_idx && C.equal a.clause b.clause
 
-  let symbol_occurrs_too_often sym_count =
+  let symbol_occurs_too_often sym_count =
     Env.flex_get k_max_symbol_occ > 0 &&
     (sym_count > Env.flex_get k_max_symbol_occ)
 
   let add_lit_to_idx lit_lhs sign cl =
     let sym = T.head_exn lit_lhs in
 
-    let sym_occs sym sign =
-      CCOpt.map_or ~default:0 C.ClauseSet.cardinal
-        (SymSignIdx.find_opt (sym,sign) !ss_idx)
-    in
+    if not (ID.Set.mem sym !ignored_symbols) then (
+      let sym_occs sym sign =
+        CCOpt.map_or ~default:0 C.ClauseSet.cardinal
+          (SymSignIdx.find_opt (sym,sign) !ss_idx)
+      in
 
-    let total_sym_occs = sym_occs sym true + sym_occs sym false + 1 in
+      let total_sym_occs = sym_occs sym true + sym_occs sym false + 1 in
 
-    if symbol_occurrs_too_often total_sym_occs then (
-      ss_idx := SymSignIdx.remove (sym, false) (SymSignIdx.remove (sym, true) !ss_idx);
-      ignored_symbols := ID.Set.add sym !ignored_symbols;
-      Util.debugf ~section 5 "ignoring symbol @[%a@]@." (fun k -> k ID.pp sym);
-    ) else (
-      ss_idx := SymSignIdx.update (sym, sign) (fun old ->
-        Some (C.ClauseSet.add cl (CCOpt.get_or ~default:C.ClauseSet.empty old))
-      ) !ss_idx;
+      if symbol_occurs_too_often total_sym_occs then (
+        ss_idx := SymSignIdx.remove (sym, false) (SymSignIdx.remove (sym, true) !ss_idx);
+        ignored_symbols := ID.Set.add sym !ignored_symbols;
+        Util.debugf ~section 5 "ignoring symbol @[%a@]@." (fun k -> k ID.pp sym);
+      ) else (
+        ss_idx := SymSignIdx.update (sym, sign) (fun old ->
+          Some (C.ClauseSet.add cl (CCOpt.get_or ~default:C.ClauseSet.empty old))
+        ) !ss_idx;
+      )
     )
 
   (* find all clauses for which L-resolution should be tried against literal
@@ -160,28 +162,30 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* Scan the clause and if it is in supported logic fragment,
      store its literals in the symbol index *)
   let scan_cl_lits cl =
-    CCArray.iter (function 
+    CCArray.iter (function
       | L.Equation(lhs,rhs,_) as lit ->
         let sign = L.is_positivoid lit in
-        let is_poly = 
-          not (Type.VarSet.is_empty (T.ty_vars lhs))
-          || not (Type.VarSet.is_empty (T.ty_vars rhs))
+        let ignore_syms_in t =
+          ignored_symbols := T.symbols ~init:!ignored_symbols t
         in
-        if not is_poly && not (Type.is_fun (T.ty lhs)) then (
+        if L.is_predicate_lit lit then
+          List.iter ignore_syms_in (T.args lhs)
+        else
+          List.iter ignore_syms_in [lhs; rhs];
+        if not (Type.is_var (T.ty lhs)) && not (Type.is_fun (T.ty lhs)) then (
           if Type.is_prop (T.ty lhs) then (
             if L.is_predicate_lit lit && Option.is_some (T.head lhs) then (
-              if not (T.is_fo_term lhs) then (
-                refine_logic EquationalHO
-              );
+              if not (T.is_fo_term lhs) then
+                refine_logic EquationalHO;
               let hd_sym = T.head_exn lhs in
-              if not (ID.Set.mem hd_sym !ignored_symbols) 
-              then add_lit_to_idx lhs sign cl
-            ) else (
+              if not (ID.Set.mem hd_sym !ignored_symbols) then
+              add_lit_to_idx lhs sign cl
+            ) else
               refine_logic EquationalHO
-            )
           ) else (
             if T.is_fo_term lhs && T.is_fo_term rhs then refine_logic EquationalFO
-            else refine_logic EquationalHO)
+            else refine_logic EquationalHO
+          )
         ) else
           logic := EquationalHO
       | _ -> ()
@@ -648,7 +652,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             lock_clause partner task;
             false))
       in
-      
+
       if not (C.is_empty cl || 
               C.is_redundant cl ||
               ID.Set.mem hd_sym !ignored_symbols ||
@@ -746,8 +750,11 @@ module Make(E : Env.S) : S with module Env = E = struct
       (* build the symbol index *)
       List.iter scan_cl_lits init_clauses;
 
-      Util.debugf ~section 1 "logic has%sequalities"
-        (fun k -> k (if !logic == NonequationalFO then " no " else " "));
+      Util.debugf ~section 1 "logic is %s@."
+        (fun k -> k (if !logic == NonequationalFO then "nonequational FO"
+           else if !logic == EquationalFO then "equational FO"
+           else if !logic == EquationalHO then "equational HO"
+           else "unknown"));
 
       (* create tasks for each clause *)
       List.iter 
