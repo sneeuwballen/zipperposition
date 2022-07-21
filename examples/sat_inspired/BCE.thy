@@ -335,4 +335,73 @@ lemma False
   (* sledgehammer [zipperposition, overlord, dont_slice] (assms_30) *)
   oops
 
+(* Fresh higher-order (non)examples *)
+
+sledgehammer_params [type_enc = mono_native_higher_fool]
+
+(* 31. neither clause is blocked *)
+lemma
+  fixes p q a
+  assumes
+    "\<And>y. \<not> p (\<lambda>x. x) \<or> q \<or> y p q"
+    "p (\<lambda>x. x) \<or> \<not> q"
+  shows False
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
+  oops
+
+(* 32. no clauses are blocked *)
+lemma
+  fixes p q a b
+  assumes
+    "\<And>y. \<not> p (\<lambda>x. x) \<or> q \<or> y p q"
+    "p (\<lambda>x. x) \<or> \<not> q"
+    "a = b"
+  shows False
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
+  oops
+
+(* 33. no clauses are blocked *)
+lemma
+  fixes p q a b
+  assumes
+    "\<And>y. \<not> p (\<lambda>x. x) c \<or> \<not> p (\<lambda>x. x) a \<or> q c \<or> q a \<or> y p q"
+    "p (\<lambda>x. x) b \<or> \<not> q b"
+    "a = b"
+  shows False
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
+  oops
+
+(* 34. no clauses are blocked *)
+lemma
+  fixes p q a b c d
+  assumes
+    "\<And>y. \<not> p (\<lambda>x. x) a \<or> q a \<or> y p q"
+    "p (\<lambda>x. x) b \<or> \<not> q b"
+    "c = d"
+  shows False
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
+  oops
+
+(* 35. no clauses are blocked *)
+lemma
+  fixes p q a b c d e
+  assumes
+    "\<And>y. \<not> p (\<lambda>x. x) a \<or> q a \<or> y p q"
+    "p (\<lambda>x. x) b \<or> \<not> q c"
+    "d = e"
+  shows False
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
+  oops
+
+(* 36. no clauses are blocked *)
+lemma
+  fixes p q a
+  assumes
+    "\<And>x. \<not> p x \<or> q x \<or> \<not> q a"
+    "p a"
+    "p = q"
+  shows False
+  sledgehammer [zipperposition, overlord, dont_slice] (assms)
+  oops
+
 end
