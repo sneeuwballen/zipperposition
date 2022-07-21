@@ -1,5 +1,14 @@
 (* Isabelle/HOL file used to generate hlbe*.p. *)
 
+(* Options:
+   --debug.zip.hlb-elim=1000 \
+   --hlbe-elim=true \
+   --hlbe-track-eq=false \
+   --hlbe-max-depth=2 \
+   --hlbe-max-self-implications=2 \
+   --hlbe-clauses-to-track=all \
+   --hlbe-elim-max-tracked=250 *)
+
 theory HLBE
   imports Main
 begin

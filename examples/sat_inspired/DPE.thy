@@ -1,5 +1,16 @@
 (* Isabelle/HOL file used to generate dpe*.p. *)
 
+(* Options:
+   --debug.zip.pred-elim=1000 \
+   --pred-elim=true \
+   --pred-elim-max-resolvents=512 \
+   --pred-elim-check-gates=true \
+   --pred-elim-only-non-conjecture-gates=false \
+   --pred-elim-check-gates-semantically=true \
+   --pred-elim-measure-fun=relaxed \
+   --pred-elim-relax-value=100 \
+   --pred-elim-non-singular=true *)
+
 theory DPE
   imports Main
 begin

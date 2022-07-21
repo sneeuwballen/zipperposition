@@ -1,5 +1,10 @@
 (* Isabelle/HOL file used to generate bce*.p. *)
 
+(* Options:
+   --debug.zip.bce=1000 \
+   --bce=true \
+   --bce-processing-kind=preprocessing *)
+
 theory BCE
   imports Main
 begin

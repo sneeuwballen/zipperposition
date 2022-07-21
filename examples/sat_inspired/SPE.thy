@@ -1,5 +1,14 @@
 (* Isabelle/HOL file used to generate spe*.p. *)
 
+(* Options (uncertain):
+   --debug.zip.pred-elim=1000 \
+   --pred-elim=true \
+   --pred-elim-max-resolvents=512 \
+   --pred-elim-check-gates=false \
+   --pred-elim-measure-fun=relaxed \
+   --pred-elim-relax-value=100 \
+   --pred-elim-non-singular=true *)
+
 theory SPE
   imports Main
 begin

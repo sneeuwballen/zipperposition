@@ -1,5 +1,9 @@
 (* Isabelle/HOL file used to generate qle*.p. *)
 
+(* Options:
+  --debug.zip.qle=1000 \
+  --qle=true *)
+
 theory QLE
   imports Main
 begin
