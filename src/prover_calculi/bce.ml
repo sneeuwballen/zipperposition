@@ -572,6 +572,9 @@ module Make(E : Env.S) : S with module Env = E = struct
               in
               (* clause is not valid *)
               if CCList.is_empty congruent then false
+              else if !logic == EquationalHO then
+                (* for HOL, binary flat L-resolvents suffice *)
+                true
               else (
                 (* validity is achieved using literals from same_hd_atms, let's
                    see what happens when they are removed as part of flat

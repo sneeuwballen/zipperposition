@@ -244,7 +244,7 @@ lemma
     "p (\<lambda>x. x) b \<or> \<not> q b"
     "a = b"
   shows False
-  sledgehammer [zipperposition, overlord, dont_slice] (assms)
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
   oops
 
 (* 24. the first two clauses are blocked *)
@@ -275,8 +275,8 @@ sledgehammer_params [type_enc = poly_native_higher_fool]
 
 (* 26. both clauses are blocked *)
 lemma assms_26:
-  "\<And>y. \<not> p (\<lambda>x. x) \<or> q \<or> y a"
-  "p \<or> \<not> q"
+  "\<And>y. \<not> p (\<lambda>x. x :: nat) \<or> q \<or> y (a :: nat)"
+  "p (\<lambda>x. x :: nat) \<or> \<not> q"
   sorry
 
 lemma False
@@ -285,8 +285,8 @@ lemma False
 
 (* 27. the first two clauses are blocked *)
 lemma assms_27:
-  "\<And>y. \<not> p (\<lambda>x. x) \<or> q \<or> y a"
-  "p (\<lambda>x. x) \<or> \<not> q"
+  "\<And>y. \<not> p (\<lambda>x. x :: nat) \<or> q \<or> y (a :: nat)"
+  "p (\<lambda>x. x :: nat) \<or> \<not> q"
   "a = b"
   sorry
 
@@ -296,19 +296,19 @@ lemma False
 
 (* 28. only the second clause is blocked *)
 lemma assms_28:
-  "\<And>y. \<not> p (\<lambda>x. x) (c :: nat) \<or> \<not> p (\<lambda>x. x) (a :: nat) \<or> q (c :: nat) \<or> q (a :: nat) \<or> y a"
-  "p (\<lambda>x. x) (b :: nat) \<or> \<not> q (b :: nat)"
+  "\<And>y. \<not> p (\<lambda>x. x :: nat) (c :: nat) \<or> \<not> p (\<lambda>x. x) (a :: nat) \<or> q (c :: nat) \<or> q (a :: nat) \<or> y a"
+  "p (\<lambda>x. x :: nat) (b :: nat) \<or> \<not> q (b :: nat)"
   "(a :: nat) = (b :: nat)"
   sorry
 
 lemma False
-  sledgehammer [zipperposition, overlord, dont_slice] (assms_28)
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms_28) *)
   oops
 
 (* 29. the first two clauses are blocked *)
 lemma assms_29:
-  "\<And>y. \<not> p (\<lambda>x. x) (a :: nat) \<or> q (a :: nat) \<or> y a"
-  "p (\<lambda>x. x) (b :: nat) \<or> \<not> q (b :: nat)"
+  "\<And>y. \<not> p (\<lambda>x. x :: nat) (a :: nat) \<or> q (a :: nat) \<or> y a"
+  "p (\<lambda>x. x :: nat) (b :: nat) \<or> \<not> q (b :: nat)"
   "c = d"
   sorry
 
