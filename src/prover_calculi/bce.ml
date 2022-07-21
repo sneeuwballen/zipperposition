@@ -601,49 +601,6 @@ module Make(E : Env.S) : S with module Env = E = struct
     if !logic == NonequationalFO then resolvent_is_valid_neq
     else resolvent_is_valid_eq
 
-  let is_blocked cl =
-    let validity_checker = get_validity_checker () in
-    let is_lonely_with_polarity idx sym sign =
-      Option.is_none (CCArray.find_map_i (fun idx' lit' ->
-        match lit' with
-        | L.Equation (lhs', _, _) when L.is_predicate_lit lit' ->
-          let sym' = T.head lhs' in
-          let sign' = L.is_positivoid lit' in
-          if sym' == Some sym && sign' == sign then Some lit' else None
-        | _ -> None
-      ) (C.lits cl))
-    in
-    let blocked_lit_idx =
-      CCArray.find_map_i (fun idx lit -> 
-        match lit with
-        | L.Equation(lhs,_,_) when L.is_predicate_lit lit && Option.is_some (T.head lhs) ->
-          let sym = T.head_exn lhs in
-          if !logic == EquationalHO &&
-             not (is_lonely_with_polarity idx sym (L.is_positivoid lit)) then
-             None
-          else
-            (match SymSignIdx.find_opt (sym, not (L.is_positivoid lit)) !ss_idx with 
-            | Some partners ->
-              if (C.ClauseSet.for_all (fun partner -> 
-                C.equal cl partner || validity_checker idx cl partner
-              ) partners) 
-              then Some idx
-              else None
-            | None -> 
-              if not (ID.Set.mem sym !ignored_symbols) 
-              then Some idx 
-              else None)
-        | _ -> None
-      ) (C.lits cl)
-    in
-    let ans = CCOpt.is_some blocked_lit_idx in
-    if ans then (
-      Util.debugf ~section 3 "@[%a@] is blocked on @[%a@] @." 
-        (fun k -> k C.pp cl L.pp (C.lits cl).(CCOpt.get_exn blocked_lit_idx));
-      Util.debugf ~section 3 "proof:@[%a@]@." (fun k -> k Proof.S.pp_tstp (C.proof cl));
-    );
-    ans
-
   (* function that actually performs the blocked clause elimination *)
   let do_eliminate_blocked_clauses () =
     let removed_cnt = ref 0 in
