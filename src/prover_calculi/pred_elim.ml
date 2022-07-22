@@ -80,7 +80,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     [(Nonequational, 0); (Equational, 1)]
   let log_compare (l1:logic) (l2:logic) =
     compare (List.assoc l1 log_to_int) (List.assoc l2 log_to_int)
-  
+
   type pred_elim_info =
   {
     sym : ID.t;
@@ -403,12 +403,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       ID.Set.iter (update ~action:`Offending) offending;
       ID.Set.iter (update ~action:`Gates) gates;
     in
-    let is_poly_safe idx lits =
-      let all = Iter.filter (fun var -> Type.is_tType (HVar.ty var)) (Literals.Seq.vars lits) in
-      let at_idx =
-        Iter.filter (fun var -> Type.is_tType (HVar.ty var)) (Literal.Seq.vars lits.(idx)) in
-      Iter.for_all (fun ty_var -> Iter.exists (HVar.equal Type.equal ty_var) at_idx) all
-    in
     let is_sym_duplicated sym idx lits =
       let is_offending = ref false in
       for i = idx + 1 to C.length cl - 1 do
@@ -428,7 +422,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       in
       (match get_sym_sign lit with
       | Some (sym, sign) when symbol_is_fresh sym ->
-        let is_offending = not (is_poly_safe idx (C.lits cl)) || is_sym_duplicated sym idx (C.lits cl) in
+        let is_offending = not (Literals.is_polymorphism_safe idx (C.lits cl))
+          || is_sym_duplicated sym idx (C.lits cl) in
         if is_offending then (
           pos,neg,ID.Set.add sym offending,gates
         ) else (
@@ -455,8 +450,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       | _ -> Iter.fold add_pred_syms_of_term syms (Literal.Seq.terms lit)
     in
 
-    let offending = ID.Set.union
-      (CCArray.fold add_deep_pred_syms_of_lit ID.Set.empty (C.lits cl)) offending in
+    let offending = CCArray.fold add_deep_pred_syms_of_lit offending (C.lits cl) in
 
     update_idx pos neg offending gates num_vars cl
 

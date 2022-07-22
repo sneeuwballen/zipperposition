@@ -45,7 +45,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       let compare = CCPair.compare ID.compare CCBool.compare
   end)
 
-
   let k_removed_active = Flex_state.create_key ()
   let k_removed_passive = Flex_state.create_key ()
   let k_bce_sat_tracked = Flex_state.create_key ()
@@ -653,10 +652,11 @@ module Make(E : Env.S) : S with module Env = E = struct
             false))
       in
 
-      if not (C.is_empty cl || 
-              C.is_redundant cl ||
-              ID.Set.mem hd_sym !ignored_symbols ||
-              (!logic == EquationalHO && not (is_alone_with_polarity ()))) then (
+      if not (C.is_empty cl)
+         && not (C.is_redundant cl)
+         && not (ID.Set.mem hd_sym !ignored_symbols)
+         && Literals.is_polymorphism_safe lit_idx (C.lits cl)
+         && (!logic != EquationalHO || is_alone_with_polarity ()) then (
         Util.debugf ~section 3 "checking blockedness" CCFun.id;
         (* let original_partners = CCDeque.to_list task.cands in *)
         match task_is_blocked task.cands with
