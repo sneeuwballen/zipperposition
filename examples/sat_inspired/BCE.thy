@@ -401,7 +401,7 @@ lemma
     "p a"
     "p = q"
   shows False
-  sledgehammer [zipperposition, overlord, dont_slice] (assms)
+  (* sledgehammer [zipperposition, overlord, dont_slice] (assms) *)
   oops
 
 end
