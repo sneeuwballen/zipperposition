@@ -103,30 +103,13 @@ module Make(E : Env.S) : S with module Env = E = struct
     mutable deleted  : bool;
   }
 
-  (* This formula estimates the difference in the number of clauses after and before carrying out
-     the task. This formula is imperfect in the case where gates are used and offending_cls is
-     nonempty. This occurs rarely in practice because nonsingular predicate elimination, which
-     would lead to offending_cls's being nonempty, is disabled by default. *)
+  (* This formula is very crude, but a seemingly better formula gave less good empirical results. *)
   let estimated_gain t =
-    let old =
-      CS.cardinal t.pos_cls + CS.cardinal t.neg_cls +
-      (match t.maybe_gate with
-      | None -> 0
-      | Some (p, n) -> List.length p + List.length n)
-      + CS.cardinal t.offending_cls
-    in
-    let new_ =
-      (match t.maybe_gate with
-        None ->
-        if CS.is_empty t.offending_cls then
-          CS.cardinal t.pos_cls * CS.cardinal t.neg_cls
-        else
-          old
-      | Some (p, n) ->
-        List.length p * (CS.cardinal t.neg_cls + CS.cardinal t.offending_cls)
-        + (CS.cardinal t.pos_cls + CS.cardinal t.offending_cls) * List.length n)
-    in
-    new_ - old
+    CS.cardinal t.pos_cls + CS.cardinal t.neg_cls +
+    (match t.maybe_gate with
+    | None -> 0
+    | Some (p, n) -> List.length p + List.length n)
+    + CS.cardinal t.offending_cls
 
   let pp_task out task =
     let original = ID.payload_pred 
