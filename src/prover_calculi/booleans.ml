@@ -2208,7 +2208,7 @@ let () =
                        "lambda-free-purify-intensional";
                        "lambda-free-extensional";
                        "ho-comb-complete";
-                       "ho-competititve";
+                       "ho-competitive";
                        "lambda-free-purify-extensional";
                        "fo-complete-basic"] (fun () ->
       _replace_quants := false;
