@@ -7,7 +7,7 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
 ulimit -t $2
 
-$DIR/zipperposition ${1:+"$1"} \
+$DIR/../zipperposition ${1:+"$1"} \
   -i tptp\
   -o tptp\
   --timeout "$2" --mode=ho-pragmatic --kbo-weight-fun-from-precedence=true\

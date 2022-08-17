@@ -156,13 +156,41 @@ There is currently no built-in portfolio mode, but we provide python scripts in 
 directory `portfolio` to run Zipperposition as a portfolio prover.
 
 To use the portfolio scripts, place a zipperposition binary
-named `zipperposition` and a E prover 2.6 binary named `eprover-ho` into the `portfolio` directory.
+named `zipperposition` and a E prover 2.6 binary (with support for higher-order logic)
+named `eprover-ho` into the `portfolio` directory.
 
 There are three different portfolios:
-* `portfolio.fo.parallel.py`
-* `portfolio.lams.parallel.py`
-* `portfolio.sh.sequential.py`
+* `portfolio.fo.parallel.py`: A portfolio optimized for first-order TPTP problems, running on multiple CPUs.
+The first argument specifies the problem file.
+The second argument is the timeout. 
+The third argument determines whether all CPUs (`true`) or all but one CPU (`false`) are used.
+Any further arguments are passed on to Zipperposition.
+Example:
+```
+./portfolio.fo.parallel.py ../examples/pelletier_problems/pb10.p 30 true
+```
 
+* `portfolio.lams.parallel.py`: A portfolio optimized for higher-order TPTP problems, running on multiple CPUs.
+The first argument specifies the problem file.
+The second argument is the timeout. 
+The third argument specifies a directory to place temporary files.
+The forth argument determines whether all CPUs (`true`) or all but one CPU (`false`) are used.
+Any further arguments are passed on to Zipperposition.
+Example:
+```
+./portfolio.lams.parallel.py ../examples/ho/PUZ081^1.p 30 ./tmp true
+```
+
+* `portfolio.sh.sequential.py`: A portfolio optimized for higher-order problems stemming from proof assistants, running on a single CPU.
+The first argument specifies the problem file.
+The second argument is the timeout. 
+The third argument specifies a directory to place temporary files.
+Any further arguments are passed on to Zipperposition.
+Example:
+
+```
+ ./portfolio.sh.sequential.py ../examples/ho/PUZ081^2.p 30 ./tmp
+```
 
 ### Native Syntax
 
