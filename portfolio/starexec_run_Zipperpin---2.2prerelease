@@ -1,0 +1,56 @@
+#!/bin/tcsh
+
+setenv HERE `dirname $0`
+setenv TPTP `dirname $1`
+
+setenv TEMPDIR `mktemp -d`
+onintr cleanup
+
+set FileLine = `grep -m 1 '^% File ' $1`
+if ("$FileLine" != "") then
+    set Problem = `expr "$FileLine" : "^% File *: *\(.*\)"`
+else
+    set Problem = `basename $1`" : TPTP v0.0.0. Released v0.0.0."
+endif
+echo    "% Problem  : $Problem"
+set SPCLine=`grep "^% SPC " $1`
+if ("$SPCLine" != "") then
+    set ProblemSPC = `expr "$SPCLine" : "^% SPC  *: *\([^ ]*\)"`
+else
+    set ProblemSPC = `$HERE/SPCForProblem $1`
+endif
+if ("$ProblemSPC" == "" || \
+    `expr "$ProblemSPC" : "TH0_.*NAR.*"` || \
+    `expr "$ProblemSPC" : "TF0_.*NAR.*"` || \
+    `expr "$ProblemSPC" : "FOF_.*"` || \
+    `expr "$ProblemSPC" : "CNF_.*"`) then
+    echo -n "% Command  : " ; echo "python3 $HERE/portfolio.lams.parallel.py %s %d $TEMPDIR true"
+    /home/starexec/bin/GetComputerInfo -p THIS Model CPUModel RAMPerCPU OS | \
+    sed -e "s/Computer   /% Computer /" \
+        -e "s/Model      /% Model    /" \
+        -e "s/CPUModel   /% CPU      /" \
+        -e "s/RAMPerCPU  /% Memory   /" \
+        -e "s/OS         /% OS       /"
+    echo -n "% CPULimit : " ; echo "$STAREXEC_CPU_LIMIT"
+    echo -n "% WCLimit  : " ; echo "$STAREXEC_WALLCLOCK_LIMIT"
+    echo -n "% DateTime : " ; date
+    echo "% CPUTime  : "
+    echo "% Running portfolio for $STAREXEC_CPU_LIMIT s"
+    echo "% File         : $1"
+    echo "% Number of cores: `nproc`"
+    echo "% Python version: `python3 --version`"
+    if (`expr "$ProblemSPC" : "TH0_.*NAR.*"`) then
+        echo "% Running in HO mode"
+        python3 $HERE/portfolio.lams.parallel.py $1 $STAREXEC_CPU_LIMIT $TEMPDIR true
+    else 
+        echo "% Running in FO mode"
+        python3 $HERE/portfolio.fo.parallel.py $1 $STAREXEC_WALLCLOCK_LIMIT $TEMPDIR true
+    endif
+else
+    echo "% SZS status Inappropriate"
+endif
+
+cleanup:
+    echo "% Zipperpin 1.5 exiting"
+    rm -rf $TEMPDIR
+

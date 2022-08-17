@@ -149,6 +149,21 @@ $ make install
 $ make uninstall
 ```
 
+### Portfolio
+
+Zipperposition gives best results when run in a portfolio of different configurations.
+There is currently no built-in portfolio mode, but we provide python scripts in the
+directory `portfolio` to run Zipperposition as a portfolio prover.
+
+To use the portfolio scripts, place a zipperposition binary
+named `zipperposition` and a E prover 2.6 binary named `eprover-ho` into the `portfolio` directory.
+
+There are three different portfolios:
+* `portfolio.fo.parallel.py`
+* `portfolio.lams.parallel.py`
+* `portfolio.sh.sequential.py`
+
+
 ### Native Syntax
 
 The native syntax, with file extension `.zf`, resembles a simple fragment of
