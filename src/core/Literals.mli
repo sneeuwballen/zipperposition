@@ -209,3 +209,6 @@ val num_predicate : t -> int
 
 val num_equational : t -> int
 (** Number of non-predicate literals *)
+
+val is_polymorphism_safe : int -> t -> bool
+(** Whether the literal with given index contains all the type variables of the other literals *)

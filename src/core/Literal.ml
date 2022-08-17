@@ -506,13 +506,13 @@ let fold_terms ?(position=Position.stop) ?(vars=false) ?(var_args=true) ?(fun_bo
   end
 
 (* try to convert a literal into a term *)
-let to_ho_term (lit:t): T.t option = match lit with
-  | True -> Some T.true_
-  | False -> Some T.false_
+let to_ho_term (lit:t): T.t = match lit with
+  | True -> T.true_
+  | False -> T.false_
   | Equation (t, u, _) when is_predicate_lit lit ->
-    Some ((if is_negativoid lit then T.Form.not_ else CCFun.id) t)
+    (if is_negativoid lit then T.Form.not_ else CCFun.id) t
   | Equation (t, u, sign) ->
-    Some (if sign then T.Form.eq t u else T.Form.neq t u)
+    if sign then T.Form.eq t u else T.Form.neq t u
 
 let as_ho_predicate (lit:t) : _ option = 
   assert(no_prop_invariant lit);
@@ -958,20 +958,3 @@ let as_pos_pure_var lit =
   | Some (l, r, true) when is_pure_var lit && is_positivoid lit ->
     Some (_as_var l, _as_var r)
   | _ -> None
-
-let are_opposite_subst ~subst (l1,sc1) (l2,sc2) =
-  let module UF = Unif.FO in
-  is_positivoid l1 != is_positivoid l2 &&
-  is_predicate_lit l1 = is_predicate_lit l2 &&
-  match l1, l2 with
-  | Equation (lhs, rhs, _), Equation (lhs', rhs', _) when is_predicate_lit l1 ->
-    (UF.equal ~subst (lhs, sc1) (lhs', sc2) && UF.equal ~subst (rhs, sc1) (rhs', sc2))
-    || (UF.equal ~subst (lhs, sc1) (rhs', sc2) && UF.equal ~subst (rhs, sc1) (lhs', sc2))
-  | Equation (lhs, _, _), Equation (lhs', _, _)->
-    UF.equal ~subst (lhs, sc1) (lhs', sc2)
-  | True, True -> true
-  | False, False -> true
-  | _ -> false
-
-let are_opposite_same_sc l1 l2 =
-  are_opposite_subst ~subst:Subst.empty (l1,0) (l2,0)

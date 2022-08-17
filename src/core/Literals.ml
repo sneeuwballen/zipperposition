@@ -529,3 +529,9 @@ let num_predicate lits =
 
 let num_equational lits = 
   CCArray.length lits - num_predicate lits
+
+let is_polymorphism_safe idx lits =
+  let all = Iter.filter (fun var -> Type.is_tType (HVar.ty var)) (Seq.vars lits) in
+  let at_idx =
+    Iter.filter (fun var -> Type.is_tType (HVar.ty var)) (Literal.Seq.vars lits.(idx)) in
+  Iter.for_all (fun ty_var -> Iter.exists (HVar.equal Type.equal ty_var) at_idx) all

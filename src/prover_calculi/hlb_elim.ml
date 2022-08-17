@@ -7,7 +7,7 @@ module Lits = Literals
 module Lit = Literal
 module A = Libzipperposition_avatar
 
-let section = Util.Section.make ~parent:Const.section "hlt-elim"
+let section = Util.Section.make ~parent:Const.section "hlb-elim"
 
 let k_enabled = Flex_state.create_key ()
 let k_max_depth = Flex_state.create_key ()
@@ -249,7 +249,6 @@ module Make(E : Env.S) : S with module Env = E = struct
   let register_propagated_lit ~prop_kind lit_t cl cs =
     let has_renaming = ref false in
     let to_remove = ref Term.Set.empty in
-
     
     retrieve_idx ~getter:(PropagatedLitsIdx.retrieve_specializations (!propagated_, idx_sc)) (lit_t,q_sc)
     |> Iter.iter (fun (t, _, subst) ->
@@ -465,8 +464,6 @@ module Make(E : Env.S) : S with module Env = E = struct
         let neg_prem = normalize_negations (T.Form.not_ premise) in
         register_propagated_lit ~prop_kind:Failed neg_prem cl ps 
       | None -> prems_ := PremiseIdx.add !prems_ premise (tbl,false)
-      
-    
 
   let normalize_variables premise concl = 
     let to_rename = T.VarSet.diff (T.vars concl) (T.vars premise) in
@@ -516,7 +513,6 @@ module Make(E : Env.S) : S with module Env = E = struct
     Env.flex_get k_unit_propagated_hle &&
     (Env.flex_get k_max_tracked_clauses == -1 || 
      !tracked_unary <= 4*Env.flex_get k_max_tracked_clauses)
-
 
   let steps = ref 0
   let track_clause cl =
@@ -603,7 +599,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         in
         let res = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof in
 
-        Util.debugf ~section 2 "simplified[fle]: @[%a@] --> @[%a@]" 
+        Util.debugf ~section 2 "simplified[unit_hle/fle]: @[%a@] --> @[%a@]" 
           (fun k -> k C.pp cl C.pp res);
         Util.debugf ~section 2 "used: @[%a@]" (fun k -> k (CS.pp C.pp) !proofset);
 
@@ -612,13 +608,15 @@ module Make(E : Env.S) : S with module Env = E = struct
     with UnitHTR(idx, (ps, prop_kind)) -> 
       let lit_l = [CCArray.get (C.lits cl) idx] in
       let proof =
-        Proof.Step.simp ~rule:(Proof.Rule.mk (if prop_kind = Failed then "ftr" else "unit_htr"))
+        Proof.Step.simp ~rule:(Proof.Rule.mk (if prop_kind = Failed then "flr" else "unit_htr"))
         (List.map C.proof_parent (cl :: CS.to_list ps))
       in
       let repl = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof in
       penalize_hidden_tautology repl;
 
-      Util.debugf ~section 2 "simplified[unit_htr]: @[@[%a@] --> @[%a@]@]" 
+      Util.debugf ~section 2
+        (if prop_kind = Failed then "simplified[flr]: @[@[%a@] --> @[%a@]@]"
+         else "simplified[unit_htr]: @[@[%a@] --> @[%a@]@]")
         (fun k -> k C.pp cl C.pp repl);
 
       Some (repl)
@@ -703,7 +701,6 @@ module Make(E : Env.S) : S with module Env = E = struct
         | _ -> ())
     | RuleNotApplicable -> None
 
-
   let do_context_simplification cl =
     let lits_to_keep = CCBV.create ~size:(C.length cl) true in
     let exception StopIteration in
@@ -786,7 +783,6 @@ module Make(E : Env.S) : S with module Env = E = struct
       units_ := UnitIdx.remove !units_ unit cl;
       decr tracked_unary;
     | None -> ()
-    
 
   let initialize () =
     let track_active () =
@@ -834,8 +830,6 @@ module Make(E : Env.S) : S with module Env = E = struct
     end;
     Signal.StopListening
   
-
-
   let setup () =
     if E.flex_get k_enabled then (
       Signal.on Env.on_start initialize;
@@ -899,10 +893,10 @@ let () =
   Options.add_opts [
     "--hlbe-elim", Arg.Bool ((:=) enabled_), " enable/disable hidden literal and tautology elimination";
     "--hlbe-elim-max-tracked", Arg.Int ((:=) max_tracked_clauses), " negative value for disabling the limit";
-    "--hlbe-elim-lits", Arg.Bool ((:=) hle_), " remove literals using HLBE (hidden-lt-elim must be on)";
-    "--hlbe-reduce-tautologies", Arg.Bool ((:=) hte_), " reduce tautologies using HLBE (hidden-lt-elim must be on)";
+    "--hlbe-elim-lits", Arg.Bool ((:=) hle_), " remove literals using HLBE (--hlbe-elim must be on)";
+    "--hlbe-reduce-tautologies", Arg.Bool ((:=) hte_), " reduce tautologies using HLBE (--hlbe-elim must be on)";
     "--hlbe-max-depth", Arg.Set_int max_depth_, " max depth of binary implication graph precomputation";
-    "--hlbe-simplify-new", Arg.Bool ((:=) simpl_new_), " apply HLTe also when moving a clause from fresh to passive";
+    "--hlbe-simplify-new", Arg.Bool ((:=) simpl_new_), " apply HLBE also when moving a clause from fresh to passive";
     "--hlbe-track-eq", Arg.Bool ((:=) track_eq_), " enable/disable tracking and simplifying equality literals";
     "--hlbe-heartbeat", Arg.Int (fun v -> heartbeat_steps := Some v), 
       " when set to n, every n steps it will be checked if any HLBE simplification is performed." ^
