@@ -155,9 +155,15 @@ let () =
 
   add_to_mode "ho-complete-basic" 
     (fun () -> default.ord := "derived_ho_kbo_complete");
-  
+
+  add_to_mode "best" 
+    (fun () -> 
+      TypeInference._rw_forms_only := true;
+    );
+
   add_to_modes 
-      [ "ho-competitive"
+      [ "best"
+      ; "ho-competitive"
       ; "ho-pragmatic"] (fun () ->
-      default.ord := "derived_ho_kbo";
+      default.ord := "derived_ho_kbo"
     );

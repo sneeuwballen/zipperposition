@@ -432,7 +432,8 @@ let () = Options.add_opts
       "--rewrite-before-cnf", Arg.Bool (fun v -> rewrite_before_cnf := v), " enable/disable rewriting before CNF"
     ];
     Params.add_to_modes 
-    [ "ho-complete-basic"
+    [ "best"
+    ; "ho-complete-basic"
     ; "ho-pragmatic"
     ; "ho-competitive"
     ; "fo-complete-basic"
@@ -444,4 +445,8 @@ let () = Options.add_opts
     (fun () ->
       narrowing := false;
       ctx_narrow_ := false;
+    );
+    Params.add_to_mode "best"
+    (fun () ->
+      rewrite_before_cnf := true;
     );

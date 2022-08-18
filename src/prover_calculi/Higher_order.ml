@@ -2633,6 +2633,24 @@ let () =
       , " Perform Ext-Sup, Ext-EqFact, or Ext-EqRes rules only when all disagreements are HO" ^
         " or when there exists a HO disagremeent";
     ];
+  Params.add_to_mode "best" (fun () ->
+      enabled_ := true;
+      def_unfold_enabled_ := false;
+      force_enabled_ := true;
+      _ext_axiom := false;
+      ext_rules_kind := `ExtFamily;
+      ext_rules_max_depth := 1;
+      _ext_neg_lit := false;
+      _neg_ext := true;
+      _neg_ext_as_simpl := false;
+      _ext_pos := true;
+      _ext_pos_all_lits := true;
+      prim_mode_ := `Neg;
+      _elim_pred_var := true;
+      enable_unif_ := false;
+      _prune_arg_fun := `PruneMaxCover;
+      _instantiate_choice_ax := true;
+    );
   Params.add_to_mode "ho-complete-basic" (fun () ->
       enabled_ := true;
       def_unfold_enabled_ := false;

@@ -219,7 +219,8 @@ let () =
   Options.add_opts
     [ "--fool", Arg.Bool (fun v -> enabled_ := v), " enable/disable fool (first-class booleans)"  ];
   Params.add_to_modes 
-    [ "ho-complete-basic"
+    [ "best"
+    ; "ho-complete-basic"
     ; "ho-pragmatic"
     ; "ho-competitive"
     ; "fo-complete-basic"

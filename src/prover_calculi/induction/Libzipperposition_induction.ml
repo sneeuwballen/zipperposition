@@ -1386,7 +1386,8 @@ let () =
     ; "--no-ind-gen-term", Arg.Clear gen_term, " do not generalize on terms"
     ];
   Params.add_to_modes 
-    [ "ho-complete-basic"
+    [ "best"
+    ; "ho-complete-basic"
     ; "ho-pragmatic"
     ; "ho-competitive"
     ; "fo-complete-basic"

@@ -1734,6 +1734,15 @@ let () =
       "--ignore-orphans", Arg.Bool ((:=) _ignoring_orphans), " whether to ignore the orphans during clause selection"
     ];
 
+  Params.add_to_mode "best"
+    (fun () ->
+      parse_wf_with_priority "3|prefer-fo|conjecture-relative-var(1.02,l,f)";
+      parse_wf_with_priority "3|prefer-sos|pnrefined(1,1,1,2,2,2,0.5)";
+      parse_wf_with_priority "4|prefer-ground|default";
+      parse_wf_with_priority "2|defer-formulas|conjecture-relative-e(0.1,0.5,100,100,100,100,1.5,1.5,1.5)";
+      parse_wf_with_priority "1|prefer-processed|fifo";
+    );
+
   Params.add_to_modes 
     [ "ho-pragmatic"
     ; "ho-competitive"

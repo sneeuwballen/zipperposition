@@ -2188,14 +2188,22 @@ let () =
           | _ -> assert false;))
       , " select on which literals to apply bool reasoning rules"
     ];
-  Params.add_to_modes ["ho-pragmatic";
+  Params.add_to_mode "best" (fun () -> 
+    _bool_reasoning := BoolHoist;
+    _trigger_bool_inst := 1;
+    _trigger_bool_ind := 1;
+    _include_quants := false;
+  );
+  Params.add_to_modes ["best";
+                       "ho-pragmatic";
                        "lambda-free-intensional";
                        "lambda-free-purify-intensional";
                        "lambda-free-extensional";
                        "ho-comb-complete";
                        "lambda-free-purify-extensional";
                        "fo-complete-basic"] (fun () ->
-      _bool_reasoning := BoolReasoningDisabled
+      _bool_reasoning := BoolReasoningDisabled;
+      Params.bool_select := "smallest"
   );
   Params.add_to_mode "ho-complete-basic" (fun () -> 
     _bool_reasoning := BoolHoist;
@@ -2203,7 +2211,8 @@ let () =
     _bool_app_var_repl := true;
     _fluid_log_hoist := true;
     _replace_quants := true);
-  Params.add_to_modes ["ho-pragmatic";
+  Params.add_to_modes ["best";
+                       "ho-pragmatic";
                        "lambda-free-intensional";
                        "lambda-free-purify-intensional";
                        "lambda-free-extensional";

@@ -428,3 +428,6 @@ let () =
   let set_bselect s = Params.bool_select := s in
   Params.add_opts
     [ "--bool-select", Arg.String(set_bselect), " set boolean literal selection function"];
+  Params.add_to_mode "best" (fun () ->
+      Params.bool_select := "sel1(consequent_ctx)"
+    );

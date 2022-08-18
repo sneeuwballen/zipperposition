@@ -3537,6 +3537,33 @@ let () =
       "--strong-simplify-reflect", Arg.Bool((:=) _strong_sr), " full effort simplify reflect -- tries to find an equation for each pair of subterms";
     ];
 
+  Params.add_to_mode "best" (fun () ->
+      _use_simultaneous_sup := false;
+      _sup_at_vars := true;
+      _sup_in_var_args := false;
+      _sup_under_lambdas := false;
+      _lambda_demod := false;
+      _local_rw := `GreenContext;
+      _demod_in_var_args := false;
+      _ho_basic_rules := true;
+      _unif_alg := `NewJPFull;
+      _sup_at_var_headed := true;
+      _pred_var_eq_fact := false;
+      _lambdasup := -1;
+      _dupsup := false;
+      _max_infs := 4;
+      _max_depth := 2;
+      _max_app_projections := 0;
+      _max_rigid_imitations := 2;
+      _max_identifications := 1;
+      _max_elims := 0;
+      _fluidsup := false;
+      _ratio := 50;
+      _guard := 10;
+      _clause_num := 30;
+      _fixpoint_decider := true;
+      _pattern_decider := true;
+    );
   Params.add_to_mode "ho-complete-basic" (fun () ->
       _use_simultaneous_sup := false;
       _local_rw := `GreenContext;

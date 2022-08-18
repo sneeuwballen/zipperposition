@@ -271,7 +271,8 @@ let () =
       "--post-cnf-lambda-lifting", Arg.Bool ((:=) _post_cnf_lifting),
       "enable/disable post-cnf lambda lifting";
     ];
-  Params.add_to_modes ["ho-complete-basic";
+  Params.add_to_modes ["best";
+                       "ho-complete-basic";
                        "ho-pragmatic";
                        "lambda-free-intensional";
                        "lambda-free-purify-intensional";

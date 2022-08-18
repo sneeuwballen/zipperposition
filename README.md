@@ -122,17 +122,13 @@ and `src/demo/`.
 Typical usage:
 
 ```
-$ zipperposition --help
-$ zipperposition problem_file [options]
-$ zipperposition --dot /tmp/foo.dot examples/ind/nat1.zf
+$ ./zipperposition.exe examples/ho/SYO265\^5.p --mode ho-competitive --timeout 30
+$ ./zipperposition.exe examples/ho/SYO265\^5.p --mode best --timeout 30
 ```
 
-to run the prover. Help is available with the option `--help`.
-For instance,
-
-```
-$ zipperposition examples/pelletier_problems/pb47.p --timeout 30
-```
+Help is available with the option `--help`.
+We recommend to set `--mode` because the default configuration is not great otherwise.
+For optimal results, use the portfolios (see below).
 
 To build the library, documentation, and tools, type in a terminal located in
 the root directory of the project:

@@ -846,4 +846,9 @@ let () =
                        "fo-complete-basic"] (fun () ->
       enabled := false;
   );
+  Params.add_to_mode "best" (fun () ->
+      enabled := true;
+      _lazy_cnf_kind := `Simp;
+      _renaming_threshold := 4;
+  );
   Extensions.register extension

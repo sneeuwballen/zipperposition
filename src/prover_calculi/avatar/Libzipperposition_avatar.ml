@@ -720,7 +720,8 @@ let () =
         skolemize and negate the component and add it to the proof state. "
     ];
   Params.add_to_modes 
-    [ "ho-complete-basic"
+    [ "best"
+    ; "ho-complete-basic"
     ; "ho-pragmatic"
     ; "ho-competitive"
     ; "fo-complete-basic"

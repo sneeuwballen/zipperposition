@@ -41,6 +41,8 @@ exception Error of string
 
 val section : Util.Section.t
 
+val _rw_forms_only : bool ref
+
 (** {2 Types for Builtins} *)
 
 module TyBuiltin : sig
