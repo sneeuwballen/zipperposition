@@ -178,7 +178,7 @@ The forth argument determines whether all CPUs (`true`) or all but one CPU (`fal
 Any further arguments are passed on to Zipperposition.
 Example:
 ```
-./portfolio.lams.parallel.py ../examples/ho/PUZ081^1.p 30 ./tmp true
+./portfolio.lams.parallel.py ../examples/ho/PUZ081^1.p 30 /tmp true
 ```
 
 * `portfolio.sh.sequential.py`: A portfolio optimized for higher-order problems stemming from proof assistants, running on a single CPU.
@@ -189,7 +189,7 @@ Any further arguments are passed on to Zipperposition.
 Example:
 
 ```
- ./portfolio.sh.sequential.py ../examples/ho/PUZ081^2.p 30 ./tmp
+ ./portfolio.sh.sequential.py ../examples/ho/PUZ081^2.p 30 /tmp
 ```
 
 ### Native Syntax
