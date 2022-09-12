@@ -1,4 +1,6 @@
 
+.NOTPARALLEL: all build check clean install test doc
+
 J?=3
 
 all: build test-cached
