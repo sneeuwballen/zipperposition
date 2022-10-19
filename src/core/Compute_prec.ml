@@ -14,6 +14,7 @@ let _custom_weights = ref ""
 let _from_prec = ref false
 let _rank = ref None
 let _kbo_const_weight = ref None
+let _all_weights_1 = ref false
 
 type 'a parametrized = Statement.clause_t Iter.t -> 'a
 
@@ -127,6 +128,7 @@ let mk_precedence ~db_w ~lmb_w ~signature t seq =
      else t.weight_rule seq) in
   let weight,arg_coeff = _add_custom_weights weight _default_arg_coeff in
   let weight = force_const_weight ~weight ~signature !_kbo_const_weight in
+  let weight = if !_all_weights_1 then (fun _ -> Precedence.Weight.one) else weight in
   let p = Precedence.create ~weight ~arg_coeff ~db_w ~lmb_w constr symbols in
   (* multiset status *)
   List.iter
@@ -149,6 +151,9 @@ let () =
     ; "--kbo-const-weight", 
       Arg.Int (fun v -> _kbo_const_weight := Some v),
       " force the weight of constants to this value in KBO"
+    ; "--all-weights-1", 
+      Arg.Bool ((:=) _all_weights_1),
+      " set all weights to 1"
     ;  "--weights"
      , Arg.Set_string _custom_weights
      , " set weights, e.g. f=2,g=3,h=1, or weights and argument coefficients, e.g. f=2:3:4,g=3:2"
