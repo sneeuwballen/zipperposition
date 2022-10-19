@@ -101,6 +101,7 @@ let k_rw_with_formulas = Flex_state.create_key ()
 let k_pred_var_eq_fact = Flex_state.create_key ()
 let k_force_limit = Flex_state.create_key ()
 let k_formula_simplify_reflect = Flex_state.create_key ()
+let k_simplify_reflect = Flex_state.create_key ()
 let k_strong_sr = Flex_state.create_key ()
 let k_superpose_w_formulas = Flex_state.create_key ()
 
@@ -2450,6 +2451,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     aux s t <+> aux t s
 
   let positive_simplify_reflect c =
+    if not (Env.flex_get k_simplify_reflect) then SimplM.return_same c else
     let driver ~is_simplified c =
       let kept_lits = CCBV.create ~size:(C.length c) true in
       let premises = 
@@ -2503,74 +2505,75 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     in
 
     let regular_sr_pair lhs rhs =
-      if T.equal lhs rhs then Some (C.ClauseSet.empty)
-      else match equatable ~sign:true ~cl:c lhs rhs with
-           | Some cl -> Some (C.ClauseSet.singleton cl)
-           | None -> (T.Seq.common_contexts lhs rhs 
-                     |> Iter.find_map (fun (a,b) -> equatable ~sign:true ~cl:c a b)
-                     |> CCOpt.map C.ClauseSet.singleton)
-    in
+        if T.equal lhs rhs then Some (C.ClauseSet.empty)
+        else match equatable ~sign:true ~cl:c lhs rhs with
+            | Some cl -> Some (C.ClauseSet.singleton cl)
+            | None -> (T.Seq.common_contexts lhs rhs 
+                      |> Iter.find_map (fun (a,b) -> equatable ~sign:true ~cl:c a b)
+                      |> CCOpt.map C.ClauseSet.singleton)
+      in
 
-    let do_strong_sr = driver ~is_simplified:strong_sr_pair in
-    let do_regular_sr = driver ~is_simplified:regular_sr_pair in
-    
-    let simplifier =
-      if Env.flex_get k_strong_sr then do_strong_sr else do_regular_sr
-    in
-    let _span = ZProf.enter_prof prof_pos_simplify_reflect in
-    (* iterate through literals and try to resolve negative ones *)
-    match simplifier c with
-    | None -> 
-      ZProf.exit_prof _span;
-      SimplM.return_same c
-    | Some (new_lits,premises) ->
-      let proof =
-        Proof.Step.simp ~rule:(Proof.Rule.mk "simplify_reflect+")
-          (List.map C.proof_parent (c::(C.ClauseSet.to_list premises))) in
-      let trail = C.trail c and penalty = C.penalty c in
-      let new_c = C.create ~trail ~penalty new_lits proof in
-      Util.debugf ~section 3 "@[@[%a@]@ pos_simplify_reflect into @[%a@]@]"
-        (fun k->k C.pp c C.pp new_c);
-      ZProf.exit_prof _span;
-      SimplM.return_new new_c
+      let do_strong_sr = driver ~is_simplified:strong_sr_pair in
+      let do_regular_sr = driver ~is_simplified:regular_sr_pair in
+      
+      let simplifier =
+        if Env.flex_get k_strong_sr then do_strong_sr else do_regular_sr
+      in
+      let _span = ZProf.enter_prof prof_pos_simplify_reflect in
+      (* iterate through literals and try to resolve negative ones *)
+      match simplifier c with
+      | None -> 
+        ZProf.exit_prof _span;
+        SimplM.return_same c
+      | Some (new_lits,premises) ->
+        let proof =
+          Proof.Step.simp ~rule:(Proof.Rule.mk "simplify_reflect+")
+            (List.map C.proof_parent (c::(C.ClauseSet.to_list premises))) in
+        let trail = C.trail c and penalty = C.penalty c in
+        let new_c = C.create ~trail ~penalty new_lits proof in
+        Util.debugf ~section 3 "@[@[%a@]@ pos_simplify_reflect into @[%a@]@]"
+          (fun k->k C.pp c C.pp new_c);
+        ZProf.exit_prof _span;
+        SimplM.return_new new_c
 
   let negative_simplify_reflect c =
-    let _span = ZProf.enter_prof prof_neg_simplify_reflect in
-    (* iterate through literals and try to resolve positive ones *)
-    let rec iterate_lits acc lits clauses = match lits with
-      | [] -> List.rev acc, clauses
-      | (Lit.Equation (s, t, true) as lit)::lits' ->
-        begin match can_refute s t with
-          | None -> (* keep literal *)
-            iterate_lits (lit::acc) lits' clauses
-          | Some new_clause -> (* drop literal, remember clause *)
-            iterate_lits acc lits' (new_clause :: clauses)
-        end
-      | lit::lits' -> iterate_lits (lit::acc) lits' clauses
-    (* try to remove the literal using a negative unit clause *)
-    and can_refute s t =
-      equatable ~sign:false ~cl:c s t
-      |> CCOpt.map C.proof_parent
-    in
-    (* fold over literals *)
-    let lits, premises = iterate_lits [] (C.lits c |> Array.to_list) [] in
-    if List.length lits = Array.length (C.lits c)
-    then (
-      (* no literal removed *)
-      ZProf.exit_prof _span;
-      Util.debug ~section 3 "neg_reflect did not simplify the clause";
-      SimplM.return_same c
-    ) else (
-      let proof =
-        Proof.Step.simp
-          ~rule:(Proof.Rule.mk "simplify_reflect-")
-          (C.proof_parent c :: premises) in
-      let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) lits proof in
-      Util.debugf ~section 3 "@[@[%a@]@ neg_simplify_reflect into @[%a@]@]"
-        (fun k->k C.pp c C.pp new_c);
-      ZProf.exit_prof _span;
-      SimplM.return_new new_c
-    )
+    if not (Env.flex_get k_simplify_reflect) then SimplM.return_same c else
+      let _span = ZProf.enter_prof prof_neg_simplify_reflect in
+      (* iterate through literals and try to resolve positive ones *)
+      let rec iterate_lits acc lits clauses = match lits with
+        | [] -> List.rev acc, clauses
+        | (Lit.Equation (s, t, true) as lit)::lits' ->
+          begin match can_refute s t with
+            | None -> (* keep literal *)
+              iterate_lits (lit::acc) lits' clauses
+            | Some new_clause -> (* drop literal, remember clause *)
+              iterate_lits acc lits' (new_clause :: clauses)
+          end
+        | lit::lits' -> iterate_lits (lit::acc) lits' clauses
+      (* try to remove the literal using a negative unit clause *)
+      and can_refute s t =
+        equatable ~sign:false ~cl:c s t
+        |> CCOpt.map C.proof_parent
+      in
+      (* fold over literals *)
+      let lits, premises = iterate_lits [] (C.lits c |> Array.to_list) [] in
+      if List.length lits = Array.length (C.lits c)
+      then (
+        (* no literal removed *)
+        ZProf.exit_prof _span;
+        Util.debug ~section 3 "neg_reflect did not simplify the clause";
+        SimplM.return_same c
+      ) else (
+        let proof =
+          Proof.Step.simp
+            ~rule:(Proof.Rule.mk "simplify_reflect-")
+            (C.proof_parent c :: premises) in
+        let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) lits proof in
+        Util.debugf ~section 3 "@[@[%a@]@ neg_simplify_reflect into @[%a@]@]"
+          (fun k->k C.pp c C.pp new_c);
+        ZProf.exit_prof _span;
+        SimplM.return_new new_c
+      )
 
   type sgn = Lit of bool | Eqn
   let flex_resolve c =
@@ -3325,6 +3328,7 @@ let _pred_var_eq_fact = ref false
 let _schedule_infs = ref true
 let _force_limit = ref 3
 let _formula_sr = ref true
+let _simplify_reflect = ref true
 let _strong_sr = ref false
 let _superposition_with_formulas = ref false
 
@@ -3408,6 +3412,7 @@ let register ~sup =
   E.flex_add k_pred_var_eq_fact !_pred_var_eq_fact;
   E.flex_add k_force_limit !_force_limit;
   E.flex_add k_formula_simplify_reflect !_formula_sr;
+  E.flex_add k_simplify_reflect !_simplify_reflect;
   E.flex_add k_superpose_w_formulas !_superposition_with_formulas;
 
   E.flex_add StreamQueue.k_guard !_guard;
@@ -3532,6 +3537,7 @@ let () =
       "--restrict-hidden-sup-at-vars", Arg.Bool (fun b -> _restrict_hidden_sup_at_vars :=	b), " enable/disable hidden superposition at variables only under certain ordering conditions";
       "--stream-force-limit", Arg.Int((:=) _force_limit), " number of attempts to get a clause when the stream is just created";
       "--formula-simplify-reflect", Arg.Bool((:=) _formula_sr), " apply simplify reflect on the formula level";
+      "--simplify-reflect", Arg.Bool((:=) _simplify_reflect), " apply positive and negative simplify reflect on the clausal level";
       "--superposition-with-formulas", Arg.Bool((:=) _superposition_with_formulas), 
         " enable superposition from (negative) formulas into any subterm";
       "--strong-simplify-reflect", Arg.Bool((:=) _strong_sr), " full effort simplify reflect -- tries to find an equation for each pair of subterms";
