@@ -31,11 +31,11 @@ let load_extensions =
     Fool.extension;
     Booleans.extension;
     Lift_lambdas.extension;
-    Summation_equality.extension;
     Pure_literal_elim.extension;
     Bool_encode.extension;
     App_encode.extension;
     Eq_encode.extension;
+    Summation_equality.extension;
     TypeTests.extension;
   ] in
   Phases.return_phase (Extensions.extensions ())

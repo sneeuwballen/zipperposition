@@ -74,7 +74,7 @@ let decimal x = test_tag double_tag any x
 let array t = test_tag (if t==decimal then double_array_tag else 0) (for_all t)
 let string x = test_tag string_tag any x
 let func x = test_tag closure_tag any x
-let custom x = test_tag custom_tag any x (* e.g. int32, big Z.t *)
+let custom x = test_tag custom_tag any x or test_tag abstract_tag any x (* e.g. int32, big Z.t *)
 (* Use lazy_force unless there's values that cannot be eagerly computed or you never need the lazy value. The lazy_or does not check the type of an unevaluated expression.
 Reference: https://stackoverflow.com/questions/56746374/how-does-ocaml-represent-lazy-values-at-runtime *)
 let lazy_aid f t x = test_tag lazy_tag f x or test_tag forward_tag (t % hd) x or t x
@@ -211,7 +211,6 @@ let extension = {Extensions.default with
 (* Do overly general assignments first so they end up to the bottom of the printer stack. *)
 
 add_pp any (fun x -> (match tag x with
-  | t when t=abstract_tag -> "abstract"
   | t when t=final_tag -> "final" 
   | t when t=out_of_heap_tag -> "code"
   | t when t=unaligned_tag -> "unaligned" (* e.g. 1ˢᵗ closure field unless its the above *)

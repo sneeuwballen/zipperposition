@@ -23,7 +23,7 @@ open Type
 open Term
 open Stdlib
 module B = Builtin
-module H = Hashtbl
+module HS = Hashtbl (* H̲ashtable for S̲tructural equality *)
 module HT = Hashtbl.Make(struct
   type t = term
   let equal = (==)
@@ -59,21 +59,21 @@ let sum_array = Array.fold_left (+) 0
 
 let index_of p l = fst(get_exn(find_idx p l))
 
-(* Search hash table by value instead of by key. *)
-let search_hash ?(eq=(=)) table value = H.fold (fun k v found -> if found=None & eq value v then Some k else found) table None
+(* Search hash table by value instead of by key. The equality relation of keys does not matter. *)
+let search_hash ?(eq=(=)) table value = HS.fold (fun k v found -> if found=None & eq value v then Some k else found) table None
 
 let with_cache_2 c f = curry(with_cache_rec c (uncurry % f % curry))
 let with_cache_3 c f = curry(with_cache_2 c (uncurry % f % curry))
 
 
 (* make constants for debugging *)
-let constants = H.create 0
-let have ?(infix=false) name par ty = match H.find_opt constants name with
+let constants = HS.create 0
+let have ?(infix=false) name par ty = match HS.find_opt constants name with
 | None ->
   let i = ID.make name in
   if infix then ID.set_payload i (ID.Attr_infix name);
   let c = const (arrow par ty) i in
-  H.add constants name c; c
+  HS.add constants name c; c
 | Some c -> c
 
 
@@ -176,6 +176,7 @@ type shifts = One
 type monomial = Z.t * powers * shifts
 type poly = monomial list
 
+
 (* This exception terminates computing or applying unifiers. Partial operations on monomials, such as product, may be considered as its cause. *)
 exception MonomialIncompatibility
 
@@ -186,17 +187,13 @@ let _z = _Z % Z.of_int
 
 let (|->) i v a = assert(v>=0); a.(i)<-v; a (* powers are non-negative *)
 let (|=>) i v = (i|->v) % copy
+let (|+>) i v a = (i |=> a.(i)+v) a
 
 let coordinate_count = ref 0
 let fold_coordinates o f = fold_left f o (init !coordinate_count id)
 
 let make_powers f = Array.init !coordinate_count f
 let (+^) = Array.map2(+)
-
-(* Make normalized Product-shift of monomial. (Multiplication must commute.) *)
-let product(s,f, z,g) = if compare f g < 0
-  then Product(s,f, z,g)
-  else Product(z,g, s,f)
 
 
 let varstr name1 n = String.make 1 Char.(chr(code name1 - n))
@@ -219,7 +216,7 @@ let shifts_to_string = function
 | Product(s1,f1, s2,f2) -> powers_to_string 'Z' s1 ^ termstr f1 ^"⬝"^ powers_to_string 'Z' s2 ^ termstr f2
 | Diagonal(sub, dup, s,f) -> "{"^ varstr 'z' sub ^"↦ "^ varstr 'z' dup ^"}"^ powers_to_string 'Z' s ^ termstr f
 
-let mono_to_string(c,m,f) = match (match str c with "1"->"" | "-1"->"-" | c'->c') ^ powers_to_string 'z' m ^ shifts_to_string f with ""->"1" | "-"->"-1" | s->s
+let mono_to_string(c,m,f) = match (match Z.to_string c with "1"->"" | "-1"->"-" | c'->c') ^ powers_to_string 'z' m ^ shifts_to_string f with ""->"1" | "-"->"-1" | s->s
 
 let poly_to_string p = if length p = 0 then "0" else concat_view " ＋ "  mono_to_string p
 
@@ -252,8 +249,8 @@ let compare_shifts s z = match s,z with
 | _, Diagonal _ -> 1
 | Product(s1,f1, s2,f2), Product(z1,g1, z2,g2) -> Term.(lex_array(-) *** lex_array(-) *** compare *** compare) (s1,(s2,(f1,f2))) (z1,(z2,(g1,g2)))
 
-let compare_mono = (fun(c,m,s) -> !elimination_priority m s, (mono_total_deg(c,m,s), (s, (m, c)))) %%>
-  (-) *** (-) *** compare_shifts *** lex_array(-) *** Z.compare
+let compare_mono = (fun(c,m,s) -> !elimination_priority m s, (mono_total_deg(c,m,s), (s, (m, c))))
+  %%> (-) *** (-) *** compare_shifts *** lex_array(-) *** Z.compare
 
 let rev_cmp_mono = flip compare_mono
 
@@ -264,20 +261,25 @@ let rev_cmp_mono = flip compare_mono
 let redefine_elimination_priority = (:=)elimination_priority
 
 (* An elimination priority function. For example: elim_oper_args[t,2; s,1; r,1] to eliminate terms t,s,r with priority among them in t. *)
-let elim_oper_args weights = 
-  let arg_weight = H.(get_or ~default:0 % find_opt(of_seq(List.to_seq weights))) in
+let elim_oper_args weights =
+  let arg_weight = get_or ~default:0 % flip assq_opt weights in
   ~=(function
   | One -> 0
   | Shift(_,f) | Diagonal(_,_,_,f) -> arg_weight f
   | Product(_,f,_,g) -> (arg_weight %%> max) f g)
 
-(* An elimination priority to indeterminates assigned by the given weight function. Example use: elim_indeterminate(function((`Shift|`Mul),arg,2)->1|_->0). *)
+(* An elimination priority to indeterminates assigned by the given weight function. For example to eliminate 3ʳᵈ variable: elim_indeterminate(function((`Shift|`Mul),3,arg)->1|_->0). *)
 let elim_indeterminate weight m = let rec this = function
 | One -> 0
 | Shift(s,f) | Diagonal(_,_,s,f) -> sum_array Array.(map(fun p -> weight(`Mul,p,f)) m +^ map(fun p -> weight(`Shift,p,f)) s)
 | Product(s1,f1, s2,f2) -> this(Shift(s1,f1)) + this(Shift(s2,f2))
 in this
 
+
+(* Make normalized Product-shift of monomial. (Multiplication must commute.) If f=g, reduce the problem of computing only one lead unifier in mgu_shift by ordering higher shift first.  *)
+let product(s,f, z,g) = if (Term.compare *** lex_array(-)) (f,s) (g,z) > 0
+  then Product(s,f, z,g)
+  else Product(z,g, s,f)
 
 (* Arithmetic of polynomials etc. Main operations to superpose polynomials are: addition, multiplication by monomial, and lcm of monomials upto leading term. *)
 
@@ -362,7 +364,7 @@ let map_monomials f l =
 
 let mgu_coef a b = Z.(lcm a b / a, lcm a b / b)
 let mgu_pow m m' = (fun n -> make_powers(fun v -> max m.(v) m'.(v) - n.(v))) @@ (m,m')
-
+(* Note: shift One always raises MonomialIncompatibility because it is never a leading monomial in normal circumstances. *)
 let rec mgu_shift s s' =
   let require condition = if not condition then raise MonomialIncompatibility in
   match s,s' with
@@ -397,8 +399,12 @@ let rec mgu_shift s s' =
 
 (* Most general lead unifier—a pair of operator monomials *)
 let rec mgu (c,m,s) (c',m',s') =
+  (* Correct multiplier by applying shift-part's coordinate substitution. Think e.g. unifier (n {k↦n}, 1) of knfₖₙ and n³fₙₙ. *)
+  let fix n = function
+  | Diagonal(sub, dup, _,_) -> (sub|->0) ((dup|+>n.(sub)) n)
+  | _ -> n in
   let uc, uc' = mgu_coef c c' in
-  let um, um' = mgu_pow m m' in
+  let um, um' = mgu_pow (fix m s') (fix m' s) in
   let us, us' = mgu_shift s s' in
   (uc,um,us), (uc',um',us')
 
@@ -429,7 +435,9 @@ let shift_var ?(by=1) v = ( **>)((v|->by)(power0()))
 let superpose p p' =
   if p=_0 or p'=_0 then [] else try
     let u,u' = mgu (hd p) (hd p') in
-    ~<[substiply u p -- substiply u' p']
+    (* Debugging note: Untyped printing here changed nontermination into premature termination. Normal printing has no such effect ⇒ its about type tests. In case of termination I saw: dim-heads=0, then [0] derived, then dim-heads=[0] (eli [{}]) and stop. Nonterminating started instead to saturate ×-monomials at this point. It continued to get dim-heads=0. Before this deviation the derived recurrences appeared exactly the same. However I then changed something somewhere and now I cannot reproduce the termination anymore. *)
+    (* [let aid = substiply u p -- substiply u' p' in print_endline(poly_to_string aid); aid] *)
+    [substiply u p -- substiply u' p']
   with MonomialIncompatibility -> []
 
 (* Try rewrite leading monomial of p by r. *)
@@ -441,13 +449,16 @@ let leadrewrite r p =
 
 (* Find r, q⬝arg s.t. p = (old - by)⬝q⬝arg + r when given indeterminate old, coefficient term by, target term arg, and polynomial p whose indeterminates commute with old. Note that r is "p evaluated at old=by". *)
 let substitute_division var arg p =
+(* Now ignoring the arg... *)
   p |> map_monomials(fun(c,m,s)-> [c, m, match s with
     | One -> One
-    | Shift(s,f) -> Shift((if f==arg then (var|=>0) s else s), f)
+    (* | Shift(s,f) -> Shift((if f==arg then (var|=>0) s else s), f) *)
+    | Shift(s,f) -> Shift((var|=>0) s, f)
     | _ -> raise MonomialIncompatibility]),
   p |> map_monomials(function
     | _, _, One -> []
-    | c, m, Shift(s,f) -> if f==arg then init s.(var) (fun j -> c, m, Shift((var|=>j) s, f)) else [c,m,Shift(s,f)]
+    (* | c, m, Shift(s,f) -> if f==arg then init s.(var) (fun j -> c, m, Shift((var|=>j) s, f)) else [c,m,Shift(s,f)] *)
+    | c, m, Shift(s,f) -> init s.(var) (fun j -> c, m, Shift((var|=>j) s, f))
     | _ -> raise MonomialIncompatibility)
 
 
@@ -537,7 +548,7 @@ let make_clause ?(parents=[]) literals proof_step = C.create literals
 
 let polyliteral p = if p = R._0 then mk_tauto else (fun(l,_,_)->l) (R.poly_as_lit_term_id p)
 
-let definitional_poly_clause p = C.create [polyliteral p] ~penalty:1 ~trail:(C.trail_l[]) Proof.Step.trivial
+let definitional_poly_clause p = make_clause [polyliteral p] ~=Proof.Step.trivial
 
 let replace_lit_by_poly c old_lit_index p = make_clause ~parents:[c]
     (polyliteral p :: except_idx (C.lits c) old_lit_index)
@@ -564,7 +575,7 @@ let saturate_in env cc = Phases.(run(
   >>= fun result -> start_phase Exit >>= ~=(return_phase result)))
 
 
-let make_polynomial_environment() =
+let make_polynomial_environment elimination_priority =
   let module PolyEnv = (val (module Env.Make(struct
       module Ctx = MainEnv.Ctx
       let params = MainEnv.params
@@ -586,23 +597,14 @@ let make_polynomial_environment() =
   PolyEnv.add_is_trivial (Array.mem mk_tauto % C.lits);
   env,
   fun clauses -> 
-    "Result of saturation"|<
-    match saturate_in env ("These are to be saturated"|<Iter.to_rev_list clauses) with
+    R.redefine_elimination_priority elimination_priority;
+    match saturate_in env (Iter.to_rev_list clauses) with
     | Error e -> raise(Failure e)
     | Ok(_, Unsat _) -> PolyEnv.C.ClauseSet.to_iter(PolyEnv.get_empty_clauses())
     | Ok _ -> PolyEnv.get_clauses()
 
 
 let coords = ref []
-(* TODO choose one of these to use *)
-(* let var_term_table = H.create 6
-let var_term = H.find var_term_table
-let var_index term = match search_hash ~eq:(==) var_term_table term with
-| Some v -> v
-| None ->
-  let new_index = H.length var_term_table in
-  H.add var_term_table new_index term;
-  new_index *)
 let var_term index = nth !coords index
 let var_index term = try index_of ((==)term) !coords
 with Invalid_argument _ -> raise(Invalid_argument("var_index "^str term^" ∉  "^str!coords))
@@ -754,7 +756,6 @@ let filter_recurrences_of ok_term = filter_recurrences R.(hd %> function
   | _ -> false)
 
 
-
 (* * The structure following propagation steps—large mutually recursive block. *  *)
 let rec recurrences_of t = match HT.find_opt recurrence_table t with
 | Some r -> r
@@ -778,19 +779,17 @@ let rec recurrences_of t = match HT.find_opt recurrence_table t with
   r
 
 and propagate_affine ?(coef1=Z.one) t ?(coef2=Z.one) s t_plus_s =
-  let env, saturate = make_polynomial_environment() in
-  R.redefine_elimination_priority(R.elim_oper_args[t,2; s,2; t_plus_s,1]);
+  let env, saturate = make_polynomial_environment(R.elim_oper_args[t,2; s,2; t_plus_s,1]) in
   let poly x = R.(if is_Z x then [to_Z x, power0(), One]
     else if memq x !coords then [Z.one, (var_index x |-> 1)(power0()), One]
     else _1 x) in
   Iter.of_list(recurrences_of t @ recurrences_of s)
-  |> Iter.cons(definitional_poly_clause ~<R.(_1 t_plus_s -- coef1*: poly t -- coef2*: poly s))
+  |> Iter.cons(definitional_poly_clause R.(_1 t_plus_s -- coef1*: poly t -- coef2*: poly s))
   |> saturate
   |> filter_recurrences_of((==)t_plus_s)
 
 and propagate_times t s t_x_s =
-  let env, saturate = make_polynomial_environment() in
-  R.redefine_elimination_priority(R.elim_oper_args[t,2; s,2; t_x_s,1]);
+  let env, saturate = make_polynomial_environment(R.elim_oper_args[t,2; s,2; t_x_s,1]) in
   (* Computing dimension: Max size of a set S of indeterminates s.t. following. A leading element of basis is interpreted as a set of its indeterminates A. Demand A⊈S for all such A. *)
   let module S = Int_set in
   let to_set powers = CCArray.foldi (fun present var pow -> (if pow=0 then id else S.add var) present) S.empty powers in
@@ -809,7 +808,6 @@ and propagate_times t s t_x_s =
       | _, _, R.Shift(s,x') when x'==x -> [to_set s]
       | _ -> [])
     in
-    ~<heads;
     let rec size_nonsuperset s = function
     | [] -> S.cardinal s
     | v::vars ->
@@ -832,9 +830,8 @@ and propagate_times t s t_x_s =
   |> filter_recurrences_of((==)t_x_s)
 
 and propagate_sum set sum_var s sum =
-  let env, saturate = make_polynomial_environment() in
   let bad = ref[] in
-  let nice = ref true in
+  (* let nice = ref true in *)
   let sum_fobic = function
   | (_,_,t) when t!=s -> 0
   | (`Mul,v,_) when v=sum_var -> 1
@@ -842,7 +839,7 @@ and propagate_sum set sum_var s sum =
   | (_,v,_) -> try fst(0, (if v=sum_var then near_bijectivity_error else near_commutation_error v) set sum_var)
   with Exit -> 1
   in
-  R.redefine_elimination_priority(R.elim_indeterminate sum_fobic);
+  let env, saturate = make_polynomial_environment(R.elim_indeterminate sum_fobic) in
   (* Note: Unfortunately post-saturation processing here reveals all the structural details of recurrence polynomials and so violates encapsulation. *)
   let rec_of_sum_with_bad_terms = Iter.of_list(recurrences_of s)
   |> saturate
@@ -877,6 +874,12 @@ and propagate_sum set sum_var s sum =
       |> map_monomials(fun(c,m,z) -> [c, m, match z with
         | One -> raise TODO (* ∑m over the set *)
         | Shift(z,s') when s'==s -> Shift(z,sum)
+        (* TODO Variables may not escape. Can we some times eliminate f? If so, this is incomplete. Now try to copy summation from the given term to f. *)
+        | Shift(z,f) when Term.subterm ~sub:(var_term sum_var) f ->
+          (match view sum with App(sum,[set;_]) ->
+            let new_var = HVar.fresh ~ty:(ty s) () in
+            Shift(z, app sum [set; fun_of_fvars [new_var] ((var new_var =: var_term sum_var) f)])
+          | _ -> assert false)
         (* | Diagonal(_,_,_,s') when s'==s -> nice:=false; z *)
         | Shift(_,f) | Diagonal(_,_,_,f) -> bad:= add_nodup ~eq:(==) f !bad; z
         (* | _ -> z]) *)
@@ -888,11 +891,11 @@ and propagate_sum set sum_var s sum =
   (* Force the iteration through to decide necessity of resaturation. *)
   |> Iter.persistent in
   if !bad=[] then rec_of_sum_with_bad_terms else(
-    R.redefine_elimination_priority(R.elim_oper_args((sum,1)::map(fun f -> f,2)!bad));
+    let _,resaturate = make_polynomial_environment(R.elim_oper_args((sum,1)::map(fun f -> f,2)!bad)) in
     Iter.of_list(flat_map recurrences_of !bad)
     (* Iter.of_list(recurrences_of s) *)
     |> Iter.append rec_of_sum_with_bad_terms
-    |> saturate
+    |> resaturate
   )
   |> filter_recurrences R.(fun r ->
     exists(function _,_,Shift(_,sm) when sm==sum ->true | _->false) r
@@ -921,6 +924,13 @@ and near_either_error =
       else if op_var = var_index set then [-1,1+base,`Dup op_var]
       else []
     in
+    (* TODO (Tuesday 26.) This ad hoc fix was not enough and the basic test case ∑f=g.zf now accumulates a lot of bloat error terms. The true cause is somewhere else though since nice equations to derive the desired outcome are present when the final propagation to difference begins. *)
+    let zero_out_useless_shifts f s = foldi(fun s vi vt -> if subterm ~sub:vt f then s else (vi|->0)s) s !coords in
+    let (@>>)() = function
+    | Shift(s,f) -> Shift(zero_out_useless_shifts f s, f)
+    | Diagonal(sub, dup, s, f) -> Diagonal(sub, dup, zero_out_useless_shifts f s, f)
+    | other -> other
+    in
     map_monomials(fun(c,m,s) ->
       assert(m.(sum_var)=0); (* those must be eliminated before these errors are meaningful. *)
       match s with
@@ -928,16 +938,24 @@ and near_either_error =
       | Shift(s,f) -> end_points |> flat_map(fun(sign, base, scale) ->
         let c = Z.( * ) (Z.of_int sign) c in
         match scale with
-        |`None -> [c, m, Shift((sum_var|=>0) s, (_z base =: var_term sum_var) f (*sum_var↦base*))]
+        (* (±1,b,None) represents ±[sum_var:=b] *)
+        |`None -> [c, m, ()@>> Shift((sum_var|=>0) s, (_z base =: var_term sum_var) f (*sum_var↦base*))]
+        (* (±1, b, Dup v) represents ±Vᵇ{sum_var↦v} where commuting Vᵇ duplicates it *)
         |`Dup var ->
-          [c, m, if subterm ~sub:(var_term var) f
-            then Diagonal(sum_var, var, (sum_var |=> s.(sum_var)+base) s, f)
+          [c, m, ()@>> if subterm ~sub:(var_term var) f
+            then Diagonal(sum_var, var, (var|+>base) ((sum_var|+>base) s), f)
             else Shift((var |-> s.(sum_var)+base) ((sum_var|=>0) s), (var_term var =: var_term sum_var) f)]
         | _ -> raise TODO)
       | _ -> assert false))
 
 
-let try_prove_sum_equality clause = match
+let step text parents lits =
+  make_clause ~parents lits (fun parent_proofs -> if parents=[]
+  then (if text="goal" then Proof.Step.goal' else Proof.Step.assert') ~file:"" ~name:text ()
+  else Proof.Step.inference ~tags:[] ~rule:(Proof.Rule.mk text) parent_proofs)
+
+
+let sum_equality_inference clause = match
   fold_lits ~eligible:(C.Eligible.res clause) (C.lits clause) 
   |> Iter.find(fun(lit, place) ->
     (* Top-level ∑ must exist. *)
@@ -962,17 +980,17 @@ let try_prove_sum_equality clause = match
         symbols = to_list !sym_set;
         specialise = HV.create 4});
       coords := to_list !coord_set;
+      (* Add constant recurrences (form Vfₓ-fₓ=0) for all coordinates that atoms (form App(f,x)) lack. *)
       to_iter !sym_set (fun s -> match view s with App(_,x) ->
         to_iter(diff !coord_set (of_list x)) (fun v -> add_recurrence s R.(
           let v_const = shift_var(var_index v) (_1 s) -- _1 s in
           make_clause [polyliteral v_const] ~=Proof.(Step.inference [] ~rule:(Rule.mk "constantness"))))
         |_-> assert false);
-      "Coordinates"|< !coords |> ~=();
       let r = recurrences_of main_expr in
-      ~=()~<recurrence_table;
       print_endline("Refuting "^ str lit);
       print_endline "Final recurrences:";
       List.iter (print_endline%str) r;
+      (* Some[step "" (r) []] *)
       print_endline "————— summation_equality: Missing induction phase ⇒ terminated —————";
       exit 1
     |_->None
@@ -980,12 +998,6 @@ let try_prove_sum_equality clause = match
 with
 | Some conclusions -> conclusions
 | None -> []
-
-
-let step text parents lits =
-  C.create lits ~penalty:1 ~trail:(C.trail_l[]) (if parents=[]
-  then (if text="goal" then Proof.Step.goal' else Proof.Step.assert') ~file:"" ~name:text ()
-  else Proof.Step.inference ~tags:[] ~rule:(Proof.Rule.mk text) (map (fun p -> C.proof_parent_subst (Subst.Renaming.create()) (p,0) Subst.empty) parents))
 
 
 (*
@@ -1038,7 +1050,7 @@ let test_hook clause =
 
 (* Setup to do when MakeSumSolver(...) is called. *);;
 (* MainEnv.add_unary_inf "test" test_hook; *)
-MainEnv.add_unary_inf "recurrences for ∑" try_prove_sum_equality
+MainEnv.add_unary_inf "recurrences for ∑" sum_equality_inference
 end
 
 
