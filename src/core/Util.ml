@@ -280,13 +280,8 @@ let pp_list0 ?(sep=" ") pp_x out = function
 
 let tstp_needs_escaping s =
   assert (s<>"");
-  s.[0] = '_' ||
-  CCString.exists
-    (function
-      | ' ' | '#' | '$' | '+' | '-' | '/' | '\n'
-      | '\t' | '\r' | '<' | '>' -> true
-      | _ -> false)
-    s
+  let idregex = Str.regexp "^[a-zA-Z]+[a-zA-Z0-9_]*$" in
+  not (Str.string_match idregex s 0)
 
 let pp_str_tstp out s =
   CCFormat.string out (if tstp_needs_escaping s then "'" ^ String.escaped s ^ "'" else s)
