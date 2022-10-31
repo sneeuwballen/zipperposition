@@ -280,8 +280,14 @@ let pp_list0 ?(sep=" ") pp_x out = function
 
 let tstp_needs_escaping s =
   assert (s<>"");
-  s.[0] = '_' ||
-  CCString.exists (function ' ' | '#' | '$' | '+' | '-' | '/' -> true | _ -> false) s
+  match s.[0] with
+  | 'a' .. 'z' | 'A' ..'Z' ->
+    CCString.exists
+      (function
+        | 'a' .. 'z' | 'A' ..'Z' | '0' ..'9' | '_' -> false
+        | _ -> true)
+      s
+  | _ -> true
 
 let pp_str_tstp out s =
   CCFormat.string out (if tstp_needs_escaping s then "'" ^ String.escaped s ^ "'" else s)
