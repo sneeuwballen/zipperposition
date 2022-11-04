@@ -86,3 +86,24 @@ module type GROUP = sig
   include MONOID
   val inverse : t -> t
 end
+
+module type RING = sig
+  include GROUP
+  val times : t -> t -> t
+  val of_Z : Z.t -> t
+end
+
+module type ORD_MONOID = sig
+  include MONOID
+  include ORD with type t := t
+end
+
+module type ORD_GROUP = sig
+  include GROUP
+  include ORD with type t := t
+end
+
+module type ORD_RING = sig
+  include RING
+  include ORD with type t := t
+end
