@@ -43,15 +43,6 @@ module AlgZ: ORD_RING = struct
   let times = Z.mul
 end
 
-type 'r ring = {
-  equal : 'r -> 'r -> bool;
-  cmp : 'r -> 'r -> int;
-  add : 'r -> 'r -> 'r;
-  mul : 'r -> 'r -> 'r;
-  to_string : 'r -> string;
-  of_int: Z.t -> 'r;
-}
-
 module type RingData = sig
   type t
   val compare: t -> t -> int
@@ -157,7 +148,7 @@ let commut a b =
 | D i, X f -> [[X f; D i]; [X(D i ^f)]]
 | XD i, X f -> [[X f; XD i]; [X(XD i ^f)]]
 | D i, O f -> map(fun(n,fn)-> [X(D i ^fn); O f; D n]) f |> if mem_assq i f then id else cons[O f; D i]
-| XD i, O f -> map(fun(n,fn)-> [(raise TODO X fn"⁻¹"); X(XD i ^fn); O f; XD n]) f
+| XD i, O f -> map(fun(n,fn)-> [(raise TODO(* X fn⁻¹ *)); X(XD i ^fn); O f; XD n]) f
 | D i, XD j when i=j -> [[XD i; D i]; [D i]]
 | O f, X g -> [[X(O f ^g); O f]]
 | O[i,[[A(V j)];[A I]]], S l when i=j&i=l -> [[S i]; []]
@@ -176,7 +167,7 @@ let commut a b =
 
 
 (* Use through redefine_elimination_priority. *)
-let elimination_priority = ref ~= ~=[]
+(* let elimination_priority = ref ~= ~=[] *)
 
 (* Append padding elements to the end of the shorter list l1 or l2 to make their lengths equal. *)
 let pad_by padding l1 l2 = (fun l -> l @ repeat ((length%%>max) l1 l2 - length l) [padding]) @@ (l1,l2)
@@ -246,7 +237,8 @@ let total_weight w weight = let rec recW _'=_'|>
 
 let total_deg = total_weight theZ ~=Z.one
 
-let indeterminate_order = ref [`I;`C;`V;`O;`S;`D;`XD;`X]
+type indeterminate_shape = [`I|`C|`V|`O|`S|`D|`XD|`X|`T]
+let indeterminate_order: indeterminate_shape list ref = ref [`I;`C;`V;`O;`S;`D;`XD;`X]
 
 let indeterminate_shape = function C _->`C | S _->`S | D _->`D | XD _->`XD | O _->`O | X _->`X | A(V _)->`V | A I->`I | A(T _)->`T
 
