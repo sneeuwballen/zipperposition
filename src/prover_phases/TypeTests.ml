@@ -3,14 +3,14 @@
 
 open Logtk
 open Libzipperposition
-open Summation_equality
 open List
 open Obj (* OCaml's reflection module—powers all of this *)
 open Util
 open Util.UntypedPrint
 open CCFun
 
-(* Self-debugging — Note: to use debug_has_type you might have to cut cyclic dependency by temporary edits. Moving registration of printers to a new file offers a possible solution. *)
+(* Self-debugging
+Note: to use debug_has_type you must prevent cyclic dependency between this file and the file you debug. Temporarily moving registration of printers from this file to a new file offers a possible solution. *)
 
 let debug_typing_fail = ref `Off
 (* The root type test combinators are annotated by this to record their last failure. *)
@@ -181,15 +181,28 @@ let exn_pair x = tuple[tuple[object0;int]; exception'] x
 let flex_state x = ccmap int exn_pair x
 let run's_result x = or_error(tuple[flex_state; szs_status]) x
 
-let powers x = array int x
+(* let powers x = array int x
 let shifts x = union 1 [
   [powers; term];
   [powers; term; powers; term];
   [int; int; powers; term]] x
 let monomial x = tuple[integer; powers; shifts] x
-let polynomial x = list monomial x
+let polynomial x = list monomial x *)
+
+let rec polynomial x = list(list indeterminate) x
+and indeterminate x = union 0 [
+  [integer];
+  [op_atom];
+  [int];
+  [int];
+  [int];
+  [polynomial];
+  [list(tuple[int;polynomial])]] x
+and op_atom x = union 1 [[int]; [term]] x
+let monomial x = list indeterminate x
 
 
+(* Define and register string converters *)
 
 let indent = ref "\n"
 let clever_view sep view l = String.(
@@ -201,14 +214,20 @@ let clever_view sep view l = String.(
     then s else concat (sep ^ !indent) l in
   indent := sub !indent 0 (length !indent - 1);
   s')
-
-(* Associate string printers to type tests when this extension is registered. *)
+(* optional helper to print integers, symbolic numbers, ring elements etc. differently *)
+let serif, double, sans, bold, thin = 94,104,114,124,134
+let digits_in style = String.(to_seq %> List.of_seq %> concat_view "" (function
+  | '0'..'9' as d -> "\xF0\x9D\x9F" ^ make 1 Char.(chr(style + code d))
+  | c -> make 1 c))
 
 let extension = {Extensions.default with
   name = "debug type tests";
   env_actions = [fun env -> let module Env = (val env) in 
 
-(* Do overly general assignments first so they end up to the bottom of the printer stack. *)
+add_pp clause (CCFormat.to_string Env.C.pp_tstp);
+]};;
+
+(* Do overly general assignments first so they end up to the bottom of the printer stack. Above env_actions run of course after this file. *)
 
 add_pp any (fun x -> (match tag x with
   | t when t=final_tag -> "final" 
@@ -274,9 +293,11 @@ add_pp tvar HVar.to_string;
 add_pp subst Subst.to_string;
 add_pp term Term.to_string;
 add_pp literal Literal.to_string;
-add_pp clause (CCFormat.to_string Env.C.pp_tstp);
 add_pp proof (CCFormat.to_string Proof.S.pp_normal);
 
-add_pp monomial RecurrencePolynomial.mono_to_string;
-add_pp polynomial RecurrencePolynomial.poly_to_string;
-]}
+add_pp indeterminate (digits_in serif % RecurrencePolynomial.indet_to_string);
+add_pp monomial (digits_in serif % RecurrencePolynomial.mono_to_string);
+add_pp polynomial (digits_in serif % RecurrencePolynomial.poly_to_string);
+(* open Summation_equality.RecurrencePolynomial;;
+add_pp monomial mono_to_string;
+add_pp polynomial poly_to_string; *)

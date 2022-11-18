@@ -6,7 +6,7 @@ open Libzipperposition
 open Libzipperposition_calculi
 open Phases_impl
 open Util
-open Util.UntypedPrint
+open UntypedPrint
 open Precedence.Weight
 open Comparison
 open Monome

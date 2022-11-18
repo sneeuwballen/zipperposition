@@ -304,7 +304,7 @@ module UntypedPrint = struct
   let add_pp type_test to_string = string_printers := (type_test, to_string % magic) :: !string_printers
 
   let str x =
-    let rec loop = function [] -> assert false (* TypeTests.ml registers generic converter *)
+    let rec loop = function [] -> raise(Failure "Printers from TypeTests.ml are uninitialized!")
     | (type_test, to_string)::printers ->
       if is_int(repr x) then string_of_int(magic x) (* prioritize int's *)
       else if type_test x then to_string x

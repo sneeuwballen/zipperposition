@@ -1,5 +1,12 @@
+(* for repl
+#mod_use "/home/vnn490/Documents/Zipo/zipperposition/src/prover_phases/RecurrencePolynomial.ml";;
+open RecurrencePolynomial;;
+#install_printer pp_poly;;
+*)
 open Logtk
 open Interfaces
+open Util
+open UntypedPrint
 open CCPair
 open CCCache
 open CCOpt
@@ -8,9 +15,9 @@ open CCArray
 open CCList
 open CCFun
 open Stdlib
-exception TODO
 
 (* Utilities *)
+let todo msg = print_string("TO‍‍D‍O "^msg^"\t"); assert false
 let (~=) x _ = x
 let (@@) = map_same
 let (%%>) = compose_binop
@@ -35,6 +42,14 @@ let index_of' = index_of % (=)
 let with_cache_2 c f = curry(with_cache_rec c (uncurry % f % curry))
 let with_cache_3 c f = curry(with_cache_2 c (uncurry % f % curry))
 
+let to_formatter: ('x->string) -> 'x CCFormat.printer
+  = fun to_string out x -> Format.fprintf out "%s" (to_string x)
+let string_part_at ?(split=' ') = get % Array.of_list % String.split_on_char split
+let subscript = String.to_seq %> List.of_seq %> concat_view "" (fun c -> match c with
+  | '('->"₍" | ')'->"₎" | '+'->"₊" | '-'->"₋" | '='->"₌"
+  | '0'..'9' -> string_part_at "₀ ₁ ₂ ₃ ₄ ₅ ₆ ₇ ₈ ₉" Char.(code c - code '0')
+  | 'a'..'y' -> string_part_at "ₐ ᵦ ᵪ ᵨ ₑ ᵩ ₔ ₕ ᵢ ⱼ ₖ ₗ ₘ ₙ ₒ ₚ ᵩ ᵣ ₛ ₜ ᵤ ᵥ ᵥᵥ ₓ ᵧ" Char.(code c - code 'a')
+  | c -> raise(Invalid_argument("RecurrencePolynomial.subscript: " ^ String.make 1 c ^ " has no subscript form assigned to it")))
 
 module AlgZ: ORD_RING = struct
   type t = Z.t
@@ -63,112 +78,32 @@ module Ring(R: RingData) = struct
   let sub a b = add a (minus b)
 end
 
-module type PolyData = sig
-  module R: RingData
-  type indet
-  type mono = indet list
-  type poly = ( mono) list
-  val compare: indet -> indet -> int
-  (* Y·X = cof Y X · Y + ... *)
-  val commutator_factor: indet -> indet -> poly
-  val commutator_surplus: indet -> indet -> poly
-end
-
-module Poly(PD: PolyData) = struct
-  include PD
-  module RingR=Ring(R) open RingR
-
-  let base_noncommuting_product b a = map(flip(@)[b]) (commutator_factor b a) @ commutator_surplus b a
-
-  let rec (++) p q = match p,q with
-  | p, [] -> p
-  | m::p, n::q when m=n -> raise TODO
-  | m::p, n::q when Stdlib.compare m n > 0 -> m :: p++(n::q)
-  | p, q -> q++p
-
-  [@@@warning "-8"]
-  let rec (><) p q = match p,q with
-  | _,[] | [],_ -> []
-  | p, []::q -> p ++ (p><q)
-  | []::p, q -> q ++ (p><q)
-  | [[a]], [[b]] -> base_noncommuting_product a b
-  | na::p, (b::m)::q ->
-    let n,a = remove_at_idx(-1) na, hd(rev na) in
-    ([n]><([[a]]><[[b]])><[m]) ++ ([na]><q) ++ (p><[b::m]) ++ (p><q)
-  [@@@warning "+8"]
-end
-
 
 type var = int
 let compare_var = (-)
 type atom = I | V of var | T of Term.t
 type poly = op list list
-and op = C of Z.t | A of atom | D of var | XD of var | S of var | X of poly | O of (var*poly)list
-(* and indet = On of var * op | Combo of indet list *)
+and op =
+| C of Z.t (* never C 1 *)
+| A of atom (* unique and last in a monomial *)
+| D of var
+| XD of var
+| S of var
+| X of poly (* never X(p + q) or X(X p · q) *)
+| O of (var*poly)list
 (* I = Combo[], M = X[[I]], S = O[[I+Z1]] *)
 
+let _0 = []
+(* Use instead of C constructor with polynomials. *)
+let const_op_poly n = Z.(if equal n zero then [] else if equal n one then [[]] else [[C n]])
+let const_eq_poly n = Z.(if equal n zero then [] else if equal n one then [[A I]] else [[C n; A I]])
+(* Use instead of C constructor with monomials. *)
+let ( *:) c m = Z.(if equal c zero then [C zero] else match m with
+  | C a ::n -> if equal (c*a) one then n else C(c*a)::n
+  | m -> if equal c one then m else C c :: m)
+(* Other safe constructors but those for X are after ordering. *)
 let shift i = O[i,[[A(V i)];[A I]]]
-let eval_at ~var at = O[var, [[C at; A I]]]
-
-let simplify1 = function
-| X[f;g] -> [[X[f]]; [X[g]]]
-| X[X f ::g] -> [[X f; X[g]]]
-| C i when Z.(equal i one) -> []
-| O[] -> []
-| a -> [[a]]
-
-let commut a b =
-  let (^) op = map(cons op) in
-  match a,b with
-| _, C o when Z.(equal o zero) -> [[C o]] (* must not merge below via or-pattern *)
-| C o, _ when Z.(equal o zero) -> [[C o]]
-| C n, C k -> [[C Z.(n*k)]]
-| a, C k -> [[b;a]]
-| D i, X f -> [[X f; D i]; [X(D i ^f)]]
-| XD i, X f -> [[X f; XD i]; [X(XD i ^f)]]
-| D i, O f -> map(fun(n,fn)-> [X(D i ^fn); O f; D n]) f |> if mem_assq i f then id else cons[O f; D i]
-| XD i, O f -> map(fun(n,fn)-> [(raise TODO(* X fn⁻¹ *)); X(XD i ^fn); O f; XD n]) f
-| D i, XD j when i=j -> [[XD i; D i]; [D i]]
-| O f, X g -> [[X(O f ^g); O f]]
-| O[i,[[A(V j)];[A I]]], S l when i=j&i=l -> [[S i]; []]
-| S l, O[i,[[A(V j)];[A I]]] when i=j&i=l -> [[S i]; [C Z.minus_one; eval_at Z.zero ~var:i]; []]
-| O[i,[[C o]]], S l when i=l -> assert Z.(equal o zero); [[a]]
-| O[i,[[C c; A I]]], S l when i=l -> Z.(if c < zero
-  then map(fun n -> [eval_at~var:i (of_int n + c)]) (range' 0 (Stdlib.abs(to_int c)))
-  else map(fun n -> [eval_at~var:i (of_int n)]) (range' 0 (to_int c)))
-| X[S i ::f], S j when i=j -> [[S i; X[f]; S i]; [S i; X[S i :: f]]; [S i; X[f]]]
-| D _, A I -> []
-| D i, A(V n) -> if i=n then [[]] else []
-| O f, A(V n) -> (match assq_opt n f with Some fn -> fn | _-> [[b]])
-| A _, A _ -> raise TODO (* illegal *)
-| A _, b -> [[b;a]] (* Delicate: I want to simplify also _,A but only when A is fully right which must be taken into account somewhere at some point! *)
-| a, b -> [[a;b]]
-
-(* Equality for normalized polynomials. *)
-let rec poly_eq p = CCList.equal mono_eq p
-and mono_eq m n = m==n or CCList.equal(curry(function
-  | C a, C b -> Z.equal a b
-  | A(T t), A(T s) -> Term.equal t s
-  | X f, X g -> poly_eq f g
-  | O f, O g -> CCList.equal(CCPair.equal (=) poly_eq) f g
-  | a, b -> a = b
-)) m n
-
-(* Hash code for normalized polynomials. *)
-let rec poly_hash ?(depth=2) p = fold_left (fun h m -> 127*h + mono_hash ~depth m) 0 (take 4 p)
-and mono_hash ?(depth=2) = fold_left (fun h x -> 31*h + indet_hash ~depth x) 0
-and indet_hash ?(depth=2) = if depth=0 then ~=7 else function
-  | X f | O((_,f)::_) -> poly_hash ~depth:(depth-1) f
-  | A(T t) -> Term.hash t
-  | x -> Hashtbl.hash x
-
-let coef_view: poly -> (poly * op list) list =
-  map(take_drop_while(function C _ | X _ -> true | _-> false))
-  %> group_by ~eq:(snd%%>mono_eq) ~hash:(snd%>mono_hash)
-  %> map(fun coef_mono_list -> map fst coef_mono_list, snd(hd coef_mono_list))
-
-let lead_coef = fst % hd % coef_view
-let lead_main_ops = snd % hd % coef_view
+let eval_at ~var at = O[var, const_eq_poly at]
 
 
 (* Append padding elements to the end of the shorter list l1 or l2 to make their lengths equal. *)
@@ -253,6 +188,8 @@ let infinities r : 'r list ord_group =
     method o = []
   end
 
+(* Monoid (R,·,1) from ring (R,+,·,0,1,...) *)
+let multiplicative r : 'r monoid = object method plus = r#times method o = r#of_Z Z.one end
 
 let total_weight w weight = let rec recW i=i|>
   fold_left(fun sum op -> w#plus sum (match op with
@@ -292,6 +229,108 @@ and tiebreak_by weights = lex_list(fun x y ->
 let indeterminate_weights: (simple_indeterminate -> int list) ref = ref~=[]
 let rev_cmp_mono = flip(compare_mono_by !indeterminate_weights)
 
+
+(* Equality for normalized polynomials. *)
+let rec poly_eq p = CCList.equal mono_eq p
+and mono_eq m n = m==n or CCList.equal indet_eq m n
+and indet_eq x y = x==y or match x,y with
+  | C a, C b -> Z.equal a b
+  | A(T t), A(T s) -> Term.equal t s
+  | X f, X g -> poly_eq f g
+  | O f, O g -> CCList.equal(CCPair.equal (=) poly_eq) f g
+  | a, b -> a = b
+
+(* Hash code for normalized polynomials. *)
+let rec poly_hash ?(depth=2) p = fold_left (fun h m -> 127*h + mono_hash ~depth m) 0 (take 4 p)
+and mono_hash ?(depth=2) = fold_left (fun h x -> 31*h + indet_hash ~depth x) 0
+and indet_hash ?(depth=2) = if depth=0 then ~=7 else function
+  | X f | O((_,f)::_) -> poly_hash ~depth:(depth-1) f
+  | A(T t) -> Term.hash t
+  | x -> Hashtbl.hash x
+
+let coef_view: poly -> (poly * op list) list =
+  map(take_drop_while(function C _ | X _ -> true | _-> false))
+  %> group_by ~eq:(snd%%>mono_eq) ~hash:(snd%>mono_hash)
+  %> map(fun coef_mono_list -> map fst coef_mono_list, snd(hd coef_mono_list))
+  %> sort(snd %%> rev_cmp_mono)
+
+let lead_coef = fst % hd % coef_view
+let lead_main_ops = snd % hd % coef_view
+
+(* Use this instead of X constructor. *)
+let mul_indet = 
+  let rec x = function X f ::g -> X f :: x g | m -> [X[m]] in
+  sort rev_cmp_mono % map x
+
+
+(* a·m, b·m ↦ (a+b)·m where numbers a,b are implicitly 1 if absent. *)
+let mono_add_coefficients = curry(function
+| C a ::m, C b ::n -> if_~=(mono_eq m n) (Z.(a+b) *: m)
+| C a ::m, n | m, C a ::n -> if_~=(mono_eq m n) (Z.(a+one) *: m)
+| m, n -> if_~=(mono_eq m n) (Z.of_int 2 *: m))
+
+let rec (++) p q : poly = match p,q with
+| p, [] -> p
+| m::p, n::q -> (match mono_add_coefficients m n with
+  | Some mn -> mn :: p++q
+  | _ when rev_cmp_mono m n < 0 -> m :: p++(n::q)
+  | _ -> q++p)
+| p, q -> q++p
+
+let (--) p q =
+  let negate = function C a ::m -> Z.neg a *: m | m -> Z.minus_one *: m in
+  p ++ map negate q
+
+
+let rec (><) p q = match p,q with
+| _,[] | [],_ -> []
+| p, []::q -> p ++ (p><q)
+| []::p, q -> q ++ (p><q)
+| [[x]], [[y]] -> str x^"·"^str y|<indeterminate_product x y
+| nx::p, (y::m)::q ->
+  let n,x = remove_at_idx(-1) nx, hd(rev nx) in
+  let xy = [[x]]><[[y]] in
+  (* Inputs nx and y::m are valid monomials, so if [[x;y]] is too, then simple concatenation puts indeterminates to the right order: *)
+  str(n,x,y,m)|<(if poly_eq xy [[x;y]] then [nx@y::m]
+    else [n]><xy><[m])
+  ++ ([nx]><q) ++ (p><[y::m]) ++ (p><q)
+
+and indeterminate_product x y =
+  let ( *^) op f = mul_indet([[op]]><f) in
+  match x,y with
+  | C n, C k -> const_op_poly Z.(n*k)
+  | _, C o | C o, _ when Z.(equal o zero) -> [[C o]]
+  | x, C k -> [[y;x]]
+  | D i, X f -> [[X f; D i]] ++ D i *^f
+  | XD i, X f -> [[X f; XD i]] ++ XD i *^f
+  | D i, O f -> (if mem_assq i f then f else (i,[[A(V i)]])::f) (* identity ∘'s in f are implicit *)
+    |> map(fun(n,fn)-> D i *^fn >< [[O f; D n]]) (* coordinatewise chain rule *)
+    |> fold_left (++) _0 (* sum *)
+  | XD i, O f -> fold_left(++)_0 (map(fun(n,fn)-> (todo"X fn⁻¹")><  XD i *^fn >< [[O f; XD n]]) (if mem_assq i f then f else (i,[[A(V i)]])::f)) (* like previous *)
+  | D i, XD j when i=j -> [[XD i; D i]; [D i]]
+  | O f, X g -> O f *^g >< [[O f]]
+  | O[i,[[A(V j)];[A I]]], S l when i=j&i=l -> [[S i]; []]
+  | S l, O[i,[[A(V j)];[A I]]] when i=j&i=l -> [[S i]; [C Z.minus_one; eval_at Z.zero ~var:i]; []]
+  | O[i,[[C o]]], S l when i=l -> assert Z.(equal o zero); [[x]]
+  | O[i,[[C c; A I]]], S l when i=l -> Z.(if c < zero
+    then map(fun n -> [eval_at~var:i (of_int n + c)]) (range' 0 (Stdlib.abs(to_int c)))
+    else map(fun n -> [eval_at~var:i (of_int n)]) (range' 0 (to_int c)))
+  | X[S i ::f], S j when i=j -> [[S i; X[f]; S i]; [S i; X[S i :: f]]; [S i; X[f]]] (* mul_indet not needed *)
+  | D _, A I -> []
+  | D i, A(V n) -> if i=n then [[]] else []
+  | O f, A(V n) -> (match assq_opt n f with Some fn -> fn | _-> [[y]])
+  | A _, A _ -> todo"illegal A·A"
+  | A _, y -> [[y;x]] (* Delicate: I want to simplify also _,A but only when A is fully right which must be taken into account somewhere at some point! *)
+  | x, y -> [[x;y]]
+
+
+let poly_alg: poly ring = object
+  method o = _0
+  method plus = (++)
+  method minus = (--)
+  method times = (><)
+  method of_Z = const_op_poly
+end
 
 (* Ordered lists representing sums g₁x₁+...+gₙxₙ. Algebraically the direct sum Gᕁ. *)
 module Sums(Parameters: sig
@@ -339,7 +378,7 @@ end) = struct
     type g = coef
     let group = (ring :> g group)
     type x = op list
-    let ord = raise TODO
+    let ord = todo"ord"
   end)
 
   let ring: t ring = object
@@ -349,6 +388,88 @@ end) = struct
     method minus=group#minus
     
     method of_Z z = [ring#of_Z z, [A I]]
-    method times = raise TODO
+    method times = todo"times"
   end
 end
+
+(* TODO provide an association in an environment *)
+let var_name = string_part_at "y x v u t s r p o n m l k j i h e a"
+let term_name t = Term.to_string t
+
+(* E.g. ["-2x";"3y";"-4z"] becomes "-2x﹢3y﹣4z". (In Ubuntu command line “﹢” has width 2 which seems nicer balance between 1 of “+” and 3 of “ + ”, some times.) *)
+let concat_plus_minus view = function
+| [] -> "0"
+| m::p -> map view p
+  |> flat_map String.(fun s -> if rcontains_from s 0 '-' then ["﹣"; sub s 1 (length s -1)] else ["﹢"; s])
+  |> cons(view m)
+  |> String.concat ""
+
+let rec poly_to_string p = concat_plus_minus mono_to_string p
+
+and poly_view_string p = coef_view p |> concat_plus_minus(function
+  | [n], m -> mono_to_string(n@m)
+  | c, m -> "("^ poly_to_string c ^")"^ mono_to_string m)
+
+and mono_to_string m = group_succ ~eq:indet_eq m
+  |> concat_view "" (fun n -> indet_to_string(hd n) ^ match length n with 1->"" | l -> superscript(string_of_int l))
+  |> function ""->"1" | "-"->"-1" | s->s
+
+and indet_to_string = function
+| C a -> (match Z.to_string a with "-1"->"-" | s->s) (* The trivial a=1 should not occur. *)
+| A I -> ""
+| A(V i) -> var_name i
+| A(T t) -> term_name t
+| D i -> subscript(var_name i)
+| XD i -> "ð"^subscript(var_name i)
+| S i -> "∑"^superscript(var_name i)
+| X[m] -> mono_to_string m
+| X f -> "("^ poly_to_string f ^")"
+| O[i,[[A(V j)];[A I]]] when i=j -> String.uppercase(var_name i)
+| O f -> "["^ concat_view "" (fun(i,fi)-> superscript(var_name i) ^ poly_view_string fi) f ^"]"
+
+let pp_poly = to_formatter poly_to_string
+
+
+let if_start pre act string = String.(
+  if length pre <= length string & sub string 0 (length pre) = pre
+  then Some(act(sub string (length pre) (length string - length pre)))
+  else None)
+
+let match_start(type r) ?(split=' ') patterns string =
+  let rules = flat_map (fun(pattern,act)-> mapi(fun i p -> p, act i) (String.split_on_char split pattern)) patterns in
+  let exception Result of r in
+  let rec apply_first = function
+  | [] -> raise(Invalid_argument(
+    "match_start: None of patterns `"^ String.concat (String.make 1 split) (map fst rules) ^"´ occurs in the beginning of the input\n"^string))
+  | (p,act)::rest -> match if_start p act string with
+    | Some ok -> raise(Result ok)
+    | None -> apply_first rest
+  in
+  try apply_first rules with Result r -> r
+
+let testterms = map (Term.const ~ty:Type.term % ID.make) ["f";"g"]
+
+let rec poly_of_string s =
+  let product = sum'(object method plus=(><) method o=[[A I]] end) in
+  String.split_on_char '-' s |> map(
+    String.split_on_char '+' %> map(
+      String.split_on_char '.' %> map(
+        fun s -> [[X(poly_of_mono_string s)]]
+      ) %> product
+    ) %> sum' poly_alg
+  ) |> function pos::neg -> fold_left (--) pos neg |_-> assert false
+
+and poly_of_mono_string s' = if ~<s'="" then _0 (* neutral in splitting above *) else
+  let map_start_factor rules = match_start (map (fun(p,f)-> p,
+    fun i s -> f i >< if s="" then [[]] (* neutral in this recursion *) else poly_of_mono_string s
+  ) rules) s' in
+  map_start_factor[
+    ("y x v u t s r p o n m l k j i h e a",fun i->mul_indet[[A(V i)]]);
+    ("Y X V U T S R P O N M L K J I H E A",fun i->[[shift i]]);
+    ("∑ʸ ∑ˣ ∑ᵛ ∑ᵘ ∑ᵗ ∑ˢ ∑ʳ ∑ᵖ ∑ᵒ ∑ⁿ ∑ᵐ ∑ˡ ∑ᵏ ∑ʲ ∑ⁱ ∑ʰ ∑ᵉ ∑ᵃ",fun i->[[S i]]);
+    ("ᵧ ₓ ᵥ ᵤ ₜ ₛ ᵣ ₚ ₒ ₙ ₘ ₗ ₖ ⱼ ᵢ ₕ ₑ ₐ",fun i->[[D i]]);
+    ("∂ d",fun i->[[D 1]]);
+    ("0 1 2 3 4 5 6 7 8 9",fun i->const_op_poly(Z.of_int i));
+    ("f g",fun i->[[A(T(get_at_idx_exn i testterms))]]);
+    ("F G",fun i->mul_indet[[A(T(get_at_idx_exn i testterms))]]);
+  ]
