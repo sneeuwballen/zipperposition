@@ -189,17 +189,17 @@ let shifts x = union 1 [
 let monomial x = tuple[integer; powers; shifts] x
 let polynomial x = list monomial x *)
 
-let rec polynomial x = list(list indeterminate) x
+let rec polynomial x = list monomial x
+and monomial x = list indeterminate x
 and indeterminate x = union 0 [
   [integer];
   [op_atom];
   [int];
   [int];
   [int];
-  [polynomial];
+  [monomial];
   [list(tuple[int;polynomial])]] x
 and op_atom x = union 1 [[int]; [term]] x
-let monomial x = list indeterminate x
 
 
 (* Define and register string converters *)
