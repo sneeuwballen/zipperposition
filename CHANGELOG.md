@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.2
+
+- add `--mode best`
+- portfolio
+- many improvements to BCE (blocked clause elimination)
+- implement lambdaKBO
+
+- small improvements: do not use `Pervasives` anymore,
+  use menhir 2.0, zarith >= 1.4
+- depend on mtime < 2.0
+- use ocaml matching for escaping of identifiers in TPTP output (#93)
+- adapt TIP parser to new spec
+
+
 ## 2.1
 
 - add `logtk.arith` sub-library, using either zarith or num
