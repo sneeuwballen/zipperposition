@@ -64,7 +64,7 @@ let compare l1 l2 =
     if c <> 0 then c else
       let c = T.compare r1 r2 in
       if c <> 0 then c else
-        Pervasives.compare sign1 sign2
+        CCShims_.Stdlib.compare sign1 sign2
   | True, True
   | False, False -> 0
   | _, _ -> __to_int l1 - __to_int l2
@@ -718,7 +718,7 @@ module Comp = struct
       | True -> 0
       | Equation _ -> 30
     in
-    C.of_total (Pervasives.compare (_to_int l1) (_to_int l2))
+    C.of_total (CCShims_.Stdlib.compare (_to_int l1) (_to_int l2))
 
   (* by multiset of terms *)
   let _cmp_by_term_multiset ~ord l1 l2 =

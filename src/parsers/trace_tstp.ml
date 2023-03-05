@@ -47,7 +47,7 @@ let hash p = match p with
   | InferForm (_, lazy s)
   | InferClause (_, lazy s) -> Hashtbl.hash s.id
 
-let compare p1 p2 = Pervasives.compare p1 p2  (* FIXME *)
+let compare p1 p2 = CCShims_.Stdlib.compare p1 p2  (* FIXME *)
 
 (** {2 Constructors and utils} *)
 

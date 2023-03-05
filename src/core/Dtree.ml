@@ -38,7 +38,7 @@ let compare_char c1 c2 =
   | Symbol s1, Symbol s2 -> ID.compare s1 s2
   | Variable v1, Variable v2 -> compare_vars v1 v2
   | Subterm t1, Subterm t2 -> T.compare t1 t2
-  | _ -> Pervasives.compare (char_to_int_ c1) (char_to_int_ c2)
+  | _ -> CCShims_.Stdlib.compare (char_to_int_ c1) (char_to_int_ c2)
 
 let[@inline] eq_char c1 c2 = compare_char c1 c2 = 0
 

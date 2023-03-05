@@ -45,7 +45,7 @@ module Make(A:ARG) = struct
     ()
 
   let equal s1 s2 = s1.id = s2.id
-  let compare s1 s2 = Pervasives.compare s1.id s2.id
+  let compare s1 s2 = CCShims_.Stdlib.compare s1.id s2.id
   let id s = s.id
   let hash s = Hashtbl.hash s.id
 

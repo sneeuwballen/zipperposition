@@ -55,7 +55,7 @@ let to_int_ = function
   | With _ -> 12
 
 let rec compare t1 t2 = match t1.term, t2.term with
-  | Var s1, Var s2 -> Pervasives.compare s1 s2
+  | Var s1, Var s2 -> CCShims_.Stdlib.compare s1 s2
   | Const s1, Const s2 -> String.compare s1 s2
   | App (s1,l1), App (s2, l2) ->
     let c = compare s1 s2 in
@@ -109,7 +109,7 @@ and compare_typed_var (v1,o1)(v2,o2) =
   let cmp = compare in
   CCOrd.( compare_var v1 v2 <?> (Util.ord_option cmp, o1, o2) )
 
-and compare_var : var CCOrd.t = Pervasives.compare
+and compare_var : var CCOrd.t = CCShims_.Stdlib.compare
 
 let equal t1 t2 = compare t1 t2 = 0
 

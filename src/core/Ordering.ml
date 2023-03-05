@@ -1058,7 +1058,7 @@ module LambdaKBO : ORD = struct
 
   module WH = CCHashtbl.Make(struct
       type t = W.t
-      let equal = Pervasives.(=)
+      let equal = CCShims_.Stdlib.(=)
       let hash = W.hash
     end)
 

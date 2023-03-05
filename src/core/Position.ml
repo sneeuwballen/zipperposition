@@ -23,7 +23,7 @@ let head pos = Head pos
 let arg i pos = Arg (i, pos)
 let body pos = Body pos
 
-let compare = Pervasives.compare
+let compare = CCShims_.Stdlib.compare
 let equal p1 p2 = compare p1 p2 = 0
 let hash p = Hashtbl.hash p
 

@@ -66,7 +66,7 @@ let payload_pred ~f:p t =
 
 let hash t = t.id
 let equal i1 i2 = i1.id = i2.id
-let compare i1 i2 = Pervasives.compare i1.id i2.id
+let compare i1 i2 = CCShims_.Stdlib.compare i1.id i2.id
 
 let pp out id = CCFormat.string out id.name
 let to_string = CCFormat.to_string pp

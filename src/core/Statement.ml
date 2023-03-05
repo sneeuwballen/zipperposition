@@ -5,7 +5,7 @@
 
 module OptionSet = Set.Make(
   struct
-    let compare x y = Pervasives.compare x y
+    let compare x y = CCShims_.Stdlib.compare x y
     type t = int option
   end)
 
