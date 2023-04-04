@@ -36,6 +36,10 @@ let lex_array c = to_list %%> lex_list c
 let length_lex_array c = (fun l -> Array.length l, l) %%> (-) *** lex_array c
 
 let fold_left_1 f = function x::l -> fold_left f x l | _->raise(Invalid_argument "fold_left_1: empty list")
+let max_list ?(ord=compare) = fold_left_1(fun x y -> if ord x y < 0 then y else x) (* use e.g. max_list(⊥ :: ...) *)
+let min_list ?(ord=compare) = fold_left_1(fun x y -> if ord x y > 0 then y else x) (* use e.g. min_list(⊤ :: ...) *)
+let max_array ?(ord=compare) ?bottom l = max_list ~ord (CCOpt.to_list bottom @ to_list l)
+let min_array ?(ord=compare) ?top l = min_list ~ord (CCOpt.to_list top @ to_list l)
 let sum_list = fold_left (+) 0
 let sum_array = Array.fold_left (+) 0
 let index_of p l = fst(get_exn(find_idx p l))
@@ -102,6 +106,7 @@ let compare_later_dominant l1 l2 = uncurry(lex_list(-)) (rev @@ pad_tail 0 l1 l2
 let compare_later_dominant = rev %%> length_lex_list(-)
 
 
+(* Some algebraic interfaces / type classes as OCaml objects. The modules EQ, ORD, MONOID etc. also exist in Interfaces.ml and are used elsewhere in Zipperposition code. Modules might be more flexible and efficient than objects. However as the inheritance hierarchy gets deeper, modules become clumsy to use as they require more type conversion annotations. This file does not make heavy use of the abstractions build on top of these type classes, so it all could be specialized and the type classes removed, if preferable. *)
 type 't ord = <compare: 't->'t->int>
 type 't monoid = <plus: 't->'t->'t; o: 't>
 type 't group = <'t monoid; minus: 't->'t->'t>
@@ -128,12 +133,20 @@ let int_alg: int ord_ring = object
   method o = 0
 end
 
+(* Monoid (R,·,1) from ring (R,+,·,0,1,...) *)
+let multiplicative r : 'r monoid = object method plus = r#times method o = r#of_Z Z.one end
+
+(* Derived basic functions *)
 let equal' k x y = 0=k#compare x y
 let min' k x y = if k#compare x y < 0 then x else y
 let max' k x y = if k#compare x y > 0 then x else y
 let sum' m = fold_left m#plus m#o
 let neg' g = g#minus g#o
 let is0' m = equal' m m#o
+let rec multiple' m x n =
+  assert(n>=0);
+  if n=0 then m#o else multiple' m (m#plus x x) (n/2) |> if n mod 2 = 0 then id else m#plus x
+let pow' r = multiple'(multiplicative r)
 
 module Monoid_of_object(M: sig type t val monoid: t monoid end) = struct
   type t = M.t
@@ -150,7 +163,7 @@ module Group_of_object(G: sig type t val group: t group end) = struct
 end
 
 module Ring_of_object(R: sig type t val ring: t ring end) = struct
-  module G = Group_of_object(struct
+  include Group_of_object(struct
     type t = R.t
     let group = (R.ring :> t group)
   end)
@@ -170,12 +183,11 @@ let infinities r : 'r list ord_group =
     method o = []
   end
 
-(* Monoid (R,·,1) from ring (R,+,·,0,1,...) *)
-let multiplicative r : 'r monoid = object method plus = r#times method o = r#of_Z Z.one end
 
+(* These are used to simplify defining orderings. They erase some structure from indeterminates that happens to be ignorable in all the orderings that are required in recurrence propagation. *)
+type simple_indeterminate = [`D of var |`O of (var*poly) list |`S of var |`T of Term.t |`V of var]
 
-type simple_indeterminate = [`D of var |`O of var*poly |`S of var |`T of Term.t |`V of var]
-
+(* Weight of monomial as a sum of given weights of (simple) indeterminates. Used in total_deg. *)
 let total_weight w weight = let rec recW i=i|>
   fold_left(fun sum op -> w#plus sum (match op with
     | C _ | A I -> w#o
@@ -183,21 +195,25 @@ let total_weight w weight = let rec recW i=i|>
     | A(T t) -> weight(`T t)
     | D i -> weight(`D i)
     | S i -> weight(`S i)
-    | O f -> sum' w (map(fun(n,fn)-> weight(`O(n,fn))) f)
+    | O f -> weight(`O f) (* sum' w (map(fun(n,fn)-> weight(`O(n,fn))) f) *)
     | X f -> recW f
     | XD i -> w#plus (weight(`V i)) (weight(`D i))
   )) w#o in recW
 
+(* Total degree of a monomial, counting every indeterminate as 1. *)
 let total_deg = total_weight theZ ~=Z.one
 
+(* Shapes of indeterminates without parameters.
+ This is used to reduce the match cases in comparison tiebreaking. We can probably keep this as an internal detail. Nevertheless indeterminate_order is already made a mutable reference for future flexibility. *)
 type indeterminate_shape = [`I|`C|`V|`O|`S|`D|`XD|`X|`T]
 let indeterminate_order: indeterminate_shape list ref = ref [`I;`C;`V;`X;`O;`S;`D;`XD;`T]
 
 let indeterminate_shape = function C _->`C | S _->`S | D _->`D | XD _->`XD | O _->`O | X _->`X | A(V _)->`V | A I->`I | A(T _)->`T
 
 (* Monomial and other orders
-What nonstandard invariants the order must satisfy? At least the C(oefficient)s must contribute last because ++ changes them while linearly merging monomial lists instead of full resorting. *)
+TODO What nonstandard invariants the order must satisfy? At least the C(oefficient)s must contribute last because ++ changes them while linearly merging monomial lists instead of full resorting. *)
 
+(* This implements monomial orders and is parameterized by weights of (simple) indeterminates. (The functions compare_poly_by and tiebreak_by are merely mutually recursive helpers.) Usage interface is provided by rev_cmp_mono and the stateful indeterminate_weights. *)
 let rec compare_mono_by weights = dup %%>
   (total_weight(infinities int_alg) weights %%> compare_later_dominant)
   *** tiebreak_by weights
@@ -213,26 +229,29 @@ and tiebreak_by weights = rev %%> lex_list(fun x y ->
     | X x, X y -> compare_mono_by weights x y
     | O x, O y -> lex_list(compare_var *** compare_poly_by weights) x y
     | A(T x), A(T y) -> Term.compare x y
-    | _ -> assert false (* If xw=yw, variant constructors of x,y must equal and they are covered above. *))
+    | _ -> assert false (* If xw=yw, variant constructors of x,y must be equal and they are covered above. *))
 
+(* Assign this to set the global monomial order. Old polynomials become invalid when the order changes (because they are sorted by the monomial order) and must not be used afterwards. However polynomials stored in clauses can still be reretrieved (see poly_as_lit_term_id and poly_of_{lit,term,id}). The weights are effectively 0-extended and compared as “signed ordinals”. Trailing zeros do not matter.
+ Desing: A global switch like this has natural drawbacks. Namely we cannot abstract polynomials computations over the order which prevents e.g. parallelization and pause-resume constructs. This could become an issue with infinitely branching inferences. However the global reference is much simpler to use because otherwise all abstractions on top of polynomial arithmetic would have to take the order as paramters either explicitly or as part of module construction. 
+ To define a weight function see elim_oper_args and elim_indeterminate. *)
 let indeterminate_weights: (simple_indeterminate -> int list) ref = ref~=[]
 
+(* The main interface to monomial orders, conveniently reversed for sorting maximal monomial first. *)
 let rev_cmp_mono = flip(compare_mono_by !indeterminate_weights)
 let sort_poly: poly->poly = sort rev_cmp_mono
 
 (* Some indeterminate weights for common elimination operations *)
 
-(* An elimination priority function. For example: elim_oper_args[t,2; s,1; r,1] to eliminate terms t,s,r with priority among them in t. *)
+(* An elimination priority to certain argument terms. For example: elim_oper_args[t,2; s,1; r,1] to eliminate terms t,s,r with priority among them in t. *)
 let elim_oper_args term_weight_list : simple_indeterminate -> int list = function
 |`T t -> cons_maybe (assq_opt t term_weight_list) []
 | _ -> []
 
-(* An elimination priority to indeterminates assigned by the given weight function. For example to eliminate 3ʳᵈ variable: elim_indeterminate(function((`Shift|`Mul),3,arg)->1|_->0). *)
-let elim_indeterminate weight = todo"function"
-(* |`O f -> weight(`Shift, *)
+(* An elimination priority to certain indeterminates. This legacy function now almost directly delegates to its weighting parameter. *)
+let elim_indeterminate weight : simple_indeterminate -> int list = fun x -> [weight x]
 
 
-(* Equality for normalized polynomials. *)
+(* Equality of normalized polynomials *)
 let rec poly_eq p = CCList.equal mono_eq p
 and mono_eq m n = m==n or CCList.equal indet_eq m n
 and indet_eq x y = x==y or match x,y with
@@ -242,9 +261,9 @@ and indet_eq x y = x==y or match x,y with
   | O f, O g -> CCList.equal(CCPair.equal (=) poly_eq) f g
   | a, b -> a = b
 
-let bit_rotate_right r b = (b lsr r) + (b lsl lnot r) (* for int's lacking 1 bit and r≥0 *)
+let bit_rotate_right r b = (b lsr r) + (b lsl lnot r) (* for int lacking 1 bit and r≥0 *)
 
-(* Hash code for normalized polynomials. *)
+(* Hash code of normalized polynomials *)
 let rec poly_hash ?(depth=2) p = fold_left (fun h m -> 127*h + mono_hash ~depth m) 0 (take 4 p)
 and mono_hash ?(depth=2) = fold_left (fun h x -> 31*h + indet_hash ~depth x) 0
 and indet_hash ?(depth=2) = if depth=0 then ~=7 else function
@@ -253,18 +272,20 @@ and indet_hash ?(depth=2) = if depth=0 then ~=7 else function
   | A(T t) -> Term.hash t
   | x -> Hashtbl.hash x
 
+(* Auxiliarity to below. Separate the predicated indeterminates to coefficient polynomials. Inverse is given by
+	p: (poly * op list)list ↦ p |> map(fun(c,m) -> c><[m]) |> fold_left(++)_0 *)
 let coef_view part_of_coef : poly -> (poly * op list) list =
   map(take_drop_while part_of_coef)
   %> group_by ~eq:(snd%%>mono_eq) ~hash:(snd%>mono_hash)
   %> map(fun coef_mono_list -> map fst coef_mono_list, snd(hd coef_mono_list))
   %> sort(snd %%> rev_cmp_mono)
 
-(* Separate pointwise-multiplicative coefficients, e.g. 2xX+3x+4X+5 ↦ [(2x+4, X); (3x+5, 1)] *)
+(* Separate pointwise-multiplicative coefficients, e.g. 2yY+3y+4Y+5 ↦ [(2y+4, Y); (3y+5, 1)] *)
 let mul_coef_view = coef_view(function C _ | X _ -> true | _-> false)
-let lead_coef = fst % hd % mul_coef_view
-let lead_main_ops = snd % hd % mul_coef_view
+let lead_coef = fst % hd % mul_coef_view (* e.g. 2y+4 from above *)
+let lead_main_ops = snd % hd % mul_coef_view (* e.g. [Y] from above *)
 
-(* Use this instead of X constructor. *)
+(* Use this instead of the X constructor. *)
 let mul_indet = 
   let rec x = function
   | (X _ | C _ as m)::f -> m :: x f
@@ -272,12 +293,11 @@ let mul_indet =
   | m -> assert(equational[m]); [X m] in
   sort_poly % map x
 
-
 (* TODO provide an association in an environment *)
 let var_name = string_part_at "y x v u t s r p o n m l k j i h e a"
 let term_name t = Term.to_string t
 
-(* E.g. ["-2x";"3y";"-4z"] becomes "-2x﹢3y﹣4z". (In Ubuntu command line “﹢” has width 2 which seems nicer balance between 1 of “+” and 3 of “ + ”, some times.) *)
+(* E.g. ["-2x";"3y";"-4z"] becomes "-2x﹢3y﹣4z". (In Ubuntu command line “﹢” has width 2 which seems nice balance between 1 of “+” and 3 of “ + ”, some times.) *)
 let concat_plus_minus view = function
 | [] -> "0"
 | m::p -> map view p
@@ -310,7 +330,8 @@ and indet_to_string = function
 let pp_poly = to_formatter poly_to_string
 
 
-(* Embedding polynomials into terms (equality is not preserved!) *)
+(* Embedding polynomials into terms
+ Equality is not preserved! This embedding is a convenient point to make polynomials aware of the monomial order that is varied between computations. When a polynomial is retrieved from a clause, it is resorted to conform to the current order, if necessary. *)
 
 (* List of terms that the given recurrence relates, without duplicates. *)
 let terms_in = sort_uniq ~cmp:Term.compare % flat_map(fun m -> match rev m with A(T t)::_->[t] | _->[])
@@ -318,15 +339,19 @@ let terms_in = sort_uniq ~cmp:Term.compare % flat_map(fun m -> match rev m with 
 let term0 = Term.const ~ty:term (ID.make "𝟬")
 exception RepresentingPolynomial of poly * Precedence.Weight.t * (simple_indeterminate -> int list)
 
+(* Given polynomial P≠0, embed P into a fresh ID idP, that idP into a Term termP, and it into a literal term0≈termP. Return all three.
+ ~name is the name given to the idP. If omitted, the name is (somewhat wastefully) taken to be the string representation of P.
+ ~weight becomes the weight of idP in KBO (at least). Default weight ω is large because the polynomial literals are expected to be the most expensive literals of a clause to process. Note: the weight assignment is separately informed about the embedded polynomials because the weight of an ID is not assigned on construction. *)
 let poly_as_lit_term_id ?name ?(weight=omega) p =
   let id = ID.make(get_lazy(fun()-> poly_to_string p) name) in
   ID.set_payload id (RepresentingPolynomial(p, weight, !indeterminate_weights));
   let term = Term.const ~ty:term id in
   Literal.mk_eq term0 term, term, id
 
-(* Includes semantics of 0 unlike poly_as_lit_term_id. *)
+(* Includes semantics of 0 giving tautology unlike poly_as_lit_term_id. (Repeated calls still give incomparable literals.) *)
 let polyliteral p = if p = _0 then mk_tauto else (fun(l,_,_)->l) (poly_as_lit_term_id p)
 
+(* Retrieve polynomial that was embedded into an id by poly_as_lit_term_id (directly or indirectly). The retrieved polynomial conforms to the current monomial order. *)
 let poly_of_id id = id |> ID.payload_find ~f:(fun data -> match data with
   | RepresentingPolynomial(p,w,ord) ->
     if ord != !indeterminate_weights then(
@@ -337,16 +362,19 @@ let poly_of_id id = id |> ID.payload_find ~f:(fun data -> match data with
     else Some p
   | _ -> None)
 
+(* Retrieve polynomial embedded into a term and make it conform to the current monomial order. *)
 let poly_of_term t = match view t with Const id -> poly_of_id id |_->None
 
+(* Retrieve polynomial embedded into a literal and make it conform to the current monomial order. *)
 let poly_of_lit = function Equation(o,p,true) when o==term0 -> poly_of_term p |_->None
 
+(* Weight of polynomial id. Used when registering the extension in summation_equality.ml to update the weight assignment to be aware of the embedded polynomials. *)
 let polyweight_of_id = ID.payload_find ~f:(function RepresentingPolynomial(_,w,_) -> Some w |_->None)
 
 
 let union_map f = fold_left (fun u a -> Int_set.union u (f a)) Int_set.empty
 
-(* Domain and range (explicit parts) of O (substitution) indeterminate. *)
+(* Domain and range (explicit parts) of an O (substitution) indeterminate. *)
 let domainO f = Int_set.of_list(map fst f)
 let rec rangeO f = union_map(free_variables%snd) f
 
@@ -356,7 +384,7 @@ and free_variables p' = Int_set.(let rec monoFV = function
   | x::m -> union (monoFV m) (match x with
     | O f -> assert false (* was prior case *)
     | C _ | A I -> empty
-    (* Do operators make explicit all implicit dependencies in argument terms? *)
+    (* Do operators make explicit all implicit dependencies in argument terms? If not, below is wrong! *)
     | A(V i) | S i | D i | XD i -> singleton i
     | X f -> monoFV f
     | A(T t) -> map_or ~default:empty free_variables (poly_of_term t) (* TODO properly track variables of a term *)
@@ -371,7 +399,7 @@ let rename_apart ~taken vs = match Int_set.(
   | [] -> [], [], []
   | raw -> [O(map(fun(v,u)->v,[[A(V u)]]) raw)], [O(map(fun(v,u)->u,[[A(V v)]]) raw)], raw
 
-(* If f n = M·n+a⃗, return Some(M,a⃗) where the matrix M and vector a⃗ are directly indexed by the present variables (as variables are usually small, expected waste of space is little—except that matrices can still easily waste quadratically space). Moreover we need a way to test for M=I to distinguish compound shifts. Substitution changes variables of the range to variables of the source space. Usually we index by the mapped range variables and hence they are the first indices that happens to coincide with the standard convention of writing matrix element indices. *)
+(* If f n = M·n+a⃗, return Some(M,a⃗) where the matrix M and vector a⃗ are directly indexed by the present variables (as variables are usually small, expected waste of space is little—except that matrices can still easily waste quadratically space). Moreover, to distinguish compound shifts, we test if M=I by encoding [||] for no-change rows (that is, if Meᵢ=eᵢ then M.(i)=[||]).  Substitution changes variables of the range to variables of the source space. Usually we index by the mapped range variables and hence they are the first indices that happens to coincide with the standard convention of writing matrix element indices. *)
 let view_affine f =
   let size = 1 + fold_left(fun s (v,_) -> max s v) 0 f in
   let width = map_or ~default:0 ((+)1) (Int_set.max_elt_opt(rangeO f)) in
@@ -380,7 +408,7 @@ let view_affine f =
   try f|>map(fun(i,p) ->
     let put vs sh = (* i ↦ vs+sh = variable list + shift constant *)
       shift.(i) <- sh;
-      if vs!=[[A(V i)]] then (* identity variable mapping gets encoded by [||] always *)
+      if vs<>[[A(V i)]] then (* identity variable mapping gets encoded by [||] always *)
         matrix.(i) <- fold_left (fun row -> function
           | [A(V n)] -> row.(n) <- 1; row
           | [C a; A(V n)] -> row.(n) <- Z.to_int a; row
@@ -474,6 +502,9 @@ let poly_alg: poly ring = object
   method of_Z = const_op_poly
 end
 
+(* Law product(a@b) = product a >< product b requires to choose to use const_op_poly. *)
+let product = fold_left (><) (const_op_poly Z.one)
+
 (* Unification and superposition *)
 
 let rec unifiers m' n' =
@@ -527,7 +558,8 @@ let default_features() = (* () because of type variables *)
   ]
 
 
-let map_terms f = sort_poly % map(map(function A(T t) -> A(T(f t)) | x -> x))
+let map_indeterminates f = fold_left (++) _0 % map(product % map f)
+let map_terms f = map_indeterminates(function A(T t) -> [[A(T(f t))]] | x -> [[x]])
 
 (* Applicable after (mul_)coef_view *)
 let to_poly_poly: (poly * op list) list -> poly =
@@ -586,7 +618,7 @@ and poly_of_mono_string s' = if s'="" then _0 (* neutral in splitting above *) e
     fun i s -> f i >< if s="" then [[]] (* neutral in this recursion *) else poly_of_mono_string s
   ) rules) s' in
   map_start_factor[
-    ("y x v u t s r p o n m l k j i h e a",fun i->mul_indet[[A(V i)]]);
+    ("y x v u t s r p o n m l k j i h e a",fun i->[[mul_var i]]);
     ("Y X V U T S R P O N M L K J I H E A",fun i->[[shift i]]);
     ("∑ʸ ∑ˣ ∑ᵛ ∑ᵘ ∑ᵗ ∑ˢ ∑ʳ ∑ᵖ ∑ᵒ ∑ⁿ ∑ᵐ ∑ˡ ∑ᵏ ∑ʲ ∑ⁱ ∑ʰ ∑ᵉ ∑ᵃ",fun i->[[S i]]);
     ("ᵧ ₓ ᵥ ᵤ ₜ ₛ ᵣ ₚ ₒ ₙ ₘ ₗ ₖ ⱼ ᵢ ₕ ₑ ₐ",fun i->[[D i]]);

@@ -362,7 +362,7 @@ let map_monomials f l =
 
 let mgu_coef a b = Z.(lcm a b / a, lcm a b / b)
 let mgu_pow m m' = (fun n -> make_powers(fun v -> max m.(v) m'.(v) - n.(v))) @@ (m,m')
-(* Note: shift One always raises MonomialIncompatibility because it is never a leading monomial in normal circumstances. *)
+(* Note: the shift One always raises MonomialIncompatibility because it is never a leading monomial in normal circumstances. *)
 let rec mgu_shift s s' =
   let require condition = if not condition then raise MonomialIncompatibility in
   match s,s' with
@@ -401,9 +401,9 @@ let rec mgu (c,m,s) (c',m',s') =
   let fix n = function
   | Diagonal(sub, dup, _,_) -> (sub|->0) ((dup|+>n.(sub)) n)
   | _ -> n in
-  let uc, uc' = mgu_coef c c' in
-  let um, um' = mgu_pow (fix m s') (fix m' s) in
-  let us, us' = mgu_shift s s' in
+  let uc,uc' = mgu_coef c c' in
+  let um,um' = mgu_pow (fix m s') (fix m' s) in
+  let us,us' = mgu_shift s s' in
   (uc,um,us), (uc',um',us')
 
 let (|~>) general special = match mgu general special with
@@ -421,12 +421,12 @@ let ( *:) a = if is0 a then ~=_0 else map Z.(fun(c,m,s) -> a*c,m,s)
 let (--) p r = p ++ Z.of_int(-1)*:r
 
 (* multiplier × polynomial *)
-let ( **:) m = substiply(Z.one, m, Shift(power0(), _z 0))
-let mul_var ?(by=1) v = ( **:)((v|->by)(power0()))
+let ( **:) m = substiply(Z.one, m, Shift(power0 (), _z 0))
+let mul_var ?(by=1) v = ( **:) ((v|->by) (power0 ()))
 
 (* shift × monomial *)
-let ( **>) s = substiply(Z.one, power0(), Shift(s, _z 0))
-let shift_var ?(by=1) v = ( **>)((v|->by)(power0()))
+let ( **>) s = substiply(Z.one, power0 (), Shift(s, _z 0))
+let shift_var ?(by=1) v = ( **>) ((v|->by) (power0 ()))
 
 
 (* Calculate superposition between two polynomials pⱼ (j=1,2) that represent equations m⬝pⱼ=0 where m runs over all monomials. A result is m₁p₁ - m₂p₂ where mⱼ are least monomials such that leading terms in mⱼpⱼ equal. Currently result is unique, if superposition is possible. *)
@@ -619,13 +619,18 @@ let map_poly_in_clause f ?(rule=Proof.Rule.mk"arithmetic on recurrence") c =
     (Proof.Step.inference ~rule)
 
 
-(* Explicit cache for propagate_recurrences_to. We could also use with_cache_rec but its explicit recursive call functionparameter is slightly inconvenient in a large mutually recursive block. *)
+(* Explicit cache for propagate_recurrences_to. We could also use with_cache_rec but its explicit recursive call functionparameter is slightly inconvenient in a long mutually recursive definition group. *)
 module PolyMap = Hashtbl.Make(struct
   type t = R.poly
   let equal = R.poly_eq
   let hash p = R.poly_hash p
 end)
 let recurrence_table = PolyMap.create 16
+
+(* Add clause c to the list of recurrences of p. *)
+let add_new_rec p c = PolyMap.add recurrence_table p
+  (CCList.add_nodup ~eq:C.equal c
+    (get_or~default:[] (PolyMap.find_opt recurrence_table p)))
 
 let rec propagate_recurrences_to f = match PolyMap.find_opt recurrence_table f with
 | Some r -> r
@@ -670,10 +675,10 @@ and propagate_times f g =
 
 and propagate_sum i f =
   let bad = ref[] in
-  let sum_blocker = function
+  let sum_blocker = function (* gives elimination priorities: [] is good, [1] is bad *)
   |`T t when not R.(CCOpt.equal poly_eq (Some f) (poly_of_term t)) -> []
   |`V v when v!=i -> []
-  |`O(v, R.[[A(V w)];[A I]]) when v=w -> (try fst([], (if v=i then near_bijectivity_error else near_commutation_error v) i)
+  |`O[v, R.[[A(V w)];[A I]]] when v=w -> (try fst([], (if v=i then near_bijectivity_error else near_commutation_error v) i)
   with Exit -> [1])
   | _ -> [1]
   in
@@ -700,18 +705,50 @@ and near_bijectivity_error = todo"biject error"
 and near_commutation_error = todo"commutation error"
 
 and propagate_subst s f =
-  (* 1. for each result coordinate create compound shift *)
-  (* 2. create equations: compound shift = composition of 1-shifts ↭ 𝕊ⱼ = ∏ᵢ Sᵢ^mᵢⱼ *)
+  (* 1. for each range coordinate create compound shift *)
+  (* 2. create equations: compound shift = composition of 1-shifts ↭ 𝕊ⱼ = ∏ᵢ Sᵢ^mᵢⱼ or as well 𝕊ᵃ = Sᵐᵃ *)
   (* 3. saturate *)
-  (* 4. replace each compound shift by single 1-shift, and substitute multipliers *)
+  (* 4. replace each compound shift by a 1-shift, and substitute multipliers *)
+  let is1shift = function R.O[_,[[A I]]] -> true | _ -> false in
   let dom = R.free_variables f in
   let s = filter (fun(v,_)-> Int_set.mem v dom) s in (* ⇒ domain of s ⊆ dom ...necessary? *)
   match R.view_affine s with
   | None -> Iter.empty
   | Some(m,a) ->
-  todo"propag. σ"
+    (* If 𝕊ⱼ=Sⱼ, we skip it, which makes saturation faster, but primarily this is to dodge the issue of telling 𝕊ⱼ and Sⱼ apart. *)
+    let changedShift = filter(fun j -> exists R.(fun i -> m@.(i,j) != if i=j then 1 else 0) (Int_set.to_list dom)) in
+    let multishifts_and_equations = changedShift(Int_set.to_list(R.rangeO s)) |> map R.(fun j ->
+      let on_dom f = map f (Int_set.to_list dom) in
+      (* 𝕊ⱼ = ∏ᵢ Sᵢ^mᵢⱼ = O[0,m₀ⱼ;...;i,mᵢⱼ;...] where j runs over range and i over domain *)
+      let ss_j = O(on_dom(fun i -> i, const_eq_poly(Z.of_int(m@.(i,j))))) in
+      (* TODO Recurrence polynomial data structure needs an additional marker to distinguish compound shifts from ordinary ones in all corner cases. *)
+      if is1shift ss_j then failwith("Unimplemented: "^ string_of_int j^"ᵗʰ compound shift cannot be distinguished from 1-shift when propagating to substitution "^ poly_to_string[[O s]] ^" of "^ poly_to_string f);
+      let eq_j = product(on_dom(fun i -> pow' poly_alg [[shift i]] (max 0 (m@.(i,j)))))
+        -- product([[ss_j]] :: on_dom(fun i -> pow' poly_alg [[shift i]] (- min 0 (m@.(i,j))))) in
+      ((ss_j, shift j), j), eq_j
+    ) in
+    (* We must eliminate all domain shifts except ones skipped above: dom\( rangeO s \ {j | ∃ ss_j} ) *)
+    let elimIndices = Int_set.(diff dom (diff (R.rangeO s) (of_list(List.map(function((_,j),_)->j) multishifts_and_equations)))) in
+    Iter.of_list(propagate_recurrences_to f)
+    |> Iter.append(Iter.of_list(map (definitional_poly_clause % snd) multishifts_and_equations))
+    |> saturate_with_order(R.elim_indeterminate(function
+      |`O[i,R.[[A I]]] -> if Int_set.mem i elimIndices then 1 else 0
+      | _ -> 0))
+    |> Iter.map(map_poly_in_clause R.(map_indeterminates(function
+      (* Replace Mᵢ=X[A(V i)] by ∑ⱼmᵢⱼMⱼ. *)
+      | X[A(V i)] -> fold_left (++) _0 (map(fun j -> const_op_poly(Z.of_int(m@.(i,j))) >< [[mul_var j]]) (Int_set.to_list(R.rangeO s)))
+      (* Replace 𝕊ⱼ by Sⱼ by looking it up from multishifts_and_equations. *)
+      | x -> [[get_or~default:x (CCList.assoc_opt ~eq:indet_eq x (map(fst%fst) multishifts_and_equations))]])))
 
 
+(* Make a polynomial into a new recurrence of its maximal term. Since polynomial is packed into a new clause, this function in this form is only suitable for testing. *)
+let declare_recurrence r = add_new_rec R.(of_term(max_list ~ord:Term.compare (terms_in r))) (definitional_poly_clause r)
+
+let sum_equality_inference clause =
+  "test"|< propagate_recurrences_to(R.poly_of_string "Xx");
+  tl(tl[clause; clause])
+
+(************************************************************************)
 let coords = ref []
 let var_term index = nth !coords index
 let var_index term = try index_of ((==)term) !coords
@@ -723,7 +760,7 @@ let is_summation s = match view s with
 
 let to_Z t = match view t with
 | AppBuiltin(B.Int z, []) -> z
-| AppBuiltin(B.Rat q, []) when Z.equal Z.one (Q.den q) -> Q.num q
+| AppBuiltin(B.Rat q, []) when Z.one == Q.den q -> Q.num q
 | _ -> raise Exit
 let is_Z t = try snd(to_Z t, true) with Exit -> false
 let to_int = Z.to_int % to_Z
@@ -734,7 +771,7 @@ let is_atom t = is_Z t or ty t == int & match view t with
 | App(f,x) -> for_all is_Z x
 | _ -> false
 
-let is_free t = ty t == int & is_var t
+let is_free t = ty t ==int & is_var t
 
 let recurrence_table = HT.create 32
 let add_recurrence t r = HT.add recurrence_table t (r :: get_or ~default:[] (HT.find_opt recurrence_table t))
@@ -744,28 +781,28 @@ type encoding_phase_info = {coords: term list; symbols: term list; specialise: t
 
 let _Z a = app_builtin ~ty:int (Int a) []
 let _z = _Z % Z.of_int
-let trivC = make_clause [Literal.mk_tauto] ~=Proof.Step.trivial
+let trivC = make_clause[Literal.mk_tauto] ~=Proof.Step.trivial
 let feed = MainEnv.FormRename.get_skolem ~parent:trivC ~mode:`SkolemRecycle
 
 let rec ev t = match view t with
-| AppBuiltin(B.Sum, [_;x;y]) ->
+| AppBuiltin(B.Sum, [_; x; y]) ->
   let x, y = ev x, ev y in
   (try _Z Z.(to_Z x + to_Z y)
-  with Exit -> app_builtin ~ty:int B.Sum [of_ty int;x;y])
-| AppBuiltin(B.Difference, [_;x;y]) ->
+  with Exit -> app_builtin ~ty:int B.Sum [of_ty int; x; y])
+| AppBuiltin(B.Difference, [_; x; y]) ->
   let x, y = ev x, ev y in
   (try _Z Z.(to_Z x - to_Z y)
-  with Exit -> app_builtin ~ty:int B.Difference [of_ty int;x;y])
-| AppBuiltin(B.Product, [_;x;y]) ->
+  with Exit -> app_builtin ~ty:int B.Difference [of_ty int; x; y])
+| AppBuiltin(B.Product, [_; x; y]) ->
   let x, y = ev x, ev y in
   (try _Z Z.(to_Z x * to_Z y)
-  with Exit -> app_builtin ~ty:int B.Product [of_ty int;x;y])
+  with Exit -> app_builtin ~ty:int B.Product [of_ty int; x; y])
 | App(s,[m;f]) when is_summation s & is_Z(ev m) ->
   ev R.(fold_left (fun adds j -> app_builtin ~ty:int B.Sum [of_ty int; adds; f@<[j]]) (_z 0) (init (1+to_int(ev m)) _z))
 | App(f,p) -> app (ev f) (map ev p)
 | Fun(ty,b) -> fun_ ty (ev b)
 | _ -> t
-(* The only two uses of ev, hopefully. *)
+(* The only two uses of ev. *)
 and (@<) g = ev % Lambda.whnf_list g
 let (=:) by old = ev % replace ~old ~by
 
@@ -890,36 +927,6 @@ and propagate_times t s t_x_s =
     |> saturate
     |> filter_recurrences_of(fun x -> x==t or x==s)
   in
-  (* Computing dimension: Max size of a set S of indeterminates s.t. following. A leading element of basis is interpreted as a set of its indeterminates A. Demand A⊈S for all such A.
-  let module S = Int_set in
-  let to_set powers = CCArray.foldi (fun present var pow -> (if pow=0 then id else S.add var) present) S.empty powers in
-  let shift_vars_on tl = sort_uniq ~cmp:(-) % flat_map(function
-  | _, _, R.Shift(s,f) when memq f tl -> S.to_list(to_set s)
-  | _ -> [])
-  in
-  let var_set = shift_vars_on[t;s] (concat(of_iter(polys_in init_recurrences))) in
-  let dimension_wrt clauses x =
-    let heads = Iter.to_rev_list(polys_in clauses) |> flat_map(fun p ->
-      match hd p with
-      | _, _, R.Shift(s,x') when x'==x -> [to_set s]
-      | _ -> [])
-    in
-    let rec size_nonsuperset s = function
-    | [] -> S.cardinal s
-    | v::vars ->
-      let s_v = S.add v s in
-      size_nonsuperset s vars |>
-      if exists (flip S.subset s_v) heads then id else max (size_nonsuperset s_v vars)
-    in
-    size_nonsuperset S.empty var_set
-  in
-  let goal_dim = (dimension_wrt init_recurrences %%> (+)) t s in
-  let module SubEnv = (val env) in
-  SubEnv.add_unary_inf "termination test" (fun _ ->
-    if goal_dim >= dimension_wrt (SubEnv.get_active()) t_x_s
-    (* TODO reliably terminate—cannot timeout (see do_step in saturate.ml line 255), nor generate ⊥ (important becomes redundant and removable) *)
-    then SubEnv.get_passive() C.mark_redundant;
-  []);*)
   init_recurrences
   |> Iter.cons(definitional_poly_clause R.(of_term t_x_s --  (mul_indet(of_term t) >< of_term s)))
   |> saturate
@@ -932,7 +939,7 @@ and propagate_sum set sum_var s sum =
   |`T t when t != s -> []
   (* |`V v when v=sum_var -> [1] *)
   |`V v when v!=sum_var -> []
-  |`O(v, R.[[A(V w)];[A I]]) when v=w -> (try fst([], (if v=sum_var then near_bijectivity_error else near_commutation_error v) set sum_var)
+  |`O[v, R.[[A(V w)];[A I]]] when v=w -> (try fst([], (if v=sum_var then near_bijectivity_error else near_commutation_error v) set sum_var)
   with Exit -> [1])
   | _ -> [1]
   in
@@ -1046,7 +1053,7 @@ let step text parents lits =
   else Proof.Step.inference ~tags:[] ~rule:(Proof.Rule.mk text) parent_proofs)
 
 
-let sum_equality_inference clause =
+let sum_equality_inference' clause =
   fold_lits ~eligible:(C.Eligible.res clause) (C.lits clause) 
   |> Iter.find(fun(lit, place) ->
     (* Top-level ∑ must exist. *)
@@ -1155,12 +1162,13 @@ let extension = RecurrencePolynomial.{
     let module I = MakeSumSolver(E) in()];
   
   prec_actions = Compute_prec.[fun state -> if not !sum_by_recurrences then id else
-    add_constr 0 (* priority 0=high—we affect only specific symbols *)
+    add_constr 0 (* priority 0=high—we coarsely define recurrence literals to be large, while tiebreaking must follow later *)
     (Precedence.Constr.make(fun a b -> match poly_of_id a, poly_of_id b with
       | None, Some _ -> 1
       | Some _, None -> -1
       | _ -> 0
     ))%
+    (* We cannot simply define the KBO weights to be maximal too. Instead they are overriding parameters that we query by polyweight_of_id. *)
     update_weight_rule(fun wf _ id -> get_lazy (fun()-> wf id) (polyweight_of_id id))];
 };;
 (* TODO Setting --int-inf-diff-to-lesseq is vital but Arith_int.ml hides it currently. *)
