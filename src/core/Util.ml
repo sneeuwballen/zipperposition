@@ -311,13 +311,13 @@ module UntypedPrint = struct
       else loop printers
     in loop(magic !string_printers)
 
-  (* Print message msg preceded by FILE line LINE ⛓️CALLDEPTH of the caller's caller. *)
+  (* Print message msg preceded by FILE line LINE ⛓️CALL-DEPTH of the caller's caller. *)
   let print_with_caller msg =
     print_string(caller_file_line 2 ^" ⛓️"^ str Printexc.(raw_backtrace_length(get_callstack 9999)) ^"\t");
     flush_all(); (* Show at least location if printing triggers segmentation fault. *)
-    let msg = msg() in print_endline(msg ^ if String.length msg < 55(*rough*) then "" else "\n")
+    let msg = msg() in print_endline(msg ^ if String.length msg < 55(*arbitrary*) then "" else "\n")
 
-  (* Sprinkle these in front of expressions you want to trace—often without rebracketing! *)
+  (* Sprinkle these in front of expressions you want to trace—often without rebracketing! Each printed value is identified by “FILE line LINE  ⛓️CALL-CHAIN-LENGTH”. The messages can be bogus due to inlining and lack of runtime types. *)
   let (~<)x = print_with_caller(fun()-> str x); x
   let (|<) info x = print_with_caller(fun()-> info ^" "^ str x); x
 end

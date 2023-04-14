@@ -295,7 +295,6 @@ add_pp term Term.to_string;
 add_pp literal Literal.to_string;
 add_pp proof (CCFormat.to_string Proof.S.pp_normal);
 
-add_pp indeterminate (digits_in serif % RecurrencePolynomial.indet_to_string);
 add_pp monomial (digits_in serif % RecurrencePolynomial.mono_to_string);
 add_pp polynomial (digits_in serif % RecurrencePolynomial.poly_to_string);
 (* open Summation_equality.RecurrencePolynomial;;

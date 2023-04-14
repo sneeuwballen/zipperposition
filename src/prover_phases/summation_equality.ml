@@ -1,4 +1,5 @@
 (* open Batteries opam install batteries + edit src/core/dune *)
+[@@@warning "-10-26"](* Before final cleanup, tolerate unused values and definitions. *)
 open Logtk
 open Logtk_parsers
 open Logtk_proofs
@@ -645,13 +646,12 @@ let rec propagate_recurrences_to f = match PolyMap.find_opt recurrence_table f w
   PolyMap.add recurrence_table f r;
   r
 
-and recurrences_of_term t = map_or ~default:[] propagate_recurrences_to (R.poly_of_term t)
+and recurrences_of_term t = propagate_recurrences_to R.(get_or~default:(of_term t) (poly_of_term t))
 
 and propagate_oper_affine p's_on_f's =
   let _,result,_ = R.poly_as_lit_term_id p's_on_f's in
   let pf_sum = R.oper_coef_view p's_on_f's in
   let f's = R.terms_in pf_sum in
-  (* let _, saturate = make_polynomial_environment(R.elim_oper_args((result,1) :: map(fun f -> f,2) f's)) in *)
   Iter.of_list(flat_map recurrences_of_term f's)
   |> Iter.cons(definitional_poly_clause R.(of_term result -- pf_sum))
   |> saturate_with_order(R.elim_oper_args((result,1) :: map(fun f -> f,2) f's))
@@ -663,7 +663,7 @@ and propagate_times f g =
   (* 3. propagate to substitution σ(f·ϱg) *)
   let rename, merge, _ = R.rename_apart ~taken:(R.free_variables f) (R.free_variables g) in
   let disjoint_recurrences = R.(
-    map(map_poly_in_clause(fun r -> r><mul_indet([rename]>< g))) (propagate_recurrences_to f) @
+    map(map_poly_in_clause(fun r -> r><mul_indet([rename]><g))) (propagate_recurrences_to f) @
     map(map_poly_in_clause(fun r -> mul_indet f><[rename]><r)) (propagate_recurrences_to g)) in
   match merge with
   | [] -> Iter.of_list disjoint_recurrences
@@ -701,8 +701,8 @@ and propagate_sum i f =
     |> resaturate
   )
 
-and near_bijectivity_error = todo"biject error"
-and near_commutation_error = todo"commutation error"
+and near_bijectivity_error _ = todo"biject error"
+and near_commutation_error _ = todo"commutation error"
 
 and propagate_subst s f =
   (* 1. for each range coordinate create compound shift *)
@@ -742,11 +742,23 @@ and propagate_subst s f =
 
 
 (* Make a polynomial into a new recurrence of its maximal term. Since polynomial is packed into a new clause, this function in this form is only suitable for testing. *)
-let declare_recurrence r = add_new_rec R.(of_term(max_list ~ord:Term.compare (terms_in r))) (definitional_poly_clause r)
+let declare_recurrence r = add_new_rec
+  R.(of_term(max_list ~ord:Term.compare (terms_in r)))
+  (definitional_poly_clause r)
 
 let sum_equality_inference clause =
-  "test"|< propagate_recurrences_to(R.poly_of_string "Xx");
-  tl(tl[clause; clause])
+  let the = R.poly_of_string in
+  declare_recurrence(the"NNf-Nf-f");
+  declare_recurrence(the"Ng-ng-g");
+  (*
+  propagate_recurrences_to (the"nf");
+  propagate_recurrences_to (the"g+f");(*OK*)
+  *)
+  propagate_recurrences_to (the"g+nf");(*loop*)
+  ~<recurrence_table;
+  print_endline "————— summation_equality: Test routine terminated —————";
+  exit 1
+  (* tl(tl[clause;clause]) *)
 
 (************************************************************************)
 let coords = ref []
