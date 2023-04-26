@@ -83,7 +83,8 @@ let const_eq_poly n = Z.(if equal n zero then [] else if equal n one then [[A I]
 (* Other safe constructors except that for X comes after ordering. *)
 let shift i = O[i,[[A(V i)];[A I]]]
 let mul_var i = X[A(V i)]
-let eval_at ~var at = O[var, const_eq_poly at]
+let eval_at' ~var p = O[var, p]
+let eval_at ~var at = eval_at' ~var (const_eq_poly at)
 (* Embed term into polynomial argument. See also poly_of_term to reverse embedding of polynomial in a term. *)
 let of_term t = [[A(T t)]]
 
@@ -252,6 +253,14 @@ let elim_oper_args term_weight_list : simple_indeterminate -> int list = functio
 let elim_indeterminate weight : simple_indeterminate -> int list = fun x -> [weight x]
 
 
+(* Use this instead of the X constructor. *)
+let mul_indet = 
+  let rec x = function
+  | (X _ | C _ as m)::f -> m :: x f
+  | [A I] -> []
+  | m -> assert(equational[m]); [X m] in
+  sort_poly % map x
+
 (* Equality of normalized polynomials *)
 let rec poly_eq p = CCList.equal mono_eq p
 and mono_eq m n = m==n or CCList.equal indet_eq m n
@@ -282,17 +291,16 @@ let coef_view part_of_coef : poly -> (poly * op list) list =
   %> sort(snd %%> rev_cmp_mono)
 
 (* Separate pointwise-multiplicative coefficients, e.g. 2yY+3y+4Y+5 ↦ [(2y+4, Y); (3y+5, 1)] *)
-let mul_coef_view = coef_view(function C _ | X _ -> true | _-> false)
-let lead_coef = fst % hd % mul_coef_view (* e.g. 2y+4 from above *)
-let lead_main_ops = snd % hd % mul_coef_view (* e.g. [Y] from above *)
+let mul_coef_view = coef_view(function C _ | X _ -> true | _ -> false)
+let lead_coef = fst % hd % mul_coef_view	(* e.g. 2y+4 from above *)
+let lead_main_ops = snd % hd % mul_coef_view	(* e.g. [Y] from above *)
 
-(* Use this instead of the X constructor. *)
-let mul_indet = 
-  let rec x = function
-  | (X _ | C _ as m)::f -> m :: x f
-  | [A I] -> []
-  | m -> assert(equational[m]); [X m] in
-  sort_poly % map x
+(* Allows to compute e.g. ∑ₙᑉᵐ s.t. ∑ₙᑉᵐ(M·P) = -Pₘ + M·∑ₙᑉᵐP and ∑ₙᑉᵐ(N·P) = Pₘ - P₀ + ∑ₙᑉᵐP *)
+let rec fold_indeterminates a f = function
+| [] | [A I] -> a `I
+| [A(T t)] -> a(`T t)
+| [A(V i)] -> a(`V i)
+| x::m -> f (fold_indeterminates a f m) [m] x (* x last ⇒ anonymous pattern match is possible *)
 
 
 (* Pretty-printing string conversion *)
@@ -300,14 +308,8 @@ let mul_indet =
 (* TODO provide an association in an environment *)
 let var_name = string_part_at "y x v u t s r p o n m l k j i h e a"
 (* Mostly Term.to_string but when polynomials are embedded into terms which are in turn embedded into polynomials, confusion could arise. Hence in one of these two embeddings the names have to be annotated.
- I use overlining here that has the benefit of not increasing visual length but the down side of not being problematic to iterate. As all pretty-printing, this can be changed to fit other needs, should such arise. *)
-let term_name t =
-  let _name = flip String.iter (Term.to_string t)
-    (* |> Iter.filter(fun c -> not(mem c [' ';'(';')'])) *)
-    (* |> Iter.take 20 *)
-    |> Iter.to_string ~sep:"" (fun c ->
-      (if Char.code c lsr 6 != 2 then "̅" else "") ^ String.make 1 c)
-  in String.sub (_name ^ "̅") 2 (String.length _name)
+ Currently I annotate at the embedding. This has the trade-off of making all polynomials in terms/clauses “ugly” but an embedded polynomial in a term in a polynomial does not need nested annotation. *)
+let term_name t = Term.to_string t
 
 (* E.g. ["-2x";"3y";"-4z"] becomes "-2x﹢3y﹣4z". (On Ubuntu command line “﹢” has width 2 which seems nice balance between 1 of “+” and 3 of “ + ”, some times.) *)
 let concat_plus_minus view = function
@@ -352,10 +354,18 @@ let term0 = Term.const ~ty:term (ID.make "𝟬")
 exception RepresentingPolynomial of poly * Precedence.Weight.t * (simple_indeterminate -> int list)
 
 (* Given polynomial P≠0, embed P into a fresh ID idP, that idP into a Term termP, and it into a literal term0≈termP. Return all three.
- ~name is the name given to the idP. If omitted, the name is (somewhat wastefully) taken to be the string representation of P.
- ~weight becomes the weight of idP in KBO (at least). Default weight ω is large because the polynomial literals are expected to be the most expensive literals of a clause to process. Note: the weight assignment is separately informed about the embedded polynomials because the weight of an ID is not assigned on construction. *)
+ ~name is the name given to the idP. If omitted, the name is (somewhat wastefully) taken to be the string representation of P, which is further annotated to support nesting the terms back into polynomials and into terms again.
+ ~weight becomes the weight of idP in KBO. Default weight ω is large because the polynomial literals are expected to be the most expensive literals of a clause to process. Note: the weight assignment is separately informed about the embedded polynomials because the weight of an ID is not assigned on construction, and precedence is fixed at the same time. *)
 let poly_as_lit_term_id ?name ?(weight=omega) p =
-  let id = ID.make(get_lazy(fun()-> poly_to_string p) name) in
+  let id = ID.make(name |> get_lazy(fun()->
+    (* I annotate by overlining here that has the benefit of not increasing visual length but the down side of being problematic to iterate. As all pretty-printing, this can be changed to fit other needs, should such arise. *)
+    let _name = flip String.iter (poly_to_string p)
+    (* |> Iter.filter(fun c -> not(mem c [' ';'(';')'])) *)
+    (* |> Iter.take 20 *)
+    |> Iter.to_string ~sep:"" (fun c ->
+      (if Char.code c lsr 6 != 2 then "̅" else "") ^ String.make 1 c)
+    in String.sub (_name ^ "̅") 2 (String.length _name)))
+  in
   ID.set_payload id (RepresentingPolynomial(p, weight, !indeterminate_weights));
   let term = Term.const ~ty:term id in
   Literal.mk_eq term0 term, term, id
@@ -547,14 +557,17 @@ let lead_unifiers = curry(function x::_, y::_ -> unifiers x y | _ -> None)
 let (|~>) general special = match lead_unifiers general special with
 | Some(u, []) -> Some u
 | Some(u, [C __1]) when Z.(equal __1 minus_one) -> Some(__1*.u)
+(* Only reduce the absolute value of the leading coefficient. This is symmetric w.r.t. 0 so a/b rounds correctly towards 0. *)
+| Some(C a :: u, [C b]) when Z.(abs a > abs b) -> Some Z.(a/b*.u)
+(* TODO is the converse when u=[] necessary to handle? *)
 | _ -> None
 
 
-let superpose p p' = match lead_unifiers p p' with
-  | Some(u,u') -> ~<[([u]><p) -- ([u']><p')]
+let superpose p p' = match lead_unifiers ~<p ~<p' with
+  | Some(u,u') -> [([u]><p) -- ([u']><p')]
   | None -> []
 
-let leadrewrite r p = CCOpt.map(fun u -> p -- ([u]><r)) (r |~> ~<p)
+let leadrewrite r p = CCOpt.map(fun u -> p -- ([u]><r)) (r |~> p)
 
 
 module type View = sig type t type v val view: t -> v option end
@@ -578,7 +591,9 @@ let default_features() = (* () because of type variables *)
   ]
 
 
-let map_indeterminates f = fold_left (++) _0 % map(product % map f)
+(* The input function produces polynomials, and its mapped version is a homomorphism. *)
+let map_monomials f = fold_left (++) _0 % map f
+let map_indeterminates f = map_monomials(product % map f)
 let map_terms f = map_indeterminates(function A(T t) -> of_term(f t) | x -> [[x]])
 
 (* Applicable after (mul_)coef_view. Pack separated (op list)'s into argument terms of polynomial except when they are already packed that way. *)

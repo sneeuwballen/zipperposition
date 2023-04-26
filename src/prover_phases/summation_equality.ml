@@ -179,14 +179,14 @@ type poly = monomial list
 (* This exception terminates computing or applying unifiers. Partial operations on monomials, such as product, may be considered as its cause. *)
 exception MonomialIncompatibility
 
+let (|->) i v a = assert(v>=0); a.(i)<-v; a (* powers are non-negative *)
+let (|=>) i v = (i|->v) % copy
+let (|+>) i v a = (i |=> a.(i)+v) a
+
 let is0 = Z.equal Z.zero
 let _Q q = app_builtin ~ty:int (Rat q) []
 let _Z = _Q % Q.of_bigint
 let _z = _Z % Z.of_int
-
-let (|->) i v a = assert(v>=0); a.(i)<-v; a (* powers are non-negative *)
-let (|=>) i v = (i|->v) % copy
-let (|+>) i v a = (i |=> a.(i)+v) a
 
 let coordinate_count = ref 0
 let fold_coordinates o f = fold_left f o (init !coordinate_count id)
@@ -194,17 +194,46 @@ let fold_coordinates o f = fold_left f o (init !coordinate_count id)
 let make_powers f = Array.init !coordinate_count f
 let (+^) = Array.map2(+)
 
+let power0() = make_powers~=0
+let _0 = []
+let _1 t = [Z.one, power0(), Shift(power0(), t)]
+let _1x1 t s = [Z.one, power0(), product(power0(), t, power0(), s)]
+
+let equal_shifts s z = s==z or match s,z with
+| Shift(s,f), Shift(z,g) -> s=z & f==g
+| Product(s1,f1, s2,f2), Product(z1,g1, z2,g2) -> s1=z1 & f1==g1 & s2=z2 & f2==g2
+| Diagonal(a,b,s,f), Diagonal(c,d,z,g) -> a=c & b=d & s=z & f==g
+| _ -> false
+let (=^) = equal_shifts
+
+let sum_monomials =
+  let rec sum_same = function
+  | (o,m,s)::p when is0 o -> sum_same p
+  | (c,m,s)::(a,n,z)::p when m=n & s=^z -> sum_same(Z.(c+a,m,s)::p)
+  | cms::p -> cms :: sum_same p
+  | [] -> []
+  in
+  sum_same % sort rev_cmp_mono
+
+let map_monomials k = sum_monomials % flat_map k
+
+let map_terms k = map_monomials(fun(c,m,s) -> [c, m, match s with
+| One -> One
+| Shift(s,f) -> Shift(s, k f)
+| Product(s,f,z,g) -> product(s, k f, z, k g)
+| Diagonal(sub,dup,s,f) -> Diagonal(sub, dup, s, k f)])
+
 
 let varstr name1 n = String.make 1 Char.(chr(code name1 - n))
 
 let termstr t = (flip String.iter (to_string t)
-  |> Iter.filter(fun c -> not(mem c [' ';'(';')']))
+  |> Iter.filter(fun c -> not(mem c [' '; '('; ')']))
   |> Iter.take 20
   |> Iter.to_string ~sep:"" (fun c ->
     String.make 1 c ^ if Char.code c < 0xC0 then "̲" else "")
 )
 
-let powers_to_string name1 = String.concat "" % to_list % Array.mapi(fun var -> function
+let powers_to_string name1 = String.concat"" % to_list % Array.mapi(fun var -> function
 | 0 -> ""
 | 1 -> varstr name1 var
 | exp -> varstr name1 var ^ superscript(string_of_int exp))
@@ -212,8 +241,8 @@ let powers_to_string name1 = String.concat "" % to_list % Array.mapi(fun var -> 
 let shifts_to_string = function
 | One -> ""
 | Shift(s,f) -> powers_to_string 'Z' s ^ termstr f
-| Product(s1,f1, s2,f2) -> powers_to_string 'Z' s1 ^ termstr f1 ^"⬝"^ powers_to_string 'Z' s2 ^ termstr f2
-| Diagonal(sub, dup, s,f) -> "{"^ varstr 'z' sub ^"↦ "^ varstr 'z' dup ^"}"^ powers_to_string 'Z' s ^ termstr f
+| Diagonal(sub, dup, s,f) -> "{" ^ varstr 'z' sub ^ "↦ " ^ varstr 'z' dup ^ "}" ^ powers_to_string 'Z' s ^ termstr f
+| Product(s1,f1, s2,f2) -> powers_to_string 'Z' s1 ^ termstr f1 ^ "⬝" ^ powers_to_string 'Z' s2 ^ termstr f2
 
 let mono_to_string(c,m,f) = match (match Z.to_string c with "1"->"" | "-1"->"-" | c'->c') ^ powers_to_string 'z' m ^ shifts_to_string f with ""->"1" | "-"->"-1" | s->s
 
@@ -281,35 +310,6 @@ let product(s,f, z,g) = if (Term.compare *** lex_array(-)) (f,s) (g,z) > 0
   else Product(z,g, s,f)
 
 (* Arithmetic of polynomials etc. Main operations to superpose polynomials are: addition, multiplication by monomial, and lcm of monomials upto leading term. *)
-
-let power0() = make_powers~=0
-let _0 = []
-let _1 t = [Z.one, power0(), Shift(power0(), t)]
-let _1x1 t s = [Z.one, power0(), product(power0(), t, power0(), s)]
-
-let equal_shifts s z = s==z or match s,z with
-| Shift(s,f), Shift(z,g) -> s=z & f==g
-| Product(s1,f1, s2,f2), Product(z1,g1, z2,g2) -> s1=z1 & f1==g1 & s2=z2 & f2==g2
-| Diagonal(a,b,s,f), Diagonal(c,d,z,g) -> a=c & b=d & s=z & f==g
-| _ -> false
-let (=^) = equal_shifts
-
-let sum_monomials =
-  let rec sum_same = function
-  | (o,m,s)::p when is0 o -> sum_same p
-  | (c,m,s)::(a,n,z)::p when m=n & s=^z -> sum_same(Z.(c+a,m,s)::p)
-  | cms::p -> cms :: sum_same p
-  | [] -> []
-  in
-  sum_same % sort rev_cmp_mono
-
-let map_monomials k = sum_monomials % flat_map k
-
-let map_terms k = map_monomials(fun(c,m,s) -> [c, m, match s with
-| One -> One
-| Shift(s,f) -> Shift(s, k f)
-| Product(s,f,z,g) -> product(s, k f, z, k g)
-| Diagonal(sub,dup,s,f) -> Diagonal(sub, dup, s, k f)])
 
 type polysubst = Z.t * powers * shifts
 
@@ -430,38 +430,6 @@ let ( **>) s = substiply(Z.one, power0 (), Shift(s, _z 0))
 let shift_var ?(by=1) v = ( **>) ((v|->by) (power0 ()))
 
 
-(* Calculate superposition between two polynomials pⱼ (j=1,2) that represent equations m⬝pⱼ=0 where m runs over all monomials. A result is m₁p₁ - m₂p₂ where mⱼ are least monomials such that leading terms in mⱼpⱼ equal. Currently result is unique, if superposition is possible. *)
-let superpose p p' =
-  if p=_0 or p'=_0 then [] else try
-    let u,u' = mgu (hd p) (hd p') in
-    (* Debugging note: Untyped printing here changed nontermination into premature termination. Normal printing has no such effect ⇒ its about type tests. In case of termination I saw: dim-heads=0, then [0] derived, then dim-heads=[0] (eli [{}]) and stop. Nonterminating started instead to saturate ×-monomials at this point. It continued to get dim-heads=0. Before this deviation the derived recurrences appeared exactly the same. However I then changed something somewhere and now I cannot reproduce the termination anymore. *)
-    (* [let aid = substiply u p -- substiply u' p' in print_endline(poly_to_string aid); aid] *)
-    [substiply u p -- substiply u' p']
-  with MonomialIncompatibility -> []
-
-(* Try rewrite leading monomial of p by r. *)
-let leadrewrite r p =
-  if r=_0 or p=_0 then None else try
-    Some(p -- (substiply (hd r |~> hd p) r))
-  with MonomialIncompatibility -> None
-
-
-(* Find r, q⬝arg s.t. p = (old - by)⬝q⬝arg + r when given indeterminate old, coefficient term by, target term arg, and polynomial p whose indeterminates commute with old. Note that r is "p evaluated at old=by". *)
-let substitute_division var arg p =
-(* Now ignoring the arg... *)
-  p |> map_monomials(fun(c,m,s)-> [c, m, match s with
-    | One -> One
-    (* | Shift(s,f) -> Shift((if f==arg then (var|=>0) s else s), f) *)
-    | Shift(s,f) -> Shift((var|=>0) s, f)
-    | _ -> raise MonomialIncompatibility]),
-  p |> map_monomials(function
-    | _, _, One -> []
-    (* | c, m, Shift(s,f) -> if f==arg then init s.(var) (fun j -> c, m, Shift((var|=>j) s, f)) else [c,m,Shift(s,f)] *)
-    | c, m, Shift(s,f) -> init s.(var) (fun j -> c, m, Shift((var|=>j) s, f))
-    | _ -> raise MonomialIncompatibility)
-
-
-
 module type View = sig type t type v val view: t -> v option end
 (* Create index from mapping clause→polynomial, and instantiate by empty_with' default_features. *)
 module LeadRewriteIndex(P: View with type v=poly) = FV_tree.FV_IDX(struct
@@ -476,7 +444,7 @@ let default_features =
   let sum value p = match hd p with
   | _, m, One -> value 0 m [|0|]
   | _, m, Shift(s,_) -> value 1 m s
-  | _, m, Product(s1,_,s2,_) -> value 2 m (s1+^s2)
+  | _, m, Product(s1,_,s2,_) -> valuexm (s1+^s2)
   | _, m, Diagonal(_,_,s,_) -> value 3 m s in
   [
     "monomial form", sum(fun f _ _ -> f);
@@ -517,6 +485,37 @@ let poly_of_lit = function Equation(t,p,true) when t==term0 -> poly_of_term p |_
 let polyweight_of_id = ID.payload_find ~f:(function RepresentingPolynomial(_,w,_) -> Some w |_->None)
 
 
+(* Calculate superposition between two polynomials pⱼ (j=1,2) that represent equations m⬝pⱼ=0 where m runs over all monomials. A result is m₁p₁ - m₂p₂ where mⱼ are least monomials such that leading terms in mⱼpⱼ equal. Currently result is unique, if superposition is possible. *)
+let superpose p p' =
+  if p=_0 or p'=_0 then [] else try
+    let u,u' = mgu (hd p) (hd p') in
+    (* Debugging note: Untyped printing here changed nontermination into premature termination. Normal printing has no such effect ⇒ its about type tests. In case of termination I saw: dim-heads=0, then [0] derived, then dim-heads=[0] (eli [{}]) and stop. Nonterminating started instead to saturate ×-monomials at this point. It continued to get dim-heads=0. Before this deviation the derived recurrences appeared exactly the same. However I then changed something somewhere and now I cannot reproduce the termination anymore. *)
+    (* [let aid = substiply u p -- substiply u' p' in print_endline(poly_to_string aid); aid] *)
+    [substiply u p -- substiply u' p']
+  with MonomialIncompatibility -> []
+
+(* Try rewrite leading monomial of p by r. *)
+let leadrewrite r p =
+  if r=_0 or p=_0 then None else try
+    Some(p -- (substiply (hd r |~> hd p) r))
+  with MonomialIncompatibility -> None
+
+
+(* Find r, q⬝arg s.t. p = (old - by)⬝q⬝arg + r when given indeterminate old, coefficient term by, target term arg, and polynomial p whose indeterminates commute with old. Note that r is "p evaluated at old=by". *)
+let substitute_division var arg p =
+(* Now ignoring the arg... *)
+  p |> map_monomials(fun(c,m,s)-> [c, m, match s with
+    | One -> One
+    (* | Shift(s,f) -> Shift((if f==arg then (var|=>0) s else s), f) *)
+    | Shift(s,f) -> Shift((var|=>0) s, f)
+    | _ -> raise MonomialIncompatibility]),
+  p |> map_monomials(function
+    | _, _, One -> []
+    (* | c, m, Shift(s,f) -> if f==arg then init s.(var) (fun j -> c, m, Shift((var|=>j) s, f)) else [c,m,Shift(s,f)] *)
+    | c, m, Shift(s,f) -> init s.(var) (fun j -> c, m, Shift((var|=>j) s, f))
+    | _ -> raise MonomialIncompatibility)
+
+
 (* quick manual data entry *)
 (* let _p s = let is_low c = String.lowercase c = c in
   let rec go = function
@@ -535,23 +534,18 @@ end
 
 module MakeSumSolver(MainEnv: Env.S) = struct
 module C = MainEnv.C
-(* module Ctx = MainEnv.Ctx *)
 module R = RecurrencePolynomial
 
-let parents_as_such = map (fun p -> C.proof_parent_subst (Subst.Renaming.create()) (p,0) Subst.empty)
+(* In general parent clauses of an inference also track applied substitutions but with polynomials these substitutions are almost always identities. *)
+let parents_as_such = map(fun p -> C.proof_parent_subst (Subst.Renaming.create()) (p,0) Subst.empty)
 
+(* Make clause with standard penalty and trail. By default no substitution is applied to parents but supplied proof_step function can of course directly embed any parents. *)
 let make_clause ?(parents=[]) literals proof_step = C.create literals
   ~penalty:(fold_left max 1 (map C.penalty parents))
   ~trail:(C.trail_l parents)
   (proof_step(parents_as_such parents))
 
 let definitional_poly_clause p = make_clause [R.polyliteral p] ~=Proof.Step.trivial
-
-let replace_lit_by_poly c old_lit_index p = make_clause ~parents:[c]
-    (R.polyliteral p :: except_idx (C.lits c) old_lit_index)
-    Proof.(Step.inference ~rule:(Rule.mk "represent recurrence by polynomial"))
-
-let polys_in = Iter.(concat % map(filter_map R.poly_of_lit % of_array % C.lits))
 
 let polys_of_2_lits no yes l1 =
   R.poly_of_lit l1 |> map_or ~default:~=no (fun p1 l2 ->
@@ -560,6 +554,12 @@ let polys_of_2_lits no yes l1 =
 let superpose_poly = polys_of_2_lits [] (R.superpose %>> map(fun p -> [R.polyliteral p], Subst.empty))
 
 let rewrite_poly = polys_of_2_lits None (R.leadrewrite %>> CCOpt.map(fun p -> [R.polyliteral p], Subst.empty))
+
+let replace_lit_by_poly c old_lit_index p = make_clause ~parents:[c]
+    (R.polyliteral p :: except_idx (C.lits c) old_lit_index)
+    Proof.(Step.inference ~rule:(Rule.mk "represent recurrence by polynomial"))
+
+let polys_in = Iter.(concat % map(filter_map R.poly_of_lit % of_array % C.lits))
 
 
 let saturate_in env cc = Phases.(run(
@@ -637,8 +637,8 @@ let rec propagate_recurrences_to f = match PolyMap.find_opt recurrence_table f w
 | Some r -> r
 | None ->
   let r = Iter.to_rev_list(match f with
-  | _::_::_ -> propagate_oper_affine f
-  | [X p::q] -> propagate_times [p] [q]
+  | [X[A(V _)]::_] | _::_::_ -> propagate_oper_affine f
+  | [X p :: q] -> propagate_times [p] [q]
   | [S i :: p] -> propagate_sum i [p]
   | [O s :: p] -> propagate_subst s [p]
   | _ -> Iter.empty)
@@ -674,39 +674,50 @@ and propagate_times f g =
   | _ -> assert false (* impossible result from R.rename_apart *)
 
 and propagate_sum i f =
-  let bad = ref[] in
+  (* let bad = ref[] in *)
+  let is_f t = R.(CCOpt.equal poly_eq (Some f) (poly_of_term t)) in
   let sum_blocker = function (* gives elimination priorities: [] is good, [1] is bad *)
-  |`T t when not R.(CCOpt.equal poly_eq (Some f) (poly_of_term t)) -> []
+  |`T t when not(is_f t) -> []
   |`V v when v!=i -> []
-  |`O[v, R.[[A(V w)];[A I]]] when v=w -> (try fst([], (if v=i then near_bijectivity_error else near_commutation_error v) i)
-  with Exit -> [1])
+  |`O[u, R.[[A(V v)];[A I]]] when v=u -> []
   | _ -> [1]
   in
-  let _, saturate = make_polynomial_environment sum_blocker in
-  let rec_of_sum_with_bad_terms = Iter.of_list(propagate_recurrences_to f)
-  |> saturate
+  (* let rec_of_sum_with_bad_terms =  *)
+  Iter.of_list(propagate_recurrences_to f)
+  |> saturate_with_order sum_blocker
+  (* ∑ₙᑉⁿNf = N∑ₙᑉⁿf - f₀ is a simplification rule so no special action is required.
   |> Iter.map R.(fun c ->
-    (* Above filtering ⟹ get_exn OK *)
+    (* TODO remember to guarantee that get_exn succeeds *)
     let p, lits = get_exn(c|>todo"view_poly_clause") in
-    make_clause (R.polyliteral p :: to_list lits) ~parents:[c]
+    let p' = p |> map_monomials(fun m -> match terms_in[m] with
+      | [f] when is_f f -> m |> fold_indeterminates
+        (function `T t -> [[S i]] >< of_term t |_-> assert false)
+        (fun s g -> function
+          | O[j,[[A I]]] when j=i -> g -- ([[eval_at ~var:i Z.zero]] >< g) ++ s
+          | O[k,[[A I]]] -> todo"near commutativity"
+          | x -> 
+            assert(not(Int_set.mem i (free_variables[[x]]))); (* or if this cannot be guaranteed, propagation should be given up. *)
+            [[x]]><s)
+      | _ -> [[S i]]><[m])
+    in
+    make_clause (R.polyliteral p' :: to_list lits) ~parents:[c]
       Proof.(Step.inference ~rule:(Rule.mk "pull recurrence out of sum"))
   )
-  (* Force the iteration through to decide necessity of resaturation. *)
+  Force the iteration through to decide necessity of resaturation. 
+  Note: resaturation might not be useful anymore because the handling of excess terms is improved.
   |> Iter.persistent in
   if !bad=[] then rec_of_sum_with_bad_terms else(
     let _,sum,_ = R.(poly_as_lit_term_id([[S i]]><f)) in
-    let _,resaturate = make_polynomial_environment(R.elim_oper_args((sum,1)::map(fun f -> f,2)!bad)) in
     Iter.of_list(flat_map recurrences_of_term !bad)
     |> Iter.append rec_of_sum_with_bad_terms
-    |> resaturate
+    |> saturate_with_order(R.elim_oper_args((sum,1)::map(fun f -> f,2)!bad))
   )
-
-and near_bijectivity_error _ = todo"biject error"
-and near_commutation_error _ = todo"commutation error"
+  *)
+  |> filter_recurrences_of[f]
 
 and propagate_subst s f =
   (* 1. for each range coordinate create compound shift *)
-  (* 2. create equations: compound shift = composition of 1-shifts ↭ 𝕊ⱼ = ∏ᵢ Sᵢ^mᵢⱼ or as well 𝕊ᵃ = Sᵐᵃ *)
+  (* 2. create equations: compound shift = composition of 1-shifts ↭ 𝕊ⱼ = ∏ᵢ Sᵢ^mᵢⱼ ↭ 𝕊ᵃ = Sᵐᵃ *)
   (* 3. saturate *)
   (* 4. replace each compound shift by a 1-shift, and substitute multipliers *)
   let is1shift = function R.O[_,[[A I]]] -> true | _ -> false in
@@ -747,16 +758,45 @@ let declare_recurrence r = add_new_rec
   (definitional_poly_clause r)
 
 let sum_equality_inference clause =
-  let the = R.poly_of_string in
-  declare_recurrence(the"NNf-Nf-f");
-  declare_recurrence(the"Ng-ng-g");
-  (*
-  propagate_recurrences_to (the"nf");
-  propagate_recurrences_to (the"g+f");(*OK*)
-  *)
-  propagate_recurrences_to (the"g+nf");(*loop*)
+  let (!) = R.poly_of_string in
+  let eq0' p = make_clause (map R.polyliteral p) ~=(Proof.Step.assert' ~file:"" ~name:"" ()) in
+  let split_or k d s = match String.split_on_char k s with
+  | [a;b] -> a,b | [a] -> if k='.' then d,a else a,d | _ -> raise Exit in
+  let eq0 ss = eq0' R.[fold_left (++) _0 (List.map(fun cmt ->
+    let c,mt = split_or '.' "1" (String.trim cmt) in
+    let m,t = split_or '\'' "" mt in
+    Z.of_string c *: poly_of_string m >< of_term(have t [] int)
+  ) (String.split_on_char '+' ss))] in
+  
+  declare_recurrence !"NNf-Nf-f";
+  declare_recurrence !"Ng-ng-g";
+(*
+  propagate_recurrences_to !"nf"; (*OK*)
+  propagate_recurrences_to !"g+f"; (*OK*)
+*)
+  propagate_recurrences_to !"g+nf"; (*diverge?*)
+
+  (* eq0"zzzzz"; eq0"zz + -1."; *)
+  (* eq0"3.zzzzzzzzzzzzzzzzzzz"; eq0"3.zzzzzzzzz + 1."; *)
+  (* eq0"x + y + -1.z"; eq0"xx + yy + -1.zz"; *)
+  (* eq0"yyx + -1.x + -1.y"; eq0"yxx + -1.x + -1."; *)
+  (* eq0"xx + 3.x + 1."; eq0"yy + 3.y + 1."; eq0"xxxxx + yyyyy"; *)
+  
+  (* eq0"2.nN + -1.m + 3."; eq0"NM + 2.m";  *)
+  (* eq0"2.nnNN + -1.n 1 N + 3."; eq0"NNN + 2.nN";   *)
+  
+  (* eq0"X'S* + -1.'S* + -1.X'f"; eq0"'h + -1.'S* + 'g*";  *)
+  (* eq0"X'g* + -1.'g* + -1.X'f"; *)
+  (* eq0"-1.XX'g* + 'g* + XX'f + X'f"; *)
+  
+  (* eq0"Y'⬝2ʸ + -2.'⬝2ʸ"; eq0"-4.'g` + y 2'⬝2ʸ + y'⬝2ʸ"; *)
+  (* eq0"xX'(ˣᵧ) + -1.yX'(ˣᵧ) + X'(ˣᵧ) + -1.x'(ˣᵧ) + -1.'(ˣᵧ)"; eq0"yY'(ˣᵧ) + Y'(ˣᵧ) + -1.x'(ˣᵧ) + y'(ˣᵧ)"; eq0"'f` + -1.y 2'(ˣᵧ)"; *)
+  (* Change priority for ↓ *)
+  (* eq0"xX'f + -1.yX'f + X'f + -1.x'f + -1.'f"; eq0"yyY'f + -1.yx'f + y 2'f + -1.x'f + y'f"; *)
+
+  (* eq0"-1.xxX 2'∑f+-2.xX 2'∑f+-1.X 2'∑f + 3.xxX'∑f+9.xX'∑f+6.X'∑f + -2.x 2'∑f+-6.x'∑f+-4.'∑f"; eq0"xX'g + -2.x'g + -4.'g"; eq0"'h` + -1.'∑f + 'g"; *)
+
   ~<recurrence_table;
-  print_endline "————— summation_equality: Test routine terminated —————";
   exit 1
   (* tl(tl[clause;clause]) *)
 
@@ -765,6 +805,15 @@ let coords = ref []
 let var_term index = nth !coords index
 let var_index term = try index_of ((==)term) !coords
 with Invalid_argument _ -> raise(Invalid_argument("var_index "^str term^" ∉  "^str!coords))
+
+(* Try to separate non-trivial eligible recurrence and the rest of the literals from the given clause. *)
+let view_poly_clause c = fold_lits ~eligible:(C.Eligible.res c) (C.lits c)
+  |> Iter.find R.(fun(l,_)-> match poly_of_lit l with
+    | Some p when p!=_0 -> Some(p, CCArray.filter((!=)l) (C.lits c))
+    | _ -> None)
+
+(* Filter those clauses that have eligible polynomial with leading term M t where some monomial M operates on an OK term t. *)
+let filter_recurrences_of ok_term = filter_recurrences R.(fun p -> match terms_in[hd p] with [t] -> ok_term t |_->false)
 
 let is_summation s = match view s with
 | Const{name="sum"} -> true
@@ -776,18 +825,6 @@ let to_Z t = match view t with
 | _ -> raise Exit
 let is_Z t = try snd(to_Z t, true) with Exit -> false
 let to_int = Z.to_int % to_Z
-
-(* Explicit integer constant or simple constant suitable as a coordinate variable. *)
-let is_atom t = is_Z t or ty t == int & match view t with
-| Const _ -> true
-| App(f,x) -> for_all is_Z x
-| _ -> false
-
-let is_free t = ty t ==int & is_var t
-
-let recurrence_table = HT.create 32
-let add_recurrence t r = HT.add recurrence_table t (r :: get_or ~default:[] (HT.find_opt recurrence_table t))
-
 
 type encoding_phase_info = {coords: term list; symbols: term list; specialise: term HV.t}
 
@@ -823,6 +860,17 @@ let no_plus = map(fun s -> match view s with
 | AppBuiltin(B.Sum, [_;x;y]) when is_Z y -> x
 | AppBuiltin(B.Difference, [_;x;y]) when is_Z y -> x
 | _ -> s)
+
+(* Explicit integer constant or simple constant suitable as a coordinate variable. *)
+let is_atom t = is_Z t or ty t == int & match view t with
+| Const _ -> true
+| App(f,x) -> for_all is_Z x
+| _ -> false
+
+let is_free t = ty t ==int & is_var t
+
+let recurrence_table = HT.create 32
+let add_recurrence t r = HT.add recurrence_table t (r :: get_or ~default:[] (HT.find_opt recurrence_table t))
 
 let rec term_to_poly info t =
   if ty t != int then raise Exit;
@@ -889,16 +937,6 @@ let register_if_clause_is_recurrence info clause =
           Shift(z, correct_shift(s' g))
         | s -> s]) *)in
         terms_in sp |> iter(flip add_recurrence (replace_lit_by_poly clause place sp)))))
-
-
-(* Try to separate non-trivial eligible recurrence and the rest of the literals from the given clause. *)
-let view_poly_clause c = fold_lits ~eligible:(C.Eligible.res c) (C.lits c)
-  |> Iter.find R.(fun(l,_)-> match poly_of_lit l with
-    | Some p when p!=_0 -> Some(p, CCArray.filter((!=)l) (C.lits c))
-    | _ -> None)
-
-(* Filter those clauses that have eligible polynomial with leading term M t where some monomial M operates on an OK term t. *)
-let filter_recurrences_of ok_term = filter_recurrences R.(fun p -> match terms_in[hd p] with [t] -> ok_term t |_->false)
 
 
 (* * The structure following propagation steps—large mutually recursive block. *  *)
@@ -1131,25 +1169,6 @@ let test_hook clause =
   );
   
   let _ = saturate_in subenv R.([
-    (* eq0"z 5"; eq0"z 2 + -1."; *)
-    (* eq0"3.z 19"; eq0"3.z 9 + 1."; *)
-    (* eq0"x + y + -1.z"; eq0"x 2 + y 2 + -1.z 2"; *)
-    (* eq0"y 2 x + -1.x + -1.y"; eq0"y 1 x 2 + -1.x + -1."; *)
-    (* eq0"x 2 + 3.x + 1."; eq0"y 2 + 3.y + 1."; eq0"x 5 + y 5"; *)
-    
-    (* eq0"2.n 1 N + -1.m + 3."; eq0"N 1 M + 2.m";  *)
-    (* eq0"2.n 2 N 2 + -1.n 1 N + 3."; eq0"N 3 + 2.n 1 N";   *)
-    
-    (* eq0"X'S* + -1.'S* + -1.X'f"; eq0"'h + -1.'S* + 'g*";  *)
-    (* eq0"X'g* + -1.'g* + -1.X'f"; *)
-    (* eq0"-1.X 2'g* + 'g* + X 2'f + X'f"; *)
-    
-    (* eq0"Y'⬝2ʸ + -2.'⬝2ʸ"; eq0"-4.'g` + y 2'⬝2ʸ + y'⬝2ʸ"; *)
-    (* eq0"x 1 X'(ˣᵧ) + -1.y 1 X'(ˣᵧ) + X'(ˣᵧ) + -1.x'(ˣᵧ) + -1.'(ˣᵧ)"; eq0"y 1 Y'(ˣᵧ) + Y'(ˣᵧ) + -1.x'(ˣᵧ) + y'(ˣᵧ)"; eq0"'f` + -1.y 2'(ˣᵧ)"; *)
-    (* Change priority for ↓ *)
-    (* eq0"x 1 X'f + -1.y 1 X'f + X'f + -1.x'f + -1.'f"; eq0"y 2 Y'f + -1.y 1 x'f + y 2'f + -1.x'f + y'f"; *)
-
-    (* eq0"-1.x 2 X 2'∑f+-2.x 1 X 2'∑f+-1.X 2'∑f + 3.x 2 X'∑f+9.x 1 X'∑f+6.X'∑f + -2.x 2'∑f+-6.x'∑f+-4.'∑f"; eq0"x 1 X'g + -2.x'g + -4.'g"; eq0"'h` + -1.'∑f + 'g"; *)
     eq0'[R._0]] |> remove_at_idx(-1)) in
   let module SubEnv = (val subenv) in
   [step "" (Iter.to_rev_list(SubEnv.get_clauses())) []]

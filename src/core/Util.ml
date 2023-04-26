@@ -317,7 +317,7 @@ module UntypedPrint = struct
     flush_all(); (* Show at least location if printing triggers segmentation fault. *)
     let msg = msg() in print_endline(msg ^ if String.length msg < 55(*arbitrary*) then "" else "\n")
 
-  (* Sprinkle these in front of expressions you want to trace—often without rebracketing! Each printed value is identified by “FILE line LINE  ⛓️CALL-CHAIN-LENGTH”. The messages can be bogus due to inlining and lack of runtime types. *)
+  (* Sprinkle these in front of expressions to trace them—often without rebracketing! *)
   let (~<)x = print_with_caller(fun()-> str x); x
   let (|<) info x = print_with_caller(fun()-> info ^" "^ str x); x
 end
