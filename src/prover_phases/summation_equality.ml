@@ -1,5 +1,5 @@
-(* open Batteries opam install batteries + edit src/core/dune *)
-[@@@warning "-10-26"](* Before final cleanup, tolerate unused values and definitions. *)
+(* open Batteries (* opam install batteries + edit src/core/dune *)
+*)[@@@warning "-10-21-26"](* Before final cleanup, tolerate unused values and definitions. *)
 open Logtk
 open Logtk_parsers
 open Logtk_proofs
@@ -43,7 +43,6 @@ let (%%>) = compose_binop
 let (%>>) f g x y = g(f x y)
 let (<:>) r f = r:=f!r
 
-(* type 't comparison = 't -> 't -> int *)
 (* Lexicographic product of comparison functions onto tuples. *)
 let ( *** ) c1 c2 (x1,x2) (y1,y2) = match c1 x1 y1 with 0 -> c2 x2 y2 | r -> r
 
@@ -165,373 +164,6 @@ let add_simplify_in_context
 
 
 
-(* Mul | Move term | Moves term² ; c p d f | c p d₁ d₂ f₁ f₂ | c p | repara...
-module RecurrencePolynomial = struct
-type powers = int array
-type shifts = One
-| Shift of powers * term
-| Product of powers * term * powers * term
-| Diagonal of int * int * powers * term
-type monomial = Z.t * powers * shifts
-type poly = monomial list
-
-
-(* This exception terminates computing or applying unifiers. Partial operations on monomials, such as product, may be considered as its cause. *)
-exception MonomialIncompatibility
-
-let (|->) i v a = assert(v>=0); a.(i)<-v; a (* powers are non-negative *)
-let (|=>) i v = (i|->v) % copy
-let (|+>) i v a = (i |=> a.(i)+v) a
-
-let is0 = Z.equal Z.zero
-let _Q q = app_builtin ~ty:int (Rat q) []
-let _Z = _Q % Q.of_bigint
-let _z = _Z % Z.of_int
-
-let coordinate_count = ref 0
-let fold_coordinates o f = fold_left f o (init !coordinate_count id)
-
-let make_powers f = Array.init !coordinate_count f
-let (+^) = Array.map2(+)
-
-let power0() = make_powers~=0
-let _0 = []
-let _1 t = [Z.one, power0(), Shift(power0(), t)]
-let _1x1 t s = [Z.one, power0(), product(power0(), t, power0(), s)]
-
-let equal_shifts s z = s==z or match s,z with
-| Shift(s,f), Shift(z,g) -> s=z & f==g
-| Product(s1,f1, s2,f2), Product(z1,g1, z2,g2) -> s1=z1 & f1==g1 & s2=z2 & f2==g2
-| Diagonal(a,b,s,f), Diagonal(c,d,z,g) -> a=c & b=d & s=z & f==g
-| _ -> false
-let (=^) = equal_shifts
-
-let sum_monomials =
-  let rec sum_same = function
-  | (o,m,s)::p when is0 o -> sum_same p
-  | (c,m,s)::(a,n,z)::p when m=n & s=^z -> sum_same(Z.(c+a,m,s)::p)
-  | cms::p -> cms :: sum_same p
-  | [] -> []
-  in
-  sum_same % sort rev_cmp_mono
-
-let map_monomials k = sum_monomials % flat_map k
-
-let map_terms k = map_monomials(fun(c,m,s) -> [c, m, match s with
-| One -> One
-| Shift(s,f) -> Shift(s, k f)
-| Product(s,f,z,g) -> product(s, k f, z, k g)
-| Diagonal(sub,dup,s,f) -> Diagonal(sub, dup, s, k f)])
-
-
-let varstr name1 n = String.make 1 Char.(chr(code name1 - n))
-
-let termstr t = (flip String.iter (to_string t)
-  |> Iter.filter(fun c -> not(mem c [' '; '('; ')']))
-  |> Iter.take 20
-  |> Iter.to_string ~sep:"" (fun c ->
-    String.make 1 c ^ if Char.code c < 0xC0 then "̲" else "")
-)
-
-let powers_to_string name1 = String.concat"" % to_list % Array.mapi(fun var -> function
-| 0 -> ""
-| 1 -> varstr name1 var
-| exp -> varstr name1 var ^ superscript(string_of_int exp))
-
-let shifts_to_string = function
-| One -> ""
-| Shift(s,f) -> powers_to_string 'Z' s ^ termstr f
-| Diagonal(sub, dup, s,f) -> "{" ^ varstr 'z' sub ^ "↦ " ^ varstr 'z' dup ^ "}" ^ powers_to_string 'Z' s ^ termstr f
-| Product(s1,f1, s2,f2) -> powers_to_string 'Z' s1 ^ termstr f1 ^ "⬝" ^ powers_to_string 'Z' s2 ^ termstr f2
-
-let mono_to_string(c,m,f) = match (match Z.to_string c with "1"->"" | "-1"->"-" | c'->c') ^ powers_to_string 'z' m ^ shifts_to_string f with ""->"1" | "-"->"-1" | s->s
-
-let poly_to_string p = if length p = 0 then "0" else concat_view " ＋ "  mono_to_string p
-
-(* List of terms that the given recurrence relates, without duplicates. *)
-let terms_in = sort_uniq ~cmp:Term.compare % flat_map(function
-| _, _, One -> []
-| _, _, (Shift(_,f) | Diagonal(_,_,_,f)) -> f
-| _, _, Product(_,f,_,g) -> [f;g])
-
-
-let mono_total_deg(_,m,s) = sum_array m + match s with
-| One -> 0
-| Shift(s,_) | Diagonal(_,_,s,_) -> sum_array s
-| Product(s1,_, s2,_) -> sum_array s1 + sum_array s2
-
-(* Use through redefine_elimination_priority. *)
-let elimination_priority = ref ~= ~=0
-
-(* Comparison functions for shifts, monomials *)
-
-let compare_shifts s z = match s,z with
-| One, One -> 0
-| One, _ -> -1
-| _, One -> 1
-| Shift(s,f), Shift(z,g) -> (lex_array(-) *** Term.compare) (s,f) (z,g)
-| Shift _, _ -> -1
-| _, Shift _ -> 1
-| Diagonal(i,i',s,f), Diagonal(j,j',z,g) -> (lex_array(-) *** Term.compare *** (-) *** (-)) (s,(f,(i,i'))) (z,(g,(j,j')))
-| Diagonal _, _ -> -1
-| _, Diagonal _ -> 1
-| Product(s1,f1, s2,f2), Product(z1,g1, z2,g2) -> Term.(lex_array(-) *** lex_array(-) *** compare *** compare) (s1,(s2,(f1,f2))) (z1,(z2,(g1,g2)))
-
-let compare_mono = (fun(c,m,s) -> !elimination_priority m s, (mono_total_deg(c,m,s), (s, (m, c))))
-  %%> (-) *** (-) *** compare_shifts *** lex_array(-) *** Z.compare
-
-let rev_cmp_mono = flip compare_mono
-
-(* Update the global elimination priority used in normalization. Existing recurrence polynomials become garbage and must not be used! However clauses that encode recurrences remain usable.
- The elimination priority overrides the default comparison order of monomials (which is total degree based). This can be used to derive equations without certain indeterminates or operands by saturation. For example take the total degree saturated set {m²+n-1, n²+m+1}. Ordering n²≺m instead one rewrites m in first polynomial deriving (-n²-1)²+n-1 = n(n³+2n+1) which is independent of m.
- Parameters to priority are list of multiplier powers and shift factor. The elimination preordering must extend divisibility: priority of the monomial M⬝N must be at least that of N. Constant priority (default) leaves the tie-breaking total degree ordering unchanged. See elim_oper_args and elim_indeterminate for other basic options.
- Desing: Having a global switch like this has drawbacks. Namely saturations of polynomial equations cannot be (easily) nested, parallelised or paused-and-resumed. Scalable solution would be to substitute the module by a functor taking the elimination priority as parameter. However that'd be complicated to use because polynomials and/or their operations had to explicitely carry the ordering. *)
-let redefine_elimination_priority = (:=)elimination_priority
-
-(* An elimination priority function. For example: elim_oper_args[t,2; s,1; r,1] to eliminate terms t,s,r with priority among them in t. *)
-let elim_oper_args weights =
-  let arg_weight = get_or ~default:0 % flip assq_opt weights in
-  ~=(function
-  | One -> 0
-  | Shift(_,f) | Diagonal(_,_,_,f) -> arg_weight f
-  | Product(_,f,_,g) -> (arg_weight %%> max) f g)
-
-(* An elimination priority to indeterminates assigned by the given weight function. For example to eliminate 3ʳᵈ variable: elim_indeterminate(function((`Shift|`Mul),3,arg)->1|_->0). *)
-let elim_indeterminate weight m = let rec this = function
-| One -> 0
-| Shift(s,f) | Diagonal(_,_,s,f) -> sum_array Array.(map(fun p -> weight(`Mul,p,f)) m +^ map(fun p -> weight(`Shift,p,f)) s)
-| Product(s1,f1, s2,f2) -> this(Shift(s1,f1)) + this(Shift(s2,f2))
-in this
-
-
-(* Make normalized Product-shift of monomial. (Multiplication must commute.) If f=g, reduce the problem of computing only one lead unifier in mgu_shift by ordering higher shift first.  *)
-let product(s,f, z,g) = if (Term.compare *** lex_array(-)) (f,s) (g,z) > 0
-  then Product(s,f, z,g)
-  else Product(z,g, s,f)
-
-(* Arithmetic of polynomials etc. Main operations to superpose polynomials are: addition, multiplication by monomial, and lcm of monomials upto leading term. *)
-
-type polysubst = Z.t * powers * shifts
-
-let shift_multiplier s m = (let rec loop out = function
-  | 0::ss, m::mm -> loop (map (cons(Z.one,m)) out) (ss,mm)
-  | s::ss, m::mm -> loop (concat(init(m+1) (fun n -> map (cons(Z.(bin (of_int m) n * of_int s**n) , m-n)) out))) (ss,mm)
-  | _ -> out
-  in loop [[]] (to_list s, to_list m) |> map(fun l -> fold_left Z.(fun a (c,_) -> c*a) Z.one l, of_list(rev_map snd l)))
-
-let substiply(c,m,x) = map_monomials(fun(a,n,z) ->
-  let s = match x with
-  | Shift(s,_) | Product(_,_,s,_) | Diagonal(_,_,s,_) -> s
-  | _ -> assert false
-  in
-  shift_multiplier s n |> map(fun(b,sn)->
-  (match x with Diagonal(sub, dup, _,_) ->
-    sn.(dup) <- sn.(dup)+sn.(sub);
-    sn.(sub) <- 0;
-  | _->());
-  Z.(a*b*c),
-  m+^sn,
-  match z,x with
-  | One, Product(z',f',_,_) -> Shift(z',f')
-  | One, _ -> One
-  | Shift(z,f), Product(z',f',_,_) -> product(z',f', s+^z,f)
-  | Shift(z,f), Diagonal(sub, dup, _,_) -> Diagonal(sub, dup, s+^z, f)
-  | Shift(z,f), _ -> Shift(s+^z,f)
-  | Product(z1,f1, z2,f2), Shift _ -> Product(s+^z1, f1, s+^z2, f2)
-  | Diagonal(sub, dup, z,f), Shift _ ->
-    if s.(sub)>0 then raise MonomialIncompatibility; (* Note: this might signal bug? *)
-    s.(sub) <- s.(dup);
-    let result = Diagonal(sub, dup, s+^z, f) in
-    s.(sub) <- 0;
-    result
-  | _ -> raise MonomialIncompatibility))
-
-(* Extend functionality of map_monomials by shifting whole recurrence forward if negative shift-powers occur. *)
-let map_monomials f l =
-  let p = map_monomials f l in
-  let backshifts = fold_left Array.(fun bs (_,_,s) -> match s with
-    | One -> bs
-    | Shift(s,_) -> mapi (fun j -> min s.(j)) bs
-    | Product(s,_,z,_) -> mapi (fun j -> min(min s.(j) z.(j))) bs
-    | Diagonal(sub, dup, s,_) -> mapi (fun j -> min(
-      if j=sub then 0 else
-      if j=dup then min s.(j) s.(sub)
-      else s.(j))) bs
-  ) (power0()) p in
-  if sum_array backshifts = 0 then p else
-    substiply (Z.one, power0(), Shift(Array.map((-)0)backshifts, _z 0)) p
-
-let mgu_coef a b = Z.(lcm a b / a, lcm a b / b)
-let mgu_pow m m' = (fun n -> make_powers(fun v -> max m.(v) m'.(v) - n.(v))) @@ (m,m')
-(* Note: the shift One always raises MonomialIncompatibility because it is never a leading monomial in normal circumstances. *)
-let rec mgu_shift s s' =
-  let require condition = if not condition then raise MonomialIncompatibility in
-  match s,s' with
-  | Shift(s,f), Shift(s',f') ->
-    require(f==f');
-    (fun u -> Shift(u,f)) @@ mgu_pow s s'
-  | Product(s1,f1, s2,f2), Product(z1,g1, z2,g2) ->
-    require(f1==g1 & f2==g2 & s1+^z2 = s2+^z1);
-    (fun u -> Shift(u,f1)) @@ mgu_pow s1 z1
-  | Diagonal(i,j,s,f), Diagonal(i',j',s',f') ->
-    require(i=i' & j=j' & f==f' & s.(i)-s.(j) = s'.(i)-s'.(j));
-    (fun u -> Shift((i|->0)u,f)) @@ mgu_pow s s'
-  | Product(s1,f1,s2,f2), Shift(s',f') ->
-    if f'==f1 then(
-      let u,u' = mgu_pow s1 s' in
-      Shift(u',f2), Product(u'+^s2,f2, u,f2)
-    )else((* copy of above with 1↔2 *)
-      require(f'==f2);
-      let u,u' = mgu_pow s2 s' in
-      Shift(u',f1), Product(u'+^s1,f1, u,f1)
-    )
-  | Diagonal(sub, dup, s,f), Shift(s',f') ->
-    require(f==f');
-    let u,u' = mgu_pow s s' in
-    let h = max u.(sub) u.(dup) in
-    u'.(sub) <- u'.(sub) + h - u.(sub);
-    u'.(dup) <- u'.(dup) + h - u.(dup);
-    u.(sub) <- h; u.(dup) <- h;
-    Shift(u,f), Diagonal(sub, dup, u',f)
-  | Shift _, _ -> CCPair.swap(mgu_shift s' s)
-  | _ -> raise MonomialIncompatibility
-
-(* Most general lead unifier—a pair of operator monomials *)
-let rec mgu (c,m,s) (c',m',s') =
-  (* Correct multiplier by applying shift-part's coordinate substitution. Think e.g. unifier (n {k↦n}, 1) of knfₖₙ and n³fₙₙ. *)
-  let fix n = function
-  | Diagonal(sub, dup, _,_) -> (sub|->0) ((dup|+>n.(sub)) n)
-  | _ -> n in
-  let uc,uc' = mgu_coef c c' in
-  let um,um' = mgu_pow (fix m s') (fix m' s) in
-  let us,us' = mgu_shift s s' in
-  (uc,um,us), (uc',um',us')
-
-let (|~>) general special = match mgu general special with
-| (c,m,s), (i, o, Shift(o',_)) when Z.(equal one (abs i)) & sum_array(o+^o') = 0 -> Z.(i*c,m,s)
-| _ -> raise MonomialIncompatibility
-
-
-(* polynomial + polynomial *)
-let (++) p r = sum_monomials(p@r)
-
-(* constant × polynomial *)
-let ( *:) a = if is0 a then ~=_0 else map Z.(fun(c,m,s) -> a*c,m,s)
-
-(* polynomial - polynomial *)
-let (--) p r = p ++ Z.of_int(-1)*:r
-
-(* multiplier × polynomial *)
-let ( **:) m = substiply(Z.one, m, Shift(power0 (), _z 0))
-let mul_var ?(by=1) v = ( **:) ((v|->by) (power0 ()))
-
-(* shift × monomial *)
-let ( **>) s = substiply(Z.one, power0 (), Shift(s, _z 0))
-let shift_var ?(by=1) v = ( **>) ((v|->by) (power0 ()))
-
-
-module type View = sig type t type v val view: t -> v option end
-(* Create index from mapping clause→polynomial, and instantiate by empty_with' default_features. *)
-module LeadRewriteIndex(P: View with type v=poly) = FV_tree.FV_IDX(struct
-  type t = P.t
-  let compare = P.view %%> Stdlib.compare (* just for usage in sets *)
-  type feature_func = poly -> int
-  let compute_feature f p = match P.view p with Some p when p!=_0 -> Some(FV_tree.N(f p)) | _->None
-end)
-
-(* Features for a rewriting index testing various sums of operator degrees. Only for ≠0 polynomials. *)
-let default_features =
-  let sum value p = match hd p with
-  | _, m, One -> value 0 m [|0|]
-  | _, m, Shift(s,_) -> value 1 m s
-  | _, m, Product(s1,_,s2,_) -> valuexm (s1+^s2)
-  | _, m, Diagonal(_,_,s,_) -> value 3 m s in
-  [
-    "monomial form", sum(fun f _ _ -> f);
-    "total degree", sum(fun _ m s -> sum_array m + sum_array s);
-    "shift degree", sum(fun _ _ s -> sum_array s);
-    "coefficient degree", sum(fun _ m _ -> sum_array m);
-    "1ˢᵗ var. degree", sum(fun _ m s -> m.(0) + s.(0));
-    (* then: multiset of indeterminates... except that only ID multisets are supported *)
-  ]
-
-
-(* Embedding polynomials to terms and literals. Does not preserve equality. *)
-
-let term0 = const ~ty:term (ID.make "𝟬")
-
-exception RepresentingPolynomial of poly * Precedence.Weight.t * (powers->shifts->int)
-
-let poly_as_lit_term_id ?name ?(weight=omega) p =
-  let id = ID.make(get_lazy(fun()-> poly_to_string p) name) in
-  ID.set_payload id (RepresentingPolynomial(p, weight, !elimination_priority));
-  let term = const ~ty:term id in
-  mk_eq term0 term, term, id
-
-let poly_of_id id = id |> ID.payload_find ~f:(fun data -> match data with
-  | RepresentingPolynomial(p,w,ord) ->
-    if ord != !elimination_priority then(
-      (* If the elimination_priority has changed, update the polynomial. *)
-      let p' = sort rev_cmp_mono p in
-      ID.set_payload ~can_erase:((==)data) id (RepresentingPolynomial(p', w, !elimination_priority));
-      Some p')
-    else Some p
-  | _ -> None)
-
-let poly_of_term t = match view t with Const id -> poly_of_id id |_->None
-
-let poly_of_lit = function Equation(t,p,true) when t==term0 -> poly_of_term p |_->None
-
-let polyweight_of_id = ID.payload_find ~f:(function RepresentingPolynomial(_,w,_) -> Some w |_->None)
-
-
-(* Calculate superposition between two polynomials pⱼ (j=1,2) that represent equations m⬝pⱼ=0 where m runs over all monomials. A result is m₁p₁ - m₂p₂ where mⱼ are least monomials such that leading terms in mⱼpⱼ equal. Currently result is unique, if superposition is possible. *)
-let superpose p p' =
-  if p=_0 or p'=_0 then [] else try
-    let u,u' = mgu (hd p) (hd p') in
-    (* Debugging note: Untyped printing here changed nontermination into premature termination. Normal printing has no such effect ⇒ its about type tests. In case of termination I saw: dim-heads=0, then [0] derived, then dim-heads=[0] (eli [{}]) and stop. Nonterminating started instead to saturate ×-monomials at this point. It continued to get dim-heads=0. Before this deviation the derived recurrences appeared exactly the same. However I then changed something somewhere and now I cannot reproduce the termination anymore. *)
-    (* [let aid = substiply u p -- substiply u' p' in print_endline(poly_to_string aid); aid] *)
-    [substiply u p -- substiply u' p']
-  with MonomialIncompatibility -> []
-
-(* Try rewrite leading monomial of p by r. *)
-let leadrewrite r p =
-  if r=_0 or p=_0 then None else try
-    Some(p -- (substiply (hd r |~> hd p) r))
-  with MonomialIncompatibility -> None
-
-
-(* Find r, q⬝arg s.t. p = (old - by)⬝q⬝arg + r when given indeterminate old, coefficient term by, target term arg, and polynomial p whose indeterminates commute with old. Note that r is "p evaluated at old=by". *)
-let substitute_division var arg p =
-(* Now ignoring the arg... *)
-  p |> map_monomials(fun(c,m,s)-> [c, m, match s with
-    | One -> One
-    (* | Shift(s,f) -> Shift((if f==arg then (var|=>0) s else s), f) *)
-    | Shift(s,f) -> Shift((var|=>0) s, f)
-    | _ -> raise MonomialIncompatibility]),
-  p |> map_monomials(function
-    | _, _, One -> []
-    (* | c, m, Shift(s,f) -> if f==arg then init s.(var) (fun j -> c, m, Shift((var|=>j) s, f)) else [c,m,Shift(s,f)] *)
-    | c, m, Shift(s,f) -> init s.(var) (fun j -> c, m, Shift((var|=>j) s, f))
-    | _ -> raise MonomialIncompatibility)
-
-
-(* quick manual data entry *)
-(* let _p s = let is_low c = String.lowercase c = c in
-  let rec go = function
-  | v::e::rest -> go rest @ [{exp=int_of_string e; var=122-Char.(code(lowercase v.[0])); base=if is_low v then`Mono else`Move(_z 1)}]
-  | _ -> []
-  in
-  go String.(split_on_char ' ' (trim(concat""[s;" 1"])))
-let _P = map_monomials(fun(c,s,t)-> [_z c, _p s, have t [] int]) *)
-
-end
-*)
-
-
-
-
-
 module MakeSumSolver(MainEnv: Env.S) = struct
 module C = MainEnv.C
 module R = RecurrencePolynomial
@@ -633,6 +265,7 @@ let add_new_rec p c = PolyMap.add recurrence_table p
   (CCList.add_nodup ~eq:C.equal c
     (get_or~default:[] (PolyMap.find_opt recurrence_table p)))
 
+(* Take polynomial expression and propagate recurrences to it based on its structure. The main branch point. *)
 let rec propagate_recurrences_to f = match PolyMap.find_opt recurrence_table f with
 | Some r -> r
 | None ->
@@ -646,6 +279,7 @@ let rec propagate_recurrences_to f = match PolyMap.find_opt recurrence_table f w
   PolyMap.add recurrence_table f r;
   r
 
+(* Recurrences of term. If it embeds polynomial, apply propagation. *)
 and recurrences_of_term t = propagate_recurrences_to R.(get_or~default:(of_term t) (poly_of_term t))
 
 and propagate_oper_affine p's_on_f's =
@@ -682,47 +316,29 @@ and propagate_sum i f =
   |`O[u, R.[[A(V v)];[A I]]] when v=u -> []
   | _ -> [1]
   in
-  (* let rec_of_sum_with_bad_terms =  *)
+  let sumf = R.([[S i]]><f) in
   Iter.of_list(propagate_recurrences_to f)
   |> saturate_with_order sum_blocker
-  (* ∑ₙᑉⁿNf = N∑ₙᑉⁿf - f₀ is a simplification rule so no special action is required.
-  |> Iter.map R.(fun c ->
-    (* TODO remember to guarantee that get_exn succeeds *)
-    let p, lits = get_exn(c|>todo"view_poly_clause") in
-    let p' = p |> map_monomials(fun m -> match terms_in[m] with
-      | [f] when is_f f -> m |> fold_indeterminates
-        (function `T t -> [[S i]] >< of_term t |_-> assert false)
-        (fun s g -> function
-          | O[j,[[A I]]] when j=i -> g -- ([[eval_at ~var:i Z.zero]] >< g) ++ s
-          | O[k,[[A I]]] -> todo"near commutativity"
-          | x -> 
-            assert(not(Int_set.mem i (free_variables[[x]]))); (* or if this cannot be guaranteed, propagation should be given up. *)
-            [[x]]><s)
-      | _ -> [[S i]]><[m])
-    in
-    make_clause (R.polyliteral p' :: to_list lits) ~parents:[c]
-      Proof.(Step.inference ~rule:(Rule.mk "pull recurrence out of sum"))
-  )
-  Force the iteration through to decide necessity of resaturation. 
-  Note: resaturation might not be useful anymore because the handling of excess terms is improved.
-  |> Iter.persistent in
-  if !bad=[] then rec_of_sum_with_bad_terms else(
-    let _,sum,_ = R.(poly_as_lit_term_id([[S i]]><f)) in
-    Iter.of_list(flat_map recurrences_of_term !bad)
-    |> Iter.append rec_of_sum_with_bad_terms
-    |> saturate_with_order(R.elim_oper_args((sum,1)::map(fun f -> f,2)!bad))
-  )
-  *)
-  |> filter_recurrences_of[f]
+  |> Iter.map(map_poly_in_clause R.((><)[[S i]]))
+  (* TODO Since N∑ⁿ=∑ⁿ+1 is (a special case of) a simplification, the corresponding recurrence is unstable. Maybe RecurrencePolynomial could expose a constructor for this recurrence and make it stable, or otherwise unification/saturation must be extended. Right now I just skip the safe constructors while the below using safe >< results in a trivial recurrence. 
+  |> Iter.cons(definitional_poly_clause R.(([[shift i]]><sumf) -- sumf -- f)) *)
+  |> Iter.cons(definitional_poly_clause R.([shift i :: hd sumf] -- sumf -- f))
+  (* ...or should it be a recurrence of an embedded summation? *)
+  (* TODO embedding issue: *)
+  (* |> filter_recurrences_of[sumf] *)  
 
 and propagate_subst s f =
   (* 1. for each range coordinate create compound shift *)
-  (* 2. create equations: compound shift = composition of 1-shifts ↭ 𝕊ⱼ = ∏ᵢ Sᵢ^mᵢⱼ ↭ 𝕊ᵃ = Sᵐᵃ *)
+  (* 2. create equations: compound shift = composition of 1-shifts ↭ 𝕊ⱼ = ∏ᵢ Sᵢ^mᵢⱼ ↭ 𝕊ᵃ = Sᵐᵃ *)
   (* 3. saturate *)
   (* 4. replace each compound shift by a 1-shift, and substitute multipliers *)
   let is1shift = function R.O[_,[[A I]]] -> true | _ -> false in
+  let _,f_term,_ = R.(poly_as_lit_term_id f) in
+  let _,sf_term,_ = R.(poly_as_lit_term_id([o s]><f)) in
   let dom = R.free_variables f in
-  let s = filter (fun(v,_)-> Int_set.mem v dom) s in (* ⇒ domain of s ⊆ dom ...necessary? *)
+  let dom = Int_set.union dom (Int_set.of_list(map fst s)) in
+  let s = filter (fun(v,_)-> Int_set.mem v dom) s in (* ⇒ domain of s ⊆ dom ...necessary?
+  What'd be the variables of just a term? They'd have to be assigned somewhere (TODO) or maybe they are not needed so for now try to ignore them. *)
   match R.view_affine s with
   | None -> Iter.empty
   | Some(m,a) ->
@@ -731,9 +347,9 @@ and propagate_subst s f =
     let multishifts_and_equations = changedShift(Int_set.to_list(R.rangeO s)) |> map R.(fun j ->
       let on_dom f = map f (Int_set.to_list dom) in
       (* 𝕊ⱼ = ∏ᵢ Sᵢ^mᵢⱼ = O[0,m₀ⱼ;...;i,mᵢⱼ;...] where j runs over range and i over domain *)
-      let ss_j = O(on_dom(fun i -> i, const_eq_poly(Z.of_int(m@.(i,j))))) in
+      let ss_j = hd(o(on_dom(fun i -> i, const_eq_poly(Z.of_int(~<m@. ~<(i,j)))))) in
       (* TODO Recurrence polynomial data structure needs an additional marker to distinguish compound shifts from ordinary ones in all corner cases. *)
-      if is1shift ss_j then failwith("Unimplemented: "^ string_of_int j^"ᵗʰ compound shift cannot be distinguished from 1-shift when propagating to substitution "^ poly_to_string[[O s]] ^" of "^ poly_to_string f);
+      if is1shift ss_j then failwith("Unimplemented: "^ string_of_int j^"ᵗʰ compound shift cannot be distinguished from 1-shift when propagating to substitution "^ poly_to_string[o s] ^" of "^ poly_to_string f);
       let eq_j = product(on_dom(fun i -> pow' poly_alg [[shift i]] (max 0 (m@.(i,j)))))
         -- product([[ss_j]] :: on_dom(fun i -> pow' poly_alg [[shift i]] (- min 0 (m@.(i,j))))) in
       ((ss_j, shift j), j), eq_j
@@ -745,11 +361,24 @@ and propagate_subst s f =
     |> saturate_with_order(R.elim_indeterminate(function
       |`O[i,R.[[A I]]] -> if Int_set.mem i elimIndices then 1 else 0
       | _ -> 0))
-    |> Iter.map(map_poly_in_clause R.(map_indeterminates(function
-      (* Replace Mᵢ=X[A(V i)] by ∑ⱼmᵢⱼMⱼ. *)
-      | X[A(V i)] -> fold_left (++) _0 (map(fun j -> const_op_poly(Z.of_int(m@.(i,j))) >< [[mul_var j]]) (Int_set.to_list(R.rangeO s)))
-      (* Replace 𝕊ⱼ by Sⱼ by looking it up from multishifts_and_equations. *)
-      | x -> [[get_or~default:x (CCList.assoc_opt ~eq:indet_eq x (map(fst%fst) multishifts_and_equations))]])))
+    |> Iter.filter_map(fun c -> try Some(c |> map_poly_in_clause R.(fun p ->
+      let p = if equational p then p else p>< of_term f_term in
+      p |> map_indeterminates(let rec transf = function
+        | C a -> const_op_poly a
+        (* Apply substitution to terminal indeterminates. *)
+        | A I -> const_eq_poly Z.one
+        | A(V i) as x -> transf(hd(hd(mul_indet[[x]]))) >< const_eq_poly Z.one
+        | A(T f') when CCOpt.equal poly_eq (Some f) (poly_of_term f') -> of_term sf_term
+        | A(T t) -> todo"cache s t"
+        (* Replace Mᵢ=X[A(V i)] by ∑ⱼmᵢⱼMⱼ. *)
+        | X[A(V i)] -> fold_left (++) _0 (map(fun j -> const_op_poly(Z.of_int(m@.(i,j))) >< [[mul_var j]]) (Int_set.to_list(R.rangeO s)))
+        (* Discard clauses still containing shifts that were to be eliminated. *)
+        | O[i,[[A(V j);A I]]] when i=j & Int_set.mem i elimIndices -> raise Exit
+        (* Replace 𝕊ⱼ by Sⱼ by looking it up from multishifts_and_equations. *)
+        | O _ as x -> [[get_or~default:x (CCList.assoc_opt ~eq:indet_eq x (map(fst%fst) multishifts_and_equations))]]
+        | _ -> raise Exit
+        in transf)))
+      with Exit -> None)
 
 
 (* Make a polynomial into a new recurrence of its maximal term. Since polynomial is packed into a new clause, this function in this form is only suitable for testing. *)
@@ -758,6 +387,7 @@ let declare_recurrence r = add_new_rec
   (definitional_poly_clause r)
 
 let sum_equality_inference clause =
+  (* for testing ↓ *)
   let (!) = R.poly_of_string in
   let eq0' p = make_clause (map R.polyliteral p) ~=(Proof.Step.assert' ~file:"" ~name:"" ()) in
   let split_or k d s = match String.split_on_char k s with
@@ -768,35 +398,44 @@ let sum_equality_inference clause =
     Z.of_string c *: poly_of_string m >< of_term(have t [] int)
   ) (String.split_on_char '+' ss))] in
   
+(*
   declare_recurrence !"NNf-Nf-f";
   declare_recurrence !"Ng-ng-g";
-(*
-  propagate_recurrences_to !"nf"; (*OK*)
-  propagate_recurrences_to !"g+f"; (*OK*)
+  propagate_recurrences_to !"nf"; (* OK *)
+  propagate_recurrences_to !"g+f"; (* OK *)
+  propagate_recurrences_to !"g+nf"; (* diverge? *)
+  propagate_recurrences_to !"{ⁿm}∑ⁿ{ᵐm-n}b - ∑ᵐb";
+  propagate_recurrences_to !"∑ᵐb"; (* OK *)
 *)
-  propagate_recurrences_to !"g+nf"; (*diverge?*)
-
-  (* eq0"zzzzz"; eq0"zz + -1."; *)
-  (* eq0"3.zzzzzzzzzzzzzzzzzzz"; eq0"3.zzzzzzzzz + 1."; *)
-  (* eq0"x + y + -1.z"; eq0"xx + yy + -1.zz"; *)
-  (* eq0"yyx + -1.x + -1.y"; eq0"yxx + -1.x + -1."; *)
-  (* eq0"xx + 3.x + 1."; eq0"yy + 3.y + 1."; eq0"xxxxx + yyyyy"; *)
-  
-  (* eq0"2.nN + -1.m + 3."; eq0"NM + 2.m";  *)
-  (* eq0"2.nnNN + -1.n 1 N + 3."; eq0"NNN + 2.nN";   *)
-  
-  (* eq0"X'S* + -1.'S* + -1.X'f"; eq0"'h + -1.'S* + 'g*";  *)
-  (* eq0"X'g* + -1.'g* + -1.X'f"; *)
-  (* eq0"-1.XX'g* + 'g* + XX'f + X'f"; *)
-  
-  (* eq0"Y'⬝2ʸ + -2.'⬝2ʸ"; eq0"-4.'g` + y 2'⬝2ʸ + y'⬝2ʸ"; *)
-  (* eq0"xX'(ˣᵧ) + -1.yX'(ˣᵧ) + X'(ˣᵧ) + -1.x'(ˣᵧ) + -1.'(ˣᵧ)"; eq0"yY'(ˣᵧ) + Y'(ˣᵧ) + -1.x'(ˣᵧ) + y'(ˣᵧ)"; eq0"'f` + -1.y 2'(ˣᵧ)"; *)
-  (* Change priority for ↓ *)
-  (* eq0"xX'f + -1.yX'f + X'f + -1.x'f + -1.'f"; eq0"yyY'f + -1.yx'f + y 2'f + -1.x'f + y'f"; *)
-
-  (* eq0"-1.xxX 2'∑f+-2.xX 2'∑f+-1.X 2'∑f + 3.xxX'∑f+9.xX'∑f+6.X'∑f + -2.x 2'∑f+-6.x'∑f+-4.'∑f"; eq0"xX'g + -2.x'g + -4.'g"; eq0"'h` + -1.'∑f + 'g"; *)
-
+  propagate_recurrences_to !"{ᵐm-n}b"; (* OK *)
+  propagate_recurrences_to !"∑ⁿ{ᵐm-n}b"; (* ok? *)
+  (* propagate_recurrences_to !"{ⁿm}∑ⁿ{ᵐm-n}b"; (* error *)
+  *)
   ~<recurrence_table;
+  exit 1;
+  let seeSatur pp = ((~<) % Iter.to_list % saturate_with_order~=[1] % Iter.of_list % map eq0) pp in
+  seeSatur["vvvvv"; "vv-1"];
+  seeSatur["yyx-x-y"; "yxx-x-1"];
+  seeSatur[
+  "3vvvvvvvvvvvvvvvvvvv"; "3vvvvvvvvv + 1";
+  (* eq0"x + y-v"; eq0"xx + yy-vv"; *)
+  (* eq0"xx + 3x + 1"; eq0"yy + 3y + 1"; eq0"xxxxx + yyyyy"; *)
+  
+  (* eq0"2nN-m + 3"; eq0"NM + 2m";  *)
+  (* eq0"2nnNN-nN + 3"; eq0"NNN + 2nN";   *)
+  
+  (* eq0"Xb-b-Xf"; eq0"h-b + g";  *)
+  (* eq0"Xg-g-Xf"; *)
+  (* eq0"-XXg + g + XXf + Xf"; *)
+  
+  (* eq0"Yb-2b"; eq0"-4g + yyb + yb"; *)
+  (* eq0"xXb-yXb + Xb-xb-b"; eq0"yYb + Yb-xb + yb"; eq0"f-yyb"; *)
+  (* Change priority for ↓ *)
+  (* eq0"xXf-yXf + Xf-xf-f"; eq0"yyYf-yxf + yyf-xf + yf"; *)
+
+  (* eq0"-XxxX∑f+3xxX∑f+9xX∑f+6X∑f-2xx∑f-6x∑f-4∑f"; eq0"xXg-2xg-4g"; eq0"h-∑f+g"; *)
+  
+  ];
   exit 1
   (* tl(tl[clause;clause]) *)
 

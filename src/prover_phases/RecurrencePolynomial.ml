@@ -1,5 +1,7 @@
 open Logtk
 open Interfaces
+open Str
+open Char
 open Util
 open UntypedPrint
 open Precedence.Weight
@@ -43,7 +45,7 @@ let min_array ?(ord=compare) ?top l = min_list ~ord (CCOpt.to_list top @ to_list
 let sum_list = fold_left (+) 0
 let sum_array = Array.fold_left (+) 0
 let index_of p l = fst(get_exn(find_idx p l))
-let index_of' = index_of % (=)
+let index_of' a = index_of((=)a)
 let with_cache_2 c f = curry(with_cache_rec c (uncurry % f % curry))
 let with_cache_3 c f = curry(with_cache_2 c (uncurry % f % curry))
 
@@ -52,8 +54,8 @@ let to_formatter: ('x->string) -> 'x CCFormat.printer
 let string_part_at ?(split=' ') = get % Array.of_list % String.split_on_char split
 let subscript = String.to_seq %> List.of_seq %> concat_view "" (fun c -> match c with
   | '('->"₍" | ')'->"₎" | '+'->"₊" | '-'->"₋" | '='->"₌"
-  | '0'..'9' -> string_part_at "₀ ₁ ₂ ₃ ₄ ₅ ₆ ₇ ₈ ₉" Char.(code c - code '0')
-  | 'a'..'y' -> string_part_at "ₐ ᵦ ᵪ ᵨ ₑ ᵩ ₔ ₕ ᵢ ⱼ ₖ ₗ ₘ ₙ ₒ ₚ ᵩ ᵣ ₛ ₜ ᵤ ᵥ ᵥᵥ ₓ ᵧ" Char.(code c - code 'a')
+  | '0'..'9' -> string_part_at "₀ ₁ ₂ ₃ ₄ ₅ ₆ ₇ ₈ ₉" (code c - code '0')
+  | 'a'..'y' -> string_part_at "ₐ ᵦ ᵪ ᵨ ₑ ᵩ ₔ ₕ ᵢ ⱼ ₖ ₗ ₘ ₙ ₒ ₚ ᵩ ᵣ ₛ ₜ ᵤ ᵥ ᵥᵥ ₓ ᵧ" (code c - code 'a')
   | c -> raise(Invalid_argument("subscript: " ^ String.make 1 c ^ " has no subscript form assigned to it")))
 
 
@@ -71,6 +73,10 @@ and op =
 | X of op list (* never X(X p · q) or X(C p · q) or X(A I); always X(_@[A _]) *)
 | O of (var*poly)list
 
+(* Distinguish operator polynomials and recurrence equations: is A present in monomials or not. *)
+let equational = for_all(fun m -> m!=[] & match hd(rev m) with A _ -> true | C o -> is0 o | _ -> false)
+let operational = for_all(fun m -> m=[] or match hd(rev m) with A _ -> false | C o -> is0 o | _ -> true)
+
 let _0 = []
 (* Use instead of C constructor with monomials. *)
 let ( *.) c m = Z.(if equal c zero then [C zero] else match m with
@@ -80,17 +86,11 @@ let ( *.) c m = Z.(if equal c zero then [C zero] else match m with
 let ( *:)c = map(( *.)c)
 let const_op_poly n = Z.(if equal n zero then [] else if equal n one then [[]] else [[C n]])
 let const_eq_poly n = Z.(if equal n zero then [] else if equal n one then [[A I]] else [[C n; A I]])
-(* Other safe constructors except that for X comes after ordering. *)
+(* Other safe constructors except that one for X comes after ordering and general compositions after arithmetic. *)
 let shift i = O[i,[[A(V i)];[A I]]]
 let mul_var i = X[A(V i)]
-let eval_at' ~var p = O[var, p]
-let eval_at ~var at = eval_at' ~var (const_eq_poly at)
 (* Embed term into polynomial argument. See also poly_of_term to reverse embedding of polynomial in a term. *)
 let of_term t = [[A(T t)]]
-
-(* Distinguish operator polynomials and recurrence equations: is A present in monomials or not. *)
-let equational = for_all(fun m -> m!=[] & match hd(rev m) with A _ -> true | C o -> is0 o | _ -> false)
-let operational = for_all(fun m -> m=[] or match hd(rev m) with A _ -> false | C o -> is0 o | _ -> true)
 
 
 (* Auxiliarity functions for general algebraic structures *)
@@ -323,7 +323,7 @@ let rec poly_to_string p = concat_plus_minus mono_to_string p
 
 and poly_view_string p = mul_coef_view p |> concat_plus_minus(function
   | [n], m -> mono_to_string(n@m)
-  | c, m -> "("^ poly_to_string c ^")"^ mono_to_string m)
+  | c, m -> "("^ poly_to_string c ^")"^ match mono_to_string m with "1"->"" | s->s)
 
 and mono_to_string m = group_succ ~eq:indet_eq m
   |> concat_view "" (fun n -> indet_to_string(hd n) ^ match length n with 1->"" | l -> superscript(string_of_int l))
@@ -339,7 +339,7 @@ and indet_to_string = function
 | S i -> "∑"^superscript(var_name i)
 | X m -> mono_to_string m
 | O[i,[[A(V j)];[A I]]] when i=j -> String.uppercase(var_name i)
-| O f -> "["^ concat_view "" (fun(i,fi)-> superscript(var_name i) ^ poly_view_string fi) f ^"]"
+| O f -> "{"^ concat_view "" (fun(i,fi)-> superscript(var_name i) ^ poly_view_string fi) f ^"}"
 
 let pp_poly = to_formatter poly_to_string
 
@@ -358,12 +358,16 @@ exception RepresentingPolynomial of poly * Precedence.Weight.t * (simple_indeter
  ~weight becomes the weight of idP in KBO. Default weight ω is large because the polynomial literals are expected to be the most expensive literals of a clause to process. Note: the weight assignment is separately informed about the embedded polynomials because the weight of an ID is not assigned on construction, and precedence is fixed at the same time. *)
 let poly_as_lit_term_id ?name ?(weight=omega) p =
   let id = ID.make(name |> get_lazy(fun()->
-    (* I annotate by overlining here that has the benefit of not increasing visual length but the down side of being problematic to iterate. As all pretty-printing, this can be changed to fit other needs, should such arise. *)
-    let _name = flip String.iter (poly_to_string p)
+    (* Compute default name only if none is given. *)
+    let replace = fold_left (%) id % map(fun(old,by) -> global_replace (regexp old) by) in
+    let _name = poly_to_string p
+    |> replace ["﹢","˖"(*ᚐ*); "﹣","−"; "-","−"] (* avoid ' ' around name *)
+    |> flip String.iter
     (* |> Iter.filter(fun c -> not(mem c [' ';'(';')'])) *)
     (* |> Iter.take 20 *)
+    (* I annotate by overlining here that has the benefit of not increasing visual length but the down side of being problematic to iterate. As all pretty-printing, this can be changed to fit other needs, should such arise. *)
     |> Iter.to_string ~sep:"" (fun c ->
-      (if Char.code c lsr 6 != 2 then "̅" else "") ^ String.make 1 c)
+      (if code c lsr 6 != 2 then "̅" else "") ^ String.make 1 c)
     in String.sub (_name ^ "̅") 2 (String.length _name)))
   in
   ID.set_payload id (RepresentingPolynomial(p, weight, !indeterminate_weights));
@@ -395,62 +399,6 @@ let poly_of_lit = function Equation(o,p,true) when o==term0 -> poly_of_term p |_
 
 (* Weight of polynomial id. Used when registering the extension in summation_equality.ml to update the weight assignment to be aware of the embedded polynomials. *)
 let polyweight_of_id = ID.payload_find ~f:(function RepresentingPolynomial(_,w,_) -> Some w |_->None)
-
-
-let union_map f = fold_left (fun u a -> Int_set.union u (f a)) Int_set.empty
-
-(* Domain and range (explicit parts) of an O (substitution) indeterminate. *)
-let domainO f = Int_set.of_list(map fst f)
-let rec rangeO f = union_map(free_variables%snd) f
-
-and free_variables p' = Int_set.(let rec monoFV = function
-  | [] -> empty
-  | O f :: m -> union (rangeO f) (diff (monoFV m) (domainO f))
-  | x::m -> union (monoFV m) (match x with
-    | O f -> assert false (* was prior case *)
-    | C _ | A I -> empty
-    (* Do operators make explicit all implicit dependencies in argument terms? If not, below is wrong! *)
-    | A(V i) | S i | D i | XD i -> singleton i
-    | X f -> monoFV f
-    | A(T t) -> map_or ~default:empty free_variables (poly_of_term t) (* TODO properly track variables of a term *)
-  ) in
-  union_map monoFV p')
-
-(* Output ϱ,σ,raw. Renaming substitution indeterminate ϱ satisfies dom ϱ = vs\taken and img ϱ ∩ vs∪taken = ∅. Substitution indeterminate σ undoes ϱ meaning [σ]><[ϱ]><p = p if free_variables p ⊆ taken∪vs. Finally raw is the list of the variable pairs (vᵢ,uᵢ) that define σ:vᵢ↦uᵢ and ϱ:uᵢ↦vᵢ. *)
-let rename_apart ~taken vs = match Int_set.(
-  let collide = diff vs taken in
-  let m = lazy(ref(max_elt(union vs taken))) in
-  fold Lazy.(fun c pairs -> incr(force m); (c, !(force m))::pairs) collide []) with
-  | [] -> [], [], []
-  | raw -> [O(map(fun(v,u)->v,[[A(V u)]]) raw)], [O(map(fun(v,u)->u,[[A(V v)]]) raw)], raw
-
-(* If f n = M·n+a⃗, return Some(M,a⃗) where the matrix M and vector a⃗ are directly indexed by the present variables (as variables are usually small, expected waste of space is little—except that matrices can still easily waste quadratically space). Moreover, to distinguish compound shifts, we test if M=I by encoding [||] for no-change rows (that is, if Meᵢ=eᵢ then M.(i)=[||]).  Substitution changes variables of the range to variables of the source space. Usually we index by the mapped range variables and hence they are the first indices that happens to coincide with the standard convention of writing matrix element indices. *)
-let view_affine f =
-  let size = 1 + fold_left(fun s (v,_) -> max s v) 0 f in
-  let width = map_or ~default:0 ((+)1) (Int_set.max_elt_opt(rangeO f)) in
-  let matrix = Array.make size [||] in
-  let shift = Array.make size 0 in
-  try f|>map(fun(i,p) ->
-    let put vs sh = (* i ↦ vs+sh = variable list + shift constant *)
-      shift.(i) <- sh;
-      if vs<>[[A(V i)]] then (* identity variable mapping gets encoded by [||] always *)
-        matrix.(i) <- fold_left (fun row -> function
-          | [A(V n)] -> row.(n) <- 1; row
-          | [C a; A(V n)] -> row.(n) <- Z.to_int a; row
-          | _ -> raise Exit
-        ) (Array.make width 0) vs
-    in
-    match rev p with
-    | [C a; A I]::vs -> put vs (Z.to_int a)
-    | [A I]::vs -> put vs 1
-    | vs -> put vs 0
-  )|> ~=(Some(matrix, shift))
-  with Exit -> None
-
-(* After view_affine it is easy to further detect compound shifts from the condition that their matrix is the identity matrix.
- Since substitutions implicitly leave unmentioned variables untouched, it was convenient to extend this to matrices so that identity matrix always has only empty rows. This convention also requires custom indexing operation. *)
-let isMatrix1 i = Array.for_all((=)[||])i
-let (@.) m (i,j) = if m.(i)=[||] then if i=j then 1 else 0 else m.(i).(j)
 
 
 (* Arithmetic operations ++, --, >< *)
@@ -490,27 +438,32 @@ let rec (><) p q = match p,q with
 
 (* As named. A(rgument) must only appear as the right-most input. (Product of two A's is formed using X.) *)
 and indeterminate_product x y =
-  let ( *^) op f = mul_indet([[op]]><f) in
+  let x_ f = mul_indet([[x]]><f) in
   match x,y with
   | C n, C k -> const_op_poly Z.(n*k)
   | _, C o | C o, _ when is0 o -> [[C o]] (* acceptably may eliminate A _ *)
   | x, C k -> [[y;x]]
-  | D i, X f -> [[X f; D i]] ++ D i *^[f]
-  | XD i, X f -> [[X f; XD i]] ++ XD i *^[f]
+  | D i, X f -> [[X f; D i]] ++ x_[f]
+  | XD i, X f -> [[X f; XD i]] ++ x_[f]
   | D i, O f -> (if mem_assq i f then f else (i,[[A(V i)]])::f) (* identity ∘'s in f are implicit *)
-    |> map(fun(n,fn)-> D i *^fn >< [[O f; D n]]) (* coordinatewise chain rule *)
+    |> map(fun(n,fn)-> x_ fn >< [o f @[D n]]) (* coordinatewise chain rule *)
     |> fold_left (++) _0 (* sum *)
-  | XD i, O f -> fold_left(++)_0 (map(fun(n,fn)-> (todo"X fn⁻¹")><  XD i *^fn >< [[O f; XD n]]) (if mem_assq i f then f else (i,[[A(V i)]])::f)) (* like previous *)
+  | XD i, O f -> fold_left(++)_0 (map(fun(n,fn)-> (todo"X fn⁻¹") >< x_ fn >< [o f @[XD n]]) (if mem_assq i f then f else (i,[[A(V i)]])::f)) (* like previous *)
   | D i, XD j when i=j -> [[XD i; D i]; [D i]]
-  | O f, X g -> O f *^[g] >< [[O f]]
-  | O[i,[[A(V j)];[A I]]], O[l,[[A(V k)];[A I]]] when i=j & l=k & i>l -> [[y;x]] (* TODO composite case *)
+  | O f, X g -> x_[g] >< [[O f]]
+  | X(S i ::f), S j when i=j -> let _Si_Xf = [[S i]]><mul_indet[f] in (_Si_Xf><[[S i]]) ++ [[S i; X(S i :: f)]] ++ _Si_Xf
   | O[i,[[A(V j)];[A I]]], S l when i=j&i=l -> [[S i]; []]
-  | S l, O[i,[[A(V j)];[A I]]] when i=j&i=l -> [[S i]; [C Z.minus_one; eval_at Z.zero ~var:i]; []]
+  | S l, O[i,[[A(V j)];[A I]]] when i=j&i=l -> [[S i]; C Z.minus_one :: eval_at Z.zero ~var:i; []]
+  | S l, O[i,[[A(V j)];[A I]]] when i=j -> [[y;x]]
+  | S l, (X[A(V i)] | D i | XD i) when l!=i -> [[y;x]]
   | O[i,[[C o]]], S l when i=l -> assert(is0 o); [[x]]
   | O[i,[[C c; A I]]], S l when i=l -> Z.(if c < zero
-    then map(fun n -> [eval_at~var:i (of_int n + c)]) (range' 0 (Stdlib.abs(to_int c)))
-    else map(fun n -> [eval_at~var:i (of_int n)]) (range' 0 (to_int c)))
-  | X(S i ::f), S j when i=j -> let _Si_Xf = [[S i]]><mul_indet[f] in (_Si_Xf><[[S i]]) ++ [[S i; X(S i :: f)]] ++ _Si_Xf
+    then map(fun n -> eval_at~var:i (of_int n + c)) (range' 0 (Stdlib.abs(to_int c)))
+    else map(fun n -> eval_at~var:i (of_int n)) (range' 0 (to_int c)))
+  | O[i,[[A(V j)];[A I]]], O[l,[[A(V k)];[A I]]] when i=j & l=k & i>l -> [[y;x]] (* TODO composite case *)
+  | D i, D l | XD i, XD l | S i, S l | X[A(V i)], X[A(V l)] when i>l -> [[y;x]]
+  | X f, X g when rev_cmp_mono f g < 0 -> [[y;x]] (* Assumes commutative product! *)
+  | X f, A _ when rev_cmp_mono f [y] < 0 -> mul_indet[[y]]><[f] (* Assumes commutative product! *)
   | D _, A I -> []
   | D i, A(V n) -> const_eq_poly Z.(if i=n then one else zero)
   | O f, A(V n) -> get_or~default:[[y]] (assq_opt n f)
@@ -518,7 +471,15 @@ and indeterminate_product x y =
   (*| A _, y -> [[y;x]] (* Delicate: I want to simplify also _,A but only when A is fully right which must be taken into account somewhere at some point! TODO was there a real need for this? *)*)
   | x, y -> [[x;y]]
 
-(* Does [[x;y]] represent x·y. Equivalently does x≯y in the internal indeterminate order. *)
+(* Use these instead of the O constructor. *)
+and eval_at' ~var p = o[var, p]
+and eval_at ~var at = eval_at' var (const_eq_poly at)
+and o subst = match subst
+  |> map(map_snd(fun p -> if equational p then p else p>< const_eq_poly Z.one))
+  |> filter(function i,[[A(V j)]] -> i!=j | _-> true)
+with []->[] | s-> assert(for_all (equational%snd) s); [O s]
+
+(* Does [[x;y]] represent x·y. Equivalently is x≯y in the internal indeterminate order. *)
 let join_normalizes x y = match x,y with
   | A _, _ -> false
   | _ -> poly_eq (indeterminate_product x y) [[x;y]]
@@ -543,7 +504,7 @@ let rec unifiers m' n' =
   | m, ([] | [C _] as n) -> n, rev m
   | x::m, x'::n when indet_eq x x' -> loop(m,n)
   | x::m, y::n when join_normalizes x y ->
-    (* This'd be faster if monomials were encoded in reverse. Only downside were unintuitivity. *)
+    (* This'd be faster if monomials were encoded in reverse. Only downside would be unintuitivity. *)
     (match rev(hd([[y]]><[rev(x::m)])) with
     | y'::xm when indet_eq y y' -> let u,v = loop(xm,n) in u@[y], v
     | _ -> raise Exit)
@@ -563,7 +524,8 @@ let (|~>) general special = match lead_unifiers general special with
 | _ -> None
 
 
-let superpose p p' = match lead_unifiers ~<p ~<p' with
+let superpose p p' = if p==p' then [] else
+  match lead_unifiers ~<p ~<p' with
   | Some(u,u') -> [([u]><p) -- ([u']><p')]
   | None -> []
 
@@ -589,6 +551,64 @@ let default_features() = (* () because of type variables *)
     "1ˢᵗ var. degree", sum(function O[0,_] | X[A(V 0)] -> 1 | _ -> 0);
     (* then: multiset of indeterminates... except that only ID multisets are supported *)
   ]
+
+
+(* Affine substitutions: accessing variables and matrix form *)
+
+let union_map f = fold_left (fun u a -> Int_set.union u (f a)) Int_set.empty
+
+(* Domain and range (explicit parts) of an O (substitution) indeterminate. *)
+let domainO f = Int_set.of_list(map fst f)
+let rec rangeO f = union_map(free_variables%snd) f
+
+and free_variables p' = Int_set.(let rec monoFV = function
+  | [] -> empty
+  | O f :: m -> union (rangeO f) (diff (monoFV m) (domainO f))
+  | x::m -> union (monoFV m) (match x with
+    | O f -> assert false (* was prior case *)
+    | C _ | A I -> empty
+    (* Do operators make explicit all implicit dependencies in argument terms? If not, below is wrong! *)
+    | A(V i) | S i | D i | XD i -> singleton i
+    | X f -> monoFV f
+    | A(T t) -> map_or ~default:empty free_variables (poly_of_term t) (* TODO properly track variables of a term *)
+  ) in
+  union_map monoFV p')
+
+(* Output ϱ,σ,raw. Renaming substitution indeterminate ϱ satisfies dom ϱ = vs\taken and img ϱ ∩ vs∪taken = ∅. Substitution indeterminate σ undoes ϱ meaning [σ]><[ϱ]><p = p if free_variables p ⊆ taken∪vs. Finally raw is the list of the variable pairs (vᵢ,uᵢ) that define σ:vᵢ↦uᵢ and ϱ:uᵢ↦vᵢ. *)
+let rename_apart ~taken vs = match Int_set.(
+  let collide = diff vs taken in
+  let m = lazy(ref(max_elt(union vs taken))) in
+  fold Lazy.(fun c pairs -> incr(force m); (c, !(force m))::pairs) collide []) with
+  | [] -> [], [], []
+  | raw -> o(map(fun(v,u)->v,[[A(V u)]]) raw), o(map(fun(v,u)->u,[[A(V v)]]) raw), raw
+
+(* If f n = M·n+a⃗, return Some(M,a⃗) where the matrix M and vector a⃗ are directly indexed by the present variables (as variables are usually small, expected waste of space is little—except that matrices can still easily waste quadratically space). Moreover, to distinguish compound shifts, we test if M=I by encoding [||] for no-change rows (that is, if Meᵢ=eᵢ then M.(i)=[||]).  Substitution changes variables of the range to variables of the source space. Usually we index by the mapped range variables and hence they are the first indices that happens to coincide with the standard convention of writing matrix element indices. *)
+let view_affine f =
+  let size = 1 + fold_left(fun s (v,_) -> max s v) 0 f in
+  let width = map_or ~default:0 ((+)1) (Int_set.max_elt_opt(rangeO f)) in
+  let matrix = Array.make size [||] in
+  let shift = Array.make size 0 in
+  try f|>map(fun(i,p) ->
+    let put vs sh = (* i ↦ vs+sh = variable list + shift constant *)
+      shift.(i) <- sh;
+      if vs<>[[A(V i)]] then (* identity variable mapping gets encoded by [||] always *)
+        matrix.(i) <- fold_left (fun row -> function
+          | [A(V n)] -> row.(n) <- 1; row
+          | [C a; A(V n)] -> row.(n) <- Z.to_int a; row
+          | _ -> raise Exit
+        ) (Array.make width 0) vs
+    in
+    match rev p with
+    | [C a; A I]::vs -> put vs (Z.to_int a)
+    | [A I]::vs -> put vs 1
+    | vs -> put vs 0
+  )|> ~=(Some(matrix, shift))
+  with Exit -> None
+
+(* After view_affine it is easy to further detect compound shifts from the condition that their matrix is the identity matrix.
+ Since substitutions implicitly leave unmentioned variables untouched, it was convenient to extend this to matrices so that identity matrix always has only empty rows. This convention also requires custom indexing operation. *)
+let isMatrix1 i = Array.for_all((=)[||])i
+let (@.) m (i,j) = if m.(i)=[||] then if i=j then 1 else 0 else m.(i).(j)
 
 
 (* The input function produces polynomials, and its mapped version is a homomorphism. *)
@@ -634,22 +654,40 @@ let match_start(type r) ?(split=' ') patterns string =
 
 let testterms = map (Term.const ~ty:Type.term % ID.make) ["b";"c";"f";"g";"q";"z"]
 
-(* To generate test data. No multidigit numerals. Terms e.g. b,c,f,g and variables e.g. n,m,k,x,y. Examples:
+(* To generate test data. No multidigit numerals. Terms e.g. b,c,f,g and variables e.g. n,m,k,x,y (must be compatible with var_name). Examples:
   Xx+3x-2
   Mmg - nMg - mg - g
   Nng - mg + ng
   ₓₓf + ᵧᵧf - ∑ˣ Y∑ʸ yₓGᵧg
   -ₓXFg + Xₓf.Xg + Xf.ₓXg -1
+  {ᵃₜb.Nb}{ᵉ2a}{ⁱ3e}{ʲ4i}{ᵏ5j}{ˡ1+k}{ᵐl+mn-2}
+  {ⁿm-n}f + N{ˣm}∑ˣf
 *)
+[@@@warning "-14"](* Regular expressions depend on UTF-8 encoding—did not work?! *)
 let rec poly_of_string s =
+  (* Workaround to add substitutions ({ᵛᵃʳpoly} ≡ {var↦poly}) to unextensible setup: Replace {ᵛ...} by an encoding character c and add rule c→... for map_start_factor. *)
+  let delim = regexp(String.of_seq(to_seq['{';'.';'.';'[';chr 131;'-';chr 191;']';'?';'\\';'|';'}'])) in
+  let s', mapSubst = full_split delim s |> let rec packSubst = function
+    | Delim"}" :: s' -> packSubst s'
+    | Delim v :: Text p :: s' ->
+      let r,m = packSubst s' in
+      let codeSubst = String.make 1 (chr(length m)) in
+      if codeSubst=" " then raise(Failure("packSubst: Too many substitutions in "^s));
+      codeSubst ^ r,
+      (codeSubst, fun i->String.[o[index_of' (sub v 1 (length v - 1)) (split_on_char ' ' "ʸ ˣ ᵛ ᵘ ᵗ ˢ ʳ ᵖ ᵒ ⁿ ᵐ ˡ ᵏ ʲ ⁱ ʰ ᵉ ᵃ"), poly_of_string p]]) :: m
+    | Text p :: s' -> map_fst((^)p) (packSubst s')
+    | [] -> "",[]
+    | s' -> raise(Invalid_argument("packSubst: "^ to_string(function Text t | Delim t -> t) s' ^" is ill-formed in "^s))
+  in packSubst in
+  (* sanity check for operator vs. recurrence *)
   let check_mul_indet p = if equational p then mul_indet p else
     raise(Invalid_argument("Operator polynomial " ^ poly_to_string p ^ " cannot become a multiplier indeterminate in " ^ s)) in
   let replace c s = String.concat"" % map(fun a -> if a=c then s else String.make 1 a) % of_seq % String.to_seq in
   let split_map_fold split fold mapper = String.split_on_char split %> map mapper %> fold_left_1 fold in
-  let p = replace '-' "+-" s |>
+  let p = replace '-' "+-" s' |>
     split_map_fold '+' (++) (
       split_map_fold '.' (fun n m -> check_mul_indet n >< m)
-        (poly_of_mono_string % replace ' ' "")) in
+        (poly_of_mono_string mapSubst % replace ' ' "")) in
   (* Make argument A I explicit for C and X monomials if A _ appears in any monomial. *)
   let p_eq = filter((function A _ :: _ -> true | _ -> false) % rev) p in
   let p_CX = filter(for_all(function C _ | X _ -> true | _ -> false)) p in
@@ -657,11 +695,11 @@ let rec poly_of_string s =
   if length p_eq + length p_CX = length p then p_eq ++ (p_CX><[[A I]])
   else raise(Invalid_argument(poly_to_string p ^ " from " ^ s ^ " mixes operator and applied monomials"))
 
-and poly_of_mono_string s' = if s'="" then _0 (* neutral in splitting above *) else
+and poly_of_mono_string base_rules s' = if s'="" then _0 (* neutral in splitting above *) else
   let map_start_factor rules = match_start (map (fun(p,f)-> p,
-    fun i s -> f i >< if s="" then [[]] (* neutral in this recursion *) else poly_of_mono_string s
+    fun i s -> f i >< if s="" then [[]] (* neutral in this recursion *) else poly_of_mono_string base_rules s
   ) rules) s' in
-  map_start_factor[
+  map_start_factor(base_rules@[
     ("y x v u t s r p o n m l k j i h e a",fun i->[[mul_var i]]);
     ("Y X V U T S R P O N M L K J I H E A",fun i->[[shift i]]);
     ("∑ʸ ∑ˣ ∑ᵛ ∑ᵘ ∑ᵗ ∑ˢ ∑ʳ ∑ᵖ ∑ᵒ ∑ⁿ ∑ᵐ ∑ˡ ∑ᵏ ∑ʲ ∑ⁱ ∑ʰ ∑ᵉ ∑ᵃ",fun i->[[S i]]);
@@ -671,4 +709,4 @@ and poly_of_mono_string s' = if s'="" then _0 (* neutral in splitting above *) e
     ("-",fun i->const_op_poly(Z.minus_one));
     ("b c f g q z",fun i->of_term(get_at_idx_exn i testterms));
     ("B C F G Q Z",fun i->mul_indet(of_term(get_at_idx_exn i testterms)));
-  ]
+  ])
