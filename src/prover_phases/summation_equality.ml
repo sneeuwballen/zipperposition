@@ -337,7 +337,7 @@ and propagate_subst s f =
   let _,sf_term,_ = R.(poly_as_lit_term_id([o s]><f)) in
   let dom = R.free_variables f in
   let dom = Int_set.union dom (Int_set.of_list(map fst s)) in
-  let s = filter (fun(v,_)-> Int_set.mem v dom) s in (* ⇒ domain of s ⊆ dom ...necessary?
+  let s = filter (fun(v,_)-> Int_set.mem v dom) s in (* => domain of s ⊆ dom ...necessary?
   What'd be the variables of just a term? They'd have to be assigned somewhere (TODO) or maybe they are not needed so for now try to ignore them. *)
   match R.view_affine s with
   | None -> Iter.empty
@@ -778,40 +778,11 @@ let sum_equality_inference' clause =
       print_endline "Final recurrences:";
       List.iter (print_endline%str) r;
       (* Some[step "" (r) []] *)
-      print_endline "————— summation_equality: Missing induction phase ⇒ terminated —————";
+      print_endline "————— summation_equality: Missing induction phase => terminated —————";
       exit 1
     |_->None
     else None)
   |> get_or ~default:[]
-
-
-(*
-let test_hook clause =
-  let subenv, saturate = make_polynomial_environment() in
-  let eq0' p = C.create (List.map R.polyliteral p) ~penalty:1 ~trail:(C.trail_l[]) (Proof.Step.assert' ~file:"" ~name:"" ()) in
-  let split_or k d s = match String.split_on_char k s with
-  | [a;b] -> a,b | [a] -> if k='.' then d,a else a,d | _ -> raise Exit in
-  let eq0 ss = eq0'[R._P(List.map(fun cmt ->
-    let c,mt = split_or '.' "1" (String.trim cmt) in
-    let m,t = split_or '\'' "" mt in
-    int_of_string c, m, t
-  ) (String.split_on_char '+' ss))] in
-
-  R.redefine_elimination_priority String.(fun m f -> 
-    match view f with
-    | Const f when contains f.name '*' -> 1 
-    | Const f when contains f.name '`' -> -1
-    | _ -> 0
-    (* let e = ref 0 in
-    let _= List.map(function {R.base=`Mono; var=1; exp} -> e:=exp; () | _->()) m in
-    !e *)
-  );
-  
-  let _ = saturate_in subenv R.([
-    eq0'[R._0]] |> remove_at_idx(-1)) in
-  let module SubEnv = (val subenv) in
-  [step "" (Iter.to_rev_list(SubEnv.get_clauses())) []]
-*)
 
 
 (* Setup to do when MakeSumSolver(...) is called. *);;
