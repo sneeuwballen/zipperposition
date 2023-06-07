@@ -433,10 +433,12 @@ let rec (><) p q = match p,q with
   let xy = [[x]]><[[y]] in
   (* Inputs nx and y::m are valid monomials, so if [[x;y]] is too, then simple concatenation puts indeterminates to the right order: *)
   (if poly_eq xy [[x;y]] then [nx@y::m]
-    else [n]><xy><[m])
+    (* Guarantee that all pushing products (A×_ ⇒ _×A) are computed before true argument products (_×A) — evaluate right product first to put any A fully right. (Is this certainly correct?)
+     TODO The entire product A1×X(An) ends up X(An)×A1 instead of An because there is no other indeterminates keeping the simplification alive. This looks severe. If a workaround is not found, the whole encoding of arguments as A indeterminates should be reworked. Minimally unifiers must special case A. *)
+    else [n]><(xy><[m]))
   ++ ([nx]><q) ++ (p><[y::m]) ++ (p><q)
 
-(* As named. A(rgument) must only appear as the right-most input. (Product of two A's is formed using X.) *)
+(* As named. A(rgument) as left input is concatenated to right without other transformations. This allows to implement application as left-multiplication by A, but caller must take care of right-multiplying by A only when A is fully right. (Product of two A's can be formed using X.) *)
 and indeterminate_product x y =
   let x_ f = mul_indet([[x]]><f) in
   match x,y with
@@ -467,8 +469,8 @@ and indeterminate_product x y =
   | D _, A I -> []
   | D i, A(V n) -> const_eq_poly Z.(if i=n then one else zero)
   | O f, A(V n) -> get_or~default:[[y]] (assq_opt n f)
-  | A _, _ -> raise(Invalid_argument("indeterminate_product ("^ indet_to_string x ^") ("^ indet_to_string y ^")"))
-  (*| A _, y -> [[y;x]] (* Delicate: I want to simplify also _,A but only when A is fully right which must be taken into account somewhere at some point! TODO was there a real need for this? *)*)
+  | A _, A _ -> raise(Invalid_argument("indeterminate_product ("^ indet_to_string x ^") ("^ indet_to_string y ^")"))
+  | A _, y -> [[y;x]] (* Push A from left to right. Caller must push A fully right before _,A multiplication! *)
   | x, y -> [[x;y]]
 
 (* Use these instead of the O constructor. *)
@@ -606,9 +608,10 @@ let view_affine f =
   with Exit -> None
 
 (* After view_affine it is easy to further detect compound shifts from the condition that their matrix is the identity matrix.
- Since substitutions implicitly leave unmentioned variables untouched, it was convenient to extend this to matrices so that identity matrix always has only empty rows. This convention also requires custom indexing operation. *)
+ Since substitutions implicitly leave unmentioned variables untouched, it was convenient to extend this to matrices so that identity matrix always has only empty rows. This convention also requires custom indexing operation. Moreover for convenience, missing rows behave like empty ones while otherwise too short rows are only 0-extended. *)
 let isMatrix1 i = Array.for_all((=)[||])i
-let (@.) m (i,j) = if m.(i)=[||] then if i=j then 1 else 0 else m.(i).(j)
+let (@.) m (i,j) = if i >= Array.length m or m.(i)=[||] then if i=j then 1 else 0
+  else try m.(i).(j) with Invalid_argument(*"index out of bounds"*)_ -> 0
 
 
 (* The input function produces polynomials, and its mapped version is a homomorphism. *)

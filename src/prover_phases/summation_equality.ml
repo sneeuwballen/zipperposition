@@ -271,7 +271,7 @@ let rec propagate_recurrences_to f = match PolyMap.find_opt recurrence_table f w
 | None ->
   let r = Iter.to_rev_list(match f with
   | [X[A(V _)]::_] | _::_::_ -> propagate_oper_affine f
-  | [X p :: q] -> propagate_times [p] [q]
+  | [X q :: p] -> propagate_times [q] [p]
   | [S i :: p] -> propagate_sum i [p]
   | [O s :: p] -> propagate_subst s [p]
   | _ -> Iter.empty)
@@ -293,14 +293,14 @@ and propagate_oper_affine p's_on_f's =
 
 and propagate_times f g =
   (* 1. rename (ϱ) var.s of g with merge σ *)
-  (* 2. create Rᶠ·ϱg and f·ϱRᵍ *)
-  (* 3. propagate to substitution σ(f·ϱg) *)
   let rename, merge, _ = R.rename_apart ~taken:(R.free_variables f) (R.free_variables g) in
+  (* 2. create Rᶠ·ϱg and f·ϱRᵍ *)
   let disjoint_recurrences = R.(
     map(map_poly_in_clause(fun r -> r><mul_indet([rename]><g))) (propagate_recurrences_to f) @
     map(map_poly_in_clause(fun r -> mul_indet f><[rename]><r)) (propagate_recurrences_to g)) in
   match merge with
   | [] -> Iter.of_list disjoint_recurrences
+  (* 3. propagate to substitution σ(f·ϱg) when σ≠id *)
   | [O m] ->
     let f_x_g' = R.(mul_indet f><[rename]>< g) in
     PolyMap.add recurrence_table f_x_g' disjoint_recurrences;
@@ -308,7 +308,6 @@ and propagate_times f g =
   | _ -> assert false (* impossible result from R.rename_apart *)
 
 and propagate_sum i f =
-  (* let bad = ref[] in *)
   let is_f t = R.(CCOpt.equal poly_eq (Some f) (poly_of_term t)) in
   let sum_blocker = function (* gives elimination priorities: [] is good, [1] is bad *)
   |`T t when not(is_f t) -> []
@@ -316,16 +315,16 @@ and propagate_sum i f =
   |`O[u, R.[[A(V v)];[A I]]] when v=u -> []
   | _ -> [1]
   in
-  let sumf = R.([[S i]]><f) in
+  let sumf = let _,sumf,_ = R.(poly_as_lit_term_id([[S i]]><f)) in R.of_term sumf in
   Iter.of_list(propagate_recurrences_to f)
   |> saturate_with_order sum_blocker
   |> Iter.map(map_poly_in_clause R.((><)[[S i]]))
-  (* TODO Since N∑ⁿ=∑ⁿ+1 is (a special case of) a simplification, the corresponding recurrence is unstable. Maybe RecurrencePolynomial could expose a constructor for this recurrence and make it stable, or otherwise unification/saturation must be extended. Right now I just skip the safe constructors while the below using safe >< results in a trivial recurrence. 
-  |> Iter.cons(definitional_poly_clause R.(([[shift i]]><sumf) -- sumf -- f)) *)
-  |> Iter.cons(definitional_poly_clause R.([shift i :: hd sumf] -- sumf -- f))
-  (* ...or should it be a recurrence of an embedded summation? *)
-  (* TODO embedding issue: *)
-  (* |> filter_recurrences_of[sumf] *)  
+  (* Replace each ∑ᵢf by the embedding sumf by rewriting by polynomial ∑ᵢf-sumf. *)
+  |> Iter.cons(definitional_poly_clause R.(([[S i]]><f) -- sumf))
+  |> saturate_with_order R.(elim_indeterminate(function`S _->1 | _->0)) (* orient the rewriter *)
+  (* Add the definitional N∑ᑉⁿf = ∑ᑉⁿf + fₙ with sumf embedded while f needs not to be. *)
+  |> Iter.cons(definitional_poly_clause R.(([[shift i]]><sumf) -- sumf -- f))
+  |> filter_recurrences_of R.[ [[S i]]><f ] (* recurrences of sumf, but the embedding level is weird *)
 
 and propagate_subst s f =
   (* 1. for each range coordinate create compound shift *)
@@ -347,7 +346,7 @@ and propagate_subst s f =
     let multishifts_and_equations = changedShift(Int_set.to_list(R.rangeO s)) |> map R.(fun j ->
       let on_dom f = map f (Int_set.to_list dom) in
       (* 𝕊ⱼ = ∏ᵢ Sᵢ^mᵢⱼ = O[0,m₀ⱼ;...;i,mᵢⱼ;...] where j runs over range and i over domain *)
-      let ss_j = hd(o(on_dom(fun i -> i, const_eq_poly(Z.of_int(~<m@. ~<(i,j)))))) in
+      let ss_j = hd(o(on_dom(fun i -> i, const_eq_poly(Z.of_int(m@.(i,j)))))) in
       (* TODO Recurrence polynomial data structure needs an additional marker to distinguish compound shifts from ordinary ones in all corner cases. *)
       if is1shift ss_j then failwith("Unimplemented: "^ string_of_int j^"ᵗʰ compound shift cannot be distinguished from 1-shift when propagating to substitution "^ poly_to_string[o s] ^" of "^ poly_to_string f);
       let eq_j = product(on_dom(fun i -> pow' poly_alg [[shift i]] (max 0 (m@.(i,j)))))
@@ -362,6 +361,7 @@ and propagate_subst s f =
       |`O[i,R.[[A I]]] -> if Int_set.mem i elimIndices then 1 else 0
       | _ -> 0))
     |> Iter.filter_map(fun c -> try Some(c |> map_poly_in_clause R.(fun p ->
+      let cache_t_to_st = HT.create 1 in
       let p = if equational p then p else p>< of_term f_term in
       p |> map_indeterminates(let rec transf = function
         | C a -> const_op_poly a
@@ -369,7 +369,9 @@ and propagate_subst s f =
         | A I -> const_eq_poly Z.one
         | A(V i) as x -> transf(hd(hd(mul_indet[[x]]))) >< const_eq_poly Z.one
         | A(T f') when CCOpt.equal poly_eq (Some f) (poly_of_term f') -> of_term sf_term
-        | A(T t) -> todo"cache s t"
+        | A(T t) when HT.mem cache_t_to_st t -> of_term(HT.find cache_t_to_st t)
+        | A(T t) -> let _,st,_ = poly_as_lit_term_id([o s] >< get_or~default:(of_term t) (poly_of_term t)) in
+          HT.add cache_t_to_st t st; of_term st
         (* Replace Mᵢ=X[A(V i)] by ∑ⱼmᵢⱼMⱼ. *)
         | X[A(V i)] -> fold_left (++) _0 (map(fun j -> const_op_poly(Z.of_int(m@.(i,j))) >< [[mul_var j]]) (Int_set.to_list(R.rangeO s)))
         (* Discard clauses still containing shifts that were to be eliminated. *)
@@ -408,8 +410,8 @@ let sum_equality_inference clause =
   propagate_recurrences_to !"∑ᵐb"; (* OK *)
 *)
   propagate_recurrences_to !"{ᵐm-n}b"; (* OK *)
-  propagate_recurrences_to !"∑ⁿ{ᵐm-n}b"; (* ok? *)
-  (* propagate_recurrences_to !"{ⁿm}∑ⁿ{ᵐm-n}b"; (* error *)
+  propagate_recurrences_to !"∑ⁿ{ᵐm-n}b"; (* missing M-rule *)
+  (* propagate_recurrences_to !"{ⁿm}∑ⁿ{ᵐm-n}b"; (* errors: {ᵐm-n} vs {ᵐ-n+m}; rec. with N is very wrong *)
   *)
   ~<recurrence_table;
   exit 1;
