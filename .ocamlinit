@@ -1,0 +1,198 @@
+(* ## added by OPAM user-setup for ocamltop / base ## 3ec62baf6f9c219ae06d9814069da862 ## you can edit, but keep this line *)
+#use "topfind";;
+(* ## end of OPAM user-setup addition for ocamltop / base ## keep this line *)
+
+let cmaPath = "/home/vnn490/Documents/Zipo/zipperposition/_build/default/src/";;
+
+(* Steps to fix “Error: unbound module An_example” in Ocaml interpreter:
+1. Find .ml file defining An_example (e.g. F12 opens definition in VSCode+Merlin).
+2. #require an external dependency, or proceed to step 3 for Zipperposition specific An_example.
+3. Note the path of the file in zipperposition/src/.
+4. Guess the paths of correponding .cma (same directory structure) and .cmi (subtly different directory structure) files.
+5. Add both to the end of the correponding #directory / #load lists below.
+6. Restart.
+
+Other notes:
+#mod_use "path/to/a_file.ml";;  Wraps inside module A_file like the compiler.
+Program ocamlobjinfo or objinfo prints info about given .cma file.
+$OCAML_TOPLEVEL_PATH/autoload  might be an alternative to this file.
+This file makes the toplevel slow to start. *)
+
+
+(* Zipperposition files: .cmi *)
+
+#directory "/home/vnn490/Documents/Zipo/zipperposition/_build/install/default/lib/logtk";;
+#directory "/home/vnn490/Documents/Zipo/zipperposition/_build/install/default/lib/logtk/proofs";;
+#directory "/home/vnn490/Documents/Zipo/zipperposition/_build/install/default/lib/logtk/parsers";;
+#directory "/home/vnn490/Documents/Zipo/zipperposition/_build/install/default/lib/logtk/solving";;
+#directory "/home/vnn490/Documents/Zipo/zipperposition/_build/install/default/lib/logtk/arbitrary";;
+
+#directory "/home/vnn490/Documents/Zipo/zipperposition/_build/install/default/lib/libzipperposition";;
+#directory "/home/vnn490/Documents/Zipo/zipperposition/_build/install/default/lib/libzipperposition/avatar";;
+#directory "/home/vnn490/Documents/Zipo/zipperposition/_build/install/default/lib/libzipperposition/arith";;
+#directory "/home/vnn490/Documents/Zipo/zipperposition/_build/install/default/lib/libzipperposition/calculi";;
+#directory "/home/vnn490/Documents/Zipo/zipperposition/_build/install/default/lib/libzipperposition/phases";;
+#directory "/home/vnn490/Documents/Zipo/zipperposition/_build/install/default/lib/libzipperposition/induction";;
+
+#directory ".";; (* Source .ml files may be duplicated in the .../_build/install/... directories so put the working directory into the search path as the last one to give it the precedence. *)
+
+
+(* External dependencies *)
+
+#require "batteries";; (* If ∄ Batteries, this just prints warning and continues. *)
+(* from src/{core,prover,solving}/dune files, (libraries ...) rows *)
+#require "containers";;
+#require "containers-data";;
+#require "iter";;
+#require "oseq";;
+#require "zarith";;
+#require "unix";;
+#require "str";;
+#require "msat";;
+#require "msat.tseitin";;
+#require "qcheck";;
+
+
+(* Zipperposition files: .cma *)
+
+let workingDirectory = Unix.getcwd();;
+let inZipperpositionDirectory p = Unix.chdir(cmaPath^p);;
+
+inZipperpositionDirectory "core";;
+#load "logtk.cma";; (* dlllogtk.so is found from the set working directory *)
+
+inZipperpositionDirectory "proofs";;
+#load "logtk_proofs.cma";;
+
+inZipperpositionDirectory "parsers";;
+#load "logtk_parsers.cma";;
+
+inZipperpositionDirectory "solving";;
+#load "logtk_solving.cma";;
+
+inZipperpositionDirectory "arbitrary";;
+#load "logtk_arbitrary.cma";;
+
+inZipperpositionDirectory "prover";;
+#load "libzipperposition.cma";;
+
+inZipperpositionDirectory "prover_calculi/avatar";;
+#load "libzipperposition_avatar.cma";;
+
+inZipperpositionDirectory "prover_calculi/arith";;
+#load "libzipperposition_arith.cma";;
+
+inZipperpositionDirectory "prover_calculi/induction";;
+#load "libzipperposition_induction.cma";;
+
+inZipperpositionDirectory "prover_calculi";;
+#load "libzipperposition_calculi.cma";;
+
+inZipperpositionDirectory "prover_phases";;
+#load "libzipperposition_phases.cma";;
+
+(* I do not know why these did not work like other modules. *)
+inZipperpositionDirectory "../../../src/prover_phases";;
+#mod_use "phases.ml";;
+#mod_use "phases_impl.ml";;
+
+inZipperpositionDirectory "../../../src/arbitrary";;
+#mod_use "arTerm.ml";;
+#mod_use "arType.ml";;
+#mod_use "arID.ml";;
+#mod_use "arLiteral.ml";;
+
+open Logtk;;
+#install_printer InnerTerm.pp;;
+#install_printer Term.pp;;
+#install_printer Type.pp;;
+#install_printer Literal.pp;;
+#install_printer Literals.pp;;
+#install_printer HVar.pp;;
+#install_printer Var.pp;;
+#install_printer ID.pp;;
+#install_printer Subst.pp;;
+#install_printer Statement.pp;;
+#install_printer Proof.S.pp_normal;;
+#install_printer Proof.Step.pp;;
+#install_printer Proof.Rule.pp;;
+#install_printer Proof.pp_tag;;
+#install_printer Proof.pp_tags;;
+#install_printer Proof.pp_parent;;
+#install_printer Rewrite.Defined_cst.pp;;
+#install_printer Rewrite.Term.Rule.pp;;
+#install_printer Rewrite.Lit.Rule.pp;;
+#install_printer Binder.pp;;
+#install_printer Builtin.pp;;
+#install_printer Comparison.pp;;
+#install_printer DBEnv.pp;;
+#install_printer Ordering.pp;;
+#install_printer ParseLocation.pp;;
+#install_printer Position.pp;;
+#install_printer Position.Build.pp;;
+#install_printer Precedence.pp;;
+#install_printer Precedence.Weight.pp;;
+#install_printer Signature.pp;;
+#install_printer STerm.pp;;
+#install_printer SLiteral.pp;;
+#install_printer TypedSTerm.pp;;
+#install_printer Unif_constr.pp;;
+#install_printer Unif_subst.pp;;
+#install_printer Logtk_parsers.Ast_tptp.pp;;
+#install_printer Logtk_parsers.Trace_tstp.pp;;
+
+
+(* Extra optional customization & restore the working directory in the end *)
+open Printexc
+open Logtk_parsers
+open Logtk_proofs
+open Libzipperposition
+open Libzipperposition_calculi
+open Phases_impl
+open Char
+open Str
+open String
+open Util
+open Util.UntypedPrint
+open Rewrite.Term
+open Rewrite.Term.Rule
+open Rewrite.Lit
+open Precedence.Weight
+open Comparison
+open Monome
+open Literals
+open Literal.Conv
+open Literal
+open CCCache
+open CCOpt
+open CCVector
+open CCArray
+open CCList
+open CCFun
+open Type
+open Term
+open Stdlib
+
+let rterm	= ArTerm.default_g;;
+let rtype	= ArType.default_g;;
+let rid	= ArID.default_g;;
+let rlit	= ArLiteral.lit_g;;
+let rlits	= ArLiteral.clause_g;;
+let check ty = QCheck.Test.(check_exn % make ty);; (* Note: ∃ QCheck.Iter *)
+
+#require "lambda-term";;
+LTerm_read_line.bind
+	[{ control=false; meta=false; shift=false; code=Enter }]
+	[UTop.end_and_accept_current_phrase];;
+record_backtrace true;;
+UTop.set_profile UTop.Light;;
+UTop.set_create_implicits true;;
+
+inZipperpositionDirectory "../../../src/prover_phases";;
+#mod_use "RecurrencePolynomial.ml";;
+open RecurrencePolynomial;;
+#mod_use "summation_equality.ml";;
+open Summation_equality;;
+
+Unix.chdir workingDirectory;; (* restore original working directory *)
+open Batteries (* If ∄ Batteries, this crashes, so make it the last command. *)
