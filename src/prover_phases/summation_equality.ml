@@ -816,7 +816,7 @@ let extension = RecurrencePolynomial.{
     (* We cannot simply define the KBO weights to be maximal too. Instead they are overriding parameters that we query by polyweight_of_id. *)
     update_weight_rule(fun wf _ id -> get_lazy (fun()-> wf id) (polyweight_of_id id))];
 };;
-(* TODO Setting --int-inf-diff-to-lesseq is vital but Arith_int.ml hides it currently. *)
+
 Options.add_opts[
   "--sum-by-recurrences", Arg.Bool((:=)sum_by_recurrences), " use holonomic sequence method to sums (∑) in algebras";
 ]
