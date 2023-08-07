@@ -241,6 +241,12 @@ val open_poly_fun : t -> int * t list * t
     @return the return type, the number of type variables,
       and the list of all its arguments *)
 
+val returns : t -> t
+(** [returns ty] opens polymorphic function types and gives only
+    the return type.
+    For example [returns (forall a b. f a -> (g b -> (c -> d)))] returns [d].
+*)
+
 val expected_ty_vars : t -> int
 (** @return the number of type variables that a type requires. *)
 

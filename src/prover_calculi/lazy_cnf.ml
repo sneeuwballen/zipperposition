@@ -22,6 +22,8 @@ let k_penalize_eq_cnf = Flex_state.create_key ()
 let k_clausify_eq_max_nonint = Flex_state.create_key ()
 let k_clausify_implications = Flex_state.create_key ()
 let k_simp_limit = Flex_state.create_key ()
+let k_simplify_quant = Flex_state.create_key ()
+let k_inf_quant = Flex_state.create_key ()
 
 let section = Util.Section.make ~parent:Const.section "lazy_cnf"
 
@@ -29,7 +31,7 @@ module type S = sig
   module Env : Env.S
   module C : module type of Env.C with type t = Env.C.t
 
-  (** {6 Registration} *)
+  (** {5 Registration} *)
 
   val setup : unit -> unit
   (** Register rules in the environment *)
@@ -339,6 +341,33 @@ module Make(E : Env.S) : S with module Env = E = struct
       miniscope b f
     | _ -> None
 
+  let clausify_quant ~parent ~var_offset ~sign ~quant_body ~(quant_hd:Builtin.t) =
+    let f = Combs.expand quant_body in
+    let var_tys, body =  T.open_fun f in
+    assert(List.length var_tys = 1);
+    let var_ty = List.hd var_tys in
+    let hd, f =
+      if sign then quant_hd,f
+      else ((if quant_hd=ForallConst then ExistsConst else ForallConst),
+            T.fun_ var_ty (T.Form.not_ body)) in
+    let rule_name = 
+      CCFormat.sprintf "lazy_cnf_%s" 
+        (if hd = ForallConst then "forall" else "exists") 
+    in
+    let subst_term =
+      if hd = ForallConst then (
+        T.var @@ HVar.make ~ty:var_ty (var_offset + 1)
+      ) else (
+        FR.get_skolem ~parent ~mode:(Env.flex_get k_skolem_mode) f
+        |> CCFun.tap (fun t ->
+          CCOpt.iter (fun hd_id -> 
+          ID.set_payload (hd_id) (ID.Attr_skolem ID.K_lazy_cnf)) (T.head t))) 
+    in
+    let expand_quant = not @@ Env.flex_get Combinators.k_enable_combinators in
+    let res_t = Lambda.eta_reduce ~expand_quant @@ Lambda.snf @@ T.app f [subst_term] in
+    res_t, hd, subst_term, rule_name
+
+
   let lazy_clausify_driver ?(ignore_eq=false) ?(force_clausification=false) ~proof_cons c =
     let return acc l =
       Iter.append acc (Iter.of_list l), `Stop in
@@ -401,40 +430,22 @@ module Make(E : Env.S) : S with module Env = E = struct
                 mk_or ~proof_cons ~rule_name [T.Form.not_ a; T.Form.not_ b] c i 
                 @ mk_or ~proof_cons ~rule_name [a; b] c i
                 )))
-        | T.AppBuiltin((ForallConst|ExistsConst) as hd, [_; f]) ->
-          let var_id = T.Seq.max_var (C.Seq.vars c) + 1 in
-          let f = Combs.expand f in
-          let var_tys, body =  T.open_fun f in
-          assert(List.length var_tys = 1);
-          let var_ty = List.hd var_tys in
-          let hd, f =
-            if sign then hd,f
-            else ((if hd=ForallConst then ExistsConst else ForallConst),
-                  T.fun_ var_ty (T.Form.not_ body)) in
-          let rule_name = 
-            CCFormat.sprintf "lazy_cnf_%s" 
-              (if hd = ForallConst then "forall" else "exists") in
-          let subst_term =
-            if hd = ForallConst then (
-              T.var @@ HVar.make ~ty:var_ty var_id
-            ) else (
-              FR.get_skolem ~parent:c ~mode:(Env.flex_get k_skolem_mode) f
-              |> CCFun.tap (fun t ->
-                CCOpt.iter (fun hd_id -> 
-                ID.set_payload (hd_id) (ID.Attr_skolem ID.K_lazy_cnf)) (T.head t))) 
-          in
-          let expand_quant = not @@ Env.flex_get Combinators.k_enable_combinators in
-          let res = Lambda.eta_reduce ~expand_quant @@ Lambda.snf @@ T.app f [subst_term] in
+        | T.AppBuiltin((ForallConst|ExistsConst) as hd, [_; f]) 
+            when Env.flex_get k_lazy_cnf_kind != `Simp || 
+                 not (Env.flex_get k_inf_quant) ->
+          let var_offset = T.Seq.max_var (C.Seq.vars c) + 1 in 
+          let res, hd, subst_term, rule_name = clausify_quant ~parent:c ~var_offset ~sign ~quant_body:f ~quant_hd:hd in
           assert(Type.is_prop (T.ty res));
           let res_cl = mk_or ~proof_cons ~rule_name [res] c i in
-          if Type.returns_prop var_ty && hd == ForallConst then (
+          if Type.returns_prop (T.ty subst_term) && hd == ForallConst then (
             assert (List.length res_cl == 1);
             assert (T.is_var subst_term);
             Signal.send Env.on_pred_var_elimination (List.hd res_cl, subst_term)
           );
 
-          if Env.flex_get k_enum_bool_funs && Type.Seq.has_bools_only var_ty then (
-            let repls = enum_bool_funs ~ty:var_ty in
+          let sub_ty = T.ty subst_term in
+          if Env.flex_get k_enum_bool_funs && Type.Seq.has_bools_only sub_ty then (
+            let repls = enum_bool_funs ~ty:sub_ty in
             if Env.flex_get k_replace_bool_fun_quants then (
               let bodies = List.map (fun r -> 
                 Lambda.eta_reduce @@ Lambda.whnf (T.app f [r])) repls in
@@ -461,6 +472,36 @@ module Make(E : Env.S) : S with module Env = E = struct
                 mk_or ~proof_cons ~rule_name [T.Form.not_ lhs; T.Form.not_ rhs] c i 
                 @ mk_or ~proof_cons ~rule_name [lhs; rhs] c i ))
       ) else continue acc) (init)
+
+  let clausify_quants ~proof_cons c =
+    C.lits c
+    |> CCArray.find_map_i (fun i -> function 
+      | Literal.Equation(lhs, _, _) as lit 
+          when Literal.is_predicate_lit lit  ->
+        begin match T.view lhs with
+        | T.AppBuiltin((ForallConst|ExistsConst) as hd, [_; body]) ->
+          let var_offset = T.Seq.max_var (C.Seq.vars c) + 1 in 
+          let sign = Literal.is_positivoid lit in
+          let res, hd, subst_term, rule_name = 
+            clausify_quant ~parent:c ~var_offset ~sign ~quant_body:body ~quant_hd:hd in
+          assert(Type.is_prop (T.ty res));
+          let res_cl = List.hd @@ mk_or ~proof_cons ~rule_name [res] c i in
+          if Type.returns_prop (T.ty subst_term) && hd == ForallConst then (
+            assert (T.is_var subst_term);
+            Signal.send Env.on_pred_var_elimination (res_cl, subst_term)
+          );
+          Some (res_cl)
+        | _ -> None end
+      | _-> None)
+
+  let reduce_quantifiers c =
+    let proof_cons = 
+      Proof.Step.simp ~infos:[] 
+                      ~tags:[Proof.Tag.T_live_cnf;
+                             Proof.Tag.T_dont_increase_depth] in
+    clausify_quants ~proof_cons c
+    |> CCOpt.map_or ~default:(SimplM.return_same c) (SimplM.return_new)
+
 
   let rename_subformulas c =
     Util.debugf ~section 3 "lazy-cnf-rename(@[%a@])@." (fun k -> k C.pp c);
@@ -555,6 +596,13 @@ module Make(E : Env.S) : S with module Env = E = struct
           | None -> None, `Continue)
         else None, `Continue) None   
   
+  let inf_quantifiers c =
+    let proof_cons = 
+      Proof.Step.inference ~infos:[] 
+                      ~tags:[Proof.Tag.T_live_cnf;
+                             Proof.Tag.T_dont_increase_depth] in
+    CCOpt.map_or ~default:[] (fun c -> [c]) @@ clausify_quants ~proof_cons c
+
   let clausify_eq c =
     let rule_name = "eq_elim" in
     fold_lits c
@@ -669,11 +717,17 @@ module Make(E : Env.S) : S with module Env = E = struct
       (* Env.Ctx.lost_completeness (); *)
       begin match Env.flex_get k_lazy_cnf_kind with 
       | `Inf | `Ignore -> 
-        Env.add_unary_inf "lazy_cnf" lazy_clausify_inf
+        Env.add_unary_inf "lazy_cnf" lazy_clausify_inf;
+        if (Env.flex_get k_simplify_quant) then (
+          Env.add_basic_simplify reduce_quantifiers;
+        )
       | `Simp -> 
           Env.add_unary_inf "elim eq" clausify_eq;
           if not (Env.flex_get k_clausify_implications) then (
             Env.add_unary_inf "inf_imp" clausify_imp
+          );
+          if Env.flex_get k_inf_quant then (
+            Env.add_unary_inf "inf_quant" inf_quantifiers;
           );
           Env.add_multi_simpl_rule ~priority:5 lazy_clausify_simpl;
           if Env.flex_get k_lazy_cnf_eager then (
@@ -708,6 +762,8 @@ let _clausify_eq_pen = ref false
 let _clausify_eq_max_noninterpreted = ref true
 let _clausify_impls = ref true
 let _simp_limit = ref (-1)
+let _simp_quant = ref false
+let _inf_quant = ref false
 
 let extension =
   let register env =
@@ -727,6 +783,8 @@ let extension =
     E.flex_add k_clausify_eq_max_nonint !_clausify_eq_max_noninterpreted;
     E.flex_add k_simp_limit !_simp_limit;
     E.flex_add k_clausify_implications !_clausify_impls;
+    E.flex_add k_simplify_quant !_simp_quant;
+    E.flex_add k_inf_quant !_inf_quant;
 
     ET.setup ()
   in
@@ -772,6 +830,8 @@ let () =
       | "ignore" -> _lazy_cnf_kind := `Ignore
       | _ -> assert false)), " use lazy cnf as either simplification, inference, or let calculus clausify";
     "--lazy-cnf-rename-eq", Arg.Bool ((:=) _rename_eq), " turn on/of renaming of boolean equalities";
+    "--lazy-cnf-simplify-quant", Arg.Bool ((:=) _simp_quant), " when non-simplifying clausification is used, clausify quantifiers in a simplifying manner";
+    "--lazy-cnf-inf-quant", Arg.Bool ((:=) _inf_quant), " when simplifying clausification is used, clausify quantifiers in a non-simplifying manner";
     "--enum-bool-funs", Arg.Bool ((:=) _enum_bool_funs), " enumerate all functions over Boolean domain (up to the order of the problem)";
     "--replace-bool-quant-fun", Arg.Bool ((:=) _replace_bool_fun_quant), " replace Boolean fun quantifier with all possible values";
     "--lazy-cnf-clausify-eq-penalty", Arg.Bool ((:=) _clausify_eq_pen), " turn on/of penalizing clausification of equivalences"];

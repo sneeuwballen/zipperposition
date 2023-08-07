@@ -1,7 +1,0 @@
-
-(library
-  (name libzipperposition_arith)
-  (public_name libzipperposition.arith)
-  (synopsis "Arithmetic calculus for the Zipperposition theorem prover")
-  (libraries libzipperposition zarith libzipperposition.avatar)
-  (flags :standard -w -32))

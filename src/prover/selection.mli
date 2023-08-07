@@ -105,8 +105,10 @@ val ho_sel  : blocker:(int -> Literal.t -> bool) -> ord:Ordering.t -> t
     The assumption is that they are hard for unification.
 *)
 
-val from_string : ord:Ordering.t -> string -> t
-(** selection function from string (may fail) *)
+val from_string : ord:Ordering.t -> string -> (t * bool)
+(** selection function from string (may fail) --
+    returns functiona and a boolean saying whether function
+    retains completeness *)
 
 val all : unit -> string list
 (** available names for selection functions *)

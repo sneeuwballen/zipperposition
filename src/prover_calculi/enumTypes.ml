@@ -77,7 +77,7 @@ module type S = sig
   (** Instantiate variables whose type is a known enumerated type,
       with all cases of this type. *)
 
-  (** {6 Registration} *)
+  (** {5 Registration} *)
 
   val setup : unit -> unit
   (** Register rules in the environment *)

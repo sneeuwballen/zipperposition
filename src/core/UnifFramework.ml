@@ -6,6 +6,8 @@ module U = Unif
 module Q = CCDeque
 module PUP = PragUnifParams
 
+let section = Util.Section.make "unif.framework"
+
 module type PARAMETERS = sig
   exception NotInFragment
   exception NotUnifiable
@@ -190,7 +192,13 @@ module Make (P : PARAMETERS) = struct
             eta_expand_otf ~subst ~scope:unifscope pref_lhs pref_rhs body_lhs body_rhs in
           let (hd_lhs, args_lhs), (hd_rhs, args_rhs) = T.as_app body_lhs, T.as_app body_rhs in
 
-          if T.equal body_lhs body_rhs then (
+          if Term.is_type lhs then (
+            assert(Term.is_type rhs);
+            try
+              let subst = Unif.FO.unify_syn ~subst:(subst) (lhs, unifscope) (rhs, unifscope) in
+              aux subst rest
+            with Unif.Fail -> OSeq.empty
+          ) else if T.equal body_lhs body_rhs then (
             aux subst rest
           ) else (
             match T.view hd_lhs, T.view hd_rhs with
@@ -221,15 +229,26 @@ module Make (P : PARAMETERS) = struct
                       try
                         Some (alg (lhs, unifscope) (rhs, unifscope) subst)
                       with 
-                      | P.NotInFragment -> None
-                      | P.NotUnifiable -> 
-                      raise Unif.Fail
+                      | P.NotInFragment -> 
+                        Util.debugf ~section 1 
+                          "@[%a@] =?= @[%a@] (subst @[%a@]) is not in fragment" 
+                            (fun k -> k T.pp lhs T.pp rhs Subst.pp subst);
+                        None
+                      | P.NotUnifiable ->
+                        Util.debugf ~section 1 
+                          "@[%a@] =?= @[%a@] (subst @[%a@]) is not unif" 
+                            (fun k -> k T.pp lhs T.pp rhs Subst.pp subst);
+                        raise Unif.Fail
                     ) (P.frag_algs ()) in 
                 match mgu with 
                 | Some substs ->
                   (* We assume that the substitution was augmented so that it is mgu for
                       lhs and rhs *)
-                  CCList.map (fun sub () -> aux sub rest ()) substs
+                  CCList.map (fun sub () -> 
+                    Util.debugf ~section 1 
+                      "@[%a@] =?= @[%a@] (subst @[%a@]) has unif @[%a@]" 
+                        (fun k -> k T.pp lhs T.pp rhs Subst.pp subst Subst.pp sub);
+                    aux sub rest ()) substs
                   |> OSeq.of_list
                   |> OSeq.merge
                 | None ->

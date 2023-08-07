@@ -132,24 +132,24 @@ let _to_multiset_with_idx lits =
 
 (* TODO: optimize! quite a bottleneck on pb47.p with NoSelection *)
 let maxlits_l ~ord lits =
-  ZProf.enter_prof prof_maxlits;
+  let _span = ZProf.enter_prof prof_maxlits in
   let m = _to_multiset_with_idx lits in
   let max = MLI.max_seq (_compare_lit_with_idx ~ord) m
             |> Iter.map fst
             |> Iter.to_list
   in
-  ZProf.exit_prof prof_maxlits;
+  ZProf.exit_prof _span;
   max
 
 let maxlits ~ord lits =
-  ZProf.enter_prof prof_maxlits;
+  let _span = ZProf.enter_prof prof_maxlits in
   let m = _to_multiset_with_idx lits in
   let max = MLI.max_seq (_compare_lit_with_idx ~ord) m
             |> Iter.map (fun (x,_) -> snd x)
             |> Iter.to_list
             |> BV.of_list
   in
-  ZProf.exit_prof prof_maxlits;
+  ZProf.exit_prof _span;
   max
 
 let is_max ~ord lits =
@@ -282,7 +282,7 @@ module Conv = struct
       )
 
   let to_s_form ?allow_free_db ?(ctx) ?hooks lits =
-    let ctx = 
+    let ctx =
       if CCOpt.is_some ctx then CCOpt.get_exn ctx
       else (
         let res = Type.Conv.create () in
@@ -299,28 +299,12 @@ module View = struct
       Lit.View.get_eqn lits.(idx) pos'
     | _ -> None
 
-  let get_arith lits pos = match pos with
-    | Position.Arg (idx, pos') when idx < Array.length lits ->
-      Lit.View.focus_arith lits.(idx) pos'
-    | _ -> None
-
-  let get_rat lits pos = match pos with
-    | Position.Arg (idx, pos') when idx < Array.length lits ->
-      Lit.View.focus_rat lits.(idx) pos'
-    | _ -> None
-
   let _unwrap2 ~msg f x y = match f x y with
     | Some z -> z
     | None -> invalid_arg msg
 
   let get_eqn_exn =
     _unwrap2 ~msg:"get_eqn: improper position" get_eqn
-
-  let get_arith_exn =
-    _unwrap2 ~msg:"get_arith: improper position" get_arith
-
-  let get_rat_exn =
-    _unwrap2 ~msg:"get_rat: improper position" get_rat
 end
 
 let fold_lits ~eligible lits k =
@@ -363,8 +347,6 @@ let fold_eqn ?(both=true) ?sign ~ord ~eligible lits k =
                 k (l, r, sign, Position.(arg i @@ left @@ stop))
           end
         | Lit.Equation _
-        | Lit.Int _
-        | Lit.Rat _
         | Lit.True
         | Lit.False -> ()
       end;
@@ -388,8 +370,6 @@ let fold_eqn_simple ?sign lits k =
         | Lit.Equation (l,r,_) when sign_ok sign ->
           k (l, r, sign, Position.(arg i @@ left @@ stop))
         | Lit.Equation _
-        | Lit.Int _
-        | Lit.Rat _
         | Lit.True
         | Lit.False -> ()
       end;
@@ -397,72 +377,6 @@ let fold_eqn_simple ?sign lits k =
     )
   in
   aux 0
-
-let fold_arith ~eligible lits k =
-  let rec aux i =
-    if i = Array.length lits then ()
-    else if not (eligible i lits.(i)) then aux (i+1)
-    else (
-      begin match Lit.View.get_arith lits.(i) with
-        | None -> ()
-        | Some x ->
-          let pos = Position.(arg i stop) in
-          k (x, pos)
-      end;
-      aux (i+1)
-    )
-  in aux 0
-
-let fold_arith_terms ~eligible ~which ~ord lits k =
-  let module M = Monome in let module MF = Monome.Focus in
-  fold_arith ~eligible lits
-    (fun (a_lit, pos) ->
-       (* do we use the given term? *)
-       let do_term =
-         match which with
-         | `All -> (fun _ -> true)
-         | `Max ->
-           let max_terms = Int_lit.max_terms ~ord a_lit in
-           fun t -> CCList.mem ~eq:T.equal t max_terms
-       in
-       Int_lit.Focus.fold_terms ~pos a_lit
-         (fun (foc_lit, pos) ->
-            let t = Int_lit.Focus.term foc_lit in
-            if do_term t then k (t, foc_lit, pos))
-    )
-
-let fold_rat ~eligible lits k =
-  let rec aux i =
-    if i = Array.length lits then ()
-    else if not (eligible i lits.(i)) then aux (i+1)
-    else (
-      begin match Lit.View.get_rat lits.(i) with
-        | None -> ()
-        | Some x ->
-          let pos = Position.(arg i stop) in
-          k (x, pos)
-      end;
-      aux (i+1)
-    )
-  in aux 0
-
-let fold_rat_terms ~eligible ~which ~ord lits k =
-  let module M = Monome in let module MF = Monome.Focus in
-  fold_rat ~eligible lits
-    (fun (a_lit, pos) ->
-       (* do we use the given term? *)
-       let do_term =
-         match which with
-         | `All -> (fun _ -> true)
-         | `Max ->
-           let max_terms = Rat_lit.max_terms ~ord a_lit in
-           fun t -> CCList.mem ~eq:T.equal t max_terms
-       in
-       Rat_lit.Focus.fold_terms ~pos a_lit
-         (fun (foc_lit, pos) ->
-            let t = Rat_lit.Focus.term foc_lit in
-            if do_term t then k (t, foc_lit, pos))
-    )
 
 let fold_terms ?(vars=false) ?(var_args=true) ?(fun_bodies=true) ?ty_args ~(which : [< `All|`Max])
     ~ord ~subterms ~eligible lits k =
@@ -602,3 +516,11 @@ let ground_lits lits =
   let res = apply_subst Subst.Renaming.none gr_subst (lits,0)  in
   assert(Iter.for_all T.is_ground @@ Seq.terms res);
   res
+
+let num_predicate lits = 
+  let cnt = ref 0 in
+  CCArray.iter (fun l -> if Lit.is_predicate_lit l then incr cnt) lits;
+  !cnt
+
+let num_equational lits = 
+  CCArray.length lits - num_predicate lits

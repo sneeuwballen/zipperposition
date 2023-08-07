@@ -229,8 +229,9 @@ let test_lambdafree_rpo = "ordering.lambdafree_rpo", `Quick, fun () ->
 
 let test_lambda_kbo = "ordering.lambda_kbo", `Quick, fun () ->
   (* alphabetical precedence, h has weight 2, all other symbols weight 1*)
-  let weight id = (if id=h_ then Precedence.Weight.add Precedence.Weight.one Precedence.Weight.one else Precedence.Weight.one) in
-  let ord = O.lambda_kbo true (Precedence.create ~weight Precedence.Constr.alpha [a_; b_; c_; f_; g_; h_]) in
+  let weight id = (if ID.equal id h_ then Precedence.Weight.add Precedence.Weight.one Precedence.Weight.one else Precedence.Weight.one) in
+  let ord = O.lambda_kbo ~ignore_quans_under_lam:true
+      (Precedence.create ~weight Precedence.Constr.alpha [a_; b_; c_; f_; g_; h_]) in
   let compare = O.compare ord in
 
   (* h (x y) > f a (x y) *)
@@ -245,20 +246,17 @@ let test_lambda_kbo = "ordering.lambda_kbo", `Quick, fun () ->
   (* forall x. x > h a a a *)
   let h = Term.const ~ty:(Type.arrow [ty;ty;ty] ty) h_ in
   let a = Term.const ~ty a_ in
-  Alcotest.(check comp_test) "forall x. x > h a a a"
+  Alcotest.(check comp_test) "fun y. forall x. x < forall x. x"
     (compare 
       (Term.app_builtin ~ty:Type.prop Builtin.ForallConst [Term.of_ty Type.prop; Term.fun_l [Type.prop] (Term.bvar ~ty:Type.prop 0)]) 
       (Term.app h [a;a;a])) Comparison.Gt;
 
-  (* fun y. forall x. x < h a a a *)
-  let h = Term.const ~ty:(Type.arrow [ty;ty;ty] ty) h_ in
-  let a = Term.const ~ty a_ in
-  Alcotest.(check comp_test) "fun y. forall x. x < h a a a"
-    (compare 
-      (Term.fun_l [ty]
-        (Term.app_builtin ~ty:Type.prop Builtin.ForallConst [Term.of_ty Type.prop; Term.fun_l [Type.prop] (Term.bvar ~ty:Type.prop 0)]) 
-      )
-      (Term.app h [a;a;a])) Comparison.Lt;
+  (* fun y. forall x. x > forall x. x *)
+  let forall_x_x = 
+    (Term.app_builtin ~ty:Type.prop Builtin.ForallConst [Term.of_ty Type.prop; Term.fun_l [Type.prop] (Term.bvar ~ty:Type.prop 0)])
+  in
+  Alcotest.(check comp_test) "fun y. forall x. x < forall x. x"
+    (compare (Term.fun_l [ty] (forall_x_x)) (forall_x_x)) Comparison.Lt;
 
   (* fun y. z <> z (Variables above and below lambdas need to be treated as if they were different variables) *)
   let z = Term.var (HVar.fresh ~ty ()) in
@@ -298,7 +296,8 @@ let test_lambda_kbo = "ordering.lambda_kbo", `Quick, fun () ->
   let zero = T.const ~ty zero_ in
   let ty1 = Term.of_ty ty in
   let ty2 = Term.of_ty (Type.app funty_ [ty; ty]) in
-  let ord = O.lambda_kbo true (Precedence.create ~weight Precedence.Constr.alpha [add_; app_; funty_; k_; s_; zero_]) in
+  let ord = O.lambda_kbo ~ignore_quans_under_lam:true
+      (Precedence.create ~weight Precedence.Constr.alpha [add_; app_; funty_; k_; s_; zero_]) in
   let x = Term.var (HVar.fresh ~ty ()) in
   let y = Term.var (HVar.fresh ~ty ()) in
   let compare = O.compare ord in
@@ -380,7 +379,7 @@ let props =
          check_ordering_subterm ~arb_t:ArTerm.default_ho o;
        ])
     [
-      O.lambda_kbo true (Precedence.default []);
+      O.lambda_kbo ~ignore_quans_under_lam:true (Precedence.default []);
       O.lambda_rpo (Precedence.default []);
     ]
   @

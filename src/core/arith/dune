@@ -1,0 +1,10 @@
+
+(library
+  (name logtk_arith)
+  (public_name logtk.arith)
+  (libraries
+    (select logtk_arith.ml from
+      (zarith -> logtk_arith.zarith.ml)
+      (num -> logtk_arith.num.ml)))
+  (flags :standard -warn-error -a+8)
+  )

@@ -111,9 +111,6 @@ module type S = sig
   val get_active : unit -> C.t Iter.t
   (** Active clauses *)
 
-  val get_clauses : unit -> C.t Iter.t
-  (** Active followed by passive clauses *)
-
   val add_binary_inf : string -> binary_inf_rule -> unit
   (** Add a binary inference rule *)
 

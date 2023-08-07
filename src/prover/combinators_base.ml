@@ -60,7 +60,7 @@ let [@inline] mk_comb comb_head ty ty_args args =
 
 (* make S combinator with the type:
   Παβγ. (α→β→γ) → (α→β) → α → γ *)
-let mk_s ?(args=[]) ~alpha ~beta ~gamma =
+let mk_s ~args ~alpha ~beta ~gamma =
   let ty = Ty.apply ty_s [Type.of_term_unsafe (alpha : Term.t :> InnerTerm.t);
                           Type.of_term_unsafe (beta : Term.t :> InnerTerm.t);
                           Type.of_term_unsafe (gamma : Term.t :> InnerTerm.t);] in
@@ -68,7 +68,7 @@ let mk_s ?(args=[]) ~alpha ~beta ~gamma =
 
 (* make C combinator with the type:
   Παβγ. (α→β→γ) → β → α → γ *)
-let mk_c ?(args=[]) ~alpha ~beta ~gamma =
+let mk_c ~args ~alpha ~beta ~gamma =
   let ty = Ty.apply ty_c [Type.of_term_unsafe (alpha : Term.t :> InnerTerm.t);
                           Type.of_term_unsafe (beta : Term.t :> InnerTerm.t);
                           Type.of_term_unsafe (gamma : Term.t :> InnerTerm.t);] in
@@ -76,7 +76,7 @@ let mk_c ?(args=[]) ~alpha ~beta ~gamma =
 
 (* make B combinator with the type:
   Παβγ. (α→β) → (γ→α) → γ → β *)
-let mk_b ?(args=[]) ~alpha ~beta ~gamma =
+let mk_b ~args ~alpha ~beta ~gamma =
   let ty = Ty.apply ty_b [Type.of_term_unsafe (alpha : Term.t :> InnerTerm.t);
                           Type.of_term_unsafe (beta : Term.t :> InnerTerm.t);
                           Type.of_term_unsafe (gamma : Term.t :> InnerTerm.t);]  in
@@ -84,14 +84,14 @@ let mk_b ?(args=[]) ~alpha ~beta ~gamma =
 
 (* make K combinator with the type:
   Παβ. β → α → β *)
-let mk_k ?(args=[]) ~alpha ~beta =
+let mk_k ~args ~alpha ~beta =
   let ty = Ty.apply ty_k [Type.of_term_unsafe (alpha : Term.t :> InnerTerm.t);
                           Type.of_term_unsafe (beta : Term.t :> InnerTerm.t)] in
   mk_comb Builtin.KComb ty [alpha;beta] args
 
 (* make I combinator with the type:
   Πα. α → α *)
-let mk_i ?(args=[]) ~alpha =
+let mk_i ~args ~alpha =
   let ty = Ty.apply ty_i [Type.of_term_unsafe (alpha : Term.t :> InnerTerm.t)] in
   mk_comb Builtin.IComb ty [alpha] args
 

@@ -547,6 +547,31 @@ module InpStmSet = Set.Make(AsKey)
 module RW = Rewrite
 module DC = RW.Defined_cst
 
+let eliminate_long_implications ?(is_goal=false) f =
+  let _elim_long_imps f =
+    let rec aux f =
+      match TST.Form.view f with
+      | TST.Form.Imply(lhs, rhs) ->
+        let is_form t = 
+          match TST.Form.view t with 
+          | Atom _ -> false
+          | _ -> true in
+        if not (is_form lhs) then (
+          let premises, concl = aux rhs in
+          lhs::premises, concl
+        ) else ([], f)
+      | _ -> ([], f) in
+    let premises, concl = aux f in
+    if CCList.length premises > 5 
+    then (
+      Util.debugf ~section 2 "trimmed @[%a@] into @[%a@]@." 
+        (fun k -> k TST.pp f TST.pp concl);
+      concl)
+    else f in
+  
+  if not is_goal then f
+  else _elim_long_imps f
+
 let sine_axiom_selector
   ?(ignore_k_most_common_symbols=None)
   ?(take_conj_defs=true)
@@ -556,31 +581,6 @@ let sine_axiom_selector
   ?(depth_end=3) 
   ?(tolerance=2.0) formulas =
   let formulas = Iter.to_list formulas in
-
-  let eliminate_long_implications ~is_goal f =
-      let _elim_long_imps f =
-        let rec aux f =
-          match TST.Form.view f with
-          | TST.Form.Imply(lhs, rhs) ->
-            let is_form t = 
-              match TST.Form.view t with 
-              | Atom _ -> false
-              | _ -> true in
-            if not (is_form lhs) then (
-              let premises, concl = aux rhs in
-              lhs::premises, concl
-            ) else ([], f)
-          | _ -> ([], f) in
-        let premises, concl = aux f in
-        if CCList.length premises > 5 
-        then (
-          Util.debugf ~section 2 "trimmed @[%a@] into @[%a@]@." 
-            (fun k -> k TST.pp f TST.pp concl);
-          concl)
-        else f in
-
-      if not is_goal then f
-      else _elim_long_imps f in
 
   let symset_of_ax ~trim_implications ?(is_goal=false) ax =
      Seq.forms ax

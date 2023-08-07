@@ -1,4 +1,5 @@
 open Logtk
+open Logtk_arith
 open Interfaces
 open Str
 open Char
@@ -103,7 +104,7 @@ let pad_head fill l1 l2 = (fun l -> repeat ((length%%>max) l1 l2 - length l) [fi
 let rec trim_head delete = function o::l when delete o -> trim_head delete l | l->l
 let trim_tail delete = rev % trim_head delete % rev
 
-(* Lexicographic comparison after 0-padding and reversal. E.g. [a] ≈ [a,0] ≤ [a,b] < [_,B] when 0≤b<B. *)
+(* Lexicographic comparison after 0-padding and reversal. E.g. [a] ≈ [a,0] <= [a,b] < [_,B] when 0<=b<B. *)
 let compare_later_dominant l1 l2 = uncurry(lex_list(-)) (rev @@ pad_tail 0 l1 l2)
 let compare_later_dominant = rev %%> length_lex_list(-)
 
@@ -131,7 +132,7 @@ let int_alg: int ord_ring = object
   method plus = (+)
   method minus = (-)
   method times = ( * )
-  method of_Z = Z.to_int
+  method of_Z = Z.to_int_exn
   method o = 0
 end
 
@@ -271,7 +272,7 @@ and indet_eq x y = x==y or match x,y with
   | O f, O g -> CCList.equal(CCPair.equal (=) poly_eq) f g
   | a, b -> a = b
 
-let bit_rotate_right r b = (b lsr r) + (b lsl lnot r) (* for int lacking 1 bit and r≥0 *)
+let bit_rotate_right r b = (b lsr r) + (b lsl lnot r) (* for int lacking 1 bit and r>=0 *)
 
 (* Hash code of normalized polynomials *)
 let rec poly_hash ?(depth=2) p = fold_left (fun h m -> 127*h + mono_hash ~depth m) 0 (take 4 p)
@@ -300,7 +301,7 @@ let rec fold_indeterminates a f = function
 | [] | [A I] -> a `I
 | [A(T t)] -> a(`T t)
 | [A(V i)] -> a(`V i)
-| x::m -> f (fold_indeterminates a f m) [m] x (* x last ⇒ anonymous pattern match is possible *)
+| x::m -> f (fold_indeterminates a f m) [m] x (* x last => anonymous pattern match is possible *)
 
 
 (* Pretty-printing string conversion *)
@@ -353,7 +354,7 @@ let terms_in = sort_uniq ~cmp:Term.compare % flat_map(fun m -> match rev m with 
 let term0 = Term.const ~ty:term (ID.make "𝟬")
 exception RepresentingPolynomial of poly * Precedence.Weight.t * (simple_indeterminate -> int list)
 
-(* Given polynomial P≠0, embed P into a fresh ID idP, that idP into a Term termP, and it into a literal term0≈termP. Return all three.
+(* Given polynomial P<>0, embed P into a fresh ID idP, that idP into a Term termP, and it into a literal term0≈termP. Return all three.
  ~name is the name given to the idP. If omitted, the name is (somewhat wastefully) taken to be the string representation of P, which is further annotated to support nesting the terms back into polynomials and into terms again.
  ~weight becomes the weight of idP in KBO. Default weight ω is large because the polynomial literals are expected to be the most expensive literals of a clause to process. Note: the weight assignment is separately informed about the embedded polynomials because the weight of an ID is not assigned on construction, and precedence is fixed at the same time. *)
 let poly_as_lit_term_id ?name ?(weight=omega) p =
@@ -391,7 +392,7 @@ let poly_of_id id = id |> ID.payload_find ~f:(fun data -> match data with
 (* Retrieve polynomial embedded into a term and make it conform to the current monomial order. See also of_term. *)
 let poly_of_term t = match view t with Const id -> poly_of_id id |_->None
 
-(* Polynomial representing the given term. If the term already embeds a polynomial, result is that embedded polynomial, in order to avoid multilayer embeddings. TODO we should not need 3 term→polynomial conversions! *)
+(* Polynomial representing the given term. If the term already embeds a polynomial, result is that embedded polynomial, in order to avoid multilayer embeddings. TODO we should not need 3 term->polynomial conversions! *)
 (* let of_term' t = get_or~default:[[A(T t)]] (poly_of_term t) *)
 
 (* Retrieve polynomial embedded into a literal and make it conform to the current monomial order. *)
@@ -433,7 +434,7 @@ let rec (><) p q = match p,q with
   let xy = [[x]]><[[y]] in
   (* Inputs nx and y::m are valid monomials, so if [[x;y]] is too, then simple concatenation puts indeterminates to the right order: *)
   (if poly_eq xy [[x;y]] then [nx@y::m]
-    (* Guarantee that all pushing products (A×_ ⇒ _×A) are computed before true argument products (_×A) — evaluate right product first to put any A fully right. (Is this certainly correct?)
+    (* Guarantee that all pushing products (A×_ => _×A) are computed before true argument products (_×A) — evaluate right product first to put any A fully right. (Is this certainly correct?)
      TODO The entire product A1×X(An) ends up X(An)×A1 instead of An because there is no other indeterminates keeping the simplification alive. This looks severe. If a workaround is not found, the whole encoding of arguments as A indeterminates should be reworked. Minimally unifiers must special case A. *)
     else [n]><(xy><[m]))
   ++ ([nx]><q) ++ (p><[y::m]) ++ (p><q)
@@ -460,8 +461,8 @@ and indeterminate_product x y =
   | S l, (X[A(V i)] | D i | XD i) when l!=i -> [[y;x]]
   | O[i,[[C o]]], S l when i=l -> assert(is0 o); [[x]]
   | O[i,[[C c; A I]]], S l when i=l -> Z.(if c < zero
-    then map(fun n -> eval_at~var:i (of_int n + c)) (range' 0 (Stdlib.abs(to_int c)))
-    else map(fun n -> eval_at~var:i (of_int n)) (range' 0 (to_int c)))
+    then map(fun n -> eval_at~var:i (of_int n + c)) (range' 0 (Stdlib.abs(to_int_exn c)))
+    else map(fun n -> eval_at~var:i (of_int n)) (range' 0 (to_int_exn c)))
   | O[i,[[A(V j)];[A I]]], O[l,[[A(V k)];[A I]]] when i=j & l=k & i>l -> [[y;x]] (* TODO composite case *)
   | D i, D l | XD i, XD l | S i, S l | X[A(V i)], X[A(V l)] when i>l -> [[y;x]]
   | X f, X g when rev_cmp_mono f g < 0 -> [[y;x]] (* Assumes commutative product! *)
@@ -475,7 +476,7 @@ and indeterminate_product x y =
 
 (* Use these instead of the O constructor. *)
 and eval_at' ~var p = o[var, p]
-and eval_at ~var at = eval_at' var (const_eq_poly at)
+and eval_at ~var at = eval_at' ~var (const_eq_poly at)
 and o subst = match subst
   |> map(map_snd(fun p -> if equational p then p else p>< const_eq_poly Z.one))
   |> filter(function i,[[A(V j)]] -> i!=j | _-> true)
@@ -502,7 +503,7 @@ let product = fold_left (><) (const_op_poly Z.one)
 let rec unifiers m' n' =
   (* Input is reversed for matching but output is in standard writing order. *)
   let rec loop = function
-  | [C a], [C b] -> Z.(let g = gcd a b in [C(b/g)], [C(a/g)])
+  | [C a], [C b] -> Z.(let g = gcd a b in [C(div b g)], [C(div a g)])
   | m, ([] | [C _] as n) -> n, rev m
   | x::m, x'::n when indet_eq x x' -> loop(m,n)
   | x::m, y::n when join_normalizes x y ->
@@ -521,7 +522,7 @@ let (|~>) general special = match lead_unifiers general special with
 | Some(u, []) -> Some u
 | Some(u, [C __1]) when Z.(equal __1 minus_one) -> Some(__1*.u)
 (* Only reduce the absolute value of the leading coefficient. This is symmetric w.r.t. 0 so a/b rounds correctly towards 0. *)
-| Some(C a :: u, [C b]) when Z.(abs a > abs b) -> Some Z.(a/b*.u)
+| Some(C a :: u, [C b]) when Z.(abs a > abs b) -> Some Z.(div a b *.u)
 (* TODO is the converse when u=[] necessary to handle? *)
 | _ -> None
 
@@ -535,7 +536,7 @@ let leadrewrite r p = CCOpt.map(fun u -> p -- ([u]><r)) (r |~> p)
 
 
 module type View = sig type t type v val view: t -> v option end
-(* Create index from mapping clause→polynomial, that can be instantiated by empty_with' default_features. *)
+(* Create index from mapping clause->polynomial, that can be instantiated by empty_with' default_features. *)
 module LeadRewriteIndex(P: View with type v=poly) = FV_tree.FV_IDX(struct
   type t = P.t
   let compare = P.view %%> Stdlib.compare (* only used by sets *)
@@ -543,7 +544,7 @@ module LeadRewriteIndex(P: View with type v=poly) = FV_tree.FV_IDX(struct
   let compute_feature f p = match P.view p with Some p when p!=_0 -> Some(FV_tree.N(f p)) | _->None
 end)
 
-(* Features for a rewriting index testing various sums of operator degrees. Only for ≠0 polynomials. *)
+(* Features for a rewriting index testing various sums of operator degrees. Only for <>0 polynomials. *)
 let default_features() = (* () because of type variables *)
   let sum value = sum_list % map value % hd in
   [(* TODO double check that these are correctly increasing *)
@@ -596,12 +597,12 @@ let view_affine f =
       if vs<>[[A(V i)]] then (* identity variable mapping gets encoded by [||] always *)
         matrix.(i) <- fold_left (fun row -> function
           | [A(V n)] -> row.(n) <- 1; row
-          | [C a; A(V n)] -> row.(n) <- Z.to_int a; row
+          | [C a; A(V n)] -> row.(n) <- Z.to_int_exn a; row
           | _ -> raise Exit
         ) (Array.make width 0) vs
     in
     match rev p with
-    | [C a; A I]::vs -> put vs (Z.to_int a)
+    | [C a; A I]::vs -> put vs (Z.to_int_exn a)
     | [A I]::vs -> put vs 1
     | vs -> put vs 0
   )|> ~=(Some(matrix, shift))
@@ -668,7 +669,7 @@ let testterms = map (Term.const ~ty:Type.term % ID.make) ["b";"c";"f";"g";"q";"z
 *)
 [@@@warning "-14"](* Regular expressions depend on UTF-8 encoding—did not work?! *)
 let rec poly_of_string s =
-  (* Workaround to add substitutions ({ᵛᵃʳpoly} ≡ {var↦poly}) to unextensible setup: Replace {ᵛ...} by an encoding character c and add rule c→... for map_start_factor. *)
+  (* Workaround to add substitutions ({ᵛᵃʳpoly} == {var↦poly}) to unextensible setup: Replace {ᵛ...} by an encoding character c and add rule c->... for map_start_factor. *)
   let delim = regexp(String.of_seq(to_seq['{';'.';'.';'[';chr 131;'-';chr 191;']';'?';'\\';'|';'}'])) in
   let s', mapSubst = full_split delim s |> let rec packSubst = function
     | Delim"}" :: s' -> packSubst s'

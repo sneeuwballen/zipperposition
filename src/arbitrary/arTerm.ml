@@ -186,6 +186,10 @@ and shrink_sub t =
        T.app f l')
   | T.Fun (ty_arg, bod) ->
     shrink bod >|= T.fun_ ty_arg
+  | T.Var v ->
+    (QA.Shrink.int v.HVar.id |> Iter.take 100) >|= fun id ->
+    let v = HVar.make ~ty:v.HVar.ty id in
+    T.var v
   | _ -> empty
 
 let mk_ gen = QA.make ~print:T.to_string ~shrink gen

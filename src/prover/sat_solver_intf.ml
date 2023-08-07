@@ -72,4 +72,7 @@ module type S = sig
       @raise Invalid_argument if the literal is not at level 0 *)
 
   val setup: unit -> unit
+
+  val clear: ?size:[ `Big | `Small | `Tiny ] -> unit -> unit
+  (** Reset the SAT solver state *)
 end

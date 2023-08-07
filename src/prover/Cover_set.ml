@@ -26,7 +26,7 @@ type t = {
   cs_cases: case list; (* cases  that also are unique *)
 }
 
-(** {6 Inductive Case} *)
+(** {5 Inductive Case} *)
 
 module Case = struct
   type t = case

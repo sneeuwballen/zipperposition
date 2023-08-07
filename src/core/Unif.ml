@@ -100,9 +100,6 @@ type 'a sequence = ('a -> unit) -> unit
 
 let section = Util.Section.make "unif"
 
-let prof_unify = ZProf.make "unify"
-let prof_matching = ZProf.make "matching"
-
 let fail () = raise Fail
 
 let _allow_pattern_unif = ref true
@@ -701,7 +698,7 @@ module Inner = struct
         delay ~tags () (* push pair as a constraint, because of typing. *)
       | T.AppBuiltin (s1,l1), T.AppBuiltin (s2, l2) when 
           Builtin.equal s1 s2 ->
-        let l1,l2 = if sc1 = sc2 then (norm_logical_inner s1 l1 l2) else l1, l2 in
+        let l1,l2 = if sc1 = sc2 && (not (Type.is_fun (Type.of_term_unsafe @@ T.ty_exn t1))) then (norm_logical_inner s1 l1 l2) else l1, l2 in
         unif_list  ~op ~bvars subst l1 sc1 l2 sc2
       | _, _ -> raise Fail
     end
@@ -1035,10 +1032,7 @@ module Inner = struct
     with Fail -> false
 
   let unify_full ?(subst=US.empty) a b : unif_subst =
-    ZProf.with_prof prof_unify
-      (fun () -> 
-        unif_rec ~root:true ~op:O_unify ~bvars:B_vars.empty subst a b
-        ) ()
+    unif_rec ~root:true ~op:O_unify ~bvars:B_vars.empty subst a b
 
   let unify_syn ?(subst=Subst.empty) a b : Subst.t =
     let subst = US.of_subst subst in
@@ -1050,16 +1044,13 @@ module Inner = struct
   let matching ?(subst=Subst.empty) ~pattern b =
     if Scoped.same_scope pattern b then invalid_arg "Unif.matching: same scopes";
     let scope = Scoped.scope b in
-    ZProf.with_prof prof_matching
-      (fun () ->
-         let subst = US.of_subst subst in
-         let subst =
-           unif_rec subst pattern b
-             ~root:true ~op:(O_match_protect (P_scope scope)) ~bvars:B_vars.empty
-         in
-         assert (not @@ US.has_constr subst);
-         US.subst subst)
-      ()
+    let subst = US.of_subst subst in
+    let subst =
+      unif_rec subst pattern b
+        ~root:true ~op:(O_match_protect (P_scope scope)) ~bvars:B_vars.empty
+    in
+    assert (not @@ US.has_constr subst);
+    US.subst subst
 
   let matching_same_scope
       ?(protect=Iter.empty) ?(subst=S.empty) ~scope ~pattern b =
@@ -1067,17 +1058,14 @@ module Inner = struct
        free variables of [b] *)
     let protect = Iter.append protect (T.Seq.vars b) in
     let blocked = T.VarSet.of_iter protect in
-    ZProf.with_prof prof_matching
-      (fun () ->
-         let subst = US.of_subst subst in
-         let subst =
-           unif_rec
-             subst (Scoped.make pattern scope) (Scoped.make b scope)
-             ~op:(O_match_protect (P_vars blocked)) ~root:true ~bvars:B_vars.empty
-         in
-         assert (not @@ US.has_constr subst);
-         US.subst subst)
-      ()
+    let subst = US.of_subst subst in
+    let subst =
+      unif_rec
+        subst (Scoped.make pattern scope) (Scoped.make b scope)
+        ~op:(O_match_protect (P_vars blocked)) ~root:true ~bvars:B_vars.empty
+    in
+    assert (not @@ US.has_constr subst);
+    US.subst subst
 
   let matching_adapt_scope ?protect ?subst ~pattern t =
     if Scoped.same_scope pattern t

@@ -195,40 +195,51 @@ module Make (S : sig val st : Flex_state.t end) = struct
     assert(T.is_ground target);
 
     let rec aux subst l r =
-      match T.view l with
-      | AppBuiltin(b, args) ->
-        begin match T.view r with 
-          | AppBuiltin(b', args') 
-            when Builtin.equal b b' ->
-            (try
-              let mode = Flex_state.get_exn PragUnifParams.k_logop_mode S.st in
-              let args, args' = Unif.norm_logical_disagreements ~mode b args args' in
+      if (T.is_type l) then (
+        if T.is_ground l && T.is_ground r && T.equal l r then subst 
+        else raise SolidMatchFail (* polymorphism not supported now *)
+      )
+      else (
+        match T.view l with
+        | AppBuiltin(b, args) ->
+          begin match T.view r with 
+            | AppBuiltin(b', args') 
+              when Builtin.equal b b' ->
+              (try
+                let mode = Flex_state.get_exn PragUnifParams.k_logop_mode S.st in
+                let args, args' = Unif.norm_logical_disagreements ~mode b args args' in
+                List.fold_left 
+                  (fun subst (l',r') ->  aux subst l' r') 
+                  subst (List.combine args args')
+              with Unif.Fail -> raise SolidMatchFail
+                    | Invalid_argument _ -> 
+                      CCFormat.printf "Error:@[%a@]::@.@[%a@]@." T.pp pattern T.pp target;
+                      CCFormat.printf "l:@[%a@]@." T.pp l;
+                      CCFormat.printf "r:@[%a@]@." T.pp r;
+                      assert false
+                    )
+            | _ -> raise SolidMatchFail end
+        | App(hd, args) when T.is_var hd -> 
+          refine_subst_w_term subst (T.as_var_exn hd) (cover r args)
+        | App(hd, args) -> 
+          assert(T.is_const hd || T.is_bvar hd);
+          begin match T.view r with 
+            | App(hd', args') when T.equal hd hd' ->
+              if List.length args != List.length args' then (
+                (* polymorphism *)
+                raise SolidMatchFail
+              );
               List.fold_left 
                 (fun subst (l',r') ->  aux subst l' r') 
                 subst (List.combine args args')
-             with Unif.Fail -> raise SolidMatchFail)
-          | _ -> raise SolidMatchFail end
-      | App(hd, args) when T.is_var hd -> 
-        refine_subst_w_term subst (T.as_var_exn hd) (cover r args)
-      | App(hd, args) -> 
-        assert(T.is_const hd || T.is_bvar hd);
-        begin match T.view r with 
-          | App(hd', args') when T.equal hd hd' ->
-            if List.length args != List.length args' then (
-              (* polymorphism *)
-              raise SolidMatchFail
-            );
-            List.fold_left 
-              (fun subst (l',r') ->  aux subst l' r') 
-              subst (List.combine args args')
-          | _ -> raise SolidMatchFail end
-      | Fun _ ->
-        let prefix, body = T.open_fun l in
-        let prefix', body' = T.open_fun r in
-        assert(List.length prefix = List.length prefix');
-        aux subst body body'
-      | Var x -> refine_subst_w_term subst x (cover r [])
-      | _ -> if T.equal l r then subst else raise SolidMatchFail 
+            | _ -> raise SolidMatchFail end
+        | Fun _ ->
+          let prefix, body = T.open_fun l in
+          let prefix', body' = T.open_fun r in
+          assert(List.length prefix = List.length prefix');
+          aux subst body body'
+        | Var x -> refine_subst_w_term subst x (cover r [])
+        | _ -> if T.equal l r then subst else raise SolidMatchFail)
     in
 
     if Type.equal (T.ty pattern) (T.ty target) &&
@@ -304,8 +315,7 @@ module Make (S : sig val st : Flex_state.t end) = struct
           | _ -> () end
       | L.True -> begin match target with | L.True -> k subst | _ -> () end
       | L.False -> begin match target with | L.False -> k subst | _ -> () end
-      | _ -> 
-        raise UnsupportedLiteralKind end
+    end
 
   let check_subsumption_possibility subsumer target =
     let is_more_specific pattern target =

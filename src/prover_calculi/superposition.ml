@@ -101,6 +101,8 @@ let k_rw_with_formulas = Flex_state.create_key ()
 let k_pred_var_eq_fact = Flex_state.create_key ()
 let k_force_limit = Flex_state.create_key ()
 let k_formula_simplify_reflect = Flex_state.create_key ()
+let k_strong_sr = Flex_state.create_key ()
+let k_superpose_w_formulas = Flex_state.create_key ()
 
 
 
@@ -245,7 +247,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           sup_at_var_headed || not (T.is_var (T.head_term t)))
       |> Iter.fold
         (fun tree (t, pos) ->
-           (* Util.debugf ~section 1 "inserting(into):@[@[%a@]|@[%a]@]" (fun k-> k C.pp c Term.pp t); *)
+           Util.debugf ~section 2 "inserting(into):@[@[%a@]|@[%a]@]" (fun k-> k C.pp c Term.pp t);
            let with_pos = C.WithPos.({term=t; pos; clause=c;}) in
            f tree t with_pos)
         !_idx_sup_into;
@@ -331,9 +333,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         ~eligible:(C.Eligible.param c) (C.lits c)
       |> Iter.filter( (fun (_,r,sign,_) -> sign || T.equal r T.false_))
       |> Iter.filter((fun (l, _, _, _) ->
-        match T.view l with
+        (Env.flex_get k_superpose_w_formulas) || 
+        begin match T.view l with
         | T.AppBuiltin((Eq|Neq), _) -> false
-        | _ -> not (T.is_formula l)
+        | _ -> not (T.is_formula l) end
       ))
       |> Iter.filter(fun (l, _, _, _) -> 
           sup_from_var_headed || not (T.is_app_var l))
@@ -341,7 +344,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (fun tree (l, r, sign, pos) ->
            assert (sign || T.equal r T.false_);
            let with_pos = C.WithPos.({term=l; pos; clause=c;}) in
-           (* Util.debugf ~section 1 "inserting(from):@[@[%a@]|@[%a]@]" (fun k-> k C.pp c Term.pp l); *)
+           Util.debugf ~section 2 "inserting(from):@[@[%a@]|@[%a]@]" (fun k-> k C.pp c Term.pp l);
            f tree l with_pos)
         !_idx_sup_from ;
     (* terms that can be demodulated: all subterms (but vars) *)
@@ -412,7 +415,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       (_update_simpl UnitIdx.remove);
     ()
 
-  (** {6 Inference Rules} *)
+  (** {5 Inference Rules} *)
 
   (* ----------------------------------------------------------------------
    * Superposition rule
@@ -627,7 +630,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let t' = if info.sup_kind != DupSup then 
           S.FO.apply ~shift_vars renaming subst (info.t, sc_a)
         else dup_sup_apply_subst info.t sc_a sc_p subst renaming in
-      Util.debugf ~section 2
+      Util.debugf ~section 1
         "@[<2>sup, kind %s(%d)@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a, t'=%a@]@])@ \
          (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@]"
         (fun k->k (kind_to_str info.sup_kind) (Term.Set.cardinal lambdasup_vars) C.pp info.active sc_a T.pp info.s T.pp info.t
@@ -663,8 +666,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         match info.passive_pos with
         | P.Arg(_, P.Left P.Stop)
         | P.Arg(_, P.Right P.Stop) ->
-          if T.equal t' T.false_ && not (Lit.is_positivoid (info.passive_lit)) then (
-            raise exit_negative_tl) 
+          if T.equal t' T.false_ then (
+            if (not (Env.flex_get k_superpose_w_formulas) && 
+                not (Lit.is_positivoid (info.passive_lit))) ||
+                (Env.flex_get k_superpose_w_formulas && 
+                 not (T.is_appbuiltin info.s))
+            then (raise exit_negative_tl)) 
           else if Lit.is_positivoid info.passive_lit &&
                     (* active clause will take the role of passive and that is how
                        we can compute the resolvent *)
@@ -672,7 +679,10 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             raise exit_double_sup
           );
         | _ ->
-          if T.equal t' T.false_ then 
+          if T.equal t' T.false_ && (
+            not (Env.flex_get k_superpose_w_formulas) ||
+            not @@ T.is_appbuiltin info.s
+          ) then 
             raise @@ exit_negative_tl);
 
 
@@ -730,11 +740,20 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         (not bool_inference &&
          not (BV.get (C.eligible_res (info.passive, sc_p) subst) passive_idx)) ||
         not (C.is_eligible_param (info.active, sc_a) subst ~idx:active_idx)
-      ) then (raise (ExitSuperposition "bad ordering conditions"));
+      ) then (
+        let c1 = O.compare ord s' t' = Comp.Lt in
+        let c2 = not bool_inference &&
+                 not (Lit.Pos.is_max_term ~ord passive_lit' passive_lit_pos)in
+        let c3 = not bool_inference &&
+                 not (BV.get (C.eligible_res (info.passive, sc_p) subst) passive_idx) in
+        let c4 = not (C.is_eligible_param (info.active, sc_a) subst ~idx:active_idx) in        
+        raise (ExitSuperposition (
+          CCFormat.sprintf "bad ordering conditions %b %b %b %b" c1 c2 c3 c4)));
       (* Check for superposition at a variable *)
       if info.sup_kind != FluidSup then
-        if not @@ Env.flex_get k_sup_at_vars then
-          assert (not (T.is_var info.u_p))
+        if not @@ Env.flex_get k_sup_at_vars then(
+          if (T.is_var info.u_p) then raise (ExitSuperposition ("sup at var position"));
+        )
         else if T.is_var info.u_p && not (sup_at_var_condition info info.u_p info.t) then (
           Util.debugf ~section 3 "superposition at variable" (fun k->k);
           raise (ExitSuperposition "superposition at variable");
@@ -821,7 +840,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       in
       let new_clause = C.create ~trail:new_trail ~penalty new_lits proof in
       (* Format.printf "LS: %a\n" C.pp new_clause;  *)
-      Util.debugf ~section 2 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
+      Util.debugf ~section 1 "@[... ok, conclusion@ @[%a@]@]" (fun k->k C.pp new_clause);
       if (not (List.for_all (Lit.for_all Term.DB.is_closed) new_lits)) then (
         CCFormat.printf "@[<2>sup, kind %s(%d)@ (@[<2>%a[%d]@ @[s=%a@]@ @[t=%a, t'=%a@]@])@ \
          (@[<2>%a[%d]@ @[passive_lit=%a@]@ @[p=%a@]@])@ with subst=@[%a@]@]"
@@ -840,7 +859,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       );
       Some new_clause
     with ExitSuperposition reason ->
-      Util.debugf ~section 2 "... cancel, %s" (fun k->k reason);
+      Util.debugf ~section 1 "... cancel, %s" (fun k->k reason);
       None
 
   (* simultaneous superposition: when rewriting D with C \lor s=t,
@@ -922,8 +941,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       ) then raise (ExitSuperposition "bad ordering conditions");
       (* Check for superposition at a variable *)
       if info.sup_kind != FluidSup then
-        if not @@ Env.flex_get k_sup_at_vars then
-          assert (not (T.is_var info.u_p))
+        if not @@ Env.flex_get k_sup_at_vars then(
+          if (T.is_var info.u_p) then raise (ExitSuperposition ("sup at var position"));
+        )
         else if T.is_var info.u_p && not (sup_at_var_condition info info.u_p info.t) then
           raise (ExitSuperposition "superposition at variable");
       (* ordering constraints are ok, build new active lits (excepted s=t) *)
@@ -1000,7 +1020,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     else do_classic_superposition info
 
   let infer_active_aux ~retrieve_from_index ~process_retrieved clause =
-    ZProf.enter_prof prof_infer_active;
+    let _span = ZProf.enter_prof prof_infer_active in
     (* no literal can be eligible for paramodulation if some are selected.
        This checks if inferences with i-th literal are needed? *)
     let eligible = C.Eligible.param clause in
@@ -1033,11 +1053,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       |> Iter.to_rev_list
 
     in
-    ZProf.exit_prof prof_infer_active;
+    ZProf.exit_prof _span;
     new_clauses
 
   let infer_passive_aux ~retrieve_from_index ~process_retrieved clause =
-    ZProf.enter_prof prof_infer_passive;
+    let _span = ZProf.enter_prof prof_infer_passive in
     (* perform inference on this lit? *)
     let eligible = C.Eligible.(res clause) in
     (* do the inferences in which clause is passive (rewritten),
@@ -1077,7 +1097,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         )
       |> Iter.to_rev_list
     in
-    ZProf.exit_prof prof_infer_passive;
+    ZProf.exit_prof _span;
     new_clauses
 
   let infer_active clause =
@@ -1123,6 +1143,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       clause
 
   let infer_lambdasup_into clause =
+    let _span = ZProf.enter_prof prof_infer_active in
     (* perform inference on this lit? *)
     let eligible = C.Eligible.(res clause) in
     (* do the inferences in which clause is passive (rewritten),
@@ -1168,7 +1189,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
            |> Iter.filter_map (fun (t,p,s) -> do_sup t p s))
       |> Iter.to_rev_list
     in
-    ZProf.exit_prof prof_infer_passive;
+    ZProf.exit_prof _span;
     new_clauses
   
   let infer_active_complete_ho clause =
@@ -1217,7 +1238,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
    * ---------------------------------------------------------------------- *)
 
   let infer_fluidsup_active clause =
-    ZProf.enter_prof prof_infer_fluidsup_active;
+    let _span = ZProf.enter_prof prof_infer_fluidsup_active in
     (* no literal can be eligible for paramodulation if some are selected.
        This checks if inferences with i-th literal are needed? *)
     let eligible = C.Eligible.param clause in
@@ -1269,11 +1290,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     ) else (
       let stm_res = List.map (fun (p,s,parents) -> Stm.make ~penalty:p ~parents (s)) new_clauses in
       StmQ.add_lst (Env.get_stm_queue ()) stm_res;
-      ZProf.exit_prof prof_infer_fluidsup_active;
+      ZProf.exit_prof _span;
       [])
 
   let infer_fluidsup_passive clause =
-    ZProf.enter_prof prof_infer_fluidsup_passive;
+    let _span = ZProf.enter_prof prof_infer_fluidsup_passive in
     (* perform inference on this lit? *)
     let eligible = C.Eligible.(res clause) in
     (* do the inferences in which clause is passive (rewritten),
@@ -1325,7 +1346,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     ) else (
       let stm_res = List.map (fun (p,s,parents) -> Stm.make ~penalty:p ~parents (s)) new_clauses in
       StmQ.add_lst (Env.get_stm_queue ()) stm_res;
-      ZProf.exit_prof prof_infer_fluidsup_passive;
+      ZProf.exit_prof _span;
       []
     )
 
@@ -1334,6 +1355,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
    * ---------------------------------------------------------------------- *)
 
   let infer_dupsup_active clause =
+    let _span = ZProf.enter_prof prof_infer_active in
     let eligible = C.Eligible.param clause in
     let new_clauses =
       Lits.fold_eqn ~ord ~both:true ~eligible (C.lits clause)
@@ -1398,12 +1420,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     ) else (
       let stm_res = List.map (fun (p,s,parents) -> Stm.make ~penalty:p ~parents ( s)) new_clauses in
       StmQ.add_lst (Env.get_stm_queue ()) stm_res;
-      ZProf.exit_prof prof_infer_fluidsup_active;
+      ZProf.exit_prof _span;
       []
     )
 
   let infer_dupsup_passive clause =
-    ZProf.enter_prof prof_infer_fluidsup_passive;
+    let _span = ZProf.enter_prof prof_infer_fluidsup_passive in
     (* perform inference on this lit? *)
     let eligible = C.Eligible.(res clause) in
     (* do the inferences in which clause is passive (rewritten),
@@ -1473,7 +1495,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     ) else (
       let stm_res = List.map (fun (p,s,parents) -> Stm.make ~penalty:p ~parents (s)) new_clauses in
       StmQ.add_lst (Env.get_stm_queue ()) stm_res;
-      ZProf.exit_prof prof_infer_fluidsup_passive;
+      ZProf.exit_prof _span;
       [])
 
   (* ----------------------------------------------------------------------
@@ -1573,7 +1595,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
    * ---------------------------------------------------------------------- *)
 
   let infer_equality_resolution_aux ~unify ~iterate_substs clause =
-    ZProf.enter_prof prof_infer_equality_resolution;
+    let _span = ZProf.enter_prof prof_infer_equality_resolution in
     let eligible = C.Eligible.filter (fun lit -> not @@ Lit.is_predicate_lit lit) in
     (* iterate on those literals *)
     let new_clauses =
@@ -1616,7 +1638,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         )
       |> Iter.to_rev_list
     in
-    ZProf.exit_prof prof_infer_equality_resolution;
+    ZProf.exit_prof _span;
     new_clauses
 
   let infer_equality_resolution c =
@@ -1702,14 +1724,14 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let new_clause =
         C.create ~trail:(C.trail info.clause) ~penalty new_lits proof
       in
-      Util.debugf ~section 1 "@[<hv2>equality factoring on@ @[%a@]@ yields @[%a@]@]"
+      Util.debugf ~section 3 "@[<hv2>equality factoring on@ @[%a@]@ yields @[%a@]@]"
         (fun k->k C.pp info.clause C.pp new_clause);
 
       Some new_clause
     ) else(None)
 
   let infer_equality_factoring_aux ~unify ~iterate_substs clause =
-    ZProf.enter_prof prof_infer_equality_factoring;
+    let _span = ZProf.enter_prof prof_infer_equality_factoring in
     let eligible = C.Eligible.(filter Lit.eqn_sign) in
     (* find root terms that are unifiable with s and are not in the
        literal at s_pos. Calls [k] with a position and substitution *)
@@ -1747,7 +1769,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                    do_eq_factoring info)))
       |> Iter.to_rev_list
     in
-    ZProf.exit_prof prof_infer_equality_factoring;
+    ZProf.exit_prof _span;
     new_clauses
 
   let infer_equality_factoring c =
@@ -1777,7 +1799,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
    * ---------------------------------------------------------------------- *)
 
   let extract_from_stream_queue ~full () =
-    ZProf.enter_prof prof_queues;
+    let _span = ZProf.enter_prof prof_queues in
     let cl =
       if full then
         StmQ.take_fair_anyway (Env.get_stm_queue ())
@@ -1785,13 +1807,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         StmQ.take_stm_nb (Env.get_stm_queue ())
     in
     let opt_res = CCOpt.sequence_l (List.filter CCOpt.is_some cl)  in
-    ZProf.exit_prof prof_queues;
+    ZProf.exit_prof _span;
     match opt_res with
     | None -> []
     | Some l ->  l
 
   let extract_from_stream_queue_fix_stm ~full () =
-    ZProf.enter_prof prof_queues;
+    let _span = ZProf.enter_prof prof_queues in
     let cl =
       if full then
         StmQ.take_fair_anyway (Env.get_stm_queue ())
@@ -1799,7 +1821,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         StmQ.take_stm_nb_fix_stm (Env.get_stm_queue ())
     in
     let opt_res = CCOpt.sequence_l (List.filter CCOpt.is_some cl) in
-    ZProf.exit_prof prof_queues;
+    ZProf.exit_prof _span;
     match opt_res with
     | None -> []
     | Some l -> l
@@ -1880,8 +1902,8 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                  "@[<hv2>demod(%d):@ @[<hv>t=%a[%d],@ l=%a[%d],@ r=%a[%d]@],@ subst=@[%a@]@]"
                  (fun k->k (C.id c) T.pp t 0 T.pp l cur_sc T.pp r cur_sc S.pp subst);
 
-               let t' = norm_b t in
-               let l' = norm_b @@ Subst.FO.apply Subst.Renaming.none subst (l,cur_sc) in               
+               let t' = Lambda.eta_expand @@ norm_b t in
+               let l' = Lambda.eta_expand @@ norm_b @@ Subst.FO.apply Subst.Renaming.none subst (l,cur_sc) in               
                (* sanity checks *)
                assert (Type.equal (T.ty l) (T.ty r));
                assert (T.equal l' t');
@@ -2137,7 +2159,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   (** Find clauses that [given] may demodulate, add them to set *)
   let backward_demodulate set given =
-    ZProf.enter_prof prof_back_demodulate;
+    let _span = ZProf.enter_prof prof_back_demodulate in
     let renaming = Subst.Renaming.create () in
     (* find clauses that might be rewritten by l -> r *)
     let recurse ~oriented set l r =
@@ -2169,7 +2191,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         end
       | _ -> set
     in
-    ZProf.exit_prof prof_back_demodulate;
+    ZProf.exit_prof _span;
     set'
 
   let is_tautology c =
@@ -2225,7 +2247,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     if C.get_flag flag_simplified c
     then SimplM.return_same c
     else (
-      ZProf.enter_prof prof_basic_simplify;
+      let _span = ZProf.enter_prof prof_basic_simplify in
       Util.incr_stat stat_basic_simplify_calls;
       let lits = C.lits c in
       let has_changed = ref false in
@@ -2289,7 +2311,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       in
       let new_lits = CCList.uniq ~eq:Lit.equal_com new_lits in
       if not !has_changed && List.length new_lits = Array.length lits then (
-        ZProf.exit_prof prof_basic_simplify;
+        ZProf.exit_prof _span;
         C.set_flag flag_simplified c true;
         SimplM.return_same c  (* no simplification *)
       ) else (
@@ -2308,7 +2330,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           "@[<>@[%a@]@ @[<2>basic_simplifies into@ @[%a@]@]@ with @[%a@]@]"
           (fun k->k C.pp c C.pp new_clause US.pp !us);
         Util.incr_stat stat_basic_simplify;
-        ZProf.exit_prof prof_basic_simplify;
+        ZProf.exit_prof _span;
         SimplM.return_new new_clause
       )
     )
@@ -2350,8 +2372,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           T.Seq.common_contexts lhs rhs
           |> Iter.find_map (fun (lhs, rhs) ->
             top_level ~sign:true ~repl:(if sign then T.true_ else T.false_) lhs rhs
-            <+> top_level ~sign:true ~repl:(if sign then T.true_ else T.false_) rhs lhs
-          )
+            <+> top_level ~sign:true ~repl:(if sign then T.true_ else T.false_) rhs lhs)
         in
 
         top_level ~sign ~repl:T.true_ lhs rhs
@@ -2368,14 +2389,16 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           if T.same_l args args' then t
           else T.app hd args'
         | T.AppBuiltin((Eq|Neq|Equiv|Xor) as hd, ([_; x; y]|[x;y]))
-          when T.DB.is_closed x && T.DB.is_closed y ->
+          when Type.is_prop (T.ty t) && T.DB.is_closed x && T.DB.is_closed y ->
           let (x',y') = CCPair.map_same aux (x,y) in
+          assert(Type.equal (T.ty x) (T.ty x'));
+          assert(Type.equal (T.ty y) (T.ty y'));
           let sign = Builtin.equal Eq hd || Builtin.equal Equiv hd in
           begin match simplify ~sign x' y' with
           | Some t -> t
-          | None -> 
+          | None ->
             if (not ((T.equal x x') && (T.equal y y'))) then (
-              if(Builtin.equal hd Eq) then T.Form.eq x' y'
+              if (Builtin.equal hd Eq) then T.Form.eq x' y'
               else if (Builtin.equal hd Neq) then T.Form.neq x' y'
               else T.app_builtin ~ty:(T.ty t) hd [x'; y']
             ) else t 
@@ -2410,134 +2433,130 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       ) else (SimplM.return_same c)
     ) else (SimplM.return_same c)
 
-  let positive_simplify_reflect c =
-    ZProf.enter_prof prof_pos_simplify_reflect;
-    (* iterate through literals and try to resolve negative ones *)
-    let rec iterate_lits acc lits clauses = match lits with
-      | [] -> List.rev acc, clauses
-      | (Lit.Equation (s, t, false) as lit)::lits' ->
-        begin match equatable_terms clauses s t with
-          | None -> (* keep literal *)
-            iterate_lits (lit::acc) lits' clauses
-          | Some new_clauses -> (* drop literal, remember clauses *)
-            iterate_lits acc lits' new_clauses
-        end
-      | lit::lits' -> iterate_lits (lit::acc) lits' clauses
-    (* try to make the terms equal using some positive unit clauses
-       from active_set *)
-    and equatable_terms clauses t1 t2 =
-      match T.Classic.view t1, T.Classic.view t2 with
-      | _ when T.equal t1 t2 -> Some clauses  (* trivial *)
-      | T.Classic.App (f, ss), T.Classic.App (g, ts)
-        when ID.equal f g && List.length ss = List.length ts ->
-        (* try to make the terms equal directly *)
-        begin match equate_root clauses t1 t2 with
-          | None -> (* otherwise try to make subterms pairwise equal *)
-            let ok, clauses = List.fold_left2
-                (fun (ok, clauses) t1' t2' ->
-                   if ok
-                   then match equatable_terms clauses t1' t2' with
-                     | None -> false, []
-                     | Some clauses -> true, clauses
-                   else false, [])
-                (true, clauses) ss ts
-            in
-            if ok then Some clauses else None
-          | Some clauses -> Some clauses
-        end
-      | _ -> equate_root clauses t1 t2 (* try to solve it with a unit equality *)
-    (* try to equate terms with a positive unit clause that match them *)
-    and equate_root clauses t1 t2 =
-      try
-        UnitIdx.retrieve ~sign:true (!_idx_simpl,1)(t1,0)
-        |> Iter.iter
-          (fun (l,r,(_,_,_,c'),subst) ->
-             let app_sub t = 
-              Term.normalize_bools @@ Lambda.eta_expand @@ Lambda.snf @@ 
-                Subst.FO.apply Subst.Renaming.none subst t in
-             assert(T.equal (app_sub (l,1)) (app_sub (t1, 0)));
-             if C.trail_subsumes c' c &&
-                Term.equal (app_sub (r,1)) (app_sub (t2,0))
-             then begin
-               (* t1!=t2 is refuted by l\sigma = r\sigma *)
-               Util.debugf ~section 4
-                 "@[<2>equate @[%a@]@ and @[%a@]@ using @[%a@]@]"
-                 (fun k->k T.pp t1 T.pp t2 C.pp c');
-               raise (FoundMatch (r, c', subst)) (* success *)
-             end
-          );
-        None (* no match *)
-      with FoundMatch (_r, c', subst) ->
-        Some (C.proof_parent_subst Subst.Renaming.none (c',1) subst :: clauses)  (* success *)
+  let equatable ~sign ~cl s t  =
+    let idx_sc, q_sc = 1, 0 in
+    let (<+>) = CCOpt.(<+>) in
+    let aux s t =
+      UnitIdx.retrieve ~sign (!_idx_simpl, idx_sc) (s, q_sc)
+      |> Iter.find_map (fun (_, rhs, (_,_,_,c'), subst) ->
+          if C.trail_subsumes c' cl then (
+            try
+              ignore(Unif.FO.matching ~subst ~pattern:(rhs, idx_sc) (t, q_sc));
+              Some c'
+            with _ -> None
+          ) else None)
     in
-    (* fold over literals *)
-    let lits, premises = iterate_lits [] (C.lits c |> Array.to_list) [] in
-    if List.length lits = Array.length (C.lits c)
-    then (
-      (* no literal removed, keep c *)
-      ZProf.exit_prof prof_pos_simplify_reflect;
+    aux s t <+> aux t s
+
+  let positive_simplify_reflect c =
+    let driver ~is_simplified c =
+      let kept_lits = CCBV.create ~size:(C.length c) true in
+      let premises = 
+        CCArray.foldi (fun premises i lit   -> 
+          let find_simplifying_premise lhs rhs = 
+            begin match is_simplified lhs rhs with
+            | Some prems -> 
+              CCBV.reset kept_lits i;
+              C.ClauseSet.union premises prems
+            | None -> premises end
+          in
+          
+          match lit with
+          | Lit.Equation(lhs, rhs, false) -> find_simplifying_premise lhs rhs
+          | Lit.Equation(lhs, rhs, true) when T.equal T.false_ rhs ->
+            find_simplifying_premise lhs T.true_
+          | _ -> premises
+        ) (C.ClauseSet.empty) (C.lits c)
+      in
+      CCOpt.return_if (not (CCBV.is_empty (CCBV.negate kept_lits)))
+        (CCBV.select kept_lits (C.lits c), premises)
+    in
+
+    let strong_sr_pair lhs rhs =
+      let tasks = Queue.create () in
+      let exception CantSimplify in
+      try
+        Queue.push (lhs, rhs) tasks;
+        let premises = ref C.ClauseSet.empty in
+        while not (Queue.is_empty tasks) do
+          let s,t = Queue.pop tasks in
+          if not (T.equal s t) then (
+            match equatable ~sign:true ~cl:c s t with
+            | Some cl -> premises := C.ClauseSet.add cl !premises
+            | None -> 
+              begin match T.view s, T.view t with
+              | T.App(hd_s, args_s), T.App(hd_t, args_t)
+                when T.is_const hd_s && T.equal hd_s hd_t ->
+                CCList.iter (fun pair -> Queue.push pair tasks) 
+                  (List.combine args_s args_t) 
+              | T.AppBuiltin(hd_s, args_s), T.AppBuiltin(hd_t, args_t)
+                when Builtin.equal hd_s hd_t && 
+                    CCList.length args_s = CCList.length args_t ->
+                CCList.iter (fun pair -> Queue.push pair tasks) 
+                  (List.combine args_s args_t) 
+              | _ -> raise CantSimplify end
+          )
+        done;
+        Some !premises
+      with CantSimplify -> None
+    in
+
+    let regular_sr_pair lhs rhs =
+      if T.equal lhs rhs then Some (C.ClauseSet.empty)
+      else match equatable ~sign:true ~cl:c lhs rhs with
+           | Some cl -> Some (C.ClauseSet.singleton cl)
+           | None -> (T.Seq.common_contexts lhs rhs 
+                     |> Iter.find_map (fun (a,b) -> equatable ~sign:true ~cl:c a b)
+                     |> CCOpt.map C.ClauseSet.singleton)
+    in
+
+    let do_strong_sr = driver ~is_simplified:strong_sr_pair in
+    let do_regular_sr = driver ~is_simplified:regular_sr_pair in
+    
+    let simplifier =
+      if Env.flex_get k_strong_sr then do_strong_sr else do_regular_sr
+    in
+    let _span = ZProf.enter_prof prof_pos_simplify_reflect in
+    (* iterate through literals and try to resolve negative ones *)
+    match simplifier c with
+    | None -> 
+      ZProf.exit_prof _span;
       SimplM.return_same c
-    ) else (
+    | Some (new_lits,premises) ->
       let proof =
         Proof.Step.simp ~rule:(Proof.Rule.mk "simplify_reflect+")
-          (C.proof_parent c::premises) in
+          (List.map C.proof_parent (c::(C.ClauseSet.to_list premises))) in
       let trail = C.trail c and penalty = C.penalty c in
-      let new_c = C.create ~trail ~penalty lits proof in
+      let new_c = C.create ~trail ~penalty new_lits proof in
       Util.debugf ~section 3 "@[@[%a@]@ pos_simplify_reflect into @[%a@]@]"
         (fun k->k C.pp c C.pp new_c);
-      ZProf.exit_prof prof_pos_simplify_reflect;
+      ZProf.exit_prof _span;
       SimplM.return_new new_c
-    )
 
   let negative_simplify_reflect c =
-    ZProf.enter_prof prof_neg_simplify_reflect;
+    let _span = ZProf.enter_prof prof_neg_simplify_reflect in
     (* iterate through literals and try to resolve positive ones *)
     let rec iterate_lits acc lits clauses = match lits with
       | [] -> List.rev acc, clauses
       | (Lit.Equation (s, t, true) as lit)::lits' ->
-        begin match can_refute s t, can_refute t s with
-          | None, None -> (* keep literal *)
+        begin match can_refute s t with
+          | None -> (* keep literal *)
             iterate_lits (lit::acc) lits' clauses
-          | Some new_clause, _ | _, Some new_clause -> (* drop literal, remember clause *)
+          | Some new_clause -> (* drop literal, remember clause *)
             iterate_lits acc lits' (new_clause :: clauses)
         end
       | lit::lits' -> iterate_lits (lit::acc) lits' clauses
     (* try to remove the literal using a negative unit clause *)
     and can_refute s t =
-      try
-        UnitIdx.retrieve ~sign:false (!_idx_simpl,1) (s,0)
-        |> Iter.iter
-          (fun (l, r, (_,_,_,c'), subst) ->
-             (* if not  (Unif.FO.equal ~subst (l, 1) (s, 0)) then (
-               CCFormat.printf "l:@[%a@], r:@[%a@]@." T.pp l T.pp s;
-               CCFormat.printf "subst: @[%a@]@." Subst.pp subst;
-               assert false;
-             ); *)
-             let norm t =
-              let t = Subst.FO.apply Subst.Renaming.none subst t in
-              Lambda.eta_reduce ~expand_quant:false @@ Lambda.snf t in
-             assert(Term.equal (norm (l,1)) (norm (s,0)));
-             Util.debugf ~section 3 "@[neg_reflect trying to eliminate@ @[%a=%a@]@ with @[%a@]@]"
-               (fun k->k T.pp s T.pp t C.pp c');
-             if C.trail_subsumes c' c && Unif.FO.equal ~subst (r, 1) (t, 0)
-             then begin
-               (* TODO: useless? *)
-               let subst = Unif.FO.matching ~subst ~pattern:(r, 1) (t, 0) in
-               Util.debugf ~section 3 "@[neg_reflect eliminates@ @[%a=%a@]@ with @[%a@]@]"
-                 (fun k->k T.pp s T.pp t C.pp c');
-               raise (FoundMatch (r, c', subst)) (* success *)
-             end
-          );
-        None (* no match *)
-      with FoundMatch (_r, c', subst) ->
-        Some (C.proof_parent_subst Subst.Renaming.none (c',1) subst) (* success *)
+      equatable ~sign:false ~cl:c s t
+      |> CCOpt.map C.proof_parent
     in
     (* fold over literals *)
     let lits, premises = iterate_lits [] (C.lits c |> Array.to_list) [] in
     if List.length lits = Array.length (C.lits c)
     then (
       (* no literal removed *)
-      ZProf.exit_prof prof_neg_simplify_reflect;
+      ZProf.exit_prof _span;
       Util.debug ~section 3 "neg_reflect did not simplify the clause";
       SimplM.return_same c
     ) else (
@@ -2548,9 +2567,52 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) lits proof in
       Util.debugf ~section 3 "@[@[%a@]@ neg_simplify_reflect into @[%a@]@]"
         (fun k->k C.pp c C.pp new_c);
-      ZProf.exit_prof prof_neg_simplify_reflect;
+      ZProf.exit_prof _span;
       SimplM.return_new new_c
     )
+
+  type sgn = Lit of bool | Eqn
+  let flex_resolve c =
+    let exception CantFlexResolve in
+    try
+      let sgn_map = T.Tbl.create 8 in
+
+      if (C.length c == 0) then raise CantFlexResolve;
+
+      Array.iter (function 
+        | Literal.Equation(lhs, rhs, _) as lit ->
+          if (Lit.is_predicate_lit lit) then (
+            assert(T.is_true_or_false rhs);
+            if (T.is_var (T.head_term lhs)) then(
+              let hd = T.head_term lhs in
+              match T.Tbl.get sgn_map hd with
+              | None -> T.Tbl.add sgn_map hd (Lit (Lit.is_positivoid lit))
+              | Some (Lit sgn) when sgn == Lit.is_positivoid lit ->  ()
+              | _ -> raise CantFlexResolve
+            ) else raise CantFlexResolve) 
+          else if Lit.is_positivoid lit then (raise CantFlexResolve)
+          else (
+            let hd_lhs, hd_rhs = CCPair.map_same T.head_term (lhs,rhs) in
+            if (T.is_var hd_lhs) && (T.is_var hd_rhs) then (
+              match T.Tbl.get sgn_map hd_lhs, T.Tbl.get sgn_map hd_rhs with
+              | None, None | Some(Eqn), None
+              | None, Some(Eqn) | Some(Eqn), Some(Eqn) ->
+                T.Tbl.replace sgn_map hd_lhs Eqn;
+                T.Tbl.replace sgn_map hd_rhs Eqn;
+              | _ -> raise CantFlexResolve
+            ) else raise CantFlexResolve
+          )
+        | False -> ()
+        | _ -> raise CantFlexResolve
+      ) (C.lits c);
+
+      let new_cl = 
+        C.create ~trail:(C.trail c) [] 
+                  (Proof.Step.simp ~rule:(Proof.Rule.mk "flex_resolve") [C.proof_parent c])
+                  ~penalty:1 in
+      SimplM.return_new new_cl
+    with CantFlexResolve -> SimplM.return_same c
+  
 
   (* ----------------------------------------------------------------------
    * subsumption
@@ -2654,7 +2716,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     )
 
   let subsumes_with a b =
-    ZProf.enter_prof prof_subsumption;
+    let _span = ZProf.enter_prof prof_subsumption in
     Util.incr_stat stat_subsumption_call;
     let (c_a, _), (c_b, _) = a,b in
     let w_a = CCArray.fold (fun acc l -> acc + Lit.weight l) 0 c_a in
@@ -2663,7 +2725,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     if w_a = w_b && Literals.equal_com c_a c_b then Some (Subst.empty, [])
     else (
       let res = if w_a <= w_b then subsumes_with_ a b else None in
-      ZProf.exit_prof prof_subsumption;
+      ZProf.exit_prof _span;
       res
     )
 
@@ -2718,7 +2780,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       end
     in
     (* check for each literal *)
-    ZProf.enter_prof prof_eq_subsumption;
+    let _span = ZProf.enter_prof prof_eq_subsumption in
     Util.incr_stat stat_eq_subsumption_call;
     let res = match a with
       | [|Lit.Equation (s, t, true)|] ->
@@ -2733,13 +2795,13 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         end
       | _ -> None (* only a positive unit clause unit-subsumes a clause *)
     in
-    ZProf.exit_prof prof_eq_subsumption;
+    ZProf.exit_prof _span;
     res
 
   let eq_subsumes a b = CCOpt.is_some (eq_subsumes_with (a,1) (b,0))
 
   let subsumed_by_active_set c =
-    ZProf.enter_prof prof_subsumption_set;
+    let _span = ZProf.enter_prof prof_subsumption_set in
     Util.incr_stat stat_subsumed_by_active_set_call;
     (* if there is an equation in c, try equality subsumption *)
     let try_eq_subsumption = CCArray.exists Lit.is_eqn (C.lits c) in
@@ -2762,11 +2824,11 @@ module Make(Env : Env.S) : S with module Env = Env = struct
            );
            res)
     in
-    ZProf.exit_prof prof_subsumption_set;
+    ZProf.exit_prof _span;
     res
 
   let subsumed_in_active_set acc c =
-    ZProf.enter_prof prof_subsumption_in_set;
+    let _span = ZProf.enter_prof prof_subsumption_in_set in
     Util.incr_stat stat_subsumed_in_active_set_call;
     (* if c is a single unit clause *)
     let try_eq_subsumption =
@@ -2791,7 +2853,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
            else res)
         acc
     in
-    ZProf.exit_prof prof_subsumption_in_set;
+    ZProf.exit_prof _span;
     res
 
   (* Number of equational lits. Used as an estimation for the difficulty of the subsumption
@@ -2810,7 +2872,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let rec contextual_literal_cutting_rec c =
     let open SimplM.Infix in
     if Array.length (C.lits c) <= 1
-    || num_equational (C.lits c) > 3
+    || Lits.num_equational (C.lits c) > 3
     || Array.length (C.lits c) > 8
     then SimplM.return_same c
     else (
@@ -2871,9 +2933,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     )
 
   let contextual_literal_cutting c =
-    ZProf.enter_prof prof_clc;
-    let res = contextual_literal_cutting_rec c in
-    ZProf.exit_prof prof_clc;
+    let res = ZProf.with_prof prof_clc contextual_literal_cutting_rec c in
     res
 
   (* ----------------------------------------------------------------------
@@ -2891,7 +2951,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let rec condensation_rec c =
     let open SimplM.Infix in
     if Array.length (C.lits c) <= 1
-    || num_equational (C.lits c) > 3
+    || Lits.num_equational (C.lits c) > 3
     || Array.length (C.lits c) > 8
     then SimplM.return_same c
     else
@@ -3137,6 +3197,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     and is_trivial = is_tautology in
 
     Env.add_basic_simplify normalize_equalities;
+    Env.add_basic_simplify flex_resolve;
     if Env.flex_get k_local_rw != `Off then (
       Env.add_basic_simplify local_rewrite
     );
@@ -3263,6 +3324,9 @@ let _pred_var_eq_fact = ref false
 let _schedule_infs = ref true
 let _force_limit = ref 3
 let _formula_sr = ref true
+let _strong_sr = ref false
+let _superposition_with_formulas = ref false
+
 
 let _guard = ref 30
 let _ratio = ref 100
@@ -3343,6 +3407,7 @@ let register ~sup =
   E.flex_add k_pred_var_eq_fact !_pred_var_eq_fact;
   E.flex_add k_force_limit !_force_limit;
   E.flex_add k_formula_simplify_reflect !_formula_sr;
+  E.flex_add k_superpose_w_formulas !_superposition_with_formulas;
 
   E.flex_add StreamQueue.k_guard !_guard;
   E.flex_add StreamQueue.k_ratio !_ratio;
@@ -3350,6 +3415,7 @@ let register ~sup =
 
   E.flex_add k_local_rw !_local_rw;
   E.flex_add k_destr_eq_res !_destr_eq_res;
+  E.flex_add k_strong_sr !_strong_sr;
 
   let module JPF = JPFull.Make(struct let st = E.flex_state () end) in
   let module JPP = PUnif.Make(struct let st = E.flex_state () end) in
@@ -3465,6 +3531,9 @@ let () =
       "--restrict-hidden-sup-at-vars", Arg.Bool (fun b -> _restrict_hidden_sup_at_vars :=	b), " enable/disable hidden superposition at variables only under certain ordering conditions";
       "--stream-force-limit", Arg.Int((:=) _force_limit), " number of attempts to get a clause when the stream is just created";
       "--formula-simplify-reflect", Arg.Bool((:=) _formula_sr), " apply simplify reflect on the formula level";
+      "--superposition-with-formulas", Arg.Bool((:=) _superposition_with_formulas), 
+        " enable superposition from (negative) formulas into any subterm";
+      "--strong-simplify-reflect", Arg.Bool((:=) _strong_sr), " full effort simplify reflect -- tries to find an equation for each pair of subterms";
     ];
 
   Params.add_to_mode "ho-complete-basic" (fun () ->

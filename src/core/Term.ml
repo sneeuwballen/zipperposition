@@ -7,7 +7,6 @@ module PB = Position.Build
 module PW = Position.With
 module T = InnerTerm
 
-let prof_app = ZProf.make "term.app"
 let prof_ac_normal_form = ZProf.make "term.AC_normal_form"
 
 (** {2 Term} *)
@@ -135,23 +134,19 @@ let tyapp t args = match args with
 let app f l = match l with
   | [] -> f
   | _::_ ->
-    ZProf.enter_prof prof_app;
     (* first; compute type *)
     let ty_result = Type.apply_unsafe (ty f) l in
     (* apply constant to type args and args *)
     let res = T.app ~ty:(ty_result : Type.t :> T.t) f l in
-    ZProf.exit_prof prof_app;
     res
 
 let app_w_ty ~ty f l  = match l with
   | [] -> f
   | _::_ ->
-    ZProf.enter_prof prof_app;
     (* first; compute type *)
     let ty_result = Type.apply_unsafe ty l in
     (* apply constant to type args and args *)
     let res = T.app ~ty:(ty_result : Type.t :> T.t) f l in
-    ZProf.exit_prof prof_app;
     res
 
 
@@ -833,12 +828,13 @@ module AC(A : AC_SPEC) = struct
     in flatten [] l
 
   let normal_form t =
-    ZProf.enter_prof prof_ac_normal_form;
+    let _span = ZProf.enter_prof prof_ac_normal_form in
     let rec normalize t = match T.view t with
       | T.Const _
       | T.Var _
       | T.DB _ -> t
-      | T.App (f, l) when T.is_const f && A.is_ac (head_exn f) ->
+      | T.App (f, l) when T.is_const f && A.is_ac (head_exn f) 
+                          && (not (Type.is_fun @@ Type.of_term_unsafe @@ T.ty_exn t)) ->
         let l = flatten (head_exn f) l in
         let tyargs, l = split_args_ ~ty:(ty f) l in
         let l = List.map normalize l in
@@ -852,7 +848,8 @@ module AC(A : AC_SPEC) = struct
               x l'
           | [] -> assert false
         end
-      | T.App (f, l) when T.is_const f && A.is_comm (head_exn f) ->
+      | T.App (f, l) when not (Type.is_fun @@ Type.of_term_unsafe @@ T.ty_exn t) && 
+                          T.is_const f && A.is_comm (head_exn f) ->
         let tyargs, l = split_args_ ~ty:(ty f) l in
         begin match l with
           | [a;b] ->
@@ -874,7 +871,7 @@ module AC(A : AC_SPEC) = struct
         T.bind ~ty:(T.ty_exn t) ~varty b (normalize body)
     in
     let t' = normalize t in
-    ZProf.exit_prof prof_ac_normal_form;
+    ZProf.exit_prof _span;
     t'
 
   let equal t1 t2 =

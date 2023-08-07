@@ -1,7 +1,7 @@
 
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
-(** {6 Simple Proof checker for TSTP} *)
+(** {5 Simple Proof checker for TSTP} *)
 
 open Logtk
 open Logtk_parsers
@@ -215,7 +215,7 @@ let all_paths_correct ~valid ~checked =
 
 (* check the structure. [minimum] is the number of check success that is
     required for a proof step to be valid. *)
-let check_structure ?(minimum=1) ~checked =
+let check_structure ~minimum ~checked =
   let valid step =
     let l = CheckedTrace.get ~checked step in
     List.length (List.filter is_success l) >= minimum

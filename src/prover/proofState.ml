@@ -65,7 +65,7 @@ module Make(C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
      table
   *)
 
-  (** {6 Common Interface for Sets} *)
+  (** {5 Common Interface for Sets} *)
 
   module type CLAUSE_SET = sig
     val on_add_clause : C.t Signal.t

@@ -20,6 +20,7 @@ module type S = sig
   
   val register_conjecture_clause : C.t -> unit
 
+  val on_proof_state_init : (C.t Iter.t) Logtk.Signal.t
   (** {6 Weight functions} *)
   module WeightFun : sig
     type t = C.t -> int
@@ -90,7 +91,7 @@ module type S = sig
   val name : t -> string
   (** Name of the implementation/role of the queue *)
 
-  (** {6 Available Queues} *)
+  (** {5 Available Queues} *)
 
   (* val make : ratio:int -> weight:(C.t -> int) -> string -> t
      (** Bring your own implementation of queue.
@@ -133,7 +134,7 @@ module type S = sig
       returned with the call to take_first();
       returns true if clause was actually removed *) 
 
-  (** {6 IO} *)
+  (** {5 IO} *)
 
   val pp : t CCFormat.printer
   val to_string : t -> string

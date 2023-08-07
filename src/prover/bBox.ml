@@ -91,10 +91,14 @@ module ICaseTbl = CCHashtbl.Make(struct
 let _clause_set = ref (FV_components.empty()) (* FO lits -> blit *)
 let _lemma_set = FV_lemma.create () (* lemma -> blit *)
 let _case_set = ICaseTbl.create 16 (* cst=term-> blit *)
+let _term_set = Term.Tbl.create 16
 
 (* should never be used *)
 let dummy_payload = Fresh
 let dummy_t = Lit.make dummy_payload
+
+let make_fresh () =
+  Lit.make dummy_payload
 
 let _retrieve_alpha_equiv lits =
   FV_components.retrieve_alpha_equiv_c !_clause_set (lits,dummy_payload,dummy_t)
@@ -158,6 +162,31 @@ let inject_lits_ lits  =
       save_ t;
       Lit.apply_sign sign t
   end
+
+let inject_lit lit =
+  let exception CantConvert in
+  let lit_to_term lit =
+    match lit with
+    | Literal.Equation(lhs, _, _) when Literal.is_predicate_lit lit -> lhs
+    | Literal.Equation(lhs, rhs, _) ->
+      if Term.compare lhs rhs < 0 then Term.Form.eq lhs rhs
+      else Term.Form.eq rhs lhs
+    | Literal.False -> raise CantConvert
+    | _ -> 
+    CCFormat.printf "lit: @[%a@]@." Literal.pp lit;
+    invalid_arg "unknown literal"
+  in
+
+  try 
+    CCOpt.return @@
+      begin match Term.Tbl.find_opt _term_set (lit_to_term lit) with
+      | Some t -> Lit.apply_sign (Literal.is_positivoid lit) t
+      | None ->
+        let term = lit_to_term lit in
+        let bool_lit = Lit.make (Fresh) in
+        Term.Tbl.add _term_set term bool_lit;
+        Lit.apply_sign (Literal.is_positivoid lit) bool_lit end
+  with CantConvert ->None
 
 let inject_lits lits =
   ZProf.with_prof prof_inject_lits inject_lits_ lits

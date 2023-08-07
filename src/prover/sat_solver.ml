@@ -46,7 +46,7 @@ module Make()
   (*   : Sat_solver_intf.S *)
 = struct
   module Lit = BBox.Lit
-  let solver = Solver.create ~size:`Big ()
+  let solver = ref (Solver.create ~size:`Big ())
 
   type clause = Lit.t list
 
@@ -188,7 +188,7 @@ module Make()
         (* atomic resolution step *)
         let q1 = aux hr_init in
         let q2 = List.map (fun (_,p) -> aux p) hr_steps in
-        begin match ResTbl.get tbl_res (c,q1::q2) with
+        begin match ResTbl.get tbl_res (c, q1::q2) with
           | Some s -> s
           | None ->
             let parents = Proof.Parent.from q1 :: List.map Proof.Parent.from q2 in
@@ -234,15 +234,15 @@ module Make()
     let module P = Solver.Proof in
     let b, l = valuation_level lit in
     if not b || l <> 0 then invalid_arg "get_proof_of_lit";
-    let a = Solver.make_atom solver lit in
+    let a = Solver.make_atom !solver lit in
     match P.prove_atom a with
     | Some p -> conv_proof_ p
     | None -> assert false
 
   let proved_at_0 lit =
-    let a = Solver.make_atom solver lit in
-    if Solver.true_at_level0 solver a then Some true
-    else if Solver.true_at_level0 solver (Solver.Atom.neg a) then Some false
+    let a = Solver.make_atom !solver lit in
+    if Solver.true_at_level0 !solver a then Some true
+    else if Solver.true_at_level0 !solver (Solver.Atom.neg a) then Some false
     else None
 
   let get_proved_lits (): Lit.Set.t =
@@ -277,11 +277,11 @@ module Make()
       let c, proof = Queue.pop queue_ in
       Util.debugf ~section 4 "@[<hv2>assume@ @[%a@]@ proof: %a@]"
         (fun k->k pp_form c Proof.Step.pp proof);
-      Solver.assume solver c proof
+      Solver.assume !solver c proof
     done;
     (* solve *)
     Util.debug ~section 4 "solve...";
-    let res = Solver.solve solver in
+    let res = Solver.solve !solver in
     Util.debug ~section 4 "solve done.";
     begin match res with
       | Solver.Sat s ->
@@ -328,6 +328,13 @@ module Make()
     );
     if !sat_pp_model_ then at_exit pp_model_;
     ()
+  
+  let clear ?(size=`Big) () =
+    Queue.clear queue_;
+    must_check := true;
+    ClauseTbl.clear clause_tbl_;
+    Lit.Tbl.clear lit_tbl_;
+    solver := Solver.create ~size ()
 end
 
 let set_compact b = sat_compact_ := b

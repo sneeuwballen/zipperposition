@@ -41,12 +41,15 @@ let k_fluid_log_hoist = Flex_state.create_key ()
 let k_solve_formulas = Flex_state.create_key ()
 let k_replace_unsupported_quants = Flex_state.create_key ()
 let k_disable_ho_bool_unif = Flex_state.create_key ()
+let k_generalize_trigger = Flex_state.create_key ()
+let k_bool_triggers_only = Flex_state.create_key ()
+
 
 module type S = sig
   module Env : Env.S
   module C : module type of Env.C
 
-  (** {6 Registration} *)
+  (** {5 Registration} *)
 
   val setup : unit -> unit
   (** Register rules in the environment *)
@@ -138,7 +141,8 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let inst_clauses_w_trigger t =
     let triggers = Type.Map.get_or ~default:[] (T.ty t) !_trigger_bools in
-    if not (CCList.mem ~eq:T.equal t triggers) then (
+    if not (CCList.mem ~eq:T.equal t triggers) &&
+       (not (Env.flex_get k_bool_triggers_only) || Type.returns_prop (T.ty t)) then (
       _trigger_bools := Type.Map.update (T.ty t) (function 
         | None -> Some [t]
         | Some res -> Some (t :: res)
@@ -149,9 +153,33 @@ module Make(E : Env.S) : S with module Env = E = struct
     ) else []
 
   let insert_new_trigger t =
-    inst_clauses_w_trigger t
-    |> CCList.to_iter
-    |> Env.add_passive
+    let do_insert t = 
+      inst_clauses_w_trigger t
+      |> CCList.to_iter
+      |> Env.add_passive
+    in
+    do_insert t;
+    if (Type.returns_prop (T.ty t)) then (
+      let t = Lambda.eta_expand t in
+      match Env.flex_get k_generalize_trigger with 
+      | `Neg ->
+        let vars, body = T.open_fun t in
+        if not (Type.is_prop (T.ty body)) then (
+          CCFormat.printf "%a:%a@." T.pp body Type.pp (T.ty body);        
+          assert (false);
+        );
+        do_insert (T.fun_l vars (T.Form.not_ body))
+      | `Var ->
+        let vars, body = T.open_fun t in
+        assert(Type.is_prop (T.ty body));
+        let n = List.length vars in
+        let dbs = List.mapi (fun i ty -> T.bvar ~ty (n-i-1)) vars in
+        let var_ty = Type.(==>) (vars @ [Type.prop]) Type.prop in
+        let var = T.var (HVar.fresh ~ty:var_ty ()) in
+        do_insert (T.fun_l vars (T.app var (dbs@[body])))
+      | _ -> ()
+    )
+    
 
   let update_triggers cl =
     (* if triggered boolean instantiation is off
@@ -166,6 +194,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     
   let handle_new_pred_var_clause (clause,var) =
     assert(T.is_var var);
+    assert(Type.returns_prop (T.ty var));
     let ty = T.ty var in
     Type.Map.get_or ~default:[] ty !_trigger_bools
     |> CCList.map (fun trigger -> instantiate_w_bool ~clause ~var ~trigger)
@@ -423,7 +452,10 @@ module Make(E : Env.S) : S with module Env = E = struct
           Proof.Rule.mk ("fluid_" ^ (if sign then "bool_" else "loob_") ^ "hoist") in
         let proof = Proof.Step.inference ~rule [C.proof_parent_subst renaming (c,sc_cl) sub] in
         let res = 
-          C.create ~penalty:(C.penalty c + 2) ~trail:(C.trail c)
+          C.create ~penalty:(C.penalty c + 
+                             (C.proof_depth c) + 
+                             (if Proof.Step.has_ho_step (C.proof_step c) then 3 else 1))
+                   ~trail:(C.trail c)
             (new_lit :: CCArray.to_list (C.lits c')) proof in
         Some res
       ) else None
@@ -530,7 +562,9 @@ module Make(E : Env.S) : S with module Env = E = struct
       in
       let rule = Proof.Rule.mk "fluid_log_symbol_hoist" in
       let step = Proof.Step.inference ~rule [C.proof_parent_subst renaming (c,sc_cl) sub] in
-      C.create ~penalty:(C.penalty c + 2) ~trail:(C.trail c) new_lits step
+      C.create ~penalty:(C.penalty c + 
+                         (C.proof_depth c) + 
+                         (if Proof.Step.has_ho_step (C.proof_step c) then 2 else 0)) ~trail:(C.trail c) new_lits step
     in
 
     let eligible = C.Eligible.res c in
@@ -908,13 +942,20 @@ module Make(E : Env.S) : S with module Env = E = struct
         let fresh_var  = HVar.fresh ~ty:var_ty () in
         T.var fresh_var
       in
+      let subst_t = fresh_var ~body in
       match b with 
       | Builtin.ForallConst ->
-        let new_lit = yes (T.app body [fresh_var ~body]) in
-        mk_res ~proof:(proof ~prefix:"forall") ~old ~repl:T.false_ new_lit c
+        let new_lit = yes (T.app body [subst_t]) in
+        let res = mk_res ~proof:(proof ~prefix:"forall") ~old ~repl:T.false_ new_lit c in
+        if Type.returns_prop (T.ty subst_t) then (
+          Signal.send Env.on_pred_var_elimination (res, subst_t));
+        res
       | Builtin.ExistsConst ->
-        let new_lit = no (T.app body [fresh_var ~body]) in
-        mk_res ~proof:(proof ~prefix:"exists") ~old ~repl:T.true_ new_lit c
+        let new_lit = no (T.app body [subst_t]) in
+        let res = mk_res ~proof:(proof ~prefix:"exists") ~old ~repl:T.true_ new_lit c in
+        if Type.returns_prop (T.ty subst_t) then (
+          Signal.send Env.on_pred_var_elimination (res, subst_t));
+        res
       | _ -> assert false
     in
         
@@ -2022,6 +2063,7 @@ let _nnf = ref false
 let _simplify_bools = ref true
 let _trigger_bool_inst = ref (-1)
 let _trigger_bool_ind = ref (-1)
+let _generalize_trigger = ref (`Off)
 let _include_quants = ref true
 let _bool_hoist_simpl = ref false
 let _rename_nested_bools = ref false
@@ -2031,6 +2073,8 @@ let _fluid_log_hoist = ref false
 let _solve_formulas = ref false
 let _replace_quants = ref false
 let _disable_ho_unif = ref false
+let _bool_triggers_only = ref (false)
+
 
 
 let extension =
@@ -2056,6 +2100,8 @@ let extension =
     E.flex_add k_solve_formulas !_solve_formulas;
     E.flex_add k_replace_unsupported_quants !_replace_quants;
     E.flex_add k_disable_ho_bool_unif !_disable_ho_unif;
+    E.flex_add k_generalize_trigger !_generalize_trigger;
+    E.flex_add k_bool_triggers_only !_bool_triggers_only;
 
     ET.setup ()
   in
@@ -2096,8 +2142,18 @@ let () =
       , " abstract away constants from the goal and use them to trigger axioms of induction";
       "--trigger-bool-inst", Arg.Set_int _trigger_bool_inst
         , " instantiate predicate variables with boolean terms already in the proof state. Argument is the maximal proof depth of predicate variable";
-    "--trigger-bool-include-quants", Arg.Bool ((:=) _include_quants)
+      "--trigger-bool-inst-prop-only", Arg.Bool ((:=) _bool_triggers_only)
+        , " make sure that lambdas are REALLY only of Boolean type";
+      "--trigger-bool-include-quants", Arg.Bool ((:=) _include_quants)
         , " include lambdas directly under a quant in consdieration";
+      "--trigger-bool-generalize", Arg.Symbol (["off"; "neg"; "var" ], (fun s -> 
+          _generalize_trigger := (match s with 
+          | "off" -> `Off
+          | "neg" -> `Neg
+          | "var" -> `Var
+          | _ -> invalid_arg "off, neg or var are the only options")  
+      )), " generalize the trigger: neg adds the negation before the trigger body, " ^
+          " and var applies the body to a fresh variable";
       "--disable-simplifying-cnf",
         Arg.Set _cnf_non_simpl,
         " implement cnf on-the-fly as an inference rule";

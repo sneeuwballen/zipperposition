@@ -1,8 +1,9 @@
 (* open Batteries (* opam install batteries + edit src/core/dune *)
-*)[@@@warning "-10-21-26"](* Before final cleanup, tolerate unused values and definitions. *)
+*)[@@@warning "-10-20-21-26"](* Before final cleanup, tolerate unused values and definitions. *)
 open Logtk
 open Logtk_parsers
 open Logtk_proofs
+open Logtk_arith
 open Libzipperposition
 open Libzipperposition_calculi
 open Phases_impl
@@ -10,7 +11,6 @@ open Util
 open UntypedPrint
 open Precedence.Weight
 open Comparison
-open Monome
 open Literals
 open Literal.Conv
 open Literal
@@ -66,6 +66,8 @@ let search_hash ?(eq=(=)) table value = HS.fold (fun k v found -> if found=None 
 let with_cache_2 c f = curry(with_cache_rec c (uncurry % f % curry))
 let with_cache_3 c f = curry(with_cache_2 c (uncurry % f % curry))
 
+let get_clauses(type c)(module Env: Env.S with type C.t=c) = Iter.append (Env.get_active()) (Env.get_passive())
+
 
 (* make constants for debugging *)
 let constants = HS.create 0
@@ -73,7 +75,7 @@ let have ?(infix=false) name par ty = match HS.find_opt constants name with
 | None ->
   let i = ID.make name in
   if infix then ID.set_payload i (ID.Attr_infix name);
-  let c = const (arrow par ty) i in
+  let c = const ~ty:(arrow par ty) i in
   HS.add constants name c; c
 | Some c -> c
 
@@ -227,7 +229,7 @@ let make_polynomial_environment indeterminate_weights =
     match saturate_in env (Iter.to_rev_list clauses) with
     | Error e -> raise(Failure e)
     | Ok(_, Unsat _) -> PolyEnv.C.ClauseSet.to_iter(PolyEnv.get_empty_clauses())
-    | Ok _ -> PolyEnv.get_clauses()
+    | Ok _ -> get_clauses(module PolyEnv)
 
 (* note: maybe this is the only interface needed and can replace make_polynomial_environment *)
 let saturate_with_order = snd % make_polynomial_environment
@@ -300,7 +302,7 @@ and propagate_times f g =
     map(map_poly_in_clause(fun r -> mul_indet f><[rename]><r)) (propagate_recurrences_to g)) in
   match merge with
   | [] -> Iter.of_list disjoint_recurrences
-  (* 3. propagate to substitution σ(f·ϱg) when σ≠id *)
+  (* 3. propagate to substitution σ(f·ϱg) when σ<>id *)
   | [O m] ->
     let f_x_g' = R.(mul_indet f><[rename]>< g) in
     PolyMap.add recurrence_table f_x_g' disjoint_recurrences;
@@ -462,10 +464,10 @@ let is_summation s = match view s with
 
 let to_Z t = match view t with
 | AppBuiltin(B.Int z, []) -> z
-| AppBuiltin(B.Rat q, []) when Z.one == Q.den q -> Q.num q
+| AppBuiltin(B.Rat q, []) -> Q.(let z = to_bigint q in if equal q (of_bigint z) then z else raise Exit)
 | _ -> raise Exit
 let is_Z t = try snd(to_Z t, true) with Exit -> false
-let to_int = Z.to_int % to_Z
+let to_int = Z.to_int_exn % to_Z
 
 type encoding_phase_info = {coords: term list; symbols: term list; specialise: term HV.t}
 
@@ -764,7 +766,7 @@ let sum_equality_inference' clause =
       in
       walk main_expr;
       (* R.coordinate_count := cardinal !coord_set; *)
-      MainEnv.get_clauses() (fun c -> c|>register_if_clause_is_recurrence{
+      get_clauses(module MainEnv) (fun c -> c|>register_if_clause_is_recurrence{
         coords = to_list !coord_set;
         symbols = to_list !sym_set;
         specialise = HV.create 4});

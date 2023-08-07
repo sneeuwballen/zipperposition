@@ -267,7 +267,7 @@ let by_context_weight_combination ~ord ~ctx_fun ~weight_fun lits =
 
   get_selectable_w_ctx ~ord lits
   |> Iter.map (fun ((t,(ctx,_),_) as arg) ->
-    Util.debugf ~section 1 "selectable @[%a/%8s@]@." (fun k -> k T.pp t (bin_of_int ctx)); arg)
+    Util.debugf ~section 2 "selectable @[%a/%8s@]@." (fun k -> k T.pp t (bin_of_int ctx)); arg)
   |> Iter.min ~lt:(fun (s,ctx_s,_) (t,ctx_t,_) -> 
     CCOrd.(<?>) (ctx_fun ctx_s ctx_t) (weight_fun lits, s, t) < 0)
   |> CCOpt.map_or ~default:[] (fun (t,ctx,pos) -> [(t,pos)])
@@ -352,6 +352,8 @@ let prefer_deep_log (_,log_d1) (_, log_d2) =
 let prefer_shallow_log (_,log_d1) (_, log_d2) =
   compare (log_d1) (log_d2)
 
+let discard_ctx _ _ = 0
+
 
 let leftmost_innermost ~ord lits =
   select_leftmost ~ord ~kind:`Inner lits
@@ -374,6 +376,7 @@ let fun_names =
 let parse_combined_function ~ord s =
   let sel_funs = [sel1; sel2; sel3] in
   let ctx_funs = [
+    ("any_ctx", discard_ctx);
     ("pos_ctx", prefer_pos_ctx);
     ("neg_ctx", prefer_neg_ctx);
     ("and_arg_ctx", prefer_and_arg);
@@ -417,7 +420,7 @@ let from_string ~ord name lits =
   in
   res lits
   |> CCFun.tap (fun l ->
-    Util.debugf ~section 2 "bool_select(@[%a@])=@.@[%a@]@."
+    Util.debugf ~section 1 "bool_select(@[%a@])=@.@[%a@]@."
       (fun k-> k Literals.pp lits (CCList.pp Term.pp) (List.map fst l))
   )
 

@@ -29,9 +29,9 @@ let test_compare = "multiset.compare", `Quick, fun()->
   ()
 
 let test_cardinal_size = "multiset.size", `Quick, fun()->
-  let m = M.of_coeffs [1, Z.(~$ 2); 3, Z.(~$ 40)] in
+  let m = M.of_coeffs [1, Z.(of_int 2); 3, Z.(of_int 40)] in
   Alcotest.(check int) "size=2" 2 (M.size m);
-  Alcotest.(check z_test) "cardinal=42" Z.(~$ 42) (M.cardinal m);
+  Alcotest.(check z_test) "cardinal=42" Z.(of_int 42) (M.cardinal m);
   ()
 
 let _sign = function
@@ -42,7 +42,7 @@ let _sign = function
 let gen1 =
   let pp1 = CCFormat.to_string (M.pp CCFormat.int) in
   let shrink_z z =
-    try Z.to_int z |> Q.Shrink.int |> Q.Iter.map Z.of_int
+    try Z.to_int_exn z |> Q.Shrink.int |> Q.Iter.map Z.of_int
     with _ -> Q.Iter.empty
   in
   let shrink2 = Q.Shrink.pair Q.Shrink.nil shrink_z in

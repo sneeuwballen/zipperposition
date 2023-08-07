@@ -61,7 +61,8 @@ module Make(Payload : PAYLOAD)
   let apply_sign b i = if b then i else i.neg
   let payload i = i.payload
   let to_int i = i.id
-  let pp out i = Format.fprintf out "%s%d" (if sign i then "" else "¬") i.id
+  let pp out i =
+    Format.fprintf out "%s%d" (if sign i then "" else "¬") (abs i).id
 
   module AsKey = struct
     type t = lit

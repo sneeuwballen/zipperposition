@@ -1,118 +1,23 @@
 (* This file is free software, part of Logtk. See file "license" for more details. *)
+open CCFun.Infix
 
 (** {1 Some helpers} *)
 
 module Fmt = CCFormat
-open CCFun.Infix
 
 (** {2 Time facilities} *)
 
 type timestamp = float
 
-let timestamp_sub a b = a -. b
-let timestamp_add a b = a +. b
-let timestamp_cmp = CCFloat.compare
+let start_ = Mtime_clock.now()
 
-let get_time_mon_() : timestamp = Unix.gettimeofday()
+let get_time_mon_us () : timestamp =
+  let t = Mtime_clock.now() in
+  Mtime.Span.to_us (Mtime.span start_ t)
 
-let start_ = get_time_mon_()
+let total_time_s () = get_time_mon_us () *. 1e-6
 
-let total_time_s () = timestamp_sub (get_time_mon_()) start_
-let start_time () = start_
-
-(** {2 Stand-alone convenience functions} *)
-
-let finally ~do_ f =
-  try
-    let x = f () in
-    do_ ();
-    x
-  with e ->
-    do_ ();
-    raise e
-
-let pp_pair ?(sep=", ") pa pb out (a,b) =
-  Format.fprintf out "@[%a%s%a@]" pa a sep pb b
-
-let pp_sep sep out () = Format.fprintf out "%s@," sep
-let pp_list ?(sep=", ") pp = Fmt.list ~sep:(pp_sep sep) pp
-let pp_seq ?(sep=", ") pp = Fmt.seq ~sep:(pp_sep sep) pp
-let pp_iter ?(sep=", ") pp = Fmt.iter ~sep:(pp_sep sep) pp
-
-let pp_list0 ?(sep=" ") pp_x out = function
-  | [] -> ()
-  | l -> Format.fprintf out " %a" (pp_list ~sep pp_x) l
-
-let tstp_needs_escaping s =
-  assert (s<>"");
-  s.[0] = '_' ||
-  CCString.exists (function ' ' | '#' | '$' | '+' | '-' | '/' -> true | _ -> false) s
-
-let pp_str_tstp out s =
-  CCFormat.string out (if tstp_needs_escaping s then "'" ^ String.escaped s ^ "'" else s)
-
-let pp_var_tstp out s = pp_str_tstp out (CCString.capitalize_ascii s)
-
-let ord_option c o1 o2 = match o1, o2 with
-  | None, None -> 0
-  | None, Some _ -> -1
-  | Some _, None -> 1
-  | Some x1, Some x2 -> c x1 x2
-
-let for_all_2 p x y = CCList.(length x = length y && for_all2 p x y)
-
-let take_drop_while f l = CCList.take_while f l, CCList.drop_while f l
-
-(* cartesian product of lists of lists *)
-let map_product ~f l =
-  let product a b =
-    List.fold_left
-      (fun acc1 l1 -> List.fold_left
-          (fun acc2 l2 -> (List.rev_append l1 l2) :: acc2)
-          acc1 b)
-      [] a
-  in
-  match l with
-  | [] -> []
-  | l1 :: tail ->
-    List.fold_left
-      (fun acc x -> product (f x) acc)
-      (f l1)
-      tail
-
-let seq_map_l ~f l =
-  let rec aux l yield = match l with
-    | [] -> yield []
-    | x :: tail ->
-      let ys = f x in
-      List.iter
-        (fun y -> aux tail (fun l -> yield (y::l)))
-        ys
-  in
-  aux l
-
-let seq_zipi seq k =
-  let i = ref 0 in
-  seq (fun x -> k (!i, x); incr i)
-
-let invalid_argf msg = Fmt.ksprintf msg ~f:invalid_arg
-let failwithf msg = Fmt.ksprintf msg ~f:failwith
-
-module Int_map = CCMap.Make(CCInt)
-module Int_set = CCSet.Make(CCInt)
-
-let escape_dot s =
-  let b = Buffer.create (String.length s + 5) in
-  String.iter
-    (fun c ->
-       begin match c with
-         | '|' | '\\' | '{' | '}' | '<' | '>' | '"' ->
-           Buffer.add_char b '\\'; Buffer.add_char b c
-         | '\n' -> Buffer.add_string b "\\l"; (* left justify *)
-         | _ -> Buffer.add_char b c
-       end)
-    s;
-  Buffer.contents b
+(** {2 Misc} *)
 
 let concat_view separator view = String.concat separator % List.map view
 
@@ -132,9 +37,6 @@ let caller_file_line d =
     sub s j1 (j2-j1)
   in
   between '/' '.' (between '"' '"' frame) ^ between ',' ',' frame
-
-
-(** {2 Debug and error printing} *)
 
 (** Debug section *)
 module Section = struct
@@ -293,7 +195,6 @@ let pp_pos pos =
   let open Lexing in
   Printf.sprintf "line %d, column %d" pos.pos_lnum (pos.pos_cnum - pos.pos_bol)
 
-
 module UntypedPrint = struct
   open Obj
   type any (* Typing technicality: Dynamic tests lead to many free type variables which are problematic with the value restriction of OCaml. Hence there's "any" to replace some. *)
@@ -402,6 +303,100 @@ module Flag = struct
     gen := 2*n;
     n
 end
+
+(** {2 Others} *)
+
+let finally ~do_ f =
+  try
+    let x = f () in
+    do_ ();
+    x
+  with e ->
+    do_ ();
+    raise e
+
+let pp_pair ?(sep=", ") pa pb out (a,b) =
+  Format.fprintf out "@[%a%s%a@]" pa a sep pb b
+
+let pp_sep sep out () = Format.fprintf out "%s@," sep
+let pp_list ?(sep=", ") pp = Fmt.list ~sep:(pp_sep sep) pp
+let pp_seq ?(sep=", ") pp = Fmt.seq ~sep:(pp_sep sep) pp
+let pp_iter ?(sep=", ") pp = Fmt.iter ~sep:(pp_sep sep) pp
+
+let pp_list0 ?(sep=" ") pp_x out = function
+  | [] -> ()
+  | l -> Format.fprintf out " %a" (pp_list ~sep pp_x) l
+
+let tstp_needs_escaping s =
+  assert (s<>"");
+  s.[0] = '_' ||
+  CCString.exists (function ' ' | '#' | '$' | '+' | '-' | '/' -> true | _ -> false) s
+
+let pp_str_tstp out s =
+  CCFormat.string out (if tstp_needs_escaping s then "'" ^ String.escaped s ^ "'" else s)
+
+let pp_var_tstp out s = pp_str_tstp out (CCString.capitalize_ascii s)
+
+let ord_option c o1 o2 = match o1, o2 with
+  | None, None -> 0
+  | None, Some _ -> -1
+  | Some _, None -> 1
+  | Some x1, Some x2 -> c x1 x2
+
+let for_all_2 p x y = CCList.(length x = length y && for_all2 p x y)
+
+let take_drop_while f l = CCList.take_while f l, CCList.drop_while f l
+
+(* cartesian product of lists of lists *)
+let map_product ~f l =
+  let product a b =
+    List.fold_left
+      (fun acc1 l1 -> List.fold_left
+          (fun acc2 l2 -> (List.rev_append l1 l2) :: acc2)
+          acc1 b)
+      [] a
+  in
+  match l with
+  | [] -> []
+  | l1 :: tail ->
+    List.fold_left
+      (fun acc x -> product (f x) acc)
+      (f l1)
+      tail
+
+let seq_map_l ~f l =
+  let rec aux l yield = match l with
+    | [] -> yield []
+    | x :: tail ->
+      let ys = f x in
+      List.iter
+        (fun y -> aux tail (fun l -> yield (y::l)))
+        ys
+  in
+  aux l
+
+let seq_zipi seq k =
+  let i = ref 0 in
+  seq (fun x -> k (!i, x); incr i)
+
+let invalid_argf msg = Fmt.ksprintf msg ~f:invalid_arg
+let failwithf msg = Fmt.ksprintf msg ~f:failwith
+
+module Int_map = CCMap.Make(CCInt)
+module Int_set = CCSet.Make(CCInt)
+
+let escape_dot s =
+  let b = Buffer.create (String.length s + 5) in
+  String.iter
+    (fun c ->
+       begin match c with
+         | '|' | '\\' | '{' | '}' | '<' | '>' | '"' ->
+           Buffer.add_char b '\\'; Buffer.add_char b c
+         | '\n' -> Buffer.add_string b "\\l"; (* left justify *)
+         | _ -> Buffer.add_char b c
+       end)
+    s;
+  Buffer.contents b
 
 (** {2 File utils} *)
 

@@ -1,7 +1,8 @@
 
+(** {1 Unification and Matching} *)
+
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
-(** {1 Unification and Matching} *)
 
 type unif_subst = Unif_subst.t
 type subst = Subst.t

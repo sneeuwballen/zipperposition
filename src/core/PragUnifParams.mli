@@ -6,7 +6,7 @@ val k_max_identifications : int Flex_state.key
 val k_max_elims           : int Flex_state.key
 
 val k_imit_first : bool Flex_state.key
-val k_logop_mode : [< `Conservative | `Pragmatic | `Off ] Flex_state.key
+val k_logop_mode : [`Conservative | `Pragmatic | `Off ] Flex_state.key
 
 val k_pattern_decider : bool Flex_state.key
 val k_solid_decider : bool Flex_state.key

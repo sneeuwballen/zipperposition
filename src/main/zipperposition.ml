@@ -11,13 +11,16 @@ open Libzipperposition_phases
 
 let section = Libzipperposition.Const.section
 
+let phases = Phases_impl.main_cli ~setup_gc:true ()
+
 let () =
-  begin match main_cli() with
+  ZProf.setup();
+  begin match Phases.run phases with
     | CCResult.Error msg ->
       print_endline msg;
       exit 1
-    | CCResult.Ok 0 -> ()
-    | CCResult.Ok errcode -> exit errcode (* failure *)
+    | CCResult.Ok (_, 0) -> ()
+    | CCResult.Ok (_, errcode) -> exit errcode (* failure *)
   end
 
 let _ =

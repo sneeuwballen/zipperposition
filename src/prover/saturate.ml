@@ -15,6 +15,7 @@ module EIntf = Eprover_interface
 let stat_redundant_given = Util.mk_stat "saturate.redundant given clauses"
 let stat_processed_given = Util.mk_stat "saturate.processed given clauses"
 let stat_steps = Util.mk_stat "saturate.steps"
+let prof_step = ZProf.make "saturate.step"
 
 let section = Util.Section.make ~parent:Const.section "saturate"
 
@@ -107,8 +108,10 @@ module Make(E : Env.S) = struct
 
   (** One iteration of the main loop ("given clause loop") *)
   let given_clause_step ?(generating=true) num =
+    let _span = ZProf.enter_prof prof_step in
     E.step_init();
     (* select next given clause *)
+    Env.do_clause_eliminate ();
     match Env.next_passive () with
     | None ->
       (* final check: might generate other clauses *)
@@ -117,7 +120,7 @@ module Make(E : Env.S) = struct
       in
       if Iter.is_empty clauses
       then (
-        Util.debugf ~section 2 "saturated set: @[%a@]@." 
+        Util.debugf ~section 3 "saturated set: @[%a@]@." 
           (fun k -> k (Iter.pp_seq Env.C.pp_tstp_full) (Env.get_active ()));
         Sat)
       else (
@@ -133,14 +136,16 @@ module Make(E : Env.S) = struct
         Util.debugf 5 ~section "@[<2>inferred @{<green>new clauses@}@ @[<v>%a@]@]"
           (fun k->k (CCFormat.list Env.C.pp) clauses);
         Env.add_passive (Iter.of_list clauses);
+        ZProf.exit_prof _span;
         Unknown
       )
     | Some c ->
       let picked_clause = c in
-      Util.debugf ~section 2 "@[<2>@{<green>given@} (before simplification):@ `@[%a@]`@]"
+      Util.debugf ~section 3 "@[<2>@{<green>given@} (before simplification):@ `@[%a@]`@]"
             (fun k->k Env.C.pp c);
       Util.debugf ~section 10 "@[proof:@[%a@]@]" (fun k -> k Proof.S.pp_tstp (Env.C.proof c));
-      
+      ZProf.message (fun () -> Format.asprintf "given: %a" Env.C.pp_tstp c);
+
       check_clause_ c;
       Util.incr_stat stat_steps;
       begin match Env.all_simplify c with
@@ -149,28 +154,31 @@ module Make(E : Env.S) = struct
           Util.debugf ~section 2 "@[@{<Yellow>### step %5d ###@}@]"(fun k->k num);
           Util.debugf ~section 1 "@[<2>given clause dropped@ @[%a@]@]"
             (fun k->k Env.C.pp c);
-          Util.debugf ~section 2 "@[proof:@[%a@]@]" (fun k -> k Proof.S.pp_zf (Env.C.proof c));
+          Util.debugf ~section 3 "@[proof:@[%a@]@]" (fun k -> k Proof.S.pp_zf (Env.C.proof c));
           Signal.send Env.on_forward_simplified (c, None);
+          ZProf.exit_prof _span;
           Unknown
         | l, _ when List.exists Env.C.is_empty l ->
           (* empty clause found *)
           let proof = Env.C.proof (List.find Env.C.is_empty l) in
           (* not sending any signal, because WE HAVE WON!!! *)
+          ZProf.exit_prof _span;
           Unsat proof
         | c :: l', state ->
           (* put clauses of [l'] back in passive set *)
-          Util.debugf ~section 2 "@[ remaining after simplification:@.@[%a@]@. @]" (fun k -> k (CCList.pp Env.C.pp) l');
+          Util.debugf ~section 3 "@[ remaining after simplification:@.@[%a@]@. @]" (fun k -> k (CCList.pp Env.C.pp) l');
           
           Env.add_passive (Iter.of_list l');
 
           Signal.send Env.on_forward_simplified (picked_clause, Some c);
 
-          Env.do_clause_eliminate ();
           (* assert(not (Env.C.is_redundant c)); *)
 
           (* clause might have been removed *)
-          if Env.C.is_redundant c then Unknown
-          else (
+          if Env.C.is_redundant c then (
+            ZProf.exit_prof _span;
+            Unknown
+          ) else (
             (* process the clause [c] *)
             let new_clauses = CCVector.create () in
             (* very expensive assert *)
@@ -180,7 +188,7 @@ module Make(E : Env.S) = struct
             Util.debugf ~section 2 "@[@{<Yellow>### step %5d ###@}@]"(fun k->k num);
             Util.debugf ~section 1 "@[<2>@{<green>given@} (%d steps, penalty %d):@ `@[%a@]`@]"
               (fun k->k num (Env.C.penalty c) Env.C.pp c);
-            Util.debugf ~section 2 "@[proof:@[%a@]@]" (fun k -> k Proof.S.pp_tstp (Env.C.proof c));
+            Util.debugf ~section 3 "@[proof:@[%a@]@]" (fun k -> k Proof.S.pp_tstp (Env.C.proof c));
             (* find clauses that are subsumed by given in active_set *)
             let subsumed_active = Env.C.ClauseSet.to_iter (Env.subsumed_by c) in
             Env.remove_active subsumed_active;
@@ -200,7 +208,7 @@ module Make(E : Env.S) = struct
             CCVector.append_iter new_clauses newly_simplified;
 
             if not (Iter.is_empty simplified_actives) then
-              Util.debugf ~section 2 "simplified_actives:@ @[%a@]@." (fun k -> k (Iter.pp_seq Env.C.pp) simplified_actives);
+              Util.debugf ~section 1 "simplified_actives:@ @[%a@]@." (fun k -> k (Iter.pp_seq Env.C.pp) simplified_actives);
             Util.debugf ~section 5 "newly_simplified:@ @[%a@]@." (fun k -> k (Iter.pp_seq Env.C.pp) newly_simplified);
 
             (* add given clause to active set *)
@@ -242,8 +250,13 @@ module Make(E : Env.S) = struct
             Env.add_passive (CCVector.to_iter new_clauses);
             (* test whether the empty clause has been found *)
             match Env.get_some_empty_clause () with
-            | None -> Unknown
-            | Some c -> Unsat (Env.C.proof c))
+            | None ->
+              ZProf.exit_prof _span;
+              Unknown
+            | Some c ->
+              let pr = Env.C.proof c in
+              ZProf.exit_prof _span;
+              Unsat pr)
       end
 
   let given_clause ?(generating=true) ?steps ?timeout () =

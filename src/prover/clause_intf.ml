@@ -188,6 +188,9 @@ module type S = sig
   val selected_lits : t -> (Literal.t * int) list
   (** get the list of selected literals *)
 
+  val selected_lits_bv : t -> CCBV.t
+  (** get the bv of selected literals *)
+
   val bool_selected : t -> (Term.t * Logtk.Position.t) list
   (** get the list of selected Bool subterms *)
 
@@ -239,8 +242,6 @@ module type S = sig
 
     val eq : t
     (** Equations *)
-
-    val arith : t
 
     val filter : (Literal.t -> bool) -> t
 
@@ -305,6 +306,7 @@ module type S = sig
   val pp_tstp_full : t CCFormat.printer  (** Print in a cnf() statement *)
 
   val to_string : t -> string (** Debug printing to a  string *)
+  val to_string_tstp : t -> string
 
   val pp_set : ClauseSet.t CCFormat.printer
   val pp_set_tstp : ClauseSet.t CCFormat.printer

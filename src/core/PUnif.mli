@@ -5,7 +5,7 @@
 (** Provides plug-in module for UnifFramework.ml that implements
     pragmatic restriction of the unification algorithm described 
     in the paper Efficient Full Higher-Order Unification
-    \url{http://matryoshka.gforge.inria.fr/pubs/hounif_paper.pdf} *)
+    {{:http://matryoshka.gforge.inria.fr/pubs/hounif_paper.pdf} (paper)} *)
 
 module IntSet : CCSet.S with type elt = CCInt.t
 

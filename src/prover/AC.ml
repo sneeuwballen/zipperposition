@@ -124,7 +124,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     &&
     (
       match lit with
-      | Lit.Equation (l, r, true) -> has_ac_ids_ l r && A.equal l r
+      | Lit.Equation (l, r, true) -> not (Type.is_fun (T.ty l)) && has_ac_ids_ l r && A.equal l r
       | _ -> false
     )
 
@@ -142,7 +142,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   (* simplify: remove literals that are redundant modulo AC *)
   let simplify c =
-    ZProf.enter_prof prof_simplify;
+    let _span = ZProf.enter_prof prof_simplify in
     if exists_ac ()
     then (
       let n = Array.length (C.lits c) in
@@ -150,7 +150,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       let lits =
         List.filter
           (fun lit -> match lit with
-             | Literal.Equation (l, r, false) ->
+             | Literal.Equation (l, r, false) when (not (Type.is_fun (T.ty l))) ->
                not (has_ac_ids_ l r && A.equal l r)
              | _ -> true)
           lits
@@ -171,17 +171,20 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             ~rule:(Proof.Rule.mk "AC.normalize") ~tags
         in
         let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) lits proof in
-        ZProf.exit_prof prof_simplify;
+        ZProf.exit_prof _span;
         Util.incr_stat stat_ac_simplify;
         Util.debugf ~section 3 "@[<2>@[%a@]@ AC-simplify into @[%a@]@]"
           (fun k->k C.pp c C.pp new_c);
         SimplM.return_new new_c
       ) else (
         (* no simplification *)
-        ZProf.exit_prof prof_simplify;
+        ZProf.exit_prof _span;
         SimplM.return_same c
       )
-    ) else SimplM.return_same c
+    ) else (
+      ZProf.exit_prof _span;
+      SimplM.return_same c
+    )
 
   let install_rules_ () =
     Env.add_is_trivial is_trivial;

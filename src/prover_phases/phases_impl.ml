@@ -46,6 +46,41 @@ let print_version ~params =
     exit 0
   )
 
+(* have a list of extensions that should be loaded, and load them
+   in phase Phases.LoadExtension
+   FIXME: still too global? *)
+(* TODO: just use a list, not "register" *)
+let load_extensions =
+  let open Libzipperposition_calculi in
+  Phases.start_phase Phases.LoadExtensions >>= fun () ->
+  Extensions.register Lazy_cnf.extension;
+  Extensions.register Combinators.extension;
+  Extensions.register Higher_order.extension;
+  Extensions.register Superposition.extension;
+  Extensions.register Bce_pe_fixpoint.extension;
+  Extensions.register Bce.extension;
+  Extensions.register Pred_elim.extension;
+  Extensions.register Qle.extension;
+  Extensions.register Hlt_elim.extension;
+  Extensions.register AC.extension;
+  Extensions.register Heuristics.extension;
+  Extensions.register Libzipperposition_avatar.extension;
+  Extensions.register EnumTypes.extension;
+  Extensions.register Libzipperposition_induction.extension;
+  Extensions.register Rewriting.extension;
+  Extensions.register Ind_types.extension;
+  Extensions.register Fool.extension;
+  Extensions.register Booleans.extension;
+  Extensions.register Lift_lambdas.extension;
+  Extensions.register Pure_literal_elim.extension;
+  Extensions.register Bool_encode.extension;
+  Extensions.register App_encode.extension;
+  Extensions.register Eq_encode.extension;
+
+
+  let l = Extensions.extensions () in
+  Phases.return_phase l
+
 (* apply functions of [field e], for each extensions [e], to update
    the current state given some parameter [x]. *)
 let do_extensions ~x ~field =
@@ -95,9 +130,9 @@ let parse_file file =
     ~x:parsed >>= fun () ->
   Phases.return_phase (input,parsed)
 
-let has_real stmt : bool =
+let has_arith stmt : bool =
   let module TS = TypedSTerm in
-  let is_real ty = TS.equal ty TS.Ty.real in
+  let is_arith ty = TS.equal ty TS.Ty.real || TS.equal ty TS.Ty.int in
   begin
     CCVector.to_iter stmt
     |> Iter.flat_map Statement.Seq.to_iter
@@ -106,9 +141,10 @@ let has_real stmt : bool =
         | `Ty ty -> Iter.return ty
         | `Term t | `Form t -> TS.Seq.subterms t |> Iter.filter_map TS.ty
         | `ID _ -> Iter.empty)
-    |> Iter.exists is_real
+    |> Iter.exists is_arith
   end
-let sine_filter stmts = 
+
+let sine_filter stmts =
   if (!_sine_threshold < 0 || CCVector.length stmts < !_sine_threshold) then (stmts)
   else (
     let seq = CCVector.to_iter stmts in
@@ -139,8 +175,8 @@ let typing ~file prelude (input,stmts) =
   Util.debugf ~section 3 "@[<hv2>@{<green>typed statements@}@ %a@]"
     (fun k->k (Util.pp_iter Statement.pp_input) (CCVector.to_iter stmts));
   begin
-    if has_real stmts then (
-      Util.debug ~section 2 "problem contains $real, lost completeness";
+    if has_arith stmts then (
+      Util.debug ~section 1 "problem contains arithmetic, lost completeness";
       Phases.set_key Ctx.Key.lost_completeness true
     ) else if !_sine_threshold >= 0 then (
       Util.debug ~section 2 "sine is applied, lost completeness";
@@ -188,8 +224,8 @@ let compute_prec ~signature stmts =
           |> Iter.flat_map (fun t -> Term.Seq.subterms_depth t
                                      |> Iter.filter_map (fun (st,d) -> 
                                          CCOpt.map (fun id -> (id,d)) (Term.head st)))  in
-        let lits = Iter.flat_map (Statement.Seq.lits) stmts in
-        Precedence.weight_fun_of_string ~signature ~lits ~lm_w:!_lmb_w ~db_w:!_db_w !_kbo_wf sym_depth)
+        let clauses = Iter.map Statement.Seq.lits stmts in
+        Precedence.weight_fun_of_string ~signature ~clauses ~lm_w:!_lmb_w ~db_w:!_db_w !_kbo_wf sym_depth)
     (* |> Compute_prec.set_weight_rule (fun _ -> Classify_cst.weight_fun) *)
 
     (* use "invfreq", with low priority *)
@@ -209,16 +245,17 @@ let compute_ord_select precedence =
   let select = Selection.from_string ~ord params.Params.select in
   let bool_select = Bool_selection.from_string ~ord params.Params.bool_select in
   do_extensions ~field:(fun e->e.Extensions.ord_select_actions)
-    ~x:(ord,select) >>= fun () ->
+    ~x:(ord,(fst select)) >>= fun () ->
   Util.debugf ~section 2 "@[<2>selection function:@ %s@]" (fun k->k params.Params.select);
   Phases.return_phase (ord, select, bool_select)
 
 let make_ctx ~signature ~ord ~select ~bool_select ~sk_ctx () =
+  let (select_fun, is_complete) = select in
   Phases.start_phase Phases.MakeCtx >>= fun () ->
   let module Res = struct
     let signature = signature
     let ord = ord
-    let select = select
+    let select = select_fun
     let bool_select = bool_select
     let sk_ctx = sk_ctx
   end in
@@ -226,7 +263,10 @@ let make_ctx ~signature ~ord ~select ~bool_select ~sk_ctx () =
   let ctx = (module MyCtx : Ctx_intf.S) in
   Phases.get >>= fun st ->
   (* did any previous extension break completeness? *)
-  let lost_comp = Flex_state.get_or ~or_:false Ctx.Key.lost_completeness st in
+  let lost_comp = 
+    Flex_state.get_or ~or_:false Ctx.Key.lost_completeness st
+    || not (is_complete)
+  in
   if lost_comp then MyCtx.lost_completeness ();
   do_extensions ~field:(fun e->e.Extensions.ctx_actions)
     ~x:ctx >>= fun () ->
@@ -247,6 +287,8 @@ let make_env ~ctx:(module Ctx : Ctx_intf.S) ~params stmts =
     (fun e -> List.iter (fun f -> f env1) e.Extensions.env_actions);
   (* convert statements to clauses *)
   let c_sets = MyEnv.convert_input_statements stmts in
+  Signal.send (MyEnv.ProofState.CQueue.on_proof_state_init)
+    (Iter.append (CCVector.to_iter (c_sets.c_set)) (CCVector.to_iter (c_sets.c_sos)));
   let env2 = (module MyEnv : Env.S with type C.t = MyEnv.C.t) in
   Phases.return_phase (Phases.Env_clauses (env2, c_sets))
 
@@ -476,6 +518,20 @@ let syms_in_conj decls =
         Statement.Seq.symbols st
       ) else empty)
 
+let syms_in_conj_f decls =
+  CCVector.fold (fun acc f -> 
+    match Statement.view f with
+    | Statement.Goal _
+    | Statement.NegatedGoal _ ->
+      Statement.Seq.forms f
+      |> Iter.map (Statement.eliminate_long_implications ~is_goal:true)
+      |> Iter.flat_map TypedSTerm.Seq.symbols
+      |> Iter.append acc
+    | _ -> acc
+  ) Iter.empty decls
+  |> ID.Set.of_iter 
+  |> ID.Set.to_iter
+
 (* Process the given file (try to solve it) *)
 let process_file ?(prelude=Iter.empty) file =
   start_file file >>= fun () ->
@@ -484,14 +540,16 @@ let process_file ?(prelude=Iter.empty) file =
   (* declare inductive types and constants *)
   CCVector.iter Statement.scan_simple_stmt_for_ind_ty decls;
   let has_goal = has_goal_decls_ decls in
+  let conj_syms = syms_in_conj_f decls in
+  Util.debugf ~section 1 "conj syms: @[%a@]@." (fun k -> k (Iter.pp_seq ID.pp) conj_syms );
   Util.debugf ~section 2 "parsed %d declarations (%s goal(s))"
     (fun k->k (CCVector.length decls) (if has_goal then "some" else "no"));
   let transformed = Booleans.preprocess_booleans (Rewriting.unfold_def_before_cnf decls) in
   let sk_ctx = Skolem.create () in
   cnf ~sk_ctx transformed >>= fun stmts ->
+  (* Removed it because it is painfully slow (@VISA.) *)
   let stmts = Booleans.preprocess_cnf_booleans stmts in
   (* compute signature, precedence, ordering *)
-  let conj_syms = syms_in_conj stmts in
   let signature = Statement.signature ~conj_syms:conj_syms (CCVector.to_iter stmts) in
   compute_prec ~signature (CCVector.to_iter stmts) >>= fun precedence ->
   Util.debugf ~section 2 "@[<2>precedence:@ @[%a@]@]" (fun k->k Precedence.pp precedence);
@@ -503,8 +561,10 @@ let process_file ?(prelude=Iter.empty) file =
   make_env ~params ~ctx stmts >>= fun (Phases.Env_clauses (env,clauses)) ->
   (* main workload *)
   has_goal_ := has_goal; (* FIXME: should be computed at Env initialization *)
+  (* pre-saturation *)
+  presaturate_clauses env clauses >>= fun (result, clauses) ->
   (* saturate, possibly changing env *)
-  refute_or_saturate env clauses >>= fun result ->
+  try_to_refute env clauses result >>= fun result ->
   Phases.return (Phases.Env_result (env, result))
 
 let print file env result =
@@ -576,12 +636,31 @@ let process_files_and_print ?(params=Params.default) files =
   print_stats () >>= fun () ->
   Phases.return r
 
+let main_cli ?setup_gc:(gc=true) () =
+  let open Phases.Infix in
+  (if gc then setup_gc else Phases.return ()) >>= fun () ->
+  setup_signal >>= fun () ->
+  parse_cli >>= fun (files, params) ->
+  load_extensions >>= fun _ ->
+  process_files_and_print ~params files >>= fun errcode ->
+  Phases.exit >|= fun () ->
+  errcode
+
 let skip_parse_cli ?(params=Params.default) file =
   Phases.start_phase Phases.Parse_CLI >>= fun () ->
   CCFormat.set_color_default true;
   Phases.set_key Params.key params >>= fun () ->
   Phases.return_phase ([file], params)
 
+let main ?setup_gc:(gc=true) ?params file =
+  let open Phases.Infix in
+  (if gc then setup_gc else Phases.return ()) >>= fun () ->
+  (* pseudo-parse *)
+  skip_parse_cli ?params file >>= fun (files, params) ->
+  load_extensions >>= fun _ ->
+  process_files_and_print ~params files >>= fun errcode ->
+  Phases.exit >|= fun () ->
+  errcode
 
 let () = 
   let open Libzipperposition in

@@ -254,7 +254,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
             let lit' = lits'.(j) in
             (* check if both lits are still potentially eligible, and have the same
                sign if [check_sign] is true. *)
-            if Lit.eqn_sign lit = Lit.eqn_sign lit' && BV.get bv j
+            if Lit.is_positivoid lit = Lit.is_positivoid lit' && BV.get bv j
             then match Lit.Comp.compare ~ord lit lit' with
               | Comparison.Incomparable
               | Comparison.Eq -> ()     (* no further information about i-th and j-th *)
@@ -373,6 +373,8 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   (** Indexed list of selected literals *)
   let selected_lits c = BV.selecti (Lazy.force c.selected) c.sclause.lits
 
+  let selected_lits_bv c = Lazy.force c.selected
+
   let bool_selected c  = Lazy.force c.bool_selected
 
   (** is the clause a unit clause? *)
@@ -478,8 +480,6 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       | Lit.Equation (_, _, true) -> true
       | _ -> false
 
-    let arith _ lit = Lit.is_arith lit
-
     let filter f _ lit = f lit
 
     let max c =
@@ -577,6 +577,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let pp_tstp_full out c = SClause.pp_tstp_full out c.sclause
 
   let to_string = CCFormat.to_string pp
+  let to_string_tstp = CCFormat.to_string pp_tstp
 
   let pp_set out set =
     Format.fprintf out "{@[<hv>%a@]}"

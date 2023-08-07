@@ -160,7 +160,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
 
   (* Avatar splitting *)
   let split c =
-    ZProf.enter_prof prof_splits;
+    let _span = ZProf.enter_prof prof_splits in
 
     let should_split c = 
       (not @@ Literals.is_trivial (C.lits c)) &&
@@ -184,7 +184,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
         (fun k -> k C.pp c (CCList.pp C.pp) res));
 
 
-    ZProf.exit_prof prof_splits;
+    ZProf.exit_prof _span;
     res
 
   let filter_absurd_trails_ = ref (fun _ -> true)
@@ -588,7 +588,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
 
   (* Just check the solver *)
   let check_satisfiability ~full () =
-    ZProf.enter_prof prof_check;
+    let _span = ZProf.enter_prof prof_check in
     Signal.send before_check_sat ();
     let res = match Sat.check ~full ()  with
       | Sat_solver.Sat ->
@@ -601,7 +601,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
         [c]
     in
     Signal.send after_check_sat ();
-    ZProf.exit_prof prof_check;
+    ZProf.exit_prof _span;
     res
 
   let register ~split_kind () =
@@ -690,7 +690,7 @@ let extension =
     Util.debug 1 "enable Avatar";
     A.register ~split_kind:!avatar_kind ()
   in
-  Extensions.({default with name="avatar"; env_actions=[action]})
+  Extensions.({default with name="avatar"; env_actions=[action]; prio=10})
 
 let () =
   Params.add_opts

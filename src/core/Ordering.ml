@@ -132,7 +132,7 @@ module Head = struct
       end
     | T.AppBuiltin (_,ss) -> ss
     (* The orderings treat lambda-expressions like a "LAM" symbol applied to the body of the lambda-expression *)
-    | T.Fun (_,t) -> [t]
+    | T.Fun (ty,t) -> [T.of_ty ty; t]
     | _ -> []
 
   let to_string = CCFormat.to_string pp
@@ -268,6 +268,7 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
     | _ -> false
 
   (** Higher-order KBO *)
+  exception UnsupportedTerm
   let rec kbo ~prec t1 t2 =
     let balance = mk_balance t1 t2 in
     (** Update variable balance, weight balance, and check whether the term contains the fluid term s.
@@ -290,7 +291,7 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
             else W.(wb - weight prec h ~below_lam)
           in
           let below_lam = (h = Head.LAM) in
-          if not P.lambda_mode && below_lam then invalid_arg "lambdas not allowed";
+          if not P.lambda_mode && below_lam then raise UnsupportedTerm;
           balance_weight_rec wb' args s ~pos ~below_lam false
       )
     (** balance_weight for the case where t is an applied variable *)
@@ -431,10 +432,13 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
     res
 
   let compare_terms ~prec x y =
-    ZProf.enter_prof prof_kbo;
-    let compare = kbo ~prec x y in
-    ZProf.exit_prof prof_kbo;
-    compare
+    let _span = ZProf.enter_prof prof_kbo in
+    let res = 
+      (try 
+        kbo ~prec x y
+      with UnsupportedTerm -> Incomparable) in
+    ZProf.exit_prof _span;
+    res
 
   (* The ordering might flip if one side is a lambda-expression *)
   let might_flip _ s t = T.is_fun s || T.is_fun t
@@ -532,9 +536,9 @@ module MakeRPO (P : PARAMETERS) : ORD = struct
        | Incomparable | Lt -> alpha ~prec ss' t)
 
   let compare_terms ~prec x y =
-    ZProf.enter_prof prof_rpo;
+    let _span = ZProf.enter_prof prof_rpo in
     let compare = rpo6 ~prec x y in
-    ZProf.exit_prof prof_rpo;
+    ZProf.exit_prof _span;
     compare
 
   (* The ordering might flip if one side is a lambda-expression or if the order is established using the subterm rule *)
@@ -631,9 +635,9 @@ module EPO : ORD = struct
     | [], (_ :: _) -> Lt
 
   let compare_terms ~prec x y = 
-    ZProf.enter_prof prof_epo;
+    let _span = ZProf.enter_prof prof_epo in
     let compare = epo ~prec (x,[]) (y,[]) in
-    ZProf.exit_prof prof_epo;
+    ZProf.exit_prof _span;
     compare
 
   let might_flip _ _ _ = false
@@ -766,9 +770,9 @@ module LambdaFreeKBOCoeff : ORD = struct
     )
 
   let compare_terms ~prec x y =
-    ZProf.enter_prof prof_lambdafree_kbo_coeff;
+    let _span = ZProf.enter_prof prof_lambdafree_kbo_coeff in
     let compare = lfhokbo_arg_coeff ~prec x y in
-    ZProf.exit_prof prof_lambdafree_kbo_coeff;
+    ZProf.exit_prof _span;
     compare
 
   let might_flip prec t s =
@@ -806,7 +810,7 @@ let map f { cache_compare=_; compare; prec; name; might_flip; cache_might_flip=_
   let might_flip prec a b = CCCache.with_cache cache_might_flip (fun (a, b) -> might_flip prec (f a) (f b)) (a,b) in
   { cache_compare; compare; prec; name; might_flip; cache_might_flip; monotonic }
 
-let lambda_kbo ignore_quans_under_lam prec =
+let lambda_kbo ~ignore_quans_under_lam prec =
   let module KBO = MakeKBO(struct 
       let name = "lambda_kbo"
       let lambda_mode = true
@@ -933,8 +937,8 @@ let subterm =
 let tbl_ =
   let h = Hashtbl.create 5 in
   Hashtbl.add h "lambdafree_kbo" lambdafree_kbo;
-  Hashtbl.add h "lambda_kbo" (lambda_kbo false);
-  Hashtbl.add h "lambda_kbo_complete" (lambda_kbo true);
+  Hashtbl.add h "lambda_kbo" (lambda_kbo ~ignore_quans_under_lam:false);
+  Hashtbl.add h "lambda_kbo_complete" (lambda_kbo ~ignore_quans_under_lam:true);
   Hashtbl.add h "lambdafree_rpo" lambdafree_rpo;
   Hashtbl.add h "lambda_rpo" lambda_rpo;
   Hashtbl.add h "epo" epo;

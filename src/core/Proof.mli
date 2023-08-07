@@ -354,7 +354,7 @@ module S : sig
 
   val is_proof_of_false : t -> bool
 
-  (** {6 Conversion to a graph of proofs} *)
+  (** {5 Conversion to a graph of proofs} *)
 
   val as_graph : (t, rule * Subst.Projection.t option * infos) CCGraph.t
   (** Get a graph of the proof *)
@@ -365,7 +365,7 @@ module S : sig
     t ->
     t Iter.t
 
-  (** {6 IO} *)
+  (** {5 IO} *)
 
   val pp_result_of : t CCFormat.printer
   val pp_notrec : t CCFormat.printer
