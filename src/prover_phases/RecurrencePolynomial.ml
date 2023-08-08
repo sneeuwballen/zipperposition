@@ -312,11 +312,11 @@ let var_name = string_part_at "y x v u t s r p o n m l k j i h e a"
  Currently I annotate at the embedding. This has the trade-off of making all polynomials in terms/clauses “ugly” but an embedded polynomial in a term in a polynomial does not need nested annotation. *)
 let term_name t = Term.to_string t
 
-(* E.g. ["-2x";"3y";"-4z"] becomes "-2x﹢3y﹣4z". (On Ubuntu command line “﹢” has width 2 which seems nice balance between 1 of “+” and 3 of “ + ”, some times.) *)
+(* E.g. ["-2x";"3y";"-4z"] becomes "-2x＋3y－4z". (On Ubuntu command line “＋” has width 2 which seems nice balance between 1 of “+” and 3 of “ + ”, some times.) *)
 let concat_plus_minus view = function
 | [] -> "0"
 | m::p -> map view p
-  |> flat_map String.(fun s -> if rcontains_from s 0 '-' then ["﹣"; sub s 1 (length s -1)] else ["﹢"; s])
+  |> flat_map String.(fun s -> if rcontains_from s 0 '-' then ["－"; sub s 1 (length s -1)] else ["＋"; s])
   |> cons(view m)
   |> String.concat ""
 
@@ -331,7 +331,7 @@ and mono_to_string m = group_succ ~eq:indet_eq m
   |> function ""->"1" | "-"->"-1" | "͘"->"1͘" | s->s
 
 and indet_to_string = function
-| C a -> (match Z.to_string a with "-1"->"-" | s->s) (* The trivial a=1 does not occur. *)
+| C a -> (match Z.to_string a with "1"->assert false | "-1"->"-" | s->s)
 | A I -> "͘"
 | A(V i) -> var_name i
 | A(T t) -> term_name t
@@ -351,7 +351,7 @@ let pp_poly = to_formatter poly_to_string
 (* List of terms that the given recurrence relates, without duplicates. *)
 let terms_in = sort_uniq ~cmp:Term.compare % flat_map(fun m -> match rev m with A(T t)::_->[t] | _->[])
 
-let term0 = Term.const ~ty:term (ID.make "𝟬")
+let term0 = Term.const ~ty:term (ID.make "⬮")
 exception RepresentingPolynomial of poly * Precedence.Weight.t * (simple_indeterminate -> int list)
 
 (* Given polynomial P<>0, embed P into a fresh ID idP, that idP into a Term termP, and it into a literal term0≈termP. Return all three.
@@ -362,7 +362,7 @@ let poly_as_lit_term_id ?name ?(weight=omega) p =
     (* Compute default name only if none is given. *)
     let replace = fold_left (%) id % map(fun(old,by) -> global_replace (regexp old) by) in
     let _name = poly_to_string p
-    |> replace ["﹢","˖"(*ᚐ*); "﹣","−"; "-","−"] (* avoid ' ' around name *)
+    |> replace ["＋","˖"; "－","−"; "-","−"] (* avoid ' ' around name *)
     |> flip String.iter
     (* |> Iter.filter(fun c -> not(mem c [' ';'(';')'])) *)
     (* |> Iter.take 20 *)

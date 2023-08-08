@@ -112,10 +112,8 @@ module UntypedPrint : sig
   (** type for values of forgotten type *)
 
   val (~<) : 'a -> 'a
-  (** Prefix an expression with ~< to trace it together with its location and call chain length. Output can contain oddities due to inlining and lack of runtime types. *)
-
   val (|<) : string -> 'a -> 'a
-  (** Prefix an expression with [message|<] to trace it together with [message], location and call chain length. Output can contain oddities due to inlining and lack of runtime types. *)
+  (** Prefix an expression with [~<] or [message|<] to trace it together with its location and call stack depth. Output can contain oddities due to inlining and lack of runtime types. *)
 
   val str : 'a -> string
   (** Adhoc polymorphic to_string *)

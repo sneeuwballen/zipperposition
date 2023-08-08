@@ -26,13 +26,13 @@ let debug_root x b = Printexc.(if not b then match !debug_typing_fail with
 ); b
 
 (* When you see garbage output from str, ~< or |< instead of registered pretty printer's output, then the corresponding type test has an error. Use this function to narrow which subexpression is causing the problem. So replace, say ~<x, by debug_has_type t x where t is the type test that should pass for x. *)
-let debug_has_type t x =
+let debug_has_type ?(msg="") t x =
   debug_typing_fail := `On;
   let x_is_t = t x in
   let recorded = !debug_typing_fail in
   debug_typing_fail := `Off;
   if x_is_t then (print_endline("Valid typing in " ^ caller_file_line 1); x) else(
-    print_endline("Invalid typing for value:\n" ^ str x ^ (match recorded with
+    print_endline(msg ^ "\nInvalid typing for value:\n" ^ str x ^ (match recorded with
       | `At(sub_x, trace) ->
         "\n\nTyping the following subexpression failed:\n" ^ str sub_x ^
         "\n\nStack trace of the last corresponding test:\n" ^ Printexc.raw_backtrace_to_string trace
@@ -91,14 +91,15 @@ let exception' x = object0 x or test_tag 0 (function y::_-> object0 y |_->false)
 let rec ccmap key t x = union 1 [[ccmap key t; key; t; ccmap key t; int]] x
 (* Test for the default Set of OCaml which as a type is also the same as CCSet. *)
 let rec ccset t x = union 1 [[ccset t; t; ccset t; int]] x
-let ccbv x = tuple[array int; int] x
+let ccbv x = tuple[string(*array int*); int] x
 let ccvector t = tuple[int; array t] ~st:(fun(s,a)-> size a >= s & s >= 0)
 let rec bucketlist k v x = union 1 [[k; v; bucketlist k v]] x
 let hashtbl k v = tuple[int; array(bucketlist k v); int; int] ~st:(fun(s,a,_,_) -> size a >= s/2 & s >= 0)
 
 (* arbitrary precision types—unsafe! *)
-let integer x = int x or custom x
-let rational x = tuple[integer; integer] x
+let using_zarith = int Logtk_arith.Z.one
+let integer x = if using_zarith then int x or custom x else tuple[int;custom] x
+let rational x = tuple(integer::integer::(if using_zarith then [] else [bool])) x
 
 (* Types specific to Zipperposition *)
 
@@ -181,14 +182,6 @@ let exn_pair x = tuple[tuple[object0;int]; exception'] x
 let flex_state x = ccmap int exn_pair x
 let run's_result x = or_error(tuple[flex_state; szs_status]) x
 
-(* let powers x = array int x
-let shifts x = union 1 [
-  [powers; term];
-  [powers; term; powers; term];
-  [int; int; powers; term]] x
-let monomial x = tuple[integer; powers; shifts] x
-let polynomial x = list monomial x *)
-
 let rec polynomial x = list monomial x
 and monomial x = list indeterminate x
 and indeterminate x = union 0 [
@@ -215,9 +208,9 @@ let clever_view sep view l = String.(
   indent := sub !indent 0 (length !indent - 1);
   s')
 (* optional helper to print integers, symbolic numbers, ring elements etc. differently *)
-let serif, double, sans, bold, thin = 94,104,114,124,134
+let wide, serif, double, sans, bold, thin = 96,94,104,114,124,134
 let digits_in style = String.(to_seq %> List.of_seq %> concat_view "" (function
-  | '0'..'9' as d -> "\xF0\x9D\x9F" ^ make 1 Char.(chr(style + code d))
+  | '0'..'9' as d -> (if style=wide then "\xEF\xBC" else "\xF0\x9D\x9F") ^ make 1 Char.(chr(style + code d))
   | c -> make 1 c))
 
 let extension = {Extensions.default with
@@ -232,7 +225,7 @@ add_pp clause (CCFormat.to_string Env.C.pp_tstp);
 add_pp any (fun x -> (match tag x with
   | t when t=final_tag -> "final" 
   | t when t=out_of_heap_tag -> "code"
-  | t when t=unaligned_tag -> "unaligned" (* e.g. 1ˢᵗ closure field unless its the above *)
+  | t when t=unaligned_tag -> "unaligned" (* e.g. 1ˢᵗ closure field unless it is the above *)
   | _ -> "tag="^str(tag x)
 )^":size="^str(size x));
 
@@ -295,8 +288,5 @@ add_pp term Term.to_string;
 add_pp literal Literal.to_string;
 add_pp proof (CCFormat.to_string Proof.S.pp_normal);
 
-add_pp monomial (digits_in serif % RecurrencePolynomial.mono_to_string);
-add_pp polynomial (digits_in serif % RecurrencePolynomial.poly_to_string);
-(* open Summation_equality.RecurrencePolynomial;;
-add_pp monomial mono_to_string;
-add_pp polynomial poly_to_string; *)
+add_pp monomial (digits_in wide % RecurrencePolynomial.mono_to_string);
+add_pp polynomial (digits_in wide % RecurrencePolynomial.poly_to_string);
