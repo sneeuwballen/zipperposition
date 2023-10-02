@@ -30,10 +30,12 @@ class Configuration:
 
 
   def __init__(self, conf_path, preferred_time):
+    import os
+    cwd = os.path.dirname(os.path.realpath(__file__))
+    conf_path = cwd + "/" + conf_path
     self._conf_path = conf_path
     self._preferred_time = preferred_time
     
-    import os
     if not os.path.isfile(conf_path):
       raise ValueError("{0} cannot be found".format(conf_path))
     if not (os.access(conf_path, os.X_OK)):
