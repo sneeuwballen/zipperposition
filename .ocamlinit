@@ -2,8 +2,6 @@
 #use "topfind";;
 (* ## end of OPAM user-setup addition for ocamltop / base ## keep this line *)
 
-let cmaPath = "/home/vnn490/Documents/Zipo/zipperposition/_build/default/src/";;
-
 (* Steps to fix “Error: unbound module An_example” in Ocaml interpreter:
 1. Find .ml file defining An_example (e.g. F12 opens definition in VSCode+Merlin).
 2. #require an external dependency, or proceed to step 3 for Zipperposition specific An_example.
@@ -13,7 +11,7 @@ let cmaPath = "/home/vnn490/Documents/Zipo/zipperposition/_build/default/src/";;
 6. Restart.
 
 Other notes:
-#mod_use "path/to/a_file.ml";;  Wraps inside module A_file like the compiler.
+#mod_use "path/to/a_file.ml";;  wraps inside module A_file like the compiler.
 Program ocamlobjinfo or objinfo prints info about given .cma file.
 $OCAML_TOPLEVEL_PATH/autoload  might be an alternative to this file.
 This file makes the toplevel slow to start. *)
@@ -21,26 +19,26 @@ This file makes the toplevel slow to start. *)
 
 (* Zipperposition files: .cmi *)
 
-#directory "/home/vnn490/Documents/Zipo/zipperposition/_build/install/default/lib/logtk";;
-#directory "/home/vnn490/Documents/Zipo/zipperposition/_build/install/default/lib/logtk/proofs";;
-#directory "/home/vnn490/Documents/Zipo/zipperposition/_build/install/default/lib/logtk/parsers";;
-#directory "/home/vnn490/Documents/Zipo/zipperposition/_build/install/default/lib/logtk/solving";;
-#directory "/home/vnn490/Documents/Zipo/zipperposition/_build/install/default/lib/logtk/arbitrary";;
+#directory "./_build/install/default/lib/logtk";;
+#directory "./_build/install/default/lib/logtk/proofs";;
+#directory "./_build/install/default/lib/logtk/parsers";;
+#directory "./_build/install/default/lib/logtk/solving";;
+#directory "./_build/install/default/lib/logtk/arbitrary";;
 
-#directory "/home/vnn490/Documents/Zipo/zipperposition/_build/install/default/lib/libzipperposition";;
-#directory "/home/vnn490/Documents/Zipo/zipperposition/_build/install/default/lib/libzipperposition/avatar";;
-#directory "/home/vnn490/Documents/Zipo/zipperposition/_build/install/default/lib/libzipperposition/arith";;
-#directory "/home/vnn490/Documents/Zipo/zipperposition/_build/install/default/lib/libzipperposition/calculi";;
-#directory "/home/vnn490/Documents/Zipo/zipperposition/_build/install/default/lib/libzipperposition/phases";;
-#directory "/home/vnn490/Documents/Zipo/zipperposition/_build/install/default/lib/libzipperposition/induction";;
+#directory "./_build/install/default/lib/libzipperposition";;
+#directory "./_build/install/default/lib/libzipperposition/avatar";;
+#directory "./_build/install/default/lib/libzipperposition/arith";;
+#directory "./_build/install/default/lib/libzipperposition/calculi";;
+#directory "./_build/install/default/lib/libzipperposition/phases";;
+#directory "./_build/install/default/lib/libzipperposition/induction";;
 
 #directory ".";; (* Source .ml files may be duplicated in the .../_build/install/... directories so put the working directory into the search path as the last one to give it the precedence. *)
 
 
-(* External dependencies *)
+(* External dependencies—missing optional ones just print warnings and continue *)
 
-#require "batteries";; (* If ∄ Batteries, this just prints warning and continues. *)
-(* from src/{core,prover,solving}/dune files, (libraries ...) rows *)
+#require "batteries";;
+(* from src/{core,prover,...}/dune files, (libraries ...) rows *)
 #require "containers";;
 #require "containers-data";;
 #require "iter";;
@@ -48,15 +46,19 @@ This file makes the toplevel slow to start. *)
 #require "zarith";;
 #require "unix";;
 #require "str";;
+#require "mtime.clock.os";;
 #require "msat";;
 #require "msat.tseitin";;
 #require "qcheck";;
+#require "logtk.arith";;
 
 
 (* Zipperposition files: .cma *)
 
-let workingDirectory = Unix.getcwd();;
-let inZipperpositionDirectory p = Unix.chdir(cmaPath^p);;
+let workingDirectory = Sys.getcwd();;
+let cmaPath = "/_build/default/src/";;
+let inZipperpositionDirectory p = try Sys.chdir(workingDirectory^cmaPath^p)
+with Sys_error e -> print_string(e^" and so ");;
 
 inZipperpositionDirectory "core";;
 #load "logtk.cma";; (* dlllogtk.so is found from the set working directory *)
@@ -78,9 +80,6 @@ inZipperpositionDirectory "prover";;
 
 inZipperpositionDirectory "prover_calculi/avatar";;
 #load "libzipperposition_avatar.cma";;
-
-inZipperpositionDirectory "prover_calculi/arith";;
-#load "libzipperposition_arith.cma";;
 
 inZipperpositionDirectory "prover_calculi/induction";;
 #load "libzipperposition_induction.cma";;
@@ -194,5 +193,5 @@ open RecurrencePolynomial;;
 #mod_use "summation_equality.ml";;
 open Summation_equality;;
 
-Unix.chdir workingDirectory;; (* restore original working directory *)
+Sys.chdir workingDirectory;; (* restore original working directory *)
 open Batteries (* If ∄ Batteries, this crashes, so make it the last command. *)

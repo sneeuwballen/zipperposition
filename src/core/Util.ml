@@ -203,14 +203,13 @@ module UntypedPrint = struct
   let string_printers: ((any -> bool) * (any -> string)) list ref = ref[]
 
   let add_pp type_test to_string = string_printers := (type_test, to_string % magic) :: !string_printers
+  
+  let registered_types() = magic List.map fst !string_printers
 
   let str x =
-    let rec loop = function [] -> raise(Failure "Printers from TypeTests.ml are uninitialized!")
-    | (type_test, to_string)::printers ->
-      if is_int(repr x) then string_of_int(magic x) (* prioritize int's *)
-      else if type_test x then to_string x
-      else loop printers
-    in loop(magic !string_printers)
+    let _, to_string = try magic List.find (CCFun.flip fst x) !string_printers
+      with Not_found -> failwith "Printers from TypeTests.ml are uninitialized!"
+    in to_string x
 
   (* Print message msg preceded by FILE line LINE ≣̲̇CALL-DEPTH of the caller's caller. *)
   let print_with_caller msg =

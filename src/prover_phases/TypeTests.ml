@@ -1,9 +1,9 @@
 (* A dynamic type test is a predicate 'a->bool. They work by traversing the term structure. Since types are erased, same data can have multiple types. But if a type test T on data X is succesful, then at least X can be (magic) cast to T safely. Safety means no segmentation fault but risks custom invariants. The below tests are accure in this sense, or preserve accuracy, except the unsafe tests integer/Z.t, rational/Q.t and lazy_or. There's no test combinators for polymorphic variants and exceptions—they can be accurately tested by pattern matching.
- Currently this file contains all definitions of type tests and their associations to string printers. It is hence easy to disable this debugging by never registering the corresponding extension. Another design would be to scatter the type tests next to the corresponding real type definitions. That'd reduce the risk of forgetting to update a test along side its corresponding type. *)
+ Currently this file contains all definitions of type tests and their associations to string printers. It is hence easy to disable this debugging by never registering the corresponding extension. Another design would be to scatter the type tests next to the corresponding real type definitions. That'd reduce the risk of forgetting to update a test along side its corresponding type. Moreover, assumptions about the order of the associations—easily enforced only in a single file—are made and documented. *)
 
 open Logtk
 open Libzipperposition
-open List
+open CCList
 open Obj (* OCaml's reflection module—powers all of this *)
 open Util
 open Util.UntypedPrint
@@ -192,7 +192,15 @@ and indeterminate x = union 0 [
   [int];
   [monomial];
   [list(tuple[int;polynomial])]] x
-and op_atom x = union 1 [[int]; [term]] x
+and op_atom x = union 1 [[int]; [term; list int]] x
+
+(* Makes a type test that searches possible types among add_pp registered types. The made type test outputs true until there's no common type for the given inputs (except any). *)
+let search_type() =
+  let with_any = registered_types() in
+  let possible = ref(take (length with_any - 1) with_any) in
+  fun x -> match filter ((|>)x) !possible with
+  | [] -> false
+  | p -> possible:=p; true
 
 
 (* Define and register string converters *)
@@ -213,14 +221,27 @@ let digits_in style = String.(to_seq %> List.of_seq %> concat_view "" (function
   | '0'..'9' as d -> (if style=wide then "\xEF\xBC" else "\xF0\x9D\x9F") ^ make 1 Char.(chr(style + code d))
   | c -> make 1 c))
 
+type printer = Printer: ('any -> string) -> printer
+let add_homogeneous_and_any polytypes_printers =
+  let _= polytypes_printers |> map(fun(t, Printer p)-> add_pp (t any) p) in
+  let _= polytypes_printers |> map(fun(t, Printer p)-> add_pp (t(search_type())) p) in()
+
+let generic_variant_pp x =
+  superscript(str(size x)) (* Prepend length of data tuple for easier exploration. *)
+  ^ (match tag x with 0-> "" | t-> "tag" ^ str t) (* Omit multipurpose default tag 0. *)
+  ^ "("^ clever_view "," str (fields x) ^")"
+
+
 let extension = {Extensions.default with
   name = "debug type tests";
   env_actions = [fun env -> let module Env = (val env) in 
 
 add_pp clause (CCFormat.to_string Env.C.pp_tstp);
+(* Keep int last to prioritize it over 0-parameter variants. *)
+add_pp int string_of_int;
 ]};;
 
-(* Do overly general assignments first so they end up to the bottom of the printer stack. Above env_actions run of course after this file. *)
+(* Do overly general assignments first so they end up to the bottom of the printer stack. Above env_actions run of course after below assignments. It is assumed that add_pp any is the first and add_pp int is the last registration which must be enforced separately if one plans to register a printer in another file. *)
 
 add_pp any (fun x -> (match tag x with
   | t when t=final_tag -> "final" 
@@ -229,26 +250,25 @@ add_pp any (fun x -> (match tag x with
   | _ -> "tag="^str(tag x)
 )^":size="^str(size x));
 
-add_pp (test 0 (fun(tag,_) -> tag < no_scan_tag)) (fun x -> 
-  superscript(str(size x)) (* Prepend length of data tuple for easier exploration. *)
-  ^ (match tag x with 0-> "" | t-> "tag" ^ str t) (* Omit multipurpose default tag 0. *)
-  ^ "("^ clever_view "," str (fields x) ^")");
+add_pp (test 0 (fun(tag,_) -> tag < no_scan_tag)) generic_variant_pp;
 
-add_pp (ccvector any) (CCVector.to_string ~start:"ᵛᵉᶜ⟨" ~stop:"⟩" str);
-
-add_pp (list any) (fun l -> "["^ clever_view ";" str l ^"]");
-
-add_pp (ccset any) (
-  let rec to_list s = if s == repr 0 then [] else to_list(field s 0) @ field s 1 :: to_list(field s 2) in
-  fun s -> "{"^ clever_view "," str (to_list s) ^"}");
-
-add_pp (hashtbl any any) Hashtbl.(fun t -> "{"^if length t = 0 then "↦̸ }" else
-  clever_view ";" (fun(k,v)-> str k ^"↦ "^ str v) (List.of_seq(to_seq t)) ^"}");
-
+add_pp (lazy_or(fun _->false)) (fun _->"lazy");
 (* already evaluated lazy values *)
 add_pp (test_tag forward_tag any) (str % Lazy.force);
 
-add_pp (lazy_or(fun _->false)) (fun _->"lazy");
+add_homogeneous_and_any[
+  array, Printer generic_variant_pp;
+  
+  ccvector, Printer(CCVector.to_string ~start:"ᵛᵉᶜ⟨" ~stop:"⟩" str);
+
+  list, Printer(fun l -> "["^ clever_view ";" str l ^"]");
+
+  ccset, Printer(let rec to_list s = if s == repr 0 then [] else to_list(field s 0) @ field s 1 :: to_list(field s 2)
+    in fun s -> "{"^ clever_view "," str (to_list s) ^"}");
+
+  flip hashtbl any, Printer Hashtbl.(fun t -> "{"^if length t = 0 then "↦̸ }" else
+    clever_view ";" (fun(k,v)-> str k ^"↦ "^ str v) (List.of_seq(to_seq t)) ^"}");
+];
 
 (* The infix_tag is for mutually recursive functions acording to a comment on https://github.com/ocaml/ocaml/issues/7810 *)
 add_pp (test 0 (fun(tag,_) -> tag=closure_tag or tag=infix_tag)) (fun f -> 
@@ -280,7 +300,7 @@ add_pp exception' Printexc.(fun e ->
 add_pp decimal string_of_float;
 (* Quote number and invisible strings. *)
 add_pp string (fun s -> if None != int_of_string_opt(String.trim s ^ "0") then "“"^s^"”" else s);
-(* Do not print list [term] as SLiteral ¬term. *)
+(* Do not print a singleton list [term] as SLiteral ¬term. *)
 add_pp (fun x -> sliteral term x & not(list any x)) ((^)"ᔆᴸⁱᵗ" % SLiteral.to_string Term.pp);
 add_pp tvar HVar.to_string;
 add_pp subst Subst.to_string;

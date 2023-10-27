@@ -114,7 +114,10 @@ module UntypedPrint : sig
   val (~<) : 'a -> 'a
   val (|<) : string -> 'a -> 'a
   (** Prefix an expression with [~<] or [message|<] to trace it together with its location and call stack depth. Output can contain oddities due to inlining and lack of runtime types. *)
-
+  
+  val registered_types : unit -> ('a -> bool) list
+  (** Retrieve the type tests used for polymorphic printing in order of priority. *)
+  
   val str : 'a -> string
   (** Adhoc polymorphic to_string *)
 

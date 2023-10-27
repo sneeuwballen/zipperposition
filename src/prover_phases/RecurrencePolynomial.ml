@@ -19,13 +19,29 @@ open CCFun
 open Stdlib
 
 (* Utilities *)
-let todo msg = print_string("TO‍‍D‍O "^msg^"\t"); assert false
+let (|@) x must =
+  let msg = Obj.(if tag(repr must)=string_tag then magic must else if magic must then "" else "ERROR") in
+  if msg="" then x else(print_string Printexc.(raw_backtrace_to_string(get_callstack 999)^"\n\n\t"^msg^"   "^str x); exit 1)
+let todo msg = Obj.magic"T﻿O﻿D﻿O" |@ msg
+
 let (~=) x _ = x
 let (@@) = map_same
 let (%%>) = compose_binop
 let (%>>) f g x y = g(f x y)
 let (<:>) r f = r:=f!r
 let is0 = Z.(equal zero)
+(* Simple polymorphic print helper independent of the heavyweight TypeTests.ml. Unknown typing can be tested as atompp _ == atomprinters 0 *)
+let atomprinters =
+  let (!)p = p % Obj.magic in
+  let pps = [| ~="⁇"; !string_of_int; !id; !string_of_float; !(fun x -> !id(Obj.field x 0)) |] in
+  fun i -> !get pps i (* guarantee polymorphicity with constant printers *)
+let atompp x : 'any->string = Obj.(let x = magic x in
+  if is_int x	then 1 else
+  if tag x = string_tag	then 2 else
+  if tag x = double_tag	then 3 else
+  if tag x = object_tag	then 4 else
+  0) |> atomprinters
+let (-^) s x = s ^ atompp x x
 (* Lexicographic product of comparison functions onto tuples. *)
 let ( *** ) c1 c2 (x1,x2) (y1,y2) = match c1 x1 y1 with 0 -> c2 x2 y2 | r -> r
 (* Example: lex_list(-) [1;4;2] [1;3;3;3] > 0 where (-) compares positive ints without overflow. *)
@@ -45,8 +61,13 @@ let max_array ?(ord=compare) ?bottom l = max_list ~ord (CCOpt.to_list bottom @ t
 let min_array ?(ord=compare) ?top l = min_list ~ord (CCOpt.to_list top @ to_list l)
 let sum_list = fold_left (+) 0
 let sum_array = Array.fold_left (+) 0
-let index_of p l = fst(get_exn(find_idx p l))
-let index_of' a = index_of((=)a)
+let index_of p l = match find_idx p l with Some(i,_) -> i |_->
+  raise(Invalid_argument("index_of among "-^ length l))
+let index_of' a l = match find_idx ((=)a) l with Some(i,_) -> i |_->
+  raise(Invalid_argument("index_of' among "-^ length l ^
+    let pp = atompp a in
+    if pp == atomprinters 0 then ""
+    else ": "-^ a ^" ∉ ["^ concat_view"; " pp l ^"]"))
 let with_cache_2 c f = curry(with_cache_rec c (uncurry % f % curry))
 let with_cache_3 c f = curry(with_cache_2 c (uncurry % f % curry))
 
@@ -63,7 +84,7 @@ let subscript = String.to_seq %> List.of_seq %> concat_view "" (fun c -> match c
 type var = int
 let compare_var = (-) (* variables are positive *)
 (* Argument terms of operation: In principle they could be anything. However we need generic sorting and embedability to clauses. Second is biggest of many problems for an extra type variable, while first is problem for using the extensible exception type to hold the arguments. Instead we rely on that terms suffice as arguments—after all polynomials can be embedded to them. *)
-type atom = I | V of var | T of Term.t
+type atom = I | V of var | T of Term.t * var list
 type poly = op list list
 and op =
 | C of Z.t (* never C 1; unique if present *)
@@ -88,10 +109,22 @@ let ( *:)c = map(( *.)c)
 let const_op_poly n = Z.(if equal n zero then [] else if equal n one then [[]] else [[C n]])
 let const_eq_poly n = Z.(if equal n zero then [] else if equal n one then [[A I]] else [[C n; A I]])
 (* Other safe constructors except that one for X comes after ordering and general compositions after arithmetic. *)
-let shift i = O[i,[[A(V i)];[A I]]]
-let mul_var i = X[A(V i)]
+let var_poly i = [A(V i)]
+let shift i = O[i,[var_poly i; [A I]]]
+let mul_var i = X(var_poly i)
 (* Embed term into polynomial argument. See also poly_of_term to reverse embedding of polynomial in a term. *)
-let of_term t = [[A(T t)]]
+let of_term~vars t = [[A(T(t, sort_uniq~cmp:(-) vars))]]
+
+(* Distinguishes standard shift indeterminates from general substitutions. *)
+let is1shift = function O[i,[[A(V j)];[A I]]] -> i=j | _ -> false
+(* Distinguishes multishift indeterminates from general substitutions. *)
+let is_multishift = function O f -> f |> for_all(function
+  | i, [[A(V j)]; ([A I] | [C _; A I])] -> i=j
+  |_->false) |_->false
+(* Unused. See view_affine *)
+let is_affine = function O f -> f |> for_all(fun(_,f') -> f' |> for_all(function
+  | [A I] | [C _; A I] | [A(V _)] | [C _; A(V _)] -> true
+  |_->false)) |_->false
 
 
 (* Auxiliarity functions for general algebraic structures *)
@@ -195,7 +228,7 @@ let total_weight w weight = let rec recW i=i|>
   fold_left(fun sum op -> w#plus sum (match op with
     | C _ | A I -> w#o
     | A(V i) -> weight(`V i)
-    | A(T t) -> weight(`T t)
+    | A(T(t,_)) -> weight(`T t)
     | D i -> weight(`D i)
     | S i -> weight(`S i)
     | O f -> weight(`O f) (* sum' w (map(fun(n,fn)-> weight(`O(n,fn))) f) *)
@@ -231,7 +264,7 @@ and tiebreak_by weights = rev %%> lex_list(fun x y ->
     | D x, D y | S x, S y | XD x, XD y | A(V x), A(V y) -> compare x y
     | X x, X y -> compare_mono_by weights x y
     | O x, O y -> lex_list(compare_var *** compare_poly_by weights) x y
-    | A(T x), A(T y) -> Term.compare x y
+    | A(T(x,_)), A(T(y,_)) -> Term.compare x y
     | _ -> assert false (* If xw=yw, variant constructors of x,y must be equal and they are covered above. *))
 
 (* Assign this to set the global monomial order. Old polynomials become invalid when the order changes (because they are sorted by the monomial order) and must not be used afterwards. However polynomials stored in clauses can still be reretrieved (see poly_as_lit_term_id and poly_of_{lit,term,id}). The weights are effectively 0-extended and compared as “signed ordinals”. Trailing zeros do not matter.
@@ -267,7 +300,8 @@ let rec poly_eq p = CCList.equal mono_eq p
 and mono_eq m n = m==n or CCList.equal indet_eq m n
 and indet_eq x y = x==y or match x,y with
   | C a, C b -> Z.equal a b
-  | A(T t), A(T s) -> t==s
+  | A(T(t,tv)), A(T(s,sv)) -> t==s & if tv=sv then true else
+    failwith("Term "^ Term.to_string t ^" must not be associated with both variables ["^ concat_view "] and [" (CCList.to_string((-^)"")) [tv;sv] ^"]")
   | X f, X g -> mono_eq f g
   | O f, O g -> CCList.equal(CCPair.equal (=) poly_eq) f g
   | a, b -> a = b
@@ -280,8 +314,15 @@ and mono_hash ?(depth=2) = fold_left (fun h x -> 31*h + indet_hash ~depth x) 0
 and indet_hash ?(depth=2) = if depth=0 then ~=7 else function
   | X f -> mono_hash ~depth:(depth-1) f
   | O f -> fold_left (fun h (i,fi) -> bit_rotate_right i (h + poly_hash ~depth:(depth-1) fi)) 0 f
-  | A(T t) -> Term.hash t
+  | A(T(t,_)) -> Term.hash t
   | x -> Hashtbl.hash x
+
+(* Hash table with polynomial keys *)
+module Hashtable = Hashtbl.Make(struct
+  type t = poly
+  let equal = poly_eq
+  let hash p = poly_hash p
+end)
 
 (* Auxiliarity to below. Separate the predicated indeterminates to coefficient polynomials. Inverse is given by
 	p: (poly * op list)list ↦ p |> map(fun(c,m) -> c><[m]) |> fold_left(++)_0 *)
@@ -299,7 +340,7 @@ let lead_main_ops = snd % hd % mul_coef_view	(* e.g. [Y] from above *)
 (* Allows to compute e.g. ∑ₙᑉᵐ s.t. ∑ₙᑉᵐ(M·P) = -Pₘ + M·∑ₙᑉᵐP and ∑ₙᑉᵐ(N·P) = Pₘ - P₀ + ∑ₙᑉᵐP *)
 let rec fold_indeterminates a f = function
 | [] | [A I] -> a `I
-| [A(T t)] -> a(`T t)
+| [A(T(t,_))] -> a(`T t)
 | [A(V i)] -> a(`V i)
 | x::m -> f (fold_indeterminates a f m) [m] x (* x last => anonymous pattern match is possible *)
 
@@ -308,11 +349,12 @@ let rec fold_indeterminates a f = function
 
 (* TODO provide an association in an environment *)
 let var_name = string_part_at "y x v u t s r p o n m l k j i h e a"
+let var_of_name n = index_of' n (String.split_on_char ' '  "y x v u t s r p o n m l k j i h e a")
 (* Mostly Term.to_string but when polynomials are embedded into terms which are in turn embedded into polynomials, confusion could arise. Hence in one of these two embeddings the names have to be annotated.
  Currently I annotate at the embedding. This has the trade-off of making all polynomials in terms/clauses “ugly” but an embedded polynomial in a term in a polynomial does not need nested annotation. *)
 let term_name t = Term.to_string t
 
-(* E.g. ["-2x";"3y";"-4z"] becomes "-2x＋3y－4z". (On Ubuntu command line “＋” has width 2 which seems nice balance between 1 of “+” and 3 of “ + ”, some times.) *)
+(* E.g. ["-2x";"3y";"-4z"] becomes "-2x＋3y－4z". (The “＋” has width 2 (in my Ubuntu and Cygwin terminals) which seems nice balance between 1 of “+” and 3 of “ + ”, some times.) *)
 let concat_plus_minus view = function
 | [] -> "0"
 | m::p -> map view p
@@ -327,14 +369,14 @@ and poly_view_string p = mul_coef_view p |> concat_plus_minus(function
   | c, m -> "("^ poly_to_string c ^")"^ match mono_to_string m with "1"->"" | s->s)
 
 and mono_to_string m = group_succ ~eq:indet_eq m
-  |> concat_view "" (fun n -> indet_to_string(hd n) ^ match length n with 1->"" | l -> superscript(string_of_int l))
-  |> function ""->"1" | "-"->"-1" | "͘"->"1͘" | s->s
+  |> concat_view "" (fun n -> indet_to_string(hd n) ^ match length n with 1->"" | l -> superscript(""-^l))
+  |> function ""->"1" | "-"->"-1" | "͘"->"1͘" | "-͘"->"-1͘" | s->s
 
 and indet_to_string = function
 | C a -> (match Z.to_string a with "1"->assert false | "-1"->"-" | s->s)
 | A I -> "͘"
 | A(V i) -> var_name i
-| A(T t) -> term_name t
+| A(T(t,v)) -> term_name t ^ concat_view"" (subscript%var_name) v
 | D i -> subscript(var_name i)
 | XD i -> "ð"^subscript(var_name i)
 | S i -> "∑"^superscript(var_name i)
@@ -346,36 +388,50 @@ let pp_poly = to_formatter poly_to_string
 
 
 (* Embedding polynomials into terms
- Equality is not preserved! This embedding is a convenient point to make polynomials aware of the monomial order that is varied between computations. When a polynomial is retrieved from a clause, it is resorted to conform to the current order, if necessary. *)
+ Equality is preserved (at the cost of ever growing polynomial->id cache). This embedding is a convenient point to make polynomials aware of the monomial order that is varied between computations. When a polynomial is retrieved from a clause, it is resorted to conform to the current order, if necessary. *)
 
+let term_of_arg = function [[A(T(t,_))]] -> t | _->assert false
+(* List of argument term monomials that the given recurrence contains, without duplicates. *)
+let arg_terms_in =
+  sort_uniq~cmp:(term_of_arg %%> Term.compare)
+  % flat_map(fun m -> match rev m with (A(T _) as a)::_ -> [ [[a]] ] | _->[])
 (* List of terms that the given recurrence relates, without duplicates. *)
-let terms_in = sort_uniq ~cmp:Term.compare % flat_map(fun m -> match rev m with A(T t)::_->[t] | _->[])
+let terms_in = map term_of_arg % arg_terms_in
+
+let poly_id_cache = Hashtable.create 4
 
 let term0 = Term.const ~ty:term (ID.make "⬮")
 exception RepresentingPolynomial of poly * Precedence.Weight.t * (simple_indeterminate -> int list)
 
-(* Given polynomial P<>0, embed P into a fresh ID idP, that idP into a Term termP, and it into a literal term0≈termP. Return all three.
- ~name is the name given to the idP. If omitted, the name is (somewhat wastefully) taken to be the string representation of P, which is further annotated to support nesting the terms back into polynomials and into terms again.
- ~weight becomes the weight of idP in KBO. Default weight ω is large because the polynomial literals are expected to be the most expensive literals of a clause to process. Note: the weight assignment is separately informed about the embedded polynomials because the weight of an ID is not assigned on construction, and precedence is fixed at the same time. *)
+(* Given polynomial P!=0, embed P into an ID idP, that idP into a Term termP, and it into a literal term0≈termP. Return all three.
+ ~name is the name given to the idP, if fresh is created. If omitted, the name is (somewhat wastefully) taken to be the string representation of P, which is further annotated to support nesting the terms back into polynomials and into terms again.
+ ~weight becomes the weight of idP in KBO, if fresh idP is created. Default weight ω is large because the polynomial literals are expected to be the most expensive literals of a clause to process. Note: the weight assignment is separately informed about the embedded polynomials because the weight of an ID is not assigned on construction, and precedence is fixed at the same time. *)
 let poly_as_lit_term_id ?name ?(weight=omega) p =
-  let id = ID.make(name |> get_lazy(fun()->
-    (* Compute default name only if none is given. *)
-    let replace = fold_left (%) id % map(fun(old,by) -> global_replace (regexp old) by) in
-    let _name = poly_to_string p
-    |> replace ["＋","˖"; "－","−"; "-","−"] (* avoid ' ' around name *)
-    |> flip String.iter
-    (* |> Iter.filter(fun c -> not(mem c [' ';'(';')'])) *)
-    (* |> Iter.take 20 *)
-    (* I annotate by overlining here that has the benefit of not increasing visual length but the down side of being problematic to iterate. As all pretty-printing, this can be changed to fit other needs, should such arise. *)
-    |> Iter.to_string ~sep:"" (fun c ->
-      (if code c lsr 6 != 2 then "̅" else "") ^ String.make 1 c)
-    in String.sub (_name ^ "̅") 2 (String.length _name)))
+  let id = match Hashtable.find_opt poly_id_cache p with
+    | Some id -> id
+    | None -> let id =
+      ID.make(name |> get_lazy(fun()->
+      (* Compute default name only if none is given. *)
+      let replace = fold_left (%) id % map(fun(old,by) -> global_replace (regexp old) by) in
+      let _name = poly_to_string p
+      |> replace ["＋","˖"; "－","−"; "-","−"] (* avoid ' ' around name *)
+      |> flip String.iter
+      (* |> Iter.filter(fun c -> not(mem c [' ';'(';')'])) *)
+      (* |> Iter.take 20 *)
+      (* I annotate by overlining here that has the benefit of not increasing visual length but the down side of being problematic to iterate. As all pretty-printing, this can be changed to fit other needs, should such arise. *)
+      |> Iter.to_string ~sep:"" (fun c ->
+        (if code c lsr 6 != 2 then "̅" else "") ^ String.make 1 c)
+      |> replace["̅̅","̲"](*<-TODO fix this hack*)
+      in String.sub (_name ^ "̅") 2 (String.length _name)))
+    in
+    ID.set_payload id (RepresentingPolynomial(p, weight, !indeterminate_weights));
+    Hashtable.add poly_id_cache p id;
+    id
   in
-  ID.set_payload id (RepresentingPolynomial(p, weight, !indeterminate_weights));
   let term = Term.const ~ty:term id in
   Literal.mk_eq term0 term, term, id
 
-(* Includes semantics of 0 giving tautology unlike poly_as_lit_term_id. (Repeated calls still give incomparable literals.) *)
+(* Includes semantics of 0 giving tautology unlike poly_as_lit_term_id. *)
 let polyliteral p = if p = _0 then mk_tauto else (fun(l,_,_)->l) (poly_as_lit_term_id p)
 
 (* Retrieve polynomial that was embedded into an id by poly_as_lit_term_id (directly or indirectly). The retrieved polynomial conforms to the current monomial order. *)
@@ -392,13 +448,10 @@ let poly_of_id id = id |> ID.payload_find ~f:(fun data -> match data with
 (* Retrieve polynomial embedded into a term and make it conform to the current monomial order. See also of_term. *)
 let poly_of_term t = match view t with Const id -> poly_of_id id |_->None
 
-(* Polynomial representing the given term. If the term already embeds a polynomial, result is that embedded polynomial, in order to avoid multilayer embeddings. TODO we should not need 3 term->polynomial conversions! *)
-(* let of_term' t = get_or~default:[[A(T t)]] (poly_of_term t) *)
-
 (* Retrieve polynomial embedded into a literal and make it conform to the current monomial order. *)
 let poly_of_lit = function Equation(o,p,true) when o==term0 -> poly_of_term p |_->None
 
-(* Weight of polynomial id. Used when registering the extension in summation_equality.ml to update the weight assignment to be aware of the embedded polynomials. *)
+(* Weight of polynomial id. This is used when registering the extension in summation_equality.ml to update the weight assignment to be aware of the embedded polynomials. *)
 let polyweight_of_id = ID.payload_find ~f:(function RepresentingPolynomial(_,w,_) -> Some w |_->None)
 
 
@@ -448,10 +501,10 @@ and indeterminate_product x y =
   | x, C k -> [[y;x]]
   | D i, X f -> [[X f; D i]] ++ x_[f]
   | XD i, X f -> [[X f; XD i]] ++ x_[f]
-  | D i, O f -> (if mem_assq i f then f else (i,[[A(V i)]])::f) (* identity ∘'s in f are implicit *)
+  | D i, O f -> (if mem_assq i f then f else (i,[var_poly i])::f) (* identity ∘'s in f are implicit *)
     |> map(fun(n,fn)-> x_ fn >< [o f @[D n]]) (* coordinatewise chain rule *)
     |> fold_left (++) _0 (* sum *)
-  | XD i, O f -> fold_left(++)_0 (map(fun(n,fn)-> (todo"X fn⁻¹") >< x_ fn >< [o f @[XD n]]) (if mem_assq i f then f else (i,[[A(V i)]])::f)) (* like previous *)
+  | XD i, O f -> fold_left(++)_0 (map(fun(n,fn)-> (todo"X fn⁻¹") >< x_ fn >< [o f @[XD n]]) (if mem_assq i f then f else (i,[var_poly i])::f)) (* like previous *)
   | D i, XD j when i=j -> [[XD i; D i]; [D i]]
   | O f, X g -> x_[g] >< [[O f]]
   | X(S i ::f), S j when i=j -> let _Si_Xf = [[S i]]><mul_indet[f] in (_Si_Xf><[[S i]]) ++ [[S i; X(S i :: f)]] ++ _Si_Xf
@@ -463,13 +516,17 @@ and indeterminate_product x y =
   | O[i,[[C c; A I]]], S l when i=l -> Z.(if c < zero
     then map(fun n -> eval_at~var:i (of_int n + c)) (range' 0 (Stdlib.abs(to_int_exn c)))
     else map(fun n -> eval_at~var:i (of_int n)) (range' 0 (to_int_exn c)))
-  | O[i,[[A(V j)];[A I]]], O[l,[[A(V k)];[A I]]] when i=j & l=k & i>l -> [[y;x]] (* TODO composite case *)
+  | O[i,[[A(V j)];[A I]]], O[l,[[A(V k)];[A I]]] when i=j & l=k & i>l -> [[y;x]]
+  | O f, O g when is_multishift x & is_multishift y & rev_cmp_mono [x] [y] <0 -> [[y;x]]
+  | O f, O g when not(is_multishift x) -> [o(map(map_snd((><)[[x]]))(*∘f*)g @ filter(fun(i,_) -> not(mem i (map fst g)))(*implicit defaults*)f)]
   | D i, D l | XD i, XD l | S i, S l | X[A(V i)], X[A(V l)] when i>l -> [[y;x]]
   | X f, X g when rev_cmp_mono f g < 0 -> [[y;x]] (* Assumes commutative product! *)
   | X f, A _ when rev_cmp_mono f [y] < 0 -> mul_indet[[y]]><[f] (* Assumes commutative product! *)
   | D _, A I -> []
   | D i, A(V n) -> const_eq_poly Z.(if i=n then one else zero)
+  | O f, A I -> const_eq_poly Z.one
   | O f, A(V n) -> get_or~default:[[y]] (assq_opt n f)
+  | O f, A(T(_,v)) -> [o(filter(fun(i,_)-> mem i v) f) @ [y]] (* No recursive call to >< in order to avoid endless loop. *)
   | A _, A _ -> raise(Invalid_argument("indeterminate_product ("^ indet_to_string x ^") ("^ indet_to_string y ^")"))
   | A _, y -> [[y;x]] (* Push A from left to right. Caller must push A fully right before _,A multiplication! *)
   | x, y -> [[x;y]]
@@ -480,7 +537,8 @@ and eval_at ~var at = eval_at' ~var (const_eq_poly at)
 and o subst = match subst
   |> map(map_snd(fun p -> if equational p then p else p>< const_eq_poly Z.one))
   |> filter(function i,[[A(V j)]] -> i!=j | _-> true)
-with []->[] | s-> assert(for_all (equational%snd) s); [O s]
+  |> fun s-> sort_uniq~cmp:(fst %%> (-)) s, length s (* sort and check nonduplication *)
+with [],_->[] | s,l-> assert(for_all (equational%snd) s & l = length s); [O s]
 
 (* Does [[x;y]] represent x·y. Equivalently is x≯y in the internal indeterminate order. *)
 let join_normalizes x y = match x,y with
@@ -528,7 +586,7 @@ let (|~>) general special = match lead_unifiers general special with
 
 
 let superpose p p' = if p==p' then [] else
-  match lead_unifiers ~<p ~<p' with
+  match lead_unifiers p p' with
   | Some(u,u') -> [([u]><p) -- ([u']><p')]
   | None -> []
 
@@ -544,7 +602,7 @@ module LeadRewriteIndex(P: View with type v=poly) = FV_tree.FV_IDX(struct
   let compute_feature f p = match P.view p with Some p when p!=_0 -> Some(FV_tree.N(f p)) | _->None
 end)
 
-(* Features for a rewriting index testing various sums of operator degrees. Only for <>0 polynomials. *)
+(* Features for a rewriting index testing various sums of operator degrees. Only for !=0 polynomials. *)
 let default_features() = (* () because of type variables *)
   let sum value = sum_list % map value % hd in
   [(* TODO double check that these are correctly increasing *)
@@ -573,9 +631,11 @@ and free_variables p' = Int_set.(let rec monoFV = function
     (* Do operators make explicit all implicit dependencies in argument terms? If not, below is wrong! *)
     | A(V i) | S i | D i | XD i -> singleton i
     | X f -> monoFV f
-    | A(T t) -> map_or ~default:empty free_variables (poly_of_term t) (* TODO properly track variables of a term *)
+    | A(T(_,v)) -> of_list v (*map_or ~default:empty free_variables (poly_of_term t)*)
   ) in
   union_map monoFV p')
+
+let free_variables' = Int_set.to_list % free_variables
 
 (* Output ϱ,σ,raw. Renaming substitution indeterminate ϱ satisfies dom ϱ = vs\taken and img ϱ ∩ vs∪taken = ∅. Substitution indeterminate σ undoes ϱ meaning [σ]><[ϱ]><p = p if free_variables p ⊆ taken∪vs. Finally raw is the list of the variable pairs (vᵢ,uᵢ) that define σ:vᵢ↦uᵢ and ϱ:uᵢ↦vᵢ. *)
 let rename_apart ~taken vs = match Int_set.(
@@ -594,7 +654,7 @@ let view_affine f =
   try f|>map(fun(i,p) ->
     let put vs sh = (* i ↦ vs+sh = variable list + shift constant *)
       shift.(i) <- sh;
-      if vs<>[[A(V i)]] then (* identity variable mapping gets encoded by [||] always *)
+      if vs<>[var_poly i] then (* identity variable mapping gets encoded by [||] always *)
         matrix.(i) <- fold_left (fun row -> function
           | [A(V n)] -> row.(n) <- 1; row
           | [C a; A(V n)] -> row.(n) <- Z.to_int_exn a; row
@@ -618,21 +678,24 @@ let (@.) m (i,j) = if i >= Array.length m or m.(i)=[||] then if i=j then 1 else 
 (* The input function produces polynomials, and its mapped version is a homomorphism. *)
 let map_monomials f = fold_left (++) _0 % map f
 let map_indeterminates f = map_monomials(product % map f)
-let map_terms f = map_indeterminates(function A(T t) -> of_term(f t) | x -> [[x]])
+let map_terms ?(vars=id) f = map_indeterminates(function A(T(t,v)) -> of_term~vars:(vars v) (f t) | x -> [[x]])
+
+(* Replace every term that embeds some polynomial p by p if act_on p. *)
+let unembed act_on = map_indeterminates(function A(T(t,_)) as x -> (
+  match poly_of_term t with Some p when act_on p -> p
+| _ -> [[x]]) | x -> [[x]])
 
 (* Applicable after (mul_)coef_view. Pack separated (op list)'s into argument terms of polynomial except when they are already packed that way. *)
 let to_poly_poly: (poly * op list) list -> poly =
   fold_left (++) _0 % map(fun(coef, arg) -> coef >< match arg with
-    | [A(T t)] -> [arg]
+    | [A(T _)] -> [arg]
     | _ -> (* If arg is not term, pack it into such. Since the packing is not a true function, input is taken in the (poly * op list)list -form grouped by arg. *)
-      let _,t,_ = poly_as_lit_term_id [arg] in of_term t)
+      let _,t,_ = poly_as_lit_term_id [arg] in of_term~vars:(free_variables'[arg]) t)
 
 (* Turn general formula into a recurrence in operator polynomial representation by embedding other parts into argument terms. *)
 let oper_coef_view: poly -> poly = to_poly_poly % coef_view(function
   | C _ | X[A(V _)] -> true
-  | O f -> let var_or_const = function [A(V _)] | [A I] | [C _; A I] -> true | _ -> false
-    in for_all(for_all var_or_const) (map snd f)
-  | _ -> false)
+  | x -> is_multishift x)
 
 
 (* Parsing polynomials from strings—primarily for testing *)
@@ -657,6 +720,8 @@ let match_start(type r) ?(split=' ') patterns string =
   try apply_first rules with Result r -> r
 
 let testterms = map (Term.const ~ty:Type.term % ID.make) ["b";"c";"f";"g";"q";"z"]
+(* Usage example: Hashtbl.add "f" "xy" *)
+let variable_dependency = Hashtbl.create 6
 
 (* To generate test data. No multidigit numerals. Terms e.g. b,c,f,g and variables e.g. n,m,k,x,y (must be compatible with var_name). Examples:
   Xx+3x-2
@@ -703,6 +768,18 @@ and poly_of_mono_string base_rules s' = if s'="" then _0 (* neutral in splitting
   let map_start_factor rules = match_start (map (fun(p,f)-> p,
     fun i s -> f i >< if s="" then [[]] (* neutral in this recursion *) else poly_of_mono_string base_rules s
   ) rules) s' in
+  (* This split_string by GPT 3.5 is quite impressive, only the loop could be reversed, while web search came out empty handed. *)
+  let split_string str =
+    let rec aux i acc =
+      if i < String.length str then
+        aux (i + 1) ((String.sub str i 1) :: acc)
+      else
+        List.rev acc
+    in
+    aux 0 [] in
+  let embedded_term i =
+    let t = get_at_idx_exn i testterms in
+    of_term t ~vars:((map var_of_name %split_string %String.concat"" %Hashtbl.find_all variable_dependency %Term.to_string) t) in
   map_start_factor(base_rules@[
     ("y x v u t s r p o n m l k j i h e a",fun i->[[mul_var i]]);
     ("Y X V U T S R P O N M L K J I H E A",fun i->[[shift i]]);
@@ -711,6 +788,6 @@ and poly_of_mono_string base_rules s' = if s'="" then _0 (* neutral in splitting
     ("∂ d",fun i->[[D 1]]);
     ("0 1 2 3 4 5 6 7 8 9",fun i->const_op_poly(Z.of_int i));
     ("-",fun i->const_op_poly(Z.minus_one));
-    ("b c f g q z",fun i->of_term(get_at_idx_exn i testterms));
-    ("B C F G Q Z",fun i->mul_indet(of_term(get_at_idx_exn i testterms)));
+    ("b c f g q z",fun i->embedded_term i);
+    ("B C F G Q Z",fun i->mul_indet(embedded_term i));
   ])
