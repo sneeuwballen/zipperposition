@@ -631,7 +631,7 @@ let sine_axiom_selector
     map in
 
   let ids_to_defs_compute defs =
-    let rec aux map d = 
+    let aux map d = 
       let update_map map id stm =
         let prev = ID.Map.get_or ~default:InpStmSet.empty id map in
         ID.Map.add id (InpStmSet.add stm prev) map in
@@ -659,7 +659,7 @@ let sine_axiom_selector
 
 
   let categorize_formulas forms =
-    let rec do_categorize (defs, helpers, axioms, conjs) f =
+    let do_categorize (defs, helpers, axioms, conjs) f =
       match view f with 
       | Def _ | Rewrite _ -> (f::defs, helpers, axioms, conjs)
       | Assert _ -> (defs, helpers, f::axioms, conjs)

@@ -83,7 +83,7 @@ let weight_fun_of_prec ?(rank=None) ~symbols ~prec_fun =
   let w_tbl =
     ID.Set.to_list symbols
     (* inverse sorting, we want the number of *larger* symbols *)
-    |> List.sort (fun f g -> Precedence.Constr.compare_by prec_fun g f)
+    |> List.sort (fun f g -> Precedence.Constr.compare_by ~constr:prec_fun g f)
     |> CCList.foldi (fun tbl idx f -> 
         ID.Map.add f (symbol_to_rank idx) tbl) 
        ID.Map.empty in
