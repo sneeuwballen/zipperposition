@@ -11,10 +11,11 @@ jobs:
     strategy:
       matrix:
         #os: [macos-latest, ubuntu-latest, windows-latest]
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest]
         ocaml-compiler:
           - 4.08.x
           - 4.13.x
+          - 5.1.x
     steps:
     - uses: actions/checkout@v2
     - uses: ocaml/setup-ocaml@v2
