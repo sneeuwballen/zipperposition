@@ -197,7 +197,7 @@ let iterate ?(flex_same=false) ~scope ~counter u v l =
       )
   in
   (* The tuple `w` can be of any length. Hence we use the sequence [[alpha], [alpha, beta], [alpha, beta, gamma], ...] *)
-  let types_w_seq = OSeq.iterate [] (fun types_w -> Type.var (H.fresh_cnt ~counter ~ty:Type.tType ()) :: types_w) in
+  let types_w_seq = OSeq.iterate (fun types_w -> Type.var (H.fresh_cnt ~counter ~ty:Type.tType ()) :: types_w) [] in
   if OSeq.is_empty positions 
   then OSeq.empty
   else 

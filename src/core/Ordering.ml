@@ -300,7 +300,7 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
 
   (** Higher-order KBO *)
   exception UnsupportedTerm
-  let rec kbo ~prec t1 t2 =
+  let kbo ~prec t1 t2 =
     let balance = mk_balance t1 t2 in
     (** Update variable balance, weight balance, and check whether the term contains the fluid term s.
         @param pos stands for positive (is t the left term?)
