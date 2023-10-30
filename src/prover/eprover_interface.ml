@@ -57,7 +57,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let output_empty_conj ~out =
     Format.fprintf out "thf(conj,conjecture,($false))."
 
-  let rec encode_ty_args_t ~encoded_symbols t =
+  let encode_ty_args_t ~encoded_symbols t =
     let make_new_sym mono_head =
       if not (T.is_ground mono_head) then (
          let err = 

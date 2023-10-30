@@ -386,7 +386,7 @@ module Make(C : Clause_intf.S) = struct
             w_diff_l args1 args2
           | T.Fun(ty1, body1), T.Fun(ty2, body2) 
             when Type.equal ty1 ty2 && Type.equal (T.ty body1) (T.ty body2) ->
-            w_diff body1 body2
+            w_diff ~given_term:body1 ~conj_term:body2
           | _, _ -> 
             int_of_float (inst_penalty *. (w conj_term) +. gen_penalty *. (w given_term))
         and w_diff_l xs ys =

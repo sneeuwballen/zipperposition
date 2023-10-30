@@ -111,7 +111,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     (* create the structure *)
     let ord = Ctx.ord () in
     let max_lits = lazy ( BV.to_list @@ Lits.maxlits sclause.lits ~ord ) in
-    let rec c = {
+    let c = {
       sclause;
       penalty;
       selected;

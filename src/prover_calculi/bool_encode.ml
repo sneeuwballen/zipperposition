@@ -325,7 +325,7 @@ let bool_encode_lit lit =
     assert(T.equal (T.ty_exn true_term) (T.ty_exn encoded_atom));
     mk_equ_lit (bool_encode_term atom) true_term
   | Eq _ | Neq _ ->
-    SLiteral.map bool_encode_term lit
+    SLiteral.map ~f:bool_encode_term lit
 
 (** Encode a clause *)
 let bool_encode_lits lits = List.map bool_encode_lit lits
