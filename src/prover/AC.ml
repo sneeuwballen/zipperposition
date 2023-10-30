@@ -242,7 +242,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     )
 
   let register_ac c id ty =
-    add (C.proof_parent c) id ty
+    add ~proof:(C.proof_parent c) id ty
 
   let scan_clause c =
     let exception Fail in

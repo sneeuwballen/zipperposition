@@ -4,7 +4,7 @@ module Q = QCheck
 
 module M = Multiset.Make(struct
   type t = int
-  let compare i j=Pervasives.compare i j
+  let compare i j=Stdlib.compare i j
 end)
 
 (* for testing *)
@@ -146,7 +146,7 @@ let max_is_max =
   let gen = Q.(map M.of_list (list small_int)) in
   let gen = Q.set_print pp gen in
   let prop m =
-    let f x y = Comparison.of_total (Pervasives.compare x y) in
+    let f x y = Comparison.of_total (Stdlib.compare x y) in
     let l = M.max f m |> M.to_list |> List.map fst in
     List.for_all (fun x -> M.is_max f x m) l
   in

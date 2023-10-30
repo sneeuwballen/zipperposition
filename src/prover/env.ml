@@ -806,7 +806,7 @@ module Make(X : sig
       match rules with
       | [] -> None
       | r :: rs ->
-        CCOpt.or_lazy ~else_:(fun () -> apply_rules rs c) (r c) in
+        CCOpt.or_lazy ~else_:(fun () -> apply_rules ~rules:rs c) (r c) in
     
     let q = Queue.create () in
     Queue.add c q;

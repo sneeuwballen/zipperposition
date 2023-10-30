@@ -131,7 +131,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
       let arg_combinations = CCList.cartesian_product arg_ms in
       let arg_comb_num = List.fold_left (fun acc a -> acc * (List.length a)) 1 arg_ms in
-      let fun_table = CCArray.create arg_comb_num (List.hd ret_m) in
+      let fun_table = CCArray.make arg_comb_num (List.hd ret_m) in
 
       let iter_funs () = 
         let rec aux i k =

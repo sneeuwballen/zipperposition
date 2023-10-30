@@ -151,7 +151,7 @@ let rec app_encode_term toplevel t  =
 (** Encode a literal *)
 let app_encode_lit lit = 
   Util.debugf ~section 2 "# Encoding Literal %a" (fun k -> k (SLiteral.pp T.pp) lit);
-  SLiteral.map (app_encode_term true) lit
+  SLiteral.map ~f:(app_encode_term true) lit
 
 (** Encode a clause *)
 let app_encode_lits lits = List.map app_encode_lit lits
