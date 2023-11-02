@@ -1148,7 +1148,18 @@ module TPTP = struct
       | AppBuiltin (b,l) ->
         (* erasing types for TH0 *)
         let l = CCList.filter (fun t -> not (Type.is_tType (ty t))) l in
-        if CCList.is_empty l then Format.fprintf out "@[%a@]" Builtin.TPTP.pp b 
+        if CCList.is_empty l
+        then
+          (* Try to eta-expand one argument to clarify the types *)
+          match t.ty with
+          | NoType -> Format.fprintf out "@[%a@]" Builtin.TPTP.pp b 
+          | HasType ty ->
+            let (args, _) = T.open_fun ty in
+            match args with
+            | [] -> Format.fprintf out "@[%a@]" Builtin.TPTP.pp b 
+            | argty :: _ -> 
+              let argty = Type.of_term_unsafe (argty :> T.t) in
+              Format.fprintf out "@[(^[X : %a]: (%a) @@ X)@]" (Type.TPTP.pp_ho ~depth:!depth) argty Builtin.TPTP.pp b
         else (
           Format.fprintf out "(@[(%a) @@ %a@])" Builtin.TPTP.pp b (Util.pp_list ~sep:" @ " pp_enclosed) l
         )
