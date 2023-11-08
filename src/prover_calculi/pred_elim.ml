@@ -1070,7 +1070,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       _tracked := CS.add cl !_tracked;
     ) init_clauses;
 
-    CCFormat.printf "logic: %s@." (logic_to_str !_logic);
+    CCFormat.printf "%% logic: %s@." (logic_to_str !_logic);
 
     schedule_tasks ();
 
