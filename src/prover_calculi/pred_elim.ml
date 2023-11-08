@@ -1063,14 +1063,14 @@ module Make(E : Env.S) : S with module Env = E = struct
 
     let init_clause_num = List.length init_clauses in
 
-    CCFormat.printf "%% PE start: %d@." init_clause_num;
+    Util.debugf ~section 1 "%% PE start: %d@." (fun k -> k init_clause_num);
     
     List.iter (fun cl -> 
       scan_cl_lits cl;
       _tracked := CS.add cl !_tracked;
     ) init_clauses;
 
-    CCFormat.printf "logic: %s@." (logic_to_str !_logic);
+    Util.debugf ~section 1 "logic: %s@." (fun k -> k (logic_to_str !_logic));
 
     schedule_tasks ();
 
@@ -1105,7 +1105,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let clause_diff =
       init_clause_num -
       (Iter.length (Env.get_active ()) + Iter.length (Env.get_passive ())) in
-    CCFormat.printf "%% PE eliminated: %d@." clause_diff;
+    Util.debugf ~section 1 "%% PE eliminated: %d@." (fun k -> k clause_diff);
 
     if Env.flex_get k_inprocessing then (
       (* Env.Ctx.lost_completeness (); *)
@@ -1156,15 +1156,15 @@ module Make(E : Env.S) : S with module Env = E = struct
     );
 
     let ans = (do_pred_elim ()) in
-    CCFormat.printf "%% PE start fixpoint: @[%a@]@." (CCOpt.pp CCInt.pp) ans;
+    Util.debugf ~section 1 "%% PE start fixpoint: @[%a@]@." (fun k -> k (CCOpt.pp CCInt.pp) ans);
     Util.debugf ~section 2 "Clause number changed for %a" (fun k -> k (CCOpt.pp CCInt.pp) ans)
 
   let fixpoint_step () =
-    CCFormat.printf "relax val: %d@." (Env.flex_get k_relax_val);
+    Util.debugf ~section 1 "relax val: %d@." (fun k -> k (Env.flex_get k_relax_val));
     let ans = do_pred_elim () in
     Util.debugf ~section 1 "Clause number changed for %a" (fun k -> k (CCOpt.pp CCInt.pp) ans);
     if CCOpt.is_some ans then (
-      CCFormat.printf "%% PE fixpoint: %d@." (CCOpt.get_exn ans)
+      Util.debugf ~section 1 "%% PE fixpoint: %d@." (fun k -> k (CCOpt.get_exn ans))
     );
     CCOpt.is_some ans
   
