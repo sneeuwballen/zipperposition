@@ -1165,7 +1165,7 @@ module TPTP = struct
         Format.fprintf out "(@[<hv2>^[@[%a@]]:@ (@[%a@])@])"
           (Util.pp_list ~sep:"," pp_db) vars pp_rec bod;
         depth := old_d;
-      | Var i -> Format.fprintf out "X%d" (HVar.id i);
+      | Var i -> Format.fprintf out "%a" HVar.pp_tstp i
     and pp_enclosed out t =
       if Type.is_tType (ty t) then (
         let ty = Type.of_term_unsafe (t :> T.t) in

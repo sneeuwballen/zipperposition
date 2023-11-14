@@ -313,7 +313,7 @@ module TPTP = struct
     | Builtin Int -> CCFormat.string out "$int"
     | Builtin Rat -> CCFormat.string out "$rat"
     | Builtin Real -> CCFormat.string out "$real"
-    | Var v -> Format.fprintf out "X%d" (HVar.id v)
+    | Var v -> Format.fprintf out "%a" HVar.pp_tstp v
     | DB i -> Format.fprintf out "Tb%d" (depth-i-1)
     | App (p, []) -> ID.pp_tstp out p
     | App (p, args) ->
