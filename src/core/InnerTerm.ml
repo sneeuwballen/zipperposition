@@ -118,7 +118,7 @@ let[@inline] ty_exn t = match t.ty with
 
 let[@inline] hash t = Hash.int t.id
 let[@inline] equal : t -> t -> bool = fun t1 t2 -> t1 == t2
-let[@inline] compare t1 t2 = CCShims_.Stdlib.compare t1.id t2.id
+let[@inline] compare t1 t2 = Stdlib.compare t1.id t2.id
 
 let rec same_l_rec l1 l2 = match l1, l2 with
   | [], [] -> true

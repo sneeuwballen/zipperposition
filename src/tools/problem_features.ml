@@ -275,7 +275,7 @@ let cnf_features = ref true
 let options =
   [ "--cnf-features", Arg.Bool ((:=) cnf_features), " clausify the problem and include CNF features"] @
   Options.make ()
-  |> List.sort CCShims_.Stdlib.compare
+  |> List.sort Stdlib.compare
   |> Arg.align
 
 (* process the given file, converting it to CNF *)

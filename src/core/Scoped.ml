@@ -22,7 +22,7 @@ let map f (v,i) : _ t = (f v, i)
 let[@inline] equal eq (v1:_ t) (v2:_ t) : bool = scope v1 = scope v2 && eq (get v1) (get v2)
 let compare c v1 v2 =
   if scope v1 = scope v2 then c (get v1) (get v2)
-  else CCShims_.Stdlib.compare (scope v1) (scope v2)
+  else Stdlib.compare (scope v1) (scope v2)
 
 let hash f (v,sc) = Hash.combine2 (Hash.int sc) (f v)
 

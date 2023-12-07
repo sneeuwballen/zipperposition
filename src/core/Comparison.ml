@@ -8,7 +8,7 @@
 type t = Lt | Leq | Eq | Geq | Gt | Incomparable
 
 type comparison = t
-let equal : t -> t -> bool = CCShims_.Stdlib.(=)
+let equal : t -> t -> bool = Stdlib.(=)
 
 let to_string = function
   | Lt -> "<"

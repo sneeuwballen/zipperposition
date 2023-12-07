@@ -31,7 +31,7 @@ let make ~trail lits =
   { lits; trail; id; flags=0; }
 
 let[@inline] equal c1 c2 = c1.id = c2.id
-let[@inline] compare c1 c2 = CCShims_.Stdlib.compare c1.id c2.id
+let[@inline] compare c1 c2 = Stdlib.compare c1.id c2.id
 let[@inline] id c = c.id
 let[@inline] hash c = Hash.int c.id
 let[@inline] lits c = c.lits

@@ -14,7 +14,7 @@ let exists = Exists
 let lambda = Lambda
 let forall_ty = ForallTy
 
-let compare (a:t) b = CCShims_.Stdlib.compare a b
+let compare (a:t) b = Stdlib.compare a b
 let equal (a:t) b = a=b
 let hash (a:t) = Hashtbl.hash a
 

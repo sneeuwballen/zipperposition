@@ -26,7 +26,7 @@ let options =
   ; "--time-limit", Arg.Int Util.set_time_limit, " hard time limit (in s)"
   ; "--print-input", Arg.Set print_in, " print input problem"
   ] @ Options.make ()
-  |> List.sort CCShims_.Stdlib.compare
+  |> List.sort Stdlib.compare
   |> Arg.align
 
 let print_res (decls: _ CCVector.ro_vector) : unit =
