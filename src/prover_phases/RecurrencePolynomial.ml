@@ -23,6 +23,9 @@ let (|@) x must =
   let msg = Obj.(if tag(repr must)=string_tag then magic must else if magic must then "" else "ERROR") in
   if msg="" then x else(print_string Printexc.(raw_backtrace_to_string(get_callstack 999)^"\n\n\t"^msg^"   "^str x); exit 1)
 let todo msg = Obj.magic"T﻿O﻿D﻿O" |@ msg
+(* let invalid_argument msg = invalid_argument msg) *)
+let invalid_argument msg = Obj.magic"invalid_argument:" |@ msg
+let (=) x y = try x=y with Invalid_argument m -> invalid_argument m
 
 let (~=) x _ = x
 let (@@) = map_same
@@ -54,7 +57,7 @@ let length_lex_list c = (fun l -> length l, l) %%> (-) *** lex_list c
 let lex_array c = to_list %%> lex_list c
 let length_lex_array c = (fun l -> Array.length l, l) %%> (-) *** lex_array c
 
-let fold_left_1 f = function x::l -> fold_left f x l | _->raise(Invalid_argument "fold_left_1: empty list")
+let fold_left_1 f = function x::l -> fold_left f x l | _->invalid_argument "fold_left_1: empty list"
 let max_list ?(ord=compare) = fold_left_1(fun x y -> if ord x y < 0 then y else x) (* use e.g. max_list(⊥ :: ...) *)
 let min_list ?(ord=compare) = fold_left_1(fun x y -> if ord x y > 0 then y else x) (* use e.g. min_list(⊤ :: ...) *)
 let max_array ?(ord=compare) ?bottom l = max_list ~ord (CCOpt.to_list bottom @ to_list l)
@@ -62,12 +65,12 @@ let min_array ?(ord=compare) ?top l = min_list ~ord (CCOpt.to_list top @ to_list
 let sum_list = fold_left (+) 0
 let sum_array = Array.fold_left (+) 0
 let index_of p l = match find_idx p l with Some(i,_) -> i |_->
-  raise(Invalid_argument("index_of among "-^ length l))
+  invalid_argument("index_of among "-^ length l)
 let index_of' a l = match find_idx ((=)a) l with Some(i,_) -> i |_->
-  raise(Invalid_argument("index_of' among "-^ length l ^
+  invalid_argument("index_of' among "-^ length l ^
     let pp = atompp a in
     if pp == atomprinters 0 then ""
-    else ": "-^ a ^" ∉ ["^ concat_view"; " pp l ^"]"))
+    else ": "-^ a ^" ∉ ["^ concat_view"; " pp l ^"]")
 let with_cache_2 c f = curry(with_cache_rec c (uncurry % f % curry))
 let with_cache_3 c f = curry(with_cache_2 c (uncurry % f % curry))
 
@@ -78,7 +81,7 @@ let subscript = String.to_seq %> List.of_seq %> concat_view "" (fun c -> match c
   | '('->"₍" | ')'->"₎" | '+'->"₊" | '-'->"₋" | '='->"₌"
   | '0'..'9' -> string_part_at "₀ ₁ ₂ ₃ ₄ ₅ ₆ ₇ ₈ ₉" (code c - code '0')
   | 'a'..'y' -> string_part_at "ₐ ᵦ ᵪ ᵨ ₑ ᵩ ₔ ₕ ᵢ ⱼ ₖ ₗ ₘ ₙ ₒ ₚ ᵩ ᵣ ₛ ₜ ᵤ ᵥ ᵥᵥ ₓ ᵧ" (code c - code 'a')
-  | c -> raise(Invalid_argument("subscript: " ^ String.make 1 c ^ " has no subscript form assigned to it")))
+  | c -> invalid_argument("subscript: " ^ String.make 1 c ^ " has no subscript form assigned to it"))
 
 
 type var = int
@@ -94,6 +97,9 @@ and op =
 | S of var
 | X of op list (* never X(X p · q) or X(C p · q) or X(A I); always X(_@[A _]) *)
 | O of (var*poly)list
+
+let debug_poly_of_term = ref(Obj.magic())
+let debug_free_variables = ref(Obj.magic())
 
 (* Distinguish operator polynomials and recurrence equations: is A present in monomials or not. *)
 let equational = for_all(fun m -> m!=[] & match hd(rev m) with A _ -> true | C o -> is0 o | _ -> false)
@@ -113,7 +119,7 @@ let var_poly i = [A(V i)]
 let shift i = O[i,[var_poly i; [A I]]]
 let mul_var i = X(var_poly i)
 (* Embed term into polynomial argument. See also poly_of_term to reverse embedding of polynomial in a term. *)
-let of_term~vars t = [[A(T(t, sort_uniq~cmp:(-) vars))]]
+let of_term~vars t = [[A(T(t, sort_uniq~cmp:(-) vars)) |@ (match !debug_poly_of_term t with None->true|Some p-> !debug_free_variables p = vars)]]
 
 (* Distinguishes standard shift indeterminates from general substitutions. *)
 let is1shift = function O[i,[[A(V j)];[A I]]] -> i=j | _ -> false
@@ -447,6 +453,7 @@ let poly_of_id id = id |> ID.payload_find ~f:(fun data -> match data with
 
 (* Retrieve polynomial embedded into a term and make it conform to the current monomial order. See also of_term. *)
 let poly_of_term t = match view t with Const id -> poly_of_id id |_->None
+let _=debug_poly_of_term:=poly_of_term
 
 (* Retrieve polynomial embedded into a literal and make it conform to the current monomial order. *)
 let poly_of_lit = function Equation(o,p,true) when o==term0 -> poly_of_term p |_->None
@@ -527,7 +534,7 @@ and indeterminate_product x y =
   | O f, A I -> const_eq_poly Z.one
   | O f, A(V n) -> get_or~default:[[y]] (assq_opt n f)
   | O f, A(T(_,v)) -> [o(filter(fun(i,_)-> mem i v) f) @ [y]] (* No recursive call to >< in order to avoid endless loop. *)
-  | A _, A _ -> raise(Invalid_argument("indeterminate_product ("^ indet_to_string x ^") ("^ indet_to_string y ^")"))
+  | A _, A _ -> invalid_argument("indeterminate_product ("^ indet_to_string x ^") ("^ indet_to_string y ^")")
   | A _, y -> [[y;x]] (* Push A from left to right. Caller must push A fully right before _,A multiplication! *)
   | x, y -> [[x;y]]
 
@@ -636,6 +643,7 @@ and free_variables p' = Int_set.(let rec monoFV = function
   union_map monoFV p')
 
 let free_variables' = Int_set.to_list % free_variables
+let _=debug_free_variables:=free_variables'
 
 (* Output ϱ,σ,raw. Renaming substitution indeterminate ϱ satisfies dom ϱ = vs\taken and img ϱ ∩ vs∪taken = ∅. Substitution indeterminate σ undoes ϱ meaning [σ]><[ϱ]><p = p if free_variables p ⊆ taken∪vs. Finally raw is the list of the variable pairs (vᵢ,uᵢ) that define σ:vᵢ↦uᵢ and ϱ:uᵢ↦vᵢ. *)
 let rename_apart ~taken vs = match Int_set.(
@@ -654,7 +662,7 @@ let view_affine f =
   try f|>map(fun(i,p) ->
     let put vs sh = (* i ↦ vs+sh = variable list + shift constant *)
       shift.(i) <- sh;
-      if vs<>[var_poly i] then (* identity variable mapping gets encoded by [||] always *)
+      if not(vs=[var_poly i]) then (* identity variable mapping gets encoded by [||] always *)
         matrix.(i) <- fold_left (fun row -> function
           | [A(V n)] -> row.(n) <- 1; row
           | [C a; A(V n)] -> row.(n) <- Z.to_int_exn a; row
@@ -689,7 +697,7 @@ let unembed act_on = map_indeterminates(function A(T(t,_)) as x -> (
 let to_poly_poly: (poly * op list) list -> poly =
   fold_left (++) _0 % map(fun(coef, arg) -> coef >< match arg with
     | [A(T _)] -> [arg]
-    | _ -> (* If arg is not term, pack it into such. Since the packing is not a true function, input is taken in the (poly * op list)list -form grouped by arg. *)
+    | _ -> (* If arg is not term, pack it into such. Since the packing is not a true function (actually it now is but the equality enforcing cache might be reworked), input is taken in the (poly * op list)list -form grouped by arg. *)
       let _,t,_ = poly_as_lit_term_id [arg] in of_term~vars:(free_variables'[arg]) t)
 
 (* Turn general formula into a recurrence in operator polynomial representation by embedding other parts into argument terms. *)
@@ -711,15 +719,15 @@ let match_start(type r) ?(split=' ') patterns string =
   let exception Result of r in
   let rec apply_first = function
   (* Ocaml top-level (basic and utop) truncates error messages and it is not obvious how to avoid this. Hence to display important info from both of the long inputs, we manually truncate the matched string. This is unfortunate because without UTF-8 support, that we do not care to add as a dependency, the message easily ends up locally corrupted. *)
-  | [] -> raise(Invalid_argument String.(
-    "match_start: "^ sub string 0 (min (length string) (3 + max_list(List.map(length%fst) rules))) ^"... starts by none of patterns:\n"^ concat (make 1 split) (List.map fst rules)))
+  | [] -> invalid_argument String.(
+    "match_start: "^ sub string 0 (min (length string) (3 + max_list(List.map(length%fst) rules))) ^"... starts by none of patterns:\n"^ concat (make 1 split) (List.map fst rules))
   | (p,act)::rest -> match if_start p act string with
     | Some ok -> raise(Result ok)
     | None -> apply_first rest
   in
   try apply_first rules with Result r -> r
 
-let testterms = map (Term.const ~ty:Type.term % ID.make) ["b";"c";"f";"g";"q";"z"]
+let testterms = map (Term.const ~ty:Type.term % ID.make) ["b";"c";"f";"g";"q";"z";"γ";"δ";"λ";"φ";"ψ";"ω";"ξ"]
 (* Usage example: Hashtbl.add "f" "xy" *)
 let variable_dependency = Hashtbl.create 6
 
@@ -732,37 +740,39 @@ let variable_dependency = Hashtbl.create 6
   {ᵃₜb.Nb}{ᵉ2a}{ⁱ3e}{ʲ4i}{ᵏ5j}{ˡ1+k}{ᵐl+mn-2}
   {ⁿm-n}f + N{ˣm}∑ˣf
 *)
-[@@@warning "-14"](* Regular expressions depend on UTF-8 encoding—did not work?! *)
+[@@@warning "-14"](* Regular expressions depend on UTF-8 encoding—did not work => built it from character list. *)
 let rec poly_of_string s =
-  (* Workaround to add substitutions ({ᵛᵃʳpoly} == {var↦poly}) to unextensible setup: Replace {ᵛ...} by an encoding character c and add rule c->... for map_start_factor. *)
-  let delim = regexp(String.of_seq(to_seq['{';'.';'.';'[';chr 131;'-';chr 191;']';'?';'\\';'|';'}'])) in
+  (* Workaround to add substitutions ({ᵛᵃʳpoly} == {var↦poly}) to unextensible setup: Replace {ᵛ...} by an encoding character c and add rule c->... for map_start_factor. In Ocaml's regexp \| denotes alternatives while lonely | matches literal bar. Superscripts have UTF-8 length 2 or 3 bytes, and end-bytes are disjoint from start-bytes. *)
+  let delim = regexp("{..["^String.of_seq(to_seq[chr 131;'-';chr 191])^"]?\\|}") in
   let s', mapSubst = full_split delim s |> let rec packSubst = function
     | Delim"}" :: s' -> packSubst s'
     | Delim v :: Text p :: s' ->
       let r,m = packSubst s' in
       let codeSubst = String.make 1 (chr(length m)) in
-      if codeSubst=" " then raise(Failure("packSubst: Too many substitutions in "^s));
+      if codeSubst=" " then failwith("packSubst: Too many substitutions in "^s);
       codeSubst ^ r,
       (codeSubst, fun i->String.[o[index_of' (sub v 1 (length v - 1)) (split_on_char ' ' "ʸ ˣ ᵛ ᵘ ᵗ ˢ ʳ ᵖ ᵒ ⁿ ᵐ ˡ ᵏ ʲ ⁱ ʰ ᵉ ᵃ"), poly_of_string p]]) :: m
     | Text p :: s' -> map_fst((^)p) (packSubst s')
     | [] -> "",[]
-    | s' -> raise(Invalid_argument("packSubst: "^ to_string(function Text t | Delim t -> t) s' ^" is ill-formed in "^s))
+    | s' -> invalid_argument("packSubst: "^ to_string(function Text t | Delim t -> t) s' ^" is ill-formed in "^s)
   in packSubst in
   (* sanity check for operator vs. recurrence *)
   let check_mul_indet p = if equational p then mul_indet p else
-    raise(Invalid_argument("Operator polynomial " ^ poly_to_string p ^ " cannot become a multiplier indeterminate in " ^ s)) in
+    invalid_argument("Operator polynomial " ^ poly_to_string p ^ " cannot become a multiplier indeterminate in " ^ s) in
+  (* substitute string s onto every character c *)
   let replace c s = String.concat"" % map(fun a -> if a=c then s else String.make 1 a) % of_seq % String.to_seq in
+  (* convenience composition chain used twice right below *)
   let split_map_fold split fold mapper = String.split_on_char split %> map mapper %> fold_left_1 fold in
   let p = replace '-' "+-" s' |>
     split_map_fold '+' (++) (
       split_map_fold '.' (fun n m -> check_mul_indet n >< m)
-        (poly_of_mono_string mapSubst % replace ' ' "")) in
+        (poly_of_mono_string mapSubst % replace ' ' "" % replace '\t' "")) in
   (* Make argument A I explicit for C and X monomials if A _ appears in any monomial. *)
   let p_eq = filter((function A _ :: _ -> true | _ -> false) % rev) p in
   let p_CX = filter(for_all(function C _ | X _ -> true | _ -> false)) p in
   if p_eq=[] then p else
   if length p_eq + length p_CX = length p then p_eq ++ (p_CX><[[A I]])
-  else raise(Invalid_argument(poly_to_string p ^ " from " ^ s ^ " mixes operator and applied monomials"))
+  else invalid_argument(poly_to_string p ^ " from " ^ s ^ " mixes operator and applied monomials")
 
 and poly_of_mono_string base_rules s' = if s'="" then _0 (* neutral in splitting above *) else
   let map_start_factor rules = match_start (map (fun(p,f)-> p,
@@ -788,6 +798,6 @@ and poly_of_mono_string base_rules s' = if s'="" then _0 (* neutral in splitting
     ("∂ d",fun i->[[D 1]]);
     ("0 1 2 3 4 5 6 7 8 9",fun i->const_op_poly(Z.of_int i));
     ("-",fun i->const_op_poly(Z.minus_one));
-    ("b c f g q z",fun i->embedded_term i);
-    ("B C F G Q Z",fun i->mul_indet(embedded_term i));
+    ("b c f g q z γ δ λ φ ψ ω ξ",fun i->embedded_term i);
+    ("B C F G Q Z Γ Δ Λ Φ Ψ Ω Ξ",fun i->mul_indet(embedded_term i));
   ])
