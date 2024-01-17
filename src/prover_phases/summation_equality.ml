@@ -1,5 +1,4 @@
-(* open Batteries (* opam install batteries + edit src/core/dune *)
-*)[@@@warning "-10-20-21-26"](* Before final cleanup, tolerate unused values and definitions. *)
+[@@@warning "-10-20-21-26"](* Before final cleanup, tolerate unused values and definitions. *)
 open Logtk
 open Logtk_parsers
 open Logtk_proofs
@@ -9,6 +8,7 @@ open Libzipperposition_calculi
 open Phases_impl
 open Util
 open UntypedPrint
+open String
 open Precedence.Weight
 open Comparison
 open Literals
@@ -66,6 +66,13 @@ let search_hash ?(eq=(=)) table value = HS.fold (fun k v found -> if found=None 
 
 let with_cache_2 c f = curry(with_cache_rec c (uncurry % f % curry))
 let with_cache_3 c f = curry(with_cache_2 c (uncurry % f % curry))
+
+let ctrl_C_stoppable act =
+  Sys.catch_break true;
+  (try act() with
+  | Sys.Break -> ()
+  | Failure b when starts_with~prefix:"Stdlib.Sys.Break" b -> ());
+  Sys.catch_break false
 
 let get_clauses(type c)(module Env: Env.S with type C.t=c) = Iter.append (Env.get_active()) (Env.get_passive())
 
@@ -287,10 +294,19 @@ let rec propagate_recurrences_to f = match PolyMap.find_opt recurrence_table f w
   | [X q :: p] -> propagate_times [q] [p]
   | [S i :: p] -> propagate_sum i [p]
   | [O s :: p] -> propagate_subst s [p]
+  | [C _ :: p] -> propagate_const f
   | _ -> Iter.empty)
   in
   PolyMap.add recurrence_table f r;
   r
+
+and propagate_const f = match f with [R.C _ :: p] ->
+  let _,ft,_ = R.poly_as_lit_term_id f in
+  let _,pt,_ = R.poly_as_lit_term_id[p] (*essential to preserve equality here*) in
+  propagate_recurrences_to[p]
+  |> map(map_poly_in_clause R.(map_terms(fun t -> if t==pt then ft else t)))
+  |> Iter.of_list
+|_-> failwith("propagate_const: "^ R.poly_to_string f ^" should have been an explicit constant multiple of a monomial")
 
 and propagate_oper_affine p's_on_f's =
   let _,result,_ = R.poly_as_lit_term_id p's_on_f's in
@@ -335,10 +351,13 @@ and propagate_sum i f =
   |> Iter.map(map_poly_in_clause R.((><)[[S i]]))
   (* Replace each ∑ᵢf by the embedding sumf by rewriting with temporary polynomial ∑ᵢf-sumf. *)
   |> Iter.cons embed_sumf_rewriter
+  (* TODO “i” has this weight problem: sum = 2 > 1 = term, but ∑g > ∑̲∑̲g̲ *)
   |> saturate_with_order R.(elim_indeterminate(function`S _->2 |`T sum_f when sum_f == hd(terms_in sumf) -> 1 | _->0)) (* orient the rewriter but keep sumf leading for filtering *)
   |> Iter.filter((!=)embed_sumf_rewriter) (* perhaps filtered anyway in the end *)
   (* Add the definitional N∑ᑉⁿf = ∑ᑉⁿf + fₙ with sumf embedded while f is not. *)
   |> Iter.cons(definitional_poly_clause R.(([[shift i]]><sumf) -- sumf -- f))
+  |>Iter.persistent
+  |>(~<) (* see above to-do-note *)
   |> filter_recurrences_of R.[ [[S i]]><f ] (* recurrences of sumf, but the embedding level is weird *)
 
 and propagate_subst s f =
@@ -361,8 +380,10 @@ and propagate_subst s f =
       (* 𝕊ⱼ = ∏ᵢ Sᵢ^mᵢⱼ = O[0,m₀ⱼ;...;i,mᵢⱼ;...] where j runs over range and i over domain *)
       let ss_j = hd(o(on_dom(fun i -> i, [var_poly i]++const_eq_poly(Z.of_int(m@.(i,j)))))) in
       (* TODO Recurrence polynomial data structure needs an additional marker to distinguish compound shifts from ordinary ones in all corner cases including permutations.
-       We can tolerate a confusion between single and multi for a shift w.r.t. a new variable. This relaxation must be taken into account when transforming multishifts to 1-shifts. *)
-      if Int_set.mem j dom & is1shift ss_j then failwith("Unimplemented: "^ string_of_int j^"ᵗʰ compound shift cannot be distinguished from 1-shift when propagating to substitution "^ poly_to_string[o s] ^" of "^ poly_to_string f);
+       We can tolerate a confusion between single and multi for a shift w.r.t. a new variable. This relaxation is good to keep in mind when transforming multishifts to 1-shifts. *)
+      let ss_j = if not(is1shift ss_j) then ss_j
+        else if not(Int_set.mem j dom) then shift j (* use final form immediately *)
+        else failwith("Unimplemented: "^ string_of_int j^"ᵗʰ compound shift cannot be distinguished from 1-shift when propagating to substitution "^ poly_to_string[o s] ^" of "^ poly_to_string f) in
       let eq_j = product(on_dom(fun i -> pow' poly_alg [[shift i]] (max 0 (m@.(i,j)))))
         -- product([[ss_j]] :: on_dom(fun i -> pow' poly_alg [[shift i]] (- min 0 (m@.(i,j))))) in
       ((ss_j, shift j), j), eq_j
@@ -396,7 +417,7 @@ and propagate_subst s f =
           (* Replace Mᵢ=X[A(V i)] by ∑ⱼmᵢⱼMⱼ. *)
           | X[A(V i)] -> fold_left (++) _0 (map(fun j -> const_op_poly(Z.of_int(m@.(i,j))) >< [[mul_var j]]) (Int_set.to_list(R.rangeO s)))
           (* Discard clauses still containing shifts that were to be eliminated. Since elimIndices ⊆ dom, we keep shifts of new variables that the below case interpretates as multishifts. *)
-          | O[i,[[A(V j)];[A I]]] when i=j & Int_set.mem i elimIndices -> raise Exit
+          | O[i,[[A(V j)];[A I]]]as x when i=j & Int_set.mem i elimIndices -> raise Exit
           (* Replace 𝕊ⱼ by Sⱼ by looking it up from multishifts_and_equations. *)
           | O _ as x -> [[get_or~default:x (CCList.assoc_opt ~eq:indet_eq x (map(fst%fst) multishifts_and_equations))]]
           | _ -> raise Exit
@@ -454,21 +475,22 @@ let sum_equality_inference clause = try
     "Q{ⁿm}z	- {ⁿx+1}∑ⁿC{ˣx-n}q	";(*5 Stirling *)
     "{ˣx+y}{ⁿm}z	- {ⁿm+1}∑ⁿBZ{ˣy}{ⁿm-n}z	";(*6 binomial *)
     "{ᵐn+1}f	- {ᵐn+1}∑ᵐ{ⁿn-m}b	";(*7 Fibonacci *)
-    "γ	- {ˣm}∑ˣ{ᵐm-1-x}g	";(*8 presented*)
+    "γ	- {ˣm}∑ˣ{ᵐm-1-x}g	";(*8 presented *)
+    "0	- ∑ⁿ∑ᵐg	";(*9 debug *)
   |]in(*
     (p,)r,e: ✓
     i: miss
-    S: loop final
-    c,b,F,A: cmp abstract with bₘₙ
+    F: leviää jo {ᵐn+1}fₘ kohdalla
+    c,b,A,S: leviää etenkin bₘₙ kanssa, ja useille sijoituksille jää kaavoja löytymättä
   *)
   let rec go() =
     print_string"tutki: ";
-    (* PolyMap.clear recurrence_table; *)
     init_rec_table();
     let p = (!)tests.(read_int()) in
     print_endline("Tutkitaan " ^ R.poly_to_string p);
-    propagate_recurrences_to p;
-    ~<recurrence_table;
+    ctrl_C_stoppable(fun()->
+      propagate_recurrences_to p;
+      ~<recurrence_table;());
     go()
   in go();
   exit 1;
@@ -497,13 +519,12 @@ let sum_equality_inference clause = try
   ];
   exit 1
   (* tl(tl[clause;clause]) *)
-with Failure x -> print_endline x; exit 1
+with e -> print_endline Printexc.((*get_backtrace() ^"\n"^ *)match e with Failure m -> m | e -> to_string e); exit 1
 
 
 (* Setup to do when MakeSumSolver(...) is called. *);;
 MainEnv.add_unary_inf "recurrences for ∑" sum_equality_inference
 end
-
 
 (* Is this extension enabled? Set by a command line option. *)
 let sum_by_recurrences = ref false

@@ -568,7 +568,8 @@ let product = fold_left (><) (const_op_poly Z.one)
 let rec unifiers m' n' =
   (* Input is reversed for matching but output is in standard writing order. *)
   let rec loop = function
-  | [C a], [C b] -> Z.(let g = gcd a b in [C(div b g)], [C(div a g)])
+  (* We demand m'!=0!=n'. This together with exactness of divisions below guarantees that hd succeeds. *)
+  | [C a], [C b] -> Z.(fun a_b -> hd(const_op_poly(div a_b (gcd a b)))) @@ (a,b)
   | m, ([] | [C _] as n) -> n, rev m
   | x::m, x'::n when indet_eq x x' -> loop(m,n)
   | x::m, y::n when join_normalizes x y ->
@@ -587,7 +588,7 @@ let (|~>) general special = match lead_unifiers general special with
 | Some(u, []) -> Some u
 | Some(u, [C __1]) when Z.(equal __1 minus_one) -> Some(__1*.u)
 (* Only reduce the absolute value of the leading coefficient. This is symmetric w.r.t. 0 so a/b rounds correctly towards 0. *)
-| Some(C a :: u, [C b]) when Z.(abs a > abs b) -> Some Z.(div a b *.u)
+| Some(C a :: u, [C b]) when Z.(gt (abs a) (abs b)) -> Some Z.(div a b *.u)
 (* TODO is the converse when u=[] necessary to handle? *)
 | _ -> None
 
@@ -604,7 +605,7 @@ module type View = sig type t type v val view: t -> v option end
 (* Create index from mapping clause->polynomial, that can be instantiated by empty_with' default_features. *)
 module LeadRewriteIndex(P: View with type v=poly) = FV_tree.FV_IDX(struct
   type t = P.t
-  let compare = P.view %%> Stdlib.compare (* only used by sets *)
+  let compare = P.view %%> CCOpt.compare(compare_poly_by~=[]) (* only used by sets *)
   type feature_func = poly -> int
   let compute_feature f p = match P.view p with Some p when p!=_0 -> Some(FV_tree.N(f p)) | _->None
 end)

@@ -12,7 +12,7 @@ open CCFun
 (* Self-debugging
 Note: to use debug_has_type you must prevent cyclic dependency between this file and the file you debug. Temporarily moving registration of printers from this file to a new file offers a possible solution. *)
 
-let debug_typing_fail = ref `Off
+let debug_typing_fail = Printexc.record_backtrace true; ref `Off
 (* The root type test combinators are annotated by this to record their last failure. *)
 let debug_root x b = Printexc.(if not b then match !debug_typing_fail with 
   |`At(_,tr0)->
