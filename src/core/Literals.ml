@@ -280,7 +280,7 @@ module Conv = struct
                    |> CCList.map (fun v -> T.Conv.to_simple_term ctx (T.var v))  in
         let disjuncts =
           match or_args with
-          | [] -> assert false
+          | [] -> TypedSTerm.app_builtin ~ty Builtin.false_ []
           | [disj] -> disj
           | _ -> TypedSTerm.app_builtin ~ty Builtin.or_ or_args in
         TypedSTerm.close_with_vars vars disjuncts
