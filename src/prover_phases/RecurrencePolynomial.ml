@@ -92,9 +92,9 @@ type poly = op list list
 and op =
 | C of Z.t (* never C 1; unique if present *)
 | A of atom (* unique and last in a monomial if present *)
+| S of var
 | D of var
 | XD of var
-| S of var
 | X of op list (* never X(X p · q) or X(C p · q) or X(A I); always X(_@[A _]) *)
 | O of (var*poly)list
 
@@ -215,8 +215,6 @@ end
 
 (* From ordered group of {r₀,r₁,r₂,...} form ordered group of pseudo-ordinals r₀+r₁ω+r₂ω²+...+rₙωⁿ represented by lists [r₀;...;rₙ]. Here ω is an infinitely large element. The results are never of the form [...;0] but inputs may be. *)
 let infinities r : 'r list ord_group =
-  (* let with_same_size f = pad_tail r#o %>> uncurry f in
-  let map2_trim f = with_same_size(map2 f) %>> trim_tail(equal' r r#o) in *)
   let map2_trim f = pad_tail r#o %>> uncurry(map2 f) %>> trim_tail(is0' r) in
   object
     method compare = rev%trim_head(is0' r) %%> length_lex_list r#compare
@@ -255,9 +253,10 @@ let indeterminate_shape = function C _->`C | S _->`S | D _->`D | XD _->`XD | O _
 (* Monomial and other orders
 TODO What nonstandard invariants the order must satisfy? At least the C(oefficient)s must contribute last because ++ changes them while linearly merging monomial lists instead of full resorting. *)
 
-(* This implements monomial orders and is parameterized by weights of (simple) indeterminates. (The functions compare_poly_by and tiebreak_by are merely mutually recursive helpers.) Usage interface is provided by rev_cmp_mono and the stateful indeterminate_weights. *)
+(* This implements monomial orders and is parameterized by weights of (simple) indeterminates. (The functions compare_poly_by and tiebreak_by are merely mutually recursive helpers. Parameter weights receives the measured monomial as a context for unplanned corner cases.) Usage interface is provided by rev_cmp_mono and the stateful indeterminate_weights. *)
 let rec compare_mono_by weights = dup %%>
-  (total_weight(infinities int_alg) weights %%> compare_later_dominant)
+  let sum_weight m = total_weight(infinities int_alg) (weights m) m in
+  (sum_weight %%> compare_later_dominant)
   *** tiebreak_by weights
 
 and compare_poly_by weights = lex_list(compare_mono_by weights)
@@ -276,7 +275,7 @@ and tiebreak_by weights = rev %%> lex_list(fun x y ->
 (* Assign this to set the global monomial order. Old polynomials become invalid when the order changes (because they are sorted by the monomial order) and must not be used afterwards. However polynomials stored in clauses can still be reretrieved (see poly_as_lit_term_id and poly_of_{lit,term,id}). The weights are effectively 0-extended and compared as “signed ordinals”. Trailing zeros do not matter.
  Desing: A global switch like this has natural drawbacks. Namely we cannot abstract polynomials computations over the order which prevents e.g. parallelization and pause-resume constructs. This could become an issue with infinitely branching inferences. However the global reference is much simpler to use because otherwise all abstractions on top of polynomial arithmetic would have to take the order as paramters either explicitly or as part of module construction. 
  To define a weight function see elim_oper_args and elim_indeterminate. *)
-let indeterminate_weights: (simple_indeterminate -> int list) ref = ref~=[]
+let indeterminate_weights: (op list -> simple_indeterminate -> int list) ref = ref ~= ~=[]
 
 (* The main interface to monomial orders, conveniently reversed for sorting maximal monomial first. *)
 let rev_cmp_mono n m = compare_mono_by !indeterminate_weights m n (* Keep parameters to reread indeterminate_weights! *)
@@ -285,12 +284,13 @@ let sort_poly: poly->poly = sort rev_cmp_mono
 (* Some indeterminate weights for common elimination operations *)
 
 (* An elimination priority to certain argument terms. For example: elim_oper_args[t,2; s,1; r,1] to eliminate terms t,s,r with priority among them in t. *)
-let elim_oper_args term_weight_list : simple_indeterminate -> int list = function
+let elim_oper_args term_weight_list _ : simple_indeterminate -> int list = function
 |`T t -> cons_maybe (assq_opt t term_weight_list) []
 | _ -> []
 
+let elim_indeterminate' weight _ : simple_indeterminate -> int list = weight
 (* An elimination priority to certain indeterminates. This legacy function now almost directly delegates to its weighting parameter. *)
-let elim_indeterminate weight : simple_indeterminate -> int list = fun x -> [weight x]
+let elim_indeterminate weight _ : simple_indeterminate -> int list = fun x -> [weight x]
 
 
 (* Use this instead of the X constructor. *)
@@ -342,6 +342,12 @@ let coef_view part_of_coef : poly -> (poly * op list) list =
 let mul_coef_view = coef_view(function C _ | X _ -> true | _ -> false)
 let lead_coef = fst % hd % mul_coef_view	(* e.g. 2y+4 from above *)
 let lead_main_ops = snd % hd % mul_coef_view	(* e.g. [Y] from above *)
+
+let rec const_mono = function
+| [] -> Z.zero
+| [[]] | [[A I]] -> Z.one
+| [[C n]] | [[C n; A I]] -> n
+| _::p -> const_mono p
 
 (* Allows to compute e.g. ∑ₙᑉᵐ s.t. ∑ₙᑉᵐ(M·P) = -Pₘ + M·∑ₙᑉᵐP and ∑ₙᑉᵐ(N·P) = Pₘ - P₀ + ∑ₙᑉᵐP *)
 let rec fold_indeterminates a f = function
@@ -407,7 +413,7 @@ let terms_in = map term_of_arg % arg_terms_in
 let poly_id_cache = Hashtable.create 4
 
 let term0 = Term.const ~ty:term (ID.make "⬮")
-exception RepresentingPolynomial of poly * Precedence.Weight.t * (simple_indeterminate -> int list)
+exception RepresentingPolynomial of poly * Precedence.Weight.t * (op list -> simple_indeterminate -> int list)
 
 (* Given polynomial P!=0, embed P into an ID idP, that idP into a Term termP, and it into a literal term0≈termP. Return all three.
  ~name is the name given to the idP, if fresh is created. If omitted, the name is (somewhat wastefully) taken to be the string representation of P, which is further annotated to support nesting the terms back into polynomials and into terms again.
@@ -515,7 +521,8 @@ and indeterminate_product x y =
   | D i, XD j when i=j -> [[XD i; D i]; [D i]]
   | O f, X g -> x_[g] >< [[O f]]
   | X(S i ::f), S j when i=j -> let _Si_Xf = [[S i]]><mul_indet[f] in (_Si_Xf><[[S i]]) ++ [[S i; X(S i :: f)]] ++ _Si_Xf
-  | O[i,[[A(V j)];[A I]]], S l when i=j&i=l -> [[S i]; []]
+  | O[i,f], S j when i=j -> let c = const_mono f in map((@)(o[i,f--const_eq_poly c])) ([[S i]] ++ const_op_poly c)
+  (* | O f, S i -> [o(filter((=)i % fst) f)] >< S i >< [o(filter((!=)i % fst) f)] (* TODO swap's semantics *) *)
   | S l, O[i,[[A(V j)];[A I]]] when i=j&i=l -> [[S i]; C Z.minus_one :: eval_at Z.zero ~var:i; []]
   | S l, O[i,[[A(V j)];[A I]]] when i=j -> [[y;x]]
   | S l, (X[A(V i)] | D i | XD i) when l!=i -> [[y;x]]
@@ -595,17 +602,17 @@ let (|~>) general special = match lead_unifiers general special with
 
 let superpose p p' = if p==p' then [] else
   match lead_unifiers p p' with
-  | Some(u,u') -> [([u]><p) -- ([u']><p')]
+  | Some(u,u') -> ["p̲p̲."|<([u]><p) -- ([u']><p')]
   | None -> []
 
-let leadrewrite r p = CCOpt.map(fun u -> p -- ([u]><r)) (r |~> p)
+let leadrewrite r p = CCOpt.map(fun u -> "rw."^str r^"\n"|<p -- ([u]><r)) (r |~> p)
 
 
 module type View = sig type t type v val view: t -> v option end
 (* Create index from mapping clause->polynomial, that can be instantiated by empty_with' default_features. *)
 module LeadRewriteIndex(P: View with type v=poly) = FV_tree.FV_IDX(struct
   type t = P.t
-  let compare = P.view %%> CCOpt.compare(compare_poly_by~=[]) (* only used by sets *)
+  let compare = P.view %%> CCOpt.compare(compare_poly_by~= ~=[]) (* only used by sets *)
   type feature_func = poly -> int
   let compute_feature f p = match P.view p with Some p when p!=_0 -> Some(FV_tree.N(f p)) | _->None
 end)
@@ -684,10 +691,16 @@ let (@.) m (i,j) = if i >= Array.length m or m.(i)=[||] then if i=j then 1 else 
   else try m.(i).(j) with Invalid_argument(*"index out of bounds"*)_ -> 0
 
 
-(* The input function produces polynomials, and its mapped version is a homomorphism. *)
+(* The input function produces polynomials, and its mapped version is linear. *)
 let map_monomials f = fold_left (++) _0 % map f
 let map_indeterminates f = map_monomials(product % map f)
 let map_terms ?(vars=id) f = map_indeterminates(function A(T(t,v)) -> of_term~vars:(vars v) (f t) | x -> [[x]])
+(* Like map_indeterminates but can stop mapping early. Input: f (rest of monomial) (its outermost indeterminate) -> (`Go/`End, polynomial into product) *)
+let map_outer_indeterminates f = map_monomials(let rec loop_f m = match m with
+  | [] -> assert false (* no 0 terms in polynomials, and below recursion structure prevents the empty case *)
+  | [x] -> snd(f m x)
+  | x::n -> match f m x with `End,p -> p | `Go,p -> p >< loop_f n
+in loop_f)
 
 (* Replace every term that embeds some polynomial p by p if act_on p. *)
 let unembed act_on = map_indeterminates(function A(T(t,_)) as x -> (

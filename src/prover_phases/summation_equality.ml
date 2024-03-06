@@ -347,17 +347,15 @@ and propagate_sum i f =
   let _,f_term,_ = R.poly_as_lit_term_id f in
   let embed_sumf_rewriter = definitional_poly_clause R.(([[S i]]>< of_term~vars:(free_variables' f) f_term) -- sumf) in
   Iter.of_list(propagate_recurrences_to f)
-  |> saturate_with_order sum_blocker
+  |> saturate_with_order(R.elim_indeterminate' sum_blocker)
   |> Iter.map(map_poly_in_clause R.((><)[[S i]]))
   (* Replace each ∑ᵢf by the embedding sumf by rewriting with temporary polynomial ∑ᵢf-sumf. *)
   |> Iter.cons embed_sumf_rewriter
-  (* TODO “i” has this weight problem: sum = 2 > 1 = term, but ∑g > ∑̲∑̲g̲ *)
-  |> saturate_with_order R.(elim_indeterminate(function`S _->2 |`T sum_f when sum_f == hd(terms_in sumf) -> 1 | _->0)) (* orient the rewriter but keep sumf leading for filtering *)
+  (* We orient the rewriteter while keeping sumf leading for filtering. Hence we need W ∑ᵢ + W f > W sumf, but at the same time sumf must dominate arbitrarily deep ∑'s in excess terms as well as substitutions of f. *)
+  |> saturate_with_order(R.elim_indeterminate'(function`S _->[2] |`T sum'f when sum'f==hd(R.terms_in sumf) -> [2;1] |`T f' when f'==f_term -> [1;1] | _->[]))
   |> Iter.filter((!=)embed_sumf_rewriter) (* perhaps filtered anyway in the end *)
   (* Add the definitional N∑ᑉⁿf = ∑ᑉⁿf + fₙ with sumf embedded while f is not. *)
   |> Iter.cons(definitional_poly_clause R.(([[shift i]]><sumf) -- sumf -- f))
-  |>Iter.persistent
-  |>(~<) (* see above to-do-note *)
   |> filter_recurrences_of R.[ [[S i]]><f ] (* recurrences of sumf, but the embedding level is weird *)
 
 and propagate_subst s f =
@@ -389,40 +387,51 @@ and propagate_subst s f =
       ((ss_j, shift j), j), eq_j
     ) in
     (* We must eliminate all domain shifts except ones skipped above: dom\( rangeO s \ {j | ∃ ss_j} ) *)
-    let elimIndices = Int_set.(diff dom (diff (R.rangeO s) (of_list(List.map(function((_,j),_)->j) multishifts_and_equations)))) in
-    (* Clause prosessing chain: to f's recurrences, add 𝕊=∏S, eliminate S, push ∘s i.e. map 𝕊ⱼ↦Sⱼ, and filter *)
+    let elimIndices = Int_set.(diff dom (diff (R.rangeO s) (of_list(List.map(snd%fst) multishifts_and_equations)))) in
+    (* * * * Clause prosessing chain: to f's recurrences, add 𝕊=∏S, eliminate S, push ∘s i.e. map 𝕊ⱼ↦Sⱼ, and filter *)
     Iter.of_list(propagate_recurrences_to f)
     |> Iter.append(Iter.of_list(map (definitional_poly_clause % snd) multishifts_and_equations))
-    |> saturate_with_order(R.elim_indeterminate(function
-      |`O[i,R.[[A I]]] -> if Int_set.mem i elimIndices then 1 else 0
-      | _ -> 0))
+    |> saturate_with_order(fun m' -> function
+      |`O[i,R.[[A(V j)];[A I]]] when i=j & Int_set.mem i elimIndices ->
+        (* Eliminate 1-shifts ...except that multishift could be simplified to 1-shift in case an excess argument term does not depend on some of the multishifted variables—a valid result of such simplification won't be penaliced. *)
+        if multishifts_and_equations |> exists R.(function(((O ss,_),_),_)-> (* ∃𝕊 *)
+          Int_set.(match assq_opt i ss with Some[[A(V j)];[A I]] when i=j -> (* 𝕊i = i+1 *)
+            equal (of_list[i]) (inter (free_variables[m']) (of_list(List.map fst ss))) (* Sᵢ goes as well *)
+          |_->false) |_->false)
+        then [] else [1]
+      | _ -> [])
+    |>(|<)"kylläinen"
     |> Iter.filter_map(fun c -> try Some(c |> map_poly_in_clause R.(fun p ->
       let cache_t_to_st = HT.create 4 in
       let p = if equational p then p else p>< of_term~vars:(free_variables' f) f_term in
       p |> map_monomials(fun m' -> [m']|>
-        (* If the substitution does not change variables in the monomial m, then m can be kept as is even if m contains shifts that were to be eliminated. This is not robust because generally the essence is that m is constant (or even satisfies more recurrences compared to f) w.r.t. some variables, while the effect of the substitution plays no rôle. *)
+        (* If the substitution does not change variables in the monomial m, then m can be kept as is, even if m contains shifts that were to be eliminated. This is not robust because generally the essence is that m is constant (or even satisfies more recurrences compared to f) w.r.t. some variables, while the effect of the substitution plays no rôle. *)
         if Int_set.inter effect_dom (free_variables[m']) = Int_set.empty then id
-        else map_indeterminates(let rec transf = function
-          | C a -> const_op_poly a
+        else map_outer_indeterminates(let rec transf upcoming = function
+          | C a -> `Go, const_op_poly a
           (* Apply substitution to terminal indeterminates. *)
-          | A I -> const_eq_poly Z.one
-          | A(V i) as x -> transf(hd(hd(mul_indet[[x]]))) >< const_eq_poly Z.one
-          | A(T(f',vars)) when CCOpt.equal poly_eq (Some f) (poly_of_term f') -> of_term~vars:(free_variables'(get_exn(poly_of_term sf_term))) sf_term
-          | A(T(t,vars)) when HT.mem cache_t_to_st t -> HT.find cache_t_to_st t
+          | A I -> `Go, const_eq_poly Z.one
+          | A(V i) as x -> CCPair.map_snd((><)(const_eq_poly Z.one)) (transf upcoming (hd(hd(mul_indet[[x]]))))
+          | A(T(f',vars)) when CCOpt.equal poly_eq (Some f) (poly_of_term f') -> `Go, of_term~vars:(free_variables'(get_exn(poly_of_term sf_term))) sf_term
+          | A(T(t,vars)) when HT.mem cache_t_to_st t -> `Go, HT.find cache_t_to_st t
           | A(T(t,vars)) ->
             let st_poly = [o s] >< get_or~default:(of_term~vars t) (poly_of_term t) in
             let _,st,_ = poly_as_lit_term_id st_poly in
             let st = of_term~vars:(free_variables' st_poly) st in
-            HT.add cache_t_to_st t st; st
+            HT.add cache_t_to_st t st; `Go,st
           (* Replace Mᵢ=X[A(V i)] by ∑ⱼmᵢⱼMⱼ. *)
-          | X[A(V i)] -> fold_left (++) _0 (map(fun j -> const_op_poly(Z.of_int(m@.(i,j))) >< [[mul_var j]]) (Int_set.to_list(R.rangeO s)))
-          (* Discard clauses still containing shifts that were to be eliminated. Since elimIndices ⊆ dom, we keep shifts of new variables that the below case interpretates as multishifts. *)
+          | X[A(V i)] -> `Go, fold_left (++) _0 (map(fun j -> const_op_poly(Z.of_int(m@.(i,j))) >< [[mul_var j]]) (Int_set.to_list(rangeO s)))
+          (* Discard clauses still containing shifts that were to be eliminated. Since elimIndices ⊆ dom, we keep shifts of new variables that the below case interpretates as multishifts that need no further transforming. *)
           | O[i,[[A(V j)];[A I]]]as x when i=j & Int_set.mem i elimIndices -> raise Exit
+          | O[i,[[A(V j)];[A I]]]as x when i=j -> `Go,[[x]]
           (* Replace 𝕊ⱼ by Sⱼ by looking it up from multishifts_and_equations. *)
-          | O _ as x -> [[get_or~default:x (CCList.assoc_opt ~eq:indet_eq x (map(fst%fst) multishifts_and_equations))]]
-          | _ -> raise Exit
+          | O _ as x -> (match assoc_opt ~eq:indet_eq x (map(fst%fst) multishifts_and_equations) with
+            | Some sx	-> `Go, [[sx]]
+            | None	-> `End, [o s]><[upcoming])
+          | _ -> `End, [o s]><[upcoming]
           in transf))))
       with Exit -> None)
+    |>Iter.persistent|>(|<)"muunnettu"
     |> filter_recurrences_of~lead:false [get_exn(R.poly_of_term sf_term)(* safe by definition of sf_term *)]
 
 
@@ -476,10 +485,9 @@ let sum_equality_inference clause = try
     "{ˣx+y}{ⁿm}z	- {ⁿm+1}∑ⁿBZ{ˣy}{ⁿm-n}z	";(*6 binomial *)
     "{ᵐn+1}f	- {ᵐn+1}∑ᵐ{ⁿn-m}b	";(*7 Fibonacci *)
     "γ	- {ˣm}∑ˣ{ᵐm-1-x}g	";(*8 presented *)
-    "0	- ∑ⁿ∑ᵐg	";(*9 debug *)
+    "0	- {ᵐm-1-x}g	";(*9 debug *)
   |]in(*
-    (p,)r,e: ✓
-    i: miss
+    (p,)r,e,i: ✓
     F: leviää jo {ᵐn+1}fₘ kohdalla
     c,b,A,S: leviää etenkin bₘₙ kanssa, ja useille sijoituksille jää kaavoja löytymättä
   *)
@@ -494,7 +502,7 @@ let sum_equality_inference clause = try
     go()
   in go();
   exit 1;
-  let seeSatur pp = ((~<) % Iter.to_list % saturate_with_order~=[1] % Iter.of_list % map eq0) pp in
+  let seeSatur pp = ((~<) % Iter.to_list % saturate_with_order~= ~=[1] % Iter.of_list % map eq0) pp in
   seeSatur["vvvvv"; "vv-1"];
   seeSatur["yyx-x-y"; "yxx-x-1"];
   seeSatur[
