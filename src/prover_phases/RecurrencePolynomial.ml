@@ -114,12 +114,10 @@ let ( *.) c m = Z.(if equal c zero then [C zero] else match m with
 let ( *:)c = map(( *.)c)
 let const_op_poly n = Z.(if equal n zero then [] else if equal n one then [[]] else [[C n]])
 let const_eq_poly n = Z.(if equal n zero then [] else if equal n one then [[A I]] else [[C n; A I]])
-(* Other safe constructors except that one for X comes after ordering and general compositions after arithmetic. *)
+(* Other safe constructors, except that one for X comes after ordering and general compositions after arithmetic, and A-T-constructor comes after variable and embedding accessors. *)
 let var_poly i = [A(V i)]
 let shift i = O[i,[var_poly i; [A I]]]
 let mul_var i = X(var_poly i)
-(* Embed term into polynomial argument. See also poly_of_term to reverse embedding of polynomial in a term. *)
-let of_term~vars t = [[A(T(t, sort_uniq~cmp:(-) vars)) |@ (match !debug_poly_of_term t with None->true|Some p-> !debug_free_variables p = vars)]]
 
 (* Distinguishes standard shift indeterminates from general substitutions. *)
 let is1shift = function O[i,[[A(V j)];[A I]]] -> i=j | _ -> false
@@ -691,6 +689,13 @@ let (@.) m (i,j) = if i >= Array.length m or m.(i)=[||] then if i=j then 1 else 
   else try m.(i).(j) with Invalid_argument(*"index out of bounds"*)_ -> 0
 
 
+(* Basic A-T-constructor: embed term into polynomial argument. See also poly_of_term to reverse embedding of polynomial in a term. The desire to compute default for vars forces this to appear late in this file. *)
+let of_term ?(vars=[-1]) t = [[A(T(t, sort_uniq~cmp:(-) (
+  if vars=[-1] then match poly_of_term t with
+  | None -> failwith("of_term: missing ~vars for non-polynomial-embedding term "^ Term.to_string t)
+  | Some p -> free_variables' p
+  else vars)))]]
+
 (* The input function produces polynomials, and its mapped version is linear. *)
 let map_monomials f = fold_left (++) _0 % map f
 let map_indeterminates f = map_monomials(product % map f)
@@ -701,6 +706,13 @@ let map_outer_indeterminates f = map_monomials(let rec loop_f m = match m with
   | [x] -> snd(f m x)
   | x::n -> match f m x with `End,p -> p | `Go,p -> p >< loop_f n
 in loop_f)
+(* Map by given f monomials of the form n·m to n·f(m), where m is maximal s.t. f m is not None, or to n·m itself otherwise. *)
+let map_submonomials f = map_monomials(
+  let rec search_sub m = match f m, m with
+    | Some fm, _ -> fm
+    | _, [] -> [[]] (* default action: id *)
+    | _, x::n -> [[x]] >< search_sub n
+  in search_sub)
 
 (* Replace every term that embeds some polynomial p by p if act_on p. *)
 let unembed act_on = map_indeterminates(function A(T(t,_)) as x -> (

@@ -23,6 +23,7 @@ open CCFun
 open Type
 open Term
 open Stdlib
+module R = RecurrencePolynomial
 module B = Builtin
 module HS = Hashtbl (* H̲ashtable for S̲tructural equality *)
 module HT = Hashtbl.Make(struct
@@ -36,8 +37,8 @@ module HV = Hashtbl.Make(struct
   let hash = HVar.hash
 end)
 
-let (=) = RecurrencePolynomial.(=)
-let todo = RecurrencePolynomial.todo
+let (=) = R.(=)
+let todo = R.todo
 let (~=) x _ = x
 let (@@) = CCPair.map_same
 let (%%>) = compose_binop
@@ -59,7 +60,7 @@ let lex_array c = to_list %%> lex_list c
 let sum_list = fold_left (+) 0
 let sum_array = Array.fold_left (+) 0
 
-let index_of = RecurrencePolynomial.index_of
+let index_of = R.index_of
 
 (* Search hash table by value instead of by key. The equality relation of keys does not matter. *)
 let search_hash ?(eq=(=)) table value = HS.fold (fun k v found -> if found=None & eq value v then Some k else found) table None
@@ -176,7 +177,6 @@ let add_simplify_in_context
 
 module MakeSumSolver(MainEnv: Env.S) = struct
 module C = MainEnv.C
-module R = RecurrencePolynomial
 
 (* In general parent clauses of an inference also track applied substitutions but with polynomials these substitutions are almost always identities. *)
 let parents_as_such = map(fun p -> C.proof_parent_subst (Subst.Renaming.create()) (p,0) Subst.empty)
@@ -315,7 +315,7 @@ and propagate_oper_affine p's_on_f's =
   |> map(fun a -> get_or~default:a R.(poly_of_term(term_of_arg a)))
   |> flat_map propagate_recurrences_to
   |> Iter.of_list
-  |> Iter.cons(definitional_poly_clause R.(of_term~vars:(free_variables' p's_on_f's) result -- pf_sum))
+  |> Iter.cons(definitional_poly_clause R.(of_term result -- pf_sum))
   |> saturate_with_order R.(elim_oper_args((result,1) :: map(fun f -> f,2) (terms_in pf_sum)))
   |> filter_recurrences_of[p's_on_f's]
 
@@ -343,9 +343,9 @@ and propagate_sum i f =
   |`O[u, R.[[A(V v)];[A I]]] when v=u -> []
   | _ -> [1]
   in
-  let sumf = R.(let _,sumf,_ = poly_as_lit_term_id([[S i]]><f) in of_term~vars:(free_variables' f) sumf) in
+  let sumf = R.(let _,sumf,_ = poly_as_lit_term_id([[S i]]><f) in of_term sumf) in
   let _,f_term,_ = R.poly_as_lit_term_id f in
-  let embed_sumf_rewriter = definitional_poly_clause R.(([[S i]]>< of_term~vars:(free_variables' f) f_term) -- sumf) in
+  let embed_sumf_rewriter = definitional_poly_clause R.(([[S i]]>< of_term f_term) -- sumf) in
   Iter.of_list(propagate_recurrences_to f)
   |> saturate_with_order(R.elim_indeterminate' sum_blocker)
   |> Iter.map(map_poly_in_clause R.((><)[[S i]]))
@@ -365,8 +365,12 @@ and propagate_subst s f =
   (* 4. replace each compound shift by a 1-shift, and substitute multipliers *)
   let _,f_term,_ = R.poly_as_lit_term_id f in
   let _,sf_term,_ = R.(poly_as_lit_term_id([o s]><f)) in
+  (* special placeholder for f that depends on both range and domain variables to prevent simplification of shifts: *)
+  let _,s'f_term,_ = R.(poly_as_lit_term_id(f++([o s]><f))) in
+  let f_is_s'f = definitional_poly_clause R.(f -- of_term s'f_term) in
   let effect_dom = Int_set.of_list(map fst s) in
   let dom = R.free_variables f in
+  let s'f = R.of_term~vars:Int_set.(to_list(union effect_dom (R.rangeO s))) s'f_term in
   assert(Int_set.subset effect_dom dom);
   match R.view_affine s with
   | None -> Iter.empty
@@ -388,8 +392,10 @@ and propagate_subst s f =
     ) in
     (* We must eliminate all domain shifts except ones skipped above: dom\( rangeO s \ {j | ∃ ss_j} ) *)
     let elimIndices = Int_set.(diff dom (diff (R.rangeO s) (of_list(List.map(snd%fst) multishifts_and_equations)))) in
-    (* * * * Clause prosessing chain: to f's recurrences, add 𝕊=∏S, eliminate S, push ∘s i.e. map 𝕊ⱼ↦Sⱼ, and filter *)
-    Iter.of_list(propagate_recurrences_to f)
+    (* * * * Clause prosessing chain: turn recurrences of f to ones of “s'f”, add 𝕊=∏S, eliminate S, push ∘s i.e. map 𝕊ⱼ↦Sⱼ, and filter *)
+    propagate_recurrences_to f
+    |> map(map_poly_in_clause R.(map_submonomials(fun n -> CCOpt.if_~=(poly_eq f [n]) s'f)))
+    |> Iter.of_list (* Above is undone via s'f_term ↦ sf_term at substitution push. *)
     |> Iter.append(Iter.of_list(map (definitional_poly_clause % snd) multishifts_and_equations))
     |> saturate_with_order(fun m' -> function
       |`O[i,R.[[A(V j)];[A I]]] when i=j & Int_set.mem i elimIndices ->
@@ -400,10 +406,9 @@ and propagate_subst s f =
           |_->false) |_->false)
         then [] else [1]
       | _ -> [])
-    |>(|<)"kylläinen"
     |> Iter.filter_map(fun c -> try Some(c |> map_poly_in_clause R.(fun p ->
       let cache_t_to_st = HT.create 4 in
-      let p = if equational p then p else p>< of_term~vars:(free_variables' f) f_term in
+      let p = if equational p then p else p>< of_term s'f_term in
       p |> map_monomials(fun m' -> [m']|>
         (* If the substitution does not change variables in the monomial m, then m can be kept as is, even if m contains shifts that were to be eliminated. This is not robust because generally the essence is that m is constant (or even satisfies more recurrences compared to f) w.r.t. some variables, while the effect of the substitution plays no rôle. *)
         if Int_set.inter effect_dom (free_variables[m']) = Int_set.empty then id
@@ -412,12 +417,11 @@ and propagate_subst s f =
           (* Apply substitution to terminal indeterminates. *)
           | A I -> `Go, const_eq_poly Z.one
           | A(V i) as x -> CCPair.map_snd((><)(const_eq_poly Z.one)) (transf upcoming (hd(hd(mul_indet[[x]]))))
-          | A(T(f',vars)) when CCOpt.equal poly_eq (Some f) (poly_of_term f') -> `Go, of_term~vars:(free_variables'(get_exn(poly_of_term sf_term))) sf_term
+          | A(T(s'f,vars)) when s'f==s'f_term -> `Go, of_term sf_term
           | A(T(t,vars)) when HT.mem cache_t_to_st t -> `Go, HT.find cache_t_to_st t
           | A(T(t,vars)) ->
-            let st_poly = [o s] >< get_or~default:(of_term~vars t) (poly_of_term t) in
-            let _,st,_ = poly_as_lit_term_id st_poly in
-            let st = of_term~vars:(free_variables' st_poly) st in
+            let _,st,_ = poly_as_lit_term_id([o s] >< get_or~default:(of_term~vars t) (poly_of_term t)) in
+            let st = of_term st in
             HT.add cache_t_to_st t st; `Go,st
           (* Replace Mᵢ=X[A(V i)] by ∑ⱼmᵢⱼMⱼ. *)
           | X[A(V i)] -> `Go, fold_left (++) _0 (map(fun j -> const_op_poly(Z.of_int(m@.(i,j))) >< [[mul_var j]]) (Int_set.to_list(rangeO s)))
@@ -431,7 +435,6 @@ and propagate_subst s f =
           | _ -> `End, [o s]><[upcoming]
           in transf))))
       with Exit -> None)
-    |>Iter.persistent|>(|<)"muunnettu"
     |> filter_recurrences_of~lead:false [get_exn(R.poly_of_term sf_term)(* safe by definition of sf_term *)]
 
 
@@ -488,17 +491,28 @@ let sum_equality_inference clause = try
     "0	- {ᵐm-1-x}g	";(*9 debug *)
   |]in(*
     (p,)r,e,i: ✓
-    F: leviää jo {ᵐn+1}fₘ kohdalla
-    c,b,A,S: leviää etenkin bₘₙ kanssa, ja useille sijoituksille jää kaavoja löytymättä
+    c,b,A,F,S: leviää etenkin bₘₙ kanssa (? ja sijoituksille jäi aikoinaan kaavoja löytymättä ?)
   *)
   let rec go() =
     print_string"tutki: ";
     init_rec_table();
-    let p = (!)tests.(read_int()) in
-    print_endline("Tutkitaan " ^ R.poly_to_string p);
-    ctrl_C_stoppable(fun()->
-      propagate_recurrences_to p;
-      ~<recurrence_table;());
+    let cmd = read_line() in
+    if String.length cmd == 1 then(
+      let p = (!)tests.(int_of_string cmd) in
+      print_endline("Tutkitaan " ^ R.poly_to_string p);
+      ctrl_C_stoppable(fun()->
+        propagate_recurrences_to p;
+        ~<recurrence_table;()))
+    else R.(match String.split_on_char ',' cmd with [p;p'] ->
+      let p,p' = poly_of_string@@(p,p') in
+      print_endline(match lead_unifiers p p' with
+      | None -> "Samastumattomat "^ poly_to_string p ^", "^ poly_to_string p'
+      | Some(u,u') -> "Unify "^poly_to_string[u]^", "^poly_to_string[u']^"\n"
+        ^"p̲p̲. "^poly_to_string(hd(superpose p p'))^"\n"
+        ^match CCOpt.or_~else_:(leadrewrite p p')(leadrewrite p' p) with
+        | Some r -> "rw. "^ poly_to_string r
+        | None -> "")
+    | x -> print_endline("Paloja jaettaessa pilkusta pitää tulla 2 eikä " ^ string_of_int(length x)));
     go()
   in go();
   exit 1;
@@ -529,6 +543,63 @@ let sum_equality_inference clause = try
   (* tl(tl[clause;clause]) *)
 with e -> print_endline Printexc.((*get_backtrace() ^"\n"^ *)match e with Failure m -> m | e -> to_string e); exit 1
 
+(* Fibonacci ongelmatulosteotos:
+summation_equality line 292 ≣̲̇26       propagating to  {ᵐn＋１͘}fₘ
+CCOption.pp line 9 ≣̲̇49        rw.M－N
+ NMfₘ－Mfₘ－fₘ
+CCOption.pp line 9 ≣̲̇50        rw.M－N
+ -Mfₘ＋N²fₘ－fₘ
+CCOption.pp line 9 ≣̲̇50        rw.M－N
+ N²fₘ－Nfₘ－fₘ
+RecurrencePolynomial line 605 ≣̲̇48     p̲p̲. -NMfₘ－Mfₘ＋N³fₘ
+CCOption.pp line 9 ≣̲̇48        rw.M－N
+ -Mfₘ＋N³fₘ－N²fₘ
+CCOption.pp line 9 ≣̲̇48        rw.M－N
+ N³fₘ－N²fₘ－Nfₘ
+CCOption.pp line 9 ≣̲̇49        rw.N²fₘ－Nfₘ－fₘ
+	‽  ‽  ‽  ‽  ‽  ‽  ‽  ‽  ‽  ‽  ‽  ‽  ‽  ‽  ‽  ‽  ‽  ‽  ‽  ‽  -Nfₘ＋fₘ
+CCOption.pp line 9 ≣̲̇49        rw.-Nfₘ＋fₘ
+ -Nfₘ
+CCOption.pp line 9 ≣̲̇49        rw.-Nfₘ＋fₘ
+ -fₘ
+RecurrencePolynomial line 605 ≣̲̇48     p̲p̲. Mfₘ－N²fₘ
+CCOption.pp line 9 ≣̲̇47        rw.M－N
+ -N²fₘ＋Nfₘ
+CCOption.pp line 9 ≣̲̇48        rw.-Nfₘ＋fₘ
+ Nfₘ－fₘ
+CCOption.pp line 9 ≣̲̇49        rw.-fₘ
+ -Nfₘ＋２fₘ
+CCOption.pp line 9 ≣̲̇49        rw.-Nfₘ＋fₘ
+ fₘ
+CCOption.pp line 9 ≣̲̇50        rw.-fₘ
+ 0
+RecurrencePolynomial line 605 ≣̲̇48     p̲p̲. -Nfₘ
+CCOption.pp line 9 ≣̲̇47        rw.-fₘ
+ -Nfₘ＋fₘ
+CCOption.pp line 9 ≣̲̇48        rw.-fₘ
+ -Nfₘ＋２fₘ
+CCOption.pp line 9 ≣̲̇49        rw.-fₘ
+ -Nfₘ＋３fₘ
+CCOption.pp line 9 ≣̲̇50        rw.-fₘ
+ -Nfₘ＋４fₘ
+*)
+
+(* Stirling ongelmatulosteotos:
+summation_equality line 292 ≣̲̇28       propagating to  {ⁿx}cₙₘ
+CCOption.pp line 9 ≣̲̇51        rw.N－X
+ XMcₙₘ－nNcₙₘ－Ncₙₘ－cₙₘ
+RecurrencePolynomial line 605 ≣̲̇50     p̲p̲. -nN²cₙₘ－２N²cₙₘ＋X²Mcₙₘ－Ncₙₘ
+CCOption.pp line 9 ≣̲̇50        rw.N－X
+ -２N²cₙₘ＋X²Mcₙₘ－nXNcₙₘ－Ncₙₘ
+CCOption.pp line 9 ≣̲̇51        rw.N－X
+ X²Mcₙₘ－nXNcₙₘ－２XNcₙₘ－Ncₙₘ
+CCOption.pp line 9 ≣̲̇51        rw.XMcₙₘ－nNcₙₘ－Ncₙₘ－cₙₘ
+ -XNcₙₘ－Ncₙₘ＋cₙₘ
+CCOption.pp line 9 ≣̲̇52        rw.N－X
+ -Ncₙₘ－X²cₙₘ＋cₙₘ
+CCOption.pp line 9 ≣̲̇52        rw.N－X
+ -X²cₙₘ－Xcₙₘ＋cₙₘ
+*)
 
 (* Setup to do when MakeSumSolver(...) is called. *);;
 MainEnv.add_unary_inf "recurrences for ∑" sum_equality_inference
@@ -538,7 +609,7 @@ end
 let sum_by_recurrences = ref false
 
 (* Define name and setup actions required to registration of this extension in libzipperposition_phases.ml *)
-let extension = RecurrencePolynomial.{
+let extension = R.{
   Extensions.default with
   name = "∑";
   env_actions = [fun env -> if !sum_by_recurrences then
