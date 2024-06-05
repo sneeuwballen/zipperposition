@@ -96,7 +96,8 @@ and op =
 | D of var
 | XD of var
 | X of op list (* never X(X p · q) or X(C p · q) or X(A I); always X(_@[A _]) *)
-| O of (var*poly)list
+| O1 of var
+| O of (var*poly)list (* O[v,[[A(V v)];[A I]]] is allowed, distinct form of O1 v *)
 
 let debug_poly_of_term = ref(Obj.magic())
 let debug_free_variables = ref(Obj.magic())
@@ -115,16 +116,16 @@ let ( *:)c = map(( *.)c)
 let const_op_poly n = Z.(if equal n zero then [] else if equal n one then [[]] else [[C n]])
 let const_eq_poly n = Z.(if equal n zero then [] else if equal n one then [[A I]] else [[C n; A I]])
 (* Other safe constructors, except that one for X comes after ordering and general compositions after arithmetic, and A-T-constructor comes after variable and embedding accessors. *)
-let var_poly i = [A(V i)]
-let shift i = O[i,[var_poly i; [A I]]]
-let mul_var i = X(var_poly i)
+let var_poly ?(plus=Z.zero) i = [[A(V i)]] @ const_eq_poly plus
+let shift i = O1 i
+let mul_var i = X[A(V i)]
 
-(* Distinguishes standard shift indeterminates from general substitutions. *)
-let is1shift = function O[i,[[A(V j)];[A I]]] -> i=j | _ -> false
-(* Distinguishes multishift indeterminates from general substitutions. *)
-let is_multishift = function O f -> f |> for_all(function
+(* Distinguishes multi- and 1-shift indeterminates from general substitutions and other indeterminates. *)
+let is_shift = function O f -> f |> for_all(function
   | i, [[A(V j)]; ([A I] | [C _; A I])] -> i=j
-  |_->false) |_->false
+  |	_->false)
+|O1 	_->true
+|	_->false
 (* Unused. See view_affine *)
 let is_affine = function O f -> f |> for_all(fun(_,f') -> f' |> for_all(function
   | [A I] | [C _; A I] | [A(V _)] | [C _; A(V _)] -> true
@@ -223,7 +224,7 @@ let infinities r : 'r list ord_group =
 
 
 (* These are used to simplify defining orderings. They erase some structure from indeterminates that happens to be ignorable in all the orderings that are required in recurrence propagation. *)
-type simple_indeterminate = [`D of var |`O of (var*poly) list |`S of var |`T of Term.t |`V of var]
+type simple_indeterminate = [`D of var |`O of (var*poly) list |`O1 of var |`S of var |`T of Term.t |`V of var]
 
 (* Weight of monomial as a sum of given weights of (simple) indeterminates. Used in total_deg. *)
 let total_weight w weight = let rec recW i=i|>
@@ -234,6 +235,7 @@ let total_weight w weight = let rec recW i=i|>
     | D i -> weight(`D i)
     | S i -> weight(`S i)
     | O f -> weight(`O f) (* sum' w (map(fun(n,fn)-> weight(`O(n,fn))) f) *)
+    | O1 i -> weight(`O1 i)
     | X f -> recW f
     | XD i -> w#plus (weight(`V i)) (weight(`D i))
   )) w#o in recW
@@ -242,11 +244,11 @@ let total_weight w weight = let rec recW i=i|>
 let total_deg = total_weight theZ ~=Z.one
 
 (* Shapes of indeterminates without parameters.
- This is used to reduce the match cases in comparison tiebreaking. We can probably keep this as an internal detail. Nevertheless indeterminate_order is already made a mutable reference for future flexibility. *)
-type indeterminate_shape = [`I|`C|`V|`O|`S|`D|`XD|`X|`T]
-let indeterminate_order: indeterminate_shape list ref = ref [`I;`C;`V;`X;`O;`S;`D;`XD;`T]
+ This is used to reduce the match cases in comparison tiebreaking. The order of 5 least indeterminates and of the top `T might be important. We can probably keep this as an internal detail. Nevertheless indeterminate_order is already made a mutable reference for future flexibility. *)
+type indeterminate_shape = [`I|`C|`V|`O1|`O|`S|`D|`XD|`X|`T]
+let indeterminate_order: indeterminate_shape list ref = ref [`I;`C;`V;`X;`O1;`O;`S;`D;`XD;`T]
 
-let indeterminate_shape = function C _->`C | S _->`S | D _->`D | XD _->`XD | O _->`O | X _->`X | A(V _)->`V | A I->`I | A(T _)->`T
+let indeterminate_shape = function C _->`C | S _->`S | D _->`D | XD _->`XD | O _->`O | O1 _->`O1 | X _->`X | A(V _)->`V | A I->`I | A(T _)->`T
 
 (* Monomial and other orders
 TODO What nonstandard invariants the order must satisfy? At least the C(oefficient)s must contribute last because ++ changes them while linearly merging monomial lists instead of full resorting. *)
@@ -264,7 +266,7 @@ and tiebreak_by weights = rev %%> lex_list(fun x y ->
   if xw<yw then -1 else if xw>yw then 1 else match x,y with
     | A I, A I -> 0
     | C x, C y -> Z.((compare***compare) (abs x, x) (abs y, y))
-    | D x, D y | S x, S y | XD x, XD y | A(V x), A(V y) -> compare x y
+    | D x, D y | S x, S y | XD x, XD y | A(V x), A(V y) | O1 x, O1 y -> compare x y
     | X x, X y -> compare_mono_by weights x y
     | O x, O y -> lex_list(compare_var *** compare_poly_by weights) x y
     | A(T(x,_)), A(T(y,_)) -> Term.compare x y
@@ -278,6 +280,9 @@ let indeterminate_weights: (op list -> simple_indeterminate -> int list) ref = r
 (* The main interface to monomial orders, conveniently reversed for sorting maximal monomial first. *)
 let rev_cmp_mono n m = compare_mono_by !indeterminate_weights m n (* Keep parameters to reread indeterminate_weights! *)
 let sort_poly: poly->poly = sort rev_cmp_mono
+
+(* Intramonomial order must be stable to avoid reconstructing monomials—only resorting them—when polynomial is retrieved from a clause embedding it. *)
+let stable_cmp_mono = compare_mono_by ~= ~=[]
 
 (* Some indeterminate weights for common elimination operations *)
 
@@ -308,7 +313,7 @@ and indet_eq x y = x==y or match x,y with
     failwith("Term "^ Term.to_string t ^" must not be associated with both variables ["^ concat_view "] and [" (CCList.to_string((-^)"")) [tv;sv] ^"]")
   | X f, X g -> mono_eq f g
   | O f, O g -> CCList.equal(CCPair.equal (=) poly_eq) f g
-  | a, b -> a = b
+  | a, b -> a = b (* note: O1∩O := ∅ *)
 
 let bit_rotate_right r b = (b lsr r) + (b lsl lnot r) (* for int lacking 1 bit and r>=0 *)
 
@@ -391,7 +396,7 @@ and indet_to_string = function
 | XD i -> "ð"^subscript(var_name i)
 | S i -> "∑"^superscript(var_name i)
 | X m -> mono_to_string m
-| O[i,[[A(V j)];[A I]]] when i=j -> String.uppercase(var_name i)
+| O1 i -> String.uppercase(var_name i)
 | O f -> "{"^ concat_view "" (fun(i,fi)-> superscript(var_name i) ^ poly_view_string fi) f ^"}"
 
 let pp_poly = to_formatter poly_to_string
@@ -498,10 +503,11 @@ let rec (><) p q = match p,q with
   let xy = [[x]]><[[y]] in
   (* Inputs nx and y::m are valid monomials, so if [[x;y]] is too, then simple concatenation puts indeterminates to the right order: *)
   (if poly_eq xy [[x;y]] then [nx@y::m]
-    (* Guarantee that all pushing products (A×_ => _×A) are computed before true argument products (_×A) — evaluate right product first to put any A fully right. (Is this certainly correct?)
-     TODO The entire product A1×X(An) ends up X(An)×A1 instead of An because there is no other indeterminates keeping the simplification alive. This looks severe. If a workaround is not found, the whole encoding of arguments as A indeterminates should be reworked. Minimally unifiers must special case A. *)
-    else [n]><(xy><[m]))
-  ++ ([nx]><q) ++ (p><[y::m]) ++ (p><q)
+    (* Guarantee that all pushing products (A×_ => _×A) are computed before true argument products (_×A) — evaluate right product first to put any A fully right.
+     TODO The entire product A1×X(An) ends up X(An)×A1 instead of An because there is no other indeterminates keeping the simplification alive. This looks severe. If a workaround is not found, the whole encoding of arguments as A indeterminates should be reworked. Minimally unifiers must special case A.
+     Potential workaround is to special case short (1×1 factor?) products. Perhaps it suffices to evaluate [[A]]×_ as _×[[A]]. Anyway, correctness of this whole push-first method needs a justification. *)
+    else [n]><(xy><[m])
+  ) ++ ([nx]><q) ++ (p><[y::m]) ++ (p><q)
 
 (* As named. A(rgument) as left input is concatenated to right without other transformations. This allows to implement application as left-multiplication by A, but caller must take care of right-multiplying by A only when A is fully right. (Product of two A's can be formed using X.) *)
 and indeterminate_product x y =
@@ -512,33 +518,36 @@ and indeterminate_product x y =
   | x, C k -> [[y;x]]
   | D i, X f -> [[X f; D i]] ++ x_[f]
   | XD i, X f -> [[X f; XD i]] ++ x_[f]
-  | D i, O f -> (if mem_assq i f then f else (i,[var_poly i])::f) (* identity ∘'s in f are implicit *)
+  | D i, O1 l -> [[y;x]]
+  | D i, O f -> (if mem_assq i f then f else (i, var_poly i)::f) (* identity ∘'s in f are implicit *)
     |> map(fun(n,fn)-> x_ fn >< [o f @[D n]]) (* coordinatewise chain rule *)
     |> fold_left (++) _0 (* sum *)
-  | XD i, O f -> fold_left(++)_0 (map(fun(n,fn)-> (todo"X fn⁻¹") >< x_ fn >< [o f @[XD n]]) (if mem_assq i f then f else (i,[var_poly i])::f)) (* like previous *)
+  | XD i, O f -> fold_left(++)_0 (map(fun(n,fn)-> (todo"X fn⁻¹") >< x_ fn >< [o f @[XD n]]) (if mem_assq i f then f else (i, var_poly i)::f)) (* like previous *)
   | D i, XD j when i=j -> [[XD i; D i]; [D i]]
-  | O f, X g -> x_[g] >< [[O f]]
+  | (O _ | O1 _), X g -> x_[g] >< [[x]]
   | X(S i ::f), S j when i=j -> let _Si_Xf = [[S i]]><mul_indet[f] in (_Si_Xf><[[S i]]) ++ [[S i; X(S i :: f)]] ++ _Si_Xf
+  | O1 i, S j when i=j -> [[S i]] ++ const_op_poly Z.one
   | O[i,f], S j when i=j -> let c = const_mono f in map((@)(o[i,f--const_eq_poly c])) ([[S i]] ++ const_op_poly c)
   (* | O f, S i -> [o(filter((=)i % fst) f)] >< S i >< [o(filter((!=)i % fst) f)] (* TODO swap's semantics *) *)
-  | S l, O[i,[[A(V j)];[A I]]] when i=j&i=l -> [[S i]; C Z.minus_one :: eval_at Z.zero ~var:i; []]
-  | S l, O[i,[[A(V j)];[A I]]] when i=j -> [[y;x]]
+  | S l, O1 i when i=l -> [[S i]; C Z.minus_one :: eval_at Z.zero ~var:i; []]
+  | S l, O1 i -> [[y;x]]
   | S l, (X[A(V i)] | D i | XD i) when l!=i -> [[y;x]]
-  | O[i,[[C o]]], S l when i=l -> assert(is0 o); [[x]]
-  | O[i,[[C c; A I]]], S l when i=l -> Z.(if c < zero
-    then map(fun n -> eval_at~var:i (of_int n + c)) (range' 0 (Stdlib.abs(to_int_exn c)))
-    else map(fun n -> eval_at~var:i (of_int n)) (range' 0 (to_int_exn c)))
-  | O[i,[[A(V j)];[A I]]], O[l,[[A(V k)];[A I]]] when i=j & l=k & i>l -> [[y;x]]
-  | O f, O g when is_multishift x & is_multishift y & rev_cmp_mono [x] [y] <0 -> [[y;x]]
-  | O f, O g when not(is_multishift x) -> [o(map(map_snd((><)[[x]]))(*∘f*)g @ filter(fun(i,_) -> not(mem i (map fst g)))(*implicit defaults*)f)]
+  | O[i,[[C o]]], S j when i=j -> assert(is0 o); [[x]]
+  | O[i,[[C c; A I]]], S j when i=j -> map Z.(fun n -> eval_at~var:i (of_int n + min c zero)) (range' 0 (abs(Z.to_int_exn c)))
+  | O f, O1 i when not(is_shift x) -> [[x]]><[o[i, var_poly i ~plus:Z.one]] (*apply below*)
+  | O f, O g when not(is_shift x) -> [o(map(map_snd((><)[[x]]))(*∘f*)g @ filter(fun(i,_) -> not(mem i (map fst g)))(*implicit defaults*)f)]
+  | x, y when is_shift x & is_shift y & stable_cmp_mono [x] [y] > 0 -> [[y;x]]
   | D i, D l | XD i, XD l | S i, S l | X[A(V i)], X[A(V l)] when i>l -> [[y;x]]
-  | X f, X g when rev_cmp_mono f g < 0 -> [[y;x]] (* Assumes commutative product! *)
-  | X f, A _ when rev_cmp_mono f [y] < 0 -> mul_indet[[y]]><[f] (* Assumes commutative product! *)
+  | X f, X g when stable_cmp_mono f g > 0 -> [[y;x]] (* Assumes commutative product! *)
+  | X f, A _ when stable_cmp_mono f [y] > 0 -> mul_indet[[y]]><[f] (* Assumes commutative product! *)
   | D _, A I -> []
   | D i, A(V n) -> const_eq_poly Z.(if i=n then one else zero)
-  | O f, A I -> const_eq_poly Z.one
+  | (O _ | O1 _), A I -> const_eq_poly Z.one
+  | O1 i, A(V j) when i=j -> var_poly i ~plus:Z.one
+  | O1 i, A(V l) -> [[y]]
   | O f, A(V n) -> get_or~default:[[y]] (assq_opt n f)
   | O f, A(T(_,v)) -> [o(filter(fun(i,_)-> mem i v) f) @ [y]] (* No recursive call to >< in order to avoid endless loop. *)
+  | O1 i, A(T(_,v)) when not(mem i v) -> [[y]]
   | A _, A _ -> invalid_argument("indeterminate_product ("^ indet_to_string x ^") ("^ indet_to_string y ^")")
   | A _, y -> [[y;x]] (* Push A from left to right. Caller must push A fully right before _,A multiplication! *)
   | x, y -> [[x;y]]
@@ -568,6 +577,9 @@ end
 (* Law product(a@b) = product a >< product b requires to choose to use const_op_poly. *)
 let product = fold_left (><) (const_op_poly Z.one)
 
+[@@@warning "-52"](* Allow match Failure"hd" but let's check it works: *)
+let()= try hd[] with Failure"hd"->() | e->print_endline("Invalid build: Fix RecurrencePolynomial.unifiers to catch "^ Printexc.to_string e)
+
 (* Unification and superposition *)
 
 let rec unifiers m' n' =
@@ -579,13 +591,13 @@ let rec unifiers m' n' =
   | x::m, x'::n when indet_eq x x' -> loop(m,n)
   | x::m, y::n when join_normalizes x y ->
     (* This'd be faster if monomials were encoded in reverse. Only downside would be unintuitivity. *)
-    (match rev(hd([[y]]><[rev(x::m)])) with
+    (match rev(hd([[y]]><[rev(x::m)])) with (* note: hd({x↦0}·xMₓ) fails but M₀=... could be useful *)
     | y'::xm when indet_eq y y' -> let u,v = loop(xm,n) in u@[y], v
     | _ -> raise Exit)
   | m, y::n when m=[] or join_normalizes y (hd m) -> CCPair.swap(loop(y::n, m))
   | _ -> raise Exit
   in
-  try Some(loop(rev m', rev n')) with Exit -> None
+  try Some(loop(rev m', rev n')) with Exit | Failure"hd" -> None
 
 let lead_unifiers = curry(function x::_, y::_ -> unifiers x y | _ -> None)
 
@@ -617,12 +629,12 @@ end)
 
 (* Features for a rewriting index testing various sums of operator degrees. Only for !=0 polynomials. *)
 let default_features() = (* () because of type variables *)
-  let sum value = sum_list % map value % hd in
-  [(* TODO double check that these are correctly increasing *)
+  let sum value = sum_list % map value % hd in [
     "total degree", sum~=1;
-    "shift degree", sum(function O _ -> 1 | _ -> 0);
+    "shift degree", sum(function O1 _ -> 1 | _ -> 0);
     "coefficient degree", sum(function X _ -> 1 | _ -> 0);
-    "1ˢᵗ var. degree", sum(function O[0,_] | X[A(V 0)] -> 1 | _ -> 0);
+    "multishift degree", sum(function O _ -> 1 | _ -> 0);
+    (* "1ˢᵗ var. degree", sum(function O[0,_] | X[A(V 0)] -> 1 | _ -> 0); *)
     (* then: multiset of indeterminates... except that only ID multisets are supported *)
   ]
 
@@ -641,10 +653,9 @@ and free_variables p' = Int_set.(let rec monoFV = function
   | x::m -> union (monoFV m) (match x with
     | O f -> assert false (* was prior case *)
     | C _ | A I -> empty
-    (* Do operators make explicit all implicit dependencies in argument terms? If not, below is wrong! *)
-    | A(V i) | S i | D i | XD i -> singleton i
+    | O1 i | A(V i) | S i | D i | XD i -> singleton i
     | X f -> monoFV f
-    | A(T(_,v)) -> of_list v (*map_or ~default:empty free_variables (poly_of_term t)*)
+    | A(T(_,v)) -> of_list v
   ) in
   union_map monoFV p')
 
@@ -653,7 +664,7 @@ let _=debug_free_variables:=free_variables'
 
 (* Output ϱ,σ,raw. Renaming substitution indeterminate ϱ satisfies dom ϱ = vs\taken and img ϱ ∩ vs∪taken = ∅. Substitution indeterminate σ undoes ϱ meaning [σ]><[ϱ]><p = p if free_variables p ⊆ taken∪vs. Finally raw is the list of the variable pairs (vᵢ,uᵢ) that define σ:vᵢ↦uᵢ and ϱ:uᵢ↦vᵢ. *)
 let rename_apart ~taken vs = match Int_set.(
-  let collide = diff vs taken in
+  let collide = inter vs taken in
   let m = lazy(ref(max_elt(union vs taken))) in
   fold Lazy.(fun c pairs -> incr(force m); (c, !(force m))::pairs) collide []) with
   | [] -> [], [], []
@@ -668,7 +679,7 @@ let view_affine f =
   try f|>map(fun(i,p) ->
     let put vs sh = (* i ↦ vs+sh = variable list + shift constant *)
       shift.(i) <- sh;
-      if not(vs=[var_poly i]) then (* identity variable mapping gets encoded by [||] always *)
+      if not(vs = var_poly i) then (* identity variable mapping gets encoded by [||] always *)
         matrix.(i) <- fold_left (fun row -> function
           | [A(V n)] -> row.(n) <- 1; row
           | [C a; A(V n)] -> row.(n) <- Z.to_int_exn a; row
@@ -729,7 +740,7 @@ let to_poly_poly: (poly * op list) list -> poly =
 (* Turn general formula into a recurrence in operator polynomial representation by embedding other parts into argument terms. *)
 let oper_coef_view: poly -> poly = to_poly_poly % coef_view(function
   | C _ | X[A(V _)] -> true
-  | x -> is_multishift x)
+  | x -> is_shift x)
 
 
 (* Parsing polynomials from strings—primarily for testing *)

@@ -255,7 +255,7 @@ let filter_map_recurrences map_poly = Iter.filter_map(fun c ->
   with Invalid_argument _ -> None)
 
 (* Filter those clauses that have eligible polynomial whose every term M f, where term f represents an expression from polylist, has normal operator monomial M (that consist only of multipliers and 1-shifts). Moreover the leading term must have such form M f. After the filtering, unembed all other polynomials outside polylist.
- Notes: The ordering of the embedded polynomial term f can be problematic. The polynomial structure of f does not automatically contribute to the ordering. Hence requiring, that M f leads, silently discards recurrences that forgot to take f into account in the ordering. However at least propagation to addition and affine forms relies to the presence of the requirement that M f leads. Now try making leading requirement optional via parameter. *)
+ Notes: The ordering of the embedded polynomial term f can be problematic. The polynomial structure of f does not automatically contribute to the ordering. Hence requiring, that M f leads, silently discards recurrences that forgot to take f into account in the ordering. However at least propagation to addition and affine forms relies to the presence of the requirement that M f leads. Hence leading requirement is made optional via parameter. *)
 let filter_recurrences_of ?(lead=true) polylist = filter_map_recurrences R.(fun p -> if_~=
   (let wanted_terms = p |> map_monomials(fun m -> match terms_in[m] with
     | [t] when mem ~eq:(CCOpt.equal poly_eq) (poly_of_term t) (map CCOpt.pure polylist) -> [m]
@@ -289,12 +289,13 @@ let add_new_rec p c = PolyMap.add recurrence_table p
 let rec propagate_recurrences_to f = match PolyMap.find_opt recurrence_table f with
 | Some r -> r
 | None ->
-  let r = Iter.to_rev_list(match "propagating to "|<f with
+  let r = Iter.to_rev_list R.(match "propagating to "|<f with
   | [X[A(V _)]::_] | _::_::_ -> propagate_oper_affine f
-  | [X q :: p] -> propagate_times [q] [p]
-  | [S i :: p] -> propagate_sum i [p]
-  | [O s :: p] -> propagate_subst s [p]
-  | [C _ :: p] -> propagate_const f
+  | [X q	:: p] -> propagate_times [q] [p]
+  | [C _	:: p] -> propagate_const f
+  | [S i	:: p] -> propagate_sum i [p]
+  | [O s	:: p] -> propagate_subst s [p]
+  | [O1 i 	:: p] -> Iter.of_list(propagate_recurrences_to([o[i, var_poly i ~plus:Z.one]]><[p]))
   | _ -> Iter.empty)
   in
   PolyMap.add recurrence_table f r;
@@ -324,30 +325,30 @@ and propagate_times f g =
   let rename, merge, _ = R.rename_apart ~taken:(R.free_variables f) (R.free_variables g) in
   (* 2. create Rᶠ·ϱg and f·ϱRᵍ *)
   let disjoint_recurrences = R.(
-    map(map_poly_in_clause(fun r -> r><mul_indet([rename]><g))) (propagate_recurrences_to f) @
+    map(map_poly_in_clause(fun r -> mul_indet r><[rename]><g)) (propagate_recurrences_to f) @
     map(map_poly_in_clause(fun r -> mul_indet f><[rename]><r)) (propagate_recurrences_to g)) in
   match merge with
   | [] -> Iter.of_list disjoint_recurrences
   (* 3. propagate to substitution σ(f·ϱg) when σ!=id *)
   | [O m] ->
-    let f_x_g' = R.(mul_indet f><[rename]>< g) in
+    let f_x_g' = "product breakdown "^str[R.o m]|<R.(mul_indet f><[rename]>< g) in
     PolyMap.add recurrence_table f_x_g' disjoint_recurrences;
     propagate_subst m f_x_g'
   | _ -> assert false (* impossible result from R.rename_apart *)
 
 and propagate_sum i f =
   let is_f t = R.(CCOpt.equal poly_eq (Some f) (poly_of_term t)) in
-  let sum_blocker = function (* gives elimination priorities: [] is good, [1] is bad *)
-  |`T t when not(is_f t) -> []
-  |`V v when v!=i -> []
-  |`O[u, R.[[A(V v)];[A I]]] when v=u -> []
-  | _ -> [1]
+  let sum_blocker = function (* gives elimination priorities: 0 is good, 1 is bad *)
+  |`T t when not(is_f t) -> 0
+  |`V v when v!=i -> 0
+  |`O1 _ -> 0
+  | _ -> 1
   in
   let sumf = R.(let _,sumf,_ = poly_as_lit_term_id([[S i]]><f) in of_term sumf) in
   let _,f_term,_ = R.poly_as_lit_term_id f in
   let embed_sumf_rewriter = definitional_poly_clause R.(([[S i]]>< of_term f_term) -- sumf) in
   Iter.of_list(propagate_recurrences_to f)
-  |> saturate_with_order(R.elim_indeterminate' sum_blocker)
+  |> saturate_with_order(R.elim_indeterminate sum_blocker)
   |> Iter.map(map_poly_in_clause R.((><)[[S i]]))
   (* Replace each ∑ᵢf by the embedding sumf by rewriting with temporary polynomial ∑ᵢf-sumf. *)
   |> Iter.cons embed_sumf_rewriter
@@ -365,7 +366,7 @@ and propagate_subst s f =
   (* 4. replace each compound shift by a 1-shift, and substitute multipliers *)
   let _,f_term,_ = R.poly_as_lit_term_id f in
   let _,sf_term,_ = R.(poly_as_lit_term_id([o s]><f)) in
-  (* special placeholder for f that depends on both range and domain variables to prevent simplification of shifts: *)
+  (* special placeholder for f that depends on both range and domain variables to prevent simplification of multishifts: *)
   let _,s'f_term,_ = R.(poly_as_lit_term_id(f++([o s]><f))) in
   let f_is_s'f = definitional_poly_clause R.(f -- of_term s'f_term) in
   let effect_dom = Int_set.of_list(map fst s) in
@@ -377,35 +378,25 @@ and propagate_subst s f =
   | Some(m,a) ->
     (* If 𝕊ⱼ=Sⱼ, we skip it, which makes saturation faster, but primarily this is to dodge the issue of telling 𝕊ⱼ and Sⱼ apart. *)
     let changedShift = filter(fun j -> exists R.(fun i -> m@.(i,j) != if i=j then 1 else 0) (Int_set.to_list dom)) in
-    let multishifts_and_equations = changedShift(Int_set.to_list(R.rangeO s)) |> map R.(fun j ->
+    let multishifts_and_equations = (*changedShift*)(Int_set.to_list(R.rangeO s)) |> map R.(fun j ->
       let on_dom f = map f (Int_set.to_list dom) in
       (* 𝕊ⱼ = ∏ᵢ Sᵢ^mᵢⱼ = O[0,m₀ⱼ;...;i,mᵢⱼ;...] where j runs over range and i over domain *)
-      let ss_j = hd(o(on_dom(fun i -> i, [var_poly i]++const_eq_poly(Z.of_int(m@.(i,j)))))) in
-      (* TODO Recurrence polynomial data structure needs an additional marker to distinguish compound shifts from ordinary ones in all corner cases including permutations.
-       We can tolerate a confusion between single and multi for a shift w.r.t. a new variable. This relaxation is good to keep in mind when transforming multishifts to 1-shifts. *)
-      let ss_j = if not(is1shift ss_j) then ss_j
-        else if not(Int_set.mem j dom) then shift j (* use final form immediately *)
-        else failwith("Unimplemented: "^ string_of_int j^"ᵗʰ compound shift cannot be distinguished from 1-shift when propagating to substitution "^ poly_to_string[o s] ^" of "^ poly_to_string f) in
+      let ss_j = hd(o(on_dom(fun i -> i, var_poly i ~plus:(Z.of_int(m@.(i,j)))))) in
       let eq_j = product(on_dom(fun i -> pow' poly_alg [[shift i]] (max 0 (m@.(i,j)))))
         -- product([[ss_j]] :: on_dom(fun i -> pow' poly_alg [[shift i]] (- min 0 (m@.(i,j))))) in
       ((ss_j, shift j), j), eq_j
     ) in
     (* We must eliminate all domain shifts except ones skipped above: dom\( rangeO s \ {j | ∃ ss_j} ) *)
     let elimIndices = Int_set.(diff dom (diff (R.rangeO s) (of_list(List.map(snd%fst) multishifts_and_equations)))) in
+    let elimIndices = dom in (* fixed ✓; TODO inline *)
     (* * * * Clause prosessing chain: turn recurrences of f to ones of “s'f”, add 𝕊=∏S, eliminate S, push ∘s i.e. map 𝕊ⱼ↦Sⱼ, and filter *)
     propagate_recurrences_to f
     |> map(map_poly_in_clause R.(map_submonomials(fun n -> CCOpt.if_~=(poly_eq f [n]) s'f)))
     |> Iter.of_list (* Above is undone via s'f_term ↦ sf_term at substitution push. *)
     |> Iter.append(Iter.of_list(map (definitional_poly_clause % snd) multishifts_and_equations))
-    |> saturate_with_order(fun m' -> function
-      |`O[i,R.[[A(V j)];[A I]]] when i=j & Int_set.mem i elimIndices ->
-        (* Eliminate 1-shifts ...except that multishift could be simplified to 1-shift in case an excess argument term does not depend on some of the multishifted variables—a valid result of such simplification won't be penaliced. *)
-        if multishifts_and_equations |> exists R.(function(((O ss,_),_),_)-> (* ∃𝕊 *)
-          Int_set.(match assq_opt i ss with Some[[A(V j)];[A I]] when i=j -> (* 𝕊i = i+1 *)
-            equal (of_list[i]) (inter (free_variables[m']) (of_list(List.map fst ss))) (* Sᵢ goes as well *)
-          |_->false) |_->false)
-        then [] else [1]
-      | _ -> [])
+    |>((|<)"pre  saturation")
+    |> saturate_with_order R.(elim_indeterminate(function`O1 i when Int_set.mem i elimIndices -> 1 |_-> 0))
+    |>((|<)"post saturation")
     |> Iter.filter_map(fun c -> try Some(c |> map_poly_in_clause R.(fun p ->
       let cache_t_to_st = HT.create 4 in
       let p = if equational p then p else p>< of_term s'f_term in
@@ -425,14 +416,14 @@ and propagate_subst s f =
             HT.add cache_t_to_st t st; `Go,st
           (* Replace Mᵢ=X[A(V i)] by ∑ⱼmᵢⱼMⱼ. *)
           | X[A(V i)] -> `Go, fold_left (++) _0 (map(fun j -> const_op_poly(Z.of_int(m@.(i,j))) >< [[mul_var j]]) (Int_set.to_list(rangeO s)))
-          (* Discard clauses still containing shifts that were to be eliminated. Since elimIndices ⊆ dom, we keep shifts of new variables that the below case interpretates as multishifts that need no further transforming. *)
-          | O[i,[[A(V j)];[A I]]]as x when i=j & Int_set.mem i elimIndices -> raise Exit
-          | O[i,[[A(V j)];[A I]]]as x when i=j -> `Go,[[x]]
+          (* Discard clauses still containing shifts that were to be eliminated. Pass commuting shifts—but aren't the rest also bad and to be eliminated? TODO *)
+          | O1 i when Int_set.mem i elimIndices -> raise Exit
+          | O1 i as x when not(Int_set.mem i (rangeO s)) -> `Go,[[x]]
           (* Replace 𝕊ⱼ by Sⱼ by looking it up from multishifts_and_equations. *)
           | O _ as x -> (match assoc_opt ~eq:indet_eq x (map(fst%fst) multishifts_and_equations) with
             | Some sx	-> `Go, [[sx]]
             | None	-> `End, [o s]><[upcoming])
-          | _ -> `End, [o s]><[upcoming]
+          | _	-> `End, [o s]><[upcoming]
           in transf))))
       with Exit -> None)
     |> filter_recurrences_of~lead:false [get_exn(R.poly_of_term sf_term)(* safe by definition of sf_term *)]
@@ -446,27 +437,12 @@ let declare_recurrence r = add_new_rec
 let sum_equality_inference clause = try
   (* for testing ↓ *)
   let (!) = R.poly_of_string in
-  let eq0' p = make_clause (map R.polyliteral p) ~=Proof.Step.trivial in
-  let split_or k d s = match String.split_on_char k s with
-  | [a;b] -> a,b | [a] -> if k='.' then d,a else a,d | _ -> raise Exit in
-  let eq0 ss = eq0' R.[fold_left (++) _0 (List.map(fun cmt ->
-    let c,mt = split_or '.' "1" (String.trim cmt) in
-    let m,t = split_or '\'' "" mt in
-    Z.of_string c *: poly_of_string m >< of_term~vars:(todo"vars in eq0")(have t [] int)
-  ) (String.split_on_char '+' ss))] in
-  
 (*
   declare_recurrence !"NNf-Nf-f";
   declare_recurrence !"Ng-ng-g";
   propagate_recurrences_to !"nf"; (* OK *)
   propagate_recurrences_to !"g+f"; (* OK *)
   propagate_recurrences_to !"g+nf"; (* diverge? *)
-  propagate_recurrences_to !"∑ᵐb"; (* OK *)
-
-  propagate_recurrences_to !"{ᵐm-n-1}b"; (* OK *)
-  propagate_recurrences_to !"∑ⁿ{ᵐm-n-1}b"; (* OK *)
-  propagate_recurrences_to !"{ⁿm}∑ⁿ{ᵐm-n-1}b"; (* OK *)
-  propagate_recurrences_to !"{ⁿm}∑ⁿ{ᵐm-n-1}b - ∑ᵐb"; (* OK *)
 *)
   ["z","xn"; "q","x"; "b","mn"; "c","mn"; "f","m"; "g","mn"; "γ","mn"]
     |> map(uncurry(HS.add R.variable_dependency));
@@ -474,6 +450,7 @@ let sum_equality_inference clause = try
     declare_recurrence !"Nz-xz	"; (* zₓₙ = xⁿ *)
     declare_recurrence !"MMf-Mf-f	"; (* fₘ = mᵗʰ Fibonacci *)
     declare_recurrence !"xXq+Xq-q	"; (* qₓ = x!⁻¹ *)
+    declare_recurrence !"{ˣ0}q-1	"; (* q₀ = 1 *)
     declare_recurrence !"mMb-nMb+Mb-mb-b	"; (* binomial coefficient: *)
     declare_recurrence !"nNb+Nb-mb-nb	"; (* bₘₙ = (ₙͫ ) *)
     declare_recurrence !"MNc-nNc-Nc-c	"; (* Stirling cₘₙ = {ₙͫ } *)
@@ -488,22 +465,23 @@ let sum_equality_inference clause = try
     "{ˣx+y}{ⁿm}z	- {ⁿm+1}∑ⁿBZ{ˣy}{ⁿm-n}z	";(*6 binomial *)
     "{ᵐn+1}f	- {ᵐn+1}∑ᵐ{ⁿn-m}b	";(*7 Fibonacci *)
     "γ	- {ˣm}∑ˣ{ᵐm-1-x}g	";(*8 presented *)
-    "0	- {ᵐm-1-x}g	";(*9 debug *)
+    "0	- F{ˣm}q	";(*9 debug *)
   |]in(*
     (p,)r,e,i: ✓
-    c,b,A,F,S: leviää etenkin bₘₙ kanssa (? ja sijoituksille jäi aikoinaan kaavoja löytymättä ?)
+    c,b,A,F,S: leviää
   *)
   let rec go() =
     print_string"tutki: ";
     init_rec_table();
-    let cmd = read_line() in
-    if String.length cmd == 1 then(
-      let p = (!)tests.(int_of_string cmd) in
+    let tutki str =
+      let p = (!)str in
       print_endline("Tutkitaan " ^ R.poly_to_string p);
       ctrl_C_stoppable(fun()->
         propagate_recurrences_to p;
-        ~<recurrence_table;()))
-    else R.(match String.split_on_char ',' cmd with [p;p'] ->
+        ~<recurrence_table;()) in
+    let cmd = read_line() in
+    if String.length cmd == 1 then tutki tests.(int_of_string cmd)
+    else R.(match String.split_on_char '~' cmd with [p;p'] ->
       let p,p' = poly_of_string@@(p,p') in
       print_endline(match lead_unifiers p p' with
       | None -> "Samastumattomat "^ poly_to_string p ^", "^ poly_to_string p'
@@ -512,94 +490,14 @@ let sum_equality_inference clause = try
         ^match CCOpt.or_~else_:(leadrewrite p p')(leadrewrite p' p) with
         | Some r -> "rw. "^ poly_to_string r
         | None -> "")
-    | x -> print_endline("Paloja jaettaessa pilkusta pitää tulla 2 eikä " ^ string_of_int(length x)));
+    | [""] -> exit 0
+    | [s] -> tutki s
+    | x -> print_endline("Madosta jaettaessa pitää paloja tulla max 2 eikä " ^ string_of_int(length x)));
     go()
-  in go();
-  exit 1;
-  let seeSatur pp = ((~<) % Iter.to_list % saturate_with_order~= ~=[1] % Iter.of_list % map eq0) pp in
-  seeSatur["vvvvv"; "vv-1"];
-  seeSatur["yyx-x-y"; "yxx-x-1"];
-  seeSatur[
-  "3vvvvvvvvvvvvvvvvvvv"; "3vvvvvvvvv + 1";
-  (* eq0"x + y-v"; eq0"xx + yy-vv"; *)
-  (* eq0"xx + 3x + 1"; eq0"yy + 3y + 1"; eq0"xxxxx + yyyyy"; *)
-  
-  (* eq0"2nN-m + 3"; eq0"NM + 2m";  *)
-  (* eq0"2nnNN-nN + 3"; eq0"NNN + 2nN";   *)
-  
-  (* eq0"Xb-b-Xf"; eq0"h-b + g";  *)
-  (* eq0"Xg-g-Xf"; *)
-  (* eq0"-XXg + g + XXf + Xf"; *)
-  
-  (* eq0"Yb-2b"; eq0"-4g + yyb + yb"; *)
-  (* eq0"xXb-yXb + Xb-xb-b"; eq0"yYb + Yb-xb + yb"; eq0"f-yyb"; *)
-  (* Change priority for ↓ *)
-  (* eq0"xXf-yXf + Xf-xf-f"; eq0"yyYf-yxf + yyf-xf + yf"; *)
-
-  (* eq0"-XxxX∑f+3xxX∑f+9xX∑f+6X∑f-2xx∑f-6x∑f-4∑f"; eq0"xXg-2xg-4g"; eq0"h-∑f+g"; *)
-  
-  ];
-  exit 1
+  in go()
   (* tl(tl[clause;clause]) *)
 with e -> print_endline Printexc.((*get_backtrace() ^"\n"^ *)match e with Failure m -> m | e -> to_string e); exit 1
 
-(* Fibonacci ongelmatulosteotos:
-summation_equality line 292 ≣̲̇26       propagating to  {ᵐn＋１͘}fₘ
-CCOption.pp line 9 ≣̲̇49        rw.M－N
- NMfₘ－Mfₘ－fₘ
-CCOption.pp line 9 ≣̲̇50        rw.M－N
- -Mfₘ＋N²fₘ－fₘ
-CCOption.pp line 9 ≣̲̇50        rw.M－N
- N²fₘ－Nfₘ－fₘ
-RecurrencePolynomial line 605 ≣̲̇48     p̲p̲. -NMfₘ－Mfₘ＋N³fₘ
-CCOption.pp line 9 ≣̲̇48        rw.M－N
- -Mfₘ＋N³fₘ－N²fₘ
-CCOption.pp line 9 ≣̲̇48        rw.M－N
- N³fₘ－N²fₘ－Nfₘ
-CCOption.pp line 9 ≣̲̇49        rw.N²fₘ－Nfₘ－fₘ
-	‽  ‽  ‽  ‽  ‽  ‽  ‽  ‽  ‽  ‽  ‽  ‽  ‽  ‽  ‽  ‽  ‽  ‽  ‽  ‽  -Nfₘ＋fₘ
-CCOption.pp line 9 ≣̲̇49        rw.-Nfₘ＋fₘ
- -Nfₘ
-CCOption.pp line 9 ≣̲̇49        rw.-Nfₘ＋fₘ
- -fₘ
-RecurrencePolynomial line 605 ≣̲̇48     p̲p̲. Mfₘ－N²fₘ
-CCOption.pp line 9 ≣̲̇47        rw.M－N
- -N²fₘ＋Nfₘ
-CCOption.pp line 9 ≣̲̇48        rw.-Nfₘ＋fₘ
- Nfₘ－fₘ
-CCOption.pp line 9 ≣̲̇49        rw.-fₘ
- -Nfₘ＋２fₘ
-CCOption.pp line 9 ≣̲̇49        rw.-Nfₘ＋fₘ
- fₘ
-CCOption.pp line 9 ≣̲̇50        rw.-fₘ
- 0
-RecurrencePolynomial line 605 ≣̲̇48     p̲p̲. -Nfₘ
-CCOption.pp line 9 ≣̲̇47        rw.-fₘ
- -Nfₘ＋fₘ
-CCOption.pp line 9 ≣̲̇48        rw.-fₘ
- -Nfₘ＋２fₘ
-CCOption.pp line 9 ≣̲̇49        rw.-fₘ
- -Nfₘ＋３fₘ
-CCOption.pp line 9 ≣̲̇50        rw.-fₘ
- -Nfₘ＋４fₘ
-*)
-
-(* Stirling ongelmatulosteotos:
-summation_equality line 292 ≣̲̇28       propagating to  {ⁿx}cₙₘ
-CCOption.pp line 9 ≣̲̇51        rw.N－X
- XMcₙₘ－nNcₙₘ－Ncₙₘ－cₙₘ
-RecurrencePolynomial line 605 ≣̲̇50     p̲p̲. -nN²cₙₘ－２N²cₙₘ＋X²Mcₙₘ－Ncₙₘ
-CCOption.pp line 9 ≣̲̇50        rw.N－X
- -２N²cₙₘ＋X²Mcₙₘ－nXNcₙₘ－Ncₙₘ
-CCOption.pp line 9 ≣̲̇51        rw.N－X
- X²Mcₙₘ－nXNcₙₘ－２XNcₙₘ－Ncₙₘ
-CCOption.pp line 9 ≣̲̇51        rw.XMcₙₘ－nNcₙₘ－Ncₙₘ－cₙₘ
- -XNcₙₘ－Ncₙₘ＋cₙₘ
-CCOption.pp line 9 ≣̲̇52        rw.N－X
- -Ncₙₘ－X²cₙₘ＋cₙₘ
-CCOption.pp line 9 ≣̲̇52        rw.N－X
- -X²cₙₘ－Xcₙₘ＋cₙₘ
-*)
 
 (* Setup to do when MakeSumSolver(...) is called. *);;
 MainEnv.add_unary_inf "recurrences for ∑" sum_equality_inference

@@ -191,6 +191,7 @@ and indeterminate x = union 0 [
   [int];
   [int];
   [monomial];
+  [int];
   [list(tuple[int;polynomial])]] x
 and op_atom x = union 1 [[int]; [term; list int]] x
 
@@ -296,6 +297,9 @@ add_pp exception' Printexc.(fun e ->
   exn_slot_name e ^"#"^ str(exn_slot_id e) ^ if tuple[any;any] e then
     "("^ clever_view "," str (tl(fields e)) ^")"
   else "");
+
+(* low priority *)
+add_pp indeterminate (digits_in wide % RecurrencePolynomial.indet_to_string);
 
 add_pp decimal string_of_float;
 (* Quote number and invisible strings. *)
