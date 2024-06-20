@@ -470,6 +470,17 @@ let poly_of_lit = function Equation(o,p,true) when o==term0 -> poly_of_term p |_
 (* Weight of polynomial id. This is used when registering the extension in summation_equality.ml to update the weight assignment to be aware of the embedded polynomials. *)
 let polyweight_of_id = ID.payload_find ~f:(function RepresentingPolynomial(_,w,_) -> Some w |_->None)
 
+(* Weaker monomial equality that also equates a submonomial with its embedding *)
+(*let rec mono_embed_eq m1 m2 = m1==m2 or match m1,m2 with
+  | [A(T(t1,_))], [A(T(t2,_))] -> t1==t2 or (match poly_of_term@@(t1,t2) with
+    | Some p1, Some p2 -> CCList.equal mono_embed_eq p1 p2
+    | _ -> false)
+  | [A(T(t,_))],m | m,[A(T(t,_))] -> (match poly_of_term t with Some[m'] -> mono_embed_eq m m' |_->false)
+  | X f1 ::n1, X f2 ::n2 -> mono_embed_eq f1 f2 & mono_embed_eq n1 n2
+  | x1::n1, x2::n2 -> indet_eq x1 x2 & mono_embed_eq n1 n2
+  | one_empty -> false (* both empty was checked before pattern match *)
+*)
+
 
 (* Arithmetic operations ++, --, >< *)
 
@@ -480,13 +491,12 @@ let mono_add_coefficients = curry(function
 | m, n -> if_~=(mono_eq m n) (Z.of_int 2 *. m))
 
 let rec (++) p q : poly = match p,q with
-| p, [] -> p
+| p,[] | [],p -> p
 | m::p, n::q -> (match mono_add_coefficients m n with
   | Some(C o ::_) when is0 o -> p++q
   | Some mn -> mn :: p++q
   | _ when rev_cmp_mono m n < 0 -> m :: p++(n::q)
-  | _ -> (n::q) ++ (m::p))
-| p, q -> q++p
+  | _ -> n :: q++(m::p))
 
 let (--) p q =
   let negate = function C a ::m -> Z.neg a *. m | m -> Z.minus_one *. m in

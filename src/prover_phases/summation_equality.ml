@@ -203,6 +203,8 @@ let replace_lit_by_poly c old_lit_index p = make_clause ~parents:[c]
 
 let polys_in = Iter.(concat % map(filter_map R.poly_of_lit % of_array % C.lits))
 
+let poly_eq_term p t = R.(CCOpt.equal poly_eq (Some p) (poly_of_term t))
+
 
 let saturate_in env cc = Phases.(run(
   let (^) label thread = start_phase label >>= return_phase >>= ~=thread in
@@ -323,23 +325,53 @@ and propagate_oper_affine p's_on_f's =
 and propagate_times f g =
   (* 1. rename (ϱ) var.s of g with merge σ *)
   let rename, merge, _ = R.rename_apart ~taken:(R.free_variables f) (R.free_variables g) in
+  let g' = R.([rename]><g) in
+  let fXg' = R.(mul_indet f><g') in
+  let _,fXg'_term,_ = R.poly_as_lit_term_id fXg' in
+  let operator_on ps m = (* n,p if polynomial p∈ps and monomial m=n·p *)
+    let result_arg = ref None in
+    let op = [m] |> R.map_outer_indeterminates R.(fun n x ->
+      match find_idx(poly_eq[n]) ps with
+      | None -> `Go, [[x]]
+      | Some(_,p) -> result_arg := Some p; `End, const_op_poly Z.one
+    ) in
+    CCOpt.map(fun p -> op, p) !result_arg
+  in
   (* 2. create Rᶠ·ϱg and f·ϱRᵍ *)
+  let map_unembed_rec p mapping = map(map_poly_in_clause R.(mapping % map_indeterminates(function
+    | A(T(pT,_)) when poly_eq_term p pT -> p
+    | x -> [[x]])))
+    (propagate_recurrences_to p) in
   let disjoint_recurrences = R.(
-    map(map_poly_in_clause(fun r -> mul_indet r><[rename]><g)) (propagate_recurrences_to f) @
-    map(map_poly_in_clause(fun r -> mul_indet f><[rename]><r)) (propagate_recurrences_to g)) in
+    (* map(map_poly_in_clause(fun r -> mul_indet r><g')) (propagate_recurrences_to f) @
+    map(map_poly_in_clause(fun r -> mul_indet f><[rename]><r)) (propagate_recurrences_to g) *)
+    map_unembed_rec f (fun r -> mul_indet r><g') @
+    map_unembed_rec g (fun r -> mul_indet f><(*[rename]><r ...gets tangled up with shifts which cannot be resolved locally during multiplication*)
+      map_outer_indeterminates(fun m -> function
+        | _ when poly_eq [m] g -> `End, g'
+        | C _ as x -> `Go, [[x]]
+        | X f -> `Go, mul_indet([rename]><[f])
+        (* Use the fact that rename/ϱ maps to fresh variables. Hence the variable of a shift is unconditionally renamed according to ϱ (and so preserved if not present). *)
+        | O1 i as x -> `Go, [match rename with [O s] -> [match assq_opt i s with Some[[A(V j)]] -> shift j |_->x]|_->[x]]
+        | _ -> `End, [rename]><[m]
+    )r) |> map(map_poly_in_clause(map_outer_indeterminates(fun m -> function
+      | X h as x -> (match operator_on[f;g'] h, operator_on[f;g'] (tl m) with
+        | _, None -> `End, [m]
+        | Some(hS,hA), Some(mS,mA) when poly_eq fXg' (mul_indet hA><mA) -> `End, hS><mS><of_term fXg'_term
+        | _	-> `Go, [[x]])
+      | x	-> `Go, [[x]]))))
+  in
   match merge with
   | [] -> Iter.of_list disjoint_recurrences
   (* 3. propagate to substitution σ(f·ϱg) when σ!=id *)
-  | [O m] ->
-    let f_x_g' = "product breakdown "^str[R.o m]|<R.(mul_indet f><[rename]>< g) in
-    PolyMap.add recurrence_table f_x_g' disjoint_recurrences;
-    propagate_subst m f_x_g'
+  | [O merges] ->
+    PolyMap.add recurrence_table fXg' disjoint_recurrences;
+    propagate_subst merges fXg'
   | _ -> assert false (* impossible result from R.rename_apart *)
 
 and propagate_sum i f =
-  let is_f t = R.(CCOpt.equal poly_eq (Some f) (poly_of_term t)) in
   let sum_blocker = function (* gives elimination priorities: 0 is good, 1 is bad *)
-  |`T t when not(is_f t) -> 0
+  |`T t when not(poly_eq_term f t) -> 0
   |`V v when v!=i -> 0
   |`O1 _ -> 0
   | _ -> 1
@@ -378,7 +410,7 @@ and propagate_subst s f =
   | Some(m,a) ->
     (* If 𝕊ⱼ=Sⱼ, we skip it, which makes saturation faster, but primarily this is to dodge the issue of telling 𝕊ⱼ and Sⱼ apart. *)
     let changedShift = filter(fun j -> exists R.(fun i -> m@.(i,j) != if i=j then 1 else 0) (Int_set.to_list dom)) in
-    let multishifts_and_equations = (*changedShift*)(Int_set.to_list(R.rangeO s)) |> map R.(fun j ->
+    let multishifts_and_equations = Int_set.to_list(R.rangeO s) |> map R.(fun j ->
       let on_dom f = map f (Int_set.to_list dom) in
       (* 𝕊ⱼ = ∏ᵢ Sᵢ^mᵢⱼ = O[0,m₀ⱼ;...;i,mᵢⱼ;...] where j runs over range and i over domain *)
       let ss_j = hd(o(on_dom(fun i -> i, var_poly i ~plus:(Z.of_int(m@.(i,j)))))) in
@@ -394,9 +426,7 @@ and propagate_subst s f =
     |> map(map_poly_in_clause R.(map_submonomials(fun n -> CCOpt.if_~=(poly_eq f [n]) s'f)))
     |> Iter.of_list (* Above is undone via s'f_term ↦ sf_term at substitution push. *)
     |> Iter.append(Iter.of_list(map (definitional_poly_clause % snd) multishifts_and_equations))
-    |>((|<)"pre  saturation")
     |> saturate_with_order R.(elim_indeterminate(function`O1 i when Int_set.mem i elimIndices -> 1 |_-> 0))
-    |>((|<)"post saturation")
     |> Iter.filter_map(fun c -> try Some(c |> map_poly_in_clause R.(fun p ->
       let cache_t_to_st = HT.create 4 in
       let p = if equational p then p else p>< of_term s'f_term in
