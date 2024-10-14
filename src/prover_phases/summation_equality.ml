@@ -39,6 +39,7 @@ end)
 
 let (=) = R.(=)
 let todo = R.todo
+let (=~) msg f x = str x ^" ⊢———"^msg^"———>"|< f x
 let (~=) x _ = x
 let (@@) = CCPair.map_same
 let (%%>) = compose_binop
@@ -403,30 +404,29 @@ and propagate_subst s f =
   let f_is_s'f = definitional_poly_clause R.(f -- of_term s'f_term) in
   let effect_dom = Int_set.of_list(map fst s) in
   let dom = R.free_variables f in
-  let s'f = R.of_term~vars:Int_set.(to_list(union effect_dom (R.rangeO s))) s'f_term in
-  assert(Int_set.subset effect_dom dom);
+  let s'f = R.of_term~vars:Int_set.(to_list(union dom (R.rangeO s))) s'f_term in
+  assert(Int_set.subset effect_dom dom); (* If this fails, sf is not properly simplified, but how to enforce that? The below code might rely on this. *)
   match R.view_affine s with
   | None -> Iter.empty
   | Some(m,a) ->
-    (* If 𝕊ⱼ=Sⱼ, we skip it, which makes saturation faster, but primarily this is to dodge the issue of telling 𝕊ⱼ and Sⱼ apart. *)
-    let changedShift = filter(fun j -> exists R.(fun i -> m@.(i,j) != if i=j then 1 else 0) (Int_set.to_list dom)) in
+    (* If 𝕊ⱼ=Sⱼ, we skip it, which makes saturation faster, but primarily this is to dodge the issue of telling 𝕊ⱼ and Sⱼ apart. ...not any more! *)
+    (* let changedShift = filter(fun j -> exists R.(fun i -> m@.(i,j) != if i=j then 1 else 0) (Int_set.to_list dom)) in*)
     let multishifts_and_equations = Int_set.to_list(R.rangeO s) |> map R.(fun j ->
-      let on_dom f = map f (Int_set.to_list dom) in
-      (* 𝕊ⱼ = ∏ᵢ Sᵢ^mᵢⱼ = O[0,m₀ⱼ;...;i,mᵢⱼ;...] where j runs over range and i over domain *)
+      let on_dom act = map act (Int_set.to_list dom) in
+      (* 𝕊ⱼ = ∏ᵢ Sᵢ^mᵢⱼ = O[0,m₀ⱼ;...;i,mᵢⱼ;...] where j runs over range and i over domain. It suffices to loop over the explicit part rangeO s of the semantic range of s, because any other variable in the implicit part dom\effect_dom is irrelevant like fixed parameter. *)
       let ss_j = hd(o(on_dom(fun i -> i, var_poly i ~plus:(Z.of_int(m@.(i,j)))))) in
       let eq_j = product(on_dom(fun i -> pow' poly_alg [[shift i]] (max 0 (m@.(i,j)))))
         -- product([[ss_j]] :: on_dom(fun i -> pow' poly_alg [[shift i]] (- min 0 (m@.(i,j))))) in
       ((ss_j, shift j), j), eq_j
     ) in
-    (* We must eliminate all domain shifts except ones skipped above: dom\( rangeO s \ {j | ∃ ss_j} ) *)
-    let elimIndices = Int_set.(diff dom (diff (R.rangeO s) (of_list(List.map(snd%fst) multishifts_and_equations)))) in
-    let elimIndices = dom in (* fixed ✓; TODO inline *)
+    (* There's 3 types of variables, namely those that are: 1. explicitly mapped by s (effect_dom); 2. implicitly merged by s (rangeO s ∩ dom); 3. irrelevant for s. *)
+    let elimIndices = Int_set.(union effect_dom (inter dom (R.rangeO s))) in
     (* * * * Clause prosessing chain: turn recurrences of f to ones of “s'f”, add 𝕊=∏S, eliminate S, push ∘s i.e. map 𝕊ⱼ↦Sⱼ, and filter *)
     propagate_recurrences_to f
     |> map(map_poly_in_clause R.(map_submonomials(fun n -> CCOpt.if_~=(poly_eq f [n]) s'f)))
     |> Iter.of_list (* Above is undone via s'f_term ↦ sf_term at substitution push. *)
     |> Iter.append(Iter.of_list(map (definitional_poly_clause % snd) multishifts_and_equations))
-    |> saturate_with_order R.(elim_indeterminate(function`O1 i when Int_set.mem i elimIndices -> 1 |_-> 0))
+    |> saturate_with_order R.(elim_indeterminate'(function`O1 i when Int_set.mem i elimIndices -> [1] |`T f' when f'==f_term -> [0] |_-> [0])) (* experiment: ignore excess terms—broke reverse example! *)
     |> Iter.filter_map(fun c -> try Some(c |> map_poly_in_clause R.(fun p ->
       let cache_t_to_st = HT.create 4 in
       let p = if equational p then p else p>< of_term s'f_term in
@@ -444,11 +444,12 @@ and propagate_subst s f =
             let _,st,_ = poly_as_lit_term_id([o s] >< get_or~default:(of_term~vars t) (poly_of_term t)) in
             let st = of_term st in
             HT.add cache_t_to_st t st; `Go,st
+          (* Pass indeterminates that are irrelevant parameter-like for s. *)
+          | X[A(V i)] | O1 i as x when not(Int_set.mem i elimIndices) -> `Go,[[x]]
           (* Replace Mᵢ=X[A(V i)] by ∑ⱼmᵢⱼMⱼ. *)
           | X[A(V i)] -> `Go, fold_left (++) _0 (map(fun j -> const_op_poly(Z.of_int(m@.(i,j))) >< [[mul_var j]]) (Int_set.to_list(rangeO s)))
-          (* Discard clauses still containing shifts that were to be eliminated. Pass commuting shifts—but aren't the rest also bad and to be eliminated? TODO *)
-          | O1 i when Int_set.mem i elimIndices -> raise Exit
-          | O1 i as x when not(Int_set.mem i (rangeO s)) -> `Go,[[x]]
+          (* Discard clauses still containing shifts that were to be eliminated. *)
+          | O1 i -> raise Exit
           (* Replace 𝕊ⱼ by Sⱼ by looking it up from multishifts_and_equations. *)
           | O _ as x -> (match assoc_opt ~eq:indet_eq x (map(fst%fst) multishifts_and_equations) with
             | Some sx	-> `Go, [[sx]]
@@ -484,6 +485,7 @@ let sum_equality_inference clause = try
     declare_recurrence !"mMb-nMb+Mb-mb-b	"; (* binomial coefficient: *)
     declare_recurrence !"nNb+Nb-mb-nb	"; (* bₘₙ = (ₙͫ ) *)
     declare_recurrence !"MNc-nNc-Nc-c	"; (* Stirling cₘₙ = {ₙͫ } *)
+    declare_recurrence !"{ⁿ0}c	"; (* cₘ₀ = 0 for m>=1 *)
     declare_recurrence !"MMγ-γ-Mg-g	"; (* double step γ=∑g *)
   in let tests = [|
     "{ᵐm+u}{ⁿh}b	- {ⁿh+1}∑ⁿB{ᵐu}{ⁿh-n}b	";(*0 convolution *)
@@ -495,17 +497,22 @@ let sum_equality_inference clause = try
     "{ˣx+y}{ⁿm}z	- {ⁿm+1}∑ⁿBZ{ˣy}{ⁿm-n}z	";(*6 binomial *)
     "{ᵐn+1}f	- {ᵐn+1}∑ᵐ{ⁿn-m}b	";(*7 Fibonacci *)
     "γ	- {ˣm}∑ˣ{ᵐm-1-x}g	";(*8 presented *)
-    "0	- F{ˣm}q	";(*9 debug *)
+    "0	+ F{ˣm}q	";(*9 debug *)
   |]in(*
     (p,)r,e,i: ✓
-    c,b,A,F,S: leviää
+    c,b,A,F: leviää heti binomikertoimilla
+    S: reunatermien sievennys tökkii, Stirling-reunat uupuvatkin täysin:
+    ∑ⁿcₙₘ{ˣ-n＋x}qₓ ≕ <ξ>
+• XM<ξ>−xX<ξ>−X<ξ>˖XMcₙₘXM{ˣ−n˖x}qₓ−xcₙₘX{ˣ−n˖x}qₓ−cₙₘX{ˣ−n˖x}qₓ˖cₙₘ{ˣ−n˖x}qₓ−X{ⁿ0ᵐm˖1͘}cₙₘXqₓ˖xX{ⁿ0}cₙₘXqₓ˖X{ⁿ0}cₙₘXqₓ−{ⁿ0}cₙₘqₓ
+• N<ξ>−<ξ>−cₙₘ{ˣ−n˖x}qₓ
+Ongelma: Ncₙₘ·XN{ˣ-n＋x}qₓ -> 𝕊ᕁᴺcₙₘ·{ˣ-n＋x}qₓ pitäisi saada pääteltyä tai lykättyä
   *)
   let rec go() =
-    print_string"tutki: ";
+    print_string"analyze: ";
     init_rec_table();
     let tutki str =
       let p = (!)str in
-      print_endline("Tutkitaan " ^ R.poly_to_string p);
+      print_endline("Analyzing " ^ R.poly_to_string p);
       ctrl_C_stoppable(fun()->
         propagate_recurrences_to p;
         ~<recurrence_table;()) in
@@ -514,7 +521,7 @@ let sum_equality_inference clause = try
     else R.(match String.split_on_char '~' cmd with [p;p'] ->
       let p,p' = poly_of_string@@(p,p') in
       print_endline(match lead_unifiers p p' with
-      | None -> "Samastumattomat "^ poly_to_string p ^", "^ poly_to_string p'
+      | None -> "Nonunifiable "^ poly_to_string p ^", "^ poly_to_string p'
       | Some(u,u') -> "Unify "^poly_to_string[u]^", "^poly_to_string[u']^"\n"
         ^"p̲p̲. "^poly_to_string(hd(superpose p p'))^"\n"
         ^match CCOpt.or_~else_:(leadrewrite p p')(leadrewrite p' p) with

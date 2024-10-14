@@ -99,9 +99,6 @@ and op =
 | O1 of var
 | O of (var*poly)list (* O[v,[[A(V v)];[A I]]] is allowed, distinct form of O1 v *)
 
-let debug_poly_of_term = ref(Obj.magic())
-let debug_free_variables = ref(Obj.magic())
-
 (* Distinguish operator polynomials and recurrence equations: is A present in monomials or not. *)
 let equational = for_all(fun m -> m!=[] & match hd(rev m) with A _ -> true | C o -> is0 o | _ -> false)
 let operational = for_all(fun m -> m=[] or match hd(rev m) with A _ -> false | C o -> is0 o | _ -> true)
@@ -462,7 +459,6 @@ let poly_of_id id = id |> ID.payload_find ~f:(fun data -> match data with
 
 (* Retrieve polynomial embedded into a term and make it conform to the current monomial order. See also of_term. *)
 let poly_of_term t = match view t with Const id -> poly_of_id id |_->None
-let _=debug_poly_of_term:=poly_of_term
 
 (* Retrieve polynomial embedded into a literal and make it conform to the current monomial order. *)
 let poly_of_lit = function Equation(o,p,true) when o==term0 -> poly_of_term p |_->None
@@ -480,6 +476,36 @@ let polyweight_of_id = ID.payload_find ~f:(function RepresentingPolynomial(_,w,_
   | x1::n1, x2::n2 -> indet_eq x1 x2 & mono_embed_eq n1 n2
   | one_empty -> false (* both empty was checked before pattern match *)
 *)
+
+
+(* General substitutions: accessing variables *)
+
+let union_map f = fold_left (fun u a -> Int_set.union u (f a)) Int_set.empty
+
+(* Domain and range (explicit parts) of an O (substitution) indeterminate. *)
+let domainO f = Int_set.of_list(map fst f)
+let rec rangeO f = union_map(free_variables%snd) f
+
+and free_variables p' = Int_set.(let rec monoFV = function
+  | [] -> empty
+  | O f :: m -> union (rangeO f) (diff (monoFV m) (domainO f))
+  | x::m -> union (monoFV m) (match x with
+    | O f -> assert false (* was prior case *)
+    | C _ | A I -> empty
+    | O1 i | A(V i) | S i | D i | XD i -> singleton i
+    | X f -> monoFV f
+    | A(T(_,v)) -> of_list v
+  ) in
+  union_map monoFV p')
+
+let free_variables' = Int_set.to_list % free_variables
+
+(* Basic A-T-constructor: embed term into polynomial argument. See also poly_of_term to reverse embedding of polynomial in a term. The desire to compute default for vars forces this to appear late in this file. *)
+let of_term ?(vars=[-1]) t = [[A(T(t, sort_uniq~cmp:(-) (
+  if vars=[-1] then match poly_of_term t with
+  | None -> failwith("of_term: missing ~vars for non-polynomial-embedding term "^ Term.to_string t)
+  | Some p -> free_variables' p
+  else vars)))]]
 
 
 (* Arithmetic operations ++, --, >< *)
@@ -544,8 +570,11 @@ and indeterminate_product x y =
   | S l, (X[A(V i)] | D i | XD i) when l!=i -> [[y;x]]
   | O[i,[[C o]]], S j when i=j -> assert(is0 o); [[x]]
   | O[i,[[C c; A I]]], S j when i=j -> map Z.(fun n -> eval_at~var:i (of_int n + min c zero)) (range' 0 (abs(Z.to_int_exn c)))
+  (* | O f, O1 i when not Int_set.(is_shift x or mem i (domainO f) or mem i (rangeO f)) -> [[y;x]] (* Unuseable with reverse-example. TODO Merging substitutions like {n↦0}{k↦k+1} = {n,k ↦ 0,k+1} gives normal form for cancelling, but on the other hand only representation {k↦k+1}{n↦0}F is easily rewritten by an equation {n↦0}F=...; anyway (but not in any case?!) a subformula  M{ᵐm－１͘}gₙₘ－gₙₘ or even -M{ᵐm－１͘}gₙₘ－{ˣx＋１͘ᵐm＋１͘}{ᵐm－x－１͘}gₙₘ＋{ᵐm－x－１͘}gₙₘ＋{ˣx＋１͘ᵐm＋１͘}{ᵐm－１͘}gₙₘ was derived in reverse-example and it is not getting simplified to 0. *) *)
   | O f, O1 i when not(is_shift x) -> [[x]]><[o[i, var_poly i ~plus:Z.one]] (*apply below*)
   | O f, O g when not(is_shift x) -> [o(map(map_snd((><)[[x]]))(*∘f*)g @ filter(fun(i,_) -> not(mem i (map fst g)))(*implicit defaults*)f)]
+  | O f, O g when let eliminated = Int_set.(flip mem (diff(domainO g)(rangeO g))) in for_all(eliminated%fst)f -> [[y]] (*needed corner case simplification*)
+  (* | O1 i, O f when not(is_shift y) -> [o[i, var_poly i ~plus:Z.one]]><[[y]] —BAD as it makes saturation loop and was a reason to distinguish O1 from O indeterminate! *)
   | x, y when is_shift x & is_shift y & stable_cmp_mono [x] [y] > 0 -> [[y;x]]
   | D i, D l | XD i, XD l | S i, S l | X[A(V i)], X[A(V l)] when i>l -> [[y;x]]
   | X f, X g when stable_cmp_mono f g > 0 -> [[y;x]] (* Assumes commutative product! *)
@@ -595,8 +624,8 @@ let()= try hd[] with Failure"hd"->() | e->print_endline("Invalid build: Fix Recu
 let rec unifiers m' n' =
   (* Input is reversed for matching but output is in standard writing order. *)
   let rec loop = function
-  (* We demand m'!=0!=n'. This together with exactness of divisions below guarantees that hd succeeds. *)
-  | [C a], [C b] -> Z.(fun a_b -> hd(const_op_poly(div a_b (gcd a b)))) @@ (a,b)
+  (* We demand m'!=0!=n'. Hence a!=0!=b and the results of the below exact divisions !=0 so that hd succeeds. *)
+  | [C a], [C b] -> Z.(fun b_a -> hd(const_op_poly(div b_a (gcd a b)))) @@ (b,a)
   | m, ([] | [C _] as n) -> n, rev m
   | x::m, x'::n when indet_eq x x' -> loop(m,n)
   | x::m, y::n when join_normalizes x y ->
@@ -614,18 +643,22 @@ let lead_unifiers = curry(function x::_, y::_ -> unifiers x y | _ -> None)
 let (|~>) general special = match lead_unifiers general special with
 | Some(u, []) -> Some u
 | Some(u, [C __1]) when Z.(equal __1 minus_one) -> Some(__1*.u)
-(* Only reduce the absolute value of the leading coefficient. This is symmetric w.r.t. 0 so a/b rounds correctly towards 0. *)
-| Some(C a :: u, [C b]) when Z.(gt (abs a) (abs b)) -> Some Z.(div a b *.u)
-(* TODO is the converse when u=[] necessary to handle? *)
+(* Only reduce the absolute value of the leading coefficient. W.l.o.g. consider reducing a (special) by multiple of b (general), so that we seek c minimizing |a-bc|. Consider normalized a,b>0. Now ∃! c∈ℤ: a-bc ∈ [-b/2,b/2[. Then 0 <= a+⌊b/2⌋-bc <= b/2+a-bc < b and hence c = ⌊(a+⌊b/2⌋)/b⌋. If c=0, no useful unifier exists. An exact precondition becomes a+⌊b/2⌋>=b ⇔ a>=b-⌊b/2⌋=⌈b/2⌉ ⇔ a>=b/2 ⇔ 2a>=b for a,b∈ℤ₊. Moreover with 2a=b we'd only swap the sign of a (special)—that is already consistently made positive in the recurrences—and hence the precondition can be tightened to 2|a|>|b| unnormalized. Especially in the case of implicit a=1 we'd only allow |b|=1 that is already handled above. Finally we simplify the complete formula of c by the identity div x (-y) = -div x y, that is valid for round-to-0 division with Zarith and Euclidean division with Big_int (Zarith's ediv, counterpart of the proper nonnegative mod), which b.t.w. can disagree for x<0. *)
+| Some(C a :: u, [C b]) when Z.(gt (abs(a+a)) (abs b)) -> Some Z.(of_int(sign a) * div(abs a + div(abs b)(of_int 2))b *.u)
 | _ -> None
 
 
+(* Difference with positive leading coefficient *)
+let (|--|) p p' = match p--p' with (C a::_)::_ as r when Z.(a<zero) -> _0--r | r->r
+
 let superpose p p' = if p==p' then [] else
   match lead_unifiers p p' with
-  | Some(u,u') -> ["p̲p̲."|<([u]><p) -- ([u']><p')]
+  | Some(u,u') -> "p̲p̲."|<[([u]><p) |--| ([u']><p')]
   | None -> []
 
-let leadrewrite r p = CCOpt.map(fun u -> "rw."^str r^"\n"|<p -- ([u]><r)) (r |~> p)
+let leadrewrite r p = r |~> p |> CCOpt.flat_map(fun u -> match [u]><r with
+  | [] -> None (* Unifier u triggers simplifications in r that make it 0. *)
+  | ur -> Some("rw. by "^str r^"\n     "^str p^"\n to "|<(p|--|ur)))
 
 
 module type View = sig type t type v val view: t -> v option end
@@ -649,30 +682,9 @@ let default_features() = (* () because of type variables *)
   ]
 
 
-(* Affine substitutions: accessing variables and matrix form *)
+(* Affine substitutions: matrix form *)
 
-let union_map f = fold_left (fun u a -> Int_set.union u (f a)) Int_set.empty
-
-(* Domain and range (explicit parts) of an O (substitution) indeterminate. *)
-let domainO f = Int_set.of_list(map fst f)
-let rec rangeO f = union_map(free_variables%snd) f
-
-and free_variables p' = Int_set.(let rec monoFV = function
-  | [] -> empty
-  | O f :: m -> union (rangeO f) (diff (monoFV m) (domainO f))
-  | x::m -> union (monoFV m) (match x with
-    | O f -> assert false (* was prior case *)
-    | C _ | A I -> empty
-    | O1 i | A(V i) | S i | D i | XD i -> singleton i
-    | X f -> monoFV f
-    | A(T(_,v)) -> of_list v
-  ) in
-  union_map monoFV p')
-
-let free_variables' = Int_set.to_list % free_variables
-let _=debug_free_variables:=free_variables'
-
-(* Output ϱ,σ,raw. Renaming substitution indeterminate ϱ satisfies dom ϱ = vs\taken and img ϱ ∩ vs∪taken = ∅. Substitution indeterminate σ undoes ϱ meaning [σ]><[ϱ]><p = p if free_variables p ⊆ taken∪vs. Finally raw is the list of the variable pairs (vᵢ,uᵢ) that define σ:vᵢ↦uᵢ and ϱ:uᵢ↦vᵢ. *)
+(* Output ϱ,σ,raw. Renaming substitution indeterminate ϱ satisfies dom ϱ = vs\taken and img ϱ ∩ vs∪taken = ∅. Substitution indeterminate σ undoes ϱ meaning [σ]><[ϱ]><p = p if free_variables p ⊆ vs∪taken. Finally raw is the list of the variable pairs (vᵢ,uᵢ) that define σ:vᵢ↦uᵢ and ϱ:uᵢ↦vᵢ. *)
 let rename_apart ~taken vs = match Int_set.(
   let collide = inter vs taken in
   let m = lazy(ref(max_elt(union vs taken))) in
@@ -709,13 +721,6 @@ let isMatrix1 i = Array.for_all((=)[||])i
 let (@.) m (i,j) = if i >= Array.length m or m.(i)=[||] then if i=j then 1 else 0
   else try m.(i).(j) with Invalid_argument(*"index out of bounds"*)_ -> 0
 
-
-(* Basic A-T-constructor: embed term into polynomial argument. See also poly_of_term to reverse embedding of polynomial in a term. The desire to compute default for vars forces this to appear late in this file. *)
-let of_term ?(vars=[-1]) t = [[A(T(t, sort_uniq~cmp:(-) (
-  if vars=[-1] then match poly_of_term t with
-  | None -> failwith("of_term: missing ~vars for non-polynomial-embedding term "^ Term.to_string t)
-  | Some p -> free_variables' p
-  else vars)))]]
 
 (* The input function produces polynomials, and its mapped version is linear. *)
 let map_monomials f = fold_left (++) _0 % map f

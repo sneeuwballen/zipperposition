@@ -281,6 +281,8 @@ add_pp (test 0 (fun(tag,_) -> tag=closure_tag or tag=infix_tag)) (fun f ->
 
 (* Do specific non-parametric assignments *)
 
+add_pp integer Logtk_arith.Z.to_string;
+
 add_pp run's_result (function
 | CCResult.Error info -> "🚫 "^info
 | CCResult.Ok(state, res) ->
