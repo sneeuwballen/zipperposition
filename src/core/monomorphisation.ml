@@ -304,7 +304,6 @@ let apply_ty_arg_subst subst poly_ty_args max_new_mono_opt max_new_poly_opt =
   in
   (* a polymorphic type argument tuple is a monomorphic candidate with regards to a given substitution
    * if that substitution instantiates all its type variables *)
-
   (*splits the poly type args into mono and poly candidates *)
   let mono_candidates, potential_poly_candidates =
     iter_partition
@@ -869,7 +868,6 @@ let monomorphise_problem_base clause_list =
       clause_list
   in
   (*Printf.printf "initialisation done at: %f\n" (Sys.time () -. !begin_time );*)
-
   (* all non-monomorphic clauses *)
   let poly_clause_list =
     List.filter (fun cl -> clause_is_monomorphic cl |> not) clause_list
@@ -890,7 +888,6 @@ let monomorphise_problem_base clause_list =
         new_subst
   in
   (*Printf.printf "initialisation done at: %f\n" (Sys.time () -. !begin_time );*)
-
   (* we don't really care about the type arguments, the substitutions are the important part*)
   let final_mono, final_non_mono, subst_map_res =
     let init_mono_map =

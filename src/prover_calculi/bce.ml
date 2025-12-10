@@ -319,8 +319,9 @@ module Make (E : Env.S) : S with module Env = E = struct
           TaskPriorityQueue.insert task_queue task )
         (Util.Int_map.find (C.id clause) !clause_lock) ;
       clause_lock := Util.Int_map.remove (C.id clause) !clause_lock
-    with Not_found -> (* clause was already removed *)
-                      ()
+    with Not_found ->
+      (* clause was already removed *)
+      ()
 
   (* remove the clause from the whole BCE tracking system *)
   let deregister_clause clause =
@@ -842,7 +843,7 @@ module Make (E : Env.S) : S with module Env = E = struct
             Env.ProofState.PassiveSet.clauses ()
             |> C.ClauseSet.to_iter
             |> Iter.iter (fun cl ->
-                   C.Tbl.add (Env.flex_get k_bce_sat_tracked) cl () ) ;
+                C.Tbl.add (Env.flex_get k_bce_sat_tracked) cl () ) ;
             Signal.on_every Env.ProofState.PassiveSet.on_add_clause (fun cl ->
                 if C.proof_depth cl = 0 then add_cl_sat cl ) ;
             Signal.on_every Env.ProofState.PassiveSet.on_remove_clause

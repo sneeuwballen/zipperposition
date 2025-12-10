@@ -181,9 +181,9 @@ module Make (Ctx : Ctx.S) : S with module Ctx = Ctx = struct
         []
     | Stmt.Def _ | Stmt.Rewrite _ ->
         if not convert_defs then []
-          (*dealt with by rewriting *)
-          (* dealt with  *)
-        else List.map of_lits (Stmt.get_formulas_from_defs st)
+        (*dealt with by rewriting *)
+        (* dealt with  *)
+          else List.map of_lits (Stmt.get_formulas_from_defs st)
     | Stmt.Assert lits ->
         [of_lits lits]
     | Stmt.Goal lits ->
@@ -220,8 +220,8 @@ module Make (Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       let renaming = S.Renaming.create () in
       Array.map (fun l -> Lit.apply_subst_no_simp renaming subst (l, sc)) lits
 
-  (** Bitvector that indicates which of the literals of [subst(clause)]
-      are maximal under [ord] *)
+  (** Bitvector that indicates which of the literals of [subst(clause)] are
+      maximal under [ord] *)
   let maxlits (c, sc) subst =
     let ord = Ctx.ord () in
     if not @@ Subst.is_empty subst then
@@ -237,15 +237,17 @@ module Make (Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       Lits.is_max ~ord lits' idx
     else BV.get (BV.of_list @@ Lazy.force c.max_lits) idx
 
-  (** Bitvector that indicates which of the literals of [subst(clause)]
-      are eligible for resolution. *)
+  (** Bitvector that indicates which of the literals of [subst(clause)] are
+      eligible for resolution. *)
   let eligible_res (c, sc) subst =
     let ord = Ctx.ord () in
     let selected = Lazy.force c.selected in
     let bool_selected = Lazy.force c.bool_selected in
     if BV.is_empty selected && CCList.is_empty bool_selected then
-      if (* maximal literals *)
-         not @@ Subst.is_empty subst then
+      if
+        (* maximal literals *)
+        not @@ Subst.is_empty subst
+      then
         let lits' = _apply_subst_no_simpl subst (lits c, sc) in
         Lits.maxlits ~ord lits'
       else BV.of_list @@ Lazy.force c.max_lits
@@ -295,7 +297,8 @@ module Make (Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     let res =
       (* directly at position of selected booleans *)
       Lazy.force c.bool_selected
-      @ (* below selected selected booleans *)
+      @
+      (* below selected selected booleans *)
       CCList.flat_map
         (fun pb ->
           let pos = Position.Build.to_pos pb in
@@ -358,8 +361,8 @@ module Make (Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       Some (create ~penalty ~trail (CCArray.to_list new_lits) proof)
     else None
 
-  (** Bitvector that indicates which of the literals of [subst(clause)]
-      are eligible for paramodulation. *)
+  (** Bitvector that indicates which of the literals of [subst(clause)] are
+      eligible for paramodulation. *)
   let eligible_param (c, sc) subst =
     let ord = Ctx.ord () in
     if

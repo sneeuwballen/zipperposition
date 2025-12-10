@@ -2,8 +2,8 @@
 
 (** {1 Feature Vector indexing} *)
 
-(** Feature Vector indexing (see Schulz 2004) for efficient forward
-    and backward subsumption *)
+(** Feature Vector indexing (see Schulz 2004) for efficient forward and backward
+    subsumption *)
 
 module T = Term
 
@@ -90,11 +90,11 @@ module Make (C : Index.CLAUSE) = struct
       let symbs_depths =
         T.Seq.subterms_depth t
         |> Iter.filter_map (fun (t, depth) ->
-               match T.Classic.view t with
-               | T.Classic.App (s, _) when ID.equal s symb ->
-                   Some depth
-               | _ ->
-                   None )
+            match T.Classic.view t with
+            | T.Classic.App (s, _) when ID.equal s symb ->
+                Some depth
+            | _ ->
+                None )
       in
       match Iter.max symbs_depths with None -> 0 | Some m -> m
 
@@ -144,10 +144,9 @@ module Make (C : Index.CLAUSE) = struct
     | _ ->
         false
 
-  (** get/add/remove the leaf for the given list of ints. The
-      continuation k takes the leaf, and returns a leaf
-      that replaces the old leaf.
-      This function returns the new trie. *)
+  (** get/add/remove the leaf for the given list of ints. The continuation k
+      takes the leaf, and returns a leaf that replaces the old leaf. This
+      function returns the new trie. *)
   let goto_leaf trie t k =
     (* the root of the tree *)
     let root = trie in

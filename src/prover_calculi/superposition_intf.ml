@@ -47,12 +47,12 @@ module type S = sig
   (** {5 Simplifications rules} *)
 
   val is_tautology : C.t -> bool
-  (** Check whether the clause is a (syntactic) tautology, ie whether
-      it contains true or "A" and "not A" *)
+  (** Check whether the clause is a (syntactic) tautology, ie whether it
+      contains true or "A" and "not A" *)
 
   val is_semantic_tautology : C.t -> bool
-  (** semantic tautology deletion, using a congruence closure algorithm
-      to see if negative literals imply some positive Literal.t *)
+  (** semantic tautology deletion, using a congruence closure algorithm to see
+      if negative literals imply some positive Literal.t *)
 
   val handle_distinct_constants : Env.lit_rewrite_rule
   (** Decide on "quoted" "symbols" (which are all distinct) *)
@@ -80,7 +80,7 @@ module type S = sig
   (** list of clauses in the active set that are subsumed by the clause *)
 
   val contextual_literal_cutting : Env.simplify_rule
-  (** contextual Literal.t cutting of the given clause by the active set  *)
+  (** contextual Literal.t cutting of the given clause by the active set *)
 
   val condensation : Env.simplify_rule
   (** condensation *)

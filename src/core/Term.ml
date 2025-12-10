@@ -350,10 +350,10 @@ let rec cover_with_terms ?(depth = 0) ?(recurse = true) t ts =
       (fun i x -> if CCOpt.is_some x then (i, CCOpt.get_exn x) else (-1, false_))
       ts
     |> CCList.filter_map (fun (i, x) ->
-           if i != -1 && equal x t then (
-             assert (Type.equal (ty x) (ty t)) ;
-             Some (bvar ~ty:(ty t) (n - 1 - i + depth)) )
-           else None )
+        if i != -1 && equal x t then (
+          assert (Type.equal (ty x) (ty t)) ;
+          Some (bvar ~ty:(ty t) (n - 1 - i + depth)) )
+        else None )
   in
   let rest =
     if recurse then
@@ -497,7 +497,7 @@ module Seq = struct
     let non_ty_syms =
       subterms t
       |> Iter.filter_map (fun t ->
-             match T.view t with T.Const s -> Some (s, ty t) | _ -> None )
+          match T.view t with T.Const s -> Some (s, ty t) | _ -> None )
     in
     let ty_syms =
       if include_types then
@@ -549,7 +549,7 @@ let has_ho_subterm t =
   && (not (equal false_ t))
   && Seq.subterms ~include_builtin:true ~ignore_head:true t
      |> Iter.exists (fun st ->
-            (not (T.equal st t)) && (Type.is_fun (ty st) || Type.is_prop (ty st)) )
+         (not (T.equal st t)) && (Type.is_fun (ty st) || Type.is_prop (ty st)) )
 
 let close_quantifier b ty_args body =
   CCList.fold_right
@@ -677,8 +677,8 @@ and type_ok ty_ =
   not
     ( Type.Seq.sub ty_
     |> Iter.exists (fun t ->
-           Type.equal t Type.prop || Type.equal t Type.rat
-           || Type.equal t Type.int ) )
+        Type.equal t Type.prop || Type.equal t Type.rat || Type.equal t Type.int )
+    )
 
 let in_lfho_fragment t =
   in_pfho_fragment t
@@ -698,8 +698,7 @@ let rec is_fo_term t =
       && T.is_const hd
       && List.for_all
            (fun t ->
-             (not (Type.is_prop (ty t) || Type.is_fun (ty t))) && is_fo_term t
-             )
+             (not (Type.is_prop (ty t) || Type.is_fun (ty t))) && is_fo_term t )
            l
   | Const _ ->
       not (Type.is_fun (ty t))
@@ -789,8 +788,10 @@ let comb_depth t =
                  do not increase the depth *)
               acc
             , comb_streak )
-          else ((* new comb_streak begins *)
-                inc_depth acc, true)
+          else
+            ( (* new comb_streak begins *)
+              inc_depth acc
+            , true )
         in
         max_d_l (List.map (aux ~comb_streak acc) l)
     | AppBuiltin (_, l) ->
@@ -1688,7 +1689,6 @@ let mangle_term ty_list str_term_list t =
                 (Type.apply (ty f) (List.map Type.of_term_unsafe type_args))
             in
             (*Printf.printf "new f type : %s\n" (T.to_string (new_f_type:> term));*)
-
             (*let new_f_name = (ID.name f_id) ^ "_" ^ (Type.mangle new_f_type) in*)
             (*List.iter (fun x -> Printf.printf "type args : %s\n" (to_string (x))) type_args;*)
             (*List.iter (fun x -> Printf.printf "new type args : %s\n" (T.to_string (x))) (new_type_args:> term list);*)
@@ -1699,8 +1699,7 @@ let mangle_term ty_list str_term_list t =
                 match
                   List.find_opt
                     (fun ((old_f_id, old_f_ty), _) ->
-                      ID.equal old_f_id f_id && Type.equal old_f_ty new_f_type
-                      )
+                      ID.equal old_f_id f_id && Type.equal old_f_ty new_f_type )
                     str_term_list
                 with
                 | Some (_, new_f) ->
@@ -1710,7 +1709,6 @@ let mangle_term ty_list str_term_list t =
                     (((f_id, new_f_type), new_f) :: str_term_list, new_f)
             in
             (*let new_f_term = T.cast ~ty:(new_f_type:> term) f in*)
-
             (*Printf.printf "old f type : %s\n" (Type.to_string (Type.apply (ty f) new_type_args));*)
             (*Printf.printf "f     term : %s\n" (to_string f);*)
             (*Printf.printf "args length : %d\n" (List.length l);*)

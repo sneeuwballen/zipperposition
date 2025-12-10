@@ -2,15 +2,13 @@
 
 (** {1 Scoped Value} *)
 
-(** A scoped value is a pair of the value and an (integer) scope.
-    The value usually contains variables, but a value in a scope A
-    share no variables with the same value in any scope B ≠ A.
+(** A scoped value is a pair of the value and an (integer) scope. The value
+    usually contains variables, but a value in a scope A share no variables with
+    the same value in any scope B ≠ A.
 
-    This makes it possible to use an object (e.g. a clause) in
-    two distinct scopes. Each scoped version of the object shares
-    no variable with the other version; hence, there is no need
-    for copying the object.
-*)
+    This makes it possible to use an object (e.g. a clause) in two distinct
+    scopes. Each scoped version of the object shares no variable with the other
+    version; hence, there is no need for copying the object. *)
 
 type scope = int
 

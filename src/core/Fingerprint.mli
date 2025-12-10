@@ -2,18 +2,14 @@
 
 (** {1 Fingerprint term indexing} *)
 
-(** Fingerprint term indexing, based on  the paper of the same
-    name by S. Schulz.
+(** Fingerprint term indexing, based on the paper of the same name by S. Schulz.
 
-    NOTE: less efficient, it seems, than {!NPDtree}
-*)
+    NOTE: less efficient, it seems, than {!NPDtree} *)
 
 (** A fingerprint function is a list of positions.
 
-    To compute the fingerprint of a term, we map
-    each position to a feature;
-    fingerprints can then be compared for potential unifiability/matching.
-*)
+    To compute the fingerprint of a term, we map each position to a feature;
+    fingerprints can then be compared for potential unifiability/matching. *)
 type fingerprint_fun
 
 val fp3d : fingerprint_fun

@@ -14,8 +14,8 @@ val section : Util.Section.t
 
 type rule
 
-(** Tag for checking an inference. Each tag describes an extension of FO
-    that is used in the inference *)
+(** Tag for checking an inference. Each tag describes an extension of FO that is
+    used in the inference *)
 type tag = Builtin.Tag.t
 
 type attrs = UntypedAST.attrs
@@ -65,9 +65,8 @@ module Tag = Builtin.Tag
 
 (** {2 Rule} *)
 
-(** A rule is a name for some specific inference or transformation rule
-    that is used to deduce formulas from other formulas.
-*)
+(** A rule is a name for some specific inference or transformation rule that is
+    used to deduce formulas from other formulas. *)
 module Rule : sig
   type t = rule
 
@@ -95,9 +94,8 @@ end
 
 (** {2 Source}
 
-    Where a statement/object originally comes from
-    (file, location, named statement, etc.)
-*)
+    Where a statement/object originally comes from (file, location, named
+    statement, etc.) *)
 module Src : sig
   type t = source
 
@@ -136,8 +134,9 @@ end
 
 (** {2 Proof Results} *)
 
-(** A proof is used to deduce some results. We can handle diverse results
-    a different stages of the proof (starting with formulas, ending with clauses) *)
+(** A proof is used to deduce some results. We can handle diverse results a
+    different stages of the proof (starting with formulas, ending with clauses)
+*)
 
 module Result : sig
   type t = result
@@ -146,8 +145,8 @@ module Result : sig
 
   type flavor = [`Pure_bool | `Absurd_lits | `Proof_of_false | `Vanilla | `Def]
 
-  (** A mapping used during instantiation, to map pre-instantiation
-      variables to post-instantiation terms *)
+  (** A mapping used during instantiation, to map pre-instantiation variables to
+      post-instantiation terms *)
   type inst_subst = (term, term) Var.Subst.t
 
   val make_tc :
@@ -168,11 +167,10 @@ module Result : sig
       results.
       @param pp_in print in given syntax
       @param is_stmt true only if ['a] is a toplevel statement (default false)
-      @param name returns the name of the result. Typically, a name from
-        the input file
-      @param to_form_subst apply substitution, then convert to form.
-      If not provided, will fail.
-  *)
+      @param name
+        returns the name of the result. Typically, a name from the input file
+      @param to_form_subst
+        apply substitution, then convert to form. If not provided, will fail. *)
 
   val make : 'a tc -> 'a -> t
 
@@ -205,12 +203,11 @@ end
 
 (** {2 A proof step} *)
 
-(** An inference step is composed of a set of premises, a rule,
-    a status (theorem/trivial/equisatisfiable…), and is used to
-    deduce new {!result} using these premises and metadata.
+(** An inference step is composed of a set of premises, a rule, a status
+    (theorem/trivial/equisatisfiable…), and is used to deduce new {!result}
+    using these premises and metadata.
 
-    A single step can be used to deduce several results.
-*)
+    A single step can be used to deduce several results. *)
 module Step : sig
   type t = step
 
@@ -285,18 +282,17 @@ module Step : sig
   (** Rule name for Esa/Simplification/Inference steps *)
 
   val distance_to_goal : t -> int option
-  (** [distance_to_conjecture p] returns [None] if [p] has no ancestor
-      that is a conjecture (including [p] itself). It returns [Some d]
-      if [d] is the distance, in the proof graph, to the closest
-      conjecture ancestor of [p] *)
+  (** [distance_to_conjecture p] returns [None] if [p] has no ancestor that is a
+      conjecture (including [p] itself). It returns [Some d] if [d] is the
+      distance, in the proof graph, to the closest conjecture ancestor of [p] *)
 
   val pp : t CCFormat.printer
 end
 
 (** {2 Parent} *)
 
-(** The link between a proof step and some intermediate results used
-    to prove its result *)
+(** The link between a proof step and some intermediate results used to prove
+    its result *)
 
 module Parent : sig
   type t = parent
@@ -320,10 +316,8 @@ val pp_tags : tag list CCFormat.printer
 
 (** {2 Proof} *)
 
-(** A proof is a pair of a result, with its proof step.
-    Typically, a refutation will be a proof of false from axioms and the
-    negated goal.
-*)
+(** A proof is a pair of a result, with its proof step. Typically, a refutation
+    will be a proof of false from axioms and the negated goal. *)
 
 module S : sig
   type t = proof

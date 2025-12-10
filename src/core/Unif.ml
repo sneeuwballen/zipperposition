@@ -243,21 +243,17 @@ let pair_lists_left l1 ret1 l2 ret2 : _ list * _ list =
     (ret1' :: l1_1, ret2 :: l2)
 
 (** During matching or variant checking, we need to {b protect} some variables
-    from being bound.
-    Typically, when matching [u] against pattern [t], we can bind variables
-    from [t] but not from [u] (since [u] must be preserved).
+    from being bound. Typically, when matching [u] against pattern [t], we can
+    bind variables from [t] but not from [u] (since [u] must be preserved).
 
     Two styles of protection exist:
 
-    - by explicit set of variables (when both [t] and [u] live in the
-      same scope)
-    - by scope: all variables in this scope are protected, EXCEPT
-        fresh variables. Fresh variables are not protected because
-        pattern unification/matching will move both terms into
-        the same (protected) scope, but we still need to bind
-        (freshly renamed) variables from the pattern.
-
-*)
+    - by explicit set of variables (when both [t] and [u] live in the same
+      scope)
+    - by scope: all variables in this scope are protected, EXCEPT fresh
+      variables. Fresh variables are not protected because pattern
+      unification/matching will move both terms into the same (protected) scope,
+      but we still need to bind (freshly renamed) variables from the pattern. *)
 type protected =
   | P_vars of T.VarSet.t
   (* blocked variables *)
@@ -274,8 +270,7 @@ let pp_protected out = function
     - unification
     - matching (with some variables protected, see {!protected})
     - variant checking (equality modulo renaming)
-    - equality (modulo some substitution)
-*)
+    - equality (modulo some substitution) *)
 type op =
   | O_unify
   | O_match_protect of protected
@@ -328,6 +323,7 @@ module Inner = struct
         false
     | T.HasType ty ->
         (*T.type_is_prop ty ||*) not (T.type_is_unifiable ty)
+
   (* is prop is removed since ext sup takes care of that *)
 
   (* change the scope of variables in this term so they live in [scope]
@@ -478,16 +474,16 @@ module Inner = struct
     let env =
       DBEnv.to_list_i bvars
       |> CCList.filter_map (function
-           | None ->
-               None
-           | Some (i, _) -> (
-             match CCList.find_idx (T.is_bvar_i i) l with
-             | None ->
-                 None
-             | Some (j, t_bvar) ->
-                 let ty = T.ty_exn t_bvar in
-                 (* map DB i into db (n-j) *)
-                 Some (i, T.bvar ~ty (n - j - 1)) ) )
+        | None ->
+            None
+        | Some (i, _) -> (
+          match CCList.find_idx (T.is_bvar_i i) l with
+          | None ->
+              None
+          | Some (j, t_bvar) ->
+              let ty = T.ty_exn t_bvar in
+              (* map DB i into db (n-j) *)
+              Some (i, T.bvar ~ty (n - j - 1)) ) )
       |> DBEnv.of_list
     in
     T.DB.eval env t |> T.fun_l (List.map T.ty_exn l)
@@ -499,8 +495,7 @@ module Inner = struct
     let args =
       List.filter
         (fun t ->
-          match T.view t with T.DB i -> DBEnv.mem subset i | _ -> assert false
-          )
+          match T.view t with T.DB i -> DBEnv.mem subset i | _ -> assert false )
         args
     in
     let n = List.length args in

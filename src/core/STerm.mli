@@ -4,15 +4,13 @@
 
 (** Simple terms, that are not hashconsed, nor typed.
 
-    Those do not use De Bruijn indices for variable binding,
-    but simply names (scoping is done later).
-    Their simplicity make them good for heavy AST transformations, output of
-    parsing, etc.
+    Those do not use De Bruijn indices for variable binding, but simply names
+    (scoping is done later). Their simplicity make them good for heavy AST
+    transformations, output of parsing, etc.
 
-    Terms are only compared, hashsed, etc. by their "term" component (the algebraic
-    variant). Additional fields (location…) are ignored for almost every
-    operation.
-*)
+    Terms are only compared, hashsed, etc. by their "term" component (the
+    algebraic variant). Additional fields (location…) are ignored for almost
+    every operation. *)
 
 type location = ParseLocation.t
 
@@ -210,7 +208,6 @@ type subst = t StrMap.t
 val empty_subst : subst
 
 val merge_subst : subst -> subst -> subst
-(** [merge a b] merges [a] into [b], but favors [b] in case
-    of conflict *)
+(** [merge a b] merges [a] into [b], but favors [b] in case of conflict *)
 
 val apply_subst : subst -> term -> term

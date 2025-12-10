@@ -3,35 +3,33 @@
 (** {1 Reduction to CNF and Simplifications} *)
 
 (** {!CNF} allows to transition from a free-form AST (with statements containing
-    formulas as {!TypedSTerm.t}) into an AST using clauses
-    and without some constructs such as "if/then/else" or "match" or "let".
-    The output is more suitable for a Superposition-like prover.
+    formulas as {!TypedSTerm.t}) into an AST using clauses and without some
+    constructs such as "if/then/else" or "match" or "let". The output is more
+    suitable for a Superposition-like prover.
 
     There also are conversion functions to go from clauses that use
-    {!TypedSTerm.t}, into clauses that use the {!Term.t} (hashconsed,
-    and usable in unification, indexing, etc.).
+    {!TypedSTerm.t}, into clauses that use the {!Term.t} (hashconsed, and usable
+    in unification, indexing, etc.).
 
-    We follow chapter 6 "Computing small clause normal forms"
-    of the "handbook of automated reasoning" for the theoretical part.
+    We follow chapter 6 "Computing small clause normal forms" of the "handbook
+    of automated reasoning" for the theoretical part.
 
     A few notes:
 
-    In worst case, normal CNF transformation can lead to an exponential
-    number of clauses, which is prohibitive. To avoid that, we use
-    the Tseitin trick to {b name} some intermediate formulas
-    by introducing fresh symbols (herein named "proxies") and
-    defining them to be equivalent to the formula they define.
+    In worst case, normal CNF transformation can lead to an exponential number
+    of clauses, which is prohibitive. To avoid that, we use the Tseitin trick to
+    {b name} some intermediate formulas by introducing fresh symbols (herein
+    named "proxies") and defining them to be equivalent to the formula they
+    define.
 
-    This is done only if we estimate that adding the proxy will
-    reduce the final number of clauses (See [Estimation] module).
+    This is done only if we estimate that adding the proxy will reduce the final
+    number of clauses (See [Estimation] module).
 
-    Before doing CNF we remove all the high-level constructs
-    such as pattern-matching and "let" by introducing
-    new symbols and defining the subterm to eliminate using
-    this new symbol (See [Flatten] module).
-    It is important to capture variables properly in this
-    phase (as in closure conversion).
-*)
+    Before doing CNF we remove all the high-level constructs such as
+    pattern-matching and "let" by introducing new symbols and defining the
+    subterm to eliminate using this new symbol (See [Flatten] module). It is
+    important to capture variables properly in this phase (as in closure
+    conversion). *)
 
 type term = TypedSTerm.t
 
@@ -50,31 +48,32 @@ exception NotCNF of form
 
 val miniscope : ?distribute_exists:bool -> form -> form
 (** Apply miniscoping transformation to the term.
-    @param distribute_exists see whether ?X:(p(X)|q(X)) should be
-      transformed into (?X: p(X) | ?X: q(X)). Default: [false] *)
+    @param distribute_exists
+      see whether ?X:(p(X)|q(X)) should be transformed into (?X: p(X) | ?X:
+      q(X)). Default: [false] *)
 
 (** Options are used to tune the behavior of the CNF conversion. *)
 type options =
   | LazyCnf
-      (** if enabled, inital formulas will not be converted to the
-      clausal form. Instead, formulas will be presented as is,
-      and lazy calculus rules will be used to clausify. *)
+      (** if enabled, inital formulas will not be converted to the clausal form.
+          Instead, formulas will be presented as is, and lazy calculus rules
+          will be used to clausify. *)
   | DistributeExists
-      (** if enabled, will distribute existential quantifiers over
-      disjunctions. This can make skolem symbols smaller (smaller arity) but
-      introduce more of them. *)
+      (** if enabled, will distribute existential quantifiers over disjunctions.
+          This can make skolem symbols smaller (smaller arity) but introduce
+          more of them. *)
   | DisableRenaming
-      (** disables formula renaming. Can re-introduce the worst-case
-      exponential behavior of CNF. *)
+      (** disables formula renaming. Can re-introduce the worst-case exponential
+          behavior of CNF. *)
   | InitialProcessing of (form -> form)
-      (** any processing, at the beginning, before CNF starts  *)
+      (** any processing, at the beginning, before CNF starts *)
   | PostNNF of (form -> form)
-      (** any processing that keeps negation at leaves,
-      just after reduction to NNF. Its output
-      must not break the NNF form (negation at root only). *)
+      (** any processing that keeps negation at leaves, just after reduction to
+          NNF. Its output must not break the NNF form (negation at root only).
+      *)
   | PostSkolem of (form -> form)
-      (** transformation applied just after skolemization. It must not
-      break skolemization nor NNF (no quantifier, no non-leaf negation). *)
+      (** transformation applied just after skolemization. It must not break
+          skolemization nor NNF (no quantifier, no non-leaf negation). *)
 
 (** Basic clause representation, as list of literals *)
 type clause = lit list
@@ -121,5 +120,5 @@ val type_declarations : c_statement Iter.t -> type_ ID.Map.t
 (** {2 Conversions} *)
 
 val convert : c_statement Iter.t -> Statement.clause_t CCVector.ro_vector
-(** Converts statements based on {!TypedSTerm} into statements
-    based on {!Term} and {!Type} *)
+(** Converts statements based on {!TypedSTerm} into statements based on {!Term}
+    and {!Type} *)

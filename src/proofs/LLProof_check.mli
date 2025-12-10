@@ -5,8 +5,7 @@
 (** TODO: the checker itself.
 
     GOAL: A tiny Tableau-like prover that tries to re-prove each step in a
-    simple way.
-*)
+    simple way. *)
 
 type proof = LLProof.t
 

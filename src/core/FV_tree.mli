@@ -2,12 +2,11 @@
 
 (** {1 Feature Vector indexing} *)
 
-(** Feature Vector indexing (see Schulz 2004) for efficient forward
-    and backward subsumption on Horn Clauses.
+(** Feature Vector indexing (see Schulz 2004) for efficient forward and backward
+    subsumption on Horn Clauses.
 
-    This allows to retrieve clauses that (potentially) subsume
-    or are subsumed by a given query clause.
-*)
+    This allows to retrieve clauses that (potentially) subsume or are subsumed
+    by a given query clause. *)
 
 type labels = Index_intf.labels
 

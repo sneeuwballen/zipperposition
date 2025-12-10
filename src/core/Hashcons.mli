@@ -30,6 +30,6 @@ end
 
 module Make (X : HashedType) : S with type elt = X.t
 
-(** Version that uses a regular Hashtbl, rather than a weak table. Never
-    frees memory, but might be faster. *)
+(** Version that uses a regular Hashtbl, rather than a weak table. Never frees
+    memory, but might be faster. *)
 module MakeNonWeak (X : HashedType) : S with type elt = X.t

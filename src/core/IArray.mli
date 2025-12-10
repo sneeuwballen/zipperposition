@@ -2,11 +2,10 @@
 
 (** {1 Immutable Arrays} *)
 
-(** An API over arrays that doesn't expose any mutating function. This
-    type ['a IArray.t] benefits from good cache locality and fast
-    access to items, but still is functional. However, most operations
-    that create new arrays are linear in time (they copy/traverse the whole
-    input). *)
+(** An API over arrays that doesn't expose any mutating function. This type
+    ['a IArray.t] benefits from good cache locality and fast access to items,
+    but still is functional. However, most operations that create new arrays are
+    linear in time (they copy/traverse the whole input). *)
 
 type 'a equal = 'a -> 'a -> bool
 
@@ -26,8 +25,8 @@ val to_array_unsafe : 'a t -> 'a array
 (** Show the underlying array. DO NOT MODIFY *)
 
 val of_array_unsafe : 'a array -> 'a t
-(** Take ownership of the given array. Careful, the array must {b NOT}
-    be modified afterwards! *)
+(** Take ownership of the given array. Careful, the array must {b NOT} be
+    modified afterwards! *)
 
 val empty : 'a t
 

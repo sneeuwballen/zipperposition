@@ -4,12 +4,11 @@
 
 module Fmt = CCFormat
 
-(** positions that are immediate arguments of some defined constant
-    can be classified as follows:
+(** positions that are immediate arguments of some defined constant can be
+    classified as follows:
     - active position (patterns on LHS of rules)
     - invariant positions (variable on LHS and RHS of rules)
-    - accumulator positions (variable on LHS, non-variable on RHS)
-*)
+    - accumulator positions (variable on LHS, non-variable on RHS) *)
 type t = P_active | P_invariant | P_accumulator
 
 type pos = t

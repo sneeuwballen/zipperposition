@@ -83,11 +83,9 @@ module type PRINT_DE_BRUIJN = sig
 
   (** User-provided hook that can be used to print terms (for composite cases)
       before the default printing occurs. The int argument is the De Bruijn
-      depth in the term.
-      A hook takes as arguments the depth and the recursive printing function
-      that it can use to print subterms.
-      A hook should return [true] if it fired, [false] to fall back
-      on the default printing. *)
+      depth in the term. A hook takes as arguments the depth and the recursive
+      printing function that it can use to print subterms. A hook should return
+      [true] if it fired, [false] to fall back on the default printing. *)
   type print_hook =
     int -> term CCFormat.printer -> Format.formatter -> term -> bool
 

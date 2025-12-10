@@ -2,8 +2,8 @@
 
 (** {1 Main file for the prover} *)
 
-(** This module just calls the main {!Phases} runner that processes files
-    passed as arguments on the command line. *)
+(** This module just calls the main {!Phases} runner that processes files passed
+    as arguments on the command line. *)
 
 open Logtk
 open Libzipperposition_phases

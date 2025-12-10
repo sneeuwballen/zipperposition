@@ -26,13 +26,12 @@ val enum_prop :
   -> signature:Signature.t
   -> offset:int
   -> (Subst.t * penalty) list
-(** Given a variable of type [τ1…τn -> prop], enumerate possible shapes
-    for it
+(** Given a variable of type [τ1…τn -> prop], enumerate possible shapes for it
     @param v the variable to refine + its scope. Must return [prop].
     @param offset to create fresh variables (should be unused elsewhere)
-    @param mode if [`Neg], only tries negation; [`None], do nothing;
-      otherwise do all connectives
-*)
+    @param mode
+      if [`Neg], only tries negation; [`None], do nothing; otherwise do all
+      connectives *)
 
 (** unification pair *)
 type pair = Type.t list * term * term
@@ -44,15 +43,15 @@ val unif_pairs :
   -> pair list Scoped.t
   -> offset:int
   -> (pair list * Unif_subst.t * penalty * Subst.Renaming.t) list
-(** [unif_pairs pairs ~scope_new_vars] returns a list of (partial) solutions
-    to the HO unification problem [pairs].
-    Each solution is a list of remaining constraints (with the substitution already applied),
-    a substitution, some penalty to influence the search space,
-    and a renaming used for the substitution *)
+(** [unif_pairs pairs ~scope_new_vars] returns a list of (partial) solutions to
+    the HO unification problem [pairs]. Each solution is a list of remaining
+    constraints (with the substitution already applied), a substitution, some
+    penalty to influence the search space, and a renaming used for the
+    substitution *)
 
 val default_fuel : int ref
 (** Default amount of fuel for {!unif_pairs} *)
 
 val enable_norm_subst : bool ref
-(** If true, substitutions obtained with {!unif_pairs}
-    are normalized and β-reduced *)
+(** If true, substitutions obtained with {!unif_pairs} are normalized and
+    β-reduced *)

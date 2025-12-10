@@ -23,7 +23,11 @@ let tef_ =
   lazy
     ( __prof
     &&
-    match Sys.getenv_opt "TEF" with Some ("1" | "true") -> true | _ -> false )
+    match Sys.getenv_opt "TEF" with
+    | Some ("1" | "true") ->
+        true
+    | _ ->
+        false )
 
 module TEF = struct
   let first_ = ref true

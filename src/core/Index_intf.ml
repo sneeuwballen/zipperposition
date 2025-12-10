@@ -79,7 +79,8 @@ module type TERM_IDX = sig
 
   val retrieve_unifiables :
     t Scoped.t -> term Scoped.t -> (term * elt * Unif_subst.t) Iter.t
-  (** Retrieves a decidable fragment of unifiables. Only one unifier per subterm. *)
+  (** Retrieves a decidable fragment of unifiables. Only one unifier per
+      subterm. *)
 
   val retrieve_unifiables_complete :
        ?unif_alg:
@@ -88,7 +89,8 @@ module type TERM_IDX = sig
     -> term Scoped.t
     -> (term * elt * Unif_subst.t option OSeq.t) Iter.t
   (** Retrieves all unifiables. The set of unifiers is potentially infinite.
-      Because HO unification is undecidable, the sequence is intersperced with `None`s to ensure termination for each element of the sequence. *)
+      Because HO unification is undecidable, the sequence is intersperced with
+      `None`s to ensure termination for each element of the sequence. *)
 
   val retrieve_generalizations :
     ?subst:subst -> t Scoped.t -> term Scoped.t -> (term * elt * subst) Iter.t
@@ -115,8 +117,8 @@ module type CLAUSE = sig
   (** Iterate on literals of the clause *)
 
   val labels : t -> labels
-  (** Some integer labels. We assume that if [c] to subsume [d],
-      then [labels c] is a subset of [labels d] *)
+  (** Some integer labels. We assume that if [c] to subsume [d], then [labels c]
+      is a subset of [labels d] *)
 end
 
 module type SUBSUMPTION_IDX = sig
@@ -142,22 +144,24 @@ module type SUBSUMPTION_IDX = sig
   val remove_seq : t -> C.t Iter.t -> t
 
   val retrieve_subsuming : t -> lits -> labels -> C.t Iter.t
-  (** Fold on a set of indexed candidate clauses, that may subsume
-      the given clause. *)
+  (** Fold on a set of indexed candidate clauses, that may subsume the given
+      clause. *)
 
   val retrieve_subsuming_c : t -> C.t -> C.t Iter.t
 
   val retrieve_subsumed : t -> lits -> labels -> C.t Iter.t
-  (** Fold on a set of indexed candidate clauses, that may be subsumed by
-      the given clause *)
+  (** Fold on a set of indexed candidate clauses, that may be subsumed by the
+      given clause *)
 
   val retrieve_subsumed_c : t -> C.t -> C.t Iter.t
 
   val retrieve_alpha_equiv : t -> lits -> labels -> C.t Iter.t
-  (** Retrieve clauses that are potentially alpha-equivalent to the given clause *)
+  (** Retrieve clauses that are potentially alpha-equivalent to the given clause
+  *)
 
   val retrieve_alpha_equiv_c : t -> C.t -> C.t Iter.t
-  (** Retrieve clauses that are potentially alpha-equivalent to the given clause *)
+  (** Retrieve clauses that are potentially alpha-equivalent to the given clause
+  *)
 
   val iter : t -> C.t Iter.t
 
@@ -167,21 +171,20 @@ end
 module type EQUATION = sig
   type t
 
-  (** An equation can have something other than a term as a right-hand
-      side, for instance a formula. *)
+  (** An equation can have something other than a term as a right-hand side, for
+      instance a formula. *)
   type rhs
 
   val compare : t -> t -> int
   (** Total order on equations *)
 
   val extract : t -> term * rhs * bool
-  (** Obtain a representation of the (in)equation. The sign indicates
-      whether it is an equation [l = r] (if true) or an inequation
-      [l != r] (if false) *)
+  (** Obtain a representation of the (in)equation. The sign indicates whether it
+      is an equation [l = r] (if true) or an inequation [l != r] (if false) *)
 
   val priority : t -> int
-  (** How "useful" this equation is. Can be safely ignored by
-      always returning the same number. *)
+  (** How "useful" this equation is. Can be safely ignored by always returning
+      the same number. *)
 end
 
 module type UNIT_IDX = sig
@@ -220,10 +223,9 @@ module type UNIT_IDX = sig
     -> t Scoped.t
     -> term Scoped.t
     -> (term * rhs * E.t * subst) Iter.t
-  (** [retrieve ~sign (idx,si) (t,st) acc] iterates on
-      (in)equations l ?= r of given [sign] and substitutions [subst],
-      such that subst(l, si) = t.
-      It therefore finds generalizations of the query term. *)
+  (** [retrieve ~sign (idx,si) (t,st) acc] iterates on (in)equations l ?= r of
+      given [sign] and substitutions [subst], such that subst(l, si) = t. It
+      therefore finds generalizations of the query term. *)
 
   val to_dot : t CCFormat.printer
   (** print the index in the DOT format *)

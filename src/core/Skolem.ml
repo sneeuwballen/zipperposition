@@ -103,11 +103,11 @@ let collect_vars subst f =
   let rec vars_seq t =
     T.Seq.free_vars t
     |> Iter.flat_map (fun v ->
-           match Var.Subst.find subst v with
-           | None ->
-               Iter.return (Var.update_ty ~f:(T.Subst.eval subst) v)
-           | Some t' ->
-               vars_seq t' )
+        match Var.Subst.find subst v with
+        | None ->
+            Iter.return (Var.update_ty ~f:(T.Subst.eval subst) v)
+        | Some t' ->
+            vars_seq t' )
   in
   let is_ty_var v = T.Ty.is_tType (Var.ty v) in
   vars_seq f |> Var.Set.of_iter |> Var.Set.to_list |> List.partition is_ty_var

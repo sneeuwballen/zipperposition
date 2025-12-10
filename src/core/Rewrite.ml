@@ -167,37 +167,36 @@ let compute_pos_gen (l : pseudo_rule list) : defined_positions =
   assert (
     l
     |> List.for_all (fun (id', args', _) ->
-           ID.equal id id' && List.length args' = n ) ) ;
+        ID.equal id id' && List.length args' = n ) ) ;
   (* now compute position roles *)
   let pos = Array.make n Defined_pos.P_invariant in
   Iter.of_list l
   |> Iter.flat_map (fun (_, args, rhs) yield ->
-         List.iteri (fun i sub -> yield (rhs, i, sub)) args )
+      List.iteri (fun i sub -> yield (rhs, i, sub)) args )
   |> Iter.iter (fun (rhs, i, arg) ->
-         match T.view arg with
-         | T.Var x ->
-             (* if all occurrences of [r.id] on the RHS also have [x] at this
+      match T.view arg with
+      | T.Var x ->
+          (* if all occurrences of [r.id] on the RHS also have [x] at this
                 position, the position stays invariant, otherwise
                 it is an accumulator *)
-             let is_invariant =
-               rhs
-               |> Iter.filter_map (fun args' ->
-                      let len = List.length args' in
-                      if len > i then Some (List.nth args' (len - i - 1))
-                      else None )
-               |> Iter.for_all (fun sub ->
-                      match T.view sub with
-                      | T.Var y ->
-                          HVar.equal Type.equal x y
-                      | _ ->
-                          false )
-             in
-             (* position is accumulator *)
-             if (not is_invariant) && pos.(i) = Defined_pos.P_invariant then
-               pos.(i) <- Defined_pos.P_accumulator
-         | _ ->
-             (* pattern, consider this as input *)
-             pos.(i) <- Defined_pos.P_active ) ;
+          let is_invariant =
+            rhs
+            |> Iter.filter_map (fun args' ->
+                let len = List.length args' in
+                if len > i then Some (List.nth args' (len - i - 1)) else None )
+            |> Iter.for_all (fun sub ->
+                match T.view sub with
+                | T.Var y ->
+                    HVar.equal Type.equal x y
+                | _ ->
+                    false )
+          in
+          (* position is accumulator *)
+          if (not is_invariant) && pos.(i) = Defined_pos.P_invariant then
+            pos.(i) <- Defined_pos.P_accumulator
+      | _ ->
+          (* pattern, consider this as input *)
+          pos.(i) <- Defined_pos.P_active ) ;
   IArray.of_array_unsafe pos
 
 module Term = struct
@@ -365,22 +364,22 @@ module Term = struct
                   let find_rule =
                     rules_of_id id
                     |> Iter.find_map (fun r ->
-                           try
-                             let n_r = Rule.arity r in
-                             let t', l_rest =
-                               if n_l = n_r then (t', [])
-                               else if n_r < n_l then
-                                 let l1, l2 = CCList.take_drop n_r l' in
-                                 (T.app f l1, l2)
-                               else raise Exit
-                             in
-                             let subst' =
-                               Unif.FO.matching ~pattern:(r.term_lhs, sc_r)
-                                 (t', sc_t)
-                             in
-                             let cur_sc_r = sc_r in
-                             Some (r, subst', cur_sc_r, l_rest)
-                           with Unif.Fail | Exit -> None )
+                        try
+                          let n_r = Rule.arity r in
+                          let t', l_rest =
+                            if n_l = n_r then (t', [])
+                            else if n_r < n_l then
+                              let l1, l2 = CCList.take_drop n_r l' in
+                              (T.app f l1, l2)
+                            else raise Exit
+                          in
+                          let subst' =
+                            Unif.FO.matching ~pattern:(r.term_lhs, sc_r)
+                              (t', sc_t)
+                          in
+                          let cur_sc_r = sc_r in
+                          Some (r, subst', cur_sc_r, l_rest)
+                        with Unif.Fail | Exit -> None )
                   in
                   match find_rule with
                   | None ->
@@ -451,10 +450,9 @@ module Term = struct
           (* try to match the rules of [id] *)
           rules_of_id id
           |> Iter.filter_map (fun r ->
-                 try
-                   Some
-                     (r, Unif.FO.unify_full ~subst (r.term_lhs, sc_r) (t, sc_t))
-                 with Unif.Fail -> None )
+              try
+                Some (r, Unif.FO.unify_full ~subst (r.term_lhs, sc_r) (t, sc_t))
+              with Unif.Fail -> None )
       | _ ->
           Iter.empty )
     | T.Fun _ | T.Var _ | T.DB _ | T.AppBuiltin _ ->
@@ -515,9 +513,9 @@ module Lit = struct
         let vars =
           TT.free_vars f
           |> List.sort (fun v1 v2 ->
-                 let c1 = Var.Set.mem vars_lhs v1 in
-                 let c2 = Var.Set.mem vars_lhs v2 in
-                 if c1 = c2 then Var.compare v1 v2 else if c1 then -1 else 1 )
+              let c1 = Var.Set.mem vars_lhs v1 in
+              let c2 = Var.Set.mem vars_lhs v2 in
+              if c1 = c2 then Var.compare v1 v2 else if c1 then -1 else 1 )
         in
         F.forall_l vars f
       in
@@ -599,12 +597,12 @@ module Lit = struct
   let step_lit (lit : Literal.t) =
     rules_of_lit lit
     |> Iter.find_map (fun r ->
-           let substs = Literal.matching ~pattern:(r.lit_lhs, 1) (lit, 0) in
-           match Iter.head substs with
-           | None ->
-               None
-           | Some (subst, tags) ->
-               Some (r, subst, tags) )
+        let substs = Literal.matching ~pattern:(r.lit_lhs, 1) (lit, 0) in
+        match Iter.head substs with
+        | None ->
+            None
+        | Some (subst, tags) ->
+            Some (r, subst, tags) )
 
   (* try to rewrite this literal, returning a list of list of lits instead *)
   let normalize_clause_ (lits : Literals.t) : _ option =
@@ -655,8 +653,8 @@ module Lit = struct
   let narrow_lit ?(subst = Unif_subst.empty) ~scope_rules:sc_r (lit, sc_lit) =
     rules_of_lit lit
     |> Iter.flat_map (fun r ->
-           Literal.unify ~subst (r.lit_lhs, sc_r) (lit, sc_lit)
-           |> Iter.map (fun (subst, tags) -> (r, subst, tags)) )
+        Literal.unify ~subst (r.lit_lhs, sc_r) (lit, sc_lit)
+        |> Iter.map (fun (subst, tags) -> (r, subst, tags)) )
 end
 
 let pseudo_rule_of_rule (r : rule) : pseudo_rule =
@@ -667,11 +665,11 @@ let pseudo_rule_of_rule (r : rule) : pseudo_rule =
       let rhs =
         Term.Rule.rhs r |> T.Seq.subterms
         |> Iter.filter_map (fun sub ->
-               match T.Classic.view sub with
-               | T.Classic.App (id', args') when ID.equal id' id ->
-                   Some args'
-               | _ ->
-                   None )
+            match T.Classic.view sub with
+            | T.Classic.App (id', args') when ID.equal id' id ->
+                Some args'
+            | _ ->
+                None )
       in
       (id, args, rhs)
   | L_rule r -> (
@@ -807,11 +805,10 @@ module Rule = struct
   let set_as_proof_parents (s : Term.Rule_inst_set.t) : Proof.parent list =
     Term.Rule_inst_set.to_iter s
     |> Iter.map (fun (r, subst, sc) ->
-           let proof =
-             Proof.S.mk (Term.Rule.proof r)
-               (Proof.Result.make res_tc (T_rule r))
-           in
-           Proof.Parent.from_subst Subst.Renaming.none (proof, sc) subst )
+        let proof =
+          Proof.S.mk (Term.Rule.proof r) (Proof.Result.make res_tc (T_rule r))
+        in
+        Proof.Parent.from_subst Subst.Renaming.none (proof, sc) subst )
     |> Iter.to_rev_list
 end
 

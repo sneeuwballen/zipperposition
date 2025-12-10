@@ -2,9 +2,9 @@
 
 (** {1 Clauses} *)
 
-(** The clauses are hashconsed within a context (an application of {!Make}).
-    Now clauses also have a {b trail}, that is, a set of boolean literals
-    that it depends upon as a conditional guard. *)
+(** The clauses are hashconsed within a context (an application of {!Make}). Now
+    clauses also have a {b trail}, that is, a set of boolean literals that it
+    depends upon as a conditional guard. *)
 
 open Logtk
 

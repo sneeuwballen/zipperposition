@@ -78,15 +78,15 @@ module type S = sig
   module Env : Env.S
 
   val given_clause_step : ?generating:bool -> int -> szs_status
-  (** Perform one step of the given clause algorithm.
-      It performs generating inferences only if [generating] is true (default);
-      other parameters are the iteration number and the environment *)
+  (** Perform one step of the given clause algorithm. It performs generating
+      inferences only if [generating] is true (default); other parameters are
+      the iteration number and the environment *)
 
   val given_clause :
     ?generating:bool -> ?steps:int -> ?timeout:float -> unit -> szs_status * int
-  (** run the given clause until a timeout occurs or a result
-      is found. It returns a tuple (new state, result, number of steps done).
-      It performs generating inferences only if [generating] is true (default) *)
+  (** run the given clause until a timeout occurs or a result is found. It
+      returns a tuple (new state, result, number of steps done). It performs
+      generating inferences only if [generating] is true (default) *)
 
   val presaturate : unit -> szs_status * int
   (** Interreduction of the given state, without generating inferences. Returns
@@ -110,7 +110,7 @@ module Make (E : Env.S) = struct
       && not
            ( Env.C.Seq.terms c
            |> Iter.flat_map (fun t ->
-                  Term.Seq.subterms ~include_builtin:true ~ignore_head:false t )
+               Term.Seq.subterms ~include_builtin:true ~ignore_head:false t )
            |> Iter.for_all (fun t -> not @@ Term.is_fun t) )
     then (
       CCFormat.printf "ENCODED WRONGLY: %a:%d.\n" Env.C.pp_tstp c
@@ -139,11 +139,11 @@ module Make (E : Env.S) = struct
           let clauses =
             clauses
             |> Iter.filter_map (fun c ->
-                   check_clause_ c ;
-                   let c, _ = Env.unary_simplify c in
-                   if Env.is_trivial c || Env.is_active c || Env.is_passive c
-                   then None
-                   else Some c )
+                check_clause_ c ;
+                let c, _ = Env.unary_simplify c in
+                if Env.is_trivial c || Env.is_active c || Env.is_passive c then
+                  None
+                else Some c )
             |> Iter.to_list
           in
           Util.debugf 5 ~section

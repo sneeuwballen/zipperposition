@@ -373,8 +373,8 @@ module Flatten = struct
             let closure =
               l
               |> List.rev_map (fun (_, match_vars, rhs) ->
-                     (* match variables are not free *)
-                     T.Form.forall_l match_vars rhs )
+                  (* match variables are not free *)
+                  T.Form.forall_l match_vars rhs )
               |> T.free_vars_l |> ty_vars_first
             in
             let cases =
@@ -1025,20 +1025,20 @@ let flatten ~ctx ~lazy_cnf ~should_define seq : _ Iter.t =
         flatten_rec_l ~of_:id ~should_define ~lazy_cnf ctx stmt Pos_inner vars
           args
         >>= (fun args ->
-              flatten_rec_l ~of_:id ~should_define ~lazy_cnf ctx stmt
-                Pos_toplevel vars args
-              >>= fun args ->
-              flatten_rec ~of_:id ~lazy_cnf ~should_define ctx stmt Pos_toplevel
-                vars rhs
-              >>= fun rhs ->
-              get_subst
-              >|= fun subst ->
-              let args = List.map (T.Subst.eval subst) args in
-              let rhs = T.Subst.eval subst rhs in
-              (args, rhs) )
+        flatten_rec_l ~of_:id ~should_define ~lazy_cnf ctx stmt Pos_toplevel
+          vars args
+        >>= fun args ->
+        flatten_rec ~of_:id ~lazy_cnf ~should_define ctx stmt Pos_toplevel vars
+          rhs
+        >>= fun rhs ->
+        get_subst
+        >|= fun subst ->
+        let args = List.map (T.Subst.eval subst) args in
+        let rhs = T.Subst.eval subst rhs in
+        (args, rhs) )
         |> to_list'
         |> List.map (fun (args, rhs) ->
-               Stmt.Def_term {vars; id; ty; args; rhs; as_form} )
+            Stmt.Def_term {vars; id; ty; args; rhs; as_form} )
     | Stmt.Def_form {vars; lhs; rhs; polarity; as_form} ->
         (let of_ =
            match lhs with SLiteral.Atom (t, _) -> T.head t | _ -> None
@@ -1057,57 +1057,56 @@ let flatten ~ctx ~lazy_cnf ~should_define seq : _ Iter.t =
          (lhs, rhs) )
         |> to_list'
         |> List.map (fun (lhs, rhs) ->
-               Stmt.Def_form {vars; lhs; rhs; polarity; as_form} )
+            Stmt.Def_form {vars; lhs; rhs; polarity; as_form} )
   in
   seq
   |> Iter.flat_map_l (fun stmt ->
-         let n = Skolem.counter ctx in
-         let proof () =
-           if Skolem.counter ctx > n then
-             proof_preprocess stmt (new_src ~ctx) rule_flatten
-           else Stmt.proof_step stmt
-         in
-         let attrs = stmt.Stmt.attrs in
-         let new_sts =
-           match stmt.Stmt.view with
-           | Stmt.Data _ | Stmt.TyDecl _ ->
-               [stmt]
-           | Stmt.Rewrite d ->
-               flatten_def stmt d
-               |> List.map (fun d' -> Stmt.rewrite ~attrs ~proof:(proof ()) d')
-           | Stmt.Def l ->
-               let l =
-                 List.map
-                   (fun d ->
-                     let rules =
-                       CCList.flat_map (flatten_def stmt) d.Stmt.def_rules
-                     in
-                     {d with Stmt.def_rules= rules} )
-                   l
-               in
-               [Stmt.def ~attrs ~proof:(proof ()) l]
-           | Stmt.Assert f ->
-               flatten_axiom stmt f
-               |> List.map (fun f -> Stmt.assert_ ~attrs ~proof:(proof ()) f)
-           | Stmt.Lemma l ->
-               List.map
-                 (fun f ->
-                   Stmt.lemma ~attrs ~proof:(proof ())
-                     [F.and_ (flatten_axiom stmt f)] )
-                 l
-           | Stmt.Goal f ->
-               [ Stmt.goal ~attrs ~proof:(proof ())
-                   (F.and_ (flatten_axiom stmt f)) ]
-           | Stmt.NegatedGoal _ ->
-               assert false
-         in
-         Util.debugf ~section 2 "@[<2>flatten `@[%a@]`@ into `@[%a@]`@]"
-           (fun k -> k pp_stmt stmt (Util.pp_list pp_stmt) new_sts ) ;
-         match pop_new_defs ~ctx with
-         | [] ->
-             new_sts
-         | l ->
-             List.rev (List.rev_append new_sts l) )
+      let n = Skolem.counter ctx in
+      let proof () =
+        if Skolem.counter ctx > n then
+          proof_preprocess stmt (new_src ~ctx) rule_flatten
+        else Stmt.proof_step stmt
+      in
+      let attrs = stmt.Stmt.attrs in
+      let new_sts =
+        match stmt.Stmt.view with
+        | Stmt.Data _ | Stmt.TyDecl _ ->
+            [stmt]
+        | Stmt.Rewrite d ->
+            flatten_def stmt d
+            |> List.map (fun d' -> Stmt.rewrite ~attrs ~proof:(proof ()) d')
+        | Stmt.Def l ->
+            let l =
+              List.map
+                (fun d ->
+                  let rules =
+                    CCList.flat_map (flatten_def stmt) d.Stmt.def_rules
+                  in
+                  {d with Stmt.def_rules= rules} )
+                l
+            in
+            [Stmt.def ~attrs ~proof:(proof ()) l]
+        | Stmt.Assert f ->
+            flatten_axiom stmt f
+            |> List.map (fun f -> Stmt.assert_ ~attrs ~proof:(proof ()) f)
+        | Stmt.Lemma l ->
+            List.map
+              (fun f ->
+                Stmt.lemma ~attrs ~proof:(proof ())
+                  [F.and_ (flatten_axiom stmt f)] )
+              l
+        | Stmt.Goal f ->
+            [Stmt.goal ~attrs ~proof:(proof ()) (F.and_ (flatten_axiom stmt f))]
+        | Stmt.NegatedGoal _ ->
+            assert false
+      in
+      Util.debugf ~section 2 "@[<2>flatten `@[%a@]`@ into `@[%a@]`@]" (fun k ->
+          k pp_stmt stmt (Util.pp_list pp_stmt) new_sts ) ;
+      match pop_new_defs ~ctx with
+      | [] ->
+          new_sts
+      | l ->
+          List.rev (List.rev_append new_sts l) )
 
 let is_rw stmt =
   match Stmt.view stmt with Stmt.Rewrite _ | Stmt.Def _ -> true | _ -> false
@@ -1163,54 +1162,51 @@ let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
   let res =
     seq
     |> Iter.flat_map (fun stmt ->
-           let old_counter = Skolem.counter ctx in
-           let proof () =
-             if Skolem.counter ctx > old_counter then
-               proof_preprocess stmt (new_src ~ctx) rule_rename
-             else Stmt.proof_step stmt
-           in
-           let attrs = Stmt.attrs stmt in
-           let new_st =
-             match stmt.Stmt.view with
-             | Stmt.Data _ | Stmt.TyDecl _ ->
-                 stmt
-             | Stmt.Def l ->
-                 let l =
-                   List.map
-                     (fun d ->
-                       let rules =
-                         List.map (process_def stmt) d.Stmt.def_rules
-                       in
-                       let new_d = {d with Stmt.def_rules= rules} in
-                       Util.debugf ~section 2
-                         "(@[simplify-def@ `@[%a@]`@ :into `@[%a@]`@])"
-                         (fun k ->
-                           let pp_st = Stmt.pp_def T.pp T.pp T.pp in
-                           k pp_st d pp_st new_d ) ;
-                       new_d )
-                     l
-                 in
-                 Stmt.def ~attrs ~proof:(proof ()) l
-             | Stmt.Rewrite d ->
-                 let d = process_def stmt d in
-                 Stmt.rewrite ~attrs ~proof:(proof ()) d
-             | Stmt.Assert f ->
-                 let f = process_form stmt ~is_goal:false f in
-                 Stmt.assert_ ~attrs ~proof:(proof ()) f
-             | Stmt.Lemma l ->
-                 let l = List.map (process_form stmt ~is_goal:true) l in
-                 Stmt.lemma ~attrs ~proof:(proof ()) l
-             | Stmt.Goal f ->
-                 let f = process_form stmt ~is_goal:true f in
-                 Stmt.goal ~attrs ~proof:(proof ()) f
-             | Stmt.NegatedGoal _ ->
-                 assert false
-           in
-           match pop_new_defs ~ctx with
-           | [] ->
-               Iter.return new_st
-           | l ->
-               Iter.of_list (List.rev (new_st :: l)) )
+        let old_counter = Skolem.counter ctx in
+        let proof () =
+          if Skolem.counter ctx > old_counter then
+            proof_preprocess stmt (new_src ~ctx) rule_rename
+          else Stmt.proof_step stmt
+        in
+        let attrs = Stmt.attrs stmt in
+        let new_st =
+          match stmt.Stmt.view with
+          | Stmt.Data _ | Stmt.TyDecl _ ->
+              stmt
+          | Stmt.Def l ->
+              let l =
+                List.map
+                  (fun d ->
+                    let rules = List.map (process_def stmt) d.Stmt.def_rules in
+                    let new_d = {d with Stmt.def_rules= rules} in
+                    Util.debugf ~section 2
+                      "(@[simplify-def@ `@[%a@]`@ :into `@[%a@]`@])" (fun k ->
+                        let pp_st = Stmt.pp_def T.pp T.pp T.pp in
+                        k pp_st d pp_st new_d ) ;
+                    new_d )
+                  l
+              in
+              Stmt.def ~attrs ~proof:(proof ()) l
+          | Stmt.Rewrite d ->
+              let d = process_def stmt d in
+              Stmt.rewrite ~attrs ~proof:(proof ()) d
+          | Stmt.Assert f ->
+              let f = process_form stmt ~is_goal:false f in
+              Stmt.assert_ ~attrs ~proof:(proof ()) f
+          | Stmt.Lemma l ->
+              let l = List.map (process_form stmt ~is_goal:true) l in
+              Stmt.lemma ~attrs ~proof:(proof ()) l
+          | Stmt.Goal f ->
+              let f = process_form stmt ~is_goal:true f in
+              Stmt.goal ~attrs ~proof:(proof ()) f
+          | Stmt.NegatedGoal _ ->
+              assert false
+        in
+        match pop_new_defs ~ctx with
+        | [] ->
+            Iter.return new_st
+        | l ->
+            Iter.of_list (List.rev (new_st :: l)) )
     |> CCVector.of_iter ?init:None
   in
   ZProf.exit_prof _span ; res

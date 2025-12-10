@@ -155,13 +155,13 @@ let ind_skolem_depth (id : ID.t) : int =
 let find_ind_skolems t : ind_skolem Iter.t =
   T.Seq.subterms t
   |> Iter.filter_map (fun t ->
-         match T.view t with
-         | T.Const id ->
-             let ty = T.ty t in
-             if id_is_ind_skolem id ty then (
-               let n_tyvars, ty_args, _ = Type.open_poly_fun ty in
-               assert (n_tyvars = 0 && ty_args = []) ;
-               Some (id, ty) )
-             else None
-         | _ ->
-             None )
+      match T.view t with
+      | T.Const id ->
+          let ty = T.ty t in
+          if id_is_ind_skolem id ty then (
+            let n_tyvars, ty_args, _ = Type.open_poly_fun ty in
+            assert (n_tyvars = 0 && ty_args = []) ;
+            Some (id, ty) )
+          else None
+      | _ ->
+          None )

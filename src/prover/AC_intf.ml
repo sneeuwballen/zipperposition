@@ -12,8 +12,8 @@ module type S = sig
   val on_add : spec Signal.t
 
   val add : proof:Proof.parent -> ID.t -> Type.t -> unit
-  (** Declare that the given symbol is AC, and update the Env subsequently
-      by adding clauses, etc. *)
+  (** Declare that the given symbol is AC, and update the Env subsequently by
+      adding clauses, etc. *)
 
   val is_ac : ID.t -> bool
 

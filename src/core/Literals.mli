@@ -5,13 +5,11 @@
 (** An array of literals is one of the major components of a clause.
 
     It defines (implicitly) a scope for its variables; applying a substitution
-    should always be done with the same {!Subst.Renaming.t} for
-    all literals in the array.
+    should always be done with the same {!Subst.Renaming.t} for all literals in
+    the array.
 
     This also provides printers, comparison, matching, positions,
-    simplifications, etc.
-    for such arrays of literals.
-*)
+    simplifications, etc. for such arrays of literals. *)
 
 type term = Term.t
 
@@ -32,8 +30,8 @@ val variant :
   -> t Scoped.t
   -> (Subst.t * Builtin.Tag.t list) Iter.t
 (** Variant checking (alpha-equivalence). It can reorder literals to do its
-    check, so that might be computationnally expensive (a bit
-    like subsumption). *)
+    check, so that might be computationnally expensive (a bit like subsumption).
+*)
 
 val are_variant : t -> t -> bool
 (** Simple interface on top of {!variant} with distinc scopes *)
@@ -103,13 +101,13 @@ module Pos : sig
       @raise Invalid_argument if the position is not valid *)
 
   val lit_at : t -> Position.t -> Literal.t * Position.t
-  (** Lookup which literal the position is about, return it
-      and the rest of the position.
+  (** Lookup which literal the position is about, return it and the rest of the
+      position.
       @raise Invalid_argument if the position is not valid *)
 
   val replace : t -> at:Position.t -> by:term -> unit
-  (** In-place modification of the array, in which the subterm at given
-      position is replaced by the [by] term.
+  (** In-place modification of the array, in which the subterm at given position
+      is replaced by the [by] term.
       @raise Invalid_argument if the position is not valid *)
 
   val idx : Position.t -> int
@@ -143,20 +141,20 @@ end
 
 module View : sig
   val get_eqn : t -> Position.t -> (term * term * bool) option
-  (** get the term l at given position in clause, and r such that l ?= r
-      is the Literal.t at the given position.
+  (** get the term l at given position in clause, and r such that l ?= r is the
+      Literal.t at the given position.
       @raise Invalid_argument if the position is not valid in the *)
 
-  (** The following functions will raise [Invalid_argument] if the
-      position is not valid or if the literal isn't what's asked for *)
+  (** The following functions will raise [Invalid_argument] if the position is
+      not valid or if the literal isn't what's asked for *)
 
   val get_eqn_exn : t -> Position.t -> term * term * bool
 end
 
 val fold_lits :
   eligible:(int -> Literal.t -> bool) -> t -> (Literal.t * int) Iter.t
-(** Fold over literals who satisfy [eligible]. The folded function
-    is given the literal and its index. *)
+(** Fold over literals who satisfy [eligible]. The folded function is given the
+    literal and its index. *)
 
 val fold_eqn :
      ?both:bool
@@ -165,19 +163,19 @@ val fold_eqn :
   -> eligible:(int -> Literal.t -> bool)
   -> t
   -> (term * term * bool * Position.t) Iter.t
-(** fold f over all literals sides, with their positions.
-    NB: REPORTED SIGN IS THE SAME AS IF Lit.is_pos WAS CALLED!
-    f is given [(left side, right side, sign, position of left side)]
-    if [ord] is present, then only the max side of an oriented
-      equation will be visited, otherwise they will both be explored.
-    if [both = true], then both sides of a non-oriented equation
-      will be visited, otherwise only one side.
-    if [sign = true], then only positive equations are visited; if it's
-      [false], only negative ones; if it's not defined, both. *)
+(** fold f over all literals sides, with their positions. NB: REPORTED SIGN IS
+    THE SAME AS IF Lit.is_pos WAS CALLED! f is given
+    [(left side, right side, sign, position of left side)] if [ord] is present,
+    then only the max side of an oriented equation will be visited, otherwise
+    they will both be explored. if [both = true], then both sides of a
+    non-oriented equation will be visited, otherwise only one side. if
+    [sign = true], then only positive equations are visited; if it's [false],
+    only negative ones; if it's not defined, both. *)
 
 val fold_eqn_simple :
   ?sign:bool -> t -> (term * term * bool * Position.t) Iter.t
-(** Like previous version but simpler: it visits all equations only in the orientation l = r  *)
+(** Like previous version but simpler: it visits all equations only in the
+    orientation l = r *)
 
 val fold_terms :
      ?vars:bool
@@ -190,8 +188,8 @@ val fold_terms :
   -> eligible:(int -> Literal.t -> bool)
   -> t
   -> term Position.With.t Iter.t
-(** See {!Literal.fold_terms}, which is the same but for the
-    [eligible] argument *)
+(** See {!Literal.fold_terms}, which is the same but for the [eligible] argument
+*)
 
 val symbols : ?init:ID.Set.t -> ?include_types:bool -> t -> ID.Set.t
 
@@ -243,4 +241,5 @@ val num_equational : t -> int
 (** Number of non-predicate literals *)
 
 val is_polymorphism_safe : int -> t -> bool
-(** Whether the literal with given index contains all the type variables of the other literals *)
+(** Whether the literal with given index contains all the type variables of the
+    other literals *)

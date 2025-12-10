@@ -4,11 +4,10 @@
 
 (** Low level proofs, intended for mechanical proof checking.
 
-    Instantiations (substitutions) are explicit because that should make
-    the job of the checker easier.
+    Instantiations (substitutions) are explicit because that should make the job
+    of the checker easier.
 
-    NOTE: this is still uncooked, and will probably change.
-*)
+    NOTE: this is still uncooked, and will probably change. *)
 
 open Logtk
 

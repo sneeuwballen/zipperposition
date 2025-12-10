@@ -12,9 +12,9 @@ val section : Util.Section.t
 module type S = Superposition_intf.S
 
 val key : (module S) Flex_state.key
-(** key to access the {!Env.flex_state}. After registration (after
-    calling [register]), the Env's state contains
-    a mapping from "superposition" to the packed module. *)
+(** key to access the {!Env.flex_state}. After registration (after calling
+    [register]), the Env's state contains a mapping from "superposition" to the
+    packed module. *)
 
 val k_unif_alg :
   (Term.t Scoped.t -> Term.t Scoped.t -> Unif_subst.t CCOpt.t OSeq.t)
@@ -25,8 +25,8 @@ val k_ho_basic_rules : bool Flex_state.key
 val get_unif_module : (module Env.S) -> (module UnifFramework.US)
 
 val register : sup:(module S) -> unit
-(** Register the superposition module to its Environment's
-    mixtbl. Done automatically by the {!extension}. *)
+(** Register the superposition module to its Environment's mixtbl. Done
+    automatically by the {!extension}. *)
 
 module Make (Env : Env.S) : S with module Env = Env
 

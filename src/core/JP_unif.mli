@@ -50,10 +50,9 @@ val iterate :
 
 val find_disagreement :
   T.t -> T.t -> ((T.t * T.t) * (T.var * int) CCList.t) option
-(** Find disagreeing subterms. 
-    This function also returns a list of variables occurring above the
-    disagreement pair, along with the index of the argument that the disagreement
-    pair occurs in. *)
+(** Find disagreeing subterms. This function also returns a list of variables
+    occurring above the disagreement pair, along with the index of the argument
+    that the disagreement pair occurs in. *)
 
 (* Unify terms of the same scope. Assumes that terms are in eta-long form. *)
 val unify :

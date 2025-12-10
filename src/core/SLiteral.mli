@@ -2,8 +2,8 @@
 
 (** {1 Simple Literal} *)
 
-(** Simple literals, used typically in {!CNF} before being converted to
-    whatever representation the prover prefers. *)
+(** Simple literals, used typically in {!CNF} before being converted to whatever
+    representation the prover prefers. *)
 
 type form = TypedSTerm.t
 

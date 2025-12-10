@@ -43,12 +43,11 @@ end
 
 (** {2 Constraints} *)
 module Constr : sig
-  (** A partial order on symbols, used to make the precedence more
-      precise.
-      ['a] encodes the kind of ordering: partial or total
-      {b NOTE}: the ordering must partition the set of ALL symbols into
-        equivalence classes, within which all symbols are equal, but
-        symbols of distinct equivalence classes are always ordered. *)
+  (** A partial order on symbols, used to make the precedence more precise. ['a]
+      encodes the kind of ordering: partial or total {b NOTE}: the ordering must
+      partition the set of ALL symbols into equivalence classes, within which
+      all symbols are equal, but symbols of distinct equivalence classes are
+      always ordered. *)
   type 'a t = private ID.t -> ID.t -> int constraint 'a = [< `partial | `total]
 
   type prec_fun = signature:Signature.t -> ID.t Iter.t -> [`partial] t
@@ -61,8 +60,8 @@ module Constr : sig
   (** decreasing arity constraint (big arity => high in precedence) *)
 
   val invfreq : prec_fun
-  (** symbols with high frequency are smaller. Elements of unknown
-      frequency are assumed to have a frequency of 0. *)
+  (** symbols with high frequency are smaller. Elements of unknown frequency are
+      assumed to have a frequency of 0. *)
 
   val max : prec_fun
   (** maximal symbols, in decreasing order *)
@@ -76,25 +75,25 @@ module Constr : sig
   (** alphabetic ordering on symbols, themselves bigger than builtin *)
 
   val compose : [`partial] t -> ([< `partial | `total] as 'a) t -> 'a t
-  (** [compose a b] uses [a] to compare symbols; if [a] cannot decide,
-      then we use [b]. *)
+  (** [compose a b] uses [a] to compare symbols; if [a] cannot decide, then we
+      use [b]. *)
 
   val compose_sort : (int * [`partial] t) list -> [`partial] t
-  (** [compose_sort l] sorts the list by increasing priority (the lower,
-      the earlier an ordering is applied, and therefore the more
-      impact it has) before composing *)
+  (** [compose_sort l] sorts the list by increasing priority (the lower, the
+      earlier an ordering is applied, and therefore the more impact it has)
+      before composing *)
 
   val compare_by : constr:'a t -> ID.t -> ID.t -> int
-  (** [compare_by ~constr a b returns the result of comparing symbols
-       a and b using constr]  *)
+  (** [compare_by ~constr a b returns the result of comparing symbols a and b
+       using constr] *)
 
   val make : (ID.t -> ID.t -> int) -> [`partial] t
-  (** Create a new partial order.
-      {b CAUTION}, this order must respect some properties (see {!'a t}) *)
+  (** Create a new partial order. {b CAUTION}, this order must respect some
+      properties (see {!'a t}) *)
 end
 
-(** Total Ordering on a finite number of symbols, plus a few more
-    data (weight for KBO, status for RPC) *)
+(** Total Ordering on a finite number of symbols, plus a few more data (weight
+    for KBO, status for RPC) *)
 type t
 
 type precedence = t
@@ -129,7 +128,8 @@ val db_weight : t -> Weight.t
 val lam_weight : t -> Weight.t
 
 val arg_coeff : t -> ID.t -> int -> int
-(** Nth argument coefficient of a symbol (for KBO with argument coefficients). *)
+(** Nth argument coefficient of a symbol (for KBO with argument coefficients).
+*)
 
 val add_list : signature:Signature.t -> t -> ID.t list -> unit
 (** Update the precedence with the given symbols *)
@@ -187,10 +187,10 @@ val create :
   -> [`total] Constr.t
   -> ID.t list
   -> t
-(** make a precedence from the given constraints. Constraints near
-    the head of the list are {b more important} than constraints close
-    to the tail. Only the very first constraint is assured to be totally
-    satisfied if constraints do not agree with one another. *)
+(** make a precedence from the given constraints. Constraints near the head of
+    the list are {b more important} than constraints close to the tail. Only the
+    very first constraint is assured to be totally satisfied if constraints do
+    not agree with one another. *)
 
 val default : ID.t list -> t
 (** default precedence. Default status for symbols is {!Lexicographic}. *)

@@ -15,9 +15,9 @@ type term = T.t
 
 type subst = Subst.t
 
-(** A context is represented as a regular array of literals, containing
-    at least one specific variable [x], paired with this variable [x].
-    Applying the context is a mere substitution *)
+(** A context is represented as a regular array of literals, containing at least
+    one specific variable [x], paired with this variable [x]. Applying the
+    context is a mere substitution *)
 type t = {lits: Literals.t; var: T.var; mutable hash: int}
 
 type ctx = t

@@ -4,22 +4,19 @@
 
 (** {2 Main Type representation}
 
-    Types are represented using InnerTerm, with kind Type. Therefore, they
-    are hashconsed and scoped.
+    Types are represented using InnerTerm, with kind Type. Therefore, they are
+    hashconsed and scoped.
 
-    Common representation of types, including higher-order
-    and polymorphic types. All type variables
-    are assumed to be universally quantified in the outermost possible
-    scope (outside any other quantifier).
+    Common representation of types, including higher-order and polymorphic
+    types. All type variables are assumed to be universally quantified in the
+    outermost possible scope (outside any other quantifier).
 
-    See {!TypeInference} for inferring types from terms and formulas,
-    and {!Signature} to associate types with symbols.
+    See {!TypeInference} for inferring types from terms and formulas, and
+    {!Signature} to associate types with symbols.
 
-    TODO: think of a good way of representing AC operators (+, ...)
-*)
+    TODO: think of a good way of representing AC operators (+, ...) *)
 
-(** Type is a subtype of the term structure
-    (itself a subtype of InnerTerm.t),
+(** Type is a subtype of the term structure (itself a subtype of InnerTerm.t),
     with explicit conversion *)
 type t = private InnerTerm.t
 
@@ -114,12 +111,12 @@ val bvar : int -> t
 (** bound variable *)
 
 val ( ==> ) : t list -> t -> t
-(** General function type. [l ==> x] is the same as [x] if [l]
-    is empty. Invariant: the return type is never a function type. *)
+(** General function type. [l ==> x] is the same as [x] if [l] is empty.
+    Invariant: the return type is never a function type. *)
 
 val of_term_unsafe : InnerTerm.t -> t
-(** {b NOTE}: this can break the invariants and make {!view} fail. Only
-    use with caution. *)
+(** {b NOTE}: this can break the invariants and make {!view} fail. Only use with
+    caution. *)
 
 val of_terms_unsafe : InnerTerm.t list -> t list
 
@@ -187,15 +184,14 @@ val close_forall : t -> t
 type arity_result = Arity of int * int | NoArity
 
 val arity : t -> arity_result
-(** Number of arguments the type expects.
-    If [arity ty] returns [Arity (a, b)] that means that it
-    expects [a] arguments to be used as arguments of Forall, and
-    [b] arguments to be used for function application. If
-    it returns [NoArity] then the arity is unknown (variable) *)
+(** Number of arguments the type expects. If [arity ty] returns [Arity (a, b)]
+    that means that it expects [a] arguments to be used as arguments of Forall,
+    and [b] arguments to be used for function application. If it returns
+    [NoArity] then the arity is unknown (variable) *)
 
 val expected_args : t -> t list
-(** Types expected as function argument by [ty]. The length of the
-    list [expected_args ty] is the same as [snd (arity ty)]. *)
+(** Types expected as function argument by [ty]. The length of the list
+    [expected_args ty] is the same as [snd (arity ty)]. *)
 
 val expected_ty_vars : t -> int
 (** Number of type parameters expected. 0 for monomorphic types. *)
@@ -205,9 +201,7 @@ val needs_args : t -> bool
 
 val order : t -> int
 (** Number of left-nested function types (1 for constant and variables).
-    [order (a->b) = 1]
-    [order ((a->b)->c) = 2]
-    [order (((a->b)->c)->d) = 2] *)
+    [order (a->b) = 1] [order ((a->b)->c) = 2] [order (((a->b)->c)->d) = 2] *)
 
 val contains_prop : t -> bool
 
@@ -222,10 +216,12 @@ val depth : t -> int
     @since 0.5.3 *)
 
 val open_poly_fun : t -> int * t list * t
-(** [open_poly_fun ty] "unrolls" polymorphic function arrows from the left, so that
-    [open_poly_fun (forall a b. f a -> (g b -> (c -> d)))] returns [2; [f a;g b;c], d].
-    @return the return type, the number of type variables,
-      and the list of all its arguments *)
+(** [open_poly_fun ty] "unrolls" polymorphic function arrows from the left, so
+    that [open_poly_fun (forall a b. f a -> (g b -> (c -> d)))] returns
+    [2; [f a;g b;c], d].
+    @return
+      the return type, the number of type variables, and the list of all its
+      arguments *)
 
 val open_fun : t -> t list * t
 (** [open_fun ty] "unrolls" function arrows from the left, so that
@@ -233,9 +229,9 @@ val open_fun : t -> t list * t
     @return the return type and the list of all its arguments *)
 
 val returns : t -> t
-(** returned type (going through foralls and arrows).
-    [returns a] is like [let _, _, ret = open_poly_fun a in ret]
-    {b NOTE} caution, not always closed *)
+(** returned type (going through foralls and arrows). [returns a] is like
+    [let _, _, ret = open_poly_fun a in ret] {b NOTE} caution, not always closed
+*)
 
 val returns_prop : t -> bool
 
@@ -245,23 +241,23 @@ val returns_tType : t -> bool
 exception ApplyError of string
 
 val apply : t -> t list -> t
-(** Given a function/forall type, and arguments, return the
-    type that results from applying the function/forall to the arguments.
-    No unification is done, types must check exactly.
+(** Given a function/forall type, and arguments, return the type that results
+    from applying the function/forall to the arguments. No unification is done,
+    types must check exactly.
     @raise ApplyError if the types do not match *)
 
 val apply1 : t -> t -> t
 (** [apply1 a b] is short for [apply a [b]]. *)
 
 val apply_unsafe : t -> InnerTerm.t list -> t
-(** Similar to {!apply}, but assumes its arguments are well-formed
-    types without more ado.
+(** Similar to {!apply}, but assumes its arguments are well-formed types without
+    more ado.
     @raise ApplyError if types do not match
     @raise Assert_failure if the arguments are not proper types *)
 
 val is_unifiable : t -> bool
-(** Are terms of this type syntactically unifiable?
-    See {!InnerTerm.type_is_unifiable} *)
+(** Are terms of this type syntactically unifiable? See
+    {!InnerTerm.type_is_unifiable} *)
 
 (** {2 IO} *)
 
@@ -336,8 +332,7 @@ module Conv : sig
   val set_maxvar : ctx -> int -> unit
 
   val of_simple_term : ctx -> TypedSTerm.t -> t option
-  (** convert a simple typed term into a type. The term is assumed to be
-        closed.
+  (** convert a simple typed term into a type. The term is assumed to be closed.
       @return an error message if the term is not a type
       @param ctx context used to map {!Var} to {!HVar} *)
 
@@ -358,7 +353,7 @@ module Conv : sig
   val to_simple_term :
     ?env:TypedSTerm.t Var.t DBEnv.t -> ctx -> t -> TypedSTerm.t
   (** convert a type to a prolog term.
-        @param env the current environment for De Bruijn indices *)
+      @param env the current environment for De Bruijn indices *)
 end
 
 (**/**)

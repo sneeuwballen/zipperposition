@@ -2,11 +2,10 @@
 
 (** {1 Hashing Combinators (for hashconsing)} *)
 
-(** A compositional interface for hashing values of type ['a]
-    by providing a ['a -> int] function.
-    Hashing composite structures is done by combining the
-    hashes of individual components using {!combine} or {!combine2};
-    Helpers for hashing lists, options, arrays, tuples, etc. are provided. *)
+(** A compositional interface for hashing values of type ['a] by providing a
+    ['a -> int] function. Hashing composite structures is done by combining the
+    hashes of individual components using {!combine} or {!combine2}; Helpers for
+    hashing lists, options, arrays, tuples, etc. are provided. *)
 
 type 'a t = 'a -> int
 

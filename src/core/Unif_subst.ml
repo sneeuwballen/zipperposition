@@ -5,8 +5,7 @@
 (** A tuple containing:
 
     - the substitution itself
-    - delayed constraints
-*)
+    - delayed constraints *)
 
 module H = HVar
 

@@ -75,18 +75,18 @@ end) : S with module Ctx = X.Ctx = struct
   (** Generation of clauses regardless of current clause *)
   type generate_rule = full:bool -> unit -> C.t list
 
-  (** Eliminates clauses from the proof state using algorithms
-      like blocked clause elimination and similar *)
+  (** Eliminates clauses from the proof state using algorithms like blocked
+      clause elimination and similar *)
   type clause_elim_rule = unit -> unit
 
   type binary_inf_rule = inf_rule
 
   type unary_inf_rule = inf_rule
 
-  (** Simplify the clause structurally (basic simplifications),
-      in the simplification monad.
-      [(c, `Same)] means the clause has not been simplified;
-      [(c, `New)] means the clause has been simplified at least once *)
+  (** Simplify the clause structurally (basic simplifications), in the
+      simplification monad. [(c, `Same)] means the clause has not been
+      simplified; [(c, `New)] means the clause has been simplified at least once
+  *)
   type simplify_rule = C.t -> C.t SimplM.t
 
   (** Normalization rule on terms *)
@@ -96,8 +96,8 @@ end) : S with module Ctx = X.Ctx = struct
 
   type rw_simplify_rule = simplify_rule
 
-  (** backward simplification by a unit clause. It returns a set of
-      active clauses that can potentially be simplified by the given clause.
+  (** backward simplification by a unit clause. It returns a set of active
+      clauses that can potentially be simplified by the given clause.
       [backward_simplify c] therefore returns a subset of
       [ProofState.ActiveSet.clauses ()] *)
   type backward_simplify_rule = C.t -> C.ClauseSet.t
@@ -105,9 +105,9 @@ end) : S with module Ctx = X.Ctx = struct
   (** check whether the clause is redundant w.r.t the set *)
   type redundant_rule = C.t -> bool
 
-  (** find redundant clauses in [ProofState.ActiveSet] w.r.t the clause.
-       first param is the set of already known redundant clause, the rule
-       should add clauses to it *)
+  (** find redundant clauses in [ProofState.ActiveSet] w.r.t the clause. first
+      param is the set of already known redundant clause, the rule should add
+      clauses to it *)
   type backward_redundant_rule = C.ClauseSet.t -> C.t -> C.ClauseSet.t
 
   (** Rule that checks whether the trail is trivial (a tautology) *)
@@ -123,8 +123,8 @@ end) : S with module Ctx = X.Ctx = struct
   type lit_rewrite_rule =
     Literal.t -> (Literal.t * Proof.parent list * Proof.tag list) option
 
-  (** (maybe) rewrite a clause to a set of clauses.
-      Must return [None] if the clause is unmodified *)
+  (** (maybe) rewrite a clause to a set of clauses. Must return [None] if the
+      clause is unmodified *)
   type multi_simpl_rule = C.t -> C.t list option
 
   type immediate_simplification_rule = C.t -> C.t Iter.t -> C.t Iter.t option
@@ -135,8 +135,7 @@ end) : S with module Ctx = X.Ctx = struct
     | CR_add of 'a  (** add this to the result *)
     | CR_return of 'a  (** shortcut the remaining rules, return this *)
 
-  (** A hook to convert a particular statement into a list
-      of clauses *)
+  (** A hook to convert a particular statement into a list of clauses *)
   type clause_conversion_rule = Statement.clause_t -> C.t list conversion_result
 
   let _binary_rules : (string * binary_inf_rule) list ref = ref []
@@ -619,10 +618,10 @@ end) : S with module Ctx = X.Ctx = struct
         >>= fun c ->
         (* rewrite literals (if needed) *)
         ( match !_lit_rules with
-        | [] ->
-            SimplM.return_same c
-        | _ :: _ ->
-            rewrite_lits c )
+          | [] ->
+              SimplM.return_same c
+          | _ :: _ ->
+              rewrite_lits c )
         >>= fun c ->
         (* apply simplifications *)
         match !_unary_simplify with
@@ -674,7 +673,8 @@ end) : S with module Ctx = X.Ctx = struct
       fix_simpl c ~f:(fun c ->
           let old_c = c in
           ho_normalize c >>= basic_simplify
-          >>= (* simplify with unit clauses, then all active clauses *)
+          >>=
+          (* simplify with unit clauses, then all active clauses *)
           ho_normalize >>= rewrite >>= rw_simplify >>= unary_simplify
           >>= active_simplify
           >|= fun c ->
@@ -772,7 +772,8 @@ end) : S with module Ctx = X.Ctx = struct
       fix_simpl c ~f:(fun c ->
           let old_c = c in
           ho_normalize c >>= basic_simplify
-          >>= (* simplify with unit clauses, then all active clauses *)
+          >>=
+          (* simplify with unit clauses, then all active clauses *)
           ho_normalize >>= rewrite >>= rw_simplify >>= unary_simplify
           >|= fun c ->
           if not (Lits.equal_com (C.lits c) (C.lits old_c)) then
@@ -936,13 +937,11 @@ end) : S with module Ctx = X.Ctx = struct
     ZProf.exit_prof _span ;
     res
 
-  (** Use all simplification rules to convert a clause into a list of
-      maximally simplified clauses.
-      
-      Stop applying mutlti_simpl rules after a certain depth.
-      Especially dangerous rules are the ones that do boolean hoisting
-      as simplification
-  *)
+  (** Use all simplification rules to convert a clause into a list of maximally
+      simplified clauses.
+
+      Stop applying mutlti_simpl rules after a certain depth. Especially
+      dangerous rules are the ones that do boolean hoisting as simplification *)
   let all_simplify c =
     let _span = ZProf.enter_prof prof_all_simplify in
     let did_simplify = ref false in

@@ -2,8 +2,8 @@
 
 (** {1 Simplification Monad}
 
-    This monad is used to combine simplifications in a way that allows
-    to know if at least one simplification was performed, or not. *)
+    This monad is used to combine simplifications in a way that allows to know
+    if at least one simplification was performed, or not. *)
 
 type +'a t = 'a * [`Same | `New]
 
@@ -15,7 +15,8 @@ val return : 'a -> 'a t
 (** alias for {!return_same} *)
 
 val return_opt : old:'a -> 'a option -> 'a t
-(** [return_opt ~old t] returns [return_new u] if [t=Some u], else returns [same old]. *)
+(** [return_opt ~old t] returns [return_new u] if [t=Some u], else returns
+    [same old]. *)
 
 val get : 'a t -> 'a
 

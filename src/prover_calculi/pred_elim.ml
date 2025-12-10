@@ -341,8 +341,7 @@ module Make (E : Env.S) : S with module Env = E = struct
                             acc )
                       1 (C.lits cl)
                   in
-                  if new_res + num_res < limit then new_res + num_res else limit
-                )
+                  if new_res + num_res < limit then new_res + num_res else limit )
               task.offending_cls 0
           in
           if max_resolvents < limit then true else (remove_symbol task ; false)
@@ -723,8 +722,7 @@ module Make (E : Env.S) : S with module Env = E = struct
               List.filter_map
                 (fun (p, n) ->
                   let lhs = apply (p, pos_sc) and rhs = apply (n, neg_sc) in
-                  if Term.equal lhs rhs then None else Some (L.mk_neq lhs rhs)
-                  )
+                  if Term.equal lhs rhs then None else Some (L.mk_neq lhs rhs) )
                 (List.combine pos_args neg_args)
               @ CCArray.except_idx (C.lits pos_cl') pos_idx
               @ CCArray.except_idx (C.lits neg_cl') neg_idx
@@ -824,9 +822,9 @@ module Make (E : Env.S) : S with module Env = E = struct
                           @@ Iter.is_empty
                                ( L.variant (lit, 0) (other_lit, 1)
                                |> Iter.filter (fun (subst, _) ->
-                                      not @@ Iter.is_empty
-                                      @@ L.variant ~subst (sym_name_lit, 0)
-                                           (name_lit, 1) ) )
+                                   not @@ Iter.is_empty
+                                   @@ L.variant ~subst (sym_name_lit, 0)
+                                        (name_lit, 1) ) )
                         in
                         if is_matched then (
                           CCBV.set matched !i ;
@@ -989,7 +987,8 @@ module Make (E : Env.S) : S with module Env = E = struct
               let to_remove = CS.of_list (core_pos @ core_neg) in
               if
                 CS.cardinal to_remove != 2
-                || (* if there are two clauses then they must be of the form p(X,Y) <-> q(X,Y) *)
+                ||
+                (* if there are two clauses then they must be of the form p(X,Y) <-> q(X,Y) *)
                 CS.for_all
                   (fun c -> C.length c == 2 && CCArray.for_all is_def (C.lits c))
                   to_remove

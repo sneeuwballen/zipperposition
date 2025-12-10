@@ -3,15 +3,14 @@
 (** {1 Terms} *)
 
 (** Those terms provide a direct presentation of higher-order terms with lambdas
-    in the sense that they make currying possible (as well as applying
-    functions to other terms).
+    in the sense that they make currying possible (as well as applying functions
+    to other terms).
 
     This is as if terms had an `apply` symbol everywhere, but more lightweight.
 
-    Types and terms are mixed because it makes application much easier
-    (applying to a type and to a term are the same thing).
-    It might also make dependent typing possible some day.
-*)
+    Types and terms are mixed because it makes application much easier (applying
+    to a type and to a term are the same thing). It might also make dependent
+    typing possible some day. *)
 
 (** {2 Term} *)
 
@@ -35,8 +34,8 @@ val view : t -> view
 
 (** {2 Classic view}
 
-    This module provides a first-order view on terms, for code
-    that focuses on first-order logic. *)
+    This module provides a first-order view on terms, for code that focuses on
+    first-order logic. *)
 module Classic : sig
   type view = private
     | Var of var
@@ -71,15 +70,13 @@ val hash_mod_alpha : t -> int
 (** Hash invariant w.r.t variable renaming *)
 
 val same_l : t list -> t list -> bool
-(** [same_l l1 l2] returns [true] if terms of [l1] and [l2] are pairwise
-    equal, [false] otherwise.
-    Precondition: both lists have the same length
+(** [same_l l1 l2] returns [true] if terms of [l1] and [l2] are pairwise equal,
+    [false] otherwise. Precondition: both lists have the same length
     @raise Assert_failure if lists have not the same length *)
 
 val same_l_gen : t list -> t list -> bool
-(** [same_l l1 l2] returns [true] if terms of [l1] and [l2] are pairwise
-    equal, [false] otherwise.
-    Precondition: both lists have the same length
+(** [same_l l1 l2] returns [true] if terms of [l1] and [l2] are pairwise equal,
+    [false] otherwise. Precondition: both lists have the same length
     @raise Assert_failure if lists have not the same length *)
 
 (** {2 Constructors} *)
@@ -89,8 +86,8 @@ val var : var -> t
 val var_of_int : ty:Type.t -> int -> t
 
 val bvar : ty:Type.t -> int -> t
-(** Create a bound variable. Providing a type is mandatory.
-    {b Warning}: be careful and try not to use this function directly.
+(** Create a bound variable. Providing a type is mandatory. {b Warning}: be
+    careful and try not to use this function directly.
     @raise InnerTerm.IllFormedTerm if the index is < 0 *)
 
 val builtin : ty:Type.t -> Builtin.t -> t
@@ -124,14 +121,14 @@ val fun_ : Type.t -> t -> t
 val fun_l : Type.t list -> t -> t
 
 val fun_of_fvars : var list -> t -> t
-(** Build a function from a list of free vars + the body.
-    This performs the De Bruijn transformation, and shifts the body. *)
+(** Build a function from a list of free vars + the body. This performs the De
+    Bruijn transformation, and shifts the body. *)
 
 val open_fun : t -> Type.t list * t
 
 val open_fun_offset : offset:int -> t -> var list * t * int
-(** [open_fun ~offset (λxy. F)] returns [[v1,v2], F[v1/x,v2/y], offset+2]
-    where [v1] and [v2] are fresh variables starting from offset *)
+(** [open_fun ~offset (λxy. F)] returns [[v1,v2], F[v1/x,v2/y], offset+2] where
+    [v1] and [v2] are fresh variables starting from offset *)
 
 val grounding : Type.t -> t
 (** [grounding ty] is a unique constant of type [ty] *)
@@ -166,9 +163,8 @@ val in_fool_fragment : t -> bool * bool
 val is_true_or_false : t -> bool
 
 val lambda_depth : t -> int option
-(** If term has no lambdas reutrn None;
-   otherwise, return Some d where d is the
-   maximal level of lambda nestings *)
+(** If term has no lambdas reutrn None; otherwise, return Some d where d is the
+    maximal level of lambda nestings *)
 
 val comb_depth : t -> int option
 (** combinatory equivalent to lambda_depth *)
@@ -191,12 +187,13 @@ val as_var_exn : t -> var
 val as_bvar_exn : t -> int
 
 val as_app : t -> t * t list
-(** [as_app t] decomposes [t] into a head (non-application) and arguments,
-    such as [(let f,l = as_app t in app f l) = t] *)
+(** [as_app t] decomposes [t] into a head (non-application) and arguments, such
+    as [(let f,l = as_app t in app f l) = t] *)
 
 val as_app_mono : t -> t * t list
-(** [as_app_mono t] decomposes [t] into a head (possibly applied to type arguments)
-    and arguments, such as [(let f,l = as_app_mono t in app f l) = t] *)
+(** [as_app_mono t] decomposes [t] into a head (possibly applied to type
+    arguments) and arguments, such as [(let f,l = as_app_mono t in app f l) = t]
+*)
 
 val as_fun : t -> Type.t list * t
 (** Open functions *)
@@ -217,8 +214,8 @@ val ty_args : t -> Type.t list
 (** Type arguments of the term *)
 
 val of_term_unsafe : InnerTerm.t -> t
-(** {b NOTE}: this can break the invariants and make {!view} fail. Only
-    apply with caution. *)
+(** {b NOTE}: this can break the invariants and make {!view} fail. Only apply
+    with caution. *)
 
 val of_term_unsafe_l : InnerTerm.t list -> t list
 
@@ -329,8 +326,8 @@ val cover_with_terms :
 val max_cover : t -> t option list -> t
 
 val weight : ?var:int -> ?sym:(ID.t -> int) -> t -> int
-(** Compute the weight of a term, given a weight for variables
-    and one for ID.ts.
+(** Compute the weight of a term, given a weight for variables and one for
+    ID.ts.
     @param var unique weight for every variable (default 1)
     @param sym function from ID.ts to their weight (default [const 1])
     @since 0.5.3 *)
@@ -343,7 +340,8 @@ val ty_vars : t -> Type.VarSet.t
 val is_ho_var : t -> bool
 
 val is_ho_app : t -> bool
-(** [is_ho_app (F t1…tn)] is true, when [F] is a variable (of any function type) *)
+(** [is_ho_app (F t1…tn)] is true, when [F] is a variable (of any function type)
+*)
 
 val as_ho_app : t -> (Type.t HVar.t * t list) option
 (** [as_ho_app (F t1…tn) = Some (F, [t1…tn])] *)
@@ -363,18 +361,18 @@ module Pos : sig
       @raise Invalid_argument if the position is invalid *)
 
   val replace : t -> Position.t -> by:t -> t
-  (** [replace t pos ~by] replaces the subterm at position [pos]
-      in [t] by the term [by]. The two terms should have the same type.
+  (** [replace t pos ~by] replaces the subterm at position [pos] in [t] by the
+      term [by]. The two terms should have the same type.
       @raise Invalid_argument if the position is not valid *)
 end
 
 val replace : t -> old:t -> by:t -> t
-(** [replace t ~old ~by] syntactically replaces all occurrences of [old]
-    in [t] by the term [by]. *)
+(** [replace t ~old ~by] syntactically replaces all occurrences of [old] in [t]
+    by the term [by]. *)
 
 val replace_m : t -> t Map.t -> t
-(** [replace t m] syntactically replaces all occurrences of bindings of
-    the map in [t], starting from the root *)
+(** [replace t m] syntactically replaces all occurrences of bindings of the map
+    in [t], starting from the root *)
 
 (** {2 High-level operations} *)
 
@@ -399,9 +397,14 @@ val all_positions :
   -> t Position.With.t Iter.t
 (** Iterate on all sub-terms with their position.
     @param vars specifies whether variables are folded on (default false).
-    @param ty_args specifies whether type arguments are folded on (default true).
-    @param var_args specifies whether arguments of applied variables are folded on (default true).
-    @param fun_bodies specifies whether bodies of lambda-expressions are folded on (default true).
+    @param ty_args
+      specifies whether type arguments are folded on (default true).
+    @param var_args
+      specifies whether arguments of applied variables are folded on (default
+      true).
+    @param fun_bodies
+      specifies whether bodies of lambda-expressions are folded on (default
+      true).
     @param pos the initial position (default empty) *)
 
 (** {2 Some AC-utils} *)
@@ -422,9 +425,9 @@ module AC (A : AC_SPEC) : sig
   (** normal form of the term modulo AC *)
 
   val equal : t -> t -> bool
-  (** Check whether the two terms are AC-equal. Optional arguments specify
-      which ID.ts are AC or commutative (by default by looking at
-      attr_ac and attr_commut). *)
+  (** Check whether the two terms are AC-equal. Optional arguments specify which
+      ID.ts are AC or commutative (by default by looking at attr_ac and
+      attr_commut). *)
 
   val symbols : t Iter.t -> ID.Set.t
   (** Set of ID.ts occurring in the terms, that are AC *)

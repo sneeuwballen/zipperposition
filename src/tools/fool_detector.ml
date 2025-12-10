@@ -1,6 +1,6 @@
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-(** {1 Find applied variables in a problem } *)
+(** {1 Find applied variables in a problem} *)
 
 open Logtk
 open Logtk_parsers
@@ -97,17 +97,17 @@ let process file =
     let fool_found = ref false in
     CCVector.to_iter (CCResult.get_exn typed_ast)
     |> Iter.iter (fun stm ->
-           match statement_kind stm with
-           | OutsideFOOL ->
-               let err =
-                 CCFormat.sprintf "Formula @[%a@] is not in FOOL"
-                   Statement.pp_input stm
-               in
-               raise (Stop err)
-           | InFOOL ->
-               fool_found := true
-           | PureFO ->
-               () ) ;
+        match statement_kind stm with
+        | OutsideFOOL ->
+            let err =
+              CCFormat.sprintf "Formula @[%a@] is not in FOOL"
+                Statement.pp_input stm
+            in
+            raise (Stop err)
+        | InFOOL ->
+            fool_found := true
+        | PureFO ->
+            () ) ;
     if not !fool_found then raise (Stop "Pure FO") else CCFormat.printf "OK.@."
   with
   | Stop reason ->

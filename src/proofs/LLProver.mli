@@ -1,7 +1,7 @@
 (** {1 Low Level Prover} *)
 
-(** A small theorem prover that checks entailment of ground formulas,
-    with higher order terms and some theories *)
+(** A small theorem prover that checks entailment of ground formulas, with
+    higher order terms and some theories *)
 
 type form = LLTerm.Form.t
 

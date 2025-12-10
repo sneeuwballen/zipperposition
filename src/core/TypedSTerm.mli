@@ -2,14 +2,13 @@
 
 (** {1 Simple Typed Terms} *)
 
-(** Similar to {!STerm}, but this time the terms are properly
-    scoped (using {!Var}) and typed.
+(** Similar to {!STerm}, but this time the terms are properly scoped (using
+    {!Var}) and typed.
 
-    These terms are suitable for many preprocessing transformations,
-    including {!CNF}.
+    These terms are suitable for many preprocessing transformations, including
+    {!CNF}.
 
-    They can be obtained from {!STerm.t} using {!TypeInference}.
-*)
+    They can be obtained from {!STerm.t} using {!TypeInference}. *)
 
 type location = ParseLocation.t
 
@@ -194,7 +193,8 @@ module Ty : sig
       [[a,b], [x,y,z], ret] *)
 
   val arity : t -> int * int
-  (** [arity ty] returns [(n,m)] where [ty = forall x1..xn (a1 ... am -> ret)] *)
+  (** [arity ty] returns [(n,m)] where [ty = forall x1..xn (a1 ... am -> ret)]
+  *)
 
   val mangle : t -> string
   (** String usable as an identifier, without whitespace *)
@@ -311,12 +311,12 @@ val is_monomorphic : t -> bool
 
 val is_subterm : strict:bool -> t -> of_:t -> bool
 (** [is_subterm a ~of_:b] is true if [a] is a subterm of [b].
-    @param strict if true, [a] must be a strict subterm of [b],
-      that is, not [b] itself *)
+    @param strict
+      if true, [a] must be a strict subterm of [b], that is, not [b] itself *)
 
 val closed : t -> bool
-(** [closed t] is [true] iff all bound variables of [t] occur under a
-    binder (i.e. they are actually bound in [t]) *)
+(** [closed t] is [true] iff all bound variables of [t] occur under a binder
+    (i.e. they are actually bound in [t]) *)
 
 val unfold_binder : Binder.t -> t -> t Var.t list * t
 (** [unfold_binder b (b v1 (b v2... (b vn t)))] returns [[v1,...,vn], t] *)
@@ -383,8 +383,7 @@ module Subst : sig
   val mem : t -> term Var.t -> bool
 
   val add : t -> term Var.t -> term -> t
-  (** Add new binding to substitution
-      Fails if the variable is bound already *)
+  (** Add new binding to substitution Fails if the variable is bound already *)
 
   val find : t -> term Var.t -> term option
 
@@ -398,8 +397,8 @@ module Subst : sig
   val eval : ?rename_binders:bool -> t -> term -> term
 
   val eval_nonrec : t -> term -> term
-  (** Evaluate under substitution, but consider the substitution as
-      not idempotent *)
+  (** Evaluate under substitution, but consider the substitution as not
+      idempotent *)
 
   include Interfaces.PRINT with type t := t
 end
@@ -433,8 +432,8 @@ module UStack : sig
   (** Save current state *)
 
   val restore : st:t -> snapshot -> unit
-  (** Restore all references to their state at [snapshot]. Bindings
-      done since are undone. *)
+  (** Restore all references to their state at [snapshot]. Bindings done since
+      are undone. *)
 end
 
 val unify :
@@ -445,10 +444,10 @@ val unify :
   -> term
   -> term
   -> unit
-(** unifies destructively the two given terms, by modifying references
-      that occur under {!Meta}. Regular variables are not modified.
-    @param allow_open if true, metas can be unified to terms
-      with free variables (default false)
+(** unifies destructively the two given terms, by modifying references that
+    occur under {!Meta}. Regular variables are not modified.
+    @param allow_open
+      if true, metas can be unified to terms with free variables (default false)
     @param st used for backtracking
     @param subst substitution for bound variables
     @raise UnifyFailure if unification fails. *)
@@ -462,9 +461,9 @@ val apply_unify :
   -> t
   -> t list
   -> t
-(** [apply_unify f_ty args] compute the type of a function of type [f_ty],
-    when applied to parameters [args]. The first elements of [args] might
-    be interpreted as types, the other ones as terms (whose types are unified
+(** [apply_unify f_ty args] compute the type of a function of type [f_ty], when
+    applied to parameters [args]. The first elements of [args] might be
+    interpreted as types, the other ones as terms (whose types are unified
     against expected types). *)
 
 val app_infer : ?st:UStack.t -> ?subst:Subst.t -> t -> t list -> t

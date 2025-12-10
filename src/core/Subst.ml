@@ -86,8 +86,8 @@ let[@unroll 2] rec deref subst ((t, sc_t) as term) =
   | _ ->
       term
 
-(** Recursively lookup a variable in the substitution, until we get a value
-    that is not a variable or that is not bound *)
+(** Recursively lookup a variable in the substitution, until we get a value that
+    is not a variable or that is not bound *)
 let get_var subst v =
   match find subst v with None -> None | Some t -> Some (deref subst t)
 
@@ -155,11 +155,11 @@ let is_renaming subst =
   let rev =
     codomain subst
     |> Iter.filter_map (fun (t, sc_t) ->
-           match T.view (Lambda.Inner.eta_reduce t) with
-           | T.Var v ->
-               Some ((v, sc_t), ())
-           | _ ->
-               None )
+        match T.view (Lambda.Inner.eta_reduce t) with
+        | T.Var v ->
+            Some ((v, sc_t), ())
+        | _ ->
+            None )
     |> M.of_iter
   in
   (* as many variables in codomain as variables in domain *)
@@ -321,15 +321,17 @@ module type SPECIALIZED = sig
 
   val apply : ?shift_vars:int -> Renaming.t -> t -> term Scoped.t -> term
   (** Apply the substitution to the given term/type.
-      @param renaming used to desambiguate free variables from distinct scopes *)
+      @param renaming used to desambiguate free variables from distinct scopes
+  *)
 
   val bind : t -> var Scoped.t -> term Scoped.t -> t
   (** Add [v] -> [t] to the substitution. Both terms have a context.
-      @raise InconsistentBinding if [v] is already bound in
-        the same context, to another term. *)
+      @raise InconsistentBinding
+        if [v] is already bound in the same context, to another term. *)
 
   val update : t -> var Scoped.t -> term Scoped.t -> t
-  (** Replaces [v] -> ? by [v] -> [t] in the substitution. Both terms have a context.
+  (** Replaces [v] -> ? by [v] -> [t] in the substitution. Both terms have a
+      context.
       @raise InconsistentBinding if [v] is not yet bound in the same context. *)
 
   val of_list : ?init:t -> (var Scoped.t * term Scoped.t) list -> t
@@ -438,6 +440,7 @@ module FO = struct
 
   let of_list' =
     (of_list :> ?init:t -> (Type.t HVar.t Scoped.t * term Scoped.t) list -> t)
+
   (* let to_list = (to_list :>  t -> (Type.t HVar.t Scoped.t * term Scoped.t) list ) *)
 
   let map f s = map (fun t -> (f (Term.of_term_unsafe t) : term :> T.t)) s

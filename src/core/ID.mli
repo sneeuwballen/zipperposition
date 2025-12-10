@@ -3,23 +3,20 @@
 (** {1 Unique Identifiers} *)
 
 (** An {!ID.t} is a unique identifier (an integer) with a human-readable name.
-    We use those to give names to variables that are not hashconsed (the hashconsing
-    does not play nice with names).
+    We use those to give names to variables that are not hashconsed (the
+    hashconsing does not play nice with names).
 
-    An identifier is primarily determined by its [id] (a unique number for
-    this identifier), and contains a string name for readability.
-    Sometimes we display identifiers as "name/id".
+    An identifier is primarily determined by its [id] (a unique number for this
+    identifier), and contains a string name for readability. Sometimes we
+    display identifiers as "name/id".
 
-    Identifiers are {b generative}: you can easily create new ones
-    or copy them.
+    Identifiers are {b generative}: you can easily create new ones or copy them.
 
-    Identifiers can carry some {b payload} (values, of type {!exn} because
-    it's extensible). It is useful to remember easily some
-    information about the identifier (e.g. special sugar notation,
-    whether it's a skolem, etc.)
+    Identifiers can carry some {b payload} (values, of type {!exn} because it's
+    extensible). It is useful to remember easily some information about the
+    identifier (e.g. special sugar notation, whether it's a skolem, etc.)
 
-    @since 1.5
-*)
+    @since 1.5 *)
 
 type t = private
   { id: int
@@ -49,8 +46,9 @@ val payload_pred : f:(exn -> bool) -> t -> bool
 
 val set_payload : ?can_erase:(exn -> bool) -> t -> exn -> unit
 (** Set given exception as payload.
-    @param can_erase if provided, checks whether an existing value
-      is to be replaced instead of adding a new entry *)
+    @param can_erase
+      if provided, checks whether an existing value is to be replaced instead of
+      adding a new entry *)
 
 include Interfaces.HASH with type t := t
 
@@ -118,10 +116,12 @@ val is_skolem : t -> bool
 (** [is_skolem id] returns [true] iff [id] is a Skolem symbol *)
 
 val is_postcnf_skolem : t -> bool
-(** [is_postcnf_skolem id] returns [true] iff [id] is a Skolem symbol introduced during proof search *)
+(** [is_postcnf_skolem id] returns [true] iff [id] is a Skolem symbol introduced
+    during proof search *)
 
 val is_lazycnf_skolem : t -> bool
-(** [is_postcnf_skolem id] returns [true] iff [id] is a Skolem symbol used by lazy CNF engine *)
+(** [is_postcnf_skolem id] returns [true] iff [id] is a Skolem symbol used by
+    lazy CNF engine *)
 
 val as_skolem : t -> skolem_kind option
 

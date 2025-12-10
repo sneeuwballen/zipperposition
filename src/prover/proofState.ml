@@ -1,8 +1,8 @@
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-(** {1 The state of a proof, contains a set of active clauses (processed),
-    a set of passive clauses (to be processed), and an ordering
-    that is used for redundancy elimination.} *)
+(** {1 The state of a proof, contains a set of active clauses (processed), a set
+    of passive clauses (to be processed), and an ordering that is used for
+    redundancy elimination.} *)
 
 open Logtk
 module T = Term
@@ -27,7 +27,8 @@ module Make (C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
   (* module TermIndex = NPDtree.MakeTerm(C.WithPos) *)
   module TermIndex = Fingerprint.Make (C.WithPos)
 
-  module UnitIndex = (* NPDtree *)
+  module UnitIndex =
+  (* NPDtree *)
   Dtree.Make (struct
     type t = T.t * T.t * bool * C.t
 
@@ -108,7 +109,7 @@ module Make (C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
 
   (** {2 Sets} *)
 
-  module ActiveSet = MakeClauseSet (struct end)
+  module ActiveSet = MakeClauseSet ()
 
   module SimplSet = struct
     let on_add_clause = Signal.create ()
@@ -121,7 +122,7 @@ module Make (C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
   end
 
   module PassiveSet = struct
-    include MakeClauseSet (struct end)
+    include MakeClauseSet ()
 
     let queue =
       let p = ClauseQueue.get_profile () in

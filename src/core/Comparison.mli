@@ -16,8 +16,8 @@ val opp : t -> t
 (** Opposite of the relation: a R b becomes b R a *)
 
 val to_total : t -> int
-(** Conversion to a total ordering. Geq, Leq, and Incomparable are translated
-    to 0 (equal). *)
+(** Conversion to a total ordering. Geq, Leq, and Incomparable are translated to
+    0 (equal). *)
 
 val of_total : int -> t
 (** Conversion from a total order *)

@@ -2,16 +2,15 @@
 
 (** {1 Positions in terms, clauses...} *)
 
-(** Positions are used to indicate a given occurrence of an object
-    in a tree-like structure.
+(** Positions are used to indicate a given occurrence of an object in a
+    tree-like structure.
 
-    Typically, we use positions to refer to a particular occurrence of
-    a term in another (bigger) term, or in a literal, or in a clause.
+    Typically, we use positions to refer to a particular occurrence of a term in
+    another (bigger) term, or in a literal, or in a clause.
 
-    A pair of [{term,clause,literal}] + position represents a  context,
-    that is, a [{term,clause,literal}] with a hole at the given position,
-    where we can put a different term.
-*)
+    A pair of [{term,clause,literal}] + position represents a context, that is,
+    a [{term,clause,literal}] with a hole at the given position, where we can
+    put a different term. *)
 
 (** A position is a path in a tree *)
 type t =
@@ -95,10 +94,10 @@ module Build : sig
   val suffix : t -> position -> t
   (** Append position at the end *)
 
-  (** All the following builders add elements to the {b end}
-      of the builder. This is useful when a term is traversed and
-      positions of subterms are needed, since positions are
-      easier to build in the wrong order (leaf-to-root). *)
+  (** All the following builders add elements to the {b end} of the builder.
+      This is useful when a term is traversed and positions of subterms are
+      needed, since positions are easier to build in the wrong order
+      (leaf-to-root). *)
 
   val type_ : t -> t
 
@@ -120,8 +119,8 @@ end
 
 (** {2 Pairing of value with Pos} *)
 
-(** Positions act a bit like lenses, in the sense that they compose
-    nicely and designat paths in objects *)
+(** Positions act a bit like lenses, in the sense that they compose nicely and
+    designat paths in objects *)
 
 module With : sig
   (** A pair of ['a] and position (builder). *)

@@ -7,10 +7,9 @@
 
 open Logtk
 
-(** A ground term of an inductive type. It must correspond to a
-    term built with the corresponding {!t} only.
-    For instance, a constant of type [nat] should be equal to
-    [s^n(0)] in any model. *)
+(** A ground term of an inductive type. It must correspond to a term built with
+    the corresponding {!t} only. For instance, a constant of type [nat] should
+    be equal to [s^n(0)] in any model. *)
 type t
 
 exception InvalidDecl of string
@@ -59,8 +58,8 @@ val pp : t CCFormat.printer
 val depth : t -> int
 
 val dominates : t -> t -> bool
-(** [dominates c1 c2] if [depth c1 < depth c2]. This way, in coversets,
-    the top constant dominates all sub-constants *)
+(** [dominates c1 c2] if [depth c1 < depth c2]. This way, in coversets, the top
+    constant dominates all sub-constants *)
 
 (** Set of constants *)
 module Cst_set : CCSet.S with type elt = t
@@ -74,14 +73,12 @@ val ind_skolem_compare : ind_skolem -> ind_skolem -> int
 val ind_skolem_equal : ind_skolem -> ind_skolem -> bool
 
 val id_is_ind_skolem : ID.t -> Type.t -> bool
-(** [id_is_potential_cst id ty] returns [true] if [id:ty] is
-    a skolem constant of an inductive type, or
-    if it is already an inductive constant. *)
+(** [id_is_potential_cst id ty] returns [true] if [id:ty] is a skolem constant
+    of an inductive type, or if it is already an inductive constant. *)
 
 val find_ind_skolems : Term.t -> ind_skolem Iter.t
-(** [find_ind_skolem term] searches subterms of [term] for constants
-    that are of an inductive type and that are skolems or
-    (already) inductive constants. *)
+(** [find_ind_skolem term] searches subterms of [term] for constants that are of
+    an inductive type and that are skolems or (already) inductive constants. *)
 
 val ind_skolem_depth : ID.t -> int
 (** depth of the skolem (0 if not an inductive constant) *)

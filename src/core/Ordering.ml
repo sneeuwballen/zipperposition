@@ -183,7 +183,11 @@ module Head = struct
         ss
     | T.AppBuiltin ((Builtin.ForallConst | Builtin.ExistsConst), [ty; lam]) -> (
       (* Under quantifiers, we ignore the lambda *)
-      match T.view lam with T.Fun (ty', body) -> [ty; body] | _ -> [ty; lam] )
+      match T.view lam with
+      | T.Fun (ty', body) ->
+          [ty; body]
+      | _ ->
+          [ty; lam] )
     | T.AppBuiltin (_, ss) ->
         ss
     (* The orderings treat lambda-expressions like a "LAM" symbol applied to the body of the lambda-expression *)
@@ -354,10 +358,10 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
 
   let rec kbo ~prec t1 t2 =
     let balance = mk_balance t1 t2 in
-    (** Update variable balance, weight balance, and check whether the term contains the fluid term s.
+    (** Update variable balance, weight balance, and check whether the term
+        contains the fluid term s.
         @param pos stands for positive (is t the left term?)
-        @return weight balance, was `s` found?
-    *)
+        @return weight balance, was `s` found? *)
     let rec balance_weight (wb : W.t) t s ~pos ~below_lam : W.t * bool =
       let t = ty1comb_to_var t balance.comb2var in
       if T.is_var t || (P.lambda_mode && is_fluid t) then
@@ -571,17 +575,19 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
   let might_flip _ s t = not (cannot_flip s t)
 end
 
-(** Hopefully more efficient (polynomial) implementation of LPO,
-    following the paper "Things to Know when Implementing LPO" by Löchner.
-    We adapt here the implementation clpo6 with some multiset symbols (=). *)
+(** Hopefully more efficient (polynomial) implementation of LPO, following the
+    paper "Things to Know when Implementing LPO" by Löchner. We adapt here the
+    implementation clpo6 with some multiset symbols (=). *)
 module MakeRPO (P : PARAMETERS) : ORD = struct
   let name = P.name
 
   (* recursive path ordering *)
   let rec rpo6 ~prec s t =
     if T.equal s t then C.Eq
-    else if (* equality test is cheap *)
-            P.lambda_mode then
+    else if
+      (* equality test is cheap *)
+      P.lambda_mode
+    then
       match (Head.term_to_head s, Head.term_to_head t) with
       | Head.V _, Head.V _ ->
           Incomparable
@@ -900,11 +906,11 @@ module LambdaFreeKBOCoeff : ORD = struct
     let app_weight head_weight coeff_multipliers args =
       args
       |> List.mapi (fun i s ->
-             match (weight prec s, coeff_multipliers i) with
-             | Some w, Some c ->
-                 Some (c w)
-             | _ ->
-                 None )
+          match (weight prec s, coeff_multipliers i) with
+          | Some w, Some c ->
+              Some (c w)
+          | _ ->
+              None )
       |> List.fold_left
            (fun w1 w2 ->
              match (w1, w2) with

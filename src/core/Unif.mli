@@ -40,8 +40,8 @@ val unif_array_com :
   -> 'a array Scoped.t
   -> 'a array Scoped.t
   -> 'subst Iter.t
-(** Generic unification over two arrays (of the same size, or the first
-    one must be smaller or equal) *)
+(** Generic unification over two arrays (of the same size, or the first one must
+    be smaller or equal) *)
 
 val unif_list :
      'subst
@@ -63,14 +63,14 @@ val unif_list_com :
 val pair_lists_right :
   term -> term list -> term -> term list -> term list * term list
 (** in HO, we have [f1 l1] and [f2 l2], where application is left-associative.
-    we need to unify from the right (the outermost application is on
-    the right) so this returns pairs to unify (including heads). *)
+    we need to unify from the right (the outermost application is on the right)
+    so this returns pairs to unify (including heads). *)
 
 val pair_lists_left :
   term list -> term -> term list -> term -> term list * term list
-(** in HO, we have [l1 -> ret1] and [l2 -> ret2], where [->] is right-associative.
-    we need to unify from the left,
-    so this returns pairs to unify (including return types). *)
+(** in HO, we have [l1 -> ret1] and [l2 -> ret2], where [->] is
+    right-associative. we need to unify from the left, so this returns pairs to
+    unify (including return types). *)
 
 (** {2 Signatures} *)
 
@@ -98,8 +98,9 @@ module FO : sig
 
   val anti_unify : ?cut:int -> term -> term -> (term * term) list option
   (** anti-unification of the two terms, returning disagreement pairs
-      @param cut if [cut=n], then the returned list will have length
-      at most [n] (if it's too long then [None] is returned) *)
+      @param cut
+        if [cut=n], then the returned list will have length at most [n] (if it's
+        too long then [None] is returned) *)
 
   val pair_lists :
     term -> term list -> term -> term list -> term list * term list

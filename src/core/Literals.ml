@@ -450,7 +450,7 @@ let is_RR_horn_clause lits =
   | _ ->
       false
 
-(** Is clause Horn and has a unique maximal literal  *)
+(** Is clause Horn and has a unique maximal literal *)
 let is_unique_max_horn_clause ~ord lits =
   BV.cardinal (pos lits) = 1 && BV.cardinal (maxlits ~ord lits) = 1
 

@@ -68,18 +68,18 @@ module type S = sig
     -> var:Type.t HVar.t
     -> term list
     -> declare_result
-  (** Declare that the domain of the type [ty_id] is restricted to
-      given list of [cases], in the form [forall var. Or_{c in cases} var = c].
-      The type of [var] must be [ty_id ty_vars].
-      Will be ignored if the type already has a enum declaration, and the old
-      declaration will be returned instead.
-      @return either the new declaration, or the already existing one for
-        this type if any
+  (** Declare that the domain of the type [ty_id] is restricted to given list of
+      [cases], in the form [forall var. Or_{c in cases} var = c]. The type of
+      [var] must be [ty_id ty_vars]. Will be ignored if the type already has a
+      enum declaration, and the old declaration will be returned instead.
+      @return
+        either the new declaration, or the already existing one for this type if
+        any
       @raise Error if some of the preconditions is not filled *)
 
   val instantiate_vars : Env.multi_simpl_rule
-  (** Instantiate variables whose type is a known enumerated type,
-      with all cases of this type. *)
+  (** Instantiate variables whose type is a known enumerated type, with all
+      cases of this type. *)
 
   (** {5 Registration} *)
 
@@ -286,7 +286,7 @@ module Make (E : Env.S) : S with module Env = E = struct
     |> Iter.flat_map Lit.Seq.terms
     |> Iter.flat_map T.Seq.subterms_depth
     |> Iter.filter_map (fun (v, depth) ->
-           if depth > 0 && T.is_var v then Some v else None )
+        if depth > 0 && T.is_var v then Some v else None )
     |> T.Seq.add_set T.Set.empty
 
   let naked_vars_ lits =

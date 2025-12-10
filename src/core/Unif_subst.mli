@@ -5,8 +5,7 @@
 (** A tuple for full-unification, containing:
 
     - the substitution itself
-    - delayed constraints (if any)
-*)
+    - delayed constraints (if any) *)
 
 type term = Subst.term
 

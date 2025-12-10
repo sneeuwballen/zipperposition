@@ -36,7 +36,7 @@ module type S = sig
   (** Check whether completeness was preserved so far *)
 
   val add_signature : Signature.t -> unit
-  (** Merge  the given signature with the context's one *)
+  (** Merge the given signature with the context's one *)
 
   val find_signature : ID.t -> Type.t option
   (** Find the type of the given symbol *)
@@ -49,8 +49,8 @@ module type S = sig
   (** Declare the type of a symbol (updates signature) *)
 
   val declare_syms : (ID.t * Type.t) list -> unit
-  (** Declare multiple symbols (more efficient that calling
-      declare function incrementally) *)
+  (** Declare multiple symbols (more efficient that calling declare function
+      incrementally) *)
 
   val on_new_symbol : (ID.t * Type.t) Signal.t
 

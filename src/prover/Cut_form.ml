@@ -88,13 +88,13 @@ let pp_zf out (f : t) : unit =
 let ind_vars t =
   vars t |> T.VarSet.to_list
   |> List.filter (fun v ->
-         let ty = HVar.ty v in
-         (* only do induction on variables of infinite types *)
-         match Ind_ty.as_inductive_type ty with
-         | Some (ity, _) ->
-             Ind_ty.is_recursive ity
-         | None ->
-             false )
+      let ty = HVar.ty v in
+      (* only do induction on variables of infinite types *)
+      match Ind_ty.as_inductive_type ty with
+      | Some (ity, _) ->
+          Ind_ty.is_recursive ity
+      | None ->
+          false )
 
 let apply_subst renaming subst (f, sc) : t =
   let cs =
@@ -217,11 +217,11 @@ module Seq = struct
   let terms_with_pos ?(subterms = true) f =
     cs f |> Iter.of_list |> Util.seq_zipi
     |> Iter.flat_map (fun (i, c) ->
-           Iter.of_array_i c |> Iter.map (fun (j, lit) -> (i, j, lit)) )
+        Iter.of_array_i c |> Iter.map (fun (j, lit) -> (i, j, lit)) )
     |> Iter.flat_map (fun (i, j, lit) ->
-           let position = Position.(arg i @@ arg j @@ stop) in
-           Literal.fold_terms lit ~position ~ord:Ordering.none ~which:`All
-             ~vars:true ~subterms )
+        let position = Position.(arg i @@ arg j @@ stop) in
+        Literal.fold_terms lit ~position ~ord:Ordering.none ~which:`All
+          ~vars:true ~subterms )
 end
 
 module FV_tbl (X : Map.OrderedType) = struct

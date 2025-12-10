@@ -133,7 +133,7 @@ module Make (C : Clause_intf.S) = struct
     in
     aux t
     |> Term.Set.filter (fun t ->
-           (not (Term.is_true_or_false t)) && not (Term.is_const t) )
+        (not (Term.is_true_or_false t)) && not (Term.is_const t) )
 
   let add_related_term_ t =
     if Term.Set.cardinal !_related_terms < max_related_ then (
@@ -218,13 +218,13 @@ module Make (C : Clause_intf.S) = struct
           let lit_weight =
             Literal.Seq.terms l
             |> Iter.map (fun t ->
-                   let var, f_nc, f_c =
-                     if List.mem t max_terms then (2, 6, 3) else (1, 2, 1)
-                   in
-                   let sym id_ =
-                     if Signature.sym_in_conj id_ signature then f_c else f_nc
-                   in
-                   Term.weight ~var ~sym t * if Term.is_app_var t then 2 else 1 )
+                let var, f_nc, f_c =
+                  if List.mem t max_terms then (2, 6, 3) else (1, 2, 1)
+                in
+                let sym id_ =
+                  if Signature.sym_in_conj id_ signature then f_c else f_nc
+                in
+                Term.weight ~var ~sym t * if Term.is_app_var t then 2 else 1 )
             |> Iter.sum
           in
           let multiplier =
@@ -496,8 +496,8 @@ module Make (C : Clause_intf.S) = struct
         else
           Term.Set.to_iter !_related_terms
           |> Iter.map (fun conj_term ->
-                 let conj_term = Lambda.eta_expand conj_term in
-                 w_diff ~given_term:t ~conj_term )
+              let conj_term = Lambda.eta_expand conj_term in
+              w_diff ~given_term:t ~conj_term )
           |> Iter.min_exn ~lt:(fun x y -> x < y)
       in
       C.Seq.lits c
@@ -1095,10 +1095,10 @@ module Make (C : Clause_intf.S) = struct
               (fun cl ->
                 C.symbols (Iter.singleton cl)
                 |> ID.Set.iter (fun k ->
-                       ID.Tbl.update cl_map
-                         ~f:(fun _ -> function
-                           | Some old -> Some (cl :: old) | None -> Some [cl] )
-                         ~k ) )
+                    ID.Tbl.update cl_map
+                      ~f:(fun _ -> function
+                        | Some old -> Some (cl :: old) | None -> Some [cl] )
+                      ~k ) )
               axs ;
             let rec fill_levels syms_at_level level =
               ID.Set.iter
@@ -1174,19 +1174,17 @@ module Make (C : Clause_intf.S) = struct
                 | Some 0 ->
                     C.Seq.lits cl
                     |> Iter.iter (function
-                         | Literal.Equation (lhs, rhs, _) as l ->
-                             ( if Lit.is_predicate_lit l then
-                                 Term.Seq.subterms ~include_builtin:true lhs
-                               else
-                                 Iter.append
-                                   (Term.Seq.subterms ~include_builtin:true lhs)
-                                   (Term.Seq.subterms ~include_builtin:true rhs)
-                             )
-                             |> Iter.iter (fun t ->
-                                    if not (Term.is_type t) then
-                                      PW.insert_term t )
-                         | _ ->
-                             () )
+                      | Literal.Equation (lhs, rhs, _) as l ->
+                          ( if Lit.is_predicate_lit l then
+                              Term.Seq.subterms ~include_builtin:true lhs
+                            else
+                              Iter.append
+                                (Term.Seq.subterms ~include_builtin:true lhs)
+                                (Term.Seq.subterms ~include_builtin:true rhs) )
+                          |> Iter.iter (fun t ->
+                              if not (Term.is_type t) then PW.insert_term t )
+                      | _ ->
+                          () )
                 | _ ->
                     () )
               cls ) ;
@@ -1241,7 +1239,8 @@ module Make (C : Clause_intf.S) = struct
         Util.invalid_argf
           "expected \
            conjecture-relative-cheap(v:int,f:int,pos_mul:float,conj_mul:float,dist_var_mul:float\n\
-           got: %s" s
+           got: %s"
+          s
 
     let parsers =
       [ ("fifo", fun _ c -> C.id c)
@@ -1315,9 +1314,9 @@ module Make (C : Clause_intf.S) = struct
       if
         C.Seq.terms c
         |> Iter.exists (fun t ->
-               Iter.exists
-                 (fun t -> Term.is_fun t || Term.is_comb t)
-                 (Term.Seq.subterms t) )
+            Iter.exists
+              (fun t -> Term.is_fun t || Term.is_comb t)
+              (Term.Seq.subterms t) )
       then 0
       else 1
 
@@ -1327,22 +1326,20 @@ module Make (C : Clause_intf.S) = struct
       if
         C.Seq.terms c
         |> Iter.exists (fun t ->
-               Iter.exists Term.is_formula (Term.Seq.subterms t) )
+            Iter.exists Term.is_formula (Term.Seq.subterms t) )
       then 0
       else 1
 
     let prefer_bool_neq c =
       C.Seq.lits c
       |> Iter.map (fun lit ->
-             match lit with
-             | Lit.Equation (lhs, rhs, false) ->
-                 if
-                   Type.is_prop (Term.ty lhs) && not (Term.is_true_or_false rhs)
-                 then
-                   2 - List.length (List.filter Term.is_appbuiltin [lhs; rhs])
-                 else max_int
-             | _ ->
-                 max_int )
+          match lit with
+          | Lit.Equation (lhs, rhs, false) ->
+              if Type.is_prop (Term.ty lhs) && not (Term.is_true_or_false rhs)
+              then 2 - List.length (List.filter Term.is_appbuiltin [lhs; rhs])
+              else max_int
+          | _ ->
+              max_int )
       |> Iter.min |> CCOpt.get_or ~default:0
 
     let prefer_easy_ho c =
@@ -1353,7 +1350,11 @@ module Make (C : Clause_intf.S) = struct
           (* clause is not obtained by normalization *)
           if Proof.Step.is_simpl step then
             (* Looking through single-step simplifications *)
-            match parents with [parent] -> aux parent | _ -> false
+            match parents with
+            | [parent] ->
+                aux parent
+            | _ ->
+                false
           else if Proof.Step.is_inference step then
             match Proof.Step.rule step with
             | Some rule ->
@@ -1368,11 +1369,11 @@ module Make (C : Clause_intf.S) = struct
       let has_lam_eq c =
         C.Seq.lits c
         |> Iter.exists (fun l ->
-               match l with
-               | Literal.Equation (lhs, _, _) ->
-                   Type.is_fun (Term.ty lhs)
-               | _ ->
-                   false )
+            match l with
+            | Literal.Equation (lhs, _, _) ->
+                Type.is_fun (Term.ty lhs)
+            | _ ->
+                false )
       in
       let in_pattern_fragment c =
         (* returns has_lambdas, is_pattern *)
@@ -1647,8 +1648,8 @@ module Make (C : Clause_intf.S) = struct
     ; mutable current_step: int
     ; mutable current_heap_idx: int }
 
-  (** generic clause queue based on some ordering on clauses, given
-      by a weight function *)
+  (** generic clause queue based on some ordering on clauses, given by a weight
+      function *)
   let is_empty_mixed q = C.Tbl.length q.tbl = 0
 
   let is_empty (q : t) =

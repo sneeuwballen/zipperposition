@@ -12,8 +12,8 @@ type clause = Literals.t
 
 type form = clause list
 
-(** A formula of the form [forall vars. \bigand_i C_i].
-    The [C_i] are clauses with free variables in [vars] *)
+(** A formula of the form [forall vars. \bigand_i C_i]. The [C_i] are clauses
+    with free variables in [vars] *)
 type t = private {vars: Term.VarSet.t; cs: form}
 
 type cut_form = t
@@ -61,23 +61,23 @@ module Pos : sig
       @raise Invalid_argument if the position is not valid *)
 
   val lit_at : t -> Position.t -> Literal.t * Position.t
-  (** Lookup which literal the position is about, return it
-      and the rest of the position.
+  (** Lookup which literal the position is about, return it and the rest of the
+      position.
       @raise Invalid_argument if the position is not valid *)
 
   val clause_at : t -> Position.t -> clause * Position.t
-  (** Lookup which clause the position is about, return it
-      and the rest of the position.
+  (** Lookup which clause the position is about, return it and the rest of the
+      position.
       @raise Invalid_argument if the position is not valid *)
 
   val replace : t -> at:Position.t -> by:term -> t
-  (** In-place modification of the array, in which the subterm at given
-      position is replaced by the [by] term.
+  (** In-place modification of the array, in which the subterm at given position
+      is replaced by the [by] term.
       @raise Invalid_argument if the position is not valid *)
 
   val replace_many : t -> term Position.Map.t -> t
-  (** In-place modification of the array, in which the subterm at given
-      position is replaced by the [by] term.
+  (** In-place modification of the array, in which the subterm at given position
+      is replaced by the [by] term.
       @raise Invalid_argument if the position is not valid *)
 end
 

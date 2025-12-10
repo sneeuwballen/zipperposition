@@ -2,11 +2,10 @@
 
 (** {1 Priority Queue of ho-streams} *)
 
-(** Heuristic selection of ho-streams, using a priority queue.
-    Only one queue is used, but the priority of a stream is determined by
-    a combination of criteria that {b should} include at least one fair
-    criterion (e.g. the age of the clause, so that older clauses are more
-    likely to be chosen). *)
+(** Heuristic selection of ho-streams, using a priority queue. Only one queue is
+    used, but the priority of a stream is determined by a combination of
+    criteria that {b should} include at least one fair criterion (e.g. the age
+    of the clause, so that older clauses are more likely to be chosen). *)
 
 open Logtk
 

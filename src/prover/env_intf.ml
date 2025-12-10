@@ -24,26 +24,26 @@ module type S = sig
       @param full if true, perform more thorough checks *)
   type generate_rule = full:bool -> unit -> C.t list
 
-  (** Eliminates clauses from the proof state using algorithms
-      like blocked clause elimination and similar *)
+  (** Eliminates clauses from the proof state using algorithms like blocked
+      clause elimination and similar *)
   type clause_elim_rule = unit -> unit
 
   type binary_inf_rule = inf_rule
 
   type unary_inf_rule = inf_rule
 
-  (** Simplify the clause structurally (basic simplifications),
-      in the simplification monad.
-      [(c, `Same)] means the clause has not been simplified;
-      [(c, `New)] means the clause has been simplified at least once *)
+  (** Simplify the clause structurally (basic simplifications), in the
+      simplification monad. [(c, `Same)] means the clause has not been
+      simplified; [(c, `New)] means the clause has been simplified at least once
+  *)
   type simplify_rule = C.t -> C.t SimplM.t
 
   type active_simplify_rule = simplify_rule
 
   type rw_simplify_rule = simplify_rule
 
-  (** backward simplification by a unit clause. It returns a set of
-      active clauses that can potentially be simplified by the given clause.
+  (** backward simplification by a unit clause. It returns a set of active
+      clauses that can potentially be simplified by the given clause.
       [backward_simplify c] therefore returns a subset of
       [ProofState.ActiveSet.clauses ()] *)
   type backward_simplify_rule = C.t -> C.ClauseSet.t
@@ -51,15 +51,15 @@ module type S = sig
   (** check whether the clause is redundant w.r.t the set *)
   type redundant_rule = C.t -> bool
 
-  (** find redundant clauses in [ProofState.ActiveSet] w.r.t the clause.
-       first param is the set of already known redundant clause, the rule
-       should add clauses to it *)
+  (** find redundant clauses in [ProofState.ActiveSet] w.r.t the clause. first
+      param is the set of already known redundant clause, the rule should add
+      clauses to it *)
   type backward_redundant_rule = C.ClauseSet.t -> C.t -> C.ClauseSet.t
 
-  (** Following Kotelnikov's iProver superposition implementation, try to simplify
-      given clause (first argument) using a set of clauses (second argument).
-      If simplification suceeded, then a set of clauses to be injected
-      into passive set is returned. *)
+  (** Following Kotelnikov's iProver superposition implementation, try to
+      simplify given clause (first argument) using a set of clauses (second
+      argument). If simplification suceeded, then a set of clauses to be
+      injected into passive set is returned. *)
   type immediate_simplification_rule = C.t -> C.t Iter.t -> C.t Iter.t option
 
   (** Rule that checks whether the trail is trivial (a tautology) *)
@@ -78,8 +78,8 @@ module type S = sig
   type lit_rewrite_rule =
     Literal.t -> (Literal.t * Proof.parent list * Proof.tag list) option
 
-  (** (maybe) rewrite a clause to a set of clauses.
-      Must return [None] if the clause is unmodified *)
+  (** (maybe) rewrite a clause to a set of clauses. Must return [None] if the
+      clause is unmodified *)
   type multi_simpl_rule = C.t -> C.t list option
 
   type 'a conversion_result =
@@ -88,8 +88,7 @@ module type S = sig
     | CR_add of 'a  (** add this to the result *)
     | CR_return of 'a  (** shortcut the remaining rules, return this *)
 
-  (** A hook to convert a particular statement into a list
-      of clauses *)
+  (** A hook to convert a particular statement into a list of clauses *)
   type clause_conversion_rule = Statement.clause_t -> C.t list conversion_result
 
   (** {2 Modify the Env} *)
@@ -143,15 +142,15 @@ module type S = sig
   (** Add basic simplification rule *)
 
   val add_unary_simplify : simplify_rule -> unit
-  (** Add unary simplification rule (not dependent on proof state)  *)
+  (** Add unary simplification rule (not dependent on proof state) *)
 
   val add_multi_simpl_rule : priority:int -> multi_simpl_rule -> unit
   (** Add a multi-clause simplification rule *)
 
   val add_cheap_multi_simpl_rule : multi_simpl_rule -> unit
-  (** Add an efficient multi-clause simplification rule,
-      that will be used to simplify newly generated clauses
-      when they are moved from unprocessed to passive set. *)
+  (** Add an efficient multi-clause simplification rule, that will be used to
+      simplify newly generated clauses when they are moved from unprocessed to
+      passive set. *)
 
   val add_is_trivial_trail : is_trivial_trail_rule -> unit
   (** Add tautology detection rule *)
@@ -173,8 +172,8 @@ module type S = sig
   (** Add a literal rewrite rule *)
 
   val add_generate : priority:int -> string -> generate_rule -> unit
-  (** Add a generation rule with assigned priority.
-      Rules with higher priority will be tried first. *)
+  (** Add a generation rule with assigned priority. Rules with higher priority
+      will be tried first. *)
 
   val add_clause_elimination_rule :
     priority:int -> string -> clause_elim_rule -> unit
@@ -217,9 +216,9 @@ module type S = sig
   (** Triggered on every input statement *)
 
   val on_forward_simplified : (C.t * C.t option) Signal.t
-  (** Triggered when after the clause set is fully forward-simplified.
-      First argument is the original clause c and the second one is Some c'
-      if c simplifies into c' or None if c is deemed redundant *)
+  (** Triggered when after the clause set is fully forward-simplified. First
+      argument is the original clause c and the second one is Some c' if c
+      simplifies into c' or None if c is deemed redundant *)
 
   val convert_input_statements :
     Statement.clause_t CCVector.ro_vector -> C.t Clause.sets
@@ -247,12 +246,12 @@ module type S = sig
   val get_stm_queue : unit -> StmQ.t
 
   val should_force_stream_eval : unit -> bool
-  (** checks if finite unification is used and whether the user wants
-      to force storing all conclusions in the queues *)
+  (** checks if finite unification is used and whether the user wants to force
+      storing all conclusions in the queues *)
 
   val get_finite_infs : 'a option OSeq.t CCList.t -> 'a CCList.t
-  (** get finitely many conclusions from inference stream.
-      NB: requires the use of terminating unification algorithms *)
+  (** get finitely many conclusions from inference stream. NB: requires the use
+      of terminating unification algorithms *)
 
   val stats : unit -> stats
   (** Compute stats *)
@@ -270,8 +269,8 @@ module type S = sig
   (** do generating inferences *)
 
   val do_clause_eliminate : unit -> unit
-  (** changes the proof state by running registered clause elimination procedures
-      and removing all the eliminated clauses from the proof state *)
+  (** changes the proof state by running registered clause elimination
+      procedures and removing all the eliminated clauses from the proof state *)
 
   val is_trivial_trail : Trail.t -> bool
   (** Check whether the trail is trivial *)
@@ -292,28 +291,28 @@ module type S = sig
   (** Simplify the clause. *)
 
   val backward_simplify : C.t -> C.ClauseSet.t * C.t Iter.t
-  (** Perform backward simplification with the given clause. It returns the
-      CSet of clauses that become redundant, and the sequence of those
-      very same clauses after simplification. *)
+  (** Perform backward simplification with the given clause. It returns the CSet
+      of clauses that become redundant, and the sequence of those very same
+      clauses after simplification. *)
 
   val simplify_active_with : (C.t -> C.t list option) -> unit
-  (** Can be called when a simplification relation becomes stronger,
-      with the strengthened relation.
-      (e.g. new axioms should be declared because a theory was detected).
-      This will go through the whole active set, trying to simplify clauses
-      with the given function. Simplified clauses will be put back in the
-      passive set. *)
+  (** Can be called when a simplification relation becomes stronger, with the
+      strengthened relation. (e.g. new axioms should be declared because a
+      theory was detected). This will go through the whole active set, trying to
+      simplify clauses with the given function. Simplified clauses will be put
+      back in the passive set. *)
 
   val forward_simplify : simplify_rule
   (** Simplify the clause w.r.t to the active set and experts *)
 
   val cheap_multi_simplify : C.t -> C.t list option
-  (** Cheap simplifications that can result in multiple clauses (e.g. AVATAR splitting) *)
+  (** Cheap simplifications that can result in multiple clauses (e.g. AVATAR
+      splitting) *)
 
   val immediate_simplify : C.t -> C.t Iter.t -> C.t Iter.t
-  (** Simplify given clause using its children. Given clause is
-      removed from active set and result of this rule is added to passive set,
-      if any of the registered rules suceeded *)
+  (** Simplify given clause using its children. Given clause is removed from
+      active set and result of this rule is added to passive set, if any of the
+      registered rules suceeded *)
 
   val generate : C.t -> C.t Iter.t
   (** Perform all generating inferences *)
@@ -325,9 +324,8 @@ module type S = sig
   (** List of active clauses subsumed by the given clause *)
 
   val all_simplify : C.t -> C.t list SimplM.t
-  (** Use all simplification rules to convert a clause into a set
-      of maximally simplified clause (or [[]] if they are all trivial).
-       *)
+  (** Use all simplification rules to convert a clause into a set of maximally
+      simplified clause (or [[]] if they are all trivial). *)
 
   val step_init : unit -> unit
   (** call all functions registered with {!add_step_init} *)
@@ -349,7 +347,7 @@ module type S = sig
 
   (* The following signals are raised only existentially  *)
   val on_pred_var_elimination : (C.t * Term.t) Signal.t
-  (** this signal is raised if a formula that universally quantifies
-      a predicate removes that predicate and rules that want to instantiate it
-      early should listen to this *)
+  (** this signal is raised if a formula that universally quantifies a predicate
+      removes that predicate and rules that want to instantiate it early should
+      listen to this *)
 end

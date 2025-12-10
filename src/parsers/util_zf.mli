@@ -16,7 +16,8 @@ type 'a parser_ = 'a -> parser_res
 val parse_lexbuf :
   ?cache:parse_cache -> ?recursive:bool -> Lexing.lexbuf parser_
 (** parse lexbuf.
-    @param recursive if true, parse includes too, relative to current dir. Default true.
+    @param recursive
+      if true, parse includes too, relative to current dir. Default true.
     @param cache parse cache to use if [recursive = true] *)
 
 val parse_stdin : unit parser_

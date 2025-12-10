@@ -158,12 +158,12 @@ let find_boolean_lit lits =
   (* retrieve clause. the index doesn't matter for retrieval *)
   _retrieve_alpha_equiv lits
   |> Iter.find_map (function
-       | lits', Clause_component _, blit when Lits.are_variant lits lits' ->
-           assert (Lit.sign blit) ;
-           (* assert (_check_variant lits lits'); *)
-           Some blit
-       | _ ->
-           None )
+    | lits', Clause_component _, blit when Lits.are_variant lits lits' ->
+        assert (Lit.sign blit) ;
+        (* assert (_check_variant lits lits'); *)
+        Some blit
+    | _ ->
+        None )
   |> CCOpt.map (fun t -> Lit.apply_sign sign t)
 
 (* clause -> boolean lit *)
@@ -288,7 +288,7 @@ let to_s_form (lit : t) =
         let ctx = T.Conv.create () in
         l
         |> List.map (fun t ->
-               Cover_set.Case.to_lit t |> Literal.Conv.to_s_form ~ctx )
+            Cover_set.Case.to_lit t |> Literal.Conv.to_s_form ~ctx )
         |> F.and_
   in
   if sign lit then f else F.not_ f

@@ -59,8 +59,8 @@ module Make (A : ARG) = struct
     ; mutable stm_nb: int
     ; name: string }
 
-  (** generic stream queue based on some ordering on streams, given
-        by a weight function *)
+  (** generic stream queue based on some ordering on streams, given by a weight
+      function *)
   let make ~guard ~ratio ~weight name =
     if ratio < 0 then
       invalid_arg "StreamQueue.make: ratio must be greater or equal to 0" ;

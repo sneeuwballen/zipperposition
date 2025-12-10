@@ -1,6 +1,6 @@
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-(** {2 Extensible Map for State}  *)
+(** {2 Extensible Map for State} *)
 
 module M = CCHet.Map
 

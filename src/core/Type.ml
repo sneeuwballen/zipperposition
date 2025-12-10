@@ -261,6 +261,7 @@ let order ty : int =
         0
   in
   max 1 (aux ty)
+
 (* never less than 1 *)
 
 let contains_prop t = Seq.sub t |> Iter.exists is_prop

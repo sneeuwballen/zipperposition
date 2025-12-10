@@ -2,12 +2,11 @@
 
 (** {1 Main AST before Typing} *)
 
-(** Parsers eventually output this AST, that uses simple terms ({!STerm})
-    for types, terms, and formulas.
+(** Parsers eventually output this AST, that uses simple terms ({!STerm}) for
+    types, terms, and formulas.
 
-    Everything is possibly annotated with a parse location so that
-    error messages can be properly localized.
-*)
+    Everything is possibly annotated with a parse location so that error
+    messages can be properly localized. *)
 
 module Loc = ParseLocation
 module T = STerm
@@ -24,7 +23,8 @@ type data =
   ; data_vars: string list
   ; data_cstors: (string * (string option * ty) list) list
         (* list of constructor. Each constructor is paired with a list of
-           arguments, that is, an optional projector + the type *) }
+           arguments, that is, an optional projector + the type *)
+  }
 
 (** Attributes (general terms) *)
 type attr =

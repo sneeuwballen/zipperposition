@@ -17,8 +17,8 @@ module type TERM = sig
   (** Subterms of the term (possibly empty list) *)
 
   val update_subterms : t -> t list -> t
-  (** Replace immediate subterms by the given list.
-      This is used to test for equality *)
+  (** Replace immediate subterms by the given list. This is used to test for
+      equality *)
 
   val pp : t CCFormat.printer
 end
@@ -34,8 +34,8 @@ module Make (T : TERM) = struct
     let hash = T.hash
   end)
 
-  (** Maps terms to their list of immediate parents, and current
-      representative *)
+  (** Maps terms to their list of immediate parents, and current representative
+  *)
   type t =
     { parents: term list H.t (* parent terms *)
     ; mutable next: term H.t (* pointer towards representative *) }

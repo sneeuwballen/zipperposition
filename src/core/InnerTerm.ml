@@ -638,7 +638,7 @@ module DB = struct
   let unbound t =
     _to_iter ~depth:0 t
     |> Iter.filter_map (fun (bvar, depth) ->
-           if bvar >= depth then Some (bvar - depth) else None )
+        if bvar >= depth then Some (bvar - depth) else None )
     |> Iter.to_rev_list
 
   (* maps the term to another term, calling [on_binder acc t]

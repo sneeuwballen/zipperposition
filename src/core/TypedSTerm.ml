@@ -531,22 +531,22 @@ module Seq = struct
   let vars t =
     subterms t
     |> Iter.filter_map (fun t ->
-           match view t with Var v -> Some v | _ -> None )
+        match view t with Var v -> Some v | _ -> None )
 
   let symbols t =
     subterms t
     |> Iter.filter_map (fun t ->
-           match view t with Const id -> Some id | _ -> None )
+        match view t with Const id -> Some id | _ -> None )
 
   let metas t =
     subterms t
     |> Iter.filter_map (fun t ->
-           match view t with
-           | Meta (a, r, k) ->
-               assert (!r = None) ;
-               Some (a, r, k)
-           | _ ->
-               None )
+        match view t with
+        | Meta (a, r, k) ->
+            assert (!r = None) ;
+            Some (a, r, k)
+        | _ ->
+            None )
 
   let subterms_with_bound t k =
     let rec iter set t =
@@ -589,11 +589,11 @@ module Seq = struct
   let free_vars t =
     subterms_with_bound t
     |> Iter.filter_map (fun (t, set) ->
-           match view t with
-           | Var v when not (Var.Set.mem set v) ->
-               Some v
-           | _ ->
-               None )
+        match view t with
+        | Var v when not (Var.Set.mem set v) ->
+            Some v
+        | _ ->
+            None )
 end
 
 let rec is_ground t =
@@ -656,8 +656,7 @@ let close_with_vars ?(binder = Binder.Forall) vars t =
   let vars =
     List.map
       (fun v ->
-        match view v with Var v -> v | _ -> invalid_arg "has to be a variable"
-        )
+        match view v with Var v -> v | _ -> invalid_arg "has to be a variable" )
       vars
   in
   bind_list binder vars t ~ty:prop
@@ -848,6 +847,7 @@ module Ty = struct
           0
     in
     max 1 (aux ty)
+
   (* never less than 1 *)
 
   let close_forall t = close_all ~ty:tType Binder.ForallTy t
@@ -1549,7 +1549,7 @@ let unify ?(allow_open = false) ?loc ?(st = UStack.create ())
       stack := (t1, t2) :: old_stack ;
       unify_terms subst t1 t2 ;
       stack := old_stack
-    (* restore stack *)
+  (* restore stack *)
   and unify_tys subst t1 t2 =
     match (t1.ty, t2.ty) with
     | Some ty1, Some ty2 ->
@@ -1809,7 +1809,7 @@ let try_alpha_renaming f1 f2 =
           aux subst ((ty_exn f1, ty_exn f2) :: rest)
       | App (hd_x, xs), App (hd_y, ys) when List.length xs = List.length ys ->
           (* head might be a lambda or a const, delegate solving it to
-             the same algorithm *)
+               the same algorithm *)
           let args = List.combine (hd_x :: xs) (hd_y :: ys) in
           aux subst (args @ rest)
       | AppBuiltin (hd_x, xs), AppBuiltin (hd_y, ys)

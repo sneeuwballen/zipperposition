@@ -83,9 +83,9 @@ module CC = Congruence.Make (struct
         assert false
 end)
 
-(** Branches of the tableau. A branch is a conjunction of formulas
-    plus some theory context (congruence closure).
-    A branch is closed if it's inconsistent *)
+(** Branches of the tableau. A branch is a conjunction of formulas plus some
+    theory context (congruence closure). A branch is closed if it's inconsistent
+*)
 module Branch : sig
   type t
 

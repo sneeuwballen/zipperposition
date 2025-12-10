@@ -2,17 +2,16 @@
 
 (** {1 Unification Constraint} *)
 
-(** A constraint is a pair of (scoped) terms that cannot be unified
-    immediately (because they belong to some theory, for example).
+(** A constraint is a pair of (scoped) terms that cannot be unified immediately
+    (because they belong to some theory, for example).
 
-    We keep them in a separate constraint that will become a negative
-    literal [t ≠ u], on which the theory can then act.
-*)
+    We keep them in a separate constraint that will become a negative literal
+    [t ≠ u], on which the theory can then act. *)
 
 type term = InnerTerm.t
 
-(** A constraint delayed because unification for this pair of terms is
-      not syntactic *)
+(** A constraint delayed because unification for this pair of terms is not
+    syntactic *)
 type t = private
   { t1: term
   ; sc1: Scoped.scope

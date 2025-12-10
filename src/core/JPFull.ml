@@ -60,16 +60,16 @@ struct
   let ident_rule ~counter ~scope t u depth =
     JP_unif.identify ~scope ~counter t u []
     |> OSeq.map (fun x ->
-           let subst = U.subst x in
-           (* variable introduced by identification *)
-           let subs_t =
-             T.of_term_unsafe (fst (snd (List.hd (Subst.to_list subst))))
-           in
-           let new_var, _ = T.as_app (snd (T.open_fun subs_t)) in
-           let new_var_id = HVar.id (T.as_var_exn new_var) in
-           (* remembering that we introduced this var in identification *)
-           ident_vars := IntSet.add new_var_id !ident_vars ;
-           Some (subst, depth + 1) )
+        let subst = U.subst x in
+        (* variable introduced by identification *)
+        let subs_t =
+          T.of_term_unsafe (fst (snd (List.hd (Subst.to_list subst))))
+        in
+        let new_var, _ = T.as_app (snd (T.open_fun subs_t)) in
+        let new_var_id = HVar.id (T.as_var_exn new_var) in
+        (* remembering that we introduced this var in identification *)
+        ident_vars := IntSet.add new_var_id !ident_vars ;
+        Some (subst, depth + 1) )
 
   let renamer ~counter t0s t1s =
     let lhs, rhs, unifscope, us = U.FO.rename_to_new_scope ~counter t0s t1s in
@@ -104,6 +104,7 @@ struct
       else []
     in
     fixpoint @ pattern @ solid
+
   (* pattern @ fixpoint @ solid *)
 
   let head_classifier s =

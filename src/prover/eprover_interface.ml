@@ -192,7 +192,7 @@ module Make (E : Env.S) : S with module Env = E = struct
     let typed_syms =
       C.typed_symbols ~include_types:true cl_iter
       |> Monomorphisation.remove_duplicates ~eq:(fun p1 p2 ->
-             ID.equal (fst p1) (fst p2) )
+          ID.equal (fst p1) (fst p2) )
     in
     let type_syms, term_syms =
       Monomorphisation.iter_partition
@@ -379,7 +379,6 @@ module Make (E : Env.S) : S with module Env = E = struct
           poly_passive_set
       in
       (*let encoded_symbols, poly_initial = take_initial ~converter () in*)
-
       (*let initial =
            Iter.to_list (Iter.join ~join_row:reconstruct_clause monomorphised_iter (Iter.of_list poly_initial))
         in*)
@@ -388,7 +387,6 @@ module Make (E : Env.S) : S with module Env = E = struct
       (*let _, ho_clauses = take_ho_clauses  ~encoded_symbols:T.Map.empty ~converter clauses in*)
       let ho_clauses = Iter.to_list clauses in
       (*List.iter (fun lit -> Printf.printf "ho_clause lit: %s\n" (C.to_string lit)) ho_clauses;*)
-
       (*Printf.printf "new initital clause nb: %i\n" (List.length poly_initial);*)
       (*Printf.printf "initial initital clause nb: %i\n" (List.length poly_initial);*)
       (*let mangle_clause cl =

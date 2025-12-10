@@ -2,12 +2,11 @@
 
 (** {1 Literals} *)
 
-(** Literals are the representation of atomic formulas in the clausal
-    world of resolution/superposition provers.
+(** Literals are the representation of atomic formulas in the clausal world of
+    resolution/superposition provers.
 
     A literal is an atomic formula (equality or predicate), paired with a sign
-    that carries negation.
-*)
+    that carries negation. *)
 
 type term = Term.t
 
@@ -30,11 +29,11 @@ val weight : t -> int
 
 (** weight of the lit (sum of weights of terms) *)
 val ho_weight : t -> int
-(** ho weight of the lit (sum of weights of terms,
-                                      ignoring applied variables and lambda prefixes *)
+(** ho weight of the lit (sum of weights of terms, ignoring applied variables
+    and lambda prefixes *)
 
-(** ho weight of the lit (sum of weights of terms,
-                                      ignoring applied variables and lambda prefixes *)
+(** ho weight of the lit (sum of weights of terms, ignoring applied variables
+    and lambda prefixes *)
 val heuristic_weight : (term -> int) -> t -> int
 (** heuristic difficulty to eliminate lit *)
 
@@ -63,8 +62,8 @@ val is_neq : t -> bool
 (** is the literal of the form a != b? *)
 
 val mk_eq : term -> term -> t
-(** build literals. If sides so not have the same sort,
-    a SortError will be raised. An ordering must be provided *)
+(** build literals. If sides so not have the same sort, a SortError will be
+    raised. An ordering must be provided *)
 
 val mk_neq : term -> term -> t
 
@@ -88,24 +87,24 @@ val mk_absurd : t
 val no_prop_invariant : t -> bool
 
 val mk_constraint : term -> term -> t
-(** [mk_constraint t u] makes a disequation or a HO constraint depending
-    on how [t] and [u] look. *)
+(** [mk_constraint t u] makes a disequation or a HO constraint depending on how
+    [t] and [u] look. *)
 
 val matching :
      ?subst:Subst.t
   -> pattern:t Scoped.t
   -> t Scoped.t
   -> (Subst.t * Builtin.Tag.t list) Iter.t
-(** checks whether subst(lit_a) matches lit_b. Returns alternative
-    substitutions s such that s(lit_a) = lit_b and s contains subst. *)
+(** checks whether subst(lit_a) matches lit_b. Returns alternative substitutions
+    s such that s(lit_a) = lit_b and s contains subst. *)
 
 val subsumes :
      ?subst:Subst.t
   -> t Scoped.t
   -> t Scoped.t
   -> (Subst.t * Builtin.Tag.t list) Iter.t
-(** More general version of {!matching}, yields [subst]
-    such that [subst(lit_a) => lit_b]. *)
+(** More general version of {!matching}, yields [subst] such that
+    [subst(lit_a) => lit_b]. *)
 
 val variant :
      ?subst:Subst.t
@@ -211,15 +210,15 @@ val fold_terms :
   -> subterms:bool
   -> t
   -> term Position.With.t Iter.t
-(** Iterate on terms, maybe subterms, of the literal.
-    Variables are ignored if [vars] is [false].
+(** Iterate on terms, maybe subterms, of the literal. Variables are ignored if
+    [vars] is [false].
 
     [vars] decides whether variables are iterated on too (default [false])
-    [var_args] decides whether arguments of applied variables are iterated on too
-    [fun_bodies] decides whether bodies of lambda-expressions are iterated on too
-    [ty_args] decides whether type arguments are iterated on too
-    [subterms] decides whether strict subterms, not only terms that
-    occur directly under the literal, are explored.
+    [var_args] decides whether arguments of applied variables are iterated on
+    too [fun_bodies] decides whether bodies of lambda-expressions are iterated
+    on too [ty_args] decides whether type arguments are iterated on too
+    [subterms] decides whether strict subterms, not only terms that occur
+    directly under the literal, are explored.
 
     [which] is used to decide which terms to visit:
     - if [which] is [`Max], only the maximal terms are explored
@@ -251,9 +250,9 @@ module Pos : sig
   (** Full description of a position in a literal. It contains:
       - [lit_pos]: the literal-prefix of the position
       - [term_pos]: the suffix that describes a subterm position
-      - [term]: the term root, just under the literal itself.
-        given this, applying T.Pos.at to the subterm position and
-        the root term we obtain the sub-term itself. *)
+      - [term]: the term root, just under the literal itself. given this,
+        applying T.Pos.at to the subterm position and the root term we obtain
+        the sub-term itself. *)
   type split = {lit_pos: Position.t; term_pos: Position.t; term: term}
 
   val split : t -> Position.t -> split
@@ -268,29 +267,27 @@ module Pos : sig
       @raise Invalid_argument if the position is invalid *)
 
   val cut : t -> Position.t -> Position.t * Position.t
-  (** cut the subterm position off. For instance a position "left.1.2.stop"
-      in an equation "l=r" will yield
-      "left.stop", "1.2.stop".
+  (** cut the subterm position off. For instance a position "left.1.2.stop" in
+      an equation "l=r" will yield "left.stop", "1.2.stop".
 
       it always holds that [let a,b = cut p in Position.append a b = p] *)
 
   val root_term : t -> Position.t -> term
-  (** Obtain the term at the given position, at the root of the literal.
-      It should hold that
-      [root_term lit p = [at lit (fst (cut p))]]. *)
+  (** Obtain the term at the given position, at the root of the literal. It
+      should hold that [root_term lit p = [at lit (fst (cut p))]]. *)
 
   val term_pos : t -> Position.t -> Position.t
   (** [term_pos lit p = snd (cut lit p)], the subterm position. *)
 
   val is_max_term : ord:Ordering.t -> t -> Position.t -> bool
   (** Is the term at the given position, maximal in the literal w.r.t this
-      ordering? In other words, if the term is replaced by a smaller term,
-      can the whole literal becomes smaller? *)
+      ordering? In other words, if the term is replaced by a smaller term, can
+      the whole literal becomes smaller? *)
 end
 
 val replace : t -> old:term -> by:term -> t
-(** [replace lit ~old ~by] syntactically replaces all occurrences of [old]
-    in [lit] by the term [by]. *)
+(** [replace lit ~old ~by] syntactically replaces all occurrences of [old] in
+    [lit] by the term [by]. *)
 
 (** {2 Specific views} *)
 module View : sig
@@ -298,8 +295,8 @@ module View : sig
 
   val get_eqn : t -> Position.t -> (term * term * bool) option
   (** View of a Prop or Equation literal, oriented by the position. If the
-      position selects its left term, return l, r, otherwise r, l.
-      for propositions it will always be p, true.
+      position selects its left term, return l, r, otherwise r, l. for
+      propositions it will always be p, true.
       @return None for other literals
       @raise Invalid_argument if the position doesn't match the literal. *)
 

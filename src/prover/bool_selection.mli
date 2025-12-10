@@ -7,9 +7,8 @@ module PB = Position.Build
 module T = Term
 module Pos = Position
 
-(** As described in FBoolSup paper, Boolean selection function
-    selects positions in the clause that are non-interpreted 
-    Boolean subterms. *)
+(** As described in FBoolSup paper, Boolean selection function selects positions
+    in the clause that are non-interpreted Boolean subterms. *)
 
 type t = Literal.t array -> (Term.t * Position.t) list
 

@@ -173,8 +173,8 @@ end
 
 module C = Constraint
 
-(** Functor to use Sat, and encode/decode the solution.
-    Use "Solving Partial Order Constraints for LPO Termination", Codish & al *)
+(** Functor to use Sat, and encode/decode the solution. Use "Solving Partial
+    Order Constraints for LPO Termination", Codish & al *)
 module MakeSolver (X : sig end) = struct
   module Lit = struct
     type t = int
@@ -334,6 +334,7 @@ module MakeSolver (X : sig end) = struct
       let a = Hashtbl.find int_to_atom_ (Lit.abs i) in
       Atom.print fmt a
     with Not_found -> Format.fprintf fmt "L%d" (abs (i : Lit.t :> int))
+
   (* tseitin *)
 
   let print_clause fmt c =
@@ -397,7 +398,7 @@ let solve_multiple l =
   let l = List.rev_map C.simplify l in
   Util.debugf ~section 2 "lpo: solve constraints %a" (fun k ->
       k (CCFormat.list C.pp) l ) ;
-  let module S = MakeSolver (struct end) in
+  let module S = MakeSolver () in
   S.solve_list l
 
 (** {5 LPO} *)

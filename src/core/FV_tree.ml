@@ -2,8 +2,8 @@
 
 (** {1 Feature Vector indexing} *)
 
-(** Feature Vector indexing (see Schulz 2004) for efficient forward
-    and backward subsumption *)
+(** Feature Vector indexing (see Schulz 2004) for efficient forward and backward
+    subsumption *)
 
 module T = Term
 module Fmt = CCFormat
@@ -203,7 +203,7 @@ module Make (C : Index_intf.CLAUSE) = struct
       |> Iter.flat_map SLiteral.to_iter
       |> Iter.flat_map subterms_depth
       |> Iter.filter_map (fun (t, d) ->
-             match T.view t with T.Const id -> Some (id, d) | _ -> None )
+          match T.view t with T.Const id -> Some (id, d) | _ -> None )
 
     let depth_sym_ filter lits _ =
       symbols_depth_ filter lits

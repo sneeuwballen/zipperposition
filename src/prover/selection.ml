@@ -1,7 +1,7 @@
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-(** Selection functions. Note for splitting: SelectComplex already selects
-    in priority "big" negative literals, ie literals that are not split symbols. *)
+(** Selection functions. Note for splitting: SelectComplex already selects in
+    priority "big" negative literals, ie literals that are not split symbols. *)
 
 open Logtk
 module T = Term
@@ -53,10 +53,10 @@ let can_select_lit ~ord (lits : Lits.t) (i : int) : bool =
       Lit.fold_terms ~vars:true ~ty_args:false ~which:`All ~subterms:true
         lits.(i)
       |> Iter.exists (fun (t, _) ->
-             let t_head, t_args = T.as_app t in
-             vars_args
-             |> CCList.exists (fun (head, args) ->
-                    T.equal head t_head && (not @@ T.same_l_gen t_args args) ) )
+          let t_head, t_args = T.as_app t in
+          vars_args
+          |> CCList.exists (fun (head, args) ->
+              T.equal head t_head && (not @@ T.same_l_gen t_args args) ) )
     in
     let contains_maxvar_as_fo_subterm vars_args =
       let vars, _ = CCList.split vars_args in
@@ -85,9 +85,9 @@ let can_select_lit ~ord (lits : Lits.t) (i : int) : bool =
           Lit.fold_terms ~vars:true ~ty_args:false ~which:`All ~subterms:true
             lits.(i)
           |> Iter.exists (fun (t, _) ->
-                 vars_args
-                 |> CCList.exists (fun (head, args) ->
-                        T.equal head t && not (CCList.is_empty args) ) )
+              vars_args
+              |> CCList.exists (fun (head, args) ->
+                  T.equal head t && not (CCList.is_empty args) ) )
       | `NoHigherOrderVariables ->
           (* We cannot select literals containing a HO variable: *)
           not
@@ -121,7 +121,7 @@ let validate_fun_ ~ord lits bv =
   else
     Iter.of_array_i lits
     |> Iter.exists (fun (i, _) ->
-           (not (BV.get bv i)) || can_select_lit ~ord lits i )
+        (not (BV.get bv i)) || can_select_lit ~ord lits i )
 
 (* build a selection function in general, given the more specialized
    one there *)
@@ -201,9 +201,8 @@ let find_min_lit ~blocker ~can_sel ~ord ~chooser lits =
   |> Iter.mapi (fun i l -> (chooser (i, l), i))
   |> Iter.sort
   |> Iter.find_map (fun (_, i) ->
-         let lit = lits.(i) in
-         if can_sel ~ord lits i && not (blocker i lit) then Some (lit, i)
-         else None )
+      let lit = lits.(i) in
+      if can_sel ~ord lits i && not (blocker i lit) then Some (lit, i) else None )
 
 let weight_based_sel_driver ?(blocker = fun _ _ -> false) ~can_sel ~ord lits f =
   match find_min_lit ~blocker ~can_sel ~ord ~chooser:f lits with
@@ -551,16 +550,17 @@ let e_sel15 ~blocker ~ord lits =
           CCBV.set sel_bv i ; Some sel_bv )
         else None )
       lits_l
-    <+> (* else find smallest negative ground lit *)
+    <+>
+    (* else find smallest negative ground lit *)
     ( lits_l
     |> CCList.filter_map (fun (i, l) ->
-           if Lit.is_negativoid l && Lit.is_ground l then
-             Some (i, Lit.ho_weight l)
-           else None )
+        if Lit.is_negativoid l && Lit.is_ground l then Some (i, Lit.ho_weight l)
+        else None )
     |> CCList.to_iter
     |> Iter.min ~lt:(fun (_, w1) (_, w2) -> w1 < w2)
     |> CCOpt.map (fun (i, _) -> CCBV.set sel_bv i ; sel_bv) )
-    <+> (* else if there is a _single_ maximal positive literal,
+    <+>
+    (* else if there is a _single_ maximal positive literal,
            do not select anything *)
     (let max_lits = Literals.maxlits ~ord lits in
      if
@@ -570,7 +570,8 @@ let e_sel15 ~blocker ~ord lits =
        assert (CCBV.is_empty sel_bv) ;
        Some sel_bv )
      else None )
-    <+> (* else behave as SelectNewComplexAHPNS  *)
+    <+>
+    (* else behave as SelectNewComplexAHPNS  *)
     Some (e_sel14 ~blocker ~ord lits)
   in
   CCOpt.get_exn res
@@ -589,8 +590,10 @@ let e_sel16 ~blocker ~ord lits =
           else ID.id (T.as_const_exn (T.head_term lhs))
         in
         if T.is_true_or_false rhs then
-          ((* predicate literal *)
-           -2, hd_val, lit_sel_diff_w l)
+          ( (* predicate literal *)
+            -2
+          , hd_val
+          , lit_sel_diff_w l )
         else if Lit.is_type_pred l then (
           (* equational literal *)
           CCBV.set blocked i ;
@@ -799,12 +802,12 @@ let ho_sel3 ~blocker ~ord lits =
         let var_headed t = Term.is_var (Term.head_term t) in
         let lhs, rhs = if var_headed rhs then (rhs, lhs) else (lhs, rhs) in
         (* Prefer using the following criteria:
-           (1) literal is pure var
-           (2a) literal is of the form X = %x.t or X = formula
-           (2b) literal is of the form X a b c = %x.t or X a b c = formula
-           (3) literal is of the form X (a b c) = s where s has a HO subterm
-           (4) literal is of the form X (a b c) = s where s has no var head
-           (5) literal is of the form X a b c = Y a b c *)
+             (1) literal is pure var
+             (2a) literal is of the form X = %x.t or X = formula
+             (2b) literal is of the form X a b c = %x.t or X a b c = formula
+             (3) literal is of the form X (a b c) = s where s has a HO subterm
+             (4) literal is of the form X (a b c) = s where s has no var head
+             (5) literal is of the form X a b c = Y a b c *)
         if var_headed lhs then
           if Term.is_var lhs && Term.is_var rhs then 0
           else if Term.is_fun rhs || Term.is_formula rhs then

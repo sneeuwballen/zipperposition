@@ -7,14 +7,11 @@ open Libzipperposition
 
 type term = Term.t
 
-(** Deal with boolean subterms as if prop was a specific case of datatype.
-    The rules are:
+(** Deal with boolean subterms as if prop was a specific case of datatype. The
+    rules are:
 
-          C[s]  
-    ----------------------
-      C[true] or s=false
-    where s boolean, not a variable, proper subterm
-*)
+    C[s] ---------------------- C[true] or s=false where s boolean, not a
+    variable, proper subterm *)
 
 module type S = sig
   module Env : Env.S

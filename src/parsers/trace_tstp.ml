@@ -140,8 +140,10 @@ let is_dag proof =
       StepTbl.remove current proof ;
       StepTbl.add closed proof () )
   in
-  try check_proof proof ; (* check from root *)
-                          true
+  try
+    check_proof proof ;
+    (* check from root *)
+    true
   with Exit -> false (* loop detected *)
 
 (** Traverse the proof. Each proof node is traversed only once. *)
@@ -281,7 +283,8 @@ let of_decls decls =
              let c = List.map SLiteral.of_form c in
              let p = InferClause (c, step) in
              add_step name p
-          *) )
+          *)
+          )
       | A.FOF (name, _role, f, info :: _) | A.TFF (name, _role, f, info :: _)
         -> (
           Util.debugf 3 "convert step %a" (fun k -> k (A.pp T.pp) decl) ;
@@ -308,8 +311,9 @@ let of_decls decls =
   | None ->
       Err.fail "could not find the root of the TSTP proof"
   | Some p -> (
-    try (* force proofs to trigger errors here *)
-        traverse p force ; Err.return p
+    try
+      (* force proofs to trigger errors here *)
+      traverse p force ; Err.return p
     with Failure msg -> Err.fail msg )
 
 let parse ?(recursive = true) filename =

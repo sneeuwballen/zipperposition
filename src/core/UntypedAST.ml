@@ -17,7 +17,8 @@ type data =
   ; data_vars: string list
   ; data_cstors: (string * (string option * ty) list) list
         (* list of constructor. Each constructor is paired with a list of
-           arguments, that is, an optional projector + the type *) }
+           arguments, that is, an optional projector + the type *)
+  }
 
 (** Attributes (general terms) *)
 type attr =
@@ -57,7 +58,11 @@ module A = struct
 end
 
 let name_of_attrs =
-  CCList.find_map (function A_app ("name", [A_quoted n]) -> Some n | _ -> None)
+  CCList.find_map (function
+    | A_app ("name", [A_quoted n]) ->
+        Some n
+    | _ ->
+        None )
 
 let attr_name n = A.app "name" [A.str n]
 

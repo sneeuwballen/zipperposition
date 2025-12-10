@@ -2,24 +2,22 @@
 
 (** {1 Statement} *)
 
-(** The input problem is made of {b statements}. Each statement can declare
-    a type, assert a formula, or a conjecture, define a term, add
-    a rewrite rule, etc.
+(** The input problem is made of {b statements}. Each statement can declare a
+    type, assert a formula, or a conjecture, define a term, add a rewrite rule,
+    etc.
 
     Those statements do not necessarily reflect exactly statements in the input
-    language(s) (e.g., TPTP).
-*)
+    language(s) (e.g., TPTP). *)
 
 (** A datatype declaration *)
 type 'ty data =
   { data_id: ID.t  (** Name of the type *)
   ; data_args: 'ty Var.t list  (** type parameters *)
-  ; data_ty: 'ty  (** type of Id, that is,   [type -> type -> ... -> type] *)
+  ; data_ty: 'ty  (** type of Id, that is, [type -> type -> ... -> type] *)
   ; data_cstors: (ID.t * 'ty * ('ty * (ID.t * 'ty)) list) list
-        (** Each constructor is [id, ty, args].
-      [ty] must be of the form [ty1 -> ty2 -> ... -> id args].
-      [args] has the form [(ty1, p1), (ty2,p2), …] where each [p]
-      is a projector. *)
+        (** Each constructor is [id, ty, args]. [ty] must be of the form
+          [ty1 -> ty2 -> ... -> id args]. [args] has the form
+          [(ty1, p1), (ty2,p2), …] where each [p] is a projector. *)
   }
 
 type attr =
@@ -49,8 +47,8 @@ type ('f, 't, 'ty) def_rule =
       ; rhs: 'f list
       ; polarity: polarity
       ; as_form: 'f list }
-      (** [forall vars, lhs op bigand rhs] where [op] depends on
-          [polarity] (in [{=>, <=>, <=}]) *)
+      (** [forall vars, lhs op bigand rhs] where [op] depends on [polarity] (in
+          [{=>, <=>, <=}]) *)
 
 type ('f, 't, 'ty) def =
   { def_id: ID.t
@@ -188,17 +186,17 @@ val map :
 type definition = Rewrite.rule_set
 
 val as_defined_cst : ID.t -> (int * definition) option
-(** [as_defined_cst id] returns [Some level] if [id] is a constant
-    defined at stratification level [level], [None] otherwise *)
+(** [as_defined_cst id] returns [Some level] if [id] is a constant defined at
+    stratification level [level], [None] otherwise *)
 
 val as_defined_cst_level : ID.t -> int option
 
 val is_defined_cst : ID.t -> bool
 
 val declare_defined_cst : ID.t -> level:int -> definition -> unit
-(** [declare_defined_cst id ~level] states that [id] is a defined
-    constant of given [level]. It means that it is defined based only
-    on constants of strictly lower levels *)
+(** [declare_defined_cst id ~level] states that [id] is a defined constant of
+    given [level]. It means that it is defined based only on constants of
+    strictly lower levels *)
 
 val scan_stmt_for_defined_cst : clause_t -> unit
 (** Try and declare defined constants in the given statement *)
@@ -209,8 +207,8 @@ val scan_tst_rewrite : input_t -> unit
 
 val scan_stmt_for_ind_ty : clause_t -> unit
 (** [scan_stmt_for_ind_ty stmt] examines [stmt], and, if the statement is a
-    declaration of inductive types or constants,
-    it declares them using {!declare_ty} or {!declare_inductive_constant}. *)
+    declaration of inductive types or constants, it declares them using
+    {!declare_ty} or {!declare_inductive_constant}. *)
 
 val scan_simple_stmt_for_ind_ty : input_t -> unit
 (** Same as {!scan_stmt} but on earlier statements *)
@@ -233,8 +231,8 @@ val sine_axiom_selector :
   -> ?tolerance:float
   -> input_t Iter.t
   -> input_t Iter.t
-(** Implementation of SinE algorithm with the usual parameters
-    described in Hoder and Voronkov Sine Qua Non paper *)
+(** Implementation of SinE algorithm with the usual parameters described in
+    Hoder and Voronkov Sine Qua Non paper *)
 
 (** {2 Iterators} *)
 

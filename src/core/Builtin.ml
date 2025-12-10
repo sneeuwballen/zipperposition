@@ -521,7 +521,8 @@ module Tag = struct
     | T_live_cnf  (** live cnf *)
     | T_ho_norm  (** higher-order normalization *)
     | T_dont_increase_depth
-        (** an inference rule that makes a clause more first-order and should not be counted in the proof depth.  *)
+        (** an inference rule that makes a clause more first-order and should
+            not be counted in the proof depth. *)
     | T_ext  (** extensionality *)
     | T_ind  (** induction *)
     | T_data  (** datatypes *)
@@ -847,8 +848,8 @@ module TPTP = struct
 end
 
 module ArithOp = struct
-  (** This exception is raised when Arith functions are called
-      on non-numeric values (Cst). *)
+  (** This exception is raised when Arith functions are called on non-numeric
+      values (Cst). *)
   exception TypeMismatch of string
 
   (* helper to raise errors *)

@@ -246,8 +246,8 @@ let update_form_statistics f =
   let vars = ID.Tbl.create 64 in
   TypedSTerm.Seq.vars f
   |> Iter.iter (fun var ->
-         let id = Var.id var in
-         ID.Tbl.replace vars id (1 + ID.Tbl.get_or ~default:0 vars id) ) ;
+      let id = Var.id var in
+      ID.Tbl.replace vars id (1 + ID.Tbl.get_or ~default:0 vars id) ) ;
   ID.Tbl.iter
     (fun key num ->
       (* once when it is quantified, and once in the body. *)
@@ -285,36 +285,35 @@ let collect_formula_features stmts =
 let collect_clause_features clauses =
   Cnf.convert @@ CCVector.to_iter clauses
   |> CCVector.iter (fun cl ->
-         let lits =
-           Iter.to_list
-           @@ Iter.filter
-                (fun l ->
-                  (not (SLiteral.is_true l)) && not (SLiteral.is_false l) )
-                (Statement.Seq.lits cl)
-         in
-         let n = List.length lits in
-         if n > 0 then (
-           let is_horn = List.length (List.filter SLiteral.is_pos lits) <= 1 in
-           incr_counter num_clauses ;
-           if not is_horn then incr_counter num_non_horn ;
-           if n == 1 then incr_counter num_unit_clauses ;
-           update_vec clause_size n ;
-           update_vec pos_lits (List.length (List.filter SLiteral.is_pos lits)) ;
-           update_vec neg_lits (List.length (List.filter SLiteral.is_neg lits)) ;
-           List.iter
-             (function
-               | SLiteral.Atom (t, sign) ->
-                   if sign then update_vec pos_t_depth (Term.depth t)
-                   else update_vec neg_t_depth (Term.depth t)
-               | SLiteral.Eq (lhs, rhs) ->
-                   update_vec pos_t_depth (Term.depth lhs) ;
-                   update_vec pos_t_depth (Term.depth rhs)
-               | SLiteral.Neq (lhs, rhs) ->
-                   update_vec neg_t_depth (Term.depth lhs) ;
-                   update_vec neg_t_depth (Term.depth rhs)
-               | _ ->
-                   () )
-             lits ) )
+      let lits =
+        Iter.to_list
+        @@ Iter.filter
+             (fun l -> (not (SLiteral.is_true l)) && not (SLiteral.is_false l))
+             (Statement.Seq.lits cl)
+      in
+      let n = List.length lits in
+      if n > 0 then (
+        let is_horn = List.length (List.filter SLiteral.is_pos lits) <= 1 in
+        incr_counter num_clauses ;
+        if not is_horn then incr_counter num_non_horn ;
+        if n == 1 then incr_counter num_unit_clauses ;
+        update_vec clause_size n ;
+        update_vec pos_lits (List.length (List.filter SLiteral.is_pos lits)) ;
+        update_vec neg_lits (List.length (List.filter SLiteral.is_neg lits)) ;
+        List.iter
+          (function
+            | SLiteral.Atom (t, sign) ->
+                if sign then update_vec pos_t_depth (Term.depth t)
+                else update_vec neg_t_depth (Term.depth t)
+            | SLiteral.Eq (lhs, rhs) ->
+                update_vec pos_t_depth (Term.depth lhs) ;
+                update_vec pos_t_depth (Term.depth rhs)
+            | SLiteral.Neq (lhs, rhs) ->
+                update_vec neg_t_depth (Term.depth lhs) ;
+                update_vec neg_t_depth (Term.depth rhs)
+            | _ ->
+                () )
+          lits ) )
 
 let cnf_features = ref true
 

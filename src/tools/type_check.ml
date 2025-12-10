@@ -57,24 +57,24 @@ let check file =
         ~implicit_ty_args:(Input_format.implicit_ty_args input)
         ?ctx:None
   >>= (fun decls ->
-        decls |> CCVector.to_iter
-        |> Cnf.cnf_of_iter ~ctx:(Skolem.create ())
-        |> CCVector.to_iter |> Cnf.convert |> CCResult.return )
+  decls |> CCVector.to_iter
+  |> Cnf.cnf_of_iter ~ctx:(Skolem.create ())
+  |> CCVector.to_iter |> Cnf.convert |> CCResult.return )
   >>= fun stmts ->
   let found_fool_subterm = ref false in
   CCVector.to_iter stmts
   |> Iter.flat_map Statement.Seq.terms
   |> (fun trm ->
-       try
-         ignore
-           (Iter.for_all
-              (fun t ->
-                let ans, is_fool = Term.in_fool_fragment t in
-                found_fool_subterm := !found_fool_subterm || is_fool ;
-                ans )
-              trm ) ;
-         ""
-       with Failure msg -> msg )
+  try
+    ignore
+      (Iter.for_all
+         (fun t ->
+           let ans, is_fool = Term.in_fool_fragment t in
+           found_fool_subterm := !found_fool_subterm || is_fool ;
+           ans )
+         trm ) ;
+    ""
+  with Failure msg -> msg )
   |> fun x ->
   if x = "" then
     if !found_fool_subterm then CCResult.return ()
@@ -91,8 +91,7 @@ let main () =
   let res = Err.fold_l (fun () file -> check file) () !files in
   match res with
   | Err.Ok () ->
-      if not !dump then (* print_line (); *)
-        print_endline "OK."
+      if not !dump then (* print_line (); *) print_endline "OK."
   | Err.Error msg ->
       print_endline msg
 

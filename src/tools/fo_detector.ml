@@ -1,6 +1,6 @@
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-(** {1 Find applied variables in a problem } *)
+(** {1 Find applied variables in a problem} *)
 
 open Logtk
 open Logtk_parsers

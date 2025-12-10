@@ -2,8 +2,8 @@
 
 (** {1 Phases of the Prover}
 
-    To process a file, the prover goes through a sequence of phases that
-    are used to build values. This module reifies the phases. *)
+    To process a file, the prover goes through a sequence of phases that are
+    used to build values. This module reifies the phases. *)
 
 open Logtk
 open Libzipperposition
@@ -32,34 +32,34 @@ type ('ret, 'before, 'after) phase =
   (* parse CLI options: get a list of files to process, and parameters *)
   | LoadExtensions : (Extensions.t list, [`Parse_cli], [`LoadExtensions]) phase
   | Parse_prelude : (prelude, [`LoadExtensions], [`Parse_prelude]) phase
-  | Start_file
-      : (filename, [`Parse_prelude], [`Start_file]) phase (* file to process *)
-  | Parse_file
-      : ( Input_format.t * UntypedAST.statement Iter.t
-        , [`Start_file]
-        , [`Parse_file] )
-        phase
+  | Start_file : (filename, [`Parse_prelude], [`Start_file]) phase
+    (* file to process *)
+  | Parse_file :
+      ( Input_format.t * UntypedAST.statement Iter.t
+      , [`Start_file]
+      , [`Parse_file] )
+      phase
     (* parse some file *)
-  | Typing
-      : ( TypeInference.typed_statement CCVector.ro_vector
-        , [`Parse_file]
-        , [`Typing] )
-        phase
+  | Typing :
+      ( TypeInference.typed_statement CCVector.ro_vector
+      , [`Parse_file]
+      , [`Typing] )
+      phase
   | CNF : (Statement.clause_t CCVector.ro_vector, [`Typing], [`CNF]) phase
   | Compute_prec : (Precedence.t, [`CNF], [`Precedence]) phase
-  | Compute_ord_select
-      : ( Ordering.t * Selection.t * Bool_selection.t
-        , [`Precedence]
-        , [`Compute_ord_select] )
-        phase
+  | Compute_ord_select :
+      ( Ordering.t * Selection.t * Bool_selection.t
+      , [`Precedence]
+      , [`Compute_ord_select] )
+      phase
     (* compute orderign and selection function *)
   | MakeCtx : ((module Ctx.S), [`Compute_ord_select], [`MakeCtx]) phase
   | MakeEnv : (env_with_clauses, [`MakeCtx], [`MakeEnv]) phase
-  | Pre_saturate
-      : ( 'c Env.packed * Saturate.szs_status * 'c Clause.sets
-        , [`MakeEnv]
-        , [`Pre_saturate] )
-        phase
+  | Pre_saturate :
+      ( 'c Env.packed * Saturate.szs_status * 'c Clause.sets
+      , [`MakeEnv]
+      , [`Pre_saturate] )
+      phase
   | Saturate : (env_with_result, [`Pre_saturate], [`Saturate]) phase
   | Print_result : (unit, [`Saturate], [`Print_result]) phase
   | Print_dot : (unit, [`Print_result], [`Print_dot]) phase
@@ -73,8 +73,8 @@ type any_phase =
 
 (** {2 Main Type} *)
 
-(** Monad type, representing an action starting at phase ['p1]
-    and stopping at phase ['p2] *)
+(** Monad type, representing an action starting at phase ['p1] and stopping at
+    phase ['p2] *)
 type (+'a, 'p1, 'p2) t
 
 val string_of_phase : _ phase -> string
@@ -104,8 +104,8 @@ val current_phase : (any_phase, _, 'p2) t
 (** Get the current phase *)
 
 val with_phase : ('a, 'p1, 'p2) phase -> f:(unit -> 'a) -> ('a, 'p1, 'p2) t
-(** Start phase, call [f ()] to get the result, return its result
-    using {!return_phase} *)
+(** Start phase, call [f ()] to get the result, return its result using
+    {!return_phase} *)
 
 val with_phase1 : ('b, 'p1, 'p2) phase -> f:('a -> 'b) -> 'a -> ('b, 'p1, 'p2) t
 
@@ -124,11 +124,10 @@ val map : ('a, 'p1, 'p2) t -> f:('a -> 'b) -> ('b, 'p1, 'p2) t
 val fold_l : f:('a -> 'b -> ('a, 'p, 'p) t) -> x:'a -> 'b list -> ('a, 'p, 'p) t
 
 val run_parallel : (errcode, 'p1, 'p2) t list -> (errcode, 'p1, 'p2) t
-(** [run_sequentiel l] runs each action of the list in succession,
-    restarting every time with the initial state (once an action
-    has finished, its state is discarded). Only the very last state
-    is kept.
-    If any errcode is non-zero, then the evaluation stops with this errcode *)
+(** [run_sequentiel l] runs each action of the list in succession, restarting
+    every time with the initial state (once an action has finished, its state is
+    discarded). Only the very last state is kept. If any errcode is non-zero,
+    then the evaluation stops with this errcode *)
 
 module Infix : sig
   val ( >>= ) : ('a, 'p1, 'p2) t -> ('a -> ('b, 'p2, 'p3) t) -> ('b, 'p1, 'p3) t

@@ -22,8 +22,9 @@ type 'a state_actions = ('a -> state -> state) list
 type 'a modifiers = ('a -> 'a) list
 (* a list of actions parametrized by ['a] *)
 
-(** An extension contains a number of actions that can modify the {!Flex_state.t}
-    during preprocessing, or modify the {!Env_intf.S} once it is built. *)
+(** An extension contains a number of actions that can modify the
+    {!Flex_state.t} during preprocessing, or modify the {!Env_intf.S} once it is
+    built. *)
 type t =
   { name: string
   ; prio: int  (** the lower, the more urgent, the earlier it is loaded *)
@@ -44,8 +45,8 @@ val default : t
 (** {2 Registration} *)
 
 val register : t -> unit
-(** Register an extension to the (current) prover. Plugins should call this
-    when they are loaded. *)
+(** Register an extension to the (current) prover. Plugins should call this when
+    they are loaded. *)
 
 val extensions : unit -> t list
 (** All currently available extensions *)

@@ -2,9 +2,7 @@
 
 (* {1 Type inference} *)
 
-(** Reference:
-    https://en.wikipedia.org/wiki/Hindley-Milner
-*)
+(** Reference: https://en.wikipedia.org/wiki/Hindley-Milner *)
 
 module PT = STerm
 module T = TypedSTerm
@@ -1283,8 +1281,8 @@ let infer_statement_exn ?(file = "<no file>") ctx st =
   let aux =
     Ctx.pop_new_types ctx
     |> List.map (fun (id, ty) ->
-           let proof = Proof.Step.intro (Proof.Src.internal []) Proof.R_decl in
-           Stmt.ty_decl ~proof id ty )
+        let proof = Proof.Step.intro (Proof.Src.internal []) Proof.R_decl in
+        Stmt.ty_decl ~proof id ty )
   in
   (st, aux)
 

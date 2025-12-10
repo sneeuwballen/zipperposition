@@ -2,9 +2,9 @@
 
 (** {1 Builtin Objects} *)
 
-(** Most objects that have a special meaning in logic are represented
-    by a {b builtin}. A builtin is a value of type {!t}; it might
-    correspond to different names in different input syntaxes.
+(** Most objects that have a special meaning in logic are represented by a
+    {b builtin}. A builtin is a value of type {!t}; it might correspond to
+    different names in different input syntaxes.
 
     Builtins cover numbers, connectives, and builtin types, among others.
 
@@ -86,12 +86,12 @@ type fixity = Infix_binary | Infix_nary | Prefix
 val fixity : t -> fixity
 
 val is_prefix : t -> bool
-(** [is_infix s] returns [true] if the way the symbol is printed should
-    be used in a prefix way if applied to 1 argument *)
+(** [is_infix s] returns [true] if the way the symbol is printed should be used
+    in a prefix way if applied to 1 argument *)
 
 val is_infix : t -> bool
-(** [is_infix s] returns [true] if the way the symbol is printed should
-    be used in an infix way if applied to two arguments *)
+(** [is_infix s] returns [true] if the way the symbol is printed should be used
+    in an infix way if applied to two arguments *)
 
 val ty : t -> [`Int | `Rat | `Other]
 
@@ -247,7 +247,7 @@ module Tag : sig
     | T_ho  (** higher order *)
     | T_live_cnf  (** live_cnf *)
     | T_ho_norm  (** higher-order normalization *)
-    | T_dont_increase_depth  (** don't increase depth  *)
+    | T_dont_increase_depth  (** don't increase depth *)
     | T_ext  (** extensionality *)
     | T_ind  (** induction *)
     | T_data  (** datatypes *)
@@ -282,14 +282,13 @@ module TPTP : sig
 end
 
 (** The module {!ArithOp} deals only with numeric constants, i.e., all symbols
-    must verify {!is_numeric} (and most of the time, have the same type).
-    The semantics of operations follows
-    {{: http://www.cs.miami.edu/~tptp/TPTP/TR/TPTPTR.shtml#Arithmetic} TPTP}.
-*)
+    must verify {!is_numeric} (and most of the time, have the same type). The
+    semantics of operations follows
+    {{:http://www.cs.miami.edu/~tptp/TPTP/TR/TPTPTR.shtml#Arithmetic} TPTP}. *)
 
 module ArithOp : sig
-  (** This exception is raised when Arith functions are called
-      on non-numeric values *)
+  (** This exception is raised when Arith functions are called on non-numeric
+      values *)
   exception TypeMismatch of string
 
   type arith_view = [`Int of Z.t | `Rat of Q.t | `Other of t]
@@ -376,8 +375,9 @@ module ArithOp : sig
 
   val divisors : Z.t -> Z.t list
   (** List of non-trivial strict divisors of the int.
-      @return [] if int <= 1, the list of divisors otherwise. Empty list
-        for prime numbers, obviously. *)
+      @return
+        [] if int <= 1, the list of divisors otherwise. Empty list for prime
+        numbers, obviously. *)
 end
 
 (** {2 ZF} *)

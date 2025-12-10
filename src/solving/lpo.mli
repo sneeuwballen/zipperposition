@@ -57,8 +57,8 @@ end
 (** {2 Solutions to constraint problems} *)
 
 module Solution : sig
-  (** A precedence on symbol. Each pair means that thG
-      first symbol is bigger than the second one. *)
+  (** A precedence on symbol. Each pair means that thG first symbol is bigger
+      than the second one. *)
   type t = (ID.t * ID.t) list
 
   val neg_to_constraint : t -> Constraint.t
@@ -68,8 +68,8 @@ module Solution : sig
 end
 
 val solve_multiple : Constraint.t list -> Solution.t LazyList.t
-(** A lazy list of partial orders over symbols, that satisfy the given
-    list of constraints *)
+(** A lazy list of partial orders over symbols, that satisfy the given list of
+    constraints *)
 
 (** {5 Search for a LPO ordering} *)
 
@@ -77,9 +77,8 @@ module FO : sig
   type term = Term.t
 
   val orient_lpo : term -> term -> Constraint.t
-  (** [orient a b] generates a constraint that is sufficient for [a]
-      to be bigger than [b] in LPO orderings satisfying the
-      constraints *)
+  (** [orient a b] generates a constraint that is sufficient for [a] to be
+      bigger than [b] in LPO orderings satisfying the constraints *)
 
   val orient_lpo_list : (term * term) list -> Constraint.t list
   (** Orient a list of pairs *)
@@ -89,9 +88,8 @@ module TypedSTerm : sig
   type term = TypedSTerm.t
 
   val orient_lpo : term -> term -> Constraint.t
-  (** [orient a b] generates a constraint that is sufficient for [a]
-      to be bigger than [b] in LPO orderings satisfying the
-      constraints *)
+  (** [orient a b] generates a constraint that is sufficient for [a] to be
+      bigger than [b] in LPO orderings satisfying the constraints *)
 
   val orient_lpo_list : (term * term) list -> Constraint.t list
   (** Orient a list of pairs *)

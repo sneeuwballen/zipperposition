@@ -3,10 +3,9 @@
 (** {1 Pattern unification algorithm implementation} *)
 
 (** This module implements pattern unification oracle described in
-    {{:http://matryoshka.gforge.inria.fr/pubs/hounif_paper.pdf} the HOUnif paper}.
-    It can be applied to terms out of the pattern fragment in which
-    case it raises NotInFragment exception.
-*)
+    {{:http://matryoshka.gforge.inria.fr/pubs/hounif_paper.pdf} the HOUnif
+     paper}. It can be applied to terms out of the pattern fragment in which
+    case it raises NotInFragment exception. *)
 
 module US = Unif_subst
 
@@ -36,8 +35,8 @@ val eta_expand_otf :
 val norm_deref : Unif_subst.t -> Term.t Scoped.t -> Term.t
 
 val unif_simple : ?subst:Subst.t -> scope:int -> Term.t -> Term.t -> US.t option
-(** Does unification on types (or other simple constructs) and catches
-    exception in case of non-unifiability *)
+(** Does unification on types (or other simple constructs) and catches exception
+    in case of non-unifiability *)
 
 val unify_scoped :
      ?subst:subst

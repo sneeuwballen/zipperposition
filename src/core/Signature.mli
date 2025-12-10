@@ -2,10 +2,11 @@
 
 (** {1 Signature} *)
 
-(** A signature is a finite mapping from identifiers to types
-    and a property sym_in_conjecture. *)
+(** A signature is a finite mapping from identifiers to types and a property
+    sym_in_conjecture. *)
 
-(** A signature maps symbols to types, and there is a map in the backwards direction *)
+(** A signature maps symbols to types, and there is a map in the backwards
+    direction *)
 type t = private {sym_map: (Type.t * bool) ID.Map.t; ty_map: ID.Set.t Type.Map.t}
 
 val empty : t
@@ -38,8 +39,8 @@ val sym_in_conj : ID.t -> t -> bool
 val set_sym_in_conj : ID.t -> t -> t
 
 val arity : t -> ID.t -> int * int
-(** Arity of the given symbol, or failure.
-    see {!Type.arity} for more details about the returned value.
+(** Arity of the given symbol, or failure. see {!Type.arity} for more details
+    about the returned value.
     @raise Not_found if the symbol is not in the signature *)
 
 val cardinal : t -> int
@@ -53,13 +54,13 @@ val merge : t -> t -> t
     @raise Type.Error if they share some symbols with distinct types *)
 
 val diff : t -> t -> t
-(** [diff s1 s2] contains the symbols of [s1] that do not appear
-    in [s2]. Useful to remove base symbols. *)
+(** [diff s1 s2] contains the symbols of [s1] that do not appear in [s2]. Useful
+    to remove base symbols. *)
 
 val well_founded : t -> bool
 (** Are there some symbols of arity 0 in the signature?
-    @return true iff the Herbrand term universe of this signature is
-      non empty  *)
+    @return true iff the Herbrand term universe of this signature is non empty
+*)
 
 module Seq : sig
   val symbols : t -> ID.t Iter.t

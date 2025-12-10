@@ -209,10 +209,10 @@ module Make (E : Env.S) : S with module Env = E = struct
     let try_decompositions ?(cons = T.Form.eq) a b =
       iter_ctx a b
       |> Iter.find (fun (a, b) ->
-             try Some (Unif.FO.matching ~subst ~pattern (cons a b, sc))
-             with Unif.Fail -> (
-               try Some (Unif.FO.matching ~subst ~pattern (cons b a, sc))
-               with Unif.Fail -> None ) )
+          try Some (Unif.FO.matching ~subst ~pattern (cons a b, sc))
+          with Unif.Fail -> (
+            try Some (Unif.FO.matching ~subst ~pattern (cons b a, sc))
+            with Unif.Fail -> None ) )
       |> function Some unif -> unif | _ -> raise Unif.Fail
     in
     try Unif.FO.matching ~subst ~pattern (t, sc)
@@ -293,8 +293,8 @@ module Make (E : Env.S) : S with module Env = E = struct
         (PropagatedLitsIdx.retrieve_specializations (!propagated_, idx_sc))
       (lit_t, q_sc)
     |> Iter.iter (fun (t, _, subst) ->
-           if Subst.is_renaming subst then has_renaming := true
-           else to_remove := Term.Set.add t !to_remove ) ;
+        if Subst.is_renaming subst then has_renaming := true
+        else to_remove := Term.Set.add t !to_remove ) ;
     if not @@ Term.Set.is_empty !to_remove then
       Util.debugf ~section 2 "removing: @[%a@]" (fun k ->
           k (Term.Set.pp T.pp) !to_remove ) ;
@@ -320,57 +320,54 @@ module Make (E : Env.S) : S with module Env = E = struct
         ~getter:(PremiseIdx.retrieve_unifiables (!prems_, idx_sc))
         (unit_term, q_sc)
       |> Iter.iter (fun (_, (concls, _), subst) ->
-             let subst = Unif_subst.subst subst in
-             T.Tbl.to_iter concls
-             |> Iter.iter (fun (concl, cs) ->
-                    let concl =
-                      Subst.FO.apply Subst.Renaming.none subst (concl, idx_sc)
-                    in
-                    register_propagated_lit ~prop_kind:UnitPropagated concl
-                      unit_cl cs ) )
+          let subst = Unif_subst.subst subst in
+          T.Tbl.to_iter concls
+          |> Iter.iter (fun (concl, cs) ->
+              let concl =
+                Subst.FO.apply Subst.Renaming.none subst (concl, idx_sc)
+              in
+              register_propagated_lit ~prop_kind:UnitPropagated concl unit_cl cs ) )
 
   let generalization_present premise concl =
     retrieve_gen_prem_idx () (premise, q_sc)
     |> Iter.exists (fun (_, (tbl, _), subst) ->
-           T.Tbl.keys tbl
-           |> Iter.exists (fun t ->
-                  try
-                    ignore
-                      (matching_eq ~subst ~pattern:(t, idx_sc) (concl, q_sc)) ;
-                    true
-                  with Unif.Fail -> false ) )
+        T.Tbl.keys tbl
+        |> Iter.exists (fun t ->
+            try
+              ignore (matching_eq ~subst ~pattern:(t, idx_sc) (concl, q_sc)) ;
+              true
+            with Unif.Fail -> false ) )
 
   let remove_instances premise concl =
     retrieve_spec_prem_idx () (premise, q_sc)
     |> (fun i ->
-         Iter.fold
-           (fun tasks (t, (tbl, _), subst) ->
-             let sets_to_remove =
-               Iter.fold
-                 (fun acc (s, cls) ->
-                   try
-                     let subst =
-                       matching_eq ~subst ~pattern:(concl, q_sc) (s, idx_sc)
-                     in
-                     if Subst.is_renaming subst then acc else cls :: acc
-                   with Unif.Fail -> acc )
-                 [] (T.Tbl.to_iter tbl)
-             in
-             if CCList.is_empty sets_to_remove then tasks
-             else (t, sets_to_remove) :: tasks )
-           [] i )
+    Iter.fold
+      (fun tasks (t, (tbl, _), subst) ->
+        let sets_to_remove =
+          Iter.fold
+            (fun acc (s, cls) ->
+              try
+                let subst =
+                  matching_eq ~subst ~pattern:(concl, q_sc) (s, idx_sc)
+                in
+                if Subst.is_renaming subst then acc else cls :: acc
+              with Unif.Fail -> acc )
+            [] (T.Tbl.to_iter tbl)
+        in
+        if CCList.is_empty sets_to_remove then tasks
+        else (t, sets_to_remove) :: tasks )
+      [] i )
     |> CCList.iter (fun (t, sets) ->
-           prems_ :=
-             PremiseIdx.update_leaf !prems_ t (fun (tbl, _) ->
-                 T.Tbl.filter_map_inplace
-                   (fun concl proofset ->
-                     if List.exists (fun set -> CS.subset set proofset) sets
-                     then (
-                       concls_ := ConclusionIdx.remove !concls_ concl t ;
-                       None )
-                     else Some proofset )
-                   tbl ;
-                 T.Tbl.length tbl != 0 ) )
+        prems_ :=
+          PremiseIdx.update_leaf !prems_ t (fun (tbl, _) ->
+              T.Tbl.filter_map_inplace
+                (fun concl proofset ->
+                  if List.exists (fun set -> CS.subset set proofset) sets then (
+                    concls_ := ConclusionIdx.remove !concls_ concl t ;
+                    None )
+                  else Some proofset )
+                tbl ;
+              T.Tbl.length tbl != 0 ) )
 
   let compute_is_unit tbl concl cl =
     let neg_concl = normalize_negations (T.Form.not_ concl) in
@@ -388,29 +385,29 @@ module Make (E : Env.S) : S with module Env = E = struct
     let max_imps = Env.flex_get k_max_imp_entries in
     retrieve_spec_concl_idx () (premise, q_sc)
     |> Iter.iter (fun (concl', premise', subst) ->
-           (* add implication premise' -> subst (concl) *)
-           prems_ :=
-             PremiseIdx.update_leaf !prems_ premise' (fun (tbl, is_unit) ->
-                 ( match T.Tbl.get tbl concl' with
-                 | Some old_proofset ->
-                     if CS.cardinal old_proofset < Env.flex_get k_max_depth then
-                       let concl =
-                         Subst.FO.apply Subst.Renaming.none subst (concl, q_sc)
-                       in
-                       if
-                         (not @@ T.Tbl.mem tbl concl)
-                         && T.depth concl <= 4
-                         && T.Tbl.length tbl <= max_imps
-                       then (
-                         let proofset = CS.add cl old_proofset in
-                         register_cl_term cl premise' ;
-                         to_add_concl :=
-                           (concl, premise', proofset, tbl) :: !to_add_concl )
-                 | None ->
-                     assert false ) ;
-                 (* if by adding concl something became unit we remove
+        (* add implication premise' -> subst (concl) *)
+        prems_ :=
+          PremiseIdx.update_leaf !prems_ premise' (fun (tbl, is_unit) ->
+              ( match T.Tbl.get tbl concl' with
+              | Some old_proofset ->
+                  if CS.cardinal old_proofset < Env.flex_get k_max_depth then
+                    let concl =
+                      Subst.FO.apply Subst.Renaming.none subst (concl, q_sc)
+                    in
+                    if
+                      (not @@ T.Tbl.mem tbl concl)
+                      && T.depth concl <= 4
+                      && T.Tbl.length tbl <= max_imps
+                    then (
+                      let proofset = CS.add cl old_proofset in
+                      register_cl_term cl premise' ;
+                      to_add_concl :=
+                        (concl, premise', proofset, tbl) :: !to_add_concl )
+              | None ->
+                  assert false ) ;
+              (* if by adding concl something became unit we remove
                     the leaf as the new one with updated unit status will be added *)
-                 true ) ) ;
+              true ) ) ;
     CCList.iter
       (fun (c, premise, ps, tbl) -> register_conclusion ~tbl ~premise c ps)
       !to_add_concl ;
@@ -433,29 +430,29 @@ module Make (E : Env.S) : S with module Env = E = struct
       | T.AppBuiltin (Builtin.Neq, ([_; a; b] | [a; b])) ->
           iter_ctx a b
           |> Iter.iter (fun (a, b) ->
-                 let new_neq = T.Form.neq a b in
-                 register_conclusion ~tbl ~premise:premise' new_neq
-                   (CS.singleton cl) )
+              let new_neq = T.Form.neq a b in
+              register_conclusion ~tbl ~premise:premise' new_neq
+                (CS.singleton cl) )
       | _ ->
           () ) ;
       register_cl_term cl premise' ;
       let max_proof_size = Env.flex_get k_max_depth in
       retrieve_gen_prem_idx () (concl, q_sc)
       |> Iter.iter (fun (_, (tbl', _), subst) ->
-             let to_add = ref [] in
-             T.Tbl.to_iter tbl'
-             |> Iter.iter (fun (t, proof_set) ->
-                    if C.ClauseSet.cardinal proof_set < max_proof_size then
-                      let concl =
-                        Subst.FO.apply Subst.Renaming.none subst (t, idx_sc)
-                      in
-                      if T.depth concl <= 4 then (
-                        let new_cls = CS.add cl proof_set in
-                        CS.iter (fun cl -> register_cl_term cl premise') new_cls ;
-                        to_add := (concl, new_cls) :: !to_add ) ) ;
-             CCList.iter
-               (fun (c, n) -> register_conclusion ~tbl ~premise:premise' c n)
-               !to_add )
+          let to_add = ref [] in
+          T.Tbl.to_iter tbl'
+          |> Iter.iter (fun (t, proof_set) ->
+              if C.ClauseSet.cardinal proof_set < max_proof_size then
+                let concl =
+                  Subst.FO.apply Subst.Renaming.none subst (t, idx_sc)
+                in
+                if T.depth concl <= 4 then (
+                  let new_cls = CS.add cl proof_set in
+                  CS.iter (fun cl -> register_cl_term cl premise') new_cls ;
+                  to_add := (concl, new_cls) :: !to_add ) ) ;
+          CCList.iter
+            (fun (c, n) -> register_conclusion ~tbl ~premise:premise' c n)
+            !to_add )
     in
     try
       let subst = Unif.FO.matching ~pattern:(premise', 0) (concl, 1) in
@@ -491,7 +488,7 @@ module Make (E : Env.S) : S with module Env = E = struct
     let alpha_renaming =
       retrieve_spec_prem_idx () (premise, q_sc)
       |> Iter.find (fun (premise', tbl, subst) ->
-             if Subst.is_renaming subst then Some (premise', subst) else None )
+          if Subst.is_renaming subst then Some (premise', subst) else None )
     in
     match alpha_renaming with
     | Some (premise', subst) -> (
@@ -636,17 +633,17 @@ module Make (E : Env.S) : S with module Env = E = struct
   let find_implication cl premise concl =
     retrieve_gen_prem_idx () (premise, q_sc)
     |> Iter.find (fun (premise', (tbl, _), subst) ->
-           T.Tbl.to_iter tbl
-           |> Iter.find (fun (concl', proofset) ->
-                  try
-                    if CS.mem cl proofset then None
-                    else
-                      let subst =
-                        matching_eq ~decompose:true ~subst
-                          ~pattern:(concl', idx_sc) (concl, q_sc)
-                      in
-                      Some (premise', concl', proofset, subst)
-                  with Unif.Fail -> None ) )
+        T.Tbl.to_iter tbl
+        |> Iter.find (fun (concl', proofset) ->
+            try
+              if CS.mem cl proofset then None
+              else
+                let subst =
+                  matching_eq ~decompose:true ~subst ~pattern:(concl', idx_sc)
+                    (concl, q_sc)
+                in
+                Some (premise', concl', proofset, subst)
+            with Unif.Fail -> None ) )
 
   let do_unit_hle_htr cl =
     let n = C.length cl in
@@ -678,8 +675,8 @@ module Make (E : Env.S) : S with module Env = E = struct
                   (i_neg_t, q_sc)
                 |> Iter.head
                 |> CCOpt.iter (fun (_, (ps, _), _) ->
-                       proofset := CS.union ps !proofset ;
-                       CCBV.reset bv i )
+                    proofset := CS.union ps !proofset ;
+                    CCBV.reset bv i )
           | None ->
               () )
         (C.lits cl) ;
@@ -805,11 +802,11 @@ module Make (E : Env.S) : S with module Env = E = struct
         penalize_hidden_tautology repl ;
         Some repl
         |> CCFun.tap (function
-             | Some res ->
-                 Util.debugf ~section 2 "HTR(@[%a@])=@[%a@]@. > @[%a@]"
-                   (fun k -> k C.pp cl C.pp res (CS.pp C.pp) proofset )
-             | _ ->
-                 () )
+          | Some res ->
+              Util.debugf ~section 2 "HTR(@[%a@])=@[%a@]@. > @[%a@]" (fun k ->
+                  k C.pp cl C.pp res (CS.pp C.pp) proofset )
+          | _ ->
+              () )
     | RuleNotApplicable ->
         None
 

@@ -55,13 +55,13 @@ module Make (E : Env.S) : S with module Env = E = struct
           (fun cl ->
             Statement.Seq.ty_decls cl
             |> Iter.iter (fun (id, ty) ->
-                   Ctx.declare id ty ;
-                   ID.set_payload id (ID.Attr_skolem ID.K_after_cnf) ) )
+                Ctx.declare id ty ;
+                ID.set_payload id (ID.Attr_skolem ID.K_after_cnf) ) )
           cnf_vec ;
         CCVector.map (C.of_statement ~convert_defs:true) cnf_vec
         |> CCVector.to_list |> CCList.flatten
         |> List.map (fun c ->
-               C.create ~penalty ~trail (CCArray.to_list (C.lits c)) proof )
+            C.create ~penalty ~trail (CCArray.to_list (C.lits c)) proof )
     | _ ->
         [c]
 
@@ -179,8 +179,8 @@ module Make (E : Env.S) : S with module Env = E = struct
                        let subst_has_lams subst =
                          Subst.codomain subst
                          |> Iter.exists (fun (t, _) ->
-                                Iter.exists T.is_fun
-                                  (T.Seq.subterms (T.of_term_unsafe t)) )
+                             Iter.exists T.is_fun
+                               (T.Seq.subterms (T.of_term_unsafe t)) )
                        in
                        if not (subst_has_lams subst) then
                          let renaming = Subst.Renaming.create () in

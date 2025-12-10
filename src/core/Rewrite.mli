@@ -2,18 +2,17 @@
 
 (** {1 Rewriting on Terms and Literals} *)
 
-(** Rewriting is a (relatively) efficient way of computing on terms
-    and literals using rules that come from the input.
-    Each rule is a pair [lhs, rhs] (left-hand side, right-hand side)
-    that means that objects matching [lhs] should be rewritten into [rhs].
+(** Rewriting is a (relatively) efficient way of computing on terms and literals
+    using rules that come from the input. Each rule is a pair [lhs, rhs]
+    (left-hand side, right-hand side) that means that objects matching [lhs]
+    should be rewritten into [rhs].
 
     For term rules, [lhs] and [rhs] are both terms (with [vars rhs ⊆ vars lhs]).
 
-    For literal rules, [lhs] is an atomic literal,
-    and [rhs] is a list of clauses.
+    For literal rules, [lhs] is an atomic literal, and [rhs] is a list of
+    clauses.
 
-    This is used for {b Deduction Modulo} in the prover.
-*)
+    This is used for {b Deduction Modulo} in the prover. *)
 
 type term = Term.t
 
@@ -53,7 +52,8 @@ module Term : sig
     (** [make_const id ty rhs] is the same as [T.const id ty --> rhs] *)
 
     val make : proof:Proof.t -> ID.t -> Type.t -> term list -> term -> t
-    (** [make id ty args rhs] is the same as [T.app (T.const id ty) args --> rhs] *)
+    (** [make id ty args rhs] is the same as
+        [T.app (T.const id ty) args --> rhs] *)
 
     include Interfaces.HASH with type t := t
 
@@ -78,9 +78,9 @@ module Term : sig
   end
 
   val normalize_term : ?max_steps:int -> term -> term * Rule_inst_set.t
-  (** [normalize t] computes the normal form of [t] w.r.t the set
-      of rewrite rules stored in IDs.
-      Returns the new term and the set of rules that were used
+  (** [normalize t] computes the normal form of [t] w.r.t the set of rewrite
+      rules stored in IDs. Returns the new term and the set of rules that were
+      used
       @param max_steps number of steps after which we stop *)
 
   val normalize_term_fst : ?max_steps:int -> term -> term
@@ -94,9 +94,9 @@ module Term : sig
     -> scope_rules:Scoped.scope
     -> term Scoped.t
     -> (rule * Unif_subst.t) Iter.t
-  (** [narrow_term ~scope_rule t] finds the set of rules [(l --> r)]
-        in IDs and substitutions [sigma] such that [sigma(l) = sigma(t)]
-        @param scope_rules used for rules (LEFT) *)
+  (** [narrow_term ~scope_rule t] finds the set of rules [(l --> r)] in IDs and
+      substitutions [sigma] such that [sigma(l) = sigma(t)]
+      @param scope_rules used for rules (LEFT) *)
 end
 
 (** {2 Rewriting on Literals and Clauses} *)
@@ -135,8 +135,8 @@ module Lit : sig
        * Subst.Renaming.t
        * Proof.tag list )
        option
-  (** normalize literals of the clause w.r.t. rules, or return [None]
-      if no rule applies. The input clause lives in scope 0. *)
+  (** normalize literals of the clause w.r.t. rules, or return [None] if no rule
+      applies. The input clause lives in scope 0. *)
 
   val narrow_lit :
        ?subst:Unif_subst.t
@@ -144,8 +144,8 @@ module Lit : sig
     -> Literal.t Scoped.t
     -> (rule * Unif_subst.t * Proof.tag list) Iter.t
   (** [narrow_term rules lit] finds the set of rules [(l --> clauses) in rules]
-        and substitutions [sigma] such that [sigma(l) = sigma(lit)]
-        @param scope_rules used for rules (LEFT) *)
+      and substitutions [sigma] such that [sigma(l) = sigma(lit)]
+      @param scope_rules used for rules (LEFT) *)
 end
 
 (** {2 Rules in General} *)
@@ -201,15 +201,15 @@ module Defined_cst : sig
   val level : t -> int
 
   val declare : ?level:int -> ID.t -> rule_set -> t
-  (** [declare id rules] makes [id] a defined constant
-      with the given (initial) set of rules
-      @raise Invalid_argument if the ID is already a skolem or a constructor,
-        or if the list of rules is empty
-  *)
+  (** [declare id rules] makes [id] a defined constant with the given (initial)
+      set of rules
+      @raise Invalid_argument
+        if the ID is already a skolem or a constructor, or if the list of rules
+        is empty *)
 
   val declare_or_add : ID.t -> rule -> unit
-  (** [declare_or_add id rule] defines [id] if it's not already a
-      defined constant, and add [rule] to it *)
+  (** [declare_or_add id rule] defines [id] if it's not already a defined
+      constant, and add [rule] to it *)
 
   val declare_proj : proof:Proof.t -> Ind_ty.projector -> unit
   (** Declare an inductive projector *)

@@ -15,11 +15,11 @@ type untyped = STerm.t
 (** {2 Description of provers} *)
 
 module Prover = struct
-  (** data useful to invoke a prover. The prover must read from
-        stdin. The command is interpolated using {! Buffer.add_substitude}, with
-        the given patterns:
+  (** data useful to invoke a prover. The prover must read from stdin. The
+      command is interpolated using {! Buffer.add_substitude}, with the given
+      patterns:
 
-        - "timeout" is the timeout in seconds *)
+      - "timeout" is the timeout in seconds *)
   type t =
     { name: string  (** name of the prover *)
     ; command: string  (** command to call prover*)

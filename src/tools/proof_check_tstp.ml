@@ -28,8 +28,8 @@ let pp_res out res =
       Format.fprintf out "prover %s failed" p
 
 module CheckedTrace = struct
-  (** Maps every step of the given trace to a list of results
-        obtained by trying to verify it using provers *)
+  (** Maps every step of the given trace to a list of results obtained by trying
+      to verify it using provers *)
   type t =
     { trace: Trace_tstp.t (* trace to check *)
     ; steps: check_result list StepTbl.t (* result of checks for every step *)
@@ -210,8 +210,9 @@ let all_paths_correct ~valid ~checked =
   in
   try
     let trace = CheckedTrace.trace ~checked in
-    check_proof trace ; (* check from root *)
-                        true
+    check_proof trace ;
+    (* check from root *)
+    true
   with Exit -> false (* loop detected *)
 
 (* check the structure. [minimum] is the number of check success that is

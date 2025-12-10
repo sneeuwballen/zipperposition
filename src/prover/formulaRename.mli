@@ -7,10 +7,10 @@ module type S = sig
   module C : Clause.S with module Ctx = Ctx
 
   val on_pred_skolem_introduction : (C.t * Term.t) Signal.t
-  (** this signal is raised when a predicate Skolem is introduced  *)
+  (** this signal is raised when a predicate Skolem is introduced *)
 
   val is_renaming_clause : C.t -> bool
-  (** This clause has the shape of the renaming clause   *)
+  (** This clause has the shape of the renaming clause *)
 
   val rename_form :
        ?should_rename:(T.t -> bool)
@@ -69,9 +69,9 @@ module type S = sig
     -> mode:[< `Choice | `SkolemRecycle | `SkolemAlwaysFresh]
     -> T.t
     -> T.t
-  (** `get_skolem ~parent ~mode f` computes a ``Skolem'' term 
-     for a formula f. This is either real Skolem term of Choice symbol applied to f,
-     depending on the mode  *)
+  (** `get_skolem ~parent ~mode f` computes a ``Skolem'' term for a formula f.
+      This is either real Skolem term of Choice symbol applied to f, depending
+      on the mode *)
 end
 
 module Make (C : Clause.S) : S with module Ctx = C.Ctx and module C = C

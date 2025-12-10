@@ -24,7 +24,7 @@ module Make (A : ARG) = struct
     ; parents: C.t list
           (** parent clauses for inference generating this stream *)
     ; mutable penalty: int  (** heuristic penalty, increased by every drip *)
-    ; mutable hits: int  (** how many attemts to retrieve unifier were there  *)
+    ; mutable hits: int  (** how many attemts to retrieve unifier were there *)
     ; mutable stm: C.t option OSeq.t  (** the stream itself *) }
 
   exception Empty_Stream

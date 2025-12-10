@@ -8,8 +8,8 @@ module S = Subst
 
 (** {2 Term traversal}
 
-    Term traversal in prefix order. This is akin to lazy transformation
-    to a flatterm. *)
+    Term traversal in prefix order. This is akin to lazy transformation to a
+    flatterm. *)
 
 type character =
   | Symbol of ID.t
@@ -142,10 +142,9 @@ module Make (E : Index.EQUATION) = struct
 
   let is_empty n = n.leaf = [] && CharMap.is_empty n.map
 
-  (** get/add/remove the leaf for the given flatterm. The
-      continuation k takes the leaf, and returns a leaf option
-      that replaces the old leaf.
-      This function returns the new trie. *)
+  (** get/add/remove the leaf for the given flatterm. The continuation k takes
+      the leaf, and returns a leaf option that replaces the old leaf. This
+      function returns the new trie. *)
   let goto_leaf trie t k =
     (* the root of the tree *)
     let root = trie in

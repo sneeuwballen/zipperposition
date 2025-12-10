@@ -316,6 +316,7 @@ let eta_expand t = Inner.eta_expand (t : T.t :> IT.t) |> T.of_term_unsafe
 
 let eta_reduce ?(expand_quant = true) ?(full = true) t =
   Inner.eta_reduce ~full ~expand_quant (t : T.t :> IT.t) |> T.of_term_unsafe
+
 (*|> CCFun.tap (fun t' ->
   if t != t' then Format.printf "@[eta_reduce `%a`@ into `%a`@]@." T.pp t T.pp t')*)
 

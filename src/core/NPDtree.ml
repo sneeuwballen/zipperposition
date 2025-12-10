@@ -8,8 +8,8 @@ module TC = T.Classic
 
 (** {2 Term traversal} *)
 
-(** Term traversal in prefix order. This is akin to lazy transformation
-    to a flatterm. *)
+(** Term traversal in prefix order. This is akin to lazy transformation to a
+    flatterm. *)
 
 type iterator =
   { cur_term: T.t
@@ -112,10 +112,9 @@ module Make (E : Index.EQUATION) = struct
   let find_sub map key =
     try ID.Map.find key map with Not_found -> raise NoSuchTrie
 
-  (** get/add/remove the leaf for the given term. The
-      continuation k takes the leaf, and returns a leaf option
-      that replaces the old leaf.
-      This function returns the new trie. *)
+  (** get/add/remove the leaf for the given term. The continuation k takes the
+      leaf, and returns a leaf option that replaces the old leaf. This function
+      returns the new trie. *)
   let goto_leaf trie t k =
     (* the root of the tree *)
     let root = trie in
@@ -266,10 +265,9 @@ module MakeTerm (X : Set.OrderedType) = struct
   let find_sub map key =
     try SIMap.find key map with Not_found -> raise NoSuchTrie
 
-  (** get/add/remove the leaf for the given term. The
-      continuation k takes the leaf, and returns a leaf option
-      that replaces the old leaf.
-      This function returns the new trie. *)
+  (** get/add/remove the leaf for the given term. The continuation k takes the
+      leaf, and returns a leaf option that replaces the old leaf. This function
+      returns the new trie. *)
   let goto_leaf trie t k =
     (* the root of the tree *)
     let root = trie in
@@ -453,8 +451,8 @@ module MakeTerm (X : Set.OrderedType) = struct
         and s2 =
           SIMap.to_iter t.map
           |> Iter.map (fun ((sym, i), t') ->
-                 let label = CCFormat.sprintf "%a/%d" ID.pp sym i in
-                 (label, t') )
+              let label = CCFormat.sprintf "%a/%d" ID.pp sym i in
+              (label, t') )
         in
         prefix s2 )
 

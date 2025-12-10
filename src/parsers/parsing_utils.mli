@@ -2,16 +2,16 @@
 
 (** {1 Utils for Parsing in various Formats (High-Level Interface)} *)
 
-(** This module provides functions to parse a file and guess its syntax
-    (from its extension) in a convenient way.
+(** This module provides functions to parse a file and guess its syntax (from
+    its extension) in a convenient way.
 
-    To parse a file [file_name] into a sequence of statements, the simplest way is:
+    To parse a file [file_name] into a sequence of statements, the simplest way
+    is:
 
     {[
       let fmt = guess_input file_name in
       parse_file fmt file_name
-    ]}
-*)
+    ]} *)
 
 open Logtk
 
@@ -27,11 +27,10 @@ val guess_input : string -> Input_format.t
 (** Guess input from file extension *)
 
 val input_of_file : string -> Input_format.t
-(** Choose input for this file based on {!Options.input} and
-    {!guess_input}.
+(** Choose input for this file based on {!Options.input} and {!guess_input}.
     This is the recommended way of picking the input format for a given file. *)
 
 val parse_file :
   Input_format.t -> string -> UntypedAST.statement Iter.t or_error
-(** [parse_file fmt file] parses the file using the parser for the
-    given input format. *)
+(** [parse_file fmt file] parses the file using the parser for the given input
+    format. *)

@@ -2,11 +2,10 @@
 
 (** {1 Priority Queue of clauses} *)
 
-(** Heuristic selection of clauses, using a priority queue.
-    Only one queue is used, but the priority of a clause is determined by
-    a combination of criteria that {b should} include at least one fair
-    criterion (e.g. the age of the clause, so that older clauses are more
-    likely to be chosen). *)
+(** Heuristic selection of clauses, using a priority queue. Only one queue is
+    used, but the priority of a clause is determined by a combination of
+    criteria that {b should} include at least one fair criterion (e.g. the age
+    of the clause, so that older clauses are more likely to be chosen). *)
 
 type profile = ClauseQueue_intf.profile
 

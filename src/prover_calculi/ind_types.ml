@@ -65,11 +65,11 @@ module Make (Env : Env_intf.S) = struct
     let res =
       C.Seq.lits c
       |> Iter.exists (fun lit ->
-             match acyclicity lit with
-             | `Neither | `Absurd ->
-                 false
-             | `Trivial ->
-                 true )
+          match acyclicity lit with
+          | `Neither | `Absurd ->
+              false
+          | `Trivial ->
+              true )
     in
     if res then (
       Util.incr_stat stat_acyclicity ;
@@ -81,11 +81,11 @@ module Make (Env : Env_intf.S) = struct
     let lits' =
       C.Seq.lits c
       |> Iter.filter (fun lit ->
-             match acyclicity lit with
-             | `Neither | `Trivial ->
-                 true
-             | `Absurd ->
-                 false (* remove lit *) )
+          match acyclicity lit with
+          | `Neither | `Trivial ->
+              true
+          | `Absurd ->
+              false (* remove lit *) )
       |> Iter.to_array
     in
     if Array.length lits' = Array.length (C.lits c) then SimplM.return_same c
@@ -110,8 +110,8 @@ module Make (Env : Env_intf.S) = struct
     let unify_sub t ~sub =
       walk_cstor_args t
       |> Iter.filter_map (fun t' ->
-             try Some (Unif.FO.unify_full (t', 0) (sub, 0))
-             with Unif.Fail -> None )
+          try Some (Unif.FO.unify_full (t', 0) (sub, 0))
+          with Unif.Fail -> None )
     in
     (* try to kill a [t=u] if there is [sigma] s.t. acyclicity applies
        to [t\sigma = u\sigma] *)
@@ -130,30 +130,30 @@ module Make (Env : Env_intf.S) = struct
     in
     Iter.of_array_i (C.lits c)
     |> Iter.flat_map (fun (i, lit) ->
-           kill_lit lit |> Iter.map (fun subst -> (i, subst)) )
+        kill_lit lit |> Iter.map (fun subst -> (i, subst)) )
     |> Iter.map (fun (i, us) ->
-           let subst = Unif_subst.subst us in
-           (* delete i-th literal and build new clause *)
-           let new_lits = CCArray.except_idx (C.lits c) i in
-           let renaming = Subst.Renaming.create () in
-           let c_guard = Literal.of_unif_subst renaming us in
-           let new_lits =
-             c_guard @ Literal.apply_subst_list renaming subst (new_lits, 0)
-           in
-           let proof =
-             Proof.Step.inference
-               [C.proof_parent_subst renaming (c, 0) subst]
-               ~rule:(Proof.Rule.mk "acyclicity")
-               ~tags:[Proof.Tag.T_data]
-           in
-           let new_c =
-             C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof
-           in
-           Util.incr_stat stat_acyclicity ;
-           Util.debugf ~section 3
-             "@[<2>acyclicity@ :from `@[%a@]`@ :into `@[%a@]`@ :subst %a@]"
-             (fun k -> k C.pp c C.pp new_c Subst.pp subst ) ;
-           new_c )
+        let subst = Unif_subst.subst us in
+        (* delete i-th literal and build new clause *)
+        let new_lits = CCArray.except_idx (C.lits c) i in
+        let renaming = Subst.Renaming.create () in
+        let c_guard = Literal.of_unif_subst renaming us in
+        let new_lits =
+          c_guard @ Literal.apply_subst_list renaming subst (new_lits, 0)
+        in
+        let proof =
+          Proof.Step.inference
+            [C.proof_parent_subst renaming (c, 0) subst]
+            ~rule:(Proof.Rule.mk "acyclicity")
+            ~tags:[Proof.Tag.T_data]
+        in
+        let new_c =
+          C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof
+        in
+        Util.incr_stat stat_acyclicity ;
+        Util.debugf ~section 3
+          "@[<2>acyclicity@ :from `@[%a@]`@ :into `@[%a@]`@ :subst %a@]"
+          (fun k -> k C.pp c C.pp new_c Subst.pp subst ) ;
+        new_c )
     |> Iter.to_rev_list
 
   (* find, in [c], a literal which a (dis)equation of given sign
@@ -161,16 +161,16 @@ module Make (Env : Env_intf.S) = struct
   let find_cstor_pair ~sign ~eligible c =
     Lits.fold_lits ~eligible (C.lits c)
     |> Iter.find (fun (lit, i) ->
-           match lit with
-           | Literal.Equation (l, r, sign') when sign = sign' -> (
-             match (T.Classic.view l, T.Classic.view r) with
-             | T.Classic.App (s1, l1), T.Classic.App (s2, l2)
-               when Ind_ty.is_constructor s1 && Ind_ty.is_constructor s2 ->
-                 Some (i, s1, l1, s2, l2)
-             | _ ->
-                 None )
-           | _ ->
-               None )
+        match lit with
+        | Literal.Equation (l, r, sign') when sign = sign' -> (
+          match (T.Classic.view l, T.Classic.view r) with
+          | T.Classic.App (s1, l1), T.Classic.App (s2, l2)
+            when Ind_ty.is_constructor s1 && Ind_ty.is_constructor s2 ->
+              Some (i, s1, l1, s2, l2)
+          | _ ->
+              None )
+        | _ ->
+            None )
 
   (* if c is `f(t1,...,tn) = f(t1',...,tn') or d`, with f inductive cstor, then
       replace c with `And_i (ti = ti' or d)` *)
@@ -184,7 +184,7 @@ module Make (Env : Env_intf.S) = struct
         let new_lits =
           List.combine l1 l2
           |> CCList.filter_map (fun (t1, t2) ->
-                 if T.equal t1 t2 then None else Some (Literal.mk_eq t1 t2) )
+              if T.equal t1 t2 then None else Some (Literal.mk_eq t1 t2) )
         in
         let rule = Proof.Rule.mk "injectivity_destruct+" in
         let proof =
@@ -282,21 +282,21 @@ module Make (Env : Env_intf.S) = struct
       let rhs_l =
         ity.Ind_ty.ty_constructors
         |> List.map (fun {Ind_ty.cstor_name; cstor_ty; _} ->
-               let n_args, _, _ = Type.open_poly_fun cstor_ty in
-               assert (n_args = List.length ty_params) ;
-               let cstor_ty_args, ret =
-                 Type.apply cstor_ty ty_params |> Type.open_fun
-               in
-               assert (Type.equal ret (T.ty t)) ;
-               (* build new constants to pass to the cstor *)
-               let args =
-                 List.map
-                   (fun ty ->
-                     let c = mk_sub_skolem t ty in
-                     Env.Ctx.declare c ty ; T.const ~ty c )
-                   cstor_ty_args
-               in
-               T.app_full (T.const ~ty:cstor_ty cstor_name) ty_params args )
+            let n_args, _, _ = Type.open_poly_fun cstor_ty in
+            assert (n_args = List.length ty_params) ;
+            let cstor_ty_args, ret =
+              Type.apply cstor_ty ty_params |> Type.open_fun
+            in
+            assert (Type.equal ret (T.ty t)) ;
+            (* build new constants to pass to the cstor *)
+            let args =
+              List.map
+                (fun ty ->
+                  let c = mk_sub_skolem t ty in
+                  Env.Ctx.declare c ty ; T.const ~ty c )
+                cstor_ty_args
+            in
+            T.app_full (T.const ~ty:cstor_ty cstor_name) ty_params args )
       in
       let lits = List.map (Literal.mk_eq t) rhs_l in
       (* XXX: could derive this from the [data] that defines [ity]… *)
@@ -314,30 +314,30 @@ module Make (Env : Env_intf.S) = struct
     let find_terms (t : term) : term Iter.t =
       T.Seq.subterms t
       |> Iter.filter (fun t ->
-             T.is_ground t
-             &&
-             match Ind_ty.as_inductive_type (T.ty t) with
-             | None ->
-                 false
-             | Some (ity, _) ->
-                 (* only for non-recursive types *)
-                 (not (Ind_ty.is_recursive ity)) && pure_value t )
+          T.is_ground t
+          &&
+          match Ind_ty.as_inductive_type (T.ty t) with
+          | None ->
+              false
+          | Some (ity, _) ->
+              (* only for non-recursive types *)
+              (not (Ind_ty.is_recursive ity)) && pure_value t )
     in
     (* find terms to instantiate exhaustiveness for, and do it *)
     let eligible = C.Eligible.(res c ** neg) in
     C.lits c |> Iter.of_array_i
     |> Iter.filter_map (fun (i, lit) ->
-           if eligible i lit then Some lit else None )
+        if eligible i lit then Some lit else None )
     |> Iter.flat_map Literal.Seq.terms
     |> Iter.flat_map find_terms
     (* remove cstor-headed terms *)
     |> Iter.filter (fun t ->
-           (not (is_cstor_app t)) && not (T.Tbl.mem exhaustiveness_tbl_ t) )
+        (not (is_cstor_app t)) && not (T.Tbl.mem exhaustiveness_tbl_ t) )
     |> T.Set.of_iter |> T.Set.to_list
     |> List.rev_map (fun t ->
-           T.Tbl.add exhaustiveness_tbl_ t () ;
-           let ax = make_axiom t in
-           ax )
+        T.Tbl.add exhaustiveness_tbl_ t () ;
+        let ax = make_axiom t in
+        ax )
 
   let setup () =
     if !enabled_ then (

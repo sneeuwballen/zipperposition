@@ -335,7 +335,7 @@ module Seq = struct
   let vars t =
     subterms t
     |> Iter.filter_map (fun t ->
-           match t.term with Var v -> Some v | _ -> None )
+        match t.term with Var v -> Some v | _ -> None )
 
   let subterms_with_bound t k =
     let add_var set = function Wildcard -> set | V s -> StringSet.add s set in
@@ -381,11 +381,11 @@ module Seq = struct
   let free_vars t =
     subterms_with_bound t
     |> Iter.filter_map (fun (t, bound) ->
-           match t.term with
-           | Var (V v) when not (StringSet.mem v bound) ->
-               Some v
-           | _ ->
-               None )
+        match t.term with
+        | Var (V v) when not (StringSet.mem v bound) ->
+            Some v
+        | _ ->
+            None )
 
   let symbols t =
     subterms t
@@ -694,8 +694,9 @@ module TPTP_THF = struct
   and pp_var out = function
     | Wildcard ->
         CCFormat.string out "$_"
-    (* TODO this is for testing purposes even if i see no theoretical harm,
-     * will need to find a better solution *)
+        (*
+                                                                                 TODO this is for testing purposes even if i see no theoretical harm,
+                                                                                * will need to find a better solution *)
     | V s ->
         Util.pp_var_tstp out s
 
