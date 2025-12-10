@@ -161,7 +161,7 @@ module Seq = struct
 
   let vars lit = Iter.flat_map T.Seq.vars (terms lit)
   let symbols ?(include_types = false) lit = Iter.flat_map (T.Seq.symbols ~include_types) (terms lit)
-  let typed_symbols lit = Iter.flat_map (T.Seq.all_typed_symbols) (terms lit)
+  let typed_symbols ?(include_types = false) lit = Iter.flat_map (T.Seq.typed_symbols ~include_types) (terms lit)
 end
 
 let symbols ?(include_types = false) lit = Seq.symbols ~include_types lit |> ID.Set.of_iter

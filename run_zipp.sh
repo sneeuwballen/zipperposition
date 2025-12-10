@@ -1,61 +1,58 @@
 
-ZIPP_TIMEOUT=20
+ZIPP_TIMEOUT=30
+MONO_TO=10
 
 SYM_MONO_CAP=-1
 SYM_MONO_MULT=-1
-SYM_MONO_FLOOR=999
+SYM_MONO_FLOOR=0
 
 SYM_POLY_CAP=-1
 SYM_POLY_MULT=-1
-SYM_POLY_FLOOR=999
+SYM_POLY_FLOOR=0
 
-CLAUSE_MONO_CAP=500
-CLAUSE_MONO_MULT=0
+CLAUSE_MONO_CAP=-1
+CLAUSE_MONO_MULT=-1
 CLAUSE_MONO_FLOOR=0
 
-CLAUSE_POLY_CAP=500
-CLAUSE_POLY_MULT=0
-CLAUSE_POLY_FLOOR=10
+CLAUSE_POLY_CAP=-1
+CLAUSE_POLY_MULT=-1
+CLAUSE_POLY_FLOOR=0
 
-MONO_SUBST=10
+MONO_SUBST=10000
 SUBST_CAP=-1
 
 
 E_TIMEOUT=30
-CLAUSE_MULT=1.0
+CLAUSE_MULT=-1
 CLAUSE_CAP=2000
 
-LOOP_NB=2
-E_CALL_STEP=0
-
-MONO_TO=20
 SUBST_ORDERING="age"
 
-E_DIR="./eprover-ho"
+LOOP_NB=5
+E_CALL_STEP=0
 
-OPT_40_B_COMB=(\
+L_40_E_LIFT=(\
   -i tptp\
   -o none\
-  --timeout $ZIPP_TIMEOUT \
-  --mode=ho-comb-complete \
-  --boolean-reasoning=simpl-only \
-  --ext-rules=off --kbo-weight-fun=lambda-def-sqarity \
-  --ho-prim-enum=none \
-  --tptp-def-as-rewrite \
-  -q "4|prefer-sos|orient-lmax(2,1,2,1,1)" \
-  -q "4|defer-sos|conjecture-relative-var(1,s,f)" \
-  -q "3|const|default" \
-  -q "1|prefer-processed|fifo" \
-  --ho-elim-leibniz=1 \
-  --select=NoSelection --solve-formulas=true \
-  --lazy-cnf=true --lazy-cnf-kind=simp --lazy-cnf-renaming-threshold=8 \
-  --sine=60 --sine-tolerance=2 --sine-depth-max=5 --sine-depth-min=1 \
-  --e-encode-lambdas=drop \
-  --scan-clause-ac=false --presaturate=true \
-  --comb-b-penalty=3 --comb-c-penalty=3 --comb-k-penalty=1 --comb-s-penalty=5 --subvarsup=false \
-  --try-e="$E_DIR" --tmp-dir="/tmp" \
+  --mode=ho-pragmatic \
+  --max-inferences=4 --ho-max-app-projections=1 --ho-max-elims=0 --ho-max-rigid-imitations=2 --ho-max-identifications=0\
+  --ho-unif-max-depth=2 --max-inferences=3\
+  --boolean-reasoning=bool-hoist --bool-select=LO\
+  --ext-rules=off --kbo-weight-fun=lambda-def-invfreqrank\
+  --ho-prim-enum=none\
+  --ho-unif-level=pragmatic-framework\
+  -q "1|prefer-sos|conjecture-relative-var(1.01,s,f)"\
+  -q "4|const|conjecture-relative-var(1.05,l,f)"\
+  -q "1|prefer-processed|fifo"\
+  -q "1|prefer-non-goals|conjecture-relative-var(1.02,l,f)"\
+  -q "4|prefer-sos|pnrefined(3,2,3,2,2,1.5,2)"\
+  --ho-elim-leibniz=1\
+  --ho-fixpoint-decider=true --ho-pattern-decider=true --ho-solid-decider=true\
+  --select=e-selection2 --solve-formulas=true --lambdasup=0\
+  --e-encode-lambdas=keep\
+  --presaturate=true --prec-gen-fun=invfreq --sine-trim-implications=true\
+  --try-e="./eprover-ho" --tmp-dir="/tmp" \
   --e-call-step=$E_CALL_STEP --timeout=$ZIPP_TIMEOUT --e-timeout=$E_TIMEOUT\
-  --e-call-point=1.0
   --sym-mono-ty-args="$SYM_MONO_CAP,$SYM_MONO_MULT,$SYM_MONO_FLOOR" \
   --sym-poly-ty-args="$SYM_POLY_CAP,$SYM_POLY_MULT,$SYM_POLY_FLOOR" \
   --clause-mono-ty-args="$CLAUSE_MONO_CAP,$CLAUSE_MONO_MULT,$CLAUSE_MONO_FLOOR" \
@@ -67,34 +64,23 @@ OPT_40_B_COMB=(\
   --monomorphisation-timeout=$MONO_TO\
 )
 
-OPT_40_B_COMB_2=(\
-  -i tptp\
-  -o none\
-  --timeout $ZIPP_TIMEOUT \
-  --mode=ho-comb-complete \
-  --boolean-reasoning=simpl-only \
-  --e-encode-lambdas=drop \
-  --presaturate=true \
-  --try-e="$E_DIR" --tmp-dir="/tmp" \
-  --e-call-step=$E_CALL_STEP --timeout=$ZIPP_TIMEOUT --e-timeout=$E_TIMEOUT\
-)
-
 ZIPP_OPT=(\
   -i tptp\
   -o none\
-  --try-e="./binaries/eprover-ho" --tmp-dir="/tmp" \
+  --try-e="./binaries/eprover-ho_2" --tmp-dir="/tmp" \
   --e-call-step=0 --timeout=30 --e-timeout=0\
   --e-call-point=1.0\
   --sym-mono-ty-args="-1,-1,999" \
   --sym-poly-ty-args="-1,-1,999" \
-  --clause-mono-ty-args="500,0,0" \
-  --clause-poly-ty-args="500,0,10" \
-  --monomorphising-subst-per-clause=10 \
+  --clause-mono-ty-args="-1,0,0" \
+  --clause-poly-ty-args="500,0.5,50" \
+  --monomorphising-subst-per-clause=5 \
   --substitution-ordering="age" \
-  --e-max-derived=2000 --new-clauses-multiplier=1 \
+  --e-max-derived=500 --new-clauses-multiplier=2 \
   --mono-loop=2\
-  --monomorphisation-timeout=20\
+  --monomorphisation-timeout=5\
 )
+
 
 
 #echo "running with ${????[@]}"
@@ -114,5 +100,5 @@ ZIPP_OPT=(\
 #echo "done 30_b.l"
 #
 #find "$1" -name \*.p | xargs --max-args=1 --max-procs=1 timeout 3000000 ./zipperposition.exe ${L_40_E_LIFT[@]}
-find "$1" -name \*.p | xargs --max-args=1 --max-procs=1 timeout 5 ./zipperposition.exe ${ZIPP_OPT[@]}
+find "$1" -name \*.p | xargs --max-args=1 --max-procs=1 timeout 3000000 ./zipperposition.exe ${ZIPP_OPT[@]}
 

@@ -387,38 +387,22 @@ module Seq = struct
      in
         aux t
 
-   (* TODO the typed_symbols function doesn't return symbols under existential quantifiers (possibly under lambdas also)
-    * this is because the substerms function also doesn't do that. This function copies symbols and adds the types of symbols*)
-   let all_typed_symbols t =
-      let type_syms_of t = Type.Seq.symbols (ty t) |> Iter.map (fun id -> id, Type.tType) in
-      let rec aux t =
-         let new_type_syms = type_syms_of t in
-         let res = match view t with
-             | AppBuiltin (_, l) ->
-                   List.fold_left (fun acc_res t -> Iter.append acc_res (aux t)) Iter.empty l
-             | Const s -> Iter.singleton (s, ty t)
-             | Var _ | DB _ -> Iter.empty
-             | Fun (ty, u) ->
-                   let new_type_syms = Type.Seq.symbols ty |> Iter.map (fun id -> id, Type.tType) in 
-                   Iter.append new_type_syms (aux u)
-             | App (f, l) ->
-                let res_f = aux f in
-                let res_l = List.fold_left (fun acc_res t -> Iter.append acc_res (aux t)) Iter.empty l in
-                Iter.append res_f res_l
-         in
-         Iter.append res new_type_syms
-     in
-     let res= aux t in
-     Iter.append res (type_syms_of t)
-            
-
   let max_var = Type.Seq.max_var
   let min_var = Type.Seq.min_var
   let add_set set xs = Iter.fold (fun set x -> Set.add x set) set xs
   let ty_vars t = subterms ~include_builtin:true t |> Iter.flat_map (fun t -> Type.Seq.vars (ty t))
 
-  let typed_symbols t =
-     subterms t |> Iter.filter_map (fun t -> match T.view t with T.Const s -> Some (s, ty t) | _ -> None)
+  let typed_symbols ?(include_types = false) t =
+     (*Printf.printf "our lad t: %s\n" (T.to_string t);*)
+     let non_ty_syms = subterms t |> Iter.filter_map (fun t -> match T.view t with T.Const s -> Some (s, ty t) | _ -> None) in
+     let ty_syms =
+        if include_types then 
+         Iter.flat_map (fun t -> Type.Seq.symbols (ty t)) (subterms t) |> Iter.map (fun ty_id -> ty_id, Type.tType)
+        else Iter.empty
+     in
+     (*Printf.printf "the type of our lad t: %s\n" (Type.to_string (ty t));*)
+     (*Iter.iter (fun (id, _) -> Printf.printf "id: %s\n" (ID.to_string id)) ty_syms;*)
+        Iter.append non_ty_syms ty_syms
 
   let common_contexts a b k =
      let common_arg xs ys =
@@ -646,8 +630,7 @@ let comb_depth t =
       (* CCFormat.printf "c_depth(@[%a@])=@[%a@]@." T.pp t (CCOpt.pp CCInt.pp) res; *)
       res
 
-(*let monomorphic t = Iter.is_empty (Seq.ty_vars t)*)
-let monomorphic t = not (Iter.exists (fun var -> Type.is_tType (HVar.ty var)) (Seq.vars t))
+let monomorphic t = Iter.is_empty (Seq.ty_vars t)
 let max_var set = VarSet.to_iter set |> Seq.max_var
 let min_var set = VarSet.to_iter set |> Seq.min_var
 let add_vars tbl t = Seq.vars t (fun v -> VarTbl.replace tbl v ())
@@ -1287,7 +1270,7 @@ let rebuild_rec t =
 let rec convert_type ty_list ty =
    let open Type in
    (*Printf.printf "converting type: %s\n" (to_string ty);*)
-   match List.find_opt (fun (old_ty,_) -> Type.equal old_ty ty) ty_list with
+   match List.find_opt (fun elem -> Type.equal (fst elem) ty) ty_list with
       | Some (_, new_ty) -> ty_list, new_ty
       | None -> 
          let args_nb, args, ret = open_poly_fun ty in
@@ -1305,8 +1288,6 @@ let rec convert_type ty_list ty =
                      let new_type = Type.const (ID.make new_ty_str) in
                      (ty, new_type)::str_ty_list, new_type
                | Builtin _ -> ty_list, ty
-               | Fun _ -> Printf.printf "qsfqsldfj\n"; assert false;
-               | Var _ -> Printf.printf "vaaaariaaaaable"; assert false;
                | _ -> Printf.printf "that's not supposed to happen\n"; assert false
 
 
@@ -1336,8 +1317,9 @@ let mangle_term ty_list str_term_list t =
                   | Const f_id ->
                      (*List.iter (fun x -> Printf.printf "new l type : %s\n" (Type.to_string x)) (List.map Type.of_term_unsafe type_args);*)
                      let ty_list, str_term_list, new_term_args = fold_left_map2 (aux env) ty_list str_term_list term_args in
-                     let ty_list, new_type_args = List.fold_left_map convert_type ty_list (List.map Type.of_term_unsafe type_args) in
                      let ty_list, new_f_type = convert_type ty_list (Type.apply (ty f) (List.map Type.of_term_unsafe type_args)) in
+                     (*Printf.printf "new f type : %s\n" (T.to_string (new_f_type:> term));*)
+
 
                      (*let new_f_name = (ID.name f_id) ^ "_" ^ (Type.mangle new_f_type) in*)
                      (*List.iter (fun x -> Printf.printf "type args : %s\n" (to_string (x))) type_args;*)
@@ -1346,22 +1328,17 @@ let mangle_term ty_list str_term_list t =
                      let str_term_list, new_f_term = 
                         if List.length type_args = 0 then str_term_list, T.cast ~ty:(new_f_type:> term) f
                         else
-                           match List.find_opt (fun ((old_f_id, old_f_ty_args), _) -> ID.equal old_f_id f_id && (List.for_all2 Type.equal old_f_ty_args new_type_args)) str_term_list with
+                           match List.find_opt (fun ((old_f_id, old_f_ty), _) -> ID.equal old_f_id f_id && Type.equal old_f_ty new_f_type) str_term_list with
                            | Some (_, new_f) ->
                               str_term_list, new_f
                            | None ->
-                              (*Printf.printf "None\n";*)
                               let new_f = const ~ty:new_f_type (ID.make (ID.name f_id)) in
-                              ((f_id, new_type_args), new_f) :: str_term_list, new_f
+                              ((f_id, new_f_type), new_f) :: str_term_list, new_f
                      in
                      (*let new_f_term = T.cast ~ty:(new_f_type:> term) f in*)
 
                      (*Printf.printf "old f type : %s\n" (Type.to_string (Type.apply (ty f) new_type_args));*)
                      (*Printf.printf "f     term : %s\n" (to_string f);*)
-                     (*Printf.printf "new f type : %s\n" (T.to_string (new_f_type:> term));*)
-                     (*(match type_args with 
-                        | [] -> ();
-                        | hd::tl -> Printf.printf "type arg hd : %s\n" (to_string hd););*)
                      (*Printf.printf "args length : %d\n" (List.length l);*)
                      (*Printf.printf "new type after AAARGH: %s\n" (Type.to_string new_type);*)
                      (*List.iter (fun x -> Printf.printf "new l terms type : %s\n" (Type.to_string (ty x))) (List.map (aux env) l);*)

@@ -217,8 +217,7 @@ module Seq : sig
   (** min var *)
 
   val ty_vars : t -> var Iter.t
-  val typed_symbols : t -> (ID.t * Type.t) Iter.t
-  val all_typed_symbols : t -> (ID.t * Type.t) Iter.t
+  val typed_symbols : ?include_types:bool -> t -> (ID.t * Type.t) Iter.t
   val add_set : Set.t -> t Iter.t -> Set.t
 
   (* given terms s and t, iterate over all terms s' t'
@@ -500,6 +499,6 @@ end
 val rebuild_rec : t -> t (* rebuild term fully, checking types *)
 
 val fold_left_map2: ('acc1 -> 'acc2 -> 'a -> 'acc1 * 'acc2 * 'b) -> 'acc1 -> 'acc2 -> 'a list -> 'acc1 * 'acc2 * 'b list
-val mangle_term : (Type.t * Type.t) list -> ((ID.t * Type.t list) * t) list -> t -> (Type.t * Type.t) list * ((ID.t * Type.t list) * t) list * t
+val mangle_term : (Type.t * Type.t) list -> ((ID.t * Type.t) * t) list -> t -> (Type.t * Type.t) list * ((ID.t * Type.t) * t) list * t
 
 (**/**)

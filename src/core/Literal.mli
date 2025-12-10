@@ -208,7 +208,7 @@ module Seq : sig
   val terms : t -> term Iter.t
   val vars : t -> Type.t HVar.t Iter.t
   val symbols : ?include_types:bool -> t -> ID.t Iter.t
-  val typed_symbols : t -> (ID.t * Type.t) Iter.t
+  val typed_symbols : ?include_types:bool -> t -> (ID.t * Type.t) Iter.t
 end
 
 (** {2 Positions} *)

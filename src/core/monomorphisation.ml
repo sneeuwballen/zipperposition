@@ -781,10 +781,6 @@ let monomorphise_problem_base clause_list =
 
    let final_clause_list = Iter.to_list new_clauses @ mono_clause_list in
 
-   (*List.iter (fun cl -> Printf.printf "clause %s\n" (Literals.to_string (snd cl))) final_clause_list;*)
-   (*let _ = List.iter (fun cl -> assert (clause_is_monomorphic cl)) final_clause_list in*)
-
-
    (* we want to have; monomorphisation time, number of initial poly and mono clauses, number of output clauses*)
    (*let print_end_info =
       let subst_count pb_subst_map =
@@ -840,9 +836,7 @@ let monomorphise_problem clause_list =
    let curr_time = Sys.time () in
    try run_with_time_limit !_monomorphisation_timeout (fun () -> 
       let monomorphised_clauses = monomorphise_problem_base clause_list in
-      (*List.iter (fun (_, cl) -> Literals.Seq.terms cl (fun term -> (Term.to_string term) |> Printf.printf "%s\n") ) monomorphised_clauses;*)
       let _, _, res = Term.fold_left_map2 mangle_clause [] [] monomorphised_clauses in
-      (*List.iter (fun (_, cl) -> Literals.Seq.terms cl (fun term -> (Term.to_string term) |> Printf.printf "%s\n") ) res;*)
    (*List.iter (fun (_, cl) -> Literals.Seq.terms cl (fun term -> (Term.to_string term) ^ " : " ^ (Type.to_string (Term.ty term)) |> Printf.printf "%s\n") ) res;*)
       (*let res = monomorphise_problem_base clause_list in*)
       Printf.printf "real monomorphisation time: %f\n" (Sys.time () -. curr_time);
