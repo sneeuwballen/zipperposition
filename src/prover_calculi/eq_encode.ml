@@ -45,16 +45,23 @@ let eq_properties () =
   let z = T.var (Var.make ~ty:alpha (ID.make "Y")) in
   let app_eq args = T.app ~ty:T.Ty.prop eq_term (alpha :: args) in
   let refl = [SLiteral.atom_true (app_eq [x; x])] in
-  let symm = [SLiteral.atom_false (app_eq [x; y]); SLiteral.atom_true (app_eq [y; x])] in
+  let symm =
+    [SLiteral.atom_false (app_eq [x; y]); SLiteral.atom_true (app_eq [y; x])]
+  in
   let trans =
-    [SLiteral.atom_false (app_eq [x; y]); SLiteral.atom_false (app_eq [y; z]); SLiteral.atom_true (app_eq [x; z])]
+    [ SLiteral.atom_false (app_eq [x; y])
+    ; SLiteral.atom_false (app_eq [y; z])
+    ; SLiteral.atom_true (app_eq [x; z]) ]
   in
   Iter.of_list
-    ((if !refl_ then [refl] else []) @ (if !symm_ then [symm] else []) @ if !trans_ then [trans] else [])
+    ( (if !refl_ then [refl] else [])
+    @ (if !symm_ then [symm] else [])
+    @ if !trans_ then [trans] else [] )
 
 (** Encode a literal *)
 let eq_encode_lit lit =
-  Util.debugf ~section 2 "# Encoding Literal %a" (fun k -> k (SLiteral.pp T.pp) lit) ;
+  Util.debugf ~section 2 "# Encoding Literal %a" (fun k ->
+      k (SLiteral.pp T.pp) lit ) ;
   match lit with
   | SLiteral.Eq (lhs, rhs) | SLiteral.Neq (lhs, rhs) ->
       let sign = match lit with SLiteral.Eq _ -> true | _ -> false in
@@ -89,14 +96,22 @@ let res_tc =
     ~to_exn:(fun i -> E_i i)
     ~compare ~pp_in:pp_clause_in ~is_stmt:true ~name:Statement.name
     ~to_form:(fun ~ctx st ->
-      let conv_c (c : T.t SLiteral.t list) : _ = c |> List.map SLiteral.to_form |> T.Form.or_ in
+      let conv_c (c : T.t SLiteral.t list) : _ =
+        c |> List.map SLiteral.to_form |> T.Form.or_
+      in
       Statement.Seq.forms st |> Iter.map conv_c |> Iter.to_list |> T.Form.and_ )
     ()
 
 (** encode a statement *)
 let eq_encode_stmt stmt =
-  let as_proof = Proof.S.mk (Statement.proof_step stmt) (Proof.Result.make res_tc stmt) in
-  let proof = Proof.Step.esa ~rule:(Proof.Rule.mk "eq_encode") [as_proof |> Proof.Parent.from] in
+  let as_proof =
+    Proof.S.mk (Statement.proof_step stmt) (Proof.Result.make res_tc stmt)
+  in
+  let proof =
+    Proof.Step.esa
+      ~rule:(Proof.Rule.mk "eq_encode")
+      [as_proof |> Proof.Parent.from]
+  in
   match Statement.view stmt with
   | Statement.Data _ ->
       failwith "Not implemented: Data"
@@ -116,7 +131,11 @@ let extension =
     if !enabled_ then (
       let seq = Iter.map eq_encode_stmt seq in
       Util.debug ~section 2 "Start eq encoding" ;
-      let axioms = Iter.map (Statement.assert_ ~proof:Proof.Step.trivial) (eq_properties ()) in
+      let axioms =
+        Iter.map
+          (Statement.assert_ ~proof:Proof.Step.trivial)
+          (eq_properties ())
+      in
       (* Add type declarations *)
       let seq = Iter.append ty_decls (Iter.append axioms seq) in
       (* Add extensionality axiom *)
@@ -128,7 +147,15 @@ let extension =
 
 let () =
   Options.add_opts
-    [ ("--eq-encode", Arg.Bool (( := ) enabled_), " enable/disable replacing equality by proxies")
-    ; ("--eq-encode-refl", Arg.Bool (( := ) refl_), " enable/disable eq proxy reflexivity axiom")
-    ; ("--eq-encode-symm", Arg.Bool (( := ) symm_), " enable/disable eq proxy symmetry axiom")
-    ; ("--eq-encode-trans", Arg.Bool (( := ) trans_), " enable/disable eq proxy transitivity axiom") ]
+    [ ( "--eq-encode"
+      , Arg.Bool (( := ) enabled_)
+      , " enable/disable replacing equality by proxies" )
+    ; ( "--eq-encode-refl"
+      , Arg.Bool (( := ) refl_)
+      , " enable/disable eq proxy reflexivity axiom" )
+    ; ( "--eq-encode-symm"
+      , Arg.Bool (( := ) symm_)
+      , " enable/disable eq proxy symmetry axiom" )
+    ; ( "--eq-encode-trans"
+      , Arg.Bool (( := ) trans_)
+      , " enable/disable eq proxy transitivity axiom" ) ]

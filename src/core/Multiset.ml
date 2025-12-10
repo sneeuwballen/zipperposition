@@ -53,14 +53,18 @@ module Make (E : Map.OrderedType) = struct
 
   let difference = _merge Z.sub
 
-  let product n m = if Z.sign n <= 0 then empty else _map (fun _ n' -> Z.mul n n') m
+  let product n m =
+    if Z.sign n <= 0 then empty else _map (fun _ n' -> Z.mul n n') m
 
   let map f (m : t) : t = M.fold (fun x n acc -> add_coeff acc (f x) n) m empty
 
   let map_coeff f m = _map f m
 
   let filter_map f (m : t) =
-    M.fold (fun x n acc -> match f x n with None -> acc | Some (x', n') -> add_coeff acc x' n') m empty
+    M.fold
+      (fun x n acc ->
+        match f x n with None -> acc | Some (x', n') -> add_coeff acc x' n' )
+      m empty
 
   let filter p m = map_coeff (fun x n -> if p x n then n else Z.zero) m
 
@@ -115,7 +119,10 @@ module Make (E : Map.OrderedType) = struct
   let of_coeffs = List.fold_left (fun acc (x, n) -> add_coeff acc x n) empty
 
   let list_of_coeffs =
-    List.fold_left (fun acc (x, n) -> List.rev_append (CCList.repeat (Z.to_int_exn n) [x]) acc) []
+    List.fold_left
+      (fun acc (x, n) ->
+        List.rev_append (CCList.repeat (Z.to_int_exn n) [x]) acc )
+      []
 
   let of_iarray = IArray.fold add empty
 
@@ -177,7 +184,9 @@ module Make (E : Map.OrderedType) = struct
           let maxs2 = m2 in
           match (maxs1, maxs2) with
           | [], [] ->
-              if met_gt || met_lt (* can't be equal? *) then Comparison.Incomparable else Eq
+              if met_gt || met_lt (* can't be equal? *) then
+                Comparison.Incomparable
+              else Eq
           | [], _ ->
               Lt
           | _, [] ->
@@ -201,10 +210,13 @@ module Make (E : Map.OrderedType) = struct
             let c = Z.compare n1 n2 in
             if c < 0 then
               (* remove x1 *)
-              check_left ~met_gt ~met_lt ~maxs1 m1' ((x2, Z.(n2 - n1)) :: List.rev_append m2' seen2)
-            else if c > 0 then (* remove [x2] *)
+              check_left ~met_gt ~met_lt ~maxs1 m1'
+                ((x2, Z.(n2 - n1)) :: List.rev_append m2' seen2)
+            else if c > 0 then
+              (* remove [x2] *)
               filter_with ~met_gt ~met_lt ~maxs1 x1 Z.(n1 - n2) m1' m2' seen2
-            else (* remove both *)
+            else
+              (* remove both *)
               check_left ~met_gt ~met_lt ~maxs1 m1' (List.rev_append m2' seen2)
         | Geq | Leq ->
             (* keep both *)
@@ -218,7 +230,8 @@ module Make (E : Map.OrderedType) = struct
             filter_with ~met_gt:true ~met_lt ~maxs1 x1 n1 m1' m2' seen2
         | Lt ->
             (* remove x1 *)
-            check_left ~met_gt ~met_lt:true ~maxs1 m1' (List.rev_append m2 seen2) )
+            check_left ~met_gt ~met_lt:true ~maxs1 m1'
+              (List.rev_append m2 seen2) )
     in
     check_left ~met_gt:false ~met_lt:false ~maxs1:[] m1 m2
 
@@ -245,7 +258,10 @@ module Make (E : Map.OrderedType) = struct
               | [] ->
                   false
               | x1 :: m1' ->
-                  if f x1 x2 = Comparison.Geq && find_mates (List.rev_append seen1 m1') m2' then true
+                  if
+                    f x1 x2 = Comparison.Geq
+                    && find_mates (List.rev_append seen1 m1') m2'
+                  then true
                   else find_mate_for_x2 (x1 :: seen1) m1'
             in
             find_mate_for_x2 [] m1
@@ -269,8 +285,10 @@ module Make (E : Map.OrderedType) = struct
       match see1 with
       | [] ->
           if find_geq_mates f (list_of_coeffs left1) (list_of_coeffs left2) then
-            if met_gt then (* any [m2] element strictly dominated? *)
-              Comparison.Gt else Geq
+            if met_gt then
+              (* any [m2] element strictly dominated? *)
+              Comparison.Gt
+            else Geq
           else if
             (* try a nonstrict comparison instead *)
             met_gt && find_geq_mates f (list_of_coeffs m1) (list_of_coeffs m2)
@@ -293,18 +311,22 @@ module Make (E : Map.OrderedType) = struct
             let c = Z.compare n1 n2 in
             if c < 0 then
               (* remove x1 *)
-              check_left ~met_gt ~left1 m1' ((x2, Z.(n2 - n1)) :: List.rev_append m2' seen2)
+              check_left ~met_gt ~left1 m1'
+                ((x2, Z.(n2 - n1)) :: List.rev_append m2' seen2)
             else if c > 0 then
               (* remove [x2] *)
               filter_with ~met_gt ~met_x1_gt ~left1 x1 Z.(n1 - n2) m1' m2' seen2
-            else (* remove both *)
+            else
+              (* remove both *)
               check_left ~met_gt ~left1 m1' (List.rev_append m2' seen2)
         | Lt | Geq | Leq | Incomparable ->
             (* keep both *)
-            filter_with ~met_gt ~met_x1_gt ~left1 x1 n1 m1' m2' ((x2, n2) :: seen2)
+            filter_with ~met_gt ~met_x1_gt ~left1 x1 n1 m1' m2'
+              ((x2, n2) :: seen2)
         | Gt ->
             (* remove [x2] *)
-            filter_with ~met_gt:true ~met_x1_gt:true ~left1 x1 n1 m1' m2' seen2 )
+            filter_with ~met_gt:true ~met_x1_gt:true ~left1 x1 n1 m1' m2' seen2
+        )
     in
     check_left ~met_gt:false ~left1:[] m1 m2
 
@@ -347,7 +369,8 @@ module Make (E : Map.OrderedType) = struct
 
   let compare m1 m2 = compare_l (to_list m1) (to_list m2)
 
-  let is_max f x m = M.for_all (fun y _ -> not (Comparison.is_Lt_or_Leq (f x y))) m
+  let is_max f x m =
+    M.for_all (fun y _ -> not (Comparison.is_Lt_or_Leq (f x y))) m
 
   (* iterate on the max elements *)
   let max_seq f (m : t) k =
@@ -379,11 +402,14 @@ module Make (E : Map.OrderedType) = struct
 
   let max f m = max_seq f m |> Iter.fold (fun m (c, t) -> add_coeff m c t) empty
 
-  let max_l f l = max_seq f (of_list l) |> Iter.fold (fun acc (x, _) -> x :: acc) []
+  let max_l f l =
+    max_seq f (of_list l) |> Iter.fold (fun acc (x, _) -> x :: acc) []
 
   let compare_partial_l f l1 l2 = compare_partial f (of_list l1) (of_list l2)
 
   let pp pp_x out m =
     let pp_p out (x, n) = Format.fprintf out "%a: %s" pp_x x (Z.to_string n) in
-    Format.fprintf out "{@[<hov>%a@]}" (Util.pp_iter ~sep:", " pp_p) (M.to_iter m)
+    Format.fprintf out "{@[<hov>%a@]}"
+      (Util.pp_iter ~sep:", " pp_p)
+      (M.to_iter m)
 end

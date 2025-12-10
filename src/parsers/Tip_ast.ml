@@ -9,7 +9,9 @@ let pp_str = Format.pp_print_string
 let pp_to_string pp x =
   let buf = Buffer.create 64 in
   let fmt = Format.formatter_of_buffer buf in
-  pp fmt x ; Format.pp_print_flush fmt () ; Buffer.contents buf
+  pp fmt x ;
+  Format.pp_print_flush fmt () ;
+  Buffer.contents buf
 
 module Loc = ParseLocation
 
@@ -28,7 +30,10 @@ type term =
   | False
   | Const of string
   | App of string * term list
-  | App_poly of string * ty list * term list (* application with explicit polymorphic type arguments *)
+  | App_poly of
+      string
+      * ty list
+      * term list (* application with explicit polymorphic type arguments *)
   | HO_app of term * term (* higher-order application *)
   | Match of term * match_branch list
   | If of term * term * term
@@ -44,11 +49,15 @@ type term =
   | Forall of (var * ty) list * term
   | Exists of (var * ty) list * term
 
-and match_branch = Match_default of term | Match_case of string * var list * term
+and match_branch =
+  | Match_default of term
+  | Match_case of string * var list * term
 
-type cstor = {cstor_name: string; cstor_args: (string * ty) list (* selector+type *)}
+type cstor =
+  {cstor_name: string; cstor_args: (string * ty) list (* selector+type *)}
 
-type 'arg fun_decl = {fun_ty_vars: ty_var list; fun_name: string; fun_args: 'arg list; fun_ret: ty}
+type 'arg fun_decl =
+  {fun_ty_vars: ty_var list; fun_name: string; fun_args: 'arg list; fun_ret: ty}
 
 type fun_def = {fr_decl: typed_var fun_decl; fr_body: term}
 
@@ -120,27 +129,38 @@ let forall vars f = match vars with [] -> f | _ -> Forall (vars, f)
 let exists vars f = match vars with [] -> f | _ -> Exists (vars, f)
 
 let rec not_ t =
-  match t with Forall (vars, u) -> exists vars (not_ u) | Exists (vars, u) -> forall vars (not_ u) | _ -> Not t
+  match t with
+  | Forall (vars, u) ->
+      exists vars (not_ u)
+  | Exists (vars, u) ->
+      forall vars (not_ u)
+  | _ ->
+      Not t
 
 let _mk ?loc stmt = {loc; stmt}
 
 let mk_cstor name l : cstor = {cstor_name= name; cstor_args= l}
 
-let mk_fun_decl ~ty_vars f args ret = {fun_ty_vars= ty_vars; fun_name= f; fun_args= args; fun_ret= ret}
+let mk_fun_decl ~ty_vars f args ret =
+  {fun_ty_vars= ty_vars; fun_name= f; fun_args= args; fun_ret= ret}
 
-let mk_fun_rec ~ty_vars f args ret body = {fr_decl= mk_fun_decl ~ty_vars f args ret; fr_body= body}
+let mk_fun_rec ~ty_vars f args ret body =
+  {fr_decl= mk_fun_decl ~ty_vars f args ret; fr_body= body}
 
 let decl_sort ?loc s ~arity = _mk ?loc (Stmt_decl_sort (s, arity))
 
 let decl_fun ?loc ~tyvars f ty_args ty_ret =
-  let d = {fun_ty_vars= tyvars; fun_name= f; fun_args= ty_args; fun_ret= ty_ret} in
+  let d =
+    {fun_ty_vars= tyvars; fun_name= f; fun_args= ty_args; fun_ret= ty_ret}
+  in
   _mk ?loc (Stmt_decl d)
 
 let fun_def ?loc fr = _mk ?loc (Stmt_fun_def fr)
 
 let fun_rec ?loc fr = _mk ?loc (Stmt_fun_rec fr)
 
-let funs_rec ?loc decls bodies = _mk ?loc (Stmt_funs_rec {fsr_decls= decls; fsr_bodies= bodies})
+let funs_rec ?loc decls bodies =
+  _mk ?loc (Stmt_funs_rec {fsr_decls= decls; fsr_bodies= bodies})
 
 let data ?loc tyvars name constrs = _mk ?loc (Stmt_data (tyvars, name, constrs))
 
@@ -164,13 +184,18 @@ let pp_list ?(start = "") ?(stop = "") ?(sep = " ") pp out l =
   let rec pp_list l =
     match l with
     | x :: (_ :: _ as l) ->
-        pp out x ; Format.pp_print_string out sep ; Format.pp_print_cut out () ; pp_list l
+        pp out x ;
+        Format.pp_print_string out sep ;
+        Format.pp_print_cut out () ;
+        pp_list l
     | x :: [] ->
         pp out x
     | [] ->
         ()
   in
-  Format.pp_print_string out start ; pp_list l ; Format.pp_print_string out stop
+  Format.pp_print_string out start ;
+  pp_list l ;
+  Format.pp_print_string out stop
 
 let pp_tyvar = pp_str
 
@@ -206,9 +231,11 @@ let rec pp_term out (t : term) =
         | Match_case (c, [], rhs) ->
             fpf out "(@[<2>%s@ %a@])" c pp_term rhs
         | Match_case (c, vars, rhs) ->
-            fpf out "(@[<2>(@[%s@ %a@])@ %a@])" c (pp_list pp_str) vars pp_term rhs
+            fpf out "(@[<2>(@[%s@ %a@])@ %a@])" c (pp_list pp_str) vars pp_term
+              rhs
       in
-      fpf out "(@[<1>match@ %a@ @[<v>%a@]@])" pp_term lhs (pp_list pp_case) cases
+      fpf out "(@[<1>match@ %a@ @[<v>%a@]@])" pp_term lhs (pp_list pp_case)
+        cases
   | If (a, b, c) ->
       fpf out "(@[<hv1>ite %a@ %a@ %a@])" pp_term a pp_term b pp_term c
   | Fun (v, body) ->
@@ -231,9 +258,11 @@ let rec pp_term out (t : term) =
   | Cast (t, ty) ->
       fpf out "(@[<hv2>as@ @[%a@]@ @[%a@]@])" pp_term t pp_ty ty
   | Forall (vars, f) ->
-      fpf out "(@[<hv2>forall@ (@[%a@])@ %a@])" (pp_list pp_typed_var) vars pp_term f
+      fpf out "(@[<hv2>forall@ (@[%a@])@ %a@])" (pp_list pp_typed_var) vars
+        pp_term f
   | Exists (vars, f) ->
-      fpf out "(@[<hv2>exists@ (@[%a@])@ %a@])" (pp_list pp_typed_var) vars pp_term f
+      fpf out "(@[<hv2>exists@ (@[%a@])@ %a@])" (pp_list pp_typed_var) vars
+        pp_term f
 
 and pp_typed_var out (v, ty) = fpf out "(@[%s@ %a@])" v pp_ty ty
 
@@ -245,9 +274,12 @@ let pp_par pp_x out (ty_vars, x) =
       fpf out "(@[<2>par (@[%a@])@ (%a)@])" (pp_list pp_tyvar) ty_vars pp_x x
 
 let pp_fun_decl pp_arg out fd =
-  fpf out "%s@ (@[%a@])@ %a" fd.fun_name (pp_list pp_arg) fd.fun_args pp_ty fd.fun_ret
+  fpf out "%s@ (@[%a@])@ %a" fd.fun_name (pp_list pp_arg) fd.fun_args pp_ty
+    fd.fun_ret
 
-let pp_fr out fr = fpf out "@[<2>%a@ %a@]" (pp_fun_decl pp_typed_var) fr.fr_decl pp_term fr.fr_body
+let pp_fr out fr =
+  fpf out "@[<2>%a@ %a@]" (pp_fun_decl pp_typed_var) fr.fr_decl pp_term
+    fr.fr_body
 
 let pp_stmt out (st : statement) =
   match view st with
@@ -260,31 +292,42 @@ let pp_stmt out (st : statement) =
   | Stmt_prove (ty_vars, t) ->
       fpf out "(@[prove@ %a@])" (pp_par pp_term) (ty_vars, t)
   | Stmt_decl d ->
-      fpf out "(@[declare-fun@ %a@])" (pp_par (pp_fun_decl pp_ty)) (d.fun_ty_vars, d)
+      fpf out "(@[declare-fun@ %a@])"
+        (pp_par (pp_fun_decl pp_ty))
+        (d.fun_ty_vars, d)
   | Stmt_fun_def fr ->
-      fpf out "(@[<2>define-fun@ %a@])" (pp_par pp_fr) (fr.fr_decl.fun_ty_vars, fr)
+      fpf out "(@[<2>define-fun@ %a@])" (pp_par pp_fr)
+        (fr.fr_decl.fun_ty_vars, fr)
   | Stmt_fun_rec fr ->
-      fpf out "(@[<2>define-fun-rec@ %a@])" (pp_par pp_fr) (fr.fr_decl.fun_ty_vars, fr)
+      fpf out "(@[<2>define-fun-rec@ %a@])" (pp_par pp_fr)
+        (fr.fr_decl.fun_ty_vars, fr)
   | Stmt_funs_rec fsr ->
       let pp_decl' out d = fpf out "(@[<2>%a@])" (pp_fun_decl pp_typed_var) d in
-      fpf out "(@[<hv2>define-funs-rec@ (@[<v>%a@])@ (@[<v>%a@])@])" (pp_list pp_decl') fsr.fsr_decls
-        (pp_list pp_term) fsr.fsr_bodies
+      fpf out "(@[<hv2>define-funs-rec@ (@[<v>%a@])@ (@[<v>%a@])@])"
+        (pp_list pp_decl') fsr.fsr_decls (pp_list pp_term) fsr.fsr_bodies
   | Stmt_data (tyvars, name, cstors) ->
       let pp_cstor_arg out (sel, ty) = fpf out "(@[%s %a@])" sel pp_ty ty in
       let pp_cstor out c =
         if c.cstor_args = [] then fpf out "(%s)" c.cstor_name
-        else fpf out "(@[<1>%s@ %a@])" c.cstor_name (pp_list pp_cstor_arg) c.cstor_args
+        else
+          fpf out "(@[<1>%s@ %a@])" c.cstor_name (pp_list pp_cstor_arg)
+            c.cstor_args
       in
-      fpf out "(@[<hv2>declare-datatype@ %s@ (par@ (@[%a@])@ (@[<v>%a@])@]))" name (pp_list pp_tyvar) tyvars
-        (pp_list pp_cstor) cstors
+      fpf out "(@[<hv2>declare-datatype@ %s@ (par@ (@[%a@])@ (@[<v>%a@])@]))"
+        name (pp_list pp_tyvar) tyvars (pp_list pp_cstor) cstors
   | Stmt_datas (tyvars, l) ->
       let pp_cstor_arg out (sel, ty) = fpf out "(@[%s %a@])" sel pp_ty ty in
       let pp_cstor out c =
         if c.cstor_args = [] then fpf out "(%s)" c.cstor_name
-        else fpf out "(@[<1>%s@ %a@])" c.cstor_name (pp_list pp_cstor_arg) c.cstor_args
+        else
+          fpf out "(@[<1>%s@ %a@])" c.cstor_name (pp_list pp_cstor_arg)
+            c.cstor_args
       in
-      let pp_data out (s, cstors) = fpf out "(@[<2>%s@ @[<v>%a@]@])" s (pp_list pp_cstor) cstors in
-      fpf out "(@[<hv2>declare-datatypes@ (@[%a@])@ (@[<v>%a@])@])" (pp_list pp_tyvar) tyvars (pp_list pp_data) l
+      let pp_data out (s, cstors) =
+        fpf out "(@[<2>%s@ @[<v>%a@]@])" s (pp_list pp_cstor) cstors
+      in
+      fpf out "(@[<hv2>declare-datatypes@ (@[%a@])@ (@[<v>%a@])@])"
+        (pp_list pp_tyvar) tyvars (pp_list pp_data) l
   | Stmt_check_sat ->
       pp_str out "(check-sat)"
 
@@ -295,7 +338,9 @@ exception Parse_error of Loc.t option * string
 let () =
   Printexc.register_printer (function
     | Parse_error (loc, msg) ->
-        let pp out () = Format.fprintf out "parse error at %a:@ %s" Loc.pp_opt loc msg in
+        let pp out () =
+          Format.fprintf out "parse error at %a:@ %s" Loc.pp_opt loc msg
+        in
         Some (pp_to_string pp ())
     | _ ->
         None )

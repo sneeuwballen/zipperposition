@@ -18,18 +18,42 @@ let equal (a : t) b = a = b
 
 let hash (a : t) = Hashtbl.hash a
 
-let to_string = function Exists -> "∃" | Forall -> "∀" | Lambda -> "λ" | ForallTy -> "Π"
+let to_string = function
+  | Exists ->
+      "∃"
+  | Forall ->
+      "∀"
+  | Lambda ->
+      "λ"
+  | ForallTy ->
+      "Π"
 
 let pp out t = CCFormat.string out (to_string t)
 
 module TPTP = struct
-  let to_string = function Exists -> "?" | Forall -> "!" | ForallTy -> "!>" | Lambda -> "^"
+  let to_string = function
+    | Exists ->
+        "?"
+    | Forall ->
+        "!"
+    | ForallTy ->
+        "!>"
+    | Lambda ->
+        "^"
 
   let pp out t = CCFormat.string out (to_string t)
 end
 
 module ZF = struct
-  let to_string = function Exists -> "exists" | Forall -> "forall" | ForallTy -> "pi" | Lambda -> "fun"
+  let to_string = function
+    | Exists ->
+        "exists"
+    | Forall ->
+        "forall"
+    | ForallTy ->
+        "pi"
+    | Lambda ->
+        "fun"
 
   let pp out t = CCFormat.string out (to_string t)
 end

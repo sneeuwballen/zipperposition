@@ -22,14 +22,17 @@ type t = {lits: Literals.t; var: T.var; mutable hash: int}
 
 type ctx = t
 
-let equal c1 c2 = HVar.equal Type.equal c1.var c2.var && Lits.equal c1.lits c2.lits
+let equal c1 c2 =
+  HVar.equal Type.equal c1.var c2.var && Lits.equal c1.lits c2.lits
 
 let raw_lits t = t.lits
 
 (* TODO: compare types of extruded variables;
    if same type, instantiate with some specific "diamond" of that type
    and check for alpha-equiv *)
-let compare c1 c2 = CCOrd.(HVar.compare Type.compare c1.var c2.var <?> (Lits.compare, c1.lits, c2.lits))
+let compare c1 c2 =
+  CCOrd.(
+    HVar.compare Type.compare c1.var c2.var <?> (Lits.compare, c1.lits, c2.lits) )
 
 let hash_real c = Hash.combine3 42 (Literals.hash c.lits) (HVar.hash c.var)
 
@@ -52,12 +55,20 @@ let extract lits t =
     let var = HVar.make_unsafe ~ty:(T.ty t) ~-2 in
     let var_t = T.var var in
     (* replace [t] with [var] *)
-    let lits = Array.map (Literal.map (fun root_t -> T.replace root_t ~old:t ~by:var_t)) lits in
+    let lits =
+      Array.map
+        (Literal.map (fun root_t -> T.replace root_t ~old:t ~by:var_t))
+        lits
+    in
     Some (make_ lits var)
   else None
 
 let extract_exn lits t =
-  match extract lits t with None -> invalid_arg "ClauseContext.extract_exn" | Some c -> c
+  match extract lits t with
+  | None ->
+      invalid_arg "ClauseContext.extract_exn"
+  | Some c ->
+      c
 
 let trivial lits t =
   (* create fresh var to replace [t], negative to avoid collisions later *)

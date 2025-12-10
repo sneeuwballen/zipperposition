@@ -31,6 +31,7 @@ val input_of_file : string -> Input_format.t
     {!guess_input}.
     This is the recommended way of picking the input format for a given file. *)
 
-val parse_file : Input_format.t -> string -> UntypedAST.statement Iter.t or_error
+val parse_file :
+  Input_format.t -> string -> UntypedAST.statement Iter.t or_error
 (** [parse_file fmt file] parses the file using the parser for the
     given input format. *)

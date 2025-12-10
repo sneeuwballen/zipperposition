@@ -22,7 +22,8 @@ let is_uniqueness_axiom f =
     let is_uniqueness_cl ~var t =
       match T.view t with
       | T.AppBuiltin (Eq, l) ->
-          List.exists (fun t -> T.var_occurs ~var t) l && List.exists (fun t -> T.is_const t) l
+          List.exists (fun t -> T.var_occurs ~var t) l
+          && List.exists (fun t -> T.is_const t) l
       | _ ->
           false
     in
@@ -43,17 +44,30 @@ let process file =
   try
     let input = Parsing_utils.input_of_file file in
     let parsed = Parsing_utils.parse_file input file in
-    (match parsed with CCResult.Error e -> raise (Stop (CCString.replace ~sub:"\n" ~by:"  " e)) | _ -> ()) ;
+    ( match parsed with
+    | CCResult.Error e ->
+        raise (Stop (CCString.replace ~sub:"\n" ~by:"  " e))
+    | _ ->
+        () ) ;
     let ast = CCResult.get_exn parsed in
     let typed_ast =
-      TypeInference.infer_statements ?ctx:None ~on_var:(Input_format.on_var input)
-        ~on_undef:(Input_format.on_undef_id input) ~on_shadow:(Input_format.on_shadow input)
+      TypeInference.infer_statements ?ctx:None
+        ~on_var:(Input_format.on_var input)
+        ~on_undef:(Input_format.on_undef_id input)
+        ~on_shadow:(Input_format.on_shadow input)
         ~implicit_ty_args:false ast
     in
-    Util.debugf 5 "Parse: %s" (fun k -> k (match typed_ast with CCResult.Error e -> e | CCResult.Ok _ -> "OK")) ;
-    (match typed_ast with CCResult.Error e -> raise (Stop (CCString.replace ~sub:"\n" ~by:"  " e)) | _ -> ()) ;
-    if Iter.exists is_uniqueness_axiom @@ CCVector.to_iter (CCResult.get_exn typed_ast) then
-      CCFormat.printf "OK.@."
+    Util.debugf 5 "Parse: %s" (fun k ->
+        k (match typed_ast with CCResult.Error e -> e | CCResult.Ok _ -> "OK") ) ;
+    ( match typed_ast with
+    | CCResult.Error e ->
+        raise (Stop (CCString.replace ~sub:"\n" ~by:"  " e))
+    | _ ->
+        () ) ;
+    if
+      Iter.exists is_uniqueness_axiom
+      @@ CCVector.to_iter (CCResult.get_exn typed_ast)
+    then CCFormat.printf "OK.@."
     else CCFormat.printf "NOK.@."
   with
   | Stop reason ->

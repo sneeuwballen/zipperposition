@@ -31,11 +31,18 @@ let expand_otf_ body =
   if CCList.is_empty extra_args then body
   else
     let n = List.length extra_args in
-    T.app (T.DB.shift n body) (List.mapi (fun i ty -> T.bvar ~ty (n - 1 - i)) extra_args)
+    T.app (T.DB.shift n body)
+      (List.mapi (fun i ty -> T.bvar ~ty (n - 1 - i)) extra_args)
 
 (* compute a feature for a given position *)
 let rec gfpf ?(depth = 0) pos t =
-  let if_and_or t = match T.view t with T.AppBuiltin (Builtin.(And | Or), _) -> true | _ -> false in
+  let if_and_or t =
+    match T.view t with
+    | T.AppBuiltin (Builtin.(And | Or), _) ->
+        true
+    | _ ->
+        false
+  in
   let unfold t =
     if T.is_app t then T.as_app t
     else
@@ -59,13 +66,16 @@ let rec gfpf ?(depth = 0) pos t =
       else
         let args = List.filter (fun x -> not @@ T.is_type x) args in
         (*                 if we are sampling something of variable type, it might eta-expand *)
-        if T.is_var hd || Type.is_var (snd (Type.open_fun (Term.ty body))) then B
+        if T.is_var hd || Type.is_var (snd (Type.open_fun (Term.ty body))) then
+          B
         else
           let num_acutal_args = List.length args in
           let extra_args, _ = Type.open_fun (T.ty body) in
           (* arguments for eta-expansion *)
           if num_acutal_args >= i then
-            let arg = T.DB.shift (List.length extra_args) (List.nth args (i - 1)) in
+            let arg =
+              T.DB.shift (List.length extra_args) (List.nth args (i - 1))
+            in
             gfpf ~depth:(depth + exp_args_num) is arg
           else if num_acutal_args + List.length extra_args >= i then
             let exp_arg_idx = i - num_acutal_args in
@@ -169,7 +179,21 @@ let fp16 =
 
 (** {2 Index construction} *)
 
-let feat_to_int_ = function A -> 0 | B -> 1 | S _ -> 2 | N -> 3 | DB _ -> 4 | BI _ -> 5 | Ignore -> 6
+let feat_to_int_ = function
+  | A ->
+      0
+  | B ->
+      1
+  | S _ ->
+      2
+  | N ->
+      3
+  | DB _ ->
+      4
+  | BI _ ->
+      5
+  | Ignore ->
+      6
 
 let cmp_feature f1 f2 =
   match (f1, f2) with
@@ -188,9 +212,21 @@ let cmp_feature f1 f2 =
 let compatible_features_unif f1 f2 =
   match f1 with
   | S s1 -> (
-    match f2 with S s2 -> ID.equal s1 s2 | A | B | Ignore -> true | N | DB _ | BI _ -> false )
+    match f2 with
+    | S s2 ->
+        ID.equal s1 s2
+    | A | B | Ignore ->
+        true
+    | N | DB _ | BI _ ->
+        false )
   | BI b1 -> (
-    match f2 with BI b2 -> Builtin.equal b1 b2 | A | B | Ignore -> true | N | DB _ | S _ -> false )
+    match f2 with
+    | BI b2 ->
+        Builtin.equal b1 b2
+    | A | B | Ignore ->
+        true
+    | N | DB _ | S _ ->
+        false )
   | Ignore ->
       true
   | B ->
@@ -198,7 +234,13 @@ let compatible_features_unif f1 f2 =
   | A -> (
     match f2 with N -> false | DB _ | Ignore | S _ | A | B | BI _ -> true )
   | DB i -> (
-    match f2 with DB j -> i = j | B | A | Ignore -> true | S _ | N | BI _ -> false )
+    match f2 with
+    | DB j ->
+        i = j
+    | B | A | Ignore ->
+        true
+    | S _ | N | BI _ ->
+        false )
   | N -> (
     match f2 with N | B | Ignore -> true | A | DB _ | S _ | BI _ -> false )
 
@@ -232,7 +274,10 @@ module Make (X : Set.OrderedType) = struct
 
   type t = {trie: trie; fp: fingerprint_fun}
 
-  and trie = Empty | Node of trie FeatureMap.t | Leaf of Leaf.t  (** The index *)
+  and trie =
+    | Empty
+    | Node of trie FeatureMap.t
+    | Leaf of Leaf.t  (** The index *)
 
   let default_fp = fp7m
 
@@ -304,7 +349,8 @@ module Make (X : Set.OrderedType) = struct
             try
               let subtrie = FeatureMap.find f map in
               let subtrie = recurse subtrie features' in
-              if subtrie = Empty then FeatureMap.remove f map else FeatureMap.add f subtrie map
+              if subtrie = Empty then FeatureMap.remove f map
+              else FeatureMap.add f subtrie map
             with Not_found -> map
           in
           (* if the map is empty, use Empty *)
@@ -319,9 +365,11 @@ module Make (X : Set.OrderedType) = struct
     (* features of term *)
     {idx with trie= recurse idx.trie features}
 
-  let remove idx t data = remove_if idx t (fun leaf t -> Leaf.remove leaf t data)
+  let remove idx t data =
+    remove_if idx t (fun leaf t -> Leaf.remove leaf t data)
 
-  let update_leaf idx t data_filter = remove_if idx t (fun leaf t -> Leaf.update_leaf leaf t data_filter)
+  let update_leaf idx t data_filter =
+    remove_if idx t (fun leaf t -> Leaf.update_leaf leaf t data_filter)
 
   let remove_ trie = CCFun.uncurry (remove trie)
 
@@ -376,16 +424,20 @@ module Make (X : Set.OrderedType) = struct
           k leaf (* give the leaf to [k] *)
       | Node map, f :: features' ->
           (* fold on any subtrie that is compatible with current feature *)
-          FeatureMap.iter (fun f' subtrie -> if compatible f f' then recurse subtrie features') map
+          FeatureMap.iter
+            (fun f' subtrie -> if compatible f f' then recurse subtrie features')
+            map
       | Node _, [] | Leaf _, _ :: _ ->
           failwith "different feature length in fingerprint trie"
     in
-    try recurse idx.trie features ; ZProf.exit_prof _span with e -> ZProf.exit_prof _span ; raise e
+    try recurse idx.trie features ; ZProf.exit_prof _span
+    with e -> ZProf.exit_prof _span ; raise e
 
   let retrieve_unifiables_aux fold_unify (idx, sc_idx) t k =
     let features = idx.fp (fst t) in
     let compatible = compatible_features_unif in
-    traverse ~compatible idx features (fun leaf -> fold_unify (leaf, sc_idx) t k)
+    traverse ~compatible idx features (fun leaf ->
+        fold_unify (leaf, sc_idx) t k )
 
   let retrieve_unifiables = retrieve_unifiables_aux Leaf.fold_unify
 
@@ -396,12 +448,14 @@ module Make (X : Set.OrderedType) = struct
     let features = idx.fp (fst t) in
     (* compatible t1 t2 if t2 can match t1 *)
     let compatible f1 f2 = compatible_features_match f2 f1 in
-    traverse ~compatible idx features (fun leaf -> Leaf.fold_match ~subst (leaf, sc_idx) t k)
+    traverse ~compatible idx features (fun leaf ->
+        Leaf.fold_match ~subst (leaf, sc_idx) t k )
 
   let retrieve_specializations ?(subst = S.empty) (idx, sc_idx) t k =
     let features = idx.fp (fst t) in
     let compatible = compatible_features_match in
-    traverse ~compatible idx features (fun leaf -> Leaf.fold_matched ~subst (leaf, sc_idx) t k)
+    traverse ~compatible idx features (fun leaf ->
+        Leaf.fold_matched ~subst (leaf, sc_idx) t k )
 
   let to_dot _ _ = failwith "Fingerprint: to_dot not implemented"
 end

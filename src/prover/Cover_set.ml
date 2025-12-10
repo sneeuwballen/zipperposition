@@ -28,10 +28,13 @@ type t =
 module Case = struct
   type t = case
 
-  let equal a b = Ind_cst.equal a.case_top b.case_top && T.equal a.case_term b.case_term
+  let equal a b =
+    Ind_cst.equal a.case_top b.case_top && T.equal a.case_term b.case_term
 
   let compare a b =
-    CCOrd.Infix.(Ind_cst.compare a.case_top b.case_top <?> (Term.compare, a.case_term, b.case_term))
+    CCOrd.Infix.(
+      Ind_cst.compare a.case_top b.case_top
+      <?> (Term.compare, a.case_term, b.case_term) )
 
   let hash a = Hash.combine2 (Ind_cst.hash a.case_top) (T.hash a.case_term)
 
@@ -60,26 +63,37 @@ let ty t = Ind_cst.ty (top t)
 
 let cases ?(which = `All) (set : t) : case Iter.t =
   let seq = Iter.of_list set.cs_cases in
-  match which with `All -> seq | `Base -> Iter.filter Case.is_base seq | `Rec -> Iter.filter Case.is_rec seq
+  match which with
+  | `All ->
+      seq
+  | `Base ->
+      Iter.filter Case.is_base seq
+  | `Rec ->
+      Iter.filter Case.is_rec seq
 
 let pp out (set : t) : unit =
-  Format.fprintf out "(@[<hv2>coverset of type `@[%a@]`@ :top `%a`@ :cases [@[<hv>%a@]]@])" Type.pp (ty set)
-    Ind_cst.pp (top set) (Util.pp_list Case.pp) set.cs_cases
+  Format.fprintf out
+    "(@[<hv2>coverset of type `@[%a@]`@ :top `%a`@ :cases [@[<hv>%a@]]@])"
+    Type.pp (ty set) Ind_cst.pp (top set) (Util.pp_list Case.pp) set.cs_cases
 
 let skolems (c : t) = Iter.of_list c.cs_cases |> Iter.flat_map_l Case.skolems
 
-let sub_constants (set : t) = Iter.of_list set.cs_cases |> Iter.flat_map_l Case.sub_constants
+let sub_constants (set : t) =
+  Iter.of_list set.cs_cases |> Iter.flat_map_l Case.sub_constants
 
 (* type declarations required by [c] *)
 let declarations (set : t) =
   let decl_of_cst c = (Ind_cst.id c, Ind_cst.ty c) in
-  let seq1 = sub_constants set |> Iter.map decl_of_cst and seq2 = skolems set and top = decl_of_cst set.cs_top in
+  let seq1 = sub_constants set |> Iter.map decl_of_cst
+  and seq2 = skolems set
+  and top = decl_of_cst set.cs_top in
   Iter.cons top (Iter.append seq1 seq2)
 
 module State_ = struct
   (* state for creating coverset *)
   type t =
-    {cst: Ind_cst.Cst_set.t (* raw set of constants *); others: (ID.t * Type.t) list (* non-inductive terms *)}
+    { cst: Ind_cst.Cst_set.t (* raw set of constants *)
+    ; others: (ID.t * Type.t) list (* non-inductive terms *) }
 
   let empty = {cst= Ind_cst.Cst_set.empty; others= []}
 
@@ -134,7 +148,11 @@ module State_ = struct
 
   let rec map_l : ('a -> 'b mm) -> 'a list -> 'b list mm =
    fun f l ->
-    match l with [] -> yield [] | x :: tl -> f x >>>= fun x' -> map_l f tl >>>= fun tl' -> yield (x' :: tl')
+    match l with
+    | [] ->
+        yield []
+    | x :: tl ->
+        f x >>>= fun x' -> map_l f tl >>>= fun tl' -> yield (x' :: tl')
 
   let run : 'a mm -> t -> 'a list = fun m st -> List.map snd (m st)
 end
@@ -160,11 +178,14 @@ let make_coverset_ ~cover_set_depth ~depth (ty : Type.t) (ity : Ind_ty.t) : t =
      - member of the coverset (one of the t such that cst=t)
      - set of sub-constants of this term *)
   let rec make (cs_depth : int) (subst : Subst.t) : T.t mm =
-    Util.debugf ~section:Ind_ty.section 5 "(@[make_cover_set@ :ty %a@ :depth %d@ :subst %a@])" (fun k ->
+    Util.debugf ~section:Ind_ty.section 5
+      "(@[make_cover_set@ :ty %a@ :depth %d@ :subst %a@])" (fun k ->
         k Ind_ty.pp ity cs_depth Subst.pp subst ) ;
     (* leaves: fresh constants *)
     if cs_depth = 0 then
-      let ty = Subst.Ty.apply Subst.Renaming.none subst (ity.Ind_ty.ty_pattern, scope) in
+      let ty =
+        Subst.Ty.apply Subst.Renaming.none subst (ity.Ind_ty.ty_pattern, scope)
+      in
       decl_sub ty
     else
       (* inner nodes or base cases: constructors *)
@@ -185,19 +206,31 @@ let make_coverset_ ~cover_set_depth ~depth (ty : Type.t) (ity : Ind_ty.t) : t =
       let n_ty_params, ty_args_f, _ = Type.open_poly_fun ty_f_applied in
       assert (n_ty_params = 0) ;
       if ty_args_f = [] then
-        if cs_depth > 0 then yield (T.app (T.const ~ty:ty_f f) ty_params) (* only one answer : f *) else fail
+        if cs_depth > 0 then yield (T.app (T.const ~ty:ty_f f) ty_params)
+          (* only one answer : f *)
+        else fail
       else
         (* make fresh type variables and apply *)
-        map_l (make_of_ty (cs_depth - 1)) ty_args_f >>|= fun args -> T.app (T.const ~ty:ty_f f) (ty_params @ args)
+        map_l (make_of_ty (cs_depth - 1)) ty_args_f
+        >>|= fun args -> T.app (T.const ~ty:ty_f f) (ty_params @ args)
   (* return a new term of type [ty] *)
   and make_of_ty depth ty : T.t mm =
     let subst =
-      try Some (Unif.Ty.matching_same_scope ~pattern:ity.Ind_ty.ty_pattern ty ~scope) with Unif.Fail -> None
+      try
+        Some
+          (Unif.Ty.matching_same_scope ~pattern:ity.Ind_ty.ty_pattern ty ~scope)
+      with Unif.Fail -> None
     in
-    match subst with Some subst -> make depth subst (* previous case *) | None -> decl_sub ty
+    match subst with
+    | Some subst ->
+        make depth subst (* previous case *)
+    | None ->
+        decl_sub ty
     (* not an inductive sub-case, just create a skolem symbol *)
   in
-  let subst = Unif.Ty.matching_same_scope ~pattern:ity.Ind_ty.ty_pattern ty ~scope in
+  let subst =
+    Unif.Ty.matching_same_scope ~pattern:ity.Ind_ty.ty_pattern ty ~scope
+  in
   (* build the toplevel values, along with a list of sub-constants
      to declare *)
   let make_cases =
@@ -221,17 +254,23 @@ let make_coverset_ ~cover_set_depth ~depth (ty : Type.t) (ity : Ind_ty.t) : t =
 
 (* compute coverset on the fly, if need be *)
 let make ?(cover_set_depth = 1) ~depth (ty : Type.t) : t =
-  if cover_set_depth <= 0 then Util.invalid_argf "Cover_set.make: cover_set_depth=%d must be > 0" cover_set_depth ;
+  if cover_set_depth <= 0 then
+    Util.invalid_argf "Cover_set.make: cover_set_depth=%d must be > 0"
+      cover_set_depth ;
   match Ind_ty.as_inductive_type ty with
   | Some (ity, _) ->
       let set = make_coverset_ ~cover_set_depth ~depth ty ity in
-      Util.debugf ~section:Ind_ty.section 2 "@[<2>new coverset:@ %a@]" (fun k -> k pp set) ;
-      Util.debugf ~section:Ind_ty.section 5 "@[<2>sub-constants:@ @[<v>%a@]@]" (fun k ->
+      Util.debugf ~section:Ind_ty.section 2 "@[<2>new coverset:@ %a@]" (fun k ->
+          k pp set ) ;
+      Util.debugf ~section:Ind_ty.section 5 "@[<2>sub-constants:@ @[<v>%a@]@]"
+        (fun k ->
           let pp_case out case =
-            Format.fprintf out "@[<h>case %a: sub {@[<hv>%a@]}@]" Case.pp case (Util.pp_list ID.pp)
+            Format.fprintf out "@[<h>case %a: sub {@[<hv>%a@]}@]" Case.pp case
+              (Util.pp_list ID.pp)
               (Case.sub_constants case |> List.rev_map Ind_cst.id)
           in
           k (Util.pp_list pp_case) set.cs_cases ) ;
       set
   | None ->
-      Util.errorf ~where:"cover_set.make" "type `@[%a@]`@ is not an inductive type" Type.pp ty
+      Util.errorf ~where:"cover_set.make"
+        "type `@[%a@]`@ is not an inductive type" Type.pp ty

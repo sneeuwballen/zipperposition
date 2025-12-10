@@ -33,6 +33,7 @@ module type SUBSUMPTION_IDX = Index_intf.SUBSUMPTION_IDX
 
 module type EQUATION = Index_intf.EQUATION
 
-module BasicEquation : EQUATION with type t = Term.t * Term.t and type rhs = Term.t
+module BasicEquation :
+  EQUATION with type t = Term.t * Term.t and type rhs = Term.t
 
 module type UNIT_IDX = Index_intf.UNIT_IDX

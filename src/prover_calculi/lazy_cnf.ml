@@ -83,7 +83,8 @@ module Make (E : Env.S) : S with module Env = E = struct
             true )
     in
     if should_update c then
-      Ls.fold_eqn ~both:false ~ord:(E.Ctx.ord ()) ~eligible:C.Eligible.always (C.lits c)
+      Ls.fold_eqn ~both:false ~ord:(E.Ctx.ord ()) ~eligible:C.Eligible.always
+        (C.lits c)
       |> Iter.iter (fun (lhs, rhs, _, pos) ->
              let i, _ = Ls.Pos.cut pos in
              let lit = (C.lits c).(i) in
@@ -133,7 +134,10 @@ module Make (E : Env.S) : S with module Env = E = struct
   let init_ty_map () = Type.Tbl.add _ty_map Type.prop [T.true_; T.false_]
 
   let rec enum_bool_funs ~ty =
-    assert (Iter.for_all (fun ty -> Type.is_fun ty || Type.is_prop ty) (Type.Seq.sub ty)) ;
+    assert (
+      Iter.for_all
+        (fun ty -> Type.is_fun ty || Type.is_prop ty)
+        (Type.Seq.sub ty) ) ;
     let insert_defining_clauses id sym arg_combs table =
       List.iteri
         (fun i arg_comb ->
@@ -149,7 +153,9 @@ module Make (E : Env.S) : S with module Env = E = struct
     let create_members arg_ms ret_m =
       assert (not (CCList.is_empty ret_m)) ;
       let arg_combinations = CCList.cartesian_product arg_ms in
-      let arg_comb_num = List.fold_left (fun acc a -> acc * List.length a) 1 arg_ms in
+      let arg_comb_num =
+        List.fold_left (fun acc a -> acc * List.length a) 1 arg_ms
+      in
       let fun_table = CCArray.create arg_comb_num (List.hd ret_m) in
       let iter_funs () =
         let rec aux i k =
@@ -183,7 +189,8 @@ module Make (E : Env.S) : S with module Env = E = struct
       let ret_members = enum_bool_funs ~ty:ret in
       let new_members = create_members arg_members ret_members in
       Type.Tbl.add _ty_map ty new_members ;
-      Env.Ctx.declare_syms (List.map (fun t -> (T.head_exn t, T.ty t)) new_members) ;
+      Env.Ctx.declare_syms
+        (List.map (fun t -> (T.head_exn t, T.ty t)) new_members) ;
       Util.debugf ~section 2 "members of type @[%a@]@. >@[%a@]" (fun k ->
           k Type.pp ty (CCList.pp T.pp) new_members ) ;
       new_members
@@ -203,30 +210,46 @@ module Make (E : Env.S) : S with module Env = E = struct
       | T.AppBuiltin (Or, l) ->
           if sign then prod_l sign l else sum_l sign l
       | T.AppBuiltin (Imply, [a; b]) ->
-          if sign then prod_l true [T.Form.not_ a; b] else sum_l true [a; T.Form.not_ b]
-      | T.AppBuiltin (((Eq | Equiv | Neq | Xor) as hd), ([_; a; b] | [a; b])) when Type.is_prop (T.ty a) ->
+          if sign then prod_l true [T.Form.not_ a; b]
+          else sum_l true [a; T.Form.not_ b]
+      | T.AppBuiltin (((Eq | Equiv | Neq | Xor) as hd), ([_; a; b] | [a; b]))
+        when Type.is_prop (T.ty a) ->
           if Builtin.equal Eq hd || Builtin.equal Equiv hd then
-            aux true (T.Form.and_ (T.Form.or_ (T.Form.not_ a) b) (T.Form.or_ (T.Form.not_ b) a))
-          else aux true (T.Form.and_ (T.Form.or_ (T.Form.not_ a) (T.Form.not_ b)) (T.Form.or_ a b))
+            aux true
+              (T.Form.and_
+                 (T.Form.or_ (T.Form.not_ a) b)
+                 (T.Form.or_ (T.Form.not_ b) a) )
+          else
+            aux true
+              (T.Form.and_
+                 (T.Form.or_ (T.Form.not_ a) (T.Form.not_ b))
+                 (T.Form.or_ a b) )
       | T.AppBuiltin ((ForallConst | ExistsConst), [_; body]) ->
           let _, body = T.open_fun body in
           aux sign body
       | _ ->
           1
-    and sum_l sign xs = List.fold_left (fun acc f -> check_cl_size @@ (acc + aux sign f)) 0 xs
-    and prod_l sign xs = List.fold_left (fun acc f -> check_cl_size @@ (acc * aux sign f)) 1 xs in
+    and sum_l sign xs =
+      List.fold_left (fun acc f -> check_cl_size @@ (acc + aux sign f)) 0 xs
+    and prod_l sign xs =
+      List.fold_left (fun acc f -> check_cl_size @@ (acc * aux sign f)) 1 xs
+    in
     try
       let estimate = aux sign f in
-      Util.debugf ~section 1 "estimate(%b, @[%a@])=@[%d@]@." (fun k -> k sign T.pp f estimate) ;
+      Util.debugf ~section 1 "estimate(%b, @[%a@])=@[%d@]@." (fun k ->
+          k sign T.pp f estimate ) ;
       true
     with TooManyClauses ->
-      Util.debugf ~section 1 "estimate(%b, @[%a@])=too many@." (fun k -> k sign T.pp f) ;
+      Util.debugf ~section 1 "estimate(%b, @[%a@])=too many@." (fun k ->
+          k sign T.pp f ) ;
       false
 
   let check_size_limits sign f =
     let limit = Env.flex_get k_simp_limit in
     Util.debugf ~section 1 "checking limit: %d@." (fun k -> k limit) ;
-    Env.flex_get k_lazy_cnf_kind != `Simp || limit < 0 || estimate_num_clauses sign limit f
+    Env.flex_get k_lazy_cnf_kind != `Simp
+    || limit < 0
+    || estimate_num_clauses sign limit f
 
   let proof ~constructor ~name ~parents c =
     constructor ~rule:(Proof.Rule.mk name) (List.map C.proof_parent parents)
@@ -251,7 +274,8 @@ module Make (E : Env.S) : S with module Env = E = struct
       if yields_clauses lhs && yields_clauses rhs then
         CCOpt.map
           (fun (r, d, p) -> (app_sign r, d, p))
-          (FR.rename_form ~should_rename ~polarity_aware ~c (T.Form.equiv lhs rhs) sign)
+          (FR.rename_form ~should_rename ~polarity_aware ~c
+             (T.Form.equiv lhs rhs) sign )
       else if yields_clauses lhs then
         CCOpt.map
           (fun (r, d, p) -> (app_sign (T.Form.eq r rhs), d, p))
@@ -266,10 +290,16 @@ module Make (E : Env.S) : S with module Env = E = struct
   let mk_and ~proof_cons ~rule_name and_args c ?(parents = [c]) lit_idx =
     let lits = CCArray.except_idx (C.lits c) lit_idx in
     let proof = proof ~constructor:proof_cons ~parents ~name:rule_name c in
-    List.map (fun t -> C.create ~penalty:(C.penalty c) ~trail:(C.trail c) (L.mk_true t :: lits) proof) and_args
+    List.map
+      (fun t ->
+        C.create ~penalty:(C.penalty c) ~trail:(C.trail c) (L.mk_true t :: lits)
+          proof )
+      and_args
 
   let mk_or ~proof_cons ~rule_name or_args c ?(parents = [c]) lit_idx =
-    let lits = List.map L.mk_true or_args @ CCArray.except_idx (C.lits c) lit_idx in
+    let lits =
+      List.map L.mk_true or_args @ CCArray.except_idx (C.lits c) lit_idx
+    in
     let proof = proof ~constructor:proof_cons ~parents ~name:rule_name c in
     [C.create ~penalty:(C.penalty c) ~trail:(C.trail c) lits proof]
 
@@ -297,12 +327,18 @@ module Make (E : Env.S) : S with module Env = E = struct
           >>= fun (b, ty, body) ->
           maxiscoping_eligible xs
           >>= fun (b', ty', bodies) ->
-          if Builtin.equal b b' && Type.equal ty ty' then Some (b, ty, List.hd body :: bodies) else None
+          if Builtin.equal b b' && Type.equal ty ty' then
+            Some (b, ty, List.hd body :: bodies)
+          else None
     in
     let miniscope hd f =
       let distribute_quant hd ty bodies =
-        let quant_hd = if Builtin.equal hd Or then T.Form.exists else T.Form.forall in
-        let outer_hd = if Builtin.equal hd Or then T.Form.or_l else T.Form.and_l in
+        let quant_hd =
+          if Builtin.equal hd Or then T.Form.exists else T.Form.forall
+        in
+        let outer_hd =
+          if Builtin.equal hd Or then T.Form.or_l else T.Form.and_l
+        in
         outer_hd (List.map (fun t -> quant_hd (T.fun_ ty t)) bodies)
       in
       let f = Combs.expand f in
@@ -331,43 +367,59 @@ module Make (E : Env.S) : S with module Env = E = struct
           Some (T.Form.exists (T.fun_ ty (T.Form.or_l bodies)))
       | _ ->
           None )
-    | T.AppBuiltin (((ExistsConst | ForallConst) as b), [_; f]) when kind = `Mini ->
+    | T.AppBuiltin (((ExistsConst | ForallConst) as b), [_; f])
+      when kind = `Mini ->
         miniscope b f
     | _ ->
         None
 
-  let clausify_quant ~parent ~var_offset ~sign ~quant_body ~(quant_hd : Builtin.t) =
+  let clausify_quant ~parent ~var_offset ~sign ~quant_body
+      ~(quant_hd : Builtin.t) =
     let f = Combs.expand quant_body in
     let var_tys, body = T.open_fun f in
     assert (List.length var_tys = 1) ;
     let var_ty = List.hd var_tys in
     let hd, f =
       if sign then (quant_hd, f)
-      else ((if quant_hd = ForallConst then ExistsConst else ForallConst), T.fun_ var_ty (T.Form.not_ body))
+      else
+        ( (if quant_hd = ForallConst then ExistsConst else ForallConst)
+        , T.fun_ var_ty (T.Form.not_ body) )
     in
-    let rule_name = CCFormat.sprintf "lazy_cnf_%s" (if hd = ForallConst then "forall" else "exists") in
+    let rule_name =
+      CCFormat.sprintf "lazy_cnf_%s"
+        (if hd = ForallConst then "forall" else "exists")
+    in
     let subst_term =
       if hd = ForallConst then T.var @@ HVar.make ~ty:var_ty (var_offset + 1)
       else
         FR.get_skolem ~parent ~mode:(Env.flex_get k_skolem_mode) f
         |> CCFun.tap (fun t ->
-               CCOpt.iter (fun hd_id -> ID.set_payload hd_id (ID.Attr_skolem ID.K_lazy_cnf)) (T.head t) )
+               CCOpt.iter
+                 (fun hd_id ->
+                   ID.set_payload hd_id (ID.Attr_skolem ID.K_lazy_cnf) )
+                 (T.head t) )
     in
     let expand_quant = not @@ Env.flex_get Combinators.k_enable_combinators in
-    let res_t = Lambda.eta_reduce ~expand_quant @@ Lambda.snf @@ T.app f [subst_term] in
+    let res_t =
+      Lambda.eta_reduce ~expand_quant @@ Lambda.snf @@ T.app f [subst_term]
+    in
     (res_t, hd, subst_term, rule_name)
 
-  let lazy_clausify_driver ?(ignore_eq = false) ?(force_clausification = false) ~proof_cons c =
+  let lazy_clausify_driver ?(ignore_eq = false) ?(force_clausification = false)
+      ~proof_cons c =
     let return acc l = (Iter.append acc (Iter.of_list l), `Stop) in
     let continue acc = (acc, `Continue) in
     let eligible_to_ignore_eq ~ignore_eq lhs rhs =
       (not (check_eq_cnf_ordering_conditions lhs rhs))
-      || (ignore_eq && (not (T.is_true_or_false lhs)) && not (T.is_true_or_false rhs))
+      || ignore_eq
+         && (not (T.is_true_or_false lhs))
+         && not (T.is_true_or_false rhs)
     in
     Util.debugf ~section 3 "lazy_cnf(@[%a@])@." (fun k -> k C.pp c) ;
     let init = Iter.empty in
     let should_clausify sign f =
-      force_clausification || (Env.flex_get k_lazy_cnf_kind != `Ignore && check_size_limits sign f)
+      force_clausification
+      || (Env.flex_get k_lazy_cnf_kind != `Ignore && check_size_limits sign f)
     in
     fold_lits c
     |> Iter.fold_while
@@ -375,16 +427,23 @@ module Make (E : Env.S) : S with module Env = E = struct
            let i, _ = Ls.Pos.cut pos in
            let lit = (C.lits c).(i) in
            if L.is_predicate_lit lit then (
-             Util.debugf ~section 3 "  subformula:%d:@[%a@]" (fun k -> k i L.pp lit) ;
+             Util.debugf ~section 3 "  subformula:%d:@[%a@]" (fun k ->
+                 k i L.pp lit ) ;
              match T.view lhs with
-             | T.AppBuiltin (And, l) when List.length l >= 2 && should_clausify sign lhs ->
+             | T.AppBuiltin (And, l)
+               when List.length l >= 2 && should_clausify sign lhs ->
                  let rule_name = "lazy_cnf_and" in
                  if sign then return acc @@ mk_and ~proof_cons l c i ~rule_name
-                 else return acc @@ mk_or ~proof_cons (List.map T.Form.not_ l) c i ~rule_name
-             | T.AppBuiltin (Or, l) when List.length l >= 2 && should_clausify sign lhs ->
+                 else
+                   return acc
+                   @@ mk_or ~proof_cons (List.map T.Form.not_ l) c i ~rule_name
+             | T.AppBuiltin (Or, l)
+               when List.length l >= 2 && should_clausify sign lhs ->
                  let rule_name = "lazy_cnf_or" in
                  if sign then return acc @@ mk_or ~proof_cons l c i ~rule_name
-                 else return acc @@ mk_and ~proof_cons (List.map T.Form.not_ l) c i ~rule_name
+                 else
+                   return acc
+                   @@ mk_and ~proof_cons (List.map T.Form.not_ l) c i ~rule_name
              | T.AppBuiltin (Imply, [a; b]) when should_clausify sign lhs ->
                  let rule_name = "lazy_cnf_imply" in
                  if sign then
@@ -392,52 +451,81 @@ module Make (E : Env.S) : S with module Env = E = struct
                      force_clausification
                      || Env.flex_get k_lazy_cnf_kind != `Simp
                      || Env.flex_get k_clausify_implications
-                   then return acc @@ mk_or ~proof_cons [T.Form.not_ a; b] c i ~rule_name
+                   then
+                     return acc
+                     @@ mk_or ~proof_cons [T.Form.not_ a; b] c i ~rule_name
                    else continue acc
-                 else return acc @@ mk_and ~proof_cons [a; T.Form.not_ b] c i ~rule_name
-             | T.AppBuiltin (((Equiv | Xor) as hd), [a; b]) when should_clausify sign lhs ->
-                 let hd = if sign then hd else if hd = Equiv then Xor else Equiv in
+                 else
+                   return acc
+                   @@ mk_and ~proof_cons [a; T.Form.not_ b] c i ~rule_name
+             | T.AppBuiltin (((Equiv | Xor) as hd), [a; b])
+               when should_clausify sign lhs ->
+                 let hd =
+                   if sign then hd else if hd = Equiv then Xor else Equiv
+                 in
                  if eligible_to_ignore_eq ~ignore_eq a b then continue acc
                  else
-                   let rule_name = CCFormat.sprintf "lazy_cnf_%s" (if hd = Equiv then "equiv" else "xor") in
+                   let rule_name =
+                     CCFormat.sprintf "lazy_cnf_%s"
+                       (if hd = Equiv then "equiv" else "xor")
+                   in
                    if hd = Equiv then
                      return acc
                      @@ mk_or ~proof_cons ~rule_name [T.Form.not_ a; b] c i
                      @ mk_or ~proof_cons ~rule_name [a; T.Form.not_ b] c i
                    else
                      return acc
-                     @@ mk_or ~proof_cons ~rule_name [T.Form.not_ a; T.Form.not_ b] c i
+                     @@ mk_or ~proof_cons ~rule_name
+                          [T.Form.not_ a; T.Form.not_ b]
+                          c i
                      @ mk_or ~proof_cons ~rule_name [a; b] c i
              | T.AppBuiltin (((ForallConst | ExistsConst) as hd), [_; f])
-               when Env.flex_get k_lazy_cnf_kind != `Simp || not (Env.flex_get k_inf_quant) ->
+               when Env.flex_get k_lazy_cnf_kind != `Simp
+                    || not (Env.flex_get k_inf_quant) ->
                  let var_offset = T.Seq.max_var (C.Seq.vars c) + 1 in
                  let res, hd, subst_term, rule_name =
-                   clausify_quant ~parent:c ~var_offset ~sign ~quant_body:f ~quant_hd:hd
+                   clausify_quant ~parent:c ~var_offset ~sign ~quant_body:f
+                     ~quant_hd:hd
                  in
                  assert (Type.is_prop (T.ty res)) ;
                  let res_cl = mk_or ~proof_cons ~rule_name [res] c i in
-                 if Type.returns_prop (T.ty subst_term) && hd == ForallConst then (
+                 if Type.returns_prop (T.ty subst_term) && hd == ForallConst
+                 then (
                    assert (List.length res_cl == 1) ;
                    assert (T.is_var subst_term) ;
-                   Signal.send Env.on_pred_var_elimination (List.hd res_cl, subst_term) ) ;
+                   Signal.send Env.on_pred_var_elimination
+                     (List.hd res_cl, subst_term) ) ;
                  let sub_ty = T.ty subst_term in
-                 if Env.flex_get k_enum_bool_funs && Type.Seq.has_bools_only sub_ty then
+                 if
+                   Env.flex_get k_enum_bool_funs
+                   && Type.Seq.has_bools_only sub_ty
+                 then
                    let repls = enum_bool_funs ~ty:sub_ty in
                    if Env.flex_get k_replace_bool_fun_quants then
-                     let bodies = List.map (fun r -> Lambda.eta_reduce @@ Lambda.whnf (T.app f [r])) repls in
+                     let bodies =
+                       List.map
+                         (fun r ->
+                           Lambda.eta_reduce @@ Lambda.whnf (T.app f [r]) )
+                         repls
+                     in
                      return acc
                      @@
-                     if hd == ForallConst then mk_and ~proof_cons ~rule_name:"_inst_quant" bodies c i
+                     if hd == ForallConst then
+                       mk_and ~proof_cons ~rule_name:"_inst_quant" bodies c i
                      else mk_or ~proof_cons ~rule_name:"_inst_quant" bodies c i
                    else return acc res_cl
                  else return acc res_cl
              | _ ->
                  continue acc )
            else if Type.is_prop (T.ty lhs) && not (L.is_predicate_lit lit) then (
-             let rule_name = CCFormat.sprintf "lazy_cnf_%s" (if sign then "equiv" else "xor") in
+             let rule_name =
+               CCFormat.sprintf "lazy_cnf_%s" (if sign then "equiv" else "xor")
+             in
              Util.debugf ~section 3 "  subeq:%d:@[%a %s= %a@]" (fun k ->
                  k i T.pp lhs (if sign then "" else "~") T.pp rhs ) ;
-             if eligible_to_ignore_eq ~ignore_eq lhs rhs || not (check_size_limits sign (T.Form.equiv lhs rhs))
+             if
+               eligible_to_ignore_eq ~ignore_eq lhs rhs
+               || not (check_size_limits sign (T.Form.equiv lhs rhs))
              then continue acc
              else if sign then
                return acc
@@ -445,7 +533,9 @@ module Make (E : Env.S) : S with module Env = E = struct
                @ mk_or ~proof_cons ~rule_name [lhs; T.Form.not_ rhs] c i
              else
                return acc
-               @@ mk_or ~proof_cons ~rule_name [T.Form.not_ lhs; T.Form.not_ rhs] c i
+               @@ mk_or ~proof_cons ~rule_name
+                    [T.Form.not_ lhs; T.Form.not_ rhs]
+                    c i
                @ mk_or ~proof_cons ~rule_name [lhs; rhs] c i )
            else continue acc )
          init
@@ -453,13 +543,15 @@ module Make (E : Env.S) : S with module Env = E = struct
   let clausify_quants ~proof_cons c =
     C.lits c
     |> CCArray.find_map_i (fun i -> function
-         | Literal.Equation (lhs, _, _) as lit when Literal.is_predicate_lit lit -> (
+         | Literal.Equation (lhs, _, _) as lit when Literal.is_predicate_lit lit
+           -> (
            match T.view lhs with
            | T.AppBuiltin (((ForallConst | ExistsConst) as hd), [_; body]) ->
                let var_offset = T.Seq.max_var (C.Seq.vars c) + 1 in
                let sign = Literal.is_positivoid lit in
                let res, hd, subst_term, rule_name =
-                 clausify_quant ~parent:c ~var_offset ~sign ~quant_body:body ~quant_hd:hd
+                 clausify_quant ~parent:c ~var_offset ~sign ~quant_body:body
+                   ~quant_hd:hd
                in
                assert (Type.is_prop (T.ty res)) ;
                let res_cl = List.hd @@ mk_or ~proof_cons ~rule_name [res] c i in
@@ -473,16 +565,24 @@ module Make (E : Env.S) : S with module Env = E = struct
              None )
 
   let reduce_quantifiers c =
-    let proof_cons = Proof.Step.simp ~infos:[] ~tags:[Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth] in
-    clausify_quants ~proof_cons c |> CCOpt.map_or ~default:(SimplM.return_same c) SimplM.return_new
+    let proof_cons =
+      Proof.Step.simp ~infos:[]
+        ~tags:[Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth]
+    in
+    clausify_quants ~proof_cons c
+    |> CCOpt.map_or ~default:(SimplM.return_same c) SimplM.return_new
 
   let rename_subformulas c =
     Util.debugf ~section 3 "lazy-cnf-rename(@[%a@])@." (fun k -> k C.pp c) ;
-    let proof_cons = Proof.Step.simp ~infos:[] ~tags:[Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth] in
+    let proof_cons =
+      Proof.Step.simp ~infos:[]
+        ~tags:[Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth]
+    in
     let clausify_defs new_defs =
       List.fold_left
         (fun acc c ->
-          lazy_clausify_driver ~ignore_eq:false ~force_clausification:true ~proof_cons c
+          lazy_clausify_driver ~ignore_eq:false ~force_clausification:true
+            ~proof_cons c
           |> Iter.to_list
           |> fun l -> if CCList.is_empty l then c :: acc else l @ acc )
         [] new_defs
@@ -501,19 +601,27 @@ module Make (E : Env.S) : S with module Env = E = struct
               aux ~sign:(not sign) body
           | T.AppBuiltin (Builtin.Imply, [a; b]) ->
               (not sign) || aux ~sign:(not sign) a || aux ~sign b
-          | T.AppBuiltin (Builtin.(Eq | Equiv | Neq | Xor), ([a; b] | [_; a; b])) ->
+          | T.AppBuiltin (Builtin.(Eq | Equiv | Neq | Xor), ([a; b] | [_; a; b]))
+            ->
               (* if it is either an equivalence(xor) which yields at
                  least two clauses, or a complicated higher-order
                  disequation (between app-vars or lambdas) in which case
                  it is good to hide it under renamed formula and
                  delay reasoning about it *)
               Type.is_prop (T.ty a)
-              || T.Seq.subterms ~include_builtin:true f |> Iter.exists (fun x -> T.is_app_var x || T.is_fun x)
+              || T.Seq.subterms ~include_builtin:true f
+                 |> Iter.exists (fun x -> T.is_app_var x || T.is_fun x)
           | _ ->
               false
-        and aux_l sign = function [] -> false | x :: xs -> aux ~sign x || aux_l sign xs in
+        and aux_l sign = function
+          | [] ->
+              false
+          | x :: xs ->
+              aux ~sign x || aux_l sign xs
+        in
         let ans = aux ~sign f in
-        Util.debugf ~section 3 "@[%a@] will%s yield clauses@." (fun k -> k T.pp f (if ans then "" else " not")) ;
+        Util.debugf ~section 3 "@[%a@] will%s yield clauses@." (fun k ->
+            k T.pp f (if ans then "" else " not") ) ;
         ans
       in
       let num_occurences = Term.Tbl.get_or _form_counter f ~default:0 in
@@ -528,22 +636,32 @@ module Make (E : Env.S) : S with module Env = E = struct
            let i, _ = Ls.Pos.cut pos in
            let lit = (C.lits c).(i) in
            let proof_cons =
-             Proof.Step.simp ~infos:[] ~tags:[Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth]
+             Proof.Step.simp ~infos:[]
+               ~tags:[Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth]
            in
            let polarity_aware = Env.flex_get k_pa_renaming in
            let should_rename = should_rename sign in
            if L.is_predicate_lit lit && T.is_appbuiltin lhs then
-             match FR.rename_form ~should_rename ~polarity_aware ~c lhs sign with
+             match
+               FR.rename_form ~should_rename ~polarity_aware ~c lhs sign
+             with
              | Some (renamer, new_defs, parents) ->
                  Term.Tbl.remove _form_counter lhs ;
                  let rule_name = "renaming" in
                  let new_defs = clausify_defs new_defs in
-                 let renamer = (if sign then CCFun.id else T.Form.not_) renamer in
-                 let renamed = mk_or ~proof_cons ~rule_name [renamer] c ~parents:(c :: parents) i in
+                 let renamer =
+                   (if sign then CCFun.id else T.Form.not_) renamer
+                 in
+                 let renamed =
+                   mk_or ~proof_cons ~rule_name [renamer] c
+                     ~parents:(c :: parents) i
+                 in
                  let res = renamed @ new_defs in
-                 Util.debugf ~section 3 "  @[renamed subformula %d:(@[%a@])=@. @[%a@]@]@." (fun k ->
+                 Util.debugf ~section 3
+                   "  @[renamed subformula %d:(@[%a@])=@. @[%a@]@]@." (fun k ->
                      k i C.pp c (CCList.pp C.pp) renamed ) ;
-                 Util.debugf ~section 3 "  new defs:@[%a@]@." (fun k -> k (CCList.pp C.pp) new_defs) ;
+                 Util.debugf ~section 3 "  new defs:@[%a@]@." (fun k ->
+                     k (CCList.pp C.pp) new_defs ) ;
                  (Some res, `Stop)
              | None ->
                  (None, `Continue)
@@ -556,11 +674,16 @@ module Make (E : Env.S) : S with module Env = E = struct
              | Some (renamer, new_defs, parents) ->
                  let rule_name = "renaming" in
                  let new_defs = clausify_defs new_defs in
-                 let renamed = mk_or ~proof_cons ~rule_name [renamer] c ~parents:(c :: parents) i in
+                 let renamed =
+                   mk_or ~proof_cons ~rule_name [renamer] c
+                     ~parents:(c :: parents) i
+                 in
                  let res = renamed @ new_defs in
-                 Util.debugf ~section 3 "  @[renamed eq %d(@[%a@]) into @[%a@]@]@." (fun k ->
+                 Util.debugf ~section 3
+                   "  @[renamed eq %d(@[%a@]) into @[%a@]@]@." (fun k ->
                      k i L.pp (C.lits c).(i) (CCList.pp C.pp) renamed ) ;
-                 Util.debugf ~section 3 "  new defs:@[%a@]@." (fun k -> k (CCList.pp C.pp) new_defs) ;
+                 Util.debugf ~section 3 "  new defs:@[%a@]@." (fun k ->
+                     k (CCList.pp C.pp) new_defs ) ;
                  (Some res, `Stop)
              | None ->
                  (None, `Continue)
@@ -569,7 +692,8 @@ module Make (E : Env.S) : S with module Env = E = struct
 
   let inf_quantifiers c =
     let proof_cons =
-      Proof.Step.inference ~infos:[] ~tags:[Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth]
+      Proof.Step.inference ~infos:[]
+        ~tags:[Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth]
     in
     CCOpt.map_or ~default:[] (fun c -> [c]) @@ clausify_quants ~proof_cons c
 
@@ -581,7 +705,8 @@ module Make (E : Env.S) : S with module Env = E = struct
            let i, _ = Ls.Pos.cut pos in
            let lit = (C.lits c).(i) in
            let proof_cons =
-             Proof.Step.inference ~infos:[] ~tags:[Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth]
+             Proof.Step.inference ~infos:[]
+               ~tags:[Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth]
            in
            if
              (not (L.is_predicate_lit lit))
@@ -594,7 +719,9 @@ module Make (E : Env.S) : S with module Env = E = struct
                  mk_or ~proof_cons ~rule_name [T.Form.not_ lhs; rhs] c i
                  @ mk_or ~proof_cons ~rule_name [lhs; T.Form.not_ rhs] c i
                else
-                 mk_or ~proof_cons ~rule_name [T.Form.not_ lhs; T.Form.not_ rhs] c i
+                 mk_or ~proof_cons ~rule_name
+                   [T.Form.not_ lhs; T.Form.not_ rhs]
+                   c i
                  @ mk_or ~proof_cons ~rule_name [lhs; rhs] c i
              in
              let pen_inc =
@@ -602,14 +729,16 @@ module Make (E : Env.S) : S with module Env = E = struct
                else if T.is_app_var lhs || T.is_app_var rhs then 3
                else 1
              in
-             if Env.flex_get k_penalize_eq_cnf then List.iter (fun c -> C.inc_penalty c pen_inc) new_cls ;
+             if Env.flex_get k_penalize_eq_cnf then
+               List.iter (fun c -> C.inc_penalty c pen_inc) new_cls ;
              new_cls @ acc )
            else acc )
          []
     |> CCFun.tap (fun res ->
            Util.debugf ~section 3 "eq_elim(@[%a@])" (fun k -> k C.pp c) ;
            if CCList.is_empty res then Util.debugf ~section 3 "=∅" CCFun.id
-           else Util.debugf ~section 3 "=@[%a@]" (fun k -> k (CCList.pp C.pp) res) )
+           else
+             Util.debugf ~section 3 "=@[%a@]" (fun k -> k (CCList.pp C.pp) res) )
 
   let clausify_imp c =
     let rule_name = "imp_elim" in
@@ -619,14 +748,20 @@ module Make (E : Env.S) : S with module Env = E = struct
            let i, _ = Ls.Pos.cut pos in
            let lit = (C.lits c).(i) in
            let proof_cons =
-             Proof.Step.inference ~infos:[] ~tags:[Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth]
+             Proof.Step.inference ~infos:[]
+               ~tags:[Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth]
            in
-           if L.is_predicate_lit lit && Type.is_prop (T.ty lhs) && L.is_positivoid lit then
+           if
+             L.is_predicate_lit lit
+             && Type.is_prop (T.ty lhs)
+             && L.is_positivoid lit
+           then
              match lit with
              | L.Equation (lhs, rhs, true) when T.equal T.true_ rhs -> (
                match T.view lhs with
                | T.AppBuiltin (Imply, [prem; concl]) ->
-                   mk_or ~proof_cons ~rule_name [T.Form.not_ prem; concl] c i @ acc
+                   mk_or ~proof_cons ~rule_name [T.Form.not_ prem; concl] c i
+                   @ acc
                | _ ->
                    acc )
              | _ ->
@@ -641,7 +776,8 @@ module Make (E : Env.S) : S with module Env = E = struct
            let i, _ = Ls.Pos.cut pos in
            let lit = (C.lits c).(i) in
            let proof_cons =
-             Proof.Step.simp ~infos:[] ~tags:[Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth]
+             Proof.Step.simp ~infos:[]
+               ~tags:[Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth]
            in
            if L.is_predicate_lit lit && T.is_appbuiltin lhs then
              match cnf_scope_form lhs with
@@ -659,12 +795,18 @@ module Make (E : Env.S) : S with module Env = E = struct
 
   let lazy_clausify_simpl c =
     update_form_counter ~action:`Increase c ;
-    let proof_cons = Proof.Step.simp ~infos:[] ~tags:[Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth] in
-    let res = Iter.to_list @@ lazy_clausify_driver ~ignore_eq:true ~proof_cons c in
+    let proof_cons =
+      Proof.Step.simp ~infos:[]
+        ~tags:[Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth]
+    in
+    let res =
+      Iter.to_list @@ lazy_clausify_driver ~ignore_eq:true ~proof_cons c
+    in
     if not @@ CCList.is_empty res then (
       Util.debugf ~section 3 "lazy_cnf_simp(@[%a@])=" (fun k -> k C.pp c) ;
       Util.debugf ~section 3 "@[%a@]@." (fun k -> k (CCList.pp C.pp) res) ;
-      Util.debugf ~section 3 "proof:@[%a@]@." (fun k -> k (CCList.pp Proof.S.pp_tstp) (List.map C.proof res)) ;
+      Util.debugf ~section 3 "proof:@[%a@]@." (fun k ->
+          k (CCList.pp Proof.S.pp_tstp) (List.map C.proof res) ) ;
       update_form_counter ~action:`Decrease c ;
       CCList.iter (update_form_counter ~action:`Increase) res )
     else Util.debugf ~section 3 "lazy_cnf_simp(@[%a@])=Ø" (fun k -> k C.pp c) ;
@@ -672,9 +814,12 @@ module Make (E : Env.S) : S with module Env = E = struct
 
   let lazy_clausify_inf c =
     let proof_cons =
-      Proof.Step.inference ~infos:[] ~tags:[Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth]
+      Proof.Step.inference ~infos:[]
+        ~tags:[Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth]
     in
-    let res = Iter.to_list (lazy_clausify_driver ~ignore_eq:false ~proof_cons c) in
+    let res =
+      Iter.to_list (lazy_clausify_driver ~ignore_eq:false ~proof_cons c)
+    in
     if not @@ CCList.is_empty res then (
       Util.debugf ~section 3 "lazy_cnf_inf(@[%a@])=" (fun k -> k C.pp c) ;
       Util.debugf ~section 3 "@[%a@]@." (fun k -> k (CCList.pp C.pp) res) )
@@ -684,27 +829,37 @@ module Make (E : Env.S) : S with module Env = E = struct
   let setup () =
     if !enabled then (
       let handler f c = f c ; Signal.ContinueListening in
-      Signal.on E.ProofState.PassiveSet.on_add_clause (handler (update_form_counter ~action:`Increase)) ;
-      Signal.on E.ProofState.ActiveSet.on_add_clause (handler (update_form_counter ~action:`Increase)) ;
-      Signal.on E.ProofState.PassiveSet.on_remove_clause (handler (update_form_counter ~action:`Decrease)) ;
-      Signal.on E.ProofState.ActiveSet.on_remove_clause (handler (update_form_counter ~action:`Decrease)) ;
+      Signal.on E.ProofState.PassiveSet.on_add_clause
+        (handler (update_form_counter ~action:`Increase)) ;
+      Signal.on E.ProofState.ActiveSet.on_add_clause
+        (handler (update_form_counter ~action:`Increase)) ;
+      Signal.on E.ProofState.PassiveSet.on_remove_clause
+        (handler (update_form_counter ~action:`Decrease)) ;
+      Signal.on E.ProofState.ActiveSet.on_remove_clause
+        (handler (update_form_counter ~action:`Decrease)) ;
       (* Env.Ctx.lost_completeness (); *)
       ( match Env.flex_get k_lazy_cnf_kind with
       | `Inf | `Ignore ->
           Env.add_unary_inf "lazy_cnf" lazy_clausify_inf ;
-          if Env.flex_get k_simplify_quant then Env.add_basic_simplify reduce_quantifiers
+          if Env.flex_get k_simplify_quant then
+            Env.add_basic_simplify reduce_quantifiers
       | `Simp ->
           Env.add_unary_inf "elim eq" clausify_eq ;
-          if not (Env.flex_get k_clausify_implications) then Env.add_unary_inf "inf_imp" clausify_imp ;
-          if Env.flex_get k_inf_quant then Env.add_unary_inf "inf_quant" inf_quantifiers ;
+          if not (Env.flex_get k_clausify_implications) then
+            Env.add_unary_inf "inf_imp" clausify_imp ;
+          if Env.flex_get k_inf_quant then
+            Env.add_unary_inf "inf_quant" inf_quantifiers ;
           Env.add_multi_simpl_rule ~priority:5 lazy_clausify_simpl ;
-          if Env.flex_get k_lazy_cnf_eager then Env.add_cheap_multi_simpl_rule lazy_clausify_simpl ) ;
+          if Env.flex_get k_lazy_cnf_eager then
+            Env.add_cheap_multi_simpl_rule lazy_clausify_simpl ) ;
       (* ** IMPORTANT **
          Due to correctly set priorioty, renaming will run before simplification *)
       if Env.flex_get k_renaming_threshold > 0 then (
         Env.add_multi_simpl_rule ~priority:4 rename_subformulas ;
-        if Env.flex_get k_lazy_cnf_eager then Env.add_cheap_multi_simpl_rule rename_subformulas ) ;
-      if Env.flex_get k_scoping != `Off then Env.add_multi_simpl_rule ~priority:3 cnf_scope )
+        if Env.flex_get k_lazy_cnf_eager then
+          Env.add_cheap_multi_simpl_rule rename_subformulas ) ;
+      if Env.flex_get k_scoping != `Off then
+        Env.add_multi_simpl_rule ~priority:3 cnf_scope )
 end
 
 let _lazy_cnf_kind = ref `Simp
@@ -764,20 +919,23 @@ let extension =
 let () =
   Options.add_opts
     [ ("--lazy-cnf", Arg.Bool (( := ) enabled), " turn on lazy clausification")
-    ; ("--lazy-cnf-eager", Arg.Bool (( := ) _eager_lcnf), " apply the rule to every newly created clause")
+    ; ( "--lazy-cnf-eager"
+      , Arg.Bool (( := ) _eager_lcnf)
+      , " apply the rule to every newly created clause" )
     ; ( "--lazy-cnf-only-eligible-lits"
       , Arg.Bool (( := ) _only_eligible)
       , " apply lazy clausification only on eligible literals" )
     ; ( "--lazy-cnf-clausify-max-eq"
       , Arg.Bool (( := ) _clausify_eq_max_noninterpreted)
-      , " enable/disable clausification of an EQ literal if max side is non-interpreted " )
+      , " enable/disable clausification of an EQ literal if max side is \
+         non-interpreted " )
     ; ( "--lazy-cnf-clausify-implications"
       , Arg.Bool (( := ) _clausify_impls)
       , " apply simplifying clausification to implications" )
     ; ( "--lazy-cnf-simp-depth-limit"
       , Arg.Int (( := ) _simp_limit)
-      , " apply simplifying clausification only to formulas that would yield less than N"
-        ^ " clauses; negative value is interpreted as infinity" )
+      , " apply simplifying clausification only to formulas that would yield \
+         less than N" ^ " clauses; negative value is interpreted as infinity" )
     ; ( "--lazy-cnf-scoping"
       , Arg.Symbol
           ( ["off"; "mini"; "maxi"]
@@ -794,10 +952,12 @@ let () =
       , " use mini/maxi scoping rules for lazy cnf" )
     ; ( "--lazy-cnf-renaming-threshold"
       , Arg.Int (( := ) _renaming_threshold)
-      , " set the subformula renaming threshold -- negative value turns renaming off" )
+      , " set the subformula renaming threshold -- negative value turns \
+         renaming off" )
     ; ( "--polarity-aware-renaming"
       , Arg.Bool (fun v -> _pa_renaming := v)
-      , " enable/disable polarity aware renaming (introducing clause with only one definition polarity)" )
+      , " enable/disable polarity aware renaming (introducing clause with only \
+         one definition polarity)" )
     ; ( "--lazy-cnf-skolem-mode"
       , Arg.Symbol
           ( ["skolem-recycle"; "skolem-fresh"; "choice"]
@@ -825,17 +985,23 @@ let () =
                   _lazy_cnf_kind := `Ignore
               | _ ->
                   assert false )
-      , " use lazy cnf as either simplification, inference, or let calculus clausify" )
-    ; ("--lazy-cnf-rename-eq", Arg.Bool (( := ) _rename_eq), " turn on/of renaming of boolean equalities")
+      , " use lazy cnf as either simplification, inference, or let calculus \
+         clausify" )
+    ; ( "--lazy-cnf-rename-eq"
+      , Arg.Bool (( := ) _rename_eq)
+      , " turn on/of renaming of boolean equalities" )
     ; ( "--lazy-cnf-simplify-quant"
       , Arg.Bool (( := ) _simp_quant)
-      , " when non-simplifying clausification is used, clausify quantifiers in a simplifying manner" )
+      , " when non-simplifying clausification is used, clausify quantifiers in \
+         a simplifying manner" )
     ; ( "--lazy-cnf-inf-quant"
       , Arg.Bool (( := ) _inf_quant)
-      , " when simplifying clausification is used, clausify quantifiers in a non-simplifying manner" )
+      , " when simplifying clausification is used, clausify quantifiers in a \
+         non-simplifying manner" )
     ; ( "--enum-bool-funs"
       , Arg.Bool (( := ) _enum_bool_funs)
-      , " enumerate all functions over Boolean domain (up to the order of the problem)" )
+      , " enumerate all functions over Boolean domain (up to the order of the \
+         problem)" )
     ; ( "--replace-bool-quant-fun"
       , Arg.Bool (( := ) _replace_bool_fun_quant)
       , " replace Boolean fun quantifier with all possible values" )

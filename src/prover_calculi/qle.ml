@@ -39,7 +39,8 @@ module Make (E : Env.S) : S with module Env = E = struct
     Env.remove_simpl (Iter.singleton c)
 
   let do_qle pure_only c_iter =
-    Util.debugf ~section 2 "init: @[%a@]@." (fun k -> k (Iter.pp_seq C.pp) c_iter) ;
+    Util.debugf ~section 2 "init: @[%a@]@." (fun k ->
+        k (Iter.pp_seq C.pp) c_iter ) ;
     let add_SAT_clause c = SAT.add_clause ~proof:Proof.Step.trivial c in
     let pred_of_lit lit =
       match lit with
@@ -70,10 +71,12 @@ module Make (E : Env.S) : S with module Env = E = struct
         let mk_quasipure_clauses special =
           Array.map
             (fun ((pol, pred) as lit) ->
-              let make_lit_pos, use_pos_var = if lit = special then (false, not pol) else (true, pol) in
+              let make_lit_pos, use_pos_var =
+                if lit = special then (false, not pol) else (true, pol)
+              in
               let pos_var, neg_var = ID.Tbl.find all_syms pred in
-              (if use_pos_var then pos_var else neg_var) |> if make_lit_pos then fun lit -> lit else SAT.Lit.neg
-              )
+              (if use_pos_var then pos_var else neg_var)
+              |> if make_lit_pos then fun lit -> lit else SAT.Lit.neg )
             pred_subcl
           |> Array.to_list |> add_SAT_clause
         in
@@ -81,10 +84,13 @@ module Make (E : Env.S) : S with module Env = E = struct
         Array.iter
           (fun (_, pred) ->
             if not (ID.Tbl.mem all_syms pred) then
-              ID.Tbl.replace all_syms pred (BBox.make_fresh (), BBox.make_fresh ()) )
+              ID.Tbl.replace all_syms pred
+                (BBox.make_fresh (), BBox.make_fresh ()) )
           pred_subcl ;
         (* Create a number of SAT clauses for each clause. *)
-        Array.iter (if pure_only then mk_pure_clauses else mk_quasipure_clauses) pred_subcl )
+        Array.iter
+          (if pure_only then mk_pure_clauses else mk_quasipure_clauses)
+          pred_subcl )
       c_iter ;
     (* Make sure that deep, higher-order occurrences of predicate symbols are
        protected by other symbols. If pure_only is true, prevent such symbols
@@ -94,7 +100,8 @@ module Make (E : Env.S) : S with module Env = E = struct
         let forget_or_protect_syms =
           Iter.iter (fun bad ->
               if ID.Tbl.mem all_syms bad then (
-                if pure_only then ID.Tbl.update all_syms ~f:(fun _ _ -> None) ~k:bad
+                if pure_only then
+                  ID.Tbl.update all_syms ~f:(fun _ _ -> None) ~k:bad
                 else
                   let bad_pos_var, bad_neg_var = ID.Tbl.find all_syms bad in
                   let mk_clause bad_var =
@@ -114,7 +121,9 @@ module Make (E : Env.S) : S with module Env = E = struct
             match lit with
             | L.Equation (lhs, _, _) when L.is_predicate_lit lit ->
                 if T.is_const (T.head_term lhs) then
-                  let bad_syms = Iter.flat_map T.Seq.symbols (Iter.of_list (T.args lhs)) in
+                  let bad_syms =
+                    Iter.flat_map T.Seq.symbols (Iter.of_list (T.args lhs))
+                  in
                   forget_or_protect_syms bad_syms
                 else forget_or_protect_syms (T.Seq.symbols lhs)
             | L.Equation (lhs, rhs, _) ->
@@ -126,7 +135,8 @@ module Make (E : Env.S) : S with module Env = E = struct
       c_iter ;
     (* For each predicate p, generate a SAT clause ~p+ \/ ~p-. *)
     Iter.iter
-      (fun (pos_var, neg_var) -> add_SAT_clause [SAT.Lit.neg pos_var; SAT.Lit.neg neg_var])
+      (fun (pos_var, neg_var) ->
+        add_SAT_clause [SAT.Lit.neg pos_var; SAT.Lit.neg neg_var] )
       (ID.Tbl.values all_syms) ;
     let unknown_syms = ID.Tbl.copy all_syms in
     let quasipure_syms = ID.Tbl.create 32 in
@@ -151,7 +161,11 @@ module Make (E : Env.S) : S with module Env = E = struct
             ID.Tbl.remove unknown_syms pred ) )
         (ID.Tbl.to_iter unknown_syms) ;
       generate_nontrivial_solution_SAT_clause () ;
-      match SAT.check ~full:true () with Sat_solver.Sat -> maximize_valuation () | _ -> ()
+      match SAT.check ~full:true () with
+      | Sat_solver.Sat ->
+          maximize_valuation ()
+      | _ ->
+          ()
     in
     let filter_clauses () =
       let is_quasipure_lit lit =
@@ -164,11 +178,15 @@ module Make (E : Env.S) : S with module Env = E = struct
         | _ ->
             false
       in
-      let contains_quasipure_sym c = CCArray.exists is_quasipure_lit (C.lits c) in
+      let contains_quasipure_sym c =
+        CCArray.exists is_quasipure_lit (C.lits c)
+      in
       Util.debugf ~section 1
         (if pure_only then "pure syms: @[%a@]" else "quasipure syms: @[%a@]")
         (fun k -> k (CCList.pp ID.pp) (ID.Tbl.keys_list quasipure_syms)) ;
-      Iter.iter (fun c -> if contains_quasipure_sym c then remove_from_proof_state c) c_iter
+      Iter.iter
+        (fun c -> if contains_quasipure_sym c then remove_from_proof_state c)
+        c_iter
     in
     Util.debugf ~section 1 "In do_qle()@." CCFun.id ;
     generate_nontrivial_solution_SAT_clause () ;
@@ -195,8 +213,11 @@ module Make (E : Env.S) : S with module Env = E = struct
   let setup () =
     if E.flex_get k_enabled then
       if not (Env.flex_get A.k_avatar_enabled) then
-        if E.flex_get k_inprocessing then E.add_clause_elimination_rule ~priority:4 "qle" inprocessing
-        else Signal.once Env.on_start (fun () -> do_qle (E.flex_get k_pure_only) (get_clauses ()))
+        if E.flex_get k_inprocessing then
+          E.add_clause_elimination_rule ~priority:4 "qle" inprocessing
+        else
+          Signal.once Env.on_start (fun () ->
+              do_qle (E.flex_get k_pure_only) (get_clauses ()) )
       else CCFormat.printf "AVATAR is not yet compatible with QLE@."
 end
 
@@ -218,11 +239,20 @@ let extension =
     E.flex_add k_pure_only !_pure_only ;
     QLE.setup ()
   in
-  {Extensions.default with Extensions.name= "qle"; prio= 40; env_actions= [action]}
+  { Extensions.default with
+    Extensions.name= "qle"
+  ; prio= 40
+  ; env_actions= [action] }
 
 let () =
   Options.add_opts
     [ ("--qle", Arg.Bool (( := ) _enabled), " enable/disable QLE")
-    ; ("--qle-inprocessing", Arg.Bool (( := ) _inprocessing), " QLE as inprocessing rule")
-    ; ("--qle-check-at", Arg.Int (( := ) _check_at), " QLE inprocessing periodicity")
-    ; ("--qle-pure-only", Arg.Bool (( := ) _pure_only), " restrict QLE to pure literals") ]
+    ; ( "--qle-inprocessing"
+      , Arg.Bool (( := ) _inprocessing)
+      , " QLE as inprocessing rule" )
+    ; ( "--qle-check-at"
+      , Arg.Int (( := ) _check_at)
+      , " QLE inprocessing periodicity" )
+    ; ( "--qle-pure-only"
+      , Arg.Bool (( := ) _pure_only)
+      , " restrict QLE to pure literals" ) ]

@@ -16,7 +16,8 @@ module PT = struct
   let _const ~ty s = PT.const ~ty (ID.make s)
 
   (* strict subterms *)
-  let rec shrink t = QA.Iter.append (TypedSTerm.Seq.subterms t |> Iter.drop 1) (shrink_sub t)
+  let rec shrink t =
+    QA.Iter.append (TypedSTerm.Seq.subterms t |> Iter.drop 1) (shrink_sub t)
 
   (* shrink immediate subterms *)
   and shrink_sub t =
@@ -100,8 +101,12 @@ module PT = struct
     let var_z = Var.of_string ~ty:ty_term "Z" in
     let var_f = Var.of_string ~ty:(PT.Ty.fun_ [ty_term] ty_term) "F" in
     let var_g = Var.of_string ~ty:(PT.Ty.fun_ [ty_term] ty_term) "G" in
-    let var_f2 = Var.of_string ~ty:(PT.Ty.fun_ [ty_term; ty_term] ty_term) "F2" in
-    let var_g2 = Var.of_string ~ty:(PT.Ty.fun_ [ty_term; ty_term] ty_term) "G2" in
+    let var_f2 =
+      Var.of_string ~ty:(PT.Ty.fun_ [ty_term; ty_term] ty_term) "F2"
+    in
+    let var_g2 =
+      Var.of_string ~ty:(PT.Ty.fun_ [ty_term; ty_term] ty_term) "G2"
+    in
     let x = PT.var var_x in
     let y = PT.var var_y in
     let z = PT.var var_z in
@@ -125,7 +130,8 @@ module PT = struct
               ; (1, map3 ite self self self) ]
             in
             let lf_list =
-              [(2, map2 app1 (oneofl [vf; vg]) self); (2, map3 app2 (oneofl [vf2; vg2]) self self)]
+              [ (2, map2 app1 (oneofl [vf; vg]) self)
+              ; (2, map3 app2 (oneofl [vf2; vg2]) self self) ]
             in
             let g_fun_t gen = map2 lam (oneofl [var_x; var_y; var_z]) gen in
             let g_fun_f1 = map2 lam (oneofl [var_f; var_g]) self in
@@ -187,7 +193,9 @@ end
 
 let rec shrink t =
   let subterms_same_ty =
-    T.Seq.subterms t |> Iter.drop 1 |> Iter.filter (fun t' -> Type.equal (T.ty t) (T.ty t') && T.DB.is_closed t')
+    T.Seq.subterms t |> Iter.drop 1
+    |> Iter.filter (fun t' ->
+           Type.equal (T.ty t) (T.ty t') && T.DB.is_closed t' )
   in
   QA.Iter.append subterms_same_ty (shrink_sub t)
 
@@ -221,9 +229,11 @@ let ctx = Term.Conv.create ()
 
 let default_g = QCheck.Gen.map (Term.Conv.of_simple_term_exn ctx) PT.default_g
 
-let default_lfho_g = QCheck.Gen.map (Term.Conv.of_simple_term_exn ctx) PT.default_lfho_g
+let default_lfho_g =
+  QCheck.Gen.map (Term.Conv.of_simple_term_exn ctx) PT.default_lfho_g
 
-let default_ho_g = QCheck.Gen.map (Term.Conv.of_simple_term_exn ctx) PT.default_ho_g
+let default_ho_g =
+  QCheck.Gen.map (Term.Conv.of_simple_term_exn ctx) PT.default_ho_g
 
 let default = mk_ default_g
 
@@ -231,9 +241,11 @@ let default_lfho = mk_ default_lfho_g
 
 let default_ho = mk_ default_ho_g
 
-let default_fuel f = QA.Gen.map (Term.Conv.of_simple_term_exn ctx) (PT.default_fuel f)
+let default_fuel f =
+  QA.Gen.map (Term.Conv.of_simple_term_exn ctx) (PT.default_fuel f)
 
-let default_ho_fuel f = QA.Gen.map (Term.Conv.of_simple_term_exn ctx) (PT.default_ho_fuel f)
+let default_ho_fuel f =
+  QA.Gen.map (Term.Conv.of_simple_term_exn ctx) (PT.default_ho_fuel f)
 
 let ground_g = QCheck.Gen.map (Term.Conv.of_simple_term_exn ctx) PT.ground_g
 
@@ -251,7 +263,10 @@ let pos t =
         PB.to_pos pb
     | T.AppBuiltin (_, l) | T.App (_, l) ->
         let len = List.length l in
-        oneof (stop :: List.mapi (fun i t' -> recurse t' (PB.arg (len - 1 - i) pb)) l) st
+        oneof
+          ( stop
+          :: List.mapi (fun i t' -> recurse t' (PB.arg (len - 1 - i) pb)) l )
+          st
     | T.Fun (_, bod) ->
         oneof [stop; recurse bod (PB.body pb)] st
   in

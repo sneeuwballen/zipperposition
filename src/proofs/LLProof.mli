@@ -39,8 +39,10 @@ type step =
   | Instantiate of {form: t; inst: inst; tags: tag list}
   | Esa of name * t list
   | Inference of
-      { intros: term list (* local renaming for the conclusion's foralls, with fresh constants *)
-      ; local_intros: term list (* variables introduced between hypothesis, not in conclusion *)
+      { intros: term list
+            (* local renaming for the conclusion's foralls, with fresh constants *)
+      ; local_intros: term list
+            (* variables introduced between hypothesis, not in conclusion *)
       ; name: name
       ; parents: parent list
       ; tags: tag list }
@@ -99,7 +101,14 @@ val instantiate : ?tags:tag list -> form -> t -> inst -> t
 
 val esa : form -> name -> t list -> t
 
-val inference : intros:term list -> local_intros:term list -> tags:tag list -> form -> name -> parent list -> t
+val inference :
+     intros:term list
+  -> local_intros:term list
+  -> tags:tag list
+  -> form
+  -> name
+  -> parent list
+  -> t
 
 (** {2 Checking steps} *)
 

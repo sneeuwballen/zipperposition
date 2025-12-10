@@ -66,7 +66,8 @@ type t =
   | Greater
   | Greatereq
   | Box_opaque  (** hint not to open this formula *)
-  | Pseudo_de_bruijn of int  (** magic to embed De Bruijn indices in normal terms *)
+  | Pseudo_de_bruijn of int
+      (** magic to embed De Bruijn indices in normal terms *)
   | BComb  (** BCIKS combinators *)
   | CComb
   | IComb
@@ -358,7 +359,8 @@ module ArithOp : sig
 
   val abs : t -> t (* absolute value *)
 
-  val divides : t -> t -> bool (* [divides a b] returns true if [a] divides [b] *)
+  val divides :
+    t -> t -> bool (* [divides a b] returns true if [a] divides [b] *)
 
   val gcd : t -> t -> t (* gcd of two ints, 1 for other types *)
 

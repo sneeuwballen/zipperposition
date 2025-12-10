@@ -75,7 +75,8 @@ module type S = sig
   type term_norm_rule = Term.t -> Term.t option
 
   (** Rewrite rule on literals *)
-  type lit_rewrite_rule = Literal.t -> (Literal.t * Proof.parent list * Proof.tag list) option
+  type lit_rewrite_rule =
+    Literal.t -> (Literal.t * Proof.parent list * Proof.tag list) option
 
   (** (maybe) rewrite a clause to a set of clauses.
       Must return [None] if the clause is unmodified *)
@@ -175,7 +176,8 @@ module type S = sig
   (** Add a generation rule with assigned priority.
       Rules with higher priority will be tried first. *)
 
-  val add_clause_elimination_rule : priority:int -> string -> clause_elim_rule -> unit
+  val add_clause_elimination_rule :
+    priority:int -> string -> clause_elim_rule -> unit
 
   val cr_skip : _ conversion_result
 
@@ -219,7 +221,8 @@ module type S = sig
       First argument is the original clause c and the second one is Some c'
       if c simplifies into c' or None if c is deemed redundant *)
 
-  val convert_input_statements : Statement.clause_t CCVector.ro_vector -> C.t Clause.sets
+  val convert_input_statements :
+    Statement.clause_t CCVector.ro_vector -> C.t Clause.sets
   (** Convert raw input statements into clauses, triggering
       {! on_input_statement} *)
 

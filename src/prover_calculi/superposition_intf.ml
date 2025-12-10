@@ -64,7 +64,10 @@ module type S = sig
   val subsumes : Literal.t array -> Literal.t array -> bool
   (** subsumes c1 c2 iff c1 subsumes c2 *)
 
-  val subsumes_with : Literals.t Scoped.t -> Literals.t Scoped.t -> (Subst.FO.t * Proof.tag list) option
+  val subsumes_with :
+       Literals.t Scoped.t
+    -> Literals.t Scoped.t
+    -> (Subst.FO.t * Proof.tag list) option
   (** returns subsuming subst if the first clause subsumes the second one *)
 
   val eq_subsumes : Literal.t array -> Literal.t array -> bool

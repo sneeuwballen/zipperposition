@@ -14,7 +14,8 @@ module T = TypedSTerm
 (* Replacement for the function type in the encoding: *)
 let id_ae_fun = ID.make "app_encode_fun"
 
-let ty_ae_fun = T.app_builtin ~ty:T.tType Builtin.Arrow [T.tType; T.tType; T.tType]
+let ty_ae_fun =
+  T.app_builtin ~ty:T.tType Builtin.Arrow [T.tType; T.tType; T.tType]
 
 let function_type = T.const ~ty:ty_ae_fun id_ae_fun
 
@@ -27,7 +28,9 @@ let ty_ae_app =
   T.bind ~ty:T.tType Binder.ForallTy alpha
     (T.bind ~ty:T.tType Binder.ForallTy beta
        (T.app_builtin ~ty:T.tType Builtin.Arrow
-          [T.var beta; T.app ~ty:T.tType function_type [T.var alpha; T.var beta]; T.var alpha] ) )
+          [ T.var beta
+          ; T.app ~ty:T.tType function_type [T.var alpha; T.var beta]
+          ; T.var alpha ] ) )
 
 let const_ae_app = T.const ~ty:ty_ae_app id_ae_app
 
@@ -48,11 +51,16 @@ let const_ext_diff = T.const ~ty:ty_ext_diff id_ext_diff
 
 (** Type declarations for these new symbols *)
 let ty_decls =
-  let ae_fun_decl = Statement.ty_decl ~proof:Proof.Step.trivial id_ae_fun ty_ae_fun in
-  let ae_app_decl = Statement.ty_decl ~proof:Proof.Step.trivial id_ae_app ty_ae_app in
+  let ae_fun_decl =
+    Statement.ty_decl ~proof:Proof.Step.trivial id_ae_fun ty_ae_fun
+  in
+  let ae_app_decl =
+    Statement.ty_decl ~proof:Proof.Step.trivial id_ae_app ty_ae_app
+  in
   Iter.of_list [ae_fun_decl; ae_app_decl]
 
-let ty_decl_ext_diff = Statement.ty_decl ~proof:Proof.Step.trivial id_ext_diff ty_ext_diff
+let ty_decl_ext_diff =
+  Statement.ty_decl ~proof:Proof.Step.trivial id_ext_diff ty_ext_diff
 
 (** Encode a type *)
 let rec app_encode_ty ty =
@@ -89,7 +97,8 @@ let rec app_encode_ty ty =
     | T.Record (_, _) ->
         failwith "Not implemented: Record"
   in
-  Util.debugf ~section 5 "Encoded type @[%a@] into @[%a@]" (fun k -> k T.pp ty T.pp ty') ;
+  Util.debugf ~section 5 "Encoded type @[%a@] into @[%a@]" (fun k ->
+      k T.pp ty T.pp ty' ) ;
   ty'
 
 (** Is a term a type? i.e. is a term of type tType? *)
@@ -102,17 +111,20 @@ let app_encode_var var =
 
 (** Encode a term *)
 let rec app_encode_term toplevel t =
-  if toplevel then Util.debugf ~section 3 "Encoding toplevel term @[%a@]" (fun k -> k T.pp t) ;
+  if toplevel then
+    Util.debugf ~section 3 "Encoding toplevel term @[%a@]" (fun k -> k T.pp t) ;
   let ty = app_encode_ty (CCOpt.get_exn (T.ty t)) in
   let t' =
     match T.view t with
     | T.App (f, []) ->
         app_encode_term false f
     | T.App (f, args) ->
-        Util.debugf ~section 5 "Attempting to encode application: %a" (fun k -> k T.pp_with_ty t) ;
+        Util.debugf ~section 5 "Attempting to encode application: %a" (fun k ->
+            k T.pp_with_ty t ) ;
         CCList.fold_left
           (fun term arg ->
-            Util.debugf ~section 5 "Encoding application of %a to %a" (fun k -> k T.pp_with_ty term T.pp arg) ;
+            Util.debugf ~section 5 "Encoding application of %a to %a" (fun k ->
+                k T.pp_with_ty term T.pp arg ) ;
             match T.view (T.ty_exn term) with
             | T.App (f, types) ->
                 assert (T.equal f function_type) ;
@@ -136,7 +148,8 @@ let rec app_encode_term toplevel t =
                   | _ :: [] ->
                       ret_ty
                   | _ :: arg_tys_head :: arg_tys_tail ->
-                      T.app_builtin ~ty:T.tType Builtin.Arrow (ret_ty :: arg_tys_head :: arg_tys_tail)
+                      T.app_builtin ~ty:T.tType Builtin.Arrow
+                        (ret_ty :: arg_tys_head :: arg_tys_tail)
                 in
                 T.app ~ty:ty' term [arg']
             | _ ->
@@ -158,12 +171,14 @@ let rec app_encode_term toplevel t =
     | _ ->
         failwith "Not implemented: Other kind of term"
   in
-  Util.debugf ~section 5 "Encoded term @[%a@] into @[%a@]" (fun k -> k T.pp t T.pp t') ;
+  Util.debugf ~section 5 "Encoded term @[%a@] into @[%a@]" (fun k ->
+      k T.pp t T.pp t' ) ;
   t'
 
 (** Encode a literal *)
 let app_encode_lit lit =
-  Util.debugf ~section 2 "# Encoding Literal %a" (fun k -> k (SLiteral.pp T.pp) lit) ;
+  Util.debugf ~section 2 "# Encoding Literal %a" (fun k ->
+      k (SLiteral.pp T.pp) lit ) ;
   SLiteral.map ~f:(app_encode_term true) lit
 
 (** Encode a clause *)
@@ -191,14 +206,22 @@ let res_tc =
     ~to_exn:(fun i -> E_i i)
     ~compare ~pp_in:pp_clause_in ~is_stmt:true ~name:Statement.name
     ~to_form:(fun ~ctx st ->
-      let conv_c (c : T.t SLiteral.t list) : _ = c |> List.map SLiteral.to_form |> T.Form.or_ in
+      let conv_c (c : T.t SLiteral.t list) : _ =
+        c |> List.map SLiteral.to_form |> T.Form.or_
+      in
       Statement.Seq.forms st |> Iter.map conv_c |> Iter.to_list |> T.Form.and_ )
     ()
 
 (** encode a statement *)
 let app_encode_stmt stmt =
-  let as_proof = Proof.S.mk (Statement.proof_step stmt) (Proof.Result.make res_tc stmt) in
-  let proof = Proof.Step.esa ~rule:(Proof.Rule.mk "app_encode") [as_proof |> Proof.Parent.from] in
+  let as_proof =
+    Proof.S.mk (Statement.proof_step stmt) (Proof.Result.make res_tc stmt)
+  in
+  let proof =
+    Proof.Step.esa
+      ~rule:(Proof.Rule.mk "app_encode")
+      [as_proof |> Proof.Parent.from]
+  in
   match Statement.view stmt with
   | Statement.Data _ ->
       failwith "Not implemented: Data"
@@ -207,11 +230,15 @@ let app_encode_stmt stmt =
   | Statement.Goal lits ->
       failwith "Not implemented: Goal"
   | Statement.Def defs ->
-      let map_single = Statement.map_def ~form:app_encode_lits ~term:(app_encode_term true) ~ty:app_encode_ty in
+      let map_single =
+        Statement.map_def ~form:app_encode_lits ~term:(app_encode_term true)
+          ~ty:app_encode_ty
+      in
       Statement.def ~proof (List.map map_single defs)
   | Statement.Rewrite def ->
       let new_def =
-        Statement.map_def_rule ~form:app_encode_lits ~term:(app_encode_term true) ~ty:app_encode_ty def
+        Statement.map_def_rule ~form:app_encode_lits
+          ~term:(app_encode_term true) ~ty:app_encode_ty def
       in
       Statement.rewrite ~proof new_def
   | Statement.NegatedGoal (skolems, clauses) ->
@@ -225,13 +252,23 @@ let app_encode_stmt stmt =
 let extensionality_axiom =
   let alpha = Var.make ~ty:T.tType (ID.make "alpha") in
   let beta = Var.make ~ty:T.tType (ID.make "beta") in
-  let fun_alpha_beta = T.app ~ty:T.tType function_type [T.var alpha; T.var beta] in
+  let fun_alpha_beta =
+    T.app ~ty:T.tType function_type [T.var alpha; T.var beta]
+  in
   let x = Var.make ~ty:fun_alpha_beta (ID.make "x") in
   let y = Var.make ~ty:fun_alpha_beta (ID.make "y") in
-  let diff = T.app ~ty:(T.var alpha) const_ext_diff [T.var alpha; T.var beta; T.var x; T.var y] in
-  let xdiff = T.app ~ty:(T.var beta) const_ae_app [T.var alpha; T.var beta; T.var x; diff] in
-  let ydiff = T.app ~ty:(T.var beta) const_ae_app [T.var alpha; T.var beta; T.var y; diff] in
-  Statement.assert_ ~proof:Proof.Step.trivial [SLiteral.neq xdiff ydiff; SLiteral.eq (T.var x) (T.var y)]
+  let diff =
+    T.app ~ty:(T.var alpha) const_ext_diff
+      [T.var alpha; T.var beta; T.var x; T.var y]
+  in
+  let xdiff =
+    T.app ~ty:(T.var beta) const_ae_app [T.var alpha; T.var beta; T.var x; diff]
+  in
+  let ydiff =
+    T.app ~ty:(T.var beta) const_ae_app [T.var alpha; T.var beta; T.var y; diff]
+  in
+  Statement.assert_ ~proof:Proof.Step.trivial
+    [SLiteral.neq xdiff ydiff; SLiteral.eq (T.var x) (T.var y)]
 
 let extension =
   let modifier seq =
@@ -243,7 +280,9 @@ let extension =
       let seq = Iter.append ty_decls seq in
       (* Add extensionality axiom *)
       let seq =
-        if !mode_ = `Extensional then Iter.append seq (Iter.of_list [ty_decl_ext_diff; extensionality_axiom])
+        if !mode_ = `Extensional then
+          Iter.append seq
+            (Iter.of_list [ty_decl_ext_diff; extensionality_axiom])
         else seq
       in
       Util.debug ~section 2 "Finished applicative encoding" ;
@@ -252,7 +291,8 @@ let extension =
   in
   Extensions.{default with name= "app_encode"; post_cnf_modifiers= [modifier]}
 
-let options = [("none", `None); ("extensional", `Extensional); ("intensional", `Intensional)]
+let options =
+  [("none", `None); ("extensional", `Extensional); ("intensional", `Intensional)]
 
 let () =
   Options.add_opts

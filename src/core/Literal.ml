@@ -27,7 +27,8 @@ let equal l1 l2 =
 let equal_com l1 l2 =
   match (l1, l2) with
   | Equation (l1, r1, sign1), Equation (l2, r2, sign2) ->
-      sign1 = sign2 && ((T.equal l1 l2 && T.equal r1 r2) || (T.equal l1 r2 && T.equal r1 l2))
+      sign1 = sign2
+      && ((T.equal l1 l2 && T.equal r1 r2) || (T.equal l1 r2 && T.equal r1 l2))
   | True, True | False, False ->
       true
   | _ ->
@@ -36,7 +37,8 @@ let equal_com l1 l2 =
 let no_prop_invariant = function
   | Equation (lhs, rhs, sign) ->
       if T.is_true_or_false rhs && not sign then (
-        CCFormat.printf "literal wrongly encoded: @[%a@] @[%a@] @[%b@]@." T.pp lhs T.pp rhs sign ;
+        CCFormat.printf "literal wrongly encoded: @[%a@] @[%a@] @[%b@]@." T.pp
+          lhs T.pp rhs sign ;
         false )
       else true
   | _ ->
@@ -57,7 +59,8 @@ let compare l1 l2 =
   | _, _ ->
       __to_int l1 - __to_int l2
 
-let fold f acc lit = match lit with Equation (l, r, _) -> f (f acc l) r | True | False -> acc
+let fold f acc lit =
+  match lit with Equation (l, r, _) -> f (f acc l) r | True | False -> acc
 
 let for_all f lit = fold (fun b t -> b && f t) true lit
 
@@ -70,7 +73,11 @@ let hash lit =
   | False ->
       50
 
-let[@inline] is_predicate_lit = function Equation (_, rhs, true) -> T.is_true_or_false rhs | _ -> false
+let[@inline] is_predicate_lit = function
+  | Equation (_, rhs, true) ->
+      T.is_true_or_false rhs
+  | _ ->
+      false
 
 let weight lit = fold (fun acc t -> acc + T.size t) 0 lit
 
@@ -100,7 +107,13 @@ let is_positivoid = function
   | _ ->
       true
 
-let eqn_sign = function Equation (_, _, sign) -> sign | False -> false | _ -> true
+let eqn_sign = function
+  | Equation (_, _, sign) ->
+      sign
+  | False ->
+      false
+  | _ ->
+      true
 
 (* specific: for the term comparison *)
 let polarity = function Equation (_, _, s) -> s | l -> is_positivoid l
@@ -113,13 +126,21 @@ let is_eq lit = is_eqn lit && is_positivoid lit
 
 let is_neq lit = is_eqn lit && is_negativoid lit
 
-let is_app_var_eq = function Equation (l, r, _) -> T.is_app_var l && T.is_app_var r | _ -> false
+let is_app_var_eq = function
+  | Equation (l, r, _) ->
+      T.is_app_var l && T.is_app_var r
+  | _ ->
+      false
 
 let is_prop = function True | False -> true | _ -> false
 
 let is_type_pred = function
   | Equation (lhs, _, _) as l when is_predicate_lit l -> (
-    match Term.view lhs with App (f, [x]) -> T.is_var x && T.is_const f | _ -> false )
+    match Term.view lhs with
+    | App (f, [x]) ->
+        T.is_var x && T.is_const f
+    | _ ->
+        false )
   | _ ->
       false
 
@@ -135,7 +156,9 @@ let is_typex_pred = function
 
 let ty_error_ a b =
   let msg =
-    CCFormat.sprintf "@[<2>Literal: incompatible types in equational lit@ for `@[%a : %a@]`@ and `@[%a : %a@]`@]"
+    CCFormat.sprintf
+      "@[<2>Literal: incompatible types in equational lit@ for `@[%a : %a@]`@ \
+       and `@[%a : %a@]`@]"
       T.TPTP.pp a Type.pp (T.ty a) T.TPTP.pp b Type.pp (T.ty b)
   in
   raise (Type.ApplyError msg)
@@ -199,20 +222,25 @@ let mk_absurd = False
 let mk_constraint l r = mk_neq l r
 
 module Seq = struct
-  let terms lit k = match lit with Equation (l, r, _) -> k l ; k r | True | False -> ()
+  let terms lit k =
+    match lit with Equation (l, r, _) -> k l ; k r | True | False -> ()
 
   let vars lit = Iter.flat_map T.Seq.vars (terms lit)
 
-  let symbols ?(include_types = false) lit = Iter.flat_map (T.Seq.symbols ~include_types) (terms lit)
+  let symbols ?(include_types = false) lit =
+    Iter.flat_map (T.Seq.symbols ~include_types) (terms lit)
 
-  let typed_symbols ?(include_types = false) lit = Iter.flat_map (T.Seq.typed_symbols ~include_types) (terms lit)
+  let typed_symbols ?(include_types = false) lit =
+    Iter.flat_map (T.Seq.typed_symbols ~include_types) (terms lit)
 end
 
-let symbols ?(include_types = false) lit = Seq.symbols ~include_types lit |> ID.Set.of_iter
+let symbols ?(include_types = false) lit =
+  Seq.symbols ~include_types lit |> ID.Set.of_iter
 
 (** Unification-like operation on components of a literal. *)
 module UnifOp = struct
-  type 'subst op = {term: subst:'subst -> term Scoped.t -> term Scoped.t -> 'subst Iter.t}
+  type 'subst op =
+    {term: subst:'subst -> term Scoped.t -> term Scoped.t -> 'subst Iter.t}
 end
 
 (* match {x1,y1} in scope 1, with {x2,y2} with scope2 *)
@@ -235,17 +263,25 @@ let unif_lits op ~subst (lit1, sc1) (lit2, sc2) k =
       ()
 
 let variant ?(subst = S.empty) lit1 lit2 k =
-  let op = UnifOp.{term= (fun ~subst t1 t2 k -> try k (Unif.FO.variant ~subst t1 t2) with Unif.Fail -> ())} in
-  unif_lits op ~subst lit1 lit2 (fun (subst, tags) -> if Subst.is_renaming subst then k (subst, tags))
+  let op =
+    UnifOp.
+      { term=
+          (fun ~subst t1 t2 k ->
+            try k (Unif.FO.variant ~subst t1 t2) with Unif.Fail -> () ) }
+  in
+  unif_lits op ~subst lit1 lit2 (fun (subst, tags) ->
+      if Subst.is_renaming subst then k (subst, tags) )
 
-let are_variant lit1 lit2 = not (Iter.is_empty (variant (Scoped.make lit1 0) (Scoped.make lit2 1)))
+let are_variant lit1 lit2 =
+  not (Iter.is_empty (variant (Scoped.make lit1 0) (Scoped.make lit2 1)))
 
 let matching ?(subst = Subst.empty) ~pattern:lit1 lit2 k =
   let op =
     UnifOp.
       { term=
           (fun ~subst t1 t2 k ->
-            try k (Unif.FO.matching_adapt_scope ~subst ~pattern:t1 t2) with Unif.Fail -> () ) }
+            try k (Unif.FO.matching_adapt_scope ~subst ~pattern:t1 t2)
+            with Unif.Fail -> () ) }
   in
   unif_lits op ~subst lit1 lit2 k
 
@@ -277,16 +313,28 @@ let _eq_subsumes ~subst l1 r1 sc1 l2 r2 sc2 k =
       enrich [subst] *)
   and equate_root ~subst l2 r2 k =
     ( try
-        let subst = Unif.FO.matching_adapt_scope ~subst ~pattern:(Scoped.make l1 sc1) (Scoped.make l2 sc2) in
-        let subst = Unif.FO.matching_adapt_scope ~subst ~pattern:(Scoped.make r1 sc1) (Scoped.make r2 sc2) in
+        let subst =
+          Unif.FO.matching_adapt_scope ~subst ~pattern:(Scoped.make l1 sc1)
+            (Scoped.make l2 sc2)
+        in
+        let subst =
+          Unif.FO.matching_adapt_scope ~subst ~pattern:(Scoped.make r1 sc1)
+            (Scoped.make r2 sc2)
+        in
         (* CCFormat.printf "%a = %a;\n%a = %a;\n%a.\n" T.pp l1 T.pp l2 T.pp r1 T.pp r2 Subst.pp subst; *)
         k subst
       with Unif.Fail ->
         (* CCFormat.printf "FAILED: %a = %a;\n%a = %a;\n%a.\n" T.pp l1 T.pp l2 T.pp r1 T.pp r2 Subst.pp subst; *)
         () ) ;
     ( try
-        let subst = Unif.FO.matching_adapt_scope ~subst ~pattern:(Scoped.make l1 sc1) (Scoped.make r2 sc2) in
-        let subst = Unif.FO.matching_adapt_scope ~subst ~pattern:(Scoped.make r1 sc1) (Scoped.make l2 sc2) in
+        let subst =
+          Unif.FO.matching_adapt_scope ~subst ~pattern:(Scoped.make l1 sc1)
+            (Scoped.make r2 sc2)
+        in
+        let subst =
+          Unif.FO.matching_adapt_scope ~subst ~pattern:(Scoped.make r1 sc1)
+            (Scoped.make l2 sc2)
+        in
         k subst
       with Unif.Fail ->
         (* CCFormat.printf "FAILED: %a = %a;\n%a = %a;\n%a.\n" T.pp l1 T.pp l2 T.pp r1 T.pp r2 Subst.pp subst; *)
@@ -304,7 +352,10 @@ let subsumes ?(subst = Subst.empty) (lit1, sc1) (lit2, sc2) k =
 
 let unify ?(subst = US.empty) lit1 lit2 k =
   let op =
-    UnifOp.{term= (fun ~subst t1 t2 k -> try k (Unif.FO.unify_full ~subst t1 t2) with Unif.Fail -> ())}
+    UnifOp.
+      { term=
+          (fun ~subst t1 t2 k ->
+            try k (Unif.FO.unify_full ~subst t1 t2) with Unif.Fail -> () ) }
   in
   unif_lits op ~subst lit1 lit2 k
 
@@ -327,16 +378,21 @@ let apply_subst_ ~f_term subst (lit, sc) =
   | True | False ->
       lit
 
-let apply_subst renaming subst (lit, sc) = apply_subst_ subst (lit, sc) ~f_term:(S.FO.apply renaming)
+let apply_subst renaming subst (lit, sc) =
+  apply_subst_ subst (lit, sc) ~f_term:(S.FO.apply renaming)
 
 let apply_subst_no_simp renaming subst (lit, sc) =
   match lit with
   | Equation (l, r, sign) ->
-      Equation (S.FO.apply renaming subst (l, sc), S.FO.apply renaming subst (r, sc), sign)
+      Equation
+        ( S.FO.apply renaming subst (l, sc)
+        , S.FO.apply renaming subst (r, sc)
+        , sign )
   | True | False ->
       lit
 
-let apply_subst_list renaming subst (lits, sc) = List.map (fun lit -> apply_subst renaming subst (lit, sc)) lits
+let apply_subst_list renaming subst (lits, sc) =
+  List.map (fun lit -> apply_subst renaming subst (lit, sc)) lits
 
 exception Lit_is_constraint
 
@@ -354,14 +410,29 @@ let is_constraint = function
 
 let negate lit =
   assert (no_prop_invariant lit) ;
-  match lit with Equation (l, r, sign) -> mk_lit l r (not sign) | True -> False | False -> True
+  match lit with
+  | Equation (l, r, sign) ->
+      mk_lit l r (not sign)
+  | True ->
+      False
+  | False ->
+      True
 
 let vars lit = Seq.vars lit |> T.VarSet.of_iter |> T.VarSet.to_list
 
 let var_occurs v lit =
-  match lit with Equation (l, r, _) -> T.var_occurs ~var:v l || T.var_occurs ~var:v r | True | False -> false
+  match lit with
+  | Equation (l, r, _) ->
+      T.var_occurs ~var:v l || T.var_occurs ~var:v r
+  | True | False ->
+      false
 
-let is_ground lit = match lit with Equation (l, r, _) -> T.is_ground l && T.is_ground r | True | False -> true
+let is_ground lit =
+  match lit with
+  | Equation (l, r, _) ->
+      T.is_ground l && T.is_ground r
+  | True | False ->
+      true
 
 let root_terms l = Seq.terms l |> Iter.to_rev_list
 
@@ -392,14 +463,18 @@ let rec cannot_be_eq (t1 : term) (t2 : term) : Builtin.Tag.t list option =
   let module TC = T.Classic in
   match (TC.view t1, TC.view t2) with
   | TC.AppBuiltin (Builtin.Int z1, []), TC.AppBuiltin (Builtin.Int z2, []) ->
-      if Z.equal z1 z2 then None else Some [Builtin.Tag.T_lia; Builtin.Tag.T_cannot_orphan]
+      if Z.equal z1 z2 then None
+      else Some [Builtin.Tag.T_lia; Builtin.Tag.T_cannot_orphan]
   | TC.AppBuiltin (Builtin.Rat n1, []), TC.AppBuiltin (Builtin.Rat n2, []) ->
-      if Q.equal n1 n2 then None else Some [Builtin.Tag.T_lra; Builtin.Tag.T_cannot_orphan]
-  | TC.App (c1, l1), TC.App (c2, l2) when Ind_ty.is_constructor c1 && Ind_ty.is_constructor c2 ->
+      if Q.equal n1 n2 then None
+      else Some [Builtin.Tag.T_lra; Builtin.Tag.T_cannot_orphan]
+  | TC.App (c1, l1), TC.App (c2, l2)
+    when Ind_ty.is_constructor c1 && Ind_ty.is_constructor c2 ->
       (* two constructor applications cannot be equal if they
          don't have the same constructor *)
       if ID.equal c1 c2 && List.length l1 = List.length l2 then
-        List.combine l1 l2 |> Iter.of_list |> Iter.find_map (fun (a, b) -> cannot_be_eq a b)
+        List.combine l1 l2 |> Iter.of_list
+        |> Iter.find_map (fun (a, b) -> cannot_be_eq a b)
       else Some [Builtin.Tag.T_data]
   | _ ->
       None
@@ -426,8 +501,9 @@ let is_absurd_tags lit =
   | True ->
       assert false
 
-let fold_terms ?(position = Position.stop) ?(vars = false) ?(var_args = true) ?(fun_bodies = true) ?ty_args
-    ~which ?(ord = Ordering.none) ~subterms lit k =
+let fold_terms ?(position = Position.stop) ?(vars = false) ?(var_args = true)
+    ?(fun_bodies = true) ?ty_args ~which ?(ord = Ordering.none) ~subterms lit k
+    =
   assert (no_prop_invariant lit) ;
   (* function to call at terms *)
   let filter_formula_subterms hd args =
@@ -451,7 +527,9 @@ let fold_terms ?(position = Position.stop) ?(vars = false) ?(var_args = true) ?(
         None
   in
   let at_term ~pos t =
-    if subterms then T.all_positions ~filter_formula_subterms ?ty_args ~vars ~var_args ~fun_bodies ~pos t k
+    if subterms then
+      T.all_positions ~filter_formula_subterms ?ty_args ~vars ~var_args
+        ~fun_bodies ~pos t k
     else if T.is_var t && not vars then () (* ignore *)
     else k (t, pos)
   in
@@ -491,14 +569,22 @@ let as_ho_predicate (lit : t) : _ option =
   match lit with
   | Equation (lhs, rhs, _) when is_predicate_lit lit -> (
       let hd_t, args_t = T.as_app lhs in
-      match (T.view hd_t, args_t) with T.Var v, _ :: _ -> Some (v, hd_t, args_t, is_positivoid lit) | _ -> None )
+      match (T.view hd_t, args_t) with
+      | T.Var v, _ :: _ ->
+          Some (v, hd_t, args_t, is_positivoid lit)
+      | _ ->
+          None )
   | _ ->
       None
 
 let is_ho_predicate lit = CCOpt.is_some (as_ho_predicate lit)
 
 let is_ho_unif lit =
-  match lit with Equation (t, u, _) when is_negativoid lit -> Term.is_ho_app t || Term.is_ho_app u | _ -> false
+  match lit with
+  | Equation (t, u, _) when is_negativoid lit ->
+      Term.is_ho_app t || Term.is_ho_app u
+  | _ ->
+      false
 
 let of_unif_subst renaming (s : Unif_subst.t) : t list =
   Unif_subst.constr_l_subst renaming s
@@ -509,7 +595,9 @@ let of_unif_subst renaming (s : Unif_subst.t) : t list =
          mk_constraint t u )
 
 let normalize_eq lit =
-  let as_neg t = match T.view t with T.AppBuiltin (Not, [f]) -> Some f | _ -> None in
+  let as_neg t =
+    match T.view t with T.AppBuiltin (Not, [f]) -> Some f | _ -> None
+  in
   let is_negativoid t = CCOpt.is_some @@ as_neg t in
   let eq_builder ~pos ~neg l r =
     match (as_neg l, as_neg r) with
@@ -556,7 +644,9 @@ let pp_debug ?(hooks = []) out lit =
   if List.for_all (fun h -> not (h out lit)) hooks then
     match lit with
     | Equation (p, t, _) when is_predicate_lit lit ->
-        Format.fprintf out "@[%s%a@]" (if is_positivoid lit then "" else "¬") T.pp p
+        Format.fprintf out "@[%s%a@]"
+          (if is_positivoid lit then "" else "¬")
+          T.pp p
     | True ->
         CCFormat.string out "Τ"
     | False ->
@@ -569,7 +659,9 @@ let pp_debug ?(hooks = []) out lit =
 let pp_tstp out lit =
   match lit with
   | Equation (p, t, _) when is_predicate_lit lit ->
-      Format.fprintf out "%s %a" (if is_positivoid lit then "" else "~") T.TPTP.pp p
+      Format.fprintf out "%s %a"
+        (if is_positivoid lit then "" else "~")
+        T.TPTP.pp p
   | True ->
       CCFormat.string out "$true"
   | False ->
@@ -582,7 +674,9 @@ let pp_tstp out lit =
 let pp_zf out lit =
   match lit with
   | Equation (p, t, _) when is_predicate_lit lit ->
-      Format.fprintf out "%s %a" (if is_positivoid lit then "" else "~") T.ZF.pp p
+      Format.fprintf out "%s %a"
+        (if is_positivoid lit then "" else "~")
+        T.ZF.pp p
   | True ->
       CCFormat.string out "true"
   | False ->
@@ -608,12 +702,24 @@ module Comp = struct
   module C = Comparison
 
   let _maxterms2 ~ord l r =
-    match O.compare ord l r with C.Gt | Geq -> [l] | Lt | Leq -> [r] | Eq -> [l] | Incomparable -> [l; r]
+    match O.compare ord l r with
+    | C.Gt | Geq ->
+        [l]
+    | Lt | Leq ->
+        [r]
+    | Eq ->
+        [l]
+    | Incomparable ->
+        [l; r]
 
   (* maximal terms of the literal *)
   let max_terms ~ord lit =
     (* assert(no_prop_invariant lit); *)
-    match lit with Equation (l, r, _) -> _maxterms2 ~ord l r | True | False -> []
+    match lit with
+    | Equation (l, r, _) ->
+        _maxterms2 ~ord l r
+    | True | False ->
+        []
 
   (* general comparison is a bit complicated.
      - First we compare literals l1 and l2
@@ -624,7 +730,10 @@ module Comp = struct
         kind-specific comparison.
   *)
 
-  type dominator_result = NoDominator of bool | NonstrictDominator | StrictDominator
+  type dominator_result =
+    | NoDominator of bool
+    | NonstrictDominator
+    | StrictDominator
 
   (* Is there an element of the first list that dominates all elements of the
      second list? *)
@@ -642,22 +751,28 @@ module Comp = struct
           | _ ->
               NonstrictDominator
         else
-          let met_geq_or_leq' = met_geq_or_leq || List.exists (fun cmp -> cmp = C.Geq || cmp = C.Leq) cmps in
+          let met_geq_or_leq' =
+            met_geq_or_leq
+            || List.exists (fun cmp -> cmp = C.Geq || cmp = C.Leq) cmps
+          in
           _find_dominators ~met_geq_or_leq:met_geq_or_leq' f ts1 ts2
 
   let _cmp_by_maxterms ~ord l1 l2 =
     let maxs1 = max_terms ~ord l1 and maxs2 = max_terms ~ord l2 in
     let f = Ordering.compare ord in
     match
-      (_find_dominators ~met_geq_or_leq:false f maxs1 maxs2, _find_dominators ~met_geq_or_leq:false f maxs2 maxs1)
+      ( _find_dominators ~met_geq_or_leq:false f maxs1 maxs2
+      , _find_dominators ~met_geq_or_leq:false f maxs2 maxs1 )
     with
     | NoDominator met_geq_or_leq1, NoDominator met_geq_or_leq2 ->
-        if met_geq_or_leq1 || met_geq_or_leq2 then C.Eq (* check next criterion *)
+        if met_geq_or_leq1 || met_geq_or_leq2 then C.Eq
+          (* check next criterion *)
         else
           let set1 = CCList.fold_right T.Set.add maxs1 T.Set.empty
           and set2 = CCList.fold_right T.Set.add maxs2 T.Set.empty in
           if T.Set.equal set1 set2 then Eq (* check next criterion *)
-          else (* no need to continue; [_cmp_specific] will fail anyway *)
+          else
+            (* no need to continue; [_cmp_specific] will fail anyway *)
             Incomparable
     | StrictDominator, NoDominator _ ->
         Gt
@@ -674,7 +789,13 @@ module Comp = struct
   let _cmp_by_polarity l1 l2 =
     let p1 = is_positivoid l1 in
     let p2 = is_positivoid l2 in
-    match (p1, p2) with true, true | false, false -> C.Eq | true, false -> Lt | false, true -> Gt
+    match (p1, p2) with
+    | true, true | false, false ->
+        C.Eq
+    | true, false ->
+        Lt
+    | false, true ->
+        Gt
 
   let _cmp_by_kind l1 l2 =
     let _to_int = function False | True -> 0 | Equation _ -> 30 in
@@ -682,7 +803,8 @@ module Comp = struct
 
   (* by multiset of terms *)
   let _cmp_by_term_multiset ~ord l1 l2 =
-    Multisets.MT.compare_partial (Ordering.compare ord) (to_multiset l1) (to_multiset l2)
+    Multisets.MT.compare_partial (Ordering.compare ord) (to_multiset l1)
+      (to_multiset l2)
 
   let _cmp_specific ~ord l1 l2 =
     match (l1, l2) with
@@ -697,14 +819,20 @@ module Comp = struct
     | Equation _, False ->
         _cmp_by_term_multiset ~ord l1 l2
 
-  let compare ~ord = C.(_cmp_by_maxterms ~ord @>> _cmp_by_polarity @>> _cmp_by_kind @>> _cmp_specific ~ord)
+  let compare ~ord =
+    C.(
+      _cmp_by_maxterms ~ord @>> _cmp_by_polarity @>> _cmp_by_kind
+      @>> _cmp_specific ~ord )
 end
 
 module Pos = struct
   type split = {lit_pos: Position.t; term_pos: Position.t; term: term}
 
   let _fail_lit lit pos =
-    let msg = CCFormat.sprintf "@[<2>invalid position @[%a@]@ in lit @[%a@]@]" Position.pp pos pp lit in
+    let msg =
+      CCFormat.sprintf "@[<2>invalid position @[%a@]@ in lit @[%a@]@]"
+        Position.pp pos pp lit
+    in
     invalid_arg msg
 
   let split lit pos =
@@ -835,13 +963,19 @@ module Conv = struct
         TypedSTerm.Form.false_
 
   let to_s_form ?allow_free_db ?(ctx = T.Conv.create ()) ?hooks lit =
-    to_form ?hooks lit |> SLiteral.map ~f:(T.Conv.to_simple_term ?allow_free_db ctx) |> SLiteral.to_form
+    to_form ?hooks lit
+    |> SLiteral.map ~f:(T.Conv.to_simple_term ?allow_free_db ctx)
+    |> SLiteral.to_form
 end
 
 module View = struct
   let as_eqn lit =
     assert (no_prop_invariant lit) ;
-    match lit with Equation (l, r, sign) -> Some (l, r, sign) | True | False -> None
+    match lit with
+    | Equation (l, r, sign) ->
+        Some (l, r, sign)
+    | True | False ->
+        None
 
   let get_eqn lit position =
     match (lit, position) with
@@ -866,7 +1000,9 @@ let as_inj_def lit =
   | Some (l, r, false) -> (
     try
       let hd_l, hd_r = (T.head_exn l, T.head_exn r) in
-      let vars_l, vars_r = (List.map _as_var (T.args l), List.map _as_var (T.args r)) in
+      let vars_l, vars_r =
+        (List.map _as_var (T.args l), List.map _as_var (T.args r))
+      in
       let args_l, args_r = (VS.of_list vars_l, VS.of_list vars_r) in
       (* We are looking for literal f X1 ... Xn ~= f Y1 ... Yn
          where all X_i, Y_i are different pairwise, but form each

@@ -68,12 +68,19 @@ let extension =
     E.flex_add k_check_at !_check_at ;
     FP.setup ()
   in
-  {Extensions.default with Extensions.name= "bce_pe_fp"; prio= 90; env_actions= [action]}
+  { Extensions.default with
+    Extensions.name= "bce_pe_fp"
+  ; prio= 90
+  ; env_actions= [action] }
 
 let () =
   Options.add_opts
-    [ ("--bce-pe-fixpoint", Arg.Bool (( := ) _enabled), " enable BCE/PE fixpoint simplification")
+    [ ( "--bce-pe-fixpoint"
+      , Arg.Bool (( := ) _enabled)
+      , " enable BCE/PE fixpoint simplification" )
     ; ( "--bce-pe-fixpoint-inprocessing"
       , Arg.Bool (( := ) _inprocessing)
       , " enable BCE/PE fixpoint as inprocessing rule" )
-    ; ("--bce-pe-fixpoint-check-at", Arg.Int (( := ) _check_at), " BCE/PE fixpoint inprocessing periodicity") ]
+    ; ( "--bce-pe-fixpoint-check-at"
+      , Arg.Int (( := ) _check_at)
+      , " BCE/PE fixpoint inprocessing periodicity" ) ]

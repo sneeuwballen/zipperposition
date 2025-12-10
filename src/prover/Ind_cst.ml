@@ -64,9 +64,15 @@ let pp out c = ID.pp out c.cst_id
 
 let on_new_cst = Signal.create ()
 
-let id_as_cst id = ID.payload_find id ~f:(function Payload_cst c -> Some c | _ -> None)
+let id_as_cst id =
+  ID.payload_find id ~f:(function Payload_cst c -> Some c | _ -> None)
 
-let id_as_cst_exn id = match id_as_cst id with None -> raise (NotAnInductiveConstant id) | Some c -> c
+let id_as_cst_exn id =
+  match id_as_cst id with
+  | None ->
+      raise (NotAnInductiveConstant id)
+  | Some c ->
+      c
 
 let id_is_cst id = match id_as_cst id with Some _ -> true | _ -> false
 
@@ -83,13 +89,14 @@ let make_skolem ty : ID.t =
   incr n_ ;
   (* declare as a skolem *)
   let k = if Ind_ty.is_inductive_type ty then ID.K_ind else ID.K_normal in
-  ID.set_payload c (ID.Attr_skolem k) ; c
+  ID.set_payload c (ID.Attr_skolem k) ;
+  c
 
 (* declare new constant *)
 let declare ~depth ~is_sub id ty =
   Util.debugf ~section:Ind_ty.section 2
-    "@[<2>declare new inductive symbol@ `@[%a : %a@]`@ :depth %d :is_sub %B@]" (fun k ->
-      k ID.pp id Type.pp ty depth is_sub ) ;
+    "@[<2>declare new inductive symbol@ `@[%a : %a@]`@ :depth %d :is_sub %B@]"
+    (fun k -> k ID.pp id Type.pp ty depth is_sub ) ;
   assert (not (id_is_cst id)) ;
   assert (Type.is_ground ty) ;
   (* constant --> not polymorphic *)
@@ -101,7 +108,14 @@ let declare ~depth ~is_sub id ty =
         invalid_declf "cannot declare a constant of type %a" Type.pp ty
   in
   (* build coverset and constant, mutually recursive *)
-  let cst = {cst_id= id; cst_ty= ty; cst_depth= depth; cst_ity= ity; cst_args= args; cst_is_sub= is_sub} in
+  let cst =
+    { cst_id= id
+    ; cst_ty= ty
+    ; cst_depth= depth
+    ; cst_ity= ity
+    ; cst_args= args
+    ; cst_is_sub= is_sub }
+  in
   ID.set_payload id (Payload_cst cst) ~can_erase:(function
     | ID.Attr_skolem ID.K_ind ->
         true (* special case: promotion from skolem to inductive const *)
@@ -127,12 +141,15 @@ let ind_skolem_equal a b = ind_skolem_compare a b = 0
 
 let id_is_ind_skolem (id : ID.t) (ty : Type.t) : bool =
   let n_tyvars, ty_args, ty_ret = Type.open_poly_fun ty in
-  n_tyvars = 0 && ty_args = [] (* constant *) && Ind_ty.is_inductive_type ty_ret
+  n_tyvars = 0 && ty_args = []
+  (* constant *) && Ind_ty.is_inductive_type ty_ret
   && Ind_ty.is_recursive (Ind_ty.as_inductive_type_exn ty_ret |> fst)
   && Type.is_ground ty
-  && (id_is_cst id || ((not (Ind_ty.is_constructor id)) && not (Rewrite.is_defined_cst id)))
+  && ( id_is_cst id
+     || ((not (Ind_ty.is_constructor id)) && not (Rewrite.is_defined_cst id)) )
 
-let ind_skolem_depth (id : ID.t) : int = match id_as_cst id with None -> 0 | Some c -> depth c
+let ind_skolem_depth (id : ID.t) : int =
+  match id_as_cst id with None -> 0 | Some c -> depth c
 
 (* find inductive constant candidates in terms *)
 let find_ind_skolems t : ind_skolem Iter.t =

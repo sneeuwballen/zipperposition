@@ -20,7 +20,8 @@ let push_l_rev env l = List.fold_left push env l
 
 let push_none env = {size= env.size + 1; stack= None :: env.stack}
 
-let rec push_none_multiple env n = if n <= 0 then env else push_none (push_none_multiple env (n - 1))
+let rec push_none_multiple env n =
+  if n <= 0 then env else push_none (push_none_multiple env (n - 1))
 
 let size env = env.size
 
@@ -31,14 +32,20 @@ let pop env =
   | _ :: tl ->
       {size= env.size - 1; stack= tl}
 
-let rec pop_many env n = match n with 0 -> env | _ -> pop_many (pop env) (n - 1)
+let rec pop_many env n =
+  match n with 0 -> env | _ -> pop_many (pop env) (n - 1)
 
 let find env n =
   assert (n >= 0) ;
   if n < env.size then List.nth env.stack n else None
 
 let find_exn env n =
-  if n < env.size then match List.nth env.stack n with None -> failwith "DBEnv.find_exn" | Some x -> x
+  if n < env.size then
+    match List.nth env.stack n with
+    | None ->
+        failwith "DBEnv.find_exn"
+    | Some x ->
+        x
   else failwith "DBEnv.find_exn"
 
 let mem env n = if n < env.size then List.nth env.stack n <> None else false
@@ -49,18 +56,27 @@ let set env n x =
 
 let num_bindings db =
   let rec count acc l =
-    match l with [] -> acc | None :: l' -> count acc l' | Some _ :: l' -> count (1 + acc) l'
+    match l with
+    | [] ->
+        acc
+    | None :: l' ->
+        count acc l'
+    | Some _ :: l' ->
+        count (1 + acc) l'
   in
   count 0 db.stack
 
 let map f db =
-  let stack = List.map (function None -> None | Some x -> Some (f x)) db.stack in
+  let stack =
+    List.map (function None -> None | Some x -> Some (f x)) db.stack
+  in
   {db with stack}
 
 let filteri f db =
   let stack =
     CCList.foldi
-      (fun acc i o -> match o with Some x when f i x -> Some x :: acc | _ -> None :: acc)
+      (fun acc i o ->
+        match o with Some x when f i x -> Some x :: acc | _ -> None :: acc )
       [] db.stack
     |> List.rev
   in

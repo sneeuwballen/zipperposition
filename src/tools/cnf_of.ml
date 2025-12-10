@@ -26,28 +26,40 @@ let options =
   ; ("--time-limit", Arg.Int Util.set_time_limit, " hard time limit (in s)")
   ; ("--print-input", Arg.Set print_in, " print input problem") ]
   @ Options.make ()
-  |> List.sort CCShims_.Stdlib.compare |> Arg.align
+  |> List.sort CCShims_.Stdlib.compare
+  |> Arg.align
 
 let print_res (decls : _ CCVector.ro_vector) : unit =
-  let close_c c = c |> List.map SLiteral.to_form |> TypedSTerm.Form.or_ |> TypedSTerm.Form.close_forall in
+  let close_c c =
+    c |> List.map SLiteral.to_form |> TypedSTerm.Form.or_
+    |> TypedSTerm.Form.close_forall
+  in
   match !Options.output with
   | Options.O_none ->
       ()
   | Options.O_normal ->
-      let ppst = Statement.pp (Util.pp_list ~sep:" ∨ " (SLiteral.pp T.pp)) T.pp T.pp in
+      let ppst =
+        Statement.pp (Util.pp_list ~sep:" ∨ " (SLiteral.pp T.pp)) T.pp T.pp
+      in
       Format.printf "@[<v2>%d statements:@ %a@]@." (CCVector.length decls)
         (CCVector.pp ~pp_sep:(CCFormat.return "@,") ppst)
         decls
   | Options.O_tptp ->
       let pp_c out c = TypedSTerm.TPTP.pp out (close_c c) in
       let ppst out st = Statement.TPTP.pp pp_c T.TPTP.pp T.TPTP.pp out st in
-      Format.printf "@[<v>%a@]@." (CCVector.pp ~pp_sep:(CCFormat.return "@,") ppst) decls
+      Format.printf "@[<v>%a@]@."
+        (CCVector.pp ~pp_sep:(CCFormat.return "@,") ppst)
+        decls
   | Options.O_zf ->
       let pp_c out c = T.ZF.pp_inner out (close_c c) in
-      let ppst out st = Statement.ZF.pp pp_c T.ZF.pp_inner T.ZF.pp_inner out st in
+      let ppst out st =
+        Statement.ZF.pp pp_c T.ZF.pp_inner T.ZF.pp_inner out st
+      in
       Format.printf "val term : type.@." ;
       (* implicit *)
-      Format.printf "@[<v>%a@]@." (CCVector.pp ~pp_sep:(CCFormat.return "@,") ppst) decls
+      Format.printf "@[<v>%a@]@."
+        (CCVector.pp ~pp_sep:(CCFormat.return "@,") ppst)
+        decls
 
 (* process the given file, converting it to CNF *)
 let process file =
@@ -56,28 +68,39 @@ let process file =
     (* parse *)
     let input = Parsing_utils.input_of_file file in
     Parsing_utils.parse_file input file
-    >>= TypeInference.infer_statements ?ctx:None ~file ~on_var:(Input_format.on_var input)
-          ~on_undef:(Input_format.on_undef_id input) ~on_shadow:(Input_format.on_shadow input)
+    >>= TypeInference.infer_statements ?ctx:None ~file
+          ~on_var:(Input_format.on_var input)
+          ~on_undef:(Input_format.on_undef_id input)
+          ~on_shadow:(Input_format.on_shadow input)
           ~implicit_ty_args:(Input_format.implicit_ty_args input)
     >|= fun st ->
     if !print_in then
-      Format.printf "@[<v2>input:@ %a@]@." (CCVector.pp ~pp_sep:(CCFormat.return "@,") Statement.pp_input) st ;
+      Format.printf "@[<v2>input:@ %a@]@."
+        (CCVector.pp ~pp_sep:(CCFormat.return "@,") Statement.pp_input)
+        st ;
     let opts =
       (if !flag_distribute_exists then [Cnf.DistributeExists] else [])
       @ (if !flag_disable_renaming then [Cnf.DisableRenaming] else [])
       @ []
     in
-    let decls = Cnf.cnf_of_iter ~opts ~ctx:(Skolem.create ()) (CCVector.to_iter st) in
+    let decls =
+      Cnf.cnf_of_iter ~opts ~ctx:(Skolem.create ()) (CCVector.to_iter st)
+    in
     let sigma = Cnf.type_declarations (CCVector.to_iter decls) in
     if !print_sig then
       Format.printf "@[<hv2>signature:@ (@[<v>%a@]@])@."
-        (ID.Map.pp ~pp_sep:(CCFormat.return "@,") ~pp_arrow:(CCFormat.return "@ : ") ID.pp T.pp)
+        (ID.Map.pp ~pp_sep:(CCFormat.return "@,")
+           ~pp_arrow:(CCFormat.return "@ : ") ID.pp T.pp )
         sigma ;
     (* print *)
     print_res decls ;
     ()
   in
-  match res with CCResult.Ok () -> () | CCResult.Error msg -> print_endline msg ; exit 1
+  match res with
+  | CCResult.Ok () ->
+      ()
+  | CCResult.Error msg ->
+      print_endline msg ; exit 1
 
 let main () =
   CCFormat.set_color_default true ;
@@ -87,7 +110,11 @@ let main () =
   if !files = [] then files := ["stdin"] ;
   files := List.rev !files ;
   List.iter process !files ;
-  (match !Options.output with Options.O_normal -> Format.printf "%% @{<Green>success!@}@." | _ -> ()) ;
+  ( match !Options.output with
+  | Options.O_normal ->
+      Format.printf "%% @{<Green>success!@}@."
+  | _ ->
+      () ) ;
   ()
 
 let _ = main ()

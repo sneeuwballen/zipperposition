@@ -79,7 +79,8 @@ let compare = T.compare
 
 let hash_mod_alpha = T.hash_mod_alpha
 
-let[@inline] is_tType ty = match T.view ty with T.AppBuiltin (Builtin.TType, []) -> true | _ -> false
+let[@inline] is_tType ty =
+  match T.view ty with T.AppBuiltin (Builtin.TType, []) -> true | _ -> false
 
 let[@inline] is_var ty = match T.view ty with T.Var _ -> true | _ -> false
 
@@ -89,13 +90,17 @@ let[@inline] is_app ty = match T.view ty with T.App _ -> true | _ -> false
 
 let[@inline] is_const ty = match T.view ty with T.Const _ -> true | _ -> false
 
-let[@inline] is_fun ty = match T.view ty with T.AppBuiltin (Builtin.Arrow, _) -> true | _ -> false
+let[@inline] is_fun ty =
+  match T.view ty with T.AppBuiltin (Builtin.Arrow, _) -> true | _ -> false
 
-let[@inline] is_forall ty = match T.view ty with T.Bind (Binder.ForallTy, _, _) -> true | _ -> false
+let[@inline] is_forall ty =
+  match T.view ty with T.Bind (Binder.ForallTy, _, _) -> true | _ -> false
 
-let[@inline] is_prop ty = match T.view ty with T.AppBuiltin (Builtin.Prop, []) -> true | _ -> false
+let[@inline] is_prop ty =
+  match T.view ty with T.AppBuiltin (Builtin.Prop, []) -> true | _ -> false
 
-let as_var_exn ty = match view ty with Var v -> v | _ -> invalid_arg "as_var_exn"
+let as_var_exn ty =
+  match view ty with Var v -> v | _ -> invalid_arg "as_var_exn"
 
 let tType = T.tType
 
@@ -109,7 +114,19 @@ let rat = T.builtin ~ty:tType Builtin.TyRat
 
 let real = T.builtin ~ty:tType Builtin.TyReal
 
-let builtin = function TType -> tType | Prop -> prop | Term -> term | Int -> int | Rat -> rat | Real -> real
+let builtin = function
+  | TType ->
+      tType
+  | Prop ->
+      prop
+  | Term ->
+      term
+  | Int ->
+      int
+  | Rat ->
+      rat
+  | Real ->
+      real
 
 let var = T.var
 
@@ -151,11 +168,13 @@ let[@inline] cast_var_unsafe v = v
 
 type def =
   | Def_unin of int (* number of type variables *)
-  | Def_data of int * ty list (* data type with number of variables and cstors *)
+  | Def_data of
+      int * ty list (* data type with number of variables and cstors *)
 
 exception Payload_def of def
 
-let def id = ID.payload_find id ~f:(function Payload_def d -> Some d | _ -> None)
+let def id =
+  ID.payload_find id ~f:(function Payload_def d -> Some d | _ -> None)
 
 let def_exn id = match def id with Some d -> d | None -> raise Not_found
 
@@ -180,7 +199,8 @@ module Seq = struct
 
   let min_var = T.Seq.min_var
 
-  let has_bools_only t = T.Seq.subterms t |> Iter.for_all (fun ty -> is_fun ty || is_prop ty)
+  let has_bools_only t =
+    T.Seq.subterms t |> Iter.for_all (fun ty -> is_fun ty || is_prop ty)
 end
 
 module VarMap = T.VarMap
@@ -288,7 +308,9 @@ let err_applyf_ msg = CCFormat.ksprintf msg ~f:err_apply_
 let rec ty_eq ty ty' =
   match (view ty, view ty') with
   | Fun (l, ty), Fun (l', ty') ->
-      if List.length l = List.length l' then List.for_all2 ty_eq l l' && ty_eq ty ty' else false
+      if List.length l = List.length l' then
+        List.for_all2 ty_eq l l' && ty_eq ty ty'
+      else false
   | Forall ty, Forall ty' ->
       ty_eq ty ty'
   | Var var, Var var' when is_tType (HVar.ty var) && is_tType (HVar.ty var') ->
@@ -298,7 +320,9 @@ let rec ty_eq ty ty' =
   | DB i, DB i' ->
       i = i'
   | App (f, l), App (f', l') ->
-      if List.length l = List.length l' then ID.equal f f' && List.for_all2 ty_eq l l' else false
+      if List.length l = List.length l' then
+        ID.equal f f' && List.for_all2 ty_eq l l'
+      else false
   | _ ->
       false
 
@@ -318,7 +342,9 @@ let apply ty0 args0 =
         let ty = T.DB.eval env ty in
         aux ty args env
     | _ ->
-        err_applyf_ "@[<2>Type.apply:@ expected quantified or function type,@ but got @[%a@] @[(args: %a)@]"
+        err_applyf_
+          "@[<2>Type.apply:@ expected quantified or function type,@ but got \
+           @[%a@] @[(args: %a)@]"
           T.pp_zf ty (CCList.pp T.pp) args
   and aux_l ty_ret exp_args args env =
     match (exp_args, args) with
@@ -332,17 +358,19 @@ let apply ty0 args0 =
           (* [ty_ret = exp_args' -> ty_ret'], continue applying *)
           aux_l ty_ret' exp_args' args env
       | _ ->
-          err_applyf_ "@[<2>Type.apply:@ unexpected arguments [@[%a@]]@]" (Util.pp_list T.pp_zf) args )
+          err_applyf_ "@[<2>Type.apply:@ unexpected arguments [@[%a@]]@]"
+            (Util.pp_list T.pp_zf) args )
     | exp :: exp_args', a :: args' ->
         (* expected type: [exp];  [a]: actual value, whose type must match [exp] *)
         let exp' = T.DB.eval env exp in
         if T.equal exp' (T.ty_exn a) then aux_l ty_ret exp_args' args' env
         else
           err_applyf_
-            "@[<2>Type.apply:@ wrong argument type,@ expected `@[_ : %a@]`@ but got `@[%a : %a@]`@ when \
-             applying `%a` to@ [@[%a@]]@ in env [%a]@]"
-            T.pp_zf exp' T.pp_zf a T.pp_zf (T.ty_exn a) T.pp_zf ty0 (Util.pp_list T.pp_zf) args0
-            (DBEnv.pp T.pp_zf) env
+            "@[<2>Type.apply:@ wrong argument type,@ expected `@[_ : %a@]`@ \
+             but got `@[%a : %a@]`@ when applying `%a` to@ [@[%a@]]@ in env \
+             [%a]@]"
+            T.pp_zf exp' T.pp_zf a T.pp_zf (T.ty_exn a) T.pp_zf ty0
+            (Util.pp_list T.pp_zf) args0 (DBEnv.pp T.pp_zf) env
   in
   aux ty0 args0 DBEnv.empty
 
@@ -388,11 +416,15 @@ module TPTP = struct
     | App (p, []) ->
         ID.pp_tstp out p
     | App (p, args) ->
-        Format.fprintf out "@[<2>%a(%a)@]" ID.pp_tstp p (Util.pp_list (pp_tstp_rec depth)) args
+        Format.fprintf out "@[<2>%a(%a)@]" ID.pp_tstp p
+          (Util.pp_list (pp_tstp_rec depth))
+          args
     | Fun (args, ret) ->
         Format.fprintf out "%a > %a" (pp_l depth) args (pp_tstp_rec depth) ret
     | Forall ty' ->
-        Format.fprintf out "!>[Tb%d:$tType]: %a" depth (pp_inner (depth + 1)) ty'
+        Format.fprintf out "!>[Tb%d:$tType]: %a" depth
+          (pp_inner (depth + 1))
+          ty'
 
   and pp_inner depth out t =
     match view t with
@@ -408,7 +440,9 @@ module TPTP = struct
     | [ty] ->
         pp_inner depth out ty
     | _ ->
-        Format.fprintf out "(@[%a@])" (Util.pp_list ~sep:" * " (pp_tstp_rec depth)) l ;
+        Format.fprintf out "(@[%a@])"
+          (Util.pp_list ~sep:" * " (pp_tstp_rec depth))
+          l ;
         assert false
 
   let pp out t = pp_tstp_rec 0 out t
@@ -436,11 +470,15 @@ module TPTP = struct
     | App (p, []) ->
         ID.pp_tstp out p
     | App (p, args) ->
-        Format.fprintf out "@[<2>%a @@ %a @]" ID.pp_tstp p (Util.pp_list ~sep:" @ " (pp_inner depth)) args
+        Format.fprintf out "@[<2>%a @@ %a @]" ID.pp_tstp p
+          (Util.pp_list ~sep:" @ " (pp_inner depth))
+          args
     | Fun (args, ret) ->
         Format.fprintf out "%a > %a" (pp_l depth) args (pp_inner depth) ret
     | Forall ty' ->
-        Format.fprintf out "!>[Tb%d:$tType]: %a" depth (pp_inner (depth + 1)) ty'
+        Format.fprintf out "!>[Tb%d:$tType]: %a" depth
+          (pp_inner (depth + 1))
+          ty'
 
   and pp_inner depth out t =
     match view t with
@@ -464,7 +502,8 @@ module TPTP = struct
     match view (HVar.ty v) with
     (* | Builtin Term -> HVar.pp out v implicit *)
     | _ ->
-        Format.fprintf out "@[%a : %a@]" HVar.pp_tstp v (pp_ho ~depth:0) (HVar.ty v)
+        Format.fprintf out "@[%a : %a@]" HVar.pp_tstp v (pp_ho ~depth:0)
+          (HVar.ty v)
 
   let to_string = CCFormat.to_string pp
 end
@@ -502,20 +541,29 @@ let rec pp_rec depth out t =
       pp_builtin out b
   | Var v ->
       let ty = HVar.ty v in
-      if is_tType ty then Format.fprintf out "A%d" (HVar.id v) else HVar.pp out v
+      if is_tType ty then Format.fprintf out "A%d" (HVar.id v)
+      else HVar.pp out v
   | DB i ->
       Format.fprintf out "T%i" (depth - i - 1)
   | App (p, []) ->
       ID.pp out p
   | App (p, args) ->
-      Format.fprintf out "@[<2>%a %a@]" ID.pp p (Util.pp_list ~sep:" " (pp_inner_app depth)) args
+      Format.fprintf out "@[<2>%a %a@]" ID.pp p
+        (Util.pp_list ~sep:" " (pp_inner_app depth))
+        args
   | Fun (args, ret) ->
-      Format.fprintf out "@[%a →@ %a@]" (Util.pp_list ~sep:" → " (pp_inner_fun depth)) args (pp_rec depth) ret
+      Format.fprintf out "@[%a →@ %a@]"
+        (Util.pp_list ~sep:" → " (pp_inner_fun depth))
+        args (pp_rec depth) ret
   | Forall ty' ->
       Format.fprintf out "@[Π T%i.@ %a@]" depth (pp_inner_fun (depth + 1)) ty'
 
 and pp_inner_fun depth out t =
-  match view t with Fun _ -> Format.fprintf out "(@[%a@])" (pp_rec depth) t | _ -> pp_rec depth out t
+  match view t with
+  | Fun _ ->
+      Format.fprintf out "(@[%a@])" (pp_rec depth) t
+  | _ ->
+      pp_rec depth out t
 
 and pp_inner_app depth out t =
   match view t with
@@ -582,7 +630,11 @@ let mangle (ty : t) : string =
         add_id buf f ;
         List.iter (fun sub -> Buffer.add_char buf '_' ; aux buf sub) l
     | Fun (args, ret) ->
-        List.iter (fun sub -> aux buf sub ; Buffer.add_string buf "_to_") args ;
+        List.iter
+          (fun sub ->
+            aux buf sub ;
+            Buffer.add_string buf "_to_" )
+          args ;
         aux buf ret
     | Forall f ->
         Printf.bprintf buf "pi_%a" aux f
@@ -604,7 +656,11 @@ module Conv = struct
     ; mutable max_vars: int option ref }
 
   let create () =
-    {vars= Var.Subst.empty; n= 0; hvars= VarMap.empty; bvars_to_db= VarMap.empty; max_vars= ref None}
+    { vars= Var.Subst.empty
+    ; n= 0
+    ; hvars= VarMap.empty
+    ; bvars_to_db= VarMap.empty
+    ; max_vars= ref None }
 
   let enter_bvar ctx v =
     let ret_handle = VarMap.find_opt v ctx.bvars_to_db in
@@ -614,7 +670,8 @@ module Conv = struct
 
   let exit_bvar ~handle ctx v =
     let new_map = VarMap.map (fun x -> x - 1) ctx.bvars_to_db in
-    if CCOpt.is_some handle then ctx.bvars_to_db <- VarMap.add v (CCOpt.get_exn handle) new_map
+    if CCOpt.is_some handle then
+      ctx.bvars_to_db <- VarMap.add v (CCOpt.get_exn handle) new_map
     else ctx.bvars_to_db <- new_map
 
   let find_bvar ctx v = VarMap.find_opt v ctx.bvars_to_db
@@ -696,7 +753,13 @@ module Conv = struct
           failwith "cannot convert record-type into type"
       | PT.Meta (_, {contents= Some ty'}, _) ->
           aux depth v2db ty'
-      | PT.Bind _ | PT.AppBuiltin _ | PT.Meta _ | PT.Ite _ | PT.Match _ | PT.Let _ | PT.Multiset _ ->
+      | PT.Bind _
+      | PT.AppBuiltin _
+      | PT.Meta _
+      | PT.Ite _
+      | PT.Match _
+      | PT.Let _
+      | PT.Multiset _ ->
           raise (Error t)
     and aux_var v =
       match Var.Subst.find ctx.vars v with
@@ -721,7 +784,8 @@ module Conv = struct
         ctx.vars <- Var.Subst.add ctx.vars v v' ;
         v'
 
-  let of_simple_term ctx t = try Some (of_simple_term_exn ctx t) with Error _ -> None
+  let of_simple_term ctx t =
+    try Some (of_simple_term_exn ctx t) with Error _ -> None
 
   let rec to_simple_term ?(env = DBEnv.empty) ctx t =
     let rec aux env t =
@@ -752,7 +816,9 @@ module Conv = struct
           let ret = aux env ret in
           PT.Ty.fun_ args ret
       | Forall t' ->
-          let v = Var.of_string ~ty:PT.tType (CCFormat.sprintf "V%d" (DBEnv.size env)) in
+          let v =
+            Var.of_string ~ty:PT.tType (CCFormat.sprintf "V%d" (DBEnv.size env))
+          in
           let t' = aux (DBEnv.push env v) t' in
           PT.bind ~ty:PT.tType Binder.forall_ty v t'
     and aux_var v = var_to_simple_var ~prefix:"A" ctx v in
@@ -761,7 +827,11 @@ module Conv = struct
   and var_to_simple_var ?(prefix = "A") ctx v =
     try VarMap.find v ctx.hvars
     with Not_found ->
-      let v' = Var.of_string ~ty:(to_simple_term ctx (HVar.ty v)) (CCFormat.sprintf "%s%d" prefix (HVar.id v)) in
+      let v' =
+        Var.of_string
+          ~ty:(to_simple_term ctx (HVar.ty v))
+          (CCFormat.sprintf "%s%d" prefix (HVar.id v))
+      in
       ctx.hvars <- VarMap.add v v' ctx.hvars ;
       v'
 end
@@ -803,5 +873,7 @@ let rebuild_rec ?(env = []) (t : t) : t =
 let unsafe_eval_db env t : t =
   if CCList.is_empty env then t
   else
-    let env = List.fold_right (fun ty env -> DBEnv.push env ty) env DBEnv.empty in
+    let env =
+      List.fold_right (fun ty env -> DBEnv.push env ty) env DBEnv.empty
+    in
     of_term_unsafe (T.DB.eval env t)

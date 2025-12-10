@@ -26,7 +26,12 @@ val norm_logical_disagreements :
   -> Term.t list
   -> Term.t list * Term.t list
 
-val occurs_check : depth:int -> subst -> InnerTerm.t HVar.t Scoped.t -> InnerTerm.t Scoped.t -> bool
+val occurs_check :
+     depth:int
+  -> subst
+  -> InnerTerm.t HVar.t Scoped.t
+  -> InnerTerm.t Scoped.t
+  -> bool
 
 val unif_array_com :
      ?size:[`Same | `Smaller]
@@ -55,12 +60,14 @@ val unif_list_com :
   -> 'subst Iter.t
 (** Generic unification over two lists (of the same size or smaller) *)
 
-val pair_lists_right : term -> term list -> term -> term list -> term list * term list
+val pair_lists_right :
+  term -> term list -> term -> term list -> term list * term list
 (** in HO, we have [f1 l1] and [f2 l2], where application is left-associative.
     we need to unify from the right (the outermost application is on
     the right) so this returns pairs to unify (including heads). *)
 
-val pair_lists_left : term list -> term -> term list -> term -> term list * term list
+val pair_lists_left :
+  term list -> term -> term list -> term -> term list * term list
 (** in HO, we have [l1 -> ret1] and [l2 -> ret2], where [->] is right-associative.
     we need to unify from the left,
     so this returns pairs to unify (including return types). *)
@@ -86,12 +93,14 @@ end
 module FO : sig
   include S with type term = Term.t and type ty = Type.t
 
-  val bind_or_update : ?check:bool -> subst -> ty HVar.t Scoped.t -> term Scoped.t -> subst
+  val bind_or_update :
+    ?check:bool -> subst -> ty HVar.t Scoped.t -> term Scoped.t -> subst
 
   val anti_unify : ?cut:int -> term -> term -> (term * term) list option
   (** anti-unification of the two terms, returning disagreement pairs
       @param cut if [cut=n], then the returned list will have length
       at most [n] (if it's too long then [None] is returned) *)
 
-  val pair_lists : term -> term list -> term -> term list -> term list * term list
+  val pair_lists :
+    term -> term list -> term -> term list -> term list * term list
 end

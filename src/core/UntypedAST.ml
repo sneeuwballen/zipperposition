@@ -20,7 +20,10 @@ type data =
            arguments, that is, an optional projector + the type *) }
 
 (** Attributes (general terms) *)
-type attr = A_app of string * attr list | A_quoted of string | A_list of attr list
+type attr =
+  | A_app of string * attr list
+  | A_quoted of string
+  | A_list of attr list
 
 type attrs = attr list
 
@@ -53,7 +56,8 @@ module A = struct
   let list l = A_list l
 end
 
-let name_of_attrs = CCList.find_map (function A_app ("name", [A_quoted n]) -> Some n | _ -> None)
+let name_of_attrs =
+  CCList.find_map (function A_app ("name", [A_quoted n]) -> Some n | _ -> None)
 
 let attr_name n = A.app "name" [A.str n]
 
@@ -98,7 +102,11 @@ let pp_attr =
   and pp_attr out = pp_attr_gen ~inner:true out in
   pp_attr_gen ~inner:false
 
-let pp_attrs out = function [] -> () | l -> Format.fprintf out "@ [@[%a@]]" (Util.pp_list ~sep:", " pp_attr) l
+let pp_attrs out = function
+  | [] ->
+      ()
+  | l ->
+      Format.fprintf out "@ [@[%a@]]" (Util.pp_list ~sep:", " pp_attr) l
 
 let pp_attr_zf = pp_attr
 
@@ -126,20 +134,28 @@ let pp_statement out st =
       fpf out "@[<2>val%a %s :@ @[%a@]@]." pp_attrs attrs id T.pp ty
   | Def l ->
       let pp_def out {def_id= id; def_ty; def_rules} =
-        fpf out "@[<2>@[%s :@ %a@]@ := @[%a@]" id T.pp def_ty (Util.pp_list ~sep:" and " T.pp) def_rules
+        fpf out "@[<2>@[%s :@ %a@]@ := @[%a@]" id T.pp def_ty
+          (Util.pp_list ~sep:" and " T.pp)
+          def_rules
       in
       fpf out "@[<2>def%a %a@]." pp_attrs attrs (Util.pp_list ~sep:"" pp_def) l
   | Rewrite t ->
       fpf out "@[<2>rewrite%a @[%a@]@]." pp_attrs attrs T.pp t
   | Data l ->
       let pp_arg out (_, ty) = T.pp out ty in
-      let pp_cstor out (id, args) = fpf out "@[<2>| @[%s@ %a@]@]" id (Util.pp_list ~sep:" " pp_arg) args in
+      let pp_cstor out (id, args) =
+        fpf out "@[<2>| @[%s@ %a@]@]" id (Util.pp_list ~sep:" " pp_arg) args
+      in
       let pp_data out d =
         fpf out "@[%s %a@] :=@ @[<v>%a@]" d.data_name
           (Util.pp_list ~sep:" " CCFormat.string)
-          d.data_vars (Util.pp_list ~sep:"" pp_cstor) d.data_cstors
+          d.data_vars
+          (Util.pp_list ~sep:"" pp_cstor)
+          d.data_cstors
       in
-      fpf out "@[<v>data%a@ %a@]." pp_attrs attrs (Util.pp_list ~sep:" and " pp_data) l
+      fpf out "@[<v>data%a@ %a@]." pp_attrs attrs
+        (Util.pp_list ~sep:" and " pp_data)
+        l
   | Assert f ->
       fpf out "@[<2>assert%a@ @[%a@]@]." pp_attrs attrs T.pp f
   | Lemma f ->
@@ -154,7 +170,8 @@ exception Parse_error of Loc.t * string
 let () =
   Printexc.register_printer (function
     | Parse_error (loc, msg) ->
-        Some (CCFormat.sprintf "@[<4>parse error:@ @[%s@]@ at %a@]" msg Loc.pp loc)
+        Some
+          (CCFormat.sprintf "@[<4>parse error:@ @[%s@]@ at %a@]" msg Loc.pp loc)
     | _ ->
         None )
 

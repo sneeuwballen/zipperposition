@@ -88,7 +88,8 @@ let[@unroll 2] rec deref subst ((t, sc_t) as term) =
 
 (** Recursively lookup a variable in the substitution, until we get a value
     that is not a variable or that is not bound *)
-let get_var subst v = match find subst v with None -> None | Some t -> Some (deref subst t)
+let get_var subst v =
+  match find subst v with None -> None | Some t -> Some (deref subst t)
 
 exception InconsistentBinding of var Scoped.t * term Scoped.t * term Scoped.t
 
@@ -96,8 +97,8 @@ let () =
   Printexc.register_printer (function
     | InconsistentBinding (v, t1, t2) ->
         let msg =
-          CCFormat.sprintf "@[<2>inconsistent binding@ for %a: %a@ and %a@]" (Scoped.pp T.pp_var) v
-            (Scoped.pp T.pp) t1 (Scoped.pp T.pp) t2
+          CCFormat.sprintf "@[<2>inconsistent binding@ for %a: %a@ and %a@]"
+            (Scoped.pp T.pp_var) v (Scoped.pp T.pp) t1 (Scoped.pp T.pp) t2
         in
         Some msg
     | _ ->
@@ -126,7 +127,8 @@ let merge s1 s2 =
       | _, None ->
           b1
       | Some t1, Some t2 ->
-          if Scoped.equal T.equal t1 t2 then Some t1 else raise (InconsistentBinding (v, t1, t2)) )
+          if Scoped.equal T.equal t1 t2 then Some t1
+          else raise (InconsistentBinding (v, t1, t2)) )
     s1 s2
 
 (* TODO check with someone who knows the code that this implementation is correct*)
@@ -134,7 +136,9 @@ let merge s1 s2 =
 let compose s1 s2 =
   let s_iter1 = M.to_iter s1 in
   let s_iter2 = M.to_iter s2 in
-  M.of_iter (Iter.append s_iter2 (Iter.filter (fun (sc_var, _) -> not (M.mem sc_var s2)) s_iter1))
+  M.of_iter
+    (Iter.append s_iter2
+       (Iter.filter (fun (sc_var, _) -> not (M.mem sc_var s2)) s_iter1) )
 
 let fold f acc subst = M.fold (fun v t acc -> f acc v t) subst acc
 
@@ -151,14 +155,19 @@ let is_renaming subst =
   let rev =
     codomain subst
     |> Iter.filter_map (fun (t, sc_t) ->
-           match T.view (Lambda.Inner.eta_reduce t) with T.Var v -> Some ((v, sc_t), ()) | _ -> None )
+           match T.view (Lambda.Inner.eta_reduce t) with
+           | T.Var v ->
+               Some ((v, sc_t), ())
+           | _ ->
+               None )
     |> M.of_iter
   in
   (* as many variables in codomain as variables in domain *)
   M.cardinal rev = M.cardinal subst
 
 (* variables introduced by the subst *)
-let introduced subst k = M.iter (fun _ (t, sc_t) -> T.Seq.vars t (fun v -> k (v, sc_t))) subst
+let introduced subst k =
+  M.iter (fun _ (t, sc_t) -> T.Seq.vars t (fun v -> k (v, sc_t))) subst
 
 let normalize subst : t =
   let rec aux sc t =
@@ -168,7 +177,11 @@ let normalize subst : t =
       match T.view t with
       | T.Var v -> (
         (* follow binding if it stays in the same domain *)
-        match find subst (v, sc) with Some (u, sc') when sc = sc' -> aux sc u | _ -> T.var (HVar.cast ~ty v) )
+        match find subst (v, sc) with
+        | Some (u, sc') when sc = sc' ->
+            aux sc u
+        | _ ->
+            T.var (HVar.cast ~ty v) )
       | T.DB i ->
           T.bvar ~ty i
       | T.Const id ->
@@ -191,20 +204,28 @@ let[@inline] to_iter subst k = M.iter (fun v t -> k (v, t)) subst
 
 let[@inline] to_list subst = M.fold (fun v t acc -> (v, t) :: acc) subst []
 
-let of_iter ?(init = empty) seq = Iter.fold (fun subst (v, t) -> bind subst v t) init seq
+let of_iter ?(init = empty) seq =
+  Iter.fold (fun subst (v, t) -> bind subst v t) init seq
 
 let of_list ?(init = empty) l =
-  match l with [] -> init | _ :: _ -> List.fold_left (fun subst (v, t) -> bind subst v t) init l
+  match l with
+  | [] ->
+      init
+  | _ :: _ ->
+      List.fold_left (fun subst (v, t) -> bind subst v t) init l
 
 let[@inline] equal (s1 : t) s2 : bool = M.equal (Scoped.equal T.equal) s1 s2
 
 let[@inline] compare s1 s2 = M.compare (Scoped.compare T.compare) s1 s2
 
-let[@inline] hash (s : t) : int = CCHash.(iter (pair (Scoped.hash HVar.hash) (Scoped.hash T.hash))) (M.to_iter s)
+let[@inline] hash (s : t) : int =
+  CCHash.(iter (pair (Scoped.hash HVar.hash) (Scoped.hash T.hash)))
+    (M.to_iter s)
 
 let pp_bindings out subst =
   let pp_binding out (v, t) =
-    Format.fprintf out "@[<2>@[%a@] @<1>→@ @[%a@]@]" (Scoped.pp T.pp_var) v (Scoped.pp T.pp) t
+    Format.fprintf out "@[<2>@[%a@] @<1>→@ @[%a@]@]" (Scoped.pp T.pp_var) v
+      (Scoped.pp T.pp) t
   in
   Util.pp_iter ~sep:", " pp_binding out (to_iter subst)
 
@@ -258,10 +279,12 @@ let apply_aux ~sv subst ~f_rename t sc =
             | T.App (hd, l) ->
                 let hd' = aux hd sc_t depth in
                 let l' = aux_list l sc_t depth in
-                if T.equal ty ty' && T.equal hd hd' && T.same_l l l' then t else T.app ~ty:ty' hd' l'
+                if T.equal ty ty' && T.equal hd hd' && T.same_l l l' then t
+                else T.app ~ty:ty' hd' l'
             | T.AppBuiltin (s, l) ->
                 let l' = aux_list l sc_t depth in
-                if T.equal ty ty' && T.same_l l l' then t else T.app_builtin ~ty:ty' s l'
+                if T.equal ty ty' && T.same_l l l' then t
+                else T.app_builtin ~ty:ty' s l'
           in
           res
   and aux_list l sc depth =
@@ -278,7 +301,10 @@ let apply_aux ~sv subst ~f_rename t sc =
 (* Apply substitution to a term and rename variables not bound by [subst]*)
 let apply ?(shift_vars = -1) renaming subst (t, sc) =
   if is_empty subst && Renaming.is_none renaming then t
-  else apply_aux ~sv:shift_vars subst ~f_rename:(Renaming.rename_with_type renaming) t sc
+  else
+    apply_aux ~sv:shift_vars subst
+      ~f_rename:(Renaming.rename_with_type renaming)
+      t sc
 
 (** {2 Specializations} *)
 
@@ -327,7 +353,8 @@ module Ty : SPECIALIZED with type term = Type.t = struct
     Scoped.map Type.of_term_unsafe t
 
   let apply ?(shift_vars = -1) renaming subst t =
-    Type.of_term_unsafe (apply ~shift_vars renaming subst (t : term Scoped.t :> T.t Scoped.t))
+    Type.of_term_unsafe
+      (apply ~shift_vars renaming subst (t : term Scoped.t :> T.t Scoped.t))
 
   let bind = (bind :> t -> var Scoped.t -> term Scoped.t -> t)
 
@@ -354,7 +381,8 @@ module FO = struct
     Scoped.map Term.of_term_unsafe t
 
   let apply ?(shift_vars = -1) renaming subst t =
-    Term.of_term_unsafe (apply ~shift_vars renaming subst (t : term Scoped.t :> T.t Scoped.t))
+    Term.of_term_unsafe
+      (apply ~shift_vars renaming subst (t : term Scoped.t :> T.t Scoped.t))
 
   let apply_l ?(shift_vars = -1) renaming subst (l, sc) =
     List.map (fun t -> apply ~shift_vars renaming subst (t, sc)) l
@@ -365,8 +393,11 @@ module FO = struct
     let subs_as_map =
       List.map
         (fun ((v, sc_v), (t, sc_t)) ->
-          ((v, sc_v), ((Lambda.snf (apply Renaming.none s2 (Term.of_term_unsafe t, sc_t)) : term :> T.t), scope))
-          )
+          ( (v, sc_v)
+          , ( ( Lambda.snf (apply Renaming.none s2 (Term.of_term_unsafe t, sc_t))
+                : term
+                :> T.t )
+            , scope ) ) )
         subs_l1
       @ to_list s2
     in
@@ -405,14 +436,18 @@ module FO = struct
 
   let update' = (update :> t -> Type.t HVar.t Scoped.t -> term Scoped.t -> t)
 
-  let of_list' = (of_list :> ?init:t -> (Type.t HVar.t Scoped.t * term Scoped.t) list -> t)
+  let of_list' =
+    (of_list :> ?init:t -> (Type.t HVar.t Scoped.t * term Scoped.t) list -> t)
   (* let to_list = (to_list :>  t -> (Type.t HVar.t Scoped.t * term Scoped.t) list ) *)
 
   let map f s = map (fun t -> (f (Term.of_term_unsafe t) : term :> T.t)) s
 
   let filter f s =
     filter
-      (fun (v, sc_v) (t, sc_t) -> f (HVar.update_ty ~f:Type.of_term_unsafe v, sc_v) (Term.of_term_unsafe t, sc_t))
+      (fun (v, sc_v) (t, sc_t) ->
+        f
+          (HVar.update_ty ~f:Type.of_term_unsafe v, sc_v)
+          (Term.of_term_unsafe t, sc_t) )
       s
 
   let iter f s =
@@ -430,7 +465,9 @@ module FO = struct
         (fun ((v, sc_v), (t, sc_t)) (l, sk_map) ->
           let t = Term.of_term_unsafe t in
           Util.debugf 1 " unleaking in unleak_vars : %a" (fun k -> k Term.pp t) ;
-          let t', sk_map = Term.DB.skolemize_loosely_bound ~already_sk:sk_map t in
+          let t', sk_map =
+            Term.DB.skolemize_loosely_bound ~already_sk:sk_map t
+          in
           let v' = (HVar.update_ty ~f:Type.of_term_unsafe v, sc_v) in
           ((v', (t', sc_t)) :: l, sk_map) )
         subs_l ([], Term.IntMap.empty)
@@ -443,15 +480,17 @@ module FO = struct
         List.filter
           (fun v ->
             let der_t, der_sc = deref subst v in
-            if der_sc != snd v then der_sc = res_scope else der_sc = res_scope && not (Term.equal (fst v) der_t)
-            )
+            if der_sc != snd v then der_sc = res_scope
+            else der_sc = res_scope && not (Term.equal (fst v) der_t) )
           subset
       in
       let derefed_vars =
         CCList.map
           (fun v ->
             let derefed = deref subst v in
-            if not (Term.is_var (fst derefed)) then raise (invalid_arg "found a non-variable") else derefed )
+            if not (Term.is_var (fst derefed)) then
+              raise (invalid_arg "found a non-variable")
+            else derefed )
           subset
         |> CCList.sort_uniq ~cmp:(Scoped.compare Term.compare)
       in
@@ -480,18 +519,21 @@ module Projection = struct
         else l )
       [] p.subst
 
-  let as_inst ?allow_free_db ~ctx (sp : t) (vars : _ HVar.t list) : (_, _) Var.Subst.t =
+  let as_inst ?allow_free_db ~ctx (sp : t) (vars : _ HVar.t list) :
+      (_, _) Var.Subst.t =
     List.map
       (fun v ->
         let t_v = Term.var v in
         let t = FO.apply (renaming sp) (subst sp) (t_v, scope sp) in
-        (Term.Conv.var_to_simple_var ctx v, Term.Conv.to_simple_term ?allow_free_db ctx t) )
+        ( Term.Conv.var_to_simple_var ctx v
+        , Term.Conv.to_simple_term ?allow_free_db ctx t ) )
       vars
     |> Var.Subst.of_list
 
   let[@inline] make renaming (subst, sc) : t = {scope= sc; subst; renaming}
 
-  let[@inline] is_empty (p : t) : bool = is_empty p.subst && Renaming.is_none p.renaming
+  let[@inline] is_empty (p : t) : bool =
+    is_empty p.subst && Renaming.is_none p.renaming
 
   let pp out (p : t) : unit = Format.fprintf out "%a[%d]" pp p.subst p.scope
 end

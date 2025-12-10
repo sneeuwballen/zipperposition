@@ -22,7 +22,10 @@
 *)
 
 type t = private
-  {id: int; name: string; mutable payload: exn list  (** Use [exn] as an open type for user-defined payload *)}
+  { id: int
+  ; name: string
+  ; mutable payload: exn list
+        (** Use [exn] as an open type for user-defined payload *) }
 
 val make : string -> t
 (** Makes a fresh ID *)

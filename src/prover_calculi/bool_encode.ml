@@ -151,34 +151,48 @@ let boolean_axioms =
   let alpha = T.var alpha_var in
   let alpha_x = T.var (Var.make ~ty:alpha (ID.make "X")) in
   let alpha_y = T.var (Var.make ~ty:alpha (ID.make "Y")) in
-  let alpha2bool_p = T.var (Var.make ~ty:([alpha] ==> bool_clone_ty) (ID.make "P")) in
+  let alpha2bool_p =
+    T.var (Var.make ~ty:([alpha] ==> bool_clone_ty) (ID.make "P"))
+  in
   (* x = T \/ x = F *)
-  let either_true_or_false = [SLiteral.eq bool_x true_term; SLiteral.eq bool_x false_term] in
+  let either_true_or_false =
+    [SLiteral.eq bool_x true_term; SLiteral.eq bool_x false_term]
+  in
   (* T != F *)
   let true_neq_false = [SLiteral.neq true_term false_term] in
   (* and T x = x *)
   let and_true = [SLiteral.eq (app_bool and_term [true_term; bool_x]) bool_x] in
   (* and F x = F *)
-  let and_false = [SLiteral.eq (app_bool and_term [false_term; bool_x]) false_term] in
+  let and_false =
+    [SLiteral.eq (app_bool and_term [false_term; bool_x]) false_term]
+  in
   (* not T = F *)
   let not_true = [SLiteral.eq (app_bool not_term [true_term]) false_term] in
   (* not F = T *)
   let not_false = [SLiteral.eq (app_bool not_term [false_term]) true_term] in
   (* or T x = T *)
-  let or_true = [SLiteral.eq (app_bool or_term [true_term; bool_x]) true_term] in
+  let or_true =
+    [SLiteral.eq (app_bool or_term [true_term; bool_x]) true_term]
+  in
   (* or F x = x *)
   let or_false = [SLiteral.eq (app_bool or_term [false_term; bool_x]) bool_x] in
   (* impl T x = x *)
   let impl_t = [SLiteral.eq (app_bool impl_term [true_term; bool_x]) bool_x] in
   (* impl F x = T *)
-  let impl_f = [SLiteral.eq (app_bool impl_term [false_term; bool_x]) true_term] in
+  let impl_f =
+    [SLiteral.eq (app_bool impl_term [false_term; bool_x]) true_term]
+  in
   let equiv_def =
     [ SLiteral.eq
         (app_bool equiv_term [bool_x; bool_y])
-        (app_bool and_term [app_bool impl_term [bool_x; bool_y]; app_bool impl_term [bool_y; bool_x]]) ]
+        (app_bool and_term
+           [ app_bool impl_term [bool_x; bool_y]
+           ; app_bool impl_term [bool_y; bool_x] ] ) ]
   in
   let xor_def =
-    [SLiteral.eq (app_bool xor_term [bool_x; bool_y]) (app_bool not_term [app_bool equiv_term [bool_x; bool_y]])]
+    [ SLiteral.eq
+        (app_bool xor_term [bool_x; bool_y])
+        (app_bool not_term [app_bool equiv_term [bool_x; bool_y]]) ]
   in
   let eq_x_y = app_bool eq_term [alpha; alpha_x; alpha_y] in
   let neq_x_y = app_bool neq_term [alpha; alpha_x; alpha_y] in
@@ -188,16 +202,22 @@ let boolean_axioms =
   let eq_false = [SLiteral.eq alpha_x alpha_y; SLiteral.eq eq_x_y false_term] in
   (* neq x y = not (eq x y) *)
   let neq_is_not_eq = [SLiteral.eq neq_x_y (app_bool not_term [eq_x_y])] in
-  let lambda_x_true = T.close_with_vars ~binder:Binder.Lambda [alpha_x] true_term in
+  let lambda_x_true =
+    T.close_with_vars ~binder:Binder.Lambda [alpha_x] true_term
+  in
   (* forall (\x. T) = T *)
-  let forall_true = [SLiteral.eq (app_bool forall_term [alpha; lambda_x_true]) true_term] in
+  let forall_true =
+    [SLiteral.eq (app_bool forall_term [alpha; lambda_x_true]) true_term]
+  in
   (* P = \x. T \/ forall P = F *)
   let forall_false =
-    [SLiteral.eq alpha2bool_p lambda_x_true; SLiteral.eq (app_bool forall_term [alpha; alpha2bool_p]) false_term]
+    [ SLiteral.eq alpha2bool_p lambda_x_true
+    ; SLiteral.eq (app_bool forall_term [alpha; alpha2bool_p]) false_term ]
   in
   (* \x. not (P x) *)
   let l_not_p_x =
-    T.close_with_vars ~binder:Binder.Lambda [alpha_x] (app_bool not_term [app_bool alpha2bool_p [alpha_x]])
+    T.close_with_vars ~binder:Binder.Lambda [alpha_x]
+      (app_bool not_term [app_bool alpha2bool_p [alpha_x]])
   in
   (* exists P = not (forall (\x. not (P x))) *)
   let exists_def =
@@ -207,9 +227,13 @@ let boolean_axioms =
   in
   (* P X *)
   let p_x = app_bool alpha2bool_p [alpha_x] in
-  let p_choice_p = app_bool alpha2bool_p [T.app ~ty:alpha choice_term [alpha; alpha2bool_p]] in
+  let p_choice_p =
+    app_bool alpha2bool_p [T.app ~ty:alpha choice_term [alpha; alpha2bool_p]]
+  in
   (* p x \/ p (choice p) *)
-  let choice_def = [SLiteral.eq p_x false_term; SLiteral.eq p_choice_p true_term] in
+  let choice_def =
+    [SLiteral.eq p_x false_term; SLiteral.eq p_choice_p true_term]
+  in
   Iter.of_list
     [ either_true_or_false
     ; true_neq_false
@@ -242,7 +266,8 @@ let bool_encode_ty ty_orig =
         T.Ty.fun_ args' ret'
     | T.AppBuiltin (f, args) ->
         assert (f != Builtin.Arrow) ;
-        if f == Builtin.Prop then bool_clone_ty else T.app_builtin ~ty:T.tType f (List.map aux args)
+        if f == Builtin.Prop then bool_clone_ty
+        else T.app_builtin ~ty:T.tType f (List.map aux args)
     | T.Const _ ->
         ty
     | T.Var _ ->
@@ -294,8 +319,11 @@ let bool_encode_term t_orig =
                 app_bool head [aux x]
             | x :: y :: tts ->
                 let init = app_bool head [aux x; aux y] in
-                List.fold_left (fun acc arg -> app_bool head [acc; aux arg]) init tts )
-        | T.AppBuiltin (((Eq | Equiv | Neq | Xor) as b), [x; y]) when T.Ty.is_prop (T.ty_exn x) ->
+                List.fold_left
+                  (fun acc arg -> app_bool head [acc; aux arg])
+                  init tts )
+        | T.AppBuiltin (((Eq | Equiv | Neq | Xor) as b), [x; y])
+          when T.Ty.is_prop (T.ty_exn x) ->
             assert (T.equal (T.ty_exn x) (T.ty_exn y)) ;
             let head = if b = Equiv || b = Eq then equiv_term else xor_term in
             let x = aux x and y = aux y in
@@ -335,19 +363,25 @@ let bool_encode_term t_orig =
             let head = if b = Forall then forall_term else exists_term in
             let x = encode_var x in
             let ty_arg = Var.ty x in
-            let fun_body = T.close_with_vars ~binder:Binder.Lambda [T.var x] (aux body) in
+            let fun_body =
+              T.close_with_vars ~binder:Binder.Lambda [T.var x] (aux body)
+            in
             app_bool head [ty_arg; fun_body]
         | _ ->
             failwith "Not implemented: Other kind of term"
     with Invalid_argument ty_err ->
       let err =
-        CCFormat.sprintf "Subterm @[%a@]:@[%a@] of @[%a@] cannot be encoded because of type error: @[%s@]" T.pp t
-          T.pp (T.ty_exn t) T.pp t_orig ty_err
+        CCFormat.sprintf
+          "Subterm @[%a@]:@[%a@] of @[%a@] cannot be encoded because of type \
+           error: @[%s@]"
+          T.pp t T.pp (T.ty_exn t) T.pp t_orig ty_err
       in
-      if CCString.prefix ~pre:"type" ty_err then invalid_arg err else invalid_arg ty_err
+      if CCString.prefix ~pre:"type" ty_err then invalid_arg err
+      else invalid_arg ty_err
   in
   let res = aux t_orig in
-  Util.debugf ~section 1 "Encoded term @[%a@] into @[%a@]" (fun k -> k T.pp t_orig T.pp res) ;
+  Util.debugf ~section 1 "Encoded term @[%a@] into @[%a@]" (fun k ->
+      k T.pp t_orig T.pp res ) ;
   res
 
 let bool_encode_lit lit =
@@ -389,14 +423,22 @@ let res_tc =
     ~to_exn:(fun i -> E_i i)
     ~compare ~pp_in:pp_clause_in ~is_stmt:true ~name:Statement.name
     ~to_form:(fun ~ctx st ->
-      let conv_c (c : T.t SLiteral.t list) : _ = c |> List.map SLiteral.to_form |> T.Form.or_ in
+      let conv_c (c : T.t SLiteral.t list) : _ =
+        c |> List.map SLiteral.to_form |> T.Form.or_
+      in
       Statement.Seq.forms st |> Iter.map conv_c |> Iter.to_list |> T.Form.and_ )
     ()
 
 (** encode a statement *)
 let bool_encode_stmt stmt =
-  let as_proof = Proof.S.mk (Statement.proof_step stmt) (Proof.Result.make res_tc stmt) in
-  let proof = Proof.Step.esa ~rule:(Proof.Rule.mk "bool_encode") [as_proof |> Proof.Parent.from] in
+  let as_proof =
+    Proof.S.mk (Statement.proof_step stmt) (Proof.Result.make res_tc stmt)
+  in
+  let proof =
+    Proof.Step.esa
+      ~rule:(Proof.Rule.mk "bool_encode")
+      [as_proof |> Proof.Parent.from]
+  in
   let res =
     match Statement.view stmt with
     | Statement.Data _ ->
@@ -406,15 +448,21 @@ let bool_encode_stmt stmt =
     | Statement.Goal lits ->
         failwith "Not implemented: Goal"
     | Statement.Def def ->
-        let map_single = Statement.map_def ~form:bool_encode_lits ~term:bool_encode_term ~ty:bool_encode_ty in
+        let map_single =
+          Statement.map_def ~form:bool_encode_lits ~term:bool_encode_term
+            ~ty:bool_encode_ty
+        in
         Statement.def ~proof (List.map map_single def)
     | Statement.Rewrite def ->
         let new_def =
-          Statement.map_def_rule ~form:bool_encode_lits ~term:bool_encode_term ~ty:bool_encode_ty def
+          Statement.map_def_rule ~form:bool_encode_lits ~term:bool_encode_term
+            ~ty:bool_encode_ty def
         in
         Statement.rewrite ~proof new_def
     | Statement.NegatedGoal (skolems, clauses) ->
-        let skolems = List.map (fun (id, ty) -> (id, bool_encode_ty ty)) skolems in
+        let skolems =
+          List.map (fun (id, ty) -> (id, bool_encode_ty ty)) skolems
+        in
         Statement.neg_goal ~proof ~skolems (List.map bool_encode_lits clauses)
     | Statement.Assert lits ->
         Statement.assert_ ~proof (bool_encode_lits lits)
@@ -429,7 +477,9 @@ let extension =
       Util.debug ~section 2 "Start boolean encoding" ;
       (* Encode statements *)
       let seq = Iter.map bool_encode_stmt seq in
-      let axioms = Iter.map (Statement.assert_ ~proof:Proof.Step.trivial) boolean_axioms in
+      let axioms =
+        Iter.map (Statement.assert_ ~proof:Proof.Step.trivial) boolean_axioms
+      in
       (* Add type declarations *)
       let seq = Iter.append ty_decls (Iter.append axioms seq) in
       (* Add extensionality axiom *)
@@ -441,4 +491,6 @@ let extension =
 
 let () =
   Options.add_opts
-    [("--encode-booleans", Arg.Bool (( := ) enabled_), " enable encoding of booleans into a fresh type")]
+    [ ( "--encode-booleans"
+      , Arg.Bool (( := ) enabled_)
+      , " enable encoding of booleans into a fresh type" ) ]

@@ -22,7 +22,13 @@ module NodeTagMap = Map.Make (struct
   let compare a b =
     let c = compare (tag_to_id a) (tag_to_id b) in
     if c == 0 then
-      match (a, b) with Sym id, Sym id' -> ID.compare id id' | BT b, BT b' -> Builtin.compare b b' | _ -> 0
+      match (a, b) with
+      | Sym id, Sym id' ->
+          ID.compare id id'
+      | BT b, BT b' ->
+          Builtin.compare b b'
+      | _ ->
+          0
     else c
 end)
 
@@ -47,14 +53,20 @@ struct
         (Sym id, [])
     | App (hd, args) ->
         assert (T.is_const hd || T.is_var hd || T.is_bvar hd) ;
-        if T.is_var hd || T.is_bvar hd then (Var, []) else (Sym (T.as_const_exn hd), remove_tys args)
+        if T.is_var hd || T.is_bvar hd then (Var, [])
+        else (Sym (T.as_const_exn hd), remove_tys args)
     | AppBuiltin (hd, args) ->
         (BT hd, remove_tys args)
     | Fun (_, body) ->
         split_tag_args body
 
   let calc_fails ts =
-    let rec aux acc = function x :: xs -> aux (1 + acc) (snd (split_tag_args x) @ xs) | [] -> acc in
+    let rec aux acc = function
+      | x :: xs ->
+          aux (1 + acc) (snd (split_tag_args x) @ xs)
+      | [] ->
+          acc
+    in
     aux 0 ts
 
   let insert_term t =
@@ -67,7 +79,9 @@ struct
               let subtree = aux Empty rest in
               Node (NodeTagMap.singleton tag subtree)
           | Node branches ->
-              let branch = CCOpt.get_or ~default:Empty (NodeTagMap.find_opt tag branches) in
+              let branch =
+                CCOpt.get_or ~default:Empty (NodeTagMap.find_opt tag branches)
+              in
               let subtree = aux branch rest in
               Node (NodeTagMap.add tag subtree branches) )
       | _ ->
@@ -91,7 +105,10 @@ struct
             | Some subtree ->
                 aux (matches + 1) subtree (args @ ts) ) )
     in
-    let matches, fails = CCPair.map_same float_of_int (aux 0 !_trie [Lambda.eta_expand (Lambda.snf t)]) in
+    let matches, fails =
+      CCPair.map_same float_of_int
+        (aux 0 !_trie [Lambda.eta_expand (Lambda.snf t)])
+    in
     Util.debugf ~section 1 "(%a, %g, %g)" (fun k -> k T.pp t matches fails) ;
     int_of_float ((P.match_weight *. matches) +. (P.miss_weight *. fails))
 end

@@ -28,7 +28,8 @@ let pp out (i : t) =
       CCFormat.string out "dk"
 
 (** What to do when we have an undefined ID in the corresponding format? *)
-let on_undef_id (i : t) = match i with I_tptp -> `Guess | I_dk | I_tip | I_zf -> `Fail
+let on_undef_id (i : t) =
+  match i with I_tptp -> `Guess | I_dk | I_tip | I_zf -> `Fail
 
 (** What to do when we have a shadowing decl? *)
 let on_shadow (i : t) =
@@ -39,7 +40,9 @@ let on_shadow (i : t) =
       if b then `Warn else `Ignore
 
 (** what to do when we have a variable without a type declaration? *)
-let on_var (i : t) = match i with I_tptp -> `Default | I_dk | I_tip | I_zf -> `Infer
+let on_var (i : t) =
+  match i with I_tptp -> `Default | I_dk | I_tip | I_zf -> `Infer
 
 (** Do we add implicit type parameters when '@' is not present? *)
-let implicit_ty_args (i : t) : bool = match i with I_tptp | I_dk -> false | I_tip | I_zf -> true
+let implicit_ty_args (i : t) : bool =
+  match i with I_tptp | I_dk -> false | I_tip | I_zf -> true

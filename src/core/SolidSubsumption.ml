@@ -66,16 +66,31 @@ struct
     | _ ->
         invalid_arg "cannot open builtin"
 
-  let open_app = function App (hds, args, repls) -> (hds, args, repls) | _ -> invalid_arg "cannot open app"
+  let open_app = function
+    | App (hds, args, repls) ->
+        (hds, args, repls)
+    | _ ->
+        invalid_arg "cannot open app"
 
-  let open_fun = function Fun (ty, bodys) -> (ty, bodys) | _ -> invalid_arg "cannot open fun"
+  let open_fun = function
+    | Fun (ty, bodys) ->
+        (ty, bodys)
+    | _ ->
+        invalid_arg "cannot open fun"
 
-  let open_repl = function Repl repls -> repls | _ -> invalid_arg "cannot open repl"
+  let open_repl = function
+    | Repl repls ->
+        repls
+    | _ ->
+        invalid_arg "cannot open repl"
 
   let repl repls =
     if TS.for_all bvar_or_const repls then Repl repls
     else
-      let err_msg = CCFormat.sprintf "replacements must be ground: @[%a@]" (TS.pp T.pp) repls in
+      let err_msg =
+        CCFormat.sprintf "replacements must be ground: @[%a@]" (TS.pp T.pp)
+          repls
+      in
       invalid_arg err_msg
 
   let rec of_term term =
@@ -94,11 +109,13 @@ struct
     let sepw = CCFormat.return "@ " in
     function
     | AppBuiltin (b, args, repls) ->
-        CCFormat.fprintf out "|@[%a@](@[%a@])|@[%a@]|" Builtin.pp b (Util.pp_list ~sep:"," pp) args
-          (TS.pp ~pp_sep:sepw T.pp) repls
+        CCFormat.fprintf out "|@[%a@](@[%a@])|@[%a@]|" Builtin.pp b
+          (Util.pp_list ~sep:"," pp) args (TS.pp ~pp_sep:sepw T.pp) repls
     | App (hds, args, repls) ->
-        CCFormat.fprintf out "|{@[%a@]}(@[%a@])|@[%a@]|" (TS.pp ~pp_sep:sepc T.pp) hds
-          (CCList.pp ~pp_sep:sepc pp) args (TS.pp ~pp_sep:sepw T.pp) repls
+        CCFormat.fprintf out "|{@[%a@]}(@[%a@])|@[%a@]|"
+          (TS.pp ~pp_sep:sepc T.pp) hds
+          (CCList.pp ~pp_sep:sepc pp)
+          args (TS.pp ~pp_sep:sepw T.pp) repls
     | Fun (ty, repls) ->
         CCFormat.fprintf out "|l@[%a@].@[%a@]|" Type.pp ty pp repls
     | Repl repls ->
@@ -108,9 +125,15 @@ struct
     let n = List.length solids in
     let rec aux ~depth s_args t : multiterm =
       (* All the ways in which we can represent term t using solids *)
-      let sols_as_db = List.mapi (fun i t -> (t, T.bvar ~ty:(T.ty t) (n - i - 1 + depth))) s_args in
+      let sols_as_db =
+        List.mapi
+          (fun i t -> (t, T.bvar ~ty:(T.ty t) (n - i - 1 + depth)))
+          s_args
+      in
       let matches_of_solids target =
-        CCList.filter_map (fun (s, s_db) -> if T.equal s target then Some s_db else None) sols_as_db
+        CCList.filter_map
+          (fun (s, s_db) -> if T.equal s target then Some s_db else None)
+          sols_as_db
         |> TS.of_list
       in
       let db_hits = matches_of_solids t in
@@ -142,19 +165,24 @@ struct
       | AppBuiltin (s_b, s_args, s_repls) ->
           let t_b, t_args, t_repls = open_builtin t in
           if s_b = t_b then
-            let args = List.map (fun (s, t) -> aux s t) @@ List.combine s_args t_args in
+            let args =
+              List.map (fun (s, t) -> aux s t) @@ List.combine s_args t_args
+            in
             app_builtin s_b args (TS.inter s_repls t_repls)
           else raise SolidMatchFail
       | App (s_hds, s_args, s_repls) ->
           let t_hds, t_args, t_repls = open_app t in
           let i_hds = TS.inter s_hds t_hds in
           if not @@ TS.is_empty i_hds then
-            let args = List.map (fun (s, t) -> aux s t) @@ List.combine s_args t_args in
+            let args =
+              List.map (fun (s, t) -> aux s t) @@ List.combine s_args t_args
+            in
             app i_hds args (TS.inter s_repls t_repls)
           else raise SolidMatchFail
       | Fun (s_ty, s_bodys) ->
           let t_ty, t_bodys = open_fun t in
-          if Type.equal s_ty t_ty then fun_ s_ty (aux s_bodys t_bodys) else raise SolidMatchFail
+          if Type.equal s_ty t_ty then fun_ s_ty (aux s_bodys t_bodys)
+          else raise SolidMatchFail
       | Repl repls ->
           let res = TS.inter repls (open_repl t) in
           if TS.is_empty res then raise SolidMatchFail else repl res
@@ -172,7 +200,9 @@ struct
 
   let refine_subst_w_subst metasubst subst =
     let res = ref metasubst in
-    Subst.FO.iter (fun (v, _) (t, _) -> res := refine_subst_w_term !res v (of_term t)) subst ;
+    Subst.FO.iter
+      (fun (v, _) (t, _) -> res := refine_subst_w_term !res v (of_term t))
+      subst ;
     !res
 
   let solid_match ~subst ~pattern ~target =
@@ -188,13 +218,18 @@ struct
           | AppBuiltin (b', args') when Builtin.equal b b' -> (
             try
               let mode = Flex_state.get_exn PragUnifParams.k_logop_mode S.st in
-              let args, args' = Unif.norm_logical_disagreements ~mode b args args' in
-              List.fold_left (fun subst (l', r') -> aux subst l' r') subst (List.combine args args')
+              let args, args' =
+                Unif.norm_logical_disagreements ~mode b args args'
+              in
+              List.fold_left
+                (fun subst (l', r') -> aux subst l' r')
+                subst (List.combine args args')
             with
             | Unif.Fail ->
                 raise SolidMatchFail
             | Invalid_argument _ ->
-                CCFormat.printf "Error:@[%a@]::@.@[%a@]@." T.pp pattern T.pp target ;
+                CCFormat.printf "Error:@[%a@]::@.@[%a@]@." T.pp pattern T.pp
+                  target ;
                 CCFormat.printf "l:@[%a@]@." T.pp l ;
                 CCFormat.printf "r:@[%a@]@." T.pp r ;
                 assert false )
@@ -206,9 +241,12 @@ struct
             assert (T.is_const hd || T.is_bvar hd) ;
             match T.view r with
             | App (hd', args') when T.equal hd hd' ->
-                if List.length args != List.length args' then (* polymorphism *)
+                if List.length args != List.length args' then
+                  (* polymorphism *)
                   raise SolidMatchFail ;
-                List.fold_left (fun subst (l', r') -> aux subst l' r') subst (List.combine args args')
+                List.fold_left
+                  (fun subst (l', r') -> aux subst l' r')
+                  subst (List.combine args args')
             | _ ->
                 raise SolidMatchFail )
         | Fun _ ->
@@ -232,7 +270,9 @@ struct
 
   let normaize_clauses subsumer target =
     try
-      let eta_exp_snf ?(f = CCFun.id) = Ls.map (fun t -> f @@ Lambda.eta_expand @@ Lambda.snf @@ t) in
+      let eta_exp_snf ?(f = CCFun.id) =
+        Ls.map (fun t -> f @@ Lambda.eta_expand @@ Lambda.snf @@ t)
+      in
       let target' = Ls.ground_lits @@ eta_exp_snf target in
       let subsumer' = eta_exp_snf ~f:(SU.solidify ~limit:false) subsumer in
       (* We populate app_var_map to contain indices of all arguments that
@@ -249,11 +289,13 @@ struct
   let subsumption_cmp l1 l2 =
     let sign_res = cmp_by_sign l1 l2 in
     if sign_res != 0 then sign_res
-    else if get_op PUP.k_use_weight_for_solid_subsumption then cmp_by_weight l1 l2
+    else if get_op PUP.k_use_weight_for_solid_subsumption then
+      cmp_by_weight l1 l2
     else 0
 
   let classic_match ~subst ~pattern ~target =
-    try Unif.FO.matching_same_scope ~subst ~pattern ~scope:0 target with Unif.Fail -> raise SolidMatchFail
+    try Unif.FO.matching_same_scope ~subst ~pattern ~scope:0 target
+    with Unif.Fail -> raise SolidMatchFail
 
   let lit_matchers ~subst ~pattern ~target k =
     match pattern with
@@ -265,13 +307,21 @@ struct
           (* let res_list = ref [] in  *)
           if sign = sign' then (
             ( try
-                let c_subst = classic_match ~subst:Subst.empty ~pattern:lhs ~target:lhs' in
-                let c_subst = classic_match ~subst:c_subst ~pattern:rhs ~target:rhs' in
+                let c_subst =
+                  classic_match ~subst:Subst.empty ~pattern:lhs ~target:lhs'
+                in
+                let c_subst =
+                  classic_match ~subst:c_subst ~pattern:rhs ~target:rhs'
+                in
                 k (refine_subst_w_subst subst c_subst)
               with SolidMatchFail -> () ) ;
             ( try
-                let c_subst = classic_match ~subst:Subst.empty ~pattern:lhs ~target:rhs' in
-                let c_subst = classic_match ~subst:c_subst ~pattern:rhs ~target:lhs' in
+                let c_subst =
+                  classic_match ~subst:Subst.empty ~pattern:lhs ~target:rhs'
+                in
+                let c_subst =
+                  classic_match ~subst:c_subst ~pattern:rhs ~target:lhs'
+                in
                 k (refine_subst_w_subst subst c_subst)
               with SolidMatchFail -> () ) ;
             ( try
@@ -290,17 +340,26 @@ struct
       match target with L.False -> k subst | _ -> () )
 
   let check_subsumption_possibility subsumer target =
-    let is_more_specific pattern target = not @@ Iter.is_empty (lit_matchers ~subst:MS.empty ~pattern ~target) in
+    let is_more_specific pattern target =
+      not @@ Iter.is_empty (lit_matchers ~subst:MS.empty ~pattern ~target)
+    in
     let neg_s, neg_t =
-      CCPair.map_same (CCArray.fold (fun acc l -> if sign l = -1 then acc + 1 else acc) 0) (subsumer, target)
+      CCPair.map_same
+        (CCArray.fold (fun acc l -> if sign l = -1 then acc + 1 else acc) 0)
+        (subsumer, target)
     in
     let pos_s, pos_t =
-      CCPair.map_same (CCArray.fold (fun acc l -> if sign l = 1 then acc + 1 else acc) 0) (subsumer, target)
+      CCPair.map_same
+        (CCArray.fold (fun acc l -> if sign l = 1 then acc + 1 else acc) 0)
+        (subsumer, target)
     in
-    ((not @@ get_op PUP.k_use_weight_for_solid_subsumption) || Ls.weight subsumer <= Ls.weight target)
+    ( (not @@ get_op PUP.k_use_weight_for_solid_subsumption)
+    || Ls.weight subsumer <= Ls.weight target )
     && neg_s <= neg_t && pos_s <= pos_t
     && ( (not (neg_t >= 3 || pos_t >= 3))
-       || CCArray.for_all (fun l -> CCArray.exists (is_more_specific l) target) subsumer )
+       || CCArray.for_all
+            (fun l -> CCArray.exists (is_more_specific l) target)
+            subsumer )
 
   let subsumes subsumer target =
     let n = Array.length subsumer in
@@ -314,7 +373,8 @@ struct
             if
               CCBV.get picklist j
               || cmp_by_sign lit lit' != 0
-              || (get_op PUP.k_use_weight_for_solid_subsumption && cmp_by_weight lit lit' > 0)
+              || get_op PUP.k_use_weight_for_solid_subsumption
+                 && cmp_by_weight lit lit' > 0
             then false
             else
               let matchers = lit_matchers ~subst ~pattern:lit ~target:lit' in

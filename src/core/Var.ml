@@ -62,7 +62,8 @@ module Set = struct
   let intersection_empty s t =
     try
       let _ =
-        ID.Map.merge_safe s t ~f:(fun _ o -> match o with `Left _ | `Right _ -> None | `Both _ -> raise Exit)
+        ID.Map.merge_safe s t ~f:(fun _ o ->
+            match o with `Left _ | `Right _ -> None | `Both _ -> raise Exit )
       in
       true
     with Exit -> false
@@ -112,10 +113,16 @@ module Subst = struct
   let to_list t = ID.Map.fold (fun _ tup acc -> tup :: acc) t []
 
   let pp pp_v out t =
-    let pp_pair out (v, x) = Format.fprintf out "@[%a → %a@]" pp_full v pp_v x in
+    let pp_pair out (v, x) =
+      Format.fprintf out "@[%a → %a@]" pp_full v pp_v x
+    in
     Format.fprintf out "@[%a@]" (Util.pp_iter ~sep:", " pp_pair) (to_iter t)
 
   let merge a b =
     ID.Map.merge_safe a b ~f:(fun _ v ->
-        match v with `Both (_, x) -> Some x (* favor right one *) | `Left x | `Right x -> Some x )
+        match v with
+        | `Both (_, x) ->
+            Some x (* favor right one *)
+        | `Left x | `Right x ->
+            Some x )
 end

@@ -26,4 +26,10 @@ let pp out (i : t) =
       CCFormat.string out "normal"
 
 (** Prefix to use for line comments *)
-let comment_prefix = function O_tptp -> "% " | O_normal | O_zf -> "# " | O_none -> ""
+let comment_prefix = function
+  | O_tptp ->
+      "% "
+  | O_normal | O_zf ->
+      "# "
+  | O_none ->
+      ""

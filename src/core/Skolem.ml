@@ -60,7 +60,8 @@ type ctx =
   ; mutable sc_new_ids: (ID.t * type_) list (* "new" symbols *)
   ; sc_on_new: ID.t -> type_ -> unit }
 
-let create ?(prefix = "zip_sk_") ?(prop_prefix = "zip_prop") ?(on_new = fun _ _ -> ()) () =
+let create ?(prefix = "zip_sk_") ?(prop_prefix = "zip_prop")
+    ?(on_new = fun _ _ -> ()) () =
   let ctx =
     { sc_prefix= prefix
     ; sc_prop_prefix= prop_prefix
@@ -77,17 +78,22 @@ let incr_counter ctx = ctx.sc_counter <- ctx.sc_counter + 1
 let fresh_id ?(start0 = false) ~ctx prefix =
   let n = CCHashtbl.get_or ~default:0 ctx.sc_gensym prefix in
   Hashtbl.replace ctx.sc_gensym prefix (n + 1) ;
-  let name = if n = 0 && not start0 then prefix else prefix ^ "_" ^ string_of_int n in
+  let name =
+    if n = 0 && not start0 then prefix else prefix ^ "_" ^ string_of_int n
+  in
   ID.make name
 
 let fresh_skolem_prefix ~ctx ~ty prefix =
   incr_counter ctx ;
   let s = fresh_id ~ctx prefix in
-  let kind = if Ind_ty.is_inductive_simple_type ty then ID.K_ind else ID.K_normal in
+  let kind =
+    if Ind_ty.is_inductive_simple_type ty then ID.K_ind else ID.K_normal
+  in
   ID.set_payload s (ID.Attr_skolem kind) ;
   ctx.sc_new_ids <- (s, ty) :: ctx.sc_new_ids ;
   ctx.sc_on_new s ty ;
-  Util.debugf ~section 3 "@[<2>new skolem symbol `%a`@ with type `@[%a@]`@]" (fun k -> k ID.pp s T.pp ty) ;
+  Util.debugf ~section 3 "@[<2>new skolem symbol `%a`@ with type `@[%a@]`@]"
+    (fun k -> k ID.pp s T.pp ty ) ;
   s
 
 let fresh_skolem ~ctx ~ty = fresh_skolem_prefix ~ctx ~ty ctx.sc_prefix
@@ -117,8 +123,10 @@ let skolem_form ~ctx subst var form =
   incr_counter ctx ;
   let tyvars, vars = collect_vars subst form in
   Util.debugf ~section 5
-    "@[<2>creating skolem for@ `@[%a@]`@ with tyvars=[@[%a@]],@ vars=[@[%a@]],@ subst={@[%a@]}@]" (fun k ->
-      k T.pp form (Util.pp_list Var.pp_full) tyvars (Util.pp_list Var.pp_full) vars (Var.Subst.pp T.pp) subst ) ;
+    "@[<2>creating skolem for@ `@[%a@]`@ with tyvars=[@[%a@]],@ \
+     vars=[@[%a@]],@ subst={@[%a@]}@]" (fun k ->
+      k T.pp form (Util.pp_list Var.pp_full) tyvars (Util.pp_list Var.pp_full)
+        vars (Var.Subst.pp T.pp) subst ) ;
   let tyvars_t = List.map (fun v -> T.Ty.var v) tyvars in
   let vars_t = List.map (fun v -> T.var v |> T.Subst.eval subst) vars in
   (* type of the symbol: quantify over type vars, apply to vars' types *)
@@ -139,13 +147,13 @@ let counter ctx = ctx.sc_counter
 (** {2 Definitions} *)
 
 let pp_form_definition out def =
-  Format.fprintf out "(@[<hv>def %a@ for: %a@ rw_rules: %B@ polarity: %a@])" T.pp def.proxy T.pp def.form
-    def.rw_rules pp_polarity def.polarity
+  Format.fprintf out "(@[<hv>def %a@ for: %a@ rw_rules: %B@ polarity: %a@])"
+    T.pp def.proxy T.pp def.form def.rw_rules pp_polarity def.polarity
 
 let pp_term_definition out def =
   let pp_rule out r = Stmt.pp_def_rule T.pp T.pp T.pp out r in
-  Format.fprintf out "(@[<hv>def_term `%a : %a`@ rules: (@[<hv>%a@])@])" ID.pp def.td_id T.pp def.td_ty
-    (Util.pp_list pp_rule) def.td_rules
+  Format.fprintf out "(@[<hv>def_term `%a : %a`@ rules: (@[<hv>%a@])@])" ID.pp
+    def.td_id T.pp def.td_ty (Util.pp_list pp_rule) def.td_rules
 
 let pp_definition out = function
   | Def_form f ->
@@ -193,14 +201,22 @@ let find_def_in_ctx ~ctx form =
       match def with
       | Def_form def when not def.rw_rules ->
           let def_form = def.form in
-          let df_vars, f_vars = CCPair.map_same (fun x -> Var.Set.of_iter (T.Seq.vars x)) (def_form, form) in
+          let df_vars, f_vars =
+            CCPair.map_same
+              (fun x -> Var.Set.of_iter (T.Seq.vars x))
+              (def_form, form)
+          in
           if not (Var.Set.intersection_empty df_vars f_vars) then None
-          else CCOpt.map (fun subst -> (def, subst)) (TypedSTerm.try_alpha_renaming def_form form)
+          else
+            CCOpt.map
+              (fun subst -> (def, subst))
+              (TypedSTerm.try_alpha_renaming def_form form)
       | _ ->
           None )
     ctx.sc_new_defs
 
-let define_form ?(pattern = "zip_tseitin") ~ctx ~rw_rules ~polarity ~parents form =
+let define_form ?(pattern = "zip_tseitin") ~ctx ~rw_rules ~polarity ~parents
+    form =
   let create_new ~ctx ~rw_rules ~polarity ~parents ~form =
     incr_counter ctx ;
     let tyvars, vars = collect_vars Var.Subst.empty form in
@@ -235,11 +251,14 @@ let define_form ?(pattern = "zip_tseitin") ~ctx ~rw_rules ~polarity ~parents for
       match find_def_in_ctx ~ctx form with
       | Some (def, subst) ->
           (* def.form is alpha renaming *)
-          assert (T.equal form (T.Subst.eval ~rename_binders:false subst def.form)) ;
+          assert (
+            T.equal form (T.Subst.eval ~rename_binders:false subst def.form) ) ;
           (* nothing is bound in form *)
           assert (T.equal form (T.Subst.eval ~rename_binders:false subst form)) ;
-          Util.debugf ~section 1 "@[<1>Reusing definition %a@ with type %a.@ Old def: %a.@ New def: %a]"
-            (fun k -> k T.pp def.proxy T.pp def.proxy_ty T.pp def.form T.pp form ) ;
+          Util.debugf ~section 1
+            "@[<1>Reusing definition %a@ with type %a.@ Old def: %a.@ New def: \
+             %a]" (fun k ->
+              k T.pp def.proxy T.pp def.proxy_ty T.pp def.form T.pp form ) ;
           let proxy = T.Subst.eval subst def.proxy in
           let proof = Proof.Step.define_internal def.proxy_id parents in
           let res =
@@ -248,7 +267,10 @@ let define_form ?(pattern = "zip_tseitin") ~ctx ~rw_rules ~polarity ~parents for
             ; proxy
             ; proof
             ; polarity
-            ; as_stmt= lazy (stmt_of_form rw_rules polarity proxy def.proxy_id def.proxy_ty form proof) }
+            ; as_stmt=
+                lazy
+                  (stmt_of_form rw_rules polarity proxy def.proxy_id
+                     def.proxy_ty form proof ) }
           in
           if def.polarity != polarity then (
             incr_counter ctx ;
@@ -260,20 +282,33 @@ let define_form ?(pattern = "zip_tseitin") ~ctx ~rw_rules ~polarity ~parents for
   in
   res
 
-let pp_rules = Fmt.(Util.pp_list Dump.(pair (list T.pp_inner |> hovbox) T.pp) |> hovbox)
+let pp_rules =
+  Fmt.(Util.pp_list Dump.(pair (list T.pp_inner |> hovbox) T.pp) |> hovbox)
 
 let stmt_of_term id ty rules proof : Stmt.input_t list =
   let module F = T.Form in
   [Stmt.def ~proof [Stmt.mk_def ~rewrite:true id ty rules]]
 
 let define_term ?(pattern = "fun_") ~ctx ~parents rules : term_definition =
-  Util.debugf ~section 5 "(@[<hv2>define_term@ :rules (@[<hv>%a@])@])" (fun k -> k pp_rules rules) ;
+  Util.debugf ~section 5 "(@[<hv2>define_term@ :rules (@[<hv>%a@])@])" (fun k ->
+      k pp_rules rules ) ;
   incr_counter ctx ;
-  let some_args, ty_ret = match rules with [] -> assert false | (args, rhs) :: _ -> (args, T.ty_exn rhs) in
+  let some_args, ty_ret =
+    match rules with
+    | [] ->
+        assert false
+    | (args, rhs) :: _ ->
+        (args, T.ty_exn rhs)
+  in
   (* separate type variables and type of arguments *)
   let ty_vars, ty_args =
     CCList.partition_map
-      (fun t -> match T.view t with T.Var v when T.Ty.is_tType (Var.ty v) -> `Left v | _ -> `Right (T.ty_exn t))
+      (fun t ->
+        match T.view t with
+        | T.Var v when T.Ty.is_tType (Var.ty v) ->
+            `Left v
+        | _ ->
+            `Right (T.ty_exn t) )
       some_args
   in
   (* checks *)
@@ -281,7 +316,8 @@ let define_term ?(pattern = "fun_") ~ctx ~parents rules : term_definition =
     (fun (args, _) ->
       let args' = CCList.drop (List.length ty_vars) args in
       assert (List.length args' = List.length ty_args) ;
-      assert (List.for_all2 (fun t ty -> T.Ty.equal ty (T.ty_exn t)) args' ty_args) ;
+      assert (
+        List.for_all2 (fun t ty -> T.Ty.equal ty (T.ty_exn t)) args' ty_args ) ;
       () )
     rules ;
   let ty = T.Ty.forall_l ty_vars (T.Ty.fun_ ty_args ty_ret) in
@@ -294,7 +330,9 @@ let define_term ?(pattern = "fun_") ~ctx ~parents rules : term_definition =
     List.map
       (fun (args, rhs) ->
         let all_vars =
-          Iter.of_list (rhs :: args) |> Iter.flat_map T.Seq.free_vars |> Var.Set.of_iter |> Var.Set.to_list
+          Iter.of_list (rhs :: args)
+          |> Iter.flat_map T.Seq.free_vars
+          |> Var.Set.of_iter |> Var.Set.to_list
         in
         if is_prop then
           let atom = T.app ~ty:ty_ret (T.const ~ty id) args in
@@ -311,7 +349,9 @@ let define_term ?(pattern = "fun_") ~ctx ~parents rules : term_definition =
             ; ty
             ; args
             ; rhs
-            ; as_form= T.Form.eq (T.app (T.const ~ty id) ~ty:(T.ty_exn rhs) args) rhs |> T.Form.close_forall } )
+            ; as_form=
+                T.Form.eq (T.app (T.const ~ty id) ~ty:(T.ty_exn rhs) args) rhs
+                |> T.Form.close_forall } )
       rules
   in
   let td_as_def = Stmt.mk_def ~rewrite:true id ty rules in
@@ -339,4 +379,8 @@ let pop_new_definitions ~ctx =
 let rule_def = Proof.Rule.mk "define"
 
 let def_as_stmt (d : definition) : Stmt.input_t list =
-  match d with Def_form d -> Lazy.force d.as_stmt | Def_term d -> Lazy.force d.td_stmt
+  match d with
+  | Def_form d ->
+      Lazy.force d.as_stmt
+  | Def_term d ->
+      Lazy.force d.td_stmt

@@ -66,9 +66,14 @@ module Make (E : Env.S) : S with module Env = E = struct
     | EquationalHO
     | Unsupported
 
-  let log_to_int = [(NonequationalFO, 0); (EquationalFO, 1); (EquationalHO, 2); (Unsupported, 3)]
+  let log_to_int =
+    [ (NonequationalFO, 0)
+    ; (EquationalFO, 1)
+    ; (EquationalHO, 2)
+    ; (Unsupported, 3) ]
 
-  let log_compare (l1 : logic) (l2 : logic) = compare (List.assoc l1 log_to_int) (List.assoc l2 log_to_int)
+  let log_compare (l1 : logic) (l2 : logic) =
+    compare (List.assoc l1 log_to_int) (List.assoc l2 log_to_int)
 
   exception UnsupportedLogic
 
@@ -89,7 +94,9 @@ module Make (E : Env.S) : S with module Env = E = struct
     type t = int * C.t
 
     let compare (idx_a, cl_a) (idx_b, cl_b) =
-      CCOrd.( <?> ) (CCInt.compare (C.id cl_a) (C.id cl_b)) (compare, idx_a, idx_b)
+      CCOrd.( <?> )
+        (CCInt.compare (C.id cl_a) (C.id cl_b))
+        (compare, idx_a, idx_b)
   end)
 
   module TaskWrapper = struct
@@ -101,7 +108,8 @@ module Make (E : Env.S) : S with module Env = E = struct
 
     let lt a b =
       DEQ.length a.cands < DEQ.length b.cands
-      || (DEQ.length a.cands = DEQ.length b.cands && CCInt.compare (C.id a.clause) (C.id b.clause) < 0)
+      || DEQ.length a.cands = DEQ.length b.cands
+         && CCInt.compare (C.id a.clause) (C.id b.clause) < 0
       || DEQ.length a.cands = DEQ.length b.cands
          && CCInt.compare (C.id a.clause) (C.id b.clause) = 0
          && a.lit_idx < b.lit_idx
@@ -129,7 +137,8 @@ module Make (E : Env.S) : S with module Env = E = struct
   (* assuming the weakest logic *)
   let logic = ref NonequationalFO
 
-  let refine_logic new_val = if log_compare new_val !logic > 0 then logic := new_val
+  let refine_logic new_val =
+    if log_compare new_val !logic > 0 then logic := new_val
 
   let lit_to_term sign = if sign then CCFun.id else T.Form.not_
 
@@ -137,29 +146,38 @@ module Make (E : Env.S) : S with module Env = E = struct
   let task_eq a b = a.lit_idx = b.lit_idx && C.equal a.clause b.clause
 
   let symbol_occurs_too_often sym_count =
-    Env.flex_get k_max_symbol_occ > 0 && sym_count > Env.flex_get k_max_symbol_occ
+    Env.flex_get k_max_symbol_occ > 0
+    && sym_count > Env.flex_get k_max_symbol_occ
 
   let add_lit_to_idx lit_lhs sign cl =
     let sym = T.head_exn lit_lhs in
     if not (ID.Set.mem sym !ignored_symbols) then
       let sym_occs sym sign =
-        CCOpt.map_or ~default:0 C.ClauseSet.cardinal (SymSignIdx.find_opt (sym, sign) !ss_idx)
+        CCOpt.map_or ~default:0 C.ClauseSet.cardinal
+          (SymSignIdx.find_opt (sym, sign) !ss_idx)
       in
       let total_sym_occs = sym_occs sym true + sym_occs sym false + 1 in
       if symbol_occurs_too_often total_sym_occs then (
-        ss_idx := SymSignIdx.remove (sym, false) (SymSignIdx.remove (sym, true) !ss_idx) ;
+        ss_idx :=
+          SymSignIdx.remove (sym, false) (SymSignIdx.remove (sym, true) !ss_idx) ;
         ignored_symbols := ID.Set.add sym !ignored_symbols ;
-        Util.debugf ~section 5 "ignoring symbol @[%a@]@." (fun k -> k ID.pp sym) )
+        Util.debugf ~section 5 "ignoring symbol @[%a@]@." (fun k -> k ID.pp sym)
+        )
       else
         ss_idx :=
           SymSignIdx.update (sym, sign)
-            (fun old -> Some (C.ClauseSet.add cl (CCOpt.get_or ~default:C.ClauseSet.empty old)))
+            (fun old ->
+              Some
+                (C.ClauseSet.add cl
+                   (CCOpt.get_or ~default:C.ClauseSet.empty old) ) )
             !ss_idx
 
   (* find all clauses for which L-resolution should be tried against literal
      with given lhs and sign *)
   let find_candidates hd sign =
-    C.ClauseSet.to_list (CCOpt.get_or ~default:C.ClauseSet.empty (SymSignIdx.find_opt (hd, not sign) !ss_idx))
+    C.ClauseSet.to_list
+      (CCOpt.get_or ~default:C.ClauseSet.empty
+         (SymSignIdx.find_opt (hd, not sign) !ss_idx) )
 
   (* Scan the clause and if it is in supported logic fragment,
      store its literals in the symbol index *)
@@ -168,17 +186,22 @@ module Make (E : Env.S) : S with module Env = E = struct
       (function
         | L.Equation (lhs, rhs, _) as lit ->
             let sign = L.is_positivoid lit in
-            let ignore_syms_in t = ignored_symbols := T.symbols ~init:!ignored_symbols t in
+            let ignore_syms_in t =
+              ignored_symbols := T.symbols ~init:!ignored_symbols t
+            in
             if L.is_predicate_lit lit then List.iter ignore_syms_in (T.args lhs)
             else List.iter ignore_syms_in [lhs; rhs] ;
-            if (not (Type.is_var (T.ty lhs))) && not (Type.is_fun (T.ty lhs)) then
+            if (not (Type.is_var (T.ty lhs))) && not (Type.is_fun (T.ty lhs))
+            then
               if Type.is_prop (T.ty lhs) then
                 if L.is_predicate_lit lit && Option.is_some (T.head lhs) then (
                   if not (T.is_fo_term lhs) then refine_logic EquationalHO ;
                   let hd_sym = T.head_exn lhs in
-                  if not (ID.Set.mem hd_sym !ignored_symbols) then add_lit_to_idx lhs sign cl )
+                  if not (ID.Set.mem hd_sym !ignored_symbols) then
+                    add_lit_to_idx lhs sign cl )
                 else refine_logic EquationalHO
-              else if T.is_fo_term lhs && T.is_fo_term rhs then refine_logic EquationalFO
+              else if T.is_fo_term lhs && T.is_fo_term rhs then
+                refine_logic EquationalFO
               else refine_logic EquationalHO
             else logic := EquationalHO
         | _ ->
@@ -221,13 +244,20 @@ module Make (E : Env.S) : S with module Env = E = struct
     match (C.lits clause).(lit_idx) with
     | L.Equation (lhs, rhs, _) as lit
       when L.is_predicate_lit lit
-           && match T.head lhs with Some hd -> not (ID.Set.mem hd !ignored_symbols) | None -> false ->
+           &&
+           match T.head lhs with
+           | Some hd ->
+               not (ID.Set.mem hd !ignored_symbols)
+           | None ->
+               false ->
         (* assert (T.is_fo_term lhs); *)
         let hd = T.head_exn lhs in
         let sign = L.is_positivoid lit in
         let cands = find_candidates hd sign in
         if update_others then update_cand_lists hd sign clause cands ;
-        let task = {lit_idx; clause; cands= DEQ.of_list cands; heap_idx= init_heap_idx} in
+        let task =
+          {lit_idx; clause; cands= DEQ.of_list cands; heap_idx= init_heap_idx}
+        in
         task_store := TaskStore.add (lit_idx, clause) task !task_store ;
         TaskPriorityQueue.insert task_queue task
     | _ ->
@@ -239,14 +269,17 @@ module Make (E : Env.S) : S with module Env = E = struct
       if !logic == Unsupported then raise UnsupportedLogic ;
       scan_cl_lits cl ;
       CCArray.iteri (fun lit_idx _ -> register_task lit_idx cl) (C.lits cl)
-    with UnsupportedLogic -> refine_logic Unsupported ; TaskPriorityQueue.clear task_queue
+    with UnsupportedLogic ->
+      refine_logic Unsupported ;
+      TaskPriorityQueue.clear task_queue
 
   (* remove the clause from symbol index *)
   let deregister_symbols cl =
     CCArray.iteri
       (fun _ lit ->
         match lit with
-        | L.Equation (lhs, _, _) when L.is_predicate_lit lit && Option.is_some (T.head lhs) ->
+        | L.Equation (lhs, _, _)
+          when L.is_predicate_lit lit && Option.is_some (T.head lhs) ->
             ss_idx :=
               SymSignIdx.update
                 (T.head_exn lhs, L.is_positivoid lit)
@@ -281,7 +314,8 @@ module Make (E : Env.S) : S with module Env = E = struct
           assert (not (DEQ.is_empty task.cands)) ;
           let locking_cl = DEQ.take_front task.cands in
           assert (C.id locking_cl = C.id clause) ;
-          Util.debugf ~section 3 " |@[%a@]|%d@." (fun k -> k C.pp task.clause task.lit_idx) ;
+          Util.debugf ~section 3 " |@[%a@]|%d@." (fun k ->
+              k C.pp task.clause task.lit_idx ) ;
           TaskPriorityQueue.insert task_queue task )
         (Util.Int_map.find (C.id clause) !clause_lock) ;
       clause_lock := Util.Int_map.remove (C.id clause) !clause_lock
@@ -289,15 +323,20 @@ module Make (E : Env.S) : S with module Env = E = struct
                       ()
 
   (* remove the clause from the whole BCE tracking system *)
-  let deregister_clause clause = deregister_symbols clause ; release_locks clause
+  let deregister_clause clause =
+    deregister_symbols clause ; release_locks clause
 
   let remove_from_proof_state clause =
     ( try
-        if Env.is_active clause then C.Tbl.add (Env.flex_get k_removed_active) clause ()
-        else if Env.is_passive clause then C.Tbl.add (Env.flex_get k_removed_passive) clause ()
-      with _ -> (* we are in the preprocessing phase, so we can mark the clause *)
-                C.mark_redundant clause ) ;
-    if Env.flex_get k_processing_kind != `InprocessingSat then C.mark_redundant clause
+        if Env.is_active clause then
+          C.Tbl.add (Env.flex_get k_removed_active) clause ()
+        else if Env.is_passive clause then
+          C.Tbl.add (Env.flex_get k_removed_passive) clause ()
+      with _ ->
+        (* we are in the preprocessing phase, so we can mark the clause *)
+        C.mark_redundant clause ) ;
+    if Env.flex_get k_processing_kind != `InprocessingSat then
+      C.mark_redundant clause
       (* if we are doing the inprocessing in SAT mode, we cannot
          mark the clauses as redundant, since they might have to be returned
          to the proof state. *) ;
@@ -316,7 +355,8 @@ module Make (E : Env.S) : S with module Env = E = struct
       CCArray.foldi
         (fun (unifiable, others) idx lit ->
           match lit with
-          | L.Equation (lhs', _, _) when L.is_predicate_lit lit && L.is_positivoid lit != sign -> (
+          | L.Equation (lhs', _, _)
+            when L.is_predicate_lit lit && L.is_positivoid lit != sign -> (
             try
               let subst = Unif.FO.unify_syn (lhs, sc_orig) (lhs', sc_partner) in
               ((lhs', subst) :: unifiable, others)
@@ -331,11 +371,14 @@ module Make (E : Env.S) : S with module Env = E = struct
       && L.is_predicate_lit l1 = L.is_predicate_lit l2
       &&
       match (l1, l2) with
-      | Equation (lhs, _, _), Equation (lhs', _, _) when L.is_predicate_lit l1 ->
+      | Equation (lhs, _, _), Equation (lhs', _, _) when L.is_predicate_lit l1
+        ->
           UF.equal ~subst (lhs, sc1) (lhs', sc2)
       | Equation (lhs, rhs, _), Equation (lhs', rhs', _) ->
-          (UF.equal ~subst (lhs, sc1) (lhs', sc2) && UF.equal ~subst (rhs, sc1) (rhs', sc2))
-          || (UF.equal ~subst (lhs, sc1) (rhs', sc2) && UF.equal ~subst (rhs, sc1) (lhs', sc2))
+          UF.equal ~subst (lhs, sc1) (lhs', sc2)
+          && UF.equal ~subst (rhs, sc1) (rhs', sc2)
+          || UF.equal ~subst (lhs, sc1) (rhs', sc2)
+             && UF.equal ~subst (rhs, sc1) (lhs', sc2)
       | True, False ->
           true
       | False, True ->
@@ -348,8 +391,11 @@ module Make (E : Env.S) : S with module Env = E = struct
       (* literals against which unifiable part of the clause needs to be checked *)
       let for_tautology_checking =
         List.filter
-          (fun (lit, _) -> L.is_positivoid lit = orig_sign && L.is_predicate_lit lit)
-          ( List.map (fun x -> (x, sc_orig)) (CCArray.except_idx (C.lits orig_cl) l_idx)
+          (fun (lit, _) ->
+            L.is_positivoid lit = orig_sign && L.is_predicate_lit lit )
+          ( List.map
+              (fun x -> (x, sc_orig))
+              (CCArray.except_idx (C.lits orig_cl) l_idx)
           @ List.map (fun x -> (x, sc_partner)) nonunifiable )
       in
       if CCList.is_empty unifiable then true
@@ -366,17 +412,22 @@ module Make (E : Env.S) : S with module Env = E = struct
                 CCOpt.is_some
                   (CCArray.find_map_i
                      (fun idx lit ->
-                       if idx != l_idx && are_opposite_lits_up_to ~subst (lit, sc_orig) (lit', sc_partner) then
-                         Some ()
+                       if
+                         idx != l_idx
+                         && are_opposite_lits_up_to ~subst (lit, sc_orig)
+                              (lit', sc_partner)
+                       then Some ()
                        else None )
                      (C.lits orig_cl) ) )
               nonunifiable
           in
           Util.debugf ~section 30
-            "check: @. lit: @[%a@]@. unif: @[%a@]@. non_unif: @[%a@]@. partner_cl: @[%a@]@." (fun k ->
+            "check: @. lit: @[%a@]@. unif: @[%a@]@. non_unif: @[%a@]@. \
+             partner_cl: @[%a@]@." (fun k ->
               k L.pp
                 (C.lits orig_cl).(l_idx)
-                (CCList.pp T.pp) (List.map fst unifiable) (CCList.pp L.pp) nonunifiable C.pp partner ) ;
+                (CCList.pp T.pp) (List.map fst unifiable) (CCList.pp L.pp)
+                nonunifiable C.pp partner ) ;
           is_valid_compl_lits
           || (not (CCList.is_empty rest))
              &&
@@ -400,7 +451,8 @@ module Make (E : Env.S) : S with module Env = E = struct
                    List.fold_left
                      (fun subst (lhs', _) ->
                        (* extending the substitution *)
-                       Unif.FO.unify_syn ~subst (lhs, sc_partner) (lhs', sc_partner) )
+                       Unif.FO.unify_syn ~subst (lhs, sc_partner)
+                         (lhs', sc_partner) )
                      subst contrasting
                  in
                  (* clause is valid, but using only literals in the unifiable part,
@@ -414,7 +466,8 @@ module Make (E : Env.S) : S with module Env = E = struct
         (* check if all L-resolvents are valid in polynomial time *)
         let rec check_l_resolvents rest = function
           | ((lhs, subst) as x) :: xs ->
-              check_lit lhs subst (rest @ xs) && check_l_resolvents (x :: rest) xs
+              check_lit lhs subst (rest @ xs)
+              && check_l_resolvents (x :: rest) xs
           | [] ->
               true
         in
@@ -449,7 +502,12 @@ module Make (E : Env.S) : S with module Env = E = struct
           | L.Equation (lhs', _, _)
             when L.is_predicate_lit lit
                  && L.is_positivoid lit != sign
-                 && match (T.head lhs, T.head lhs') with Some hd, Some hd' -> ID.equal hd hd' | _ -> false ->
+                 &&
+                 match (T.head lhs, T.head lhs') with
+                 | Some hd, Some hd' ->
+                     ID.equal hd hd'
+                 | _ ->
+                     false ->
               (lhs' :: same_hds, others)
           | _ ->
               (same_hds, lit :: others) )
@@ -469,10 +527,12 @@ module Make (E : Env.S) : S with module Env = E = struct
       && L.is_predicate_lit l1 = L.is_predicate_lit l2
       &&
       match (l1, l2) with
-      | Equation (lhs, _, _), Equation (lhs', _, _) when L.is_predicate_lit l1 ->
+      | Equation (lhs, _, _), Equation (lhs', _, _) when L.is_predicate_lit l1
+        ->
           CC.is_eq cc lhs lhs'
       | Equation (lhs, rhs, _), Equation (lhs', rhs', _) ->
-          (CC.is_eq cc lhs lhs' && CC.is_eq cc rhs rhs') || (CC.is_eq cc lhs rhs' && CC.is_eq cc rhs lhs')
+          (CC.is_eq cc lhs lhs' && CC.is_eq cc rhs rhs')
+          || (CC.is_eq cc lhs rhs' && CC.is_eq cc rhs lhs')
       | True, False ->
           true
       | False, True ->
@@ -481,17 +541,27 @@ module Make (E : Env.S) : S with module Env = E = struct
           false
     in
     let check_resolvents l_idx orig_cl (same_hd_atms, diff_hd_lits) =
-      let orig_args = T.args @@ CCOpt.get_exn @@ L.View.get_lhs (C.lits orig_cl).(l_idx) in
+      let orig_args =
+        T.args @@ CCOpt.get_exn @@ L.View.get_lhs (C.lits orig_cl).(l_idx)
+      in
       (* add equations that correspond to computing a flat resolvent between
          original lit and the one that has new_args arguments to the head *)
       let add_flat_resolvent ~cc new_args =
         Util.debugf ~section 10 " adding resolvent <%a>, <%a>@." (fun k ->
             k (CCList.pp T.pp) orig_args (CCList.pp T.pp) new_args ) ;
-        List.fold_left (fun acc (lhs, rhs) -> CC.mk_eq acc lhs rhs) cc (List.combine orig_args new_args)
+        List.fold_left
+          (fun acc (lhs, rhs) -> CC.mk_eq acc lhs rhs)
+          cc
+          (List.combine orig_args new_args)
       in
       (* calculating positive resp. negative literals in both clauses *)
-      let orig_pos, orig_neg = CCList.partition L.is_positivoid (CCArray.except_idx (C.lits orig_cl) l_idx) in
-      let partner_pos, partner_neg = CCList.partition L.is_positivoid diff_hd_lits in
+      let orig_pos, orig_neg =
+        CCList.partition L.is_positivoid
+          (CCArray.except_idx (C.lits orig_cl) l_idx)
+      in
+      let partner_pos, partner_neg =
+        CCList.partition L.is_positivoid diff_hd_lits
+      in
       let all_pos = orig_pos @ partner_pos in
       let all_neg = orig_neg @ partner_neg in
       (* Literals from same_hd_atms part might need to be tested for congruence
@@ -503,7 +573,11 @@ module Make (E : Env.S) : S with module Env = E = struct
               CCOpt.flat_map
                 (fun t ->
                   CCOpt.return_if
-                    (match (T.head t, T.head orig_lhs) with Some hd, Some hd' -> ID.equal hd hd' | _ -> false)
+                    ( match (T.head t, T.head orig_lhs) with
+                    | Some hd, Some hd' ->
+                        ID.equal hd hd'
+                    | _ ->
+                        false )
                     t )
                 (L.View.get_lhs lit)
             else None )
@@ -526,7 +600,13 @@ module Make (E : Env.S) : S with module Env = E = struct
             List.exists
               (fun lit ->
                 assert (L.is_positivoid lit) ;
-                match lit with L.Equation (lhs, rhs, _) -> CC.is_eq cc lhs rhs | L.True -> true | _ -> false )
+                match lit with
+                | L.Equation (lhs, rhs, _) ->
+                    CC.is_eq cc lhs rhs
+                | L.True ->
+                    true
+                | _ ->
+                    false )
               all_pos
           in
           (* if clause is valid because there are opposite literals in nonunifiable
@@ -537,7 +617,9 @@ module Make (E : Env.S) : S with module Env = E = struct
                 CCOpt.is_some
                   (CCArray.find_map_i
                      (fun idx lit ->
-                       if idx != l_idx && are_opposite_lits_up_to ~cc lit lit' then Some () else None )
+                       if idx != l_idx && are_opposite_lits_up_to ~cc lit lit'
+                       then Some ()
+                       else None )
                      (C.lits orig_cl) ) )
               diff_hd_lits
           in
@@ -546,25 +628,34 @@ module Make (E : Env.S) : S with module Env = E = struct
              &&
              let congruent, rest =
                List.partition
-                 (fun lhs -> List.exists (fun lhs' -> CC.is_eq cc lhs lhs') for_congruence_testing)
+                 (fun lhs ->
+                   List.exists
+                     (fun lhs' -> CC.is_eq cc lhs lhs')
+                     for_congruence_testing )
                  rest
              in
              (* clause is not valid *)
              if CCList.is_empty congruent then false
-             else if !logic == EquationalHO then (* for HOL, binary flat L-resolvents suffice *)
+             else if !logic == EquationalHO then
+               (* for HOL, binary flat L-resolvents suffice *)
                true
              else
                (* validity is achieved using literals from same_hd_atms, let's
                   see what happens when they are removed as part of flat
                   L-resolvent computation*)
-               let cc = List.fold_left (fun acc lhs -> add_flat_resolvent ~cc (T.args lhs)) cc congruent in
+               let cc =
+                 List.fold_left
+                   (fun acc lhs -> add_flat_resolvent ~cc (T.args lhs))
+                   cc congruent
+               in
                check_lit ~cc rest
         in
         (* check if all l-resolvents are valid in polynomial time *)
         let rec check_l_resolvents others = function
           | t :: ts ->
               let cc_with_lhs = add_flat_resolvent ~cc:orig_cc (T.args t) in
-              check_lit ~cc:cc_with_lhs (others @ ts) && check_l_resolvents (t :: others) ts
+              check_lit ~cc:cc_with_lhs (others @ ts)
+              && check_l_resolvents (t :: others) ts
           | [] ->
               true
         in
@@ -574,7 +665,8 @@ module Make (E : Env.S) : S with module Env = E = struct
 
   let get_validity_checker () =
     assert (!logic != Unsupported) ;
-    if !logic == NonequationalFO then resolvent_is_valid_neq else resolvent_is_valid_eq
+    if !logic == NonequationalFO then resolvent_is_valid_neq
+    else resolvent_is_valid_eq
 
   (* function that actually performs the blocked clause elimination *)
   let do_eliminate_blocked_clauses () =
@@ -584,7 +676,9 @@ module Make (E : Env.S) : S with module Env = E = struct
     let process_task task =
       let cl = task.clause in
       let lit_idx = task.lit_idx in
-      let hd_sym = T.head_exn @@ CCOpt.get_exn @@ L.View.get_lhs (C.lits cl).(lit_idx) in
+      let hd_sym =
+        T.head_exn @@ CCOpt.get_exn @@ L.View.get_lhs (C.lits cl).(lit_idx)
+      in
       let is_alone_with_polarity () =
         let sign = L.is_positivoid (C.lits cl).(lit_idx) in
         Option.is_none
@@ -596,7 +690,10 @@ module Make (E : Env.S) : S with module Env = E = struct
                  | L.Equation (lhs', _, _) when L.is_predicate_lit lit' ->
                      let sym' = T.head lhs' in
                      let sign' = L.is_positivoid lit' in
-                     if Option.equal ID.equal sym' (Some hd_sym) && sign' == sign then Some lit' else None
+                     if
+                       Option.equal ID.equal sym' (Some hd_sym) && sign' == sign
+                     then Some lit'
+                     else None
                  | _ ->
                      None )
              (C.lits cl) )
@@ -606,12 +703,16 @@ module Make (E : Env.S) : S with module Env = E = struct
         DEQ.is_empty deq
         ||
         let partner = DEQ.take_front deq in
-        if C.equal cl partner || C.is_redundant partner || validity_checker lit_idx cl partner then (
+        if
+          C.equal cl partner || C.is_redundant partner
+          || validity_checker lit_idx cl partner
+        then (
           Util.debugf ~section 5 "valid-res(@[%a@], @[%a@](%b))@." (fun k ->
               k C.pp cl C.pp partner (C.is_redundant partner) ) ;
           task_is_blocked deq )
         else (
-          Util.debugf ~section 5 "maybe-invalid-res(@[%a@], @[%a@])@." (fun k -> k C.pp partner C.pp cl) ;
+          Util.debugf ~section 5 "maybe-invalid-res(@[%a@], @[%a@])@." (fun k ->
+              k C.pp partner C.pp cl ) ;
           DEQ.push_front deq partner ;
           lock_clause partner task ;
           false )
@@ -627,7 +728,8 @@ module Make (E : Env.S) : S with module Env = E = struct
         (* let original_partners = CCDeque.to_list task.cands in *)
         match task_is_blocked task.cands with
         | true ->
-            Util.debugf ~section 2 "removed(%d): @[%a@]" (fun k -> k task.lit_idx C.pp cl) ;
+            Util.debugf ~section 2 "removed(%d): @[%a@]" (fun k ->
+                k task.lit_idx C.pp cl ) ;
             deregister_clause cl ;
             remove_from_proof_state cl ;
             incr removed_cnt
@@ -635,7 +737,9 @@ module Make (E : Env.S) : S with module Env = E = struct
             assert (not (TaskPriorityQueue.in_heap task)) )
       else
         Util.debugf ~section 3 "ignoring %b %b %b" (fun k ->
-            k (C.is_empty task.clause) (C.is_redundant task.clause) (ID.Set.mem hd_sym !ignored_symbols) )
+            k (C.is_empty task.clause)
+              (C.is_redundant task.clause)
+              (ID.Set.mem hd_sym !ignored_symbols) )
     in
     let module Q = TaskPriorityQueue in
     while not (Q.is_empty task_queue) do
@@ -650,10 +754,13 @@ module Make (E : Env.S) : S with module Env = E = struct
   let eliminate_blocked_clauses () =
     steps := (!steps + 1) mod Env.flex_get k_check_at ;
     if !steps = 0 then
-      let original_cls = Iter.to_list (Iter.append (Env.get_active ()) (Env.get_passive ())) in
+      let original_cls =
+        Iter.to_list (Iter.append (Env.get_active ()) (Env.get_passive ()))
+      in
       let eliminated = do_eliminate_blocked_clauses () in
       if eliminated != 0 then
-        Util.debugf ~section 2 "original clause set:@.@[%a@]" (fun k -> k (CCList.pp C.pp) original_cls)
+        Util.debugf ~section 2 "original clause set:@.@[%a@]" (fun k ->
+            k (CCList.pp C.pp) original_cls )
 
   let react_clause_addded cl = add_clause cl
 
@@ -688,7 +795,8 @@ module Make (E : Env.S) : S with module Env = E = struct
       @ C.ClauseSet.to_list (Env.ProofState.PassiveSet.clauses ())
     in
     ( try
-        Util.debugf ~section 3 "init_cl: @[%a@]@." (fun k -> k (CCList.pp C.pp) init_clauses) ;
+        Util.debugf ~section 3 "init_cl: @[%a@]@." (fun k ->
+            k (CCList.pp C.pp) init_clauses ) ;
         let init_clause_num = List.length init_clauses in
         CCFormat.printf "%% BCE start: %d@." init_clause_num ;
         (* build the symbol index *)
@@ -701,16 +809,24 @@ module Make (E : Env.S) : S with module Env = E = struct
                 else "unknown" ) ) ;
         (* create tasks for each clause *)
         List.iter
-          (fun cl -> CCArray.iteri (fun lit_idx _ -> register_task ~update_others:false lit_idx cl) (C.lits cl))
+          (fun cl ->
+            CCArray.iteri
+              (fun lit_idx _ -> register_task ~update_others:false lit_idx cl)
+              (C.lits cl) )
           init_clauses ;
         (* eliminate clauses *)
         ignore (do_eliminate_blocked_clauses ()) ;
         let clause_diff =
-          init_clause_num - (Iter.length (Env.get_active ()) + Iter.length (Env.get_passive ()))
+          init_clause_num
+          - (Iter.length (Env.get_active ()) + Iter.length (Env.get_passive ()))
         in
         CCFormat.printf "%% BCE eliminated: %d@." clause_diff ;
-        if Env.flex_get k_processing_kind != `PreprocessingOnly || Env.flex_get k_fp_mode then (
-          if Env.flex_get k_processing_kind == `InprocessingFull then Env.Ctx.lost_completeness () ;
+        if
+          Env.flex_get k_processing_kind != `PreprocessingOnly
+          || Env.flex_get k_fp_mode
+        then (
+          if Env.flex_get k_processing_kind == `InprocessingFull then
+            Env.Ctx.lost_completeness () ;
           if Env.flex_get k_processing_kind == `InprocessingSat then (
             Env.flex_add k_removed_active (C.Tbl.create 256) ;
             Env.flex_add k_removed_passive (C.Tbl.create 256) ;
@@ -723,32 +839,43 @@ module Make (E : Env.S) : S with module Env = E = struct
               C.Tbl.remove (Env.flex_get k_bce_sat_tracked) cl ;
               react_clause_removed cl
             in
-            Env.ProofState.PassiveSet.clauses () |> C.ClauseSet.to_iter
-            |> Iter.iter (fun cl -> C.Tbl.add (Env.flex_get k_bce_sat_tracked) cl ()) ;
+            Env.ProofState.PassiveSet.clauses ()
+            |> C.ClauseSet.to_iter
+            |> Iter.iter (fun cl ->
+                   C.Tbl.add (Env.flex_get k_bce_sat_tracked) cl () ) ;
             Signal.on_every Env.ProofState.PassiveSet.on_add_clause (fun cl ->
                 if C.proof_depth cl = 0 then add_cl_sat cl ) ;
-            Signal.on_every Env.ProofState.PassiveSet.on_remove_clause remove_cl_sat ;
-            Signal.on_every Env.on_forward_simplified (fun (_, state) -> CCOpt.iter add_cl_sat state) ;
-            Signal.on_every Env.ProofState.ActiveSet.on_remove_clause remove_cl_sat )
+            Signal.on_every Env.ProofState.PassiveSet.on_remove_clause
+              remove_cl_sat ;
+            Signal.on_every Env.on_forward_simplified (fun (_, state) ->
+                CCOpt.iter add_cl_sat state ) ;
+            Signal.on_every Env.ProofState.ActiveSet.on_remove_clause
+              remove_cl_sat )
           else (
             (* clauses begin their life when they are added to the passive set *)
-            Signal.on_every Env.ProofState.PassiveSet.on_add_clause react_clause_addded ;
+            Signal.on_every Env.ProofState.PassiveSet.on_add_clause
+              react_clause_addded ;
             (* clauses can be calculus-removed from the active set only in DISCOUNT loop *)
-            Signal.on_every Env.ProofState.ActiveSet.on_remove_clause react_clause_removed ;
+            Signal.on_every Env.ProofState.ActiveSet.on_remove_clause
+              react_clause_removed ;
             (* Clauses are removed from the passive set when they are moved to active.
                In this case clause can me modified or deemed redundant by forward
                modification procedures. we react accordingly.*)
             Signal.on_every Env.on_forward_simplified (fun (c, new_state) ->
                 match new_state with
                 | Some c' ->
-                    if not (C.equal c c') then (react_clause_removed c ; react_clause_addded c')
+                    if not (C.equal c c') then (
+                      react_clause_removed c ; react_clause_addded c' )
                 | _ ->
                     react_clause_removed c
                 (* c is redundant *) ) ) ;
           if not @@ Env.flex_get k_fp_mode then
             if Env.flex_get k_processing_kind = `InprocessingFull then
-              Env.add_clause_elimination_rule ~priority:1 "BCE" eliminate_blocked_clauses
-            else Env.add_clause_elimination_rule ~priority:1 "BCE_SAT" eliminate_bce_sat )
+              Env.add_clause_elimination_rule ~priority:1 "BCE"
+                eliminate_blocked_clauses
+            else
+              Env.add_clause_elimination_rule ~priority:1 "BCE_SAT"
+                eliminate_bce_sat )
         else raise UnsupportedLogic
         (* clear all data structures *)
       with UnsupportedLogic ->
@@ -772,16 +899,24 @@ module Make (E : Env.S) : S with module Env = E = struct
       fixpoint_active := true ;
       List.iter scan_cl_lits init_clauses ;
       List.iter
-        (fun cl -> CCArray.iteri (fun lit_idx _ -> register_task ~update_others:false lit_idx cl) (C.lits cl))
+        (fun cl ->
+          CCArray.iteri
+            (fun lit_idx _ -> register_task ~update_others:false lit_idx cl)
+            (C.lits cl) )
         init_clauses ;
       (* eliminate clauses *)
       let num_eliminated = do_eliminate_blocked_clauses () in
-      Util.debugf ~section 2 "Step eliminates %d clauses" (fun k -> k num_eliminated) ;
+      Util.debugf ~section 2 "Step eliminates %d clauses" (fun k ->
+          k num_eliminated ) ;
       CCFormat.printf "%% BCE start fixpoint: @[%d@]@." num_eliminated ;
       Signal.on Env.ProofState.PassiveSet.on_add_clause (fun c ->
-          if !fixpoint_active then (react_clause_addded c ; Signal.ContinueListening) else Signal.StopListening ) ;
+          if !fixpoint_active then (
+            react_clause_addded c ; Signal.ContinueListening )
+          else Signal.StopListening ) ;
       Signal.on Env.ProofState.PassiveSet.on_remove_clause (fun c ->
-          if !fixpoint_active then (react_clause_removed c ; Signal.ContinueListening) else Signal.StopListening )
+          if !fixpoint_active then (
+            react_clause_removed c ; Signal.ContinueListening )
+          else Signal.StopListening )
     with UnsupportedLogic ->
       Util.debugf ~section 2 "logic is unsupported" CCFun.id ;
       (* releasing possibly used memory *)
@@ -793,8 +928,10 @@ module Make (E : Env.S) : S with module Env = E = struct
 
   let fixpoint_step () =
     let num_eliminated = do_eliminate_blocked_clauses () in
-    Util.debugf ~section 1 "Step eliminates %d clauses" (fun k -> k num_eliminated) ;
-    if num_eliminated != 0 then CCFormat.printf "%% BCE fixpoint: %d@." num_eliminated ;
+    Util.debugf ~section 1 "Step eliminates %d clauses" (fun k ->
+        k num_eliminated ) ;
+    if num_eliminated != 0 then
+      CCFormat.printf "%% BCE fixpoint: %d@." num_eliminated ;
     num_eliminated != 0
 
   let end_fixpoint () =
@@ -823,7 +960,10 @@ let extension =
     E.flex_add k_processing_kind !_processing_kind ;
     BCE.setup ()
   in
-  {Extensions.default with Extensions.name= "bce"; prio= 40; env_actions= [action]}
+  { Extensions.default with
+    Extensions.name= "bce"
+  ; prio= 40
+  ; env_actions= [action] }
 
 let () =
   Options.add_opts
@@ -841,7 +981,9 @@ let () =
             | _ ->
                 assert false )
       , " scan clauses for AC definitions" )
-    ; ("--bce-check-every", Arg.Int (( := ) _check_at), " check BCE every n steps of saturation algorithm")
+    ; ( "--bce-check-every"
+      , Arg.Int (( := ) _check_at)
+      , " check BCE every n steps of saturation algorithm" )
     ; ( "--bce-max-symbol-occurences"
       , Arg.Int (( := ) _max_symbol_occ)
       , " limit a given symbol to n occurences only" ) ]

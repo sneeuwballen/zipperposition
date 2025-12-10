@@ -90,25 +90,46 @@ let parse_args () =
   (* options list *)
   let options =
     [ ("--mode", mode_spec (), " mode")
-    ; ("--ord", Arg.Symbol (Ordering.names (), ( := ) ord), " choose term ordering")
+    ; ( "--ord"
+      , Arg.Symbol (Ordering.names (), ( := ) ord)
+      , " choose term ordering" )
     ; ("--version", Arg.Set version, " print version")
-    ; ("--steps", Arg.Set_int steps, " maximal number of steps of given clause loop (no limit if negative)")
+    ; ( "--steps"
+      , Arg.Set_int steps
+      , " maximal number of steps of given clause loop (no limit if negative)"
+      )
     ; ("--timeout", Arg.Set_float timeout, " timeout (in seconds)")
     ; ("-t", Arg.Set_float timeout, " short for --timeout")
     ; ("--expand-def", Arg.Set expand_def, " expand definitions")
-    ; ("--presaturate", Arg.Bool (( := ) presaturate), " pre-saturate (interreduction of) the initial clause set")
-    ; ("--dot", Arg.String (fun s -> dot_file := Some s), " print final state to file in DOT")
-    ; ("--dot-llproof", Arg.String (fun s -> dot_llproof := Some s), " print LLProof to file in DOT")
+    ; ( "--presaturate"
+      , Arg.Bool (( := ) presaturate)
+      , " pre-saturate (interreduction of) the initial clause set" )
+    ; ( "--dot"
+      , Arg.String (fun s -> dot_file := Some s)
+      , " print final state to file in DOT" )
+    ; ( "--dot-llproof"
+      , Arg.String (fun s -> dot_llproof := Some s)
+      , " print LLProof to file in DOT" )
     ; ("--dot-sat", Arg.Set dot_sat, " print saturated set into DOT")
-    ; ("--dot-all-roots", Arg.Set dot_all_roots, " print all empty clauses into DOT")
+    ; ( "--dot-all-roots"
+      , Arg.Set dot_all_roots
+      , " print all empty clauses into DOT" )
     ; ( "--dot-check-prefix"
       , Arg.String (fun s -> dot_check := Some s)
       , " prefix for printing checker proofs in DOT" )
-    ; ("--color", Arg.Bool CCFormat.set_color_default, " enable/disable ANSI color codes")
+    ; ( "--color"
+      , Arg.Bool CCFormat.set_color_default
+      , " enable/disable ANSI color codes" )
     ; ("--seed", Arg.Set_int seed, " set random seed")
-    ; ("--unary-depth", Arg.Set_int unary_depth, " maximum depth for successive unary inferences")
-    ; ("--def-as-rewrite", Arg.Set def_as_rewrite, " treat definitions as rewrite rules")
-    ; ("--def-as-assert", Arg.Clear def_as_rewrite, " treat definitions as axioms")
+    ; ( "--unary-depth"
+      , Arg.Set_int unary_depth
+      , " maximum depth for successive unary inferences" )
+    ; ( "--def-as-rewrite"
+      , Arg.Set def_as_rewrite
+      , " treat definitions as rewrite rules" )
+    ; ( "--def-as-assert"
+      , Arg.Clear def_as_rewrite
+      , " treat definitions as axioms" )
     ; ("--check", Arg.Set check, " check proof")
     ; ("--prelude", Arg.String (CCVector.push prelude), " parse prelude file")
     ; ("--no-check", Arg.Clear check, " do not check proof") ]
@@ -158,7 +179,10 @@ let () =
     ; "lambda-free-extensional"
     ; "ho-comb-complete"
     ; "lambda-free-purify-intensional"
-    ; "lambda-free-purify-extensional" ] (fun () -> default.ord := "lambdafree_kbo" ) ;
-  add_to_mode "ho-complete-basic" (fun () -> default.ord := "derived_ho_kbo_complete") ;
+    ; "lambda-free-purify-extensional" ] (fun () ->
+      default.ord := "lambdafree_kbo" ) ;
+  add_to_mode "ho-complete-basic" (fun () ->
+      default.ord := "derived_ho_kbo_complete" ) ;
   add_to_mode "best" (fun () -> TypeInference._rw_forms_only := true) ;
-  add_to_modes ["best"; "ho-competitive"; "ho-pragmatic"] (fun () -> default.ord := "derived_ho_kbo")
+  add_to_modes ["best"; "ho-competitive"; "ho-pragmatic"] (fun () ->
+      default.ord := "derived_ho_kbo" )

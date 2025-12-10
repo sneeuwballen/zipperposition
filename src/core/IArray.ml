@@ -78,7 +78,9 @@ let exists p a =
   with ExitNow -> true
 
 let equal eq a b =
-  let rec aux i = if i = Array.length a then true else eq a.(i) b.(i) && aux (i + 1) in
+  let rec aux i =
+    if i = Array.length a then true else eq a.(i) b.(i) && aux (i + 1)
+  in
   Array.length a = Array.length b && aux 0
 
 let compare cmp a b =

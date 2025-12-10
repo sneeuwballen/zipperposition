@@ -10,7 +10,12 @@
 val _stats : bool ref
 (** Enable printing of statistics? *)
 
-type input_format = I_tptp | I_zf | I_tip | I_dk | I_guess (* based on the file extension *)
+type input_format =
+  | I_tptp
+  | I_zf
+  | I_tip
+  | I_dk
+  | I_guess (* based on the file extension *)
 
 val input_format_of_string : string -> input_format
 

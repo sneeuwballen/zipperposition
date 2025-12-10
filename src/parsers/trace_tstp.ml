@@ -22,7 +22,11 @@ type t =
   | InferForm of form * step lazy_t
   | InferClause of clause * step lazy_t
 
-and step = {id: id; rule: string; parents: t array; esa: bool  (** Equisatisfiable step? *)}
+and step =
+  { id: id
+  ; rule: string
+  ; parents: t array
+  ; esa: bool  (** Equisatisfiable step? *) }
 
 type proof = t
 
@@ -35,7 +39,8 @@ let equal p1 p2 =
   | InferForm (f1, (lazy step1)), InferForm (f2, (lazy step2)) ->
       step1.id = step2.id && T.equal f1 f2
   | InferClause (c1, (lazy step1)), InferClause (c2, (lazy step2)) -> (
-    try step1.id = step2.id && List.for_all2 (SLiteral.equal T.equal) c1 c2 with Invalid_argument _ -> false )
+    try step1.id = step2.id && List.for_all2 (SLiteral.equal T.equal) c1 c2
+    with Invalid_argument _ -> false )
   | _ ->
       false
 
@@ -72,7 +77,11 @@ let is_axiom = function Axiom _ -> true | _ -> false
 
 let is_theory = function Theory _ -> true | _ -> false
 
-let is_step = function InferClause _ | InferForm _ -> true | Axiom _ | Theory _ -> false
+let is_step = function
+  | InferClause _ | InferForm _ ->
+      true
+  | Axiom _ | Theory _ ->
+      false
 
 let is_proof_of_false = function
   | InferForm (form, _) when T.equal form T.false_ ->
@@ -118,7 +127,8 @@ let is_dag proof =
   (* recursive DFS traversal *)
   let rec check_proof proof =
     if StepTbl.mem closed proof then () (* ok *)
-    else if StepTbl.mem current proof then raise Exit (* we followed a back link! *)
+    else if StepTbl.mem current proof then
+      raise Exit (* we followed a back link! *)
     else (
       StepTbl.add current proof () ;
       ( match proof with
@@ -127,10 +137,12 @@ let is_dag proof =
       | Axiom _ | Theory _ ->
           () ) ;
       (* proof is now totally explored *)
-      StepTbl.remove current proof ; StepTbl.add closed proof () )
+      StepTbl.remove current proof ;
+      StepTbl.add closed proof () )
   in
   try check_proof proof ; (* check from root *)
-                          true with Exit -> false (* loop detected *)
+                          true
+  with Exit -> false (* loop detected *)
 
 (** Traverse the proof. Each proof node is traversed only once. *)
 let traverse ?(traversed = StepTbl.create 11) proof k =
@@ -191,15 +203,20 @@ let of_decls decls =
   (* find a proof name *)
   let find_step name =
     try Hashtbl.find steps name
-    with Not_found -> failwith (CCFormat.sprintf "proof step %a not found in derivation" A.pp_name name)
+    with Not_found ->
+      failwith
+        (CCFormat.sprintf "proof step %a not found in derivation" A.pp_name name)
   in
   (* read information about the source of the clause/formula *)
   let read_info info =
     match info with
     | A.GList [A.GString ("'proof'" | "proof")] ->
         `Proof
-    | A.GNode ("inference", [A.GString rule; A.GList [A.GNode ("status", [A.GString status])]; A.GList parents])
-      ->
+    | A.GNode
+        ( "inference"
+        , [ A.GString rule
+          ; A.GList [A.GNode ("status", [A.GString status])]
+          ; A.GList parents ] ) ->
         (* lazily lookup parent steps by their name in the derivation *)
         let parents =
           lazy
@@ -213,7 +230,9 @@ let of_decls decls =
                  | A.GNode ("theory", [A.GString th]) ->
                      Theory th
                  | _ ->
-                     failwith (CCFormat.sprintf "not a valid parent: %a" A.pp_general data) )
+                     failwith
+                       (CCFormat.sprintf "not a valid parent: %a" A.pp_general
+                          data ) )
                (Array.of_list parents) )
         in
         let esa = status <> "thm" in
@@ -230,7 +249,8 @@ let of_decls decls =
         let parent = find_step (A.NameString s) in
         `Parents ("trivial", false, Lazy.from_val [|parent|])
     | _ ->
-        Util.debugf 1 "not a valid proof step: %a" (fun k -> k A.pp_general_debugf info) ;
+        Util.debugf 1 "not a valid proof step: %a" (fun k ->
+            k A.pp_general_debugf info ) ;
         `NoIdea
   in
   (* what to do if a step is read *)
@@ -238,7 +258,8 @@ let of_decls decls =
     match step with
     | InferForm _ | InferClause _ ->
         if is_proof_of_false step && !root = None then root := Some step ;
-        Util.debugf 3 "add step %a (root? %B)" (fun k -> k A.pp_name id (is_proof_of_false step)) ;
+        Util.debugf 3 "add step %a (root? %B)" (fun k ->
+            k A.pp_name id (is_proof_of_false step) ) ;
         Hashtbl.replace steps id step
     | Axiom _ | Theory _ ->
         ()
@@ -248,24 +269,39 @@ let of_decls decls =
     (fun decl ->
       match decl with
       | A.CNF (_name, _role, _c, info :: _) -> (
-          Util.debugf 3 "@[<2>convert step@ @[%a@]@]" (fun k -> k (A.pp T.pp) decl) ;
-          match read_info info with `Proof | `NoIdea -> () | `Parents (_rule, _esa, _parents) -> assert false
+          Util.debugf 3 "@[<2>convert step@ @[%a@]@]" (fun k ->
+              k (A.pp T.pp) decl ) ;
+          match read_info info with
+          | `Proof | `NoIdea ->
+              ()
+          | `Parents (_rule, _esa, _parents) ->
+              assert false
           (* FIXME
              let step = lazy {id=name; esa; rule; parents=Lazy.force parents} in
              let c = List.map SLiteral.of_form c in
              let p = InferClause (c, step) in
              add_step name p
           *) )
-      | A.FOF (name, _role, f, info :: _) | A.TFF (name, _role, f, info :: _) -> (
+      | A.FOF (name, _role, f, info :: _) | A.TFF (name, _role, f, info :: _)
+        -> (
           Util.debugf 3 "convert step %a" (fun k -> k (A.pp T.pp) decl) ;
           match read_info info with
           | `Proof | `NoIdea ->
               ()
           | `Parents (rule, esa, parents) ->
-              let step = lazy {id= name; esa; rule; parents= Lazy.force parents} in
+              let step =
+                lazy {id= name; esa; rule; parents= Lazy.force parents}
+              in
               let p = InferForm (f, step) in
               add_step name p )
-      | A.TypeDecl _ | A.FOF _ | A.CNF _ | A.TFF _ | A.THF _ | A.Include _ | A.IncludeOnly _ | A.NewType _ ->
+      | A.TypeDecl _
+      | A.FOF _
+      | A.CNF _
+      | A.TFF _
+      | A.THF _
+      | A.Include _
+      | A.IncludeOnly _
+      | A.NewType _ ->
           () )
     decls ;
   match !root with
@@ -280,10 +316,12 @@ let parse ?(recursive = true) filename =
   Err.(
     Util_tptp.parse_file ~recursive filename
     >>= fun decls ->
-    Util.debugf 1 "@[<2>decls:@ @[<hv>%a@]@]" (fun k -> k (Util.pp_iter ~sep:"" (A.pp T.pp)) decls) ;
+    Util.debugf 1 "@[<2>decls:@ @[<hv>%a@]@]" (fun k ->
+        k (Util.pp_iter ~sep:"" (A.pp T.pp)) decls ) ;
     of_decls decls )
 
-let _extract_axiom proof = match proof with Axiom (f, n) -> (f, n) | _ -> assert false
+let _extract_axiom proof =
+  match proof with Axiom (f, n) -> (f, n) | _ -> assert false
 
 let _pp_clause out c =
   match c with
@@ -311,27 +349,39 @@ let pp_tstp out proof =
           ()
       | Theory s ->
           CCFormat.fprintf out "theory(%s)" s
-      | InferClause (c, (lazy ({rule= "axiom"; _} as step))) when is_axiom step.parents.(0) ->
+      | InferClause (c, (lazy ({rule= "axiom"; _} as step)))
+        when is_axiom step.parents.(0) ->
           let id = get_id p in
           let f, n = _extract_axiom step.parents.(0) in
-          Format.fprintf out "cnf(%a, axiom, (%a), file('%s', %s)).\n" A.pp_name id _pp_clause c f n
-      | InferForm (f, (lazy ({rule= "axiom"; _} as step))) when is_axiom step.parents.(0) ->
+          Format.fprintf out "cnf(%a, axiom, (%a), file('%s', %s)).\n" A.pp_name
+            id _pp_clause c f n
+      | InferForm (f, (lazy ({rule= "axiom"; _} as step)))
+        when is_axiom step.parents.(0) ->
           let id = get_id p in
           let file, n = _extract_axiom step.parents.(0) in
-          Format.fprintf out "tff(%a, axiom, %a, file('%s', %s)).\n" A.pp_name id T.pp f file n
+          Format.fprintf out "tff(%a, axiom, %a, file('%s', %s)).\n" A.pp_name
+            id T.pp f file n
       | InferForm (f, (lazy step)) ->
           let id = get_id p in
           let ids = Array.map _print_parent step.parents in
           let status = if step.esa then "esa" else "thm" in
           let kind = if _form_is_fof f then "fof" else "tff" in
-          Format.fprintf out "%s(%a, plain, %a, inference('%s', [status(%s)], [%a])).\n" kind A.pp_name id T.pp
-            (T.close_all Binder.Forall f) step.rule status (CCFormat.array CCFormat.string) ids
+          Format.fprintf out
+            "%s(%a, plain, %a, inference('%s', [status(%s)], [%a])).\n" kind
+            A.pp_name id T.pp
+            (T.close_all Binder.Forall f)
+            step.rule status
+            (CCFormat.array CCFormat.string)
+            ids
       | InferClause (c, (lazy step)) ->
           let id = get_id p in
           let ids = Array.map _print_parent step.parents in
           let status = if step.esa then "esa" else "thm" in
-          Format.fprintf out "cnf(%a, plain, %a, inference('%s', [status(%s)], [%a])).\n" A.pp_name id _pp_clause
-            c step.rule status (CCFormat.array CCFormat.string) ids )
+          Format.fprintf out
+            "cnf(%a, plain, %a, inference('%s', [status(%s)], [%a])).\n"
+            A.pp_name id _pp_clause c step.rule status
+            (CCFormat.array CCFormat.string)
+            ids )
 
 let pp0 out proof =
   match proof with
@@ -340,7 +390,8 @@ let pp0 out proof =
   | Theory s ->
       Format.fprintf out "theory(%s)" s
   | InferClause (c, _) ->
-      Format.fprintf out "proof for %a (id %a)" _pp_clause c A.pp_name (get_id proof)
+      Format.fprintf out "proof for %a (id %a)" _pp_clause c A.pp_name
+        (get_id proof)
   | InferForm (f, _) ->
       Format.fprintf out "proof for %a (id %a)" T.pp f A.pp_name (get_id proof)
 
@@ -351,11 +402,13 @@ let pp1 out proof =
   | Theory s ->
       Format.fprintf out "theory(%s)" s
   | InferClause (c, (lazy step)) ->
-      Format.fprintf out "proof for %a (id %a) from\n  %a" _pp_clause c A.pp_name (get_id proof)
+      Format.fprintf out "proof for %a (id %a) from\n  %a" _pp_clause c
+        A.pp_name (get_id proof)
         CCFormat.(array ~sep:(return "@.  ") pp0)
         step.parents
   | InferForm (f, (lazy step)) ->
-      Format.fprintf out "proof for %a (id %a) from\n %a" T.pp f A.pp_name (get_id proof)
+      Format.fprintf out "proof for %a (id %a) from\n %a" T.pp f A.pp_name
+        (get_id proof)
         CCFormat.(array ~sep:(return "@.  ") pp0)
         step.parents
 

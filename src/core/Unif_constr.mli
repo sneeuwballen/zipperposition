@@ -13,7 +13,12 @@ type term = InnerTerm.t
 
 (** A constraint delayed because unification for this pair of terms is
       not syntactic *)
-type t = private {t1: term; sc1: Scoped.scope; t2: term; sc2: Scoped.scope; tags: Proof.tag list}
+type t = private
+  { t1: term
+  ; sc1: Scoped.scope
+  ; t2: term
+  ; sc2: Scoped.scope
+  ; tags: Proof.tag list }
 
 val make : tags:Proof.tag list -> term Scoped.t -> term Scoped.t -> t
 

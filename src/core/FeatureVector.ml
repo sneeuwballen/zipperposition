@@ -31,9 +31,13 @@ module Make (C : Index.CLAUSE) = struct
 
     let to_string = CCFormat.to_string pp
 
-    let size_plus = {name= "size+"; f= (fun lits -> Iter.filter SLiteral.is_pos lits |> Iter.length)}
+    let size_plus =
+      { name= "size+"
+      ; f= (fun lits -> Iter.filter SLiteral.is_pos lits |> Iter.length) }
 
-    let size_minus = {name= "size-"; f= (fun lits -> Iter.filter SLiteral.is_neg lits |> Iter.length)}
+    let size_minus =
+      { name= "size-"
+      ; f= (fun lits -> Iter.filter SLiteral.is_neg lits |> Iter.length) }
 
     let rec _depth_term depth t =
       let pref, t = T.open_fun t in
@@ -44,9 +48,12 @@ module Make (C : Index.CLAUSE) = struct
       | T.Fun _ ->
           assert false (* we just opened a function*)
       | T.AppBuiltin (_, l) | T.App (_, l) ->
-          if CCList.is_empty l || T.is_var (T.head_term t) then depth (* for logical operators*)
+          if CCList.is_empty l || T.is_var (T.head_term t) then depth
+            (* for logical operators*)
           else
-            let max_arg_depth = Iter.max_exn (Iter.map (_depth_term depth) (Iter.of_list l)) in
+            let max_arg_depth =
+              Iter.max_exn (Iter.map (_depth_term depth) (Iter.of_list l))
+            in
             max_arg_depth + 1
 
     (* sum of depths at which symbols occur. Eg f(a, g(b)) will yield 4 (f
@@ -55,27 +62,39 @@ module Make (C : Index.CLAUSE) = struct
       { name= "sum_of_depths"
       ; f=
           (fun lits ->
-            Iter.fold (fun acc lit -> SLiteral.fold (fun acc t -> acc + _depth_term 0 t) acc lit) 0 lits ) }
+            Iter.fold
+              (fun acc lit ->
+                SLiteral.fold (fun acc t -> acc + _depth_term 0 t) acc lit )
+              0 lits ) }
 
-    let _select_sign ~sign lits = lits |> Iter.filter (fun l -> SLiteral.sign l = sign)
+    let _select_sign ~sign lits =
+      lits |> Iter.filter (fun l -> SLiteral.sign l = sign)
 
     (* sequence of symbols of clause, of given sign *)
     let _symbols ~sign lits =
       let filter_term t = not (T.is_app_var t) in
-      _select_sign ~sign lits |> Iter.flat_map SLiteral.to_iter |> Iter.flat_map (T.Seq.symbols ~filter_term)
+      _select_sign ~sign lits
+      |> Iter.flat_map SLiteral.to_iter
+      |> Iter.flat_map (T.Seq.symbols ~filter_term)
 
     let count_symb_plus symb =
-      {name= CCFormat.sprintf "count+(%a)" ID.pp symb; f= (fun lits -> Iter.length (_symbols ~sign:true lits))}
+      { name= CCFormat.sprintf "count+(%a)" ID.pp symb
+      ; f= (fun lits -> Iter.length (_symbols ~sign:true lits)) }
 
     let count_symb_minus symb =
-      {name= CCFormat.sprintf "count-(%a)" ID.pp symb; f= (fun lits -> Iter.length (_symbols ~sign:false lits))}
+      { name= CCFormat.sprintf "count-(%a)" ID.pp symb
+      ; f= (fun lits -> Iter.length (_symbols ~sign:false lits)) }
 
     (* max depth of the symbol in the term, or -1 *)
     let max_depth_term symb t =
       let symbs_depths =
         T.Seq.subterms_depth t
         |> Iter.filter_map (fun (t, depth) ->
-               match T.Classic.view t with T.Classic.App (s, _) when ID.equal s symb -> Some depth | _ -> None )
+               match T.Classic.view t with
+               | T.Classic.App (s, _) when ID.equal s symb ->
+                   Some depth
+               | _ ->
+                   None )
       in
       match Iter.max symbs_depths with None -> 0 | Some m -> m
 
@@ -83,18 +102,23 @@ module Make (C : Index.CLAUSE) = struct
       Iter.fold
         (fun depth lit ->
           if sign = SLiteral.sign lit then
-            SLiteral.fold (fun depth t -> max depth (max_depth_term symb t)) depth lit
+            SLiteral.fold
+              (fun depth t -> max depth (max_depth_term symb t))
+              depth lit
           else depth )
         0 lits
 
     let max_depth_plus symb =
-      {name= CCFormat.sprintf "max_depth+(%a)" ID.pp symb; f= _max_depth_lits ~sign:true symb}
+      { name= CCFormat.sprintf "max_depth+(%a)" ID.pp symb
+      ; f= _max_depth_lits ~sign:true symb }
 
     let max_depth_minus symb =
-      {name= CCFormat.sprintf "max_depth-(%a)" ID.pp symb; f= _max_depth_lits ~sign:false symb}
+      { name= CCFormat.sprintf "max_depth-(%a)" ID.pp symb
+      ; f= _max_depth_lits ~sign:false symb }
   end
 
-  let compute_fv features lits = List.map (fun feat -> feat.Feature.f lits) features
+  let compute_fv features lits =
+    List.map (fun feat -> feat.Feature.f lits) features
 
   (** {2 Feature Trie} *)
 
@@ -151,7 +175,8 @@ module Make (C : Index.CLAUSE) = struct
           goto subtrie t' rebuild'
         with Not_found ->
           (* no subtrie found *)
-          let subtrie = if t' = [] then TrieLeaf CSet.empty else TrieNode IntMap.empty
+          let subtrie =
+            if t' = [] then TrieLeaf CSet.empty else TrieNode IntMap.empty
           and rebuild' subtrie =
             match subtrie with
             | _ when empty_trie subtrie ->
@@ -177,7 +202,8 @@ module Make (C : Index.CLAUSE) = struct
 
   let features idx = idx.features
 
-  let default_features = [Feature.size_plus; Feature.size_minus; Feature.sum_of_depths]
+  let default_features =
+    [Feature.size_plus; Feature.size_minus; Feature.sum_of_depths]
 
   (** maximam number of features in addition to basic ones *)
   let max_features = 25
@@ -189,10 +215,18 @@ module Make (C : Index.CLAUSE) = struct
     Signature.iter sigma (fun s (ty, _) ->
         if ignore s then () (* base symbols don't count *)
         else
-          let arity = match Type.arity ty with Type.NoArity -> 0 | Type.Arity (_, i) -> i in
+          let arity =
+            match Type.arity ty with
+            | Type.NoArity ->
+                0
+            | Type.Arity (_, i) ->
+                i
+          in
           if Type.equal ty Type.TPTP.o then
             features :=
-              [(1 + arity, Feature.count_symb_plus s); (1 + arity, Feature.count_symb_minus s)] @ !features
+              [ (1 + arity, Feature.count_symb_plus s)
+              ; (1 + arity, Feature.count_symb_minus s) ]
+              @ !features
           else
             features :=
               [ (0, Feature.max_depth_plus s)
@@ -205,7 +239,8 @@ module Make (C : Index.CLAUSE) = struct
     let features = CCList.take max_features features in
     let features = List.map (fun (_, f) -> f) features in
     let features = default_features @ features in
-    Util.debugf 2 "FV features: [%a]" (fun k -> k (CCFormat.list Feature.pp) features) ;
+    Util.debugf 2 "FV features: [%a]" (fun k ->
+        k (CCFormat.list Feature.pp) features ) ;
     features
 
   let of_signature signature =
@@ -244,7 +279,11 @@ module Make (C : Index.CLAUSE) = struct
       | [], TrieLeaf set ->
           CSet.iter f set
       | i :: fv', TrieNode map ->
-          IntMap.iter (fun j subnode -> if j <= i then fold_lower fv' subnode (* go in the branch *) else ()) map
+          IntMap.iter
+            (fun j subnode ->
+              if j <= i then fold_lower fv' subnode (* go in the branch *)
+              else () )
+            map
       | _ ->
           failwith "number of features in feature vector changed"
     in
@@ -260,7 +299,9 @@ module Make (C : Index.CLAUSE) = struct
           CSet.iter f set
       | i :: fv', TrieNode map ->
           IntMap.iter
-            (fun j subnode -> if j >= i then fold_higher fv' subnode (* go in the branch *) else ())
+            (fun j subnode ->
+              if j >= i then fold_higher fv' subnode (* go in the branch *)
+              else () )
             map
       | _ ->
           failwith "number of features in feature vector changed"
@@ -276,17 +317,24 @@ module Make (C : Index.CLAUSE) = struct
       | [], TrieLeaf set ->
           CSet.iter f set
       | i :: fv', TrieNode map ->
-          IntMap.iter (fun j subnode -> if j = i then fold_higher fv' subnode (* go in the branch *) else ()) map
+          IntMap.iter
+            (fun j subnode ->
+              if j = i then fold_higher fv' subnode (* go in the branch *)
+              else () )
+            map
       | _ ->
           failwith "number of features in feature vector changed"
     in
     fold_higher fv idx.trie
 
-  let retrieve_subsuming_c idx c f = retrieve_subsuming idx (C.to_lits c) (C.labels c) f
+  let retrieve_subsuming_c idx c f =
+    retrieve_subsuming idx (C.to_lits c) (C.labels c) f
 
-  let retrieve_subsumed_c idx c f = retrieve_subsumed idx (C.to_lits c) (C.labels c) f
+  let retrieve_subsumed_c idx c f =
+    retrieve_subsumed idx (C.to_lits c) (C.labels c) f
 
-  let retrieve_alpha_equiv_c idx c f = retrieve_alpha_equiv idx (C.to_lits c) (C.labels c) f
+  let retrieve_alpha_equiv_c idx c f =
+    retrieve_alpha_equiv idx (C.to_lits c) (C.labels c) f
 
   let iter idx f =
     let rec iter = function

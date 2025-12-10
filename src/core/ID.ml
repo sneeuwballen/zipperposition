@@ -3,7 +3,10 @@
 (** {1 Unique Identifiers} *)
 
 type t =
-  {id: int; name: string; mutable payload: exn list  (** Use [exn] as an open type for user-defined payload *)}
+  { id: int
+  ; name: string
+  ; mutable payload: exn list
+        (** Use [exn] as an open type for user-defined payload *) }
 
 type t_ = t
 
@@ -56,7 +59,8 @@ let payload_find ~f:p t =
       | None, [] ->
           None
       | None, e3 :: tail3 -> (
-        match p e3 with Some _ as res -> res | None -> CCList.find_map p tail3 ) ) )
+        match p e3 with Some _ as res -> res | None -> CCList.find_map p tail3 )
+      ) )
 
 let payload_pred ~f:p t =
   match t.payload with
@@ -87,7 +91,8 @@ let pp_fullc = pp_full
 
 let pp_tstp out id =
   let name_and_id = id.name ^ "_" ^ string_of_int id.id in
-  if Util.tstp_needs_escaping name_and_id then CCFormat.fprintf out "'%s'" name_and_id
+  if Util.tstp_needs_escaping name_and_id then
+    CCFormat.fprintf out "'%s'" name_and_id
   else CCFormat.string out name_and_id
 
 let pp_zf = pp_tstp
@@ -98,7 +103,10 @@ let gensym =
   fun () ->
     let i = !r / String.length names in
     let j = !r mod String.length names in
-    let name = if i = 0 then Printf.sprintf "%c" names.[j] else Printf.sprintf "%c%d" names.[j] i in
+    let name =
+      if i = 0 then Printf.sprintf "%c" names.[j]
+      else Printf.sprintf "%c%d" names.[j] i
+    in
     incr r ; make name
 
 module O_ = struct
@@ -141,24 +149,34 @@ let as_prefix = payload_find ~f:(function Attr_prefix s -> Some s | _ -> None)
 
 let is_prefix id = as_prefix id |> CCOpt.is_some
 
-let as_parameter id = payload_find id ~f:(function Attr_parameter i -> Some i | _ -> None)
+let as_parameter id =
+  payload_find id ~f:(function Attr_parameter i -> Some i | _ -> None)
 
 let is_parameter id = as_parameter id |> CCOpt.is_some
 
-let is_comm id = CCOpt.is_some @@ payload_find ~f:(function Attr_comm -> Some 1 | _ -> None) id
+let is_comm id =
+  CCOpt.is_some
+  @@ payload_find ~f:(function Attr_comm -> Some 1 | _ -> None) id
 
-let is_assoc id = CCOpt.is_some @@ payload_find ~f:(function Attr_assoc -> Some 1 | _ -> None) id
+let is_assoc id =
+  CCOpt.is_some
+  @@ payload_find ~f:(function Attr_assoc -> Some 1 | _ -> None) id
 
 let is_ac id = is_comm id && is_assoc id
 
-let is_skolem id = payload_pred id ~f:(function Attr_skolem _ -> true | _ -> false)
+let is_skolem id =
+  payload_pred id ~f:(function Attr_skolem _ -> true | _ -> false)
 
-let is_postcnf_skolem id = payload_pred id ~f:(function Attr_skolem K_after_cnf -> true | _ -> false)
+let is_postcnf_skolem id =
+  payload_pred id ~f:(function Attr_skolem K_after_cnf -> true | _ -> false)
 
-let is_lazycnf_skolem id = payload_pred id ~f:(function Attr_skolem K_lazy_cnf -> true | _ -> false)
+let is_lazycnf_skolem id =
+  payload_pred id ~f:(function Attr_skolem K_lazy_cnf -> true | _ -> false)
 
-let as_skolem id = payload_find id ~f:(function Attr_skolem a -> Some a | _ -> None)
+let as_skolem id =
+  payload_find id ~f:(function Attr_skolem a -> Some a | _ -> None)
 
 (* Note: If you want to reinsert mandatory arguments: They were here. (let num_mandatory_args _ =) *)
 
-let is_distinct_object id = payload_pred id ~f:(function Attr_distinct -> true | _ -> false)
+let is_distinct_object id =
+  payload_pred id ~f:(function Attr_distinct -> true | _ -> false)

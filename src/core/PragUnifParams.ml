@@ -12,7 +12,8 @@ let k_max_elims = Flex_state.create_key ()
 
 let k_imit_first = Flex_state.create_key ()
 
-let k_logop_mode : [`Conservative | `Pragmatic | `Off] Flex_state.key = Flex_state.create_key ()
+let k_logop_mode : [`Conservative | `Pragmatic | `Off] Flex_state.key =
+  Flex_state.create_key ()
 
 let k_pattern_decider = Flex_state.create_key ()
 
@@ -34,7 +35,8 @@ let k_use_weight_for_solid_subsumption = Flex_state.create_key ()
 
 let k_sort_constraints = Flex_state.create_key ()
 
-let k_oracle_composer : (Subst.t option OSeq.t OSeq.t -> Subst.t option OSeq.t) Flex_state.key =
+let k_oracle_composer :
+    (Subst.t option OSeq.t OSeq.t -> Subst.t option OSeq.t) Flex_state.key =
   Flex_state.create_key ()
 
 let k_try_lfho = Flex_state.create_key ()

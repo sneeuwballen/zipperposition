@@ -37,7 +37,8 @@ module Make (T : TERM) = struct
   (** Maps terms to their list of immediate parents, and current
       representative *)
   type t =
-    {parents: term list H.t (* parent terms *); mutable next: term H.t (* pointer towards representative *)}
+    { parents: term list H.t (* parent terms *)
+    ; mutable next: term H.t (* pointer towards representative *) }
 
   let create ?(size = 64) () = {parents= H.create size; next= H.create size}
 
@@ -45,7 +46,8 @@ module Make (T : TERM) = struct
   let[@inline] set_next_ cc t next : t = {cc with next= H.replace cc.next t next}
 
   (* update [node.parents] to be [parents] *)
-  let[@inline] set_parents_ cc t parents : t = {cc with parents= H.replace cc.parents t parents}
+  let[@inline] set_parents_ cc t parents : t =
+    {cc with parents= H.replace cc.parents t parents}
 
   let[@inline] next_ cc t = H.get t cc.next |> CCOpt.get_or ~default:t
 
@@ -89,7 +91,10 @@ module Make (T : TERM) = struct
       List.fold_left
         (fun cc p1 ->
           List.fold_left
-            (fun cc p2 -> if (not (T.equal p1 p2)) && are_congruent_ cc p1 p2 then merge_ cc p1 p2 else cc)
+            (fun cc p2 ->
+              if (not (T.equal p1 p2)) && are_congruent_ cc p1 p2 then
+                merge_ cc p1 p2
+              else cc )
             cc right )
         cc left
 
@@ -118,7 +123,9 @@ module Make (T : TERM) = struct
             let parents = find_ cc sub |> parents_ cc in
             List.fold_left
               (fun cc parent_sub ->
-                if (not (T.equal t parent_sub)) && are_congruent_ cc t parent_sub then merge_ cc t parent_sub
+                if
+                  (not (T.equal t parent_sub)) && are_congruent_ cc t parent_sub
+                then merge_ cc t parent_sub
                 else cc )
               cc parents )
           cc subs
@@ -130,7 +137,8 @@ module Make (T : TERM) = struct
         let repr = find_ cc mem in
         f ~mem ~repr )
 
-  let iter_roots cc f = H.iter cc.next (fun t next -> if T.equal t next then f t)
+  let iter_roots cc f =
+    H.iter cc.next (fun t next -> if T.equal t next then f t)
 
   let[@inline] mk_eq cc t1 t2 =
     let cc = add cc t1 in
@@ -145,10 +153,16 @@ module Make (T : TERM) = struct
   let pp_debug out (cc : t) : unit =
     let module Fmt = CCFormat in
     let pp_parent out (t, l) =
-      Fmt.fprintf out "(@[<hv1>parents@ :of %a@ (@[<v>%a@])@])" T.pp t (Util.pp_list ~sep:" " T.pp) l
-    and pp_next out (t, u) = Fmt.fprintf out "(@[<hv>next@ :of %a@ :is %a@])" T.pp t T.pp u in
-    Fmt.fprintf out "(@[<v>cc@ :parent_tbl (@[<v>%a@])@ :next_tbl (@[<v>%a@])@])" (Util.pp_iter pp_parent)
-      (H.to_iter cc.parents) (Util.pp_iter pp_next) (H.to_iter cc.next)
+      Fmt.fprintf out "(@[<hv1>parents@ :of %a@ (@[<v>%a@])@])" T.pp t
+        (Util.pp_list ~sep:" " T.pp)
+        l
+    and pp_next out (t, u) =
+      Fmt.fprintf out "(@[<hv>next@ :of %a@ :is %a@])" T.pp t T.pp u
+    in
+    Fmt.fprintf out
+      "(@[<v>cc@ :parent_tbl (@[<v>%a@])@ :next_tbl (@[<v>%a@])@])"
+      (Util.pp_iter pp_parent) (H.to_iter cc.parents) (Util.pp_iter pp_next)
+      (H.to_iter cc.next)
 end
 
 module FO = Make (struct
@@ -162,7 +176,8 @@ module FO = Make (struct
 
   let pp = T.pp
 
-  let subterms t = match T.Classic.view t with T.Classic.App (_, l) -> l | _ -> []
+  let subterms t =
+    match T.Classic.view t with T.Classic.App (_, l) -> l | _ -> []
 
   let update_subterms t l =
     match (T.view t, l) with

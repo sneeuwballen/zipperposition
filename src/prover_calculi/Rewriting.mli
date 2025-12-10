@@ -10,7 +10,17 @@ module Make (E : Env_intf.S) : sig
 end
 
 val unfold_def_before_cnf :
-     ((Logtk.TypedSTerm.t, Logtk.TypedSTerm.t, Logtk.TypedSTerm.t) Logtk.Statement.t, 'c) CCVector.t
-  -> ((Logtk.TypedSTerm.t, Logtk.TypedSTerm.t, Logtk.TypedSTerm.t) Logtk.Statement.t, 'c) CCVector.t
+     ( ( Logtk.TypedSTerm.t
+       , Logtk.TypedSTerm.t
+       , Logtk.TypedSTerm.t )
+       Logtk.Statement.t
+     , 'c )
+     CCVector.t
+  -> ( ( Logtk.TypedSTerm.t
+       , Logtk.TypedSTerm.t
+       , Logtk.TypedSTerm.t )
+       Logtk.Statement.t
+     , 'c )
+     CCVector.t
 
 val extension : Extensions.t

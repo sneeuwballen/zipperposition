@@ -21,7 +21,11 @@ module type S = sig
     -> bool
     -> (T.t * C.t list * C.t list) option
 
-  val get_skolem : parent:C.t -> mode:[< `Choice | `SkolemRecycle | `SkolemAlwaysFresh] -> T.t -> T.t
+  val get_skolem :
+       parent:C.t
+    -> mode:[< `Choice | `SkolemRecycle | `SkolemAlwaysFresh]
+    -> T.t
+    -> T.t
 end
 
 module Make (C : Clause.S) = struct
@@ -36,7 +40,8 @@ module Make (C : Clause.S) = struct
     let compare (a1, c1) (a2, c2) = T.compare a1 a2
   end)
 
-  let on_pred_skolem_introduction : (C.t * Logtk.Term.t) Logtk.Signal.t = Signal.create ()
+  let on_pred_skolem_introduction : (C.t * Logtk.Term.t) Logtk.Signal.t =
+    Signal.create ()
 
   let _skolem_idx = ref @@ Idx.empty ()
 
@@ -50,7 +55,11 @@ module Make (C : Clause.S) = struct
     let is_renaming_lit = function
       | L.Equation (lhs, _, _) as lit when L.is_predicate_lit lit -> (
           let hd = T.head_term lhs in
-          match T.head hd with Some id -> ID.Set.mem id !_renamer_symbols | None -> false )
+          match T.head hd with
+          | Some id ->
+              ID.Set.mem id !_renamer_symbols
+          | None ->
+              false )
       | _ ->
           false
     in
@@ -63,20 +72,30 @@ module Make (C : Clause.S) = struct
       | _ ->
           false
     in
-    Util.debugf ~section 1 "@[%a@] is %srenaming" (fun k -> k C.pp c (if ans then "" else "not ")) ;
+    Util.debugf ~section 1 "@[%a@] is %srenaming" (fun k ->
+        k C.pp c (if ans then "" else "not ") ) ;
     ans
 
   let mk_renaming_clause parent ~polarity_aware ~renamer ~form sign =
-    let proof = Proof.Step.define_internal (T.head_exn renamer) [C.proof_parent parent] in
+    let proof =
+      Proof.Step.define_internal (T.head_exn renamer) [C.proof_parent parent]
+    in
     let res =
       if polarity_aware then
-        if sign then C.create ~penalty:1 ~trail:Trail.empty [L.mk_false renamer; L.mk_true form] proof
-        else C.create ~penalty:1 ~trail:Trail.empty [L.mk_true renamer; L.mk_false form] proof
+        if sign then
+          C.create ~penalty:1 ~trail:Trail.empty
+            [L.mk_false renamer; L.mk_true form]
+            proof
+        else
+          C.create ~penalty:1 ~trail:Trail.empty
+            [L.mk_true renamer; L.mk_false form]
+            proof
       else C.create ~penalty:1 ~trail:Trail.empty [L.mk_eq renamer form] proof
     in
     res
 
-  let rename_form ?(should_rename = fun _ -> true) ?(polarity_aware = true) ~c form sign =
+  let rename_form ?(should_rename = fun _ -> true) ?(polarity_aware = true) ~c
+      form sign =
     assert (Type.is_prop (T.ty form)) ;
     let mk_sign sign = if polarity_aware then Some sign else None in
     let defined_with_sign sign = function
@@ -92,10 +111,14 @@ module Make (C : Clause.S) = struct
     in
     if is_renaming_clause c || T.is_true_or_false form then None
     else
-      let gen = Iter.head @@ Idx.retrieve_generalizations (!_renaming_idx, 0) (form, 1) in
+      let gen =
+        Iter.head @@ Idx.retrieve_generalizations (!_renaming_idx, 0) (form, 1)
+      in
       match gen with
       | Some (orig, (renamer, defined_as), subst) ->
-          let renamer_sub = Subst.FO.apply Subst.Renaming.none subst (renamer, 0) in
+          let renamer_sub =
+            Subst.FO.apply Subst.Renaming.none subst (renamer, 0)
+          in
           (* it might be that at one moment we tried to do the renaming in
              polarity aware mode and then at the other in non-polarity aware mode *)
           let renamer_sub, new_defs, parents =
@@ -103,10 +126,16 @@ module Make (C : Clause.S) = struct
                a polarity aware definition -- simply insert the other polarity *)
             if
               (not polarity_aware)
-              && (defined_with_sign sign !defined_as || defined_with_sign (not sign) !defined_as)
+              && ( defined_with_sign sign !defined_as
+                 || defined_with_sign (not sign) !defined_as )
             then (
-              let sign = if defined_with_sign sign !defined_as then not sign else sign in
-              let def = mk_renaming_clause c ~polarity_aware:true ~renamer ~form:orig sign in
+              let sign =
+                if defined_with_sign sign !defined_as then not sign else sign
+              in
+              let def =
+                mk_renaming_clause c ~polarity_aware:true ~renamer ~form:orig
+                  sign
+              in
               defined_as := (def, Some sign) :: !defined_as ;
               (renamer_sub, [def], !defined_as) )
             else if polarity_aware then (
@@ -114,16 +143,31 @@ module Make (C : Clause.S) = struct
                 (* if we are doing PA and the sign is present in one form or the
                    other, OK *)
                 defined_with_sign sign !defined_as
-                || match !defined_as with [(_, Some _); (_, Some _)] -> true | [(_, None)] -> true | _ -> false
+                ||
+                match !defined_as with
+                | [(_, Some _); (_, Some _)] ->
+                    true
+                | [(_, None)] ->
+                    true
+                | _ ->
+                    false
               then (renamer_sub, [], !defined_as)
               else
                 (* if the sign is missing add it*)
-                let def = mk_renaming_clause c ~polarity_aware ~renamer ~form:orig sign in
+                let def =
+                  mk_renaming_clause c ~polarity_aware ~renamer ~form:orig sign
+                in
                 defined_as := (def, Some sign) :: !defined_as ;
                 (renamer_sub, [def], !defined_as) )
             else (
               assert (
-                match !defined_as with [(_, None)] -> true | [(_, Some _); (_, Some _)] -> true | _ -> false ) ;
+                match !defined_as with
+                | [(_, None)] ->
+                    true
+                | [(_, Some _); (_, Some _)] ->
+                    true
+                | _ ->
+                    false ) ;
               (renamer_sub, [], !defined_as) )
           in
           Some (renamer_sub, new_defs, CCList.map fst parents)
@@ -131,10 +175,15 @@ module Make (C : Clause.S) = struct
           (* maybe we need to define it if it appears too many times *)
           if should_rename form then (
             let free_vars = T.vars form |> T.VarSet.to_list in
-            let (id, ty), renamer = T.mk_fresh_skolem ~prefix:"form" free_vars Type.prop in
+            let (id, ty), renamer =
+              T.mk_fresh_skolem ~prefix:"form" free_vars Type.prop
+            in
             Ctx.declare id ty ;
-            let def = mk_renaming_clause c ~renamer ~polarity_aware ~form sign in
-            _renaming_idx := Idx.add !_renaming_idx form (renamer, ref [(def, mk_sign sign)]) ;
+            let def =
+              mk_renaming_clause c ~renamer ~polarity_aware ~form sign
+            in
+            _renaming_idx :=
+              Idx.add !_renaming_idx form (renamer, ref [(def, mk_sign sign)]) ;
             _renamer_symbols := ID.Set.add id !_renamer_symbols ;
             Some (renamer, [def], [def]) )
           else None
@@ -153,7 +202,9 @@ module Make (C : Clause.S) = struct
     in
     match mode with
     | `SkolemRecycle -> (
-        let gen = Iter.head @@ Idx.retrieve_generalizations (!_skolem_idx, 0) (f, 1) in
+        let gen =
+          Iter.head @@ Idx.retrieve_generalizations (!_skolem_idx, 0) (f, 1)
+        in
         match gen with
         | Some (orig, (skolem, _), subst) ->
             Subst.FO.apply Subst.Renaming.none subst (skolem, 0)

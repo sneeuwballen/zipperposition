@@ -19,7 +19,12 @@ val elim_subsets_rule :
   -> int
   -> (Subst.FO.t * int) OSeq.t
 
-val proj_hs : counter:int ref -> scope:Scoped.scope -> flex:Term.t -> Term.t -> Subst.FO.t CCList.t
+val proj_hs :
+     counter:int ref
+  -> scope:Scoped.scope
+  -> flex:Term.t
+  -> Term.t
+  -> Subst.FO.t CCList.t
 
 module Make (S : sig
   val st : Flex_state.t

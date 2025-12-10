@@ -110,7 +110,8 @@ module Make () (*   : Sat_solver_intf.S *) = struct
     dump_l l ;
     List.iter (add_clause_ ~proof) l
 
-  let add_clause_seq ~proof (seq : clause Iter.t) = add_clauses ~proof (Iter.to_rev_list seq)
+  let add_clause_seq ~proof (seq : clause Iter.t) =
+    add_clauses ~proof (Iter.to_rev_list seq)
 
   let result_ = ref Sat
 
@@ -135,7 +136,8 @@ module Make () (*   : Sat_solver_intf.S *) = struct
 
   let pp_ = ref Lit.pp
 
-  let pp_clause out c = Format.fprintf out "[@[<hv>%a@]]" (Util.pp_list ~sep:" ⊔ " !pp_) c
+  let pp_clause out c =
+    Format.fprintf out "[@[<hv>%a@]]" (Util.pp_list ~sep:" ⊔ " !pp_) c
 
   let pp_form_simpl out l = Util.pp_list ~sep:"" pp_clause out l
 
@@ -159,7 +161,9 @@ module Make () (*   : Sat_solver_intf.S *) = struct
       let fmt = Format.formatter_of_out_channel oc in
       Msat.Log.set_debug_out fmt ;
       Msat.Log.set_debug 9999 ;
-      at_exit (fun () -> Format.pp_print_flush fmt () ; close_out_noerr oc) )
+      at_exit (fun () ->
+          Format.pp_print_flush fmt () ;
+          close_out_noerr oc ) )
 
   exception UndecidedLit = Solver.UndecidedLit
 
@@ -172,9 +176,11 @@ module Make () (*   : Sat_solver_intf.S *) = struct
   module ResTbl = CCHashtbl.Make (struct
     type t = sat_clause * Proof.t list
 
-    let equal (c, l1) (c', l2) = CCList.equal Lit.equal c c' && CCList.equal Proof.S.equal l1 l2
+    let equal (c, l1) (c', l2) =
+      CCList.equal Lit.equal c c' && CCList.equal Proof.S.equal l1 l2
 
-    let hash (c, l) = CCHash.combine2 (CCHash.int @@ List.length c) (CCHash.list Proof.S.hash l)
+    let hash (c, l) =
+      CCHash.combine2 (CCHash.int @@ List.length c) (CCHash.list Proof.S.hash l)
   end)
 
   let tbl_res = ResTbl.create 16
@@ -203,8 +209,13 @@ module Make () (*   : Sat_solver_intf.S *) = struct
           | Some s ->
               s
           | None ->
-              let parents = Proof.Parent.from q1 :: List.map Proof.Parent.from q2 in
-              let step = Proof.Step.inference parents ~rule:(Proof.Rule.mk "sat_resolution") in
+              let parents =
+                Proof.Parent.from q1 :: List.map Proof.Parent.from q2
+              in
+              let step =
+                Proof.Step.inference parents
+                  ~rule:(Proof.Rule.mk "sat_resolution")
+              in
               let s = Proof.S.mk step (Bool_clause.mk_proof_res c) in
               ResTbl.add tbl_res (c, q1 :: q2) s ;
               s )
@@ -231,10 +242,13 @@ module Make () (*   : Sat_solver_intf.S *) = struct
     in
     let {P.conclusion= c; _} = P.expand p in
     let c = bool_clause_of_sat c in
-    let step = Proof.Step.inference leaves ~rule:(Proof.Rule.mk "sat_resolution*") in
+    let step =
+      Proof.Step.inference leaves ~rule:(Proof.Rule.mk "sat_resolution*")
+    in
     Proof.S.mk step (Bool_clause.mk_proof_res c)
 
-  let conv_proof_ p = if !sat_compact_ then conv_proof_compact_ p else conv_proof_atomic_ p
+  let conv_proof_ p =
+    if !sat_compact_ then conv_proof_compact_ p else conv_proof_atomic_ p
 
   let get_proof_of_lit lit =
     let module P = Solver.Proof in
@@ -252,15 +266,27 @@ module Make () (*   : Sat_solver_intf.S *) = struct
   let get_proved_lits () : Lit.Set.t =
     Lit.Tbl.to_iter lit_tbl_
     |> Iter.filter_map (fun (lit, _) ->
-           match proved_at_0 lit with Some true -> Some lit | Some false -> Some (Lit.neg lit) | None -> None )
+           match proved_at_0 lit with
+           | Some true ->
+               Some lit
+           | Some false ->
+               Some (Lit.neg lit)
+           | None ->
+               None )
     |> Lit.Set.of_iter
 
   let pp_model_ () : unit =
     match last_result () with
     | Sat ->
-        let m = Lit.Tbl.keys lit_tbl_ |> Iter.map (fun l -> (l, valuation l)) |> Iter.to_rev_list in
+        let m =
+          Lit.Tbl.keys lit_tbl_
+          |> Iter.map (fun l -> (l, valuation l))
+          |> Iter.to_rev_list
+        in
         let pp_pair out (l, b) = Format.fprintf out "(@[%B %a@])" b BBox.pp l in
-        Format.printf "(@[<hv2>bool_model@ %a@])@." (Util.pp_list ~sep:" " pp_pair) m
+        Format.printf "(@[<hv2>bool_model@ %a@])@."
+          (Util.pp_list ~sep:" " pp_pair)
+          m
     | Unsat _ ->
         ()
 
@@ -274,7 +300,8 @@ module Make () (*   : Sat_solver_intf.S *) = struct
     (* add pending clauses *)
     while not (Queue.is_empty queue_) do
       let c, proof = Queue.pop queue_ in
-      Util.debugf ~section 4 "@[<hv2>assume@ @[%a@]@ proof: %a@]" (fun k -> k pp_form c Proof.Step.pp proof) ;
+      Util.debugf ~section 4 "@[<hv2>assume@ @[%a@]@ proof: %a@]" (fun k ->
+          k pp_form c Proof.Step.pp proof ) ;
       Solver.assume !solver c proof
     done ;
     (* solve *)
@@ -312,12 +339,15 @@ module Make () (*   : Sat_solver_intf.S *) = struct
 
   let setup () =
     if !sat_dump_file_ <> "" then (
-      Util.debugf ~section 1 "dump SAT clauses to `%s`" (fun k -> k !sat_dump_file_) ;
+      Util.debugf ~section 1 "dump SAT clauses to `%s`" (fun k ->
+          k !sat_dump_file_ ) ;
       try
         let oc = open_out !sat_dump_file_ in
         dump_to := Some oc ;
         at_exit (fun () -> close_out_noerr oc)
-      with e -> Util.warnf "@[<2>could not open `%s`:@ %s@]" !sat_dump_file_ (Printexc.to_string e) ) ;
+      with e ->
+        Util.warnf "@[<2>could not open `%s`:@ %s@]" !sat_dump_file_
+          (Printexc.to_string e) ) ;
     if !sat_pp_model_ then at_exit pp_model_ ;
     ()
 
@@ -333,7 +363,9 @@ let set_compact b = sat_compact_ := b
 
 let () =
   Params.add_opts
-    [ ("--sat-dump", Arg.Set_string sat_dump_file_, " output SAT problem(s) into <file>")
+    [ ( "--sat-dump"
+      , Arg.Set_string sat_dump_file_
+      , " output SAT problem(s) into <file>" )
     ; ("--sat-log", Arg.Set_string sat_log_file, " output SAT logs into <file>")
     ; ("--compact-sat", Arg.Set sat_compact_, " compact SAT proofs")
     ; ("--no-compact-sat", Arg.Clear sat_compact_, " do not compact SAT proofs")

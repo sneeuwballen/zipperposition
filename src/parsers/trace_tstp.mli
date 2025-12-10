@@ -18,7 +18,11 @@ type t =
   | InferForm of form * step lazy_t
   | InferClause of clause * step lazy_t
 
-and step = {id: id; rule: string; parents: t array; esa: bool  (** Equisatisfiable step? *)}
+and step =
+  { id: id
+  ; rule: string
+  ; parents: t array
+  ; esa: bool  (** Equisatisfiable step? *) }
 
 val equal : t -> t -> bool
 

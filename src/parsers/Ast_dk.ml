@@ -30,7 +30,8 @@ let v v = V v
 (* Global list of type aliases *)
 let ty_aliases : (string, ty) Hashtbl.t = Hashtbl.create 16
 
-let find_alias ~or_else (s : string) : ty = try Hashtbl.find ty_aliases s with Not_found -> or_else
+let find_alias ~or_else (s : string) : ty =
+  try Hashtbl.find ty_aliases s with Not_found -> or_else
 
 let add_alias s ty : unit =
   Util.debugf 2 "Registering alias %s := %a" (fun k -> k s T.pp ty) ;
@@ -67,6 +68,7 @@ let mk_assert ?loc ~name t = A.assert_ ?loc ~attrs:[A.attr_name name] t
 
 let mk_goal ?loc ~name t = A.goal ?loc ~attrs:[A.attr_name name] t
 
-let mk_def ?loc id ty body = A.def ?loc [A.mk_def id ty [T.eq (mk_const id ty) body]]
+let mk_def ?loc id ty body =
+  A.def ?loc [A.mk_def id ty [T.eq (mk_const id ty) body]]
 
 let mk_rewrite ?loc t = A.rewrite ?loc t

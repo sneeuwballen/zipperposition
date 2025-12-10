@@ -9,7 +9,15 @@ module I_map = Util.Int_map
 let errorf msg = Util.errorf ~where:"llterm" msg
 
 module Int_op = struct
-  type t = Leq0 | Geq0 | Lt0 | Gt0 | Eq0 | Neq0 | Divisible_by of Z.t | Not_div_by of Z.t
+  type t =
+    | Leq0
+    | Geq0
+    | Lt0
+    | Gt0
+    | Eq0
+    | Neq0
+    | Divisible_by of Z.t
+    | Not_div_by of Z.t
 
   let equal a b =
     match (a, b) with
@@ -17,7 +25,8 @@ module Int_op = struct
         Z.equal a b
     | Not_div_by a, Not_div_by b ->
         Z.equal a b
-    | Divisible_by _, _ | _, Divisible_by _ | Not_div_by _, _ | _, Not_div_by _ ->
+    | Divisible_by _, _ | _, Divisible_by _ | Not_div_by _, _ | _, Not_div_by _
+      ->
         false
     | _ ->
         a = b
@@ -88,7 +97,19 @@ module Rat_op = struct
     | Neq0 ->
         Fmt.fprintf out "!= 0"
 
-  let not = function Leq0 -> Gt0 | Geq0 -> Lt0 | Lt0 -> Geq0 | Gt0 -> Leq0 | Eq0 -> Neq0 | Neq0 -> Eq0
+  let not = function
+    | Leq0 ->
+        Gt0
+    | Geq0 ->
+        Lt0
+    | Lt0 ->
+        Geq0
+    | Gt0 ->
+        Leq0
+    | Eq0 ->
+        Neq0
+    | Neq0 ->
+        Eq0
 end
 
 type t = {view: view; ty: t option; mutable id: int  (** unique ID *)}
@@ -196,36 +217,48 @@ module Make_linexp (N : NUM) = struct
 
   let ( * ) c e : t =
     if N.equal N.zero c then zero
-    else {const= N.(c * e.const); coeffs= I_map.map (fun (t, n) -> (t, N.(c * n))) e.coeffs}
+    else
+      { const= N.(c * e.const)
+      ; coeffs= I_map.map (fun (t, n) -> (t, N.(c * n))) e.coeffs }
 
   let const c = {const= c; coeffs= I_map.empty}
 
   let add c t e =
     let _, n = I_map.get_or ~default:(t, N.zero) t.id e.coeffs in
     let n = N.(n + c) in
-    let coeffs = if N.equal N.zero n then I_map.remove t.id e.coeffs else I_map.add t.id (t, n) e.coeffs in
+    let coeffs =
+      if N.equal N.zero n then I_map.remove t.id e.coeffs
+      else I_map.add t.id (t, n) e.coeffs
+    in
     {e with coeffs}
 
   let monomial c t = {const= N.zero; coeffs= I_map.singleton t.id (t, c)}
 
   let monomial1 t = {const= N.zero; coeffs= I_map.singleton t.id (t, N.one)}
 
-  let equal e1 e2 = N.equal e1.const e2.const && I_map.equal (CCEqual.pair ( == ) N.equal) e1.coeffs e2.coeffs
+  let equal e1 e2 =
+    N.equal e1.const e2.const
+    && I_map.equal (CCEqual.pair ( == ) N.equal) e1.coeffs e2.coeffs
 
   let hash hash_t e =
     let hash_n n = Hash.string @@ N.to_string n in
-    Hash.combine3 10 (hash_n e.const) (Hash.seq (Hash.pair hash_t hash_n) @@ I_map.values e.coeffs)
+    Hash.combine3 10 (hash_n e.const)
+      (Hash.seq (Hash.pair hash_t hash_n) @@ I_map.values e.coeffs)
 
-  let map f e = I_map.fold (fun _ (t, n) acc -> add n (f t) acc) e.coeffs (const e.const)
+  let map f e =
+    I_map.fold (fun _ (t, n) acc -> add n (f t) acc) e.coeffs (const e.const)
 
   let subterms e = I_map.values e.coeffs |> Iter.map fst
 
   let pp pp_t out (e : t) : unit =
     if is_const e then N.pp_print out e.const
     else
-      let pp_const out () = if N.equal N.zero e.const then () else Fmt.fprintf out "@ + %a" N.pp_print e.const
+      let pp_const out () =
+        if N.equal N.zero e.const then ()
+        else Fmt.fprintf out "@ + %a" N.pp_print e.const
       and pp_pair out (t, c) =
-        if N.equal N.one c then pp_t out t else Fmt.fprintf out "@[<2>%a@ @<1>· %a@]" N.pp_print c pp_t t
+        if N.equal N.one c then pp_t out t
+        else Fmt.fprintf out "@[<2>%a@ @<1>· %a@]" N.pp_print c pp_t t
       in
       Fmt.fprintf out "(@[<hv>%a%a@])"
         Fmt.(iter ~sep:(return "@ + ") pp_pair)
@@ -271,7 +304,8 @@ module H_cons = Hashcons.Make (struct
     | Var v1, Var v2 ->
         HVar.equal equal v1 v2
     | Bind b1, Bind b2 ->
-        Binder.equal b1.binder b2.binder && equal b1.ty_var b2.ty_var && equal b1.body b2.body
+        Binder.equal b1.binder b2.binder
+        && equal b1.ty_var b2.ty_var && equal b1.body b2.body
     | AppBuiltin (b1, l1), AppBuiltin (b2, l2) ->
         Builtin.equal b1 b2 && CCList.equal equal l1 l2
     | Ite (a1, b1, c1), Ite (a2, b2, c2) ->
@@ -336,25 +370,34 @@ let rec pp_rec depth out (t : t) =
       Format.fprintf out "@<1>⟦@[%a@]@<1>⟧" (pp_rec depth) t
   | AppBuiltin (b, [a]) when Builtin.is_prefix b ->
       Format.fprintf out "@[<1>%a@ %a@]" Builtin.pp b (pp_rec_inner depth) a
-  | AppBuiltin (b, ([t1; t2] | [_; t1; t2])) when Builtin.fixity b = Builtin.Infix_binary ->
-      Format.fprintf out "@[<1>%a %a@ %a@]" (pp_rec_inner depth) t1 Builtin.pp b (pp_rec_inner depth) t2
+  | AppBuiltin (b, ([t1; t2] | [_; t1; t2]))
+    when Builtin.fixity b = Builtin.Infix_binary ->
+      Format.fprintf out "@[<1>%a %a@ %a@]" (pp_rec_inner depth) t1 Builtin.pp b
+        (pp_rec_inner depth) t2
   | AppBuiltin (b, l) when Builtin.is_infix b && List.length l > 0 ->
       Format.fprintf out "@[<hv>%a@]" (pp_infix_ depth b) l
   | AppBuiltin (b, []) ->
       Builtin.pp out b
   | AppBuiltin (b, l) ->
-      Format.fprintf out "(@[<hv>%a@ %a@])" Builtin.pp b (Util.pp_list (pp_rec_inner depth)) l
+      Format.fprintf out "(@[<hv>%a@ %a@])" Builtin.pp b
+        (Util.pp_list (pp_rec_inner depth))
+        l
   | Bind {ty_var; binder; body} ->
-      Fmt.fprintf out "@[%a (@[Y%d:%a@]).@ %a@]" Binder.pp binder depth (pp_rec depth) ty_var
+      Fmt.fprintf out "@[%a (@[Y%d:%a@]).@ %a@]" Binder.pp binder depth
+        (pp_rec depth) ty_var
         (pp_rec @@ (depth + 1))
         body
   | Ite (a, b, c) ->
-      Fmt.fprintf out "@[<hv2>ite %a@ %a@ %a@]" (pp_rec_inner depth) a (pp_rec_inner depth) b
-        (pp_rec_inner depth) c
+      Fmt.fprintf out "@[<hv2>ite %a@ %a@ %a@]" (pp_rec_inner depth) a
+        (pp_rec_inner depth) b (pp_rec_inner depth) c
   | Int_pred (l, o) ->
-      Fmt.fprintf out "(@[%a@ %a@])" (Linexp_int.pp (pp_rec_inner depth)) l Int_op.pp o
+      Fmt.fprintf out "(@[%a@ %a@])"
+        (Linexp_int.pp (pp_rec_inner depth))
+        l Int_op.pp o
   | Rat_pred (l, o) ->
-      Fmt.fprintf out "(@[%a@ %a@])" (Linexp_rat.pp (pp_rec_inner depth)) l Rat_op.pp o
+      Fmt.fprintf out "(@[%a@ %a@])"
+        (Linexp_rat.pp (pp_rec_inner depth))
+        l Rat_op.pp o
 
 and pp_rec_inner depth out t =
   match view t with
@@ -370,7 +413,8 @@ and pp_infix_ depth b out l =
   | [t] ->
       pp_rec_inner depth out t
   | t :: l' ->
-      Format.fprintf out "@[%a@]@ %a %a" (pp_rec_inner depth) t Builtin.pp b (pp_infix_ depth b) l'
+      Format.fprintf out "@[%a@]@ %a %a" (pp_rec_inner depth) t Builtin.pp b
+        (pp_infix_ depth b) l'
 
 let pp = pp_rec 0
 
@@ -412,20 +456,23 @@ let[@inline] const ~ty id = mk_ (Const id) (Some ty)
 
 let prop = mk_ (AppBuiltin (Builtin.Prop, [])) (Some t_type)
 
-let[@inline] is_type t : bool = match ty t with Some ty -> ty == t_type | None -> false
+let[@inline] is_type t : bool =
+  match ty t with Some ty -> ty == t_type | None -> false
 
 let ite a b c =
   match (ty b, ty c) with
   | Some ty1, Some ty2 when equal ty1 ty2 ->
       mk_ (Ite (a, b, c)) (ty b)
   | _ ->
-      errorf "type error:@ cannot build `@[ite %a %a %a@]`@ incompatible types" pp a pp b pp c
+      errorf "type error:@ cannot build `@[ite %a %a %a@]`@ incompatible types"
+        pp a pp b pp c
 
 let[@inline] app_ f x ~ty = mk_ (App (f, x)) (Some ty)
 
 let[@inline] arrow_ a b = mk_ (Arrow (a, b)) (Some t_type)
 
-let[@inline] bind_ ~ty binder ~ty_var body = mk_ (Bind {binder; ty_var; body}) (Some ty)
+let[@inline] bind_ ~ty binder ~ty_var body =
+  mk_ (Bind {binder; ty_var; body}) (Some ty)
 
 let id_eta_ = ID.make "test_eta_" (* privat to {!as_eta_expansion} *)
 
@@ -517,7 +564,9 @@ let[@inline] map ~f ~bind:f_bind b_acc t =
       arrow_ (f b_acc a) (f b_acc b)
   | Bind b ->
       let b_acc' = f_bind b_acc in
-      bind_ b.binder ~ty:(f b_acc @@ ty_exn t) ~ty_var:(f b_acc b.ty_var) (f b_acc' b.body)
+      bind_ b.binder
+        ~ty:(f b_acc @@ ty_exn t)
+        ~ty_var:(f b_acc b.ty_var) (f b_acc' b.body)
   | AppBuiltin (b, l) ->
       app_builtin ~ty:(f b_acc @@ ty_exn t) b (List.map (f b_acc) l)
   | Ite (a, b, c) ->
@@ -532,7 +581,8 @@ let db_shift n (t : t) : t =
   let rec aux k t =
     match view t with
     | Var v ->
-        if HVar.id v >= k then var (HVar.make (HVar.id v + n) ~ty:(HVar.ty v)) else t
+        if HVar.id v >= k then var (HVar.make (HVar.id v + n) ~ty:(HVar.ty v))
+        else t
     | _ ->
         map ~f:aux ~bind:succ k t
   in
@@ -543,7 +593,8 @@ let db_eval ~(sub : t) (t : t) : t =
   let rec aux k t =
     match view t with
     | Var v ->
-        if HVar.id v = k then (* shift [sub] by the number of binders added since binding point *)
+        if HVar.id v = k then
+          (* shift [sub] by the number of binders added since binding point *)
           db_shift k sub
         else if HVar.id v > k then
           (* shift down by 1, to account for the vanished binder *)
@@ -561,7 +612,9 @@ let bind ~ty binder ~ty_var body =
          check if replacing [db0] with a fresh [c] in [t] contains [c] *)
       let c = const id_eta_ ~ty:(HVar.ty v) in
       let t_reduced = db_eval ~sub:c t in
-      if subterms t_reduced |> Iter.exists (equal c) then bind_ binder ~ty ~ty_var body else t_reduced
+      if subterms t_reduced |> Iter.exists (equal c) then
+        bind_ binder ~ty ~ty_var body
+      else t_reduced
   | _ ->
       bind_ binder ~ty ~ty_var body
 
@@ -572,14 +625,15 @@ let app_ f x =
   | Some {view= Bind {binder= Binder.ForallTy; ty_var; body}; _}, Some ty_x ->
       (* polymorphic type *)
       if not (equal ty_x t_type) then
-        errorf "cannot apply@ `@[<2>%a@ : %a@]`@ to non-type `@[<2>%a@ : %a@]`" pp f (Fmt.opt pp) (ty f) pp x
-          (Fmt.opt pp) (ty x) ;
-      if not (equal ty_var t_type) then errorf "ill-formed polymorphic type@ `%a`" pp (ty_exn f) ;
+        errorf "cannot apply@ `@[<2>%a@ : %a@]`@ to non-type `@[<2>%a@ : %a@]`"
+          pp f (Fmt.opt pp) (ty f) pp x (Fmt.opt pp) (ty x) ;
+      if not (equal ty_var t_type) then
+        errorf "ill-formed polymorphic type@ `%a`" pp (ty_exn f) ;
       let ty = db_eval ~sub:x body in
       app_ f x ~ty
   | _ ->
-      errorf "type error: cannot apply `@[<2>%a@ : %a@]`@ to `@[<2>%a@ : %a@]`" pp f (Fmt.opt pp) (ty f) pp x
-        (Fmt.opt pp) (ty x)
+      errorf "type error: cannot apply `@[<2>%a@ : %a@]`@ to `@[<2>%a@ : %a@]`"
+        pp f (Fmt.opt pp) (ty f) pp x (Fmt.opt pp) (ty x)
 
 let app f x =
   match view f with
@@ -597,7 +651,8 @@ let app f x =
 
 let rec app_l f = function [] -> f | a :: tail -> app_l (app f a) tail
 
-let rec returns (t : t) : ty = match view t with Arrow (_, ret) -> returns ret | _ -> t
+let rec returns (t : t) : ty =
+  match view t with Arrow (_, ret) -> returns ret | _ -> t
 
 let arrow a b =
   match (ty a, ty b) with
@@ -606,9 +661,12 @@ let arrow a b =
   | _ when a == t_type && returns b == t_type ->
       arrow_ a b (* type constructor *)
   | _ ->
-      errorf "type error: cannot make arrow between non-types@ :from `%a`@ :to `%a`" pp a pp b
+      errorf
+        "type error: cannot make arrow between non-types@ :from `%a`@ :to `%a`"
+        pp a pp b
 
-let rec arrow_l l ret = match l with [] -> ret | a :: tail -> arrow a (arrow_l tail ret)
+let rec arrow_l l ret =
+  match l with [] -> ret | a :: tail -> arrow a (arrow_l tail ret)
 
 let box_opaque t = app_builtin ~ty:(ty_exn t) Builtin.Box_opaque [t]
 
@@ -622,11 +680,13 @@ let as_eta_expansion body : _ option =
       (* check if replacing [db0] with a fresh [c] in [t] contains [c] *)
       let c = const id_eta_ ~ty:(HVar.ty v) in
       let t_reduced = db_eval ~sub:c t in
-      if subterms t_reduced |> Iter.exists (equal c) then None else Some t_reduced
+      if subterms t_reduced |> Iter.exists (equal c) then None
+      else Some t_reduced
   | _ ->
       None
 
-let[@inline] lambda ~ty_var body = bind Binder.Lambda ~ty:(arrow ty_var @@ ty_exn body) ~ty_var body
+let[@inline] lambda ~ty_var body =
+  bind Binder.Lambda ~ty:(arrow ty_var @@ ty_exn body) ~ty_var body
 
 module Form = struct
   type t = term
@@ -736,12 +796,17 @@ module Set = CCSet.Make (As_key)
 module Conv = struct
   module T = TypedSTerm
 
-  type ctx = {depth: int; (* depth *) vars: (T.t, int * ty) Var.Subst.t (* depth at binding site, + type *)}
+  type ctx =
+    { depth: int
+    ; (* depth *)
+      vars: (T.t, int * ty) Var.Subst.t (* depth at binding site, + type *) }
 
   let create () : ctx = {depth= 0; vars= Var.Subst.empty}
 
   let pp_ctx out (c : ctx) : unit =
-    Fmt.fprintf out "(@[ctx@ :depth %d@ :vars %a@])" c.depth (Var.Subst.pp (Fmt.map fst Fmt.int)) c.vars
+    Fmt.fprintf out "(@[ctx@ :depth %d@ :vars %a@])" c.depth
+      (Var.Subst.pp (Fmt.map fst Fmt.int))
+      c.vars
 
   let rec of_term (ctx : ctx) (t : T.t) : t =
     match T.view t with
@@ -774,7 +839,10 @@ module Conv = struct
     | T.Bind (b, var, body) ->
         let ty = of_term ctx (T.ty_exn t) in
         let ty_var = of_term ctx (Var.ty var) in
-        let ctx = {depth= ctx.depth + 1; vars= Var.Subst.add ctx.vars var (ctx.depth, ty_var)} in
+        let ctx =
+          { depth= ctx.depth + 1
+          ; vars= Var.Subst.add ctx.vars var (ctx.depth, ty_var) }
+        in
         bind b ~ty_var ~ty (of_term ctx body)
     | T.AppBuiltin (Builtin.TType, []) ->
         t_type
@@ -785,7 +853,12 @@ module Conv = struct
     | T.AppBuiltin (b, l) -> (
         let ty = T.ty_exn t in
         match b with
-        | (Builtin.Greatereq | Builtin.Lesseq | Builtin.Less | Builtin.Greater | Builtin.Eq | Builtin.Neq)
+        | Builtin.Greatereq
+        | Builtin.Lesseq
+        | Builtin.Less
+        | Builtin.Greater
+        | Builtin.Eq
+        | Builtin.Neq
           when List.exists is_arith l ->
             if List.exists is_int l then conv_int_pred ctx ~ty b l
             else (

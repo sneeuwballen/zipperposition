@@ -87,7 +87,10 @@ module Kind : sig
 
   val pp : t CCFormat.printer
 
-  val pp_tstp : Format.formatter -> kind * [< `Name of string | `Theory of string] list -> unit
+  val pp_tstp :
+       Format.formatter
+    -> kind * [< `Name of string | `Theory of string] list
+    -> unit
 end
 
 (** {2 Source}
@@ -110,7 +113,12 @@ module Src : sig
 
   val loc : from_file -> ParseLocation.t option
 
-  val from_file : ?loc:ParseLocation.t -> ?name:string -> ?attrs:UntypedAST.attrs -> string -> t
+  val from_file :
+       ?loc:ParseLocation.t
+    -> ?name:string
+    -> ?attrs:UntypedAST.attrs
+    -> string
+    -> t
 
   val internal : attrs -> t
 
@@ -147,7 +155,8 @@ module Result : sig
     -> to_exn:('a -> exn)
     -> compare:('a -> 'a -> int)
     -> to_form:(ctx:Term.Conv.ctx -> 'a -> form)
-    -> ?to_form_subst:(ctx:Term.Conv.ctx -> Subst.Projection.t -> 'a -> form * inst_subst)
+    -> ?to_form_subst:
+         (ctx:Term.Conv.ctx -> Subst.Projection.t -> 'a -> form * inst_subst)
     -> pp_in:(Output_format.t -> 'a CCFormat.printer)
     -> ?name:('a -> string)
     -> ?is_stmt:bool
@@ -185,7 +194,8 @@ module Result : sig
 
   val to_form : ?ctx:Term.Conv.ctx -> t -> form
 
-  val to_form_subst : ?ctx:Term.Conv.ctx -> Subst.Projection.t -> t -> form * inst_subst
+  val to_form_subst :
+    ?ctx:Term.Conv.ctx -> Subst.Projection.t -> t -> form * inst_subst
   (** instantiated form + bindings for vars *)
 
   val flavor : t -> flavor
@@ -248,7 +258,8 @@ module Step : sig
 
   val has_ho_step : t -> bool
 
-  val inference : ?infos:infos -> ?tags:tag list -> rule:rule -> parent list -> t
+  val inference :
+    ?infos:infos -> ?tags:tag list -> rule:rule -> parent list -> t
 
   val simp : ?infos:infos -> ?tags:tag list -> rule:rule -> parent list -> t
 

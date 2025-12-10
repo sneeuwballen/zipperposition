@@ -39,4 +39,9 @@ val unif_simple : ?subst:Subst.t -> scope:int -> Term.t -> Term.t -> US.t option
 (** Does unification on types (or other simple constructs) and catches
     exception in case of non-unifiability *)
 
-val unify_scoped : ?subst:subst -> ?counter:int ref -> Term.t Scoped.t -> Term.t Scoped.t -> subst
+val unify_scoped :
+     ?subst:subst
+  -> ?counter:int ref
+  -> Term.t Scoped.t
+  -> Term.t Scoped.t
+  -> subst

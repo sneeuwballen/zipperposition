@@ -157,7 +157,8 @@ val constrain_term_type_exn : ?loc:loc -> Ctx.t -> untyped -> type_ -> unit
 (** Force the term's type and the given type to be the same.
     @raise Error if an inconsistency is detected *)
 
-val constrain_term_term : ?loc:loc -> Ctx.t -> untyped -> untyped -> unit or_error
+val constrain_term_term :
+  ?loc:loc -> Ctx.t -> untyped -> untyped -> unit or_error
 (** Safe version of {!constrain_term_term_exn} *)
 
 val constrain_term_type : ?loc:loc -> Ctx.t -> untyped -> type_ -> unit or_error
@@ -167,7 +168,11 @@ val constrain_term_type : ?loc:loc -> Ctx.t -> untyped -> type_ -> unit or_error
 
 type typed_statement = (typed, typed, type_) Statement.t
 
-val infer_statement_exn : ?file:string -> Ctx.t -> UntypedAST.statement -> typed_statement * typed_statement list
+val infer_statement_exn :
+     ?file:string
+  -> Ctx.t
+  -> UntypedAST.statement
+  -> typed_statement * typed_statement list
 (** [infer_statement ctx ~f st] checks and convert [st] into a
     typed statements, and a list of auxiliary type declarations for symbols
     that were inferred implicitly. *)

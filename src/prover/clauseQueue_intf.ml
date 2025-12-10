@@ -53,7 +53,10 @@ module type S = sig
         Some threshold is used for clauses that are too far away *)
 
     val conj_relative :
-      ?distinct_vars_mul:float -> ?parameters_magnitude:[< `Large | `Small > `Large] -> ?goal_penalty:bool -> t
+         ?distinct_vars_mul:float
+      -> ?parameters_magnitude:[< `Large | `Small > `Large]
+      -> ?goal_penalty:bool
+      -> t
 
     val combine : (t * int) list -> t
     (** Combine a list of pairs [w, coeff] where [w] is a weight function,

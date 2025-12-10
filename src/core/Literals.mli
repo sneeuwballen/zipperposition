@@ -26,7 +26,11 @@ val compare_multiset : ord:Ordering.t -> t -> t -> Comparison.t
 
 include Interfaces.HASH with type t := t
 
-val variant : ?subst:Subst.t -> t Scoped.t -> t Scoped.t -> (Subst.t * Builtin.Tag.t list) Iter.t
+val variant :
+     ?subst:Subst.t
+  -> t Scoped.t
+  -> t Scoped.t
+  -> (Subst.t * Builtin.Tag.t list) Iter.t
 (** Variant checking (alpha-equivalence). It can reorder literals to do its
     check, so that might be computationnally expensive (a bit
     like subsumption). *)
@@ -34,7 +38,11 @@ val variant : ?subst:Subst.t -> t Scoped.t -> t Scoped.t -> (Subst.t * Builtin.T
 val are_variant : t -> t -> bool
 (** Simple interface on top of {!variant} with distinc scopes *)
 
-val matching : ?subst:Subst.t -> pattern:t Scoped.t -> t Scoped.t -> (Subst.t * Builtin.Tag.t list) Iter.t
+val matching :
+     ?subst:Subst.t
+  -> pattern:t Scoped.t
+  -> t Scoped.t
+  -> (Subst.t * Builtin.Tag.t list) Iter.t
 
 val matches : t -> t -> bool
 
@@ -124,7 +132,11 @@ module Conv : sig
   (** To list of formulas *)
 
   val to_s_form :
-    ?allow_free_db:bool -> ?ctx:Term.Conv.ctx -> ?hooks:Literal.Conv.hook_to list -> t -> TypedSTerm.Form.t
+       ?allow_free_db:bool
+    -> ?ctx:Term.Conv.ctx
+    -> ?hooks:Literal.Conv.hook_to list
+    -> t
+    -> TypedSTerm.Form.t
 
   val to_tst : t -> TypedSTerm.t
 end
@@ -141,7 +153,8 @@ module View : sig
   val get_eqn_exn : t -> Position.t -> term * term * bool
 end
 
-val fold_lits : eligible:(int -> Literal.t -> bool) -> t -> (Literal.t * int) Iter.t
+val fold_lits :
+  eligible:(int -> Literal.t -> bool) -> t -> (Literal.t * int) Iter.t
 (** Fold over literals who satisfy [eligible]. The folded function
     is given the literal and its index. *)
 
@@ -162,7 +175,8 @@ val fold_eqn :
     if [sign = true], then only positive equations are visited; if it's
       [false], only negative ones; if it's not defined, both. *)
 
-val fold_eqn_simple : ?sign:bool -> t -> (term * term * bool * Position.t) Iter.t
+val fold_eqn_simple :
+  ?sign:bool -> t -> (term * term * bool * Position.t) Iter.t
 (** Like previous version but simpler: it visits all equations only in the orientation l = r  *)
 
 val fold_terms :

@@ -47,9 +47,13 @@ end = struct
     | S s ->
         Fmt.fprintf out "(@[set@ %a@])" (Fmt.iter ID.pp) (ID.Set.to_iter s)
     | M m ->
-        Fmt.fprintf out "(@[mset@ %a@])" Fmt.(iter (pair ~sep:silent ID.pp int)) (ID.Map.to_iter m)
+        Fmt.fprintf out "(@[mset@ %a@])"
+          Fmt.(iter (pair ~sep:silent ID.pp int))
+          (ID.Map.to_iter m)
     | L l ->
-        Fmt.fprintf out "(@[labels@ %a@])" Fmt.(iter int) (Util.Int_set.to_iter l)
+        Fmt.fprintf out "(@[labels@ %a@])"
+          Fmt.(iter int)
+          (Util.Int_set.to_iter l)
 
   let to_string = Fmt.to_string pp
 
@@ -77,7 +81,10 @@ end = struct
     | S s1, S s2 ->
         mk_s (ID.Set.union s1 s2)
     | M m1, M m2 ->
-        ID.Map.merge (fun _ o1 o2 -> Some (op (CCOpt.get_or ~default o1) (CCOpt.get_or ~default o2))) m1 m2
+        ID.Map.merge
+          (fun _ o1 o2 ->
+            Some (op (CCOpt.get_or ~default o1) (CCOpt.get_or ~default o2)) )
+          m1 m2
         |> mk_m
     | L s1, L s2 ->
         Util.Int_set.union s1 s2 |> mk_l
@@ -121,14 +128,21 @@ module Make (C : Index_intf.CLAUSE) = struct
 
     let make name f = {name; f}
 
-    let size_plus = make "size+" (fun lits _ -> Iter.filter SLiteral.is_pos lits |> Iter.length |> mk_n)
+    let size_plus =
+      make "size+" (fun lits _ ->
+          Iter.filter SLiteral.is_pos lits |> Iter.length |> mk_n )
 
-    let size_minus = make "size-" (fun lits _ -> Iter.filter SLiteral.is_neg lits |> Iter.length |> mk_n)
+    let size_minus =
+      make "size-" (fun lits _ ->
+          Iter.filter SLiteral.is_neg lits |> Iter.length |> mk_n )
 
-    let weight_lit lit = SLiteral.to_iter lit |> Iter.map T.ho_weight |> Iter.fold ( + ) 0
+    let weight_lit lit =
+      SLiteral.to_iter lit |> Iter.map T.ho_weight |> Iter.fold ( + ) 0
 
     let weight_ name filter =
-      make name (fun lits _ -> Iter.filter filter lits |> Iter.map weight_lit |> Iter.fold ( + ) 0 |> mk_n)
+      make name (fun lits _ ->
+          Iter.filter filter lits |> Iter.map weight_lit |> Iter.fold ( + ) 0
+          |> mk_n )
 
     let weight_plus = weight_ "weight+" SLiteral.is_pos
 
@@ -140,7 +154,8 @@ module Make (C : Index_intf.CLAUSE) = struct
 
     (* sequence of symbols of clause, of given sign *)
     let symbols_ filter lits : ID.t Iter.t =
-      lits |> Iter.filter filter |> Iter.flat_map SLiteral.to_iter
+      lits |> Iter.filter filter
+      |> Iter.flat_map SLiteral.to_iter
       |> Iter.flat_map (T.Seq.symbols ~filter_term:not_app_var)
 
     let set_sym_ filter lits _ = symbols_ filter lits |> ID.Set.of_iter |> mk_s
@@ -184,8 +199,11 @@ module Make (C : Index_intf.CLAUSE) = struct
         in
         recurse 0 t
       in
-      lits |> Iter.filter filter |> Iter.flat_map SLiteral.to_iter |> Iter.flat_map subterms_depth
-      |> Iter.filter_map (fun (t, d) -> match T.view t with T.Const id -> Some (id, d) | _ -> None)
+      lits |> Iter.filter filter
+      |> Iter.flat_map SLiteral.to_iter
+      |> Iter.flat_map subterms_depth
+      |> Iter.filter_map (fun (t, d) ->
+             match T.view t with T.Const id -> Some (id, d) | _ -> None )
 
     let depth_sym_ filter lits _ =
       symbols_depth_ filter lits
@@ -203,9 +221,11 @@ module Make (C : Index_intf.CLAUSE) = struct
 
   type feature_funs = Feature_fun.t IArray.t
 
-  let compute_fv funs lits labels : feature_vector = IArray.map (fun feat -> feat.Feature_fun.f lits labels) funs
+  let compute_fv funs lits labels : feature_vector =
+    IArray.map (fun feat -> feat.Feature_fun.f lits labels) funs
 
-  let compute_fv_c funs c : feature_vector = compute_fv funs (C.to_lits c) (C.labels c)
+  let compute_fv_c funs c : feature_vector =
+    compute_fv funs (C.to_lits c) (C.labels c)
 
   (** {2 Feature Trie} *)
 
@@ -262,7 +282,9 @@ module Make (C : Index_intf.CLAUSE) = struct
             goto subtrie (i + 1) rebuild'
           with Not_found ->
             (* no subtrie found *)
-            let subtrie = if i + 1 = IArray.length fv then TrieLeaf C_set.empty else TrieNode Feat_map.empty
+            let subtrie =
+              if i + 1 = IArray.length fv then TrieLeaf C_set.empty
+              else TrieNode Feat_map.empty
             and rebuild' subtrie =
               match subtrie with
               | _ when empty_trie subtrie ->
@@ -334,7 +356,11 @@ module Make (C : Index_intf.CLAUSE) = struct
     let fv = compute_fv idx.funs lits labels in
     let rec fold_higher i node =
       if i = IArray.length fv then
-        match node with TrieLeaf set -> C_set.iter f set | TrieNode _ -> assert false
+        match node with
+        | TrieLeaf set ->
+            C_set.iter f set
+        | TrieNode _ ->
+            assert false
       else
         match (node, IArray.get fv i) with
         | TrieNode map, feat ->
@@ -351,21 +377,27 @@ module Make (C : Index_intf.CLAUSE) = struct
 
   (* clauses that subsume (potentially) the given clause *)
   let retrieve_subsuming idx lits labels f : unit =
-    retrieve_ idx lits labels f ~check:(fun ~feat_query ~feat_tree -> Feature.leq feat_tree feat_query)
+    retrieve_ idx lits labels f ~check:(fun ~feat_query ~feat_tree ->
+        Feature.leq feat_tree feat_query )
 
   (* clauses that are subsumed (potentially) by the given clause *)
   let retrieve_subsumed idx lits labels f : unit =
-    retrieve_ idx lits labels f ~check:(fun ~feat_query ~feat_tree -> Feature.leq feat_query feat_tree)
+    retrieve_ idx lits labels f ~check:(fun ~feat_query ~feat_tree ->
+        Feature.leq feat_query feat_tree )
 
   (* clauses that are potentially alpha-equivalent to the given clause*)
   let retrieve_alpha_equiv idx lits labels f : unit =
-    retrieve_ idx lits labels f ~check:(fun ~feat_query ~feat_tree -> Feature.equal feat_query feat_tree)
+    retrieve_ idx lits labels f ~check:(fun ~feat_query ~feat_tree ->
+        Feature.equal feat_query feat_tree )
 
-  let retrieve_subsuming_c idx c f = retrieve_subsuming idx (C.to_lits c) (C.labels c) f
+  let retrieve_subsuming_c idx c f =
+    retrieve_subsuming idx (C.to_lits c) (C.labels c) f
 
-  let retrieve_subsumed_c idx c f = retrieve_subsumed idx (C.to_lits c) (C.labels c) f
+  let retrieve_subsumed_c idx c f =
+    retrieve_subsumed idx (C.to_lits c) (C.labels c) f
 
-  let retrieve_alpha_equiv_c idx c f = retrieve_alpha_equiv idx (C.to_lits c) (C.labels c) f
+  let retrieve_alpha_equiv_c idx c f =
+    retrieve_alpha_equiv idx (C.to_lits c) (C.labels c) f
 
   let iter idx f =
     let rec iter = function

@@ -27,7 +27,10 @@ type data =
            arguments, that is, an optional projector + the type *) }
 
 (** Attributes (general terms) *)
-type attr = A_app of string * attr list | A_quoted of string | A_list of attr list
+type attr =
+  | A_app of string * attr list
+  | A_quoted of string
+  | A_list of attr list
 
 type attrs = attr list
 

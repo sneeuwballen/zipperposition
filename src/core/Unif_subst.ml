@@ -24,7 +24,8 @@ let make subst cstr_l = {subst; cstr_l}
 
 let empty : t = make Subst.empty []
 
-let is_empty (s : t) : bool = Subst.is_empty (subst s) && CCList.is_empty (constr_l s)
+let is_empty (s : t) : bool =
+  Subst.is_empty (subst s) && CCList.is_empty (constr_l s)
 
 let map_subst ~f t = {t with subst= f t.subst}
 
@@ -40,15 +41,19 @@ let mem t v = Subst.mem t.subst v
 
 let deref t v = Subst.deref t.subst v
 
-let merge t1 t2 = {subst= Subst.merge t1.subst t2.subst; cstr_l= t1.cstr_l @ t2.cstr_l}
+let merge t1 t2 =
+  {subst= Subst.merge t1.subst t2.subst; cstr_l= t1.cstr_l @ t2.cstr_l}
 
-let compose ~scope t1 t2 = {subst= Subst.FO.compose ~scope t1.subst t2.subst; cstr_l= t1.cstr_l @ t2.cstr_l}
+let compose ~scope t1 t2 =
+  { subst= Subst.FO.compose ~scope t1.subst t2.subst
+  ; cstr_l= t1.cstr_l @ t2.cstr_l }
 
 module FO = struct
   let bind t (v : Type.t HVar.t Scoped.t) u =
     {t with subst= Subst.FO.bind t.subst (v :> InnerTerm.t HVar.t Scoped.t) u}
 
-  let mem t (v : Type.t HVar.t Scoped.t) = Subst.mem t.subst (v :> InnerTerm.t HVar.t Scoped.t)
+  let mem t (v : Type.t HVar.t Scoped.t) =
+    Subst.mem t.subst (v :> InnerTerm.t HVar.t Scoped.t)
 
   let deref s t = Subst.FO.deref s.subst t
 
@@ -84,11 +89,14 @@ module FO = struct
         bind subst (v, scope) (newvar, new_scope)
     in
     let subst = empty in
-    let collect_vars = List.fold_left (fun acc t -> Iter.append (Term.Seq.vars t) acc) Iter.empty in
+    let collect_vars =
+      List.fold_left (fun acc t -> Iter.append (Term.Seq.vars t) acc) Iter.empty
+    in
     let subst = collect_vars t0s |> Iter.fold (add_renaming scope0) subst in
     let subst = collect_vars t1s |> Iter.fold (add_renaming scope1) subst in
     let t0', t1' =
-      (List.map (fun t0 -> apply subst (t0, scope0)) t0s, List.map (fun t1 -> apply subst (t1, scope1)) t1s)
+      ( List.map (fun t0 -> apply subst (t0, scope0)) t0s
+      , List.map (fun t1 -> apply subst (t1, scope1)) t1s )
     in
     (t0', t1', new_scope, subst)
 end
@@ -100,17 +108,25 @@ let add_constr c t = {t with cstr_l= c :: t.cstr_l}
 let pp out t : unit =
   if has_constr t then
     Format.fprintf out "(@[%a@ :constr_l (@[<hv>%a@])@])" Subst.pp (subst t)
-      (Util.pp_list ~sep:"" Unif_constr.pp) (constr_l t)
+      (Util.pp_list ~sep:"" Unif_constr.pp)
+      (constr_l t)
   else Subst.pp out (subst t)
 
-let equal a b = Subst.equal (subst a) (subst b) && CCList.equal Unif_constr.equal (constr_l a) (constr_l b)
+let equal a b =
+  Subst.equal (subst a) (subst b)
+  && CCList.equal Unif_constr.equal (constr_l a) (constr_l b)
 
-let hash a = Hash.combine2 (Subst.hash @@ subst a) (Hash.list Unif_constr.hash @@ constr_l a)
+let hash a =
+  Hash.combine2
+    (Subst.hash @@ subst a)
+    (Hash.list Unif_constr.hash @@ constr_l a)
 
 let compare a b =
   let open CCOrd.Infix in
-  Subst.compare (subst a) (subst b) <?> (CCList.compare Unif_constr.compare, constr_l a, constr_l b)
+  Subst.compare (subst a) (subst b)
+  <?> (CCList.compare Unif_constr.compare, constr_l a, constr_l b)
 
 let to_string = CCFormat.to_string pp
 
-let constr_l_subst renaming (s : t) : _ list = constr_l s |> Unif_constr.apply_subst_l renaming (subst s)
+let constr_l_subst renaming (s : t) : _ list =
+  constr_l s |> Unif_constr.apply_subst_l renaming (subst s)

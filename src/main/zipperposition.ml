@@ -24,5 +24,6 @@ let () =
 
 let _ =
   at_exit (fun () ->
-      Util.debugf ~section 1 "run time: %.3f" (fun k -> k (Util.total_time_s ())) ;
+      Util.debugf ~section 1 "run time: %.3f" (fun k ->
+          k (Util.total_time_s ()) ) ;
       Signal.send Libzipperposition.Signals.on_exit 0 )

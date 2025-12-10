@@ -39,7 +39,15 @@ type lit = t
 
 let dummy = Lit.dummy
 
-let payload_to_int_ = function Fresh -> 0 | Clause_component _ -> 1 | Case _ -> 2 | Lemma _ -> 3
+let payload_to_int_ = function
+  | Fresh ->
+      0
+  | Clause_component _ ->
+      1
+  | Case _ ->
+      2
+  | Lemma _ ->
+      3
 
 let compare_payload l1 l2 =
   match (l1, l2) with
@@ -72,7 +80,8 @@ module FV_components = FV_tree.Make (struct
   type t = Lits.t * payload * lit
 
   let compare (l1, i1, j1) (l2, i2, j2) =
-    CCOrd.(Lits.compare l1 l2 <?> (compare_payload, i1, i2) <?> (Lit.compare, j1, j2))
+    CCOrd.(
+      Lits.compare l1 l2 <?> (compare_payload, i1, i2) <?> (Lit.compare, j1, j2) )
 
   let to_lits (l, _, _) = Lits.to_form l |> Iter.of_list
 
@@ -111,7 +120,9 @@ let dummy_t = Lit.make dummy_payload
 
 let make_fresh () = Lit.make dummy_payload
 
-let _retrieve_alpha_equiv lits = FV_components.retrieve_alpha_equiv_c !_clause_set (lits, dummy_payload, dummy_t)
+let _retrieve_alpha_equiv lits =
+  FV_components.retrieve_alpha_equiv_c !_clause_set
+    (lits, dummy_payload, dummy_t)
 
 let _retrieve_lemma (f : Cut_form.t) = FV_lemma.get _lemma_set f
 
@@ -129,11 +140,14 @@ let save_ lit =
   | Case p ->
       ICaseTbl.add _case_set p (payload, lit)
 
-let _check_variant lits lits' = Lits.matches lits lits' && Lits.matches lits' lits
+let _check_variant lits lits' =
+  Lits.matches lits lits' && Lits.matches lits' lits
 
 let negate_ground lits =
   match lits with
-  | [|lit0|] when Literal.is_ground lit0 && Literal.is_negativoid lit0 && not (Literal.is_constraint lit0) ->
+  | [|lit0|]
+    when Literal.is_ground lit0 && Literal.is_negativoid lit0
+         && not (Literal.is_constraint lit0) ->
       ([|Literal.negate lits.(0)|], false)
   | _ ->
       (lits, true)
@@ -173,7 +187,8 @@ let inject_lit lit =
     | Literal.Equation (lhs, _, _) when Literal.is_predicate_lit lit ->
         lhs
     | Literal.Equation (lhs, rhs, _) ->
-        if Term.compare lhs rhs < 0 then Term.Form.eq lhs rhs else Term.Form.eq rhs lhs
+        if Term.compare lhs rhs < 0 then Term.Form.eq lhs rhs
+        else Term.Form.eq rhs lhs
     | Literal.False ->
         raise CantConvert
     | _ ->
@@ -197,7 +212,13 @@ let inject_lits lits = ZProf.with_prof prof_inject_lits inject_lits_ lits
 
 let inject_lemma_ (f : Cut_form.t) : t =
   let old_lit =
-    match _retrieve_lemma f with None -> None | Some (Lemma _, blit) -> Some blit | Some _ -> assert false
+    match _retrieve_lemma f with
+    | None ->
+        None
+    | Some (Lemma _, blit) ->
+        Some blit
+    | Some _ ->
+        assert false
   in
   match old_lit with
   | Some lit ->
@@ -222,17 +243,30 @@ let inject_case p =
     save_ t ; t
 
 let must_be_kept lit =
-  match Lit.payload (Lit.abs lit) with Fresh | Clause_component _ -> false | Lemma _ | Case _ -> true
+  match Lit.payload (Lit.abs lit) with
+  | Fresh | Clause_component _ ->
+      false
+  | Lemma _ | Case _ ->
+      true
 
-let is_lemma lit = match Lit.payload (Lit.abs lit) with Lemma _ -> true | _ -> false
+let is_lemma lit =
+  match Lit.payload (Lit.abs lit) with Lemma _ -> true | _ -> false
 
-let is_case lit = match Lit.payload (Lit.abs lit) with Case _ -> true | _ -> false
+let is_case lit =
+  match Lit.payload (Lit.abs lit) with Case _ -> true | _ -> false
 
-let as_case lit = match Lit.payload (Lit.abs lit) with Case p -> Some p | _ -> None
+let as_case lit =
+  match Lit.payload (Lit.abs lit) with Case p -> Some p | _ -> None
 
-let as_lemma lit = match Lit.payload (Lit.abs lit) with Lemma f -> Some f | _ -> None
+let as_lemma lit =
+  match Lit.payload (Lit.abs lit) with Lemma f -> Some f | _ -> None
 
-let as_lits lit = match Lit.payload (Lit.abs lit) with Clause_component lits -> Some lits | _ -> None
+let as_lits lit =
+  match Lit.payload (Lit.abs lit) with
+  | Clause_component lits ->
+      Some lits
+  | _ ->
+      None
 
 (* boolean lit -> payload *)
 let payload = Lit.payload
@@ -252,7 +286,10 @@ let to_s_form (lit : t) =
         Cut_form.to_s_form f |> F.box_opaque
     | Case l ->
         let ctx = T.Conv.create () in
-        l |> List.map (fun t -> Cover_set.Case.to_lit t |> Literal.Conv.to_s_form ~ctx) |> F.and_
+        l
+        |> List.map (fun t ->
+               Cover_set.Case.to_lit t |> Literal.Conv.to_s_form ~ctx )
+        |> F.and_
   in
   if sign lit then f else F.not_ f
 
@@ -262,7 +299,8 @@ let pp out i =
   if !pp_bbox_id then Format.fprintf out "/%d" (Lit.to_int i |> abs) ;
   ()
 
-let pp_bclause out lits = Format.fprintf out "@[<hv>%a@]" (Util.pp_list ~sep:" ⊔ " pp) lits
+let pp_bclause out lits =
+  Format.fprintf out "@[<hv>%a@]" (Util.pp_list ~sep:" ⊔ " pp) lits
 
 (* print a single boolean box *)
 let pp_tstp out b =
@@ -278,7 +316,8 @@ let pp_tstp out b =
     | Fresh ->
         failwith "cannot print <fresh> boolean box"
   in
-  if Lit.sign b then pp_box_unsigned out b else Format.fprintf out "@[~@ %a@]" pp_box_unsigned b
+  if Lit.sign b then pp_box_unsigned out b
+  else Format.fprintf out "@[~@ %a@]" pp_box_unsigned b
 
 let pp_zf out i =
   let pp_payload out = function
@@ -299,4 +338,6 @@ let pp_zf out i =
 let () =
   Options.add_opts
     [ ("--pp-bbox-id", Arg.Set pp_bbox_id, " print boolean literals' IDs")
-    ; ("--no-pp-bbox-id", Arg.Clear pp_bbox_id, " do not print boolean literals' IDs") ]
+    ; ( "--no-pp-bbox-id"
+      , Arg.Clear pp_bbox_id
+      , " do not print boolean literals' IDs" ) ]

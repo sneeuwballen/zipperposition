@@ -31,9 +31,14 @@ let classify_stm f =
         | Const _ ->
             PureFO
         | App (hd, args) ->
-            if T.is_fun hd || T.is_var hd then OutsideFOOL else aux_l ~top:false args
+            if T.is_fun hd || T.is_var hd then OutsideFOOL
+            else aux_l ~top:false args
         | AppBuiltin (hd, args) ->
-            let top = top && (Builtin.is_logical_op hd || List.mem hd Builtin.[True; False; Eq; Neq]) in
+            let top =
+              top
+              && ( Builtin.is_logical_op hd
+                 || List.mem hd Builtin.[True; False; Eq; Neq] )
+            in
             aux_l ~top args
         | Ite (cond, cond_true, cond_false) ->
             refine (aux_l ~top [cond; cond_true; cond_false]) InFOOL
@@ -69,21 +74,35 @@ let process file =
   try
     let input = Parsing_utils.input_of_file file in
     let parsed = Parsing_utils.parse_file input file in
-    (match parsed with CCResult.Error e -> raise (Stop (CCString.replace ~sub:"\n" ~by:"  " e)) | _ -> ()) ;
+    ( match parsed with
+    | CCResult.Error e ->
+        raise (Stop (CCString.replace ~sub:"\n" ~by:"  " e))
+    | _ ->
+        () ) ;
     let ast = CCResult.get_exn parsed in
     let typed_ast =
-      TypeInference.infer_statements ?ctx:None ~on_var:(Input_format.on_var input)
-        ~on_undef:(Input_format.on_undef_id input) ~on_shadow:(Input_format.on_shadow input)
+      TypeInference.infer_statements ?ctx:None
+        ~on_var:(Input_format.on_var input)
+        ~on_undef:(Input_format.on_undef_id input)
+        ~on_shadow:(Input_format.on_shadow input)
         ~implicit_ty_args:false ast
     in
-    Util.debugf 5 "Parse: %s" (fun k -> k (match typed_ast with CCResult.Error e -> e | CCResult.Ok _ -> "OK")) ;
-    (match typed_ast with CCResult.Error e -> raise (Stop (CCString.replace ~sub:"\n" ~by:"  " e)) | _ -> ()) ;
+    Util.debugf 5 "Parse: %s" (fun k ->
+        k (match typed_ast with CCResult.Error e -> e | CCResult.Ok _ -> "OK") ) ;
+    ( match typed_ast with
+    | CCResult.Error e ->
+        raise (Stop (CCString.replace ~sub:"\n" ~by:"  " e))
+    | _ ->
+        () ) ;
     let fool_found = ref false in
     CCVector.to_iter (CCResult.get_exn typed_ast)
     |> Iter.iter (fun stm ->
            match statement_kind stm with
            | OutsideFOOL ->
-               let err = CCFormat.sprintf "Formula @[%a@] is not in FOOL" Statement.pp_input stm in
+               let err =
+                 CCFormat.sprintf "Formula @[%a@] is not in FOOL"
+                   Statement.pp_input stm
+               in
                raise (Stop err)
            | InFOOL ->
                fool_found := true

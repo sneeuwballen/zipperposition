@@ -27,7 +27,8 @@ type view = private
   | DB of int  (** Bound variable (De Bruijn index) *)
   | Var of var  (** Term variable *)
   | Const of ID.t  (** Typed constant *)
-  | App of t * t list  (** Application to a list of terms (cannot be left-nested) *)
+  | App of t * t list
+      (** Application to a list of terms (cannot be left-nested) *)
   | Fun of Type.t * t  (** Lambda abstraction *)
 
 val view : t -> view
@@ -176,7 +177,8 @@ val hd_is_comb : Builtin.t -> bool
 
 val is_comb : t -> bool
 
-val mk_fresh_skolem : ?prefix:string -> var list -> Type.t -> (ID.t * Type.t) * t
+val mk_fresh_skolem :
+  ?prefix:string -> var list -> Type.t -> (ID.t * Type.t) * t
 
 val as_const : t -> ID.t option
 
@@ -238,11 +240,20 @@ module VarTbl : CCHashtbl.S with type key = var
 module Seq : sig
   val vars : t -> var Iter.t
 
-  val subterms : ?include_builtin:bool -> ?include_app_vars:bool -> ?ignore_head:bool -> t -> t Iter.t
+  val subterms :
+       ?include_builtin:bool
+    -> ?include_app_vars:bool
+    -> ?ignore_head:bool
+    -> t
+    -> t Iter.t
 
-  val subterms_depth : ?filter_term:(t -> bool) -> t -> (t * int) Iter.t (* subterms with their depth *)
+  val subterms_depth :
+       ?filter_term:(t -> bool)
+    -> t
+    -> (t * int) Iter.t (* subterms with their depth *)
 
-  val symbols : ?include_types:bool -> ?filter_term:(t -> bool) -> t -> ID.t Iter.t
+  val symbols :
+    ?include_types:bool -> ?filter_term:(t -> bool) -> t -> ID.t Iter.t
 
   val max_var : var Iter.t -> int
   (** max var *)
@@ -311,7 +322,8 @@ val size : t -> int
 val normalize_bools : t -> t
 
 (* all the ways in which term can be covered (built) using the arguments given *)
-val cover_with_terms : ?depth:int -> ?recurse:bool -> t -> t option list -> t list
+val cover_with_terms :
+  ?depth:int -> ?recurse:bool -> t -> t option list -> t list
 
 (* cover the term in a maximal way looked top-down *)
 val max_cover : t -> t option list -> t
@@ -552,7 +564,11 @@ end
 module TPTP : sig
   include Interfaces.PRINT with type t := t
 
-  include Interfaces.PRINT_DE_BRUIJN with type t := t and type term := t and type print_hook := print_hook
+  include
+    Interfaces.PRINT_DE_BRUIJN
+      with type t := t
+       and type term := t
+       and type print_hook := print_hook
 end
 
 module ZF : sig
@@ -571,7 +587,12 @@ module Conv : sig
   val of_simple_term_exn : ctx -> TypedSTerm.t -> t
   (** @raise Type.Conv.Error on failure *)
 
-  val to_simple_term : ?allow_free_db:bool -> ?env:TypedSTerm.t Var.t DBEnv.t -> ctx -> t -> TypedSTerm.t
+  val to_simple_term :
+       ?allow_free_db:bool
+    -> ?env:TypedSTerm.t Var.t DBEnv.t
+    -> ctx
+    -> t
+    -> TypedSTerm.t
 
   val var_to_simple_var : ?prefix:string -> ctx -> var -> TypedSTerm.t Var.t
 end
@@ -581,7 +602,11 @@ end
 val rebuild_rec : t -> t (* rebuild term fully, checking types *)
 
 val fold_left_map2 :
-  ('acc1 -> 'acc2 -> 'a -> 'acc1 * 'acc2 * 'b) -> 'acc1 -> 'acc2 -> 'a list -> 'acc1 * 'acc2 * 'b list
+     ('acc1 -> 'acc2 -> 'a -> 'acc1 * 'acc2 * 'b)
+  -> 'acc1
+  -> 'acc2
+  -> 'a list
+  -> 'acc1 * 'acc2 * 'b list
 
 val mangle_term :
      (Type.t * Type.t) list

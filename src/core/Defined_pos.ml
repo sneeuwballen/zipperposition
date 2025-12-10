@@ -32,5 +32,6 @@ end = struct
   type t = pos IArray.t
 
   let pp out (a : t) =
-    Fmt.(within "[" "]" @@ hvbox @@ iter @@ pair ~sep:(return ":") int pp) out (IArray.to_iteri a)
+    Fmt.(within "[" "]" @@ hvbox @@ iter @@ pair ~sep:(return ":") int pp)
+      out (IArray.to_iteri a)
 end

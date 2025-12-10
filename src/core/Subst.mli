@@ -191,7 +191,8 @@ module FO : sig
 
   val bind' : t -> Type.t HVar.t Scoped.t -> term Scoped.t -> t
 
-  val apply_l : ?shift_vars:int -> Renaming.t -> t -> term list Scoped.t -> term list
+  val apply_l :
+    ?shift_vars:int -> Renaming.t -> t -> term list Scoped.t -> term list
 
   val of_list' : ?init:t -> (Type.t HVar.t Scoped.t * term Scoped.t) list -> t
 
@@ -211,7 +212,8 @@ module FO : sig
       that containts loosely bound variables. It fixes the substitution
       so that all such variables are remaped to a fresh skolem *)
 
-  val subset_is_renaming : subset:term Scoped.t list -> res_scope:int -> t -> bool
+  val subset_is_renaming :
+    subset:term Scoped.t list -> res_scope:int -> t -> bool
 
   val canonize_neg_vars : var_set:InnerTerm.VarSet.t -> t
 

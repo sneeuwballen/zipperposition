@@ -41,14 +41,18 @@ let detect_stmt stmt =
 let process file =
   let input = Input_format.I_tptp in
   let parse = Util_tptp.parse_file ~recursive:true file in
-  Util.debugf 5 "Parse: %s" (fun k -> k (match parse with CCResult.Error e -> e | CCResult.Ok _ -> "OK")) ;
+  Util.debugf 5 "Parse: %s" (fun k ->
+      k (match parse with CCResult.Error e -> e | CCResult.Ok _ -> "OK") ) ;
   let ast = Iter.map Util_tptp.to_ast (CCResult.get_exn parse) in
   let typed_ast =
-    TypeInference.infer_statements ?ctx:None ~on_var:(Input_format.on_var input)
-      ~on_undef:(Input_format.on_undef_id input) ~on_shadow:(Input_format.on_shadow input)
+    TypeInference.infer_statements ?ctx:None
+      ~on_var:(Input_format.on_var input)
+      ~on_undef:(Input_format.on_undef_id input)
+      ~on_shadow:(Input_format.on_shadow input)
       ~implicit_ty_args:false ast
   in
-  Util.debugf 5 "Parse: %s" (fun k -> k (match typed_ast with CCResult.Error e -> e | CCResult.Ok _ -> "OK")) ;
+  Util.debugf 5 "Parse: %s" (fun k ->
+      k (match typed_ast with CCResult.Error e -> e | CCResult.Ok _ -> "OK") ) ;
   let typed_ast = CCVector.to_list (CCResult.get_exn typed_ast) in
   let detected = CCList.exists detect_stmt typed_ast in
   detected

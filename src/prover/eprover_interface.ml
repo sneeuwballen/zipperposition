@@ -60,19 +60,24 @@ module Make (E : Env.S) : S with module Env = E = struct
 
   exception CantEncode of string
 
-  let output_empty_conj ~out = Format.fprintf out "thf(conj,conjecture,($false))."
+  let output_empty_conj ~out =
+    Format.fprintf out "thf(conj,conjecture,($false))."
 
   let rec encode_ty_args_t ~encoded_symbols t =
     let make_new_sym mono_head =
       ( if not (T.is_ground mono_head) then
           let err = CCFormat.sprintf "%a has non-ground type argument" T.pp t in
           raise @@ CantEncode err ) ;
-      let (id, ty), res = T.mk_fresh_skolem ~prefix:"ty_enc" [] (T.ty mono_head) in
+      let (id, ty), res =
+        T.mk_fresh_skolem ~prefix:"ty_enc" [] (T.ty mono_head)
+      in
       Env.Ctx.declare id ty ; res
     in
     let rec aux ~sym_map t =
       ( if not (Type.is_ground (T.ty t)) then
-          let err = CCFormat.sprintf "%a has non-ground type %a" T.pp t Type.pp (T.ty t) in
+          let err =
+            CCFormat.sprintf "%a has non-ground type %a" T.pp t Type.pp (T.ty t)
+          in
           raise @@ CantEncode err ) ;
       match T.view t with
       (*| T.Const id ->
@@ -90,15 +95,19 @@ module Make (E : Env.S) : S with module Env = E = struct
       | T.Fun (ty, body) ->
           let sym_map', body' = aux ~sym_map body in
           (sym_map', T.fun_ ty body')
-      | T.AppBuiltin (b, _) when (b == Builtin.Eq || b == Builtin.Neq) && not (Type.is_prop (T.ty t)) ->
+      | T.AppBuiltin (b, _)
+        when (b == Builtin.Eq || b == Builtin.Neq)
+             && not (Type.is_prop (T.ty t)) ->
           let err = CCFormat.sprintf "%a is ho bool" T.pp t in
           raise @@ CantEncode err
       (* type erasure for terms E can understand *)
-      | T.AppBuiltin (((Builtin.Eq | Builtin.Neq) as b), [ty; lhs; rhs]) when T.is_ground ty ->
+      | T.AppBuiltin (((Builtin.Eq | Builtin.Neq) as b), [ty; lhs; rhs])
+        when T.is_ground ty ->
           let sym_map, lhs' = aux ~sym_map lhs in
           let sym_map, rhs' = aux ~sym_map rhs in
           (sym_map, T.app_builtin ~ty:Type.prop b [ty; lhs'; rhs'])
-      | T.AppBuiltin (((Builtin.ForallConst | Builtin.ExistsConst) as b), [q; body])
+      | T.AppBuiltin
+          (((Builtin.ForallConst | Builtin.ExistsConst) as b), [q; body])
         when Type.is_ground (T.ty body) ->
           let vars, body = T.open_fun body in
           let sym_map, body' = aux ~sym_map body in
@@ -132,8 +141,12 @@ module Make (E : Env.S) : S with module Env = E = struct
         (fun l (encoded_symbols, ls) ->
           match l with
           | Literal.Equation (lhs, rhs, sign) ->
-              let encoded_symbols, lhs = encode_ty_args_t ~encoded_symbols lhs in
-              let encoded_symbols, rhs = encode_ty_args_t ~encoded_symbols rhs in
+              let encoded_symbols, lhs =
+                encode_ty_args_t ~encoded_symbols lhs
+              in
+              let encoded_symbols, rhs =
+                encode_ty_args_t ~encoded_symbols rhs
+              in
               (encoded_symbols, Literal.mk_lit lhs rhs sign :: ls)
           | _ ->
               (encoded_symbols, l :: ls) )
@@ -158,17 +171,17 @@ module Make (E : Env.S) : S with module Env = E = struct
     (*Format.fprintf out "%% orig:@.@[%s@]@." commented;*)
     match C.distance_to_goal clause with
     | Some d when d = 0 ->
-        Format.fprintf out "@[thf(zip_cl_%d,negated_conjecture,@[%a@]).@]@\n" (C.id clause)
-          TypedSTerm.TPTP_THF.pp lits_converted
+        Format.fprintf out "@[thf(zip_cl_%d,negated_conjecture,@[%a@]).@]@\n"
+          (C.id clause) TypedSTerm.TPTP_THF.pp lits_converted
     | _ ->
-        Format.fprintf out "@[thf(zip_cl_%d,axiom,@[%a@]).@]@\n" (C.id clause) TypedSTerm.TPTP_THF.pp
-          lits_converted
+        Format.fprintf out "@[thf(zip_cl_%d,axiom,@[%a@]).@]@\n" (C.id clause)
+          TypedSTerm.TPTP_THF.pp lits_converted
 
   let output_symdecl ~out sym ty =
     (* distinguished between user defined types and tptp types *)
     (*let usr_sym = ID.make (ID.name sym ^ "_u") in*)
-    Format.fprintf out "@[thf(@['%a_type',type,@[%a@]:@ @[%a@]@]).@]@\n" ID.pp sym ID.pp_tstp sym
-      (Type.TPTP.pp_ho ~depth:0) ty
+    Format.fprintf out "@[thf(@['%a_type',type,@[%a@]:@ @[%a@]@]).@]@\n" ID.pp
+      sym ID.pp_tstp sym (Type.TPTP.pp_ho ~depth:0) ty
 
   let output_all ?(already_defined = ID.Set.empty) ~out cl_set =
     let cl_iter = Iter.of_list cl_set in
@@ -178,9 +191,14 @@ module Make (E : Env.S) : S with module Env = E = struct
     (*CCList.iter (fun sym -> Printf.printf "symbol: %s\n" (ID.to_string sym)) syms ;*)
     let typed_syms =
       C.typed_symbols ~include_types:true cl_iter
-      |> Monomorphisation.remove_duplicates ~eq:(fun p1 p2 -> ID.equal (fst p1) (fst p2))
+      |> Monomorphisation.remove_duplicates ~eq:(fun p1 p2 ->
+             ID.equal (fst p1) (fst p2) )
     in
-    let type_syms, term_syms = Monomorphisation.iter_partition (fun (_, ty) -> Type.is_tType ty) typed_syms in
+    let type_syms, term_syms =
+      Monomorphisation.iter_partition
+        (fun (_, ty) -> Type.is_tType ty)
+        typed_syms
+    in
     (*Iter.iter (fun (id, _) -> Printf.printf "typed symbol: %s\n" (ID.to_string id)) typed_syms;*)
     Iter.iter (fun (sym, ty) -> output_symdecl ~out sym ty) type_syms ;
     Iter.iter (fun (sym, ty) -> output_symdecl ~out sym ty) term_syms ;
@@ -205,8 +223,10 @@ module Make (E : Env.S) : S with module Env = E = struct
     | Some e_path ->
         let to_ = !_timeout in
         let cmd =
-          CCFormat.sprintf "timeout %d %s --pos-ext=all --neg-ext=all %s --cpu-limit=%d %s -s -p" (to_ + 2)
-            e_path prob_path to_
+          CCFormat.sprintf
+            "timeout %d %s --pos-ext=all --neg-ext=all %s --cpu-limit=%d %s -s \
+             -p"
+            (to_ + 2) e_path prob_path to_
             (if !_e_auto then "--auto" else "--auto-schedule")
         in
         let process_channel = Unix.open_process_in cmd in
@@ -216,7 +236,8 @@ module Make (E : Env.S) : S with module Env = E = struct
             while not !refutation_found do
               let line = input_line process_channel in
               (*Printf.printf "%s\n" line;*)
-              if Str.string_match regex_refutation_begin line 0 then refutation_found := true
+              if Str.string_match regex_refutation_begin line 0 then
+                refutation_found := true
               (*Printf.printf "we got that bool: %b!\n" !refutation_found;*)
             done ;
             if !refutation_found then
@@ -228,7 +249,8 @@ module Make (E : Env.S) : S with module Env = E = struct
                   if Str.string_match reg_thf_clause line 0 then
                     let id = CCInt.of_string (Str.matched_group 1 line) in
                     clause_ids := CCOpt.get_exn id :: !clause_ids
-                  else if Str.string_match regex_refutation_end line 0 then raise End_of_file
+                  else if Str.string_match regex_refutation_end line 0 then
+                    raise End_of_file
                 done ;
                 Some !clause_ids
               with End_of_file -> Some !clause_ids
@@ -252,7 +274,8 @@ module Make (E : Env.S) : S with module Env = E = struct
     let convert_clauses ~converter ~encoded_symbols iter =
       let converted =
         let res =
-          Iter.map (fun c -> CCOpt.get_or ~default:c (C.eta_reduce c)) iter |> Iter.flat_map_l converter
+          Iter.map (fun c -> CCOpt.get_or ~default:c (C.eta_reduce c)) iter
+          |> Iter.flat_map_l converter
         in
         res
       in
@@ -261,10 +284,13 @@ module Make (E : Env.S) : S with module Env = E = struct
         Iter.fold
           (fun (acc, encoded_symbols) cl ->
             try
-              let encoded_symbols, cl' = encode_ty_args_cl ~encoded_symbols cl in
+              let encoded_symbols, cl' =
+                encode_ty_args_cl ~encoded_symbols cl
+              in
               (cl' :: acc, encoded_symbols)
             with CantEncode reason ->
-              Util.debugf 5 "cannot encode(%s):@.@[%a@]@." (fun k -> k reason C.pp cl) ;
+              Util.debugf 5 "cannot encode(%s):@.@[%a@]@." (fun k ->
+                  k reason C.pp cl ) ;
               (acc, encoded_symbols) )
           ([], encoded_symbols) converted
       in
@@ -290,7 +316,9 @@ module Make (E : Env.S) : S with module Env = E = struct
       (*|> Iter.take !_max_derived*)
       |> convert_clauses ~converter ~encoded_symbols
     in
-    let prob_name, prob_channel = Filename.open_temp_file ~temp_dir:!_tmp_dir "e_input" "" in
+    let prob_name, prob_channel =
+      Filename.open_temp_file ~temp_dir:!_tmp_dir "e_input" ""
+    in
     let out = Format.formatter_of_out_channel prob_channel in
     try
       let converter =
@@ -313,12 +341,17 @@ module Make (E : Env.S) : S with module Env = E = struct
         if clause_id = C.id original_clause then
           (* TODO check that this is indeed a simplification*)
           let rule = Proof.Rule.mk "monomorphisation" in
-          let proof_step = Proof.Step.simp ~rule [C.proof_parent original_clause] in
+          let proof_step =
+            Proof.Step.simp ~rule [C.proof_parent original_clause]
+          in
           let new_lits = Array.to_list new_lits in
           (* Have no idea what I'm doing here *)
           let clause_trail = C.trail original_clause in
           let clause_penalty = C.penalty original_clause in
-          let res = C.create ~penalty:clause_penalty ~trail:clause_trail new_lits proof_step in
+          let res =
+            C.create ~penalty:clause_penalty ~trail:clause_trail new_lits
+              proof_step
+          in
           (*Printf.printf "\n%s\n" (C.to_string res);*)
           Some res
         else None
@@ -329,12 +362,22 @@ module Make (E : Env.S) : S with module Env = E = struct
           (Iter.union ~eq:C.equal poly_active_set poly_passive_set)
       in
       (*List.iter (fun cl -> Printf.printf "\noriginal clause: %s" (C.to_string cl)) clause_list;*)
-      let simple_clause_list = List.map (fun cl -> (C.id cl, C.lits cl)) clause_list in
-      let monomorphised_clauses = Monomorphisation.monomorphise_problem simple_clause_list in
+      let simple_clause_list =
+        List.map (fun cl -> (C.id cl, C.lits cl)) clause_list
+      in
+      let monomorphised_clauses =
+        Monomorphisation.monomorphise_problem simple_clause_list
+      in
       (*Printf.printf "EProver intf clause nb %i\n" (List.length monomorphised_clauses);*)
       let monomorphised_iter = Iter.of_list monomorphised_clauses in
-      let active_set = Iter.join ~join_row:reconstruct_clause monomorphised_iter poly_active_set in
-      let passive_set = Iter.join ~join_row:reconstruct_clause monomorphised_iter poly_passive_set in
+      let active_set =
+        Iter.join ~join_row:reconstruct_clause monomorphised_iter
+          poly_active_set
+      in
+      let passive_set =
+        Iter.join ~join_row:reconstruct_clause monomorphised_iter
+          poly_passive_set
+      in
       (*let encoded_symbols, poly_initial = take_initial ~converter () in*)
 
       (*let initial =
@@ -369,14 +412,21 @@ module Make (E : Env.S) : S with module Env = E = struct
         match run_e prob_name with
         | Some ids ->
             assert (not (CCList.is_empty ids)) ;
-            let clauses = List.map (fun id -> List.find (fun cl -> C.id cl = id) cl_set) ids in
+            let clauses =
+              List.map (fun id -> List.find (fun cl -> C.id cl = id) cl_set) ids
+            in
             let rule = Proof.Rule.mk "eprover" in
-            let proof_step = Proof.Step.inference ~rule (List.map C.proof_parent clauses) in
+            let proof_step =
+              Proof.Step.inference ~rule (List.map C.proof_parent clauses)
+            in
             let ty = TypedSTerm.prop in
             let proof =
-              Proof.S.mk proof_step (Proof.Result.of_form (TypedSTerm.app_builtin ~ty Builtin.false_ []))
+              Proof.S.mk proof_step
+                (Proof.Result.of_form
+                   (TypedSTerm.app_builtin ~ty Builtin.false_ []) )
             in
-            Printf.printf "e success\n" ; Some proof
+            Printf.printf "e success\n" ;
+            Some proof
         | _ ->
             Printf.printf "e fail\n" ; None
       in
@@ -384,7 +434,8 @@ module Make (E : Env.S) : S with module Env = E = struct
       Printf.printf "eprover time %f\n" (Sys.time () -. start_e_time) ;
       res
     with PolymorphismDetected ->
-      CCFormat.printf "%% Running E stopped because polymorphism was detected @." ;
+      CCFormat.printf
+        "%% Running E stopped because polymorphism was detected @." ;
       None
 
   let setup () = ()
@@ -410,14 +461,21 @@ let () =
               | _ ->
                   assert false )
       , " how to treat lambdas when giving problem to E" )
-    ; ("--tmp-dir", Arg.String (fun v -> _tmp_dir := v), " scratch directory for running E")
+    ; ( "--tmp-dir"
+      , Arg.String (fun v -> _tmp_dir := v)
+      , " scratch directory for running E" )
     ; ("--e-timeout", Arg.Set_int _timeout, " set E prover timeout.")
     ; ( "--e-sort-by-weight-only"
       , Arg.Bool (( := ) _sort_by_weight_only)
       , " order the clauses only by the weight, not by the proof depth." )
     ; (* TODO this option seems to not be implemented, check with someone whether that is indeed the case *)
-      ("--e-only-ho-steps", Arg.Bool (( := ) _only_ho_steps), " translate only HO proof steps to E")
+      ( "--e-only-ho-steps"
+      , Arg.Bool (( := ) _only_ho_steps)
+      , " translate only HO proof steps to E" )
     ; ( "--e-auto"
       , Arg.Bool (fun v -> _e_auto := v)
-      , " If set to on eprover will not run in autoschedule, but in auto mode" )
-    ; ("--max-derived", Arg.Int (( := ) _max_derived), " maximum number of clauses to send to E") ]
+      , " If set to on eprover will not run in autoschedule, but in auto mode"
+      )
+    ; ( "--max-derived"
+      , Arg.Int (( := ) _max_derived)
+      , " maximum number of clauses to send to E" ) ]

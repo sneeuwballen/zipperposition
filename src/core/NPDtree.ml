@@ -11,9 +11,13 @@ module TC = T.Classic
 (** Term traversal in prefix order. This is akin to lazy transformation
     to a flatterm. *)
 
-type iterator = {cur_term: T.t; stack: T.t list list (* skip: drop head, next: first of head *)}
+type iterator =
+  { cur_term: T.t
+  ; stack: T.t list list (* skip: drop head, next: first of head *) }
 
-let eq_ty = Type.close_forall @@ Type.( ==> ) [Type.var_of_int 0; Type.var_of_int 0] Type.prop
+let eq_ty =
+  Type.close_forall
+  @@ Type.( ==> ) [Type.var_of_int 0; Type.var_of_int 0] Type.prop
 
 let eq_id = ID.make "zip_eq_proxy"
 
@@ -46,7 +50,8 @@ let rec open_term ~stack t =
   | T.Var _ | T.DB _ | T.AppBuiltin _ | T.Fun _ | T.Const _ ->
       Some {cur_term= t; stack= [] :: stack}
   | _ when (not (Unif.Ty.type_is_unifiable (T.ty t))) || Type.is_fun (T.ty t) ->
-      Some {cur_term= t; stack= [] :: stack} (* opaque constant/partial application *)
+      Some {cur_term= t; stack= [] :: stack}
+      (* opaque constant/partial application *)
   | T.App (f, _) when T.is_var f ->
       Some {cur_term= t; stack= [] :: stack} (* higher-order term *)
   | T.App (_, l) ->
@@ -55,7 +60,11 @@ let rec open_term ~stack t =
 type view_head = As_star | As_app of ID.t * T.t list
 
 let view_head (t : T.t) : view_head =
-  if (not (T.is_app t)) || (not (Unif.Ty.type_is_unifiable (T.ty t))) || Type.is_fun (T.ty t) || T.is_ho_app t
+  if
+    (not (T.is_app t))
+    || (not (Unif.Ty.type_is_unifiable (T.ty t)))
+    || Type.is_fun (T.ty t)
+    || T.is_ho_app t
   then As_star
   else
     let s, l = T.as_app t in
@@ -70,7 +79,8 @@ let rec next_rec stack =
   | (t :: next') :: stack' ->
       open_term ~stack:(next' :: stack') t
 
-let skip iter = match iter.stack with [] -> None | _next :: stack' -> next_rec stack'
+let skip iter =
+  match iter.stack with [] -> None | _next :: stack' -> next_rec stack'
 
 let next iter = next_rec iter.stack
 
@@ -86,16 +96,21 @@ module Make (E : Index.EQUATION) = struct
 
   module Leaf = Index.MakeLeaf (E)
 
-  type t = {star: t option; (* by variable *) map: t ID.Map.t; (* by symbol *) leaf: Leaf.t (* leaves *)}
+  type t =
+    { star: t option
+    ; (* by variable *) map: t ID.Map.t
+    ; (* by symbol *) leaf: Leaf.t (* leaves *) }
   (* The discrimination tree *)
 
   let empty () = {map= ID.Map.empty; star= None; leaf= Leaf.empty}
 
-  let is_empty n = n.star = None && ID.Map.is_empty n.map && Leaf.is_empty n.leaf
+  let is_empty n =
+    n.star = None && ID.Map.is_empty n.map && Leaf.is_empty n.leaf
 
   exception NoSuchTrie
 
-  let find_sub map key = try ID.Map.find key map with Not_found -> raise NoSuchTrie
+  let find_sub map key =
+    try ID.Map.find key map with Not_found -> raise NoSuchTrie
 
   (** get/add/remove the leaf for the given term. The
       continuation k takes the leaf, and returns a leaf option
@@ -117,15 +132,21 @@ module Make (E : Index.EQUATION) = struct
       | Some i -> (
         match view_head i.cur_term with
         | As_star ->
-            let subtrie = match trie.star with None -> empty () | Some trie' -> trie' in
+            let subtrie =
+              match trie.star with None -> empty () | Some trie' -> trie'
+            in
             let rebuild subtrie =
-              if is_empty subtrie then rebuild {trie with star= None} else rebuild {trie with star= Some subtrie}
+              if is_empty subtrie then rebuild {trie with star= None}
+              else rebuild {trie with star= Some subtrie}
             in
             goto subtrie (next i) rebuild
         | As_app (s, _) ->
-            let subtrie = try find_sub trie.map s with NoSuchTrie -> empty () in
+            let subtrie =
+              try find_sub trie.map s with NoSuchTrie -> empty ()
+            in
             let rebuild subtrie =
-              if is_empty subtrie then rebuild {trie with map= ID.Map.remove s trie.map}
+              if is_empty subtrie then
+                rebuild {trie with map= ID.Map.remove s trie.map}
               else rebuild {trie with map= ID.Map.add s subtrie trie.map}
             in
             goto subtrie (next i) rebuild )
@@ -172,7 +193,12 @@ module Make (E : Index.EQUATION) = struct
                 let subtrie = find_sub trie.map s in
                 traverse subtrie (next i)
               with NoSuchTrie -> () ) ;
-            match trie.star with None -> () | Some subtrie -> traverse subtrie (skip i) (* skip subterm *) ) )
+            match trie.star with
+            | None ->
+                ()
+            | Some subtrie ->
+                traverse subtrie (skip i)
+            (* skip subterm *) ) )
     in
     try traverse (fst dt) (iterate (fst t)) with e -> raise e
 
@@ -189,8 +215,12 @@ module Make (E : Index.EQUATION) = struct
 
   let _as_graph =
     CCGraph.make (fun t ->
-        let prefix s = match t.star with None -> s | Some t' -> Iter.cons ("*", t') s
-        and s2 = ID.Map.to_iter t.map |> Iter.map (fun (sym, t') -> (ID.to_string sym, t')) in
+        let prefix s =
+          match t.star with None -> s | Some t' -> Iter.cons ("*", t') s
+        and s2 =
+          ID.Map.to_iter t.map
+          |> Iter.map (fun (sym, t') -> (ID.to_string sym, t'))
+        in
         prefix s2 )
 
   let to_dot out t =
@@ -204,7 +234,8 @@ module Make (E : Index.EQUATION) = struct
         ~attrs_e:(fun e -> [`Label e])
         ~name:"NPDtree" ~graph:_as_graph
     in
-    Format.fprintf out "@[<2>%a@]@." pp t ; ()
+    Format.fprintf out "@[<2>%a@]@." pp t ;
+    ()
 end
 
 (** {2 General purpose index} *)
@@ -221,7 +252,10 @@ module MakeTerm (X : Set.OrderedType) = struct
   type elt = X.t
 
   (** The discrimination tree *)
-  type t = {star: t option (* by variable *); map: t SIMap.t (* by symbol+arity *); leaf: Leaf.t (* leaves *)}
+  type t =
+    { star: t option (* by variable *)
+    ; map: t SIMap.t (* by symbol+arity *)
+    ; leaf: Leaf.t (* leaves *) }
 
   let empty () = {map= SIMap.empty; star= None; leaf= Leaf.empty}
 
@@ -229,7 +263,8 @@ module MakeTerm (X : Set.OrderedType) = struct
 
   exception NoSuchTrie
 
-  let find_sub map key = try SIMap.find key map with Not_found -> raise NoSuchTrie
+  let find_sub map key =
+    try SIMap.find key map with Not_found -> raise NoSuchTrie
 
   (** get/add/remove the leaf for the given term. The
       continuation k takes the leaf, and returns a leaf option
@@ -250,16 +285,22 @@ module MakeTerm (X : Set.OrderedType) = struct
       | Some i -> (
         match view_head i.cur_term with
         | As_star ->
-            let subtrie = match trie.star with None -> empty () | Some trie' -> trie' in
+            let subtrie =
+              match trie.star with None -> empty () | Some trie' -> trie'
+            in
             let rebuild subtrie =
-              if is_empty subtrie then rebuild {trie with star= None} else rebuild {trie with star= Some subtrie}
+              if is_empty subtrie then rebuild {trie with star= None}
+              else rebuild {trie with star= Some subtrie}
             in
             goto subtrie (next i) rebuild
         | As_app (s, l) ->
             let arity = List.length l in
-            let subtrie = try find_sub trie.map (s, arity) with NoSuchTrie -> empty () in
+            let subtrie =
+              try find_sub trie.map (s, arity) with NoSuchTrie -> empty ()
+            in
             let rebuild subtrie =
-              if is_empty subtrie then rebuild {trie with map= SIMap.remove (s, arity) trie.map}
+              if is_empty subtrie then
+                rebuild {trie with map= SIMap.remove (s, arity) trie.map}
               else rebuild {trie with map= SIMap.add (s, arity) subtrie trie.map}
             in
             goto subtrie (next i) rebuild )
@@ -298,7 +339,9 @@ module MakeTerm (X : Set.OrderedType) = struct
       if n = 0 then k trie
       else (
         (match trie.star with None -> () | Some trie' -> skip trie' (n - 1) k) ;
-        SIMap.iter (fun (_, arity) trie' -> skip trie' (n + arity - 1) k) trie.map )
+        SIMap.iter
+          (fun (_, arity) trie' -> skip trie' (n + arity - 1) k)
+          trie.map )
     in
     skip trie 1 k
 
@@ -319,7 +362,11 @@ module MakeTerm (X : Set.OrderedType) = struct
                 let subtrie = SIMap.find (s, arity) trie.map in
                 traverse subtrie (next i)
               with Not_found -> () ) ;
-            match trie.star with None -> () | Some subtrie -> traverse subtrie (skip i)
+            match trie.star with
+            | None ->
+                ()
+            | Some subtrie ->
+                traverse subtrie (skip i)
             (* skip subterm of [t] *) ) )
     in
     try traverse (fst dt) (iterate (fst t)) with e -> raise e
@@ -349,7 +396,12 @@ module MakeTerm (X : Set.OrderedType) = struct
                 let subtrie = SIMap.find (s, arity) trie.map in
                 traverse subtrie (next i)
               with Not_found -> () ) ;
-            match trie.star with None -> () | Some subtrie -> traverse subtrie (skip i) (* skip subterm *) ) )
+            match trie.star with
+            | None ->
+                ()
+            | Some subtrie ->
+                traverse subtrie (skip i)
+            (* skip subterm *) ) )
     in
     try traverse (fst dt) (iterate (fst t)) with e -> raise e
 
@@ -382,7 +434,9 @@ module MakeTerm (X : Set.OrderedType) = struct
 
   let rec fold dt k acc =
     let acc = Leaf.fold dt.leaf acc k in
-    let acc = match dt.star with None -> acc | Some trie' -> fold trie' k acc in
+    let acc =
+      match dt.star with None -> acc | Some trie' -> fold trie' k acc
+    in
     SIMap.fold (fun _ trie' acc -> fold trie' k acc) dt.map acc
 
   let size dt =
@@ -394,7 +448,8 @@ module MakeTerm (X : Set.OrderedType) = struct
 
   let _as_graph =
     CCGraph.make (fun t ->
-        let prefix s = match t.star with None -> s | Some t' -> Iter.cons ("*", t') s
+        let prefix s =
+          match t.star with None -> s | Some t' -> Iter.cons ("*", t') s
         and s2 =
           SIMap.to_iter t.map
           |> Iter.map (fun ((sym, i), t') ->
@@ -417,5 +472,6 @@ module MakeTerm (X : Set.OrderedType) = struct
         ~attrs_e:(fun e -> [`Label e])
         ~name:"NPDtree" ~graph:_as_graph
     in
-    Format.fprintf out "@[<2>%a@]@." pp t ; ()
+    Format.fprintf out "@[<2>%a@]@." pp t ;
+    ()
 end

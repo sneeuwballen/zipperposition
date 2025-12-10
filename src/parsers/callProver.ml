@@ -33,7 +33,8 @@ module Prover = struct
   let list_provers () = Hashtbl.fold (fun n _ acc -> n :: acc) __table []
 
   let register name prover =
-    if Hashtbl.mem __table name then invalid_arg ("prover already registered: " ^ name)
+    if Hashtbl.mem __table name then
+      invalid_arg ("prover already registered: " ^ name)
     else Hashtbl.add __table name prover
 
   let p_E =
@@ -43,7 +44,11 @@ module Prover = struct
     ; sat= ["SZS status Satisfiable"; "SZS status CounterTheorem"] }
 
   let p_Eproof =
-    {p_E with name= "Eproof"; command= "eproof_ram --cpu-limit=${timeout} -tAuto -xAuto -l0 --tstp-in --tstp-out"}
+    { p_E with
+      name= "Eproof"
+    ; command=
+        "eproof_ram --cpu-limit=${timeout} -tAuto -xAuto -l0 --tstp-in \
+         --tstp-out" }
 
   let p_SPASS =
     { name= "SPASS"
@@ -67,15 +72,22 @@ let name p = p.Prover.name
 type result = Unsat | Sat | Unknown | Error of string
 
 (* among the strings in [patterns], find if one is a substring of [s] *)
-let _find_mem patterns s = List.exists (fun p -> CCString.find ~sub:p s >= 0) patterns
+let _find_mem patterns s =
+  List.exists (fun p -> CCString.find ~sub:p s >= 0) patterns
 
 let call_with_out ?(timeout = 30) ?(args = []) ~prover decls =
   (* compute input to give to the prover *)
-  let input = CCFormat.sprintf "@[<v>%a@]" (Util.pp_list ~sep:"" (A.pp ST.pp)) decls in
+  let input =
+    CCFormat.sprintf "@[<v>%a@]" (Util.pp_list ~sep:"" (A.pp ST.pp)) decls
+  in
   (* build command (add arguments to the end) *)
   let buf = Buffer.create 15 in
-  Buffer.add_substitute buf (function "timeout" -> string_of_int timeout | s -> s) prover.Prover.command ;
-  List.iter (fun arg -> Buffer.add_char buf ' ' ; Buffer.add_string buf arg) args ;
+  Buffer.add_substitute buf
+    (function "timeout" -> string_of_int timeout | s -> s)
+    prover.Prover.command ;
+  List.iter
+    (fun arg -> Buffer.add_char buf ' ' ; Buffer.add_string buf arg)
+    args ;
   let cmd = Buffer.contents buf in
   Util.debugf 2 "run prover %s" (fun k -> k prover.Prover.name) ;
   Util.debugf 4 "command is: \"%s\"" (fun k -> k cmd) ;
@@ -99,7 +111,8 @@ let call ?timeout ?args ~prover decls =
 
 let decls_of_string ~source str =
   let lexbuf = Lexing.from_string str in
-  ParseLocation.set_file lexbuf source ; Util_tptp.parse_lexbuf lexbuf
+  ParseLocation.set_file lexbuf source ;
+  Util_tptp.parse_lexbuf lexbuf
 
 (* try to parse a proof. Returns a proof option *)
 let proof_of_decls decls =
@@ -116,7 +129,10 @@ let call_proof ?timeout ?args ~prover decls =
 
 module Eprover = struct
   type result =
-    {answer: szs_answer; output: string; decls: untyped Ast_tptp.t Iter.t option; proof: Trace_tstp.t option}
+    { answer: szs_answer
+    ; output: string
+    ; decls: untyped Ast_tptp.t Iter.t option
+    ; proof: Trace_tstp.t option }
 
   and szs_answer = Theorem | CounterSatisfiable | Unknown
 
@@ -131,14 +147,23 @@ module Eprover = struct
   (* parse SZS answer *)
   let parse_answer output =
     if CCString.mem ~sub:"SZS status Theorem" output then Theorem
-    else if CCString.mem ~sub:"SZS status CounterSatisfiable" output then CounterSatisfiable
+    else if CCString.mem ~sub:"SZS status CounterSatisfiable" output then
+      CounterSatisfiable
     else Unknown
 
   (* run eproof_ram on the given input. returns a result *)
   let _run_either ?(opts = []) ?(level = 1) ~prover ~steps ~input () =
     let level' = Printf.sprintf "-l%d" level in
     let command =
-      [prover; "--tstp-in"; "--tstp-out"; level'; "-C"; string_of_int steps; "-xAuto"; "-tAuto"] @ opts
+      [ prover
+      ; "--tstp-in"
+      ; "--tstp-out"
+      ; level'
+      ; "-C"
+      ; string_of_int steps
+      ; "-xAuto"
+      ; "-tAuto" ]
+      @ opts
     in
     let cmd = String.concat " " command in
     Err.(
@@ -159,21 +184,31 @@ module Eprover = struct
       Err.return {answer; output; decls; proof} )
 
   (* run eproof_ram on the given input. returns a result *)
-  let run_eproof ~steps ~input = _run_either ~prover:"eproof_ram" ~steps ~input ()
+  let run_eproof ~steps ~input =
+    _run_either ~prover:"eproof_ram" ~steps ~input ()
 
   (* run eprover on the given input. returns a result Lwt *)
-  let run_eprover ?opts ?level ~steps ~input () = _run_either ~prover:"eprover" ?opts ?level ~steps ~input ()
+  let run_eprover ?opts ?level ~steps ~input () =
+    _run_either ~prover:"eprover" ?opts ?level ~steps ~input ()
 
   (* explore the surrounding of this list of formulas, returning a
      list of terms (clausal form) *)
   let discover ?(opts = []) ~steps decls =
     let command =
-      ["eprover"; "--tstp-in"; "--tstp-out"; "-S"; "--restrict-literal-comparisons"; "-C"; string_of_int steps]
+      [ "eprover"
+      ; "--tstp-in"
+      ; "--tstp-out"
+      ; "-S"
+      ; "--restrict-literal-comparisons"
+      ; "-C"
+      ; string_of_int steps ]
       @ opts
     in
     let cmd = String.concat " " command in
     (* build stdin *)
-    let input = CCFormat.sprintf "@[%a@]" (Util.pp_iter ~sep:"" (A.pp ST.pp)) decls in
+    let input =
+      CCFormat.sprintf "@[%a@]" (Util.pp_iter ~sep:"" (A.pp ST.pp)) decls
+    in
     Err.(
       (* call E *)
       Util.popen ~cmd ~input
@@ -185,7 +220,9 @@ module Eprover = struct
     let command = ["eprover"; "--tstp-in"; "--tstp-out"; "--cnf"] @ opts in
     let cmd = String.concat " " command in
     (* build stdin *)
-    let input = CCFormat.sprintf "@[%a@]" (Util.pp_iter ~sep:"" (A.pp ST.pp)) decls in
+    let input =
+      CCFormat.sprintf "@[%a@]" (Util.pp_iter ~sep:"" (A.pp ST.pp)) decls
+    in
     Err.(
       (* call E *)
       Util.popen ~cmd ~input

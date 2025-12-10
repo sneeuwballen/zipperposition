@@ -9,11 +9,15 @@
 val section : Util.Section.t
 
 (** Constructor for an inductive type *)
-type constructor = private {cstor_name: ID.t; cstor_ty: Type.t; cstor_args: (Type.t * projector) list}
+type constructor = private
+  {cstor_name: ID.t; cstor_ty: Type.t; cstor_args: (Type.t * projector) list}
 
 (** A projector for a given constructor and argument position *)
 and projector = private
-  {p_id: ID.t; p_ty: Type.t; p_index: int (* index of projected argument *); p_cstor: constructor lazy_t}
+  { p_id: ID.t
+  ; p_ty: Type.t
+  ; p_index: int (* index of projected argument *)
+  ; p_cstor: constructor lazy_t }
 
 (** {5 Inductive Types} *)
 
@@ -37,7 +41,8 @@ exception NotAnInductiveType of ID.t
 
 exception NotAnInductiveConstructor of ID.t
 
-val declare_ty : ID.t -> ty_vars:Type.t HVar.t list -> constructor list -> proof:Proof.t -> t
+val declare_ty :
+  ID.t -> ty_vars:Type.t HVar.t list -> constructor list -> proof:Proof.t -> t
 (** Declare the given inductive type.
     @raise InvalidDecl if the type is already declared, or the list
       of constructors is empty *)
@@ -68,7 +73,8 @@ val proof : t -> Proof.t
 
 (** {5 Constructors} *)
 
-val mk_constructor : ID.t -> Type.t -> (Type.t * (ID.t * Type.t)) list -> constructor
+val mk_constructor :
+  ID.t -> Type.t -> (Type.t * (ID.t * Type.t)) list -> constructor
 
 val is_constructor : ID.t -> bool
 (** true if the symbol is an inductive constructor (zero, successor...) *)

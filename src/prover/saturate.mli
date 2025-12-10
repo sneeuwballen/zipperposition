@@ -9,7 +9,12 @@ val check_timeout : float option -> bool
 (** check whether we still have some time w.r.t timeout *)
 
 (** The SZS status of a state *)
-type szs_status = Unsat of Proof.S.t | Sat | Unknown | Error of string | Timeout
+type szs_status =
+  | Unsat of Proof.S.t
+  | Sat
+  | Unknown
+  | Error of string
+  | Timeout
 
 val k_abort_after_fragment_check : bool Flex_state.key
 
@@ -21,7 +26,8 @@ module type S = sig
       It performs generating inferences only if [generating] is true (default);
       other parameters are the iteration number and the environment *)
 
-  val given_clause : ?generating:bool -> ?steps:int -> ?timeout:float -> unit -> szs_status * int
+  val given_clause :
+    ?generating:bool -> ?steps:int -> ?timeout:float -> unit -> szs_status * int
   (** run the given clause until a timeout occurs or a result
       is found. It returns a tuple (new state, result, number of steps done).
       It performs generating inferences only if [generating] is true (default) *)

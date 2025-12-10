@@ -9,7 +9,12 @@
     an end position (line, column) + an optional file name.
 *)
 
-type t = {file: string; start_line: int; start_column: int; stop_line: int; stop_column: int}
+type t =
+  { file: string
+  ; start_line: int
+  ; start_column: int
+  ; stop_line: int
+  ; stop_column: int }
 
 val mk : string -> int -> int -> int -> int -> t
 

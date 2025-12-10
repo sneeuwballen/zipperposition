@@ -39,7 +39,9 @@ module Inner = struct
         let ret_ty = T.ty_exn st.head in
         let ty = T.arrow arg_tys ret_ty in
         let l = List.rev_map (eval_in_env_ st.env) l in
-        {st with head= T.app_builtin ~ty b ty_args; args= List.rev_append l st.args}
+        { st with
+          head= T.app_builtin ~ty b ty_args
+        ; args= List.rev_append l st.args }
     | _ ->
         st
 
@@ -65,9 +67,16 @@ module Inner = struct
           {st with head= t'; env= DBEnv.empty} |> normalize |> whnf_rec
     | T.Bind (Binder.Lambda, ty_var, body), a :: args' ->
         (* beta-reduce *)
-        Util.debugf 50 "(@[<2>beta-reduce@ @[%a@ %a@]@])" (fun k -> k T.pp st.head T.pp a) ;
-        assert ((not (T.is_ground ty_var)) || (not (T.is_ground (T.ty_exn a))) || T.equal ty_var (T.ty_exn a)) ;
-        let st' = {head= body; env= DBEnv.push st.env a; args= args'; ty= st.ty} |> normalize in
+        Util.debugf 50 "(@[<2>beta-reduce@ @[%a@ %a@]@])" (fun k ->
+            k T.pp st.head T.pp a ) ;
+        assert (
+          (not (T.is_ground ty_var))
+          || (not (T.is_ground (T.ty_exn a)))
+          || T.equal ty_var (T.ty_exn a) ) ;
+        let st' =
+          {head= body; env= DBEnv.push st.env a; args= args'; ty= st.ty}
+          |> normalize
+        in
         whnf_rec st'
     | T.AppBuiltin _, _ | T.Bind _, _ ->
         st
@@ -132,14 +141,19 @@ module Inner = struct
             let n_args = List.length ty_args in
             let n_missing = n_args - List.length args in
             if n_missing > 0 then (
-              Util.debugf 50 "(@[eta_expand_rec `%a`,@ missing %d args@ in %a@])" (fun k ->
+              Util.debugf 50
+                "(@[eta_expand_rec `%a`,@ missing %d args@ in %a@])" (fun k ->
                   k T.pp t n_missing (CCFormat.Dump.list T.pp) ty_args ) ;
               (* missing args: suffix of length [n_missing] *)
               let missing_args = CCList.drop (n_args - n_missing) ty_args in
               (* shift body to accommodate for new binders *)
               let body = T.DB.shift n_missing body in
               (* build the fully-abstracted term *)
-              let dbvars = List.mapi (fun i ty_arg -> T.bvar (n_missing - i - 1) ~ty:ty_arg) missing_args in
+              let dbvars =
+                List.mapi
+                  (fun i ty_arg -> T.bvar (n_missing - i - 1) ~ty:ty_arg)
+                  missing_args
+              in
               T.fun_l ty_args (aux (T.app ~ty:ty_ret body dbvars)) )
             else if not top_level_only then
               let ty = T.ty_exn body in
@@ -157,7 +171,8 @@ module Inner = struct
                 | T.Bind (b, varty, body') ->
                     assert (b <> Binder.Lambda) ;
                     let body_reduced = aux body' in
-                    if body' = body_reduced then body else T.bind ~ty ~varty b body_reduced
+                    if body' = body_reduced then body
+                    else T.bind ~ty ~varty b body_reduced
               in
               T.fun_l ty_args body
             else t
@@ -173,7 +188,8 @@ module Inner = struct
         List.fold_right
           (fun arg (idx, vars) ->
             if idx = -1 then (idx, vars)
-            else if idx < pref_len && T.is_bvar_i idx arg then (idx + 1, arg :: vars)
+            else if idx < pref_len && T.is_bvar_i idx arg then
+              (idx + 1, arg :: vars)
             else (-1, vars) )
           args (0, [])
       in
@@ -185,14 +201,20 @@ module Inner = struct
           List.fold_right
             (fun arg (idx, m) ->
               if idx = -1 then (idx, m)
-              else if not @@ List.exists (fun tt -> T.DB.contains tt (T.as_bvar_exn arg)) non_redundant then
-                (idx + 1, m + 1)
+              else if
+                not
+                @@ List.exists
+                     (fun tt -> T.DB.contains tt (T.as_bvar_exn arg))
+                     non_redundant
+              then (idx + 1, m + 1)
               else (-1, m) )
             r_bvars (0, 0)
         in
         if m > 0 then
           let args = CCList.take (n - m) args in
-          let ty = Type.apply_unsafe (Type.of_term_unsafe @@ T.ty_exn hd) args in
+          let ty =
+            Type.apply_unsafe (Type.of_term_unsafe @@ T.ty_exn hd) args
+          in
           (m, T.DB.unshift m (T.app ~ty:(ty :> T.t) hd args))
         else (0, t)
     in
@@ -209,7 +231,10 @@ module Inner = struct
               let pref, body = T.open_bind Binder.Lambda t in
               let body' = if full then aux body else body in
               let n, reduced = q_reduce ~pref_len:(List.length pref) body' in
-              assert (Type.equal (Type.of_term_unsafe @@ T.ty_exn body) (Type.of_term_unsafe @@ T.ty_exn body')) ;
+              assert (
+                Type.equal
+                  (Type.of_term_unsafe @@ T.ty_exn body)
+                  (Type.of_term_unsafe @@ T.ty_exn body') ) ;
               if n = 0 && T.equal body body' then t
               else T.fun_l (CCList.take (List.length pref - n) pref) reduced
           | T.Bind (_, _, _) ->
@@ -220,14 +245,17 @@ module Inner = struct
               let f' = aux f in
               let l' = List.map aux l in
               if T.equal f f' && T.same_l l l' then t else T.app ~ty f' l'
-          | T.AppBuiltin ((Builtin.(ExistsConst | ForallConst) as hd), [tyarg; body]) when expand_quant ->
+          | T.AppBuiltin
+              ((Builtin.(ExistsConst | ForallConst) as hd), [tyarg; body])
+            when expand_quant ->
               (* top-level eta expand body of the quantifier *)
               let body' = eta_expand_rec ~top_level_only:true body in
               let pref, matrix = T.open_bind Binder.Lambda body' in
               (* reduce everything underneath the body *)
               let matrix' = aux matrix in
               let body' = T.fun_l pref matrix' in
-              if T.equal body' body then t else T.app_builtin ~ty:(T.ty_exn t) hd [tyarg; body']
+              if T.equal body' body then t
+              else T.app_builtin ~ty:(T.ty_exn t) hd [tyarg; body']
           | T.AppBuiltin (b, l) ->
               let l' = List.map aux l in
               if T.same_l l l' then t else T.app_builtin ~ty b l' )
@@ -265,9 +293,17 @@ type term = Term.t
 let whnf t = Inner.whnf (t : T.t :> IT.t) |> T.of_term_unsafe
 
 let whnf_list t args =
-  let st = Inner.st_of_term ~env:DBEnv.empty ~ty:(T.ty t : Type.t :> IT.t) (t : T.t :> IT.t) in
+  let st =
+    Inner.st_of_term ~env:DBEnv.empty
+      ~ty:(T.ty t : Type.t :> IT.t)
+      (t : T.t :> IT.t)
+  in
   let ty = Type.apply_unsafe (T.ty t) (args : T.t list :> IT.t list) in
-  let st = Inner.add_args_tail st (args : T.t list :> IT.t list) ~ty:(ty : Type.t :> IT.t) in
+  let st =
+    Inner.add_args_tail st
+      (args : T.t list :> IT.t list)
+      ~ty:(ty : Type.t :> IT.t)
+  in
   let st = Inner.whnf_rec st in
   let t' = Inner.term_of_st st |> T.of_term_unsafe in
   t'
@@ -292,13 +328,17 @@ let rec is_lambda_pattern t =
   | T.DB _ | T.Var _ | T.Const _ ->
       true
   | T.App (hd, args) ->
-      if T.is_var hd then all_distinct_bound args else List.for_all is_lambda_pattern args
+      if T.is_var hd then all_distinct_bound args
+      else List.for_all is_lambda_pattern args
   | T.Fun (_, body) ->
       is_lambda_pattern body
 
 and all_distinct_bound args =
   try
-    List.map (fun arg -> match T.view (eta_reduce arg) with T.DB i -> i | _ -> raise Exit) args
+    List.map
+      (fun arg ->
+        match T.view (eta_reduce arg) with T.DB i -> i | _ -> raise Exit )
+      args
     |> Util.Int_set.of_list
     |> fun set -> Util.Int_set.cardinal set = List.length args
   with Exit -> false

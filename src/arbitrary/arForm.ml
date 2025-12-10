@@ -19,7 +19,12 @@ let mk_ gen = QA.make ~print:PT.to_string ~shrink:PT.Seq.subterms gen
 let atom_g =
   let open QCheck.Gen in
   let t = 1 -- 3 >>= AT.default_fuel in
-  oneof [AT.pred_g; map F.not_ AT.pred_g; map2 F.eq t t; map2 F.neq t t; oneofl [F.true_; F.false_]]
+  oneof
+    [ AT.pred_g
+    ; map F.not_ AT.pred_g
+    ; map2 F.eq t t
+    ; map2 F.neq t t
+    ; oneofl [F.true_; F.false_] ]
 
 let atom = mk_ atom_g
 

@@ -19,7 +19,11 @@ let __prof = true
 (* do we produce traces in the
    https://docs.google.com/document/d/1CvAClvFfyA5R-PhYUmn5OOQtYMH4h6I0nSsKchNAySU/
    format? *)
-let tef_ = lazy (__prof && match Sys.getenv_opt "TEF" with Some ("1" | "true") -> true | _ -> false)
+let tef_ =
+  lazy
+    ( __prof
+    &&
+    match Sys.getenv_opt "TEF" with Some ("1" | "true") -> true | _ -> false )
 
 module TEF = struct
   let first_ = ref true
@@ -39,7 +43,9 @@ module TEF = struct
   let setup_ =
     lazy
       ( if Lazy.force tef_ then (
-          let oc = Unix.open_process_out "zstd --fast -q -z -f - -o trace.json.zst" in
+          let oc =
+            Unix.open_process_out "zstd --fast -q -z -f - -o trace.json.zst"
+          in
           output_char oc '[' ;
           at_exit (fun () -> teardown_ oc) ;
           out_ := Some oc ) )
@@ -53,14 +59,16 @@ module TEF = struct
     let ts = start in
     let pid = Unix.getpid () in
     emit_sep_ oc ;
-    Printf.fprintf oc {json|{"pid": %d,"tid":1,"dur": %.2f,"ts": %.2f,"name":"%s","ph":"X"}|json} pid dur ts
-      prof.prof_name ;
+    Printf.fprintf oc
+      {json|{"pid": %d,"tid":1,"dur": %.2f,"ts": %.2f,"name":"%s","ph":"X"}|json}
+      pid dur ts prof.prof_name ;
     ()
 
   let emit_instant_event oc ~ts ~msg () : unit =
     let pid = Unix.getpid () in
     emit_sep_ oc ;
-    Printf.fprintf oc {json|{"pid": %d,"tid":1,"ts": %.2f,"name":%S,"ph":"I"}|json} pid ts msg ;
+    Printf.fprintf oc
+      {json|{"pid": %d,"tid":1,"ts": %.2f,"name":%S,"ph":"I"}|json} pid ts msg ;
     ()
 
   let teardown () =
@@ -72,14 +80,17 @@ module TEF = struct
         teardown_ oc
 end
 
-let prof_active_ = lazy (match Sys.getenv_opt "PROF" with Some ("1" | "true") -> true | _ -> false)
+let prof_active_ =
+  lazy
+    (match Sys.getenv_opt "PROF" with Some ("1" | "true") -> true | _ -> false)
 
 let active_ = lazy (Lazy.force tef_ || Lazy.force prof_active_)
 
 let enable_profiling b =
   if b && not __prof then
     Util.errorf ~where:"zprof"
-      "profiling has been deactivated at compile time. Change `ZProf.__prof` and recompile."
+      "profiling has been deactivated at compile time. Change `ZProf.__prof` \
+       and recompile."
 
 let profilers = ref []
 
@@ -89,7 +100,8 @@ let make name =
   if __prof then profilers := prof :: !profilers ;
   prof
 
-let enter_prof_active_ profiler : span = Span {start= Util.get_time_mon_us (); prof= profiler}
+let enter_prof_active_ profiler : span =
+  Span {start= Util.get_time_mon_us (); prof= profiler}
 
 let[@inline] enter_prof profiler : span =
   if __prof && Lazy.force active_ then enter_prof_active_ profiler else No_span
@@ -101,10 +113,15 @@ let[@inline never] exit_with_ profiler start : unit =
     profiler.prof_total <- profiler.prof_total +. delta ;
     profiler.prof_calls <- profiler.prof_calls + 1 ;
     if delta > profiler.prof_max then profiler.prof_max <- delta ) ;
-  (match !TEF.out_ with None -> () | Some oc -> TEF.emit_duration_event oc profiler ~start ~end_:stop ()) ;
+  ( match !TEF.out_ with
+  | None ->
+      ()
+  | Some oc ->
+      TEF.emit_duration_event oc profiler ~start ~end_:stop () ) ;
   ()
 
-let[@inline] exit_prof span = match span with No_span -> () | Span {start; prof} -> exit_with_ prof start
+let[@inline] exit_prof span =
+  match span with No_span -> () | Span {start; prof} -> exit_with_ prof start
 
 let message_real_ f =
   match !TEF.out_ with
@@ -124,25 +141,33 @@ let with_prof_active_ p f x =
     exit_prof span ; y
   with e -> exit_prof span ; raise e
 
-let[@inline] with_prof_ p f x = if Lazy.force active_ then with_prof_active_ p f x else f x
+let[@inline] with_prof_ p f x =
+  if Lazy.force active_ then with_prof_active_ p f x else f x
 
-let[@inline] with_prof p f x = if __prof && Lazy.force active_ then with_prof_ p f x else f x
+let[@inline] with_prof p f x =
+  if __prof && Lazy.force active_ then with_prof_ p f x else f x
 
 let show_profilers out () =
   Format.fprintf out "@[<v>" ;
-  Format.fprintf out "@[%39s ---------- --------- --------- --------- ---------@]@," (String.make 39 '-') ;
-  Format.fprintf out "@[%-39s %10s %9s %9s %9s %9s@]@," "function" "#calls" "total (s)" "% total" "max (us)"
-    "average (us)" ;
+  Format.fprintf out
+    "@[%39s ---------- --------- --------- --------- ---------@]@,"
+    (String.make 39 '-') ;
+  Format.fprintf out "@[%-39s %10s %9s %9s %9s %9s@]@," "function" "#calls"
+    "total (s)" "% total" "max (us)" "average (us)" ;
   (* sort profilers by decreasing total time *)
-  let profilers = List.sort (fun p1 p2 -> -CCFloat.compare p1.prof_total p2.prof_total) !profilers in
+  let profilers =
+    List.sort
+      (fun p1 p2 -> -CCFloat.compare p1.prof_total p2.prof_total)
+      !profilers
+  in
   let tot = Util.total_time_s () in
   List.iter
     (fun profiler ->
       if profiler.prof_calls > 0 then
         (* print content of the profiler *)
         let total_s = profiler.prof_total *. 1e-6 in
-        Format.fprintf out "@[%-39s %10d %9.3f %9.2f %9.1f %9.1f@]@," profiler.prof_name profiler.prof_calls
-          total_s
+        Format.fprintf out "@[%-39s %10d %9.3f %9.2f %9.1f %9.1f@]@,"
+          profiler.prof_name profiler.prof_calls total_s
           (total_s *. 100. /. tot)
           profiler.prof_max
           (profiler.prof_total /. float_of_int profiler.prof_calls) )

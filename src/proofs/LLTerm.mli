@@ -9,7 +9,15 @@ type t
 type var = t HVar.t
 
 module Int_op : sig
-  type t = Leq0 | Geq0 | Lt0 | Gt0 | Eq0 | Neq0 | Divisible_by of Z.t | Not_div_by of Z.t
+  type t =
+    | Leq0
+    | Geq0
+    | Lt0
+    | Gt0
+    | Eq0
+    | Neq0
+    | Divisible_by of Z.t
+    | Not_div_by of Z.t
 
   val not : t -> t
 

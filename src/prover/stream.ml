@@ -21,7 +21,8 @@ module Make (A : ARG) = struct
 
   type t =
     { id: int  (** unique ID of the stream *)
-    ; parents: C.t list  (** parent clauses for inference generating this stream *)
+    ; parents: C.t list
+          (** parent clauses for inference generating this stream *)
     ; mutable penalty: int  (** heuristic penalty, increased by every drip *)
     ; mutable hits: int  (** how many attemts to retrieve unifier were there  *)
     ; mutable stm: C.t option OSeq.t  (** the stream itself *) }
@@ -112,13 +113,16 @@ module Make (A : ARG) = struct
                   let s', p_tl, tl_res = _drip_n tl n (guard - 1) in
                   (s', p + p_tl, tl_res)
                 with Drip_n_Unfinished (partial_res, p_partial, n') ->
-                  raise (Drip_n_Unfinished (hd :: partial_res, p + p_partial, n')) )
+                  raise
+                    (Drip_n_Unfinished (hd :: partial_res, p + p_partial, n')) )
               | _ -> (
                 try
                   let s', p_tl, tl_res = _drip_n tl (n - 1) (guard - 1) in
                   (s', p + p_tl, hd :: tl_res)
                 with Drip_n_Unfinished (partial_res, p_partial, n') ->
-                  raise (Drip_n_Unfinished (hd :: partial_res, p + p_partial, n')) ) ) )
+                  raise
+                    (Drip_n_Unfinished (hd :: partial_res, p + p_partial, n')) )
+              ) )
     in
     let orig_penalty = s.penalty in
     let res =

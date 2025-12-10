@@ -23,7 +23,8 @@ let trivial = {cs= []; vars= T.VarSet.empty}
 let make cs =
   if cs = [] then trivial
   else
-    let vars = Iter.of_list cs |> Iter.flat_map Literals.Seq.vars |> T.VarSet.of_iter
+    let vars =
+      Iter.of_list cs |> Iter.flat_map Literals.Seq.vars |> T.VarSet.of_iter
     and cs = CCList.sort_uniq ~cmp:Literals.compare cs in
     {cs; vars}
 
@@ -57,46 +58,66 @@ let to_string = Fmt.to_string pp
 let pp_tstp out (f : t) : unit =
   let pp_c = Fmt.within "(" ")" Literals.pp_tstp in
   let pp_body out () =
-    match f.cs with [c] -> pp_c out c | _ -> Fmt.fprintf out "(@[%a@])" (Util.pp_list ~sep:" & " pp_c) f.cs
+    match f.cs with
+    | [c] ->
+        pp_c out c
+    | _ ->
+        Fmt.fprintf out "(@[%a@])" (Util.pp_list ~sep:" & " pp_c) f.cs
   in
   if T.VarSet.is_empty f.vars then pp_body out ()
   else
-    Fmt.fprintf out "(@[<2>![%a]:@ (%a)@])" (Util.pp_list Type.TPTP.pp_typed_var) (T.VarSet.to_list f.vars)
-      pp_body ()
+    Fmt.fprintf out "(@[<2>![%a]:@ (%a)@])"
+      (Util.pp_list Type.TPTP.pp_typed_var)
+      (T.VarSet.to_list f.vars) pp_body ()
 
 let pp_zf out (f : t) : unit =
   let pp_c = Fmt.within "(" ")" Literals.pp_zf in
   let pp_body out () =
-    match f.cs with [c] -> pp_c out c | _ -> Fmt.fprintf out "(@[%a@])" (Util.pp_list ~sep:" && " pp_c) f.cs
+    match f.cs with
+    | [c] ->
+        pp_c out c
+    | _ ->
+        Fmt.fprintf out "(@[%a@])" (Util.pp_list ~sep:" && " pp_c) f.cs
   in
   if T.VarSet.is_empty f.vars then pp_body out ()
   else
-    Fmt.fprintf out "(@[<2>forall %a.@ (%a)@])" (Util.pp_list Type.ZF.pp_typed_var) (T.VarSet.to_list f.vars)
-      pp_body ()
+    Fmt.fprintf out "(@[<2>forall %a.@ (%a)@])"
+      (Util.pp_list Type.ZF.pp_typed_var)
+      (T.VarSet.to_list f.vars) pp_body ()
 
 let ind_vars t =
   vars t |> T.VarSet.to_list
   |> List.filter (fun v ->
          let ty = HVar.ty v in
          (* only do induction on variables of infinite types *)
-         match Ind_ty.as_inductive_type ty with Some (ity, _) -> Ind_ty.is_recursive ity | None -> false )
+         match Ind_ty.as_inductive_type ty with
+         | Some (ity, _) ->
+             Ind_ty.is_recursive ity
+         | None ->
+             false )
 
 let apply_subst renaming subst (f, sc) : t =
-  let cs = List.map (fun lits -> Literals.apply_subst renaming subst (lits, sc)) f.cs in
+  let cs =
+    List.map (fun lits -> Literals.apply_subst renaming subst (lits, sc)) f.cs
+  in
   make cs
 
 let subst1 (v : var) (t : term) (f : t) : t =
   let renaming = Subst.Renaming.create () in
-  let subst = Subst.FO.bind Subst.empty ((v : var :> InnerTerm.t HVar.t), 0) (t, 1) in
+  let subst =
+    Subst.FO.bind Subst.empty ((v : var :> InnerTerm.t HVar.t), 0) (t, 1)
+  in
   apply_subst renaming subst (f, 0)
 
 (* find substitutions making [f1] and [f2] variants, if possible *)
 let variant_ ~subst (f1, sc1) (f2, sc2) : _ Iter.t =
   Unif.unif_list_com ~size:`Same subst
-    ~op:(fun subst c1 c2 k -> Literals.variant ~subst c1 c2 (fun (subst, _tags) -> k subst))
+    ~op:(fun subst c1 c2 k ->
+      Literals.variant ~subst c1 c2 (fun (subst, _tags) -> k subst) )
     (f1.cs, sc1) (f2.cs, sc2)
 
-let are_variant f1 f2 : bool = not @@ Iter.is_empty @@ variant_ ~subst:Subst.empty (f1, 1) (f2, 0)
+let are_variant f1 f2 : bool =
+  not @@ Iter.is_empty @@ variant_ ~subst:Subst.empty (f1, 1) (f2, 0)
 
 let normalize_form (f : form) : form =
   let module RW = Rewrite in
@@ -131,10 +152,13 @@ let normalize_form (f : form) : form =
           cs
     and rm_trivial = List.filter (fun c -> not (Literals.is_trivial c)) in
     let cs = c |> rw_terms |> rw_clause |> rm_trivial in
-    if !progress then normalize_form fuel cs (* normalize each result recursively *)
+    if !progress then
+      normalize_form fuel cs (* normalize each result recursively *)
     else (* done, just simplify *)
       Iter.of_list cs |> Iter.map simplify
-  and normalize_form fuel (f : form) : clause Iter.t = Iter.of_list f |> Iter.flat_map (normalize_up_to fuel) in
+  and normalize_form fuel (f : form) : clause Iter.t =
+    Iter.of_list f |> Iter.flat_map (normalize_up_to fuel)
+  in
   normalize_form 3 f |> Iter.to_rev_list
 
 let normalize (f : t) : t = cs f |> normalize_form |> make
@@ -174,10 +198,13 @@ module Pos = struct
     let l = cs f in
     P.Map.fold
       (fun p by l ->
-        let n, p_c = match p with P.Arg (n, p') -> (n, p') | _ -> assert false in
+        let n, p_c =
+          match p with P.Arg (n, p') -> (n, p') | _ -> assert false
+        in
         let c = List.nth l n in
         let c' = Array.copy c in
-        Literals.Pos.replace c' ~at:p_c ~by ; CCList.set_at_idx n c' l )
+        Literals.Pos.replace c' ~at:p_c ~by ;
+        CCList.set_at_idx n c' l )
       m l
     |> make
 
@@ -189,10 +216,12 @@ module Seq = struct
 
   let terms_with_pos ?(subterms = true) f =
     cs f |> Iter.of_list |> Util.seq_zipi
-    |> Iter.flat_map (fun (i, c) -> Iter.of_array_i c |> Iter.map (fun (j, lit) -> (i, j, lit)))
+    |> Iter.flat_map (fun (i, c) ->
+           Iter.of_array_i c |> Iter.map (fun (j, lit) -> (i, j, lit)) )
     |> Iter.flat_map (fun (i, j, lit) ->
            let position = Position.(arg i @@ arg j @@ stop) in
-           Literal.fold_terms lit ~position ~ord:Ordering.none ~which:`All ~vars:true ~subterms )
+           Literal.fold_terms lit ~position ~ord:Ordering.none ~which:`All
+             ~vars:true ~subterms )
 end
 
 module FV_tbl (X : Map.OrderedType) = struct
@@ -200,7 +229,8 @@ module FV_tbl (X : Map.OrderedType) = struct
 
   (* approximation here, we represent it as a clause, losing the
          boolean structure. monotonicity w.r.t features should still apply *)
-  let to_lits (f : cut_form) = cs f |> Iter.of_list |> Iter.flat_map_l Literals.to_form
+  let to_lits (f : cut_form) =
+    cs f |> Iter.of_list |> Iter.flat_map_l Literals.to_form
 
   (* index for lemmas, to ensure α-equivalent lemmas have the same lit *)
   module FV = FV_tree.Make (struct

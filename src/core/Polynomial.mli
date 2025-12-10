@@ -57,4 +57,5 @@ module type S = sig
   val pp : Format.formatter -> t -> unit
 end
 
-module Make (Coeff : IntegerModule) (Indet : OrderedType) : S with type coeff = Coeff.t and type indet = Indet.t
+module Make (Coeff : IntegerModule) (Indet : OrderedType) :
+  S with type coeff = Coeff.t and type indet = Indet.t

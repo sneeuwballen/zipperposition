@@ -61,14 +61,20 @@ val get_debug : unit -> int
 val break_on_debug : bool ref
 (** Shall we wait for user input after each debug message? *)
 
-val debugf : ?section:Section.t -> int -> ('a, Format.formatter, unit, unit) format4 -> ('a -> unit) -> unit
+val debugf :
+     ?section:Section.t
+  -> int
+  -> ('a, Format.formatter, unit, unit) format4
+  -> ('a -> unit)
+  -> unit
 (** Print a debug message, with the given section and verbosity level.
     The message might be dropped if its level is too high. *)
 
 val debug : ?section:Section.t -> int -> string -> unit
 (** Cheap non-formatting version of {!debugf} *)
 
-val ksprintf_noc : f:(string -> 'a) -> ('b, Format.formatter, unit, 'a) format4 -> 'b
+val ksprintf_noc :
+  f:(string -> 'a) -> ('b, Format.formatter, unit, 'a) format4 -> 'b
 (** Same as [CCFormat.ksprintf], but without colors *)
 
 val err_spf : ('b, Format.formatter, unit, string) format4 -> 'b
@@ -156,7 +162,11 @@ val finally : do_:(unit -> unit) -> (unit -> 'a) -> 'a
     same exception is raised; in {b any} case, [do_ ()] is called after
     [f ()] terminates. *)
 
-val pp_pair : ?sep:string -> 'a CCFormat.printer -> 'b CCFormat.printer -> ('a * 'b) CCFormat.printer
+val pp_pair :
+     ?sep:string
+  -> 'a CCFormat.printer
+  -> 'b CCFormat.printer
+  -> ('a * 'b) CCFormat.printer
 
 val pp_list : ?sep:string -> 'a CCFormat.printer -> 'a list CCFormat.printer
 (** Print a list without begin/end separators *)

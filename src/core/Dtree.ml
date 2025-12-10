@@ -22,7 +22,13 @@ type iterator =
   ; stack: T.t list list (* skip: drop head, next: first of head *)
   ; stack_len: int }
 
-let[@inline] char_to_int_ = function Symbol _ -> 0 | Variable _ -> 2 | Subterm _ -> 3
+let[@inline] char_to_int_ = function
+  | Symbol _ ->
+      0
+  | Variable _ ->
+      2
+  | Subterm _ ->
+      3
 
 let compare_char c1 c2 =
   (* compare variables by index *)
@@ -52,7 +58,11 @@ let term_to_char (t : T.t) : character * T.t list =
   | ST.Const s ->
       (Symbol s, [])
   | ST.App (f, l) -> (
-    match ST.view f with ST.Const s -> (Symbol s, T.of_term_unsafe_l l) | _ -> (Subterm t, []) )
+    match ST.view f with
+    | ST.Const s ->
+        (Symbol s, T.of_term_unsafe_l l)
+    | _ ->
+        (Subterm t, []) )
   | ST.AppBuiltin _ | ST.DB _ | ST.Bind _ ->
       (Subterm t, [])
 
@@ -85,7 +95,12 @@ let rec next_rec stack len =
   | (t :: next') :: stack' ->
       Some (open_term ~stack:(next' :: stack') ~len t)
 
-let skip iter = match iter.stack with [] -> None | _next :: stack' -> next_rec stack' (iter.stack_len - 1)
+let skip iter =
+  match iter.stack with
+  | [] ->
+      None
+  | _next :: stack' ->
+      next_rec stack' (iter.stack_len - 1)
 
 let[@inline] next iter = next_rec iter.stack iter.stack_len
 
@@ -96,7 +111,11 @@ let[@inline] iterate term = Some (open_term ~stack:[] ~len:0 term)
 let to_list t : _ list =
   let rec getnext acc iter : _ list =
     let acc' = iter.cur_char :: acc in
-    match next iter with None -> List.rev acc' | Some iter' -> getnext acc' iter'
+    match next iter with
+    | None ->
+        List.rev acc'
+    | Some iter' ->
+        getnext acc' iter'
   in
   match iterate t with None -> assert false | Some i -> getnext [] i
 
@@ -115,7 +134,8 @@ module Make (E : Index.EQUATION) = struct
 
   type trie =
     { map: trie CharMap.t  (** map atom -> trie *)
-    ; leaf: (T.t * E.t * int) list  (** leaf with (term, value, priority) list *) }
+    ; leaf: (T.t * E.t * int) list
+          (** leaf with (term, value, priority) list *) }
   (* The discrimination tree *)
 
   let empty_trie = {map= CharMap.empty; leaf= []}
@@ -215,23 +235,35 @@ module Make (E : Index.EQUATION) = struct
               match c2 with
               | Variable v2 -> (
                 (* deal with the variable branche in the trie *)
-                match S.FO.get_var subst (Scoped.set dt (v2 :> ST.t HVar.t)) with
+                match
+                  S.FO.get_var subst (Scoped.set dt (v2 :> ST.t HVar.t))
+                with
                 | None -> (
                   (* not bound: try to match types + bind, then continue *)
                   try
                     let subst =
-                      Unif.Ty.matching ~subst ~pattern:(Scoped.set dt (HVar.ty v2)) (Scoped.set t (T.ty t_pos))
+                      Unif.Ty.matching ~subst
+                        ~pattern:(Scoped.set dt (HVar.ty v2))
+                        (Scoped.set t (T.ty t_pos))
                     in
-                    let subst = Unif.FO.bind ~check:false subst (Scoped.set dt v2) (Scoped.set t t_pos) in
+                    let subst =
+                      Unif.FO.bind ~check:false subst (Scoped.set dt v2)
+                        (Scoped.set t t_pos)
+                    in
                     traverse subtrie (skip i) subst
-                  with Unif.Fail -> () (* incompatible binding, or occur check *) )
+                  with Unif.Fail ->
+                    () (* incompatible binding, or occur check *) )
                 | Some t' ->
                     (* already bound, check consistency *)
-                    if Unif.FO.equal ~subst (Scoped.set t t_pos) t' then traverse subtrie (skip i) subst )
+                    if Unif.FO.equal ~subst (Scoped.set t t_pos) t' then
+                      traverse subtrie (skip i) subst )
               | Subterm t2 -> (
                 (* fallback to matching *)
                 try
-                  let subst = Unif.FO.matching ~subst ~pattern:(Scoped.set dt t2) (Scoped.set t t_pos) in
+                  let subst =
+                    Unif.FO.matching ~subst ~pattern:(Scoped.set dt t2)
+                      (Scoped.set t t_pos)
+                  in
                   traverse subtrie (skip i) subst
                 with Unif.Fail -> () )
               | _ when eq_char c2 c1 ->
@@ -262,7 +294,8 @@ module Make (E : Index.EQUATION) = struct
 
   (* TODO: print leaf itself *)
 
-  let rec equal_ a b = a == b || (a.leaf == b.leaf && CharMap.equal equal_ a.map b.map)
+  let rec equal_ a b =
+    a == b || (a.leaf == b.leaf && CharMap.equal equal_ a.map b.map)
 
   let to_dot out t =
     Util.debugf 2 "@[<2>print graph of size %d@]" (fun k -> k (size t)) ;
@@ -285,4 +318,6 @@ module Default = Make (Index.BasicEquation)
 
 let () =
   Options.add_opts
-    [("--dtree-max-depth", Arg.Set_int max_depth_, " set maximal depth of terms for Dtree (demodulation)")]
+    [ ( "--dtree-max-depth"
+      , Arg.Set_int max_depth_
+      , " set maximal depth of terms for Dtree (demodulation)" ) ]

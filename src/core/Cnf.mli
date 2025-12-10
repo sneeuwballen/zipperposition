@@ -66,7 +66,8 @@ type options =
   | DisableRenaming
       (** disables formula renaming. Can re-introduce the worst-case
       exponential behavior of CNF. *)
-  | InitialProcessing of (form -> form)  (** any processing, at the beginning, before CNF starts  *)
+  | InitialProcessing of (form -> form)
+      (** any processing, at the beginning, before CNF starts  *)
   | PostNNF of (form -> form)
       (** any processing that keeps negation at leaves,
       just after reduction to NNF. Its output
@@ -90,7 +91,8 @@ val pp_f_statement : f_statement CCFormat.printer
 
 val pp_c_statement : c_statement CCFormat.printer
 
-val pp_fo_c_statement : (Term.t SLiteral.t list, Term.t, Type.t) Statement.t CCFormat.printer
+val pp_fo_c_statement :
+  (Term.t SLiteral.t list, Term.t, Type.t) Statement.t CCFormat.printer
 
 val is_clause : form -> bool
 
@@ -98,12 +100,20 @@ val is_cnf : form -> bool
 
 (** {2 Main Interface} *)
 
-val cnf_of : ctx:Skolem.ctx -> ?opts:options list -> f_statement -> c_statement CCVector.ro_vector
+val cnf_of :
+     ctx:Skolem.ctx
+  -> ?opts:options list
+  -> f_statement
+  -> c_statement CCVector.ro_vector
 (** Transform the statement into proper CNF; returns a list of statements,
     including type declarations for new Skolem symbols or formulas proxies.
     Options are used to tune the behavior. *)
 
-val cnf_of_iter : ctx:Skolem.ctx -> ?opts:options list -> f_statement Iter.t -> c_statement CCVector.ro_vector
+val cnf_of_iter :
+     ctx:Skolem.ctx
+  -> ?opts:options list
+  -> f_statement Iter.t
+  -> c_statement CCVector.ro_vector
 
 val type_declarations : c_statement Iter.t -> type_ ID.Map.t
 (** Compute the types declared in the statement sequence *)

@@ -27,11 +27,13 @@ val find_file : string -> string -> string option
     recursively, in [dir], or in its parent dir recursively.
     It also looks in the "TPTP" environment variable. *)
 
-val parse_lexbuf : ?names:A.name list -> Lexing.lexbuf -> untyped A.t Iter.t or_error
+val parse_lexbuf :
+  ?names:A.name list -> Lexing.lexbuf -> untyped A.t Iter.t or_error
 (** Given a lexbuf, try to parse its content into a sequence of untyped
     declarations *)
 
-val parse_file : ?cache:parse_cache -> recursive:bool -> string -> untyped A.t Iter.t or_error
+val parse_file :
+  ?cache:parse_cache -> recursive:bool -> string -> untyped A.t Iter.t or_error
 (** Parsing a TPTP file is here presented with a [recursive] option
     that, if true, will make "include" directives to be recursively
     parsed. It uses {!find_file} for included files.

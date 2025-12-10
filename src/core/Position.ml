@@ -34,7 +34,11 @@ let equal p1 p2 = compare p1 p2 = 0
 
 let hash p = Hashtbl.hash p
 
-let rec size = function Stop -> 0 | Type p | Left p | Right p | Head p | Arg (_, p) | Body p -> 1 + size p
+let rec size = function
+  | Stop ->
+      0
+  | Type p | Left p | Right p | Head p | Arg (_, p) | Body p ->
+      1 + size p
 
 let rev pos =
   let rec aux acc pos =
@@ -99,7 +103,11 @@ let rec is_prefix p1 p2 : bool =
   match (p1, p2) with
   | Stop, _ ->
       true
-  | Left l1, Left l2 | Right l1, Right l2 | Head l1, Head l2 | Body l1, Body l2 | Type l1, Type l2 ->
+  | Left l1, Left l2
+  | Right l1, Right l2
+  | Head l1, Head l2
+  | Body l1, Body l2
+  | Type l1, Type l2 ->
       is_prefix l1 l2
   | Arg (i1, l1), Arg (i2, l2) ->
       i1 = i2 && is_prefix l1 l2
@@ -139,7 +147,8 @@ module Map = struct
     let compare = compare
   end)
 
-  let prune_subsumed (m : _ t) : _ t = filter (fun k _ -> not (exists (fun k' _ -> is_strict_prefix k' k) m)) m
+  let prune_subsumed (m : _ t) : _ t =
+    filter (fun k _ -> not (exists (fun k' _ -> is_strict_prefix k' k) m)) m
 end
 
 (** {2 Position builder}
@@ -149,8 +158,10 @@ end
 module Build = struct
   type t =
     | E  (** Empty (identity function) *)
-    | P of position * t  (** Pre-pend given position, then apply previous builder *)
-    | N of (position -> position) * t  (** Apply function to position, then apply linked builder *)
+    | P of position * t
+        (** Pre-pend given position, then apply previous builder *)
+    | N of (position -> position) * t
+        (** Apply function to position, then apply linked builder *)
 
   let empty = E
 
@@ -229,5 +240,6 @@ module With = struct
 
   let hash f t = Hash.combine3 41 (f (get t)) (hash (pos t))
 
-  let pp f out t = CCFormat.fprintf out "(@[:pos %a :in %a@])" pp (pos t) f (get t)
+  let pp f out t =
+    CCFormat.fprintf out "(@[:pos %a :in %a@])" pp (pos t) f (get t)
 end

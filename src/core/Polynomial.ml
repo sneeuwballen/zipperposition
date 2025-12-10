@@ -73,9 +73,11 @@ module Make (Coeff : IntegerModule) (Indet : OrderedType) = struct
             assert (Coeff.add w1 w2 <> Coeff.zero) ;
             Some (Coeff.add w1 w2) )
 
-  let mult_const c p = if c = 0 then P.empty else P.map (fun w -> Coeff.mult c w) p
+  let mult_const c p =
+    if c = 0 then P.empty else P.map (fun w -> Coeff.mult c w) p
 
-  let mult_indet x p : t = P.fold (fun m w new_p -> P.add (Monomial.add m x) w new_p) p P.empty
+  let mult_indet x p : t =
+    P.fold (fun m w new_p -> P.add (Monomial.add m x) w new_p) p P.empty
 
   let compare_aux p1 p2 =
     (* Comparison result for each monomial *)
@@ -128,10 +130,13 @@ module Make (Coeff : IntegerModule) (Indet : OrderedType) = struct
   let equal p1 p2 = compare_aux p1 p2 = None
 
   let monomial_pp out (a : Monomial.t) : unit =
-    Format.fprintf out "(%a)" (Util.pp_list ~sep:"*" Indet.pp) (Monomial.to_list a)
+    Format.fprintf out "(%a)"
+      (Util.pp_list ~sep:"*" Indet.pp)
+      (Monomial.to_list a)
 
   let pp out (a : t) : unit =
     Format.fprintf out "Poly[%a]"
-      (Util.pp_list ~sep:" + " (CCPair.pp ~pp_sep:(CCFormat.return "@ * ") monomial_pp Coeff.pp))
+      (Util.pp_list ~sep:" + "
+         (CCPair.pp ~pp_sep:(CCFormat.return "@ * ") monomial_pp Coeff.pp) )
       (P.bindings a)
 end

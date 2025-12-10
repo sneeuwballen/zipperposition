@@ -147,7 +147,8 @@ module type S = sig
   val max_l : (elt -> elt -> Comparison.t) -> elt list -> elt list
   (** Maximal elements of a list *)
 
-  val compare_partial_l : (elt -> elt -> Comparison.t) -> elt list -> elt list -> Comparison.t
+  val compare_partial_l :
+    (elt -> elt -> Comparison.t) -> elt list -> elt list -> Comparison.t
   (** Compare two multisets represented as list of elements *)
 
   val pp : elt CCFormat.printer -> t CCFormat.printer

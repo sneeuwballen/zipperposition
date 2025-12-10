@@ -16,11 +16,13 @@ let parse_lexbuf_ lex =
   let l = Tip_parser.parse_list Tip_lexer.token lex in
   Iter.of_list l
 
-let parse_lexbuf file : parser_res = try parse_lexbuf_ file |> E.return with e -> E.of_exn e
+let parse_lexbuf file : parser_res =
+  try parse_lexbuf_ file |> E.return with e -> E.of_exn e
 
 let parse_stdin () : parser_res =
   let lexbuf = Lexing.from_channel stdin in
-  ParseLocation.set_file lexbuf "stdin" ; parse_lexbuf lexbuf
+  ParseLocation.set_file lexbuf "stdin" ;
+  parse_lexbuf lexbuf
 
 let parse_file file : parser_res =
   if file = "stdin" then parse_stdin ()
@@ -28,7 +30,8 @@ let parse_file file : parser_res =
     try
       CCIO.with_in file (fun ic ->
           let lexbuf = Lexing.from_channel ic in
-          ParseLocation.set_file lexbuf file ; parse_lexbuf_ lexbuf )
+          ParseLocation.set_file lexbuf file ;
+          parse_lexbuf_ lexbuf )
       |> E.return
     with
     | Sys_error e ->
@@ -102,7 +105,13 @@ let rec conv_term (t : A.term) : T.t =
   | A.App (s, []) | A.Const s -> (
     (* look for integer constants, but otherwise
        let type inference distinguish constants and variables *)
-    match (as_int s, as_rat s) with Some z, _ -> T.int_ z | None, Some q -> T.rat q | None, None -> T.var s )
+    match (as_int s, as_rat s) with
+    | Some z, _ ->
+        T.int_ z
+    | None, Some q ->
+        T.rat q
+    | None, None ->
+        T.var s )
   | A.App (f, l) -> (
       let l = List.map conv_term l in
       match (f, l) with
@@ -201,7 +210,11 @@ let conv_def (d : A.typed_var A.fun_decl) : string * T.typed_var list * T.t =
 let conv_def ?loc decl body =
   (* translate into definitions *)
   let f, vars, ty_f = conv_def decl in
-  let vars_as_t = List.map (function T.Wildcard, _ -> assert false | T.V s, _ -> T.var s) vars in
+  let vars_as_t =
+    List.map
+      (function T.Wildcard, _ -> assert false | T.V s, _ -> T.var s)
+      vars
+  in
   let def =
     let body = conv_term body in
     T.forall ?loc vars (T.eq ?loc (T.app_const ?loc f vars_as_t) body)
@@ -210,7 +223,8 @@ let conv_def ?loc decl body =
 
 let convert (st : A.statement) : UA.statement list =
   let loc = CCOpt.map conv_loc st.A.loc in
-  Util.debugf 3 "@[<2>convert TIP statement@ @[%a@]@,%a@]" (fun k -> k A.pp_stmt st ParseLocation.pp_opt loc) ;
+  Util.debugf 3 "@[<2>convert TIP statement@ @[%a@]@,%a@]" (fun k ->
+      k A.pp_stmt st ParseLocation.pp_opt loc ) ;
   match st.A.stmt with
   | A.Stmt_decl_sort (s, i) ->
       let ty = T.fun_ty (CCList.init i (fun _ -> T.tType)) T.tType in
@@ -234,7 +248,9 @@ let convert (st : A.statement) : UA.statement list =
       let cstors =
         List.map
           (fun c ->
-            let args = c.A.cstor_args |> List.map (CCPair.map CCOpt.return conv_ty) in
+            let args =
+              c.A.cstor_args |> List.map (CCPair.map CCOpt.return conv_ty)
+            in
             (c.A.cstor_name, args) )
           cstors
       in
@@ -247,7 +263,9 @@ let convert (st : A.statement) : UA.statement list =
             let cstors =
               List.map
                 (fun c ->
-                  let args = c.A.cstor_args |> List.map (CCPair.map CCOpt.return conv_ty) in
+                  let args =
+                    c.A.cstor_args |> List.map (CCPair.map CCOpt.return conv_ty)
+                  in
                   (c.A.cstor_name, args) )
                 cstors
             in

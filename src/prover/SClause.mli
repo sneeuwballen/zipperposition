@@ -36,7 +36,8 @@ val length : t -> int
 
 val update_trail : (Trail.t -> Trail.t) -> t -> t
 
-val to_s_form : ?allow_free_db:bool -> ?ctx:Term.Conv.ctx -> t -> TypedSTerm.Form.t
+val to_s_form :
+  ?allow_free_db:bool -> ?ctx:Term.Conv.ctx -> t -> TypedSTerm.Form.t
 
 (** {2 Flags} *)
 

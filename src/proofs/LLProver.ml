@@ -60,13 +60,17 @@ module CC = Congruence.Make (struct
         let l' = T.Linexp_int.subterms le |> Iter.to_list in
         assert (List.length l = List.length l') ;
         let map = List.combine l' l in
-        let le' = T.Linexp_int.map (fun t -> CCList.Assoc.get_exn ~eq:T.equal t map) le in
+        let le' =
+          T.Linexp_int.map (fun t -> CCList.Assoc.get_exn ~eq:T.equal t map) le
+        in
         T.int_pred le' op
     | Rat_pred (le, op), l ->
         let l' = T.Linexp_rat.subterms le |> Iter.to_list in
         assert (List.length l = List.length l') ;
         let map = List.combine l' l in
-        let le' = T.Linexp_rat.map (fun t -> CCList.Assoc.get_exn ~eq:T.equal t map) le in
+        let le' =
+          T.Linexp_rat.map (fun t -> CCList.Assoc.get_exn ~eq:T.equal t map) le
+        in
         T.rat_pred le' op
     | T.App _, _
     | T.Arrow _, _
@@ -97,7 +101,10 @@ module Branch : sig
   val pop_to_expand : t -> (T.t * t) option
   (** remove and return next formula to expand *)
 
-  type closed = C_not_closed | C_closed_by_diseq of T.t * T.t | C_closed_by_theory of string
+  type closed =
+    | C_not_closed
+    | C_closed_by_diseq of T.t * T.t
+    | C_closed_by_theory of string
 
   val to_expand : t -> T.t Iter.t
 
@@ -115,7 +122,10 @@ module Branch : sig
 end = struct
   module T_set = T.Set
 
-  type closed = C_not_closed | C_closed_by_diseq of T.t * T.t | C_closed_by_theory of string
+  type closed =
+    | C_not_closed
+    | C_closed_by_diseq of T.t * T.t
+    | C_closed_by_theory of string
 
   type t =
     { id: int (* generative ID *)
@@ -147,11 +157,14 @@ end = struct
     ; closed= C_not_closed
     ; parent= None }
 
-  let[@inline] is_closed b : bool = match b.closed with C_not_closed -> false | _ -> true
+  let[@inline] is_closed b : bool =
+    match b.closed with C_not_closed -> false | _ -> true
 
   let mk_child =
     let n = ref 1 in
-    let aux (f : F.t) (b : t) : t = {b with id= CCRef.incr_then_get n; form= Some f; parent= Some b} in
+    let aux (f : F.t) (b : t) : t =
+      {b with id= CCRef.incr_then_get n; form= Some f; parent= Some b}
+    in
     aux
 
   (* check if some diseq is true *)
@@ -171,12 +184,15 @@ end = struct
 
   let[@inline] add_diseq_l_ t u b = {b with diseq= (t, u) :: b.diseq}
 
-  let[@inline] add_eq t u b : t = if is_closed b then b else b |> add_cc_eq t u |> check_closed
+  let[@inline] add_eq t u b : t =
+    if is_closed b then b else b |> add_cc_eq t u |> check_closed
 
   let[@inline] add_diseq t u b : t =
-    if is_closed b then b else b |> add_cc_ t |> add_cc_ u |> add_diseq_l_ t u |> check_closed
+    if is_closed b then b
+    else b |> add_cc_ t |> add_cc_ u |> add_diseq_l_ t u |> check_closed
 
-  let[@inline] add_to_expand f b = if is_closed b then b else {b with to_expand= T_set.add f b.to_expand}
+  let[@inline] add_to_expand f b =
+    if is_closed b then b else {b with to_expand= T_set.add f b.to_expand}
 
   let[@inline] add_form_to_expand f b = b |> add_to_expand f |> check_closed
 
@@ -224,9 +240,13 @@ end = struct
       | F.Imply (a, b) ->
           add_form_to_expand (F.and_ [a; F.not_ b]) br
       | F.Equiv (a, b) ->
-          add_form_to_expand (F.or_ [F.and_ [a; F.not_ b]; F.and_ [b; F.not_ a]]) br
+          add_form_to_expand
+            (F.or_ [F.and_ [a; F.not_ b]; F.and_ [b; F.not_ a]])
+            br
       | F.Xor (a, b) ->
-          add_form_to_expand (F.and_ [F.or_ [a; F.not_ b]; F.or_ [b; F.not_ a]]) br
+          add_form_to_expand
+            (F.and_ [F.or_ [a; F.not_ b]; F.or_ [b; F.not_ a]])
+            br
       | F.Exists {ty_var; body} ->
           let f = F.forall ~ty_var (F.not_ body) in
           br |> add_eq f F.true_
@@ -237,9 +257,13 @@ end = struct
     | F.Imply (a, b) ->
         add_form_to_expand (F.or_ [F.not_ a; b]) br
     | F.Xor (a, b) ->
-        add_form_to_expand (F.or_ [F.and_ [a; F.not_ b]; F.and_ [b; F.not_ a]]) br
+        add_form_to_expand
+          (F.or_ [F.and_ [a; F.not_ b]; F.and_ [b; F.not_ a]])
+          br
     | F.Equiv (a, b) ->
-        add_form_to_expand (F.and_ [F.or_ [a; F.not_ b]; F.or_ [b; F.not_ a]]) br
+        add_form_to_expand
+          (F.and_ [F.or_ [a; F.not_ b]; F.or_ [b; F.not_ a]])
+          br
     | F.Forall _ ->
         br |> add_eq f F.true_
     | F.Exists {ty_var; body} ->
@@ -274,13 +298,16 @@ end = struct
       | exception Not_found ->
           None
 
-  let rec unfold_parents b = match b.parent with None -> [b] | Some p -> b :: unfold_parents p
+  let rec unfold_parents b =
+    match b.parent with None -> [b] | Some p -> b :: unfold_parents p
 
   let debug out (b : t) : unit =
     (* print one branch *)
     let pp_b out b =
-      Fmt.fprintf out "(@[<hv>branch/%d :closed %B@ :form (%a)@ :to_expand (@[<hv>%a@])@])" b.id (is_closed b)
-        (Fmt.some T.pp) b.form (Util.pp_iter T.pp) (T_set.to_iter b.to_expand)
+      Fmt.fprintf out
+        "(@[<hv>branch/%d :closed %B@ :form (%a)@ :to_expand (@[<hv>%a@])@])"
+        b.id (is_closed b) (Fmt.some T.pp) b.form (Util.pp_iter T.pp)
+        (T_set.to_iter b.to_expand)
     in
     Fmt.fprintf out "(@[<v>%a@])" (Util.pp_list pp_b) (unfold_parents b)
 end
@@ -302,40 +329,53 @@ end = struct
 
   let all = [or_; and_]
 
-  let[@inline] apply (l : t list) (f : F.t) : F.t list list = CCList.flat_map (fun r -> r f) l
+  let[@inline] apply (l : t list) (f : F.t) : F.t list list =
+    CCList.flat_map (fun r -> r f) l
 end
 
 type branch = Branch.t
 
 (** main state *)
 type t =
-  {mutable open_branches: branch list; mutable closed_branches: branch list; mutable saturated: branch option}
+  { mutable open_branches: branch list
+  ; mutable closed_branches: branch list
+  ; mutable saturated: branch option }
 
 type final_state = t
 
 let debug_tab out (tab : t) : unit =
-  Fmt.fprintf out "(@[tab@ :branches (@[<v>%a@])@ :saturated (%a)@])" (Util.pp_list Branch.debug)
+  Fmt.fprintf out "(@[tab@ :branches (@[<v>%a@])@ :saturated (%a)@])"
+    (Util.pp_list Branch.debug)
     (List.rev_append tab.open_branches tab.closed_branches)
     (Fmt.some Branch.debug) tab.saturated
 
 (* solve tableau by expanding it piece by piece *)
 let solve_ (tab : t) : res =
-  while (not (CCList.is_empty tab.open_branches)) && CCOpt.is_none tab.saturated do
+  while
+    (not (CCList.is_empty tab.open_branches)) && CCOpt.is_none tab.saturated
+  do
     let b = List.hd tab.open_branches in
     tab.open_branches <- List.tl tab.open_branches ;
-    Util.debugf ~section 3 "(@[llproof.check.tab.solve@ %a@])" (fun k -> k debug_tab tab) ;
+    Util.debugf ~section 3 "(@[llproof.check.tab.solve@ %a@])" (fun k ->
+        k debug_tab tab ) ;
     match Branch.pop_to_expand b with
     | None ->
-        if Branch.is_closed b then tab.closed_branches <- b :: tab.closed_branches
-        else (* cannot close this branch, it has no form to expand *)
+        if Branch.is_closed b then
+          tab.closed_branches <- b :: tab.closed_branches
+        else
+          (* cannot close this branch, it has no form to expand *)
           tab.saturated <- Some b
     | Some (f, b_tail) ->
-        let new_branches = Rule.apply Rule.all f |> List.map (fun forms -> Branch.add b_tail forms) in
+        let new_branches =
+          Rule.apply Rule.all f
+          |> List.map (fun forms -> Branch.add b_tail forms)
+        in
         assert (not @@ CCList.is_empty new_branches) ;
         (* add new branches *)
         List.iter
           (fun b ->
-            if Branch.is_closed b then tab.closed_branches <- b :: tab.closed_branches
+            if Branch.is_closed b then
+              tab.closed_branches <- b :: tab.closed_branches
             else tab.open_branches <- b :: tab.open_branches )
           new_branches
   done ;
@@ -344,12 +384,17 @@ let solve_ (tab : t) : res =
   | Some b ->
       (* found a branch that is not refutable *)
       assert (not (Branch.is_closed @@ Branch.check_closed b)) ;
-      Util.debugf ~section 1 "(@[llprover.prove.failed@ :branch %a@])" (fun k -> k Branch.debug b) ;
+      Util.debugf ~section 1 "(@[llprover.prove.failed@ :branch %a@])" (fun k ->
+          k Branch.debug b ) ;
       R_fail
   | None ->
       assert (CCList.is_empty tab.open_branches) ;
-      Util.debugf ~section 5 "(@[llprover.prove.success@ :branches (@[<v>%a@])@ :saturated %a@])" (fun k ->
-          k (Util.pp_list Branch.debug) tab.closed_branches (Fmt.some Branch.debug) tab.saturated ) ;
+      Util.debugf ~section 5
+        "(@[llprover.prove.success@ :branches (@[<v>%a@])@ :saturated %a@])"
+        (fun k ->
+          k
+            (Util.pp_list Branch.debug)
+            tab.closed_branches (Fmt.some Branch.debug) tab.saturated ) ;
       R_ok
 
 let can_check : LLProof.tag list -> bool =
@@ -373,7 +418,8 @@ let can_check : LLProof.tag list -> bool =
   List.for_all f
 
 let prove (a : form list) (b : form) =
-  Util.debugf ~section 3 "(@[@{<yellow>llprover.prove@}@ :hyps (@[<hv>%a@])@ :concl %a@])" (fun k ->
+  Util.debugf ~section 3
+    "(@[@{<yellow>llprover.prove@}@ :hyps (@[<hv>%a@])@ :concl %a@])" (fun k ->
       k (Util.pp_list T.pp) a T.pp b ) ;
   Util.incr_stat stat_solve ;
   let _span = ZProf.enter_prof prof_check in
@@ -386,14 +432,21 @@ let prove (a : form list) (b : form) =
 let pp_stats out (s : final_state) =
   let n_open = List.length s.open_branches in
   let n_closed = List.length s.closed_branches in
-  Format.fprintf out "(@[llprover.stats@ :n_branches %d@ :n_closed %d@])" (n_closed + n_open) n_closed
+  Format.fprintf out "(@[llprover.stats@ :n_branches %d@ :n_closed %d@])"
+    (n_closed + n_open) n_closed
 
 let _to_str_escape fmt = Util.ksprintf_noc ~f:Util.escape_dot fmt
 
 let pp_dot out (s : final_state) : unit =
   let module ISet = Util.Int_set in
-  let as_graph = CCGraph.make (fun b -> Branch.parent b |> Iter.of_opt |> Iter.map (fun v -> ((), v))) in
-  let saturated_set = Iter.of_opt s.saturated |> Iter.fold (fun s b -> ISet.add (Branch.id b) s) ISet.empty in
+  let as_graph =
+    CCGraph.make (fun b ->
+        Branch.parent b |> Iter.of_opt |> Iter.map (fun v -> ((), v)) )
+  in
+  let saturated_set =
+    Iter.of_opt s.saturated
+    |> Iter.fold (fun s b -> ISet.add (Branch.id b) s) ISet.empty
+  in
   let br_eq b1 b2 = CCInt.equal (Branch.id b1) (Branch.id b2) in
   let br_hash b = Hash.int @@ Branch.id b in
   let tbl = CCGraph.mk_table ~eq:br_eq ~hash:br_hash 32 in
@@ -406,17 +459,21 @@ let pp_dot out (s : final_state) : unit =
     let pp_closed out b =
       match Branch.closed b with
       | Branch.C_not_closed ->
-          Fmt.fprintf out "<not closed> (%d to expand)" (Branch.to_expand b |> Iter.length)
+          Fmt.fprintf out "<not closed> (%d to expand)"
+            (Branch.to_expand b |> Iter.length)
       | Branch.C_closed_by_diseq (t, u) ->
           Fmt.fprintf out "<closed by `@[<1>%a ≠@ %a@]`>" T.pp t T.pp u
       | Branch.C_closed_by_theory s ->
           Fmt.fprintf out "<closed by theory %S>" s
     in
     let label =
-      _to_str_escape "@[<v>[%d] %a@ (@[%a@])@]" (Branch.id b) pp_closed b (Fmt.some T.pp) (Branch.form b)
+      _to_str_escape "@[<v>[%d] %a@ (@[%a@])@]" (Branch.id b) pp_closed b
+        (Fmt.some T.pp) (Branch.form b)
     in
     [`Label label; `Shape "box"; `Style "filled"] @ color
   in
-  let all_branches = Iter.append (Iter.of_list s.open_branches) (Iter.of_list s.closed_branches) in
+  let all_branches =
+    Iter.append (Iter.of_list s.open_branches) (Iter.of_list s.closed_branches)
+  in
   CCGraph.Dot.pp_all ~tbl ~eq:br_eq ~graph:as_graph ~attrs_v out all_branches ;
   () (* TODO *)

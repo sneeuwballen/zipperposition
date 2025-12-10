@@ -5,20 +5,23 @@ open CCResult.Infix
 
 type 'a or_error = ('a, string) CCResult.t
 
-let parse_tptp file : _ or_error = Util_tptp.parse_file ~recursive:true file >|= Iter.map Util_tptp.to_ast
+let parse_tptp file : _ or_error =
+  Util_tptp.parse_file ~recursive:true file >|= Iter.map Util_tptp.to_ast
 
 let parse_tip file = Util_tip.parse_file file >|= Util_tip.convert_seq
 
 let parse_dk file = Util_dk.parse_file file
 
 let guess_input (file : string) : Input_format.t =
-  if CCString.suffix ~suf:".p" file || CCString.suffix ~suf:".tptp" file then Input_format.tptp
+  if CCString.suffix ~suf:".p" file || CCString.suffix ~suf:".tptp" file then
+    Input_format.tptp
   else if CCString.suffix ~suf:".smt2" file then Input_format.tip
   else if CCString.suffix ~suf:".zf" file then Input_format.zf
   else if CCString.suffix ~suf:".skp" file then Input_format.dk
   else
     let res = Input_format.default in
-    Util.warnf "unable to guess syntax for `%s`, use default syntax (%a)" file Input_format.pp res ;
+    Util.warnf "unable to guess syntax for `%s`, use default syntax (%a)" file
+      Input_format.pp res ;
     res
 
 (** Parse file using the input format chosen by the user *)

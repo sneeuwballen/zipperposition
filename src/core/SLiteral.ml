@@ -45,9 +45,22 @@ let fold f acc = function
   | Eq (a, b) | Neq (a, b) ->
       f (f acc a) b
 
-let iter ~f = function True | False -> () | Atom (t, _) -> f t | Eq (a, b) | Neq (a, b) -> f a ; f b
+let iter ~f = function
+  | True | False ->
+      ()
+  | Atom (t, _) ->
+      f t
+  | Eq (a, b) | Neq (a, b) ->
+      f a ; f b
 
-let to_iter l f = match l with True | False -> () | Atom (t, _) -> f t | Eq (a, b) | Neq (a, b) -> f a ; f b
+let to_iter l f =
+  match l with
+  | True | False ->
+      ()
+  | Atom (t, _) ->
+      f t
+  | Eq (a, b) | Neq (a, b) ->
+      f a ; f b
 
 let equal eq a b =
   match (a, b) with
@@ -78,7 +91,13 @@ let is_true = function True -> true | _ -> false
 
 let is_false = function False -> true | _ -> false
 
-let sign = function True | Eq _ -> true | Atom (_, b) -> b | Neq _ | False -> false
+let sign = function
+  | True | Eq _ ->
+      true
+  | Atom (_, b) ->
+      b
+  | Neq _ | False ->
+      false
 
 let is_pos l = sign l
 
@@ -126,7 +145,8 @@ let of_form f =
       True
   | F.False ->
       False
-  | F.Or _ | F.And _ | F.Equiv _ | F.Xor _ | F.Imply _ | F.Forall _ | F.Exists _ ->
+  | F.Or _ | F.And _ | F.Equiv _ | F.Xor _ | F.Imply _ | F.Forall _ | F.Exists _
+    ->
       not_lit f
 
 let pp ppt out = function

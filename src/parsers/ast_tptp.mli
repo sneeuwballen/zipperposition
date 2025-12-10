@@ -54,10 +54,13 @@ type 'a t =
   | FOF of name * role * 'a * optional_info
   | TFF of name * role * 'a * optional_info
   | THF of name * role * 'a * optional_info (* XXX not parsed yet *)
-  | TypeDecl of name * string * 'a * optional_info (* type declaration for a symbol *)
-  | NewType of name * string * 'a * optional_info (* declare new type constant... *)
+  | TypeDecl of
+      name * string * 'a * optional_info (* type declaration for a symbol *)
+  | NewType of
+      name * string * 'a * optional_info (* declare new type constant... *)
   | Include of string
-  | IncludeOnly of string * name list (* include a subset of names *)  (** top level declaration *)
+  | IncludeOnly of string * name list (* include a subset of names *)
+      (** top level declaration *)
 
 type 'a declaration = 'a t
 

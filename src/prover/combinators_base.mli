@@ -2,11 +2,14 @@ open Logtk
 
 exception IsNotCombinator
 
-val mk_s : args:Term.t list -> alpha:Term.t -> beta:Term.t -> gamma:Term.t -> Term.t
+val mk_s :
+  args:Term.t list -> alpha:Term.t -> beta:Term.t -> gamma:Term.t -> Term.t
 
-val mk_b : args:Term.t list -> alpha:Term.t -> beta:Term.t -> gamma:Term.t -> Term.t
+val mk_b :
+  args:Term.t list -> alpha:Term.t -> beta:Term.t -> gamma:Term.t -> Term.t
 
-val mk_c : args:Term.t list -> alpha:Term.t -> beta:Term.t -> gamma:Term.t -> Term.t
+val mk_c :
+  args:Term.t list -> alpha:Term.t -> beta:Term.t -> gamma:Term.t -> Term.t
 
 val mk_k : args:Term.t list -> alpha:Term.t -> beta:Term.t -> Term.t
 
@@ -24,6 +27,7 @@ val comb2lam : Term.t -> Term.t
 
 val comb_normalize : Term.t -> Term.t CCOpt.t
 
-val cmp_by_max_weak_r_len : Term.t -> Term.t -> Logtk.Comparison.t * Term.t * Term.t
+val cmp_by_max_weak_r_len :
+  Term.t -> Term.t -> Logtk.Comparison.t * Term.t * Term.t
 
 val narrow : Term.t -> Term.t

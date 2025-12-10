@@ -36,6 +36,7 @@ val k_sort_constraints : bool Flex_state.key
 
 val k_try_lfho : bool Flex_state.key
 
-val k_oracle_composer : (Subst.t option OSeq.t OSeq.t -> Subst.t option OSeq.t) Flex_state.key
+val k_oracle_composer :
+  (Subst.t option OSeq.t OSeq.t -> Subst.t option OSeq.t) Flex_state.key
 
 val k_skip_multiplier : float Flex_state.key

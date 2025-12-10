@@ -50,9 +50,11 @@ let not_cnf_ f = raise (NotCNF f)
 
 type clause = lit list
 
-let pp_clause out = Format.fprintf out "@[<2>%a@]" (Util.pp_list ~sep:" ∨ " (SLiteral.pp T.pp))
+let pp_clause out =
+  Format.fprintf out "@[<2>%a@]" (Util.pp_list ~sep:" ∨ " (SLiteral.pp T.pp))
 
-let clause_to_fo ?(ctx = Term.Conv.create ()) c = List.map (SLiteral.map ~f:(Term.Conv.of_simple_term_exn ctx)) c
+let clause_to_fo ?(ctx = Term.Conv.create ()) c =
+  List.map (SLiteral.map ~f:(Term.Conv.of_simple_term_exn ctx)) c
 
 let as_lit = SLiteral.of_form
 
@@ -131,24 +133,32 @@ module Flatten = struct
 
   let ( >>= ) : type a b. a t -> (a -> b t) -> b t =
    fun seq f subst yield ->
-    seq subst (fun (subst, x) -> f x subst (fun (subst', y) -> yield (T.Subst.merge subst subst', y)))
+    seq subst (fun (subst, x) ->
+        f x subst (fun (subst', y) -> yield (T.Subst.merge subst subst', y)) )
 
   let ( >|= ) : type a b. a t -> (a -> b) -> b t =
    fun seq f subst yield -> seq subst (fun (subst, x) -> yield (subst, f x))
 
-  let ( <*> ) : ('a -> 'b) t -> 'a t -> 'b t = fun f x -> f >>= fun f -> x >|= fun x -> f x
+  let ( <*> ) : ('a -> 'b) t -> 'a t -> 'b t =
+   fun f x -> f >>= fun f -> x >|= fun x -> f x
 
   let ( <$> ) f x = x >|= f ?loc:None
 
-  let add_subst : T.Subst.t -> unit t = fun sigma subst -> Iter.return (T.Subst.merge subst sigma, ())
+  let add_subst : T.Subst.t -> unit t =
+   fun sigma subst -> Iter.return (T.Subst.merge subst sigma, ())
 
   let get_subst : T.Subst.t t = fun subst -> Iter.return (subst, subst)
 
   (* non deterministic choice *)
-  let ( <+> ) : type a. a t -> a t -> a t = fun x y subst -> Iter.append (x subst) (y subst)
+  let ( <+> ) : type a. a t -> a t -> a t =
+   fun x y subst -> Iter.append (x subst) (y subst)
 
   let rec map_m f l =
-    match l with [] -> return [] | x :: tail -> f x >>= fun x -> map_m f tail >|= fun tail -> x :: tail
+    match l with
+    | [] ->
+        return []
+    | x :: tail ->
+        f x >>= fun x -> map_m f tail >|= fun tail -> x :: tail
 
   let map_sliteral : ('a -> 'b t) -> 'a SLiteral.t -> 'b SLiteral.t t =
    fun f lit ->
@@ -165,18 +175,30 @@ module Flatten = struct
         return SLiteral.neq <*> f a <*> f b
 
   let rec fold_m f acc l =
-    match l with [] -> return acc | [x] -> f acc x | x :: tail -> f acc x >>= fun acc -> fold_m f acc tail
+    match l with
+    | [] ->
+        return acc
+    | [x] ->
+        f acc x
+    | x :: tail ->
+        f acc x >>= fun acc -> fold_m f acc tail
 
-  let choice_l : 'a t list -> 'a t = fun l subst -> Iter.flat_map (fun x -> x subst) (Iter.of_list l)
+  let choice_l : 'a t list -> 'a t =
+   fun l subst -> Iter.flat_map (fun x -> x subst) (Iter.of_list l)
 
-  let of_list : 'a list -> 'a t = fun l subst -> Iter.of_list l |> Iter.map (fun x -> (subst, x))
+  let of_list : 'a list -> 'a t =
+   fun l subst -> Iter.of_list l |> Iter.map (fun x -> (subst, x))
 
-  let to_list : 'a t -> (T.Subst.t * 'a) list = fun seq -> seq T.Subst.empty |> Iter.to_rev_list
+  let to_list : 'a t -> (T.Subst.t * 'a) list =
+   fun seq -> seq T.Subst.empty |> Iter.to_rev_list
 
-  let to_list' : 'a t -> 'a list = fun seq -> seq T.Subst.empty |> Iter.map snd |> Iter.to_rev_list
+  let to_list' : 'a t -> 'a list =
+   fun seq -> seq T.Subst.empty |> Iter.map snd |> Iter.to_rev_list
 
   let apply_subst_vars_ subst vars =
-    List.map (fun v -> try Var.Subst.find_exn subst v with Not_found -> T.var v) vars
+    List.map
+      (fun v -> try Var.Subst.find_exn subst v with Not_found -> T.var v)
+      vars
 
   type position =
     | Pos_toplevel
@@ -185,10 +207,13 @@ module Flatten = struct
 
   (* put type variables first *)
   let ty_vars_first (l : _ Var.t list) : _ Var.t list =
-    let ty_vars, other_vars = List.partition (fun v -> T.Ty.is_tType (Var.ty v)) l in
+    let ty_vars, other_vars =
+      List.partition (fun v -> T.Ty.is_tType (Var.ty v)) l
+    in
     ty_vars @ other_vars
 
-  let pp_rules = Fmt.(Util.pp_list Dump.(pair (list T.pp_inner |> hovbox) T.pp) |> hovbox)
+  let pp_rules =
+    Fmt.(Util.pp_list Dump.(pair (list T.pp_inner |> hovbox) T.pp) |> hovbox)
 
   (* [t=u], but one of them is a lambda/function type. Add/create new variables
      [vars] and turn this into [t vars = u vars], modulo beta.
@@ -201,7 +226,8 @@ module Flatten = struct
     let vars_u, u = T.unfold_fun u in
     (* variable names, for re-use *)
     let names =
-      if List.length vars_t > List.length vars_u then List.map Var.name vars_t else List.map Var.name vars_u
+      if List.length vars_t > List.length vars_u then List.map Var.name vars_t
+      else List.map Var.name vars_u
     in
     (* make variables for full application *)
     let vars =
@@ -214,7 +240,8 @@ module Flatten = struct
     let mk_args_subst vars' =
       let n = List.length vars' in
       ( List.map T.var (CCList.drop n vars)
-      , Var.Subst.of_list (List.combine vars' (CCList.take n vars |> List.map T.var)) )
+      , Var.Subst.of_list
+          (List.combine vars' (CCList.take n vars |> List.map T.var)) )
     in
     let args_t, subst_t = mk_args_subst vars_t in
     let args_u, subst_u = mk_args_subst vars_u in
@@ -230,10 +257,16 @@ module Flatten = struct
      @param vars the variables that can be replaced in the context
      @param of_ the ID being defined, if any
   *)
-  let flatten_rec ?of_ ~lazy_cnf ~should_define (ctx : Skolem.ctx) stmt (pos : position)
-      (vars : type_ Var.t list) (t : term) : T.t t =
+  let flatten_rec ?of_ ~lazy_cnf ~should_define (ctx : Skolem.ctx) stmt
+      (pos : position) (vars : type_ Var.t list) (t : term) : T.t t =
     (* how to name intermediate subterms? *)
-    let mk_pat what = match of_ with None -> what ^ "_" | Some id -> Fmt.sprintf "%s_%s_" (ID.name id) what in
+    let mk_pat what =
+      match of_ with
+      | None ->
+          what ^ "_"
+      | Some id ->
+          Fmt.sprintf "%s_%s_" (ID.name id) what
+    in
     let rec aux pos vars t =
       match T.view t with
       | T.AppBuiltin (Builtin.True, []) ->
@@ -242,36 +275,56 @@ module Flatten = struct
           return F.false_
       | T.AppBuiltin (Builtin.Distinct, l) ->
           (* expand [distinct(ts)] into [And_{i<j} t_i != t_j] *)
-          let l = CCList.diagonal l |> List.rev_map (fun (t, u) -> T.Form.neq_or_xor t u) in
-          let f = if CCList.length l == 1 then List.hd l else T.Form.and_ ?loc:(T.loc t) l in
-          Util.debugf ~section 5 "(@[flatten.expand-distinct@ %a@ :into %a@])" (fun k -> k T.pp t T.pp f) ;
+          let l =
+            CCList.diagonal l
+            |> List.rev_map (fun (t, u) -> T.Form.neq_or_xor t u)
+          in
+          let f =
+            if CCList.length l == 1 then List.hd l
+            else T.Form.and_ ?loc:(T.loc t) l
+          in
+          Util.debugf ~section 5 "(@[flatten.expand-distinct@ %a@ :into %a@])"
+            (fun k -> k T.pp t T.pp f ) ;
           aux pos vars f
       | T.Var v -> (
           (* look [v] up in subst *)
           get_subst
-          >>= fun subst -> match T.Subst.find subst v with None -> return t | Some t' -> aux pos vars t' )
+          >>= fun subst ->
+          match T.Subst.find subst v with
+          | None ->
+              return t
+          | Some t' ->
+              aux pos vars t' )
       | T.Const _ ->
           return t
       | T.App (f, l) ->
-          T.app ~ty:(T.ty_exn t) <$> aux Pos_inner vars f <*> map_m (aux Pos_inner vars) l
+          T.app ~ty:(T.ty_exn t)
+          <$> aux Pos_inner vars f
+          <*> map_m (aux Pos_inner vars) l
       | T.Ite (a, b, c) -> (
         match T.view a with
         | T.Var x when List.exists (Var.equal x) vars ->
             (* substitute [x] with [true] and [false] in either branch *)
             add_subst (Var.Subst.singleton x F.true_)
             >>= (fun () -> aux pos vars b)
-            <+> (add_subst (Var.Subst.singleton x F.false_) >>= fun () -> aux pos vars c)
+            <+> ( add_subst (Var.Subst.singleton x F.false_)
+                >>= fun () -> aux pos vars c )
         | _ ->
             (* give a name to [if a b c] *)
             let closure = T.free_vars_l [b; c] |> ty_vars_first in
             let cases_true =
               aux pos vars b
               >>= fun b ->
-              get_subst >|= fun subst -> (apply_subst_vars_ subst closure @ [F.true_], T.Subst.eval subst b)
+              get_subst
+              >|= fun subst ->
+              (apply_subst_vars_ subst closure @ [F.true_], T.Subst.eval subst b)
             and cases_false =
               aux pos vars c
               >>= fun c ->
-              get_subst >|= fun subst -> (apply_subst_vars_ subst closure @ [F.false_], T.Subst.eval subst c)
+              get_subst
+              >|= fun subst ->
+              ( apply_subst_vars_ subst closure @ [F.false_]
+              , T.Subst.eval subst c )
             in
             let rules = to_list' (cases_true <+> cases_false) in
             let def =
@@ -280,8 +333,9 @@ module Flatten = struct
             in
             aux Pos_toplevel vars a
             >|= fun a ->
-            T.app ~ty:(T.ty_exn b) (T.const def.Skolem.td_id ~ty:def.Skolem.td_ty) (List.map T.var closure @ [a])
-        )
+            T.app ~ty:(T.ty_exn b)
+              (T.const def.Skolem.td_id ~ty:def.Skolem.td_ty)
+              (List.map T.var closure @ [a]) )
       | T.Let (l, u) ->
           (* add let-bound terms to substitution without processing them.
              They will be processed differently at every place the
@@ -303,7 +357,8 @@ module Flatten = struct
             (* the term [c vars] *)
             let case =
               let ty = T.ty_exn u in
-              T.app ~ty (T.const_of_cstor c) (c.T.cstor_args @ List.map T.var c_vars)
+              T.app ~ty (T.const_of_cstor c)
+                (c.T.cstor_args @ List.map T.var c_vars)
             in
             (* bind [x = c vars] *)
             let subst = T.Subst.add T.Subst.empty x case in
@@ -336,7 +391,8 @@ module Flatten = struct
               (apply_subst_vars_ subst closure @ [case], T.Subst.eval subst rhs)
             in
             let rules = to_list' cases in
-            Util.debugf ~section 5 "(@[define_match@ :term %a@ :rules %a@])" (fun k -> k T.pp t pp_rules rules) ;
+            Util.debugf ~section 5 "(@[define_match@ :term %a@ :rules %a@])"
+              (fun k -> k T.pp t pp_rules rules ) ;
             let def =
               Skolem.define_term ~ctx rules ~pattern:(mk_pat "match")
                 ~parents:[Stmt.as_proof_i stmt |> Proof.Parent.from]
@@ -344,13 +400,17 @@ module Flatten = struct
             (* now apply definition to [u] *)
             aux Pos_inner vars u
             >|= fun u ->
-            T.app ~ty:(T.ty_exn t) (T.const def.Skolem.td_id ~ty:def.Skolem.td_ty) (List.map T.var closure @ [u])
-        )
-      | T.AppBuiltin (Builtin.Greater, [ty; a; b]) when T.equal T.Ty.rat (T.ty_exn a) ->
+            T.app ~ty:(T.ty_exn t)
+              (T.const def.Skolem.td_id ~ty:def.Skolem.td_ty)
+              (List.map T.var closure @ [u]) )
+      | T.AppBuiltin (Builtin.Greater, [ty; a; b])
+        when T.equal T.Ty.rat (T.ty_exn a) ->
           aux pos vars (T.app_builtin ~ty:T.Ty.prop Builtin.Less [ty; b; a])
-      | T.AppBuiltin (Builtin.Greatereq, [ty; a; b]) when T.equal T.Ty.rat (T.ty_exn a) ->
+      | T.AppBuiltin (Builtin.Greatereq, [ty; a; b])
+        when T.equal T.Ty.rat (T.ty_exn a) ->
           aux pos vars (T.app_builtin ~ty:T.Ty.prop Builtin.Lesseq [ty; b; a])
-      | T.AppBuiltin (Builtin.Neq, [_; a; b]) when T.equal T.Ty.rat (T.ty_exn a) ->
+      | T.AppBuiltin (Builtin.Neq, [_; a; b]) when T.equal T.Ty.rat (T.ty_exn a)
+        ->
           (* rat: a!=b -> a<b ∨ a>b *)
           aux Pos_toplevel vars a
           >>= fun a ->
@@ -358,10 +418,12 @@ module Flatten = struct
           >|= fun b ->
           let f =
             T.Form.or_
-              [T.app_builtin ~ty:T.Ty.prop Builtin.Less [a; b]; T.app_builtin ~ty:T.Ty.prop Builtin.Less [b; a]]
+              [ T.app_builtin ~ty:T.Ty.prop Builtin.Less [a; b]
+              ; T.app_builtin ~ty:T.Ty.prop Builtin.Less [b; a] ]
           in
           aux_maybe_define ~should_define pos f
-      | T.AppBuiltin (Builtin.Eq, [_; a; b]) when (not lazy_cnf) && T.Ty.is_prop (T.ty_exn a) ->
+      | T.AppBuiltin (Builtin.Eq, [_; a; b])
+        when (not lazy_cnf) && T.Ty.is_prop (T.ty_exn a) ->
           (* converting equality to equivalence to ensure better CNF (that is better renaming)
              when lazy cnf is off *)
           F.equiv <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b
@@ -374,19 +436,23 @@ module Flatten = struct
           (* turn [f = λx. t] into [∀x. f x=t] *)
           let vars_forall, a, b = complete_eq a b in
           let t' = F.forall_l vars_forall (F.eq_or_equiv a b) in
-          Util.debugf ~section 5 "(@[<2>rewrite-eq@ `%a`@ :into `%a`@])" (fun k -> k T.pp t T.pp t') ;
+          Util.debugf ~section 5 "(@[<2>rewrite-eq@ `%a`@ :into `%a`@])"
+            (fun k -> k T.pp t T.pp t' ) ;
           assert (vars_forall <> []) ;
           aux pos vars t'
-      | T.AppBuiltin (Builtin.Neq, [_; a; b]) when (not lazy_cnf) && T.Ty.is_prop (T.ty_exn a) ->
+      | T.AppBuiltin (Builtin.Neq, [_; a; b])
+        when (not lazy_cnf) && T.Ty.is_prop (T.ty_exn a) ->
           F.xor <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b
       | T.AppBuiltin (Builtin.Eq, [_; a; b]) ->
           F.eq <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b
       (* >|= aux_maybe_define ~should_define pos *)
-      | T.AppBuiltin (Builtin.Neq, [_; a; b]) when (T.is_fun a || T.is_fun b) && not lazy_cnf ->
+      | T.AppBuiltin (Builtin.Neq, [_; a; b])
+        when (T.is_fun a || T.is_fun b) && not lazy_cnf ->
           (* turn [f ≠ λx. t] into [∃x. f x≠t] *)
           let vars_exist, a, b = complete_eq a b in
           let t' = F.exists_l vars_exist (F.neq_or_xor a b) in
-          Util.debugf ~section 5 "(@[<2>rewrite-eq@ `%a`@ :into `%a`@])" (fun k -> k T.pp t T.pp t') ;
+          Util.debugf ~section 5 "(@[<2>rewrite-eq@ `%a`@ :into `%a`@])"
+            (fun k -> k T.pp t T.pp t' ) ;
           assert (vars_exist <> []) ;
           aux pos vars t'
       | T.AppBuiltin (Builtin.Neq, [_; a; b]) ->
@@ -403,18 +469,25 @@ module Flatten = struct
       (* >|= aux_maybe_define pos *)
       | T.AppBuiltin (Builtin.And, l) ->
           if CCList.length l <= 1 then return t
-          else F.and_ <$> map_m (aux Pos_toplevel vars) l (*>|= aux_maybe_define pos*)
+          else
+            F.and_
+            <$> map_m (aux Pos_toplevel vars) l (*>|= aux_maybe_define pos*)
       | T.AppBuiltin (Builtin.Or, l) ->
           if CCList.length l <= 1 then return t
-          else F.or_ <$> map_m (aux Pos_toplevel vars) l (*>|= aux_maybe_define pos*)
+          else
+            F.or_
+            <$> map_m (aux Pos_toplevel vars) l (*>|= aux_maybe_define pos*)
       | T.AppBuiltin (Builtin.Not, [a]) ->
           F.not_ <$> aux Pos_toplevel vars a (*>|= aux_maybe_define pos*)
       | T.AppBuiltin (b, l) ->
-          return (T.app_builtin ~ty:(T.ty_exn t) b) <*> map_m (aux Pos_inner vars) l
+          return (T.app_builtin ~ty:(T.ty_exn t) b)
+          <*> map_m (aux Pos_inner vars) l
       | T.Bind (Binder.Forall, var, body) ->
-          aux Pos_toplevel vars body >|= F.forall var (*>|= aux_maybe_define pos*)
+          aux Pos_toplevel vars body
+          >|= F.forall var (*>|= aux_maybe_define pos*)
       | T.Bind (Binder.Exists, var, body) ->
-          aux Pos_toplevel vars body >|= F.exists var (*>|= aux_maybe_define pos*)
+          aux Pos_toplevel vars body
+          >|= F.exists var (*>|= aux_maybe_define pos*)
       | T.Bind (Binder.Lambda, _, _) ->
           (* lambda-lifting *)
           let fun_vars, body = T.unfold_fun t in
@@ -439,8 +512,8 @@ module Flatten = struct
             in
             def.Skolem.proxy
     in
-    Util.debugf ~section 5 "@[<2>flatten_rec@ `@[%a@]`@ vars: (@[%a@])@]" (fun k ->
-        k T.pp t (Util.pp_list Var.pp_fullc) vars ) ;
+    Util.debugf ~section 5 "@[<2>flatten_rec@ `@[%a@]`@ vars: (@[%a@])@]"
+      (fun k -> k T.pp t (Util.pp_list Var.pp_fullc) vars ) ;
     aux pos vars t
 
   let flatten_rec_l ?of_ ~lazy_cnf ~should_define ctx stmt pos vars l =
@@ -478,7 +551,8 @@ let miniscope ?(distribute_exists = false) f =
           (* see whether we push the existential into the formulas [with_v], in
               which the variable occurs, or whether we keep it outside *)
           let with_v =
-            if distribute_exists then List.map (F.exists var) with_v else [F.exists var (F.or_ with_v)]
+            if distribute_exists then List.map (F.exists var) with_v
+            else [F.exists var (F.or_ with_v)]
           in
           F.or_ (with_v @ without_v)
       | _ ->
@@ -510,9 +584,13 @@ let rec nnf f =
   | F.True | F.False ->
       f
   | F.Neq (a, b) ->
-      if T.equal a b then F.false_ else if T.Ty.is_prop (T.ty_exn a) then nnf (T.Form.xor a b) else f
+      if T.equal a b then F.false_
+      else if T.Ty.is_prop (T.ty_exn a) then nnf (T.Form.xor a b)
+      else f
   | F.Eq (a, b) ->
-      if T.equal a b then F.true_ else if T.Ty.is_prop (T.ty_exn a) then nnf (T.Form.equiv a b) else f
+      if T.equal a b then F.true_
+      else if T.Ty.is_prop (T.ty_exn a) then nnf (T.Form.equiv a b)
+      else f
   | F.Not f' -> (
     match F.view f' with
     | F.Not f'' ->
@@ -562,7 +640,8 @@ let rec nnf f =
       else nnf (F.and_ [F.imply f1 f2; F.imply f2 f1])
   | F.Xor (f1, f2) ->
       (* equivalence with negative polarity *)
-      if T.equal f1 f2 then F.false_ else nnf (F.and_ [F.or_ [f1; f2]; F.or_ [F.not_ f1; F.not_ f2]])
+      if T.equal f1 f2 then F.false_
+      else nnf (F.and_ [F.or_ [f1; f2]; F.or_ [F.not_ f1; F.not_ f2]])
   | F.Forall (var, f') ->
       F.forall var (nnf f')
   | F.Exists (var, f') ->
@@ -587,14 +666,14 @@ let skolemize ~ctx f =
     | F.Exists (var, f') ->
         (* replace [v] by a fresh skolem term *)
         let t = Skolem.skolem_form ~ctx subst var f in
-        Util.debugf 10 ~section "@[<2>bind `%a` to@ `@[%a@]`@ :subst {%a}@]" (fun k ->
-            k Var.pp_fullc var T.pp t T.Subst.pp subst ) ;
+        Util.debugf 10 ~section "@[<2>bind `%a` to@ `@[%a@]`@ :subst {%a}@]"
+          (fun k -> k Var.pp_fullc var T.pp t T.Subst.pp subst ) ;
         let subst = Var.Subst.add subst var t in
         skolemize subst f'
     | F.Forall (var, f') ->
         let var' = Var.copy var in
-        Util.debugf 10 ~section "@[<2>rename `%a` to@ `%a`@ :subst {%a}@]" (fun k ->
-            k Var.pp_fullc var Var.pp_fullc var' T.Subst.pp subst ) ;
+        Util.debugf 10 ~section "@[<2>rename `%a` to@ `%a`@ :subst {%a}@]"
+          (fun k -> k Var.pp_fullc var Var.pp_fullc var' T.Subst.pp subst ) ;
         let subst = Var.Subst.add subst var (T.var var') in
         skolemize subst f'
   in
@@ -621,7 +700,9 @@ module Estimation = struct
         TooBig
     | Exactly a, Exactly b ->
         let c = op a b in
-        if (a > 0 && b > 0 && (c < a || c < b)) (* overflow *) || c > limit then TooBig else Exactly c
+        if (a > 0 && b > 0 && (c < a || c < b)) (* overflow *) || c > limit then
+          TooBig
+        else Exactly c
 
   let ( +/ ) = lift2 ( + )
 
@@ -629,9 +710,19 @@ module Estimation = struct
 
   (* comparison, but also assume that if both are too big, the first is bigger *)
   let geq_or_big e1 e2 =
-    match (e1, e2) with TooBig, _ -> true | Exactly e', Exactly e'' -> e' >= e'' | Exactly _, TooBig -> false
+    match (e1, e2) with
+    | TooBig, _ ->
+        true
+    | Exactly e', Exactly e'' ->
+        e' >= e''
+    | Exactly _, TooBig ->
+        false
 
-  let pp out = function TooBig -> Fmt.string out "<too big>" | Exactly n -> Fmt.int out n
+  let pp out = function
+    | TooBig ->
+        Fmt.string out "<too big>"
+    | Exactly n ->
+        Fmt.int out n
 end
 
 (* estimate the number of clauses needed by this formula. *)
@@ -669,8 +760,19 @@ let estimate_num_clauses ~pos f =
         E.((num false a */ num true b) +/ (num true a */ num false b))
     | F.Forall (_, f'), _ | F.Exists (_, f'), _ ->
         num pos f'
-  and sum_list pos l = match l with [] -> E.Exactly 0 | x :: tail -> E.(num pos x +/ sum_list pos tail)
-  and prod_list pos l = match l with [] -> E.Exactly 1 | x :: tail -> E.(num pos x */ prod_list pos tail) in
+  and sum_list pos l =
+    match l with
+    | [] ->
+        E.Exactly 0
+    | x :: tail ->
+        E.(num pos x +/ sum_list pos tail)
+  and prod_list pos l =
+    match l with
+    | [] ->
+        E.Exactly 1
+    | x :: tail ->
+        E.(num pos x */ prod_list pos tail)
+  in
   let n = num pos f in
   ZProf.exit_prof _span ; n
 
@@ -704,11 +806,14 @@ let introduce_defs ~ctx ~is_pos stmt f =
   (* rename formula *)
   and rename_form ~polarity f =
     let def =
-      Skolem.define_form ~ctx ~rw_rules:false ~polarity ~parents:[Stmt.as_proof_i stmt |> Proof.Parent.from] f
+      Skolem.define_form ~ctx ~rw_rules:false ~polarity
+        ~parents:[Stmt.as_proof_i stmt |> Proof.Parent.from]
+        f
     in
     let p = def.Skolem.proxy in
-    Util.debugf ~section 2 "@[<2>introduce@ def. @[%a@]@ for subformula `@[%a@]`@ with pol %a@]" (fun k ->
-        k T.pp p T.pp f Skolem.pp_polarity polarity ) ;
+    Util.debugf ~section 2
+      "@[<2>introduce@ def. @[%a@]@ for subformula `@[%a@]`@ with pol %a@]"
+      (fun k -> k T.pp p T.pp f Skolem.pp_polarity polarity ) ;
     p
   in
   (* recurse in sub-formulas, renaming as needed.
@@ -730,13 +835,15 @@ let introduce_defs ~ctx ~is_pos stmt f =
       | `Neg ->
           E.(b */ p false f, b +/ p false f)
       | `Both ->
-          E.((a */ p true f) +/ (b */ p false f), a +/ b +/ p true f +/ p false f)
+          E.
+            ( (a */ p true f) +/ (b */ p false f)
+            , a +/ b +/ p true f +/ p false f )
     in
     let should_rename = E.geq_or_big c1 c2 in
     if (not (will_yield_lit f)) && should_rename then (
       let f' = rename_form ~polarity f in
-      Util.debugf ~section 2 "rename because pol=%a, a=%a, b=%a, c1=%a, c2=%a" (fun k ->
-          k Skolem.pp_polarity polarity E.pp a E.pp b E.pp c1 E.pp c2 ) ;
+      Util.debugf ~section 2 "rename because pol=%a, a=%a, b=%a, c1=%a, c2=%a"
+        (fun k -> k Skolem.pp_polarity polarity E.pp a E.pp b E.pp c1 E.pp c2 ) ;
       f' )
     else f
   (* introduce definitions for subterms *)
@@ -854,9 +961,14 @@ let rec to_cnf_rec f =
   | F.Or l ->
       Util.map_product ~f:to_cnf_rec l
   | F.Forall _ | F.Exists _ ->
-      errorf_ "@[<2>Cnf.to_cnf_rec:@ can only clausify a skolemized formula,@ not @[%a@]@]" T.pp f
+      errorf_
+        "@[<2>Cnf.to_cnf_rec:@ can only clausify a skolemized formula,@ not \
+         @[%a@]@]"
+        T.pp f
   | F.Xor _ | F.Imply _ | F.Equiv _ ->
-      errorf_ "@[<2>Cnf.to_cnf_rec:@ can only clausify a NNF formula,@ not @[%a@]@]" T.pp f
+      errorf_
+        "@[<2>Cnf.to_cnf_rec:@ can only clausify a NNF formula,@ not @[%a@]@]"
+        T.pp f
 
 let to_cnf f =
   let res = ZProf.with_prof prof_to_cnf to_cnf_rec f in
@@ -867,11 +979,14 @@ type options =
   | DistributeExists
   | DisableRenaming
   | InitialProcessing of (form -> form)  (** any processing, at the beginning *)
-  | PostNNF of (form -> form)  (** any processing that keeps negation at leaves *)
-  | PostSkolem of (form -> form)  (** must not introduce variables nor negations *)
+  | PostNNF of (form -> form)
+      (** any processing that keeps negation at leaves *)
+  | PostSkolem of (form -> form)
+      (** must not introduce variables nor negations *)
 
 (* return new sources, without modifying anything *)
-let new_src ~ctx : Stmt.input_t list = Skolem.new_definitions ~ctx |> CCList.flat_map Skolem.def_as_stmt
+let new_src ~ctx : Stmt.input_t list =
+  Skolem.new_definitions ~ctx |> CCList.flat_map Skolem.def_as_stmt
 
 let rule_flatten = Proof.Rule.mk "cnf.flatten"
 
@@ -907,11 +1022,14 @@ let flatten ~ctx ~lazy_cnf ~should_define seq : _ Iter.t =
   let flatten_def stmt d : _ Stmt.def_rule list =
     match d with
     | Stmt.Def_term {vars; id; ty; args; rhs; as_form} ->
-        flatten_rec_l ~of_:id ~should_define ~lazy_cnf ctx stmt Pos_inner vars args
+        flatten_rec_l ~of_:id ~should_define ~lazy_cnf ctx stmt Pos_inner vars
+          args
         >>= (fun args ->
-              flatten_rec_l ~of_:id ~should_define ~lazy_cnf ctx stmt Pos_toplevel vars args
+              flatten_rec_l ~of_:id ~should_define ~lazy_cnf ctx stmt
+                Pos_toplevel vars args
               >>= fun args ->
-              flatten_rec ~of_:id ~lazy_cnf ~should_define ctx stmt Pos_toplevel vars rhs
+              flatten_rec ~of_:id ~lazy_cnf ~should_define ctx stmt Pos_toplevel
+                vars rhs
               >>= fun rhs ->
               get_subst
               >|= fun subst ->
@@ -919,12 +1037,18 @@ let flatten ~ctx ~lazy_cnf ~should_define seq : _ Iter.t =
               let rhs = T.Subst.eval subst rhs in
               (args, rhs) )
         |> to_list'
-        |> List.map (fun (args, rhs) -> Stmt.Def_term {vars; id; ty; args; rhs; as_form})
+        |> List.map (fun (args, rhs) ->
+               Stmt.Def_term {vars; id; ty; args; rhs; as_form} )
     | Stmt.Def_form {vars; lhs; rhs; polarity; as_form} ->
-        (let of_ = match lhs with SLiteral.Atom (t, _) -> T.head t | _ -> None in
-         map_sliteral (flatten_rec ~should_define ~lazy_cnf ?of_ ctx stmt Pos_inner vars) lhs
+        (let of_ =
+           match lhs with SLiteral.Atom (t, _) -> T.head t | _ -> None
+         in
+         map_sliteral
+           (flatten_rec ~should_define ~lazy_cnf ?of_ ctx stmt Pos_inner vars)
+           lhs
          >>= fun lhs ->
-         flatten_rec_l ?of_ ~should_define ~lazy_cnf ctx stmt Pos_toplevel vars rhs
+         flatten_rec_l ?of_ ~should_define ~lazy_cnf ctx stmt Pos_toplevel vars
+           rhs
          >>= fun rhs ->
          get_subst
          >|= fun subst ->
@@ -932,13 +1056,15 @@ let flatten ~ctx ~lazy_cnf ~should_define seq : _ Iter.t =
          let rhs = List.map (T.Subst.eval subst) rhs in
          (lhs, rhs) )
         |> to_list'
-        |> List.map (fun (lhs, rhs) -> Stmt.Def_form {vars; lhs; rhs; polarity; as_form})
+        |> List.map (fun (lhs, rhs) ->
+               Stmt.Def_form {vars; lhs; rhs; polarity; as_form} )
   in
   seq
   |> Iter.flat_map_l (fun stmt ->
          let n = Skolem.counter ctx in
          let proof () =
-           if Skolem.counter ctx > n then proof_preprocess stmt (new_src ~ctx) rule_flatten
+           if Skolem.counter ctx > n then
+             proof_preprocess stmt (new_src ~ctx) rule_flatten
            else Stmt.proof_step stmt
          in
          let attrs = stmt.Stmt.attrs in
@@ -947,41 +1073,57 @@ let flatten ~ctx ~lazy_cnf ~should_define seq : _ Iter.t =
            | Stmt.Data _ | Stmt.TyDecl _ ->
                [stmt]
            | Stmt.Rewrite d ->
-               flatten_def stmt d |> List.map (fun d' -> Stmt.rewrite ~attrs ~proof:(proof ()) d')
+               flatten_def stmt d
+               |> List.map (fun d' -> Stmt.rewrite ~attrs ~proof:(proof ()) d')
            | Stmt.Def l ->
                let l =
                  List.map
                    (fun d ->
-                     let rules = CCList.flat_map (flatten_def stmt) d.Stmt.def_rules in
+                     let rules =
+                       CCList.flat_map (flatten_def stmt) d.Stmt.def_rules
+                     in
                      {d with Stmt.def_rules= rules} )
                    l
                in
                [Stmt.def ~attrs ~proof:(proof ()) l]
            | Stmt.Assert f ->
-               flatten_axiom stmt f |> List.map (fun f -> Stmt.assert_ ~attrs ~proof:(proof ()) f)
+               flatten_axiom stmt f
+               |> List.map (fun f -> Stmt.assert_ ~attrs ~proof:(proof ()) f)
            | Stmt.Lemma l ->
-               List.map (fun f -> Stmt.lemma ~attrs ~proof:(proof ()) [F.and_ (flatten_axiom stmt f)]) l
+               List.map
+                 (fun f ->
+                   Stmt.lemma ~attrs ~proof:(proof ())
+                     [F.and_ (flatten_axiom stmt f)] )
+                 l
            | Stmt.Goal f ->
-               [Stmt.goal ~attrs ~proof:(proof ()) (F.and_ (flatten_axiom stmt f))]
+               [ Stmt.goal ~attrs ~proof:(proof ())
+                   (F.and_ (flatten_axiom stmt f)) ]
            | Stmt.NegatedGoal _ ->
                assert false
          in
-         Util.debugf ~section 2 "@[<2>flatten `@[%a@]`@ into `@[%a@]`@]" (fun k ->
-             k pp_stmt stmt (Util.pp_list pp_stmt) new_sts ) ;
-         match pop_new_defs ~ctx with [] -> new_sts | l -> List.rev (List.rev_append new_sts l) )
+         Util.debugf ~section 2 "@[<2>flatten `@[%a@]`@ into `@[%a@]`@]"
+           (fun k -> k pp_stmt stmt (Util.pp_list pp_stmt) new_sts ) ;
+         match pop_new_defs ~ctx with
+         | [] ->
+             new_sts
+         | l ->
+             List.rev (List.rev_append new_sts l) )
 
-let is_rw stmt = match Stmt.view stmt with Stmt.Rewrite _ | Stmt.Def _ -> true | _ -> false
+let is_rw stmt =
+  match Stmt.view stmt with Stmt.Rewrite _ | Stmt.Def _ -> true | _ -> false
 
 (* simplify formulas and rename them. May introduce new formulas *)
 let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
   let _span = ZProf.enter_prof prof_simplify_rename in
   (* process a formula *)
   let process_form ~is_goal stmt f =
-    Util.debugf ~section 2 "@[<2>simplify and rename@ `@[%a@]`@]" (fun k -> k T.pp f) ;
+    Util.debugf ~section 2 "@[<2>simplify and rename@ `@[%a@]`@]" (fun k ->
+        k T.pp f ) ;
     (* preprocessing *)
     let f = List.fold_left ( |> ) f preprocess in
     (* introduce definitions? *)
-    if disable_renaming || is_clause f || is_rw stmt then f else introduce_defs ~is_pos:(not is_goal) ~ctx stmt f
+    if disable_renaming || is_clause f || is_rw stmt then f
+    else introduce_defs ~is_pos:(not is_goal) ~ctx stmt f
   in
   let process_def stmt d =
     match d with
@@ -990,14 +1132,21 @@ let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
            into the def [p vars=rhs vars] *)
         let ty_vars, ty_args, ty_ret = T.Ty.unfold (T.ty_exn rhs) in
         if ty_vars <> [] then
-          errorf_ "cannot deal with polymorphic definition@ `%a`" (Stmt.pp_def_rule T.pp T.pp T.pp) d ;
-        if ty_args = [] then Stmt.Def_term {vars; id; ty= ty_id; args; rhs; as_form}
+          errorf_ "cannot deal with polymorphic definition@ `%a`"
+            (Stmt.pp_def_rule T.pp T.pp T.pp)
+            d ;
+        if ty_args = [] then
+          Stmt.Def_term {vars; id; ty= ty_id; args; rhs; as_form}
         else
-          let new_vars = List.mapi (fun i ty -> Var.makef ~ty "x_%d" i) ty_args in
+          let new_vars =
+            List.mapi (fun i ty -> Var.makef ~ty "x_%d" i) ty_args
+          in
           let vars = vars @ new_vars in
           let rhs = T.app_whnf ~ty:ty_ret rhs (List.map T.var new_vars) in
           if T.Ty.is_prop ty_ret then
-            let lhs_t = T.app_whnf ~ty:ty_ret (T.const ~ty:ty_id id) (args @ List.map T.var new_vars)
+            let lhs_t =
+              T.app_whnf ~ty:ty_ret (T.const ~ty:ty_id id)
+                (args @ List.map T.var new_vars)
             and rhs_t = process_form stmt ~is_goal:false rhs in
             let as_form = [T.Form.equiv lhs_t rhs_t] in
             let lhs = SLiteral.atom_true lhs_t in
@@ -1016,7 +1165,8 @@ let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
     |> Iter.flat_map (fun stmt ->
            let old_counter = Skolem.counter ctx in
            let proof () =
-             if Skolem.counter ctx > old_counter then proof_preprocess stmt (new_src ~ctx) rule_rename
+             if Skolem.counter ctx > old_counter then
+               proof_preprocess stmt (new_src ~ctx) rule_rename
              else Stmt.proof_step stmt
            in
            let attrs = Stmt.attrs stmt in
@@ -1028,9 +1178,13 @@ let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
                  let l =
                    List.map
                      (fun d ->
-                       let rules = List.map (process_def stmt) d.Stmt.def_rules in
+                       let rules =
+                         List.map (process_def stmt) d.Stmt.def_rules
+                       in
                        let new_d = {d with Stmt.def_rules= rules} in
-                       Util.debugf ~section 2 "(@[simplify-def@ `@[%a@]`@ :into `@[%a@]`@])" (fun k ->
+                       Util.debugf ~section 2
+                         "(@[simplify-def@ `@[%a@]`@ :into `@[%a@]`@])"
+                         (fun k ->
                            let pp_st = Stmt.pp_def T.pp T.pp T.pp in
                            k pp_st d pp_st new_d ) ;
                        new_d )
@@ -1052,7 +1206,11 @@ let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
              | Stmt.NegatedGoal _ ->
                  assert false
            in
-           match pop_new_defs ~ctx with [] -> Iter.return new_st | l -> Iter.of_list (List.rev (new_st :: l)) )
+           match pop_new_defs ~ctx with
+           | [] ->
+               Iter.return new_st
+           | l ->
+               Iter.of_list (List.rev (new_st :: l)) )
     |> CCVector.of_iter ?init:None
   in
   ZProf.exit_prof _span ; res
@@ -1069,19 +1227,29 @@ let rule_cnf = Proof.Rule.mk "cnf"
 
 let rule_neg = Proof.Rule.mk "cnf.neg"
 
-let proof_cnf stmt = Proof.Step.esa ~rule:rule_cnf [Stmt.as_proof_i stmt |> Proof.Parent.from]
+let proof_cnf stmt =
+  Proof.Step.esa ~rule:rule_cnf [Stmt.as_proof_i stmt |> Proof.Parent.from]
 
-let proof_neg stmt = Proof.Step.esa ~rule:rule_neg [Stmt.as_proof_i stmt |> Proof.Parent.from]
+let proof_neg stmt =
+  Proof.Step.esa ~rule:rule_neg [Stmt.as_proof_i stmt |> Proof.Parent.from]
 
 (* Transform the clauses into proper CNF; returns a list of clauses *)
 let cnf_of_iter ~ctx ?(opts = []) (seq : Stmt.input_t Iter.t) : _ CCVector.t =
   (* read options *)
-  let disable_renaming = List.mem DisableRenaming opts || List.mem LazyCnf opts in
+  let disable_renaming =
+    List.mem DisableRenaming opts || List.mem LazyCnf opts
+  in
   let lazy_cnf = List.mem LazyCnf opts in
   let preprocess =
-    T.simplify_formula :: CCList.filter_map (function InitialProcessing f -> Some f | _ -> None) opts
-  and post_nnf = CCList.filter_map (function PostNNF f -> Some f | _ -> None) opts
-  and post_skolem = CCList.filter_map (function PostSkolem f -> Some f | _ -> None) opts in
+    T.simplify_formula
+    :: CCList.filter_map
+         (function InitialProcessing f -> Some f | _ -> None)
+         opts
+  and post_nnf =
+    CCList.filter_map (function PostNNF f -> Some f | _ -> None) opts
+  and post_skolem =
+    CCList.filter_map (function PostSkolem f -> Some f | _ -> None) opts
+  in
   (* simplify and introduce definitions *)
   let v =
     if (*List.mem LazyCnf opts*) false then CCVector.of_iter seq
@@ -1097,7 +1265,9 @@ let cnf_of_iter ~ctx ?(opts = []) (seq : Stmt.input_t Iter.t) : _ CCVector.t =
     let view_as_cnf f =
       assert (T.Ty.is_prop (T.ty_exn f)) ;
       let eligible_for_lazy_cnf f =
-        List.mem LazyCnf opts && T.Seq.vars f |> Iter.for_all (fun sf -> not (T.Ty.is_tType (Var.ty sf)))
+        List.mem LazyCnf opts
+        && T.Seq.vars f
+           |> Iter.for_all (fun sf -> not (T.Ty.is_tType (Var.ty sf)))
       in
       if eligible_for_lazy_cnf f then lazy_as_cnf f else as_cnf f
     in
@@ -1110,12 +1280,14 @@ let cnf_of_iter ~ctx ?(opts = []) (seq : Stmt.input_t Iter.t) : _ CCVector.t =
         Util.debugf ~section 4 "@[<2>... NNF:@ `@[%a@]`@]" (fun k -> k T.pp f) ;
         let distribute_exists = List.mem DistributeExists opts in
         let f = miniscope ~distribute_exists f in
-        Util.debugf ~section 4 "@[<2>... miniscoped:@ `@[%a@]`@]" (fun k -> k T.pp f) ;
+        Util.debugf ~section 4 "@[<2>... miniscoped:@ `@[%a@]`@]" (fun k ->
+            k T.pp f ) ;
         (* adjust the variable counter to [f] before skolemizing *)
         let f = skolemize ~ctx Var.Subst.empty f in
         (* processing post-skolemization *)
         let f = List.fold_left ( |> ) f post_skolem in
-        Util.debugf ~section 4 "@[<2>... skolemized:@ `@[%a@]`@]" (fun k -> k T.pp f) ;
+        Util.debugf ~section 4 "@[<2>... skolemized:@ `@[%a@]`@]" (fun k ->
+            k T.pp f ) ;
         let clauses = to_cnf f in
         Util.debugf ~section 2 "@[<2>... CNF:@ `@[%a@]`@]" (fun k ->
             k (Util.pp_list ~sep:", " pp_clause) clauses ) ;
@@ -1133,7 +1305,9 @@ let cnf_of_iter ~ctx ?(opts = []) (seq : Stmt.input_t Iter.t) : _ CCVector.t =
   let conv_def d : _ Stmt.def_rule list =
     match d with
     | Stmt.Def_term {vars; id; ty; args; rhs; _} ->
-        let as_form : clause = [SLiteral.eq (T.app (T.const ~ty id) ~ty:(T.ty_exn rhs) args) rhs] in
+        let as_form : clause =
+          [SLiteral.eq (T.app (T.const ~ty id) ~ty:(T.ty_exn rhs) args) rhs]
+        in
         [Stmt.Def_term {vars; id; ty; args; rhs; as_form}]
     | Stmt.Def_form {vars; lhs; rhs; polarity; _} -> (
         let conv_polarized_default () =
@@ -1143,14 +1317,23 @@ let cnf_of_iter ~ctx ?(opts = []) (seq : Stmt.input_t Iter.t) : _ CCVector.t =
              negative: ¬ lhs <=> cnf(¬ rhs) *)
           let c_pos () =
             let rhs = CCList.flat_map conv_form rhs in
-            let as_form = List.map (fun rhs -> SLiteral.negate lhs :: rhs) rhs in
+            let as_form =
+              List.map (fun rhs -> SLiteral.negate lhs :: rhs) rhs
+            in
             Stmt.Def_form {vars; lhs; rhs; polarity= `Imply; as_form}
           and c_neg () =
             let rhs = conv_form (F.not_ (F.and_ rhs)) in
-            let as_form : clause list = List.map (fun rhs -> lhs :: List.map SLiteral.negate rhs) rhs in
-            Stmt.Def_form {vars; lhs= SLiteral.negate lhs; rhs; as_form; polarity= `Imply}
+            let as_form : clause list =
+              List.map (fun rhs -> lhs :: List.map SLiteral.negate rhs) rhs
+            in
+            Stmt.Def_form
+              {vars; lhs= SLiteral.negate lhs; rhs; as_form; polarity= `Imply}
           in
-          match polarity with `Imply -> [c_pos ()] | `Equiv -> [c_pos (); c_neg ()]
+          match polarity with
+          | `Imply ->
+              [c_pos ()]
+          | `Equiv ->
+              [c_pos (); c_neg ()]
         in
         (* see if the rule can be cast as a (boolean) term rule *)
         match (lhs, rhs) with
@@ -1159,7 +1342,11 @@ let cnf_of_iter ~ctx ?(opts = []) (seq : Stmt.input_t Iter.t) : _ CCVector.t =
           | Some (id, ty_id, args), Some lit when SLiteral.is_pos lit ->
               (* convert to term rule *)
               let rhs = SLiteral.to_form lit in
-              let as_form : clause = [SLiteral.eq (T.app (T.const ~ty:ty_id id) ~ty:(T.ty_exn rhs) args) rhs] in
+              let as_form : clause =
+                [ SLiteral.eq
+                    (T.app (T.const ~ty:ty_id id) ~ty:(T.ty_exn rhs) args)
+                    rhs ]
+              in
               [Stmt.Def_term {vars; id; ty= ty_id; args; rhs; as_form}]
           | _ ->
               conv_polarized_default () )
@@ -1173,7 +1360,9 @@ let cnf_of_iter ~ctx ?(opts = []) (seq : Stmt.input_t Iter.t) : _ CCVector.t =
       match stmt.Stmt.view with
       | Stmt.Assert f ->
           let proof = proof_cnf stmt in
-          List.iter (fun c -> CCVector.push res (Stmt.assert_ ~attrs ~proof c)) (conv_form f)
+          List.iter
+            (fun c -> CCVector.push res (Stmt.assert_ ~attrs ~proof c))
+            (conv_form f)
       | Stmt.Def l ->
           let l =
             List.map
@@ -1199,7 +1388,9 @@ let cnf_of_iter ~ctx ?(opts = []) (seq : Stmt.input_t Iter.t) : _ CCVector.t =
           assert (T.Ty.is_prop (T.ty_exn f)) ;
           let not_f = F.not_ f in
           assert (T.Ty.is_prop (T.ty_exn not_f)) ;
-          let stmt = Stmt.neg_goal ~proof:(proof_neg stmt) ~skolems:[] [not_f] in
+          let stmt =
+            Stmt.neg_goal ~proof:(proof_neg stmt) ~skolems:[] [not_f]
+          in
           (* now take the CNF of negated goal *)
           let skolems, l = conv_form_sk not_f in
           let proof = proof_cnf stmt in
@@ -1223,7 +1414,11 @@ let cnf_of ~ctx ?opts st = cnf_of_iter ~ctx ?opts (Iter.return st)
 let pp_f_statement out st = Statement.pp T.pp T.pp T.pp out st
 
 let pp_c_statement out st =
-  let pp_clause out c = Format.fprintf out "@[<hv>%a@]" (Util.pp_list ~sep:" ∨ " (SLiteral.pp T.pp)) c in
+  let pp_clause out c =
+    Format.fprintf out "@[<hv>%a@]"
+      (Util.pp_list ~sep:" ∨ " (SLiteral.pp T.pp))
+      c
+  in
   Statement.pp pp_clause T.pp T.pp out st
 
 let pp_fo_c_statement = Statement.pp_clause
@@ -1256,7 +1451,8 @@ let convert seq =
         Stmt.Def_form {vars; lhs; rhs; polarity; as_form}
   in
   let conv_statement st =
-    Util.debugf ~section 3 "@[<2>@{<yellow>convert@}@ `@[%a@]`@]" (fun k -> k pp_c_statement st) ;
+    Util.debugf ~section 3 "@[<2>@{<yellow>convert@}@ `@[%a@]`@]" (fun k ->
+        k pp_c_statement st ) ;
     let t_ctx = Term.Conv.create () in
     let ty_ctx = Type.Conv.create () in
     let attrs = Stmt.attrs st in
@@ -1267,7 +1463,9 @@ let convert seq =
           let c = clause_to_fo ~ctx:t_ctx c in
           Stmt.goal ~attrs ~proof c
       | Stmt.NegatedGoal (sk, l) ->
-          let skolems = List.map (fun (id, ty) -> (id, (conv_ty ty_ctx) ty)) sk in
+          let skolems =
+            List.map (fun (id, ty) -> (id, (conv_ty ty_ctx) ty)) sk
+          in
           let l = List.map (clause_to_fo ~ctx:t_ctx) l in
           Stmt.neg_goal ~attrs ~proof ~skolems l
       | Stmt.Lemma l ->
@@ -1282,7 +1480,9 @@ let convert seq =
       | Stmt.Def l ->
           let l =
             List.map
-              (fun d -> Stmt.map_def d ~term:(conv_t t_ctx) ~ty:(conv_ty ty_ctx) ~form:(clause_to_fo ~ctx:t_ctx))
+              (fun d ->
+                Stmt.map_def d ~term:(conv_t t_ctx) ~ty:(conv_ty ty_ctx)
+                  ~form:(clause_to_fo ~ctx:t_ctx) )
               l
           in
           Stmt.def ~attrs ~proof l
@@ -1292,8 +1492,8 @@ let convert seq =
           let ty = conv_ty ty_ctx ty in
           Stmt.ty_decl ~attrs ~proof id ty
     in
-    Util.debugf ~section 3 "@[@[<2>convert@ `@[%a@]`@]@ @[<2>into `@[%a@]`@]@]" (fun k ->
-        k pp_c_statement st Stmt.pp_clause res ) ;
+    Util.debugf ~section 3 "@[@[<2>convert@ `@[%a@]`@]@ @[<2>into `@[%a@]`@]@]"
+      (fun k -> k pp_c_statement st Stmt.pp_clause res ) ;
     res
   in
   Iter.map conv_statement seq |> CCVector.of_iter |> CCVector.freeze

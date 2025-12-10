@@ -90,7 +90,10 @@ module Term : sig
      whenever [f] is a defined constant with one rule which matches [l] *)
 
   val narrow_term :
-    ?subst:Unif_subst.t -> scope_rules:Scoped.scope -> term Scoped.t -> (rule * Unif_subst.t) Iter.t
+       ?subst:Unif_subst.t
+    -> scope_rules:Scoped.scope
+    -> term Scoped.t
+    -> (rule * Unif_subst.t) Iter.t
   (** [narrow_term ~scope_rule t] finds the set of rules [(l --> r)]
         in IDs and substitutions [sigma] such that [sigma(l) = sigma(t)]
         @param scope_rules used for rules (LEFT) *)
@@ -124,7 +127,14 @@ module Lit : sig
   end
 
   val normalize_clause :
-    Literals.t -> (Literals.t list * rule * Subst.t * Scoped.scope * Subst.Renaming.t * Proof.tag list) option
+       Literals.t
+    -> ( Literals.t list
+       * rule
+       * Subst.t
+       * Scoped.scope
+       * Subst.Renaming.t
+       * Proof.tag list )
+       option
   (** normalize literals of the clause w.r.t. rules, or return [None]
       if no rule applies. The input clause lives in scope 0. *)
 
@@ -155,7 +165,8 @@ module Rule : sig
 
   val as_proof : t -> Proof.t
 
-  val lit_as_proof_parent_subst : Subst.Renaming.t -> Subst.t -> Lit.Rule.t Scoped.t -> Proof.parent
+  val lit_as_proof_parent_subst :
+    Subst.Renaming.t -> Subst.t -> Lit.Rule.t Scoped.t -> Proof.parent
   (** Helper for clause rewriting *)
 
   val set_as_proof_parents : Term.Rule_inst_set.t -> Proof.parent list

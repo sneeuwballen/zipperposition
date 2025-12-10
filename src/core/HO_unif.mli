@@ -8,7 +8,18 @@ type term = Term.t
 type penalty = int
 
 val enum_prop :
-     ?mode:[`And | `Or | `Neg | `Quants | `TF | `Eq | `Combinators | `Full | `Pragmatic | `Simple | `None]
+     ?mode:
+       [ `And
+       | `Or
+       | `Neg
+       | `Quants
+       | `TF
+       | `Eq
+       | `Combinators
+       | `Full
+       | `Pragmatic
+       | `Simple
+       | `None ]
   -> ?add_var:bool
   -> Term.var Scoped.t
   -> enum_cache:Term.Set.t ref
@@ -29,7 +40,10 @@ type pair = Type.t list * term * term
 val pp_pair : pair CCFormat.printer
 
 val unif_pairs :
-  ?fuel:int -> pair list Scoped.t -> offset:int -> (pair list * Unif_subst.t * penalty * Subst.Renaming.t) list
+     ?fuel:int
+  -> pair list Scoped.t
+  -> offset:int
+  -> (pair list * Unif_subst.t * penalty * Subst.Renaming.t) list
 (** [unif_pairs pairs ~scope_new_vars] returns a list of (partial) solutions
     to the HO unification problem [pairs].
     Each solution is a list of remaining constraints (with the substitution already applied),

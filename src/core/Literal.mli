@@ -91,17 +91,33 @@ val mk_constraint : term -> term -> t
 (** [mk_constraint t u] makes a disequation or a HO constraint depending
     on how [t] and [u] look. *)
 
-val matching : ?subst:Subst.t -> pattern:t Scoped.t -> t Scoped.t -> (Subst.t * Builtin.Tag.t list) Iter.t
+val matching :
+     ?subst:Subst.t
+  -> pattern:t Scoped.t
+  -> t Scoped.t
+  -> (Subst.t * Builtin.Tag.t list) Iter.t
 (** checks whether subst(lit_a) matches lit_b. Returns alternative
     substitutions s such that s(lit_a) = lit_b and s contains subst. *)
 
-val subsumes : ?subst:Subst.t -> t Scoped.t -> t Scoped.t -> (Subst.t * Builtin.Tag.t list) Iter.t
+val subsumes :
+     ?subst:Subst.t
+  -> t Scoped.t
+  -> t Scoped.t
+  -> (Subst.t * Builtin.Tag.t list) Iter.t
 (** More general version of {!matching}, yields [subst]
     such that [subst(lit_a) => lit_b]. *)
 
-val variant : ?subst:Subst.t -> t Scoped.t -> t Scoped.t -> (Subst.t * Builtin.Tag.t list) Iter.t
+val variant :
+     ?subst:Subst.t
+  -> t Scoped.t
+  -> t Scoped.t
+  -> (Subst.t * Builtin.Tag.t list) Iter.t
 
-val unify : ?subst:Unif_subst.t -> t Scoped.t -> t Scoped.t -> (Unif_subst.t * Builtin.Tag.t list) Iter.t
+val unify :
+     ?subst:Unif_subst.t
+  -> t Scoped.t
+  -> t Scoped.t
+  -> (Unif_subst.t * Builtin.Tag.t list) Iter.t
 
 val are_variant : t -> t -> bool
 
@@ -171,7 +187,8 @@ val is_app_var_eq : t -> bool
 
 val is_type_pred : t -> bool
 
-val is_typex_pred : t -> bool (* like in E, type predicate with multiple variables *)
+val is_typex_pred :
+  t -> bool (* like in E, type predicate with multiple variables *)
 
 val is_predicate_lit : t -> bool
 
@@ -303,7 +320,12 @@ module Conv : sig
 
   val to_form : ?hooks:hook_to list -> t -> term SLiteral.t
 
-  val to_s_form : ?allow_free_db:bool -> ?ctx:Term.Conv.ctx -> ?hooks:hook_to list -> t -> TypedSTerm.Form.t
+  val to_s_form :
+       ?allow_free_db:bool
+    -> ?ctx:Term.Conv.ctx
+    -> ?hooks:hook_to list
+    -> t
+    -> TypedSTerm.Form.t
 
   val lit_to_tst : ?ctx:Term.Conv.ctx -> term SLiteral.t -> TypedSTerm.t
 end

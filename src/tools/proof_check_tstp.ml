@@ -42,13 +42,18 @@ module CheckedTrace = struct
   let failures ~checked = checked.failures
 
   (* result for this step *)
-  let get ~checked step = try StepTbl.find checked.steps step with Not_found -> []
+  let get ~checked step =
+    try StepTbl.find checked.steps step with Not_found -> []
 
   (* add a result to the checked_trace *)
   let add ~checked step res =
     let l = get ~checked step in
     StepTbl.replace checked.steps step (res :: l) ;
-    match res with Failed _ -> checked.failures <- (step, res) :: checked.failures | _ -> ()
+    match res with
+    | Failed _ ->
+        checked.failures <- (step, res) :: checked.failures
+    | _ ->
+        ()
 end
 
 (* can we avoid checking this proof step? *)
@@ -57,7 +62,13 @@ let _do_not_check proof =
   | TT.Axiom _ | TT.Theory _ ->
       true
   | TT.InferClause (_, (lazy step)) | TT.InferForm (_, (lazy step)) -> (
-      step.TT.esa || match step.TT.parents with [|a|] when TT.is_axiom a -> true (* axiom *) | _ -> false )
+      step.TT.esa
+      ||
+      match step.TT.parents with
+      | [|a|] when TT.is_axiom a ->
+          true (* axiom *)
+      | _ ->
+          false )
 
 let slit_to_form = function
   | SLiteral.Atom (t, true) ->
@@ -127,12 +138,14 @@ let check_step ~timeout ~prover step =
           | CallProver.Unsat ->
               Succeeded p_name
           | CallProver.Error e ->
-              Util.debugf 1 "error trying to check %a: %s" (fun k -> k TT.pp1 step e) ;
+              Util.debugf 1 "error trying to check %a: %s" (fun k ->
+                  k TT.pp1 step e ) ;
               Failed p_name
           | CallProver.Unknown | CallProver.Sat ->
               Failed p_name
         in
-        Util.debugf 1 "step %a: %a" (fun k -> k A.pp_name (TT.get_id step) pp_res res) ;
+        Util.debugf 1 "step %a: %a" (fun k ->
+            k A.pp_name (TT.get_id step) pp_res res ) ;
         E.return res )
 
 (* print progress in proof checking *)
@@ -177,7 +190,9 @@ let all_paths_correct ~valid ~checked =
   let rec check_proof proof =
     if StepTbl.mem closed proof then () (* ok *)
     else if StepTbl.mem current proof then
-      let _ = Util.debugf 1 "step %a not valid, in a cycle" (fun k -> k TT.pp proof) in
+      let _ =
+        Util.debugf 1 "step %a not valid, in a cycle" (fun k -> k TT.pp proof)
+      in
       raise Exit (* we followed a back link! *)
     else if not (valid proof) then
       let _ = Util.debugf 1 "step %a not validated" (fun k -> k TT.pp proof) in
@@ -190,7 +205,8 @@ let all_paths_correct ~valid ~checked =
       | TT.Axiom _ | TT.Theory _ ->
           () ) ;
       (* proof is now totally explored *)
-      StepTbl.remove current proof ; StepTbl.replace closed proof () )
+      StepTbl.remove current proof ;
+      StepTbl.replace closed proof () )
   in
   try
     let trace = CheckedTrace.trace ~checked in
@@ -226,19 +242,25 @@ let progress = ref false
 let options =
   Arg.align
     ( [ ("--pp", Arg.Set print_problem, " print problem after parsing")
-      ; ("--timeout", Arg.Set_int timeout, " timeout for subprovers (in seconds)")
-      ; ("--minimum", Arg.Set_int minimum, " minimum number of checks to validate a step (1)")
+      ; ( "--timeout"
+        , Arg.Set_int timeout
+        , " timeout for subprovers (in seconds)" )
+      ; ( "--minimum"
+        , Arg.Set_int minimum
+        , " minimum number of checks to validate a step (1)" )
       ; ("--progress", Arg.Set progress, " print progress") ]
     @ Options.make () )
 
 (** parse_args returns parameters *)
-let parse_args () = Arg.parse options (fun f -> file := f) "check the given TSTP derivation"
+let parse_args () =
+  Arg.parse options (fun f -> file := f) "check the given TSTP derivation"
 
 let main file =
   E.(
     TT.parse ~recursive:true file
     >>= fun trace ->
-    if !print_problem then Format.printf "@[<2>derivation:@,@[%a@]@]@." TT.pp_tstp trace ;
+    if !print_problem then
+      Format.printf "@[<2>derivation:@,@[%a@]@]@." TT.pp_tstp trace ;
     Util.debugf 1 "trace of %d steps" (fun k -> k (TT.size trace)) ;
     (* check that the steps form a DAG *)
     if not (TT.is_dag trace) then (
@@ -254,7 +276,8 @@ let main file =
       (fun (proof, res) ->
         match res with
         | Failed prover ->
-            Util.debugf 1 "trying to prove %a with %s failed" (fun k -> k TT.pp1 proof prover)
+            Util.debugf 1 "trying to prove %a with %s failed" (fun k ->
+                k TT.pp1 proof prover )
         | _ ->
             assert false )
       (CheckedTrace.failures ~checked) ;
@@ -268,4 +291,8 @@ let main file =
 let () =
   CCFormat.set_color_default true ;
   parse_args () ;
-  match main !file with E.Ok () -> () | E.Error msg -> print_endline msg ; exit 1
+  match main !file with
+  | E.Ok () ->
+      ()
+  | E.Error msg ->
+      print_endline msg ; exit 1

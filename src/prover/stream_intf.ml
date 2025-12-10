@@ -7,7 +7,8 @@ module type S = sig
 
   type t = private
     { id: int  (** unique ID of the stream *)
-    ; parents: C.t list  (** parent clauses for inference generating this stream *)
+    ; parents: C.t list
+          (** parent clauses for inference generating this stream *)
     ; mutable penalty: int  (** heuristic penalty *)
     ; mutable hits: int  (** how many attemts to retrieve unifier were there  *)
     ; mutable stm: C.t option OSeq.t  (** the stream itself *) }

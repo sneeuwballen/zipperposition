@@ -57,7 +57,8 @@ let update_max_db props new_db =
 let get_max_db props = I.to_int (props &&& f_db_mask >>> 16)
 
 (* Properties that should be set if they are set for ANY of the subterms *)
-let any_props = f_is_beta_reducible ||| f_has_freevars ||| f_has_lams ||| f_has_quant
+let any_props =
+  f_is_beta_reducible ||| f_has_freevars ||| f_has_lams ||| f_has_quant
 
 (* Properties that should be set if they are set for ALL of the subterms *)
 let all_props = zero
@@ -71,7 +72,13 @@ let debug_props out props =
   CCFormat.fprintf out " h_q:%b" (get_property props f_has_quant) ;
   CCFormat.fprintf out " beta_r:%b@." (get_property props f_is_beta_reducible)
 
-type t = {term: view; ty: type_result; mutable id: int; mutable payload: exn; props: I.t; ho_weight: int lazy_t}
+type t =
+  { term: view
+  ; ty: type_result
+  ; mutable id: int
+  ; mutable payload: exn
+  ; props: I.t
+  ; ho_weight: int lazy_t }
 
 (* head form *)
 and view =
@@ -80,7 +87,8 @@ and view =
   | Bind of Binder.t * t * t  (** Type, sub-term *)
   | Const of ID.t  (** Constant *)
   | App of t * t list  (** Uncurried application *)
-  | AppBuiltin of Builtin.t * t list  (** For representing special constructors *)
+  | AppBuiltin of Builtin.t * t list
+      (** For representing special constructors *)
 
 and type_result = NoType | HasType of t
 
@@ -94,16 +102,19 @@ let any_props_for_ts =
     zero
 
 let add_ty_vars props ty_props =
-  if get_property ty_props f_has_freevars then set_property props f_has_freevars else props
+  if get_property ty_props f_has_freevars then set_property props f_has_freevars
+  else props
 
 let add_ty_vars props ty_props =
-  if get_property ty_props f_has_freevars then set_property props f_has_freevars else props
+  if get_property ty_props f_has_freevars then set_property props f_has_freevars
+  else props
 
 let[@inline] view t = t.term
 
 let[@inline] ty t = t.ty
 
-let[@inline] ty_exn t = match t.ty with NoType -> invalid_arg "InnerTerm.ty_exn" | HasType ty -> ty
+let[@inline] ty_exn t =
+  match t.ty with NoType -> invalid_arg "InnerTerm.ty_exn" | HasType ty -> ty
 
 let[@inline] hash t = Hash.int t.id
 
@@ -132,11 +143,16 @@ let same_l l1 l2 =
       same_l_rec l1 l2
 
 let[@inline] ty_is_fun ty =
-  match view ty with AppBuiltin (Builtin.Arrow, _ret :: args) -> List.length args != 0 | _ -> false
+  match view ty with
+  | AppBuiltin (Builtin.Arrow, _ret :: args) ->
+      List.length args != 0
+  | _ ->
+      false
 
 let same_l_gen l1 l2 = List.length l1 == List.length l2 && same_l l1 l2
 
-let _hash_ty t = match t.ty with NoType -> 1 | HasType ty -> Hash.combine2 2 ty.id
+let _hash_ty t =
+  match t.ty with NoType -> 1 | HasType ty -> Hash.combine2 2 ty.id
 
 let _hash_norec t =
   match view t with
@@ -177,7 +193,13 @@ let hash_mod_alpha t : int =
   aux 2 t
 
 let _eq_ty t1 t2 =
-  match (t1.ty, t2.ty) with NoType, NoType -> true | HasType ty1, HasType ty2 -> equal ty1 ty2 | _ -> false
+  match (t1.ty, t2.ty) with
+  | NoType, NoType ->
+      true
+  | HasType ty1, HasType ty2 ->
+      equal ty1 ty2
+  | _ ->
+      false
 
 let rec _eq_norec_list l1 l2 =
   match (l1, l2) with
@@ -251,9 +273,15 @@ let rec open_bind b t =
 
 let[@inline] is_var t = match view t with Var _ -> true | _ -> false
 
-let[@inline] is_lam t = match view t with Bind (Binder.Lambda, _, _) -> true | _ -> false
+let[@inline] is_lam t =
+  match view t with Bind (Binder.Lambda, _, _) -> true | _ -> false
 
-let open_fun ty = match view ty with AppBuiltin (Builtin.Arrow, ret :: args) -> (args, ret) | _ -> ([], ty)
+let open_fun ty =
+  match view ty with
+  | AppBuiltin (Builtin.Arrow, ret :: args) ->
+      (args, ret)
+  | _ ->
+      ([], ty)
 
 let ho_weight_ t t_ty =
   let rec aux t t_ty =
@@ -262,7 +290,11 @@ let ho_weight_ t t_ty =
       | NoType ->
           0
       | HasType ty -> (
-        match view ty with AppBuiltin (Builtin.Arrow, l) -> List.length l - 1 | _ -> 0 )
+        match view ty with
+        | AppBuiltin (Builtin.Arrow, l) ->
+            List.length l - 1
+        | _ ->
+            0 )
     in
     match t with
     | Var _ | DB _ | Const _ ->
@@ -276,30 +308,59 @@ let ho_weight_ t t_ty =
         if is_var f then 1 else init_w t_ty + aux_l (aux (view f) (ty f)) l
     | AppBuiltin (_, l) ->
         aux_l (init_w t_ty + 1) l
-  and aux_l acc = function [] -> acc | x :: xs -> aux_l (acc + aux (view x) (ty x)) xs in
+  and aux_l acc = function
+    | [] ->
+        acc
+    | x :: xs ->
+        aux_l (acc + aux (view x) (ty x)) xs
+  in
   aux t t_ty
 
 let[@inline] ho_weight t = Lazy.force t.ho_weight
 
-let make_ ~props ~ty term = {term; ty; id= ~-1; payload= No_payload; props; ho_weight= lazy (ho_weight_ term ty)}
+let make_ ~props ~ty term =
+  { term
+  ; ty
+  ; id= ~-1
+  ; payload= No_payload
+  ; props
+  ; ho_weight= lazy (ho_weight_ term ty) }
 
 let const ~ty s =
-  let my_t = make_ ~props:(add_ty_vars zero ty.props) ~ty:(HasType ty) (Const s) in
+  let my_t =
+    make_ ~props:(add_ty_vars zero ty.props) ~ty:(HasType ty) (Const s)
+  in
   H.hashcons my_t
 
 let builtin ~ty b =
-  let my_t = make_ ~props:(add_ty_vars zero ty.props) ~ty:(HasType ty) (AppBuiltin (b, [])) in
+  let my_t =
+    make_
+      ~props:(add_ty_vars zero ty.props)
+      ~ty:(HasType ty)
+      (AppBuiltin (b, []))
+  in
   H.hashcons my_t
 
 let tType =
   let my_t = make_ ~props:zero ~ty:NoType (AppBuiltin (Builtin.TType, [])) in
   H.hashcons my_t
 
-let open_fun ty = match view ty with AppBuiltin (Builtin.Arrow, ret :: args) -> (args, ret) | _ -> ([], ty)
+let open_fun ty =
+  match view ty with
+  | AppBuiltin (Builtin.Arrow, ret :: args) ->
+      (args, ret)
+  | _ ->
+      ([], ty)
 
-let[@inline] is_a_type t = match ty t with HasType ty -> equal ty tType | NoType -> assert false
+let[@inline] is_a_type t =
+  match ty t with HasType ty -> equal ty tType | NoType -> assert false
 
-let expected_args t = match view t with AppBuiltin (Builtin.Arrow, l) -> CCList.length l - 1 | _ -> 0
+let expected_args t =
+  match view t with
+  | AppBuiltin (Builtin.Arrow, l) ->
+      CCList.length l - 1
+  | _ ->
+      0
 
 let rec debugf out t =
   match view t with
@@ -318,7 +379,8 @@ let rec debugf out t =
   | App (s, l) ->
       Format.fprintf out "(@[<1>%a@ %a@])" debugf s (Util.pp_list debugf) l
   | Bind (b, varty, t') ->
-      Format.fprintf out "(@[<1>%a@ %a@ %a@])" Binder.pp b debugf varty debugf t'
+      Format.fprintf out "(@[<1>%a@ %a@ %a@])" Binder.pp b debugf varty debugf
+        t'
 
 let flatten_and_or b l =
   let rec aux acc = function
@@ -348,7 +410,8 @@ let rec app_builtin ~ty b l =
       let ty = app_builtin ~ty:tType Builtin.arrow [prop; prop] in
       let my_t = make_ ~props:zero ~ty:(HasType ty) (AppBuiltin (b, [])) in
       H.hashcons my_t
-  | (Builtin.And | Builtin.Or), l when CCList.length l < 2 && expected_args ty < 2 ->
+  | (Builtin.And | Builtin.Or), l
+    when CCList.length l < 2 && expected_args ty < 2 ->
       let args = (if CCList.is_empty l then [prop] else []) @ [prop; prop] in
       let ty = app_builtin ~ty:tType Builtin.arrow args in
       let props = add_ty_vars (any_props_for_ts l) ty.props in
@@ -366,7 +429,9 @@ let rec app_builtin ~ty b l =
       in
       let props = add_ty_vars (any_props_for_ts l) ty.props in
       let props =
-        if Builtin.is_quantifier b && List.length l = 2 then set_property props f_has_quant else props
+        if Builtin.is_quantifier b && List.length l = 2 then
+          set_property props f_has_quant
+        else props
       in
       let my_t = make_ ~props ~ty:(HasType ty) (AppBuiltin (b, l)) in
       H.hashcons my_t
@@ -381,7 +446,9 @@ let app ~ty f l =
       (* flatten *)
       let flattened = l1 @ l in
       let props = add_ty_vars (any_props_for_ts (f1 :: flattened)) ty.props in
-      let props = if is_lam f1 then set_property props f_is_beta_reducible else props in
+      let props =
+        if is_lam f1 then set_property props f_is_beta_reducible else props
+      in
       let my_t = make_ ~props ~ty:(HasType ty) (App (f1, flattened)) in
       H.hashcons my_t
   | AppBuiltin (f1, l1), _ ->
@@ -401,13 +468,17 @@ let app ~ty f l =
       in
       let props = add_ty_vars (any_props_for_ts t_args) ty.props in
       let props =
-        if Builtin.is_quantifier f1 && List.length t_args = 2 then set_property props f_has_quant else props
+        if Builtin.is_quantifier f1 && List.length t_args = 2 then
+          set_property props f_has_quant
+        else props
       in
       let my_t = make_ ~props ~ty:(HasType ty) (AppBuiltin (f1, t_args)) in
       H.hashcons my_t
   | _ ->
       let props = add_ty_vars (any_props_for_ts (f :: l)) ty.props in
-      let props = if is_lam f then set_property props f_is_beta_reducible else props in
+      let props =
+        if is_lam f then set_property props f_is_beta_reducible else props
+      in
       let my_t = make_ ~props ~ty:(HasType ty) (App (f, l)) in
       H.hashcons my_t
 
@@ -424,9 +495,14 @@ let bvar ~ty i =
 let bind ~ty ~varty s t' =
   let props = add_ty_vars (add_ty_vars t'.props ty.props) varty.props in
   let props =
-    if Binder.equal Binder.Lambda s || Binder.equal Binder.ForallTy s then dec_max_db props else props
+    if Binder.equal Binder.Lambda s || Binder.equal Binder.ForallTy s then
+      dec_max_db props
+    else props
   in
-  let props = if Binder.equal Binder.Lambda s then set_property props f_has_lams else props in
+  let props =
+    if Binder.equal Binder.Lambda s then set_property props f_has_lams
+    else props
+  in
   H.hashcons (make_ ~props ~ty:(HasType ty) (Bind (s, varty, t')))
 
 let cast ~ty old =
@@ -452,9 +528,11 @@ let[@inline] is_bind t = match view t with Bind _ -> true | _ -> false
 
 let[@inline] is_app t = match view t with App _ -> true | _ -> false
 
-let[@inline] is_tType t = match view t with AppBuiltin (Builtin.TType, _) -> true | _ -> false
+let[@inline] is_tType t =
+  match view t with AppBuiltin (Builtin.TType, _) -> true | _ -> false
 
-let[@inline] is_lambda t = match view t with Bind (Binder.Lambda, _, _) -> true | _ -> false
+let[@inline] is_lambda t =
+  match view t with Bind (Binder.Lambda, _, _) -> true | _ -> false
 
 (** {3 Payload} *)
 
@@ -463,7 +541,11 @@ let payload t = t.payload
 let set_payload_erase t e = t.payload <- e
 
 let set_payload t e =
-  match t.payload with No_payload -> t.payload <- e | _ -> invalid_arg "Term.set_payload: collision"
+  match t.payload with
+  | No_payload ->
+      t.payload <- e
+  | _ ->
+      invalid_arg "Term.set_payload: collision"
 
 (** {3 Containers} *)
 
@@ -533,7 +615,11 @@ module DB = struct
   let[@inline] _id x = x
 
   let closed t =
-    let db_calc t = _to_iter ~depth:0 t |> Iter.map (fun (bvar, depth) -> bvar < depth) |> Iter.for_all _id in
+    let db_calc t =
+      _to_iter ~depth:0 t
+      |> Iter.map (fun (bvar, depth) -> bvar < depth)
+      |> Iter.for_all _id
+    in
     if get_property t.props f_db_overflowed then db_calc t
     else
       let res = get_max_db t.props = 0 in
@@ -544,11 +630,15 @@ module DB = struct
       res
 
   (* check whether t contains the De Bruijn symbol n *)
-  let contains t n = _to_iter ~depth:0 t |> Iter.map (fun (bvar, depth) -> bvar = n + depth) |> Iter.exists _id
+  let contains t n =
+    _to_iter ~depth:0 t
+    |> Iter.map (fun (bvar, depth) -> bvar = n + depth)
+    |> Iter.exists _id
 
   let unbound t =
     _to_iter ~depth:0 t
-    |> Iter.filter_map (fun (bvar, depth) -> if bvar >= depth then Some (bvar - depth) else None)
+    |> Iter.filter_map (fun (bvar, depth) ->
+           if bvar >= depth then Some (bvar - depth) else None )
     |> Iter.to_rev_list
 
   (* maps the term to another term, calling [on_binder acc t]
@@ -589,11 +679,13 @@ module DB = struct
       ~on_binder:(fun ~ty:_ ~depth:_ () _ _ -> ())
       t
 
-  let shift ?(depth = 0) n t = if depth = 0 && n = 0 then t else shift_real ~depth n t
+  let shift ?(depth = 0) n t =
+    if depth = 0 && n = 0 then t else shift_real ~depth n t
 
   let unshift_real ?depth n t =
     _fold_map ?depth ()
-      ~on_bvar:(fun ~depth () i -> if i >= depth + n then i - n (* unshift *) else i)
+      ~on_bvar:(fun ~depth () i ->
+        if i >= depth + n then i - n (* unshift *) else i )
       ~on_binder:(fun ~ty:_ ~depth:_ () _ _ -> ())
       t
 
@@ -620,7 +712,8 @@ module DB = struct
         | Var v ->
             var (HVar.cast ~ty v)
         | DB i ->
-            if i < depth then bvar ~ty i else bvar ~ty (i + List.length to_replace) (* shift *)
+            if i < depth then bvar ~ty i
+            else bvar ~ty (i + List.length to_replace) (* shift *)
         | Const s ->
             const ~ty s
         | Bind (s, varty, t') ->
@@ -628,7 +721,9 @@ module DB = struct
             let t' = _replace (depth + 1) t' ~to_replace in
             bind ~ty ~varty:varty' s t'
         | App (f, l) ->
-            app ~ty (_replace depth ~to_replace f) (List.map (_replace depth ~to_replace) l)
+            app ~ty
+              (_replace depth ~to_replace f)
+              (List.map (_replace depth ~to_replace) l)
         | AppBuiltin (s, l) ->
             app_builtin ~ty s (List.map (_replace depth ~to_replace) l) )
 
@@ -654,7 +749,9 @@ module DB = struct
           | DB i -> (
             match DBEnv.find env i with
             | None ->
-                if i >= DBEnv.size env then bvar ~ty (i - DBEnv.size env0) (* unshift *) else bvar ~ty i
+                if i >= DBEnv.size env then bvar ~ty (i - DBEnv.size env0)
+                  (* unshift *)
+                else bvar ~ty i
             | Some t' ->
                 (* type might not be exactly equal, e.g. might be equal
                    up to unifier *)
@@ -693,7 +790,8 @@ module DB = struct
     and aux' depth ty t =
       match view t with
       | Var v -> (
-        try shift depth (VarMap.find v subst) with Not_found -> var (HVar.cast ~ty v) )
+        try shift depth (VarMap.find v subst)
+        with Not_found -> var (HVar.cast ~ty v) )
       | DB i ->
           bvar ~ty i
       | Const s ->
@@ -712,7 +810,11 @@ end
 
 let bind_vars ~ty b vars t =
   (* subst: bind vars_i to a De Bruijn (reverse list so that last element is 0) *)
-  let subst = CCList.foldi (fun s i v -> VarMap.add v (bvar ~ty:(HVar.ty v) i) s) VarMap.empty (List.rev vars) in
+  let subst =
+    CCList.foldi
+      (fun s i v -> VarMap.add v (bvar ~ty:(HVar.ty v) i) s)
+      VarMap.empty (List.rev vars)
+  in
   List.fold_right
     (fun v t ->
       let varty = HVar.ty v |> DB.apply_subst subst in
@@ -822,7 +924,8 @@ module Pos = struct
   module P = Position
 
   let fail_ t pos =
-    Util.errorf ~where:"Term.Pos" "@[<2>invalid position `@[%a@]`@ in term `@[%a@]`@]" P.pp pos debugf t
+    Util.errorf ~where:"Term.Pos"
+      "@[<2>invalid position `@[%a@]`@ in term `@[%a@]`@]" P.pp pos debugf t
 
   let rec at t pos =
     match (view t, pos) with
@@ -952,7 +1055,8 @@ let open_bind_fresh b t =
 let open_bind_fresh2 ?(eq_ty = equal) b t1 t2 =
   let rec aux env vars t1 t2 =
     match (view t1, view t2) with
-    | Bind (b1, ty_var1, body1), Bind (b2, ty_var2, body2) when b1 = b && b2 = b && eq_ty ty_var1 ty_var2 ->
+    | Bind (b1, ty_var1, body1), Bind (b2, ty_var2, body2)
+      when b1 = b && b2 = b && eq_ty ty_var1 ty_var2 ->
         let v = HVar.fresh ~ty:ty_var1 () in
         let env = DBEnv.push env (var v) in
         aux env (v :: vars) body1 body2
@@ -982,7 +1086,11 @@ let rec returns ty =
       ty
 
 let rec expected_ty_vars ty =
-  match view ty with Bind (Binder.ForallTy, _, ty') -> 1 + expected_ty_vars ty' | _ -> 0
+  match view ty with
+  | Bind (Binder.ForallTy, _, ty') ->
+      1 + expected_ty_vars ty'
+  | _ ->
+      0
 
 let is_ground t = not @@ get_property t.props f_has_freevars
 
@@ -999,7 +1107,8 @@ let rec size t =
   | App (head, l) ->
       _size_list (1 + size head) l
 
-and _size_list acc l = match l with [] -> acc | t :: l' -> _size_list (acc + size t) l'
+and _size_list acc l =
+  match l with [] -> acc | t :: l' -> _size_list (acc + size t) l'
 
 let depth t = Seq.subterms_depth t |> Iter.map snd |> Iter.fold max 0
 
@@ -1014,7 +1123,8 @@ let rec head t =
 
 let type_is_unifiable (ty : t) : bool =
   match view ty with
-  | AppBuiltin ((Builtin.TyInt | Builtin.TyRat), _) | Bind (Binder.ForallTy, _, _) ->
+  | AppBuiltin ((Builtin.TyInt | Builtin.TyRat), _)
+  | Bind (Binder.ForallTy, _, _) ->
       false
   | _ ->
       true
@@ -1030,14 +1140,20 @@ let type_non_unifiable_tags (ty : t) : _ list =
   | _ ->
       []
 
-let type_is_prop t = match view t with AppBuiltin (Builtin.Prop, _) -> true | _ -> false
+let type_is_prop t =
+  match view t with AppBuiltin (Builtin.Prop, _) -> true | _ -> false
 
-let[@inline] get_type t = match ty t with HasType ty -> ty | NoType -> invalid_arg "must have type!"
+let[@inline] get_type t =
+  match ty t with HasType ty -> ty | NoType -> invalid_arg "must have type!"
 
 let[@inline] as_app t =
   match view t with
   | App (f, l) -> (
-    match view f with AppBuiltin (b, l') -> (app_builtin b ~ty:(ty_exn t) (l' @ l), []) | _ -> (f, l) )
+    match view f with
+    | AppBuiltin (b, l') ->
+        (app_builtin b ~ty:(ty_exn t) (l' @ l), [])
+    | _ ->
+        (f, l) )
   | AppBuiltin (b, l) when not (Builtin.is_quantifier b) ->
       let ty_args, args = CCList.partition is_a_type l in
       let ty = arrow (List.map ty_exn args) (ty_exn t) in
@@ -1047,13 +1163,16 @@ let[@inline] as_app t =
 
 let[@inline] as_var t = match view t with Var v -> Some v | _ -> None
 
-let[@inline] as_var_exn t = match view t with Var v -> v | _ -> invalid_arg "as_var_exn"
+let[@inline] as_var_exn t =
+  match view t with Var v -> v | _ -> invalid_arg "as_var_exn"
 
 let as_const t = match view t with Const v -> Some v | _ -> None
 
-let as_const_exn t = match view t with Const v -> v | _ -> invalid_arg "as_const_exn"
+let as_const_exn t =
+  match view t with Const v -> v | _ -> invalid_arg "as_const_exn"
 
-let[@inline] as_bvar_exn t = match view t with DB i -> i | _ -> invalid_arg "as_bvar_exn"
+let[@inline] as_bvar_exn t =
+  match view t with DB i -> i | _ -> invalid_arg "as_bvar_exn"
 
 let[@inline] is_bvar_i i t = match view t with DB j -> i = j | _ -> false
 
@@ -1072,7 +1191,13 @@ let add_default_hook h = _hooks := h :: !_hooks
 let default_hooks () = !_hooks
 
 let needs_args (t : t) : bool =
-  match view t with AppBuiltin (Builtin.Arrow, _) -> true | Bind (Binder.ForallTy, _, _) -> true | _ -> false
+  match view t with
+  | AppBuiltin (Builtin.Arrow, _) ->
+      true
+  | Bind (Binder.ForallTy, _, _) ->
+      true
+  | _ ->
+      false
 
 let show_type_arguments = ref false
 
@@ -1086,7 +1211,8 @@ let rec open_bind2 b t1 t2 =
 
 let rec pp_depth ?(hooks = []) depth out t =
   let rec _pp depth out t =
-    if List.exists (fun h -> h depth (_pp depth) out t) hooks then () (* hook took control *)
+    if List.exists (fun h -> h depth (_pp depth) out t) hooks then ()
+      (* hook took control *)
     else (
       _pp_root depth out t ;
       if !print_hashconsing_ids then Format.fprintf out "/%d" t.id )
@@ -1094,17 +1220,26 @@ let rec pp_depth ?(hooks = []) depth out t =
     match view t with
     | Var v ->
         pp_var out v ;
-        if !print_all_types then Format.fprintf out ":%a" (_pp_surrounded depth) (ty_exn t)
+        if !print_all_types then
+          Format.fprintf out ":%a" (_pp_surrounded depth) (ty_exn t)
     | DB i ->
         Format.fprintf out "Y%d" (depth - i - 1) ;
-        if !print_all_types then Format.fprintf out ":%a" (_pp_surrounded depth) (ty_exn t)
+        if !print_all_types then
+          Format.fprintf out ":%a" (_pp_surrounded depth) (ty_exn t)
     | Const s -> (
-      match ID.as_prefix s with Some s -> CCFormat.string out s | None -> ID.pp out s )
+      match ID.as_prefix s with
+      | Some s ->
+          CCFormat.string out s
+      | None ->
+          ID.pp out s )
     | Bind (b, _, _) ->
         (* unfold *)
         let varty_l, t' = open_bind b t in
-        let pp_tyvar out (i, varty) = Format.fprintf out "(@[Y%d:@[%a@])@]" (depth + i) (_pp depth) varty in
-        Format.fprintf out "@[<1>%a@ @[%a@].@ %a@]" Binder.pp b (Util.pp_iter ~sep:" " pp_tyvar)
+        let pp_tyvar out (i, varty) =
+          Format.fprintf out "(@[Y%d:@[%a@])@]" (depth + i) (_pp depth) varty
+        in
+        Format.fprintf out "@[<1>%a@ @[%a@].@ %a@]" Binder.pp b
+          (Util.pp_iter ~sep:" " pp_tyvar)
           (Iter.of_array_i (Array.of_list varty_l))
           (_pp_surrounded (depth + List.length varty_l))
           t'
@@ -1114,22 +1249,29 @@ let rec pp_depth ?(hooks = []) depth out t =
         Format.fprintf out "@[%a@ → %a@]"
           (Util.pp_list ~sep:" → " (_pp_surrounded depth))
           args (_pp_surrounded depth) ret
-    | AppBuiltin (((Builtin.ExistsConst | Builtin.ForallConst) as b), [x; body]) ->
-        Format.fprintf out "%a %a. %a" Builtin.pp b (_pp depth) x (_pp depth) body
+    | AppBuiltin (((Builtin.ExistsConst | Builtin.ForallConst) as b), [x; body])
+      ->
+        Format.fprintf out "%a %a. %a" Builtin.pp b (_pp depth) x (_pp depth)
+          body
     | AppBuiltin (((Builtin.Eq | Builtin.Neq) as b), x :: rest) ->
         let sep, l =
-          if is_a_type x then (CCFormat.sprintf "(%a::%a) " Builtin.pp b (_pp depth) x, rest)
+          if is_a_type x then
+            (CCFormat.sprintf "(%a::%a) " Builtin.pp b (_pp depth) x, rest)
           else (CCFormat.sprintf "%a " Builtin.pp b, x :: rest)
         in
-        if CCList.length l = 1 then Format.fprintf out "(%a @[%a@])" Builtin.pp b (_pp depth) (List.hd l)
+        if CCList.length l = 1 then
+          Format.fprintf out "(%a @[%a@])" Builtin.pp b (_pp depth) (List.hd l)
         else Format.fprintf out " @[%a@]" (Util.pp_list ~sep (_pp depth)) l
     | AppBuiltin (b, ([_; a] | [a])) when Builtin.is_prefix b ->
         Format.fprintf out "@[<1>%a %a@]" Builtin.pp b (_pp depth) a
     | AppBuiltin (b, [t1; t2]) when Builtin.is_infix b ->
-        Format.fprintf out "(@[%a %s@ %a@])" (_pp depth) t1 (Builtin.to_string b) (_pp depth) t2
-    | AppBuiltin (b, [_ty; t1; t2]) when Builtin.is_infix b && is_tType (ty_exn _ty) ->
+        Format.fprintf out "(@[%a %s@ %a@])" (_pp depth) t1
+          (Builtin.to_string b) (_pp depth) t2
+    | AppBuiltin (b, [_ty; t1; t2])
+      when Builtin.is_infix b && is_tType (ty_exn _ty) ->
         (* always drop the type argument, it's always inferrable for builtins *)
-        Format.fprintf out "(@[%a %s@ %a@])" (_pp depth) t1 (Builtin.to_string b) (_pp depth) t2
+        Format.fprintf out "(@[%a %s@ %a@])" (_pp depth) t1
+          (Builtin.to_string b) (_pp depth) t2
     | AppBuiltin (b, l) when Builtin.is_infix b && List.length l >= 2 ->
         let sep = CCFormat.sprintf " %s " (Builtin.to_string b) in
         Format.fprintf out "(@[%a@])" (Util.pp_list ~sep (_pp depth)) l
@@ -1142,7 +1284,10 @@ let rec pp_depth ?(hooks = []) depth out t =
           else l
         in
         if CCList.is_empty l then Format.fprintf out "@[%a@]" Builtin.pp b
-        else Format.fprintf out "@[%a(%a)@]" Builtin.pp b (Util.pp_list (_pp depth)) l
+        else
+          Format.fprintf out "@[%a(%a)@]" Builtin.pp b
+            (Util.pp_list (_pp depth))
+            l
     | App (f, l) -> (
         (* remove type arguments unless required,
            or unless we are already printing a type *)
@@ -1150,13 +1295,18 @@ let rec pp_depth ?(hooks = []) depth out t =
           if !show_type_arguments || is_tType (ty_exn t) then l
           else List.filter (fun t -> not (is_tType @@ ty_exn t)) l
         in
-        let as_infix = match view f with Const id -> ID.as_infix id | _ -> None in
-        let as_prefix = match view f with Const id -> ID.as_prefix id | _ -> None in
+        let as_infix =
+          match view f with Const id -> ID.as_infix id | _ -> None
+        in
+        let as_prefix =
+          match view f with Const id -> ID.as_prefix id | _ -> None
+        in
         match (as_infix, as_prefix, l) with
         | _, _, [] ->
             _pp depth out f
         | Some s, _, [a; b] ->
-            Format.fprintf out "@[<1>%a@ %s@ %a@]" (_pp_surrounded depth) a s (_pp_surrounded depth) b
+            Format.fprintf out "@[<1>%a@ %s@ %a@]" (_pp_surrounded depth) a s
+              (_pp_surrounded depth) b
         | _, Some s, [a] ->
             Format.fprintf out "@[<1>%s@ %a@]" s (_pp_surrounded depth) a
         | _ ->
@@ -1209,8 +1359,11 @@ let rec pp_zf out t =
     | Bind (b, _, _) ->
         (* unfold *)
         let varty_l, t' = open_bind b t in
-        let pp_tyvar out (i, varty) = Format.fprintf out "(@[Y%d:@[%a@])@]" (depth + i) (pp_ depth) varty in
-        Format.fprintf out "@[<1>%a@ @[%a@].@ %a@]" Binder.ZF.pp b (Util.pp_iter ~sep:" " pp_tyvar)
+        let pp_tyvar out (i, varty) =
+          Format.fprintf out "(@[Y%d:@[%a@])@]" (depth + i) (pp_ depth) varty
+        in
+        Format.fprintf out "@[<1>%a@ @[%a@].@ %a@]" Binder.ZF.pp b
+          (Util.pp_iter ~sep:" " pp_tyvar)
           (Iter.of_array_i (Array.of_list varty_l))
           (_pp_surrounded (depth + List.length varty_l))
           t'
@@ -1220,23 +1373,29 @@ let rec pp_zf out t =
         Format.fprintf out "@[%a@ -> %a@]"
           (Util.pp_list ~sep:" -> " (_pp_surrounded depth))
           args (_pp_surrounded depth) ret
-    | AppBuiltin (b, [x; body]) when Builtin.equal b Builtin.ExistsConst || Builtin.equal b Builtin.ForallConst
-      ->
+    | AppBuiltin (b, [x; body])
+      when Builtin.equal b Builtin.ExistsConst
+           || Builtin.equal b Builtin.ForallConst ->
         Format.printf "%a %a. %a" Builtin.pp b pp_zf x pp_zf body
     | AppBuiltin (b, ([_; a] | [a])) when Builtin.is_prefix b ->
         Format.fprintf out "@[<1>%a %a@]" Builtin.ZF.pp b (pp_ depth) a
     | AppBuiltin (b, [t1; t2]) when Builtin.is_infix b ->
-        Format.fprintf out "(@[%a %a@ %a@])" (pp_ depth) t1 Builtin.ZF.pp b (pp_ depth) t2
-    | AppBuiltin (b, [_ty; t1; t2]) when Builtin.is_infix b && is_tType (ty_exn _ty) ->
+        Format.fprintf out "(@[%a %a@ %a@])" (pp_ depth) t1 Builtin.ZF.pp b
+          (pp_ depth) t2
+    | AppBuiltin (b, [_ty; t1; t2])
+      when Builtin.is_infix b && is_tType (ty_exn _ty) ->
         (* always drop the type argument, it's always inferrable for builtins *)
-        Format.fprintf out "(@[%a %a@ %a@])" (pp_ depth) t1 Builtin.ZF.pp b (pp_ depth) t2
+        Format.fprintf out "(@[%a %a@ %a@])" (pp_ depth) t1 Builtin.ZF.pp b
+          (pp_ depth) t2
     | AppBuiltin (b, l) when List.length l >= 2 && Builtin.is_infix b ->
         let sep = CCFormat.sprintf " %s " (Builtin.to_string b) in
         Format.fprintf out "(@[%a@])" (Util.pp_list ~sep pp_zf) l
     | AppBuiltin (b, []) ->
         Builtin.ZF.pp out b
     | AppBuiltin (b, l) ->
-        Format.fprintf out "@[%a(%a)@]" Builtin.ZF.pp b (Util.pp_list (pp_ depth)) l
+        Format.fprintf out "@[%a(%a)@]" Builtin.ZF.pp b
+          (Util.pp_list (pp_ depth))
+          l
     | App (f, l) -> (
       match l with
       | [] ->

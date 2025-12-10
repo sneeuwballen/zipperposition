@@ -101,15 +101,18 @@ module type S = sig
         (the higher, the less likely the clause is to be picked soon)
       also takes a list of literals and a proof builder *)
 
-  val create_a : penalty:int -> trail:Trail.t -> Literal.t array -> proof_step -> t
+  val create_a :
+    penalty:int -> trail:Trail.t -> Literal.t array -> proof_step -> t
   (** Build a new clause from the given literals. *)
 
   val of_sclause : ?penalty:int -> SClause.t -> proof_step -> t
 
-  val of_forms : ?penalty:int -> trail:Trail.t -> Term.t SLiteral.t list -> proof_step -> t
+  val of_forms :
+    ?penalty:int -> trail:Trail.t -> Term.t SLiteral.t list -> proof_step -> t
   (** Directly from list of formulas *)
 
-  val of_forms_axiom : ?penalty:int -> file:string -> name:string -> Term.t SLiteral.t list -> t
+  val of_forms_axiom :
+    ?penalty:int -> file:string -> name:string -> Term.t SLiteral.t list -> t
   (** Construction from formulas as axiom (initial clause) *)
 
   val of_statement : ?convert_defs:bool -> Statement.clause_t -> t list
@@ -123,7 +126,8 @@ module type S = sig
 
   val proof_parent : t -> Proof.Parent.t
 
-  val proof_parent_subst : Subst.Renaming.t -> t Scoped.t -> Subst.t -> Proof.Parent.t
+  val proof_parent_subst :
+    Subst.Renaming.t -> t Scoped.t -> Subst.t -> Proof.Parent.t
 
   val update_proof : t -> (proof_step -> proof_step) -> t
   (** [update_proof c f] creates a new clause that is

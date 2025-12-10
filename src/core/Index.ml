@@ -39,13 +39,18 @@ module MakeLeaf (X : Set.OrderedType) : LEAF with type elt = X.t = struct
 
   let remove leaf t data = remove_if leaf t (fun set -> S.remove data set)
 
-  let update_leaf leaf t data_filter = remove_if leaf t (fun set -> S.filter data_filter set)
+  let update_leaf leaf t data_filter =
+    remove_if leaf t (fun set -> S.filter data_filter set)
 
   let is_empty = T.Map.is_empty
 
-  let iter leaf f = T.Map.iter (fun t set -> S.iter (fun elt -> f t elt) set) leaf
+  let iter leaf f =
+    T.Map.iter (fun t set -> S.iter (fun elt -> f t elt) set) leaf
 
-  let fold leaf acc f = T.Map.fold (fun t set acc -> S.fold (fun elt acc -> f acc t elt) set acc) leaf acc
+  let fold leaf acc f =
+    T.Map.fold
+      (fun t set acc -> S.fold (fun elt acc -> f acc t elt) set acc)
+      leaf acc
 
   let size leaf = T.Map.fold (fun _ set acc -> S.cardinal set + acc) leaf 0
 

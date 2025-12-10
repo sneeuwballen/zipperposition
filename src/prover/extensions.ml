@@ -27,7 +27,8 @@ type t =
   ; prio: int  (** the lower, the more urgent, the earlier it is loaded *)
   ; start_file_actions: string state_actions
   ; post_parse_actions: UntypedAST.statement Iter.t state_actions
-  ; post_typing_actions: TypeInference.typed_statement CCVector.ro_vector state_actions
+  ; post_typing_actions:
+      TypeInference.typed_statement CCVector.ro_vector state_actions
   ; post_cnf_modifiers: Cnf.c_statement Iter.t modifiers
   ; post_cnf_actions: Statement.clause_t CCVector.ro_vector state_actions
   ; ord_select_actions: (Ordering.t * Selection.t) state_actions
@@ -63,13 +64,16 @@ let register self =
     Hashtbl.replace _extensions self.name self ) ;
   __current := CCResult.Ok self
 
-let cmp_prio_name a b = if a.prio = b.prio then String.compare a.name b.name else compare a.prio b.prio
+let cmp_prio_name a b =
+  if a.prio = b.prio then String.compare a.name b.name
+  else compare a.prio b.prio
 
 let extensions () =
   CCHashtbl.values _extensions
   |> Iter.sort_uniq ~cmp:cmp_prio_name (* sort by increasing priority *)
   |> Iter.to_list
 
-let by_name name = try Some (Hashtbl.find _extensions name) with Not_found -> None
+let by_name name =
+  try Some (Hashtbl.find _extensions name) with Not_found -> None
 
 let names () = CCHashtbl.keys _extensions

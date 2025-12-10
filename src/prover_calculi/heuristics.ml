@@ -44,7 +44,8 @@ module Make (E : Env.S) = struct
   let _depth_types lits =
     Literals.Seq.terms lits |> Iter.map T.ty
     |> Iter.map (fun t -> InnerTerm.depth (t : Type.t :> InnerTerm.t))
-    |> Iter.max ?lt:None |> CCOpt.map_or ~default:0 CCFun.id
+    |> Iter.max ?lt:None
+    |> CCOpt.map_or ~default:0 CCFun.id
 
   let is_too_deep c =
     match !depth_limit_ with
@@ -56,7 +57,9 @@ module Make (E : Env.S) = struct
         if depth > d then (
           Ctx.lost_completeness () ;
           Util.incr_stat stat_depth_limit ;
-          Util.debugf ~section 5 "@[<2>clause dismissed (too deep at %d):@ @[%a@]@]" (fun k -> k depth C.pp c) ;
+          Util.debugf ~section 5
+            "@[<2>clause dismissed (too deep at %d):@ @[%a@]@]" (fun k ->
+              k depth C.pp c ) ;
           true )
         else false
 
@@ -65,11 +68,16 @@ module Make (E : Env.S) = struct
     else
       let lits = C.lits c in
       (* number of distinct term variables *)
-      let n_vars = Literals.vars lits |> List.filter (fun v -> not (Type.is_tType (HVar.ty v))) |> List.length in
+      let n_vars =
+        Literals.vars lits
+        |> List.filter (fun v -> not (Type.is_tType (HVar.ty v)))
+        |> List.length
+      in
       if n_vars > !max_vars then (
         Ctx.lost_completeness () ;
         Util.incr_stat stat_vars ;
-        Util.debugf ~section 5 "@[<2>clause dismissed (%d vars is too much):@ @[%a@]@]" (fun k ->
+        Util.debugf ~section 5
+          "@[<2>clause dismissed (%d vars is too much):@ @[%a@]@]" (fun k ->
             k n_vars C.pp c ) ;
         true )
       else false
@@ -92,9 +100,15 @@ let extension =
 let () =
   Params.add_opts
     [ ("--depth-limit", Arg.Int enable_depth_limit, " set maximal term depth")
-    ; ("--max-vars", Arg.Set_int max_vars, " maximum number of variables per clause")
-    ; ("--no-max-vars", Arg.Set no_max_vars, " disable maximum number of variables per clause")
-    ; ("--enable-max-vars", Arg.Clear no_max_vars, "enable maximum number of variables per clause") ] ;
+    ; ( "--max-vars"
+      , Arg.Set_int max_vars
+      , " maximum number of variables per clause" )
+    ; ( "--no-max-vars"
+      , Arg.Set no_max_vars
+      , " disable maximum number of variables per clause" )
+    ; ( "--enable-max-vars"
+      , Arg.Clear no_max_vars
+      , "enable maximum number of variables per clause" ) ] ;
   Params.add_to_mode "best" (fun () -> no_max_vars := true) ;
   Params.add_to_mode "ho-pragmatic" (fun () -> no_max_vars := true) ;
   Params.add_to_mode "ho-competitive" (fun () -> no_max_vars := true) ;

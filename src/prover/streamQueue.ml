@@ -54,15 +54,24 @@ module Make (A : ARG) = struct
       mutable fair_tries: int
     ; ratio: int
     ; guard: int
-    ; weight: Stm.t -> int (* function that assigns an initial weight to a stream (based on what criteria?) *)
+    ; weight: Stm.t -> int
+          (* function that assigns an initial weight to a stream (based on what criteria?) *)
     ; mutable stm_nb: int
     ; name: string }
 
   (** generic stream queue based on some ordering on streams, given
         by a weight function *)
   let make ~guard ~ratio ~weight name =
-    if ratio < 0 then invalid_arg "StreamQueue.make: ratio must be greater or equal to 0" ;
-    {weight; name; ratio; time_before_fair= ratio; fair_tries= 0; guard; stm_nb= 0; hp= H.empty}
+    if ratio < 0 then
+      invalid_arg "StreamQueue.make: ratio must be greater or equal to 0" ;
+    { weight
+    ; name
+    ; ratio
+    ; time_before_fair= ratio
+    ; fair_tries= 0
+    ; guard
+    ; stm_nb= 0
+    ; hp= H.empty }
 
   let is_empty (q : t) = H.is_empty q.hp
 
@@ -78,7 +87,8 @@ module Make (A : ARG) = struct
   let add_lst q sl = List.iter (add q) sl
 
   let rec _take_first guard q =
-    if H.is_empty q.hp then None (* TODO: replace with cheaper test q.stm_nb = 0 ? *)
+    if H.is_empty q.hp then None
+      (* TODO: replace with cheaper test q.stm_nb = 0 ? *)
     else (
       if guard = 0 then raise Not_found ;
       let dripped = ref None in
@@ -96,7 +106,11 @@ module Make (A : ARG) = struct
           reduced_hp
       in
       q.hp <- new_hp ;
-      match !dripped with None -> _take_first (guard - 1) q | Some _ -> !dripped )
+      match !dripped with
+      | None ->
+          _take_first (guard - 1) q
+      | Some _ ->
+          !dripped )
 
   let take_first q =
     assert (q.guard >= 0) ;
@@ -111,7 +125,11 @@ module Make (A : ARG) = struct
        H.fold (fun res (_,s) -> Stm.drip s :: res) [] q.hp *)
     q.fair_tries <- q.fair_tries + 1 ;
     (* H.fold (fun res (_,s) -> Stm.drip s :: res) [] q.hp *)
-    let all_stms = CCList.sort (fun (_, s) (_, s') -> CCInt.compare (Stm.id s) (Stm.id s')) (H.to_list q.hp) in
+    let all_stms =
+      CCList.sort
+        (fun (_, s) (_, s') -> CCInt.compare (Stm.id s) (Stm.id s'))
+        (H.to_list q.hp)
+    in
     let to_drip, rest = CCList.take_drop tries all_stms in
     let dripped =
       let rec consume_until_empty n acc = function
@@ -126,24 +144,33 @@ module Make (A : ARG) = struct
                 false
               in
               if is_empty_clause result || (full && limit_reached) then
-                List.rev_append ((result, s) :: acc) (CCList.rev_map (fun (_, s) -> (None, s)) s_rest)
-              else (consume_until_empty [@tailrec]) n ((result, s) :: acc) s_rest
+                List.rev_append ((result, s) :: acc)
+                  (CCList.rev_map (fun (_, s) -> (None, s)) s_rest)
+              else
+                (consume_until_empty [@tailrec]) n ((result, s) :: acc) s_rest
           | exception Stm.Empty_Stream ->
               (consume_until_empty [@tailrec]) n acc s_rest )
       in
       (consume_until_empty [@tailrec]) 0 [] to_drip
     in
-    let new_stms = List.rev_append (List.rev_map (fun (_, s) -> (Stm.penalty s, s)) dripped) rest in
+    let new_stms =
+      List.rev_append
+        (List.rev_map (fun (_, s) -> (Stm.penalty s, s)) dripped)
+        rest
+    in
     q.hp <- H.of_list new_stms ;
     q.stm_nb <- List.length new_stms ;
     let taken = List.rev_map fst dripped in
-    Util.debugf ~section 1 "taken clauses: @[%a@]@." (fun k -> k (CCList.pp (CCOpt.pp Stm.C.pp)) taken) ;
+    Util.debugf ~section 1 "taken clauses: @[%a@]@." (fun k ->
+        k (CCList.pp (CCOpt.pp Stm.C.pp)) taken ) ;
     taken
 
   let rec take_fair_anyway q =
     if H.is_empty q.hp then [None]
     else
-      let res = CCList.filter_map CCFun.id (take_fair ~full:true (H.size q.hp) q) in
+      let res =
+        CCList.filter_map CCFun.id (take_fair ~full:true (H.size q.hp) q)
+      in
       if CCList.is_empty res then take_fair_anyway q
       else (
         q.time_before_fair <- q.ratio ;
@@ -155,7 +182,8 @@ module Make (A : ARG) = struct
       try
         let res = take_first q in
         (* if empty clause is found do not go futher *)
-        if is_empty_clause res then res :: prev_res else _take_nb q (nb - 1) (res :: prev_res)
+        if is_empty_clause res then res :: prev_res
+        else _take_nb q (nb - 1) (res :: prev_res)
       with Not_found -> prev_res
 
   let clauses_to_take q =
@@ -168,7 +196,9 @@ module Make (A : ARG) = struct
     else (
       q.time_before_fair <- q.time_before_fair - 1 ;
       (* Only extract clauses if the minimal stream weight is low *)
-      if (not (H.is_empty q.hp)) && fst (H.find_min_exn q.hp) <= 50 then _take_nb q n [] else [] )
+      if (not (H.is_empty q.hp)) && fst (H.find_min_exn q.hp) <= 50 then
+        _take_nb q n []
+      else [] )
 
   let rec _take_stm_nb_fix_stm q n res =
     if n = 0 || H.is_empty q.hp then res
@@ -183,7 +213,8 @@ module Make (A : ARG) = struct
           let res = Stm.drip_n s n q.guard in
           q.hp <- H.insert (q.weight s, s) red_hp ;
           res
-      with Stm.Drip_n_Unfinished (res', _, n') -> _take_stm_nb_fix_stm q n' (res' @ res)
+      with Stm.Drip_n_Unfinished (res', _, n') ->
+        _take_stm_nb_fix_stm q n' (res' @ res)
 
   let take_stm_nb_fix_stm q =
     let n = clauses_to_take q in

@@ -23,7 +23,8 @@ let create () =
 (* remove handler at index i *)
 let remove s i =
   assert (s.n > 0 && i >= 0) ;
-  if i < s.n - 1 (* erase handler with the last one *) then s.handlers.(i) <- s.handlers.(s.n - 1) ;
+  if i < s.n - 1 (* erase handler with the last one *) then
+    s.handlers.(i) <- s.handlers.(s.n - 1) ;
   s.handlers.(s.n - 1) <- nop_handler ;
   (* free handler *)
   s.n <- s.n - 1 ;
@@ -32,7 +33,12 @@ let remove s i =
 let send s x =
   for i = 0 to s.n - 1 do
     while
-      try match s.handlers.(i) x with ContinueListening -> false (* keep *) | StopListening -> true
+      try
+        match s.handlers.(i) x with
+        | ContinueListening ->
+            false (* keep *)
+        | StopListening ->
+            true
       with e -> !_exn_handler e ; false (* be conservative, keep... *)
     do
       remove s i (* i-th handler is done, remove it *)

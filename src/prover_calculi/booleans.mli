@@ -7,7 +7,11 @@ open Logtk
 
 val _quant_rename : bool ref
 
-type reasoning_kind = BoolReasoningDisabled | BoolSimplificationsOnly | BoolHoist | BoolCasesPreprocess
+type reasoning_kind =
+  | BoolReasoningDisabled
+  | BoolSimplificationsOnly
+  | BoolHoist
+  | BoolCasesPreprocess
 
 val k_bool_reasoning : reasoning_kind Flex_state.key
 
@@ -35,4 +39,5 @@ val preprocess_booleans :
   -> Logtk.TypeInference.typed_statement CCVector.ro_vector
 
 val preprocess_cnf_booleans :
-  Logtk.Statement.clause_t CCVector.ro_vector -> Logtk.Statement.clause_t CCVector.ro_vector
+     Logtk.Statement.clause_t CCVector.ro_vector
+  -> Logtk.Statement.clause_t CCVector.ro_vector

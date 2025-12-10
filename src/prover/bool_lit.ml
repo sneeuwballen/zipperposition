@@ -15,7 +15,10 @@ end
 let stat_num_lit = Util.mk_stat "msat.num_lits"
 
 module Make (Payload : PAYLOAD) : S with type payload = Payload.t = struct
-  type t = {id: int; (* sign = sign of literal *) payload: Payload.t; neg: t (* negation *)}
+  type t =
+    { id: int
+    ; (* sign = sign of literal *) payload: Payload.t
+    ; neg: t (* negation *) }
 
   type lit = t
 
@@ -58,7 +61,8 @@ module Make (Payload : PAYLOAD) : S with type payload = Payload.t = struct
 
   let to_int i = i.id
 
-  let pp out i = Format.fprintf out "%s%d" (if sign i then "" else "¬") (abs i).id
+  let pp out i =
+    Format.fprintf out "%s%d" (if sign i then "" else "¬") (abs i).id
 
   module AsKey = struct
     type t = lit

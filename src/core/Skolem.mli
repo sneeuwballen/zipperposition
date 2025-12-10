@@ -18,7 +18,12 @@ type form = TypedSTerm.t
 (** Context needed to create new symbols *)
 type ctx
 
-val create : ?prefix:string -> ?prop_prefix:string -> ?on_new:(ID.t -> type_ -> unit) -> unit -> ctx
+val create :
+     ?prefix:string
+  -> ?prop_prefix:string
+  -> ?on_new:(ID.t -> type_ -> unit)
+  -> unit
+  -> ctx
 (** New skolem contex. A prefix can be provided, which will be
     added to all newly created skolem symbols.
     @param prefix used to name skolem functions/constants
@@ -40,7 +45,8 @@ val counter : ctx -> int
 
 (** {2 Skolemization} *)
 
-val skolem_form : ctx:ctx -> (type_, term) Var.Subst.t -> type_ Var.t -> form -> term
+val skolem_form :
+  ctx:ctx -> (type_, term) Var.Subst.t -> type_ Var.t -> form -> term
 (** [skolem_form ~ctx subst var f] returns a term [t] made of a new symbol
     applied to the free variables of [f] that do not occur in [subst].
     This term should replace the variable [var], occurring free in [f].
@@ -96,7 +102,11 @@ type term_definition = private
   ; td_stmt: Statement.input_t list lazy_t }
 
 val define_term :
-  ?pattern:string -> ctx:ctx -> parents:Proof.Parent.t list -> (term list * term) list -> term_definition
+     ?pattern:string
+  -> ctx:ctx
+  -> parents:Proof.Parent.t list
+  -> (term list * term) list
+  -> term_definition
 (** [define_term l] introduces a new function symbol [f] that is
     defined by:
     - for each [args, rhs] in [l], [f args = rhs]

@@ -25,7 +25,9 @@ type stats =
 val pp_stats : stats CCFormat.printer
 
 (** Result for checking only one step *)
-type check_step_res = CS_check of res | CS_skip of [`ESA | `Other | `Tags | `Trivial]
+type check_step_res =
+  | CS_check of res
+  | CS_skip of [`ESA | `Other | `Tags | `Trivial]
 
 val check :
      ?dot_prefix:string

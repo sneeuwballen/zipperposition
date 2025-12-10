@@ -45,7 +45,8 @@ let is_empty = Lit.Set.is_empty
 
 let subsumes t1 t2 = Lit.Set.subset t1 t2
 
-let is_trivial trail = Lit.Set.exists (fun i -> Lit.Set.mem (Lit.neg i) trail) trail
+let is_trivial trail =
+  Lit.Set.exists (fun i -> Lit.Set.mem (Lit.neg i) trail) trail
 
 let merge = Lit.Set.union
 
@@ -73,8 +74,15 @@ let is_active trail ~v =
 
 let to_iter = Lit.Set.to_iter
 
-let labels (t : t) = to_iter t |> Iter.map BBox.Lit.to_int |> Util.Int_set.of_iter
+let labels (t : t) =
+  to_iter t |> Iter.map BBox.Lit.to_int |> Util.Int_set.of_iter
 
 let to_s_form (t : t) =
   let module F = TypedSTerm.Form in
-  match to_list t |> List.map BBox.to_s_form with [] -> F.true_ | [f] -> f | l -> F.and_ l
+  match to_list t |> List.map BBox.to_s_form with
+  | [] ->
+      F.true_
+  | [f] ->
+      f
+  | l ->
+      F.and_ l

@@ -53,7 +53,10 @@ module Make (Elt : RANKED) = struct
     let i = ref (Elt.idx elt) in
     ( try
         while !li < sz do
-          let child = if !ri < sz && Elt.lt (Vec.get heap !ri) (Vec.get heap !li) then !ri else !li in
+          let child =
+            if !ri < sz && Elt.lt (Vec.get heap !ri) (Vec.get heap !li) then !ri
+            else !li
+          in
           if not (Elt.lt (Vec.get heap child) elt) then raise Exit ;
           Vec.set heap !i (Vec.get heap child) ;
           Elt.set_idx (Vec.get heap !i) !i ;
@@ -127,7 +130,8 @@ module Make (Elt : RANKED) = struct
         raise Not_found
     | 1 ->
         let x = Vec.pop_exn heap in
-        Elt.set_idx x _absent_index ; x
+        Elt.set_idx x _absent_index ;
+        x
     | _ ->
         let x = Vec.get heap 0 in
         let new_hd = Vec.pop_exn heap in

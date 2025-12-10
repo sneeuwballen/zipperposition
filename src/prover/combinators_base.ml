@@ -10,7 +10,9 @@ let ty_s =
   let db_alpha = Ty.bvar 2 and db_beta = Ty.bvar 1 and db_gamma = Ty.bvar 0 in
   let open Type in
   let prefix ty = forall @@ forall @@ forall ty in
-  prefix ([[db_alpha; db_beta] ==> db_gamma; [db_alpha] ==> db_beta; db_alpha] ==> db_gamma)
+  prefix
+    ( [[db_alpha; db_beta] ==> db_gamma; [db_alpha] ==> db_beta; db_alpha]
+    ==> db_gamma )
 
 (* see mk_c *)
 let ty_c =
@@ -24,7 +26,8 @@ let ty_b =
   let db_alpha = Ty.bvar 2 and db_beta = Ty.bvar 1 and db_gamma = Ty.bvar 0 in
   let open Type in
   let prefix ty = forall @@ forall @@ forall ty in
-  prefix ([[db_alpha] ==> db_beta; [db_gamma] ==> db_alpha; db_gamma] ==> db_beta)
+  prefix
+    ([[db_alpha] ==> db_beta; [db_gamma] ==> db_alpha; db_gamma] ==> db_beta)
 
 (* see mk_k *)
 let ty_k =
@@ -82,19 +85,26 @@ let mk_b ~args ~alpha ~beta ~gamma =
 let mk_k ~args ~alpha ~beta =
   let ty =
     Ty.apply ty_k
-      [Type.of_term_unsafe (alpha : Term.t :> InnerTerm.t); Type.of_term_unsafe (beta : Term.t :> InnerTerm.t)]
+      [ Type.of_term_unsafe (alpha : Term.t :> InnerTerm.t)
+      ; Type.of_term_unsafe (beta : Term.t :> InnerTerm.t) ]
   in
   mk_comb Builtin.KComb ty [alpha; beta] args
 
 (* make I combinator with the type:
    Πα. α → α *)
 let mk_i ~args ~alpha =
-  let ty = Ty.apply ty_i [Type.of_term_unsafe (alpha : Term.t :> InnerTerm.t)] in
+  let ty =
+    Ty.apply ty_i [Type.of_term_unsafe (alpha : Term.t :> InnerTerm.t)]
+  in
   mk_comb Builtin.IComb ty [alpha] args
 
 (* {2 Helper functions} *)
 let[@inline] term_has_comb ~comb t =
-  match T.view t with T.AppBuiltin (hd, _) when Builtin.equal comb hd -> true | _ -> false
+  match T.view t with
+  | T.AppBuiltin (hd, _) when Builtin.equal comb hd ->
+      true
+  | _ ->
+      false
 
 (* Returns the cobminator head, type arguments and real arguments
    of a combinator *)
@@ -197,7 +207,11 @@ let narrowS t =
   try
     let c_kind, _, args = unpack_comb t in
     if Builtin.equal Builtin.SComb c_kind then
-      match args with x :: y :: z :: rest -> Some (T.app x (z :: T.app y [z] :: rest)) | _ -> None
+      match args with
+      | x :: y :: z :: rest ->
+          Some (T.app x (z :: T.app y [z] :: rest))
+      | _ ->
+          None
     else None
   with IsNotCombinator -> None
 
@@ -207,7 +221,11 @@ let narrowB t =
   try
     let c_kind, _, args = unpack_comb t in
     if Builtin.equal Builtin.BComb c_kind then
-      match args with x :: y :: z :: rest -> Some (T.app x (T.app y [z] :: rest)) | _ -> None
+      match args with
+      | x :: y :: z :: rest ->
+          Some (T.app x (T.app y [z] :: rest))
+      | _ ->
+          None
     else None
   with IsNotCombinator -> None
 
@@ -217,7 +235,11 @@ let narrowC t =
   try
     let c_kind, _, args = unpack_comb t in
     if Builtin.equal Builtin.CComb c_kind then
-      match args with x :: y :: z :: rest -> Some (T.app x (z :: y :: rest)) | _ -> None
+      match args with
+      | x :: y :: z :: rest ->
+          Some (T.app x (z :: y :: rest))
+      | _ ->
+          None
     else None
   with IsNotCombinator -> None
 
@@ -236,7 +258,8 @@ let narrowK t =
 let narrowI t =
   try
     let c_kind, _, args = unpack_comb t in
-    if Builtin.equal Builtin.IComb c_kind then match args with x :: rest -> Some (T.app x rest) | _ -> None
+    if Builtin.equal Builtin.IComb c_kind then
+      match args with x :: rest -> Some (T.app x rest) | _ -> None
     else None
   with IsNotCombinator -> None
 
@@ -316,7 +339,11 @@ let opt9 t =
       match args with
       | [i] -> (
           let alpha = Term.of_ty @@ List.hd @@ Type.expected_args @@ T.ty t in
-          match unpack_comb i with Builtin.IComb, _, [] -> Some (mk_i ~args:[] ~alpha) | _ -> None )
+          match unpack_comb i with
+          | Builtin.IComb, _, [] ->
+              Some (mk_i ~args:[] ~alpha)
+          | _ ->
+              None )
       | [i; x] -> (
         match unpack_comb i with Builtin.IComb, _, [] -> Some x | _ -> None )
       | _ ->
@@ -331,7 +358,11 @@ let opt10 t =
     if Builtin.equal Builtin.SComb c_kind then
       match args with
       | [k; x] -> (
-        match unpack_comb k with Builtin.KComb, [_; beta], [] -> Some (mk_i ~args:[] ~alpha:beta) | _ -> None )
+        match unpack_comb k with
+        | Builtin.KComb, [_; beta], [] ->
+            Some (mk_i ~args:[] ~alpha:beta)
+        | _ ->
+            None )
       | _ ->
           None
     else None
@@ -365,7 +396,9 @@ let opt12 t =
         | Builtin.BComb, _, [k; x] -> (
           match unpack_comb k with
           | Builtin.KComb, _, [] ->
-              let alpha = Term.of_ty @@ List.hd @@ Type.expected_args @@ T.ty t in
+              let alpha =
+                Term.of_ty @@ List.hd @@ Type.expected_args @@ T.ty t
+              in
               let beta = T.of_ty @@ T.ty x in
               Some (mk_k ~args:[x] ~alpha ~beta)
           | _ ->
@@ -454,7 +487,9 @@ let max_weak_reduction_length var_handler ~state orig_t =
     match T.view t with
     | T.DB _ | T.Fun _ ->
         let err_msg =
-          CCFormat.sprintf "lambdas should be removed@.orig:@[%a@];subterm:@[%a@]@." T.pp orig_t T.pp t
+          CCFormat.sprintf
+            "lambdas should be removed@.orig:@[%a@];subterm:@[%a@]@." T.pp
+            orig_t T.pp t
         in
         invalid_arg err_msg
     | T.Const _ ->
@@ -479,7 +514,8 @@ let max_weak_reduction_length var_handler ~state orig_t =
               let steps_rest = aux (narrow_one t) in
               steps_rest + steps_inc
         | Builtin.SComb | Builtin.CComb | Builtin.BComb ->
-            if CCList.length args < 3 then aux_l args else aux (narrow_one t) + 1
+            if CCList.length args < 3 then aux_l args
+            else aux (narrow_one t) + 1
         | _ ->
             invalid_arg "only combinators are supported" )
     | T.AppBuiltin (b, l) ->
@@ -494,7 +530,12 @@ let max_weak_reduction_length var_handler ~state orig_t =
 
 let cmp_by_max_weak_r_len t1 t2 =
   let numvars = Iter.length (T.Seq.vars t1) + Iter.length (T.Seq.vars t2) in
-  let state = {pos_counter= 0; neg_counter= 0; balance= Term.Tbl.create numvars; var_map= Term.Tbl.create 16} in
+  let state =
+    { pos_counter= 0
+    ; neg_counter= 0
+    ; balance= Term.Tbl.create numvars
+    ; var_map= Term.Tbl.create 16 }
+  in
   let rec encode_vars t =
     let encode t =
       match T.Tbl.get state.var_map t with
@@ -502,7 +543,8 @@ let cmp_by_max_weak_r_len t1 t2 =
           t'
       | None ->
           let fresh_var = T.var (HVar.fresh ~ty:(T.ty t) ()) in
-          T.Tbl.add state.var_map t fresh_var ; fresh_var
+          T.Tbl.add state.var_map t fresh_var ;
+          fresh_var
     in
     if T.is_ground t then t
     else
@@ -527,9 +569,12 @@ let cmp_by_max_weak_r_len t1 t2 =
   let return res = (res, t1, t2) in
   let t1_len = max_weak_reduction_length add_pos_var ~state t1 in
   let t2_len = max_weak_reduction_length add_neg_var ~state t2 in
-  if t1_len > t2_len then if state.neg_counter > 0 then return Comparison.Incomparable else return Comparison.Gt
+  if t1_len > t2_len then
+    if state.neg_counter > 0 then return Comparison.Incomparable
+    else return Comparison.Gt
   else if t1_len < t2_len then
-    if state.pos_counter > 0 then return Comparison.Incomparable else return Comparison.Lt
+    if state.pos_counter > 0 then return Comparison.Incomparable
+    else return Comparison.Lt
   else return Comparison.Eq
 
 (* Assumes beta-reduced, eta-short term *)
@@ -559,7 +604,9 @@ let abf ~rules t =
               let r_conv = abstract ~bvar_ty r in
               let ret_ty = Ty.apply_unsafe l_ty [(r :> InnerTerm.t)] in
               let raw_res =
-                mk_s ~alpha:bvar_ty ~beta:(Term.of_ty @@ T.ty r) ~gamma:(Term.of_ty ret_ty) ~args:[l_conv; r_conv]
+                mk_s ~alpha:bvar_ty
+                  ~beta:(Term.of_ty @@ T.ty r)
+                  ~gamma:(Term.of_ty ret_ty) ~args:[l_conv; r_conv]
               in
               (ret_ty, apply_rw_rules ~rules raw_res) )
             (T.ty hd_mono, hd_conv)
@@ -575,10 +622,14 @@ let abf ~rules t =
         let hd_mono, args = T.as_app_mono t in
         let args' = List.map aux args in
         assert (not (T.is_fun hd_mono)) ;
-        try if T.same_l args args' then t else T.app hd_mono args' (* flattens AppBuiltin if necessary *)
+        try
+          if T.same_l args args' then t
+          else T.app hd_mono args' (* flattens AppBuiltin if necessary *)
         with Type.ApplyError _ ->
-          CCFormat.printf "hd:@[%a@]; type:@[%a@]@." T.pp hd_mono Type.pp (T.ty hd_mono) ;
-          CCFormat.printf "tys of args: @[%a@]" (CCList.pp Ty.pp) (CCList.map T.ty args') ;
+          CCFormat.printf "hd:@[%a@]; type:@[%a@]@." T.pp hd_mono Type.pp
+            (T.ty hd_mono) ;
+          CCFormat.printf "tys of args: @[%a@]" (CCList.pp Ty.pp)
+            (CCList.map T.ty args') ;
           CCFormat.printf "error for @[%a@]@." T.pp t ;
           assert false )
     | T.Fun (ty, body) ->
@@ -646,7 +697,9 @@ let comb2lam t =
           | _ ->
               assert false
         in
-        let res = Lambda.eta_reduce ~expand_quant:false @@ Lambda.snf @@ T.app lam args' in
+        let res =
+          Lambda.eta_reduce ~expand_quant:false @@ Lambda.snf @@ T.app lam args'
+        in
         assert (Type.equal (T.ty t) (T.ty res)) ;
         res
     | T.AppBuiltin (b, args) ->

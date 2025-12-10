@@ -64,7 +64,10 @@ module FO : sig
   val singleton : Type.t HVar.t Scoped.t -> Term.t Scoped.t -> t
 
   val rename_to_new_scope :
-    counter:int ref -> Term.t Scoped.t -> Term.t Scoped.t -> Term.t * Term.t * Scoped.scope * t
+       counter:int ref
+    -> Term.t Scoped.t
+    -> Term.t Scoped.t
+    -> Term.t * Term.t * Scoped.scope * t
 
   val rename_l_to_new_scope :
        counter:int ref

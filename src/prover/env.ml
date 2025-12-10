@@ -120,7 +120,8 @@ end) : S with module Ctx = X.Ctx = struct
   type term_rewrite_rule = Term.t -> (Term.t * Proof.parent list) option
 
   (** Rewrite rule on literals *)
-  type lit_rewrite_rule = Literal.t -> (Literal.t * Proof.parent list * Proof.tag list) option
+  type lit_rewrite_rule =
+    Literal.t -> (Literal.t * Proof.parent list * Proof.tag list) option
 
   (** (maybe) rewrite a clause to a set of clauses.
       Must return [None] if the clause is unmodified *)
@@ -235,10 +236,12 @@ end) : S with module Ctx = X.Ctx = struct
   let get_active () = ProofState.ActiveSet.clauses () |> C.ClauseSet.to_iter
 
   let add_binary_inf name rule =
-    if not (List.mem_assoc name !_binary_rules) then _binary_rules := (name, rule) :: !_binary_rules
+    if not (List.mem_assoc name !_binary_rules) then
+      _binary_rules := (name, rule) :: !_binary_rules
 
   let add_unary_inf name rule =
-    if not (List.mem_assoc name !_unary_rules) then _unary_rules := (name, rule) :: !_unary_rules
+    if not (List.mem_assoc name !_unary_rules) then
+      _unary_rules := (name, rule) :: !_unary_rules
 
   let _add_prioritized ~store ~priority name rule =
     if not (List.mem name (List.map (fun (_, n, _) -> n) !store)) then
@@ -248,7 +251,8 @@ end) : S with module Ctx = X.Ctx = struct
       in
       store := CCList.sorted_insert ~cmp (priority, name, rule) !store
 
-  let add_generate ~priority name rule = _add_prioritized ~store:_generate_rules ~priority name rule
+  let add_generate ~priority name rule =
+    _add_prioritized ~store:_generate_rules ~priority name rule
 
   let add_clause_elimination_rule ~priority name rule =
     _add_prioritized ~store:_cl_elim_rules ~priority name rule
@@ -261,7 +265,8 @@ end) : S with module Ctx = X.Ctx = struct
 
   let add_redundant r = _redundant := r :: !_redundant
 
-  let add_backward_redundant r = _backward_redundant := r :: !_backward_redundant
+  let add_backward_redundant r =
+    _backward_redundant := r :: !_backward_redundant
 
   let add_basic_simplify r = _basic_simplify := r :: !_basic_simplify
 
@@ -275,7 +280,8 @@ end) : S with module Ctx = X.Ctx = struct
     Util.debugf ~section 1 "[ Adding rule %s to env ]" (fun k -> k name) ;
     _rewrite_rules := (name, rule) :: !_rewrite_rules
 
-  let add_immediate_simpl_rule rule = _immediate_simpl := rule :: !_immediate_simpl
+  let add_immediate_simpl_rule rule =
+    _immediate_simpl := rule :: !_immediate_simpl
 
   let set_ho_normalization_rule name rule =
     _norm_name := name ;
@@ -287,7 +293,9 @@ end) : S with module Ctx = X.Ctx = struct
 
   let add_multi_simpl_rule ~priority rule =
     _multi_simpl_rule :=
-      CCList.sorted_insert ~cmp:(fun (p1, _) (p2, _) -> CCInt.compare p1 p2) (priority, rule) !_multi_simpl_rule
+      CCList.sorted_insert
+        ~cmp:(fun (p1, _) (p2, _) -> CCInt.compare p1 p2)
+        (priority, rule) !_multi_simpl_rule
 
   let multi_simpl_rules () = List.map snd !_multi_simpl_rule
 
@@ -299,7 +307,8 @@ end) : S with module Ctx = X.Ctx = struct
 
   let cr_return x = CR_return x
 
-  let add_clause_conversion r = _clause_conversion_rules := r :: !_clause_conversion_rules
+  let add_clause_conversion r =
+    _clause_conversion_rules := r :: !_clause_conversion_rules
 
   let add_step_init f = _step_init := f :: !_step_init
 
@@ -311,7 +320,8 @@ end) : S with module Ctx = X.Ctx = struct
 
   let[@inline] get_empty_clauses () = !_empty_clauses
 
-  let get_some_empty_clause () = try Some (C.ClauseSet.choose !_empty_clauses) with Not_found -> None
+  let get_some_empty_clause () =
+    try Some (C.ClauseSet.choose !_empty_clauses) with Not_found -> None
 
   let has_empty_clause () = not (C.ClauseSet.is_empty !_empty_clauses)
 
@@ -323,7 +333,8 @@ end) : S with module Ctx = X.Ctx = struct
 
   let pp out () = CCFormat.string out "env"
 
-  let pp_full out () = Format.fprintf out "@[<hv2>env(state:@ %a@,)@]" ProofState.debug ()
+  let pp_full out () =
+    Format.fprintf out "@[<hv2>env(state:@ %a@,)@]" ProofState.debug ()
 
   (** {2 Misc} *)
   let update_flex_state f = CCRef.update f flex_state_
@@ -347,12 +358,15 @@ end) : S with module Ctx = X.Ctx = struct
 
   let get_finite_infs streams =
     assert (flex_get PragUnifParams.k_unif_alg_is_terminating) ;
-    CCList.flat_map (fun s -> OSeq.to_rev_list @@ OSeq.filter_map CCFun.id s) streams
+    CCList.flat_map
+      (fun s -> OSeq.to_rev_list @@ OSeq.filter_map CCFun.id s)
+      streams
 
   (** do binary inferences that involve the given clause *)
   let do_binary_inferences c =
     let _span = ZProf.enter_prof prof_generate_binary in
-    Util.debugf ~section 5 "@[<2>do binary inferences with current active set:@ `@[%a@]`@]" (fun k ->
+    Util.debugf ~section 5
+      "@[<2>do binary inferences with current active set:@ `@[%a@]`@]" (fun k ->
         k C.pp_set (ProofState.ActiveSet.clauses ()) ) ;
     (* apply every inference rule *)
     let clauses =
@@ -384,18 +398,22 @@ end) : S with module Ctx = X.Ctx = struct
     let clauses =
       CCList.fold_while
         (fun acc (_, name, g) ->
-          Util.debugf ~section 3 "apply generating rule %s (full: %b)" (fun k -> k name full) ;
+          Util.debugf ~section 3 "apply generating rule %s (full: %b)" (fun k ->
+              k name full ) ;
           (* We are trying low effort generating functions first.
              If they find an empty clause -- then we do not go on to
              full effort generating functions *)
           let from_g = g ~full () in
-          let status = if List.exists C.is_empty from_g then `Stop else `Continue in
+          let status =
+            if List.exists C.is_empty from_g then `Stop else `Continue
+          in
           (List.rev_append from_g acc, status) )
         [] !_generate_rules
     in
     Iter.of_list clauses
 
-  let do_clause_eliminate () = List.iter (fun (_, _, elim_procedure) -> elim_procedure ()) !_cl_elim_rules
+  let do_clause_eliminate () =
+    List.iter (fun (_, _, elim_procedure) -> elim_procedure ()) !_cl_elim_rules
 
   let is_trivial_trail trail =
     match !_is_trivial_trail with
@@ -443,7 +461,8 @@ end) : S with module Ctx = X.Ctx = struct
 
   (** Apply rewrite rules AND evaluation functions *)
   let rewrite c =
-    Util.debugf ~section 5 "@[<2>rewrite clause@ `@[%a@]`...@]" (fun k -> k C.pp c) ;
+    Util.debugf ~section 5 "@[<2>rewrite clause@ `@[%a@]`...@]" (fun k ->
+        k C.pp c ) ;
     let applied_rules = ref StrSet.empty in
     let proofs : Proof.parent list ref = ref [] in
     let rec reduce_term rules t =
@@ -457,21 +476,33 @@ end) : S with module Ctx = X.Ctx = struct
         | Some (t', proof) ->
             applied_rules := StrSet.add name !applied_rules ;
             proofs := List.rev_append proof !proofs ;
-            let new_t = match !_norm_rule t' with None -> t' | Some tt -> tt in
-            Util.debugf ~section 5 "@[<2>rewrite `@[%a@]`@ into `@[%a@]`@ :proof (@[%a@])@]" (fun k ->
+            let new_t =
+              match !_norm_rule t' with None -> t' | Some tt -> tt
+            in
+            Util.debugf ~section 5
+              "@[<2>rewrite `@[%a@]`@ into `@[%a@]`@ :proof (@[%a@])@]"
+              (fun k ->
                 k T.pp t T.pp new_t (Util.pp_list Proof.pp_parent) proof ) ;
             reduce_term !_rewrite_rules new_t (* re-apply all rules *) )
     in
-    let lits' = Array.map (fun lit -> Lit.map (reduce_term !_rewrite_rules) lit) (C.lits c) in
-    if StrSet.is_empty !applied_rules then SimplM.return_same c (* no simplification *)
+    let lits' =
+      Array.map
+        (fun lit -> Lit.map (reduce_term !_rewrite_rules) lit)
+        (C.lits c)
+    in
+    if StrSet.is_empty !applied_rules then
+      SimplM.return_same c (* no simplification *)
     else (
       C.mark_redundant c ;
       (* FIXME: put the rules as parameters *)
       let rule = Proof.Rule.mk "rw" in
       let proof = Proof.Step.simp ~rule (C.proof_parent c :: !proofs) in
-      let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) lits' proof in
+      let c' =
+        C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) lits' proof
+      in
       assert (not (C.equal c c')) ;
-      Util.debugf ~section 3 "@[term rewritten clause `@[%a@]`@ into `@[%a@]`" (fun k -> k C.pp c C.pp c') ;
+      Util.debugf ~section 3 "@[term rewritten clause `@[%a@]`@ into `@[%a@]`"
+        (fun k -> k C.pp c C.pp c' ) ;
       SimplM.return_new c' )
 
   let ho_normalize c =
@@ -495,10 +526,15 @@ end) : S with module Ctx = X.Ctx = struct
       C.mark_redundant c ;
       (* FIXME: put the rules as parameters *)
       let rule = Proof.Rule.mk !_norm_name in
-      let proof = Proof.Step.simp ~rule ~tags:[Proof.Tag.T_ho_norm] [C.proof_parent c] in
-      let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) lits' proof in
+      let proof =
+        Proof.Step.simp ~rule ~tags:[Proof.Tag.T_ho_norm] [C.proof_parent c]
+      in
+      let c' =
+        C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) lits' proof
+      in
       assert (not (C.equal c c')) ;
-      Util.debugf ~section 3 "@[lambda rewritten clause `@[%a@]`@ into `@[%a@]`" (fun k -> k C.pp c C.pp c') ;
+      Util.debugf ~section 3 "@[lambda rewritten clause `@[%a@]`@ into `@[%a@]`"
+        (fun k -> k C.pp c C.pp c' ) ;
       SimplM.return_new c' )
 
   (** Apply literal rewrite rules *)
@@ -519,8 +555,11 @@ end) : S with module Ctx = X.Ctx = struct
             proofs := List.rev_append proof !proofs ;
             tags := List.rev_append tgs !tags ;
             Util.debugf ~section 5
-              "@[rewritten lit `@[%a@]`@ into `@[%a@]`@ (using %s)@ :proof (@[%a@]) :tags %a@]" (fun k ->
-                k Lit.pp lit Lit.pp lit' name (Util.pp_list Proof.pp_parent) proof Proof.pp_tags tgs ) ;
+              "@[rewritten lit `@[%a@]`@ into `@[%a@]`@ (using %s)@ :proof \
+               (@[%a@]) :tags %a@]" (fun k ->
+                k Lit.pp lit Lit.pp lit' name
+                  (Util.pp_list Proof.pp_parent)
+                  proof Proof.pp_tags tgs ) ;
             rewrite_lit !_lit_rules lit' )
     in
     (* apply lit rules *)
@@ -531,10 +570,15 @@ end) : S with module Ctx = X.Ctx = struct
       C.mark_redundant c ;
       (* FIXME: put the rules as parameters *)
       let rule = Proof.Rule.mk "rw_lit" in
-      let proof = Proof.Step.simp ~rule ~tags:!tags (C.proof_parent c :: !proofs) in
-      let c' = C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) lits proof in
+      let proof =
+        Proof.Step.simp ~rule ~tags:!tags (C.proof_parent c :: !proofs)
+      in
+      let c' =
+        C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) lits proof
+      in
       assert (not (C.equal c c')) ;
-      Util.debugf ~section 3 "@[lit rewritten `@[%a@]`@ into `@[%a@]`@]" (fun k -> k C.pp c C.pp c') ;
+      Util.debugf ~section 3 "@[lit rewritten `@[%a@]`@ into `@[%a@]`@]"
+        (fun k -> k C.pp c C.pp c' ) ;
       SimplM.return_new c' )
 
   (* apply simplification in a fixpoint *)
@@ -574,7 +618,11 @@ end) : S with module Ctx = X.Ctx = struct
         rewrite c
         >>= fun c ->
         (* rewrite literals (if needed) *)
-        (match !_lit_rules with [] -> SimplM.return_same c | _ :: _ -> rewrite_lits c)
+        ( match !_lit_rules with
+        | [] ->
+            SimplM.return_same c
+        | _ :: _ ->
+            rewrite_lits c )
         >>= fun c ->
         (* apply simplifications *)
         match !_unary_simplify with
@@ -627,10 +675,13 @@ end) : S with module Ctx = X.Ctx = struct
           let old_c = c in
           ho_normalize c >>= basic_simplify
           >>= (* simplify with unit clauses, then all active clauses *)
-          ho_normalize >>= rewrite >>= rw_simplify >>= unary_simplify >>= active_simplify
+          ho_normalize >>= rewrite >>= rw_simplify >>= unary_simplify
+          >>= active_simplify
           >|= fun c ->
           if not (Lits.equal_com (C.lits c) (C.lits old_c)) then
-            Util.debugf ~section 2 "@[clause `@[%a@]`@ simplified into `@[%a@]`@]" (fun k -> k C.pp old_c C.pp c) ;
+            Util.debugf ~section 2
+              "@[clause `@[%a@]`@ simplified into `@[%a@]`@]" (fun k ->
+                k C.pp old_c C.pp c ) ;
           c )
     in
     ZProf.exit_prof _span ; res
@@ -638,20 +689,29 @@ end) : S with module Ctx = X.Ctx = struct
   let multi_simplify ~depth c : (C.t * int) list option =
     let _span = ZProf.enter_prof prof_multi_simplify in
     let depth_map = ref (Util.Int_map.singleton (C.id c) depth) in
-    let[@inline] get_depth c = CCOpt.get_exn @@ Util.Int_map.get (C.id c) !depth_map in
+    let[@inline] get_depth c =
+      CCOpt.get_exn @@ Util.Int_map.get (C.id c) !depth_map
+    in
     let[@inline] update_map c c' =
       let d = get_depth c in
-      depth_map := Util.Int_map.add (C.id c') d (Util.Int_map.remove (C.id c) !depth_map)
+      depth_map :=
+        Util.Int_map.add (C.id c') d (Util.Int_map.remove (C.id c) !depth_map)
     in
     let set_children c children =
       let d' = get_depth c + 1 in
-      depth_map := List.fold_left (fun map child -> Util.Int_map.add (C.id child) d' map) !depth_map children
+      depth_map :=
+        List.fold_left
+          (fun map child -> Util.Int_map.add (C.id child) d' map)
+          !depth_map children
     in
     let init_cl = c in
     let did_something = ref false in
     (* try rules one by one until some of them succeeds *)
     let rec try_next ~depth c rules =
-      if flex_get k_max_multi_simpl_depth != -1 && depth > flex_get k_max_multi_simpl_depth then None
+      if
+        flex_get k_max_multi_simpl_depth != -1
+        && depth > flex_get k_max_multi_simpl_depth
+      then None
       else
         match rules with
         | [] ->
@@ -668,7 +728,9 @@ end) : S with module Ctx = X.Ctx = struct
       let depth = get_depth c in
       if not (C.ClauseSet.mem c !set) then (
         let orig_c = c in
-        let c, st = if C.equal c init_cl then SimplM.return_same c else simplify c in
+        let c, st =
+          if C.equal c init_cl then SimplM.return_same c else simplify c
+        in
         update_map orig_c c ;
         if st = `New then did_something := true ;
         match try_next ~depth c (multi_simpl_rules ()) with
@@ -696,7 +758,9 @@ end) : S with module Ctx = X.Ctx = struct
     | [f; g] ->
         C.ClauseSet.union (f given) (g given)
     | l ->
-        List.fold_left (fun set f -> C.ClauseSet.union set (f given)) C.ClauseSet.empty l
+        List.fold_left
+          (fun set f -> C.ClauseSet.union set (f given))
+          C.ClauseSet.empty l
 
   (* Perform backward simplification with the given clause *)
   let backward_simplify given =
@@ -712,7 +776,9 @@ end) : S with module Ctx = X.Ctx = struct
           ho_normalize >>= rewrite >>= rw_simplify >>= unary_simplify
           >|= fun c ->
           if not (Lits.equal_com (C.lits c) (C.lits old_c)) then
-            Util.debugf ~section 1 "@[clause `@[%a@]`@ simplified into `@[%a@]`@]" (fun k -> k C.pp old_c C.pp c) ;
+            Util.debugf ~section 1
+              "@[clause `@[%a@]`@ simplified into `@[%a@]`@]" (fun k ->
+                k C.pp old_c C.pp c ) ;
           c )
     in
     (* try to simplify the candidates. Before is the set of clauses that
@@ -723,13 +789,15 @@ end) : S with module Ctx = X.Ctx = struct
           let c', is_new = back_simplify c in
           match is_new with
           | `Same ->
-              if is_trivial c' then (C.ClauseSet.add c before, after (* just remove the clause *))
+              if is_trivial c' then
+                (C.ClauseSet.add c before, after (* just remove the clause *))
               else (before, after)
           | `New ->
               (* the active clause has been backward simplified! *)
               C.mark_redundant c ;
               C.mark_backward_simplified c ;
-              Util.debugf ~section 2 "@[active clause `@[%a@]@ simplified into `@[%a@]`@]" (fun k ->
+              Util.debugf ~section 2
+                "@[active clause `@[%a@]@ simplified into `@[%a@]`@]" (fun k ->
                   k C.pp c C.pp c' ) ;
               (C.ClauseSet.add c before, c' :: after) )
         candidates (C.ClauseSet.empty, [])
@@ -753,15 +821,18 @@ end) : S with module Ctx = X.Ctx = struct
                   false clauses
               in
               if redundant then C.mark_redundant c ;
-              Util.debugf ~section 3 "@[active clause `@[%a@]`@ simplified into clauses `@[%a@]`@]" (fun k ->
-                  k C.pp c (CCFormat.list C.pp) clauses ) ;
+              Util.debugf ~section 3
+                "@[active clause `@[%a@]`@ simplified into clauses `@[%a@]`@]"
+                (fun k -> k C.pp c (CCFormat.list C.pp) clauses ) ;
               (c, clauses) :: set )
-        (ProofState.ActiveSet.clauses ()) []
+        (ProofState.ActiveSet.clauses ())
+        []
     in
     (* remove clauses from active set, put their simplified version into
         the passive set for further processing *)
     ProofState.ActiveSet.remove (Iter.of_list set |> Iter.map fst) ;
-    Iter.of_list set |> Iter.map snd |> Iter.flat_map Iter.of_list |> ProofState.PassiveSet.add ;
+    Iter.of_list set |> Iter.map snd |> Iter.flat_map Iter.of_list
+    |> ProofState.PassiveSet.add ;
     ()
 
   (** Simplify the clause w.r.t to the active set *)
@@ -773,7 +844,11 @@ end) : S with module Ctx = X.Ctx = struct
 
   let _apply_multi_rules ~rule_list c =
     let rec apply_rules ~rules c =
-      match rules with [] -> None | r :: rs -> CCOpt.or_lazy ~else_:(fun () -> apply_rules ~rules:rs c) (r c)
+      match rules with
+      | [] ->
+          None
+      | r :: rs ->
+          CCOpt.or_lazy ~else_:(fun () -> apply_rules ~rules:rs c) (r c)
     in
     let q = Queue.create () in
     Queue.add c q ;
@@ -814,12 +889,17 @@ end) : S with module Ctx = X.Ctx = struct
         if depth < params.Params.unary_depth then
           (* infer clauses from c, add them to the queue *)
           let new_clauses = do_unary_inferences c in
-          Iter.iter (fun c' -> Queue.push (c', depth + 1) unary_queue) new_clauses )
+          Iter.iter
+            (fun c' -> Queue.push (c', depth + 1) unary_queue)
+            new_clauses )
     done ;
     (* generating rules *)
     let other_clauses = do_generate ~full:false () in
     (* combine all clauses *)
-    let result = Iter.(append (of_list !unary_clauses) (append binary_clauses other_clauses)) in
+    let result =
+      Iter.(
+        append (of_list !unary_clauses) (append binary_clauses other_clauses) )
+    in
     Util.add_stat stat_inferred (Iter.length result) ;
     ZProf.exit_prof _span ;
     result
@@ -840,14 +920,21 @@ end) : S with module Ctx = X.Ctx = struct
     if res then C.mark_redundant c ;
     res
 
-  let is_redundant c = C.is_redundant c || ZProf.with_prof prof_is_redundant is_redundant_ c
+  let is_redundant c =
+    C.is_redundant c || ZProf.with_prof prof_is_redundant is_redundant_ c
 
   (** find redundant clauses in current active_set *)
   let subsumed_by c =
     let _span = ZProf.enter_prof prof_subsumed_by in
-    let res = List.fold_left (fun set rule -> rule set c) C.ClauseSet.empty !_backward_redundant in
+    let res =
+      List.fold_left
+        (fun set rule -> rule set c)
+        C.ClauseSet.empty !_backward_redundant
+    in
     (* all those clauses are redundant *)
-    C.ClauseSet.iter C.mark_redundant res ; ZProf.exit_prof _span ; res
+    C.ClauseSet.iter C.mark_redundant res ;
+    ZProf.exit_prof _span ;
+    res
 
   (** Use all simplification rules to convert a clause into a list of
       maximally simplified clauses.
@@ -890,9 +977,13 @@ end) : S with module Ctx = X.Ctx = struct
 
   let step_init () = List.iter (fun f -> f ()) !_step_init
 
-  let is_lemma_ st = match Statement.view st with Statement.Lemma _ -> true | _ -> false
+  let is_lemma_ st =
+    match Statement.view st with Statement.Lemma _ -> true | _ -> false
 
-  let has_sos_attr st = CCList.exists (function Statement.A_sos -> true | _ -> false) (Statement.attrs st)
+  let has_sos_attr st =
+    CCList.exists
+      (function Statement.A_sos -> true | _ -> false)
+      (Statement.attrs st)
 
   let convert_input_statements stmts : C.t Clause.sets =
     Util.debug ~section 2 "trigger on_input_statement" ;
@@ -929,8 +1020,12 @@ end) : S with module Ctx = X.Ctx = struct
         | _ ->
             CCVector.append_list c_set cs )
       stmts ;
-    Util.debugf ~section 1 "@[<v>@[<2>clauses:@ @[<v>%a@]@]@ @[<2>sos:@ @[<v>%a@]@]@]" (fun k ->
-        k (Util.pp_iter ~sep:" " C.pp) (CCVector.to_iter c_set) (Util.pp_iter ~sep:" " C.pp)
+    Util.debugf ~section 1
+      "@[<v>@[<2>clauses:@ @[<v>%a@]@]@ @[<2>sos:@ @[<v>%a@]@]@]" (fun k ->
+        k
+          (Util.pp_iter ~sep:" " C.pp)
+          (CCVector.to_iter c_set)
+          (Util.pp_iter ~sep:" " C.pp)
           (CCVector.to_iter c_sos) ) ;
     Util.debugf ~section 1 "end@." CCFun.id ;
     let c_set = CCVector.freeze c_set in

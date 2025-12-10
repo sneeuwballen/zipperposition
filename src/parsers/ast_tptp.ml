@@ -144,10 +144,13 @@ type 'a t =
   | FOF of name * role * 'a * optional_info
   | TFF of name * role * 'a * optional_info
   | THF of name * role * 'a * optional_info (* XXX not parsed yet *)
-  | TypeDecl of name * string * 'a * optional_info (* type declaration for a symbol *)
-  | NewType of name * string * 'a * optional_info (* declare new type constant... *)
+  | TypeDecl of
+      name * string * 'a * optional_info (* type declaration for a symbol *)
+  | NewType of
+      name * string * 'a * optional_info (* declare new type constant... *)
   | Include of string
-  | IncludeOnly of string * name list (* include a subset of names *)  (** top level declaration *)
+  | IncludeOnly of string * name list (* include a subset of names *)
+      (** top level declaration *)
 
 type 'a declaration = 'a t
 
@@ -172,19 +175,26 @@ let get_name = function
 let fpf = Format.fprintf
 
 let pp_form_ pp out (logic, name, role, f, generals) =
-  Format.fprintf out "@[<2>%s(%a,@ %a,@ (@[%a@])%a@])." logic pp_name name pp_role role pp f pp_generals generals
+  Format.fprintf out "@[<2>%s(%a,@ %a,@ (@[%a@])%a@])." logic pp_name name
+    pp_role role pp f pp_generals generals
 
 let pp pp_t out = function
   | Include filename ->
       fpf out "@[<hv2>include(@,'%s'@,).@]" filename
   | IncludeOnly (filename, names) ->
-      fpf out "@[<2>include('%s',@ [@[%a@]]@])." filename (Util.pp_list pp_name) names
+      fpf out "@[<2>include('%s',@ [@[%a@]]@])." filename (Util.pp_list pp_name)
+        names
   | TypeDecl (name, s, ty, g) ->
-      fpf out "@[<2>tff(%a, type,@ (@[%s : %a@])%a@])." pp_name name s pp_t ty pp_generals g
+      fpf out "@[<2>tff(%a, type,@ (@[%s : %a@])%a@])." pp_name name s pp_t ty
+        pp_generals g
   | NewType (name, s, kind, g) ->
-      fpf out "@[<2>tff(%a, type,@ (@[%s : %a@])%a@])." pp_name name s pp_t kind pp_generals g
+      fpf out "@[<2>tff(%a, type,@ (@[%s : %a@])%a@])." pp_name name s pp_t kind
+        pp_generals g
   | CNF (name, role, c, generals) ->
-      pp_form_ (Util.pp_list ~sep:" | " pp_t) out ("cnf", name, role, c, generals)
+      pp_form_
+        (Util.pp_list ~sep:" | " pp_t)
+        out
+        ("cnf", name, role, c, generals)
   | FOF (name, role, f, generals) ->
       pp_form_ pp_t out ("fof", name, role, f, generals)
   | TFF (name, role, f, generals) ->

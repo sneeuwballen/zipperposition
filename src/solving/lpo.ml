@@ -114,18 +114,46 @@ module Constraint = struct
         simplify x
     | And l -> (
         let l' = List.fold_left flatten_and [] l in
-        match l' with [] -> true_ | _ when List.mem false_ l' -> false_ | [x] -> x | _ -> and_ l' )
+        match l' with
+        | [] ->
+            true_
+        | _ when List.mem false_ l' ->
+            false_
+        | [x] ->
+            x
+        | _ ->
+            and_ l' )
     | Or l -> (
         let l' = List.fold_left flatten_or [] l in
-        match l' with [] -> false_ | _ when List.mem true_ l' -> true_ | [x] -> x | _ -> or_ l' )
+        match l' with
+        | [] ->
+            false_
+        | _ when List.mem true_ l' ->
+            true_
+        | [x] ->
+            x
+        | _ ->
+            or_ l' )
     | _ ->
         t
 
   and flatten_or acc t =
-    match simplify t with False -> acc | Or l -> List.fold_left flatten_or acc l | t' -> t' :: acc
+    match simplify t with
+    | False ->
+        acc
+    | Or l ->
+        List.fold_left flatten_or acc l
+    | t' ->
+        t' :: acc
 
   and flatten_and acc t =
-    match simplify t with True -> acc | And l -> List.fold_left flatten_and acc l | t' -> t' :: acc
+    match simplify t with
+    | True ->
+        acc
+    | And l ->
+        List.fold_left flatten_and acc l
+    | t' ->
+        t' :: acc
 end
 
 module Solution = struct
@@ -215,7 +243,9 @@ module MakeSolver (X : sig end) = struct
     try AtomTbl.find atom_to_int_ a
     with Not_found ->
       let i = Lit.fresh () in
-      AtomTbl.add atom_to_int_ a i ; Hashtbl.add int_to_atom_ i a ; i
+      AtomTbl.add atom_to_int_ a i ;
+      Hashtbl.add int_to_atom_ i a ;
+      i
 
   (* get the propositional variable that represents the n-th bit of [s] *)
   let digit s n = atom_to_lit (Atom.make s n)
@@ -230,7 +260,9 @@ module MakeSolver (X : sig end) = struct
     if n = 0 then F.f_false
     else
       let d_a = F.make_atom (digit a n) and d_b = F.make_atom (digit b n) in
-      F.make_or [F.make_and [F.make_not d_a; d_b]; F.make_and [F.make_equiv d_a d_b; encode_lt ~n:(n - 1) a b]]
+      F.make_or
+        [ F.make_and [F.make_not d_a; d_b]
+        ; F.make_and [F.make_equiv d_a d_b; encode_lt ~n:(n - 1) a b] ]
 
   (* encode [a <= b]_n, with not [b < a]_n. *)
   let encode_leq ~n a b = F.make_not (encode_lt ~n b a)
@@ -270,7 +302,8 @@ module MakeSolver (X : sig end) = struct
       let is_true = sat.SI.eval lit in
       if is_true then r := (2 * !r) + 1 else r := 2 * !r
     done ;
-    Util.debugf ~section 3 "index of symbol %a in precedence is %d" (fun k -> k ID.pp s !r) ;
+    Util.debugf ~section 3 "index of symbol %a in precedence is %d" (fun k ->
+        k ID.pp s !r ) ;
     !r
 
   (* extract a solution *)
@@ -282,11 +315,14 @@ module MakeSolver (X : sig end) = struct
     let _, _, sol =
       List.fold_left
         (fun (cur_n, other_s, acc) (n, s) ->
-          if n = cur_n then (n, s :: other_s, acc (* yet another symbol with rank [n] *))
+          if n = cur_n then
+            (n, s :: other_s, acc (* yet another symbol with rank [n] *))
           else (
             (* elements of [other_s] have a lower rank, force them to be smaller  *)
             assert (cur_n < n) ;
-            let acc = List.fold_left (fun acc s' -> (s, s') :: acc) acc other_s in
+            let acc =
+              List.fold_left (fun acc s' -> (s, s') :: acc) acc other_s
+            in
             (n, [s], acc) ) )
         (~-1, [], []) syms
     in
@@ -300,18 +336,25 @@ module MakeSolver (X : sig end) = struct
     with Not_found -> Format.fprintf fmt "L%d" (abs (i : Lit.t :> int))
   (* tseitin *)
 
-  let print_clause fmt c = Format.fprintf fmt "@[<hv2>%a@]" (Util.pp_list ~sep:" or " print_lit) c
+  let print_clause fmt c =
+    Format.fprintf fmt "@[<hv2>%a@]" (Util.pp_list ~sep:" or " print_lit) c
 
-  let print_clauses fmt c = Format.fprintf fmt "@[<v>%a@]" (Util.pp_list ~sep:"" print_clause) c
+  let print_clauses fmt c =
+    Format.fprintf fmt "@[<v>%a@]" (Util.pp_list ~sep:"" print_clause) c
 
   (* solve the given list of constraints *)
   let solve_list l =
     (* count the number of symbols *)
-    let symbols = Iter.of_list l |> Iter.flat_map C.Seq.exprs |> ID.Set.of_iter |> ID.Set.elements in
+    let symbols =
+      Iter.of_list l |> Iter.flat_map C.Seq.exprs |> ID.Set.of_iter
+      |> ID.Set.elements
+    in
     let num = List.length symbols in
     (* the number of digits required to map each symbol to a distinct int *)
     let n = int_of_float (ceil (log (float_of_int num) /. log 2.)) in
-    Util.debugf ~section 2 "constraints on %d symbols -> %d digits (%d bool vars)" (fun k -> k num n (n * num)) ;
+    Util.debugf ~section 2
+      "constraints on %d symbols -> %d digits (%d bool vars)" (fun k ->
+        k num n (n * num) ) ;
     let encode_constr c =
       Util.debugf ~section 5 "encode constr %a..." (fun k -> k C.pp c) ;
       let f = encode_constr ~n c in
@@ -329,24 +372,31 @@ module MakeSolver (X : sig end) = struct
       | Solver.Sat sat ->
           Util.debug ~section 5 "next solution exists, try to extract it..." ;
           let solution = get_solution sat ~n symbols in
-          Util.debugf ~section 5 "... solution is %a" (fun k -> k Solution.pp solution) ;
+          Util.debugf ~section 5 "... solution is %a" (fun k ->
+              k Solution.pp solution ) ;
           (* obtain another solution: negate current one and continue *)
           let tl = lazy (negate ~n solution) in
           LazyList.Cons (solution, tl)
       | Solver.Unsat _ ->
-          Util.debug ~section 5 "no solution" ; LazyList.Nil
+          Util.debug ~section 5 "no solution" ;
+          LazyList.Nil
     and negate ~n:_ solution =
       (* negate current solution to get the next one... if any *)
       let c = Solution.neg_to_constraint solution in
       encode_constr c ;
-      match Solver.solve solver with Solver.Sat _ -> next () | Solver.Unsat _ -> LazyList.Nil
+      match Solver.solve solver with
+      | Solver.Sat _ ->
+          next ()
+      | Solver.Unsat _ ->
+          LazyList.Nil
     in
     lazy (next ())
 end
 
 let solve_multiple l =
   let l = List.rev_map C.simplify l in
-  Util.debugf ~section 2 "lpo: solve constraints %a" (fun k -> k (CCFormat.list C.pp) l) ;
+  Util.debugf ~section 2 "lpo: solve constraints %a" (fun k ->
+      k (CCFormat.list C.pp) l ) ;
   let module S = MakeSolver (struct end) in
   S.solve_list l
 
@@ -365,7 +415,13 @@ let any_bigger ~orient_lpo l b =
 
 (* [a] bigger than all the elements of [l] *)
 and all_bigger ~orient_lpo a l =
-  match l with [] -> C.true_ | [x] -> orient_lpo a x | _ -> C.and_ (List.rev_map (fun y -> orient_lpo a y) l)
+  match l with
+  | [] ->
+      C.true_
+  | [x] ->
+      orient_lpo a x
+  | _ ->
+      C.and_ (List.rev_map (fun y -> orient_lpo a y) l)
 
 (* constraint for l1 >_lex l2 (lexicographic extension of LPO) *)
 and lexico_order ~eq ~orient_lpo l1 l2 =
@@ -373,7 +429,13 @@ and lexico_order ~eq ~orient_lpo l1 l2 =
   let c =
     List.fold_left2
       (fun constr a b ->
-        match constr with Some _ -> constr | None when eq a b -> None | None -> Some (orient_lpo a b) )
+        match constr with
+        | Some _ ->
+            constr
+        | None when eq a b ->
+            None
+        | None ->
+            Some (orient_lpo a b) )
       None l1 l2
   in
   match c with None -> C.false_ (* they are equal *) | Some c -> c
@@ -392,20 +454,23 @@ module FO = struct
         C.false_ (* a variable cannot be > *)
     | _, _ when T.subterm ~sub:b a ->
         C.true_ (* trivial subterm property --> ok! *)
-    | TC.App (f, (_ :: _ as l)), TC.App (g, l') when List.length l = List.length l' ->
+    | TC.App (f, (_ :: _ as l)), TC.App (g, l')
+      when List.length l = List.length l' ->
         (* three cases: either some element of [l] is > [r],
             or precedence of first symbol applies,
             or lexicographic case applies (with non empty lists) *)
         C.or_
           [ C.and_ [C.eq f g; lexico_order ~eq:T.equal ~orient_lpo l l']
             (* f=g, lexicographic order of subterms *)
-          ; C.and_ [C.gt f g; all_bigger ~orient_lpo a l'] (* f>g and a > all subterms of b *)
+          ; C.and_ [C.gt f g; all_bigger ~orient_lpo a l']
+            (* f>g and a > all subterms of b *)
           ; any_bigger ~orient_lpo l b (* some subterm of a is > b *) ]
     | TC.App (f, l), TC.App (g, l') ->
         (* two cases: either some element of [l] is > [r],
             or precedence of first symbol applies *)
         C.or_
-          [ C.and_ [C.gt f g; all_bigger ~orient_lpo a l'] (* f>g and a > all subterms of b *)
+          [ C.and_ [C.gt f g; all_bigger ~orient_lpo a l']
+            (* f>g and a > all subterms of b *)
           ; any_bigger ~orient_lpo l b (* some subterm of a is > b *) ]
     | TC.App (_, l), _ ->
         (* only the subterm property can apply *)
@@ -419,7 +484,8 @@ module FO = struct
       (fun (l, r) ->
         let c = orient_lpo l r in
         let c' = C.simplify c in
-        Util.debugf ~section 2 "constr %a simplified into %a" (fun k -> k C.pp c C.pp c') ;
+        Util.debugf ~section 2 "constr %a simplified into %a" (fun k ->
+            k C.pp c C.pp c' ) ;
         c' )
       l
 end
@@ -447,13 +513,15 @@ module TypedSTerm = struct
           C.or_
             [ C.and_ [C.eq f g; lexico_order ~eq:T.equal ~orient_lpo l l']
               (* f=g, lexicographic order of subterms *)
-            ; C.and_ [C.gt f g; all_bigger ~orient_lpo a l'] (* f>g and a > all subterms of b *)
+            ; C.and_ [C.gt f g; all_bigger ~orient_lpo a l']
+              (* f>g and a > all subterms of b *)
             ; any_bigger ~orient_lpo l b (* some subterm of a is > b *) ]
       | T.Const f, T.Const g ->
           (* two cases: either some element of [l] is > [r],
               or precedence of first symbol applies *)
           C.or_
-            [ C.and_ [C.gt f g; all_bigger ~orient_lpo a l'] (* f>g and a > all subterms of b *)
+            [ C.and_ [C.gt f g; all_bigger ~orient_lpo a l']
+              (* f>g and a > all subterms of b *)
             ; any_bigger ~orient_lpo l b (* some subterm of a is > b *) ]
       | _ ->
           C.false_ (* no clue *) )
@@ -469,7 +537,8 @@ module TypedSTerm = struct
       (fun (l, r) ->
         let c = orient_lpo l r in
         let c' = C.simplify c in
-        Util.debugf ~section 2 "constr %a simplified into %a" (fun k -> k C.pp c C.pp c') ;
+        Util.debugf ~section 2 "constr %a simplified into %a" (fun k ->
+            k C.pp c C.pp c' ) ;
         c' )
       l
 end

@@ -24,7 +24,9 @@ module TC = Term.Classic
 
 let mk_cache n =
   let hash (a, b) = Hash.combine3 42 (T.hash a) (T.hash b) in
-  CCCache.replacing ~eq:(fun (a1, b1) (a2, b2) -> T.equal a1 a2 && T.equal b1 b2) ~hash n
+  CCCache.replacing
+    ~eq:(fun (a1, b1) (a2, b2) -> T.equal a1 a2 && T.equal b1 b2)
+    ~hash n
 
 type term = T.t
 
@@ -54,7 +56,9 @@ let add_list ~signature ord l = Prec.add_list ~signature ord.prec l
 
 let name ord = ord.name
 
-let clear_cache ord = CCCache.clear ord.cache_compare ; CCCache.clear ord.cache_might_flip
+let clear_cache ord =
+  CCCache.clear ord.cache_compare ;
+  CCCache.clear ord.cache_might_flip
 
 let pp out ord = Format.fprintf out "%s(@[%a@])" ord.name Prec.pp ord.prec
 
@@ -69,20 +73,35 @@ let ty1comb_to_var t balance =
         t'
     | None ->
         let fresh_var = T.var (HVar.fresh ~ty:(T.ty t) ()) in
-        T.Tbl.add balance t fresh_var ; fresh_var )
+        T.Tbl.add balance t fresh_var ;
+        fresh_var )
   else t
 
 let is_problematic_type ty = Type.is_var ty || Type.is_fun ty
 
 let partition_leading p =
-  let rec part acc xs = match xs with x :: xs' when p x -> part (x :: acc) xs' | _ -> (List.rev acc, xs) in
+  let rec part acc xs =
+    match xs with
+    | x :: xs' when p x ->
+        part (x :: acc) xs'
+    | _ ->
+        (List.rev acc, xs)
+  in
   part []
 
 let break_term_up u =
-  match T.view u with T.App (hd, all_args) -> (hd, partition_leading Term.is_type all_args) | _ -> (u, ([], []))
+  match T.view u with
+  | T.App (hd, all_args) ->
+      (hd, partition_leading Term.is_type all_args)
+  | _ ->
+      (u, ([], []))
 
 let is_eta_reduced_term_stable_wrt_flip t =
-  match T.view (fst (break_term_up t)) with T.AppBuiltin _ | T.DB _ | T.Const _ -> true | _ -> false
+  match T.view (fst (break_term_up t)) with
+  | T.AppBuiltin _ | T.DB _ | T.Const _ ->
+      true
+  | _ ->
+      false
 
 let is_term_stable_wrt_flip t =
   match T.view (fst (break_term_up t)) with
@@ -114,7 +133,13 @@ module Head = struct
 
   type quantifier = Forall | Exists
 
-  type t = I of ID.t | B of Builtin.t | Q of quantifier | V of var | DB of int | LAM
+  type t =
+    | I of ID.t
+    | B of Builtin.t
+    | Q of quantifier
+    | V of var
+    | DB of int
+    | LAM
 
   let pp out = function
     | I id ->
@@ -239,7 +264,11 @@ let prec_compare prec a b =
   | _, Head.V _ ->
       Incomparable
 
-let prec_status prec = function Head.I s -> Prec.status prec s | _ -> Prec.LengthLexicographic
+let prec_status prec = function
+  | Head.I s ->
+      Prec.status prec s
+  | _ ->
+      Prec.LengthLexicographic
 
 module type PARAMETERS = sig
   val name : string
@@ -256,7 +285,8 @@ module TermBoolAsKey = struct
 
   let hash (t, b) = Hash.combine2 (T.hash t) (Hash.bool b)
 
-  let compare (t1, b1) (t2, b2) = if CCBool.equal b1 b2 then T.compare t1 t2 else CCBool.compare b1 b2
+  let compare (t1, b1) (t2, b2) =
+    if CCBool.equal b1 b2 then T.compare t1 t2 else CCBool.compare b1 b2
 end
 
 module TermBoolTbl = CCHashtbl.Make (TermBoolAsKey)
@@ -274,7 +304,10 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
   (** create a balance for the two terms *)
   let mk_balance t1 t2 =
     let numvars = Iter.length (T.Seq.vars t1) + Iter.length (T.Seq.vars t2) in
-    {pos_counter= 0; neg_counter= 0; balance= TermBoolTbl.create (2 * numvars); comb2var= Term.Tbl.create 16}
+    { pos_counter= 0
+    ; neg_counter= 0
+    ; balance= TermBoolTbl.create (2 * numvars)
+    ; comb2var= Term.Tbl.create 16 }
 
   (** add a positive variable *)
   let add_pos_var balance var ~below_lam =
@@ -308,7 +341,13 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
 
   (* Overapproximation of being fluid *)
   let is_fluid t =
-    match T.view t with T.App (f, l) -> T.is_var f | T.Fun (ty, body) -> not (T.is_ground body) | _ -> false
+    match T.view t with
+    | T.App (f, l) ->
+        T.is_var f
+    | T.Fun (ty, body) ->
+        not (T.is_ground body)
+    | _ ->
+        false
 
   (** Higher-order KBO *)
   exception UnsupportedTerm
@@ -321,14 +360,18 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
     *)
     let rec balance_weight (wb : W.t) t s ~pos ~below_lam : W.t * bool =
       let t = ty1comb_to_var t balance.comb2var in
-      if T.is_var t || (P.lambda_mode && is_fluid t) then balance_weight_var wb t s ~pos ~below_lam
+      if T.is_var t || (P.lambda_mode && is_fluid t) then
+        balance_weight_var wb t s ~pos ~below_lam
       else
         match (Head.term_to_head t, Head.term_to_args t) with
         | Head.V v, args ->
             let wb', res = balance_weight_var wb (T.var v) s ~pos ~below_lam in
             balance_weight_rec wb' args s ~pos ~below_lam res
         | h, args ->
-            let wb' = if pos then W.(wb + weight prec h ~below_lam) else W.(wb - weight prec h ~below_lam) in
+            let wb' =
+              if pos then W.(wb + weight prec h ~below_lam)
+              else W.(wb - weight prec h ~below_lam)
+            in
             let below_lam = h = Head.LAM in
             if (not P.lambda_mode) && below_lam then raise UnsupportedTerm ;
             balance_weight_rec wb' args s ~pos ~below_lam false
@@ -338,10 +381,12 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
       (* TODO: count below and above lam separately *)
       if pos then (
         add_pos_var balance t ~below_lam ;
-        (W.(wb + weight_var_headed), CCOpt.is_some s && Term.equal (CCOpt.get_exn s) t) )
+        ( W.(wb + weight_var_headed)
+        , CCOpt.is_some s && Term.equal (CCOpt.get_exn s) t ) )
       else (
         add_neg_var balance t ~below_lam ;
-        (W.(wb - weight_var_headed), CCOpt.is_some s && Term.equal (CCOpt.get_exn s) t) )
+        ( W.(wb - weight_var_headed)
+        , CCOpt.is_some s && Term.equal (CCOpt.get_exn s) t ) )
     (** list version of the previous one, threaded with the check result *)
     (** list version of the previous one, threaded with the check result *)
     and balance_weight_rec wb terms s ~pos ~below_lam res =
@@ -363,25 +408,40 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
             tckbolex wb' terms1' terms2' ~below_lam
         | wb', res ->
             (* just compute the weights and return result *)
-            let wb'', _ = balance_weight_rec wb' terms1' None ~pos:true ~below_lam false in
-            let wb''', _ = balance_weight_rec wb'' terms2' None ~pos:false ~below_lam false in
+            let wb'', _ =
+              balance_weight_rec wb' terms1' None ~pos:true ~below_lam false
+            in
+            let wb''', _ =
+              balance_weight_rec wb'' terms2' None ~pos:false ~below_lam false
+            in
             (wb''', res) )
       | [], _ ->
-          let wb, _ = balance_weight_rec wb terms2 None ~pos:false ~below_lam false in
+          let wb, _ =
+            balance_weight_rec wb terms2 None ~pos:false ~below_lam false
+          in
           (wb, Lt)
       | _, [] ->
-          let wb, _ = balance_weight_rec wb terms1 None ~pos:true ~below_lam false in
+          let wb, _ =
+            balance_weight_rec wb terms1 None ~pos:true ~below_lam false
+          in
           (wb, Gt)
     (** tckbo, for non-variable-headed terms). *)
     (** tckbo, for non-variable-headed terms). *)
     (* length-lexicographic comparison *)
     and tckbolenlex wb terms1 terms2 ~below_lam =
-      if List.length terms1 = List.length terms2 then tckbolex wb terms1 terms2 ~below_lam
+      if List.length terms1 = List.length terms2 then
+        tckbolex wb terms1 terms2 ~below_lam
       else
         (* just compute the weights and return result *)
-        let wb', _ = balance_weight_rec wb terms1 None ~pos:true ~below_lam false in
-        let wb'', _ = balance_weight_rec wb' terms2 None ~pos:false ~below_lam false in
-        let res = if List.length terms1 > List.length terms2 then C.Gt else Lt in
+        let wb', _ =
+          balance_weight_rec wb terms1 None ~pos:true ~below_lam false
+        in
+        let wb'', _ =
+          balance_weight_rec wb' terms2 None ~pos:false ~below_lam false
+        in
+        let res =
+          if List.length terms1 > List.length terms2 then C.Gt else Lt
+        in
         (wb'', res)
     (** tckbo, for non-variable-headed terms). *)
     (** tckbo, for non-variable-headed terms). *)
@@ -391,43 +451,67 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
       else if P.lambda_mode then
         match (Head.term_to_head t1, Head.term_to_head t2) with
         | Head.V _, Head.V _ ->
-            add_pos_var balance t1 ~below_lam ; add_neg_var balance t2 ~below_lam ; (wb, Incomparable)
+            add_pos_var balance t1 ~below_lam ;
+            add_neg_var balance t2 ~below_lam ;
+            (wb, Incomparable)
         | Head.V _, _ ->
             add_pos_var balance t1 ~below_lam ;
-            let wb', contains = balance_weight wb t2 (Some t1) ~pos:false ~below_lam in
+            let wb', contains =
+              balance_weight wb t2 (Some t1) ~pos:false ~below_lam
+            in
             (W.(wb' + weight_var_headed), if contains then Lt else Incomparable)
         | _, Head.V _ ->
             add_neg_var balance t2 ~below_lam ;
-            let wb', contains = balance_weight wb t1 (Some t2) ~pos:true ~below_lam in
+            let wb', contains =
+              balance_weight wb t1 (Some t2) ~pos:true ~below_lam
+            in
             (W.(wb' - weight_var_headed), if contains then Gt else Incomparable)
         | h1, h2 ->
-            tckbo_composite wb h1 h2 (Head.term_to_args t1) (Head.term_to_args t2) ~below_lam
+            tckbo_composite wb h1 h2 (Head.term_to_args t1)
+              (Head.term_to_args t2) ~below_lam
       else
         let t1 = ty1comb_to_var t1 balance.comb2var in
         let t2 = ty1comb_to_var t2 balance.comb2var in
         match (T.view t1, T.view t2) with
         | T.Var x, T.Var y ->
-            add_pos_var balance t1 ~below_lam ; add_neg_var balance t2 ~below_lam ; (wb, C.Incomparable)
+            add_pos_var balance t1 ~below_lam ;
+            add_neg_var balance t2 ~below_lam ;
+            (wb, C.Incomparable)
         | T.Var x, _ ->
             add_pos_var balance t1 ~below_lam ;
-            let wb', contains = balance_weight wb t2 (Some t1) ~pos:false ~below_lam in
+            let wb', contains =
+              balance_weight wb t2 (Some t1) ~pos:false ~below_lam
+            in
             (W.(wb' + one), if contains then Lt else Incomparable)
         | _, T.Var y ->
             add_neg_var balance t2 ~below_lam ;
-            let wb', contains = balance_weight wb t1 (Some t2) ~pos:true ~below_lam in
+            let wb', contains =
+              balance_weight wb t1 (Some t2) ~pos:true ~below_lam
+            in
             (W.(wb' - one), if contains then Gt else Incomparable)
         | _ ->
             let f, g = (Head.term_to_head t1, Head.term_to_head t2) in
-            tckbo_composite wb f g (Head.term_to_args t1) (Head.term_to_args t2) ~below_lam
+            tckbo_composite wb f g (Head.term_to_args t1) (Head.term_to_args t2)
+              ~below_lam
     (** tckbo, for non-variable-headed terms). *)
     (** tckbo, for non-variable-headed terms). *)
     and tckbo_composite wb f g ss ts ~below_lam =
       (* do the recursive computation of kbo *)
       let wb', res = tckbo_rec wb f g ss ts ~below_lam in
-      let wb'' = W.(wb' + weight prec f ~below_lam - weight prec g ~below_lam) in
+      let wb'' =
+        W.(wb' + weight prec f ~below_lam - weight prec g ~below_lam)
+      in
       if not P.lambda_mode then (
-        (match f with Head.V x -> add_pos_var balance (T.var x) ~below_lam | _ -> ()) ;
-        match g with Head.V x -> add_neg_var balance (T.var x) ~below_lam | _ -> () ) ;
+        ( match f with
+        | Head.V x ->
+            add_pos_var balance (T.var x) ~below_lam
+        | _ ->
+            () ) ;
+        match g with
+        | Head.V x ->
+            add_neg_var balance (T.var x) ~below_lam
+        | _ ->
+            () ) ;
       (* check variable condition *)
       let g_or_n = if balance.neg_counter = 0 then C.Gt else Incomparable
       and l_or_n = if balance.pos_counter = 0 then C.Lt else Incomparable in
@@ -461,8 +545,13 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
             tckbolenlex wb ss ts ~below_lam:ss_below_lam
       else
         (* just compute variable and weight balances *)
-        let wb', _ = balance_weight_rec wb ss None ~pos:true ~below_lam:ss_below_lam false in
-        let wb'', _ = balance_weight_rec wb' ts None ~pos:false ~below_lam:ts_below_lam false in
+        let wb', _ =
+          balance_weight_rec wb ss None ~pos:true ~below_lam:ss_below_lam false
+        in
+        let wb'', _ =
+          balance_weight_rec wb' ts None ~pos:false ~below_lam:ts_below_lam
+            false
+        in
         (wb'', C.Incomparable)
     in
     let _, res = tckbo W.zero t1 t2 ~below_lam:false in
@@ -475,7 +564,9 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
 
   let cannot_flip s t =
     assert (Type.equal (Term.ty s) (Term.ty t)) ;
-    T.equal s t || (is_eta_reduced_term_stable_wrt_flip s && is_eta_reduced_term_stable_wrt_flip t)
+    T.equal s t
+    || is_eta_reduced_term_stable_wrt_flip s
+       && is_eta_reduced_term_stable_wrt_flip t
 
   let might_flip _ s t = not (cannot_flip s t)
 end
@@ -499,7 +590,8 @@ module MakeRPO (P : PARAMETERS) : ORD = struct
       | Head.V _, _ ->
           if has_subterm t s then Lt else Incomparable
       | h1, h2 ->
-          rpo6_composite ~prec s t h1 h2 (Head.term_to_args s) (Head.term_to_args t)
+          rpo6_composite ~prec s t h1 h2 (Head.term_to_args s)
+            (Head.term_to_args t)
     else
       match (T.view s, T.view t) with
       | T.Var _, T.Var _ ->
@@ -510,10 +602,13 @@ module MakeRPO (P : PARAMETERS) : ORD = struct
           if T.var_occurs ~var t then Lt else Incomparable
       | _ ->
           let h1, h2 = (Head.term_to_head s, Head.term_to_head t) in
-          rpo6_composite ~prec s t h1 h2 (Head.term_to_args s) (Head.term_to_args t)
+          rpo6_composite ~prec s t h1 h2 (Head.term_to_args s)
+            (Head.term_to_args t)
 
   and has_subterm t sub =
-    T.Seq.subterms ~ignore_head:true ~include_builtin:true ~include_app_vars:false t |> Iter.mem ~eq:T.equal sub
+    T.Seq.subterms ~ignore_head:true ~include_builtin:true
+      ~include_app_vars:false t
+    |> Iter.mem ~eq:T.equal sub
 
   (* handle the composite cases *)
   and rpo6_composite ~prec s t f g ss ts =
@@ -539,7 +634,13 @@ module MakeRPO (P : PARAMETERS) : ORD = struct
     | [] ->
         Gt
     | t :: ts' -> (
-      match rpo6 ~prec s t with C.Gt -> cMA ~prec s ts' | Eq | Lt -> Lt | _ -> C.opp (alpha ~prec ts' s) )
+      match rpo6 ~prec s t with
+      | C.Gt ->
+          cMA ~prec s ts'
+      | Eq | Lt ->
+          Lt
+      | _ ->
+          C.opp (alpha ~prec ts' s) )
 
   (* lexicographic comparison of s=f(ss), and t=f(ts) *)
   and cLMA ~prec s t ss ts =
@@ -579,7 +680,13 @@ module MakeRPO (P : PARAMETERS) : ORD = struct
 
   (* bidirectional comparison by subterm property (bidirectional alpha) *)
   and cAA ~prec s t ss ts =
-    match alpha ~prec ss t with Gt -> Gt | Incomparable -> C.opp (alpha ~prec ts s) | _ -> assert false
+    match alpha ~prec ss t with
+    | Gt ->
+        Gt
+    | Incomparable ->
+        C.opp (alpha ~prec ts s)
+    | _ ->
+        assert false
 
   (* if some s in ss is >= t, then s > t by subterm property and transitivity *)
   and alpha ~prec ss t =
@@ -600,7 +707,8 @@ module MakeRPO (P : PARAMETERS) : ORD = struct
   let cannot_flip ~prec s t =
     assert (Type.equal (Term.ty s) (Term.ty t)) ;
     T.equal s t
-    || is_eta_reduced_term_stable_wrt_flip s && is_eta_reduced_term_stable_wrt_flip t
+    || is_eta_reduced_term_stable_wrt_flip s
+       && is_eta_reduced_term_stable_wrt_flip t
        && not
             (let c = rpo6 ~prec s t in
              c = Incomparable
@@ -620,27 +728,38 @@ module EPO : ORD = struct
 
   and _cache =
     let hash ((b, bb), (a, aa)) =
-      Hash.combine4 (T.hash b) (T.hash a) (Hash.list T.hash bb) (Hash.list T.hash aa)
+      Hash.combine4 (T.hash b) (T.hash a) (Hash.list T.hash bb)
+        (Hash.list T.hash aa)
     in
     CCCache.replacing
       ~eq:(fun ((b1, bb1), (a1, aa1)) ((b2, bb2), (a2, aa2)) ->
-        T.equal b1 b2 && T.equal a1 a2 && CCList.equal T.equal bb1 bb2 && CCList.equal T.equal aa1 aa2 )
+        T.equal b1 b2 && T.equal a1 a2
+        && CCList.equal T.equal bb1 bb2
+        && CCList.equal T.equal aa1 aa2 )
       ~hash 512
 
   and epo_behind_cache ~prec (t, tt) (s, ss) =
-    if T.equal t s && CCList.length tt = CCList.length ss && CCList.for_all2 T.equal tt ss then C.Eq
+    if
+      T.equal t s
+      && CCList.length tt = CCList.length ss
+      && CCList.for_all2 T.equal tt ss
+    then C.Eq
     else
       match ((T.view t, tt), (T.view s, ss)) with
       | (T.Var _, []), (T.Var _, []) ->
           Incomparable
       | _, (T.Var var, []) ->
-          if T.var_occurs ~var t || CCList.exists (T.var_occurs ~var) tt then Gt else Incomparable
+          if T.var_occurs ~var t || CCList.exists (T.var_occurs ~var) tt then Gt
+          else Incomparable
       | (T.Var var, []), _ ->
-          if T.var_occurs ~var s || CCList.exists (T.var_occurs ~var) ss then Lt else Incomparable
+          if T.var_occurs ~var s || CCList.exists (T.var_occurs ~var) ss then Lt
+          else Incomparable
       | _ -> (
         match (Head.term_to_head t, Head.term_to_head s) with
         | g, f ->
-            epo_composite ~prec (t, tt) (s, ss) (g, Head.term_to_args t @ tt) (f, Head.term_to_args s @ ss) )
+            epo_composite ~prec (t, tt) (s, ss)
+              (g, Head.term_to_args t @ tt)
+              (f, Head.term_to_args s @ ss) )
 
   and epo_composite ~prec (t, tt) (s, ss) (g, gg) (f, ff) =
     match prec_compare prec g f with
@@ -661,11 +780,13 @@ module EPO : ORD = struct
         match g with
         | Head.V _ ->
             if c = C.Gt then epo_check_e4 ~prec (t, tt) (s, ss) (g, gg) (f, ff)
-            else if c = Lt then epo_check_e4_inv ~prec (t, tt) (s, ss) (g, gg) (f, ff)
+            else if c = Lt then
+              epo_check_e4_inv ~prec (t, tt) (s, ss) (g, gg) (f, ff)
             else epo_check_e1 ~prec (t, tt) (s, ss) (g, gg) (f, ff)
         | _ ->
             if c = Gt then epo_check_e2_e3 ~prec (t, tt) (s, ss) (g, gg) (f, ff)
-            else if c = Lt then epo_check_e2_e3_inv ~prec (t, tt) (s, ss) (g, gg) (f, ff)
+            else if c = Lt then
+              epo_check_e2_e3_inv ~prec (t, tt) (s, ss) (g, gg) (f, ff)
             else epo_check_e1 ~prec (t, tt) (s, ss) (g, gg) (f, ff) )
     | _ ->
         epo_check_e1 ~prec (t, tt) (s, ss) (g, gg) (f, ff)
@@ -779,9 +900,18 @@ module LambdaFreeKBOCoeff : ORD = struct
     let app_weight head_weight coeff_multipliers args =
       args
       |> List.mapi (fun i s ->
-             match (weight prec s, coeff_multipliers i) with Some w, Some c -> Some (c w) | _ -> None )
+             match (weight prec s, coeff_multipliers i) with
+             | Some w, Some c ->
+                 Some (c w)
+             | _ ->
+                 None )
       |> List.fold_left
-           (fun w1 w2 -> match (w1, w2) with Some w1', Some w2' -> Some (WP.add w1' w2') | _, _ -> None)
+           (fun w1 w2 ->
+             match (w1, w2) with
+             | Some w1', Some w2' ->
+                 Some (WP.add w1' w2')
+             | _, _ ->
+                 None )
            head_weight
     in
     match T.view t with
@@ -859,7 +989,8 @@ module LambdaFreeKBOCoeff : ORD = struct
       | Some wt, Some ws ->
           if WP.compare wt ws > 0 then Gt (* by rule C1 *)
           else if WP.compare wt ws < 0 then Lt (* by rule C1 *)
-          else if WP.equal wt ws then lfhokbo_same_weight t s (* try rules C2 - C4 *)
+          else if WP.equal wt ws then
+            lfhokbo_same_weight t s (* try rules C2 - C4 *)
           else Incomparable
             (* Our approximation of comparing polynomials cannot
                determine the greater polynomial *)
@@ -877,21 +1008,27 @@ module LambdaFreeKBOCoeff : ORD = struct
     let term_arity =
       match Type.arity (Term.ty t) with
       | Type.NoArity ->
-          failwith (CCFormat.sprintf "term %a has ill-formed type %a" Term.pp t Type.pp (Term.ty t))
+          failwith
+            (CCFormat.sprintf "term %a has ill-formed type %a" Term.pp t Type.pp
+               (Term.ty t) )
       | Type.Arity (_, n) ->
           n
     in
     let id_arity s =
       match Type.arity (Type.const s) with
       | Type.NoArity ->
-          failwith (CCFormat.sprintf "symbol %a has ill-formed type %a" ID.pp s Type.pp (Type.const s))
+          failwith
+            (CCFormat.sprintf "symbol %a has ill-formed type %a" ID.pp s Type.pp
+               (Type.const s) )
       | Type.Arity (_, n) ->
           n
     in
     match (Head.term_to_head t, Head.term_to_head s) with
     | Head.I g, Head.I f ->
         List.exists
-          (fun i -> Prec.arg_coeff prec g (id_arity g - i) != Prec.arg_coeff prec f (id_arity f - i))
+          (fun i ->
+            Prec.arg_coeff prec g (id_arity g - i)
+            != Prec.arg_coeff prec f (id_arity f - i) )
           CCList.(0 --^ term_arity)
     | Head.V _, _ | _, Head.V _ ->
         true
@@ -922,7 +1059,11 @@ module Polynomial = struct
     | _, WeightUnknown _ ->
         -1
     | CoeffUnknown (ts, j), CoeffUnknown (ss, i) -> (
-      match CCList.compare T.compare ts ss with 0 -> CCInt.compare j i | n -> n )
+      match CCList.compare T.compare ts ss with
+      | 0 ->
+          CCInt.compare j i
+      | n ->
+          n )
 
   let equal unk1 (unk2 : unknown) = compare unk2 unk1 = 0
 
@@ -936,9 +1077,13 @@ module Polynomial = struct
 
   let pp_unknown out = function
     | EtaUnknown var ->
-        Format.pp_print_string out "h_{" ; HVar.pp out var ; Format.pp_print_string out "}"
+        Format.pp_print_string out "h_{" ;
+        HVar.pp out var ;
+        Format.pp_print_string out "}"
     | WeightUnknown ts ->
-        Format.pp_print_string out "w_{" ; CCList.pp Term.pp out ts ; Format.pp_print_string out "}"
+        Format.pp_print_string out "w_{" ;
+        CCList.pp Term.pp out ts ;
+        Format.pp_print_string out "}"
     | CoeffUnknown (ts, i) ->
         Format.pp_print_string out "k_{" ;
         CCList.pp Term.pp out ts ;
@@ -954,9 +1099,18 @@ module Polynomial = struct
     let hash = Hash.list hash_unknown
   end)
 
-  type polynomial = {mutable hashtbl: W.t ULH.t; mutable pos_counter: int; mutable neg_counter: int}
+  type polynomial =
+    { mutable hashtbl: W.t ULH.t
+    ; mutable pos_counter: int
+    ; mutable neg_counter: int }
 
-  let mk_key = function [] -> [] | [unk] -> [unk] | unks -> List.sort compare unks
+  let mk_key = function
+    | [] ->
+        []
+    | [unk] ->
+        [unk]
+    | unks ->
+        List.sort compare unks
 
   let incr_counter poly sign k =
     if sign > 0 then poly.pos_counter <- poly.pos_counter + k
@@ -979,20 +1133,30 @@ module Polynomial = struct
           incr_counter poly (W.sign coeff) 1
       | Some old_coeff ->
           let sum = W.add old_coeff coeff in
-          if sum = W.zero then ULH.remove poly.hashtbl key else ULH.replace poly.hashtbl key sum ;
+          if sum = W.zero then ULH.remove poly.hashtbl key
+          else ULH.replace poly.hashtbl key sum ;
           incr_counter poly (W.sign old_coeff) (-1) ;
           incr_counter poly (W.sign sum) 1
 
   let add poly1 poly2 =
-    if not (is_zero poly2) then ULH.iter (fun key coeff -> add_monomial poly1 coeff key) poly2.hashtbl
+    if not (is_zero poly2) then
+      ULH.iter (fun key coeff -> add_monomial poly1 coeff key) poly2.hashtbl
 
   let multiply_unknowns poly unks =
     if not (CCList.is_empty unks) then (
       let old_hashtbl = poly.hashtbl in
       poly.hashtbl <- ULH.create 16 ;
-      ULH.iter (fun key coeff -> ULH.add poly.hashtbl (mk_key (List.rev_append unks key)) coeff) old_hashtbl )
+      ULH.iter
+        (fun key coeff ->
+          ULH.add poly.hashtbl (mk_key (List.rev_append unks key)) coeff )
+        old_hashtbl )
 
-  let constant_monomial poly = match ULH.find_opt poly.hashtbl [] with None -> W.zero | Some coeff -> coeff
+  let constant_monomial poly =
+    match ULH.find_opt poly.hashtbl [] with
+    | None ->
+        W.zero
+    | Some coeff ->
+        coeff
 
   let pp out poly =
     let first = ref true in
@@ -1004,7 +1168,9 @@ module Polynomial = struct
         Format.pp_print_string out ")" ;
         if not (CCList.is_empty key) then (
           Format.pp_print_string out "*" ;
-          CCList.pp ~pp_sep:(fun out () -> Format.pp_print_string out "*") pp_unknown out key ) )
+          CCList.pp
+            ~pp_sep:(fun out () -> Format.pp_print_string out "*")
+            pp_unknown out key ) )
       poly.hashtbl ;
     if !first then Format.pp_print_string out "0" ;
     CCFormat.printf " [%d %d]" poly.pos_counter poly.neg_counter
@@ -1028,7 +1194,11 @@ let same_length_lex_ext f ys xs =
     | _, _ ->
         assert false
   in
-  match CCInt.compare (List.length ys) (List.length xs) with 0 -> lex ys xs | n -> if n > 0 then C.Gt else Lt
+  match CCInt.compare (List.length ys) (List.length xs) with
+  | 0 ->
+      lex ys xs
+  | n ->
+      if n > 0 then C.Gt else Lt
 
 let same_length_lex_ext_data f ys xs =
   let rec lex ys xs =
@@ -1058,7 +1228,8 @@ let same_length_lex_ext_data f ys xs =
       ([], if n > 0 then C.Gt else Lt)
 
 let cw_ext f ys xs =
-  if List.length ys = List.length xs then same_length_lex_ext (fun y x -> C.smooth (f y x)) ys xs
+  if List.length ys = List.length xs then
+    same_length_lex_ext (fun y x -> C.smooth (f y x)) ys xs
   else C.Incomparable
 
 let cw_ext_data f ys xs =
@@ -1095,7 +1266,8 @@ module LambdaKBO : ORD = struct
      variables. *)
   let my_db_weight = W.one
 
-  let add_monomial w sign coeff unks = Polynomial.add_monomial w (W.mult sign coeff) unks
+  let add_monomial w sign coeff unks =
+    Polynomial.add_monomial w (W.mult sign coeff) unks
 
   module Type_KBO = MakeKBO (struct
     let name = "type_kbo"
@@ -1107,7 +1279,8 @@ module LambdaKBO : ORD = struct
 
   let compare_type_terms ~prec = Type_KBO.compare_terms ~prec
 
-  let compare_types ~prec t_ty s_ty = compare_type_terms ~prec (Term.of_ty t_ty) (Term.of_ty s_ty)
+  let compare_types ~prec t_ty s_ty =
+    compare_type_terms ~prec (Term.of_ty t_ty) (Term.of_ty s_ty)
 
   module WH = CCHashtbl.Make (struct
     type t = W.t
@@ -1125,7 +1298,8 @@ module LambdaKBO : ORD = struct
         id
     | None ->
         let id = ID.make (W.to_string w) in
-        WH.add weight_id_hashtbl w id ; id
+        WH.add weight_id_hashtbl w id ;
+        id
 
   (* The ordering might flip if one eta-reduced side is a lambda-expression. *)
   let cannot_flip t s =
@@ -1135,25 +1309,30 @@ module LambdaKBO : ORD = struct
   let rec normalize_consts ~prec t =
     match T.view t with
     | AppBuiltin (b, bargs) ->
-        Term.app_builtin ~ty:(Term.ty t) b (List.map (normalize_consts ~prec) bargs)
+        Term.app_builtin ~ty:(Term.ty t) b
+          (List.map (normalize_consts ~prec) bargs)
     | Const fid ->
         let fid' = id_of_weight (Prec.weight prec fid) in
         Term.const ~ty:(Term.ty t) fid'
     | Fun (ty, body) ->
         Term.fun_ ty (normalize_consts ~prec body)
     | App (s, ts) ->
-        Term.app (normalize_consts ~prec s) (List.map (normalize_consts ~prec) ts)
+        Term.app (normalize_consts ~prec s)
+          (List.map (normalize_consts ~prec) ts)
     | _ ->
         t
 
   let categorize_var_arg var arg arg_ty (some_args, extra_args) =
-    if is_problematic_type arg_ty then (arg :: some_args, extra_args) else (some_args, arg :: extra_args)
+    if is_problematic_type arg_ty then (arg :: some_args, extra_args)
+    else (some_args, arg :: extra_args)
 
   let rec add_weight_of ~prec w sign t =
     let add_eta_extra_of w ty =
       match Type.view ty with
       | Var var ->
-          add_monomial w sign (W.add (Prec.lam_weight prec) my_db_weight) [Polynomial.EtaUnknown var]
+          add_monomial w sign
+            (W.add (Prec.lam_weight prec) my_db_weight)
+            [Polynomial.EtaUnknown var]
       | _ ->
           ()
     in
@@ -1177,23 +1356,30 @@ module LambdaKBO : ORD = struct
           add_monomial w sign W.one [Polynomial.WeightUnknown [hd]] )
         else
           let arg_tys, _ = Type.open_fun (Term.ty hd) in
-          let some_args, extra_args = List.fold_right2 (categorize_var_arg var) args arg_tys ([], []) in
+          let some_args, extra_args =
+            List.fold_right2 (categorize_var_arg var) args arg_tys ([], [])
+          in
           let some_normal_args = List.map (normalize_consts ~prec) some_args in
           let add_weight_of_extra_arg i arg =
             let w' = Polynomial.create_zero () in
             add_weight_of ~prec w' sign arg ;
             add_monomial w' (-1 * sign) my_db_weight [] ;
-            Polynomial.multiply_unknowns w' [Polynomial.CoeffUnknown (hd :: some_normal_args, i + 1)] ;
+            Polynomial.multiply_unknowns w'
+              [Polynomial.CoeffUnknown (hd :: some_normal_args, i + 1)] ;
             Polynomial.add w w'
           in
           add_monomial w sign W.one [] ;
-          add_monomial w sign W.one [Polynomial.WeightUnknown (hd :: some_normal_args)] ;
+          add_monomial w sign W.one
+            [Polynomial.WeightUnknown (hd :: some_normal_args)] ;
           List.iteri add_weight_of_extra_arg extra_args ;
           add_eta_extra_of w (Term.ty t)
     | Const fid ->
         add_monomial w sign (Prec.weight prec fid) [] ;
         (* we abuse the meaning of the word "sign" below *)
-        List.iteri (fun i arg -> add_weight_of ~prec w (sign * Prec.arg_coeff prec fid i) arg) args ;
+        List.iteri
+          (fun i arg ->
+            add_weight_of ~prec w (sign * Prec.arg_coeff prec fid i) arg )
+          args ;
         add_eta_extra_of w (Term.ty t)
     | Fun (_, body) ->
         add_monomial w sign (Prec.lam_weight prec) [] ;
@@ -1202,7 +1388,9 @@ module LambdaKBO : ORD = struct
         () (* impossible *)
 
   let analyze_weight_diff w =
-    match (Polynomial.all_coeffs_nonnegative w, Polynomial.all_coeffs_nonpositive w) with
+    match
+      (Polynomial.all_coeffs_nonnegative w, Polynomial.all_coeffs_nonpositive w)
+    with
     | false, false ->
         C.Incomparable
     | true, false ->
@@ -1246,10 +1434,16 @@ module LambdaKBO : ORD = struct
         if CCList.is_empty t_args then (w, C.Eq)
         else
           let arg_tys, _ = Type.open_fun (Term.ty t_hd) in
-          let some_t_args, extra_t_args = List.fold_right2 (categorize_var_arg y) t_args arg_tys ([], []) in
-          let some_s_args, extra_s_args = List.fold_right2 (categorize_var_arg y) s_args arg_tys ([], []) in
+          let some_t_args, extra_t_args =
+            List.fold_right2 (categorize_var_arg y) t_args arg_tys ([], [])
+          in
+          let some_s_args, extra_s_args =
+            List.fold_right2 (categorize_var_arg y) s_args arg_tys ([], [])
+          in
           let some_normal_t_args = List.map (normalize_consts ~prec) some_t_args
-          and some_normal_s_args = List.map (normalize_consts ~prec) some_s_args in
+          and some_normal_s_args =
+            List.map (normalize_consts ~prec) some_s_args
+          in
           if
             CCList.equal T.equal some_normal_t_args some_normal_s_args
             && CCList.for_all2 cannot_flip some_t_args some_s_args
@@ -1257,16 +1451,19 @@ module LambdaKBO : ORD = struct
             let arg_ws, cmp = cw_ext_data (process_terms ~prec) t_args s_args in
             let extra_arg_ws = CCList.drop (List.length some_t_args) arg_ws in
             let add_weight_of_extra_arg i arg_w =
-              Polynomial.multiply_unknowns arg_w [Polynomial.CoeffUnknown (t_hd :: some_normal_t_args, i + 1)] ;
+              Polynomial.multiply_unknowns arg_w
+                [Polynomial.CoeffUnknown (t_hd :: some_normal_t_args, i + 1)] ;
               Polynomial.add w arg_w
             in
             List.iteri add_weight_of_extra_arg extra_arg_ws ;
             consider_weight w cmp )
           else consider_weights_poly ~prec t s C.Incomparable
     | Var _, AppBuiltin (b, _) ->
-        consider_weights_poly ~prec t s (if Builtin.as_int b = 0 then C.Geq else C.Incomparable)
+        consider_weights_poly ~prec t s
+          (if Builtin.as_int b = 0 then C.Geq else C.Incomparable)
     | AppBuiltin (b, _), Var _ ->
-        consider_weights_poly ~prec t s (if Builtin.as_int b = 0 then C.Leq else C.Incomparable)
+        consider_weights_poly ~prec t s
+          (if Builtin.as_int b = 0 then C.Leq else C.Incomparable)
     | Var _, _ | _, Var _ ->
         consider_weights_poly ~prec t s C.Incomparable
     | Fun (t_ty, t_body), Fun (s_ty, s_body) -> (
@@ -1292,7 +1489,9 @@ module LambdaKBO : ORD = struct
       | 0 -> (
         match ID.compare gid fid with
         | 0 -> (
-          match same_length_lex_ext (compare_type_terms ~prec) t_tyargs s_tyargs with
+          match
+            same_length_lex_ext (compare_type_terms ~prec) t_tyargs s_tyargs
+          with
           | Eq ->
               process_args ~prec t_args s_args
           | cmp ->
@@ -1310,7 +1509,9 @@ module LambdaKBO : ORD = struct
     | AppBuiltin (t_b, t_bargs), AppBuiltin (s_b, s_bargs) -> (
       match Builtin.compare t_b s_b with
       | 0 ->
-          process_args ~prec (t_bargs @ t_tyargs @ t_args) (s_bargs @ s_tyargs @ s_args)
+          process_args ~prec
+            (t_bargs @ t_tyargs @ t_args)
+            (s_bargs @ s_tyargs @ s_args)
       | n when n > 0 ->
           consider_weights_poly ~prec t s Gt
       | _ ->
@@ -1345,7 +1546,8 @@ module LambdaLPO : ORD = struct
 
   let compare_type_terms ~prec = Type_RPO.compare_terms ~prec
 
-  let compare_types ~prec t_ty s_ty = compare_type_terms ~prec (Term.of_ty t_ty) (Term.of_ty s_ty)
+  let compare_types ~prec t_ty s_ty =
+    compare_type_terms ~prec (Term.of_ty t_ty) (Term.of_ty s_ty)
 
   (* The ordering might flip if one side is a lambda-expression or
      variable-headed or if the orientation is established using the subterm
@@ -1361,10 +1563,15 @@ module LambdaLPO : ORD = struct
              || (cmp = C.Gt && check_subs ~prec [t] s)
              || (cmp = C.Lt && check_subs ~prec [s] t) )
 
-  and check_subs ~prec ts s = List.exists (fun ti -> C.is_Gt_or_Geq_or_Eq (do_compare_terms ~prec ti s)) ts
+  and check_subs ~prec ts s =
+    List.exists
+      (fun ti -> C.is_Gt_or_Geq_or_Eq (do_compare_terms ~prec ti s))
+      ts
 
   and compare_subs_both_ways ~prec t ts s ss =
-    if check_subs ~prec ts s then C.Gt else if check_subs ~prec ss t then C.Lt else C.Incomparable
+    if check_subs ~prec ts s then C.Gt
+    else if check_subs ~prec ss t then C.Lt
+    else C.Incomparable
 
   and compare_rest ~prec t ss =
     match ss with
@@ -1405,15 +1612,18 @@ module LambdaLPO : ORD = struct
     let s_hd, (s_tyargs, s_args) = break_term_up s in
     match (T.view t_hd, T.view s_hd) with
     | Var y, Var x ->
-        if HVar.id y = HVar.id x && List.for_all2 (cannot_flip ~prec) t_args s_args then
-          cw_ext (do_compare_terms ~prec) t_args s_args
+        if
+          HVar.id y = HVar.id x
+          && List.for_all2 (cannot_flip ~prec) t_args s_args
+        then cw_ext (do_compare_terms ~prec) t_args s_args
         else C.Incomparable
     | Var _, Fun (_, s_body) ->
         if check_subs ~prec [s_body] t then C.Lt else C.Incomparable
     | Var _, (DB _ | Const _) ->
         if check_subs ~prec s_args t then C.Lt else C.Incomparable
     | Var _, AppBuiltin (s_b, s_bargs) ->
-        if check_subs ~prec (List.rev_append s_bargs s_args) t then C.Lt else C.Incomparable
+        if check_subs ~prec (List.rev_append s_bargs s_args) t then C.Lt
+        else C.Incomparable
     | (Const _ | DB _), Var _ ->
         if check_subs ~prec t_args s then C.Gt else C.Incomparable
     | Const gid, Const fid -> (
@@ -1421,7 +1631,9 @@ module LambdaLPO : ORD = struct
       | 0 -> (
         match ID.compare gid fid with
         | 0 -> (
-          match same_length_lex_ext (compare_type_terms ~prec) t_tyargs s_tyargs with
+          match
+            same_length_lex_ext (compare_type_terms ~prec) t_tyargs s_tyargs
+          with
           | Gt ->
               compare_rest ~prec t s_args
           | Eq ->
@@ -1445,14 +1657,18 @@ module LambdaLPO : ORD = struct
     | (Const _ | AppBuiltin _ | DB _), Fun (_, s_body) ->
         compare_rest ~prec t [s_body]
     | AppBuiltin (t_b, t_bargs), Var _ ->
-        if check_subs ~prec (List.rev_append t_bargs t_args) s then C.Gt else C.Incomparable
+        if check_subs ~prec (List.rev_append t_bargs t_args) s then C.Gt
+        else C.Incomparable
     | AppBuiltin (_, t_bargs), Const _ ->
         C.opp (compare_rest ~prec s (List.rev_append t_bargs t_args))
     | AppBuiltin (t_b, t_bargs), AppBuiltin (s_b, s_bargs) -> (
-        let all_t_args = t_bargs @ t_tyargs @ t_args and all_s_args = s_bargs @ s_tyargs @ s_args in
+        let all_t_args = t_bargs @ t_tyargs @ t_args
+        and all_s_args = s_bargs @ s_tyargs @ s_args in
         match CCInt.compare (Builtin.as_int t_b) (Builtin.as_int s_b) with
         | 0 -> (
-          match CCInt.compare (List.length all_t_args) (List.length all_s_args) with
+          match
+            CCInt.compare (List.length all_t_args) (List.length all_s_args)
+          with
           | 0 ->
               compare_regular_args ~prec t all_t_args s all_s_args
           | n when n > 0 ->
@@ -1498,12 +1714,25 @@ end
 
 let dummy_cache_ = CCCache.dummy
 
-let map2 f g {cache_compare= _; compare; prec; name; might_flip; cache_might_flip= _; monotonic} =
+let map2 f g
+    { cache_compare= _
+    ; compare
+    ; prec
+    ; name
+    ; might_flip
+    ; cache_might_flip= _
+    ; monotonic } =
   let cache_compare = mk_cache 256 in
   let cache_might_flip = mk_cache 256 in
-  let compare prec a b = CCCache.with_cache cache_compare (fun (a, b) -> compare prec (f a) (f b)) (a, b) in
+  let compare prec a b =
+    CCCache.with_cache cache_compare
+      (fun (a, b) -> compare prec (f a) (f b))
+      (a, b)
+  in
   let might_flip prec a b =
-    CCCache.with_cache cache_might_flip (fun (a, b) -> might_flip prec (g a) (g b)) (a, b)
+    CCCache.with_cache cache_might_flip
+      (fun (a, b) -> might_flip prec (g a) (g b))
+      (a, b)
   in
   {cache_compare; compare; prec; name; might_flip; cache_might_flip; monotonic}
 
@@ -1518,12 +1747,27 @@ let derived_ho_kbo ~ignore_quans_under_lam prec =
     let ignore_deep_quants = ignore_quans_under_lam
   end) in
   let cache_compare = mk_cache 256 in
-  let compare prec a b = CCCache.with_cache cache_compare (fun (a, b) -> KBO.compare_terms ~prec a b) (a, b) in
+  let compare prec a b =
+    CCCache.with_cache cache_compare
+      (fun (a, b) -> KBO.compare_terms ~prec a b)
+      (a, b)
+  in
   let cache_might_flip = mk_cache 256 in
-  let might_flip prec a b = CCCache.with_cache cache_might_flip (fun (a, b) -> KBO.might_flip prec a b) (a, b) in
+  let might_flip prec a b =
+    CCCache.with_cache cache_might_flip
+      (fun (a, b) -> KBO.might_flip prec a b)
+      (a, b)
+  in
   let normalize t = Lambda.eta_reduce t |> Lambda.snf in
   let monotonic = false in
-  map normalize {cache_compare; compare; name= KBO.name; prec; might_flip; cache_might_flip; monotonic}
+  map normalize
+    { cache_compare
+    ; compare
+    ; name= KBO.name
+    ; prec
+    ; might_flip
+    ; cache_might_flip
+    ; monotonic }
 
 let lambdafree_kbo prec =
   let module KBO = MakeKBO (struct
@@ -1534,11 +1778,25 @@ let lambdafree_kbo prec =
     let ignore_deep_quants = true
   end) in
   let cache_compare = mk_cache 256 in
-  let compare prec a b = CCCache.with_cache cache_compare (fun (a, b) -> KBO.compare_terms ~prec a b) (a, b) in
+  let compare prec a b =
+    CCCache.with_cache cache_compare
+      (fun (a, b) -> KBO.compare_terms ~prec a b)
+      (a, b)
+  in
   let cache_might_flip = mk_cache 256 in
-  let might_flip prec a b = CCCache.with_cache cache_might_flip (fun (a, b) -> KBO.might_flip prec a b) (a, b) in
+  let might_flip prec a b =
+    CCCache.with_cache cache_might_flip
+      (fun (a, b) -> KBO.might_flip prec a b)
+      (a, b)
+  in
   let monotonic = true in
-  {cache_compare; compare; name= KBO.name; prec; might_flip; cache_might_flip; monotonic}
+  { cache_compare
+  ; compare
+  ; name= KBO.name
+  ; prec
+  ; might_flip
+  ; cache_might_flip
+  ; monotonic }
 
 let lambdafree_rpo prec =
   let module RPO = MakeRPO (struct
@@ -1549,11 +1807,25 @@ let lambdafree_rpo prec =
     let ignore_deep_quants = true
   end) in
   let cache_compare = mk_cache 256 in
-  let compare prec a b = CCCache.with_cache cache_compare (fun (a, b) -> RPO.compare_terms ~prec a b) (a, b) in
+  let compare prec a b =
+    CCCache.with_cache cache_compare
+      (fun (a, b) -> RPO.compare_terms ~prec a b)
+      (a, b)
+  in
   let cache_might_flip = mk_cache 256 in
-  let might_flip prec a b = CCCache.with_cache cache_might_flip (fun (a, b) -> RPO.might_flip prec a b) (a, b) in
+  let might_flip prec a b =
+    CCCache.with_cache cache_might_flip
+      (fun (a, b) -> RPO.might_flip prec a b)
+      (a, b)
+  in
   let monotonic = false in
-  {cache_compare; compare; name= RPO.name; prec; might_flip; cache_might_flip; monotonic}
+  { cache_compare
+  ; compare
+  ; name= RPO.name
+  ; prec
+  ; might_flip
+  ; cache_might_flip
+  ; monotonic }
 
 let derived_ho_rpo prec =
   let module RPO = MakeRPO (struct
@@ -1564,11 +1836,25 @@ let derived_ho_rpo prec =
     let ignore_deep_quants = true
   end) in
   let cache_compare = mk_cache 256 in
-  let compare prec a b = CCCache.with_cache cache_compare (fun (a, b) -> RPO.compare_terms ~prec a b) (a, b) in
+  let compare prec a b =
+    CCCache.with_cache cache_compare
+      (fun (a, b) -> RPO.compare_terms ~prec a b)
+      (a, b)
+  in
   let cache_might_flip = mk_cache 256 in
-  let might_flip prec a b = CCCache.with_cache cache_might_flip (fun (a, b) -> RPO.might_flip prec a b) (a, b) in
+  let might_flip prec a b =
+    CCCache.with_cache cache_might_flip
+      (fun (a, b) -> RPO.might_flip prec a b)
+      (a, b)
+  in
   let monotonic = false in
-  {cache_compare; compare; name= RPO.name; prec; might_flip; cache_might_flip; monotonic}
+  { cache_compare
+  ; compare
+  ; name= RPO.name
+  ; prec
+  ; might_flip
+  ; cache_might_flip
+  ; monotonic }
 
 let compose f ord =
   { ord with
@@ -1590,51 +1876,95 @@ let dummy_cache_ = CCCache.dummy
 let epo prec =
   let cache_compare = mk_cache 256 in
   (* TODO: make internal EPO cache accessible here ? **)
-  let compare prec a b = CCCache.with_cache cache_compare (fun (a, b) -> EPO.compare_terms ~prec a b) (a, b) in
+  let compare prec a b =
+    CCCache.with_cache cache_compare
+      (fun (a, b) -> EPO.compare_terms ~prec a b)
+      (a, b)
+  in
   let cache_might_flip = dummy_cache_ in
   let might_flip = EPO.might_flip in
-  {cache_compare; compare; name= EPO.name; prec; might_flip; cache_might_flip; monotonic= true}
+  { cache_compare
+  ; compare
+  ; name= EPO.name
+  ; prec
+  ; might_flip
+  ; cache_might_flip
+  ; monotonic= true }
 
 let lambdafree_kbo_coeff prec =
   let cache_compare = mk_cache 256 in
   let compare prec a b =
-    CCCache.with_cache cache_compare (fun (a, b) -> LambdaFreeKBOCoeff.compare_terms ~prec a b) (a, b)
+    CCCache.with_cache cache_compare
+      (fun (a, b) -> LambdaFreeKBOCoeff.compare_terms ~prec a b)
+      (a, b)
   in
   let cache_might_flip = mk_cache 256 in
   let might_flip prec a b =
-    CCCache.with_cache cache_might_flip (fun (a, b) -> LambdaFreeKBOCoeff.might_flip prec a b) (a, b)
+    CCCache.with_cache cache_might_flip
+      (fun (a, b) -> LambdaFreeKBOCoeff.might_flip prec a b)
+      (a, b)
   in
-  {cache_compare; compare; name= LambdaFreeKBOCoeff.name; prec; might_flip; cache_might_flip; monotonic= false}
+  { cache_compare
+  ; compare
+  ; name= LambdaFreeKBOCoeff.name
+  ; prec
+  ; might_flip
+  ; cache_might_flip
+  ; monotonic= false }
 
 let lambda_kbo prec =
   let cache_compare = mk_cache 256 in
   let compare prec a b =
-    CCCache.with_cache cache_compare (fun (a, b) -> LambdaKBO.compare_terms ~prec a b) (a, b)
+    CCCache.with_cache cache_compare
+      (fun (a, b) -> LambdaKBO.compare_terms ~prec a b)
+      (a, b)
   in
   let cache_might_flip = mk_cache 256 in
   let might_flip prec a b =
-    CCCache.with_cache cache_might_flip (fun (a, b) -> LambdaKBO.might_flip prec a b) (a, b)
+    CCCache.with_cache cache_might_flip
+      (fun (a, b) -> LambdaKBO.might_flip prec a b)
+      (a, b)
   in
-  let normalize_cmp t = if Term.is_fo_term t then t else Lambda.eta_expand (Lambda.snf t) in
+  let normalize_cmp t =
+    if Term.is_fo_term t then t else Lambda.eta_expand (Lambda.snf t)
+  in
   let normalize_flip t = if Term.is_fo_term t then t else Lambda.snf t in
   let monotonic = false in
   map2 normalize_cmp normalize_flip
-    {cache_compare; compare; name= LambdaKBO.name; prec; might_flip; cache_might_flip; monotonic}
+    { cache_compare
+    ; compare
+    ; name= LambdaKBO.name
+    ; prec
+    ; might_flip
+    ; cache_might_flip
+    ; monotonic }
 
 let lambda_lpo prec =
   let cache_compare = mk_cache 256 in
   let compare prec a b =
-    CCCache.with_cache cache_compare (fun (a, b) -> LambdaLPO.compare_terms ~prec a b) (a, b)
+    CCCache.with_cache cache_compare
+      (fun (a, b) -> LambdaLPO.compare_terms ~prec a b)
+      (a, b)
   in
   let cache_might_flip = mk_cache 256 in
   let might_flip prec a b =
-    CCCache.with_cache cache_might_flip (fun (a, b) -> LambdaLPO.might_flip prec a b) (a, b)
+    CCCache.with_cache cache_might_flip
+      (fun (a, b) -> LambdaLPO.might_flip prec a b)
+      (a, b)
   in
-  let normalize_cmp t = if Term.is_fo_term t then t else Lambda.eta_expand (Lambda.snf t) in
+  let normalize_cmp t =
+    if Term.is_fo_term t then t else Lambda.eta_expand (Lambda.snf t)
+  in
   let normalize_flip t = if Term.is_fo_term t then t else Lambda.snf t in
   let monotonic = false in
   map2 normalize_cmp normalize_flip
-    {cache_compare; compare; name= LambdaLPO.name; prec; might_flip; cache_might_flip; monotonic}
+    { cache_compare
+    ; compare
+    ; name= LambdaLPO.name
+    ; prec
+    ; might_flip
+    ; cache_might_flip
+    ; monotonic }
 
 let none =
   let compare _ t1 t2 = if T.equal t1 t2 then C.Eq else Incomparable in
@@ -1671,7 +2001,8 @@ let tbl_ =
   let h = Hashtbl.create 16 in
   Hashtbl.add h "lambdafree_kbo" lambdafree_kbo ;
   Hashtbl.add h "derived_ho_kbo" (derived_ho_kbo ~ignore_quans_under_lam:false) ;
-  Hashtbl.add h "derived_ho_kbo_complete" (derived_ho_kbo ~ignore_quans_under_lam:true) ;
+  Hashtbl.add h "derived_ho_kbo_complete"
+    (derived_ho_kbo ~ignore_quans_under_lam:true) ;
   Hashtbl.add h "lambdafree_rpo" lambdafree_rpo ;
   Hashtbl.add h "derived_ho_rpo" derived_ho_rpo ;
   Hashtbl.add h "epo" epo ;
@@ -1689,8 +2020,10 @@ let names () = CCHashtbl.keys_list tbl_
 let default_of_prec prec = default_of_list (Prec.snapshot prec)
 
 let by_name name prec =
-  try (Hashtbl.find tbl_ name) prec with Not_found -> invalid_arg ("no such registered ordering: " ^ name)
+  try (Hashtbl.find tbl_ name) prec
+  with Not_found -> invalid_arg ("no such registered ordering: " ^ name)
 
 let register name ord =
-  if Hashtbl.mem tbl_ name then invalid_arg ("ordering name already used: " ^ name)
+  if Hashtbl.mem tbl_ name then
+    invalid_arg ("ordering name already used: " ^ name)
   else Hashtbl.add tbl_ name ord

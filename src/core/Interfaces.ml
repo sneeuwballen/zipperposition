@@ -40,17 +40,28 @@ end
 module type PRINT2 = sig
   type ('a, 'b) t
 
-  val pp : 'a CCFormat.printer -> 'b CCFormat.printer -> ('a, 'b) t CCFormat.printer
+  val pp :
+    'a CCFormat.printer -> 'b CCFormat.printer -> ('a, 'b) t CCFormat.printer
 
-  val to_string : 'a CCFormat.printer -> 'b CCFormat.printer -> ('a, 'b) t -> string
+  val to_string :
+    'a CCFormat.printer -> 'b CCFormat.printer -> ('a, 'b) t -> string
 end
 
 module type PRINT3 = sig
   type ('a, 'b, 'c) t
 
-  val pp : 'a CCFormat.printer -> 'b CCFormat.printer -> 'c CCFormat.printer -> ('a, 'b, 'c) t CCFormat.printer
+  val pp :
+       'a CCFormat.printer
+    -> 'b CCFormat.printer
+    -> 'c CCFormat.printer
+    -> ('a, 'b, 'c) t CCFormat.printer
 
-  val to_string : 'a CCFormat.printer -> 'b CCFormat.printer -> 'c CCFormat.printer -> ('a, 'b, 'c) t -> string
+  val to_string :
+       'a CCFormat.printer
+    -> 'b CCFormat.printer
+    -> 'c CCFormat.printer
+    -> ('a, 'b, 'c) t
+    -> string
 end
 
 (** Register printers by name *)
@@ -77,7 +88,8 @@ module type PRINT_DE_BRUIJN = sig
       that it can use to print subterms.
       A hook should return [true] if it fired, [false] to fall back
       on the default printing. *)
-  type print_hook = int -> term CCFormat.printer -> Format.formatter -> term -> bool
+  type print_hook =
+    int -> term CCFormat.printer -> Format.formatter -> term -> bool
 
   val pp_depth : ?hooks:print_hook list -> int -> t CCFormat.printer
 end

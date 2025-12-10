@@ -60,7 +60,8 @@ type t =
   | Greater
   | Greatereq
   | Box_opaque  (** hint not to open this formula *)
-  | Pseudo_de_bruijn of int  (** magic to embed De Bruijn indices in normal terms *)
+  | Pseudo_de_bruijn of int
+      (** magic to embed De Bruijn indices in normal terms *)
   | BComb
   | CComb
   | IComb
@@ -196,7 +197,13 @@ let to_int_ = function
 let as_int = to_int_
 
 let compare a b =
-  match (a, b) with Int i, Int j -> Z.compare i j | Rat i, Rat j -> Q.compare i j | _ -> to_int_ a - to_int_ b
+  match (a, b) with
+  | Int i, Int j ->
+      Z.compare i j
+  | Rat i, Rat j ->
+      Q.compare i j
+  | _ ->
+      to_int_ a - to_int_ b
 
 let equal a b = compare a b = 0
 
@@ -243,7 +250,11 @@ let is_logical_op = function
   | _ ->
       false
 
-let is_logical_binop = function And | Or | Imply | Xor | Equiv -> true | _ -> false
+let is_logical_binop = function
+  | And | Or | Imply | Xor | Equiv ->
+      true
+  | _ ->
+      false
 
 let is_flattened_logical = function And | Or -> true | _ -> false
 
@@ -437,9 +448,14 @@ let fixity = function
 
 let is_prefix o = fixity o = Prefix
 
-let is_infix o = match fixity o with Infix_nary | Infix_binary -> true | Prefix -> false
+let is_infix o =
+  match fixity o with Infix_nary | Infix_binary -> true | Prefix -> false
 
-let is_combinator = function BComb | CComb | IComb | KComb | SComb -> true | _ -> false
+let is_combinator = function
+  | BComb | CComb | IComb | KComb | SComb ->
+      true
+  | _ ->
+      false
 
 let ty = function Int _ -> `Int | Rat _ -> `Rat | _ -> `Other
 
@@ -819,7 +835,8 @@ module TPTP = struct
 
   let is_prefix o = fixity o = Prefix
 
-  let is_infix o = match fixity o with Infix_nary | Infix_binary -> true | Prefix -> false
+  let is_infix o =
+    match fixity o with Infix_nary | Infix_binary -> true | Prefix -> false
 
   let of_string b = try Some (of_string_exn b) with NotABuiltin -> None
 
@@ -835,7 +852,8 @@ module ArithOp = struct
   exception TypeMismatch of string
 
   (* helper to raise errors *)
-  let _ty_mismatch fmt = CCFormat.ksprintf ~f:(fun msg -> raise (TypeMismatch msg)) fmt
+  let _ty_mismatch fmt =
+    CCFormat.ksprintf ~f:(fun msg -> raise (TypeMismatch msg)) fmt
 
   let sign = function
     | Int n ->
@@ -849,7 +867,9 @@ module ArithOp = struct
 
   let view = function Int i -> `Int i | Rat n -> `Rat n | s -> `Other s
 
-  let parse_num s = if String.contains s '/' then mk_rat (Q.of_string s) else mk_int (Z.of_string s)
+  let parse_num s =
+    if String.contains s '/' then mk_rat (Q.of_string s)
+    else mk_int (Z.of_string s)
 
   let one_i = mk_int Z.one
 
@@ -990,7 +1010,8 @@ module ArithOp = struct
     match (s1, s2) with
     | Int n1, Int n2 ->
         let q, r = Z.div_rem n1 n2 in
-        if Z.sign r = 0 then mk_int q else _ty_mismatch "non-exact integral division: %a / %a" pp s1 pp s2
+        if Z.sign r = 0 then mk_int q
+        else _ty_mismatch "non-exact integral division: %a / %a" pp s1 pp s2
     | Rat n1, Rat n2 ->
         if Q.sign n2 = 0 then raise Division_by_zero else mk_rat (Q.div n1 n2)
     | _ ->
@@ -1004,10 +1025,18 @@ module ArithOp = struct
         if sign s2 > 0 then floor (quotient s1 s2) else ceiling (quotient s1 s2)
 
   let quotient_t s1 s2 =
-    match (s1, s2) with Int n1, Int n2 -> mk_int (Z.div n1 n2) | _ -> truncate (quotient s1 s2)
+    match (s1, s2) with
+    | Int n1, Int n2 ->
+        mk_int (Z.div n1 n2)
+    | _ ->
+        truncate (quotient s1 s2)
 
   let quotient_f s1 s2 =
-    match (s1, s2) with Int n1, Int n2 -> mk_int (Z.div n1 n2) | _ -> floor (quotient s1 s2)
+    match (s1, s2) with
+    | Int n1, Int n2 ->
+        mk_int (Z.div n1 n2)
+    | _ ->
+        floor (quotient s1 s2)
 
   let remainder_e s1 s2 =
     match (s1, s2) with
@@ -1078,10 +1107,22 @@ module ArithOp = struct
         _ty_mismatch "gcd: expected two numerical types"
 
   let less s1 s2 =
-    match (s1, s2) with Int n1, Int n2 -> Z.lt n1 n2 | Rat n1, Rat n2 -> Q.lt n1 n2 | _ -> err2_ s1 s2
+    match (s1, s2) with
+    | Int n1, Int n2 ->
+        Z.lt n1 n2
+    | Rat n1, Rat n2 ->
+        Q.lt n1 n2
+    | _ ->
+        err2_ s1 s2
 
   let lesseq s1 s2 =
-    match (s1, s2) with Int n1, Int n2 -> Z.leq n1 n2 | Rat n1, Rat n2 -> Q.leq n1 n2 | _ -> err2_ s1 s2
+    match (s1, s2) with
+    | Int n1, Int n2 ->
+        Z.leq n1 n2
+    | Rat n1, Rat n2 ->
+        Q.leq n1 n2
+    | _ ->
+        err2_ s1 s2
 
   let greater s1 s2 = less s2 s1
 
@@ -1089,7 +1130,8 @@ module ArithOp = struct
 
   (* factorize [n] into a product of prime numbers. [n] must be positive *)
   let divisors n =
-    if Z.leq n Z.zero then raise (Invalid_argument "prime_factors: expected number > 0")
+    if Z.leq n Z.zero then
+      raise (Invalid_argument "prime_factors: expected number > 0")
     else
       match Z.to_int_exn n with
       | n ->

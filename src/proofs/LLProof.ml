@@ -41,7 +41,8 @@ and step =
   | Esa of name * t list
   | Inference of
       { intros: term list (* local renaming, with fresh constants *)
-      ; local_intros: term list (* variables introduced between hypothesis, not in conclusion *)
+      ; local_intros: term list
+            (* variables introduced between hypothesis, not in conclusion *)
       ; name: name
       ; parents: parent list
       ; tags: tag list }
@@ -60,7 +61,8 @@ let p_of p = p_inst p []
 
 let pp_tags = Proof.pp_tags
 
-let pp_inst out (l : inst) : unit = Format.fprintf out "[@[<hv>%a@]]" (Util.pp_list ~sep:"," T.pp) l
+let pp_inst out (l : inst) : unit =
+  Format.fprintf out "[@[<hv>%a@]]" (Util.pp_list ~sep:"," T.pp) l
 
 let pp_step out (s : step) : unit =
   match s with
@@ -100,13 +102,21 @@ let premises (p : t) : t list =
   let open_p {p_proof; _} = p_proof in
   List.rev_map open_p @@ parents p
 
-let inst (p : t) : inst = match p.step with Instantiate {inst; _} -> inst | _ -> []
+let inst (p : t) : inst =
+  match p.step with Instantiate {inst; _} -> inst | _ -> []
 
-let tags (p : t) : tag list = match p.step with Inference {tags; _} | Instantiate {tags; _} -> tags | _ -> []
+let tags (p : t) : tag list =
+  match p.step with
+  | Inference {tags; _} | Instantiate {tags; _} ->
+      tags
+  | _ ->
+      []
 
-let intros (p : t) : inst = match p.step with Inference {intros; _} -> intros | _ -> []
+let intros (p : t) : inst =
+  match p.step with Inference {intros; _} -> intros | _ -> []
 
-let local_intros (p : t) : inst = match p.step with Inference {local_intros; _} -> local_intros | _ -> []
+let local_intros (p : t) : inst =
+  match p.step with Inference {local_intros; _} -> local_intros | _ -> []
 
 let equal a b = a.id = b.id
 
@@ -135,16 +145,30 @@ let pp_parent out p =
   | _ :: _ ->
       Format.fprintf out "@[(@[%a@])@,%a@]" pp_res p.p_proof pp_inst p.p_inst
 
-let pp_inst_some out = function [] -> () | l -> Fmt.fprintf out "@ :inst %a" pp_inst l
+let pp_inst_some out = function
+  | [] ->
+      ()
+  | l ->
+      Fmt.fprintf out "@ :inst %a" pp_inst l
 
-let pp_intro_some out = function [] -> () | l -> Fmt.fprintf out "@ :intro %a" pp_inst l
+let pp_intro_some out = function
+  | [] ->
+      ()
+  | l ->
+      Fmt.fprintf out "@ :intro %a" pp_inst l
 
-let pp_lintro_some out = function [] -> () | l -> Fmt.fprintf out "@ :local-intro %a" pp_inst l
+let pp_lintro_some out = function
+  | [] ->
+      ()
+  | l ->
+      Fmt.fprintf out "@ :local-intro %a" pp_inst l
 
 let pp out (p : t) : unit =
-  Fmt.fprintf out "(@[<hv2>proof/%d %a%a@ :res `%a`@ :from [@[<hv>%a@]]%a%a%a@])" p.id pp_step (step p)
-    Proof.pp_tags (tags p) pp_res p (Util.pp_list pp_parent) (parents p) pp_inst_some (inst p) pp_intro_some
-    (intros p) pp_lintro_some (local_intros p)
+  Fmt.fprintf out
+    "(@[<hv2>proof/%d %a%a@ :res `%a`@ :from [@[<hv>%a@]]%a%a%a@])" p.id pp_step
+    (step p) Proof.pp_tags (tags p) pp_res p (Util.pp_list pp_parent)
+    (parents p) pp_inst_some (inst p) pp_intro_some (intros p) pp_lintro_some
+    (local_intros p)
 
 let pp_dag out (p : t) : unit =
   let seen = Tbl.create 32 in
@@ -218,7 +242,8 @@ module Dot = struct
               name
         in
         let descr = Fmt.sprintf "@[<h>%s%a@]" descr pp_tags (tags p) in
-        parents p |> Iter.of_list |> Iter.map (fun p' -> ((descr, inst p), p'.p_proof)) )
+        parents p |> Iter.of_list
+        |> Iter.map (fun p' -> ((descr, inst p), p'.p_proof)) )
 
   let _to_str_escape fmt = Util.ksprintf_noc ~f:Util.escape_dot fmt
 
@@ -251,7 +276,9 @@ module Dot = struct
         Some "grey"
 
   let pp_dot_seq ~name out seq =
-    CCGraph.Dot.pp_all ~tbl:(CCGraph.mk_table ~eq:equal ~hash 64) ~eq:equal ~name ~graph:as_graph
+    CCGraph.Dot.pp_all
+      ~tbl:(CCGraph.mk_table ~eq:equal ~hash 64)
+      ~eq:equal ~name ~graph:as_graph
       ~attrs_v:(fun p ->
         let top, b_color =
           match get_check_res p with
@@ -264,10 +291,14 @@ module Dot = struct
           | Some R_skip ->
               ("[check ø]", [`Color "yellow"])
         in
-        let label = _to_str_escape "@[<v>%s@,@[<2>%a@]@]@." top T.pp (concl p) in
+        let label =
+          _to_str_escape "@[<v>%s@,@[<2>%a@]@]@." top T.pp (concl p)
+        in
         let attrs = [`Label label; `Style "filled"] in
         let shape = `Shape "box" in
-        let color = match color p with None -> [] | Some c -> [`Other ("fillcolor", c)] in
+        let color =
+          match color p with None -> [] | Some c -> [`Other ("fillcolor", c)]
+        in
         (shape :: color) @ b_color @ attrs )
       ~attrs_e:(fun (r, inst) ->
         let label = _to_str_escape "@[<v>%s%a@]@." r pp_inst_some inst in
@@ -285,5 +316,6 @@ module Dot = struct
         let out = Format.formatter_of_out_channel oc in
         Format.fprintf out "%a@." (pp_dot_seq ~name) seq )
 
-  let pp_dot_file ?name filename proof = pp_dot_seq_file ?name filename (Iter.singleton proof)
+  let pp_dot_file ?name filename proof =
+    pp_dot_seq_file ?name filename (Iter.singleton proof)
 end

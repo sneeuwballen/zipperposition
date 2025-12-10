@@ -62,23 +62,40 @@ val name : Prover.t -> string
 
 type result = Unsat | Sat | Unknown | Error of string
 
-val call : ?timeout:int -> ?args:string list -> prover:Prover.t -> untyped A.t list -> result or_error
+val call :
+     ?timeout:int
+  -> ?args:string list
+  -> prover:Prover.t
+  -> untyped A.t list
+  -> result or_error
 (** Call the prover (if present) on the given problem, and
     return a result. Default timeout is 30. *)
 
 val call_proof :
-  ?timeout:int -> ?args:string list -> prover:Prover.t -> untyped A.t list -> (result * Trace_tstp.t) or_error
+     ?timeout:int
+  -> ?args:string list
+  -> prover:Prover.t
+  -> untyped A.t list
+  -> (result * Trace_tstp.t) or_error
 (** Call the prover, and also tries to parse a TSTP derivation,
     if the prover succeeded *)
 
 val call_with_out :
-  ?timeout:int -> ?args:string list -> prover:Prover.t -> untyped A.t list -> (result * string) or_error
+     ?timeout:int
+  -> ?args:string list
+  -> prover:Prover.t
+  -> untyped A.t list
+  -> (result * string) or_error
 (** Same as {!call}, but also returns the raw output of the prover *)
 
 (** {2 E-prover specific functions} *)
 
 module Eprover : sig
-  type result = {answer: szs_answer; output: string; decls: untyped A.t Iter.t option; proof: Trace_tstp.t option}
+  type result =
+    { answer: szs_answer
+    ; output: string
+    ; decls: untyped A.t Iter.t option
+    ; proof: Trace_tstp.t option }
 
   and szs_answer = Theorem | CounterSatisfiable | Unknown
 
@@ -87,16 +104,27 @@ module Eprover : sig
   val run_eproof : steps:int -> input:string -> result or_error
   (** Run Eproof_ram, and tries to read a proof back. *)
 
-  val run_eprover : ?opts:string list -> ?level:int -> steps:int -> input:string -> unit -> result or_error
+  val run_eprover :
+       ?opts:string list
+    -> ?level:int
+    -> steps:int
+    -> input:string
+    -> unit
+    -> result or_error
   (** Runs E with the given input (optional verbosity level). The returned
       result will not contain a proof.
       [opts] is an additional list of command line options that will be
       given to E. *)
 
-  val discover : ?opts:string list -> steps:int -> untyped A.t Iter.t -> untyped A.t Iter.t or_error
+  val discover :
+       ?opts:string list
+    -> steps:int
+    -> untyped A.t Iter.t
+    -> untyped A.t Iter.t or_error
   (** explore the surrounding of this list of declarations, returning the
       TPTP output of E *)
 
-  val cnf : ?opts:string list -> untyped A.t Iter.t -> untyped A.t Iter.t or_error
+  val cnf :
+    ?opts:string list -> untyped A.t Iter.t -> untyped A.t Iter.t or_error
   (** Use E to convert a set of statements into CNF *)
 end

@@ -100,9 +100,11 @@ val multiset : ?loc:location -> ty:t -> t list -> t
 
 val meta : ?loc:location -> meta_var -> t
 
-val record : ?loc:location -> ty:t -> (string * t) list -> rest:t Var.t option -> t
+val record :
+  ?loc:location -> ty:t -> (string * t) list -> rest:t Var.t option -> t
 
-val record_flatten : ?loc:location -> ty:t -> (string * t) list -> rest:t option -> t
+val record_flatten :
+  ?loc:location -> ty:t -> (string * t) list -> rest:t option -> t
 (** Build a record with possibly a row variable.
     @raise IllFormedTerm if the [rest] is not either a record or a variable. *)
 
@@ -339,7 +341,8 @@ val close_all : ty:t -> Binder.t -> t -> t
 
 val close_with_vars : ?binder:Binder.t -> t list -> t -> t
 
-val map : f:('a -> t -> t) -> bind:('a -> ty Var.t -> 'a * ty Var.t) -> 'a -> t -> t
+val map :
+  f:('a -> t -> t) -> bind:('a -> ty Var.t -> 'a * ty Var.t) -> 'a -> t -> t
 (** Generic non-recursive map *)
 
 include Interfaces.PRINT with type t := t
@@ -434,7 +437,14 @@ module UStack : sig
       done since are undone. *)
 end
 
-val unify : ?allow_open:bool -> ?loc:location -> ?st:UStack.t -> ?subst:Subst.t -> term -> term -> unit
+val unify :
+     ?allow_open:bool
+  -> ?loc:location
+  -> ?st:UStack.t
+  -> ?subst:Subst.t
+  -> term
+  -> term
+  -> unit
 (** unifies destructively the two given terms, by modifying references
       that occur under {!Meta}. Regular variables are not modified.
     @param allow_open if true, metas can be unified to terms

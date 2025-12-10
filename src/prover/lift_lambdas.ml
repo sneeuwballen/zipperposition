@@ -36,14 +36,21 @@ module Make (E : Env.S) : S with module Env = E = struct
     | [|Literal.Equation (l, r, _)|]
       when Type.is_prop (T.ty l)
            && (not (T.equal l r))
-           && (((not (T.equal r T.true_)) && not (T.equal r T.false_)) || T.is_formula l || T.is_formula r) ->
+           && ( ((not (T.equal r T.true_)) && not (T.equal r T.false_))
+              || T.is_formula l || T.is_formula r ) ->
         let f = Literals.Conv.to_tst (C.lits c) in
         let proof =
-          Proof.Step.simp ~rule:(Proof.Rule.mk "clausify_def") ~tags:[Proof.Tag.T_ho] [C.proof_parent c]
+          Proof.Step.simp
+            ~rule:(Proof.Rule.mk "clausify_def")
+            ~tags:[Proof.Tag.T_ho]
+            [C.proof_parent c]
         in
         let trail = C.trail c and penalty = C.penalty c in
         let stmt = Statement.assert_ ~proof f in
-        let cnf_vec = Cnf.convert @@ CCVector.to_iter @@ Cnf.cnf_of ~ctx:(Ctx.sk_ctx ()) stmt in
+        let cnf_vec =
+          Cnf.convert @@ CCVector.to_iter
+          @@ Cnf.cnf_of ~ctx:(Ctx.sk_ctx ()) stmt
+        in
         CCVector.iter
           (fun cl ->
             Statement.Seq.ty_decls cl
@@ -53,7 +60,8 @@ module Make (E : Env.S) : S with module Env = E = struct
           cnf_vec ;
         CCVector.map (C.of_statement ~convert_defs:true) cnf_vec
         |> CCVector.to_list |> CCList.flatten
-        |> List.map (fun c -> C.create ~penalty ~trail (CCArray.to_list (C.lits c)) proof)
+        |> List.map (fun c ->
+               C.create ~penalty ~trail (CCArray.to_list (C.lits c)) proof )
     | _ ->
         [c]
 
@@ -72,7 +80,10 @@ module Make (E : Env.S) : S with module Env = E = struct
             let i = i - depth in
             match Util.Int_map.get i lb_map with
             | Some var ->
-                assert (not @@ Scoped.equal T.equal (sc var) (Subst.FO.deref subst (sc var))) ;
+                assert (
+                  not
+                  @@ Scoped.equal T.equal (sc var)
+                       (Subst.FO.deref subst (sc var)) ) ;
                 (var, lb_map, subst)
             | None ->
                 let fvar = HVar.fresh_cnt ~counter ~ty:(T.ty t) () in
@@ -86,7 +97,9 @@ module Make (E : Env.S) : S with module Env = E = struct
       | T.Fun _ ->
           let prefs, body = T.open_fun t in
           let depth_inc = List.length prefs in
-          let body', lb_map, subst = aux ~depth:(depth + depth_inc) ~lb_map ~subst body in
+          let body', lb_map, subst =
+            aux ~depth:(depth + depth_inc) ~lb_map ~subst body
+          in
           (T.fun_l prefs body', lb_map, subst)
       | AppBuiltin (b, l) ->
           let l', lb_map, subst = aux_l ~depth ~lb_map ~subst l in
@@ -110,7 +123,9 @@ module Make (E : Env.S) : S with module Env = E = struct
     if not (Type.is_fun (T.ty t)) then (s, t)
     else
       let tys, _ = Type.open_fun (T.ty t) in
-      let fresh_vars = List.map (fun ty -> T.var (HVar.fresh_cnt ~counter ~ty ())) tys in
+      let fresh_vars =
+        List.map (fun ty -> T.var (HVar.fresh_cnt ~counter ~ty ())) tys
+      in
       (Lambda.whnf @@ T.app s fresh_vars, Lambda.whnf @@ T.app t fresh_vars)
 
   let lift_lambdas_t ~parent ~counter t =
@@ -121,25 +136,41 @@ module Make (E : Env.S) : S with module Env = E = struct
           let pref_vars, body = T.open_fun t in
           let body', (reused_defs, new_defs), declared_syms = aux body in
           let body_closed = T.fun_l pref_vars body' in
-          Util.debugf ~section 1 "after lifting:@[%a@]@." (fun k -> k T.pp body_closed) ;
-          let generalization = Idx.retrieve_generalizations (!idx, 1) (body_closed, 0) |> Iter.head in
+          Util.debugf ~section 1 "after lifting:@[%a@]@." (fun k ->
+              k T.pp body_closed ) ;
+          let generalization =
+            Idx.retrieve_generalizations (!idx, 1) (body_closed, 0) |> Iter.head
+          in
           match generalization with
           | Some (_, (def, lhs), subst) ->
               let lits = C.lits def in
               assert (Array.length lits = 1) ;
-              let lhs' = Lambda.eta_reduce @@ Lambda.snf @@ Subst.FO.apply Subst.Renaming.none subst (lhs, 1) in
+              let lhs' =
+                Lambda.eta_reduce @@ Lambda.snf
+                @@ Subst.FO.apply Subst.Renaming.none subst (lhs, 1)
+              in
               (lhs', (def :: reused_defs, new_defs), declared_syms)
           | None ->
               let free_vars = T.vars body' in
-              let unbound, _, subst = loose_bound_to_fvars ~counter body_closed in
+              let unbound, _, subst =
+                loose_bound_to_fvars ~counter body_closed
+              in
               let new_free_vars = T.VarSet.diff (T.vars unbound) free_vars in
-              let all_vars = T.VarSet.to_list free_vars @ T.VarSet.to_list new_free_vars in
-              let (id, ty), new_ll_sym = T.mk_fresh_skolem ~prefix:"l_lift" all_vars (T.ty t) in
+              let all_vars =
+                T.VarSet.to_list free_vars @ T.VarSet.to_list new_free_vars
+              in
+              let (id, ty), new_ll_sym =
+                T.mk_fresh_skolem ~prefix:"l_lift" all_vars (T.ty t)
+              in
               let lhs = new_ll_sym and rhs = unbound in
               let lhs_applied, rhs_applied = fully_apply ~counter lhs rhs in
               let lits = [Literal.mk_eq lhs_applied rhs_applied] in
-              let proof = Proof.Step.define_internal id [C.proof_parent parent] in
-              let lift_def = C.create ~penalty:1 ~trail:Trail.empty lits proof in
+              let proof =
+                Proof.Step.define_internal id [C.proof_parent parent]
+              in
+              let lift_def =
+                C.create ~penalty:1 ~trail:Trail.empty lits proof
+              in
               let repl = Subst.FO.apply Subst.Renaming.none subst (sc lhs) in
               let new_def =
                 Idx.retrieve_specializations (!idx, 1) (rhs, 0)
@@ -148,50 +179,75 @@ module Make (E : Env.S) : S with module Env = E = struct
                        let subst_has_lams subst =
                          Subst.codomain subst
                          |> Iter.exists (fun (t, _) ->
-                                Iter.exists T.is_fun (T.Seq.subterms (T.of_term_unsafe t)) )
+                                Iter.exists T.is_fun
+                                  (T.Seq.subterms (T.of_term_unsafe t)) )
                        in
                        if not (subst_has_lams subst) then
                          let renaming = Subst.Renaming.create () in
                          let lhs, rhs =
-                           (Subst.FO.apply renaming subst (lhs, 0), Subst.FO.apply renaming subst (lhs_spec, 1))
+                           ( Subst.FO.apply renaming subst (lhs, 0)
+                           , Subst.FO.apply renaming subst (lhs_spec, 1) )
                          in
                          let lits = [Literal.mk_eq lhs rhs] in
-                         let proof = Proof.Step.define_internal id [C.proof_parent parent; C.proof_parent def] in
-                         let lift_rel = C.create ~penalty:1 ~trail:Trail.empty lits proof in
+                         let proof =
+                           Proof.Step.define_internal id
+                             [C.proof_parent parent; C.proof_parent def]
+                         in
+                         let lift_rel =
+                           C.create ~penalty:1 ~trail:Trail.empty lits proof
+                         in
                          lift_rel :: acc
                        else acc )
                      [lift_def]
               in
               idx := Idx.add !idx rhs (lift_def, lhs) ;
-              (repl, (reused_defs, new_def @ new_defs), (id, ty) :: declared_syms) )
+              ( repl
+              , (reused_defs, new_def @ new_defs)
+              , (id, ty) :: declared_syms ) )
       | T.Var _ | T.Const _ | T.DB _ ->
           (t, ([], []), [])
       | T.App (hd, l) ->
           assert (not (T.is_fun hd)) ;
           let l', new_defs, declared_syms = aux_l l in
           ((if T.same_l l l' then t else T.app hd l'), new_defs, declared_syms)
-      | T.AppBuiltin (((Builtin.ExistsConst | Builtin.ForallConst) as b), [_; q_body]) when T.is_fun q_body ->
+      | T.AppBuiltin
+          (((Builtin.ExistsConst | Builtin.ForallConst) as b), [_; q_body])
+        when T.is_fun q_body ->
           let vars, body = T.open_fun q_body in
           let body', new_defs, declared_syms = aux body in
-          let mk_q b = if Builtin.equal b ExistsConst then T.Form.exists else T.Form.forall in
-          ((if T.equal body body' then t else mk_q b (T.fun_l vars body')), new_defs, declared_syms)
+          let mk_q b =
+            if Builtin.equal b ExistsConst then T.Form.exists else T.Form.forall
+          in
+          ( (if T.equal body body' then t else mk_q b (T.fun_l vars body'))
+          , new_defs
+          , declared_syms )
       | T.AppBuiltin (b, l) ->
           let l', new_defs, declared_syms = aux_l l in
-          ((if T.same_l l l' then t else T.app_builtin ~ty:(T.ty t) b l'), new_defs, declared_syms)
+          ( (if T.same_l l l' then t else T.app_builtin ~ty:(T.ty t) b l')
+          , new_defs
+          , declared_syms )
     and aux_l = function
       | [] ->
           ([], ([], []), [])
       | x :: xs ->
           let x', (x_reused_defs, x_new_defs), declared_syms = aux x in
           let xs', (xs_reused_defs, xs_new_defs), declared_symss = aux_l xs in
-          (x' :: xs', (x_reused_defs @ xs_reused_defs, x_new_defs @ xs_new_defs), declared_syms @ declared_symss)
+          ( x' :: xs'
+          , (x_reused_defs @ xs_reused_defs, x_new_defs @ xs_new_defs)
+          , declared_syms @ declared_symss )
     in
     Util.debugf ~section 1 "lifting @[%a@]@." (fun k -> k T.pp t) ;
     let res, defs, declared_syms = aux (Lambda.snf @@ t) in
-    Ctx.declare_syms declared_syms ; (res, defs)
+    Ctx.declare_syms declared_syms ;
+    (res, defs)
 
   let lift_lambdas cl =
-    let counter = ref ((C.Seq.vars cl |> Iter.map HVar.id |> Iter.max |> CCOpt.get_or ~default:0) + 1) in
+    let counter =
+      ref
+        ( ( C.Seq.vars cl |> Iter.map HVar.id |> Iter.max
+          |> CCOpt.get_or ~default:0 )
+        + 1 )
+    in
     let lits, (reused_defs, new_defs) =
       C.lits cl |> CCArray.to_list
       |> fun l ->
@@ -199,9 +255,14 @@ module Make (E : Env.S) : S with module Env = E = struct
         (fun lit (acc, (reused_defs, new_defs)) ->
           match lit with
           | Literal.Equation (lhs, rhs, sign) ->
-              let lhs', (reused_lhs, new_lhs) = lift_lambdas_t ~parent:cl ~counter lhs in
-              let rhs', (reused_rhs, new_rhs) = lift_lambdas_t ~parent:cl ~counter rhs in
-              let reused = reused_lhs @ reused_rhs and new_ = new_rhs @ new_lhs in
+              let lhs', (reused_lhs, new_lhs) =
+                lift_lambdas_t ~parent:cl ~counter lhs
+              in
+              let rhs', (reused_rhs, new_rhs) =
+                lift_lambdas_t ~parent:cl ~counter rhs
+              in
+              let reused = reused_lhs @ reused_rhs
+              and new_ = new_rhs @ new_lhs in
               let lit' = Literal.mk_lit lhs' rhs' sign in
               (lit' :: acc, (reused @ reused_defs, new_ @ new_defs))
           | _ ->
@@ -212,10 +273,13 @@ module Make (E : Env.S) : S with module Env = E = struct
     if Literals.equal (Array.of_list lits) (C.lits cl) then []
     else
       let proof =
-        Proof.Step.simp ~tags:[Proof.Tag.T_ho] ~rule:(Proof.Rule.mk "lambda_lifting")
+        Proof.Step.simp ~tags:[Proof.Tag.T_ho]
+          ~rule:(Proof.Rule.mk "lambda_lifting")
           (List.map C.proof_parent ((cl :: reused_defs) @ new_defs))
       in
-      let lifted = C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lits proof in
+      let lifted =
+        C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lits proof
+      in
       lifted :: new_defs
 
   let lift_lambdas_simp cl =
@@ -224,16 +288,21 @@ module Make (E : Env.S) : S with module Env = E = struct
       Util.debugf ~section 1 "Nothing to do for @[%a@]@." (fun k -> k C.pp cl) ;
       None )
     else (
-      Util.debugf ~section 1 "lifting(@[%a@])@. = @[%a@]" (fun k -> k C.pp cl (CCList.pp C.pp) res) ;
+      Util.debugf ~section 1 "lifting(@[%a@])@. = @[%a@]" (fun k ->
+          k C.pp cl (CCList.pp C.pp) res ) ;
       Some (CCList.flat_map clausify_def res) )
 
   let lift_lambdas_cnf st =
     Env.cr_return
-    @@ CCList.flat_map (fun c -> CCOpt.get_or ~default:[c] (lift_lambdas_simp c)) (E.C.of_statement st)
+    @@ CCList.flat_map
+         (fun c -> CCOpt.get_or ~default:[c] (lift_lambdas_simp c))
+         (E.C.of_statement st)
 
   let setup () =
-    if Env.flex_get k_live_lifting then Env.add_multi_simpl_rule ~priority:5 lift_lambdas_simp ;
-    if Env.flex_get k_post_cnf_lifting then Env.add_clause_conversion lift_lambdas_cnf
+    if Env.flex_get k_live_lifting then
+      Env.add_multi_simpl_rule ~priority:5 lift_lambdas_simp ;
+    if Env.flex_get k_post_cnf_lifting then
+      Env.add_clause_conversion lift_lambdas_cnf
 end
 
 let _live_lifting = ref false
@@ -248,15 +317,19 @@ let extension =
     E.flex_add k_post_cnf_lifting !_post_cnf_lifting ;
     ET.setup ()
   in
-  {Extensions.default with Extensions.name= "lift_lambdas"; prio= 1; env_actions= [register]}
+  { Extensions.default with
+    Extensions.name= "lift_lambdas"
+  ; prio= 1
+  ; env_actions= [register] }
 
 let () =
   Options.add_opts
     [ ( "--live-lambda-lifting"
       , Arg.Bool (( := ) _live_lifting)
       , " enable/disable lambda lifting as simplifying inference" )
-    ; ("--post-cnf-lambda-lifting", Arg.Bool (( := ) _post_cnf_lifting), "enable/disable post-cnf lambda lifting")
-    ] ;
+    ; ( "--post-cnf-lambda-lifting"
+      , Arg.Bool (( := ) _post_cnf_lifting)
+      , "enable/disable post-cnf lambda lifting" ) ] ;
   Params.add_to_modes
     [ "best"
     ; "ho-complete-basic"

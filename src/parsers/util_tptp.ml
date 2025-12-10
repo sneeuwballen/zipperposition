@@ -48,8 +48,8 @@ let find_file name dir =
       search dir'
     with Not_found -> None
   in
-  if Filename.is_relative name (* search by relative path, in parent dirs *) then
-    match search dir with None -> search_env () | Some _ as res -> res
+  if Filename.is_relative name (* search by relative path, in parent dirs *)
+  then match search dir with None -> search_env () | Some _ as res -> res
   else if Sys.file_exists name then Some name (* found *)
   else None
 
@@ -61,10 +61,13 @@ let parse_lexbuf ?names buf =
     List.iter
       (fun decl ->
         match (decl, names) with
-        | (A.CNF _ | A.FOF _ | A.TFF _ | A.THF _ | A.TypeDecl _ | A.NewType _), None ->
+        | ( (A.CNF _ | A.FOF _ | A.TFF _ | A.THF _ | A.TypeDecl _ | A.NewType _)
+          , None ) ->
             Queue.push decl q
-        | (A.CNF _ | A.FOF _ | A.TFF _ | A.THF _ | A.TypeDecl _ | A.NewType _), Some names ->
-            if List.mem (A.get_name decl) names then Queue.push decl q else () (* not included *)
+        | ( (A.CNF _ | A.FOF _ | A.TFF _ | A.THF _ | A.TypeDecl _ | A.NewType _)
+          , Some names ) ->
+            if List.mem (A.get_name decl) names then Queue.push decl q
+            else () (* not included *)
         | (A.Include _ | A.IncludeOnly _), _ ->
             Queue.push decl q )
       decls ;
@@ -83,12 +86,18 @@ let _find_and_open filename dir =
   | _ -> (
     match find_file filename dir with
     | Some filename -> (
-      try open_in filename with Sys_error msg -> errorf "error when opening file `%s`: %s" filename msg )
+      try open_in filename
+      with Sys_error msg ->
+        errorf "error when opening file `%s`: %s" filename msg )
     | None ->
         errorf "could not find file `%s`" filename )
 
 let parse_file ?cache ~recursive f =
-  let parse_cache = lazy (if recursive then CCOpt.get_lazy create_parse_cache cache else assert false) in
+  let parse_cache =
+    lazy
+      ( if recursive then CCOpt.get_lazy create_parse_cache cache
+        else assert false )
+  in
   let dir = Filename.dirname f in
   let result_decls = Queue.create () in
   (* function that parses one file *)
@@ -103,22 +112,40 @@ let parse_file ?cache ~recursive f =
       List.iter
         (fun decl ->
           match (decl, names) with
-          | (A.CNF _ | A.FOF _ | A.TFF _ | A.THF _ | A.TypeDecl _ | A.NewType _), None ->
+          | ( ( A.CNF _
+              | A.FOF _
+              | A.TFF _
+              | A.THF _
+              | A.TypeDecl _
+              | A.NewType _ )
+            , None ) ->
               Queue.push decl result_decls
-          | (A.CNF _ | A.FOF _ | A.TFF _ | A.THF _ | A.TypeDecl _ | A.NewType _), Some names ->
-              if List.mem (A.get_name decl) names then Queue.push decl result_decls else () (* not included *)
+          | ( ( A.CNF _
+              | A.FOF _
+              | A.TFF _
+              | A.THF _
+              | A.TypeDecl _
+              | A.NewType _ )
+            , Some names ) ->
+              if List.mem (A.get_name decl) names then
+                Queue.push decl result_decls
+              else () (* not included *)
           | A.Include f, _ when recursive ->
               if Hashtbl.mem (Lazy.force parse_cache) f then
-                Util.debugf 2 "@[<2>ignore include of `%s`, already parsed@]" (fun k -> k f)
+                Util.debugf 2 "@[<2>ignore include of `%s`, already parsed@]"
+                  (fun k -> k f )
               else (
                 (* be sure not to include the file twice *)
                 Hashtbl.add (Lazy.force parse_cache) f () ;
                 parse_this_file ?names:None f )
           | A.IncludeOnly (f, names'), _ when recursive ->
               if Hashtbl.mem (Lazy.force parse_cache) f then
-                Util.debugf 2 "@[<2>ignore include of `%s`, already parsed@]" (fun k -> k f)
+                Util.debugf 2 "@[<2>ignore include of `%s`, already parsed@]"
+                  (fun k -> k f )
               else (
-                Util.debugf 2 "@[<2>caution: partial include of `%s` will not be cached" (fun k -> k f) ;
+                Util.debugf 2
+                  "@[<2>caution: partial include of `%s` will not be cached"
+                  (fun k -> k f ) ;
                 parse_this_file ~names:names' f )
           | (A.Include _ | A.IncludeOnly _), _ ->
               Queue.push decl result_decls )
@@ -137,12 +164,14 @@ let parse_file ?cache ~recursive f =
 
 let fpf = Format.fprintf
 
-let print_into ppt oc decls = fpf oc "@[<v>%a@]@?" (Util.pp_iter ~sep:"" (A.pp ppt)) decls
+let print_into ppt oc decls =
+  fpf oc "@[<v>%a@]@?" (Util.pp_iter ~sep:"" (A.pp ppt)) decls
 
 let print_into_file ppt file decls =
   CCIO.with_out file (fun oc ->
       let out = Format.formatter_of_out_channel oc in
-      print_into ppt out decls ; Format.pp_print_flush out () )
+      print_into ppt out decls ;
+      Format.pp_print_flush out () )
 
 let has_includes decls =
   Iter.exists
@@ -176,10 +205,15 @@ let rec looks_like_def f =
   match PT.view f with
   | PT.Bind (Binder.Forall, _, f') ->
       looks_like_def f'
-  | PT.AppBuiltin ((Builtin.Equiv | Builtin.Eq), ([_; lhs; rhs] | [lhs; rhs])) -> (
+  | PT.AppBuiltin ((Builtin.Equiv | Builtin.Eq), ([_; lhs; rhs] | [lhs; rhs]))
+    -> (
       (* LHS is an atom/literal? *)
       let as_atom t =
-        match PT.view t with PT.Const id | PT.App ({PT.term= PT.Const id; _}, _) -> Some id | _ -> None
+        match PT.view t with
+        | PT.Const id | PT.App ({PT.term= PT.Const id; _}, _) ->
+            Some id
+        | _ ->
+            None
       in
       (* check that [lhs] is atomic and its head does not occur in [rhs] *)
       match as_atom lhs with
@@ -203,7 +237,8 @@ let to_ast st =
         UA.lemma ~attrs f
     | A.R_definition when !enable_def_as_rewrite && looks_like_def f ->
         (* conversion into def *)
-        Util.debugf ~section 3 "(@[tptp.def_as_rewrite@ %a@])" (fun k -> k PT.pp f) ;
+        Util.debugf ~section 3 "(@[tptp.def_as_rewrite@ %a@])" (fun k ->
+            k PT.pp f ) ;
         Util.incr_stat stat_def_as_rw ;
         UA.rewrite ~attrs f
     | A.R_definition
@@ -220,7 +255,10 @@ let to_ast st =
     let name = A.string_of_name name in
     let attr_name = UA.attr_name name in
     let attrs' =
-      CCList.flat_map (function A.GNode ("attrs", l) -> CCList.flat_map attr_of_info l | _ -> []) info
+      CCList.flat_map
+        (function
+          | A.GNode ("attrs", l) -> CCList.flat_map attr_of_info l | _ -> [] )
+        info
     in
     UA.decl s ty ~attrs:(attr_name :: attrs')
   in
@@ -229,7 +267,9 @@ let to_ast st =
       error "cannot convert `Include` to UntypedAST"
   | A.TypeDecl (name, s, ty, info) | A.NewType (name, s, ty, info) ->
       conv_decl name s ty info
-  | A.TFF (name, role, f, _) | A.THF (name, role, f, _) | A.FOF (name, role, f, _) ->
+  | A.TFF (name, role, f, _)
+  | A.THF (name, role, f, _)
+  | A.FOF (name, role, f, _) ->
       conv_form name role f
   | A.CNF (name, role, f, _) ->
       assert (not (CCList.is_empty f)) ;
@@ -243,7 +283,13 @@ let name_sym_ sy =
   A.NameString str
 
 let of_ast st =
-  let name = match UA.name st with None -> A.NameString "no_name" | Some s -> A.NameString s in
+  let name =
+    match UA.name st with
+    | None ->
+        A.NameString "no_name"
+    | Some s ->
+        A.NameString s
+  in
   match st.UA.stmt with
   | UA.Include s ->
       A.Include s
@@ -266,5 +312,9 @@ let of_ast st =
 
 let () =
   Options.add_opts
-    [ ("--tptp-def-as-rewrite", Arg.Set enable_def_as_rewrite, " in TPTP, definitions as rewrite rules")
-    ; ("--no-tptp-def-as-rewrite", Arg.Clear enable_def_as_rewrite, " disable definition->rewrite in TPTP") ]
+    [ ( "--tptp-def-as-rewrite"
+      , Arg.Set enable_def_as_rewrite
+      , " in TPTP, definitions as rewrite rules" )
+    ; ( "--no-tptp-def-as-rewrite"
+      , Arg.Clear enable_def_as_rewrite
+      , " disable definition->rewrite in TPTP" ) ]

@@ -11,7 +11,11 @@ type location = ParseLocation.t
 
 let section = Util.Section.make "typedSTerm"
 
-type t = {term: view; ty: t option; mutable hash: int; (* computed lazily *) loc: location option}
+type t =
+  { term: view
+  ; ty: t option
+  ; mutable hash: int
+  ; (* computed lazily *) loc: location option }
 
 and term = t
 
@@ -36,11 +40,18 @@ and view =
 
 and meta_var = t Var.t * t option ref * [`Generalize | `BindDefault | `NoBind]
 
-let rec deref t = match t.term with Meta (_, {contents= Some t'}, _) -> deref t' | _ -> t
+let rec deref t =
+  match t.term with Meta (_, {contents= Some t'}, _) -> deref t' | _ -> t
 
-let[@inline] must_deref t : bool = match t.term with Meta (_, {contents= Some _}, _) -> true | _ -> false
+let[@inline] must_deref t : bool =
+  match t.term with Meta (_, {contents= Some _}, _) -> true | _ -> false
 
-let view t = match t.term with Meta (_, {contents= Some t'}, _) -> (deref t').term | v -> v
+let view t =
+  match t.term with
+  | Meta (_, {contents= Some t'}, _) ->
+      (deref t').term
+  | v ->
+      v
 
 let loc t = t.loc
 
@@ -67,7 +78,8 @@ let rec head_exn t =
 
 let head t = try Some (head_exn t) with Not_found -> None
 
-let is_tType t = match view t with AppBuiltin (Builtin.TType, _) -> true | _ -> false
+let is_tType t =
+  match view t with AppBuiltin (Builtin.TType, _) -> true | _ -> false
 
 let to_int_ = function
   | Var _ ->
@@ -116,7 +128,8 @@ and hash_rec_ t =
   | Bind (s, v, t') ->
       Hash.combine4 6 (Binder.hash s) (Var.hash v) (hash t')
   | Record (l, rest) ->
-      Hash.combine3 7 (Hash.opt hash rest) (Hash.list (Hash.pair Hash.string hash) l)
+      Hash.combine3 7 (Hash.opt hash rest)
+        (Hash.list (Hash.pair Hash.string hash) l)
   | Ite (a, b, c) ->
       Hash.combine4 8 (hash a) (hash b) (hash c)
   | Let (_, u) ->
@@ -196,7 +209,11 @@ let rec pp out t =
   | Var s ->
       Var.pp_fullc out s
   | Const s -> (
-    match ID.as_prefix s with Some s -> CCFormat.string out s | None -> ID.pp out s )
+    match ID.as_prefix s with
+    | Some s ->
+        CCFormat.string out s
+    | None ->
+        ID.pp out s )
   | App (_, []) ->
       assert false
   | App (f, l) -> (
@@ -204,8 +221,12 @@ let rec pp out t =
         if !InnerTerm.show_type_arguments || is_tType (ty_exn t) then l
         else List.filter (fun t -> not (ty_exn t |> is_tType)) l
       in
-      let as_infix = match view f with Const id -> ID.as_infix id | _ -> None in
-      let as_prefix = match view f with Const id -> ID.as_prefix id | _ -> None in
+      let as_infix =
+        match view f with Const id -> ID.as_infix id | _ -> None
+      in
+      let as_prefix =
+        match view f with Const id -> ID.as_prefix id | _ -> None
+      in
       match (as_infix, as_prefix, l) with
       | _, _, [] ->
           pp out f
@@ -214,11 +235,17 @@ let rec pp out t =
       | _, Some s, [a] ->
           Format.fprintf out "@[<1>%s@ %a@]" s pp_inner a
       | _ ->
-          Format.fprintf out "@[<2>%a@ %a@]" pp_inner f (Util.pp_list ~sep:" " pp_inner) l )
+          Format.fprintf out "@[<2>%a@ %a@]" pp_inner f
+            (Util.pp_list ~sep:" " pp_inner)
+            l )
   | Bind (s, _, _) ->
       let vars, body = unfold_binder s t in
-      let pp_bound_var out v = Format.fprintf out "@[%a%a@]" Var.pp_fullc v pp_var_ty v in
-      Format.fprintf out "@[<2>%a %a.@ %a@]" Binder.pp s (Util.pp_list ~sep:" " pp_bound_var) vars pp_inner body
+      let pp_bound_var out v =
+        Format.fprintf out "@[%a%a@]" Var.pp_fullc v pp_var_ty v
+      in
+      Format.fprintf out "@[<2>%a %a.@ %a@]" Binder.pp s
+        (Util.pp_list ~sep:" " pp_bound_var)
+        vars pp_inner body
   | Record (l, None) ->
       Format.fprintf out "{%a}" pp_fields l
   | Record (l, Some r) ->
@@ -231,7 +258,8 @@ let rec pp out t =
       Format.fprintf out "@[<hv>%a@]" (pp_infix_ Builtin.Arrow) (args @ [ret])
   | AppBuiltin (Builtin.Not, [f]) ->
       Format.fprintf out "@[¬@ %a@]" pp f
-  | AppBuiltin (b, ([t1; t2] | [_; t1; t2])) when Builtin.fixity b = Builtin.Infix_binary ->
+  | AppBuiltin (b, ([t1; t2] | [_; t1; t2]))
+    when Builtin.fixity b = Builtin.Infix_binary ->
       Format.fprintf out "@[%a %a@ %a@]" pp_inner t1 Builtin.pp b pp_inner t2
   | AppBuiltin (b, l) when Builtin.is_infix b && List.length l > 0 ->
       Format.fprintf out "@[<hv>%a@]" (pp_infix_ b) l
@@ -242,14 +270,23 @@ let rec pp out t =
   | Ite (a, b, c) ->
       Format.fprintf out "@[<2>if %a@ then %a@ else %a@]" pp a pp b pp c
   | Let (l, u) ->
-      let pp_binding out (v, t) = Format.fprintf out "@[%a := %a@]" Var.pp_fullc v pp t in
-      Format.fprintf out "@[<2>let %a@ in (%a)@]" (Util.pp_list ~sep:" and " pp_binding) l pp u
+      let pp_binding out (v, t) =
+        Format.fprintf out "@[%a := %a@]" Var.pp_fullc v pp t
+      in
+      Format.fprintf out "@[<2>let %a@ in (%a)@]"
+        (Util.pp_list ~sep:" and " pp_binding)
+        l pp u
   | Match (u, l) ->
       let pp_branch out (c, vars, rhs) =
-        Format.fprintf out "@[<2>case@ @[%a%a%a@] ->@ %a@]" ID.pp c.cstor_id (Util.pp_list0 ~sep:" " pp_inner)
-          c.cstor_args (Util.pp_list0 ~sep:" " Var.pp_fullc) vars pp rhs
+        Format.fprintf out "@[<2>case@ @[%a%a%a@] ->@ %a@]" ID.pp c.cstor_id
+          (Util.pp_list0 ~sep:" " pp_inner)
+          c.cstor_args
+          (Util.pp_list0 ~sep:" " Var.pp_fullc)
+          vars pp rhs
       in
-      Format.fprintf out "@[<hv>@[<hv2>match %a with@ %a@]@ end@]" pp u (Util.pp_list ~sep:" | " pp_branch) l
+      Format.fprintf out "@[<hv>@[<hv2>match %a with@ %a@]@ end@]" pp u
+        (Util.pp_list ~sep:" | " pp_branch)
+        l
   | Multiset l ->
       Format.fprintf out "[@[%a@]]" (Util.pp_list ~sep:", " pp_inner) l
   | Meta (id, r, _) ->
@@ -277,11 +314,16 @@ and pp_infix_ b out l =
   | [t] ->
       pp_inner out t
   | t :: l' ->
-      Format.fprintf out "@[%a@]@ %a %a" pp_inner t Builtin.pp b (pp_infix_ b) l'
+      Format.fprintf out "@[%a@]@ %a %a" pp_inner t Builtin.pp b (pp_infix_ b)
+        l'
 
 and pp_var_ty out v =
   let ty = Var.ty v in
-  match view ty with AppBuiltin (Builtin.Term, []) -> () | _ -> Format.fprintf out ":%a" pp_inner ty
+  match view ty with
+  | AppBuiltin (Builtin.Term, []) ->
+      ()
+  | _ ->
+      Format.fprintf out ":%a" pp_inner ty
 
 let pp_with_ty out t = Format.fprintf out "(@[%a@,:%a@])" pp t pp (ty_exn t)
 
@@ -293,7 +335,12 @@ let ill_formed m = raise (IllFormedTerm m)
 
 let ill_formedf m = CCFormat.ksprintf m ~f:ill_formed
 
-let () = Printexc.register_printer (function IllFormedTerm msg -> Some ("ill formed term: " ^ msg) | _ -> None)
+let () =
+  Printexc.register_printer (function
+    | IllFormedTerm msg ->
+        Some ("ill formed term: " ^ msg)
+    | _ ->
+        None )
 
 let make_ ?loc ~ty view = {term= view; loc; ty= Some ty; hash= -1}
 
@@ -344,7 +391,13 @@ let let_ ?loc l u =
       make_ ?loc ~ty (Let (l, u))
 
 let match_ ?loc u l =
-  let ty = match l with (_, _, {ty= Some ty; _}) :: _ -> ty | _ :: _ | [] -> assert false in
+  let ty =
+    match l with
+    | (_, _, {ty= Some ty; _}) :: _ ->
+        ty
+    | _ :: _ | [] ->
+        assert false
+  in
   make_ ?loc ~ty (Match (u, l))
 
 let builtin ?loc ~ty b = make_ ?loc ~ty (AppBuiltin (b, []))
@@ -364,7 +417,8 @@ let app ?loc ~ty s l =
 
 let bind ?loc ~ty s v l = make_ ?loc ~ty (Bind (s, v, l))
 
-let bind_list ?loc ~ty s vars t = List.fold_right (fun v t -> bind ?loc ~ty s v t) vars t
+let bind_list ?loc ~ty s vars t =
+  List.fold_right (fun v t -> bind ?loc ~ty s v t) vars t
 
 let multiset ?loc ~ty l = make_ ?loc ~ty (Multiset l)
 
@@ -397,7 +451,8 @@ let at_loc ?loc t = {t with loc}
 
 let with_ty ~ty t = {t with ty= Some ty}
 
-let map_ty t ~f = {t with hash= ~-1; ty= (match t.ty with None -> None | Some x -> Some (f x))}
+let map_ty t ~f =
+  {t with hash= ~-1; ty= (match t.ty with None -> None | Some x -> Some (f x))}
 
 let of_string ?loc ~ty s = const ?loc ~ty (ID.make s)
 
@@ -407,7 +462,8 @@ let prop = builtin ~ty:tType Builtin.Prop
 
 let fresh_var ?loc ~ty () = var ?loc (Var.gensym ~ty ())
 
-let box_opaque t : t = make_ ~ty:(ty_exn t) (AppBuiltin (Builtin.Box_opaque, [t]))
+let box_opaque t : t =
+  make_ ~ty:(ty_exn t) (AppBuiltin (Builtin.Box_opaque, [t]))
 
 (** {2 Utils} *)
 
@@ -417,7 +473,11 @@ let is_meta t = match view t with Meta _ -> true | _ -> false
 
 let is_const = function {term= Const _; _} -> true | _ -> false
 
-let is_fun = function {term= Bind (Binder.Lambda, _, _); _} -> true | _ -> false
+let is_fun = function
+  | {term= Bind (Binder.Lambda, _, _); _} ->
+      true
+  | _ ->
+      false
 
 module Set = Iter.Set.Make (struct
   type t = term
@@ -468,9 +528,15 @@ module Seq = struct
     in
     iter t
 
-  let vars t = subterms t |> Iter.filter_map (fun t -> match view t with Var v -> Some v | _ -> None)
+  let vars t =
+    subterms t
+    |> Iter.filter_map (fun t ->
+           match view t with Var v -> Some v | _ -> None )
 
-  let symbols t = subterms t |> Iter.filter_map (fun t -> match view t with Const id -> Some id | _ -> None)
+  let symbols t =
+    subterms t
+    |> Iter.filter_map (fun t ->
+           match view t with Const id -> Some id | _ -> None )
 
   let metas t =
     subterms t
@@ -495,7 +561,11 @@ module Seq = struct
       | Ite (a, b, c) ->
           iter set a ; iter set b ; iter set c
       | Let (l, u) ->
-          let set' = List.fold_left (fun bound' (v, u) -> iter set u ; Var.Set.add bound' v) set l in
+          let set' =
+            List.fold_left
+              (fun bound' (v, u) -> iter set u ; Var.Set.add bound' v)
+              set l
+          in
           iter set' u
       | Match (u, l) ->
           iter set u ;
@@ -519,7 +589,11 @@ module Seq = struct
   let free_vars t =
     subterms_with_bound t
     |> Iter.filter_map (fun (t, set) ->
-           match view t with Var v when not (Var.Set.mem set v) -> Some v | _ -> None )
+           match view t with
+           | Var v when not (Var.Set.mem set v) ->
+               Some v
+           | _ ->
+               None )
 end
 
 let rec is_ground t =
@@ -543,7 +617,8 @@ let rec is_ground t =
   | Bind (_, v, t') ->
       is_ground (Var.ty v) && is_ground t'
   | Record (l, rest) ->
-      CCOpt.map_or is_ground ~default:true rest && List.for_all (fun (_, t') -> is_ground t') l
+      CCOpt.map_or is_ground ~default:true rest
+      && List.for_all (fun (_, t') -> is_ground t') l
   | Multiset l ->
       List.for_all is_ground l
   | Meta _ ->
@@ -566,7 +641,10 @@ let free_vars_set t = Seq.free_vars t |> Var.Set.of_iter
 
 let free_vars t = Seq.free_vars t |> Var.Set.of_iter |> Var.Set.to_list
 
-let free_vars_l l = Iter.of_list l |> Iter.flat_map Seq.free_vars |> Var.Set.of_iter |> Var.Set.to_list
+let free_vars_l l =
+  Iter.of_list l
+  |> Iter.flat_map Seq.free_vars
+  |> Var.Set.of_iter |> Var.Set.to_list
 
 let closed t = Seq.free_vars t |> Iter.is_empty
 
@@ -575,7 +653,13 @@ let close_all ~ty s t =
   bind_list ~ty s vars t
 
 let close_with_vars ?(binder = Binder.Forall) vars t =
-  let vars = List.map (fun v -> match view v with Var v -> v | _ -> invalid_arg "has to be a variable") vars in
+  let vars =
+    List.map
+      (fun v ->
+        match view v with Var v -> v | _ -> invalid_arg "has to be a variable"
+        )
+      vars
+  in
   bind_list binder vars t ~ty:prop
 
 let unfold_fun = unfold_binder Binder.Lambda
@@ -603,7 +687,9 @@ let map ~f ~bind:f_bind b_acc t =
       app_builtin ?loc:t.loc ~ty b l
   | Record (l, rest) ->
       let ty = f b_acc (ty_exn t) in
-      record_flatten ?loc:t.loc ~ty (List.map (CCPair.map_snd (f b_acc)) l) ~rest:(CCOpt.map (f b_acc) rest)
+      record_flatten ?loc:t.loc ~ty
+        (List.map (CCPair.map_snd (f b_acc)) l)
+        ~rest:(CCOpt.map (f b_acc) rest)
   | Ite (a, b, c) ->
       let a = f b_acc a in
       let b = f b_acc b in
@@ -709,7 +795,8 @@ module Ty = struct
 
   let meta = meta
 
-  let mk_fun_ ?loc args ret = app_builtin ?loc ~ty:tType Builtin.Arrow (ret :: args)
+  let mk_fun_ ?loc args ret =
+    app_builtin ?loc ~ty:tType Builtin.Arrow (ret :: args)
 
   let fun_ ?loc args ret =
     match (args, view ret) with
@@ -796,7 +883,9 @@ module Ty = struct
 
   let mangle ty =
     let add_id buf id =
-      let s = ID.name id |> CCString.filter (function '#' -> false | _ -> true) in
+      let s =
+        ID.name id |> CCString.filter (function '#' -> false | _ -> true)
+      in
       Buffer.add_string buf s ; Buffer.add_string buf "_u"
     in
     let rec aux buf t =
@@ -821,7 +910,11 @@ module Ty = struct
           add_id buf f ;
           List.iter (fun sub -> Buffer.add_char buf '_' ; aux buf sub) l
       | Ty_fun (args, ret) ->
-          List.iter (fun sub -> aux buf sub ; Buffer.add_string buf "_to_") args ;
+          List.iter
+            (fun sub ->
+              aux buf sub ;
+              Buffer.add_string buf "_to_" )
+            args ;
           aux buf ret
       | Ty_forall (v, f) ->
           Printf.bprintf buf "pi_%a_%a" add_id (Var.id v) aux f
@@ -869,14 +962,25 @@ module Ty = struct
     | Ty_record (l, _) ->
         List.for_all (fun (_, t) -> is_quantifier_free t) l
 
-  let rec is_prenex ty = match view ty with Ty_forall (_, bod) -> is_prenex bod | _ -> is_quantifier_free ty
+  let rec is_prenex ty =
+    match view ty with
+    | Ty_forall (_, bod) ->
+        is_prenex bod
+    | _ ->
+        is_quantifier_free ty
 
   let is_tType = is_tType
 
   let is_prop t = match view t with Ty_builtin Prop -> true | _ -> false
 
   let rec returns t =
-    match view t with Ty_fun (_, ret) -> returns ret | Ty_forall (_, t') -> returns t' | _ -> t
+    match view t with
+    | Ty_fun (_, ret) ->
+        returns ret
+    | Ty_forall (_, t') ->
+        returns t'
+    | _ ->
+        t
 
   let returns_tType t = is_tType (returns t)
 
@@ -930,7 +1034,8 @@ module Form = struct
     | Forall of t Var.t * t
     | Exists of t Var.t * t
 
-  let is_prop_ (t : term) : bool = match t.ty with Some ty -> Ty.is_prop ty | None -> false
+  let is_prop_ (t : term) : bool =
+    match t.ty with Some ty -> Ty.is_prop ty | None -> false
 
   let view (t : term) =
     match view t with
@@ -967,7 +1072,16 @@ module Form = struct
         Exists (v, t)
     | Bind ((Binder.ForallTy | Binder.Lambda), _, _) ->
         assert false
-    | Ite _ | Match _ | Let _ | Multiset _ | Record _ | Meta _ | Var _ | Const _ | App _ | AppBuiltin _ ->
+    | Ite _
+    | Match _
+    | Let _
+    | Multiset _
+    | Record _
+    | Meta _
+    | Var _
+    | Const _
+    | App _
+    | AppBuiltin _ ->
         Atom t
 
   (** Smart constructors (perform simplifications) *)
@@ -1025,7 +1139,8 @@ module Form = struct
     | [t] when not parsing ->
         t
     | _ ->
-        app_builtin ?loc ~ty:Ty.prop Builtin.And (if parsing then l else flattened)
+        app_builtin ?loc ~ty:Ty.prop Builtin.And
+          (if parsing then l else flattened)
 
   let or_ ?loc l =
     let flattened = flatten_ `Or [] l in
@@ -1036,7 +1151,8 @@ module Form = struct
     | [t] when not parsing ->
         t
     | _ ->
-        app_builtin ?loc ~ty:Ty.prop Builtin.Or (if parsing then l else flattened)
+        app_builtin ?loc ~ty:Ty.prop Builtin.Or
+          (if parsing then l else flattened)
 
   let not_ ?loc f =
     assert (Ty.is_prop (ty_exn f)) ;
@@ -1056,7 +1172,9 @@ module Form = struct
 
   let close_forall ?loc f =
     (* quantification over types: outermost *)
-    let tyvars, vars = List.partition (fun v -> Ty.returns_tType (Var.ty v)) (free_vars f) in
+    let tyvars, vars =
+      List.partition (fun v -> Ty.returns_tType (Var.ty v)) (free_vars f)
+    in
     forall_l ?loc tyvars (forall_l ?loc vars f)
 
   let is_var = function Atom x -> is_var x | _ -> false
@@ -1066,7 +1184,8 @@ let _l_counter = ref 0
 
 let _lam_ids = Tbl.create 16
 
-let is_monomorphic t = Seq.subterms t |> Iter.for_all (fun t -> Ty.is_mono (ty_exn t))
+let is_monomorphic t =
+  Seq.subterms t |> Iter.for_all (fun t -> Ty.is_mono (ty_exn t))
 
 let is_subterm ~strict a ~of_:b =
   let subs = Seq.subterms b in
@@ -1098,7 +1217,9 @@ module Subst = struct
   let to_string = CCFormat.to_string pp
 
   let add subst v t =
-    if mem subst v then Util.invalid_argf "@[<2>var `@[%a@]`@ already bound in {@[%a@]}@]" Var.pp_full v pp subst ;
+    if mem subst v then
+      Util.invalid_argf "@[<2>var `@[%a@]`@ already bound in {@[%a@]}@]"
+        Var.pp_full v pp subst ;
     Var.Subst.add subst v t
 
   let add_l = List.fold_left (fun subst (v, t) -> add subst v t)
@@ -1116,12 +1237,16 @@ module Subst = struct
     | _ ->
         map subst t
           ~bind:
-            (if rename_binders then rename_var ~rename_binders else eval_binders ~recursive ~rename_binders ~t)
+            ( if rename_binders then rename_var ~rename_binders
+              else eval_binders ~recursive ~rename_binders ~t )
           ~f:(eval_ ~rename_binders ~recursive)
 
   (* rename variable and evaluate its type. *)
   and rename_var ~rename_binders subst v =
-    let v' = Var.copy v |> Var.update_ty ~f:(eval_ ~rename_binders ~recursive:true subst) in
+    let v' =
+      Var.copy v
+      |> Var.update_ty ~f:(eval_ ~rename_binders ~recursive:true subst)
+    in
     (* (re-)bind [v] to [v'] *)
     let subst = Var.Subst.add subst v (var v') in
     (subst, v')
@@ -1129,7 +1254,8 @@ module Subst = struct
   and eval_var ~rename_binders ~recursive ~t subst v =
     match Var.Subst.find subst v with
     | None ->
-        var ?loc:t.loc (Var.update_ty v ~f:(eval_ ~recursive ~rename_binders subst))
+        var ?loc:t.loc
+          (Var.update_ty v ~f:(eval_ ~recursive ~rename_binders subst))
     | Some t' ->
         if recursive then (
           assert (t != t') ;
@@ -1147,7 +1273,9 @@ module Subst = struct
   let eval ?(rename_binders = true) subst t =
     if is_empty subst then t else eval_ ~rename_binders ~recursive:true subst t
 
-  let eval_nonrec subst t = if is_empty subst then t else eval_ ~rename_binders:true ~recursive:false subst t
+  let eval_nonrec subst t =
+    if is_empty subst then t
+    else eval_ ~rename_binders:true ~recursive:false subst t
 end
 
 let rec rename subst t =
@@ -1185,7 +1313,8 @@ let rec rectify_aux ?(pref = "v_") ~cnt ~subst t =
       let _, subst, v = handle_var ~rename:false ~pref ~cnt ~subst v_old t_ty in
       let body, subst = rectify_aux ~cnt ~subst body in
       ( bind ~ty:t_ty b v body
-      , if CCOpt.is_none old then Subst.remove subst v_old else Subst.add subst v_old (CCOpt.get_exn old) )
+      , if CCOpt.is_none old then Subst.remove subst v_old
+        else Subst.add subst v_old (CCOpt.get_exn old) )
   | AppBuiltin (b, fs) ->
       let fs, subst = rec_aux_l ~cnt ~subst fs in
       (app_builtin ~ty:t_ty b fs, subst)
@@ -1212,7 +1341,8 @@ and handle_var ~pref ?(rename = true) ~cnt ~subst v t_ty =
 
 let rectify ?(cnt = ref 0) ?(subst = Subst.empty) t = rectify_aux ~cnt ~subst t
 
-let rectify_l ?(cnt = ref 0) ?(subst = Subst.empty) ls = rec_aux_l ~cnt ~subst ls
+let rectify_l ?(cnt = ref 0) ?(subst = Subst.empty) ls =
+  rec_aux_l ~cnt ~subst ls
 
 (* apply and reduce *)
 let app_whnf ?loc ~ty f l =
@@ -1241,7 +1371,9 @@ end)
 (** {2 Substitutions, Unification} *)
 
 module UStack = struct
-  type t = {mutable size: int; mutable l: term option ref list (* list of bindings to undo *)}
+  type t =
+    { mutable size: int
+    ; mutable l: term option ref list (* list of bindings to undo *) }
 
   let create () = {size= 0; l= []}
 
@@ -1276,16 +1408,24 @@ end
 exception UnifyFailure of string * (term * term) list * location option
 
 let pp_stack out l =
-  let pp_ty out = function None -> () | Some ty -> Format.fprintf out ":%a" pp ty in
+  let pp_ty out = function
+    | None ->
+        ()
+    | Some ty ->
+        Format.fprintf out ":%a" pp ty
+  in
   let pp_frame out (t1, t2) =
-    Format.fprintf out "@[<2>unifying `@[%a@,%a@]`@ and `@[%a@,%a@]`@]" pp t1 pp_ty (ty t1) pp t2 pp_ty (ty t2)
+    Format.fprintf out "@[<2>unifying `@[%a@,%a@]`@ and `@[%a@,%a@]`@]" pp t1
+      pp_ty (ty t1) pp t2 pp_ty (ty t2)
   in
   Format.fprintf out "@[<v>%a@]" (Util.pp_list pp_frame) l
 
 let () =
   Printexc.register_printer (function
     | UnifyFailure (msg, st, loc) ->
-        Some (CCFormat.sprintf "@[<2>@{<Red>unification error@}:@ %s@ %a@,%a@]" msg pp_stack st Loc.pp_opt loc)
+        Some
+          (CCFormat.sprintf "@[<2>@{<Red>unification error@}:@ %s@ %a@,%a@]" msg
+             pp_stack st Loc.pp_opt loc )
     | _ ->
         None )
 
@@ -1317,13 +1457,18 @@ let occur_check_ ~allow_open ~subst v t =
     | Let (l, u) ->
         List.exists (fun (_, t) -> check bound t) l
         ||
-        let bound = List.fold_left (fun set (v, _) -> Var.Set.add set v) bound l in
+        let bound =
+          List.fold_left (fun set (v, _) -> Var.Set.add set v) bound l
+        in
         check bound u
     | Match (u, l) ->
         check bound u
         || List.exists
              (fun (_, vars, rhs) ->
-               let bound = if allow_open then bound else List.fold_left Var.Set.add bound vars in
+               let bound =
+                 if allow_open then bound
+                 else List.fold_left Var.Set.add bound vars
+               in
                check bound rhs )
              l
     | Const _ ->
@@ -1331,18 +1476,24 @@ let occur_check_ ~allow_open ~subst v t =
     | App (f, l) ->
         check bound f || List.exists (check bound) l
     | Bind (_, v, t) ->
-        check bound v.Var.ty || check (if allow_open then bound else Var.Set.add bound v) t
+        check bound v.Var.ty
+        || check (if allow_open then bound else Var.Set.add bound v) t
     | AppBuiltin (_, l) | Multiset l ->
         List.exists (check bound) l
     | Record (l, rest) ->
-        CCOpt.map_or (check bound) ~default:false rest || List.exists (fun (_, t) -> check bound t) l
+        CCOpt.map_or (check bound) ~default:false rest
+        || List.exists (fun (_, t) -> check bound t) l
   in
   check Var.Set.empty t
 
 let are_same_meta_ r1 r2 =
   match (r1, r2) with
   | Some r1, Some r2 -> (
-    match (view r1, view r2) with Meta (v1, _, _), Meta (v2, _, _) -> Var.equal v1 v2 | _ -> false )
+    match (view r1, view r2) with
+    | Meta (v1, _, _), Meta (v2, _, _) ->
+        Var.equal v1 v2
+    | _ ->
+        false )
   | _ ->
       false
 
@@ -1374,14 +1525,18 @@ let[@inline] [@unfold 1] rec normalize subst (t : term) : term =
   | AppBuiltin (Builtin.Arrow, ret :: args) when must_deref ret ->
       let vars, args', ret' = Ty.unfold @@ deref ret in
       if vars = [] then Ty.fun_ ?loc:t.loc (args @ args') ret' else t
-  | AppBuiltin (Builtin.Arrow, {term= Var v; _} :: args) when Subst.mem subst v ->
+  | AppBuiltin (Builtin.Arrow, {term= Var v; _} :: args) when Subst.mem subst v
+    ->
       let ret = Subst.find_exn subst v in
       let vars, args', ret' = Ty.unfold @@ deref ret in
-      if vars = [] then Ty.fun_ ?loc:t.loc (args @ args') ret' |> normalize subst else t
+      if vars = [] then
+        Ty.fun_ ?loc:t.loc (args @ args') ret' |> normalize subst
+      else t
   | _ ->
       deref t
 
-let unify ?(allow_open = false) ?loc ?(st = UStack.create ()) ?(subst = Subst.empty) t1 t2 =
+let unify ?(allow_open = false) ?loc ?(st = UStack.create ())
+    ?(subst = Subst.empty) t1 t2 =
   let stack = ref [] in
   let fail_ msg = fail_uniff_ ?loc !stack msg in
   let rec unif_rec subst t1 t2 =
@@ -1425,7 +1580,8 @@ let unify ?(allow_open = false) ?loc ?(st = UStack.create ()) ?(subst = Subst.em
         if occur_check_ ~allow_open ~subst t2 t1 then fail_ "occur check"
         else UStack.bind ~st r (Subst.eval subst t1)
     | Var v1, Var v2 ->
-        if not (Var.equal v1 v2) then fail_ "incompatible variables@ (subst {@[%a@]})" Subst.pp subst
+        if not (Var.equal v1 v2) then
+          fail_ "incompatible variables@ (subst {@[%a@]})" Subst.pp subst
     | Const id1, Const id2 when ID.equal id1 id2 ->
         ()
     | App (f1, l1), App (f2, l2) when List.length l1 = List.length l2 ->
@@ -1438,11 +1594,15 @@ let unify ?(allow_open = false) ?loc ?(st = UStack.create ()) ?(subst = Subst.em
            unify [f1 hd1] with [f2], and [tl1] with [l2] *)
         if n1 > n2 then (
           let hd1, tl1 = CCList.take_drop (n1 - n2) l1 in
-          let f1' = app f1 hd1 ~ty:Ty.(fun_ (List.map ty_exn tl1) (ty_exn t1)) in
+          let f1' =
+            app f1 hd1 ~ty:Ty.(fun_ (List.map ty_exn tl1) (ty_exn t1))
+          in
           unif_rec subst f1' f2 ; unif_l subst tl1 l2 )
         else
           let hd2, tl2 = CCList.take_drop (n2 - n1) l2 in
-          let f2' = app f2 hd2 ~ty:Ty.(fun_ (List.map ty_exn tl2) (ty_exn t2)) in
+          let f2' =
+            app f2 hd2 ~ty:Ty.(fun_ (List.map ty_exn tl2) (ty_exn t2))
+          in
           unif_rec subst f1 f2' ; unif_l subst l1 tl2
     | Ite (a1, b1, c1), Ite (a2, b2, c2) ->
         unif_rec subst a1 a2 ; unif_rec subst b1 b2 ; unif_rec subst c1 c2
@@ -1458,19 +1618,25 @@ let unify ?(allow_open = false) ?loc ?(st = UStack.create ()) ?(subst = Subst.em
         unif_rec subst u1 u2 ;
         List.iter2
           (fun (c1, vars1, rhs1) (c2, vars2, rhs2) ->
-            if List.length vars1 = List.length vars2 && List.length c1.cstor_args = List.length c2.cstor_args
+            if
+              List.length vars1 = List.length vars2
+              && List.length c1.cstor_args = List.length c2.cstor_args
             then (
               if not (ID.equal c1.cstor_id c2.cstor_id) then
-                fail_ "constructors %a and %a are not compatible (subst {@[%a@]})" ID.pp c1.cstor_id ID.pp
-                  c2.cstor_id Subst.pp subst ;
+                fail_
+                  "constructors %a and %a are not compatible (subst {@[%a@]})"
+                  ID.pp c1.cstor_id ID.pp c2.cstor_id Subst.pp subst ;
               unif_l subst c1.cstor_args c2.cstor_args ;
               let subst = rename_vars_l subst vars1 vars2 in
               unif_rec subst rhs1 rhs2 )
             else fail_ "incompatible branches" )
           l1 l2
-    | AppBuiltin (b1, l1), AppBuiltin (b2, l2) when List.length l1 = List.length l2 ->
+    | AppBuiltin (b1, l1), AppBuiltin (b2, l2)
+      when List.length l1 = List.length l2 ->
         if Builtin.equal b1 b2 then unif_l subst l1 l2
-        else fail_ "%a and %a are not compatible (subst {@[%a@]})" Builtin.pp b1 Builtin.pp b2 Subst.pp subst
+        else
+          fail_ "%a and %a are not compatible (subst {@[%a@]})" Builtin.pp b1
+            Builtin.pp b2 Subst.pp subst
     | Multiset l1, Multiset l2 when List.length l1 = List.length l2 ->
         (* unification is n-ary, so we choose the first satisfying, if any *)
         unif_multi subst l1 l2
@@ -1532,7 +1698,9 @@ let unify ?(allow_open = false) ?loc ?(st = UStack.create ()) ?(subst = Subst.em
     | [], _, `MustMatch | _, [], `MustMatch ->
         fail_ "fields must match, but got %a and %a" pp_fields l1 pp_fields l2
     | (n1, t1) :: l1', (n2, t2) :: l2', `Flexible ->
-        if n1 = n2 then (unif_rec subst t1 t2 ; unif_record_fields kind subst l1' l2')
+        if n1 = n2 then (
+          unif_rec subst t1 t2 ;
+          unif_record_fields kind subst l1' l2' )
         else if n1 < n2 then
           let rest1, rest2 = unif_record_fields kind subst l1' l2 in
           ((n1, t1) :: rest1, rest2)
@@ -1540,7 +1708,9 @@ let unify ?(allow_open = false) ?loc ?(st = UStack.create ()) ?(subst = Subst.em
           let rest1, rest2 = unif_record_fields kind subst l1 l2' in
           (rest1, (n2, t2) :: rest2)
     | (n1, t1) :: l1', (n2, t2) :: l2', `MustMatch ->
-        if n1 = n2 then (unif_rec subst t1 t2 ; unif_record_fields kind subst l1' l2')
+        if n1 = n2 then (
+          unif_rec subst t1 t2 ;
+          unif_record_fields kind subst l1' l2' )
         else fail_ "fields %a and %a do not match" pp_fields l1 pp_fields l2
   and unif_record_rest ~ty subst r rest =
     match (r, rest) with
@@ -1552,7 +1722,8 @@ let unify ?(allow_open = false) ?loc ?(st = UStack.create ()) ?(subst = Subst.em
       match (view t, rest) with
       | Meta (_, v, _), _ ->
           let t' = record ~ty rest ~rest:None in
-          if occur_check_ ~allow_open ~subst t t' then fail_ "occur-check of the row %a in @[%a@]" pp t pp t'
+          if occur_check_ ~allow_open ~subst t t' then
+            fail_ "occur-check of the row %a in @[%a@]" pp t pp t'
           else UStack.bind ~st v t'
       | Record ([], None), [] ->
           () (* if the meta was already bound, somehow *)
@@ -1561,8 +1732,10 @@ let unify ?(allow_open = false) ?loc ?(st = UStack.create ()) ?(subst = Subst.em
   in
   unif_rec subst t1 t2
 
-let apply_unify ?gen_fresh_meta ?allow_open ?loc ?st ?(subst = Subst.empty) ty l =
-  Util.debugf ~section 5 "@[<>apply `%a`@ to [@[%a@]]@]" (fun k -> k pp ty (Util.pp_list pp) l) ;
+let apply_unify ?gen_fresh_meta ?allow_open ?loc ?st ?(subst = Subst.empty) ty l
+    =
+  Util.debugf ~section 5 "@[<>apply `%a`@ to [@[%a@]]@]" (fun k ->
+      k pp ty (Util.pp_list pp) l ) ;
   let rec aux subst ty l =
     match (Ty.view ty, l) with
     | _, [] ->
@@ -1570,14 +1743,16 @@ let apply_unify ?gen_fresh_meta ?allow_open ?loc ?st ?(subst = Subst.empty) ty l
     | Ty.Ty_forall (v, ty'), a :: l' ->
         let ty_a = ty_exn a in
         unify ?allow_open ?loc ?st ~subst ty_a tType ;
-        Util.debugf ~section 5 "@[bind `%a` to `@[%a@]`@]" (fun k -> k Var.pp_fullc v pp a) ;
+        Util.debugf ~section 5 "@[bind `%a` to `@[%a@]`@]" (fun k ->
+            k Var.pp_fullc v pp a ) ;
         aux (Subst.add subst v a) ty' l'
     | Ty.Ty_fun (exp, ret), _ ->
         aux_l subst exp ret l
     | Ty.Ty_meta _, _ -> (
       match gen_fresh_meta with
       | None ->
-          fail_uniff_ ?loc [] "cannot apply type `@[%a@]`@ to `@[%a@]`" pp ty (Util.pp_list pp) l
+          fail_uniff_ ?loc [] "cannot apply type `@[%a@]`@ to `@[%a@]`" pp ty
+            (Util.pp_list pp) l
       | Some g ->
           (* unify meta with [tyof(l) -> fresh_var()] *)
           let ret = g () |> Ty.meta in
@@ -1586,8 +1761,14 @@ let apply_unify ?gen_fresh_meta ?allow_open ?loc ?st ?(subst = Subst.empty) ty l
     | Ty.Ty_var v, _ when Subst.mem subst v ->
         (* Apply the substitution because it could replace the type variable by a function type *)
         aux subst (Subst.eval subst ty) l
-    | (Ty.Ty_var _ | Ty.Ty_app _ | Ty.Ty_builtin _ | Ty.Ty_multiset _ | Ty.Ty_record _), _ ->
-        fail_uniff_ ?loc [] "cannot apply type `@[%a@]`@ to `@[%a@]`" pp ty (Util.pp_list pp) l
+    | ( ( Ty.Ty_var _
+        | Ty.Ty_app _
+        | Ty.Ty_builtin _
+        | Ty.Ty_multiset _
+        | Ty.Ty_record _ )
+      , _ ) ->
+        fail_uniff_ ?loc [] "cannot apply type `@[%a@]`@ to `@[%a@]`" pp ty
+          (Util.pp_list pp) l
   and aux_l subst exp ret l =
     match (exp, l) with
     | [], [] ->
@@ -1621,7 +1802,8 @@ let try_alpha_renaming f1 f2 =
           | _ ->
               fail_unif_ [(f1, f2)] "double binding" )
         | None ->
-            if not (Var.equal v v') then aux (Subst.add subst v f2) ((Var.ty v, Var.ty v') :: rest)
+            if not (Var.equal v v') then
+              aux (Subst.add subst v f2) ((Var.ty v, Var.ty v') :: rest)
             else aux subst rest )
       | Const x, Const y when ID.equal x y ->
           aux subst ((ty_exn f1, ty_exn f2) :: rest)
@@ -1643,11 +1825,14 @@ let try_alpha_renaming f1 f2 =
                 (ty1, ty2) :: rest
           in
           aux subst (List.combine xs ys @ rest)
-      | AppBuiltin (hd_x, _xs), AppBuiltin (hd_y, _ys) when Builtin.equal hd_x hd_y ->
+      | AppBuiltin (hd_x, _xs), AppBuiltin (hd_y, _ys)
+        when Builtin.equal hd_x hd_y ->
           fail_unif_ [(f1, f2)] "arity mismatch"
       | Bind (b, v, body), Bind (b', v', body') when Binder.equal b b' ->
           assert (not @@ Subst.mem subst v) ;
-          let subst = if not (Var.equal v v') then Subst.add subst v (var v') else subst in
+          let subst =
+            if not (Var.equal v v') then Subst.add subst v (var v') else subst
+          in
           aux subst ((Var.ty v, Var.ty v') :: (body, body') :: rest)
       | _ ->
           fail_unif_ [(f1, f2)] "mismatch or unknown constructors" )
@@ -1657,12 +1842,14 @@ let try_alpha_renaming f1 f2 =
     let vars2 = Seq.vars f2 |> Var.Set.of_iter in
     if Var.Set.intersection_empty vars1 vars2 then (
       let subst = aux Subst.empty [(f1, f2)] in
-      Util.debugf ~section 5 "Alpha renaming succeeded:@ of %a@ and %a@ with subst %a" (fun k ->
+      Util.debugf ~section 5
+        "Alpha renaming succeeded:@ of %a@ and %a@ with subst %a" (fun k ->
           k pp f1 pp f2 Subst.pp subst ) ;
       Some subst )
     else None
   with UnifyFailure (msg, st, _) ->
-    Util.debugf ~section 1 "Alpha renaming failed: %s@ %a" (fun k -> k msg pp_stack st) ;
+    Util.debugf ~section 1 "Alpha renaming failed: %s@ %a" (fun k ->
+        k msg pp_stack st ) ;
     None
 
 (*
@@ -1679,13 +1866,20 @@ let simplify_formula t =
     let exists_double args =
       let pos, neg =
         CCList.partition_map
-          (fun t -> match view t with AppBuiltin (Builtin.Not, [s]) -> `Right s | _ -> `Left t)
+          (fun t ->
+            match view t with
+            | AppBuiltin (Builtin.Not, [s]) ->
+                `Right s
+            | _ ->
+                `Left t )
           args
         |> CCPair.map_same Set.of_list
       in
       not (Set.is_empty (Set.inter pos neg))
     in
-    let netural_el, absorbing_el = if b = Builtin.And then (F.true_, F.false_) else (F.false_, F.true_) in
+    let netural_el, absorbing_el =
+      if b = Builtin.And then (F.true_, F.false_) else (F.false_, F.true_)
+    in
     let l' = CCList.sort_uniq ~cmp:compare l in
     if exists_double l || List.exists (equal absorbing_el) l then absorbing_el
     else
@@ -1700,9 +1894,15 @@ let simplify_formula t =
        and the conclusion of the form b1 \/ ... \/ bm
        and if the intersection of {a1, ..., an} and {b1, ..., bm}
        is not empty then simplify the implication into T *)
-    let premise_terms = match view premise with AppBuiltin (And, l) -> l | _ -> [premise] in
-    let conc_terms = match view conclusion with AppBuiltin (Or, l) -> l | _ -> [conclusion] in
-    let is_true = List.exists (fun c -> List.exists (equal c) premise_terms) conc_terms in
+    let premise_terms =
+      match view premise with AppBuiltin (And, l) -> l | _ -> [premise]
+    in
+    let conc_terms =
+      match view conclusion with AppBuiltin (Or, l) -> l | _ -> [conclusion]
+    in
+    let is_true =
+      List.exists (fun c -> List.exists (equal c) premise_terms) conc_terms
+    in
     if is_true then Some F.true_ else None
   in
   let rec aux t =
@@ -1771,7 +1971,9 @@ let rec erase t =
   | App (f, l) ->
       STerm.app (erase f) (List.map erase l)
   | Bind (b, v, t) ->
-      STerm.bind b [(STerm.V (Var.to_string v), Some (erase (Var.ty v)))] (erase t)
+      STerm.bind b
+        [(STerm.V (Var.to_string v), Some (erase (Var.ty v)))]
+        (erase t)
   | AppBuiltin (b, l) ->
       STerm.app_builtin b (List.map erase l)
   | Ite (a, b, c) ->

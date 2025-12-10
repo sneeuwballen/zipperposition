@@ -20,7 +20,9 @@ let shrink_lit (lit : lit) =
   let open Q.Iter in
   match lit with
   | Literal.Equation (t, u, sign) ->
-      AT.shrink t >|= (fun t -> Literal.mk_lit t u sign) <+> (AT.shrink u >|= fun u -> Literal.mk_lit t u sign)
+      AT.shrink t
+      >|= (fun t -> Literal.mk_lit t u sign)
+      <+> (AT.shrink u >|= fun u -> Literal.mk_lit t u sign)
   | _ ->
       empty
 

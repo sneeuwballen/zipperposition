@@ -129,7 +129,8 @@ val cast_var_unsafe : InnerTerm.t HVar.t -> t HVar.t
 
 type def =
   | Def_unin of int (* number of type variables *)
-  | Def_data of int * ty list (* data type with number of variables and cstors *)
+  | Def_data of
+      int * ty list (* data type with number of variables and cstors *)
 
 val def : ID.t -> def option
 (** Access the definition of a type *)
@@ -346,14 +347,16 @@ module Conv : sig
   val fresh_ty_var : ctx -> t HVar.t
   (** Fresh type variable *)
 
-  val var_to_simple_var : ?prefix:string -> ctx -> t HVar.t -> TypedSTerm.t Var.t
+  val var_to_simple_var :
+    ?prefix:string -> ctx -> t HVar.t -> TypedSTerm.t Var.t
 
   exception Error of TypedSTerm.t
 
   val of_simple_term_exn : ctx -> TypedSTerm.t -> t
   (** @raise Invalid_argument if conversion is impossible *)
 
-  val to_simple_term : ?env:TypedSTerm.t Var.t DBEnv.t -> ctx -> t -> TypedSTerm.t
+  val to_simple_term :
+    ?env:TypedSTerm.t Var.t DBEnv.t -> ctx -> t -> TypedSTerm.t
   (** convert a type to a prolog term.
         @param env the current environment for De Bruijn indices *)
 end

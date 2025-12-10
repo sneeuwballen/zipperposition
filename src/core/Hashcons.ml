@@ -61,7 +61,9 @@ module MakeNonWeak (X : HashedType) = struct
 
   let tbl : elt H.t = H.create 1024
 
-  let hashcons x = try H.find tbl x with Not_found -> X.tag !count_ x ; incr count_ ; H.add tbl x x ; x
+  let hashcons x =
+    try H.find tbl x
+    with Not_found -> X.tag !count_ x ; incr count_ ; H.add tbl x x ; x
 
   let mem x = H.mem tbl x
 
@@ -74,5 +76,10 @@ module MakeNonWeak (X : HashedType) = struct
     let open Hashtbl in
     let sum_buck = Array.fold_left ( + ) 0 stat.bucket_histogram in
     let min_buck = Array.fold_left min max_int stat.bucket_histogram in
-    (stat.num_buckets, stat.num_bindings, sum_buck, min_buck, 0, stat.max_bucket_length)
+    ( stat.num_buckets
+    , stat.num_bindings
+    , sum_buck
+    , min_buck
+    , 0
+    , stat.max_bucket_length )
 end

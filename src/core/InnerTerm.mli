@@ -24,7 +24,12 @@ module I = Int32
 
 (** Abstract type of term *)
 type t = private
-  {term: view; ty: type_result; mutable id: int; mutable payload: exn; props: I.t; ho_weight: int lazy_t}
+  { term: view
+  ; ty: type_result
+  ; mutable id: int
+  ; mutable payload: exn
+  ; props: I.t
+  ; ho_weight: int lazy_t }
 
 and view = private
   | Var of t HVar.t  (** Free variable *)
@@ -32,7 +37,8 @@ and view = private
   | Bind of Binder.t * t * t  (** Type, sub-term *)
   | Const of ID.t  (** Constant *)
   | App of t * t list  (** Uncurried application *)
-  | AppBuiltin of Builtin.t * t list  (** For representing special constructors *)
+  | AppBuiltin of Builtin.t * t list
+      (** For representing special constructors *)
 
 and type_result = NoType | HasType of t
 
@@ -271,7 +277,8 @@ val open_bind_fresh : Binder.t -> t -> t HVar.t list * t
 (** [open_bind_fresh λ (λxy. F)] returns [[v1,v2], F[v1/x,v2/y]]
     where [v1] and [v2] are fresh variables using {!HVar.fresh} *)
 
-val open_bind_fresh2 : ?eq_ty:(t -> t -> bool) -> Binder.t -> t -> t -> t HVar.t list * t * t
+val open_bind_fresh2 :
+  ?eq_ty:(t -> t -> bool) -> Binder.t -> t -> t -> t HVar.t list * t * t
 (** [open_bind_free2 λ (λxy. F) (λxyz. G)]
     returns [[v1,v2], F[v1/x,v2/y], λz.G[v1/x,v2/y]]
     where [v1] and [v2] are fresh variables using {!HVar.fresh}
