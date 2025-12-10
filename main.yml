@@ -1,0 +1,32 @@
+name: build
+on:
+  push:
+  pull_request:
+    branches:
+      - master
+jobs:
+  run:
+    name: Build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        #os: [macos-latest, ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest]
+        ocaml-compiler:
+          - 4.08.x
+          - 4.13.x
+    steps:
+    - uses: actions/checkout@v2
+    - uses: ocaml/setup-ocaml@v2
+      with:
+        ocaml-compiler: ${{ matrix.ocaml-compiler }}
+    - run: opam pin -n .
+    - run: opam depext -yt zipperposition
+    - run: opam install -t . --deps-only
+    - run: opam exec -- dune build @install --profile=release
+    - run: opam exec -- dune runtest --profile=release
+    - uses: actions/upload-artifact@master
+      with:
+        name: zipperposition-bin-${{ matrix.os }}-${{ matrix.ocaml-compiler }}.exe
+        path: _build/default/src/main/zipperposition.exe
+
