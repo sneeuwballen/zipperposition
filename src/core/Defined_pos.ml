@@ -17,9 +17,12 @@ type pos = t
 let equal (a : t) (b : t) : bool = a = b
 
 let pp out = function
-   | P_active -> Fmt.string out "active"
-   | P_invariant -> Fmt.string out "invariant"
-   | P_accumulator -> Fmt.string out "accumulator"
+  | P_active ->
+      Fmt.string out "active"
+  | P_invariant ->
+      Fmt.string out "invariant"
+  | P_accumulator ->
+      Fmt.string out "accumulator"
 
 module Arr : sig
   type t = pos IArray.t
@@ -29,5 +32,5 @@ end = struct
   type t = pos IArray.t
 
   let pp out (a : t) =
-     Fmt.(within "[" "]" @@ hvbox @@ iter @@ pair ~sep:(return ":") int pp) out (IArray.to_iteri a)
+    Fmt.(within "[" "]" @@ hvbox @@ iter @@ pair ~sep:(return ":") int pp) out (IArray.to_iteri a)
 end

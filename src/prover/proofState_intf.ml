@@ -5,6 +5,7 @@ open Logtk
 (** {2 Set of active clauses} *)
 module type S = sig
   module Ctx : Ctx.S
+
   module C : Clause_intf.S
 
   (** Priority queues on clauses *)
@@ -13,7 +14,9 @@ module type S = sig
   (** {5 Useful Index structures} *)
 
   module TermIndex : Index.TERM_IDX with type elt = C.WithPos.t
+
   module UnitIndex : Index.UNIT_IDX with type E.t = Term.t * Term.t * bool * C.t and type E.rhs = Term.t
+
   module SubsumptionIndex : Index.SUBSUMPTION_IDX with type C.t = C.t
 
   (** {5 Common Interface for Sets} *)
@@ -63,8 +66,8 @@ module type S = sig
 
   (** {5 Misc} *)
 
-  type stats = int * int * int
   (** statistics on the state (num active, num passive, num simplification) *)
+  type stats = int * int * int
 
   val stats : unit -> stats
   (** Compute statistics *)

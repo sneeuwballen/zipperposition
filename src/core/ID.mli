@@ -21,11 +21,8 @@
     @since 1.5
 *)
 
-type t = private {
-   id : int;
-   name : string;
-   mutable payload : exn list;  (** Use [exn] as an open type for user-defined payload *)
- }
+type t = private
+  {id: int; name: string; mutable payload: exn list  (** Use [exn] as an open type for user-defined payload *)}
 
 val make : string -> t
 (** Makes a fresh ID *)
@@ -36,10 +33,15 @@ val copy : t -> t
 (** Copy with a new ID *)
 
 val id : t -> int
+
 val name : t -> string
+
 val payload : t -> exn list
+
 val dummy_of_int : int -> t
+
 val payload_find : f:(exn -> 'a option) -> t -> 'a option
+
 val payload_pred : f:(exn -> bool) -> t -> bool
 
 val set_payload : ?can_erase:(exn -> bool) -> t -> exn -> unit
@@ -48,7 +50,9 @@ val set_payload : ?can_erase:(exn -> bool) -> t -> exn -> unit
       is to be replaced instead of adding a new entry *)
 
 include Interfaces.HASH with type t := t
+
 include Interfaces.ORD with type t := t
+
 include Interfaces.PRINT with type t := t
 
 (** NOTE: default printer does not display the {!id} field *)
@@ -61,38 +65,50 @@ val pp_fullc : t CCFormat.printer
     readability). Only use for debugging. *)
 
 val pp_tstp : t CCFormat.printer
+
 val pp_zf : t CCFormat.printer
 
 val gensym : unit -> t
 (** Generate a new ID with a new, unique name *)
 
 module Map : CCMap.S with type key = t
+
 module Set : CCSet.S with type elt = t
+
 module Tbl : CCHashtbl.S with type key = t
 
-exception Attr_infix of string
 (** Infix name for pretty-printing *)
+exception Attr_infix of string
 
-exception Attr_prefix of string
 (** Prefix name for pretty-printing *)
+exception Attr_prefix of string
 
-exception Attr_parameter of int
 (** Parameter, used for HO unif *)
+exception Attr_parameter of int
 
 type skolem_kind = K_normal | K_after_cnf | K_lazy_cnf | K_ind (* inductive *)
 
 exception Attr_skolem of skolem_kind
+
 exception Attr_distinct
+
 exception Attr_comm
+
 exception Attr_assoc
+
 exception Attr_cnf_def
 (* Symbol is a name introduced during CNF *)
 
 val as_infix : t -> string option
+
 val is_infix : t -> bool
+
 val as_prefix : t -> string option
+
 val is_prefix : t -> bool
+
 val as_parameter : t -> int option
+
 val is_parameter : t -> bool
 
 val is_skolem : t -> bool
@@ -110,5 +126,7 @@ val is_distinct_object : t -> bool
 (** whether the identifier is a distinct object (as defined in TPTP syntax) *)
 
 val is_comm : t -> bool
+
 val is_assoc : t -> bool
+
 val is_ac : t -> bool

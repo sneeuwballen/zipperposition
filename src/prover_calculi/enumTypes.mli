@@ -56,6 +56,7 @@ exception Error of string
 
 module type S = sig
   module Env : Env.S
+
   module C : module type of Env.C
 
   type decl

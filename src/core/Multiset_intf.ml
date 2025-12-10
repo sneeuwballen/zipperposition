@@ -1,11 +1,11 @@
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
 module type S = sig
-  type elt
   (** Elements of the multiset *)
+  type elt
 
-  type t
   (** A multiset of elements of type 'a *)
+  type t
 
   val size : t -> int
   (** Number of distinct elements. *)
@@ -28,6 +28,7 @@ module type S = sig
       Will return [Z.zero] if the element is not part of the multiset *)
 
   val singleton : elt -> t
+
   val doubleton : elt -> elt -> t
 
   val add : t -> elt -> t
@@ -69,8 +70,11 @@ module type S = sig
 
   module Seq : sig
     val of_iter : t -> elt Iter.t -> t
+
     val to_iter : t -> elt Iter.t
+
     val of_coeffs : t -> (elt * Z.t) Iter.t -> t
+
     val to_coeffs : t -> (elt * Z.t) Iter.t
   end
 
@@ -87,6 +91,7 @@ module type S = sig
   (** Fold on elements with their multiplicity *)
 
   val for_all : (elt -> bool) -> t -> bool
+
   val exists : (elt -> bool) -> t -> bool
 
   val choose : t -> elt

@@ -9,4 +9,5 @@
 *)
 
 module Make (E : Index.EQUATION) : Index.UNIT_IDX with module E = E
+
 module MakeTerm (X : Set.OrderedType) : Index.TERM_IDX with type elt = X.t

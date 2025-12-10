@@ -8,6 +8,7 @@ module type S = sig
   (** {5 Registration} *)
 
   val set_e_bin : string -> unit
+
   val try_e : Env.C.t Iter.t -> Env.C.t Iter.t -> Logtk.Proof.proof option
 
   val setup : unit -> unit

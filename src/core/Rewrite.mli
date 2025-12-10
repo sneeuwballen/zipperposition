@@ -17,8 +17,8 @@
 
 type term = Term.t
 
-type defined_cst
 (** Payload of a defined function symbol or type *)
+type defined_cst
 
 type proof = Proof.step
 
@@ -32,13 +32,21 @@ module Term : sig
     type t = rule
 
     val lhs : t -> term
+
     val rhs : t -> term
+
     val vars : t -> Term.VarSet.t
+
     val vars_l : t -> Type.t HVar.t list
+
     val head_id : t -> ID.t
+
     val args : t -> term list
+
     val arity : t -> int
+
     val proof : t -> proof
+
     val as_lit : t -> Literal.t
 
     val make_const : proof:Proof.t -> ID.t -> Type.t -> term -> t
@@ -48,7 +56,9 @@ module Term : sig
     (** [make id ty args rhs] is the same as [T.app (T.const id ty) args --> rhs] *)
 
     include Interfaces.HASH with type t := t
+
     include Interfaces.ORD with type t := t
+
     include Interfaces.PRINT with type t := t
   end
 
@@ -95,13 +105,21 @@ module Lit : sig
     type t = rule
 
     val lhs : t -> Literal.t
+
     val rhs : t -> Literal.t list list
+
     val proof : t -> proof
+
     val make : proof:Proof.t -> Literal.t -> Literal.t list list -> t
+
     val is_equational : t -> bool
+
     val as_clauses : t -> Literals.t list
+
     val head_id : t -> ID.t option
+
     val compare : t -> t -> int
+
     val pp : t CCFormat.printer
   end
 
@@ -111,10 +129,10 @@ module Lit : sig
       if no rule applies. The input clause lives in scope 0. *)
 
   val narrow_lit :
-    ?subst:Unif_subst.t ->
-    scope_rules:Scoped.scope ->
-    Literal.t Scoped.t ->
-    (rule * Unif_subst.t * Proof.tag list) Iter.t
+       ?subst:Unif_subst.t
+    -> scope_rules:Scoped.scope
+    -> Literal.t Scoped.t
+    -> (rule * Unif_subst.t * Proof.tag list) Iter.t
   (** [narrow_term rules lit] finds the set of rules [(l --> clauses) in rules]
         and substitutions [sigma] such that [sigma(l) = sigma(lit)]
         @param scope_rules used for rules (LEFT) *)
@@ -128,9 +146,13 @@ module Rule : sig
   type t = rule
 
   val of_term : Term.Rule.t -> t
+
   val of_lit : Lit.Rule.t -> t
+
   val proof : t -> proof
+
   val pp : t CCFormat.printer
+
   val as_proof : t -> Proof.t
 
   val lit_as_proof_parent_subst : Subst.Renaming.t -> Subst.t -> Lit.Rule.t Scoped.t -> Proof.parent
@@ -154,11 +176,17 @@ module Defined_cst : sig
   type t = defined_cst
 
   val ty : t -> Type.t
+
   val rules : t -> rule_set
+
   val rules_seq : t -> rule Iter.t
+
   val rules_term_seq : t -> Term.rule Iter.t
+
   val rules_lit_seq : t -> Lit.rule Iter.t
+
   val defined_positions : t -> Defined_pos.Arr.t
+
   val level : t -> int
 
   val declare : ?level:int -> ID.t -> rule_set -> t
@@ -179,8 +207,11 @@ module Defined_cst : sig
   (** Add a rewrite rule [cstor (proj1 x)…(projn x) --> x] *)
 
   val add_term_rule : t -> Term.rule -> unit
+
   val add_term_rule_l : t -> Term.rule list -> unit
+
   val add_lit_rule : t -> Lit.rule -> unit
+
   val add_lit_rule_l : t -> Lit.rule list -> unit
 
   val add_eq_rule : Lit.rule -> unit
@@ -192,8 +223,11 @@ module Defined_cst : sig
 end
 
 val as_defined_cst : ID.t -> defined_cst option
+
 val is_defined_cst : ID.t -> bool
+
 val all_cst : Defined_cst.t Iter.t
+
 val all_rules : Rule.t Iter.t
 
 (**/**)

@@ -9,12 +9,16 @@
     an end position (line, column) + an optional file name.
 *)
 
-type t = { file : string; start_line : int; start_column : int; stop_line : int; stop_column : int }
+type t = {file: string; start_line: int; start_column: int; stop_line: int; stop_column: int}
 
 val mk : string -> int -> int -> int -> int -> t
+
 val mk_pair : string -> int * int -> int * int -> t
+
 val mk_pos : Lexing.position -> Lexing.position -> t
+
 val eq : t -> t -> bool
+
 val hash : t -> int
 
 val combine : t -> t -> t
@@ -35,6 +39,7 @@ module Infix : sig
 end
 
 include module type of Infix
+
 include Interfaces.PRINT with type t := t
 
 val pp_opt : t option CCFormat.printer

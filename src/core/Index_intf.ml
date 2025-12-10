@@ -1,27 +1,37 @@
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
 type term = Term.t
+
 type subst = Subst.t
 
 module type LEAF = sig
   type t
+
   type elt
 
   val empty : t
+
   val add : t -> term -> elt -> t
+
   val remove : t -> term -> elt -> t
+
   val update_leaf : t -> term -> (elt -> bool) -> t
+
   val is_empty : t -> bool
+
   val iter : t -> (term -> elt -> unit) -> unit
+
   val fold : t -> 'a -> ('a -> term -> elt -> 'a) -> 'a
+
   val size : t -> int
+
   val fold_unify : t Scoped.t -> term Scoped.t -> (term * elt * Unif_subst.t) Iter.t
 
   val fold_unify_complete :
-    unif_alg:(Term.t Scoped.t -> Term.t Scoped.t -> Unif_subst.t option OSeq.t) ->
-    t Scoped.t ->
-    term Scoped.t ->
-    (term * elt * Unif_subst.t option OSeq.t) Iter.t
+       unif_alg:(Term.t Scoped.t -> Term.t Scoped.t -> Unif_subst.t option OSeq.t)
+    -> t Scoped.t
+    -> term Scoped.t
+    -> (term * elt * Unif_subst.t option OSeq.t) Iter.t
 
   val fold_match : ?subst:subst -> t Scoped.t -> term Scoped.t -> (term * elt * subst) Iter.t
   (** Match the indexed terms against the given query term *)
@@ -32,44 +42,58 @@ end
 
 module type TERM_IDX = sig
   type t
+
   type elt
 
   module Leaf : LEAF with type elt = elt
 
   val name : string
+
   val empty : unit -> t
+
   val is_empty : t -> bool
+
   val size : t -> int
+
   val add : t -> term -> elt -> t
+
   val add_seq : t -> (term * elt) Iter.t -> t
+
   val add_list : t -> (term * elt) list -> t
+
   val remove : t -> term -> elt -> t
+
   val update_leaf : t -> term -> (elt -> bool) -> t
+
   val remove_seq : t -> (term * elt) Iter.t -> t
+
   val remove_list : t -> (term * elt) list -> t
+
   val iter : t -> (term -> elt -> unit) -> unit
+
   val fold : t -> ('a -> term -> elt -> 'a) -> 'a -> 'a
 
   val retrieve_unifiables : t Scoped.t -> term Scoped.t -> (term * elt * Unif_subst.t) Iter.t
   (** Retrieves a decidable fragment of unifiables. Only one unifier per subterm. *)
 
   val retrieve_unifiables_complete :
-    ?unif_alg:(Term.t Scoped.t -> Term.t Scoped.t -> Unif_subst.t option OSeq.t) ->
-    t Scoped.t ->
-    term Scoped.t ->
-    (term * elt * Unif_subst.t option OSeq.t) Iter.t
+       ?unif_alg:(Term.t Scoped.t -> Term.t Scoped.t -> Unif_subst.t option OSeq.t)
+    -> t Scoped.t
+    -> term Scoped.t
+    -> (term * elt * Unif_subst.t option OSeq.t) Iter.t
   (** Retrieves all unifiables. The set of unifiers is potentially infinite.
       Because HO unification is undecidable, the sequence is intersperced with `None`s to ensure termination for each element of the sequence. *)
 
   val retrieve_generalizations : ?subst:subst -> t Scoped.t -> term Scoped.t -> (term * elt * subst) Iter.t
+
   val retrieve_specializations : ?subst:subst -> t Scoped.t -> term Scoped.t -> (term * elt * subst) Iter.t
 
   val to_dot : elt CCFormat.printer -> t CCFormat.printer
   (** print oneself in DOT into the given file *)
 end
 
-type lits = term SLiteral.t Iter.t
 (** Iter of literals, as a cheap abstraction on query clauses *)
+type lits = term SLiteral.t Iter.t
 
 type labels = Util.Int_set.t
 
@@ -101,6 +125,7 @@ module type SUBSUMPTION_IDX = sig
   (** Index the clause *)
 
   val add_seq : t -> C.t Iter.t -> t
+
   val add_list : t -> C.t list -> t
 
   val remove : t -> C.t -> t
@@ -127,15 +152,16 @@ module type SUBSUMPTION_IDX = sig
   (** Retrieve clauses that are potentially alpha-equivalent to the given clause *)
 
   val iter : t -> C.t Iter.t
+
   val fold : ('a -> C.t -> 'a) -> 'a -> t -> 'a
 end
 
 module type EQUATION = sig
   type t
 
-  type rhs
   (** An equation can have something other than a term as a right-hand
       side, for instance a formula. *)
+  type rhs
 
   val compare : t -> t -> int
   (** Total order on equations *)
@@ -153,21 +179,25 @@ end
 module type UNIT_IDX = sig
   type t
 
-  module E : EQUATION
   (** Module that describes indexed equations *)
+  module E : EQUATION
 
-  type rhs = E.rhs
   (** Right hand side of equation *)
+  type rhs = E.rhs
 
   val empty : unit -> t
+
   val is_empty : t -> bool
 
   val add : t -> E.t -> t
   (** Index the given (in)equation *)
 
   val add_seq : t -> E.t Iter.t -> t
+
   val add_list : t -> E.t list -> t
+
   val remove : t -> E.t -> t
+
   val remove_seq : t -> E.t Iter.t -> t
 
   val size : t -> int

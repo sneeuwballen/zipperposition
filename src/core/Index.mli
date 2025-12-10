@@ -6,6 +6,7 @@
     (for subsumption) *)
 
 type term = Term.t
+
 type subst = Subst.t
 
 (** {2 Leaf} *)

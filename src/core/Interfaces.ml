@@ -25,6 +25,7 @@ module type PRINT = sig
   type t
 
   val pp : t CCFormat.printer
+
   val to_string : t -> string
 end
 
@@ -32,6 +33,7 @@ module type PRINT1 = sig
   type 'a t
 
   val pp : 'a CCFormat.printer -> 'a t CCFormat.printer
+
   val to_string : 'a CCFormat.printer -> 'a t -> string
 end
 
@@ -39,6 +41,7 @@ module type PRINT2 = sig
   type ('a, 'b) t
 
   val pp : 'a CCFormat.printer -> 'b CCFormat.printer -> ('a, 'b) t CCFormat.printer
+
   val to_string : 'a CCFormat.printer -> 'b CCFormat.printer -> ('a, 'b) t -> string
 end
 
@@ -46,6 +49,7 @@ module type PRINT3 = sig
   type ('a, 'b, 'c) t
 
   val pp : 'a CCFormat.printer -> 'b CCFormat.printer -> 'c CCFormat.printer -> ('a, 'b, 'c) t CCFormat.printer
+
   val to_string : 'a CCFormat.printer -> 'b CCFormat.printer -> 'c CCFormat.printer -> ('a, 'b, 'c) t -> string
 end
 
@@ -54,6 +58,7 @@ module type PRINT_OVERLOAD = sig
   type t
 
   val pp_with : string -> t CCFormat.printer
+
   val add_printer : string -> t CCFormat.printer -> unit
 
   val set_default_printer : string -> unit
@@ -62,9 +67,9 @@ end
 
 module type PRINT_DE_BRUIJN = sig
   type t
+
   type term
 
-  type print_hook = int -> term CCFormat.printer -> Format.formatter -> term -> bool
   (** User-provided hook that can be used to print terms (for composite cases)
       before the default printing occurs. The int argument is the De Bruijn
       depth in the term.
@@ -72,6 +77,7 @@ module type PRINT_DE_BRUIJN = sig
       that it can use to print subterms.
       A hook should return [true] if it fired, [false] to fall back
       on the default printing. *)
+  type print_hook = int -> term CCFormat.printer -> Format.formatter -> term -> bool
 
   val pp_depth : ?hooks:print_hook list -> int -> t CCFormat.printer
 end
@@ -80,8 +86,11 @@ module type ITER = sig
   type 'a t
 
   val to_iter : 'a t -> 'a Iter.t
+
   val of_iter : ?init:'a t -> 'a Iter.t -> 'a t
+
   val to_list : 'a t -> 'a list
+
   val of_list : ?init:'a t -> 'a list -> 'a t
 end
 
@@ -89,6 +98,7 @@ module type MONOID = sig
   type t
 
   val zero : t
+
   val plus : t -> t -> t
 end
 

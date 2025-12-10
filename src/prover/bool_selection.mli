@@ -12,6 +12,7 @@ module Pos = Position
     Boolean subterms. *)
 
 type t = Literal.t array -> (Term.t * Position.t) list
+
 type parametrized = strict:bool -> ord:Ordering.t -> t
 
 (** {2 Selection Functions} *)

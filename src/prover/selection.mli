@@ -13,6 +13,7 @@ open Logtk
 *)
 
 type t = Literal.t array -> CCBV.t
+
 type parametrized = strict:bool -> ord:Ordering.t -> t
 
 val no_select : t

@@ -3,11 +3,13 @@
 module type S = sig
   type t
 
-  type payload
   (** Additional data carried in the literal *)
+  type payload
 
   val compare : t -> t -> int
+
   val equal : t -> t -> bool
+
   val hash : t -> int
 
   val dummy : t
@@ -45,5 +47,6 @@ module type S = sig
   val pp : t CCFormat.printer
 
   module Set : CCSet.S with type elt = t
+
   module Tbl : CCHashtbl.S with type key = t
 end

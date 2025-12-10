@@ -14,6 +14,7 @@
 open Logtk
 
 type 'a or_error = ('a, string) CCResult.t
+
 type untyped = STerm.t
 
 module A = Ast_tptp
@@ -21,17 +22,16 @@ module A = Ast_tptp
 (** {2 Description of provers} *)
 
 module Prover : sig
-  type t = {
-     name : string;  (** name of the prover *)
-     command : string;  (** command to call prover*)
-     unsat : string list;  (** prover returned unsat (possible outputs)*)
-     sat : string list;  (** prover returned sat (possible outputs)*)
-   }
   (** data useful to invoke a prover. The prover must read from
         stdin. The command is interpolated using {! Buffer.add_substitude}, with
         the given patterns:
 
         - "timeout" is the timeout in seconds *)
+  type t =
+    { name: string  (** name of the prover *)
+    ; command: string  (** command to call prover*)
+    ; unsat: string list  (** prover returned unsat (possible outputs)*)
+    ; sat: string list  (** prover returned sat (possible outputs)*) }
 
   val lookup : string -> t
   (** Lookup a prover by its name.
@@ -45,9 +45,13 @@ module Prover : sig
       @raise Invalid_argument if the name is already used. *)
 
   val p_E : t
+
   val p_Eproof : t
+
   val p_SPASS : t
+
   val p_Zenon : t
+
   val default : t list
 end
 
@@ -74,12 +78,7 @@ val call_with_out :
 (** {2 E-prover specific functions} *)
 
 module Eprover : sig
-  type result = {
-     answer : szs_answer;
-     output : string;
-     decls : untyped A.t Iter.t option;
-     proof : Trace_tstp.t option;
-   }
+  type result = {answer: szs_answer; output: string; decls: untyped A.t Iter.t option; proof: Trace_tstp.t option}
 
   and szs_answer = Theorem | CounterSatisfiable | Unknown
 

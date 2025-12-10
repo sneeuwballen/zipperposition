@@ -15,11 +15,13 @@
 
 type term = Term.t
 
-type t = Literal.t array
 (** Array of literals *)
+type t = Literal.t array
 
 val equal_com : t -> t -> bool
+
 val compare : t -> t -> int
+
 val compare_multiset : ord:Ordering.t -> t -> t -> Comparison.t
 
 include Interfaces.HASH with type t := t
@@ -33,10 +35,15 @@ val are_variant : t -> t -> bool
 (** Simple interface on top of {!variant} with distinc scopes *)
 
 val matching : ?subst:Subst.t -> pattern:t Scoped.t -> t Scoped.t -> (Subst.t * Builtin.Tag.t list) Iter.t
+
 val matches : t -> t -> bool
+
 val weight : t -> int
+
 val ho_weight : t -> int
+
 val depth : t -> int
+
 val vars : t -> Type.t HVar.t list
 
 val is_ground : t -> bool
@@ -46,9 +53,13 @@ val to_form : t -> term SLiteral.t list
 (** Make a 'or' formula from literals *)
 
 val apply_subst : Subst.Renaming.t -> Subst.t -> t Scoped.t -> t
+
 val of_unif_subst : Subst.Renaming.t -> Unif_subst.t -> t
+
 val map : (term -> term) -> t -> t
+
 val pos : t -> CCBV.t
+
 val neg : t -> CCBV.t
 
 val maxlits : ord:Ordering.t -> t -> CCBV.t
@@ -70,7 +81,9 @@ val apply_subst : Subst.Renaming.t -> Subst.t -> t Scoped.t -> t
 
 module Seq : sig
   val vars : t -> Type.t HVar.t Iter.t
+
   val terms : t -> term Iter.t
+
   val to_form : t -> term SLiteral.t Iter.t
 end
 
@@ -133,12 +146,12 @@ val fold_lits : eligible:(int -> Literal.t -> bool) -> t -> (Literal.t * int) It
     is given the literal and its index. *)
 
 val fold_eqn :
-  ?both:bool ->
-  ?sign:bool ->
-  ord:Ordering.t ->
-  eligible:(int -> Literal.t -> bool) ->
-  t ->
-  (term * term * bool * Position.t) Iter.t
+     ?both:bool
+  -> ?sign:bool
+  -> ord:Ordering.t
+  -> eligible:(int -> Literal.t -> bool)
+  -> t
+  -> (term * term * bool * Position.t) Iter.t
 (** fold f over all literals sides, with their positions.
     NB: REPORTED SIGN IS THE SAME AS IF Lit.is_pos WAS CALLED!
     f is given [(left side, right side, sign, position of left side)]
@@ -153,30 +166,37 @@ val fold_eqn_simple : ?sign:bool -> t -> (term * term * bool * Position.t) Iter.
 (** Like previous version but simpler: it visits all equations only in the orientation l = r  *)
 
 val fold_terms :
-  ?vars:bool ->
-  ?var_args:bool ->
-  ?fun_bodies:bool ->
-  ?ty_args:bool ->
-  which:[< `Max | `All ] ->
-  ord:Ordering.t ->
-  subterms:bool ->
-  eligible:(int -> Literal.t -> bool) ->
-  t ->
-  term Position.With.t Iter.t
+     ?vars:bool
+  -> ?var_args:bool
+  -> ?fun_bodies:bool
+  -> ?ty_args:bool
+  -> which:[< `Max | `All]
+  -> ord:Ordering.t
+  -> subterms:bool
+  -> eligible:(int -> Literal.t -> bool)
+  -> t
+  -> term Position.With.t Iter.t
 (** See {!Literal.fold_terms}, which is the same but for the
     [eligible] argument *)
 
 val symbols : ?init:ID.Set.t -> ?include_types:bool -> t -> ID.Set.t
-val typed_symbols : ?include_types:bool -> t -> (ID.t * Type.t) Iter.t 
+
+val typed_symbols : ?include_types:bool -> t -> (ID.t * Type.t) Iter.t
 
 (** {2 IO} *)
 
 val pp : t CCFormat.printer
+
 val pp_vars : t CCFormat.printer
+
 val pp_tstp : t CCFormat.printer
+
 val pp_tstp_closed : t CCFormat.printer
+
 val pp_zf : t CCFormat.printer
+
 val pp_zf_closed : t CCFormat.printer
+
 val to_string : t -> string
 
 (** {2 Special kinds of literal arrays} *)
@@ -199,6 +219,7 @@ val unshielded_vars : ?filter:(Term.var -> bool) -> t -> Term.var list
 (** Set of variables occurring unshielded *)
 
 val vars_distinct : t -> bool
+
 val ground_lits : t -> t
 
 val num_predicate : t -> int

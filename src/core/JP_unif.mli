@@ -10,19 +10,23 @@ module S : sig
 end
 
 val project_onesided : scope:Scoped.scope -> counter:int ref -> T.t -> subst OSeq.t
+
 val imitate_onesided : scope:Scoped.scope -> counter:int ref -> T.t -> T.t -> subst OSeq.t
+
 val imitate : scope:Scoped.scope -> counter:int ref -> T.t -> T.t -> (T.var * int) list -> subst OSeq.t
+
 val identify : scope:Scoped.scope -> counter:int ref -> T.t -> T.t -> (T.var * int) list -> subst OSeq.t
+
 val eliminate : scope:Scoped.scope -> counter:int ref -> T.t -> T.t -> (Type.t HVar.t * int) list -> subst OSeq.t
 
 val iterate :
-  ?flex_same:bool ->
-  scope:Scoped.scope ->
-  counter:int ref ->
-  T.t ->
-  T.t ->
-  (T.var * 'a) CCList.t ->
-  Unif_subst.t option OSeq.t
+     ?flex_same:bool
+  -> scope:Scoped.scope
+  -> counter:int ref
+  -> T.t
+  -> T.t
+  -> (T.var * 'a) CCList.t
+  -> Unif_subst.t option OSeq.t
 
 val find_disagreement : T.t -> T.t -> ((T.t * T.t) * (T.var * int) CCList.t) option
 (** Find disagreeing subterms. 

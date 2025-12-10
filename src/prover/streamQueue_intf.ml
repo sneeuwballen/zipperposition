@@ -7,9 +7,9 @@ module type S = sig
 
   (** {5 Weight functions} *)
   module WeightFun : sig
-    type t = Stm.t -> int
     (** attribute a weight to a stream. The smaller, the better (lightweight
         streams will be favored). A weight must always be positive. *)
+    type t = Stm.t -> int
 
     val penalty : t
     (** Returns the penalty of the stream *)
@@ -20,8 +20,8 @@ module type S = sig
         of weights. *)
   end
 
-  type t
   (** A priority queue. *)
+  type t
 
   val add : t -> Stm.t -> unit
   (** Add a stream to the Queue *)
@@ -78,5 +78,6 @@ module type S = sig
   (** {5 IO} *)
 
   val pp : t CCFormat.printer
+
   val to_string : t -> string
 end

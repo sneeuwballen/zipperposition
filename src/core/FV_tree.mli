@@ -10,10 +10,11 @@
 *)
 
 type labels = Index_intf.labels
+
 type feature = N of int | S of ID.Set.t | M of int ID.Map.t | L of labels
 
-type feature_vector = feature IArray.t
 (** a vector of feature *)
+type feature_vector = feature IArray.t
 
 module Make (C : Index_intf.CLAUSE) : sig
   (** {2 Feature Functions} *)
@@ -21,6 +22,7 @@ module Make (C : Index_intf.CLAUSE) : sig
     type t
 
     val name : t -> string
+
     val compute : t -> C.t -> feature
 
     include Interfaces.PRINT with type t := t
@@ -32,7 +34,9 @@ module Make (C : Index_intf.CLAUSE) : sig
     (** size of negative clause *)
 
     val labels : t
+
     val weight_plus : t
+
     val weight_minus : t
 
     val set_sym_plus : t
@@ -63,6 +67,8 @@ module Make (C : Index_intf.CLAUSE) : sig
   include Index.SUBSUMPTION_IDX with module C = C
 
   val empty_with : feature_funs -> t
+
   val default_feature_funs : feature_funs
+
   val feature_funs : t -> feature_funs
 end

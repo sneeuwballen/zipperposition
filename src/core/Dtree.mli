@@ -13,4 +13,5 @@
 *)
 
 module Make (E : Index.EQUATION) : Index.UNIT_IDX with module E = E
+
 module Default : Index.UNIT_IDX with module E = Index.BasicEquation

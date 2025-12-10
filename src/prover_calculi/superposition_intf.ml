@@ -5,7 +5,9 @@ open Libzipperposition
 
 module type S = sig
   module Env : Env.S
+
   module C : module type of Env.C with type t = Env.C.t
+
   module PS : module type of Env.ProofState with type C.t = Env.C.t
 
   (** {5 Term Indices} *)
@@ -28,6 +30,7 @@ module type S = sig
   (** superposition where given clause is passive *)
 
   val infer_equality_resolution : Env.unary_inf_rule
+
   val infer_equality_factoring : Env.unary_inf_rule
 
   (** {5 Extraction of clauses from the queue (HO feature)} *)

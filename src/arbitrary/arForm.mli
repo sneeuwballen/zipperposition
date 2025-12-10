@@ -5,7 +5,9 @@
 open Logtk
 
 type 'a arbitrary = 'a QCheck.arbitrary
+
 type 'a gen = 'a QCheck.Gen.t
+
 type form = TypedSTerm.t
 
 val atom_g : form gen

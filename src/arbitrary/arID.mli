@@ -5,6 +5,7 @@
 open Logtk
 
 type 'a arbitrary = 'a QCheck.arbitrary
+
 type 'a gen = 'a QCheck.Gen.t
 
 val default_g : ID.t gen

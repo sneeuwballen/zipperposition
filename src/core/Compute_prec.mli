@@ -10,16 +10,16 @@ type t
 
 val empty : t
 
-val add_constr : int -> [ `partial ] Precedence.Constr.t -> t -> t
+val add_constr : int -> [`partial] Precedence.Constr.t -> t -> t
 (** Add a precedence constraint with its priority. The lower the
     priority, the stronger influence the constraint will have. *)
 
-val add_constrs : (int * [ `partial ] Precedence.Constr.t) list -> t -> t
+val add_constrs : (int * [`partial] Precedence.Constr.t) list -> t -> t
 
-type 'a parametrized = Statement.clause_t Iter.t -> 'a
 (** Some values are parametrized by the list of statements *)
+type 'a parametrized = Statement.clause_t Iter.t -> 'a
 
-val add_constr_rule : int -> [ `partial ] Precedence.Constr.t parametrized -> t -> t
+val add_constr_rule : int -> [`partial] Precedence.Constr.t parametrized -> t -> t
 (** Add a precedence constraint rule *)
 
 val set_weight_rule : Precedence.weight_fun parametrized -> t -> t

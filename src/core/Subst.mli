@@ -13,6 +13,7 @@
 *)
 
 type term = InnerTerm.t
+
 type var = InnerTerm.t HVar.t
 
 (** {2 Renamings}
@@ -36,8 +37,8 @@ end
 
 (** {3 Basics} *)
 
-type t
 (** A substitution that binds term variables to other terms *)
+type t
 
 type subst = t
 
@@ -121,7 +122,9 @@ val is_renaming : t -> bool
 (** Check whether the substitution is a variable renaming *)
 
 val equal : t -> t -> bool
+
 val compare : t -> t -> int
+
 val hash : t -> int
 
 include Interfaces.PRINT with type t := t
@@ -130,10 +133,15 @@ val pp_bindings : t CCFormat.printer
 (** Only print the bindings, no box *)
 
 val fold : ('a -> var Scoped.t -> term Scoped.t -> 'a) -> 'a -> t -> 'a
+
 val iter : (var Scoped.t -> term Scoped.t -> unit) -> t -> unit
+
 val to_iter : t -> (var Scoped.t * term Scoped.t) Iter.t
+
 val to_list : t -> (var Scoped.t * term Scoped.t) list
+
 val of_iter : ?init:t -> (var Scoped.t * term Scoped.t) Iter.t -> t
+
 val of_list : ?init:t -> (var Scoped.t * term Scoped.t) list -> t
 
 (** {2 Applying a substitution} *)
@@ -151,10 +159,13 @@ val apply : ?shift_vars:int -> Renaming.t -> t -> term Scoped.t -> term
 
 module type SPECIALIZED = sig
   type term
+
   type t = subst
 
   val find_exn : t -> var Scoped.t -> term Scoped.t
+
   val get_var : t -> var Scoped.t -> term Scoped.t option
+
   val deref : t -> term Scoped.t -> term Scoped.t
 
   val apply : ?shift_vars:int -> Renaming.t -> t -> term Scoped.t -> term
@@ -179,10 +190,15 @@ module FO : sig
   include SPECIALIZED with type term = Term.t
 
   val bind' : t -> Type.t HVar.t Scoped.t -> term Scoped.t -> t
+
   val apply_l : ?shift_vars:int -> Renaming.t -> t -> term list Scoped.t -> term list
+
   val of_list' : ?init:t -> (Type.t HVar.t Scoped.t * term Scoped.t) list -> t
+
   val map : (term -> term) -> t -> t
+
   val iter : (Type.t HVar.t Scoped.t -> term Scoped.t -> unit) -> t -> unit
+
   val filter : (Type.t HVar.t Scoped.t -> term Scoped.t -> bool) -> t -> t
 
   val compose : scope:int -> t -> t -> t
@@ -196,19 +212,23 @@ module FO : sig
       so that all such variables are remaped to a fresh skolem *)
 
   val subset_is_renaming : subset:term Scoped.t list -> res_scope:int -> t -> bool
+
   val canonize_neg_vars : var_set:InnerTerm.VarSet.t -> t
+
   val canonize_all_vars : term -> term
 end
 
 (** {2 Projections for proofs} *)
 
 module Projection : sig
-  type t = private { scope : Scoped.scope; subst : subst; renaming : Renaming.t }
   (** A representation of the substitution for a given scope, after applying
       the renaming. *)
+  type t = private {scope: Scoped.scope; subst: subst; renaming: Renaming.t}
 
   val subst : t -> subst
+
   val scope : t -> Scoped.scope
+
   val renaming : t -> Renaming.t
 
   val bindings : t -> (var * term) list
@@ -217,14 +237,16 @@ module Projection : sig
       in terms of the codomain are bound in the renaming *)
 
   val as_inst :
-    ?allow_free_db:bool ->
-    ctx:Term.Conv.ctx ->
-    t ->
-    Type.t HVar.t list ->
-    (TypedSTerm.t, TypedSTerm.t) Var.Subst.t
+       ?allow_free_db:bool
+    -> ctx:Term.Conv.ctx
+    -> t
+    -> Type.t HVar.t list
+    -> (TypedSTerm.t, TypedSTerm.t) Var.Subst.t
   (** Convert into an instantiation on the given variables *)
 
   val is_empty : t -> bool
+
   val make : Renaming.t -> subst Scoped.t -> t
+
   val pp : t CCFormat.printer
 end

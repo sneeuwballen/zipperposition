@@ -12,6 +12,7 @@ module type S = Stream_intf.S
 
 module type ARG = sig
   module Ctx : Ctx.S
+
   module C : Clause.S with module Ctx = Ctx
 end
 

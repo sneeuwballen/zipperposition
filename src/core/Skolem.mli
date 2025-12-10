@@ -10,11 +10,13 @@
 *)
 
 type type_ = TypedSTerm.t
+
 type term = TypedSTerm.t
+
 type form = TypedSTerm.t
 
-type ctx
 (** Context needed to create new symbols *)
+type ctx
 
 val create : ?prefix:string -> ?prop_prefix:string -> ?on_new:(ID.t -> type_ -> unit) -> unit -> ctx
 (** New skolem contex. A prefix can be provided, which will be
@@ -49,51 +51,49 @@ val skolem_form : ctx:ctx -> (type_, term) Var.Subst.t -> type_ Var.t -> form ->
 
 (** {2 Definitions of Formulas} *)
 
-type polarity = [ `Pos | `Neg | `Both ]
+type polarity = [`Pos | `Neg | `Both]
 
 val pp_polarity : polarity CCFormat.printer
 
-type form_definition = private {
-   form : form;
-   proxy_id : ID.t; (* name *)
-   (* the defined object *)
-   proxy : term;
-   (* atom/term standing for the defined object *)
-   proxy_ty : type_;
-   (* type of [proxy_id] *)
-   rw_rules : bool;
-   (* do we add rewrite rules (instead of an axiom)?
-      [proxy -> true if form]
-      [proxy -> false if not form] (depending on polarity) *)
-   polarity : polarity;
-   proof : Proof.step;
-   (* source for this definition *)
-   as_stmt : Statement.input_t list lazy_t;
- }
+type form_definition = private
+  { form: form
+  ; proxy_id: ID.t (* name *)
+  ; (* the defined object *)
+    proxy: term
+  ; (* atom/term standing for the defined object *)
+    proxy_ty: type_
+  ; (* type of [proxy_id] *)
+    rw_rules: bool
+  ; (* do we add rewrite rules (instead of an axiom)?
+       [proxy -> true if form]
+       [proxy -> false if not form] (depending on polarity) *)
+    polarity: polarity
+  ; proof: Proof.step
+  ; (* source for this definition *)
+    as_stmt: Statement.input_t list lazy_t }
 
 val pp_form_definition : form_definition CCFormat.printer
 
 val define_form :
-  ?pattern:string ->
-  ctx:ctx ->
-  rw_rules:bool ->
-  polarity:polarity ->
-  parents:Proof.Parent.t list ->
-  form ->
-  form_definition
+     ?pattern:string
+  -> ctx:ctx
+  -> rw_rules:bool
+  -> polarity:polarity
+  -> parents:Proof.Parent.t list
+  -> form
+  -> form_definition
 (** [define ~ctx f] returns a new predicate for [f],
     with the free variables of [f] as arguments.
 
     @return the atomic formula that stands for [f]. *)
 
-type term_definition = private {
-   td_id : ID.t;
-   td_ty : type_;
-   td_rules : (form, term, type_) Statement.def_rule list;
-   td_as_def : (form, term, type_) Statement.def;
-   td_proof : Proof.step;
-   td_stmt : Statement.input_t list lazy_t;
- }
+type term_definition = private
+  { td_id: ID.t
+  ; td_ty: type_
+  ; td_rules: (form, term, type_) Statement.def_rule list
+  ; td_as_def: (form, term, type_) Statement.def
+  ; td_proof: Proof.step
+  ; td_stmt: Statement.input_t list lazy_t }
 
 val define_term :
   ?pattern:string -> ctx:ctx -> parents:Proof.Parent.t list -> (term list * term) list -> term_definition

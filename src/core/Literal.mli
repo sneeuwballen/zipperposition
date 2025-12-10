@@ -67,6 +67,7 @@ val mk_eq : term -> term -> t
     a SortError will be raised. An ordering must be provided *)
 
 val mk_neq : term -> term -> t
+
 val mk_lit : term -> term -> bool -> t
 
 val mk_prop : term -> bool -> t
@@ -99,10 +100,15 @@ val subsumes : ?subst:Subst.t -> t Scoped.t -> t Scoped.t -> (Subst.t * Builtin.
     such that [subst(lit_a) => lit_b]. *)
 
 val variant : ?subst:Subst.t -> t Scoped.t -> t Scoped.t -> (Subst.t * Builtin.Tag.t list) Iter.t
+
 val unify : ?subst:Unif_subst.t -> t Scoped.t -> t Scoped.t -> (Unif_subst.t * Builtin.Tag.t list) Iter.t
+
 val are_variant : t -> t -> bool
+
 val apply_subst : Subst.Renaming.t -> Subst.t -> t Scoped.t -> t
+
 val apply_subst_no_simp : Subst.Renaming.t -> Subst.t -> t Scoped.t -> t
+
 val apply_subst_list : Subst.Renaming.t -> Subst.t -> t list Scoped.t -> t list
 
 exception Lit_is_constraint
@@ -132,7 +138,9 @@ val vars : t -> Type.t HVar.t list
 (** gather variables *)
 
 val var_occurs : Type.t HVar.t -> t -> bool
+
 val is_ground : t -> bool
+
 val symbols : ?include_types:bool -> t -> ID.Set.t
 
 val root_terms : t -> term list
@@ -152,6 +160,7 @@ module Set : CCSet.S with type elt = t
 (** {2 Basic semantic checks} *)
 
 val is_trivial : t -> bool
+
 val is_absurd : t -> bool
 
 val is_absurd_tags : t -> Proof.tag list
@@ -161,24 +170,30 @@ val is_app_var_eq : t -> bool
 (** if [is_absurd lit], return why *)
 
 val is_type_pred : t -> bool
+
 val is_typex_pred : t -> bool (* like in E, type predicate with multiple variables *)
+
 val is_predicate_lit : t -> bool
+
 val as_inj_def : t -> (ID.t * (Term.var * Term.var) list) option
+
 val is_pure_var : t -> bool
+
 val as_pos_pure_var : t -> (Term.var * Term.var) option
+
 val max_term_positions : ord:Ordering.t -> t -> int
 
 val fold_terms :
-  ?position:Position.t ->
-  ?vars:bool ->
-  ?var_args:bool ->
-  ?fun_bodies:bool ->
-  ?ty_args:bool ->
-  which:[< `Max | `All ] ->
-  ?ord:Ordering.t ->
-  subterms:bool ->
-  t ->
-  term Position.With.t Iter.t
+     ?position:Position.t
+  -> ?vars:bool
+  -> ?var_args:bool
+  -> ?fun_bodies:bool
+  -> ?ty_args:bool
+  -> which:[< `Max | `All]
+  -> ?ord:Ordering.t
+  -> subterms:bool
+  -> t
+  -> term Position.With.t Iter.t
 (** Iterate on terms, maybe subterms, of the literal.
     Variables are ignored if [vars] is [false].
 
@@ -206,20 +221,23 @@ end
 
 module Seq : sig
   val terms : t -> term Iter.t
+
   val vars : t -> Type.t HVar.t Iter.t
+
   val symbols : ?include_types:bool -> t -> ID.t Iter.t
+
   val typed_symbols : ?include_types:bool -> t -> (ID.t * Type.t) Iter.t
 end
 
 (** {2 Positions} *)
 module Pos : sig
-  type split = { lit_pos : Position.t; term_pos : Position.t; term : term }
   (** Full description of a position in a literal. It contains:
       - [lit_pos]: the literal-prefix of the position
       - [term_pos]: the suffix that describes a subterm position
       - [term]: the term root, just under the literal itself.
         given this, applying T.Pos.at to the subterm position and
         the root term we obtain the sub-term itself. *)
+  type split = {lit_pos: Position.t; term_pos: Position.t; term: term}
 
   val split : t -> Position.t -> split
   (** @raise Invalid_argument if the position is incorrect *)
@@ -269,12 +287,14 @@ module View : sig
       @raise Invalid_argument if the position doesn't match the literal. *)
 
   val get_lhs : t -> term option
+
   val get_rhs : t -> term option
 end
 
 (** {2 Conversions} *)
 module Conv : sig
   type hook_from = term SLiteral.t -> t option
+
   type hook_to = t -> term SLiteral.t option
 
   val of_form : ?hooks:hook_from list -> term SLiteral.t -> t
@@ -282,19 +302,26 @@ module Conv : sig
       @raise Invalid_argument if the formula is not atomic. *)
 
   val to_form : ?hooks:hook_to list -> t -> term SLiteral.t
+
   val to_s_form : ?allow_free_db:bool -> ?ctx:Term.Conv.ctx -> ?hooks:hook_to list -> t -> TypedSTerm.Form.t
+
   val lit_to_tst : ?ctx:Term.Conv.ctx -> term SLiteral.t -> TypedSTerm.t
 end
 
 (** {2 IO} *)
 
-type print_hook = CCFormat.t -> t -> bool
 (** might print the literal on the given buffer.
     @return true if it printed, false otherwise *)
+type print_hook = CCFormat.t -> t -> bool
 
 val add_default_hook : print_hook -> unit
+
 val pp_debug : ?hooks:print_hook list -> t CCFormat.printer
+
 val pp : t CCFormat.printer
+
 val pp_zf : t CCFormat.printer
+
 val pp_tstp : t CCFormat.printer
+
 val to_string : t -> string

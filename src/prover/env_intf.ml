@@ -4,85 +4,92 @@ open Logtk
 
 module type S = sig
   module Ctx : Ctx.S
+
   module C : Clause.S with module Ctx = Ctx
+
   module ProofState : ProofState.S with module C = C and module Ctx = Ctx
+
   module Stm : Stream.S with module C = C
+
   module StmQ : StreamQueue.S with module Stm = Stm
+
   module FormRename : FormulaRename.S with module C = C
 
   val k_max_multi_simpl_depth : int Flex_state.key
 
-  type inf_rule = C.t -> C.t list
   (** An inference returns a list of conclusions *)
+  type inf_rule = C.t -> C.t list
 
-  type generate_rule = full:bool -> unit -> C.t list
   (** Generation of clauses regardless of current clause.
       @param full if true, perform more thorough checks *)
+  type generate_rule = full:bool -> unit -> C.t list
 
-  type clause_elim_rule = unit -> unit
   (** Eliminates clauses from the proof state using algorithms
       like blocked clause elimination and similar *)
+  type clause_elim_rule = unit -> unit
 
   type binary_inf_rule = inf_rule
+
   type unary_inf_rule = inf_rule
 
-  type simplify_rule = C.t -> C.t SimplM.t
   (** Simplify the clause structurally (basic simplifications),
       in the simplification monad.
       [(c, `Same)] means the clause has not been simplified;
       [(c, `New)] means the clause has been simplified at least once *)
+  type simplify_rule = C.t -> C.t SimplM.t
 
   type active_simplify_rule = simplify_rule
+
   type rw_simplify_rule = simplify_rule
 
-  type backward_simplify_rule = C.t -> C.ClauseSet.t
   (** backward simplification by a unit clause. It returns a set of
       active clauses that can potentially be simplified by the given clause.
       [backward_simplify c] therefore returns a subset of
       [ProofState.ActiveSet.clauses ()] *)
+  type backward_simplify_rule = C.t -> C.ClauseSet.t
 
-  type redundant_rule = C.t -> bool
   (** check whether the clause is redundant w.r.t the set *)
+  type redundant_rule = C.t -> bool
 
-  type backward_redundant_rule = C.ClauseSet.t -> C.t -> C.ClauseSet.t
   (** find redundant clauses in [ProofState.ActiveSet] w.r.t the clause.
        first param is the set of already known redundant clause, the rule
        should add clauses to it *)
+  type backward_redundant_rule = C.ClauseSet.t -> C.t -> C.ClauseSet.t
 
-  type immediate_simplification_rule = C.t -> C.t Iter.t -> C.t Iter.t option
   (** Following Kotelnikov's iProver superposition implementation, try to simplify
       given clause (first argument) using a set of clauses (second argument).
       If simplification suceeded, then a set of clauses to be injected
       into passive set is returned. *)
+  type immediate_simplification_rule = C.t -> C.t Iter.t -> C.t Iter.t option
 
-  type is_trivial_trail_rule = Trail.t -> bool
   (** Rule that checks whether the trail is trivial (a tautology) *)
+  type is_trivial_trail_rule = Trail.t -> bool
 
-  type is_trivial_rule = C.t -> bool
   (** Rule that checks whether the clause is trivial (a tautology) *)
+  type is_trivial_rule = C.t -> bool
 
-  type term_rewrite_rule = Term.t -> (Term.t * Proof.parent list) option
   (** Rewrite rule on terms *)
+  type term_rewrite_rule = Term.t -> (Term.t * Proof.parent list) option
 
-  type term_norm_rule = Term.t -> Term.t option
   (** Normalization rule on terms *)
+  type term_norm_rule = Term.t -> Term.t option
 
-  type lit_rewrite_rule = Literal.t -> (Literal.t * Proof.parent list * Proof.tag list) option
   (** Rewrite rule on literals *)
+  type lit_rewrite_rule = Literal.t -> (Literal.t * Proof.parent list * Proof.tag list) option
 
-  type multi_simpl_rule = C.t -> C.t list option
   (** (maybe) rewrite a clause to a set of clauses.
       Must return [None] if the clause is unmodified *)
+  type multi_simpl_rule = C.t -> C.t list option
 
   type 'a conversion_result =
-     | CR_skip  (** rule didn't fire *)
-     | CR_drop  (** drop the clause from the proof state *)
-     | CR_add of 'a  (** add this to the result *)
-     | CR_return of 'a  (** shortcut the remaining rules, return this *)
+    | CR_skip  (** rule didn't fire *)
+    | CR_drop  (** drop the clause from the proof state *)
+    | CR_add of 'a  (** add this to the result *)
+    | CR_return of 'a  (** shortcut the remaining rules, return this *)
 
-  type clause_conversion_rule = Statement.clause_t -> C.t list conversion_result
   (** A hook to convert a particular statement into a list
       of clauses *)
+  type clause_conversion_rule = Statement.clause_t -> C.t list conversion_result
 
   (** {2 Modify the Env} *)
 
@@ -158,6 +165,7 @@ module type S = sig
   (** Add a ho norm rule *)
 
   val get_ho_normalization_rule : unit -> term_norm_rule
+
   val add_immediate_simpl_rule : immediate_simplification_rule -> unit
 
   val add_lit_rule : string -> lit_rewrite_rule -> unit
@@ -168,15 +176,20 @@ module type S = sig
       Rules with higher priority will be tried first. *)
 
   val add_clause_elimination_rule : priority:int -> string -> clause_elim_rule -> unit
+
   val cr_skip : _ conversion_result
+
   val cr_return : 'a -> 'a conversion_result
+
   val cr_add : 'a -> 'a conversion_result
+
   val add_clause_conversion : clause_conversion_rule -> unit
 
   val add_step_init : (unit -> unit) -> unit
   (** add a function to call before each saturation step *)
 
   val add_fragment_check : (C.t -> bool) -> unit
+
   val check_fragment : C.t -> bool
 
   (** {2 Use the Env} *)
@@ -214,15 +227,19 @@ module type S = sig
   (** Signal triggered when an empty clause is found *)
 
   val ord : unit -> Ordering.t
+
   val precedence : unit -> Precedence.t
+
   val signature : unit -> Signature.t
+
   val pp : unit CCFormat.printer
+
   val pp_full : unit CCFormat.printer
 
   (** {2 High level operations} *)
 
-  type stats = int * int * int
   (** statistics on clauses : num active, num passive, num simplification *)
+  type stats = int * int * int
 
   val get_stm_queue : unit -> StmQ.t
 

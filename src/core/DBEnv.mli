@@ -9,9 +9,9 @@
     at hand.
 *)
 
-type +'a t
 (** An environment that maps De Bruijn indices to values of
     type 'a. *)
+type +'a t
 
 val empty : 'a t
 (** Empty environment *)

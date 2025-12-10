@@ -4,8 +4,8 @@
 
 open Logtk
 
-module type S = Ctx_intf.S
 (** {2 Context for a Proof} *)
+module type S = Ctx_intf.S
 
 module Key : sig
   val lost_completeness : bool Flex_state.key
@@ -13,9 +13,13 @@ end
 
 module type PARAMETERS = sig
   val signature : Signature.t
+
   val ord : Ordering.t
+
   val select : Selection.t
+
   val bool_select : Bool_selection.t
+
   val sk_ctx : Skolem.ctx
 end
 

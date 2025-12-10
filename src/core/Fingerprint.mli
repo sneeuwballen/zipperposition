@@ -8,23 +8,32 @@
     NOTE: less efficient, it seems, than {!NPDtree}
 *)
 
-type fingerprint_fun
 (** A fingerprint function is a list of positions.
 
     To compute the fingerprint of a term, we map
     each position to a feature;
     fingerprints can then be compared for potential unifiability/matching.
 *)
+type fingerprint_fun
 
 val fp3d : fingerprint_fun
+
 val fp3w : fingerprint_fun
+
 val fp4d : fingerprint_fun
+
 val fp4m : fingerprint_fun
+
 val fp4w : fingerprint_fun
+
 val fp5m : fingerprint_fun
+
 val fp6m : fingerprint_fun
+
 val fp7 : fingerprint_fun
+
 val fp7m : fingerprint_fun
+
 val fp16 : fingerprint_fun
 
 module Make (X : Set.OrderedType) : sig
@@ -36,6 +45,8 @@ module Make (X : Set.OrderedType) : sig
   (** Empty index, using the given fingerprint function *)
 
   val get_fingerprint : t -> fingerprint_fun
+
   val update_leaf : t -> Term.t -> (Leaf.elt -> bool) -> t
+
   val pp_keys : t -> unit
 end

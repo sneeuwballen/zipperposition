@@ -4,17 +4,17 @@
 
 type term = Term.t
 
-type penalty = int
 (** penalty on the search space *)
+type penalty = int
 
 val enum_prop :
-  ?mode:[ `And | `Or | `Neg | `Quants | `TF | `Eq | `Combinators | `Full | `Pragmatic | `Simple | `None ] ->
-  ?add_var:bool ->
-  Term.var Scoped.t ->
-  enum_cache:Term.Set.t ref ->
-  signature:Signature.t ->
-  offset:int ->
-  (Subst.t * penalty) list
+     ?mode:[`And | `Or | `Neg | `Quants | `TF | `Eq | `Combinators | `Full | `Pragmatic | `Simple | `None]
+  -> ?add_var:bool
+  -> Term.var Scoped.t
+  -> enum_cache:Term.Set.t ref
+  -> signature:Signature.t
+  -> offset:int
+  -> (Subst.t * penalty) list
 (** Given a variable of type [τ1…τn -> prop], enumerate possible shapes
     for it
     @param v the variable to refine + its scope. Must return [prop].
@@ -23,8 +23,8 @@ val enum_prop :
       otherwise do all connectives
 *)
 
-type pair = Type.t list * term * term
 (** unification pair *)
+type pair = Type.t list * term * term
 
 val pp_pair : pair CCFormat.printer
 
