@@ -76,6 +76,10 @@ let _e_max_derived = ref 1000000
 
 let _monomorphisation_timeout = ref 3.0
 
+
+(* remove duplicates from an iter *)
+let remove_duplicates iter ~eq = Iter.map List.hd (Iter.group_by ~eq iter)
+
 let iter_partition filter iter =
   Iter.fold
     (fun (acc_1, acc_2) elem ->
