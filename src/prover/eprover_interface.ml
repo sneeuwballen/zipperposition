@@ -27,12 +27,6 @@ let _timeout = ref 11
 
 let _e_auto = ref false
 
-let _max_derived = ref 100000000
-
-let _only_ho_steps = ref true
-
-let _sort_by_weight_only = ref false
-
 let e_bin = ref (None : string option)
 
 let regex_refutation_begin = Str.regexp ".*SZS output start CNFRefutation.*"
@@ -55,7 +49,6 @@ module Make (E : Env.S) : S with module Env = E = struct
 
   let init_clauses = ref C.ClauseSet.empty
 
-  (*let initialize () = init_clauses := C.ClauseSet.of_iter (Env.get_passive ())*)
   let initialize () = init_clauses := C.ClauseSet.of_iter Iter.empty
 
   exception CantEncode of string
@@ -80,16 +73,6 @@ module Make (E : Env.S) : S with module Env = E = struct
           in
           raise @@ CantEncode err ) ;
       match T.view t with
-      (*| T.Const id ->
-            (match Type.view (T.ty t) with
-                | App(id, []) ->
-                   Printf.printf "type id: %i, type string: %s\n" (ID.id id) (Type.to_string (T.ty t));
-                   Env.Ctx.declare id (Type.tType)
-                | _ -> ()
-             );
-            Printf.printf "const id: %s, const type: %s\n" (ID.to_string id) (Type.to_string (T.ty t));
-            Env.Ctx.declare id (T.ty t);
-            (sym_map, t)*)
       | T.Const _ | T.Var _ | T.DB _ ->
           (sym_map, t)
       | T.Fun (ty, body) ->
@@ -161,14 +144,7 @@ module Make (E : Env.S) : S with module Env = E = struct
     (encoded_symbols, res)
 
   let output_cl ~out clause =
-    (*Printf.printf "output clause: %s\n" (C.to_string clause);*)
     let lits_converted = Literals.Conv.to_tst (C.lits clause) in
-    (*Printf.printf "output converted lit: %s\n" (TypedSTerm.to_string lits_converted);*)
-    (*Printf.printf "converted literals: %s\n" (TypedSTerm.to_string lits_converted);*)
-    (*Format.fprintf out "%% %d:\n" (C.proof_depth clause);*)
-    (*let orig_cl_str = CCFormat.sprintf "%% @[%a@]@." C.pp_tstp clause in*)
-    (*let commented = CCString.replace ~which:`All ~sub:"\n" ~by:"\n% " orig_cl_str in*)
-    (*Format.fprintf out "%% orig:@.@[%s@]@." commented;*)
     match C.distance_to_goal clause with
     | Some d when d = 0 ->
         Format.fprintf out "@[thf(zip_cl_%d,negated_conjecture,@[%a@]).@]@\n"
@@ -179,16 +155,11 @@ module Make (E : Env.S) : S with module Env = E = struct
 
   let output_symdecl ~out sym ty =
     (* distinguished between user defined types and tptp types *)
-    (*let usr_sym = ID.make (ID.name sym ^ "_u") in*)
     Format.fprintf out "@[thf(@['%a_type',type,@[%a@]:@ @[%a@]@]).@]@\n" ID.pp
       sym ID.pp_tstp sym (Type.TPTP.pp_ho ~depth:0) ty
 
   let output_all ?(already_defined = ID.Set.empty) ~out cl_set =
     let cl_iter = Iter.of_list cl_set in
-    (*let syms =
-        C.symbols ~include_types:true cl_iter |> (fun syms -> ID.Set.diff syms already_defined) |> ID.Set.to_list |> List.rev
-      in*)
-    (*CCList.iter (fun sym -> Printf.printf "symbol: %s\n" (ID.to_string sym)) syms ;*)
     let typed_syms =
       C.typed_symbols ~include_types:true cl_iter
       |> Monomorphisation.remove_duplicates ~eq:(fun p1 p2 ->
@@ -199,18 +170,9 @@ module Make (E : Env.S) : S with module Env = E = struct
         (fun (_, ty) -> Type.is_tType ty)
         typed_syms
     in
-    (*Iter.iter (fun (id, _) -> Printf.printf "typed symbol: %s\n" (ID.to_string id)) typed_syms;*)
     Iter.iter (fun (sym, ty) -> output_symdecl ~out sym ty) type_syms ;
     Iter.iter (fun (sym, ty) -> output_symdecl ~out sym ty) term_syms ;
-    (*CCList.fold_right
-      (fun sym _ ->
-        let ty = Ctx.find_signature_exn sym in
-        Printf.printf "symbol: %s, type: %s\n" (ID.to_string sym) (Type.to_string ty);
-           output_symdecl ~out sym ty)
-      syms ();*)
     Iter.iter (output_cl ~out) cl_iter ;
-    (*if ID.Set.is_empty already_defined then output_empty_conj ~out;*)
-    (*ID.Set.of_list syms*)
     ID.Set.empty
 
   let set_e_bin path = e_bin := Some path
@@ -218,7 +180,6 @@ module Make (E : Env.S) : S with module Env = E = struct
   let disable_e () = e_bin := None
 
   let run_e prob_path =
-    Printf.printf "path: %s\n" prob_path ;
     match !e_bin with
     | Some e_path ->
         let to_ = !_timeout in
@@ -235,10 +196,8 @@ module Make (E : Env.S) : S with module Env = E = struct
           try
             while not !refutation_found do
               let line = input_line process_channel in
-              (*Printf.printf "%s\n" line;*)
               if Str.string_match regex_refutation_begin line 0 then
                 refutation_found := true
-              (*Printf.printf "we got that bool: %b!\n" !refutation_found;*)
             done ;
             if !refutation_found then
               let clause_ids = ref [] in
@@ -271,72 +230,11 @@ module Make (E : Env.S) : S with module Env = E = struct
       |> Iter.max |> CCOpt.get_or ~default:0
       |> fun lam_depth -> lam_depth > lambda_limit
     in
-    let convert_clauses ~converter ~encoded_symbols iter =
-      let converted =
-        let res =
-          Iter.map (fun c -> CCOpt.get_or ~default:c (C.eta_reduce c)) iter
-          |> Iter.flat_map_l converter
-        in
-        res
-      in
-      (*Iter.iter (fun cl -> Printf.printf "\nBefore conversion: %s\n" (C.to_string cl)) converted;*)
-      let encoded, encoded_symbols =
-        Iter.fold
-          (fun (acc, encoded_symbols) cl ->
-            try
-              let encoded_symbols, cl' =
-                encode_ty_args_cl ~encoded_symbols cl
-              in
-              (cl' :: acc, encoded_symbols)
-            with CantEncode reason ->
-              Util.debugf 5 "cannot encode(%s):@.@[%a@]@." (fun k ->
-                  k reason C.pp cl ) ;
-              (acc, encoded_symbols) )
-          ([], encoded_symbols) converted
-      in
-      (encoded_symbols, encoded)
-    in
-    (*let take_initial ~converter () =
-         (*Printf.printf "TAKE INITIAL: %i\n" (C.ClauseSet.cardinal !init_clauses);*)
-         (*List.iter (fun cl -> Printf.printf "\ninitial clause: %s" (C.to_string cl)) (C.ClauseSet.to_list !init_clauses);*)
-         let module CS = C.ClauseSet in
-         CS.filter (fun c -> not (lambdas_too_deep c)) !init_clauses
-         |> CS.to_iter
-         |> convert_clauses ~converter ~encoded_symbols:T.Map.empty
-      in*)
-    let take_ho_clauses ~converter ~encoded_symbols clauses =
-      (* TODO we ignored proof depth conditions because the clauses we have are the ones generated by the monomorphisation
-       * and therefore it doesn't matter that they = 0, the subsequent sorting and taking !max_derived makes
-       * removing those with depth 5 or greater somewhat redundant because we already eliminate clauses with high
-       * proof depth that we don't want, need to double check that this doesn't cause any issues*)
-      (* in fact sorting by proof depth may not make any sense considering that the newly generated clauses are
-       * not derived through means in which the notion of proof depth is relevant (as far as i understand) *)
-      clauses
-      (*|> Iter.sort ~cmp:(fun c1 c2 -> CCInt.compare (C.ho_weight c1) (C.ho_weight c2))*)
-      (*|> Iter.take !_max_derived*)
-      |> convert_clauses ~converter ~encoded_symbols
-    in
     let prob_name, prob_channel =
       Filename.open_temp_file ~temp_dir:!_tmp_dir "e_input" ""
     in
     let out = Format.formatter_of_out_channel prob_channel in
     try
-      let converter =
-        match !_encode_lams with
-        | `Keep ->
-            fun c -> [c]
-        | `Drop ->
-            fun c -> if Iter.exists T.has_lambda (C.Seq.terms c) then [] else [c]
-        | `Combs ->
-            fun c -> ([Combs.force_conv_lams c] :> C.t list)
-        | _ ->
-            fun c ->
-              let lifted = LLift.lift_lambdas c in
-              if CCList.is_empty lifted then [c] else lifted
-      in
-      (*List.iter (fun cl -> Printf.printf "\nWe have a clause: %s" (C.to_string cl)) ((E.C.ClauseSet.to_list !init_clauses) @ (Iter.to_list poly_active_set) @ (Iter.to_list poly_passive_set));*)
-      (*List.iter (fun cl -> Printf.printf "\nWe have a clause: %s" (C.to_string cl)) (poly_initial @ (Iter.to_list poly_active_set) @ (Iter.to_list poly_passive_set));*)
-      (*List.iter (fun cl -> Printf.printf "\nWe have a clause: %s" (C.to_string cl)) ([] @ (Iter.to_list poly_active_set) @ (Iter.to_list poly_passive_set));*)
       let reconstruct_clause (clause_id, new_lits) original_clause =
         if clause_id = C.id original_clause then
           (* TODO check that this is indeed a simplification*)
@@ -345,30 +243,25 @@ module Make (E : Env.S) : S with module Env = E = struct
             Proof.Step.simp ~rule [C.proof_parent original_clause]
           in
           let new_lits = Array.to_list new_lits in
-          (* Have no idea what I'm doing here *)
           let clause_trail = C.trail original_clause in
           let clause_penalty = C.penalty original_clause in
           let res =
             C.create ~penalty:clause_penalty ~trail:clause_trail new_lits
               proof_step
           in
-          (*Printf.printf "\n%s\n" (C.to_string res);*)
           Some res
         else None
       in
       let clause_list =
         Iter.to_list
-          (*(Iter.union ~eq:C.equal (Iter.of_list poly_initial)*)
           (Iter.union ~eq:C.equal poly_active_set poly_passive_set)
       in
-      (*List.iter (fun cl -> Printf.printf "\noriginal clause: %s" (C.to_string cl)) clause_list;*)
       let simple_clause_list =
         List.map (fun cl -> (C.id cl, C.lits cl)) clause_list
       in
       let monomorphised_clauses =
         Monomorphisation.monomorphise_problem simple_clause_list
       in
-      (*Printf.printf "EProver intf clause nb %i\n" (List.length monomorphised_clauses);*)
       let monomorphised_iter = Iter.of_list monomorphised_clauses in
       let active_set =
         Iter.join ~join_row:reconstruct_clause monomorphised_iter
@@ -378,35 +271,14 @@ module Make (E : Env.S) : S with module Env = E = struct
         Iter.join ~join_row:reconstruct_clause monomorphised_iter
           poly_passive_set
       in
-      (*let encoded_symbols, poly_initial = take_initial ~converter () in*)
-      (*let initial =
-           Iter.to_list (Iter.join ~join_row:reconstruct_clause monomorphised_iter (Iter.of_list poly_initial))
-        in*)
       let clauses = Iter.append active_set passive_set in
-      (*let encoded_symbols, clauses = Iter.fold fold_encode_clauses (T.Map.empty, Iter.empty) clauses in*)
-      (*let _, ho_clauses = take_ho_clauses  ~encoded_symbols:T.Map.empty ~converter clauses in*)
       let ho_clauses = Iter.to_list clauses in
-      (*List.iter (fun lit -> Printf.printf "ho_clause lit: %s\n" (C.to_string lit)) ho_clauses;*)
-      (*Printf.printf "new initital clause nb: %i\n" (List.length poly_initial);*)
-      (*Printf.printf "initial initital clause nb: %i\n" (List.length poly_initial);*)
-      (*let mangle_clause cl =
-            let mangled_lits = Array.map (fun lit -> Literal.map Term.mangle_term lit) (C.lits cl) in
-            reconstruct_clause (C.id cl, mangled_lits) cl
-        in
-        let ho_clauses = List.filter_map mangle_clause ho_clauses in*)
-
-      (*Printf.printf "ho clause nb: %i\n" (List.length ho_clauses);*)
-      (*List.iter (fun cl -> Printf.printf "this clause has taken its toll, wohoh i know she said [Polymorphism Detected] too many times before wohohoh: %s\n" (C.to_string_tstp cl)) ho_clauses;*)
       let _ = output_all ~out ho_clauses in
-      (*Format.fprintf out "%% -- PASSIVE -- \n";*)
-      (*ignore (output_all ~already_defined ~out ho_clauses);*)
       close_out prob_channel ;
       let cl_set = ho_clauses in
       let start_e_time = Sys.time () in
       let res =
         FileUtil.cp [prob_name] FilePath.current_dir ;
-        Printf.printf "monomorphised problem name %s\n" prob_name ;
-        assert false ;
         match run_e prob_name with
         | Some ids ->
             assert (not (CCList.is_empty ids)) ;
@@ -428,7 +300,6 @@ module Make (E : Env.S) : S with module Env = E = struct
         | _ ->
             Printf.printf "e fail\n" ; None
       in
-      (* Sys.remove prob_name; *)
       Printf.printf "eprover time %f\n" (Sys.time () -. start_e_time) ;
       res
     with PolymorphismDetected ->
@@ -457,23 +328,14 @@ let () =
               | "combs" ->
                   _encode_lams := `Combs
               | _ ->
-                  assert false )
+                  failwith "Error: invalide option for --e-encode-lamdas" )
       , " how to treat lambdas when giving problem to E" )
     ; ( "--tmp-dir"
       , Arg.String (fun v -> _tmp_dir := v)
       , " scratch directory for running E" )
     ; ("--e-timeout", Arg.Set_int _timeout, " set E prover timeout.")
-    ; ( "--e-sort-by-weight-only"
-      , Arg.Bool (( := ) _sort_by_weight_only)
-      , " order the clauses only by the weight, not by the proof depth." )
-    ; (* TODO this option seems to not be implemented, check with someone whether that is indeed the case *)
-      ( "--e-only-ho-steps"
-      , Arg.Bool (( := ) _only_ho_steps)
-      , " translate only HO proof steps to E" )
     ; ( "--e-auto"
       , Arg.Bool (fun v -> _e_auto := v)
       , " If set to on eprover will not run in autoschedule, but in auto mode"
       )
-    ; ( "--max-derived"
-      , Arg.Int (( := ) _max_derived)
-      , " maximum number of clauses to send to E" ) ]
+    ; ]

@@ -1,11 +1,8 @@
+(* This file is free software, part of Zipperposition. See file "license" for more details. *)
+
 module T = Term
 module Lit = Literal
 module Ty = Type
-module IT = InnerTerm
-module Subst = Subst
-module Sc = Scoped
-module TermSet = T.Set
-module TypeSet = Ty.Set
 module ArgMap = Map.Make (ID)
 module ClauseArgMap = Map.Make (Int)
 module SubstMap = Map.Make (Int)
@@ -16,11 +13,8 @@ module PbSubstMap = Map.Make (Int)
  * instead monomorphic should be understood as ground and polymorphic as non-ground *)
 
 (* TODO make module *)
-(* TODO refactor what we can *)
-(* TODO write nice documentation and comments *)
 (* TODO if no new type arguments are derived, end the iterations *)
 (* TODO clean up interface with the rest of the prover*)
-(* TODO tests? *)
 (* TODO squash all commits and make the necessary rebase so that this can be added to the main zipperposition branch*)
 (* TODO check when Iter.persistent is useful and where Iter.persistent_lazy might be more adapted*)
 (* TODO the timeout mechanism is completely independent from the main timeout, this needs to be discussed with
@@ -72,8 +66,6 @@ let _poly_ty_args_per_clause =
     ; absolute_cap= Some 500
     ; relative_floor= 1000000 }
 
-let _ty_var_limit = ref 100000
-
 let _monomorphising_subst_per_clause = ref 5
 
 let _new_clauses_relative_bound = ref 2.0
@@ -83,8 +75,6 @@ let _substitution_ordering = ref "age"
 let _e_max_derived = ref 1000000
 
 let _monomorphisation_timeout = ref 3.0
-
-let begin_time = ref 0.0
 
 let iter_partition filter iter =
   Iter.fold
@@ -486,16 +476,6 @@ let mono_step_clause mono_map poly_map susbt_clause_map curr_iteration =
   let new_mono_map_all, new_poly_map_all, used_substs_iter =
     apply_subst_map mono_map poly_map new_subst_all
   in
-  (* TODO check if eliminating existing type args from the new ones is worth it*)
-  let remove_existing new_map curr_map =
-    ArgMap.mapi
-      (fun fun_sym new_ty_args ->
-        let old_iter, new_iter = ArgMap.find fun_sym curr_map in
-        Iter.diff ~eq:ty_arg_eq new_ty_args (Iter.append old_iter new_iter) )
-      new_map
-  in
-  (*let new_mono_map = remove_existing new_mono_map_all mono_map in*)
-  (*let new_poly_map = remove_existing new_poly_map_all poly_map in*)
   let new_mono_map = new_mono_map_all in
   let new_poly_map = new_poly_map_all in
   ( new_mono_map
@@ -523,7 +503,7 @@ let mono_step clause_list mono_map poly_clause_map subst_map curr_iter =
     let merge_iter _ iter_1 iter_2 =
       Some (iter_union ~eq:ty_arg_eq iter_1 iter_2)
     in
-    (* not that this way of updating the maps relies on the injectivity of clause ids*)
+    (* this way of updating the maps relies on the injectivity of clause ids*)
     let res_mono_map = ArgMap.union merge_iter new_mono_map acc_mono_map in
     let res_poly_clause_map =
       ClauseArgMap.add clause_id new_poly_map acc_poly_clause_map
@@ -589,7 +569,6 @@ let add_typed_sym mono_map poly_map term =
   in
   let update_maps (curr_mono_map, curr_poly_map) (ty_sym, ty_args) =
     (* this removes function symbols with no type arguments *)
-    (* TODO when replacing the if condition by false on COM025_5, we generate fewer clauses, need to investigate*)
     if ty_args = [] then (curr_mono_map, curr_poly_map)
     else
       let ty_args_mono = type_args_are_mono ty_args in
@@ -645,8 +624,7 @@ let map_initialisation_step (mono_map, clause_poly_map, pb_subst_map)
         ClauseArgMap.add clause_id new_poly_map_unique clause_poly_map
     (*should not happen if each clause has a unique id*)
     | Some other_poly_map ->
-        Printf.printf "Error: different clauses have the same id\n" ;
-        assert false
+        failwith "Error: different clauses have the same id\n" ;
   in
   (new_mono_map_unique, new_clause_poly_map, new_subst_map)
 
@@ -717,26 +695,6 @@ let generate_monomorphising_subst subst_map ty_var_iter max_new_subst =
   in
   Iter.persistent_lazy monomorphising_subst_iter
 
-(* counts the number of type arguments in a map *)
-let count_arg_map arg_map =
-  ArgMap.fold
-    (fun _ (old_iter, new_iter) acc ->
-      Iter.length old_iter + Iter.length new_iter + acc )
-    arg_map 0
-
-(* counts number of type arguments in a map, counting old and new type arguments seperately *)
-let count_arg_map_split arg_map =
-  ArgMap.fold
-    (fun _ (old_iter, new_iter) (old_acc, new_acc) ->
-      (Iter.length old_iter + old_acc, Iter.length new_iter + new_acc) )
-    arg_map (0, 0)
-
-(* counts the number of type arguments in a clause type argument map *)
-let count_clause_arg_map clause_arg_map =
-  ClauseArgMap.fold
-    (fun _ arg_map acc -> count_arg_map arg_map + acc)
-    clause_arg_map 0
-
 (* all type variables in a clause *)
 let clause_ty_vars lit_arr =
   let var_eq = HVar.equal (fun _ _ -> true) in
@@ -750,7 +708,7 @@ let clause_ty_vars lit_arr =
   Iter.filter (fun var -> Type.equal (HVar.ty var) Type.tType) all_vars
 
 (* computes a map with all the substitutions that were generated during a given iteration *)
-let subst_map_filter_age subst_map (iteration_count : int) =
+let subst_map_filter_age subst_map iteration_count =
   SubstMap.map
     (fun subst_iter ->
       Iter.filter (fun (subst, age) -> age = iteration_count) subst_iter )
@@ -811,8 +769,7 @@ let instantiate_clause subst_map (clause_id, lit_arr) new_clauses_remaining =
         age_merge_mono_subst subst_map vars_to_instantiate
           (new_clauses_remaining * !_loop_count)
     | _ ->
-        Printf.printf "Error: incorrect substitution map ordering option\n" ;
-        assert false
+        failwith "Error: incorrect substitution map ordering option\n" ;
   in
   let apply_subst subst lit_arr = Array.map (apply_subst_lit subst) lit_arr in
   let new_lits_iter =
@@ -889,7 +846,7 @@ let monomorphise_problem_base clause_list =
     |> remove_duplicates ~eq:clause_eq
   in
   let final_clause_list = Iter.to_list new_clauses @ mono_clause_list in
-  (* we want to have; monomorphisation time, number of initial poly and mono clauses, number of output clauses*)
+  (* we want to have: monomorphisation time, number of initial poly and mono clauses, number of output clauses*)
   final_clause_list
 
 let mangle_lit str_ty_list str_term_list lit =
@@ -1059,7 +1016,7 @@ let () =
       , " substitution ordering used at the clause generation phase of the \
          monomorphisation algorithm" )
     ; ( "--e-max-derived"
-      , (* TODO if this is greater than _max_derived, print warning that we are creating superfluous clauses *)
+      , 
         Arg.Set_int _e_max_derived
       , " set the limit of clauses that are derived by Zipperposition and \
          given to E" )
