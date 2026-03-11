@@ -672,7 +672,7 @@ let extension =
   let action env =
     let module E = (val env : Env.S) in
     Util.debug 1 "create new SAT solver";
-    let module Sat = Sat_solver.Make(struct end) in
+    let module Sat = Sat_solver.Make() in
     Sat.setup();
     let module A = Make(E)(Sat) in
     E.flex_add k_avatar (module A : S);
