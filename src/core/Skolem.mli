@@ -62,7 +62,7 @@ val pp_polarity : polarity CCFormat.printer
 
 type form_definition = private {
   form: form;
-  proxy_id: ID.t (* name *);
+  proxy_id: ID.t; (* name *)
   (* the defined object *)
   proxy: term;
   (* atom/term standing for the defined object *)

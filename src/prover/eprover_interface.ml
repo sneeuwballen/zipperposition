@@ -153,7 +153,7 @@ module Make (E : Env.S) : S with module Env = E = struct
     let typed_syms =
       C.typed_symbols ~include_types:true cl_iter
       |> Monomorphisation.remove_duplicates ~eq:(fun p1 p2 ->
-          ID.equal (fst p1) (fst p2))
+             ID.equal (fst p1) (fst p2))
     in
     let type_syms, term_syms =
       Monomorphisation.iter_partition

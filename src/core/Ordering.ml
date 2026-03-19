@@ -897,9 +897,9 @@ module LambdaFreeKBOCoeff : ORD = struct
     let app_weight head_weight coeff_multipliers args =
       args
       |> List.mapi (fun i s ->
-          match weight prec s, coeff_multipliers i with
-          | Some w, Some c -> Some (c w)
-          | _ -> None)
+             match weight prec s, coeff_multipliers i with
+             | Some w, Some c -> Some (c w)
+             | _ -> None)
       |> List.fold_left
            (fun w1 w2 ->
              match w1, w2 with

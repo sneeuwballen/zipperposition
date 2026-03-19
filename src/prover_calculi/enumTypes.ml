@@ -101,13 +101,13 @@ module Make (E : Env.S) : S with module Env = E = struct
   type decl = {
     decl_ty_id: id_or_ty_builtin;
     decl_ty_vars: Type.t HVar.t list;
-    decl_ty: Type.t (* id applied to ty_vars (shortcut) *);
+    decl_ty: Type.t; (* id applied to ty_vars (shortcut) *)
     decl_var: Type.t HVar.t (* x = ... *);
     decl_cases: term list (* ... t1 | t2 | ... | tn *);
     decl_proof:
       [ `Data of Proof.t * Type.t Statement.data | `Clause of Proof.t ];
         (* justification for the enumeration axiom *)
-    mutable decl_symbols: ID.Set.t (* set of declared symbols for t1,...,tn *);
+    mutable decl_symbols: ID.Set.t; (* set of declared symbols for t1,...,tn *)
   }
 
   let pp_decl out d =
@@ -274,10 +274,10 @@ module Make (E : Env.S) : S with module Env = E = struct
     |> Iter.flat_map Lit.Seq.terms
     |> Iter.flat_map T.Seq.subterms_depth
     |> Iter.filter_map (fun (v, depth) ->
-        if depth > 0 && T.is_var v then
-          Some v
-        else
-          None)
+           if depth > 0 && T.is_var v then
+             Some v
+           else
+             None)
     |> T.Seq.add_set T.Set.empty
 
   let naked_vars_ lits =

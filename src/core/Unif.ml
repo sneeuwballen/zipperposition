@@ -124,19 +124,19 @@ let occurs_check ~depth subst (v, sc_v) t =
       (* check type and subterms *)
       check ~depth (ty, sc_t)
       ||
-        (match T.view t with
-        | T.Var v' ->
-          (HVar.equal T.equal v v' && sc_v = sc_t)
-          ||
-            (match Subst.find subst (v', sc_t) with
-            | None -> false
-            | Some t' -> check ~depth t')
-        | T.DB i -> i >= depth (* not closed! *)
-        | T.Const _ -> false
-        | T.Bind (_, varty, t') ->
-          check ~depth (varty, sc_t) || check ~depth:(depth + 1) (t', sc_t)
-        | T.AppBuiltin (_, l) -> check_l ~depth l sc_t
-        | T.App (hd, l) -> check ~depth (hd, sc_t) || check_l ~depth l sc_t)
+      (match T.view t with
+      | T.Var v' ->
+        (HVar.equal T.equal v v' && sc_v = sc_t)
+        ||
+        (match Subst.find subst (v', sc_t) with
+        | None -> false
+        | Some t' -> check ~depth t')
+      | T.DB i -> i >= depth (* not closed! *)
+      | T.Const _ -> false
+      | T.Bind (_, varty, t') ->
+        check ~depth (varty, sc_t) || check ~depth:(depth + 1) (t', sc_t)
+      | T.AppBuiltin (_, l) -> check_l ~depth l sc_t
+      | T.App (hd, l) -> check ~depth (hd, sc_t) || check_l ~depth l sc_t)
   and check_l ~depth l sc =
     match l with
     | [] -> false
@@ -461,8 +461,8 @@ module Inner = struct
   let env_l_dense (e : 'a DBEnv.t) : 'a list =
     DBEnv.to_list e
     |> List.map (function
-      | Some x -> x
-      | None -> assert false)
+         | Some x -> x
+         | None -> assert false)
 
   (* Abstract on given bound variables *)
   let fun_of_bvars ~bvars (l : T.t list) (t : T.t) : T.t =
@@ -471,14 +471,14 @@ module Inner = struct
     let env =
       DBEnv.to_list_i bvars
       |> CCList.filter_map (function
-        | None -> None
-        | Some (i, _) ->
-          (match CCList.find_idx (T.is_bvar_i i) l with
-          | None -> None
-          | Some (j, t_bvar) ->
-            let ty = T.ty_exn t_bvar in
-            (* map DB i into db (n-j) *)
-            Some (i, T.bvar ~ty (n - j - 1))))
+           | None -> None
+           | Some (i, _) ->
+             (match CCList.find_idx (T.is_bvar_i i) l with
+             | None -> None
+             | Some (j, t_bvar) ->
+               let ty = T.ty_exn t_bvar in
+               (* map DB i into db (n-j) *)
+               Some (i, T.bvar ~ty (n - j - 1))))
       |> DBEnv.of_list
     in
     T.DB.eval env t |> T.fun_l (List.map T.ty_exn l)

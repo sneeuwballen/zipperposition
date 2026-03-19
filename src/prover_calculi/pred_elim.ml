@@ -829,9 +829,9 @@ module Make (E : Env.S) : S with module Env = E = struct
                         @@ Iter.is_empty
                              (L.variant (lit, 0) (other_lit, 1)
                              |> Iter.filter (fun (subst, _) ->
-                                 not @@ Iter.is_empty
-                                 @@ L.variant ~subst (sym_name_lit, 0)
-                                      (name_lit, 1)))
+                                    not @@ Iter.is_empty
+                                    @@ L.variant ~subst (sym_name_lit, 0)
+                                         (name_lit, 1)))
                       in
                       if is_matched then (
                         CCBV.set matched !i;

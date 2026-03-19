@@ -14,10 +14,10 @@ module Inner = struct
   type term = T.t
 
   type state = {
-    head: T.t (* not an app *);
+    head: T.t; (* not an app *)
     env: T.t DBEnv.t (* env for the head *);
     args: T.t list (* arguments, with their own env *);
-    ty: T.t (* type *);
+    ty: T.t; (* type *)
   }
 
   (* evaluate term in environment *)

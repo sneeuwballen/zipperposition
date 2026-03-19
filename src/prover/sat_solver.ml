@@ -266,10 +266,10 @@ module Make () = (*   : Sat_solver_intf.S *) struct
   let get_proved_lits () : Lit.Set.t =
     Lit.Tbl.to_iter lit_tbl_
     |> Iter.filter_map (fun (lit, _) ->
-        match proved_at_0 lit with
-        | Some true -> Some lit
-        | Some false -> Some (Lit.neg lit)
-        | None -> None)
+           match proved_at_0 lit with
+           | Some true -> Some lit
+           | Some false -> Some (Lit.neg lit)
+           | None -> None)
     |> Lit.Set.of_iter
 
   let pp_model_ () : unit =

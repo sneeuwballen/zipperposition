@@ -23,8 +23,8 @@ let invalid_declf m = CCFormat.ksprintf m ~f:invalid_decl
 type t = {
   cst_id: ID.t;
   cst_args: Type.t list;
-  cst_ty: Type.t (* [cst_ty = cst_id cst_args] *);
-  cst_ity: Ind_ty.t (* the corresponding inductive type *);
+  cst_ty: Type.t; (* [cst_ty = cst_id cst_args] *)
+  cst_ity: Ind_ty.t; (* the corresponding inductive type *)
   cst_is_sub: bool; (* sub-constant? *)
   cst_depth: int; (* how many induction lead to this one? *)
 }
@@ -150,13 +150,13 @@ let ind_skolem_depth (id : ID.t) : int =
 let find_ind_skolems t : ind_skolem Iter.t =
   T.Seq.subterms t
   |> Iter.filter_map (fun t ->
-      match T.view t with
-      | T.Const id ->
-        let ty = T.ty t in
-        if id_is_ind_skolem id ty then (
-          let n_tyvars, ty_args, _ = Type.open_poly_fun ty in
-          assert (n_tyvars = 0 && ty_args = []);
-          Some (id, ty)
-        ) else
-          None
-      | _ -> None)
+         match T.view t with
+         | T.Const id ->
+           let ty = T.ty t in
+           if id_is_ind_skolem id ty then (
+             let n_tyvars, ty_args, _ = Type.open_poly_fun ty in
+             assert (n_tyvars = 0 && ty_args = []);
+             Some (id, ty)
+           ) else
+             None
+         | _ -> None)

@@ -511,8 +511,8 @@ let mangle (ty : t) : string =
        * like `to_int: $tType > $tType` because otherwise (int to_int) list would conflict with int > int list*)
       (* TODO removing the "_" filter as a temporary measure*)
       |> CCString.filter (function
-        | '#' | '_' -> false
-        | _ -> true)
+           | '#' | '_' -> false
+           | _ -> true)
       (*|> CCString.filter (function '#' -> false | _ -> true)*)
     in
     Buffer.add_string buf s;

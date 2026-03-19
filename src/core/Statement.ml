@@ -388,28 +388,28 @@ module Seq = struct
     | _ ->
       to_iter st
       |> Iter.filter_map (function
-        | `Form f -> Some f
-        | _ -> None)
+           | `Form f -> Some f
+           | _ -> None)
 
   let lits st = forms st |> Iter.flat_map Iter.of_list
 
   let terms st =
     to_iter st
     |> Iter.flat_map (function
-      | `Form f -> Iter.of_list f |> Iter.flat_map SLiteral.to_iter
-      | `Term t -> Iter.return t
-      | _ -> Iter.empty)
+         | `Form f -> Iter.of_list f |> Iter.flat_map SLiteral.to_iter
+         | `Term t -> Iter.return t
+         | _ -> Iter.empty)
 
   let symbols st =
     to_iter st
     |> Iter.flat_map (function
-      | `ID id -> Iter.return id
-      | `Form f ->
-        Iter.of_list f
-        |> Iter.flat_map SLiteral.to_iter
-        |> Iter.flat_map Term.Seq.symbols
-      | `Term t -> Term.Seq.symbols t
-      | `Ty ty -> Type.Seq.symbols ty)
+         | `ID id -> Iter.return id
+         | `Form f ->
+           Iter.of_list f
+           |> Iter.flat_map SLiteral.to_iter
+           |> Iter.flat_map Term.Seq.symbols
+         | `Term t -> Term.Seq.symbols t
+         | `Ty ty -> Type.Seq.symbols ty)
 end
 
 let signature ?(init = Signature.empty) ?(conj_syms = Iter.empty) seq =
@@ -628,12 +628,12 @@ let sine_axiom_selector ?(ignore_k_most_common_symbols = None)
   let count_occ ~tbl ax =
     symset_of_ax ~trim_implications:false ax
     |> ID.Set.iter (fun k ->
-        ID.Tbl.update tbl
-          ~f:(fun _ vopt ->
-            match vopt with
-            | Some v -> Some (v + 1)
-            | None -> Some 1)
-          ~k)
+           ID.Tbl.update tbl
+             ~f:(fun _ vopt ->
+               match vopt with
+               | Some v -> Some (v + 1)
+               | None -> Some 1)
+             ~k)
   in
   let create_trigger_map ~trim_implications ~tbl axioms =
     let map = ID.Tbl.create (Iter.length @@ ID.Tbl.keys tbl) in
@@ -996,8 +996,8 @@ let res_tc_c : clause_t Proof.result_tc =
       let conv_c (c : clause) : formula =
         c
         |> List.rev_map (fun lit ->
-            SLiteral.map lit ~f:(Term.Conv.to_simple_term ctx)
-            |> SLiteral.to_form)
+               SLiteral.map lit ~f:(Term.Conv.to_simple_term ctx)
+               |> SLiteral.to_form)
         |> F.or_ |> F.close_forall
       in
       Seq.forms st |> Iter.map conv_c |> Iter.to_list |> F.and_)
@@ -1030,15 +1030,15 @@ let scan_stmt_for_defined_cst (st : (clause, Term.t, Type.t) t) : unit =
     let ids_and_levels =
       l
       |> List.filter (fun { def_ty = ty; def_rewrite = b; _ } ->
-          (* definitions require [b=true] or the LHS be a constant *)
-          let _, args, _ = Type.open_poly_fun ty in
-          b || CCList.is_empty args)
+             (* definitions require [b=true] or the LHS be a constant *)
+             let _, args, _ = Type.open_poly_fun ty in
+             b || CCList.is_empty args)
       |> List.map (fun { def_id; def_rules; _ } ->
-          let lev =
-            Iter.of_list def_rules |> Iter.map level_of_rule |> Iter.max
-            |> CCOpt.get_or ~default:0
-          and def = conv_rules def_rules proof in
-          def_id, lev, def)
+             let lev =
+               Iter.of_list def_rules |> Iter.map level_of_rule |> Iter.max
+               |> CCOpt.get_or ~default:0
+             and def = conv_rules def_rules proof in
+             def_id, lev, def)
     in
     let level =
       Iter.of_list ids_and_levels
@@ -1119,10 +1119,10 @@ let get_rw_rule ?weight_incr:(w_i = 1000000) c =
   let distinct_free_vars l =
     l
     |> List.map (fun t ->
-        Term.as_var t |> fun v ->
-        match v with
-        | Some x -> Some (HVar.id x)
-        | None -> None)
+           Term.as_var t |> fun v ->
+           match v with
+           | Some x -> Some (HVar.id x)
+           | None -> None)
     |> OptionSet.of_list
     |> fun set ->
     (not (OptionSet.mem None set)) && OptionSet.cardinal set = List.length l

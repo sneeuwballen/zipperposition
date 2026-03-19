@@ -113,7 +113,8 @@ end)
 
 let _compare_lit_with_idx ~ord (lit1, i1) (lit2, i2) =
   if i1 = i2 then
-    Comparison.Eq (* ignore collisions *)
+    Comparison.Eq
+  (* ignore collisions *)
   else (
     let c = Lit.Comp.compare ~ord lit1 lit2 in
     (* two occurrences of one lit should be incomparable (and therefore maximal) *)

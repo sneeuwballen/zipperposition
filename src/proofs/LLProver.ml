@@ -109,7 +109,7 @@ end = struct
   type t = {
     id: int; (* generative ID *)
     form: T.t option;
-    to_expand: T_set.t (* all to expand *);
+    to_expand: T_set.t; (* all to expand *)
     cc: CC.t;
     diseq: (T.t * T.t) list (* negative constraints *);
     mutable closed: closed;

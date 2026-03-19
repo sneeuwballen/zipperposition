@@ -49,13 +49,13 @@ let mk_debug_opts () =
   (* debugf level for every section *)
   Util.Section.iter
   |> Iter.filter_map (fun (name, sec) ->
-      if name = "" then
-        None
-      else
-        Some
-          ( "--debug." ^ name,
-            Arg.Int (Util.Section.set_debug sec),
-            " debug level for section " ^ name ))
+         if name = "" then
+           None
+         else
+           Some
+             ( "--debug." ^ name,
+               Arg.Int (Util.Section.set_debug sec),
+               " debug level for section " ^ name ))
   |> Iter.to_list
   |> CCList.cons
        ( "-d",

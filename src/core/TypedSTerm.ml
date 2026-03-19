@@ -494,25 +494,25 @@ module Seq = struct
   let vars t =
     subterms t
     |> Iter.filter_map (fun t ->
-        match view t with
-        | Var v -> Some v
-        | _ -> None)
+           match view t with
+           | Var v -> Some v
+           | _ -> None)
 
   let symbols t =
     subterms t
     |> Iter.filter_map (fun t ->
-        match view t with
-        | Const id -> Some id
-        | _ -> None)
+           match view t with
+           | Const id -> Some id
+           | _ -> None)
 
   let metas t =
     subterms t
     |> Iter.filter_map (fun t ->
-        match view t with
-        | Meta (a, r, k) ->
-          assert (!r = None);
-          Some (a, r, k)
-        | _ -> None)
+           match view t with
+           | Meta (a, r, k) ->
+             assert (!r = None);
+             Some (a, r, k)
+           | _ -> None)
 
   let subterms_with_bound t k =
     let rec iter set t =
@@ -557,9 +557,9 @@ module Seq = struct
   let free_vars t =
     subterms_with_bound t
     |> Iter.filter_map (fun (t, set) ->
-        match view t with
-        | Var v when not (Var.Set.mem set v) -> Some v
-        | _ -> None)
+           match view t with
+           | Var v when not (Var.Set.mem set v) -> Some v
+           | _ -> None)
 end
 
 let rec is_ground t =
@@ -805,8 +805,8 @@ module Ty = struct
       let s =
         ID.name id
         |> CCString.filter (function
-          | '#' -> false
-          | _ -> true)
+             | '#' -> false
+             | _ -> true)
       in
       Buffer.add_string buf s;
       Buffer.add_string buf "_u"

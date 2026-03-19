@@ -29,7 +29,7 @@ let build_constraints args1 args2 rest =
   let rf, other =
     CCList.combine args1 args2
     |> CCList.partition (fun (s, t) ->
-        T.is_const (T.head_term s) && T.is_const (T.head_term t))
+           T.is_const (T.head_term s) && T.is_const (T.head_term t))
   in
   rf @ rest @ other
 

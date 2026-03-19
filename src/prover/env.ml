@@ -545,8 +545,8 @@ end) : S with module Ctx = X.Ctx = struct
         rewrite c >>= fun c ->
         (* rewrite literals (if needed) *)
         (match !_lit_rules with
-          | [] -> SimplM.return_same c
-          | _ :: _ -> rewrite_lits c)
+        | [] -> SimplM.return_same c
+        | _ :: _ -> rewrite_lits c)
         >>= fun c ->
         (* apply simplifications *)
         match !_unary_simplify with

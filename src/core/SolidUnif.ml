@@ -396,10 +396,10 @@ struct
         let same_args =
           List.combine args_l args_r
           |> List.mapi (fun i (a, b) ->
-              if T.equal a b then
-                Some (T.bvar ~ty:(T.ty a) (n_l - i - 1))
-              else
-                None)
+                 if T.equal a b then
+                   Some (T.bvar ~ty:(T.ty a) (n_l - i - 1))
+                 else
+                   None)
           |> CCList.filter_map CCFun.id
         in
         let fresh_var_ty =
@@ -514,7 +514,7 @@ struct
     let rf, other =
       CCList.combine args1 args2
       |> CCList.partition (fun (s, t) ->
-          T.is_const (T.head_term s) && T.is_const (T.head_term t))
+             T.is_const (T.head_term s) && T.is_const (T.head_term t))
     in
     rf @ rest @ other
 

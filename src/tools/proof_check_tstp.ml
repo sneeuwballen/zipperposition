@@ -31,7 +31,7 @@ let pp_res out res =
 
 module CheckedTrace = struct
   type t = {
-    trace: Trace_tstp.t (* trace to check *);
+    trace: Trace_tstp.t; (* trace to check *)
     steps: check_result list StepTbl.t (* result of checks for every step *);
     mutable failures: (Trace_tstp.t * check_result) list;
   }
@@ -62,9 +62,9 @@ let _do_not_check proof =
   | TT.InferClause (_, (lazy step)) | TT.InferForm (_, (lazy step)) ->
     step.TT.esa
     ||
-      (match step.TT.parents with
-      | [| a |] when TT.is_axiom a -> true (* axiom *)
-      | _ -> false)
+    (match step.TT.parents with
+    | [| a |] when TT.is_axiom a -> true (* axiom *)
+    | _ -> false)
 
 let slit_to_form = function
   | SLiteral.Atom (t, true) -> t

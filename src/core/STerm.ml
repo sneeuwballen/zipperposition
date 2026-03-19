@@ -296,9 +296,9 @@ module Seq = struct
   let vars t =
     subterms t
     |> Iter.filter_map (fun t ->
-        match t.term with
-        | Var v -> Some v
-        | _ -> None)
+           match t.term with
+           | Var v -> Some v
+           | _ -> None)
 
   let subterms_with_bound t k =
     let add_var set = function
@@ -347,15 +347,15 @@ module Seq = struct
   let free_vars t =
     subterms_with_bound t
     |> Iter.filter_map (fun (t, bound) ->
-        match t.term with
-        | Var (V v) when not (StringSet.mem v bound) -> Some v
-        | _ -> None)
+           match t.term with
+           | Var (V v) when not (StringSet.mem v bound) -> Some v
+           | _ -> None)
 
   let symbols t =
     subterms t
     |> Iter.filter_map (function
-      | { term = Const s; _ } -> Some s
-      | _ -> None)
+         | { term = Const s; _ } -> Some s
+         | _ -> None)
 end
 
 let ground t = Seq.vars t |> Iter.is_empty

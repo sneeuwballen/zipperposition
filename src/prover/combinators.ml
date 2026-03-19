@@ -188,53 +188,53 @@ module Make (E : Env.S) : S with module Env = E = struct
     (* Variable has at least one arugment *)
     |> Iter.filter (fun (u_p, _) -> T.is_app_var u_p)
     |> Iter.flat_map_l (fun (u, u_pos) ->
-        (* variable names as in Ahmed's paper (unpublished) *)
-        let var = T.head_term u in
-        assert (T.is_var var);
-        CCList.filter_map
-          (fun (subst, comb_penalty) ->
-            let renaming = Subst.Renaming.create () in
-            let lit_idx, lit_pos = Lits.Pos.cut u_pos in
-            let comb_penalty = max comb_penalty 1 in
-            Util.debugf ~section 3 "narrow vars:@[%a@]:@[%d@]" (fun k ->
-                k C.pp clause lit_idx);
-            let lit =
-              Lit.apply_subst_no_simp renaming subst (lits.(lit_idx), 1)
-            in
-            if
-              (not (Lit.Pos.is_max_term ~ord lit lit_pos))
-              || not (CCBV.get (C.eligible_res (clause, 1) subst) lit_idx)
-            then (
-              Util.debugf ~section 3 "ordering restriction fail: @[%a@]@."
-                (fun k -> k Subst.pp subst);
-              None
-            ) else (
-              let t_depth =
-                Position.size (Literal.Pos.term_pos lits.(lit_idx) lit_pos)
-              in
-              let depth_mul =
-                if not @@ Env.flex_get k_deep_app_var_penalty then
-                  1
-                else
-                  max t_depth 1
-              in
-              let lits' =
-                CCArray.to_list @@ Lits.apply_subst renaming subst (lits, 1)
-              in
-              let proof =
-                Proof.Step.inference ~rule ~tags
-                  [ C.proof_parent_subst renaming (clause, 1) subst ]
-              in
-              let penalty = depth_mul * comb_penalty * C.penalty clause in
-              (* CCFormat.printf "penalty:%d@." penalty; *)
-              let new_clause =
-                C.create ~trail:(C.trail clause) ~penalty lits' proof
-              in
-              Util.debugf ~section 3 "success: @[%a@]@." (fun k ->
-                  k C.pp new_clause);
-              Some new_clause
-            ))
-          (instantiate_var_w_comb ~var))
+           (* variable names as in Ahmed's paper (unpublished) *)
+           let var = T.head_term u in
+           assert (T.is_var var);
+           CCList.filter_map
+             (fun (subst, comb_penalty) ->
+               let renaming = Subst.Renaming.create () in
+               let lit_idx, lit_pos = Lits.Pos.cut u_pos in
+               let comb_penalty = max comb_penalty 1 in
+               Util.debugf ~section 3 "narrow vars:@[%a@]:@[%d@]" (fun k ->
+                   k C.pp clause lit_idx);
+               let lit =
+                 Lit.apply_subst_no_simp renaming subst (lits.(lit_idx), 1)
+               in
+               if
+                 (not (Lit.Pos.is_max_term ~ord lit lit_pos))
+                 || not (CCBV.get (C.eligible_res (clause, 1) subst) lit_idx)
+               then (
+                 Util.debugf ~section 3 "ordering restriction fail: @[%a@]@."
+                   (fun k -> k Subst.pp subst);
+                 None
+               ) else (
+                 let t_depth =
+                   Position.size (Literal.Pos.term_pos lits.(lit_idx) lit_pos)
+                 in
+                 let depth_mul =
+                   if not @@ Env.flex_get k_deep_app_var_penalty then
+                     1
+                   else
+                     max t_depth 1
+                 in
+                 let lits' =
+                   CCArray.to_list @@ Lits.apply_subst renaming subst (lits, 1)
+                 in
+                 let proof =
+                   Proof.Step.inference ~rule ~tags
+                     [ C.proof_parent_subst renaming (clause, 1) subst ]
+                 in
+                 let penalty = depth_mul * comb_penalty * C.penalty clause in
+                 (* CCFormat.printf "penalty:%d@." penalty; *)
+                 let new_clause =
+                   C.create ~trail:(C.trail clause) ~penalty lits' proof
+                 in
+                 Util.debugf ~section 3 "success: @[%a@]@." (fun k ->
+                     k C.pp new_clause);
+                 Some new_clause
+               ))
+             (instantiate_var_w_comb ~var))
     |> Iter.to_list
 
   let lams2combs_otf c =

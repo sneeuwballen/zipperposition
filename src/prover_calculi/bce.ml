@@ -837,7 +837,7 @@ module Make (E : Env.S) : S with module Env = E = struct
            Env.ProofState.PassiveSet.clauses ()
            |> C.ClauseSet.to_iter
            |> Iter.iter (fun cl ->
-               C.Tbl.add (Env.flex_get k_bce_sat_tracked) cl ());
+                  C.Tbl.add (Env.flex_get k_bce_sat_tracked) cl ());
            Signal.on_every Env.ProofState.PassiveSet.on_add_clause (fun cl ->
                if C.proof_depth cl = 0 then add_cl_sat cl);
            Signal.on_every Env.ProofState.PassiveSet.on_remove_clause

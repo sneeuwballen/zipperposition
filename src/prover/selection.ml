@@ -51,10 +51,10 @@ let can_select_lit ~ord (lits : Lits.t) (i : int) : bool =
       Lit.fold_terms ~vars:true ~ty_args:false ~which:`All ~subterms:true
         lits.(i)
       |> Iter.exists (fun (t, _) ->
-          let t_head, t_args = T.as_app t in
-          vars_args
-          |> CCList.exists (fun (head, args) ->
-              T.equal head t_head && (not @@ T.same_l_gen t_args args)))
+             let t_head, t_args = T.as_app t in
+             vars_args
+             |> CCList.exists (fun (head, args) ->
+                    T.equal head t_head && (not @@ T.same_l_gen t_args args)))
     in
     let contains_maxvar_as_fo_subterm vars_args =
       let vars, _ = CCList.split vars_args in
@@ -82,9 +82,9 @@ let can_select_lit ~ord (lits : Lits.t) (i : int) : bool =
         Lit.fold_terms ~vars:true ~ty_args:false ~which:`All ~subterms:true
           lits.(i)
         |> Iter.exists (fun (t, _) ->
-            vars_args
-            |> CCList.exists (fun (head, args) ->
-                T.equal head t && not (CCList.is_empty args)))
+               vars_args
+               |> CCList.exists (fun (head, args) ->
+                      T.equal head t && not (CCList.is_empty args)))
       | `NoHigherOrderVariables ->
         (* We cannot select literals containing a HO variable: *)
         not
@@ -118,7 +118,7 @@ let validate_fun_ ~ord lits bv =
   else
     Iter.of_array_i lits
     |> Iter.exists (fun (i, _) ->
-        (not (BV.get bv i)) || can_select_lit ~ord lits i)
+           (not (BV.get bv i)) || can_select_lit ~ord lits i)
 
 (* build a selection function in general, given the more specialized
    one there *)
@@ -213,11 +213,11 @@ let find_min_lit ~blocker ~can_sel ~ord ~chooser lits =
   |> Iter.mapi (fun i l -> chooser (i, l), i)
   |> Iter.sort
   |> Iter.find_map (fun (_, i) ->
-      let lit = lits.(i) in
-      if can_sel ~ord lits i && not (blocker i lit) then
-        Some (lit, i)
-      else
-        None)
+         let lit = lits.(i) in
+         if can_sel ~ord lits i && not (blocker i lit) then
+           Some (lit, i)
+         else
+           None)
 
 let weight_based_sel_driver ?(blocker = fun _ _ -> false) ~can_sel ~ord lits f =
   match find_min_lit ~blocker ~can_sel ~ord ~chooser:f lits with
@@ -641,15 +641,15 @@ let e_sel15 ~blocker ~ord lits =
     (* else find smallest negative ground lit *)
     (lits_l
     |> CCList.filter_map (fun (i, l) ->
-        if Lit.is_negativoid l && Lit.is_ground l then
-          Some (i, Lit.ho_weight l)
-        else
-          None)
+           if Lit.is_negativoid l && Lit.is_ground l then
+             Some (i, Lit.ho_weight l)
+           else
+             None)
     |> CCList.to_iter
     |> Iter.min ~lt:(fun (_, w1) (_, w2) -> w1 < w2)
     |> CCOpt.map (fun (i, _) ->
-        CCBV.set sel_bv i;
-        sel_bv))
+           CCBV.set sel_bv i;
+           sel_bv))
     <+>
     (* else if there is a _single_ maximal positive literal,
            do not select anything *)
@@ -917,10 +917,10 @@ let ho_sel ~blocker ~ord lits =
       Lit.Seq.terms l
       |> Iter.flat_map (Term.Seq.subterms ~include_builtin:true)
       |> Iter.map (fun t ->
-          if Term.is_app_var t then
-            1
-          else
-            0)
+             if Term.is_app_var t then
+               1
+             else
+               0)
       |> Iter.sum |> float_of_int
     in
     let weight = float_of_int (Lit.weight l) in

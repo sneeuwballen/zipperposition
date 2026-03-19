@@ -112,15 +112,15 @@ let process file =
     let fool_found = ref false in
     CCVector.to_iter (CCResult.get_exn typed_ast)
     |> Iter.iter (fun stm ->
-        match statement_kind stm with
-        | OutsideFOOL ->
-          let err =
-            CCFormat.sprintf "Formula @[%a@] is not in FOOL" Statement.pp_input
-              stm
-          in
-          raise (Stop err)
-        | InFOOL -> fool_found := true
-        | PureFO -> ());
+           match statement_kind stm with
+           | OutsideFOOL ->
+             let err =
+               CCFormat.sprintf "Formula @[%a@] is not in FOOL"
+                 Statement.pp_input stm
+             in
+             raise (Stop err)
+           | InFOOL -> fool_found := true
+           | PureFO -> ());
     if not !fool_found then
       raise (Stop "Pure FO")
     else

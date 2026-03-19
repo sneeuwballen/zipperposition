@@ -527,32 +527,34 @@ module U = struct
     let proj =
       Iter.of_list all_ty_args |> Util.seq_zipi
       |> Iter.filter_map (fun (i, ty_arg_i) ->
-          let ty_args_i, ty_ret_i = Type.open_fun ty_arg_i in
-          try
-            let subst = Unif.Ty.unify_full ~subst (ty_ret_i, sc) (ty_ret, sc) in
-            (* now make fresh variables for [ty_args_i] *)
-            let offset, f_vars =
-              ty_args_i
-              |> List.map (Type.arrow all_ty_args)
-              |> mk_fresh_vars offset
-            in
-            (* [λall_vars. (F1 all_vars)…(Fm all_vars)] *)
-            let lambda =
-              let f_vars_applied =
-                List.map (fun f_var -> T.app (T.var f_var) all_vars) f_vars
-              in
-              T.app (List.nth all_vars i) f_vars_applied
-              |> T.fun_l (List.map T.ty all_vars)
-            (* [x_k (F1 args…vars_right)…(Fm args…vars_right] *)
-            and lhs =
-              let f_vars_applied =
-                List.map (fun f_var -> T.app (T.var f_var) lhs_args) f_vars
-              in
-              T.app (List.nth lhs_args i) f_vars_applied
-            in
-            let subst = US.FO.bind subst (v, sc) (lambda, sc) in
-            Some ([ ty_args @ env, lhs, rhs ], subst, offset, "proj")
-          with Unif.Fail -> None)
+             let ty_args_i, ty_ret_i = Type.open_fun ty_arg_i in
+             try
+               let subst =
+                 Unif.Ty.unify_full ~subst (ty_ret_i, sc) (ty_ret, sc)
+               in
+               (* now make fresh variables for [ty_args_i] *)
+               let offset, f_vars =
+                 ty_args_i
+                 |> List.map (Type.arrow all_ty_args)
+                 |> mk_fresh_vars offset
+               in
+               (* [λall_vars. (F1 all_vars)…(Fm all_vars)] *)
+               let lambda =
+                 let f_vars_applied =
+                   List.map (fun f_var -> T.app (T.var f_var) all_vars) f_vars
+                 in
+                 T.app (List.nth all_vars i) f_vars_applied
+                 |> T.fun_l (List.map T.ty all_vars)
+               (* [x_k (F1 args…vars_right)…(Fm args…vars_right] *)
+               and lhs =
+                 let f_vars_applied =
+                   List.map (fun f_var -> T.app (T.var f_var) lhs_args) f_vars
+                 in
+                 T.app (List.nth lhs_args i) f_vars_applied
+               in
+               let subst = US.FO.bind subst (v, sc) (lambda, sc) in
+               Some ([ ty_args @ env, lhs, rhs ], subst, offset, "proj")
+             with Unif.Fail -> None)
     (* imitate: if [t=f u1…um],
        create new variables [F1…Fm] and try
        [v := λall_vars. f (F1 all_vars)…(Fm all_vars)] *)
@@ -771,16 +773,17 @@ module U = struct
     US.map_subst us ~f:(fun subst ->
         Subst.normalize subst
         |> Subst.FO.filter (fun (v, sc_v) (t, sc_t) ->
-            (* filter out intermediate variables. They are the ones
+               (* filter out intermediate variables. They are the ones
                   that have an index >= offset,
                   and only point to other intermediate vars *)
-            let is_fvar (v, sc_v) =
-              sc_v = sc
-              && HVar.id v >= offset
-              && not (Type.is_tType (HVar.ty v))
-            in
-            (not (is_fvar (v, sc_v)))
-            || T.Seq.vars t |> Iter.exists (fun v' -> not (is_fvar (v', sc_t))))
+               let is_fvar (v, sc_v) =
+                 sc_v = sc
+                 && HVar.id v >= offset
+                 && not (Type.is_tType (HVar.ty v))
+               in
+               (not (is_fvar (v, sc_v)))
+               || T.Seq.vars t
+                  |> Iter.exists (fun v' -> not (is_fvar (v', sc_t))))
         |> Subst.FO.map Lambda.snf)
 
   let norm_subst offset sc us =
@@ -808,12 +811,12 @@ module U = struct
     let sols1 =
       st.sols
       |> List.rev_map (fun (subst, p) ->
-          [], norm_subst st.offset0 st.sc subst, p, Subst.Renaming.create ())
+             [], norm_subst st.offset0 st.sc subst, p, Subst.Renaming.create ())
     and sols2 =
       st.queue |> Iter.of_queue
       |> Iter.map (fun pb ->
-          let pairs, renaming = apply_subst pb.pairs pb.subst in
-          pairs, norm_subst st.offset0 st.sc pb.subst, pb.penalty, renaming)
+             let pairs, renaming = apply_subst pb.pairs pb.subst in
+             pairs, norm_subst st.offset0 st.sc pb.subst, pb.penalty, renaming)
       |> Iter.to_rev_list
     in
     List.rev_append sols1 sols2

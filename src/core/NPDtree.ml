@@ -97,7 +97,7 @@ module Make (E : Index.EQUATION) = struct
   type t = {
     star: t option;
     (* by variable *) map: t ID.Map.t;
-    (* by symbol *) leaf: Leaf.t (* leaves *);
+    (* by symbol *) leaf: Leaf.t; (* leaves *)
   }
   (* The discrimination tree *)
 
@@ -261,7 +261,7 @@ module MakeTerm (X : Set.OrderedType) = struct
   type t = {
     star: t option (* by variable *);
     map: t SIMap.t (* by symbol+arity *);
-    leaf: Leaf.t (* leaves *);
+    leaf: Leaf.t; (* leaves *)
   }
   (** The discrimination tree *)
 
@@ -461,8 +461,8 @@ module MakeTerm (X : Set.OrderedType) = struct
         and s2 =
           SIMap.to_iter t.map
           |> Iter.map (fun ((sym, i), t') ->
-              let label = CCFormat.sprintf "%a/%d" ID.pp sym i in
-              label, t')
+                 let label = CCFormat.sprintf "%a/%d" ID.pp sym i in
+                 label, t')
         in
         prefix s2)
 

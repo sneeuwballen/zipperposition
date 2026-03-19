@@ -100,9 +100,9 @@ module Make (C : Index.CLAUSE) = struct
       let symbs_depths =
         T.Seq.subterms_depth t
         |> Iter.filter_map (fun (t, depth) ->
-            match T.Classic.view t with
-            | T.Classic.App (s, _) when ID.equal s symb -> Some depth
-            | _ -> None)
+               match T.Classic.view t with
+               | T.Classic.App (s, _) when ID.equal s symb -> Some depth
+               | _ -> None)
       in
       match Iter.max symbs_depths with
       | None -> 0

@@ -703,7 +703,7 @@ module S = struct
         in
         st |> Step.parents |> Iter.of_list
         |> Iter.map (fun p' ->
-            (rule, Parent.subst p', Step.infos st), Parent.proof p'))
+               (rule, Parent.subst p', Step.infos st), Parent.proof p'))
 
   (** {2 IO} *)
 
@@ -820,25 +820,25 @@ module S = struct
         constants :=
           F.Seq.subterms f
           |> CCFun.tap (fun subterms ->
-              Iter.iter
-                (fun st ->
-                  match F.view st with
-                  | F.AppBuiltin (hd, args) ->
-                    has_comb := Builtin.is_combinator hd || !has_comb
-                  | _ -> ())
-                subterms)
+                 Iter.iter
+                   (fun st ->
+                     match F.view st with
+                     | F.AppBuiltin (hd, args) ->
+                       has_comb := Builtin.is_combinator hd || !has_comb
+                     | _ -> ())
+                   subterms)
           |> Iter.filter F.is_const |> F.Set.of_iter |> F.Set.union !constants;
         F.Seq.subterms f |> Iter.filter_map F.ty
         |> Iter.iter (fun t ->
-            match F.Ty.view t with
-            | F.Ty.Ty_app (hd, args) when not @@ ID.Set.mem hd !types ->
-              let ty =
-                F.Ty.( ==> )
-                  (CCList.replicate (List.length args) F.Ty.tType)
-                  F.Ty.tType
-              in
-              tydecl_out out hd ty
-            | _ -> ()));
+               match F.Ty.view t with
+               | F.Ty.Ty_app (hd, args) when not @@ ID.Set.mem hd !types ->
+                 let ty =
+                   F.Ty.( ==> )
+                     (CCList.replicate (List.length args) F.Ty.tType)
+                     F.Ty.tType
+                 in
+                 tydecl_out out hd ty
+               | _ -> ()));
     F.Set.iter
       (fun cst ->
         match F.as_id_app cst with

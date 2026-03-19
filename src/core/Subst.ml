@@ -151,9 +151,9 @@ let is_renaming subst =
   let rev =
     codomain subst
     |> Iter.filter_map (fun (t, sc_t) ->
-        match T.view (Lambda.Inner.eta_reduce t) with
-        | T.Var v -> Some ((v, sc_t), ())
-        | _ -> None)
+           match T.view (Lambda.Inner.eta_reduce t) with
+           | T.Var v -> Some ((v, sc_t), ())
+           | _ -> None)
     |> M.of_iter
   in
   (* as many variables in codomain as variables in domain *)

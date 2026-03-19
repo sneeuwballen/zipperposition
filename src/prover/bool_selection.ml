@@ -304,7 +304,7 @@ let by_size ~ord ~kind lits =
   in
   get_selectable_w_ctx ~ord lits
   |> selector ~lt:(fun (s, _, _) (t, _, _) ->
-      Term.ho_weight s < Term.ho_weight t)
+         Term.ho_weight s < Term.ho_weight t)
   |> CCOpt.map_or ~default:[] (fun (t, ctx, pos) -> [ t, pos ])
 
 let by_context_weight_combination ~ord ~ctx_fun ~weight_fun lits =
@@ -325,11 +325,11 @@ let by_context_weight_combination ~ord ~ctx_fun ~weight_fun lits =
   in
   get_selectable_w_ctx ~ord lits
   |> Iter.map (fun ((t, (ctx, _), _) as arg) ->
-      Util.debugf ~section 2 "selectable @[%a/%8s@]@." (fun k ->
-          k T.pp t (bin_of_int ctx));
-      arg)
+         Util.debugf ~section 2 "selectable @[%a/%8s@]@." (fun k ->
+             k T.pp t (bin_of_int ctx));
+         arg)
   |> Iter.min ~lt:(fun (s, ctx_s, _) (t, ctx_t, _) ->
-      CCOrd.( <?> ) (ctx_fun ctx_s ctx_t) (weight_fun lits, s, t) < 0)
+         CCOrd.( <?> ) (ctx_fun ctx_s ctx_t) (weight_fun lits, s, t) < 0)
   |> CCOpt.map_or ~default:[] (fun (t, ctx, pos) -> [ t, pos ])
 
 let is_eq t =
@@ -460,8 +460,8 @@ let from_string ~ord name lits =
   in
   res lits
   |> CCFun.tap (fun l ->
-      Util.debugf ~section 1 "bool_select(@[%a@])=@.@[%a@]@." (fun k ->
-          k Literals.pp lits (CCList.pp Term.pp) (List.map fst l)))
+         Util.debugf ~section 1 "bool_select(@[%a@])=@.@[%a@]@." (fun k ->
+             k Literals.pp lits (CCList.pp Term.pp) (List.map fst l)))
 
 let () =
   let set_bselect s = Params.bool_select := s in

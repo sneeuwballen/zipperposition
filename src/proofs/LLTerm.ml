@@ -255,9 +255,9 @@ module H_cons = Hashcons.Make (struct
 
   let equal a b =
     (match a.ty, b.ty with
-      | Some ty1, Some ty2 -> equal ty1 ty2
-      | None, None -> true
-      | Some _, None | None, Some _ -> false)
+    | Some ty1, Some ty2 -> equal ty1 ty2
+    | None, None -> true
+    | Some _, None | None, Some _ -> false)
     &&
     match a.view, b.view with
     | Type, Type -> true
@@ -450,14 +450,14 @@ let int_pred l o =
     let module O = Int_op in
     let n = l.const in
     (match o with
-      | O.Leq0 -> Z.sign n <= 0
-      | O.Geq0 -> Z.sign n >= 0
-      | O.Lt0 -> Z.sign n < 0
-      | O.Gt0 -> Z.sign n > 0
-      | O.Eq0 -> Z.sign n = 0
-      | O.Neq0 -> Z.sign n <> 0
-      | O.Divisible_by k -> Z.equal Z.zero (Z.rem n k)
-      | O.Not_div_by k -> not (Z.equal Z.zero (Z.rem n k)))
+    | O.Leq0 -> Z.sign n <= 0
+    | O.Geq0 -> Z.sign n >= 0
+    | O.Lt0 -> Z.sign n < 0
+    | O.Gt0 -> Z.sign n > 0
+    | O.Eq0 -> Z.sign n = 0
+    | O.Neq0 -> Z.sign n <> 0
+    | O.Divisible_by k -> Z.equal Z.zero (Z.rem n k)
+    | O.Not_div_by k -> not (Z.equal Z.zero (Z.rem n k)))
     |> of_bool
   else
     mk_ (Int_pred (l, o)) (Some prop)
@@ -467,12 +467,12 @@ let rat_pred l o =
     let module O = Rat_op in
     let n = l.const in
     (match o with
-      | O.Leq0 -> Q.sign n <= 0
-      | O.Geq0 -> Q.sign n >= 0
-      | O.Lt0 -> Q.sign n < 0
-      | O.Gt0 -> Q.sign n > 0
-      | O.Eq0 -> Q.sign n = 0
-      | O.Neq0 -> Q.sign n <> 0)
+    | O.Leq0 -> Q.sign n <= 0
+    | O.Geq0 -> Q.sign n >= 0
+    | O.Lt0 -> Q.sign n < 0
+    | O.Gt0 -> Q.sign n > 0
+    | O.Eq0 -> Q.sign n = 0
+    | O.Neq0 -> Q.sign n <> 0)
     |> of_bool
   else
     mk_ (Rat_pred (l, o)) (Some prop)

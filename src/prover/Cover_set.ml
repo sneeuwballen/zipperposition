@@ -13,7 +13,7 @@ type term = Term.t
 
 type case = {
   case_top: cst; (* copy of the coverset's top constant *)
-  case_term: Term.t (* rhs *);
+  case_term: Term.t; (* rhs *)
   case_kind: [ `Base | `Rec ]; (* at least one sub-constant? *)
   case_sub: cst list (* set of sub-constants *);
   case_skolems: (ID.t * Type.t) list (* set of other skolems *);
@@ -83,7 +83,7 @@ let declarations (set : t) =
 module State_ = struct
   (* state for creating coverset *)
   type t = {
-    cst: Ind_cst.Cst_set.t (* raw set of constants *);
+    cst: Ind_cst.Cst_set.t; (* raw set of constants *)
     others: (ID.t * Type.t) list (* non-inductive terms *);
   }
 

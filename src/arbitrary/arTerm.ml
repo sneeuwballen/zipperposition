@@ -167,7 +167,7 @@ let rec shrink t =
   let subterms_same_ty =
     T.Seq.subterms t |> Iter.drop 1
     |> Iter.filter (fun t' ->
-        Type.equal (T.ty t) (T.ty t') && T.DB.is_closed t')
+           Type.equal (T.ty t) (T.ty t') && T.DB.is_closed t')
   in
   QA.Iter.append subterms_same_ty (shrink_sub t)
 
