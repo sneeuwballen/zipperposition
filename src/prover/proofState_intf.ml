@@ -5,7 +5,6 @@ open Logtk
 (** {2 Set of active clauses} *)
 module type S = sig
   module Ctx : Ctx.S
-
   module C : Clause_intf.S
 
   (** Priority queues on clauses *)
@@ -69,8 +68,8 @@ module type S = sig
 
   (** {5 Misc} *)
 
-  (** statistics on the state (num active, num passive, num simplification) *)
   type stats = int * int * int
+  (** statistics on the state (num active, num passive, num simplification) *)
 
   val stats : unit -> stats
   (** Compute statistics *)

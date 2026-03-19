@@ -6,7 +6,6 @@ open Logtk
 module A = Tip_ast
 
 type parser_res = (A.statement Iter.t, string) CCResult.t
-
 type 'a parser_ = 'a -> parser_res
 
 val parse_lexbuf : Lexing.lexbuf parser_

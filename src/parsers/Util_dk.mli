@@ -6,7 +6,6 @@ open Logtk
 module A = UntypedAST
 
 type parser_res = (UntypedAST.statement Iter.t, string) CCResult.t
-
 type 'a parser_ = 'a -> parser_res
 
 val parse_lexbuf : Lexing.lexbuf parser_

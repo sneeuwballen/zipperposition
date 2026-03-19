@@ -7,8 +7,8 @@
 module type S = sig
   type term
 
-  (** Represents a congruence *)
   type t
+  (** Represents a congruence *)
 
   val create : ?size:int -> unit -> t
   (** New congruence.

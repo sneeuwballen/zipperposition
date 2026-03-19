@@ -14,9 +14,7 @@ val enable_depth_limit : int -> unit
 
 module type S = sig
   module Env : Env.S
-
   module C : module type of Env.C
-
   module PS : module type of Env.ProofState
 
   val register : unit -> unit

@@ -16,8 +16,8 @@ module CQ = ClauseQueue
 
 let prof_next_passive = ZProf.make "proofState.next_passive"
 
-(** {2 Set of active clauses} *)
 module type S = ProofState_intf.S
+(** {2 Set of active clauses} *)
 
 module Make (C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
   module Ctx = C.Ctx
@@ -31,7 +31,6 @@ module Make (C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
   (* NPDtree *)
   Dtree.Make (struct
     type t = T.t * T.t * bool * C.t
-
     type rhs = T.t
 
     let compare (t11, t12, s1, c1) (t21, t22, s2, c2) =
@@ -39,18 +38,20 @@ module Make (C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
       T.compare t11 t21 <?> (T.compare, t12, t22) <?> (compare, s1, s2)
       <?> (C.compare, c1, c2)
 
-    let extract (t1, t2, sign, _) = (t1, t2, sign)
+    let extract (t1, t2, sign, _) = t1, t2, sign
 
-    let priority (_, _, _, c) = if C.is_oriented_rule c then 2 else 1
+    let priority (_, _, _, c) =
+      if C.is_oriented_rule c then
+        2
+      else
+        1
   end)
 
   module SubsumptionIndex = FV_tree.Make (struct
     type t = C.t
 
     let compare = C.compare
-
     let to_lits c = C.to_forms c |> Iter.of_list
-
     let labels c = C.trail c |> Trail.labels
   end)
 
@@ -83,27 +84,25 @@ module Make (C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
 
   module MakeClauseSet (X : sig end) = struct
     let clauses_ = ref C.ClauseSet.empty
-
     let on_add_clause = Signal.create ()
-
     let on_remove_clause = Signal.create ()
-
     let clauses () = !clauses_
-
     let num_clauses () = C.ClauseSet.cardinal !clauses_
 
     let add seq =
       seq (fun c ->
           if not (C.ClauseSet.mem c !clauses_) then (
-            clauses_ := C.ClauseSet.add c !clauses_ ;
-            Signal.send on_add_clause c ) ) ;
+            clauses_ := C.ClauseSet.add c !clauses_;
+            Signal.send on_add_clause c
+          ));
       ()
 
     let remove seq =
       seq (fun c ->
           if C.ClauseSet.mem c !clauses_ then (
-            clauses_ := C.ClauseSet.remove c !clauses_ ;
-            Signal.send on_remove_clause c ) ) ;
+            clauses_ := C.ClauseSet.remove c !clauses_;
+            Signal.send on_remove_clause c
+          ));
       ()
   end
 
@@ -113,11 +112,8 @@ module Make (C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
 
   module SimplSet = struct
     let on_add_clause = Signal.create ()
-
     let on_remove_clause = Signal.create ()
-
     let add seq = seq (fun c -> Signal.send on_add_clause c)
-
     let remove seq = seq (fun c -> Signal.send on_remove_clause c)
   end
 
@@ -129,28 +125,28 @@ module Make (C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
       CQueue.of_profile p
 
     let next_ () =
-      if CQueue.is_empty queue then None
-      else
+      if CQueue.is_empty queue then
+        None
+      else (
         try
           let x = CQueue.take_first queue in
-          Signal.send on_remove_clause x ;
-          clauses_ := C.ClauseSet.remove x !clauses_ ;
+          Signal.send on_remove_clause x;
+          clauses_ := C.ClauseSet.remove x !clauses_;
           Some x
         with Not_found -> None
+      )
 
     let next () = ZProf.with_prof prof_next_passive next_ ()
 
     let remove seq =
       seq (fun c ->
-          if CQueue.remove queue c then Signal.send on_remove_clause c )
+          if CQueue.remove queue c then Signal.send on_remove_clause c)
 
     let add seq =
       seq (fun c -> if CQueue.add queue c then Signal.send on_add_clause c)
 
     let is_passive cl = CQueue.mem_cl queue cl
-
     let clauses () = C.ClauseSet.of_iter (CQueue.all_clauses queue)
-
     let num_clauses () = CQueue.length queue
   end
 
@@ -158,9 +154,9 @@ module Make (C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
   (* num passive, num active, num simplification *)
 
   let stats () =
-    ( C.ClauseSet.cardinal (ActiveSet.clauses ())
-    , C.ClauseSet.cardinal (PassiveSet.clauses ())
-    , 0 )
+    ( C.ClauseSet.cardinal (ActiveSet.clauses ()),
+      C.ClauseSet.cardinal (PassiveSet.clauses ()),
+      0 )
 
   let pp out state =
     let num_active, num_passive, num_simpl = stats state in

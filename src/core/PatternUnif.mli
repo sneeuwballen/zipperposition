@@ -9,28 +9,26 @@
 
 module US = Unif_subst
 
-(** Substitution with optional constraints *)
 type subst = US.t
+(** Substitution with optional constraints *)
 
 (** Helpers for substitutions *)
 module S : sig
   val apply : subst -> Term.t Scoped.t -> Term.t
-
   val pp : subst CCFormat.printer
 end
 
 exception NotUnifiable
-
 exception NotInFragment
 
 val eta_expand_otf :
-     subst:subst
-  -> scope:Scoped.scope
-  -> Type.t list
-  -> Type.t list
-  -> Term.t
-  -> Term.t
-  -> Term.t * Term.t * Type.t list
+  subst:subst ->
+  scope:Scoped.scope ->
+  Type.t list ->
+  Type.t list ->
+  Term.t ->
+  Term.t ->
+  Term.t * Term.t * Type.t list
 
 val norm_deref : Unif_subst.t -> Term.t Scoped.t -> Term.t
 
@@ -39,8 +37,8 @@ val unif_simple : ?subst:Subst.t -> scope:int -> Term.t -> Term.t -> US.t option
     in case of non-unifiability *)
 
 val unify_scoped :
-     ?subst:subst
-  -> ?counter:int ref
-  -> Term.t Scoped.t
-  -> Term.t Scoped.t
-  -> subst
+  ?subst:subst ->
+  ?counter:int ref ->
+  Term.t Scoped.t ->
+  Term.t Scoped.t ->
+  subst

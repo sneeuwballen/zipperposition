@@ -14,8 +14,8 @@
 
 type term = Term.t
 
-(** Partial ordering on terms *)
 type t
+(** Partial ordering on terms *)
 
 type ordering = t
 

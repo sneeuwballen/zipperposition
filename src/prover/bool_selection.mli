@@ -11,18 +11,17 @@ module Pos = Position
     in the clause that are non-interpreted Boolean subterms. *)
 
 type t = Literal.t array -> (Term.t * Position.t) list
-
 type parametrized = strict:bool -> ord:Ordering.t -> t
 
 (** {2 Selection Functions} *)
 
 val all_selectable_subterms :
-     ?forbidden:T.VarSet.t
-  -> ord:Ordering.t
-  -> pos_builder:PB.t
-  -> T.t
-  -> (T.t * Pos.t -> unit)
-  -> unit
+  ?forbidden:T.VarSet.t ->
+  ord:Ordering.t ->
+  pos_builder:PB.t ->
+  T.t ->
+  (T.t * Pos.t -> unit) ->
+  unit
 
 val all_eligible_subterms :
   ord:Ordering.t -> pos_builder:PB.t -> T.t -> (T.t * Pos.t -> unit) -> unit

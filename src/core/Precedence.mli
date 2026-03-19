@@ -2,55 +2,46 @@
 
 (** {1 Precedence (total ordering) on symbols} *)
 
-type symbol_status = Multiset | Lexicographic | LengthLexicographic
+type symbol_status =
+  | Multiset
+  | Lexicographic
+  | LengthLexicographic
 
 (** {2 Weight of Symbols} *)
 module Weight : sig
   type t
 
   val int : int -> t
-
   val zero : t
-
   val one : t
-
   val omega : t
-
   val omega_plus : int -> t
-
   val sign : t -> int
-
   val add : t -> t -> t
-
   val diff : t -> t -> t
-
   val mult : int -> t -> t
-
   val hash : t -> int
 
   module Infix : sig
     val ( + ) : t -> t -> t
-
     val ( - ) : t -> t -> t
   end
 
   include module type of Infix
-
   include Interfaces.ORD with type t := t
-
   include Interfaces.PRINT with type t := t
 end
 
 (** {2 Constraints} *)
 module Constr : sig
+  type 'a t = private ID.t -> ID.t -> int constraint 'a = [< `partial | `total ]
   (** A partial order on symbols, used to make the precedence more precise. ['a]
       encodes the kind of ordering: partial or total {b NOTE}: the ordering must
       partition the set of ALL symbols into equivalence classes, within which
       all symbols are equal, but symbols of distinct equivalence classes are
       always ordered. *)
-  type 'a t = private ID.t -> ID.t -> int constraint 'a = [< `partial | `total]
 
-  type prec_fun = signature:Signature.t -> ID.t Iter.t -> [`partial] t
+  type prec_fun = signature:Signature.t -> ID.t Iter.t -> [ `partial ] t
 
   (* TODO: sth based on order of the type. Higher-order functions should
      be bigger than first-order functions, so that ghd() works fine
@@ -71,14 +62,14 @@ module Constr : sig
 
   val prec_fun_of_str : string -> prec_fun
 
-  val alpha : [`total] t
+  val alpha : [ `total ] t
   (** alphabetic ordering on symbols, themselves bigger than builtin *)
 
-  val compose : [`partial] t -> ([< `partial | `total] as 'a) t -> 'a t
+  val compose : [ `partial ] t -> ([< `partial | `total ] as 'a) t -> 'a t
   (** [compose a b] uses [a] to compare symbols; if [a] cannot decide, then we
       use [b]. *)
 
-  val compose_sort : (int * [`partial] t) list -> [`partial] t
+  val compose_sort : (int * [ `partial ] t) list -> [ `partial ] t
   (** [compose_sort l] sorts the list by increasing priority (the lower, the
       earlier an ordering is applied, and therefore the more impact it has)
       before composing *)
@@ -87,14 +78,14 @@ module Constr : sig
   (** [compare_by ~constr a b returns the result of comparing symbols a and b
        using constr] *)
 
-  val make : (ID.t -> ID.t -> int) -> [`partial] t
+  val make : (ID.t -> ID.t -> int) -> [ `partial ] t
   (** Create a new partial order. {b CAUTION}, this order must respect some
       properties (see {!'a t}) *)
 end
 
+type t
 (** Total Ordering on a finite number of symbols, plus a few more data (weight
     for KBO, status for RPC) *)
-type t
 
 type precedence = t
 
@@ -122,9 +113,7 @@ val weight : t -> ID.t -> Weight.t
 (** Weight of a symbol (for KBO). *)
 
 val sel_prec_weight : t -> ID.t -> int
-
 val db_weight : t -> Weight.t
-
 val lam_weight : t -> Weight.t
 
 val arg_coeff : t -> ID.t -> int -> int
@@ -143,35 +132,28 @@ module Seq : sig
 end
 
 val pp_snapshot : ID.t list CCFormat.printer
-
 val pp_debugf : t CCFormat.printer
 
 include Interfaces.PRINT with type t := t
 
 type weight_fun = ID.t -> Weight.t
-
 type arg_coeff_fun = ID.t -> int list
 
 val weight_modarity : signature:Signature.t -> weight_fun
-
 val weight_constant : weight_fun
-
 val weight_invfreq : ID.t Iter.t -> weight_fun
-
 val weight_freq : ID.t Iter.t -> weight_fun
-
 val weight_invfreqrank : ID.t Iter.t -> weight_fun
-
 val weight_freqrank : ID.t Iter.t -> weight_fun
 
 val weight_fun_of_string :
-     signature:Signature.t
-  -> clauses:Term.t SLiteral.t Iter.t Iter.t
-  -> lm_w:int
-  -> db_w:int
-  -> string
-  -> (ID.t * int) Iter.t
-  -> weight_fun
+  signature:Signature.t ->
+  clauses:Term.t SLiteral.t Iter.t Iter.t ->
+  lm_w:int ->
+  db_w:int ->
+  string ->
+  (ID.t * int) Iter.t ->
+  weight_fun
 
 val set_weight : t -> weight_fun -> unit
 (** Change the weight function of the precedence
@@ -180,13 +162,13 @@ val set_weight : t -> weight_fun -> unit
 (** {2 Creation of a precedence from constraints} *)
 
 val create :
-     ?weight:weight_fun
-  -> ?arg_coeff:arg_coeff_fun
-  -> ?db_w:int
-  -> ?lmb_w:int
-  -> [`total] Constr.t
-  -> ID.t list
-  -> t
+  ?weight:weight_fun ->
+  ?arg_coeff:arg_coeff_fun ->
+  ?db_w:int ->
+  ?lmb_w:int ->
+  [ `total ] Constr.t ->
+  ID.t list ->
+  t
 (** make a precedence from the given constraints. Constraints near the head of
     the list are {b more important} than constraints close to the tail. Only the
     very first constraint is assured to be totally satisfied if constraints do
@@ -198,5 +180,5 @@ val default : ID.t list -> t
 val default_seq : ID.t Iter.t -> t
 (** default precedence on the given sequence of symbols *)
 
-val constr : t -> [`total] Constr.t
+val constr : t -> [ `total ] Constr.t
 (** Obtain the constraint *)

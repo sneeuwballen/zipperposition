@@ -3,14 +3,12 @@
 open Logtk
 
 type proof_step = Proof.Step.t
-
 type proof = Proof.S.t
 
 module type S = sig
   module Ctx : Ctx.S
 
   type t
-
   type clause = t
 
   (** {2 Flags} *)
@@ -24,29 +22,20 @@ module type S = sig
   (** get value of boolean flag *)
 
   val mark_redundant : t -> unit
-
   val is_redundant : t -> bool
-
   val mark_backward_simplified : t -> unit
-
   val is_backward_simplified : t -> bool
-
   val is_orphaned : t -> bool
 
   (** {2 Basics} *)
 
   include Interfaces.EQ with type t := t
-
   include Interfaces.HASH with type t := t
 
   val compare : t -> t -> int
-
   val id : t -> int
-
   val lits : t -> Literal.t array
-
   val is_ground : t -> bool
-
   val weight : t -> int
 
   (* cached weight in terms *)
@@ -187,7 +176,6 @@ module type S = sig
   (** get the list of selected Bool subterms *)
 
   val penalty : t -> int
-
   val inc_penalty : t -> int -> unit
 
   val is_unit_clause : t -> bool
@@ -208,34 +196,30 @@ module type S = sig
   (** Easy iteration on an abstract view of literals *)
 
   val to_s_form : t -> TypedSTerm.Form.t
-
   val ground_clause : t -> t
-
   val eta_reduce : t -> t option
 
   (** {2 Iterators} *)
 
   module Seq : sig
     val lits : t -> Literal.t Iter.t
-
     val terms : t -> Term.t Iter.t
-
     val vars : t -> Type.t HVar.t Iter.t
   end
 
   val apply_subst :
-       ?renaming:Subst.Renaming.t
-    -> ?proof:Proof.Step.t option
-    -> ?penalty_inc:int option
-    -> t Scoped.t
-    -> Subst.FO.t
-    -> t
+    ?renaming:Subst.Renaming.t ->
+    ?proof:Proof.Step.t option ->
+    ?penalty_inc:int option ->
+    t Scoped.t ->
+    Subst.FO.t ->
+    t
 
   (** {2 Filter literals} *)
 
   module Eligible : sig
-    (** Eligibility criterion for a literal *)
     type t = int -> Literal.t -> bool
+    (** Eligibility criterion for a literal *)
 
     val res : clause -> t
     (** Only literals that are eligible for resolution *)
@@ -279,8 +263,8 @@ module type S = sig
 
   (** {2 Set of clauses} *)
 
-  (** Simple set *)
   module ClauseSet : CCSet.S with type elt = t
+  (** Simple set *)
 
   (** {2 Position} *)
 
@@ -292,17 +276,19 @@ module type S = sig
 
   (** Clause within which a subterm (and its position) are highlighted *)
   module WithPos : sig
-    type t = {clause: clause; pos: Position.t; term: Term.t}
+    type t = {
+      clause: clause;
+      pos: Position.t;
+      term: Term.t;
+    }
 
     val compare : t -> t -> int
-
     val pp : t CCFormat.printer
   end
 
   (** {2 IO} *)
 
   val pp : t CCFormat.printer
-
   val pp_tstp : t CCFormat.printer
 
   val pp_tstp_full : t CCFormat.printer
@@ -315,7 +301,6 @@ module type S = sig
   (** Debug printing to a string *)
 
   val pp_set : ClauseSet.t CCFormat.printer
-
   val pp_set_tstp : ClauseSet.t CCFormat.printer
 
   (**/**)

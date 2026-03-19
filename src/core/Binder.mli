@@ -6,20 +6,19 @@
 
     @since 1.5 *)
 
-type t = Exists | Forall | ForallTy | Lambda
+type t =
+  | Exists
+  | Forall
+  | ForallTy
+  | Lambda
 
 include Interfaces.HASH with type t := t
-
 include Interfaces.ORD with type t := t
-
 include Interfaces.PRINT with type t := t
 
 val exists : t
-
 val forall : t
-
 val lambda : t
-
 val forall_ty : t
 
 module TPTP : sig

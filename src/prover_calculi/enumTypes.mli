@@ -48,22 +48,23 @@ exception Error of string
 
 module type S = sig
   module Env : Env.S
-
   module C : module type of Env.C
 
   type decl
 
   val pp_decl : decl CCFormat.printer
 
-  type declare_result = New of decl | AlreadyDeclared of decl
+  type declare_result =
+    | New of decl
+    | AlreadyDeclared of decl
 
   val declare_ty :
-       proof:Proof.t
-    -> ty_id:ID.t
-    -> ty_vars:Type.t HVar.t list
-    -> var:Type.t HVar.t
-    -> term list
-    -> declare_result
+    proof:Proof.t ->
+    ty_id:ID.t ->
+    ty_vars:Type.t HVar.t list ->
+    var:Type.t HVar.t ->
+    term list ->
+    declare_result
   (** Declare that the domain of the type [ty_id] is restricted to given list of
       [cases], in the form [forall var. Or_{c in cases} var = c]. The type of
       [var] must be [ty_id ty_vars]. Will be ignored if the type already has a

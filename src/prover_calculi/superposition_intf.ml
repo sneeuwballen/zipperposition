@@ -5,9 +5,7 @@ open Libzipperposition
 
 module type S = sig
   module Env : Env.S
-
   module C : module type of Env.C with type t = Env.C.t
-
   module PS : module type of Env.ProofState with type C.t = Env.C.t
 
   (** {5 Term Indices} *)
@@ -30,7 +28,6 @@ module type S = sig
   (** superposition where given clause is passive *)
 
   val infer_equality_resolution : Env.unary_inf_rule
-
   val infer_equality_factoring : Env.unary_inf_rule
 
   (** {5 Extraction of clauses from the queue (HO feature)} *)
@@ -65,9 +62,9 @@ module type S = sig
   (** subsumes c1 c2 iff c1 subsumes c2 *)
 
   val subsumes_with :
-       Literals.t Scoped.t
-    -> Literals.t Scoped.t
-    -> (Subst.FO.t * Proof.tag list) option
+    Literals.t Scoped.t ->
+    Literals.t Scoped.t ->
+    (Subst.FO.t * Proof.tag list) option
   (** returns subsuming subst if the first clause subsumes the second one *)
 
   val eq_subsumes : Literal.t array -> Literal.t array -> bool

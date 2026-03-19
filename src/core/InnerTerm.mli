@@ -20,14 +20,15 @@
    take weight of 1 *)
 module I = Int32
 
+type t = private {
+  term: view;
+  ty: type_result;
+  mutable id: int;
+  mutable payload: exn;
+  props: I.t;
+  ho_weight: int lazy_t;
+}
 (** Abstract type of term *)
-type t = private
-  { term: view
-  ; ty: type_result
-  ; mutable id: int
-  ; mutable payload: exn
-  ; props: I.t
-  ; ho_weight: int lazy_t }
 
 and view = private
   | Var of t HVar.t  (** Free variable *)
@@ -38,7 +39,9 @@ and view = private
   | AppBuiltin of Builtin.t * t list
       (** For representing special constructors *)
 
-and type_result = NoType | HasType of t
+and type_result =
+  | NoType
+  | HasType of t
 
 type term = t
 
@@ -53,7 +56,6 @@ val ty_exn : t -> t
     @raise Invalid_argument if the type is [NoType] *)
 
 include Interfaces.HASH with type t := t
-
 include Interfaces.ORD with type t := t
 
 val hash_mod_alpha : t -> int
@@ -81,17 +83,11 @@ exception IllFormedTerm of string
 type nat = int
 
 val const : ty:t -> ID.t -> t
-
 val app : ty:t -> t -> t list -> t
-
 val bind : ty:t -> varty:t -> Binder.t -> t -> t
-
 val var : t HVar.t -> t
-
 val bvar : ty:t -> nat -> t
-
 val app_builtin : ty:t -> Builtin.t -> t list -> t
-
 val builtin : ty:t -> Builtin.t -> t
 
 val tType : t
@@ -105,25 +101,15 @@ val cast : ty:t -> t -> t
 (** Change the type *)
 
 val is_var : t -> bool
-
 val is_bvar : t -> bool
-
 val is_const : t -> bool
-
 val is_bind : t -> bool
-
 val is_app : t -> bool
-
 val is_tType : t -> bool
-
 val is_lambda : t -> bool
-
 val hashcons_stats : unit -> int * int * int * int * int * int
-
 val is_eta_reducible : t -> bool
-
 val is_beta_reducible : t -> bool
-
 val has_lambda : t -> bool
 
 (** {3 Payload} *)
@@ -142,15 +128,10 @@ val set_payload_erase : t -> exn -> unit
 (** {3 Containers} *)
 
 module Map : CCMap.S with type key = term
-
 module Set : CCSet.S with type elt = term
-
 module Tbl : CCHashtbl.S with type key = term
-
 module VarMap : CCMap.S with type key = t HVar.t
-
 module VarSet : CCSet.S with type elt = t HVar.t
-
 module VarTbl : CCHashtbl.S with type key = t HVar.t
 
 (** {3 De Bruijn indices handling} *)
@@ -197,21 +178,13 @@ end
 
 module Seq : sig
   val vars : t -> t HVar.t Iter.t
-
   val subterms : t -> t Iter.t
-
   val subterms_depth : t -> (t * int) Iter.t (* subterms with their depth *)
-
   val symbols : t -> ID.t Iter.t
-
   val types : t -> t Iter.t
-
   val max_var : t HVar.t Iter.t -> int
-
   val min_var : t HVar.t Iter.t -> int
-
   val add_set : Set.t -> t Iter.t -> Set.t
-
   val add_tbl : unit Tbl.t -> t Iter.t -> unit
 end
 
@@ -243,7 +216,6 @@ val close_vars : ty:t -> Binder.t -> t -> t
 (** Close all free variables of the term using the binding symbol *)
 
 val fun_ : t -> t -> t
-
 val fun_l : t list -> t -> t
 
 val fun_of_fvars : t HVar.t list -> t -> t
@@ -298,7 +270,6 @@ val open_poly_fun : t -> int * t list * t
       arguments *)
 
 val open_bind : Binder.t -> t -> t list * t
-
 val open_bind2 : Binder.t -> t -> t -> t list * t * t list * t
 
 val mk_fun : ty_l:t list -> t -> t
@@ -310,7 +281,6 @@ val is_ground : t -> bool
 (** {3 Misc} *)
 
 val size : t -> int
-
 val depth : t -> int
 
 val head : t -> ID.t option
@@ -333,13 +303,9 @@ val as_app : t -> t * t list
     as [(let f,l = as_app t in app f l) = t] *)
 
 val as_var : t -> t HVar.t option
-
 val as_var_exn : t -> t HVar.t
-
 val as_const : t -> ID.t option
-
 val as_const_exn : t -> ID.t
-
 val as_bvar_exn : t -> int
 
 val is_bvar_i : int -> t -> bool
@@ -357,7 +323,6 @@ val show_type_arguments : bool ref
 (** Parameter for printing/hiding type arguments in terms *)
 
 include Interfaces.PRINT with type t := t
-
 include Interfaces.PRINT_DE_BRUIJN with type t := t and type term := t
 
 val pp_var : t HVar.t CCFormat.printer
@@ -366,11 +331,8 @@ val add_default_hook : print_hook -> unit
 (** Add a print hook that will be used from now on *)
 
 val default_hooks : unit -> print_hook list
-
 val debugf : t CCFormat.printer
-
 val pp_zf : t CCFormat.printer
-
 val pp_in : Output_format.t -> t CCFormat.printer
 
 (* TODO: path-selection operation (for handling general-data in TPTP), see

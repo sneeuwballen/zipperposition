@@ -3,7 +3,6 @@ module T = Term
 
 module type S = sig
   module Ctx : Ctx.S
-
   module C : Clause.S with module Ctx = Ctx
 
   val on_pred_skolem_introduction : (C.t * Term.t) Signal.t
@@ -13,12 +12,12 @@ module type S = sig
   (** This clause has the shape of the renaming clause *)
 
   val rename_form :
-       ?should_rename:(T.t -> bool)
-    -> ?polarity_aware:bool
-    -> c:C.t
-    -> T.t
-    -> bool
-    -> (T.t * C.t list * C.t list) option
+    ?should_rename:(T.t -> bool) ->
+    ?polarity_aware:bool ->
+    c:C.t ->
+    T.t ->
+    bool ->
+    (T.t * C.t list * C.t list) option
   (**
     `rename_form ~should_rename ~c f polarity` tries to find
     a definition for formula f with the given polarity.
@@ -65,10 +64,10 @@ module type S = sig
     
   *)
   val get_skolem :
-       parent:C.t
-    -> mode:[< `Choice | `SkolemRecycle | `SkolemAlwaysFresh]
-    -> T.t
-    -> T.t
+    parent:C.t ->
+    mode:[< `Choice | `SkolemRecycle | `SkolemAlwaysFresh ] ->
+    T.t ->
+    T.t
   (** `get_skolem ~parent ~mode f` computes a ``Skolem'' term for a formula f.
       This is either real Skolem term of Choice symbol applied to f, depending
       on the mode *)

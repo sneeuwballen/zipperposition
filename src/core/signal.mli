@@ -8,8 +8,8 @@
     the signal and be notified every time an event (a value) is emitted through
     the signal. *)
 
-(** Signal of type 'a *)
 type 'a t
+(** Signal of type 'a *)
 
 val create : unit -> 'a t
 (** New signal *)
@@ -17,7 +17,9 @@ val create : unit -> 'a t
 val send : 'a t -> 'a -> unit
 (** Trigger the signal *)
 
-type handler_response = ContinueListening | StopListening
+type handler_response =
+  | ContinueListening
+  | StopListening
 
 val on : 'a t -> ('a -> handler_response) -> unit
 (** Register a handler to the signal; the handler returns [true] if it wants to
@@ -36,7 +38,6 @@ val propagate : 'a t -> 'a t -> unit
 (** {2 Combinators} *)
 
 val map : 'a t -> ('a -> 'b) -> 'b t
-
 val filter : 'a t -> ('a -> bool) -> 'a t
 
 val set_exn_handler : (exn -> unit) -> unit

@@ -10,18 +10,15 @@
 open Logtk
 
 type term = Term.t
-
 type subst = Subst.t
 
+type t
 (** A context is represented as a regular array of literals, containing at least
     one specific variable [x], paired with this variable [x]. Applying the
     context is a mere substitution *)
-type t
 
 val compare : t -> t -> int
-
 val equal : t -> t -> bool
-
 val hash : t -> int
 
 val make : Literals.t -> var:Term.var -> t

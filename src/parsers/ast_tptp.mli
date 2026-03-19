@@ -6,7 +6,9 @@
 
 open Logtk
 
-type name = NameInt of int | NameString of string  (** name of a formula *)
+type name =
+  | NameInt of int
+  | NameString of string  (** name of a formula *)
 
 and role =
   | R_axiom (* true *)
@@ -34,19 +36,12 @@ and general_data =
   | GList of general_data list
 
 val role_of_string : string -> role
-
 val string_of_role : role -> string
-
 val pp_role : role CCFormat.printer
-
 val string_of_name : name -> string
-
 val pp_name : name CCFormat.printer
-
 val pp_general : general_data CCFormat.printer
-
 val pp_general_debugf : general_data CCFormat.printer (* ugly version *)
-
 val pp_generals : general_data list CCFormat.printer
 
 type 'a t =

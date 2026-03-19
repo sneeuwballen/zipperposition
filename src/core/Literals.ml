@@ -8,24 +8,33 @@ module S = Subst
 module Lit = Literal
 
 type term = Term.t
-
 type t = Literal.t array
 
 let prof_maxlits = ZProf.make "lits.maxlits"
 
 let equal lits1 lits2 =
   let rec check i =
-    if i = Array.length lits1 then true
-    else Lit.equal lits1.(i) lits2.(i) && check (i + 1)
+    if i = Array.length lits1 then
+      true
+    else
+      Lit.equal lits1.(i) lits2.(i) && check (i + 1)
   in
-  if Array.length lits1 <> Array.length lits2 then false else check 0
+  if Array.length lits1 <> Array.length lits2 then
+    false
+  else
+    check 0
 
 let equal_com lits1 lits2 =
   let rec check i =
-    if i = Array.length lits1 then true
-    else Lit.equal_com lits1.(i) lits2.(i) && check (i + 1)
+    if i = Array.length lits1 then
+      true
+    else
+      Lit.equal_com lits1.(i) lits2.(i) && check (i + 1)
   in
-  if Array.length lits1 <> Array.length lits2 then false else check 0
+  if Array.length lits1 <> Array.length lits2 then
+    false
+  else
+    check 0
 
 let compare = CCArray.compare Lit.compare
 
@@ -40,7 +49,7 @@ let hash lits = Hash.array Lit.hash lits
 let variant ?(subst = S.empty) (a1, sc1) (a2, sc2) =
   Unif.unif_array_com ~size:`Same (subst, []) (a1, sc1) (a2, sc2)
     ~op:(fun (subst, t1) x y k ->
-      Lit.variant ~subst x y (fun (s, t2) -> k (s, t1 @ t2)) )
+      Lit.variant ~subst x y (fun (s, t2) -> k (s, t1 @ t2)))
   |> Iter.filter (fun (s, _) -> Subst.is_renaming s)
 
 let are_variant a1 a2 =
@@ -49,15 +58,13 @@ let are_variant a1 a2 =
 let matching ?(subst = S.empty) ~pattern:(a1, sc1) (a2, sc2) =
   Unif.unif_array_com ~size:`Same (subst, []) (a1, sc1) (a2, sc2)
     ~op:(fun (subst, t1) x y k ->
-      Lit.matching ~subst ~pattern:x y (fun (s, t2) -> k (s, t1 @ t2)) )
+      Lit.matching ~subst ~pattern:x y (fun (s, t2) -> k (s, t1 @ t2)))
 
 let matches a1 a2 =
   not (Iter.is_empty (matching ~pattern:(Scoped.make a1 0) (Scoped.make a2 1)))
 
 let weight lits = Array.fold_left (fun w lit -> w + Lit.weight lit) 0 lits
-
 let ho_weight lits = Array.fold_left (fun w lit -> w + Lit.ho_weight lit) 0 lits
-
 let depth lits = Array.fold_left (fun d lit -> max d (Lit.depth lit)) 0 lits
 
 let vars lits =
@@ -75,7 +82,6 @@ let apply_subst renaming subst (lits, sc) =
   Array.map (fun lit -> Lit.apply_subst renaming subst (lit, sc)) lits
 
 let of_unif_subst renaming s = Literal.of_unif_subst renaming s |> Array.of_list
-
 let map f lits = Array.map (fun lit -> Lit.map f lit) lits
 
 (** bitvector of literals that are positive *)
@@ -83,7 +89,7 @@ let pos lits =
   let bv = BV.create ~size:(Array.length lits) false in
   for i = 0 to Array.length lits - 1 do
     if Lit.is_positivoid lits.(i) then BV.set bv i
-  done ;
+  done;
   bv
 
 (** bitvector of literals that are positive *)
@@ -91,7 +97,7 @@ let neg lits =
   let bv = BV.create ~size:(Array.length lits) false in
   for i = 0 to Array.length lits - 1 do
     if Lit.is_negativoid lits.(i) then BV.set bv i
-  done ;
+  done;
   bv
 
 (** Multiset of literals, with their index *)
@@ -99,15 +105,23 @@ module MLI = Multiset.Make (struct
   type t = Lit.t * int
 
   let compare (l1, i1) (l2, i2) =
-    if i1 = i2 then Lit.compare l1 l2 else CCShims_.Stdlib.compare i1 i2
+    if i1 = i2 then
+      Lit.compare l1 l2
+    else
+      CCShims_.Stdlib.compare i1 i2
 end)
 
 let _compare_lit_with_idx ~ord (lit1, i1) (lit2, i2) =
-  if i1 = i2 then Comparison.Eq (* ignore collisions *)
-  else
+  if i1 = i2 then
+    Comparison.Eq (* ignore collisions *)
+  else (
     let c = Lit.Comp.compare ~ord lit1 lit2 in
     (* two occurrences of one lit should be incomparable (and therefore maximal) *)
-    if c = Comparison.Eq then Incomparable else c
+    if c = Comparison.Eq then
+      Incomparable
+    else
+      c
+  )
 
 let _to_multiset_with_idx lits =
   CCArray.foldi (fun acc i x -> MLI.add acc (x, i)) MLI.empty lits
@@ -119,7 +133,8 @@ let maxlits_l ~ord lits =
   let max =
     MLI.max_seq (_compare_lit_with_idx ~ord) m |> Iter.map fst |> Iter.to_list
   in
-  ZProf.exit_prof _span ; max
+  ZProf.exit_prof _span;
+  max
 
 let maxlits ~ord lits =
   let _span = ZProf.enter_prof prof_maxlits in
@@ -129,7 +144,8 @@ let maxlits ~ord lits =
     |> Iter.map (fun (x, _) -> snd x)
     |> Iter.to_list |> BV.of_list
   in
-  ZProf.exit_prof _span ; max
+  ZProf.exit_prof _span;
+  max
 
 let is_max ~ord lits =
   (*
@@ -144,38 +160,36 @@ let is_max ~ord lits =
 let is_trivial lits =
   (* check if a pair of lits is trivial *)
   let rec check_multi lits i =
-    if i = Array.length lits then false
-    else
+    if i = Array.length lits then
+      false
+    else (
       let lit = lits.(i) in
       let triv =
         match lit with
-        | Lit.Equation (l, r, true) when T.equal l r ->
-            true
+        | Lit.Equation (l, r, true) when T.equal l r -> true
         | Lit.Equation (l, r, sign) ->
-            if Lit.is_predicate_lit lit then
-              let sign = Lit.is_positivoid lit in
-              CCArray.exists
-                (function
-                  | Lit.Equation (l', _, _) as lit'
-                    when Lit.is_predicate_lit lit' ->
-                      let sign' = Lit.is_positivoid lit' in
-                      sign != sign' && T.equal l l'
-                  | _ ->
-                      false )
-                lits
-            else
-              CCArray.exists
-                (function
-                  | Lit.Equation (l', r', sign') when sign = not sign' ->
-                      (T.equal l l' && T.equal r r')
-                      || (T.equal l r' && T.equal l' r)
-                  | _ ->
-                      false )
-                lits
-        | lit ->
-            Lit.is_trivial lit
+          if Lit.is_predicate_lit lit then (
+            let sign = Lit.is_positivoid lit in
+            CCArray.exists
+              (function
+                | Lit.Equation (l', _, _) as lit' when Lit.is_predicate_lit lit'
+                  ->
+                  let sign' = Lit.is_positivoid lit' in
+                  sign != sign' && T.equal l l'
+                | _ -> false)
+              lits
+          ) else
+            CCArray.exists
+              (function
+                | Lit.Equation (l', r', sign') when sign = not sign' ->
+                  (T.equal l l' && T.equal r r')
+                  || (T.equal l r' && T.equal l' r)
+                | _ -> false)
+              lits
+        | lit -> Lit.is_trivial lit
       in
       triv || check_multi lits (i + 1)
+    )
   in
   CCArray.exists Lit.is_trivial lits || check_multi lits 0
 
@@ -186,9 +200,7 @@ let apply_subst renaming subst (lits, sc) =
 
 module Seq = struct
   let vars lits = Iter.of_array lits |> Iter.flat_map Lit.Seq.vars
-
   let terms a = Iter.of_array a |> Iter.flat_map Lit.Seq.terms
-
   let to_form a = Iter.of_array a |> Iter.map Lit.Conv.to_form
 end
 
@@ -212,36 +224,38 @@ module Pos = struct
   let at lits pos =
     match pos with
     | Position.Arg (idx, pos') when idx >= 0 && idx < Array.length lits ->
-        Lit.Pos.at lits.(idx) pos'
-    | _ ->
-        _fail_lits lits pos
+      Lit.Pos.at lits.(idx) pos'
+    | _ -> _fail_lits lits pos
 
   let lit_at lits pos =
     match pos with
     | Position.Arg (i, pos') when i >= 0 && i < Array.length lits ->
-        (lits.(i), pos')
-    | _ ->
-        _fail_lits lits pos
+      lits.(i), pos'
+    | _ -> _fail_lits lits pos
 
   let replace lits ~at ~by =
     match at with
     | Position.Arg (idx, pos') when idx >= 0 && idx < Array.length lits ->
-        lits.(idx) <- Lit.Pos.replace lits.(idx) ~at:pos' ~by
-    | _ ->
-        _fail_lits lits at
+      lits.(idx) <- Lit.Pos.replace lits.(idx) ~at:pos' ~by
+    | _ -> _fail_lits lits at
 
-  let idx = function Position.Arg (i, _) -> i | p -> _fail_pos p
+  let idx = function
+    | Position.Arg (i, _) -> i
+    | p -> _fail_pos p
 
-  let tail = function Position.Arg (_, pos') -> pos' | p -> _fail_pos p
+  let tail = function
+    | Position.Arg (_, pos') -> pos'
+    | p -> _fail_pos p
 
-  let cut = function Position.Arg (i, pos') -> (i, pos') | p -> _fail_pos p
+  let cut = function
+    | Position.Arg (i, pos') -> i, pos'
+    | p -> _fail_pos p
 
   (* Does this position target one side of an equation? *)
   let is_toplevel_pos = function
     | Position.Arg (_, (Position.Left p | Position.Right p)) ->
-        Position.equal p Position.stop
-    | _ ->
-        false
+      Position.equal p Position.stop
+    | _ -> false
 end
 
 module Conv = struct
@@ -255,7 +269,7 @@ module Conv = struct
   let to_tst lits =
     let ctx = Type.Conv.create () in
     let var_seq = Seq.vars lits in
-    Type.Conv.set_maxvar ctx (T.Seq.max_var var_seq) ;
+    Type.Conv.set_maxvar ctx (T.Seq.max_var var_seq);
     Array.map (fun t -> Lit.Conv.lit_to_tst ~ctx (Lit.Conv.to_form t)) lits
     |> Array.to_list
     |> fun or_args ->
@@ -267,22 +281,21 @@ module Conv = struct
     in
     let disjuncts =
       match or_args with
-      | [] ->
-          TypedSTerm.app_builtin ~ty Builtin.false_ []
-      | [disj] ->
-          disj
-      | _ ->
-          TypedSTerm.app_builtin ~ty Builtin.or_ or_args
+      | [] -> TypedSTerm.app_builtin ~ty Builtin.false_ []
+      | [ disj ] -> disj
+      | _ -> TypedSTerm.app_builtin ~ty Builtin.or_ or_args
     in
     TypedSTerm.close_with_vars vars disjuncts
 
   let to_s_form ?allow_free_db ?ctx ?hooks lits =
     let ctx =
-      if CCOpt.is_some ctx then CCOpt.get_exn ctx
-      else
+      if CCOpt.is_some ctx then
+        CCOpt.get_exn ctx
+      else (
         let res = Type.Conv.create () in
-        Type.Conv.set_maxvar res (Seq.vars lits |> T.Seq.max_var) ;
+        Type.Conv.set_maxvar res (Seq.vars lits |> T.Seq.max_var);
         res
+      )
     in
     Array.to_list lits
     |> List.map (Literal.Conv.to_s_form ?hooks ?allow_free_db ~ctx)
@@ -293,83 +306,100 @@ module View = struct
   let get_eqn lits pos =
     match pos with
     | Position.Arg (idx, pos') when idx < Array.length lits ->
-        Lit.View.get_eqn lits.(idx) pos'
-    | _ ->
-        None
+      Lit.View.get_eqn lits.(idx) pos'
+    | _ -> None
 
   let _unwrap2 ~msg f x y =
-    match f x y with Some z -> z | None -> invalid_arg msg
+    match f x y with
+    | Some z -> z
+    | None -> invalid_arg msg
 
   let get_eqn_exn = _unwrap2 ~msg:"get_eqn: improper position" get_eqn
 end
 
 let fold_lits ~eligible lits k =
   let rec aux i =
-    if i = Array.length lits then ()
-    else if not (eligible i lits.(i)) then aux (i + 1)
+    if i = Array.length lits then
+      ()
+    else if not (eligible i lits.(i)) then
+      aux (i + 1)
     else (
-      k (lits.(i), i) ;
-      aux (i + 1) )
+      k (lits.(i), i);
+      aux (i + 1)
+    )
   in
   aux 0
 
 let fold_eqn ?(both = true) ?sign ~ord ~eligible lits k =
-  let sign_ok s = match sign with None -> true | Some sign -> sign = s in
+  let sign_ok s =
+    match sign with
+    | None -> true
+    | Some sign -> sign = s
+  in
   let rec aux i =
-    if i = Array.length lits then ()
-    else if not (eligible i lits.(i)) then aux (i + 1)
-    else
-      let sign = Lit.is_positivoid lits.(i) in
-      ( match lits.(i) with
-      | Lit.Equation (l, r, _) when sign_ok sign -> (
-        match Ordering.compare ord l r with
-        | Comparison.Gt | Geq ->
-            k (l, r, sign, Position.(arg i @@ left @@ stop))
-        | Lt | Leq ->
-            k (r, l, sign, Position.(arg i @@ right @@ stop))
-        | Eq | Incomparable ->
-            if both then (
-              (* visit both sides of the equation *)
-              k (r, l, sign, Position.(arg i @@ right @@ stop)) ;
-              k (l, r, sign, Position.(arg i @@ left @@ stop)) )
-            else
-              (* only one side *)
-              k (l, r, sign, Position.(arg i @@ left @@ stop)) )
-      | Lit.Equation _ | Lit.True | Lit.False ->
-          () ) ;
+    if i = Array.length lits then
+      ()
+    else if not (eligible i lits.(i)) then
       aux (i + 1)
+    else (
+      let sign = Lit.is_positivoid lits.(i) in
+      (match lits.(i) with
+      | Lit.Equation (l, r, _) when sign_ok sign ->
+        (match Ordering.compare ord l r with
+        | Comparison.Gt | Geq -> k (l, r, sign, Position.(arg i @@ left @@ stop))
+        | Lt | Leq -> k (r, l, sign, Position.(arg i @@ right @@ stop))
+        | Eq | Incomparable ->
+          if both then (
+            (* visit both sides of the equation *)
+            k (r, l, sign, Position.(arg i @@ right @@ stop));
+            k (l, r, sign, Position.(arg i @@ left @@ stop))
+          ) else
+            (* only one side *)
+            k (l, r, sign, Position.(arg i @@ left @@ stop)))
+      | Lit.Equation _ | Lit.True | Lit.False -> ());
+      aux (i + 1)
+    )
   in
   aux 0
 
 let fold_eqn_simple ?sign lits k =
-  let sign_ok s = match sign with None -> true | Some sign -> sign = s in
+  let sign_ok s =
+    match sign with
+    | None -> true
+    | Some sign -> sign = s
+  in
   let rec aux i =
-    if i = Array.length lits then ()
-    else
+    if i = Array.length lits then
+      ()
+    else (
       (* IMPORTANT: Returning the computed sign (positivoid vs negativoid)
          rather than the sign stored in the equation *)
       let sign = Lit.is_positivoid lits.(i) in
-      ( match lits.(i) with
+      (match lits.(i) with
       | Lit.Equation (l, r, _) when sign_ok sign ->
-          k (l, r, sign, Position.(arg i @@ left @@ stop))
-      | Lit.Equation _ | Lit.True | Lit.False ->
-          () ) ;
+        k (l, r, sign, Position.(arg i @@ left @@ stop))
+      | Lit.Equation _ | Lit.True | Lit.False -> ());
       aux (i + 1)
+    )
   in
   aux 0
 
 let fold_terms ?(vars = false) ?(var_args = true) ?(fun_bodies = true) ?ty_args
-    ~(which : [< `All | `Max]) ~ord ~subterms ~eligible lits k =
+    ~(which : [< `All | `Max ]) ~ord ~subterms ~eligible lits k =
   let rec aux i =
-    if i = Array.length lits then ()
-    else if not (eligible i lits.(i)) then aux (i + 1) (* ignore lit *)
+    if i = Array.length lits then
+      ()
+    else if not (eligible i lits.(i)) then
+      aux (i + 1)
+    (* ignore lit *)
     else (
       Util.debugf 50 "folding literal %a, %B" (fun k ->
-          k Lit.pp lits.(i) fun_bodies ) ;
+          k Lit.pp lits.(i) fun_bodies);
       Lit.fold_terms
         ~position:Position.(arg i stop)
-        ?ty_args ~vars ~var_args ~fun_bodies ~which ~ord ~subterms lits.(i) k ;
-      aux (i + 1) )
+        ?ty_args ~vars ~var_args ~fun_bodies ~which ~ord ~subterms lits.(i) k;
+      aux (i + 1)
+    )
   in
   aux 0
 
@@ -384,12 +414,10 @@ let typed_symbols ?(include_types = false) lits =
 
 let pp_gen ~false_ ~l ~r ~sep ~pp_lit out lits =
   match lits with
-  | [||] ->
-      CCFormat.string out false_
-  | [|l|] ->
-      pp_lit out l
+  | [||] -> CCFormat.string out false_
+  | [| l |] -> pp_lit out l
   | _ ->
-      Format.fprintf out "%s@[<hv>%a@]%s" l CCFormat.(array ~sep pp_lit) lits r
+    Format.fprintf out "%s@[<hv>%a@]%s" l CCFormat.(array ~sep pp_lit) lits r
 
 let pp out lits =
   let pp_lit = CCFormat.hovbox Lit.pp in
@@ -398,10 +426,9 @@ let pp out lits =
 
 let pp_vars_gen ~pp_var ~pp_lits out lits =
   let pp_vars out = function
-    | [] ->
-        ()
+    | [] -> ()
     | l ->
-        Format.fprintf out "forall @[%a@].@ " (Util.pp_list ~sep:" " pp_var) l
+      Format.fprintf out "forall @[%a@].@ " (Util.pp_list ~sep:" " pp_var) l
   in
   let vars_ = Seq.vars lits |> T.VarSet.of_iter |> T.VarSet.to_list in
   Format.fprintf out "@[<2>%a%a@]" pp_vars vars_ pp_lits lits
@@ -417,12 +444,11 @@ let pp_tstp out lits =
 (* print quantified literals *)
 let pp_tstp_closed out lits =
   let pp_vars out = function
-    | [] ->
-        ()
+    | [] -> ()
     | l ->
-        Format.fprintf out "![@[%a@]]:@ "
-          (Util.pp_list ~sep:", " Type.TPTP.pp_typed_var)
-          l
+      Format.fprintf out "![@[%a@]]:@ "
+        (Util.pp_list ~sep:", " Type.TPTP.pp_typed_var)
+        l
   in
   Format.fprintf out "@[<2>%a%a@]" pp_vars (vars lits) pp_tstp lits
 
@@ -442,13 +468,12 @@ let to_string a = CCFormat.to_string pp a
 let is_RR_horn_clause lits =
   let bv = pos lits in
   match BV.to_list bv with
-  | [i] ->
-      (* single positive lit, check variables restrictions, ie all vars
+  | [ i ] ->
+    (* single positive lit, check variables restrictions, ie all vars
           occur in the head *)
-      let hd_vars = Lit.vars lits.(i) in
-      List.length hd_vars = List.length (vars lits)
-  | _ ->
-      false
+    let hd_vars = Lit.vars lits.(i) in
+    List.length hd_vars = List.length (vars lits)
+  | _ -> false
 
 (** Is clause Horn and has a unique maximal literal *)
 let is_unique_max_horn_clause ~ord lits =
@@ -465,18 +490,14 @@ let is_shielded var (lits : t) : bool =
   let var_eq = HVar.equal Type.equal in
   let rec shielded_by_term ~root t =
     match T.view t with
-    | T.Var v' when var_eq v' var ->
-        not root
+    | T.Var v' when var_eq v' var -> not root
     | _ when Type.Seq.vars (T.ty t) |> Iter.exists (var_eq var) ->
-        true (* shielded by type *)
-    | T.Var _ | T.DB _ | T.Const _ ->
-        false
-    | T.AppBuiltin (_, l) ->
-        List.exists (shielded_by_term ~root:false) l
+      true (* shielded by type *)
+    | T.Var _ | T.DB _ | T.Const _ -> false
+    | T.AppBuiltin (_, l) -> List.exists (shielded_by_term ~root:false) l
     | T.App (f, l) ->
-        shielded_by_term ~root f || List.exists (shielded_by_term ~root:false) l
-    | T.Fun (_, bod) ->
-        shielded_by_term ~root:false bod
+      shielded_by_term ~root f || List.exists (shielded_by_term ~root:false) l
+    | T.Fun (_, bod) -> shielded_by_term ~root:false bod
   in
   (* is there a term, directly under a literal, that shields the variable? *)
   lits |> Seq.terms |> Iter.exists (shielded_by_term ~root:true)
@@ -498,16 +519,16 @@ let ground_lits lits =
         let ty = HVar.ty v in
         Subst.FO.bind subst
           ((v :> InnerTerm.t HVar.t), 0)
-          (T.mk_tmp_cst ~counter ~ty, 0) )
+          (T.mk_tmp_cst ~counter ~ty, 0))
       all_vars Subst.empty
   in
   let res = apply_subst Subst.Renaming.none gr_subst (lits, 0) in
-  assert (Iter.for_all T.is_ground @@ Seq.terms res) ;
+  assert (Iter.for_all T.is_ground @@ Seq.terms res);
   res
 
 let num_predicate lits =
   let cnt = ref 0 in
-  CCArray.iter (fun l -> if Lit.is_predicate_lit l then incr cnt) lits ;
+  CCArray.iter (fun l -> if Lit.is_predicate_lit l then incr cnt) lits;
   !cnt
 
 let num_equational lits = CCArray.length lits - num_predicate lits

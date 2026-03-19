@@ -3,61 +3,56 @@
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
 type unif_subst = Unif_subst.t
-
 type subst = Subst.t
-
 type term = InnerTerm.t
-
 type ty = InnerTerm.t
-
 type 'a sequence = ('a -> unit) -> unit
 
-(** Raised when a unification/matching attempt fails *)
 exception Fail
+(** Raised when a unification/matching attempt fails *)
 
 val _allow_pattern_unif : bool ref
-
 val _unif_bool : bool ref
 
 val norm_logical_disagreements :
-     ?mode:[< `Conservative | `Off | `Pragmatic > `Conservative]
-  -> Builtin.t
-  -> Term.t list
-  -> Term.t list
-  -> Term.t list * Term.t list
+  ?mode:[< `Conservative | `Off | `Pragmatic > `Conservative ] ->
+  Builtin.t ->
+  Term.t list ->
+  Term.t list ->
+  Term.t list * Term.t list
 
 val occurs_check :
-     depth:int
-  -> subst
-  -> InnerTerm.t HVar.t Scoped.t
-  -> InnerTerm.t Scoped.t
-  -> bool
+  depth:int ->
+  subst ->
+  InnerTerm.t HVar.t Scoped.t ->
+  InnerTerm.t Scoped.t ->
+  bool
 
 val unif_array_com :
-     ?size:[`Same | `Smaller]
-  -> 'subst
-  -> op:('subst -> 'a Scoped.t -> 'a Scoped.t -> 'subst Iter.t)
-  -> 'a array Scoped.t
-  -> 'a array Scoped.t
-  -> 'subst Iter.t
+  ?size:[ `Same | `Smaller ] ->
+  'subst ->
+  op:('subst -> 'a Scoped.t -> 'a Scoped.t -> 'subst Iter.t) ->
+  'a array Scoped.t ->
+  'a array Scoped.t ->
+  'subst Iter.t
 (** Generic unification over two arrays (of the same size, or the first one must
     be smaller or equal) *)
 
 val unif_list :
-     'subst
-  -> op:('subst -> 'a Scoped.t -> 'a Scoped.t -> 'subst Iter.t)
-  -> 'a list Scoped.t
-  -> 'a list Scoped.t
-  -> 'subst Iter.t
+  'subst ->
+  op:('subst -> 'a Scoped.t -> 'a Scoped.t -> 'subst Iter.t) ->
+  'a list Scoped.t ->
+  'a list Scoped.t ->
+  'subst Iter.t
 (** Generic unification over two lists (of the same size) *)
 
 val unif_list_com :
-     ?size:[`Same | `Smaller]
-  -> 'subst
-  -> op:('subst -> 'a Scoped.t -> 'a Scoped.t -> 'subst Iter.t)
-  -> 'a list Scoped.t
-  -> 'a list Scoped.t
-  -> 'subst Iter.t
+  ?size:[ `Same | `Smaller ] ->
+  'subst ->
+  op:('subst -> 'a Scoped.t -> 'a Scoped.t -> 'subst Iter.t) ->
+  'a list Scoped.t ->
+  'a list Scoped.t ->
+  'subst Iter.t
 (** Generic unification over two lists (of the same size or smaller) *)
 
 val pair_lists_right :

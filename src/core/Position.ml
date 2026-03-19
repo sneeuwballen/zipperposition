@@ -15,130 +15,101 @@ type t =
 type position = t
 
 let stop = Stop
-
 let type_ pos = Type pos
-
 let left pos = Left pos
-
 let right pos = Right pos
-
 let head pos = Head pos
-
 let arg i pos = Arg (i, pos)
-
 let body pos = Body pos
-
 let compare = CCShims_.Stdlib.compare
-
 let equal p1 p2 = compare p1 p2 = 0
-
 let hash p = Hashtbl.hash p
 
 let rec size = function
-  | Stop ->
-      0
-  | Type p | Left p | Right p | Head p | Arg (_, p) | Body p ->
-      1 + size p
+  | Stop -> 0
+  | Type p | Left p | Right p | Head p | Arg (_, p) | Body p -> 1 + size p
 
 let rev pos =
   let rec aux acc pos =
     match pos with
-    | Stop ->
-        acc
-    | Type pos' ->
-        aux (Type acc) pos'
-    | Left pos' ->
-        aux (Left acc) pos'
-    | Right pos' ->
-        aux (Right acc) pos'
-    | Head pos' ->
-        aux (Head acc) pos'
-    | Arg (i, pos') ->
-        aux (Arg (i, acc)) pos'
-    | Body pos' ->
-        aux (Body acc) pos'
+    | Stop -> acc
+    | Type pos' -> aux (Type acc) pos'
+    | Left pos' -> aux (Left acc) pos'
+    | Right pos' -> aux (Right acc) pos'
+    | Head pos' -> aux (Head acc) pos'
+    | Arg (i, pos') -> aux (Arg (i, acc)) pos'
+    | Body pos' -> aux (Body acc) pos'
   in
   aux Stop pos
 
-let opp = function Left p -> Right p | Right p -> Left p | pos -> pos
+let opp = function
+  | Left p -> Right p
+  | Right p -> Left p
+  | pos -> pos
 
 (* Recursive append *)
 let rec append p1 p2 =
   match p1 with
-  | Stop ->
-      p2
-  | Type p1' ->
-      Type (append p1' p2)
-  | Left p1' ->
-      Left (append p1' p2)
-  | Right p1' ->
-      Right (append p1' p2)
-  | Head p1' ->
-      Head (append p1' p2)
-  | Arg (i, p1') ->
-      Arg (i, append p1' p2)
-  | Body p1' ->
-      Body (append p1' p2)
+  | Stop -> p2
+  | Type p1' -> Type (append p1' p2)
+  | Left p1' -> Left (append p1' p2)
+  | Right p1' -> Right (append p1' p2)
+  | Head p1' -> Head (append p1' p2)
+  | Arg (i, p1') -> Arg (i, append p1' p2)
+  | Body p1' -> Body (append p1' p2)
 
 let rec pp out pos =
   match pos with
-  | Stop ->
-      CCFormat.string out "ε"
+  | Stop -> CCFormat.string out "ε"
   | Type p' ->
-      CCFormat.string out "τ." ; pp out p'
+    CCFormat.string out "τ.";
+    pp out p'
   | Left p' ->
-      CCFormat.string out "←." ; pp out p'
+    CCFormat.string out "←.";
+    pp out p'
   | Right p' ->
-      CCFormat.string out "→." ; pp out p'
+    CCFormat.string out "→.";
+    pp out p'
   | Head p' ->
-      CCFormat.string out "@." ; pp out p'
+    CCFormat.string out "@.";
+    pp out p'
   | Arg (i, p') ->
-      Format.fprintf out "%d." i ; pp out p'
+    Format.fprintf out "%d." i;
+    pp out p'
   | Body p' ->
-      Format.fprintf out "β." ; pp out p'
+    Format.fprintf out "β.";
+    pp out p'
 
 let to_string = CCFormat.to_string pp
 
 let rec is_prefix p1 p2 : bool =
-  match (p1, p2) with
-  | Stop, _ ->
-      true
+  match p1, p2 with
+  | Stop, _ -> true
   | Left l1, Left l2
   | Right l1, Right l2
   | Head l1, Head l2
   | Body l1, Body l2
   | Type l1, Type l2 ->
-      is_prefix l1 l2
-  | Arg (i1, l1), Arg (i2, l2) ->
-      i1 = i2 && is_prefix l1 l2
+    is_prefix l1 l2
+  | Arg (i1, l1), Arg (i2, l2) -> i1 = i2 && is_prefix l1 l2
   | Left _, _ | Right _, _ | Head _, _ | Body _, _ | Arg _, _ | Type _, _ ->
-      false
+    false
 
 let is_strict_prefix p1 p2 = (not (equal p1 p2)) && is_prefix p1 p2
 
 let rec until_first_fun = function
-  | Stop ->
-      Stop
-  | Type p ->
-      Type (until_first_fun p)
-  | Left p ->
-      Left (until_first_fun p)
-  | Right p ->
-      Right (until_first_fun p)
-  | Head p ->
-      Head (until_first_fun p)
-  | Arg (i, p) ->
-      Arg (i, until_first_fun p)
-  | Body _ ->
-      Stop
+  | Stop -> Stop
+  | Type p -> Type (until_first_fun p)
+  | Left p -> Left (until_first_fun p)
+  | Right p -> Right (until_first_fun p)
+  | Head p -> Head (until_first_fun p)
+  | Arg (i, p) -> Arg (i, until_first_fun p)
+  | Body _ -> Stop
 
 let rec num_of_funs = function
-  | Stop ->
-      0
-  | Type p' | Left p' | Right p' | Head p' | Arg (_, p') ->
-      num_of_funs p'
-  | Body p' ->
-      1 + num_of_funs p'
+  | Stop -> 0
+  | Type p' | Left p' | Right p' | Head p' | Arg (_, p') -> num_of_funs p'
+  | Body p' -> 1 + num_of_funs p'
 
 module Map = struct
   include CCMap.Make (struct
@@ -164,21 +135,16 @@ module Build = struct
         (** Apply function to position, then apply linked builder *)
 
   let empty = E
-
   let of_pos p = P (p, E)
 
   (* how to apply a difference list to a tail list *)
   let rec apply_rec tail b =
     match b with
-    | E ->
-        tail
-    | P (pos0, b') ->
-        apply_rec (append pos0 tail) b'
-    | N (f, b') ->
-        apply_rec (f tail) b'
+    | E -> tail
+    | P (pos0, b') -> apply_rec (append pos0 tail) b'
+    | N (f, b') -> apply_rec (f tail) b'
 
   let apply_flip b pos = apply_rec pos b
-
   let to_pos b = apply_rec stop b
 
   let suffix b pos =
@@ -191,21 +157,13 @@ module Build = struct
     N ((fun pos1 -> append pos (apply_rec pos1 b)), E)
 
   let append p1 p2 = N (apply_flip p2, p1)
-
   let left b = N (left, b)
-
   let right b = N (right, b)
-
   let type_ b = N (type_, b)
-
   let head b = N (head, b)
-
   let arg i b = N (arg i, b)
-
   let body b = N (body, b)
-
   let pp out t = pp out (to_pos t)
-
   let to_string t = to_string (to_pos t)
 end
 
@@ -215,16 +173,11 @@ module With = struct
   type 'a t = 'a * position
 
   let get = fst
-
   let pos = snd
-
-  let make x p : _ t = (x, p)
-
+  let make x p : _ t = x, p
   let of_pair p = p
-
-  let map_pos f (x, pos) = (x, f pos)
-
-  let map f (x, pos) = (f x, pos)
+  let map_pos f (x, pos) = x, f pos
+  let map f (x, pos) = f x, pos
 
   module Infix = struct
     let ( >|= ) x f = map f x
@@ -236,7 +189,10 @@ module With = struct
 
   let compare f t1 t2 =
     let c = f (get t1) (get t2) in
-    if c = 0 then compare (pos t1) (pos t2) else c
+    if c = 0 then
+      compare (pos t1) (pos t2)
+    else
+      c
 
   let hash f t = Hash.combine3 41 (f (get t)) (hash (pos t))
 

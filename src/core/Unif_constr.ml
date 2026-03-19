@@ -6,26 +6,25 @@ module T = InnerTerm
 
 type term = T.t
 
-type t =
-  { t1: term
-  ; sc1: Scoped.scope
-  ; t2: term
-  ; sc2: Scoped.scope
-  ; tags: Proof.tag list }
+type t = {
+  t1: term;
+  sc1: Scoped.scope;
+  t2: term;
+  sc2: Scoped.scope;
+  tags: Proof.tag list;
+}
 
-let[@inline] make ~tags (t1, sc1) (t2, sc2) = {t1; sc1; t2; sc2; tags}
-
+let[@inline] make ~tags (t1, sc1) (t2, sc2) = { t1; sc1; t2; sc2; tags }
 let[@inline] tags t = t.tags
 
 let apply_subst renaming subst (c : t) : term * term =
-  ( Subst.apply renaming subst (c.t1, c.sc1)
-  , Subst.apply renaming subst (c.t2, c.sc2) )
+  ( Subst.apply renaming subst (c.t1, c.sc1),
+    Subst.apply renaming subst (c.t2, c.sc2) )
 
 let apply_subst_l renaming subst (l : t list) : _ list =
   List.map (apply_subst renaming subst) l
 
 let pp out (c : t) = CCFormat.fprintf out "(@[%a =?=@ %a@])" T.pp c.t1 T.pp c.t2
-
 let hash (c : t) = Hash.combine4 (T.hash c.t1) c.sc1 (T.hash c.t2) c.sc2
 
 let equal c1 c2 =

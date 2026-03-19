@@ -8,14 +8,12 @@
     linear in time (they copy/traverse the whole input). *)
 
 type 'a equal = 'a -> 'a -> bool
-
 type 'a ord = 'a -> 'a -> int
 
-(** Array of values of type 'a *)
 type 'a t
+(** Array of values of type 'a *)
 
 val of_list : 'a list -> 'a t
-
 val to_list : 'a t -> 'a list
 
 val to_array_copy : 'a t -> 'a array
@@ -29,55 +27,34 @@ val of_array_unsafe : 'a array -> 'a t
     modified afterwards! *)
 
 val empty : 'a t
-
 val length : _ t -> int
-
 val singleton : 'a -> 'a t
-
 val doubleton : 'a -> 'a -> 'a t
-
 val make : int -> 'a -> 'a t
-
 val init : int -> (int -> 'a) -> 'a t
-
 val get : 'a t -> int -> 'a
 
 val set : 'a t -> int -> 'a -> 'a t
 (** Copy the array and modify its copy *)
 
 val map : ('a -> 'b) -> 'a t -> 'b t
-
 val map_arr : ('a -> 'b) -> 'a t -> 'b array
-
 val mapi : (int -> 'a -> 'b) -> 'a t -> 'b t
-
 val mapi_arr : (int -> 'a -> 'b) -> 'a t -> 'b array
-
 val append : 'a t -> 'a t -> 'a t
-
 val iter : ('a -> unit) -> 'a t -> unit
-
 val iteri : (int -> 'a -> unit) -> 'a t -> unit
-
 val foldi : ('a -> int -> 'b -> 'a) -> 'a -> 'b t -> 'a
-
 val fold : ('a -> 'b -> 'a) -> 'a -> 'b t -> 'a
-
 val for_all : ('a -> bool) -> 'a t -> bool
-
 val exists : ('a -> bool) -> 'a t -> bool
-
 val equal : 'a equal -> 'a t equal
-
 val compare : 'a ord -> 'a t ord
-
 val hash : 'a Hash.t -> 'a t Hash.t
 
 val hash_comm : 'a Hash.t -> 'a t Hash.t
 (** Commutative hash *)
 
 val to_iter : 'a t -> 'a Iter.t
-
 val to_iteri : 'a t -> (int * 'a) Iter.t
-
 val of_iter : 'a Iter.t -> 'a t

@@ -1,13 +1,18 @@
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-(** {1 HO} *)
 open Logtk
+(** {1 HO} *)
 
 open Libzipperposition
 
 val prim_enum_terms : Term.Set.t ref
 
-type prune_kind = [`NoPrune | `OldPrune | `PruneAllCovers | `PruneMaxCover]
+type prune_kind =
+  [ `NoPrune
+  | `OldPrune
+  | `PruneAllCovers
+  | `PruneMaxCover
+  ]
 
 val k_prune_arg_fun : prune_kind Flex_state.key
 
@@ -17,7 +22,6 @@ val k_diff_const : Term.t Flex_state.key
 
 module type S = sig
   module Env : Env.S
-
   module C : module type of Env.C
 
   (** {5 Registration} *)

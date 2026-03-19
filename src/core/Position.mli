@@ -25,19 +25,12 @@ type t =
 type position = t
 
 val stop : t
-
 val type_ : t -> t
-
 val left : t -> t
-
 val right : t -> t
-
 val head : t -> t
-
 val body : t -> t
-
 val arg : int -> t -> t
-
 val size : t -> int
 
 val opp : t -> t
@@ -56,13 +49,9 @@ val is_strict_prefix : t -> t -> bool
 (** [is_prefix a b] is true iff [a] is a prefix of [b] and [a != b] *)
 
 val compare : t -> t -> int
-
 val equal : t -> t -> bool
-
 val hash : t -> int
-
 val num_of_funs : t -> int
-
 val until_first_fun : t -> t
 
 include Interfaces.PRINT with type t := t
@@ -108,7 +97,6 @@ module Build : sig
   (** Add [left] at the end *)
 
   val body : t -> t
-
   val head : t -> t
 
   val arg : int -> t -> t
@@ -123,19 +111,14 @@ end
     designat paths in objects *)
 
 module With : sig
-  (** A pair of ['a] and position (builder). *)
   type 'a t = 'a * position
+  (** A pair of ['a] and position (builder). *)
 
   val get : 'a t -> 'a
-
   val pos : _ t -> position
-
   val make : 'a -> position -> 'a t
-
   val of_pair : 'a * position -> 'a t
-
   val map_pos : (position -> position) -> 'a t -> 'a t
-
   val map : ('a -> 'b) -> 'a t -> 'b t
 
   module Infix : sig
@@ -145,10 +128,7 @@ module With : sig
   include module type of Infix
 
   val equal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
-
   val compare : ('a -> 'a -> int) -> 'a t -> 'a t -> int
-
   val hash : ('a -> int) -> 'a t -> int
-
   val pp : 'a CCFormat.printer -> 'a t CCFormat.printer
 end

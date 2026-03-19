@@ -6,38 +6,35 @@ module T = Term
 module Fmt = CCFormat
 
 let section = Util.Section.make "rewrite"
-
 let stat_term_rw = Util.mk_stat "rw.steps_term"
-
 let prof_term_rw = ZProf.make "rw.term"
-
 let stat_lit_rw = Util.mk_stat "rw.steps_lit"
-
 let prof_lit_rw = ZProf.make "rw.lit"
 
 (* do we rewrite literals of the form [t = u]? *)
 let allow_pos_eqn_rewrite_ = ref false
 
 type term = Term.t
-
 type proof = Proof.step
 
-type term_rule =
-  { term_head: ID.t (* head symbol of LHS *)
-  ; term_args: term list (* arguments *)
-  ; term_arity: int (* [length args] *)
-  ; term_lhs: term (* [lhs = head args] *)
-  ; term_rhs: term
-  ; term_proof: proof }
+type term_rule = {
+  term_head: ID.t (* head symbol of LHS *);
+  term_args: term list (* arguments *);
+  term_arity: int; (* [length args] *)
+  term_lhs: term; (* [lhs = head args] *)
+  term_rhs: term;
+  term_proof: proof;
+}
 
-type lit_rule =
-  { lit_lhs: Literal.t
-  ; lit_rhs: Literal.t list list
-  ; (* list of clauses *) lit_proof: proof }
+type lit_rule = {
+  lit_lhs: Literal.t;
+  lit_rhs: Literal.t list list;
+  (* list of clauses *) lit_proof: proof;
+}
 
 let compare_tr r1 r2 =
   CCOrd.(
-    T.compare r1.term_lhs r2.term_lhs <?> (T.compare, r1.term_rhs, r2.term_rhs) )
+    T.compare r1.term_lhs r2.term_lhs <?> (T.compare, r1.term_rhs, r2.term_rhs))
 
 let compare_lr r1 r2 =
   let open CCOrd.Infix in
@@ -57,20 +54,21 @@ module LR_set = CCSet.Make (struct
 end)
 
 type defined_position = Defined_pos.t
-
 type defined_positions = defined_position IArray.t
 
-type rule = T_rule of term_rule | L_rule of lit_rule
+type rule =
+  | T_rule of term_rule
+  | L_rule of lit_rule
 
 let compare_rule r1 r2 =
-  let to_int = function T_rule _ -> 0 | L_rule _ -> 1 in
-  match (r1, r2) with
-  | T_rule r1, T_rule r2 ->
-      compare_tr r1 r2
-  | L_rule r1, L_rule r2 ->
-      compare_lr r1 r2
-  | T_rule _, _ | L_rule _, _ ->
-      CCInt.compare (to_int r1) (to_int r2)
+  let to_int = function
+    | T_rule _ -> 0
+    | L_rule _ -> 1
+  in
+  match r1, r2 with
+  | T_rule r1, T_rule r2 -> compare_tr r1 r2
+  | L_rule r1, L_rule r2 -> compare_lr r1 r2
+  | T_rule _, _ | L_rule _, _ -> CCInt.compare (to_int r1) (to_int r2)
 
 module Rule_set = CCSet.Make (struct
   type t = rule
@@ -80,16 +78,17 @@ end)
 
 type rule_set = Rule_set.t
 
-type defined_cst =
-  { defined_id: ID.t
-  ; defined_ty: Type.t
-  ; defined_level: int option
-  ; mutable defined_rules: rule_set
-  ; (* set of rewrite rules.
+type defined_cst = {
+  defined_id: ID.t;
+  defined_ty: Type.t;
+  defined_level: int option;
+  mutable defined_rules: rule_set;
+  (* set of rewrite rules.
         invariant: all these rules have [term_head = defined_id]
         or are equations of type [tau] with [head tau = defined_id] *)
-    mutable defined_positions:
-      defined_positions lazy_t (* metadata on positions *) }
+  mutable defined_positions:
+    defined_positions lazy_t (* metadata on positions *);
+}
 
 let pp_term_rule out r =
   Fmt.fprintf out "@[<2>@[%a@] :=@ @[%a@]@]" T.pp r.term_lhs T.pp r.term_rhs
@@ -107,20 +106,20 @@ let pp_lit_rules out (s : lit_rule Iter.t) : unit =
   Format.fprintf out "{@[<hv>%a@]}" (Util.pp_iter pp_lit_rule) s
 
 let pp_rule out = function
-  | T_rule r ->
-      Format.fprintf out "(@[%a [T]@])" pp_term_rule r
-  | L_rule l ->
-      Format.fprintf out "(@[%a [B]@])" pp_lit_rule l
+  | T_rule r -> Format.fprintf out "(@[%a [T]@])" pp_term_rule r
+  | L_rule l -> Format.fprintf out "(@[%a [B]@])" pp_lit_rule l
 
 let pp_rule_set out (rs : rule_set) : unit =
   Fmt.(within "{" "}" @@ hvbox @@ Util.pp_iter pp_rule)
     out (Rule_set.to_iter rs)
 
-(** Annotation on IDs that are defined. *)
 exception Payload_defined_cst of defined_cst
+(** Annotation on IDs that are defined. *)
 
 let as_defined_cst id =
-  ID.payload_find id ~f:(function Payload_defined_cst c -> Some c | _ -> None)
+  ID.payload_find id ~f:(function
+    | Payload_defined_cst c -> Some c
+    | _ -> None)
 
 let is_defined_cst id = CCOpt.is_some (as_defined_cst id)
 
@@ -128,19 +127,22 @@ module Cst_ = struct
   type t = defined_cst
 
   let rules t = t.defined_rules
-
   let rules_seq t = Rule_set.to_iter (rules t)
 
   let rules_term_seq t : term_rule Iter.t =
-    rules_seq t |> Iter.filter_map (function T_rule t -> Some t | _ -> None)
+    rules_seq t
+    |> Iter.filter_map (function
+      | T_rule t -> Some t
+      | _ -> None)
 
   let rules_lit_seq t : lit_rule Iter.t =
-    rules_seq t |> Iter.filter_map (function L_rule t -> Some t | _ -> None)
+    rules_seq t
+    |> Iter.filter_map (function
+      | L_rule t -> Some t
+      | _ -> None)
 
   let defined_positions t = Lazy.force t.defined_positions
-
   let ty t = t.defined_ty
-
   let level t = CCOpt.get_or ~default:0 t.defined_level
 
   let pp out (t : t) : unit =
@@ -159,44 +161,43 @@ let compute_pos_gen (l : pseudo_rule list) : defined_positions =
   (* ID, number of arguments *)
   let id, n =
     match l with
-    | [] ->
-        assert false
-    | (id, args, _) :: _ ->
-        (id, List.length args)
+    | [] -> assert false
+    | (id, args, _) :: _ -> id, List.length args
   in
   assert (
     l
     |> List.for_all (fun (id', args', _) ->
-        ID.equal id id' && List.length args' = n ) ) ;
+        ID.equal id id' && List.length args' = n));
   (* now compute position roles *)
   let pos = Array.make n Defined_pos.P_invariant in
   Iter.of_list l
   |> Iter.flat_map (fun (_, args, rhs) yield ->
-      List.iteri (fun i sub -> yield (rhs, i, sub)) args )
+      List.iteri (fun i sub -> yield (rhs, i, sub)) args)
   |> Iter.iter (fun (rhs, i, arg) ->
       match T.view arg with
       | T.Var x ->
-          (* if all occurrences of [r.id] on the RHS also have [x] at this
+        (* if all occurrences of [r.id] on the RHS also have [x] at this
                 position, the position stays invariant, otherwise
                 it is an accumulator *)
-          let is_invariant =
-            rhs
-            |> Iter.filter_map (fun args' ->
-                let len = List.length args' in
-                if len > i then Some (List.nth args' (len - i - 1)) else None )
-            |> Iter.for_all (fun sub ->
-                match T.view sub with
-                | T.Var y ->
-                    HVar.equal Type.equal x y
-                | _ ->
-                    false )
-          in
-          (* position is accumulator *)
-          if (not is_invariant) && pos.(i) = Defined_pos.P_invariant then
-            pos.(i) <- Defined_pos.P_accumulator
+        let is_invariant =
+          rhs
+          |> Iter.filter_map (fun args' ->
+              let len = List.length args' in
+              if len > i then
+                Some (List.nth args' (len - i - 1))
+              else
+                None)
+          |> Iter.for_all (fun sub ->
+              match T.view sub with
+              | T.Var y -> HVar.equal Type.equal x y
+              | _ -> false)
+        in
+        (* position is accumulator *)
+        if (not is_invariant) && pos.(i) = Defined_pos.P_invariant then
+          pos.(i) <- Defined_pos.P_accumulator
       | _ ->
-          (* pattern, consider this as input *)
-          pos.(i) <- Defined_pos.P_active ) ;
+        (* pattern, consider this as input *)
+        pos.(i) <- Defined_pos.P_active);
   IArray.of_array_unsafe pos
 
 module Term = struct
@@ -206,54 +207,48 @@ module Term = struct
     type t = term_rule
 
     let lhs r = r.term_lhs
-
     let rhs r = r.term_rhs
-
     let head_id r = r.term_head
-
     let args r = r.term_args
-
     let arity r = r.term_arity
-
     let ty r = T.ty r.term_rhs
-
     let proof r = r.term_proof
-
     let as_lit (r : t) : Literal.t = Literal.mk_eq (lhs r) (rhs r)
-
     let vars r = T.vars (lhs r)
-
     let vars_l r = vars r |> T.VarSet.to_list
 
     let make_ head args term_lhs term_rhs proof =
       let term_proof =
-        Proof.Step.define head (Proof.Src.internal []) [Proof.Parent.from proof]
+        Proof.Step.define head (Proof.Src.internal [])
+          [ Proof.Parent.from proof ]
       in
-      { term_head= head
-      ; term_args= args
-      ; term_arity= List.length args
-      ; term_lhs
-      ; term_rhs
-      ; term_proof }
+      {
+        term_head = head;
+        term_args = args;
+        term_arity = List.length args;
+        term_lhs;
+        term_rhs;
+        term_proof;
+      }
 
     (* constant rule [id := rhs] *)
     let make_const ~proof id ty rhs : t =
       let lhs = T.const ~ty id in
-      assert (Type.equal (T.ty rhs) (T.ty lhs)) ;
+      assert (Type.equal (T.ty rhs) (T.ty lhs));
       if not (T.VarSet.is_empty @@ T.vars rhs) then
         Util.invalid_argf
           "Rule.make_const %a %a:@ invalid rule, RHS contains variables" ID.pp
-          id T.pp rhs ;
+          id T.pp rhs;
       make_ id [] lhs rhs proof
 
     (* [id args := rhs] *)
     let make ~proof id ty args rhs : t =
-      Util.debugf ~section 1 "Making rule for %a" (fun k -> k ID.pp id) ;
+      Util.debugf ~section 1 "Making rule for %a" (fun k -> k ID.pp id);
       let lhs = T.app (T.const ~ty id) args in
       if not (T.VarSet.subset (T.vars rhs) (T.vars lhs)) then
         Util.invalid_argf
           "Rule.make_const %a %a:@ invalid rule, RHS contains variables" ID.pp
-          id T.pp rhs ;
+          id T.pp rhs;
       make_ id args lhs rhs proof
 
     let make_rewritten ~proof ~rewrite_fun id ty args rhs : t =
@@ -268,13 +263,9 @@ module Term = struct
       |> F.close_forall
 
     let to_form ~ctx r = conv_ ~ctx (lhs r) (rhs r)
-
     let compare = compare_tr
-
     let hash r = Hash.combine2 (T.hash @@ lhs r) (T.hash @@ rhs r)
-
     let equal r1 r2 = compare r1 r2 = 0
-
     let to_string = Fmt.to_string pp
   end
 
@@ -289,10 +280,8 @@ module Term = struct
   (* term rules for this ID, if any *)
   let rules_of_id id : rule Iter.t =
     match as_defined_cst id with
-    | None ->
-        Iter.empty
-    | Some dcst ->
-        Cst_.rules_term_seq dcst
+    | None -> Iter.empty
+    | Some dcst -> Cst_.rules_term_seq dcst
 
   module Rule_inst_set = struct
     include CCSet.Make (struct
@@ -321,7 +310,7 @@ module Term = struct
      Use the Term.DB case extensively... *)
 
   let normalize_term_ max_steps (t0 : term) : term * Rule_inst_set.t =
-    assert (max_steps >= 0) ;
+    assert (max_steps >= 0);
     let set = ref Rule_inst_set.empty in
     let sc_t = 0 in
     (* scope of variables of term being normalized *)
@@ -333,105 +322,111 @@ module Term = struct
     let rec reduce t k =
       let t = Lambda.snf t in
       match T.view t with
-      | _ when !fuel = 0 ->
-          k t
-      | T.Const id -> (
+      | _ when !fuel = 0 -> k t
+      | T.Const id ->
         (* pick a constant rule *)
-        match rules_of_id id |> Iter.head with
+        (match rules_of_id id |> Iter.head with
         | Some r when T.is_const r.term_lhs ->
-            (* reduce [rhs], but no variable can be bound *)
-            assert (T.equal t r.term_lhs) ;
-            let cur_sc_r = sc_r in
-            set := Rule_inst_set.add (r, Subst.empty, cur_sc_r) !set ;
-            Util.incr_stat stat_term_rw ;
-            decr fuel ;
-            Util.debugf ~section 5 "@[<2>rewrite `@[%a@]`@ using `@[%a@]`@]"
-              (fun k -> k T.pp t Rule.pp r ) ;
-            reduce r.term_rhs k
+          (* reduce [rhs], but no variable can be bound *)
+          assert (T.equal t r.term_lhs);
+          let cur_sc_r = sc_r in
+          set := Rule_inst_set.add (r, Subst.empty, cur_sc_r) !set;
+          Util.incr_stat stat_term_rw;
+          decr fuel;
+          Util.debugf ~section 5 "@[<2>rewrite `@[%a@]`@ using `@[%a@]`@]"
+            (fun k -> k T.pp t Rule.pp r);
+          reduce r.term_rhs k
         | Some _ ->
-            assert (Type.is_fun (T.ty t) || Type.is_forall (T.ty t)) ;
-            k t (* must be a partial application *)
-        | None ->
-            k t )
+          assert (Type.is_fun (T.ty t) || Type.is_forall (T.ty t));
+          k t (* must be a partial application *)
+        | None -> k t)
       | T.App (f, l) ->
-          (* first, reduce subterms *)
-          (* assert(l != 0) *)
-          reduce_l l (fun l' ->
-              let t' = if T.same_l l l' then t else T.app f l' in
-              let n_l = List.length l' in
-              match T.view f with
-              | T.Const id -> (
-                  let find_rule =
-                    rules_of_id id
-                    |> Iter.find_map (fun r ->
-                        try
-                          let n_r = Rule.arity r in
-                          let t', l_rest =
-                            if n_l = n_r then (t', [])
-                            else if n_r < n_l then
-                              let l1, l2 = CCList.take_drop n_r l' in
-                              (T.app f l1, l2)
-                            else raise Exit
-                          in
-                          let subst' =
-                            Unif.FO.matching ~pattern:(r.term_lhs, sc_r)
-                              (t', sc_t)
-                          in
-                          let cur_sc_r = sc_r in
-                          Some (r, subst', cur_sc_r, l_rest)
-                        with Unif.Fail | Exit -> None )
-                  in
-                  match find_rule with
-                  | None ->
-                      k t'
-                  | Some (r, subst, sc_r, l_rest) ->
-                      (* rewrite [t = r.lhs\sigma] into [rhs] (and normalize [rhs],
-                          which contain variables bound by [subst]) *)
-                      Util.debugf ~section 5
-                        "(@[<2>rewrite `@[%a@]`@ :using `@[%a@]`@ :with \
-                         `@[%a@]`[%d]@ :rest [@[%a@]]@])" (fun k ->
-                          k T.pp t' Rule.pp r Subst.pp subst sc_r
-                            (Util.pp_list ~sep:"," T.pp)
-                            l_rest ) ;
-                      set := Rule_inst_set.add (r, subst, sc_r) !set ;
-                      Util.incr_stat stat_term_rw ;
-                      decr fuel ;
-                      (* NOTE: not efficient, will traverse [t'] fully *)
-                      let rhs =
-                        Subst.FO.apply Subst.Renaming.none subst
-                          (r.term_rhs, sc_r)
+        (* first, reduce subterms *)
+        (* assert(l != 0) *)
+        reduce_l l (fun l' ->
+            let t' =
+              if T.same_l l l' then
+                t
+              else
+                T.app f l'
+            in
+            let n_l = List.length l' in
+            match T.view f with
+            | T.Const id ->
+              let find_rule =
+                rules_of_id id
+                |> Iter.find_map (fun r ->
+                    try
+                      let n_r = Rule.arity r in
+                      let t', l_rest =
+                        if n_l = n_r then
+                          t', []
+                        else if n_r < n_l then (
+                          let l1, l2 = CCList.take_drop n_r l' in
+                          T.app f l1, l2
+                        ) else
+                          raise Exit
                       in
-                      (* add leftover arguments *)
-                      let rhs = T.app rhs l_rest in
-                      reduce rhs k )
-              | _ ->
-                  k t' )
-      | T.Fun (arg, body) ->
-          (* term rewrite rules, because [vars(rhs)⊆vars(lhs)], map
-             closed terms to closed terms, so we can safely rewrite under λ *)
-          reduce body (fun body' ->
-              assert (Type.equal (T.ty body) (T.ty body')) ;
-              let t = if T.equal body body' then t else T.fun_ arg body' in
-              k t )
-      | T.Var _ | T.DB _ ->
-          k t
-      | T.AppBuiltin (_, []) ->
-          k t
-      | T.AppBuiltin (b, l) ->
-          reduce_l l (fun l' ->
-              let t' =
-                if T.same_l l l' then t else T.app_builtin ~ty:(T.ty t) b l'
+                      let subst' =
+                        Unif.FO.matching ~pattern:(r.term_lhs, sc_r) (t', sc_t)
+                      in
+                      let cur_sc_r = sc_r in
+                      Some (r, subst', cur_sc_r, l_rest)
+                    with Unif.Fail | Exit -> None)
               in
-              k t' )
+              (match find_rule with
+              | None -> k t'
+              | Some (r, subst, sc_r, l_rest) ->
+                (* rewrite [t = r.lhs\sigma] into [rhs] (and normalize [rhs],
+                          which contain variables bound by [subst]) *)
+                Util.debugf ~section 5
+                  "(@[<2>rewrite `@[%a@]`@ :using `@[%a@]`@ :with \
+                   `@[%a@]`[%d]@ :rest [@[%a@]]@])" (fun k ->
+                    k T.pp t' Rule.pp r Subst.pp subst sc_r
+                      (Util.pp_list ~sep:"," T.pp)
+                      l_rest);
+                set := Rule_inst_set.add (r, subst, sc_r) !set;
+                Util.incr_stat stat_term_rw;
+                decr fuel;
+                (* NOTE: not efficient, will traverse [t'] fully *)
+                let rhs =
+                  Subst.FO.apply Subst.Renaming.none subst (r.term_rhs, sc_r)
+                in
+                (* add leftover arguments *)
+                let rhs = T.app rhs l_rest in
+                reduce rhs k)
+            | _ -> k t')
+      | T.Fun (arg, body) ->
+        (* term rewrite rules, because [vars(rhs)⊆vars(lhs)], map
+             closed terms to closed terms, so we can safely rewrite under λ *)
+        reduce body (fun body' ->
+            assert (Type.equal (T.ty body) (T.ty body'));
+            let t =
+              if T.equal body body' then
+                t
+              else
+                T.fun_ arg body'
+            in
+            k t)
+      | T.Var _ | T.DB _ -> k t
+      | T.AppBuiltin (_, []) -> k t
+      | T.AppBuiltin (b, l) ->
+        reduce_l l (fun l' ->
+            let t' =
+              if T.same_l l l' then
+                t
+              else
+                T.app_builtin ~ty:(T.ty t) b l'
+            in
+            k t')
     (* reduce list *)
     and reduce_l (l : _ list) k =
       match l with
-      | [] ->
-          k []
+      | [] -> k []
       | t :: tail ->
-          reduce_l tail (fun tail' -> reduce t (fun t' -> k (t' :: tail')))
+        reduce_l tail (fun tail' -> reduce t (fun t' -> k (t' :: tail')))
     in
-    reduce t0 (fun t -> (t, !set))
+    reduce t0 (fun t -> t, !set)
 
   let normalize_term ?(max_steps = 3) (t : term) : term * Rule_inst_set.t =
     ZProf.with_prof prof_term_rw (normalize_term_ max_steps) t
@@ -442,21 +437,17 @@ module Term = struct
       _ Iter.t =
     let t = Lambda.snf t in
     match T.view t with
-    | T.Const _ ->
-        Iter.empty (* already normal form *)
-    | T.App (f, _) -> (
-      match T.view f with
+    | T.Const _ -> Iter.empty (* already normal form *)
+    | T.App (f, _) ->
+      (match T.view f with
       | T.Const id ->
-          (* try to match the rules of [id] *)
-          rules_of_id id
-          |> Iter.filter_map (fun r ->
-              try
-                Some (r, Unif.FO.unify_full ~subst (r.term_lhs, sc_r) (t, sc_t))
-              with Unif.Fail -> None )
-      | _ ->
-          Iter.empty )
-    | T.Fun _ | T.Var _ | T.DB _ | T.AppBuiltin _ ->
-        Iter.empty
+        (* try to match the rules of [id] *)
+        rules_of_id id
+        |> Iter.filter_map (fun r ->
+            try Some (r, Unif.FO.unify_full ~subst (r.term_lhs, sc_r) (t, sc_t))
+            with Unif.Fail -> None)
+      | _ -> Iter.empty)
+    | T.Fun _ | T.Var _ | T.DB _ | T.AppBuiltin _ -> Iter.empty
 end
 
 module Lit = struct
@@ -468,40 +459,37 @@ module Lit = struct
     let rule = Proof.Rule.mk "rw.lit"
 
     let make ~proof lit_lhs lit_rhs =
-      let lit_proof = Proof.Step.esa ~rule [Proof.Parent.from proof] in
-      {lit_lhs; lit_rhs; lit_proof}
+      let lit_proof = Proof.Step.esa ~rule [ Proof.Parent.from proof ] in
+      { lit_lhs; lit_rhs; lit_proof }
 
     let lhs c = c.lit_lhs
-
     let rhs c = c.lit_rhs
-
     let proof c = c.lit_proof
 
     (* conversion into regular clauses *)
     let as_clauses (c : t) : Literals.t list =
-      assert (not (Literal.is_constraint @@ lhs c)) ;
+      assert (not (Literal.is_constraint @@ lhs c));
       List.map
         (fun rhs_c -> Array.of_list (Literal.negate (lhs c) :: rhs_c))
         (rhs c)
 
     let head_id c =
       match lhs c with
-      | Literal.Equation (lhs, _, _) as lit when Literal.is_predicate_lit lit
-        -> (
-        match T.view lhs with
-        | T.Const id ->
-            Some id
-        | T.App (f, _) -> (
-          match T.view f with T.Const id -> Some id | _ -> assert false )
-        | _ ->
-            assert false )
-      | Literal.Equation _ ->
-          None
-      | _ ->
-          assert false
+      | Literal.Equation (lhs, _, _) as lit when Literal.is_predicate_lit lit ->
+        (match T.view lhs with
+        | T.Const id -> Some id
+        | T.App (f, _) ->
+          (match T.view f with
+          | T.Const id -> Some id
+          | _ -> assert false)
+        | _ -> assert false)
+      | Literal.Equation _ -> None
+      | _ -> assert false
 
     let is_equational c =
-      match lhs c with Literal.Equation _ -> true | _ -> false
+      match lhs c with
+      | Literal.Equation _ -> true
+      | _ -> false
 
     let conv_ ~ctx lhs rhs =
       let module F = TypedSTerm.Form in
@@ -515,7 +503,12 @@ module Lit = struct
           |> List.sort (fun v1 v2 ->
               let c1 = Var.Set.mem vars_lhs v1 in
               let c2 = Var.Set.mem vars_lhs v2 in
-              if c1 = c2 then Var.compare v1 v2 else if c1 then -1 else 1 )
+              if c1 = c2 then
+                Var.compare v1 v2
+              else if c1 then
+                -1
+              else
+                1)
         in
         F.forall_l vars f
       in
@@ -533,7 +526,6 @@ module Lit = struct
       |> T.VarSet.of_iter |> T.VarSet.to_list
 
     let compare r1 r2 : int = compare_lr r1 r2
-
     let pp = pp_lit_rule
   end
 
@@ -542,7 +534,7 @@ module Lit = struct
 
     let add_clause r s =
       Util.debugf ~section 5 "@[<2>add rewrite rule@ `@[%a@]`@]" (fun k ->
-          k Rule.pp r ) ;
+          k Rule.pp r);
       add r s
 
     let pp out s = pp_lit_rules out (to_iter s)
@@ -554,44 +546,36 @@ module Lit = struct
   let add_eq_rule (r : Rule.t) : unit =
     match Rule.lhs r with
     | Literal.Equation (t, u, sign) ->
-        let ty = T.ty t in
-        if sign && (not !allow_pos_eqn_rewrite_) && T.is_var t && T.is_var u
-        then
-          (* ignore positive rules *)
-          Util.debugf ~section 2
-            "@[<2>ignore positive equational rewrite `%a`@]" (fun k ->
-              k Rule.pp r )
-        else if Type.is_const ty || Type.is_app ty then
-          eq_rules_ := Set.add r !eq_rules_
-        else
-          Util.invalid_argf
-            "Rewrite.Lit.add_eq_rule:@ invalid equation type `@[%a@]`@ for \
-             rule `%a`"
-            Type.pp ty Rule.pp r
+      let ty = T.ty t in
+      if sign && (not !allow_pos_eqn_rewrite_) && T.is_var t && T.is_var u then
+        (* ignore positive rules *)
+        Util.debugf ~section 2 "@[<2>ignore positive equational rewrite `%a`@]"
+          (fun k -> k Rule.pp r)
+      else if Type.is_const ty || Type.is_app ty then
+        eq_rules_ := Set.add r !eq_rules_
+      else
+        Util.invalid_argf
+          "Rewrite.Lit.add_eq_rule:@ invalid equation type `@[%a@]`@ for rule \
+           `%a`"
+          Type.pp ty Rule.pp r
     | _ ->
-        Util.invalid_argf "Rewrite.Lit.add_eq_rule:@ non-equational rule `%a`"
-          Rule.pp r
+      Util.invalid_argf "Rewrite.Lit.add_eq_rule:@ non-equational rule `%a`"
+        Rule.pp r
 
   (* term rules for this ID, if any *)
   let rules_of_id id : rule Iter.t =
     match as_defined_cst id with
-    | None ->
-        Iter.empty
-    | Some dcst ->
-        Cst_.rules_lit_seq dcst
+    | None -> Iter.empty
+    | Some dcst -> Cst_.rules_lit_seq dcst
 
   let rules_of_lit lit : rule Iter.t =
     match lit with
-    | Literal.Equation (lhs, _, _) when Literal.is_predicate_lit lit -> (
-      match T.Classic.view lhs with
-      | T.Classic.App (id, _) ->
-          rules_of_id id
-      | _ ->
-          Iter.empty )
-    | Literal.Equation _ ->
-        Set.to_iter !eq_rules_
-    | _ ->
-        Iter.empty
+    | Literal.Equation (lhs, _, _) when Literal.is_predicate_lit lit ->
+      (match T.Classic.view lhs with
+      | T.Classic.App (id, _) -> rules_of_id id
+      | _ -> Iter.empty)
+    | Literal.Equation _ -> Set.to_iter !eq_rules_
+    | _ -> Iter.empty
 
   (* find rules that can apply to this literal *)
   let step_lit (lit : Literal.t) =
@@ -599,10 +583,8 @@ module Lit = struct
     |> Iter.find_map (fun r ->
         let substs = Literal.matching ~pattern:(r.lit_lhs, 1) (lit, 0) in
         match Iter.head substs with
-        | None ->
-            None
-        | Some (subst, tags) ->
-            Some (r, subst, tags) )
+        | None -> None
+        | Some (subst, tags) -> Some (r, subst, tags))
 
   (* try to rewrite this literal, returning a list of list of lits instead *)
   let normalize_clause_ (lits : Literals.t) : _ option =
@@ -615,38 +597,36 @@ module Lit = struct
       CCArray.find_map_i
         (fun i lit ->
           match step_lit lit with
-          | None ->
-              None
+          | None -> None
           | Some (rule, subst, tags) ->
-              let clauses = rule.lit_rhs in
-              Util.debugf ~section 5
-                "@[<2>lit rewrite `@[%a@]`@ :into `@[<v>%a@]`@ :with @[%a@]@ \
-                 :rule `%a`@]" (fun k ->
-                  k Literal.pp lit
-                    (Util.pp_list
-                       (Fmt.hvbox (Util.pp_list ~sep:" ∨ " Literal.pp)) )
-                    clauses Subst.pp subst Rule.pp rule ) ;
-              Util.incr_stat stat_lit_rw ;
-              Some (i, clauses, subst, rule, tags) )
+            let clauses = rule.lit_rhs in
+            Util.debugf ~section 5
+              "@[<2>lit rewrite `@[%a@]`@ :into `@[<v>%a@]`@ :with @[%a@]@ \
+               :rule `%a`@]" (fun k ->
+                k Literal.pp lit
+                  (Util.pp_list
+                     (Fmt.hvbox (Util.pp_list ~sep:" ∨ " Literal.pp)))
+                  clauses Subst.pp subst Rule.pp rule);
+            Util.incr_stat stat_lit_rw;
+            Some (i, clauses, subst, rule, tags))
         lits
     in
     match step with
-    | None ->
-        None
+    | None -> None
     | Some (i, clause_chunks, subst, rule, tags) ->
-        let renaming = Subst.Renaming.create () in
-        (* remove rewritten literal, replace by [clause_chunks], apply
+      let renaming = Subst.Renaming.create () in
+      (* remove rewritten literal, replace by [clause_chunks], apply
            substitution (clause_chunks might contain other variables!),
            distribute to get a CNF again *)
-        let lits = CCArray.except_idx lits i in
-        let lits = Literal.apply_subst_list renaming subst (lits, 0) in
-        let clause_chunks = eval_ll renaming subst (clause_chunks, 1) in
-        let clauses =
-          List.rev_map
-            (fun new_lits -> Array.of_list (new_lits @ lits))
-            clause_chunks
-        in
-        Some (clauses, rule, subst, 1, renaming, tags)
+      let lits = CCArray.except_idx lits i in
+      let lits = Literal.apply_subst_list renaming subst (lits, 0) in
+      let clause_chunks = eval_ll renaming subst (clause_chunks, 1) in
+      let clauses =
+        List.rev_map
+          (fun new_lits -> Array.of_list (new_lits @ lits))
+          clause_chunks
+      in
+      Some (clauses, rule, subst, 1, renaming, tags)
 
   let normalize_clause lits = ZProf.with_prof prof_lit_rw normalize_clause_ lits
 
@@ -654,115 +634,97 @@ module Lit = struct
     rules_of_lit lit
     |> Iter.flat_map (fun r ->
         Literal.unify ~subst (r.lit_lhs, sc_r) (lit, sc_lit)
-        |> Iter.map (fun (subst, tags) -> (r, subst, tags)) )
+        |> Iter.map (fun (subst, tags) -> r, subst, tags))
 end
 
 let pseudo_rule_of_rule (r : rule) : pseudo_rule =
   match r with
   | T_rule r ->
-      let id = Term.Rule.head_id r in
-      let args = Term.Rule.args r in
-      let rhs =
-        Term.Rule.rhs r |> T.Seq.subterms
-        |> Iter.filter_map (fun sub ->
-            match T.Classic.view sub with
-            | T.Classic.App (id', args') when ID.equal id' id ->
-                Some args'
-            | _ ->
-                None )
-      in
-      (id, args, rhs)
-  | L_rule r -> (
-      let view_atom id (t : term) =
-        match T.Classic.view t with
-        | T.Classic.App (id', args') when ID.equal id' id ->
-            Some args'
-        | _ ->
-            None
-      in
-      let view_lit id (lit : Literal.t) =
-        match lit with
-        | Equation (lhs, _, _) when Literal.is_predicate_lit lit ->
-            view_atom id lhs
-        | _ ->
-            None
-      in
-      let fail () =
-        Util.invalid_argf "cannot compute position for rule %a" Lit.Rule.pp r
-      in
-      match Lit.Rule.lhs r with
-      | Equation (lhs, _, _) as lit when Literal.is_predicate_lit lit -> (
-        match T.Classic.view lhs with
-        | T.Classic.App (id, args) ->
-            (* occurrences of literals with same [id] on RHS *)
-            let rhs =
-              Lit.Rule.rhs r |> Iter.of_list |> Iter.flat_map Iter.of_list
-              |> Iter.filter_map (view_lit id)
-            in
-            (id, args, rhs)
-        | _ ->
-            fail () )
-      | Literal.True | Literal.False | Literal.Equation _ ->
-          fail () )
+    let id = Term.Rule.head_id r in
+    let args = Term.Rule.args r in
+    let rhs =
+      Term.Rule.rhs r |> T.Seq.subterms
+      |> Iter.filter_map (fun sub ->
+          match T.Classic.view sub with
+          | T.Classic.App (id', args') when ID.equal id' id -> Some args'
+          | _ -> None)
+    in
+    id, args, rhs
+  | L_rule r ->
+    let view_atom id (t : term) =
+      match T.Classic.view t with
+      | T.Classic.App (id', args') when ID.equal id' id -> Some args'
+      | _ -> None
+    in
+    let view_lit id (lit : Literal.t) =
+      match lit with
+      | Equation (lhs, _, _) when Literal.is_predicate_lit lit ->
+        view_atom id lhs
+      | _ -> None
+    in
+    let fail () =
+      Util.invalid_argf "cannot compute position for rule %a" Lit.Rule.pp r
+    in
+    (match Lit.Rule.lhs r with
+    | Equation (lhs, _, _) as lit when Literal.is_predicate_lit lit ->
+      (match T.Classic.view lhs with
+      | T.Classic.App (id, args) ->
+        (* occurrences of literals with same [id] on RHS *)
+        let rhs =
+          Lit.Rule.rhs r |> Iter.of_list |> Iter.flat_map Iter.of_list
+          |> Iter.filter_map (view_lit id)
+        in
+        id, args, rhs
+      | _ -> fail ())
+    | Literal.True | Literal.False | Literal.Equation _ -> fail ())
 
 module Rule = struct
   type t = rule
 
   let of_term t = T_rule t
-
   let of_lit t = L_rule t
-
   let pp = pp_rule
 
   let to_form ?(ctx = Type.Conv.create ()) (r : rule) : TypedSTerm.t =
     match r with
-    | T_rule r ->
-        Term.Rule.to_form ~ctx r
-    | L_rule r ->
-        Lit.Rule.to_form ~ctx r
+    | T_rule r -> Term.Rule.to_form ~ctx r
+    | L_rule r -> Lit.Rule.to_form ~ctx r
 
   let to_form_subst ?(ctx = Type.Conv.create ()) (sp : Subst.Projection.t)
       (r : rule) : TypedSTerm.t * _ =
     let module TT = TypedSTerm in
-    let {Subst.Projection.renaming; scope= sc; subst} = sp in
+    let { Subst.Projection.renaming; scope = sc; subst } = sp in
     match r with
-    | T_rule {term_lhs; term_rhs; _} ->
-        let lhs = Subst.FO.apply renaming subst (term_lhs, sc) in
-        let rhs = Subst.FO.apply renaming subst (term_rhs, sc) in
-        let f = Term.Rule.conv_ ~ctx lhs rhs in
-        let inst =
-          Subst.Projection.as_inst ~ctx sp (T.vars_prefix_order term_lhs)
-        in
-        (f, inst)
-    | L_rule ({lit_lhs; lit_rhs; _} as lit_r) ->
-        let lhs = Literal.apply_subst renaming subst (lit_lhs, sc) in
-        let rhs =
-          List.map
-            (fun l -> Literal.apply_subst_list renaming subst (l, sc))
-            lit_rhs
-        in
-        let inst = Subst.Projection.as_inst ~ctx sp (Lit.Rule.vars lit_r) in
-        (Lit.Rule.conv_ ~ctx lhs rhs, inst)
+    | T_rule { term_lhs; term_rhs; _ } ->
+      let lhs = Subst.FO.apply renaming subst (term_lhs, sc) in
+      let rhs = Subst.FO.apply renaming subst (term_rhs, sc) in
+      let f = Term.Rule.conv_ ~ctx lhs rhs in
+      let inst =
+        Subst.Projection.as_inst ~ctx sp (T.vars_prefix_order term_lhs)
+      in
+      f, inst
+    | L_rule ({ lit_lhs; lit_rhs; _ } as lit_r) ->
+      let lhs = Literal.apply_subst renaming subst (lit_lhs, sc) in
+      let rhs =
+        List.map
+          (fun l -> Literal.apply_subst_list renaming subst (l, sc))
+          lit_rhs
+      in
+      let inst = Subst.Projection.as_inst ~ctx sp (Lit.Rule.vars lit_r) in
+      Lit.Rule.conv_ ~ctx lhs rhs, inst
 
   let pp_zf out r = TypedSTerm.ZF.pp out (to_form r)
-
   let pp_tptp out r = TypedSTerm.TPTP_THF.pp out (to_form r)
 
   let pp_in = function
-    | Output_format.O_normal ->
-        pp
-    | Output_format.O_zf ->
-        pp_zf
-    | Output_format.O_tptp ->
-        pp_tptp
-    | Output_format.O_none ->
-        fun _ _ -> ()
+    | Output_format.O_normal -> pp
+    | Output_format.O_zf -> pp_zf
+    | Output_format.O_tptp -> pp_tptp
+    | Output_format.O_none -> fun _ _ -> ()
 
   let proof = function
-    | T_rule r ->
-        Term.Rule.proof r
-    | L_rule r ->
-        Lit.Rule.proof r
+    | T_rule r -> Term.Rule.proof r
+    | L_rule r -> Lit.Rule.proof r
 
   let contains_skolems (t : term) : bool =
     T.Seq.symbols t |> Iter.exists ID.is_skolem
@@ -771,22 +733,20 @@ module Rule = struct
     L_rule (Lit.Rule.make ~proof lit_lhs lit_rhs)
 
   let compare a b =
-    match (a, b) with
-    | T_rule r1, T_rule r2 ->
-        Term.Rule.compare r1 r2
-    | L_rule r1, L_rule r2 ->
-        Lit.Rule.compare r1 r2
-    | T_rule _, L_rule _ ->
-        -1
-    | L_rule _, T_rule _ ->
-        1
+    match a, b with
+    | T_rule r1, T_rule r2 -> Term.Rule.compare r1 r2
+    | L_rule r1, L_rule r2 -> Lit.Rule.compare r1 r2
+    | T_rule _, L_rule _ -> -1
+    | L_rule _, T_rule _ -> 1
 
   exception E_p of t
 
   let res_tc : t Proof.result_tc =
     Proof.Result.make_tc
       ~to_exn:(fun t -> E_p t)
-      ~of_exn:(function E_p p -> Some p | _ -> None)
+      ~of_exn:(function
+        | E_p p -> Some p
+        | _ -> None)
       ~compare
       ~flavor:(fun _ -> `Def)
       ~pp_in
@@ -808,7 +768,7 @@ module Rule = struct
         let proof =
           Proof.S.mk (Term.Rule.proof r) (Proof.Result.make res_tc (T_rule r))
         in
-        Proof.Parent.from_subst Subst.Renaming.none (proof, sc) subst )
+        Proof.Parent.from_subst Subst.Renaming.none (proof, sc) subst)
     |> Iter.to_rev_list
 end
 
@@ -830,69 +790,69 @@ module Defined_cst = struct
       |> Iter.to_rev_list |> compute_pos_gen
     in
     Util.debugf ~section 3 "(@[<2>defined_pos %a@ :pos (@[<hv>%a@])@])"
-      (fun k -> k ID.pp id (Util.pp_iter Defined_pos.pp) (IArray.to_iter pos) ) ;
+      (fun k -> k ID.pp id (Util.pp_iter Defined_pos.pp) (IArray.to_iter pos));
     pos
 
   let check_rules id rules =
-    Rule_set.iter (function T_rule r -> check_id_tr id r | _ -> ()) rules
+    Rule_set.iter
+      (function
+        | T_rule r -> check_id_tr id r
+        | _ -> ())
+      rules
 
   (* main builder *)
   let make_ level id ty rules : t =
-    check_rules id rules ;
-    { defined_id= id
-    ; defined_level= level
-    ; defined_ty= ty
-    ; defined_rules= rules
-    ; defined_positions= lazy (compute_pos id rules) }
+    check_rules id rules;
+    {
+      defined_id = id;
+      defined_level = level;
+      defined_ty = ty;
+      defined_rules = rules;
+      defined_positions = lazy (compute_pos id rules);
+    }
 
   let declare ?level id (rules : rule_set) : t =
     (* declare that [id] is a defined constant of level [l+1] *)
     Util.debugf ~section 2 "@[<2>declare %a@ as defined constant@ :rules %a@]"
-      (fun k -> k ID.pp id pp_rule_set rules ) ;
+      (fun k -> k ID.pp id pp_rule_set rules);
     let ty =
       if Rule_set.is_empty rules then
         Util.invalid_argf
           "cannot declare %a as defined constant with empty set of rules" ID.pp
-          id ;
+          id;
       match Rule_set.choose rules with
-      | T_rule s ->
-          Term.Rule.ty s
-      | L_rule _ ->
-          Type.prop
+      | T_rule s -> Term.Rule.ty s
+      | L_rule _ -> Type.prop
     in
     let dcst = make_ level id ty rules in
-    ID.set_payload id (Payload_defined_cst dcst) ;
-    CCList.Ref.push allcst_ dcst ;
+    ID.set_payload id (Payload_defined_cst dcst);
+    CCList.Ref.push allcst_ dcst;
     dcst
 
   let add_rule (dcst : t) (r : rule) : unit =
-    (match r with T_rule r -> check_id_tr dcst.defined_id r | L_rule _ -> ()) ;
+    (match r with
+    | T_rule r -> check_id_tr dcst.defined_id r
+    | L_rule _ -> ());
     let rules = Rule_set.add r (rules dcst) in
-    dcst.defined_rules <- rules ;
-    dcst.defined_positions <- lazy (compute_pos dcst.defined_id rules) ;
+    dcst.defined_rules <- rules;
+    dcst.defined_positions <- lazy (compute_pos dcst.defined_id rules);
     (* update positions *)
     ()
 
   let add_term_rule (dcst : t) (r : term_rule) : unit = add_rule dcst (T_rule r)
-
   let add_lit_rule (dcst : t) (r : lit_rule) : unit = add_rule dcst (L_rule r)
-
   let add_term_rule_l dcst = List.iter (add_term_rule dcst)
-
   let add_lit_rule_l dcst = List.iter (add_lit_rule dcst)
-
   let add_eq_rule = Lit.add_eq_rule
-
   let add_eq_rule_l = List.iter add_eq_rule
 
   let declare_or_add id (rule : rule) : unit =
     match as_defined_cst id with
     | Some c ->
-        Util.debugf ~section 2 "@[<2>add rule@ :to %a@ :rule %a@]" (fun k ->
-            k ID.pp id pp_rule rule ) ;
-        add_rule c rule
-    | None ->
-        ignore (declare ?level:None id (Rule_set.singleton rule))
+      Util.debugf ~section 2 "@[<2>add rule@ :to %a@ :rule %a@]" (fun k ->
+          k ID.pp id pp_rule rule);
+      add_rule c rule
+    | None -> ignore (declare ?level:None id (Rule_set.singleton rule))
 
   (* make a single rule [proj (C … x_i …) --> x_i] *)
   let mk_rule_proj_ (p : Ind_ty.projector) proof : rule =
@@ -916,24 +876,25 @@ module Defined_cst = struct
         (List.map T.var vars)
     in
     let rhs = T.var (List.nth vars i) in
-    T_rule (Term.Rule.make ~proof id ty_proj (List.map T.var ty_vars @ [t]) rhs)
+    T_rule
+      (Term.Rule.make ~proof id ty_proj (List.map T.var ty_vars @ [ t ]) rhs)
 
   let declare_proj ~proof (p : Ind_ty.projector) : unit =
     let p_id = Ind_ty.projector_id p in
     match as_defined_cst p_id with
     | Some _ ->
-        Util.invalid_argf "cannot declare proj %a, already defined" ID.pp p_id
+      Util.invalid_argf "cannot declare proj %a, already defined" ID.pp p_id
     | None ->
-        let rule = mk_rule_proj_ p proof in
-        Util.debugf ~section 3 "(@[declare-proj %a@ :rule %a@])" (fun k ->
-            k ID.pp p_id Rule.pp rule ) ;
-        ignore (declare ?level:None p_id (Rule_set.singleton rule))
+      let rule = mk_rule_proj_ p proof in
+      Util.debugf ~section 3 "(@[declare-proj %a@ :rule %a@])" (fun k ->
+          k ID.pp p_id Rule.pp rule);
+      ignore (declare ?level:None p_id (Rule_set.singleton rule))
 
   (* make a single rule [C (proj_1 x)…(proj_n x) --> x] *)
   let mk_rule_cstor_ (c : Ind_ty.constructor) proof : rule =
     let c_id = c.Ind_ty.cstor_name in
     let projs = List.map snd c.Ind_ty.cstor_args in
-    assert (projs <> []) ;
+    assert (projs <> []);
     (* make type variables *)
     let c_ty = c.Ind_ty.cstor_ty in
     let n_ty_vars, _, _ = Type.open_poly_fun c_ty in
@@ -949,7 +910,7 @@ module Defined_cst = struct
           T.app_full
             (T.const ~ty:(Ind_ty.projector_ty proj) (Ind_ty.projector_id proj))
             (List.map Type.var ty_vars)
-            [T.var x] )
+            [ T.var x ])
         projs
     in
     let rhs = T.var x in
@@ -957,27 +918,28 @@ module Defined_cst = struct
 
   let declare_cstor ~proof (c : Ind_ty.constructor) : unit =
     let c_id = c.Ind_ty.cstor_name in
-    if not (CCList.is_empty c.Ind_ty.cstor_args) then
+    if not (CCList.is_empty c.Ind_ty.cstor_args) then (
       match as_defined_cst c_id with
       | Some _ ->
-          Util.invalid_argf "cannot declare cstor %a, already defined" ID.pp
-            c_id
+        Util.invalid_argf "cannot declare cstor %a, already defined" ID.pp c_id
       | None ->
-          let rule = mk_rule_cstor_ c proof in
-          Util.debugf ~section 3 "(@[declare-cstor %a@ :rule %a@])" (fun k ->
-              k ID.pp c_id Rule.pp rule ) ;
-          ignore (declare ?level:None c_id (Rule_set.singleton rule) : t)
+        let rule = mk_rule_cstor_ c proof in
+        Util.debugf ~section 3 "(@[declare-cstor %a@ :rule %a@])" (fun k ->
+            k ID.pp c_id Rule.pp rule);
+        ignore (declare ?level:None c_id (Rule_set.singleton rule) : t)
+    )
 end
 
 let all_cst k = List.iter k !allcst_
-
 let all_rules = all_cst |> Iter.flat_map Defined_cst.rules_seq
 
 let () =
   Options.add_opts
-    [ ( "--rw-pos-eqn"
-      , Arg.Set allow_pos_eqn_rewrite_
-      , " do rewriting on positive equations" )
-    ; ( "--no-rw-pos-eqn"
-      , Arg.Clear allow_pos_eqn_rewrite_
-      , " no rewriting on positive equations" ) ]
+    [
+      ( "--rw-pos-eqn",
+        Arg.Set allow_pos_eqn_rewrite_,
+        " do rewriting on positive equations" );
+      ( "--no-rw-pos-eqn",
+        Arg.Clear allow_pos_eqn_rewrite_,
+        " no rewriting on positive equations" );
+    ]

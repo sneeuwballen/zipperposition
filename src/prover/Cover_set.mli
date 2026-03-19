@@ -7,11 +7,8 @@
 open Logtk
 
 type cst = Ind_cst.t
-
 type term = Term.t
-
 type case
-
 type t
 
 (** {5 Inductive Case}
@@ -25,19 +22,12 @@ module Case : sig
   type t = case
 
   val equal : t -> t -> bool
-
   val compare : t -> t -> int
-
   val hash : t -> int
-
   val pp : t CCFormat.printer
-
   val is_rec : t -> bool
-
   val is_base : t -> bool
-
   val to_term : t -> term
-
   val to_lit : t -> Literal.t
 
   val same_cst : t -> t -> bool
@@ -50,7 +40,6 @@ module Case : sig
 end
 
 val pp : t CCFormat.printer
-
 val ty : t -> Type.t
 
 val top : t -> cst
@@ -60,7 +49,7 @@ val declarations : t -> (ID.t * Type.t) Iter.t
 (** [declarations set] returns a list of type declarations that should be made
     if [set] is new (declare the top cst and its subcases) *)
 
-val cases : ?which:[`Rec | `Base | `All] -> t -> case Iter.t
+val cases : ?which:[ `Rec | `Base | `All ] -> t -> case Iter.t
 (** Cases of the cover set *)
 
 val sub_constants : t -> cst Iter.t

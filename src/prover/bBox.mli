@@ -23,7 +23,6 @@ module Lit : Bool_lit_intf.S with type payload = payload
 type t = Lit.t
 
 val dummy : t
-
 val pp_payload : payload CCFormat.printer
 
 val make_fresh : unit -> t
@@ -63,7 +62,6 @@ val as_case : t -> inductive_case list option
 (** If [payload t = Case p], then return [Some p], else return [None] *)
 
 val as_lemma : t -> Cut_form.t option
-
 val as_lits : t -> Literals.t option
 
 val must_be_kept : t -> bool
@@ -80,9 +78,6 @@ val to_s_form : t -> TypedSTerm.Form.t
     Those printers print the content (injection) of a boolean literal, if any *)
 
 val pp : t CCFormat.printer
-
 val pp_tstp : t CCFormat.printer
-
 val pp_zf : t CCFormat.printer
-
 val pp_bclause : t list CCFormat.printer

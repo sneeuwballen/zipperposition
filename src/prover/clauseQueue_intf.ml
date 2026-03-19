@@ -24,10 +24,10 @@ module type S = sig
 
   (** {6 Weight functions} *)
   module WeightFun : sig
+    type t = C.t -> int
     (** attribute a weight to a clause. The smaller, the better (lightweight
         clauses will be favored). A weight must always be positive; the weight
         of the empty clause should alwyays be 0. *)
-    type t = C.t -> int
 
     val of_string : string -> t
     (** parse string description of weight function and return it *)
@@ -45,7 +45,6 @@ module type S = sig
     (** Favor clauses that have at least one non-(ground negative) lit *)
 
     val favor_ground : t
-
     val favor_horn : t
 
     val favor_goal : t
@@ -53,10 +52,10 @@ module type S = sig
         Some threshold is used for clauses that are too far away *)
 
     val conj_relative :
-         ?distinct_vars_mul:float
-      -> ?parameters_magnitude:[< `Large | `Small > `Large]
-      -> ?goal_penalty:bool
-      -> t
+      ?distinct_vars_mul:float ->
+      ?parameters_magnitude:[< `Large | `Small > `Large ] ->
+      ?goal_penalty:bool ->
+      t
 
     val combine : (t * int) list -> t
     (** Combine a list of pairs [w, coeff] where [w] is a weight function, and
@@ -71,8 +70,8 @@ module type S = sig
     (** parse string description of weight function and return it *)
   end
 
-  (** A priority queue. *)
   type t
+  (** A priority queue. *)
 
   val add : t -> C.t -> bool
   (** Add a clause to the Queue; returns true if clause was actually added *)
@@ -136,6 +135,5 @@ module type S = sig
   (** {5 IO} *)
 
   val pp : t CCFormat.printer
-
   val to_string : t -> string
 end

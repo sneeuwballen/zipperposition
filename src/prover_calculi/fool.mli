@@ -15,7 +15,6 @@ type term = Term.t
 
 module type S = sig
   module Env : Env.S
-
   module C : module type of Env.C
 
   (** {5 Registration} *)

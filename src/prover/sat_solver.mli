@@ -3,7 +3,6 @@
 (** {1 Interface to MSat} *)
 
 include module type of Sat_solver_intf
-
 module Make () : S
 
 val set_compact : bool -> unit

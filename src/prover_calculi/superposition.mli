@@ -21,7 +21,6 @@ val k_unif_alg :
   Flex_state.key
 
 val k_ho_basic_rules : bool Flex_state.key
-
 val get_unif_module : (module Env.S) -> (module UnifFramework.US)
 
 val register : sup:(module S) -> unit

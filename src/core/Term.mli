@@ -15,11 +15,10 @@
 (** {2 Term} *)
 
 type t = private InnerTerm.t
-
 type term = t
 
-(** Variables are typed with {!Type.t} *)
 type var = Type.t HVar.t
+(** Variables are typed with {!Type.t} *)
 
 type view = private
   | AppBuiltin of Builtin.t * t list
@@ -52,18 +51,14 @@ val subterm : sub:t -> t -> bool
 (** checks whether [sub] is a (non-strict) subterm of [t] *)
 
 include Interfaces.HASH with type t := t
-
 include Interfaces.ORD with type t := t
 
 val ty : t -> Type.t
 (** Obtain the type of a term.. *)
 
 module IntMap : Map.S with type key = int
-
 module Set : CCSet.S with type elt = t
-
 module Map : CCMap.S with type key = t
-
 module Tbl : CCHashtbl.S with type key = t
 
 val hash_mod_alpha : t -> int
@@ -82,7 +77,6 @@ val same_l_gen : t list -> t list -> bool
 (** {2 Constructors} *)
 
 val var : var -> t
-
 val var_of_int : ty:Type.t -> int -> t
 
 val bvar : ty:Type.t -> int -> t
@@ -91,7 +85,6 @@ val bvar : ty:Type.t -> int -> t
     @raise InnerTerm.IllFormedTerm if the index is < 0 *)
 
 val builtin : ty:Type.t -> Builtin.t -> t
-
 val app_builtin : ty:Type.t -> Builtin.t -> t list -> t
 
 val const : ty:Type.t -> ID.t -> t
@@ -113,11 +106,8 @@ val app_full : t -> Type.t list -> t list -> t
 (** Apply the term to types, then to terms *)
 
 val true_ : t
-
 val false_ : t
-
 val fun_ : Type.t -> t -> t
-
 val fun_l : Type.t list -> t -> t
 
 val fun_of_fvars : var list -> t -> t
@@ -134,32 +124,21 @@ val grounding : Type.t -> t
 (** [grounding ty] is a unique constant of type [ty] *)
 
 val is_var : t -> bool
-
 val is_appbuiltin : t -> bool
-
 val is_bvar : t -> bool
-
 val is_formula : t -> bool
-
 val is_app : t -> bool
-
 val is_const : t -> bool
-
 val is_fun : t -> bool
-
 val is_app_var : t -> bool
 
 val is_type : t -> bool
 (** Does it have type [tType]? *)
 
 val in_pfho_fragment : t -> bool
-
 val in_lfho_fragment : t -> bool
-
 val is_fo_term : t -> bool
-
 val in_fool_fragment : t -> bool * bool
-
 val is_true_or_false : t -> bool
 
 val lambda_depth : t -> int option
@@ -170,20 +149,15 @@ val comb_depth : t -> int option
 (** combinatory equivalent to lambda_depth *)
 
 val hd_is_comb : Builtin.t -> bool
-
 val is_comb : t -> bool
 
 val mk_fresh_skolem :
   ?prefix:string -> var list -> Type.t -> (ID.t * Type.t) * t
 
 val as_const : t -> ID.t option
-
 val as_const_exn : t -> ID.t
-
 val as_var : t -> var option
-
 val as_var_exn : t -> var
-
 val as_bvar_exn : t -> int
 
 val as_app : t -> t * t list
@@ -223,13 +197,10 @@ val of_ty : Type.t -> t
 (** Upcast from type *)
 
 val mk_tmp_cst : counter:int ref -> ty:Type.t -> t
-
 val is_properly_encoded : t -> bool
 
 module VarSet : CCSet.S with type elt = var
-
 module VarMap : CCMap.S with type key = var
-
 module VarTbl : CCHashtbl.S with type key = var
 
 (** {2 Iters} *)
@@ -238,16 +209,16 @@ module Seq : sig
   val vars : t -> var Iter.t
 
   val subterms :
-       ?include_builtin:bool
-    -> ?include_app_vars:bool
-    -> ?ignore_head:bool
-    -> t
-    -> t Iter.t
+    ?include_builtin:bool ->
+    ?include_app_vars:bool ->
+    ?ignore_head:bool ->
+    t ->
+    t Iter.t
 
   val subterms_depth :
-       ?filter_term:(t -> bool)
-    -> t
-    -> (t * int) Iter.t (* subterms with their depth *)
+    ?filter_term:(t -> bool) ->
+    t ->
+    (t * int) Iter.t (* subterms with their depth *)
 
   val symbols :
     ?include_types:bool -> ?filter_term:(t -> bool) -> t -> ID.t Iter.t
@@ -259,9 +230,7 @@ module Seq : sig
   (** min var *)
 
   val ty_vars : t -> var Iter.t
-
   val typed_symbols : ?include_types:bool -> t -> (ID.t * Type.t) Iter.t
-
   val add_set : Set.t -> t Iter.t -> Set.t
 
   (* given terms s and t, iterate over all terms s' t'
@@ -284,7 +253,6 @@ val monomorphic : t -> bool
 (** true if the term contains no type var *)
 
 val is_beta_reducible : t -> bool
-
 val has_lambda : t -> bool
 
 val max_var : VarSet.t -> int
@@ -387,14 +355,14 @@ val contains_symbol : ID.t -> t -> bool
 (** High level fold-like combinators *)
 
 val all_positions :
-     ?filter_formula_subterms:(Builtin.t -> t list -> int list CCOpt.t)
-  -> ?vars:bool
-  -> ?ty_args:bool
-  -> ?var_args:bool
-  -> ?fun_bodies:bool
-  -> ?pos:Position.t
-  -> t
-  -> t Position.With.t Iter.t
+  ?filter_formula_subterms:(Builtin.t -> t list -> int list CCOpt.t) ->
+  ?vars:bool ->
+  ?ty_args:bool ->
+  ?var_args:bool ->
+  ?fun_bodies:bool ->
+  ?pos:Position.t ->
+  t ->
+  t Position.With.t Iter.t
 (** Iterate on all sub-terms with their position.
     @param vars specifies whether variables are folded on (default false).
     @param ty_args
@@ -411,7 +379,6 @@ val all_positions :
 
 module type AC_SPEC = sig
   val is_ac : ID.t -> bool
-
   val is_comm : ID.t -> bool
 end
 
@@ -442,7 +409,6 @@ val print_all_types : bool ref
 (** If true, {!pp} will print the types of all annotated terms *)
 
 include Interfaces.PRINT with type t := t
-
 include Interfaces.PRINT_DE_BRUIJN with type t := t and type term := t
 
 val pp_var : Type.t HVar.t CCFormat.printer
@@ -464,29 +430,17 @@ val debugf : Format.formatter -> t -> unit
 
 module Form : sig
   val not_ : t -> t
-
   val equiv : t -> t -> t
-
   val xor : t -> t -> t
-
   val imply : t -> t -> t
-
   val eq : t -> t -> t
-
   val neq : t -> t -> t
-
   val and_ : t -> t -> t
-
   val or_ : t -> t -> t
-
   val and_l : t list -> t
-
   val or_l : t list -> t
-
   val forall : t -> t
-
   val exists : t -> t
-
   val choice : t -> t
 end
 
@@ -494,45 +448,25 @@ end
 
 module Arith : sig
   val floor : t
-
   val ceiling : t
-
   val truncate : t
-
   val round : t
-
   val prec : t
-
   val succ : t
-
   val sum : t
-
   val difference : t
-
   val uminus : t
-
   val product : t
-
   val quotient : t
-
   val quotient_e : t
-
   val quotient_t : t
-
   val quotient_f : t
-
   val remainder_e : t
-
   val remainder_t : t
-
   val remainder_f : t
-
   val less : t
-
   val lesseq : t
-
   val greater : t
-
   val greatereq : t
 
   val pp_hook : print_hook
@@ -540,25 +474,17 @@ module Arith : sig
 end
 
 val close_quantifier : Builtin.t -> Type.t list -> t -> t
-
 val has_ho_subterm : t -> bool
 
 (** {2 De Bruijn} *)
 module DB : sig
   val is_closed : t -> bool
-
   val shift : ?depth:int -> int -> t -> t
-
   val unshift : ?depth:int -> int -> t -> t
-
   val eval : t DBEnv.t -> t -> t
-
   val unbound : t -> int list
-
   val skolemize_loosely_bound : ?already_sk:t IntMap.t -> t -> t * t IntMap.t
-
   val unskolemize : int Map.t -> Map.key -> t
-
   val map_vars_shift : ?depth:int -> int Map.t -> t -> t
 end
 
@@ -584,18 +510,17 @@ module Conv : sig
   type ctx = Type.Conv.ctx
 
   val create : unit -> ctx
-
   val of_simple_term : ctx -> TypedSTerm.t -> t option
 
   val of_simple_term_exn : ctx -> TypedSTerm.t -> t
   (** @raise Type.Conv.Error on failure *)
 
   val to_simple_term :
-       ?allow_free_db:bool
-    -> ?env:TypedSTerm.t Var.t DBEnv.t
-    -> ctx
-    -> t
-    -> TypedSTerm.t
+    ?allow_free_db:bool ->
+    ?env:TypedSTerm.t Var.t DBEnv.t ->
+    ctx ->
+    t ->
+    TypedSTerm.t
 
   val var_to_simple_var : ?prefix:string -> ctx -> var -> TypedSTerm.t Var.t
 end
@@ -605,16 +530,16 @@ end
 val rebuild_rec : t -> t (* rebuild term fully, checking types *)
 
 val fold_left_map2 :
-     ('acc1 -> 'acc2 -> 'a -> 'acc1 * 'acc2 * 'b)
-  -> 'acc1
-  -> 'acc2
-  -> 'a list
-  -> 'acc1 * 'acc2 * 'b list
+  ('acc1 -> 'acc2 -> 'a -> 'acc1 * 'acc2 * 'b) ->
+  'acc1 ->
+  'acc2 ->
+  'a list ->
+  'acc1 * 'acc2 * 'b list
 
 val mangle_term :
-     (Type.t * Type.t) list
-  -> ((ID.t * Type.t) * t) list
-  -> t
-  -> (Type.t * Type.t) list * ((ID.t * Type.t) * t) list * t
+  (Type.t * Type.t) list ->
+  ((ID.t * Type.t) * t) list ->
+  t ->
+  (Type.t * Type.t) list * ((ID.t * Type.t) * t) list * t
 
 (**/**)

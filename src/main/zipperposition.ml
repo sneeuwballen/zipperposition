@@ -9,21 +9,19 @@ open Logtk
 open Libzipperposition_phases
 
 let section = Libzipperposition.Const.section
-
 let phases = Phases_impl.main_cli ~setup_gc:true ()
 
 let () =
-  ZProf.setup () ;
+  ZProf.setup ();
   match Phases.run phases with
   | CCResult.Error msg ->
-      print_endline msg ; exit 1
-  | CCResult.Ok (_, 0) ->
-      ()
-  | CCResult.Ok (_, errcode) ->
-      exit errcode (* failure *)
+    print_endline msg;
+    exit 1
+  | CCResult.Ok (_, 0) -> ()
+  | CCResult.Ok (_, errcode) -> exit errcode (* failure *)
 
 let _ =
   at_exit (fun () ->
       Util.debugf ~section 1 "run time: %.3f" (fun k ->
-          k (Util.total_time_s ()) ) ;
-      Signal.send Libzipperposition.Signals.on_exit 0 )
+          k (Util.total_time_s ()));
+      Signal.send Libzipperposition.Signals.on_exit 0)

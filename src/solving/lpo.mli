@@ -20,27 +20,16 @@ module Constraint : sig
     | False (* impossible constraint *)
 
   val eq : expr -> expr -> t
-
   val neq : expr -> expr -> t
-
   val le : expr -> expr -> t
-
   val lt : expr -> expr -> t
-
   val gt : expr -> expr -> t
-
   val ge : expr -> expr -> t
-
   val and_ : t list -> t
-
   val or_ : t list -> t
-
   val not_ : t -> t
-
   val imply : t -> t -> t
-
   val true_ : t
-
   val false_ : t
 
   module Seq : sig
@@ -57,9 +46,9 @@ end
 (** {2 Solutions to constraint problems} *)
 
 module Solution : sig
+  type t = (ID.t * ID.t) list
   (** A precedence on symbol. Each pair means that thG first symbol is bigger
       than the second one. *)
-  type t = (ID.t * ID.t) list
 
   val neg_to_constraint : t -> Constraint.t
   (** Constraint that explicitly eliminate this solution *)

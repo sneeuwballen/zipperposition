@@ -14,18 +14,14 @@ open Logtk
 val section : Util.Section.t
 
 type term = TypedSTerm.t
-
 type ty = term
-
 type form = term
 
-(** Instantiate some binder with the following terms. Order matters. *)
 type inst = term list
+(** Instantiate some binder with the following terms. Order matters. *)
 
 type tag = Proof.tag
-
 type name = string
-
 type t
 
 type step =
@@ -35,39 +31,37 @@ type step =
   | Trivial
   | By_def of ID.t
   | Define of ID.t
-  | Instantiate of {form: t; inst: inst; tags: tag list}
+  | Instantiate of {
+      form: t;
+      inst: inst;
+      tags: tag list;
+    }
   | Esa of name * t list
-  | Inference of
-      { intros: term list
-            (* local renaming for the conclusion's foralls, with fresh constants *)
-      ; local_intros: term list
-            (* variables introduced between hypothesis, not in conclusion *)
-      ; name: name
-      ; parents: parent list
-      ; tags: tag list }
+  | Inference of {
+      intros: term list;
+          (* local renaming for the conclusion's foralls, with fresh constants *)
+      local_intros: term list;
+          (* variables introduced between hypothesis, not in conclusion *)
+      name: name;
+      parents: parent list;
+      tags: tag list;
+    }
 
-and parent = {p_proof: t; p_inst: inst (* instantiate [forall] variables *)}
+and parent = {
+  p_proof: t;
+  p_inst: inst; (* instantiate [forall] variables *)
+}
 
 val id : t -> int
-
 val concl : t -> form
-
 val step : t -> step
-
 val parents : t -> parent list
-
 val premises : t -> t list
-
 val p_of : t -> parent
-
 val p_inst : t -> inst -> parent
-
 val pp_step : step CCFormat.printer
-
 val pp_parent : parent CCFormat.printer
-
 val pp_id : t CCFormat.printer
-
 val pp_res : t CCFormat.printer
 
 val pp : t CCFormat.printer
@@ -77,46 +71,36 @@ val pp_dag : t CCFormat.printer
 (** Print the whole DAG *)
 
 val pp_inst : inst CCFormat.printer
-
 val equal : t -> t -> bool
-
 val compare : t -> t -> int
-
 val hash : t -> int
-
 val goal : form -> t
-
 val negated_goal : form -> t -> t
-
 val assert_ : form -> t
-
 val trivial : form -> t
-
 val by_def : ID.t -> form -> t
-
 val define : ID.t -> form -> t
-
 val instantiate : ?tags:tag list -> form -> t -> inst -> t
-
 val esa : form -> name -> t list -> t
 
 val inference :
-     intros:term list
-  -> local_intros:term list
-  -> tags:tag list
-  -> form
-  -> name
-  -> parent list
-  -> t
+  intros:term list ->
+  local_intros:term list ->
+  tags:tag list ->
+  form ->
+  name ->
+  parent list ->
+  t
 
 (** {2 Checking steps} *)
 
-type check_res = R_ok | R_fail | R_skip
+type check_res =
+  | R_ok
+  | R_fail
+  | R_skip
 
 val get_check_res : t -> check_res option
-
 val set_check_res : t -> check_res -> unit
-
 val pp_check_res : check_res CCFormat.printer
 
 (** {2 Printing} *)

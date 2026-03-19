@@ -2,11 +2,13 @@
 
 open Logtk
 
-type spec = {sym: ID.t; ty: Type.t}
+type spec = {
+  sym: ID.t;
+  ty: Type.t;
+}
 
 module type S = sig
   module Env : Env.S
-
   module C : module type of Env.C
 
   val on_add : spec Signal.t

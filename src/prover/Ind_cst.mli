@@ -7,13 +7,12 @@
 
 open Logtk
 
+type t
 (** A ground term of an inductive type. It must correspond to a term built with
     the corresponding {!t} only. For instance, a constant of type [nat] should
     be equal to [s^n(0)] in any model. *)
-type t
 
 exception InvalidDecl of string
-
 exception NotAnInductiveConstant of ID.t
 
 val id_as_cst : ID.t -> t option
@@ -37,39 +36,31 @@ val is_sub : t -> bool
 (** Is the constant a sub-constant (i.e. a subterm of a case in a coverset)? *)
 
 val id_is_sub : ID.t -> bool
-
 val equal : t -> t -> bool
-
 val compare : t -> t -> int
-
 val hash : t -> int
-
 val id : t -> ID.t
-
 val to_term : t -> Term.t
-
 val ty : t -> Type.t
 
 val same_type : t -> t -> bool
 (** Do these two inductive constants have the same type? *)
 
 val pp : t CCFormat.printer
-
 val depth : t -> int
 
 val dominates : t -> t -> bool
 (** [dominates c1 c2] if [depth c1 < depth c2]. This way, in coversets, the top
     constant dominates all sub-constants *)
 
-(** Set of constants *)
 module Cst_set : CCSet.S with type elt = t
+(** Set of constants *)
 
 (** {2 Inductive Skolems} *)
 
 type ind_skolem = ID.t * Type.t
 
 val ind_skolem_compare : ind_skolem -> ind_skolem -> int
-
 val ind_skolem_equal : ind_skolem -> ind_skolem -> bool
 
 val id_is_ind_skolem : ID.t -> Type.t -> bool

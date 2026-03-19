@@ -12,9 +12,7 @@ val empty : t
 type 'a key
 
 val create_key : unit -> 'a key
-
 val add : 'a key -> 'a -> t -> t
-
 val get : 'a key -> t -> 'a option
 
 val get_exn : 'a key -> t -> 'a

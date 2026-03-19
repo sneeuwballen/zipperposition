@@ -32,18 +32,14 @@
     conversion). *)
 
 type term = TypedSTerm.t
-
 type form = TypedSTerm.t
-
 type type_ = TypedSTerm.t
-
 type lit = term SLiteral.t
 
 (** See "computing small normal forms", in the handbook of automated reasoning.
     All transformations are made on curried terms and formulas. *)
 
 exception Error of string
-
 exception NotCNF of form
 
 val miniscope : ?distribute_exists:bool -> form -> form
@@ -75,44 +71,42 @@ type options =
       (** transformation applied just after skolemization. It must not break
           skolemization nor NNF (no quantifier, no non-leaf negation). *)
 
-(** Basic clause representation, as list of literals *)
 type clause = lit list
+(** Basic clause representation, as list of literals *)
 
 val clause_to_fo : ?ctx:Term.Conv.ctx -> clause -> Term.t SLiteral.t list
 
-(** A statement before CNF *)
 type f_statement = (term, term, type_) Statement.t
+(** A statement before CNF *)
 
-(** A statement after CNF *)
 type c_statement = (clause, term, type_) Statement.t
+(** A statement after CNF *)
 
 val pp_f_statement : f_statement CCFormat.printer
-
 val pp_c_statement : c_statement CCFormat.printer
 
 val pp_fo_c_statement :
   (Term.t SLiteral.t list, Term.t, Type.t) Statement.t CCFormat.printer
 
 val is_clause : form -> bool
-
 val is_cnf : form -> bool
 
 (** {2 Main Interface} *)
 
 val cnf_of :
-     ctx:Skolem.ctx
-  -> ?opts:options list
-  -> f_statement
-  -> c_statement CCVector.ro_vector
+  ctx:Skolem.ctx ->
+  ?opts:options list ->
+  f_statement ->
+  c_statement CCVector.ro_vector
 (** Transform the statement into proper CNF; returns a list of statements,
     including type declarations for new Skolem symbols or formulas proxies.
     Options are used to tune the behavior. *)
 
 val cnf_of_iter :
-     ctx:Skolem.ctx
-  -> ?opts:options list
-  -> f_statement Iter.t
-  -> c_statement CCVector.ro_vector
+  ctx:Skolem.ctx ->
+  ?opts:options list ->
+  f_statement Iter.t ->
+  c_statement CCVector.ro_vector
 
 val type_declarations : c_statement Iter.t -> type_ ID.Map.t
 (** Compute the types declared in the statement sequence *)

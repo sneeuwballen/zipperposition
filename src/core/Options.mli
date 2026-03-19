@@ -18,7 +18,11 @@ type input_format =
 
 val input_format_of_string : string -> input_format
 
-type print_format = Output_format.t = O_none | O_normal | O_tptp | O_zf
+type print_format = Output_format.t =
+  | O_none
+  | O_normal
+  | O_tptp
+  | O_zf
 
 val print_format_of_string : string -> print_format
 (** @raise Failure if it could not parse *)

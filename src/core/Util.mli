@@ -60,11 +60,11 @@ val break_on_debug : bool ref
 (** Shall we wait for user input after each debug message? *)
 
 val debugf :
-     ?section:Section.t
-  -> int
-  -> ('a, Format.formatter, unit, unit) format4
-  -> ('a -> unit)
-  -> unit
+  ?section:Section.t ->
+  int ->
+  ('a, Format.formatter, unit, unit) format4 ->
+  ('a -> unit) ->
+  unit
 (** Print a debug message, with the given section and verbosity level. The
     message might be dropped if its level is too high. *)
 
@@ -84,9 +84,9 @@ val warn : string -> unit
 val warnf : ('a, Format.formatter, unit, unit) format4 -> 'a
 (** Emit warning, with formatting *)
 
+exception Error of string * string
 (** generalist error that do not really belong elsewhere. [Error (where,what)]
     means that error [what] was raised from [where]. *)
-exception Error of string * string
 
 val error : where:string -> string -> 'a
 (** [error msg] raises [Error msg]
@@ -121,7 +121,6 @@ module Exn : sig
   (** printer for backtraces, if enabled (print nothing otherwise) *)
 
   val fmt_backtrace : Format.formatter -> unit -> unit
-
   val string_of_backtrace : unit -> string
 end
 
@@ -135,16 +134,14 @@ val print_global_stats : comment:string -> unit -> unit
 (** comment prefix *)
 
 val incr_stat : stat -> unit
-
 val add_stat : stat -> int -> unit
-
 val pp_stat : Format.formatter -> stat -> unit
 
 (** {2 Flags as integers} *)
 
 module Flag : sig
-  (** Generator of flags *)
   type gen = int ref
+  (** Generator of flags *)
 
   val create : unit -> gen
   (** New generator *)
@@ -161,16 +158,15 @@ val finally : do_:(unit -> unit) -> (unit -> 'a) -> 'a
     terminates. *)
 
 val pp_pair :
-     ?sep:string
-  -> 'a CCFormat.printer
-  -> 'b CCFormat.printer
-  -> ('a * 'b) CCFormat.printer
+  ?sep:string ->
+  'a CCFormat.printer ->
+  'b CCFormat.printer ->
+  ('a * 'b) CCFormat.printer
 
 val pp_list : ?sep:string -> 'a CCFormat.printer -> 'a list CCFormat.printer
 (** Print a list without begin/end separators *)
 
 val pp_seq : ?sep:string -> 'a CCFormat.printer -> 'a Seq.t CCFormat.printer
-
 val pp_iter : ?sep:string -> 'a CCFormat.printer -> 'a Iter.t CCFormat.printer
 
 val pp_list0 : ?sep:string -> 'a CCFormat.printer -> 'a list CCFormat.printer
@@ -184,24 +180,17 @@ val pp_str_tstp : string CCFormat.printer
 (** possibly escaping *)
 
 val pp_var_tstp : string CCFormat.printer
-
 val ord_option : 'a CCOrd.t -> 'a option CCOrd.t
 
 (* TODO: use containers' at some point *)
 val take_drop_while : ('a -> bool) -> 'a list -> 'a list * 'a list
-
 val map_product : f:('a -> 'b list list) -> 'a list -> 'b list list
-
 val seq_map_l : f:('a -> 'b list) -> 'a list -> 'b list Iter.t
-
 val seq_zipi : 'a Iter.t -> (int * 'a) Iter.t
-
 val invalid_argf : ('a, Format.formatter, unit, 'b) format4 -> 'a
-
 val failwithf : ('a, Format.formatter, unit, 'b) format4 -> 'a
 
 module Int_map : CCMap.S with type key = int
-
 module Int_set : CCSet.S with type elt = int
 
 val escape_dot : string -> string

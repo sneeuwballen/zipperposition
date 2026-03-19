@@ -10,7 +10,6 @@ module type TERM = sig
   type t
 
   val equal : t -> t -> bool
-
   val hash : t -> int
 
   val subterms : t -> t list
@@ -30,39 +29,42 @@ module Make (T : TERM) = struct
     type t = term
 
     let equal = T.equal
-
     let hash = T.hash
   end)
 
+  type t = {
+    parents: term list H.t (* parent terms *);
+    mutable next: term H.t (* pointer towards representative *);
+  }
   (** Maps terms to their list of immediate parents, and current representative
   *)
-  type t =
-    { parents: term list H.t (* parent terms *)
-    ; mutable next: term H.t (* pointer towards representative *) }
 
-  let create ?(size = 64) () = {parents= H.create size; next= H.create size}
+  let create ?(size = 64) () = { parents = H.create size; next = H.create size }
 
   (* update [node.next] to be [next] *)
-  let[@inline] set_next_ cc t next : t = {cc with next= H.replace cc.next t next}
+  let[@inline] set_next_ cc t next : t =
+    { cc with next = H.replace cc.next t next }
 
   (* update [node.parents] to be [parents] *)
   let[@inline] set_parents_ cc t parents : t =
-    {cc with parents= H.replace cc.parents t parents}
+    { cc with parents = H.replace cc.parents t parents }
 
   let[@inline] next_ cc t = H.get t cc.next |> CCOpt.get_or ~default:t
-
   let[@inline] parents_ cc t = H.get t cc.parents |> CCOpt.get_or ~default:[]
 
   (* find representative *)
   let rec find_ cc (t : term) : term =
     let next = next_ cc t in
-    if T.equal t next then t (* root *)
-    else
+    if T.equal t next then
+      t
+    (* root *)
+    else (
       let root = find_ cc next in
       (* path compression. Can be done in place as it doesn't change
          the semantics of the CC *)
-      if not (T.equal root next) then cc.next <- H.replace cc.next t root ;
+      if not (T.equal root next) then cc.next <- H.replace cc.next t root;
       root
+    )
 
   (* are two nodes, with their subterm lists, congruent? To
       check this, we compute the representative of subnodes
@@ -81,9 +83,10 @@ module Make (T : TERM) = struct
     (* get representatives *)
     let t1 = find_ cc t1 in
     let t2 = find_ cc t2 in
-    if T.equal t1 t2 then cc
-    else
-      let left, right = (parents_ cc t1, parents_ cc t2) in
+    if T.equal t1 t2 then
+      cc
+    else (
+      let left, right = parents_ cc t1, parents_ cc t2 in
       (* n1 now points to n2, put every class information in n2 *)
       let cc = set_next_ cc t1 t2 in
       let cc = set_parents_ cc t2 (List.rev_append left right) in
@@ -94,16 +97,18 @@ module Make (T : TERM) = struct
             (fun cc p2 ->
               if (not (T.equal p1 p2)) && are_congruent_ cc p1 p2 then
                 merge_ cc p1 p2
-              else cc )
-            cc right )
+              else
+                cc)
+            cc right)
         cc left
+    )
 
   (* add [t] to the CC *)
   let rec add cc (t : term) : t =
     if H.mem cc.parents t then (
-      assert (H.mem cc.next t) ;
-      cc )
-    else
+      assert (H.mem cc.next t);
+      cc
+    ) else (
       let subs = T.subterms t in
       let cc = set_parents_ cc t [] in
       let cc = set_next_ cc t t in
@@ -114,7 +119,7 @@ module Make (T : TERM) = struct
         List.fold_left
           (fun cc sub ->
             let repr = find_ cc sub in
-            set_parents_ cc repr (t :: parents_ cc repr) )
+            set_parents_ cc repr (t :: parents_ cc repr))
           cc subs
       in
       let cc =
@@ -125,17 +130,20 @@ module Make (T : TERM) = struct
               (fun cc parent_sub ->
                 if
                   (not (T.equal t parent_sub)) && are_congruent_ cc t parent_sub
-                then merge_ cc t parent_sub
-                else cc )
-              cc parents )
+                then
+                  merge_ cc t parent_sub
+                else
+                  cc)
+              cc parents)
           cc subs
       in
       cc
+    )
 
   let iter cc f =
     H.iter cc.next (fun mem _ ->
         let repr = find_ cc mem in
-        f ~mem ~repr )
+        f ~mem ~repr)
 
   let iter_roots cc f =
     H.iter cc.next (fun t next -> if T.equal t next then f t)
@@ -171,20 +179,17 @@ module FO = Make (struct
   type t = T.t
 
   let equal = T.equal
-
   let hash = T.hash
-
   let pp = T.pp
 
   let subterms t =
-    match T.Classic.view t with T.Classic.App (_, l) -> l | _ -> []
+    match T.Classic.view t with
+    | T.Classic.App (_, l) -> l
+    | _ -> []
 
   let update_subterms t l =
-    match (T.view t, l) with
-    | T.App (hd, l), l' when List.length l = List.length l' ->
-        T.app hd l'
-    | _, [] ->
-        t
-    | _ ->
-        assert false
+    match T.view t, l with
+    | T.App (hd, l), l' when List.length l = List.length l' -> T.app hd l'
+    | _, [] -> t
+    | _ -> assert false
 end)

@@ -9,19 +9,19 @@ module Fmt = CCFormat
     - active position (patterns on LHS of rules)
     - invariant positions (variable on LHS and RHS of rules)
     - accumulator positions (variable on LHS, non-variable on RHS) *)
-type t = P_active | P_invariant | P_accumulator
+type t =
+  | P_active
+  | P_invariant
+  | P_accumulator
 
 type pos = t
 
 let equal (a : t) (b : t) : bool = a = b
 
 let pp out = function
-  | P_active ->
-      Fmt.string out "active"
-  | P_invariant ->
-      Fmt.string out "invariant"
-  | P_accumulator ->
-      Fmt.string out "accumulator"
+  | P_active -> Fmt.string out "active"
+  | P_invariant -> Fmt.string out "invariant"
+  | P_accumulator -> Fmt.string out "accumulator"
 
 module Arr : sig
   type t = pos IArray.t

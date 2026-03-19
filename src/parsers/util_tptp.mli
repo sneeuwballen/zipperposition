@@ -6,9 +6,7 @@ open Logtk
 module A = Ast_tptp
 
 type 'a or_error = ('a, string) CCResult.t
-
 type untyped = STerm.t
-
 type typed = TypedSTerm.t
 
 val enable_def_as_rewrite : bool ref
@@ -17,8 +15,8 @@ exception Error of string
 
 (** {2 Printing/Parsing} *)
 
-(** Cache that remembers the set of files that have been parsed so far *)
 type parse_cache
+(** Cache that remembers the set of files that have been parsed so far *)
 
 val create_parse_cache : unit -> parse_cache
 
@@ -47,7 +45,6 @@ val parse_file :
 (** Printing is simpler, because it does not involve includes. *)
 
 val print_into : 't CCFormat.printer -> 't A.t Iter.t CCFormat.printer
-
 val print_into_file : 't CCFormat.printer -> string -> 't A.t Iter.t -> unit
 
 val has_includes : _ A.t Iter.t -> bool

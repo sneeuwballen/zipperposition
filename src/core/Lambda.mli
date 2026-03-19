@@ -36,12 +36,8 @@ module Inner : sig
   type term = InnerTerm.t
 
   val whnf : term -> term
-
   val snf : term -> term
-
   val eta_expand : term -> term
-
   val eta_reduce : ?expand_quant:bool -> ?full:bool -> term -> term
-
   val beta_red_head : term -> term
 end

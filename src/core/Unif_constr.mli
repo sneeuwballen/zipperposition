@@ -10,17 +10,17 @@
 
 type term = InnerTerm.t
 
+type t = private {
+  t1: term;
+  sc1: Scoped.scope;
+  t2: term;
+  sc2: Scoped.scope;
+  tags: Proof.tag list;
+}
 (** A constraint delayed because unification for this pair of terms is not
     syntactic *)
-type t = private
-  { t1: term
-  ; sc1: Scoped.scope
-  ; t2: term
-  ; sc2: Scoped.scope
-  ; tags: Proof.tag list }
 
 val make : tags:Proof.tag list -> term Scoped.t -> term Scoped.t -> t
-
 val tags : t -> Proof.tag list
 
 val apply_subst : Subst.Renaming.t -> Subst.t -> t -> term * term
@@ -34,7 +34,5 @@ module FO : sig
 end
 
 include Interfaces.HASH with type t := t
-
 include Interfaces.ORD with type t := t
-
 include Interfaces.PRINT with type t := t

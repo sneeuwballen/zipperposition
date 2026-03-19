@@ -16,10 +16,11 @@ module type S = Clause_intf.S
 
 type proof_step = Proof.Step.t
 
+type 'c sets = {
+  c_set: 'c CCVector.ro_vector;  (** main set of clauses *)
+  c_sos: 'c CCVector.ro_vector;  (** set of support *)
+}
 (** Bundle of clause sets *)
-type 'c sets =
-  { c_set: 'c CCVector.ro_vector  (** main set of clauses *)
-  ; c_sos: 'c CCVector.ro_vector  (** set of support *) }
 
 (** {2 Type def} *)
 module Make (Ctx : Ctx.S) : S with module Ctx = Ctx = struct
@@ -28,29 +29,31 @@ module Make (Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   type flag = SClause.flag
 
   (* re-export type, to access fields *)
-  type sclause = SClause.t = private
-    {id: int; lits: Literals.t; trail: Trail.t; mutable flags: flag}
+  type sclause = SClause.t = private {
+    id: int;
+    lits: Literals.t;
+    trail: Trail.t;
+    mutable flags: flag;
+  }
 
-  type t =
-    { sclause: sclause
-    ; mutable penalty: int  (** heuristic penalty *)
-    ; selected: BV.t Lazy.t  (** bitvector for selected lits*)
-    ; bool_selected: (Term.t * Position.t) list Lazy.t
-    ; max_lits: int list Lazy.t  (** bitvector for maximal lits *)
-    ; mutable proof: proof_step  (** Proof of the clause *)
-    ; mutable eligible_res: BV.t option (* eligible for resolution? *)
-    ; mutable eligible_bool: SClause.TPSet.t option }
+  type t = {
+    sclause: sclause;
+    mutable penalty: int;  (** heuristic penalty *)
+    selected: BV.t Lazy.t;  (** bitvector for selected lits*)
+    bool_selected: (Term.t * Position.t) list Lazy.t;
+    max_lits: int list Lazy.t;  (** bitvector for maximal lits *)
+    mutable proof: proof_step;  (** Proof of the clause *)
+    mutable eligible_res: BV.t option (* eligible for resolution? *);
+    mutable eligible_bool: SClause.TPSet.t option;
+  }
 
   type clause = t
 
   (** {2 boolean flags} *)
 
   let get_flag flag c = SClause.get_flag flag c.sclause
-
   let set_flag flag c b = SClause.set_flag flag c.sclause b
-
   let mark_redundant c = set_flag SClause.flag_redundant c true
-
   let is_redundant c = get_flag SClause.flag_redundant c
 
   let mark_backward_simplified c =
@@ -61,15 +64,10 @@ module Make (Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   (** {2 Hashcons} *)
 
   let equal c1 c2 = SClause.equal c1.sclause c2.sclause
-
   let compare c1 c2 = SClause.compare c1.sclause c2.sclause
-
   let hash c = SClause.hash c.sclause
-
   let id c = SClause.id c.sclause
-
   let is_ground c = Literals.is_ground c.sclause.lits
-
   let weight c = Lits.weight c.sclause.lits
 
   let ho_weight c =
@@ -77,26 +75,17 @@ module Make (Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     |> Iter.fold (fun acc t -> T.ho_weight t + acc) 0
 
   let trail c = c.sclause.trail
-
   let has_trail c = not (Trail.is_empty c.sclause.trail)
-
   let trail_subsumes c1 c2 = Trail.subsumes c1.sclause.trail c2.sclause.trail
-
   let is_active c ~v = Trail.is_active c.sclause.trail ~v
-
   let penalty c = c.penalty
-
   let inc_penalty c inc = c.penalty <- c.penalty + inc
 
   let trail_l = function
-    | [] ->
-        Trail.empty
-    | [c] ->
-        c.sclause.trail
-    | [c1; c2] ->
-        Trail.merge c1.sclause.trail c2.sclause.trail
-    | l ->
-        Trail.merge_l (List.map trail l)
+    | [] -> Trail.empty
+    | [ c ] -> c.sclause.trail
+    | [ c1; c2 ] -> Trail.merge c1.sclause.trail c2.sclause.trail
+    | l -> Trail.merge_l (List.map trail l)
 
   let lits c = c.sclause.lits
 
@@ -104,16 +93,13 @@ module Make (Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     type t = clause
 
     let hash = hash
-
     let equal = equal
   end)
 
   (** {2 Utils} *)
 
   let is_goal c = Proof.Step.is_goal c.proof
-
   let distance_to_goal c = Proof.Step.distance_to_goal c.proof
-
   let comes_from_goal c = CCOpt.is_some @@ distance_to_goal c
 
   (* private function for building clauses *)
@@ -122,17 +108,19 @@ module Make (Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     let ord = Ctx.ord () in
     let max_lits = lazy (BV.to_list @@ Lits.maxlits sclause.lits ~ord) in
     let rec c =
-      { sclause
-      ; penalty
-      ; selected
-      ; bool_selected
-      ; proof
-      ; max_lits
-      ; eligible_res= None
-      ; eligible_bool= None }
+      {
+        sclause;
+        penalty;
+        selected;
+        bool_selected;
+        proof;
+        max_lits;
+        eligible_res = None;
+        eligible_bool = None;
+      }
     in
     (* return clause *)
-    Util.incr_stat stat_clause_create ;
+    Util.incr_stat stat_clause_create;
     c
 
   let of_sclause ?(penalty = 1) c proof =
@@ -140,7 +128,9 @@ module Make (Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     let bool_selected = lazy (Ctx.bool_select c.lits) in
     create_inner ~penalty ~selected ~bool_selected c proof
 
-  let lit_is_false_ = function Literal.False -> true | _ -> false
+  let lit_is_false_ = function
+    | Literal.False -> true
+    | _ -> false
 
   let create_a ~penalty ~trail lits proof =
     (* remove spurious "false" literals automatically *)
@@ -148,7 +138,8 @@ module Make (Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       (* TODO running exists not necessary? should directly filter unless i'm mistaken*)
       if CCArray.exists lit_is_false_ lits then
         CCArray.filter (fun lit -> not (lit_is_false_ lit)) lits
-      else lits
+      else
+        lits
     in
     let selected = lazy (Ctx.select lits) in
     let bool_selected = lazy (Ctx.bool_select lits) in
@@ -177,19 +168,17 @@ module Make (Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       c
     in
     match Stmt.view st with
-    | Stmt.Data _ | Stmt.TyDecl _ ->
-        []
+    | Stmt.Data _ | Stmt.TyDecl _ -> []
     | Stmt.Def _ | Stmt.Rewrite _ ->
-        if not convert_defs then []
-        (*dealt with by rewriting *)
-        (* dealt with  *)
-          else List.map of_lits (Stmt.get_formulas_from_defs st)
-    | Stmt.Assert lits ->
-        [of_lits lits]
-    | Stmt.Goal lits ->
-        [of_lits lits]
-    | Stmt.Lemma l | Stmt.NegatedGoal (_, l) ->
-        List.map of_lits l
+      if not convert_defs then
+        []
+      (*dealt with by rewriting *)
+      (* dealt with  *)
+      else
+        List.map of_lits (Stmt.get_formulas_from_defs st)
+    | Stmt.Assert lits -> [ of_lits lits ]
+    | Stmt.Goal lits -> [ of_lits lits ]
+    | Stmt.Lemma l | Stmt.NegatedGoal (_, l) -> List.map of_lits l
 
   let update_trail f c =
     let sclause = SClause.update_trail f c.sclause in
@@ -197,9 +186,7 @@ module Make (Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       ~bool_selected:c.bool_selected ~penalty:c.penalty
 
   let proof_step c = c.proof
-
   let proof c = Proof.S.mk c.proof (SClause.mk_proof_res c.sclause)
-
   let proof_parent c = Proof.Parent.from (proof c)
 
   let proof_parent_subst renaming (c, sc) subst =
@@ -215,27 +202,32 @@ module Make (Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let length c = SClause.length c.sclause
 
   let _apply_subst_no_simpl subst (lits, sc) =
-    if Subst.is_empty subst then lits (* id *)
-    else
+    if Subst.is_empty subst then
+      lits
+    (* id *)
+    else (
       let renaming = S.Renaming.create () in
       Array.map (fun l -> Lit.apply_subst_no_simp renaming subst (l, sc)) lits
+    )
 
   (** Bitvector that indicates which of the literals of [subst(clause)] are
       maximal under [ord] *)
   let maxlits (c, sc) subst =
     let ord = Ctx.ord () in
-    if not @@ Subst.is_empty subst then
+    if not @@ Subst.is_empty subst then (
       let lits' = _apply_subst_no_simpl subst (lits c, sc) in
       Lits.maxlits ~ord lits'
-    else BV.of_list @@ Lazy.force c.max_lits
+    ) else
+      BV.of_list @@ Lazy.force c.max_lits
 
   (** Check whether the literal is maximal *)
   let is_maxlit (c, sc) subst ~idx =
-    if not @@ Subst.is_empty subst then
+    if not @@ Subst.is_empty subst then (
       let ord = Ctx.ord () in
       let lits' = _apply_subst_no_simpl subst (lits c, sc) in
       Lits.is_max ~ord lits' idx
-    else BV.get (BV.of_list @@ Lazy.force c.max_lits) idx
+    ) else
+      BV.get (BV.of_list @@ Lazy.force c.max_lits) idx
 
   (** Bitvector that indicates which of the literals of [subst(clause)] are
       eligible for resolution. *)
@@ -247,11 +239,12 @@ module Make (Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       if
         (* maximal literals *)
         not @@ Subst.is_empty subst
-      then
+      then (
         let lits' = _apply_subst_no_simpl subst (lits c, sc) in
         Lits.maxlits ~ord lits'
-      else BV.of_list @@ Lazy.force c.max_lits
-    else
+      ) else
+        BV.of_list @@ Lazy.force c.max_lits
+    else (
       let lits' = _apply_subst_no_simpl subst (lits c, sc) in
       let bv = BV.copy selected in
       let n = Array.length lits' in
@@ -259,34 +252,35 @@ module Make (Ctx : Ctx.S) : S with module Ctx = Ctx = struct
           same sign. *)
       for i = 0 to n - 1 do
         (* i-th lit is already known not to be max? *)
-        if not (BV.get bv i) then ()
-        else
+        if not (BV.get bv i) then
+          ()
+        else (
           let lit = lits'.(i) in
           for j = i + 1 to n - 1 do
             let lit' = lits'.(j) in
             (* check if both lits are still potentially eligible, and have the same
                sign if [check_sign] is true. *)
             if Lit.is_positivoid lit = Lit.is_positivoid lit' && BV.get bv j
-            then
+            then (
               match Lit.Comp.compare ~ord lit lit' with
               | Comparison.Incomparable | Eq ->
-                  () (* no further information about i-th and j-th *)
-              | Gt | Geq ->
-                  BV.reset bv j (* j-th cannot be max *)
-              | Lt | Leq ->
-                  BV.reset bv i (* i-th cannot be max *)
+                () (* no further information about i-th and j-th *)
+              | Gt | Geq -> BV.reset bv j (* j-th cannot be max *)
+              | Lt | Leq -> BV.reset bv i (* i-th cannot be max *)
+            )
           done
-      done ;
+        )
+      done;
       bv
+    )
 
   let eligible_res_no_subst c =
     match c.eligible_res with
-    | Some r ->
-        r
+    | Some r -> r
     | None ->
-        let bv = eligible_res (c, 0) Subst.empty in
-        c.eligible_res <- Some bv ;
-        bv
+      let bv = eligible_res (c, 0) Subst.empty in
+      c.eligible_res <- Some bv;
+      bv
 
   let eligible_subterms_of_bool_ c =
     let module PB = Position.Build in
@@ -306,7 +300,7 @@ module Make (Ctx : Ctx.S) : S with module Ctx = Ctx = struct
           (* selects --subterms-- of given t that are eligible *)
           Iter.to_list
             (Bool_selection.all_eligible_subterms ~ord:(Ctx.ord ())
-               ~pos_builder:pb t ) )
+               ~pos_builder:pb t))
         starting_positions
     in
     let res =
@@ -314,36 +308,33 @@ module Make (Ctx : Ctx.S) : S with module Ctx = Ctx = struct
         (fun (_, p) ->
           let module P = Position in
           match p with
-          | P.Arg (idx, P.Left P.Stop) | P.Arg (idx, P.Right P.Stop) -> (
-            match (lits c).(idx) with
-            | Lit.Equation (_, _, false) ->
-                true
-            | _ ->
-                false )
-          | _ ->
-              true )
+          | P.Arg (idx, P.Left P.Stop) | P.Arg (idx, P.Right P.Stop) ->
+            (match (lits c).(idx) with
+            | Lit.Equation (_, _, false) -> true
+            | _ -> false)
+          | _ -> true)
         res
     in
     if CCList.is_empty res then
       Util.debugf 1 "nothing selected for @[%a@]@." (fun k ->
-          k Lits.pp (lits c) )
+          k Lits.pp (lits c))
     else (
-      Util.debugf 1 "For @[%a@]@." (fun k -> k Lits.pp (lits c)) ;
+      Util.debugf 1 "For @[%a@]@." (fun k -> k Lits.pp (lits c));
       CCList.iter
         (fun (t, p) ->
           Util.debugf 1 "  |@[%a@] -> @[%a@]@." (fun k ->
-              k Position.pp p T.pp t ) )
-        res ) ;
+              k Position.pp p T.pp t))
+        res
+    );
     res
 
   let eligible_subterms_of_bool c =
     match c.eligible_bool with
     | None ->
-        let res = SClause.TPSet.of_list (eligible_subterms_of_bool_ c) in
-        c.eligible_bool <- Some res ;
-        res
-    | Some cache ->
-        cache
+      let res = SClause.TPSet.of_list (eligible_subterms_of_bool_ c) in
+      c.eligible_bool <- Some res;
+      res
+    | Some cache -> cache
 
   let eta_reduce c =
     let lit_arr = lits c in
@@ -352,14 +343,15 @@ module Make (Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       Literals.map
         (fun t ->
           let reduced = Lambda.eta_reduce (Lambda.snf t) in
-          if not (Term.equal t reduced) then changed := true ;
-          reduced )
+          if not (Term.equal t reduced) then changed := true;
+          reduced)
         lit_arr
     in
-    if !changed then
+    if !changed then (
       let penalty = penalty c and trail = trail c and proof = proof_step c in
       Some (create ~penalty ~trail (CCArray.to_list new_lits) proof)
-    else None
+    ) else
+      None
 
   (** Bitvector that indicates which of the literals of [subst(clause)] are
       eligible for paramodulation. *)
@@ -370,16 +362,18 @@ module Make (Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       && CCList.is_empty (Lazy.force c.bool_selected)
     then (
       let bv, lits' =
-        if not @@ Subst.is_empty subst then
+        if not @@ Subst.is_empty subst then (
           let lits' = _apply_subst_no_simpl subst (lits c, sc) in
           (* maximal ones *)
-          (Lits.maxlits ~ord lits', lits')
-        else (BV.of_list @@ Lazy.force c.max_lits, lits c)
+          Lits.maxlits ~ord lits', lits'
+        ) else
+          BV.of_list @@ Lazy.force c.max_lits, lits c
       in
       (* only keep literals that are positive equations *)
-      BV.filter bv (fun i -> Lit.eqn_sign lits'.(i) (* == true*)) ;
-      bv )
-    else BV.empty () (* no eligible literal when some are selected *)
+      BV.filter bv (fun i -> Lit.eqn_sign lits'.(i) (* == true*));
+      bv
+    ) else
+      BV.empty () (* no eligible literal when some are selected *)
 
   let is_eligible_param (c, sc) subst ~idx =
     Lit.eqn_sign c.sclause.lits.(idx)
@@ -397,24 +391,23 @@ module Make (Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let selected_lits c = BV.selecti (Lazy.force c.selected) c.sclause.lits
 
   let selected_lits_bv c = Lazy.force c.selected
-
   let bool_selected c = Lazy.force c.bool_selected
 
   (** is the clause a unit clause? *)
-  let is_unit_clause c = match c.sclause.lits with [|_|] -> true | _ -> false
+  let is_unit_clause c =
+    match c.sclause.lits with
+    | [| _ |] -> true
+    | _ -> false
 
   let is_oriented_rule c =
     let ord = Ctx.ord () in
     match c.sclause.lits with
-    | [|Lit.Equation (l, r, true)|] -> (
+    | [| Lit.Equation (l, r, true) |] ->
       (* counting predicate literals of the form p = FALSE as rewrite rules *)
-      match Ordering.compare ord l r with
-      | Comparison.Gt | Lt | Geq | Leq ->
-          true
-      | Eq | Incomparable ->
-          false )
-    | _ ->
-        false
+      (match Ordering.compare ord l r with
+      | Comparison.Gt | Lt | Geq | Leq -> true
+      | Eq | Incomparable -> false)
+    | _ -> false
 
   let symbols ?(init = ID.Set.empty) ?(include_types = false) seq =
     Iter.fold
@@ -427,42 +420,43 @@ module Make (Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       seq
 
   let to_forms c = Lits.Conv.to_forms c.sclause.lits
-
   let to_sclause c = c.sclause
-
   let to_s_form c = SClause.to_s_form c.sclause
 
   let is_inj_axiom c =
-    if CCArray.length (lits c) = 2 then
+    if CCArray.length (lits c) = 2 then (
       let inj_defs = CCArray.filter_map Lit.as_inj_def (lits c) in
-      if CCArray.length inj_defs != 1 then None
-      else
+      if CCArray.length inj_defs != 1 then
+        None
+      else (
         let sym, var_pairs = CCArray.get inj_defs 0 in
         let l =
           CCArray.filter_map Lit.as_pos_pure_var (lits c) |> CCArray.to_list
         in
-        if List.length l != 1 then None
-        else
+        if List.length l != 1 then
+          None
+        else (
           let x, y = List.hd l in
           let v_eq = HVar.equal Type.equal in
           let rec args_same n = function
-            | [] ->
-                None
+            | [] -> None
             | (x', y') :: xs ->
-                if (v_eq x x' && v_eq y y') || (v_eq x y' && v_eq y x') then
-                  Some (sym, n)
-                else args_same (n + 1) xs
+              if (v_eq x x' && v_eq y y') || (v_eq x y' && v_eq y x') then
+                Some (sym, n)
+              else
+                args_same (n + 1) xs
           in
           args_same 0 var_pairs
-    else None
+        )
+      )
+    ) else
+      None
 
   let proof_depth c = Proof.Step.inferences_performed (proof_step c)
 
   module Seq = struct
     let lits c = Iter.of_array c.sclause.lits
-
     let terms c = lits c |> Iter.flat_map Lit.Seq.terms
-
     let vars c = terms c |> Iter.flat_map T.Seq.vars
   end
 
@@ -484,9 +478,10 @@ module Make (Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   (** {2 Filter literals} *)
   let is_orphaned c =
     let aux proof =
-      let p_res, step = (Proof.S.result proof, Proof.S.step proof) in
+      let p_res, step = Proof.S.result proof, Proof.S.step proof in
       (* we reached the root *)
-      if Proof.Result.is_stmt p_res then false
+      if Proof.Result.is_stmt p_res then
+        false
       else
         Proof.Step.is_inference step
         && (not (List.mem Proof.Tag.T_cannot_orphan (Proof.Step.tags step)))
@@ -508,37 +503,32 @@ module Make (Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       fun i _lit -> BV.get bv i
 
     let eq _ lit =
-      match lit with Lit.Equation (_, _, true) -> true | _ -> false
+      match lit with
+      | Lit.Equation (_, _, true) -> true
+      | _ -> false
 
     let filter f _ lit = f lit
-
     let max c i _ = BV.get (BV.of_list @@ Lazy.force c.max_lits) i
-
     let pos _ lit = Lit.is_positivoid lit
 
-    let pos_eq _ lit = match lit with Lit.Equation (l, r, s) -> s | _ -> false
+    let pos_eq _ lit =
+      match lit with
+      | Lit.Equation (l, r, s) -> s
+      | _ -> false
 
     let neg _ lit = Lit.is_negativoid lit
-
     let always _ _ = true
 
     let combine l =
       match l with
-      | [] ->
-          fun _ _ -> true
-      | [x] ->
-          x
-      | [x; y] ->
-          fun i lit -> x i lit && y i lit
-      | [x; y; z] ->
-          fun i lit -> x i lit && y i lit && z i lit
-      | _ ->
-          fun i lit -> List.for_all (fun eligible -> eligible i lit) l
+      | [] -> fun _ _ -> true
+      | [ x ] -> x
+      | [ x; y ] -> fun i lit -> x i lit && y i lit
+      | [ x; y; z ] -> fun i lit -> x i lit && y i lit && z i lit
+      | _ -> fun i lit -> List.for_all (fun eligible -> eligible i lit) l
 
     let ( ** ) f1 f2 i lit = f1 i lit && f2 i lit
-
     let ( ++ ) f1 f2 i lit = f1 i lit || f2 i lit
-
     let ( ~~ ) f i lit = not (f i lit)
   end
 
@@ -558,14 +548,23 @@ module Make (Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   end
 
   module WithPos = struct
-    type t = {clause: clause; pos: Position.t; term: T.t}
+    type t = {
+      clause: clause;
+      pos: Position.t;
+      term: T.t;
+    }
 
     let compare t1 t2 =
       let c = SClause.compare t1.clause.sclause t2.clause.sclause in
-      if c <> 0 then c
-      else
+      if c <> 0 then
+        c
+      else (
         let c = T.compare t1.term t2.term in
-        if c <> 0 then c else Position.compare t1.pos t2.pos
+        if c <> 0 then
+          c
+        else
+          Position.compare t1.pos t2.pos
+      )
 
     let pp out t =
       Format.fprintf out "@[clause @[%a@]@ at pos @[%a@]@]" Lits.pp
@@ -586,8 +585,9 @@ module Make (Ctx : Ctx.S) : S with module Ctx = Ctx = struct
     let selected = Lazy.force c.selected in
     let max = maxlits (Scoped.make c 0) S.empty in
     let pp_lits out lits =
-      if Array.length lits = 0 then CCFormat.string out "⊥"
-      else
+      if Array.length lits = 0 then
+        CCFormat.string out "⊥"
+      else (
         let pp_lit out (i, lit) =
           Format.fprintf out "@[%a%a%a@]" Lit.pp lit (pp_selected selected) i
             (pp_maxlit max) i
@@ -595,18 +595,16 @@ module Make (Ctx : Ctx.S) : S with module Ctx = Ctx = struct
         Format.fprintf out "[@[%a@]]"
           (Util.pp_iter ~sep:" ∨ " pp_lit)
           (Iter.of_array_i lits)
+      )
     in
     Format.fprintf out "@[%a@[<2>%a%a@]@]/id:%d/depth:%d/penalty:%d/red:%b"
       SClause.pp_vars c.sclause pp_lits c.sclause.lits SClause.pp_trail
-      c.sclause.trail c.sclause.id (proof_depth c) (penalty c) (is_redundant c) ;
+      c.sclause.trail c.sclause.id (proof_depth c) (penalty c) (is_redundant c);
     ()
 
   let pp_tstp out c = SClause.pp_tstp out c.sclause
-
   let pp_tstp_full out c = SClause.pp_tstp_full out c.sclause
-
   let to_string = CCFormat.to_string pp
-
   let to_string_tstp = CCFormat.to_string pp_tstp
 
   let pp_set out set =
@@ -619,7 +617,7 @@ module Make (Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       (ClauseSet.to_iter set)
 
   let check_types c =
-    Util.debugf 5 "(@[check_types@ %a@])" (fun k -> k pp c) ;
+    Util.debugf 5 "(@[check_types@ %a@])" (fun k -> k pp c);
     lits c |> Literals.Seq.terms
     |> Iter.iter (fun t -> ignore (Term.rebuild_rec t))
 end

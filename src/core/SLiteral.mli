@@ -6,12 +6,16 @@
     representation the prover prefers. *)
 
 type form = TypedSTerm.t
-
 type term = TypedSTerm.t
 
 exception NotALit of form
 
-type +'t t = True | False | Atom of 't * bool | Eq of 't * 't | Neq of 't * 't
+type +'t t =
+  | True
+  | False
+  | Atom of 't * bool
+  | Eq of 't * 't
+  | Neq of 't * 't
 
 type 'a lit = 'a t
 
@@ -19,39 +23,22 @@ val of_form : form -> term t
 (** @raise NotALit if the form is not a literal *)
 
 val to_form : term t -> form
-
 val map : f:('a -> 'b) -> 'a t -> 'b t
-
 val fold : ('a -> 't -> 'a) -> 'a -> 't t -> 'a
-
 val iter : f:('a -> unit) -> 'a t -> unit
-
 val to_iter : 'a t -> 'a Iter.t
-
 val equal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
-
 val true_ : _ t
-
 val false_ : _ t
-
 val eq : 'a -> 'a -> 'a t
-
 val neq : 'a -> 'a -> 'a t
-
 val atom : 'a -> bool -> 'a t
-
 val atom_true : 'a -> 'a t
-
 val atom_false : 'a -> 'a t
-
 val is_true : _ t -> bool
-
 val is_false : _ t -> bool
-
 val sign : _ t -> bool
-
 val is_pos : _ t -> bool
-
 val is_neg : _ t -> bool
 
 val negate : 'a t -> 'a t

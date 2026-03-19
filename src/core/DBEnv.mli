@@ -7,8 +7,8 @@
     This is low level and should be used with a lot of care (it's mostly used in
     {!InnerTerm.DB} and a lot of coffee or aspiring at hand. *)
 
-(** An environment that maps De Bruijn indices to values of type 'a. *)
 type +'a t
+(** An environment that maps De Bruijn indices to values of type 'a. *)
 
 val empty : 'a t
 (** Empty environment *)

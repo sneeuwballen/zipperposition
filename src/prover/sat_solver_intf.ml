@@ -3,10 +3,11 @@
 open Logtk
 
 type proof_step = Proof.Step.t
-
 type proof = Proof.t
 
-type result = Sat | Unsat of proof
+type result =
+  | Sat
+  | Unsat of proof
 
 exception WrongState of string
 
@@ -23,7 +24,6 @@ module type S = sig
       and must not have been already used. *)
 
   val add_clauses : proof:proof_step -> Lit.t list list -> unit
-
   val add_clause_seq : proof:proof_step -> Lit.t list Iter.t -> unit
 
   val check : full:bool -> unit -> result
@@ -70,6 +70,6 @@ module type S = sig
 
   val setup : unit -> unit
 
-  val clear : ?size:[`Big | `Small | `Tiny] -> unit -> unit
+  val clear : ?size:[ `Big | `Small | `Tiny ] -> unit -> unit
   (** Reset the SAT solver state *)
 end

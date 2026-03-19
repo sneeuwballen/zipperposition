@@ -5,7 +5,9 @@
 
 type form = LLTerm.Form.t
 
-type res = R_ok | R_fail
+type res =
+  | R_ok
+  | R_fail
 
 type final_state
 
@@ -16,5 +18,4 @@ val prove : form list -> form -> res * final_state
 (** [prove a b] returns [R_ok] if [a => b] is a tautology. *)
 
 val pp_stats : final_state CCFormat.printer
-
 val pp_dot : final_state CCFormat.printer

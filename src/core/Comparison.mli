@@ -4,7 +4,13 @@
 
 (** {2 Combined nonstrict-strict partial orders} *)
 
-type t = Lt | Leq | Eq | Geq | Gt | Incomparable
+type t =
+  | Lt
+  | Leq
+  | Eq
+  | Geq
+  | Gt
+  | Incomparable
 
 type comparison = t
 
@@ -36,9 +42,7 @@ val ( @>> ) : 'a comparator -> 'a comparator -> 'a comparator
 (** Combination of comparators that work on the same values. *)
 
 val is_Gt_or_Geq : t -> bool
-
 val is_Gt_or_Geq_or_Eq : t -> bool
-
 val is_Lt_or_Leq : t -> bool
 
 val is_Lt_or_Leq_or_Eq : t -> bool

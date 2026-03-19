@@ -4,28 +4,29 @@
 
 type term = Term.t
 
-(** penalty on the search space *)
 type penalty = int
+(** penalty on the search space *)
 
 val enum_prop :
-     ?mode:
-       [ `And
-       | `Or
-       | `Neg
-       | `Quants
-       | `TF
-       | `Eq
-       | `Combinators
-       | `Full
-       | `Pragmatic
-       | `Simple
-       | `None ]
-  -> ?add_var:bool
-  -> Term.var Scoped.t
-  -> enum_cache:Term.Set.t ref
-  -> signature:Signature.t
-  -> offset:int
-  -> (Subst.t * penalty) list
+  ?mode:
+    [ `And
+    | `Or
+    | `Neg
+    | `Quants
+    | `TF
+    | `Eq
+    | `Combinators
+    | `Full
+    | `Pragmatic
+    | `Simple
+    | `None
+    ] ->
+  ?add_var:bool ->
+  Term.var Scoped.t ->
+  enum_cache:Term.Set.t ref ->
+  signature:Signature.t ->
+  offset:int ->
+  (Subst.t * penalty) list
 (** Given a variable of type [τ1…τn -> prop], enumerate possible shapes for it
     @param v the variable to refine + its scope. Must return [prop].
     @param offset to create fresh variables (should be unused elsewhere)
@@ -33,16 +34,16 @@ val enum_prop :
       if [`Neg], only tries negation; [`None], do nothing; otherwise do all
       connectives *)
 
-(** unification pair *)
 type pair = Type.t list * term * term
+(** unification pair *)
 
 val pp_pair : pair CCFormat.printer
 
 val unif_pairs :
-     ?fuel:int
-  -> pair list Scoped.t
-  -> offset:int
-  -> (pair list * Unif_subst.t * penalty * Subst.Renaming.t) list
+  ?fuel:int ->
+  pair list Scoped.t ->
+  offset:int ->
+  (pair list * Unif_subst.t * penalty * Subst.Renaming.t) list
 (** [unif_pairs pairs ~scope_new_vars] returns a list of (partial) solutions to
     the HO unification problem [pairs]. Each solution is a list of remaining
     constraints (with the substitution already applied), a substitution, some

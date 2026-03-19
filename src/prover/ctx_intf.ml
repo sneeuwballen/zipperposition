@@ -12,7 +12,6 @@ module type S = sig
   (** selection function for clauses *)
 
   val set_selection_fun : Selection.t -> unit
-
   val set_ord : Ordering.t -> unit
 
   val signature : unit -> Signature.t
@@ -26,7 +25,6 @@ module type S = sig
   (** Compare two terms *)
 
   val select : Selection.t
-
   val bool_select : Bool_selection.t
 
   val lost_completeness : unit -> unit
@@ -53,22 +51,16 @@ module type S = sig
       incrementally) *)
 
   val on_new_symbol : (ID.t * Type.t) Signal.t
-
   val on_signature_update : Signature.t Signal.t
-
   val set_injective_for_arg : ID.t -> int -> unit
-
   val is_injective_for_arg : ID.t -> int -> bool
 
   (** {2 Literals} *)
 
   module Lit : sig
     val from_hooks : unit -> Literal.Conv.hook_from list
-
     val add_from_hook : Literal.Conv.hook_from -> unit
-
     val to_hooks : unit -> Literal.Conv.hook_to list
-
     val add_to_hook : Literal.Conv.hook_to -> unit
 
     val of_form : Term.t SLiteral.t -> Literal.t

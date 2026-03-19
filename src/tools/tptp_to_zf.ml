@@ -11,12 +11,9 @@ module T = TypedSTerm
 let pp_stmt out s =
   let pp_t =
     match !Options.output with
-    | Logtk.Options.O_none | Logtk.Options.O_zf ->
-        T.ZF.pp_inner
-    | Logtk.Options.O_normal ->
-        T.pp_inner
-    | Logtk.Options.O_tptp ->
-        T.TPTP.pp
+    | Logtk.Options.O_none | Logtk.Options.O_zf -> T.ZF.pp_inner
+    | Logtk.Options.O_normal -> T.pp_inner
+    | Logtk.Options.O_tptp -> T.TPTP.pp
   in
   Statement.pp pp_t pp_t pp_t out s
 
@@ -43,28 +40,25 @@ let process file =
         ~implicit_ty_args:(Input_format.implicit_ty_args input)
   >|= fun stmts ->
   (* declare "term" then proceed *)
-  Format.printf "@[<v>%a@,%a@]@." declare_term () pp_stmts stmts ;
+  Format.printf "@[<v>%a@,%a@]@." declare_term () pp_stmts stmts;
   ()
 
 let options = Arg.align @@ Options.make ()
 
 let () =
-  CCFormat.set_color_default true ;
+  CCFormat.set_color_default true;
   let files = ref [] in
   let add_file f = files := f :: !files in
-  Arg.parse options add_file "tptp_to_zf [options] [file|stdin]" ;
+  Arg.parse options add_file "tptp_to_zf [options] [file|stdin]";
   let file =
     match !files with
-    | [] ->
-        "stdin"
-    | [f] ->
-        f
-    | _ :: _ ->
-        failwith "expected at most one file"
+    | [] -> "stdin"
+    | [ f ] -> f
+    | _ :: _ -> failwith "expected at most one file"
   in
   let res = process file in
   match res with
-  | CCResult.Ok () ->
-      ()
+  | CCResult.Ok () -> ()
   | CCResult.Error msg ->
-      print_endline msg ; exit 1
+    print_endline msg;
+    exit 1

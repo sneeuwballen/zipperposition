@@ -16,16 +16,21 @@
 
     TODO: think of a good way of representing AC operators (+, ...) *)
 
+type t = private InnerTerm.t
 (** Type is a subtype of the term structure (itself a subtype of InnerTerm.t),
     with explicit conversion *)
-type t = private InnerTerm.t
 
 type ty = t
 
-type builtin = TType | Prop | Term | Rat | Int | Real
+type builtin =
+  | TType
+  | Prop
+  | Term
+  | Rat
+  | Int
+  | Real
 
 val pp_builtin : builtin CCFormat.printer
-
 val builtin_conv : builtin -> Builtin.t
 
 type view = private
@@ -41,27 +46,17 @@ val view : t -> view
     @raise Assert_failure if the argument is not a type *)
 
 include Interfaces.HASH with type t := t
-
 include Interfaces.ORD with type t := t
 
 val is_tType : t -> bool
-
 val is_var : t -> bool
-
 val is_bvar : t -> bool
-
 val is_app : t -> bool
-
 val is_const : t -> bool
-
 val is_fun : t -> bool
-
 val is_forall : t -> bool
-
 val is_prop : t -> bool
-
 val as_var_exn : t -> t HVar.t
-
 val ty_eq : t -> t -> bool
 
 val hash_mod_alpha : t -> int
@@ -70,17 +65,11 @@ val hash_mod_alpha : t -> int
 (** {2 Constructors} *)
 
 val tType : t
-
 val prop : t
-
 val term : t
-
 val int : t
-
 val rat : t
-
 val real : t
-
 val var : t HVar.t -> t
 
 val var_of_int : int -> t
@@ -119,7 +108,6 @@ val of_term_unsafe : InnerTerm.t -> t
     caution. *)
 
 val of_terms_unsafe : InnerTerm.t list -> t list
-
 val cast_var_unsafe : InnerTerm.t HVar.t -> t HVar.t
 
 (** {2 Definition} *)
@@ -142,9 +130,7 @@ val set_def : ID.t -> def -> unit
 (** {2 Containers} *)
 
 module Set : CCSet.S with type elt = t
-
 module Map : CCMap.S with type key = t
-
 module Tbl : CCHashtbl.S with type key = t
 
 module Seq : sig
@@ -154,22 +140,16 @@ module Seq : sig
   (** Subterms *)
 
   val symbols : t -> ID.t Iter.t
-
   val add_set : Set.t -> t Iter.t -> Set.t
-
   val max_var : t HVar.t Iter.t -> int
-
   val min_var : t HVar.t Iter.t -> int
-
   val has_bools_only : t -> bool
 end
 
 (** {2 Utils} *)
 
 module VarSet : CCSet.S with type elt = t HVar.t
-
 module VarMap : CCMap.S with type key = t HVar.t
-
 module VarTbl : CCHashtbl.S with type key = t HVar.t
 
 val vars_set : VarSet.t -> t -> VarSet.t
@@ -181,7 +161,9 @@ val vars : t -> t HVar.t list
 val close_forall : t -> t
 (** bind free variables *)
 
-type arity_result = Arity of int * int | NoArity
+type arity_result =
+  | Arity of int * int
+  | NoArity
 
 val arity : t -> arity_result
 (** Number of arguments the type expects. If [arity ty] returns [Arity (a, b)]
@@ -234,11 +216,10 @@ val returns : t -> t
 *)
 
 val returns_prop : t -> bool
-
 val returns_tType : t -> bool
 
-(** Error raised when {!apply} fails *)
 exception ApplyError of string
+(** Error raised when {!apply} fails *)
 
 val apply : t -> t list -> t
 (** Given a function/forall type, and arguments, return the type that results
@@ -262,24 +243,19 @@ val is_unifiable : t -> bool
 (** {2 IO} *)
 
 include Interfaces.PRINT_DE_BRUIJN with type term := t and type t := t
-
 include Interfaces.PRINT with type t := t
 
 val pp_surrounded : t CCFormat.printer
-
 val pp_typed_var : t HVar.t CCFormat.printer
-
 val mangle : t -> string
 
 (** {2 TPTP-specific printer and types} *)
 
 module TPTP : sig
   include Interfaces.PRINT_DE_BRUIJN with type term := t and type t := t
-
   include Interfaces.PRINT with type t := t
 
   val pp_typed_var : t HVar.t CCFormat.printer
-
   val pp_ho : ?depth:int -> CCFormat.t -> t -> unit
 
   (** {2 Basic types} *)
@@ -314,21 +290,13 @@ module Conv : sig
   type ctx
 
   val create : unit -> ctx
-
   val copy : ctx -> ctx
-
   val clear : ctx -> unit
-
   val enter_bvar : ctx -> VarMap.key -> int option
-
   val exit_bvar : handle:int CCOpt.t -> ctx -> VarMap.key -> unit
-
   val find_bvar : ctx -> VarMap.key -> int option
-
   val get_maxvar : ctx -> int
-
   val incr_maxvar : ctx -> unit
-
   val set_maxvar : ctx -> int -> unit
 
   val of_simple_term : ctx -> TypedSTerm.t -> t option

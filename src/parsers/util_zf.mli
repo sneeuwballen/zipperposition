@@ -4,13 +4,12 @@
 
 open Logtk
 
-(** Cache that remembers the set of files that have been parsed so far *)
 type parse_cache
+(** Cache that remembers the set of files that have been parsed so far *)
 
 val create_parse_cache : unit -> parse_cache
 
 type parser_res = (UntypedAST.statement Iter.t, string) CCResult.t
-
 type 'a parser_ = 'a -> parser_res
 
 val parse_lexbuf :

@@ -6,15 +6,13 @@ module type HashedType = sig
   type t
 
   val equal : t -> t -> bool
-
   val hash : t -> int
-
   val tag : int -> t -> unit
 end
 
 module type S = sig
-  (** Hashconsed objects *)
   type elt
+  (** Hashconsed objects *)
 
   val hashcons : elt -> elt
   (** Hashcons the elements *)
