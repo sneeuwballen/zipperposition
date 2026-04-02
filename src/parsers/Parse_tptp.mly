@@ -491,6 +491,11 @@ variable:
 atomic_word:
   | s=SINGLE_QUOTED { remove_quotes s }
   | s=LOWER_WORD { s }
+  | FOF { "fof" }
+  | CNF { "cnf" }
+  | TFF { "tff" }
+  | THF { "thf" }
+  | INCLUDE { "include" }
 
 atomic_defined_word:
   | NOTCONST { PT.builtin Builtin.Not }
