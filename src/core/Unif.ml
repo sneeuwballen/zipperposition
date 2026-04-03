@@ -533,10 +533,14 @@ module Inner = struct
       let mk_rhs l =
         let n = List.length l in
         let args =
-          List.map
-            (fun a ->
-               let i = CCList.find_idx (T.equal a) l |> CCOpt.get_exn |> fst in
-               T.bvar ~ty:(T.ty_exn a) (n-i-1))
+          List.filter_map
+            (fun a -> match T.view a with
+              | T.DB db_i ->
+                (match CCList.find_idx (T.is_bvar_i db_i) l with
+                  | Some (i, found) ->
+                    Some (T.bvar ~ty:(T.ty_exn found) (n-i-1))
+                  | None -> None)
+              | _ -> None)
             inter
         in
         let body = T.app ~ty:ty_ret (T.var f) args in
@@ -1013,11 +1017,15 @@ module Inner = struct
     let rhs =
       T.app ~ty:ty_ret
         (T.var v2)
-        (List.map
-           (fun a ->
-              let i = CCList.find_idx (T.equal a) l1 |> CCOpt.get_exn|>fst in
-              T.bvar ~ty:(T.ty_exn a) (n-i-1))
-           l2)
+        (List.filter_map
+          (fun a -> match T.view a with
+              | T.DB db_i ->
+                (match CCList.find_idx (T.is_bvar_i db_i) l1 with
+                | Some (i, found) ->
+                  Some (T.bvar ~ty:(T.ty_exn found) (n-i-1))
+                | None -> None)
+              | _ -> None)
+          l2)
       |> T.fun_l (List.map T.ty_exn l1)
     in
     let subst = US.bind subst (v1,scope) (rhs,scope) in
