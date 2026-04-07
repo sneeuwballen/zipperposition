@@ -521,7 +521,7 @@ module Inner = struct
           (fun t -> match T.view t with
              | T.DB i ->
                DBEnv.mem bvars.B_vars.left i &&
-               List.exists (T.is_bvar_i i) l2
+               List.exists (T.equal t) l2
              | _ -> assert false)
           l1
       in
