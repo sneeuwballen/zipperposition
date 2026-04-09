@@ -7,6 +7,9 @@ all: build test-cached
 
 DUNE_OPTS= -j $(J) --profile=release
 
+fmt:
+	@ocamlformat -i src/*/*.{ml,mli} --no-comment-check --quiet --ocp-indent-config
+
 build:
 	@dune build @install $(DUNE_OPTS)
 
