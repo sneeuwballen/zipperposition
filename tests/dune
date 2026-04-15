@@ -5,8 +5,8 @@
              iter qcheck-core qcheck-alcotest alcotest)
   (flags :standard -warn-error -3 -w -3-50 -color always -open Logtk_arith))
 
-(alias
- (name    runtest)
+(rule
+ (alias    runtest)
  (package logtk)
  (locks   /tlock)
  (deps    run_tests.exe)
