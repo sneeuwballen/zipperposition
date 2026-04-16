@@ -43,16 +43,21 @@ let role_of_string = function
   | "assumption" ->  R_assumption
   | "lemma" -> R_axiom (* R_lemma makes problems harder *)
   | "theorem" -> R_theorem
+  | "corollary" -> R_axiom (* TPTP standard: axiom-like, treated as lemma *)
   | "conjecture" -> R_conjecture
   | "negated_conjecture" -> R_negated_conjecture
   | "plain" -> R_plain
   | "fi_domain" -> R_finite "domain"
   | "fi_functors" -> R_finite "functors"
   | "fi_predicates" -> R_finite "predicates"
+  | "interpretation" -> R_plain (* TPTP standard: semantic specification *)
+  | "logic" -> R_plain          (* TPTP standard: logic specification *)
   | "question" -> R_question
   | "type" -> R_type
   | "unknown" -> R_unknown
-  | s -> failwith ("not a proper TPTP role: " ^ s)
+  | s ->
+    Printf.eprintf "warning: unknown TPTP role '%s', treating as unknown\n%!" s;
+    R_unknown
 
 let string_of_role = function
   | R_axiom -> "axiom"
