@@ -7,7 +7,7 @@
   (libraries containers containers-data iter oseq
              unix mtime mtime.clock.os logtk.arith)
   (flags :standard -w -32-50 -open Logtk_arith)
-  (foreign_stubs (language c) (names util_stubs) (flags -Wextra -Wno-unused-parameter) )
+  (foreign_stubs (language c) (names util_stubs) (flags :standard -Wextra -Wno-unused-parameter) )
 )
 
 (documentation
