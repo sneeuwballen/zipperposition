@@ -85,8 +85,8 @@ module Make(A:ARG) = struct
           let cl_p = (clause_penalty s hd) in
           s.penalty <-  s.penalty + cl_p;
           hd) in
-    if CCOpt.is_some res then 
-      Util.debugf ~section 1 "drip:%d/%d->@[%a@]:@. @[%a@]@." (fun k -> k orig_penalty s.hits pp s (CCOpt.pp C.pp) res);
+    if CCOption.is_some res then 
+      Util.debugf ~section 1 "drip:%d/%d->@[%a@]:@. @[%a@]@." (fun k -> k orig_penalty s.hits pp s (CCOption.pp C.pp) res);
     res
 
   let drip_n s n guard =
@@ -128,7 +128,7 @@ module Make(A:ARG) = struct
         s.stm <- OSeq.empty;
         s.penalty <- s.penalty + p_add;
         raise (Drip_n_Unfinished (res,p_add,n')) in
-    Util.debugf ~section 1 "drip_n:%d->@[%a@]:@. @[%a@]@." (fun k -> k orig_penalty pp s (CCList.pp (CCOpt.pp C.pp)) res);
+    Util.debugf ~section 1 "drip_n:%d->@[%a@]:@. @[%a@]@." (fun k -> k orig_penalty pp s (CCList.pp (CCOption.pp C.pp)) res);
     res
 
 end

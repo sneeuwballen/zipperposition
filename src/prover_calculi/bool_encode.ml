@@ -243,7 +243,7 @@ let bool_encode_term t_orig  =
       if T.equal (T.ty_exn t) T.tType 
       then bool_encode_ty t
       else (
-        let ty = bool_encode_ty (CCOpt.get_exn (T.ty t)) in
+        let ty = bool_encode_ty (CCOption.get_exn_or "Zipper" (T.ty t)) in
         match T.view t with
           | T.Const c -> 
             T.const ~ty c
@@ -294,7 +294,7 @@ let bool_encode_term t_orig  =
           | T.Bind (Binder.Lambda, var, body) ->
             let var' = encode_var var in
             let body' = aux body in
-            let ty = bool_encode_ty (CCOpt.get_exn (T.ty t)) in
+            let ty = bool_encode_ty (CCOption.get_exn_or "Zipper" (T.ty t)) in
             T.bind ~ty Binder.Lambda var' body'
           | T.Bind (((Forall|Exists as b)), x, body) ->
             let head = if b = Forall then forall_term else exists_term in

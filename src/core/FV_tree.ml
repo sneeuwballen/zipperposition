@@ -69,7 +69,7 @@ end = struct
     | M m1, M m2 ->
       ID.Map.merge
         (fun _ o1 o2 ->
-           Some (op (CCOpt.get_or ~default o1) (CCOpt.get_or ~default o2)))
+           Some (op (CCOption.get_or ~default o1) (CCOption.get_or ~default o2)))
         m1 m2
       |> mk_m
     | L s1, L s2 -> Util.Int_set.union s1 s2 |> mk_l

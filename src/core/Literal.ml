@@ -445,14 +445,14 @@ let is_absurd lit =
   assert(no_prop_invariant lit);
   match lit with
   | Equation (l, r, false) when T.equal l r -> true
-  | Equation (l, r, true) -> CCOpt.is_some (cannot_be_eq l r)
+  | Equation (l, r, true) -> CCOption.is_some (cannot_be_eq l r)
   | False -> true
   | Equation _ | True -> false
 
 let is_absurd_tags lit = 
   assert(no_prop_invariant lit);
   match lit with
-  | Equation (l,r,true) -> cannot_be_eq l r |> CCOpt.get_or ~default:[]
+  | Equation (l,r,true) -> cannot_be_eq l r |> CCOption.get_or ~default:[]
   | Equation _  | False -> []
   | True -> assert false
 
@@ -525,7 +525,7 @@ let as_ho_predicate (lit:t) : _ option =
     end
   | _ -> None
 
-let is_ho_predicate lit = CCOpt.is_some (as_ho_predicate lit)
+let is_ho_predicate lit = CCOption.is_some (as_ho_predicate lit)
 
 let is_ho_unif lit = match lit with
   | Equation (t, u, _) when is_negativoid lit -> Term.is_ho_app t || Term.is_ho_app u
@@ -547,7 +547,7 @@ let normalize_eq lit =
     | _ -> None 
   in
 
-  let is_negativoid t = CCOpt.is_some @@ as_neg t in
+  let is_negativoid t = CCOption.is_some @@ as_neg t in
 
   let eq_builder ~pos ~neg l r =
     match as_neg l, as_neg r with
@@ -575,7 +575,7 @@ let normalize_eq lit =
           Some (eq_cons l r)
         | T.AppBuiltin (Builtin.Not, [f]) -> 
           let elim_not = mk_lit f T.true_ (not sign) in
-          Some (CCOpt.get_or ~default:elim_not (aux elim_not))
+          Some (CCOption.get_or ~default:elim_not (aux elim_not))
         | _ -> None
       end
     | Equation(lhs,rhs,sign) when is_negativoid lhs || is_negativoid rhs ->

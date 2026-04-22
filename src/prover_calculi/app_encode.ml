@@ -97,7 +97,7 @@ let app_encode_var var =
 let rec app_encode_term toplevel t  =
   if toplevel then Util.debugf ~section 3 "Encoding toplevel term @[%a@]" (fun k -> k T.pp t);
 
-  let ty = app_encode_ty (CCOpt.get_exn (T.ty t)) in
+  let ty = app_encode_ty (CCOption.get_exn_or "Zipper" (T.ty t)) in
   let t' = match T.view t with
     | T.App (f, []) -> app_encode_term false f
     | T.App (f, args) ->
@@ -114,7 +114,7 @@ let rec app_encode_term toplevel t  =
              T.app
                ~ty:(List.nth types 1)
                const_ae_app
-               [CCOpt.get_exn (T.ty arg'); List.nth types 1; term; arg']
+               [CCOption.get_exn_or "Zipper" (T.ty arg'); List.nth types 1; term; arg']
            | T.Bind (Binder.ForallTy, var, t) ->
              assert (is_type arg);
              let arg' = app_encode_ty arg in

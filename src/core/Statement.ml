@@ -182,7 +182,7 @@ let as_defined_cst id =
           Some (Rewrite.Defined_cst.level c, Rewrite.Defined_cst.rules c)
         | _ -> None)
 
-let as_defined_cst_level id = CCOpt.map fst @@ as_defined_cst id
+let as_defined_cst_level id = CCOption.map fst @@ as_defined_cst id
 
 let is_defined_cst id = as_defined_cst id <> None
 
@@ -246,7 +246,7 @@ let level_of_rule (d:_ def_rule): int =
   |> Iter.flat_map Term.Seq.symbols
   |> Iter.filter_map as_defined_cst_level
   |> Iter.max
-  |> CCOpt.get_or ~default:0
+  |> CCOption.get_or ~default:0
 
 (** {2 Inductive Types} *)
 
@@ -982,7 +982,7 @@ let scan_stmt_for_defined_cst (st:(clause,Term.t,Type.t) t): unit = match view s
              Iter.of_list def_rules
              |> Iter.map level_of_rule
              |> Iter.max
-             |> CCOpt.get_or ~default:0
+             |> CCOption.get_or ~default:0
            and def =
              conv_rules def_rules proof
            in
@@ -991,7 +991,7 @@ let scan_stmt_for_defined_cst (st:(clause,Term.t,Type.t) t): unit = match view s
     let level =
       Iter.of_list ids_and_levels
       |> Iter.map (fun (_,l,_) -> l)
-      |> Iter.max |> CCOpt.map_or ~default:0 succ
+      |> Iter.max |> CCOption.map_or ~default:0 succ
     in
     List.iter
       (fun (id,_,def) ->

@@ -164,7 +164,7 @@ module Make(X : sig
     match !_queue with
     | None ->
       _queue := Some (StmQ.default ());
-      CCOpt.get_exn (!_queue);
+      CCOption.get_exn_or "Zipper" (!_queue);
     | Some q -> q 
 
   let add_empty c =
@@ -643,7 +643,7 @@ module Make(X : sig
     let depth_map = 
       ref (Util.Int_map.singleton (C.id c) depth) in
     let [@inline] get_depth c =
-      CCOpt.get_exn @@ Util.Int_map.get (C.id c) !depth_map in
+      CCOption.get_exn_or "Zipper" @@ Util.Int_map.get (C.id c) !depth_map in
     let [@inline] update_map c c' = 
       let d = get_depth c in
       depth_map := 
@@ -806,7 +806,7 @@ module Make(X : sig
       match rules with
       | [] -> None
       | r :: rs ->
-        CCOpt.or_lazy ~else_:(fun () -> apply_rules ~rules:rs c) (r c) in
+        CCOption.or_lazy ~else_:(fun () -> apply_rules ~rules:rs c) (r c) in
     
     let q = Queue.create () in
     Queue.add c q;

@@ -12,6 +12,6 @@
   (promote (until-clean) (into ../..))
   (libraries logtk logtk.parsers)
   (package zipperposition-tools)
-  (flags :standard -w -32)
+  (flags :standard -w -a)
   (ocamlopt_flags :standard -Oclassic)
 )

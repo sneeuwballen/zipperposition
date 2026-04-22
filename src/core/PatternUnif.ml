@@ -176,7 +176,7 @@ let rec build_term ?(depth=0) ~subst ~scope ~counter var bvar_map t =
          proper elimination of the arguments not present in all_args
          If it is bound then dereference and try again. *)
       if not (US.FO.mem subst (Term.as_var_exn hd, scope)) then (
-        if CCOpt.is_none (get_bvars args) then raise NotInFragment;
+        if CCOption.is_none (get_bvars args) then raise NotInFragment;
 
         let new_args, subst =
           List.fold_right (fun arg (l, subst) -> (
@@ -269,7 +269,7 @@ let rec unify ~scope ~counter ~subst = function
       if not (Type.equal (T.ty s) (T.ty t)) then (
         raise NotUnifiable
       );
-      (* let ty_unif = CCOpt.get_exn ty_unif in *)
+      (* let ty_unif = CCOption.get_exn_or "Zipper" ty_unif in *)
       (* let subst = US.merge subst ty_unif in *)
       let s', t' = norm_deref subst (s,scope), norm_deref subst (t,scope) in
       (* rotating to get naked variables on the lhs *)
@@ -325,11 +325,11 @@ let rec unify ~scope ~counter ~subst = function
    For example, X 0 3 1 =?= X 1 3 2 is solved by {X -> λλλ. Y 1} *) 
 and flex_same ~counter ~scope ~subst var args_s args_t =
   let bvar_s, bvar_t = get_bvars args_s, get_bvars args_t in
-  if CCOpt.is_none bvar_s || CCOpt.is_none bvar_t then
+  if CCOption.is_none bvar_s || CCOption.is_none bvar_t then
     raise NotInFragment;
 
 
-  let bvar_s, bvar_t = CCOpt.get_exn bvar_s, CCOpt.get_exn bvar_t in
+  let bvar_s, bvar_t = CCOption.get_exn_or "Zipper" bvar_s, CCOption.get_exn_or "Zipper" bvar_t in
   assert(CCArray.length bvar_s = CCArray.length bvar_t);
   let v = Term.as_var_exn var in
   let ret_ty = Type.apply_unsafe (Term.ty var) 
@@ -363,10 +363,10 @@ and flex_diff  ~counter ~scope ~subst var_s var_t args_s args_t =
     US.FO.bind subst (Term.as_var_exn var_s,scope) (var_t,scope)
   ) else (
     let bvar_s, bvar_t = get_bvars args_s, get_bvars args_t in
-    if CCOpt.is_none bvar_s || CCOpt.is_none bvar_t then (
+    if CCOption.is_none bvar_s || CCOption.is_none bvar_t then (
       raise NotInFragment
     ) else (
-      let bvar_s, bvar_t = CCOpt.get_exn bvar_s, CCOpt.get_exn bvar_t in
+      let bvar_s, bvar_t = CCOption.get_exn_or "Zipper" bvar_s, CCOption.get_exn_or "Zipper" bvar_t in
       let new_bvars = 
         CCArray.map (fun si -> 
             match CCArray.bsearch ~cmp (fst si, Term.true_) bvar_t  with
@@ -401,10 +401,10 @@ and flex_rigid ~pref_l ~subst ~counter ~scope flex rigid =
   assert(Term.is_var hd);
 
   let bvars = get_bvars args in
-  if CCOpt.is_none bvars then
+  if CCOption.is_none bvars then
     raise NotInFragment;
 
-  let bvars = CCOpt.get_exn bvars in
+  let bvars = CCOption.get_exn_or "Zipper" bvars in
   (* let all_args = List.length pref_l = Array.length bvars in *)
   try
     let matrix, subst = 

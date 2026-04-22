@@ -338,7 +338,7 @@ module Ty : SPECIALIZED with type term = Type.t = struct
 
   let get_var subst v =
     let o = get_var subst v in
-    CCOpt.map (Scoped.map Type.of_term_unsafe) o
+    CCOption.map (Scoped.map Type.of_term_unsafe) o
 
   let find_exn subst v =
     let t = find_exn subst v in
@@ -363,7 +363,7 @@ module FO = struct
 
   let get_var subst v =
     let o = get_var subst v in
-    CCOpt.map (Scoped.map Term.of_term_unsafe) o
+    CCOption.map (Scoped.map Term.of_term_unsafe) o
 
   let find_exn subst v =
     let t = find_exn subst v in

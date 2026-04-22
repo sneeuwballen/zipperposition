@@ -606,13 +606,13 @@ let rec infer_rec ?loc ctx (t:PT.t) : T.t =
         |> List.split
       in
       let rest =
-        CCOpt.map
+        CCOption.map
           (fun s -> match Ctx.get_var_ ctx s with
              | `Var v -> v
              | `ID (id,_) -> error_ ?loc "row variable cannot be a constant %a" ID.pp id)
           rest
       in
-      let ty = T.Ty.record_flatten ty_l ~rest:(CCOpt.map Var.ty rest) in
+      let ty = T.Ty.record_flatten ty_l ~rest:(CCOption.map Var.ty rest) in
       T.record ~ty ?loc l ~rest
     | PT.AppBuiltin (Builtin.Wildcard, []) ->
       (* make a new TYPE variable *)
@@ -651,11 +651,11 @@ let rec infer_rec ?loc ctx (t:PT.t) : T.t =
       then error_ ?loc "(in)equation @[%a@] ?= @[%a@] between types is forbidden" T.pp a T.pp b;
       begin match conn with
         | Builtin.Eq ->
-          if T.Ty.is_prop (T.ty_exn a) && (CCOpt.is_none (T.head a) || CCOpt.is_none (T.head b))
+          if T.Ty.is_prop (T.ty_exn a) && (CCOption.is_none (T.head a) || CCOption.is_none (T.head b))
           then T.Form.equiv a b 
           else T.Form.eq a b
         | Builtin.Neq ->
-          if T.Ty.is_prop (T.ty_exn a) && (CCOpt.is_none (T.head a) || CCOpt.is_none (T.head b))
+          if T.Ty.is_prop (T.ty_exn a) && (CCOption.is_none (T.head a) || CCOption.is_none (T.head b))
           then T.Form.xor a b 
           else T.Form.neq a b
         | _ -> assert false

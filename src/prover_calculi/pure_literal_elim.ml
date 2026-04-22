@@ -156,7 +156,7 @@ let get_pure_symbols forbidden ids2clauses clauses =
   (* joins all clauses in one map with occurences of symbol *)
   let all_clauses = 
     List.fold_left (fun acc cl -> 
-      IDMap.union (fun _ a b -> CCOpt.return @@ a + b) acc cl
+      IDMap.union (fun _ a b -> CCOption.return @@ a + b) acc cl
     ) IDMap.empty clauses
   in
   let all_symbols = 
@@ -187,11 +187,11 @@ let remove_pure_clauses (seq : (TST.t SLiteral.t list, TST.t, TST.t) Statement.t
   let filter_if_has_pure stmt lits =
     Util.incr_stat total_clauses;
     let ans = 
-      CCOpt.return_if 
+      CCOption.return_if 
         (ID.Set.is_empty @@ ID.Set.inter pure_syms (cl_syms lits)) 
       stmt
     in
-    if CCOpt.is_none ans then (
+    if CCOption.is_none ans then (
       Util.incr_stat removed_clauses;
       Util.debugf ~section 2 "removed: @[%a@]@." 
         (fun k -> k (CCList.pp (SLiteral.pp TST.pp)) lits); 

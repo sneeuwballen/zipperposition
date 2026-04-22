@@ -288,7 +288,7 @@ module Conv = struct
 
   let to_s_form ?allow_free_db ?(ctx) ?hooks lits =
     let ctx =
-      if CCOpt.is_some ctx then CCOpt.get_exn ctx
+      if CCOption.is_some ctx then CCOption.get_exn_or "Zipper" ctx
       else (
         let res = Type.Conv.create () in
         Type.Conv.set_maxvar res (Seq.vars lits |> T.Seq.max_var);

@@ -435,7 +435,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let aux i =
       try
         let decl = find_decl_ i in
-        check_decl_ ~ty s decl |> CCOpt.to_list
+        check_decl_ ~ty s decl |> CCOption.to_list
       with Not_found -> []
     in
     let clauses =
@@ -468,7 +468,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     match detect_declaration c with
     | None -> ()
     | Some (var,cases) ->
-      let ty_id = CCOpt.get_exn (as_simple_ty (HVar.ty var)) in
+      let ty_id = CCOption.get_exn_or "Zipper" (as_simple_ty (HVar.ty var)) in
       let is_new = declare_ ~ty_id ~ty_vars:[] ~var ~proof:(`Clause (C.proof c)) cases in
       (* clause becomes redundant if it's a new declaration *)
       match is_new with

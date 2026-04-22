@@ -123,14 +123,14 @@ exception Attr_assoc
 exception Attr_cnf_def
 
 let as_infix = payload_find ~f:(function Attr_infix s->Some s | _ -> None)
-let is_infix id = as_infix id |> CCOpt.is_some
+let is_infix id = as_infix id |> CCOption.is_some
 let as_prefix = payload_find ~f:(function Attr_prefix s->Some s | _ -> None)
-let is_prefix id = as_prefix id |> CCOpt.is_some
+let is_prefix id = as_prefix id |> CCOption.is_some
 let as_parameter id = payload_find id ~f:(function Attr_parameter i -> Some i | _ -> None)
-let is_parameter id = as_parameter id |> CCOpt.is_some
-let is_comm id = CCOpt.is_some @@ 
+let is_parameter id = as_parameter id |> CCOption.is_some
+let is_comm id = CCOption.is_some @@ 
   payload_find ~f:(function Attr_comm -> Some 1 | _ -> None) id
-let is_assoc id = CCOpt.is_some @@ 
+let is_assoc id = CCOption.is_some @@ 
   payload_find ~f:(function Attr_assoc -> Some 1 | _ -> None) id
 let is_ac id = is_comm id && is_assoc id
 

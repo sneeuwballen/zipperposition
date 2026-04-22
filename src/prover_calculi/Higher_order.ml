@@ -946,7 +946,7 @@ module Make(E : Env.S) : S with module Env = E = struct
              end)
           ([], [], [])
           (C.lits c)
-        |> CCOpt.return
+        |> CCOption.return
       with Exit -> None
     in
     (* try to eliminate [v], if it doesn't occur in its own arguments *)
@@ -958,7 +958,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         | Some (other_lits, constr_l, pos_lits) ->
           (* gather positive/negative args *)
           let pos_args, neg_args =
-            CCList.partition_map
+            CCList.partition_filter_map
               (fun (args,sign) -> if sign then `Left args else `Right args)
               constr_l
           in
@@ -1032,7 +1032,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             | T.Var x -> Some x
             | T.App(hd, _) when T.is_var hd ->  Some (T.as_var_exn hd)
             | _ -> None in
-          CCOpt.to_list (extract_var l) @ CCOpt.to_list (extract_var r))
+          CCOption.to_list (extract_var l) @ CCOption.to_list (extract_var r))
       |> Iter.filter (fun v -> Type.returns_prop @@ HVar.ty v)
       |> T.VarSet.of_iter (* unique *)
     in
@@ -1086,7 +1086,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let insantiate_choice ?(proof_constructor=Proof.Step.inference) ?(inst_vars=true) ?(choice_ops=choice_ops) c =
     let max_var = 
       ref ((C.Seq.vars c |> Iter.map HVar.id
-            |> Iter.max |> CCOpt.get_or ~default: 0) + 1) in
+            |> Iter.max |> CCOption.get_or ~default: 0) + 1) in
 
     let is_choice_subterm t =
       match T.view t with
@@ -1377,7 +1377,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let elim_andrews_equality_simpls c =
     if C.proof_depth c < Env.flex_get k_elim_andrews_eq then (
       let res = elim_andrews_eq_ c in
-      CCOpt.return_if (not (CCList.is_empty res)) res
+      CCOption.return_if (not (CCList.is_empty res)) res
     ) else None
   
 
@@ -1433,7 +1433,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let pairs, others =
         C.lits c
         |> Array.to_list
-        |> CCList.partition_map
+        |> CCList.partition_filter_map
           (function
             | Literal.Equation (t,u, false) as lit
               when Literal.is_ho_constraint lit -> `Left ([],t,u)
@@ -1591,7 +1591,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       if condition then raise Fail in
 
     let find_in_args var args =
-      fst @@ CCOpt.get_or ~default:(-1, T.true_)
+      fst @@ CCOption.get_or ~default:(-1, T.true_)
         (CCList.find_idx (T.equal var) args) in
 
     try 
@@ -1739,7 +1739,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                     List.hd new_cl
                 ) in
               let first_two, rest = 
-                OSeq.take 2 res, OSeq.map CCOpt.return (OSeq.drop 2 res) in
+                OSeq.take 2 res, OSeq.map CCOption.return (OSeq.drop 2 res) in
               let stm =  Stm.make ~penalty:(C.penalty c + 20) ~parents:[c] rest in
               StmQ.add (Env.get_stm_queue ()) stm;
               
@@ -2040,7 +2040,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         if not (ID.Set.is_empty ids) then List.map (Term.const ~ty) (ID.Set.to_list ids)
         else [Type.Tbl.get_or_add groundings ~f:introduce_new_const ~k:ty] 
     in
-    CCOpt.map (fun v ->
+    CCOption.map (fun v ->
       let inst repl =
         assert (T.is_ground repl);
         let subst = Subst.FO.bind' Subst.empty (v,0) (repl,0) in

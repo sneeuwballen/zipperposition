@@ -330,10 +330,10 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
     (* TODO: count below and above lam separately *)
       if pos then (
         add_pos_var balance t ~below_lam;
-        W.(wb + weight_var_headed), CCOpt.is_some s && (Term.equal (CCOpt.get_exn s) t)
+        W.(wb + weight_var_headed), CCOption.is_some s && (Term.equal (CCOption.get_exn_or "Zipper" s) t)
       ) else (
         add_neg_var balance t ~below_lam;
-        W.(wb - weight_var_headed), CCOpt.is_some s && (Term.equal (CCOpt.get_exn s) t)
+        W.(wb - weight_var_headed), CCOption.is_some s && (Term.equal (CCOption.get_exn_or "Zipper" s) t)
       )
     (** list version of the previous one, threaded with the check result *)
     and balance_weight_rec wb terms s ~pos ~below_lam res = match terms with

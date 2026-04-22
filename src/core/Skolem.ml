@@ -200,7 +200,7 @@ let find_def_in_ctx ~ctx form =
         let df_vars, f_vars = 
           CCPair.map_same (fun x -> Var.Set.of_iter (T.Seq.vars x)) (def_form,form) in
         if not (Var.Set.intersection_empty df_vars f_vars) then None 
-        else CCOpt.map (fun subst -> def,subst) (TypedSTerm.try_alpha_renaming def_form form)
+        else CCOption.map (fun subst -> def,subst) (TypedSTerm.try_alpha_renaming def_form form)
       | _ -> None) 
     ctx.sc_new_defs
 
@@ -280,7 +280,7 @@ let define_term ?(pattern="fun_") ~ctx ~parents rules : term_definition =
   in
   (* separate type variables and type of arguments *)
   let ty_vars, ty_args =
-    CCList.partition_map
+    CCList.partition_filter_map
       (fun t -> match T.view t with
          | T.Var v when T.Ty.is_tType (Var.ty v) -> `Left v
          | _ -> `Right (T.ty_exn t))

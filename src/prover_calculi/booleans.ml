@@ -272,7 +272,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         ) immediate_args in
 
     if C.proof_depth cl < Env.flex_get k_trigger_bool_ind &&
-       CCOpt.is_some (C.distance_to_goal cl) then (
+       CCOption.is_some (C.distance_to_goal cl) then (
       match C.lits cl with
       | [| Literal.Equation(lhs, rhs, _) as lit |] ->
         let res = 
@@ -373,7 +373,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                 ~rule:(Proof.Rule.mk "bool_hoist") ~tags:[Proof.Tag.T_ho] in
 
     let bool_subterms  = get_bool_hoist_eligible c in
-    CCOpt.return_if (not @@ CCList.is_empty bool_subterms) (
+    CCOption.return_if (not @@ CCList.is_empty bool_subterms) (
       CCList.fold_left (fun acc (t,_) ->
         let t,c = handle_poly_bool_hoist t c in
         let neg_lit, repl_neg = no t, T.true_ in
@@ -468,7 +468,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           let unif_seq =
             get_unif_alg () (zx, sc_zx) (u, sc_cl)
             |> OSeq.flat_map (fun us_opt -> 
-              CCOpt.map_or ~default:OSeq.empty (fun us ->
+              CCOption.map_or ~default:OSeq.empty (fun us ->
                 assert(not @@ US.has_constr us);
                 let sub = US.subst us in
                 let renaming = Subst.Renaming.create () in
@@ -557,7 +557,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let lits = Literals.apply_subst renaming sub ((C.lits c), sc_cl) in
       Literals.Pos.replace lits ~at ~by:partner.repl;
       let new_lits =
-        (CCOpt.map_or ~default:[] (fun x -> [L.apply_subst renaming sub (x,sc_partner)]) partner.new_lit)
+        (CCOption.map_or ~default:[] (fun x -> [L.apply_subst renaming sub (x,sc_partner)]) partner.new_lit)
         @ (Array.to_list (lits))
       in
       let rule = Proof.Rule.mk "fluid_log_symbol_hoist" in
@@ -586,7 +586,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             let seq = 
               get_unif_alg () (p.unif_partner, sc_partner) (var, sc_cl)
               |> OSeq.filter_map (
-                CCOpt.map (fun us -> 
+                CCOption.map (fun us -> 
                   assert(not (Unif_subst.has_constr us));
                   let sub = Unif_subst.subst us in
                   let eligible' = C.eligible_res (c, sc_cl) sub in
@@ -671,7 +671,7 @@ module Make(E : Env.S) : S with module Env = E = struct
             let seq = 
               get_unif_alg () (p.unif_partner, sc_partner) (var, sc_cl)
               |> OSeq.filter_map (
-                CCOpt.map (fun us -> 
+                CCOption.map (fun us -> 
                   assert(not (Unif_subst.has_constr us));
                   let sub = Unif_subst.subst us in
                   let eligible' = C.eligible_res (c, sc_cl) sub in
@@ -714,7 +714,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let seq =
         get_unif_alg () (app_var, 0) (target, 0)
         |> OSeq.filter_map (
-            CCOpt.map (fun us -> 
+            CCOption.map (fun us -> 
               assert(not (Unif_subst.has_constr us));
               let sub = Unif_subst.subst us in
               let renaming = Subst.Renaming.create () in
@@ -823,7 +823,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           (Builtin.is_logical_binop hd || hd = Builtin.Not)
           && List.for_all T.is_var args
         | _ -> false)) 
-    |> CCOpt.map (fun (t,_) -> 
+    |> CCOption.map (fun (t,_) -> 
         let vars = T.VarSet.to_list (T.vars t) in
         assert (List.for_all (fun t -> Type.is_prop (HVar.ty t)) vars);
         all_bool_substs vars
@@ -838,7 +838,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
     let is_var_headed t = T.is_var (T.head_term t) in
     let is_eligible xs =
-      CCOpt.return_if ((List.for_all is_var_headed xs) && (List.exists T.is_app_var xs)) xs
+      CCOption.return_if ((List.for_all is_var_headed xs) && (List.exists T.is_app_var xs)) xs
     in
 
     let create_targets n =
@@ -869,7 +869,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         List.map (fun target -> 
           get_unif_alg_l () (args, 0) (target, 0)
           |> OSeq.filter_map (
-              CCOpt.map (fun us -> 
+              CCOption.map (fun us -> 
                 assert(not (Unif_subst.has_constr us));
                 let sub = Unif_subst.subst us in
                 let renaming = Subst.Renaming.create () in
@@ -968,7 +968,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         let rest = if CCArray.exists Literal.is_trivial (C.lits hoisted) then acc else hoisted :: acc in
         CCList.cons_maybe (quant_rw ~at:p b body) (rest)
       | _ -> acc) []
-    |> (fun res -> CCOpt.return_if (not @@ CCList.is_empty res) res)
+    |> (fun res -> CCOption.return_if (not @@ CCList.is_empty res) res)
 
    let nested_eq_rw c =
     (* TODO(BOOL): currently incompatible with combiantors *)
@@ -982,7 +982,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         Some (
           get_unif_alg () (mk_sc a) (mk_sc b)
           |> OSeq.map (fun unif_subst_opt ->
-              CCOpt.map (fun unif_subst -> 
+              CCOption.map (fun unif_subst -> 
                 assert (not @@ US.has_constr unif_subst);
                 let subst = US.subst unif_subst in
                 let repl = 
@@ -1021,7 +1021,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       if L.is_predicate_lit lit then (
         match lit with
         | L.Equation(lhs,_,_) ->
-          CCOpt.get_exn (FR.rename_form ~polarity_aware:false ~c lhs sign)
+          CCOption.get_exn_or "Zipper" (FR.rename_form ~polarity_aware:false ~c lhs sign)
         | _ -> assert false
       ) else (
         let mk_form =
@@ -1029,7 +1029,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         in
         match lit with
         | L.Equation(lhs,rhs,_) ->
-          CCOpt.get_exn (FR.rename_form ~polarity_aware:false ~c (mk_form lhs rhs) sign)
+          CCOption.get_exn_or "Zipper" (FR.rename_form ~polarity_aware:false ~c (mk_form lhs rhs) sign)
         | _ -> assert false
       )
     in
@@ -1082,7 +1082,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let open Term in
       let compl_in_l l =
         let pos, neg = 
-          CCList.partition_map (fun t ->
+          CCList.partition_filter_map (fun t ->
               match view t with
               | AppBuiltin(Builtin.Not, [s]) -> `Right s
               | _ -> `Left t) l
@@ -1507,7 +1507,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           Util.debugf ~section 5 "unif problem: @[%a=?=%a@]@."(fun k -> k T.pp l T.pp r);
           let stm = 
             unif_alg l r
-            |> OSeq.map (CCOpt.map (fun subst -> 
+            |> OSeq.map (CCOption.map (fun subst -> 
               let renaming = Subst.Renaming.create () in
               let new_lits =
                 CCArray.except_idx (C.lits c) i
@@ -1575,7 +1575,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           )) cnf_vec;
       let solved = 
         if Env.flex_get k_solve_formulas then (
-          CCOpt.get_or ~default:[] (solve_bool_formulas ~which:`All c))
+          CCOption.get_or ~default:[] (solve_bool_formulas ~which:`All c))
         else [] in
 
       let clauses = CCVector.map (C.of_statement ~convert_defs:true) cnf_vec
@@ -1591,7 +1591,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     | None -> None
 
   let cnf_infer cl = 
-    CCOpt.get_or ~default:[] (cnf_otf cl)
+    CCOption.get_or ~default:[] (cnf_otf cl)
 
   let interpret_boolean_functions c =
     (* Collects boolean functions only at top level, 
@@ -1691,7 +1691,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       if Env.flex_get k_solve_formulas then (
         Env.add_unary_inf "solve formulas" (
           fun c -> 
-            CCOpt.get_or ~default:[] @@
+            CCOption.get_or ~default:[] @@
             solve_bool_formulas ~which:`OnlyPositive c
         ));
       if Env.flex_get k_trigger_bool_inst > 0 || Env.flex_get k_trigger_bool_ind > 0 then (
@@ -1774,7 +1774,7 @@ let map_propositions ~proof f =
     )
 
 
-let is_bool t = CCOpt.equal Ty.equal (Some prop) (ty t)
+let is_bool t = CCOption.equal Ty.equal (Some prop) (ty t)
 let is_T_F t = match view t with AppBuiltin((True|False),[]) -> true | _ -> false
 
 (* Modify every subterm of t by f except those at the "top". Here top is true if subterm occurs under a quantifier Æ in a context where it could participate to the clausification if the surrounding context of Æ was ignored. *)
@@ -1939,7 +1939,7 @@ let eager_cases_near stms =
           when not top && no_leaky_variables p ->
         return p
       | Bind(Binder.Lambda, var, body) ->
-        CCOpt.map (fun (body_t, body_f, s) -> 
+        CCOption.map (fun (body_t, body_f, s) -> 
           assert(no_leaky_variables s);
           (T.fun_l [var] body_t, T.fun_l [var] body_f, s)
         ) (aux ~top:false body)
@@ -1948,11 +1948,11 @@ let eager_cases_near stms =
       | Const _ when not top && T.Ty.is_prop p_ty  ->
         return p
       | AppBuiltin(b, args) ->
-        CCOpt.map (fun (args_t,args_f, s) -> 
+        CCOption.map (fun (args_t,args_f, s) -> 
           (T.app_builtin ~ty:p_ty b args_t, T.app_builtin ~ty:p_ty b args_f, s)
         ) (aux_l args)
       | App(hd,args) ->
-        CCOpt.map (fun (args_t,args_f, s) -> 
+        CCOption.map (fun (args_t,args_f, s) -> 
           (T.app ~ty:p_ty hd args_t, T.app ~ty:p_ty hd args_f, s)
         ) (aux_l args)
       | _ -> None

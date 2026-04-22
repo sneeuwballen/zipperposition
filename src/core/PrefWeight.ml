@@ -78,7 +78,7 @@ end) = struct
           let subtree = aux Empty rest in
           Node (NodeTagMap.singleton tag subtree)
         | Node branches -> 
-          let branch = CCOpt.get_or ~default:Empty 
+          let branch = CCOption.get_or ~default:Empty 
                         (NodeTagMap.find_opt tag branches) in
           let subtree = aux branch rest in
           Node (NodeTagMap.add tag subtree branches) end

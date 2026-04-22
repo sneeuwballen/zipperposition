@@ -119,7 +119,7 @@ let as_inductive_type ty = match Type.view ty with
   | Type.Fun _ | Type.Forall _ | Type.Builtin _ | Type.DB _ | Type.Var _
     -> None
 
-let as_inductive_type_exn ty = as_inductive_type ty |> CCOpt.get_exn
+let as_inductive_type_exn ty = as_inductive_type ty |> CCOption.get_exn_or "Zipper"
 
 let is_recursive (t:t) =
   let new_ = Lazy.is_val t.ty_is_rec in

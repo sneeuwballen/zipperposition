@@ -349,7 +349,7 @@ let unify ~scope ~counter t0 s0 =
                  OSeq.return (unif_simple ~scope t_subst s_subst)  else
                  unify_terms t_subst s_subst ~rules:(rules @ [rulename]) in
              unifiers 
-             |> OSeq.map (CCOpt.map (fun unifier -> US.merge subst unifier))
+             |> OSeq.map (CCOption.map (fun unifier -> US.merge subst unifier))
            (* We actually want to compose the substitutions here, but merge will have the same effect. *)
            | None -> OSeq.empty
         )
@@ -372,7 +372,7 @@ let unify ~scope ~counter t0 s0 =
       else  (Util.debugf 1 "Doing JP unif %a = %a" (fun k -> k T.pp t0 T.pp s0); 
              unify_terms t' s' ~rules:[]) in
     (* let term_unifiers = unify_terms t' s' ~rules:[] in *)
-    OSeq.map (CCOpt.map (US.merge type_unifier)) term_unifiers 
+    OSeq.map (CCOption.map (US.merge type_unifier)) term_unifiers 
   | None -> OSeq.empty
 
 (* TODO: Remove tracking of rules for efficiency? *)
@@ -398,7 +398,7 @@ let unify_scoped (t0, scope0) (t1, scope1) =
        (* Util.debugf 1 "UNIFY_START %a =?= %a" (fun k -> k T.pp t0 T.pp t1); *)
        unify ~scope:unifscope ~counter (S.apply subst (t0, scope0)) (S.apply subst (t1, scope1))
        (* merge with var renaming *)
-       |> OSeq.map (CCOpt.map (US.merge subst))
+       |> OSeq.map (CCOption.map (US.merge subst))
     ) ()
 
 let unify_scoped_nonterminating t s = OSeq.filter_map (fun x -> x) (unify_scoped t s)

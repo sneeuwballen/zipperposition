@@ -301,7 +301,7 @@ let debug_tab out (tab:t) : unit =
 
 (* solve tableau by expanding it piece by piece *)
 let solve_ (tab:t) : res =
-  while not (CCList.is_empty tab.open_branches) && CCOpt.is_none tab.saturated do
+  while not (CCList.is_empty tab.open_branches) && CCOption.is_none tab.saturated do
     let b = List.hd tab.open_branches in
     tab.open_branches <- List.tl tab.open_branches;
     Util.debugf ~section 3

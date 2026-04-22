@@ -98,7 +98,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   (* if k_clausify_eq_max_nonint is disabled, then we will not clausify
      if the max side is non-interpreted *)
   let check_eq_cnf_ordering_conditions lhs rhs =
-    let is_noninterpeted t = CCOpt.is_some (Term.head t) in
+    let is_noninterpeted t = CCOption.is_some (Term.head t) in
     let ord = E.Ctx.ord () in
     (E.flex_get k_clausify_eq_max_nonint) ||
     (match Ordering.compare ord lhs rhs with
@@ -254,13 +254,13 @@ module Make(E : Env.S) : S with module Env = E = struct
     if Env.flex_get k_rename_eq 
     then (
       if (yields_clauses lhs && yields_clauses rhs) then
-        (CCOpt.map (fun (r,d,p) -> app_sign r, d, p)
+        (CCOption.map (fun (r,d,p) -> app_sign r, d, p)
           (FR.rename_form ~should_rename ~polarity_aware ~c (T.Form.equiv lhs rhs) sign))
       else if yields_clauses lhs then
-        (CCOpt.map (fun (r,d,p) -> app_sign (T.Form.eq r rhs), d, p) 
+        (CCOption.map (fun (r,d,p) -> app_sign (T.Form.eq r rhs), d, p) 
           (FR.rename_form ~should_rename ~polarity_aware:false ~c lhs sign))
       else if yields_clauses rhs then
-        (CCOpt.map (fun (r,d,p) -> app_sign (T.Form.eq lhs r), d, p) 
+        (CCOption.map (fun (r,d,p) -> app_sign (T.Form.eq lhs r), d, p) 
           (FR.rename_form ~should_rename ~polarity_aware:false ~c rhs sign))
       else None
     ) else None
@@ -281,7 +281,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
   let cnf_scope_form form =
     let kind = Env.flex_get k_scoping in
-    let open CCOpt in
+    let open CCOption in
 
     let rec maxiscoping_eligible l =
       let get_quant t = 
@@ -360,7 +360,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       ) else (
         FR.get_skolem ~parent ~mode:(Env.flex_get k_skolem_mode) f
         |> CCFun.tap (fun t ->
-          CCOpt.iter (fun hd_id -> 
+          CCOption.iter (fun hd_id -> 
           ID.set_payload (hd_id) (ID.Attr_skolem ID.K_lazy_cnf)) (T.head t))) 
     in
     let expand_quant = not @@ Env.flex_get Combinators.k_enable_combinators in
@@ -500,7 +500,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                       ~tags:[Proof.Tag.T_live_cnf;
                              Proof.Tag.T_dont_increase_depth] in
     clausify_quants ~proof_cons c
-    |> CCOpt.map_or ~default:(SimplM.return_same c) (SimplM.return_new)
+    |> CCOption.map_or ~default:(SimplM.return_same c) (SimplM.return_new)
 
 
   let rename_subformulas c =
@@ -601,7 +601,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       Proof.Step.inference ~infos:[] 
                       ~tags:[Proof.Tag.T_live_cnf;
                              Proof.Tag.T_dont_increase_depth] in
-    CCOpt.map_or ~default:[] (fun c -> [c]) @@ clausify_quants ~proof_cons c
+    CCOption.map_or ~default:[] (fun c -> [c]) @@ clausify_quants ~proof_cons c
 
   let clausify_eq c =
     let rule_name = "eq_elim" in

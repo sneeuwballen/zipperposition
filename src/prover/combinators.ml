@@ -285,7 +285,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         let n = List.length ty_args in
         let bvars = List.mapi (fun i ty -> T.bvar ~ty (n-i-1)) ty_args in
         let t' = T.app t bvars in
-        let body = CCOpt.get_or ~default:t' (comb_normalize t') in
+        let body = CCOption.get_or ~default:t' (comb_normalize t') in
         T.fun_l ty_args body
       ) else Lambda.eta_expand t
     

@@ -302,10 +302,10 @@ let process file =
   | CCResult.Ok () ->
     List.iter (function
       | Counter n ->
-        if CCOpt.is_none (StrTbl.get cnt_map n) then (
+        if CCOption.is_none (StrTbl.get cnt_map n) then (
           StrTbl.replace cnt_map n 0)
       | Vector n ->
-        if CCOpt.is_none (StrTbl.get vec_map n) then (
+        if CCOption.is_none (StrTbl.get vec_map n) then (
           StrTbl.replace vec_map n [-1]
         )) all_features;
     

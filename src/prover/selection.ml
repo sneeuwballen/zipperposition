@@ -500,7 +500,7 @@ let e_sel14 ~blocker ~ord lits =
   weight_based_sel_driver ~can_sel:can_select_lit ~ord lits chooser ~blocker:(blocker blocked)
 
 let e_sel15 ~blocker ~ord lits =
-  let (<+>) = CCOpt.Infix.(<+>)  in
+  let (<+>) = CCOption.Infix.(<+>)  in
   let lits_l = CCList.mapi (fun i l -> (i,l)) (CCArray.to_list lits) in
   let sel_bv = CCBV.create ~size:(CCArray.length lits) false in
   let res = 
@@ -520,7 +520,7 @@ let e_sel15 ~blocker ~ord lits =
           ) else None)
      |> CCList.to_iter
      |> Iter.min ~lt:(fun (_, w1) (_, w2) -> w1 < w2)
-     |> CCOpt.map (fun (i,_) -> CCBV.set sel_bv i; sel_bv))
+     |> CCOption.map (fun (i,_) -> CCBV.set sel_bv i; sel_bv))
   <+>
     (* else if there is a _single_ maximal positive literal,
        do not select anything *)
@@ -533,7 +533,7 @@ let e_sel15 ~blocker ~ord lits =
   <+>
     (* else behave as SelectNewComplexAHPNS  *)
     Some (e_sel14 ~blocker ~ord lits) in
-  CCOpt.get_exn res
+  CCOption.get_exn_or "Zipper" res
   |> (fun res_bv -> 
         let block_bv = 
           CCBV.create ~size:(CCArray.length lits) true in

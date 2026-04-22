@@ -490,8 +490,8 @@ module Conv = struct
 
   let exit_bvar ~handle ctx v =
     let new_map = VarMap.map (fun x-> x-1) ctx.bvars_to_db in
-    if CCOpt.is_some handle then (
-      ctx.bvars_to_db <- VarMap.add v (CCOpt.get_exn handle) new_map
+    if CCOption.is_some handle then (
+      ctx.bvars_to_db <- VarMap.add v (CCOption.get_exn_or "Zipper" handle) new_map
     )
     else ctx.bvars_to_db <- new_map
 
@@ -516,7 +516,7 @@ module Conv = struct
     ctx.n <- i+1
 
   let get_maxvar ctx =
-    CCOpt.get_or ~default:0 (!(ctx.max_vars))
+    CCOption.get_or ~default:0 (!(ctx.max_vars))
   
   let incr_maxvar ctx =
     set_maxvar ctx (get_maxvar ctx + 1)

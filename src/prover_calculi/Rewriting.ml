@@ -257,7 +257,7 @@ module Make(E : Env_intf.S) = struct
                "(@[<2>ctx_narrow@ :rule %a[%d]@ :clause %a[%d]@ :pos %a@ :subst %a@ :yield %a@])"
                (fun k->k RW.Rule.pp rule sc_p C.pp c sc_a P.pp rule_pos Subst.pp subst C.pp new_c);
              new_c)
-        |> CCOpt.return
+        |> CCOption.return
     in
     ctx_narrow_find (s,sc_a) sc_p
     |> Iter.fold
@@ -331,23 +331,23 @@ let rewrite_tst_stmt stmt =
     let ctx = Type.Conv.create () in
     let t = Term.Conv.of_simple_term_exn ctx f in
     let snf = Lambda.snf in
-    CCOpt.map (fun (t',p) ->  (Term.Conv.to_simple_term ctx (snf t'), p)) (simpl_term t) in
+    CCOption.map (fun (t',p) ->  (Term.Conv.to_simple_term ctx (snf t'), p)) (simpl_term t) in
 
   let aux_l fs =
     let ts = List.map aux fs in
-    if List.for_all CCOpt.is_none ts then None
+    if List.for_all CCOption.is_none ts then None
     else (
       let proof = ref [] in
       let combined = CCList.combine fs ts in
       let res = 
         List.map (fun (f,res) -> 
-            let f', p_list = CCOpt.get_or ~default:(f,[]) res in
+            let f', p_list = CCOption.get_or ~default:(f,[]) res in
             proof := p_list @ !proof;
             f') combined in
       Some (res, !proof)) in
 
   let mk_proof ~stmt_parents f_opt orig =
-    CCOpt.map (fun (f', parent_list) -> 
+    CCOption.map (fun (f', parent_list) -> 
         let rule = Proof.Rule.mk "definition expansion" in
         f', Proof.S.mk_f_simp ~rule orig (parent_list @ stmt_parents)) f_opt in
 

@@ -195,7 +195,7 @@ let lift_lambdas_t ~parent ~counter t  =
   let lift_lambdas cl =
     let counter = 
       ref ((C.Seq.vars cl |> Iter.map HVar.id 
-            |> Iter.max |> CCOpt.get_or ~default:0) + 1) in
+            |> Iter.max |> CCOption.get_or ~default:0) + 1) in
     let lits, (reused_defs, new_defs) = 
       C.lits cl
       |> CCArray.to_list
@@ -234,7 +234,7 @@ let lift_lambdas_t ~parent ~counter t  =
   
   let lift_lambdas_cnf st =
     Env.cr_return @@ CCList.flat_map (fun c -> 
-      CCOpt.get_or ~default:[c] (lift_lambdas_simp c)
+      CCOption.get_or ~default:[c] (lift_lambdas_simp c)
     )(E.C.of_statement st)
 
   let setup () =

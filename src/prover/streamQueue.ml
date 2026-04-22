@@ -140,7 +140,7 @@ module Make(A : ARG) = struct
         | (_,s) :: s_rest ->
           match Stm.drip s with
           | result ->
-            let n = n + (if CCOpt.is_some result then 1 else 0) in
+            let n = n + (if CCOption.is_some result then 1 else 0) in
             let limit_reached = (*get_op k_clause_num > 0 && n < get_op k_clause_num*) false in
             if (is_empty_clause result) || (full && limit_reached) 
             then List.rev_append ((result,s) :: acc) (CCList.rev_map (fun (_,s) -> None, s) s_rest)
@@ -153,7 +153,7 @@ module Make(A : ARG) = struct
     q.hp <- H.of_list new_stms;
     q.stm_nb <- List.length new_stms;
     let taken = List.rev_map fst dripped in
-    Util.debugf ~section 1 "taken clauses: @[%a@]@." (fun k -> k (CCList.pp (CCOpt.pp Stm.C.pp)) taken);
+    Util.debugf ~section 1 "taken clauses: @[%a@]@." (fun k -> k (CCList.pp (CCOption.pp Stm.C.pp)) taken);
     taken
 
 
@@ -164,7 +164,7 @@ module Make(A : ARG) = struct
       if CCList.is_empty res then take_fair_anyway q
       else (
         q.time_before_fair <- q.ratio;
-        List.rev_map CCOpt.return res)
+        List.rev_map CCOption.return res)
     )
     
   let rec _take_nb q nb prev_res =

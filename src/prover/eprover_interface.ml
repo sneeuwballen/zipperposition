@@ -207,7 +207,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                 flush_all ();
                 if Str.string_match reg_thf_clause line 0 then (
                   let id = CCInt.of_string (Str.matched_group 1 line) in
-                  clause_ids := CCOpt.get_exn id :: !clause_ids;)
+                  clause_ids := CCOption.get_exn_or "Zipper" id :: !clause_ids;)
                 else if Str.string_match regex_refutation_end line 0 then (
                   raise End_of_file
                 )
@@ -228,16 +228,16 @@ module Make(E : Env.S) : S with module Env = E = struct
       let lambda_limit = 6 in
       C.Seq.terms c
       |> Iter.map (fun t -> 
-          CCOpt.get_or ~default:0 (Term.lambda_depth t))
+          CCOption.get_or ~default:0 (Term.lambda_depth t))
       |> Iter.max
-      |> CCOpt.get_or ~default:0
+      |> CCOption.get_or ~default:0
       |> (fun lam_depth -> lam_depth > lambda_limit) 
     in
 
     let convert_clauses ~converter ~encoded_symbols iter =
       let converted = 
         Iter.map (fun c -> 
-          CCOpt.get_or ~default:c (C.eta_reduce c)) iter
+          CCOption.get_or ~default:c (C.eta_reduce c)) iter
         |> Iter.flat_map_l converter in
 
       let encoded, encoded_symbols = 
@@ -303,7 +303,7 @@ module Make(E : Env.S) : S with module Env = E = struct
               List.find (fun cl -> (C.id cl) = id) cl_set) ids in
           let rule = Proof.Rule.mk "eprover" in
           let proof = Proof.Step.inference  ~rule (List.map C.proof_parent clauses) in
-          let penalty = CCOpt.get_exn @@ Iter.max (Iter.map C.penalty (Iter.of_list clauses)) in
+          let penalty = CCOption.get_exn_or "Zipper" @@ Iter.max (Iter.map C.penalty (Iter.of_list clauses)) in
           let trail = C.trail_l clauses in
           Some (C.create ~penalty ~trail [] proof)
         | _ -> None 

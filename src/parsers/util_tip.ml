@@ -192,7 +192,7 @@ let conv_def ?loc decl body =
   UA.mk_def f ty_f [def]
 
 let convert (st:A.statement): UA.statement list =
-  let loc = CCOpt.map conv_loc st.A.loc in
+  let loc = CCOption.map conv_loc st.A.loc in
   Util.debugf 3 "@[<2>convert TIP statement@ @[%a@]@,%a@]"
     (fun k->k A.pp_stmt st ParseLocation.pp_opt loc);
   match st.A.stmt with
@@ -220,7 +220,7 @@ let convert (st:A.statement): UA.statement list =
         (fun c ->
           let args =
             c.A.cstor_args
-            |> List.map (CCPair.map CCOpt.return conv_ty) in
+            |> List.map (CCPair.map CCOption.return conv_ty) in
           c.A.cstor_name, args)
         cstors
     in
@@ -239,7 +239,7 @@ let convert (st:A.statement): UA.statement list =
                (fun c ->
                   let args =
                     c.A.cstor_args
-                    |> List.map (CCPair.map CCOpt.return conv_ty) in
+                    |> List.map (CCPair.map CCOption.return conv_ty) in
                   c.A.cstor_name, args)
                cstors
            in

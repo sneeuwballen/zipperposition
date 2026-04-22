@@ -146,7 +146,7 @@ let find_boolean_lit lits =
         (* assert (_check_variant lits lits'); *)
         Some blit
       | _ -> None)
-  |> CCOpt.map (fun t -> Lit.apply_sign sign t)
+  |> CCOption.map (fun t -> Lit.apply_sign sign t)
 
 (* clause -> boolean lit *)
 let inject_lits_ lits  =
@@ -178,7 +178,7 @@ let inject_lit lit =
   in
 
   try 
-    CCOpt.return @@
+    CCOption.return @@
       begin match Term.Tbl.find_opt _term_set (lit_to_term lit) with
       | Some t -> Lit.apply_sign (Literal.is_positivoid lit) t
       | None ->

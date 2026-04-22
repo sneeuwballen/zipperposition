@@ -6,5 +6,5 @@
     (select logtk_arith.ml from
       (zarith -> logtk_arith.zarith.ml)
       (num -> logtk_arith.num.ml)))
-  (flags :standard -warn-error -a+8)
+  (flags :standard )
   )

@@ -480,7 +480,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             (fun unique_args (t,_) ->
                if Term.equal (fst (T.as_app t)) var
                then (
-                 if CCOpt.equal (CCList.equal T.equal) unique_args (Some (snd (T.as_app t)))
+                 if CCOption.equal (CCList.equal T.equal) unique_args (Some (snd (T.as_app t)))
                  then (unique_args, `Continue) (* found the same arguments of var again *)
                  else (None, `Stop) (* different arguments of var found *)
                ) else (unique_args, `Continue) (* this term doesn't have var as head *)
@@ -994,8 +994,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     let open SupInfo in
     assert (info.sup_kind=DupSup || info.sup_kind=SubVarSup || Type.equal (T.ty info.s) (T.ty info.t));
     assert (info.sup_kind=DupSup || info.sup_kind=SubVarSup ||
-            Unif.Ty.equal ~subst:(US.subst info.subst)
-              (T.ty info.s, info.scope_active) (T.ty info.u_p, info.scope_passive));
+            Type.equal
+              (Subst.Ty.apply Subst.Renaming.none (US.subst info.subst) (T.ty info.s, info.scope_active))
+              (Subst.Ty.apply Subst.Renaming.none (US.subst info.subst) (T.ty info.u_p, info.scope_passive)));
     let renaming = Subst.Renaming.create () in
     let shift_vars = if info.sup_kind = LambdaSup then 0 else -1 in
     let s = Subst.FO.apply ~shift_vars renaming (US.subst info.subst) (info.s, info.scope_active) in
@@ -1200,7 +1201,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             (* /!\ may differ from the actual penalty (by -2) *)
             let parents = [clause; with_pos.clause] in
             let p = max (C.penalty clause) (C.penalty with_pos.clause) in
-            Some (p, parents, OSeq.map (CCOpt.flat_map (do_sup u_p with_pos)) substs))
+            Some (p, parents, OSeq.map (CCOption.flat_map (do_sup u_p with_pos)) substs))
         clause
     in
 
@@ -1220,7 +1221,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
             (* /!\ may differ from the actual penalty (by -2) *)
             let parents = [clause; with_pos.clause] in
             let p = max (C.penalty clause) (C.penalty with_pos.clause) in
-            Some (p, parents, OSeq.map (CCOpt.flat_map (do_sup u_p with_pos)) substs))
+            Some (p, parents, OSeq.map (CCOption.flat_map (do_sup u_p with_pos)) substs))
         clause
     in
     
@@ -1261,7 +1262,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                   let ht = T.app var_h [t] in
                   let res = Env.flex_get k_unif_alg (u_p,1) (hs,0) |> OSeq.map (
                       fun osubst ->
-                        osubst |> CCOpt.flat_map (
+                        osubst |> CCOption.flat_map (
                           fun subst ->
                             let passive = with_pos.C.WithPos.clause in
                             let passive_pos = with_pos.C.WithPos.pos in
@@ -1320,7 +1321,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                       Env.flex_get k_unif_alg (hs,1) (u_p,0)
                       |> OSeq.map
                         (fun osubst ->
-                           osubst |> CCOpt.flat_map (fun subst ->
+                           osubst |> CCOption.flat_map (fun subst ->
                                let info = SupInfo.({
                                    s = hs; t = ht; active; active_pos=s_pos; scope_active=1; subst;
                                    u_p; passive=clause; passive_lit; passive_pos; scope_passive=0; sup_kind=FluidSup
@@ -1390,7 +1391,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                   let z_args = T.app term_z (args_up @ [t]) in
                   let res = Env.flex_get k_unif_alg (s,scope_active) (w_args,scope_passive) |> OSeq.map (
                       fun osubst ->
-                        osubst |> CCOpt.flat_map (
+                        osubst |> CCOption.flat_map (
                           fun subst ->
                             let subst = US.merge subst subst_y in
                             let passive = with_pos.C.WithPos.clause in
@@ -1469,7 +1470,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                       let z_args = T.app term_z (List.append args_up [t]) in
                       let res = Env.flex_get k_unif_alg (w_args,scope_passive) (s,scope_active) |> OSeq.map (
                           fun osubst ->
-                            osubst |> CCOpt.flat_map (
+                            osubst |> CCOption.flat_map (
                               fun subst ->
                                 let subst = US.merge subst subst_y in
                                 let info = SupInfo.({
@@ -1646,12 +1647,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       ~unify:(fun l r -> 
         try Some (Unif.FO.unify_full l r) 
         with Unif.Fail -> None)
-      ~iterate_substs:(fun substs do_eq_res -> CCOpt.flat_map do_eq_res substs) c
+      ~iterate_substs:(fun substs do_eq_res -> CCOption.flat_map do_eq_res substs) c
 
   let infer_equality_resolution_complete_ho clause =
     let inf_res = infer_equality_resolution_aux
         ~unify:(Env.flex_get k_unif_alg)
-        ~iterate_substs:(fun substs do_eq_res -> Some (OSeq.map (CCOpt.flat_map do_eq_res) substs))
+        ~iterate_substs:(fun substs do_eq_res -> Some (OSeq.map (CCOption.flat_map do_eq_res) substs))
         clause
     in
     if Env.should_force_stream_eval () then (
@@ -1779,12 +1780,12 @@ module Make(Env : Env.S) : S with module Env = Env = struct
         try Some (Unif.FO.unify_full s t) 
         with Unif.Fail -> 
       None)
-      ~iterate_substs:(fun subst do_eq_fact -> CCOpt.flat_map do_eq_fact subst) c
+      ~iterate_substs:(fun subst do_eq_fact -> CCOption.flat_map do_eq_fact subst) c
 
   let infer_equality_factoring_complete_ho clause =
     let inf_res = infer_equality_factoring_aux
         ~unify:(Env.flex_get k_unif_alg)
-        ~iterate_substs:(fun substs do_eq_fact -> Some (OSeq.map (CCOpt.flat_map do_eq_fact) substs))
+        ~iterate_substs:(fun substs do_eq_fact -> Some (OSeq.map (CCOption.flat_map do_eq_fact) substs))
         clause
     in
     if Env.should_force_stream_eval () then (
@@ -1807,7 +1808,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       else
         StmQ.take_stm_nb (Env.get_stm_queue ())
     in
-    let opt_res = CCOpt.sequence_l (List.filter CCOpt.is_some cl)  in
+    let opt_res = CCOption.sequence_l (List.filter CCOption.is_some cl)  in
     ZProf.exit_prof _span;
     match opt_res with
     | None -> []
@@ -1821,7 +1822,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       else
         StmQ.take_stm_nb_fix_stm (Env.get_stm_queue ())
     in
-    let opt_res = CCOpt.sequence_l (List.filter CCOpt.is_some cl) in
+    let opt_res = CCOption.sequence_l (List.filter CCOption.is_some cl) in
     ZProf.exit_prof _span;
     match opt_res with
     | None -> []
@@ -2357,7 +2358,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
     let do_sr t =
       let simplify ~sign lhs rhs =
-        let (<+>) = CCOpt.(<+>) in
+        let (<+>) = CCOption.(<+>) in
         let top_level ~sign ~repl lhs rhs = 
           UnitIdx.retrieve ~sign (!_idx_simpl, idx_sc) (lhs, q_sc)
           |> Iter.find_map (fun (_, rhs', (_,_,_,c'), subst) ->
@@ -2436,7 +2437,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let equatable ~sign ~cl s t  =
     let idx_sc, q_sc = 1, 0 in
-    let (<+>) = CCOpt.(<+>) in
+    let (<+>) = CCOption.(<+>) in
     let aux s t =
       UnitIdx.retrieve ~sign (!_idx_simpl, idx_sc) (s, q_sc)
       |> Iter.find_map (fun (_, rhs, (_,_,_,c'), subst) ->
@@ -2469,7 +2470,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
           | _ -> premises
         ) (C.ClauseSet.empty) (C.lits c)
       in
-      CCOpt.return_if (not (CCBV.is_empty (CCBV.negate kept_lits)))
+      CCOption.return_if (not (CCBV.is_empty (CCBV.negate kept_lits)))
         (CCBV.select kept_lits (C.lits c), premises)
     in
 
@@ -2508,7 +2509,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
            | Some cl -> Some (C.ClauseSet.singleton cl)
            | None -> (T.Seq.common_contexts lhs rhs 
                      |> Iter.find_map (fun (a,b) -> equatable ~sign:true ~cl:c a b)
-                     |> CCOpt.map C.ClauseSet.singleton)
+                     |> CCOption.map C.ClauseSet.singleton)
     in
 
     let do_strong_sr = driver ~is_simplified:strong_sr_pair in
@@ -2550,7 +2551,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     (* try to remove the literal using a negative unit clause *)
     and can_refute s t =
       equatable ~sign:false ~cl:c s t
-      |> CCOpt.map C.proof_parent
+      |> CCOption.map C.proof_parent
     in
     (* fold over literals *)
     let lits, premises = iterate_lits [] (C.lits c |> Array.to_list) [] in
@@ -2799,7 +2800,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     ZProf.exit_prof _span;
     res
 
-  let eq_subsumes a b = CCOpt.is_some (eq_subsumes_with (a,1) (b,0))
+  let eq_subsumes a b = CCOption.is_some (eq_subsumes_with (a,1) (b,0))
 
   let subsumed_by_active_set c =
     let _span = ZProf.enter_prof prof_subsumption_set in
@@ -2903,7 +2904,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
                     | None -> subsumes_with (C.lits c',1) (lits,0)
                   in
                   subst
-                  |> CCOpt.map
+                  |> CCOption.map
                     (fun (subst,tags) ->
                        (* remove the literal and recurse *)
                        CCArray.except_idx lits i, i, c', subst, tags))
@@ -3050,7 +3051,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
       if condition then raise Fail in
 
     let find_in_args var args =
-      fst @@ CCOpt.get_or ~default:(-1, T.true_)
+      fst @@ CCOption.get_or ~default:(-1, T.true_)
         (CCList.find_idx (T.equal var) args) in
 
     try 
@@ -3131,9 +3132,9 @@ module Make(Env : Env.S) : S with module Env = Env = struct
   let normalize_equalities c =
     let lits = Array.to_list (C.lits c) in
     let normalized = List.map Literal.normalize_eq lits in
-    if List.exists CCOpt.is_some normalized then (
+    if List.exists CCOption.is_some normalized then (
       let new_lits = List.mapi (fun i l_opt -> 
-          CCOpt.get_or ~default:(Array.get (C.lits c) i) l_opt) normalized in
+          CCOption.get_or ~default:(Array.get (C.lits c) i) l_opt) normalized in
       let proof = Proof.Step.simp [C.proof_parent c] 
           ~rule:(Proof.Rule.mk "simplify nested equalities")  in
       let new_c = C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof in
@@ -3155,22 +3156,22 @@ module Make(Env : Env.S) : S with module Env = Env = struct
 
   let setup_dot_printers () =
     let pp_leaf _ _ = () in
-    CCOpt.iter
+    CCOption.iter
       (fun file ->
          Signal.once Signals.on_dot_output
            (fun () -> _print_idx ~f:(TermIndex.to_dot pp_leaf) file !_idx_sup_into))
     @@ Env.flex_get k_dot_sup_into;
-    CCOpt.iter
+    CCOption.iter
       (fun file ->
          Signal.once Signals.on_dot_output
            (fun () -> _print_idx ~f:(TermIndex.to_dot pp_leaf) file !_idx_sup_from))
     @@ Env.flex_get k_dot_sup_from;
-    CCOpt.iter
+    CCOption.iter
       (fun file ->
          Signal.once Signals.on_dot_output
            (fun () -> _print_idx ~f:UnitIdx.to_dot file !_idx_simpl))
     @@ Env.flex_get k_dot_simpl;
-    CCOpt.iter
+    CCOption.iter
       (fun file ->
          Signal.once Signals.on_dot_output
            (fun () -> _print_idx ~f:(TermIndex.to_dot pp_leaf) file !_idx_back_demod))

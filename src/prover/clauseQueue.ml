@@ -54,10 +54,10 @@ let profile_of_string s =
         in
         let par_mag = List.nth args 2 in
         let goal_pen = List.nth args 3 in
-        if CCOpt.is_none ratio then (
+        if CCOption.is_none ratio then (
           invalid_arg err_msg;
         ) else (
-          cr_var_ratio := CCOpt.get_exn ratio;
+          cr_var_ratio := CCOption.get_exn_or "Zipper" ratio;
           cr_var_mul := var_mul;
           parameters_magnitude := if CCString.equal par_mag "l" then `Large
             else if CCString.equal par_mag "s" then `Small
@@ -152,7 +152,7 @@ module Make(C : Clause_intf.S) = struct
         |> Iter.map Term.ty
         |> Iter.map Type.depth
         |> Iter.max ?lt:None
-        |> CCOpt.map_or CCFun.id ~default:0
+        |> CCOption.map_or CCFun.id ~default:0
       in
       let w_lits = weight_lits_ (C.lits c) in
       w_lits * Array.length (C.lits c) + _depth_ty
@@ -177,7 +177,7 @@ module Make(C : Clause_intf.S) = struct
       let t_depth c = C.Seq.terms c
                       |> Iter.map Term.depth
                       |> Iter.max
-                      |> CCOpt.get_or ~default:0
+                      |> CCOption.get_or ~default:0
                       |> float_of_int in
 
       let weight c = float_of_int (weight_lits_ (C.lits c)) in
@@ -678,8 +678,8 @@ module Make(C : Clause_intf.S) = struct
       try
         ignore(Str.search_forward crv_regex s 0);
         
-        let sym_w = CCOpt.get_exn @@  CCInt.of_string (Str.matched_group 1 s) in
-        let var_w = CCOpt.get_exn @@ CCInt.of_string (Str.matched_group 2 s) in
+        let sym_w = CCOption.get_exn_or "Zipper" @@  CCInt.of_string (Str.matched_group 1 s) in
+        let var_w = CCOption.get_exn_or "Zipper" @@ CCInt.of_string (Str.matched_group 2 s) in
         let max_t_mul = CCFloat.of_string_exn (Str.matched_group 3 s) in
         let max_l_mul = CCFloat.of_string_exn (Str.matched_group 4 s) in
         let pos_mul = CCFloat.of_string_exn (Str.matched_group 5 s) in
@@ -720,10 +720,10 @@ module Make(C : Clause_intf.S) = struct
       try
         ignore(Str.search_forward crv_regex s 0);
         let parse_bool s = CCString.prefix ~pre:"t" (String.lowercase_ascii s) in
-        let fweight = CCOpt.get_exn @@  CCInt.of_string (Str.matched_group 1 s) in
-        let vweight = CCOpt.get_exn @@  CCInt.of_string (Str.matched_group 2 s) in
+        let fweight = CCOption.get_exn_or "Zipper" @@  CCInt.of_string (Str.matched_group 1 s) in
+        let vweight = CCOption.get_exn_or "Zipper" @@  CCInt.of_string (Str.matched_group 2 s) in
         let pos_multiplier = CCFloat.of_string_exn (Str.matched_group 3 s) in
-        let dup_weight = CCOpt.get_exn @@  CCInt.of_string (Str.matched_group 4 s) in
+        let dup_weight = CCOption.get_exn_or "Zipper" @@  CCInt.of_string (Str.matched_group 4 s) in
         let pos_use_dag = parse_bool @@ Str.matched_group 5 s in
         let pos_t_reset = parse_bool @@ Str.matched_group 6 s in
         let pos_eqn_reset = parse_bool @@ Str.matched_group 7 s in
@@ -748,10 +748,10 @@ module Make(C : Clause_intf.S) = struct
         ignore(Str.search_forward crv_regex s 0);
         let conj_mul = CCFloat.of_string_exn (Str.matched_group 1 s) in
         let fresh_mul = CCFloat.of_string_exn (Str.matched_group 2 s) in
-        let f = CCOpt.get_exn @@ CCInt.of_string (Str.matched_group 3 s) in
-        let cst = CCOpt.get_exn @@  CCInt.of_string (Str.matched_group 4 s) in
-        let p = CCOpt.get_exn @@  CCInt.of_string (Str.matched_group 5 s) in
-        let v = CCOpt.get_exn @@  CCInt.of_string (Str.matched_group 6 s) in
+        let f = CCOption.get_exn_or "Zipper" @@ CCInt.of_string (Str.matched_group 3 s) in
+        let cst = CCOption.get_exn_or "Zipper" @@  CCInt.of_string (Str.matched_group 4 s) in
+        let p = CCOption.get_exn_or "Zipper" @@  CCInt.of_string (Str.matched_group 5 s) in
+        let v = CCOption.get_exn_or "Zipper" @@  CCInt.of_string (Str.matched_group 6 s) in
         let max_term_mul = CCFloat.of_string_exn (Str.matched_group 7 s) in
         let max_lit_mul = CCFloat.of_string_exn (Str.matched_group 8 s) in
         let pos_mul = CCFloat.of_string_exn (Str.matched_group 9 s) in
@@ -770,8 +770,8 @@ module Make(C : Clause_intf.S) = struct
         ignore(Str.search_forward crs_regex s 0);
         let inst_penalty = CCFloat.of_string_exn (Str.matched_group 1 s) in
         let gen_penalty = CCFloat.of_string_exn (Str.matched_group 2 s) in
-        let var_w = CCOpt.get_exn @@ CCInt.of_string (Str.matched_group 3 s) in
-        let sym_w = CCOpt.get_exn @@  CCInt.of_string (Str.matched_group 4 s) in
+        let var_w = CCOption.get_exn_or "Zipper" @@ CCInt.of_string (Str.matched_group 3 s) in
+        let sym_w = CCOption.get_exn_or "Zipper" @@  CCInt.of_string (Str.matched_group 4 s) in
         conj_relative_struct ~inst_penalty ~gen_penalty ~var_w ~sym_w
       with Not_found | Invalid_argument _ ->
         invalid_arg
@@ -787,8 +787,8 @@ module Make(C : Clause_intf.S) = struct
            ^ "\\([0-9]+[.]?[0-9]*\\))") in
       try
         ignore(Str.search_forward or_lmax_regex s 0);
-        let v_w = CCOpt.get_exn (CCInt.of_string (Str.matched_group 1 s)) in
-        let f_w = CCOpt.get_exn (CCInt.of_string (Str.matched_group 2 s)) in
+        let v_w = CCOption.get_exn_or "Zipper" (CCInt.of_string (Str.matched_group 1 s)) in
+        let f_w = CCOption.get_exn_or "Zipper" (CCInt.of_string (Str.matched_group 2 s)) in
         let pos_m = CCFloat.of_string_exn (Str.matched_group 3 s) in
         let unord_m = CCFloat.of_string_exn (Str.matched_group 4 s) in
         let max_l_mul = CCFloat.of_string_exn (Str.matched_group 5 s) in
@@ -811,10 +811,10 @@ module Make(C : Clause_intf.S) = struct
            ^ "\\([0-9]+[.]?[0-9]*\\))") in
       try
         ignore(Str.search_forward or_lmax_regex s 0);
-        let pf_w = CCOpt.get_exn (CCInt.of_string (Str.matched_group 1 s)) in
-        let pv_w = CCOpt.get_exn (CCInt.of_string (Str.matched_group 2 s)) in
-        let nf_w = CCOpt.get_exn (CCInt.of_string (Str.matched_group 3 s)) in
-        let nv_w = CCOpt.get_exn (CCInt.of_string (Str.matched_group 4 s)) in
+        let pf_w = CCOption.get_exn_or "Zipper" (CCInt.of_string (Str.matched_group 1 s)) in
+        let pv_w = CCOption.get_exn_or "Zipper" (CCInt.of_string (Str.matched_group 2 s)) in
+        let nf_w = CCOption.get_exn_or "Zipper" (CCInt.of_string (Str.matched_group 3 s)) in
+        let nv_w = CCOption.get_exn_or "Zipper" (CCInt.of_string (Str.matched_group 4 s)) in
         let max_t_m = CCFloat.of_string_exn (Str.matched_group 5 s) in
         let max_l_m = CCFloat.of_string_exn (Str.matched_group 6 s) in
         let pos_m = CCFloat.of_string_exn (Str.matched_group 7 s) in
@@ -902,11 +902,11 @@ module Make(C : Clause_intf.S) = struct
         let l_poly_const = CCFloat.of_string_exn (Str.matched_group 1 s) in
         let l_poly_lin = CCFloat.of_string_exn (Str.matched_group 2 s) in
         let l_poly_sq = CCFloat.of_string_exn (Str.matched_group 3 s) in
-        let def_l = CCOpt.get_exn (CCInt.of_string (Str.matched_group 4 s)) in
-        let fw = CCOpt.get_exn (CCInt.of_string (Str.matched_group 5 s)) in
-        let cw = CCOpt.get_exn (CCInt.of_string (Str.matched_group 6 s)) in
-        let pw = CCOpt.get_exn (CCInt.of_string (Str.matched_group 7 s)) in
-        let vw = CCOpt.get_exn (CCInt.of_string (Str.matched_group 8 s)) in
+        let def_l = CCOption.get_exn_or "Zipper" (CCInt.of_string (Str.matched_group 4 s)) in
+        let fw = CCOption.get_exn_or "Zipper" (CCInt.of_string (Str.matched_group 5 s)) in
+        let cw = CCOption.get_exn_or "Zipper" (CCInt.of_string (Str.matched_group 6 s)) in
+        let pw = CCOption.get_exn_or "Zipper" (CCInt.of_string (Str.matched_group 7 s)) in
+        let vw = CCOption.get_exn_or "Zipper" (CCInt.of_string (Str.matched_group 8 s)) in
         let max_t_mul = CCFloat.of_string_exn (Str.matched_group 9 s) in
         let max_lit_mul = CCFloat.of_string_exn (Str.matched_group 10 s) in
         let pos_lit_mul = CCFloat.of_string_exn (Str.matched_group 11 s) in
@@ -1011,8 +1011,8 @@ module Make(C : Clause_intf.S) = struct
           ("clauseweight(\\([0-9]+\\),\\([0-9]+\\),\\([0-9]+[.]?[0-9]*\\)") in
       try
         ignore(Str.search_forward or_lmax_regex s 0);
-        let fw = CCOpt.get_exn (CCInt.of_string (Str.matched_group 1 s)) in
-        let vw = CCOpt.get_exn (CCInt.of_string (Str.matched_group 2 s)) in
+        let fw = CCOption.get_exn_or "Zipper" (CCInt.of_string (Str.matched_group 1 s)) in
+        let vw = CCOption.get_exn_or "Zipper" (CCInt.of_string (Str.matched_group 2 s)) in
         let pos_lit_mul = CCFloat.of_string_exn (Str.matched_group 3 s) in
         clauseweight ~fw ~vw ~pos_lit_mul
       with Not_found | Invalid_argument _ ->
@@ -1042,8 +1042,8 @@ module Make(C : Clause_intf.S) = struct
            ^ "\\([0-9]+[.]?[0-9]*\\))") in
       try
         ignore(Str.search_forward or_lmax_regex s 0);
-        let v = CCOpt.get_exn (CCInt.of_string (Str.matched_group 1 s)) in
-        let f = CCOpt.get_exn (CCInt.of_string (Str.matched_group 2 s)) in
+        let v = CCOption.get_exn_or "Zipper" (CCInt.of_string (Str.matched_group 1 s)) in
+        let f = CCOption.get_exn_or "Zipper" (CCInt.of_string (Str.matched_group 2 s)) in
         let pos_mul = CCFloat.of_string_exn (Str.matched_group 3 s) in
         let conj_mul = CCFloat.of_string_exn (Str.matched_group 4 s) in
         let dist_var_mul = CCFloat.of_string_exn (Str.matched_group 5 s) in
@@ -1096,7 +1096,7 @@ module Make(C : Clause_intf.S) = struct
     let prefer_ho_steps c = if Proof.Step.has_ho_step (C.proof_step c) then 0 else 1
 
     let prefer_sos c =
-      if C.proof_depth c = 0 || CCOpt.is_some (C.distance_to_goal c) then 0 else 1
+      if C.proof_depth c = 0 || CCOption.is_some (C.distance_to_goal c) then 0 else 1
 
     let prefer_non_goals c =
       if Iter.exists Literal.is_positivoid (C.Seq.lits c) then 0 else 1
@@ -1138,7 +1138,7 @@ module Make(C : Clause_intf.S) = struct
           ) else max_int
         | _ -> max_int)
       |> Iter.min
-      |> CCOpt.get_or ~default:0
+      |> CCOption.get_or ~default:0
 
     let prefer_easy_ho c =
       let is_arg_cong_child c =
@@ -1235,7 +1235,7 @@ module Make(C : Clause_intf.S) = struct
       if C.is_ground c then 1 else 0
 
     let defer_sos c = 
-      if C.proof_depth c = 0 || CCOpt.is_some (C.distance_to_goal c) then 1 else 0
+      if C.proof_depth c = 0 || CCOption.is_some (C.distance_to_goal c) then 1 else 0
 
     let prefer_top_level_app_var c =
       let lits = C.lits c in
@@ -1271,7 +1271,7 @@ module Make(C : Clause_intf.S) = struct
       C.Seq.terms c
       |> Iter.map app_var_depth
       |> Iter.max
-      |> CCOpt.get_or ~default:min_int
+      |> CCOption.get_or ~default:min_int
 
     let by_app_var_num c =
       C.Seq.terms c
@@ -1308,8 +1308,8 @@ module Make(C : Clause_intf.S) = struct
 
       C.Seq.terms c
       |> Iter.fold (fun acc t -> max_opt acc (depth_fun t)) None
-      |> CCOpt.map modifier
-      |> CCOpt.get_or ~default:max_int
+      |> CCOption.map modifier
+      |> CCOption.get_or ~default:max_int
 
     
     let prefer_shallow_lambdas c = 
@@ -1326,7 +1326,7 @@ module Make(C : Clause_intf.S) = struct
       Literals.Seq.terms (C.lits c)
       |> Iter.map Term.depth
       |> Iter.max
-      |> CCOpt.get_or ~default:0
+      |> CCOption.get_or ~default:0
 
     let defer_shallow c =
       - (prefer_shallow c)
@@ -1713,7 +1713,7 @@ let parse_wf_with_priority s =
   let wf_with_prio_regex = Str.regexp "\\([0-9]+\\)|\\(.+\\)|\\(.+\\)" in
   try
     ignore(Str.search_forward wf_with_prio_regex s 0);
-    let ratio = CCOpt.get_exn (CCInt.of_string (Str.matched_group 1 s)) in
+    let ratio = CCOption.get_exn_or "Zipper" (CCInt.of_string (Str.matched_group 1 s)) in
     let priority_str = CCString.trim (Str.matched_group 2 s) in
     let weight_fun = CCString.trim (Str.matched_group 3 s) in
     funs_to_parse := !funs_to_parse @ [(ratio, priority_str, weight_fun)]

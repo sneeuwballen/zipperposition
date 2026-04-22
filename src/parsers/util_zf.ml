@@ -27,7 +27,7 @@ let rec parse_lexbuf_ ?cache ?(recursive=true) ~dir lex =
   in
   if recursive
   then (
-    let cache = CCOpt.get_lazy create_parse_cache cache in
+    let cache = CCOption.get_lazy create_parse_cache cache in
     CCList.flat_map
       (fun st -> match st.A.stmt with
          | A.Include s ->

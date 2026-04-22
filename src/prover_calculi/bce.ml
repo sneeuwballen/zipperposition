@@ -133,7 +133,7 @@ module Make(E : Env.S) : S with module Env = E = struct
 
     if not (ID.Set.mem sym !ignored_symbols) then (
       let sym_occs sym sign =
-        CCOpt.map_or ~default:0 C.ClauseSet.cardinal
+        CCOption.map_or ~default:0 C.ClauseSet.cardinal
           (SymSignIdx.find_opt (sym,sign) !ss_idx)
       in
 
@@ -145,7 +145,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         Util.debugf ~section 5 "ignoring symbol @[%a@]@." (fun k -> k ID.pp sym);
       ) else (
         ss_idx := SymSignIdx.update (sym, sign) (fun old ->
-          Some (C.ClauseSet.add cl (CCOpt.get_or ~default:C.ClauseSet.empty old))
+          Some (C.ClauseSet.add cl (CCOption.get_or ~default:C.ClauseSet.empty old))
         ) !ss_idx;
       )
     )
@@ -154,7 +154,7 @@ module Make(E : Env.S) : S with module Env = E = struct
      with given lhs and sign  *)
   let find_candidates hd sign = 
     C.ClauseSet.to_list
-      (CCOpt.get_or
+      (CCOption.get_or
           ~default:C.ClauseSet.empty
         (SymSignIdx.find_opt (hd, not sign) !ss_idx))
   
@@ -263,7 +263,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           SymSignIdx.update (T.head_exn lhs, L.is_positivoid lit) (function
             | Some old ->
               let new_ = C.ClauseSet.remove cl old in
-              CCOpt.return_if (not (C.ClauseSet.is_empty new_)) new_
+              CCOption.return_if (not (C.ClauseSet.is_empty new_)) new_
             | None -> None (*already removed*)) !ss_idx;
       | _ -> ()
     ) (C.lits cl)
@@ -271,7 +271,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let lock_clause locker locked_task =
     assert(C.id locker == C.id (DEQ.peek_front locked_task.cands));
     clause_lock := Util.Int_map.update (C.id locker) (fun old_val -> 
-      let locked_tasks = CCOpt.get_or ~default:[] old_val in
+      let locked_tasks = CCOption.get_or ~default:[] old_val in
       Some (locked_task :: locked_tasks)
     ) !clause_lock
 
@@ -379,7 +379,7 @@ module Make(E : Env.S) : S with module Env = E = struct
              part -- we have won as those literals will not be removed with L-resolution *)
           let is_valid_compl_lits =
             List.exists (fun lit' ->
-              CCOpt.is_some (CCArray.find_map_i (fun idx lit ->
+              CCOption.is_some (CCArray.find_map_i (fun idx lit ->
                 if idx != l_idx &&
                   are_opposite_lits_up_to ~subst (lit, sc_orig) (lit', sc_partner) then(
                   Some ())
@@ -398,9 +398,9 @@ module Make(E : Env.S) : S with module Env = E = struct
             (* else, we do L-resolution with the unifiable part extended *)
             let contrasting, rest' =
               CCList.partition (fun (lhs,_) ->
-                CCOpt.is_some (
+                CCOption.is_some (
                   List.find_opt (fun (lit, sc) ->
-                    let lhs'  = CCOpt.get_exn (L.View.get_lhs lit) in
+                    let lhs'  = CCOption.get_exn_or "Zipper" (L.View.get_lhs lit) in
                     Unif.FO.equal ~subst (lhs',sc) (lhs, sc_partner)
                   )
                   for_tautology_checking))  
@@ -497,7 +497,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     in
 
     let check_resolvents l_idx orig_cl (same_hd_atms, diff_hd_lits) =
-      let orig_args = T.args @@ CCOpt.get_exn @@ (L.View.get_lhs (C.lits orig_cl).(l_idx)) in
+      let orig_args = T.args @@ CCOption.get_exn_or "Zipper" @@ (L.View.get_lhs (C.lits orig_cl).(l_idx)) in
 
       (* add equations that correspond to computing a flat resolvent between
          original lit and the one that has new_args arguments to the head *)
@@ -523,8 +523,8 @@ module Make(E : Env.S) : S with module Env = E = struct
       let for_congruence_testing =
         CCList.filter_map (fun lit -> 
           if L.is_predicate_lit lit && L.is_positivoid lit = orig_sign then (
-            CCOpt.flat_map (fun t -> 
-              CCOpt.return_if 
+            CCOption.flat_map (fun t -> 
+              CCOption.return_if 
                 (match T.head t, T.head orig_lhs with
                  | Some hd, Some hd' -> ID.equal hd hd'
                  | _ -> false)
@@ -536,7 +536,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let orig_cc =
         List.fold_left (fun acc lit -> 
           assert (L.is_negativoid lit);
-          let lhs,rhs,_ = CCOpt.get_exn @@ L.View.as_eqn lit in
+          let lhs,rhs,_ = CCOption.get_exn_or "Zipper" @@ L.View.as_eqn lit in
           CC.mk_eq acc lhs rhs
         ) (CC.create ~size:16 ()) all_neg
       in
@@ -558,7 +558,7 @@ module Make(E : Env.S) : S with module Env = E = struct
              part -- we have won as those literals will not be removed with L-resolution *)
           let is_valid_compl_lits =
             List.exists (fun lit' ->
-              CCOpt.is_some (CCArray.find_map_i (fun idx lit ->
+              CCOption.is_some (CCArray.find_map_i (fun idx lit ->
                 if idx != l_idx &&
                   are_opposite_lits_up_to ~cc lit lit' then(
                   Some ())
@@ -617,7 +617,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       let cl = task.clause in
       let lit_idx = task.lit_idx in
       let hd_sym = 
-        T.head_exn @@ CCOpt.get_exn @@ L.View.get_lhs (C.lits cl).(lit_idx)
+        T.head_exn @@ CCOption.get_exn_or "Zipper" @@ L.View.get_lhs (C.lits cl).(lit_idx)
       in
       let is_alone_with_polarity () =
         let sign = L.is_positivoid (C.lits cl).(lit_idx) in
@@ -800,7 +800,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           );
           Signal.on_every Env.ProofState.PassiveSet.on_remove_clause remove_cl_sat;
           Signal.on_every Env.on_forward_simplified (fun (_,state) ->
-            CCOpt.iter (add_cl_sat) state);
+            CCOption.iter (add_cl_sat) state);
           Signal.on_every Env.ProofState.ActiveSet.on_remove_clause remove_cl_sat;
         ) else (
           (* clauses begin their life when they are added to the passive set *)

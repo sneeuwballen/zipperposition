@@ -113,7 +113,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
         if E.flex_get k_abstract_known_singletons then (
           let lits = Array.of_list lits in
           let bool_name = BBox.find_boolean_lit lits in
-          CCOpt.iter (fun bool_lit -> 
+          CCOption.iter (fun bool_lit -> 
               (* asserting Trail -> bool_name *)
               if List.for_all (fun bg -> 
                   BBox.Lit.equal (BBox.Lit.neg bg) bool_lit)
@@ -167,7 +167,7 @@ module Make(E : Env.S)(Sat : Sat_solver.S)
       (not @@ E.flex_get k_split_only_initial || C.proof_depth c == 0) &&
       (not @@ E.flex_get k_split_only_ground || C.is_ground c) &&
       (not @@ E.flex_get k_split_only_goals || 
-       CCOpt.get_or ~default:(-1) (C.distance_to_goal c) >= 0) &&
+       CCOption.get_or ~default:(-1) (C.distance_to_goal c) >= 0) &&
       (not @@ E.flex_get k_abstract_known_singletons ||
        Array.length (C.lits c) != 0) &&
       (E.flex_get k_abstract_known_singletons ||

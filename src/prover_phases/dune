@@ -4,5 +4,5 @@
   (synopsis "main for the Zipperposition theorem prover")
   (libraries libzipperposition libzipperposition.calculi
              libzipperposition.avatar libzipperposition.induction)
-  (flags :standard -w -32)
+  (flags :standard -w -a)
 )

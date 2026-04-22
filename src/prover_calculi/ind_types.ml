@@ -36,7 +36,7 @@ module Make(Env : Env_intf.S) = struct
       | T.AppBuiltin _ -> None
     end
 
-  let is_cstor_app t = CCOpt.is_some (as_cstor_app t)
+  let is_cstor_app t = CCOption.is_some (as_cstor_app t)
 
   (* traverse all the sub-terms under at least one constructor *)
   let walk_cstor_args (t:term): term Iter.t =
@@ -256,7 +256,7 @@ module Make(Env : Env_intf.S) = struct
            This way, the case will be smaller than the constant. *)
         let depth = match T.view t with
           | T.Const id ->
-            Ind_cst.id_as_cst id |> CCOpt.map Ind_cst.depth |> CCOpt.map succ
+            Ind_cst.id_as_cst id |> CCOption.map Ind_cst.depth |> CCOption.map succ
           | _ -> None
         in
         Ind_cst.make ~is_sub:false ?depth ty |> Ind_cst.id

@@ -53,8 +53,8 @@ module Make(T : TERM) = struct
   let[@inline] set_parents_ cc t parents : t =
     { cc with parents=H.replace cc.parents t parents }
 
-  let[@inline] next_ cc t = H.get t cc.next |> CCOpt.get_or ~default:t
-  let[@inline] parents_ cc t = H.get t cc.parents |> CCOpt.get_or ~default:[]
+  let[@inline] next_ cc t = H.get t cc.next |> CCOption.get_or ~default:t
+  let[@inline] parents_ cc t = H.get t cc.parents |> CCOption.get_or ~default:[]
 
   (* find representative *)
   let rec find_ cc (t:term) : term =

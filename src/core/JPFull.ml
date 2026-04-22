@@ -18,7 +18,7 @@ module Make (S : sig val st: Flex_state.t end) = struct
   
   let iter_rule ?(flex_same=false) ~counter ~scope t u depth  =
     JP_unif.iterate ~flex_same ~scope ~counter t u []
-    |> OSeq.map (CCOpt.map (fun s -> U.subst s, depth+1))
+    |> OSeq.map (CCOption.map (fun s -> U.subst s, depth+1))
 
   let imit_rule ~counter ~scope t u depth =
     JP_unif.imitate ~scope ~counter t u []
@@ -145,7 +145,7 @@ module Make (S : sig val st: Flex_state.t end) = struct
     (fun x y ->
        elim_vars := IntSet.empty;
        ident_vars := IntSet.empty;
-       OSeq.map (CCOpt.map Unif_subst.of_subst) (JPFull.unify_scoped x y))
+       OSeq.map (CCOption.map Unif_subst.of_subst) (JPFull.unify_scoped x y))
   
   let unify_scoped_l =  
     let counter = ref 0 in
@@ -166,5 +166,5 @@ module Make (S : sig val st: Flex_state.t end) = struct
     (fun x y ->
        elim_vars := IntSet.empty;
        ident_vars := IntSet.empty;
-       OSeq.map (CCOpt.map Unif_subst.of_subst) (JPFull.unify_scoped_l x y))
+       OSeq.map (CCOption.map Unif_subst.of_subst) (JPFull.unify_scoped_l x y))
 end

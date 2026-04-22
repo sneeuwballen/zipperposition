@@ -140,14 +140,14 @@ let rec compare t1 t2 =
       CCOrd.list compare l1 l2
     | Record (l1, rest1), Record (l2, rest2) ->
       CCOrd.(
-        CCOpt.compare compare rest1 rest2
+        CCOption.compare compare rest1 rest2
         <?> (cmp_fields, l1, l2)
       )
     | Meta (id1,_,_), Meta (id2,_,_) -> Var.compare id1 id2
     | Ite (a1,b1,c1), Ite (a2,b2,c2) ->
       CCList.compare compare [a1;b1;c1] [a2;b2;c2]
     | Let (l1,t1), Let (l2,t2) ->
-      CCOrd.( compare t1 t2
+      CCOrd.( poly t1 t2
               <?> (list (pair Var.compare compare), l1, l2))
     | Match (u1,l1), Match (u2,l2) ->
       let cmp_branch (c1,vars1,rhs1) (c2,vars2,rhs2) =
@@ -156,7 +156,7 @@ let rec compare t1 t2 =
                <?> (list Var.compare, vars1,vars2)
                <?> (compare,rhs1,rhs2))
       in
-      CCOrd.( compare u1 u2 <?> (list cmp_branch,l1,l2))
+      CCOrd.( poly u1 u2 <?> (list cmp_branch,l1,l2))
     | Var _, _
     | Const _, _
     | App _, _
@@ -350,12 +350,12 @@ let rec check_no_dup_ seen l = match l with
     check_no_dup_ (n::seen) l'
 
 let record ?loc ~ty l ~rest =
-  let rest = CCOpt.map (var ?loc) rest in
+  let rest = CCOption.map (var ?loc) rest in
   check_no_dup_ [] l;
   make_ ?loc ~ty (Record (l,rest))
 
 let record_flatten ?loc ~ty l ~rest =
-  match CCOpt.map deref rest with
+  match CCOption.map deref rest with
   | None
   | Some {term=(Var _ | Meta _); _} ->
     let l = List.sort cmp_field l in
@@ -402,7 +402,7 @@ module Seq = struct
   let subterms t k =
     let rec iter t =
       k t;
-      CCOpt.iter iter t.ty;
+      CCOption.iter iter t.ty;
       match (deref t).term with
       | Meta _
       | Var _
@@ -410,7 +410,7 @@ module Seq = struct
       | App (f, l) -> iter f; List.iter iter l
       | Bind (_, v, t') -> iter (Var.ty v); iter t'
       | Record (l, rest) ->
-        CCOpt.iter iter rest;
+        CCOption.iter iter rest;
         List.iter (fun (_,t) -> iter t) l
       | Ite (a,b,c) -> iter a; iter b; iter c
       | Let (l,u) -> iter u; List.iter (fun (_,t) -> iter t) l
@@ -447,7 +447,7 @@ module Seq = struct
   let subterms_with_bound t k =
     let rec iter set t =
       k (t,set);
-      CCOpt.iter (iter set) t.ty;
+      CCOption.iter (iter set) t.ty;
       match view t with
       | Meta _
       | Var _
@@ -472,7 +472,7 @@ module Seq = struct
         let set' = Var.Set.add set v in
         iter set (Var.ty v); iter set' t'
       | Record (l, rest) ->
-        CCOpt.iter (iter set) rest;
+        CCOption.iter (iter set) rest;
         List.iter (fun (_,t) -> iter set t) l
       | AppBuiltin (_,l)
       | Multiset l -> List.iter (iter set) l
@@ -488,7 +488,7 @@ module Seq = struct
 end
 
 let rec is_ground t =
-  CCOpt.map_or is_ground ~default:true t.ty
+  CCOption.map_or is_ground ~default:true t.ty
   &&
   match t.term with
   | Var _ -> false
@@ -505,7 +505,7 @@ let rec is_ground t =
     List.for_all (fun (_,_,t) -> is_ground t) l
   | Bind (_, v, t') -> is_ground (Var.ty v) && is_ground t'
   | Record (l, rest) ->
-    CCOpt.map_or is_ground ~default:true rest
+    CCOption.map_or is_ground ~default:true rest
     &&
     List.for_all (fun (_,t') -> is_ground t') l
   | Multiset l -> List.for_all is_ground l
@@ -566,7 +566,7 @@ let map ~f ~bind:f_bind b_acc t = match view t with
     let ty = f b_acc (ty_exn t) in
     record_flatten ?loc:t.loc ~ty
       (List.map (CCPair.map_snd (f b_acc)) l)
-      ~rest:(CCOpt.map (f b_acc) rest)
+      ~rest:(CCOption.map (f b_acc) rest)
   | Ite (a,b,c) ->
     let a = f b_acc a in
     let b = f b_acc b in
@@ -901,7 +901,7 @@ module Form = struct
 
   let and_ ?loc l  =
     let flattened = flatten_ `And [] l in
-    let parsing = CCOpt.is_some loc in
+    let parsing = CCOption.is_some loc in
     match flattened with
     | [] when not parsing -> true_
     | [t] when not parsing -> t 
@@ -911,7 +911,7 @@ module Form = struct
 
   let or_ ?loc l = 
     let flattened = flatten_ `Or [] l in
-    let parsing = CCOpt.is_some loc in
+    let parsing = CCOption.is_some loc in
     match flattened with
     | [] when not parsing -> false_
     | [t] when not parsing -> t 
@@ -1065,8 +1065,8 @@ let rec rectify_aux ?(pref="v_") ~cnt ~subst t =
     let old = Subst.find subst v_old in
     let (_,subst,v) = handle_var ~rename:false ~pref ~cnt ~subst v_old t_ty in
     let (body, subst) = rectify_aux ~cnt ~subst body in
-    bind ~ty:t_ty b v body, (if CCOpt.is_none old then Subst.remove subst v_old
-                             else Subst.add subst v_old (CCOpt.get_exn old))
+    bind ~ty:t_ty b v body, (if CCOption.is_none old then Subst.remove subst v_old
+                             else Subst.add subst v_old (CCOption.get_exn_or "Zipper" old))
   | AppBuiltin(b, fs) ->
     let fs, subst = rec_aux_l ~cnt ~subst fs in
     app_builtin ~ty:t_ty b fs, subst
@@ -1185,7 +1185,7 @@ let occur_check_ ~allow_open ~subst v t =
   assert (is_meta v);
   let rec check bound t =
     v == t ||
-    CCOpt.map_or (check bound) ~default:false t.ty ||
+    CCOption.map_or (check bound) ~default:false t.ty ||
     match view t with
     | Meta _ -> equal v t
     | Var v' ->
@@ -1217,7 +1217,7 @@ let occur_check_ ~allow_open ~subst v t =
     | AppBuiltin (_,l)
     | Multiset l -> List.exists (check bound) l
     | Record (l, rest) ->
-      CCOpt.map_or (check bound) ~default:false rest ||
+      CCOption.map_or (check bound) ~default:false rest ||
       List.exists (fun (_,t) -> check bound t) l
   in
   check Var.Set.empty t
@@ -1573,7 +1573,7 @@ let simplify_formula t =
   let simplify_and_or t b l =
     let exists_double args =
       let pos, neg = 
-        CCList.partition_map (fun t -> 
+        CCList.partition_filter_map (fun t -> 
             match view t with 
             | AppBuiltin(Builtin.Not, [s]) -> `Right s
             | _ -> `Left t) args
@@ -1694,7 +1694,7 @@ let rec erase t = match view t with
     let u = erase u in
     STerm.let_ l u
   | Record (l, rest) ->
-    let rest = CCOpt.map
+    let rest = CCOption.map
         (fun t -> match view t with
            | Var v -> STerm.V (Var.to_string v)
            | _ -> failwith "cannot erase non-variable record raw")

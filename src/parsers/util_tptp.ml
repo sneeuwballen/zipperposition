@@ -97,7 +97,7 @@ let _find_and_open filename dir =
 
 let parse_file ?cache ~recursive f =
   let parse_cache =
-    lazy (if recursive then CCOpt.get_lazy create_parse_cache cache
+    lazy (if recursive then CCOption.get_lazy create_parse_cache cache
           else assert false)
   in
   let dir = Filename.dirname f in

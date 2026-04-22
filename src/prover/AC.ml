@@ -301,7 +301,7 @@ module Make(Env : Env.S) : S with module Env = Env = struct
     match C.lits c with 
     | [| Literal.Equation(lhs,rhs,true) |] ->
       let ty = T.ty (T.head_term lhs) in
-      CCOpt.iter (fun id -> 
+      CCOption.iter (fun id -> 
         if not (ID.is_ac id) then (
           if ID.is_comm id then (
             if test_associativity lhs rhs || test_associativity rhs lhs then (

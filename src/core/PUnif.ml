@@ -160,7 +160,7 @@ let elim_subsets_rule  ?(max_elims=None) ~elim_vars ~counter ~scope t u depth =
            T.equal args_t.(i) args_u.(i) 
         then `Left (T.bvar ~ty (pref_len-i-1))
         else `Right (T.bvar ~ty (pref_len-i-1))) pref_tys
-    |> CCList.partition_map CCFun.id in
+    |> CCList.partition_filter_map CCFun.id in
 
   let diff_args_num = List.length diff_args in
   let end_ = match max_elims with 
@@ -206,7 +206,7 @@ module Make (St : sig val st : Flex_state.t end) = struct
         if is_ident_last then [],[]
         else (
           proj_lr ~counter ~scope ~subst s t flag (get_option PUP.k_max_app_projections)
-          |> CCList.partition_map (fun ((sub,_) as r) -> 
+          |> CCList.partition_filter_map (fun ((sub,_) as r) -> 
               let binding,_ = Subst.FO.deref sub (T.head_term s,scope) in
               let _,body = T.open_fun binding in
               if T.is_bvar body then `Left (Some r) else `Right (Some r))) in
@@ -375,7 +375,7 @@ module Make (St : sig val st : Flex_state.t end) = struct
        elim_vars := IntSet.empty;
        ident_vars := IntSet.empty;
        let res = PragUnif.unify_scoped x y in
-       OSeq.map (CCOpt.map Unif_subst.of_subst) (res))
+       OSeq.map (CCOption.map Unif_subst.of_subst) (res))
 
   let unify_scoped_l =  
     let counter = ref 0 in
@@ -398,5 +398,5 @@ module Make (St : sig val st : Flex_state.t end) = struct
        elim_vars := IntSet.empty;
        ident_vars := IntSet.empty;
        let res = PragUnif.unify_scoped_l x y in
-       OSeq.map (CCOpt.map Unif_subst.of_subst) (res))
+       OSeq.map (CCOption.map Unif_subst.of_subst) (res))
 end

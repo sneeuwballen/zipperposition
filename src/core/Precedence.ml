@@ -133,7 +133,7 @@ module Constr = struct
         else None 
       )
       |> Iter.max
-      |> CCOpt.get_or ~default:max_int in
+      |> CCOption.get_or ~default:max_int in
     (* compare by inverse frequency (higher frequency => smaller) *)
     let is_unary_max_freq _sig s1 =
       Signature.mem !_sig s1
@@ -479,7 +479,7 @@ let depth_occurrence = depth_occ_driver ~flip:true
 let max_arity signature = 
   Signature.Seq.symbols signature
   |> Iter.map (fun sym -> snd @@ Signature.arity signature sym)
-  |> Iter.max |> CCOpt.get_or ~default:max_int
+  |> Iter.max |> CCOption.get_or ~default:max_int
 
 (* weight of f = arity of f + 4 *)
 let weight_modarity ~signature =
@@ -506,7 +506,7 @@ let weight_arity0 ~signature =
     |> Iter.fold (fun acc sym -> 
         max_arity acc (sym,ID.id sym)
       ) None
-    |> CCOpt.map fst in
+    |> CCOption.map fst in
   
   function a ->
     let res = 
@@ -594,7 +594,7 @@ let lambda_def_weight lm_w db_w base_weight clauses =
     let try_extracting lhs rhs =
       match T.view lhs with
       | T.Const id ->
-        CCOpt.return_if (T.is_ground rhs) (id, rhs)
+        CCOption.return_if (T.is_ground rhs) (id, rhs)
       | T.App(hd, args) when T.is_const hd ->
         if List.for_all T.is_var args then (
           let var_set = VS.of_list (List.map T.as_var_exn args) in
@@ -608,7 +608,7 @@ let lambda_def_weight lm_w db_w base_weight clauses =
         ) else None
       | _ -> None
     in
-    let (<+>) = CCOpt.(<+>) in
+    let (<+>) = CCOption.(<+>) in
     try_extracting lhs rhs <+> try_extracting rhs lhs
   in
 

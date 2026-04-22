@@ -809,7 +809,7 @@ module Make
               Cut_form.vars f
               |> T.VarSet.to_iter
               |> Iter.map HVar.id
-              |> Iter.max |> CCOpt.get_or ~default:0 |> succ
+              |> Iter.max |> CCOption.get_or ~default:0 |> succ
             in
             CCList.foldi
               (fun m i v ->
@@ -874,7 +874,7 @@ module Make
                Cut_form.vars f
                |> T.VarSet.to_iter
                |> Iter.map HVar.id
-               |> Iter.max |> CCOpt.get_or ~default:0 |> succ
+               |> Iter.max |> CCOption.get_or ~default:0 |> succ
                |> HVar.make ~ty:(T.ty t)
              in
              let m =
@@ -1148,7 +1148,7 @@ module Make
       Iter.of_list generalize_on
       |> Iter.map (fun (id,_) -> Ind_cst.ind_skolem_depth id)
       |> Iter.max
-      |> CCOpt.get_or ~default:0
+      |> CCOption.get_or ~default:0
     (* the trail should not contain a positive "lemma" atom.
        We accept negative lemma atoms because the induction can be used to
        prove the lemma *)
@@ -1273,7 +1273,7 @@ module Make
       |> Iter.filter_map
         (fun lit ->
            BoolBox.as_lemma lit
-           |> CCOpt.map (fun lemma -> lemma, BoolLit.sign lit))
+           |> CCOption.map (fun lemma -> lemma, BoolLit.sign lit))
     in
     (* are there two distinct positive lemma literals in the trail? *)
     Iter.diagonal relevant_cases

@@ -535,7 +535,7 @@ module Inner = struct
         let args =
           List.map
             (fun a ->
-               let i = CCList.find_idx (T.equal a) l |> CCOpt.get_exn |> fst in
+               let i = CCList.find_idx (T.equal a) l |> CCOption.get_exn_or "Zipper" |> fst in
                T.bvar ~ty:(T.ty_exn a) (n-i-1))
             inter
         in
@@ -726,7 +726,7 @@ module Inner = struct
         then fail () (* occur check or t2 is open *)
         else (
           if US.mem subst (v1,sc1) then (
-            let derefed = CCOpt.get_exn @@ Subst.get_var (US.subst subst) (v1,sc1) in 
+            let derefed = CCOption.get_exn_or "Zipper" @@ Subst.get_var (US.subst subst) (v1,sc1) in 
             let derefed = Scoped.map ((fun t -> ((Lambda.eta_reduce (Term.of_term_unsafe t)) :> InnerTerm.t))) derefed in
             if snd @@ derefed == sc2 && T.equal (fst @@ derefed) t2 then subst else fail()
           ) else US.bind subst (v1,sc1) (t2,sc2)
@@ -741,7 +741,7 @@ module Inner = struct
         then fail() (* occur check *)
         else (
           if US.mem subst (v2,sc2) then (
-            let derefed = CCOpt.get_exn @@ Subst.get_var (US.subst subst) (v2,sc2) in 
+            let derefed = CCOption.get_exn_or "Zipper" @@ Subst.get_var (US.subst subst) (v2,sc2) in 
             let derefed = Scoped.map ((fun t -> ((Lambda.eta_reduce (Term.of_term_unsafe t)) :> InnerTerm.t))) derefed in
             if snd @@ derefed == sc1 && T.equal (fst @@ derefed) t1 then subst else fail()
           ) else US.bind subst (v2,sc2) (t1,sc1)
@@ -1015,7 +1015,7 @@ module Inner = struct
         (T.var v2)
         (List.map
            (fun a ->
-              let i = CCList.find_idx (T.equal a) l1 |> CCOpt.get_exn|>fst in
+              let i = CCList.find_idx (T.equal a) l1 |> CCOption.get_exn_or "Zipper"|>fst in
               T.bvar ~ty:(T.ty_exn a) (n-i-1))
            l2)
       |> T.fun_l (List.map T.ty_exn l1)

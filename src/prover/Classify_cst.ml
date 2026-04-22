@@ -31,7 +31,7 @@ let classify id =
       (ID.as_parameter |>> fun x->Parameter x);
       (Ind_cst.id_as_cst |>> fun c -> Inductive_cst (Some c));
       (fun id ->
-         let open CCOpt.Infix in
+         let open CCOption.Infix in
          ID.as_skolem id >>= function
          | ID.K_ind -> Some (Inductive_cst None)
          | ID.K_normal | ID.K_after_cnf | ID.K_lazy_cnf -> Some Skolem);
@@ -62,7 +62,7 @@ let pp_signature out sigma =
     "{@[<hv>%a@]}" (Util.pp_list ~sep:"," pp_pair) (Signature.to_list sigma)
 
 let dominates_ opt_c opt_sub =
-  CCOpt.(get_or ~default:false (map2 Ind_cst.dominates opt_c opt_sub))
+  CCOption.(get_or ~default:false (map2 Ind_cst.dominates opt_c opt_sub))
 
 let prec_constr_ a b =
   let to_int_ = function

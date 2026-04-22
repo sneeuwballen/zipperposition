@@ -70,7 +70,7 @@ let get_forbidden_vars ~ord lits =
     ) T.VarSet.empty
 
 let select_leftmost ~ord ~kind lits =
-  let open CCOpt in
+  let open CCOption in
   let forbidden = get_forbidden_vars ~ord lits in
 
   let rec aux_lits idx =
@@ -95,7 +95,7 @@ let select_leftmost ~ord ~kind lits =
   and aux_term ~top ~pos_builder t =
     (* if t is app_var then return the term itself, but do not recurse  *)
     if T.is_app_var t then (
-      CCOpt.return_if (is_selectable ~top ~forbidden t) (t, PB.to_pos pos_builder)
+      CCOption.return_if (is_selectable ~top ~forbidden t) (t, PB.to_pos pos_builder)
     ) else (
       match T.view t with
       | T.App(_, args)
@@ -119,7 +119,7 @@ let select_leftmost ~ord ~kind lits =
       <+>
     (aux_term_args ~idx:(idx-1) ~pos_builder xs) 
   in
-  CCOpt.map_or ~default:[] (fun x -> [x]) (aux_lits 0)
+  CCOption.map_or ~default:[] (fun x -> [x]) (aux_lits 0)
 
 let collect_green_subterms_ ~forbidden ~filter ~ord ~pos_builder t k = 
   let rec aux_term ~top ~pos_builder t k =
@@ -165,7 +165,7 @@ let all_eligible_subterms ~ord ~pos_builder =
   collect_green_subterms_ ~forbidden:(T.VarSet.empty) ~filter ~ord ~pos_builder 
 
 let get_selectable_w_ctx ~ord lits = 
-  let open CCOpt in
+  let open CCOption in
   let forbidden = get_forbidden_vars ~ord lits in
 
   let selectable_with_ctx ?(forbidden=T.VarSet.empty) ~block_top ~ord ~pos_builder t ctx log_depth k =
@@ -252,7 +252,7 @@ let by_size ~ord ~kind lits =
     if kind = `Max then Iter.max else Iter.min in
   get_selectable_w_ctx ~ord lits
   |> selector ~lt:(fun (s,_,_) (t,_,_) -> Term.ho_weight s < Term.ho_weight t)
-  |> CCOpt.map_or ~default:[] (fun (t,ctx,pos) -> [(t,pos)])
+  |> CCOption.map_or ~default:[] (fun (t,ctx,pos) -> [(t,pos)])
 
 let by_context_weight_combination ~ord ~ctx_fun ~weight_fun lits =
     let bin_of_int d =
@@ -270,7 +270,7 @@ let by_context_weight_combination ~ord ~ctx_fun ~weight_fun lits =
     Util.debugf ~section 2 "selectable @[%a/%8s@]@." (fun k -> k T.pp t (bin_of_int ctx)); arg)
   |> Iter.min ~lt:(fun (s,ctx_s,_) (t,ctx_t,_) -> 
     CCOrd.(<?>) (ctx_fun ctx_s ctx_t) (weight_fun lits, s, t) < 0)
-  |> CCOpt.map_or ~default:[] (fun (t,ctx,pos) -> [(t,pos)])
+  |> CCOption.map_or ~default:[] (fun (t,ctx,pos) -> [(t,pos)])
 
 let is_eq t = 
   match T.view t with
@@ -392,7 +392,7 @@ let parse_combined_function ~ord s =
     Str.regexp ("sel\\([1-3]\\)(\\(.+\\))") in
     try
       ignore(Str.search_forward or_lmax_regex s 0);
-      let sel_id = CCOpt.get_exn (CCInt.of_string (Str.matched_group 1 s)) in
+      let sel_id = CCOption.get_exn_or "Zipper" (CCInt.of_string (Str.matched_group 1 s)) in
       let ctx_fun_name = Str.matched_group 2 s in
 
       let weight_fun = List.nth sel_funs (sel_id-1) in

@@ -223,8 +223,8 @@ end
 
 val var_occurs : var:var -> t -> bool (** [var_occurs ~var t] true iff [var] in t *)
 
-val is_ground : t -> bool (** is the term ground? (no free vars) *)
-val is_linear : t -> bool (** is the term linear? (no vars occurring multiple times) *)
+val is_ground : t -> bool (* is the term ground? (no free vars) *)
+val is_linear : t -> bool (* is the term linear? (no vars occurring multiple times) *)
 val monomorphic : t -> bool (** true if the term contains no type var *)
 
 val is_beta_reducible : t -> bool
@@ -319,7 +319,7 @@ val contains_symbol : ID.t -> t -> bool
 (** High level fold-like combinators *)
 
 val all_positions :
-  ?filter_formula_subterms:(Builtin.t -> t list -> int list CCOpt.t) ->
+  ?filter_formula_subterms:(Builtin.t -> t list -> int list CCOption.t) ->
   ?vars:bool -> ?ty_args:bool -> ?var_args:bool -> ?fun_bodies:bool -> ?pos:Position.t ->
   t -> t Position.With.t Iter.t
 (** Iterate on all sub-terms with their position.

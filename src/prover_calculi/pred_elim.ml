@@ -118,7 +118,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     CCFormat.fprintf out 
       "%a(%b) {@. +: @[%a@];@. -:@[%a@];@. ?:@[%a@]@. g:@[%a@]@. v^2:@[%g@]; |l|:@[%d@]; |%a|:@[%d@]; h_idx: @[%d@] @.}@."
       ID.pp task.sym original (CS.pp C.pp) task.pos_cls (CS.pp C.pp) task.neg_cls
-      (CS.pp C.pp) task.offending_cls (CCOpt.pp (CCPair.pp (CCList.pp C.pp) (CCList.pp C.pp))) task.maybe_gate task.sq_var_weight
+      (CS.pp C.pp) task.offending_cls (CCOption.pp (CCPair.pp (CCList.pp C.pp) (CCList.pp C.pp))) task.maybe_gate task.sq_var_weight
       task.num_lits ID.pp task.sym (estimated_gain task) task.heap_idx
 
   let copy_task t = 
@@ -144,7 +144,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       if not a.deleted && not b.deleted then (
           let open CCOrd in
           (compare (estimated_gain a) (estimated_gain b)
-          <?> (compare, not (CCOpt.is_some a.maybe_gate), not (CCOpt.is_some b.maybe_gate))
+          <?> (compare, not (CCOption.is_some a.maybe_gate), not (CCOption.is_some b.maybe_gate))
           <?> (compare, a.num_lits, b.num_lits)
           <?> (compare, a.sq_var_weight, b.sq_var_weight)
           <?> (ID.compare, a.sym, b.sym)) < 0
@@ -215,7 +215,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         None
       else if Type.is_prop (T.ty lhs) then (
         if L.is_predicate_lit lit then (
-          CCOpt.map (fun hd_sym -> (hd_sym, sign)) (T.head lhs)
+          CCOption.map (fun hd_sym -> (hd_sym, sign)) (T.head lhs)
         ) else (
           None;
       )) else (_logic := Equational; None)
@@ -349,7 +349,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     let update_idx pos neg offending gates num_vars cl =
       let update ~action sym =
         _pred_sym_idx := ID.Map.update sym (fun old ->
-          let entry = CCOpt.get_or ~default:(mk_pred_elim_info sym) old in
+          let entry = CCOption.get_or ~default:(mk_pred_elim_info sym) old in
           let old_ = copy_task entry in
           begin match action with
           | `Pos ->
@@ -504,7 +504,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                 if TaskSet.in_heap old && TaskSet.in_heap task then (
                   TaskSet.update _task_queue ~new_:task ~old;
                 );
-              CCOpt.return_if (not (ID.Set.mem task.sym !_ignored_symbols)) task
+              CCOption.return_if (not (ID.Set.mem task.sym !_ignored_symbols)) task
             | None -> None) !_pred_sym_idx
         ) (C.symbols (Iter.singleton cl)));
       Signal.ContinueListening)
@@ -513,7 +513,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let replace_clauses task clauses =
     Util.debugf ~section 2 "replaced clauses(%a):@. regular:@[%a@]@. gates:@[%a@]@." 
       (fun k -> k ID.pp task.sym (CS.pp C.pp) (CS.union task.pos_cls task.neg_cls) 
-                  (CCOpt.pp (CCPair.pp (CCList.pp C.pp) (CCList.pp C.pp))) task.maybe_gate);
+                  (CCOption.pp (CCPair.pp (CCList.pp C.pp) (CCList.pp C.pp))) task.maybe_gate);
     Util.debugf ~section 2 "resolvents: @[%a@]@." (fun k -> k (CCList.pp C.pp) clauses);
     _ignored_symbols := ID.Set.add task.sym !_ignored_symbols;
     let remove iter =
@@ -545,10 +545,10 @@ module Make(E : Env.S) : S with module Env = E = struct
     Literals.is_trivial (C.lits c) || Trail.is_trivial (C.trail c)
 
   let find_lit_by_sym sym sign cl =
-    CCOpt.get_exn (CCArray.find_map_i (fun idx lit -> 
+    CCOption.get_exn_or "Zipper" (CCArray.find_map_i (fun idx lit -> 
       match get_sym_sign lit with
       | Some (sym', sign') when ID.equal sym sym' && sign = sign' -> 
-        Some (idx, CCOpt.get_exn (L.View.get_lhs lit))
+        Some (idx, CCOption.get_exn_or "Zipper" (L.View.get_lhs lit))
       | _ -> None
     ) (C.lits cl))
 
@@ -578,7 +578,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         C.create ~penalty:(max (C.penalty pos_cl) (C.penalty neg_cl))
                  ~trail:(C.trail_l [pos_cl; neg_cl]) lits proof
       in
-      CCOpt.return_if (not (is_tauto c)) c
+      CCOption.return_if (not (is_tauto c)) c
     with Unif.Fail -> None
   
   let eq_resolver ~sym ~pos_cl ~neg_cl =
@@ -638,7 +638,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           C.create ~penalty:(max (C.penalty pos_cl') (C.penalty neg_cl'))
                     ~trail:(C.trail_l [pos_cl'; neg_cl']) lits (proof subst renaming)
       in
-      CCOpt.return_if (not (is_tauto c)) c
+      CCOption.return_if (not (is_tauto c)) c
     with Unif.Fail -> None
 
   let check_if_gate task =
@@ -651,11 +651,11 @@ module Make(E : Env.S) : S with module Env = E = struct
         (match (CCArray.find_idx (fun lit -> 
           match get_sym_sign lit with 
           | Some(sym', sign') -> ID.equal sym sym' && 
-                                 ((CCOpt.is_none sign) || CCOpt.get_exn sign == sign')
+                                 ((CCOption.is_none sign) || CCOption.get_exn_or "Zipper" sign == sign')
           | None -> false) (C.lits cl)) with
         | Some (i, lit) ->
           let free_vars = T.VarSet.of_list (L.vars lit) in
-          CCOpt.is_none (CCArray.find_map_i (fun j lit'  ->
+          CCOption.is_none (CCArray.find_map_i (fun j lit'  ->
             if (i=j || T.VarSet.subset (T.VarSet.of_list (L.vars lit')) free_vars) then None
             else Some j
           ) (C.lits cl))
@@ -690,7 +690,7 @@ module Make(E : Env.S) : S with module Env = E = struct
                   | Some(sym',_) -> ID.equal sym sym'
                   | None -> false
                 ) (C.lits cl) in
-                let idx_name, _ = CCOpt.get_exn idx_name_opt in
+                let idx_name, _ = CCOption.get_exn_or "Zipper" idx_name_opt in
                 let name_lit = L.negate (C.lits cl).(idx_name) in
                 let other_lit = L.negate (C.lits cl).(1 - idx_name) in
                 let is_matched = 
@@ -773,7 +773,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         in
         if List.exists (fun pos_cl -> 
           List.exists (fun neg_cl -> 
-            CCOpt.is_some @@ 
+            CCOption.is_some @@ 
               neq_resolver ~sym:task.sym ~pos_cl ~neg_cl) neg_cls
         ) pos_cls then None
         else Some (pos_cls, neg_cls)
@@ -792,7 +792,7 @@ module Make(E : Env.S) : S with module Env = E = struct
           let parents = List.map (fun p -> Proof.S.step @@ Proof.Parent.proof p) (Proof.Step.parents proof) in
           Util.debugf ~section 5 "SAT prover found unsat set: %d@." (fun k -> k  (CCList.length parents));
           let used_cls = CCList.filter_map (fun (_,_,cl) -> 
-            CCOpt.return_if (CCList.mem ~eq:Proof.Step.equal (C.proof_step cl) parents) cl) cls  in
+            CCOption.return_if (CCList.mem ~eq:Proof.Step.equal (C.proof_step cl) parents) cl) cls  in
           Util.debugf ~section 5 "used clauses: @[%a@]@." (fun k -> k (CCList.pp C.pp) used_cls);
           split_clauses used_cls
         | _ -> None)
@@ -800,13 +800,13 @@ module Make(E : Env.S) : S with module Env = E = struct
       in
       let is_def = function
         | (Literal.Equation(lhs,_,_) as lit) when Literal.is_predicate_lit lit ->
-          CCOpt.is_some (Term.head lhs) && List.for_all T.is_var (T.args lhs)
+          CCOption.is_some (Term.head lhs) && List.for_all T.is_var (T.args lhs)
         | _ -> false
       in
       match gates_l with 
       | x :: xs ->
         (* we will standardize all clauses by the first name literal in x *)
-        let i,name_lit = CCOpt.get_exn (CCArray.find_map_i (fun i lit -> 
+        let i,name_lit = CCOption.get_exn_or "Zipper" (CCArray.find_map_i (fun i lit -> 
             match lit with 
             | L.Equation(lhs,rhs,_) when L.is_predicate_lit lit -> 
               begin match T.head lhs with
@@ -872,7 +872,7 @@ module Make(E : Env.S) : S with module Env = E = struct
   let calc_non_singular_resolvents ~sym ~pos ~neg ~offending =
     let find_lit_by_sym_opt sign cl =
       try
-        CCOpt.return (find_lit_by_sym sym sign cl)
+        CCOption.return (find_lit_by_sym sym sign cl)
       with _ -> None
     in
 
@@ -968,8 +968,8 @@ module Make(E : Env.S) : S with module Env = E = struct
               [replace_sym pos neg (ty_vars, lam) cl]))
         in
         let has_lit cl =
-          let (<+>) = CCOpt.(<+>) in
-          CCOpt.is_some (find_lit_by_sym_opt true cl <+>
+          let (<+>) = CCOption.(<+>) in
+          CCOption.is_some (find_lit_by_sym_opt true cl <+>
                          find_lit_by_sym_opt false cl)
         in
         let has_pred', no_pred' = List.partition has_lit new_cls in
@@ -1156,17 +1156,17 @@ module Make(E : Env.S) : S with module Env = E = struct
     );
 
     let ans = (do_pred_elim ()) in
-    Util.debugf ~section 1 "%% PE start fixpoint: @[%a@]@." (fun k -> k (CCOpt.pp CCInt.pp) ans);
-    Util.debugf ~section 2 "Clause number changed for %a" (fun k -> k (CCOpt.pp CCInt.pp) ans)
+    Util.debugf ~section 1 "%% PE start fixpoint: @[%a@]@." (fun k -> k (CCOption.pp CCInt.pp) ans);
+    Util.debugf ~section 2 "Clause number changed for %a" (fun k -> k (CCOption.pp CCInt.pp) ans)
 
   let fixpoint_step () =
     Util.debugf ~section 1 "relax val: %d@." (fun k -> k (Env.flex_get k_relax_val));
     let ans = do_pred_elim () in
-    Util.debugf ~section 1 "Clause number changed for %a" (fun k -> k (CCOpt.pp CCInt.pp) ans);
-    if CCOpt.is_some ans then (
-      Util.debugf ~section 1 "%% PE fixpoint: %d@." (fun k -> k (CCOpt.get_exn ans))
+    Util.debugf ~section 1 "Clause number changed for %a" (fun k -> k (CCOption.pp CCInt.pp) ans);
+    if CCOption.is_some ans then (
+      Util.debugf ~section 1 "%% PE fixpoint: %d@." (fun k -> k (CCOption.get_exn_or "Zipper" ans))
     );
-    CCOpt.is_some ans
+    CCOption.is_some ans
   
   let end_fixpoint () =
     _done := true;

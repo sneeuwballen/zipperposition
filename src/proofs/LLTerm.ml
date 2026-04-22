@@ -302,7 +302,7 @@ let pp_inner = pp_rec_inner 0
 let subterms (t:t) (k:t -> unit) : unit =
   let rec aux t =
     k t;
-    CCOpt.iter aux (ty t);
+    CCOption.iter aux (ty t);
     begin match view t with
       | Type | Const _ | Var _ -> ()
       | App (f,a) -> aux f; aux a

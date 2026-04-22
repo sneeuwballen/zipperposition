@@ -283,7 +283,7 @@ module Conv : sig
   val clear : ctx -> unit
 
   val enter_bvar : ctx -> VarMap.key -> int option
-  val exit_bvar  : handle:int CCOpt.t -> ctx -> VarMap.key -> unit
+  val exit_bvar  : handle:int CCOption.t -> ctx -> VarMap.key -> unit
   val find_bvar  : ctx -> VarMap.key -> int option
   val get_maxvar : ctx -> int
   val incr_maxvar : ctx -> unit

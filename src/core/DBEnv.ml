@@ -94,7 +94,7 @@ let of_list l =
 let to_list e = e.stack
 
 let to_list_i e =
-  List.mapi (fun i x -> CCOpt.map (CCPair.make i) x) e.stack
+  List.mapi (fun i x -> CCOption.map (CCPair.make i) x) e.stack
 
 let pp pp_x out e =
   let pp_item out = function

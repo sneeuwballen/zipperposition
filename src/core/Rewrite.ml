@@ -107,7 +107,7 @@ let as_defined_cst id =
         | Payload_defined_cst c -> Some c
         | _ -> None)
 
-let is_defined_cst id = CCOpt.is_some (as_defined_cst id)
+let is_defined_cst id = CCOption.is_some (as_defined_cst id)
 
 module Cst_ = struct
   type t = defined_cst
@@ -130,7 +130,7 @@ module Cst_ = struct
 
   let defined_positions t = Lazy.force t.defined_positions
   let ty t = t.defined_ty
-  let level t = CCOpt.get_or ~default:0 t.defined_level
+  let level t = CCOption.get_or ~default:0 t.defined_level
 
   let pp out (t:t): unit =
     Fmt.fprintf out "(@[defined_id@ :ty %a @ :rules %a@ :positions %a@])"

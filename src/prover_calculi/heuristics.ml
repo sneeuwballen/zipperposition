@@ -43,7 +43,7 @@ module Make(E : Env.S) = struct
     |> Iter.map T.ty
     |> Iter.map (fun t -> InnerTerm.depth (t : Type.t :> InnerTerm.t))
     |> Iter.max ?lt:None
-    |> CCOpt.map_or ~default:0 CCFun.id
+    |> CCOption.map_or ~default:0 CCFun.id
 
   let is_too_deep c =
     match !depth_limit_ with

@@ -227,7 +227,7 @@ let compute_prec ~signature stmts =
           |> Iter.flat_map Statement.Seq.terms
           |> Iter.flat_map (fun t -> Term.Seq.subterms_depth t
                                      |> Iter.filter_map (fun (st,d) -> 
-                                         CCOpt.map (fun id -> (id,d)) (Term.head st)))  in
+                                         CCOption.map (fun id -> (id,d)) (Term.head st)))  in
         let clauses = Iter.map Statement.Seq.lits stmts in
         Precedence.weight_fun_of_string ~signature ~clauses ~lm_w:!_lmb_w ~db_w:!_db_w !_kbo_wf sym_depth)
     (* |> Compute_prec.set_weight_rule (fun _ -> Classify_cst.weight_fun) *)
@@ -514,7 +514,7 @@ let syms_in_conj decls =
   |> CCVector.to_iter
   |> flat_map (fun st -> 
       let pr = Statement.proof_step st in
-      if CCOpt.is_some (Proof.Step.distance_to_goal pr) then (
+      if CCOption.is_some (Proof.Step.distance_to_goal pr) then (
         Statement.Seq.symbols st
       ) else empty)
 

@@ -89,7 +89,7 @@ let weight_fun_of_prec ?(rank=None) ~symbols ~prec_fun =
        ID.Map.empty in
 
   function id ->
-    let res = CCOpt.get_or ~default:5 (ID.Map.get id w_tbl) in
+    let res = CCOption.get_or ~default:5 (ID.Map.get id w_tbl) in
     Precedence.Weight.int res
 
 let force_const_weight ~weight ~signature = function

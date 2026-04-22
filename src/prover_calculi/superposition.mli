@@ -17,7 +17,7 @@ val key : (module S) Flex_state.key
     calling [register]), the Env's state contains
     a mapping from "superposition" to the packed module. *)
 
-val k_unif_alg : (Term.t Scoped.t -> Term.t Scoped.t -> Unif_subst.t CCOpt.t OSeq.t) Flex_state.key
+val k_unif_alg : (Term.t Scoped.t -> Term.t Scoped.t -> Unif_subst.t CCOption.t OSeq.t) Flex_state.key
 val k_ho_basic_rules : bool Flex_state.key
 val get_unif_module : (module Env.S) -> (module UnifFramework.US)
 

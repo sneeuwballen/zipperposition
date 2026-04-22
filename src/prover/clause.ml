@@ -104,7 +104,7 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
   let is_goal c = Proof.Step.is_goal c.proof
 
   let distance_to_goal c = Proof.Step.distance_to_goal c.proof
-  let comes_from_goal c = CCOpt.is_some @@ distance_to_goal c
+  let comes_from_goal c = CCOption.is_some @@ distance_to_goal c
 
   (* private function for building clauses *)
   let create_inner ~penalty ~selected ~bool_selected sclause proof =
@@ -439,11 +439,11 @@ module Make(Ctx : Ctx.S) : S with module Ctx = Ctx = struct
 
   let apply_subst ?(renaming) ?(proof=None) ?(penalty_inc=None) (c,sc) subst =
     let lits = lits c in
-    let renaming = CCOpt.get_or ~default:(S.Renaming.create ()) renaming in
+    let renaming = CCOption.get_or ~default:(S.Renaming.create ()) renaming in
     let new_lits = Literals.apply_subst renaming  subst (lits, sc) in
-    let proof_step = CCOpt.get_or ~default:(proof_step c) proof in
+    let proof_step = CCOption.get_or ~default:(proof_step c) proof in
     (* increase can be negative if we perform a simplification *)
-    let penalty = max ((CCOpt.get_or ~default:0 penalty_inc) + (penalty c)) 1 in
+    let penalty = max ((CCOption.get_or ~default:0 penalty_inc) + (penalty c)) 1 in
     create ~trail:(trail c) ~penalty (CCArray.to_list new_lits) proof_step
 
 

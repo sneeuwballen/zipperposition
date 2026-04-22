@@ -29,7 +29,7 @@ let e_path = ref (None : string option)
 let tried_e = ref false 
 let e_call_point = ref 0.2
 let should_try_e = function
-  | Some timeout when CCOpt.is_some !e_path -> 
+  | Some timeout when CCOption.is_some !e_path -> 
     let passed = Util.total_time_s () in
     if not !tried_e && passed > !e_call_point *. timeout then (
       tried_e := true;
@@ -240,7 +240,7 @@ module Make(E : Env.S) = struct
             let inferred_clauses =
               (* After forward simplification, do cheap multi simplification like AVATAR *)
               Iter.flat_map_l (fun c -> 
-                CCOpt.get_or ~default:[c] (Env.cheap_multi_simplify c)
+                CCOption.get_or ~default:[c] (Env.cheap_multi_simplify c)
               ) inferred_clauses in
             CCVector.append_iter new_clauses inferred_clauses;
             Util.debugf ~section 2 "@[<2>inferred @{<green>new clauses@}:@ [@[<v>%a@]]@]"
@@ -260,8 +260,8 @@ module Make(E : Env.S) = struct
       end
 
   let given_clause ?(generating=true) ?steps ?timeout () =
-    if CCOpt.is_some !e_path then (
-      EInterface.set_e_bin (CCOpt.get_exn !e_path)
+    if CCOption.is_some !e_path then (
+      EInterface.set_e_bin (CCOption.get_exn_or "Zipper" !e_path)
     );
 
     (* num: number of steps done so far *)

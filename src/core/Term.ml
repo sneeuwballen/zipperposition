@@ -287,7 +287,7 @@ let as_ho_app t =
     | _ -> None
   end
 
-let is_ho_app t = CCOpt.is_some (as_ho_app t)
+let is_ho_app t = CCOption.is_some (as_ho_app t)
 
 let is_ho_pred t = is_ho_app t && Type.is_prop (ty t)
 
@@ -305,7 +305,7 @@ let rec all_combs = function
 let rec cover_with_terms ?(depth=0) ?(recurse=true) t ts =
   let n = List.length ts in
   let db = CCList.mapi (fun i x -> 
-      if CCOpt.is_some x then (i, CCOpt.get_exn x) else (-1, false_)) 
+      if CCOption.is_some x then (i, CCOption.get_exn_or "Zipper" x) else (-1, false_)) 
       ts
            |> CCList.filter_map (fun (i,x) ->
                if i!=(-1) && equal x t then 
@@ -450,7 +450,7 @@ module Seq = struct
         | x :: xs' ->
           begin match ys with
           | y :: ys' ->
-            if (not (equal x y)) && CCOpt.is_none acc then (
+            if (not (equal x y)) && CCOption.is_none acc then (
               aux (Some (x,y)) xs' ys'
             ) else if equal x y then aux acc xs' ys'
             else None
@@ -659,7 +659,7 @@ let lambda_depth t =
     | Fun (_,u) -> aux (inc_depth acc) u 
     | Var _ | DB _ | Const _ -> acc in
   let res = aux None t in
-  (* CCFormat.printf "l_depth(@[%a@])=@[%a@]@." T.pp t (CCOpt.pp CCInt.pp) res; *)
+  (* CCFormat.printf "l_depth(@[%a@])=@[%a@]@." T.pp t (CCOption.pp CCInt.pp) res; *)
   res
 
 let comb_depth t =
@@ -685,7 +685,7 @@ let comb_depth t =
     | Var _ | DB _ | Const _ -> acc in
 
   let res = aux ~comb_streak:false None t in
-  (* CCFormat.printf "c_depth(@[%a@])=@[%a@]@." T.pp t (CCOpt.pp CCInt.pp) res; *)
+  (* CCFormat.printf "c_depth(@[%a@])=@[%a@]@." T.pp t (CCOption.pp CCInt.pp) res; *)
   res
 
 let monomorphic t = Iter.is_empty (Seq.ty_vars t)
@@ -778,9 +778,9 @@ let all_positions ?(filter_formula_subterms=(fun _ _ -> None))
     | App (head, _) when not var_args && T.is_var head ->
       f (PW.make t (PB.to_pos pb))
     | AppBuiltin (hd, args) 
-      when CCOpt.is_some (filter_formula_subterms hd args) ->
+      when CCOption.is_some (filter_formula_subterms hd args) ->
       f (PW.make t (PB.to_pos pb));
-      let taken_args = CCOpt.get_exn (filter_formula_subterms hd args) in
+      let taken_args = CCOption.get_exn_or "Zipper" (filter_formula_subterms hd args) in
       let len = List.length args in
       let invi i = len - 1 - i in
       List.iter
@@ -1278,7 +1278,7 @@ module Conv = struct
           assert(Type.is_prop ty_b);
           let body = fun_ ty_arg (aux body) in
           decr depth;
-          if CCOpt.is_some previous then PT.Var_tbl.replace tbl v (CCOpt.get_exn previous)
+          if CCOption.is_some previous then PT.Var_tbl.replace tbl v (CCOption.get_exn_or "Zipper" previous)
           else PT.Var_tbl.remove tbl v;
           app_builtin ~ty:ty_b b [of_ty ty_arg; body])
       | PT.Meta _

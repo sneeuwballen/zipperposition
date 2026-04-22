@@ -33,7 +33,7 @@ let path_check ~subst ~scope var t =
         if under_var || not no_prefix then None
         else raise NotUnif)
       else (
-        CCOpt.map (fun args' -> 
+        CCOption.map (fun args' -> 
             if T.same_l args args' then t else T.app hd args') 
           (aux_l ~depth ~under_var:true args))
     | T.App(hd,args) -> 
@@ -41,12 +41,12 @@ let path_check ~subst ~scope var t =
       begin match aux ~depth ~under_var hd with
         | None -> None
         | Some hd' -> 
-          CCOpt.map (fun args' -> 
+          CCOption.map (fun args' -> 
               if T.same_l args args' && T.equal hd hd' then t 
               else T.app hd' args') 
             (aux_l ~depth ~under_var args) end
     | T.AppBuiltin(b, args) -> 
-      CCOpt.map (fun args' -> 
+      CCOption.map (fun args' -> 
           if T.same_l args args' then t 
           else T.app_builtin ~ty:(T.ty t) b args') 
         (aux_l ~depth ~under_var args)
@@ -73,7 +73,7 @@ let path_check ~subst ~scope var t =
       let xs' = aux_l ~depth ~under_var xs in
       match aux ~depth ~under_var x with
       | None -> ignore(xs'); None
-      | Some t -> CCOpt.map (fun ts -> t :: ts) xs' in
+      | Some t -> CCOption.map (fun ts -> t :: ts) xs' in
 
   aux ~depth:0 ~under_var:false t
 

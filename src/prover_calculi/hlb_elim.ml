@@ -115,7 +115,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         | x :: xs' ->
           begin match ys with
           | y :: ys' ->
-            if (not (T.equal x y)) && CCOpt.is_none acc then (
+            if (not (T.equal x y)) && CCOption.is_none acc then (
               aux (Some (x,y)) xs' ys'
             ) else if T.equal x y then aux acc xs' ys'
             else None
@@ -214,7 +214,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     Trail.is_empty (C.trail cl) &&
     (match C.lits cl with
     | [| l1; l2 |] -> 
-      CCOpt.is_some (get_predicate l1) && CCOpt.is_some (get_predicate l2)
+      CCOption.is_some (get_predicate l1) && CCOption.is_some (get_predicate l2)
     | _ -> false)
 
   let [@inline] rec normalize_negations lhs =
@@ -321,8 +321,8 @@ module Make(E : Env.S) : S with module Env = E = struct
     let neg_concl = normalize_negations (T.Form.not_ concl) in
     let neg_concl_flip = normalize_negations (T.Form.not_ (flip_eq concl)) in
     T.Tbl.find_opt tbl neg_concl
-    |> CCOpt.(<+>) (T.Tbl.find_opt tbl neg_concl_flip)
-    |> CCOpt.(<$>) (CS.add cl)
+    |> CCOption.(<+>) (T.Tbl.find_opt tbl neg_concl_flip)
+    |> CCOption.(<$>) (CS.add cl)
 
   (* find already stored implications a -> b such that premise\sigma = b.
      Then, store the implication a -> concl\sigma   *)
@@ -445,7 +445,7 @@ module Make(E : Env.S) : S with module Env = E = struct
         );
         (* if by adding concl something became unit we remove
            the leaf as the new one with updated unit status will be added *)
-        CCOpt.is_none !became_unit
+        CCOption.is_none !became_unit
       );
 
       (match !became_unit with 
@@ -579,12 +579,12 @@ module Make(E : Env.S) : S with module Env = E = struct
             retrieve_idx ~getter:(PropagatedLitsIdx.retrieve_generalizations (!propagated_, idx_sc)) 
               (i_t, q_sc)
             |> Iter.head
-            |> CCOpt.iter (fun (_,ps,_) -> raise (UnitHTR(i,ps))));
+            |> CCOption.iter (fun (_,ps,_) -> raise (UnitHTR(i,ps))));
 
           if Env.flex_get k_delete_lits then (
             retrieve_idx ~getter:(PropagatedLitsIdx.retrieve_generalizations (!propagated_, idx_sc)) (i_neg_t, q_sc)
             |> Iter.head
-            |> CCOpt.iter (fun (_,(ps, _),_) -> 
+            |> CCOption.iter (fun (_,(ps, _),_) -> 
               proofset := CS.union ps !proofset;
               CCBV.reset bv i))
         | None -> ()
@@ -630,7 +630,7 @@ module Make(E : Env.S) : S with module Env = E = struct
       if Env.flex_get k_heartbeat_disabled_hlbe then raise RuleNotApplicable;
       if n > 7 then raise RuleNotApplicable; 
       let bv = CCBV.create ~size:n true in
-      let (<+>) = CCOpt.(<+>) in
+      let (<+>) = CCOption.(<+>) in
       let proofset = ref CS.empty in
       CCArray.iteri (fun i i_lit ->
         match get_predicate i_lit with
@@ -747,7 +747,7 @@ module Make(E : Env.S) : S with module Env = E = struct
     | None -> SimplM.return_same cl)
 
   let [@inline] check_heartbeat arg =
-    if CCOpt.is_some arg then heartbeat_ := true;
+    if CCOption.is_some arg then heartbeat_ := true;
     arg 
 
   let hle_htr = simplify_opt ~f:(fun a -> check_heartbeat @@ do_hte_hle a)

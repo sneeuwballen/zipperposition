@@ -326,7 +326,7 @@ module Make (P : PARAMETERS) = struct
       OSeq.append 
         (try_lfho_unif t0s t1s)
         (do_unif ~bind_cnt ~hits_cnt [(lhs,rhs,P.init_flag)] subst unifscope)
-      |> OSeq.map (fun opt -> CCOpt.map (fun subst ->
+      |> OSeq.map (fun opt -> CCOption.map (fun subst ->
         let norm t = T.normalize_bools @@ Lambda.eta_expand @@ Lambda.snf t in
         let l = norm @@ S.FO.apply Subst.Renaming.none subst t0s in 
         let r = norm @@ S.FO.apply Subst.Renaming.none subst t1s in

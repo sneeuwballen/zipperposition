@@ -180,7 +180,7 @@ module Make (S : sig val st : Flex_state.t end) = struct
     if not @@ MS.mem var subst then (
       MS.add var t subst
     ) else (
-      let old = CCOpt.get_exn @@ MS.get var subst in
+      let old = CCOption.get_exn_or "Zipper" @@ MS.get var subst in
       MS.add var (term_intersection old t) subst 
     )
 

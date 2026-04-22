@@ -260,7 +260,7 @@ module FV_tbl(X : Map.OrderedType) = struct
     |> Iter.find_map
       (fun (k',v) -> if are_variant k k' then Some v else None)
 
-  let mem t k = get t k |> CCOpt.is_some
+  let mem t k = get t k |> CCOption.is_some
 
   let to_iter t = FV.iter t.fv
 end

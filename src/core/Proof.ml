@@ -416,7 +416,7 @@ module Step = struct
   let count_rules ~name p =
     let rec aux p =
       let init = 
-        CCOpt.get_or ~default: 0 (CCOpt.map (fun r -> 
+        CCOption.get_or ~default: 0 (CCOption.map (fun r -> 
           if CCString.equal (Rule.name r) name then 1 else 0)
         (rule p)) in
       List.fold_left (fun acc par -> 
@@ -469,7 +469,7 @@ module Step = struct
           | p::l -> List.fold_left combine_dist (Parent.proof p).step.dist_to_goal l
         in
         match kind with
-        | Inference _ -> CCOpt.map succ d
+        | Inference _ -> CCOption.map succ d
         | _ -> d
     in
     let inc = 
