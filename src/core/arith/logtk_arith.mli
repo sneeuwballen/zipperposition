@@ -1,6 +1,6 @@
-
 module Z : sig
   type t
+
   val zero : t
   val one : t
   val minus_one : t
@@ -31,15 +31,14 @@ module Z : sig
   val min : t -> t -> t
   val max : t -> t -> t
   val hash : t -> int
-
-  val (+) : t -> t -> t
+  val ( + ) : t -> t -> t
   val ( * ) : t -> t -> t
   val ( - ) : t -> t -> t
 end
 
 module Q : sig
-
   type t
+
   val zero : t
   val one : t
   val minus_one : t
@@ -60,10 +59,8 @@ module Q : sig
   val compare : t -> t -> int
   val equal : t -> t -> bool
   val div : t -> t -> t
-
-  val (+) : t -> t -> t
+  val ( + ) : t -> t -> t
   val ( * ) : t -> t -> t
   val ( - ) : t -> t -> t
   val ( / ) : t -> t -> t
-
 end

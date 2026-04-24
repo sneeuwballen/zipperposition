@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 open Logtk
@@ -13,7 +12,6 @@ module type S = sig
   (** selection function for clauses *)
 
   val set_selection_fun : Selection.t -> unit
-
   val set_ord : Ordering.t -> unit
 
   val signature : unit -> Signature.t
@@ -36,7 +34,7 @@ module type S = sig
   (** Check whether completeness was preserved so far *)
 
   val add_signature : Signature.t -> unit
-  (** Merge  the given signature with the context's one *)
+  (** Merge the given signature with the context's one *)
 
   val find_signature : ID.t -> Type.t option
   (** Find the type of the given symbol *)
@@ -49,12 +47,11 @@ module type S = sig
   (** Declare the type of a symbol (updates signature) *)
 
   val declare_syms : (ID.t * Type.t) list -> unit
-  (** Declare multiple symbols (more efficient that calling
-      declare function incrementally) *)
+  (** Declare multiple symbols (more efficient that calling declare function
+      incrementally) *)
 
   val on_new_symbol : (ID.t * Type.t) Signal.t
   val on_signature_update : Signature.t Signal.t
-
   val set_injective_for_arg : ID.t -> int -> unit
   val is_injective_for_arg : ID.t -> int -> bool
 
@@ -63,7 +60,6 @@ module type S = sig
   module Lit : sig
     val from_hooks : unit -> Literal.Conv.hook_from list
     val add_from_hook : Literal.Conv.hook_from -> unit
-
     val to_hooks : unit -> Literal.Conv.hook_to list
     val add_to_hook : Literal.Conv.hook_to -> unit
 

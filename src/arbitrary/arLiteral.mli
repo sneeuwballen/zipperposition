@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Arbitrary Literals} *)
@@ -11,9 +10,7 @@ type lit = Literal.t
 type clause = Literals.t
 
 val lit_g : lit gen
-
 val lit : lit arbitrary
-
 val clause_g : clause gen
 
 val clause : clause arbitrary

@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Trace of a TSTP prover} *)
@@ -6,7 +5,6 @@
 open Logtk
 
 type id = Ast_tptp.name
-
 type term = STerm.t
 type form = STerm.t
 type clause = term SLiteral.t list
@@ -18,20 +16,18 @@ type t =
   | InferClause of clause * step lazy_t
 
 and step = {
-  id : id;
-  rule : string;
-  parents : t array;
-  esa : bool; (** Equisatisfiable step? *)
+  id: id;
+  rule: string;
+  parents: t array;
+  esa: bool;  (** Equisatisfiable step? *)
 }
 
 val equal : t -> t -> bool
 val compare : t -> t -> int
-
 val mk_f_axiom : id:id -> form -> file:string -> name:string -> t
 val mk_c_axiom : id:id -> clause -> file:string -> name:string -> t
 val mk_f_step : ?esa:bool -> id:id -> form -> rule:string -> t list -> t
 val mk_c_step : ?esa:bool -> id:id -> clause -> rule:string -> t list -> t
-
 val is_axiom : t -> bool
 val is_theory : t -> bool
 val is_step : t -> bool
@@ -54,8 +50,8 @@ val is_dag : t -> bool
 (** Is the proof a proper DAG? *)
 
 val traverse : ?traversed:proof_set -> t -> (t -> unit) -> unit
-(** Traverse the proof. Each proof node is traversed only once,
-    using the set to recognize already traversed proofs. *)
+(** Traverse the proof. Each proof node is traversed only once, using the set to
+    recognize already traversed proofs. *)
 
 val to_iter : t -> t Iter.t
 (** Traversal of parent proofs *)
