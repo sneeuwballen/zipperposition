@@ -2,53 +2,53 @@
 
 (** {1 Simple Typed Terms} *)
 
-(** Similar to {!STerm}, but this time the terms are properly
-    scoped (using {!Var}) and typed.
+(** Similar to {!STerm}, but this time the terms are properly scoped (using
+    {!Var}) and typed.
 
-    These terms are suitable for many preprocessing transformations,
-    including {!CNF}.
+    These terms are suitable for many preprocessing transformations, including
+    {!CNF}.
 
-    They can be obtained from {!STerm.t} using {!TypeInference}.
-*)
+    They can be obtained from {!STerm.t} using {!TypeInference}. *)
 
 type location = ParseLocation.t
-
 type t
 type term = t
 type ty = t
 
-(** a constructor of given type, applied to a list of type argumentss *)
 type match_cstor = {
   cstor_id: ID.t;
   cstor_ty: ty;
   cstor_args: ty list;
 }
+(** a constructor of given type, applied to a list of type argumentss *)
 
-type match_branch = match_cstor  * t Var.t list * t
+type match_branch = match_cstor * t Var.t list * t
 
 type view = private
-  | Var of t Var.t (** variable *)
-  | Const of ID.t (** constant *)
-  | App of t * t list (** apply term *)
+  | Var of t Var.t  (** variable *)
+  | Const of ID.t  (** constant *)
+  | App of t * t list  (** apply term *)
   | Ite of t * t * t
   | Match of t * match_branch list
   | Let of (t Var.t * t) list * t
-  | Bind of Binder.t * t Var.t * t (** bind variable in term *)
+  | Bind of Binder.t * t Var.t * t  (** bind variable in term *)
   | AppBuiltin of Builtin.t * t list
   | Multiset of t list
-  | Record of (string * t) list * t option (** extensible record *)
-  | Meta of meta_var (** Unification variable *)
+  | Record of (string * t) list * t option  (** extensible record *)
+  | Meta of meta_var  (** Unification variable *)
 
 (* a variable with a one-shot binding, and some annotation about
    whether it can be generalized *)
-and meta_var = t Var.t * t option ref * [`Generalize | `BindDefault | `NoBind]
+and meta_var = t Var.t * t option ref * [ `Generalize | `BindDefault | `NoBind ]
 
 val view : t -> view
 val loc : t -> location option
 val ty : t -> t option
 val ty_exn : t -> t
 val head : t -> ID.t option
-val head_exn : t -> ID.t (** @raise Not_found if not an application/const *)
+
+val head_exn : t -> ID.t
+(** @raise Not_found if not an application/const *)
 
 val deref : t -> t
 (** While [t] is a bound [Meta] variable, follow its link *)
@@ -62,11 +62,12 @@ exception IllFormedTerm of string
 
 val tType : t
 val prop : t
-
 val var : ?loc:location -> t Var.t -> t
 val var_of_string : ?loc:location -> ty:t -> string -> t
 val app : ?loc:location -> ty:t -> t -> t list -> t
-val app_whnf : ?loc:location -> ty:t -> t -> t list -> t (** application + WHNF *)
+
+val app_whnf : ?loc:location -> ty:t -> t -> t list -> t
+(** application + WHNF *)
 
 val const : ?loc:location -> ty:t -> ID.t -> t
 val const_of_cstor : ?loc:location -> match_cstor -> t
@@ -79,11 +80,14 @@ val bind : ?loc:location -> ty:t -> Binder.t -> t Var.t -> t -> t
 val bind_list : ?loc:location -> ty:t -> Binder.t -> t Var.t list -> t -> t
 val multiset : ?loc:location -> ty:t -> t list -> t
 val meta : ?loc:location -> meta_var -> t
-val record : ?loc:location -> ty:t -> (string*t) list -> rest:t Var.t option -> t
-val record_flatten : ?loc:location -> ty:t -> (string*t) list -> rest:t option -> t
+
+val record :
+  ?loc:location -> ty:t -> (string * t) list -> rest:t Var.t option -> t
+
+val record_flatten :
+  ?loc:location -> ty:t -> (string * t) list -> rest:t option -> t
 (** Build a record with possibly a row variable.
     @raise IllFormedTerm if the [rest] is not either a record or a variable. *)
-
 
 val fun_l : ?loc:location -> t Var.t list -> t -> t
 
@@ -91,7 +95,6 @@ val of_string : ?loc:location -> ty:t -> string -> t
 (** Make a constant from this string *)
 
 val at_loc : ?loc:location -> t -> t
-
 val with_ty : ty:t -> t -> t
 val map_ty : t -> f:(t -> t) -> t
 
@@ -106,7 +109,13 @@ val box_opaque : t -> t
 module Ty : sig
   type t = term
 
-  type builtin = Prop | TType | Term | Int | Rat | Real
+  type builtin =
+    | Prop
+    | TType
+    | Term
+    | Int
+    | Rat
+    | Real
 
   type view =
     | Ty_builtin of builtin
@@ -135,7 +144,6 @@ module Ty : sig
   val multiset : ?loc:location -> t -> t
   val record : ?loc:location -> (string * t) list -> rest:t Var.t option -> t
   val record_flatten : ?loc:location -> (string * t) list -> rest:t option -> t
-
   val prop : t
   val int : t
   val rat : t
@@ -143,7 +151,7 @@ module Ty : sig
   val real : t
   val term : t
 
-  val (==>) : t list -> t -> t
+  val ( ==> ) : t list -> t -> t
   (** alias for {!fun_} *)
 
   val close_forall : t -> t
@@ -153,7 +161,8 @@ module Ty : sig
       [[a,b], [x,y,z], ret] *)
 
   val arity : t -> int * int
-  (** [arity ty] returns [(n,m)] where [ty = forall x1..xn (a1 ... am -> ret)] *)
+  (** [arity ty] returns [(n,m)] where [ty = forall x1..xn (a1 ... am -> ret)]
+  *)
 
   val mangle : t -> string
   (** String usable as an identifier, without whitespace *)
@@ -180,6 +189,7 @@ val sort_ty_vars_first : t Var.t list -> t Var.t list
 
 module Form : sig
   type t = term
+
   type view =
     | True
     | False
@@ -213,18 +223,13 @@ module Form : sig
   val ite : ?loc:location -> t -> t -> t -> t
   val forall : ?loc:location -> t Var.t -> t -> t
   val exists : ?loc:location -> t Var.t -> t -> t
-
   val eq_or_equiv : t -> t -> t
   val neq_or_xor : t -> t -> t
-
   val forall_l : ?loc:location -> t Var.t list -> t -> t
   val exists_l : ?loc:location -> t Var.t list -> t -> t
-
   val unfold_binder : Binder.t -> t -> t Var.t list * t
-
   val unfold_forall : t -> t Var.t list * t
   val close_forall : ?loc:location -> t -> t
-
   val box_opaque : t -> t
   val is_var : view -> bool
 end
@@ -244,12 +249,12 @@ val is_monomorphic : t -> bool
 
 val is_subterm : strict:bool -> t -> of_:t -> bool
 (** [is_subterm a ~of_:b] is true if [a] is a subterm of [b].
-    @param strict if true, [a] must be a strict subterm of [b],
-      that is, not [b] itself *)
+    @param strict
+      if true, [a] must be a strict subterm of [b], that is, not [b] itself *)
 
 val closed : t -> bool
-(** [closed t] is [true] iff all bound variables of [t] occur under a
-    binder (i.e. they are actually bound in [t]) *)
+(** [closed t] is [true] iff all bound variables of [t] occur under a binder
+    (i.e. they are actually bound in [t]) *)
 
 val unfold_binder : Binder.t -> t -> t Var.t list * t
 (** [unfold_binder b (b v1 (b v2... (b vn t)))] returns [[v1,...,vn], t] *)
@@ -260,7 +265,6 @@ val var_occurs : var:t Var.t -> t -> bool
 (** [var_occurs ~var t] is [true] iff [var] occurs in [t] *)
 
 val as_id_app : t -> (ID.t * Ty.t * t list) option
-
 val vars : t -> t Var.t list
 val free_vars : t -> t Var.t list
 val free_vars_l : t list -> t Var.t list
@@ -271,19 +275,14 @@ val close_all : ty:t -> Binder.t -> t -> t
 
 val close_with_vars : ?binder:Binder.t -> t list -> t -> t
 
-(** Generic non-recursive map *)
 val map :
-  f:('a -> t -> t) ->
-  bind:('a -> ty Var.t -> 'a * ty Var.t) ->
-  'a ->
-  t ->
-  t
+  f:('a -> t -> t) -> bind:('a -> ty Var.t -> 'a * ty Var.t) -> 'a -> t -> t
+(** Generic non-recursive map *)
 
 include Interfaces.PRINT with type t := t
 
 val pp_inner : t CCFormat.printer
 val pp_with_ty : t CCFormat.printer
-
 val pp_in : Output_format.t -> t CCFormat.printer
 
 module Set : Iter.Set.S with type elt = term
@@ -305,12 +304,10 @@ module Subst : sig
   type t = (term, term) Var.Subst.t
 
   val empty : t
-
   val mem : t -> term Var.t -> bool
 
   val add : t -> term Var.t -> term -> t
-  (** Add new binding to substitution
-      Fails if the variable is bound already *)
+  (** Add new binding to substitution Fails if the variable is bound already *)
 
   val find : t -> term Var.t -> term option
 
@@ -318,14 +315,12 @@ module Subst : sig
   (** @raise Not_found if the variable is not present *)
 
   val rename_var : rename_binders:bool -> t -> term Var.t -> t * term Var.t
-
   val merge : t -> t -> t
-
   val eval : ?rename_binders:bool -> t -> term -> term
 
   val eval_nonrec : t -> term -> term
-  (** Evaluate under substitution, but consider the substitution as
-      not idempotent *)
+  (** Evaluate under substitution, but consider the substitution as not
+      idempotent *)
 
   include Interfaces.PRINT with type t := t
 end
@@ -359,33 +354,41 @@ module UStack : sig
   (** Save current state *)
 
   val restore : st:t -> snapshot -> unit
-  (** Restore all references to their state at [snapshot]. Bindings
-      done since are undone. *)
+  (** Restore all references to their state at [snapshot]. Bindings done since
+      are undone. *)
 end
 
 val unify :
-  ?allow_open:bool -> ?loc:location -> ?st:UStack.t -> ?subst:Subst.t ->
-  term -> term -> unit
-(** unifies destructively the two given terms, by modifying references
-      that occur under {!Meta}. Regular variables are not modified.
-    @param allow_open if true, metas can be unified to terms
-      with free variables (default false)
+  ?allow_open:bool ->
+  ?loc:location ->
+  ?st:UStack.t ->
+  ?subst:Subst.t ->
+  term ->
+  term ->
+  unit
+(** unifies destructively the two given terms, by modifying references that
+    occur under {!Meta}. Regular variables are not modified.
+    @param allow_open
+      if true, metas can be unified to terms with free variables (default false)
     @param st used for backtracking
     @param subst substitution for bound variables
     @raise UnifyFailure if unification fails. *)
 
 val apply_unify :
   ?gen_fresh_meta:(unit -> meta_var) ->
-  ?allow_open:bool -> ?loc:location -> ?st:UStack.t -> ?subst:Subst.t ->
-  t -> t list -> t
-(** [apply_unify f_ty args] compute the type of a function of type [f_ty],
-    when applied to parameters [args]. The first elements of [args] might
-    be interpreted as types, the other ones as terms (whose types are unified
+  ?allow_open:bool ->
+  ?loc:location ->
+  ?st:UStack.t ->
+  ?subst:Subst.t ->
+  t ->
+  t list ->
+  t
+(** [apply_unify f_ty args] compute the type of a function of type [f_ty], when
+    applied to parameters [args]. The first elements of [args] might be
+    interpreted as types, the other ones as terms (whose types are unified
     against expected types). *)
 
-val app_infer :
-  ?st:UStack.t -> ?subst:Subst.t ->
-  t -> t list -> t
+val app_infer : ?st:UStack.t -> ?subst:Subst.t -> t -> t list -> t
 (** [app_infer f l] computes the type [ty] of [f l], and return [app ~ty f l]
     @raise UnifyFailure if types do not correspond *)
 
@@ -409,6 +412,6 @@ end
 
 module ZF : sig
   include Interfaces.PRINT with type t := t
+
   val pp_inner : t CCFormat.printer
 end
-

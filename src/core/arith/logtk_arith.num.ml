@@ -1,8 +1,8 @@
-
 module Z = struct
-
   include Big_int
+
   type t = big_int
+
   let of_int = big_int_of_int
   let of_string = big_int_of_string
   let one = of_int 1
@@ -18,10 +18,10 @@ module Z = struct
   let gcd = gcd_big_int
   let div = div_big_int
   let ( * ) = mul
-  let (-) = sub
-  let (+) = add
-  let (/) = div
-  let lcm a b = (a * b) / gcd a b
+  let ( - ) = sub
+  let ( + ) = add
+  let ( / ) = div
+  let lcm a b = a * b / gcd a b
   let max = max_big_int
   let min = min_big_int
   let to_int_exn i = int_of_big_int i
@@ -41,7 +41,9 @@ end
 
 module Q = struct
   open Ratio
+
   type t = Ratio.ratio
+
   let of_int = ratio_of_int
   let of_bigint = ratio_of_big_int
   let abs = abs_ratio
@@ -66,9 +68,8 @@ module Q = struct
   let compare = compare_ratio
   let of_string = ratio_of_string
   let ( * ) = mul
-  let (-) = sub
-  let (+) = add
-  let (/) = div
+  let ( - ) = sub
+  let ( + ) = add
+  let ( / ) = div
   let of_ints a b = of_int a / of_int b
 end
-

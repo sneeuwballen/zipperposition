@@ -1,8 +1,8 @@
-
 (executable
-  (name resolution1)
-  (flags :standard -warn-error -a+8)
-  (modes native)
-  (promote (until-clean) (into ../../..))
-  (libraries logtk logtk.parsers containers iter))
-
+ (name resolution1)
+ (flags :standard -warn-error -a+8)
+ (modes native)
+ (promote
+  (until-clean)
+  (into ../../..))
+ (libraries logtk logtk.parsers containers iter))

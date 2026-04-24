@@ -1,14 +1,23 @@
-
 ; main lib
+
 (library
-  (name logtk)
-  (public_name logtk)
-  (synopsis "core data structures and algorithms for Logtk")
-  (libraries containers containers-data iter oseq
-             unix mtime mtime.clock.os logtk.arith)
-  (flags :standard -w -32-50 -open Logtk_arith)
-  (foreign_stubs (language c) (names util_stubs) (flags :standard -Wextra -Wno-unused-parameter) )
-)
+ (name logtk)
+ (public_name logtk)
+ (synopsis "core data structures and algorithms for Logtk")
+ (libraries
+  containers
+  containers-data
+  iter
+  oseq
+  unix
+  mtime
+  mtime.clock.os
+  logtk.arith)
+ (flags :standard -w -32-50 -open Logtk_arith)
+ (foreign_stubs
+  (language c)
+  (names util_stubs)
+  (flags :standard -Wextra -Wno-unused-parameter)))
 
 (documentation
-  (package logtk))
+ (package logtk))

@@ -1,23 +1,21 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Imperative Union-Find structure} *)
 
-(** We need to be able to hash and compare keys, and values need to form
-    a monoid *)
+(** We need to be able to hash and compare keys, and values need to form a
+    monoid *)
 module type PAIR = sig
   type key
   type value
 
   val hash : key -> int
   val equal : key -> key -> bool
-
   val merge : value -> value -> value
   val zero : value
 end
 
 (** Build a union-find module from a key/value specification *)
-module Make(P : PAIR) = struct
+module Make (P : PAIR) = struct
   type key = P.key
   (** Elements that can be compared *)
 
@@ -26,20 +24,20 @@ module Make(P : PAIR) = struct
 
   type node = {
     n_key: key;
-    mutable n_repr : node option; (* representative *)
-    mutable n_value : value; (* value (only up-to-date for representative) *)
+    mutable n_repr: node option; (* representative *)
+    mutable n_value: value; (* value (only up-to-date for representative) *)
   }
 
-  module H = CCHashtbl.Make(struct include P type t = P.key end)
+  module H = CCHashtbl.Make (struct
+    include P
 
-  (** The union-find imperative structure itself*)
+    type t = P.key
+  end)
+
   type t = node H.t
+  (** The union-find imperative structure itself*)
 
-  let mk_node key = {
-    n_repr = None;
-    n_key=key;
-    n_value = P.zero;
-  }
+  let mk_node key = { n_repr = None; n_key = key; n_value = P.zero }
 
   (** Elements that can be compared *)
   let create keys =
@@ -49,12 +47,12 @@ module Make(P : PAIR) = struct
     t
 
   let mem t key = H.mem t key
-
   let n_repr n = n.n_repr
   let n_key n = n.n_key
   let n_value n = n.n_value
 
-  let rec find_root (node:node): node = match node.n_repr with
+  let rec find_root (node : node) : node =
+    match node.n_repr with
     | None -> node
     | Some node' ->
       (* path compression *)
@@ -64,7 +62,6 @@ module Make(P : PAIR) = struct
       root
 
   let find_node t key = H.find t key
-
   let find t key = find_node t key |> find_root |> n_key
 
   (** Get value of the root for this key. *)
@@ -75,7 +72,7 @@ module Make(P : PAIR) = struct
     if n1 != n2 then (
       (* k2 points to k1, and k1 points to the new value *)
       n1.n_value <- P.merge n1.n_value n2.n_value;
-      n2.n_repr <- Some n1;
+      n2.n_repr <- Some n1
     )
 
   (** Merge two representatives *)
@@ -98,9 +95,8 @@ module Make(P : PAIR) = struct
   let iter t f =
     H.iter
       (fun key node ->
-         if P.equal key node.n_key && node.n_repr=None then f key node.n_value)
+        if P.equal key node.n_key && node.n_repr = None then f key node.n_value)
       t
 
-  let to_iter t f =
-    iter t (fun x y -> f (x,y))
+  let to_iter t f = iter t (fun x y -> f (x, y))
 end

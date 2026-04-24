@@ -8,11 +8,11 @@ module Fmt = CCFormat
 
 type timestamp = float
 
-let start_ = Mtime_clock.now()
+let start_ = Mtime_clock.now ()
 
 let get_time_mon_us () : timestamp =
-  let t = Mtime_clock.now() in
-  (Mtime.Span.to_float_ns (Mtime.span start_ t)) *. 1e-3
+  let t = Mtime_clock.now () in
+  Mtime.Span.to_float_ns (Mtime.span start_ t) *. 1e-3
 
 let total_time_s () = get_time_mon_us () *. 1e-6
 
@@ -23,43 +23,48 @@ module Section = struct
   let null_level = -1 (* absence of level *)
 
   type t = {
-    descr : descr;
-    full_name : string;
-    mutable level : int;
+    descr: descr;
+    full_name: string;
+    mutable level: int;
     mutable cur_level: int lazy_t; (* cached computed level *)
   }
+
   and descr =
     | Root
-    | Sub of string * t * t list  (* name, parent, inheriting *)
+    | Sub of string * t * t list (* name, parent, inheriting *)
 
   (* inlinable function *)
   let[@inline] cur_level s = Lazy.force s.cur_level
 
   (* recursive lookup of level, with inheritance from parent *)
   let compute_cur_level_ s =
-    if s.level <> null_level then s.level
-    else match s.descr with
+    if s.level <> null_level then
+      s.level
+    else (
+      match s.descr with
       | Root -> 0
       | Sub (_, parent, []) -> cur_level parent
-      | Sub (_, parent, [i]) -> max (cur_level parent) (cur_level i)
+      | Sub (_, parent, [ i ]) -> max (cur_level parent) (cur_level i)
       | Sub (_, parent, inheriting) ->
         List.fold_left
           (fun m i -> max m (cur_level i))
           (cur_level parent) inheriting
+    )
 
   (* build a section *)
-  let mk ?(level=null_level) descr full_name : t =
-    let rec self = {
-      descr; full_name; level; cur_level= lazy (compute_cur_level_ self);
-    } in
+  let mk ?(level = null_level) descr full_name : t =
+    let rec self =
+      { descr; full_name; level; cur_level = lazy (compute_cur_level_ self) }
+    in
     self
 
   let root : t = mk ~level:0 Root ""
 
   (* computes full name of section *)
-  let compute_full_name (d:descr) =
+  let compute_full_name (d : descr) =
     let buf = Buffer.create 15 in
-    let rec add d = match d with
+    let rec add d =
+      match d with
       | Root -> true
       | Sub (name, parent, _) ->
         let parent_is_root = add parent.descr in
@@ -78,19 +83,30 @@ module Section = struct
   (* reset all cached levels *)
   let invalidate_cache () =
     root.cur_level <- lazy (compute_cur_level_ root);
-    Hashtbl.iter (fun _ s -> s.cur_level <- lazy (compute_cur_level_ s)) section_table
+    Hashtbl.iter
+      (fun _ s -> s.cur_level <- lazy (compute_cur_level_ s))
+      section_table
 
-  let set_debug s i = assert (i>=0); s.level <- i; invalidate_cache ()
-  let clear_debug s = s.level <- null_level; invalidate_cache()
+  let set_debug s i =
+    assert (i >= 0);
+    s.level <- i;
+    invalidate_cache ()
+
+  let clear_debug s =
+    s.level <- null_level;
+    invalidate_cache ()
+
   let get_debug s =
-    if s.level=null_level then None else Some s.level
+    if s.level = null_level then
+      None
+    else
+      Some s.level
 
-  let make ?(parent=root) ?(inheriting=[]) name =
-    if name="" then invalid_arg "Section.make: empty name";
-    let descr = Sub(name, parent, inheriting) in
+  let make ?(parent = root) ?(inheriting = []) name =
+    if name = "" then invalid_arg "Section.make: empty name";
+    let descr = Sub (name, parent, inheriting) in
     let name' = compute_full_name descr in
-    try
-      Hashtbl.find section_table name'
+    try Hashtbl.find section_table name'
     with Not_found ->
       (* new section! register it, add an option to set its level *)
       let sec = mk descr name' in
@@ -99,53 +115,50 @@ module Section = struct
 
   let iter yield =
     yield ("", root);
-    Hashtbl.iter (fun name sec -> yield (name,sec)) section_table
+    Hashtbl.iter (fun name sec -> yield (name, sec)) section_table
 end
 
 let break_on_debug = ref false
 
 (* wait for user input *)
-let wait_user_input () =
-  ignore (input_line stdin)
-
+let wait_user_input () = ignore (input_line stdin)
 let set_debug = Section.set_debug Section.root
 let get_debug () = Section.root.Section.level
-
 let debug_fmt_ = Format.std_formatter
 
 let debugf_real ~section msg k =
-  let now = total_time_s() in
-  if section == Section.root
-  then Format.fprintf debug_fmt_ "@{<blue>@[<4>%.3f[]@}@ " now
-  else Format.fprintf debug_fmt_ "@{<blue>@[<4>%.3f[%s]@}@ "
-      now section.Section.full_name;
-  k (Format.kfprintf
+  let now = total_time_s () in
+  if section == Section.root then
+    Format.fprintf debug_fmt_ "@{<blue>@[<4>%.3f[]@}@ " now
+  else
+    Format.fprintf debug_fmt_ "@{<blue>@[<4>%.3f[%s]@}@ " now
+      section.Section.full_name;
+  k
+    (Format.kfprintf
        (fun fmt ->
-          Format.fprintf fmt "@]@.";
-          if !break_on_debug then wait_user_input();
-       )
+         Format.fprintf fmt "@]@.";
+         if !break_on_debug then wait_user_input ())
        debug_fmt_ msg)
 
-let[@inline] debugf ?(section=Section.root) l msg k =
-  if l <= Section.cur_level section then (
-    debugf_real ~section msg k
-  )
+let[@inline] debugf ?(section = Section.root) l msg k =
+  if l <= Section.cur_level section then debugf_real ~section msg k
 
-let[@inline] debug ?section l msg = debugf ?section l "%s" (fun k->k msg)
+let[@inline] debug ?section l msg = debugf ?section l "%s" (fun k -> k msg)
 
 let ksprintf_noc ~f fmt =
   let buf = Buffer.create 32 in
   let out = Format.formatter_of_buffer buf in
   Format.kfprintf
-    (fun _ -> Format.pp_print_flush out (); f (Buffer.contents buf)) out fmt
+    (fun _ ->
+      Format.pp_print_flush out ();
+      f (Buffer.contents buf))
+    out fmt
 
 (* print error prefix *)
 let pp_error_prefix out () = Format.fprintf out "@{<Red>Error@}: "
 
 let err_spf fmt =
-  Fmt.ksprintf fmt
-    ~f:(fun s -> Fmt.sprintf "@[%a@,%s@]" pp_error_prefix () s)
-
+  Fmt.ksprintf fmt ~f:(fun s -> Fmt.sprintf "@[%a@,%s@]" pp_error_prefix () s)
 
 let warn_fmt_ = Format.err_formatter
 
@@ -160,15 +173,12 @@ let warn msg = warnf "%s" msg
 exception Error of string * string
 
 let () =
-  Printexc.register_printer
-    (function
-      | Error (where,msg) ->
-        Some (err_spf "error in %s:@ %s" where msg)
-      | Invalid_argument msg ->
-        Some (err_spf "@[<2>invalid_argument: %s@]" msg)
-      | _ -> None)
+  Printexc.register_printer (function
+    | Error (where, msg) -> Some (err_spf "error in %s:@ %s" where msg)
+    | Invalid_argument msg -> Some (err_spf "@[<2>invalid_argument: %s@]" msg)
+    | _ -> None)
 
-let error ~where msg = raise (Error (where,msg))
+let error ~where msg = raise (Error (where, msg))
 let errorf ~where msg = Fmt.ksprintf ~f:(error ~where) msg
 
 let pp_pos pos =
@@ -179,14 +189,14 @@ external set_memory_limit_stub : int -> unit = "logtk_set_memory_limit"
 
 let set_memory_limit n =
   if n <= 0 then invalid_arg "set_memory_limit: expect positive arg";
-  debugf 1 "limit memory to %d MB" (fun k-> k n);
+  debugf 1 "limit memory to %d MB" (fun k -> k n);
   set_memory_limit_stub n
 
 external set_time_limit_stub : int -> unit = "logtk_set_time_limit"
 
 let set_time_limit n =
   if n <= 0 then invalid_arg "set_time_limit: expect positive arg";
-  debugf 1 "limit time to %ds" (fun k->k n);
+  debugf 1 "limit time to %ds" (fun k -> k n);
   set_time_limit_stub n
 
 module Exn = struct
@@ -209,9 +219,10 @@ module Exn = struct
       Format.fprintf out "\nbacktrace:\n%s" (Printexc.get_backtrace ())
 
   let string_of_backtrace () =
-    if Printexc.backtrace_status ()
-    then "\nbacktrace:\n" ^ Printexc.get_backtrace ()
-    else "<no backtrace>"
+    if Printexc.backtrace_status () then
+      "\nbacktrace:\n" ^ Printexc.get_backtrace ()
+    else
+      "<no backtrace>"
 end
 
 (** {2 Runtime statistics} *)
@@ -223,20 +234,25 @@ type stat = string * int64 ref
 let mk_stat, print_global_stats =
   let stats = ref [] in
   (* create a stat *)
-  (fun name ->
-     let stat = (name, ref 0L) in
-     stats := stat :: !stats;
-     stat),
-  (* print stats *)
-  (fun ~comment () ->
-     let stats = List.sort (fun (n1,_)(n2,_) -> String.compare n1 n2) !stats in
-     List.iter
-       (fun (name, cnt) -> Format.printf "%sstat: %-35s ... %Ld@." comment name !cnt)
-       stats)
+  ( (fun name ->
+      let stat = name, ref 0L in
+      stats := stat :: !stats;
+      stat),
+    (* print stats *)
+    fun ~comment () ->
+      let stats =
+        List.sort (fun (n1, _) (n2, _) -> String.compare n1 n2) !stats
+      in
+      List.iter
+        (fun (name, cnt) ->
+          Format.printf "%sstat: %-35s ... %Ld@." comment name !cnt)
+        stats )
 
-let incr_stat (_, count) = count := Int64.add !count Int64.one  (** increment given statistics *)
+(** increment given statistics *)
+let incr_stat (_, count) = count := Int64.add !count Int64.one
 
-let add_stat (_, count) num = count := Int64.add !count (Int64.of_int num) (** add to stat *)
+(** add to stat *)
+let add_stat (_, count) num = count := Int64.add !count (Int64.of_int num)
 
 let pp_stat out (name, count) =
   Format.fprintf out "%s-%d" name (CCInt64.to_int !count)
@@ -251,7 +267,7 @@ module Flag = struct
   let get_new gen =
     let n = !gen in
     if n < 0 then failwith "Flag.get_new: too many flags allocated";
-    gen := 2*n;
+    gen := 2 * n;
     n
 end
 
@@ -266,35 +282,40 @@ let finally ~do_ f =
     do_ ();
     raise e
 
-let pp_pair ?(sep=", ") pa pb out (a,b) =
+let pp_pair ?(sep = ", ") pa pb out (a, b) =
   Format.fprintf out "@[%a%s%a@]" pa a sep pb b
 
 let pp_sep sep out () = Format.fprintf out "%s@," sep
-let pp_list ?(sep=", ") pp = Fmt.list ~sep:(pp_sep sep) pp
-let pp_seq ?(sep=", ") pp = Fmt.seq ~sep:(pp_sep sep) pp
-let pp_iter ?(sep=", ") pp = Fmt.iter ~sep:(pp_sep sep) pp
+let pp_list ?(sep = ", ") pp = Fmt.list ~sep:(pp_sep sep) pp
+let pp_seq ?(sep = ", ") pp = Fmt.seq ~sep:(pp_sep sep) pp
+let pp_iter ?(sep = ", ") pp = Fmt.iter ~sep:(pp_sep sep) pp
 
-let pp_list0 ?(sep=" ") pp_x out = function
+let pp_list0 ?(sep = " ") pp_x out = function
   | [] -> ()
   | l -> Format.fprintf out " %a" (pp_list ~sep pp_x) l
 
 let tstp_needs_escaping s =
-  assert (s<>"");
+  assert (s <> "");
   match s.[0] with
-  | 'a' .. 'z' | 'A' ..'Z' ->
+  | 'a' .. 'z' | 'A' .. 'Z' ->
     CCString.exists
       (function
-        | 'a' .. 'z' | 'A' ..'Z' | '0' ..'9' | '_' -> false
+        | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_' -> false
         | _ -> true)
       s
   | _ -> true
 
 let pp_str_tstp out s =
-  CCFormat.string out (if tstp_needs_escaping s then "'" ^ String.escaped s ^ "'" else s)
+  CCFormat.string out
+    (if tstp_needs_escaping s then
+       "'" ^ String.escaped s ^ "'"
+     else
+       s)
 
 let pp_var_tstp out s = pp_str_tstp out (CCString.capitalize_ascii s)
 
-let ord_option c o1 o2 = match o1, o2 with
+let ord_option c o1 o2 =
+  match o1, o2 with
   | None, None -> 0
   | None, Some _ -> -1
   | Some _, None -> 1
@@ -306,50 +327,47 @@ let take_drop_while f l = CCList.take_while f l, CCList.drop_while f l
 let map_product ~f l =
   let product a b =
     List.fold_left
-      (fun acc1 l1 -> List.fold_left
-          (fun acc2 l2 -> (List.rev_append l1 l2) :: acc2)
-          acc1 b)
+      (fun acc1 l1 ->
+        List.fold_left (fun acc2 l2 -> List.rev_append l1 l2 :: acc2) acc1 b)
       [] a
   in
   match l with
   | [] -> []
-  | l1 :: tail ->
-    List.fold_left
-      (fun acc x -> product (f x) acc)
-      (f l1)
-      tail
+  | l1 :: tail -> List.fold_left (fun acc x -> product (f x) acc) (f l1) tail
 
 let seq_map_l ~f l =
-  let rec aux l yield = match l with
+  let rec aux l yield =
+    match l with
     | [] -> yield []
     | x :: tail ->
       let ys = f x in
-      List.iter
-        (fun y -> aux tail (fun l -> yield (y::l)))
-        ys
+      List.iter (fun y -> aux tail (fun l -> yield (y :: l))) ys
   in
   aux l
 
 let seq_zipi seq k =
   let i = ref 0 in
-  seq (fun x -> k (!i, x); incr i)
+  seq (fun x ->
+      k (!i, x);
+      incr i)
 
 let invalid_argf msg = Fmt.ksprintf msg ~f:invalid_arg
 let failwithf msg = Fmt.ksprintf msg ~f:failwith
 
-module Int_map = CCMap.Make(CCInt)
-module Int_set = CCSet.Make(CCInt)
+module Int_map = CCMap.Make (CCInt)
+module Int_set = CCSet.Make (CCInt)
 
 let escape_dot s =
   let b = Buffer.create (String.length s + 5) in
   String.iter
     (fun c ->
-       begin match c with
-         | '|' | '\\' | '{' | '}' | '<' | '>' | '"' ->
-           Buffer.add_char b '\\'; Buffer.add_char b c
-         | '\n' -> Buffer.add_string b "\\l"; (* left justify *)
-         | _ -> Buffer.add_char b c
-       end)
+      match c with
+      | '|' | '\\' | '{' | '}' | '<' | '>' | '"' ->
+        Buffer.add_char b '\\';
+        Buffer.add_char b c
+      | '\n' -> Buffer.add_string b "\\l"
+      (* left justify *)
+      | _ -> Buffer.add_char b c)
     s;
   Buffer.contents b
 

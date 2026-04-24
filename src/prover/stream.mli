@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Stream} *)
@@ -17,4 +16,4 @@ module type ARG = sig
 end
 
 (** {2 Build a new Stream} *)
-module Make(A : ARG) : S with module Ctx = A.Ctx and module C = A.C
+module Make (A : ARG) : S with module Ctx = A.Ctx and module C = A.C

@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Deal with Inductive Types} *)
@@ -35,8 +34,8 @@
 *)
 
 open Libzipperposition
-module Make(E : Env_intf.S) : sig
 
+module Make (E : Env_intf.S) : sig
   val setup : unit -> unit
 end
 
