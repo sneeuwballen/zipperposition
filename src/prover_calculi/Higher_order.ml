@@ -1734,8 +1734,8 @@ module Make (E : Env.S) : S with module Env = E = struct
                `Left ([], t, u)
              | lit -> `Right lit)
       in
-       assert (pairs <> []);
-       ho_unif_real_ c pairs others 
+      assert (pairs <> []);
+      ho_unif_real_ c pairs others
     ) else
       []
 
