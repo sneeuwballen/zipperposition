@@ -111,8 +111,22 @@ module Make (C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
   module SimplSet = struct
     let on_add_clause = Signal.create ()
     let on_remove_clause = Signal.create ()
-    let add seq = seq (fun c -> Signal.send on_add_clause c)
-    let remove seq = seq (fun c -> Signal.send on_remove_clause c)
+
+    open struct
+      let n_clauses = Atomic.make 0
+    end
+
+    let add seq =
+      seq (fun c ->
+          Atomic.incr n_clauses;
+          Signal.send on_add_clause c);
+      Trace.counter_int "simpl.n-clauses" (Atomic.get n_clauses)
+
+    let remove seq =
+      seq (fun c ->
+          Atomic.decr n_clauses;
+          Signal.send on_remove_clause c);
+      Trace.counter_int "passive.n-clauses" (Atomic.get n_clauses)
   end
 
   module PassiveSet = struct
@@ -135,16 +149,19 @@ module Make (C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
         with Not_found -> None
       )
 
+    let num_clauses () = CQueue.length queue
+
     let remove seq =
       seq (fun c ->
-          if CQueue.remove queue c then Signal.send on_remove_clause c)
+          if CQueue.remove queue c then Signal.send on_remove_clause c);
+      Trace.counter_int "passive.n-clauses" (num_clauses ())
 
     let add seq =
-      seq (fun c -> if CQueue.add queue c then Signal.send on_add_clause c)
+      seq (fun c -> if CQueue.add queue c then Signal.send on_add_clause c);
+      Trace.counter_int "passive.n-clauses" (num_clauses ())
 
     let is_passive cl = CQueue.mem_cl queue cl
     let clauses () = C.ClauseSet.of_iter (CQueue.all_clauses queue)
-    let num_clauses () = CQueue.length queue
   end
 
   type stats = int * int * int

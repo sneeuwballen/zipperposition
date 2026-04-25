@@ -277,6 +277,9 @@ module Make (E : Env.S) = struct
         ))
 
   let given_clause ?(generating = true) ?steps ?timeout () =
+    let@ _sp =
+      Trace.with_span ~__FILE__ ~__LINE__ "saturate.given-clause-algo"
+    in
     if CCOpt.is_some !e_path then EInterface.set_e_bin (CCOpt.get_exn !e_path);
 
     (* num: number of steps done so far *)

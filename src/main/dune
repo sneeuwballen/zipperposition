@@ -4,6 +4,7 @@
  (name zipperposition)
  (package zipperposition)
  (public_name zipperposition)
+ (flags :standard -open Logtk_common)
  (promote
   (until-clean)
   (into ../..))
@@ -11,6 +12,7 @@
  (libraries
   logtk
   libzipperposition.phases
+  logtk.common
   (select
    setup_trace.ml
    from

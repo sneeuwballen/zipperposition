@@ -154,6 +154,7 @@ let check_step ?dot_prefix (p : proof) : check_step_res =
 
 let check ?dot_prefix ?(before_check = fun _ -> ()) ?(on_check = fun _ _ -> ())
     (p : proof) : res * stats =
+  let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "llproof.check" in
   let tbl = P.Tbl.create 64 in
   let stats =
     ref
@@ -167,8 +168,13 @@ let check ?dot_prefix ?(before_check = fun _ -> ()) ?(on_check = fun _ _ -> ())
       }
   in
   let upd_stats f = stats := f !stats in
-  let rec check (p : proof) : unit =
+  let to_check = Queue.create () in
+  Queue.push p to_check;
+
+  while not (Queue.is_empty to_check) do
+    let p = Queue.pop to_check in
     if not (P.Tbl.mem tbl p) then (
+      let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "llproof.check.step" in
       before_check p;
       Util.debugf ~section 3 "(@[@{<Yellow>start_checking_proof@}@ %a@])"
         (fun k -> k P.pp p);
@@ -208,10 +214,9 @@ let check ?dot_prefix ?(before_check = fun _ -> ()) ?(on_check = fun _ _ -> ())
                    s.n_skip_trivial);
             }));
       (* now check premises *)
-      List.iter check (P.premises p)
+      List.iter (fun p -> Queue.push p to_check) (P.premises p)
     )
-  in
-  check p;
+  done;
   if !stats.n_fail = 0 then
     R_ok, !stats
   else

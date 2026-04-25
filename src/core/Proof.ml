@@ -307,6 +307,7 @@ module Result = struct
     | Some x -> r.res_pp_in o out x
 
   let pp = pp_in Output_format.normal
+  let to_string = Fmt.to_string pp
 
   let flavor (Res (r, x)) =
     match r.res_of_exn x with
@@ -763,15 +764,22 @@ module S = struct
     | `DFS -> traverse_dfs ~traversed proof k
 
   let pp_normal out proof =
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "proof.pp-normal" in
     let sep = "by" in
     Format.fprintf out "@[<v>";
     let pp_bullet out = Format.fprintf out "@<1>@{<Green>*@}" in
     traverse ~order:`DFS proof (fun p ->
+        let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "pp-step" in
+        if Trace.enabled () then
+          Trace.add_data_to_span _sp
+            [ "res", `String (Result.to_string (result p)) ];
+
         Format.fprintf out "@[<hv2>%t @[%a@] %s@ %a@]@," pp_bullet Result.pp
           (result p) sep Step.pp (step p));
     Format.fprintf out "@]"
 
   let pp_tstp out proof =
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "proof.pp-tstp" in
     let module F = TypedSTerm in
     let ctx = Type.Conv.create () in
     let conv_ty ty = Type.Conv.of_simple_term_exn ctx ty in
@@ -820,6 +828,11 @@ module S = struct
     let types = ref ID.Set.empty in
 
     traverse ~order:`DFS proof (fun p ->
+        let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "pp-step" in
+        if Trace.enabled () then
+          Trace.add_data_to_span _sp
+            [ "res", `String (Result.to_string (result p)) ];
+
         let f = Result.to_form (result p) in
         constants :=
           F.Seq.subterms f
@@ -855,6 +868,11 @@ module S = struct
     if !has_comb then declare_combinators ();
 
     traverse ~order:`DFS proof (fun p ->
+        let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "pp-step" in
+        if Trace.enabled () then
+          Trace.add_data_to_span _sp
+            [ "res", `String (Result.to_string (result p)) ];
+
         let p_name = name ~namespace p in
         let parents =
           List.map
@@ -884,10 +902,16 @@ module S = struct
     ()
 
   let pp_zf out proof =
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "proof.pp-zf" in
     let module UA = UntypedAST.A in
     Format.fprintf out "@[<v>";
     let namespace = Tbl.create 8 in
     traverse ~order:`DFS proof (fun p ->
+        let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "pp-step" in
+        if Trace.enabled () then
+          Trace.add_data_to_span _sp
+            [ "res", `String (Result.to_string (result p)) ];
+
         let p_name = name ~namespace p in
         let parents =
           List.map
@@ -932,11 +956,13 @@ module S = struct
 
   (** Prints the proof according to the given input switch *)
   let pp_in o out proof =
-    match o with
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "proof.pp" in
+    (match o with
     | Output_format.O_none -> Util.debug ~section 1 "proof printing disabled"
     | Output_format.O_tptp -> pp_tstp out proof
     | Output_format.O_normal -> pp_normal out proof
-    | Output_format.O_zf -> pp_zf out proof
+    | Output_format.O_zf -> pp_zf out proof);
+    Fmt.pp_print_flush out ()
 
   let _pp_list_str = Util.pp_list CCFormat.string
   let _to_str_escape fmt = Util.ksprintf_noc ~f:Util.escape_dot fmt

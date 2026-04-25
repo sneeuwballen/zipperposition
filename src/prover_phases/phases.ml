@@ -118,6 +118,11 @@ let bind x ~f st =
   | E.Ok (st, x) -> f x st
   | E.Error msg -> E.Error msg (*  cut evaluation *)
 
+let with_span ~__FILE__ ~__LINE__ name x =
+ fun st ->
+  let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ name in
+  x _sp st
+
 let bind_err e ~f st =
   match e with
   | E.Ok x -> f x st
@@ -162,7 +167,11 @@ let return_phase x = return_phase_err (E.Ok x)
 
 let with_phase1 p ~f x =
   start_phase p >>= fun () ->
+  let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "phases.phase" in
+  Trace.add_data_to_span _sp
+    [ "p", `String (string_of_any_phase (Any_phase p)) ];
   let y = f x in
+
   return_phase y
 
 let with_phase p ~f = with_phase1 p ~f ()
@@ -181,7 +190,7 @@ let set_key k v st =
   let st = Flex_state.add k v st in
   E.Ok (st, ())
 
-let run_parallel l =
+let run_and_discard_l l =
   let rec aux = function
     | [] -> return 0
     | [ a ] -> a
@@ -201,6 +210,7 @@ let update ~f st =
   E.Ok (st, ())
 
 let run_with st m =
+  let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "phases.run" in
   try m st
   with e ->
     let stack = Printexc.get_backtrace () in

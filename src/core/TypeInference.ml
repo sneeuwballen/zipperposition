@@ -1233,6 +1233,7 @@ let infer_statements_exn ?def_as_rewrite ?on_var ?on_undef ?on_shadow ?ctx ?file
 
 let infer_statements ?def_as_rewrite ?on_var ?on_undef ?on_shadow ?ctx ?file
     ~implicit_ty_args seq =
+  let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "type-infer.statements" in
   try
     Err.return
       (infer_statements_exn ?def_as_rewrite ?on_var ?on_undef ?on_shadow ?ctx
