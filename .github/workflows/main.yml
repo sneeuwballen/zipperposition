@@ -25,3 +25,6 @@ jobs:
       - run: opam install -t . --deps-only
       - run: opam exec -- dune build @install --profile=release
       - run: opam exec -- dune runtest --profile=release
+
+      - run: opam install trace-tef
+      - run: opam exec -- dune build @install --profile=release
