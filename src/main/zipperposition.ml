@@ -12,7 +12,7 @@ let section = Libzipperposition.Const.section
 let phases = Phases_impl.main_cli ~setup_gc:true ()
 
 let () =
-  ZProf.setup ();
+  Setup_trace.with_setup () @@ fun () ->
   match Phases.run phases with
   | CCResult.Error msg ->
     print_endline msg;
@@ -20,7 +20,7 @@ let () =
   | CCResult.Ok (_, 0) -> ()
   | CCResult.Ok (_, errcode) -> exit errcode (* failure *)
 
-let _ =
+let () =
   at_exit (fun () ->
       Util.debugf ~section 1 "run time: %.3f" (fun k ->
           k (Util.total_time_s ()));
