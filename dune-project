@@ -25,7 +25,7 @@
   (containers-data (and (>= "3.0") (< "4.0")))
   (iter (>= "1.2"))
   (menhir :build)
-  (trace-core (>= 0.11))
+  (trace (>= 0.11))
   (alcotest :with-test)
   (qcheck-core (and :with-test (>= "0.9")))
   (qcheck-alcotest (and :with-test (>= "0.9"))))
