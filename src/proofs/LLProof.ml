@@ -268,6 +268,7 @@ module Dot = struct
 
   let pp_dot_seq_file ?(name = "llproof") filename seq =
     (* print graph on file *)
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "llproof.pp-dot" in
     Util.debugf ~section 1 "print LLProof graph to@ `%s`" (fun k -> k filename);
     CCIO.with_out filename (fun oc ->
         let out = Format.formatter_of_out_channel oc in
