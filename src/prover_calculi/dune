@@ -2,5 +2,5 @@
  (name libzipperposition_calculi)
  (public_name libzipperposition.calculi)
  (synopsis "calculi for the Zipperposition theorem prover")
- (libraries libzipperposition libzipperposition.avatar)
- (flags :standard -w -32))
+ (libraries libzipperposition libzipperposition.avatar logtk.common)
+ (flags :standard -w -32 -open Logtk_common))

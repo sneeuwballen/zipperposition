@@ -28,7 +28,6 @@ type stats = {
 }
 
 let section = LLProof.section
-let prof_check = ZProf.make "llproof.check.step"
 let stat_check = Util.mk_stat "llproof.check.step"
 
 let pp_res out = function
@@ -117,7 +116,8 @@ let prove ~dot_prefix (a : form list) (b : form) =
         Fmt.fprintf out "%a@." LLProver.pp_dot final_state));
   conv_res res
 
-let check_step_ ?dot_prefix (p : proof) : check_step_res =
+let check_step ?dot_prefix (p : proof) : check_step_res =
+  let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "llproof.check-step" in
   let concl = P.concl p in
   Util.incr_stat stat_check;
   match P.step p with
@@ -151,9 +151,6 @@ let check_step_ ?dot_prefix (p : proof) : check_step_res =
       CS_check (prove ~dot_prefix all_premises concl)
     ) else
       CS_skip `Tags
-
-let check_step ?dot_prefix p =
-  ZProf.with_prof prof_check (check_step_ ?dot_prefix) p
 
 let check ?dot_prefix ?(before_check = fun _ -> ()) ?(on_check = fun _ _ -> ())
     (p : proof) : res * stats =

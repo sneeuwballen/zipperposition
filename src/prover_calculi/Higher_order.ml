@@ -26,10 +26,6 @@ let stat_ho_unif_steps = Util.mk_stat "ho.unif.steps"
 let stat_neg_ext = Util.mk_stat "ho.neg_ext_success"
 let stat_ext_dec = Util.mk_stat "sup.ext_dec calls"
 let stat_ext_inst = Util.mk_stat "sup.ext_inst calls"
-let prof_eq_res = ZProf.make "ho.eq_res"
-let prof_eq_res_syn = ZProf.make "ho.eq_res_syntactic"
-let prof_ext_dec = ZProf.make "sup.ext_dec"
-let prof_ho_unif = ZProf.make "ho.unif"
 let stat_complete_eq = Util.mk_stat "ho.complete_eq.steps"
 let k_ext_pos = Flex_state.create_key ()
 let k_ext_pos_all_lits = Flex_state.create_key ()
@@ -1005,7 +1001,8 @@ module Make (E : Env.S) : S with module Env = E = struct
     else
       []
 
-  let ext_eqres_aux c =
+  let ext_eqres c =
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "HO.ext_eqres" in
     let eligible = C.Eligible.always in
 
     if ext_rule_eligible c then (
@@ -1074,8 +1071,6 @@ module Make (E : Env.S) : S with module Env = E = struct
       res
     ) else
       []
-
-  let ext_eqres given = ZProf.with_prof prof_ext_dec ext_eqres_aux given
 
   let insert_into_ext_dec_index index (c, pos, t) =
     let key = T.head_exn t in
@@ -1729,6 +1724,7 @@ module Make (E : Env.S) : S with module Env = E = struct
   (* HO unification of constraints *)
   let ho_unif (c : C.t) : C.t list =
     if C.lits c |> CCArray.exists Literal.is_ho_constraint then (
+      let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "HO.ho-unif" in
       (* separate constraints from the rest *)
       let pairs, others =
         C.lits c |> Array.to_list
@@ -1738,11 +1734,8 @@ module Make (E : Env.S) : S with module Env = E = struct
                `Left ([], t, u)
              | lit -> `Right lit)
       in
-      assert (pairs <> []);
-      let _span = ZProf.enter_prof prof_ho_unif in
-      let r = ho_unif_real_ c pairs others in
-      ZProf.exit_prof _span;
-      r
+       assert (pairs <> []);
+       ho_unif_real_ c pairs others 
     ) else
       []
 

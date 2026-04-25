@@ -8,7 +8,6 @@ module US = Unif_subst
 
 let stat_unif_calls = Util.mk_stat "ho_unif.calls"
 let stat_unif_steps = Util.mk_stat "ho_unif.steps"
-let prof_norm_subst = ZProf.make "ho_unif.norm_subst"
 let section = Util.Section.make "ho_unif"
 
 type term = Term.t
@@ -771,7 +770,7 @@ module U = struct
     done
 
   (* normalize substitution *)
-  let norm_subst_ offset sc (us : US.t) () : US.t =
+  let norm_subst_ offset sc (us : US.t) : US.t =
     US.map_subst us ~f:(fun subst ->
         Subst.normalize subst
         |> Subst.FO.filter (fun (v, sc_v) (t, sc_t) ->
@@ -790,7 +789,8 @@ module U = struct
 
   let norm_subst offset sc us =
     if !enable_norm_subst then
-      ZProf.with_prof prof_norm_subst (norm_subst_ offset sc us) ()
+      let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "ho_unif.norm_subst" in
+      norm_subst_ offset sc us
     else
       us
 

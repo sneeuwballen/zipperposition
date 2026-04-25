@@ -13,7 +13,6 @@ type res =
 
 let section = LLProof.section
 let stat_solve = Util.mk_stat "llproof.prove"
-let prof_check = ZProf.make "llproof.prove"
 
 (** Congruence Closure *)
 module CC = Congruence.Make (struct
@@ -383,18 +382,18 @@ let can_check : LLProof.tag list -> bool =
   List.for_all f
 
 let prove (a : form list) (b : form) =
+  let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "llproof.prove" in
   Util.debugf ~section 3
     "(@[@{<yellow>llprover.prove@}@ :hyps (@[<hv>%a@])@ :concl %a@])" (fun k ->
       k (Util.pp_list T.pp) a T.pp b);
   Util.incr_stat stat_solve;
-  let _span = ZProf.enter_prof prof_check in
+  let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "llprover.prove" in
   (* prove [a ∧ -b ⇒ ⊥] *)
   let b_init = Branch.add (Branch.root ()) (F.not_ b :: a) in
   let tab =
     { open_branches = [ b_init ]; closed_branches = []; saturated = None }
   in
   let res = solve_ tab in
-  ZProf.exit_prof _span;
   res, tab
 
 let pp_stats out (s : final_state) =
@@ -406,6 +405,7 @@ let pp_stats out (s : final_state) =
 let _to_str_escape fmt = Util.ksprintf_noc ~f:Util.escape_dot fmt
 
 let pp_dot out (s : final_state) : unit =
+  let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "llproof.pp-dot" in
   let module ISet = Util.Int_set in
   let as_graph =
     CCGraph.make (fun b ->

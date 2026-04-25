@@ -6,14 +6,6 @@ module Prec = Precedence
 module MT = Multiset.Make (Term)
 module W = Precedence.Weight
 module C = Comparison
-
-let prof_rpo = ZProf.make "compare_rpo"
-let prof_kbo = ZProf.make "compare_kbo"
-let prof_epo = ZProf.make "compare_epo"
-let prof_lambdafree_kbo_coeff = ZProf.make "compare_lambdafree_kbo_coeff"
-let prof_lambda_kbo = ZProf.make "compare_lambda_kbo"
-let prof_lambda_lpo = ZProf.make "compare_lambda_lpo"
-
 module T = Term
 module TC = Term.Classic
 
@@ -532,10 +524,8 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
     res
 
   let compare_terms ~prec x y =
-    let _span = ZProf.enter_prof prof_kbo in
-    let res = try kbo ~prec x y with UnsupportedTerm -> Incomparable in
-    ZProf.exit_prof _span;
-    res
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "order.kbo" in
+    try kbo ~prec x y with UnsupportedTerm -> Incomparable
 
   let cannot_flip s t =
     assert (Type.equal (Term.ty s) (Term.ty t));
@@ -668,10 +658,8 @@ module MakeRPO (P : PARAMETERS) : ORD = struct
       | _ -> alpha ~prec ss' t)
 
   let compare_terms ~prec x y =
-    let _span = ZProf.enter_prof prof_rpo in
-    let compare = rpo6 ~prec x y in
-    ZProf.exit_prof _span;
-    compare
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "order.rpo" in
+    rpo6 ~prec x y
 
   (* The ordering might flip if one side is a lambda-expression or
      variable-headed or if the orientation is established using the subterm
@@ -832,10 +820,8 @@ module EPO : ORD = struct
     | [], _ :: _ -> Lt
 
   let compare_terms ~prec x y =
-    let _span = ZProf.enter_prof prof_epo in
-    let compare = epo ~prec (x, []) (y, []) in
-    ZProf.exit_prof _span;
-    compare
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "order.epo" in
+    epo ~prec (x, []) (y, [])
 
   let might_flip _ _ _ = false
 end
@@ -980,10 +966,10 @@ module LambdaFreeKBOCoeff : ORD = struct
     )
 
   let compare_terms ~prec x y =
-    let _span = ZProf.enter_prof prof_lambdafree_kbo_coeff in
-    let compare = lfhokbo_arg_coeff ~prec x y in
-    ZProf.exit_prof _span;
-    compare
+    let@ _sp =
+      Trace.with_span ~__FILE__ ~__LINE__ "order.lambda-free-kbo-coeff"
+    in
+    lfhokbo_arg_coeff ~prec x y
 
   let might_flip prec t s =
     (* Terms can flip if they have different argument coefficients for remaining arguments. *)
@@ -1496,9 +1482,8 @@ module LambdaKBO : ORD = struct
     consider_weight w (consider_poly t s cmp)
 
   let compare_terms ~prec t s =
-    let _span = ZProf.enter_prof prof_lambda_kbo in
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "order.lambda-kbo" in
     let _, cmp = process_terms ~prec t s in
-    ZProf.exit_prof _span;
     cmp
 
   let might_flip _ t s = not (cannot_flip t s)
@@ -1667,10 +1652,8 @@ module LambdaLPO : ORD = struct
     | App _, _ | _, App _ -> assert false
 
   let compare_terms ~prec t s =
-    let _span = ZProf.enter_prof prof_lambda_lpo in
-    let cmp = do_compare_terms ~prec t s in
-    ZProf.exit_prof _span;
-    cmp
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "order.lambda-lpo" in
+    do_compare_terms ~prec t s
 
   let might_flip prec t s = not (cannot_flip ~prec t s)
 end

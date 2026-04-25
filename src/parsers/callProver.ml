@@ -86,9 +86,15 @@ type result =
 let _find_mem patterns s =
   List.exists (fun p -> CCString.find ~sub:p s >= 0) patterns
 
-let call_with_out ?(timeout = 30) ?(args = []) ~prover decls =
+let call_with_out ?(timeout = 30) ?(args = []) ~(prover : Prover.t) decls =
+  let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "call-prover" in
+  Trace.add_data_to_span _sp [ "prover", `String prover.name ];
+
   (* compute input to give to the prover *)
   let input =
+    let@ _sp =
+      Trace.with_span ~__FILE__ ~__LINE__ "call-prover.serialize-input"
+    in
     CCFormat.sprintf "@[<v>%a@]" (Util.pp_list ~sep:"" (A.pp ST.pp)) decls
   in
   (* build command (add arguments to the end) *)

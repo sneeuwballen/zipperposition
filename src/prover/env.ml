@@ -11,17 +11,6 @@ module IntSet = Set.Make (CCInt)
 
 let section = Util.Section.make ~parent:Const.section "env"
 let stat_inferred = Util.mk_stat "env.inferred clauses"
-let prof_generate = ZProf.make "env.generate"
-let prof_generate_unary = ZProf.make "env.generate_unary"
-let prof_generate_binary = ZProf.make "env.generate_binary"
-let prof_back_simplify = ZProf.make "env.back_simplify"
-let prof_simplify = ZProf.make "env.simplify"
-let prof_multi_simplify = ZProf.make "env.multi_simplify"
-let prof_fwd_simplify = ZProf.make "env.fwd_simplify"
-let prof_all_simplify = ZProf.make "env.all_simplify"
-let prof_is_redundant = ZProf.make "env.is_redundant"
-let prof_subsumed_by = ZProf.make "env.subsumed_by"
-let prof_cheap_multi = ZProf.make "env.cheap_multi_simp"
 
 module type S = Env_intf.S
 (** {2 Signature} *)
@@ -295,7 +284,7 @@ end) : S with module Ctx = X.Ctx = struct
 
   (** do binary inferences that involve the given clause *)
   let do_binary_inferences c =
-    let _span = ZProf.enter_prof prof_generate_binary in
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "env.do-binary-inferences" in
     Util.debugf ~section 5
       "@[<2>do binary inferences with current active set:@ `@[%a@]`@]" (fun k ->
         k C.pp_set (ProofState.ActiveSet.clauses ()));
@@ -308,12 +297,11 @@ end) : S with module Ctx = X.Ctx = struct
           List.rev_append new_clauses acc)
         [] !_binary_rules
     in
-    ZProf.exit_prof _span;
     Iter.of_list clauses
 
   (** do unary inferences for the given clause *)
   let do_unary_inferences c =
-    let _span = ZProf.enter_prof prof_generate_unary in
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "env.do-unary-inferences" in
     Util.debug ~section 3 "do unary inferences";
     (* apply every inference rule *)
     let clauses =
@@ -324,7 +312,6 @@ end) : S with module Ctx = X.Ctx = struct
           List.rev_append new_clauses acc)
         [] !_unary_rules
     in
-    ZProf.exit_prof _span;
     Iter.of_list clauses
 
   let do_generate ~full () =
@@ -587,7 +574,7 @@ end) : S with module Ctx = X.Ctx = struct
 
   let simplify c =
     let open SimplM.Infix in
-    let _span = ZProf.enter_prof prof_simplify in
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "env.simplify" in
     let res =
       fix_simpl c ~f:(fun c ->
           let old_c = c in
@@ -603,11 +590,10 @@ end) : S with module Ctx = X.Ctx = struct
                 k C.pp old_c C.pp c);
           c)
     in
-    ZProf.exit_prof _span;
     res
 
   let multi_simplify ~depth c : (C.t * int) list option =
-    let _span = ZProf.enter_prof prof_multi_simplify in
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "env.multi-simplify" in
     let depth_map = ref (Util.Int_map.singleton (C.id c) depth) in
     let[@inline] get_depth c =
       CCOpt.get_exn @@ Util.Int_map.get (C.id c) !depth_map
@@ -670,7 +656,6 @@ end) : S with module Ctx = X.Ctx = struct
           List.iter (fun c -> Queue.push c q) l
       )
     done;
-    ZProf.exit_prof _span;
     if !did_something then (
       C.mark_redundant c;
       Some (List.map (fun c -> c, get_depth c) (C.ClauseSet.to_list !set))
@@ -690,7 +675,7 @@ end) : S with module Ctx = X.Ctx = struct
 
   (* Perform backward simplification with the given clause *)
   let backward_simplify given =
-    let _span = ZProf.enter_prof prof_back_simplify in
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "env.backward-simplify" in
     (* set of candidate clauses, that may be unit-simplifiable *)
     let candidates = backward_simplify_find_candidates given in
     let back_simplify c =
@@ -730,7 +715,6 @@ end) : S with module Ctx = X.Ctx = struct
             C.ClauseSet.add c before, c' :: after)
         candidates (C.ClauseSet.empty, [])
     in
-    ZProf.exit_prof _span;
     before, Iter.of_list after
 
   let simplify_active_with f =
@@ -765,10 +749,8 @@ end) : S with module Ctx = X.Ctx = struct
   (** Simplify the clause w.r.t to the active set *)
   let forward_simplify c =
     let open SimplM.Infix in
-    let _span = ZProf.enter_prof prof_fwd_simplify in
-    let res = ho_normalize c >>= rewrite >>= rw_simplify >>= unary_simplify in
-    ZProf.exit_prof _span;
-    res
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "env.forward-simplify" in
+    ho_normalize c >>= rewrite >>= rw_simplify >>= unary_simplify
 
   let _apply_multi_rules ~rule_list c =
     let rec apply_rules ~rules c =
@@ -795,9 +777,8 @@ end) : S with module Ctx = X.Ctx = struct
     !res, !any_simplified
 
   let cheap_multi_simplify c =
-    let _span = ZProf.enter_prof prof_cheap_multi in
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "env.cheap-multi-simplify" in
     let res, any_simplified = _apply_multi_rules ~rule_list:!_cheap_msr c in
-    ZProf.exit_prof _span;
 
     if any_simplified then
       Some res
@@ -806,7 +787,7 @@ end) : S with module Ctx = X.Ctx = struct
 
   (** generate all clauses from inferences *)
   let generate given =
-    let _span = ZProf.enter_prof prof_generate in
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "env.generate" in
     (* binary clauses *)
     let binary_clauses = do_binary_inferences given in
     (* unary inferences *)
@@ -836,11 +817,11 @@ end) : S with module Ctx = X.Ctx = struct
         append (of_list !unary_clauses) (append binary_clauses other_clauses))
     in
     Util.add_stat stat_inferred (Iter.length result);
-    ZProf.exit_prof _span;
     result
 
   (* check whether the clause is redundant w.r.t the current active_set *)
   let is_redundant_ c =
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "env.is-redundant" in
     let res =
       match !_redundant with
       | [] -> false
@@ -851,12 +832,11 @@ end) : S with module Ctx = X.Ctx = struct
     if res then C.mark_redundant c;
     res
 
-  let is_redundant c =
-    C.is_redundant c || ZProf.with_prof prof_is_redundant is_redundant_ c
+  let is_redundant c = C.is_redundant c || is_redundant_ c
 
   (** find redundant clauses in current active_set *)
   let subsumed_by c =
-    let _span = ZProf.enter_prof prof_subsumed_by in
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "env.subsumed-by" in
     let res =
       List.fold_left
         (fun set rule -> rule set c)
@@ -864,7 +844,6 @@ end) : S with module Ctx = X.Ctx = struct
     in
     (* all those clauses are redundant *)
     C.ClauseSet.iter C.mark_redundant res;
-    ZProf.exit_prof _span;
     res
 
   (** Use all simplification rules to convert a clause into a list of maximally
@@ -873,7 +852,7 @@ end) : S with module Ctx = X.Ctx = struct
       Stop applying mutlti_simpl rules after a certain depth. Especially
       dangerous rules are the ones that do boolean hoisting as simplification *)
   let all_simplify c =
-    let _span = ZProf.enter_prof prof_all_simplify in
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "env.all-simplify" in
     let did_simplify = ref false in
     let set = ref C.ClauseSet.empty in
     let q = Queue.create () in
@@ -909,7 +888,6 @@ end) : S with module Ctx = X.Ctx = struct
       )
     done;
     let res = C.ClauseSet.to_list !set in
-    ZProf.exit_prof _span;
     if !did_simplify then
       SimplM.return_new res
     else

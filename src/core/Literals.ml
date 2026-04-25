@@ -10,8 +10,6 @@ module Lit = Literal
 type term = Term.t
 type t = Literal.t array
 
-let prof_maxlits = ZProf.make "lits.maxlits"
-
 let equal lits1 lits2 =
   let rec check i =
     if i = Array.length lits1 then
@@ -129,24 +127,16 @@ let _to_multiset_with_idx lits =
 
 (* TODO: optimize! quite a bottleneck on pb47.p with NoSelection *)
 let maxlits_l ~ord lits =
-  let _span = ZProf.enter_prof prof_maxlits in
+  let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "literals.maxlits" in
   let m = _to_multiset_with_idx lits in
-  let max =
-    MLI.max_seq (_compare_lit_with_idx ~ord) m |> Iter.map fst |> Iter.to_list
-  in
-  ZProf.exit_prof _span;
-  max
+  MLI.max_seq (_compare_lit_with_idx ~ord) m |> Iter.map fst |> Iter.to_list
 
 let maxlits ~ord lits =
-  let _span = ZProf.enter_prof prof_maxlits in
+  let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "literals.maxlits" in
   let m = _to_multiset_with_idx lits in
-  let max =
-    MLI.max_seq (_compare_lit_with_idx ~ord) m
-    |> Iter.map (fun (x, _) -> snd x)
-    |> Iter.to_list |> BV.of_list
-  in
-  ZProf.exit_prof _span;
-  max
+  MLI.max_seq (_compare_lit_with_idx ~ord) m
+  |> Iter.map (fun (x, _) -> snd x)
+  |> Iter.to_list |> BV.of_list
 
 let is_max ~ord lits =
   (*

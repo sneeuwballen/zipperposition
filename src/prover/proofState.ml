@@ -14,8 +14,6 @@ module Pos = Position
 module PB = Position.Build
 module CQ = ClauseQueue
 
-let prof_next_passive = ZProf.make "proofState.next_passive"
-
 module type S = ProofState_intf.S
 (** {2 Set of active clauses} *)
 
@@ -124,7 +122,8 @@ module Make (C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
       let p = ClauseQueue.get_profile () in
       CQueue.of_profile p
 
-    let next_ () =
+    let next () =
+      let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "proof-state.next" in
       if CQueue.is_empty queue then
         None
       else (
@@ -135,8 +134,6 @@ module Make (C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
           Some x
         with Not_found -> None
       )
-
-    let next () = ZProf.with_prof prof_next_passive next_ ()
 
     let remove seq =
       seq (fun c ->

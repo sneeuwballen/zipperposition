@@ -8,7 +8,6 @@ module Lit = Literal
 open AC_intf
 
 let section = Util.Section.make "AC"
-let prof_simplify = ZProf.make "AC.simplify"
 let stat_ac_simplify = Util.mk_stat "AC.simplify"
 let stat_ac_redundant = Util.mk_stat "AC.redundant"
 
@@ -128,7 +127,7 @@ module Make (Env : Env.S) : S with module Env = Env = struct
 
   (* simplify: remove literals that are redundant modulo AC *)
   let simplify c =
-    let _span = ZProf.enter_prof prof_simplify in
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "prover.ac.simplify" in
     if exists_ac () then (
       let n = Array.length (C.lits c) in
       let lits = Array.to_list (C.lits c) in
@@ -157,20 +156,15 @@ module Make (Env : Env.S) : S with module Env = Env = struct
         let new_c =
           C.create ~trail:(C.trail c) ~penalty:(C.penalty c) lits proof
         in
-        ZProf.exit_prof _span;
         Util.incr_stat stat_ac_simplify;
         Util.debugf ~section 3 "@[<2>@[%a@]@ AC-simplify into @[%a@]@]"
           (fun k -> k C.pp c C.pp new_c);
         SimplM.return_new new_c
-      ) else (
+      ) else
         (* no simplification *)
-        ZProf.exit_prof _span;
         SimplM.return_same c
-      )
-    ) else (
-      ZProf.exit_prof _span;
+    ) else
       SimplM.return_same c
-    )
 
   let install_rules_ () =
     Env.add_is_trivial is_trivial;
