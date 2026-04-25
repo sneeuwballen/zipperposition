@@ -7,14 +7,6 @@ module F = T.Form
 module Stmt = Statement
 module Fmt = CCFormat
 
-let prof_estimate = ZProf.make "cnf.estimate_num_clauses"
-let prof_simplify_rename = ZProf.make "cnf.simplify_rename"
-let prof_flatten = ZProf.make "cnf.flatten"
-let prof_to_cnf = ZProf.make "cnf.distribute"
-let prof_miniscope = ZProf.make "cnf.miniscope"
-let prof_skolemize = ZProf.make "cnf.skolemize"
-let section = Util.Section.make "cnf"
-
 type term = T.t
 type type_ = T.t
 type form = F.t
@@ -22,6 +14,8 @@ type lit = term SLiteral.t
 
 exception Error of string
 exception NotCNF of form
+
+let section = Util.Section.make "cnf"
 
 let () =
   Printexc.register_printer (function
@@ -495,7 +489,7 @@ end
 
 (* miniscoping (push quantifiers as deep as possible in the formula) *)
 let miniscope ?(distribute_exists = false) f =
-  let _span = ZProf.enter_prof prof_miniscope in
+  let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "cnf.miniscope" in
   (* recursive miniscoping *)
   let rec miniscope f =
     match F.view f with
@@ -538,9 +532,7 @@ let miniscope ?(distribute_exists = false) f =
     | F.Not f' -> F.not_ (miniscope f')
     | F.True | F.False | F.Neq _ | F.Eq _ | F.Atom _ -> f
   in
-  let res = miniscope f in
-  ZProf.exit_prof _span;
-  res
+  miniscope f
 
 (* negation normal form (also remove equivalence and implications). *)
 let rec nnf f =
@@ -616,7 +608,7 @@ let rec nnf f =
   | F.Exists (var, f') -> F.exists var (nnf f')
 
 let skolemize ~ctx f =
-  let _span = ZProf.enter_prof prof_skolemize in
+  let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "cnf.skolemize" in
   let rec skolemize subst f =
     match F.view f with
     | F.And l -> F.and_ (List.map (skolemize subst) l)
@@ -640,9 +632,7 @@ let skolemize ~ctx f =
       let subst = Var.Subst.add subst var (T.var var') in
       skolemize subst f'
   in
-  let res = skolemize f in
-  ZProf.exit_prof _span;
-  res
+  skolemize f
 
 (* For the following, we use "handbook of automated reasoning",
    chapter "compute small clause normal forms". We use a naive computation
@@ -687,7 +677,7 @@ end
 
 (* estimate the number of clauses needed by this formula. *)
 let estimate_num_clauses ~pos f =
-  let _span = ZProf.enter_prof prof_estimate in
+  let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "cnf.estimate-num-clauses" in
   let module E = Estimation in
   (* recursive function.
      @param pos true if the formula is positive, false if it's negated *)
@@ -721,9 +711,7 @@ let estimate_num_clauses ~pos f =
     | [] -> E.Exactly 1
     | x :: tail -> E.(num pos x */ prod_list pos tail)
   in
-  let n = num pos f in
-  ZProf.exit_prof _span;
-  n
+  num pos f
 
 (* atomic formula, or forall/exists/not an atomic formula (1 literal) *)
 let rec will_yield_lit f =
@@ -918,8 +906,8 @@ let rec to_cnf_rec f =
       T.pp f
 
 let to_cnf f =
-  let res = ZProf.with_prof prof_to_cnf to_cnf_rec f in
-  res
+  let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "cnf.to.cnf" in
+  to_cnf_rec f
 
 type options =
   | LazyCnf
@@ -1060,7 +1048,7 @@ let is_rw stmt =
 
 (* simplify formulas and rename them. May introduce new formulas *)
 let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
-  let _span = ZProf.enter_prof prof_simplify_rename in
+  let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "cnf.simplify-rename" in
   (* process a formula *)
   let process_form ~is_goal stmt f =
     Util.debugf ~section 2 "@[<2>simplify and rename@ `@[%a@]`@]" (fun k ->
@@ -1156,7 +1144,6 @@ let simplify_and_rename ~ctx ~disable_renaming ~preprocess seq =
            | l -> Iter.of_list (List.rev (new_st :: l)))
     |> CCVector.of_iter ?init:None
   in
-  ZProf.exit_prof _span;
   res
 
 type f_statement = (term, term, type_) Statement.t

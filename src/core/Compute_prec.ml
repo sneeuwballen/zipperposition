@@ -4,7 +4,6 @@
 
 module T = Term
 
-let prof_mk_prec = ZProf.make "mk_precedence"
 let section = Util.Section.(make ~parent:root) "compute_prec"
 let _alpha_precedence = ref false
 let _custom_weights = ref ""
@@ -107,7 +106,7 @@ let force_const_weight ~weight ~signature = function
   | None -> weight
 
 let mk_precedence ~db_w ~lmb_w ~signature t seq =
-  let _span = ZProf.enter_prof prof_mk_prec in
+  let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "compute-prec" in
   (* set of symbols *)
   let symbols =
     seq
@@ -140,7 +139,6 @@ let mk_precedence ~db_w ~lmb_w ~signature t seq =
   let p = Precedence.create ~weight ~arg_coeff ~db_w ~lmb_w constr symbols in
   (* multiset status *)
   List.iter (fun (s, status) -> Precedence.declare_status p s status) t.status;
-  ZProf.exit_prof _span;
   p
 
 let () =

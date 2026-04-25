@@ -12,7 +12,6 @@ let stat_narrow_fail = Util.mk_stat "test_prop.narrow.fails"
 let stat_narrow_ok = Util.mk_stat "test_prop.narrow.ok"
 let stat_narrow_step_term = Util.mk_stat "test_prop.narrow.steps_term"
 let stat_narrow_step_lit = Util.mk_stat "test_prop.narrow.steps_lit"
-let prof_narrow = ZProf.make "test_prop.narrow"
 
 type term = T.t
 type lit = Literal.t
@@ -195,7 +194,10 @@ end
 let default_limit = Narrow.default_limit
 
 let check_form ?(limit = Narrow.default_limit) (f : form) : res =
-  ZProf.with_prof prof_narrow (Narrow.check_form ~limit) f
+  let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "induction.test-prop.narrow" in
+  Trace.add_data_to_span _sp [ "limit", `Int limit ];
+
+  Narrow.check_form ~limit f
 
 (* [t] head symbol is a function that is not a constructor *)
 let starts_with_fun (t : T.t) : bool =

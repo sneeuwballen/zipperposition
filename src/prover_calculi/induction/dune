@@ -2,5 +2,9 @@
  (name libzipperposition_induction)
  (public_name libzipperposition.induction)
  (synopsis "Induction calculus for the Zipperposition theorem prover")
- (libraries libzipperposition libzipperposition.avatar logtk.arith)
- (flags :standard -w -32 -open Logtk_arith))
+ (libraries
+  libzipperposition
+  libzipperposition.avatar
+  logtk.arith
+  logtk.common)
+ (flags :standard -w -32 -open Logtk_arith -open Logtk_common))

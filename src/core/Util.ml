@@ -229,13 +229,13 @@ end
 
 (* TODO cleanup, make hierarchic *)
 
-type stat = string * int64 ref
+type stat = string * int Atomic.t
 
 let mk_stat, print_global_stats =
   let stats = ref [] in
   (* create a stat *)
   ( (fun name ->
-      let stat = name, ref 0L in
+      let stat : stat = name, Atomic.make 0 in
       stats := stat :: !stats;
       stat),
     (* print stats *)
@@ -245,17 +245,18 @@ let mk_stat, print_global_stats =
       in
       List.iter
         (fun (name, cnt) ->
-          Format.printf "%sstat: %-35s ... %Ld@." comment name !cnt)
+          Format.printf "%sstat: %-35s ... %d@." comment name (Atomic.get cnt))
         stats )
 
 (** increment given statistics *)
-let incr_stat (_, count) = count := Int64.add !count Int64.one
+let[@inline] incr_stat (_, count) = Atomic.incr count
 
 (** add to stat *)
-let add_stat (_, count) num = count := Int64.add !count (Int64.of_int num)
+let[@inline] add_stat (_, count) num =
+  ignore (Atomic.fetch_and_add count num : int)
 
 let pp_stat out (name, count) =
-  Format.fprintf out "%s-%d" name (CCInt64.to_int !count)
+  Format.fprintf out "%s-%d" name (Atomic.get count)
 
 (** {Flags as integers} *)
 
@@ -377,6 +378,10 @@ type 'a or_error = ('a, string) CCResult.t
 
 (** Call given command with given output, and return its output as a string *)
 let popen ~cmd ~input : _ or_error =
+  let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "popen" in
+  Trace.add_data_to_span _sp
+    [ "cnd", `String cmd; "input.size", `Int (String.length input) ];
+
   try
     let from, into = Unix.open_process cmd in
     (* send input to the subprocess *)

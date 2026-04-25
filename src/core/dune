@@ -12,8 +12,10 @@
   unix
   mtime
   mtime.clock.os
+  atomic
+  logtk.common
   logtk.arith)
- (flags :standard -w -32-50 -open Logtk_arith)
+ (flags :standard -w -32-50 -open Logtk_arith -open Logtk_common)
  (foreign_stubs
   (language c)
   (names util_stubs)

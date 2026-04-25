@@ -3,8 +3,8 @@
  (public_name logtk.parsers)
  (synopsis "parsers for logtk")
  (optional)
- (libraries containers logtk logtk.arith)
- (flags :standard -warn-error -32 -open Logtk_arith)
+ (libraries containers logtk logtk.arith logtk.common)
+ (flags :standard -warn-error -32 -open Logtk_arith -open Logtk_common)
  (ocamlopt_flags :standard -Oclassic))
 
 (menhir

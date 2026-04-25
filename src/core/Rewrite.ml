@@ -7,9 +7,7 @@ module Fmt = CCFormat
 
 let section = Util.Section.make "rewrite"
 let stat_term_rw = Util.mk_stat "rw.steps_term"
-let prof_term_rw = ZProf.make "rw.term"
 let stat_lit_rw = Util.mk_stat "rw.steps_lit"
-let prof_lit_rw = ZProf.make "rw.lit"
 
 (* do we rewrite literals of the form [t = u]? *)
 let allow_pos_eqn_rewrite_ = ref false
@@ -430,7 +428,8 @@ module Term = struct
     reduce t0 (fun t -> t, !set)
 
   let normalize_term ?(max_steps = 3) (t : term) : term * Rule_inst_set.t =
-    ZProf.with_prof prof_term_rw (normalize_term_ max_steps) t
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "term.rw.normalize" in
+    normalize_term_ max_steps t
 
   let normalize_term_fst ?max_steps t = fst (normalize_term ?max_steps t)
 
@@ -590,7 +589,8 @@ module Lit = struct
            | Some (subst, tags) -> Some (r, subst, tags))
 
   (* try to rewrite this literal, returning a list of list of lits instead *)
-  let normalize_clause_ (lits : Literals.t) : _ option =
+  let normalize_clause (lits : Literals.t) : _ option =
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "term.rw.normalize-clause" in
     let eval_ll renaming subst (l, sc) =
       List.map
         (List.map (fun lit -> Literal.apply_subst renaming subst (lit, sc)))
@@ -630,8 +630,6 @@ module Lit = struct
           clause_chunks
       in
       Some (clauses, rule, subst, 1, renaming, tags)
-
-  let normalize_clause lits = ZProf.with_prof prof_lit_rw normalize_clause_ lits
 
   let narrow_lit ?(subst = Unif_subst.empty) ~scope_rules:sc_r (lit, sc_lit) =
     rules_of_lit lit

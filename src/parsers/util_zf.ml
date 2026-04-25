@@ -60,6 +60,7 @@ let parse_stdin () : parser_res =
   parse_lexbuf ~recursive:false lexbuf
 
 let parse_file ?cache ?recursive file : parser_res =
+  let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "zf.parse-file" in
   if file = "stdin" then
     parse_stdin ()
   else (

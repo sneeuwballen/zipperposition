@@ -14,9 +14,6 @@ type 'a printer = Format.formatter -> 'a -> unit
 (** {2 Avatar} *)
 let section = Util.Section.make ~parent:Const.section "avatar"
 
-let prof_splits = ZProf.make "avatar.split"
-let prof_check = ZProf.make "avatar.check"
-let prof_simp_trail = ZProf.make "avatar.simp_trail"
 let stat_splits = Util.mk_stat "avatar.splits"
 let stat_trail_trivial = Util.mk_stat "avatar.trivial_trail"
 let stat_trail_simplify = Util.mk_stat "avatar.simplify_trail"
@@ -154,7 +151,7 @@ module Make (E : Env.S) (Sat : Sat_solver.S) = struct
 
   (* Avatar splitting *)
   let split c =
-    let _span = ZProf.enter_prof prof_splits in
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "avatar.split" in
 
     let should_split c =
       (not @@ Literals.is_trivial (C.lits c))
@@ -184,7 +181,6 @@ module Make (E : Env.S) (Sat : Sat_solver.S) = struct
       Util.debugf ~section 1 "Clause @[%a@] split into:@.@[%a@]@." (fun k ->
           k C.pp c (CCList.pp C.pp) res));
 
-    ZProf.exit_prof _span;
     res
 
   let filter_absurd_trails_ = ref (fun _ -> true)
@@ -277,7 +273,8 @@ module Make (E : Env.S) (Sat : Sat_solver.S) = struct
   exception Trail_is_trivial
 
   (* return [new_trail], [is_trivial] *)
-  let simplify_opt_ (trail : Trail.t) : trail_status =
+  let simplify_opt (trail : Trail.t) : trail_status =
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "avatar.simplify-opt" in
     let n_simpl = ref 0 in
     try
       let trail, removed =
@@ -302,8 +299,6 @@ module Make (E : Env.S) (Sat : Sat_solver.S) = struct
       ) else
         Tr_same
     with Trail_is_trivial -> Tr_trivial
-
-  let simplify_opt trail = ZProf.with_prof prof_simp_trail simplify_opt_ trail
 
   (* simplify the trail of [c] using boolean literals that have been proven *)
   let simplify_trail_ c =
@@ -605,7 +600,9 @@ module Make (E : Env.S) (Sat : Sat_solver.S) = struct
 
   (* Just check the solver *)
   let check_satisfiability ~full () =
-    let _span = ZProf.enter_prof prof_check in
+    let@ _sp =
+      Trace.with_span ~__FILE__ ~__LINE__ "avatar.check-satisfiability"
+    in
     Signal.send before_check_sat ();
     let res =
       match Sat.check ~full () with
@@ -619,7 +616,6 @@ module Make (E : Env.S) (Sat : Sat_solver.S) = struct
         [ c ]
     in
     Signal.send after_check_sat ();
-    ZProf.exit_prof _span;
     res
 
   let register ~split_kind () =

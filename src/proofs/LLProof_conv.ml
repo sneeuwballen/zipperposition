@@ -169,5 +169,6 @@ and conv_parent st step_res intros local_intros tags (parent : Proof.Parent.t) :
   LLProof.p_inst prev_proof inst_intros
 
 let conv (p : Proof.t) : LLProof.t =
+  let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "llprover.proof.conv" in
   let st = { ctx = Term.Conv.create (); tbl = Proof.S.Tbl.create 32 } in
   conv_proof st p

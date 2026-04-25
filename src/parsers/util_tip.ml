@@ -24,6 +24,7 @@ let parse_stdin () : parser_res =
   parse_lexbuf lexbuf
 
 let parse_file file : parser_res =
+  let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "tip.parse-file" in
   if file = "stdin" then
     parse_stdin ()
   else (
