@@ -10,9 +10,6 @@ module Unif = Logtk.Unif
 module type S = Ctx_intf.S
 (** {2 Context for a Proof} *)
 
-let prof_add_signature = ZProf.make "ctx.add_signature"
-let prof_declare_sym = ZProf.make "ctx.declare"
-
 module type PARAMETERS = sig
   val signature : Signature.t
   val ord : Ordering.t
@@ -72,18 +69,16 @@ module Make (X : PARAMETERS) = struct
     ()
 
   let add_signature signature =
-    let _span = ZProf.enter_prof prof_add_signature in
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "ctx.add-signature" in
     let _diff = Signature.diff signature !_signature in
     (* declare new symbols *)
     Signature.iter _diff declare_new_;
-    ZProf.exit_prof _span;
     ()
 
   let declare symb ty =
-    let _span = ZProf.enter_prof prof_declare_sym in
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "ctx.declare" in
     let is_new = not (Signature.mem !_signature symb) in
     if is_new then declare_new_ symb (ty, false);
-    ZProf.exit_prof _span;
     ()
 
   let declare_syms l =

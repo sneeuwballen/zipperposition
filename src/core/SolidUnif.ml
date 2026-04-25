@@ -10,12 +10,6 @@ module US_A = struct
   let pp = US.pp
 end
 
-let prof_flex_same = ZProf.make "su.flex_same"
-let prof_flex_diff = ZProf.make "su.flex_diff"
-let prof_flex_rigid = ZProf.make "su.flex_rigid"
-let prof_cover_rigid = ZProf.make "su.cover_rigid"
-let prof_solidifier = ZProf.make "su.solidifier"
-
 exception NotInFragment = PU.NotInFragment
 exception NotUnifiable = PU.NotUnifiable
 
@@ -110,8 +104,8 @@ struct
       | _ -> t
     in
 
-    let res = ZProf.with_prof prof_solidifier aux t in
-    res
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "su.solidify" in
+    aux t
 
   let all_combs ~combs_limit l =
     let rec aux = function
@@ -231,14 +225,8 @@ struct
         CCList.interleave db_hits rest
     in
 
-    let _span = ZProf.enter_prof prof_cover_rigid in
-    try
-      let res = aux ~depth:0 solids t in
-      ZProf.exit_prof _span;
-      res
-    with CoveringImpossible ->
-      ZProf.exit_prof _span;
-      []
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "su.cover-rigid" in
+    aux ~depth:0 solids t
 
   let collect_flex_flex ~counter ~flex_args t =
     let replace_var ~bvar_tys ~target =
@@ -304,7 +292,7 @@ struct
     aux ~bvar_tys:[] t
 
   let solve_flex_flex_diff ~subst ~counter ~scope lhs rhs =
-    let _span = ZProf.enter_prof prof_flex_diff in
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "su.flex-flex-diff" in
     let lhs =
       solidify @@ Lambda.whnf
       @@ Subst.FO.apply Subst.Renaming.none subst (lhs, scope)
@@ -378,11 +366,10 @@ struct
         US.of_subst subst
       )
     in
-    ZProf.exit_prof _span;
     res
 
   let solve_flex_flex_same ~subst ~counter ~scope lhs rhs =
-    let _span = ZProf.enter_prof prof_flex_same in
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "su.flex-flex-same" in
     let lhs =
       solidify @@ Lambda.whnf
       @@ Subst.FO.apply Subst.Renaming.none subst (lhs, scope)
@@ -429,11 +416,10 @@ struct
         US.of_subst subst
       )
     in
-    ZProf.exit_prof _span;
     res
 
   let cover_flex_rigid ~subst ~counter ~scope flex rigid =
-    let _span = ZProf.enter_prof prof_flex_rigid in
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "su.cover-flex-rigid" in
     assert (T.is_var (T.head_term flex));
     assert (not @@ T.is_app_var rigid);
 
@@ -488,7 +474,6 @@ struct
         )
       )
     in
-    ZProf.exit_prof _span;
     res
 
   let var_conditions s t =

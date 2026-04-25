@@ -3,8 +3,9 @@
  (public_name libzipperposition.phases)
  (synopsis "main for the Zipperposition theorem prover")
  (libraries
+  logtk.common
   libzipperposition
   libzipperposition.calculi
   libzipperposition.avatar
   libzipperposition.induction)
- (flags :standard -w -32))
+ (flags :standard -w -32 -open Logtk_common))

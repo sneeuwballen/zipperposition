@@ -6,8 +6,6 @@ module PB = Position.Build
 module PW = Position.With
 module T = InnerTerm
 
-let prof_ac_normal_form = ZProf.make "term.AC_normal_form"
-
 (** {2 Term} *)
 
 type t = T.t
@@ -893,7 +891,7 @@ module AC (A : AC_SPEC) = struct
     flatten [] l
 
   let normal_form t =
-    let _span = ZProf.enter_prof prof_ac_normal_form in
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "term.ac.normal-form" in
     let rec normalize t =
       match T.view t with
       | T.Const _ | T.Var _ | T.DB _ -> t
@@ -936,9 +934,7 @@ module AC (A : AC_SPEC) = struct
       | T.Bind (b, varty, body) ->
         T.bind ~ty:(T.ty_exn t) ~varty b (normalize body)
     in
-    let t' = normalize t in
-    ZProf.exit_prof _span;
-    t'
+    normalize t
 
   let equal t1 t2 =
     let t1' = normal_form t1 and t2' = normal_form t2 in

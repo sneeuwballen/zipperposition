@@ -12,8 +12,6 @@ module Stmt = Statement
 
 type term = T.t
 
-let prof_detect = ZProf.make "enum_types.detect"
-let prof_instantiate = ZProf.make "enum_types.instantiate_vars"
 let stat_declare = Util.mk_stat "enum_types.declare"
 let stat_simplify = Util.mk_stat "enum_types.simplify"
 let stat_instantiate = Util.mk_stat "enum_types.instantiate_axiom"
@@ -210,7 +208,8 @@ module Make (E : Env.S) : S with module Env = E = struct
 
   (* detect whether the clause [c] is a declaration of a simply-typed EnumType
      with only constants as cases (in other words, a monomorphic finite type) *)
-  let detect_decl_ c =
+  let detect_declaration c =
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "enum-types.detect-decl" in
     let eq_var_ ~var t =
       match T.view t with
       | T.Var v' -> HVar.equal Type.equal var v'
@@ -259,8 +258,6 @@ module Make (E : Env.S) : S with module Env = E = struct
         _check_all_vars ~ty:(T.ty r) ~var [ l ] lits
       | _ -> None
     )
-
-  let detect_declaration c = ZProf.with_prof prof_detect detect_decl_ c
 
   (* retrieve variables that are directly under a positive equation *)
   let vars_under_eq_ lits =
@@ -319,7 +316,10 @@ module Make (E : Env.S) : S with module Env = E = struct
      found be E-unification *)
 
   (* instantiate variables that belong to an enum case *)
-  let instantiate_vars_ c =
+  let instantiate_vars c =
+    let@ _sp =
+      Trace.with_span ~__FILE__ ~__LINE__ "enum-types.instantiate-vars"
+    in
     (* which variables are candidate? depends on a CLI flag *)
     let vars =
       if !_instantiate_shielded then
@@ -365,8 +365,6 @@ module Make (E : Env.S) : S with module Env = E = struct
           in
           Some l)
       vars
-
-  let instantiate_vars c = ZProf.with_prof prof_instantiate instantiate_vars_ c
 
   let instantiate_axiom_ ~ty_s s poly_args decl =
     if ID.Set.mem s decl.decl_symbols then

@@ -11,7 +11,6 @@ module Err = CCResult
 module Subst = Var.Subst
 module Fmt = CCFormat
 
-let prof_infer = ZProf.make "TypeInference.infer"
 let section = Util.Section.(make "ty-infer")
 let _rw_forms_only = ref false
 
@@ -883,29 +882,16 @@ and infer_prop_ ?loc ctx t : T.t =
   t
 
 let infer_exn ctx t =
-  let _span = ZProf.enter_prof prof_infer in
+  let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "type-infer" in
   Util.debugf ~section 50 "@[<2>infer type of@ `@[%a@]`@]" (fun k -> k PT.pp t);
-  try
-    let t = infer_rec ctx t in
-    ZProf.exit_prof _span;
-    t
-  with e ->
-    ZProf.exit_prof _span;
-    raise e
+  infer_rec ctx t
 
 let infer ctx t =
   try Err.return (infer_exn ctx t) with e -> Err.of_exn_trace e
 
 let infer_clause_exn ctx c =
-  let _span = ZProf.enter_prof prof_infer in
-  try
-    let c = List.map (infer_prop_ ctx) c in
-    Ctx.exit_scope ctx;
-    ZProf.exit_prof _span;
-    c
-  with e ->
-    ZProf.exit_prof _span;
-    raise e
+  let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "type-infer.clause" in
+  List.map (infer_prop_ ctx) c
 
 let infer_prop_exn ctx t =
   let t' = infer_exn ctx t in
@@ -1247,6 +1233,7 @@ let infer_statements_exn ?def_as_rewrite ?on_var ?on_undef ?on_shadow ?ctx ?file
 
 let infer_statements ?def_as_rewrite ?on_var ?on_undef ?on_shadow ?ctx ?file
     ~implicit_ty_args seq =
+  let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "type-infer.statements" in
   try
     Err.return
       (infer_statements_exn ?def_as_rewrite ?on_var ?on_undef ?on_shadow ?ctx

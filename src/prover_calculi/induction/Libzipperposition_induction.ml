@@ -36,7 +36,6 @@ let stat_generalize_terms_active_pos =
 
 let stat_assess_goal = Util.mk_stat "induction.assess_goal_calls"
 let stat_assess_goal_ok = Util.mk_stat "induction.assess_goal_ok"
-let prof_check_goal = ZProf.make "induction.check_goal"
 let k_enable : bool Flex_state.key = Flex_state.create_key ()
 let k_ind_depth : int Flex_state.key = Flex_state.create_key ()
 let k_limit_to_active : bool Flex_state.key = Flex_state.create_key ()
@@ -200,7 +199,11 @@ end = struct
      and no inferences among active clauses, just between active clauses and
      those derived from [lemma]. Inferences with trails are dropped because
      the lemma should be inconditionally true. *)
-  let check_not_absurd_or_trivial_ (g : t) : bool =
+  let check_not_absurd_or_trivial (g : t) : bool =
+    let@ _sp =
+      Trace.with_span ~__FILE__ ~__LINE__
+        "induction.check-not-absurd-or-trivial"
+    in
     Util.debugf ~section 2
       "@[<2>@{<green>assess goal@}@ :goal %a@ :max-steps %d@]" (fun k ->
         k pp g max_steps_);
@@ -287,9 +290,6 @@ end = struct
         (fun k -> k pp g C.pp c !n);
       Util.incr_stat stat_absurd_lemmas;
       false
-
-  let check_not_absurd_or_trivial g =
-    ZProf.with_prof prof_check_goal check_not_absurd_or_trivial_ g
 
   (* some checks that [g] should be considered as a goal *)
   let is_acceptable_goal (g : t) : bool =

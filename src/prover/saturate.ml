@@ -13,7 +13,6 @@ module EIntf = Eprover_interface
 let stat_redundant_given = Util.mk_stat "saturate.redundant given clauses"
 let stat_processed_given = Util.mk_stat "saturate.processed given clauses"
 let stat_steps = Util.mk_stat "saturate.steps"
-let prof_step = ZProf.make "saturate.step"
 let section = Util.Section.make ~parent:Const.section "saturate"
 let k_abort_after_fragment_check = Flex_state.create_key ()
 
@@ -114,7 +113,7 @@ module Make (E : Env.S) = struct
 
   (** One iteration of the main loop ("given clause loop") *)
   let given_clause_step ?(generating = true) num =
-    let _span = ZProf.enter_prof prof_step in
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "saturate.step" in
     E.step_init ();
     (* select next given clause *)
     Env.do_clause_eliminate ();
@@ -142,7 +141,6 @@ module Make (E : Env.S) = struct
           "@[<2>inferred @{<green>new clauses@}@ @[<v>%a@]@]" (fun k ->
             k (CCFormat.list Env.C.pp) clauses);
         Env.add_passive (Iter.of_list clauses);
-        ZProf.exit_prof _span;
         Unknown
       )
     | Some c ->
@@ -152,7 +150,7 @@ module Make (E : Env.S) = struct
           k Env.C.pp c);
       Util.debugf ~section 10 "@[proof:@[%a@]@]" (fun k ->
           k Proof.S.pp_tstp (Env.C.proof c));
-      ZProf.message (fun () -> Format.asprintf "given: %a" Env.C.pp_tstp c);
+      Trace.messagef (fun k -> k "given: %a" Env.C.pp_tstp c);
 
       check_clause_ c;
       Util.incr_stat stat_steps;
@@ -166,13 +164,11 @@ module Make (E : Env.S) = struct
         Util.debugf ~section 3 "@[proof:@[%a@]@]" (fun k ->
             k Proof.S.pp_zf (Env.C.proof c));
         Signal.send Env.on_forward_simplified (c, None);
-        ZProf.exit_prof _span;
         Unknown
       | l, _ when List.exists Env.C.is_empty l ->
         (* empty clause found *)
         let proof = Env.C.proof (List.find Env.C.is_empty l) in
         (* not sending any signal, because WE HAVE WON!!! *)
-        ZProf.exit_prof _span;
         Unsat proof
       | c :: l', state ->
         (* put clauses of [l'] back in passive set *)
@@ -186,10 +182,9 @@ module Make (E : Env.S) = struct
         (* assert(not (Env.C.is_redundant c)); *)
 
         (* clause might have been removed *)
-        if Env.C.is_redundant c then (
-          ZProf.exit_prof _span;
+        if Env.C.is_redundant c then
           Unknown
-        ) else (
+        else (
           (* process the clause [c] *)
           let new_clauses = CCVector.create () in
           (* very expensive assert *)
@@ -275,16 +270,16 @@ module Make (E : Env.S) = struct
           Env.add_passive (CCVector.to_iter new_clauses);
           (* test whether the empty clause has been found *)
           match Env.get_some_empty_clause () with
-          | None ->
-            ZProf.exit_prof _span;
-            Unknown
+          | None -> Unknown
           | Some c ->
             let pr = Env.C.proof c in
-            ZProf.exit_prof _span;
             Unsat pr
         ))
 
   let given_clause ?(generating = true) ?steps ?timeout () =
+    let@ _sp =
+      Trace.with_span ~__FILE__ ~__LINE__ "saturate.given-clause-algo"
+    in
     if CCOpt.is_some !e_path then EInterface.set_e_bin (CCOpt.get_exn !e_path);
 
     (* num: number of steps done so far *)

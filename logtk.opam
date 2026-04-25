@@ -25,12 +25,14 @@ depends: [
   "containers-data" {>= "3.0" & < "4.0"}
   "iter" {>= "1.2"}
   "menhir" {build}
+  "atomic"
+  "trace" {>= "0.11"}
   "alcotest" {with-test}
   "qcheck-core" {with-test & >= "0.9"}
   "qcheck-alcotest" {with-test & >= "0.9"}
   "odoc" {with-doc}
 ]
-depopts: ["msat"]
+depopts: ["msat" "trace-tef" "tracy-client"]
 conflicts: [
   "msat" {< "0.8.1" | >= "0.10"}
   "zarith" {< "1.7"}

@@ -12,9 +12,6 @@ let section = RW.section
 let stat_narrowing_lit = Util.mk_stat "narrow.lit_steps"
 let stat_narrowing_term = Util.mk_stat "narrow.term_steps"
 let stat_ctx_narrowing = Util.mk_stat "narrow.ctx_narrow_steps"
-let prof_narrowing_term = ZProf.make "narrow.term"
-let prof_narrowing_lit = ZProf.make "narrow.lit"
-let prof_ctx_narrowing = ZProf.make "narrow.ctx_narrow"
 let max_steps = 500
 let rewrite_before_cnf = ref false
 
@@ -44,7 +41,10 @@ module Make (E : Env_intf.S) = struct
 
   (* simplification rule *)
   (* perform term narrowing in [c] *)
-  let narrow_term_passive_ c : C.t list =
+  let narrow_term_passive c : C.t list =
+    let@ _sp =
+      Trace.with_span ~__FILE__ ~__LINE__ "rewriting.narrow-term-passive"
+    in
     let eligible = C.Eligible.(res c) in
     let sc_rule = 1 in
     let sc_c = 0 in
@@ -93,9 +93,6 @@ module Make (E : Env_intf.S) = struct
                   Some c'))
     |> Iter.to_rev_list
 
-  let narrow_term_passive =
-    ZProf.with_prof prof_narrowing_term narrow_term_passive_
-
   (* XXX: for now, we only do one step, and let Env.multi_simplify
      manage the fixpoint *)
   let simpl_clause c =
@@ -124,7 +121,8 @@ module Make (E : Env_intf.S) = struct
       Some clauses
 
   (* narrowing on literals of given clause, using lits rewrite rules *)
-  let narrow_lits_ c =
+  let narrow_lits c =
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "rewriting.narrow-lits" in
     let eligible = C.Eligible.res c in
     let lits = C.lits c in
     Literals.fold_lits ~eligible lits
@@ -172,8 +170,6 @@ module Make (E : Env_intf.S) = struct
                   List.rev_append clauses acc)
                 acc)
          []
-
-  let narrow_lits lits = ZProf.with_prof prof_narrowing_lit narrow_lits_ lits
 
   (* find positions in rules' LHS *)
   let ctx_narrow_find (s, sc_a) sc_p :
@@ -283,7 +279,10 @@ module Make (E : Env_intf.S) = struct
            | Some cs -> cs @ acc)
          acc
 
-  let contextual_narrowing_ c : C.t list =
+  let contextual_narrowing c : C.t list =
+    let@ _sp =
+      Trace.with_span ~__FILE__ ~__LINE__ "rewriting.contextual-narrowing"
+    in
     (* no literal can be eligible for paramodulation if some are selected.
        This checks if inferences with i-th literal are needed? *)
     let eligible = C.Eligible.param c in
@@ -300,9 +299,6 @@ module Make (E : Env_intf.S) = struct
            []
     in
     new_clauses
-
-  let contextual_narrowing c =
-    ZProf.with_prof prof_ctx_narrowing contextual_narrowing_ c
 
   let setup ?(ctx_narrow = true) ~narrowing ~has_rw () =
     Util.debug ~section 1 "register Rewriting to Env...";

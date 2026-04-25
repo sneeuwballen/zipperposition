@@ -4,8 +4,18 @@
  (name zipperposition)
  (package zipperposition)
  (public_name zipperposition)
+ (flags :standard -open Logtk_common)
  (promote
   (until-clean)
   (into ../..))
  (modes native)
- (libraries logtk libzipperposition.phases))
+ (libraries
+  logtk
+  libzipperposition.phases
+  logtk.common
+  (select
+   setup_trace.ml
+   from
+   (tracy-client tracy-client.trace -> setup_trace.tracy.ml)
+   (trace-tef -> setup_trace.tef.ml)
+   (-> setup_trace.dummy.ml))))

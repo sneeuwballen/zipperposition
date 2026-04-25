@@ -1,0 +1,4 @@
+(library
+ (name logtk_common)
+ (public_name logtk.common)
+ (libraries trace.core))
