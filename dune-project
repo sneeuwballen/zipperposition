@@ -25,10 +25,14 @@
   (containers-data (and (>= "3.0") (< "4.0")))
   (iter (>= "1.2"))
   (menhir :build)
+  (trace-core (>= 0.11))
   (alcotest :with-test)
   (qcheck-core (and :with-test (>= "0.9")))
   (qcheck-alcotest (and :with-test (>= "0.9"))))
- (depopts msat)
+ (depopts
+  msat
+  trace-tef
+  tracy-client)
  (conflicts
   (msat (or (< "0.8.1") (>= "0.10")))
   (zarith (< "1.7"))))
