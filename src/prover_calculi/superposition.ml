@@ -1526,7 +1526,9 @@ module Make (Env : Env.S) : S with module Env = Env = struct
    * ---------------------------------------------------------------------- *)
 
   let infer_fluidsup_active clause =
-    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "sup.infer-fluidsup-active" in
+    let@ _sp =
+      Trace.with_span ~__FILE__ ~__LINE__ "sup.infer-fluidsup-active"
+    in
     (* no literal can be eligible for paramodulation if some are selected.
        This checks if inferences with i-th literal are needed? *)
     let eligible = C.Eligible.param clause in
@@ -1609,7 +1611,9 @@ module Make (Env : Env.S) : S with module Env = Env = struct
     )
 
   let infer_fluidsup_passive clause =
-    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "sup.infer-fluidsup-passive" in
+    let@ _sp =
+      Trace.with_span ~__FILE__ ~__LINE__ "sup.infer-fluidsup-passive"
+    in
     (* perform inference on this lit? *)
     let eligible = C.Eligible.(res clause) in
     (* do the inferences in which clause is passive (rewritten),
@@ -2288,7 +2292,9 @@ module Make (Env : Env.S) : S with module Env = Env = struct
    * ---------------------------------------------------------------------- *)
 
   let extract_from_stream_queue ~full () =
-    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "sup.extract-from-stream-queue" in
+    let@ _sp =
+      Trace.with_span ~__FILE__ ~__LINE__ "sup.extract-from-stream-queue"
+    in
     let cl =
       if full then
         StmQ.take_fair_anyway (Env.get_stm_queue ())
@@ -2301,7 +2307,10 @@ module Make (Env : Env.S) : S with module Env = Env = struct
     | Some l -> l
 
   let extract_from_stream_queue_fix_stm ~full () =
-    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "sup.extract-from-stream-queue-fix-stm" in
+    let@ _sp =
+      Trace.with_span ~__FILE__ ~__LINE__
+        "sup.extract-from-stream-queue-fix-stm"
+    in
     let cl =
       if full then
         StmQ.take_fair_anyway (Env.get_stm_queue ())
@@ -2539,7 +2548,7 @@ module Make (Env : Env.S) : S with module Env = Env = struct
       Term.VarSet.for_all
         (fun v -> HVar.id v >= 0)
         (Literals.vars (C.lits c) |> Term.VarSet.of_list));
-        let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "sup.demodulate" in
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "sup.demodulate" in
 
     Util.incr_stat stat_demodulate_call;
     (* state for storing proofs and scope *)
@@ -2828,7 +2837,7 @@ module Make (Env : Env.S) : S with module Env = Env = struct
   let basic_simplify c =
     if C.get_flag flag_simplified c then
       SimplM.return_same c
-    else (
+    else
       let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "sup.basic-simplify" in
       Util.incr_stat stat_basic_simplify_calls;
       let lits = C.lits c in
@@ -2922,7 +2931,6 @@ module Make (Env : Env.S) : S with module Env = Env = struct
         Util.incr_stat stat_basic_simplify;
         SimplM.return_new new_clause
       )
-    )
 
   let handle_distinct_constants lit =
     match lit with
@@ -3158,8 +3166,7 @@ module Make (Env : Env.S) : S with module Env = Env = struct
     let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "sup.pos-simplify-reflect" in
     (* iterate through literals and try to resolve negative ones *)
     match simplifier c with
-    | None ->
-      SimplM.return_same c
+    | None -> SimplM.return_same c
     | Some (new_lits, premises) ->
       let proof =
         Proof.Step.simp
@@ -3462,7 +3469,9 @@ module Make (Env : Env.S) : S with module Env = Env = struct
   let eq_subsumes a b = CCOpt.is_some (eq_subsumes_with (a, 1) (b, 0))
 
   let subsumed_by_active_set c =
-    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "sup.subsumed-by-active-set" in
+    let@ _sp =
+      Trace.with_span ~__FILE__ ~__LINE__ "sup.subsumed-by-active-set"
+    in
     Util.incr_stat stat_subsumed_by_active_set_call;
     (* if there is an equation in c, try equality subsumption *)
     let try_eq_subsumption = CCArray.exists Lit.is_eqn (C.lits c) in
@@ -3491,7 +3500,9 @@ module Make (Env : Env.S) : S with module Env = Env = struct
     res
 
   let subsumed_in_active_set acc c =
-    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "sup.subsumed-in-active-set" in
+    let@ _sp =
+      Trace.with_span ~__FILE__ ~__LINE__ "sup.subsumed-in-active-set"
+    in
     Util.incr_stat stat_subsumed_in_active_set_call;
     (* if c is a single unit clause *)
     let try_eq_subsumption =
@@ -3607,7 +3618,9 @@ module Make (Env : Env.S) : S with module Env = Env = struct
     )
 
   let contextual_literal_cutting c =
-    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "sup.contextual-literal-cutting" in
+    let@ _sp =
+      Trace.with_span ~__FILE__ ~__LINE__ "sup.contextual-literal-cutting"
+    in
     contextual_literal_cutting_rec c
 
   (* ----------------------------------------------------------------------
