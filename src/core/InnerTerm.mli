@@ -24,7 +24,6 @@ type t = private {
   term: view;
   ty: type_result;
   mutable id: int;
-  mutable payload: exn;
   props: I.t;
   ho_weight: int lazy_t;
 }
@@ -111,19 +110,6 @@ val hashcons_stats : unit -> int * int * int * int * int * int
 val is_eta_reducible : t -> bool
 val is_beta_reducible : t -> bool
 val has_lambda : t -> bool
-
-(** {3 Payload} *)
-
-exception No_payload
-
-val payload : t -> exn
-
-val set_payload : t -> exn -> unit
-(** Set payload.
-    @raise Invalid_argument if there is already a payload *)
-
-val set_payload_erase : t -> exn -> unit
-(** Set payload, ignoring the previous payload. *)
 
 (** {3 Containers} *)
 

@@ -55,9 +55,10 @@ let () =
       Some (spf "%a is not an inductive constructor" ID.pp id)
     | _ -> None)
 
-exception Payload_ind_type of t
-exception Payload_ind_cstor of constructor * t
-exception Payload_ind_projector of projector
+type ID.payload +=
+  | Payload_ind_type of t
+  | Payload_ind_cstor of constructor * t
+  | Payload_ind_projector of projector
 
 let invalid_decl_ msg = raise (InvalidDecl msg)
 let invalid_declf_ fmt = CCFormat.ksprintf fmt ~f:invalid_decl_

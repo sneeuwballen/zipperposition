@@ -211,6 +211,6 @@ val all_rules : Rule.t Iter.t
 
 (**/**)
 
-exception Payload_defined_cst of defined_cst
+type ID.payload += Payload_defined_cst of defined_cst
 
 (**/**)

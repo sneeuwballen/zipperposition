@@ -18,10 +18,12 @@
 
     @since 1.5 *)
 
+type payload = ..
+
 type t = private {
   id: int;
   name: string;
-  mutable payload: exn list;
+  mutable payload: payload list;
       (** Use [exn] as an open type for user-defined payload *)
 }
 
@@ -35,13 +37,13 @@ val copy : t -> t
 
 val id : t -> int
 val name : t -> string
-val payload : t -> exn list
+val payload : t -> payload list
 val dummy_of_int : int -> t
-val payload_find : f:(exn -> 'a option) -> t -> 'a option
-val payload_pred : f:(exn -> bool) -> t -> bool
+val payload_find : f:(payload -> 'a option) -> t -> 'a option
+val payload_pred : f:(payload -> bool) -> t -> bool
 
-val set_payload : ?can_erase:(exn -> bool) -> t -> exn -> unit
-(** Set given exception as payload.
+val set_payload : ?can_erase:(payload -> bool) -> t -> payload -> unit
+(** Set given payload.
     @param can_erase
       if provided, checks whether an existing value is to be replaced instead of
       adding a new entry *)
@@ -69,14 +71,9 @@ module Map : CCMap.S with type key = t
 module Set : CCSet.S with type elt = t
 module Tbl : CCHashtbl.S with type key = t
 
-exception Attr_infix of string
-(** Infix name for pretty-printing *)
-
-exception Attr_prefix of string
-(** Prefix name for pretty-printing *)
-
-exception Attr_parameter of int
-(** Parameter, used for HO unif *)
+type payload += Attr_infix of string  (** Infix name for pretty-printing *)
+type payload += Attr_prefix of string  (** Prefix name for pretty-printing *)
+type payload += Attr_parameter of int  (** Parameter, used for HO unif *)
 
 type skolem_kind =
   | K_normal
@@ -84,11 +81,12 @@ type skolem_kind =
   | K_lazy_cnf
   | K_ind (* inductive *)
 
-exception Attr_skolem of skolem_kind
-exception Attr_distinct
-exception Attr_comm
-exception Attr_assoc
-exception Attr_cnf_def
+type payload +=
+  | Attr_skolem of skolem_kind
+  | Attr_distinct
+  | Attr_comm
+  | Attr_assoc
+  | Attr_cnf_def
 (* Symbol is a name introduced during CNF *)
 
 val as_infix : t -> string option

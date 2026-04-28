@@ -2,10 +2,12 @@
 
 (** {1 Unique Identifiers} *)
 
+type payload = ..
+
 type t = {
   id: int;
   name: string;
-  mutable payload: exn list;
+  mutable payload: payload list;
       (** Use [exn] as an open type for user-defined payload *)
 }
 
@@ -104,9 +106,10 @@ module Map = CCMap.Make (O_)
 module Set = CCSet.Make (O_)
 module Tbl = CCHashtbl.Make (O_)
 
-exception Attr_infix of string
-exception Attr_prefix of string
-exception Attr_parameter of int
+type payload +=
+  | Attr_infix of string
+  | Attr_prefix of string
+  | Attr_parameter of int
 
 type skolem_kind =
   | K_normal
@@ -114,11 +117,12 @@ type skolem_kind =
   | K_lazy_cnf
   | K_ind (* inductive *)
 
-exception Attr_skolem of skolem_kind
-exception Attr_distinct
-exception Attr_comm
-exception Attr_assoc
-exception Attr_cnf_def
+type payload +=
+  | Attr_skolem of skolem_kind
+  | Attr_distinct
+  | Attr_comm
+  | Attr_assoc
+  | Attr_cnf_def
 
 let as_infix =
   payload_find ~f:(function

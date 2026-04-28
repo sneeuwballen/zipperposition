@@ -163,7 +163,7 @@ type def =
   | Def_data of
       int * ty list (* data type with number of variables and cstors *)
 
-exception Payload_def of def
+type ID.payload += Payload_def of def
 
 let def id =
   ID.payload_find id ~f:(function
