@@ -29,7 +29,7 @@ type t = {
   cst_depth: int; (* how many induction lead to this one? *)
 }
 
-exception Payload_cst of t
+type ID.payload += Payload_cst of t
 
 (** {5 Inductive Constants} *)
 

@@ -66,7 +66,6 @@ type t = {
   term: view;
   ty: type_result;
   mutable id: int;
-  mutable payload: exn;
   props: I.t;
   ho_weight: int lazy_t;
 }
@@ -231,7 +230,6 @@ end)
 
 let hashcons_stats () = H.stats ()
 
-exception No_payload
 exception IllFormedTerm of string
 
 type nat = int
@@ -289,14 +287,7 @@ let ho_weight_ t t_ty =
 let[@inline] ho_weight t = Lazy.force t.ho_weight
 
 let make_ ~props ~ty term =
-  {
-    term;
-    ty;
-    id = ~-1;
-    payload = No_payload;
-    props;
-    ho_weight = lazy (ho_weight_ term ty);
-  }
+  { term; ty; id = ~-1; props; ho_weight = lazy (ho_weight_ term ty) }
 
 let const ~ty s =
   let my_t =
@@ -532,16 +523,6 @@ let[@inline] is_lambda t =
   match view t with
   | Bind (Binder.Lambda, _, _) -> true
   | _ -> false
-
-(** {3 Payload} *)
-
-let payload t = t.payload
-let set_payload_erase t e = t.payload <- e
-
-let set_payload t e =
-  match t.payload with
-  | No_payload -> t.payload <- e
-  | _ -> invalid_arg "Term.set_payload: collision"
 
 (** {3 Containers} *)
 

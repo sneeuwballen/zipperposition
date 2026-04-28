@@ -76,6 +76,6 @@ val ind_skolem_depth : ID.t -> int
 
 (**/**)
 
-exception Payload_cst of t
+type ID.payload += Payload_cst of t
 
 (**/**)

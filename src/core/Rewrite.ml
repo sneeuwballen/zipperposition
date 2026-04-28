@@ -111,8 +111,9 @@ let pp_rule_set out (rs : rule_set) : unit =
   Fmt.(within "{" "}" @@ hvbox @@ Util.pp_iter pp_rule)
     out (Rule_set.to_iter rs)
 
-exception Payload_defined_cst of defined_cst
-(** Annotation on IDs that are defined. *)
+type ID.payload +=
+  | Payload_defined_cst of defined_cst
+        (** Annotation on IDs that are defined. *)
 
 let as_defined_cst id =
   ID.payload_find id ~f:(function

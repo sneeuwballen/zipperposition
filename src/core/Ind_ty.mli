@@ -101,10 +101,11 @@ val as_projector : ID.t -> projector option
 
 (**/**)
 
-(** Exceptions used to store information in IDs *)
+(** used to store information in IDs *)
 
-exception Payload_ind_type of t
-exception Payload_ind_cstor of constructor * t
-exception Payload_ind_projector of projector
+type ID.payload +=
+  | Payload_ind_type of t
+  | Payload_ind_cstor of constructor * t
+  | Payload_ind_projector of projector
 
 (**/**)
