@@ -1,15 +1,12 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Term Orderings} *)
 
-(** Term orderings are well-founded orderings on terms, that
-    (usually) have some nice properties for Superposition, such as being
-    total on ground terms, stable by substitution,
-    and stable by context (monotonic).
+(** Term orderings are well-founded orderings on terms, that (usually) have some
+    nice properties for Superposition, such as being total on ground terms,
+    stable by substitution, and stable by context (monotonic).
 
-    We provide several classic orderings, such as RPO and KBO.
-*)
+    We provide several classic orderings, such as RPO and KBO. *)
 
 (* TODO: compute orderings modulo a substitution *)
 
@@ -26,13 +23,14 @@ val compare : t -> term -> term -> Comparison.t
 (** Compare two terms using the given ordering *)
 
 val might_flip : t -> term -> term -> bool
-(** Returns false for two terms t and s if for any ground substitution θ the ordering
-    of tθ vs sθ cannot change when appending arguments. This function is allowed
-    to overapproximate, i.e. we get no information if it returns true. *)
+(** Returns false for two terms t and s if for any ground substitution θ the
+    ordering of tθ vs sθ cannot change when appending arguments. This function
+    is allowed to overapproximate, i.e. we get no information if it returns
+    true. *)
 
-val monotonic : t -> bool	
-(** Is the ordering fully monotonic? Is it in particular compatible with arguments,	
-    i.e., t > s ==> t a > s a *)	
+val monotonic : t -> bool
+(** Is the ordering fully monotonic? Is it in particular compatible with
+    arguments, i.e., t > s ==> t a > s a *)
 
 val precedence : t -> Precedence.t
 (** Current precedence *)
@@ -48,9 +46,9 @@ val clear_cache : t -> unit
 include Interfaces.PRINT with type t := t
 
 (** {2 Ordering implementations}
-    An ordering is a partial ordering on terms. Several implementations
-    are simplification orderings (compatible with substitution,
-    with the subterm property, and monotonic), some other are not. *)
+    An ordering is a partial ordering on terms. Several implementations are
+    simplification orderings (compatible with substitution, with the subterm
+    property, and monotonic), some other are not. *)
 
 val derived_ho_kbo : ignore_quans_under_lam:bool -> Precedence.t -> t
 (** Higher-order Knuth-Bendix ordering derived via an encoding *)
@@ -63,6 +61,7 @@ val compose : (term -> term -> Comparison.t * term * term) -> t -> t
     order. For example, if the first argument returns Eq, then the order is
     determined by the second argument, and otherwise the result of the first
     argument is returned. *)
+
 val lambdafree_kbo : Precedence.t -> t
 (** Knuth-Bendix ordering - lambda-free version *)
 
@@ -79,8 +78,8 @@ val epo : Precedence.t -> t
 (** Embedding path order *)
 
 val none : t
-(** All terms are incomparable (equality still works).
-    Not a simplification ordering. *)
+(** All terms are incomparable (equality still works). Not a simplification
+    ordering. *)
 
 val subterm : t
 (** Subterm ordering. Not a simplification ordering. *)
@@ -96,13 +95,14 @@ val default_of_prec : Precedence.t -> t
 
 val by_name : string -> Precedence.t -> t
 (** Choose ordering by name among registered ones, or
-    @raise Invalid_argument if no ordering with the given name are registered. *)
+    @raise Invalid_argument if no ordering with the given name are registered.
+*)
 
 val names : unit -> string list
 
 val register : string -> (Precedence.t -> t) -> unit
-(** Register a new ordering, which can depend on a precedence.
-    The name must not be registered already.
+(** Register a new ordering, which can depend on a precedence. The name must not
+    be registered already.
     @raise Invalid_argument if the name is already used. *)
 
 (* Type-1 combinator is a combinator that is not ground

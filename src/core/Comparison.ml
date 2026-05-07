@@ -1,14 +1,20 @@
-
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Partial Ordering values} *)
 
 (** {2 Combined nonstrict-strict partial orders} *)
 
-type t = Lt | Leq | Eq | Geq | Gt | Incomparable
+type t =
+  | Lt
+  | Leq
+  | Eq
+  | Geq
+  | Gt
+  | Incomparable
 
 type comparison = t
-let equal : t -> t -> bool = Stdlib.(=)
+
+let equal : t -> t -> bool = Stdlib.( = )
 
 let to_string = function
   | Lt -> "<"
@@ -20,19 +26,22 @@ let to_string = function
 
 let pp out c = CCFormat.string out (to_string c)
 
-let opp cmp = match cmp with
+let opp cmp =
+  match cmp with
   | Eq | Incomparable -> cmp
   | Lt -> Gt
   | Gt -> Lt
   | Leq -> Geq
   | Geq -> Leq
 
-let to_total ord = match ord with
+let to_total ord =
+  match ord with
   | Lt -> -1
   | Gt -> 1
   | Geq | Leq | Eq | Incomparable -> 0
 
-let of_total ord = match ord with
+let of_total ord =
+  match ord with
   | 0 -> Eq
   | x when x > 0 -> Gt
   | _ -> Lt
@@ -54,7 +63,7 @@ let smooth = function
 
 type 'a comparator = 'a -> 'a -> t
 
-let (@>>) f g x y =
+let ( @>> ) f g x y =
   match f x y with
   | Geq -> merge_with_Geq (g x y)
   | Eq -> g x y

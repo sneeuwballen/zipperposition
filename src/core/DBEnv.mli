@@ -1,18 +1,14 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 De Bruijn environments} *)
 
 (** An environment is used to map De Bruijn indices to objects (or nothing).
 
-    This is low level and should be used with a lot of care
-    (it's mostly used in {!InnerTerm.DB} and a lot of coffee or aspiring
-    at hand.
-*)
+    This is low level and should be used with a lot of care (it's mostly used in
+    {!InnerTerm.DB} and a lot of coffee or aspiring at hand. *)
 
 type +'a t
-(** An environment that maps De Bruijn indices to values of
-    type 'a. *)
+(** An environment that maps De Bruijn indices to values of type 'a. *)
 
 val empty : 'a t
 (** Empty environment *)
@@ -27,8 +23,8 @@ val singleton : 'a -> 'a t
 (** Single binding *)
 
 val push : 'a t -> 'a -> 'a t
-(** Create a new environment, when entering a scope, where the De Bruijn
-    index 0 is bound to the given value *)
+(** Create a new environment, when entering a scope, where the De Bruijn index 0
+    is bound to the given value *)
 
 val push_l_same_order : 'a t -> 'a list -> 'a t
 (** [push_l_same_order env l] builds env [l0 :: l1 :: … :: env] *)
@@ -37,12 +33,12 @@ val push_l_rev : 'a t -> 'a list -> 'a t
 (** [push_l_rev env l] builds env [l(n-1) :: … :: l1 :: l0 :: env] *)
 
 val push_none : 'a t -> 'a t
-(** Create a new environment, when entering a scope, where
-    the De Bruijn index 0 is bound to nothing. *)
+(** Create a new environment, when entering a scope, where the De Bruijn index 0
+    is bound to nothing. *)
 
 val push_none_multiple : 'a t -> int -> 'a t
-(** Call [push_none] [n] times (after we've entered [n] scopes, for
-    instances) *)
+(** Call [push_none] [n] times (after we've entered [n] scopes, for instances)
+*)
 
 val pop : 'a t -> 'a t
 (** Exit a scope, removing the top binding.
@@ -52,21 +48,19 @@ val pop_many : 'a t -> int -> 'a t
 (** [pop_many env n] calls [pop env] [n] times *)
 
 val size : 'a t -> int
-(** Number of scopes (number of times {!push} or {!push_none} were
-    called to produce the given environment) *)
+(** Number of scopes (number of times {!push} or {!push_none} were called to
+    produce the given environment) *)
 
 val find : 'a t -> int -> 'a option
-(** Find to which value the given De Bruijn index is bound to, or
-    return None *)
+(** Find to which value the given De Bruijn index is bound to, or return None *)
 
 val find_exn : 'a t -> int -> 'a
 (** Unsafe version of {!find}.
     @raise Failure if the index is not bound within [env] *)
 
 val mem : _ t -> int -> bool
-(** [mem env i] returns [true] iff [find env i] returns [Some _]
-    rather than [None], ie. whether the [i]-th De Bruijn variable
-    is bound within [env] *)
+(** [mem env i] returns [true] iff [find env i] returns [Some _] rather than
+    [None], ie. whether the [i]-th De Bruijn variable is bound within [env] *)
 
 val set : 'a t -> int -> 'a -> 'a t
 (** Set the [n]-th variable to the given objects.

@@ -1,11 +1,9 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Heuristics} *)
 
 open Logtk
 open Libzipperposition
-
 module T = Term
 module Lit = Literal
 
@@ -18,7 +16,6 @@ let enable_depth_limit i =
   depth_limit_ := Some i
 
 let section = Util.Section.make ~parent:Const.section "heuristics"
-
 let stat_depth_limit = Util.mk_stat "trivial.too_deep"
 let stat_vars = Util.mk_stat "trivial.too_many_vars"
 
@@ -32,15 +29,14 @@ module type S = sig
   val register : unit -> unit
 end
 
-module Make(E : Env.S) = struct
+module Make (E : Env.S) = struct
   module Env = E
   module PS = Env.ProofState
   module C = Env.C
   module Ctx = Env.Ctx
 
   let _depth_types lits =
-    Literals.Seq.terms lits
-    |> Iter.map T.ty
+    Literals.Seq.terms lits |> Iter.map T.ty
     |> Iter.map (fun t -> InnerTerm.depth (t : Type.t :> InnerTerm.t))
     |> Iter.max ?lt:None
     |> CCOpt.map_or ~default:0 CCFun.id
@@ -51,33 +47,36 @@ module Make(E : Env.S) = struct
     | Some d ->
       let lits = C.lits c in
       let depth = max (_depth_types lits) (Literals.depth lits) in
-      if depth > d
-      then (
-        Ctx.lost_completeness();
+      if depth > d then (
+        Ctx.lost_completeness ();
         Util.incr_stat stat_depth_limit;
-        Util.debugf ~section 5 "@[<2>clause dismissed (too deep at %d):@ @[%a@]@]"
-          (fun k->k depth C.pp c);
+        Util.debugf ~section 5
+          "@[<2>clause dismissed (too deep at %d):@ @[%a@]@]" (fun k ->
+            k depth C.pp c);
         true
-      ) else false
+      ) else
+        false
 
   let has_too_many_vars c =
-    if !no_max_vars
-    then false
+    if !no_max_vars then
+      false
     else (
       let lits = C.lits c in
       (* number of distinct term variables *)
       let n_vars =
-        (Literals.vars lits
-         |> List.filter (fun v -> not (Type.is_tType (HVar.ty v)))
-         |> List.length)
+        Literals.vars lits
+        |> List.filter (fun v -> not (Type.is_tType (HVar.ty v)))
+        |> List.length
       in
       if n_vars > !max_vars then (
-        Ctx.lost_completeness();
+        Ctx.lost_completeness ();
         Util.incr_stat stat_vars;
-        Util.debugf ~section 5 "@[<2>clause dismissed (%d vars is too much):@ @[%a@]@]"
-          (fun k->k n_vars C.pp c);
+        Util.debugf ~section 5
+          "@[<2>clause dismissed (%d vars is too much):@ @[%a@]@]" (fun k ->
+            k n_vars C.pp c);
         true
-      ) else false
+      ) else
+        false
     )
 
   let register () =
@@ -90,38 +89,36 @@ end
 let extension =
   let action env =
     let module E = (val env : Env.S) in
-    let module H = Make(E) in
+    let module H = Make (E) in
     H.register ()
   in
-  Extensions.(
-    { default with name="heuristics"; env_actions=[action]; }
-  )
+  Extensions.{ default with name = "heuristics"; env_actions = [ action ] }
 
 let () =
   Params.add_opts
-    [ "--depth-limit", Arg.Int enable_depth_limit, " set maximal term depth";
-      "--max-vars", Arg.Set_int max_vars, " maximum number of variables per clause";
-      "--no-max-vars", Arg.Set no_max_vars, " disable maximum number of variables per clause";
-      "--enable-max-vars", Arg.Clear no_max_vars, "enable maximum number of variables per clause";
+    [
+      "--depth-limit", Arg.Int enable_depth_limit, " set maximal term depth";
+      ( "--max-vars",
+        Arg.Set_int max_vars,
+        " maximum number of variables per clause" );
+      ( "--no-max-vars",
+        Arg.Set no_max_vars,
+        " disable maximum number of variables per clause" );
+      ( "--enable-max-vars",
+        Arg.Clear no_max_vars,
+        "enable maximum number of variables per clause" );
     ];
-  Params.add_to_mode "best" (fun () ->
-      no_max_vars := true;
-    );
-  Params.add_to_mode "ho-pragmatic" (fun () ->
-      no_max_vars := true;
-    );
-  Params.add_to_mode "ho-competitive" (fun () ->
-      no_max_vars := true;
-    );
-  Params.add_to_modes 
-    [ "ho-complete-basic"
-    ; "fo-complete-basic"
-    ; "lambda-free-intensional"
-    ; "lambda-free-extensional"
-    ; "ho-comb-complete"
-    ; "lambda-free-purify-intensional"
-    ; "lambda-free-purify-extensional"] 
-    (fun () ->
-       no_max_vars := true;
-    );
+  Params.add_to_mode "best" (fun () -> no_max_vars := true);
+  Params.add_to_mode "ho-pragmatic" (fun () -> no_max_vars := true);
+  Params.add_to_mode "ho-competitive" (fun () -> no_max_vars := true);
+  Params.add_to_modes
+    [
+      "ho-complete-basic";
+      "fo-complete-basic";
+      "lambda-free-intensional";
+      "lambda-free-extensional";
+      "ho-comb-complete";
+      "lambda-free-purify-intensional";
+      "lambda-free-purify-extensional";
+    ] (fun () -> no_max_vars := true);
   ()

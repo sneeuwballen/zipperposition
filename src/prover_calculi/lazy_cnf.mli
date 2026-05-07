@@ -1,12 +1,11 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-(** {1 Booleans} *)
 open Libzipperposition
+(** {1 Booleans} *)
+
 open Logtk
 
 val enabled : bool ref
-
 val k_pa_renaming : bool Flex_state.key
 
 module type S = sig
@@ -18,9 +17,9 @@ module type S = sig
   val setup : unit -> unit
   (** Register rules in the environment *)
 
-  val update_form_counter: action:[< `Decrease | `Increase ] -> C.t -> unit
+  val update_form_counter : action:[< `Decrease | `Increase ] -> C.t -> unit
 end
 
-module Make(E : Env.S) : S with module Env = E
+module Make (E : Env.S) : S with module Env = E
 
 val extension : Extensions.t

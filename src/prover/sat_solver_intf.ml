@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 open Logtk
@@ -25,7 +24,6 @@ module type S = sig
       and must not have been already used. *)
 
   val add_clauses : proof:proof_step -> Lit.t list list -> unit
-
   val add_clause_seq : proof:proof_step -> Lit.t list Iter.t -> unit
 
   val check : full:bool -> unit -> result
@@ -41,26 +39,25 @@ module type S = sig
       @raise WrongState if the last result wasn't {!Sat} *)
 
   val valuation_level : Lit.t -> bool * int
-  (** Gives the value of a literal in the model, as well as its
-      decision level. If decision level is 0, the literal has been proved,
-      rather than decided/propagated
+  (** Gives the value of a literal in the model, as well as its decision level.
+      If decision level is 0, the literal has been proved, rather than
+      decided/propagated
       @raise WrongState if the last result wasn't {!Sat} *)
 
   val proved_at_0 : Lit.t -> bool option
-  (** If the literal has been propagated at decision level 0,
-      return its value (which does not depend on the model).
-      Otherwise return [None] *)
+  (** If the literal has been propagated at decision level 0, return its value
+      (which does not depend on the model). Otherwise return [None] *)
 
-  val all_proved: unit -> Lit.Set.t
+  val all_proved : unit -> Lit.Set.t
   (** Set of (signed) proved literals *)
 
   val set_printer : Lit.t CCFormat.printer -> unit
   (** How to print literals? *)
 
   val get_proof : unit -> proof
-  (** Return a proof of [false], assuming {!check} returned [Unsat].
-      The leaves of the proof are input clauses' proofs, the internal
-      nodes are clauses deduced by the SAT solver.
+  (** Return a proof of [false], assuming {!check} returned [Unsat]. The leaves
+      of the proof are input clauses' proofs, the internal nodes are clauses
+      deduced by the SAT solver.
       @raise WrongState if the last result isn't [Unsat] *)
 
   val get_proof_opt : unit -> proof option
@@ -71,8 +68,8 @@ module type S = sig
       proved true at level 0 (see {!valuation_level})
       @raise Invalid_argument if the literal is not at level 0 *)
 
-  val setup: unit -> unit
+  val setup : unit -> unit
 
-  val clear: ?size:[ `Big | `Small | `Tiny ] -> unit -> unit
+  val clear : ?size:[ `Big | `Small | `Tiny ] -> unit -> unit
   (** Reset the SAT solver state *)
 end

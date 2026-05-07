@@ -1,6 +1,7 @@
 (rule
  (targets const.ml)
- (deps (glob_files ../../*.opam))
+ (deps
+  (glob_files ../../*.opam))
  (action
   (with-stdout-to
    %{targets}
@@ -9,8 +10,8 @@
     (echo "let section = Logtk.Util.Section.make \"zip\"\n")))))
 
 (library
-  (name libzipperposition)
-  (public_name libzipperposition)
-  (synopsis "library for the Zipperposition theorem prover")
-  (libraries containers msat logtk logtk.arith logtk.proofs logtk.parsers str)
-  (flags :standard -w -32-50 -open Logtk_arith))
+ (name libzipperposition)
+ (public_name libzipperposition)
+ (synopsis "library for the Zipperposition theorem prover")
+ (libraries containers msat logtk logtk.arith logtk.proofs logtk.parsers str)
+ (flags :standard -w -32-50 -open Logtk_arith))

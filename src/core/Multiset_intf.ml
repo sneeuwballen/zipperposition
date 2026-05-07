@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
 module type S = sig
@@ -12,8 +11,8 @@ module type S = sig
   (** Number of distinct elements. *)
 
   val cardinal : t -> Z.t
-  (** Number of unique occurrences of elements (the multiplicity of each
-      element is considered) *)
+  (** Number of unique occurrences of elements (the multiplicity of each element
+      is considered) *)
 
   val empty : t
   (** Empty multiset *)
@@ -25,11 +24,10 @@ module type S = sig
   (** Is the element part of the multiset? *)
 
   val find : t -> elt -> Z.t
-  (** Return the multiplicity of the element within the multiset.
-      Will return [Z.zero] if the element is not part of the multiset *)
+  (** Return the multiplicity of the element within the multiset. Will return
+      [Z.zero] if the element is not part of the multiset *)
 
   val singleton : elt -> t
-
   val doubleton : elt -> elt -> t
 
   val add : t -> elt -> t
@@ -48,8 +46,8 @@ module type S = sig
   (** Sum of multiplicies *)
 
   val difference : t -> t -> t
-  (** Difference of multisets. If [x] has a bigger multiplicity in the
-      second argument it won't appear in the result *)
+  (** Difference of multisets. If [x] has a bigger multiplicity in the second
+      argument it won't appear in the result *)
 
   val product : Z.t -> t -> t
   (** Multiply all multiplicities with the given coefficient *)
@@ -72,7 +70,6 @@ module type S = sig
   module Seq : sig
     val of_iter : t -> elt Iter.t -> t
     val to_iter : t -> elt Iter.t
-
     val of_coeffs : t -> (elt * Z.t) Iter.t -> t
     val to_coeffs : t -> (elt * Z.t) Iter.t
   end
@@ -90,7 +87,6 @@ module type S = sig
   (** Fold on elements with their multiplicity *)
 
   val for_all : (elt -> bool) -> t -> bool
-
   val exists : (elt -> bool) -> t -> bool
 
   val choose : t -> elt
@@ -101,8 +97,8 @@ module type S = sig
   (** Multiset from list *)
 
   val of_coeffs : (elt * Z.t) list -> t
-  (** From list of elements with multiplicities. Multiplicities lower
-      than 0 will not count. *)
+  (** From list of elements with multiplicities. Multiplicities lower than 0
+      will not count. *)
 
   val of_iarray : elt IArray.t -> t
   (** From immutable array *)
@@ -116,26 +112,25 @@ module type S = sig
   (** Check equality of two multisets *)
 
   val cancel : t -> t -> t * t
-  (** Remove common elements from the multisets. For instance,
-      on [{1,1,2}] and [{1,2,2,3}], [cancel] will return [({1}, {2,3})] *)
+  (** Remove common elements from the multisets. For instance, on [{1,1,2}] and
+      [{1,2,2,3}], [cancel] will return [({1}, {2,3})] *)
 
   (** {5 Comparisons}
 
-      In the following, the comparison function must be equality-compatible
-      with [E.compare]. In other words, if [E.compare x y = 0] then
+      In the following, the comparison function must be equality-compatible with
+      [E.compare]. In other words, if [E.compare x y = 0] then
       [f x y = Comparison.Eq] must hold. *)
 
   val compare : t -> t -> int
   (** Compare two multisets with the multiset extension of {!E.compare} *)
 
   val compare_partial : (elt -> elt -> Comparison.t) -> t -> t -> Comparison.t
-  (** Compare two multisets with the multiset extension of the
-      given ordering. This ordering is total iff the element
-      ordering is. *)
+  (** Compare two multisets with the multiset extension of the given ordering.
+      This ordering is total iff the element ordering is. *)
 
   val is_max : (elt -> elt -> Comparison.t) -> elt -> t -> bool
-  (** Is the given element maximal (ie not dominated by any
-      other element) within the multiset? *)
+  (** Is the given element maximal (ie not dominated by any other element)
+      within the multiset? *)
 
   val max : (elt -> elt -> Comparison.t) -> t -> t
   (** Maximal elements of the multiset, w.r.t the given ordering. *)

@@ -1,8 +1,11 @@
 ; main binary
+
 (executable
-  (name zipperposition)
-  (package zipperposition)
-  (public_name zipperposition)
-  (promote (until-clean) (into ../..))
-  (modes native)
-  (libraries logtk libzipperposition.phases))
+ (name zipperposition)
+ (package zipperposition)
+ (public_name zipperposition)
+ (promote
+  (until-clean)
+  (into ../..))
+ (modes native)
+ (libraries logtk libzipperposition.phases))

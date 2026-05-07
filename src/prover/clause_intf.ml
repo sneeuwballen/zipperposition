@@ -15,36 +15,38 @@ module type S = sig
 
   type flag = SClause.flag
 
-  val set_flag : flag -> t -> bool -> unit (** set boolean flag *)
+  val set_flag : flag -> t -> bool -> unit
+  (** set boolean flag *)
 
-  val get_flag : flag -> t -> bool (** get value of boolean flag *)
+  val get_flag : flag -> t -> bool
+  (** get value of boolean flag *)
 
   val mark_redundant : t -> unit
   val is_redundant : t -> bool
   val mark_backward_simplified : t -> unit
   val is_backward_simplified : t -> bool
-
   val is_orphaned : t -> bool
 
   (** {2 Basics} *)
 
   include Interfaces.EQ with type t := t
   include Interfaces.HASH with type t := t
-  val compare : t -> t -> int
 
+  val compare : t -> t -> int
   val id : t -> int
   val lits : t -> Literal.t array
-
   val is_ground : t -> bool
+
   val weight : t -> int
-  (* cached weight in terms *)
+  (** cached weight in terms *)
+
   val ho_weight : t -> int
 
   module Tbl : CCHashtbl.S with type key = t
 
   val is_goal : t -> bool
-  (** Looking at the clause's proof, return [true] iff the clause is an
-      initial (negated) goal from the problem *)
+  (** Looking at the clause's proof, return [true] iff the clause is an initial
+      (negated) goal from the problem *)
 
   val distance_to_goal : t -> int option
   (** See {!Proof.distance_to_goal}, applied to the clause's proof *)
@@ -67,8 +69,8 @@ module type S = sig
   (** Merge the trails of several clauses *)
 
   val update_trail : (Trail.t -> Trail.t) -> t -> t
-  (** Change the trail. The resulting clause has same parents, proof
-      and literals as the input one *)
+  (** Change the trail. The resulting clause has same parents, proof and
+      literals as the input one *)
 
   val trail_subsumes : t -> t -> bool
   (** [trail_subsumes c1 c2 = Trail.subsumes (get_trail c1) (get_trail c2)] *)
@@ -77,49 +79,31 @@ module type S = sig
   (** True if the clause's trail is active in this valuation *)
 
   val is_inj_axiom : t -> (ID.t * int) option
-  (** Returns Some (sym,i) if clause is injectivity axiom for ith argument
-      of symbol sym. *)
+  (** Returns Some (sym,i) if clause is injectivity axiom for ith argument of
+      symbol sym. *)
 
   (** {2 Constructors} *)
 
-  val create :
-    penalty:int ->
-    trail:Trail.t ->
-    Literal.t list ->
-    proof_step ->
-    t
+  val create : penalty:int -> trail:Trail.t -> Literal.t list -> proof_step -> t
   (** Build a new clause from the given literals.
       @param trail boolean trail
-      @param penalty heuristic penalty due to history of the clause
-        (the higher, the less likely the clause is to be picked soon)
-      also takes a list of literals and a proof builder *)
+      @param penalty
+        heuristic penalty due to history of the clause (the higher, the less
+        likely the clause is to be picked soon) also takes a list of literals
+        and a proof builder *)
 
   val create_a :
-    penalty:int ->
-    trail:Trail.t ->
-    Literal.t array ->
-    proof_step ->
-    t
+    penalty:int -> trail:Trail.t -> Literal.t array -> proof_step -> t
   (** Build a new clause from the given literals. *)
 
-  val of_sclause :
-    ?penalty:int ->
-    SClause.t ->
-    proof_step ->
-    t
+  val of_sclause : ?penalty:int -> SClause.t -> proof_step -> t
 
   val of_forms :
-    ?penalty:int ->
-    trail:Trail.t ->
-    Term.t SLiteral.t list ->
-    proof_step ->
-    t
+    ?penalty:int -> trail:Trail.t -> Term.t SLiteral.t list -> proof_step -> t
   (** Directly from list of formulas *)
 
   val of_forms_axiom :
-    ?penalty:int ->
-    file:string -> name:string ->
-    Term.t SLiteral.t list -> t
+    ?penalty:int -> file:string -> name:string -> Term.t SLiteral.t list -> t
   (** Construction from formulas as axiom (initial clause) *)
 
   val of_statement : ?convert_defs:bool -> Statement.clause_t -> t list
@@ -133,12 +117,12 @@ module type S = sig
 
   val proof_parent : t -> Proof.Parent.t
 
-  val proof_parent_subst : Subst.Renaming.t -> t Scoped.t -> Subst.t -> Proof.Parent.t
+  val proof_parent_subst :
+    Subst.Renaming.t -> t Scoped.t -> Subst.t -> Proof.Parent.t
 
   val update_proof : t -> (proof_step -> proof_step) -> t
-  (** [update_proof c f] creates a new clause that is
-      similar to [c] in all aspects, but with
-      the proof [f (proof_step c)] *)
+  (** [update_proof c f] creates a new clause that is similar to [c] in all
+      aspects, but with the proof [f (proof_step c)] *)
 
   val proof_depth : t -> int
 
@@ -152,29 +136,27 @@ module type S = sig
   (** List of maximal literals *)
 
   val is_maxlit : t Scoped.t -> Subst.t -> idx:int -> bool
-  (** Is the i-th literal maximal in subst(clause)? Equivalent to
-      Bitvector.get (maxlits ~ord c subst) i *)
+  (** Is the i-th literal maximal in subst(clause)? Equivalent to Bitvector.get
+      (maxlits ~ord c subst) i *)
 
   val eligible_res : t Scoped.t -> Subst.t -> CCBV.t
-  (** Bitvector that indicates which of the literals of [subst(clause)]
-      are eligible for resolution. THe literal has to be either maximal
-      among selected literals of the same sign, if some literal is selected,
-      or maximal if none is selected. *)
+  (** Bitvector that indicates which of the literals of [subst(clause)] are
+      eligible for resolution. THe literal has to be either maximal among
+      selected literals of the same sign, if some literal is selected, or
+      maximal if none is selected. *)
 
   val eligible_res_no_subst : t -> CCBV.t
   (** More efficient version of {!eligible_res} with [Subst.empty] *)
 
   val eligible_param : t Scoped.t -> Subst.t -> CCBV.t
-  (** Bitvector that indicates which of the literals of [subst(clause)]
-      are eligible for paramodulation. That means the literal
-      is positive, no literal is selecteed, and the literal
-      is maximal among literals of [subst(clause)]. *)
+  (** Bitvector that indicates which of the literals of [subst(clause)] are
+      eligible for paramodulation. That means the literal is positive, no
+      literal is selecteed, and the literal is maximal among literals of
+      [subst(clause)]. *)
 
   val eligible_subterms_of_bool : t -> SClause.TPSet.t
-  (** 
-    Set that contains positions of selected Booleans and their
-    eligible green subterms.
-  *)
+  (** Set that contains positions of selected Booleans and their eligible green
+      subterms. *)
 
   val is_eligible_param : t Scoped.t -> Subst.t -> idx:int -> bool
   (** Check whether the [idx]-th literal is eligible for paramodulation *)
@@ -195,7 +177,6 @@ module type S = sig
   (** get the list of selected Bool subterms *)
 
   val penalty : t -> int
-
   val inc_penalty : t -> int -> unit
 
   val is_unit_clause : t -> bool
@@ -213,9 +194,7 @@ module type S = sig
   (** Easy iteration on an abstract view of literals *)
 
   val to_s_form : t -> TypedSTerm.Form.t
-
   val ground_clause : t -> t
-
   val eta_reduce : t -> t option
 
   (** {2 Iterators} *)
@@ -226,7 +205,13 @@ module type S = sig
     val vars : t -> Type.t HVar.t Iter.t
   end
 
-  val apply_subst : ?renaming: Subst.Renaming.t -> ?proof:Proof.Step.t option -> ?penalty_inc:int option -> t Scoped.t -> Subst.FO.t -> t
+  val apply_subst :
+    ?renaming:Subst.Renaming.t ->
+    ?proof:Proof.Step.t option ->
+    ?penalty_inc:int option ->
+    t Scoped.t ->
+    Subst.FO.t ->
+    t
 
   (** {2 Filter literals} *)
 
@@ -261,8 +246,8 @@ module type S = sig
     (** All literals *)
 
     val combine : t list -> t
-    (** Logical "and" of the given eligibility criteria. A literal is
-        eligible only if all elements of the list say so. *)
+    (** Logical "and" of the given eligibility criteria. A literal is eligible
+        only if all elements of the list say so. *)
 
     val ( ** ) : t -> t -> t
     (** Logical "and" *)
@@ -276,8 +261,8 @@ module type S = sig
 
   (** {2 Set of clauses} *)
 
-  (** Simple set *)
   module ClauseSet : CCSet.S with type elt = t
+  (** Simple set *)
 
   (** {2 Position} *)
 
@@ -290,9 +275,9 @@ module type S = sig
   (** Clause within which a subterm (and its position) are highlighted *)
   module WithPos : sig
     type t = {
-      clause : clause;
-      pos : Position.t;
-      term : Term.t;
+      clause: clause;
+      pos: Position.t;
+      term: Term.t;
     }
 
     val compare : t -> t -> int
@@ -303,16 +288,20 @@ module type S = sig
 
   val pp : t CCFormat.printer
   val pp_tstp : t CCFormat.printer
-  val pp_tstp_full : t CCFormat.printer  (** Print in a cnf() statement *)
 
-  val to_string : t -> string (** Debug printing to a  string *)
+  val pp_tstp_full : t CCFormat.printer
+  (** Print in a cnf() statement *)
+
+  val to_string : t -> string
+  (** Debug printing to a string *)
+
   val to_string_tstp : t -> string
-
   val pp_set : ClauseSet.t CCFormat.printer
   val pp_set_tstp : ClauseSet.t CCFormat.printer
 
   (**/**)
+
   val check_types : t -> unit
+
   (**/**)
 end
-

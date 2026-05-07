@@ -5,8 +5,7 @@
 (** Various helpers for the provers.
 
     It provides counters for statistics, basic profilers, helper functions,
-    debugging functions…
-*)
+    debugging functions… *)
 
 (** {2 Time facilities} *)
 
@@ -22,7 +21,8 @@ val get_time_mon_us : unit -> float
 module Section : sig
   type t
 
-  val full_name : t -> string  (** Full path to the section *)
+  val full_name : t -> string
+  (** Full path to the section *)
 
   val set_debug : t -> int -> unit
   (** Debug level for section (and its descendants) *)
@@ -39,42 +39,43 @@ module Section : sig
   val iter : (string * t) Iter.t
   (** all registered sections *)
 
-  val root : t (** Default section, with no parent *)
+  val root : t
+  (** Default section, with no parent *)
 
   val make : ?parent:t -> ?inheriting:t list -> string -> t
   (** [make ?parent ?inheriting name] makes a new section with the given name.
-      It has a parent (default [root]), used to give it a name. It can
-      also have a list of sections it inherits from.
-      Unless specified explicitly otherwise (using
-      {!set_debug}, the level of the section will be the max level of its
+      It has a parent (default [root]), used to give it a name. It can also have
+      a list of sections it inherits from. Unless specified explicitly otherwise
+      (using {!set_debug}, the level of the section will be the max level of its
       parent and its inherited sections. *)
 end
 
-val set_debug : int -> unit (** Set debug level of [Section.root] *)
+val set_debug : int -> unit
+(** Set debug level of [Section.root] *)
 
-val get_debug : unit -> int (** Current debug level for [Section.root] *)
+val get_debug : unit -> int
+(** Current debug level for [Section.root] *)
 
 val break_on_debug : bool ref
 (** Shall we wait for user input after each debug message? *)
 
-val debugf : ?section:Section.t ->
+val debugf :
+  ?section:Section.t ->
   int ->
   ('a, Format.formatter, unit, unit) format4 ->
   ('a -> unit) ->
   unit
-(** Print a debug message, with the given section and verbosity level.
-    The message might be dropped if its level is too high. *)
+(** Print a debug message, with the given section and verbosity level. The
+    message might be dropped if its level is too high. *)
 
 val debug : ?section:Section.t -> int -> string -> unit
 (** Cheap non-formatting version of {!debugf} *)
 
 val ksprintf_noc :
-  f:(string -> 'a) ->
-  ('b, Format.formatter, unit, 'a) format4 -> 'b
+  f:(string -> 'a) -> ('b, Format.formatter, unit, 'a) format4 -> 'b
 (** Same as [CCFormat.ksprintf], but without colors *)
 
-val err_spf :
-  ('b, Format.formatter, unit, string) format4 -> 'b
+val err_spf : ('b, Format.formatter, unit, string) format4 -> 'b
 (** Version of {!sprintf} that adds a colored "error" prefix *)
 
 val warn : string -> unit
@@ -84,8 +85,8 @@ val warnf : ('a, Format.formatter, unit, unit) format4 -> 'a
 (** Emit warning, with formatting *)
 
 exception Error of string * string
-(** generalist error that do not really belong elsewhere.
-    [Error (where,what)] means that error [what] was raised from [where]. *)
+(** generalist error that do not really belong elsewhere. [Error (where,what)]
+    means that error [what] was raised from [where]. *)
 
 val error : where:string -> string -> 'a
 (** [error msg] raises [Error msg]
@@ -120,7 +121,6 @@ module Exn : sig
   (** printer for backtraces, if enabled (print nothing otherwise) *)
 
   val fmt_backtrace : Format.formatter -> unit -> unit
-
   val string_of_backtrace : unit -> string
 end
 
@@ -130,14 +130,12 @@ type stat
 
 val mk_stat : string -> stat
 
-val print_global_stats : comment:string -> unit -> unit (** comment prefix *)
+val print_global_stats : comment:string -> unit -> unit
+(** comment prefix *)
 
 val incr_stat : stat -> unit
-
 val add_stat : stat -> int -> unit
-
 val pp_stat : Format.formatter -> stat -> unit
-
 
 (** {2 Flags as integers} *)
 
@@ -155,42 +153,41 @@ end
 (** {2 Others} *)
 
 val finally : do_:(unit -> unit) -> (unit -> 'a) -> 'a
-(** [finally ~do_ f] calls [f ()] and returns its result. If it raises, the
-    same exception is raised; in {b any} case, [do_ ()] is called after
-    [f ()] terminates. *)
+(** [finally ~do_ f] calls [f ()] and returns its result. If it raises, the same
+    exception is raised; in {b any} case, [do_ ()] is called after [f ()]
+    terminates. *)
 
 val pp_pair :
-  ?sep:string -> 'a CCFormat.printer -> 'b CCFormat.printer -> ('a * 'b) CCFormat.printer
+  ?sep:string ->
+  'a CCFormat.printer ->
+  'b CCFormat.printer ->
+  ('a * 'b) CCFormat.printer
 
 val pp_list : ?sep:string -> 'a CCFormat.printer -> 'a list CCFormat.printer
 (** Print a list without begin/end separators *)
 
 val pp_seq : ?sep:string -> 'a CCFormat.printer -> 'a Seq.t CCFormat.printer
-val pp_iter: ?sep:string -> 'a CCFormat.printer -> 'a Iter.t CCFormat.printer
+val pp_iter : ?sep:string -> 'a CCFormat.printer -> 'a Iter.t CCFormat.printer
 
 val pp_list0 : ?sep:string -> 'a CCFormat.printer -> 'a list CCFormat.printer
-(** Print a list with a whitespace in front if it's non empty, or
-    does nothing if the list is empty
-    Default separator is " " *)
+(** Print a list with a whitespace in front if it's non empty, or does nothing
+    if the list is empty Default separator is " " *)
 
-val tstp_needs_escaping: string -> bool
+val tstp_needs_escaping : string -> bool
 (** Is this name a proper TSTP identifier, or does it need ' ' around it? *)
 
-val pp_str_tstp : string CCFormat.printer (** possibly escaping *)
+val pp_str_tstp : string CCFormat.printer
+(** possibly escaping *)
 
 val pp_var_tstp : string CCFormat.printer
-
 val ord_option : 'a CCOrd.t -> 'a option CCOrd.t
 
 (* TODO: use containers' at some point *)
 val take_drop_while : ('a -> bool) -> 'a list -> 'a list * 'a list
-
 val map_product : f:('a -> 'b list list) -> 'a list -> 'b list list
-
 val seq_map_l : f:('a -> 'b list) -> 'a list -> 'b list Iter.t
 val seq_zipi : 'a Iter.t -> (int * 'a) Iter.t
-
-val invalid_argf: ('a, Format.formatter, unit, 'b) format4 -> 'a
+val invalid_argf : ('a, Format.formatter, unit, 'b) format4 -> 'a
 val failwithf : ('a, Format.formatter, unit, 'b) format4 -> 'a
 
 module Int_map : CCMap.S with type key = int
@@ -204,5 +201,5 @@ val escape_dot : string -> string
 type 'a or_error = ('a, string) CCResult.t
 
 val popen : cmd:string -> input:string -> string or_error
-(** Run the given command [cmd] with the given [input], wait for it
-    to terminate, and return its stdout. *)
+(** Run the given command [cmd] with the given [input], wait for it to
+    terminate, and return its stdout. *)

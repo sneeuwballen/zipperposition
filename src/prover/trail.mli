@@ -1,10 +1,8 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 Boolean Trail} *)
 
 open Logtk
-
 module Lit = BBox.Lit
 
 type t
@@ -29,7 +27,6 @@ val of_list : bool_lit list -> t
 val add_list : t -> bool_lit list -> t
 val to_list : t -> bool_lit list
 val to_iter : t -> bool_lit Iter.t
-
 val labels : t -> Index_intf.labels
 
 val subsumes : t -> t -> bool
@@ -54,7 +51,7 @@ type valuation = bool_lit -> bool
 (** A boolean valuation *)
 
 val is_active : t -> v:valuation -> bool
-(** [Trail.is_active t ~v] is true iff all boolean literals
-    in [t] are satisfied in the boolean valuation [v]. *)
+(** [Trail.is_active t ~v] is true iff all boolean literals in [t] are satisfied
+    in the boolean valuation [v]. *)
 
 val to_s_form : t -> TypedSTerm.Form.t

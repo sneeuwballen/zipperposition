@@ -1,11 +1,9 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** Test typing *)
 
 open Logtk
 open Logtk_arbitrary
-
 module PT = TypedSTerm
 
 let check_cmp =
@@ -14,10 +12,8 @@ let check_cmp =
   (* comparison of two types is 0 iff they are equal *)
   let prop (ty1, ty2) =
     let c = Type.compare ty1 ty2 in
-    (c = 0) = (Type.equal ty1 ty2)
+    c = 0 = Type.equal ty1 ty2
   in
   QCheck.Test.make ~name gen prop
 
-let props =
-  [ check_cmp
-  ]
+let props = [ check_cmp ]

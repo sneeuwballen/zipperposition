@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Logtk. See file "license" for more details. *)
 
 (** {1 Substitutions} *)
@@ -10,28 +9,27 @@
 
     The concept of scope is to allow the same free variable to be used in
     several contexts without being renamed. A scope is kind of a namespace,
-    where variables from distinct namespaces are always distinct.
-*)
+    where variables from distinct namespaces are always distinct. *)
 
 type term = InnerTerm.t
 type var = InnerTerm.t HVar.t
 
 (** {2 Renamings}
-    A renaming is used to disambiguate variables that come from distinct
-    scopes but have the same index. It is used to merge together several scopes, in
-    a sound way, by ensuring variables from those scopes are mapped to distinct
-    variables of the new scope. For instance, a given renaming applied to (X,0) and
-    (X,1) will return two different variables, as if one of the X had been renamed
-    prior to unification/binding. *)
+    A renaming is used to disambiguate variables that come from distinct scopes
+    but have the same index. It is used to merge together several scopes, in a
+    sound way, by ensuring variables from those scopes are mapped to distinct
+    variables of the new scope. For instance, a given renaming applied to (X,0)
+    and (X,1) will return two different variables, as if one of the X had been
+    renamed prior to unification/binding. *)
 
 module Renaming : sig
   type t
 
   val create : unit -> t
-  (** Make a fresh renaming. It can only grow, so it is safe to use
-      it as a value. *)
+  (** Make a fresh renaming. It can only grow, so it is safe to use it as a
+      value. *)
 
-  val none: t
+  val none : t
   (** Renaming that doesn't actually rename(!) *)
 end
 
@@ -57,14 +55,15 @@ val find_exn : t -> var Scoped.t -> term Scoped.t
 val find : t -> var Scoped.t -> term Scoped.t option
 
 val deref : t -> term Scoped.t -> term Scoped.t
-(** [deref t s_t] dereferences [t] as long as [t] is a variable bound
-    in [subst] *)
+(** [deref t s_t] dereferences [t] as long as [t] is a variable bound in [subst]
+*)
 
 val get_var : t -> var Scoped.t -> term Scoped.t option
-(** Lookup recursively the var in the substitution, until it is not a
-    variable anymore, or it is not bound.
-    @return None if the variable is not bound, [Some (deref (t, sc_t))]
-      if [v] is bound to [t, sc_t] *)
+(** Lookup recursively the var in the substitution, until it is not a variable
+    anymore, or it is not bound.
+    @return
+      None if the variable is not bound, [Some (deref (t, sc_t))] if [v] is
+      bound to [t, sc_t] *)
 
 val mem : t -> var Scoped.t -> bool
 (** Check whether the variable is bound by the substitution *)
@@ -72,14 +71,15 @@ val mem : t -> var Scoped.t -> bool
 exception InconsistentBinding of var Scoped.t * term Scoped.t * term Scoped.t
 
 val bind : t -> var Scoped.t -> term Scoped.t -> t
-(** Add [v] -> [t] to the substitution. Both terms have a context.
-    It is {b important} that the bound term is De-Bruijn-closed (assert).
-    @raise InconsistentBinding if [v] is already bound in
-      the same context, to another term. *)
+(** Add [v] -> [t] to the substitution. Both terms have a context. It is
+    {b important} that the bound term is De-Bruijn-closed (assert).
+    @raise InconsistentBinding
+      if [v] is already bound in the same context, to another term. *)
 
 val update : t -> var Scoped.t -> term Scoped.t -> t
-(** Replace [v] -> ? by  [v] -> [t] in the substitution. Both terms have a context.
-    It is {b important} that the bound term is De-Bruijn-closed (assert).
+(** Replace [v] -> ? by [v] -> [t] in the substitution. Both terms have a
+    context. It is {b important} that the bound term is De-Bruijn-closed
+    (assert).
     @raise InconsistentBinding if [v] is not yet bound in the same context. *)
 
 val merge : t -> t -> t
@@ -94,19 +94,19 @@ val filter_scope : t -> Scoped.scope -> t
 
 (** {2 Set operations} *)
 
-val domain : t -> (var Scoped.t) Iter.t
+val domain : t -> var Scoped.t Iter.t
 (** Domain of substitution *)
 
-val codomain : t -> (term Scoped.t) Iter.t
+val codomain : t -> term Scoped.t Iter.t
 (** Codomain (image terms) of substitution *)
 
-val introduced : t -> (var Scoped.t) Iter.t
+val introduced : t -> var Scoped.t Iter.t
 (** Variables introduced by the substitution (ie vars of codomain) *)
 
 val normalize : t -> t
-(** Normalize bindings that are in the same scope.
-    E.g. [x0 -> f(y0), y0 -> g(z0), z0->a]
-    becomes [x0->f(g(a))0, y0->g(a)0, z0->g(z0)] *)
+(** Normalize bindings that are in the same scope. E.g.
+    [x0 -> f(y0), y0 -> g(z0), z0->a] becomes
+    [x0->f(g(a))0, y0->g(a)0, z0->g(z0)] *)
 
 val map : (term -> term) -> t -> t
 (** Map on term *)
@@ -124,9 +124,7 @@ val is_renaming : t -> bool
 (** Check whether the substitution is a variable renaming *)
 
 val equal : t -> t -> bool
-
 val compare : t -> t -> int
-
 val hash : t -> int
 
 include Interfaces.PRINT with type t := t
@@ -136,7 +134,6 @@ val pp_bindings : t CCFormat.printer
 
 val fold : ('a -> var Scoped.t -> term Scoped.t -> 'a) -> 'a -> t -> 'a
 val iter : (var Scoped.t -> term Scoped.t -> unit) -> t -> unit
-
 val to_iter : t -> (var Scoped.t * term Scoped.t) Iter.t
 val to_list : t -> (var Scoped.t * term Scoped.t) list
 val of_iter : ?init:t -> (var Scoped.t * term Scoped.t) Iter.t -> t
@@ -145,12 +142,11 @@ val of_list : ?init:t -> (var Scoped.t * term Scoped.t) list -> t
 (** {2 Applying a substitution} *)
 
 val apply : ?shift_vars:int -> Renaming.t -> t -> term Scoped.t -> term
-(** Apply the substitution to the given term.
-    This function assumes that all terms in the substitution are closed,
-    and it will not perform De Bruijn indices shifting. For instance,
-    applying [{X -> f(db0)}] (with [db0] the De Bruijn index [0])
-    to the term [forall. p(X)] will yield [forall. p(f(db0))] (capturing)
-    and not [forall. p(f(db1))].
+(** Apply the substitution to the given term. This function assumes that all
+    terms in the substitution are closed, and it will not perform De Bruijn
+    indices shifting. For instance, applying [{X -> f(db0)}] (with [db0] the De
+    Bruijn index [0]) to the term [forall. p(X)] will yield [forall. p(f(db0))]
+    (capturing) and not [forall. p(f(db1))].
     @param renaming used to desambiguate free variables from distinct scopes *)
 
 (** {2 Specializations} *)
@@ -160,22 +156,22 @@ module type SPECIALIZED = sig
   type t = subst
 
   val find_exn : t -> var Scoped.t -> term Scoped.t
-
   val get_var : t -> var Scoped.t -> term Scoped.t option
-
   val deref : t -> term Scoped.t -> term Scoped.t
 
   val apply : ?shift_vars:int -> Renaming.t -> t -> term Scoped.t -> term
   (** Apply the substitution to the given term/type.
-      @param renaming used to desambiguate free variables from distinct scopes *)
+      @param renaming used to desambiguate free variables from distinct scopes
+  *)
 
   val bind : t -> var Scoped.t -> term Scoped.t -> t
   (** Add [v] -> [t] to the substitution. Both terms have a context.
-      @raise InconsistentBinding if [v] is already bound in
-        the same context, to another term. *)
+      @raise InconsistentBinding
+        if [v] is already bound in the same context, to another term. *)
 
   val update : t -> var Scoped.t -> term Scoped.t -> t
-  (** Replace [v] -> ? by  [v] -> [t] in the substitution. Both terms have a context.
+  (** Replace [v] -> ? by [v] -> [t] in the substitution. Both terms have a
+      context.
       @raise InconsistentBinding if [v] is not yet bound in the same context. *)
 
   val of_list : ?init:t -> (var Scoped.t * term Scoped.t) list -> t
@@ -185,19 +181,28 @@ module Ty : SPECIALIZED with type term = Type.t
 
 module FO : sig
   include SPECIALIZED with type term = Term.t
+
   val bind' : t -> Type.t HVar.t Scoped.t -> term Scoped.t -> t
-  val apply_l : ?shift_vars:int -> Renaming.t -> t -> term list Scoped.t -> term list
+
+  val apply_l :
+    ?shift_vars:int -> Renaming.t -> t -> term list Scoped.t -> term list
+
   val of_list' : ?init:t -> (Type.t HVar.t Scoped.t * term Scoped.t) list -> t
   val map : (term -> term) -> t -> t
   val iter : (Type.t HVar.t Scoped.t -> term Scoped.t -> unit) -> t -> unit
   val filter : (Type.t HVar.t Scoped.t -> term Scoped.t -> bool) -> t -> t
-  val compose:  scope:int -> t -> t -> t
-  (** Takes a substitution that might map a variable x to a term
-      that containts loosely bound variables. It fixes the substitution
-      so that all such variables are remaped to a fresh skolem *)
-  val unleak_variables : t -> t * (Term.t list)
-  val subset_is_renaming : subset:(term Scoped.t list) -> res_scope:int -> t -> bool
-  val canonize_neg_vars : var_set:(InnerTerm.VarSet.t) -> t
+
+  val compose : scope:int -> t -> t -> t
+  (** Takes a substitution that might map a variable x to a term that containts
+      loosely bound variables. It fixes the substitution so that all such
+      variables are remaped to a fresh skolem *)
+
+  val unleak_variables : t -> t * Term.t list
+
+  val subset_is_renaming :
+    subset:term Scoped.t list -> res_scope:int -> t -> bool
+
+  val canonize_neg_vars : var_set:InnerTerm.VarSet.t -> t
   val canonize_all_vars : term -> term
 end
 
@@ -209,29 +214,27 @@ module Projection : sig
     subst: subst;
     renaming: Renaming.t;
   }
-  (** A representation of the substitution for a given scope, after applying
-      the renaming. *)
+  (** A representation of the substitution for a given scope, after applying the
+      renaming. *)
 
   val subst : t -> subst
   val scope : t -> Scoped.scope
   val renaming : t -> Renaming.t
 
   val bindings : t -> (var * term) list
-  (** List of bindings of the projection.
-      Variables in the domain are bound in [scope subst], but variables
-      in terms of the codomain are bound in the renaming *)
+  (** List of bindings of the projection. Variables in the domain are bound in
+      [scope subst], but variables in terms of the codomain are bound in the
+      renaming *)
 
   val as_inst :
     ?allow_free_db:bool ->
     ctx:Term.Conv.ctx ->
     t ->
     Type.t HVar.t list ->
-    (TypedSTerm.t,TypedSTerm.t) Var.Subst.t
+    (TypedSTerm.t, TypedSTerm.t) Var.Subst.t
   (** Convert into an instantiation on the given variables *)
 
   val is_empty : t -> bool
-
   val make : Renaming.t -> subst Scoped.t -> t
-
   val pp : t CCFormat.printer
 end

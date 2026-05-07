@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 (** {1 BBox (Boolean Box)}
@@ -24,33 +23,31 @@ module Lit : Bool_lit_intf.S with type payload = payload
 type t = Lit.t
 
 val dummy : t
-
 val pp_payload : payload CCFormat.printer
 
 val make_fresh : unit -> t
 (** Create a fresh new boolean variable as a positive literal. *)
 
 val find_boolean_lit : Literals.t -> t option
-(** Find a boolean literal that abstracts given clause component and 
-    the new sign of the abstracted literal. If no boolean literal exists,
-    None will be the first component.  *)
+(** Find a boolean literal that abstracts given clause component and the new
+    sign of the abstracted literal. If no boolean literal exists, None will be
+    the first component. *)
 
 val inject_lits : Literals.t -> t
-(** Inject a clause into a boolean literal. No other clause will map
-    to the same literal unless it is alpha-equivalent to this one.
-    The boolean literal can be negative is the argument is a
-    unary negative clause *)
+(** Inject a clause into a boolean literal. No other clause will map to the same
+    literal unless it is alpha-equivalent to this one. The boolean literal can
+    be negative is the argument is a unary negative clause *)
 
 val inject_lit : Literal.t -> t option
-(** Convert a single literal into a boolean literal. Syntactically
-    the same literal will be given exactly the same boolean literal.
-    Negation of this literal will get negation of the boolean literal.
-    Supports equality. Returns None for unsupported literals *)
+(** Convert a single literal into a boolean literal. Syntactically the same
+    literal will be given exactly the same boolean literal. Negation of this
+    literal will get negation of the boolean literal. Supports equality. Returns
+    None for unsupported literals *)
 
 val inject_lemma : Cut_form.t -> t
-(** Make a new literal from this formula that we are going to cut
-    on. This is generative, meaning that calling it twice with the
-    same arguments will produce distinct literals. *)
+(** Make a new literal from this formula that we are going to cut on. This is
+    generative, meaning that calling it twice with the same arguments will
+    produce distinct literals. *)
 
 val inject_case : inductive_case list -> t
 (** Inject [cst = case] *)
@@ -65,7 +62,6 @@ val as_case : t -> inductive_case list option
 (** If [payload t = Case p], then return [Some p], else return [None] *)
 
 val as_lemma : t -> Cut_form.t option
-
 val as_lits : t -> Literals.t option
 
 val must_be_kept : t -> bool
@@ -76,15 +72,12 @@ val must_be_kept : t -> bool
 val is_lemma : t -> bool
 (** returns [true] if the bool literal represents a lemma *)
 
-
 val to_s_form : t -> TypedSTerm.Form.t
 
 (** {2 Printers}
     Those printers print the content (injection) of a boolean literal, if any *)
 
 val pp : t CCFormat.printer
-
-val pp_tstp: t CCFormat.printer
+val pp_tstp : t CCFormat.printer
 val pp_zf : t CCFormat.printer
-
 val pp_bclause : t list CCFormat.printer

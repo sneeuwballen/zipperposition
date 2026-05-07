@@ -1,4 +1,3 @@
-
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 open Logtk
@@ -8,15 +7,18 @@ module type S = sig
   module Ctx : Ctx.S
   module C : Clause_intf.S
 
-  module CQueue : ClauseQueue.S with module C = C and type C.t = C.t
   (** Priority queues on clauses *)
+  module CQueue : ClauseQueue.S with module C = C and type C.t = C.t
 
   (** {5 Useful Index structures} *)
 
   module TermIndex : Index.TERM_IDX with type elt = C.WithPos.t
-  module UnitIndex : Index.UNIT_IDX
-    with type E.t = (Term.t * Term.t * bool * C.t)
-     and type E.rhs = Term.t
+
+  module UnitIndex :
+    Index.UNIT_IDX
+      with type E.t = Term.t * Term.t * bool * C.t
+       and type E.rhs = Term.t
+
   module SubsumptionIndex : Index.SUBSUMPTION_IDX with type C.t = C.t
 
   (** {5 Common Interface for Sets} *)
