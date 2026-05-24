@@ -1,5 +1,7 @@
 (* This file is free software. See file "license" for more details. *)
 
+(* TODO:(simon) use CCHash, or vendor the C bindings *)
+
 type 'a t = 'a -> int
 
 let bool b =

@@ -2,6 +2,14 @@
 
 (** {1 Hashconsing} *)
 
+(* TODO:(simon)
+
+  - make state explicit
+  - still have one global state, protected with a lock
+  - have [hashcons : t -> t] acquire the lock implicitly
+  - have [hashcons_with: state -> t -> t] and [with_lock : (state -> 'a) -> 'a]
+    for batch.  Batch to be used in rewriting, inference rules, etc *)
+
 module type HashedType = sig
   type t
 
