@@ -67,7 +67,7 @@ type t = {
   ty: type_result;
   mutable id: int;
   props: I.t;
-  ho_weight: int lazy_t;
+  ho_weight: int lazy_t; (* TODO: change into a mutable option. *)
 }
 
 (* head form *)
@@ -257,6 +257,7 @@ let open_fun ty =
   | _ -> [], ty
 
 let ho_weight_ t t_ty =
+  (* TODO: reuse [t.ho_weight] if defined, except in App case *)
   let rec aux t t_ty =
     let init_w s_ty =
       match s_ty with
