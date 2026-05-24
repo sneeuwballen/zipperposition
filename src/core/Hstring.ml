@@ -1,0 +1,33 @@
+type t = {
+  str: string;
+  mutable id: int;
+  h: int;
+}
+
+module Hcons = Hashcons.Make (struct
+  type nonrec t = t
+
+  let equal a b = a.str = b.str
+  let hash a = a.h
+
+  let tag id t =
+    assert (t.id = -1);
+    t.id <- id
+end)
+
+let[@inline] equal (a : t) b = a == b
+let[@inline] hash a = a.h
+
+let[@inline] make str =
+  let h = Hash.string str in
+  Hcons.hashcons { str; h; id = -1 }
+
+let makef fmt = Format.kasprintf make fmt
+
+let compare a b =
+  if a.h != b.h then
+    CCInt.compare a.h b.h
+  else
+    CCString.compare a.str b.str
+
+let pp out self = CCFormat.string out self.str
