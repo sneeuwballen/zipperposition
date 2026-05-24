@@ -537,6 +537,7 @@ end
 module Set = CCSet.Make (AsKey)
 module Map = CCMap.Make (AsKey)
 module Tbl = CCHashtbl.Make (AsKey)
+module WeakTbl = Ephemeron.K1.Make (AsKey)
 
 module HVarKey = struct
   type t = term HVar.t

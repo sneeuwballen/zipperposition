@@ -116,6 +116,7 @@ val has_lambda : t -> bool
 module Map : CCMap.S with type key = term
 module Set : CCSet.S with type elt = term
 module Tbl : CCHashtbl.S with type key = term
+module WeakTbl : Ephemeron.S with type key = term
 module VarMap : CCMap.S with type key = t HVar.t
 module VarSet : CCSet.S with type elt = t HVar.t
 module VarTbl : CCHashtbl.S with type key = t HVar.t
