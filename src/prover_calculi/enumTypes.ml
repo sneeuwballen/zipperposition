@@ -31,11 +31,11 @@ let error_ s = raise (Error s)
 let errorf_ msg = CCFormat.ksprintf msg ~f:error_
 
 type id_or_ty_builtin =
-  | I of ID.t
+  | I of Name.t
   | B of Type.builtin
 
 let pp_id_or_builtin out = function
-  | I id -> ID.pp out id
+  | I id -> Name.pp out id
   | B b -> Type.pp_builtin out b
 
 (** {2 Inference rules} *)
@@ -54,7 +54,7 @@ module type S = sig
 
   val declare_ty :
     proof:Proof.t ->
-    ty_id:ID.t ->
+    ty_id:Name.t ->
     ty_vars:Type.t HVar.t list ->
     var:Type.t HVar.t ->
     term list ->
@@ -85,7 +85,7 @@ let _instantiate_projector_axiom = ref false
 
 let is_projector_ id ~of_ =
   match Ind_ty.as_projector id with
-  | Some p -> ID.equal (Ind_ty.projector_id p) of_
+  | Some p -> Name.equal (Ind_ty.projector_id p) of_
   | None -> false
 
 module Make (E : Env.S) : S with module Env = E = struct
@@ -105,7 +105,7 @@ module Make (E : Env.S) : S with module Env = E = struct
     decl_proof:
       [ `Data of Proof.t * Type.t Statement.data | `Clause of Proof.t ];
         (* justification for the enumeration axiom *)
-    mutable decl_symbols: ID.Set.t; (* set of declared symbols for t1,...,tn *)
+    mutable decl_symbols: Name.Set.t; (* set of declared symbols for t1,...,tn *)
   }
 
   let pp_decl out d =
@@ -113,16 +113,16 @@ module Make (E : Env.S) : S with module Env = E = struct
       d.decl_ty (Util.pp_list T.pp) d.decl_cases
 
   (* set of enumerated types (indexed by [decl_ty_id]) *)
-  let decls_by_id = ID.Tbl.create 16
+  let decls_by_id = Name.Tbl.create 16
   let decls_builtin = ref []
 
   let find_decl_ = function
-    | I i -> ID.Tbl.find decls_by_id i
+    | I i -> Name.Tbl.find decls_by_id i
     | B b -> List.assoc b !decls_builtin
 
   let add_decl_ id decl =
     match id with
-    | I id -> ID.Tbl.add decls_by_id id decl
+    | I id -> Name.Tbl.add decls_by_id id decl
     | B b -> decls_builtin := (b, decl) :: !decls_builtin
 
   (* triggered whenever a new EnumType is added *)
@@ -176,8 +176,8 @@ module Make (E : Env.S) : S with module Env = E = struct
           (fun set t ->
             match T.head t with
             | None -> errorf_ "non-symbolic case @[%a@]" T.pp t
-            | Some s -> ID.Set.add s set)
-          ID.Set.empty cases
+            | Some s -> Name.Set.add s set)
+          Name.Set.empty cases
       in
       let decl =
         {
@@ -367,13 +367,13 @@ module Make (E : Env.S) : S with module Env = E = struct
       vars
 
   let instantiate_axiom_ ~ty_s s poly_args decl =
-    if ID.Set.mem s decl.decl_symbols then
+    if Name.Set.mem s decl.decl_symbols then
       None
     (* already declared *)
     else (
       let ty_args, _ = Type.open_fun ty_s in
       (* need to add an axiom instance for this symbol and declaration *)
-      decl.decl_symbols <- ID.Set.add s decl.decl_symbols;
+      decl.decl_symbols <- Name.Set.add s decl.decl_symbols;
       (* create the axiom.
          - build [subst = decl.x->s(u1,...,u_m)]
            where the the [u_i] are variables of the types required by [ty_s]
@@ -412,7 +412,7 @@ module Make (E : Env.S) : S with module Env = E = struct
       let c' = C.create ~trail ~penalty (c_guard @ lits) proof in
       Util.debugf ~section 3
         "@[<2>instantiate axiom of enum type `%a` on @[%a@]:@ clause @[%a@]@]"
-        (fun k -> k pp_id_or_builtin decl.decl_ty_id ID.pp s C.pp c');
+        (fun k -> k pp_id_or_builtin decl.decl_ty_id Name.pp s C.pp c');
       Util.incr_stat stat_instantiate;
       Some c'
     )
@@ -442,7 +442,7 @@ module Make (E : Env.S) : S with module Env = E = struct
     match Type.view ty_ret, decl.decl_ty_id with
     | Type.Builtin b, B b' when b = b' -> instantiate_axiom ~ty_s:ty s [] decl
     | Type.App (c, args), I i
-      when ID.equal c i
+      when Name.equal c i
            && (not (is_projector_ s ~of_:i))
            && List.length args = List.length decl.decl_ty_vars ->
       instantiate_axiom ~ty_s:ty s args decl
@@ -497,7 +497,7 @@ module Make (E : Env.S) : S with module Env = E = struct
      declare the inductive type as an EnumType. *)
   let _declare_inductive ~proof d =
     Util.debugf ~section 5 "@[<2>examine data `%a`@]" (fun k ->
-        k ID.pp d.Stmt.data_id);
+        k Name.pp d.Stmt.data_id);
     (* make HVars *)
     let ty_vars =
       List.mapi (fun i _ -> HVar.make ~ty:Type.tType i) d.Stmt.data_args

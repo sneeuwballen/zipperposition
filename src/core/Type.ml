@@ -29,7 +29,7 @@ type view =
   | Builtin of builtin
   | Var of t HVar.t
   | DB of int
-  | App of ID.t * t list  (** parametrized type *)
+  | App of Name.t * t list  (** parametrized type *)
   | Fun of t list * t  (** Function type (left to right, no left-nesting) *)
   | Forall of t  (** explicit quantification using De Bruijn index *)
 
@@ -163,10 +163,10 @@ type def =
   | Def_data of
       int * ty list (* data type with number of variables and cstors *)
 
-type ID.payload += Payload_def of def
+type Name_payload.t += Payload_def of def
 
-let def id =
-  ID.payload_find id ~f:(function
+let def c =
+  Name_payload.find c ~f:(function
     | Payload_def d -> Some d
     | _ -> None)
 
@@ -175,7 +175,7 @@ let def_exn id =
   | Some d -> d
   | None -> raise Not_found
 
-let set_def id d = ID.set_payload id (Payload_def d)
+let set_def c d = Name_payload.add c (Payload_def d)
 
 (** {2 Containers} *)
 
@@ -330,7 +330,7 @@ module TPTP = struct
   let o = prop
   let int = int
   let rat = rat
-  let real = const (ID.make "$real")
+  let real = const (Name.make "$real")
 
   type print_hook = int -> (CCFormat.t -> t -> unit) -> CCFormat.t -> t -> bool
 
@@ -344,9 +344,9 @@ module TPTP = struct
     | Builtin Real -> CCFormat.string out "$real"
     | Var v -> Format.fprintf out "%a" HVar.pp_tstp v
     | DB i -> Format.fprintf out "Tb%d" (depth - i - 1)
-    | App (p, []) -> ID.pp_tstp out p
+    | App (p, []) -> Name.pp_tstp out p
     | App (p, args) ->
-      Format.fprintf out "@[<2>%a(%a)@]" ID.pp_tstp p
+      Format.fprintf out "@[<2>%a(%a)@]" Name.pp_tstp p
         (Util.pp_list (pp_tstp_rec depth))
         args
     | Fun (args, ret) ->
@@ -382,9 +382,9 @@ module TPTP = struct
     | Builtin Real -> CCFormat.string out "$real"
     | Var v -> Format.fprintf out "X%d" (HVar.id v)
     | DB i -> Format.fprintf out "Tb%d" (depth - i - 1)
-    | App (p, []) -> ID.pp_tstp out p
+    | App (p, []) -> Name.pp_tstp out p
     | App (p, args) ->
-      Format.fprintf out "@[<2>%a @@ %a @]" ID.pp_tstp p
+      Format.fprintf out "@[<2>%a @@ %a @]" Name.pp_tstp p
         (Util.pp_list ~sep:" @ " (pp_inner depth))
         args
     | Fun (args, ret) ->
@@ -446,9 +446,9 @@ let rec pp_rec depth out t =
     else
       HVar.pp out v
   | DB i -> Format.fprintf out "T%i" (depth - i - 1)
-  | App (p, []) -> ID.pp out p
+  | App (p, []) -> Name.pp out p
   | App (p, args) ->
-    Format.fprintf out "@[<2>%a %a@]" ID.pp p
+    Format.fprintf out "@[<2>%a %a@]" Name.pp p
       (Util.pp_list ~sep:" " (pp_inner_app depth))
       args
   | Fun (args, ret) ->
@@ -483,9 +483,9 @@ let pp_in = function
 let pp_typed_var out v = pp_typed_var_gen ~pp_ty:pp out v
 
 let mangle (ty : t) : string =
-  let add_id buf id =
+  let add_name buf name =
     let s =
-      ID.name id
+      Name.to_string name
       |> CCString.filter (function
            | '#' | '_' -> false
            | _ -> true)
@@ -502,9 +502,9 @@ let mangle (ty : t) : string =
     | Builtin Term -> Buffer.add_string buf "i"
     | Var _ -> Buffer.add_string buf "_"
     | DB i -> Printf.bprintf buf "A%d" i
-    | App (f, []) -> add_id buf f
+    | App (f, []) -> add_name buf f
     | App (f, l) ->
-      add_id buf f;
+      add_name buf f;
       List.iter
         (fun sub ->
           Buffer.add_char buf '_';

@@ -36,24 +36,24 @@ module type S = sig
   val add_signature : Signature.t -> unit
   (** Merge the given signature with the context's one *)
 
-  val find_signature : ID.t -> Type.t option
+  val find_signature : Name.t -> Type.t option
   (** Find the type of the given symbol *)
 
-  val find_signature_exn : ID.t -> Type.t
+  val find_signature_exn : Name.t -> Type.t
   (** Unsafe version of {!find_signature}.
       @raise Not_found for unknown symbols *)
 
-  val declare : ID.t -> Type.t -> unit
+  val declare : Name.t -> Type.t -> unit
   (** Declare the type of a symbol (updates signature) *)
 
-  val declare_syms : (ID.t * Type.t) list -> unit
+  val declare_syms : (Name.t * Type.t) list -> unit
   (** Declare multiple symbols (more efficient that calling declare function
       incrementally) *)
 
-  val on_new_symbol : (ID.t * Type.t) Signal.t
+  val on_new_symbol : (Name.t * Type.t) Signal.t
   val on_signature_update : Signature.t Signal.t
-  val set_injective_for_arg : ID.t -> int -> unit
-  val is_injective_for_arg : ID.t -> int -> bool
+  val set_injective_for_arg : Name.t -> int -> unit
+  val is_injective_for_arg : Name.t -> int -> bool
 
   (** {2 Literals} *)
 

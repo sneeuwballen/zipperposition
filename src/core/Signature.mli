@@ -6,8 +6,8 @@
     sym_in_conjecture. *)
 
 type t = private {
-  sym_map: (Type.t * bool) ID.Map.t;
-  ty_map: ID.Set.t Type.Map.t;
+  sym_map: (Type.t * bool) Name.Map.t;
+  ty_map: Name.Set.t Type.Map.t;
 }
 (** A signature maps symbols to types, and there is a map in the backwards
     direction *)
@@ -17,30 +17,30 @@ val empty : t
 
 val is_empty : t -> bool
 
-val mem : t -> ID.t -> bool
+val mem : t -> Name.t -> bool
 (** Is the symbol declared? *)
 
-exception AlreadyDeclared of ID.t * Type.t * Type.t
+exception AlreadyDeclared of Name.t * Type.t * Type.t
 
-val declare : t -> ID.t -> Type.t -> t
+val declare : t -> Name.t -> Type.t -> t
 (** Declare the symbol, or
     @raise AlreadyDeclared if the symbol is already defined
     @raise Invalid_argument if the type has free variables *)
 
-val find : t -> ID.t -> Type.t option
+val find : t -> Name.t -> Type.t option
 (** Lookup the type of a symbol *)
 
-val find_exn : t -> ID.t -> Type.t
+val find_exn : t -> Name.t -> Type.t
 (** Lookup the type of a symbol
     @raise Not_found if the symbol is not in the signature *)
 
-val find_by_type : t -> Type.t -> ID.Set.t
+val find_by_type : t -> Type.t -> Name.Set.t
 (** Reverse lookup -- given a type return all IDs with that type *)
 
-val sym_in_conj : ID.t -> t -> bool
-val set_sym_in_conj : ID.t -> t -> t
+val sym_in_conj : Name.t -> t -> bool
+val set_sym_in_conj : Name.t -> t -> t
 
-val arity : t -> ID.t -> int * int
+val arity : t -> Name.t -> int * int
 (** Arity of the given symbol, or failure. see {!Type.arity} for more details
     about the returned value.
     @raise Not_found if the symbol is not in the signature *)
@@ -65,24 +65,24 @@ val well_founded : t -> bool
 *)
 
 module Seq : sig
-  val symbols : t -> ID.t Iter.t
+  val symbols : t -> Name.t Iter.t
   val types : t -> Type.t Iter.t
-  val to_iter : t -> (ID.t * (Type.t * bool)) Iter.t
-  val of_iter : (ID.t * Type.t) Iter.t -> t
+  val to_iter : t -> (Name.t * (Type.t * bool)) Iter.t
+  val of_iter : (Name.t * Type.t) Iter.t -> t
 end
 
-val to_set : t -> ID.Set.t
+val to_set : t -> Name.Set.t
 (** Set of symbols of the signature *)
 
-val to_list : t -> (ID.t * (Type.t * bool)) list
-val iter : t -> (ID.t -> Type.t * bool -> unit) -> unit
-val fold : t -> 'a -> ('a -> ID.t -> Type.t * bool -> 'a) -> 'a
+val to_list : t -> (Name.t * (Type.t * bool)) list
+val iter : t -> (Name.t -> Type.t * bool -> unit) -> unit
+val fold : t -> 'a -> ('a -> Name.t -> Type.t * bool -> 'a) -> 'a
 
-val is_bool : t -> ID.t -> bool
+val is_bool : t -> Name.t -> bool
 (** Has the symbol a boolean return sort?
     @raise Not_found if the symbol is not in the signature *)
 
-val is_not_bool : t -> ID.t -> bool
+val is_not_bool : t -> Name.t -> bool
 
 (** {2 IO} *)
 

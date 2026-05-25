@@ -117,7 +117,7 @@ end
 (** {2 Typing context} *)
 
 module Ctx = struct
-  type env = (string, [ `Var of type_ Var.t | `ID of ID.t * type_ ]) Hashtbl.t
+  type env = (string, [ `Var of type_ Var.t | `ID of Name.t * type_ ]) Hashtbl.t
 
   type t = {
     default: type_;
@@ -139,9 +139,9 @@ module Ctx = struct
     mutable local_vars: T.t Var.t list;
     (* free variables in the local scope *)
     mutable datatypes:
-      (ID.t * type_ * (type_ * (ID.t * type_)) list) list ID.Tbl.t;
+      (Name.t * type_ * (type_ * (Name.t * type_)) list) list Name.Tbl.t;
     (* datatype ID -> list of cstors *)
-    mutable new_types: (ID.t * type_) list;
+    mutable new_types: (Name.t * type_) list;
     (* list of symbols whose type has been inferred recently *)
     mutable ite_map: T.t T.Map.t;
   }
@@ -157,7 +157,7 @@ module Ctx = struct
         on_shadow;
         implicit_ty_args;
         env = Hashtbl.create 32;
-        datatypes = ID.Tbl.create 32;
+        datatypes = Name.Tbl.create 32;
         new_metas = [];
         local_vars = [];
         new_types = [];
@@ -214,7 +214,7 @@ module Ctx = struct
     ()
 
   let declare ?loc ctx s ty =
-    let name = ID.name s in
+    let name = Name.to_string s in
     let doit =
       match CCHashtbl.get ctx.env name with
       | None -> true
@@ -223,7 +223,7 @@ module Ctx = struct
         | `Ignore ->
           (* ignore decl, but ensure the two types are the same *)
           Util.debugf ~section 50 "ignore duplicate declaration of `%a`"
-            (fun k -> k ID.pp s);
+            (fun k -> k Name.pp s);
           T.unify ?loc ty_old ty;
           false
         | `Warn ->
@@ -232,7 +232,7 @@ module Ctx = struct
     in
     if doit then (
       Util.debugf ~section 30 "@{<yellow>declare@} %a:@ @[%a@]" (fun k ->
-          k ID.pp s T.pp ty);
+          k Name.pp s T.pp ty);
       Hashtbl.add ctx.env name (`ID (s, ty))
     )
 
@@ -302,8 +302,8 @@ module Ctx = struct
           name pp_names
           (find_close_names ctx name)
           T.pp ty);
-      let id = ID.make name in
-      if is_distinct_ name attrs then ID.set_payload id ID.Attr_distinct;
+      let id = Name.make name in
+      if is_distinct_ name attrs then Name_payload.add id Name.Attr_distinct;
       Hashtbl.add ctx.env name (`ID (id, ty));
       ctx.new_types <- (id, ty) :: ctx.new_types;
       id, ty
@@ -540,7 +540,9 @@ let rec infer_rec ?loc ctx (t : PT.t) : T.t =
       unify ?loc (T.ty_exn a) T.Ty.prop;
       unify ?loc (T.ty_exn b) (T.ty_exn c);
       let mk_ite arg_ty =
-        let id = ID.make (CCFormat.sprintf "zip_internal_ite_%a" T.pp arg_ty) in
+        let id =
+          Name.make (CCFormat.sprintf "zip_internal_ite_%a" T.pp arg_ty)
+        in
         let ty = T.Ty.( ==> ) [ T.Ty.prop; arg_ty; arg_ty ] arg_ty in
         T.const ~ty id, ty
       in
@@ -593,7 +595,7 @@ let rec infer_rec ?loc ctx (t : PT.t) : T.t =
       let data =
         try
           let ty_id = T.head_exn ty_u in
-          ID.Tbl.find ctx.Ctx.datatypes ty_id
+          Name.Tbl.find ctx.Ctx.datatypes ty_id
         with Not_found ->
           error_ ?loc "type `@[%a@]` is not a known datatype" T.pp ty_u
       in
@@ -624,7 +626,7 @@ let rec infer_rec ?loc ctx (t : PT.t) : T.t =
             match Ctx.get_var_ ctx s with
             | `Var v -> v
             | `ID (id, _) ->
-              error_ ?loc "row variable cannot be a constant %a" ID.pp id)
+              error_ ?loc "row variable cannot be a constant %a" Name.pp id)
           rest
       in
       let ty = T.Ty.record_flatten ty_l ~rest:(CCOpt.map Var.ty rest) in
@@ -777,7 +779,7 @@ and infer_app ?loc ctx id ty_id (l : PT.t list) : T.t =
   let l = List.map (infer_rec ?loc ctx) l in
   Util.debugf ~section 50
     "@[<2>apply@ @[<2>%a:@,%a@]@ to [@[<2>@[%a@]]:@,[@[%a@]@]]@]" (fun k ->
-      k ID.pp id T.pp ty_id (Util.pp_list T.pp) l (Util.pp_list T.pp)
+      k Name.pp id T.pp ty_id (Util.pp_list T.pp) l (Util.pp_list T.pp)
         (List.map T.ty_exn l));
   let ty = apply_unify ctx ?loc ~allow_open:true ty_id l in
   T.app ?loc ~ty (T.const ?loc ~ty:ty_id id) l
@@ -806,7 +808,7 @@ and infer_match ?loc ctx ~ty_matched t data (l : PT.match_branch list) :
           (* now cover every missing case *)
           CCList.filter_map
             (fun (c_id, c_ty, _) ->
-              if List.exists (ID.equal c_id) !seen then
+              if List.exists (Name.equal c_id) !seen then
                 None
               else (
                 let ty_params, c_ty_applied = apply_ty_to_metas ?loc ctx c_ty in
@@ -826,11 +828,12 @@ and infer_match ?loc ctx ~ty_matched t data (l : PT.match_branch list) :
           let c_id, c_ty =
             Ctx.get_id_ ?loc ~attrs:t.PT.attrs ~arity:(List.length vars) ctx s
           in
-          if List.exists (ID.equal c_id) !seen then
-            error_ ?loc "duplicate branch for constructor `%a`" ID.pp c_id;
-          if List.for_all (fun (cstor, _, _) -> not (ID.equal c_id cstor)) data
+          if List.exists (Name.equal c_id) !seen then
+            error_ ?loc "duplicate branch for constructor `%a`" Name.pp c_id;
+          if
+            List.for_all (fun (cstor, _, _) -> not (Name.equal c_id cstor)) data
           then
-            error_ ?loc "symbol `%a` not a suitable constructor" ID.pp c_id;
+            error_ ?loc "symbol `%a` not a suitable constructor" Name.pp c_id;
           seen := c_id :: !seen;
           (* apply [ty_s] to some meta variables *)
           let ty_params, c_ty_applied = apply_ty_to_metas ?loc ctx c_ty in
@@ -838,8 +841,8 @@ and infer_match ?loc ctx ~ty_matched t data (l : PT.match_branch list) :
           assert (_vars = []);
           unify ?loc ty_ret_s ty_matched;
           if List.length ty_s_args <> List.length vars then
-            error_ ?loc "constructor `%a`@ expected %d arguments,@ got %d" ID.pp
-              c_id (List.length ty_s_args) (List.length vars);
+            error_ ?loc "constructor `%a`@ expected %d arguments,@ got %d"
+              Name.pp c_id (List.length ty_s_args) (List.length vars);
           with_typed_vars_ ?loc
             ~infer_ty:(fun ?loc:_ _ ty -> ty)
             ctx
@@ -857,7 +860,7 @@ and infer_match ?loc ctx ~ty_matched t data (l : PT.match_branch list) :
   let missing =
     CCList.filter_map
       (fun (id, _, _) ->
-        if List.exists (fun (c, _, _) -> ID.equal id c.T.cstor_id) l then
+        if List.exists (fun (c, _, _) -> Name.equal id c.T.cstor_id) l then
           None
         else
           Some id)
@@ -868,10 +871,10 @@ and infer_match ?loc ctx ~ty_matched t data (l : PT.match_branch list) :
   | _ :: _ ->
     if !error_on_incomplete_match_ then
       error_ ?loc "missing cases in match: (@[%a@])@ :in `%a`"
-        (Util.pp_list ID.pp) missing PT.pp t
+        (Util.pp_list Name.pp) missing PT.pp t
     else (
       Util.warnf "%a@,missing cases in match: (@[%a@])@ :in `%a`" Loc.pp_opt loc
-        (Util.pp_list ID.pp) missing PT.pp t;
+        (Util.pp_list Name.pp) missing PT.pp t;
       l
     )
 
@@ -955,16 +958,16 @@ let rec as_def ?loc ?of_ bound t =
     in
     (* check that we talk about the same ID *)
     (match of_ with
-    | Some id' when not (ID.equal id id') ->
+    | Some id' when not (Name.equal id id') ->
       error_ ?loc
         "rule `%a`@ for `%a` has head symbol `%a`@ every rule in the \
          definition of `%a` must start with `%a`"
-        T.pp t ID.pp id ID.pp id' ID.pp id ID.pp id
+        T.pp t Name.pp id Name.pp id' Name.pp id Name.pp id
     | _ -> ());
     check_ty_prenex ?loc ty;
     if T.Ty.returns_tType ty then
       error_ ?loc "in definition of %a,@ equality between types is forbidden"
-        ID.pp id;
+        Name.pp id;
     Stmt.Def_term { vars; id; ty; args; rhs; as_form = t }
   and yield_prop lhs rhs pol =
     let vars =
@@ -976,9 +979,9 @@ let rec as_def ?loc ?of_ bound t =
     (match lhs with
     | SLiteral.Atom (t, _) ->
       (match T.head t, of_ with
-      | Some id, Some id' when not (ID.equal id' id) ->
+      | Some id, Some id' when not (Name.equal id' id) ->
         error_ ?loc "rule `%a`@ must have `%a` as head symbol, not `%a`" T.pp t
-          ID.pp id' ID.pp id
+          Name.pp id' Name.pp id
       | _ -> ())
     | _ -> ());
     Stmt.Def_form { vars; lhs; rhs = [ rhs ]; polarity = pol; as_form = [ t ] }
@@ -1027,13 +1030,14 @@ let infer_defs ?loc ctx (l : A.def list) : (_, _, _) Stmt.def list =
   let decls =
     List.map
       (fun d ->
-        let id = ID.make d.A.def_id in
+        let id = Name.make d.A.def_id in
         let ty = infer_ty_exn ctx d.A.def_ty in
         check_ty_prenex ?loc ty;
         (* cannot return [Type] *)
         if T.Ty.returns_tType ty then
           error_ ?loc
-            "in definition of %a,@ equality between types is forbidden" ID.pp id;
+            "in definition of %a,@ equality between types is forbidden" Name.pp
+            id;
         Ctx.declare ?loc ctx id ty;
         id, ty, d.A.def_rules)
       l
@@ -1056,9 +1060,9 @@ let set_notation id attrs : unit =
   List.iter
     (function
       | A.A_app ("infix", [ A.A_quoted s ]) ->
-        ID.set_payload id (ID.Attr_infix s)
+        Name_payload.add id (Name.Attr_infix s)
       | A.A_app ("prefix", [ A.A_quoted s ]) ->
-        ID.set_payload id (ID.Attr_prefix s)
+        Name_payload.add id (Name.Attr_prefix s)
       | _ -> ())
     attrs
 
@@ -1087,7 +1091,7 @@ let infer_statement_exn ?(file = "<no file>") ctx st =
     | A.Decl (s, ty) ->
       (* new type
          TODO: warning if it shadows? *)
-      let id = ID.make s in
+      let id = Name.make s in
       let ty = infer_ty_exn ctx ty in
       check_ty_prenex ?loc ty;
       Ctx.declare ?loc ctx id ty;
@@ -1110,7 +1114,7 @@ let infer_statement_exn ?(file = "<no file>") ctx st =
       let data_types =
         List.map
           (fun d ->
-            let data_ty = ID.make d.A.data_name in
+            let data_ty = Name.make d.A.data_name in
             (* the type [data_ty : type -> type -> ... -> type] *)
             let ty_of_data_ty =
               T.Ty.fun_
@@ -1137,7 +1141,7 @@ let infer_statement_exn ?(file = "<no file>") ctx st =
                 let cstors =
                   List.map
                     (fun (name, args) ->
-                      let c_id = ID.make name in
+                      let c_id = Name.make name in
                       (* type of c: forall ty_vars. ty_args -> ty_ret *)
                       let args =
                         List.mapi
@@ -1148,10 +1152,10 @@ let infer_statement_exn ?(file = "<no file>") ctx st =
                               T.Ty.forall_l ty_vars (T.Ty.fun_ [ ty_ret ] ty)
                             and p_id =
                               match p with
-                              | Some p -> ID.make p
+                              | Some p -> Name.make p
                               | None ->
                                 (* create projector *)
-                                ID.makef "proj_%a_%d" ID.pp c_id i
+                                Name.makef "proj_%a_%d" Name.pp c_id i
                             in
                             Ctx.declare ?loc ctx p_id p_ty;
                             ty, (p_id, p_ty))
@@ -1166,7 +1170,7 @@ let infer_statement_exn ?(file = "<no file>") ctx st =
                       c_id, ty_c, args)
                     d.A.data_cstors
                 in
-                ID.Tbl.add ctx.Ctx.datatypes data_ty cstors;
+                Name.Tbl.add ctx.Ctx.datatypes data_ty cstors;
                 Stmt.mk_data data_ty ty_of_data_ty ~args:ty_vars cstors))
           l data_types
       in

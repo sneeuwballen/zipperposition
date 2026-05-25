@@ -16,7 +16,7 @@ let symm_ = ref true
 let trans_ = ref false
 let ( ==> ) = T.Ty.( ==> )
 let decl id ty = Statement.ty_decl ~proof:Proof.Step.trivial id ty
-let eq_id = ID.make "$_eq_proxy"
+let eq_id = Name.make "$$_eq_proxy"
 
 let eq_type =
   let alpha = Var.make ~ty:T.tType (ID.make "alpha") in
@@ -105,7 +105,7 @@ let res_tc =
       | E_i c -> Some c
       | _ -> None)
     ~to_exn:(fun i -> E_i i)
-    ~compare ~pp_in:pp_clause_in ~is_stmt:true ~name:Statement.name
+    ~compare ~pp_in:pp_clause_in ~is_stmt:true ~name:Statement.get_name
     ~to_form:(fun ~ctx st ->
       let conv_c (c : T.t SLiteral.t list) : _ =
         c |> List.map SLiteral.to_form |> T.Form.or_

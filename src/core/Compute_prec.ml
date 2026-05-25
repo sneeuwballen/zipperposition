@@ -18,7 +18,7 @@ type t = {
   constr_rules: (int * [ `partial ] Precedence.Constr.t parametrized) list;
   last_constr: [ `total ] Precedence.Constr.t;
   weight_rule: Precedence.weight_fun parametrized;
-  status: (ID.t * Precedence.symbol_status) list;
+  status: (Name.t * Precedence.symbol_status) list;
 }
 
 (* uniform weight *)
@@ -56,12 +56,12 @@ let _add_custom_weights weights arg_coeff =
             |> CCString.split_on_char ':' |> List.map int_of_string
           in
           ( (fun constant ->
-              if ID.name constant = name then
+              if Name.to_string constant = name then
                 Precedence.Weight.int (List.hd values)
               else
                 weights constant),
             fun constant ->
-              if ID.name constant = name then
+              if Name.to_string constant = name then
                 List.tl values
               else
                 arg_coeff constant )
@@ -71,7 +71,7 @@ let _add_custom_weights weights arg_coeff =
 
 let weight_fun_of_prec ?(rank = None) ~symbols ~prec_fun =
   let symbol_to_rank idx =
-    let sym_no = ID.Set.cardinal symbols in
+    let sym_no = Name.Set.cardinal symbols in
     match rank with
     | Some numb_ranks when sym_no > numb_ranks ->
       let divider = sym_no / numb_ranks in
@@ -80,17 +80,17 @@ let weight_fun_of_prec ?(rank = None) ~symbols ~prec_fun =
   in
 
   let w_tbl =
-    ID.Set.to_list symbols
+    Name.Set.to_list symbols
     (* inverse sorting, we want the number of *larger* symbols *)
     |> List.sort (fun f g -> Precedence.Constr.compare_by ~constr:prec_fun g f)
     |> CCList.foldi
-         (fun tbl idx f -> ID.Map.add f (symbol_to_rank idx) tbl)
-         ID.Map.empty
+         (fun tbl idx f -> Name.Map.add f (symbol_to_rank idx) tbl)
+         Name.Map.empty
   in
 
   function
   | id ->
-    let res = CCOpt.get_or ~default:5 (ID.Map.get id w_tbl) in
+    let res = CCOpt.get_or ~default:5 (Name.Map.get id w_tbl) in
     Precedence.Weight.int res
 
 let force_const_weight ~weight ~signature = function
@@ -111,7 +111,7 @@ let mk_precedence ~db_w ~lmb_w ~signature t seq =
   let symbols =
     seq
     |> Iter.flat_map Statement.Seq.symbols
-    |> ID.Set.of_iter |> ID.Set.to_list
+    |> Name.Set.of_iter |> Name.Set.to_list
   in
   (* constraints *)
   let constrs =
@@ -129,7 +129,7 @@ let mk_precedence ~db_w ~lmb_w ~signature t seq =
   in
   let weight =
     if !_from_prec then
-      weight_fun_of_prec ~rank:!_rank ~symbols:(ID.Set.of_list symbols)
+      weight_fun_of_prec ~rank:!_rank ~symbols:(Name.Set.of_list symbols)
         ~prec_fun:constr
     else
       t.weight_rule seq

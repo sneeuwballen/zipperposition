@@ -15,7 +15,7 @@ let norm_logical_disagreements ?(mode = `Conservative) b args args' :
         let ( <?> ) = CCOrd.( <?> ) in
         let hd_to_int t =
           match Term.view (Term.head_term t) with
-          | Const x -> ID.id x
+          | Const x -> x.id
           | AppBuiltin (b, _) -> Builtin.as_int b
           | DB i -> i
           | Var v -> HVar.id v
@@ -636,7 +636,7 @@ module Inner = struct
       else
         raise Fail
     | T.Const f, T.Const g ->
-      if ID.equal f g then
+      if Name.equal f g then
         subst
       else if op = O_unify && (not root) && has_non_unifiable_type t1 then (
         let tags = T.type_non_unifiable_tags (T.ty_exn t1) in
@@ -646,7 +646,7 @@ module Inner = struct
     | ( T.App ({ T.term = T.Const id1; _ }, l1),
         T.App ({ T.term = T.Const id2; _ }, l2) ) ->
       (* first-order applications *)
-      if ID.equal id1 id2 && List.length l1 = List.length l2 then
+      if Name.equal id1 id2 && List.length l1 = List.length l2 then
         (* just unify subterms pairwise *)
         unif_list ~op ~bvars subst l1 sc1 l2 sc2
       else if op = O_unify && (not root) && has_non_unifiable_type t1 then (
@@ -902,7 +902,7 @@ module Inner = struct
         (f2, scope)
     | T.Const id1, T.Const id2 ->
       (* first-order applications *)
-      if ID.equal id1 id2 then
+      if Name.equal id1 id2 then
         same_rigid_head ()
       else if op = O_unify && (not root) && has_non_unifiable_type t1 then (
         let tags = T.type_non_unifiable_tags (T.ty_exn t1) in

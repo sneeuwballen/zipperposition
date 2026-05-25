@@ -16,7 +16,7 @@ type term = Term.t
 type proof = Proof.step
 
 type term_rule = {
-  term_head: ID.t; (* head symbol of LHS *)
+  term_head: Name.t; (* head symbol of LHS *)
   term_args: term list; (* arguments *)
   term_arity: int; (* [length args] *)
   term_lhs: term; (* [lhs = head args] *)
@@ -77,7 +77,7 @@ end)
 type rule_set = Rule_set.t
 
 type defined_cst = {
-  defined_id: ID.t;
+  defined_id: Name.t;
   defined_ty: Type.t;
   defined_level: int option;
   mutable defined_rules: rule_set;
@@ -111,12 +111,12 @@ let pp_rule_set out (rs : rule_set) : unit =
   Fmt.(within "{" "}" @@ hvbox @@ Util.pp_iter pp_rule)
     out (Rule_set.to_iter rs)
 
-type ID.payload +=
+type Name_payload.t +=
   | Payload_defined_cst of defined_cst
         (** Annotation on IDs that are defined. *)
 
 let as_defined_cst id =
-  ID.payload_find id ~f:(function
+  Name_payload.find id ~f:(function
     | Payload_defined_cst c -> Some c
     | _ -> None)
 
@@ -152,7 +152,7 @@ module Cst_ = struct
   let to_string = Fmt.to_string pp
 end
 
-type pseudo_rule = ID.t * term list * term list Iter.t
+type pseudo_rule = Name.t * term list * term list Iter.t
 (* LHS id, LHS args, sequence of occurrences of same ID's arguments on RHS *)
 
 (* compute position roles for a set of rules with the given terms as LHS *)
@@ -166,7 +166,7 @@ let compute_pos_gen (l : pseudo_rule list) : defined_positions =
   assert (
     l
     |> List.for_all (fun (id', args', _) ->
-           ID.equal id id' && List.length args' = n));
+           Name.equal id id' && List.length args' = n));
   (* now compute position roles *)
   let pos = Array.make n Defined_pos.P_invariant in
   Iter.of_list l
@@ -236,17 +236,17 @@ module Term = struct
       assert (Type.equal (T.ty rhs) (T.ty lhs));
       if not (T.VarSet.is_empty @@ T.vars rhs) then
         Util.invalid_argf
-          "Rule.make_const %a %a:@ invalid rule, RHS contains variables" ID.pp
+          "Rule.make_const %a %a:@ invalid rule, RHS contains variables" Name.pp
           id T.pp rhs;
       make_ id [] lhs rhs proof
 
     (* [id args := rhs] *)
     let make ~proof id ty args rhs : t =
-      Util.debugf ~section 1 "Making rule for %a" (fun k -> k ID.pp id);
+      Util.debugf ~section 1 "Making rule for %a" (fun k -> k Name.pp id);
       let lhs = T.app (T.const ~ty id) args in
       if not (T.VarSet.subset (T.vars rhs) (T.vars lhs)) then
         Util.invalid_argf
-          "Rule.make_const %a %a:@ invalid rule, RHS contains variables" ID.pp
+          "Rule.make_const %a %a:@ invalid rule, RHS contains variables" Name.pp
           id T.pp rhs;
       make_ id args lhs rhs proof
 
@@ -648,14 +648,14 @@ let pseudo_rule_of_rule (r : rule) : pseudo_rule =
       Term.Rule.rhs r |> T.Seq.subterms
       |> Iter.filter_map (fun sub ->
              match T.Classic.view sub with
-             | T.Classic.App (id', args') when ID.equal id' id -> Some args'
+             | T.Classic.App (id', args') when Name.equal id' id -> Some args'
              | _ -> None)
     in
     id, args, rhs
   | L_rule r ->
     let view_atom id (t : term) =
       match T.Classic.view t with
-      | T.Classic.App (id', args') when ID.equal id' id -> Some args'
+      | T.Classic.App (id', args') when Name.equal id' id -> Some args'
       | _ -> None
     in
     let view_lit id (lit : Literal.t) =
@@ -729,7 +729,7 @@ module Rule = struct
     | L_rule r -> Lit.Rule.proof r
 
   let contains_skolems (t : term) : bool =
-    T.Seq.symbols t |> Iter.exists ID.is_skolem
+    T.Seq.symbols t |> Iter.exists Name.is_skolem
 
   let make_lit ~proof lit_lhs lit_rhs =
     L_rule (Lit.Rule.make ~proof lit_lhs lit_rhs)
@@ -782,9 +782,9 @@ module Defined_cst = struct
 
   (* check the ID of this rule *)
   let check_id_tr id (r : term_rule) : unit =
-    if not (ID.equal id (Term.Rule.head_id r)) then
+    if not (Name.equal id (Term.Rule.head_id r)) then
       Util.invalid_argf "Rewrite_term.Defined_cst:@ rule %a@ should have id %a"
-        Term.Rule.pp r ID.pp id
+        Term.Rule.pp r Name.pp id
 
   let compute_pos id (s : rule_set) =
     let pos =
@@ -793,7 +793,7 @@ module Defined_cst = struct
       |> Iter.to_rev_list |> compute_pos_gen
     in
     Util.debugf ~section 3 "(@[<2>defined_pos %a@ :pos (@[<hv>%a@])@])"
-      (fun k -> k ID.pp id (Util.pp_iter Defined_pos.pp) (IArray.to_iter pos));
+      (fun k -> k Name.pp id (Util.pp_iter Defined_pos.pp) (IArray.to_iter pos));
     pos
 
   let check_rules id rules =
@@ -817,18 +817,18 @@ module Defined_cst = struct
   let declare ?level id (rules : rule_set) : t =
     (* declare that [id] is a defined constant of level [l+1] *)
     Util.debugf ~section 2 "@[<2>declare %a@ as defined constant@ :rules %a@]"
-      (fun k -> k ID.pp id pp_rule_set rules);
+      (fun k -> k Name.pp id pp_rule_set rules);
     let ty =
       if Rule_set.is_empty rules then
         Util.invalid_argf
-          "cannot declare %a as defined constant with empty set of rules" ID.pp
-          id;
+          "cannot declare %a as defined constant with empty set of rules"
+          Name.pp id;
       match Rule_set.choose rules with
       | T_rule s -> Term.Rule.ty s
       | L_rule _ -> Type.prop
     in
     let dcst = make_ level id ty rules in
-    ID.set_payload id (Payload_defined_cst dcst);
+    Name_payload.add id (Payload_defined_cst dcst);
     CCList.Ref.push allcst_ dcst;
     dcst
 
@@ -853,7 +853,7 @@ module Defined_cst = struct
     match as_defined_cst id with
     | Some c ->
       Util.debugf ~section 2 "@[<2>add rule@ :to %a@ :rule %a@]" (fun k ->
-          k ID.pp id pp_rule rule);
+          k Name.pp id pp_rule rule);
       add_rule c rule
     | None -> ignore (declare ?level:None id (Rule_set.singleton rule))
 
@@ -886,11 +886,11 @@ module Defined_cst = struct
     let p_id = Ind_ty.projector_id p in
     match as_defined_cst p_id with
     | Some _ ->
-      Util.invalid_argf "cannot declare proj %a, already defined" ID.pp p_id
+      Util.invalid_argf "cannot declare proj %a, already defined" Name.pp p_id
     | None ->
       let rule = mk_rule_proj_ p proof in
       Util.debugf ~section 3 "(@[declare-proj %a@ :rule %a@])" (fun k ->
-          k ID.pp p_id Rule.pp rule);
+          k Name.pp p_id Rule.pp rule);
       ignore (declare ?level:None p_id (Rule_set.singleton rule))
 
   (* make a single rule [C (proj_1 x)…(proj_n x) --> x] *)
@@ -924,11 +924,12 @@ module Defined_cst = struct
     if not (CCList.is_empty c.Ind_ty.cstor_args) then (
       match as_defined_cst c_id with
       | Some _ ->
-        Util.invalid_argf "cannot declare cstor %a, already defined" ID.pp c_id
+        Util.invalid_argf "cannot declare cstor %a, already defined" Name.pp
+          c_id
       | None ->
         let rule = mk_rule_cstor_ c proof in
         Util.debugf ~section 3 "(@[declare-cstor %a@ :rule %a@])" (fun k ->
-            k ID.pp c_id Rule.pp rule);
+            k Name.pp c_id Rule.pp rule);
         ignore (declare ?level:None c_id (Rule_set.singleton rule) : t)
     )
 end

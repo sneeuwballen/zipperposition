@@ -107,7 +107,7 @@ module Head = struct
     | Exists
 
   type t =
-    | I of ID.t
+    | I of Name.t
     | B of Builtin.t
     | Q of quantifier
     | V of var
@@ -115,7 +115,7 @@ module Head = struct
     | LAM
 
   let pp out = function
-    | I id -> ID.pp out id
+    | I id -> Name.pp out id
     | B b -> Builtin.pp out b
     | Q Forall -> CCString.pp out "FORALL"
     | Q Exists -> CCString.pp out "EXISTS"
@@ -986,7 +986,7 @@ module LambdaFreeKBOCoeff : ORD = struct
       match Type.arity (Type.const s) with
       | Type.NoArity ->
         failwith
-          (CCFormat.sprintf "symbol %a has ill-formed type %a" ID.pp s Type.pp
+          (CCFormat.sprintf "symbol %a has ill-formed type %a" Name.pp s Type.pp
              (Type.const s))
       | Type.Arity (_, n) -> n
     in
@@ -1251,7 +1251,7 @@ module LambdaKBO : ORD = struct
     match WH.find_opt weight_id_hashtbl w with
     | Some id -> id
     | None ->
-      let id = ID.make (W.to_string w) in
+      let id = Name.make (W.to_string w) in
       WH.add weight_id_hashtbl w id;
       id
 
@@ -1452,7 +1452,7 @@ module LambdaKBO : ORD = struct
     | Const gid, Const fid ->
       (match Prec.compare prec gid fid with
       | 0 ->
-        (match ID.compare gid fid with
+        (match Name.compare gid fid with
         | 0 ->
           (match
              same_length_lex_ext (compare_type_terms ~prec) t_tyargs s_tyargs
@@ -1590,7 +1590,7 @@ module LambdaLPO : ORD = struct
     | Const gid, Const fid ->
       (match Prec.compare prec gid fid with
       | 0 ->
-        (match ID.compare gid fid with
+        (match Name.compare gid fid with
         | 0 ->
           (match
              same_length_lex_ext (compare_type_terms ~prec) t_tyargs s_tyargs

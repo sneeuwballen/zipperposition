@@ -499,7 +499,7 @@ let print_szs_result (type c) ~file (module Env : Env_intf.S with type C.t = c)
 
 (* print weight of [s] within precedence [prec] *)
 let pp_weight prec out s =
-  Format.fprintf out "w(%a)=%a" ID.pp s Precedence.Weight.pp
+  Format.fprintf out "w(%a)=%a" Name.pp s Precedence.Weight.pp
     (Precedence.weight prec s)
 
 (* does the sequence of declarations contain at least one conjecture? *)
@@ -543,7 +543,7 @@ let syms_in_conj_f decls =
         |> Iter.append acc
       | _ -> acc)
     Iter.empty decls
-  |> ID.Set.of_iter |> ID.Set.to_iter
+  |> Name.Set.of_iter |> Name.Set.to_iter
 
 (* Process the given file (try to solve it) *)
 let process_file ?(prelude = Iter.empty) file =
@@ -559,7 +559,7 @@ let process_file ?(prelude = Iter.empty) file =
   let has_goal = has_goal_decls_ decls in
   let conj_syms = syms_in_conj_f decls in
   Util.debugf ~section 1 "conj syms: @[%a@]@." (fun k ->
-      k (Iter.pp_seq ID.pp) conj_syms);
+      k (Iter.pp_seq Name.pp) conj_syms);
   Util.debugf ~section 2 "parsed %d declarations (%s goal(s))" (fun k ->
       k (CCVector.length decls)
         (if has_goal then

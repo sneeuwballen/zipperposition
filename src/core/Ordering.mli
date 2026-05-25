@@ -35,7 +35,7 @@ val monotonic : t -> bool
 val precedence : t -> Precedence.t
 (** Current precedence *)
 
-val add_list : signature:Signature.t -> t -> ID.t list -> unit
+val add_list : signature:Signature.t -> t -> Name.t list -> unit
 (** Update precedence with symbols *)
 
 val name : t -> string
@@ -88,7 +88,7 @@ val map : (term -> term) -> t -> t
 
 (** {2 Global table of Orders} *)
 
-val default_of_list : ID.t list -> t
+val default_of_list : Name.t list -> t
 (** default ordering on terms (RPO6) using default precedence *)
 
 val default_of_prec : Precedence.t -> t

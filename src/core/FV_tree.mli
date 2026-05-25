@@ -12,8 +12,8 @@ type labels = Index_intf.labels
 
 type feature =
   | N of int
-  | S of ID.Set.t
-  | M of int ID.Map.t
+  | S of Name.Set.t
+  | M of int Name.Map.t
   | L of labels
 
 type feature_vector = feature IArray.t

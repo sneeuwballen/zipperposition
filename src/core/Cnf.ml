@@ -247,7 +247,7 @@ module Flatten = struct
     let mk_pat what =
       match of_ with
       | None -> what ^ "_"
-      | Some id -> Fmt.sprintf "%s_%s_" (ID.name id) what
+      | Some id -> Printf.sprintf "%s_%s_" (Name.to_string id) what
     in
     let rec aux pos vars t =
       match T.view t with
@@ -1200,7 +1200,7 @@ let cnf_of_iter ~ctx ?(opts = []) (seq : Stmt.input_t Iter.t) : _ CCVector.t =
   (* reduce the new formulas to CNF *)
   let res = CCVector.create () in
   (* convert formula into CNF, returning a list of clauses and a list of skolems *)
-  let conv_form_sk f : (ID.t * type_) list * clause list =
+  let conv_form_sk f : (Name.t * type_) list * clause list =
     Util.debugf ~section 2 "@[<2>reduce@ `@[%a@]`@ to CNF@]" (fun k -> k T.pp f);
     let view_as_cnf f =
       assert (T.Ty.is_prop (T.ty_exn f));
@@ -1363,7 +1363,7 @@ let pp_fo_c_statement = Statement.pp_clause
 
 let type_declarations seq =
   let open Statement in
-  seq |> Iter.flat_map Seq.ty_decls |> ID.Map.of_iter
+  seq |> Iter.flat_map Seq.ty_decls |> Name.Map.of_iter
 
 let convert seq =
   let module A = UntypedAST in

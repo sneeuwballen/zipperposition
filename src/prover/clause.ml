@@ -410,7 +410,7 @@ module Make (Ctx : Ctx.S) : S with module Ctx = Ctx = struct
       | Eq | Incomparable -> false)
     | _ -> false
 
-  let symbols ?(init = ID.Set.empty) ?(include_types = false) seq =
+  let symbols ?(init = Name.Set.empty) ?(include_types = false) seq =
     Iter.fold
       (fun set c -> Lits.symbols ~include_types ~init:set c.sclause.lits)
       init seq

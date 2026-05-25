@@ -102,7 +102,7 @@ let can_select_lit ~ord (lits : Lits.t) (i : int) : bool =
       | Lit.Equation (lhs, rhs, _) when Lit.is_predicate_lit lits.(i) ->
         (match T.as_const (T.head_term lhs) with
         | Some sym ->
-          not (ID.is_postcnf_skolem sym && not (ID.is_lazycnf_skolem sym))
+          not (Name.is_postcnf_skolem sym && not (Name.is_lazycnf_skolem sym))
         | _ -> true)
       | _ -> true
     in
@@ -234,11 +234,11 @@ let mk_alpha_rank_map lits =
     (fun syms l ->
       match l with
       | Lit.Equation (lhs, _, _) when T.is_const lhs ->
-        (T.as_const_exn lhs, ID.name (T.as_const_exn lhs)) :: syms
+        (T.as_const_exn lhs, Name.to_string (T.as_const_exn lhs)) :: syms
       | _ -> syms)
     [] lits
   |> List.sort (fun (_, x) (_, y) -> CCString.compare x y)
-  |> CCList.foldi (fun acc i (id, _) -> ID.Map.add id i acc) ID.Map.empty
+  |> CCList.foldi (fun acc i (id, _) -> Name.Map.add id i acc) Name.Map.empty
 
 let lit_sel_diff_w l =
   match l with
@@ -257,11 +257,11 @@ let pred_freq ~ord lits =
            match hd with
            | None -> acc
            | Some id ->
-             let current_val = ID.Map.get_or id acc ~default:0 in
-             ID.Map.add id (current_val + 1) acc
+             let current_val = Name.Map.get_or id acc ~default:0 in
+             Name.Map.add id (current_val + 1) acc
          ) else
            acc)
-       ID.Map.empty
+       Name.Map.empty
 
 let is_truly_equational l = not (Literal.is_predicate_lit l)
 
@@ -269,7 +269,7 @@ let get_pred_freq ~freq_tbl lit =
   match lit with
   | Lit.Equation (l, r, _) when Lit.is_predicate_lit lit ->
     (match T.head l with
-    | Some id -> ID.Map.get_or id freq_tbl ~default:0
+    | Some id -> Name.Map.get_or id freq_tbl ~default:0
     | None -> max_int)
   | _ -> max_int
 
@@ -336,7 +336,7 @@ let e_sel2 ~blocker ~ord lits =
           if not hd_is_cst then
             max_int
           else
-            ID.Map.get_or ~default:max_int
+            Name.Map.get_or ~default:max_int
               (T.as_const_exn (T.head_term lhs))
               alpha_map
         in
@@ -457,7 +457,7 @@ let e_sel8 ~blocker ~ord lits =
     | Lit.Equation (l, _, _) as lit
       when Lit.is_predicate_lit lit && Lit.is_positivoid lit
            && T.is_const (T.head_term l) ->
-      ID.Map.get_or ~default:max_int (T.head_exn l) alpha_map
+      Name.Map.get_or ~default:max_int (T.head_exn l) alpha_map
     | _ -> max_int
   in
   let is_propositional = function
@@ -506,7 +506,7 @@ let e_sel9 ~blocker ~ord lits =
     | Lit.Equation (lhs, _, _) ->
       let hd = T.head_term lhs in
       if T.is_const hd then
-        ID.id (T.as_const_exn hd)
+        (T.as_const_exn hd).id
       else
         max_int
     | _ -> max_int
@@ -608,7 +608,7 @@ let e_sel14 ~blocker ~ord lits =
     let hd_is_fresh_pred = function
       | Lit.Equation (lhs, rhs, _) as l when Lit.is_predicate_lit l ->
         (match T.as_const (T.head_term lhs) with
-        | Some c -> ID.is_postcnf_skolem c
+        | Some c -> Name.is_postcnf_skolem c
         | None -> false)
       | _ -> false
     in
@@ -693,7 +693,7 @@ let e_sel16 ~blocker ~ord lits =
         if not (T.is_const (T.head_term lhs)) then
           0
         else
-          ID.id (T.as_const_exn (T.head_term lhs))
+          (T.as_const_exn (T.head_term lhs)).id
       in
       if T.is_true_or_false rhs then
         ( (* predicate literal *)
@@ -751,7 +751,7 @@ let e_sel18 ~blocker ~ord lits =
         (if not (T.is_const (T.head_term lhs)) then
            max_int
          else
-           ID.Map.get_or ~default:max_int
+           Name.Map.get_or ~default:max_int
              (T.as_const_exn (T.head_term lhs))
              alpha_map),
         -lit_sel_diff_w l )

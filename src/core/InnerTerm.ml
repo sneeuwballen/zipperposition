@@ -75,7 +75,7 @@ and view =
   | Var of t HVar.t  (** Free or bound variable *)
   | DB of int
   | Bind of Binder.t * t * t  (** Type, sub-term *)
-  | Const of ID.t  (** Constant *)
+  | Const of Name.t  (** Constant *)
   | App of t * t list  (** Uncurried application *)
   | AppBuiltin of Builtin.t * t list
       (** For representing special constructors *)
@@ -148,7 +148,7 @@ let _hash_norec t =
   | DB v -> Hash.combine2 2 (Hash.int v)
   | Bind (b, varty, t') ->
     Hash.combine4 3 (Binder.hash b) (hash varty) (hash t')
-  | Const s -> Hash.combine2 4 (ID.hash s)
+  | Const s -> Hash.combine2 4 (Name.hash s)
   | App (f, l) -> Hash.combine3 10 (hash f) (Hash.list hash l)
   | AppBuiltin (b, l) -> Hash.combine3 20 (Builtin.hash b) (Hash.list hash l)
 
@@ -164,7 +164,7 @@ let hash_mod_alpha t : int =
         | DB v -> Hash.combine2 2 (Hash.int v)
         | Bind (b, varty, t') ->
           Hash.combine4 3 (Binder.hash b) (aux (d - 1) varty) (aux (d - 1) t')
-        | Const s -> Hash.combine2 4 (ID.hash s)
+        | Const s -> Hash.combine2 4 (Name.hash s)
         | App (f, l) ->
           Hash.combine3 10 (aux (d - 1) f) (Hash.list (aux (d - 1)) l)
         | AppBuiltin (b, l) ->
@@ -204,7 +204,7 @@ let _eq_norec t1 t2 =
   match t1.term, t2.term with
   | Var i, Var j -> HVar.equal equal i j
   | DB i, DB j -> i = j
-  | Const s1, Const s2 -> ID.equal s1 s2
+  | Const s1, Const s2 -> Name.equal s1 s2
   | Bind (b1, varty1, t1'), Bind (b2, varty2, t2') ->
     Binder.equal b1 b2 && equal varty1 varty2 && equal t1' t2'
   | App (f1, l1), App (f2, l2) -> equal f1 f2 && _eq_norec_list l1 l2
@@ -331,7 +331,7 @@ let rec debugf out t =
     Format.fprintf out "(@[<1>%a@ %a@])" Builtin.pp b (Util.pp_list debugf) l
   | Var i -> HVar.pp out i
   | DB i -> Format.fprintf out "Y%d" i
-  | Const s -> ID.pp out s
+  | Const s -> Name.pp out s
   | App (_, []) -> assert false
   | App (s, l) ->
     Format.fprintf out "(@[<1>%a@ %a@])" debugf s (Util.pp_list debugf) l
@@ -1200,9 +1200,9 @@ let rec pp_depth ?(hooks = []) depth out t =
       if !print_all_types then
         Format.fprintf out ":%a" (_pp_surrounded depth) (ty_exn t)
     | Const s ->
-      (match ID.as_prefix s with
+      (match Name.as_prefix s with
       | Some s -> CCFormat.string out s
-      | None -> ID.pp out s)
+      | None -> Name.pp out s)
     | Bind (b, _, _) ->
       (* unfold *)
       let varty_l, t' = open_bind b t in
@@ -1271,12 +1271,12 @@ let rec pp_depth ?(hooks = []) depth out t =
       in
       let as_infix =
         match view f with
-        | Const id -> ID.as_infix id
+        | Const id -> Name.as_infix id
         | _ -> None
       in
       let as_prefix =
         match view f with
-        | Const id -> ID.as_prefix id
+        | Const id -> Name.as_prefix id
         | _ -> None
       in
       (match as_infix, as_prefix, l with
@@ -1321,7 +1321,7 @@ let rec pp_zf out t =
     match view t with
     | Var v -> pp_var_zf out v
     | DB i -> Format.fprintf out "Y%d" (depth - i - 1)
-    | Const s -> ID.pp_zf out s
+    | Const s -> Name.pp_zf out s
     | Bind (b, _, _) ->
       (* unfold *)
       let varty_l, t' = open_bind b t in

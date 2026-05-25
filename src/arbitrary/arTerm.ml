@@ -12,7 +12,7 @@ type 'a gen = 'a QCheck.Gen.t
 module PT = struct
   module PT = TypedSTerm
 
-  let _const ~ty s = PT.const ~ty (ID.make s)
+  let _const ~ty s = PT.const ~ty (Name.make s)
 
   (* strict subterms *)
   let rec shrink t =
@@ -153,7 +153,7 @@ module PT = struct
   let p x y = PT.app ~ty:ty_prop (_const ~ty:ty_pred2 "p") [ x; y ]
   let q x = PT.app ~ty:ty_prop (_const ~ty:ty_pred1 "q") [ x ]
   let r x = PT.app ~ty:ty_prop (_const ~ty:ty_pred1 "r") [ x ]
-  let s = PT.const ~ty:ty_prop (ID.make "s")
+  let s = PT.const ~ty:ty_prop (Name.make "s")
 
   let pred_g =
     let sub = default_g in

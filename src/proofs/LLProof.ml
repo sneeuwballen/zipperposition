@@ -36,8 +36,8 @@ and step =
   | Assert
   | Negated_goal of t
   | Trivial
-  | By_def of ID.t
-  | Define of ID.t
+  | By_def of Name.t
+  | Define of Name.t
   | Instantiate of {
       form: t;
       inst: inst;
@@ -74,8 +74,8 @@ let pp_step out (s : step) : unit =
   | Assert -> Fmt.string out "assert"
   | Negated_goal _ -> Fmt.string out "negated_goal"
   | Trivial -> Fmt.string out "trivial"
-  | By_def id -> Fmt.fprintf out "(by_def :of %a)" ID.pp id
-  | Define id -> Fmt.fprintf out "(@[define@ %a@])" ID.pp id
+  | By_def id -> Fmt.fprintf out "(by_def :of %a)" Name.pp id
+  | Define id -> Fmt.fprintf out "(@[define@ %a@])" Name.pp id
   | Instantiate { inst; tags; _ } ->
     Fmt.fprintf out "(@[instantiate %a%a@])" pp_inst inst pp_tags tags
   | Esa (n, _) -> Fmt.fprintf out "(esa %s)" n
@@ -203,8 +203,8 @@ module Dot = struct
           | Assert -> "assert"
           | Negated_goal _ -> "negated_goal"
           | Trivial -> "trivial"
-          | By_def id -> Fmt.sprintf "by_def(%a)" ID.pp id
-          | Define id -> Fmt.sprintf "define(%a)" ID.pp id
+          | By_def id -> Fmt.sprintf "by_def(%a)" Name.pp id
+          | Define id -> Fmt.sprintf "define(%a)" Name.pp id
           | Instantiate _ -> "instantiate"
           | Esa (name, _) -> name
           | Inference { name; _ } -> name

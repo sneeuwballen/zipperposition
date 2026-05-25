@@ -16,7 +16,7 @@ type case = {
   case_term: Term.t; (* rhs *)
   case_kind: [ `Base | `Rec ]; (* at least one sub-constant? *)
   case_sub: cst list; (* set of sub-constants *)
-  case_skolems: (ID.t * Type.t) list; (* set of other skolems *)
+  case_skolems: (Name.t * Type.t) list; (* set of other skolems *)
 }
 
 type t = {
@@ -84,7 +84,7 @@ module State_ = struct
   (* state for creating coverset *)
   type t = {
     cst: Ind_cst.Cst_set.t; (* raw set of constants *)
-    others: (ID.t * Type.t) list; (* non-inductive terms *)
+    others: (Name.t * Type.t) list; (* non-inductive terms *)
   }
 
   let empty = { cst = Ind_cst.Cst_set.empty; others = [] }
@@ -257,7 +257,7 @@ let make ?(cover_set_depth = 1) ~depth (ty : Type.t) : t =
       (fun k ->
         let pp_case out case =
           Format.fprintf out "@[<h>case %a: sub {@[<hv>%a@]}@]" Case.pp case
-            (Util.pp_list ID.pp)
+            (Util.pp_list Name.pp)
             (Case.sub_constants case |> List.rev_map Ind_cst.id)
         in
         k (Util.pp_list pp_case) set.cs_cases);

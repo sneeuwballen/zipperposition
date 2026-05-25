@@ -50,7 +50,9 @@ and conv_step st p =
      need to substitute eagerly *)
   let intros =
     let l =
-      List.mapi (fun i v -> v, T.const ~ty:(Var.ty v) (ID.makef "sk_%d" i)) vars
+      List.mapi
+        (fun i v -> v, T.const ~ty:(Var.ty v) (Name.makef "$$sk_%d" i))
+        vars
     in
     let subst = Var.Subst.of_list l in
     List.map (fun (_, c) -> T.Subst.eval subst c) l
@@ -154,7 +156,7 @@ and conv_parent st step_res intros local_intros tags (parent : Proof.Parent.t) :
           | None ->
             (* introduce local_intro *)
             let c =
-              ID.makef "sk_%d"
+              Name.makef "sk_%d"
                 (List.length intros + Var.Subst.size !local_intros)
               |> T.const ~ty:(Var.ty v |> T.Subst.eval intro_subst)
             in

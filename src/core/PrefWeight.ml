@@ -13,7 +13,7 @@ let section = Util.Section.make "pref.weight"
 
 type node_tag =
   | Var
-  | Sym of ID.t
+  | Sym of Name.t
   | BT of Builtin.t
 
 module NodeTagMap = Map.Make (struct
@@ -28,7 +28,7 @@ module NodeTagMap = Map.Make (struct
     let c = compare (tag_to_id a) (tag_to_id b) in
     if c == 0 then (
       match a, b with
-      | Sym id, Sym id' -> ID.compare id id'
+      | Sym id, Sym id' -> Name.compare id id'
       | BT b, BT b' -> Builtin.compare b b'
       | _ -> 0
     ) else

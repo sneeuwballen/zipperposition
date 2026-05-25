@@ -7,7 +7,7 @@ open Logtk
 (** {5 Constraints} *)
 
 module Constraint : sig
-  type expr = ID.t
+  type expr = Name.t
 
   type t =
     | EQ of expr * expr
@@ -46,7 +46,7 @@ end
 (** {2 Solutions to constraint problems} *)
 
 module Solution : sig
-  type t = (ID.t * ID.t) list
+  type t = (Name.t * Name.t) list
   (** A precedence on symbol. Each pair means that thG first symbol is bigger
       than the second one. *)
 

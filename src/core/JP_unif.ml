@@ -383,7 +383,7 @@ let find_disagreement s t =
         find_disagreement_l ss tt
       | T.Var _, T.Var _ when T.equal s t -> OSeq.empty
       | T.DB i, T.DB j when i = j -> OSeq.empty
-      | T.Const a, T.Const b when ID.equal a b -> OSeq.empty
+      | T.Const a, T.Const b when Name.equal a b -> OSeq.empty
       | T.Fun (ty_s, s'), T.Fun (ty_t, t') ->
         (* type can be different for quantifiers -- 
            e.g. forall x:nat alpha == !! \x:nat. alpha

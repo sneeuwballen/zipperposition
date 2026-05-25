@@ -8,7 +8,7 @@ type res =
   | Ty of Ind_ty.t
   | Cstor of Ind_ty.constructor * Ind_ty.t
   | Inductive_cst of Ind_cst.t option
-  | Projector of ID.t  (** projector of some constructor (id: type) *)
+  | Projector of Name.t  (** projector of some constructor (id: type) *)
   | DefinedCst of int * Statement.definition
   | Parameter of int
   | Skolem
@@ -31,13 +31,13 @@ let classify id =
     [
       (Ind_ty.as_constructor |>> fun (c, t) -> Cstor (c, t));
       (Ind_ty.as_inductive_ty |>> fun x -> Ty x);
-      (ID.as_parameter |>> fun x -> Parameter x);
+      (Name.as_parameter |>> fun x -> Parameter x);
       (Ind_cst.id_as_cst |>> fun c -> Inductive_cst (Some c));
       (fun id ->
         let open CCOpt.Infix in
-        ID.as_skolem id >>= function
-        | ID.K_ind -> Some (Inductive_cst None)
-        | ID.K_normal | ID.K_after_cnf | ID.K_lazy_cnf -> Some Skolem);
+        Name.as_skolem id >>= function
+        | Name.K_ind -> Some (Inductive_cst None)
+        | Name.K_normal | Name.K_after_cnf | Name.K_lazy_cnf -> Some Skolem);
       (Ind_ty.as_projector |>> fun p -> Projector (Ind_ty.projector_id p));
       ( Rewrite.as_defined_cst |>> fun cst ->
         DefinedCst (Rewrite.Defined_cst.level cst, Rewrite.Defined_cst.rules cst)
@@ -63,7 +63,7 @@ let pp_res out = function
   | Ty _ -> Format.fprintf out "ind_ty"
   | Cstor (_, ity) -> Format.fprintf out "cstor of %a" Ind_ty.pp ity
   | Inductive_cst _ -> Format.fprintf out "ind_cst"
-  | Projector id -> Format.fprintf out "projector_%a" ID.pp id
+  | Projector id -> Format.fprintf out "projector_%a" Name.pp id
   | DefinedCst (lev, _) -> Format.fprintf out "defined (level %d)" lev
   | Parameter i -> Format.fprintf out "parameter %d" i
   | Skolem -> CCFormat.string out "skolem"
@@ -71,7 +71,7 @@ let pp_res out = function
 
 let pp_signature out sigma =
   let pp_pair out (id, (ty, _)) =
-    Format.fprintf out "(@[%a : %a (%a)@])" ID.pp id Type.pp ty pp_res
+    Format.fprintf out "(@[%a : %a (%a)@])" Name.pp id Type.pp ty pp_res
       (classify id)
   in
   Format.fprintf out "{@[<hv>%a@]}"
@@ -125,7 +125,7 @@ let prec_constr_ a b =
 
 let prec_constr = Precedence.Constr.make prec_constr_
 
-let weight_fun (id : ID.t) : Precedence.Weight.t =
+let weight_fun (id : Name.t) : Precedence.Weight.t =
   let module W = Precedence.Weight in
   match classify id with
   | Ty _ -> W.int 1

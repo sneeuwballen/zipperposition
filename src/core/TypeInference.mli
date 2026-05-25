@@ -9,7 +9,7 @@
       inferring the exact type of each subterm (and possibly inferring type
       parameters).
 
-    In this context, {b generalizing} type variables means that if some ID.t
+    In this context, {b generalizing} type variables means that if some Name.t
     whose type was unknown and its type still contains variables after the type
     inference, those variables are quantified instead of being bound to a
     default type (typically {!Type.i}).
@@ -90,7 +90,7 @@ module Ctx : sig
       provided at creation of the context. Some ree variables will be
       generalized, i.e., kept as (free) variables *)
 
-  val declare : ?loc:loc -> t -> ID.t -> type_ -> unit
+  val declare : ?loc:loc -> t -> Name.t -> type_ -> unit
   (** Declare the type of a symbol, possibly shadowing a previous version *)
 
   val with_var : t -> type_ Var.t -> f:(unit -> 'a) -> 'a
@@ -99,7 +99,7 @@ module Ctx : sig
   val with_vars : t -> type_ Var.t list -> f:(unit -> 'a) -> 'a
   (** Execute a function f with additional declared variables *)
 
-  val pop_new_types : t -> (ID.t * type_) list
+  val pop_new_types : t -> (Name.t * type_) list
   (** Obtain the list of symbols whose type has been inferred recently, and
       reset it. *)
 end

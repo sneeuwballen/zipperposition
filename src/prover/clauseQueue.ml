@@ -546,7 +546,7 @@ module Make (C : Clause_intf.S) = struct
         let rec w_diff ~given_term ~conj_term =
           match T.view given_term, T.view conj_term with
           | T.Var _, T.Var _ -> 1
-          | T.Const x, T.Const y when ID.equal x y -> 1
+          | T.Const x, T.Const y when Name.equal x y -> 1
           | T.DB i, T.DB j when i = j -> 1
           | T.Var _, _ -> int_of_float (inst_penalty *. w conj_term)
           | T.App (hd, _), _ when T.is_var hd ->
@@ -625,7 +625,7 @@ module Make (C : Clause_intf.S) = struct
            else
              1.0)
           *.
-          if ID.is_postcnf_skolem sym then
+          if Name.is_postcnf_skolem sym then
             fresh_mul
           else
             1.0
@@ -782,7 +782,7 @@ module Make (C : Clause_intf.S) = struct
         else
           C.maxlits (c, 0) Subst.empty
       in
-      let get_syms l r = ID.Set.union (Term.symbols l) (Term.symbols r) in
+      let get_syms l r = Name.Set.union (Term.symbols l) (Term.symbols r) in
       let get_vars l r = Term.VarSet.union (Term.vars l) (Term.vars r) in
 
       let res =
@@ -809,12 +809,12 @@ module Make (C : Clause_intf.S) = struct
                  let w = pos_c *. max_c *. mul_max_t (l, w_l) (r, w_r) in
                  assert (int_of_float w != 0);
                  ( w +. weight,
-                   ID.Set.union syms (get_syms l r),
+                   Name.Set.union syms (get_syms l r),
                    Term.VarSet.union vars (get_vars l r) )
                | _ -> weight +. 1.0, syms, vars)
-             (0.0, ID.Set.empty, Term.VarSet.empty)
+             (0.0, Name.Set.empty, Term.VarSet.empty)
         |> fun (w, syms, vars) ->
-        let f = float_of_int @@ ID.Set.cardinal syms in
+        let f = float_of_int @@ Name.Set.cardinal syms in
         let v = float_of_int @@ Term.VarSet.cardinal vars in
 
         let f_factor = (fdiff_a *. f) +. fdiff_b in
@@ -1119,7 +1119,7 @@ module Make (C : Clause_intf.S) = struct
         ^ "-fun_weight:int,-var_weight:int"
         ^ "max_t_mult:float, max_lit_mul:float, pos_lit_mult:float)"
 
-    let _f_weights = ID.Tbl.create 100
+    let _f_weights = Name.Tbl.create 100
     let _default = ref (-1)
 
     let calc_poly base x ~c ~lin ~sq =
@@ -1147,7 +1147,7 @@ module Make (C : Clause_intf.S) = struct
                   float_of_int
                   @@ Term.weight ~var:vw
                        ~sym:(fun id ->
-                         ID.Tbl.get_or _f_weights ~default:!_default id)
+                         Name.Tbl.get_or _f_weights ~default:!_default id)
                        t
                 in
                 let ord_side = Ordering.compare ord l r in
@@ -1263,12 +1263,12 @@ module Make (C : Clause_intf.S) = struct
 
             let goal_syms = C.symbols (Iter.of_list goals) in
 
-            let cl_map = ID.Tbl.create 100 in
+            let cl_map = Name.Tbl.create 100 in
             List.iter
               (fun cl ->
                 C.symbols (Iter.singleton cl)
-                |> ID.Set.iter (fun k ->
-                       ID.Tbl.update cl_map
+                |> Name.Set.iter (fun k ->
+                       Name.Tbl.update cl_map
                          ~f:(fun _ -> function
                            | Some old -> Some (cl :: old)
                            | None -> Some [ cl ])
@@ -1276,26 +1276,26 @@ module Make (C : Clause_intf.S) = struct
               axs;
 
             let rec fill_levels syms_at_level level =
-              ID.Set.iter
+              Name.Set.iter
                 (fun id ->
-                  assert (not (ID.Tbl.mem _f_weights id));
-                  ID.Tbl.replace _f_weights id level)
+                  assert (not (Name.Tbl.mem _f_weights id));
+                  Name.Tbl.replace _f_weights id level)
                 syms_at_level;
               let new_syms =
-                ID.Set.fold
+                Name.Set.fold
                   (fun id new_syms ->
-                    let cls = ID.Tbl.get_or ~default:[] cl_map id in
-                    ID.Set.fold
+                    let cls = Name.Tbl.get_or ~default:[] cl_map id in
+                    Name.Set.fold
                       (fun id acc ->
-                        if not (ID.Tbl.mem _f_weights id) then
-                          ID.Set.add id acc
+                        if not (Name.Tbl.mem _f_weights id) then
+                          Name.Set.add id acc
                         else
                           acc)
                       (C.symbols (Iter.of_list cls))
                       new_syms)
-                  syms_at_level ID.Set.empty
+                  syms_at_level Name.Set.empty
               in
-              if not (ID.Set.is_empty new_syms) then
+              if not (Name.Set.is_empty new_syms) then
                 fill_levels new_syms (level + 1)
               else
                 level
@@ -1307,7 +1307,7 @@ module Make (C : Clause_intf.S) = struct
                 (max cw (max pw fw))
                 (def_l + max_lvl);
 
-            ID.Tbl.filter_map_inplace
+            Name.Tbl.filter_map_inplace
               (fun id lvl ->
                 let ty = Signature.find_exn (C.Ctx.signature ()) id in
                 let base =

@@ -25,7 +25,7 @@ let pp_polarity out = function
 
 type form_definition = {
   form: form;
-  proxy_id: ID.t; (* name *)
+  proxy_id: Name.t; (* name *)
   (* the defined object *)
   proxy: term;
   (* atom/term standing for the defined object *)
@@ -42,7 +42,7 @@ type form_definition = {
 }
 
 type term_definition = {
-  td_id: ID.t;
+  td_id: Name.t;
   td_ty: type_;
   td_rules: (form, term, type_) Statement.def_rule list;
   td_as_def: (form, term, type_) Statement.def;
@@ -60,8 +60,8 @@ type ctx = {
   mutable sc_counter: int;
   mutable sc_gensym: (string, int) Hashtbl.t; (* prefix -> count *)
   mutable sc_new_defs: definition list; (* "new" definitions *)
-  mutable sc_new_ids: (ID.t * type_) list; (* "new" symbols *)
-  sc_on_new: ID.t -> type_ -> unit;
+  mutable sc_new_ids: (Name.t * type_) list; (* "new" symbols *)
+  sc_on_new: Name.t -> type_ -> unit;
 }
 
 let create ?(prefix = "zip_sk_") ?(prop_prefix = "zip_prop")
@@ -81,7 +81,7 @@ let create ?(prefix = "zip_sk_") ?(prop_prefix = "zip_prop")
 
 let incr_counter ctx = ctx.sc_counter <- ctx.sc_counter + 1
 
-let fresh_id ?(start0 = false) ~ctx prefix =
+let fresh_name ?(start0 = false) ~ctx prefix =
   let n = CCHashtbl.get_or ~default:0 ctx.sc_gensym prefix in
   Hashtbl.replace ctx.sc_gensym prefix (n + 1);
   let name =
@@ -90,22 +90,22 @@ let fresh_id ?(start0 = false) ~ctx prefix =
     else
       prefix ^ "_" ^ string_of_int n
   in
-  ID.make name
+  Name.make name
 
 let fresh_skolem_prefix ~ctx ~ty prefix =
   incr_counter ctx;
-  let s = fresh_id ~ctx prefix in
+  let s = fresh_name ~ctx prefix in
   let kind =
     if Ind_ty.is_inductive_simple_type ty then
-      ID.K_ind
+      Name.K_ind
     else
-      ID.K_normal
+      Name.K_normal
   in
-  ID.set_payload s (ID.Attr_skolem kind);
+  Name_payload.add s (Name.Attr_skolem kind);
   ctx.sc_new_ids <- (s, ty) :: ctx.sc_new_ids;
   ctx.sc_on_new s ty;
   Util.debugf ~section 3 "@[<2>new skolem symbol `%a`@ with type `@[%a@]`@]"
-    (fun k -> k ID.pp s T.pp ty);
+    (fun k -> k Name.pp s T.pp ty);
   s
 
 let fresh_skolem ~ctx ~ty = fresh_skolem_prefix ~ctx ~ty ctx.sc_prefix
@@ -164,7 +164,7 @@ let pp_form_definition out def =
 
 let pp_term_definition out def =
   let pp_rule out r = Stmt.pp_def_rule T.pp T.pp T.pp out r in
-  Format.fprintf out "(@[<hv>def_term `%a : %a`@ rules: (@[<hv>%a@])@])" ID.pp
+  Format.fprintf out "(@[<hv>def_term `%a : %a`@ rules: (@[<hv>%a@])@])" Name.pp
     def.td_id T.pp def.td_ty (Util.pp_list pp_rule) def.td_rules
 
 let pp_definition out = function
@@ -230,8 +230,8 @@ let define_form ?(pattern = "zip_tseitin") ~ctx ~rw_rules ~polarity ~parents
     (* similar to {!skolem_form}, but always return [prop] *)
     let ty = ty_forall_l tyvars (T.Ty.fun_ (List.map Var.ty vars) T.Ty.prop) in
     (* not a skolem (but a defined term). Will be defined, not declared. *)
-    let f = fresh_id ~start0:true ~ctx pattern in
-    ID.set_payload f ID.Attr_cnf_def;
+    let f = fresh_name ~start0:true ~ctx pattern in
+    Name_payload.add f Name.Attr_cnf_def;
     let proxy = T.app ~ty:T.Ty.prop (T.const ~ty f) (tyvars_t @ vars_t) in
     let proof = Proof.Step.define_internal f parents in
     (* register the new definition *)
@@ -329,7 +329,7 @@ let define_term ?(pattern = "fun_") ~ctx ~parents rules : term_definition =
   let is_prop = T.Ty.is_prop ty_ret in
   (* NOTE: not a skolem, just a mere constant undeclared so far. Will be
      a defined constant later on. *)
-  let id = fresh_id ~start0:true ~ctx pattern in
+  let id = fresh_name ~start0:true ~ctx pattern in
   (* convert rules *)
   let rules =
     List.map

@@ -21,7 +21,7 @@ let pp_stmts out seq =
   CCVector.pp ~pp_sep:(CCFormat.return "@,") pp_stmt out seq
 
 let declare_term out () =
-  let id = ID.make "term" in
+  let id = Name.make "term" in
   let st =
     Statement.ty_decl
       ~proof:(Proof.Step.intro (Proof.Src.internal []) Proof.R_decl)

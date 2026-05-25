@@ -90,8 +90,8 @@ let process file =
     let sigma = Cnf.type_declarations (CCVector.to_iter decls) in
     if !print_sig then
       Format.printf "@[<hv2>signature:@ (@[<v>%a@]@])@."
-        (ID.Map.pp ~pp_sep:(CCFormat.return "@,")
-           ~pp_arrow:(CCFormat.return "@ : ") ID.pp T.pp)
+        (Name.Map.pp ~pp_sep:(CCFormat.return "@,")
+           ~pp_arrow:(CCFormat.return "@ : ") Name.pp T.pp)
         sigma;
     (* print *)
     print_res decls;

@@ -37,7 +37,7 @@ type view = private
   | Builtin of builtin
   | Var of t HVar.t
   | DB of int
-  | App of ID.t * t list  (** parametrized type *)
+  | App of Hstring.t * t list  (** parametrized type *)
   | Fun of t list * t  (** Function type (left to right, no left-nesting) *)
   | Forall of t  (** explicit quantification using De Bruijn index *)
 
@@ -74,12 +74,12 @@ val var : t HVar.t -> t
 val var_of_int : int -> t
 (** Build a type variable. *)
 
-val app : ID.t -> t list -> t
+val app : Hstring.t -> t list -> t
 (** Parametrized type *)
 
 val builtin : builtin -> t
 
-val const : ID.t -> t
+val const : Hstring.t -> t
 (** Constant sort *)
 
 val arrow : t list -> t -> t
@@ -116,14 +116,14 @@ type def =
   | Def_data of
       int * ty list (* data type with number of variables and cstors *)
 
-val def : ID.t -> def option
+val def : Hstring.t -> def option
 (** Access the definition of a type *)
 
-val def_exn : ID.t -> def
+val def_exn : Hstring.t -> def
 (** Unsafe version of {!def}
     @raise Not_found if not a proper constant *)
 
-val set_def : ID.t -> def -> unit
+val set_def : Hstring.t -> def -> unit
 (** Set definition of an ID *)
 
 (** {2 Containers} *)
@@ -138,7 +138,7 @@ module Seq : sig
   val sub : t -> t Iter.t
   (** Subterms *)
 
-  val symbols : t -> ID.t Iter.t
+  val symbols : t -> Hstring.t Iter.t
   val add_set : Set.t -> t Iter.t -> Set.t
   val max_var : t HVar.t Iter.t -> int
   val min_var : t HVar.t Iter.t -> int

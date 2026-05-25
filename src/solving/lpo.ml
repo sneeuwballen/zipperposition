@@ -10,7 +10,7 @@ let section = Util.Section.(make ~parent:(make "solving") "lpo")
 (** {5 Constraints} *)
 
 module Constraint = struct
-  type expr = ID.t
+  type expr = Name.t
 
   type t =
     | EQ of expr * expr
@@ -49,7 +49,7 @@ module Constraint = struct
       iter c
   end
 
-  let pp_expr = ID.pp
+  let pp_expr = Name.pp
 
   let rec pp out t =
     match t with
@@ -67,9 +67,9 @@ module Constraint = struct
   (* simplify the constraints *)
   let rec simplify t =
     match t with
-    | EQ (a, b) when ID.equal a b -> true_
-    | LE (a, b) when ID.equal a b -> true_
-    | LT (a, b) when ID.equal a b -> false_
+    | EQ (a, b) when Name.equal a b -> true_
+    | LE (a, b) when Name.equal a b -> true_
+    | LT (a, b) when Name.equal a b -> false_
     | Not (Not t) -> simplify t
     | Not True -> true_
     | Not False -> true_
@@ -109,7 +109,7 @@ module Constraint = struct
 end
 
 module Solution = struct
-  type t = (ID.t * ID.t) list
+  type t = (Name.t * Name.t) list
 
   (* constraint that prohibits this solution. We build the
      clause that makes at least one a>b false. *)
@@ -118,7 +118,7 @@ module Solution = struct
     let l = List.map (fun (a, b) -> C.le a b) sol in
     C.or_ l
 
-  let pp out s = Util.pp_list (Util.pp_pair ~sep:" > " ID.pp ID.pp) out s
+  let pp out s = Util.pp_list (Util.pp_pair ~sep:" > " Name.pp Name.pp) out s
   let to_string = CCFormat.to_string pp
 end
 
@@ -164,17 +164,17 @@ module MakeSolver (X : sig end) = struct
   module Atom : sig
     type t
 
-    val make : ID.t -> int -> t
+    val make : Name.t -> int -> t
     val equal : t -> t -> bool
     val hash : t -> int
     val print : Format.formatter -> t -> unit
   end = struct
-    type t = ID.t * int
+    type t = Name.t * int
 
     let make s i = s, i
-    let equal (s1, i1) (s2, i2) = ID.equal s1 s2 && i1 = i2
-    let hash (s, i) = Hash.combine3 42 (ID.hash s) (Hash.int i)
-    let print fmt (s, i) = Format.fprintf fmt "%a/%d" ID.pp s i
+    let equal (s1, i1) (s2, i2) = Name.equal s1 s2 && i1 = i2
+    let hash (s, i) = Hash.combine3 42 (Name.hash s) (Hash.int i)
+    let print fmt (s, i) = Format.fprintf fmt "%a/%d" Name.pp s i
   end
 
   module AtomTbl = CCHashtbl.Make (Atom)
@@ -248,11 +248,11 @@ module MakeSolver (X : sig end) = struct
         r := 2 * !r
     done;
     Util.debugf ~section 3 "index of symbol %a in precedence is %d" (fun k ->
-        k ID.pp s !r);
+        k Name.pp s !r);
     !r
 
   (* extract a solution *)
-  let get_solution sat ~n (symbols : ID.t list) : (ID.t * ID.t) list =
+  let get_solution sat ~n (symbols : Name.t list) : (Name.t * Name.t) list =
     let syms = List.rev_map (fun s -> int_of_symbol sat ~n s, s) symbols in
     (* sort in increasing order *)
     let syms = List.sort (fun (n1, _) (n2, _) -> n1 - n2) syms in
@@ -292,8 +292,8 @@ module MakeSolver (X : sig end) = struct
   let solve_list l =
     (* count the number of symbols *)
     let symbols =
-      Iter.of_list l |> Iter.flat_map C.Seq.exprs |> ID.Set.of_iter
-      |> ID.Set.elements
+      Iter.of_list l |> Iter.flat_map C.Seq.exprs |> Name.Set.of_iter
+      |> Name.Set.elements
     in
     let num = List.length symbols in
     (* the number of digits required to map each symbol to a distinct int *)

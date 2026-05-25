@@ -34,13 +34,13 @@ module Make (Env : Env.S) : S with module Env = Env = struct
         (* ground-complete set of axioms (see "E: a brainiac theorem prover") *)
   }
 
-  let tbl : cell ID.Tbl.t = ID.Tbl.create 3
+  let tbl : cell Name.Tbl.t = Name.Tbl.create 3
   let on_add : spec Signal.t = Signal.create ()
 
   let mk_axioms_ proof s ty : C.t list =
     let ty_args_n, ty_args, _ty_ret = Type.open_poly_fun ty in
     if List.length ty_args <> 2 then
-      Util.errorf ~where:"AC" "AC symbol `%a`must be of arity 2" ID.pp s;
+      Util.errorf ~where:"AC" "AC symbol `%a`must be of arity 2" Name.pp s;
     (* create type variables, for polymorphic AC symbols *)
     let ty_vars = CCList.init ty_args_n (fun i -> HVar.make ~ty:Type.tType i) in
     let ty_vars_t = List.map Type.var ty_vars in
@@ -53,7 +53,7 @@ module Make (Env : Env.S) : S with module Env = Env = struct
     | [ a; b ] ->
       if not (Type.equal a b && Type.equal a ty_ret) then
         Util.errorf ~where:"AC" "AC symbol `%a` argument types must be `@[%a@]`"
-          ID.pp s Type.pp ty_ret
+          Name.pp s Type.pp ty_ret
     | _ -> assert false);
     let x = T.var_of_int ~ty:ty_ret (ty_args_n + 1) in
     let y = T.var_of_int ~ty:ty_ret (ty_args_n + 2) in
@@ -77,19 +77,19 @@ module Make (Env : Env.S) : S with module Env = Env = struct
     ]
 
   let add_ proof ~ty s =
-    try ID.Tbl.find tbl s
+    try Name.Tbl.find tbl s
     with Not_found ->
       let spec = { ty; sym = s } in
       let axioms = mk_axioms_ proof s ty in
       let cell = { spec; proof; axioms } in
-      ID.Tbl.add tbl s cell;
+      Name.Tbl.add tbl s cell;
       Signal.send on_add spec;
       cell
 
-  let is_ac s = ID.Tbl.mem tbl s
-  let exists_ac () = ID.Tbl.length tbl > 0
-  let find_proof s = (ID.Tbl.find tbl s).proof
-  let symbols () = ID.Tbl.keys tbl |> ID.Set.of_iter
+  let is_ac s = Name.Tbl.mem tbl s
+  let exists_ac () = Name.Tbl.length tbl > 0
+  let find_proof s = (Name.Tbl.find tbl s).proof
+  let symbols () = Name.Tbl.keys tbl |> Name.Set.of_iter
 
   module A = T.AC (struct
     let is_ac = is_ac
@@ -144,11 +144,11 @@ module Make (Env : Env.S) : S with module Env = Env = struct
       if n' < n && not (C.get_flag SClause.flag_persistent c) then (
         (* did some simplification *)
         let symbols = symbols_of_terms (C.Seq.terms c) in
-        let symbols = ID.Set.to_list symbols in
+        let symbols = Name.Set.to_list symbols in
         let tags = List.map (fun id -> Builtin.Tag.T_ac id) symbols in
         let premises =
           C.proof_parent c
-          :: List.map (fun id -> (ID.Tbl.find tbl id).proof) symbols
+          :: List.map (fun id -> (Name.Tbl.find tbl id).proof) symbols
         in
         let proof =
           Proof.Step.simp premises ~rule:(Proof.Rule.mk "AC.normalize") ~tags
@@ -174,7 +174,7 @@ module Make (Env : Env.S) : S with module Env = Env = struct
   let add ~proof s ty =
     Util.debugf ~section 1
       "@[enable AC redundancy criterion@ for `@[%a : @[%a@]@]`@ :proof %a@]"
-      (fun k -> k ID.pp s Type.pp ty Proof.pp_parent proof);
+      (fun k -> k Name.pp s Type.pp ty Proof.pp_parent proof);
     (* is this the first case of AC symbols? If yes, then add inference rules *)
     let first = not (exists_ac ()) in
     if first then install_rules_ ();
@@ -182,7 +182,7 @@ module Make (Env : Env.S) : S with module Env = Env = struct
     let cell = add_ proof ~ty s in
     (* add clauses *)
     Util.debugf ~section 3 "@[<2>add AC axioms for `%a : @[%a@]`:@ @[<hv>%a@]@]"
-      (fun k -> k ID.pp s Type.pp ty (Util.pp_list C.pp) cell.axioms);
+      (fun k -> k Name.pp s Type.pp ty (Util.pp_list C.pp) cell.axioms);
     (* add axioms to either passive, or active set *)
     if
       Env.ProofState.ActiveSet.clauses ()
@@ -286,26 +286,26 @@ module Make (Env : Env.S) : S with module Env = Env = struct
       let ty = T.ty (T.head_term lhs) in
       CCOpt.iter
         (fun id ->
-          if not (ID.is_ac id) then
-            if ID.is_comm id then (
+          if not (Name.is_ac id) then
+            if Name.is_comm id then (
               if test_associativity lhs rhs || test_associativity rhs lhs then (
-                ID.set_payload id ID.Attr_assoc;
-                assert (ID.is_ac id);
+                Name_payload.add id Name.Attr_assoc;
+                assert (Name.is_ac id);
                 register_ac c id ty
               )
-            ) else if ID.is_assoc id then (
+            ) else if Name.is_assoc id then (
               if test_commutativty lhs rhs then (
-                ID.set_payload id ID.Attr_comm;
-                assert (ID.is_ac id);
+                Name_payload.add id Name.Attr_comm;
+                assert (Name.is_ac id);
                 register_ac c id ty
               )
             ) else if test_commutativty lhs rhs then (
-              ID.set_payload id ID.Attr_comm;
-              assert (ID.is_comm id)
+              Name_payload.add id Name.Attr_comm;
+              assert (Name.is_comm id)
             ) else if test_associativity lhs rhs || test_associativity rhs lhs
               then (
-              ID.set_payload id ID.Attr_assoc;
-              assert (ID.is_assoc id)
+              Name_payload.add id Name.Attr_assoc;
+              assert (Name.is_assoc id)
             ))
         (T.head lhs)
     | _ -> ()

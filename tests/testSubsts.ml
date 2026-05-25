@@ -6,13 +6,13 @@ module S = Subst
 
 let ty = Type.TPTP.i
 let __const ?(ty = ty) s = T.const ~ty s
-let f_ = ID.make "f"
-let g_ = ID.make "g"
-let h_ = ID.make "h"
-let list_ = ID.make "list"
-let nil_ = ID.make "nil"
-let a = __const (ID.make "a")
-let b = __const (ID.make "b")
+let f_ = Name.make "f"
+let g_ = Name.make "g"
+let h_ = Name.make "h"
+let list_ = Name.make "list"
+let nil_ = Name.make "nil"
+let a = __const (Name.make "a")
+let b = __const (Name.make "b")
 let x = T.var_of_int ~ty 1
 let y = T.var_of_int ~ty 2
 let f x y = T.app (__const ~ty:Type.([ term; term ] ==> term) f_) [ x; y ]

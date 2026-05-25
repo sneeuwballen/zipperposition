@@ -20,13 +20,13 @@ let eq_ty =
   Type.close_forall
   @@ Type.( ==> ) [ Type.var_of_int 0; Type.var_of_int 0 ] Type.prop
 
-let eq_id = ID.make "zip_eq_proxy"
-let neq_id = ID.make "zip_neq_proxy"
+let eq_id = Name.make "$$zip_eq_proxy"
+let neq_id = Name.make "$$zip_neq_proxy"
 let eq_const = T.const ~ty:eq_ty eq_id
 let neq_const = T.const ~ty:eq_ty neq_id
 let[@inline] mk_eq a b = T.app eq_const [ T.of_ty (T.ty a); a; b ]
 let[@inline] mk_neq a b = T.app neq_const [ T.of_ty (T.ty a); a; b ]
-let neg_id = ID.make "zip_neg_proxy"
+let neg_id = Name.make "$$zip_neg_proxy"
 
 let neg_const =
   let ty = Type.( ==> ) [ Type.prop ] Type.prop in
@@ -52,7 +52,7 @@ let rec open_term ~stack t =
 
 type view_head =
   | As_star
-  | As_app of ID.t * T.t list
+  | As_app of Name.t * T.t list
 
 let view_head (t : T.t) : view_head =
   if
@@ -96,20 +96,20 @@ module Make (E : Index.EQUATION) = struct
 
   type t = {
     star: t option; (* by variable *)
-    map: t ID.Map.t; (* by symbol *)
+    map: t Name.Map.t; (* by symbol *)
     leaf: Leaf.t; (* leaves *)
   }
   (* The discrimination tree *)
 
-  let empty () = { map = ID.Map.empty; star = None; leaf = Leaf.empty }
+  let empty () = { map = Name.Map.empty; star = None; leaf = Leaf.empty }
 
   let is_empty n =
-    n.star = None && ID.Map.is_empty n.map && Leaf.is_empty n.leaf
+    n.star = None && Name.Map.is_empty n.map && Leaf.is_empty n.leaf
 
   exception NoSuchTrie
 
   let find_sub map key =
-    try ID.Map.find key map with Not_found -> raise NoSuchTrie
+    try Name.Map.find key map with Not_found -> raise NoSuchTrie
 
   (** get/add/remove the leaf for the given term. The continuation k takes the
       leaf, and returns a leaf option that replaces the old leaf. This function
@@ -145,9 +145,9 @@ module Make (E : Index.EQUATION) = struct
           let subtrie = try find_sub trie.map s with NoSuchTrie -> empty () in
           let rebuild subtrie =
             if is_empty subtrie then
-              rebuild { trie with map = ID.Map.remove s trie.map }
+              rebuild { trie with map = Name.Map.remove s trie.map }
             else
-              rebuild { trie with map = ID.Map.add s subtrie trie.map }
+              rebuild { trie with map = Name.Map.add s subtrie trie.map }
           in
           goto subtrie (next i) rebuild)
     in
@@ -202,7 +202,7 @@ module Make (E : Index.EQUATION) = struct
     (match dt.star with
     | None -> ()
     | Some trie' -> iter trie' k);
-    ID.Map.iter (fun _ trie' -> iter trie' k) dt.map
+    Name.Map.iter (fun _ trie' -> iter trie' k) dt.map
 
   let size dt =
     let n = ref 0 in
@@ -216,8 +216,8 @@ module Make (E : Index.EQUATION) = struct
           | None -> s
           | Some t' -> Iter.cons ("*", t') s
         and s2 =
-          ID.Map.to_iter t.map
-          |> Iter.map (fun (sym, t') -> ID.to_string sym, t')
+          Name.Map.to_iter t.map
+          |> Iter.map (fun (sym, t') -> Name.to_string sym, t')
         in
         prefix s2)
 
@@ -244,11 +244,11 @@ end
 (** {2 General purpose index} *)
 
 module SIMap = Iter.Map.Make (struct
-  type t = ID.t * int
+  type t = Name.t * int
 
   let compare (s1, i1) (s2, i2) =
     if i1 = i2 then
-      ID.compare s1 s2
+      Name.compare s1 s2
     else
       i1 - i2
 end)
@@ -461,7 +461,7 @@ module MakeTerm (X : Set.OrderedType) = struct
         and s2 =
           SIMap.to_iter t.map
           |> Iter.map (fun ((sym, i), t') ->
-                 let label = CCFormat.sprintf "%a/%d" ID.pp sym i in
+                 let label = CCFormat.sprintf "%a/%d" Name.pp sym i in
                  label, t')
         in
         prefix s2)

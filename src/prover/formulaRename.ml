@@ -42,7 +42,7 @@ module Make (C : Clause.S) = struct
 
   let _skolem_idx = ref @@ Idx.empty ()
   let _renaming_idx = ref @@ Idx.empty ()
-  let _renamer_symbols = ref @@ ID.Set.empty
+  let _renamer_symbols = ref @@ Name.Set.empty
 
   (* Two-literal clause of which one is a renaming literal
      and the other one is a formula *)
@@ -51,7 +51,7 @@ module Make (C : Clause.S) = struct
       | L.Equation (lhs, _, _) as lit when L.is_predicate_lit lit ->
         let hd = T.head_term lhs in
         (match T.head hd with
-        | Some id -> ID.Set.mem id !_renamer_symbols
+        | Some id -> Name.Set.mem id !_renamer_symbols
         | None -> false)
       | _ -> false
     in
@@ -184,7 +184,7 @@ module Make (C : Clause.S) = struct
           let def = mk_renaming_clause c ~renamer ~polarity_aware ~form sign in
           _renaming_idx :=
             Idx.add !_renaming_idx form (renamer, ref [ def, mk_sign sign ]);
-          _renamer_symbols := ID.Set.add id !_renamer_symbols;
+          _renamer_symbols := Name.Set.add id !_renamer_symbols;
           Some (renamer, [ def ], [ def ])
         ) else
           None

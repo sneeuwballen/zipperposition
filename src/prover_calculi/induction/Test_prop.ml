@@ -27,8 +27,8 @@ type 'a t_view =
   | T_Z of Z.t
   | T_Q of Q.t
   | T_bool of bool
-  | T_cstor of ID.t * 'a list (* cstor application *)
-  | T_app of ID.t * 'a list (* other application *)
+  | T_cstor of Name.t * 'a list (* cstor application *)
+  | T_app of Name.t * 'a list (* other application *)
   | T_fun_app of 'a * 'a list
   | T_builtin of Builtin.t * 'a list
   | T_fun of Type.t * 'a

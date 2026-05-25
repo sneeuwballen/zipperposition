@@ -50,7 +50,7 @@ module Make (E : Env.S) : S with module Env = E = struct
           None
       | _ -> None
     in
-    let all_syms = ID.Tbl.create 128 in
+    let all_syms = Name.Tbl.create 128 in
 
     SAT.clear ();
 
@@ -66,7 +66,7 @@ module Make (E : Env.S) : S with module Env = E = struct
         let pred_subcl = CCArray.filter_map pred_of_lit (C.lits c) in
 
         let mk_pure_clauses (pol, pred) =
-          let pos_var, neg_var = ID.Tbl.find all_syms pred in
+          let pos_var, neg_var = Name.Tbl.find all_syms pred in
           [
             SAT.Lit.neg
               (if not pol then
@@ -85,7 +85,7 @@ module Make (E : Env.S) : S with module Env = E = struct
                 else
                   true, pol
               in
-              let pos_var, neg_var = ID.Tbl.find all_syms pred in
+              let pos_var, neg_var = Name.Tbl.find all_syms pred in
               (if use_pos_var then
                  pos_var
                else
@@ -103,8 +103,8 @@ module Make (E : Env.S) : S with module Env = E = struct
         (* Create p+, p- variables for each predicate symbol p. *)
         Array.iter
           (fun (_, pred) ->
-            if not (ID.Tbl.mem all_syms pred) then
-              ID.Tbl.replace all_syms pred
+            if not (Name.Tbl.mem all_syms pred) then
+              Name.Tbl.replace all_syms pred
                 (BBox.make_fresh (), BBox.make_fresh ()))
           pred_subcl;
 
@@ -124,17 +124,17 @@ module Make (E : Env.S) : S with module Env = E = struct
       (fun c ->
         let forget_or_protect_syms =
           Iter.iter (fun bad ->
-              if ID.Tbl.mem all_syms bad then
+              if Name.Tbl.mem all_syms bad then
                 if pure_only then
-                  ID.Tbl.update all_syms ~f:(fun _ _ -> None) ~k:bad
+                  Name.Tbl.update all_syms ~f:(fun _ _ -> None) ~k:bad
                 else (
-                  let bad_pos_var, bad_neg_var = ID.Tbl.find all_syms bad in
+                  let bad_pos_var, bad_neg_var = Name.Tbl.find all_syms bad in
                   let mk_clause bad_var =
                     Array.append
                       (Array.make 1 (SAT.Lit.neg bad_var))
                       (Array.map
                          (fun (pol, pred) ->
-                           let pos_var, neg_var = ID.Tbl.find all_syms pred in
+                           let pos_var, neg_var = Name.Tbl.find all_syms pred in
                            if pol then
                              pos_var
                            else
@@ -168,10 +168,10 @@ module Make (E : Env.S) : S with module Env = E = struct
     Iter.iter
       (fun (pos_var, neg_var) ->
         add_SAT_clause [ SAT.Lit.neg pos_var; SAT.Lit.neg neg_var ])
-      (ID.Tbl.values all_syms);
+      (Name.Tbl.values all_syms);
 
-    let unknown_syms = ID.Tbl.copy all_syms in
-    let quasipure_syms = ID.Tbl.create 32 in
+    let unknown_syms = Name.Tbl.copy all_syms in
+    let quasipure_syms = Name.Tbl.create 32 in
 
     (* Generate a SAT clause p1+ \/ p1- \/ ... \/ pN+ \/ pN-, where the pIs are
        the predicate symbols of unknown purity status (initially all). *)
@@ -179,7 +179,7 @@ module Make (E : Env.S) : S with module Env = E = struct
       add_SAT_clause
         (CCList.flat_map
            (fun (pos_var, neg_var) -> [ pos_var; neg_var ])
-           (CCList.of_iter (ID.Tbl.values unknown_syms)))
+           (CCList.of_iter (Name.Tbl.values unknown_syms)))
     in
 
     let rec maximize_valuation () =
@@ -187,15 +187,15 @@ module Make (E : Env.S) : S with module Env = E = struct
         (fun (pred, (pos_var, neg_var)) ->
           if SAT.valuation pos_var then (
             add_SAT_clause [ pos_var ];
-            ID.Tbl.replace quasipure_syms pred pos_var;
-            ID.Tbl.remove unknown_syms pred
+            Name.Tbl.replace quasipure_syms pred pos_var;
+            Name.Tbl.remove unknown_syms pred
           );
           if SAT.valuation neg_var then (
             add_SAT_clause [ neg_var ];
-            ID.Tbl.replace quasipure_syms pred neg_var;
-            ID.Tbl.remove unknown_syms pred
+            Name.Tbl.replace quasipure_syms pred neg_var;
+            Name.Tbl.remove unknown_syms pred
           ))
-        (ID.Tbl.to_iter unknown_syms);
+        (Name.Tbl.to_iter unknown_syms);
       generate_nontrivial_solution_SAT_clause ();
       match SAT.check ~full:true () with
       | Sat_solver.Sat -> maximize_valuation ()
@@ -207,7 +207,7 @@ module Make (E : Env.S) : S with module Env = E = struct
         | L.Equation (lhs, rhs, true) ->
           if T.is_const (T.head_term lhs) then (
             let sym = T.as_const_exn (T.head_term lhs) in
-            ID.Tbl.mem quasipure_syms sym
+            Name.Tbl.mem quasipure_syms sym
           ) else
             false
         | _ -> false
@@ -220,7 +220,7 @@ module Make (E : Env.S) : S with module Env = E = struct
            "pure syms: @[%a@]"
          else
            "quasipure syms: @[%a@]")
-        (fun k -> k (CCList.pp ID.pp) (ID.Tbl.keys_list quasipure_syms));
+        (fun k -> k (CCList.pp Name.pp) (Name.Tbl.keys_list quasipure_syms));
       Iter.iter
         (fun c -> if contains_quasipure_sym c then remove_from_proof_state c)
         c_iter

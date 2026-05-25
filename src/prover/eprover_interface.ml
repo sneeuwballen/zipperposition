@@ -154,15 +154,15 @@ module Make (E : Env.S) : S with module Env = E = struct
         TypedSTerm.TPTP_THF.pp lits_converted
 
   let output_symdecl ~out sym ty =
-    Format.fprintf out "@[thf(@['%a_type',type,@[%a@]:@ @[%a@]@]).@]@\n" ID.pp
-      sym ID.pp_tstp sym (Type.TPTP.pp_ho ~depth:0) ty
+    Format.fprintf out "@[thf(@['%a_type',type,@[%a@]:@ @[%a@]@]).@]@\n" Name.pp
+      sym Name.pp_tstp sym (Type.TPTP.pp_ho ~depth:0) ty
 
-  let output_all ?(already_defined = ID.Set.empty) ~out cl_set =
+  let output_all ?(already_defined = Name.Set.empty) ~out cl_set =
     let cl_iter = Iter.of_list cl_set in
     let syms =
       C.symbols ~include_types:true cl_iter
-      |> (fun syms -> ID.Set.diff syms already_defined)
-      |> ID.Set.to_list
+      |> (fun syms -> Name.Set.diff syms already_defined)
+      |> Name.Set.to_list
     in
     (* first printing type declarations, and only then the types *)
     CCList.fold_right
@@ -180,8 +180,8 @@ module Make (E : Env.S) : S with module Env = E = struct
     |> Iter.iter (fun (sym, ty) -> output_symdecl ~out sym ty);
 
     Iter.iter (output_cl ~out) cl_iter;
-    if ID.Set.is_empty already_defined then output_empty_conj ~out;
-    ID.Set.of_list syms
+    if Name.Set.is_empty already_defined then output_empty_conj ~out;
+    Name.Set.of_list syms
 
   let set_e_bin path = e_bin := Some path
   let disable_e () = e_bin := None

@@ -34,14 +34,15 @@ end
 
 (** {2 Constraints} *)
 module Constr : sig
-  type 'a t = private ID.t -> ID.t -> int constraint 'a = [< `partial | `total ]
+  type 'a t = private Name.t -> Name.t -> int
+    constraint 'a = [< `partial | `total ]
   (** A partial order on symbols, used to make the precedence more precise. ['a]
       encodes the kind of ordering: partial or total {b NOTE}: the ordering must
       partition the set of ALL symbols into equivalence classes, within which
       all symbols are equal, but symbols of distinct equivalence classes are
       always ordered. *)
 
-  type prec_fun = signature:Signature.t -> ID.t Iter.t -> [ `partial ] t
+  type prec_fun = signature:Signature.t -> Name.t Iter.t -> [ `partial ] t
 
   (* TODO: sth based on order of the type. Higher-order functions should
      be bigger than first-order functions, so that ghd() works fine
@@ -74,11 +75,11 @@ module Constr : sig
       earlier an ordering is applied, and therefore the more impact it has)
       before composing *)
 
-  val compare_by : constr:'a t -> ID.t -> ID.t -> int
+  val compare_by : constr:'a t -> Name.t -> Name.t -> int
   (** [compare_by ~constr a b returns the result of comparing symbols a and b
        using constr] *)
 
-  val make : (ID.t -> ID.t -> int) -> [ `partial ] t
+  val make : (Name.t -> Name.t -> int) -> [ `partial ] t
   (** Create a new partial order. {b CAUTION}, this order must respect some
       properties (see {!'a t}) *)
 end
@@ -97,54 +98,54 @@ val equal : t -> t -> bool
    The rationale is that this way, inserting a new symbol is [O(ln n)] rather
    than [O(n)] of number of symbols. *)
 
-val snapshot : t -> ID.t list
+val snapshot : t -> Name.t list
 (** Current list of symbols, in increasing order *)
 
-val compare : t -> ID.t -> ID.t -> int
+val compare : t -> Name.t -> Name.t -> int
 (** Compare two symbols using the precedence *)
 
-val mem : t -> ID.t -> bool
-(** Is the ID.t part of the precedence? *)
+val mem : t -> Name.t -> bool
+(** Is the Name.t part of the precedence? *)
 
-val status : t -> ID.t -> symbol_status
+val status : t -> Name.t -> symbol_status
 (** Status of the symbol *)
 
-val weight : t -> ID.t -> Weight.t
+val weight : t -> Name.t -> Weight.t
 (** Weight of a symbol (for KBO). *)
 
-val sel_prec_weight : t -> ID.t -> int
+val sel_prec_weight : t -> Name.t -> int
 val db_weight : t -> Weight.t
 val lam_weight : t -> Weight.t
 
-val arg_coeff : t -> ID.t -> int -> int
+val arg_coeff : t -> Name.t -> int -> int
 (** Nth argument coefficient of a symbol (for KBO with argument coefficients).
 *)
 
-val add_list : signature:Signature.t -> t -> ID.t list -> unit
+val add_list : signature:Signature.t -> t -> Name.t list -> unit
 (** Update the precedence with the given symbols *)
 
-val declare_status : t -> ID.t -> symbol_status -> unit
+val declare_status : t -> Name.t -> symbol_status -> unit
 (** Change the status of the given precedence
     @raise Error if the symbol is not in the the precedence already *)
 
 module Seq : sig
-  val symbols : t -> ID.t Iter.t
+  val symbols : t -> Name.t Iter.t
 end
 
-val pp_snapshot : ID.t list CCFormat.printer
+val pp_snapshot : Name.t list CCFormat.printer
 val pp_debugf : t CCFormat.printer
 
 include Interfaces.PRINT with type t := t
 
-type weight_fun = ID.t -> Weight.t
-type arg_coeff_fun = ID.t -> int list
+type weight_fun = Name.t -> Weight.t
+type arg_coeff_fun = Name.t -> int list
 
 val weight_modarity : signature:Signature.t -> weight_fun
 val weight_constant : weight_fun
-val weight_invfreq : ID.t Iter.t -> weight_fun
-val weight_freq : ID.t Iter.t -> weight_fun
-val weight_invfreqrank : ID.t Iter.t -> weight_fun
-val weight_freqrank : ID.t Iter.t -> weight_fun
+val weight_invfreq : Name.t Iter.t -> weight_fun
+val weight_freq : Name.t Iter.t -> weight_fun
+val weight_invfreqrank : Name.t Iter.t -> weight_fun
+val weight_freqrank : Name.t Iter.t -> weight_fun
 
 val weight_fun_of_string :
   signature:Signature.t ->
@@ -152,7 +153,7 @@ val weight_fun_of_string :
   lm_w:int ->
   db_w:int ->
   string ->
-  (ID.t * int) Iter.t ->
+  (Name.t * int) Iter.t ->
   weight_fun
 
 val set_weight : t -> weight_fun -> unit
@@ -167,17 +168,17 @@ val create :
   ?db_w:int ->
   ?lmb_w:int ->
   [ `total ] Constr.t ->
-  ID.t list ->
+  Name.t list ->
   t
 (** make a precedence from the given constraints. Constraints near the head of
     the list are {b more important} than constraints close to the tail. Only the
     very first constraint is assured to be totally satisfied if constraints do
     not agree with one another. *)
 
-val default : ID.t list -> t
+val default : Name.t list -> t
 (** default precedence. Default status for symbols is {!Lexicographic}. *)
 
-val default_seq : ID.t Iter.t -> t
+val default_seq : Name.t Iter.t -> t
 (** default precedence on the given sequence of symbols *)
 
 val constr : t -> [ `total ] Constr.t

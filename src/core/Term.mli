@@ -24,7 +24,7 @@ type view = private
   | AppBuiltin of Builtin.t * t list
   | DB of int  (** Bound variable (De Bruijn index) *)
   | Var of var  (** Term variable *)
-  | Const of ID.t  (** Typed constant *)
+  | Const of Name.t  (** Typed constant *)
   | App of t * t list
       (** Application to a list of terms (cannot be left-nested) *)
   | Fun of Type.t * t  (** Lambda abstraction *)
@@ -39,7 +39,7 @@ module Classic : sig
   type view = private
     | Var of var
     | DB of int
-    | App of ID.t * t list  (** covers Const and App *)
+    | App of Name.t * t list  (** covers Const and App *)
     | AppBuiltin of Builtin.t * t list
     | NonFO  (** any other case *)
 
@@ -84,7 +84,7 @@ val bvar : ty:Type.t -> int -> t
 val builtin : ty:Type.t -> Builtin.t -> t
 val app_builtin : ty:Type.t -> Builtin.t -> t list -> t
 
-val const : ty:Type.t -> ID.t -> t
+val const : ty:Type.t -> Name.t -> t
 (** Create a typed constant *)
 
 val tyapp : t -> Type.t list -> t
@@ -149,10 +149,10 @@ val hd_is_comb : Builtin.t -> bool
 val is_comb : t -> bool
 
 val mk_fresh_skolem :
-  ?prefix:string -> var list -> Type.t -> (ID.t * Type.t) * t
+  ?prefix:string -> var list -> Type.t -> (Name.t * Type.t) * t
 
-val as_const : t -> ID.t option
-val as_const_exn : t -> ID.t
+val as_const : t -> Name.t option
+val as_const_exn : t -> Name.t
 val as_var : t -> var option
 val as_var_exn : t -> var
 val as_bvar_exn : t -> int
@@ -213,7 +213,7 @@ module Seq : sig
   (** subterms with their depth *)
 
   val symbols :
-    ?include_types:bool -> ?filter_term:(t -> bool) -> t -> ID.t Iter.t
+    ?include_types:bool -> ?filter_term:(t -> bool) -> t -> Name.t Iter.t
 
   val max_var : var Iter.t -> int
   (** max var *)
@@ -222,7 +222,7 @@ module Seq : sig
   (** min var *)
 
   val ty_vars : t -> var Iter.t
-  val typed_symbols : t -> (ID.t * Type.t) Iter.t
+  val typed_symbols : t -> (Name.t * Type.t) Iter.t
   val add_set : Set.t -> t Iter.t -> Set.t
 
   (* given terms s and t, iterate over all terms s' t'
@@ -263,11 +263,11 @@ val vars_prefix_order : t -> var list
 val depth : t -> int
 (** depth of the term *)
 
-val head : t -> ID.t option
-(** head ID.t *)
+val head : t -> Name.t option
+(** head Name.t *)
 
-val head_exn : t -> ID.t
-(** head ID.t (or Invalid_argument) *)
+val head_exn : t -> Name.t
+(** head Name.t (or Invalid_argument) *)
 
 val size : t -> int
 (** Size (number of nodes) *)
@@ -283,11 +283,11 @@ val cover_with_terms :
 (* cover the term in a maximal way looked top-down *)
 val max_cover : t -> t option list -> t
 
-val weight : ?var:int -> ?sym:(ID.t -> int) -> t -> int
+val weight : ?var:int -> ?sym:(Name.t -> int) -> t -> int
 (** Compute the weight of a term, given a weight for variables and one for
-    ID.ts.
+    Name.ts.
     @param var unique weight for every variable (default 1)
-    @param sym function from ID.ts to their weight (default [const 1])
+    @param sym function from Name.ts to their weight (default [const 1])
     @since 0.5.3 *)
 
 val ho_weight : t -> int
@@ -334,11 +334,11 @@ val replace_m : t -> t Map.t -> t
 
 (** {2 High-level operations} *)
 
-val symbols : ?init:ID.Set.t -> t -> ID.Set.t
+val symbols : ?init:Name.Set.t -> t -> Name.Set.t
 (** Symbols of the term (keys of signature) *)
 
-val contains_symbol : ID.t -> t -> bool
-(** Does the term contain this given ID.t? *)
+val contains_symbol : Name.t -> t -> bool
+(** Does the term contain this given Name.t? *)
 
 (** {2 Fold} *)
 
@@ -368,14 +368,14 @@ val all_positions :
 (** {2 Some AC-utils} *)
 
 module type AC_SPEC = sig
-  val is_ac : ID.t -> bool
-  val is_comm : ID.t -> bool
+  val is_ac : Name.t -> bool
+  val is_comm : Name.t -> bool
 end
 
 module AC (A : AC_SPEC) : sig
-  val flatten : ID.t -> t list -> t list
+  val flatten : Name.t -> t list -> t list
   (** [flatten_ac f l] flattens the list of terms [l] by deconstructing all its
-      elements that have [f] as head ID.t. For instance, if l=[1+2; 3+(4+5)]
+      elements that have [f] as head Name.t. For instance, if l=[1+2; 3+(4+5)]
       with f="+", this will return [1;2;3;4;5], perhaps in a different order *)
 
   val normal_form : t -> t
@@ -383,13 +383,13 @@ module AC (A : AC_SPEC) : sig
 
   val equal : t -> t -> bool
   (** Check whether the two terms are AC-equal. Optional arguments specify which
-      ID.ts are AC or commutative (by default by looking at attr_ac and
+      Name.ts are AC or commutative (by default by looking at attr_ac and
       attr_commut). *)
 
-  val symbols : t Iter.t -> ID.Set.t
-  (** Set of ID.ts occurring in the terms, that are AC *)
+  val symbols : t Iter.t -> Name.Set.t
+  (** Set of Name.ts occurring in the terms, that are AC *)
 
-  val seq_symbols : t -> ID.t Iter.t
+  val seq_symbols : t -> Name.t Iter.t
   (** Iter of AC symbols in this term *)
 end
 

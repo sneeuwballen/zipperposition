@@ -7,14 +7,14 @@ module T = Term
 let section = Util.Section.make "ind_ty"
 
 type constructor = {
-  cstor_name: ID.t;
+  cstor_name: Name.t;
   cstor_ty: Type.t;
   cstor_args: (Type.t * projector) list;
 }
 (** Constructor for an inductive type *)
 
 and projector = {
-  p_id: ID.t;
+  p_id: Name.t;
   p_ty: Type.t;
   p_index: int; (* index of projected argument *)
   p_cstor: constructor lazy_t;
@@ -24,7 +24,7 @@ and projector = {
 (** {5 Inductive Types} *)
 
 type t = {
-  ty_id: ID.t; (* name *)
+  ty_id: Name.t; (* name *)
   ty_vars: Type.t HVar.t list; (* list of variables *)
   ty_pattern: Type.t; (* equal to  [id ty_vars] *)
   ty_constructors: constructor list;
@@ -36,26 +36,27 @@ type t = {
 }
 (** An inductive type, along with its set of constructors *)
 
-let equal a b = ID.equal a.ty_id b.ty_id
+let equal a b = Name.equal a.ty_id b.ty_id
 
 type id_or_tybuiltin =
-  | I of ID.t
+  | I of Name.t
   | B of Type.builtin
 
 exception InvalidDecl of string
-exception NotAnInductiveConstructor of ID.t
-exception NotAnInductiveType of ID.t
+exception NotAnInductiveConstructor of Name.t
+exception NotAnInductiveType of Name.t
 
 let () =
   let spf = CCFormat.sprintf in
   Printexc.register_printer (function
     | InvalidDecl msg -> Some (spf "@[<2>invalid declaration:@ %s@]" msg)
-    | NotAnInductiveType id -> Some (spf "%a is not an inductive type" ID.pp id)
+    | NotAnInductiveType id ->
+      Some (spf "%a is not an inductive type" Name.pp id)
     | NotAnInductiveConstructor id ->
-      Some (spf "%a is not an inductive constructor" ID.pp id)
+      Some (spf "%a is not an inductive constructor" Name.pp id)
     | _ -> None)
 
-type ID.payload +=
+type Name_payload.t +=
   | Payload_ind_type of t
   | Payload_ind_cstor of constructor * t
   | Payload_ind_projector of projector
@@ -68,7 +69,7 @@ let pp out ty =
     | [] -> ()
     | l -> Format.fprintf out " %a" (Util.pp_list HVar.pp) l
   in
-  Format.fprintf out "@[%a%a@]" ID.pp ty.ty_id ppvars ty.ty_vars
+  Format.fprintf out "@[%a%a@]" Name.pp ty.ty_id ppvars ty.ty_vars
 
 let type_hd ty =
   let _, _, ret = Type.open_poly_fun ty in
@@ -83,14 +84,14 @@ let type_hd_exn ty =
   | None -> invalid_declf_ "expected function type,@ got `@[%a@]`" Type.pp ty
 
 let as_inductive_ty id =
-  ID.payload_find id ~f:(function
+  Name_payload.find id ~f:(function
     | Payload_ind_type ty -> Some ty
     | _ -> None)
 
 let as_inductive_ty_exn id =
   match as_inductive_ty id with
   | Some ty -> ty
-  | None -> invalid_declf_ "%a is not an inductive type" ID.pp id
+  | None -> invalid_declf_ "%a is not an inductive type" Name.pp id
 
 let is_inductive_ty id =
   match as_inductive_ty id with
@@ -146,7 +147,7 @@ let is_rec_ (top : t) : bool =
     match Type.view ty with
     | Type.Forall ty' -> find_in_ty seen ty'
     | Type.App (id, l) ->
-      ID.equal id top.ty_id || List.exists (find_in_ty seen) l
+      Name.equal id top.ty_id || List.exists (find_in_ty seen) l
     | Type.Fun (args, ret) ->
       find_in_ty seen ret || List.exists (find_in_ty seen) args
     | Type.Builtin _ | Type.Var _ | Type.DB _ -> false
@@ -155,12 +156,13 @@ let is_rec_ (top : t) : bool =
 
 (* declare that the given type is inductive *)
 let declare_ty id ~ty_vars constructors ~proof =
-  Util.debugf ~section 1 "declare inductive type %a" (fun k -> k ID.pp id);
+  Util.debugf ~section 1 "declare inductive type %a" (fun k -> k Name.pp id);
   if constructors = [] then
-    invalid_declf_ "Ind_types.declare_ty %a: no constructors provided" ID.pp id;
+    invalid_declf_ "Ind_types.declare_ty %a: no constructors provided" Name.pp
+      id;
   (* check that [ty] is not declared already *)
   (match as_inductive_ty id with
-  | Some _ -> invalid_declf_ "inductive type %a already declared" ID.pp id
+  | Some _ -> invalid_declf_ "inductive type %a already declared" Name.pp id
   | None -> ());
   let rec ity =
     {
@@ -175,18 +177,18 @@ let declare_ty id ~ty_vars constructors ~proof =
   (* map the constructors to [ity] too *)
   List.iter
     (fun c ->
-      ID.set_payload c.cstor_name (Payload_ind_cstor (c, ity));
+      Name_payload.add c.cstor_name (Payload_ind_cstor (c, ity));
       (* declare projectors *)
       List.iter
         (fun (_, p) ->
-          ID.set_payload p.p_id (Payload_ind_projector p) ~can_erase:(function
+          Name_payload.add p.p_id (Payload_ind_projector p) ~can_erase:(function
             | Payload_ind_projector _ -> true
             | _ -> false))
         c.cstor_args;
       ())
     constructors;
   (* map [id] to [ity] *)
-  ID.set_payload id (Payload_ind_type ity);
+  Name_payload.add id (Payload_ind_type ity);
   ity
 
 (** {5 Constructors} *)
@@ -206,7 +208,7 @@ let mk_constructor id ty args =
   Lazy.force c
 
 let as_constructor id =
-  ID.payload_find id ~f:(function
+  Name_payload.find id ~f:(function
     | Payload_ind_cstor (cstor, ity) -> Some (cstor, ity)
     | _ -> None)
 
@@ -231,6 +233,6 @@ let projector_idx p = p.p_index
 let projector_cstor p = Lazy.force p.p_cstor
 
 let as_projector id =
-  ID.payload_find id ~f:(function
+  Name_payload.find id ~f:(function
     | Payload_ind_projector p -> Some p
     | _ -> None)

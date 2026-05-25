@@ -642,7 +642,7 @@ module Make (E : Env.S) : S with module Env = E = struct
     if
       Env.flex_get k_penalize_tautologies
       && not
-         @@ ID.Set.exists
+         @@ Name.Set.exists
               (fun id -> Signature.sym_in_conj id (Env.signature ()))
               (C.symbols (Iter.singleton cl))
     then

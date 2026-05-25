@@ -25,8 +25,8 @@ type kind =
   | Simplification of rule * tag list
   | Esa of rule
   | Trivial  (** trivial, or trivial within theories *)
-  | Define of ID.t * source  (** definition *)
-  | By_def of ID.t  (** following from the def of ID *)
+  | Define of Name.t * source  (** definition *)
+  | By_def of Name.t  (** following from the def of ID *)
 
 and source = private {
   src_id: int;
@@ -218,9 +218,9 @@ module Step : sig
   val src : t -> source option
   val tags : t -> tag list
   val trivial : t
-  val by_def : ID.t -> t
-  val define : ID.t -> source -> parent list -> t
-  val define_internal : ID.t -> parent list -> t
+  val by_def : Name.t -> t
+  val define : Name.t -> source -> parent list -> t
+  val define_internal : Name.t -> parent list -> t
   val lemma : source -> t
   val intro : source -> role -> t
   val assert_ : source -> t
@@ -309,7 +309,7 @@ module S : sig
 
   val mk_f : step -> form -> t
   val mk_f_trivial : form -> t
-  val mk_f_by_def : ID.t -> form -> t
+  val mk_f_by_def : Name.t -> form -> t
   val mk_f_inference : rule:rule -> form -> parent list -> t
   val mk_f_simp : rule:rule -> form -> parent list -> t
   val mk_f_esa : rule:rule -> form -> parent list -> t

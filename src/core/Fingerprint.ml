@@ -19,7 +19,7 @@ type feature =
   | B
   | DB of int
   | N
-  | S of ID.t
+  | S of Name.t
   | BI of Builtin.t
   | Ignore
 
@@ -131,7 +131,7 @@ let pp_feature out = function
   | B -> CCFormat.fprintf out "B"
   | DB i -> CCFormat.fprintf out "DB %d" i
   | N -> CCFormat.fprintf out "N"
-  | S id -> CCFormat.fprintf out "S %a" ID.pp id
+  | S id -> CCFormat.fprintf out "S %a" Name.pp id
   | BI b -> CCFormat.fprintf out "BI %a" Builtin.pp b
   | Ignore -> CCFormat.fprintf out "I"
 
@@ -189,7 +189,7 @@ let feat_to_int_ = function
 let cmp_feature f1 f2 =
   match f1, f2 with
   | A, A | B, B | N, N | Ignore, Ignore -> 0
-  | S s1, S s2 -> ID.compare s1 s2
+  | S s1, S s2 -> Name.compare s1 s2
   | BI b1, BI b2 -> Builtin.compare b1 b2
   | DB i, DB j -> compare i j
   | _ -> feat_to_int_ f1 - feat_to_int_ f2
@@ -199,7 +199,7 @@ let compatible_features_unif f1 f2 =
   match f1 with
   | S s1 ->
     (match f2 with
-    | S s2 -> ID.equal s1 s2
+    | S s2 -> Name.equal s1 s2
     | A | B | Ignore -> true
     | N | DB _ | BI _ -> false)
   | BI b1 ->
@@ -228,7 +228,7 @@ let compatible_features_match f1 f2 =
   match f1 with
   | S s1 ->
     (match f2 with
-    | S s2 -> ID.equal s1 s2
+    | S s2 -> Name.equal s1 s2
     | Ignore -> true
     | _ -> false)
   | BI b1 ->

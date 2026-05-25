@@ -78,7 +78,7 @@ module Make (E : Env.S) : S with module Env = E = struct
     compare (List.assoc l1 log_to_int) (List.assoc l2 log_to_int)
 
   type pred_elim_info = {
-    sym: ID.t;
+    sym: Name.t;
     (* clauses with single pos/neg occurrence of a symbol *)
     mutable pos_cls: CS.t;
     mutable neg_cls: CS.t;
@@ -108,19 +108,19 @@ module Make (E : Env.S) : S with module Env = E = struct
 
   let pp_task out task =
     let original =
-      ID.payload_pred
+      Name_payload.exists
         ~f:(function
-          | ID.Attr_cnf_def -> true
+          | Name.Attr_cnf_def -> true
           | _ -> false)
         task.sym
     in
     CCFormat.fprintf out
       "%a(%b) {@. +: @[%a@];@. -:@[%a@];@. ?:@[%a@]@. g:@[%a@]@. v^2:@[%g@]; \
        |l|:@[%d@]; |%a|:@[%d@]; h_idx: @[%d@] @.}@."
-      ID.pp task.sym original (CS.pp C.pp) task.pos_cls (CS.pp C.pp)
+      Name.pp task.sym original (CS.pp C.pp) task.pos_cls (CS.pp C.pp)
       task.neg_cls (CS.pp C.pp) task.offending_cls
       (CCOpt.pp (CCPair.pp (CCList.pp C.pp) (CCList.pp C.pp)))
-      task.maybe_gate task.sq_var_weight task.num_lits ID.pp task.sym
+      task.maybe_gate task.sq_var_weight task.num_lits Name.pp task.sym
       (estimated_gain task) task.heap_idx
 
   let copy_task t =
@@ -165,7 +165,8 @@ module Make (E : Env.S) : S with module Env = E = struct
               not (CCOpt.is_some b.maybe_gate) )
         <?> (compare, a.num_lits, b.num_lits)
         <?> (compare, a.sq_var_weight, b.sq_var_weight)
-        <?> (ID.compare, a.sym, b.sym) < 0
+        <?> (Name.compare, a.sym, b.sym)
+        < 0
       else
         a.deleted
   end
@@ -181,11 +182,11 @@ module Make (E : Env.S) : S with module Env = E = struct
       (* implicitly makes it the smallest *)
       decrease h el;
       let min_el = remove_min h in
-      assert (ID.equal min_el.sym el.sym);
+      assert (Name.equal min_el.sym el.sym);
       el.deleted <- false (* clear it for the next insertion *)
 
     let update h ~old ~new_ =
-      assert (ID.equal old.sym new_.sym);
+      assert (Name.equal old.sym new_.sym);
       assert (old.heap_idx == new_.heap_idx);
       assert (in_heap new_ && in_heap old);
 
@@ -217,7 +218,7 @@ module Make (E : Env.S) : S with module Env = E = struct
     | Equational -> "eq"
     | Nonequational -> "neq"
 
-  let _ignored_symbols = ref ID.Set.empty
+  let _ignored_symbols = ref Name.Set.empty
 
   let mk_pred_elim_info sym =
     {
@@ -234,7 +235,7 @@ module Make (E : Env.S) : S with module Env = E = struct
       deleted = false;
     }
 
-  let _pred_sym_idx = ref ID.Map.empty
+  let _pred_sym_idx = ref Name.Map.empty
 
   let get_sym_sign lit =
     match lit with
@@ -254,8 +255,8 @@ module Make (E : Env.S) : S with module Env = E = struct
     | _ -> None
 
   let remove_symbol entry =
-    _pred_sym_idx := ID.Map.remove entry.sym !_pred_sym_idx;
-    _ignored_symbols := ID.Set.add entry.sym !_ignored_symbols;
+    _pred_sym_idx := Name.Map.remove entry.sym !_pred_sym_idx;
+    _ignored_symbols := Name.Set.add entry.sym !_ignored_symbols;
     if TaskSet.in_heap entry then TaskSet.remove_el _task_queue entry
 
   let calc_sq_var cl =
@@ -319,7 +320,7 @@ module Make (E : Env.S) : S with module Env = E = struct
                   CCArray.fold
                     (fun acc lit ->
                       match get_sym_sign lit with
-                      | Some (sym, sign) when ID.equal task.sym sym ->
+                      | Some (sym, sign) when Name.equal task.sym sym ->
                         acc
                         *
                         if sign then
@@ -400,7 +401,7 @@ module Make (E : Env.S) : S with module Env = E = struct
     let update_idx pos neg offending gates num_vars cl =
       let update ~action sym =
         _pred_sym_idx :=
-          ID.Map.update sym
+          Name.Map.update sym
             (fun old ->
               let entry = CCOpt.get_or ~default:(mk_pred_elim_info sym) old in
               let old_ = copy_task entry in
@@ -423,23 +424,23 @@ module Make (E : Env.S) : S with module Env = E = struct
               possibly_ignore_sym entry;
               if TaskSet.in_heap old_ && TaskSet.in_heap entry then
                 TaskSet.update _task_queue ~old:old_ ~new_:entry;
-              if ID.Set.mem entry.sym !_ignored_symbols then
+              if Name.Set.mem entry.sym !_ignored_symbols then
                 None
               else
                 Some entry)
             !_pred_sym_idx
       in
 
-      ID.Set.iter (update ~action:`Pos) pos;
-      ID.Set.iter (update ~action:`Neg) neg;
-      ID.Set.iter (update ~action:`Offending) offending;
-      ID.Set.iter (update ~action:`Gates) gates
+      Name.Set.iter (update ~action:`Pos) pos;
+      Name.Set.iter (update ~action:`Neg) neg;
+      Name.Set.iter (update ~action:`Offending) offending;
+      Name.Set.iter (update ~action:`Gates) gates
     in
     let is_sym_duplicated sym idx lits =
       let is_offending = ref false in
       for i = idx + 1 to C.length cl - 1 do
         match get_sym_sign (C.lits cl).(i) with
-        | Some (sym', _) -> is_offending := !is_offending || ID.equal sym sym'
+        | Some (sym', _) -> is_offending := !is_offending || Name.equal sym sym'
         | None -> ()
       done;
       !is_offending
@@ -449,10 +450,10 @@ module Make (E : Env.S) : S with module Env = E = struct
       CCArray.foldi
         (fun ((pos, neg, offending, gates) as acc) idx lit ->
           let symbol_is_fresh sym =
-            (not (ID.Set.mem sym pos))
-            && (not (ID.Set.mem sym neg))
-            && (not (ID.Set.mem sym offending))
-            && not (ID.Set.mem sym !_ignored_symbols)
+            (not (Name.Set.mem sym pos))
+            && (not (Name.Set.mem sym neg))
+            && (not (Name.Set.mem sym offending))
+            && not (Name.Set.mem sym !_ignored_symbols)
           in
           match get_sym_sign lit with
           | Some (sym, sign) when symbol_is_fresh sym ->
@@ -461,21 +462,21 @@ module Make (E : Env.S) : S with module Env = E = struct
               || is_sym_duplicated sym idx (C.lits cl)
             in
             if is_offending then
-              pos, neg, ID.Set.add sym offending, gates
+              pos, neg, Name.Set.add sym offending, gates
             else (
               let gates =
                 if is_flat lit then
-                  ID.Set.add sym gates
+                  Name.Set.add sym gates
                 else
                   gates
               in
               if sign then
-                ID.Set.add sym pos, neg, offending, gates
+                Name.Set.add sym pos, neg, offending, gates
               else
-                pos, ID.Set.add sym neg, offending, gates
+                pos, Name.Set.add sym neg, offending, gates
             )
           | _ -> acc)
-        (ID.Set.empty, ID.Set.empty, ID.Set.empty, ID.Set.empty)
+        (Name.Set.empty, Name.Set.empty, Name.Set.empty, Name.Set.empty)
         (C.lits cl)
     in
 
@@ -484,7 +485,7 @@ module Make (E : Env.S) : S with module Env = E = struct
       Iter.fold
         (fun syms u ->
           if T.is_const u && is_pred_like_type (Term.ty u) then
-            ID.Set.add (T.as_const_exn u) syms
+            Name.Set.add (T.as_const_exn u) syms
           else
             syms)
         syms
@@ -519,7 +520,7 @@ module Make (E : Env.S) : S with module Env = E = struct
     if not !_done then (
       let should_retry task =
         should_schedule task
-        && (not (ID.Set.mem task.sym !_ignored_symbols))
+        && (not (Name.Set.mem task.sym !_ignored_symbols))
         &&
         match task.last_check with
         | Some (old_sq_var_sum, old_num_lit) ->
@@ -550,10 +551,10 @@ module Make (E : Env.S) : S with module Env = E = struct
 
       if (not (CS.mem cl !_newly_added)) && CS.mem cl !_tracked then (
         _tracked := CS.remove cl !_tracked;
-        ID.Set.iter
+        Name.Set.iter
           (fun sym ->
             _pred_sym_idx :=
-              ID.Map.update sym
+              Name.Map.update sym
                 (function
                   | Some task ->
                     let mem_gate cl maybe_gate =
@@ -584,7 +585,7 @@ module Make (E : Env.S) : S with module Env = E = struct
                     if TaskSet.in_heap old && TaskSet.in_heap task then
                       TaskSet.update _task_queue ~new_:task ~old;
                     CCOpt.return_if
-                      (not (ID.Set.mem task.sym !_ignored_symbols))
+                      (not (Name.Set.mem task.sym !_ignored_symbols))
                       task
                   | None -> None)
                 !_pred_sym_idx)
@@ -597,13 +598,13 @@ module Make (E : Env.S) : S with module Env = E = struct
   let replace_clauses task clauses =
     Util.debugf ~section 2
       "replaced clauses(%a):@. regular:@[%a@]@. gates:@[%a@]@." (fun k ->
-        k ID.pp task.sym (CS.pp C.pp)
+        k Name.pp task.sym (CS.pp C.pp)
           (CS.union task.pos_cls task.neg_cls)
           (CCOpt.pp (CCPair.pp (CCList.pp C.pp) (CCList.pp C.pp)))
           task.maybe_gate);
     Util.debugf ~section 2 "resolvents: @[%a@]@." (fun k ->
         k (CCList.pp C.pp) clauses);
-    _ignored_symbols := ID.Set.add task.sym !_ignored_symbols;
+    _ignored_symbols := Name.Set.add task.sym !_ignored_symbols;
     let remove iter =
       Env.remove_active iter;
       Env.remove_passive iter;
@@ -629,7 +630,7 @@ module Make (E : Env.S) : S with module Env = E = struct
     _newly_added := CS.add_list !_newly_added clauses;
     List.iter (fun cl -> ignore (react_clause_added cl)) clauses;
 
-    _pred_sym_idx := ID.Map.remove task.sym !_pred_sym_idx
+    _pred_sym_idx := Name.Map.remove task.sym !_pred_sym_idx
 
   let is_tauto c =
     Literals.is_trivial (C.lits c) || Trail.is_trivial (C.trail c)
@@ -639,7 +640,7 @@ module Make (E : Env.S) : S with module Env = E = struct
       (CCArray.find_map_i
          (fun idx lit ->
            match get_sym_sign lit with
-           | Some (sym', sign') when ID.equal sym sym' && sign = sign' ->
+           | Some (sym', sign') when Name.equal sym sym' && sign = sign' ->
              Some (idx, CCOpt.get_exn (L.View.get_lhs lit))
            | _ -> None)
          (C.lits cl))
@@ -774,7 +775,7 @@ module Make (E : Env.S) : S with module Env = E = struct
               (fun lit ->
                 match get_sym_sign lit with
                 | Some (sym', sign') ->
-                  ID.equal sym sym'
+                  Name.equal sym sym'
                   && (CCOpt.is_none sign || CCOpt.get_exn sign == sign')
                 | None -> false)
               (C.lits cl)
@@ -809,7 +810,7 @@ module Make (E : Env.S) : S with module Env = E = struct
             List.partition
               (fun lit ->
                 match get_sym_sign lit with
-                | Some (sym', _) -> ID.equal sym sym'
+                | Some (sym', _) -> Name.equal sym sym'
                 | _ -> false)
               (CCArray.to_list @@ C.lits long_cl)
           in
@@ -833,7 +834,7 @@ module Make (E : Env.S) : S with module Env = E = struct
                         CCArray.find_idx
                           (fun lit ->
                             match get_sym_sign lit with
-                            | Some (sym', _) -> ID.equal sym sym'
+                            | Some (sym', _) -> Name.equal sym sym'
                             | None -> false)
                           (C.lits cl)
                       in
@@ -936,7 +937,7 @@ module Make (E : Env.S) : S with module Env = E = struct
               CCArray.exists
                 (fun lit ->
                   match get_sym_sign lit with
-                  | Some (id, sign) -> ID.equal id task.sym && sign
+                  | Some (id, sign) -> Name.equal id task.sym && sign
                   | _ -> false)
                 (C.lits cl))
             used_cls
@@ -1002,7 +1003,7 @@ module Make (E : Env.S) : S with module Env = E = struct
                  | L.Equation (lhs, rhs, _) when L.is_predicate_lit lit ->
                    (match T.head lhs with
                    | Some head ->
-                     if ID.equal task.sym head then
+                     if Name.equal task.sym head then
                        Some (i, lhs)
                      else
                        None
@@ -1042,9 +1043,9 @@ module Make (E : Env.S) : S with module Env = E = struct
       Env.flex_get k_check_gates
       && ((not (Env.flex_get k_only_original_gates))
          || not
-            @@ ID.payload_pred
+            @@ Name_payload.exists
                  ~f:(function
-                   | ID.Attr_cnf_def -> true
+                   | Name.Attr_cnf_def -> true
                    | _ -> false)
                  task.sym)
       && ((not (Env.flex_get k_only_non_conjecture_gates))
@@ -1056,7 +1057,7 @@ module Make (E : Env.S) : S with module Env = E = struct
         ignore (check_and () || check_or () || check_ite ())
 
   let schedule_tasks () =
-    ID.Map.iter
+    Name.Map.iter
       (fun _ task ->
         check_if_gate task;
 
@@ -1097,7 +1098,7 @@ module Make (E : Env.S) : S with module Env = E = struct
     let lambda_term_for_sym hd_pos tl_pos =
       let is_sym_lit lit =
         match get_sym_sign lit with
-        | Some (sym', _) when ID.equal sym sym' -> true
+        | Some (sym', _) when Name.equal sym sym' -> true
         | _ -> false
       in
       let term_of_lits lits = T.Form.or_l (List.map L.to_ho_term lits) in
@@ -1131,7 +1132,7 @@ module Make (E : Env.S) : S with module Env = E = struct
         | App (f, l) ->
           (match T.view f with
           | Const s ->
-            if ID.equal s sym then (
+            if Name.equal s sym then (
               let num_ty_args = List.length ty_vars in
               let ty_args, tm_args = CCList.take_drop num_ty_args l in
               let subst =
@@ -1146,7 +1147,7 @@ module Make (E : Env.S) : S with module Env = E = struct
               T.app f (List.map replace_by_lam l)
           | _ -> T.app f (List.map replace_by_lam l))
         | Const s ->
-          if ID.equal s sym then
+          if Name.equal s sym then
             lam
           else
             t
@@ -1254,7 +1255,7 @@ module Make (E : Env.S) : S with module Env = E = struct
     while not (S.is_empty _task_queue) do
       let task = S.remove_min _task_queue in
 
-      if not (ID.Set.mem task.sym !_ignored_symbols) then (
+      if not (Name.Set.mem task.sym !_ignored_symbols) then (
         Util.debugf ~section 5 "checking: @[%a@]" (fun k -> k pp_task task);
         process_task task
       )
@@ -1296,7 +1297,7 @@ module Make (E : Env.S) : S with module Env = E = struct
     schedule_tasks ();
 
     Util.debugf ~section 5 "state:@[%a@]@." (fun k ->
-        k (Iter.pp_seq pp_task) (ID.Map.values !_pred_sym_idx));
+        k (Iter.pp_seq pp_task) (Name.Map.values !_pred_sym_idx));
 
     Util.debugf ~section 1 "logic has%sequalities" (fun k ->
         k
@@ -1323,7 +1324,7 @@ module Make (E : Env.S) : S with module Env = E = struct
     Util.debugf ~section 5 "after elim: @[%a@]@." (fun k ->
         k (CS.pp C.pp) (Env.ProofState.PassiveSet.clauses ()));
     Util.debugf ~section 5 "state:@[%a@]@." (fun k ->
-        k (Iter.pp_seq pp_task) (ID.Map.values !_pred_sym_idx));
+        k (Iter.pp_seq pp_task) (Name.Map.values !_pred_sym_idx));
 
     let clause_diff =
       init_clause_num
@@ -1339,7 +1340,7 @@ module Make (E : Env.S) : S with module Env = E = struct
       Util.debugf ~section 1 "processing is done" CCFun.id;
     (* releasing possibly used memory *)
     _done := true;
-    _pred_sym_idx := ID.Map.empty;
+    _pred_sym_idx := Name.Map.empty;
     Signal.StopListening
 
   let register () = Signal.on Env.on_start initialize
@@ -1401,7 +1402,7 @@ module Make (E : Env.S) : S with module Env = E = struct
 
   let end_fixpoint () =
     _done := true;
-    _pred_sym_idx := ID.Map.empty;
+    _pred_sym_idx := Name.Map.empty;
     fixpoint_active := false
 
   let setup ?(in_fp_mode = false) () =

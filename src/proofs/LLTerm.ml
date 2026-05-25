@@ -91,7 +91,7 @@ type t = {
 
 and view =
   | Type
-  | Const of ID.t
+  | Const of Name.t
   | App of t * t  (** curried application *)
   | Arrow of t * t  (** functional arrow *)
   | Var of var  (** bound var *)
@@ -261,7 +261,7 @@ module H_cons = Hashcons.Make (struct
     &&
     match a.view, b.view with
     | Type, Type -> true
-    | Const id1, Const id2 -> ID.equal id1 id2
+    | Const id1, Const id2 -> Name.equal id1 id2
     | App (f1, x1), App (f2, x2) -> equal f1 f2 && equal x1 x2
     | Arrow (a1, b1), Arrow (a2, b2) -> equal a1 a2 && equal b1 b2
     | Var v1, Var v2 -> HVar.equal equal v1 v2
@@ -291,7 +291,7 @@ module H_cons = Hashcons.Make (struct
   let hash (a : t) : int =
     match a.view with
     | Type -> 1
-    | Const id -> CCHash.combine2 10 (ID.hash id)
+    | Const id -> CCHash.combine2 10 (Name.hash id)
     | Var v -> CCHash.combine2 20 (HVar.hash v)
     | App (f, x) -> CCHash.combine3 30 (hash f) (hash x)
     | Arrow (a, b) -> CCHash.combine3 35 (hash a) (hash b)
@@ -313,7 +313,7 @@ end)
 let rec pp_rec depth out (t : t) =
   match view t with
   | Type -> Fmt.string out "type"
-  | Const id -> ID.pp_fullc out id
+  | Const id -> Name.pp_full out id
   | App (f, a) ->
     Fmt.fprintf out "@[%a@ %a@]" (pp_rec depth) f (pp_rec_inner depth) a
   | Arrow (a, b) ->
@@ -419,7 +419,7 @@ let[@inline] arrow_ a b = mk_ (Arrow (a, b)) (Some t_type)
 let[@inline] bind_ ~ty binder ~ty_var body =
   mk_ (Bind { binder; ty_var; body }) (Some ty)
 
-let id_eta_ = ID.make "test_eta_" (* privat to {!as_eta_expansion} *)
+let id_eta_ = Name.make "test_eta_" (* privat to {!as_eta_expansion} *)
 
 let[@inline] app_builtin ~ty b l =
   let mk_ b l = mk_ (AppBuiltin (b, l)) (Some ty) in
@@ -591,7 +591,7 @@ let rec arrow_l l ret =
   | a :: tail -> arrow a (arrow_l tail ret)
 
 let box_opaque t = app_builtin ~ty:(ty_exn t) Builtin.Box_opaque [ t ]
-let id_eta_ = ID.make "test_eta_" (* privat to {!as_eta_expansion} *)
+let id_eta_ = Name.make "test_eta_" (* privat to {!as_eta_expansion} *)
 
 (* check if [body = t db0], with [db0 ∉ t].
    returns [Some (t shift -1)] if it's the case *)

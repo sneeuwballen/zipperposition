@@ -60,7 +60,7 @@ module type S = sig
 
   val declare_ty :
     proof:Proof.t ->
-    ty_id:ID.t ->
+    ty_id:Name.t ->
     ty_vars:Type.t HVar.t list ->
     var:Type.t HVar.t ->
     term list ->

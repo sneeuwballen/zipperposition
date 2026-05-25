@@ -3,14 +3,14 @@ open Libzipperposition
 
 let section = Util.Section.make ~parent:Const.section "ple"
 
-type id_sgn = ID.t * bool
+type id_sgn = Name.t * bool
 
 module IDMap = CCMap.Make (struct
   type t = id_sgn
 
   let compare (id1, sgn1) (id2, sgn2) =
     let open CCOrd in
-    ID.compare id1 id2 <?> (CCBool.compare, sgn1, sgn2)
+    Name.compare id1 id2 <?> (CCBool.compare, sgn1, sgn2)
 end)
 
 module IntSet = Util.Int_set
@@ -21,17 +21,17 @@ exception AppVarFound
 let _enabled = ref false
 let total_clauses = Util.mk_stat "total_clauses"
 let removed_clauses = Util.mk_stat "removed_clauses"
-let pp_key = CCPair.pp ID.pp CCBool.pp
+let pp_key = CCPair.pp Name.pp CCBool.pp
 
 let cl_syms lits =
   let lit_syms lit =
     SLiteral.fold
-      (fun acc t -> ID.Set.union (ID.Set.of_iter (TST.Seq.symbols t)) acc)
-      ID.Set.empty lit
+      (fun acc t -> Name.Set.union (Name.Set.of_iter (TST.Seq.symbols t)) acc)
+      Name.Set.empty lit
   in
   List.fold_left
-    (fun acc lit -> ID.Set.union acc (lit_syms lit))
-    ID.Set.empty lits
+    (fun acc lit -> Name.Set.union acc (lit_syms lit))
+    Name.Set.empty lits
 
 (* Computes a map (symbol, polarity) -> item, that is for each item we know how many times
    it occurs positive, how many times it occurs negative and for the clauses in
@@ -70,12 +70,12 @@ let compute_occurence_map
     let all_symbol_occurences = ocurrences IDMap.empty lits in
 
     let id_map' =
-      IDMap.keys all_symbol_occurences |> Iter.map fst |> ID.Set.of_iter
+      IDMap.keys all_symbol_occurences |> Iter.map fst |> Name.Set.of_iter
       |> fun syms ->
-      ID.Set.fold
+      Name.Set.fold
         (fun sym acc ->
-          let prev = ID.Map.get_or sym acc ~default:IntSet.empty in
-          ID.Map.add sym (IntSet.add cl_idx prev) acc)
+          let prev = Name.Map.get_or sym acc ~default:IntSet.empty in
+          Name.Map.add sym (IntSet.add cl_idx prev) acc)
         syms ids2clauses
     in
     id_map', all_symbol_occurences
@@ -92,10 +92,10 @@ let compute_occurence_map
         let f_syms =
           Statement.Seq.forms stmt
           |> Iter.fold
-               (fun acc lits -> ID.Set.union acc (cl_syms lits))
-               ID.Set.empty
+               (fun acc lits -> Name.Set.union acc (cl_syms lits))
+               Name.Set.empty
         in
-        ID.Set.union f_syms forbidden, ids2clauses, clauses
+        Name.Set.union f_syms forbidden, ids2clauses, clauses
       | Statement.Assert lits ->
         (* normal clause *)
         let ids2clauses', new_cl =
@@ -118,7 +118,7 @@ let compute_occurence_map
         (* after CNFing a 'normal' problem all goals should 
          be negated and clausified *)
         failwith "Not implemented: Goal")
-    (ID.Set.empty, ID.Map.empty, [])
+    (Name.Set.empty, Name.Map.empty, [])
     seq
 
 let get_pure_symbols forbidden ids2clauses clauses =
@@ -127,7 +127,7 @@ let get_pure_symbols forbidden ids2clauses clauses =
     let rec aux processed symbol_occurences = function
       | [] -> processed
       | sym :: syms as all_syms ->
-        if ID.Set.mem sym processed || ID.Set.mem sym forbidden then
+        if Name.Set.mem sym processed || Name.Set.mem sym forbidden then
           aux processed symbol_occurences syms
         else (
           let clauses_to_remove =
@@ -138,7 +138,7 @@ let get_pure_symbols forbidden ids2clauses clauses =
                   Some clauses.(idx)
                 ) else
                   None)
-              (IntSet.to_list @@ ID.Map.find sym ids2clauses)
+              (IntSet.to_list @@ Name.Map.find sym ids2clauses)
           in
           let symbol_occurences', next_to_process =
             List.fold_left
@@ -151,8 +151,9 @@ let get_pure_symbols forbidden ids2clauses clauses =
                     if
                       new_ = 0
                       && not
-                           (ID.Set.mem sym processed || ID.Set.mem sym forbidden
-                           || CCList.mem ~eq:ID.equal (fst key) all_syms)
+                           (Name.Set.mem sym processed
+                          || Name.Set.mem sym forbidden
+                           || CCList.mem ~eq:Name.equal (fst key) all_syms)
                     then
                       sym_occs', fst key :: next_to_process
                     else
@@ -162,12 +163,13 @@ let get_pure_symbols forbidden ids2clauses clauses =
               (symbol_occurences, []) clauses_to_remove
           in
           Util.debugf ~section 1 "became pure: @[%a@]@." (fun k ->
-              k (CCList.pp ID.pp) next_to_process);
-          aux (ID.Set.add sym processed) symbol_occurences'
-            (next_to_process @ syms)
+              k (CCList.pp Name.pp) next_to_process);
+          aux
+            (Name.Set.add sym processed)
+            symbol_occurences' (next_to_process @ syms)
         )
     in
-    aux ID.Set.empty all_clauses (ID.Set.to_list init_pure)
+    aux Name.Set.empty all_clauses (Name.Set.to_list init_pure)
   in
 
   (* joins all clauses in one map with occurences of symbol *)
@@ -176,17 +178,19 @@ let get_pure_symbols forbidden ids2clauses clauses =
       (fun acc cl -> IDMap.union (fun _ a b -> CCOpt.return @@ (a + b)) acc cl)
       IDMap.empty clauses
   in
-  let all_symbols = IDMap.keys all_clauses |> Iter.map fst |> ID.Set.of_iter in
+  let all_symbols =
+    IDMap.keys all_clauses |> Iter.map fst |> Name.Set.of_iter
+  in
   let init_pure =
-    ID.Set.filter
+    Name.Set.filter
       (fun sym ->
-        (not @@ ID.Set.mem sym forbidden)
+        (not @@ Name.Set.mem sym forbidden)
         && (IDMap.get_or ~default:0 (sym, true) all_clauses == 0
            || IDMap.get_or ~default:0 (sym, false) all_clauses == 0))
       all_symbols
   in
   Util.debugf ~section 1 "initially pure: @[%a@]@." (fun k ->
-      k (ID.Set.pp ID.pp) init_pure);
+      k (Name.Set.pp Name.pp) init_pure);
   let clause_status = CCBV.create ~size:(List.length clauses) false in
   calculate_pure init_pure clause_status all_clauses
 
@@ -195,14 +199,14 @@ let remove_pure_clauses
   let forbidden, ids2cls, cls = compute_occurence_map seq in
 
   let pure_syms =
-    ID.Set.diff (get_pure_symbols forbidden ids2cls cls) forbidden
+    Name.Set.diff (get_pure_symbols forbidden ids2cls cls) forbidden
   in
 
   let filter_if_has_pure stmt lits =
     Util.incr_stat total_clauses;
     let ans =
       CCOpt.return_if
-        (ID.Set.is_empty @@ ID.Set.inter pure_syms (cl_syms lits))
+        (Name.Set.is_empty @@ Name.Set.inter pure_syms (cl_syms lits))
         stmt
     in
     if CCOpt.is_none ans then (

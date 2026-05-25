@@ -10,10 +10,10 @@
     language(s) (e.g., TPTP). *)
 
 type 'ty data = {
-  data_id: ID.t;  (** Name of the type *)
+  data_id: Name.t;  (** Name of the type *)
   data_args: 'ty Var.t list;  (** type parameters *)
   data_ty: 'ty;  (** type of Id, that is, [type -> type -> ... -> type] *)
-  data_cstors: (ID.t * 'ty * ('ty * (ID.t * 'ty)) list) list;
+  data_cstors: (Name.t * 'ty * ('ty * (Name.t * 'ty)) list) list;
       (** Each constructor is [id, ty, args]. [ty] must be of the form
           [ty1 -> ty2 -> ... -> id args]. [args] has the form
           [(ty1, p1), (ty2,p2), …] where each [p] is a projector. *)
@@ -27,7 +27,7 @@ type attr =
   | A_sos  (** set of support *)
 
 type attrs = attr list
-type 'ty skolem = ID.t * 'ty
+type 'ty skolem = Name.t * 'ty
 
 type polarity =
   [ `Equiv
@@ -38,7 +38,7 @@ type polarity =
 type ('f, 't, 'ty) def_rule =
   | Def_term of {
       vars: 'ty Var.t list;
-      id: ID.t;
+      id: Name.t;
       ty: 'ty;
       args: 't list;
       rhs: 't;
@@ -55,14 +55,14 @@ type ('f, 't, 'ty) def_rule =
           [{=>, <=>, <=}]) *)
 
 type ('f, 't, 'ty) def = {
-  def_id: ID.t;
+  def_id: Name.t;
   def_ty: 'ty; (* def_ty = def_vars -> def_ty_ret *)
   def_rules: ('f, 't, 'ty) def_rule list;
   def_rewrite: bool; (* rewrite rule or mere assertion? *)
 }
 
 type ('f, 't, 'ty) view =
-  | TyDecl of ID.t * 'ty  (** id: ty *)
+  | TyDecl of Name.t * 'ty  (** id: ty *)
   | Data of 'ty data list
   | Def of ('f, 't, 'ty) def list
   | Rewrite of ('f, 't, 'ty) def_rule
@@ -94,7 +94,7 @@ val view : ('f, 't, 'ty) t -> ('f, 't, 'ty) view
 val attrs : (_, _, _) t -> attrs
 val proof_step : (_, _, _) t -> proof
 
-val name : (_, _, _) t -> string
+val get_name : (_, _, _) t -> string
 (** Retrieve a name from the proof, or generate+save a new one *)
 
 val as_proof_i : input_t -> Proof.t
@@ -103,15 +103,15 @@ val as_proof_c : clause_t -> Proof.t
 val res_tc_c : clause_t Proof.result_tc
 
 val mk_data :
-  ID.t ->
+  Name.t ->
   args:'ty Var.t list ->
   'ty ->
-  (ID.t * 'ty * ('ty * (ID.t * 'ty)) list) list ->
+  (Name.t * 'ty * ('ty * (Name.t * 'ty)) list) list ->
   'ty data
 
 val mk_def :
   ?rewrite:bool ->
-  ID.t ->
+  Name.t ->
   'ty ->
   ('f, 't, 'ty) def_rule list ->
   ('f, 't, 'ty) def
@@ -119,7 +119,7 @@ val mk_def :
 val attrs_ua : (_, _, _) t -> UntypedAST.attrs
 (** All attributes, included these in the proof *)
 
-val ty_decl : ?attrs:attrs -> proof:proof -> ID.t -> 'ty -> (_, _, 'ty) t
+val ty_decl : ?attrs:attrs -> proof:proof -> Name.t -> 'ty -> (_, _, 'ty) t
 
 val def :
   ?attrs:attrs -> proof:proof -> ('f, 't, 'ty) def list -> ('f, 't, 'ty) t
@@ -141,7 +141,7 @@ val neg_goal :
 
 val signature :
   ?init:Signature.t ->
-  ?conj_syms:ID.t Iter.t ->
+  ?conj_syms:Name.t Iter.t ->
   (_, _, Type.t) t Iter.t ->
   Signature.t
 (** Compute signature when the types are using {!Type} *)
@@ -175,14 +175,14 @@ val map :
 
 type definition = Rewrite.rule_set
 
-val as_defined_cst : ID.t -> (int * definition) option
+val as_defined_cst : Name.t -> (int * definition) option
 (** [as_defined_cst id] returns [Some level] if [id] is a constant defined at
     stratification level [level], [None] otherwise *)
 
-val as_defined_cst_level : ID.t -> int option
-val is_defined_cst : ID.t -> bool
+val as_defined_cst_level : Name.t -> int option
+val is_defined_cst : Name.t -> bool
 
-val declare_defined_cst : ID.t -> level:int -> definition -> unit
+val declare_defined_cst : Name.t -> level:int -> definition -> unit
 (** [declare_defined_cst id ~level] states that [id] is a defined constant of
     given [level]. It means that it is defined based only on constants of
     strictly lower levels *)
@@ -203,7 +203,7 @@ val scan_simple_stmt_for_ind_ty : input_t -> unit
 (** Same as {!scan_stmt} but on earlier statements *)
 
 val get_rw_rule :
-  ?weight_incr:int -> clause_t -> (ID.Set.elt * Rewrite.rule) option
+  ?weight_incr:int -> clause_t -> (Name.Set.elt * Rewrite.rule) option
 
 val get_formulas_from_defs : ('a, _, _) t -> 'a CCList.t
 
@@ -228,13 +228,13 @@ val sine_axiom_selector :
 module Seq : sig
   val to_iter :
     ('f, 't, 'ty) t ->
-    [ `Term of 't | `Form of 'f | `Ty of 'ty | `ID of ID.t ] Iter.t
+    [ `Term of 't | `Form of 'f | `Ty of 'ty | `ID of Name.t ] Iter.t
 
-  val ty_decls : (_, _, 'ty) t -> (ID.t * 'ty) Iter.t
+  val ty_decls : (_, _, 'ty) t -> (Name.t * 'ty) Iter.t
   val forms : ('f, _, _) t -> 'f Iter.t
   val lits : (clause, _, _) t -> Term.t SLiteral.t Iter.t
   val terms : (clause, Term.t, _) t -> Term.t Iter.t
-  val symbols : (clause, Term.t, Type.t) t -> ID.t Iter.t
+  val symbols : (clause, Term.t, Type.t) t -> Name.t Iter.t
 end
 
 (** {2 IO} *)

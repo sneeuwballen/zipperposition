@@ -16,7 +16,7 @@ type term = t
 type ty = t
 
 type match_cstor = {
-  cstor_id: ID.t;
+  cstor_id: Hstring.t;
   cstor_ty: ty;
   cstor_args: ty list;
 }
@@ -26,7 +26,7 @@ type match_branch = match_cstor * t Var.t list * t
 
 type view = private
   | Var of t Var.t  (** variable *)
-  | Const of ID.t  (** constant *)
+  | Const of Hstring.t  (** constant *)
   | App of t * t list  (** apply term *)
   | Ite of t * t * t
   | Match of t * match_branch list
@@ -45,9 +45,9 @@ val view : t -> view
 val loc : t -> location option
 val ty : t -> t option
 val ty_exn : t -> t
-val head : t -> ID.t option
+val head : t -> Hstring.t option
 
-val head_exn : t -> ID.t
+val head_exn : t -> Hstring.t
 (** @raise Not_found if not an application/const *)
 
 val deref : t -> t
@@ -69,7 +69,7 @@ val app : ?loc:location -> ty:t -> t -> t list -> t
 val app_whnf : ?loc:location -> ty:t -> t -> t list -> t
 (** application + WHNF *)
 
-val const : ?loc:location -> ty:t -> ID.t -> t
+val const : ?loc:location -> ty:t -> Hstring.t -> t
 val const_of_cstor : ?loc:location -> match_cstor -> t
 val ite : ?loc:location -> t -> t -> t -> t
 val match_ : ?loc:location -> t -> match_branch list -> t
@@ -120,7 +120,7 @@ module Ty : sig
   type view =
     | Ty_builtin of builtin
     | Ty_var of t Var.t
-    | Ty_app of ID.t * t list
+    | Ty_app of Hstring.t * t list
     | Ty_fun of t list * t
     | Ty_forall of t Var.t * t
     | Ty_multiset of t
@@ -137,8 +137,8 @@ module Ty : sig
   val var_of_string : ?loc:location -> string -> t
   val meta : ?loc:location -> meta_var -> t
   val fun_ : ?loc:location -> t list -> t -> t
-  val app : ?loc:location -> ID.t -> t list -> t
-  val const : ?loc:location -> ID.t -> t
+  val app : ?loc:location -> Hstring.t -> t list -> t
+  val const : ?loc:location -> Hstring.t -> t
   val forall : ?loc:location -> t Var.t -> t -> t
   val forall_l : ?loc:location -> t Var.t list -> t -> t
   val multiset : ?loc:location -> t -> t
@@ -264,7 +264,7 @@ val unfold_fun : t -> t Var.t list * t
 val var_occurs : var:t Var.t -> t -> bool
 (** [var_occurs ~var t] is [true] iff [var] occurs in [t] *)
 
-val as_id_app : t -> (ID.t * Ty.t * t list) option
+val as_id_app : t -> (Hstring.t * Ty.t * t list) option
 val vars : t -> t Var.t list
 val free_vars : t -> t Var.t list
 val free_vars_l : t list -> t Var.t list
@@ -295,7 +295,7 @@ module Seq : sig
   val vars : t -> t Var.t Iter.t
   val free_vars : t -> t Var.t Iter.t
   val metas : t -> meta_var Iter.t
-  val symbols : t -> ID.t Iter.t
+  val symbols : t -> Hstring.t Iter.t
 end
 
 (** {2 Substitutions} *)

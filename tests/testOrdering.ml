@@ -11,14 +11,14 @@ module O = Ordering
 let comp_test = Alcotest.testable Comparison.pp Comparison.equal
 let count = 1_000
 let long_factor = 10
-let a_ = ID.make "a"
-let b_ = ID.make "b"
-let c_ = ID.make "c"
-let d_ = ID.make "d"
-let e_ = ID.make "e"
-let f_ = ID.make "f"
-let g_ = ID.make "g"
-let h_ = ID.make "h"
+let a_ = Name.make "a"
+let b_ = Name.make "b"
+let c_ = Name.make "c"
+let d_ = Name.make "d"
+let e_ = Name.make "e"
+let f_ = Name.make "f"
+let g_ = Name.make "g"
+let h_ = Name.make "h"
 let ty = Type.term
 
 (* [less_specific cm1 cm2] is true if [cmp2] is compatible with, and possibly
@@ -74,7 +74,7 @@ let check_ordering_inv_by_subst ~gen_t ord =
     (* declare symbols *)
     Iter.of_list [ t1; t2 ]
     |> Iter.flat_map T.Seq.symbols
-    |> ID.Set.of_iter |> ID.Set.to_list
+    |> Name.Set.of_iter |> Name.Set.to_list
     |> O.add_list ~signature:!signature !ord;
     let t1' = S.apply Subst.Renaming.none subst (t1, 0) in
     let t2' = S.apply Subst.Renaming.none subst (t2, 0) in
@@ -94,7 +94,7 @@ let check_ordering_trans ~arb_t ord =
     (* declare symbols *)
     Iter.of_list [ t1; t2; t3 ]
     |> Iter.flat_map T.Seq.symbols
-    |> ID.Set.of_iter |> ID.Set.to_list
+    |> Name.Set.of_iter |> Name.Set.to_list
     |> O.add_list ~signature:!signature !ord;
     (* check that instantiating variables preserves ordering *)
     let o12 = O.compare !ord t1 t2 in
@@ -116,7 +116,7 @@ let check_ordering_swap_args ~arb_t ord =
     (* declare symbols *)
     Iter.of_list [ t1; t2 ]
     |> Iter.flat_map T.Seq.symbols
-    |> ID.Set.of_iter |> ID.Set.to_list
+    |> Name.Set.of_iter |> Name.Set.to_list
     |> O.add_list ~signature:!signature !ord;
     (* check that instantiating variables preserves ordering *)
     let o12 = O.compare !ord t1 t2 in
@@ -149,7 +149,7 @@ let check_ordering_subterm ~arb_t ord =
       (* declare symbols *)
       Iter.of_list [ t ]
       |> Iter.flat_map T.Seq.symbols
-      |> ID.Set.of_iter |> ID.Set.to_list
+      |> Name.Set.of_iter |> Name.Set.to_list
       |> O.add_list ~signature:!signature !ord;
     T.Seq.subterms_depth t
     |> Iter.filter_map (fun (t, i) ->
@@ -275,7 +275,7 @@ let test_derived_ho_kbo =
     fun () ->
       (* alphabetical precedence, h has weight 2, all other symbols weight 1 *)
       let weight id =
-        if ID.equal id h_ then
+        if Name.equal id h_ then
           Precedence.Weight.add Precedence.Weight.one Precedence.Weight.one
         else
           Precedence.Weight.one
@@ -419,24 +419,24 @@ let test_derived_ho_kbo =
            (pow n (fun t -> Term.app f [ t ]) a));
 
       (* polymorphic example *)
-      let funty_ = ID.make "funty" in
+      let funty_ = Name.make "funty" in
       let appty =
         Type.forall_n 2
           (Type.arrow
              [ Type.app funty_ [ Type.bvar 1; Type.bvar 0 ]; Type.bvar 1 ]
              (Type.bvar 0))
       in
-      let app_ = ID.make "app" in
+      let app_ = Name.make "app" in
       let app = T.const ~ty:appty app_ in
-      let add_ = ID.make "add" in
+      let add_ = Name.make "add" in
       let add =
         T.const ~ty:(Type.app funty_ [ ty; Type.app funty_ [ ty; ty ] ]) add_
       in
-      let s_ = ID.make "s" in
+      let s_ = Name.make "s" in
       let s = T.const ~ty:(Type.app funty_ [ ty; ty ]) s_ in
-      let k_ = ID.make "k" in
+      let k_ = Name.make "k" in
       let k = T.const ~ty k_ in
-      let zero_ = ID.make "zero" in
+      let zero_ = Name.make "zero" in
       let zero = T.const ~ty zero_ in
       let ty1 = Term.of_ty ty in
       let ty2 = Term.of_ty (Type.app funty_ [ ty; ty ]) in
@@ -516,24 +516,24 @@ let test_lambdafree_kbo =
            (Term.app f [ y; Term.app x [ a ] ]));
 
       (* polymorphic example *)
-      let funty_ = ID.make "funty" in
+      let funty_ = Name.make "funty" in
       let appty =
         Type.forall_n 2
           (Type.arrow
              [ Type.app funty_ [ Type.bvar 1; Type.bvar 0 ]; Type.bvar 1 ]
              (Type.bvar 0))
       in
-      let app_ = ID.make "app" in
+      let app_ = Name.make "app" in
       let app = T.const ~ty:appty app_ in
-      let add_ = ID.make "add" in
+      let add_ = Name.make "add" in
       let add =
         T.const ~ty:(Type.app funty_ [ ty; Type.app funty_ [ ty; ty ] ]) add_
       in
-      let s_ = ID.make "s" in
+      let s_ = Name.make "s" in
       let s = T.const ~ty:(Type.app funty_ [ ty; ty ]) s_ in
-      let k_ = ID.make "k" in
+      let k_ = Name.make "k" in
       let k = T.const ~ty k_ in
-      let zero_ = ID.make "zero" in
+      let zero_ = Name.make "zero" in
       let zero = T.const ~ty zero_ in
       let ty1 = Term.of_ty ty in
       let ty2 = Term.of_ty (Type.app funty_ [ ty; ty ]) in
@@ -900,24 +900,24 @@ let test_lambda_kbo =
         (Literal.Comp.compare ~ord fbza_eq_b fbzb_eq_a);
 
       (* polymorphic example *)
-      let funty_ = ID.make "funty" in
+      let funty_ = Name.make "funty" in
       let appty =
         Type.forall_n 2
           (Type.arrow
              [ Type.app funty_ [ Type.bvar 1; Type.bvar 0 ]; Type.bvar 1 ]
              (Type.bvar 0))
       in
-      let app_ = ID.make "app" in
+      let app_ = Name.make "app" in
       let app = T.const ~ty:appty app_ in
-      let add_ = ID.make "add" in
+      let add_ = Name.make "add" in
       let add =
         T.const ~ty:(Type.app funty_ [ ty; Type.app funty_ [ ty; ty ] ]) add_
       in
-      let s_ = ID.make "s" in
+      let s_ = Name.make "s" in
       let s = T.const ~ty:(Type.app funty_ [ ty; ty ]) s_ in
-      let k_ = ID.make "k" in
+      let k_ = Name.make "k" in
       let k = T.const ~ty k_ in
-      let zero_ = ID.make "zero" in
+      let zero_ = Name.make "zero" in
       let zero = T.const ~ty zero_ in
       let ty1 = Term.of_ty ty in
       let ty2 = Term.of_ty (Type.app funty_ [ ty; ty ]) in
@@ -1308,24 +1308,24 @@ let test_lambda_lpo =
         (Literal.Comp.compare ~ord fbza_eq_b fbzb_eq_a);
 
       (* polymorphic example *)
-      let funty_ = ID.make "funty" in
+      let funty_ = Name.make "funty" in
       let appty =
         Type.forall_n 2
           (Type.arrow
              [ Type.app funty_ [ Type.bvar 1; Type.bvar 0 ]; Type.bvar 1 ]
              (Type.bvar 0))
       in
-      let app_ = ID.make "app" in
+      let app_ = Name.make "app" in
       let app = T.const ~ty:appty app_ in
-      let add_ = ID.make "add" in
+      let add_ = Name.make "add" in
       let add =
         T.const ~ty:(Type.app funty_ [ ty; Type.app funty_ [ ty; ty ] ]) add_
       in
-      let s_ = ID.make "s" in
+      let s_ = Name.make "s" in
       let s = T.const ~ty:(Type.app funty_ [ ty; ty ]) s_ in
-      let k_ = ID.make "k" in
+      let k_ = Name.make "k" in
       let k = T.const ~ty k_ in
-      let zero_ = ID.make "zero" in
+      let zero_ = Name.make "zero" in
       let zero = T.const ~ty zero_ in
       let ty1 = Term.of_ty ty in
       let ty2 = Term.of_ty (Type.app funty_ [ ty; ty ]) in

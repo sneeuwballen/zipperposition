@@ -9,14 +9,14 @@
 val section : Util.Section.t
 
 type constructor = private {
-  cstor_name: ID.t;
+  cstor_name: Name.t;
   cstor_ty: Type.t;
   cstor_args: (Type.t * projector) list;
 }
 (** Constructor for an inductive type *)
 
 and projector = private {
-  p_id: ID.t;
+  p_id: Name.t;
   p_ty: Type.t;
   p_index: int; (* index of projected argument *)
   p_cstor: constructor lazy_t;
@@ -26,7 +26,7 @@ and projector = private {
 (** {5 Inductive Types} *)
 
 type t = private {
-  ty_id: ID.t; (* name *)
+  ty_id: Name.t; (* name *)
   ty_vars: Type.t HVar.t list; (* list of variables *)
   ty_pattern: Type.t; (* equal to  [id ty_vars] *)
   ty_constructors: constructor list;
@@ -41,22 +41,22 @@ type t = private {
 val pp : t CCFormat.printer
 
 exception InvalidDecl of string
-exception NotAnInductiveType of ID.t
-exception NotAnInductiveConstructor of ID.t
+exception NotAnInductiveType of Name.t
+exception NotAnInductiveConstructor of Name.t
 
 val declare_ty :
-  ID.t -> ty_vars:Type.t HVar.t list -> constructor list -> proof:Proof.t -> t
+  Name.t -> ty_vars:Type.t HVar.t list -> constructor list -> proof:Proof.t -> t
 (** Declare the given inductive type.
     @raise InvalidDecl
       if the type is already declared, or the list of constructors is empty *)
 
-val as_inductive_ty : ID.t -> t option
+val as_inductive_ty : Name.t -> t option
 
-val as_inductive_ty_exn : ID.t -> t
+val as_inductive_ty_exn : Name.t -> t
 (** Unsafe version of {!as_inductive_ty}
     @raise NotAnInductiveType if the ID is not an inductive type *)
 
-val is_inductive_ty : ID.t -> bool
+val is_inductive_ty : Name.t -> bool
 
 val as_inductive_type : Type.t -> (t * Type.t list) option
 (** [as_inductive_ty (list int)] will return [list, [int]] as an inductive type
@@ -75,16 +75,16 @@ val proof : t -> Proof.t
 (** {5 Constructors} *)
 
 val mk_constructor :
-  ID.t -> Type.t -> (Type.t * (ID.t * Type.t)) list -> constructor
+  Name.t -> Type.t -> (Type.t * (Name.t * Type.t)) list -> constructor
 
-val is_constructor : ID.t -> bool
+val is_constructor : Name.t -> bool
 (** true if the symbol is an inductive constructor (zero, successor...) *)
 
-val as_constructor : ID.t -> (constructor * t) option
+val as_constructor : Name.t -> (constructor * t) option
 (** if [id] is a constructor of [ity], then [as_constructor id] returns
     [Some (cstor, ity)] *)
 
-val as_constructor_exn : ID.t -> constructor * t
+val as_constructor_exn : Name.t -> constructor * t
 (** Unsafe version of {!as_constructor}
     @raise NotAnInductiveConstructor if it fails *)
 
@@ -93,17 +93,17 @@ val contains_inductive_types : Term.t -> bool
 
 (** {5 Projectors} *)
 
-val projector_id : projector -> ID.t
+val projector_id : projector -> Name.t
 val projector_ty : projector -> Type.t
 val projector_idx : projector -> int
 val projector_cstor : projector -> constructor
-val as_projector : ID.t -> projector option
+val as_projector : Name.t -> projector option
 
 (**/**)
 
 (** used to store information in IDs *)
 
-type ID.payload +=
+type Name_payload.t +=
   | Payload_ind_type of t
   | Payload_ind_cstor of constructor * t
   | Payload_ind_projector of projector

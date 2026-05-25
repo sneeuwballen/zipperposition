@@ -172,7 +172,7 @@ let enum_prop ?(mode = `Full) ?(add_var = false) ((v : Term.var), sc_v)
       match mode with
       | `Pragmatic ->
         let syms_of_var_ty = Signature.find_by_type signature ty_v in
-        ID.Set.fold
+        Name.Set.fold
           (fun sym acc -> Term.const ~ty:ty_v sym :: acc)
           syms_of_var_ty []
       | `Full ->
@@ -191,7 +191,7 @@ let enum_prop ?(mode = `Full) ?(add_var = false) ((v : Term.var), sc_v)
               T.app (T.var (HVar.make ~ty:var_ty (offset + i))) bvars)
             arg_tys
         in
-        ID.Set.fold
+        Name.Set.fold
           (fun sym acc ->
             T.fun_l arg_tys (Term.app (Term.const ~ty:ty_v sym) fresh_vars)
             :: acc)
@@ -424,7 +424,7 @@ module U = struct
           (match T.Classic.view t, T.Classic.view u with
           | _ when T.equal t u -> aux acc tail (* drop trivial *)
           | T.Classic.App (id1, l1), T.Classic.App (id2, l2) ->
-            if ID.equal id1 id2 && List.length l1 = List.length l2 then
+            if Name.equal id1 id2 && List.length l1 = List.length l2 then
               aux acc (mk_pairs env l1 l2 @ tail)
             else
               raise Exit (* failure *)
@@ -680,7 +680,7 @@ module U = struct
            | _ when T.equal t1 t2 ->
              push_new "triv" ~penalty ~offset ~subst [] (* trivial *)
            | T.Const id1, T.Const id2 ->
-             if ID.equal id1 id2 && List.length l1 = List.length l2 then (
+             if Name.equal id1 id2 && List.length l1 = List.length l2 then (
                (* unify arguments pairwise *)
                let new_pairs = mk_pairs env l1 l2 in
                push_new "rigid" ~penalty ~offset ~subst new_pairs

@@ -394,10 +394,10 @@ let fold_terms ?(vars = false) ?(var_args = true) ?(fun_bodies = true) ?ty_args
   in
   aux 0
 
-let symbols ?(init = ID.Set.empty) ?(include_types = false) lits =
+let symbols ?(init = Name.Set.empty) ?(include_types = false) lits =
   Iter.of_array lits
   |> Iter.flat_map (Lit.Seq.symbols ~include_types)
-  |> ID.Set.add_iter init
+  |> Name.Set.add_iter init
 
 (** {3 IO} *)
 

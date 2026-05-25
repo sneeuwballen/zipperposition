@@ -25,7 +25,7 @@ val add_constr_rule :
 val set_weight_rule : Precedence.weight_fun parametrized -> t -> t
 (** Choose the way weights are computed *)
 
-val add_status : (ID.t * Precedence.symbol_status) list -> t -> t
+val add_status : (Name.t * Precedence.symbol_status) list -> t -> t
 (** Specify explicitly the status of some symbols *)
 
 (** Parameters db_w and lmb_w correspond to the weight de-Bruijn and lambda

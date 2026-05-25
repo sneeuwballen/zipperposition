@@ -167,7 +167,7 @@ module Make (E : Env.S) : S with module Env = E = struct
              (* let stm = definition_stream id fresh_sym arg_combinations table in
         let stm_res = Env.Stm.make ~penalty:(1) ~parents:[] (stm) in
         Env.StmQ.add (Env.get_stm_queue ()) stm_res;  *)
-             Util.debugf ~section 2 "declaring %a" (fun k -> k ID.pp id);
+             Util.debugf ~section 2 "declaring %a" (fun k -> k Name.pp id);
              fresh_sym)
       |> Iter.to_list
     in
@@ -415,7 +415,7 @@ module Make (E : Env.S) : S with module Env = E = struct
         |> CCFun.tap (fun t ->
                CCOpt.iter
                  (fun hd_id ->
-                   ID.set_payload hd_id (ID.Attr_skolem ID.K_lazy_cnf))
+                   Name_payload.add hd_id (Name.Attr_skolem Name.K_lazy_cnf))
                  (T.head t))
     in
     let expand_quant = not @@ Env.flex_get Combinators.k_enable_combinators in

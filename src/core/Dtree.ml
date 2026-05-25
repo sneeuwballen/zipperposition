@@ -12,7 +12,7 @@ module S = Subst
     flatterm. *)
 
 type character =
-  | Symbol of ID.t
+  | Symbol of Name.t
   | Variable of Type.t HVar.t
   | Subterm of T.t (* opaque term, just do matching *)
 
@@ -38,7 +38,7 @@ let compare_char c1 c2 =
       c
   in
   match c1, c2 with
-  | Symbol s1, Symbol s2 -> ID.compare s1 s2
+  | Symbol s1, Symbol s2 -> Name.compare s1 s2
   | Variable v1, Variable v2 -> compare_vars v1 v2
   | Subterm t1, Subterm t2 -> T.compare t1 t2
   | _ -> Stdlib.compare (char_to_int_ c1) (char_to_int_ c2)
@@ -59,7 +59,7 @@ let term_to_char (t : T.t) : character * T.t list =
 
 let pp_char out = function
   | Variable v -> Type.pp_typed_var out v
-  | Symbol f -> ID.pp out f
+  | Symbol f -> Name.pp out f
   | Subterm t -> CCFormat.hbox T.pp out t
 
 (* parameter: maximum depth before we start using {!Subterm} *)

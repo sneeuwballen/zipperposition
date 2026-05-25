@@ -190,7 +190,7 @@ module Tag : sig
     | T_ind  (** induction *)
     | T_data  (** datatypes *)
     | T_distinct  (** distinct constants *)
-    | T_ac of ID.t  (** AC symbol *)
+    | T_ac of Name.t  (** AC symbol *)
     | T_cannot_orphan
 
   val compare : t -> t -> int

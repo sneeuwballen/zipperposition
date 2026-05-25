@@ -10,11 +10,11 @@ type 'a gen = 'a QCheck.Gen.t
 let mk_ gen = QCheck.make ~print:Type.to_string ~shrink:Type.Seq.sub gen
 let base_g = QCheck.Gen.oneofl Type.[ term; prop; int; rat ]
 let base = mk_ base_g
-let const_ s = Type.const (ID.make s)
+let const_ s = Type.const (Name.make s)
 let a_ = const_ "a"
 let b_ = const_ "b"
-let list_ = ID.make "list"
-let prod_ = ID.make "prod"
+let list_ = Name.make "list"
+let prod_ = Name.make "prod"
 
 let ground_g =
   let open QCheck.Gen in

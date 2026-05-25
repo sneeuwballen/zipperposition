@@ -38,9 +38,9 @@ module Make (E : Env.S) : S with module Env = E = struct
   module DEQ = CCDeque
 
   module SymSignIdx = Map.Make (struct
-    type t = ID.t * bool
+    type t = Name.t * bool
 
-    let compare = CCPair.compare ID.compare CCBool.compare
+    let compare = CCPair.compare Name.compare CCBool.compare
   end)
 
   let k_removed_active = Flex_state.create_key ()
@@ -116,7 +116,7 @@ module Make (E : Env.S) : S with module Env = E = struct
   let task_queue = TaskPriorityQueue.create ()
 
   (* a set containing symbols for which BCE will not be tried *)
-  let ignored_symbols = ref ID.Set.empty
+  let ignored_symbols = ref Name.Set.empty
 
   (* assuming the weakest logic *)
   let logic = ref NonequationalFO
@@ -140,7 +140,7 @@ module Make (E : Env.S) : S with module Env = E = struct
   let add_lit_to_idx lit_lhs sign cl =
     let sym = T.head_exn lit_lhs in
 
-    if not (ID.Set.mem sym !ignored_symbols) then (
+    if not (Name.Set.mem sym !ignored_symbols) then (
       let sym_occs sym sign =
         CCOpt.map_or ~default:0 C.ClauseSet.cardinal
           (SymSignIdx.find_opt (sym, sign) !ss_idx)
@@ -151,8 +151,9 @@ module Make (E : Env.S) : S with module Env = E = struct
       if symbol_occurs_too_often total_sym_occs then (
         ss_idx :=
           SymSignIdx.remove (sym, false) (SymSignIdx.remove (sym, true) !ss_idx);
-        ignored_symbols := ID.Set.add sym !ignored_symbols;
-        Util.debugf ~section 5 "ignoring symbol @[%a@]@." (fun k -> k ID.pp sym)
+        ignored_symbols := Name.Set.add sym !ignored_symbols;
+        Util.debugf ~section 5 "ignoring symbol @[%a@]@." (fun k ->
+            k Name.pp sym)
       ) else
         ss_idx :=
           SymSignIdx.update (sym, sign)
@@ -189,7 +190,7 @@ module Make (E : Env.S) : S with module Env = E = struct
               if L.is_predicate_lit lit && Option.is_some (T.head lhs) then (
                 if not (T.is_fo_term lhs) then refine_logic EquationalHO;
                 let hd_sym = T.head_exn lhs in
-                if not (ID.Set.mem hd_sym !ignored_symbols) then
+                if not (Name.Set.mem hd_sym !ignored_symbols) then
                   add_lit_to_idx lhs sign cl
               ) else
                 refine_logic EquationalHO
@@ -227,7 +228,7 @@ module Make (E : Env.S) : S with module Env = E = struct
                 match lit with
                 | L.Equation (lhs, _, _)
                   when L.is_predicate_lit lit
-                       && Option.equal ID.equal (T.head lhs) (Some hd)
+                       && Option.equal Name.equal (T.head lhs) (Some hd)
                        && sign != L.is_positivoid lit ->
                   add_candidates lit_idx cand [ clause ]
                 | _ -> ())
@@ -240,7 +241,7 @@ module Make (E : Env.S) : S with module Env = E = struct
       when L.is_predicate_lit lit
            &&
            match T.head lhs with
-           | Some hd -> not (ID.Set.mem hd !ignored_symbols)
+           | Some hd -> not (Name.Set.mem hd !ignored_symbols)
            | None -> false ->
       (* assert (T.is_fo_term lhs); *)
       let hd = T.head_exn lhs in
@@ -505,7 +506,7 @@ module Make (E : Env.S) : S with module Env = E = struct
                  && L.is_positivoid lit != sign
                  &&
                  match T.head lhs, T.head lhs' with
-                 | Some hd, Some hd' -> ID.equal hd hd'
+                 | Some hd, Some hd' -> Name.equal hd hd'
                  | _ -> false ->
             lhs' :: same_hds, others
           | _ -> same_hds, lit :: others)
@@ -575,7 +576,7 @@ module Make (E : Env.S) : S with module Env = E = struct
                 (fun t ->
                   CCOpt.return_if
                     (match T.head t, T.head orig_lhs with
-                    | Some hd, Some hd' -> ID.equal hd hd'
+                    | Some hd, Some hd' -> Name.equal hd hd'
                     | _ -> false)
                     t)
                 (L.View.get_lhs lit)
@@ -704,7 +705,8 @@ module Make (E : Env.S) : S with module Env = E = struct
                  | L.Equation (lhs', _, _) when L.is_predicate_lit lit' ->
                    let sym' = T.head lhs' in
                    let sign' = L.is_positivoid lit' in
-                   if Option.equal ID.equal sym' (Some hd_sym) && sign' == sign
+                   if
+                     Option.equal Name.equal sym' (Some hd_sym) && sign' == sign
                    then
                      Some lit'
                    else
@@ -738,7 +740,7 @@ module Make (E : Env.S) : S with module Env = E = struct
       if
         (not (C.is_empty cl))
         && (not (C.is_redundant cl))
-        && (not (ID.Set.mem hd_sym !ignored_symbols))
+        && (not (Name.Set.mem hd_sym !ignored_symbols))
         && Literals.is_polymorphism_safe lit_idx (C.lits cl)
         && (!logic != EquationalHO || is_alone_with_polarity ())
       then (
@@ -756,7 +758,7 @@ module Make (E : Env.S) : S with module Env = E = struct
         Util.debugf ~section 3 "ignoring %b %b %b" (fun k ->
             k (C.is_empty task.clause)
               (C.is_redundant task.clause)
-              (ID.Set.mem hd_sym !ignored_symbols))
+              (Name.Set.mem hd_sym !ignored_symbols))
     in
 
     let module Q = TaskPriorityQueue in

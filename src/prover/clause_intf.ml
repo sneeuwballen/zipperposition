@@ -78,7 +78,7 @@ module type S = sig
   val is_active : t -> v:Trail.valuation -> bool
   (** True if the clause's trail is active in this valuation *)
 
-  val is_inj_axiom : t -> (ID.t * int) option
+  val is_inj_axiom : t -> (Name.t * int) option
   (** Returns Some (sym,i) if clause is injectivity axiom for ith argument of
       symbol sym. *)
 
@@ -185,7 +185,8 @@ module type S = sig
   val is_oriented_rule : t -> bool
   (** Is the clause a positive oriented clause? *)
 
-  val symbols : ?init:ID.Set.t -> ?include_types:bool -> t Iter.t -> ID.Set.t
+  val symbols :
+    ?init:Name.Set.t -> ?include_types:bool -> t Iter.t -> Name.Set.t
   (** symbols that occur in the clause *)
 
   val to_sclause : t -> SClause.t

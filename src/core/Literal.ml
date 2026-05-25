@@ -260,7 +260,7 @@ module Seq = struct
 end
 
 let symbols ?(include_types = false) lit =
-  Seq.symbols ~include_types lit |> ID.Set.of_iter
+  Seq.symbols ~include_types lit |> Name.Set.of_iter
 
 (** Unification-like operation on components of a literal. *)
 module UnifOp = struct
@@ -484,7 +484,7 @@ let rec cannot_be_eq (t1 : term) (t2 : term) : Builtin.Tag.t list option =
     when Ind_ty.is_constructor c1 && Ind_ty.is_constructor c2 ->
     (* two constructor applications cannot be equal if they
          don't have the same constructor *)
-    if ID.equal c1 c2 && List.length l1 = List.length l2 then
+    if Name.equal c1 c2 && List.length l1 = List.length l2 then
       List.combine l1 l2 |> Iter.of_list
       |> Iter.find_map (fun (a, b) -> cannot_be_eq a b)
     else

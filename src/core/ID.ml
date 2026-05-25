@@ -2,12 +2,14 @@
 
 (** {1 Unique Identifiers} *)
 
-type payload = ..
+open Name_payload
+
+type payload = Name_payload.t
 
 type t = {
   id: int;
   name: string;
-  mutable payload: payload list;
+  mutable payload: Name_payload.t list;
       (** Use [exn] as an open type for user-defined payload *)
 }
 
@@ -31,38 +33,11 @@ let dummy_of_int id =
   let name = "DUMMY_" ^ CCInt.to_string id in
   { id; name; payload = [] }
 
-let set_payload ?(can_erase = fun _ -> false) t e =
-  let rec aux = function
-    | [] -> [ e ]
-    | e' :: tail when can_erase e' -> e :: tail
-    | e' :: tail -> e' :: aux tail
-  in
-  t.payload <- aux t.payload
+let set_payload ?can_erase t e =
+  t.payload <- Name_payload.Pure.add ?can_erase e t.payload
 
-let payload_find ~f:p t =
-  match t.payload with
-  | [] -> None
-  | e1 :: tail ->
-    (match p e1, tail with
-    | (Some _ as res), _ -> res
-    | None, [] -> None
-    | None, e2 :: tail2 ->
-      (match p e2, tail2 with
-      | (Some _ as res), _ -> res
-      | None, [] -> None
-      | None, e3 :: tail3 ->
-        (match p e3 with
-        | Some _ as res -> res
-        | None -> CCList.find_map p tail3)))
-
-let payload_pred ~f:p t =
-  match t.payload with
-  | [] -> false
-  | e :: _ when p e -> true
-  | _ :: e :: _ when p e -> true
-  | _ :: _ :: e :: _ when p e -> true
-  | l -> List.exists p l
-
+let payload_find ~f:p t = Name_payload.Pure.find ~f:p t.payload
+let payload_pred ~f:p t = Name_payload.Pure.exists ~f:p t.payload
 let hash t = t.id
 let equal i1 i2 = i1.id = i2.id
 let compare i1 i2 = Stdlib.compare i1.id i2.id
@@ -94,53 +69,35 @@ let gensym =
     incr r;
     make name
 
-module O_ = struct
-  type t = t_
+module As_key = struct
+  type nonrec t = t
 
   let equal = equal
   let compare = compare
   let hash = hash
 end
 
-module Map = CCMap.Make (O_)
-module Set = CCSet.Make (O_)
-module Tbl = CCHashtbl.Make (O_)
-
-type payload +=
-  | Attr_infix of string
-  | Attr_prefix of string
-  | Attr_parameter of int
-
-type skolem_kind =
-  | K_normal
-  | K_after_cnf
-  | K_lazy_cnf
-  | K_ind (* inductive *)
-
-type payload +=
-  | Attr_skolem of skolem_kind
-  | Attr_distinct
-  | Attr_comm
-  | Attr_assoc
-  | Attr_cnf_def
+module Map = CCMap.Make (As_key)
+module Set = CCSet.Make (As_key)
+module Tbl = CCHashtbl.Make (As_key)
 
 let as_infix =
   payload_find ~f:(function
-    | Attr_infix s -> Some s
+    | Name.Attr_infix s -> Some s
     | _ -> None)
 
 let is_infix id = as_infix id |> CCOpt.is_some
 
 let as_prefix =
   payload_find ~f:(function
-    | Attr_prefix s -> Some s
+    | Name.Attr_prefix s -> Some s
     | _ -> None)
 
 let is_prefix id = as_prefix id |> CCOpt.is_some
 
 let as_parameter id =
   payload_find id ~f:(function
-    | Attr_parameter i -> Some i
+    | Name.Attr_parameter i -> Some i
     | _ -> None)
 
 let is_parameter id = as_parameter id |> CCOpt.is_some
@@ -149,7 +106,7 @@ let is_comm id =
   CCOpt.is_some
   @@ payload_find
        ~f:(function
-         | Attr_comm -> Some 1
+         | Name.Attr_comm -> Some 1
          | _ -> None)
        id
 
@@ -157,7 +114,7 @@ let is_assoc id =
   CCOpt.is_some
   @@ payload_find
        ~f:(function
-         | Attr_assoc -> Some 1
+         | Name.Attr_assoc -> Some 1
          | _ -> None)
        id
 
@@ -165,27 +122,22 @@ let is_ac id = is_comm id && is_assoc id
 
 let is_skolem id =
   payload_pred id ~f:(function
-    | Attr_skolem _ -> true
+    | Name.Attr_skolem _ -> true
     | _ -> false)
 
 let is_postcnf_skolem id =
   payload_pred id ~f:(function
-    | Attr_skolem K_after_cnf -> true
+    | Name.Attr_skolem K_after_cnf -> true
     | _ -> false)
 
 let is_lazycnf_skolem id =
   payload_pred id ~f:(function
-    | Attr_skolem K_lazy_cnf -> true
+    | Name.Attr_skolem K_lazy_cnf -> true
     | _ -> false)
 
 let as_skolem id =
   payload_find id ~f:(function
-    | Attr_skolem a -> Some a
+    | Name.Attr_skolem a -> Some a
     | _ -> None)
 
 (* Note: If you want to reinsert mandatory arguments: They were here. (let num_mandatory_args _ =) *)
-
-let is_distinct_object id =
-  payload_pred id ~f:(function
-    | Attr_distinct -> true
-    | _ -> false)

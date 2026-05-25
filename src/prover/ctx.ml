@@ -29,7 +29,7 @@ module Make (X : PARAMETERS) = struct
   let _signature = ref X.signature
   let _complete = ref true
   let _sk_ctx = ref X.sk_ctx
-  let _inj_syms = ref ID.Map.empty
+  let _inj_syms = ref Name.Map.empty
   let renaming = S.Renaming.create ()
   let ord () = !_ord
   let sk_ctx () = !_sk_ctx
@@ -44,7 +44,7 @@ module Make (X : PARAMETERS) = struct
   let find_signature_exn s =
     try Signature.find_exn !_signature s
     with Not_found ->
-      invalid_arg (CCFormat.sprintf "%a not found in signature" ID.pp s)
+      invalid_arg (CCFormat.sprintf "%a not found in signature" Name.pp s)
 
   let compare t1 t2 = Ordering.compare !_ord t1 t2
   let select lits = !_select lits
@@ -61,7 +61,7 @@ module Make (X : PARAMETERS) = struct
   let declare_new_ symb (ty, _) =
     Util.debugf ~section:Const.section 2
       "@[<2>@{<cyan>declare new symbol@}@ `@[%a:%a@]`@]" (fun k ->
-        k ID.pp symb Type.pp ty);
+        k Name.pp symb Type.pp ty);
     _signature := Signature.declare !_signature symb ty;
     Signal.send on_signature_update !_signature;
     Signal.send on_new_symbol (symb, ty);
@@ -91,15 +91,15 @@ module Make (X : PARAMETERS) = struct
 
   let set_injective_for_arg sym i =
     let arg_bv =
-      match ID.Map.find_opt sym !_inj_syms with
+      match Name.Map.find_opt sym !_inj_syms with
       | Some res -> res
       | None -> CCBV.empty ()
     in
     CCBV.set arg_bv i;
-    _inj_syms := ID.Map.add sym arg_bv !_inj_syms
+    _inj_syms := Name.Map.add sym arg_bv !_inj_syms
 
   let is_injective_for_arg sym i =
-    match ID.Map.find_opt sym !_inj_syms with
+    match Name.Map.find_opt sym !_inj_syms with
     | Some res -> CCBV.get res i
     | None -> false
 

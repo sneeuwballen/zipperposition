@@ -307,7 +307,7 @@ module Make (Env : Env.S) : S with module Env = Env = struct
                  if
                    ((not (T.is_var body)) || T.is_ho_var body)
                    && ((not (T.is_const hd))
-                      || not (ID.is_skolem (T.as_const_exn hd)))
+                      || not (Name.is_skolem (T.as_const_exn hd)))
                    && (sup_at_var_headed || not (T.is_var (T.head_term body)))
                  then
                    (*CCFormat.printf "Adding %a to LS index.\n" T.pp body; *)
@@ -1429,7 +1429,7 @@ module Make (Env : Env.S) : S with module Env = Env = struct
                if
                  ((not (T.is_var body)) || T.is_ho_var body)
                  && ((not (T.is_const hd))
-                    || not (ID.is_skolem (T.as_const_exn hd)))
+                    || not (Name.is_skolem (T.as_const_exn hd)))
                  && (Env.flex_get k_sup_at_var_headed
                     || not (T.is_var (T.head_term body)))
                then
@@ -2937,8 +2937,8 @@ module Make (Env : Env.S) : S with module Env = Env = struct
     | Lit.Equation (l, r, sign) when T.is_const l && T.is_const r ->
       assert (not (T.is_true_or_false r));
       let s1 = T.head_exn l and s2 = T.head_exn r in
-      if ID.is_distinct_object s1 && ID.is_distinct_object s2 then
-        if sign = ID.equal s1 s2 then
+      if Name.is_distinct_object s1 && Name.is_distinct_object s2 then
+        if sign = Name.equal s1 s2 then
           Some (Lit.mk_tauto, [], [ Proof.Tag.T_distinct ])
         (* "a" = "a", or "a" != "b" *)
         else

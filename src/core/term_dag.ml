@@ -195,7 +195,7 @@ and encode_term (self : t) (term : InnerTerm.t) : E.offset =
       | Const id ->
         let ty_off = encode_type_offset self (InnerTerm.ty term) in
         E.write_node self.enc "tm.const" (fun nd ->
-            E.string nd (ID.name id);
+            E.string nd (Hstring.to_string id);
             match ty_off with
             | None -> E.null nd
             | Some off -> E.ref nd off)
@@ -345,7 +345,7 @@ and decode_term_node (st : decode_state) (nd : D.node_decoder) (cmd : string) :
       | HasType t -> t
       | NoType -> failwith "Term_dag.decode: tm.const requires a type"
     in
-    let id = ID.make name in
+    let id = Hstring.make name in
     InnerTerm.const ~ty:ty_term id
   | "tm.app" ->
     let vals = read_remaining_values nd in

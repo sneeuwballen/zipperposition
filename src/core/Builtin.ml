@@ -351,7 +351,7 @@ module Tag = struct
     | T_ind  (** induction *)
     | T_data  (** datatypes *)
     | T_distinct  (** distinct constants *)
-    | T_ac of ID.t  (** AC symbols *)
+    | T_ac of Name.t  (** AC symbols *)
     | T_cannot_orphan
 
   let compare = Stdlib.compare
@@ -367,7 +367,7 @@ module Tag = struct
     | T_ind -> Fmt.string out "ind"
     | T_data -> Fmt.string out "data"
     | T_distinct -> Fmt.string out "distinct_constants"
-    | T_ac id -> Fmt.fprintf out "(ac %a)" ID.pp_full id
+    | T_ac id -> Fmt.fprintf out "(ac %a)" Name.pp_full id
     | T_cannot_orphan -> Fmt.fprintf out "cannot orphan"
 end
 

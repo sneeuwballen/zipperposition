@@ -10,40 +10,40 @@ let section = Util.Section.make ~parent:Const.section "bool_encode"
 let enabled_ = ref false
 let ( ==> ) = T.Ty.( ==> )
 let decl id ty = Statement.ty_decl ~proof:Proof.Step.trivial id ty
-let bool_clone_id = ID.make "$_bool"
+let bool_clone_id = Name.make "$_bool"
 let bool_clone_ty = T.const ~ty:T.tType bool_clone_id
 let bool_clone_tydecl = decl bool_clone_id bool_clone_ty
-let true_clone_id = ID.make "$_true"
+let true_clone_id = Name.make "$_true"
 let true_term = T.const ~ty:bool_clone_ty true_clone_id
 let true_clone_tydecl = decl true_clone_id bool_clone_ty
-let false_clone_id = ID.make "$_false"
+let false_clone_id = Name.make "$_false"
 let false_term = T.const ~ty:bool_clone_ty false_clone_id
 let false_clone_tydecl = decl false_clone_id bool_clone_ty
-let and_id = ID.make "$_and"
+let and_id = Name.make "$_and"
 let and_type = [ bool_clone_ty; bool_clone_ty ] ==> bool_clone_ty
 let and_term = T.const ~ty:and_type and_id
 let and_clone_tydecl = decl and_id and_type
-let or_id = ID.make "$_or"
+let or_id = Name.make "$_or"
 let or_type = [ bool_clone_ty; bool_clone_ty ] ==> bool_clone_ty
 let or_term = T.const ~ty:or_type or_id
 let or_clone_tydecl = decl or_id or_type
-let not_id = ID.make "$_not"
+let not_id = Name.make "$_not"
 let not_type = [ bool_clone_ty ] ==> bool_clone_ty
 let not_term = T.const ~ty:not_type not_id
 let not_clone_tydecl = decl not_id not_type
-let impl_id = ID.make "$_impl"
+let impl_id = Name.make "$_impl"
 let impl_type = [ bool_clone_ty; bool_clone_ty ] ==> bool_clone_ty
 let impl_term = T.const ~ty:impl_type impl_id
 let impl_clone_tydecl = decl impl_id impl_type
-let equiv_id = ID.make "$_equiv"
+let equiv_id = Name.make "$_equiv"
 let equiv_type = [ bool_clone_ty; bool_clone_ty ] ==> bool_clone_ty
 let equiv_term = T.const ~ty:equiv_type equiv_id
 let equiv_clone_tydecl = decl equiv_id equiv_type
-let xor_id = ID.make "$_xor"
+let xor_id = Name.make "$_xor"
 let xor_type = [ bool_clone_ty; bool_clone_ty ] ==> bool_clone_ty
 let xor_term = T.const ~ty:xor_type xor_id
 let xor_clone_tydecl = decl xor_id xor_type
-let eq_id = ID.make "$_eq"
+let eq_id = Name.make "$_eq"
 
 let eq_type =
   let alpha = Var.make ~ty:T.tType (ID.make "alpha") in
@@ -52,10 +52,10 @@ let eq_type =
 
 let eq_term = T.const ~ty:eq_type eq_id
 let eq_clone_tydecl = decl eq_id eq_type
-let neq_id = ID.make "$_neq"
+let neq_id = Name.make "$_neq"
 let neq_term = T.const ~ty:eq_type neq_id
 let neq_clone_tydecl = decl neq_id eq_type
-let forall_id = ID.make "$_forall"
+let forall_id = Name.make "$_forall"
 
 let forall_type =
   let alpha = Var.make ~ty:T.tType (ID.make "alpha") in
@@ -64,10 +64,10 @@ let forall_type =
 
 let forall_term = T.const ~ty:forall_type forall_id
 let forall_clone_tydecl = decl forall_id forall_type
-let exists_id = ID.make "$_exists"
+let exists_id = Name.make "$_exists"
 let exists_term = T.const ~ty:forall_type exists_id
 let exists_clone_tydecl = decl exists_id forall_type
-let choice_id = ID.make "$_choice"
+let choice_id = Name.make "$_choice"
 
 let choice_type =
   let alpha = Var.make ~ty:T.tType (ID.make "alpha") in
@@ -427,7 +427,7 @@ let res_tc =
       | E_i c -> Some c
       | _ -> None)
     ~to_exn:(fun i -> E_i i)
-    ~compare ~pp_in:pp_clause_in ~is_stmt:true ~name:Statement.name
+    ~compare ~pp_in:pp_clause_in ~is_stmt:true ~name:Statement.get_name
     ~to_form:(fun ~ctx st ->
       let conv_c (c : T.t SLiteral.t list) : _ =
         c |> List.map SLiteral.to_form |> T.Form.or_

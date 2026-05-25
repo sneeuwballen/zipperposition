@@ -364,7 +364,7 @@ let rec unify ~scope ~counter ~subst = function
         let subst = flex_rigid ~pref_l ~subst ~counter ~scope body_t' body_s' in
         unify ~scope ~counter ~subst rest
       | T.Const f, T.Const g
-        when ID.equal f g && List.length args_s = List.length args_t ->
+        when Name.equal f g && List.length args_s = List.length args_t ->
         unify ~subst ~counter ~scope @@ build_constraints args_s args_t rest
       | T.AppBuiltin (hd_s, args_s'), T.AppBuiltin (hd_t, args_t')
         when Builtin.equal hd_s hd_t ->

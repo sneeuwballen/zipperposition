@@ -7,21 +7,21 @@ open Logtk
 module T = Term
 
 exception InvalidDecl of string
-exception NotAnInductiveConstant of ID.t
+exception NotAnInductiveConstant of Name.t
 
 let () =
   let spf = CCFormat.sprintf in
   Printexc.register_printer (function
     | InvalidDecl msg -> Some (spf "@[<2>invalid declaration:@ %s@]" msg)
     | NotAnInductiveConstant id ->
-      Some (spf "%a is not an inductive constant" ID.pp id)
+      Some (spf "%a is not an inductive constant" Name.pp id)
     | _ -> None)
 
 let invalid_decl m = raise (InvalidDecl m)
 let invalid_declf m = CCFormat.ksprintf m ~f:invalid_decl
 
 type t = {
-  cst_id: ID.t;
+  cst_id: Name.t;
   cst_args: Type.t list;
   cst_ty: Type.t; (* [cst_ty = cst_id cst_args] *)
   cst_ity: Ind_ty.t; (* the corresponding inductive type *)
@@ -29,16 +29,16 @@ type t = {
   cst_depth: int; (* how many induction lead to this one? *)
 }
 
-type ID.payload += Payload_cst of t
+type Name_payload.t += Payload_cst of t
 
 (** {5 Inductive Constants} *)
 
 let to_term c = Term.const ~ty:c.cst_ty c.cst_id
 let id c = c.cst_id
 let ty c = c.cst_ty
-let equal a b = ID.equal a.cst_id b.cst_id
-let compare a b = ID.compare a.cst_id b.cst_id
-let hash a = ID.hash a.cst_id
+let equal a b = Name.equal a.cst_id b.cst_id
+let compare a b = Name.compare a.cst_id b.cst_id
+let hash a = Name.hash a.cst_id
 
 module Cst_set = CCSet.Make (struct
   type t_ = t
@@ -49,11 +49,11 @@ end)
 
 let depth c = c.cst_depth
 let same_type c1 c2 = Type.equal c1.cst_ty c2.cst_ty
-let pp out c = ID.pp out c.cst_id
+let pp out c = Name.pp out c.cst_id
 let on_new_cst = Signal.create ()
 
 let id_as_cst id =
-  ID.payload_find id ~f:(function
+  Name_payload.find id ~f:(function
     | Payload_cst c -> Some c
     | _ -> None)
 
@@ -74,24 +74,24 @@ let id_is_sub id = id_as_cst id |> CCOpt.map_or ~default:false is_sub
 
 let n_ = ref 0
 
-let make_skolem ty : ID.t =
-  let c = ID.makef "#%s_%d" (Type.mangle ty) !n_ in
+let make_skolem ty : Name.t =
+  let c = Name.makef "#%s_%d" (Type.mangle ty) !n_ in
   incr n_;
   (* declare as a skolem *)
   let k =
     if Ind_ty.is_inductive_type ty then
-      ID.K_ind
+      Name.K_ind
     else
-      ID.K_normal
+      Name.K_normal
   in
-  ID.set_payload c (ID.Attr_skolem k);
+  Name_payload.add c (Name.Attr_skolem k);
   c
 
 (* declare new constant *)
 let declare ~depth ~is_sub id ty =
   Util.debugf ~section:Ind_ty.section 2
     "@[<2>declare new inductive symbol@ `@[%a : %a@]`@ :depth %d :is_sub %B@]"
-    (fun k -> k ID.pp id Type.pp ty depth is_sub);
+    (fun k -> k Name.pp id Type.pp ty depth is_sub);
   assert (not (id_is_cst id));
   assert (Type.is_ground ty);
   (* constant --> not polymorphic *)
@@ -111,8 +111,8 @@ let declare ~depth ~is_sub id ty =
       cst_is_sub = is_sub;
     }
   in
-  ID.set_payload id (Payload_cst cst) ~can_erase:(function
-    | ID.Attr_skolem ID.K_ind ->
+  Name_payload.add id (Payload_cst cst) ~can_erase:(function
+    | Name.Attr_skolem Name.K_ind ->
       true (* special case: promotion from skolem to inductive const *)
     | _ -> false);
   (* return *)
@@ -127,12 +127,12 @@ let dominates (c1 : t) (c2 : t) : bool = c1.cst_depth < c2.cst_depth
 
 (** {2 Inductive Skolems} *)
 
-type ind_skolem = ID.t * Type.t
+type ind_skolem = Name.t * Type.t
 
-let ind_skolem_compare = CCOrd.pair ID.compare Type.compare
+let ind_skolem_compare = CCOrd.pair Name.compare Type.compare
 let ind_skolem_equal a b = ind_skolem_compare a b = 0
 
-let id_is_ind_skolem (id : ID.t) (ty : Type.t) : bool =
+let id_is_ind_skolem (id : Name.t) (ty : Type.t) : bool =
   let n_tyvars, ty_args, ty_ret = Type.open_poly_fun ty in
   n_tyvars = 0
   && ty_args = [] (* constant *)
@@ -142,7 +142,7 @@ let id_is_ind_skolem (id : ID.t) (ty : Type.t) : bool =
   && (id_is_cst id
      || ((not (Ind_ty.is_constructor id)) && not (Rewrite.is_defined_cst id)))
 
-let ind_skolem_depth (id : ID.t) : int =
+let ind_skolem_depth (id : Name.t) : int =
   match id_as_cst id with
   | None -> 0
   | Some c -> depth c

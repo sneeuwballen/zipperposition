@@ -16,7 +16,7 @@ type view =
   | AppBuiltin of Builtin.t * t list
   | DB of int  (** Bound variable (De Bruijn index) *)
   | Var of var  (** Term variable *)
-  | Const of ID.t  (** Typed constant *)
+  | Const of Name.t  (** Typed constant *)
   | App of t * t list
       (** Application to a list of terms (cannot be left-nested) *)
   | Fun of Type.t * t  (** Lambda abstraction *)
@@ -72,7 +72,7 @@ module Classic = struct
   type view =
     | Var of var
     | DB of int
-    | App of ID.t * t list  (** covers Const and App *)
+    | App of Name.t * t list  (** covers Const and App *)
     | AppBuiltin of Builtin.t * t list
     | NonFO  (** any other case *)
 
@@ -588,7 +588,8 @@ let rec in_pfho_fragment t =
     else
       raise
         (Failure
-           (CCFormat.sprintf "Constant has out-of-fragment type [%a] " ID.pp sym))
+           (CCFormat.sprintf "Constant has out-of-fragment type [%a] " Name.pp
+              sym))
   | AppBuiltin (_, l) | App (_, l) ->
     if
       (top_level_exception t || type_ok (ty t))
@@ -621,7 +622,7 @@ and top_level_exception t =
   let hd = head_term t in
   let hd_is_skolem =
     match as_const hd with
-    | Some sym -> ID.is_skolem sym
+    | Some sym -> Name.is_skolem sym
     | None -> false
   in
   if is_var hd || hd_is_skolem then
@@ -784,8 +785,8 @@ let mk_fresh_skolem ?(prefix = "_fresh_sk") =
  fun vars ty_ret ->
   let i = CCRef.incr_then_get n in
   (* fresh skolem **)
-  let id = ID.makef "#%s%d" prefix i in
-  ID.set_payload id (ID.Attr_skolem ID.K_after_cnf);
+  let id = Name.makef "#%s%d" prefix i in
+  Name_payload.add id (Name.Attr_skolem Name.K_after_cnf);
   let ty_vars, vars =
     List.partition (fun v -> Type.is_tType (HVar.ty v)) vars
   in
@@ -797,7 +798,7 @@ let mk_fresh_skolem ?(prefix = "_fresh_sk") =
 
 let mk_tmp_cst ~counter ~ty =
   let idx = CCRef.get_then_incr counter in
-  let id = ID.makef "#tmp%d" idx in
+  let id = Name.makef "#tmp%d" idx in
   const id ~ty
 
 let rec head_exn t =
@@ -819,10 +820,10 @@ let replace t ~old ~by =
 let replace_m t m =
   of_term_unsafe (T.replace_m (t : t :> T.t) (m : t Map.t :> T.t T.Map.t))
 
-let symbols ?(init = ID.Set.empty) t = ID.Set.add_iter init (Seq.symbols t)
+let symbols ?(init = Name.Set.empty) t = Name.Set.add_iter init (Seq.symbols t)
 
 (** Does t contains the symbol f? *)
-let contains_symbol f t = Iter.exists (ID.equal f) (Seq.symbols t)
+let contains_symbol f t = Iter.exists (Name.equal f) (Seq.symbols t)
 
 (** {2 Fold} *)
 
@@ -868,8 +869,8 @@ let all_positions ?(filter_formula_subterms = fun _ _ -> None) ?(vars = false)
 (** {2 Some AC-utils} *)
 
 module type AC_SPEC = sig
-  val is_ac : ID.t -> bool
-  val is_comm : ID.t -> bool
+  val is_ac : Name.t -> bool
+  val is_comm : Name.t -> bool
 end
 
 module AC (A : AC_SPEC) = struct
@@ -882,7 +883,7 @@ module AC (A : AC_SPEC) = struct
       match T.view t with
       | T.App (f', l') ->
         (match head f' with
-        | Some id when ID.equal id f ->
+        | Some id when Name.equal id f ->
           let _, args = split_args_ ~ty:(ty f') l' in
           flatten acc args
         | Some _ | None -> t :: acc)
@@ -943,7 +944,7 @@ module AC (A : AC_SPEC) = struct
   let seq_symbols t = Seq.symbols t |> Iter.filter A.is_ac
 
   let symbols seq =
-    seq |> Iter.flat_map seq_symbols |> ID.Set.add_iter ID.Set.empty
+    seq |> Iter.flat_map seq_symbols |> Name.Set.add_iter Name.Set.empty
 end
 
 (** {2 Printing/parsing} *)
@@ -1226,7 +1227,7 @@ module TPTP = struct
           Format.fprintf out "(@[(%a) @@ %a@])" Builtin.TPTP.pp b
             (Util.pp_list ~sep:" @ " pp_enclosed)
             l
-      | Const s -> ID.pp_tstp out s
+      | Const s -> Name.pp_tstp out s
       | App (f, l) ->
         Format.fprintf out "%a" (Util.pp_list ~sep:" @ " pp_enclosed) (f :: l)
       | Fun _ ->

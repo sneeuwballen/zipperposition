@@ -22,7 +22,7 @@ and term = t
 and ty = t
 
 and match_cstor = {
-  cstor_id: ID.t;
+  cstor_id: Name.t;
   cstor_ty: ty;
   cstor_args: ty list;
 }
@@ -31,7 +31,7 @@ and match_branch = match_cstor * t Var.t list * t
 
 and view =
   | Var of t Var.t  (** variable *)
-  | Const of ID.t  (** constant *)
+  | Const of Name.t  (** constant *)
   | App of t * t list  (** apply term *)
   | Ite of t * t * t
   | Match of t * match_branch list
@@ -115,7 +115,7 @@ let rec hash t =
 and hash_rec_ t =
   match view t with
   | Var s -> Hash.combine2 1 (Var.hash s)
-  | Const s -> Hash.combine2 2 (ID.hash s)
+  | Const s -> Hash.combine2 2 (Name.hash s)
   | App (s, l) -> Hash.combine3 3 (hash s) (Hash.list hash l)
   | Multiset l -> Hash.combine2 4 (Hash.list hash l)
   | AppBuiltin (b, l) -> Hash.combine3 5 (Builtin.hash b) (Hash.list hash l)
@@ -141,7 +141,7 @@ let rec compare t1 t2 =
   else (
     match view t1, view t2 with
     | Var s1, Var s2 -> Var.compare s1 s2
-    | Const s1, Const s2 -> ID.compare s1 s2
+    | Const s1, Const s2 -> Name.compare s1 s2
     | App (s1, l1), App (s2, l2) ->
       compare s1 s2 <?> (CCOrd.list compare, l1, l2)
     | Bind (s1, v1, t1), Bind (s2, v2, t2) ->
@@ -161,7 +161,7 @@ let rec compare t1 t2 =
     | Match (u1, l1), Match (u2, l2) ->
       let cmp_branch (c1, vars1, rhs1) (c2, vars2, rhs2) =
         CCOrd.(
-          ID.compare c1.cstor_id c2.cstor_id
+          Name.compare c1.cstor_id c2.cstor_id
           <?> (list compare, c1.cstor_args, c2.cstor_args)
           <?> (list Var.compare, vars1, vars2)
           <?> (compare, rhs1, rhs2))
@@ -195,9 +195,9 @@ let rec pp out t =
   match view t with
   | Var s -> Var.pp_fullc out s
   | Const s ->
-    (match ID.as_prefix s with
+    (match Name.as_prefix s with
     | Some s -> CCFormat.string out s
-    | None -> ID.pp out s)
+    | None -> Name.pp out s)
   | App (_, []) -> assert false
   | App (f, l) ->
     let l =
@@ -208,12 +208,12 @@ let rec pp out t =
     in
     let as_infix =
       match view f with
-      | Const id -> ID.as_infix id
+      | Const c -> Name.as_infix c
       | _ -> None
     in
     let as_prefix =
       match view f with
-      | Const id -> ID.as_prefix id
+      | Const c -> Name.as_prefix c
       | _ -> None
     in
     (match as_infix, as_prefix, l with
@@ -261,7 +261,7 @@ let rec pp out t =
       l pp u
   | Match (u, l) ->
     let pp_branch out (c, vars, rhs) =
-      Format.fprintf out "@[<2>case@ @[%a%a%a@] ->@ %a@]" ID.pp c.cstor_id
+      Format.fprintf out "@[<2>case@ @[%a%a%a@] ->@ %a@]" Name.pp c.cstor_id
         (Util.pp_list0 ~sep:" " pp_inner)
         c.cstor_args
         (Util.pp_list0 ~sep:" " Var.pp_fullc)
@@ -413,7 +413,7 @@ let map_ty t ~f =
       | Some x -> Some (f x));
   }
 
-let of_string ?loc ~ty s = const ?loc ~ty (ID.make s)
+let of_string ?loc ~ty s = const ?loc ~ty (Name.make s)
 
 let tType =
   { ty = None; loc = None; term = AppBuiltin (Builtin.TType, []); hash = -1 }
@@ -689,7 +689,7 @@ module Ty = struct
   type view =
     | Ty_builtin of builtin
     | Ty_var of t Var.t
-    | Ty_app of ID.t * t list
+    | Ty_app of Name.t * t list
     | Ty_fun of t list * t
     | Ty_forall of t Var.t * t
     | Ty_multiset of t
@@ -801,15 +801,17 @@ module Ty = struct
     | _ -> 0, 0
 
   let mangle ty =
-    let add_id buf id =
+    let add_str buf str =
       let s =
-        ID.name id
-        |> CCString.filter (function
-             | '#' -> false
-             | _ -> true)
+        CCString.filter
+          (function
+            | '#' -> false
+            | _ -> true)
+          str
       in
       Buffer.add_string buf s
     in
+    let add_name buf name = add_str buf (Name.to_string name) in
     let rec aux buf t =
       match view t with
       | Ty_builtin TType -> Buffer.add_string buf "ty"
@@ -818,10 +820,10 @@ module Ty = struct
       | Ty_builtin Real -> Buffer.add_string buf "real"
       | Ty_builtin Prop -> Buffer.add_string buf "prop"
       | Ty_builtin Term -> Buffer.add_string buf "i"
-      | Ty_var v -> add_id buf (Var.id v)
-      | Ty_app (f, []) -> add_id buf f
+      | Ty_var v -> add_str buf (Var.name v)
+      | Ty_app (f, []) -> add_name buf f
       | Ty_app (f, l) ->
-        add_id buf f;
+        add_name buf f;
         List.iter
           (fun sub ->
             Buffer.add_char buf '_';
@@ -835,7 +837,7 @@ module Ty = struct
           args;
         aux buf ret
       | Ty_forall (v, f) ->
-        Printf.bprintf buf "pi_%a_%a" add_id (Var.id v) aux f
+        Printf.bprintf buf "pi_%a_%a" add_str (Var.name v) aux f
       | Ty_multiset _ | Ty_record (_, _) | Ty_meta _ -> ()
     in
     let buf = Buffer.create 32 in
@@ -1453,7 +1455,7 @@ let unify ?(allow_open = false) ?loc ?(st = UStack.create ())
     | Var v1, Var v2 ->
       if not (Var.equal v1 v2) then
         fail_ "incompatible variables@ (subst {@[%a@]})" Subst.pp subst
-    | Const id1, Const id2 when ID.equal id1 id2 -> ()
+    | Const id1, Const id2 when Name.equal id1 id2 -> ()
     | App (f1, l1), App (f2, l2) when List.length l1 = List.length l2 ->
       unif_rec subst f1 f2;
       unif_l subst l1 l2
@@ -1494,9 +1496,9 @@ let unify ?(allow_open = false) ?loc ?(st = UStack.create ())
             List.length vars1 = List.length vars2
             && List.length c1.cstor_args = List.length c2.cstor_args
           then (
-            if not (ID.equal c1.cstor_id c2.cstor_id) then
+            if not (Name.equal c1.cstor_id c2.cstor_id) then
               fail_ "constructors %a and %a are not compatible (subst {@[%a@]})"
-                ID.pp c1.cstor_id ID.pp c2.cstor_id Subst.pp subst;
+                Name.pp c1.cstor_id Name.pp c2.cstor_id Subst.pp subst;
             unif_l subst c1.cstor_args c2.cstor_args;
             let subst = rename_vars_l subst vars1 vars2 in
             unif_rec subst rhs1 rhs2
@@ -1665,7 +1667,7 @@ let try_alpha_renaming f1 f2 =
             aux (Subst.add subst v f2) ((Var.ty v, Var.ty v') :: rest)
           else
             aux subst rest)
-      | Const x, Const y when ID.equal x y ->
+      | Const x, Const y when Name.equal x y ->
         aux subst ((ty_exn f1, ty_exn f2) :: rest)
       | App (hd_x, xs), App (hd_y, ys) when List.length xs = List.length ys ->
         (* head might be a lambda or a const, delegate solving it to
@@ -1852,7 +1854,7 @@ let simplify_formula t =
 let rec erase t =
   match view t with
   | Var v -> STerm.var (Var.to_string v)
-  | Const s -> STerm.const (ID.to_string s)
+  | Const s -> STerm.const (Name.to_string s)
   | App (f, l) -> STerm.app (erase f) (List.map erase l)
   | Bind (b, v, t) ->
     STerm.bind b
@@ -1866,7 +1868,7 @@ let rec erase t =
       List.map
         (fun (c, vars, rhs) ->
           (* type arguments of [c] are ignored as being implicit *)
-          let c = ID.to_string c.cstor_id in
+          let c = Name.to_string c.cstor_id in
           let vars = List.map (fun v -> STerm.V (Var.to_string v)) vars in
           let rhs = erase rhs in
           STerm.Match_case (c, vars, rhs))

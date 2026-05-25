@@ -33,7 +33,7 @@ and view = private
   | Var of t HVar.t  (** Free variable *)
   | DB of int
   | Bind of Binder.t * t * t  (** Type, sub-term *)
-  | Const of ID.t  (** Constant *)
+  | Const of Hstring.t  (** Constant *)
   | App of t * t list  (** Uncurried application *)
   | AppBuiltin of Builtin.t * t list
       (** For representing special constructors *)
@@ -81,7 +81,7 @@ exception IllFormedTerm of string
 
 type nat = int
 
-val const : ty:t -> ID.t -> t
+val const : ty:t -> Hstring.t -> t
 val app : ty:t -> t -> t list -> t
 val bind : ty:t -> varty:t -> Binder.t -> t -> t
 val var : t HVar.t -> t
@@ -167,7 +167,7 @@ module Seq : sig
   val vars : t -> t HVar.t Iter.t
   val subterms : t -> t Iter.t
   val subterms_depth : t -> (t * int) Iter.t (* subterms with their depth *)
-  val symbols : t -> ID.t Iter.t
+  val symbols : t -> Hstring.t Iter.t
   val types : t -> t Iter.t
   val max_var : t HVar.t Iter.t -> int
   val min_var : t HVar.t Iter.t -> int
@@ -270,7 +270,7 @@ val is_ground : t -> bool
 val size : t -> int
 val depth : t -> int
 
-val head : t -> ID.t option
+val head : t -> Hstring.t option
 (** Head symbol, or None if the term is a (bound) variable *)
 
 val type_is_unifiable : t -> bool
@@ -291,8 +291,8 @@ val as_app : t -> t * t list
 
 val as_var : t -> t HVar.t option
 val as_var_exn : t -> t HVar.t
-val as_const : t -> ID.t option
-val as_const_exn : t -> ID.t
+val as_const : t -> Hstring.t option
+val as_const_exn : t -> Hstring.t
 val as_bvar_exn : t -> int
 
 val is_bvar_i : int -> t -> bool

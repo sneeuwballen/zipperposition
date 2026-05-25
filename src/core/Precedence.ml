@@ -70,15 +70,16 @@ let is_post_cnf_skolem ~sig_ref s =
   let ans =
     ((not (Signature.is_empty !sig_ref)) && not (Signature.mem !sig_ref s))
     ||
-    match ID.as_skolem s with
-    | Some ID.K_after_cnf -> true
+    match Name.as_skolem s with
+    | Some Name.K_after_cnf -> true
     | _ -> false
   in
   ans
 
-let post_cnf_id ~sig_ref s =
+let post_cnf_id ~sig_ref (s : Name.t) =
   if is_post_cnf_skolem ~sig_ref s then
-    ID.id s
+    (* TODO: this is really a hack, we need sth better. *)
+    s.id
   else
     is_not_fresh_sk
 
@@ -89,12 +90,12 @@ let update_signature prev_sig signature =
   Signal.ContinueListening
 
 module Constr = struct
-  type 'a t = ID.t -> ID.t -> int constraint 'a = [< `partial | `total ]
-  type prec_fun = signature:Signature.t -> ID.t Iter.t -> [ `partial ] t
+  type 'a t = Name.t -> Name.t -> int constraint 'a = [< `partial | `total ]
+  type prec_fun = signature:Signature.t -> Name.t Iter.t -> [ `partial ] t
 
   (* In the following functions, fresh symbols are made the smallest.
      However, newer fresh symbols are placed after older fresh symbols
-     (using monotonicity of the value of ID.int)
+     (using monotonicity of the value of Name.int)
    *)
 
   let arity ~signature _ s1 s2 =
@@ -104,7 +105,7 @@ module Constr = struct
     (* bigger arity means bigger symbol *)
     -CCInt.compare (post_cnf_id ~sig_ref:_sig s1) (post_cnf_id ~sig_ref:_sig s2)
     <?> (CCInt.compare, get_arity ~sig_ref:_sig s1, get_arity ~sig_ref:_sig s2)
-    <?> (ID.compare, s1, s2)
+    <?> (Name.compare, s1, s2)
 
   let inv_arity ~signature _ s1 s2 =
     let _sig = ref signature in
@@ -112,22 +113,22 @@ module Constr = struct
     let open CCOrd in
     -CCInt.compare (post_cnf_id ~sig_ref:_sig s1) (post_cnf_id ~sig_ref:_sig s2)
     <?> (CCInt.compare, get_arity ~sig_ref:_sig s2, get_arity ~sig_ref:_sig s1)
-    <?> (ID.compare, s1, s2)
+    <?> (Name.compare, s1, s2)
 
   let invfreqhack ~signature seq =
     let _sig = ref signature in
     Signal.on on_signature_update (update_signature _sig);
 
     (* symbol -> number of occurrences of symbol in seq *)
-    let tbl = ID.Tbl.create 16 in
-    Iter.iter (ID.Tbl.incr tbl) seq;
+    let tbl = Name.Tbl.create 16 in
+    Iter.iter (Name.Tbl.incr tbl) seq;
     let avg =
       if Iter.length seq == 0 then
         10
       else
-        Iter.sum (ID.Tbl.values tbl) / Iter.length (ID.Tbl.values tbl)
+        Iter.sum (Name.Tbl.values tbl) / Iter.length (Name.Tbl.values tbl)
     in
-    let find_freq s = ID.Tbl.get_or ~default:avg tbl s in
+    let find_freq s = Name.Tbl.get_or ~default:avg tbl s in
     let max_unary_freq =
       Signature.Seq.symbols signature
       |> Iter.filter_map (fun id ->
@@ -154,13 +155,13 @@ module Constr = struct
       (* criteria as in generate_invfreq_hack_precedence -- E source *)
       let categorize s =
         if is_post_cnf_skolem ~sig_ref:_sig s then
-          min_int, ID.id s, 0
+          min_int, s.id, 0
         else if is_nullary _sig s then
-          min_int + 1, -find_freq s, ID.id s
+          min_int + 1, -find_freq s, s.id
         else if is_unary_max_freq _sig s then
-          max_int, 0, ID.id s
+          max_int, 0, s.id
         else
-          -find_freq s, get_arity ~sig_ref:_sig s, ID.id s
+          -find_freq s, get_arity ~sig_ref:_sig s, s.id
       in
       let (a1, a2, a3), (b1, b2, b3) = CCPair.map_same categorize (s1, s2) in
       CCInt.compare a1 b1 <?> (CCInt.compare, a2, b2) <?> (CCInt.compare, a3, b3)
@@ -170,15 +171,15 @@ module Constr = struct
     Signal.on on_signature_update (update_signature _sig);
 
     (* symbol -> number of occurrences of symbol in seq *)
-    let tbl = ID.Tbl.create 16 in
-    Iter.iter (ID.Tbl.incr tbl) seq;
+    let tbl = Name.Tbl.create 16 in
+    Iter.iter (Name.Tbl.incr tbl) seq;
     let avg =
       if Iter.length seq == 0 then
         10
       else
-        Iter.sum (ID.Tbl.values tbl) / Iter.length (ID.Tbl.values tbl)
+        Iter.sum (Name.Tbl.values tbl) / Iter.length (Name.Tbl.values tbl)
     in
-    let find_freq s = ID.Tbl.get_or ~default:avg tbl s in
+    let find_freq s = Name.Tbl.get_or ~default:avg tbl s in
 
     let is_nullary _sig s1 =
       Signature.mem !_sig s1 && get_arity ~sig_ref:_sig s1 == 0
@@ -187,13 +188,13 @@ module Constr = struct
     fun s1 s2 ->
       let open CCOrd in
       (* criteria as in generate_invfreq_hack_precedence -- E source *)
-      let categorize s =
+      let categorize (s : Name.t) =
         if is_post_cnf_skolem ~sig_ref:_sig s then
-          min_int, ID.id s, 0
+          min_int, s.id, 0
         else if is_nullary _sig s then
-          min_int + 1, -find_freq s, ID.id s
+          min_int + 1, -find_freq s, s.id
         else
-          -find_freq s, get_arity ~sig_ref:_sig s, ID.id s
+          -find_freq s, get_arity ~sig_ref:_sig s, s.id
       in
       let (a1, a2, a3), (b1, b2, b3) = CCPair.map_same categorize (s1, s2) in
       CCInt.compare a1 b1 <?> (CCInt.compare, a2, b2) <?> (CCInt.compare, a3, b3)
@@ -201,29 +202,29 @@ module Constr = struct
   let invfreqconj ~signature seq =
     (* The set of conjecture symbols cannot increase, so we do not subscribe to
        signature changes*)
-    let tbl = ID.Tbl.create 16 in
-    Iter.iter (ID.Tbl.incr tbl) seq;
+    let tbl = Name.Tbl.create 16 in
+    Iter.iter (Name.Tbl.incr tbl) seq;
     let avg =
       if Iter.length seq == 0 then
         10
       else
-        Iter.sum (ID.Tbl.values tbl) / Iter.length (ID.Tbl.values tbl)
+        Iter.sum (Name.Tbl.values tbl) / Iter.length (Name.Tbl.values tbl)
     in
-    let find_freq s = ID.Tbl.get_or ~default:avg tbl s in
+    let find_freq s = Name.Tbl.get_or ~default:avg tbl s in
 
     fun s1 s2 ->
       let open CCOrd in
       (* criteria as in generate_invfreq_hack_precedence -- E source *)
-      let categorize s =
+      let categorize (s : Name.t) =
         if is_post_cnf_skolem ~sig_ref:(ref signature) s then
-          min_int, ID.id s, 0
+          min_int, s.id, 0
         else
           ( (if Signature.sym_in_conj s signature then
                1
              else
                0),
             find_freq s,
-            ID.id s )
+            s.id )
       in
       let (a1, a2, a3), (b1, b2, b3) = CCPair.map_same categorize (s1, s2) in
       CCInt.compare a1 b1 <?> (CCInt.compare, a2, b2) <?> (CCInt.compare, a3, b3)
@@ -231,15 +232,15 @@ module Constr = struct
   (* symbol -> number of occurrences of symbol in seq *)
   let invfreq ~signature seq =
     (* Does not use the signature *)
-    let tbl = ID.Tbl.create 16 in
-    Iter.iter (ID.Tbl.incr tbl) seq;
+    let tbl = Name.Tbl.create 16 in
+    Iter.iter (Name.Tbl.incr tbl) seq;
     let avg =
       if Iter.length seq == 0 then
         10
       else
-        Iter.sum (ID.Tbl.values tbl) / Iter.length (ID.Tbl.values tbl)
+        Iter.sum (Name.Tbl.values tbl) / Iter.length (Name.Tbl.values tbl)
     in
-    let find_freq s = ID.Tbl.get_or ~default:avg tbl s in
+    let find_freq s = Name.Tbl.get_or ~default:avg tbl s in
     let sig_ref = ref signature in
     (* compare by inverse frequency (higher frequency => smaller) *)
     fun s1 s2 ->
@@ -250,7 +251,7 @@ module Constr = struct
       -CCInt.compare (post_cnf_id ~sig_ref s1) (post_cnf_id ~sig_ref s2)
       (* post-cnf symbols have the same value of n2 and n1 *)
       <?> (CCInt.compare, n2, n1)
-      <?> (ID.compare, s1, s2)
+      <?> (Name.compare, s1, s2)
 
   let unary_first ~signature _ s1 s2 =
     let open CCOrd in
@@ -268,7 +269,7 @@ module Constr = struct
       else
         get_arity ~sig_ref:_sig s
     in
-    CCInt.compare (weight _sig s1) (weight _sig s2) <?> (ID.compare, s1, s2)
+    CCInt.compare (weight _sig s1) (weight _sig s2) <?> (Name.compare, s1, s2)
 
   let const_first ~signature _ s1 s2 =
     let open CCOrd in
@@ -286,7 +287,7 @@ module Constr = struct
       else
         get_arity ~sig_ref:_sig s
     in
-    CCInt.compare (weight _sig s1) (weight _sig s2) <?> (ID.compare, s1, s2)
+    CCInt.compare (weight _sig s1) (weight _sig s2) <?> (Name.compare, s1, s2)
 
   let prec_fun_of_str name =
     let map =
@@ -313,27 +314,27 @@ module Constr = struct
 
   (* regular string ordering *)
   let alpha a b =
-    let c = String.compare (ID.name a) (ID.name b) in
+    let c = String.compare (Name.to_string a) (Name.to_string b) in
     if c = 0 then
-      ID.compare a b
+      Name.compare a b
     else
       c
 
   let max ~signature l =
-    let set = ID.Set.of_iter l in
+    let set = Name.Set.of_iter l in
     fun s1 s2 ->
-      let is_max1 = ID.Set.mem s1 set in
-      let is_max2 = ID.Set.mem s2 set in
+      let is_max1 = Name.Set.mem s1 set in
+      let is_max2 = Name.Set.mem s2 set in
       match is_max1, is_max2 with
       | true, true | false, false -> 0
       | true, false -> 1
       | false, true -> -1
 
   let min ~signature l =
-    let set = ID.Set.of_iter l in
+    let set = Name.Set.of_iter l in
     fun s1 s2 ->
-      let is_min1 = ID.Set.mem s1 set in
-      let is_min2 = ID.Set.mem s2 set in
+      let is_min1 = Name.Set.mem s1 set in
+      let is_min2 = Name.Set.mem s2 set in
       match is_min1, is_min2 with
       | true, true | false, false -> 0
       | true, false -> -1
@@ -365,15 +366,15 @@ end
 (* TODO: think about how to compare some builtins (true, false, numbers...) *)
 
 type t = {
-  mutable snapshot: ID.t list;
+  mutable snapshot: Name.t list;
   (* symbols by increasing order *)
-  mutable tbl: int ID.Tbl.t Lazy.t;
+  mutable tbl: int Name.Tbl.t Lazy.t;
   (* symbol -> index in precedence *)
-  status: symbol_status ID.Tbl.t;
+  status: symbol_status Name.Tbl.t;
   (* symbol -> status *)
-  mutable weight: ID.t -> Weight.t;
+  mutable weight: Name.t -> Weight.t;
   (* weight function *)
-  mutable arg_coeff: ID.t -> int list;
+  mutable arg_coeff: Name.t -> int list;
   (* argument coefficients *)
   db_w: int;
   lmb_w: int;
@@ -384,7 +385,7 @@ type t = {
 type precedence = t
 
 let equal p1 p2 =
-  try List.for_all2 ID.equal p1.snapshot p2.snapshot
+  try List.for_all2 Name.equal p1.snapshot p2.snapshot
   with Invalid_argument _ -> false
 
 let snapshot p = p.snapshot
@@ -392,21 +393,21 @@ let snapshot p = p.snapshot
 (* Precedence weight for E-like selection functions *)
 let sel_prec_weight p s1 =
   let (lazy tbl) = p.tbl in
-  ID.Tbl.get_or ~default:100 tbl s1
+  Name.Tbl.get_or ~default:100 tbl s1
 
 let compare_by_tbl p s1 s2 =
   let (lazy tbl) = p.tbl in
-  let i1 = ID.Tbl.get_or ~default:~-1 tbl s1 in
-  let i2 = ID.Tbl.get_or ~default:~-1 tbl s2 in
+  let i1 = Name.Tbl.get_or ~default:~-1 tbl s1 in
+  let i2 = Name.Tbl.get_or ~default:~-1 tbl s2 in
   let c = CCInt.compare i1 i2 in
   if c = 0 then (
-    assert ((i1 = -1 && i2 = -1) || ID.equal s1 s2);
+    assert ((i1 = -1 && i2 = -1) || Name.equal s1 s2);
     c
   ) else
     c
 
 let compare p s1 s2 =
-  match ID.as_parameter s1, ID.as_parameter s2 with
+  match Name.as_parameter s1, Name.as_parameter s2 with
   | None, None -> compare_by_tbl p s1 s2
   | Some _, None -> -1
   | None, Some _ -> 1
@@ -414,14 +415,14 @@ let compare p s1 s2 =
 
 let mem p s =
   let (lazy tbl) = p.tbl in
-  ID.Tbl.mem tbl s
+  Name.Tbl.mem tbl s
 
-let status p s = ID.Tbl.get_or ~default:LengthLexicographic p.status s
+let status p s = Name.Tbl.get_or ~default:LengthLexicographic p.status s
 let weight p s = p.weight s
 let db_weight p = Weight.int p.db_w
 let lam_weight p = Weight.int p.lmb_w
 let arg_coeff p s i = try List.nth (p.arg_coeff s) i with _ -> 1
-let declare_status p s status = ID.Tbl.replace p.status s status
+let declare_status p s status = Name.Tbl.replace p.status s status
 
 module Seq = struct
   let symbols p = Iter.of_list p.snapshot
@@ -430,23 +431,23 @@ end
 let pp_ pp_id out l =
   Format.fprintf out "[@[<2>%a@]]" (Util.pp_list ~sep:" < " pp_id) l
 
-let pp_snapshot out l = pp_ ID.pp out l
+let pp_snapshot out l = pp_ Name.pp out l
 
 let pp out prec =
   let pp_id out s =
     match status prec s with
-    | Multiset -> Format.fprintf out "%a[M]" ID.pp s
-    | Lexicographic -> Format.fprintf out "%a[L]" ID.pp s
-    | LengthLexicographic -> Format.fprintf out "%a" ID.pp s
+    | Multiset -> Format.fprintf out "%a[M]" Name.pp s
+    | Lexicographic -> Format.fprintf out "%a[L]" Name.pp s
+    | LengthLexicographic -> Format.fprintf out "%a" Name.pp s
   in
   pp_ pp_id out prec.snapshot
 
 let pp_debugf out prec =
   let pp_id out s =
     match status prec s with
-    | Multiset -> Format.fprintf out "%a[M]" ID.pp_full s
-    | Lexicographic -> Format.fprintf out "%a[L]" ID.pp_full s
-    | LengthLexicographic -> Format.fprintf out "%a" ID.pp_full s
+    | Multiset -> Format.fprintf out "%a[M]" Name.pp_full s
+    | Lexicographic -> Format.fprintf out "%a[L]" Name.pp_full s
+    | LengthLexicographic -> Format.fprintf out "%a" Name.pp_full s
   in
   pp_ pp_id out prec.snapshot
 
@@ -455,14 +456,14 @@ let to_string = CCFormat.to_string pp
 (* build a table  symbol -> i. such as if
     [tbl s = i], then w[List.nth i l = s] *)
 let mk_tbl_ l =
-  let tbl = ID.Tbl.create 64 in
-  List.iteri (fun i s -> ID.Tbl.add tbl s i) l;
+  let tbl = Name.Tbl.create 64 in
+  List.iteri (fun i s -> Name.Tbl.add tbl s i) l;
   tbl
 
 (** {3 Weight} *)
 
-type weight_fun = ID.t -> Weight.t
-type arg_coeff_fun = ID.t -> int list
+type weight_fun = Name.t -> Weight.t
+type arg_coeff_fun = Name.t -> int list
 
 (* constant weight *)
 let default_weight = Weight.int 1
@@ -470,13 +471,13 @@ let weight_constant _ = default_weight
 let empty_sig = Signature.empty
 
 let depth_occ_driver ~flip stmt_d =
-  let tbl = ID.Tbl.create 16 in
+  let tbl = Name.Tbl.create 16 in
   Iter.iter
     (fun (sym, d) ->
       try
-        let l = ID.Tbl.find tbl sym in
-        ID.Tbl.replace tbl sym (d :: l)
-      with _ -> ID.Tbl.add tbl sym [ d ])
+        let l = Name.Tbl.find tbl sym in
+        Name.Tbl.replace tbl sym (d :: l)
+      with _ -> Name.Tbl.add tbl sym [ d ])
     stmt_d;
 
   let rec sum = function
@@ -485,29 +486,29 @@ let depth_occ_driver ~flip stmt_d =
   in
 
   let sorted =
-    ID.Tbl.to_list tbl
+    Name.Tbl.to_list tbl
     |> List.map (fun (id, depths) ->
            let d_sum = sum depths and n = List.length depths in
            d_sum / n, n, id)
     |> List.sort (fun (avg1, n1, id1) (avg2, n2, id2) ->
            let open CCOrd in
            if flip then
-             compare avg2 avg1 <?> (compare, n2, n1) <?> (ID.compare, id2, id1)
+             compare avg2 avg1 <?> (compare, n2, n1) <?> (Name.compare, id2, id1)
            else
-             compare avg1 avg2 <?> (compare, n1, n2) <?> (ID.compare, id1, id2))
+             compare avg1 avg2 <?> (compare, n1, n2) <?> (Name.compare, id1, id2))
   in
 
-  ID.Tbl.clear tbl;
-  let tbl = ID.Tbl.create 16 in
+  Name.Tbl.clear tbl;
+  let tbl = Name.Tbl.create 16 in
   List.iteri
-    (fun i (_, _, sym) -> ID.Tbl.add tbl sym (Weight.int (i + 5)))
+    (fun i (_, _, sym) -> Name.Tbl.add tbl sym (Weight.int (i + 5)))
     sorted;
   let default = Weight.int 5 in
   fun sym ->
     if is_post_cnf_skolem ~sig_ref:(ref empty_sig) sym then
       default_weight
     else
-      ID.Tbl.get_or ~default tbl sym
+      Name.Tbl.get_or ~default tbl sym
 
 let inv_depth_occurrence = depth_occ_driver ~flip:false
 let depth_occurrence = depth_occ_driver ~flip:true
@@ -546,7 +547,7 @@ let weight_arity0 ~signature =
 
   let max_sym =
     Signature.Seq.symbols signature
-    |> Iter.fold (fun acc sym -> max_arity acc (sym, ID.id sym)) None
+    |> Iter.fold (fun acc (sym : Name.t) -> max_arity acc (sym, sym.id)) None
     |> CCOpt.map fst
   in
 
@@ -557,7 +558,7 @@ let weight_arity0 ~signature =
       | None -> get_arity ~sig_ref:_sig a + 1
       (* no access to the precedence, cannot compute max symbol -- cannot assign 0 *)
       | Some m_id ->
-        if ID.equal m_id a then
+        if Name.equal m_id a then
           1
         else
           get_arity ~sig_ref:_sig a + 1
@@ -597,56 +598,56 @@ let weight_invsq_arity ~signature =
     else
       Weight.int ((max_a * max_a) - (arity * arity) + 1)
 
-let weight_invfreq (symbs : ID.t Iter.t) : ID.t -> Weight.t =
-  let tbl = ID.Tbl.create 16 in
-  Iter.iter (ID.Tbl.incr tbl) symbs;
-  let max_freq = List.fold_left max 0 (ID.Tbl.values_list tbl) in
+let weight_invfreq (symbs : Name.t Iter.t) : Name.t -> Weight.t =
+  let tbl = Name.Tbl.create 16 in
+  Iter.iter (Name.Tbl.incr tbl) symbs;
+  let max_freq = List.fold_left max 0 (Name.Tbl.values_list tbl) in
   fun sym ->
     if is_post_cnf_skolem ~sig_ref:(ref empty_sig) sym then
       default_weight
     else
-      Weight.int (max_freq - ID.Tbl.get_or ~default:(max_freq / 2) tbl sym + 5)
+      Weight.int (max_freq - Name.Tbl.get_or ~default:(max_freq / 2) tbl sym + 5)
 
-let weight_freq (symbs : ID.t Iter.t) : ID.t -> Weight.t =
-  let tbl = ID.Tbl.create 16 in
-  Iter.iter (ID.Tbl.incr tbl) symbs;
+let weight_freq (symbs : Name.t Iter.t) : Name.t -> Weight.t =
+  let tbl = Name.Tbl.create 16 in
+  Iter.iter (Name.Tbl.incr tbl) symbs;
   fun sym ->
     if is_post_cnf_skolem ~sig_ref:(ref empty_sig) sym then
       default_weight
     else
-      Weight.int (ID.Tbl.get_or ~default:10 tbl sym + 5)
+      Weight.int (Name.Tbl.get_or ~default:10 tbl sym + 5)
 
-let weight_rank ~flip (symbs : ID.t Iter.t) : ID.t -> Weight.t =
-  let tbl = ID.Tbl.create 16 in
-  Iter.iter (ID.Tbl.incr tbl) symbs;
+let weight_rank ~flip (symbs : Name.t Iter.t) : Name.t -> Weight.t =
+  let tbl = Name.Tbl.create 16 in
+  Iter.iter (Name.Tbl.incr tbl) symbs;
   let sorted =
     CCList.sort
       (fun s1 s2 ->
-        let w_s1 = ID.Tbl.get_or tbl ~default:0 s1 in
-        let w_s2 = ID.Tbl.get_or tbl ~default:0 s2 in
+        let w_s1 = Name.Tbl.get_or tbl ~default:0 s1 in
+        let w_s2 = Name.Tbl.get_or tbl ~default:0 s2 in
         if flip then
           CCInt.compare w_s2 w_s1
         else
           CCInt.compare w_s1 w_s2)
-      (ID.Tbl.keys_list tbl)
+      (Name.Tbl.keys_list tbl)
   in
   let prev_step = ref (-1) in
   let w = ref 0 in
   List.iter
-    (fun (sym : ID.t) ->
-      let num_occs = ID.Tbl.get_or tbl sym ~default:0 in
+    (fun (sym : Name.t) ->
+      let num_occs = Name.Tbl.get_or tbl sym ~default:0 in
       if num_occs != !prev_step then (
         prev_step := num_occs;
         incr w
       );
-      ID.Tbl.replace tbl sym !w)
+      Name.Tbl.replace tbl sym !w)
     sorted;
 
   fun sym ->
     if is_post_cnf_skolem ~sig_ref:(ref empty_sig) sym then
       default_weight
     else
-      Weight.int (ID.Tbl.get_or ~default:10 tbl sym)
+      Weight.int (Name.Tbl.get_or ~default:10 tbl sym)
 
 let weight_invfreqrank = weight_rank ~flip:true
 let weight_freqrank = weight_rank ~flip:false
@@ -654,8 +655,8 @@ let weight_freqrank = weight_rank ~flip:false
 (* This function takes base KBO weight function and adjusts it so
    that defined symbols are larger than its defitnitions. *)
 let lambda_def_weight lm_w db_w base_weight clauses =
-  let definition_map = ID.Tbl.create 64 in
-  let dependencies = ID.Tbl.create 64 in
+  let definition_map = Name.Tbl.create 64 in
+  let dependencies = Name.Tbl.create 64 in
   let module VS = T.VarSet in
   let find_def lhs rhs =
     let try_extracting lhs rhs =
@@ -683,34 +684,34 @@ let lambda_def_weight lm_w db_w base_weight clauses =
 
   let exception Loop in
   let topological_sort ~all_nodes dependencies =
-    let unvisited = ref (ID.Set.of_iter (ID.Tbl.keys dependencies)) in
-    let visiting = ref ID.Set.empty in
-    let visited = ref ID.Set.empty in
+    let unvisited = ref (Name.Set.of_iter (Name.Tbl.keys dependencies)) in
+    let visiting = ref Name.Set.empty in
+    let visited = ref Name.Set.empty in
     let sorted = ref [] in
 
     let rec visit id =
-      if not (ID.Set.mem id !visited) then (
-        if ID.Set.mem id !visiting then raise Loop;
+      if not (Name.Set.mem id !visited) then (
+        if Name.Set.mem id !visiting then raise Loop;
 
-        visiting := ID.Set.add id !visiting;
-        List.iter visit (ID.Tbl.get_or ~default:[] dependencies id);
+        visiting := Name.Set.add id !visiting;
+        List.iter visit (Name.Tbl.get_or ~default:[] dependencies id);
 
-        visited := ID.Set.add id !visited;
-        visiting := ID.Set.remove id !visiting;
-        unvisited := ID.Set.remove id !unvisited;
+        visited := Name.Set.add id !visited;
+        visiting := Name.Set.remove id !visiting;
+        unvisited := Name.Set.remove id !unvisited;
         sorted := id :: !sorted
       )
     in
 
-    while not (ID.Set.is_empty !unvisited) do
-      visit (ID.Set.choose !unvisited)
+    while not (Name.Set.is_empty !unvisited) do
+      visit (Name.Set.choose !unvisited)
     done;
 
     Util.debugf ~section 1 "top sorted: @[%a@]@." (fun k ->
-        k (CCList.pp ID.pp) !sorted);
+        k (CCList.pp Name.pp) !sorted);
 
     let no_deps =
-      ID.Set.to_list (ID.Set.diff all_nodes (ID.Set.of_list !sorted))
+      Name.Set.to_list (Name.Set.diff all_nodes (Name.Set.of_list !sorted))
     in
     no_deps @ !sorted
   in
@@ -726,14 +727,14 @@ let lambda_def_weight lm_w db_w base_weight clauses =
           | Some (hd_id, r) ->
             Util.debugf ~section 2 "is_def: %a := %a" (fun k ->
                 k T.pp lhs T.pp rhs);
-            ID.Tbl.update definition_map
+            Name.Tbl.update definition_map
               ~f:(fun _ -> function
                 | None -> Some [ r ]
                 | Some res -> Some (r :: res))
               ~k:hd_id;
             Term.Seq.symbols r
             |> Iter.iter (fun k ->
-                   ID.Tbl.update dependencies
+                   Name.Tbl.update dependencies
                      ~f:(fun _ -> function
                        | None -> Some [ hd_id ]
                        | Some res -> Some (hd_id :: res))
@@ -745,14 +746,14 @@ let lambda_def_weight lm_w db_w base_weight clauses =
       ))
     clauses;
 
-  let weights = ID.Tbl.create 64 in
+  let weights = Name.Tbl.create 64 in
 
   let eval_weight ~weights t =
     let rec aux t =
       match Term.view t with
       | Term.DB _ -> Weight.int db_w
       | Term.Var _ -> Weight.one
-      | Term.Const id -> ID.Tbl.get_or weights id ~default:(base_weight id)
+      | Term.Const id -> Name.Tbl.get_or weights id ~default:(base_weight id)
       | Term.Fun (_, body) -> Weight.( + ) (Weight.int lm_w) (aux body)
       | Term.App (hd, args) -> aux_l (hd :: args)
       | Term.AppBuiltin (hd, args) ->
@@ -773,20 +774,21 @@ let lambda_def_weight lm_w db_w base_weight clauses =
 
   (try
      topological_sort
-       ~all_nodes:(ID.Set.of_iter (ID.Tbl.keys definition_map))
+       ~all_nodes:(Name.Set.of_iter (Name.Tbl.keys definition_map))
        dependencies
      |> CCList.iter (fun id ->
             let w_opt =
               Iter.max
                 ~lt:(fun x y -> Weight.compare x y < 0)
                 (Iter.map (eval_weight ~weights)
-                   (Iter.of_list @@ ID.Tbl.get_or ~default:[] definition_map id))
+                   (Iter.of_list
+                   @@ Name.Tbl.get_or ~default:[] definition_map id))
             in
             match w_opt with
             | Some w ->
               Util.debugf ~section 1 "lambda weight lift of %a = %a" (fun k ->
-                  k ID.pp id Weight.pp w);
-              ID.Tbl.add weights id w
+                  k Name.pp id Weight.pp w);
+              Name.Tbl.add weights id w
             | None -> ())
    with Loop -> Util.debugf ~section 1 "warning looped" (fun k -> k));
 
@@ -794,7 +796,7 @@ let lambda_def_weight lm_w db_w base_weight clauses =
     if is_post_cnf_skolem ~sig_ref:(ref empty_sig) sy then
       default_weight
     else
-      ID.Tbl.get_or ~default:(base_weight sy) weights sy
+      Name.Tbl.get_or ~default:(base_weight sy) weights sy
 
 let weight_fun_of_string ~signature ~clauses ~lm_w ~db_w s sd =
   let syms_only sym_depth = Iter.map fst sym_depth in
@@ -837,7 +839,7 @@ let check_inv_ p =
   let rec sorted_ = function
     | [] | [ _ ] -> true
     | s :: (s' :: _ as tail) ->
-      assert (not (ID.equal s s'));
+      assert (not (Name.equal s s'));
       p.constr s s' < 0 && sorted_ tail
   in
   sorted_ p.snapshot
@@ -854,7 +856,7 @@ let create ?(weight = weight_constant) ?(arg_coeff = arg_coeff_default)
       arg_coeff;
       db_w;
       lmb_w;
-      status = ID.Tbl.create 16;
+      status = Name.Tbl.create 16;
       constr = c;
     }
   in
@@ -870,7 +872,7 @@ let add_list ~signature p l =
     | id' :: l' ->
       let c = p.constr id id' in
       if c = 0 then (
-        assert (ID.equal id id');
+        assert (Name.equal id id');
         (* total order *)
         l
         (* not new *)
@@ -887,7 +889,7 @@ let add_list ~signature p l =
   in
   let is_new_sym id =
     if Lazy.is_val p.tbl then
-      ID.Tbl.mem (Lazy.force p.tbl) id
+      Name.Tbl.mem (Lazy.force p.tbl) id
     else
       List.mem id p.snapshot
   in
@@ -903,7 +905,7 @@ let add_list ~signature p l =
 
   if not (CCList.is_empty l) then (
     Util.debugf ~section 4 "@[<v>old prec: @[%a@]@,new prec: @[%a@]@]" (fun k ->
-        k (Util.pp_list ID.pp) p.snapshot (Util.pp_list ID.pp) snapshot);
+        k (Util.pp_list Name.pp) p.snapshot (Util.pp_list Name.pp) snapshot);
     assert (check_inv_ p);
     p.snapshot <- snapshot;
     p.tbl <- lazy (mk_tbl_ snapshot)

@@ -150,7 +150,7 @@ val vars : t -> Type.t HVar.t list
 
 val var_occurs : Type.t HVar.t -> t -> bool
 val is_ground : t -> bool
-val symbols : ?include_types:bool -> t -> ID.Set.t
+val symbols : ?include_types:bool -> t -> Name.Set.t
 
 val root_terms : t -> term list
 (** all the terms immediatly under the lit *)
@@ -181,7 +181,7 @@ val is_typex_pred :
   t -> bool (* like in E, type predicate with multiple variables *)
 
 val is_predicate_lit : t -> bool
-val as_inj_def : t -> (ID.t * (Term.var * Term.var) list) option
+val as_inj_def : t -> (Name.t * (Term.var * Term.var) list) option
 val is_pure_var : t -> bool
 val as_pos_pure_var : t -> (Term.var * Term.var) option
 val max_term_positions : ord:Ordering.t -> t -> int
@@ -225,7 +225,7 @@ end
 module Seq : sig
   val terms : t -> term Iter.t
   val vars : t -> Type.t HVar.t Iter.t
-  val symbols : ?include_types:bool -> t -> ID.t Iter.t
+  val symbols : ?include_types:bool -> t -> Name.t Iter.t
 end
 
 (** {2 Positions} *)

@@ -314,9 +314,9 @@ module T_view : sig
   type 'a t =
     | T_var of T.var
     | T_db of int
-    | T_app_defined of ID.t * Rewrite.Defined_cst.t * 'a list
-    | T_app_cstor of ID.t * 'a list
-    | T_app_unin of ID.t * 'a list
+    | T_app_defined of Name.t * Rewrite.Defined_cst.t * 'a list
+    | T_app_cstor of Name.t * 'a list
+    | T_app_unin of Name.t * 'a list
     | T_app of 'a * 'a list
     | T_fun of Type.t * 'a
     | T_builtin of Builtin.t * 'a list
@@ -331,9 +331,9 @@ end = struct
   type 'a t =
     | T_var of T.var
     | T_db of int
-    | T_app_defined of ID.t * Rewrite.Defined_cst.t * 'a list
-    | T_app_cstor of ID.t * 'a list
-    | T_app_unin of ID.t * 'a list
+    | T_app_defined of Name.t * Rewrite.Defined_cst.t * 'a list
+    | T_app_cstor of Name.t * 'a list
+    | T_app_unin of Name.t * 'a list
     | T_app of 'a * 'a list
     | T_fun of Type.t * 'a
     | T_builtin of Builtin.t * 'a list
@@ -1086,7 +1086,7 @@ module Make (E : Env.S) (A : AVATAR with module E = E) = struct
       @param generalize_on the set of (skolem) constants that are replaced
        by free variables in the negation of [clauses] *)
   let prove_by_ind (clauses : C.t list) ~ignore_depth ~generalize_on : unit =
-    let pp_csts = Util.pp_list Fmt.(pair ~sep:(return ":@ ") ID.pp Type.pp) in
+    let pp_csts = Util.pp_list Fmt.(pair ~sep:(return ":@ ") Name.pp Type.pp) in
     (* remove trivial clauses *)
     let clauses =
       List.filter (fun c -> not @@ Literals.is_trivial @@ C.lits c) clauses

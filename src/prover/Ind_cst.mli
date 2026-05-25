@@ -13,21 +13,21 @@ type t
     be equal to [s^n(0)] in any model. *)
 
 exception InvalidDecl of string
-exception NotAnInductiveConstant of ID.t
+exception NotAnInductiveConstant of Name.t
 
-val id_as_cst : ID.t -> t option
+val id_as_cst : Name.t -> t option
 
-val id_as_cst_exn : ID.t -> t
+val id_as_cst_exn : Name.t -> t
 (** Unsafe version of {!as_cst}
     @raise NotAnInductiveConstant if it fails *)
 
-val id_is_cst : ID.t -> bool
+val id_is_cst : Name.t -> bool
 (** Check whether the given constant is an inductive constant *)
 
 val on_new_cst : t Signal.t
 (** Triggered with new inductive constants *)
 
-val make_skolem : Type.t -> ID.t
+val make_skolem : Type.t -> Name.t
 
 val make : ?depth:int -> is_sub:bool -> Type.t -> t
 (** Make a new constant of the given type *)
@@ -35,11 +35,11 @@ val make : ?depth:int -> is_sub:bool -> Type.t -> t
 val is_sub : t -> bool
 (** Is the constant a sub-constant (i.e. a subterm of a case in a coverset)? *)
 
-val id_is_sub : ID.t -> bool
+val id_is_sub : Name.t -> bool
 val equal : t -> t -> bool
 val compare : t -> t -> int
 val hash : t -> int
-val id : t -> ID.t
+val id : t -> Name.t
 val to_term : t -> Term.t
 val ty : t -> Type.t
 
@@ -58,12 +58,12 @@ module Cst_set : CCSet.S with type elt = t
 
 (** {2 Inductive Skolems} *)
 
-type ind_skolem = ID.t * Type.t
+type ind_skolem = Name.t * Type.t
 
 val ind_skolem_compare : ind_skolem -> ind_skolem -> int
 val ind_skolem_equal : ind_skolem -> ind_skolem -> bool
 
-val id_is_ind_skolem : ID.t -> Type.t -> bool
+val id_is_ind_skolem : Name.t -> Type.t -> bool
 (** [id_is_potential_cst id ty] returns [true] if [id:ty] is a skolem constant
     of an inductive type, or if it is already an inductive constant. *)
 
@@ -71,11 +71,11 @@ val find_ind_skolems : Term.t -> ind_skolem Iter.t
 (** [find_ind_skolem term] searches subterms of [term] for constants that are of
     an inductive type and that are skolems or (already) inductive constants. *)
 
-val ind_skolem_depth : ID.t -> int
+val ind_skolem_depth : Name.t -> int
 (** depth of the skolem (0 if not an inductive constant) *)
 
 (**/**)
 
-type ID.payload += Payload_cst of t
+type Name_payload.t += Payload_cst of t
 
 (**/**)

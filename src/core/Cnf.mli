@@ -108,7 +108,7 @@ val cnf_of_iter :
   f_statement Iter.t ->
   c_statement CCVector.ro_vector
 
-val type_declarations : c_statement Iter.t -> type_ ID.Map.t
+val type_declarations : c_statement Iter.t -> type_ Name.Map.t
 (** Compute the types declared in the statement sequence *)
 
 (** {2 Conversions} *)

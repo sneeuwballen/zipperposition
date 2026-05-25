@@ -85,13 +85,13 @@ module Make (C : Index.CLAUSE) = struct
 
     let count_symb_plus symb =
       {
-        name = CCFormat.sprintf "count+(%a)" ID.pp symb;
+        name = CCFormat.sprintf "count+(%a)" Name.pp symb;
         f = (fun lits -> Iter.length (_symbols ~sign:true lits));
       }
 
     let count_symb_minus symb =
       {
-        name = CCFormat.sprintf "count-(%a)" ID.pp symb;
+        name = CCFormat.sprintf "count-(%a)" Name.pp symb;
         f = (fun lits -> Iter.length (_symbols ~sign:false lits));
       }
 
@@ -101,7 +101,7 @@ module Make (C : Index.CLAUSE) = struct
         T.Seq.subterms_depth t
         |> Iter.filter_map (fun (t, depth) ->
                match T.Classic.view t with
-               | T.Classic.App (s, _) when ID.equal s symb -> Some depth
+               | T.Classic.App (s, _) when Name.equal s symb -> Some depth
                | _ -> None)
       in
       match Iter.max symbs_depths with
@@ -121,13 +121,13 @@ module Make (C : Index.CLAUSE) = struct
 
     let max_depth_plus symb =
       {
-        name = CCFormat.sprintf "max_depth+(%a)" ID.pp symb;
+        name = Printf.sprintf "max_depth+(%s)" (Name.to_string symb);
         f = _max_depth_lits ~sign:true symb;
       }
 
     let max_depth_minus symb =
       {
-        name = CCFormat.sprintf "max_depth-(%a)" ID.pp symb;
+        name = Printf.sprintf "max_depth-(%s)" (Name.to_string symb);
         f = _max_depth_lits ~sign:false symb;
       }
   end

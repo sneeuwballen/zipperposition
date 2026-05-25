@@ -179,7 +179,7 @@ val fold_terms :
 (** See {!Literal.fold_terms}, which is the same but for the [eligible] argument
 *)
 
-val symbols : ?init:ID.Set.t -> ?include_types:bool -> t -> ID.Set.t
+val symbols : ?init:Name.Set.t -> ?include_types:bool -> t -> Name.Set.t
 
 (** {2 IO} *)
 

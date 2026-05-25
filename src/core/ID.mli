@@ -18,7 +18,7 @@
 
     @since 1.5 *)
 
-type payload = ..
+type payload = Name_payload.t
 
 type t = private {
   id: int;
@@ -71,24 +71,6 @@ module Map : CCMap.S with type key = t
 module Set : CCSet.S with type elt = t
 module Tbl : CCHashtbl.S with type key = t
 
-type payload += Attr_infix of string  (** Infix name for pretty-printing *)
-type payload += Attr_prefix of string  (** Prefix name for pretty-printing *)
-type payload += Attr_parameter of int  (** Parameter, used for HO unif *)
-
-type skolem_kind =
-  | K_normal
-  | K_after_cnf
-  | K_lazy_cnf
-  | K_ind (* inductive *)
-
-type payload +=
-  | Attr_skolem of skolem_kind
-  | Attr_distinct
-  | Attr_comm
-  | Attr_assoc
-  | Attr_cnf_def
-(* Symbol is a name introduced during CNF *)
-
 val as_infix : t -> string option
 val is_infix : t -> bool
 val as_prefix : t -> string option
@@ -107,11 +89,7 @@ val is_lazycnf_skolem : t -> bool
 (** [is_postcnf_skolem id] returns [true] iff [id] is a Skolem symbol used by
     lazy CNF engine *)
 
-val as_skolem : t -> skolem_kind option
-
-val is_distinct_object : t -> bool
-(** whether the identifier is a distinct object (as defined in TPTP syntax) *)
-
+val as_skolem : t -> Name.skolem_kind option
 val is_comm : t -> bool
 val is_assoc : t -> bool
 val is_ac : t -> bool

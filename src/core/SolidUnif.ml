@@ -540,7 +540,7 @@ struct
       CCList.filter_map
         (fun (i, fa) ->
           match T.head fa with
-          | Some id' when ID.equal id id' && Type.equal (T.ty fa) ret_ty ->
+          | Some id' when Name.equal id id' && Type.equal (T.ty fa) ret_ty ->
             let subs_term = T.fun_l pref_tys (T.bvar ~ty:ret_ty (n - 1 - i)) in
             let subst =
               Subst.FO.bind' subst (flex_var, scope) (subs_term, scope)
@@ -628,7 +628,7 @@ struct
              @@ build_constraints args_lhs args_rhs rest
            with Unif.Fail -> raise NotUnifiable)
         | T.Const f, T.Const g
-          when ID.equal f g && List.length args_s = List.length args_t ->
+          when Name.equal f g && List.length args_s = List.length args_t ->
           unify ~subst ~counter ~scope @@ build_constraints args_s args_t rest
         | T.DB i, T.DB j when i = j && List.length args_s = List.length args_t
           ->

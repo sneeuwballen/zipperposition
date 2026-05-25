@@ -14,4 +14,9 @@ val make : string -> t
 val makef : ('a, Format.formatter, unit, t) format4 -> 'a
 val equal : t -> t -> bool
 val compare : t -> t -> int
-val pp : t CCFormat.printer
+val hash : t -> int
+val to_string : t -> string
+
+module Map : CCMap.S with type key = t
+module Set : CCSet.S with type elt = t
+module Tbl : CCHashtbl.S with type key = t

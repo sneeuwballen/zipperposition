@@ -18,7 +18,7 @@ let enabled_ = ref true
 module Make (Env : Env_intf.S) = struct
   module C = Env.C
 
-  let as_cstor_app (t : term) : (ID.t * term list) option =
+  let as_cstor_app (t : term) : (Name.t * term list) option =
     match T.view t with
     | T.App (f, l) ->
       (match T.view f with
@@ -164,7 +164,7 @@ module Make (Env : Env_intf.S) = struct
   let injectivity_destruct_pos c =
     let eligible = C.Eligible.(filter Literal.is_eq) in
     match find_cstor_pair ~sign:true ~eligible c with
-    | Some (idx, s1, l1, s2, l2) when ID.equal s1 s2 ->
+    | Some (idx, s1, l1, s2, l2) when Name.equal s1 s2 ->
       (* same constructor: simplify *)
       assert (List.length l1 = List.length l2);
       let other_lits = CCArray.except_idx (C.lits c) idx in
@@ -204,7 +204,7 @@ module Make (Env : Env_intf.S) = struct
       (match T.Classic.view l, T.Classic.view r with
       | T.Classic.App (s1, _), T.Classic.App (s2, _)
         when Ind_ty.is_constructor s1 && Ind_ty.is_constructor s2
-             && not (ID.equal s1 s2) ->
+             && not (Name.equal s1 s2) ->
         (* s1(...) = s2(...) is absurd,
              s1(...) != s2(...) is obvious *)
         Util.incr_stat stat_disjointness;
@@ -238,7 +238,7 @@ module Make (Env : Env_intf.S) = struct
      "hierarchic superposition with weak abstraction"'s rule that
      introduces background constants to equate to foreground terms *)
   let exhaustiveness (c : C.t) : C.t list =
-    let mk_sub_skolem (t : term) (ty : Type.t) : ID.t =
+    let mk_sub_skolem (t : term) (ty : Type.t) : Name.t =
       if Ind_ty.is_inductive_type ty then (
         (* declare a constant, with a depth that (if any)
            is bigger than [t]'s depth.

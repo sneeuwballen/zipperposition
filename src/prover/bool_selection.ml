@@ -345,9 +345,9 @@ let is_eq t =
   | _ -> false
 
 let sel1 lits =
-  let w_tbl = ID.Tbl.create 16 in
-  let incr_id = ID.Tbl.incr ~by:1 w_tbl in
-  let id_w = ID.Tbl.get_or ~default:0 w_tbl in
+  let w_tbl = Name.Tbl.create 16 in
+  let incr_id = Name.Tbl.incr ~by:1 w_tbl in
+  let id_w = Name.Tbl.get_or ~default:0 w_tbl in
 
   Iter.of_array lits
   |> Iter.flat_map (Lit.Seq.symbols ~include_types:false)

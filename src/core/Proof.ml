@@ -27,8 +27,8 @@ type kind =
   | Simplification of rule * tag list
   | Esa of rule
   | Trivial  (** trivial, or trivial within theories *)
-  | Define of ID.t * source  (** definition *)
-  | By_def of ID.t  (** following from the def of ID *)
+  | Define of Name.t * source  (** definition *)
+  | By_def of Name.t  (** following from the def of ID *)
 
 and source = {
   src_id: int;
@@ -235,9 +235,9 @@ module Kind = struct
       Format.fprintf out "simp %a%a" Rule.pp rule pp_tags tags
     | Esa rule -> Format.fprintf out "esa %a" Rule.pp rule
     | Trivial -> CCFormat.string out "trivial"
-    | By_def id -> Format.fprintf out "by_def(%a)" ID.pp id
+    | By_def id -> Format.fprintf out "by_def(%a)" Name.pp id
     | Define (id, src) ->
-      Format.fprintf out "define(@[%a@ %a@])" ID.pp id Src.pp src
+      Format.fprintf out "define(@[%a@ %a@])" Name.pp id Src.pp src
 
   let pp_tstp out (k, parents) =
     let pp_parents = Util.pp_list pp_parent_ in
@@ -623,9 +623,9 @@ module Step = struct
       Format.fprintf out "@[<2>lemma%a@]" pp_infos step.infos
     | Trivial -> Format.fprintf out "@[<2>trivial%a@]" pp_infos step.infos
     | By_def id ->
-      Format.fprintf out "@[<2>by_def %a%a@]" ID.pp id pp_infos step.infos
+      Format.fprintf out "@[<2>by_def %a%a@]" Name.pp id pp_infos step.infos
     | Define (id, src) ->
-      Format.fprintf out "@[<2>define %a@ %a%a%a@]" ID.pp id Src.pp src
+      Format.fprintf out "@[<2>define %a@ %a%a%a@]" Name.pp id Src.pp src
         pp_parents (parents step) pp_infos step.infos
     | Inference _ | Simplification _ | Esa _ ->
       Format.fprintf out "@[<hv2>%a%a%a@]" Kind.pp (kind step) pp_parents
@@ -785,14 +785,15 @@ module S = struct
     let conv_ty ty = Type.Conv.of_simple_term_exn ctx ty in
 
     let namespace = Tbl.create 8 in
-    let already_defined = ref ID.Set.empty in
+    let already_defined = ref Name.Set.empty in
     let tydecl_out out hd ty =
-      if not (ID.Set.mem hd !already_defined) then (
+      if not (Name.Set.mem hd !already_defined) then (
         Format.fprintf out "thf(@[@[%a@], type, @[%a@]: @[%a@]@]).@."
           Util.pp_str_tstp
-          (ID.name hd ^ "_type")
-          Util.pp_str_tstp (ID.name hd) (Type.TPTP.pp_ho ~depth:0) (conv_ty ty);
-        already_defined := ID.Set.add hd !already_defined
+          (Name.to_string hd ^ "_type")
+          Util.pp_str_tstp (Name.to_string hd) (Type.TPTP.pp_ho ~depth:0)
+          (conv_ty ty);
+        already_defined := Name.Set.add hd !already_defined
       )
     in
 
@@ -825,7 +826,7 @@ module S = struct
     (* Format.fprintf out "@[<v>"; *)
     let constants = ref F.Set.empty in
     let has_comb = ref false in
-    let types = ref ID.Set.empty in
+    let types = ref Name.Set.empty in
 
     traverse ~order:`DFS proof (fun p ->
         let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "pp-step" in
@@ -849,7 +850,7 @@ module S = struct
         F.Seq.subterms f |> Iter.filter_map F.ty
         |> Iter.iter (fun t ->
                match F.Ty.view t with
-               | F.Ty.Ty_app (hd, args) when not @@ ID.Set.mem hd !types ->
+               | F.Ty.Ty_app (hd, args) when not @@ Name.Set.mem hd !types ->
                  let ty =
                    F.Ty.( ==> )
                      (CCList.replicate (List.length args) F.Ty.tType)

@@ -41,7 +41,7 @@ end
 
 type view =
   | Type
-  | Const of ID.t
+  | Const of Name.t
   | App of t * t  (** curried application *)
   | Arrow of t * t  (** functional arrow *)
   | Var of var  (** bound var *)
@@ -94,7 +94,7 @@ val compare : t -> t -> int
 val is_type : t -> bool
 val t_type : ty
 val var : var -> t
-val const : ty:ty -> ID.t -> t
+val const : ty:ty -> Name.t -> t
 val app : t -> t -> t
 val app_l : t -> t list -> t
 val arrow : t -> t -> t

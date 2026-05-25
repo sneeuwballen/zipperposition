@@ -12,8 +12,8 @@ type labels = Index_intf.labels
 
 type feature =
   | N of int
-  | S of ID.Set.t
-  | M of int ID.Map.t
+  | S of Name.Set.t
+  | M of int Name.Map.t
   | L of labels
 
 type feature_vector = feature IArray.t
@@ -40,11 +40,12 @@ end = struct
   let pp out (f : t) : unit =
     match f with
     | N i -> Fmt.int out i
-    | S s -> Fmt.fprintf out "(@[set@ %a@])" (Fmt.iter ID.pp) (ID.Set.to_iter s)
+    | S s ->
+      Fmt.fprintf out "(@[set@ %a@])" (Fmt.iter Name.pp) (Name.Set.to_iter s)
     | M m ->
       Fmt.fprintf out "(@[mset@ %a@])"
-        Fmt.(iter (pair ~sep:silent ID.pp int))
-        (ID.Map.to_iter m)
+        Fmt.(iter (pair ~sep:silent Name.pp int))
+        (Name.Map.to_iter m)
     | L l ->
       Fmt.fprintf out "(@[labels@ %a@])" Fmt.(iter int) (Util.Int_set.to_iter l)
 
@@ -59,8 +60,8 @@ end = struct
     in
     match f1, f2 with
     | N i1, N i2 -> CCInt.compare i1 i2
-    | S s1, S s2 -> ID.Set.compare s1 s2
-    | M m1, M m2 -> ID.Map.compare CCInt.compare m1 m2
+    | S s1, S s2 -> Name.Set.compare s1 s2
+    | M m1, M m2 -> Name.Map.compare CCInt.compare m1 m2
     | L m1, L m2 -> Util.Int_set.compare m1 m2
     | N _, _ | S _, _ | M _, _ | L _, _ -> CCInt.compare (to_int f1) (to_int f2)
 
@@ -70,9 +71,9 @@ end = struct
   let combine_ ~default ~op f1 f2 : feature =
     match f1, f2 with
     | N i1, N i2 -> mk_n (i1 + i2)
-    | S s1, S s2 -> mk_s (ID.Set.union s1 s2)
+    | S s1, S s2 -> mk_s (Name.Set.union s1 s2)
     | M m1, M m2 ->
-      ID.Map.merge
+      Name.Map.merge
         (fun _ o1 o2 ->
           Some (op (CCOpt.get_or ~default o1) (CCOpt.get_or ~default o2)))
         m1 m2
@@ -86,9 +87,9 @@ end = struct
   let leq (f1 : t) (f2 : t) : bool =
     match f1, f2 with
     | N i1, N i2 -> i1 <= i2
-    | S s1, S s2 -> ID.Set.subset s1 s2
+    | S s1, S s2 -> Name.Set.subset s1 s2
     | M m1, M m2 ->
-      ID.Map.for_all (fun k i1 -> i1 <= ID.Map.get_or ~default:~-1 k m2) m1
+      Name.Map.for_all (fun k i1 -> i1 <= Name.Map.get_or ~default:~-1 k m2) m1
     | L s1, L s2 -> Util.Int_set.subset s1 s2
     | N _, _ | S _, _ | M _, _ | L _, _ -> assert false
 end
@@ -108,7 +109,7 @@ module Make (C : Index_intf.CLAUSE) = struct
     let compute f c = f.f (C.to_lits c) (C.labels c)
     let name f = f.name
     let pp out f = Fmt.string out f.name
-    let to_string = Fmt.to_string pp
+    let to_string f = f.name
     let make name f = { name; f }
 
     let size_plus =
@@ -133,12 +134,14 @@ module Make (C : Index_intf.CLAUSE) = struct
     let not_app_var t = not (T.is_app_var t)
 
     (* sequence of symbols of clause, of given sign *)
-    let symbols_ filter lits : ID.t Iter.t =
+    let symbols_ filter lits : Name.t Iter.t =
       lits |> Iter.filter filter
       |> Iter.flat_map SLiteral.to_iter
       |> Iter.flat_map (T.Seq.symbols ~filter_term:not_app_var)
 
-    let set_sym_ filter lits _ = symbols_ filter lits |> ID.Set.of_iter |> mk_s
+    let set_sym_ filter lits _ =
+      symbols_ filter lits |> Name.Set.of_iter |> mk_s
+
     let set_sym_plus = make "set_symb+" (set_sym_ SLiteral.is_pos)
     let set_sym_minus = make "set_symb-" (set_sym_ SLiteral.is_neg)
 
@@ -146,16 +149,16 @@ module Make (C : Index_intf.CLAUSE) = struct
       symbols_ filter lits
       |> Iter.fold
            (fun m id ->
-             let n = ID.Map.get_or ~default:0 id m in
-             ID.Map.add id (n + 1) m)
-           ID.Map.empty
+             let n = Name.Map.get_or ~default:0 id m in
+             Name.Map.add id (n + 1) m)
+           Name.Map.empty
       |> mk_m
 
     let multiset_sym_plus = make "mset_symb+" (multiset_sym_ SLiteral.is_pos)
     let multiset_sym_minus = make "mset_symb-" (multiset_sym_ SLiteral.is_neg)
 
     (* sequence of symbols of clause with their depth *)
-    let symbols_depth_ filter lits : (ID.t * int) Iter.t =
+    let symbols_depth_ filter lits : (Name.t * int) Iter.t =
       (* ignores app vars and does not count opening the functions *)
       let subterms_depth t k =
         let rec recurse depth t =
@@ -188,9 +191,9 @@ module Make (C : Index_intf.CLAUSE) = struct
       symbols_depth_ filter lits
       |> Iter.fold
            (fun m (id, d) ->
-             let d' = ID.Map.get_or ~default:0 id m in
-             ID.Map.add id (max d d') m)
-           ID.Map.empty
+             let d' = Name.Map.get_or ~default:0 id m in
+             Name.Map.add id (max d d') m)
+           Name.Map.empty
       |> mk_m
 
     let depth_sym_plus = make "depth_sym+" (depth_sym_ SLiteral.is_pos)

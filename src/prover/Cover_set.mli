@@ -36,7 +36,7 @@ module Case : sig
   val sub_constants : t -> cst list
   (** All sub-constants that are subterms of a specific case *)
 
-  val skolems : t -> (ID.t * Type.t) list
+  val skolems : t -> (Name.t * Type.t) list
 end
 
 val pp : t CCFormat.printer
@@ -45,7 +45,7 @@ val ty : t -> Type.t
 val top : t -> cst
 (** top constant of the coverset *)
 
-val declarations : t -> (ID.t * Type.t) Iter.t
+val declarations : t -> (Name.t * Type.t) Iter.t
 (** [declarations set] returns a list of type declarations that should be made
     if [set] is new (declare the top cst and its subcases) *)
 

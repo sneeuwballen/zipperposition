@@ -51,7 +51,7 @@ module Make (E : Env.S) : S with module Env = E = struct
           Statement.Seq.ty_decls cl
           |> Iter.iter (fun (id, ty) ->
                  Ctx.declare id ty;
-                 ID.set_payload id (ID.Attr_skolem ID.K_after_cnf)))
+                 Name_payload.add id (Name.Attr_skolem Name.K_after_cnf)))
         cnf_vec;
 
       CCVector.map (C.of_statement ~convert_defs:true) cnf_vec

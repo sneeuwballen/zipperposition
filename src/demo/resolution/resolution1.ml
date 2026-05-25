@@ -320,8 +320,8 @@ let process_file f =
       let decls = Cnf.cnf_of_iter ~ctx (CCVector.to_iter st) in
       _signature :=
         CCVector.to_iter decls |> Cnf.type_declarations
-        |> ID.Map.map (fun ty -> conv_ty ty)
-        |> ID.Map.to_iter |> Signature.Seq.of_iter;
+        |> Name.Map.map (fun ty -> conv_ty ty)
+        |> Name.Map.to_iter |> Signature.Seq.of_iter;
       let clauses =
         CCVector.to_iter decls |> Cnf.convert |> CCVector.to_iter
         |> Iter.flat_map Statement.Seq.forms

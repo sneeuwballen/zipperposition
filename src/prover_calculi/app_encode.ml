@@ -10,8 +10,8 @@ let mode_ : [ `None | `Extensional | `Intensional ] ref = ref `None
 
 module T = TypedSTerm
 
-(* Replacement for the function type in the encoding: *)
-let id_ae_fun = ID.make "app_encode_fun"
+(** Replacement for the function type in the encoding: *)
+let id_ae_fun = Name.make "app_encode_fun"
 
 let ty_ae_fun =
   T.app_builtin ~ty:T.tType Builtin.Arrow [ T.tType; T.tType; T.tType ]
@@ -19,7 +19,7 @@ let ty_ae_fun =
 let function_type = T.const ~ty:ty_ae_fun id_ae_fun
 
 (* Replacement for application in the encoding: *)
-let id_ae_app = ID.make "app_encode_app"
+let id_ae_app = Name.make "app_encode_app"
 
 let ty_ae_app =
   let alpha = Var.make ~ty:T.tType (ID.make "alpha") in
@@ -36,7 +36,7 @@ let ty_ae_app =
 let const_ae_app = T.const ~ty:ty_ae_app id_ae_app
 
 (* skolem for the extensionality axiom: *)
-let id_ext_diff = ID.make "app_encode_ext_diff"
+let id_ext_diff = Name.make "app_encode_ext_diff"
 
 let ty_ext_diff =
   let alpha = Var.make ~ty:T.tType (ID.make "alpha") in
@@ -188,7 +188,7 @@ let res_tc =
       | E_i c -> Some c
       | _ -> None)
     ~to_exn:(fun i -> E_i i)
-    ~compare ~pp_in:pp_clause_in ~is_stmt:true ~name:Statement.name
+    ~compare ~pp_in:pp_clause_in ~is_stmt:true ~name:Statement.get_name
     ~to_form:(fun ~ctx st ->
       let conv_c (c : T.t SLiteral.t list) : _ =
         c |> List.map SLiteral.to_form |> T.Form.or_

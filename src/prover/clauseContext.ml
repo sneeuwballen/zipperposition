@@ -93,7 +93,7 @@ let apply_same_scope { lits; var; _ } t =
   let subst = Subst.FO.bind Subst.empty (var, 0) (t, 0) in
   _apply_subst subst (lits, 0)
 
-let _diamond = ID.make "◇"
+let _diamond = Name.make "◇"
 
 let pp out c =
   let cst = T.const ~ty:(HVar.ty c.var) _diamond in

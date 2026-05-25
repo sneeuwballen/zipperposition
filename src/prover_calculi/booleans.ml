@@ -225,7 +225,7 @@ module Make (E : Env.S) : S with module Env = E = struct
   let handle_new_skolem_sym (c, trigger) =
     let trig_hd = T.head_term trigger in
     assert (T.is_const trig_hd);
-    assert (ID.is_postcnf_skolem (T.as_const_exn trig_hd));
+    assert (Name.is_postcnf_skolem (T.as_const_exn trig_hd));
 
     if C.proof_depth c < Env.flex_get k_trigger_bool_inst then
       insert_new_trigger trigger;
@@ -2039,7 +2039,7 @@ module Make (E : Env.S) : S with module Env = E = struct
           Statement.Seq.ty_decls cl
           |> Iter.iter (fun (id, ty) ->
                  Ctx.declare id ty;
-                 ID.set_payload id (ID.Attr_skolem ID.K_after_cnf)))
+                 Name_payload.add id (Name.Attr_skolem Name.K_after_cnf)))
         cnf_vec;
       let solved =
         if Env.flex_get k_solve_formulas then
@@ -2330,7 +2330,7 @@ let name_quantifiers stmts =
           let vars =
             Var.Set.of_iter (TypedSTerm.Seq.free_vars t) |> Var.Set.to_list
           in
-          let qid = ID.gensym () in
+          let qid = Name.gensym () in
           let ty = app_builtin ~ty:tType Arrow (prop :: map Var.ty vars) in
           let q = const ~ty qid in
           let q_vars = app ~ty:prop q (map var vars) in

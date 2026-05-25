@@ -12,13 +12,13 @@ let t_test = (module T : Alcotest.TESTABLE with type t = T.t)
 let ty_test = (module Type : Alcotest.TESTABLE with type t = Type.t)
 (* unit tests *)
 
-let f_ = ID.make "f"
-let g_ = ID.make "g"
-let h_ = ID.make "h"
-let k_ = ID.make "k"
-let l_ = ID.make "l"
-let p_ = ID.make "p"
-let q_ = ID.make "q"
+let f_ = Name.make "f"
+let g_ = Name.make "g"
+let h_ = Name.make "h"
+let k_ = Name.make "k"
+let l_ = Name.make "l"
+let p_ = Name.make "p"
+let q_ = Name.make "q"
 let ty = Type.term
 let ty_t = Term.of_ty ty
 let prop = Type.prop
@@ -32,8 +32,8 @@ let k_fun = T.const ~ty:Type.([ [ ty; ty ] ==> ty ] ==> ty) k_
 let k x = T.app k_fun [ x ]
 let l_fun = T.const ~ty:Type.([ [ ty; ty ] ==> ty; ty ] ==> ty) l_
 let l x = T.app l_fun [ x ]
-let a = T.const ~ty (ID.make "a")
-let b = T.const ~ty (ID.make "b")
+let a = T.const ~ty (Name.make "a")
+let b = T.const ~ty (Name.make "b")
 let x = T.var_of_int ~ty 0
 let y = T.var_of_int ~ty 1
 let fun_var x y = T.app (T.var_of_int ~ty:Type.([ ty; ty ] ==> ty) 2) [ x; y ]
@@ -162,7 +162,7 @@ let test_polymorphic_app =
       let polyty =
         Type.forall_fvars [ HVar.make ~ty:Type.tType 0 ] (Type.var_of_int 0)
       in
-      let f_poly = Term.const ~ty:polyty (ID.make "f_poly") in
+      let f_poly = Term.const ~ty:polyty (Name.make "f_poly") in
       (* ty → ty *)
       let funty = Type.([ ty ] ==> ty) in
       (* apply term of type `Π α. α` to terms of type `ty → ty` and `ty`: *)

@@ -288,7 +288,7 @@ module Make (P : PARAMETERS) = struct
               else
                 OSeq.empty
             | T.Const f, T.Const g ->
-              if ID.equal f g && List.length args_lhs = List.length args_rhs
+              if Name.equal f g && List.length args_lhs = List.length args_rhs
               then
                 decompose_and_cont args_lhs args_rhs rest flag subst
               else

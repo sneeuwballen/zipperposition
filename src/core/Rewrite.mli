@@ -34,16 +34,16 @@ module Term : sig
     val rhs : t -> term
     val vars : t -> Term.VarSet.t
     val vars_l : t -> Type.t HVar.t list
-    val head_id : t -> ID.t
+    val head_id : t -> Name.t
     val args : t -> term list
     val arity : t -> int
     val proof : t -> proof
     val as_lit : t -> Literal.t
 
-    val make_const : proof:Proof.t -> ID.t -> Type.t -> term -> t
+    val make_const : proof:Proof.t -> Name.t -> Type.t -> term -> t
     (** [make_const id ty rhs] is the same as [T.const id ty --> rhs] *)
 
-    val make : proof:Proof.t -> ID.t -> Type.t -> term list -> term -> t
+    val make : proof:Proof.t -> Name.t -> Type.t -> term list -> term -> t
     (** [make id ty args rhs] is the same as
         [T.app (T.const id ty) args --> rhs] *)
 
@@ -103,7 +103,7 @@ module Lit : sig
     val make : proof:Proof.t -> Literal.t -> Literal.t list list -> t
     val is_equational : t -> bool
     val as_clauses : t -> Literals.t list
-    val head_id : t -> ID.t option
+    val head_id : t -> Name.t option
     val compare : t -> t -> int
     val pp : t CCFormat.printer
   end
@@ -174,14 +174,14 @@ module Defined_cst : sig
   val defined_positions : t -> Defined_pos.Arr.t
   val level : t -> int
 
-  val declare : ?level:int -> ID.t -> rule_set -> t
+  val declare : ?level:int -> Name.t -> rule_set -> t
   (** [declare id rules] makes [id] a defined constant with the given (initial)
       set of rules
       @raise Invalid_argument
         if the ID is already a skolem or a constructor, or if the list of rules
         is empty *)
 
-  val declare_or_add : ID.t -> rule -> unit
+  val declare_or_add : Name.t -> rule -> unit
   (** [declare_or_add id rule] defines [id] if it's not already a defined
       constant, and add [rule] to it *)
 
@@ -204,13 +204,13 @@ module Defined_cst : sig
   include Interfaces.PRINT with type t := t
 end
 
-val as_defined_cst : ID.t -> defined_cst option
-val is_defined_cst : ID.t -> bool
+val as_defined_cst : Name.t -> defined_cst option
+val is_defined_cst : Name.t -> bool
 val all_cst : Defined_cst.t Iter.t
 val all_rules : Rule.t Iter.t
 
 (**/**)
 
-type ID.payload += Payload_defined_cst of defined_cst
+type Name_payload.t += Payload_defined_cst of defined_cst
 
 (**/**)

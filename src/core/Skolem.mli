@@ -17,7 +17,7 @@ type ctx
 val create :
   ?prefix:string ->
   ?prop_prefix:string ->
-  ?on_new:(ID.t -> type_ -> unit) ->
+  ?on_new:(Name.t -> type_ -> unit) ->
   unit ->
   ctx
 (** New skolem contex. A prefix can be provided, which will be added to all
@@ -26,14 +26,14 @@ val create :
     @param prop_prefix used to name sub-formulas during CNF
     @param on_id function called whenever a Skolem symbol is created *)
 
-val fresh_skolem : ctx:ctx -> ty:type_ -> ID.t
+val fresh_skolem : ctx:ctx -> ty:type_ -> Name.t
 (** Just obtain a fresh skolem symbol. It is also declared in the inner
     signature. *)
 
-val fresh_skolem_prefix : ctx:ctx -> ty:type_ -> string -> ID.t
+val fresh_skolem_prefix : ctx:ctx -> ty:type_ -> string -> Name.t
 (** Fresh symbol with a different name *)
 
-val pop_new_skolem_symbols : ctx:ctx -> (ID.t * type_) list
+val pop_new_skolem_symbols : ctx:ctx -> (Name.t * type_) list
 (** Remove and return the list of newly created Skolem symbols *)
 
 val counter : ctx -> int
@@ -62,7 +62,7 @@ val pp_polarity : polarity CCFormat.printer
 
 type form_definition = private {
   form: form;
-  proxy_id: ID.t; (* name *)
+  proxy_id: Name.t; (* name *)
   (* the defined object *)
   proxy: term;
   (* atom/term standing for the defined object *)
@@ -94,7 +94,7 @@ val define_form :
     @return the atomic formula that stands for [f]. *)
 
 type term_definition = private {
-  td_id: ID.t;
+  td_id: Name.t;
   td_ty: type_;
   td_rules: (form, term, type_) Statement.def_rule list;
   td_as_def: (form, term, type_) Statement.def;

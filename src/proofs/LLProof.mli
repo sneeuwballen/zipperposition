@@ -29,8 +29,8 @@ type step =
   | Assert
   | Negated_goal of t
   | Trivial
-  | By_def of ID.t
-  | Define of ID.t
+  | By_def of Name.t
+  | Define of Name.t
   | Instantiate of {
       form: t;
       inst: inst;
@@ -78,8 +78,8 @@ val goal : form -> t
 val negated_goal : form -> t -> t
 val assert_ : form -> t
 val trivial : form -> t
-val by_def : ID.t -> form -> t
-val define : ID.t -> form -> t
+val by_def : Name.t -> form -> t
+val define : Name.t -> form -> t
 val instantiate : ?tags:tag list -> form -> t -> inst -> t
 val esa : form -> name -> t list -> t
 

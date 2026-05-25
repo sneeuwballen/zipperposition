@@ -17,6 +17,7 @@ end)
 
 let[@inline] equal (a : t) b = a == b
 let[@inline] hash a = a.h
+let[@inline] to_string self = self.str
 
 let[@inline] make str =
   let h = Hash.string str in
@@ -30,4 +31,14 @@ let compare a b =
   else
     CCString.compare a.str b.str
 
-let pp out self = CCFormat.string out self.str
+module As_key = struct
+  type nonrec t = t
+
+  let equal = equal
+  let compare = compare
+  let hash = hash
+end
+
+module Map = CCMap.Make (As_key)
+module Set = CCSet.Make (As_key)
+module Tbl = CCHashtbl.Make (As_key)

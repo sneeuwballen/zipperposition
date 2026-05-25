@@ -125,8 +125,8 @@ module Make (E : Env.S) : S with module Env = E = struct
   end)
 
   let idx_ext_neg_lit_ : FV_ext_neg_lit.t ref = ref (FV_ext_neg_lit.empty ())
-  let _ext_dec_from_idx = ref ID.Map.empty
-  let _ext_dec_into_idx = ref ID.Map.empty
+  let _ext_dec_from_idx = ref Name.Map.empty
+  let _ext_dec_into_idx = ref Name.Map.empty
 
   (* retrieve skolems for this literal, if any *)
   let find_skolems_ (lit : Literal.t) : T.t list option =
@@ -842,7 +842,7 @@ module Make (E : Env.S) : S with module Env = E = struct
      Currently with no restrictions or indexing. After initial evaluation,
      will find ways to restrict it somehow. *)
   let retrieve_from_extdec_idx idx id =
-    let cl_map = ID.Map.find_opt id idx in
+    let cl_map = Name.Map.find_opt id idx in
     match cl_map with
     | None -> Iter.empty
     | Some cl_map ->
@@ -1074,7 +1074,7 @@ module Make (E : Env.S) : S with module Env = E = struct
 
   let insert_into_ext_dec_index index (c, pos, t) =
     let key = T.head_exn t in
-    let clause_map = ID.Map.find_opt key !index in
+    let clause_map = Name.Map.find_opt key !index in
     let clause_map =
       match clause_map with
       | None -> C.Tbl.create 8
@@ -1084,16 +1084,16 @@ module Make (E : Env.S) : S with module Env = E = struct
       try (t, pos) :: C.Tbl.find clause_map c with _ -> [ t, pos ]
     in
     C.Tbl.replace clause_map c all_pos;
-    index := ID.Map.add key clause_map !index
+    index := Name.Map.add key clause_map !index
 
   let remove_from_ext_dec_index index (c, _, t) =
     let key = T.head_exn t in
-    let clause_map = ID.Map.find_opt key !index in
+    let clause_map = Name.Map.find_opt key !index in
     match clause_map with
     | None -> Util.debugf ~section 1 "all clauses allready deleted." CCFun.id
     | Some res ->
       C.Tbl.remove res c;
-      index := ID.Map.add key res !index
+      index := Name.Map.add key res !index
 
   (* try to eliminate a predicate variable in one fell swoop *)
   let elim_pred_variable ?(proof_constructor = Proof.Step.inference) (c : C.t) :
@@ -1792,8 +1792,8 @@ module Make (E : Env.S) : S with module Env = E = struct
   module VTbl = CCHashtbl.Make (TVar)
 
   let mk_diff_const () =
-    let diff_id = ID.make "zf_ext_diff" in
-    ID.set_payload diff_id (ID.Attr_skolem ID.K_normal);
+    let diff_id = Name.make "zf_ext_diff" in
+    Name_payload.add diff_id (Name.Attr_skolem Name.K_normal);
     (* make the arguments of diff mandatory *)
     let alpha_var = HVar.make ~ty:Type.tType 0 in
     let alpha = Type.var alpha_var in
@@ -1830,7 +1830,7 @@ module Make (E : Env.S) : S with module Env = E = struct
       ~trail:Trail.empty lits Proof.Step.trivial
 
   let mk_choice_clause () =
-    let choice_id = ID.make "zf_choice" in
+    let choice_id = Name.make "zf_choice" in
     let alpha_var = HVar.make ~ty:Type.tType 0 in
     let alpha = Type.var alpha_var in
     let alpha_to_prop = Type.arrow [ alpha ] Type.prop in
@@ -1852,7 +1852,7 @@ module Make (E : Env.S) : S with module Env = E = struct
       ~trail:Trail.empty lits Proof.Step.trivial
 
   let mk_ite_clauses () =
-    let ite_id = ID.make "zf_ite" in
+    let ite_id = Name.make "zf_ite" in
     let alpha = Type.var (HVar.make ~ty:Type.tType 0) in
     let ite_ty = Type.arrow [ Type.prop; alpha; alpha ] alpha in
     let ite_const = Term.const ~ty:ite_ty ite_id in
@@ -2479,8 +2479,8 @@ module Make (E : Env.S) : S with module Env = E = struct
         [ Type.Tbl.get_or_add groundings ~f:introduce_new_const ~k:ty ]
       | `All ->
         let ids = Signature.find_by_type (C.Ctx.signature ()) ty in
-        if not (ID.Set.is_empty ids) then
-          List.map (Term.const ~ty) (ID.Set.to_list ids)
+        if not (Name.Set.is_empty ids) then
+          List.map (Term.const ~ty) (Name.Set.to_list ids)
         else
           [ Type.Tbl.get_or_add groundings ~f:introduce_new_const ~k:ty ]
     in
