@@ -18,13 +18,11 @@
    term in which lambda prefixes are not counted in the weight.
    all other symbols (including bound and free variables)
    take weight of 1  *)
-module I = Int32
-
 type t = private {
   term: view;
   ty: type_result;
   mutable id: int;
-  props: I.t;
+  props: int;
   ho_weight: int lazy_t;
 }
 (** Abstract type of term *)

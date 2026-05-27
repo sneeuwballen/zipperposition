@@ -2,71 +2,64 @@
 
 (** {1 Inner Terms} *)
 
-module I = Int32
+module Flags = struct
+  let () = assert (Sys.word_size >= 63)
 
-let zero = I.zero
-let ( <<< ) = I.shift_left
-let ( >>> ) = I.shift_right_logical
-let ( &&& ) = I.logand
-let ( ||| ) = I.logor
-let ( ~~~ ) = I.lognot
+  type t = int
 
-(* flags for propetries
-   flag is set if for any subterm the corresponding property holds *)
-let f_has_freevars = I.one
-let f_is_beta_reducible = f_has_freevars <<< 1
+  let zero = 0
+  let max_db_depth = 1 lsl 30
+  let f_has_freevars = 1
+  let f_is_beta_reducible = 1 lsl 1
+  let f_has_lams = 1 lsl 2
+  let f_has_quant = 1 lsl 3
+  let db_shift = 5
 
-(* If DB has more than 16 bits (very unlikely),
-   then we set a bit that forces to recompute the property *)
-let f_db_overflowed = f_is_beta_reducible <<< 1
-let f_has_lams = f_db_overflowed <<< 1
-let f_has_quant = f_has_lams <<< 1
+  (* From bit 5 onwards, we will keep the maximum
+     De Bruijn variable seen so far. *)
+  let f_db_mask = lnot 0 lsl db_shift
+  let set_property props prop_flag = props lor prop_flag
+  let unset_property props prop_flag = props land lnot prop_flag
+  let get_property props prop_flag = props land prop_flag <> 0
 
-(* From 16th bit onwards, we will keep the maximum 
-   De Bruijn variable seen so far. *)
-let f_db_mask = ~~~zero <<< 16
-let max_db = I.to_int (f_db_mask >>> 16)
-let set_property props prop_flag = props ||| prop_flag
-let unset_property props prop_flag = props &&& ~~~prop_flag
-let get_property props prop_flag = not @@ I.equal zero (props &&& prop_flag)
+  let dec_max_db props =
+    let max_db_val = (props land f_db_mask) lsr db_shift in
+    let cleared = props land lnot f_db_mask in
+    let max_db_val = max (max_db_val - 1) 0 lsl db_shift in
+    cleared lor max_db_val
 
-let dec_max_db props =
-  let max_db_val = I.to_int (props &&& f_db_mask >>> 16) in
-  let cleared = props &&& ~~~f_db_mask in
-  let max_db_val = I.of_int @@ max (max_db_val - 1) 0 <<< 16 in
-  cleared ||| max_db_val
+  let update_max_db props new_db =
+    if new_db > max_db_depth then
+      failwith "InnerTerm.Flags.update_max_db: db_depth too high"
+    else (
+      let max_db_val = max ((props land f_db_mask) lsr db_shift) new_db in
+      props land lnot f_db_mask lor (max_db_val lsl db_shift)
+    )
 
-let update_max_db props new_db =
-  if new_db > max_db then
-    set_property props f_db_overflowed
-  else (
-    let max_db_val = max (I.to_int (props &&& f_db_mask >>> 16)) new_db in
-    props &&& ~~~f_db_mask ||| (I.of_int max_db_val <<< 16)
-  )
+  let get_max_db props = (props land f_db_mask) lsr db_shift
 
-let get_max_db props = I.to_int (props &&& f_db_mask >>> 16)
+  (* Properties that should be set if they are set for ANY of the subterms *)
+  let any_props =
+    f_is_beta_reducible lor f_has_freevars lor f_has_lams lor f_has_quant
 
-(* Properties that should be set if they are set for ANY of the subterms *)
-let any_props =
-  f_is_beta_reducible ||| f_has_freevars ||| f_has_lams ||| f_has_quant
+  (* Properties that should be set if they are set for ALL of the subterms *)
+  let all_props = zero
+  (* currently no props like that -- is_closed computed
+                          by looking at the value of max_db *)
 
-(* Properties that should be set if they are set for ALL of the subterms *)
-let all_props = zero
-(* currently no props like that -- is_closed computed
-                        by looking at the value of max_db *)
-
-let debug_props out props =
-  CCFormat.fprintf out "db:%d" (get_max_db props);
-  CCFormat.fprintf out " h_fv:%b" (get_property props f_has_freevars);
-  CCFormat.fprintf out " h_l:%b" (get_property props f_has_lams);
-  CCFormat.fprintf out " h_q:%b" (get_property props f_has_quant);
-  CCFormat.fprintf out " beta_r:%b@." (get_property props f_is_beta_reducible)
+  let debug_props out props =
+    CCFormat.fprintf out "db:%d" (get_max_db props);
+    CCFormat.fprintf out " h_fv:%b" (get_property props f_has_freevars);
+    CCFormat.fprintf out " h_l:%b" (get_property props f_has_lams);
+    CCFormat.fprintf out " h_q:%b" (get_property props f_has_quant);
+    CCFormat.fprintf out " beta_r:%b@." (get_property props f_is_beta_reducible)
+end
 
 type t = {
   term: view;
   ty: type_result;
   mutable id: int;
-  props: I.t;
+  props: int;
   ho_weight: int lazy_t; (* TODO: change into a mutable option. *)
 }
 
@@ -89,19 +82,13 @@ type term = t
 let any_props_for_ts =
   List.fold_left
     (fun acc t ->
-      let new_props = any_props &&& t.props ||| acc in
-      update_max_db new_props (get_max_db t.props))
-    zero
+      let new_props = Flags.any_props land t.props lor acc in
+      Flags.update_max_db new_props (Flags.get_max_db t.props))
+    Flags.zero
 
 let add_ty_vars props ty_props =
-  if get_property ty_props f_has_freevars then
-    set_property props f_has_freevars
-  else
-    props
-
-let add_ty_vars props ty_props =
-  if get_property ty_props f_has_freevars then
-    set_property props f_has_freevars
+  if Flags.get_property ty_props Flags.f_has_freevars then
+    Flags.set_property props Flags.f_has_freevars
   else
     props
 
@@ -292,21 +279,23 @@ let make_ ~props ~ty term =
 
 let const ~ty s =
   let my_t =
-    make_ ~props:(add_ty_vars zero ty.props) ~ty:(HasType ty) (Const s)
+    make_ ~props:(add_ty_vars Flags.zero ty.props) ~ty:(HasType ty) (Const s)
   in
   H.hashcons my_t
 
 let builtin ~ty b =
   let my_t =
     make_
-      ~props:(add_ty_vars zero ty.props)
+      ~props:(add_ty_vars Flags.zero ty.props)
       ~ty:(HasType ty)
       (AppBuiltin (b, []))
   in
   H.hashcons my_t
 
 let tType =
-  let my_t = make_ ~props:zero ~ty:NoType (AppBuiltin (Builtin.TType, [])) in
+  let my_t =
+    make_ ~props:Flags.zero ~ty:NoType (AppBuiltin (Builtin.TType, []))
+  in
   H.hashcons my_t
 
 let open_fun ty =
@@ -363,7 +352,7 @@ let rec app_builtin ~ty b l =
     app_builtin ~ty Builtin.Arrow ((ret :: l2) @ l1)
   | Builtin.Not, [] ->
     let ty = app_builtin ~ty:tType Builtin.arrow [ prop; prop ] in
-    let my_t = make_ ~props:zero ~ty:(HasType ty) (AppBuiltin (b, [])) in
+    let my_t = make_ ~props:Flags.zero ~ty:(HasType ty) (AppBuiltin (b, [])) in
     H.hashcons my_t
   | (Builtin.And | Builtin.Or), l
     when CCList.length l < 2 && expected_args ty < 2 ->
@@ -393,7 +382,7 @@ let rec app_builtin ~ty b l =
     let props = add_ty_vars (any_props_for_ts l) ty.props in
     let props =
       if Builtin.is_quantifier b && List.length l = 2 then
-        set_property props f_has_quant
+        Flags.set_property props Flags.f_has_quant
       else
         props
     in
@@ -411,7 +400,7 @@ let app ~ty f l =
     let props = add_ty_vars (any_props_for_ts (f1 :: flattened)) ty.props in
     let props =
       if is_lam f1 then
-        set_property props f_is_beta_reducible
+        Flags.set_property props Flags.f_is_beta_reducible
       else
         props
     in
@@ -443,7 +432,7 @@ let app ~ty f l =
     let props = add_ty_vars (any_props_for_ts t_args) ty.props in
     let props =
       if Builtin.is_quantifier f1 && List.length t_args = 2 then
-        set_property props f_has_quant
+        Flags.set_property props Flags.f_has_quant
       else
         props
     in
@@ -453,7 +442,7 @@ let app ~ty f l =
     let props = add_ty_vars (any_props_for_ts (f :: l)) ty.props in
     let props =
       if is_lam f then
-        set_property props f_is_beta_reducible
+        Flags.set_property props Flags.f_is_beta_reducible
       else
         props
     in
@@ -461,26 +450,26 @@ let app ~ty f l =
     H.hashcons my_t
 
 let var v =
-  let props = set_property zero f_has_freevars in
+  let props = Flags.set_property Flags.zero Flags.f_has_freevars in
   H.hashcons (make_ ~props ~ty:(HasType (HVar.ty v)) (Var v))
 
 let bvar ~ty i =
   if i < 0 then raise (IllFormedTerm "bvar");
   let max_db = i + 1 in
-  let props = add_ty_vars (update_max_db zero max_db) ty.props in
+  let props = add_ty_vars (Flags.update_max_db Flags.zero max_db) ty.props in
   H.hashcons (make_ ~props ~ty:(HasType ty) (DB i))
 
 let bind ~ty ~varty s t' =
   let props = add_ty_vars (add_ty_vars t'.props ty.props) varty.props in
   let props =
     if Binder.equal Binder.Lambda s || Binder.equal Binder.ForallTy s then
-      dec_max_db props
+      Flags.dec_max_db props
     else
       props
   in
   let props =
     if Binder.equal Binder.Lambda s then
-      set_property props f_has_lams
+      Flags.set_property props Flags.f_has_lams
     else
       props
   in
@@ -554,14 +543,15 @@ module VarTbl = CCHashtbl.Make (HVarKey)
 
 (** {3 Basic Printer} *)
 
-let[@inline] has_lambda t = get_property t.props f_has_lams
+let[@inline] has_lambda t = Flags.get_property t.props Flags.f_has_lams
 
 let[@inline] is_eta_reducible t =
   (* if it has a quantifier -- we have to expand *)
-  get_property t.props f_has_quant || get_property t.props f_has_lams
+  Flags.get_property t.props Flags.f_has_quant
+  || Flags.get_property t.props Flags.f_has_lams
 
 let[@inline] is_beta_reducible t =
-  let res = get_property t.props f_is_beta_reducible in
+  let res = Flags.get_property t.props Flags.f_is_beta_reducible in
   assert ((not res) || has_lambda t);
   res
 
@@ -587,23 +577,7 @@ module DB = struct
       List.iter (fun t -> _to_iter ~depth t k) l
 
   let[@inline] _id x = x
-
-  let closed t =
-    let db_calc t =
-      _to_iter ~depth:0 t
-      |> Iter.map (fun (bvar, depth) -> bvar < depth)
-      |> Iter.for_all _id
-    in
-    if get_property t.props f_db_overflowed then
-      db_calc t
-    else (
-      let res = get_max_db t.props = 0 in
-      (* if(res != db_calc t) then (
-         CCFormat.printf "t:@[%a@];max_db:%d@." debugf t (get_max_db t.props);
-         assert(false);
-         ); *)
-      res
-    )
+  let closed t = Flags.get_max_db t.props = 0
 
   (* check whether t contains the De Bruijn symbol n *)
   let contains t n =
@@ -1062,7 +1036,7 @@ let rec expected_ty_vars ty =
   | Bind (Binder.ForallTy, _, ty') -> 1 + expected_ty_vars ty'
   | _ -> 0
 
-let is_ground t = not @@ get_property t.props f_has_freevars
+let is_ground t = not @@ Flags.get_property t.props Flags.f_has_freevars
 
 (** {3 Misc} *)
 
