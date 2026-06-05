@@ -62,9 +62,7 @@ let read (self : node_decoder) : value =
   let off_start = self.off in
   let high, low = read_leading_ self in
   match high with
-  | 0 ->
-    self.off <- String.length self.dec.str;
-    Stop
+  | 0 -> Stop
   | 1 ->
     (match low with
     | 0 -> Null
@@ -92,16 +90,14 @@ let iter_nodes (self : t) (f : offset -> string -> value list -> unit) : unit =
       let dec = { dec = self; off } in
       match read dec with
       | String cmd ->
-        let stop_off = ref dec.off in
         let rec collect acc =
-          stop_off := dec.off;
           match read dec with
           | Stop -> List.rev acc
           | v -> collect (v :: acc)
         in
         let args = collect [] in
         f off cmd args;
-        go (!stop_off + 1)
+        go dec.off
       | _ -> fail off "expected string at start of node"
     )
   in
