@@ -15,7 +15,7 @@
   atomic
   logtk.common
   logtk.arith
-  zipperposition_minidag)
+  zipperposition_mdag)
  (flags :standard -w -32-50 -open Logtk_arith -open Logtk_common)
  (foreign_stubs
   (language c)

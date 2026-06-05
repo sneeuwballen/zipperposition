@@ -1,5 +1,5 @@
-module E = Zipperposition_minidag.Encode
-module D = Zipperposition_minidag.Decode
+module E = Zipperposition_mdag.Encode
+module D = Zipperposition_mdag.Decode
 
 (* Encoding format — each node stores its type annotation as the last value:
    - "tm.var"      int ref(ty)            — HVar.id, type term

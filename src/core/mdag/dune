@@ -1,0 +1,3 @@
+(library
+ (name zipperposition_mdag)
+ (public_name logtk.mdag))
