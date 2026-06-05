@@ -6,7 +6,6 @@ open Logtk
 module SI = Msat.Solver_intf
 
 let section = Util.Section.make ~parent:Const.section "msat"
-let prof_call_msat = ZProf.make "msat.call"
 let stat_num_clauses = Util.mk_stat "msat.num_clauses"
 let stat_num_calls = Util.mk_stat "msat.num_calls"
 
@@ -45,7 +44,7 @@ module Solver = Msat.Make_pure_sat (struct
   type proof = Sat_solver_intf.proof_step
 end)
 
-module Make () (*   : Sat_solver_intf.S *) = struct
+module Make () : Sat_solver_intf.S = struct
   module Lit = BBox.Lit
 
   let solver = ref (Solver.create ~size:`Big ())
@@ -316,8 +315,9 @@ module Make () (*   : Sat_solver_intf.S *) = struct
       proof_ := Some p);
     !result_
 
-  let check_ full =
+  let check ~full () =
     if full || !must_check then (
+      let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "msat.check" in
       assert (full || not (Queue.is_empty queue_));
       Util.debug ~section 5 "check_real";
       must_check := false;
@@ -330,7 +330,6 @@ module Make () (*   : Sat_solver_intf.S *) = struct
     let res = check_unconditional_ () in
     assert (res = Sat)
 
-  let check ~full () = ZProf.with_prof prof_call_msat check_ full
   let set_printer pp = pp_ := pp
 
   let setup () =

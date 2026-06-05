@@ -4,8 +4,6 @@ open Logtk
 module Lits = Literals
 
 let section = Util.Section.make ~parent:Const.section "bbox"
-let prof_inject_lits = ZProf.make "bbox.inject_lits"
-let prof_inject_lemma = ZProf.make "bbox.inject_lemma"
 let pp_bbox_id : bool ref = ref true
 
 module StringTbl = CCHashtbl.Make (struct
@@ -140,7 +138,8 @@ let find_boolean_lit lits =
   |> CCOpt.map (fun t -> Lit.apply_sign sign t)
 
 (* clause -> boolean lit *)
-let inject_lits_ lits =
+let inject_lits lits =
+  let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "bbox.inject-lits" in
   let old_lit = find_boolean_lit lits in
   match old_lit with
   | Some t -> t (* sign already applied*)
@@ -181,9 +180,8 @@ let inject_lit lit =
       Lit.apply_sign (Literal.is_positivoid lit) bool_lit
   with CantConvert -> None
 
-let inject_lits lits = ZProf.with_prof prof_inject_lits inject_lits_ lits
-
-let inject_lemma_ (f : Cut_form.t) : t =
+let inject_lemma (f : Cut_form.t) : t =
+  let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "bbox.inject-lemma" in
   let old_lit =
     match _retrieve_lemma f with
     | None -> None
@@ -198,8 +196,6 @@ let inject_lemma_ (f : Cut_form.t) : t =
     (* maintain mapping *)
     save_ lit;
     lit
-
-let inject_lemma f = ZProf.with_prof prof_inject_lemma inject_lemma_ f
 
 let inject_case p =
   (* normalize by sorting the list of cases *)

@@ -6,8 +6,6 @@ module T = Term
 module I = Index
 module S = Subst
 
-let prof_traverse = ZProf.make "fingerprint.traverse"
-
 (* a feature.
    A    = variable
    B    = below variable
@@ -401,7 +399,7 @@ module Make (X : Set.OrderedType) = struct
 
   (** fold on parts of the trie that are compatible with features *)
   let traverse ~compatible idx features k =
-    let _span = ZProf.enter_prof prof_traverse in
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "fingerprint.traverse" in
     (* fold on the trie *)
     let rec recurse trie features =
       match trie, features with
@@ -415,12 +413,7 @@ module Make (X : Set.OrderedType) = struct
       | Node _, [] | Leaf _, _ :: _ ->
         failwith "different feature length in fingerprint trie"
     in
-    try
-      recurse idx.trie features;
-      ZProf.exit_prof _span
-    with e ->
-      ZProf.exit_prof _span;
-      raise e
+    recurse idx.trie features
 
   let retrieve_unifiables_aux fold_unify (idx, sc_idx) t k =
     let features = idx.fp (fst t) in

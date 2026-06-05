@@ -13,5 +13,13 @@
  (name libzipperposition)
  (public_name libzipperposition)
  (synopsis "library for the Zipperposition theorem prover")
- (libraries containers msat logtk logtk.arith logtk.proofs logtk.parsers str)
- (flags :standard -w -32-50 -open Logtk_arith))
+ (libraries
+  containers
+  msat
+  logtk
+  logtk.arith
+  logtk.common
+  logtk.proofs
+  logtk.parsers
+  str)
+ (flags :standard -w -32-50 -open Logtk_arith -open Logtk_common))

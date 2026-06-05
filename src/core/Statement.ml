@@ -602,7 +602,8 @@ let eliminate_long_implications ?(is_goal = false) f =
 let sine_axiom_selector ?(ignore_k_most_common_symbols = None)
     ?(take_conj_defs = true) ?(take_only_defs = false)
     ?(trim_implications = false) ?(depth_start = 1) ?(depth_end = 3)
-    ?(tolerance = 2.0) formulas =
+    ?(tolerance = 2.0) formulas : _ Iter.t =
+  let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "sine-axiom-selector" in
   let formulas = Iter.to_list formulas in
 
   let symset_of_ax ~trim_implications ?(is_goal = false) ax =

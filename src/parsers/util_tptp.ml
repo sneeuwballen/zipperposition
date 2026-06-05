@@ -97,6 +97,7 @@ let _find_and_open filename dir =
     | None -> errorf "could not find file `%s`" filename)
 
 let parse_file ?cache ~recursive f =
+  let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "tptp.parse-file" in
   let parse_cache =
     lazy
       (if recursive then

@@ -2,10 +2,6 @@
 
 (** {1 Lambda-Calculus} *)
 
-let prof_whnf = ZProf.make "term.whnf"
-let prof_snf = ZProf.make "term.snf"
-let prof_eta_expand = ZProf.make "term.eta_expand"
-let prof_eta_reduce = ZProf.make "term.eta_reduce"
 let section = Util.Section.make "lambdas"
 
 module Inner = struct
@@ -85,7 +81,7 @@ module Inner = struct
       term_of_st st
     | _ -> t
 
-  let rec whnf_term ?(env = DBEnv.empty) t =
+  let rec whnf_term_rec ?(env = DBEnv.empty) t =
     ignore env;
     let pref, tt = T.open_bind Binder.Lambda t in
     assert (not (T.is_lambda tt));
@@ -95,13 +91,13 @@ module Inner = struct
       if T.equal tt' tt then
         t
       else
-        whnf_term (T.fun_l pref tt')
+        whnf_term_rec (T.fun_l pref tt')
     ) else
       t
 
   let rec snf_rec t =
     if T.is_beta_reducible t then (
-      let t = whnf_term t in
+      let t = whnf_term_rec t in
       match T.ty t with
       | T.NoType -> t
       | T.HasType ty ->
@@ -145,7 +141,7 @@ module Inner = struct
         (* polymorhpic eta expansion not implemented *)
         else (
           (* first, WHNF *)
-          let t = whnf_term t in
+          let t = whnf_term_rec t in
           (* see how many arguments are missing, and what type *)
           let args, body = T.open_bind Binder.Lambda t in
           let n_args = List.length ty_args in
@@ -303,8 +299,8 @@ module Inner = struct
     t'
 
   let whnf t =
-    let t' = ZProf.with_prof prof_whnf whnf_term t in
-    t'
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "term.whnf" in
+    whnf_term_rec t
 
   let beta_red_head t =
     let pref, body = T.open_fun t in
@@ -314,13 +310,16 @@ module Inner = struct
   let add_args_tail ~ty st args : state = { st with args = st.args @ args; ty }
 
   let snf t =
-    let t' = ZProf.with_prof prof_snf snf_rec t in
-    t'
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "term.snf" in
+    snf_rec t
 
-  let eta_expand t = ZProf.with_prof prof_eta_expand eta_expand_rec t
+  let eta_expand t =
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "term.eta-expand" in
+    eta_expand_rec t
 
   let eta_reduce ?(expand_quant = true) ?(full = true) t =
-    ZProf.with_prof prof_eta_reduce (eta_reduce_aux ~expand_quant ~full) t
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "term.eta-reduce" in
+    eta_reduce_aux ~expand_quant ~full t
 end
 
 module T = Term

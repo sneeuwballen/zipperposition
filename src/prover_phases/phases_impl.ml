@@ -311,6 +311,7 @@ let print_stats_env (type c) (module Env : Env.S with type C.t = c) =
 
 (* print stats *)
 let print_stats () =
+  let@ _sp = Phases.with_span ~__FILE__ ~__LINE__ "phase.print-stats" in
   Phases.start_phase Phases.Print_stats >>= fun () ->
   Signal.send Signals.on_print_stats ();
   let comment = Options.comment () in
@@ -332,6 +333,7 @@ let print_stats () =
 (* pre-saturation *)
 let presaturate_clauses (type c) (module Env : Env.S with type C.t = c)
     (c_sets : c Clause.sets) =
+  let@ _sp = Phases.with_span ~__FILE__ ~__LINE__ "phase.presaturate" in
   Phases.start_phase Phases.Pre_saturate >>= fun () ->
   let module Sat = Saturate.Make (Env) in
   let num_clauses = CCVector.length c_sets.Clause.c_set in
@@ -359,6 +361,7 @@ let presaturate_clauses (type c) (module Env : Env.S with type C.t = c)
    used to influence how saturation is done, for how long it runs, etc. *)
 let try_to_refute (type c) (module Env : Env.S with type C.t = c) clauses result
     =
+  let@ _sp = Phases.with_span ~__FILE__ ~__LINE__ "phase.saturate" in
   Phases.start_phase Phases.Saturate >>= fun () ->
   let module Sat = Saturate.Make (Env) in
   (* add clauses to passive set of [env], and SOS to active set *)
@@ -412,6 +415,7 @@ let try_to_refute (type c) (module Env : Env.S with type C.t = c) clauses result
 (* Print some content of the state, based on environment variables *)
 let print_dots (type c) (module Env : Env_intf.S with type C.t = c)
     (result : Saturate.szs_status) =
+  let@ _sp = Phases.with_span ~__FILE__ ~__LINE__ "phase.print-dots" in
   Phases.start_phase Phases.Print_dot >>= fun () ->
   Signal.send Signals.on_dot_output ();
   (* see if we need to print proof state *)
@@ -456,6 +460,7 @@ let unsat_to_str () =
 
 let print_szs_result (type c) ~file (module Env : Env_intf.S with type C.t = c)
     (result : Saturate.szs_status) =
+  let@ _sp = Phases.with_span ~__FILE__ ~__LINE__ "phase.print-szs-result" in
   Phases.start_phase Phases.Print_result >>= fun () ->
   let comment = Options.comment () in
   (match result with
@@ -542,8 +547,12 @@ let syms_in_conj_f decls =
 
 (* Process the given file (try to solve it) *)
 let process_file ?(prelude = Iter.empty) file =
+  let@ _sp = Phases.with_span ~__FILE__ ~__LINE__ "phase.process-file" in
+
   start_file file >>= fun () ->
   parse_file file >>= fun stmts ->
+  Trace.add_data_to_span _sp [ "file", `String file ];
+
   typing ~file prelude stmts >>= fun decls ->
   (* declare inductive types and constants *)
   CCVector.iter Statement.scan_simple_stmt_for_ind_ty decls;
@@ -585,11 +594,13 @@ let process_file ?(prelude = Iter.empty) file =
   Phases.return (Phases.Env_result (env, result))
 
 let print file env result =
+  let@ _sp = Phases.with_span ~__FILE__ ~__LINE__ "phase.print" in
   (* print some statistics *)
   print_stats_env env;
   print_szs_result ~file env result >>= fun () -> print_dots env result
 
 let check res =
+  let@ _sp = Phases.with_span ~__FILE__ ~__LINE__ "phase.check-proof" in
   Phases.start_phase Phases.Check_proof >>= fun () ->
   Phases.get_key Params.key >>= fun params ->
   let comment = Options.comment () in
@@ -644,17 +655,21 @@ let setup_signal =
 
 (* process several files, printing the result *)
 let process_files_and_print ?(params = Params.default) files =
+  let@ _sp =
+    Phases.with_span ~__FILE__ ~__LINE__ "phase.process-files-and-print"
+  in
   parse_prelude params >>= fun prelude ->
   let f file =
     process_file ~prelude file >>= fun (Phases.Env_result (env, res)) ->
     print file env res >>= fun () -> check res
   in
   let phases = List.map f files in
-  Phases.run_parallel phases >>= fun r ->
+  Phases.run_and_discard_l phases >>= fun r ->
   print_stats () >>= fun () -> Phases.return r
 
 let main_cli ?setup_gc:(gc = true) () =
   let open Phases.Infix in
+  let@ _sp = Phases.with_span ~__FILE__ ~__LINE__ "phase.main-cli" in
   (if gc then
      setup_gc
    else

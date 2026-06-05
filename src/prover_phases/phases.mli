@@ -116,13 +116,20 @@ val bind :
   ('b, 'p_before, 'p_after) t
 (** [bind state f] calls [f] to go one step further from [state] *)
 
+val with_span :
+  __FILE__:string ->
+  __LINE__:int ->
+  string ->
+  (Trace.span -> ('a, 'p1, 'p2) t) ->
+  ('a, 'p1, 'p2) t
+
 val map : ('a, 'p1, 'p2) t -> f:('a -> 'b) -> ('b, 'p1, 'p2) t
 (** Map the current value *)
 
 val fold_l : f:('a -> 'b -> ('a, 'p, 'p) t) -> x:'a -> 'b list -> ('a, 'p, 'p) t
 
-val run_parallel : (errcode, 'p1, 'p2) t list -> (errcode, 'p1, 'p2) t
-(** [run_sequentiel l] runs each action of the list in succession, restarting
+val run_and_discard_l : (errcode, 'p1, 'p2) t list -> (errcode, 'p1, 'p2) t
+(** [run_and_discard_l l] runs each action of the list in succession, restarting
     every time with the initial state (once an action has finished, its state is
     discarded). Only the very last state is kept. If any errcode is non-zero,
     then the evaluation stops with this errcode *)
