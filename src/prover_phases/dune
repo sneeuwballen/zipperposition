@@ -4,6 +4,7 @@
  (synopsis "main for the Zipperposition theorem prover")
  (libraries
   logtk.common
+  logtk.proofs
   libzipperposition
   libzipperposition.calculi
   libzipperposition.avatar

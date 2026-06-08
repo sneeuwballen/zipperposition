@@ -606,29 +606,45 @@ let check res =
   let comment = Options.comment () in
   let errcode =
     match res with
-    | Saturate.Unsat p when params.Params.check ->
-      (* check proof! *)
-      Util.debug ~section 2 "start checking proof…";
+    | Saturate.Unsat p
+      when params.Params.check || CCOpt.is_some params.Params.proof_trace ->
       let p' = LLProof_conv.conv p in
-      (* check *)
-      let start = Util.total_time_s () in
-      let dot_prefix = params.Params.dot_check in
-      let res, stats = LLProof_check.check ?dot_prefix p' in
-      let stop = Util.total_time_s () in
-      Format.printf "%s(@[<h>proof_check@ :res %a@ :stats %a :time %.3fs@])@."
-        comment LLProof_check.pp_res res LLProof_check.pp_stats stats
-        (stop -. start);
-      (* print proof? (do it after check, results are cached) *)
+      let errcode =
+        if params.Params.check then (
+          Util.debug ~section 2 "start checking proof…";
+          let start = Util.total_time_s () in
+          let dot_prefix = params.Params.dot_check in
+          let res, stats = LLProof_check.check ?dot_prefix p' in
+          let stop = Util.total_time_s () in
+          Format.printf
+            "%s(@[<h>proof_check@ :res %a@ :stats %a :time %.3fs@])@." comment
+            LLProof_check.pp_res res LLProof_check.pp_stats stats (stop -. start);
+          if res = LLProof_check.R_fail then
+            15
+          else
+            0
+        ) else
+          0
+      in
       (match params.Params.dot_llproof with
       | None -> ()
       | Some file ->
         Util.debugf ~section 2 "print LLProof into `%s`" (fun k -> k file);
         LLProof.Dot.pp_dot_file file p');
-      (* exit code *)
-      if res = LLProof_check.R_fail then
-        15
-      else
-        0
+      (match params.Params.proof_trace with
+      | None -> ()
+      | Some file ->
+        Util.debugf ~section 2 "write proof trace to `%s`" (fun k -> k file);
+        let enc = Proof_trace.create (open_out_bin file) in
+        ignore
+          (Proof_trace.emit_proof enc
+             ~get_lits:(fun p ->
+               match Proof.Result.view (Proof.S.result p) with
+               | SClause.SClause_view c -> SClause.lits c
+               | _ -> [||])
+             p);
+        Proof_trace.close enc);
+      errcode
     | _ -> 0
   in
   Phases.return_phase errcode
