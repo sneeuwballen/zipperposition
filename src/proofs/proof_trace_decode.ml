@@ -92,8 +92,6 @@ external term_of_type : Type.t -> Term.t = "%identity"
 let ty_of_term (t : Term.t) : Type.t =
   Type.of_term_unsafe (t : Term.t :> InnerTerm.t)
 
-(* ── builtin reverse mapping ── *)
-
 let builtin_of_string s =
   match s with
   | "¬" -> Some Builtin.Not
@@ -168,8 +166,6 @@ let builtin_of_string s =
       )
     else
       None
-
-(* ── tag / role decoding ── *)
 
 let tag_of_int = function
   | 0 -> Builtin.Tag.T_lia
@@ -346,8 +342,6 @@ and decode_subst (st : t) (off : D.offset) : Subst.Projection.t =
     in
     Int_tbl.add st.subst_cache off proj;
     proj
-
-(* ── step / proof decoding ── *)
 
 and decode_proof_at (st : t) (off : D.offset) : Proof.t =
   if off = -1 then raise (D.Fail ("null ref in decode_proof_at", off));

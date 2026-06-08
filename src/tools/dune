@@ -4,6 +4,7 @@
   cnf_of
   tptp_to_zf
   proof_check_tstp
+  proof_check_mdag
   fo_detector
   fool_detector
   check_finite_domain
@@ -13,6 +14,7 @@
   zipper_cnf_of
   zipper_tptp_to_zf
   zipper_proof_check_tstp
+  zipper_proof_check_mdag
   zipper_fo_detector
   zipper_fool_detector
   zipper_fd_detector
@@ -21,7 +23,7 @@
  (promote
   (until-clean)
   (into ../..))
- (libraries logtk logtk.parsers)
+ (libraries logtk logtk.parsers logtk.proofs)
  (package zipperposition-tools)
  (flags :standard -w -32)
  (ocamlopt_flags :standard -Oclassic))

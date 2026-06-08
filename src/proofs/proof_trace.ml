@@ -103,29 +103,38 @@ and emit_term self (t : Term.t) : offset =
 and emit_term_noncached self t =
   match Term.view t with
   | Term.Var v ->
+    let ty_off = emit_type self (HVar.ty v) in
     E.write_node self.enc "t.v" (fun enc ->
         E.int enc (HVar.id v);
-        E.ref enc (emit_type self (HVar.ty v)))
+        E.ref enc ty_off)
   | Term.DB i ->
+    let ty_off = emit_type self (Term.ty t) in
     E.write_node self.enc "t.d" (fun enc ->
         E.int enc i;
-        E.ref enc (emit_type self (Term.ty t)))
+        E.ref enc ty_off)
   | Term.Const name ->
+    let n_off = emit_name self name in
+    let ty_off = emit_type self (Term.ty t) in
     E.write_node self.enc "t.c" (fun enc ->
-        E.ref enc (emit_name self name);
-        E.ref enc (emit_type self (Term.ty t)))
+        E.ref enc n_off;
+        E.ref enc ty_off)
   | Term.App (hd, args) ->
+    let hd_off = emit_term self hd in
+    let arg_offs = List.map (emit_term self) args in
     E.write_node self.enc "t.@" (fun enc ->
-        E.ref enc (emit_term self hd);
-        List.iter (fun a -> E.ref enc (emit_term self a)) args)
+        E.ref enc hd_off;
+        List.iter (fun a -> E.ref enc a) arg_offs)
   | Term.Fun (ty, body) ->
+    let ty_off = emit_type self ty in
+    let body_off = emit_term self body in
     E.write_node self.enc "t.f" (fun enc ->
-        E.ref enc (emit_type self ty);
-        E.ref enc (emit_term self body))
+        E.ref enc ty_off;
+        E.ref enc body_off)
   | Term.AppBuiltin (b, args) ->
+    let arg_offs = List.map (emit_term self) args in
     E.write_node self.enc "t.b" (fun enc ->
         E.string enc (Builtin.to_string b);
-        List.iter (fun a -> E.ref enc (emit_term self a)) args)
+        List.iter (fun a -> E.ref enc a) arg_offs)
 
 (** {2 Literals} *)
 
@@ -306,13 +315,13 @@ let collect_names_in_literal acc = function
 (** {2 Emit proof DAG} *)
 
 let rec collect (seen : unit Int_tbl.t) acc (p : Proof.t) =
-  let id = Proof.Step.hash (Proof.S.step p) in
+  let id = Proof.S.hash p in
   if not (Int_tbl.mem seen id) then (
     Int_tbl.add seen id ();
-    acc := p :: !acc;
     List.iter
       (fun parent -> collect seen acc (Proof.Parent.proof parent))
-      (Proof.Step.parents (Proof.S.step p))
+      (Proof.Step.parents (Proof.S.step p));
+    acc := p :: !acc
   )
 
 let emit_proof self ~get_lits (root : Proof.t) : offset =
@@ -342,13 +351,13 @@ let emit_proof self ~get_lits (root : Proof.t) : offset =
   List.iter
     (fun p ->
       let step = Proof.S.step p in
-      let step_id = Proof.Step.hash step in
+      let proof_id = Proof.S.hash p in
       let clause_off = emit_clause self (get_lits p) in
       let parents =
         List.map
           (fun parent ->
-            let p_step = Proof.S.step (Proof.Parent.proof parent) in
-            let p_off = Int_tbl.find step_offs (Proof.Step.hash p_step) in
+            let parent_proof = Proof.Parent.proof parent in
+            let p_off = Int_tbl.find step_offs (Proof.S.hash parent_proof) in
             let s_off =
               match Proof.Parent.subst parent with
               | None -> None
@@ -357,9 +366,9 @@ let emit_proof self ~get_lits (root : Proof.t) : offset =
             p_off, s_off)
           (Proof.Step.parents step)
       in
-      Int_tbl.add step_offs step_id (emit_step self ~clause_off ~parents step))
-    !steps;
-  let root_off = Int_tbl.find step_offs (Proof.Step.hash (Proof.S.step root)) in
+      Int_tbl.add step_offs proof_id (emit_step self ~clause_off ~parents step))
+    (List.rev !steps);
+  let root_off = Int_tbl.find step_offs (Proof.S.hash root) in
   let result_off =
     E.write_node self.enc "result.unsat" (fun enc -> E.ref enc root_off)
   in
