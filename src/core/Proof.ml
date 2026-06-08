@@ -61,10 +61,12 @@ type flavor =
   | `Def
   ]
 
+type result_view = ..
+
 type 'a result_tc = {
   res_id: int; (* unique ID of the class *)
-  res_of_exn: exn -> 'a option;
-  res_to_exn: 'a -> exn;
+  res_of_exn: result_view -> 'a option;
+  res_to_exn: 'a -> result_view;
   res_compare: 'a -> 'a -> int;
   res_is_stmt: bool;
   res_is_dead_cl: unit -> bool;
@@ -78,7 +80,7 @@ type 'a result_tc = {
 (** Typeclass for the result of a proof step *)
 
 (** existential type for result of an inference *)
-type result = Res : 'a result_tc * exn -> result
+type result = Res : 'a result_tc * result_view -> result
 
 type step = {
   id: int; (* unique ID *)
@@ -344,17 +346,17 @@ module Result = struct
     }
 
   let make tc x : t = Res (tc, tc.res_to_exn x)
+  let view (Res (_, x)) = x
 
-  exception E_form of form
-
+  type result_view += Form_view of form
   type inst_subst = (term, term) Var.Subst.t
 
   let form_tc : form result_tc =
     make_tc
       ~of_exn:(function
-        | E_form f -> Some f
+        | Form_view f -> Some f
         | _ -> None)
-      ~to_exn:(fun f -> E_form f)
+      ~to_exn:(fun f -> Form_view f)
       ~to_form:(fun ~ctx:_ t -> t)
       ~compare:T.compare ~pp_in:TypedSTerm.pp_in
       ~flavor:(fun f ->

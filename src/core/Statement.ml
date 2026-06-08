@@ -998,15 +998,15 @@ let pp_input_in o =
 
 (** {2 Proofs} *)
 
-exception E_i of input_t
-exception E_c of clause_t
+type Proof.result_view += Stmt_view of input_t
+type Proof.result_view += Stmt_clause_view of clause_t
 
 let res_tc_i : input_t Proof.result_tc =
   Proof.Result.make_tc
     ~of_exn:(function
-      | E_i c -> Some c
+      | Stmt_view c -> Some c
       | _ -> None)
-    ~to_exn:(fun i -> E_i i)
+    ~to_exn:(fun i -> Stmt_view i)
     ~compare ~pp_in:pp_input_in ~is_stmt:true ~name:get_name
     ~to_form:(fun ~ctx:_ st ->
       Seq.forms st |> Iter.to_list |> TypedSTerm.Form.and_)
@@ -1015,9 +1015,9 @@ let res_tc_i : input_t Proof.result_tc =
 let res_tc_c : clause_t Proof.result_tc =
   Proof.Result.make_tc
     ~of_exn:(function
-      | E_c c -> Some c
+      | Stmt_clause_view c -> Some c
       | _ -> None)
-    ~to_exn:(fun i -> E_c i)
+    ~to_exn:(fun i -> Stmt_clause_view i)
     ~compare ~pp_in:pp_clause_in ~is_stmt:true ~name:get_name
     ~to_form:(fun ~ctx st ->
       let module F = TypedSTerm.Form in

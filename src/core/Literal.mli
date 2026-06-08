@@ -171,7 +171,7 @@ module Set : CCSet.S with type elt = t
 val is_trivial : t -> bool
 val is_absurd : t -> bool
 
-val is_absurd_tags : t -> Proof.tag list
+val is_absurd_tags : t -> Builtin.Tag.t list
 (** if [is_absurd lit], return why *)
 
 val is_app_var_eq : t -> bool

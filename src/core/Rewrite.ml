@@ -741,13 +741,13 @@ module Rule = struct
     | T_rule _, L_rule _ -> -1
     | L_rule _, T_rule _ -> 1
 
-  exception E_p of t
+  type Proof.result_view += Rewrite_view of t
 
   let res_tc : t Proof.result_tc =
     Proof.Result.make_tc
-      ~to_exn:(fun t -> E_p t)
+      ~to_exn:(fun t -> Rewrite_view t)
       ~of_exn:(function
-        | E_p p -> Some p
+        | Rewrite_view p -> Some p
         | _ -> None)
       ~compare
       ~flavor:(fun _ -> `Def)

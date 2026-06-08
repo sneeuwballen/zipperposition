@@ -56,8 +56,10 @@ and from_file = {
 type 'a result_tc
 (** Typeclass for the result of a proof step *)
 
+type result_view = ..
+
 (** result of an inference *)
-type result = Res : 'a result_tc * exn -> result
+type result = Res : 'a result_tc * result_view -> result
 
 type step
 (** A proof step, without the conclusion *)
@@ -156,8 +158,8 @@ module Result : sig
       post-instantiation terms *)
 
   val make_tc :
-    of_exn:(exn -> 'a option) ->
-    to_exn:('a -> exn) ->
+    of_exn:(result_view -> 'a option) ->
+    to_exn:('a -> result_view) ->
     compare:('a -> 'a -> int) ->
     to_form:(ctx:Term.Conv.ctx -> 'a -> form) ->
     ?to_form_subst:
@@ -197,6 +199,7 @@ module Result : sig
 
   val flavor : t -> flavor
   val name : t -> string option
+  val view : t -> result_view
 end
 
 (** {2 A proof step} *)

@@ -115,7 +115,7 @@ module Lit : sig
     * Subst.t
     * Scoped.scope
     * Subst.Renaming.t
-    * Proof.tag list)
+    * Builtin.Tag.t list)
     option
   (** normalize literals of the clause w.r.t. rules, or return [None] if no rule
       applies. The input clause lives in scope 0. *)
@@ -124,7 +124,7 @@ module Lit : sig
     ?subst:Unif_subst.t ->
     scope_rules:Scoped.scope ->
     Literal.t Scoped.t ->
-    (rule * Unif_subst.t * Proof.tag list) Iter.t
+    (rule * Unif_subst.t * Builtin.Tag.t list) Iter.t
   (** [narrow_term rules lit] finds the set of rules [(l --> clauses) in rules]
       and substitutions [sigma] such that [sigma(l) = sigma(lit)]
       @param scope_rules used for rules (LEFT) *)

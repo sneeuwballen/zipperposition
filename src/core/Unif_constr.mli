@@ -15,13 +15,13 @@ type t = private {
   sc1: Scoped.scope;
   t2: term;
   sc2: Scoped.scope;
-  tags: Proof.tag list;
+  tags: Builtin.Tag.t list;
 }
 (** A constraint delayed because unification for this pair of terms is not
     syntactic *)
 
-val make : tags:Proof.tag list -> term Scoped.t -> term Scoped.t -> t
-val tags : t -> Proof.tag list
+val make : tags:Builtin.Tag.t list -> term Scoped.t -> term Scoped.t -> t
+val tags : t -> Builtin.Tag.t list
 
 val apply_subst : Subst.Renaming.t -> Subst.t -> t -> term * term
 (** Apply a substitution to a delayed constraint *)
@@ -30,7 +30,7 @@ val apply_subst_l : Subst.Renaming.t -> Subst.t -> t list -> (term * term) list
 (** Apply a substitution to delayed constraints *)
 
 module FO : sig
-  val make : tags:Proof.tag list -> Term.t Scoped.t -> Term.t Scoped.t -> t
+  val make : tags:Builtin.Tag.t list -> Term.t Scoped.t -> Term.t Scoped.t -> t
 end
 
 include Interfaces.HASH with type t := t

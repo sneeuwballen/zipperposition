@@ -11,7 +11,7 @@ type t = {
   sc1: Scoped.scope;
   t2: term;
   sc2: Scoped.scope;
-  tags: Proof.tag list;
+  tags: Builtin.Tag.t list;
 }
 
 let[@inline] make ~tags (t1, sc1) (t2, sc2) = { t1; sc1; t2; sc2; tags }
