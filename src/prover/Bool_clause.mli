@@ -10,6 +10,6 @@ type t = bool_lit list
 val proof_tc : t Proof.Result.tc
 val mk_proof_res : t -> Proof.Result.t
 
-exception E_proof of t
+type Proof.result_view += Bool_clause_view of t
 
 val proof_res_as_bc : Proof.Result.t -> t option

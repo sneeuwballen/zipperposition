@@ -80,6 +80,8 @@ val pp_in : Output_format.t -> t CCFormat.printer
 
 (** {2 Proofs} *)
 
+type Proof.result_view += SClause_view of t
+
 val proof_tc : t -> t Proof.Result.tc
 val mk_proof_res : t -> Proof.Result.t
 val adapt : Proof.S.t -> t -> Proof.S.t

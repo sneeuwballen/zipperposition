@@ -22,6 +22,7 @@ type t = {
   dot_sat: bool;  (** Print saturated set into DOT? *)
   dot_all_roots: bool;
   dot_check: string option;  (** prefix for printing checker proofs *)
+  proof_trace: string option;  (** file to write proof trace in mdag format *)
   def_as_rewrite: bool;
   expand_def: bool;  (** expand definitions *)
   stats: bool;
@@ -48,6 +49,7 @@ let default : t =
     dot_file = None;
     dot_llproof = None;
     dot_check = None;
+    proof_trace = None;
     unary_depth = 1;
     dot_sat = false;
     expand_def = false;
@@ -79,6 +81,7 @@ let parse_args () =
   and dot_sat = ref default.dot_sat
   and dot_all_roots = ref default.dot_all_roots
   and dot_check = ref default.dot_check
+  and proof_trace = ref default.proof_trace
   and expand_def = ref default.expand_def
   and unary_depth = ref default.unary_depth
   and def_as_rewrite = ref default.def_as_rewrite
@@ -117,6 +120,9 @@ let parse_args () =
       ( "--dot-check-prefix",
         Arg.String (fun s -> dot_check := Some s),
         " prefix for printing checker proofs in DOT" );
+      ( "--proof-trace",
+        Arg.String (fun s -> proof_trace := Some s),
+        " store proof trace in mdag format to file" );
       ( "--color",
         Arg.Bool CCFormat.set_color_default,
         " enable/disable ANSI color codes" );
@@ -164,6 +170,7 @@ let parse_args () =
     dot_file = !dot_file;
     dot_llproof = !dot_llproof;
     dot_check = !dot_check;
+    proof_trace = !proof_trace;
     unary_depth = !unary_depth;
     dot_sat = !dot_sat;
     expand_def = !expand_def;

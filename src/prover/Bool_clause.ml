@@ -20,14 +20,14 @@ let pp_in = function
 
 let to_form ~ctx:_ c = List.map BBox.to_s_form c |> TypedSTerm.Form.or_
 
-exception E_proof of t
+type Proof.result_view += Bool_clause_view of t
 
 let proof_tc =
   Proof.Result.make_tc
     ~of_exn:(function
-      | E_proof c -> Some c
+      | Bool_clause_view c -> Some c
       | _ -> None)
-    ~to_exn:(fun c -> E_proof c)
+    ~to_exn:(fun c -> Bool_clause_view c)
     ~compare
     ~flavor:(fun _ -> `Pure_bool)
     ~to_form ~pp_in ()
@@ -35,7 +35,6 @@ let proof_tc =
 let mk_proof_res = Proof.Result.make proof_tc
 
 let proof_res_as_bc r =
-  let module P = Proof in
-  match r with
-  | P.Res (_, E_proof p) -> Some p
+  match Proof.Result.view r with
+  | Bool_clause_view p -> Some p
   | _ -> None

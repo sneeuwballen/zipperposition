@@ -21,6 +21,8 @@ type t = {
   mutable flags: flag;  (** boolean flags for the clause *)
 }
 
+type Proof.result_view += SClause_view of t
+
 let id_count_ = ref 0
 
 (** {2 Basics} *)
@@ -155,8 +157,6 @@ let pp_in = function
 
 (** {2 Proofs} *)
 
-exception E_proof of t
-
 (* conversion to simple formula after instantiation, including the
    substitution used for instantiating *)
 let to_s_form_subst ~ctx subst c : _ * _ Var.Subst.t =
@@ -176,9 +176,9 @@ let to_s_form_subst ~ctx subst c : _ * _ Var.Subst.t =
 let proof_tc cl =
   Proof.Result.make_tc
     ~of_exn:(function
-      | E_proof c -> Some c
+      | SClause_view c -> Some c
       | _ -> None)
-    ~to_exn:(fun c -> E_proof c)
+    ~to_exn:(fun c -> SClause_view c)
     ~compare
     ~flavor:(fun c ->
       if Literals.is_absurd (lits c) then

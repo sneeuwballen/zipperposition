@@ -542,7 +542,7 @@ module Make (E : Env.S) (Sat : Sat_solver.S) = struct
         (Proof.Step.parents p)
     in
     match Proof.S.result p with
-    | Proof.Res (_, Bool_clause.E_proof l) ->
+    | Proof.Res (_, Bool_clause.Bool_clause_view l) ->
       List.exists (eq_abs lit) l || in_proof_ (Proof.S.step p) lit
     | _ -> in_proof_ (Proof.S.step p) lit
 

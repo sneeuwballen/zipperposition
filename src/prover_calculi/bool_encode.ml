@@ -409,7 +409,7 @@ let bool_encode_lit lit =
 (** Encode a clause *)
 let bool_encode_lits lits = List.map bool_encode_lit lits
 
-exception E_i of (T.t SLiteral.t list, T.t, T.t) Statement.t
+type Proof.result_view += View of (T.t SLiteral.t list, T.t, T.t) Statement.t
 
 let pp_in pp_f pp_t pp_ty = function
   | Output_format.O_zf -> Statement.ZF.pp pp_f pp_t pp_ty
@@ -424,9 +424,9 @@ let pp_clause_in o =
 let res_tc =
   Proof.Result.make_tc
     ~of_exn:(function
-      | E_i c -> Some c
+      | View c -> Some c
       | _ -> None)
-    ~to_exn:(fun i -> E_i i)
+    ~to_exn:(fun i -> View i)
     ~compare ~pp_in:pp_clause_in ~is_stmt:true ~name:Statement.get_name
     ~to_form:(fun ~ctx st ->
       let conv_c (c : T.t SLiteral.t list) : _ =
