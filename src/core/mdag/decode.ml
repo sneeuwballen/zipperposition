@@ -2,6 +2,7 @@ type t = { str: string }
 (** Decoder *)
 
 let create str : t = { str }
+let raw_string (self : t) : string = self.str
 
 type offset = int
 
@@ -76,6 +77,36 @@ let read (self : node_decoder) : value =
   | 6 -> Blob (string_ self ~low)
   | 7 -> Ref (read_uint64 self ~low |> Int64.to_int)
   | _ -> failf off_start "invalid high: %d" high
+
+let read_int (self : node_decoder) : int =
+  match read self with
+  | Int64 i -> Int64.to_int i
+  | _ -> fail self.off "expected int"
+
+let read_string (self : node_decoder) : string =
+  match read self with
+  | String s -> s
+  | _ -> fail self.off "expected string"
+
+let read_blob (self : node_decoder) : string =
+  match read self with
+  | Blob s -> s
+  | _ -> fail self.off "expected blob"
+
+let read_ref (self : node_decoder) : offset =
+  match read self with
+  | Ref off -> off
+  | Null -> -1
+  | _ -> fail self.off "expected ref"
+
+let read_all_refs (self : node_decoder) : offset list =
+  let rec collect acc =
+    match read self with
+    | Ref off -> collect (off :: acc)
+    | Stop -> List.rev acc
+    | _ -> fail self.off "expected ref"
+  in
+  collect []
 
 let read_node (self : t) (off : offset) f =
   let dec = { dec = self; off } in
