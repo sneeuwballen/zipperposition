@@ -81,25 +81,37 @@ let print_stats () =
     Printf.printf "  %2d: %-5d %s\n%!" i sizes.(i) bar
   done;
   let shard_stats = InnerTerm.hashcons_shard_stats () in
-  Printf.printf "\nPer-shard weak table stats (legend: entries=#terms, load=entries/table_len):\n%!";
+  Printf.printf
+    "\n\
+     Per-shard weak table stats (legend: entries=#terms, \
+     load=entries/table_len):\n\
+     %!";
   let bar_w = 40 in
   let max_entries = ref 0 in
-  Array.iter (fun (_, n, _, _, _, _) -> max_entries := max !max_entries n) shard_stats;
+  Array.iter
+    (fun (_, n, _, _, _, _) -> max_entries := max !max_entries n)
+    shard_stats;
   let max_entries = max 1 !max_entries in
   for i = 0 to n_shards - 1 do
     let table_len, num_entries, sum_bucket_len, minb, _medb, maxb =
       shard_stats.(i)
     in
     let avg_bkt =
-      if num_entries = 0 then 0 else sum_bucket_len / num_entries
+      if num_entries = 0 then
+        0
+      else
+        sum_bucket_len / num_entries
     in
     let load_pct =
-      if table_len = 0 then 0
-      else (num_entries * 100) / table_len
+      if table_len = 0 then
+        0
+      else
+        num_entries * 100 / table_len
     in
     let bar = String.make (num_entries * bar_w / max_entries) '#' in
-    Printf.printf "  %2d: entries=%-5d load=%-3d%% avg_bkt=%-4d min=%-4d max=%-4d %s\n%!"
-      i num_entries load_pct avg_bkt minb maxb bar
+    Printf.printf
+      "  %2d: entries=%-5d load=%-3d%% avg_bkt=%-4d min=%-4d max=%-4d %s\n%!" i
+      num_entries load_pct avg_bkt minb maxb bar
   done
 
 let main () =
