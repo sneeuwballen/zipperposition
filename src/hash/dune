@@ -1,0 +1,9 @@
+(library
+ (name logtk_hash)
+ (public_name logtk.hash)
+ (libraries iter containers)
+ (private_modules hash_impl)
+ (foreign_stubs
+  (language c)
+  (flags :standard -O2)
+  (names hash_stubs)))
