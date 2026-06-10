@@ -82,5 +82,6 @@
   (iter (>= "1.2"))
   (oseq (>= "0.2"))
   (msat (and (>= "0.8") (< "0.10")))
+  trace-tef
   (logtk (= :version))
   (libzipperposition (= :version))))
