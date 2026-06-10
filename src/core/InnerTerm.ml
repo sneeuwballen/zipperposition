@@ -203,9 +203,6 @@ let _eq_norec t1 t2 =
 
 (** {3 Constructors} *)
 
-(* XXX: use cppo?
-   module H = Hashcons.MakeNonWeak(struct
-*)
 module H = Hashcons.Make (struct
   type t = term
 
@@ -215,9 +212,14 @@ module H = Hashcons.Make (struct
   let[@inline] tag i t =
     assert (t.id = ~-1);
     t.id <- i
+
+  let n_shards_log2 = 5 (* 32 shards *)
+  let init_size = 4096
 end)
 
 let hashcons_stats () = H.stats ()
+let hashcons_shard_sizes () = H.shard_sizes ()
+let hashcons_shard_stats () = H.shard_stats ()
 
 exception IllFormedTerm of string
 

@@ -13,6 +13,9 @@ module Hcons = Hashcons.Make (struct
   let tag id t =
     assert (t.id = -1);
     t.id <- id
+
+  let n_shards_log2 = 3 (* 8 shards *)
+  let init_size = 64
 end)
 
 let[@inline] equal (a : t) b = a == b

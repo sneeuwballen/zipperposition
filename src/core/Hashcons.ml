@@ -7,6 +7,7 @@ module type S = Logtk_hashcons.S
 
 module Make (X : HashedType) : S with type elt = X.t = Logtk_hashcons.Make (X)
 [@@inline]
+(* *)
 
 (*
 module Make (X : HashedType) = struct
@@ -33,6 +34,7 @@ module Make (X : HashedType) = struct
     x
 
   let stats () = H.stats tbl
+  let shard_sizes () = [||]
 end
 [@@inline]
 *)

@@ -4,6 +4,11 @@ module type HashedType = sig
   val equal : t -> t -> bool
   val hash : t -> int
   val tag : int -> t -> unit
+
+  (** parameters *)
+
+  val n_shards_log2 : int
+  val init_size : int
 end
 
 module type S = sig
@@ -13,6 +18,8 @@ module type S = sig
   val mem : elt -> bool
   val fresh_unique_id : unit -> int
   val stats : unit -> int * int * int * int * int * int
+  val shard_sizes : unit -> int array
+  val shard_stats : unit -> (int * int * int * int * int * int) array
 end
 
 module Spinlock = struct
@@ -45,8 +52,8 @@ module Spinlock = struct
 end
 
 module Make (X : HashedType) : S with type elt = X.t = struct
-  let n_shards = 256
-  let shard_mask = 255
+  let n_shards = 1 lsl X.n_shards_log2
+  let shard_mask = n_shards - 1
 
   module W = Weak.Make (X)
 
@@ -55,7 +62,7 @@ module Make (X : HashedType) : S with type elt = X.t = struct
   let locks : Spinlock.t array =
     Array.init n_shards (fun _ -> Spinlock.create ())
 
-  let tbls : W.t array = Array.init n_shards (fun _ -> W.create 64)
+  let tbls : W.t array = Array.init n_shards (fun _ -> W.create X.init_size)
   let global_id : int Atomic.t = Atomic.make 0
   let[@inline] shard_of x = X.hash x land max_int land shard_mask
 
@@ -89,13 +96,29 @@ module Make (X : HashedType) : S with type elt = X.t = struct
       let lock = locks.(i) in
       Spinlock.inline_lock lock;
       let sn, sbind, ssb, smb, _, smxb = W.stats tbls.(i) in
-      n := !n + sn;
-      b := !b + sbind;
+      n := !n + sbind;
+      b := !b + sn;
       sb := !sb + ssb;
       mb := min !mb smb;
       mxb := max !mxb smxb;
       Spinlock.unlock lock
     done;
     !n, !b, !sb, !mb, 0, !mxb
+
+  let shard_sizes () =
+    Array.init n_shards (fun i ->
+        let lock = locks.(i) in
+        Spinlock.inline_lock lock;
+        let _, sn, _, _, _, _ = W.stats tbls.(i) in
+        Spinlock.unlock lock;
+        sn)
+
+  let shard_stats () =
+    Array.init n_shards (fun i ->
+        let lock = locks.(i) in
+        Spinlock.inline_lock lock;
+        let s = W.stats tbls.(i) in
+        Spinlock.unlock lock;
+        s)
 end
 [@@inline]
