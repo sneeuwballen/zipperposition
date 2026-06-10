@@ -106,8 +106,7 @@ val is_tType : t -> bool
 val is_lambda : t -> bool
 val hashcons_stats : unit -> int * int * int * int * int * int
 val hashcons_shard_sizes : unit -> int array
-val hashcons_shard_stats :
-  unit -> (int * int * int * int * int * int) array
+val hashcons_shard_stats : unit -> (int * int * int * int * int * int) array
 val is_eta_reducible : t -> bool
 val is_beta_reducible : t -> bool
 val has_lambda : t -> bool

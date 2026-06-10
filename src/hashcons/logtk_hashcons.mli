@@ -19,8 +19,7 @@ module type S = sig
   val fresh_unique_id : unit -> int
   val stats : unit -> int * int * int * int * int * int
   val shard_sizes : unit -> int array
-  val shard_stats :
-    unit -> (int * int * int * int * int * int) array
+  val shard_stats : unit -> (int * int * int * int * int * int) array
 end
 
 module Make : functor (X : HashedType) -> S with type elt = X.t
