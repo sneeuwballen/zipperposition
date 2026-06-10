@@ -70,35 +70,4 @@ let once s f =
       StopListening)
 
 let propagate a b = on_every a (send b)
-
-(** {2 Combinators} *)
-
-let map signal f =
-  let signal' = create () in
-  (* weak ref *)
-  let r = Weak.create 1 in
-  Weak.set r 0 (Some signal');
-  on signal (fun x ->
-      match Weak.get r 0 with
-      | None -> StopListening
-      | Some signal' ->
-        send signal' (f x);
-        ContinueListening);
-  signal'.alive <- Keep signal;
-  signal'
-
-let filter signal p =
-  let signal' = create () in
-  (* weak ref *)
-  let r = Weak.create 1 in
-  Weak.set r 0 (Some signal');
-  on signal (fun x ->
-      match Weak.get r 0 with
-      | None -> StopListening
-      | Some signal' ->
-        if p x then send signal' x;
-        ContinueListening);
-  signal'.alive <- Keep signal;
-  signal'
-
 let set_exn_handler h = _exn_handler := h
