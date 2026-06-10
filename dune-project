@@ -16,7 +16,7 @@
  (synopsis "Core types and algorithms for logic")
  (tags (logic unification term))
  (depends
-  (ocaml (>= "4.14"))
+  (ocaml (>= "5.2"))
   base-bytes
   base-unix
   (zarith (>= "1.7"))
@@ -44,7 +44,7 @@
  (synopsis "Library for Zipperposition")
  (tags (logic unification term superposition prover))
  (depends
-  (ocaml (>= "4.14"))
+  (ocaml (>= "5.2"))
   base-bytes
   base-unix
   (logtk (= :version))
@@ -61,7 +61,7 @@
  (synopsis "A fully automatic theorem prover for typed higher-order and beyond")
  (tags (logic unification term superposition prover))
  (depends
-  (ocaml (>= "4.14"))
+  (ocaml (>= "5.2"))
   base-unix
   (logtk (= :version))
   (libzipperposition (= :version))
@@ -77,7 +77,7 @@
  (synopsis "Support tools for Zipperposition")
  (tags (logic unification term superposition prover))
  (depends
-  (ocaml (>= "4.14"))
+  (ocaml (>= "5.2"))
   (containers (and (>= "3.0") (< "4.0")))
   (iter (>= "1.2"))
   (oseq (>= "0.2"))

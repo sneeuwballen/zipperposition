@@ -1,0 +1,6 @@
+(library
+ (name logtk_hashcons)
+ (public_name logtk.hashcons)
+ (libraries containers iter)
+ (private_modules spinlock)
+ (flags :standard -w -32-50))

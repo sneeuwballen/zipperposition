@@ -17,7 +17,7 @@ homepage: "https://github.com/sneeuwballen/zipperposition"
 bug-reports: "https://github.com/sneeuwballen/zipperposition/issues"
 depends: [
   "dune" {>= "3.11"}
-  "ocaml" {>= "4.14"}
+  "ocaml" {>= "5.2"}
   "base-unix"
   "logtk" {= version}
   "libzipperposition" {= version}
