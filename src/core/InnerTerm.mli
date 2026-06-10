@@ -23,7 +23,7 @@ type t = private {
   ty: type_result;
   mutable id: int;
   props: int;
-  mutable ho_weight: int option;
+  ho_weight: int option Atomic.t;
 }
 (** Abstract type of term *)
 

@@ -60,7 +60,7 @@ type t = {
   ty: type_result;
   mutable id: int;
   props: int;
-  mutable ho_weight: int option;
+  ho_weight: int option Atomic.t;
 }
 
 (* head form *)
@@ -246,11 +246,11 @@ let open_fun ty =
   | _ -> [], ty
 
 let rec ho_weight t =
-  match t.ho_weight with
+  match Atomic.get t.ho_weight with
   | Some w -> w
   | None ->
     let w = ho_weight_uncached_ t.term t.ty in
-    t.ho_weight <- Some w;
+    Atomic.set t.ho_weight (Some w);
     w
 
 and ho_weight_uncached_ t t_ty : int =
@@ -281,7 +281,8 @@ and ho_weight_l_ acc = function
     let acc = acc + ho_weight t in
     ho_weight_l_ acc ts
 
-let make_ ~props ~ty term = { term; ty; id = ~-1; props; ho_weight = None }
+let make_ ~props ~ty term =
+  { term; ty; id = ~-1; props; ho_weight = Atomic.make None }
 
 let const ~ty s =
   let my_t =

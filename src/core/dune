@@ -16,6 +16,7 @@
   logtk.common
   logtk.arith
   logtk.hash
+  logtk.hashcons
   zipperposition_mdag)
  (flags :standard -w -32-50 -open Logtk_arith -open Logtk_common)
  (foreign_stubs
