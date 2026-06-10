@@ -101,7 +101,7 @@ let[@inline] ty_exn t =
   | HasType ty -> ty
 
 let[@inline] hash t = Hash.int t.id
-let[@inline] equal : t -> t -> bool = fun t1 t2 -> t1 == t2
+let[@inline] equal (t1 : t) (t2 : t) : bool = t1 == t2
 let[@inline] compare t1 t2 = Stdlib.compare t1.id t2.id
 
 let rec same_l_rec l1 l2 =
@@ -175,8 +175,10 @@ let _eq_ty t1 t2 =
 let rec _eq_norec_list l1 l2 =
   match l1, l2 with
   | [], [] -> true
-  | [], _ | _, [] -> false
+  | [ t1 ], [ t2 ] -> equal t1 t2
+  | [ t1; u1 ], [ t2; u2 ] -> equal t1 t2 && equal u1 u2
   | t1 :: l1', t2 :: l2' -> equal t1 t2 && _eq_norec_list l1' l2'
+  | [], _ | _, [] -> false
 
 let rec _eq_record_list l1 l2 =
   match l1, l2 with
