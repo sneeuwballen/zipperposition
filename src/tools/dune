@@ -23,7 +23,7 @@
  (promote
   (until-clean)
   (into ../..))
- (libraries logtk logtk.parsers logtk.proofs)
+ (libraries logtk logtk.parsers logtk.proofs trace-tef)
  (package zipperposition-tools)
  (flags :standard -w -32)
  (ocamlopt_flags :standard -Oclassic))

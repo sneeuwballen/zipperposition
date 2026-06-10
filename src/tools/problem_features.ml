@@ -5,6 +5,8 @@
 open Logtk
 open Logtk_parsers
 
+let ( let@ ) = ( @@ )
+
 type feature =
   | Counter of string (* counter kind of feature *)
   | Vector of
@@ -15,15 +17,7 @@ let get_f_name = function
   | Counter x -> x
   | Vector x -> x
 
-module StrKey = struct
-  type t = string
-
-  let equal = CCString.equal
-  let hash = CCString.hash
-  let compare = CCString.compare
-end
-
-module StrTbl = CCHashtbl.Make (StrKey)
+module StrTbl = CCHashtbl.Make (CCString)
 
 let cnt_map = StrTbl.create 64
 let vec_map = StrTbl.create 64
@@ -262,7 +256,7 @@ let collect_formula_features stmts =
     stmts
 
 let collect_clause_features clauses =
-  Cnf.convert @@ CCVector.to_iter clauses
+  CCVector.to_iter clauses |> Cnf.convert
   |> CCVector.iter (fun cl ->
          let lits =
            Iter.to_list
@@ -375,6 +369,7 @@ let process file =
     exit 1
 
 let main () =
+  let@ () = Trace_tef.with_setup () in
   CCFormat.set_color_default true;
   let files = ref [] in
   let add_file f = files := f :: !files in
@@ -387,4 +382,4 @@ let main () =
   | _ -> ());
   ()
 
-let _ = main ()
+let () = main ()
