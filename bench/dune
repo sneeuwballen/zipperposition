@@ -1,0 +1,4 @@
+(executable
+ (name bench_hashcons)
+ (libraries logtk mtime.clock.os)
+ (flags :standard -w -32-50 -open Logtk_arith -open Logtk))

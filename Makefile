@@ -110,5 +110,8 @@ reindent: ocp-indent
 gallery.svg:
 	for i in gallery/*.dot ; do dot -Tsvg "$$i" > "gallery/`basename $${i} .dot`.svg" ; done
 
+test-hashcons-contention:
+	@timeout 120 dune exec --profile=release -- bench/bench_hashcons.exe
+
 .PHONY: doc push_doc dot package tags test-all
 
