@@ -60,7 +60,7 @@ type t = {
   ty: type_result;
   mutable id: int;
   props: int;
-  ho_weight: int lazy_t; (* TODO: change into a mutable option. *)
+  mutable ho_weight: int option;
 }
 
 (* head form *)
@@ -243,39 +243,43 @@ let open_fun ty =
   | AppBuiltin (Builtin.Arrow, ret :: args) -> args, ret
   | _ -> [], ty
 
-let ho_weight_ t t_ty =
-  (* TODO: reuse [t.ho_weight] if defined, except in App case *)
-  let rec aux t t_ty =
-    let init_w s_ty =
-      match s_ty with
-      | NoType -> 0
-      | HasType ty ->
-        (match view ty with
-        | AppBuiltin (Builtin.Arrow, l) -> List.length l - 1
-        | _ -> 0)
-    in
-    match t with
-    | Var _ | DB _ | Const _ -> init_w t_ty + 1
-    | Bind (Binder.Lambda, _, t') ->
-      let _, t' = open_bind Binder.Lambda t' in
-      init_w (ty t') + aux (view t') (ty t')
-    | Bind (_, _, t') -> aux (view t') (ty t')
-    | App (f, l) ->
-      if is_var f then
-        1
-      else
-        init_w t_ty + aux_l (aux (view f) (ty f)) l
-    | AppBuiltin (_, l) -> aux_l (init_w t_ty + 1) l
-  and aux_l acc = function
-    | [] -> acc
-    | x :: xs -> aux_l (acc + aux (view x) (ty x)) xs
+let rec ho_weight t =
+  match t.ho_weight with
+  | Some w -> w
+  | None ->
+    let w = ho_weight_uncached_ t.term t.ty in
+    t.ho_weight <- Some w;
+    w
+
+and ho_weight_uncached_ t t_ty : int =
+  let init_w s_ty =
+    match s_ty with
+    | NoType -> 0
+    | HasType ty ->
+      (match view ty with
+      | AppBuiltin (Builtin.Arrow, l) -> List.length l - 1
+      | _ -> 0)
   in
-  aux t t_ty
+  match t with
+  | Var _ | DB _ | Const _ -> init_w t_ty + 1
+  | Bind (Binder.Lambda, _, t') ->
+    let _, t' = open_bind Binder.Lambda t' in
+    init_w (ty t') + ho_weight t'
+  | Bind (_, _, t') -> ho_weight t'
+  | App (f, l) ->
+    if is_var f then
+      1
+    else
+      init_w t_ty + ho_weight_l_ (ho_weight f) l
+  | AppBuiltin (_, l) -> ho_weight_l_ (init_w t_ty + 1) l
 
-let[@inline] ho_weight t = Lazy.force t.ho_weight
+and ho_weight_l_ acc = function
+  | [] -> acc
+  | t :: ts ->
+    let acc = acc + ho_weight t in
+    ho_weight_l_ acc ts
 
-let make_ ~props ~ty term =
-  { term; ty; id = ~-1; props; ho_weight = lazy (ho_weight_ term ty) }
+let make_ ~props ~ty term = { term; ty; id = ~-1; props; ho_weight = None }
 
 let const ~ty s =
   let my_t =

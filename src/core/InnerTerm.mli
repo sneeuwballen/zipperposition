@@ -23,7 +23,7 @@ type t = private {
   ty: type_result;
   mutable id: int;
   props: int;
-  ho_weight: int lazy_t;
+  mutable ho_weight: int option;
 }
 (** Abstract type of term *)
 
