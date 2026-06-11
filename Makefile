@@ -2,13 +2,12 @@
 .NOTPARALLEL: all build check clean install test doc
 
 J?=3
-
-all: build test-cached
-
 DUNE_OPTS= -j $(J) --profile=release
 
 build:
 	@dune build @install $(DUNE_OPTS)
+
+all: build test-cached
 
 check:
 	@dune build @check $(DUNE_OPTS)
