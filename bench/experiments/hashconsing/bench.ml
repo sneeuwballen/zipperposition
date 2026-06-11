@@ -17,6 +17,10 @@ let impls : impl StringMap.t =
        (module struct
          include Term.Make (Hashcons_mutex.Make)
        end : Term.S)
+  |> add "hashtbl"
+       (module struct
+         include Term.Make (Hashcons_hashtbl.Make)
+       end : Term.S)
 
 let n_iters = ref 1
 let n_consts = ref 200
@@ -75,7 +79,8 @@ let run () =
     | Some m -> m
     | None ->
       Printf.eprintf
-        "Unknown implementation '%s'. Choose: old, spinlock, mutex\n" !impl_key;
+        "Unknown implementation '%s'. Choose: old, spinlock, mutex, hashtbl\n"
+        !impl_key;
       exit 1
   in
   let (module M : Term.S) = impl in
@@ -84,6 +89,6 @@ let run () =
 
 let () =
   Arg.parse spec anon_fun
-    "Usage: bench.exe [old|spinlock|mutex] [options]\nOptions:";
+    "Usage: bench.exe [old|spinlock|mutex|hashtbl] [options]\nOptions:";
   Printexc.record_backtrace true;
   run ()

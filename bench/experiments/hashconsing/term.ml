@@ -9,12 +9,18 @@ end
 module Make (HC : Hashcons_type.Make) : S = struct
   type t = {
     mutable id: int;
+    hash: int;
     view: view;
   }
 
   and view =
     | Const of string
     | App of t * t list
+
+  let hash_id t = int t.id
+
+  let hash_const_ s = combine2 4 (string s)
+  let hash_app_ f l = combine3 10 (hash_id f) (list hash_id l)
 
   module HCArg = struct
     type nonrec t = t
@@ -28,12 +34,7 @@ module Make (HC : Hashcons_type.Make) : S = struct
         && List.for_all2 ( == ) l1 l2
       | _ -> false
 
-    let hash_sub t = int t.id
-
-    let hash (a : t) =
-      match a.view with
-      | Const s -> combine2 4 (string s)
-      | App (f, l) -> combine3 10 (hash_sub f) (list hash_sub l)
+    let hash (a : t) = a.hash
 
     let tag i (t' : t) = t'.id <- i
     let n_shards_log2 = 5
@@ -46,7 +47,13 @@ module Make (HC : Hashcons_type.Make) : S = struct
     (* H.hashcons returns H.elt but H.elt = t by sharing constraint *)
     H.hashcons x
 
-  let const s = ext_hashcons { id = ~-1; view = Const s }
-  let app f l = ext_hashcons { id = ~-1; view = App (f, l) }
+  let const s =
+    let h = hash_const_ s in
+    ext_hashcons { id = ~-1; hash = h; view = Const s }
+
+  let app f l =
+    let h = hash_app_ f l in
+    ext_hashcons { id = ~-1; hash = h; view = App (f, l) }
+
   let compare a b = Stdlib.compare a.id b.id
 end

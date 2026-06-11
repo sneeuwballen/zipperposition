@@ -6,6 +6,7 @@
   hashcons_old
   hashcons_spinlock
   hashcons_mutex
+  hashcons_hashtbl
   term)
  (libraries logtk mtime.clock.os)
  (flags :standard -w -32-50 -open Logtk_hash))

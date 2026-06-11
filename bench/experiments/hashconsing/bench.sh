@@ -24,7 +24,7 @@ echo "  warmup=$WARMUP  min-runs=$MIN_RUNS"
 echo ""
 
 echo "=== Running hyperfine ==="
-exec hyperfine \
+hyperfine \
   --warmup "$WARMUP" \
   --min-runs "$MIN_RUNS" \
   --export-json "$SCRIPT_DIR/results.json" \
@@ -35,4 +35,9 @@ exec hyperfine \
   -n "spinlock" \
   "$BENCH spinlock --iters $ITERS --consts $CONSTS --depth $DEPTH" \
   -n "mutex" \
-  "$BENCH mutex --iters $ITERS --consts $CONSTS --depth $DEPTH"
+  "$BENCH mutex --iters $ITERS --consts $CONSTS --depth $DEPTH" \
+  -n "hashtbl" \
+  "$BENCH hashtbl --iters $ITERS --consts $CONSTS --depth $DEPTH"
+
+echo ""
+echo "=== Results saved to results.json and results.md ==="
