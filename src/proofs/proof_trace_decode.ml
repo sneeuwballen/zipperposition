@@ -4,6 +4,9 @@
 
 open Logtk
 module D = Zipperposition_mdag.Decode
+
+let section = Util.Section.make "proof_trace_decode"
+
 module Int_tbl = CCHashtbl.Make (CCInt)
 
 type t = {
@@ -16,6 +19,7 @@ type t = {
   mutable proof_cache: Proof.t Int_tbl.t;
   mutable clause_cache: Literal.t array Int_tbl.t;
   mutable subst_cache: Subst.Projection.t Int_tbl.t;
+  mutable hvar_cache: (int * Type.t, Term.var) Hashtbl.t;
 }
 
 type cursor = {
@@ -196,6 +200,166 @@ let clause_to_form (lits : Literal.t array) : Term.t =
 let term_to_form (ctx : Term.Conv.ctx) (t : Term.t) : Proof.form =
   Term.Conv.to_simple_term ~allow_free_db:true ctx t
 
+type Proof.result_view += Decoded_form_view of Proof.form
+
+(* Canonical variable cache: two Var.t with same name+type become the same object *)
+module Var_norm = struct
+  module Tbl = CCHashtbl.Make (struct
+    type t = string * string
+
+    let equal (a, b) (c, d) = String.equal a c && String.equal b d
+    let hash (a, b) = Hashtbl.hash (a, b)
+  end)
+
+  let tbl : TypedSTerm.t Var.t Tbl.t = Tbl.create 256
+  let clear () = Tbl.clear tbl
+
+  let canon_var (v : TypedSTerm.t Var.t) : TypedSTerm.t Var.t =
+    let key = Var.name v, TypedSTerm.to_string (Var.ty v) in
+    match Tbl.find tbl key with
+    | v' -> v'
+    | exception Not_found ->
+      Tbl.add tbl key v;
+      v
+
+  let rename_forall (f : TypedSTerm.t) : TypedSTerm.t =
+    let rec collect acc f =
+      match TypedSTerm.view f with
+      | Bind (Binder.Forall, v, body) -> collect (v :: acc) body
+      | _ -> List.rev acc, f
+    in
+    let vars, body = collect [] f in
+    if vars = [] then
+      f
+    else (
+      let body_ty = TypedSTerm.ty_exn f in
+      let type_vars, term_vars =
+        List.partition (fun v -> TypedSTerm.Ty.is_tType (Var.ty v)) vars
+      in
+      let rename_group prefix vars =
+        List.mapi
+          (fun i old_v ->
+            let new_v =
+              canon_var
+                (Var.of_string ~ty:(Var.ty old_v)
+                   (Printf.sprintf "%s%d" prefix i))
+            in
+            old_v, new_v)
+          vars
+      in
+      let renamed = rename_group "A" type_vars @ rename_group "X" term_vars in
+      let subst =
+        List.fold_left
+          (fun s (old_v, new_v) -> Var.Subst.add s old_v (TypedSTerm.var new_v))
+          Var.Subst.empty renamed
+      in
+      let body = TypedSTerm.Subst.eval subst body in
+      let ordered_vars = List.map snd renamed in
+      TypedSTerm.bind_list ~ty:body_ty Binder.Forall ordered_vars body
+    )
+
+  let normalize_forall (f : TypedSTerm.t) : TypedSTerm.t =
+    let rec collect acc f =
+      match TypedSTerm.view f with
+      | Bind (Binder.Forall, v, body) -> collect (v :: acc) body
+      | _ -> List.rev acc, f
+    in
+    let vars, body = collect [] f in
+    if vars = [] then
+      f
+    else (
+      let body_ty = TypedSTerm.ty_exn f in
+      let vars' = List.map canon_var vars in
+      let subst =
+        List.fold_left2
+          (fun s old_v new_v ->
+            if Var.equal old_v new_v then
+              s
+            else
+              Var.Subst.add s old_v (TypedSTerm.var new_v))
+          Var.Subst.empty vars vars'
+      in
+      let body = TypedSTerm.Subst.eval subst body in
+      TypedSTerm.bind_list ~ty:body_ty Binder.Forall vars' body
+    )
+end
+
+let decoder_ctx_ref : Term.Conv.ctx option ref = ref None
+
+let decoded_form_tc : Proof.form Proof.Result.tc =
+  Proof.Result.make_tc
+    ~of_exn:(function
+      | Decoded_form_view f -> Some f
+      | _ -> None)
+    ~to_exn:(fun f -> Decoded_form_view f)
+    ~compare:(fun a b -> TypedSTerm.compare a b)
+    ~to_form:(fun ~ctx:_ t -> t)
+    ~to_form_subst:(fun ~ctx:conv_ctx subst f ->
+      let bindings = ref [] in
+      Subst.FO.iter
+        (fun v_sc t_sc ->
+          bindings := (Scoped.get v_sc, Scoped.get t_sc) :: !bindings)
+        (Subst.Projection.subst subst);
+      if !bindings = [] then
+        f, Var.Subst.empty
+      else (
+        let ctx =
+          match !decoder_ctx_ref with
+          | Some c -> c
+          | None -> Term.Conv.create ()
+        in
+        let vars, body = TypedSTerm.unfold_binder Binder.Forall f in
+        let name_to_var = Hashtbl.create 16 in
+        List.iter (fun v -> Hashtbl.replace name_to_var (Var.name v) v) vars;
+        let var_subst_ref = ref Var.Subst.empty in
+        !bindings
+        |> List.iter (fun (hv, rhs) ->
+               let hv_name =
+                 CCFormat.sprintf "%s%d"
+                   (if Type.is_tType (HVar.ty hv) then
+                      "A"
+                    else
+                      "X")
+                   (HVar.id hv)
+               in
+               let svar =
+                 match Hashtbl.find name_to_var hv_name with
+                 | v -> v
+                 | exception Not_found -> Term.Conv.var_to_simple_var ctx hv
+               in
+               let srhs = Term.Conv.to_simple_term ctx rhs in
+               let is_identity =
+                 match TypedSTerm.view srhs with
+                 | TypedSTerm.Var v' -> Var.equal v' svar
+                 | _ -> false
+               in
+               if not is_identity then
+                 var_subst_ref := Var.Subst.add !var_subst_ref svar srhs);
+        let inst_subst =
+          List.filter_map
+            (fun v ->
+              match Var.Subst.find !var_subst_ref v with
+              | Some t -> Some (v, t)
+              | None -> None)
+            vars
+          |> Var.Subst.of_list
+        in
+        let instantiated_form =
+          TypedSTerm.Subst.eval_nonrec !var_subst_ref body
+        in
+        let instantiated_form =
+          TypedSTerm.close_all ~ty:TypedSTerm.prop Binder.Forall
+            instantiated_form
+        in
+        instantiated_form, inst_subst
+      ))
+    ~pp_in:(fun _ out f -> TypedSTerm.pp_inner out f)
+    ()
+
+let decoded_form_of_form (f : Proof.form) : Proof.Result.t =
+  Proof.Result.make decoded_form_tc f
+
+(* Canonical variable cache: two Var.t with same name+type become the same object *)
 let builtin_result_ty (b : Builtin.t) : Type.t =
   match Builtin.ty b with
   | `Int -> Type.int
@@ -227,7 +391,21 @@ and decode_term_node (st : t) (c : cursor) (cmd : string) (off : D.offset) :
     let id = read_int c in
     let ty_ref = read_ref c in
     let ty = ty_of_term (decode_term st ty_ref) in
-    Term.var_of_int ~ty id
+    let hvar =
+      let key = id, ty in
+      match Hashtbl.find st.hvar_cache key with
+      | v -> v
+      | exception Not_found ->
+        let t = Term.var_of_int ~ty id in
+        let v =
+          match Term.view t with
+          | Term.Var v -> v
+          | _ -> assert false
+        in
+        Hashtbl.add st.hvar_cache key v;
+        v
+    in
+    Term.var hvar
   | "t.d" ->
     let i = read_int c in
     let ty_ref = read_ref c in
@@ -334,7 +512,13 @@ and decode_subst (st : t) (off : D.offset) : Subst.Projection.t =
         | _ -> raise (D.Fail ("expected variable in substitution", off))
       in
       let rhs = decode_term st term_ref in
-      bindings := (Scoped.make v scope, Scoped.make rhs scope) :: !bindings
+      let is_identity =
+        match Term.view rhs with
+        | Term.Var v2 -> HVar.equal Type.equal v v2
+        | _ -> false
+      in
+      if not is_identity then
+        bindings := (Scoped.make v scope, Scoped.make rhs scope) :: !bindings
     done;
     let fo_subst = Subst.FO.of_list' (List.rev !bindings) in
     let proj =
@@ -354,13 +538,16 @@ and decode_proof_at (st : t) (off : D.offset) : Proof.t =
     let clause_lits = decode_clause st clause_off in
     let clause_term = clause_to_form clause_lits in
     let form = term_to_form st.conv_ctx clause_term in
-    let result = Proof.Result.of_form form in
+    let form = TypedSTerm.close_all ~ty:TypedSTerm.prop Binder.Forall form in
+    let form = Var_norm.normalize_forall form in
+    let result = decoded_form_of_form form in
     let p = Proof.S.mk step result in
     Int_tbl.add st.proof_cache off p;
     p
 
 and decode_step_node (st : t) (c : cursor) (cmd : string) (off : D.offset) :
     Proof.Step.t * D.offset =
+  Util.debugf ~section 3 "decode_step_node off=%d cmd=%s" (fun k -> k off cmd);
   match cmd with
   | "s.i" ->
     let role_str = read_string c in
@@ -419,9 +606,10 @@ and read_parent (st : t) (c : cursor) : Proof.Parent.t option =
         else
           -1
       in
-      if s_off >= 0 then
-        Some (Proof.Parent.from_subst_proj p (decode_subst st s_off))
-      else
+      if s_off >= 0 then (
+        let subst = decode_subst st s_off in
+        Some (Proof.Parent.from_subst_proj p subst)
+      ) else
         Some (Proof.Parent.from p)
     | D.Null ->
       c.pos <- c.pos + 1;
@@ -464,11 +652,13 @@ and read_parents_and_tags (st : t) (c : cursor) :
 
 and read_parents_no_tags (st : t) (c : cursor) : Proof.Parent.t list =
   let parents = read_parents st c in
+  let _ : unit =
+    if c.pos < Array.length c.args && c.args.(c.pos) = D.String "|" then
+      c.pos <- c.pos + 1
+  in
   if c.pos < Array.length c.args then
     raise (D.Fail ("unexpected trailing data after parents", 0));
   parents
-
-(* ── footer helpers ── *)
 
 type footer_val =
   [ `Str of string
@@ -477,7 +667,8 @@ type footer_val =
 
 let read_footer (st : t) (footer_off : D.offset) : (string * footer_val) list =
   let cmd = cmd_of_offset st footer_off in
-  if cmd <> "footer" then raise (D.Fail ("expected footer node", footer_off));
+  if cmd <> "zip.footer" then
+    raise (D.Fail ("expected zip.footer node", footer_off));
   let fc = cursor_of_offset st footer_off in
   let rec loop acc =
     if fc.pos >= Array.length fc.args then
@@ -503,27 +694,28 @@ let read_footer (st : t) (footer_off : D.offset) : (string * footer_val) list =
 
 let find_footer_offset (st : t) : D.offset =
   let raw = D.raw_string st.data in
-  if st.total_len < 6 then
-    raise (D.Fail ("file too small for footer-offset", 0));
+  if st.total_len < 6 then raise (D.Fail ("file too small for mdag.end", 0));
   let u32_bytes = Bytes.of_string (String.sub raw (st.total_len - 5) 4) in
   Int32.to_int (Bytes.get_int32_le u32_bytes 0)
 
-(* ── main API ── *)
-
 let create (s : string) : t =
+  let conv_ctx = Term.Conv.create () in
+  decoder_ctx_ref := Some conv_ctx;
   {
     data = D.create s;
     total_len = String.length s;
-    conv_ctx = Term.Conv.create ();
+    conv_ctx;
     node_cache = Int_tbl.create 256;
     term_cache = Int_tbl.create 256;
     name_cache = Int_tbl.create 64;
     proof_cache = Int_tbl.create 64;
     clause_cache = Int_tbl.create 64;
     subst_cache = Int_tbl.create 64;
+    hvar_cache = Hashtbl.create 256;
   }
 
 let decode_proof (st : t) : Proof.t * (string * string) list =
+  Var_norm.clear ();
   let footer_off = find_footer_offset st in
   if footer_off >= st.total_len then
     raise (D.Fail ("invalid footer offset", footer_off));
@@ -537,7 +729,7 @@ let decode_proof (st : t) : Proof.t * (string * string) list =
         footer_kv
     with
     | Some off -> off
-    | None -> raise (D.Fail ("footer missing result-offset", footer_off))
+    | None -> raise (D.Fail ("zip.footer missing result-offset", footer_off))
   in
   let cmd = cmd_of_offset st result_off in
   let proof =

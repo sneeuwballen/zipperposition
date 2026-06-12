@@ -634,15 +634,23 @@ let check res =
       (match params.Params.proof_trace with
       | None -> ()
       | Some file ->
+        let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "proof.mdag-trace" in
         Util.debugf ~section 2 "write proof trace to `%s`" (fun k -> k file);
         let enc = Proof_trace.create (open_out_bin file) in
-        ignore
-          (Proof_trace.emit_proof enc
-             ~get_lits:(fun p ->
-               match Proof.Result.view (Proof.S.result p) with
-               | SClause.SClause_view c -> SClause.lits c
-               | _ -> [||])
-             p);
+        let off, stats =
+          Proof_trace.emit_proof enc
+            ~get_lits:(fun p ->
+              match Proof.Result.view (Proof.S.result p) with
+              | SClause.SClause_view c -> SClause.lits c
+              | _ -> [||])
+            p
+        in
+        Trace.add_data_to_span _sp
+          [
+            "offset", `Int (off :> int);
+            "n-terms", `Int stats.n_terms;
+            "steps", `Int stats.n_steps;
+          ];
         Proof_trace.close enc);
       errcode
     | _ -> 0

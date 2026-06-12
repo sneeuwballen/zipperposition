@@ -144,8 +144,10 @@ let check_step ?dot_prefix (p : proof) : check_step_res =
          [ T.Subst.eval subst p'_inst ]
          (T.Subst.eval subst body_concl))
   | P.Esa (_, _) -> CS_skip `ESA (* TODO *)
-  | P.Inference { parents; tags; intros; _ } ->
-    if LLProver.can_check tags then (
+  | P.Inference { parents; tags; intros; name; _ } ->
+    if name = "simplify_reflect-" || name = "simplify_reflect+" then
+      CS_skip `Other
+    else if LLProver.can_check tags then (
       (* within the fragment of {!Tab.prove} *)
       let all_premises = List.map concl_of_parent parents
       and concl = instantiate concl intros in

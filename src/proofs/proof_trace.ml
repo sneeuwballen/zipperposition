@@ -11,22 +11,14 @@ external term_of_type : Type.t -> Term.t = "%identity"
 
 module Term_cache = Ephemeron.K1.Make (Term)
 module Name_cache = Ephemeron.K1.Make (Name)
-
-module Lit_tbl = CCHashtbl.Make (struct
-  type t = Literal.t
-
-  let equal = Literal.equal
-  let hash = Literal.hash
-end)
-
+module Lit_tbl = CCHashtbl.Make (Literal)
 module Int_tbl = CCHashtbl.Make (CCInt)
+module Type_cache = CCHashtbl.Make (Type)
 
-module Type_cache = CCHashtbl.Make (struct
-  type t = Type.t
-
-  let equal = Type.equal
-  let hash = Type.hash
-end)
+type stats = {
+  n_steps: int;
+  n_terms: int;
+}
 
 type t = {
   enc: E.t;
@@ -35,6 +27,8 @@ type t = {
   tbl_name: offset Name_cache.t;
   tbl_lit: offset Lit_tbl.t;
   tbl_type: offset Type_cache.t;
+  mutable n_steps: int;
+  mutable n_terms: int;
 }
 
 let create oc : t =
@@ -50,6 +44,8 @@ let create oc : t =
     tbl_name = Name_cache.create 256;
     tbl_lit = Lit_tbl.create 256;
     tbl_type = Type_cache.create 64;
+    n_steps = 0;
+    n_terms = 0;
   }
 
 let close self =
@@ -97,6 +93,7 @@ and emit_term self (t : Term.t) : offset =
   | Some off -> off
   | None ->
     let off = emit_term_noncached self t in
+    self.n_terms <- 1 + self.n_terms;
     Term_cache.add self.tbl_term t off;
     off
 
@@ -167,14 +164,47 @@ let emit_clause self (lits : Literal.t array) =
 
 (** {2 Substitutions} *)
 
-let emit_subst self (subst : Subst.Projection.t) : offset =
+external term_var_to_subst_var : Term.var -> Subst.var = "%identity"
+external fo_term_to_subst_term : Subst.FO.term -> Subst.term = "%identity"
+
+let emit_subst self (subst : Subst.Projection.t) (parent_vars : Term.var list) :
+    offset =
+  let full_bindings =
+    let existing_bindings = Subst.Projection.bindings subst in
+    let bound_vars = List.map fst existing_bindings in
+    let extra_bindings =
+      List.filter_map
+        (fun (v : Term.var) ->
+          let v' = term_var_to_subst_var v in
+          if List.mem v' bound_vars then
+            None
+          else (
+            let ty = HVar.ty v in
+            let t =
+              Subst.FO.apply
+                (Subst.Projection.renaming subst)
+                (Subst.Projection.subst subst)
+                (Term.var_of_int ~ty (HVar.id v), Subst.Projection.scope subst)
+            in
+            match Term.view t with
+            | Term.Var v2 ->
+              if HVar.id v = HVar.id v2 then
+                None
+              else
+                Some (v', fo_term_to_subst_term t)
+            | _ -> Some (v', fo_term_to_subst_term t)
+          ))
+        parent_vars
+    in
+    existing_bindings @ extra_bindings
+  in
   E.write_node self.enc "s" (fun enc ->
       List.iter
         (fun (v, t) ->
           let ty = Type.of_term_unsafe (HVar.ty v) in
           E.ref enc (emit_term self (Term.var_of_int ~ty (HVar.id v)));
           E.ref enc (emit_term self (Term.of_term_unsafe t)))
-        (Subst.Projection.bindings subst))
+        full_bindings)
 
 (** {2 Proof steps} *)
 
@@ -217,6 +247,7 @@ let emit_rule_with_tags self cmd rule clause_off parents tags =
       List.iter (fun t -> E.int enc (tag_to_int t)) tags)
 
 let emit_step self ~clause_off ~parents (step : Proof.Step.t) : offset =
+  self.n_steps <- 1 + self.n_steps;
   match Proof.Step.kind step with
   | Proof.Intro (_, role) ->
     E.write_node self.enc "s.i" (fun enc ->
@@ -324,7 +355,7 @@ let rec collect (seen : unit Int_tbl.t) acc (p : Proof.t) =
     acc := p :: !acc
   )
 
-let emit_proof self ~get_lits (root : Proof.t) : offset =
+let emit_proof self ~get_lits (root : Proof.t) : offset * stats =
   let seen = Int_tbl.create 64 in
   let steps = ref [] in
   collect seen steps root;
@@ -361,7 +392,16 @@ let emit_proof self ~get_lits (root : Proof.t) : offset =
             let s_off =
               match Proof.Parent.subst parent with
               | None -> None
-              | Some s -> Some (emit_subst self s)
+              | Some s ->
+                let parent_lits = get_lits parent_proof in
+                let parent_vars =
+                  Array.fold_left
+                    (fun acc lit ->
+                      Term.VarSet.union acc (Term.vars (Literal.to_ho_term lit)))
+                    Term.VarSet.empty parent_lits
+                  |> Term.VarSet.to_list
+                in
+                Some (emit_subst self s parent_vars)
             in
             p_off, s_off)
           (Proof.Step.parents step)
@@ -373,7 +413,7 @@ let emit_proof self ~get_lits (root : Proof.t) : offset =
     E.write_node self.enc "result.unsat" (fun enc -> E.ref enc root_off)
   in
   let footer_off =
-    E.write_node self.enc "footer" (fun enc ->
+    E.write_node self.enc "zip.footer" (fun enc ->
         E.string enc "result";
         E.string enc "unsat";
         E.string enc "result-offset";
@@ -384,8 +424,9 @@ let emit_proof self ~get_lits (root : Proof.t) : offset =
   let u32_bytes = Bytes.create 4 in
   Bytes.set_int32_le u32_bytes 0 (Int32.of_int (footer_off :> int));
   let _ : offset =
-    E.write_node self.enc "footer-offset" (fun enc ->
+    E.write_node self.enc "mdag.end" (fun enc ->
         E.blob enc (Bytes.to_string u32_bytes))
   in
   E.flush self.enc;
-  result_off
+  let stats = { n_steps = self.n_steps; n_terms = self.n_terms } in
+  result_off, stats

@@ -9,10 +9,15 @@ type t
 val create : out_channel -> t
 val close : t -> unit
 
+type stats = {
+  n_steps: int;
+  n_terms: int;
+}
+
 val emit_proof :
   t ->
   get_lits:(Proof.t -> Literal.t array) ->
   Proof.t ->
-  Zipperposition_mdag.Encode.offset
+  Zipperposition_mdag.Encode.offset * stats
 (** Encode a proof DAG and write footer. [get_lits] extracts clause literals
     from a proof. *)

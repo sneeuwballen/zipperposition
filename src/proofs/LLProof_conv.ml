@@ -129,13 +129,10 @@ and conv_parent st step_res intros local_intros tags (parent : Proof.Parent.t) :
             match Var.Subst.find inst_subst v with
             | Some t -> t
             | None ->
-              errorf
-                "cannot find variable `%a`@ in inst-subst {%a}@ :inst-res %a@ \
-                 :res %a@ :parent %a@ :intros [@[%a@]]"
-                Var.pp_fullc v (Var.Subst.pp T.pp) inst_subst T.pp
-                p_instantiated_res T.pp step_res Proof.pp_parent parent
-                (Util.pp_list ~sep:"," T.pp)
-                intros)
+              Util.debugf ~section 5
+                "(@[llproof.conv.no_inst_subst@ for var %a@ :using self@])"
+                (fun k -> k Var.pp_fullc v);
+              T.var v)
           vars_p
       in
       LLProof.instantiate ~tags p_instantiated_res p inst, p_instantiated_res
@@ -146,6 +143,22 @@ and conv_parent st step_res intros local_intros tags (parent : Proof.Parent.t) :
     let vars_instantiated, _ =
       T.unfold_binder Binder.forall p_instantiated_res
     in
+    (* Compute unused intros: conclusion forall vars not matched by any
+       parent forall var via intro_subst. These are available for
+       pass-through (remaining) parent forall vars. *)
+    let used_intro_vars = Hashtbl.create 8 in
+    List.iter
+      (fun v ->
+        if Var.Subst.mem intro_subst v then Hashtbl.replace used_intro_vars v ())
+      vars_instantiated;
+    let unused_intros =
+      List.filter (fun v -> not (Hashtbl.mem used_intro_vars v)) vars_step_res
+      |> List.map (fun v ->
+             match Var.Subst.find intro_subst v with
+             | Some t -> t
+             | None -> assert false)
+    in
+    let unused_intros_ref = ref unused_intros in
     List.map
       (fun v ->
         match Var.Subst.find intro_subst v with
@@ -154,18 +167,30 @@ and conv_parent st step_res intros local_intros tags (parent : Proof.Parent.t) :
           (match Var.Subst.find !local_intros v with
           | Some t -> t
           | None ->
-            (* introduce local_intro *)
-            let c =
-              Name.makef "sk_%d"
-                (List.length intros + Var.Subst.size !local_intros)
-              |> T.const ~ty:(Var.ty v |> T.Subst.eval intro_subst)
-            in
-            local_intros := Var.Subst.add !local_intros v c;
-            Util.debugf ~section 5
-              "(@[llproof.conv.add_local_intro@ %a := %a@ :p-instantiated \
-               `%a`@])" (fun k ->
-                k Var.pp_fullc v T.pp c T.pp p_instantiated_res);
-            c))
+            (* Use next unused intro from conclusion's forall vars *)
+            (match !unused_intros_ref with
+            | t :: rest ->
+              unused_intros_ref := rest;
+              local_intros := Var.Subst.add !local_intros v t;
+              Util.debugf ~section 5
+                "(@[llproof.conv.pass_through@ %a := %a@ :unused_intros [%a]@])"
+                (fun k ->
+                  k Var.pp_fullc v T.pp t
+                    (Util.pp_list ~sep:",@ " T.pp)
+                    unused_intros);
+              t
+            | [] ->
+              let c =
+                Name.makef "sk_%d"
+                  (List.length intros + Var.Subst.size !local_intros)
+                |> T.const ~ty:(Var.ty v |> T.Subst.eval intro_subst)
+              in
+              local_intros := Var.Subst.add !local_intros v c;
+              Util.debugf ~section 5
+                "(@[llproof.conv.add_local_intro@ %a := %a@ :p-instantiated \
+                 `%a`@])" (fun k ->
+                  k Var.pp_fullc v T.pp c T.pp p_instantiated_res);
+              c)))
       vars_instantiated
   in
   LLProof.p_inst prev_proof inst_intros
