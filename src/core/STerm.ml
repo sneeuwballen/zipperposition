@@ -479,28 +479,28 @@ module TPTP = struct
     | Var v -> pp_var out v
     | Const s -> pp_id out s
     | List l -> Format.fprintf out "[@[<hv>%a@]]" (Util.pp_list ~sep:"," pp) l
-    | AppBuiltin (_b_and, l) ->
+    | AppBuiltin (_b_and, l) when Builtin.equal _b_and Builtin.and_ ->
       if CCList.is_empty l then
         Format.fprintf out "%s" "(&)"
       else if CCList.length l = 1 then
         Format.fprintf out "(& %a)" pp_surrounded (List.hd l)
       else
         Util.pp_list ~sep:" & " pp_surrounded out l
-    | AppBuiltin (_b_or, l) ->
+    | AppBuiltin (_b_or, l) when Builtin.equal _b_or Builtin.or_ ->
       if CCList.is_empty l then
         Format.fprintf out "%s" "(|)"
       else if CCList.length l = 1 then
         Format.fprintf out "(| %a)" pp_surrounded (List.hd l)
       else
         Util.pp_list ~sep:" | " pp_surrounded out l
-    | AppBuiltin (_b_not, [ a ]) ->
+    | AppBuiltin (_b_not, [ a ]) when Builtin.equal _b_not Builtin.not_ ->
       Format.fprintf out "@[<1>~@,@[%a@]@]" pp_surrounded a
     | AppBuiltin (_b_imply, [ a; b_imply ])
       when Builtin.equal _b_imply Builtin.imply ->
       Format.fprintf out "@[%a =>@ %a@]" pp_surrounded a pp_surrounded b_imply
     | AppBuiltin (_b_xor, [ a; b ]) when Builtin.equal _b_xor Builtin.xor ->
       Format.fprintf out "@[%a <~>@ %a@]" pp_surrounded a pp_surrounded b
-    | AppBuiltin (_b_equiv, [ a; b ]) ->
+    | AppBuiltin (_b_equiv, [ a; b ]) when Builtin.equal _b_equiv Builtin.equiv ->
       Format.fprintf out "@[%a <=>@ %a@]" pp_surrounded a pp_surrounded b
     | AppBuiltin (_b_eq, ([ _; a; b_eq ] | [ a; b_eq ]))
       when Builtin.equal _b_eq Builtin.eq ->
@@ -577,7 +577,7 @@ module TPTP_THF = struct
     | AppBuiltin (_b_xor2, [ a; b ]) when Builtin.equal _b_xor2 Builtin.xor ->
       Format.fprintf out "@[%a <~>@ %a@]" pp_force_surrounded a
         pp_force_surrounded b
-    | AppBuiltin (_b_equiv, [ a; b ]) ->
+    | AppBuiltin (_b_equiv, [ a; b ]) when Builtin.equal _b_equiv Builtin.equiv ->
       Format.fprintf out "@[%a <=>@ %a@]" pp_force_surrounded a
         pp_force_surrounded b
     | AppBuiltin (_b_eq, ([ _; a; b_eq ] | [ a; b_eq ]))
@@ -653,9 +653,9 @@ module ZF = struct
       CCFormat.string out "type"
     | AppBuiltin (_b_tyint2, _) when Builtin.equal _b_tyint2 Builtin.ty_int ->
       CCFormat.string out "int"
-    | AppBuiltin (_b_and, l) ->
+    | AppBuiltin (_b_and, l) when Builtin.equal _b_and Builtin.and_ ->
       Format.fprintf out "@[<hv>%a@]" (Util.pp_list ~sep:" && " pp_surrounded) l
-    | AppBuiltin (_b_or, l) ->
+    | AppBuiltin (_b_or, l) when Builtin.equal _b_or Builtin.or_ ->
       Format.fprintf out "@[<hv>%a@]" (Util.pp_list ~sep:" || " pp_surrounded) l
     | AppBuiltin (_b_not4, [ a ]) when Builtin.equal _b_not4 Builtin.not_ ->
       Format.fprintf out "@[<2>~@ @[%a@]@]" pp_surrounded a
@@ -666,12 +666,12 @@ module ZF = struct
     | AppBuiltin (_b_xor2, [ a; b ]) when Builtin.equal _b_xor2 Builtin.xor ->
       Format.fprintf out "@[<3>~ (@[%a@]@ <=> @[%a@])@]" pp_surrounded a
         pp_surrounded b
-    | AppBuiltin (_b_equiv, [ a; b ]) ->
+    | AppBuiltin (_b_equiv, [ a; b ]) when Builtin.equal _b_equiv Builtin.equiv ->
       Format.fprintf out "@[@[%a@]@ <=> @[%a@]@]" pp_surrounded a pp_surrounded
         b
-    | AppBuiltin (_b_eq, [ _; a; b ]) ->
+    | AppBuiltin (_b_eq, [ _; a; b ]) when Builtin.equal _b_eq Builtin.eq ->
       Format.fprintf out "@[@[%a@]@ = @[%a@]@]" pp_surrounded a pp_surrounded b
-    | AppBuiltin (_b_neq, [ _; a; b ]) ->
+    | AppBuiltin (_b_neq, [ _; a; b ]) when Builtin.equal _b_neq Builtin.neq ->
       Format.fprintf out "@[@[%a@]@ != @[%a@]@]" pp_surrounded a pp_surrounded b
     | AppBuiltin (b, [ ret; a ]) ->
       Format.fprintf out "@[@[%a@] ->@ @[%a@]@]" pp a pp ret
