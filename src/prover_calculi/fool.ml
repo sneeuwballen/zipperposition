@@ -78,7 +78,10 @@ module Make (E : Env.S) : S with module Env = E = struct
              &&
              match T.view t with
              | T.Const _ | T.App _ -> true
-             | T.AppBuiltin ((Builtin.True | Builtin.False), _) -> false
+             | T.AppBuiltin (b, _)
+               when Builtin.equal b Builtin.true_
+                    || Builtin.equal b Builtin.false_ ->
+               false
              | T.AppBuiltin (_, _) -> true
              | T.Var _ | T.DB _ -> false
              | T.Fun _ -> assert false (* by typing *))
@@ -182,18 +185,29 @@ module Make (E : Env.S) : S with module Env = E = struct
              (* see if there is some CNF to do here *)
              let sign = T.equal rhs T.true_ in
              (match T.view lhs, sign with
-             | T.AppBuiltin (Builtin.And, l), true
-             | T.AppBuiltin (Builtin.Or, l), false ->
+             | T.AppBuiltin (_b_and, l), true
+               when Builtin.equal _b_and Builtin.and_ ->
                let lits = CCArray.except_idx (C.lits c) i in
                l
                |> List.map (fun t -> Literal.mk_prop t sign :: lits |> mk_c)
                |> CCOpt.return
-             | T.AppBuiltin (Builtin.Or, l), true
-             | T.AppBuiltin (Builtin.And, l), false ->
+             | T.AppBuiltin (_b_or, l), false
+               when Builtin.equal _b_or Builtin.or_ ->
+               let lits = CCArray.except_idx (C.lits c) i in
+               l
+               |> List.map (fun t -> Literal.mk_prop t sign :: lits |> mk_c)
+               |> CCOpt.return
+             | T.AppBuiltin (_b_or, l), true
+               when Builtin.equal _b_or Builtin.or_ ->
                let lits = CCArray.except_idx (C.lits c) i in
                List.map (fun t -> Literal.mk_prop t sign) l @ lits
                |> mk_c |> CCList.return |> CCOpt.return
-             | T.AppBuiltin (Builtin.Eq, [ _; t; u ]), _ ->
+             | T.AppBuiltin (_b_and, l), false
+               when Builtin.equal _b_and Builtin.and_ ->
+               let lits = CCArray.except_idx (C.lits c) i in
+               List.map (fun t -> Literal.mk_prop t sign) l @ lits
+               |> mk_c |> CCList.return |> CCOpt.return
+             | T.AppBuiltin (_b_eq, [ _; t; u ]), _ ->
                let lits = CCArray.except_idx (C.lits c) i in
                let lit = Literal.mk_lit t u sign in
                Some [ mk_c (lit :: lits) ]

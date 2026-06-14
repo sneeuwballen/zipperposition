@@ -250,13 +250,14 @@ let bool_encode_ty ty_orig =
   let rec aux ty =
     match T.view ty with
     | T.App (f, args) -> T.app ~ty:T.tType (aux f) (CCList.map aux args)
-    | T.AppBuiltin (Builtin.Arrow, ret :: args) ->
+    | T.AppBuiltin (_b_arrow, ret :: args)
+      when Builtin.equal _b_arrow Builtin.arrow ->
       let ret' = aux ret in
       let args' = List.map aux args in
       T.Ty.fun_ args' ret'
     | T.AppBuiltin (f, args) ->
-      assert (f != Builtin.Arrow);
-      if f == Builtin.Prop then
+      assert (f != Builtin.arrow);
+      if f == Builtin.prop then
         bool_clone_ty
       else
         T.app_builtin ~ty:T.tType f (List.map aux args)
@@ -292,9 +293,10 @@ let bool_encode_term t_orig =
           let f' = aux f in
           let args' = List.map aux args in
           T.app ~ty f' args'
-        | T.AppBuiltin (((And | Or) as b), ts) ->
+        | T.AppBuiltin (b, ts)
+          when Builtin.equal b Builtin.and_ || Builtin.equal b Builtin.or_ ->
           let head =
-            if b == And then
+            if Builtin.equal b Builtin.and_ then
               and_term
             else
               or_term
@@ -307,21 +309,26 @@ let bool_encode_term t_orig =
             List.fold_left
               (fun acc arg -> app_bool head [ acc; aux arg ])
               init tts)
-        | T.AppBuiltin (((Eq | Equiv | Neq | Xor) as b), [ x; y ])
-          when T.Ty.is_prop (T.ty_exn x) ->
+        | T.AppBuiltin (b, [ x; y ])
+          when (Builtin.equal b Builtin.eq
+               || Builtin.equal b Builtin.equiv
+               || Builtin.equal b Builtin.neq
+               || Builtin.equal b Builtin.xor)
+               && T.Ty.is_prop (T.ty_exn x) ->
           assert (T.equal (T.ty_exn x) (T.ty_exn y));
           let head =
-            if b = Equiv || b = Eq then
+            if Builtin.equal b Builtin.equiv || Builtin.equal b Builtin.eq then
               equiv_term
             else
               xor_term
           in
           let x = aux x and y = aux y in
           app_bool head [ x; y ]
-        | T.AppBuiltin (((Eq | Neq) as b), ([ x; y ] | [ _; x; y ])) ->
+        | T.AppBuiltin (b, ([ x; y ] | [ _; x; y ]))
+          when Builtin.equal b Builtin.eq || Builtin.equal b Builtin.neq ->
           assert (T.equal (T.ty_exn x) (T.ty_exn y));
           let head =
-            if b = Eq then
+            if Builtin.equal b Builtin.eq then
               eq_term
             else
               neq_term
@@ -329,26 +336,28 @@ let bool_encode_term t_orig =
           let x = aux x and y = aux y in
           let ty_arg = T.ty_exn x in
           app_bool head [ ty_arg; x; y ]
-        | T.AppBuiltin (Imply, [ x; y ]) ->
+        | T.AppBuiltin (b, [ x; y ]) when Builtin.equal b Builtin.imply ->
           assert (T.equal (T.ty_exn x) (T.ty_exn y));
           let x = aux x and y = aux y in
           app_bool impl_term [ x; y ]
-        | T.AppBuiltin (((ForallConst | ExistsConst) as b), ([ x ] | [ _; x ]))
-          ->
+        | T.AppBuiltin (b, ([ x ] | [ _; x ]))
+          when Builtin.equal b Builtin.forallConst
+               || Builtin.equal b Builtin.existsConst ->
           let x = aux x in
           let _, args, _ = T.Ty.unfold (T.ty_exn x) in
           assert (List.length args = 1);
           let ty_arg = List.hd args in
           let head =
-            if b = ForallConst then
+            if Builtin.equal b Builtin.forallConst then
               forall_term
             else
               exists_term
           in
           app_bool head [ ty_arg; x ]
-        | T.AppBuiltin (Not, l) -> app_bool not_term (List.map aux l)
-        | T.AppBuiltin (True, []) -> true_term
-        | T.AppBuiltin (False, []) -> false_term
+        | T.AppBuiltin (b, l) when Builtin.equal b Builtin.not_ ->
+          app_bool not_term (List.map aux l)
+        | T.AppBuiltin (b, []) when Builtin.equal b Builtin.true_ -> true_term
+        | T.AppBuiltin (b, []) when Builtin.equal b Builtin.false_ -> false_term
         | T.AppBuiltin (f, ts) ->
           assert (not (T.equal t T.Form.true_ || T.equal t T.Form.false_));
           T.app_builtin ~ty f (List.map aux ts)

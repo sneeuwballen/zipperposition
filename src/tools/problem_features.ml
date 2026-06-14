@@ -26,7 +26,7 @@ let rec is_unit form =
   match TypedSTerm.view form with
   | Bind ((Binder.Forall | Binder.Exists), _, body) -> is_unit body
   | AppBuiltin (hd, args) ->
-    (Builtin.equal hd Builtin.Eq || Builtin.equal hd Builtin.Neq)
+    (Builtin.equal hd Builtin.eq || Builtin.equal hd Builtin.neq)
     && (List.length args < 2
        || not (TypedSTerm.Ty.is_prop (TypedSTerm.ty_exn (List.hd args))))
   | _ -> true
@@ -170,7 +170,7 @@ let rec traverse_formula f =
   | Var _ | Meta _ | Const _ -> traverse_term f
   | AppBuiltin (b, l) ->
     if
-      (Builtin.equal b Builtin.Eq || Builtin.equal b Builtin.Neq)
+      (Builtin.equal b Builtin.eq || Builtin.equal b Builtin.neq)
       && List.length l == 3
       && not (T.Ty.is_prop (List.hd l))
     then (

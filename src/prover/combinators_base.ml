@@ -66,7 +66,7 @@ let mk_s ~args ~alpha ~beta ~gamma =
         Type.of_term_unsafe (gamma : Term.t :> InnerTerm.t);
       ]
   in
-  mk_comb Builtin.SComb ty [ alpha; beta; gamma ] args
+  mk_comb Builtin.sComb ty [ alpha; beta; gamma ] args
 
 (* make C combinator with the type:
   Παβγ. (α→β→γ) → β → α → γ *)
@@ -79,7 +79,7 @@ let mk_c ~args ~alpha ~beta ~gamma =
         Type.of_term_unsafe (gamma : Term.t :> InnerTerm.t);
       ]
   in
-  mk_comb Builtin.CComb ty [ alpha; beta; gamma ] args
+  mk_comb Builtin.cComb ty [ alpha; beta; gamma ] args
 
 (* make B combinator with the type:
   Παβγ. (α→β) → (γ→α) → γ → β *)
@@ -92,7 +92,7 @@ let mk_b ~args ~alpha ~beta ~gamma =
         Type.of_term_unsafe (gamma : Term.t :> InnerTerm.t);
       ]
   in
-  mk_comb Builtin.BComb ty [ alpha; beta; gamma ] args
+  mk_comb Builtin.bComb ty [ alpha; beta; gamma ] args
 
 (* make K combinator with the type:
   Παβ. β → α → β *)
@@ -104,7 +104,7 @@ let mk_k ~args ~alpha ~beta =
         Type.of_term_unsafe (beta : Term.t :> InnerTerm.t);
       ]
   in
-  mk_comb Builtin.KComb ty [ alpha; beta ] args
+  mk_comb Builtin.kComb ty [ alpha; beta ] args
 
 (* make I combinator with the type:
   Πα. α → α *)
@@ -112,7 +112,7 @@ let mk_i ~args ~alpha =
   let ty =
     Ty.apply ty_i [ Type.of_term_unsafe (alpha : Term.t :> InnerTerm.t) ]
   in
-  mk_comb Builtin.IComb ty [ alpha ] args
+  mk_comb Builtin.iComb ty [ alpha ] args
 
 (* {2 Helper functions} *)
 let[@inline] term_has_comb ~comb t =
@@ -148,11 +148,11 @@ let s2b_tyargs ~alpha ~beta ~gamma = beta, gamma, alpha
 let opt1 t =
   try
     let c_kind, ty_args, args = unpack_comb t in
-    if Builtin.equal Builtin.SComb c_kind then (
+    if Builtin.equal Builtin.sComb c_kind then (
       match args, ty_args with
       | [ u; v ], [ alpha; _; beta ] ->
         (match unpack_comb u, unpack_comb v with
-        | (Builtin.KComb, _, [ x ]), (Builtin.KComb, _, [ y ]) ->
+        | (b1, _, [ x ]), (b2, _, [ y ]) ->
           let xy = Term.app x [ y ] in
           Some (mk_k ~args:[ xy ] ~alpha ~beta)
         | _ -> None)
@@ -165,11 +165,11 @@ let opt1 t =
 let opt2 t =
   try
     let c_kind, _, args = unpack_comb t in
-    if Builtin.equal Builtin.SComb c_kind then (
+    if Builtin.equal Builtin.sComb c_kind then (
       match args with
       | [ u; v ] ->
         (match unpack_comb u, unpack_comb v with
-        | (Builtin.KComb, _, [ x ]), (Builtin.IComb, _, []) -> Some x
+        | (b1, _, [ x ]), (b2, _, []) -> Some x
         | _ -> None)
       | _ -> None
     ) else
@@ -180,11 +180,11 @@ let opt2 t =
 let opt3 t =
   try
     let c_kind, ty_args, args = unpack_comb t in
-    if Builtin.equal Builtin.SComb c_kind then (
+    if Builtin.equal Builtin.sComb c_kind then (
       match args, ty_args with
       | [ u; y ], [ alpha; beta; gamma ] ->
         (match unpack_comb u with
-        | Builtin.KComb, _, [ x ] ->
+        | b_, _, [ x ] ->
           let alpha, beta, gamma = s2b_tyargs ~alpha ~beta ~gamma in
           Some (mk_b ~args:[ x; y ] ~alpha ~beta ~gamma)
         | _ -> None)
@@ -197,12 +197,11 @@ let opt3 t =
 let opt4 t =
   try
     let c_kind, ty_args, args = unpack_comb t in
-    if Builtin.equal Builtin.SComb c_kind then (
+    if Builtin.equal Builtin.sComb c_kind then (
       match args, ty_args with
       | [ x; u ], [ alpha; beta; gamma ] ->
         (match unpack_comb u with
-        | Builtin.KComb, _, [ y ] ->
-          Some (mk_c ~args:[ x; y ] ~alpha ~beta ~gamma)
+        | b_, _, [ y ] -> Some (mk_c ~args:[ x; y ] ~alpha ~beta ~gamma)
         | _ -> None)
       | _ -> None
     ) else
@@ -214,7 +213,7 @@ let opt4 t =
 let narrowS t =
   try
     let c_kind, _, args = unpack_comb t in
-    if Builtin.equal Builtin.SComb c_kind then (
+    if Builtin.equal Builtin.sComb c_kind then (
       match args with
       | x :: y :: z :: rest -> Some (T.app x (z :: T.app y [ z ] :: rest))
       | _ -> None
@@ -227,7 +226,7 @@ let narrowS t =
 let narrowB t =
   try
     let c_kind, _, args = unpack_comb t in
-    if Builtin.equal Builtin.BComb c_kind then (
+    if Builtin.equal Builtin.bComb c_kind then (
       match args with
       | x :: y :: z :: rest -> Some (T.app x (T.app y [ z ] :: rest))
       | _ -> None
@@ -240,7 +239,7 @@ let narrowB t =
 let narrowC t =
   try
     let c_kind, _, args = unpack_comb t in
-    if Builtin.equal Builtin.CComb c_kind then (
+    if Builtin.equal Builtin.cComb c_kind then (
       match args with
       | x :: y :: z :: rest -> Some (T.app x (z :: y :: rest))
       | _ -> None
@@ -253,7 +252,7 @@ let narrowC t =
 let narrowK t =
   try
     let c_kind, _, args = unpack_comb t in
-    if Builtin.equal Builtin.KComb c_kind then (
+    if Builtin.equal Builtin.kComb c_kind then (
       match args with
       | x :: y :: rest -> Some (T.app x rest)
       | _ -> None
@@ -266,7 +265,7 @@ let narrowK t =
 let narrowI t =
   try
     let c_kind, _, args = unpack_comb t in
-    if Builtin.equal Builtin.IComb c_kind then (
+    if Builtin.equal Builtin.iComb c_kind then (
       match args with
       | x :: rest -> Some (T.app x rest)
       | _ -> None
@@ -278,11 +277,11 @@ let narrowI t =
 let opt5 t =
   try
     let c_kind, ty_args, args = unpack_comb t in
-    if Builtin.equal Builtin.SComb c_kind then (
+    if Builtin.equal Builtin.sComb c_kind then (
       match args, ty_args with
       | [ kx ], [ alpha; beta; gamma ] ->
         (match unpack_comb kx with
-        | Builtin.KComb, _, [ x ] ->
+        | b_, _, [ x ] ->
           let alpha, beta, gamma = s2b_tyargs ~alpha ~beta ~gamma in
           Some (mk_b ~args:[ x ] ~alpha ~beta ~gamma)
         | _ -> None)
@@ -296,11 +295,11 @@ let opt5 t =
 let opt6 t =
   try
     let c_kind, ty_args, args = unpack_comb t in
-    if Builtin.equal Builtin.BComb c_kind then (
+    if Builtin.equal Builtin.bComb c_kind then (
       match args with
       | [ x; ky ] ->
         (match unpack_comb ky with
-        | Builtin.KComb, [ alpha; _ ], [ y ] ->
+        | b, [ alpha; _ ], [ y ] ->
           let xy = T.app x [ y ] in
           Some (mk_k ~args:[ xy ] ~alpha ~beta:(Term.of_ty @@ T.ty xy))
         | _ -> None)
@@ -313,11 +312,11 @@ let opt6 t =
 let opt7 t =
   try
     let c_kind, ty_args, args = unpack_comb t in
-    if Builtin.equal Builtin.BComb c_kind then (
+    if Builtin.equal Builtin.bComb c_kind then (
       match args with
       | [ x; i ] ->
         (match unpack_comb i with
-        | Builtin.IComb, _, [] -> Some x
+        | b_, _, [] -> Some x
         | _ -> None)
       | _ -> None
     ) else
@@ -328,11 +327,11 @@ let opt7 t =
 let opt8 t =
   try
     let c_kind, ty_args, args = unpack_comb t in
-    if Builtin.equal Builtin.CComb c_kind then (
+    if Builtin.equal Builtin.cComb c_kind then (
       match args with
       | [ kx; y ] ->
         (match unpack_comb kx with
-        | Builtin.KComb, [ alpha; _ ], [ x ] ->
+        | b, [ alpha; _ ], [ x ] ->
           let xy = T.app x [ y ] in
           Some (mk_k ~args:[ xy ] ~alpha ~beta:(Term.of_ty @@ T.ty xy))
         | _ -> None)
@@ -345,16 +344,16 @@ let opt8 t =
 let opt9 t =
   try
     let c_kind, ty_args, args = unpack_comb t in
-    if Builtin.equal Builtin.BComb c_kind then (
+    if Builtin.equal Builtin.bComb c_kind then (
       match args with
       | [ i ] ->
         let alpha = Term.of_ty @@ List.hd @@ Type.expected_args @@ T.ty t in
         (match unpack_comb i with
-        | Builtin.IComb, _, [] -> Some (mk_i ~args:[] ~alpha)
+        | b_, _, [] -> Some (mk_i ~args:[] ~alpha)
         | _ -> None)
       | [ i; x ] ->
         (match unpack_comb i with
-        | Builtin.IComb, _, [] -> Some x
+        | b_, _, [] -> Some x
         | _ -> None)
       | _ -> None
     ) else
@@ -365,11 +364,11 @@ let opt9 t =
 let opt10 t =
   try
     let c_kind, ty_args, args = unpack_comb t in
-    if Builtin.equal Builtin.SComb c_kind then (
+    if Builtin.equal Builtin.sComb c_kind then (
       match args with
       | [ k; x ] ->
         (match unpack_comb k with
-        | Builtin.KComb, [ _; beta ], [] -> Some (mk_i ~args:[] ~alpha:beta)
+        | b, [ _; beta ], [] -> Some (mk_i ~args:[] ~alpha:beta)
         | _ -> None)
       | _ -> None
     ) else
@@ -380,13 +379,13 @@ let opt10 t =
 let opt11 t =
   try
     let c_kind, ty_args, args = unpack_comb t in
-    if Builtin.equal Builtin.SComb c_kind then (
+    if Builtin.equal Builtin.sComb c_kind then (
       match args with
       | [ bkx; y ] ->
         (match unpack_comb bkx with
-        | Builtin.BComb, _, [ k; x ] ->
+        | b_, _, [ k; x ] ->
           (match unpack_comb k with
-          | Builtin.KComb, _, [] -> Some x
+          | b_, _, [] -> Some x
           | _ -> None)
         | _ -> None)
       | _ -> None
@@ -398,13 +397,13 @@ let opt11 t =
 let opt12 t =
   try
     let c_kind, ty_args, args = unpack_comb t in
-    if Builtin.equal Builtin.SComb c_kind then (
+    if Builtin.equal Builtin.sComb c_kind then (
       match args with
       | [ bkx ] ->
         (match unpack_comb bkx with
-        | Builtin.BComb, _, [ k; x ] ->
+        | b_, _, [ k; x ] ->
           (match unpack_comb k with
-          | Builtin.KComb, _, [] ->
+          | b_, _, [] ->
             let alpha = Term.of_ty @@ List.hd @@ Type.expected_args @@ T.ty t in
             let beta = T.of_ty @@ T.ty x in
             Some (mk_k ~args:[ x ] ~alpha ~beta)
@@ -521,12 +520,12 @@ let max_weak_reduction_length var_handler ~state orig_t =
       assert (T.is_ground t);
       let c_kind, _, args = unpack_comb t in
       (match c_kind with
-      | Builtin.IComb ->
+      | b when Builtin.equal b Builtin.iComb ->
         if CCList.is_empty args then
           0
         else
           aux (narrow_one t) + 1
-      | Builtin.KComb ->
+      | b when Builtin.equal b Builtin.kComb ->
         if CCList.length args < 2 then
           aux_l args
         else (
@@ -534,7 +533,10 @@ let max_weak_reduction_length var_handler ~state orig_t =
           let steps_rest = aux (narrow_one t) in
           steps_rest + steps_inc
         )
-      | Builtin.SComb | Builtin.CComb | Builtin.BComb ->
+      | b
+        when Builtin.equal b Builtin.sComb
+             || Builtin.equal b Builtin.cComb
+             || Builtin.equal b Builtin.bComb ->
         if CCList.length args < 3 then
           aux_l args
         else
@@ -720,26 +722,28 @@ let comb2lam t =
       let ( -| ) = fun l i -> CCList.take i l in
       let lam =
         match b with
-        | Builtin.SComb ->
+        | b when Builtin.equal b Builtin.sComb ->
           let x = T.bvar ~ty:(ty_args -- 0) 2 in
           let y = T.bvar ~ty:(ty_args -- 1) 1 in
           let z = T.bvar ~ty:(ty_args -- 2) 0 in
           let xz_yz = T.app x [ z; T.app y [ z ] ] in
           T.fun_l (ty_args -| 3) xz_yz
-        | Builtin.BComb ->
+        | b when Builtin.equal b Builtin.bComb ->
           let x = T.bvar ~ty:(ty_args -- 0) 2 in
           let y = T.bvar ~ty:(ty_args -- 1) 1 in
           let z = T.bvar ~ty:(ty_args -- 2) 0 in
           let x_yz = T.app x [ T.app y [ z ] ] in
           T.fun_l (ty_args -| 3) x_yz
-        | Builtin.CComb ->
+        | b when Builtin.equal b Builtin.cComb ->
           let x = T.bvar ~ty:(ty_args -- 0) 2 in
           let y = T.bvar ~ty:(ty_args -- 1) 1 in
           let z = T.bvar ~ty:(ty_args -- 2) 0 in
           let xzy = T.app x [ z; y ] in
           T.fun_l (ty_args -| 3) xzy
-        | Builtin.KComb -> T.fun_l (ty_args -| 2) (T.bvar ~ty:(ty_args -- 0) 1)
-        | Builtin.IComb -> T.fun_l (ty_args -| 1) (T.bvar ~ty:(ty_args -- 0) 0)
+        | b when Builtin.equal b Builtin.kComb ->
+          T.fun_l (ty_args -| 2) (T.bvar ~ty:(ty_args -- 0) 1)
+        | b when Builtin.equal b Builtin.iComb ->
+          T.fun_l (ty_args -| 1) (T.bvar ~ty:(ty_args -- 0) 0)
         | _ -> assert false
       in
       let res =

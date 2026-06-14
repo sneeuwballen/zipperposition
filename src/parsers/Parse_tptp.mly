@@ -124,10 +124,12 @@ declaration:
   | declaration_ty_header LEFT_PAREN name=name COMMA role COMMA tydecl=type_decl info=annotations RIGHT_PAREN DOT
     { let s, ty = tydecl in
       match ty.PT.term with
-      | PT.AppBuiltin (Builtin.TType, [])
+      | PT.AppBuiltin (b, []) when Builtin.equal b Builtin.tType ->
+             (* declare a new type symbol *)
+             A.NewType (name, s, ty, info)
       | PT.AppBuiltin
-          (Builtin.Arrow,
-           {PT.term=PT.AppBuiltin (Builtin.TType,[]);_} :: _) ->
+          (b, {PT.term=PT.AppBuiltin (b2,[]);_} :: _)
+          when Builtin.equal b Builtin.arrow && Builtin.equal b2 Builtin.tType ->
              (* declare a new type symbol *)
              A.NewType (name, s, ty, info)
       | _ -> A.TypeDecl (name, s, ty, info)
@@ -309,7 +311,7 @@ type_arg: l=assoc_binary_formula_aux(ARROW) {
   | EXISTS { PT.exists }
   | LAMBDA { PT.lambda }
   | CHOICE_BINDER { fun ?loc vars body ->
-                      PT.app_builtin ?loc Builtin.ChoiceConst
+                      PT.app_builtin ?loc Builtin.choiceConst
                         [PT.lambda ?loc vars body]
                   }
 %inline unary_connective:
@@ -378,7 +380,7 @@ defined_atom:
   | CHOICE_CONST
     {
       let loc = L.mk_pos $startpos $endpos in
-      PT.app_builtin ~loc Builtin.ChoiceConst []
+      PT.app_builtin ~loc Builtin.choiceConst []
     }
   | s=DISTINCT_OBJECT
     {
@@ -498,13 +500,13 @@ atomic_word:
   | INCLUDE { "include" }
 
 atomic_defined_word:
-  | NOTCONST { PT.builtin Builtin.Not }
-  | IMPLYCONST { PT.builtin Builtin.Imply }
-  | EXISTSCONST { PT.builtin Builtin.ExistsConst }
-  | FORALLCONST { PT.builtin Builtin.ForallConst }
-  | LEFT_PAREN EQUAL RIGHT_PAREN {PT.builtin Builtin.Eq}
-  | LEFT_PAREN AND RIGHT_PAREN {PT.builtin Builtin.And}
-  | LEFT_PAREN VLINE RIGHT_PAREN {PT.builtin Builtin.Or}
+  | NOTCONST { PT.builtin Builtin.not_ }
+  | IMPLYCONST { PT.builtin Builtin.imply }
+  | EXISTSCONST { PT.builtin Builtin.existsConst }
+  | FORALLCONST { PT.builtin Builtin.forallConst }
+  | LEFT_PAREN EQUAL RIGHT_PAREN {PT.builtin Builtin.eq}
+  | LEFT_PAREN AND RIGHT_PAREN {PT.builtin Builtin.and_}
+  | LEFT_PAREN VLINE RIGHT_PAREN {PT.builtin Builtin.or_}
   | WILDCARD { PT.wildcard }
 
 defined_ty:

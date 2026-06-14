@@ -73,42 +73,46 @@ module TyBuiltin = struct
   let choice_ty = T.Ty.(forall a ([ [ a_ ] ==> prop ] ==> a_))
 
   let ty_exn = function
-    | Builtin.True -> T.Ty.prop
-    | Builtin.False -> T.Ty.prop
-    | Builtin.Eq -> prop2poly
-    | Builtin.Neq -> prop2poly
-    | Builtin.Not -> prop1
-    | Builtin.Imply -> prop2
-    | Builtin.And -> prop2
-    | Builtin.Or -> prop2
-    | Builtin.Equiv -> prop2
-    | Builtin.Xor -> prop2
-    | Builtin.ForallConst -> hobinder
-    | Builtin.ExistsConst -> hobinder
-    | Builtin.Less -> prop2poly
-    | Builtin.Lesseq -> prop2poly
-    | Builtin.Greater -> prop2poly
-    | Builtin.Greatereq -> prop2poly
-    | Builtin.Uminus -> ty1op
-    | Builtin.Sum -> ty2op
-    | Builtin.Difference -> ty2op
-    | Builtin.Product -> ty2op
-    | Builtin.Quotient -> ty2op
-    | Builtin.Quotient_e -> ty2op_to_i
-    | Builtin.Quotient_f -> ty2op_to_i
-    | Builtin.Quotient_t -> ty2op_to_i
-    | Builtin.Remainder_e -> ty2op_to_i
-    | Builtin.Remainder_f -> ty2op_to_i
-    | Builtin.Remainder_t -> ty2op_to_i
-    | Builtin.Floor -> ty1op
-    | Builtin.Ceiling -> ty1op
-    | Builtin.Round -> ty1op
-    | Builtin.Truncate -> ty1op
-    | Builtin.To_int -> T.Ty.(forall a ([ a_ ] ==> int))
-    | Builtin.To_rat -> T.Ty.(forall a ([ a_ ] ==> rat))
-    | Builtin.Is_int -> T.Ty.(forall a ([ a_ ] ==> prop))
-    | Builtin.Is_rat -> T.Ty.(forall a ([ a_ ] ==> prop))
-    | Builtin.ChoiceConst -> choice_ty
+    | b when Builtin.equal b Builtin.true_ -> T.Ty.prop
+    | b when Builtin.equal b Builtin.false_ -> T.Ty.prop
+    | b when Builtin.equal b Builtin.eq -> prop2poly
+    | b when Builtin.equal b Builtin.neq -> prop2poly
+    | b when Builtin.equal b Builtin.not_ -> prop1
+    | b when Builtin.equal b Builtin.imply -> prop2
+    | b when Builtin.equal b Builtin.and_ -> prop2
+    | b when Builtin.equal b Builtin.or_ -> prop2
+    | b when Builtin.equal b Builtin.equiv -> prop2
+    | b when Builtin.equal b Builtin.xor -> prop2
+    | b when Builtin.equal b Builtin.forallConst -> hobinder
+    | b when Builtin.equal b Builtin.existsConst -> hobinder
+    | b when Builtin.equal b Builtin.less_ -> prop2poly
+    | b when Builtin.equal b Builtin.lesseq_ -> prop2poly
+    | b when Builtin.equal b Builtin.greater_ -> prop2poly
+    | b when Builtin.equal b Builtin.greatereq_ -> prop2poly
+    | b when Builtin.equal b Builtin.uminus_ -> ty1op
+    | b when Builtin.equal b Builtin.sum_ -> ty2op
+    | b when Builtin.equal b Builtin.difference_ -> ty2op
+    | b when Builtin.equal b Builtin.product_ -> ty2op
+    | b when Builtin.equal b Builtin.quotient_ -> ty2op
+    | b when Builtin.equal b Builtin.quotient_e -> ty2op_to_i
+    | b when Builtin.equal b Builtin.quotient_f -> ty2op_to_i
+    | b when Builtin.equal b Builtin.quotient_t -> ty2op_to_i
+    | b when Builtin.equal b Builtin.remainder_e -> ty2op_to_i
+    | b when Builtin.equal b Builtin.remainder_f -> ty2op_to_i
+    | b when Builtin.equal b Builtin.remainder_t -> ty2op_to_i
+    | b when Builtin.equal b Builtin.floor_ -> ty1op
+    | b when Builtin.equal b Builtin.ceiling_ -> ty1op
+    | b when Builtin.equal b Builtin.round_ -> ty1op
+    | b when Builtin.equal b Builtin.truncate_ -> ty1op
+    | b when Builtin.equal b Builtin.to_int_c ->
+      T.Ty.(forall a ([ a_ ] ==> int))
+    | b when Builtin.equal b Builtin.to_rat_c ->
+      T.Ty.(forall a ([ a_ ] ==> rat))
+    | b when Builtin.equal b Builtin.is_int_ ->
+      T.Ty.(forall a ([ a_ ] ==> prop))
+    | b when Builtin.equal b Builtin.is_rat_ ->
+      T.Ty.(forall a ([ a_ ] ==> prop))
+    | b when Builtin.equal b Builtin.choiceConst -> choice_ty
     | _ -> invalid_arg "TyBuiltin.ty_exn"
 
   let ty x = try Some (ty_exn x) with _ -> None
@@ -387,17 +391,26 @@ let apply_unify ~allow_open ?loc ctx ty l =
 let rec infer_ty_ ?loc ctx ty =
   let rec aux ty =
     match PT.view ty with
-    | PT.AppBuiltin (Builtin.TyInt, []) -> T.Ty.int
-    | PT.AppBuiltin (Builtin.TyRat, []) -> T.Ty.rat
-    | PT.AppBuiltin (Builtin.TyReal, []) -> T.Ty.real
-    | PT.AppBuiltin (Builtin.Term, []) -> T.Ty.term
-    | PT.AppBuiltin (Builtin.Prop, []) -> T.Ty.prop
-    | PT.AppBuiltin (Builtin.TType, []) -> T.Ty.tType
-    | PT.AppBuiltin (Builtin.Arrow, ret :: args) ->
+    | PT.AppBuiltin (_b_tyint, []) when Builtin.equal _b_tyint Builtin.ty_int ->
+      T.Ty.int
+    | PT.AppBuiltin (_b_tyrat, []) when Builtin.equal _b_tyrat Builtin.ty_rat ->
+      T.Ty.rat
+    | PT.AppBuiltin (_b_tyreal, []) when Builtin.equal _b_tyreal Builtin.ty_real
+      ->
+      T.Ty.real
+    | PT.AppBuiltin (_b_term, []) when Builtin.equal _b_term Builtin.term ->
+      T.Ty.term
+    | PT.AppBuiltin (_b_prop, []) when Builtin.equal _b_prop Builtin.prop ->
+      T.Ty.prop
+    | PT.AppBuiltin (_b_ttype, []) when Builtin.equal _b_ttype Builtin.tType ->
+      T.Ty.tType
+    | PT.AppBuiltin (_b_arrow, ret :: args)
+      when Builtin.equal _b_arrow Builtin.arrow ->
       let ret = aux ret in
       let args = List.map aux args in
       T.Ty.fun_ ?loc args ret
-    | PT.AppBuiltin (Builtin.HasType, [ t; ty ]) ->
+    | PT.AppBuiltin (_b_hastype, [ t; ty ])
+      when Builtin.equal _b_hastype Builtin.has_type ->
       (* cast *)
       let t = aux t in
       let ty = aux ty in
@@ -432,7 +445,8 @@ let rec infer_ty_ ?loc ctx ty =
           List.iter (fun v -> unify T.tType (Var.ty v)) vars';
           let body' = aux body in
           T.Ty.forall_l vars' body')
-    | PT.AppBuiltin (Builtin.Wildcard, []) ->
+    | PT.AppBuiltin (_b_wildcard, [])
+      when Builtin.equal _b_wildcard Builtin.wildcard ->
       Ctx.fresh_ty_meta_var ctx ~dest:`Generalize () |> T.meta
     | _ -> error_ ?loc "@[<2>`@[%a@]`@ is not a valid type@]" PT.pp ty
   and aux_app id ty l =
@@ -631,34 +645,41 @@ let rec infer_rec ?loc ctx (t : PT.t) : T.t =
       in
       let ty = T.Ty.record_flatten ty_l ~rest:(CCOpt.map Var.ty rest) in
       T.record ~ty ?loc l ~rest
-    | PT.AppBuiltin (Builtin.Wildcard, []) ->
+    | PT.AppBuiltin (_b_wildcard, [])
+      when Builtin.equal _b_wildcard Builtin.wildcard ->
       (* make a new TYPE variable *)
       let v = Ctx.fresh_ty_meta_var ~dest:`Generalize ctx () in
       T.Ty.meta v
-    | PT.AppBuiltin (Builtin.Arrow, ret :: args) ->
+    | PT.AppBuiltin (_b_arrow, ret :: args)
+      when Builtin.equal _b_arrow Builtin.arrow ->
       let ret = infer_ty_exn ctx ret in
       let args = List.map (infer_ty_exn ctx) args in
       T.Ty.fun_ ?loc args ret
-    | PT.AppBuiltin (Builtin.True, []) -> T.Form.true_
-    | PT.AppBuiltin (Builtin.False, []) -> T.Form.false_
-    | PT.AppBuiltin (Builtin.And, l) when List.length l >= 2 ->
+    | PT.AppBuiltin (_b_true, []) when Builtin.equal _b_true Builtin.true_ ->
+      T.Form.true_
+    | PT.AppBuiltin (_b_false, []) when Builtin.equal _b_false Builtin.false_ ->
+      T.Form.false_
+    | PT.AppBuiltin (_b1_and, l) when Builtin.equal _b1_and Builtin.and_ ->
       let l = List.map (infer_prop_ ?loc ctx) l in
       T.Form.and_ ?loc l
-    | PT.AppBuiltin (Builtin.Or, l) when List.length l >= 2 ->
+    | PT.AppBuiltin (_b1_or, l) when Builtin.equal _b1_or Builtin.or_ ->
       let l = List.map (infer_prop_ ?loc ctx) l in
       T.Form.or_ ?loc l
-    | PT.AppBuiltin
-        (((Builtin.Equiv | Builtin.Xor | Builtin.Imply) as conn), [ a; b ]) ->
+    | PT.AppBuiltin (conn, [ a; b ])
+      when Builtin.equal conn Builtin.equiv
+           || Builtin.equal conn Builtin.xor
+           || Builtin.equal conn Builtin.imply ->
       let a = infer_prop_ ?loc ctx a and b = infer_prop_ ?loc ctx b in
       (match conn with
-      | Builtin.Equiv -> T.Form.equiv ?loc a b
-      | Builtin.Xor -> T.Form.xor ?loc a b
-      | Builtin.Imply -> T.Form.imply ?loc a b
+      | conn_ when Builtin.equal conn_ Builtin.equiv -> T.Form.equiv ?loc a b
+      | conn_ when Builtin.equal conn_ Builtin.xor -> T.Form.xor ?loc a b
+      | conn_ when Builtin.equal conn_ Builtin.imply -> T.Form.imply ?loc a b
       | _ -> assert false)
-    | PT.AppBuiltin (Builtin.Not, [ a ]) ->
+    | PT.AppBuiltin (_b_not, [ a ]) when Builtin.equal _b_not Builtin.not_ ->
       let a = infer_prop_ ?loc ctx a in
       T.Form.not_ ?loc a
-    | PT.AppBuiltin (((Builtin.Eq | Builtin.Neq) as conn), [ a; b ]) ->
+    | PT.AppBuiltin (conn, [ a; b ])
+      when Builtin.equal conn Builtin.eq || Builtin.equal conn Builtin.neq ->
       (* a ?= b *)
       let a = infer_rec ?loc ctx a in
       let b = infer_rec ?loc ctx b in
@@ -667,7 +688,7 @@ let rec infer_rec ?loc ctx (t : PT.t) : T.t =
         error_ ?loc "(in)equation @[%a@] ?= @[%a@] between types is forbidden"
           T.pp a T.pp b;
       (match conn with
-      | Builtin.Eq ->
+      | conn_ when Builtin.equal conn_ Builtin.eq ->
         if
           T.Ty.is_prop (T.ty_exn a)
           && (CCOpt.is_none (T.head a) || CCOpt.is_none (T.head b))
@@ -675,7 +696,7 @@ let rec infer_rec ?loc ctx (t : PT.t) : T.t =
           T.Form.equiv a b
         else
           T.Form.eq a b
-      | Builtin.Neq ->
+      | bb when Builtin.equal bb Builtin.neq ->
         if
           T.Ty.is_prop (T.ty_exn a)
           && (CCOpt.is_none (T.head a) || CCOpt.is_none (T.head b))
@@ -701,24 +722,44 @@ let rec infer_rec ?loc ctx (t : PT.t) : T.t =
       with_non_inferred_typed_vars ?loc ctx vars ~f:(fun vars' ->
           let t' = infer_rec ?loc ctx t' in
           T.Ty.forall_l ?loc vars' t')
-    | PT.AppBuiltin ((Builtin.Int _ as b), []) -> T.builtin ~ty:T.Ty.int b
-    | PT.AppBuiltin ((Builtin.Rat _ as b), []) -> T.builtin ~ty:T.Ty.rat b
-    | PT.AppBuiltin ((Builtin.Real _ as b), []) -> T.builtin ~ty:T.Ty.real b
-    | PT.AppBuiltin (Builtin.TyInt, []) -> T.Ty.int
-    | PT.AppBuiltin (Builtin.TyRat, []) -> T.Ty.rat
-    | PT.AppBuiltin (Builtin.Term, []) -> T.Ty.term
-    | PT.AppBuiltin (Builtin.Prop, []) -> T.Ty.prop
-    | PT.AppBuiltin (Builtin.TType, []) -> T.Ty.tType
-    | PT.AppBuiltin (Builtin.HasType, [ t; ty ]) ->
+    | PT.AppBuiltin (b, [])
+      when match Builtin.is_payload b with
+           | Some (Builtin.Int _) -> true
+           | _ -> false ->
+      T.builtin ~ty:T.Ty.int b
+    | PT.AppBuiltin (b, [])
+      when match Builtin.is_payload b with
+           | Some (Builtin.Rat _) -> true
+           | _ -> false ->
+      T.builtin ~ty:T.Ty.rat b
+    | PT.AppBuiltin (b, [])
+      when match Builtin.is_payload b with
+           | Some (Builtin.Real _) -> true
+           | _ -> false ->
+      T.builtin ~ty:T.Ty.real b
+    | PT.AppBuiltin (_b_tyint, []) when Builtin.equal _b_tyint Builtin.ty_int ->
+      T.Ty.int
+    | PT.AppBuiltin (_b_tyrat, []) when Builtin.equal _b_tyrat Builtin.ty_rat ->
+      T.Ty.rat
+    | PT.AppBuiltin (_b_term, []) when Builtin.equal _b_term Builtin.term ->
+      T.Ty.term
+    | PT.AppBuiltin (_b_prop, []) when Builtin.equal _b_prop Builtin.prop ->
+      T.Ty.prop
+    | PT.AppBuiltin (_b_ttype, []) when Builtin.equal _b_ttype Builtin.tType ->
+      T.Ty.tType
+    | PT.AppBuiltin (_b_hastype, [ t; ty ])
+      when Builtin.equal _b_hastype Builtin.has_type ->
       (* cast *)
       let t = infer_rec ?loc ctx t in
       let ty = infer_ty_exn ctx ty in
       unify ?loc (T.ty_exn t) ty;
       t
-    | PT.AppBuiltin (Builtin.HasType, l) ->
+    | PT.AppBuiltin (_b_hastype, l)
+      when Builtin.equal _b_hastype Builtin.has_type ->
       error_ ?loc "ill-formed has_type@ [@[<hv>%a@]]" (Util.pp_list PT.pp) l
-    | PT.AppBuiltin (Builtin.Distinct, ([] | [ _ ])) -> T.Form.true_
-    | PT.AppBuiltin (Builtin.Distinct, l) ->
+    | PT.AppBuiltin (_b_distinct, ([] | [ _ ])) -> T.Form.true_
+    | PT.AppBuiltin (_b_distinct, l)
+      when Builtin.equal _b_distinct Builtin.distinct ->
       (* [distinct(l)] is boolean typed *)
       let l = List.map (infer_rec ?loc ctx) l in
       let x =
@@ -727,8 +768,8 @@ let rec infer_rec ?loc ctx (t : PT.t) : T.t =
         | _ -> assert false
       in
       List.iter (fun y -> unify ?loc (T.ty_exn x) (T.ty_exn y)) l;
-      T.app_builtin ?loc ~ty:T.Ty.prop Builtin.Distinct l
-    | PT.AppBuiltin (Builtin.ChoiceConst, [ t ]) when PT.is_lam t ->
+      T.app_builtin ?loc ~ty:T.Ty.prop Builtin.distinct l
+    | PT.AppBuiltin (_b_choice, [ t ]) when PT.is_lam t ->
       let t = infer_rec ?loc ctx t in
       let ty = T.ty_exn t in
       let _, alpha_l, _ = T.Ty.unfold ty in
@@ -736,7 +777,7 @@ let rec infer_rec ?loc ctx (t : PT.t) : T.t =
         error_ ?loc "choice binder takes only one variable";
       let alpha = List.hd alpha_l in
       (* reapplying type argument and reusing lambda binder *)
-      T.app_builtin ?loc ~ty:alpha Builtin.ChoiceConst [ alpha; t ]
+      T.app_builtin ?loc ~ty:alpha Builtin.choiceConst [ alpha; t ]
     | PT.AppBuiltin (b, l) ->
       (match TyBuiltin.ty b with
       | None ->
@@ -988,19 +1029,19 @@ let rec as_def ?loc ?of_ bound t =
   in
   match T.view t with
   | T.Bind (Binder.Forall, v, t) -> as_def ?loc (Var.Set.add bound v) t
-  | T.AppBuiltin (((Builtin.Equiv | Builtin.Imply) as op), [ lhs; rhs ]) ->
+  | T.AppBuiltin (b0_, [ lhs; rhs ]) ->
     (* check that LHS is a literal, and  that all free variables
          of RHS occur in LHS (bound variables are ok though) *)
     check_vars_eqn ?loc bound lhs rhs;
     let lhs = SLiteral.of_form lhs in
     let pol =
-      if op = Builtin.Equiv then
+      if Builtin.equal b0_ Builtin.equiv then
         `Equiv
       else
         `Imply
     in
     yield_prop lhs rhs pol
-  | T.AppBuiltin (Builtin.Eq, [ _; lhs; rhs ]) ->
+  | T.AppBuiltin (_b_eq, [ _; lhs; rhs ]) when Builtin.equal _b_eq Builtin.eq ->
     check_vars_eqn ?loc bound lhs rhs;
     (match T.view lhs with
     | T.Const id ->
@@ -1013,7 +1054,7 @@ let rec as_def ?loc ?of_ bound t =
         yield_term id ty args rhs
       | _ -> fail ())
     | _ -> fail ())
-  | T.AppBuiltin (Builtin.Not, [ lhs ]) ->
+  | T.AppBuiltin (_b_not, [ lhs ]) when Builtin.equal _b_not Builtin.not_ ->
     let rhs = T.Form.false_ in
     check_vars_eqn ?loc bound lhs rhs;
     let lhs = SLiteral.of_form lhs in

@@ -802,18 +802,18 @@ module S = struct
     let declare_combinators () =
       let decls =
         [
-          ( Builtin.SComb,
+          ( Builtin.sComb,
             "s_comb",
             "!>[A:$tType, B:$tType, C:$tType]: ((A > B > C) > (A > B) > A > C)"
           );
-          ( Builtin.CComb,
+          ( Builtin.cComb,
             "c_comb",
             "!>[A:$tType, B:$tType, C:$tType]: ((A > B > C) > B > A > C)" );
-          ( Builtin.BComb,
+          ( Builtin.bComb,
             "b_comb",
             "!>[A:$tType, B:$tType, C:$tType]: ((A > B) > (C > A) > C > B)" );
-          Builtin.KComb, "k_comb", "!>[A:$tType, B:$tType]: (B > A > B)";
-          Builtin.IComb, "i_comb", "!>[A:$tType]: (A > A)";
+          Builtin.kComb, "k_comb", "!>[A:$tType, B:$tType]: (B > A > B)";
+          Builtin.iComb, "i_comb", "!>[A:$tType]: (A > A)";
         ]
       in
       List.iter

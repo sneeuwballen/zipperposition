@@ -38,10 +38,15 @@ type 'a t_view =
 
 let t_view (t : term) : term t_view =
   match T.view t with
-  | T.AppBuiltin (Builtin.Int n, []) -> T_Z n
-  | T.AppBuiltin (Builtin.Rat n, []) -> T_Q n
-  | T.AppBuiltin (Builtin.True, []) -> T_bool true
-  | T.AppBuiltin (Builtin.False, []) -> T_bool false
+  | T.AppBuiltin (b_, []) ->
+    (match Builtin.is_payload b_ with
+    | Some (Builtin.Int n) -> T_Z n
+    | Some (Builtin.Rat q) -> T_Q q
+    | _ -> T_builtin (b_, []))
+  | T.AppBuiltin (_b_true, []) when Builtin.equal _b_true Builtin.true_ ->
+    T_bool true
+  | T.AppBuiltin (_b_false, []) when Builtin.equal _b_false Builtin.false_ ->
+    T_bool false
   | T.AppBuiltin (b, l) -> T_builtin (b, l)
   | T.Var v -> T_var v
   | T.Const id when Ind_ty.is_constructor id -> T_cstor (id, [])

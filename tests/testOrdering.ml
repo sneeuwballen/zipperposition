@@ -353,7 +353,7 @@ let test_derived_ho_kbo =
       Alcotest.(check comp_test)
         "forall x. x > h a a a"
         (compare
-           (Term.app_builtin ~ty:Type.prop Builtin.ForallConst
+           (Term.app_builtin ~ty:Type.prop Builtin.forallConst
               [
                 Term.of_ty Type.prop;
                 Term.fun_l [ Type.prop ] (Term.bvar ~ty:Type.prop 0);
@@ -363,7 +363,7 @@ let test_derived_ho_kbo =
 
       (* fun y. forall x. x < forall x. x *)
       let forall_x_x =
-        Term.app_builtin ~ty:Type.prop Builtin.ForallConst
+        Term.app_builtin ~ty:Type.prop Builtin.forallConst
           [
             Term.of_ty Type.prop;
             Term.fun_l [ Type.prop ] (Term.bvar ~ty:Type.prop 0);
@@ -698,7 +698,7 @@ let test_lambda_kbo =
       Alcotest.(check comp_test)
         "forall x. x > h a a a" Comparison.Gt
         (compare
-           (Term.app_builtin ~ty:Type.prop Builtin.ForallConst
+           (Term.app_builtin ~ty:Type.prop Builtin.forallConst
               [
                 Term.of_ty Type.prop;
                 Term.fun_l [ Type.prop ] (Term.bvar ~ty:Type.prop 0);
@@ -712,7 +712,7 @@ let test_lambda_kbo =
         "fun y. forall x. x > h a a a" Comparison.Gt
         (compare
            (Term.fun_l [ ty ]
-              (Term.app_builtin ~ty:Type.prop Builtin.ForallConst
+              (Term.app_builtin ~ty:Type.prop Builtin.forallConst
                  [
                    Term.of_ty Type.prop;
                    Term.fun_l [ Type.prop ] (Term.bvar ~ty:Type.prop 0);
@@ -752,7 +752,7 @@ let test_lambda_kbo =
       Alcotest.(check comp_test)
         "z a <=>? false" Comparison.Incomparable
         (compare (Term.app z [ a ])
-           (Term.app_builtin ~ty:Type.prop Builtin.False []));
+           (Term.app_builtin ~ty:Type.prop Builtin.false_ []));
 
       (* z a >= true *)
       let a = Term.const ~ty a_ in
@@ -760,7 +760,7 @@ let test_lambda_kbo =
       Alcotest.(check comp_test)
         "z a >= true" Comparison.Geq
         (compare (Term.app z [ a ])
-           (Term.app_builtin ~ty:Type.prop Builtin.True []));
+           (Term.app_builtin ~ty:Type.prop Builtin.true_ []));
 
       (* y (z a) <=>? z (y a) *)
       let a = Term.const ~ty a_ in
@@ -1103,7 +1103,7 @@ let test_lambda_lpo =
       Alcotest.(check comp_test)
         "forall x. x < h a a a" Comparison.Lt
         (compare
-           (Term.app_builtin ~ty:Type.prop Builtin.ForallConst
+           (Term.app_builtin ~ty:Type.prop Builtin.forallConst
               [
                 Term.of_ty Type.prop;
                 Term.fun_l [ Type.prop ] (Term.bvar ~ty:Type.prop 0);
@@ -1117,7 +1117,7 @@ let test_lambda_lpo =
         "fun y. forall x. x < h a a a" Comparison.Lt
         (compare
            (Term.fun_l [ ty ]
-              (Term.app_builtin ~ty:Type.prop Builtin.ForallConst
+              (Term.app_builtin ~ty:Type.prop Builtin.forallConst
                  [
                    Term.of_ty Type.prop;
                    Term.fun_l [ Type.prop ] (Term.bvar ~ty:Type.prop 0);
@@ -1160,7 +1160,7 @@ let test_lambda_lpo =
       Alcotest.(check comp_test)
         "z a <=>? false" Comparison.Incomparable
         (compare (Term.app z [ a ])
-           (Term.app_builtin ~ty:Type.prop Builtin.False []));
+           (Term.app_builtin ~ty:Type.prop Builtin.false_ []));
 
       (* z a <=>? true *)
       let a = Term.const ~ty a_ in
@@ -1168,7 +1168,7 @@ let test_lambda_lpo =
       Alcotest.(check comp_test)
         "z a <=>? true" Comparison.Incomparable
         (compare (Term.app z [ a ])
-           (Term.app_builtin ~ty:Type.prop Builtin.True []));
+           (Term.app_builtin ~ty:Type.prop Builtin.true_ []));
 
       (* y (z a) <=>? z (y a) *)
       let a = Term.const ~ty a_ in

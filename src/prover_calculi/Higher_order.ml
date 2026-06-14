@@ -1281,7 +1281,8 @@ module Make (E : Env.S) : S with module Env = E = struct
         && List.length (Type.expected_args ty) = 1
         && Type.equal (Term.ty t) (List.hd (Type.expected_args ty))
         && Type.returns_prop ty && T.DB.is_closed t
-      | T.AppBuiltin (Builtin.ChoiceConst, l) ->
+      | T.AppBuiltin (_b_choice, l)
+        when Builtin.equal _b_choice Builtin.choiceConst ->
         CCList.length l == 2 && T.DB.is_closed t
       | _ -> false
     in
@@ -1338,7 +1339,7 @@ module Make (E : Env.S) : S with module Env = E = struct
       let alpha_to_prop = List.hd args in
       assert (Type.is_fun alpha_to_prop);
       let alpha = List.hd (fst (Type.open_fun alpha_to_prop)) in
-      let res = T.app_builtin Builtin.ChoiceConst ~ty [ T.of_ty alpha ] in
+      let res = T.app_builtin Builtin.choiceConst ~ty [ T.of_ty alpha ] in
       res
     in
 
@@ -1378,9 +1379,10 @@ module Make (E : Env.S) : S with module Env = E = struct
           | Some def_clause -> generate_instances_of_hd ~def_clause hd arg
           | None -> []
         )
-      | T.AppBuiltin (ChoiceConst, [ ty_arg; ch_arg ]) ->
+      | T.AppBuiltin (b, [ ty_arg; ch_arg ])
+        when Builtin.equal b Builtin.choiceConst ->
         let ty = Type.arrow [ T.ty ch_arg ] (T.ty t) in
-        let hd = T.app_builtin ~ty ChoiceConst [ ty_arg ] in
+        let hd = T.app_builtin ~ty Builtin.choiceConst [ ty_arg ] in
         generate_instances_of_hd ~def_clause:None hd ch_arg
       | _ -> assert false
     in

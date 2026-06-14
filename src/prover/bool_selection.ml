@@ -134,18 +134,20 @@ let collect_green_subterms_ ~forbidden ~filter ~ord ~pos_builder t k =
       ( (* only green subterms are eligible *) )
     else (
       match T.view t with
-      | T.AppBuiltin
-          ( (BIn.Eq | BIn.Neq | BIn.Xor | BIn.Equiv),
-            (([ a; b ] | [ _; a; b ]) as l) )
-        when Type.is_prop (T.ty a) ->
+      | T.AppBuiltin (b, (([ a; b_arg ] | [ _; a; b_arg ]) as l))
+        when (Builtin.equal b Builtin.eq
+             || Builtin.equal b Builtin.neq
+             || Builtin.equal b Builtin.xor
+             || Builtin.equal b Builtin.equiv)
+             && Type.is_prop (T.ty a) ->
         (* only going to the larger side of the (dis)equation *)
         let offset = List.length l - 2 in
         (*skipping possible tyarg*)
-        (match Ordering.compare ord a b with
+        (match Ordering.compare ord a b_arg with
         | Comparison.Lt | Leq ->
           aux_term ~top:false
             ~pos_builder:(PB.arg (inv_idx l (1 + offset)) pos_builder)
-            b k
+            b_arg k
         | Gt | Geq ->
           aux_term ~top:false
             ~pos_builder:(PB.arg (inv_idx l offset) pos_builder)
@@ -153,7 +155,7 @@ let collect_green_subterms_ ~forbidden ~filter ~ord ~pos_builder t k =
         | _ ->
           aux_term ~top:false
             ~pos_builder:(PB.arg (inv_idx l (1 + offset)) pos_builder)
-            b k;
+            b_arg k;
           aux_term ~top:false
             ~pos_builder:(PB.arg (inv_idx l offset) pos_builder)
             a k)
@@ -203,18 +205,20 @@ let get_selectable_w_ctx ~ord lits =
         ( (* only green subterms are eligible *) )
       else (
         match T.view t with
-        | T.AppBuiltin
-            ( (BIn.Eq | BIn.Neq | BIn.Xor | BIn.Equiv),
-              (([ a; b ] | [ _; a; b ]) as l) ) ->
+        | T.AppBuiltin (b, (([ a; b_arg ] | [ _; a; b_arg ]) as l))
+          when Builtin.equal b Builtin.eq
+               || Builtin.equal b Builtin.neq
+               || Builtin.equal b Builtin.xor
+               || Builtin.equal b Builtin.equiv ->
           (* only going to the larger side of the (dis)equation *)
           let ctx = under_equiv_ctx in
           let offset = List.length l - 2 in
           (*skipping possible tyarg*)
-          (match Ordering.compare ord a b with
+          (match Ordering.compare ord a b_arg with
           | Comparison.Lt | Leq ->
             aux_term ~top:false
               ~pos_builder:(PB.arg (inv_idx l (1 + offset)) pos_builder)
-              b ctx (log_depth + 1) k
+              b_arg ctx (log_depth + 1) k
           | Gt | Geq ->
             aux_term ~top:false
               ~pos_builder:(PB.arg (inv_idx l offset) pos_builder)
@@ -222,7 +226,7 @@ let get_selectable_w_ctx ~ord lits =
           | _ ->
             aux_term ~top:false
               ~pos_builder:(PB.arg (inv_idx l (1 + offset)) pos_builder)
-              b ctx (log_depth + 1) k;
+              b_arg ctx (log_depth + 1) k;
             aux_term ~top:false
               ~pos_builder:(PB.arg (inv_idx l offset) pos_builder)
               a ctx (log_depth + 1) k)
@@ -230,21 +234,22 @@ let get_selectable_w_ctx ~ord lits =
           aux_term_args
             ~idx:(List.length args - 1)
             ~pos_builder args under_equiv_ctx log_depth k
-        | T.AppBuiltin (Builtin.Not, [ t ]) ->
+        | T.AppBuiltin (_b_not, [ t ]) when Builtin.equal _b_not Builtin.not_ ->
           let ctx = negate_sgn ctx lor neg_sym_ctx in
           aux_term ~top:false ~pos_builder:(PB.arg 0 pos_builder) t ctx
             (log_depth + 1) k
-        | T.AppBuiltin (Builtin.And, args) ->
+        | T.AppBuiltin (_b_and, args) when Builtin.equal _b_and Builtin.and_ ->
           let ctx = get_sgn_ctx ctx lor and_ctx in
           aux_term_args
             ~idx:(List.length args - 1)
             ~pos_builder args ctx (log_depth + 1) k
-        | T.AppBuiltin (Builtin.Or, args) ->
+        | T.AppBuiltin (_b_or, args) when Builtin.equal _b_or Builtin.or_ ->
           let ctx = get_sgn_ctx ctx lor or_ctx in
           aux_term_args
             ~idx:(List.length args - 1)
             ~pos_builder args ctx (log_depth + 1) k
-        | T.AppBuiltin (Builtin.Imply, [ p; c ]) ->
+        | T.AppBuiltin (_b_imply, [ p; c ])
+          when Builtin.equal _b_imply Builtin.imply ->
           let ctx_p = negate_sgn ctx lor premise_ctx in
           aux_term ~top:false ~pos_builder:(PB.arg 1 pos_builder) p ctx_p
             (log_depth + 1) k;
@@ -341,7 +346,9 @@ let by_context_weight_combination ~ord ~ctx_fun ~weight_fun lits =
 
 let is_eq t =
   match T.view t with
-  | T.AppBuiltin ((Eq | Neq), _) -> true
+  | T.AppBuiltin (b, _)
+    when Builtin.equal b Builtin.eq || Builtin.equal b Builtin.neq ->
+    true
   | _ -> false
 
 let sel1 lits =

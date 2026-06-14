@@ -37,7 +37,7 @@ let b = T.const ~ty (Name.make "b")
 let x = T.var_of_int ~ty 0
 let y = T.var_of_int ~ty 1
 let fun_var x y = T.app (T.var_of_int ~ty:Type.([ ty; ty ] ==> ty) 2) [ x; y ]
-let quant body = T.app_builtin ~ty:prop Builtin.ExistsConst [ ty_t; body ]
+let quant body = T.app_builtin ~ty:prop Builtin.existsConst [ ty_t; body ]
 let p_fun = T.const ~ty:Type.([ ty ] ==> prop) p_
 let q_fun = T.const ~ty:Type.([ [ ty ] ==> prop; ty ] ==> prop) q_
 

@@ -36,11 +36,11 @@ let[@inline] mk_neg f = T.app neg_const [ f ]
 
 let rec open_term ~stack t =
   match T.view t with
-  | T.AppBuiltin (Eq, ([ a; b ] | [ _; a; b ])) when Type.is_prop (T.ty t) ->
-    open_term ~stack (mk_eq a b)
-  | T.AppBuiltin (Neq, ([ a; b ] | [ _; a; b ])) when Type.is_prop (T.ty t) ->
-    open_term ~stack (mk_neq a b)
-  | T.AppBuiltin (Not, [ a ]) -> open_term ~stack (mk_neg a)
+  | T.AppBuiltin (b0, ([ a; b2 ] | [ _; a; b2 ])) when Type.is_prop (T.ty t) ->
+    open_term ~stack (mk_eq a b2)
+  | T.AppBuiltin (b0, ([ a; b2 ] | [ _; a; b2 ])) when Type.is_prop (T.ty t) ->
+    open_term ~stack (mk_neq a b2)
+  | T.AppBuiltin (b, [ a ]) -> open_term ~stack (mk_neg a)
   | T.Var _ | T.DB _ | T.AppBuiltin _ | T.Fun _ | T.Const _ ->
     Some { cur_term = t; stack = [] :: stack }
   | _ when (not (Unif.Ty.type_is_unifiable (T.ty t))) || Type.is_fun (T.ty t) ->

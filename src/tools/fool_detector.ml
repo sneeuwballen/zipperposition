@@ -46,7 +46,8 @@ let classify_stm f =
           let top =
             top
             && (Builtin.is_logical_op hd
-               || List.mem hd Builtin.[ True; False; Eq; Neq ])
+               || List.mem hd
+                    [ Builtin.true_; Builtin.false_; Builtin.eq; Builtin.neq ])
           in
           aux_l ~top args
         | Ite (cond, cond_true, cond_false) ->

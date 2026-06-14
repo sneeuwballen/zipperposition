@@ -185,7 +185,7 @@ apply_term:
   | ARITH_MINUS t=apply_term
     {
       let loc = L.mk_pos $startpos $endpos in
-      T.app_builtin ~loc Builtin.Uminus [t]
+      T.app_builtin ~loc Builtin.uminus_ [t]
     }
 
 mult_term:
@@ -193,12 +193,12 @@ mult_term:
   | a=apply_term ARITH_PRODUCT b=mult_term
     {
       let loc = L.mk_pos $startpos $endpos in
-      T.app_builtin ~loc Builtin.Product [a;b]
+      T.app_builtin ~loc Builtin.product_ [a;b]
     }
 
 %inline PLUS_OP:
-  | ARITH_PLUS { Builtin.Sum }
-  | ARITH_MINUS { Builtin.Difference }
+  | ARITH_PLUS { Builtin.sum_ }
+  | ARITH_MINUS { Builtin.difference_ }
 
 plus_term:
   | t=mult_term { t }
@@ -209,10 +209,10 @@ plus_term:
     }
 
 %inline ARITH_OP:
-  | ARITH_LT { Builtin.Less }
-  | ARITH_LEQ { Builtin.Lesseq }
-  | ARITH_GT { Builtin.Greater }
-  | ARITH_GEQ { Builtin.Greatereq }
+  | ARITH_LT { Builtin.less_ }
+  | ARITH_LEQ { Builtin.lesseq_ }
+  | ARITH_GT { Builtin.greater_ }
+  | ARITH_GEQ { Builtin.greatereq_ }
 
 arith_op_term:
   | t=plus_term { t }

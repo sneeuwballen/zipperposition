@@ -47,14 +47,23 @@ let view t =
     | _ ->
       CCFormat.printf "wrong:@[%a@]@." T.pp t;
       assert false)
-  | T.AppBuiltin (Builtin.Arrow, [ _ ]) -> assert false
-  | T.AppBuiltin (Builtin.Arrow, ret :: l) -> Fun (l, ret)
-  | T.AppBuiltin (Builtin.Prop, []) -> Builtin Prop
-  | T.AppBuiltin (Builtin.TType, []) -> Builtin TType
-  | T.AppBuiltin (Builtin.Term, []) -> Builtin Term
-  | T.AppBuiltin (Builtin.TyInt, []) -> Builtin Int
-  | T.AppBuiltin (Builtin.TyRat, []) -> Builtin Rat
-  | T.AppBuiltin (Builtin.TyReal, []) -> Builtin Real
+  | T.AppBuiltin (_b_arrow, [ _ ]) when Builtin.equal _b_arrow Builtin.arrow ->
+    assert false
+  | T.AppBuiltin (_b_arrow, ret :: l) when Builtin.equal _b_arrow Builtin.arrow
+    ->
+    Fun (l, ret)
+  | T.AppBuiltin (_b_prop, []) when Builtin.equal _b_prop Builtin.prop ->
+    Builtin Prop
+  | T.AppBuiltin (_b_ttype, []) when Builtin.equal _b_ttype Builtin.tType ->
+    Builtin TType
+  | T.AppBuiltin (_b_term, []) when Builtin.equal _b_term Builtin.term ->
+    Builtin Term
+  | T.AppBuiltin (_b_tyint, []) when Builtin.equal _b_tyint Builtin.ty_int ->
+    Builtin Int
+  | T.AppBuiltin (_b_tyrat, []) when Builtin.equal _b_tyrat Builtin.ty_rat ->
+    Builtin Rat
+  | T.AppBuiltin (_b_tyreal, []) when Builtin.equal _b_tyreal Builtin.ty_real ->
+    Builtin Real
   | _ -> assert false
 
 let hash = T.hash
@@ -64,7 +73,8 @@ let hash_mod_alpha = T.hash_mod_alpha
 
 let[@inline] is_tType ty =
   match T.view ty with
-  | T.AppBuiltin (Builtin.TType, []) -> true
+  | T.AppBuiltin (_b_ttype, []) when Builtin.equal _b_ttype Builtin.tType ->
+    true
   | _ -> false
 
 let[@inline] is_var ty =
@@ -89,7 +99,7 @@ let[@inline] is_const ty =
 
 let[@inline] is_fun ty =
   match T.view ty with
-  | T.AppBuiltin (Builtin.Arrow, _) -> true
+  | T.AppBuiltin (_b_arrow, _) when Builtin.equal _b_arrow Builtin.arrow -> true
   | _ -> false
 
 let[@inline] is_forall ty =
@@ -99,7 +109,7 @@ let[@inline] is_forall ty =
 
 let[@inline] is_prop ty =
   match T.view ty with
-  | T.AppBuiltin (Builtin.Prop, []) -> true
+  | T.AppBuiltin (_b_prop, []) when Builtin.equal _b_prop Builtin.prop -> true
   | _ -> false
 
 let as_var_exn ty =
@@ -108,11 +118,11 @@ let as_var_exn ty =
   | _ -> invalid_arg "as_var_exn"
 
 let tType = T.tType
-let prop = T.builtin ~ty:tType Builtin.Prop
-let term = T.builtin ~ty:tType Builtin.Term
-let int = T.builtin ~ty:tType Builtin.TyInt
-let rat = T.builtin ~ty:tType Builtin.TyRat
-let real = T.builtin ~ty:tType Builtin.TyReal
+let prop = T.builtin ~ty:tType Builtin.prop
+let term = T.builtin ~ty:tType Builtin.term
+let int = T.builtin ~ty:tType Builtin.ty_int
+let rat = T.builtin ~ty:tType Builtin.ty_rat
+let real = T.builtin ~ty:tType Builtin.ty_real
 
 let builtin = function
   | TType -> tType
@@ -279,7 +289,8 @@ let apply ty0 args0 =
   let rec aux ty args env =
     match T.view ty, args with
     | _, [] -> T.DB.eval env ty
-    | T.AppBuiltin (Builtin.Arrow, ret :: exp_args), _ :: _ ->
+    | T.AppBuiltin (_b1_arrow, ret :: exp_args), _ :: _
+      when Builtin.equal _b1_arrow Builtin.arrow ->
       (* match expected types with actual types *)
       aux_l ret exp_args args env
     | T.Bind (Binder.ForallTy, _, ty'), arg :: args' ->
@@ -299,7 +310,8 @@ let apply ty0 args0 =
     | _, [] -> T.DB.eval env (arrow exp_args ty_ret)
     | [], _ ->
       (match T.view (T.DB.eval env ty_ret) with
-      | T.AppBuiltin (Builtin.Arrow, ty_ret' :: exp_args') ->
+      | T.AppBuiltin (_b_arrow, ty_ret' :: exp_args')
+        when Builtin.equal _b_arrow Builtin.arrow ->
         (* [ty_ret = exp_args' -> ty_ret'], continue applying *)
         aux_l ty_ret' exp_args' args env
       | _ ->
@@ -600,21 +612,33 @@ module Conv = struct
                level, therefore there are [depth-i] binders in between *)
           bvar (depth - i - 1)
         | None -> var (aux_var v))
-      | PT.AppBuiltin (Builtin.Wildcard, []) ->
+      | PT.AppBuiltin (_b_wildcard, [])
+        when Builtin.equal _b_wildcard Builtin.wildcard ->
         (* make a fresh variable, but do not remember it *)
         var (fresh_ty_var ctx)
       | PT.Const id -> const id
-      | PT.AppBuiltin (Builtin.Arrow, ret :: args) ->
+      | PT.AppBuiltin (_b_arrow, ret :: args)
+        when Builtin.equal _b_arrow Builtin.arrow ->
         let ret = aux depth v2db ret in
         assert (not (is_fun ret || is_forall ret));
         let args = List.map (aux depth v2db) args in
         arrow args ret
-      | PT.AppBuiltin (Builtin.Term, []) -> term
-      | PT.AppBuiltin (Builtin.Prop, []) -> prop
-      | PT.AppBuiltin (Builtin.TType, []) -> tType
-      | PT.AppBuiltin (Builtin.TyInt, []) -> int
-      | PT.AppBuiltin (Builtin.TyRat, []) -> rat
-      | PT.AppBuiltin (Builtin.TyReal, []) -> real
+      | PT.AppBuiltin (_b_term, []) when Builtin.equal _b_term Builtin.term ->
+        term
+      | PT.AppBuiltin (_b_prop, []) when Builtin.equal _b_prop Builtin.prop ->
+        prop
+      | PT.AppBuiltin (_b_ttype, []) when Builtin.equal _b_ttype Builtin.tType
+        ->
+        tType
+      | PT.AppBuiltin (_b_tyint, []) when Builtin.equal _b_tyint Builtin.ty_int
+        ->
+        int
+      | PT.AppBuiltin (_b_tyrat, []) when Builtin.equal _b_tyrat Builtin.ty_rat
+        ->
+        rat
+      | PT.AppBuiltin (_b_tyreal, [])
+        when Builtin.equal _b_tyreal Builtin.ty_real ->
+        real
       | PT.App (f, l) ->
         (match PT.view f with
         | PT.Const hd ->
@@ -657,12 +681,12 @@ module Conv = struct
   let rec to_simple_term ?(env = DBEnv.empty) ctx t =
     let rec aux env t =
       match view t with
-      | Builtin Prop -> PT.builtin ~ty:PT.tType Builtin.Prop
-      | Builtin TType -> PT.builtin ~ty:PT.tType Builtin.TType
-      | Builtin Term -> PT.builtin ~ty:PT.tType Builtin.Term
-      | Builtin Int -> PT.builtin ~ty:PT.tType Builtin.TyInt
-      | Builtin Rat -> PT.builtin ~ty:PT.tType Builtin.TyRat
-      | Builtin Real -> PT.builtin ~ty:PT.tType Builtin.TyReal
+      | Builtin Prop -> PT.builtin ~ty:PT.tType Builtin.prop
+      | Builtin TType -> PT.builtin ~ty:PT.tType Builtin.tType
+      | Builtin Term -> PT.builtin ~ty:PT.tType Builtin.term
+      | Builtin Int -> PT.builtin ~ty:PT.tType Builtin.ty_int
+      | Builtin Rat -> PT.builtin ~ty:PT.tType Builtin.ty_rat
+      | Builtin Real -> PT.builtin ~ty:PT.tType Builtin.ty_real
       | Var v ->
         let v = aux_var v in
         PT.var v

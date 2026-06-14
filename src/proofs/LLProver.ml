@@ -24,7 +24,8 @@ module CC = Congruence.Make (struct
     match T.view t with
     | T.App (f, a) -> [ f; a ]
     | T.Arrow (a, b) -> [ a; b ]
-    | T.AppBuiltin (Builtin.Box_opaque, _) -> [] (* simple equality *)
+    | T.AppBuiltin (_b_box, _) when Builtin.equal _b_box Builtin.box_opaque ->
+      [] (* simple equality *)
     | T.AppBuiltin (_, l) -> l
     | T.Ite (a, b, c) -> [ a; b; c ]
     | T.Bind { body; _ } -> [ body ]

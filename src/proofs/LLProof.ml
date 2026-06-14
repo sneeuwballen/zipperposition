@@ -218,8 +218,10 @@ module Dot = struct
   let color p : string option =
     let rec is_bool_atom t =
       match T.view t with
-      | T.AppBuiltin (Builtin.Box_opaque, _) -> true
-      | T.AppBuiltin (Builtin.Not, [ t ]) -> is_bool_atom t
+      | T.AppBuiltin (_b_box, _) when Builtin.equal _b_box Builtin.box_opaque ->
+        true
+      | T.AppBuiltin (_b_not, [ t ]) when Builtin.equal _b_not Builtin.not_ ->
+        is_bool_atom t
       | _ -> false
     in
     match step p, F.view (concl p) with

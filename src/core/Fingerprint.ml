@@ -45,7 +45,11 @@ let expand_otf_ body =
 let rec gfpf ?(depth = 0) pos t =
   let if_and_or t =
     match T.view t with
-    | T.AppBuiltin (Builtin.(And | Or), _) -> true
+    | T.AppBuiltin (b, _)
+      when match Builtin.view b with
+           | Some Builtin_gen.And | Some Builtin_gen.Or -> true
+           | _ -> false ->
+      true
     | _ -> false
   in
 

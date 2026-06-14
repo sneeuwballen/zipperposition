@@ -94,75 +94,77 @@ let ty_of_term (t : Term.t) : Type.t =
 
 let builtin_of_string s =
   match s with
-  | "¬" -> Some Builtin.Not
-  | "∧" -> Some Builtin.And
-  | "∨" -> Some Builtin.Or
-  | "⇒" -> Some Builtin.Imply
-  | "≡" -> Some Builtin.Equiv
-  | "<~>" -> Some Builtin.Xor
-  | "=" -> Some Builtin.Eq
-  | "≠" -> Some Builtin.Neq
-  | ":" -> Some Builtin.HasType
-  | "true" -> Some Builtin.True
-  | "false" -> Some Builtin.False
-  | "→" -> Some Builtin.Arrow
-  | "_" -> Some Builtin.Wildcard
-  | "Ms" -> Some Builtin.Multiset
-  | "type" -> Some Builtin.TType
-  | "prop" -> Some Builtin.Prop
-  | "ι" -> Some Builtin.Term
-  | "·∀" -> Some Builtin.ForallConst
-  | "·∃" -> Some Builtin.ExistsConst
-  | "·ε" -> Some Builtin.ChoiceConst
-  | "★" -> Some Builtin.Grounding
-  | "int" -> Some Builtin.TyInt
-  | "rat" -> Some Builtin.TyRat
-  | "real" -> Some Builtin.TyReal
-  | "floor" -> Some Builtin.Floor
-  | "ceiling" -> Some Builtin.Ceiling
-  | "truncate" -> Some Builtin.Truncate
-  | "round" -> Some Builtin.Round
-  | "prec" -> Some Builtin.Prec
-  | "succ" -> Some Builtin.Succ
-  | "uminus" -> Some Builtin.Uminus
-  | "×" -> Some Builtin.Product
-  | "quotient_e" -> Some Builtin.Quotient_e
-  | "quotient_t" -> Some Builtin.Quotient_t
-  | "quotient_f" -> Some Builtin.Quotient_f
-  | "remainder_e" -> Some Builtin.Remainder_e
-  | "remainder_t" -> Some Builtin.Remainder_t
-  | "remainder_f" -> Some Builtin.Remainder_f
-  | "is_int" -> Some Builtin.Is_int
-  | "is_rat" -> Some Builtin.Is_rat
-  | "to_int" -> Some Builtin.To_int
-  | "to_rat" -> Some Builtin.To_rat
-  | "≤" -> Some Builtin.Lesseq
-  | "≥" -> Some Builtin.Greatereq
-  | "<box>" -> Some Builtin.Box_opaque
-  | "distinct" -> Some Builtin.Distinct
-  | "B" -> Some Builtin.BComb
-  | "C" -> Some Builtin.CComb
-  | "I" -> Some Builtin.IComb
-  | "K" -> Some Builtin.KComb
-  | "S" -> Some Builtin.SComb
-  | "+" -> Some Builtin.Sum
-  | "-" -> Some Builtin.Difference
-  | "/" -> Some Builtin.Quotient
-  | "<" -> Some Builtin.Less
-  | ">" -> Some Builtin.Greater
+  | "¬" -> Some (Builtin.make_view Builtin_gen.Not)
+  | "∧" -> Some (Builtin.make_view Builtin_gen.And)
+  | "∨" -> Some (Builtin.make_view Builtin_gen.Or)
+  | "⇒" -> Some (Builtin.make_view Builtin_gen.Imply)
+  | "≡" -> Some (Builtin.make_view Builtin_gen.Equiv)
+  | "<~>" -> Some (Builtin.make_view Builtin_gen.Xor)
+  | "=" -> Some (Builtin.make_view Builtin_gen.Eq)
+  | "≠" -> Some (Builtin.make_view Builtin_gen.Neq)
+  | ":" -> Some (Builtin.make_view Builtin_gen.HasType)
+  | "true" -> Some (Builtin.make_view Builtin_gen.True)
+  | "false" -> Some (Builtin.make_view Builtin_gen.False)
+  | "→" -> Some (Builtin.make_view Builtin_gen.Arrow)
+  | "_" -> Some (Builtin.make_view Builtin_gen.Wildcard)
+  | "Ms" -> Some (Builtin.make_view Builtin_gen.Multiset)
+  | "type" -> Some (Builtin.make_view Builtin_gen.TType)
+  | "prop" -> Some (Builtin.make_view Builtin_gen.Prop)
+  | "ι" -> Some (Builtin.make_view Builtin_gen.Term)
+  | "·∀" -> Some (Builtin.make_view Builtin_gen.ForallConst)
+  | "·∃" -> Some (Builtin.make_view Builtin_gen.ExistsConst)
+  | "·ε" -> Some (Builtin.make_view Builtin_gen.ChoiceConst)
+  | "★" -> Some (Builtin.make_view Builtin_gen.Grounding)
+  | "int" -> Some (Builtin.make_view Builtin_gen.TyInt)
+  | "rat" -> Some (Builtin.make_view Builtin_gen.TyRat)
+  | "real" -> Some (Builtin.make_view Builtin_gen.TyReal)
+  | "floor" -> Some (Builtin.make_view Builtin_gen.Floor)
+  | "ceiling" -> Some (Builtin.make_view Builtin_gen.Ceiling)
+  | "truncate" -> Some (Builtin.make_view Builtin_gen.Truncate)
+  | "round" -> Some (Builtin.make_view Builtin_gen.Round)
+  | "prec" -> Some (Builtin.make_view Builtin_gen.Prec)
+  | "succ" -> Some (Builtin.make_view Builtin_gen.Succ)
+  | "uminus" -> Some (Builtin.make_view Builtin_gen.Uminus)
+  | "×" -> Some (Builtin.make_view Builtin_gen.Product)
+  | "quotient_e" -> Some (Builtin.make_view Builtin_gen.Quotient_e)
+  | "quotient_t" -> Some (Builtin.make_view Builtin_gen.Quotient_t)
+  | "quotient_f" -> Some (Builtin.make_view Builtin_gen.Quotient_f)
+  | "remainder_e" -> Some (Builtin.make_view Builtin_gen.Remainder_e)
+  | "remainder_t" -> Some (Builtin.make_view Builtin_gen.Remainder_t)
+  | "remainder_f" -> Some (Builtin.make_view Builtin_gen.Remainder_f)
+  | "is_int" -> Some (Builtin.make_view Builtin_gen.Is_int)
+  | "is_rat" -> Some (Builtin.make_view Builtin_gen.Is_rat)
+  | "to_int" -> Some (Builtin.make_view Builtin_gen.To_int)
+  | "to_rat" -> Some (Builtin.make_view Builtin_gen.To_rat)
+  | "≤" -> Some (Builtin.make_view Builtin_gen.Lesseq)
+  | "≥" -> Some (Builtin.make_view Builtin_gen.Greatereq)
+  | "<box>" -> Some (Builtin.make_view Builtin_gen.Box_opaque)
+  | "distinct" -> Some (Builtin.make_view Builtin_gen.Distinct)
+  | "B" -> Some (Builtin.make_view Builtin_gen.BComb)
+  | "C" -> Some (Builtin.make_view Builtin_gen.CComb)
+  | "I" -> Some (Builtin.make_view Builtin_gen.IComb)
+  | "K" -> Some (Builtin.make_view Builtin_gen.KComb)
+  | "S" -> Some (Builtin.make_view Builtin_gen.SComb)
+  | "+" -> Some (Builtin.make_view Builtin_gen.Sum)
+  | "-" -> Some (Builtin.make_view Builtin_gen.Difference)
+  | "/" -> Some (Builtin.make_view Builtin_gen.Quotient)
+  | "<" -> Some (Builtin.make_view Builtin_gen.Less)
+  | ">" -> Some (Builtin.make_view Builtin_gen.Greater)
   | _ ->
     if String.length s > 3 && String.sub s 0 3 = "db_" then (
       try
         Some
-          (Builtin.Pseudo_de_bruijn
-             (int_of_string (String.sub s 3 (String.length s - 3))))
+          (Builtin.make_payload
+             (Builtin.Pseudo_de_bruijn
+                (int_of_string (String.sub s 3 (String.length s - 3)))))
       with _ -> None
     ) else if String.length s > 0 && s.[0] >= '0' && s.[0] <= '9' then
       if String.contains s '/' then (
-        try Some (Builtin.Rat (Q.of_string s))
-        with _ -> Some (Builtin.Int (Z.of_string s))
+        try Some (Builtin.make_payload (Builtin.Rat (Q.of_string s)))
+        with _ -> Some (Builtin.make_payload (Builtin.Int (Z.of_string s)))
       ) else (
-        try Some (Builtin.Int (Z.of_string s)) with _ -> None
+        try Some (Builtin.make_payload (Builtin.Int (Z.of_string s)))
+        with _ -> None
       )
     else
       None
@@ -201,9 +203,16 @@ let builtin_result_ty (b : Builtin.t) : Type.t =
   | `Int -> Type.int
   | `Rat -> Type.rat
   | `Other ->
-    (match b with
-    | Arrow | TType | Prop | Term | TyInt | TyRat | TyReal | Multiset | HasType
-      ->
+    (match Builtin.view b with
+    | Some Arrow
+    | Some TType
+    | Some Prop
+    | Some Term
+    | Some TyInt
+    | Some TyRat
+    | Some TyReal
+    | Some Multiset
+    | Some HasType ->
       Type.tType
     | _ -> Type.prop)
 

@@ -319,7 +319,7 @@ let rec pp_rec depth out (t : t) =
   | Arrow (a, b) ->
     Fmt.fprintf out "@[%a@ @<1>→ %a@]" (pp_rec_inner depth) a (pp_rec depth) b
   | Var v -> Format.fprintf out "Y%d" (depth - HVar.id v - 1)
-  | AppBuiltin (Builtin.Box_opaque, [ t ]) ->
+  | AppBuiltin (_b_box, [ t ]) when Builtin.equal _b_box Builtin.box_opaque ->
     Format.fprintf out "@<1>⟦@[%a@]@<1>⟧" (pp_rec depth) t
   | AppBuiltin (b, [ a ]) when Builtin.is_prefix b ->
     Format.fprintf out "@[<1>%a@ %a@]" Builtin.pp b (pp_rec_inner depth) a
@@ -399,7 +399,7 @@ let[@inline] mk_ view ty : t =
 let t_type = mk_ Type None
 let[@inline] var v = mk_ (Var v) (Some (HVar.ty v))
 let[@inline] const ~ty id = mk_ (Const id) (Some ty)
-let prop = mk_ (AppBuiltin (Builtin.Prop, [])) (Some t_type)
+let prop = mk_ (AppBuiltin (Builtin.prop, [])) (Some t_type)
 
 let[@inline] is_type t : bool =
   match ty t with
@@ -424,20 +424,24 @@ let id_eta_ = Name.make "test_eta_" (* privat to {!as_eta_expansion} *)
 let[@inline] app_builtin ~ty b l =
   let mk_ b l = mk_ (AppBuiltin (b, l)) (Some ty) in
   match b, l with
-  | Builtin.Not, [ f' ] ->
+  | b, [ f' ] ->
     (match view f' with
-    | AppBuiltin (Builtin.Eq, l) -> mk_ Builtin.Neq l
-    | AppBuiltin (Builtin.Neq, l) -> mk_ Builtin.Eq l
-    | AppBuiltin (Builtin.Not, [ t ]) -> t
-    | AppBuiltin (Builtin.True, []) -> mk_ Builtin.False []
-    | AppBuiltin (Builtin.False, []) -> mk_ Builtin.True []
+    | AppBuiltin (_b_eq, l) when Builtin.equal _b_eq Builtin.eq ->
+      mk_ Builtin.neq l
+    | AppBuiltin (_b_neq, l) when Builtin.equal _b_neq Builtin.neq ->
+      mk_ Builtin.eq l
+    | AppBuiltin (_b_not, [ t ]) when Builtin.equal _b_not Builtin.not_ -> t
+    | AppBuiltin (_b_true, []) when Builtin.equal _b_true Builtin.true_ ->
+      mk_ Builtin.false_ []
+    | AppBuiltin (_b_false, []) when Builtin.equal _b_false Builtin.false_ ->
+      mk_ Builtin.true_ []
     | _ -> mk_ b l)
   | _ -> mk_ b l
 
 let[@inline] builtin ~ty b = app_builtin ~ty b []
-let bool = builtin ~ty:t_type Builtin.Prop
-let true_ = builtin ~ty:bool Builtin.True
-let false_ = builtin ~ty:bool Builtin.False
+let bool = builtin ~ty:t_type Builtin.prop
+let true_ = builtin ~ty:bool Builtin.true_
+let false_ = builtin ~ty:bool Builtin.false_
 
 let of_bool b =
   if b then
@@ -590,7 +594,7 @@ let rec arrow_l l ret =
   | [] -> ret
   | a :: tail -> arrow a (arrow_l tail ret)
 
-let box_opaque t = app_builtin ~ty:(ty_exn t) Builtin.Box_opaque [ t ]
+let box_opaque t = app_builtin ~ty:(ty_exn t) Builtin.box_opaque [ t ]
 let id_eta_ = Name.make "test_eta_" (* privat to {!as_eta_expansion} *)
 
 (* check if [body = t db0], with [db0 ∉ t].
@@ -640,16 +644,26 @@ module Form = struct
 
   let view t =
     match view t with
-    | AppBuiltin (Builtin.True, []) -> True
-    | AppBuiltin (Builtin.False, []) -> False
-    | AppBuiltin (Builtin.And, l) -> And l
-    | AppBuiltin (Builtin.Or, l) -> Or l
-    | AppBuiltin (Builtin.Not, [ t ]) -> Not t
-    | AppBuiltin (Builtin.Eq, ([ _; t; u ] | [ t; u ])) -> Eq (t, u)
-    | AppBuiltin (Builtin.Neq, ([ _; t; u ] | [ t; u ])) -> Neq (t, u)
-    | AppBuiltin (Builtin.Imply, [ t; u ]) -> Imply (t, u)
-    | AppBuiltin (Builtin.Equiv, [ t; u ]) -> Equiv (t, u)
-    | AppBuiltin (Builtin.Xor, [ t; u ]) -> Xor (t, u)
+    | AppBuiltin (_b_true, []) when Builtin.equal _b_true Builtin.true_ -> True
+    | AppBuiltin (_b_false, []) when Builtin.equal _b_false Builtin.false_ ->
+      False
+    | AppBuiltin (_b_and, l) when Builtin.equal _b_and Builtin.and_ -> And l
+    | AppBuiltin (_b_or, l) when Builtin.equal _b_or Builtin.or_ -> Or l
+    | AppBuiltin (_b_not, [ t ]) when Builtin.equal _b_not Builtin.not_ -> Not t
+    | AppBuiltin (_b1_eq, ([ _; t; u ] | [ t; u ]))
+      when Builtin.equal _b1_eq Builtin.eq ->
+      Eq (t, u)
+    | AppBuiltin (_b1_neq, ([ _; t; u ] | [ t; u ]))
+      when Builtin.equal _b1_neq Builtin.neq ->
+      Neq (t, u)
+    | AppBuiltin (_b_imply, [ t; u ]) when Builtin.equal _b_imply Builtin.imply
+      ->
+      Imply (t, u)
+    | AppBuiltin (_b_equiv, [ t; u ]) when Builtin.equal _b_equiv Builtin.equiv
+      ->
+      Equiv (t, u)
+    | AppBuiltin (_b_xor, [ t; u ]) when Builtin.equal _b_xor Builtin.xor ->
+      Xor (t, u)
     | Bind { binder = Binder.Forall; ty_var; body; _ } ->
       Forall { ty_var; body }
     | Bind { binder = Binder.Exists; ty_var; body; _ } ->
@@ -660,13 +674,13 @@ module Form = struct
 
   let true_ = true_
   let false_ = false_
-  let eq a b = app_builtin ~ty:(ty_exn a) Builtin.Eq [ a; b ]
-  let neq a b = app_builtin ~ty:bool Builtin.Neq [ a; b ]
-  let and_ a = app_builtin ~ty:bool Builtin.And a
-  let or_ a = app_builtin ~ty:bool Builtin.Or a
-  let equiv a b = app_builtin ~ty:(ty_exn a) Builtin.Equiv [ a; b ]
-  let imply a b = app_builtin ~ty:(ty_exn a) Builtin.Imply [ a; b ]
-  let xor a b = app_builtin ~ty:(ty_exn a) Builtin.Xor [ a; b ]
+  let eq a b = app_builtin ~ty:(ty_exn a) Builtin.eq [ a; b ]
+  let neq a b = app_builtin ~ty:bool Builtin.neq [ a; b ]
+  let and_ a = app_builtin ~ty:bool Builtin.and_ a
+  let or_ a = app_builtin ~ty:bool Builtin.or_ a
+  let equiv a b = app_builtin ~ty:(ty_exn a) Builtin.equiv [ a; b ]
+  let imply a b = app_builtin ~ty:(ty_exn a) Builtin.imply [ a; b ]
+  let xor a b = app_builtin ~ty:(ty_exn a) Builtin.xor [ a; b ]
   let int_pred = int_pred
   let rat_pred = rat_pred
   let forall ~ty_var body = bind Binder.Forall ~ty:bool ~ty_var body
@@ -679,7 +693,7 @@ module Form = struct
     | Not f -> f
     | Int_pred (l, o) -> int_pred l (Int_op.not o)
     | Rat_pred (l, o) -> rat_pred l (Rat_op.not o)
-    | _ -> app_builtin ~ty:bool Builtin.Not [ a ]
+    | _ -> app_builtin ~ty:bool Builtin.not_ [ a ]
 end
 
 module As_key = struct
@@ -714,12 +728,15 @@ module Conv = struct
         assert (ctx.depth > i);
         let ty = db_shift (ctx.depth - i) ty in
         var (HVar.make (ctx.depth - i - 1) ~ty))
-    | T.AppBuiltin (Builtin.Pseudo_de_bruijn i, []) ->
-      (* NOTE: magic here. This was a free De Bruijn index, typically coming
-         from rewriting under lambdas. Now we convert it back into a
-         normal DB index. *)
-      let ty = of_term ctx (T.ty_exn t) in
-      var (HVar.make i ~ty)
+    | T.AppBuiltin (b, []) ->
+      (match Builtin.is_payload b with
+      | Some (Builtin.Pseudo_de_bruijn i) ->
+        (* NOTE: magic here. This was a free De Bruijn index, typically coming
+            from rewriting under lambdas. Now we convert it back into a
+            normal DB index. *)
+        let ty = of_term ctx (T.ty_exn t) in
+        var (HVar.make i ~ty)
+      | _ -> of_term ctx t)
     | T.Const id ->
       let ty = of_term ctx (T.ty_exn t) in
       const id ~ty
@@ -742,17 +759,23 @@ module Conv = struct
         }
       in
       bind b ~ty_var ~ty (of_term ctx body)
-    | T.AppBuiltin (Builtin.TType, []) -> t_type
-    | T.AppBuiltin (Builtin.Arrow, ret :: l) ->
+    | T.AppBuiltin (_b_ttype, []) when Builtin.equal _b_ttype Builtin.tType ->
+      t_type
+    | T.AppBuiltin (_b_arrow, ret :: l)
+      when Builtin.equal _b_arrow Builtin.arrow ->
       let ret = of_term ctx ret in
       let l = List.map (of_term ctx) l in
       arrow_l l ret
     | T.AppBuiltin (b, l) ->
       let ty = T.ty_exn t in
       (match b with
-      | Builtin.Greatereq | Builtin.Lesseq | Builtin.Less | Builtin.Greater
-      | Builtin.Eq | Builtin.Neq
-        when List.exists is_arith l ->
+      | b
+        when Builtin.equal b Builtin.greatereq_
+             || Builtin.equal b Builtin.lesseq_
+             || Builtin.equal b Builtin.less_
+             || Builtin.equal b Builtin.greater_
+             || (Builtin.equal b Builtin.eq || Builtin.equal b Builtin.neq)
+                && List.exists is_arith l ->
         if List.exists is_int l then
           conv_int_pred ctx ~ty b l
         else (
@@ -780,12 +803,12 @@ module Conv = struct
     let module O = Int_op in
     let op =
       match b with
-      | Builtin.Greatereq -> O.Geq0
-      | Builtin.Lesseq -> O.Leq0
-      | Builtin.Less -> O.Lt0
-      | Builtin.Greater -> O.Gt0
-      | Builtin.Eq -> O.Eq0
-      | Builtin.Neq -> O.Neq0
+      | b when Builtin.equal b Builtin.greatereq_ -> O.Geq0
+      | b when Builtin.equal b Builtin.lesseq_ -> O.Leq0
+      | b when Builtin.equal b Builtin.less_ -> O.Lt0
+      | b when Builtin.equal b Builtin.greater_ -> O.Gt0
+      | b when Builtin.equal b Builtin.eq -> O.Eq0
+      | b when Builtin.equal b Builtin.neq -> O.Neq0
       | _ -> assert false
     in
     match l with
@@ -799,12 +822,12 @@ module Conv = struct
     let module O = Rat_op in
     let op =
       match b with
-      | Builtin.Greatereq -> O.Geq0
-      | Builtin.Lesseq -> O.Leq0
-      | Builtin.Less -> O.Lt0
-      | Builtin.Greater -> O.Gt0
-      | Builtin.Eq -> O.Eq0
-      | Builtin.Neq -> O.Neq0
+      | b when Builtin.equal b Builtin.greatereq_ -> O.Geq0
+      | b when Builtin.equal b Builtin.lesseq_ -> O.Leq0
+      | b when Builtin.equal b Builtin.less_ -> O.Lt0
+      | b when Builtin.equal b Builtin.greater_ -> O.Gt0
+      | b when Builtin.equal b Builtin.eq -> O.Eq0
+      | b when Builtin.equal b Builtin.neq -> O.Neq0
       | _ -> assert false
     in
     match l with
@@ -816,33 +839,51 @@ module Conv = struct
 
   and conv_int_linexp ctx t : Linexp_int.t =
     match T.view t with
-    | T.AppBuiltin (Builtin.Int z, []) -> Linexp_int.const z
-    | T.AppBuiltin (Builtin.Sum, [ _; a; b ]) ->
+    | T.AppBuiltin (b_, []) ->
+      (match Builtin.is_payload b_ with
+      | Some (Builtin.Int n) -> Linexp_int.const n
+      | _ -> Linexp_int.monomial1 (of_term ctx t))
+    | T.AppBuiltin (_b, [ _; a; b ]) when Builtin.equal _b Builtin.sum_ ->
       Linexp_int.(conv_int_linexp ctx a + conv_int_linexp ctx b)
-    | T.AppBuiltin (Builtin.Difference, [ _; a; b ]) ->
+    | T.AppBuiltin (_b, [ _; a; b ]) when Builtin.equal _b Builtin.difference_
+      ->
       Linexp_int.(conv_int_linexp ctx a - conv_int_linexp ctx b)
-    | T.AppBuiltin (Builtin.Product, [ _; a; b ]) ->
-      (match T.view a, T.view b with
-      | T.AppBuiltin (Builtin.Int n, []), _ ->
-        Linexp_int.(n * conv_int_linexp ctx b)
-      | _, T.AppBuiltin (Builtin.Int n, []) ->
-        Linexp_int.(n * conv_int_linexp ctx a)
+    | T.AppBuiltin (_b_prod, [ _; a; b_prod ])
+      when Builtin.equal _b_prod Builtin.product_ ->
+      (match T.view a, T.view b_prod with
+      | T.AppBuiltin (b_, []), _ ->
+        (match Builtin.is_payload b_ with
+        | Some (Builtin.Int n) -> Linexp_int.(n * conv_int_linexp ctx b_prod)
+        | _ -> Linexp_int.monomial1 (of_term ctx t))
+      | _, T.AppBuiltin (b_, []) ->
+        (match Builtin.is_payload b_ with
+        | Some (Builtin.Int n) -> Linexp_int.(n * conv_int_linexp ctx a)
+        | _ -> Linexp_int.monomial1 (of_term ctx t))
       | _ -> Linexp_int.monomial1 (of_term ctx t))
     | _ -> Linexp_int.monomial1 (of_term ctx t)
 
   and conv_rat_linexp ctx t : Linexp_rat.t =
     match T.view t with
-    | T.AppBuiltin (Builtin.Rat z, []) -> Linexp_rat.const z
-    | T.AppBuiltin (Builtin.Sum, [ _; a; b ]) ->
+    | T.AppBuiltin (b_, []) ->
+      (match Builtin.is_payload b_ with
+      | Some (Builtin.Rat q) -> Linexp_rat.const q
+      | _ -> Linexp_rat.monomial1 (of_term ctx t))
+    | T.AppBuiltin (_b, [ _; a; b ]) when Builtin.equal _b Builtin.sum_ ->
       Linexp_rat.(conv_rat_linexp ctx a + conv_rat_linexp ctx b)
-    | T.AppBuiltin (Builtin.Difference, [ _; a; b ]) ->
+    | T.AppBuiltin (_b, [ _; a; b ]) when Builtin.equal _b Builtin.difference_
+      ->
       Linexp_rat.(conv_rat_linexp ctx a - conv_rat_linexp ctx b)
-    | T.AppBuiltin (Builtin.Product, [ _; a; b ]) ->
-      (match T.view a, T.view b with
-      | T.AppBuiltin (Builtin.Rat n, []), _ ->
-        Linexp_rat.(n * conv_rat_linexp ctx b)
-      | _, T.AppBuiltin (Builtin.Rat n, []) ->
-        Linexp_rat.(n * conv_rat_linexp ctx a)
+    | T.AppBuiltin (_b_prod, [ _; a; b_prod ])
+      when Builtin.equal _b_prod Builtin.product_ ->
+      (match T.view a, T.view b_prod with
+      | T.AppBuiltin (b_, []), _ ->
+        (match Builtin.is_payload b_ with
+        | Some (Builtin.Rat q) -> Linexp_rat.(q * conv_rat_linexp ctx b_prod)
+        | _ -> Linexp_rat.monomial1 (of_term ctx t))
+      | _, T.AppBuiltin (b_, []) ->
+        (match Builtin.is_payload b_ with
+        | Some (Builtin.Rat q) -> Linexp_rat.(q * conv_rat_linexp ctx a)
+        | _ -> Linexp_rat.monomial1 (of_term ctx t))
       | _ -> Linexp_rat.monomial1 (of_term ctx t))
     | _ -> Linexp_rat.monomial1 (of_term ctx t)
 end

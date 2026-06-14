@@ -98,10 +98,19 @@ module Make (E : Env.S) : S with module Env = E = struct
 
       match T.view t with
       | T.App (hd, args) -> List.iter (fun t -> get_terms t k) args
-      | T.AppBuiltin ((And | Or | Not | Imply | Eq | Neq | Equiv | Xor), args)
-        ->
+      | T.AppBuiltin (b, args)
+        when Builtin.equal b Builtin.and_
+             || Builtin.equal b Builtin.or_
+             || Builtin.equal b Builtin.not_
+             || Builtin.equal b Builtin.imply
+             || Builtin.equal b Builtin.eq
+             || Builtin.equal b Builtin.neq
+             || Builtin.equal b Builtin.equiv
+             || Builtin.equal b Builtin.xor ->
         List.iter (fun t -> get_terms t k) args
-      | T.AppBuiltin ((ForallConst | ExistsConst), [ _; body ]) ->
+      | T.AppBuiltin (b, [ _; body ])
+        when Builtin.equal b Builtin.forallConst
+             || Builtin.equal b Builtin.existsConst ->
         if Env.flex_get k_include_quants then k body
       | _ -> ()
     in
@@ -363,7 +372,14 @@ module Make (E : Env.S) : S with module Env = E = struct
            | T.AppBuiltin (hd, _) ->
              (* check that the term has no interpreted sym on top *)
              not
-               (List.mem hd Builtin.[ Eq; Neq; ForallConst; ExistsConst; Not ]
+               (List.mem hd
+                  [
+                    Builtin.eq;
+                    Builtin.neq;
+                    Builtin.forallConst;
+                    Builtin.existsConst;
+                    Builtin.not_;
+                  ]
                || Builtin.is_logical_binop hd)
            | T.App (hd, _) -> not @@ T.is_var hd
            | _ -> true)
@@ -457,7 +473,14 @@ module Make (E : Env.S) : S with module Env = E = struct
            match T.view t with
            | T.AppBuiltin (hd, _) ->
              List.mem hd
-               [ Builtin.Eq; Neq; Xor; Equiv; ForallConst; ExistsConst ]
+               [
+                 Builtin.eq;
+                 Builtin.neq;
+                 Builtin.xor;
+                 Builtin.equiv;
+                 Builtin.forallConst;
+                 Builtin.existsConst;
+               ]
              && Type.is_prop (T.ty t)
            | _ -> false)
     |> Iter.to_list
@@ -465,10 +488,14 @@ module Make (E : Env.S) : S with module Env = E = struct
     |> CCList.sort_uniq ~cmp:(fun (t1, _) (t2, _) -> T.compare t1 t2)
     |> List.map (fun (t, _) ->
            match T.view t with
-           | T.AppBuiltin (Builtin.(Eq | Equiv), ([ a; b ] | [ _; a; b ])) ->
+           | T.AppBuiltin (b_bltn, ([ a; b ] | [ _; a; b ]))
+             when Builtin.equal b_bltn Builtin.eq
+                  || Builtin.equal b_bltn Builtin.equiv ->
              let new_lit = Literal.mk_eq a b in
              mk_res ~proof:(proof ~prefix:"eq") ~old:t ~repl:T.false_ new_lit c
-           | T.AppBuiltin (Builtin.(Neq | Xor), ([ a; b ] | [ _; a; b ])) ->
+           | T.AppBuiltin (b_bltn, ([ a; b ] | [ _; a; b ]))
+             when Builtin.equal b_bltn Builtin.neq
+                  || Builtin.equal b_bltn Builtin.xor ->
              let new_lit = Literal.mk_eq a b in
              mk_res ~proof:(proof ~prefix:"neq") ~old:t ~repl:T.true_ new_lit c
            | _ -> assert false)
@@ -1048,12 +1075,14 @@ module Make (E : Env.S) : S with module Env = E = struct
            Type.is_prop (T.ty t)
            &&
            match T.view t with
-           | T.AppBuiltin (Builtin.(Eq | Neq), [ _; a; b ])
-             when Type.is_prop (T.ty a) ->
+           | T.AppBuiltin (b_bltn, [ _; a; b ])
+             when (Builtin.equal b_bltn Builtin.eq
+                  || Builtin.equal b_bltn Builtin.neq)
+                  && Type.is_prop (T.ty a) ->
              (* tyarg does not have to be a variable *)
              T.is_var a && T.is_var b
            | T.AppBuiltin (hd, args) ->
-             (Builtin.is_logical_binop hd || hd = Builtin.Not)
+             (Builtin.is_logical_binop hd || hd = Builtin.not_)
              && List.for_all T.is_var args
            | _ -> false)
     |> CCOpt.map (fun (t, _) ->
@@ -1094,12 +1123,14 @@ module Make (E : Env.S) : S with module Env = E = struct
       get_bool_eligible c
       |> Iter.filter_map (fun (t, _) ->
              match T.view t with
-             | T.AppBuiltin ((Eq | Neq), [ _; a; b ]) when Type.is_prop (T.ty a)
-               ->
+             | T.AppBuiltin (b_bltn, [ _; a; b ])
+               when (Builtin.equal b_bltn Builtin.eq
+                    || Builtin.equal b_bltn Builtin.neq)
+                    && Type.is_prop (T.ty a) ->
                (* tyarg does not have to be a variable *)
                is_eligible [ a; b ]
              | T.AppBuiltin (hd, args)
-               when (Builtin.is_logical_binop hd || hd = Builtin.Not)
+               when (Builtin.is_logical_binop hd || hd = Builtin.not_)
                     && Type.is_prop (T.ty t) ->
                is_eligible args
              | _ -> None)
@@ -1142,8 +1173,8 @@ module Make (E : Env.S) : S with module Env = E = struct
           (* CAUTION: Using is_pos to really mean is the RHS of the
              term true or false? *)
           let sign = L.is_positivoid (C.lits c).(i) in
-          (Builtin.equal b Builtin.ForallConst && sign)
-          || (Builtin.equal b Builtin.ExistsConst && not sign)
+          (Builtin.equal b Builtin.forallConst && sign)
+          || (Builtin.equal b Builtin.existsConst && not sign)
         | _ -> false
       in
 
@@ -1158,7 +1189,7 @@ module Make (E : Env.S) : S with module Env = E = struct
         in
         let body = Combs.expand body in
         let form_for_skolem =
-          (if b = Builtin.ForallConst then
+          (if b = Builtin.forallConst then
              T.Form.not_
            else
              CCFun.id)
@@ -1195,7 +1226,7 @@ module Make (E : Env.S) : S with module Env = E = struct
       in
       let subst_t = fresh_var ~body in
       match b with
-      | Builtin.ForallConst ->
+      | b when Builtin.equal b Builtin.forallConst ->
         let new_lit = yes (T.app body [ subst_t ]) in
         let res =
           mk_res ~proof:(proof ~prefix:"forall") ~old ~repl:T.false_ new_lit c
@@ -1203,7 +1234,7 @@ module Make (E : Env.S) : S with module Env = E = struct
         if Type.returns_prop (T.ty subst_t) then
           Signal.send Env.on_pred_var_elimination (res, subst_t);
         res
-      | Builtin.ExistsConst ->
+      | b when Builtin.equal b Builtin.existsConst ->
         let new_lit = no (T.app body [ subst_t ]) in
         let res =
           mk_res ~proof:(proof ~prefix:"exists") ~old ~repl:T.true_ new_lit c
@@ -1218,8 +1249,9 @@ module Make (E : Env.S) : S with module Env = E = struct
     |> Iter.fold
          (fun acc (t, p) ->
            match T.view t with
-           | T.AppBuiltin
-               ((Builtin.(ForallConst | ExistsConst) as b), [ _; body ]) ->
+           | T.AppBuiltin (b, [ _; body ])
+             when Builtin.equal b Builtin.forallConst
+                  || Builtin.equal b Builtin.existsConst ->
              let hoisted = quant_hoist ~old:t b body in
              let rest =
                if CCArray.exists Literal.is_trivial (C.lits hoisted) then
@@ -1240,9 +1272,11 @@ module Make (E : Env.S) : S with module Env = E = struct
     get_bool_eligible c
     |> Iter.filter_map (fun (t, p) ->
            match T.view t with
-           | T.AppBuiltin
-               ( (Builtin.(Eq | Neq | Equiv | Xor) as hd),
-                 ([ a; b ] | [ _; a; b ]) ) ->
+           | T.AppBuiltin (hd_bt, ([ a; b ] | [ _; a; b ]))
+             when Builtin.equal hd_bt Builtin.eq
+                  || Builtin.equal hd_bt Builtin.neq
+                  || Builtin.equal hd_bt Builtin.equiv
+                  || Builtin.equal hd_bt Builtin.xor ->
              Some
                (get_unif_alg () (mk_sc a) (mk_sc b)
                |> OSeq.map (fun unif_subst_opt ->
@@ -1251,7 +1285,10 @@ module Make (E : Env.S) : S with module Env = E = struct
                           assert (not @@ US.has_constr unif_subst);
                           let subst = US.subst unif_subst in
                           let repl =
-                            if hd = Builtin.Eq || hd = Builtin.Equiv then
+                            if
+                              Builtin.equal hd_bt Builtin.eq
+                              || Builtin.equal hd_bt Builtin.equiv
+                            then
                               T.true_
                             else
                               T.false_
@@ -1358,15 +1395,15 @@ module Make (E : Env.S) : S with module Env = E = struct
   let simplify_bools t =
     let negate t =
       match T.view t with
-      | T.AppBuiltin (((Builtin.Eq | Builtin.Neq) as b), l) ->
+      | T.AppBuiltin (b0_, l) ->
         let hd =
-          if b = Builtin.Eq then
-            Builtin.Neq
+          if Builtin.equal b0_ Builtin.eq then
+            Builtin.neq
           else
-            Builtin.Eq
+            Builtin.eq
         in
         T.app_builtin ~ty:(T.ty t) hd l
-      | T.AppBuiltin (Builtin.Not, [ s ]) -> s
+      | T.AppBuiltin (_b_not, [ s ]) when Builtin.equal _b_not Builtin.not_ -> s
       | _ -> T.Form.not_ t
     in
 
@@ -1377,7 +1414,9 @@ module Make (E : Env.S) : S with module Env = E = struct
           CCList.partition_map
             (fun t ->
               match view t with
-              | AppBuiltin (Builtin.Not, [ s ]) -> `Right s
+              | AppBuiltin (_b_not, [ s ])
+                when Builtin.equal _b_not Builtin.not_ ->
+                `Right s
               | _ -> `Left t)
             l
           |> CCPair.map_same Set.of_list
@@ -1386,9 +1425,9 @@ module Make (E : Env.S) : S with module Env = E = struct
       in
 
       let res =
-        assert (b = Builtin.And || b = Builtin.Or);
+        assert (b = Builtin.and_ || b = Builtin.or_);
         let netural_el, absorbing_el =
-          if b = Builtin.And then
+          if b = Builtin.and_ then
             true_, false_
           else
             false_, true_
@@ -1430,7 +1469,7 @@ module Make (E : Env.S) : S with module Env = E = struct
           t
         else
           T.app hd' args'
-      | AppBuiltin (Builtin.And, [ x ])
+      | AppBuiltin (_b1_and, [ x ])
         when T.is_true_or_false x && ty_is_prop t
              && List.length (Type.expected_args (T.ty t)) = 1 ->
         if T.equal x T.true_ then
@@ -1439,7 +1478,7 @@ module Make (E : Env.S) : S with module Env = E = struct
           assert (T.equal x T.false_);
           T.fun_ Type.prop T.false_
         )
-      | AppBuiltin (Builtin.Or, [ x ])
+      | AppBuiltin (_b1_or, [ x ])
         when T.is_true_or_false x && ty_is_prop t
              && List.length (Type.expected_args (T.ty t)) = 1 ->
         let prop = Type.prop in
@@ -1449,28 +1488,29 @@ module Make (E : Env.S) : S with module Env = E = struct
           assert (T.equal x T.false_);
           T.fun_ prop (T.bvar ~ty:prop 0)
         )
-      | AppBuiltin (Builtin.And, l) when ty_is_prop t && List.length l > 1 ->
+      | AppBuiltin (_b1_and, l) when Builtin.equal _b1_and Builtin.and_ ->
         let l' = List.map aux l in
         let t =
           if T.same_l l l' then
             t
           else
-            T.app_builtin ~ty:Type.prop Builtin.And l'
+            T.app_builtin ~ty:Type.prop Builtin.and_ l'
         in
-        simplify_and_or t Builtin.And l'
-      | AppBuiltin (Builtin.Or, l) when ty_is_prop t && List.length l > 1 ->
+        simplify_and_or t Builtin.and_ l'
+      | AppBuiltin (_b1_or, l) when Builtin.equal _b1_or Builtin.or_ ->
         let l' = List.map aux l in
         let t =
           if T.same_l l l' then
             t
           else
-            T.app_builtin ~ty:Type.prop Builtin.Or l'
+            T.app_builtin ~ty:Type.prop Builtin.or_ l'
         in
-        simplify_and_or t Builtin.Or l'
-      | AppBuiltin (Builtin.Not, [ s ]) ->
+        simplify_and_or t Builtin.or_ l'
+      | AppBuiltin (_b_not, [ s ]) when Builtin.equal _b_not Builtin.not_ ->
         let s' = aux s in
         (match T.view s' with
-        | AppBuiltin (Builtin.Not, [ s'' ]) -> s''
+        | AppBuiltin (_b_not, [ s'' ]) when Builtin.equal _b_not Builtin.not_ ->
+          s''
         | _ ->
           if T.equal s' T.true_ then
             T.false_
@@ -1479,21 +1519,24 @@ module Make (E : Env.S) : S with module Env = E = struct
           else if T.equal s s' then
             t
           else
-            T.app_builtin ~ty:Type.prop Builtin.Not [ s' ])
-      | AppBuiltin (Builtin.Imply, [ p; c ]) ->
+            T.app_builtin ~ty:Type.prop Builtin.not_ [ s' ])
+      | AppBuiltin (_b_imply, [ p; c ])
+        when Builtin.equal _b_imply Builtin.imply ->
         let unroll_and p =
           match T.view p with
-          | AppBuiltin (And, l) -> T.Set.of_list l
+          | AppBuiltin (b, l) when Builtin.equal b Builtin.and_ ->
+            T.Set.of_list l
           | _ -> T.Set.singleton p
         in
         let unroll_or p =
           match T.view p with
-          | AppBuiltin (Or, l) -> T.Set.of_list l
+          | AppBuiltin (b, l) when Builtin.equal b Builtin.or_ ->
+            T.Set.of_list l
           | _ -> T.Set.singleton p
         in
         let is_impl p =
           match T.view p with
-          | AppBuiltin (Imply, [ l; r ]) -> true
+          | AppBuiltin (b, [ l; r ]) when Builtin.equal b Builtin.imply -> true
           | _ -> false
         in
 
@@ -1504,7 +1547,7 @@ module Make (E : Env.S) : S with module Env = E = struct
           assert (is_impl p);
           let rec aux acc p =
             match T.view p with
-            | AppBuiltin (Imply, [ l; r ]) ->
+            | AppBuiltin (b, [ l; r ]) when Builtin.equal b Builtin.imply ->
               let unrolled_l = unroll_and l in
               let acc' = Term.Set.union unrolled_l acc in
               if is_impl r then
@@ -1538,12 +1581,12 @@ module Make (E : Env.S) : S with module Env = E = struct
         else if T.equal p p' && T.equal c c' then
           t
         else
-          T.app_builtin ~ty:(T.ty t) Builtin.Imply [ p'; c' ]
-      | AppBuiltin
-          (((Builtin.Eq | Builtin.Equiv) as hd), ([ a; b ] | [ _; a; b ]))
-        when Type.is_prop (T.ty t) ->
+          T.app_builtin ~ty:(T.ty t) Builtin.imply [ p'; c' ]
+      | AppBuiltin (b0_, ([ a; b ] | [ _; a; b ]))
+        when (Builtin.equal b0_ Builtin.eq || Builtin.equal b0_ Builtin.equiv)
+             && Type.is_prop (T.ty t) ->
         let cons =
-          if hd = Builtin.Eq then
+          if Builtin.equal b0_ Builtin.eq then
             T.Form.eq
           else
             T.Form.equiv
@@ -1563,11 +1606,11 @@ module Make (E : Env.S) : S with module Env = E = struct
           t
         else
           cons a' b'
-      | AppBuiltin
-          (((Builtin.Neq | Builtin.Xor) as hd), ([ a; b ] | [ _; a; b ]))
-        when Type.is_prop (T.ty t) ->
+      | AppBuiltin (b0_, ([ a; b ] | [ _; a; b ]))
+        when (Builtin.equal b0_ Builtin.neq || Builtin.equal b0_ Builtin.xor)
+             && Type.is_prop (T.ty t) ->
         let cons =
-          if hd = Builtin.Neq then
+          if Builtin.equal b0_ Builtin.neq then
             T.Form.neq
           else
             T.Form.xor
@@ -1587,7 +1630,9 @@ module Make (E : Env.S) : S with module Env = E = struct
           t
         else
           cons a' b'
-      | AppBuiltin (((ExistsConst | ForallConst) as b), [ tyarg; g ]) ->
+      | AppBuiltin (b, [ tyarg; g ])
+        when Builtin.equal b Builtin.existsConst
+             || Builtin.equal b Builtin.forallConst ->
         let g' = aux g in
         let exp_g = Combs.expand g' in
         let _, body = T.open_fun exp_g in
@@ -1649,12 +1694,14 @@ module Make (E : Env.S) : S with module Env = E = struct
           t
         else
           T.app hd' args'
-      | AppBuiltin (((ExistsConst | ForallConst) as hd), [ alpha ]) ->
+      | AppBuiltin (hd, [ alpha ])
+        when Builtin.equal hd Builtin.existsConst
+             || Builtin.equal hd Builtin.forallConst ->
         let alpha = Type.of_term_unsafe (alpha :> InnerTerm.t) in
         let alpha2prop = Type.arrow [ alpha ] Type.prop in
         let inner_quant =
           let body =
-            if Builtin.equal hd ExistsConst then
+            if Builtin.equal hd Builtin.existsConst then
               T.false_
             else
               T.true_
@@ -1663,13 +1710,15 @@ module Make (E : Env.S) : S with module Env = E = struct
         in
         let var = T.bvar ~ty:alpha2prop 0 in
         let body =
-          if Builtin.equal hd ExistsConst then
+          if Builtin.equal hd Builtin.existsConst then
             T.Form.neq var inner_quant
           else
             T.Form.eq var inner_quant
         in
         T.fun_ alpha2prop body
-      | AppBuiltin ((ExistsConst | ForallConst), []) ->
+      | AppBuiltin (b, [])
+        when Builtin.equal b Builtin.existsConst
+             || Builtin.equal b Builtin.forallConst ->
         invalid_arg "type argument must be present"
       | AppBuiltin (hd, args) ->
         let args' = List.map aux args in
@@ -1678,7 +1727,7 @@ module Make (E : Env.S) : S with module Env = E = struct
           let q_pref, q_body = T.open_fun @@ List.nth args' 1 in
           let var_ty = List.hd q_pref in
           if not (quant_normal var_ty q_body) then
-            if Builtin.equal hd Builtin.ExistsConst then
+            if Builtin.equal hd Builtin.existsConst then
               T.Form.neq (List.nth args' 1) (T.fun_ var_ty T.false_)
             else
               T.Form.eq (List.nth args' 1) (T.fun_ var_ty T.true_)
@@ -1753,23 +1802,27 @@ module Make (E : Env.S) : S with module Env = E = struct
           t
         else
           T.app hd' l'
-      | AppBuiltin (Builtin.Not, [ f ]) ->
+      | AppBuiltin (_b_not, [ f ]) when Builtin.equal _b_not Builtin.not_ ->
         (match T.view f with
-        | AppBuiltin (Not, [ g ]) -> aux g
-        | AppBuiltin (((And | Or) as b), l) when List.length l >= 2 ->
+        | AppBuiltin (b_not, [ g ]) -> aux g
+        | AppBuiltin (b, l)
+          when (Builtin.equal b Builtin.and_ || Builtin.equal b Builtin.or_)
+               && List.length l >= 2 ->
           let flipped =
-            if b = Builtin.And then
+            if b = Builtin.and_ then
               F.or_l
             else
               F.and_l
           in
           flipped (List.map (fun t -> aux (F.not_ t)) l)
-        | AppBuiltin (((ForallConst | ExistsConst) as b), ([ g ] | [ _; g ])) ->
+        | AppBuiltin (b, ([ g ] | [ _; g ]))
+          when Builtin.equal b Builtin.forallConst
+               || Builtin.equal b Builtin.existsConst ->
           let flipped =
-            if b = Builtin.ForallConst then
-              Builtin.ExistsConst
+            if b = Builtin.forallConst then
+              Builtin.existsConst
             else
-              Builtin.ForallConst
+              Builtin.forallConst
           in
           let g_ty_args, g_body = T.open_fun (Combs.expand g) in
           let g_body' = aux @@ F.not_ g_body in
@@ -1777,27 +1830,32 @@ module Make (E : Env.S) : S with module Env = E = struct
             Lambda.eta_reduce ~expand_quant (T.fun_l g_ty_args g_body')
           in
           T.app_builtin ~ty:(T.ty t) flipped [ g' ]
-        | AppBuiltin (Imply, [ g; h ]) -> F.and_ (aux g) (aux @@ F.not_ h)
-        | AppBuiltin (((Equiv | Xor) as b), [ g; h ]) ->
+        | AppBuiltin (b, [ g; h ]) when Builtin.equal b Builtin.imply ->
+          F.and_ (aux g) (aux @@ F.not_ h)
+        | AppBuiltin (b, [ g; h ])
+          when Builtin.equal b Builtin.equiv || Builtin.equal b Builtin.xor ->
           let flipped =
-            if b = Equiv then
-              Builtin.Xor
+            if Builtin.equal b Builtin.equiv then
+              Builtin.xor
             else
-              Builtin.Equiv
+              Builtin.equiv
           in
           aux (T.app_builtin ~ty:(T.ty t) flipped [ g; h ])
-        | AppBuiltin (((Eq | Neq) as b), ([ _; s; t ] | [ s; t ])) ->
+        | AppBuiltin (b, ([ _; s; t ] | [ s; t ]))
+          when Builtin.equal b Builtin.eq || Builtin.equal b Builtin.neq ->
           let flipped =
-            if b = Eq then
+            if Builtin.equal b Builtin.eq then
               F.neq
             else
               F.eq
           in
           flipped (aux s) (aux t)
         | _ -> F.not_ (aux f))
-      | AppBuiltin (Imply, [ f; g ]) -> aux (F.or_ (F.not_ f) g)
-      | AppBuiltin (Equiv, [ f; g ]) -> aux (F.and_ (F.imply f g) (F.imply g f))
-      | AppBuiltin (Xor, [ f; g ]) ->
+      | AppBuiltin (b, [ f; g ]) when Builtin.equal b Builtin.imply ->
+        aux (F.or_ (F.not_ f) g)
+      | AppBuiltin (b, [ f; g ]) when Builtin.equal b Builtin.equiv ->
+        aux (F.and_ (F.imply f g) (F.imply g f))
+      | AppBuiltin (b, [ f; g ]) when Builtin.equal b Builtin.xor ->
         aux (F.and_ (F.or_ f g) (F.or_ (F.not_ f) (F.not_ g)))
       | AppBuiltin (b, l) ->
         let l' = List.map aux l in
@@ -1850,23 +1908,25 @@ module Make (E : Env.S) : S with module Env = E = struct
     let normalize_not t =
       let rec aux t =
         match T.view t with
-        | T.AppBuiltin (Not, [ f ]) ->
+        | T.AppBuiltin (b_not, [ f ]) ->
           (match T.view f with
-          | T.AppBuiltin (Not, [ g ]) -> aux g
-          | T.AppBuiltin (((Eq | Equiv) as b), l) ->
+          | T.AppBuiltin (b_not, [ g ]) -> aux g
+          | T.AppBuiltin (b, l)
+            when Builtin.equal b Builtin.eq || Builtin.equal b Builtin.equiv ->
             let flipped =
-              if b = Builtin.Eq then
-                Builtin.Neq
+              if b = Builtin.eq then
+                Builtin.neq
               else
-                Builtin.Xor
+                Builtin.xor
             in
             T.app_builtin flipped l ~ty:(T.ty f)
-          | T.AppBuiltin (((Neq | Xor) as b), l) ->
+          | T.AppBuiltin (b, l)
+            when Builtin.equal b Builtin.neq || Builtin.equal b Builtin.xor ->
             let flipped =
-              if b = Builtin.Neq then
-                Builtin.Eq
+              if b = Builtin.neq then
+                Builtin.eq
               else
-                Builtin.Equiv
+                Builtin.equiv
             in
             T.app_builtin flipped l ~ty:(T.ty f)
           | _ -> t)
@@ -1906,12 +1966,15 @@ module Make (E : Env.S) : S with module Env = E = struct
               T.Form.not_
           in
           match T.view (normalize_not (apply_sign l)) with
-          | T.AppBuiltin ((Neq | Xor), ([ f; g ] | [ _; f; g ]))
-            when Type.is_prop (T.ty f) && which == `All ->
+          | T.AppBuiltin (b, ([ f; g ] | [ _; f; g ]))
+            when (Builtin.equal b Builtin.neq || Builtin.equal b Builtin.xor)
+                 && Type.is_prop (T.ty f)
+                 && which == `All ->
             assert (Type.equal (T.ty f) (T.ty g));
             Some (f, g)
-          | T.AppBuiltin ((Eq | Equiv), ([ f; g ] | [ _; f; g ]))
-            when Type.is_prop (T.ty f) ->
+          | T.AppBuiltin (b, ([ f; g ] | [ _; f; g ]))
+            when (Builtin.equal b Builtin.eq || Builtin.equal b Builtin.equiv)
+                 && Type.is_prop (T.ty f) ->
             assert (Type.equal (T.ty f) (T.ty g));
             find_pos_var_headed_eq f g
           | _ -> None
@@ -2269,7 +2332,9 @@ let is_bool t = CCOpt.equal Ty.equal (Some prop) (ty t)
 
 let is_T_F t =
   match view t with
-  | AppBuiltin ((True | False), []) -> true
+  | AppBuiltin (b, [])
+    when Builtin.equal b Builtin.true_ || Builtin.equal b Builtin.false_ ->
+    true
   | _ -> false
 
 (* Modify every subterm of t by f except those at the "top". Here top is true if subterm occurs under a quantifier Æ in a context where it could participate to the clausification if the surrounding context of Æ was ignored. *)
@@ -2331,7 +2396,9 @@ let name_quantifiers stmts =
             Var.Set.of_iter (TypedSTerm.Seq.free_vars t) |> Var.Set.to_list
           in
           let qid = Name.gensym () in
-          let ty = app_builtin ~ty:tType Arrow (prop :: map Var.ty vars) in
+          let ty =
+            app_builtin ~ty:tType Builtin.arrow (prop :: map Var.ty vars)
+          in
           let q = const ~ty qid in
           let q_vars = app ~ty:prop q (map var vars) in
           let proof =
@@ -2342,7 +2409,7 @@ let name_quantifiers stmts =
           let definition =
             (* ∀ vars: q[vars] ⇔ t, where t is a quantifier formula and q is a new name for it. *)
             bind_list ~ty:prop Binder.Forall vars
-              (app_builtin ~ty:prop Builtin.Equiv [ q_vars; t ])
+              (app_builtin ~ty:prop Builtin.equiv [ q_vars; t ])
           in
           CCVector.push new_stmts q_typedecl;
           CCVector.push new_stmts (assert_ ~proof definition);
@@ -2401,10 +2468,10 @@ let case_bool vs c p =
     && Var.Set.is_empty (Var.Set.diff (free_vars_set p) vs)
   then (
     let ty = prop in
-    app_builtin ~ty And
+    app_builtin ~ty Builtin.and_
       [
-        app_builtin ~ty Imply [ p; replace p Form.true_ c ];
-        app_builtin ~ty Or [ p; replace p Form.false_ c ];
+        app_builtin ~ty Builtin.imply [ p; replace p Form.true_ c ];
+        app_builtin ~ty Builtin.or_ [ p; replace p Form.false_ c ];
       ]
   ) else
     c
@@ -2472,8 +2539,8 @@ let eager_cases_near stms =
              &&
              (* making sure it is not T or F *)
              (Builtin.is_logical_op hd
-             || Builtin.equal hd Builtin.Eq
-             || Builtin.equal hd Builtin.Neq) ->
+             || Builtin.equal hd Builtin.eq
+             || Builtin.equal hd Builtin.neq) ->
         CCFormat.printf "found OK eq@.";
         return p
       | Bind ((Binder.Exists | Binder.Forall), var, body)
@@ -2518,10 +2585,11 @@ let eager_cases_near stms =
     let rec aux ~vars p =
       let p_ty = T.ty_exn p in
       match T.view p with
-      | AppBuiltin (((Builtin.Neq | Builtin.Eq) as hd), ([ _; a; b ] | [ a; b ]))
-        when not (T.Ty.is_prop (T.ty_exn a)) ->
+      | AppBuiltin (b0_, ([ _; a; b ] | [ a; b ]))
+        when (Builtin.equal b0_ Builtin.eq || Builtin.equal b0_ Builtin.neq)
+             && not (T.Ty.is_prop (T.ty_exn a)) ->
         let cons =
-          if hd = Neq then
+          if Builtin.equal b0_ Builtin.neq then
             T.Form.neq
           else
             T.Form.eq

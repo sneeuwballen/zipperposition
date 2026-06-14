@@ -177,23 +177,23 @@ let open_fun_offset ~offset t =
   in
   aux offset DBEnv.empty [] t
 
-let true_ = builtin ~ty:Type.prop Builtin.True
-let false_ = builtin ~ty:Type.prop Builtin.False
-let grounding ty = builtin ~ty Builtin.Grounding
+let true_ = builtin ~ty:Type.prop Builtin.true_
+let false_ = builtin ~ty:Type.prop Builtin.false_
+let grounding ty = builtin ~ty Builtin.grounding
 
 let is_formula t =
   match T.view t with
   | T.AppBuiltin (hd, _) ->
     List.mem hd
       [
-        Builtin.And;
-        Builtin.Or;
-        Builtin.Not;
-        Builtin.Imply;
-        Builtin.Equiv;
-        Builtin.Xor;
-        Builtin.ForallConst;
-        Builtin.ExistsConst;
+        Builtin.and_;
+        Builtin.or_;
+        Builtin.not_;
+        Builtin.imply;
+        Builtin.equiv;
+        Builtin.xor;
+        Builtin.forallConst;
+        Builtin.existsConst;
       ]
   | _ -> false
 
@@ -532,7 +532,9 @@ let weight ?(var = 1) ?(sym = fun _ -> 1) t =
     else (
       match view t with
       | Var _ | DB _ -> var
-      | AppBuiltin ((ForallConst | ExistsConst), [ _; body ]) ->
+      | AppBuiltin (b_forall, [ _; body ])
+        when Builtin.equal b_forall Builtin.forallConst
+             || Builtin.equal b_forall Builtin.existsConst ->
         let _, body = open_fun body in
         1 + weight body
       | AppBuiltin (_, l) -> List.fold_left (fun s t' -> s + weight t') 1 l
@@ -672,13 +674,13 @@ let in_fool_fragment t =
     match view t with
     | AppBuiltin (b, l) ->
       if
-        Builtin.is_logical_op b || Builtin.equal Builtin.Eq b
-        || Builtin.equal Builtin.Neq b
+        Builtin.is_logical_op b || Builtin.equal Builtin.eq b
+        || Builtin.equal Builtin.neq b
       then (
         fool_subterm_found := true;
         List.for_all (aux ~top:false) l
       ) else
-        Builtin.equal Builtin.True b || Builtin.equal Builtin.False b
+        Builtin.equal Builtin.true_ b || Builtin.equal Builtin.false_ b
     | App (hd, l) -> T.is_const hd && List.for_all (aux ~top:false) l
     | Var _ ->
       if Type.is_prop (ty t) then fool_subterm_found := true;
@@ -695,7 +697,7 @@ let in_fool_fragment t =
 let is_true_or_false t =
   match view t with
   | AppBuiltin (b, _) ->
-    CCList.mem ~eq:Builtin.equal b [ Builtin.True; Builtin.False ]
+    CCList.mem ~eq:Builtin.equal b [ Builtin.true_; Builtin.false_ ]
   | _ -> false
 
 let inc_depth = function
@@ -966,7 +968,8 @@ let to_string = CCFormat.to_string pp
 module Form = struct
   let pp_hook _depth pp_rec out t =
     match Classic.view t with
-    | Classic.AppBuiltin (Builtin.Not, [ a ]) ->
+    | Classic.AppBuiltin (_b_not, [ a ]) when Builtin.equal _b_not Builtin.not_
+      ->
       Format.fprintf out "(@[<1>¬@ %a@])" pp_rec a;
       true
     | _ -> false (* default *)
@@ -980,7 +983,7 @@ module Form = struct
     );
     assert (Type.is_prop (ty t));
     match view t with
-    | AppBuiltin (Builtin.Not, [ u ]) -> u
+    | AppBuiltin (_b_not, [ u ]) when Builtin.equal _b_not Builtin.not_ -> u
     | _ -> app_builtin ~ty:Type.prop Builtin.not_ [ t ]
 
   let eq a b =
@@ -1017,13 +1020,13 @@ module Form = struct
     assert (Type.is_fun (ty t) && Type.returns_prop (ty t));
     let ty_args, ret_ty = Type.open_fun (ty t) in
     assert (List.length ty_args = 1);
-    app_builtin ~ty:Type.prop Builtin.ForallConst [ of_ty (List.hd ty_args); t ]
+    app_builtin ~ty:Type.prop Builtin.forallConst [ of_ty (List.hd ty_args); t ]
 
   let exists t =
     assert (Type.is_fun (ty t) && Type.returns_prop (ty t));
     let ty_args, ret_ty = Type.open_fun (ty t) in
     assert (List.length ty_args = 1);
-    app_builtin ~ty:Type.prop Builtin.ExistsConst [ of_ty (List.hd ty_args); t ]
+    app_builtin ~ty:Type.prop Builtin.existsConst [ of_ty (List.hd ty_args); t ]
 
   let choice t =
     let ty = ty t in
@@ -1031,11 +1034,11 @@ module Form = struct
     let args, ret = Type.open_fun ty in
     assert (Type.is_prop ret);
     let alpha = List.hd args in
-    app_builtin Builtin.ChoiceConst ~ty:alpha [ of_ty alpha; t ]
+    app_builtin Builtin.choiceConst ~ty:alpha [ of_ty alpha; t ]
 
-  let equiv f g = app_builtin ~ty:Type.prop Builtin.Equiv [ f; g ]
-  let xor f g = app_builtin ~ty:Type.prop Builtin.Xor [ f; g ]
-  let imply f g = app_builtin ~ty:Type.prop Builtin.Imply [ f; g ]
+  let equiv f g = app_builtin ~ty:Type.prop Builtin.equiv [ f; g ]
+  let xor f g = app_builtin ~ty:Type.prop Builtin.xor [ f; g ]
+  let imply f g = app_builtin ~ty:Type.prop Builtin.imply [ f; g ]
 end
 
 (** {2 Arith} *)
@@ -1082,38 +1085,39 @@ module Arith = struct
     | Var v when Type.equal (ty t) Type.rat ->
       Format.fprintf out "Q%d" (HVar.id v);
       true
-    | AppBuiltin (Builtin.Less, [ _; a; b ]) ->
-      Format.fprintf out "%a < %a" pp_surrounded a pp_surrounded b;
+    | AppBuiltin (b1, [ _; a; b2 ]) when Builtin.equal b1 Builtin.less_ ->
+      Format.fprintf out "%a < %a" pp_surrounded a pp_surrounded b2;
       true
-    | AppBuiltin (Builtin.Lesseq, [ _; a; b ]) ->
-      Format.fprintf out "%a ≤ %a" pp_surrounded a pp_surrounded b;
+    | AppBuiltin (b1, [ _; a; b2 ]) when Builtin.equal b1 Builtin.lesseq_ ->
+      Format.fprintf out "%a ≤ %a" pp_surrounded a pp_surrounded b2;
       true
-    | AppBuiltin (Builtin.Greater, [ _; a; b ]) ->
-      Format.fprintf out "%a > %a" pp_surrounded a pp_surrounded b;
+    | AppBuiltin (b1, [ _; a; b2 ]) when Builtin.equal b1 Builtin.greater_ ->
+      Format.fprintf out "%a > %a" pp_surrounded a pp_surrounded b2;
       true
-    | AppBuiltin (Builtin.Greatereq, [ _; a; b ]) ->
-      Format.fprintf out "%a ≥ %a" pp_surrounded a pp_surrounded b;
+    | AppBuiltin (b1, [ _; a; b2 ]) when Builtin.equal b1 Builtin.greatereq_ ->
+      Format.fprintf out "%a ≥ %a" pp_surrounded a pp_surrounded b2;
       true
-    | AppBuiltin (Builtin.Sum, [ _; a; b ]) ->
-      Format.fprintf out "%a + %a" pp_surrounded a pp_surrounded b;
+    | AppBuiltin (b1, [ _; a; b2 ]) when Builtin.equal b1 Builtin.sum_ ->
+      Format.fprintf out "%a + %a" pp_surrounded a pp_surrounded b2;
       true
-    | AppBuiltin (Builtin.Difference, [ _; a; b ]) ->
-      Format.fprintf out "%a - %a" pp_surrounded a pp_surrounded b;
+    | AppBuiltin (b1, [ _; a; b2 ]) when Builtin.equal b1 Builtin.difference_ ->
+      Format.fprintf out "%a - %a" pp_surrounded a pp_surrounded b2;
       true
-    | AppBuiltin (Builtin.Product, [ _; a; b ]) ->
-      Format.fprintf out "%a × %a" pp_surrounded a pp_surrounded b;
+    | AppBuiltin (b1, [ _; a; b2 ]) when Builtin.equal b1 Builtin.product_ ->
+      Format.fprintf out "%a × %a" pp_surrounded a pp_surrounded b2;
       true
-    | AppBuiltin (Builtin.Quotient, [ _; a; b ]) ->
-      Format.fprintf out "%a / %a" pp_surrounded a pp_surrounded b;
+    | AppBuiltin (_b_quot, [ _; a; b_quot ])
+      when Builtin.equal _b_quot Builtin.quotient_ ->
+      Format.fprintf out "%a / %a" pp_surrounded a pp_surrounded b_quot;
       true
-    | AppBuiltin (Builtin.Quotient_e, [ _; a; b ]) ->
-      Format.fprintf out "%a // %a" pp_surrounded a pp_surrounded b;
+    | AppBuiltin (b1, [ _; a; b2 ]) when Builtin.equal b1 Builtin.quotient_e ->
+      Format.fprintf out "%a // %a" pp_surrounded a pp_surrounded b2;
       true
-    | AppBuiltin (Builtin.Uminus, [ _; a ]) ->
+    | AppBuiltin (b1, [ _; a ]) when Builtin.equal b1 Builtin.uminus_ ->
       Format.fprintf out "-%a" pp_surrounded a;
       true
-    | AppBuiltin (Builtin.Remainder_e, [ _; a; b ]) ->
-      Format.fprintf out "%a mod %a" pp_surrounded a pp_surrounded b;
+    | AppBuiltin (b1, [ _; a; b2 ]) when Builtin.equal b1 Builtin.remainder_e ->
+      Format.fprintf out "%a mod %a" pp_surrounded a pp_surrounded b2;
       true
     | _ -> false (* default *)
 
@@ -1208,11 +1212,11 @@ module TPTP = struct
       | DB i -> Format.fprintf out "Y%d" (!depth - i - 1)
       (* print type of term *)
       | AppBuiltin (b, []) -> Builtin.TPTP.pp out b
-      | AppBuiltin (b, [ tyarg; t; u ])
-        when Builtin.TPTP.is_infix b && is_type tyarg ->
+      | AppBuiltin (b, [ tyarg; t; u ]) when Builtin.is_infix b && is_type tyarg
+        ->
         Format.fprintf out "(@[(%a) %a@ (%a)@])" pp_rec t Builtin.TPTP.pp b
           pp_rec u
-      | AppBuiltin (b, [ t; u ]) when Builtin.TPTP.is_infix b ->
+      | AppBuiltin (b, [ t; u ]) when Builtin.is_infix b ->
         Format.fprintf out "(@[(%a) %a@ (%a)@])" pp_rec t Builtin.TPTP.pp b
           pp_rec u
       | AppBuiltin (b, l) when List.length l >= 2 && Builtin.is_infix b ->
@@ -1304,19 +1308,23 @@ module Conv = struct
         (match PT.Var_tbl.get tbl v with
         | Some (i, ty) -> bvar ~ty (!depth - i - 1)
         | None -> var (Type.Conv.var_of_simple_term ctx v))
-      | PT.AppBuiltin (Builtin.Wildcard, []) ->
+      | PT.AppBuiltin (_b_wildcard, [])
+        when Builtin.equal _b_wildcard Builtin.wildcard ->
         (* fresh type variable *)
         var (Type.Conv.fresh_ty_var ctx)
       | PT.Const id ->
         let ty = Type.Conv.of_simple_term_exn ctx (PT.ty_exn t) in
         const ~ty id
       | PT.Bind (Binder.ForallTy, _, _)
-      | PT.AppBuiltin (Builtin.Arrow, _)
-      | PT.AppBuiltin (Builtin.Term, [])
-      | PT.AppBuiltin (Builtin.Prop, [])
-      | PT.AppBuiltin (Builtin.TType, [])
-      | PT.AppBuiltin (Builtin.TyInt, [])
-      | PT.AppBuiltin (Builtin.TyRat, []) ->
+      | PT.AppBuiltin (_, _)
+      | PT.AppBuiltin (_, [])
+      | PT.AppBuiltin (_, [])
+      | PT.AppBuiltin (_, [])
+      | PT.AppBuiltin (_, []) ->
+        let t = Type.Conv.of_simple_term_exn ctx t in
+        of_ty t
+      | PT.AppBuiltin (_b_tyrat, []) when Builtin.equal _b_tyrat Builtin.ty_rat
+        ->
         let t = Type.Conv.of_simple_term_exn ctx t in
         of_ty t
       | PT.App (f, l) ->
@@ -1343,9 +1351,9 @@ module Conv = struct
         else (
           let b =
             if Binder.equal b Binder.Forall then
-              Builtin.ForallConst
+              Builtin.forallConst
             else
-              Builtin.ExistsConst
+              Builtin.existsConst
           in
           let ty_arg = Type.Conv.of_simple_term_exn ctx (Var.ty v) in
           let previous =
@@ -1392,7 +1400,9 @@ module Conv = struct
         | Some v -> ST.var v
         | None when allow_free_db ->
           (* encode DB index *)
-          ST.builtin ~ty:(aux_ty @@ ty t) (Builtin.Pseudo_de_bruijn i)
+          ST.builtin
+            ~ty:(aux_ty @@ ty t)
+            (Builtin.make_payload (Builtin.Pseudo_de_bruijn i))
         | None ->
           Util.errorf ~where:"Term" "cannot find `Y%d`@ @[:in [%a]@]" i
             (DBEnv.pp Var.pp) env)
@@ -1400,10 +1410,10 @@ module Conv = struct
       | App (f, l) ->
         ST.app ~ty:(aux_ty (ty t)) (aux_t env f) (List.map (aux_t env) l)
       | AppBuiltin (b, [ _; body ])
-        when Builtin.equal b Builtin.ForallConst
-             || Builtin.equal b Builtin.ExistsConst ->
+        when Builtin.equal b Builtin.forallConst
+             || Builtin.equal b Builtin.existsConst ->
         let b =
-          if Builtin.equal b Builtin.ForallConst then
+          if Builtin.equal b Builtin.forallConst then
             Binder.Forall
           else
             Binder.Exists
@@ -1412,9 +1422,9 @@ module Conv = struct
 
         if is_true_or_false fun_body then
           if T.equal fun_body true_ then
-            ST.app_builtin ~ty:(aux_ty Type.prop) Builtin.True []
+            ST.app_builtin ~ty:(aux_ty Type.prop) Builtin.true_ []
           else
-            ST.app_builtin ~ty:(aux_ty Type.prop) Builtin.False []
+            ST.app_builtin ~ty:(aux_ty Type.prop) Builtin.false_ []
         else if not (Type.returns_prop (ty fun_body)) then (
           let err_msg =
             CCFormat.sprintf "quantifier wrongly encoded: %a(%a)" T.pp t T.pp
@@ -1517,7 +1527,7 @@ let rec normalize_bools t =
       t
     else
       app hd' args'
-  | AppBuiltin (((Builtin.And | Builtin.Or) as b), l) ->
+  | AppBuiltin (b0_, l) ->
     let l' = List.map normalize_bools l in
     let sorted = CCList.sort_uniq ~cmp:weight_cmp l' in
     if List.length l = List.length sorted && same_l l sorted then
@@ -1525,19 +1535,27 @@ let rec normalize_bools t =
     else if Type.is_prop (ty t) && List.length sorted = 1 then
       List.hd sorted
     else
-      app_builtin ~ty:Type.prop b sorted
-  | AppBuiltin
-      ( ((Builtin.Eq | Builtin.Neq | Builtin.Xor | Builtin.Equiv) as b),
-        ([ _; x; y ] as l) )
-  | AppBuiltin
-      ( ((Builtin.Eq | Builtin.Neq | Builtin.Xor | Builtin.Equiv) as b),
-        ([ x; y ] as l) )
-    when not (is_type x) ->
+      app_builtin ~ty:Type.prop b0_ sorted
+  | AppBuiltin (b, l)
+    when (Builtin.equal b Builtin.eq
+         || Builtin.equal b Builtin.neq
+         || Builtin.equal b Builtin.xor
+         || Builtin.equal b Builtin.equiv)
+         &&
+         match l with
+         | [ _; x; y ] | [ x; y ] -> not (is_type x)
+         | _ -> false ->
     let rec swap_last_two l =
       match l with
       | [] | [ _ ] -> l
       | [ x; y ] -> [ y; x ]
       | x :: xs -> x :: swap_last_two xs
+    in
+    let x, y =
+      match l with
+      | [ _; x; y ] -> x, y
+      | [ x; y ] -> x, y
+      | _ -> assert false
     in
     let x', y' = normalize_bools x, normalize_bools y in
     let l =
@@ -1563,8 +1581,8 @@ let rec is_properly_encoded t =
   match view t with
   | Var _ | DB _ | Const _ -> true
   | AppBuiltin (hd, l)
-    when Builtin.equal hd Builtin.ForallConst
-         || Builtin.equal hd Builtin.ExistsConst ->
+    when Builtin.equal hd Builtin.forallConst
+         || Builtin.equal hd Builtin.existsConst ->
     let res =
       match l with
       | [ tyarg ] -> Type.is_tType (ty tyarg)
@@ -1581,7 +1599,8 @@ let rec is_properly_encoded t =
     in
     (* if not res then CCFormat.printf "Failed for %a.\n" T.pp t; *)
     res
-  | AppBuiltin (Builtin.(Eq | Neq), l) ->
+  | AppBuiltin (b, l)
+    when Builtin.equal b Builtin.eq || Builtin.equal b Builtin.neq ->
     List.length l >= 1 && Type.is_tType (ty (List.hd l))
   | AppBuiltin (_, l) -> List.for_all is_properly_encoded l
   | App (hd, l) -> List.for_all is_properly_encoded (hd :: l)

@@ -1,5 +1,11 @@
 ; main lib
 
+(rule
+ (targets builtin_gen.ml builtin_gen.mli)
+ (deps gen_builtin.ml)
+ (action
+  (run ocaml %{project_root}/src/core/gen_builtin.ml %{targets})))
+
 (library
  (name logtk)
  (public_name logtk)
@@ -17,7 +23,7 @@
   logtk.arith
   logtk.hash
   zipperposition_mdag)
- (flags :standard -w -32-50 -open Logtk_arith -open Logtk_common)
+ (flags :standard -w -27-32-50 -open Logtk_arith -open Logtk_common)
  (foreign_stubs
   (language c)
   (names util_stubs)

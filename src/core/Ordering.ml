@@ -127,8 +127,12 @@ module Head = struct
     match T.view s with
     | T.App (f, _) -> term_to_head f
     (* The head Q is only used if there are two arguments, the type argument and the lambda-expression *)
-    | T.AppBuiltin (Builtin.ForallConst, [ _; _ ]) -> Q Forall
-    | T.AppBuiltin (Builtin.ExistsConst, [ _; _ ]) -> Q Exists
+    | T.AppBuiltin (_b_forall, [ _; _ ])
+      when Builtin.equal _b_forall Builtin.forallConst ->
+      Q Forall
+    | T.AppBuiltin (_b_exists, [ _; _ ])
+      when Builtin.equal _b_exists Builtin.existsConst ->
+      Q Exists
     | T.AppBuiltin (fid, _) -> B fid
     | T.Const fid -> I fid
     | T.Var x -> V x
@@ -138,7 +142,9 @@ module Head = struct
   let term_to_args s =
     match T.view s with
     | T.App (_, ss) -> ss
-    | T.AppBuiltin ((Builtin.ForallConst | Builtin.ExistsConst), [ ty; lam ]) ->
+    | T.AppBuiltin (b, [ ty; lam ])
+      when Builtin.equal b Builtin.forallConst
+           || Builtin.equal b Builtin.existsConst ->
       (* Under quantifiers, we ignore the lambda *)
       (match T.view lam with
       | T.Fun (ty', body) -> [ ty; body ]
@@ -1288,7 +1294,7 @@ module LambdaKBO : ORD = struct
           [ Polynomial.EtaUnknown var ]
       | _ -> ()
     in
-    let is_quantifier b = b = Builtin.ForallConst || b = Builtin.ExistsConst in
+    let is_quantifier b = b = Builtin.forallConst || b = Builtin.existsConst in
     let hd, (_, args) = break_term_up t in
     match T.view hd with
     | AppBuiltin (b, bargs) ->

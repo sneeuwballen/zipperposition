@@ -48,8 +48,8 @@ let rec conv_ty ty =
   match ty with
   | A.Ty_bool -> T.prop
   | A.Ty_arrow (args, ret) -> T.fun_ty (List.map conv_ty args) (conv_ty ret)
-  | A.Ty_app ("Int", []) -> T.builtin Builtin.TyInt
-  | A.Ty_app ("Rat", []) -> T.builtin Builtin.TyRat
+  | A.Ty_app ("Int", []) -> T.builtin Builtin.ty_int
+  | A.Ty_app ("Rat", []) -> T.builtin Builtin.ty_rat
   | A.Ty_app (s, []) -> T.var s (* var or const: let type inference decide *)
   | A.Ty_app (s, args) -> T.app (T.var s) (List.map conv_ty args)
 

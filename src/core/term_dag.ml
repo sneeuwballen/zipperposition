@@ -22,130 +22,138 @@ type t = {
 let create enc = { enc; term_cache = InnerTerm.WeakTbl.create 64 }
 
 let builtin_to_strings (b : Builtin.t) : string * string option =
-  match b with
-  | Builtin.Int n -> "Int", Some (Z.to_string n)
-  | Builtin.Rat q -> "Rat", Some (Q.to_string q)
-  | Builtin.Real s -> "Real", Some s
-  | Builtin.Pseudo_de_bruijn i -> "Pseudo_de_bruijn", Some (string_of_int i)
-  | Builtin.Not -> "Not", None
-  | Builtin.And -> "And", None
-  | Builtin.Or -> "Or", None
-  | Builtin.Imply -> "Imply", None
-  | Builtin.Equiv -> "Equiv", None
-  | Builtin.Xor -> "Xor", None
-  | Builtin.Eq -> "Eq", None
-  | Builtin.Neq -> "Neq", None
-  | Builtin.HasType -> "HasType", None
-  | Builtin.True -> "True", None
-  | Builtin.False -> "False", None
-  | Builtin.Arrow -> "Arrow", None
-  | Builtin.Wildcard -> "Wildcard", None
-  | Builtin.Multiset -> "Multiset", None
-  | Builtin.TType -> "TType", None
-  | Builtin.Prop -> "Prop", None
-  | Builtin.Term -> "Term", None
-  | Builtin.ForallConst -> "ForallConst", None
-  | Builtin.ExistsConst -> "ExistsConst", None
-  | Builtin.ChoiceConst -> "ChoiceConst", None
-  | Builtin.Grounding -> "Grounding", None
-  | Builtin.TyInt -> "TyInt", None
-  | Builtin.TyRat -> "TyRat", None
-  | Builtin.TyReal -> "TyReal", None
-  | Builtin.Floor -> "Floor", None
-  | Builtin.Ceiling -> "Ceiling", None
-  | Builtin.Truncate -> "Truncate", None
-  | Builtin.Round -> "Round", None
-  | Builtin.Prec -> "Prec", None
-  | Builtin.Succ -> "Succ", None
-  | Builtin.Sum -> "Sum", None
-  | Builtin.Difference -> "Difference", None
-  | Builtin.Uminus -> "Uminus", None
-  | Builtin.Product -> "Product", None
-  | Builtin.Quotient -> "Quotient", None
-  | Builtin.Quotient_e -> "Quotient_e", None
-  | Builtin.Quotient_t -> "Quotient_t", None
-  | Builtin.Quotient_f -> "Quotient_f", None
-  | Builtin.Remainder_e -> "Remainder_e", None
-  | Builtin.Remainder_t -> "Remainder_t", None
-  | Builtin.Remainder_f -> "Remainder_f", None
-  | Builtin.Is_int -> "Is_int", None
-  | Builtin.Is_rat -> "Is_rat", None
-  | Builtin.To_int -> "To_int", None
-  | Builtin.To_rat -> "To_rat", None
-  | Builtin.Less -> "Less", None
-  | Builtin.Lesseq -> "Lesseq", None
-  | Builtin.Greater -> "Greater", None
-  | Builtin.Greatereq -> "Greatereq", None
-  | Builtin.Box_opaque -> "Box_opaque", None
-  | Builtin.BComb -> "BComb", None
-  | Builtin.CComb -> "CComb", None
-  | Builtin.IComb -> "IComb", None
-  | Builtin.KComb -> "KComb", None
-  | Builtin.SComb -> "SComb", None
-  | Builtin.Distinct -> "Distinct", None
+  match Builtin.is_payload b with
+  | Some (Builtin.Int n) -> "Int", Some (Z.to_string n)
+  | Some (Builtin.Rat q) -> "Rat", Some (Q.to_string q)
+  | Some (Builtin.Real s) -> "Real", Some s
+  | Some (Builtin.Pseudo_de_bruijn i) ->
+    "Pseudo_de_bruijn", Some (string_of_int i)
+  | None ->
+    (match Builtin.view b with
+    | Some Builtin_gen.Not -> "Not", None
+    | Some Builtin_gen.And -> "And", None
+    | Some Builtin_gen.Or -> "Or", None
+    | Some Builtin_gen.Imply -> "Imply", None
+    | Some Builtin_gen.Equiv -> "Equiv", None
+    | Some Builtin_gen.Xor -> "Xor", None
+    | Some Builtin_gen.Eq -> "Eq", None
+    | Some Builtin_gen.Neq -> "Neq", None
+    | Some Builtin_gen.HasType -> "HasType", None
+    | Some Builtin_gen.True -> "True", None
+    | Some Builtin_gen.False -> "False", None
+    | Some Builtin_gen.Arrow -> "Arrow", None
+    | Some Builtin_gen.Wildcard -> "Wildcard", None
+    | Some Builtin_gen.Multiset -> "Multiset", None
+    | Some Builtin_gen.TType -> "TType", None
+    | Some Builtin_gen.Prop -> "Prop", None
+    | Some Builtin_gen.Term -> "Term", None
+    | Some Builtin_gen.ForallConst -> "ForallConst", None
+    | Some Builtin_gen.ExistsConst -> "ExistsConst", None
+    | Some Builtin_gen.ChoiceConst -> "ChoiceConst", None
+    | Some Builtin_gen.Grounding -> "Grounding", None
+    | Some Builtin_gen.TyInt -> "TyInt", None
+    | Some Builtin_gen.TyRat -> "TyRat", None
+    | Some Builtin_gen.TyReal -> "TyReal", None
+    | Some Builtin_gen.Floor -> "Floor", None
+    | Some Builtin_gen.Ceiling -> "Ceiling", None
+    | Some Builtin_gen.Truncate -> "Truncate", None
+    | Some Builtin_gen.Round -> "Round", None
+    | Some Builtin_gen.Prec -> "Prec", None
+    | Some Builtin_gen.Succ -> "Succ", None
+    | Some Builtin_gen.Sum -> "Sum", None
+    | Some Builtin_gen.Difference -> "Difference", None
+    | Some Builtin_gen.Uminus -> "Uminus", None
+    | Some Builtin_gen.Product -> "Product", None
+    | Some Builtin_gen.Quotient -> "Quotient", None
+    | Some Builtin_gen.Quotient_e -> "Quotient_e", None
+    | Some Builtin_gen.Quotient_t -> "Quotient_t", None
+    | Some Builtin_gen.Quotient_f -> "Quotient_f", None
+    | Some Builtin_gen.Remainder_e -> "Remainder_e", None
+    | Some Builtin_gen.Remainder_t -> "Remainder_t", None
+    | Some Builtin_gen.Remainder_f -> "Remainder_f", None
+    | Some Builtin_gen.Is_int -> "Is_int", None
+    | Some Builtin_gen.Is_rat -> "Is_rat", None
+    | Some Builtin_gen.To_int -> "To_int", None
+    | Some Builtin_gen.To_rat -> "To_rat", None
+    | Some Builtin_gen.Less -> "Less", None
+    | Some Builtin_gen.Lesseq -> "Lesseq", None
+    | Some Builtin_gen.Greater -> "Greater", None
+    | Some Builtin_gen.Greatereq -> "Greatereq", None
+    | Some Builtin_gen.Box_opaque -> "Box_opaque", None
+    | Some Builtin_gen.BComb -> "BComb", None
+    | Some Builtin_gen.CComb -> "CComb", None
+    | Some Builtin_gen.IComb -> "IComb", None
+    | Some Builtin_gen.KComb -> "KComb", None
+    | Some Builtin_gen.SComb -> "SComb", None
+    | Some Builtin_gen.Distinct -> "Distinct", None
+    | None ->
+      failwith
+        (Printf.sprintf "Term_dag.builtin_to_strings: unknown builtin %s"
+           (Builtin.to_string b)))
 
 let strings_to_builtin (name : string) (payload : string option) : Builtin.t =
   match name, payload with
-  | "Int", Some s -> Builtin.Int (Z.of_string s)
-  | "Rat", Some s -> Builtin.Rat (Q.of_string s)
-  | "Real", Some s -> Builtin.Real s
-  | "Pseudo_de_bruijn", Some s -> Builtin.Pseudo_de_bruijn (int_of_string s)
-  | "Not", None -> Builtin.Not
-  | "And", None -> Builtin.And
-  | "Or", None -> Builtin.Or
-  | "Imply", None -> Builtin.Imply
-  | "Equiv", None -> Builtin.Equiv
-  | "Xor", None -> Builtin.Xor
-  | "Eq", None -> Builtin.Eq
-  | "Neq", None -> Builtin.Neq
-  | "HasType", None -> Builtin.HasType
-  | "True", None -> Builtin.True
-  | "False", None -> Builtin.False
-  | "Arrow", None -> Builtin.Arrow
-  | "Wildcard", None -> Builtin.Wildcard
-  | "Multiset", None -> Builtin.Multiset
-  | "TType", None -> Builtin.TType
-  | "Prop", None -> Builtin.Prop
-  | "Term", None -> Builtin.Term
-  | "ForallConst", None -> Builtin.ForallConst
-  | "ExistsConst", None -> Builtin.ExistsConst
-  | "ChoiceConst", None -> Builtin.ChoiceConst
-  | "Grounding", None -> Builtin.Grounding
-  | "TyInt", None -> Builtin.TyInt
-  | "TyRat", None -> Builtin.TyRat
-  | "TyReal", None -> Builtin.TyReal
-  | "Floor", None -> Builtin.Floor
-  | "Ceiling", None -> Builtin.Ceiling
-  | "Truncate", None -> Builtin.Truncate
-  | "Round", None -> Builtin.Round
-  | "Prec", None -> Builtin.Prec
-  | "Succ", None -> Builtin.Succ
-  | "Sum", None -> Builtin.Sum
-  | "Difference", None -> Builtin.Difference
-  | "Uminus", None -> Builtin.Uminus
-  | "Product", None -> Builtin.Product
-  | "Quotient", None -> Builtin.Quotient
-  | "Quotient_e", None -> Builtin.Quotient_e
-  | "Quotient_t", None -> Builtin.Quotient_t
-  | "Quotient_f", None -> Builtin.Quotient_f
-  | "Remainder_e", None -> Builtin.Remainder_e
-  | "Remainder_t", None -> Builtin.Remainder_t
-  | "Remainder_f", None -> Builtin.Remainder_f
-  | "Is_int", None -> Builtin.Is_int
-  | "Is_rat", None -> Builtin.Is_rat
-  | "To_int", None -> Builtin.To_int
-  | "To_rat", None -> Builtin.To_rat
-  | "Less", None -> Builtin.Less
-  | "Lesseq", None -> Builtin.Lesseq
-  | "Greater", None -> Builtin.Greater
-  | "Greatereq", None -> Builtin.Greatereq
-  | "Box_opaque", None -> Builtin.Box_opaque
-  | "BComb", None -> Builtin.BComb
-  | "CComb", None -> Builtin.CComb
-  | "IComb", None -> Builtin.IComb
-  | "KComb", None -> Builtin.KComb
-  | "SComb", None -> Builtin.SComb
-  | "Distinct", None -> Builtin.Distinct
+  | "Int", Some s -> Builtin.make_payload (Builtin.Int (Z.of_string s))
+  | "Rat", Some s -> Builtin.make_payload (Builtin.Rat (Q.of_string s))
+  | "Real", Some s -> Builtin.make_payload (Builtin.Real s)
+  | "Pseudo_de_bruijn", Some s ->
+    Builtin.make_payload (Builtin.Pseudo_de_bruijn (int_of_string s))
+  | "Not", None -> Builtin.make_view Builtin_gen.Not
+  | "And", None -> Builtin.make_view Builtin_gen.And
+  | "Or", None -> Builtin.make_view Builtin_gen.Or
+  | "Imply", None -> Builtin.make_view Builtin_gen.Imply
+  | "Equiv", None -> Builtin.make_view Builtin_gen.Equiv
+  | "Xor", None -> Builtin.make_view Builtin_gen.Xor
+  | "Eq", None -> Builtin.make_view Builtin_gen.Eq
+  | "Neq", None -> Builtin.make_view Builtin_gen.Neq
+  | "HasType", None -> Builtin.make_view Builtin_gen.HasType
+  | "True", None -> Builtin.make_view Builtin_gen.True
+  | "False", None -> Builtin.make_view Builtin_gen.False
+  | "Arrow", None -> Builtin.make_view Builtin_gen.Arrow
+  | "Wildcard", None -> Builtin.make_view Builtin_gen.Wildcard
+  | "Multiset", None -> Builtin.make_view Builtin_gen.Multiset
+  | "TType", None -> Builtin.make_view Builtin_gen.TType
+  | "Prop", None -> Builtin.make_view Builtin_gen.Prop
+  | "Term", None -> Builtin.make_view Builtin_gen.Term
+  | "ForallConst", None -> Builtin.make_view Builtin_gen.ForallConst
+  | "ExistsConst", None -> Builtin.make_view Builtin_gen.ExistsConst
+  | "ChoiceConst", None -> Builtin.make_view Builtin_gen.ChoiceConst
+  | "Grounding", None -> Builtin.make_view Builtin_gen.Grounding
+  | "TyInt", None -> Builtin.make_view Builtin_gen.TyInt
+  | "TyRat", None -> Builtin.make_view Builtin_gen.TyRat
+  | "TyReal", None -> Builtin.make_view Builtin_gen.TyReal
+  | "Floor", None -> Builtin.make_view Builtin_gen.Floor
+  | "Ceiling", None -> Builtin.make_view Builtin_gen.Ceiling
+  | "Truncate", None -> Builtin.make_view Builtin_gen.Truncate
+  | "Round", None -> Builtin.make_view Builtin_gen.Round
+  | "Prec", None -> Builtin.make_view Builtin_gen.Prec
+  | "Succ", None -> Builtin.make_view Builtin_gen.Succ
+  | "Sum", None -> Builtin.make_view Builtin_gen.Sum
+  | "Difference", None -> Builtin.make_view Builtin_gen.Difference
+  | "Uminus", None -> Builtin.make_view Builtin_gen.Uminus
+  | "Product", None -> Builtin.make_view Builtin_gen.Product
+  | "Quotient", None -> Builtin.make_view Builtin_gen.Quotient
+  | "Quotient_e", None -> Builtin.make_view Builtin_gen.Quotient_e
+  | "Quotient_t", None -> Builtin.make_view Builtin_gen.Quotient_t
+  | "Quotient_f", None -> Builtin.make_view Builtin_gen.Quotient_f
+  | "Remainder_e", None -> Builtin.make_view Builtin_gen.Remainder_e
+  | "Remainder_t", None -> Builtin.make_view Builtin_gen.Remainder_t
+  | "Remainder_f", None -> Builtin.make_view Builtin_gen.Remainder_f
+  | "Is_int", None -> Builtin.make_view Builtin_gen.Is_int
+  | "Is_rat", None -> Builtin.make_view Builtin_gen.Is_rat
+  | "To_int", None -> Builtin.make_view Builtin_gen.To_int
+  | "To_rat", None -> Builtin.make_view Builtin_gen.To_rat
+  | "Less", None -> Builtin.make_view Builtin_gen.Less
+  | "Lesseq", None -> Builtin.make_view Builtin_gen.Lesseq
+  | "Greater", None -> Builtin.make_view Builtin_gen.Greater
+  | "Greatereq", None -> Builtin.make_view Builtin_gen.Greatereq
+  | "Box_opaque", None -> Builtin.make_view Builtin_gen.Box_opaque
+  | "BComb", None -> Builtin.make_view Builtin_gen.BComb
+  | "CComb", None -> Builtin.make_view Builtin_gen.CComb
+  | "IComb", None -> Builtin.make_view Builtin_gen.IComb
+  | "KComb", None -> Builtin.make_view Builtin_gen.KComb
+  | "SComb", None -> Builtin.make_view Builtin_gen.SComb
+  | "Distinct", None -> Builtin.make_view Builtin_gen.Distinct
   | _ ->
     failwith (Printf.sprintf "Term_dag.strings_to_builtin: unknown %S" name)
 

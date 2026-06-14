@@ -76,22 +76,19 @@ module Make (E : Env.S) : S with module Env = E = struct
         let sym_map', body' = aux ~sym_map body in
         sym_map', T.fun_ ty body'
       | T.AppBuiltin (b, _)
-        when (b == Builtin.Eq || b == Builtin.Neq)
+        when (Builtin.equal b Builtin.eq || Builtin.equal b Builtin.neq)
              && not (Type.is_prop (T.ty t)) ->
         let err = CCFormat.sprintf "%a is ho bool" T.pp t in
         raise @@ CantEncode err
       (* type erasure for terms E can understand *)
-      | T.AppBuiltin (((Builtin.Eq | Builtin.Neq) as b), [ ty; lhs; rhs ])
-        when T.is_ground ty ->
+      | T.AppBuiltin (b0_, [ ty; lhs; rhs ]) when T.is_ground ty ->
         let sym_map, lhs' = aux ~sym_map lhs in
         let sym_map, rhs' = aux ~sym_map rhs in
-        sym_map, T.app_builtin ~ty:Type.prop b [ ty; lhs'; rhs' ]
-      | T.AppBuiltin
-          (((Builtin.ForallConst | Builtin.ExistsConst) as b), [ q; body ])
-        when Type.is_ground (T.ty body) ->
+        sym_map, T.app_builtin ~ty:Type.prop b0_ [ ty; lhs'; rhs' ]
+      | T.AppBuiltin (b0_, [ q; body ]) when Type.is_ground (T.ty body) ->
         let vars, body = T.open_fun body in
         let sym_map, body' = aux ~sym_map body in
-        sym_map, T.app_builtin ~ty:Type.prop b [ q; T.fun_l vars body' ]
+        sym_map, T.app_builtin ~ty:Type.prop b0_ [ q; T.fun_l vars body' ]
       | T.AppBuiltin (_, l) | T.App (_, l) ->
         let hd_mono, args = T.as_app_mono t in
         let sym_map, hd =

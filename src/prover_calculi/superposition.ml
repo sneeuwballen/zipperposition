@@ -329,7 +329,9 @@ module Make (Env : Env.S) : S with module Env = Env = struct
              Env.flex_get k_superpose_w_formulas
              ||
              match T.view l with
-             | T.AppBuiltin ((Eq | Neq), _) -> false
+             | T.AppBuiltin (b, _)
+               when Builtin.equal b Builtin.eq || Builtin.equal b Builtin.neq ->
+               false
              | _ -> not (T.is_formula l))
       |> Iter.filter (fun (l, _, _, _) ->
              sup_from_var_headed || not (T.is_app_var l))
@@ -2500,13 +2502,14 @@ module Make (Env : Env.S) : S with module Env = Env = struct
         else
           reduce_at_root ~toplevel t k (* TODO: DemodExt *)
       | T.Var _ | T.DB _ -> k t
-      | T.AppBuiltin ((Builtin.(ForallConst | ExistsConst) as hd), [ _; body ])
-        ->
+      | T.AppBuiltin (hd, [ _; body ])
+        when Builtin.equal hd Builtin.forallConst
+             || Builtin.equal hd Builtin.existsConst ->
         if not (Env.flex_get k_quant_demod) then
           reduce_at_root ~toplevel t k
         else (
           let mk_quant =
-            if hd = ForallConst then
+            if Builtin.equal hd Builtin.forallConst then
               T.Form.forall
             else
               T.Form.exists
@@ -3005,20 +3008,26 @@ module Make (Env : Env.S) : S with module Env = Env = struct
             t
           else
             T.app hd args'
-        | T.AppBuiltin
-            (((Eq | Neq | Equiv | Xor) as hd), ([ _; x; y ] | [ x; y ]))
-          when Type.is_prop (T.ty t) && T.DB.is_closed x && T.DB.is_closed y ->
+        | T.AppBuiltin (hd, ([ _; x; y ] | [ x; y ]))
+          when (Builtin.equal hd Builtin.eq
+               || Builtin.equal hd Builtin.neq
+               || Builtin.equal hd Builtin.equiv
+               || Builtin.equal hd Builtin.xor)
+               && Type.is_prop (T.ty t)
+               && T.DB.is_closed x && T.DB.is_closed y ->
           let x', y' = CCPair.map_same aux (x, y) in
           assert (Type.equal (T.ty x) (T.ty x'));
           assert (Type.equal (T.ty y) (T.ty y'));
-          let sign = Builtin.equal Eq hd || Builtin.equal Equiv hd in
+          let sign =
+            Builtin.equal hd Builtin.eq || Builtin.equal hd Builtin.equiv
+          in
           (match simplify ~sign x' y' with
           | Some t -> t
           | None ->
             if not (T.equal x x' && T.equal y y') then
-              if Builtin.equal hd Eq then
+              if Builtin.equal hd Builtin.eq then
                 T.Form.eq x' y'
-              else if Builtin.equal hd Neq then
+              else if Builtin.equal hd Builtin.neq then
                 T.Form.neq x' y'
               else
                 T.app_builtin ~ty:(T.ty t) hd [ x'; y' ]

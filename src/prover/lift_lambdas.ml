@@ -204,13 +204,11 @@ module Make (E : Env.S) : S with module Env = E = struct
              T.app hd l'),
           new_defs,
           declared_syms )
-      | T.AppBuiltin
-          (((Builtin.ExistsConst | Builtin.ForallConst) as b), [ _; q_body ])
-        when T.is_fun q_body ->
+      | T.AppBuiltin (b0_, [ _; q_body ]) when T.is_fun q_body ->
         let vars, body = T.open_fun q_body in
         let body', new_defs, declared_syms = aux body in
         let mk_q b =
-          if Builtin.equal b ExistsConst then
+          if Builtin.equal b Builtin.existsConst then
             T.Form.exists
           else
             T.Form.forall
@@ -218,7 +216,7 @@ module Make (E : Env.S) : S with module Env = E = struct
         ( (if T.equal body body' then
              t
            else
-             mk_q b (T.fun_l vars body')),
+             mk_q b0_ (T.fun_l vars body')),
           new_defs,
           declared_syms )
       | T.AppBuiltin (b, l) ->

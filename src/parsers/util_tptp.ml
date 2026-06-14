@@ -203,8 +203,8 @@ let attr_of_info = function
 let rec looks_like_def f =
   match PT.view f with
   | PT.Bind (Binder.Forall, _, f') -> looks_like_def f'
-  | PT.AppBuiltin
-      ((Builtin.Equiv | Builtin.Eq), ([ _; lhs; rhs ] | [ lhs; rhs ])) ->
+  | PT.AppBuiltin (b, ([ _; lhs; rhs ] | [ lhs; rhs ]))
+    when Builtin.equal b Builtin.equiv || Builtin.equal b Builtin.eq ->
     (* LHS is an atom/literal? *)
     let as_atom t =
       match PT.view t with

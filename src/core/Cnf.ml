@@ -251,9 +251,13 @@ module Flatten = struct
     in
     let rec aux pos vars t =
       match T.view t with
-      | T.AppBuiltin (Builtin.True, []) -> return F.true_
-      | T.AppBuiltin (Builtin.False, []) -> return F.false_
-      | T.AppBuiltin (Builtin.Distinct, l) ->
+      | T.AppBuiltin (_b_true, []) when Builtin.equal _b_true Builtin.true_ ->
+        return F.true_
+      | T.AppBuiltin (_b_false, []) when Builtin.equal _b_false Builtin.false_
+        ->
+        return F.false_
+      | T.AppBuiltin (_b_distinct, l)
+        when Builtin.equal _b_distinct Builtin.distinct ->
         (* expand [distinct(ts)] into [And_{i<j} t_i != t_j] *)
         let l =
           CCList.diagonal l
@@ -369,31 +373,33 @@ module Flatten = struct
           T.app ~ty:(T.ty_exn t)
             (T.const def.Skolem.td_id ~ty:def.Skolem.td_ty)
             (List.map T.var closure @ [ u ]))
-      | T.AppBuiltin (Builtin.Greater, [ ty; a; b ])
-        when T.equal T.Ty.rat (T.ty_exn a) ->
-        aux pos vars (T.app_builtin ~ty:T.Ty.prop Builtin.Less [ ty; b; a ])
-      | T.AppBuiltin (Builtin.Greatereq, [ ty; a; b ])
-        when T.equal T.Ty.rat (T.ty_exn a) ->
-        aux pos vars (T.app_builtin ~ty:T.Ty.prop Builtin.Lesseq [ ty; b; a ])
-      | T.AppBuiltin (Builtin.Neq, [ _; a; b ])
-        when T.equal T.Ty.rat (T.ty_exn a) ->
+      | T.AppBuiltin (_b_greater, [ ty; a; b ])
+        when Builtin.equal _b_greater Builtin.greater_
+             && T.equal T.Ty.rat (T.ty_exn a) ->
+        aux pos vars (T.app_builtin ~ty:T.Ty.prop Builtin.less_ [ ty; b; a ])
+      | T.AppBuiltin (_b_greatereq, [ ty; a; b ])
+        when Builtin.equal _b_greatereq Builtin.greatereq_
+             && T.equal T.Ty.rat (T.ty_exn a) ->
+        aux pos vars (T.app_builtin ~ty:T.Ty.prop Builtin.lesseq_ [ ty; b; a ])
+      | T.AppBuiltin (_b1_neq, [ _; a; b ]) when T.equal T.Ty.rat (T.ty_exn a)
+        ->
         (* rat: a!=b -> a<b ∨ a>b *)
         aux Pos_toplevel vars a >>= fun a ->
         aux Pos_toplevel vars b >|= fun b ->
         let f =
           T.Form.or_
             [
-              T.app_builtin ~ty:T.Ty.prop Builtin.Less [ a; b ];
-              T.app_builtin ~ty:T.Ty.prop Builtin.Less [ b; a ];
+              T.app_builtin ~ty:T.Ty.prop Builtin.less_ [ a; b ];
+              T.app_builtin ~ty:T.Ty.prop Builtin.less_ [ b; a ];
             ]
         in
         aux_maybe_define ~should_define pos f
-      | T.AppBuiltin (Builtin.Eq, [ _; a; b ])
+      | T.AppBuiltin (_b1_eq, [ _; a; b ])
         when (not lazy_cnf) && T.Ty.is_prop (T.ty_exn a) ->
         (* converting equality to equivalence to ensure better CNF (that is better renaming)
            when lazy cnf is off *)
         F.equiv <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b
-      | T.AppBuiltin (Builtin.Eq, [ _; a; b ])
+      | T.AppBuiltin (_b1_eq, [ _; a; b ])
       (* when either of a and b are formulas, and they contain HO subterms
            it is better not to replace Lambda with Forall.
            
@@ -406,13 +412,13 @@ module Flatten = struct
             k T.pp t T.pp t');
         assert (vars_forall <> []);
         aux pos vars t'
-      | T.AppBuiltin (Builtin.Neq, [ _; a; b ])
+      | T.AppBuiltin (_b1_neq, [ _; a; b ])
         when (not lazy_cnf) && T.Ty.is_prop (T.ty_exn a) ->
         F.xor <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b
-      | T.AppBuiltin (Builtin.Eq, [ _; a; b ]) ->
+      | T.AppBuiltin (_b_eq, [ _; a; b ]) when Builtin.equal _b_eq Builtin.eq ->
         F.eq <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b
       (* >|= aux_maybe_define ~should_define pos *)
-      | T.AppBuiltin (Builtin.Neq, [ _; a; b ])
+      | T.AppBuiltin (_b1_neq, [ _; a; b ])
         when (T.is_fun a || T.is_fun b) && not lazy_cnf ->
         (* turn [f ≠ λx. t] into [∃x. f x≠t] *)
         let vars_exist, a, b = complete_eq a b in
@@ -421,31 +427,34 @@ module Flatten = struct
             k T.pp t T.pp t');
         assert (vars_exist <> []);
         aux pos vars t'
-      | T.AppBuiltin (Builtin.Neq, [ _; a; b ]) ->
+      | T.AppBuiltin (_b_neq, [ _; a; b ]) when Builtin.equal _b_neq Builtin.neq
+        ->
         F.neq <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b
       (* >|= aux_maybe_define pos *)
-      | T.AppBuiltin (Builtin.Imply, [ a; b ]) ->
+      | T.AppBuiltin (_b_imply, [ a; b ])
+        when Builtin.equal _b_imply Builtin.imply ->
         F.imply <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b
       (* >|= aux_maybe_define pos *)
-      | T.AppBuiltin (Builtin.Equiv, [ a; b ]) ->
+      | T.AppBuiltin (_b_equiv, [ a; b ])
+        when Builtin.equal _b_equiv Builtin.equiv ->
         F.equiv <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b
       (* >|= aux_maybe_define pos *)
-      | T.AppBuiltin (Builtin.Xor, [ a; b ]) ->
+      | T.AppBuiltin (_b_xor, [ a; b ]) when Builtin.equal _b_xor Builtin.xor ->
         F.xor <$> aux Pos_toplevel vars a <*> aux Pos_toplevel vars b
       (* >|= aux_maybe_define pos *)
-      | T.AppBuiltin (Builtin.And, l) ->
+      | T.AppBuiltin (_b_and, l) when Builtin.equal _b_and Builtin.and_ ->
         if CCList.length l <= 1 then
           return t
         else
           F.and_ <$> map_m (aux Pos_toplevel vars) l
         (*>|= aux_maybe_define pos*)
-      | T.AppBuiltin (Builtin.Or, l) ->
+      | T.AppBuiltin (_b_or, l) when Builtin.equal _b_or Builtin.or_ ->
         if CCList.length l <= 1 then
           return t
         else
           F.or_ <$> map_m (aux Pos_toplevel vars) l
         (*>|= aux_maybe_define pos*)
-      | T.AppBuiltin (Builtin.Not, [ a ]) ->
+      | T.AppBuiltin (_b_not, [ a ]) when Builtin.equal _b_not Builtin.not_ ->
         F.not_ <$> aux Pos_toplevel vars a (*>|= aux_maybe_define pos*)
       | T.AppBuiltin (b, l) ->
         return (T.app_builtin ~ty:(T.ty_exn t) b)

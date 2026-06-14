@@ -273,9 +273,10 @@ module Inner = struct
               t
             else
               T.app ~ty f' l'
-          | T.AppBuiltin
-              ((Builtin.(ExistsConst | ForallConst) as hd), [ tyarg; body ])
-            when expand_quant ->
+          | T.AppBuiltin (b, [ tyarg; body ])
+            when (Builtin.equal b Builtin.existsConst
+                 || Builtin.equal b Builtin.forallConst)
+                 && expand_quant ->
             (* top-level eta expand body of the quantifier *)
             let body' = eta_expand_rec ~top_level_only:true body in
             let pref, matrix = T.open_bind Binder.Lambda body' in
@@ -285,7 +286,7 @@ module Inner = struct
             if T.equal body' body then
               t
             else
-              T.app_builtin ~ty:(T.ty_exn t) hd [ tyarg; body' ]
+              T.app_builtin ~ty:(T.ty_exn t) b [ tyarg; body' ]
           | T.AppBuiltin (b, l) ->
             let l' = List.map aux l in
             if T.same_l l l' then

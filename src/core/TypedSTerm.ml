@@ -86,7 +86,7 @@ let head t = try Some (head_exn t) with Not_found -> None
 
 let is_tType t =
   match view t with
-  | AppBuiltin (Builtin.TType, _) -> true
+  | AppBuiltin (_b_ttype, _) when Builtin.equal _b_ttype Builtin.tType -> true
   | _ -> false
 
 let to_int_ = function
@@ -235,13 +235,15 @@ let rec pp out t =
       vars pp_inner body
   | Record (l, None) -> Format.fprintf out "{%a}" pp_fields l
   | Record (l, Some r) -> Format.fprintf out "{%a | %a}" pp_fields l pp r
-  | AppBuiltin (Builtin.Box_opaque, [ t ]) ->
+  | AppBuiltin (_b_box, [ t ]) when Builtin.equal _b_box Builtin.box_opaque ->
     Format.fprintf out "@<1>⟦@[%a@]@<1>⟧" pp_inner t
   | AppBuiltin (b, [ a ]) when Builtin.is_prefix b ->
     Format.fprintf out "@[%a %a@]" Builtin.pp b pp_inner a
-  | AppBuiltin (Builtin.Arrow, ret :: args) ->
-    Format.fprintf out "@[<hv>%a@]" (pp_infix_ Builtin.Arrow) (args @ [ ret ])
-  | AppBuiltin (Builtin.Not, [ f ]) -> Format.fprintf out "@[¬@ %a@]" pp f
+  | AppBuiltin (_b_arrow, ret :: args) when Builtin.equal _b_arrow Builtin.arrow
+    ->
+    Format.fprintf out "@[<hv>%a@]" (pp_infix_ Builtin.arrow) (args @ [ ret ])
+  | AppBuiltin (_b_not, [ f ]) when Builtin.equal _b_not Builtin.not_ ->
+    Format.fprintf out "@[¬@ %a@]" pp f
   | AppBuiltin (b, ([ t1; t2 ] | [ _; t1; t2 ]))
     when Builtin.fixity b = Builtin.Infix_binary ->
     Format.fprintf out "@[%a %a@ %a@]" pp_inner t1 Builtin.pp b pp_inner t2
@@ -289,7 +291,7 @@ and pp_fields out f = Util.pp_list ~sep:", " pp_field out f
 and pp_infix_ b out l =
   match l with
   | [] -> assert false
-  | [ t ] when b = Builtin.Arrow -> pp out t
+  | [ t ] when b = Builtin.arrow -> pp out t
   | [ t ] -> pp_inner out t
   | t :: l' ->
     Format.fprintf out "@[%a@]@ %a %a" pp_inner t Builtin.pp b (pp_infix_ b) l'
@@ -297,7 +299,7 @@ and pp_infix_ b out l =
 and pp_var_ty out v =
   let ty = Var.ty v in
   match view ty with
-  | AppBuiltin (Builtin.Term, []) -> ()
+  | AppBuiltin (_b_term, []) when Builtin.equal _b_term Builtin.term -> ()
   | _ -> Format.fprintf out ":%a" pp_inner ty
 
 let pp_with_ty out t = Format.fprintf out "(@[%a@,:%a@])" pp t pp (ty_exn t)
@@ -322,18 +324,23 @@ let const_of_cstor ?loc c = const ?loc c.cstor_id ~ty:c.cstor_ty
 let app_builtin ?loc ~ty b (l : t list) =
   let mk_ b l = make_ ?loc ~ty (AppBuiltin (b, l)) in
   match b, l with
-  | Builtin.Not, [ f' ] ->
+  | b, [ f' ] ->
     (match view f' with
-    | AppBuiltin (Builtin.Eq, l) -> mk_ Builtin.Neq l
-    | AppBuiltin (Builtin.Neq, l) -> mk_ Builtin.Eq l
-    | AppBuiltin (Builtin.Not, [ t ]) -> t
-    | AppBuiltin (Builtin.True, []) -> mk_ Builtin.False []
-    | AppBuiltin (Builtin.False, []) -> mk_ Builtin.True []
+    | AppBuiltin (_b_eq, l) when Builtin.equal _b_eq Builtin.eq ->
+      mk_ Builtin.neq l
+    | AppBuiltin (_b_neq, l) when Builtin.equal _b_neq Builtin.neq ->
+      mk_ Builtin.eq l
+    | AppBuiltin (_b_not, [ t ]) when Builtin.equal _b_not Builtin.not_ -> t
+    | AppBuiltin (_b_true, []) when Builtin.equal _b_true Builtin.true_ ->
+      mk_ Builtin.false_ []
+    | AppBuiltin (_b_false, []) when Builtin.equal _b_false Builtin.false_ ->
+      mk_ Builtin.true_ []
     | _ -> mk_ b l)
-  | Builtin.Arrow, ret1 :: args1 ->
+  | b_, ret1 :: args1 when Builtin.equal b_ Builtin.arrow ->
     (match view ret1 with
-    | AppBuiltin (Builtin.Arrow, ret2 :: args2) ->
-      mk_ Builtin.Arrow ((ret2 :: args1) @ args2)
+    | AppBuiltin (_b_arrow, ret2 :: args2)
+      when Builtin.equal _b_arrow Builtin.arrow ->
+      mk_ Builtin.arrow ((ret2 :: args1) @ args2)
     | _ -> mk_ b l)
   | _ -> mk_ b l
 
@@ -416,13 +423,13 @@ let map_ty t ~f =
 let of_string ?loc ~ty s = const ?loc ~ty (Name.make s)
 
 let tType =
-  { ty = None; loc = None; term = AppBuiltin (Builtin.TType, []); hash = -1 }
+  { ty = None; loc = None; term = AppBuiltin (Builtin.tType, []); hash = -1 }
 
-let prop = builtin ~ty:tType Builtin.Prop
+let prop = builtin ~ty:tType Builtin.prop
 let fresh_var ?loc ~ty () = var ?loc (Var.gensym ~ty ())
 
 let box_opaque t : t =
-  make_ ~ty:(ty_exn t) (AppBuiltin (Builtin.Box_opaque, [ t ]))
+  make_ ~ty:(ty_exn t) (AppBuiltin (Builtin.box_opaque, [ t ]))
 
 (** {2 Utils} *)
 
@@ -630,7 +637,7 @@ let map ~f ~bind:f_bind b_acc t =
     let b_acc', v' = f_bind b_acc v in
     let body = f b_acc' body in
     bind ?loc:t.loc ~ty:(f b_acc (ty_exn t)) s v' body
-  | AppBuiltin (Builtin.TType, _) -> t
+  | AppBuiltin (_b_ttype, _) when Builtin.equal _b_ttype Builtin.tType -> t
   | AppBuiltin (b, l) ->
     let l = List.map (f b_acc) l in
     let ty = f b_acc (ty_exn t) in
@@ -714,14 +721,24 @@ module Ty = struct
       | _ -> assert false)
     | Meta (_, { contents = Some ty' }, _) -> view ty'
     | Meta (v, o, k) -> Ty_meta (v, o, k)
-    | AppBuiltin (Builtin.Prop, []) -> Ty_builtin Prop
-    | AppBuiltin (Builtin.TType, []) -> Ty_builtin TType
-    | AppBuiltin (Builtin.TyInt, []) -> Ty_builtin Int
-    | AppBuiltin (Builtin.TyRat, []) -> Ty_builtin Rat
-    | AppBuiltin (Builtin.TyReal, []) -> Ty_builtin Real
-    | AppBuiltin (Builtin.Term, []) -> Ty_builtin Term
-    | AppBuiltin (Builtin.Arrow, ret :: args) -> Ty_fun (args, ret)
-    | AppBuiltin (Builtin.Multiset, [ t ]) -> Ty_multiset t
+    | AppBuiltin (_b_prop, []) when Builtin.equal _b_prop Builtin.prop ->
+      Ty_builtin Prop
+    | AppBuiltin (_b_ttype, []) when Builtin.equal _b_ttype Builtin.tType ->
+      Ty_builtin TType
+    | AppBuiltin (_b_tyint, []) when Builtin.equal _b_tyint Builtin.ty_int ->
+      Ty_builtin Int
+    | AppBuiltin (_b_tyrat, []) when Builtin.equal _b_tyrat Builtin.ty_rat ->
+      Ty_builtin Rat
+    | AppBuiltin (_b_tyreal, []) when Builtin.equal _b_tyreal Builtin.ty_real ->
+      Ty_builtin Real
+    | AppBuiltin (_b_term, []) when Builtin.equal _b_term Builtin.term ->
+      Ty_builtin Term
+    | AppBuiltin (_b_arrow, ret :: args)
+      when Builtin.equal _b_arrow Builtin.arrow ->
+      Ty_fun (args, ret)
+    | AppBuiltin (_b_multiset, [ t ])
+      when Builtin.equal _b_multiset Builtin.multiset ->
+      Ty_multiset t
     | Let _ | Ite _ | Match _ | Multiset _ | AppBuiltin _ | Bind _ ->
       assert false
 
@@ -735,7 +752,7 @@ module Ty = struct
   let meta = meta
 
   let mk_fun_ ?loc args ret =
-    app_builtin ?loc ~ty:tType Builtin.Arrow (ret :: args)
+    app_builtin ?loc ~ty:tType Builtin.arrow (ret :: args)
 
   let fun_ ?loc args ret =
     match args, view ret with
@@ -750,14 +767,14 @@ module Ty = struct
   let const ?loc id = const ?loc ~ty:tType id
   let forall ?loc v t = bind ~ty:tType ?loc Binder.ForallTy v t
   let forall_l ?loc = List.fold_right (forall ?loc)
-  let multiset ?loc t = app_builtin ?loc ~ty:tType Builtin.Multiset [ t ]
+  let multiset ?loc t = app_builtin ?loc ~ty:tType Builtin.multiset [ t ]
   let record ?loc l ~rest = record ?loc ~ty:tType l ~rest
   let record_flatten ?loc l ~rest = record_flatten ?loc ~ty:tType l ~rest
-  let prop = builtin ~ty:tType Builtin.Prop
-  let int = builtin ~ty:tType Builtin.TyInt
-  let rat = builtin ~ty:tType Builtin.TyRat
-  let real = builtin ~ty:tType Builtin.TyReal
-  let term = builtin ~ty:tType Builtin.Term
+  let prop = builtin ~ty:tType Builtin.prop
+  let int = builtin ~ty:tType Builtin.ty_int
+  let rat = builtin ~ty:tType Builtin.ty_rat
+  let real = builtin ~ty:tType Builtin.ty_real
+  let term = builtin ~ty:tType Builtin.term
   let ( ==> ) args ret = fun_ args ret
 
   let order ty : int =
@@ -924,15 +941,23 @@ module Form = struct
 
   let view (t : term) =
     match view t with
-    | AppBuiltin (Builtin.True, []) -> True
-    | AppBuiltin (Builtin.False, []) -> False
-    | AppBuiltin (Builtin.And, l) when Ty.is_prop (ty_exn t) -> And l
-    | AppBuiltin (Builtin.Or, l) when Ty.is_prop (ty_exn t) -> Or l
-    | AppBuiltin (Builtin.Not, [ f ]) -> Not f
-    | AppBuiltin (Builtin.Imply, [ a; b ]) -> Imply (a, b)
-    | AppBuiltin (Builtin.Equiv, [ a; b ]) -> Equiv (a, b)
-    | AppBuiltin (Builtin.Xor, [ a; b ]) -> Xor (a, b)
-    | AppBuiltin ((Builtin.(Eq | Neq) as hd), l) when Ty.is_prop (ty_exn t) ->
+    | AppBuiltin (_b_true, []) when Builtin.equal _b_true Builtin.true_ -> True
+    | AppBuiltin (_b_false, []) when Builtin.equal _b_false Builtin.false_ ->
+      False
+    | AppBuiltin (_b1_and, l) when Builtin.equal _b1_and Builtin.and_ -> And l
+    | AppBuiltin (_b1_or, l) when Builtin.equal _b1_or Builtin.or_ -> Or l
+    | AppBuiltin (_b_not, [ f ]) when Builtin.equal _b_not Builtin.not_ -> Not f
+    | AppBuiltin (_b_imply, [ a; b ]) when Builtin.equal _b_imply Builtin.imply
+      ->
+      Imply (a, b)
+    | AppBuiltin (_b_equiv, [ a; b ]) when Builtin.equal _b_equiv Builtin.equiv
+      ->
+      Equiv (a, b)
+    | AppBuiltin (_b_xor, [ a; b ]) when Builtin.equal _b_xor Builtin.xor ->
+      Xor (a, b)
+    | AppBuiltin (hd, l)
+      when (Builtin.equal hd Builtin.eq || Builtin.equal hd Builtin.neq)
+           && Ty.is_prop (ty_exn t) ->
       (match l with
       | [ x ] | [ x; _ ] ->
         if not (Ty.is_tType (ty_exn x)) then (
@@ -941,7 +966,7 @@ module Form = struct
         ) else
           Atom t
       | [ x; l; r ] ->
-        if hd = Builtin.Eq then
+        if hd = Builtin.eq then
           Eq (l, r)
         else
           Neq (l, r)
@@ -955,22 +980,22 @@ module Form = struct
 
   (** Smart constructors (perform simplifications) *)
 
-  let true_ = builtin ~ty:Ty.prop Builtin.True
-  let false_ = builtin ~ty:Ty.prop Builtin.False
+  let true_ = builtin ~ty:Ty.prop Builtin.true_
+  let false_ = builtin ~ty:Ty.prop Builtin.false_
   let atom t = t
 
   let eq ?loc a b =
     assert (not (is_tType (ty_exn a)));
-    app_builtin ?loc ~ty:Ty.prop Builtin.Eq [ ty_exn a; a; b ]
+    app_builtin ?loc ~ty:Ty.prop Builtin.eq [ ty_exn a; a; b ]
 
   let neq ?loc a b =
     assert (not (is_tType (ty_exn a)));
-    app_builtin ?loc ~ty:Ty.prop Builtin.Neq [ ty_exn a; a; b ]
+    app_builtin ?loc ~ty:Ty.prop Builtin.neq [ ty_exn a; a; b ]
 
-  let equiv ?loc a b = app_builtin ?loc ~ty:Ty.prop Builtin.Equiv [ a; b ]
-  let xor ?loc a b = app_builtin ?loc ~ty:Ty.prop Builtin.Xor [ a; b ]
+  let equiv ?loc a b = app_builtin ?loc ~ty:Ty.prop Builtin.equiv [ a; b ]
+  let xor ?loc a b = app_builtin ?loc ~ty:Ty.prop Builtin.xor [ a; b ]
   let ite = ite
-  let imply ?loc a b = app_builtin ?loc ~ty:Ty.prop Builtin.Imply [ a; b ]
+  let imply ?loc a b = app_builtin ?loc ~ty:Ty.prop Builtin.imply [ a; b ]
 
   let eq_or_equiv t u =
     if Ty.is_prop (ty_exn t) then
@@ -1005,7 +1030,7 @@ module Form = struct
     | [] when not parsing -> true_
     | [ t ] when not parsing -> t
     | _ ->
-      app_builtin ?loc ~ty:Ty.prop Builtin.And
+      app_builtin ?loc ~ty:Ty.prop Builtin.and_
         (if parsing then
            l
          else
@@ -1018,7 +1043,7 @@ module Form = struct
     | [] when not parsing -> false_
     | [ t ] when not parsing -> t
     | _ ->
-      app_builtin ?loc ~ty:Ty.prop Builtin.Or
+      app_builtin ?loc ~ty:Ty.prop Builtin.or_
         (if parsing then
            l
          else
@@ -1026,7 +1051,7 @@ module Form = struct
 
   let not_ ?loc f =
     assert (Ty.is_prop (ty_exn f));
-    app_builtin ?loc ~ty:Ty.prop Builtin.Not [ f ]
+    app_builtin ?loc ~ty:Ty.prop Builtin.not_ [ f ]
 
   let forall ?loc v t = bind ?loc ~ty:Ty.prop Binder.Forall v t
   let exists ?loc v t = bind ?loc ~ty:Ty.prop Binder.Exists v t
@@ -1380,14 +1405,15 @@ let[@inline] [@unfold 1] rec normalize subst (t : term) : term =
   | App ({ term = Var v; _ }, l) when Subst.mem subst v ->
     let f = Subst.find_exn subst v in
     normalize subst (app ?loc:t.loc ~ty:(ty_exn t) (deref f) l)
-  | AppBuiltin (Builtin.Arrow, ret :: args) when must_deref ret ->
+  | AppBuiltin (_b1_arrow, ret :: args)
+    when Builtin.equal _b1_arrow Builtin.arrow ->
     let vars, args', ret' = Ty.unfold @@ deref ret in
     if vars = [] then
       Ty.fun_ ?loc:t.loc (args @ args') ret'
     else
       t
-  | AppBuiltin (Builtin.Arrow, { term = Var v; _ } :: args)
-    when Subst.mem subst v ->
+  | AppBuiltin (_b1_arrow, { term = Var v; _ } :: args) when Subst.mem subst v
+    ->
     let ret = Subst.find_exn subst v in
     let vars, args', ret' = Ty.unfold @@ deref ret in
     if vars = [] then
@@ -1731,7 +1757,9 @@ let simplify_formula t =
         CCList.partition_map
           (fun t ->
             match view t with
-            | AppBuiltin (Builtin.Not, [ s ]) -> `Right s
+            | AppBuiltin (_b_not, [ s ]) when Builtin.equal _b_not Builtin.not_
+              ->
+              `Right s
             | _ -> `Left t)
           args
         |> CCPair.map_same Set.of_list
@@ -1740,7 +1768,7 @@ let simplify_formula t =
     in
 
     let netural_el, absorbing_el =
-      if b = Builtin.And then
+      if b = Builtin.and_ then
         F.true_, F.false_
       else
         F.false_, F.true_
@@ -1770,12 +1798,12 @@ let simplify_formula t =
        is not empty then simplify the implication into T  *)
     let premise_terms =
       match view premise with
-      | AppBuiltin (And, l) -> l
+      | AppBuiltin (_b_and, l) when Builtin.equal _b_and Builtin.and_ -> l
       | _ -> [ premise ]
     in
     let conc_terms =
       match view conclusion with
-      | AppBuiltin (Or, l) -> l
+      | AppBuiltin (_b_or, l) when Builtin.equal _b_or Builtin.or_ -> l
       | _ -> [ conclusion ]
     in
     let is_true =
@@ -1790,15 +1818,22 @@ let simplify_formula t =
   let rec aux t =
     let ty = ty_exn t in
     match view t with
-    | AppBuiltin (((And | Or) as b), args) when Ty.is_prop ty ->
+    | AppBuiltin (b, args)
+      when (Builtin.equal b Builtin.and_ || Builtin.equal b Builtin.or_)
+           && Ty.is_prop ty ->
       simplify_and_or t b (List.map aux args)
-    | AppBuiltin (Not, [ s ]) ->
+    | AppBuiltin (b_not, [ s ]) ->
       (match view s with
-      | AppBuiltin (Not, [ u ]) -> aux u
-      | AppBuiltin (True, []) -> F.false_
-      | AppBuiltin (False, []) -> F.true_
-      | _ -> app_builtin ~ty Not [ aux s ])
-    | AppBuiltin (((Eq | Equiv) as b), [ x; y ]) when Ty.is_prop (ty_exn x) ->
+      | AppBuiltin (_b_not2, [ u ]) when Builtin.equal _b_not2 Builtin.not_ ->
+        aux u
+      | AppBuiltin (_b_true2, []) when Builtin.equal _b_true2 Builtin.true_ ->
+        F.false_
+      | AppBuiltin (_b_false, []) when Builtin.equal _b_false Builtin.false_ ->
+        F.true_
+      | _ -> app_builtin ~ty Builtin.not_ [ aux s ])
+    | AppBuiltin (b, [ x; y ])
+      when (Builtin.equal b Builtin.eq || Builtin.equal b Builtin.equiv)
+           && Ty.is_prop (ty_exn x) ->
       assert (Ty.is_prop (ty_exn y));
       let x = aux x and y = aux y in
       if equal x y then
@@ -1815,9 +1850,13 @@ let simplify_formula t =
         F.false_
       else
         app_builtin ~ty b [ x; y ]
-    | AppBuiltin ((Neq | Xor), [ x; y ]) when Ty.is_prop (ty_exn x) ->
+    | AppBuiltin (b_neqxor, [ x; y ])
+      when (Builtin.equal b_neqxor Builtin.neq
+           || Builtin.equal b_neqxor Builtin.xor)
+           && Ty.is_prop (ty_exn x) ->
       aux (F.not_ (F.eq_or_equiv x y))
-    | AppBuiltin (Imply, [ x; y ]) ->
+    | AppBuiltin (_b_imply2, [ x; y ])
+      when Builtin.equal _b_imply2 Builtin.imply ->
       let x = aux x and y = aux y in
       (match simpl_and_or_imp x y with
       | Some res -> res
@@ -1837,8 +1876,11 @@ let simplify_formula t =
         else if equal y (F.not_ x) then
           y
         else
-          app_builtin ~ty Imply [ x; y ])
-    | AppBuiltin ((Neq | Xor), [ x; y ]) when Ty.is_prop (ty_exn x) ->
+          app_builtin ~ty Builtin.imply [ x; y ])
+    | AppBuiltin (b_neqxor, [ x; y ])
+      when (Builtin.equal b_neqxor Builtin.neq
+           || Builtin.equal b_neqxor Builtin.xor)
+           && Ty.is_prop (ty_exn x) ->
       aux (F.not_ (F.eq_or_equiv x y))
     | AppBuiltin (b, args) -> app_builtin ~ty b (List.map aux args)
     | App (hd, args) -> app ~ty (aux hd) (List.map aux args)

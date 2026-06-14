@@ -146,10 +146,10 @@ let enum_prop ?(mode = `Full) ?(add_var = false) ((v : Term.var), sc_v)
                   (List.mapi (fun j ty -> T.bvar ~ty (m - j - 1)) arg_typeargs)
               in
               let forall =
-                T.close_quantifier Builtin.ForallConst arg_typeargs form_body
+                T.close_quantifier Builtin.forallConst arg_typeargs form_body
               in
               let exists =
-                T.close_quantifier Builtin.ExistsConst arg_typeargs form_body
+                T.close_quantifier Builtin.existsConst arg_typeargs form_body
               in
               let forall, exists =
                 CCPair.map_same (T.fun_l ty_args) (forall, exists)
@@ -251,22 +251,22 @@ let enum_prop ?(mode = `Full) ?(add_var = false) ((v : Term.var), sc_v)
           [
             T.true_, 0;
             T.false_, 0;
-            T.app_builtin ~ty:([ o; o ] ==> o) Builtin.And [], 1;
-            T.app_builtin ~ty:([ o; o ] ==> o) Builtin.Or [], 1;
-            T.app_builtin ~ty:([ o ] ==> o) Builtin.Not [], 1;
+            T.app_builtin ~ty:([ o; o ] ==> o) Builtin.and_ [], 1;
+            T.app_builtin ~ty:([ o; o ] ==> o) Builtin.or_ [], 1;
+            T.app_builtin ~ty:([ o ] ==> o) Builtin.not_ [], 1;
             ( T.app_builtin
                 ~ty:([ fresh_ty; fresh_ty ] ==> o)
-                Builtin.Eq
+                Builtin.eq
                 [ T.of_ty fresh_ty ],
               1 );
             ( T.app_builtin
                 ~ty:([ [ fresh_ty ] ==> o ] ==> o)
-                Builtin.ForallConst
+                Builtin.forallConst
                 [ T.of_ty fresh_ty ],
               1 );
             ( T.app_builtin
                 ~ty:([ [ fresh_ty ] ==> o ] ==> o)
-                Builtin.ExistsConst
+                Builtin.existsConst
                 [ T.of_ty fresh_ty ],
               1 );
           ]

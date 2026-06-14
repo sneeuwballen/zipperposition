@@ -74,7 +74,11 @@ let test_builtin_int =
   ( "builtin Int roundtrip",
     `Quick,
     fun () ->
-      let t = Term.app_builtin ~ty:Type.int (Builtin.Int (Z.of_int 42)) [] in
+      let t =
+        Term.app_builtin ~ty:Type.int
+          (Builtin.make_payload (Builtin.Int (Z.of_int 42)))
+          []
+      in
       Alcotest.(check bool) "builtin int roundtrip" true (roundtrip t) )
 
 let test_builtin_arrow =

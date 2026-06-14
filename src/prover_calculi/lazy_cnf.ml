@@ -197,25 +197,31 @@ module Make (E : Env.S) : S with module Env = E = struct
     in
     let rec aux sign f =
       match T.view f with
-      | T.AppBuiltin (Not, [ f ]) -> aux (not sign) f
-      | T.AppBuiltin (And, l) ->
+      | T.AppBuiltin (b, [ f ]) when Builtin.equal b Builtin.not_ ->
+        aux (not sign) f
+      | T.AppBuiltin (b, l) when Builtin.equal b Builtin.and_ ->
         if sign then
           sum_l sign l
         else
           prod_l sign l
-      | T.AppBuiltin (Or, l) ->
+      | T.AppBuiltin (b, l) when Builtin.equal b Builtin.or_ ->
         if sign then
           prod_l sign l
         else
           sum_l sign l
-      | T.AppBuiltin (Imply, [ a; b ]) ->
+      | T.AppBuiltin (b_builtin, [ a; b ])
+        when Builtin.equal b_builtin Builtin.imply ->
         if sign then
           prod_l true [ T.Form.not_ a; b ]
         else
           sum_l true [ a; T.Form.not_ b ]
-      | T.AppBuiltin (((Eq | Equiv | Neq | Xor) as hd), ([ _; a; b ] | [ a; b ]))
-        when Type.is_prop (T.ty a) ->
-        if Builtin.equal Eq hd || Builtin.equal Equiv hd then
+      | T.AppBuiltin (hd, ([ _; a; b ] | [ a; b ]))
+        when (Builtin.equal hd Builtin.eq
+             || Builtin.equal hd Builtin.equiv
+             || Builtin.equal hd Builtin.neq
+             || Builtin.equal hd Builtin.xor)
+             && Type.is_prop (T.ty a) ->
+        if Builtin.equal hd Builtin.eq || Builtin.equal hd Builtin.equiv then
           aux true
             (T.Form.and_
                (T.Form.or_ (T.Form.not_ a) b)
@@ -225,7 +231,9 @@ module Make (E : Env.S) : S with module Env = E = struct
             (T.Form.and_
                (T.Form.or_ (T.Form.not_ a) (T.Form.not_ b))
                (T.Form.or_ a b))
-      | T.AppBuiltin ((ForallConst | ExistsConst), [ _; body ]) ->
+      | T.AppBuiltin (b, [ _; body ])
+        when Builtin.equal b Builtin.forallConst
+             || Builtin.equal b Builtin.existsConst ->
         let _, body = T.open_fun body in
         aux sign body
       | _ -> 1
@@ -262,7 +270,8 @@ module Make (E : Env.S) : S with module Env = E = struct
 
     let yields_clauses f =
       match T.view f with
-      | T.AppBuiltin ((Eq | Neq), [ ty; _; _ ]) ->
+      | T.AppBuiltin (b, [ ty; _; _ ])
+        when Builtin.equal b Builtin.eq || Builtin.equal b Builtin.neq ->
         Type.is_prop (Type.of_term_unsafe (ty :> InnerTerm.t))
       | T.AppBuiltin (_, _) -> true
       | _ -> false
@@ -317,7 +326,9 @@ module Make (E : Env.S) : S with module Env = E = struct
       let get_quant t =
         let t = Combs.expand t in
         match T.view t with
-        | T.AppBuiltin (((ForallConst | ExistsConst) as b), [ _; x ]) ->
+        | T.AppBuiltin (b, [ _; x ])
+          when Builtin.equal b Builtin.forallConst
+               || Builtin.equal b Builtin.existsConst ->
           let ty, body = T.open_fun x in
           assert (List.length ty = 1);
           Some (b, List.hd ty, [ body ])
@@ -339,13 +350,13 @@ module Make (E : Env.S) : S with module Env = E = struct
     let miniscope hd f =
       let distribute_quant hd ty bodies =
         let quant_hd =
-          if Builtin.equal hd Or then
+          if Builtin.equal hd Builtin.or_ then
             T.Form.exists
           else
             T.Form.forall
         in
         let outer_hd =
-          if Builtin.equal hd Or then
+          if Builtin.equal hd Builtin.or_ then
             T.Form.or_l
           else
             T.Form.and_l
@@ -359,28 +370,36 @@ module Make (E : Env.S) : S with module Env = E = struct
         let ty, body = T.open_fun f in
         assert (List.length ty = 1);
         match T.view body with
-        | T.AppBuiltin (Or, l) when Builtin.equal hd ExistsConst ->
-          Some (distribute_quant Or (List.hd ty) l)
-        | T.AppBuiltin (And, l) when Builtin.equal hd ForallConst ->
-          Some (distribute_quant And (List.hd ty) l)
+        | T.AppBuiltin (b, l)
+          when Builtin.equal b Builtin.or_
+               && Builtin.equal hd Builtin.existsConst ->
+          Some (distribute_quant b (List.hd ty) l)
+        | T.AppBuiltin (b, l)
+          when Builtin.equal b Builtin.and_
+               && Builtin.equal hd Builtin.forallConst ->
+          Some (distribute_quant b (List.hd ty) l)
         | _ -> None
       ) else
         None
     in
 
     match T.view form with
-    | T.AppBuiltin (And, (_ :: _ as l)) when kind = `Maxi ->
+    | T.AppBuiltin (b, (_ :: _ as l))
+      when Builtin.equal b Builtin.and_ && kind = `Maxi ->
       (match maxiscoping_eligible l with
-      | Some (ForallConst, ty, bodies) ->
+      | Some (b_q, ty, bodies) when Builtin.equal b_q Builtin.forallConst ->
         Some (T.Form.forall (T.fun_ ty (T.Form.and_l bodies)))
       | _ -> None)
-    | T.AppBuiltin (Or, (_ :: _ as l)) when kind = `Maxi ->
+    | T.AppBuiltin (b, (_ :: _ as l))
+      when Builtin.equal b Builtin.or_ && kind = `Maxi ->
       (match maxiscoping_eligible l with
-      | Some (ExistsConst, ty, bodies) ->
+      | Some (b_q, ty, bodies) when Builtin.equal b_q Builtin.existsConst ->
         Some (T.Form.exists (T.fun_ ty (T.Form.or_l bodies)))
       | _ -> None)
-    | T.AppBuiltin (((ExistsConst | ForallConst) as b), [ _; f ])
-      when kind = `Mini ->
+    | T.AppBuiltin (b, [ _; f ])
+      when (Builtin.equal b Builtin.forallConst
+           || Builtin.equal b Builtin.existsConst)
+           && kind = `Mini ->
       miniscope b f
     | _ -> None
 
@@ -394,21 +413,21 @@ module Make (E : Env.S) : S with module Env = E = struct
       if sign then
         quant_hd, f
       else
-        ( (if quant_hd = ForallConst then
-             ExistsConst
+        ( (if Builtin.equal quant_hd Builtin.forallConst then
+             Builtin.existsConst
            else
-             ForallConst),
+             Builtin.forallConst),
           T.fun_ var_ty (T.Form.not_ body) )
     in
     let rule_name =
       CCFormat.sprintf "lazy_cnf_%s"
-        (if hd = ForallConst then
+        (if Builtin.equal hd Builtin.forallConst then
            "forall"
          else
            "exists")
     in
     let subst_term =
-      if hd = ForallConst then
+      if Builtin.equal hd Builtin.forallConst then
         T.var @@ HVar.make ~ty:var_ty (var_offset + 1)
       else
         FR.get_skolem ~parent ~mode:(Env.flex_get k_skolem_mode) f
@@ -455,23 +474,29 @@ module Make (E : Env.S) : S with module Env = E = struct
              Util.debugf ~section 3 "  subformula:%d:@[%a@]" (fun k ->
                  k i L.pp lit);
              match T.view lhs with
-             | T.AppBuiltin (And, l)
-               when List.length l >= 2 && should_clausify sign lhs ->
+             | T.AppBuiltin (b, l)
+               when Builtin.equal b Builtin.and_
+                    && List.length l >= 2
+                    && should_clausify sign lhs ->
                let rule_name = "lazy_cnf_and" in
                if sign then
                  return acc @@ mk_and ~proof_cons l c i ~rule_name
                else
                  return acc
                  @@ mk_or ~proof_cons (List.map T.Form.not_ l) c i ~rule_name
-             | T.AppBuiltin (Or, l)
-               when List.length l >= 2 && should_clausify sign lhs ->
+             | T.AppBuiltin (b, l)
+               when Builtin.equal b Builtin.or_
+                    && List.length l >= 2
+                    && should_clausify sign lhs ->
                let rule_name = "lazy_cnf_or" in
                if sign then
                  return acc @@ mk_or ~proof_cons l c i ~rule_name
                else
                  return acc
                  @@ mk_and ~proof_cons (List.map T.Form.not_ l) c i ~rule_name
-             | T.AppBuiltin (Imply, [ a; b ]) when should_clausify sign lhs ->
+             | T.AppBuiltin (b_bltn, [ a; b ])
+               when Builtin.equal b_bltn Builtin.imply
+                    && should_clausify sign lhs ->
                let rule_name = "lazy_cnf_imply" in
                if sign then
                  if
@@ -486,27 +511,29 @@ module Make (E : Env.S) : S with module Env = E = struct
                else
                  return acc
                  @@ mk_and ~proof_cons [ a; T.Form.not_ b ] c i ~rule_name
-             | T.AppBuiltin (((Equiv | Xor) as hd), [ a; b ])
-               when should_clausify sign lhs ->
+             | T.AppBuiltin (hd, [ a; b ])
+               when (Builtin.equal hd Builtin.equiv
+                    || Builtin.equal hd Builtin.xor)
+                    && should_clausify sign lhs ->
                let hd =
                  if sign then
                    hd
-                 else if hd = Equiv then
-                   Xor
+                 else if Builtin.equal hd Builtin.equiv then
+                   Builtin.xor
                  else
-                   Equiv
+                   Builtin.equiv
                in
                if eligible_to_ignore_eq ~ignore_eq a b then
                  continue acc
                else (
                  let rule_name =
                    CCFormat.sprintf "lazy_cnf_%s"
-                     (if hd = Equiv then
+                     (if Builtin.equal hd Builtin.equiv then
                         "equiv"
                       else
                         "xor")
                  in
-                 if hd = Equiv then
+                 if Builtin.equal hd Builtin.equiv then
                    return acc
                    @@ mk_or ~proof_cons ~rule_name [ T.Form.not_ a; b ] c i
                    @ mk_or ~proof_cons ~rule_name [ a; T.Form.not_ b ] c i
@@ -517,8 +544,10 @@ module Make (E : Env.S) : S with module Env = E = struct
                         c i
                    @ mk_or ~proof_cons ~rule_name [ a; b ] c i
                )
-             | T.AppBuiltin (((ForallConst | ExistsConst) as hd), [ _; f ])
-               when Env.flex_get k_lazy_cnf_kind != `Simp
+             | T.AppBuiltin (hd, [ _; f ])
+               when (Builtin.equal hd Builtin.forallConst
+                    || Builtin.equal hd Builtin.existsConst)
+                    && Env.flex_get k_lazy_cnf_kind != `Simp
                     || not (Env.flex_get k_inf_quant) ->
                let var_offset = T.Seq.max_var (C.Seq.vars c) + 1 in
                let res, hd, subst_term, rule_name =
@@ -527,7 +556,10 @@ module Make (E : Env.S) : S with module Env = E = struct
                in
                assert (Type.is_prop (T.ty res));
                let res_cl = mk_or ~proof_cons ~rule_name [ res ] c i in
-               if Type.returns_prop (T.ty subst_term) && hd == ForallConst then (
+               if
+                 Type.returns_prop (T.ty subst_term)
+                 && Builtin.equal hd Builtin.forallConst
+               then (
                  assert (List.length res_cl == 1);
                  assert (T.is_var subst_term);
                  Signal.send Env.on_pred_var_elimination
@@ -548,7 +580,7 @@ module Make (E : Env.S) : S with module Env = E = struct
                    in
                    return acc
                    @@
-                   if hd == ForallConst then
+                   if Builtin.equal hd Builtin.forallConst then
                      mk_and ~proof_cons ~rule_name:"_inst_quant" bodies c i
                    else
                      mk_or ~proof_cons ~rule_name:"_inst_quant" bodies c i
@@ -599,7 +631,9 @@ module Make (E : Env.S) : S with module Env = E = struct
          | Literal.Equation (lhs, _, _) as lit when Literal.is_predicate_lit lit
            ->
            (match T.view lhs with
-           | T.AppBuiltin (((ForallConst | ExistsConst) as hd), [ _; body ]) ->
+           | T.AppBuiltin (hd, [ _; body ])
+             when Builtin.equal hd Builtin.forallConst
+                  || Builtin.equal hd Builtin.existsConst ->
              let var_offset = T.Seq.max_var (C.Seq.vars c) + 1 in
              let sign = Literal.is_positivoid lit in
              let res, hd, subst_term, rule_name =
@@ -608,7 +642,10 @@ module Make (E : Env.S) : S with module Env = E = struct
              in
              assert (Type.is_prop (T.ty res));
              let res_cl = List.hd @@ mk_or ~proof_cons ~rule_name [ res ] c i in
-             if Type.returns_prop (T.ty subst_term) && hd == ForallConst then (
+             if
+               Type.returns_prop (T.ty subst_term)
+               && Builtin.equal hd Builtin.forallConst
+             then (
                assert (T.is_var subst_term);
                Signal.send Env.on_pred_var_elimination (res_cl, subst_term)
              );
@@ -649,17 +686,25 @@ module Make (E : Env.S) : S with module Env = E = struct
       let will_yield_claues f =
         let rec aux ~sign f =
           match T.view f with
-          | T.AppBuiltin (Builtin.And, l) ->
+          | T.AppBuiltin (_b_and, l) when Builtin.equal _b_and Builtin.and_ ->
             (sign && List.length l >= 2) || aux_l sign l
-          | T.AppBuiltin (Builtin.Or, l) ->
+          | T.AppBuiltin (_b_or, l) when Builtin.equal _b_or Builtin.or_ ->
             ((not sign) && List.length l >= 2) || aux_l sign l
-          | T.AppBuiltin (Builtin.(ForallConst | ExistsConst), [ _; body ]) ->
+          | T.AppBuiltin (b, [ _; body ])
+            when Builtin.equal b Builtin.forallConst
+                 || Builtin.equal b Builtin.existsConst ->
             aux ~sign (snd (T.open_fun body))
-          | T.AppBuiltin (Builtin.Not, [ body ]) -> aux ~sign:(not sign) body
-          | T.AppBuiltin (Builtin.Imply, [ a; b ]) ->
+          | T.AppBuiltin (_b_not, [ body ])
+            when Builtin.equal _b_not Builtin.not_ ->
+            aux ~sign:(not sign) body
+          | T.AppBuiltin (_b_imply, [ a; b ])
+            when Builtin.equal _b_imply Builtin.imply ->
             (not sign) || aux ~sign:(not sign) a || aux ~sign b
-          | T.AppBuiltin
-              (Builtin.(Eq | Equiv | Neq | Xor), ([ a; b ] | [ _; a; b ])) ->
+          | T.AppBuiltin (hd, ([ a; b ] | [ _; a; b ]))
+            when Builtin.equal hd Builtin.eq
+                 || Builtin.equal hd Builtin.equiv
+                 || Builtin.equal hd Builtin.neq
+                 || Builtin.equal hd Builtin.xor ->
             (* if it is either an equivalence(xor) which yields at
                least two clauses, or a complicated higher-order
                disequation (between app-vars or lambdas) in which case
@@ -827,7 +872,8 @@ module Make (E : Env.S) : S with module Env = E = struct
              match lit with
              | L.Equation (lhs, rhs, true) when T.equal T.true_ rhs ->
                (match T.view lhs with
-               | T.AppBuiltin (Imply, [ prem; concl ]) ->
+               | T.AppBuiltin (b, [ prem; concl ])
+                 when Builtin.equal b Builtin.imply ->
                  mk_or ~proof_cons ~rule_name [ T.Form.not_ prem; concl ] c i
                  @ acc
                | _ -> acc)

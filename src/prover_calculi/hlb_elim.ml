@@ -155,10 +155,10 @@ module Make (E : Env.S) : S with module Env = E = struct
 
   let retrieve_idx ~getter (premise, q_sc) =
     match T.view premise with
-    | T.AppBuiltin (Builtin.Eq, ([ _; a; b ] | [ a; b ])) when tracking_eq () ->
+    | T.AppBuiltin (_b1_eq, ([ _; a; b ] | [ a; b ]))
+      when Builtin.equal _b1_eq Builtin.eq && tracking_eq () ->
       Iter.append (getter (premise, q_sc)) (getter (T.Form.eq b a, q_sc))
-    | T.AppBuiltin (Builtin.Neq, ([ _; a; b ] | [ a; b ])) when tracking_eq ()
-      ->
+    | T.AppBuiltin (_b1_neq, ([ _; a; b ] | [ a; b ])) when tracking_eq () ->
       Iter.append (getter (premise, q_sc)) (getter (T.Form.neq b a, q_sc))
     | _ -> getter (premise, q_sc)
 
@@ -203,21 +203,19 @@ module Make (E : Env.S) : S with module Env = E = struct
     try Unif.FO.matching ~subst ~pattern (t, sc)
     with Unif.Fail ->
       (match T.view t with
-      | T.AppBuiltin (Builtin.Eq, ([ _; a; b ] | [ a; b ])) when tracking_eq ()
-        ->
+      | T.AppBuiltin (_b1_eq, ([ _; a; b ] | [ a; b ])) when tracking_eq () ->
         (try Unif.FO.matching ~subst ~pattern (T.Form.eq b a, sc)
          with Unif.Fail when decompose -> try_decompositions a b)
-      | T.AppBuiltin (Builtin.Neq, ([ _; a; b ] | [ a; b ])) when tracking_eq ()
-        ->
+      | T.AppBuiltin (_b1_neq, ([ _; a; b ] | [ a; b ])) when tracking_eq () ->
         Unif.FO.matching ~subst ~pattern (T.Form.neq b a, sc)
       | _ -> raise Unif.Fail)
 
   let[@inline] flip_eq t =
     match T.view t with
-    | T.AppBuiltin (Builtin.Eq, ([ a; b ] | [ _; a; b ])) when tracking_eq () ->
+    | T.AppBuiltin (_b1_eq, ([ a; b ] | [ _; a; b ]))
+      when Builtin.equal _b1_eq Builtin.eq && tracking_eq () ->
       T.Form.eq b a
-    | T.AppBuiltin (Builtin.Neq, ([ a; b ] | [ _; a; b ])) when tracking_eq ()
-      ->
+    | T.AppBuiltin (_b1_neq, ([ a; b ] | [ _; a; b ])) when tracking_eq () ->
       T.Form.neq b a
     | _ -> t
 
@@ -231,11 +229,16 @@ module Make (E : Env.S) : S with module Env = E = struct
 
   let[@inline] rec normalize_negations lhs =
     match T.view lhs with
-    | T.AppBuiltin (Builtin.Not, [ t ]) ->
+    | T.AppBuiltin (_b_not, [ t ]) when Builtin.equal _b_not Builtin.not_ ->
       (match T.view t with
-      | T.AppBuiltin (Builtin.Not, [ s ]) -> normalize_negations s
-      | T.AppBuiltin (Builtin.Eq, ([ _; a; b ] | [ a; b ])) -> T.Form.neq a b
-      | T.AppBuiltin (Builtin.Neq, ([ _; a; b ] | [ a; b ])) -> T.Form.eq a b
+      | T.AppBuiltin (_b_not, [ s ]) when Builtin.equal _b_not Builtin.not_ ->
+        normalize_negations s
+      | T.AppBuiltin (_b1_eq, ([ _; a; b ] | [ a; b ]))
+        when Builtin.equal _b1_eq Builtin.eq ->
+        T.Form.neq a b
+      | T.AppBuiltin (_b1_neq, ([ _; a; b ] | [ a; b ]))
+        when Builtin.equal _b1_neq Builtin.neq ->
+        T.Form.eq a b
       | _ -> lhs)
     | _ -> lhs
 
@@ -432,7 +435,8 @@ module Make (E : Env.S) : S with module Env = E = struct
     let aux concl =
       register_conclusion ~tbl ~premise:premise' concl (CS.singleton cl);
       (match T.view concl with
-      | T.AppBuiltin (Builtin.Neq, ([ _; a; b ] | [ a; b ])) ->
+      | T.AppBuiltin (_b1_neq, ([ _; a; b ] | [ a; b ]))
+        when Builtin.equal _b1_neq Builtin.neq ->
         iter_ctx a b
         |> Iter.iter (fun (a, b) ->
                let new_neq = T.Form.neq a b in

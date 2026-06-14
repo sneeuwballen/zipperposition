@@ -119,7 +119,9 @@ let same_l l1 l2 =
 
 let[@inline] ty_is_fun ty =
   match view ty with
-  | AppBuiltin (Builtin.Arrow, _ret :: args) -> List.length args != 0
+  | AppBuiltin (_b_arrow, _ret :: args)
+    when Builtin.equal _b_arrow Builtin.arrow ->
+    List.length args != 0
   | _ -> false
 
 let same_l_gen l1 l2 = List.length l1 == List.length l2 && same_l l1 l2
@@ -242,7 +244,9 @@ let[@inline] is_lam t =
 
 let open_fun ty =
   match view ty with
-  | AppBuiltin (Builtin.Arrow, ret :: args) -> args, ret
+  | AppBuiltin (_b_arrow, ret :: args) when Builtin.equal _b_arrow Builtin.arrow
+    ->
+    args, ret
   | _ -> [], ty
 
 let rec ho_weight t =
@@ -259,7 +263,8 @@ and ho_weight_uncached_ t t_ty : int =
     | NoType -> 0
     | HasType ty ->
       (match view ty with
-      | AppBuiltin (Builtin.Arrow, l) -> List.length l - 1
+      | AppBuiltin (_b_arrow, l) when Builtin.equal _b_arrow Builtin.arrow ->
+        List.length l - 1
       | _ -> 0)
   in
   match t with
@@ -300,13 +305,15 @@ let builtin ~ty b =
 
 let tType =
   let my_t =
-    make_ ~props:Flags.zero ~ty:NoType (AppBuiltin (Builtin.TType, []))
+    make_ ~props:Flags.zero ~ty:NoType (AppBuiltin (Builtin.tType, []))
   in
   H.hashcons my_t
 
 let open_fun ty =
   match view ty with
-  | AppBuiltin (Builtin.Arrow, ret :: args) -> args, ret
+  | AppBuiltin (_b_arrow, ret :: args) when Builtin.equal _b_arrow Builtin.arrow
+    ->
+    args, ret
   | _ -> [], ty
 
 let[@inline] is_a_type t =
@@ -316,7 +323,8 @@ let[@inline] is_a_type t =
 
 let expected_args t =
   match view t with
-  | AppBuiltin (Builtin.Arrow, l) -> CCList.length l - 1
+  | AppBuiltin (_b_arrow, l) when Builtin.equal _b_arrow Builtin.arrow ->
+    CCList.length l - 1
   | _ -> 0
 
 let rec debugf out t =
@@ -351,17 +359,21 @@ let rec app_builtin ~ty b l =
   let l = flatten_and_or b l in
 
   match b, l with
-  | Builtin.Arrow, [] -> assert false
-  | Builtin.Arrow, [ ret ] -> ret
-  | Builtin.Arrow, { term = AppBuiltin (Builtin.Arrow, ret :: l1); _ } :: l2 ->
+  | b', [] when Builtin.equal b' Builtin.arrow -> assert false
+  | b', [ ret ] when Builtin.equal b' Builtin.arrow -> ret
+  | b', { term = AppBuiltin (_b1_arrow, ret :: l1); _ } :: l2
+    when Builtin.equal b' Builtin.arrow && Builtin.equal _b1_arrow Builtin.arrow
+    ->
     (* flatten *)
-    app_builtin ~ty Builtin.Arrow ((ret :: l2) @ l1)
-  | Builtin.Not, [] ->
+    app_builtin ~ty Builtin.arrow ((ret :: l2) @ l1)
+  | b', [] when Builtin.equal b' Builtin.not_ ->
     let ty = app_builtin ~ty:tType Builtin.arrow [ prop; prop ] in
     let my_t = make_ ~props:Flags.zero ~ty:(HasType ty) (AppBuiltin (b, [])) in
     H.hashcons my_t
-  | (Builtin.And | Builtin.Or), l
-    when CCList.length l < 2 && expected_args ty < 2 ->
+  | b', l
+    when (Builtin.equal b' Builtin.and_ || Builtin.equal b' Builtin.or_)
+         && CCList.length l < 2
+         && expected_args ty < 2 ->
     let args =
       (if CCList.is_empty l then
          [ prop ]
@@ -375,7 +387,11 @@ let rec app_builtin ~ty b l =
     H.hashcons my_t
   | _ ->
     assert (
-      (not (List.mem b Builtin.[ Eq; Neq; ForallConst; ExistsConst ]))
+      (not
+         (List.mem b
+            [
+              Builtin.eq; Builtin.neq; Builtin.forallConst; Builtin.existsConst;
+            ]))
       || (List.length l >= 1 && is_a_type (List.hd l)));
     let ty =
       if Builtin.is_quantifier b && List.length l = 2 then
@@ -416,7 +432,7 @@ let app ~ty f l =
     let t_args = flatten_and_or f1 l1 @ l in
     let ty =
       if Builtin.is_logical_op f1 && not (Builtin.is_quantifier f1) then (
-        let prop = builtin ~ty:tType Builtin.Prop in
+        let prop = builtin ~ty:tType Builtin.prop in
 
         let args, _ = open_fun ty in
         if List.length args > 0 then
@@ -512,7 +528,7 @@ let[@inline] is_app t =
 
 let[@inline] is_tType t =
   match view t with
-  | AppBuiltin (Builtin.TType, _) -> true
+  | AppBuiltin (_b_ttype, _) when Builtin.equal _b_ttype Builtin.tType -> true
   | _ -> false
 
 let[@inline] is_lambda t =
@@ -1034,7 +1050,8 @@ let rec open_poly_fun ty =
 let rec returns ty =
   match view ty with
   | Bind (Binder.ForallTy, _, ty') -> returns ty'
-  | AppBuiltin (Builtin.Arrow, ret :: _) -> ret
+  | AppBuiltin (_b_arrow, ret :: _) when Builtin.equal _b_arrow Builtin.arrow ->
+    ret
   | _ -> ty
 
 let rec expected_ty_vars ty =
@@ -1068,23 +1085,24 @@ let rec head t =
 
 let type_is_unifiable (ty : t) : bool =
   match view ty with
-  | AppBuiltin ((Builtin.TyInt | Builtin.TyRat), _)
-  | Bind (Binder.ForallTy, _, _) ->
+  | AppBuiltin (b, _)
+    when Builtin.equal b Builtin.ty_int || Builtin.equal b Builtin.ty_rat ->
     false
+  | Bind (Binder.ForallTy, _, _) -> false
   | _ -> true
 
 let type_non_unifiable_tags (ty : t) : _ list =
   match view ty with
-  | AppBuiltin (Builtin.TyInt, _) ->
+  | AppBuiltin (_b_tyint, _) when Builtin.equal _b_tyint Builtin.ty_int ->
     [ Builtin.Tag.T_lia; Builtin.Tag.T_cannot_orphan ]
-  | AppBuiltin (Builtin.TyRat, _) ->
+  | AppBuiltin (_b_tyrat, _) when Builtin.equal _b_tyrat Builtin.ty_rat ->
     [ Builtin.Tag.T_lra; Builtin.Tag.T_cannot_orphan ]
   | Bind (Binder.ForallTy, _, _) -> [ Builtin.Tag.T_ho ]
   | _ -> []
 
 let type_is_prop t =
   match view t with
-  | AppBuiltin (Builtin.Prop, _) -> true
+  | AppBuiltin (_b_prop, _) when Builtin.equal _b_prop Builtin.prop -> true
   | _ -> false
 
 let[@inline] get_type t =
@@ -1147,7 +1165,7 @@ let default_hooks () = !_hooks
 
 let needs_args (t : t) : bool =
   match view t with
-  | AppBuiltin (Builtin.Arrow, _) -> true
+  | AppBuiltin (_b_arrow, _) when Builtin.equal _b_arrow Builtin.arrow -> true
   | Bind (Binder.ForallTy, _, _) -> true
   | _ -> false
 
@@ -1194,23 +1212,29 @@ let rec pp_depth ?(hooks = []) depth out t =
         (Iter.of_array_i (Array.of_list varty_l))
         (_pp_surrounded (depth + List.length varty_l))
         t'
-    | AppBuiltin (Builtin.Arrow, ([] | [ _ ])) -> assert false
-    | AppBuiltin (Builtin.Arrow, ret :: args) ->
+    | AppBuiltin (_b1_arrow, ([] | [ _ ]))
+      when Builtin.equal _b1_arrow Builtin.arrow ->
+      assert false
+    | AppBuiltin (_b_arrow, ret :: args)
+      when Builtin.equal _b_arrow Builtin.arrow ->
       Format.fprintf out "@[%a@ → %a@]"
         (Util.pp_list ~sep:" → " (_pp_surrounded depth))
         args (_pp_surrounded depth) ret
-    | AppBuiltin
-        (((Builtin.ExistsConst | Builtin.ForallConst) as b), [ x; body ]) ->
-      Format.fprintf out "%a %a. %a" Builtin.pp b (_pp depth) x (_pp depth) body
-    | AppBuiltin (((Builtin.Eq | Builtin.Neq) as b), x :: rest) ->
+    | AppBuiltin (b0, [ x; body ])
+      when Builtin.equal b0 Builtin.existsConst
+           || Builtin.equal b0 Builtin.forallConst ->
+      Format.fprintf out "%a %a. %a" Builtin.pp b0 (_pp depth) x (_pp depth)
+        body
+    | AppBuiltin (b0, x :: rest)
+      when Builtin.equal b0 Builtin.eq || Builtin.equal b0 Builtin.neq ->
       let sep, l =
         if is_a_type x then
-          CCFormat.sprintf "(%a::%a) " Builtin.pp b (_pp depth) x, rest
+          CCFormat.sprintf "(%a::%a) " Builtin.pp b0 (_pp depth) x, rest
         else
-          CCFormat.sprintf "%a " Builtin.pp b, x :: rest
+          CCFormat.sprintf "%a " Builtin.pp b0, x :: rest
       in
       if CCList.length l = 1 then
-        Format.fprintf out "(%a @[%a@])" Builtin.pp b (_pp depth) (List.hd l)
+        Format.fprintf out "(%a @[%a@])" Builtin.pp b0 (_pp depth) (List.hd l)
       else
         Format.fprintf out " @[%a@]" (Util.pp_list ~sep (_pp depth)) l
     | AppBuiltin (b, ([ _; a ] | [ a ])) when Builtin.is_prefix b ->
@@ -1286,10 +1310,14 @@ let rec pp_depth ?(hooks = []) depth out t =
 and pp_var out v =
   let ty = HVar.ty v in
   match view ty with
-  | AppBuiltin (Builtin.TType, []) -> Format.fprintf out "A%d" (HVar.id v)
-  | AppBuiltin (Builtin.TyInt, []) -> Format.fprintf out "I%d" (HVar.id v)
-  | AppBuiltin (Builtin.TyRat, []) -> Format.fprintf out "Q%d" (HVar.id v)
-  | AppBuiltin (Builtin.Prop, []) -> Format.fprintf out "P%d" (HVar.id v)
+  | AppBuiltin (_b_ttype, []) when Builtin.equal _b_ttype Builtin.tType ->
+    Format.fprintf out "A%d" (HVar.id v)
+  | AppBuiltin (_b_tyint, []) when Builtin.equal _b_tyint Builtin.ty_int ->
+    Format.fprintf out "I%d" (HVar.id v)
+  | AppBuiltin (_b_tyrat, []) when Builtin.equal _b_tyrat Builtin.ty_rat ->
+    Format.fprintf out "Q%d" (HVar.id v)
+  | AppBuiltin (_b_prop, []) when Builtin.equal _b_prop Builtin.prop ->
+    Format.fprintf out "P%d" (HVar.id v)
   | _ when needs_args ty -> Format.fprintf out "F%d" (HVar.id v)
   | _ -> HVar.pp out v
 
@@ -1313,14 +1341,17 @@ let rec pp_zf out t =
         (Iter.of_array_i (Array.of_list varty_l))
         (_pp_surrounded (depth + List.length varty_l))
         t'
-    | AppBuiltin (Builtin.Arrow, ([] | [ _ ])) -> assert false
-    | AppBuiltin (Builtin.Arrow, ret :: args) ->
+    | AppBuiltin (_b1_arrow, ([] | [ _ ]))
+      when Builtin.equal _b1_arrow Builtin.arrow ->
+      assert false
+    | AppBuiltin (_b_arrow, ret :: args)
+      when Builtin.equal _b_arrow Builtin.arrow ->
       Format.fprintf out "@[%a@ -> %a@]"
         (Util.pp_list ~sep:" -> " (_pp_surrounded depth))
         args (_pp_surrounded depth) ret
     | AppBuiltin (b, [ x; body ])
-      when Builtin.equal b Builtin.ExistsConst
-           || Builtin.equal b Builtin.ForallConst ->
+      when Builtin.equal b Builtin.existsConst
+           || Builtin.equal b Builtin.forallConst ->
       Format.printf "%a %a. %a" Builtin.pp b pp_zf x pp_zf body
     | AppBuiltin (b, ([ _; a ] | [ a ])) when Builtin.is_prefix b ->
       Format.fprintf out "@[<1>%a %a@]" Builtin.ZF.pp b (pp_ depth) a
@@ -1358,10 +1389,14 @@ let rec pp_zf out t =
 and pp_var_zf out v =
   let ty = HVar.ty v in
   match view ty with
-  | AppBuiltin (Builtin.TType, []) -> Format.fprintf out "A%d" (HVar.id v)
-  | AppBuiltin (Builtin.TyInt, []) -> Format.fprintf out "I%d" (HVar.id v)
-  | AppBuiltin (Builtin.TyRat, []) -> Format.fprintf out "Q%d" (HVar.id v)
-  | AppBuiltin (Builtin.Prop, []) -> Format.fprintf out "P%d" (HVar.id v)
+  | AppBuiltin (_b_ttype, []) when Builtin.equal _b_ttype Builtin.tType ->
+    Format.fprintf out "A%d" (HVar.id v)
+  | AppBuiltin (_b_tyint, []) when Builtin.equal _b_tyint Builtin.ty_int ->
+    Format.fprintf out "I%d" (HVar.id v)
+  | AppBuiltin (_b_tyrat, []) when Builtin.equal _b_tyrat Builtin.ty_rat ->
+    Format.fprintf out "Q%d" (HVar.id v)
+  | AppBuiltin (_b_prop, []) when Builtin.equal _b_prop Builtin.prop ->
+    Format.fprintf out "P%d" (HVar.id v)
   | _ when needs_args ty -> Format.fprintf out "F%d" (HVar.id v)
   | _ -> HVar.pp out v
 

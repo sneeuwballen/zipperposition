@@ -25,7 +25,7 @@ let is_uniqueness_axiom f =
   let check_form f =
     let is_uniqueness_cl ~var t =
       match T.view t with
-      | T.AppBuiltin (Eq, l) ->
+      | T.AppBuiltin (b, l) when Builtin.equal b Builtin.eq ->
         List.exists (fun t -> T.var_occurs ~var t) l
         && List.exists (fun t -> T.is_const t) l
       | _ -> false
@@ -34,7 +34,7 @@ let is_uniqueness_axiom f =
     match T.view f with
     | T.Bind ((Binder.Forall | Binder.Exists), var, body) ->
       (match T.view body with
-      | T.AppBuiltin (Or, l) ->
+      | T.AppBuiltin (b, l) when Builtin.equal b Builtin.or_ ->
         List.for_all (fun t -> is_uniqueness_cl ~var t) l
       | _ -> false)
     | _ -> false

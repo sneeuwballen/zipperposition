@@ -160,27 +160,31 @@ let rec mk_lit a b sign =
   if not (Type.equal (T.ty a) (T.ty b)) then ty_error_ a b;
   (* Maybe the sign will flip, so we have to beta reduce. *)
   match T.view a, T.view b with
-  | T.AppBuiltin (Builtin.True, []), T.AppBuiltin (Builtin.False, []) ->
+  | T.AppBuiltin (_b_true, []), T.AppBuiltin (_b1_false, [])
+    when Builtin.equal _b1_false Builtin.false_ ->
     if sign then
       False
     else
       True
-  | T.AppBuiltin (Builtin.False, []), T.AppBuiltin (Builtin.True, []) ->
+  | T.AppBuiltin (_b1_false, []), T.AppBuiltin (_b_true, [])
+    when Builtin.equal _b_true Builtin.true_ ->
     if sign then
       False
     else
       True
-  | T.AppBuiltin (Builtin.True, []), T.AppBuiltin (Builtin.True, []) ->
+  | T.AppBuiltin (_b1_true, []), T.AppBuiltin (_b2_true, [])
+    when Builtin.equal _b1_true Builtin.true_ ->
     if sign then
       True
     else
       False
-  | T.AppBuiltin (Builtin.False, []), T.AppBuiltin (Builtin.False, []) ->
+  | T.AppBuiltin (_b1_false, []), T.AppBuiltin (_b2_false, [])
+    when Builtin.equal _b1_false Builtin.false_ ->
     if sign then
       True
     else
       False
-  | T.AppBuiltin (Builtin.True, []), _ ->
+  | T.AppBuiltin (_b1_true, []), _ when Builtin.equal _b1_true Builtin.true_ ->
     let lhs, rhs =
       ( b,
         if sign then
@@ -189,7 +193,7 @@ let rec mk_lit a b sign =
           T.false_ )
     in
     Equation (lhs, rhs, true)
-  | _, T.AppBuiltin (Builtin.True, []) ->
+  | _, T.AppBuiltin (_b_true, []) when Builtin.equal _b_true Builtin.true_ ->
     let lhs, rhs =
       ( a,
         if sign then
@@ -198,7 +202,8 @@ let rec mk_lit a b sign =
           T.false_ )
     in
     Equation (lhs, rhs, true)
-  | T.AppBuiltin (Builtin.False, []), _ ->
+  | T.AppBuiltin (_b1_false, []), _ when Builtin.equal _b1_false Builtin.false_
+    ->
     let lhs, rhs =
       ( b,
         if sign then
@@ -207,7 +212,8 @@ let rec mk_lit a b sign =
           T.true_ )
     in
     Equation (lhs, rhs, true)
-  | _, T.AppBuiltin (Builtin.False, []) ->
+  | _, T.AppBuiltin (_b1_false, []) when Builtin.equal _b1_false Builtin.false_
+    ->
     let lhs, rhs =
       ( a,
         if sign then
@@ -220,19 +226,22 @@ let rec mk_lit a b sign =
 
 and mk_prop p sign =
   match T.view p with
-  | T.AppBuiltin (Builtin.True, []) ->
+  | T.AppBuiltin (_b_true, []) when Builtin.equal _b_true Builtin.true_ ->
     if sign then
       True
     else
       False
-  | T.AppBuiltin (Builtin.False, []) ->
+  | T.AppBuiltin (_b1_false, []) when Builtin.equal _b1_false Builtin.false_ ->
     if sign then
       False
     else
       True
-  | T.AppBuiltin (Builtin.Not, [ p' ]) -> mk_prop p' (not sign)
-  | T.AppBuiltin (Builtin.Eq, [ a; b ]) -> mk_lit a b sign
-  | T.AppBuiltin (Builtin.Neq, [ a; b ]) -> mk_lit a b (not sign)
+  | T.AppBuiltin (_b_not, [ p' ]) when Builtin.equal _b_not Builtin.not_ ->
+    mk_prop p' (not sign)
+  | T.AppBuiltin (_b_eq, [ a; b ]) when Builtin.equal _b_eq Builtin.eq ->
+    mk_lit a b sign
+  | T.AppBuiltin (_b_neq, [ a; b ]) when Builtin.equal _b_neq Builtin.neq ->
+    mk_lit a b (not sign)
   | _ ->
     if not (Type.equal (T.ty p) Type.prop) then ty_error_ p T.true_;
     mk_lit p T.true_ sign
@@ -470,16 +479,19 @@ let is_trivial lit =
 let rec cannot_be_eq (t1 : term) (t2 : term) : Builtin.Tag.t list option =
   let module TC = T.Classic in
   match TC.view t1, TC.view t2 with
-  | TC.AppBuiltin (Builtin.Int z1, []), TC.AppBuiltin (Builtin.Int z2, []) ->
-    if Z.equal z1 z2 then
-      None
-    else
-      Some [ Builtin.Tag.T_lia; Builtin.Tag.T_cannot_orphan ]
-  | TC.AppBuiltin (Builtin.Rat n1, []), TC.AppBuiltin (Builtin.Rat n2, []) ->
-    if Q.equal n1 n2 then
-      None
-    else
-      Some [ Builtin.Tag.T_lra; Builtin.Tag.T_cannot_orphan ]
+  | TC.AppBuiltin (b1, []), TC.AppBuiltin (b2, []) ->
+    (match Builtin.is_payload b1, Builtin.is_payload b2 with
+    | Some (Builtin.Int z1), Some (Builtin.Int z2) ->
+      if Z.equal z1 z2 then
+        None
+      else
+        Some [ Builtin.Tag.T_lia; Builtin.Tag.T_cannot_orphan ]
+    | Some (Builtin.Rat n1), Some (Builtin.Rat n2) ->
+      if Q.equal n1 n2 then
+        None
+      else
+        Some [ Builtin.Tag.T_lra; Builtin.Tag.T_cannot_orphan ]
+    | _ -> None)
   | TC.App (c1, l1), TC.App (c2, l2)
     when Ind_ty.is_constructor c1 && Ind_ty.is_constructor c2 ->
     (* two constructor applications cannot be equal if they
@@ -517,12 +529,19 @@ let fold_terms ?(position = Position.stop) ?(vars = false) ?(var_args = true)
     match which with
     | `Max ->
       (match hd, args with
-      | (Eq | Neq | Xor | Equiv), ([ _; a; b ] | [ a; b ]) ->
+      | b_bltn, ([ _; a; b ] | [ a; b ])
+        when Builtin.equal b_bltn Builtin.eq
+             || Builtin.equal b_bltn Builtin.neq
+             || Builtin.equal b_bltn Builtin.xor
+             || Builtin.equal b_bltn Builtin.equiv ->
         (match Ordering.compare ord a b with
         | Comparison.Lt | Leq -> Some [ List.length args - 1 ]
         | Gt | Geq -> Some [ List.length args - 2 ]
         | _ -> None)
-      | (ForallConst | ExistsConst), [ _; _ ] -> Some []
+      | b, [ _; _ ]
+        when Builtin.equal b Builtin.forallConst
+             || Builtin.equal b Builtin.existsConst ->
+        Some []
       | _ -> None)
     | `All -> None
   in
@@ -599,7 +618,7 @@ let of_unif_subst renaming (s : Unif_subst.t) : t list =
 let normalize_eq lit =
   let as_neg t =
     match T.view t with
-    | T.AppBuiltin (Not, [ f ]) -> Some f
+    | T.AppBuiltin (b_not, [ f ]) -> Some f
     | _ -> None
   in
 
@@ -621,7 +640,8 @@ let normalize_eq lit =
     | Equation (lhs, rhs, _) when is_predicate_lit lit ->
       let sign = is_positivoid lit in
       (match T.view lhs with
-      | T.AppBuiltin (Builtin.(Eq | Equiv), ([ _; l; r ] | [ l; r ])) ->
+      | T.AppBuiltin (b, ([ _; l; r ] | [ l; r ]))
+        when Builtin.equal b Builtin.eq || Builtin.equal b Builtin.equiv ->
         (* first arg can be type variable *)
         let eq_cons =
           if sign then
@@ -630,7 +650,8 @@ let normalize_eq lit =
             mk_neq_
         in
         Some (eq_cons l r)
-      | T.AppBuiltin (Builtin.(Neq | Xor), ([ _; l; r ] | [ l; r ])) ->
+      | T.AppBuiltin (b, ([ _; l; r ] | [ l; r ]))
+        when Builtin.equal b Builtin.neq || Builtin.equal b Builtin.xor ->
         let eq_cons =
           if sign then
             mk_neq_
@@ -638,7 +659,7 @@ let normalize_eq lit =
             mk_eq_
         in
         Some (eq_cons l r)
-      | T.AppBuiltin (Builtin.Not, [ f ]) ->
+      | T.AppBuiltin (_b_not, [ f ]) when Builtin.equal _b_not Builtin.not_ ->
         let elim_not = mk_lit f T.true_ (not sign) in
         Some (CCOpt.get_or ~default:elim_not (aux elim_not))
       | _ -> None)
@@ -942,9 +963,9 @@ module Conv = struct
           else (
             let hd =
               if sign then
-                Builtin.Equiv
+                Builtin.equiv
               else
-                Builtin.Xor
+                Builtin.xor
             in
             SLiteral.atom (T.app_builtin ~ty:Type.prop hd [ l; r ]) true
           )

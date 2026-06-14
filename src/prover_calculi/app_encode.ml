@@ -14,7 +14,7 @@ module T = TypedSTerm
 let id_ae_fun = Name.make "app_encode_fun"
 
 let ty_ae_fun =
-  T.app_builtin ~ty:T.tType Builtin.Arrow [ T.tType; T.tType; T.tType ]
+  T.app_builtin ~ty:T.tType Builtin.arrow [ T.tType; T.tType; T.tType ]
 
 let function_type = T.const ~ty:ty_ae_fun id_ae_fun
 
@@ -26,7 +26,7 @@ let ty_ae_app =
   let beta = Var.make ~ty:T.tType (ID.make "beta") in
   T.bind ~ty:T.tType Binder.ForallTy alpha
     (T.bind ~ty:T.tType Binder.ForallTy beta
-       (T.app_builtin ~ty:T.tType Builtin.Arrow
+       (T.app_builtin ~ty:T.tType Builtin.arrow
           [
             T.var beta;
             T.app ~ty:T.tType function_type [ T.var alpha; T.var beta ];
@@ -43,7 +43,7 @@ let ty_ext_diff =
   let beta = Var.make ~ty:T.tType (ID.make "beta") in
   T.bind ~ty:T.tType Binder.ForallTy alpha
     (T.bind ~ty:T.tType Binder.ForallTy beta
-       (T.app_builtin ~ty:T.tType Builtin.Arrow
+       (T.app_builtin ~ty:T.tType Builtin.arrow
           [
             T.var alpha;
             T.app ~ty:T.tType function_type [ T.var alpha; T.var beta ];
@@ -72,7 +72,8 @@ let rec app_encode_ty ty =
     | T.App (f, args) ->
       assert (not (T.equal f function_type));
       T.app ~ty:T.tType (app_encode_ty f) (CCList.map app_encode_ty args)
-    | T.AppBuiltin (Builtin.Arrow, ret :: args) when not (T.Ty.is_tType ret) ->
+    | T.AppBuiltin (_b1_arrow, ret :: args)
+      when (not (T.Ty.is_tType ret)) && Builtin.equal _b1_arrow Builtin.arrow ->
       let ret_ty =
         CCList.fold_right
           (fun arg t ->
@@ -133,7 +134,8 @@ let rec app_encode_term toplevel t =
             let arg' = app_encode_ty arg in
             let t' = T.Subst.eval_nonrec (Var.Subst.singleton var arg') t in
             T.app ~ty:t' term [ arg' ]
-          | T.AppBuiltin (Builtin.Arrow, ret_ty :: arg_tys) ->
+          | T.AppBuiltin (_b_arrow, ret_ty :: arg_tys)
+            when Builtin.equal _b_arrow Builtin.arrow ->
             (* mandatory arguments *)
             let arg' = app_encode_term false arg in
             let ty' =
@@ -141,7 +143,7 @@ let rec app_encode_term toplevel t =
               | [] -> assert false
               | _ :: [] -> ret_ty
               | _ :: arg_tys_head :: arg_tys_tail ->
-                T.app_builtin ~ty:T.tType Builtin.Arrow
+                T.app_builtin ~ty:T.tType Builtin.arrow
                   (ret_ty :: arg_tys_head :: arg_tys_tail)
             in
             T.app ~ty:ty' term [ arg' ]

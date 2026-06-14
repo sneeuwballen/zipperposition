@@ -694,8 +694,8 @@ module Inner = struct
         let subst, t1 = restrict_to_scope subst (t1, sc1) ~into:sc2 in
         let subst, t2 = restrict_to_scope subst (t2, sc2) ~into:sc2 in
         unif_ho ~op ~root ~bvars subst t1 t2 ~scope:sc2)
-    | ( T.AppBuiltin (Builtin.Arrow, ret1 :: args1),
-        T.AppBuiltin (Builtin.Arrow, ret2 :: args2) ) ->
+    | T.AppBuiltin (b1, ret1 :: args1), T.AppBuiltin (b2, ret2 :: args2)
+      when Builtin.equal b1 Builtin.arrow && Builtin.equal b2 Builtin.arrow ->
       (* unify [a -> b] and [a' -> b'], virtually *)
       let l1, l2 = pair_lists_left args1 ret1 args2 ret2 in
       unif_list ~op ~bvars subst l1 sc1 l2 sc2
@@ -714,17 +714,41 @@ module Inner = struct
     (* | T.Bind ((Binder.Forall | Binder.Exists), _, _), _
       | _, T.Bind ((Binder.Forall | Binder.Exists), _, _) ->
         delay ~tags:[] () cannot unify non-atomic propositions, so delay *)
-    | T.AppBuiltin (Builtin.Int n1, []), T.AppBuiltin (Builtin.Int n2, []) ->
-      if Z.equal n1 n2 then
-        subst
-      else
-        raise Fail (* int equality *)
-    | T.AppBuiltin (Builtin.Rat n1, []), T.AppBuiltin (Builtin.Rat n2, []) ->
-      if Q.equal n1 n2 then
-        subst
-      else
-        raise Fail (* rational equality *)
-    | T.AppBuiltin (Builtin.True, _), _ | T.AppBuiltin (Builtin.False, _), _ ->
+    | T.AppBuiltin (b1, []), T.AppBuiltin (b2, [])
+      when (match Builtin.is_payload b1 with
+           | Some (Builtin.Int _) -> true
+           | _ -> false)
+           &&
+           match Builtin.is_payload b2 with
+           | Some (Builtin.Int _) -> true
+           | _ -> false ->
+      (match Builtin.is_payload b1, Builtin.is_payload b2 with
+      | Some (Builtin.Int n1), Some (Builtin.Int n2) ->
+        if Z.equal n1 n2 then
+          subst
+        else
+          raise Fail
+      | _ -> assert false)
+    | T.AppBuiltin (b1, []), T.AppBuiltin (b2, [])
+      when (match Builtin.is_payload b1 with
+           | Some (Builtin.Rat _) -> true
+           | _ -> false)
+           &&
+           match Builtin.is_payload b2 with
+           | Some (Builtin.Rat _) -> true
+           | _ -> false ->
+      (match Builtin.is_payload b1, Builtin.is_payload b2 with
+      | Some (Builtin.Rat n1), Some (Builtin.Rat n2) ->
+        if Q.equal n1 n2 then
+          subst
+        else
+          raise Fail
+      | _ -> assert false)
+    | T.AppBuiltin (b1, _), T.AppBuiltin (b2, _)
+      when Builtin.equal b1 Builtin.true_
+           || Builtin.equal b1 Builtin.false_
+           || Builtin.equal b2 Builtin.true_
+           || Builtin.equal b2 Builtin.false_ ->
       if T.equal t1 t2 then
         subst
       else
