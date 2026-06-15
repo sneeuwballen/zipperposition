@@ -1,38 +1,50 @@
+(* This file is free software, part of Zipperposition. See file "license" for more details. *)
+
+(** {1 Low-level MDAG encoder — node-buffered}
+
+    Each {!write_node} call gets its own buffer from a pool, writes the node
+    (command + arguments + stop) into it, then flushes the complete buffer to
+    output. This naturally supports nesting: inner nodes are written and flushed
+    first, so their offsets are known when the outer node writes refs to them.
+*)
+
 class type output = object
   method write : bytes -> int -> int -> unit
 end
 
 type t = {
-  mutable buf: bytes;
-  mutable len: int;
+  mutable buf: bytes; (* saved parent buffer; restored after node writes *)
+  mutable len: int; (* saved parent buffer length *)
   out: output;
-  mutable cur_offset: int;  (** How many bytes written into [out] already? *)
+  mutable cur_offset: int;  (** How many bytes have been written into [out] *)
+  node_pool: bytes Pool.t;  (** Pool of node buffers *)
 }
-(** Encoder *)
 
 let buf_size = 1024
-let high_watermark = buf_size - 32
 
 let create ~out () : t =
   let out = (out :> output) in
-  { out; cur_offset = 0; buf = Bytes.create buf_size; len = 0 }
-
-let[@inline never] flush_ self : unit =
-  self.out#write self.buf 0 self.len;
-  self.cur_offset <- self.cur_offset + self.len;
-  self.len <- 0
+  let pool =
+    Pool.create ~mk_item:(fun () -> Bytes.create buf_size) ~clear:ignore ()
+  in
+  {
+    out;
+    cur_offset = 0;
+    buf = Bytes.create buf_size;
+    len = 0;
+    node_pool = pool;
+  }
 
 let[@inline] abs_offset_ (self : t) : int = self.cur_offset + self.len
-let flush self : unit = if self.len > 0 then flush_ self
+let flush _self : unit = ()
+(* no-op: each node flushes itself immediately *)
 
 type node_encoder = t
 type offset = int
 
-let maybe_flush self = if self.len >= high_watermark then flush_ self
 let[@inline] buf_len self = Bytes.length self.buf
 
 let[@inline never] ensure_slow_ (self : t) n =
-  if self.len + n >= high_watermark then flush self;
   let cap = ref (buf_len self) in
   while !cap < self.len + n do
     cap := !cap + (!cap / 2)
@@ -129,9 +141,20 @@ let ref self i =
   uint_ self ~high:7 i
 
 let write_node (self : t) cmd (f : node_encoder -> unit) : offset =
-  let offset = abs_offset_ self in
+  let saved_buf = self.buf in
+  let saved_len = self.len in
+  let node_buf = Pool.Raw.acquire self.node_pool in
+  self.buf <- node_buf;
+  self.len <- 0;
   string self cmd;
   f self;
   stop self;
-  maybe_flush self;
+  (* capture offset after all nested nodes have been flushed *)
+  let offset = self.cur_offset in
+  self.out#write self.buf 0 self.len;
+  self.cur_offset <- self.cur_offset + self.len;
+  let released_buf = self.buf in
+  self.buf <- saved_buf;
+  self.len <- saved_len;
+  Pool.Raw.release self.node_pool released_buf;
   offset
