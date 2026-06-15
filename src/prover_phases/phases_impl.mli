@@ -30,7 +30,7 @@ val process_files_and_print :
   ?params:Params.t -> Phases.filename list -> Phases.errcode Phases.t
 (** Process each file in the list successively, printing the results. *)
 
-val print_stats : unit -> unit Phases.t
+val print_stats : unit Phases.t
 
 val main_cli : ?setup_gc:bool -> unit -> Phases.errcode Phases.t
 (** Main for the command-line prover *)

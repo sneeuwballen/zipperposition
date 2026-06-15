@@ -14,8 +14,9 @@ let phases = Phases_impl.main_cli ~setup_gc:true ()
 let () =
   Setup_trace.with_setup () @@ fun () ->
   match Phases.run phases with
-  | CCResult.Error msg ->
-    print_endline msg;
+  | CCResult.Error (e, bt) ->
+    Printf.printf "%s\n%s\n" (Printexc.to_string e)
+      (Printexc.raw_backtrace_to_string bt);
     exit 1
   | CCResult.Ok (_, 0) -> ()
   | CCResult.Ok (_, errcode) -> exit errcode (* failure *)

@@ -7,7 +7,6 @@ open Logtk_parsers
 open Logtk_proofs
 open Libzipperposition
 open Libzipperposition_calculi
-open Phases.Syntax
 module T = Term
 module O = Ordering
 module Lit = Literal
@@ -46,9 +45,9 @@ let print_version ~params =
    in phase Phases.LoadExtension
    FIXME: still too global? *)
 (* TODO: just use a list, not "register" *)
-let load_extensions =
+let load_extensions (st_ref : Phases.State.t ref) =
   let open Libzipperposition_calculi in
-  let@ () = Phases.with_phase Phases.LoadExtensions in
+  let@ () = Phases.with_phase st_ref Phases.LoadExtensions in
   Extensions.register Lazy_cnf.extension;
   Extensions.register Combinators.extension;
   Extensions.register Higher_order.extension;
@@ -73,15 +72,14 @@ let load_extensions =
   Extensions.register App_encode.extension;
   Extensions.register Eq_encode.extension;
 
-  let l = Extensions.extensions () in
-  Phases.return l
+  Extensions.extensions ()
 
 (* apply functions of [field e], for each extensions [e], to update
    the current state given some parameter [x]. *)
-let do_extensions ~x ~field =
+let do_extensions ~x ~field (st_ref : Phases.State.t ref) =
   Extensions.extensions ()
-  |> Phases.fold_l ~x:() ~f:(fun () e ->
-         Phases.fold_l (field e) ~x:() ~f:(fun () f -> Phases.update ~f:(f x)))
+  |> List.iter (fun e ->
+         field e |> List.iter (fun f -> Phases.update ~f:(f x) st_ref))
 
 let apply_modifiers ~field o =
   Extensions.extensions ()
@@ -89,17 +87,14 @@ let apply_modifiers ~field o =
        (fun o e -> field e |> CCList.fold_left (fun o m -> m o) o)
        o
 
-let start_file file =
-  let@ () = Phases.with_phase Phases.Start_file in
+let start_file (st_ref : Phases.State.t ref) file =
+  let@ () = Phases.with_phase st_ref Phases.Start_file in
   Util.debugf ~section 2 "@[@{<Yellow>### process file@ `%s` ###@}@]" (fun k ->
       k file);
-  let* () =
-    do_extensions ~field:(fun e -> e.Extensions.start_file_actions) ~x:file
-  in
-  Phases.return ()
+  do_extensions ~field:(fun e -> e.Extensions.start_file_actions) ~x:file st_ref
 
-let parse_prelude (params : Params.t) =
-  let@ () = Phases.with_phase Phases.Parse_prelude in
+let parse_prelude (st_ref : Phases.State.t ref) (params : Params.t) =
+  let@ () = Phases.with_phase st_ref Phases.Parse_prelude in
   let prelude_files = params.Params.prelude in
   let res =
     if CCVector.is_empty prelude_files then
@@ -114,16 +109,22 @@ let parse_prelude (params : Params.t) =
              Parsing_utils.parse_file fmt file)
       |> CCResult.map Iter.of_list |> CCResult.map Iter.flatten
   in
-  Phases.return_result res
+  match res with
+  | Ok x -> x
+  | Error msg -> Phases.failwith msg st_ref
 
-let parse_file file =
-  let@ () = Phases.with_phase Phases.Parse_file in
+let parse_file (st_ref : Phases.State.t ref) file =
+  let@ () = Phases.with_phase st_ref Phases.Parse_file in
   let input = Parsing_utils.input_of_file file in
-  let* parsed = Phases.return_result (Parsing_utils.parse_file input file) in
-  let* () =
-    do_extensions ~field:(fun e -> e.Extensions.post_parse_actions) ~x:parsed
+  let parsed =
+    match Parsing_utils.parse_file input file with
+    | Ok x -> x
+    | Error msg -> Phases.failwith msg st_ref
   in
-  Phases.return (input, parsed)
+  do_extensions
+    ~field:(fun e -> e.Extensions.post_parse_actions)
+    ~x:parsed st_ref;
+  input, parsed
 
 let has_arith stmt : bool =
   let module TS = TypedSTerm in
@@ -153,41 +154,41 @@ let sine_filter stmts =
     CCVector.freeze (CCVector.of_iter filtered)
   )
 
-let typing ~file prelude (input, stmts) =
-  let@ () = Phases.with_phase Phases.Typing in
-  let* params = Phases.get_key Params.key in
+let typing (st_ref : Phases.State.t ref) ~file prelude (input, stmts) =
+  let@ () = Phases.with_phase st_ref Phases.Typing in
+  let params = Phases.get_key Params.key st_ref in
   let def_as_rewrite = params.Params.def_as_rewrite in
-  let* stmts =
-    Phases.return_result
-      (TypeInference.infer_statements
-         ~on_var:(Input_format.on_var input)
-         ~on_undef:(Input_format.on_undef_id input)
-         ~on_shadow:(Input_format.on_shadow input)
-         ~implicit_ty_args:(Input_format.implicit_ty_args input)
-         ~def_as_rewrite ?ctx:None ~file
-         (Iter.append prelude stmts))
+  let stmts =
+    match
+      TypeInference.infer_statements
+        ~on_var:(Input_format.on_var input)
+        ~on_undef:(Input_format.on_undef_id input)
+        ~on_shadow:(Input_format.on_shadow input)
+        ~implicit_ty_args:(Input_format.implicit_ty_args input)
+        ~def_as_rewrite ?ctx:None ~file
+        (Iter.append prelude stmts)
+    with
+    | Ok x -> x
+    | Error msg -> Phases.failwith msg st_ref
   in
   let stmts = sine_filter stmts in
   Util.debugf ~section 3 "@[<hv2>@{<green>typed statements@}@ %a@]" (fun k ->
       k (Util.pp_iter Statement.pp_input) (CCVector.to_iter stmts));
-  let* () =
-    if has_arith stmts then (
-      Util.debug ~section 1 "problem contains arithmetic, lost completeness";
-      Phases.set_key Ctx.Key.lost_completeness true
-    ) else if !_sine_threshold >= 0 then (
-      Util.debug ~section 2 "sine is applied, lost completeness";
-      Phases.set_key Ctx.Key.lost_completeness true
-    ) else
-      Phases.return ()
-  in
-  let* () =
-    do_extensions ~field:(fun e -> e.Extensions.post_typing_actions) ~x:stmts
-  in
-  Phases.return stmts
+  if has_arith stmts then (
+    Util.debug ~section 1 "problem contains arithmetic, lost completeness";
+    Phases.set_key Ctx.Key.lost_completeness true st_ref
+  ) else if !_sine_threshold >= 0 then (
+    Util.debug ~section 2 "sine is applied, lost completeness";
+    Phases.set_key Ctx.Key.lost_completeness true st_ref
+  );
+  do_extensions
+    ~field:(fun e -> e.Extensions.post_typing_actions)
+    ~x:stmts st_ref;
+  stmts
 
 (* obtain clauses  *)
-let cnf ~sk_ctx decls =
-  let@ () = Phases.with_phase Phases.CNF in
+let cnf (st_ref : Phases.State.t ref) ~sk_ctx decls =
+  let@ () = Phases.with_phase st_ref Phases.CNF in
   let opts =
     if !Lazy_cnf.enabled then
       [ Cnf.LazyCnf ]
@@ -201,23 +202,19 @@ let cnf ~sk_ctx decls =
     |> apply_modifiers ~field:(fun e -> e.Extensions.post_cnf_modifiers)
     |> Cnf.convert
   in
-  let* () =
-    do_extensions ~field:(fun e -> e.Extensions.post_cnf_actions) ~x:stmts
-  in
-  Phases.return stmts
+  do_extensions ~field:(fun e -> e.Extensions.post_cnf_actions) ~x:stmts st_ref;
+  stmts
 
 (* compute a precedence *)
-let compute_prec ~signature stmts =
-  let@ () = Phases.with_phase Phases.Compute_prec in
-  (* use extensions *)
-  let* state = Phases.get in
+let compute_prec (st_ref : Phases.State.t ref) ~signature stmts =
+  let@ () = Phases.with_phase st_ref Phases.Compute_prec in
+  let state = !st_ref in
   let cp =
     Extensions.extensions ()
     |> List.fold_left
          (fun cp e ->
            List.fold_left (fun cp f -> f state cp) cp e.Extensions.prec_actions)
          Compute_prec.empty
-    (* add constraint about inductive constructors, etc. *)
     |> Compute_prec.add_constr 10 Classify_cst.prec_constr
     |> Compute_prec.set_weight_rule (fun stmts ->
            let sym_depth =
@@ -231,36 +228,31 @@ let compute_prec ~signature stmts =
            let clauses = Iter.map Statement.Seq.lits stmts in
            Precedence.weight_fun_of_string ~signature ~clauses ~lm_w:!_lmb_w
              ~db_w:!_db_w !_kbo_wf sym_depth)
-    (* |> Compute_prec.set_weight_rule (fun _ -> Classify_cst.weight_fun) *)
-    (* use "invfreq", with low priority *)
     |> Compute_prec.add_constr_rule 90 (fun seq ->
            let syms = Signature.Seq.symbols signature in
            Precedence.Constr.prec_fun_of_str !_prec_fun ~signature syms)
   in
-  let prec =
-    Compute_prec.mk_precedence ~signature ~db_w:!_db_w ~lmb_w:!_lmb_w cp stmts
-  in
-  Phases.return prec
+  Compute_prec.mk_precedence ~signature ~db_w:!_db_w ~lmb_w:!_lmb_w cp stmts
 
-let compute_ord_select precedence =
-  let@ () = Phases.with_phase Phases.Compute_ord_select in
-  let* params = Phases.get_key Params.key in
+let compute_ord_select (st_ref : Phases.State.t ref) precedence =
+  let@ () = Phases.with_phase st_ref Phases.Compute_ord_select in
+  let params = Phases.get_key Params.key st_ref in
   let ord = Ordering.by_name !(params.Params.ord) precedence in
   Util.debugf ~section 2 "@[<2>ordering %s@]" (fun k -> k (Ordering.name ord));
   let select = Selection.from_string ~ord params.Params.select in
   let bool_select = Bool_selection.from_string ~ord params.Params.bool_select in
-  let* () =
-    do_extensions
-      ~field:(fun e -> e.Extensions.ord_select_actions)
-      ~x:(ord, fst select)
-  in
+  do_extensions
+    ~field:(fun e -> e.Extensions.ord_select_actions)
+    ~x:(ord, fst select)
+    st_ref;
   Util.debugf ~section 2 "@[<2>selection function:@ %s@]" (fun k ->
       k params.Params.select);
-  Phases.return (ord, select, bool_select)
+  ord, select, bool_select
 
-let make_ctx ~signature ~ord ~select ~bool_select ~sk_ctx () =
+let make_ctx (st_ref : Phases.State.t ref) ~signature ~ord ~select ~bool_select
+    ~sk_ctx () =
   let select_fun, is_complete = select in
-  let@ () = Phases.with_phase Phases.MakeCtx in
+  let@ () = Phases.with_phase st_ref Phases.MakeCtx in
   let module Res = struct
     let signature = signature
     let ord = ord
@@ -270,18 +262,18 @@ let make_ctx ~signature ~ord ~select ~bool_select ~sk_ctx () =
   end in
   let module MyCtx = Ctx.Make (Res) in
   let ctx = (module MyCtx : Ctx_intf.S) in
-  let* st = Phases.get in
-  (* did any previous extension break completeness? *)
+  let st = !st_ref in
   let lost_comp =
     Flex_state.get_or ~or_:false Ctx.Key.lost_completeness st || not is_complete
   in
   if lost_comp then MyCtx.lost_completeness ();
-  let* () = do_extensions ~field:(fun e -> e.Extensions.ctx_actions) ~x:ctx in
-  Phases.return ctx
+  do_extensions ~field:(fun e -> e.Extensions.ctx_actions) ~x:ctx st_ref;
+  ctx
 
-let make_env ~ctx:(module Ctx : Ctx_intf.S) ~params stmts =
-  let@ () = Phases.with_phase Phases.MakeEnv in
-  let* state = Phases.get in
+let make_env (st_ref : Phases.State.t ref) ~ctx:(module Ctx : Ctx_intf.S)
+    ~params stmts =
+  let@ () = Phases.with_phase st_ref Phases.MakeEnv in
+  let state = !st_ref in
   let module MyEnv = Env.Make (struct
     module Ctx = Ctx
 
@@ -289,17 +281,15 @@ let make_env ~ctx:(module Ctx : Ctx_intf.S) ~params stmts =
     let flex_state = state
   end) in
   let env1 = (module MyEnv : Env.S) in
-  (* use extensions to customize env *)
   Extensions.extensions ()
   |> List.iter (fun e -> List.iter (fun f -> f env1) e.Extensions.env_actions);
-  (* convert statements to clauses *)
   let c_sets = MyEnv.convert_input_statements stmts in
   Signal.send MyEnv.ProofState.CQueue.on_proof_state_init
     (Iter.append
        (CCVector.to_iter c_sets.c_set)
        (CCVector.to_iter c_sets.c_sos));
   let env2 = (module MyEnv : Env.S with type C.t = MyEnv.C.t) in
-  Phases.return (Phases.Env_clauses (env2, c_sets))
+  Phases.Env_clauses (env2, c_sets)
 
 (* FIXME: move this into Env! *)
 let has_goal_ = ref false
@@ -322,9 +312,9 @@ let print_stats_env (type c) (module Env : Env.S with type C.t = c) =
   )
 
 (* print stats *)
-let print_stats () =
+let print_stats (st_ref : Phases.State.t ref) =
   let@ _sp = Phases.with_span ~__FILE__ ~__LINE__ "phase.print-stats" in
-  let@ () = Phases.with_phase Phases.Print_stats in
+  let@ () = Phases.with_phase st_ref Phases.Print_stats in
   Signal.send Signals.on_print_stats ();
   let comment = Options.comment () in
   let print_gc () =
@@ -335,18 +325,17 @@ let print_stats () =
       comment stats.Gc.minor_words stats.Gc.major_words stats.Gc.top_heap_words
       stats.Gc.minor_collections stats.Gc.major_collections
   in
-  let* params = Phases.get_key Params.key in
+  let params = Phases.get_key Params.key st_ref in
   if params.Params.stats then (
     print_gc ();
     Util.print_global_stats ~comment ()
-  );
-  Phases.return ()
+  )
 
 (* pre-saturation *)
-let presaturate_clauses (type c) (module Env : Env.S with type C.t = c)
-    (c_sets : c Clause.sets) =
+let presaturate_clauses (type c) (st_ref : Phases.State.t ref)
+    (module Env : Env.S with type C.t = c) (c_sets : c Clause.sets) =
   let@ _sp = Phases.with_span ~__FILE__ ~__LINE__ "phase.presaturate" in
-  let@ () = Phases.with_phase Phases.Pre_saturate in
+  let@ () = Phases.with_phase st_ref Phases.Pre_saturate in
   let module Sat = Saturate.Make (Env) in
   let num_clauses = CCVector.length c_sets.Clause.c_set in
   if Env.params.Params.presaturate then (
@@ -354,10 +343,8 @@ let presaturate_clauses (type c) (module Env : Env.S with type C.t = c)
     Env.add_passive (CCVector.to_iter c_sets.Clause.c_set);
     let result, num = Sat.presaturate () in
     Util.debugf ~section 2 "initial presaturation in %d steps" (fun k -> k num);
-    (* pre-saturated set of clauses *)
     let c_set = Env.get_active () |> CCVector.of_iter |> CCVector.freeze in
     let clauses = { c_sets with Clause.c_set } in
-    (* remove clauses from [env] *)
     Env.remove_active (CCVector.to_iter c_set);
     Env.remove_passive (CCVector.to_iter c_set);
     Util.debugf ~section 2 "@[<2>%d clauses pre-saturated into:@ @[<hv>%a@]@]"
@@ -365,18 +352,17 @@ let presaturate_clauses (type c) (module Env : Env.S with type C.t = c)
         k num_clauses
           (Util.pp_iter ~sep:" " Env.C.pp_tstp_full)
           (CCVector.to_iter c_set));
-    Phases.return (result, clauses)
+    result, clauses
   ) else
-    Phases.return (Saturate.Unknown, c_sets)
+    Saturate.Unknown, c_sets
 
 (* try to refute the set of clauses contained in the [env]. Parameters are
    used to influence how saturation is done, for how long it runs, etc. *)
-let try_to_refute (type c) (module Env : Env.S with type C.t = c) clauses result
-    =
+let try_to_refute (type c) (st_ref : Phases.State.t ref)
+    (module Env : Env.S with type C.t = c) clauses result =
   let@ _sp = Phases.with_span ~__FILE__ ~__LINE__ "phase.saturate" in
-  let@ () = Phases.with_phase Phases.Saturate in
+  let@ () = Phases.with_phase st_ref Phases.Saturate in
   let module Sat = Saturate.Make (Env) in
-  (* add clauses to passive set of [env], and SOS to active set *)
   if not (CCVector.is_empty clauses.Clause.c_sos) then
     Env.Ctx.lost_completeness ();
   Env.add_active (CCVector.to_iter clauses.Clause.c_sos);
@@ -395,12 +381,10 @@ let try_to_refute (type c) (module Env : Env.S with type C.t = c) clauses result
     else (
       Util.debugf ~section 2 "run for %.3f s" (fun k ->
           k Env.params.Params.timeout);
-      (* FIXME: only do that for zipperposition, not the library? *)
       ignore (setup_alarm Env.params.Params.timeout);
       Some (Util.total_time_s () +. Env.params.Params.timeout -. 0.25)
     )
   in
-
   Util.debugf ~section 1 "active(%d): @[%a@]" (fun k ->
       k
         (Iter.length @@ Env.get_active ())
@@ -409,12 +393,10 @@ let try_to_refute (type c) (module Env : Env.S with type C.t = c) clauses result
       k
         (Iter.length @@ Env.get_passive ())
         (Iter.pp_seq Env.C.pp) (Env.get_passive ()));
-
   Signal.send Env.on_start ();
   let result, num =
     match result with
-    | Saturate.Unsat _ ->
-      result, 0 (* already found unsat during presaturation *)
+    | Saturate.Unsat _ -> result, 0
     | _ -> Sat.given_clause ~generating:true ?steps ?timeout ()
   in
   let comment = Options.comment () in
@@ -422,19 +404,17 @@ let try_to_refute (type c) (module Env : Env.S with type C.t = c) clauses result
     (Util.total_time_s ());
   Util.debugf ~section 2 "@[<2>final precedence:@ @[%a@]@]" (fun k ->
       k Precedence.pp (Env.precedence ()));
-  Phases.return result
+  result
 
 (* Print some content of the state, based on environment variables *)
-let print_dots (type c) (module Env : Env_intf.S with type C.t = c)
-    (result : Saturate.szs_status) =
+let print_dots (type c) (st_ref : Phases.State.t ref)
+    (module Env : Env_intf.S with type C.t = c) (result : Saturate.szs_status) =
   let@ _sp = Phases.with_span ~__FILE__ ~__LINE__ "phase.print-dots" in
-  let@ () = Phases.with_phase Phases.Print_dot in
+  let@ () = Phases.with_phase st_ref Phases.Print_dot in
   Signal.send Signals.on_dot_output ();
-  (* see if we need to print proof state *)
-  (match Env.params.Params.dot_file, result with
+  match Env.params.Params.dot_file, result with
   | Some dot_f, Saturate.Unsat proof ->
     let name = "unsat_graph" in
-    (* print proof of false *)
     let proof =
       if Env.params.Params.dot_all_roots then
         Env.(Iter.append (get_active ()) (get_passive ()))
@@ -449,13 +429,11 @@ let print_dots (type c) (module Env : Env_intf.S with type C.t = c)
     Proof.S.pp_dot_seq_file ~name dot_f proof
   | Some dot_f, (Saturate.Sat | Saturate.Unknown) when Env.params.Params.dot_sat
     ->
-    (* print saturated set *)
     let name = "sat_set" in
     let seq = Iter.append (Env.get_active ()) (Env.get_passive ()) in
     let seq = Iter.map Env.C.proof seq in
     Proof.S.pp_dot_seq_file ~name dot_f seq
-  | _ -> ());
-  Phases.return ()
+  | _ -> ()
 
 (* TODO: parametrize, remove side effect *)
 let sat_to_str () =
@@ -470,12 +448,12 @@ let unsat_to_str () =
   else
     "Unsatisfiable"
 
-let print_szs_result (type c) ~file (module Env : Env_intf.S with type C.t = c)
-    (result : Saturate.szs_status) =
+let print_szs_result (type c) (st_ref : Phases.State.t ref) ~file
+    (module Env : Env_intf.S with type C.t = c) (result : Saturate.szs_status) =
   let@ _sp = Phases.with_span ~__FILE__ ~__LINE__ "phase.print-szs-result" in
-  let@ () = Phases.with_phase Phases.Print_result in
+  let@ () = Phases.with_phase st_ref Phases.Print_result in
   let comment = Options.comment () in
-  (match result with
+  match result with
   | Saturate.Unknown | Saturate.Timeout ->
     Format.printf "%sSZS status ResourceOut for '%s'@." comment file
   | Saturate.Error s ->
@@ -494,7 +472,7 @@ let print_szs_result (type c) ~file (module Env : Env_intf.S with type C.t = c)
     Format.printf "%sSZS status GaveUp for '%s'@." comment file;
     (match !Options.output with
     | Options.O_none -> ()
-    | Options.O_zf -> failwith "not implemented: printing in ZF" (* TODO *)
+    | Options.O_zf -> failwith "not implemented: printing in ZF"
     | Options.O_tptp ->
       Util.debugf ~section 2 "@[<2>saturated set:@ @[<hv>%a@]@]" (fun k ->
           k (Util.pp_iter ~sep:" " Env.C.pp_tstp_full) (Env.get_active ()))
@@ -502,12 +480,10 @@ let print_szs_result (type c) ~file (module Env : Env_intf.S with type C.t = c)
       Util.debugf ~section 2 "@[<2>saturated set:@ @[<hv>%a@]@]" (fun k ->
           k (Util.pp_iter ~sep:" " Env.C.pp) (Env.get_active ())))
   | Saturate.Unsat proof ->
-    (* print status then proof *)
     Format.printf "%sSZS status %s for '%s'@." comment (unsat_to_str ()) file;
     Format.printf "%sSZS output start Refutation@." comment;
     Format.printf "%a@." (Proof.S.pp_in !Options.output) proof;
-    Format.printf "%sSZS output end Refutation@." comment);
-  Phases.return ()
+    Format.printf "%sSZS output end Refutation@." comment
 
 (* print weight of [s] within precedence [prec] *)
 let pp_weight prec out s =
@@ -524,15 +500,14 @@ let has_goal_decls_ decls =
     decls
 
 (* parse CLI options and list of files to deal with *)
-let parse_cli =
-  let@ () = Phases.with_phase Phases.Parse_CLI in
+let parse_cli (st_ref : Phases.State.t ref) =
+  let@ () = Phases.with_phase st_ref Phases.Parse_CLI in
   CCFormat.set_color_default true;
-  (* parse arguments *)
   let params = Params.parse_args () in
   let files = CCVector.to_list params.Params.files in
-  let* () = Phases.set_key Params.key params in
+  Phases.set_key Params.key params st_ref;
   print_version ~params;
-  Phases.return (files, params)
+  files, params
 
 let syms_in_conj decls =
   let open Iter in
@@ -558,15 +533,12 @@ let syms_in_conj_f decls =
   |> Name.Set.of_iter |> Name.Set.to_iter
 
 (* Process the given file (try to solve it) *)
-let process_file ?(prelude = Iter.empty) file =
+let process_file ?(prelude = Iter.empty) file (st_ref : Phases.State.t ref) =
   let@ _sp = Phases.with_span ~__FILE__ ~__LINE__ "phase.process-file" in
-
-  let* () = start_file file in
-  let* stmts = parse_file file in
+  start_file st_ref file;
+  let input, stmts = parse_file st_ref file in
   Trace.add_data_to_span _sp [ "file", `String file ];
-
-  let* decls = typing ~file prelude stmts in
-  (* declare inductive types and constants *)
+  let decls = typing st_ref ~file prelude (input, stmts) in
   CCVector.iter Statement.scan_simple_stmt_for_ind_ty decls;
   let has_goal = has_goal_decls_ decls in
   let conj_syms = syms_in_conj_f decls in
@@ -582,39 +554,32 @@ let process_file ?(prelude = Iter.empty) file =
     Booleans.preprocess_booleans (Rewriting.unfold_def_before_cnf decls)
   in
   let sk_ctx = Skolem.create () in
-  let* stmts = cnf ~sk_ctx transformed in
-  (* Removed it because it is painfully slow (@VISA.) *)
+  let stmts = cnf st_ref ~sk_ctx transformed in
   let stmts = Booleans.preprocess_cnf_booleans stmts in
-  (* compute signature, precedence, ordering *)
   let signature = Statement.signature ~conj_syms (CCVector.to_iter stmts) in
-  let* precedence = compute_prec ~signature (CCVector.to_iter stmts) in
+  let precedence = compute_prec st_ref ~signature (CCVector.to_iter stmts) in
   Util.debugf ~section 2 "@[<2>precedence:@ @[%a@]@]" (fun k ->
       k Precedence.pp precedence);
-  let* ord, select, bool_select = compute_ord_select precedence in
-  (* HO *)
-  let* params = Phases.get_key Params.key in
-  (* build the context and env *)
-  let* ctx = make_ctx ~signature ~ord ~select ~bool_select ~sk_ctx () in
-  let* (Phases.Env_clauses (env, clauses)) = make_env ~params ~ctx stmts in
-  (* main workload *)
+  let ord, select, bool_select = compute_ord_select st_ref precedence in
+  let params = Phases.get_key Params.key st_ref in
+  let ctx = make_ctx st_ref ~signature ~ord ~select ~bool_select ~sk_ctx () in
+  let (Phases.Env_clauses (env, clauses)) =
+    make_env st_ref ~params ~ctx stmts
+  in
   has_goal_ := has_goal;
-  (* FIXME: should be computed at Env initialization *)
-  (* pre-saturation *)
-  let* result, clauses = presaturate_clauses env clauses in
-  (* saturate, possibly changing env *)
-  let* result = try_to_refute env clauses result in
-  Phases.return (Phases.Env_result (env, result))
+  let result, clauses = presaturate_clauses st_ref env clauses in
+  let result = try_to_refute st_ref env clauses result in
+  Phases.Env_result (env, result)
 
-let print file env result =
+let print file env result (st_ref : Phases.State.t ref) =
   let@ _sp = Phases.with_span ~__FILE__ ~__LINE__ "phase.print" in
-  (* print some statistics *)
   print_stats_env env;
-  let* () = print_szs_result ~file env result in
-  print_dots env result
+  print_szs_result st_ref ~file env result;
+  print_dots st_ref env result
 
-let check res =
-  let@ () = Phases.with_phase Phases.Check_proof in
-  let* params = Phases.get_key Params.key in
+let check res (st_ref : Phases.State.t ref) =
+  let@ () = Phases.with_phase st_ref Phases.Check_proof in
+  let params = Phases.get_key Params.key st_ref in
   let comment = Options.comment () in
   let errcode =
     match res with
@@ -659,77 +624,63 @@ let check res =
       errcode
     | _ -> 0
   in
-  Phases.return errcode
+  errcode
 
-let setup_gc =
-  let@ () = Phases.with_phase Phases.Setup_gc in
-  (* GC! increase max overhead because we want the GC to be faster, even if
-      it implies more wasted memory. *)
+let setup_gc (st_ref : Phases.State.t ref) =
+  let@ () = Phases.with_phase st_ref Phases.Setup_gc in
   let gc = Gc.get () in
-  Gc.set { gc with Gc.space_overhead = 150 };
-  Phases.return ()
+  Gc.set { gc with Gc.space_overhead = 150 }
 
-let setup_signal =
-  let@ () = Phases.with_phase Phases.Setup_signal in
-  (* signal handler. Re-raise, bugs shouldn't keep hidden *)
+let setup_signal (st_ref : Phases.State.t ref) =
+  let@ () = Phases.with_phase st_ref Phases.Setup_signal in
   Signal.set_exn_handler (fun e ->
       let stack = Printexc.get_backtrace () in
       let msg = Printexc.to_string e in
       output_string stderr ("exception raised in signal: " ^ msg ^ "\n");
       output_string stderr stack;
       flush stderr;
-      raise e);
-  Phases.return ()
+      raise e)
 
 (* process several files, printing the result *)
-let process_files_and_print ?(params = Params.default) files =
+let process_files_and_print ?(params = Params.default) files
+    (st_ref : Phases.State.t ref) =
   let@ _sp =
     Phases.with_span ~__FILE__ ~__LINE__ "phase.process-files-and-print"
   in
-  let* prelude = parse_prelude params in
-  let f file =
-    let* (Phases.Env_result (env, res)) = process_file ~prelude file in
-    let* () = print file env res in
-    check res
+  let prelude = parse_prelude st_ref params in
+  let f file : _ Phases.t =
+   fun st_ref ->
+    let (Phases.Env_result (env, res)) = process_file ~prelude file st_ref in
+    print file env res st_ref;
+    check res st_ref
   in
   let phases = List.map f files in
-  let* r = Phases.run_and_discard_l phases in
-  let* () = print_stats () in
-  Phases.return r
+  let r = Phases.run_and_discard_l phases st_ref in
+  print_stats st_ref;
+  r
 
-let main_cli ?setup_gc:(gc = true) () =
-  let open Phases.Syntax in
+let main_cli ?setup_gc:(gc = true) () (st_ref : Phases.State.t ref) =
   let@ _sp = Phases.with_span ~__FILE__ ~__LINE__ "phase.main-cli" in
-  let* () =
-    if gc then
-      setup_gc
-    else
-      Phases.return ()
-  in
-  let* files, params = parse_cli in
-  let* _ = load_extensions in
-  let* errcode = process_files_and_print ~params files in
-  let+ () = Phases.exit in
+  if gc then setup_gc st_ref;
+  let files, params = parse_cli st_ref in
+  let _exts = load_extensions st_ref in
+  let errcode = process_files_and_print ~params files st_ref in
+  Phases.exit st_ref;
   errcode
 
-let skip_parse_cli ?(params = Params.default) file =
-  let@ () = Phases.with_phase Parse_CLI in
+let skip_parse_cli (st_ref : Phases.State.t ref) ?(params = Params.default) file
+    =
+  let@ () = Phases.with_phase st_ref Parse_CLI in
   CCFormat.set_color_default true;
-  Phases.return ([ file ], params)
+  Phases.set_key Params.key params st_ref;
+  [ file ], params
 
-let main ?setup_gc:(gc = true) ?params file =
-  let open Phases.Syntax in
-  let* () =
-    if gc then
-      setup_gc
-    else
-      Phases.return ()
-  in
-  (* pseudo-parse *)
-  let* files, params = skip_parse_cli ?params file in
-  let* _ = load_extensions in
-  let* errcode = process_files_and_print ~params files in
-  let+ () = Phases.exit in
+let main ?setup_gc:(gc = true) ?params file (st_ref : Phases.State.t ref) =
+  if gc then setup_gc st_ref;
+  let files, params = skip_parse_cli st_ref ?params file in
+  let _ = load_extensions st_ref in
+  let errcode = process_files_and_print ~params files st_ref in
+  Phases.exit st_ref;
   errcode
 
 let () =

@@ -9,7 +9,7 @@ open Logtk
 open Libzipperposition
 
 type filename = string
-type 'a or_error = ('a, string) CCResult.t
+type 'a or_error = ('a, exn * Printexc.raw_backtrace) CCResult.t
 
 (** {2 Phases} *)
 
@@ -47,36 +47,37 @@ type phase =
 
 (** {2 Main Type} *)
 
-type 'a t
-(** Monad type, representing an action *)
-
 val show_phase : phase -> string
 
-val return : 'a -> 'a t
-(** Return a value into the monad *)
+module State : sig
+  type t = Flex_state.t
+end
 
-val fail : string -> 'a t
-(** Fail with the given error message *)
-
-val return_result : 'a or_error -> 'a t
+type 'a t = State.t ref -> 'a
+(** Main state monad *)
 
 val exit : unit t
 (** Exit *)
 
-val with_phase : phase -> (unit -> 'a t) -> 'a t
-(** Start phase, call [f ()] to get the result, return its result using
-    {!return_phase} *)
-
-val bind : 'a t -> f:('a -> 'b t) -> 'b t
-(** [bind state f] calls [f] to go one step further from [state] *)
+val with_phase : State.t ref -> phase -> (unit -> 'a) -> 'a
+(** [with_phase st_ref phase f] runs [f ()] within the given phase, logging
+    start/end and adding a trace span. *)
 
 val with_span :
-  __FILE__:string -> __LINE__:int -> string -> (Trace.span -> 'a t) -> 'a t
+  __FILE__:string -> __LINE__:int -> string -> (Trace.span -> 'a) -> 'a
+(** [with_span name f] wraps [f _sp] in a trace span. *)
 
-val map : 'a t -> f:('a -> 'b) -> 'b t
-(** Map the current value *)
+val failwith : string -> 'a t
+(** [failwith msg] raises [Failure msg] (caught by {!run_with}) *)
 
-val fold_l : f:('a -> 'b -> 'a t) -> x:'a -> 'b list -> 'a t
+val get_key : 'a Flex_state.key -> 'a t
+(** [get_key k st_ref] returns the value associated with [k] in the state *)
+
+val set_key : 'a Flex_state.key -> 'a -> unit t
+(** [set_key k v st_ref] sets [k] to [v] in the state *)
+
+val update : f:(Flex_state.t -> Flex_state.t) -> unit t
+(** [update ~f st_ref] changes the state using [f] *)
 
 val run_and_discard_l : int t list -> int t
 (** [run_and_discard_l l] runs each action of the list in succession, restarting
@@ -84,26 +85,11 @@ val run_and_discard_l : int t list -> int t
     discarded). Only the very last state is kept. If any errcode is non-zero,
     then the evaluation stops with this errcode *)
 
-module Syntax : sig
-  val ( let* ) : 'a t -> ('a -> 'b t) -> 'b t
-  val ( let+ ) : 'a t -> ('a -> 'b) -> 'b t
-end
-
 val empty_state : Flex_state.t
-val get : Flex_state.t t
-val set : Flex_state.t -> unit t
-
-val get_key : 'a Flex_state.key -> 'a t
-(** [get_key k] returns the value associated with [k] in the state *)
-
-val set_key : 'a Flex_state.key -> 'a -> unit t
-
-val update : f:(Flex_state.t -> Flex_state.t) -> unit t
-(** [update ~f] changes the state using [f] *)
 
 val run_with : Flex_state.t -> 'a t -> (Flex_state.t * 'a) or_error
 (** [run_with state m] executes the actions in [m] starting with [state],
-    returning some value (or error) and the final state. *)
+    returning some value (or error with backtrace) and the final state. *)
 
 val run : 'a t -> (Flex_state.t * 'a) or_error
 (** [run m] is [run_with empty_state m] *)
