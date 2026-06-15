@@ -20,53 +20,28 @@ type env_with_result =
 type errcode = int
 type prelude = UntypedAST.statement Iter.t
 
-type ('ret, 'before, 'after) phase =
-  | Init : (unit, _, [ `Init ]) phase (* global setup *)
-  | Setup_gc : (unit, [ `Init ], [ `Init ]) phase
-  | Setup_signal : (unit, [ `Init ], [ `Init ]) phase
-  | Parse_CLI : (filename list * Params.t, [ `Init ], [ `Parse_cli ]) phase
-  (* parse CLI options: get a list of files to process, and parameters *)
-  | LoadExtensions :
-      (Extensions.t list, [ `Parse_cli ], [ `LoadExtensions ]) phase
-  | Parse_prelude : (prelude, [ `LoadExtensions ], [ `Parse_prelude ]) phase
-  | Start_file : (filename, [ `Parse_prelude ], [ `Start_file ]) phase
-    (* file to process *)
-  | Parse_file :
-      ( Input_format.t * UntypedAST.statement Iter.t,
-        [ `Start_file ],
-        [ `Parse_file ] )
-      phase
-    (* parse some file *)
-  | Typing :
-      ( TypeInference.typed_statement CCVector.ro_vector,
-        [ `Parse_file ],
-        [ `Typing ] )
-      phase
-  | CNF : (Statement.clause_t CCVector.ro_vector, [ `Typing ], [ `CNF ]) phase
-  | Compute_prec : (Precedence.t, [ `CNF ], [ `Precedence ]) phase
-  | Compute_ord_select :
-      ( Ordering.t * Selection.t * Bool_selection.t,
-        [ `Precedence ],
-        [ `Compute_ord_select ] )
-      phase
-    (* compute orderign and selection function *)
-  | MakeCtx : ((module Ctx.S), [ `Compute_ord_select ], [ `MakeCtx ]) phase
-  | MakeEnv : (env_with_clauses, [ `MakeCtx ], [ `MakeEnv ]) phase
-  | Pre_saturate :
-      ( 'c Env.packed * Saturate.szs_status * 'c Clause.sets,
-        [ `MakeEnv ],
-        [ `Pre_saturate ] )
-      phase
-  | Saturate : (env_with_result, [ `Pre_saturate ], [ `Saturate ]) phase
-  | Print_result : (unit, [ `Saturate ], [ `Print_result ]) phase
-  | Print_dot : (unit, [ `Print_result ], [ `Print_dot ]) phase
-  | Check_proof : (errcode, [ `Print_dot ], [ `Check_proof ]) phase
-  | Print_stats : (unit, [ `Check_proof ], [ `Print_stats ]) phase
-  | Exit : (unit, _, [ `Exit ]) phase
-
-type any_phase =
-  | Any_phase : (_, _, _) phase -> any_phase
-      (** A phase hidden in an existential type *)
+type phase =
+  | Init
+  | Setup_gc
+  | Setup_signal
+  | Parse_CLI
+  | LoadExtensions
+  | Parse_prelude
+  | Start_file
+  | Parse_file
+  | Typing
+  | CNF
+  | Compute_prec
+  | Compute_ord_select
+  | MakeCtx
+  | MakeEnv
+  | Pre_saturate
+  | Saturate
+  | Print_result
+  | Print_dot
+  | Check_proof
+  | Print_stats
+  | Exit
 
 module State = Flex_state
 
@@ -74,13 +49,12 @@ module Key = struct
   let cur_phase = State.create_key ()
 end
 
-(* empty state: at Init *)
-let empty_state = State.empty |> State.add Key.cur_phase (Any_phase Init)
+let empty_state = State.empty |> State.add Key.cur_phase Init
 
 (* A simple state monad *)
-type (+'a, 'p1, 'p2) t = State.t -> (State.t * 'a) or_error
+type 'a t = State.t -> (State.t * 'a) or_error
 
-let string_of_phase : type a b c. (a, b, c) phase -> string = function
+let show_phase = function
   | Init -> "init"
   | Setup_gc -> "setup_gc"
   | Setup_signal -> "setup_signal"
@@ -103,10 +77,9 @@ let string_of_phase : type a b c. (a, b, c) phase -> string = function
   | Check_proof -> "check_proof"
   | Exit -> "exit"
 
-let string_of_any_phase (Any_phase p) = string_of_phase p
 let return x st = E.return (st, x)
 
-let return_err x st =
+let return_result x st =
   match x with
   | E.Ok x -> E.Ok (st, x)
   | E.Error msg -> E.Error msg
@@ -133,50 +106,35 @@ let map x ~f st =
   | E.Error msg -> E.Error msg
   | E.Ok (st, x) -> E.Ok (st, f x)
 
-module Infix = struct
-  let ( >>= ) x f = bind x ~f
-  let ( >>?= ) x f = bind_err x ~f
-  let ( >|= ) x f = map x ~f
+module Syntax = struct
+  let ( let* ) x f = bind x ~f
+  let ( let+ ) x f = map x ~f
 end
 
-include Infix
+open Syntax
 
 let rec fold_l ~f ~x = function
   | [] -> return x
-  | y :: ys -> f x y >>= fun x' -> fold_l ~f ~x:x' ys
+  | y :: ys ->
+    let* x' = f x y in
+    fold_l ~f ~x:x' ys
 
-let current_phase st =
-  try E.Ok (st, State.get_exn Key.cur_phase st)
-  with Not_found ->
-    let msg = "could not find current phase" in
-    E.Error msg
-
-let start_phase p st =
+let with_phase p (f : unit -> 'a t) : 'a t =
+ fun st ->
+  let p_name = show_phase p in
   Util.debugf ~section:Const.section 2 "@{<yellow>start phase@} %s" (fun k ->
-      k (string_of_phase p));
-  let st = State.add Key.cur_phase (Any_phase p) st in
-  E.Ok (st, ())
+      k p_name);
+  let y =
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "phases.phase" in
+    Trace.add_data_to_span _sp [ "p", `String p_name ];
+    f () st
+  in
 
-let return_phase_err x =
-  current_phase >>= fun p ->
   Util.debugf ~section:Const.section 2 "@{<yellow>terminate phase@} %s"
-    (fun k -> k (string_of_any_phase p));
-  return_err x
+    (fun k -> k p_name);
+  y
 
-let return_phase x = return_phase_err (E.Ok x)
-
-let with_phase1 p ~f x =
-  start_phase p >>= fun () ->
-  let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "phases.phase" in
-  Trace.add_data_to_span _sp
-    [ "p", `String (string_of_any_phase (Any_phase p)) ];
-  let y = f x in
-
-  return_phase y
-
-let with_phase p ~f = with_phase1 p ~f ()
-let with_phase2 p ~f x y = with_phase1 p ~f:(f x) y
-let exit = start_phase Exit >>= fun () -> return_phase ()
+let exit : unit t = with_phase Exit return
 let get st = E.Ok (st, st)
 
 let get_key k st =
@@ -195,13 +153,14 @@ let run_and_discard_l l =
     | [] -> return 0
     | [ a ] -> a
     | a :: tail ->
-      get >>= fun old_st ->
-      a >>= fun n ->
+      let* old_st = get in
+      let* n = a in
       if n <> 0 then
         return n
       else
         (* restore old state *)
-        set old_st >>= fun () -> aux tail
+        let* () = set old_st in
+        aux tail
   in
   aux l
 
