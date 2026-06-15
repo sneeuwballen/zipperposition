@@ -964,7 +964,7 @@ module Make (E : Env.S) : S with module Env = E = struct
               |> SAT.add_clause ~proof:(C.proof_step c))
           cls;
         match SAT.check ~full:true () with
-        | Sat_solver.Unsat _ ->
+        | Sat_solver_intf.Unsat _ ->
           let proof = Proof.S.step (SAT.get_proof ()) in
           let parents =
             List.map

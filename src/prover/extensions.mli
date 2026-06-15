@@ -32,7 +32,7 @@ type t = {
   post_cnf_modifiers: Cnf.c_statement Iter.t modifiers;
   post_cnf_actions: Statement.clause_t CCVector.ro_vector state_actions;
   ord_select_actions: (Ordering.t * Selection.t) state_actions;
-  ctx_actions: (module Ctx_intf.S) state_actions;
+  ctx_actions: Ctx.t state_actions;
   prec_actions: prec_action list;
   env_actions: env_action list;
 }

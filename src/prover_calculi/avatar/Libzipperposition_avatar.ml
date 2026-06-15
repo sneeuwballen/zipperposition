@@ -36,7 +36,7 @@ let k_split_only_ground : bool Flex_state.key = Flex_state.create_key ()
 let k_max_trail_size : int Flex_state.key = Flex_state.create_key ()
 let k_infer_from_components : bool Flex_state.key = Flex_state.create_key ()
 
-module Make (E : Env.S) (Sat : Sat_solver.S) = struct
+module Make (E : Env.S) (Sat : Sat_solver_intf.STATIC) = struct
   module E = E
   module Ctx = E.Ctx
   module C = E.C
@@ -262,8 +262,7 @@ module Make (E : Env.S) (Sat : Sat_solver.S) = struct
           k C.pp_trail trail BBox.pp lit);
       true
 
-  let trail_is_trivial tr =
-    Sat.last_result () = Sat_solver.Sat && trail_is_trivial_ tr
+  let trail_is_trivial tr = Sat.last_result () = Sat.Sat && trail_is_trivial_ tr
 
   type trail_status =
     | Tr_trivial
@@ -332,7 +331,7 @@ module Make (E : Env.S) (Sat : Sat_solver.S) = struct
 
   (* only simplify if SAT *)
   let simplify_trail c =
-    if Sat.last_result () = Sat_solver.Sat then
+    if Sat.last_result () = Sat.Sat then
       simplify_trail_ c
     else
       SimplM.return_same c
@@ -350,7 +349,7 @@ module Make (E : Env.S) (Sat : Sat_solver.S) = struct
   (* subset of active clauses that have a trivial trail or simplifiable
      trail *)
   let backward_simplify_trails (_ : C.t) : C.ClauseSet.t =
-    if Sat.last_result () = Sat_solver.Sat && new_proved_lits () then
+    if Sat.last_result () = Sat.Sat && new_proved_lits () then
       E.ProofState.ActiveSet.clauses ()
       |> C.ClauseSet.to_iter
       |> Iter.filter (fun c -> not (Trail.is_empty @@ C.trail c))
@@ -606,10 +605,10 @@ module Make (E : Env.S) (Sat : Sat_solver.S) = struct
     Signal.send before_check_sat ();
     let res =
       match Sat.check ~full () with
-      | Sat_solver.Sat ->
+      | Sat.Sat ->
         Util.debug ~section 3 "SAT-solver reports \"SAT\"";
         []
-      | Sat_solver.Unsat proof ->
+      | Sat.Unsat proof ->
         Util.debug ~section 1 "SAT-solver reports \"UNSAT\"";
         let proof = Proof.S.step proof in
         let c = C.create ~trail:Trail.empty ~penalty:1 [] proof in

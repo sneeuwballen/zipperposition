@@ -5,7 +5,7 @@ open Libzipperposition
 
 module type S = sig
   module E : Env.S
-  module Solver : Sat_solver.S
+  module Solver : Sat_solver_intf.STATIC
   module BLit = BBox.Lit
 
   val split : E.multi_simpl_rule

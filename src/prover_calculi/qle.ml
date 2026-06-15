@@ -25,7 +25,7 @@ module Make (E : Env.S) : S with module Env = E = struct
   module CS = C.ClauseSet
   module L = Literal
   module T = Term
-  module SAT = Sat_solver.Make ()
+  module SAT = SAT.Make ()
 
   let remove_from_proof_state c =
     Util.debugf ~section 1 "removing @[%a@]" (fun k -> k C.pp c);
@@ -39,7 +39,7 @@ module Make (E : Env.S) : S with module Env = E = struct
     Util.debugf ~section 2 "init: @[%a@]@." (fun k ->
         k (Iter.pp_seq C.pp) c_iter);
 
-    let add_SAT_clause c = SAT.add_clause ~proof:Proof.Step.trivial c in
+    let add_SAT_clause c = SAT.add_clause sat ~proof:Proof.Step.trivial c in
     let pred_of_lit lit =
       match lit with
       | L.Equation (lhs, _, _) when L.is_predicate_lit lit ->
@@ -52,7 +52,7 @@ module Make (E : Env.S) : S with module Env = E = struct
     in
     let all_syms = Name.Tbl.create 128 in
 
-    SAT.clear ();
+    SAT.clear sat ();
 
     (* For each clause l1 \/ ... \/ lN (ignoring equality literals), if
        pure_only is false, generate N SAT clauses
@@ -185,12 +185,12 @@ module Make (E : Env.S) : S with module Env = E = struct
     let rec maximize_valuation () =
       Iter.iter
         (fun (pred, (pos_var, neg_var)) ->
-          if SAT.valuation pos_var then (
+          if SAT.valuation sat pos_var then (
             add_SAT_clause [ pos_var ];
             Name.Tbl.replace quasipure_syms pred pos_var;
             Name.Tbl.remove unknown_syms pred
           );
-          if SAT.valuation neg_var then (
+          if SAT.valuation sat neg_var then (
             add_SAT_clause [ neg_var ];
             Name.Tbl.replace quasipure_syms pred neg_var;
             Name.Tbl.remove unknown_syms pred
@@ -198,7 +198,7 @@ module Make (E : Env.S) : S with module Env = E = struct
         (Name.Tbl.to_iter unknown_syms);
       generate_nontrivial_solution_SAT_clause ();
       match SAT.check ~full:true () with
-      | Sat_solver.Sat -> maximize_valuation ()
+      | SAT.Sat -> maximize_valuation ()
       | _ -> ()
     in
     let filter_clauses () =
@@ -228,15 +228,15 @@ module Make (E : Env.S) : S with module Env = E = struct
 
     Util.debugf ~section 1 "In do_qle()@." CCFun.id;
     generate_nontrivial_solution_SAT_clause ();
-    (match SAT.check ~full:true () with
-    | Sat_solver.Sat ->
+    (match SAT.check sat ~full:true () with
+    | SAT.Sat ->
       Util.debugf ~section 1 "Maximizing()@." CCFun.id;
       maximize_valuation ();
       filter_clauses ()
     | _ ->
       Util.debugf ~section 1 "Unsat()@." CCFun.id;
       ());
-    SAT.clear ()
+    SAT.clear sat ()
 
   let get_clauses () = Iter.append (Env.get_passive ()) (Env.get_active ())
   let steps = ref 0

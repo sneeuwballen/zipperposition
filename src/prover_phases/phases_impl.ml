@@ -253,29 +253,55 @@ let make_ctx (st_ref : Phases.State.t ref) ~signature ~ord ~select ~bool_select
     ~sk_ctx () =
   let select_fun, is_complete = select in
   let@ () = Phases.with_phase st_ref Phases.MakeCtx in
-  let module Res = struct
-    let signature = signature
-    let ord = ord
-    let select = select_fun
-    let bool_select = bool_select
-    let sk_ctx = sk_ctx
-  end in
-  let module MyCtx = Ctx.Make (Res) in
-  let ctx = (module MyCtx : Ctx_intf.S) in
+  let ctx =
+    Ctx.create ~signature ~ord ~select:select_fun ~bool_select ~sk_ctx
+  in
   let st = !st_ref in
   let lost_comp =
     Flex_state.get_or ~or_:false Ctx.Key.lost_completeness st || not is_complete
   in
-  if lost_comp then MyCtx.lost_completeness ();
+  if lost_comp then Ctx.lost_completeness ctx;
   do_extensions ~field:(fun e -> e.Extensions.ctx_actions) ~x:ctx st_ref;
   ctx
 
-let make_env (st_ref : Phases.State.t ref) ~ctx:(module Ctx : Ctx_intf.S)
-    ~params stmts =
+let make_env (st_ref : Phases.State.t ref) ~ctx ~params stmts =
   let@ () = Phases.with_phase st_ref Phases.MakeEnv in
   let state = !st_ref in
+  (* TEMPORARY adapter: wraps Ctx.t record into Ctx_intf.S module for Env.Make *)
+  let module Ctx_mod = struct
+    let sk_ctx () = Ctx.sk_ctx ctx
+    let ord () = Ctx.ord ctx
+    let set_ord o = Ctx.set_ord ctx o
+    let selection_fun () = Ctx.selection_fun ctx
+    let set_selection_fun s = Ctx.set_selection_fun ctx s
+    let signature () = Ctx.signature ctx
+    let renaming = Ctx.renaming ctx
+    let compare = Ctx.compare ctx
+    let select = Ctx.select ctx
+    let bool_select = Ctx.bool_select ctx
+    let lost_completeness () = Ctx.lost_completeness ctx
+    let is_completeness_preserved () = Ctx.is_completeness_preserved ctx
+    let add_signature s = Ctx.add_signature ctx s
+    let find_signature n = Ctx.find_signature ctx n
+    let find_signature_exn n = Ctx.find_signature_exn ctx n
+    let declare n t = Ctx.declare ctx n t
+    let declare_syms l = Ctx.declare_syms ctx l
+    let on_new_symbol = Ctx.on_new_symbol ctx
+    let on_signature_update = Ctx.on_signature_update ctx
+    let set_injective_for_arg n i = Ctx.set_injective_for_arg ctx n i
+    let is_injective_for_arg n i = Ctx.is_injective_for_arg ctx n i
+
+    module Lit = struct
+      let of_form f = Ctx.lit_of_form ctx f
+      let to_form f = Ctx.lit_to_form ctx f
+      let from_hooks () = [] (* unused *)
+      let add_from_hook h = Ctx.add_lit_from_hook ctx h
+      let to_hooks () = [] (* unused *)
+      let add_to_hook h = Ctx.add_lit_to_hook ctx h
+    end
+  end in
   let module MyEnv = Env.Make (struct
-    module Ctx = Ctx
+    module Ctx = Ctx_mod
 
     let params = params
     let flex_state = state
