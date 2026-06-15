@@ -1,11 +1,10 @@
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-(** {1 Check LLProof} *)
+(** {1 Check LLProof — Clause-Based} *)
 
 open Logtk
 module T = TypedSTerm
 module F = T.Form
-module Ty = T.Ty
 module Fmt = CCFormat
 module P = LLProof
 
@@ -21,9 +20,9 @@ type res =
 type stats = {
   n_ok: int;
   n_fail: int;
-  n_skip_esa: int;  (** steps skipped because ESA *)
-  n_skip_tags: int;  (** steps skipped because of theory tags *)
-  n_skip_trivial: int;  (** steps skipped because they are trivial *)
+  n_skip_esa: int;
+  n_skip_tags: int;
+  n_skip_trivial: int;
   n_skip: int;
 }
 
@@ -48,29 +47,70 @@ let () =
     | Error msg -> Some (Util.err_spf "llproof_check: %s" msg)
     | _ -> None)
 
+(** {2 Applying Instantiation} *)
+
+(** One-shot variable replacement: replace each occurrence of [v] with [t] in
+    the term, without recursively substituting inside [t]. *)
+let rec replace_vars (subst : (Type.t HVar.t * Term.t) list) (t : Term.t) :
+    Term.t =
+  if Term.is_ground t then
+    t
+  else (
+    match Term.view t with
+    | Term.Var v ->
+      (match List.assq_opt v subst with
+      | Some t' -> t'
+      | None -> t)
+    | Term.DB _ -> t
+    | Term.Const _ -> t
+    | Term.App (hd, args) ->
+      let hd' = replace_vars subst hd in
+      let args' = List.map (replace_vars subst) args in
+      Term.app hd' args'
+    | Term.Fun (ty, body) -> Term.fun_ ty (replace_vars subst body)
+    | Term.AppBuiltin (b, args) ->
+      Term.app_builtin ~ty:(Term.ty t) b (List.map (replace_vars subst) args)
+  )
+
+let replace_vars_lit (subst : (Type.t HVar.t * Term.t) list) (lit : Literal.t) :
+    Literal.t =
+  match Literal.View.as_eqn lit with
+  | Some (l, r, sign) ->
+    Literal.mk_lit (replace_vars subst l) (replace_vars subst r) sign
+  | None -> lit
+
+let apply_inst (inst : LLProof.inst) (clause : LLProof.clause) : LLProof.clause
+    =
+  if inst = [] then
+    clause
+  else
+    Array.map (replace_vars_lit inst) clause
+
+let concl_of_parent (p : LLProof.parent) : LLProof.clause =
+  apply_inst p.LLProof.p_inst (P.concl p.LLProof.p_proof)
+
+(** {2 Conversion to LLTerm (ground)} *)
+
+(** Replace free [Var.t] nodes in [f] with fresh constants. Returns the ground
+    formula and the variable-to-constant mapping. *)
+let ground_form ~ctx (f : form) : form =
+  let vars = T.free_vars f in
+  if vars = [] then
+    f
+  else (
+    let subst =
+      vars
+      |> List.mapi (fun i v ->
+             v, T.const ~ty:(Var.ty v) (Name.makef "$$sk_%d" i))
+      |> Var.Subst.of_list
+    in
+    T.Subst.eval subst f
+  )
+
+let clause_to_form ~ctx (cl : LLProof.clause) : form =
+  Literals.Conv.to_s_form ~allow_free_db:true ~ctx cl
+
 (** {2 Checking Proofs} *)
-
-let instantiate (f : form) (inst : LLProof.inst) : form =
-  let f = T.rename_all_vars f in
-  let vars, body = T.unfold_binder Binder.Forall f in
-  if List.length vars <> List.length inst then
-    errorf "mismatched arities in instantiate `%a`@ :with %a" T.pp f
-      LLProof.pp_inst inst;
-  let subst = List.fold_left2 Var.Subst.add Var.Subst.empty vars inst in
-  let f' = T.Subst.eval subst body in
-  Util.debugf ~section 5
-    "(@[<hv>instantiate@ :inst %a@ :from %a@ :into %a@ :subst {%a}@])" (fun k ->
-      k LLProof.pp_inst inst T.pp f T.pp f' (Var.Subst.pp T.pp_with_ty) subst);
-  f'
-
-let concl_of_parent (p : LLProof.parent) : form =
-  match p.LLProof.p_inst with
-  | [] -> P.concl p.LLProof.p_proof
-  | r ->
-    let f = P.concl p.LLProof.p_proof in
-    instantiate f r
-
-let open_forall = T.unfold_binder Binder.Forall
 
 type check_step_res =
   | CS_check of res
@@ -92,66 +132,60 @@ let conv_res = function
   | LLProver.R_ok -> R_ok
   | LLProver.R_fail -> R_fail
 
-let n_proof = ref 0 (* proof counter *)
+let n_proof = ref 0
 
-let prove ~dot_prefix (a : form list) (b : form) =
+let prove ~dot_prefix (premises : form list) (concl : form) =
   let module TT = LLTerm in
-  (* convert into {!LLTerm.t} *)
   let ctx = TT.Conv.create () in
-  let a = List.map (TT.Conv.of_term ctx) a in
-  let b = TT.Conv.of_term ctx b in
-  (* prove [a ∧ -b ⇒ ⊥] *)
+  let a = List.map (TT.Conv.of_term ctx) premises in
+  let b = TT.Conv.of_term ctx concl in
   let res, final_state = LLProver.prove a b in
   Util.debugf ~section 5 "(@[proof-stats@ %a@])" (fun k ->
       k LLProver.pp_stats final_state);
-  (* print state, maybe *)
-  (match dot_prefix with
-  | None -> ()
-  | Some prefix ->
+  (match dot_prefix, res with
+  | Some prefix, LLProver.R_fail ->
     let p_id = CCRef.incr_then_get n_proof in
     let file = Printf.sprintf "%s_%d.dot" prefix p_id in
     Util.debugf ~section 2 "print proof %d@ into `%s`" (fun k -> k p_id file);
     CCIO.with_out file (fun oc ->
         let out = Format.formatter_of_out_channel oc in
-        Fmt.fprintf out "%a@." LLProver.pp_dot final_state));
+        Fmt.fprintf out "%a@." LLProver.pp_dot final_state)
+  | _ -> ());
   conv_res res
 
 let check_step ?dot_prefix (p : proof) : check_step_res =
   let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "llproof.check-step" in
-  let concl = P.concl p in
-  Util.incr_stat stat_check;
+  let ctx = Term.Conv.create () in
   match P.step p with
   | P.Goal | P.Assert | P.By_def _ | P.Define _ -> CS_check R_ok
-  | P.Negated_goal p' ->
-    (* [p'] should prove [not concl] *)
-    CS_check (prove ~dot_prefix [ P.concl p' ] (F.not_ concl))
-  | P.Trivial -> CS_skip `Other (* axiom of the theory *)
-  | P.Instantiate { tags; _ } when not (LLProver.can_check tags) ->
-    CS_skip `Tags
-  | P.Instantiate { form = p'; inst; _ } ->
-    (* re-instantiate and check we get the same thing *)
-    let p'_inst = instantiate (LLProof.concl p') inst in
-    let vars, body_concl = open_forall concl in
-    (* now remove free variables by using fresh constants *)
-    let subst =
-      vars
-      |> List.mapi (fun i v ->
-             v, T.const ~ty:(Var.ty v) (Name.makef "$$sk_%d" i))
-      |> Var.Subst.of_list
-    in
-    CS_check
-      (prove ~dot_prefix
-         [ T.Subst.eval subst p'_inst ]
-         (T.Subst.eval subst body_concl))
-  | P.Esa (_, _) -> CS_skip `ESA (* TODO *)
-  | P.Inference { parents; tags; intros; name; _ } ->
+  | P.Trivial -> CS_skip `Other
+  | P.Esa (_, _) -> CS_skip `ESA
+  | P.Inference { parents; tags; name; _ } ->
     if name = "simplify_reflect-" || name = "simplify_reflect+" then
       CS_skip `Other
     else if LLProver.can_check tags then (
-      (* within the fragment of {!Tab.prove} *)
-      let all_premises = List.map concl_of_parent parents
-      and concl = instantiate concl intros in
-      CS_check (prove ~dot_prefix all_premises concl)
+      (* Apply instantiations and build forms *)
+      let prem_forms =
+        List.map
+          (fun par ->
+            let cl = concl_of_parent par in
+            clause_to_form ~ctx cl)
+          parents
+      in
+      let concl_form = clause_to_form ~ctx (P.concl p) in
+      (* Ground all forms consistently: use the same Skolem constants
+         for variables that appear in multiple clauses (conclusion + premises). *)
+      let all_forms = concl_form :: prem_forms in
+      let all_vars = T.free_vars_l all_forms in
+      let subst =
+        all_vars
+        |> List.mapi (fun i v ->
+               v, T.const ~ty:(Var.ty v) (Name.makef "$$sk_%d" i))
+        |> Var.Subst.of_list
+      in
+      let ground_concl = T.Subst.eval subst concl_form in
+      let ground_prems = List.map (T.Subst.eval subst) prem_forms in
+      CS_check (prove ~dot_prefix ground_prems ground_concl)
     ) else
       CS_skip `Tags
 
@@ -216,7 +250,6 @@ let check ?dot_prefix ?(before_check = fun _ -> ()) ?(on_check = fun _ _ -> ())
                  else
                    s.n_skip_trivial);
             }));
-      (* now check premises *)
       List.iter (fun p -> Queue.push p to_check) (P.premises p)
     )
   done;

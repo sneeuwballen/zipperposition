@@ -1,6 +1,6 @@
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-(** {1 Proof Trace Decoder} *)
+(** {1 Proof Trace Decoder — Clause-Based} *)
 
 open Logtk
 module D = Zipperposition_mdag.Decode
@@ -12,14 +12,13 @@ module Int_tbl = CCHashtbl.Make (CCInt)
 type t = {
   data: D.t;
   total_len: int;
-  conv_ctx: Term.Conv.ctx;
   mutable node_cache: (string * D.value array) Int_tbl.t;
   mutable term_cache: Term.t Int_tbl.t;
   mutable name_cache: Name.t Int_tbl.t;
-  mutable proof_cache: Proof.t Int_tbl.t;
   mutable clause_cache: Literal.t array Int_tbl.t;
   mutable subst_cache: Subst.Projection.t Int_tbl.t;
   mutable hvar_cache: (int * Type.t, Term.var) Hashtbl.t;
+  mutable proof_cache: LLProof.t Int_tbl.t;
 }
 
 type cursor = {
@@ -194,172 +193,6 @@ let role_of_string = function
   | "l" -> Proof.R_lemma
   | s -> raise (D.Fail ("unknown role: " ^ s, 0))
 
-let clause_to_form (lits : Literal.t array) : Term.t =
-  Term.Form.or_l (Array.to_list lits |> List.map Literal.to_ho_term)
-
-let term_to_form (ctx : Term.Conv.ctx) (t : Term.t) : Proof.form =
-  Term.Conv.to_simple_term ~allow_free_db:true ctx t
-
-type Proof.result_view += Decoded_form_view of Proof.form
-
-(* Canonical variable cache: two Var.t with same name+type become the same object *)
-module Var_norm = struct
-  module Tbl = CCHashtbl.Make (struct
-    type t = string * string
-
-    let equal (a, b) (c, d) = String.equal a c && String.equal b d
-    let hash (a, b) = Hashtbl.hash (a, b)
-  end)
-
-  let tbl : TypedSTerm.t Var.t Tbl.t = Tbl.create 256
-  let clear () = Tbl.clear tbl
-
-  let canon_var (v : TypedSTerm.t Var.t) : TypedSTerm.t Var.t =
-    let key = Var.name v, TypedSTerm.to_string (Var.ty v) in
-    match Tbl.find tbl key with
-    | v' -> v'
-    | exception Not_found ->
-      Tbl.add tbl key v;
-      v
-
-  let rename_forall (f : TypedSTerm.t) : TypedSTerm.t =
-    let rec collect acc f =
-      match TypedSTerm.view f with
-      | Bind (Binder.Forall, v, body) -> collect (v :: acc) body
-      | _ -> List.rev acc, f
-    in
-    let vars, body = collect [] f in
-    if vars = [] then
-      f
-    else (
-      let body_ty = TypedSTerm.ty_exn f in
-      let type_vars, term_vars =
-        List.partition (fun v -> TypedSTerm.Ty.is_tType (Var.ty v)) vars
-      in
-      let rename_group prefix vars =
-        List.mapi
-          (fun i old_v ->
-            let new_v =
-              canon_var
-                (Var.of_string ~ty:(Var.ty old_v)
-                   (Printf.sprintf "%s%d" prefix i))
-            in
-            old_v, new_v)
-          vars
-      in
-      let renamed = rename_group "A" type_vars @ rename_group "X" term_vars in
-      let subst =
-        List.fold_left
-          (fun s (old_v, new_v) -> Var.Subst.add s old_v (TypedSTerm.var new_v))
-          Var.Subst.empty renamed
-      in
-      let body = TypedSTerm.Subst.eval subst body in
-      let ordered_vars = List.map snd renamed in
-      TypedSTerm.bind_list ~ty:body_ty Binder.Forall ordered_vars body
-    )
-
-  let normalize_forall (f : TypedSTerm.t) : TypedSTerm.t =
-    let rec collect acc f =
-      match TypedSTerm.view f with
-      | Bind (Binder.Forall, v, body) -> collect (v :: acc) body
-      | _ -> List.rev acc, f
-    in
-    let vars, body = collect [] f in
-    if vars = [] then
-      f
-    else (
-      let body_ty = TypedSTerm.ty_exn f in
-      let vars' = List.map canon_var vars in
-      let subst =
-        List.fold_left2
-          (fun s old_v new_v ->
-            if Var.equal old_v new_v then
-              s
-            else
-              Var.Subst.add s old_v (TypedSTerm.var new_v))
-          Var.Subst.empty vars vars'
-      in
-      let body = TypedSTerm.Subst.eval subst body in
-      TypedSTerm.bind_list ~ty:body_ty Binder.Forall vars' body
-    )
-end
-
-let decoder_ctx_ref : Term.Conv.ctx option ref = ref None
-
-let decoded_form_tc : Proof.form Proof.Result.tc =
-  Proof.Result.make_tc
-    ~of_exn:(function
-      | Decoded_form_view f -> Some f
-      | _ -> None)
-    ~to_exn:(fun f -> Decoded_form_view f)
-    ~compare:(fun a b -> TypedSTerm.compare a b)
-    ~to_form:(fun ~ctx:_ t -> t)
-    ~to_form_subst:(fun ~ctx:conv_ctx subst f ->
-      let bindings = ref [] in
-      Subst.FO.iter
-        (fun v_sc t_sc ->
-          bindings := (Scoped.get v_sc, Scoped.get t_sc) :: !bindings)
-        (Subst.Projection.subst subst);
-      if !bindings = [] then
-        f, Var.Subst.empty
-      else (
-        let ctx =
-          match !decoder_ctx_ref with
-          | Some c -> c
-          | None -> Term.Conv.create ()
-        in
-        let vars, body = TypedSTerm.unfold_binder Binder.Forall f in
-        let name_to_var = Hashtbl.create 16 in
-        List.iter (fun v -> Hashtbl.replace name_to_var (Var.name v) v) vars;
-        let var_subst_ref = ref Var.Subst.empty in
-        !bindings
-        |> List.iter (fun (hv, rhs) ->
-               let hv_name =
-                 CCFormat.sprintf "%s%d"
-                   (if Type.is_tType (HVar.ty hv) then
-                      "A"
-                    else
-                      "X")
-                   (HVar.id hv)
-               in
-               let svar =
-                 match Hashtbl.find name_to_var hv_name with
-                 | v -> v
-                 | exception Not_found -> Term.Conv.var_to_simple_var ctx hv
-               in
-               let srhs = Term.Conv.to_simple_term ctx rhs in
-               let is_identity =
-                 match TypedSTerm.view srhs with
-                 | TypedSTerm.Var v' -> Var.equal v' svar
-                 | _ -> false
-               in
-               if not is_identity then
-                 var_subst_ref := Var.Subst.add !var_subst_ref svar srhs);
-        let inst_subst =
-          List.filter_map
-            (fun v ->
-              match Var.Subst.find !var_subst_ref v with
-              | Some t -> Some (v, t)
-              | None -> None)
-            vars
-          |> Var.Subst.of_list
-        in
-        let instantiated_form =
-          TypedSTerm.Subst.eval_nonrec !var_subst_ref body
-        in
-        let instantiated_form =
-          TypedSTerm.close_all ~ty:TypedSTerm.prop Binder.Forall
-            instantiated_form
-        in
-        instantiated_form, inst_subst
-      ))
-    ~pp_in:(fun _ out f -> TypedSTerm.pp_inner out f)
-    ()
-
-let decoded_form_of_form (f : Proof.form) : Proof.Result.t =
-  Proof.Result.make decoded_form_tc f
-
-(* Canonical variable cache: two Var.t with same name+type become the same object *)
 let builtin_result_ty (b : Builtin.t) : Type.t =
   match Builtin.ty b with
   | `Int -> Type.int
@@ -448,18 +281,28 @@ and decode_term_node (st : t) (c : cursor) (cmd : string) (off : D.offset) :
   | "ty.arrow" ->
     let dom_ref = read_ref c in
     let cod_ref = read_ref c in
-    let dom_ty = ty_of_term (decode_term st dom_ref) in
-    let cod_ty = ty_of_term (decode_term st cod_ref) in
-    term_of_type (Type.arrow [ dom_ty ] cod_ty)
+    let dom = ty_of_term (decode_term st dom_ref) in
+    let cod = ty_of_term (decode_term st cod_ref) in
+    term_of_type (Type.arrow [ dom ] cod)
+  | "ty.name" ->
+    let name_ref = read_ref c in
+    let _name = decode_name st name_ref in
+    term_of_type Type.tType
   | _ -> raise (D.Fail ("unexpected term command: " ^ cmd, off))
 
 and decode_name (st : t) (off : D.offset) : Name.t =
   match Int_tbl.find st.name_cache off with
   | n -> n
   | exception Not_found ->
+    let cmd = cmd_of_offset st off in
     let c = cursor_of_offset st off in
-    let s = read_string c in
-    let n = Name.make s in
+    let n =
+      match cmd with
+      | "n" ->
+        let s = read_string c in
+        Name.make s
+      | _ -> raise (D.Fail ("expected name node, got: " ^ cmd, off))
+    in
     Int_tbl.add st.name_cache off n;
     n
 
@@ -527,7 +370,20 @@ and decode_subst (st : t) (off : D.offset) : Subst.Projection.t =
     Int_tbl.add st.subst_cache off proj;
     proj
 
-and decode_proof_at (st : t) (off : D.offset) : Proof.t =
+(** Convert a decoded [Subst.Projection.t] to an [LLProof.inst]. Reads raw
+    bindings without applying the substitution recursively, since the MDAG trace
+    already contains the fully-applied terms. *)
+and subst_to_inst (proj : Subst.Projection.t) : LLProof.inst =
+  Subst.fold
+    (fun acc (v, _sc_v) (t, _sc_t) ->
+      if _sc_v = proj.scope then
+        (Type.cast_var_unsafe v, Term.of_term_unsafe t) :: acc
+      else
+        acc)
+    []
+    (Subst.Projection.subst proj)
+
+and decode_proof_at (st : t) (off : D.offset) : LLProof.t =
   if off = -1 then raise (D.Fail ("null ref in decode_proof_at", off));
   match Int_tbl.find st.proof_cache off with
   | p -> p
@@ -535,43 +391,46 @@ and decode_proof_at (st : t) (off : D.offset) : Proof.t =
     let cmd = cmd_of_offset st off in
     let c = cursor_of_offset st off in
     let step, clause_off = decode_step_node st c cmd off in
-    let clause_lits = decode_clause st clause_off in
-    let clause_term = clause_to_form clause_lits in
-    let form = term_to_form st.conv_ctx clause_term in
-    let form = TypedSTerm.close_all ~ty:TypedSTerm.prop Binder.Forall form in
-    let form = Var_norm.normalize_forall form in
-    let result = decoded_form_of_form form in
-    let p = Proof.S.mk step result in
+    let clause = decode_clause st clause_off in
+    let p = LLProof.mk_ clause step in
     Int_tbl.add st.proof_cache off p;
     p
 
 and decode_step_node (st : t) (c : cursor) (cmd : string) (off : D.offset) :
-    Proof.Step.t * D.offset =
+    LLProof.step * D.offset =
   Util.debugf ~section 3 "decode_step_node off=%d cmd=%s" (fun k -> k off cmd);
   match cmd with
   | "s.i" ->
     let role_str = read_string c in
     let cl_ref = read_ref c in
     let role = role_of_string role_str in
-    Proof.Step.intro (Proof.Src.internal []) role, cl_ref
+    let step =
+      match role with
+      | Proof.R_assert -> LLProof.Assert
+      | Proof.R_goal -> LLProof.Goal
+      | Proof.R_lemma -> LLProof.Goal
+      | Proof.R_def | Proof.R_decl -> LLProof.Trivial
+    in
+    step, cl_ref
   | "s.triv" ->
     let cl_ref = read_ref c in
-    Proof.Step.trivial, cl_ref
+    LLProof.Trivial, cl_ref
   | "s.inf" ->
     let rule_str = read_string c in
     let cl_ref = read_ref c in
     let parents, tags = read_parents_and_tags st c in
-    Proof.Step.inference ~tags ~rule:(Proof.Rule.mk rule_str) parents, cl_ref
+    LLProof.Inference { name = rule_str; tags; parents }, cl_ref
   | "s.simp" ->
     let rule_str = read_string c in
     let cl_ref = read_ref c in
     let parents, tags = read_parents_and_tags st c in
-    Proof.Step.simp ~tags ~rule:(Proof.Rule.mk rule_str) parents, cl_ref
+    LLProof.Inference { name = rule_str; tags; parents }, cl_ref
   | "s.esa" ->
     let rule_str = read_string c in
     let cl_ref = read_ref c in
     let parents = read_parents_no_tags st c in
-    Proof.Step.esa ~rule:(Proof.Rule.mk rule_str) parents, cl_ref
+    ( LLProof.Esa (rule_str, List.map (fun p -> p.LLProof.p_proof) parents),
+      cl_ref )
   | "s.def" ->
     let id_str = read_string c in
     let cl_ref = read_ref c in
@@ -579,14 +438,14 @@ and decode_step_node (st : t) (c : cursor) (cmd : string) (off : D.offset) :
     let name = Name.make id_str in
     let step =
       if parents = [] then
-        Proof.Step.by_def name
+        LLProof.By_def name
       else
-        Proof.Step.define name (Proof.Src.internal []) parents
+        LLProof.Define name
     in
     step, cl_ref
   | _ -> raise (D.Fail ("unexpected step command: " ^ cmd, off))
 
-and read_parent (st : t) (c : cursor) : Proof.Parent.t option =
+and read_parent (st : t) (c : cursor) : LLProof.parent option =
   if c.pos >= Array.length c.args then
     None
   else (
@@ -608,9 +467,10 @@ and read_parent (st : t) (c : cursor) : Proof.Parent.t option =
       in
       if s_off >= 0 then (
         let subst = decode_subst st s_off in
-        Some (Proof.Parent.from_subst_proj p subst)
+        let inst = subst_to_inst subst in
+        Some (LLProof.p_inst p inst)
       ) else
-        Some (Proof.Parent.from p)
+        Some (LLProof.p_of p)
     | D.Null ->
       c.pos <- c.pos + 1;
       read_parent st c
@@ -618,7 +478,7 @@ and read_parent (st : t) (c : cursor) : Proof.Parent.t option =
     | _ -> None
   )
 
-and read_parents (st : t) (c : cursor) : Proof.Parent.t list =
+and read_parents (st : t) (c : cursor) : LLProof.parent list =
   let rec loop acc =
     match read_parent st c with
     | Some p -> loop (p :: acc)
@@ -632,16 +492,19 @@ and read_tags (c : cursor) : Builtin.Tag.t list =
       List.rev acc
     else (
       match c.args.(c.pos) with
-      | D.Int64 i ->
+      | D.String "|" ->
         c.pos <- c.pos + 1;
-        loop (tag_of_int (Int64.to_int i) :: acc)
-      | _ -> raise (D.Fail ("expected int for tag", 0))
+        loop acc
+      | D.Int64 n ->
+        c.pos <- c.pos + 1;
+        loop (tag_of_int (Int64.to_int n) :: acc)
+      | _ -> List.rev acc
     )
   in
   loop []
 
 and read_parents_and_tags (st : t) (c : cursor) :
-    Proof.Parent.t list * Builtin.Tag.t list =
+    LLProof.parent list * Builtin.Tag.t list =
   let parents = read_parents st c in
   let _ : unit =
     if c.pos < Array.length c.args && c.args.(c.pos) = D.String "|" then
@@ -650,7 +513,7 @@ and read_parents_and_tags (st : t) (c : cursor) :
   let tags = read_tags c in
   parents, tags
 
-and read_parents_no_tags (st : t) (c : cursor) : Proof.Parent.t list =
+and read_parents_no_tags (st : t) (c : cursor) : LLProof.parent list =
   let parents = read_parents st c in
   let _ : unit =
     if c.pos < Array.length c.args && c.args.(c.pos) = D.String "|" then
@@ -699,12 +562,9 @@ let find_footer_offset (st : t) : D.offset =
   Int32.to_int (Bytes.get_int32_le u32_bytes 0)
 
 let create (s : string) : t =
-  let conv_ctx = Term.Conv.create () in
-  decoder_ctx_ref := Some conv_ctx;
   {
     data = D.create s;
     total_len = String.length s;
-    conv_ctx;
     node_cache = Int_tbl.create 256;
     term_cache = Int_tbl.create 256;
     name_cache = Int_tbl.create 64;
@@ -714,8 +574,7 @@ let create (s : string) : t =
     hvar_cache = Hashtbl.create 256;
   }
 
-let decode_proof (st : t) : Proof.t * (string * string) list =
-  Var_norm.clear ();
+let decode_proof (st : t) : LLProof.t * (string * string) list =
   let footer_off = find_footer_offset st in
   if footer_off >= st.total_len then
     raise (D.Fail ("invalid footer offset", footer_off));

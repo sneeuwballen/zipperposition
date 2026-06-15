@@ -1,20 +1,19 @@
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
-(** {1 Low Level Proofs} *)
+(** {1 Low Level Proofs — Clause-Based} *)
 
 open Logtk
-module T = TypedSTerm
-module F = T.Form
 module Fmt = CCFormat
 
 let section = Util.Section.make "llproof"
 
-type term = T.t
-type ty = term
-type form = term
+type clause = Literal.t array
+(** A clause: disjunction of literals. Free variables are implicitly universal.
+*)
 
-type inst = term list
-(** Instantiate some binder with the following terms. Order matters. *)
+type inst = (Type.t HVar.t * Term.t) list
+(** Instantiation: pairs of (variable, replacement term). Identity pairs (v → v)
+    should be omitted. *)
 
 type tag = Proof.tag
 type name = string
@@ -25,37 +24,28 @@ type check_res =
   | R_skip
 
 type t = {
-  id: int; (* unique ID *)
-  concl: form;
+  id: int;
+  concl: clause;
   step: step;
-  mutable checked: check_res option; (* caching result of checking *)
+  mutable checked: check_res option;
 }
 
 and step =
   | Goal
   | Assert
-  | Negated_goal of t
   | Trivial
   | By_def of Name.t
   | Define of Name.t
-  | Instantiate of {
-      form: t;
-      inst: inst;
-      tags: tag list;
-    }
   | Esa of name * t list
   | Inference of {
-      intros: term list; (* local renaming, with fresh constants *)
-      local_intros: term list;
-          (* variables introduced between hypothesis, not in conclusion *)
       name: name;
-      parents: parent list;
       tags: tag list;
+      parents: parent list;
     }
 
 and parent = {
   p_proof: t;
-  p_inst: inst; (* instantiate [forall] variables *)
+  p_inst: inst;
 }
 
 let concl p = p.concl
@@ -66,18 +56,18 @@ let p_of p = p_inst p []
 let pp_tags = Proof.pp_tags
 
 let pp_inst out (l : inst) : unit =
-  Format.fprintf out "[@[<hv>%a@]]" (Util.pp_list ~sep:"," T.pp) l
+  Format.fprintf out "[@[<hv>%a@]]"
+    (Util.pp_list ~sep:",@ " (fun out (v, t) ->
+         Format.fprintf out "%a → %a" HVar.pp v Term.pp t))
+    l
 
 let pp_step out (s : step) : unit =
   match s with
   | Goal -> Fmt.string out "goal"
   | Assert -> Fmt.string out "assert"
-  | Negated_goal _ -> Fmt.string out "negated_goal"
   | Trivial -> Fmt.string out "trivial"
   | By_def id -> Fmt.fprintf out "(by_def :of %a)" Name.pp id
   | Define id -> Fmt.fprintf out "(@[define@ %a@])" Name.pp id
-  | Instantiate { inst; tags; _ } ->
-    Fmt.fprintf out "(@[instantiate %a%a@])" pp_inst inst pp_tags tags
   | Esa (n, _) -> Fmt.fprintf out "(esa %s)" n
   | Inference { name = n; tags; _ } ->
     Fmt.fprintf out "(inf %s%a)" n pp_tags tags
@@ -85,8 +75,6 @@ let pp_step out (s : step) : unit =
 let parents (p : t) : parent list =
   match p.step with
   | Goal | Assert | Trivial | By_def _ | Define _ -> []
-  | Negated_goal p2 -> [ p_of p2 ]
-  | Instantiate { form = p2; _ } -> [ p_of p2 ]
   | Esa (_, l) -> List.map p_of l
   | Inference { parents = l; _ } -> l
 
@@ -94,24 +82,9 @@ let premises (p : t) : t list =
   let open_p { p_proof; _ } = p_proof in
   List.rev_map open_p @@ parents p
 
-let inst (p : t) : inst =
-  match p.step with
-  | Instantiate { inst; _ } -> inst
-  | _ -> []
-
 let tags (p : t) : tag list =
   match p.step with
-  | Inference { tags; _ } | Instantiate { tags; _ } -> tags
-  | _ -> []
-
-let intros (p : t) : inst =
-  match p.step with
-  | Inference { intros; _ } -> intros
-  | _ -> []
-
-let local_intros (p : t) : inst =
-  match p.step with
-  | Inference { local_intros; _ } -> local_intros
+  | Inference { tags; _ } -> tags
   | _ -> []
 
 let equal a b = a.id = b.id
@@ -127,7 +100,15 @@ module Tbl = CCHashtbl.Make (struct
 end)
 
 let pp_id out (p : t) : unit = Fmt.int out p.id
-let pp_res out (p : t) = T.pp out (concl p)
+
+let pp_clause out (cl : clause) : unit =
+  Array.iteri
+    (fun i lit ->
+      if i > 0 then Fmt.string out " | ";
+      Literal.pp out lit)
+    cl
+
+let pp_res out (p : t) = pp_clause out (concl p)
 
 let pp_parent out p =
   match p.p_inst with
@@ -135,24 +116,24 @@ let pp_parent out p =
   | _ :: _ ->
     Format.fprintf out "@[(@[%a@])@,%a@]" pp_res p.p_proof pp_inst p.p_inst
 
-let pp_inst_some out = function
-  | [] -> ()
-  | l -> Fmt.fprintf out "@ :inst %a" pp_inst l
-
-let pp_intro_some out = function
-  | [] -> ()
-  | l -> Fmt.fprintf out "@ :intro %a" pp_inst l
-
-let pp_lintro_some out = function
-  | [] -> ()
-  | l -> Fmt.fprintf out "@ :local-intro %a" pp_inst l
+let pp_inst_some out (inst : inst) =
+  if inst <> [] then Fmt.fprintf out "@ :inst %a" pp_inst inst
 
 let pp out (p : t) : unit =
-  Fmt.fprintf out
-    "(@[<hv2>proof/%d %a%a@ :res `%a`@ :from [@[<hv>%a@]]%a%a%a@])" p.id pp_step
-    (step p) Proof.pp_tags (tags p) pp_res p (Util.pp_list pp_parent)
-    (parents p) pp_inst_some (inst p) pp_intro_some (intros p) pp_lintro_some
-    (local_intros p)
+  Fmt.fprintf out "(@[<hv2>proof/%d %a%a@ :res @[%a@]@ :from [@[<hv>%a@]]%a@])"
+    p.id pp_step (step p) Proof.pp_tags (tags p) pp_clause (concl p)
+    (Util.pp_list pp_parent) (parents p) pp_inst_some
+    (match p.step with
+    | Inference { parents; _ } ->
+      List.filter_map
+        (fun par ->
+          if par.p_inst <> [] then
+            Some par.p_inst
+          else
+            None)
+        parents
+      |> List.concat
+    | _ -> [])
 
 let pp_dag out (p : t) : unit =
   let seen = Tbl.create 32 in
@@ -166,24 +147,19 @@ let pp_dag out (p : t) : unit =
   in
   Fmt.fprintf out "(@[<hv2>proof@ %a@])" pp p
 
-let mk_ : form -> step -> t =
+let mk_ : clause -> step -> t =
   let n = ref 0 in
   fun concl step -> { id = CCRef.incr_then_get n; concl; step; checked = None }
 
-let goal f = mk_ f Goal
-let negated_goal f p = mk_ f (Negated_goal p)
-let assert_ f = mk_ f Assert
-let trivial f = mk_ f Trivial
-let by_def id f = mk_ f (By_def id)
-let define id f = mk_ f (Define id)
+let goal cl = mk_ cl Goal
+let assert_ cl = mk_ cl Assert
+let trivial cl = mk_ cl Trivial
+let by_def id cl = mk_ cl (By_def id)
+let define id cl = mk_ cl (Define id)
+let esa cl name ps = mk_ cl (Esa (name, ps))
 
-let instantiate ?(tags = []) f p inst =
-  mk_ f (Instantiate { form = p; inst; tags })
-
-let esa f name ps = mk_ f (Esa (name, ps))
-
-let inference ~intros ~local_intros ~tags f name ps : t =
-  mk_ f (Inference { name; intros; local_intros; parents = ps; tags })
+let inference ~tags cl name ps : t =
+  mk_ cl (Inference { name; parents = ps; tags })
 
 let get_check_res t = t.checked
 let set_check_res t r = t.checked <- Some r
@@ -194,42 +170,30 @@ let pp_check_res out = function
   | R_skip -> Fmt.string out "skip"
 
 module Dot = struct
-  (** Get a graph of the proof *)
   let as_graph : (t, string * inst) CCGraph.t =
     CCGraph.make (fun p ->
         let descr =
           match step p with
           | Goal -> "goal"
           | Assert -> "assert"
-          | Negated_goal _ -> "negated_goal"
           | Trivial -> "trivial"
           | By_def id -> Fmt.sprintf "by_def(%a)" Name.pp id
           | Define id -> Fmt.sprintf "define(%a)" Name.pp id
-          | Instantiate _ -> "instantiate"
           | Esa (name, _) -> name
           | Inference { name; _ } -> name
         in
         let descr = Fmt.sprintf "@[<h>%s%a@]" descr pp_tags (tags p) in
         parents p |> Iter.of_list
-        |> Iter.map (fun p' -> (descr, inst p), p'.p_proof))
+        |> Iter.map (fun p' -> (descr, p'.p_inst), p'.p_proof))
 
   let _to_str_escape fmt = Util.ksprintf_noc ~f:Util.escape_dot fmt
 
   let color p : string option =
-    let rec is_bool_atom t =
-      match T.view t with
-      | T.AppBuiltin (Builtin.Box_opaque, _) -> true
-      | T.AppBuiltin (Builtin.Not, [ t ]) -> is_bool_atom t
-      | _ -> false
-    in
-    match step p, F.view (concl p) with
-    | _, F.False -> Some "red"
-    | _ when is_bool_atom (concl p) -> Some "cyan"
-    | _, F.Or l when List.for_all is_bool_atom l -> Some "cyan"
-    | Goal, _ -> Some "green"
-    | Assert, _ -> Some "yellow"
-    | Trivial, _ -> Some "gold"
-    | (By_def _ | Define _), _ -> Some "navajowhite"
+    match step p with
+    | Goal -> Some "green"
+    | Assert -> Some "yellow"
+    | Trivial -> Some "gold"
+    | By_def _ | Define _ -> Some "navajowhite"
     | _ -> Some "grey"
 
   let pp_dot_seq ~name out seq =
@@ -247,7 +211,7 @@ module Dot = struct
           | Some R_skip -> "[check ø]", [ `Color "yellow" ]
         in
         let label =
-          _to_str_escape "@[<v>%s@,@[<2>%a@]@]@." top T.pp (concl p)
+          _to_str_escape "@[<v>%s@,@[<2>%a@]@]@." top pp_clause (concl p)
         in
         let attrs = [ `Label label; `Style "filled" ] in
         let shape = `Shape "box" in
@@ -267,7 +231,6 @@ module Dot = struct
   let pp_dot ~name out proof = pp_dot_seq ~name out (Iter.singleton proof)
 
   let pp_dot_seq_file ?(name = "llproof") filename seq =
-    (* print graph on file *)
     let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "llproof.pp-dot" in
     Util.debugf ~section 1 "print LLProof graph to@ `%s`" (fun k -> k filename);
     CCIO.with_out filename (fun oc ->

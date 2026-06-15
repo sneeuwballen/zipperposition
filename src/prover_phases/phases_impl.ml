@@ -608,7 +608,14 @@ let check res =
     match res with
     | Saturate.Unsat p
       when params.Params.check || CCOpt.is_some params.Params.proof_trace ->
-      let p' = LLProof_conv.conv p in
+      let p' =
+        LLProof_conv.conv
+          ~get_clause:(fun p ->
+            match Proof.Result.view (Proof.S.result p) with
+            | SClause.SClause_view c -> SClause.lits c
+            | _ -> [||])
+          p
+      in
       let errcode =
         if params.Params.check then (
           Util.debug ~section 2 "start checking proof…";

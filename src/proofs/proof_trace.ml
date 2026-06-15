@@ -179,20 +179,26 @@ let emit_subst self (subst : Subst.Projection.t) (parent_vars : Term.var list) :
           if List.mem v' bound_vars then
             None
           else (
-            let ty = HVar.ty v in
-            let t =
-              Subst.FO.apply
-                (Subst.Projection.renaming subst)
+            (* Check if [v] is actually in the substitution's domain.
+               If so, it's bound (even if the image happens to have
+               the same HVar.id as [v] — they're different clauses). *)
+            let is_bound =
+              Subst.mem
                 (Subst.Projection.subst subst)
-                (Term.var_of_int ~ty (HVar.id v), Subst.Projection.scope subst)
+                (v', Subst.Projection.scope subst)
             in
-            match Term.view t with
-            | Term.Var v2 ->
-              if HVar.id v = HVar.id v2 then
-                None
-              else
-                Some (v', fo_term_to_subst_term t)
-            | _ -> Some (v', fo_term_to_subst_term t)
+            if is_bound then
+              None
+            else (
+              let ty = HVar.ty v in
+              let t =
+                Subst.FO.apply
+                  (Subst.Projection.renaming subst)
+                  (Subst.Projection.subst subst)
+                  (Term.var_of_int ~ty (HVar.id v), Subst.Projection.scope subst)
+              in
+              Some (v', fo_term_to_subst_term t)
+            )
           ))
         parent_vars
     in
