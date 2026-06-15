@@ -6,7 +6,7 @@ let section = Util.Section.make ~parent:Const.section "renaming"
 
 module type S = sig
   module Ctx : Ctx.S
-  module C : Clause.S with module Ctx = Ctx
+  module C : Clause_intf.S with module Ctx = Ctx
 
   val on_pred_skolem_introduction : (C.t * Term.t) Signal.t
   val is_renaming_clause : C.t -> bool
@@ -26,7 +26,7 @@ module type S = sig
     T.t
 end
 
-module Make (C : Clause.S) = struct
+module Make (C : Clause_intf.S) = struct
   module Ctx = C.Ctx
   module C = C
 

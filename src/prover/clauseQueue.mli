@@ -17,6 +17,56 @@ val set_profile : profile -> unit
 val ignoring_orphans : unit -> bool
 val disable_ignoring_orphans : unit -> unit
 
-module type S = ClauseQueue_intf.S
+(** {1 A priority queue of clauses, purely functional} *)
 
-module Make (C : Clause.S) : S with module C = C
+val register_conjecture_clause : Clause.t -> unit
+val on_proof_state_init : Clause.t Iter.t Logtk.Signal.t
+
+(** {6 Weight functions} *)
+module WeightFun : sig
+  type t = Clause.t -> int
+
+  val of_string : string -> t
+  val default : t
+  val penalty : t
+  val favor_all_neg : t
+  val favor_non_all_neg : t
+  val favor_ground : t
+  val favor_horn : t
+  val favor_goal : t
+
+  val conj_relative :
+    ?distinct_vars_mul:float ->
+    ?parameters_magnitude:[< `Large | `Small > `Large ] ->
+    ?goal_penalty:bool ->
+    t
+
+  val combine : (t * int) list -> t
+end
+
+module PriorityFun : sig
+  type t = Clause.t -> int
+
+  val of_string : string -> t
+end
+
+type t
+
+val add : t -> Clause.t -> bool
+val add_seq : t -> Clause.t Iter.t -> unit
+val length : t -> int
+val is_empty : t -> bool
+val take_first : t -> Clause.t
+val name : t -> string
+val bfs : unit -> t
+val almost_bfs : unit -> t
+val explore : unit -> t
+val ground : unit -> t
+val goal_oriented : unit -> t
+val default : unit -> t
+val of_profile : profile -> t
+val all_clauses : t -> Clause.t Iter.t
+val mem_cl : t -> Clause.t -> bool
+val remove : t -> Clause.t -> bool
+val pp : t CCFormat.printer
+val to_string : t -> string

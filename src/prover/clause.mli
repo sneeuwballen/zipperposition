@@ -12,9 +12,9 @@ val stat_clause_create : Util.stat
 type t
 (** Abstract type for a clause *)
 
-type sets = {
-  c_set: t CCVector.ro_vector;  (** main set of clauses *)
-  c_sos: t CCVector.ro_vector;  (** set of support *)
+type 'a sets = {
+  c_set: 'a CCVector.ro_vector;  (** main set of clauses *)
+  c_sos: 'a CCVector.ro_vector;  (** set of support *)
 }
 (** Bundle of clause sets *)
 
@@ -58,6 +58,9 @@ val update_trail : (Trail.t -> Trail.t) -> t -> t
 val trail_subsumes : t -> t -> bool
 val is_active : t -> v:Trail.valuation -> bool
 val is_inj_axiom : t -> (Name.t * int) option
+
+val ctx_of : t -> Ctx.t
+(** Context that was used to create this clause *)
 
 (** {2 Constructors} *)
 

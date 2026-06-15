@@ -39,9 +39,9 @@ type t = {
 
 type clause = t
 
-type sets = {
-  c_set: t CCVector.ro_vector;  (** main set of clauses *)
-  c_sos: t CCVector.ro_vector;  (** set of support *)
+type 'a sets = {
+  c_set: 'a CCVector.ro_vector;  (** main set of clauses *)
+  c_sos: 'a CCVector.ro_vector;  (** set of support *)
 }
 (** Bundle of clause sets *)
 
@@ -101,7 +101,8 @@ let comes_from_goal c = CCOpt.is_some @@ distance_to_goal c
 (* private function for building clauses *)
 let create_inner ~ctx ~penalty ~selected ~bool_selected sclause proof =
   (* create the structure *)
-  let max_lits = lazy (BV.to_list @@ Lits.maxlits sclause.lits) in
+  let ord = Ctx.ord ctx in
+  let max_lits = lazy (BV.to_list @@ Lits.maxlits sclause.lits ~ord) in
   let c =
     {
       sclause;
@@ -176,8 +177,8 @@ let of_statement ~ctx ?(convert_defs = false) st =
 
 let update_trail f c =
   let sclause = SClause.update_trail f c.sclause in
-  create_inner c.ctx c.proof ~selected:c.selected ~bool_selected:c.bool_selected
-    ~penalty:c.penalty sclause
+  create_inner ~ctx:c.ctx ~penalty:c.penalty ~selected:c.selected
+    ~bool_selected:c.bool_selected c.sclause c.proof
 
 let proof_step c = c.proof
 let proof c = Proof.S.mk c.proof (SClause.mk_proof_res c.sclause)
@@ -303,7 +304,8 @@ let eligible_subterms_of_bool_ ~ctx c =
         let pos = Position.Build.to_pos pb in
         let t = Literals.Pos.at (lits c) pos in
         (* selects --subterms-- of given t that are eligible *)
-        Bool_selection.all_eligible_subterms ~ord ~pos_builder:pb t)
+        Bool_selection.all_eligible_subterms ~ord ~pos_builder:pb t
+        |> Iter.to_list)
       starting_positions
   in
   SClause.TPSet.of_list res
@@ -320,16 +322,28 @@ let eligible_subterms_of_bool ~ctx c =
     eligible for paramodulation. That means the literal is positive, no literal
     is selected, and the literal is maximal among literals of [subst(clause)].
 *)
+let positive_maxlits_ ?max_lits ~ord lits =
+  let max_bv =
+    match max_lits with
+    | Some ml -> BV.of_list ml
+    | None -> Lits.maxlits ~ord lits
+  in
+  let res = BV.create ~size:(Array.length lits) false in
+  for i = 0 to Array.length lits - 1 do
+    if BV.get max_bv i && Literal.is_positivoid lits.(i) then BV.set res i
+  done;
+  res
+
 let eligible_param ~ctx (c, sc) subst =
   let ord = Ctx.ord ctx in
   let selected = Lazy.force c.selected in
   if BV.is_empty selected then
     if not @@ Subst.is_empty subst then (
       let lits' = _apply_subst_no_simpl subst (lits c, sc) in
-      Lits.positive_maxlits lits' ~ord
+      positive_maxlits_ ~ord lits'
     ) else
       (* if no substitution, we can use the cached max_lits *)
-      Lits.positive_maxlits_l ?max_lits:(Lazy.force c.max_lits) (lits c) ~ord
+      positive_maxlits_ ?max_lits:(Some (Lazy.force c.max_lits)) ~ord (lits c)
   else
     BV.empty
 
@@ -377,6 +391,7 @@ let is_oriented_rule ~ctx c =
   )
 
 let is_inj_axiom c = SClause.is_inj_axiom c.sclause
+let ctx_of c = c.ctx
 
 (** {2 Constructors} *)
 let is_orphaned c = SClause.is_orphaned c.sclause

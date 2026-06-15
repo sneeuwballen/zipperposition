@@ -3,7 +3,7 @@ module T = Term
 
 module type S = sig
   module Ctx : Ctx.S
-  module C : Clause.S with module Ctx = Ctx
+  module C : Clause_intf.S with module Ctx = Ctx
 
   val on_pred_skolem_introduction : (C.t * Term.t) Signal.t
   (** this signal is raised when a predicate Skolem is introduced *)
@@ -50,4 +50,4 @@ module type S = sig
       on the mode *)
 end
 
-module Make (C : Clause.S) : S with module Ctx = C.Ctx and module C = C
+module Make (C : Clause_intf.S) : S with module Ctx = C.Ctx and module C = C

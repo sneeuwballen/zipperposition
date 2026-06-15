@@ -7,5 +7,3 @@
 module type S = ProofState_intf.S
 
 (** {2 Create a Proof State} *)
-
-module Make (C : Clause.S) : S with module C = C and module Ctx = C.Ctx

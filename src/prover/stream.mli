@@ -8,12 +8,24 @@ open Logtk
 
 val stat_stream_create : Util.stat
 
-module type S = Stream_intf.S
+type t = private {
+  id: int;
+  parents: Clause.t list;
+  mutable penalty: int;
+  mutable hits: int;
+  mutable stm: Clause.t option OSeq.t;
+}
 
-module type ARG = sig
-  module Ctx : Ctx.S
-  module C : Clause.S with module Ctx = Ctx
-end
+exception Empty_Stream
+exception Drip_n_Unfinished of Clause.t option list * int * int
 
-(** {2 Build a new Stream} *)
-module Make (A : ARG) : S with module Ctx = A.Ctx and module C = A.C
+val make : ?penalty:int -> parents:Clause.t list -> Clause.t option OSeq.t -> t
+val equal : t -> t -> bool
+val compare : t -> t -> int
+val hash : t -> int
+val id : t -> int
+val is_empty : t -> bool
+val penalty : t -> int
+val drip : t -> Clause.t option
+val drip_n : t -> int -> int -> Clause.t option list
+val pp : t CCFormat.printer

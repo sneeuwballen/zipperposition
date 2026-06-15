@@ -11,14 +11,8 @@ open Logtk
 
 module type S = StreamQueue_intf.S
 
-module type ARG = sig
-  module Stm : Stream.S
-
-  val state : unit -> Flex_state.t
-end
-
 val k_guard : int Flex_state.key
 val k_ratio : int Flex_state.key
 val k_clause_num : int Flex_state.key
 
-module Make (A : ARG) : S with module Stm = A.Stm
+(* StreamQueue is now concrete; Make removed *)

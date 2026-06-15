@@ -8,7 +8,20 @@ module type S = sig
   module C : Clause_intf.S
 
   (** Priority queues on clauses *)
-  module CQueue : ClauseQueue.S with module C = C and type C.t = C.t
+  module CQueue : sig
+    type t
+
+    val add : t -> C.t -> bool
+    val take_first : t -> C.t
+    val length : t -> int
+    val is_empty : t -> bool
+    val remove : t -> C.t -> bool
+    val mem_cl : t -> C.t -> bool
+    val all_clauses : t -> C.t Iter.t
+    val on_proof_state_init : C.t Iter.t Signal.t
+    val register_conjecture_clause : C.t -> unit
+    val pp : t CCFormat.printer
+  end
 
   (** {5 Useful Index structures} *)
 

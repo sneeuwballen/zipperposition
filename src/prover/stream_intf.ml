@@ -1,24 +1,23 @@
 (* This file is free software, part of Zipperposition. See file "license" for more details. *)
 
 module type S = sig
-  module Ctx : Ctx.S
-  module C : Clause.S with module Ctx = Ctx
-
   type t = private {
     id: int;  (** unique ID of the stream *)
-    parents: C.t list;
+    parents: Clause.t list;
         (** parent clauses for inference generating this stream *)
     mutable penalty: int;  (** heuristic penalty *)
     mutable hits: int;  (** how many attemts to retrieve unifier were there *)
-    mutable stm: C.t option OSeq.t;  (** the stream itself *)
+    mutable stm: Clause.t option OSeq.t;  (** the stream itself *)
   }
 
   exception Empty_Stream
-  exception Drip_n_Unfinished of C.t option list * int * int
+  exception Drip_n_Unfinished of Clause.t option list * int * int
 
   (** {2 Basics} *)
 
-  val make : ?penalty:int -> parents:C.t list -> C.t option OSeq.t -> t
+  val make :
+    ?penalty:int -> parents:Clause.t list -> Clause.t option OSeq.t -> t
+
   val equal : t -> t -> bool
   val compare : t -> t -> int
   val hash : t -> int
@@ -26,11 +25,11 @@ module type S = sig
   val is_empty : t -> bool
   val penalty : t -> int
 
-  val drip : t -> C.t option
+  val drip : t -> Clause.t option
   (** Remove the first element in the stream and return it.
       @raise Empty_Stream if the stream is empty *)
 
-  val drip_n : t -> int -> int -> C.t option list
+  val drip_n : t -> int -> int -> Clause.t option list
   (** Attempt to remove the n first elements in the stream and return them.
       Return less if the guard is reached.
       @raise Drip_n_Unfinished(cl,n)

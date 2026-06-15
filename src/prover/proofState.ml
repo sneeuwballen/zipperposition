@@ -17,43 +17,38 @@ module CQ = ClauseQueue
 module type S = ProofState_intf.S
 (** {2 Set of active clauses} *)
 
-module Make (C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
-  module Ctx = C.Ctx
-  module C = C
-  module CQueue = ClauseQueue.Make (C)
+(* module TermIndex = NPDtree.MakeTerm(Clause.WithPos) *)
+module TermIndex = Fingerprint.Make (Clause.WithPos)
 
-  (* module TermIndex = NPDtree.MakeTerm(C.WithPos) *)
-  module TermIndex = Fingerprint.Make (C.WithPos)
+module UnitIndex =
+(* NPDtree *)
+Dtree.Make (struct
+  type t = T.t * T.t * bool * Clause.t
+  type rhs = T.t
 
-  module UnitIndex =
-  (* NPDtree *)
-  Dtree.Make (struct
-    type t = T.t * T.t * bool * C.t
-    type rhs = T.t
+  let compare (t11, t12, s1, c1) (t21, t22, s2, c2) =
+    let open CCOrd.Infix in
+    T.compare t11 t21 <?> (T.compare, t12, t22) <?> (compare, s1, s2)
+    <?> (Clause.compare, c1, c2)
 
-    let compare (t11, t12, s1, c1) (t21, t22, s2, c2) =
-      let open CCOrd.Infix in
-      T.compare t11 t21 <?> (T.compare, t12, t22) <?> (compare, s1, s2)
-      <?> (C.compare, c1, c2)
+  let extract (t1, t2, sign, _) = t1, t2, sign
 
-    let extract (t1, t2, sign, _) = t1, t2, sign
+  let priority (_, _, _, c) =
+    if Clause.is_oriented_rule c then
+      2
+    else
+      1
+end)
 
-    let priority (_, _, _, c) =
-      if C.is_oriented_rule c then
-        2
-      else
-        1
-  end)
+module SubsumptionIndex = FV_tree.Make (struct
+  type t = Clause.t
 
-  module SubsumptionIndex = FV_tree.Make (struct
-    type t = C.t
+  let compare = Clause.compare
+  let to_lits c = Clause.to_forms c |> Iter.of_list
+  let labels c = Clause.trail c |> Trail.labels
+end)
 
-    let compare = C.compare
-    let to_lits c = C.to_forms c |> Iter.of_list
-    let labels c = C.trail c |> Trail.labels
-  end)
-
-  (* XXX: no customization of indexing for now
+(* XXX: no customization of indexing for now
      let _indexes =
      let table = Hashtbl.create 2 in
      let mk_fingerprint fp =
@@ -64,129 +59,129 @@ module Make (C : Clause.S) : S with module C = C and module Ctx = C.Ctx = struct
      table
   *)
 
-  (** {5 Common Interface for Sets} *)
+(** {5 Common Interface for Sets} *)
 
-  module type CLAUSE_SET = sig
-    val on_add_clause : C.t Signal.t
-    (** signal triggered when a clause is added to the set *)
+module type CLAUSE_SET = sig
+  val on_add_clause : Clause.t Signal.t
+  (** signal triggered when a clause is added to the set *)
 
-    val on_remove_clause : C.t Signal.t
-    (** signal triggered when a clause is removed from the set *)
+  val on_remove_clause : Clause.t Signal.t
+  (** signal triggered when a clause is removed from the set *)
 
-    val add : C.t Iter.t -> unit
-    (** Add clauses to the set *)
+  val add : Clause.t Iter.t -> unit
+  (** Add clauses to the set *)
 
-    val remove : C.t Iter.t -> unit
-    (** Remove clauses from the set *)
-  end
-
-  module MakeClauseSet (X : sig end) = struct
-    let clauses_ = ref C.ClauseSet.empty
-    let on_add_clause = Signal.create ()
-    let on_remove_clause = Signal.create ()
-    let clauses () = !clauses_
-    let num_clauses () = C.ClauseSet.cardinal !clauses_
-
-    let add seq =
-      seq (fun c ->
-          if not (C.ClauseSet.mem c !clauses_) then (
-            clauses_ := C.ClauseSet.add c !clauses_;
-            Signal.send on_add_clause c
-          ));
-      ()
-
-    let remove seq =
-      seq (fun c ->
-          if C.ClauseSet.mem c !clauses_ then (
-            clauses_ := C.ClauseSet.remove c !clauses_;
-            Signal.send on_remove_clause c
-          ));
-      ()
-  end
-
-  (** {2 Sets} *)
-
-  module ActiveSet = MakeClauseSet (struct end)
-
-  module SimplSet = struct
-    let on_add_clause = Signal.create ()
-    let on_remove_clause = Signal.create ()
-
-    open struct
-      let n_clauses = Atomic.make 0
-    end
-
-    let add seq =
-      seq (fun c ->
-          Atomic.incr n_clauses;
-          Signal.send on_add_clause c);
-      Trace.counter_int "simpl.n-clauses" (Atomic.get n_clauses)
-
-    let remove seq =
-      seq (fun c ->
-          Atomic.decr n_clauses;
-          Signal.send on_remove_clause c);
-      Trace.counter_int "passive.n-clauses" (Atomic.get n_clauses)
-  end
-
-  module PassiveSet = struct
-    include MakeClauseSet (struct end)
-
-    let queue =
-      let p = ClauseQueue.get_profile () in
-      CQueue.of_profile p
-
-    let next () =
-      let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "proof-state.next" in
-      if CQueue.is_empty queue then
-        None
-      else (
-        try
-          let x = CQueue.take_first queue in
-          Signal.send on_remove_clause x;
-          clauses_ := C.ClauseSet.remove x !clauses_;
-          Some x
-        with Not_found -> None
-      )
-
-    let num_clauses () = CQueue.length queue
-
-    let remove seq =
-      seq (fun c ->
-          if CQueue.remove queue c then Signal.send on_remove_clause c);
-      Trace.counter_int "passive.n-clauses" (num_clauses ())
-
-    let add seq =
-      seq (fun c -> if CQueue.add queue c then Signal.send on_add_clause c);
-      Trace.counter_int "passive.n-clauses" (num_clauses ())
-
-    let is_passive cl = CQueue.mem_cl queue cl
-    let clauses () = C.ClauseSet.of_iter (CQueue.all_clauses queue)
-  end
-
-  type stats = int * int * int
-  (* num passive, num active, num simplification *)
-
-  let stats () =
-    ( C.ClauseSet.cardinal (ActiveSet.clauses ()),
-      C.ClauseSet.cardinal (PassiveSet.clauses ()),
-      0 )
-
-  let pp out state =
-    let num_active, num_passive, num_simpl = stats state in
-    Format.fprintf out
-      "state {%d active clauses; %d passive clauses; %d simplification_rules; \
-       %a}"
-      num_active num_passive num_simpl CQueue.pp PassiveSet.queue
-
-  let debug out state =
-    let num_active, num_passive, num_simpl = stats state in
-    Format.fprintf out
-      "@[<v2>state {%d active clauses;@ %d passive clauses;@ %d \
-       simplification_rules;@ queues@[<hv>%a@] @,\
-       active:@[<hv>%a@]@,\
-       passive:@[<hv>%a@]@,\
-       }@]"
-      num_active num_passive num_simpl CQueue.pp PassiveSet.queue C.pp_set
-      (ActiveSet.clauses ()) C.pp_set (PassiveSet.clauses ())
+  val remove : Clause.t Iter.t -> unit
+  (** Remove clauses from the set *)
 end
+
+module MakeClauseSet (X : sig end) = struct
+  let clauses_ = ref Clause.ClauseSet.empty
+  let on_add_clause = Signal.create ()
+  let on_remove_clause = Signal.create ()
+  let clauses () = !clauses_
+  let num_clauses () = Clause.ClauseSet.cardinal !clauses_
+
+  let add seq =
+    seq (fun c ->
+        if not (Clause.ClauseSet.mem c !clauses_) then (
+          clauses_ := Clause.ClauseSet.add c !clauses_;
+          Signal.send on_add_clause c
+        ));
+    ()
+
+  let remove seq =
+    seq (fun c ->
+        if Clause.ClauseSet.mem c !clauses_ then (
+          clauses_ := Clause.ClauseSet.remove c !clauses_;
+          Signal.send on_remove_clause c
+        ));
+    ()
+end
+
+(** {2 Sets} *)
+
+module ActiveSet = MakeClauseSet (struct end)
+
+module SimplSet = struct
+  let on_add_clause = Signal.create ()
+  let on_remove_clause = Signal.create ()
+
+  open struct
+    let n_clauses = Atomic.make 0
+  end
+
+  let add seq =
+    seq (fun c ->
+        Atomic.incr n_clauses;
+        Signal.send on_add_clause c);
+    Trace.counter_int "simpl.n-clauses" (Atomic.get n_clauses)
+
+  let remove seq =
+    seq (fun c ->
+        Atomic.decr n_clauses;
+        Signal.send on_remove_clause c);
+    Trace.counter_int "passive.n-clauses" (Atomic.get n_clauses)
+end
+
+module PassiveSet = struct
+  include MakeClauseSet (struct end)
+
+  let queue =
+    let p = ClauseQueue.get_profile () in
+    ClauseQueue.of_profile p
+
+  let next () =
+    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "proof-state.next" in
+    if ClauseQueue.is_empty queue then
+      None
+    else (
+      try
+        let x = ClauseQueue.take_first queue in
+        Signal.send on_remove_clause x;
+        clauses_ := Clause.ClauseSet.remove x !clauses_;
+        Some x
+      with Not_found -> None
+    )
+
+  let num_clauses () = ClauseQueue.length queue
+
+  let remove seq =
+    seq (fun c ->
+        if ClauseQueue.remove queue c then Signal.send on_remove_clause c);
+    Trace.counter_int "passive.n-clauses" (num_clauses ())
+
+  let add seq =
+    seq (fun c -> if ClauseQueue.add queue c then Signal.send on_add_clause c);
+    Trace.counter_int "passive.n-clauses" (num_clauses ())
+
+  let is_passive cl = ClauseQueue.mem_cl queue cl
+
+  let clauses () =
+    ClauseQueue.all_clauses queue |> Iter.to_list |> Clause.ClauseSet.of_list
+end
+
+type stats = int * int * int
+(* num passive, num active, num simplification *)
+
+let stats () =
+  ( Clause.ClauseSet.cardinal (ActiveSet.clauses ()),
+    Clause.ClauseSet.cardinal (PassiveSet.clauses ()),
+    0 )
+
+let pp out state =
+  let num_active, num_passive, num_simpl = stats state in
+  Format.fprintf out
+    "state {%d active clauses; %d passive clauses; %d simplification_rules; %a}"
+    num_active num_passive num_simpl ClauseQueue.pp PassiveSet.queue
+
+let debug out state =
+  let num_active, num_passive, num_simpl = stats state in
+  Format.fprintf out
+    "@[<v2>state {%d active clauses;@ %d passive clauses;@ %d \
+     simplification_rules;@ queues@[<hv>%a@] @,\
+     active:@[<hv>%a@]@,\
+     passive:@[<hv>%a@]@,\
+     }@]"
+    num_active num_passive num_simpl ClauseQueue.pp PassiveSet.queue
+    Clause.pp_set (ActiveSet.clauses ()) Clause.pp_set (PassiveSet.clauses ())

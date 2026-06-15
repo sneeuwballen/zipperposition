@@ -4,9 +4,9 @@ open Logtk
 
 module type S = sig
   module Ctx : Ctx.S
-  module C : Clause.S with module Ctx = Ctx
+  module C : Clause_intf.S with module Ctx = Ctx
   module ProofState : ProofState.S with module C = C and module Ctx = Ctx
-  module Stm : Stream.S with module C = C
+  module Stm : Stream_intf.S
   module StmQ : StreamQueue.S with module Stm = Stm
   module FormRename : FormulaRename.S with module C = C
 

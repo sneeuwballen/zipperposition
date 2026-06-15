@@ -12,5 +12,6 @@ val set_compact : bool -> unit
 *)
 
 module Make () : Sat_solver_intf.STATIC
+[@@ocaml.deprecated "use Sat_solver.create () and pass t explicitly"]
 (** Backward-compatible generative functor. Creates a fresh solver and binds all
     functions to a hidden internal state. Use {!create} for new code. *)
