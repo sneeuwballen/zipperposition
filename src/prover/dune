@@ -22,4 +22,47 @@
   logtk.proofs
   logtk.parsers
   str)
- (flags :standard -w -32-50 -open Logtk_arith -open Logtk_common))
+ (flags :standard -w -32-50 -open Logtk_arith -open Logtk_common)
+ (modules
+  AC
+  AC_intf
+  bBox
+  Bool_clause
+  bool_lit
+  bool_lit_intf
+  bool_selection
+  Classify_cst
+  clause
+  clauseContext
+  clause_intf
+  clauseQueue
+  clauseQueue_intf
+  combinators_base
+  Const
+  Cover_set
+  ctx
+  ctx_intf
+  Cut_form
+  env_intf
+  env
+  eprover_interface
+  extensions
+  formulaRename
+  Ind_cst
+  lift_lambdas
+  params
+  proofState
+  proofState_intf
+  sat_solver
+  sat_solver_intf
+  saturate
+  SClause
+  selection
+  signals
+  simplM
+  stream
+  stream_intf
+  streamQueue
+  streamQueue_intf
+  trail
+  combinators))

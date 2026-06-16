@@ -10,12 +10,12 @@ type t = {
   data: D.t;
   total_len: int;
   conv_ctx: Term.Conv.ctx;
-  mutable node_cache: (string * D.value array) Int_tbl.t;
-  mutable term_cache: Term.t Int_tbl.t;
-  mutable name_cache: Name.t Int_tbl.t;
-  mutable proof_cache: Proof.t Int_tbl.t;
-  mutable clause_cache: Literal.t array Int_tbl.t;
-  mutable subst_cache: Subst.Projection.t Int_tbl.t;
+  node_cache: (string * D.value array) Int_tbl.t;
+  term_cache: Term.t Int_tbl.t;
+  name_cache: Name.t Int_tbl.t;
+  proof_cache: Proof.t Int_tbl.t;
+  clause_cache: Literal.t array Int_tbl.t;
+  subst_cache: Subst.Projection.t Int_tbl.t;
 }
 
 type cursor = {

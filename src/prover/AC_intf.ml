@@ -8,12 +8,12 @@ type spec = {
 }
 
 module type S = sig
-  module Env : Env.S
-  module C : module type of Env.C
+  module E : Env.S
+  module C : Clause_intf.S
 
   val on_add : spec Signal.t
 
-  val add : proof:Proof.parent -> Name.t -> Type.t -> unit
+  val add : proof:Proof.parent -> Name.t -> Type.t -> Env.t -> unit
   (** Declare that the given symbol is AC, and update the Env subsequently by
       adding clauses, etc. *)
 
@@ -32,7 +32,7 @@ module type S = sig
   val exists_ac : unit -> bool
   (** Is there any AC symbol? *)
 
-  val scan_statement : Statement.clause_t -> unit
+  val scan_statement : Env.t -> Statement.clause_t -> unit
   (** Check whether the statement contains an "AC" attribute, do the proper
       declaration in this case *)
 
@@ -47,6 +47,6 @@ module type S = sig
   val simplify : Env.simplify_rule
   (** Simplify the clause modulo AC *)
 
-  val setup : unit -> unit
+  val setup : Env.t -> unit
   (** Register on Env *)
 end

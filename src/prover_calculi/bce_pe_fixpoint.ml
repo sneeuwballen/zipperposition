@@ -13,6 +13,7 @@ module type S = sig
 end
 
 module Make (E : Env.S) : S with module Env = E = struct
+  module OuterEnv = Env
   module Env = E
   module BCE = Bce.Make (E)
   module PE = Pred_elim.Make (E)
@@ -41,19 +42,21 @@ module Make (E : Env.S) : S with module Env = E = struct
       done
     );
 
-    steps := (!steps + 1) mod Env.flex_get k_check_at
+    steps :=
+      (!steps + 1) mod OuterEnv.flex_get_of (OuterEnv.get_global ()) k_check_at
 
   let setup () =
-    if E.flex_get k_enabled then
-      if E.flex_get k_fp_inprocessing then (
-        E.flex_add Pred_elim.k_enabled true;
-        E.flex_add Bce.k_enabled true;
+    if OuterEnv.flex_get_of (OuterEnv.get_global ()) k_enabled then
+      if OuterEnv.flex_get_of (OuterEnv.get_global ()) k_fp_inprocessing then (
+        OuterEnv.flex_add_of (OuterEnv.get_global ()) Pred_elim.k_enabled true;
+        OuterEnv.flex_add_of (OuterEnv.get_global ()) Bce.k_enabled true;
         PE.setup ~in_fp_mode:true ();
         BCE.setup ~in_fp_mode:true ();
-        Env.Ctx.lost_completeness ();
-        E.add_clause_elimination_rule ~priority:5 "bce-pe-fp" inprocessing
+        Env.Ctx.lost_completeness (OuterEnv.get_ctx (OuterEnv.get_global ()));
+        OuterEnv.add_clause_elimination_rule (OuterEnv.get_global ())
+          ~priority:5 "bce-pe-fp" inprocessing
       ) else
-        Signal.once E.on_start run_fixpoint
+        Signal.once (OuterEnv.on_start (OuterEnv.get_global ())) run_fixpoint
 end
 
 let _enabled = ref false
@@ -61,12 +64,12 @@ let _check_at = ref 10
 let _inprocessing = ref false
 
 let extension =
-  let action env =
-    let module E = (val env : Env.S) in
+  let action (env : Env.t) =
+    let module E = (val (module Env) : Env.S) in
     let module FP = Make (E) in
-    E.flex_add k_enabled !_enabled;
-    E.flex_add k_fp_inprocessing !_inprocessing;
-    E.flex_add k_check_at !_check_at;
+    Env.flex_add_of (Env.get_global ()) k_enabled !_enabled;
+    Env.flex_add_of (Env.get_global ()) k_fp_inprocessing !_inprocessing;
+    Env.flex_add_of (Env.get_global ()) k_check_at !_check_at;
     FP.setup ()
   in
   {

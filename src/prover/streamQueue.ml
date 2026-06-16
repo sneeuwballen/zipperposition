@@ -5,6 +5,9 @@
 open Logtk
 
 let section = Util.Section.make ~parent:Const.section "stmq"
+
+module type S = StreamQueue_intf.S
+
 let k_guard = Flex_state.create_key ()
 let k_ratio = Flex_state.create_key ()
 let k_clause_num = Flex_state.create_key ()
@@ -106,7 +109,7 @@ let take_first q =
 
 let is_empty_clause = function
   | None -> false
-  | Some cl -> Stream.C.is_empty cl
+  | Some cl -> Clause.is_empty cl
 
 let take_fair ?(full = false) tries q =
   q.time_before_fair <- q.ratio;
@@ -136,9 +139,7 @@ let take_fair ?(full = false) tries q =
             else
               0
           in
-          let limit_reached =
-            (*get_op k_clause_num > 0 && n < get_op k_clause_num*) false
-          in
+          let limit_reached = (*k_clause_num > 0 && n < k_clause_num*) false in
           if is_empty_clause result || (full && limit_reached) then
             List.rev_append ((result, s) :: acc)
               (CCList.rev_map (fun (_, s) -> None, s) s_rest)
@@ -191,7 +192,7 @@ let rec _take_nb q nb prev_res =
   )
 
 let clauses_to_take q =
-  let max_clause = get_op k_clause_num in
+  let max_clause = -1 in
   if max_clause < 0 then
     q.stm_nb
   else
@@ -243,7 +244,7 @@ let name q = q.name
 let default () : t =
   let open WeightFun in
   let weight = penalty in
-  make ~guard:(get_op k_guard) ~ratio:(get_op k_ratio) ~weight "default"
+  make ~guard:1 ~ratio:1 ~weight "default"
 
 let pp out q = CCFormat.fprintf out "queue %s" (name q)
 let to_string = CCFormat.to_string pp

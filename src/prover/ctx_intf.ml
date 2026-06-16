@@ -6,6 +6,8 @@
 open Logtk
 
 module type S = sig
+  type t
+
   val sk_ctx : unit -> Skolem.ctx
   val ord : unit -> Ordering.t
   val selection_fun : unit -> Selection.t

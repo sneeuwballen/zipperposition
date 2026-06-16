@@ -5,7 +5,7 @@ module T = Term
 let section = Util.Section.make ~parent:Const.section "renaming"
 
 module type S = sig
-  module Ctx : Ctx.S
+  module Ctx : module type of Ctx
   module C : Clause_intf.S with module Ctx = Ctx
 
   val on_pred_skolem_introduction : (C.t * Term.t) Signal.t
@@ -79,15 +79,17 @@ module Make (C : Clause_intf.S) = struct
     let res =
       if polarity_aware then
         if sign then
-          C.create ~penalty:1 ~trail:Trail.empty
+          C.create ~ctx:(C.ctx_of parent) ~penalty:1 ~trail:Trail.empty
             [ L.mk_false renamer; L.mk_true form ]
             proof
         else
-          C.create ~penalty:1 ~trail:Trail.empty
+          C.create ~ctx:(C.ctx_of parent) ~penalty:1 ~trail:Trail.empty
             [ L.mk_true renamer; L.mk_false form ]
             proof
       else
-        C.create ~penalty:1 ~trail:Trail.empty [ L.mk_eq renamer form ] proof
+        C.create ~ctx:(C.ctx_of parent) ~penalty:1 ~trail:Trail.empty
+          [ L.mk_eq renamer form ]
+          proof
     in
 
     res
@@ -180,7 +182,7 @@ module Make (C : Clause_intf.S) = struct
           let (id, ty), renamer =
             T.mk_fresh_skolem ~prefix:"form" free_vars Type.prop
           in
-          Ctx.declare id ty;
+          Ctx.declare (C.ctx_of c) id ty;
           let def = mk_renaming_clause c ~renamer ~polarity_aware ~form sign in
           _renaming_idx :=
             Idx.add !_renaming_idx form (renamer, ref [ def, mk_sign sign ]);
@@ -199,7 +201,7 @@ module Make (C : Clause_intf.S) = struct
     let mk_skolem () =
       let free_vars_l = T.VarSet.to_list (T.VarSet.of_iter free_vars) in
       let (id, ty), t = T.mk_fresh_skolem ~prefix:"sk" free_vars_l ret_ty in
-      Ctx.declare id ty;
+      Ctx.declare (C.ctx_of parent) id ty;
       Signal.send on_pred_skolem_introduction (parent, t);
       t
     in

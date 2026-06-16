@@ -11,6 +11,6 @@ module type S = sig
   val setup : unit -> unit
 end
 
-module Make (E : Env.S) : S with module Env = E
+module Make (E : Env.S) : S
 
 val extension : Extensions.t

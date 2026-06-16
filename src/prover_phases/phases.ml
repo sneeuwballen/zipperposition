@@ -10,12 +10,8 @@ type 'a or_error = ('a, exn * Printexc.raw_backtrace) CCResult.t
 
 (** {2 Phases} *)
 
-type env_with_clauses =
-  | Env_clauses : 'c Env.packed * 'c Clause.sets -> env_with_clauses
-
-type env_with_result =
-  | Env_result : 'c Env.packed * Saturate.szs_status -> env_with_result
-
+type env_with_clauses = Env.t * Clause.t Clause.sets
+type env_with_result = Env.t * Saturate.szs_status
 type errcode = int
 type prelude = UntypedAST.statement Iter.t
 

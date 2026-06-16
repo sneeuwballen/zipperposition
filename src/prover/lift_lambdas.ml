@@ -16,6 +16,7 @@ module type S = sig
 end
 
 module Make (E : Env.S) : S with module Env = E = struct
+  module OuterEnv = Env
   module Env = E
   module C = Env.C
   module Ctx = Env.Ctx
@@ -44,20 +45,23 @@ module Make (E : Env.S) : S with module Env = E = struct
       let trail = C.trail c and penalty = C.penalty c in
       let stmt = Statement.assert_ ~proof f in
       let cnf_vec =
-        Cnf.convert @@ CCVector.to_iter @@ Cnf.cnf_of ~ctx:(Ctx.sk_ctx ()) stmt
+        Cnf.convert @@ CCVector.to_iter
+        @@ Cnf.cnf_of ~ctx:(Ctx.sk_ctx (C.ctx_of c)) stmt
       in
       CCVector.iter
         (fun cl ->
           Statement.Seq.ty_decls cl
           |> Iter.iter (fun (id, ty) ->
-                 Ctx.declare id ty;
+                 Ctx.declare (C.ctx_of c) id ty;
                  Name_payload.add id (Name.Attr_skolem Name.K_after_cnf)))
         cnf_vec;
 
-      CCVector.map (C.of_statement ~convert_defs:true) cnf_vec
+      CCVector.map (C.of_statement ~ctx:(C.ctx_of c) ~convert_defs:true) cnf_vec
       |> CCVector.to_list |> CCList.flatten
-      |> List.map (fun c ->
-             C.create ~penalty ~trail (CCArray.to_list (C.lits c)) proof)
+      |> List.map (fun c' ->
+             C.create ~ctx:(C.ctx_of c') ~penalty ~trail
+               (CCArray.to_list (C.lits c'))
+               proof)
     | _ -> [ c ]
 
   let setup () = ()
@@ -158,7 +162,10 @@ module Make (E : Env.S) : S with module Env = E = struct
           let lhs_applied, rhs_applied = fully_apply ~counter lhs rhs in
           let lits = [ Literal.mk_eq lhs_applied rhs_applied ] in
           let proof = Proof.Step.define_internal id [ C.proof_parent parent ] in
-          let lift_def = C.create ~penalty:1 ~trail:Trail.empty lits proof in
+          let lift_def =
+            C.create ~ctx:(C.ctx_of parent) ~penalty:1 ~trail:Trail.empty lits
+              proof
+          in
           let repl = Subst.FO.apply Subst.Renaming.none subst (sc lhs) in
 
           let new_def =
@@ -184,7 +191,8 @@ module Make (E : Env.S) : S with module Env = E = struct
                          [ C.proof_parent parent; C.proof_parent def ]
                      in
                      let lift_rel =
-                       C.create ~penalty:1 ~trail:Trail.empty lits proof
+                       C.create ~ctx:(C.ctx_of parent) ~penalty:1
+                         ~trail:Trail.empty lits proof
                      in
                      lift_rel :: acc
                    ) else
@@ -240,7 +248,7 @@ module Make (E : Env.S) : S with module Env = E = struct
     in
     Util.debugf ~section 1 "lifting @[%a@]@." (fun k -> k T.pp t);
     let res, defs, declared_syms = aux (Lambda.snf @@ t) in
-    Ctx.declare_syms declared_syms;
+    Ctx.declare_syms (C.ctx_of parent) declared_syms;
     res, defs
 
   let lift_lambdas cl =
@@ -279,7 +287,8 @@ module Make (E : Env.S) : S with module Env = E = struct
           (List.map C.proof_parent ((cl :: reused_defs) @ new_defs))
       in
       let lifted =
-        C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lits proof
+        C.create ~ctx:(C.ctx_of cl) ~penalty:(C.penalty cl) ~trail:(C.trail cl)
+          lits proof
       in
 
       lifted :: new_defs
@@ -297,27 +306,28 @@ module Make (E : Env.S) : S with module Env = E = struct
     )
 
   let lift_lambdas_cnf st =
-    Env.cr_return
-    @@ CCList.flat_map
+    OuterEnv.CR_return
+      (CCList.flat_map
          (fun c -> CCOpt.get_or ~default:[ c ] (lift_lambdas_simp c))
-         (E.C.of_statement st)
+         (C.of_statement ~ctx:(OuterEnv.get_ctx (OuterEnv.get_global ())) st))
 
   let setup () =
-    if Env.flex_get k_live_lifting then
-      Env.add_multi_simpl_rule ~priority:5 lift_lambdas_simp;
-    if Env.flex_get k_post_cnf_lifting then
-      Env.add_clause_conversion lift_lambdas_cnf
+    let env = OuterEnv.get_global () in
+    if OuterEnv.flex_get_of env k_live_lifting then
+      OuterEnv.add_multi_simpl_rule env ~priority:5 lift_lambdas_simp;
+    if OuterEnv.flex_get_of env k_post_cnf_lifting then
+      OuterEnv.add_clause_conversion env lift_lambdas_cnf
 end
 
 let _live_lifting = ref false
 let _post_cnf_lifting = ref false
 
 let extension =
-  let register env =
-    let module E = (val env : Env.S) in
+  let register (env : Env.t) =
+    let module E = (val (module Env) : Env.S) in
     let module ET = Make (E) in
-    E.flex_add k_live_lifting !_live_lifting;
-    E.flex_add k_post_cnf_lifting !_post_cnf_lifting;
+    Env.flex_add_of env k_live_lifting !_live_lifting;
+    Env.flex_add_of env k_post_cnf_lifting !_post_cnf_lifting;
     ET.setup ()
   in
   {

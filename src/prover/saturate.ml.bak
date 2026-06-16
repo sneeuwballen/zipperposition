@@ -96,8 +96,7 @@ module Make (E : Env.S) = struct
       assert false
     );
     if
-      OuterEnv.flex_get_of (OuterEnv.get_global ())
-        Combinators.k_enable_combinators
+      Env.flex_get_of (OuterEnv.get_global ()) Combinators.k_enable_combinators
       && not
            (Env.C.Seq.terms c
            |> Iter.flat_map (fun t ->
@@ -116,33 +115,26 @@ module Make (E : Env.S) = struct
   (** One iteration of the main loop ("given clause loop") *)
   let given_clause_step ?(generating = true) num =
     let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "saturate.step" in
-    OuterEnv.step_init (OuterEnv.get_global ());
+    E.step_init ();
     (* select next given clause *)
-    OuterEnv.do_clause_eliminate (OuterEnv.get_global ());
-    match OuterEnv.next_passive (OuterEnv.get_global ()) () with
+    OuterEnv.do_clause_eliminate ();
+    match OuterEnv.next_passive () with
     | None ->
       (* final check: might generate other clauses *)
-      let clauses =
-        OuterEnv.do_generate (OuterEnv.get_global ()) ~full:true ()
-      in
+      let clauses = OuterEnv.do_generate ~full:true () in
       if Iter.is_empty clauses then (
         Util.debugf ~section 3 "saturated set: @[%a@]@." (fun k ->
-            k
-              (Iter.pp_seq Env.C.pp_tstp_full)
-              (OuterEnv.get_active (OuterEnv.get_global ()) ()));
+            k (Iter.pp_seq Env.C.pp_tstp_full) (OuterEnv.get_active ()));
         Sat
       ) else (
         let clauses =
           clauses
           |> Iter.filter_map (fun c ->
                  check_clause_ c;
-                 let c, _ =
-                   OuterEnv.unary_simplify (OuterEnv.get_global ()) c
-                 in
+                 let c, _ = OuterEnv.unary_simplify c in
                  if
-                   OuterEnv.is_trivial (OuterEnv.get_global ()) c
-                   || OuterEnv.is_active (OuterEnv.get_global ()) c
-                   || OuterEnv.is_passive (OuterEnv.get_global ()) c
+                   OuterEnv.is_trivial c || OuterEnv.is_active c
+                   || OuterEnv.is_passive c
                  then
                    None
                  else
@@ -152,7 +144,7 @@ module Make (E : Env.S) = struct
         Util.debugf 5 ~section
           "@[<2>inferred @{<green>new clauses@}@ @[<v>%a@]@]" (fun k ->
             k (CCFormat.list Env.C.pp) clauses);
-        OuterEnv.add_passive (OuterEnv.get_global ()) (Iter.of_list clauses);
+        OuterEnv.add_passive (Iter.of_list clauses);
         Unknown
       )
     | Some c ->
@@ -166,7 +158,7 @@ module Make (E : Env.S) = struct
 
       check_clause_ c;
       Util.incr_stat stat_steps;
-      (match OuterEnv.all_simplify (OuterEnv.get_global ()) c with
+      (match OuterEnv.all_simplify c with
       | [], _ ->
         Util.incr_stat stat_redundant_given;
         Util.debugf ~section 2 "@[@{<Yellow>### step %5d ###@}@]" (fun k ->
@@ -175,9 +167,7 @@ module Make (E : Env.S) = struct
             k Env.C.pp c);
         Util.debugf ~section 3 "@[proof:@[%a@]@]" (fun k ->
             k Proof.S.pp_zf (Env.C.proof c));
-        Signal.send
-          (OuterEnv.on_forward_simplified (OuterEnv.get_global ()))
-          (c, None);
+        Signal.send Env.on_forward_simplified (c, None);
         Unknown
       | l, _ when List.exists Env.C.is_empty l ->
         (* empty clause found *)
@@ -189,11 +179,9 @@ module Make (E : Env.S) = struct
         Util.debugf ~section 3 "@[ remaining after simplification:@.@[%a@]@. @]"
           (fun k -> k (CCList.pp Env.C.pp) l');
 
-        OuterEnv.add_passive (OuterEnv.get_global ()) (Iter.of_list l');
+        OuterEnv.add_passive (Iter.of_list l');
 
-        Signal.send
-          (OuterEnv.on_forward_simplified (OuterEnv.get_global ()))
-          (picked_clause, Some c);
+        Signal.send Env.on_forward_simplified (picked_clause, Some c);
 
         (* assert(not (Env.C.is_redundant c)); *)
 
@@ -204,7 +192,7 @@ module Make (E : Env.S) = struct
           (* process the clause [c] *)
           let new_clauses = CCVector.create () in
           (* very expensive assert *)
-          (* assert (not (OuterEnv.is_redundant (OuterEnv.get_global ()) c)); *)
+          (* assert (not (OuterEnv.is_redundant c)); *)
           (* process the given clause! *)
           Util.incr_stat stat_processed_given;
           Util.debugf ~section 2 "@[@{<Yellow>### step %5d ###@}@]" (fun k ->
@@ -216,16 +204,15 @@ module Make (E : Env.S) = struct
               k Proof.S.pp_tstp (Env.C.proof c));
           (* find clauses that are subsumed by given in active_set *)
           let subsumed_active =
-            C.ClauseSet.to_seq (OuterEnv.subsumed_by (OuterEnv.get_global ()) c)
-            |> Iter.of_seq
+            C.ClauseSet.to_seq (OuterEnv.subsumed_by c) |> Iter.of_seq
           in
-          OuterEnv.remove_active (OuterEnv.get_global ()) subsumed_active;
-          OuterEnv.remove_simpl (OuterEnv.get_global ()) subsumed_active;
+          OuterEnv.remove_active subsumed_active;
+          OuterEnv.remove_simpl subsumed_active;
           (* add given clause to simpl_set *)
-          OuterEnv.add_simpl (OuterEnv.get_global ()) (Iter.singleton c);
+          OuterEnv.add_simpl (Iter.singleton c);
           (* simplify active set using c *)
           let simplified_actives, newly_simplified =
-            OuterEnv.backward_simplify (OuterEnv.get_global ()) c
+            OuterEnv.backward_simplify c
           in
           let simplified_actives =
             C.ClauseSet.to_seq simplified_actives |> Iter.of_seq
@@ -235,8 +222,8 @@ module Make (E : Env.S) = struct
               from passive set *)
           check_clauses_ simplified_actives;
           check_clauses_ newly_simplified;
-          OuterEnv.remove_active (OuterEnv.get_global ()) simplified_actives;
-          OuterEnv.remove_simpl (OuterEnv.get_global ()) simplified_actives;
+          OuterEnv.remove_active simplified_actives;
+          OuterEnv.remove_simpl simplified_actives;
           CCVector.append_iter new_clauses newly_simplified;
 
           if not (Iter.is_empty simplified_actives) then
@@ -246,12 +233,12 @@ module Make (E : Env.S) = struct
               k (Iter.pp_seq Env.C.pp) newly_simplified);
 
           (* add given clause to active set *)
-          OuterEnv.add_active (OuterEnv.get_global ()) (Iter.singleton c);
+          OuterEnv.add_active (Iter.singleton c);
           (* do inferences between c and the active set (including c),
               if [generate] is set to true *)
           let inferred_clauses =
             if generating then
-              OuterEnv.generate (OuterEnv.get_global ()) c
+              OuterEnv.generate c
             else
               Iter.empty
           in
@@ -262,15 +249,12 @@ module Make (E : Env.S) = struct
               (fun c ->
                 Util.debugf ~section 4 "inferred: `@[%a@]`" (fun k ->
                     k Env.C.pp c);
-                let c, _ =
-                  OuterEnv.forward_simplify (OuterEnv.get_global ()) c
-                in
+                let c, _ = OuterEnv.forward_simplify c in
                 check_clause_ c;
                 (* keep clauses  that are not redundant *)
                 if
-                  OuterEnv.is_trivial (OuterEnv.get_global ()) c
-                  || OuterEnv.is_active (OuterEnv.get_global ()) c
-                  || OuterEnv.is_passive (OuterEnv.get_global ()) c
+                  OuterEnv.is_trivial c || OuterEnv.is_active c
+                  || OuterEnv.is_passive c
                 then (
                   Util.debugf ~section 4 "clause `@[%a@]` is trivial, dump"
                     (fun k -> k Env.C.pp c);
@@ -283,15 +267,13 @@ module Make (E : Env.S) = struct
               inferred_clauses
           in
           let inferred_clauses =
-            OuterEnv.immediate_simplify (OuterEnv.get_global ()) c
-              inferred_clauses
+            OuterEnv.immediate_simplify c inferred_clauses
           in
           let inferred_clauses =
             (* After forward simplification, do cheap multi simplification like AVATAR *)
             Iter.flat_map_l
               (fun c ->
-                CCOpt.get_or ~default:[ c ]
-                  (OuterEnv.cheap_multi_simplify (OuterEnv.get_global ()) c))
+                CCOpt.get_or ~default:[ c ] (OuterEnv.cheap_multi_simplify c))
               inferred_clauses
           in
           CCVector.append_iter new_clauses inferred_clauses;
@@ -300,10 +282,9 @@ module Make (E : Env.S) = struct
               k (Util.pp_iter Env.C.pp) (CCVector.to_iter new_clauses));
           (* add new clauses (including simplified active clauses)
               to passive set and simpl_set *)
-          OuterEnv.add_passive (OuterEnv.get_global ())
-            (CCVector.to_iter new_clauses);
+          OuterEnv.add_passive (CCVector.to_iter new_clauses);
           (* test whether the empty clause has been found *)
-          match OuterEnv.get_some_empty_clause (OuterEnv.get_global ()) with
+          match OuterEnv.get_some_empty_clause () with
           | None -> Unknown
           | Some c ->
             let pr = Env.C.proof c in
@@ -329,13 +310,11 @@ module Make (E : Env.S) = struct
 
           if should_try_e timeout then (
             let res =
-              EInterface.try_e
-                (OuterEnv.get_active (OuterEnv.get_global ()) ())
-                (OuterEnv.get_passive (OuterEnv.get_global ()) ())
+              EInterface.try_e (OuterEnv.get_active ())
+                (OuterEnv.get_passive ())
             in
             match res with
-            | Some c ->
-              OuterEnv.add_passive (OuterEnv.get_global ()) (Iter.singleton c)
+            | Some c -> OuterEnv.add_passive (Iter.singleton c)
             | _ -> ()
           );
 
@@ -352,33 +331,23 @@ module Make (E : Env.S) = struct
     given_clause ?steps:None ?timeout:None ~generating:false ()
 
   let check_fragment () =
-    if
-      not
-        (OuterEnv.get_passive (OuterEnv.get_global ()) ()
-        |> Iter.for_all (OuterEnv.check_fragment (OuterEnv.get_global ())))
+    if not (OuterEnv.get_passive () |> Iter.for_all OuterEnv.check_fragment)
     then
       invalid_arg "Problem out of fragment"
     else if
-      try
-        OuterEnv.flex_get_of (OuterEnv.get_global ())
-          k_abort_after_fragment_check
-      with Not_found -> false
+      try Env.flex_get k_abort_after_fragment_check with Not_found -> false
     then (
       print_endline "Problem in fragment";
       exit 0
     )
 
   let register_conjectures () =
-    OuterEnv.get_passive (OuterEnv.get_global ()) ()
-    |> Iter.iter ClauseQueue.register_conjecture_clause
+    OuterEnv.get_passive () |> Iter.iter ClauseQueue.register_conjecture_clause
 
   let () =
-    OuterEnv.flex_add_of (OuterEnv.get_global ())
-      OuterEnv.k_max_multi_simpl_depth !_max_multi_simpl;
-    Signal.on_every (OuterEnv.on_start (OuterEnv.get_global ())) check_fragment;
-    Signal.on_every
-      (OuterEnv.on_start (OuterEnv.get_global ()))
-      register_conjectures
+    Env.flex_add OuterEnv.k_max_multi_simpl_depth !_max_multi_simpl;
+    Signal.on_every Env.on_start check_fragment;
+    Signal.on_every Env.on_start register_conjectures
 end
 
 let () =

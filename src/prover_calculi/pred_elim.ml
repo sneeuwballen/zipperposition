@@ -47,26 +47,33 @@ module type S = sig
 end
 
 let register_parameters env =
-  let module E = (val env : Env.S) in
-  E.flex_add k_enabled !_enabled;
-  E.flex_add k_check_at !_check_at;
-  E.flex_add k_inprocessing !_inprocessing;
-  E.flex_add k_max_resolvents !_max_resolvents;
-  E.flex_add k_check_gates !_check_gates;
-  E.flex_add k_only_original_gates !_original_gates_only;
-  E.flex_add k_only_non_conjecture_gates !_only_non_conj_gates;
-  E.flex_add k_check_gates_semantically !_check_semantically;
-  E.flex_add k_non_singular_pe !_non_singular_pe;
-  E.flex_add k_relax_val !_relax_val;
-  E.flex_add k_prefer_spe !_prefer_spe
+  let module E = (val (module Env) : Env.S) in
+  Env.flex_add_of env k_enabled !_enabled;
+  Env.flex_add_of env k_check_at !_check_at;
+  Env.flex_add_of env k_inprocessing !_inprocessing;
+  Env.flex_add_of env k_max_resolvents !_max_resolvents;
+  Env.flex_add_of env k_check_gates !_check_gates;
+  Env.flex_add_of env k_only_original_gates !_original_gates_only;
+  Env.flex_add_of env k_only_non_conjecture_gates !_only_non_conj_gates;
+  Env.flex_add_of env k_check_gates_semantically !_check_semantically;
+  Env.flex_add_of env k_non_singular_pe !_non_singular_pe;
+  Env.flex_add_of env k_relax_val !_relax_val;
+  Env.flex_add_of env k_prefer_spe !_prefer_spe
 
-module Make (E : Env.S) : S with module Env = E = struct
+module Make (E : Env.S) = struct
+  module OuterEnv = Env
   module Env = E
   module C = Env.C
   module CS = C.ClauseSet
   module L = Literal
   module T = Term
-  module SAT = Sat_solver.Make ()
+  module SAT = Sat_solver
+
+  let _sat_st = SAT.create ()
+  let _sat_clear () = SAT.clear _sat_st ()
+  let _sat_add_clause = SAT.add_clause _sat_st
+  let _sat_check = SAT.check _sat_st
+  let _sat_get_proof () = SAT.get_proof _sat_st
 
   type logic =
     | Nonequational (* nonequational monomorphic FO without theories *)
@@ -117,8 +124,8 @@ module Make (E : Env.S) : S with module Env = E = struct
     CCFormat.fprintf out
       "%a(%b) {@. +: @[%a@];@. -:@[%a@];@. ?:@[%a@]@. g:@[%a@]@. v^2:@[%g@]; \
        |l|:@[%d@]; |%a|:@[%d@]; h_idx: @[%d@] @.}@."
-      Name.pp task.sym original (CS.pp C.pp) task.pos_cls (CS.pp C.pp)
-      task.neg_cls (CS.pp C.pp) task.offending_cls
+      Name.pp task.sym original C.pp_set task.pos_cls C.pp_set task.neg_cls
+      C.pp_set task.offending_cls
       (CCOpt.pp (CCPair.pp (CCList.pp C.pp) (CCList.pp C.pp)))
       task.maybe_gate task.sq_var_weight task.num_lits Name.pp task.sym
       (estimated_gain task) task.heap_idx
@@ -298,15 +305,16 @@ module Make (E : Env.S) : S with module Env = E = struct
 
   let should_schedule task =
     let eligible_for_non_singular_pe task =
-      Env.flex_get k_non_singular_pe
+      OuterEnv.flex_get_of (OuterEnv.get_global ()) k_non_singular_pe
       &&
       match task.maybe_gate with
       | Some (pos, neg) ->
         let limit =
-          if Env.flex_get k_max_resolvents < 0 then
+          if OuterEnv.flex_get_of (OuterEnv.get_global ()) k_max_resolvents < 0
+          then
             max_int
           else
-            Env.flex_get k_max_resolvents
+            OuterEnv.flex_get_of (OuterEnv.get_global ()) k_max_resolvents
         in
         let pos_num, neg_num = List.length pos, List.length neg in
         let max_resolvents =
@@ -357,9 +365,12 @@ module Make (E : Env.S) : S with module Env = E = struct
         + (List.length neg_gates * card entry.pos_cls)
       | None -> card entry.neg_cls * card entry.pos_cls
     in
-    if Env.flex_get k_max_resolvents < 0 then
+    if OuterEnv.flex_get_of (OuterEnv.get_global ()) k_max_resolvents < 0 then
       ()
-    else if possible_resolvents > Env.flex_get k_max_resolvents then
+    else if
+      possible_resolvents
+      > OuterEnv.flex_get_of (OuterEnv.get_global ()) k_max_resolvents
+    then
       remove_symbol entry
 
   let scan_cl_lits ?(handle_gates = true) cl =
@@ -536,10 +547,10 @@ module Make (E : Env.S) : S with module Env = E = struct
             || CCList.mem ~eq:C.equal cl neg_cls
           then (
             (* reintroduce gate clauses *)
-            task.pos_cls <- CS.add_list task.pos_cls pos_cls;
-            task.neg_cls <- CS.add_list task.neg_cls neg_cls;
+            task.pos_cls <- CS.union task.pos_cls (CS.of_list pos_cls);
+            task.neg_cls <- CS.union task.neg_cls (CS.of_list neg_cls);
             if
-              Env.flex_get k_non_singular_pe
+              OuterEnv.flex_get_of (OuterEnv.get_global ()) k_non_singular_pe
               && TaskSet.in_heap task
               && not (CS.is_empty task.offending_cls)
             then
@@ -598,7 +609,7 @@ module Make (E : Env.S) : S with module Env = E = struct
   let replace_clauses task clauses =
     Util.debugf ~section 2
       "replaced clauses(%a):@. regular:@[%a@]@. gates:@[%a@]@." (fun k ->
-        k Name.pp task.sym (CS.pp C.pp)
+        k Name.pp task.sym C.pp_set
           (CS.union task.pos_cls task.neg_cls)
           (CCOpt.pp (CCPair.pp (CCList.pp C.pp) (CCList.pp C.pp)))
           task.maybe_gate);
@@ -606,9 +617,9 @@ module Make (E : Env.S) : S with module Env = E = struct
         k (CCList.pp C.pp) clauses);
     _ignored_symbols := Name.Set.add task.sym !_ignored_symbols;
     let remove iter =
-      Env.remove_active iter;
-      Env.remove_passive iter;
-      Env.remove_simpl iter;
+      OuterEnv.remove_active (OuterEnv.get_global ()) iter;
+      OuterEnv.remove_passive (OuterEnv.get_global ()) iter;
+      OuterEnv.remove_simpl (OuterEnv.get_global ()) iter;
       Iter.iter
         (fun c ->
           C.mark_redundant c;
@@ -618,16 +629,18 @@ module Make (E : Env.S) : S with module Env = E = struct
           ))
         iter
     in
-    assert (CS.is_empty task.offending_cls || Env.flex_get k_non_singular_pe);
-    remove (CS.to_iter task.offending_cls);
-    remove (CS.to_iter task.pos_cls);
-    remove (CS.to_iter task.neg_cls);
+    assert (
+      CS.is_empty task.offending_cls
+      || OuterEnv.flex_get_of (OuterEnv.get_global ()) k_non_singular_pe);
+    remove (CS.to_seq task.offending_cls |> Iter.of_seq);
+    remove (CS.to_seq task.pos_cls |> Iter.of_seq);
+    remove (CS.to_seq task.neg_cls |> Iter.of_seq);
     (match task.maybe_gate with
     | Some (pos_cls, neg_cls) ->
       remove (CCList.to_iter pos_cls);
       remove (CCList.to_iter neg_cls)
     | None -> ());
-    _newly_added := CS.add_list !_newly_added clauses;
+    _newly_added := List.fold_left (fun s x -> CS.add x s) !_newly_added clauses;
     List.iter (fun cl -> ignore (react_clause_added cl)) clauses;
 
     _pred_sym_idx := Name.Map.remove task.sym !_pred_sym_idx
@@ -670,7 +683,7 @@ module Make (E : Env.S) : S with module Env = E = struct
           ]
       in
       let c =
-        C.create
+        C.create ~ctx:(C.ctx_of pos_cl)
           ~penalty:(max (C.penalty pos_cl) (C.penalty neg_cl))
           ~trail:(C.trail_l [ pos_cl; neg_cl ])
           lits proof
@@ -753,7 +766,7 @@ module Make (E : Env.S) : S with module Env = E = struct
             @ CCArray.except_idx (C.lits pos_cl') pos_idx
             @ CCArray.except_idx (C.lits neg_cl') neg_idx
           in
-          C.create
+          C.create ~ctx:(C.ctx_of pos_cl')
             ~penalty:(max (C.penalty pos_cl') (C.penalty neg_cl'))
             ~trail:(C.trail_l [ pos_cl'; neg_cl' ])
             lits (proof subst renaming)
@@ -908,7 +921,7 @@ module Make (E : Env.S) : S with module Env = E = struct
     (* not yet implemented *)
     let check_ite () = false in
     let check_sat () =
-      SAT.clear ();
+      _sat_clear ();
       let orig_sc, new_sc = 0, 1 in
       let rename_clause ~name_lit c =
         let lits = C.lits c in
@@ -961,11 +974,11 @@ module Make (E : Env.S) : S with module Env = E = struct
           (fun (i, lits, c) ->
             if not (is_tauto c) then
               CCList.filter_map BBox.inject_lit (CCArray.to_list lits)
-              |> SAT.add_clause ~proof:(C.proof_step c))
+              |> _sat_add_clause ~proof:(C.proof_step c))
           cls;
-        match SAT.check ~full:true () with
-        | Sat_solver_intf.Unsat _ ->
-          let proof = Proof.S.step (SAT.get_proof ()) in
+        match _sat_check ~full:true () with
+        | Unsat _ ->
+          let proof = Proof.S.step (_sat_get_proof ()) in
           let parents =
             List.map
               (fun p -> Proof.S.step @@ Proof.Parent.proof p)
@@ -1040,18 +1053,26 @@ module Make (E : Env.S) : S with module Env = E = struct
       | _ -> false
     in
     if
-      Env.flex_get k_check_gates
-      && ((not (Env.flex_get k_only_original_gates))
+      OuterEnv.flex_get_of (OuterEnv.get_global ()) k_check_gates
+      && ((not
+             (OuterEnv.flex_get_of (OuterEnv.get_global ())
+                k_only_original_gates))
          || not
             @@ Name_payload.exists
                  ~f:(function
                    | Name.Attr_cnf_def -> true
                    | _ -> false)
                  task.sym)
-      && ((not (Env.flex_get k_only_non_conjecture_gates))
-         || (not @@ Signature.sym_in_conj task.sym (Env.signature ())))
+      && ((not
+             (OuterEnv.flex_get_of (OuterEnv.get_global ())
+                k_only_non_conjecture_gates))
+         || not
+            @@ Signature.sym_in_conj task.sym
+                 (Ctx.signature (OuterEnv.get_ctx (OuterEnv.get_global ()))))
     then
-      if Env.flex_get k_check_gates_semantically then
+      if
+        OuterEnv.flex_get_of (OuterEnv.get_global ()) k_check_gates_semantically
+      then
         ignore (check_sat ())
       else
         ignore (check_and () || check_or () || check_ite ())
@@ -1088,7 +1109,12 @@ module Make (E : Env.S) : S with module Env = E = struct
 
     let rename_pos_sym_vars new_vars cl =
       let _, t = find_lit_by_sym sym true cl in
-      let sym_ty = Option.get (Signature.find (Env.signature ()) sym) in
+      let sym_ty =
+        Option.get
+          (Signature.find
+             (Ctx.signature (OuterEnv.get_ctx (OuterEnv.get_global ())))
+             sym)
+      in
       let sym_cst = Term.const ~ty:sym_ty sym in
       let new_t = Term.app sym_cst new_vars in
       let subst = Unif.FO.matching ~pattern:(t, 0) (new_t, 1) in
@@ -1161,7 +1187,7 @@ module Make (E : Env.S) : S with module Env = E = struct
           ~rule:(Proof.Rule.mk "pred_inlining")
           (List.map C.proof_parent ((cl :: pos) @ neg))
       in
-      C.create ~penalty:(C.penalty cl)
+      C.create ~ctx:(C.ctx_of cl) ~penalty:(C.penalty cl)
         ~trail:(C.trail_l ((cl :: pos) @ neg))
         new_lits proof
     in
@@ -1203,7 +1229,8 @@ module Make (E : Env.S) : S with module Env = E = struct
 
     aux (CS.to_list offending) []
 
-  let measure_decreases () = Env.flex_get k_measure_fun
+  let measure_decreases () =
+    OuterEnv.flex_get_of (OuterEnv.get_global ()) k_measure_fun
 
   let do_pred_elim () =
     let removed_cls = ref None in
@@ -1214,7 +1241,9 @@ module Make (E : Env.S) : S with module Env = E = struct
     in
 
     let process_task task =
-      assert (CS.is_empty task.offending_cls || Env.flex_get k_non_singular_pe);
+      assert (
+        CS.is_empty task.offending_cls
+        || OuterEnv.flex_get_of (OuterEnv.get_global ()) k_non_singular_pe);
       let pos_cls, neg_cls =
         CCPair.map_same CS.to_list (task.pos_cls, task.neg_cls)
       in
@@ -1222,14 +1251,21 @@ module Make (E : Env.S) : S with module Env = E = struct
       let resolvents =
         match task.maybe_gate with
         | Some (pos_gates, neg_gates) ->
-          if Env.flex_get k_prefer_spe && CS.is_empty task.offending_cls then (
+          if
+            OuterEnv.flex_get_of (OuterEnv.get_global ()) k_prefer_spe
+            && CS.is_empty task.offending_cls
+          then (
             let results =
               calc_resolvents ~sym ~pos:pos_gates ~neg:neg_cls
               @ calc_resolvents ~sym ~pos:pos_cls ~neg:neg_gates
               @ calc_resolvents ~sym ~pos:pos_cls ~neg:neg_cls
             in
 
-            if measure_decreases () (Env.flex_get k_relax_val) task results then
+            if
+              measure_decreases ()
+                (OuterEnv.flex_get_of (OuterEnv.get_global ()) k_relax_val)
+                task results
+            then
               results
             else
               calc_resolvents ~sym ~pos:pos_gates ~neg:neg_cls
@@ -1243,7 +1279,11 @@ module Make (E : Env.S) : S with module Env = E = struct
           assert (CS.is_empty task.offending_cls);
           calc_resolvents ~sym ~pos:pos_cls ~neg:neg_cls
       in
-      if measure_decreases () (Env.flex_get k_relax_val) task resolvents then (
+      if
+        measure_decreases ()
+          (OuterEnv.flex_get_of (OuterEnv.get_global ()) k_relax_val)
+          task resolvents
+      then (
         Util.debugf ~section 1 "task info: @[%a@]" (fun k -> k pp_task task);
         updated_removed (calc_num_cls task - List.length resolvents);
         replace_clauses task resolvents
@@ -1262,7 +1302,8 @@ module Make (E : Env.S) : S with module Env = E = struct
     done;
 
     (* storing all newly computed clauses *)
-    Env.add_passive (CS.to_iter !_newly_added);
+    OuterEnv.add_passive (OuterEnv.get_global ())
+      (CS.to_seq !_newly_added |> Iter.of_seq);
     _newly_added := CS.empty;
     !removed_cls
 
@@ -1270,14 +1311,15 @@ module Make (E : Env.S) : S with module Env = E = struct
 
   (* driver that does that every k-th step of given-clause loop *)
   let do_predicate_elimination () =
-    steps := (!steps + 1) mod Env.flex_get k_check_at;
+    steps :=
+      (!steps + 1) mod OuterEnv.flex_get_of (OuterEnv.get_global ()) k_check_at;
 
     if !steps = 0 then ignore (do_pred_elim ())
 
   let initialize () =
     let init_clauses =
-      CS.to_list (Env.ProofState.ActiveSet.clauses ())
-      @ CS.to_list (Env.ProofState.PassiveSet.clauses ())
+      Clause.ClauseSet.to_list (Env.ProofState.ActiveSet.clauses ())
+      @ Clause.ClauseSet.to_list (Env.ProofState.PassiveSet.clauses ())
     in
     Util.debugf ~section 5 "init_cl: @[%a@]@." (fun k ->
         k (CCList.pp C.pp) init_clauses);
@@ -1310,7 +1352,8 @@ module Make (E : Env.S) : S with module Env = E = struct
     Signal.on Env.ProofState.PassiveSet.on_remove_clause react_clause_removed;
     Signal.on Env.ProofState.ActiveSet.on_add_clause react_clause_added;
     Signal.on Env.ProofState.ActiveSet.on_remove_clause react_clause_removed;
-    Signal.on_every Env.on_forward_simplified (fun (c, new_state) ->
+    Signal.on_every OuterEnv.on_forward_simplified (OuterEnv.get_global ())
+      (fun (c, new_state) ->
         if not !_done then (
           match new_state with
           | Some c' ->
@@ -1322,28 +1365,31 @@ module Make (E : Env.S) : S with module Env = E = struct
     ignore (do_pred_elim ());
 
     Util.debugf ~section 5 "after elim: @[%a@]@." (fun k ->
-        k (CS.pp C.pp) (Env.ProofState.PassiveSet.clauses ()));
+        k Clause.pp_set (Env.ProofState.PassiveSet.clauses ()));
     Util.debugf ~section 5 "state:@[%a@]@." (fun k ->
         k (Iter.pp_seq pp_task) (Name.Map.values !_pred_sym_idx));
 
     let clause_diff =
       init_clause_num
-      - (Iter.length (Env.get_active ()) + Iter.length (Env.get_passive ()))
+      - (Iter.length (OuterEnv.get_active (OuterEnv.get_global ()) ())
+        + Iter.length (OuterEnv.get_passive (OuterEnv.get_global ()) ()))
     in
     Util.debugf ~section 1 "%% PE eliminated: %d@." (fun k -> k clause_diff);
 
-    if Env.flex_get k_inprocessing then
+    if OuterEnv.flex_get_of (OuterEnv.get_global ()) k_inprocessing then
       (* Env.Ctx.lost_completeness (); *)
-      Env.add_clause_elimination_rule ~priority:2 "pred_elim"
-        do_predicate_elimination
-    else if not @@ Env.flex_get k_fp_mode then
+      OuterEnv.add_clause_elimination_rule (OuterEnv.get_global ()) ~priority:2
+        "pred_elim" do_predicate_elimination
+    else if not @@ OuterEnv.flex_get_of (OuterEnv.get_global ()) k_fp_mode then
       Util.debugf ~section 1 "processing is done" CCFun.id;
     (* releasing possibly used memory *)
     _done := true;
     _pred_sym_idx := Name.Map.empty;
     Signal.StopListening
 
-  let register () = Signal.on Env.on_start initialize
+  let register () =
+    Signal.on OuterEnv.on_start (OuterEnv.get_global ()) initialize
+
   let fixpoint_active = ref false
 
   let begin_fixpoint () =
@@ -1352,7 +1398,7 @@ module Make (E : Env.S) : S with module Env = E = struct
     register_parameters env;
     (*  has to be called after register parameters as 
         measure functions are not visible outside the module *)
-    Env.flex_add k_measure_fun
+    OuterEnv.flex_add_of (OuterEnv.get_global ()) k_measure_fun
       (match !_measure_name with
       | "kk" -> kk_measure
       | "relaxed" -> relaxed_measure
@@ -1360,8 +1406,8 @@ module Make (E : Env.S) : S with module Env = E = struct
       | _ -> invalid_arg "measure function not found");
 
     let init_clauses =
-      CS.to_list (Env.ProofState.ActiveSet.clauses ())
-      @ CS.to_list (Env.ProofState.PassiveSet.clauses ())
+      Clause.ClauseSet.to_list (Env.ProofState.ActiveSet.clauses ())
+      @ Clause.ClauseSet.to_list (Env.ProofState.PassiveSet.clauses ())
     in
 
     List.iter
@@ -1391,7 +1437,7 @@ module Make (E : Env.S) : S with module Env = E = struct
 
   let fixpoint_step () =
     Util.debugf ~section 1 "relax val: %d@." (fun k ->
-        k (Env.flex_get k_relax_val));
+        k (OuterEnv.flex_get_of (OuterEnv.get_global ()) k_relax_val));
     let ans = do_pred_elim () in
     Util.debugf ~section 1 "Clause number changed for %a" (fun k ->
         k (CCOpt.pp CCInt.pp) ans);
@@ -1406,33 +1452,36 @@ module Make (E : Env.S) : S with module Env = E = struct
     fixpoint_active := false
 
   let setup ?(in_fp_mode = false) () =
-    Env.flex_add k_fp_mode in_fp_mode;
-    Env.flex_add k_measure_fun
+    OuterEnv.flex_add_of (OuterEnv.get_global ()) k_fp_mode in_fp_mode;
+    OuterEnv.flex_add_of (OuterEnv.get_global ()) k_measure_fun
       (match !_measure_name with
       | "kk" -> kk_measure
       | "relaxed" -> relaxed_measure
       | "conservative" -> conservative_measure
       | _ -> invalid_arg "measure function not found");
 
-    if Env.flex_get k_enabled then
-      if not (Env.flex_get A.k_avatar_enabled) then
+    if OuterEnv.flex_get_of (OuterEnv.get_global ()) k_enabled then
+      if not (OuterEnv.flex_get_of (OuterEnv.get_global ()) A.k_avatar_enabled)
+      then
         register ()
       else
         CCFormat.printf "AVATAR is not yet compatible with PredElim@."
 end
 
 let extension =
-  let action env =
-    let module E = (val env : Env.S) in
+  let action (env : Env.t) =
+    let module E = (val (module Env) : Env.S) in
     register_parameters env;
     let module PredElim = Make (E) in
-    E.flex_add k_enabled !_enabled;
-    E.flex_add k_check_at !_check_at;
-    E.flex_add k_inprocessing !_inprocessing;
-    E.flex_add k_max_resolvents !_max_resolvents;
-    E.flex_add k_check_gates !_check_gates;
-    E.flex_add k_non_singular_pe !_non_singular_pe;
-    E.flex_add k_relax_val !_relax_val;
+    OuterEnv.flex_add_of (OuterEnv.get_global ()) k_enabled !_enabled;
+    OuterEnv.flex_add_of (OuterEnv.get_global ()) k_check_at !_check_at;
+    OuterEnv.flex_add_of (OuterEnv.get_global ()) k_inprocessing !_inprocessing;
+    OuterEnv.flex_add_of (OuterEnv.get_global ()) k_max_resolvents
+      !_max_resolvents;
+    OuterEnv.flex_add_of (OuterEnv.get_global ()) k_check_gates !_check_gates;
+    OuterEnv.flex_add_of (OuterEnv.get_global ()) k_non_singular_pe
+      !_non_singular_pe;
+    OuterEnv.flex_add_of (OuterEnv.get_global ()) k_relax_val !_relax_val;
 
     PredElim.setup ()
   in

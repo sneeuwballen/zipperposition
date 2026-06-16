@@ -216,7 +216,7 @@ module WeightFun = struct
     res
 
   let avoid_expensive c =
-    let max_lits = Clause.maxlits ~ctx:(Clause.ctx_of c) (c, 0) Subst.empty in
+    let max_lits = Clause.maxlits (c, 0) Subst.empty in
     let signature = Ctx.signature (Clause.ctx_of c) in
     CCArray.foldi
       (fun acc i l ->
@@ -272,7 +272,7 @@ module WeightFun = struct
       if C.has_selected_lits c then
         C.selected_lits_bv c
       else
-        Clause.maxlits ~ctx:(Clause.ctx_of c) (c, 0) Subst.empty
+        Clause.maxlits (c, 0) Subst.empty
     in
     let ord = Ctx.ord (Clause.ctx_of c) in
     let res =
@@ -340,7 +340,7 @@ module WeightFun = struct
       if C.has_selected_lits c then
         C.selected_lits_bv c
       else
-        Clause.maxlits ~ctx:(Clause.ctx_of c) (c, 0) Subst.empty
+        Clause.maxlits (c, 0) Subst.empty
     in
     let ord = Ctx.ord (Clause.ctx_of c) in
     let res =
@@ -466,7 +466,7 @@ module WeightFun = struct
       if C.has_selected_lits c then
         C.selected_lits_bv c
       else
-        Clause.maxlits ~ctx:(Clause.ctx_of c) (c, 0) Subst.empty
+        Clause.maxlits (c, 0) Subst.empty
     in
     let pos_mul, max_mul, v, f =
       match parameters_magnitude with
@@ -523,7 +523,7 @@ module WeightFun = struct
       if C.has_selected_lits c then
         C.selected_lits_bv c
       else
-        Clause.maxlits ~ctx:(Clause.ctx_of c) (c, 0) Subst.empty
+        Clause.maxlits (c, 0) Subst.empty
     in
 
     let struct_diff_weight t =
@@ -675,7 +675,7 @@ module WeightFun = struct
       if C.has_selected_lits c then
         C.selected_lits_bv c
       else
-        Clause.maxlits ~ctx:(Clause.ctx_of c) (c, 0) Subst.empty
+        Clause.maxlits (c, 0) Subst.empty
     in
     C.Seq.lits c
     |> Iter.foldi
@@ -768,7 +768,7 @@ module WeightFun = struct
       if C.has_selected_lits c then
         C.selected_lits_bv c
       else
-        Clause.maxlits ~ctx:(Clause.ctx_of c) (c, 0) Subst.empty
+        Clause.maxlits (c, 0) Subst.empty
     in
     let get_syms l r = Name.Set.union (Term.symbols l) (Term.symbols r) in
     let get_vars l r = Term.VarSet.union (Term.vars l) (Term.vars r) in
@@ -1111,7 +1111,7 @@ module WeightFun = struct
       if C.has_selected_lits c then
         C.selected_lits_bv c
       else
-        Clause.maxlits ~ctx:(Clause.ctx_of c) (c, 0) Subst.empty
+        Clause.maxlits (c, 0) Subst.empty
     in
     let ord = Ctx.ord (Clause.ctx_of c) in
     let res =
@@ -1167,7 +1167,7 @@ module WeightFun = struct
       if C.has_selected_lits c then
         C.selected_lits_bv c
       else
-        Clause.maxlits ~ctx:(Clause.ctx_of c) (c, 0) Subst.empty
+        Clause.maxlits (c, 0) Subst.empty
     in
     let ord = Ctx.ord (Clause.ctx_of c) in
     let res =
@@ -1871,10 +1871,7 @@ and mixed = {
   mutable current_heap_idx: int;
 }
 
-and t = {
-  ctx: Ctx.t;
-  data: data;
-}
+and t = { data: data }
 
 (** generic clause queue based on some ordering on clauses, given by a weight
     function *)
@@ -1882,20 +1879,20 @@ let is_empty_mixed q = C.Tbl.length q.tbl = 0
 
 let is_empty (q : t) =
   match q with
-  | { data = FIFO q; ctx } -> Queue.is_empty q
-  | { data = Mixed q; ctx } -> is_empty_mixed q
+  | { data = FIFO q } -> Queue.is_empty q
+  | { data = Mixed q } -> is_empty_mixed q
 
 let length q =
   match q with
-  | { data = FIFO q; ctx } -> Queue.length q
-  | { data = Mixed q; ctx } -> C.Tbl.length q.tbl
+  | { data = FIFO q } -> Queue.length q
+  | { data = Mixed q } -> C.Tbl.length q.tbl
 
 let add q c =
   match q with
-  | { data = FIFO q; ctx } ->
+  | { data = FIFO q } ->
     Queue.push c q;
     true
-  | { data = Mixed q; ctx } ->
+  | { data = Mixed q } ->
     if not (C.Tbl.mem q.tbl c) then (
       C.Tbl.add q.tbl c ();
       let weights = Array.map (fun f -> f c) q.weight_funs in
@@ -1988,24 +1985,24 @@ let add_to_mixed_eval ~ratio ~weight_fun mixed_eval : unit =
   ()
 
 let take_first = function
-  | { data = FIFO q; ctx } ->
+  | { data = FIFO q } ->
     if Queue.is_empty q then
       raise Not_found
     else
       Queue.pop q
-  | { data = Mixed q; ctx } -> take_first_mixed q
+  | { data = Mixed q } -> take_first_mixed q
 
 let name q =
   match q with
-  | { data = FIFO _; ctx } -> "bfs"
-  | { data = Mixed q; ctx } -> "mixed"
+  | { data = FIFO _ } -> "bfs"
+  | { data = Mixed q } -> "mixed"
 
 (** {5 Combination of queues} *)
 
 let const_prioritize_fun wf = fun c -> wf c, 1
 let fifo_wf c = C.id c, 1
 
-let goal_oriented ~ctx () : t =
+let goal_oriented () : t =
   let open WeightFun in
   let weight =
     penalize
@@ -2019,11 +2016,11 @@ let goal_oriented ~ctx () : t =
   let mixed = mixed_eval () in
   add_to_mixed_eval ~ratio:5 ~weight_fun mixed;
   add_to_mixed_eval ~ratio:1 ~weight_fun:fifo_wf mixed;
-  { ctx; data = Mixed mixed }
+  { data = Mixed mixed }
 
-let bfs ~ctx () : t = { ctx; data = FIFO (Queue.create ()) }
+let bfs () : t = { data = FIFO (Queue.create ()) }
 
-let almost_bfs ~ctx () : t =
+let almost_bfs () : t =
   let open WeightFun in
   let weight = penalize (combine [ default, 3 ]) in
   (* make ~ratio:1 ~weight "almost_bfs" *)
@@ -2031,18 +2028,18 @@ let almost_bfs ~ctx () : t =
   let mixed = mixed_eval () in
   add_to_mixed_eval ~ratio:1 ~weight_fun mixed;
   add_to_mixed_eval ~ratio:1 ~weight_fun:fifo_wf mixed;
-  { ctx; data = Mixed mixed }
+  { data = Mixed mixed }
 
-let explore ~ctx () : t =
+let explore () : t =
   let open WeightFun in
   (* make ~ratio:6 ~weight "explore" *)
   let weight_fun = const_prioritize_fun explore_fun in
   let mixed = mixed_eval () in
   add_to_mixed_eval ~ratio:5 ~weight_fun mixed;
   add_to_mixed_eval ~ratio:1 ~weight_fun:fifo_wf mixed;
-  { ctx; data = Mixed mixed }
+  { data = Mixed mixed }
 
-let ground ~ctx () : t =
+let ground () : t =
   let open WeightFun in
   let weight =
     penalize
@@ -2053,16 +2050,16 @@ let ground ~ctx () : t =
   let mixed = mixed_eval () in
   add_to_mixed_eval ~ratio:5 ~weight_fun mixed;
   add_to_mixed_eval ~ratio:1 ~weight_fun:fifo_wf mixed;
-  { ctx; data = Mixed mixed }
+  { data = Mixed mixed }
 
-let default ~ctx () : t =
+let default () : t =
   let open WeightFun in
   (* make ~ratio:6 ~weight "default" *)
   let weight_fun = const_prioritize_fun default_fun in
   let mixed = mixed_eval () in
   add_to_mixed_eval ~ratio:5 ~weight_fun mixed;
   add_to_mixed_eval ~ratio:1 ~weight_fun:fifo_wf mixed;
-  { ctx; data = Mixed mixed }
+  { data = Mixed mixed }
 
 let conj_relative_mk () : t =
   (* make ~ratio:6 ~weight:WeightFun.conj_relative "conj_relative" *)
@@ -2070,7 +2067,7 @@ let conj_relative_mk () : t =
   let mixed = mixed_eval () in
   add_to_mixed_eval ~ratio:5 ~weight_fun mixed;
   add_to_mixed_eval ~ratio:1 ~weight_fun:fifo_wf mixed;
-  { ctx; data = Mixed mixed }
+  { data = Mixed mixed }
 
 let conj_var_relative_mk () : t =
   (* make ~ratio:!cr_var_ratio ~weight:(WeightFun.conj_relative ~distinct_vars_mul:!cr_var_mul)
@@ -2083,7 +2080,7 @@ let conj_var_relative_mk () : t =
   let mixed = mixed_eval () in
   add_to_mixed_eval ~ratio:!cr_var_ratio ~weight_fun mixed;
   add_to_mixed_eval ~ratio:1 ~weight_fun:fifo_wf mixed;
-  { ctx; data = Mixed mixed }
+  { data = Mixed mixed }
 
 let ho_weight () =
   (* make ~ratio:4 ~weight:WeightFun.ho_weight_calc "ho-weight" *)
@@ -2091,7 +2088,7 @@ let ho_weight () =
   let mixed = mixed_eval () in
   add_to_mixed_eval ~ratio:3 ~weight_fun mixed;
   add_to_mixed_eval ~ratio:1 ~weight_fun:fifo_wf mixed;
-  { ctx; data = Mixed mixed }
+  { data = Mixed mixed }
 
 let ho_weight_init () =
   (* make ~ratio:5 ~weight:WeightFun.ho_weight_initial "ho-weight-init" *)
@@ -2099,7 +2096,7 @@ let ho_weight_init () =
   let mixed = mixed_eval () in
   add_to_mixed_eval ~ratio:4 ~weight_fun mixed;
   add_to_mixed_eval ~ratio:1 ~weight_fun:fifo_wf mixed;
-  { ctx; data = Mixed mixed }
+  { data = Mixed mixed }
 
 let avoid_expensive_mk () : t =
   (* make ~ratio:20 ~weight:WeightFun.avoid_expensive "avoid-expensive" *)
@@ -2107,7 +2104,7 @@ let avoid_expensive_mk () : t =
   let mixed = mixed_eval () in
   add_to_mixed_eval ~ratio:10 ~weight_fun mixed;
   add_to_mixed_eval ~ratio:1 ~weight_fun:fifo_wf mixed;
-  { ctx; data = Mixed mixed }
+  { data = Mixed mixed }
 
 let of_profile p =
   let open ClauseQueue_intf in
@@ -2134,24 +2131,24 @@ let of_profile p =
           ~weight_fun:(fun c -> prio_fun c, weight_fun c)
           mixed)
       !funs_to_parse;
-    Mixed mixed
+    { data = Mixed mixed }
   )
 
 let all_clauses q =
   match q with
-  | { data = FIFO q; ctx } -> CCSeq.to_iter (Queue.to_seq q)
-  | { data = Mixed q; ctx } -> Iter.map fst (C.Tbl.to_iter q.tbl)
+  | { data = FIFO q } -> CCSeq.to_iter (Queue.to_seq q)
+  | { data = Mixed q } -> Iter.map fst (C.Tbl.to_iter q.tbl)
 
 let mem_cl q cl =
   match q with
-  | { data = FIFO q; ctx } ->
+  | { data = FIFO q } ->
     Iter.exists (C.equal cl) (CCSeq.to_iter (Queue.to_seq q))
-  | { data = Mixed q; ctx } -> C.Tbl.mem q.tbl cl
+  | { data = Mixed q } -> C.Tbl.mem q.tbl cl
 
 let remove q cl =
   match q with
-  | { data = FIFO q; ctx } -> invalid_arg "legacy queue, removal unsupported"
-  | { data = Mixed q; ctx } ->
+  | { data = FIFO q } -> invalid_arg "legacy queue, removal unsupported"
+  | { data = Mixed q } ->
     if C.Tbl.mem q.tbl cl then (
       C.Tbl.remove q.tbl cl;
       true

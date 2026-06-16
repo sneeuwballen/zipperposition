@@ -34,6 +34,7 @@ let reg_thf_clause = Str.regexp "thf(zip_cl_\\([0-9]+\\),.*"
 module IntSet = CCSet.Make (CCInt)
 
 module Make (E : Env.S) : S with module Env = E = struct
+  module OuterEnv = Env
   module Env = E
   module C = Env.C
   module Ctx = Env.Ctx
@@ -43,7 +44,13 @@ module Make (E : Env.S) : S with module Env = E = struct
 
   let ( ==> ) = Type.( ==> )
   let init_clauses = ref C.ClauseSet.empty
-  let initialize () = init_clauses := C.ClauseSet.of_iter (Env.get_passive ())
+
+  let initialize () =
+    init_clauses :=
+      Iter.fold
+        (fun set cl -> C.ClauseSet.add cl set)
+        C.ClauseSet.empty
+        (OuterEnv.get_passive (OuterEnv.get_global ()) ())
 
   exception CantEncode of string
 
@@ -59,7 +66,7 @@ module Make (E : Env.S) : S with module Env = E = struct
       let (id, ty), res =
         T.mk_fresh_skolem ~prefix:"ty_enc" [] (T.ty mono_head)
       in
-      Env.Ctx.declare id ty;
+      Env.Ctx.declare (OuterEnv.get_ctx (OuterEnv.get_global ())) id ty;
       res
     in
 
@@ -133,7 +140,8 @@ module Make (E : Env.S) : S with module Env = E = struct
       if Literals.equal (CCArray.of_list lits) (C.lits cl) then
         cl
       else
-        C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lits proof
+        C.create ~ctx:(C.ctx_of cl) ~penalty:(C.penalty cl) ~trail:(C.trail cl)
+          lits proof
     in
     encoded_symbols, res
 
@@ -167,7 +175,9 @@ module Make (E : Env.S) : S with module Env = E = struct
     (* first printing type declarations, and only then the types *)
     CCList.fold_right
       (fun sym acc ->
-        let ty = Ctx.find_signature_exn sym in
+        let ty =
+          Ctx.find_signature_exn (OuterEnv.get_ctx (OuterEnv.get_global ())) sym
+        in
         if Type.is_tType ty then (
           output_symdecl ~out sym ty;
           acc
@@ -265,7 +275,7 @@ module Make (E : Env.S) : S with module Env = E = struct
     let take_initial ~converter () =
       let module CS = C.ClauseSet in
       CS.filter (fun c -> not (lambdas_too_deep c)) !init_clauses
-      |> CS.to_iter
+      |> CS.to_seq |> Iter.of_seq
       |> convert_clauses ~converter ~encoded_symbols:T.Map.empty
     in
 
@@ -338,7 +348,10 @@ module Make (E : Env.S) : S with module Env = E = struct
             @@ Iter.max (Iter.map C.penalty (Iter.of_list clauses))
           in
           let trail = C.trail_l clauses in
-          Some (C.create ~penalty ~trail [] proof)
+          Some
+            (C.create
+               ~ctx:(C.ctx_of (List.hd clauses))
+               ~penalty ~trail [] proof)
         | _ -> None
       in
       (* Sys.remove prob_name; *)
@@ -349,7 +362,7 @@ module Make (E : Env.S) : S with module Env = E = struct
       None
 
   let setup () = ()
-  let () = Signal.once Env.on_start initialize
+  let () = Signal.once (OuterEnv.on_start (OuterEnv.get_global ())) initialize
 end
 
 let () =

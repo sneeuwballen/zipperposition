@@ -12,11 +12,15 @@ val stat_clause_create : Util.stat
 type t
 (** Abstract type for a clause *)
 
+type clause = t
+
 type 'a sets = {
   c_set: 'a CCVector.ro_vector;  (** main set of clauses *)
   c_sos: 'a CCVector.ro_vector;  (** set of support *)
 }
 (** Bundle of clause sets *)
+
+module Ctx : module type of Ctx
 
 (** {2 Boolean flags} *)
 
@@ -112,13 +116,13 @@ val proof_depth : t -> int
 
 val is_empty : t -> bool
 val length : t -> int
-val maxlits : ctx:Ctx.t -> t Scoped.t -> Subst.t -> CCBV.t
-val is_maxlit : ctx:Ctx.t -> t Scoped.t -> Subst.t -> idx:int -> bool
-val eligible_res : ctx:Ctx.t -> t Scoped.t -> Subst.t -> CCBV.t
-val eligible_res_no_subst : ctx:Ctx.t -> t -> CCBV.t
-val eligible_param : ctx:Ctx.t -> t Scoped.t -> Subst.t -> CCBV.t
-val is_eligible_param : ctx:Ctx.t -> t Scoped.t -> Subst.t -> idx:int -> bool
-val eligible_subterms_of_bool : ctx:Ctx.t -> t -> SClause.TPSet.t
+val maxlits : t Scoped.t -> Subst.t -> CCBV.t
+val is_maxlit : t Scoped.t -> Subst.t -> idx:int -> bool
+val eligible_res : t Scoped.t -> Subst.t -> CCBV.t
+val eligible_res_no_subst : t -> CCBV.t
+val eligible_param : t Scoped.t -> Subst.t -> CCBV.t
+val is_eligible_param : t Scoped.t -> Subst.t -> idx:int -> bool
+val eligible_subterms_of_bool : t -> SClause.TPSet.t
 val has_selected_lits : t -> bool
 val is_selected : t -> int -> bool
 val selected_lits : t -> (Literal.t * int) list
@@ -126,6 +130,15 @@ val selected_lits_bv : t -> CCBV.t
 val bool_selected : t -> (Term.t * Logtk.Position.t) list
 val penalty : t -> int
 val inc_penalty : t -> int -> unit
+val ctx_of : t -> Ctx.t
+
+val apply_subst :
+  ?renaming:Subst.Renaming.t ->
+  ?proof:Proof.Step.t ->
+  ?penalty_inc:int ->
+  t Scoped.t ->
+  Subst.FO.t ->
+  t
 
 (** {2 Properties} *)
 
@@ -157,6 +170,33 @@ val pp_tstp_full : t CCFormat.printer
 val pp_set : ClauseSet.t CCFormat.printer
 val pp_set_tstp : ClauseSet.t CCFormat.printer
 val pp_tstp_list : t list CCFormat.printer
+val pp_trail : Trail.t CCFormat.printer
+val to_string : t -> string
+val to_string_tstp : t -> string
+
+module Eligible : sig
+  type t = int -> Literal.t -> bool
+
+  val res : clause -> t
+  val param : clause -> t
+  val eq : t
+  val filter : (Literal.t -> bool) -> t
+  val max : clause -> t
+  val pos : t
+  val pos_eq : t
+  val neg : t
+  val always : t
+  val combine : t list -> t
+  val ( ** ) : t -> t -> t
+  val ( ++ ) : t -> t -> t
+  val ( ~~ ) : t -> t
+end
+
+module Pos : sig
+  val at : t -> Logtk.Position.t -> Term.t
+end
+
+val to_string : t -> string
 
 module WithPos : sig
   type elt = t
@@ -167,11 +207,12 @@ module WithPos : sig
   val hash : t -> int
   val pp : t CCFormat.printer
   val term : t -> Term.t
-  val clause : t -> t
+  val clause : t -> elt
   val pos : t -> Logtk.Position.t
-  val lits : t -> Literal.t array
+  val lits : t -> Literals.t
   val literals : t -> Literal.t
   val is_pos : t -> bool
+  val make : clause:elt -> pos:Logtk.Position.t -> t
 end
 
 module Seq : sig

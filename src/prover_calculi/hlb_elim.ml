@@ -33,6 +33,7 @@ module type S = sig
 end
 
 module Make (E : Env.S) : S with module Env = E = struct
+  module OuterEnv = Env
   module Env = E
   module C = Env.C
   module CS = C.ClauseSet
@@ -97,14 +98,16 @@ module Make (E : Env.S) : S with module Env = E = struct
   let is_tauto c =
     Literals.is_trivial (C.lits c) || Trail.is_trivial (C.trail c)
 
-  let[@inline] tracking_eq () = Env.flex_get k_track_eq
+  let[@inline] tracking_eq () =
+    OuterEnv.flex_get_of (OuterEnv.get_global ()) k_track_eq
 
   (* constants denoting the scope of index and the query, respectively *)
   let idx_sc, q_sc = 0, 1
 
   let should_update_propagated () =
-    Env.flex_get k_unit_propagated_hle
-    && !propagated_size_ <= Env.flex_get k_max_tracked_clauses
+    OuterEnv.flex_get_of (OuterEnv.get_global ()) k_unit_propagated_hle
+    && !propagated_size_
+       <= OuterEnv.flex_get_of (OuterEnv.get_global ()) k_max_tracked_clauses
 
   let app_subst ?(sc = idx_sc) ~subst t =
     Subst.FO.apply Subst.Renaming.none subst (t, sc)
@@ -386,7 +389,9 @@ module Make (E : Env.S) : S with module Env = E = struct
     Util.debugf ~section 3 "transitive conclusion: @[%a@] --> @[%a@]" (fun k ->
         k T.pp premise T.pp concl);
     let to_add_concl = ref [] in
-    let max_imps = Env.flex_get k_max_imp_entries in
+    let max_imps =
+      OuterEnv.flex_get_of (OuterEnv.get_global ()) k_max_imp_entries
+    in
     retrieve_spec_concl_idx () (premise, q_sc)
     |> Iter.iter (fun (concl', premise', subst) ->
            (* add implication premise' -> subst (concl) *)
@@ -394,7 +399,10 @@ module Make (E : Env.S) : S with module Env = E = struct
              PremiseIdx.update_leaf !prems_ premise' (fun (tbl, is_unit) ->
                  (match T.Tbl.get tbl concl' with
                  | Some old_proofset ->
-                   if CS.cardinal old_proofset < Env.flex_get k_max_depth then (
+                   if
+                     CS.cardinal old_proofset
+                     < OuterEnv.flex_get_of (OuterEnv.get_global ()) k_max_depth
+                   then (
                      let concl =
                        Subst.FO.apply Subst.Renaming.none subst (concl, q_sc)
                      in
@@ -441,7 +449,9 @@ module Make (E : Env.S) : S with module Env = E = struct
       | _ -> ());
       register_cl_term cl premise';
 
-      let max_proof_size = Env.flex_get k_max_depth in
+      let max_proof_size =
+        OuterEnv.flex_get_of (OuterEnv.get_global ()) k_max_depth
+      in
       retrieve_gen_prem_idx () (concl, q_sc)
       |> Iter.iter (fun (_, (tbl', _), subst) ->
              let to_add = ref [] in
@@ -470,13 +480,16 @@ module Make (E : Env.S) : S with module Env = E = struct
          that variable we cannot pump the term -- give up *)
       if T.equal concl concl' then raise Unif.Fail;
       let concl = ref concl in
-      while !i <= Env.flex_get k_max_self_impls do
+      while
+        !i <= OuterEnv.flex_get_of (OuterEnv.get_global ()) k_max_self_impls
+      do
         aux !concl;
         (* PUTTING concl IN THE SCOPE OF premise' -- intentional!!! *)
         concl := Subst.FO.apply Subst.Renaming.none subst (!concl, 0);
         if T.depth !concl > 3 then
           (* breaking out of the loop for the very deep terms *)
-          i := Env.flex_get k_max_self_impls + 1;
+          i :=
+            OuterEnv.flex_get_of (OuterEnv.get_global ()) k_max_self_impls + 1;
         i := !i + 1
       done
     with Unif.Fail -> aux concl
@@ -511,7 +524,9 @@ module Make (E : Env.S) : S with module Env = E = struct
             if
               (not (T.Tbl.mem tbl concl))
               && (not (T.Tbl.mem tbl (flip_eq concl)))
-              && T.Tbl.length tbl <= Env.flex_get k_max_imp_entries
+              && T.Tbl.length tbl
+                 <= OuterEnv.flex_get_of (OuterEnv.get_global ())
+                      k_max_imp_entries
             then (
               extend_premise tbl premise' concl cl;
               if not is_unit then (
@@ -581,7 +596,8 @@ module Make (E : Env.S) : S with module Env = E = struct
     match CCArray.map get_predicate (C.lits cl) with
     | [| Some (a_lhs, a_sign); Some (b_lhs, b_sign) |] ->
       let elig =
-        if Env.flex_get k_insert_only_ordered then
+        if OuterEnv.flex_get_of (OuterEnv.get_global ()) k_insert_only_ordered
+        then
           C.eligible_param (cl, 0) Subst.empty
         else
           CCBV.create ~size:2 true
@@ -598,26 +614,38 @@ module Make (E : Env.S) : S with module Env = E = struct
 
   let can_track_bin_cl cl =
     cl_is_ht_trackable cl
-    && (Env.flex_get k_max_tracked_clauses == -1
-       || !tracked_binary <= Env.flex_get k_max_tracked_clauses)
+    && (OuterEnv.flex_get_of (OuterEnv.get_global ()) k_max_tracked_clauses
+        == -1
+       || !tracked_binary
+          <= OuterEnv.flex_get_of (OuterEnv.get_global ()) k_max_tracked_clauses
+       )
 
   let can_track_unary_cl cl =
-    Env.flex_get k_unit_propagated_hle
-    && (Env.flex_get k_max_tracked_clauses == -1
-       || !tracked_unary <= 4 * Env.flex_get k_max_tracked_clauses)
+    OuterEnv.flex_get_of (OuterEnv.get_global ()) k_unit_propagated_hle
+    && (OuterEnv.flex_get_of (OuterEnv.get_global ()) k_max_tracked_clauses
+        == -1
+       || !tracked_unary
+          <= 4
+             * OuterEnv.flex_get_of (OuterEnv.get_global ())
+                 k_max_tracked_clauses)
 
   let steps = ref 0
 
   let track_clause cl =
     try
-      if Env.flex_get k_heartbeat_disabled_hlbe then raise RuleNotApplicable;
-      (match Env.flex_get k_heartbeat_steps with
+      if OuterEnv.flex_get_of (OuterEnv.get_global ()) k_heartbeat_disabled_hlbe
+      then
+        raise RuleNotApplicable;
+      (match
+         OuterEnv.flex_get_of (OuterEnv.get_global ()) k_heartbeat_steps
+       with
       | Some h_steps when !steps != 0 && !steps mod h_steps = 0 ->
         if !heartbeat_ then
           heartbeat_ := false
         else (
           CCFormat.printf "disabling heartbeat %d@." !steps;
-          Env.flex_add k_heartbeat_disabled_hlbe true;
+          OuterEnv.flex_add_of (OuterEnv.get_global ())
+            k_heartbeat_disabled_hlbe true;
           raise RuleNotApplicable
         )
       | _ -> ());
@@ -636,14 +664,16 @@ module Make (E : Env.S) : S with module Env = E = struct
     with RuleNotApplicable -> ()
 
   let make_tauto ~proof =
-    C.create ~penalty:1 ~trail:Trail.empty [ Literal.mk_tauto ] proof
+    C.create
+      ~ctx:(OuterEnv.get_ctx (OuterEnv.get_global ()))
+      ~penalty:1 ~trail:Trail.empty [ Literal.mk_tauto ] proof
 
   let penalize_hidden_tautology cl =
     if
-      Env.flex_get k_penalize_tautologies
+      OuterEnv.flex_get_of (OuterEnv.get_global ()) k_penalize_tautologies
       && not
          @@ Name.Set.exists
-              (fun id -> Signature.sym_in_conj id (Env.signature ()))
+              (fun id -> Signature.sym_in_conj id (Ctx.signature (C.ctx_of cl)))
               (C.symbols (Iter.singleton cl))
     then
       C.inc_penalty cl (C.length cl - 1)
@@ -671,7 +701,9 @@ module Make (E : Env.S) : S with module Env = E = struct
     let exception UnitHTR of int * (CS.t * propagation_kind) in
     let proofset = ref CS.empty in
     try
-      if Env.flex_get k_heartbeat_disabled_hlbe then raise RuleNotApplicable;
+      if OuterEnv.flex_get_of (OuterEnv.get_global ()) k_heartbeat_disabled_hlbe
+      then
+        raise RuleNotApplicable;
       if n > 7 then raise RuleNotApplicable;
       CCArray.iteri
         (fun i lit ->
@@ -680,7 +712,11 @@ module Make (E : Env.S) : S with module Env = E = struct
             let i_t = lit_to_term i_lhs i_sign in
             let i_neg_t = lit_to_term ~negate:true i_lhs i_sign in
 
-            if n != 1 && Env.flex_get k_reduce_tautologies then
+            if
+              n != 1
+              && OuterEnv.flex_get_of (OuterEnv.get_global ())
+                   k_reduce_tautologies
+            then
               retrieve_idx
                 ~getter:
                   (PropagatedLitsIdx.retrieve_generalizations
@@ -689,7 +725,7 @@ module Make (E : Env.S) : S with module Env = E = struct
               |> Iter.head
               |> CCOpt.iter (fun (_, ps, _) -> raise (UnitHTR (i, ps)));
 
-            if Env.flex_get k_delete_lits then
+            if OuterEnv.flex_get_of (OuterEnv.get_global ()) k_delete_lits then
               retrieve_idx
                 ~getter:
                   (PropagatedLitsIdx.retrieve_generalizations
@@ -712,13 +748,13 @@ module Make (E : Env.S) : S with module Env = E = struct
             (List.map C.proof_parent (cl :: CS.to_list !proofset))
         in
         let res =
-          C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof
+          C.create ~ctx:(C.ctx_of cl) ~penalty:(C.penalty cl)
+            ~trail:(C.trail cl) lit_l proof
         in
 
         Util.debugf ~section 2 "simplified[unit_hle/fle]: @[%a@] --> @[%a@]"
           (fun k -> k C.pp cl C.pp res);
-        Util.debugf ~section 2 "used: @[%a@]" (fun k ->
-            k (CS.pp C.pp) !proofset);
+        Util.debugf ~section 2 "used: @[%a@]" (fun k -> k C.pp_set !proofset);
 
         Some res
       )
@@ -736,7 +772,8 @@ module Make (E : Env.S) : S with module Env = E = struct
           (List.map C.proof_parent (cl :: CS.to_list ps))
       in
       let repl =
-        C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof
+        C.create ~ctx:(C.ctx_of cl) ~penalty:(C.penalty cl) ~trail:(C.trail cl)
+          lit_l proof
       in
       penalize_hidden_tautology repl;
 
@@ -754,7 +791,9 @@ module Make (E : Env.S) : S with module Env = E = struct
     let exception HiddenTauto of int * int * CS.t in
     let n = C.length cl in
     try
-      if Env.flex_get k_heartbeat_disabled_hlbe then raise RuleNotApplicable;
+      if OuterEnv.flex_get_of (OuterEnv.get_global ()) k_heartbeat_disabled_hlbe
+      then
+        raise RuleNotApplicable;
       if n > 7 then raise RuleNotApplicable;
       let bv = CCBV.create ~size:n true in
       let ( <+> ) = CCOpt.( <+> ) in
@@ -771,7 +810,11 @@ module Make (E : Env.S) : S with module Env = E = struct
                 | Some (j_lhs, j_sign) when CCBV.get bv j && i != j ->
                   let j_t = lit_to_term j_lhs j_sign in
                   let j_neg_t = lit_to_term ~negate:true j_lhs j_sign in
-                  if Env.flex_get k_reduce_tautologies && C.length cl != 2 then (
+                  if
+                    OuterEnv.flex_get_of (OuterEnv.get_global ())
+                      k_reduce_tautologies
+                    && C.length cl != 2
+                  then (
                     match
                       find_implication cl i_neg_t j_t
                       <+> find_implication cl j_neg_t i_t
@@ -784,7 +827,8 @@ module Make (E : Env.S) : S with module Env = E = struct
                       raise (HiddenTauto (i, j, proofset))
                     | _ -> ()
                   );
-                  if Env.flex_get k_delete_lits then (
+                  if OuterEnv.flex_get_of (OuterEnv.get_global ()) k_delete_lits
+                  then (
                     match
                       find_implication cl i_neg_t j_neg_t
                       <+> find_implication cl j_t i_t
@@ -795,7 +839,7 @@ module Make (E : Env.S) : S with module Env = E = struct
                       Util.debugf ~section 3 "@[%a@] --> @[%a@]" (fun k ->
                           k T.pp i_neg_t T.pp j_neg_t);
                       Util.debugf ~section 3 "used(%d): @[%a@]" (fun k ->
-                          k j (CS.pp C.pp) proofset');
+                          k j C.pp_set proofset');
 
                       proofset := CS.union proofset' !proofset
                     | _ -> ()
@@ -815,13 +859,13 @@ module Make (E : Env.S) : S with module Env = E = struct
             (List.map C.proof_parent (cl :: CS.to_list !proofset))
         in
         let res =
-          C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof
+          C.create ~ctx:(C.ctx_of cl) ~penalty:(C.penalty cl)
+            ~trail:(C.trail cl) lit_l proof
         in
 
         Util.debugf ~section 2 "simplified[hle]: @[%a@] --> @[%a@]" (fun k ->
             k C.pp cl C.pp res);
-        Util.debugf ~section 2 "used: @[%a@]" (fun k ->
-            k (CS.pp C.pp) !proofset);
+        Util.debugf ~section 2 "used: @[%a@]" (fun k -> k C.pp_set !proofset);
 
         Some res
       )
@@ -834,14 +878,15 @@ module Make (E : Env.S) : S with module Env = E = struct
           (List.map C.proof_parent (cl :: CS.to_list proofset))
       in
       let repl =
-        C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof
+        C.create ~ctx:(C.ctx_of cl) ~penalty:(C.penalty cl) ~trail:(C.trail cl)
+          lit_l proof
       in
       penalize_hidden_tautology repl;
       Some repl
       |> CCFun.tap (function
            | Some res ->
              Util.debugf ~section 2 "HTR(@[%a@])=@[%a@]@. > @[%a@]" (fun k ->
-                 k C.pp cl C.pp res (CS.pp C.pp) proofset)
+                 k C.pp cl C.pp res C.pp_set proofset)
            | _ -> ())
     | RuleNotApplicable -> None
 
@@ -891,7 +936,8 @@ module Make (E : Env.S) : S with module Env = E = struct
           [ C.proof_parent cl ]
       in
       let res =
-        C.create ~penalty:(C.penalty cl) ~trail:(C.trail cl) lit_l proof
+        C.create ~ctx:(C.ctx_of cl) ~penalty:(C.penalty cl) ~trail:(C.trail cl)
+          lit_l proof
       in
       Some res
     )
@@ -960,17 +1006,23 @@ module Make (E : Env.S) : S with module Env = E = struct
     let track_active () =
       Signal.on_every Env.ProofState.ActiveSet.on_add_clause track_clause;
       Signal.on_every Env.ProofState.ActiveSet.on_remove_clause untrack_clause;
-      Signal.on_every Env.on_forward_simplified (fun (_, _) -> incr steps)
+      Signal.on_every
+        (OuterEnv.on_forward_simplified (OuterEnv.get_global ()))
+        (fun (_, _) -> incr steps)
     in
     let track_passive () =
       Signal.on_every Env.ProofState.PassiveSet.on_add_clause track_clause;
       Signal.on_every Env.ProofState.PassiveSet.on_remove_clause untrack_clause;
-      Signal.on_every Env.on_forward_simplified (fun (_, _) -> incr steps)
+      Signal.on_every
+        (OuterEnv.on_forward_simplified (OuterEnv.get_global ()))
+        (fun (_, _) -> incr steps)
     in
     let track_all () =
       Signal.on_every Env.ProofState.PassiveSet.on_add_clause track_clause;
       Signal.on_every Env.ProofState.ActiveSet.on_remove_clause untrack_clause;
-      Signal.on_every Env.on_forward_simplified (fun (c, new_state) ->
+      Signal.on_every
+        (OuterEnv.on_forward_simplified (OuterEnv.get_global ()))
+        (fun (c, new_state) ->
           incr steps;
           match new_state with
           | Some c' ->
@@ -982,7 +1034,7 @@ module Make (E : Env.S) : S with module Env = E = struct
     in
 
     let initialize_with_passive () =
-      Iter.iter track_clause (E.get_passive ());
+      Iter.iter track_clause (OuterEnv.get_passive (OuterEnv.get_global ()) ());
 
       Util.debugf ~section 3 "discovered implications:" CCFun.id;
       PremiseIdx.iter !prems_ (fun premise (tbl, _) ->
@@ -990,7 +1042,7 @@ module Make (E : Env.S) : S with module Env = E = struct
               k T.pp premise (Iter.pp_seq T.pp) (T.Tbl.keys tbl)))
     in
 
-    (match Env.flex_get k_clauses_to_track with
+    (match OuterEnv.flex_get_of (OuterEnv.get_global ()) k_clauses_to_track with
     | `Passive ->
       initialize_with_passive ();
       track_passive ()
@@ -1001,18 +1053,21 @@ module Make (E : Env.S) : S with module Env = E = struct
     Signal.StopListening
 
   let setup () =
-    if E.flex_get k_enabled then (
-      Signal.on Env.on_start initialize;
+    if OuterEnv.flex_get_of (OuterEnv.get_global ()) k_enabled then (
+      Signal.on (OuterEnv.on_start (OuterEnv.get_global ())) initialize;
       let add_simpl =
-        if Env.flex_get k_simpl_new then
-          Env.add_basic_simplify
+        if OuterEnv.flex_get_of (OuterEnv.get_global ()) k_simpl_new then
+          OuterEnv.add_basic_simplify (OuterEnv.get_global ())
         else
-          Env.add_active_simplify
+          OuterEnv.add_active_simplify (OuterEnv.get_global ())
       in
 
-      if Env.flex_get k_basic_rules then add_simpl hle_htr;
+      if OuterEnv.flex_get_of (OuterEnv.get_global ()) k_basic_rules then
+        add_simpl hle_htr;
       add_simpl ctx_simpl;
-      if Env.flex_get k_unit_propagated_hle then add_simpl unit_hle_htr
+      if OuterEnv.flex_get_of (OuterEnv.get_global ()) k_unit_propagated_hle
+      then
+        add_simpl unit_hle_htr
     )
 end
 
@@ -1033,25 +1088,27 @@ let basic_rules_ = ref true
 let penalize_tautologies_ = ref true
 
 let extension =
-  let register env =
-    let module E = (val env : Env.S) in
+  let register (env : Env.t) =
+    let module E = (val (module Env) : Env.S) in
     let module HLT = Make (E) in
-    E.flex_add k_enabled !enabled_;
-    E.flex_add k_max_depth !max_depth_;
-    E.flex_add k_simpl_new !simpl_new_;
-    E.flex_add k_clauses_to_track !clauses_to_track_;
-    E.flex_add k_max_self_impls !max_self_impls_;
-    E.flex_add k_unit_propagated_hle !propagated_hle;
-    E.flex_add k_max_tracked_clauses !max_tracked_clauses;
-    E.flex_add k_track_eq !track_eq_;
-    E.flex_add k_delete_lits !hle_;
-    E.flex_add k_reduce_tautologies !hte_;
-    E.flex_add k_insert_only_ordered !insert_ordered_;
-    E.flex_add k_heartbeat_steps !heartbeat_steps;
-    E.flex_add k_heartbeat_disabled_hlbe false;
-    E.flex_add k_max_imp_entries !max_imp_;
-    E.flex_add k_basic_rules !basic_rules_;
-    E.flex_add k_penalize_tautologies !penalize_tautologies_;
+    Env.flex_add_of (Env.get_global ()) k_enabled !enabled_;
+    Env.flex_add_of (Env.get_global ()) k_max_depth !max_depth_;
+    Env.flex_add_of (Env.get_global ()) k_simpl_new !simpl_new_;
+    Env.flex_add_of (Env.get_global ()) k_clauses_to_track !clauses_to_track_;
+    Env.flex_add_of (Env.get_global ()) k_max_self_impls !max_self_impls_;
+    Env.flex_add_of (Env.get_global ()) k_unit_propagated_hle !propagated_hle;
+    Env.flex_add_of (Env.get_global ()) k_max_tracked_clauses
+      !max_tracked_clauses;
+    Env.flex_add_of (Env.get_global ()) k_track_eq !track_eq_;
+    Env.flex_add_of (Env.get_global ()) k_delete_lits !hle_;
+    Env.flex_add_of (Env.get_global ()) k_reduce_tautologies !hte_;
+    Env.flex_add_of (Env.get_global ()) k_insert_only_ordered !insert_ordered_;
+    Env.flex_add_of (Env.get_global ()) k_heartbeat_steps !heartbeat_steps;
+    Env.flex_add_of (Env.get_global ()) k_heartbeat_disabled_hlbe false;
+    Env.flex_add_of (Env.get_global ()) k_max_imp_entries !max_imp_;
+    Env.flex_add_of (Env.get_global ()) k_basic_rules !basic_rules_;
+    Env.flex_add_of (Env.get_global ()) k_penalize_tautologies
+      !penalize_tautologies_;
     HLT.setup ()
   in
   {

@@ -19,21 +19,24 @@ module type S = sig
   val setup : unit -> unit
 end
 
-module Make (E : Env.S) : S with module Env = E = struct
+module Make (E : Env.S) = struct
+  module OuterEnv = Env
   module Env = E
   module C = Env.C
   module CS = C.ClauseSet
   module L = Literal
   module T = Term
-  module SAT = SAT.Make ()
+  module SAT = Sat_solver
+
+  let sat = SAT.create ()
 
   let remove_from_proof_state c =
     Util.debugf ~section 1 "removing @[%a@]" (fun k -> k C.pp c);
 
     C.mark_redundant c;
-    Env.remove_active (Iter.singleton c);
-    Env.remove_passive (Iter.singleton c);
-    Env.remove_simpl (Iter.singleton c)
+    OuterEnv.remove_active (OuterEnv.get_global ()) (Iter.singleton c);
+    OuterEnv.remove_passive (OuterEnv.get_global ()) (Iter.singleton c);
+    OuterEnv.remove_simpl (OuterEnv.get_global ()) (Iter.singleton c)
 
   let do_qle pure_only c_iter =
     Util.debugf ~section 2 "init: @[%a@]@." (fun k ->
@@ -197,7 +200,7 @@ module Make (E : Env.S) : S with module Env = E = struct
           ))
         (Name.Tbl.to_iter unknown_syms);
       generate_nontrivial_solution_SAT_clause ();
-      match SAT.check ~full:true () with
+      match SAT.check sat ~full:true () with
       | SAT.Sat -> maximize_valuation ()
       | _ -> ()
     in
@@ -238,24 +241,37 @@ module Make (E : Env.S) : S with module Env = E = struct
       ());
     SAT.clear sat ()
 
-  let get_clauses () = Iter.append (Env.get_passive ()) (Env.get_active ())
+  let get_clauses () =
+    Iter.append
+      (OuterEnv.get_passive (OuterEnv.get_global ()) ())
+      (OuterEnv.get_active (OuterEnv.get_global ()) ())
+
   let steps = ref 0
 
   let inprocessing () =
     if !steps = 0 then (
       Util.debugf ~section 1 "doing inprocessing@." CCFun.id;
-      do_qle (E.flex_get k_pure_only) (get_clauses ())
+      do_qle
+        (OuterEnv.flex_get_of (OuterEnv.get_global ()) k_pure_only)
+        (get_clauses ())
     );
-    steps := (!steps + 1) mod Env.flex_get k_check_at
+    steps :=
+      (!steps + 1) mod OuterEnv.flex_get_of (OuterEnv.get_global ()) k_check_at
 
   let setup () =
-    if E.flex_get k_enabled then
-      if not (Env.flex_get A.k_avatar_enabled) then
-        if E.flex_get k_inprocessing then
-          E.add_clause_elimination_rule ~priority:4 "qle" inprocessing
+    if OuterEnv.flex_get_of (OuterEnv.get_global ()) k_enabled then
+      if not (OuterEnv.flex_get_of (OuterEnv.get_global ()) A.k_avatar_enabled)
+      then
+        if OuterEnv.flex_get_of (OuterEnv.get_global ()) k_inprocessing then
+          OuterEnv.add_clause_elimination_rule (OuterEnv.get_global ())
+            ~priority:4 "qle" inprocessing
         else
-          Signal.once Env.on_start (fun () ->
-              do_qle (E.flex_get k_pure_only) (get_clauses ()))
+          Signal.once
+            (OuterEnv.on_start (OuterEnv.get_global ()))
+            (fun () ->
+              do_qle
+                (OuterEnv.flex_get_of (OuterEnv.get_global ()) k_pure_only)
+                (get_clauses ()))
       else
         CCFormat.printf "AVATAR is not yet compatible with QLE@."
 end
@@ -266,13 +282,13 @@ let _check_at = ref 100
 let _pure_only = ref false
 
 let extension =
-  let action env =
-    let module E = (val env : Env.S) in
+  let action (env : Env.t) =
+    let module E = (val (module Env) : Env.S) in
     let module QLE = Make (E) in
-    E.flex_add k_enabled !_enabled;
-    E.flex_add k_inprocessing !_inprocessing;
-    E.flex_add k_check_at !_check_at;
-    E.flex_add k_pure_only !_pure_only;
+    Env.flex_add_of (Env.get_global ()) k_enabled !_enabled;
+    Env.flex_add_of (Env.get_global ()) k_inprocessing !_inprocessing;
+    Env.flex_add_of (Env.get_global ()) k_check_at !_check_at;
+    Env.flex_add_of (Env.get_global ()) k_pure_only !_pure_only;
     QLE.setup ()
   in
   {

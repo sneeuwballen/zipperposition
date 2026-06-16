@@ -257,7 +257,7 @@ let extension =
       seq
   in
 
-  let print_stats _ =
+  let print_stats (_ : Env.t) =
     if !_enabled then
       CCFormat.printf "%%%a@.%%%a@." Util.pp_stat removed_clauses Util.pp_stat
         total_clauses

@@ -51,8 +51,9 @@ module type S = sig
 end
 
 module Make (E : Env.S) : S with module Env = E = struct
+  module OuterEnv = Env
   module Env = E
-  module PS = E.ProofState
+  module PS = ProofState
   module C = Env.C
   module Ctx = Env.Ctx
   module Fool = Fool.Make (Env)
@@ -71,23 +72,25 @@ module Make (E : Env.S) : S with module Env = E = struct
   let _cls_w_pred_vars = ref Type.Map.empty (* type --> (clause,var) *)
 
   let get_unif_alg () =
-    if Env.flex_get k_disable_ho_bool_unif then
+    if OuterEnv.flex_get_of (OuterEnv.get_global ()) k_disable_ho_bool_unif then
       fun _ _ ->
     OSeq.empty
     else
-      Env.flex_get Superposition.k_unif_alg
+      OuterEnv.flex_get_of (OuterEnv.get_global ()) Superposition.k_unif_alg
 
   let get_unif_alg_l () =
-    if Env.flex_get k_disable_ho_bool_unif then
+    if OuterEnv.flex_get_of (OuterEnv.get_global ()) k_disable_ho_bool_unif then
       fun _ _ ->
     OSeq.empty
     else (
-      let (module U) = Superposition.get_unif_module (module E) in
-      U.unify_scoped_l
+      let u =
+        Superposition.get_unif_module (Libzipperposition.Env.get_global ())
+      in
+      u.unify_scoped_l
     )
 
   let get_triggers c =
-    let ord = Ctx.ord () in
+    let ord = Ctx.ord (OuterEnv.get_ctx (OuterEnv.get_global ())) in
     let trivial_trigger t =
       let body = snd @@ T.open_fun t in
       T.is_var body || T.is_true_or_false body
@@ -102,7 +105,8 @@ module Make (E : Env.S) : S with module Env = E = struct
         ->
         List.iter (fun t -> get_terms t k) args
       | T.AppBuiltin ((ForallConst | ExistsConst), [ _; body ]) ->
-        if Env.flex_get k_include_quants then k body
+        if OuterEnv.flex_get_of (OuterEnv.get_global ()) k_include_quants then
+          k body
       | _ -> ()
     in
 
@@ -130,7 +134,11 @@ module Make (E : Env.S) : S with module Env = E = struct
       Subst.FO.bind' Subst.empty (T.as_var_exn var, cl_sc) (trigger, trig_sc)
     in
     let renaming = Subst.Renaming.create () in
-    let expand_quant = not @@ Env.flex_get Combinators.k_enable_combinators in
+    let expand_quant =
+      not
+      @@ OuterEnv.flex_get_of (OuterEnv.get_global ())
+           Combinators.k_enable_combinators
+    in
     let lits = Literals.apply_subst renaming subst (C.lits clause, cl_sc) in
     let lits =
       Literals.map
@@ -144,7 +152,9 @@ module Make (E : Env.S) : S with module Env = E = struct
         [ C.proof_parent_subst renaming (clause, cl_sc) subst ]
     in
     let res =
-      C.create_a lits proof ~penalty:(C.penalty clause) ~trail:(C.trail clause)
+      C.create_a
+        ~ctx:(OuterEnv.get_ctx (OuterEnv.get_global ()))
+        lits proof ~penalty:(C.penalty clause) ~trail:(C.trail clause)
     in
     (* CCFormat.printf "instatiate:@.c:@[%a@]@.subst:@[%a@]@.res:@[%a@]@." C.pp clause Subst.pp subst C.pp res; *)
     res
@@ -153,7 +163,8 @@ module Make (E : Env.S) : S with module Env = E = struct
     let triggers = Type.Map.get_or ~default:[] (T.ty t) !_trigger_bools in
     if
       (not (CCList.mem ~eq:T.equal t triggers))
-      && ((not (Env.flex_get k_bool_triggers_only))
+      && ((not
+             (OuterEnv.flex_get_of (OuterEnv.get_global ()) k_bool_triggers_only))
          || Type.returns_prop (T.ty t))
     then (
       _trigger_bools :=
@@ -171,12 +182,15 @@ module Make (E : Env.S) : S with module Env = E = struct
 
   let insert_new_trigger t =
     let do_insert t =
-      inst_clauses_w_trigger t |> CCList.to_iter |> Env.add_passive
+      inst_clauses_w_trigger t |> CCList.to_iter
+      |> OuterEnv.add_passive (OuterEnv.get_global ())
     in
     do_insert t;
     if Type.returns_prop (T.ty t) then (
       let t = Lambda.eta_expand t in
-      match Env.flex_get k_generalize_trigger with
+      match
+        OuterEnv.flex_get_of (OuterEnv.get_global ()) k_generalize_trigger
+      with
       | `Neg ->
         let vars, body = T.open_fun t in
         if not (Type.is_prop (T.ty body)) then (
@@ -198,7 +212,10 @@ module Make (E : Env.S) : S with module Env = E = struct
   let update_triggers cl =
     (* if triggered boolean instantiation is off
        k_trigger_bool_inst is -1 *)
-    if C.proof_depth cl < Env.flex_get k_trigger_bool_inst then (
+    if
+      C.proof_depth cl
+      < OuterEnv.flex_get_of (OuterEnv.get_global ()) k_trigger_bool_inst
+    then (
       let new_triggers = get_triggers cl in
       if not (Iter.is_empty new_triggers) then
         Iter.iter insert_new_trigger new_triggers
@@ -211,7 +228,8 @@ module Make (E : Env.S) : S with module Env = E = struct
     let ty = T.ty var in
     Type.Map.get_or ~default:[] ty !_trigger_bools
     |> CCList.map (fun trigger -> instantiate_w_bool ~clause ~var ~trigger)
-    |> CCList.to_iter |> Env.add_passive;
+    |> CCList.to_iter
+    |> OuterEnv.add_passive (OuterEnv.get_global ());
 
     _cls_w_pred_vars :=
       Type.Map.update ty
@@ -227,7 +245,10 @@ module Make (E : Env.S) : S with module Env = E = struct
     assert (T.is_const trig_hd);
     assert (Name.is_postcnf_skolem (T.as_const_exn trig_hd));
 
-    if C.proof_depth c < Env.flex_get k_trigger_bool_inst then
+    if
+      C.proof_depth c
+      < OuterEnv.flex_get_of (OuterEnv.get_global ()) k_trigger_bool_inst
+    then
       insert_new_trigger trigger;
 
     Signal.ContinueListening
@@ -311,7 +332,8 @@ module Make (E : Env.S) : S with module Env = E = struct
     in
 
     if
-      C.proof_depth cl < Env.flex_get k_trigger_bool_ind
+      C.proof_depth cl
+      < OuterEnv.flex_get_of (OuterEnv.get_global ()) k_trigger_bool_ind
       && CCOpt.is_some (C.distance_to_goal cl)
     then (
       match C.lits cl with
@@ -328,13 +350,15 @@ module Make (E : Env.S) : S with module Env = E = struct
   let () = Signal.on PS.ActiveSet.on_add_clause (fun c -> update_triggers c)
 
   let mk_res ~proof ~old ~repl new_lit c =
-    C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
+    C.create
+      ~ctx:(OuterEnv.get_ctx (OuterEnv.get_global ()))
+      ~trail:(C.trail c) ~penalty:(C.penalty c)
       (new_lit
       :: Array.to_list (C.lits c |> Literals.map (T.replace ~old ~by:repl)))
       proof
 
   let get_green_eligible c =
-    let ord = C.Ctx.ord () in
+    let ord = C.Ctx.ord (OuterEnv.get_ctx (OuterEnv.get_global ())) in
     Ls.fold_terms ~vars:false ~var_args:false ~fun_bodies:false ~ty_args:false
       ~ord ~which:`Max ~subterms:true ~eligible:(C.Eligible.res c) (C.lits c)
 
@@ -532,7 +556,7 @@ module Make (E : Env.S) : S with module Env = E = struct
             [ C.proof_parent_subst renaming (c, sc_cl) sub ]
         in
         let res =
-          C.create
+          C.create ~ctx:(C.ctx_of c)
             ~penalty:
               (C.penalty c + C.proof_depth c
               +
@@ -594,13 +618,15 @@ module Make (E : Env.S) : S with module Env = E = struct
                        ))
                      us_opt)
           in
-          if Env.should_force_stream_eval () then
-            Env.get_finite_infs [ unif_seq ] @ acc
+          if OuterEnv.should_force_stream_eval (OuterEnv.get_global ()) () then
+            OuterEnv.get_finite_infs (OuterEnv.get_global ()) [ unif_seq ] @ acc
           else (
             let stm_res =
               Env.Stm.make ~penalty:(C.penalty c + 2) ~parents:[ c ] unif_seq
             in
-            Env.StmQ.add (Env.get_stm_queue ()) stm_res;
+            Env.StmQ.add
+              (OuterEnv.get_stm_queue (OuterEnv.get_global ()))
+              stm_res;
             acc
           )
         ) else
@@ -732,7 +758,7 @@ module Make (E : Env.S) : S with module Env = E = struct
         Proof.Step.inference ~rule
           [ C.proof_parent_subst renaming (c, sc_cl) sub ]
       in
-      C.create
+      C.create ~ctx:(C.ctx_of c)
         ~penalty:
           (C.penalty c + C.proof_depth c
           +
@@ -783,15 +809,21 @@ module Make (E : Env.S) : S with module Env = E = struct
                                    Some (mk_res sub pos p)))
                      in
 
-                     if Env.should_force_stream_eval () then
-                       Env.get_finite_infs [ seq ] @ acc
+                     if
+                       OuterEnv.should_force_stream_eval
+                         (OuterEnv.get_global ()) ()
+                     then
+                       OuterEnv.get_finite_infs (OuterEnv.get_global ()) [ seq ]
+                       @ acc
                      else (
                        let stm_res =
                          Env.Stm.make
                            ~penalty:(C.penalty c + 2)
                            ~parents:[ c ] seq
                        in
-                       Env.StmQ.add (Env.get_stm_queue ()) stm_res;
+                       Env.StmQ.add
+                         (OuterEnv.get_stm_queue (OuterEnv.get_global ()))
+                         stm_res;
                        acc
                      ))
                    acc partners)
@@ -829,7 +861,11 @@ module Make (E : Env.S) : S with module Env = E = struct
       let lits = Array.copy @@ C.lits c in
       (* Literals.Pos.replace lits ~at ~by:partner.repl; *)
       let renaming = Subst.Renaming.create () in
-      let expand_quant = not @@ Env.flex_get Combinators.k_enable_combinators in
+      let expand_quant =
+        not
+        @@ OuterEnv.flex_get_of (OuterEnv.get_global ())
+             Combinators.k_enable_combinators
+      in
       let repl_sub =
         Lambda.eta_reduce ~expand_quant
         @@ Lambda.snf
@@ -848,7 +884,9 @@ module Make (E : Env.S) : S with module Env = E = struct
           [ C.proof_parent_subst renaming (c, sc_cl) sub ]
       in
       let res =
-        C.create_a ~penalty:(C.penalty c + 2) ~trail:(C.trail c) lits step
+        C.create_a ~ctx:(C.ctx_of c)
+          ~penalty:(C.penalty c + 2)
+          ~trail:(C.trail c) lits step
       in
 
       Util.debugf ~section 5 "fluid_quant_rw:@.@[%a@] -> @.@[%a@]@." (fun k ->
@@ -896,15 +934,21 @@ module Make (E : Env.S) : S with module Env = E = struct
                                  else
                                    Some (mk_res sub pos p)))
                      in
-                     if Env.should_force_stream_eval () then
-                       Env.get_finite_infs [ seq ] @ acc
+                     if
+                       OuterEnv.should_force_stream_eval
+                         (OuterEnv.get_global ()) ()
+                     then
+                       OuterEnv.get_finite_infs (OuterEnv.get_global ()) [ seq ]
+                       @ acc
                      else (
                        let stm_res =
                          Env.Stm.make
                            ~penalty:(C.penalty c + 2)
                            ~parents:[ c ] seq
                        in
-                       Env.StmQ.add (Env.get_stm_queue ()) stm_res;
+                       Env.StmQ.add
+                         (OuterEnv.get_stm_queue (OuterEnv.get_global ()))
+                         stm_res;
                        acc
                      ))
                    acc partners)
@@ -923,9 +967,7 @@ module Make (E : Env.S) : S with module Env = E = struct
 
     let add_immediate acc sub idx =
       let renaming = Subst.Renaming.create () in
-      let res =
-        C.apply_subst ~renaming ~proof:(Some (p sub renaming)) (c, 0) sub
-      in
+      let res = C.apply_subst ~renaming ~proof:(p sub renaming) (c, 0) sub in
       res :: acc
     in
 
@@ -939,9 +981,8 @@ module Make (E : Env.S) : S with module Env = E = struct
                   let sub = Unif_subst.subst us in
                   let renaming = Subst.Renaming.create () in
                   let res =
-                    C.apply_subst ~penalty_inc:(Some 1) ~renaming
-                      ~proof:(Some (p sub renaming))
-                      (c, 0) sub
+                    C.apply_subst ~penalty_inc:1 ~renaming
+                      ~proof:(p sub renaming) (c, 0) sub
                   in
                   (* not eligible under substitution *)
                   if not @@ CCBV.get (C.eligible_res_no_subst res) idx then
@@ -949,11 +990,11 @@ module Make (E : Env.S) : S with module Env = E = struct
                   else
                     Some res))
       in
-      if Env.should_force_stream_eval () then
-        Env.get_finite_infs [ seq ]
+      if OuterEnv.should_force_stream_eval (OuterEnv.get_global ()) () then
+        OuterEnv.get_finite_infs (OuterEnv.get_global ()) [ seq ]
       else (
         let stm_res = Env.Stm.make ~penalty:(C.penalty c) ~parents:[ c ] seq in
-        Env.StmQ.add (Env.get_stm_queue ()) stm_res;
+        Env.StmQ.add (OuterEnv.get_stm_queue (OuterEnv.get_global ())) stm_res;
         []
       )
     in
@@ -1059,8 +1100,7 @@ module Make (E : Env.S) : S with module Env = E = struct
     |> CCOpt.map (fun (t, _) ->
            let vars = T.VarSet.to_list (T.vars t) in
            assert (List.for_all (fun t -> Type.is_prop (HVar.ty t)) vars);
-           all_bool_substs vars
-           |> List.map (C.apply_subst ~proof:(Some p) (c, 0)))
+           all_bool_substs vars |> List.map (C.apply_subst ~proof:p (c, 0)))
 
   let replace_bool_app_vars (c : C.t) =
     let p sub renaming =
@@ -1113,19 +1153,19 @@ module Make (E : Env.S) : S with module Env = E = struct
                            let sub = Unif_subst.subst us in
                            let renaming = Subst.Renaming.create () in
                            let res =
-                             C.apply_subst ~penalty_inc:(Some 1) ~renaming
-                               ~proof:(Some (p sub renaming))
-                               (c, 0) sub
+                             C.apply_subst ~penalty_inc:1 ~renaming
+                               ~proof:(p sub renaming) (c, 0) sub
                            in
                            (* not eligible under substitution *)
                            Some res)))
                (create_targets (List.length args)))
       |> Iter.to_list
     in
-    if Env.should_force_stream_eval () then
-      Env.get_finite_infs stms
+    if OuterEnv.should_force_stream_eval (OuterEnv.get_global ()) () then
+      OuterEnv.get_finite_infs (OuterEnv.get_global ()) stms
     else (
-      Env.StmQ.add_lst (Env.get_stm_queue ())
+      Env.StmQ.add_lst
+        (OuterEnv.get_stm_queue (OuterEnv.get_global ()))
         (List.map
            (fun seq -> Env.Stm.make ~penalty:(C.penalty c) ~parents:[ c ] seq)
            stms);
@@ -1172,8 +1212,10 @@ module Make (E : Env.S) : S with module Env = E = struct
         let new_lits = CCArray.copy (C.lits c) in
         Literals.Pos.replace ~at ~by:repl new_lits;
         Some
-          (C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
-             (Array.to_list new_lits) proof)
+          (C.create
+             ~ctx:(OuterEnv.get_ctx (OuterEnv.get_global ()))
+             ~trail:(C.trail c) ~penalty:(C.penalty c) (Array.to_list new_lits)
+             proof)
       )
     in
 
@@ -1201,7 +1243,9 @@ module Make (E : Env.S) : S with module Env = E = struct
           mk_res ~proof:(proof ~prefix:"forall") ~old ~repl:T.false_ new_lit c
         in
         if Type.returns_prop (T.ty subst_t) then
-          Signal.send Env.on_pred_var_elimination (res, subst_t);
+          Signal.send
+            (OuterEnv.on_pred_var_elimination (OuterEnv.get_global ()))
+            (res, subst_t);
         res
       | Builtin.ExistsConst ->
         let new_lit = no (T.app body [ subst_t ]) in
@@ -1209,7 +1253,9 @@ module Make (E : Env.S) : S with module Env = E = struct
           mk_res ~proof:(proof ~prefix:"exists") ~old ~repl:T.true_ new_lit c
         in
         if Type.returns_prop (T.ty subst_t) then
-          Signal.send Env.on_pred_var_elimination (res, subst_t);
+          Signal.send
+            (OuterEnv.on_pred_var_elimination (OuterEnv.get_global ()))
+            (res, subst_t);
         res
       | _ -> assert false
     in
@@ -1275,18 +1321,20 @@ module Make (E : Env.S) : S with module Env = E = struct
                             Proof.Step.inference ~tags:[ Proof.Tag.T_ho ] ~rule
                               (parents renaming subst)
                           in
-                          C.create ~penalty:(C.penalty c) ~trail:(C.trail c)
-                            new_lits proof)
+                          C.create ~ctx:(C.ctx_of c) ~penalty:(C.penalty c)
+                            ~trail:(C.trail c) new_lits proof)
                         unif_subst_opt))
            | _ -> None)
     |> Iter.flat_map_l (fun clause_seq ->
-           if Env.should_force_stream_eval () then
-             Env.get_finite_infs [ clause_seq ]
+           if OuterEnv.should_force_stream_eval (OuterEnv.get_global ()) () then
+             OuterEnv.get_finite_infs (OuterEnv.get_global ()) [ clause_seq ]
            else (
              let stm_res =
                Env.Stm.make ~penalty:(C.penalty c) ~parents:[ c ] clause_seq
              in
-             Env.StmQ.add (Env.get_stm_queue ()) stm_res;
+             Env.StmQ.add
+               (OuterEnv.get_stm_queue (OuterEnv.get_global ()))
+               stm_res;
              []
            ))
     |> Iter.to_rev_list
@@ -1345,7 +1393,8 @@ module Make (E : Env.S) : S with module Env = E = struct
       let parents = List.map C.proof_parent (c :: new_parents) in
       let proof = Proof.Step.simp ~rule parents in
       let renamed =
-        C.create_a ~penalty:(C.penalty c) ~trail:(C.trail c) new_lits proof
+        C.create_a ~ctx:(C.ctx_of c) ~penalty:(C.penalty c) ~trail:(C.trail c)
+          new_lits proof
       in
 
       Util.debugf ~section 1 "renamed @[%a@] into@. @[%a@]" (fun k ->
@@ -1690,7 +1739,10 @@ module Make (E : Env.S) : S with module Env = E = struct
           T.app_builtin ~ty:(T.ty t) hd args'
       | DB _ | Const _ | Var _ -> t
     in
-    if Env.flex_get Combinators.k_enable_combinators then
+    if
+      OuterEnv.flex_get_of (OuterEnv.get_global ())
+        Combinators.k_enable_combinators
+    then
       t
     else
       aux (Lambda.eta_reduce @@ Lambda.snf t)
@@ -1706,8 +1758,10 @@ module Make (E : Env.S) : S with module Env = E = struct
           ~rule:(Proof.Rule.mk "replace unsupported quants")
       in
       let new_ =
-        C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
-          (Array.to_list new_lits) proof
+        C.create
+          ~ctx:(OuterEnv.get_ctx (OuterEnv.get_global ()))
+          ~trail:(C.trail c) ~penalty:(C.penalty c) (Array.to_list new_lits)
+          proof
       in
       Some new_
     )
@@ -1724,8 +1778,10 @@ module Make (E : Env.S) : S with module Env = E = struct
             ~rule:(Proof.Rule.mk "simplify boolean subterms")
         in
         let new_ =
-          C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
-            (Array.to_list new_lits) proof
+          C.create
+            ~ctx:(OuterEnv.get_ctx (OuterEnv.get_global ()))
+            ~trail:(C.trail c) ~penalty:(C.penalty c) (Array.to_list new_lits)
+            proof
         in
         SimplM.return_new new_
       )
@@ -1736,7 +1792,11 @@ module Make (E : Env.S) : S with module Env = E = struct
 
   let nnf_bools t =
     let module F = T.Form in
-    let expand_quant = not @@ Env.flex_get Combinators.k_enable_combinators in
+    let expand_quant =
+      not
+      @@ OuterEnv.flex_get_of (OuterEnv.get_global ())
+           Combinators.k_enable_combinators
+    in
     let rec aux t =
       match T.view t with
       | Const _ | DB _ | Var _ -> t
@@ -1819,8 +1879,10 @@ module Make (E : Env.S) : S with module Env = E = struct
           ~rule:(Proof.Rule.mk "nnf boolean subterms")
       in
       let new_ =
-        C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
-          (Array.to_list new_lits) proof
+        C.create
+          ~ctx:(OuterEnv.get_ctx (OuterEnv.get_global ()))
+          ~trail:(C.trail c) ~penalty:(C.penalty c) (Array.to_list new_lits)
+          proof
       in
       SimplM.return_new new_
     )
@@ -1836,8 +1898,10 @@ module Make (E : Env.S) : S with module Env = E = struct
           ~rule:(Proof.Rule.mk "normalize subterms")
       in
       let new_ =
-        C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
-          (Array.to_list new_lits) proof
+        C.create
+          ~ctx:(OuterEnv.get_ctx (OuterEnv.get_global ()))
+          ~trail:(C.trail c) ~penalty:(C.penalty c) (Array.to_list new_lits)
+          proof
       in
       SimplM.return_new new_
     )
@@ -1921,8 +1985,13 @@ module Make (E : Env.S) : S with module Env = E = struct
     in
 
     let unif_alg l r =
-      if not (Env.flex_get Combinators.k_enable_combinators) then
-        Env.flex_get Superposition.k_unif_alg (l, 0) (r, 0)
+      if
+        not
+          (OuterEnv.flex_get_of (OuterEnv.get_global ())
+             Combinators.k_enable_combinators)
+      then
+        OuterEnv.flex_get_of (OuterEnv.get_global ()) Superposition.k_unif_alg
+          (l, 0) (r, 0)
       else
         OSeq.return (Some (Unif.FO.unify_full (l, 0) (r, 0)))
     in
@@ -1966,8 +2035,8 @@ module Make (E : Env.S) : S with module Env = E = struct
                                 ]
                             in
                             let res =
-                              C.create ~penalty:(C.penalty c) ~trail:(C.trail c)
-                                new_lits proof
+                              C.create ~ctx:(C.ctx_of c) ~penalty:(C.penalty c)
+                                ~trail:(C.trail c) new_lits proof
                             in
                             Util.debugf ~section 5 "solved by @[%a@]@."
                               (fun k -> k C.pp res);
@@ -1978,7 +2047,7 @@ module Make (E : Env.S) : S with module Env = E = struct
                   let stm =
                     Stm.make ~penalty:(C.penalty c) ~parents:[ c ] rest
                   in
-                  StmQ.add (Env.get_stm_queue ()) stm;
+                  StmQ.add (OuterEnv.get_stm_queue (OuterEnv.get_global ())) stm;
                   hd
                 | OSeq.Nil -> None
               with _ ->
@@ -2032,27 +2101,35 @@ module Make (E : Env.S) : S with module Env = E = struct
       let stmt = Statement.assert_ ~proof f in
       let cnf_vec =
         Cnf.convert @@ CCVector.to_iter
-        @@ Cnf.cnf_of ~opts ~ctx:(Ctx.sk_ctx ()) stmt
+        @@ Cnf.cnf_of ~opts
+             ~ctx:(Env.Ctx.sk_ctx (OuterEnv.get_ctx (OuterEnv.get_global ())))
+             stmt
       in
       CCVector.iter
         (fun cl ->
           Statement.Seq.ty_decls cl
           |> Iter.iter (fun (id, ty) ->
-                 Ctx.declare id ty;
+                 Ctx.declare (OuterEnv.get_ctx (OuterEnv.get_global ())) id ty;
                  Name_payload.add id (Name.Attr_skolem Name.K_after_cnf)))
         cnf_vec;
       let solved =
-        if Env.flex_get k_solve_formulas then
+        if OuterEnv.flex_get_of (OuterEnv.get_global ()) k_solve_formulas then
           CCOpt.get_or ~default:[] (solve_bool_formulas ~which:`All c)
         else
           []
       in
 
       let clauses =
-        CCVector.map (C.of_statement ~convert_defs:true) cnf_vec
+        CCVector.map
+          (C.of_statement
+             ~ctx:(OuterEnv.get_ctx (OuterEnv.get_global ()))
+             ~convert_defs:true)
+          cnf_vec
         |> CCVector.to_list |> CCList.flatten
         |> List.map (fun c ->
-               C.create ~penalty ~trail (CCArray.to_list (C.lits c)) proof)
+               C.create ~ctx:(C.ctx_of c) ~penalty ~trail
+                 (CCArray.to_list (C.lits c))
+                 proof)
       in
       Util.debugf ~section 5 "cl:@[%a@]@." (fun k -> k C.pp c);
       Util.debugf ~section 5 " @[%a@]@." (fun k -> k (CCList.pp C.pp) clauses);
@@ -2136,7 +2213,9 @@ module Make (E : Env.S) : S with module Env = E = struct
                Literal.mk_prop (forall_close (negate_bool_fun t')) false
              in
              let forall_cl =
-               C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
+               C.create
+                 ~ctx:(OuterEnv.get_ctx (OuterEnv.get_global ()))
+                 ~trail:(C.trail c) ~penalty:(C.penalty c)
                  (as_forall
                  :: Array.to_list
                       (C.lits c
@@ -2145,7 +2224,9 @@ module Make (E : Env.S) : S with module Env = E = struct
                  proof
              in
              let forall_neg_cl =
-               C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
+               C.create
+                 ~ctx:(OuterEnv.get_ctx (OuterEnv.get_global ()))
+                 ~trail:(C.trail c) ~penalty:(C.penalty c)
                  (as_neg_forall
                  :: Array.to_list
                       (C.lits c
@@ -2168,72 +2249,106 @@ module Make (E : Env.S) : S with module Env = E = struct
          []
 
   let setup () =
-    (* Env.add_basic_simplify normalize_equalities; put into superposition right now *)
-    if Env.flex_get k_replace_unsupported_quants then
-      Signal.once Env.on_start (fun () ->
+    (* OuterEnv.add_basic_simplify (OuterEnv.get_global ()) normalize_equalities; put into superposition right now *)
+    if
+      OuterEnv.flex_get_of (OuterEnv.get_global ()) k_replace_unsupported_quants
+    then
+      Signal.once
+        (OuterEnv.on_start (OuterEnv.get_global ()))
+        (fun () ->
           Env.ProofState.PassiveSet.clauses ()
-          |> C.ClauseSet.iter (fun cl ->
+          |> Clause.ClauseSet.iter (fun cl ->
                  match replace_unsupported_quants cl with
                  | None -> ()
                  | Some new_ ->
-                   Env.remove_passive (Iter.singleton cl);
-                   Env.add_passive (Iter.singleton new_)));
-    match Env.flex_get k_bool_reasoning with
+                   OuterEnv.remove_passive (OuterEnv.get_global ())
+                     (Iter.singleton cl);
+                   OuterEnv.add_passive (OuterEnv.get_global ())
+                     (Iter.singleton new_)));
+    match OuterEnv.flex_get_of (OuterEnv.get_global ()) k_bool_reasoning with
     | BoolReasoningDisabled -> ()
-    | BoolCasesPreprocess -> Env.add_unary_inf "false_elim" false_elim
+    | BoolCasesPreprocess ->
+      OuterEnv.add_unary_inf (OuterEnv.get_global ()) "false_elim" false_elim
     | _ ->
-      if Env.flex_get k_solve_formulas then
-        Env.add_unary_inf "solve formulas" (fun c ->
+      if OuterEnv.flex_get_of (OuterEnv.get_global ()) k_solve_formulas then
+        OuterEnv.add_unary_inf (OuterEnv.get_global ()) "solve formulas"
+          (fun c ->
             CCOpt.get_or ~default:[]
             @@ solve_bool_formulas ~which:`OnlyPositive c);
       if
-        Env.flex_get k_trigger_bool_inst > 0
-        || Env.flex_get k_trigger_bool_ind > 0
+        OuterEnv.flex_get_of (OuterEnv.get_global ()) k_trigger_bool_inst > 0
+        || OuterEnv.flex_get_of (OuterEnv.get_global ()) k_trigger_bool_ind > 0
       then (
-        Signal.on Env.on_pred_var_elimination handle_new_pred_var_clause;
-        Signal.on Env.FormRename.on_pred_skolem_introduction
-          handle_new_skolem_sym
+        Signal.on
+          (OuterEnv.on_pred_var_elimination (OuterEnv.get_global ()))
+          handle_new_pred_var_clause;
+        Signal.on FR.on_pred_skolem_introduction handle_new_skolem_sym
       );
-      if Env.flex_get k_trigger_bool_ind > 0 then
-        Env.add_unary_inf "trigger bool ind" trigger_induction;
-      if Env.flex_get k_simplify_bools then
-        Env.add_basic_simplify simpl_bool_subterms;
-      if Env.flex_get k_nnf then E.add_basic_simplify nnf_bool_subters;
-      if Env.flex_get k_norm_bools then
-        Env.add_basic_simplify normalize_bool_terms;
+      if OuterEnv.flex_get_of (OuterEnv.get_global ()) k_trigger_bool_ind > 0
+      then
+        OuterEnv.add_unary_inf (OuterEnv.get_global ()) "trigger bool ind"
+          trigger_induction;
+      if OuterEnv.flex_get_of (OuterEnv.get_global ()) k_simplify_bools then
+        OuterEnv.add_basic_simplify (OuterEnv.get_global ()) simpl_bool_subterms;
+      if OuterEnv.flex_get_of (OuterEnv.get_global ()) k_nnf then
+        OuterEnv.add_basic_simplify (OuterEnv.get_global ()) nnf_bool_subters;
+      if OuterEnv.flex_get_of (OuterEnv.get_global ()) k_norm_bools then
+        OuterEnv.add_basic_simplify (OuterEnv.get_global ())
+          normalize_bool_terms;
       if not !Lazy_cnf.enabled then (
-        Env.add_multi_simpl_rule ~priority:2 Fool.rw_bool_lits;
-        if Env.flex_get k_cnf_non_simpl then
-          Env.add_unary_inf "cnf otf inf" cnf_infer
+        OuterEnv.add_multi_simpl_rule (OuterEnv.get_global ()) ~priority:2
+          Fool.rw_bool_lits;
+        if OuterEnv.flex_get_of (OuterEnv.get_global ()) k_cnf_non_simpl then
+          OuterEnv.add_unary_inf (OuterEnv.get_global ()) "cnf otf inf"
+            cnf_infer
         else
-          Env.add_multi_simpl_rule ~priority:2 cnf_otf
+          OuterEnv.add_multi_simpl_rule (OuterEnv.get_global ()) ~priority:2
+            cnf_otf
       );
-      if Env.flex_get k_interpret_bool_funs then
-        Env.add_unary_inf "interpret boolean functions"
-          interpret_boolean_functions;
+      if OuterEnv.flex_get_of (OuterEnv.get_global ()) k_interpret_bool_funs
+      then
+        OuterEnv.add_unary_inf (OuterEnv.get_global ())
+          "interpret boolean functions" interpret_boolean_functions;
 
-      Env.add_unary_inf "false_elim" false_elim;
-      if Env.flex_get k_bool_reasoning = BoolHoist then (
-        if Env.flex_get k_bool_hoist_simpl then
-          Env.add_multi_simpl_rule ~priority:1000 bool_hoist_simpl;
-        Env.add_unary_inf "bool_hoist" bool_hoist;
+      OuterEnv.add_unary_inf (OuterEnv.get_global ()) "false_elim" false_elim;
+      if
+        OuterEnv.flex_get_of (OuterEnv.get_global ()) k_bool_reasoning
+        = BoolHoist
+      then (
+        if OuterEnv.flex_get_of (OuterEnv.get_global ()) k_bool_hoist_simpl then
+          OuterEnv.add_multi_simpl_rule (OuterEnv.get_global ()) ~priority:1000
+            bool_hoist_simpl;
+        OuterEnv.add_unary_inf (OuterEnv.get_global ()) "bool_hoist" bool_hoist;
 
-        if Env.flex_get k_rename_nested_bools then
-          Env.add_multi_simpl_rule ~priority:500 rename_nested_booleans;
+        if OuterEnv.flex_get_of (OuterEnv.get_global ()) k_rename_nested_bools
+        then
+          OuterEnv.add_multi_simpl_rule (OuterEnv.get_global ()) ~priority:500
+            rename_nested_booleans;
 
-        Env.add_unary_inf "formula_hoist" eq_hoist;
-        Env.add_multi_simpl_rule ~priority:100 replace_bool_vars;
-        Env.add_multi_simpl_rule ~priority:90 quantifier_rw_and_hoist;
-        Env.add_unary_inf "eq_rw" nested_eq_rw;
+        OuterEnv.add_unary_inf (OuterEnv.get_global ()) "formula_hoist" eq_hoist;
+        OuterEnv.add_multi_simpl_rule (OuterEnv.get_global ()) ~priority:100
+          replace_bool_vars;
+        OuterEnv.add_multi_simpl_rule (OuterEnv.get_global ()) ~priority:90
+          quantifier_rw_and_hoist;
+        OuterEnv.add_unary_inf (OuterEnv.get_global ()) "eq_rw" nested_eq_rw;
 
-        if Env.flex_get Superposition.k_ho_basic_rules then (
-          if Env.flex_get k_bool_app_var_repl then
-            Env.add_unary_inf "replace_bool_app_vars" replace_bool_app_vars;
-          if Env.flex_get k_fluid_hoist then
-            Env.add_unary_inf "fluid_hoist" fluid_hoist;
-          if Env.flex_get k_fluid_log_hoist then (
-            Env.add_unary_inf "fluid_log_hoist" fluid_log_hoist;
-            Env.add_unary_inf "fluid_quant_rw" fluid_quant_rw
+        if
+          OuterEnv.flex_get_of (OuterEnv.get_global ())
+            Superposition.k_ho_basic_rules
+        then (
+          if OuterEnv.flex_get_of (OuterEnv.get_global ()) k_bool_app_var_repl
+          then
+            OuterEnv.add_unary_inf (OuterEnv.get_global ())
+              "replace_bool_app_vars" replace_bool_app_vars;
+          if OuterEnv.flex_get_of (OuterEnv.get_global ()) k_fluid_hoist then
+            OuterEnv.add_unary_inf (OuterEnv.get_global ()) "fluid_hoist"
+              fluid_hoist;
+          if OuterEnv.flex_get_of (OuterEnv.get_global ()) k_fluid_log_hoist
+          then (
+            OuterEnv.add_unary_inf (OuterEnv.get_global ()) "fluid_log_hoist"
+              fluid_log_hoist;
+            OuterEnv.add_unary_inf (OuterEnv.get_global ()) "fluid_quant_rw"
+              fluid_quant_rw
           )
         )
       )
@@ -2647,30 +2762,30 @@ let _disable_ho_unif = ref false
 let _bool_triggers_only = ref false
 
 let extension =
-  let register env =
-    let module E = (val env : Env.S) in
+  let register (env : Env.t) =
+    let module E = (val (module Env) : Env.S) in
     let module ET = Make (E) in
-    E.flex_add k_bool_reasoning !_bool_reasoning;
-    E.flex_add k_quant_rename !_quant_rename;
-    E.flex_add k_interpret_bool_funs !_interpret_bool_funs;
-    E.flex_add k_cnf_non_simpl !_cnf_non_simpl;
-    E.flex_add k_norm_bools !_norm_bools;
-    E.flex_add k_filter_literals !_filter_literals;
-    E.flex_add k_nnf !_nnf;
-    E.flex_add k_simplify_bools !_simplify_bools;
-    E.flex_add k_trigger_bool_inst !_trigger_bool_inst;
-    E.flex_add k_trigger_bool_ind !_trigger_bool_ind;
-    E.flex_add k_include_quants !_include_quants;
-    E.flex_add k_bool_hoist_simpl !_bool_hoist_simpl;
-    E.flex_add k_rename_nested_bools !_rename_nested_bools;
-    E.flex_add k_fluid_hoist !_fluid_hoist;
-    E.flex_add k_bool_app_var_repl !_bool_app_var_repl;
-    E.flex_add k_fluid_log_hoist !_fluid_log_hoist;
-    E.flex_add k_solve_formulas !_solve_formulas;
-    E.flex_add k_replace_unsupported_quants !_replace_quants;
-    E.flex_add k_disable_ho_bool_unif !_disable_ho_unif;
-    E.flex_add k_generalize_trigger !_generalize_trigger;
-    E.flex_add k_bool_triggers_only !_bool_triggers_only;
+    Env.flex_add_of env k_bool_reasoning !_bool_reasoning;
+    Env.flex_add_of env k_quant_rename !_quant_rename;
+    Env.flex_add_of env k_interpret_bool_funs !_interpret_bool_funs;
+    Env.flex_add_of env k_cnf_non_simpl !_cnf_non_simpl;
+    Env.flex_add_of env k_norm_bools !_norm_bools;
+    Env.flex_add_of env k_filter_literals !_filter_literals;
+    Env.flex_add_of env k_nnf !_nnf;
+    Env.flex_add_of env k_simplify_bools !_simplify_bools;
+    Env.flex_add_of env k_trigger_bool_inst !_trigger_bool_inst;
+    Env.flex_add_of env k_trigger_bool_ind !_trigger_bool_ind;
+    Env.flex_add_of env k_include_quants !_include_quants;
+    Env.flex_add_of env k_bool_hoist_simpl !_bool_hoist_simpl;
+    Env.flex_add_of env k_rename_nested_bools !_rename_nested_bools;
+    Env.flex_add_of env k_fluid_hoist !_fluid_hoist;
+    Env.flex_add_of env k_bool_app_var_repl !_bool_app_var_repl;
+    Env.flex_add_of env k_fluid_log_hoist !_fluid_log_hoist;
+    Env.flex_add_of env k_solve_formulas !_solve_formulas;
+    Env.flex_add_of env k_replace_unsupported_quants !_replace_quants;
+    Env.flex_add_of env k_disable_ho_bool_unif !_disable_ho_unif;
+    Env.flex_add_of env k_generalize_trigger !_generalize_trigger;
+    Env.flex_add_of env k_bool_triggers_only !_bool_triggers_only;
 
     ET.setup ()
   in

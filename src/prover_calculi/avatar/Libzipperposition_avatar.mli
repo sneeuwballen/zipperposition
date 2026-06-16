@@ -28,7 +28,7 @@ module Make (E : Env.S) (Sat : Sat_solver_intf.STATIC) :
 val k_avatar : (module Avatar_intf.S) Flex_state.key
 val k_simplify_trail : bool Flex_state.key
 val k_avatar_enabled : bool Flex_state.key
-val get_env : (module Env.S) -> (module S)
+val get_env : Env.t -> (module S)
 
 val extension : Extensions.t
 (** Extension that enables Avatar splitting and create a new SAT-solver. *)

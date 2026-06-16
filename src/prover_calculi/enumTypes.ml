@@ -89,6 +89,7 @@ let is_projector_ id ~of_ =
   | None -> false
 
 module Make (E : Env.S) : S with module Env = E = struct
+  module OuterEnv = Env
   module Env = E
   module C = Env.C
   module PS = Env.ProofState
@@ -353,7 +354,9 @@ module Make (E : Env.S) : S with module Env = E = struct
                 in
                 let trail = C.trail c and penalty = C.penalty c in
                 let c' =
-                  C.create_a ~trail ~penalty
+                  C.create_a
+                    ~ctx:(OuterEnv.get_ctx (OuterEnv.get_global ()))
+                    ~trail ~penalty
                     (CCArray.append c_guard lits')
                     proof
                 in
@@ -409,7 +412,11 @@ module Make (E : Env.S) : S with module Env = E = struct
       let trail = Trail.empty in
       (* start with initial penalty *)
       let penalty = 4 in
-      let c' = C.create ~trail ~penalty (c_guard @ lits) proof in
+      let c' =
+        C.create
+          ~ctx:(OuterEnv.get_ctx (OuterEnv.get_global ()))
+          ~trail ~penalty (c_guard @ lits) proof
+      in
       Util.debugf ~section 3
         "@[<2>instantiate axiom of enum type `%a` on @[%a@]:@ clause @[%a@]@]"
         (fun k -> k pp_id_or_builtin decl.decl_ty_id Name.pp s C.pp c');
@@ -468,7 +475,10 @@ module Make (E : Env.S) : S with module Env = E = struct
 
   let _on_new_decl decl =
     let clauses =
-      Signature.fold (Ctx.signature ()) [] (fun acc s (ty, _) ->
+      Signature.fold
+        (Env.Ctx.signature (OuterEnv.get_ctx (OuterEnv.get_global ())))
+        []
+        (fun acc s (ty, _) ->
           match check_decl_ s ~ty decl with
           | None -> acc
           | Some c -> c :: acc)
@@ -534,7 +544,11 @@ module Make (E : Env.S) : S with module Env = E = struct
     match Stmt.view stmt with
     | Stmt.Assert c ->
       let proof = Stmt.proof_step stmt in
-      let c = C.of_forms ~trail:Trail.empty c proof in
+      let c =
+        C.of_forms
+          ~ctx:(OuterEnv.get_ctx (OuterEnv.get_global ()))
+          ~trail:Trail.empty c proof
+      in
       _detect_and_declare c
     | Stmt.Data l ->
       let proof = Stmt.as_proof_c stmt in
@@ -546,27 +560,35 @@ module Make (E : Env.S) : S with module Env = E = struct
   let setup () =
     if !_enable then (
       Util.debug ~section 1 "register handling of enumerated types";
-      Env.add_multi_simpl_rule ~priority:5 instantiate_vars;
-      Env.add_is_trivial is_trivial;
+      OuterEnv.add_multi_simpl_rule (OuterEnv.get_global ()) ~priority:5
+        instantiate_vars;
+      OuterEnv.add_is_trivial (OuterEnv.get_global ()) is_trivial;
       (* look in input statements  for inductive types *)
-      Signal.on_every Env.on_input_statement _detect_stmt;
+      Signal.on_every
+        (OuterEnv.on_input_statement (OuterEnv.get_global ()))
+        _detect_stmt;
       (* signals: instantiate axioms upon new symbols, or when new
           declarations are added *)
-      Signal.on_every Ctx.on_new_symbol (fun (s, ty) -> _on_new_symbol s ~ty);
+      Signal.on_every
+        (Ctx.on_new_symbol (OuterEnv.get_ctx (OuterEnv.get_global ())))
+        (fun (s, ty) -> _on_new_symbol s ~ty);
       Signal.on_every on_new_decl (fun decl ->
           _on_new_decl decl;
           (* need to simplify (instantiate) active clauses that have naked
               variables of the given type *)
-          Env.simplify_active_with instantiate_vars);
-      Signature.iter (Ctx.signature ()) (fun s (ty, _) -> _on_new_symbol s ~ty)
+          OuterEnv.simplify_active_with (OuterEnv.get_global ())
+            instantiate_vars);
+      Signature.iter
+        (Ctx.signature (OuterEnv.get_ctx (OuterEnv.get_global ())))
+        (fun s (ty, _) -> _on_new_symbol s ~ty)
     )
 end
 
 (** {2 As Extension} *)
 
 let extension =
-  let register env =
-    let module E = (val env : Env.S) in
+  let register (env : Env.t) =
+    let module E = (val (module Env) : Env.S) in
     let module ET = Make (E) in
     ET.setup ()
   in

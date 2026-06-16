@@ -10,7 +10,7 @@ type 'a or_error = ('a, string) CCResult.t
 
 type state = Flex_state.t
 
-type env_action = (module Env.S) -> unit
+type env_action = Env.t -> unit
 (** An extension is allowed to modify an environment *)
 
 type prec_action = state -> Compute_prec.t -> Compute_prec.t

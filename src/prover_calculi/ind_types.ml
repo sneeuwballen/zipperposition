@@ -14,7 +14,9 @@ let stat_injectivity = Util.mk_stat "ind_ty.injectivity_steps"
 let stat_exhaustiveness = Util.mk_stat "ind_ty.exhaustiveness_steps"
 let enabled_ = ref true
 
+module OuterEnv = Env
 (** {1 Deal with Inductive Types} *)
+
 module Make (Env : Env_intf.S) = struct
   module C = Env.C
 
@@ -89,7 +91,9 @@ module Make (Env : Env_intf.S) = struct
           [ C.proof_parent c ]
       in
       let c' =
-        C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) lits' proof
+        C.create_a
+          ~ctx:(OuterEnv.get_ctx (OuterEnv.get_global ()))
+          ~trail:(C.trail c) ~penalty:(C.penalty c) lits' proof
       in
       Util.incr_stat stat_acyclicity;
       Util.debugf ~section 3
@@ -136,7 +140,9 @@ module Make (Env : Env_intf.S) = struct
                ~tags:[ Proof.Tag.T_data ]
            in
            let new_c =
-             C.create ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof
+             C.create
+               ~ctx:(OuterEnv.get_ctx (OuterEnv.get_global ()))
+               ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof
            in
            Util.incr_stat stat_acyclicity;
            Util.debugf ~section 3
@@ -185,8 +191,10 @@ module Make (Env : Env_intf.S) = struct
       let clauses =
         List.map
           (fun lit ->
-            C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
-              (lit :: other_lits) proof)
+            C.create
+              ~ctx:(OuterEnv.get_ctx (OuterEnv.get_global ()))
+              ~trail:(C.trail c) ~penalty:(C.penalty c) (lit :: other_lits)
+              proof)
           new_lits
       in
       Util.incr_stat stat_injectivity;
@@ -276,7 +284,9 @@ module Make (Env : Env_intf.S) = struct
                  List.map
                    (fun ty ->
                      let c = mk_sub_skolem t ty in
-                     Env.Ctx.declare c ty;
+                     Env.Ctx.declare
+                       (OuterEnv.get_ctx (OuterEnv.get_global ()))
+                       c ty;
                      T.const ~ty c)
                    cstor_ty_args
                in
@@ -287,7 +297,11 @@ module Make (Env : Env_intf.S) = struct
       let proof = Proof.Step.trivial in
       let penalty = 5 in
       (* do not use too lightly! *)
-      let new_c = C.create ~trail:Trail.empty ~penalty lits proof in
+      let new_c =
+        C.create
+          ~ctx:(OuterEnv.get_ctx (OuterEnv.get_global ()))
+          ~trail:Trail.empty ~penalty lits proof
+      in
       Util.incr_stat stat_exhaustiveness;
       Util.debugf ~section 3
         "(@[<2>exhaustiveness axiom@ :for `@[%a:%a@]`@ :clause %a@])" (fun k ->
@@ -328,16 +342,21 @@ module Make (Env : Env_intf.S) = struct
   let setup () =
     if !enabled_ then (
       Util.debug ~section 2 "setup inductive types calculus";
-      Env.add_is_trivial acyclicity_trivial;
-      Env.add_unary_simplify acyclicity_simplify;
-      Env.add_multi_simpl_rule ~priority:5 injectivity_destruct_pos;
-      Env.add_lit_rule "ind_types.disjointness" disjointness;
-      Env.add_unary_inf "ind_types.acyclicity" acyclicity_inf;
-      Env.add_unary_inf "ind_types.exhaustiveness" exhaustiveness
+      OuterEnv.add_is_trivial (OuterEnv.get_global ()) acyclicity_trivial;
+      OuterEnv.add_unary_simplify (OuterEnv.get_global ()) acyclicity_simplify;
+      OuterEnv.add_multi_simpl_rule (OuterEnv.get_global ()) ~priority:5
+        injectivity_destruct_pos;
+      OuterEnv.add_lit_rule (OuterEnv.get_global ()) "ind_types.disjointness"
+        disjointness;
+      OuterEnv.add_unary_inf (OuterEnv.get_global ()) "ind_types.acyclicity"
+        acyclicity_inf;
+      OuterEnv.add_unary_inf (OuterEnv.get_global ()) "ind_types.exhaustiveness"
+        exhaustiveness
     )
 end
 
-let env_act (module E : Env_intf.S) =
+let env_act (env : Env.t) =
+  let module E = (val (module Env) : Env.S) in
   let module M = Make (E) in
   M.setup ()
 

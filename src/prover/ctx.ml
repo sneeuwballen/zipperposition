@@ -13,10 +13,10 @@ module type S = Ctx_intf.S
 type t = {
   mutable ord: Ordering.t;
   mutable select: Selection.t;
-  mutable bool_select: Bool_selection.t;
+  bool_select: Bool_selection.t;
   mutable signature: Signature.t;
   mutable complete: bool;
-  mutable sk_ctx: Skolem.ctx;
+  sk_ctx: Skolem.ctx;
   mutable inj_syms: CCBV.t Name.Map.t;
   renaming: Subst.Renaming.t;
   on_new_symbol: (Name.t * Type.t) Signal.t;
@@ -41,6 +41,8 @@ let create ~signature ~ord ~select ~bool_select ~sk_ctx =
     lit_to_hooks = [];
   }
 
+(** Global default context (used when ~ctx is not provided to Clause.create) *)
+
 (** {2 Accessors / mutators} *)
 
 let ord t = t.ord
@@ -59,9 +61,10 @@ let compare t t1 t2 = Ordering.compare t.ord t1 t2
 let select t lits = t.select lits
 let bool_select t lits = t.bool_select lits
 
-let lost_completeness t =
-  if t.complete then Util.debug ~section:Const.section 1 "completeness is lost";
-  t.complete <- false
+let lost_completeness ctx =
+  if ctx.complete then
+    Util.debug ~section:Const.section 1 "completeness is lost";
+  ctx.complete <- false
 
 let is_completeness_preserved t = t.complete
 
@@ -125,6 +128,53 @@ let lit_to_form t f = Literal.Conv.to_form ~hooks:t.lit_to_hooks f
 let add_lit_from_hook t h = t.lit_from_hooks <- h :: t.lit_from_hooks
 let add_lit_to_hook t h = t.lit_to_hooks <- h :: t.lit_to_hooks
 
+module Lit = struct
+  (* Bridge: uses global ref for backward compat *)
+  let _from_hooks : Literal.Conv.hook_from list ref = ref []
+  let _to_hooks : Literal.Conv.hook_to list ref = ref []
+  let from_hooks () = !_from_hooks
+  let add_from_hook h = _from_hooks := h :: !_from_hooks
+  let to_hooks () = !_to_hooks
+  let add_to_hook h = _to_hooks := h :: !_to_hooks
+  let of_form f = Literal.Conv.of_form ~hooks:!_from_hooks f
+  let to_form f = Literal.Conv.to_form ~hooks:!_to_hooks f
+end
+
 module Key = struct
   let lost_completeness = Flex_state.create_key ()
 end
+
+(** {2 Bridge functions (old-style, use global ctx ref)} *)
+
+let _ctx : t option ref = ref None
+
+let _with f =
+  match !_ctx with
+  | Some ctx -> f ctx
+  | None -> invalid_arg "Ctx global not set"
+
+let set_global ctx = _ctx := Some ctx
+let sk_ctx' () = _with sk_ctx
+let ord' () = _with ord
+let selection_fun' () = _with selection_fun
+let set_selection_fun' f = _with (fun ctx -> set_selection_fun ctx f)
+let set_ord' o = _with (fun ctx -> set_ord ctx o)
+let signature' () = _with signature
+let renaming' = _with renaming
+let compare' t1 t2 = _with (fun ctx -> compare ctx t1 t2)
+let select' = _with select
+let bool_select' = _with bool_select
+let lost_completeness' () = _with (fun ctx -> lost_completeness ctx)
+let is_completeness_preserved' () = _with is_completeness_preserved
+let add_signature' s = _with (fun ctx -> add_signature ctx s)
+let find_signature' n = _with (fun ctx -> find_signature ctx n)
+let find_signature_exn' n = _with (fun ctx -> find_signature_exn ctx n)
+let declare' n ty = _with (fun ctx -> declare ctx n ty)
+let declare_syms' l = _with (fun ctx -> declare_syms ctx l)
+let on_new_symbol' = _with on_new_symbol
+let on_signature_update' = _with on_signature_update
+
+let set_injective_for_arg' n i =
+  _with (fun ctx -> set_injective_for_arg ctx n i)
+
+let is_injective_for_arg' n i = _with (fun ctx -> is_injective_for_arg ctx n i)

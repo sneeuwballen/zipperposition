@@ -4,7 +4,7 @@ open Logtk
 
 (** {2 Set of active clauses} *)
 module type S = sig
-  module Ctx : Ctx.S
+  module Ctx : module type of Ctx
   module C : Clause_intf.S
 
   (** Priority queues on clauses *)

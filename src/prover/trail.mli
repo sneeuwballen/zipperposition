@@ -55,3 +55,4 @@ val is_active : t -> v:valuation -> bool
     in the boolean valuation [v]. *)
 
 val to_s_form : t -> TypedSTerm.Form.t
+val pp : t CCFormat.printer

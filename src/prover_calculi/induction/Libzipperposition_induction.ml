@@ -89,6 +89,8 @@ module Make_goal (E : Env_intf.S) : sig
   val has_been_tried : t -> bool
   (** Is the goal already converted into a lemma? *)
 end = struct
+  module OuterEnv = Env
+
   type status =
     | S_trivial
     | S_ok
@@ -187,7 +189,8 @@ end = struct
 
   (* do only a few steps of inferences for checking if a candidate lemma
      is trivial/absurd *)
-  let max_steps_ = E.flex_get k_goal_assess_limit
+  let max_steps_ =
+    OuterEnv.flex_get_of (OuterEnv.get_global ()) k_goal_assess_limit
 
   (* TODO: if goal passes tests, can we use the demod/sup steps to infer active
      positions? (e.g. looking at which variables were substituted with
@@ -207,7 +210,7 @@ end = struct
     Util.debugf ~section 2
       "@[<2>@{<green>assess goal@}@ :goal %a@ :max-steps %d@]" (fun k ->
         k pp g max_steps_);
-    let module CQ = E.ProofState.CQueue in
+    let module CQ = Libzipperposition.ClauseQueue in
     let q = CQ.almost_bfs () in
     (* clauses waiting *)
     let push_c c = ignore (CQ.add q c) in
@@ -219,10 +222,12 @@ end = struct
       List.iter
         (fun lits ->
           let c =
-            C.create_a ~trail:Trail.empty ~penalty:1 lits Proof.Step.trivial
+            C.create_a
+              ~ctx:(OuterEnv.get_ctx (OuterEnv.get_global ()))
+              ~trail:Trail.empty ~penalty:1 lits Proof.Step.trivial
           in
-          let c, _ = E.unary_simplify c in
-          if E.is_trivial c then
+          let c, _ = OuterEnv.unary_simplify (OuterEnv.get_global ()) c in
+          if OuterEnv.is_trivial (OuterEnv.get_global ()) c then
             ()
           else if C.is_empty c then
             raise (Yield_false c)
@@ -236,14 +241,14 @@ end = struct
         try
           incr n;
           let c = CQ.take_first q in
-          let c, _ = E.unary_simplify c in
+          let c, _ = OuterEnv.unary_simplify (OuterEnv.get_global ()) c in
           (* check for empty clause *)
           if C.comes_from_goal c then
             ()
           (* ignore, a valid lemma might contradict goal *)
           else if C.is_empty c && Trail.is_empty (C.trail c) then
             raise (Yield_false c)
-          else if E.is_trivial c then
+          else if OuterEnv.is_trivial (OuterEnv.get_global ()) c then
             ()
           else (
             trivial := false;
@@ -252,11 +257,15 @@ end = struct
               if needed *)
             if !n + 2 < max_steps_ then (
               let new_c =
-                Iter.append (E.do_binary_inferences c) (E.do_unary_inferences c)
+                Iter.append
+                  (OuterEnv.do_binary_inferences (OuterEnv.get_global ()) c)
+                  (OuterEnv.do_unary_inferences (OuterEnv.get_global ()) c)
               in
               new_c
               |> Iter.filter_map (fun new_c ->
-                     let new_c, _ = E.unary_simplify new_c in
+                     let new_c, _ =
+                       OuterEnv.unary_simplify (OuterEnv.get_global ()) new_c
+                     in
                      (* discard trivial/conditional clauses, or clauses coming
                       from goals (as they might be true lemmas but contradict
                       the negated goal, which makes them even more useful);
@@ -265,7 +274,8 @@ end = struct
                        None
                      else if not (Trail.is_empty (C.trail new_c)) then
                        None
-                     else if E.is_trivial new_c then
+                     else if OuterEnv.is_trivial (OuterEnv.get_global ()) new_c
+                     then
                        None
                      else if C.is_empty new_c then
                        raise (Yield_false new_c)
@@ -328,6 +338,8 @@ module T_view : sig
       under a cstor, uninterpreted symbol, builtin, or under a defined function
       at an active position *)
 end = struct
+  module OuterEnv = Env
+
   type 'a t =
     | T_var of T.var
     | T_db of int
@@ -426,6 +438,7 @@ end
 
 (** {2 Calculus of Induction} *)
 module Make (E : Env.S) (A : AVATAR with module E = E) = struct
+  module OuterEnv = Env
   module Env = E
   module Ctx = E.Ctx
   module C = E.C
@@ -433,8 +446,10 @@ module Make (E : Env.S) (A : AVATAR with module E = E) = struct
   module BoolLit = BoolBox.Lit
   module Goal = Make_goal (E)
 
-  let max_depth = Env.flex_get k_ind_depth
-  let cover_set_depth = Env.flex_get k_coverset_depth
+  let max_depth = OuterEnv.flex_get_of (OuterEnv.get_global ()) k_ind_depth
+
+  let cover_set_depth =
+    OuterEnv.flex_get_of (OuterEnv.get_global ()) k_coverset_depth
 
   let is_ind_conjecture_ c =
     match C.distance_to_goal c with
@@ -471,7 +486,7 @@ module Make (E : Env.S) (A : AVATAR with module E = E) = struct
       @return a list of ways to generalize the given clause *)
   let scan_clause (c : C.t) : Ind_cst.ind_skolem list list =
     let l1 =
-      if E.flex_get k_ind_on_subcst then
+      if OuterEnv.flex_get_of (OuterEnv.get_global ()) k_ind_on_subcst then
         C.lits c |> Lits.Seq.terms |> scan_terms ~mode:`All
       else
         []
@@ -486,7 +501,9 @@ module Make (E : Env.S) (A : AVATAR with module E = E) = struct
   let decl_cst_of_set (set : Cover_set.t) : unit =
     Util.debugf ~section 3 "@[<2>declare coverset@ `%a`@]" (fun k ->
         k Cover_set.pp set);
-    Cover_set.declarations set |> Iter.iter (fun (id, ty) -> Ctx.declare id ty)
+    Cover_set.declarations set
+    |> Iter.iter (fun (id, ty) ->
+           Ctx.declare (OuterEnv.get_ctx (OuterEnv.get_global ())) id ty)
 
   (* induction on the given variables *)
   let ind_on_vars (cut : A.cut_res) (vars : T.var list) : C.t list =
@@ -516,7 +533,7 @@ module Make (E : Env.S) (A : AVATAR with module E = E) = struct
       |> List.map (fun v ->
              let ty_v = HVar.ty v in
              let id = Ind_cst.make_skolem ty_v in
-             Ctx.declare id ty_v;
+             Ctx.declare (OuterEnv.get_ctx (OuterEnv.get_global ())) id ty_v;
              (v, 0), (T.const ~ty:ty_v id, 1))
       |> Subst.FO.of_list' ?init:None
     in
@@ -577,7 +594,9 @@ module Make (E : Env.S) (A : AVATAR with module E = E) = struct
                                [ b_lit_case; BoolLit.neg cut_blit ]
                                |> Trail.of_list
                              in
-                             C.create_a lits proof ~trail ~penalty:1))
+                             C.create_a
+                               ~ctx:(OuterEnv.get_ctx (OuterEnv.get_global ()))
+                               lits proof ~trail ~penalty:1))
                |> Iter.to_list
              in
              (* clauses [CNF[¬goal[case]) <- b_lit(case), ¬cut.blit] with
@@ -605,7 +624,9 @@ module Make (E : Env.S) (A : AVATAR with module E = E) = struct
                       let trail =
                         [ BoolLit.neg cut_blit; b_lit_case ] |> Trail.of_list
                       in
-                      C.create_a lits proof ~trail ~penalty:1)
+                      C.create_a
+                        ~ctx:(OuterEnv.get_ctx (OuterEnv.get_global ()))
+                        lits proof ~trail ~penalty:1)
              in
              (* all new clauses *)
              let res = List.rev_append pos_clauses neg_clauses in
@@ -866,12 +887,12 @@ module Make (E : Env.S) (A : AVATAR with module E = E) = struct
 
     let all =
       let g1 =
-        if Env.flex_get k_generalize_var then
+        if OuterEnv.flex_get_of (OuterEnv.get_global ()) k_generalize_var then
           vars_at_active_pos
         else
           id
       and g2 =
-        if Env.flex_get k_generalize_term then
+        if OuterEnv.flex_get_of (OuterEnv.get_global ()) k_generalize_term then
           terms_at_active_pos
         else
           id
@@ -885,7 +906,7 @@ module Make (E : Env.S) (A : AVATAR with module E = E) = struct
 
   (* should we do induction on [x] in [c]? *)
   let should_do_ind_on_var (f : Cut_form.t) (x : T.var) : bool =
-    (not (E.flex_get k_limit_to_active))
+    (not (OuterEnv.flex_get_of (OuterEnv.get_global ()) k_limit_to_active))
     || var_occurs_under_active_pos f x
     || var_always_naked f x
 
@@ -1168,7 +1189,7 @@ module Make (E : Env.S) (A : AVATAR with module E = E) = struct
         List.filter (fun (id, ty) -> Ind_cst.id_is_ind_skolem id ty) skolems
       in
       (match ind_skolems with
-      | [] -> E.CR_skip
+      | [] -> OuterEnv.CR_skip
       | consts ->
         (* introduce one lemma where all the skolems are
                replaced by variables. But first, simplify these clauses
@@ -1179,12 +1200,14 @@ module Make (E : Env.S) (A : AVATAR with module E = E) = struct
                NOTE: do not use {!all_simplify} as it interacts badly
                with avatar splitting. *)
         let clauses =
-          C.of_statement st |> List.map (fun c -> fst (E.basic_simplify c))
+          C.of_statement ~ctx:(OuterEnv.get_ctx (OuterEnv.get_global ())) st
+          |> List.map (fun c ->
+                 fst (OuterEnv.basic_simplify (OuterEnv.get_global ()) c))
         in
         prove_by_ind clauses ~ignore_depth:true ~generalize_on:consts;
         (* "skip" in any case, because the proof is done in a cut anyway *)
-        E.CR_skip)
-    | _ -> E.cr_skip
+        OuterEnv.CR_skip)
+    | _ -> OuterEnv.CR_skip
 
   (* checks whether the trail is trivial, that is, it contains
      two literals [i = t1] and [i = t2] with [t1], [t2] distinct cover set cases *)
@@ -1244,13 +1267,17 @@ module Make (E : Env.S) (A : AVATAR with module E = E) = struct
 
   let register () =
     Util.debug ~section 2 "register induction";
-    let d = Env.flex_get k_ind_depth in
+    let d = OuterEnv.flex_get_of (OuterEnv.get_global ()) k_ind_depth in
     Util.debugf ~section 2 "maximum induction depth: %d" (fun k -> k d);
-    Env.add_unary_inf "induction.ind" inf_prove_by_ind;
-    Env.add_clause_conversion convert_statement;
-    Env.add_is_trivial_trail trail_is_trivial_cases;
-    if E.flex_get Avatar.k_simplify_trail then
-      Env.add_is_trivial_trail trail_is_trivial_lemmas;
+    OuterEnv.add_unary_inf (OuterEnv.get_global ()) "induction.ind"
+      inf_prove_by_ind;
+    OuterEnv.add_clause_conversion (OuterEnv.get_global ()) convert_statement;
+    OuterEnv.add_is_trivial_trail (OuterEnv.get_global ())
+      trail_is_trivial_cases;
+    if OuterEnv.flex_get_of (OuterEnv.get_global ()) Avatar.k_simplify_trail
+    then
+      OuterEnv.add_is_trivial_trail (OuterEnv.get_global ())
+        trail_is_trivial_lemmas;
     (* try to prove lemmas by induction *)
     A.add_prove_lemma prove_lemma_by_ind;
     ()
@@ -1295,15 +1322,17 @@ let post_typing_hook stmts state =
     Flex_state.add k_enable false state
 
 (* if enabled: register the main functor, with inference rules, etc. *)
-let env_action (module E : Env.S) =
-  let is_enabled = E.flex_get k_enable in
+let env_action (env : Env.t) =
+  let is_enabled = Env.flex_get_of (Env.get_global ()) k_enable in
   if is_enabled then (
-    let (module A) = Avatar.get_env (module E) in
+    let (module A) = Avatar.get_env env in
     (* XXX here we do not use E anymore, because we do not know
        that A.E = E. Therefore, it is simpler to use A.E. *)
     let module E = A.E in
-    E.Ctx.lost_completeness ();
-    E.Ctx.set_selection_fun Selection.no_select;
+    E.Ctx.lost_completeness (Env.get_ctx (Env.get_global ()));
+    E.Ctx.set_selection_fun
+      (Env.get_ctx (Env.get_global ()))
+      Selection.no_select;
     let module M = Make (A.E) (A) in
     M.register ()
   )

@@ -37,6 +37,7 @@ let k_max_trail_size : int Flex_state.key = Flex_state.create_key ()
 let k_infer_from_components : bool Flex_state.key = Flex_state.create_key ()
 
 module Make (E : Env.S) (Sat : Sat_solver_intf.STATIC) = struct
+  module OuterEnv = Env
   module E = E
   module Ctx = E.Ctx
   module C = E.C
@@ -97,7 +98,10 @@ module Make (E : Env.S) (Sat : Sat_solver_intf.STATIC) = struct
       assert (Array.length lits = 0);
       None
     | [ lits ] ->
-      if E.flex_get k_abstract_known_singletons then (
+      if
+        OuterEnv.flex_get_of (OuterEnv.get_global ())
+          k_abstract_known_singletons
+      then (
         let lits = Array.of_list lits in
         let bool_name = BBox.find_boolean_lit lits in
         CCOpt.iter
@@ -131,7 +135,9 @@ module Make (E : Env.S) (Sat : Sat_solver_intf.STATIC) = struct
             (* new trail: add the new one *)
             let trail = Trail.add bool_name keep_trail in
             let c =
-              C.create_a ~trail ~penalty:(C.penalty c) lits
+              C.create_a
+                ~ctx:(OuterEnv.get_ctx (OuterEnv.get_global ()))
+                ~trail ~penalty:(C.penalty c) lits
                 (proof ~rule:(Proof.Rule.mk "split"))
             in
             c, bool_name)
@@ -155,15 +161,25 @@ module Make (E : Env.S) (Sat : Sat_solver_intf.STATIC) = struct
 
     let should_split c =
       (not @@ Literals.is_trivial (C.lits c))
-      && ((not @@ E.flex_get k_split_only_initial) || C.proof_depth c == 0)
-      && ((not @@ E.flex_get k_split_only_ground) || C.is_ground c)
-      && ((not @@ E.flex_get k_split_only_goals)
+      && (not
+          @@ OuterEnv.flex_get_of (OuterEnv.get_global ()) k_split_only_initial
+         || C.proof_depth c == 0)
+      && (not
+          @@ OuterEnv.flex_get_of (OuterEnv.get_global ()) k_split_only_ground
+         || C.is_ground c)
+      && (not
+          @@ OuterEnv.flex_get_of (OuterEnv.get_global ()) k_split_only_goals
          || CCOpt.get_or ~default:(-1) (C.distance_to_goal c) >= 0)
-      && ((not @@ E.flex_get k_abstract_known_singletons)
+      && (not
+          @@ OuterEnv.flex_get_of (OuterEnv.get_global ())
+               k_abstract_known_singletons
          || Array.length (C.lits c) != 0)
-      && (E.flex_get k_abstract_known_singletons || Array.length (C.lits c) > 1)
-      && (E.flex_get k_max_trail_size < 0
-         || Trail.length (C.trail c) <= E.flex_get k_max_trail_size)
+      && (OuterEnv.flex_get_of (OuterEnv.get_global ())
+            k_abstract_known_singletons
+         || Array.length (C.lits c) > 1)
+      && (OuterEnv.flex_get_of (OuterEnv.get_global ()) k_max_trail_size < 0
+         || Trail.length (C.trail c)
+            <= OuterEnv.flex_get_of (OuterEnv.get_global ()) k_max_trail_size)
     in
 
     let res =
@@ -202,7 +218,7 @@ module Make (E : Env.S) (Sat : Sat_solver_intf.STATIC) = struct
     );
     if
       Array.length (C.lits c) = 0
-      && E.flex_get k_infer_from_components
+      && OuterEnv.flex_get_of (OuterEnv.get_global ()) k_infer_from_components
       && Trail.length (C.trail c) = 1
     then (
       let bool_lit = List.hd (Trail.to_list (C.trail c)) in
@@ -231,7 +247,7 @@ module Make (E : Env.S) (Sat : Sat_solver_intf.STATIC) = struct
         in
         List.map
           (fun lit ->
-            C.create ~penalty:(C.penalty c) ~trail:Trail.empty
+            C.create ~ctx:(C.ctx_of c) ~penalty:(C.penalty c) ~trail:Trail.empty
               [ negate lit ]
               proof)
           lits'
@@ -322,7 +338,9 @@ module Make (E : Env.S) (Sat : Sat_solver_intf.STATIC) = struct
           (Proof.Parent.from (C.proof c) :: proof_removed)
       in
       let c' =
-        C.create_a ~trail:new_trail ~penalty:(C.penalty c) (C.lits c) proof
+        C.create_a
+          ~ctx:(OuterEnv.get_ctx (OuterEnv.get_global ()))
+          ~trail:new_trail ~penalty:(C.penalty c) (C.lits c) proof
       in
       Util.debugf ~section 3
         "@[<2>clause @[%a@]@ trail-simplifies into @[%a@]@]" (fun k ->
@@ -350,8 +368,8 @@ module Make (E : Env.S) (Sat : Sat_solver_intf.STATIC) = struct
      trail *)
   let backward_simplify_trails (_ : C.t) : C.ClauseSet.t =
     if Sat.last_result () = Sat.Sat && new_proved_lits () then
-      E.ProofState.ActiveSet.clauses ()
-      |> C.ClauseSet.to_iter
+      ProofState.ActiveSet.clauses ()
+      |> Clause.ClauseSet.to_seq |> Iter.of_seq
       |> Iter.filter (fun c -> not (Trail.is_empty @@ C.trail c))
       |> Iter.filter (fun c ->
              let ok =
@@ -365,7 +383,7 @@ module Make (E : Env.S) (Sat : Sat_solver_intf.STATIC) = struct
                  (fun k -> k C.pp c)
              );
              ok)
-      |> C.ClauseSet.of_iter
+      |> Iter.fold (fun s x -> C.ClauseSet.add x s) C.ClauseSet.empty
     else
       C.ClauseSet.empty
 
@@ -373,7 +391,7 @@ module Make (E : Env.S) (Sat : Sat_solver_intf.STATIC) = struct
 
   type cut_res = {
     cut_form: Cut_form.t;  (** the lemma itself *)
-    cut_pos: E.C.t list;  (** clauses true if lemma is true *)
+    cut_pos: C.t list;  (** clauses true if lemma is true *)
     cut_lit: BLit.t;  (** lit that is true if lemma is true *)
     cut_depth: int;  (** if the lemma is used to prove another lemma *)
     cut_proof: Proof.Step.t;  (** where does the lemma come from? *)
@@ -393,7 +411,7 @@ module Make (E : Env.S) (Sat : Sat_solver_intf.STATIC) = struct
     let pp_depth out d = if d > 0 then Format.fprintf out "@ :depth %d" d in
     let pp_reason out r = Format.fprintf out "@ :reason @[%a@]" r () in
     Format.fprintf out "(@[<4>@[<hv>cut@ :form @[%a@]@ :lit @[%a@]%a]%a@])"
-      (Util.pp_list E.C.pp) c.cut_pos BLit.pp c.cut_lit pp_depth c.cut_depth
+      (Util.pp_list C.pp) c.cut_pos BLit.pp c.cut_lit pp_depth c.cut_depth
       (Fmt.some pp_reason) c.cut_reason
 
   let cut_res_clauses c = Iter.of_list c.cut_pos
@@ -419,7 +437,9 @@ module Make (E : Env.S) (Sat : Sat_solver_intf.STATIC) = struct
     let c_pos =
       List.map
         (fun lits ->
-          C.create_a ~trail:(Trail.singleton box) ~penalty lits proof_pos)
+          C.create_a
+            ~ctx:(OuterEnv.get_ctx (OuterEnv.get_global ()))
+            ~trail:(Trail.singleton box) ~penalty lits proof_pos)
         (Cut_form.cs f)
     in
     {
@@ -472,7 +492,7 @@ module Make (E : Env.S) (Sat : Sat_solver_intf.STATIC) = struct
         |> List.map (fun v ->
                let ty_v = HVar.ty v in
                let id = Ind_cst.make_skolem ty_v in
-               Ctx.declare id ty_v;
+               Ctx.declare (OuterEnv.get_ctx (OuterEnv.get_global ())) id ty_v;
                (v, 0), (T.const ~ty:ty_v id, 0))
         |> Subst.FO.of_list' ?init:None
       in
@@ -489,7 +509,9 @@ module Make (E : Env.S) (Sat : Sat_solver_intf.STATIC) = struct
         |> CCList.map (fun l ->
                let lits = Array.of_list l in
                let trail = Trail.singleton (BLit.neg @@ cut_lit c) in
-               C.create_a lits proof ~trail ~penalty:1)
+               C.create_a
+                 ~ctx:(OuterEnv.get_ctx (OuterEnv.get_global ()))
+                 lits proof ~trail ~penalty:1)
       in
       clauses
     in
@@ -591,8 +613,8 @@ module Make (E : Env.S) (Sat : Sat_solver_intf.STATIC) = struct
       add_lemma cut;
       Signal.send on_input_lemma cut;
       (* interrupt here *)
-      E.cr_return all_clauses
-    | _ -> E.cr_skip
+      OuterEnv.CR_return all_clauses
+    | _ -> OuterEnv.CR_skip
 
   let before_check_sat = Signal.create ()
   let after_check_sat = Signal.create ()
@@ -611,7 +633,11 @@ module Make (E : Env.S) (Sat : Sat_solver_intf.STATIC) = struct
       | Sat.Unsat proof ->
         Util.debug ~section 1 "SAT-solver reports \"UNSAT\"";
         let proof = Proof.S.step proof in
-        let c = C.create ~trail:Trail.empty ~penalty:1 [] proof in
+        let c =
+          C.create
+            ~ctx:(OuterEnv.get_ctx (OuterEnv.get_global ()))
+            ~trail:Trail.empty ~penalty:1 [] proof
+        in
         [ c ]
     in
     Signal.send after_check_sat ();
@@ -628,43 +654,71 @@ module Make (E : Env.S) (Sat : Sat_solver_intf.STATIC) = struct
       (fun k -> k (split_to_str split_kind));
     Sat.set_printer BBox.pp;
     (match split_kind with
-    | `Lazy -> E.add_multi_simpl_rule ~priority:0 split
+    | `Lazy ->
+      OuterEnv.add_multi_simpl_rule (OuterEnv.get_global ()) ~priority:0 split
     | `Eager ->
-      E.add_cheap_multi_simpl_rule split;
+      OuterEnv.add_cheap_multi_simpl_rule (OuterEnv.get_global ()) split;
       (* this rule is used to interfere with lazy clausification *)
-      E.add_multi_simpl_rule ~priority:0 split
+      OuterEnv.add_multi_simpl_rule (OuterEnv.get_global ()) ~priority:0 split
     | `Off -> ());
 
-    E.add_unary_inf "avatar_check_empty" check_empty;
-    E.add_generate ~priority:1000 "avatar_check_sat" check_satisfiability;
-    E.add_generate ~priority:100 "avatar.lemmas" inf_new_lemmas;
-    E.add_clause_conversion convert_lemma;
+    OuterEnv.add_unary_inf (OuterEnv.get_global ()) "avatar_check_empty"
+      check_empty;
+    OuterEnv.add_generate (OuterEnv.get_global ()) ~priority:1000
+      "avatar_check_sat" check_satisfiability;
+    OuterEnv.add_generate (OuterEnv.get_global ()) ~priority:100 "avatar.lemmas"
+      inf_new_lemmas;
+    OuterEnv.add_clause_conversion (OuterEnv.get_global ()) convert_lemma;
 
     if split_kind != `Off then
-      Signal.on E.on_start (fun () ->
-          E.get_passive ()
+      Signal.on
+        (OuterEnv.on_start (OuterEnv.get_global ()))
+        (fun () ->
+          OuterEnv.get_passive (OuterEnv.get_global ()) ()
           |> Iter.iter (fun cl ->
                  match split cl with
                  | None -> ()
                  | Some splitted ->
-                   E.remove_passive (Iter.singleton cl);
-                   E.add_passive (Iter.of_list splitted));
+                   OuterEnv.remove_passive (OuterEnv.get_global ())
+                     (Iter.singleton cl);
+                   OuterEnv.add_passive (OuterEnv.get_global ())
+                     (Iter.of_list splitted));
 
           Signal.ContinueListening);
-    E.add_is_trivial_trail trail_is_trivial;
-    if E.flex_get k_simplify_trail then (
-      E.add_unary_simplify simplify_trail;
-      if E.flex_get k_back_simplify_trail then
-        E.add_backward_simplify backward_simplify_trails
+    OuterEnv.add_is_trivial_trail (OuterEnv.get_global ()) trail_is_trivial;
+    if OuterEnv.flex_get_of (OuterEnv.get_global ()) k_simplify_trail then (
+      OuterEnv.add_unary_simplify (OuterEnv.get_global ()) simplify_trail;
+      OuterEnv.add_backward_simplify (OuterEnv.get_global ()) (fun c ->
+          if Sat.last_result () = Sat.Sat && new_proved_lits () then
+            Clause.ClauseSet.filter
+              (fun c -> not (Trail.is_empty @@ C.trail c))
+              (E.ProofState.ActiveSet.clauses ())
+            |> Clause.ClauseSet.filter (fun c ->
+                   let ok =
+                     match simplify_opt (C.trail c) with
+                     | Tr_trivial | Tr_simplify_into _ -> true
+                     | Tr_same -> false
+                   in
+                   if ok then (
+                     Util.incr_stat stat_backward_simp_trail;
+                     Util.debugf ~section 5
+                       "(@[<2>backward_simplify_trail@ %a@])" (fun k ->
+                         k C.pp c)
+                   );
+                   ok)
+          else
+            Clause.ClauseSet.empty)
     );
-    if E.flex_get k_show_lemmas then
+    if OuterEnv.flex_get_of (OuterEnv.get_global ()) k_show_lemmas then
       Signal.once Signals.on_exit (fun _ -> show_lemmas ());
     (* be sure there is an initial valuation *)
     ignore (Sat.check ~full:true ());
     ()
 end
 
-let get_env (module E : Env.S) : (module S) = E.flex_get k_avatar
+let get_env (env : Env.t) : (module S) =
+  Env.flex_get_of (Env.get_global ()) k_avatar
+
 let avatar_kind = ref `Lazy
 let show_lemmas_ = ref false
 let simplify_trail_ = ref true
@@ -677,23 +731,26 @@ let max_trail_size = ref (-1)
 let infer_from_components = ref false
 
 let extension =
-  let action env =
-    let module E = (val env : Env.S) in
+  let action (env : Env.t) =
+    let module E = (val (module Env) : Env.S) in
     Util.debug 1 "create new SAT solver";
     let module Sat = Sat_solver.Make () in
     Sat.setup ();
     let module A = Make (E) (Sat) in
-    E.flex_add k_avatar (module A : S);
-    E.flex_add k_show_lemmas !show_lemmas_;
-    E.flex_add k_simplify_trail !simplify_trail_;
-    E.flex_add k_back_simplify_trail !back_simplify_trail_;
-    E.flex_add k_abstract_known_singletons !abstract_known_singletons;
-    E.flex_add k_split_only_initial !split_only_initial;
-    E.flex_add k_split_only_goals !split_only_goals;
-    E.flex_add k_split_only_ground !split_only_ground;
-    E.flex_add k_max_trail_size !max_trail_size;
-    E.flex_add k_infer_from_components !infer_from_components;
-    E.flex_add k_avatar_enabled (!avatar_kind != `Off);
+    Env.flex_add_of (Env.get_global ()) k_avatar (module A);
+    Env.flex_add_of (Env.get_global ()) k_show_lemmas !show_lemmas_;
+    Env.flex_add_of (Env.get_global ()) k_simplify_trail !simplify_trail_;
+    Env.flex_add_of (Env.get_global ()) k_back_simplify_trail
+      !back_simplify_trail_;
+    Env.flex_add_of (Env.get_global ()) k_abstract_known_singletons
+      !abstract_known_singletons;
+    Env.flex_add_of (Env.get_global ()) k_split_only_initial !split_only_initial;
+    Env.flex_add_of (Env.get_global ()) k_split_only_goals !split_only_goals;
+    Env.flex_add_of (Env.get_global ()) k_split_only_ground !split_only_ground;
+    Env.flex_add_of (Env.get_global ()) k_max_trail_size !max_trail_size;
+    Env.flex_add_of (Env.get_global ()) k_infer_from_components
+      !infer_from_components;
+    Env.flex_add_of (Env.get_global ()) k_avatar_enabled (!avatar_kind != `Off);
 
     Util.debug 1 "enable Avatar";
     A.register ~split_kind:!avatar_kind ()

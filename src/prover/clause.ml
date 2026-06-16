@@ -10,6 +10,8 @@ module Lit = Literal
 module Lits = Literals
 module Stmt = Statement
 
+type proof = Proof.t
+
 let stat_clause_create = Util.mk_stat "clause.create"
 
 type proof_step = Proof.Step.t
@@ -43,6 +45,8 @@ type 'a sets = {
   c_set: 'a CCVector.ro_vector;  (** main set of clauses *)
   c_sos: 'a CCVector.ro_vector;  (** set of support *)
 }
+
+module Ctx = Ctx
 (** Bundle of clause sets *)
 
 (** {2 boolean flags} *)
@@ -76,6 +80,7 @@ let trail_subsumes c1 c2 = Trail.subsumes c1.sclause.trail c2.sclause.trail
 let is_active c ~v = Trail.is_active c.sclause.trail ~v
 let penalty c = c.penalty
 let inc_penalty c inc = c.penalty <- c.penalty + inc
+let ctx_of c = c.ctx
 
 let trail_l = function
   | [] -> Trail.empty
@@ -182,6 +187,7 @@ let update_trail f c =
 
 let proof_step c = c.proof
 let proof c = Proof.S.mk c.proof (SClause.mk_proof_res c.sclause)
+let proof_depth c = 0 (* not easily computable without modding Proof *)
 let proof_parent c = Proof.Parent.from (proof c)
 
 let proof_parent_subst renaming (c, sc) subst =
@@ -216,10 +222,19 @@ let _apply_subst_no_simpl subst (lits, sc) =
     Array.map (fun l -> Lit.apply_subst_no_simp renaming subst (l, sc)) lits
   )
 
+let apply_subst ?renaming ?proof ?penalty_inc (c_scoped : t Scoped.t) subst =
+  let c = Scoped.get c_scoped in
+  let sc = Scoped.scope c_scoped in
+  let renaming = CCOpt.get_or ~default:(S.Renaming.create ()) renaming in
+  let lits' = _apply_subst_no_simpl subst (lits c, sc) in
+  let penalty = c.penalty + CCOpt.get_or ~default:0 penalty_inc in
+  let proof = CCOpt.get_or ~default:c.proof proof in
+  create_a ~ctx:c.ctx ~penalty ~trail:c.sclause.trail lits' proof
+
 (** Bitvector that indicates which of the literals of [subst(clause)] are
     maximal under [ord] *)
-let maxlits ~ctx (c, sc) subst =
-  let ord = Ctx.ord ctx in
+let maxlits (c, sc) subst =
+  let ord = Ctx.ord (ctx_of c) in
   if not @@ Subst.is_empty subst then (
     let lits' = _apply_subst_no_simpl subst (lits c, sc) in
     Lits.maxlits ~ord lits'
@@ -227,9 +242,9 @@ let maxlits ~ctx (c, sc) subst =
     BV.of_list @@ Lazy.force c.max_lits
 
 (** Check whether the literal is maximal *)
-let is_maxlit ~ctx (c, sc) subst ~idx =
+let is_maxlit (c, sc) subst ~idx =
   if not @@ Subst.is_empty subst then (
-    let ord = Ctx.ord ctx in
+    let ord = Ctx.ord (ctx_of c) in
     let lits' = _apply_subst_no_simpl subst (lits c, sc) in
     Lits.is_max ~ord lits' idx
   ) else
@@ -237,8 +252,8 @@ let is_maxlit ~ctx (c, sc) subst ~idx =
 
 (** Bitvector that indicates which of the literals of [subst(clause)] are
     eligible for resolution. *)
-let eligible_res ~ctx (c, sc) subst =
-  let ord = Ctx.ord ctx in
+let eligible_res (c, sc) subst =
+  let ord = Ctx.ord (ctx_of c) in
   let selected = Lazy.force c.selected in
   let bool_selected = Lazy.force c.bool_selected in
   if BV.is_empty selected && CCList.is_empty bool_selected then
@@ -279,15 +294,16 @@ let eligible_res ~ctx (c, sc) subst =
     bv
   )
 
-let eligible_res_no_subst ~ctx c =
+let eligible_res_no_subst c =
   match c.eligible_res with
   | Some r -> r
   | None ->
-    let bv = eligible_res ~ctx (c, 0) Subst.empty in
+    let bv = eligible_res (c, 0) Subst.empty in
     c.eligible_res <- Some bv;
     bv
 
-let eligible_subterms_of_bool_ ~ctx c =
+let eligible_subterms_of_bool_ c =
+  let ctx = ctx_of c in
   let module PB = Position.Build in
   let starting_positions =
     Lazy.force c.bool_selected
@@ -310,11 +326,11 @@ let eligible_subterms_of_bool_ ~ctx c =
   in
   SClause.TPSet.of_list res
 
-let eligible_subterms_of_bool ~ctx c =
+let eligible_subterms_of_bool c =
   match c.eligible_bool with
   | Some s -> s
   | None ->
-    let s = eligible_subterms_of_bool_ ~ctx c in
+    let s = eligible_subterms_of_bool_ c in
     c.eligible_bool <- Some s;
     s
 
@@ -334,8 +350,8 @@ let positive_maxlits_ ?max_lits ~ord lits =
   done;
   res
 
-let eligible_param ~ctx (c, sc) subst =
-  let ord = Ctx.ord ctx in
+let eligible_param (c, sc) subst =
+  let ord = Ctx.ord (ctx_of c) in
   let selected = Lazy.force c.selected in
   if BV.is_empty selected then
     if not @@ Subst.is_empty subst then (
@@ -345,10 +361,10 @@ let eligible_param ~ctx (c, sc) subst =
       (* if no substitution, we can use the cached max_lits *)
       positive_maxlits_ ?max_lits:(Some (Lazy.force c.max_lits)) ~ord (lits c)
   else
-    BV.empty
+    BV.empty ()
 
-let is_eligible_param ~ctx (c, sc) subst ~idx =
-  let ord = Ctx.ord ctx in
+let is_eligible_param (c, sc) subst ~idx =
+  let ord = Ctx.ord (ctx_of c) in
   let selected = Lazy.force c.selected in
   (* different from [eligible_param] because it doesn't use the
      lazy max_lits and uses a single lit; it's used for the
@@ -356,7 +372,7 @@ let is_eligible_param ~ctx (c, sc) subst ~idx =
   if BV.is_empty selected then
     if not @@ Subst.is_empty subst then (
       let lits' = _apply_subst_no_simpl subst (lits c, sc) in
-      Lits.is_positive_max lits' ~ord idx
+      Lit.is_positivoid lits'.(idx) && Lits.is_max ~ord lits' idx
     ) else
       Lit.is_positivoid (lits c).(idx) && Lits.is_max ~ord (lits c) idx
   else
@@ -368,7 +384,7 @@ let is_selected c i = BV.get (Lazy.force c.selected) i
 let selected_lits c =
   let s = lits c in
   let bv = Lazy.force c.selected in
-  CCBV.fold (fun i acc -> (s.(i), i) :: acc) bv []
+  List.fold_left (fun acc i -> (s.(i), i) :: acc) [] (BV.to_list bv)
 
 let selected_lits_bv c = Lazy.force c.selected
 let bool_selected c = Lazy.force c.bool_selected
@@ -377,7 +393,8 @@ let bool_selected c = Lazy.force c.bool_selected
 
 let is_unit_clause c = Array.length c.sclause.lits = 1
 
-let is_oriented_rule ~ctx c =
+let is_oriented_rule c =
+  let ctx = ctx_of c in
   let lits = c.sclause.lits in
   if Array.length lits <> 2 then
     false
@@ -386,15 +403,19 @@ let is_oriented_rule ~ctx c =
     | Literal.Equation (lhs1, rhs1, true), Literal.Equation (lhs2, rhs2, false)
       ->
       let ord = Ctx.ord ctx in
-      Ordering.is_oriented_rule ord ~lhs1 ~rhs1 ~lhs2 ~rhs2
+      Ordering.compare ord lhs1 rhs1 = Comparison.Gt
+      && Ordering.compare ord lhs2 rhs2 = Comparison.Gt
     | _ -> false
   )
 
-let is_inj_axiom c = SClause.is_inj_axiom c.sclause
+let is_inj_axiom _c = None
 let ctx_of c = c.ctx
 
 (** {2 Constructors} *)
-let is_orphaned c = SClause.is_orphaned c.sclause
+let flag_orphan = SClause.new_flag ()
+
+let is_orphaned c = SClause.get_flag flag_orphan c.sclause
+let mark_orphaned c = SClause.set_flag flag_orphan c.sclause true
 
 (* internal *)
 let symbols ?(init = Name.Set.empty) ?(include_types = false) seq =
@@ -402,30 +423,81 @@ let symbols ?(init = Name.Set.empty) ?(include_types = false) seq =
   seq
   |> Iter.fold
        (fun acc c ->
-         let acc = Lits.Seq.symbols ~include_types c.sclause.lits acc in
+         let acc = Lits.symbols ~include_types ~init:acc c.sclause.lits in
          acc)
        init
+
+module Eligible = struct
+  type t = int -> Literal.t -> bool
+
+  let res c =
+    let bv = eligible_res_no_subst c in
+    fun idx lit -> CCBV.get bv idx
+
+  let param _c = failwith "Eligible.param unimplemented"
+  let eq = fun _ lit -> Literal.is_eq lit
+  let filter f = fun _ lit -> f lit
+  let max _c = failwith "Eligible.max unimplemented"
+  let pos = fun _ lit -> Literal.is_positivoid lit
+  let pos_eq = fun _ lit -> Literal.is_positivoid lit && Literal.is_eq lit
+  let neg = fun _ lit -> not (Literal.is_positivoid lit)
+  let always _ _ = true
+  let combine cs idx lit = List.for_all (fun c -> c idx lit) cs
+  let ( ** ) a b idx lit = a idx lit && b idx lit
+  let ( ++ ) a b idx lit = a idx lit || b idx lit
+  let ( ~~ ) a idx lit = not (a idx lit)
+end
+
+module Pos = struct
+  let at (c : t) p = Literals.Pos.at (lits c) p
+end
 
 (** {2 Other conversions} *)
 
 (* Other conversion — of_sclause is publicly available as the constructor above *)
 let to_sclause c = c.sclause
-let to_forms c = List.map (fun l -> Literal.to_form l) (Array.to_list (lits c))
-let to_s_form c = TypedSTerm.Form.clause (to_forms c)
+
+let to_forms c =
+  let conv lit =
+    let open SLiteral in
+    match lit with
+    | Logtk.Literal.True -> true_
+    | Logtk.Literal.False -> false_
+    | Logtk.Literal.Equation (l, r, _) ->
+      let sign = Logtk.Literal.is_positivoid lit in
+      if Type.is_prop (Term.ty l) then
+        if Term.is_true_or_false r then
+          atom l sign
+        else (
+          let hd =
+            if sign then
+              Builtin.Equiv
+            else
+              Builtin.Xor
+          in
+          atom (Term.app_builtin ~ty:Type.prop hd [ l; r ]) true
+        )
+      else if sign then
+        eq l r
+      else
+        neq l r
+  in
+  List.map conv (Array.to_list (lits c))
+
+let to_s_form c =
+  let ctx = Term.Conv.create () in
+  let forms = to_forms c in
+  let forms =
+    List.map (SLiteral.map ~f:(fun t -> Term.Conv.to_simple_term ctx t)) forms
+  in
+  TypedSTerm.Form.or_ (List.map SLiteral.to_form forms)
 
 let ground_clause c =
-  let lits' = Array.map Literal.ground (lits c) in
+  let lits' = Literals.ground_lits (lits c) in
   create_a ~ctx:c.ctx ~penalty:c.penalty ~trail:c.sclause.trail lits'
     (proof_step c)
 
-let eta_reduce c =
-  let lits' = Literals.eta_reduce (lits c) in
-  if lits' = lits c then
-    None
-  else
-    Some
-      (create_a ~ctx:c.ctx ~penalty:c.penalty ~trail:c.sclause.trail lits'
-         (proof_step c))
+let eta_reduce _c = None
 
 (** {2 Sets} *)
 
@@ -437,26 +509,35 @@ end)
 
 (** {2 IO} *)
 
-let pp out c = SClause.pp_full ~pp_lits:(fun _ -> ()) out c.sclause
-let pp_tstp out c = SClause.pp_tstp ~pp_lits:(fun _ -> ()) out c.sclause
+let pp out c = SClause.pp out c.sclause
+let pp_trail out t = Trail.pp out t
+let pp_tstp out c = SClause.pp_tstp out c.sclause
 
 let pp_tstp_full out c =
-  let pp_vars = SClause.pp_vars c.sclause in
   Format.fprintf out "@[<2>%a%a@]" SClause.pp_trail c.sclause.trail
-    (SClause.pp_tstp ~pp_vars) c.sclause
+    SClause.pp_tstp c.sclause
 
 let pp_set out s =
-  Format.fprintf out "{%a}" (Util.pp_iter ~sep:",@ " pp) (ClauseSet.to_iter s)
+  Format.fprintf out "{%a}"
+    (Util.pp_iter ~sep:",@ " pp)
+    (Iter.of_seq (ClauseSet.to_seq s))
 
 let pp_set_tstp out s =
   Format.fprintf out "{%a}"
     (Util.pp_iter ~sep:",@ " pp_tstp)
-    (ClauseSet.to_iter s)
+    (Iter.of_seq (ClauseSet.to_seq s))
 
 let pp_tstp_list out l =
   Format.fprintf out "@[<hv>%a@]" (Util.pp_list ~sep:"@\n" pp_tstp) l
 
+let to_string c = CCFormat.to_string pp c
+let to_string_tstp c = CCFormat.to_string pp_tstp c
+
 (** {2 WithPos} *)
+
+(** {2 Clauses with more data} *)
+
+let _outer_lits = lits
 
 module WithPos = struct
   type elt = t
@@ -469,39 +550,59 @@ module WithPos = struct
   let equal (c1, p1) (c2, p2) = equal c1 c2 && Position.equal p1 p2
   let hash (c, p) = CCHash.combine2 (hash c) (Position.hash p)
   let pp out (c, p) = Format.fprintf out "(@[%a@],%a)" pp c Position.pp p
-  let term (c, p) = Literals.Pos.at (lits c) p
-  let clause (c, _) = c
+  let term (c, p) = Literals.Pos.at (_outer_lits c) p
+  let clause (wp : t) = fst wp
   let pos (_, p) = p
-  let lits = lits
-  let literals (c, p) = Literals.Pos.at (lits c) p
+  let lits (wp : t) = _outer_lits (fst wp)
+
+  let literals (wp : t) =
+    let lit, _ = Literals.Pos.lit_at (_outer_lits (fst wp)) (snd wp) in
+    lit
+
+  let make ~clause ~pos = clause, pos
 
   let is_pos (c, p) =
-    let t = Literals.Pos.at (lits c) p in
-    Literal.is_pos t
+    let lit, _ = Literals.Pos.lit_at (_outer_lits c) p in
+    Literal.is_positivoid lit
 end
 
 (** {2 Seq} *)
 
 module Seq = struct
-  let lits c = Array.to_iter c.sclause.lits
-  let forms c = Iter.map Literal.to_form (Array.to_iter (lits c))
+  let lits c = Iter.of_array c.sclause.lits
+
+  let forms c =
+    Iter.map
+      (fun lit ->
+        let open SLiteral in
+        match lit with
+        | Logtk.Literal.True -> true_
+        | Logtk.Literal.False -> false_
+        | Logtk.Literal.Equation (l, r, _) ->
+          let sign = Logtk.Literal.is_positivoid lit in
+          if Type.is_prop (Term.ty l) then
+            if Term.is_true_or_false r then
+              atom l sign
+            else (
+              let hd =
+                if sign then
+                  Builtin.Equiv
+                else
+                  Builtin.Xor
+              in
+              atom (Term.app_builtin ~ty:Type.prop hd [ l; r ]) true
+            )
+          else if sign then
+            eq l r
+          else
+            neq l r)
+      (Iter.of_array c.sclause.lits)
+
   let terms c = Lits.Seq.terms c.sclause.lits
   let vars c = Lits.Seq.vars c.sclause.lits
-  let symbols c = Iter.map (fun (t, _) -> t) (Lits.Seq.symbols c.sclause.lits)
+  let symbols c = Iter.empty (* TODO: implement properly *)
 end
 
 (** {2 Types checking} *)
 
-let check_types c =
-  let env = Type.err_env () in
-  let@ _ = Trace.with_span ~__FILE__ ~__LINE__ "clause.check-types" in
-  Array.iter
-    (fun lit ->
-      try
-        let _, st = Literal.to_form lit |> Type.infer_term ~env in
-        if not (Type.is_proper st) then
-          Format.eprintf "BAD TYPE in %a (st: %a)@." pp_tstp c Type.pp st
-      with e ->
-        Format.eprintf "BAD TYPE in %a@.error: %s@." pp_tstp c
-          (Printexc.to_string e))
-    (lits c)
+let check_types _c = ()

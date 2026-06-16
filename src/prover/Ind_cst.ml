@@ -28,6 +28,7 @@ type t = {
   cst_is_sub: bool; (* sub-constant? *)
   cst_depth: int; (* how many induction lead to this one? *)
 }
+[@@warning "-69"]
 
 type Name_payload.t += Payload_cst of t
 

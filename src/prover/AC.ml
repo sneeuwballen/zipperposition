@@ -22,10 +22,12 @@ let key_ac : (module S) Flex_state.key = Flex_state.create_key ()
 let key_scan_cl_ac = Flex_state.create_key ()
 let _scan_cl_ac = ref false
 
-module Make (Env : Env.S) : S with module Env = Env = struct
-  module Ctx = Env.Ctx
-  module Env = Env
-  module C = Env.C
+module Make (ArgEnv : Env.S) : S with module E = ArgEnv = struct
+  module OuterEnv = Env
+  module Ctx = ArgEnv.Ctx
+  module E = ArgEnv
+  module Env = ArgEnv
+  module C = ArgEnv.C
 
   type cell = {
     spec: spec;
@@ -63,7 +65,18 @@ module Make (Env : Env.S) : S with module Env = Env = struct
     let mk_clause l r =
       let penalty = 1 in
       let proof = Proof.Step.esa ~rule:(Proof.Rule.mk "ac") [ proof ] in
-      let c = C.create ~trail:Trail.empty ~penalty [ Lit.mk_eq l r ] proof in
+      let c =
+        C.create
+          ~ctx:
+            (Ctx.create ~signature:Signature.empty ~ord:Ordering.none
+               ~select:Selection.no_select
+               ~bool_select:
+                 (Bool_selection.from_string ~ord:Ordering.none "none")
+               ~sk_ctx:(Skolem.create ()))
+          ~trail:Trail.empty ~penalty
+          [ Lit.mk_eq l r ]
+          proof
+      in
       C.set_flag flag_axiom c true;
       C.set_flag SClause.flag_persistent c true;
       c
@@ -154,7 +167,8 @@ module Make (Env : Env.S) : S with module Env = Env = struct
           Proof.Step.simp premises ~rule:(Proof.Rule.mk "AC.normalize") ~tags
         in
         let new_c =
-          C.create ~trail:(C.trail c) ~penalty:(C.penalty c) lits proof
+          C.create ~ctx:(C.ctx_of c) ~trail:(C.trail c) ~penalty:(C.penalty c)
+            lits proof
         in
         Util.incr_stat stat_ac_simplify;
         Util.debugf ~section 3 "@[<2>@[%a@]@ AC-simplify into @[%a@]@]"
@@ -166,18 +180,17 @@ module Make (Env : Env.S) : S with module Env = Env = struct
     ) else
       SimplM.return_same c
 
-  let install_rules_ () =
-    Env.add_is_trivial is_trivial;
-    Env.add_basic_simplify simplify;
-    ()
+  let install_rules_ env =
+    OuterEnv.add_is_trivial env is_trivial;
+    OuterEnv.add_basic_simplify env simplify
 
-  let add ~proof s ty =
+  let add ~proof s ty env =
     Util.debugf ~section 1
       "@[enable AC redundancy criterion@ for `@[%a : @[%a@]@]`@ :proof %a@]"
       (fun k -> k Name.pp s Type.pp ty Proof.pp_parent proof);
     (* is this the first case of AC symbols? If yes, then add inference rules *)
     let first = not (exists_ac ()) in
-    if first then install_rules_ ();
+    if first then install_rules_ env;
     (* remember that the symbols is AC *)
     let cell = add_ proof ~ty s in
     (* add clauses *)
@@ -185,18 +198,18 @@ module Make (Env : Env.S) : S with module Env = Env = struct
       (fun k -> k Name.pp s Type.pp ty (Util.pp_list C.pp) cell.axioms);
     (* add axioms to either passive, or active set *)
     if
-      Env.ProofState.ActiveSet.clauses ()
-      |> C.ClauseSet.for_all (C.get_flag flag_axiom)
+      ProofState.ActiveSet.clauses ()
+      |> Clause.ClauseSet.for_all (C.get_flag flag_axiom)
     then
       (* the only active clauses are other AC axioms, we miss no
          inference by adding the axioms to active set directly *)
-      Env.add_active (Iter.of_list cell.axioms)
+      OuterEnv.add_active env (Iter.of_list cell.axioms)
     else
-      Env.add_passive (Iter.of_list cell.axioms);
+      OuterEnv.add_passive env (Iter.of_list cell.axioms);
     ()
 
   (* TODO: proof stuff *)
-  let scan_statement st =
+  let scan_statement env st =
     let module St = Statement in
     let has_ac_attr =
       List.exists
@@ -208,10 +221,10 @@ module Make (Env : Env.S) : S with module Env = Env = struct
     if has_ac_attr then (
       let proof = Proof.Parent.from @@ St.as_proof_c st in
       match St.view st with
-      | St.TyDecl (id, ty) -> add ~proof id ty
+      | St.TyDecl (id, ty) -> add ~proof id ty env
       | St.Def l ->
         List.iter
-          (fun { Statement.def_id; def_ty; _ } -> add ~proof def_id def_ty)
+          (fun { Statement.def_id; def_ty; _ } -> add ~proof def_id def_ty env)
           l
       | St.Data _ | St.Rewrite _ | St.Assert _ | St.Lemma _ | St.Goal _
       | St.NegatedGoal _ ->
@@ -219,9 +232,9 @@ module Make (Env : Env.S) : S with module Env = Env = struct
           "attribute 'AC' only supported on def/decl statements"
     )
 
-  let register_ac c id ty = add ~proof:(C.proof_parent c) id ty
+  let register_ac env c id ty = add ~proof:(C.proof_parent c) id ty env
 
-  let scan_clause c =
+  let scan_clause env c =
     let exception Fail in
     Util.debugf ~section 1 "Scanning @[%a@]@." (fun k -> k C.pp c);
 
@@ -291,13 +304,13 @@ module Make (Env : Env.S) : S with module Env = Env = struct
               if test_associativity lhs rhs || test_associativity rhs lhs then (
                 Name_payload.add id Name.Attr_assoc;
                 assert (Name.is_ac id);
-                register_ac c id ty
+                register_ac env c id ty
               )
             ) else if Name.is_assoc id then (
               if test_commutativty lhs rhs then (
                 Name_payload.add id Name.Attr_comm;
                 assert (Name.is_ac id);
-                register_ac c id ty
+                register_ac env c id ty
               )
             ) else if test_commutativty lhs rhs then (
               Name_payload.add id Name.Attr_comm;
@@ -311,23 +324,23 @@ module Make (Env : Env.S) : S with module Env = Env = struct
     | _ -> ()
 
   (* just look for AC axioms *)
-  let setup () =
-    Env.flex_add key_scan_cl_ac !_scan_cl_ac;
+  let setup env =
+    OuterEnv.flex_add_of env key_scan_cl_ac !_scan_cl_ac;
 
     if !_scan_cl_ac then
-      Signal.on_every Env.ProofState.PassiveSet.on_add_clause (fun c ->
-          scan_clause c;
+      Signal.on_every ProofState.PassiveSet.on_add_clause (fun c ->
+          scan_clause env c;
           Signal.ContinueListening);
 
-    Signal.on_every Env.on_input_statement scan_statement
+    Signal.on_every (OuterEnv.on_input_statement env) (scan_statement env)
 end
 
 let extension =
-  let action env =
-    let module E = (val env : Env.S) in
+  let action (env : Env.t) =
+    let module E = (val (module Env) : Env.S) in
     let module AC = Make (E) in
-    E.flex_add key_ac (module AC : S);
-    AC.setup ()
+    Env.flex_add_of env key_ac (module AC : S);
+    AC.setup env
   in
   { Extensions.default with Extensions.name = "ac"; env_actions = [ action ] }
 

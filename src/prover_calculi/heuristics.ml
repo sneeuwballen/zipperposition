@@ -30,6 +30,7 @@ module type S = sig
 end
 
 module Make (E : Env.S) = struct
+  module OuterEnv = Env
   module Env = E
   module PS = Env.ProofState
   module C = Env.C
@@ -48,7 +49,7 @@ module Make (E : Env.S) = struct
       let lits = C.lits c in
       let depth = max (_depth_types lits) (Literals.depth lits) in
       if depth > d then (
-        Ctx.lost_completeness ();
+        Ctx.lost_completeness (OuterEnv.get_ctx (OuterEnv.get_global ()));
         Util.incr_stat stat_depth_limit;
         Util.debugf ~section 5
           "@[<2>clause dismissed (too deep at %d):@ @[%a@]@]" (fun k ->
@@ -69,7 +70,7 @@ module Make (E : Env.S) = struct
         |> List.length
       in
       if n_vars > !max_vars then (
-        Ctx.lost_completeness ();
+        Ctx.lost_completeness (OuterEnv.get_ctx (OuterEnv.get_global ()));
         Util.incr_stat stat_vars;
         Util.debugf ~section 5
           "@[<2>clause dismissed (%d vars is too much):@ @[%a@]@]" (fun k ->
@@ -81,14 +82,14 @@ module Make (E : Env.S) = struct
 
   let register () =
     Util.debug ~section 2 "register heuristics...";
-    Env.add_is_trivial is_too_deep;
-    Env.add_is_trivial has_too_many_vars;
+    OuterEnv.add_is_trivial (OuterEnv.get_global ()) is_too_deep;
+    OuterEnv.add_is_trivial (OuterEnv.get_global ()) has_too_many_vars;
     ()
 end
 
 let extension =
-  let action env =
-    let module E = (val env : Env.S) in
+  let action (env : Env.t) =
+    let module E = (val (module Env) : Env.S) in
     let module H = Make (E) in
     H.register ()
   in

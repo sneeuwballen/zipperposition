@@ -72,7 +72,14 @@ val lit_to_form : t -> Literal.t -> Term.t SLiteral.t
 val add_lit_from_hook : t -> Literal.Conv.hook_from -> unit
 val add_lit_to_hook : t -> Literal.Conv.hook_to -> unit
 
-(** {2 Keys} *)
+module Lit : sig
+  val from_hooks : unit -> Literal.Conv.hook_from list
+  val add_from_hook : Literal.Conv.hook_from -> unit
+  val to_hooks : unit -> Literal.Conv.hook_to list
+  val add_to_hook : Literal.Conv.hook_to -> unit
+  val of_form : Term.t SLiteral.t -> Literal.t
+  val to_form : Literal.t -> Term.t SLiteral.t
+end
 
 module Key : sig
   val lost_completeness : bool Flex_state.key

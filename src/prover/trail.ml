@@ -61,3 +61,5 @@ let to_s_form (t : t) =
   | [] -> F.true_
   | [ f ] -> f
   | l -> F.and_ l
+
+let pp out t = Lit.Set.pp Lit.pp out t

@@ -2,7 +2,7 @@ open Logtk
 module T = Term
 
 module type S = sig
-  module Ctx : Ctx.S
+  module Ctx : module type of Ctx
   module C : Clause_intf.S with module Ctx = Ctx
 
   val on_pred_skolem_introduction : (C.t * Term.t) Signal.t

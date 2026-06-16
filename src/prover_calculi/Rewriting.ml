@@ -36,6 +36,7 @@ let simpl_term t =
   )
 
 module Make (E : Env_intf.S) = struct
+  module OuterEnv = Env
   module Env = E
   module C = E.C
 
@@ -49,7 +50,8 @@ module Make (E : Env_intf.S) = struct
     let sc_rule = 1 in
     let sc_c = 0 in
     Literals.fold_terms ~vars:false ~subterms:true ~ty_args:false
-      ~ord:(C.Ctx.ord ()) ~which:`All ~eligible (C.lits c)
+      ~ord:(C.Ctx.ord (OuterEnv.get_ctx (OuterEnv.get_global ())))
+      ~which:`All ~eligible (C.lits c)
     |> Iter.flat_map (fun (u_p, passive_pos) ->
            RW.Term.narrow_term ~scope_rules:sc_rule (u_p, sc_c)
            |> Iter.filter_map (fun (rule, us) ->
@@ -81,7 +83,9 @@ module Make (E : Env_intf.S) = struct
                       ~rule:(Proof.Rule.mk "narrow")
                   in
                   let c' =
-                    C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
+                    C.create
+                      ~ctx:(OuterEnv.get_ctx (OuterEnv.get_global ()))
+                      ~trail:(C.trail c) ~penalty:(C.penalty c)
                       (c_guard @ CCArray.to_list lits')
                       proof
                   in
@@ -112,7 +116,9 @@ module Make (E : Env_intf.S) = struct
       let clauses =
         List.map
           (fun c' ->
-            C.create_a ~trail:(C.trail c) ~penalty:(C.penalty c) c' proof)
+            C.create_a
+              ~ctx:(OuterEnv.get_ctx (OuterEnv.get_global ()))
+              ~trail:(C.trail c) ~penalty:(C.penalty c) c' proof)
           clauses
       in
       Util.debugf ~section 2
@@ -156,8 +162,10 @@ module Make (E : Env_intf.S) = struct
                           @ Literal.apply_subst_list renaming subst (lits', 0)
                           @ Literal.apply_subst_list renaming subst (c', 1)
                         in
-                        C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
-                          new_lits proof)
+                        C.create
+                          ~ctx:(OuterEnv.get_ctx (OuterEnv.get_global ()))
+                          ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits
+                          proof)
                       (RW.Lit.Rule.rhs rule)
                   in
                   Util.debugf ~section 3
@@ -193,7 +201,9 @@ module Make (E : Env_intf.S) = struct
     and find_lit (r : RW.Lit.rule) =
       let lit = RW.Lit.Rule.lhs r in
       Literal.fold_terms lit ~position:P.stop ~vars:false ~ty_args:false
-        ~which:`All ~ord:(E.Ctx.ord ()) ~subterms:true
+        ~which:`All
+        ~ord:(Ctx.ord (OuterEnv.get_ctx (OuterEnv.get_global ())))
+        ~subterms:true
       |> Iter.filter_map (fun (t, p) ->
              match p with
              | P.Left P.Stop -> None (* not root *)
@@ -259,7 +269,7 @@ module Make (E : Env_intf.S) = struct
                (* add some penalty on every inference *)
                let penalty = Array.length (C.lits c) + C.penalty c in
                let new_c =
-                 C.create
+                 C.create ~ctx:(C.ctx_of c)
                    (c_guard @ new_lits @ ctx)
                    proof ~trail:(C.trail c) ~penalty
                in
@@ -286,7 +296,7 @@ module Make (E : Env_intf.S) = struct
     (* no literal can be eligible for paramodulation if some are selected.
        This checks if inferences with i-th literal are needed? *)
     let eligible = C.Eligible.param c in
-    let ord = E.Ctx.ord () in
+    let ord = Ctx.ord (OuterEnv.get_ctx (OuterEnv.get_global ())) in
     (* do the inferences where clause is active; for this,
        we try to rewrite conditionally other clauses using
        non-minimal sides of every positive literal *)
@@ -302,14 +312,20 @@ module Make (E : Env_intf.S) = struct
 
   let setup ?(ctx_narrow = true) ~narrowing ~has_rw () =
     Util.debug ~section 1 "register Rewriting to Env...";
-    E.add_rewrite_rule "rewrite_defs" simpl_term;
+    OuterEnv.add_rewrite_rule (OuterEnv.get_global ()) "rewrite_defs" simpl_term;
     if narrowing then (
-      E.add_binary_inf "narrow_term_defs" narrow_term_passive;
-      E.add_unary_inf "narrow_lit_defs" narrow_lits
+      OuterEnv.add_binary_inf (OuterEnv.get_global ()) "narrow_term_defs"
+        narrow_term_passive;
+      OuterEnv.add_unary_inf (OuterEnv.get_global ()) "narrow_lit_defs"
+        narrow_lits
     );
-    if ctx_narrow then E.add_binary_inf "ctx_narrow" contextual_narrowing;
-    if has_rw then E.Ctx.lost_completeness ();
-    E.add_multi_simpl_rule ~priority:5 simpl_clause;
+    if ctx_narrow then
+      OuterEnv.add_binary_inf (OuterEnv.get_global ()) "ctx_narrow"
+        contextual_narrowing;
+    if has_rw then
+      Ctx.lost_completeness (OuterEnv.get_ctx (OuterEnv.get_global ()));
+    OuterEnv.add_multi_simpl_rule (OuterEnv.get_global ()) ~priority:5
+      simpl_clause;
     ()
 end
 
@@ -446,11 +462,12 @@ let post_tying stmts st =
     st
 
 (* add a term simplification that normalizes terms w.r.t the set of rules *)
-let normalize_simpl (module E : Env_intf.S) =
+let normalize_simpl (env : Env.t) =
+  let module E = (val (module Env) : Env.S) in
   let module M = Make (E) in
-  let has_rw = E.flex_get Key.has_rw in
-  E.flex_add Key.ctx_narrow !ctx_narrow_;
-  E.flex_add Key.narrow !narrowing;
+  let has_rw = Env.flex_get_of (Env.get_global ()) Key.has_rw in
+  Env.flex_add_of (Env.get_global ()) Key.ctx_narrow !ctx_narrow_;
+  Env.flex_add_of (Env.get_global ()) Key.narrow !narrowing;
 
   M.setup ~has_rw ~narrowing:!narrowing ~ctx_narrow:!ctx_narrow_ ()
 

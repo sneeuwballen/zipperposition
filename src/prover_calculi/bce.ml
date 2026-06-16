@@ -30,6 +30,7 @@ module type S = sig
 end
 
 module Make (E : Env.S) : S with module Env = E = struct
+  module OuterEnv = Env
   module Env = E
   module C = Env.C
   module L = Literal
@@ -134,8 +135,9 @@ module Make (E : Env.S) : S with module Env = E = struct
   let task_eq a b = a.lit_idx = b.lit_idx && C.equal a.clause b.clause
 
   let symbol_occurs_too_often sym_count =
-    Env.flex_get k_max_symbol_occ > 0
-    && sym_count > Env.flex_get k_max_symbol_occ
+    OuterEnv.flex_get_of (OuterEnv.get_global ()) k_max_symbol_occ > 0
+    && sym_count
+       > OuterEnv.flex_get_of (OuterEnv.get_global ()) k_max_symbol_occ
 
   let add_lit_to_idx lit_lhs sign cl =
     let sym = T.head_exn lit_lhs in
@@ -321,21 +323,28 @@ module Make (E : Env.S) : S with module Env = E = struct
 
   let remove_from_proof_state clause =
     (try
-       if Env.is_active clause then
-         C.Tbl.add (Env.flex_get k_removed_active) clause ()
-       else if Env.is_passive clause then
-         C.Tbl.add (Env.flex_get k_removed_passive) clause ()
+       if OuterEnv.is_active (OuterEnv.get_global ()) clause then
+         C.Tbl.add
+           (OuterEnv.flex_get_of (OuterEnv.get_global ()) k_removed_active)
+           clause ()
+       else if OuterEnv.is_passive (OuterEnv.get_global ()) clause then
+         C.Tbl.add
+           (OuterEnv.flex_get_of (OuterEnv.get_global ()) k_removed_passive)
+           clause ()
      with _ ->
        (* we are in the preprocessing phase, so we can mark the clause *)
        C.mark_redundant clause);
-    if Env.flex_get k_processing_kind != `InprocessingSat then
+    if
+      OuterEnv.flex_get_of (OuterEnv.get_global ()) k_processing_kind
+      != `InprocessingSat
+    then
       C.mark_redundant clause
     (* if we are doing the inprocessing in SAT mode, we cannot
          mark the clauses as redundant, since they might have to be returned
          to the proof state. *);
-    Env.remove_active (Iter.singleton clause);
-    Env.remove_passive (Iter.singleton clause);
-    Env.remove_simpl (Iter.singleton clause)
+    OuterEnv.remove_active (OuterEnv.get_global ()) (Iter.singleton clause);
+    OuterEnv.remove_passive (OuterEnv.get_global ()) (Iter.singleton clause);
+    OuterEnv.remove_simpl (OuterEnv.get_global ()) (Iter.singleton clause)
 
   (* checks whether all L-resolvents between orig_cl on literal with index
      lit_idx and partner are valid   *)
@@ -773,11 +782,15 @@ module Make (E : Env.S) : S with module Env = E = struct
 
   (* driver that does that every k-th step of given-clause loop *)
   let eliminate_blocked_clauses () =
-    steps := (!steps + 1) mod Env.flex_get k_check_at;
+    steps :=
+      (!steps + 1) mod OuterEnv.flex_get_of (OuterEnv.get_global ()) k_check_at;
 
     if !steps = 0 then (
       let original_cls =
-        Iter.to_list (Iter.append (Env.get_active ()) (Env.get_passive ()))
+        Iter.to_list
+          (Iter.append
+             (OuterEnv.get_active (OuterEnv.get_global ()) ())
+             (OuterEnv.get_passive (OuterEnv.get_global ()) ()))
       in
       let eliminated = do_eliminate_blocked_clauses () in
       if eliminated != 0 then
@@ -789,37 +802,50 @@ module Make (E : Env.S) : S with module Env = E = struct
   let react_clause_removed cl = deregister_clause cl
 
   let do_bce_sat () =
-    C.Tbl.clear (Env.flex_get k_removed_active);
-    C.Tbl.clear (Env.flex_get k_removed_passive);
+    C.Tbl.clear (OuterEnv.flex_get_of (OuterEnv.get_global ()) k_removed_active);
+    C.Tbl.clear
+      (OuterEnv.flex_get_of (OuterEnv.get_global ()) k_removed_passive);
 
     Util.debugf ~section 1 "new BCE-SAT attempt" CCFun.id;
 
     ignore @@ do_eliminate_blocked_clauses ();
 
-    if C.Tbl.length (Env.flex_get k_bce_sat_tracked) == 0 then
+    if
+      C.Tbl.length
+        (OuterEnv.flex_get_of (OuterEnv.get_global ()) k_bce_sat_tracked)
+      == 0
+    then
       CCFormat.printf "%% BCE inprocessing removed all clauses"
     else (
       (* reinserting removed clauses *)
-      let removed_actives = C.Tbl.keys (Env.flex_get k_removed_active) in
-      let removed_passives = C.Tbl.keys (Env.flex_get k_removed_passive) in
+      let removed_actives =
+        C.Tbl.keys
+          (OuterEnv.flex_get_of (OuterEnv.get_global ()) k_removed_active)
+      in
+      let removed_passives =
+        C.Tbl.keys
+          (OuterEnv.flex_get_of (OuterEnv.get_global ()) k_removed_passive)
+      in
       Util.debugf ~section 1 "reinserting %d/%d clauses" (fun k ->
           k
             (Iter.length removed_actives + Iter.length removed_passives)
-            (C.Tbl.length (Env.flex_get k_bce_sat_tracked)));
-      Env.add_active removed_actives;
-      Env.add_simpl removed_actives;
-      Env.add_passive removed_passives
+            (C.Tbl.length
+               (OuterEnv.flex_get_of (OuterEnv.get_global ()) k_bce_sat_tracked)));
+      OuterEnv.add_active (OuterEnv.get_global ()) removed_actives;
+      OuterEnv.add_simpl (OuterEnv.get_global ()) removed_actives;
+      OuterEnv.add_passive (OuterEnv.get_global ()) removed_passives
     )
 
   let eliminate_bce_sat () =
-    steps := (!steps + 1) mod Env.flex_get k_check_at;
+    steps :=
+      (!steps + 1) mod OuterEnv.flex_get_of (OuterEnv.get_global ()) k_check_at;
 
     if !steps = 0 then do_bce_sat ()
 
   let initialize_regular () =
     let init_clauses =
-      C.ClauseSet.to_list (Env.ProofState.ActiveSet.clauses ())
-      @ C.ClauseSet.to_list (Env.ProofState.PassiveSet.clauses ())
+      Clause.ClauseSet.to_list (Env.ProofState.ActiveSet.clauses ())
+      @ Clause.ClauseSet.to_list (Env.ProofState.PassiveSet.clauses ())
     in
     (try
        Util.debugf ~section 3 "init_cl: @[%a@]@." (fun k ->
@@ -855,42 +881,61 @@ module Make (E : Env.S) : S with module Env = E = struct
 
        let clause_diff =
          init_clause_num
-         - (Iter.length (Env.get_active ()) + Iter.length (Env.get_passive ()))
+         - (Iter.length (OuterEnv.get_active (OuterEnv.get_global ()) ())
+           + Iter.length (OuterEnv.get_passive (OuterEnv.get_global ()) ()))
        in
        CCFormat.printf "%% BCE eliminated: %d@." clause_diff;
 
        if
-         Env.flex_get k_processing_kind != `PreprocessingOnly
-         || Env.flex_get k_fp_mode
+         OuterEnv.flex_get_of (OuterEnv.get_global ()) k_processing_kind
+         != `PreprocessingOnly
+         || OuterEnv.flex_get_of (OuterEnv.get_global ()) k_fp_mode
        then (
-         if Env.flex_get k_processing_kind == `InprocessingFull then
-           Env.Ctx.lost_completeness ();
+         if
+           OuterEnv.flex_get_of (OuterEnv.get_global ()) k_processing_kind
+           == `InprocessingFull
+         then
+           Env.Ctx.lost_completeness (OuterEnv.get_ctx (OuterEnv.get_global ()));
 
-         if Env.flex_get k_processing_kind == `InprocessingSat then (
-           Env.flex_add k_removed_active (C.Tbl.create 256);
-           Env.flex_add k_removed_passive (C.Tbl.create 256);
-           Env.flex_add k_bce_sat_tracked (C.Tbl.create 256);
+         if
+           OuterEnv.flex_get_of (OuterEnv.get_global ()) k_processing_kind
+           == `InprocessingSat
+         then (
+           OuterEnv.flex_add_of (OuterEnv.get_global ()) k_removed_active
+             (C.Tbl.create 256);
+           OuterEnv.flex_add_of (OuterEnv.get_global ()) k_removed_passive
+             (C.Tbl.create 256);
+           OuterEnv.flex_add_of (OuterEnv.get_global ()) k_bce_sat_tracked
+             (C.Tbl.create 256);
 
            let add_cl_sat cl =
-             C.Tbl.add (Env.flex_get k_bce_sat_tracked) cl ();
+             C.Tbl.add
+               (OuterEnv.flex_get_of (OuterEnv.get_global ()) k_bce_sat_tracked)
+               cl ();
              react_clause_addded cl
            in
            let remove_cl_sat cl =
-             C.Tbl.remove (Env.flex_get k_bce_sat_tracked) cl;
+             C.Tbl.remove
+               (OuterEnv.flex_get_of (OuterEnv.get_global ()) k_bce_sat_tracked)
+               cl;
              react_clause_removed cl
            in
 
-           Env.ProofState.PassiveSet.clauses ()
-           |> C.ClauseSet.to_iter
+           Clause.ClauseSet.to_seq (Env.ProofState.PassiveSet.clauses ())
+           |> Iter.of_seq
            |> Iter.iter (fun cl ->
-                  C.Tbl.add (Env.flex_get k_bce_sat_tracked) cl ());
+                  C.Tbl.add
+                    (OuterEnv.flex_get_of (OuterEnv.get_global ())
+                       k_bce_sat_tracked)
+                    cl ());
 
            Signal.on_every Env.ProofState.PassiveSet.on_add_clause (fun cl ->
                if C.proof_depth cl = 0 then add_cl_sat cl);
            Signal.on_every Env.ProofState.PassiveSet.on_remove_clause
              remove_cl_sat;
-           Signal.on_every Env.on_forward_simplified (fun (_, state) ->
-               CCOpt.iter add_cl_sat state);
+           Signal.on_every
+             (OuterEnv.on_forward_simplified (OuterEnv.get_global ()))
+             (fun (_, state) -> CCOpt.iter add_cl_sat state);
            Signal.on_every Env.ProofState.ActiveSet.on_remove_clause
              remove_cl_sat
          ) else (
@@ -903,7 +948,9 @@ module Make (E : Env.S) : S with module Env = E = struct
            (* Clauses are removed from the passive set when they are moved to active.
             In this case clause can me modified or deemed redundant by forward
             modification procedures. we react accordingly.*)
-           Signal.on_every Env.on_forward_simplified (fun (c, new_state) ->
+           Signal.on_every
+             (OuterEnv.on_forward_simplified (OuterEnv.get_global ()))
+             (fun (c, new_state) ->
                match new_state with
                | Some c' ->
                  if not (C.equal c c') then (
@@ -913,13 +960,16 @@ module Make (E : Env.S) : S with module Env = E = struct
                | _ -> react_clause_removed c
                (* c is redundant *))
          );
-         if not @@ Env.flex_get k_fp_mode then
-           if Env.flex_get k_processing_kind = `InprocessingFull then
-             Env.add_clause_elimination_rule ~priority:1 "BCE"
-               eliminate_blocked_clauses
+         if not @@ OuterEnv.flex_get_of (OuterEnv.get_global ()) k_fp_mode then
+           if
+             OuterEnv.flex_get_of (OuterEnv.get_global ()) k_processing_kind
+             = `InprocessingFull
+           then
+             OuterEnv.add_clause_elimination_rule (OuterEnv.get_global ())
+               ~priority:1 "BCE" eliminate_blocked_clauses
            else
-             Env.add_clause_elimination_rule ~priority:1 "BCE_SAT"
-               eliminate_bce_sat
+             OuterEnv.add_clause_elimination_rule (OuterEnv.get_global ())
+               ~priority:1 "BCE_SAT" eliminate_bce_sat
        ) else
          raise UnsupportedLogic
        (* clear all data structures *)
@@ -935,11 +985,12 @@ module Make (E : Env.S) : S with module Env = E = struct
   let fixpoint_active = ref false
 
   let begin_fixpoint () =
-    E.flex_add k_max_symbol_occ !_max_symbol_occ;
+    OuterEnv.flex_add_of (OuterEnv.get_global ()) k_max_symbol_occ
+      !_max_symbol_occ;
 
     let init_clauses =
-      C.ClauseSet.to_list (Env.ProofState.ActiveSet.clauses ())
-      @ C.ClauseSet.to_list (Env.ProofState.PassiveSet.clauses ())
+      Clause.ClauseSet.to_list (Env.ProofState.ActiveSet.clauses ())
+      @ Clause.ClauseSet.to_list (Env.ProofState.PassiveSet.clauses ())
     in
     try
       fixpoint_active := true;
@@ -994,12 +1045,16 @@ module Make (E : Env.S) : S with module Env = E = struct
     TaskPriorityQueue.clear task_queue;
     fixpoint_active := false
 
-  let register () = Signal.on Env.on_start initialize_regular
+  let register () =
+    Signal.on (OuterEnv.on_start (OuterEnv.get_global ())) initialize_regular
 
   let setup ?(in_fp_mode = false) () =
-    if Env.flex_get k_enabled then (
-      Env.flex_add k_fp_mode in_fp_mode;
-      if not (Env.flex_get Avatar.k_avatar_enabled) then
+    if OuterEnv.flex_get_of (OuterEnv.get_global ()) k_enabled then (
+      OuterEnv.flex_add_of (OuterEnv.get_global ()) k_fp_mode in_fp_mode;
+      if
+        not
+          (OuterEnv.flex_get_of (OuterEnv.get_global ()) Avatar.k_avatar_enabled)
+      then
         register ()
       else
         CCFormat.printf "AVATAR is not yet compatible with BCE@."
@@ -1007,13 +1062,13 @@ module Make (E : Env.S) : S with module Env = E = struct
 end
 
 let extension =
-  let action env =
-    let module E = (val env : Env.S) in
+  let action (env : Env.t) =
+    let module E = (val (module Env) : Env.S) in
     let module BCE = Make (E) in
-    E.flex_add k_enabled !_enabled;
-    E.flex_add k_max_symbol_occ !_max_symbol_occ;
-    E.flex_add k_check_at !_check_at;
-    E.flex_add k_processing_kind !_processing_kind;
+    Env.flex_add_of (Env.get_global ()) k_enabled !_enabled;
+    Env.flex_add_of (Env.get_global ()) k_max_symbol_occ !_max_symbol_occ;
+    Env.flex_add_of (Env.get_global ()) k_check_at !_check_at;
+    Env.flex_add_of (Env.get_global ()) k_processing_kind !_processing_kind;
     BCE.setup ()
   in
   {

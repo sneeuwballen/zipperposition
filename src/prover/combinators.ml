@@ -21,21 +21,26 @@ let k_unif_resolve = Flex_state.create_key ()
 let k_combinators_max_depth = Flex_state.create_key ()
 
 module type S = sig
-  module Env : Env.S
-  module C : module type of Env.C
+  module E : Env.S
+  module C : module type of E.C
 
-  val setup : unit -> unit
+  val setup : Env.t -> unit
   (** {5 Registration} *)
 
-  val maybe_conv_lams : Env.C.t -> Env.C.t
-  val force_conv_lams : Env.C.t -> Env.C.t
+  val maybe_conv_lams : E.C.t -> E.C.t
+  val force_conv_lams : E.C.t -> E.C.t
   val expand : T.t -> T.t
 end
 
-module Make (E : Env.S) : S with module Env = E = struct
+module Make (E : Env.S) : S with module E = E = struct
+  module OuterEnv = Env
   module Env = E
+  module E = E
   module C = Env.C
   module Ctx = Env.Ctx
+
+  let _env_ref : OuterEnv.t option ref = ref None
+  let get_env () = CCOpt.get_exn !_env_ref
 
   let has_lams_aux =
     Iter.exists (fun t ->
@@ -50,17 +55,17 @@ module Make (E : Env.S) : S with module Env = E = struct
   let enocde_stmt st =
     let rule = Proof.Rule.mk "lams2combs" in
     let rules = curry_optimizations @ bunder_optimizations in
-    E.cr_return
-    @@ List.map
+    OuterEnv.CR_return
+      (List.map
          (fun c ->
            if has_lams_c c then (
              let proof = Proof.Step.simp [ C.proof_parent c ] ~rule in
              let lits' = Literals.map (abf ~rules) (C.lits c) in
-             C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
-               (Array.to_list lits') proof
+             C.create ~ctx:(C.ctx_of c) ~trail:(C.trail c)
+               ~penalty:(C.penalty c) (Array.to_list lits') proof
            ) else
              c)
-         (E.C.of_statement st)
+         (C.of_statement ~ctx:(OuterEnv.get_ctx (get_env ())) st))
 
   let comb_narrow c =
     let new_lits = Literals.map narrow (C.lits c) in
@@ -73,7 +78,7 @@ module Make (E : Env.S) : S with module Env = E = struct
           ~rule:(Proof.Rule.mk "narrow combinators")
       in
       let new_ =
-        C.create ~trail:(C.trail c) ~penalty:(C.penalty c)
+        C.create ~ctx:(C.ctx_of c) ~trail:(C.trail c) ~penalty:(C.penalty c)
           (Array.to_list new_lits) proof
       in
       SimplM.return_new new_
@@ -132,22 +137,22 @@ module Make (E : Env.S) : S with module Env = E = struct
   let partially_applied_s () =
     partially_apply
       ~comb:(mk_s ~alpha ~beta ~gamma ~args:[], 0)
-      [ s_arg1, 1; s_arg2, Env.flex_get k_s_penalty ]
+      [ s_arg1, 1; s_arg2, OuterEnv.flex_get_of (get_env ()) k_s_penalty ]
 
   let partially_applied_b () =
     partially_apply
       ~comb:(mk_b ~alpha ~beta ~gamma ~args:[], 0)
-      [ b_arg1, 1; b_arg2, Env.flex_get k_b_penalty ]
+      [ b_arg1, 1; b_arg2, OuterEnv.flex_get_of (get_env ()) k_b_penalty ]
 
   let partially_applied_c () =
     partially_apply
       ~comb:(mk_c ~alpha ~beta ~gamma ~args:[], 0)
-      [ c_arg1, 1; c_arg2, Env.flex_get k_c_penalty ]
+      [ c_arg1, 1; c_arg2, OuterEnv.flex_get_of (get_env ()) k_c_penalty ]
 
   let partially_applied_k () =
     partially_apply
       ~comb:(mk_k ~alpha ~beta ~args:[], 0)
-      [ k_arg1, Env.flex_get k_k_penalty ]
+      [ k_arg1, OuterEnv.flex_get_of (get_env ()) k_k_penalty ]
 
   let partially_applied_i () = [ mk_i ~alpha ~args:[], 0 ]
 
@@ -165,7 +170,7 @@ module Make (E : Env.S) : S with module Env = E = struct
   let narrow_app_var_rule_name = "narrow_applied_variable"
 
   let narrow_app_vars_applicable cl =
-    match Env.flex_get k_combinators_max_depth with
+    match OuterEnv.flex_get_of (get_env ()) k_combinators_max_depth with
     | None -> true
     | Some max_depth ->
       Proof.Step.count_rules ~name:narrow_app_var_rule_name (C.proof_step cl)
@@ -176,7 +181,7 @@ module Make (E : Env.S) : S with module Env = E = struct
     let rule = Proof.Rule.mk narrow_app_var_rule_name in
     let tags = [ Proof.Tag.T_ho ] in
 
-    let ord = Env.ord () in
+    let ord = Ctx.ord (OuterEnv.get_ctx (get_env ())) in
     let eligible = C.Eligible.(res clause) in
     let lits = C.lits clause in
     (* do the inferences in which clause is passive (rewritten),
@@ -216,7 +221,10 @@ module Make (E : Env.S) : S with module Env = E = struct
                    Position.size (Literal.Pos.term_pos lits.(lit_idx) lit_pos)
                  in
                  let depth_mul =
-                   if not @@ Env.flex_get k_deep_app_var_penalty then
+                   if
+                     not
+                     @@ OuterEnv.flex_get_of (get_env ()) k_deep_app_var_penalty
+                   then
                      1
                    else
                      max t_depth 1
@@ -231,7 +239,8 @@ module Make (E : Env.S) : S with module Env = E = struct
                  let penalty = depth_mul * comb_penalty * C.penalty clause in
                  (* CCFormat.printf "penalty:%d@." penalty; *)
                  let new_clause =
-                   C.create ~trail:(C.trail clause) ~penalty lits' proof
+                   C.create ~ctx:(C.ctx_of clause) ~trail:(C.trail clause)
+                     ~penalty lits' proof
                  in
 
                  Util.debugf ~section 3 "success: @[%a@]@." (fun k ->
@@ -254,14 +263,14 @@ module Make (E : Env.S) : S with module Env = E = struct
       in
       let lits' = Literals.map (abf ~rules) (C.lits c) in
       let new_ =
-        C.create ~trail:(C.trail c) ~penalty:(C.penalty c) (Array.to_list lits')
-          proof
+        C.create ~ctx:(C.ctx_of c) ~trail:(C.trail c) ~penalty:(C.penalty c)
+          (Array.to_list lits') proof
       in
       SimplM.return_new new_
     )
 
   let maybe_conv_lams c =
-    if E.flex_get k_enable_combinators then
+    if OuterEnv.flex_get_of (get_env ()) k_enable_combinators then
       SimplM.get (lams2combs_otf c)
     else
       c
@@ -269,7 +278,7 @@ module Make (E : Env.S) : S with module Env = E = struct
   let ho_unif_solve c =
     let module PUnif = PUnif.Make (struct
       let st =
-        Env.flex_state ()
+        OuterEnv.flex_state_of (get_env ())
         |> Flex_state.add PragUnifParams.k_fixpoint_decider true
         |> Flex_state.add PragUnifParams.k_pattern_decider true
         |> Flex_state.add PragUnifParams.k_solid_decider true
@@ -295,7 +304,8 @@ module Make (E : Env.S) : S with module Env = E = struct
           Proof.Step.simp ~rule
             [ C.proof_parent_subst Subst.Renaming.none (c, 0) subst ]
         in
-        SimplM.return_new (C.create ~penalty:1 ~trail:(C.trail c) [] proof)
+        SimplM.return_new
+          (C.create ~ctx:(C.ctx_of c) ~penalty:1 ~trail:(C.trail c) [] proof)
       | _ -> SimplM.return_same c)
     | _ -> SimplM.return_same c
 
@@ -310,7 +320,7 @@ module Make (E : Env.S) : S with module Env = E = struct
   (* Expands the chosen term to be of the form 
        \lambda (all type vars). body of prop type *)
   let expand t =
-    if Env.flex_get k_enable_combinators then (
+    if OuterEnv.flex_get_of (get_env ()) k_enable_combinators then (
       assert (not (T.is_fun t));
       (* no lambdas if combinators are on *)
       let ty_args, ret_ty = Type.open_fun (T.ty t) in
@@ -322,15 +332,21 @@ module Make (E : Env.S) : S with module Env = E = struct
     ) else
       Lambda.eta_expand t
 
-  let setup () =
-    if E.flex_get k_enable_combinators then (
-      E.add_clause_conversion enocde_stmt;
-      if E.flex_get k_app_var_narrowing then
-        E.add_unary_inf "narrow applied variable" narrow_app_vars;
-      E.add_basic_simplify lams2combs_otf;
-      E.Ctx.set_ord (Ordering.compose cmp_by_max_weak_r_len (E.Ctx.ord ()));
+  let setup (env : OuterEnv.t) =
+    _env_ref := Some env;
+    if OuterEnv.flex_get_of (get_env ()) k_enable_combinators then (
+      OuterEnv.add_clause_conversion (get_env ()) enocde_stmt;
+      if OuterEnv.flex_get_of (get_env ()) k_app_var_narrowing then
+        OuterEnv.add_unary_inf (get_env ()) "narrow applied variable"
+          narrow_app_vars;
+      OuterEnv.add_basic_simplify (get_env ()) lams2combs_otf;
+      Ctx.set_ord
+        (OuterEnv.get_ctx (get_env ()))
+        (Ordering.compose cmp_by_max_weak_r_len
+           (Ctx.ord (OuterEnv.get_ctx (get_env ()))));
 
-      if Env.flex_get k_unif_resolve then E.add_unary_simplify ho_unif_solve;
+      if OuterEnv.flex_get_of (get_env ()) k_unif_resolve then
+        OuterEnv.add_unary_simplify (get_env ()) ho_unif_solve;
 
       Unif._allow_pattern_unif := false
     )
@@ -350,20 +366,20 @@ let _combinators_max_depth = ref None
 let extension =
   let lam2combs seq = seq in
 
-  let register env =
-    let module E = (val env : Env.S) in
-    E.flex_add k_enable_combinators !_enable_combinators;
-    E.flex_add k_app_var_narrowing !_app_var_narrowing;
-    E.flex_add k_s_penalty !_s_penalty;
-    E.flex_add k_c_penalty !_c_penalty;
-    E.flex_add k_b_penalty !_b_penalty;
-    E.flex_add k_k_penalty !_k_penalty;
-    E.flex_add k_deep_app_var_penalty !_deep_app_var_penalty;
-    E.flex_add k_unif_resolve !_unif_resolve;
-    E.flex_add k_combinators_max_depth !_combinators_max_depth;
+  let register (env : Env.t) =
+    let module E = (val (module Env) : Env.S) in
+    Env.flex_add_of env k_enable_combinators !_enable_combinators;
+    Env.flex_add_of env k_app_var_narrowing !_app_var_narrowing;
+    Env.flex_add_of env k_s_penalty !_s_penalty;
+    Env.flex_add_of env k_c_penalty !_c_penalty;
+    Env.flex_add_of env k_b_penalty !_b_penalty;
+    Env.flex_add_of env k_k_penalty !_k_penalty;
+    Env.flex_add_of env k_deep_app_var_penalty !_deep_app_var_penalty;
+    Env.flex_add_of env k_unif_resolve !_unif_resolve;
+    Env.flex_add_of env k_combinators_max_depth !_combinators_max_depth;
 
     let module ET = Make (E) in
-    ET.setup ()
+    ET.setup env
   in
   {
     Extensions.default with

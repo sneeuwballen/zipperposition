@@ -6,7 +6,7 @@ open Libzipperposition
 module type S = sig
   module Env : Env.S
   module C : module type of Env.C with type t = Env.C.t
-  module PS : module type of Env.ProofState with type C.t = Env.C.t
+  module PS : module type of Env.ProofState
 
   (** {5 Term Indices} *)
 

@@ -99,7 +99,7 @@ let can_select_lit ~ord (lits : Lits.t) (i : int) : bool =
       (not !_restrict_fresh_sk_selection)
       ||
       match lits.(i) with
-      | Lit.Equation (lhs, rhs, _) when Lit.is_predicate_lit lits.(i) ->
+      | Lit.Equation (lhs, _rhs, _) when Lit.is_predicate_lit lits.(i) ->
         (match T.as_const (T.head_term lhs) with
         | Some sym ->
           not (Name.is_postcnf_skolem sym && not (Name.is_lazycnf_skolem sym))

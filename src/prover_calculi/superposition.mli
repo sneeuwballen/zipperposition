@@ -21,7 +21,15 @@ val k_unif_alg :
   Flex_state.key
 
 val k_ho_basic_rules : bool Flex_state.key
-val get_unif_module : (module Env.S) -> (module UnifFramework.US)
+
+type unif_module = {
+  unify_scoped:
+    Term.t Scoped.t -> Term.t Scoped.t -> Unif_subst.t option OSeq.t;
+  unify_scoped_l:
+    Term.t list Scoped.t -> Term.t list Scoped.t -> Unif_subst.t option OSeq.t;
+}
+
+val get_unif_module : Env.t -> unif_module
 
 val register : sup:(module S) -> unit
 (** Register the superposition module to its Environment's mixtbl. Done

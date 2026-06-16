@@ -16,14 +16,8 @@ val setup_signal : unit Phases.t
 
 val process_file :
   ?prelude:Phases.prelude -> Phases.filename -> Phases.env_with_result Phases.t
-(** [process_file f] parses [f], does the preprocessing phases, including type
-    inference, choice of precedence, ordering, etc. , saturates the set of
-    clauses, and return the result *)
 
-val print :
-  Phases.filename -> 'c Env.packed -> Saturate.szs_status -> unit Phases.t
-(** Printing of results *)
-
+val print : Phases.filename -> Env.t -> Saturate.szs_status -> unit Phases.t
 val check : Saturate.szs_status -> Phases.errcode Phases.t
 
 val process_files_and_print :

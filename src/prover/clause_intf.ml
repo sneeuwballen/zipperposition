@@ -6,7 +6,7 @@ type proof_step = Proof.Step.t
 type proof = Proof.S.t
 
 module type S = sig
-  module Ctx : Ctx.S
+  module Ctx : module type of Ctx
 
   type t
   type clause = t
@@ -84,7 +84,13 @@ module type S = sig
 
   (** {2 Constructors} *)
 
-  val create : penalty:int -> trail:Trail.t -> Literal.t list -> proof_step -> t
+  val create :
+    ctx:Ctx.t ->
+    penalty:int ->
+    trail:Trail.t ->
+    Literal.t list ->
+    proof_step ->
+    t
   (** Build a new clause from the given literals.
       @param trail boolean trail
       @param penalty
@@ -93,20 +99,36 @@ module type S = sig
         and a proof builder *)
 
   val create_a :
-    penalty:int -> trail:Trail.t -> Literal.t array -> proof_step -> t
+    ctx:Ctx.t ->
+    penalty:int ->
+    trail:Trail.t ->
+    Literal.t array ->
+    proof_step ->
+    t
   (** Build a new clause from the given literals. *)
 
-  val of_sclause : ?penalty:int -> SClause.t -> proof_step -> t
+  val of_sclause : ctx:Ctx.t -> ?penalty:int -> SClause.t -> proof_step -> t
 
   val of_forms :
-    ?penalty:int -> trail:Trail.t -> Term.t SLiteral.t list -> proof_step -> t
+    ctx:Ctx.t ->
+    ?penalty:int ->
+    trail:Trail.t ->
+    Term.t SLiteral.t list ->
+    proof_step ->
+    t
   (** Directly from list of formulas *)
 
   val of_forms_axiom :
-    ?penalty:int -> file:string -> name:string -> Term.t SLiteral.t list -> t
+    ctx:Ctx.t ->
+    ?penalty:int ->
+    file:string ->
+    name:string ->
+    Term.t SLiteral.t list ->
+    t
   (** Construction from formulas as axiom (initial clause) *)
 
-  val of_statement : ?convert_defs:bool -> Statement.clause_t -> t list
+  val of_statement :
+    ctx:Ctx.t -> ?convert_defs:bool -> Statement.clause_t -> t list
   (** Extract a clause from a statement, if any *)
 
   val proof_step : t -> proof_step
@@ -178,6 +200,11 @@ module type S = sig
 
   val penalty : t -> int
   val inc_penalty : t -> int -> unit
+  val ctx_of : t -> Ctx.t
+
+  (** Internal: get default context *)
+
+  (** Get the context of the clause *)
 
   val is_unit_clause : t -> bool
   (** is the clause a unit clause? *)
@@ -208,8 +235,8 @@ module type S = sig
 
   val apply_subst :
     ?renaming:Subst.Renaming.t ->
-    ?proof:Proof.Step.t option ->
-    ?penalty_inc:int option ->
+    ?proof:Proof.Step.t ->
+    ?penalty_inc:int ->
     t Scoped.t ->
     Subst.FO.t ->
     t
@@ -262,7 +289,7 @@ module type S = sig
 
   (** {2 Set of clauses} *)
 
-  module ClauseSet : CCSet.S with type elt = t
+  module ClauseSet : Set.S with type elt = t
   (** Simple set *)
 
   (** {2 Position} *)
@@ -275,14 +302,20 @@ module type S = sig
 
   (** Clause within which a subterm (and its position) are highlighted *)
   module WithPos : sig
-    type t = {
-      clause: clause;
-      pos: Position.t;
-      term: Term.t;
-    }
+    type elt = t
+    type t
 
     val compare : t -> t -> int
+    val equal : t -> t -> bool
+    val hash : t -> int
     val pp : t CCFormat.printer
+    val term : t -> Term.t
+    val clause : t -> elt
+    val pos : t -> Position.t
+    val lits : t -> Literals.t
+    val literals : t -> Literal.t
+    val is_pos : t -> bool
+    val make : clause:elt -> pos:Position.t -> t
   end
 
   (** {2 IO} *)

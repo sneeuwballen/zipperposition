@@ -26,6 +26,7 @@ module type S = sig
 end
 
 module Make (E : Env.S) : S with module Env = E = struct
+  module OuterEnv = Env
   module Env = E
   module C = Env.C
   module Ctx = Env.Ctx
@@ -56,7 +57,9 @@ module Make (E : Env.S) : S with module Env = E = struct
         ~rule:(Proof.Rule.mk "fool_param")
     in
     let new_c =
-      C.create ~trail:(C.trail c) ~penalty:(C.penalty c) (new_lit :: lits) proof
+      C.create
+        ~ctx:(OuterEnv.get_ctx (OuterEnv.get_global ()))
+        ~trail:(C.trail c) ~penalty:(C.penalty c) (new_lit :: lits) proof
     in
     Util.debugf ~section 5 "... deduce `@[%a@]`" (fun k -> k C.pp new_c);
     new_c
@@ -130,8 +133,9 @@ module Make (E : Env.S) : S with module Env = E = struct
                    [ C.proof_parent_subst renaming (c, 0) subst ]
                in
                let new_c =
-                 C.create new_lits proof ~penalty:(C.penalty c)
-                   ~trail:(C.trail c)
+                 C.create
+                   ~ctx:(OuterEnv.get_ctx (OuterEnv.get_global ()))
+                   new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c)
                in
 
                Util.incr_stat stat_elim_var;
@@ -159,7 +163,9 @@ module Make (E : Env.S) : S with module Env = E = struct
         Proof.Step.simp ~rule:(Proof.Rule.mk "cnf_fool")
           [ Proof.Parent.from @@ C.proof c ]
       in
-      C.create lits proof ~penalty:(C.penalty c) ~trail:(C.trail c)
+      C.create
+        ~ctx:(OuterEnv.get_ctx (OuterEnv.get_global ()))
+        lits proof ~penalty:(C.penalty c) ~trail:(C.trail c)
     in
     C.lits c
     |> CCArray.find_map_i (fun i lit ->
@@ -214,15 +220,17 @@ module Make (E : Env.S) : S with module Env = E = struct
 
   let setup () =
     Util.debug ~section 1 "setup fool rules";
-    Env.add_unary_inf "fool_param" fool_param;
-    Env.add_multi_simpl_rule ~priority:5 rw_bool_lits;
-    Env.add_unary_inf "fool_elim_var" fool_elim_var;
+    OuterEnv.add_unary_inf (OuterEnv.get_global ()) "fool_param" fool_param;
+    OuterEnv.add_multi_simpl_rule (OuterEnv.get_global ()) ~priority:5
+      rw_bool_lits;
+    OuterEnv.add_unary_inf (OuterEnv.get_global ()) "fool_elim_var"
+      fool_elim_var;
     ()
 end
 
 let extension =
-  let register env =
-    let module E = (val env : Env.S) in
+  let register (env : Env.t) =
+    let module E = (val (module Env) : Env.S) in
     let module ET = Make (E) in
     if !enabled_ then ET.setup ()
   in
