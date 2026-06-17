@@ -100,7 +100,9 @@ type t = {
 let _env : t option ref = ref None
 
 (** Set the global env instance (called from phases_impl after creation) *)
-let set_global env = _env := Some env
+let set_global env =
+  _env := Some env;
+  Ctx.set_global env.ctx
 
 (** Get the current env (for old-style bridge) *)
 let get_global () = CCOpt.get_exn !_env

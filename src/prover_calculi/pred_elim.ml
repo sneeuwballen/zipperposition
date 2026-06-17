@@ -745,7 +745,7 @@ module Make (E : Env.S) = struct
             CCArray.except_idx pos_lits pos_idx
             @ CCArray.except_idx neg_lits neg_idx
           in
-          C.create
+          C.create ~ctx:(C.ctx_of pos_cl)
             ~penalty:(max (C.penalty pos_cl) (C.penalty neg_cl))
             ~trail:(C.trail_l [ pos_cl; neg_cl ])
             lits (proof subst renaming)
@@ -1352,7 +1352,8 @@ module Make (E : Env.S) = struct
     Signal.on Env.ProofState.PassiveSet.on_remove_clause react_clause_removed;
     Signal.on Env.ProofState.ActiveSet.on_add_clause react_clause_added;
     Signal.on Env.ProofState.ActiveSet.on_remove_clause react_clause_removed;
-    Signal.on_every OuterEnv.on_forward_simplified (OuterEnv.get_global ())
+    Signal.on_every
+      (OuterEnv.on_forward_simplified (OuterEnv.get_global ()))
       (fun (c, new_state) ->
         if not !_done then (
           match new_state with
@@ -1388,14 +1389,13 @@ module Make (E : Env.S) = struct
     Signal.StopListening
 
   let register () =
-    Signal.on OuterEnv.on_start (OuterEnv.get_global ()) initialize
+    Signal.on (OuterEnv.on_start (OuterEnv.get_global ())) initialize
 
   let fixpoint_active = ref false
 
   let begin_fixpoint () =
     fixpoint_active := true;
-    let env = (module E : OrigEnv.S) in
-    register_parameters env;
+    register_parameters (OuterEnv.get_global ());
     (*  has to be called after register parameters as 
         measure functions are not visible outside the module *)
     OuterEnv.flex_add_of (OuterEnv.get_global ()) k_measure_fun
@@ -1473,15 +1473,13 @@ let extension =
     let module E = (val (module Env) : Env.S) in
     register_parameters env;
     let module PredElim = Make (E) in
-    OuterEnv.flex_add_of (OuterEnv.get_global ()) k_enabled !_enabled;
-    OuterEnv.flex_add_of (OuterEnv.get_global ()) k_check_at !_check_at;
-    OuterEnv.flex_add_of (OuterEnv.get_global ()) k_inprocessing !_inprocessing;
-    OuterEnv.flex_add_of (OuterEnv.get_global ()) k_max_resolvents
-      !_max_resolvents;
-    OuterEnv.flex_add_of (OuterEnv.get_global ()) k_check_gates !_check_gates;
-    OuterEnv.flex_add_of (OuterEnv.get_global ()) k_non_singular_pe
-      !_non_singular_pe;
-    OuterEnv.flex_add_of (OuterEnv.get_global ()) k_relax_val !_relax_val;
+    Env.flex_add_of env k_enabled !_enabled;
+    Env.flex_add_of env k_check_at !_check_at;
+    Env.flex_add_of env k_inprocessing !_inprocessing;
+    Env.flex_add_of env k_max_resolvents !_max_resolvents;
+    Env.flex_add_of env k_check_gates !_check_gates;
+    Env.flex_add_of env k_non_singular_pe !_non_singular_pe;
+    Env.flex_add_of env k_relax_val !_relax_val;
 
     PredElim.setup ()
   in

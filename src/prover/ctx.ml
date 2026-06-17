@@ -160,10 +160,10 @@ let selection_fun' () = _with selection_fun
 let set_selection_fun' f = _with (fun ctx -> set_selection_fun ctx f)
 let set_ord' o = _with (fun ctx -> set_ord ctx o)
 let signature' () = _with signature
-let renaming' = _with renaming
+let renaming' () = _with renaming
 let compare' t1 t2 = _with (fun ctx -> compare ctx t1 t2)
-let select' = _with select
-let bool_select' = _with bool_select
+let select' () = _with select
+let bool_select' () = _with bool_select
 let lost_completeness' () = _with (fun ctx -> lost_completeness ctx)
 let is_completeness_preserved' () = _with is_completeness_preserved
 let add_signature' s = _with (fun ctx -> add_signature ctx s)
@@ -171,8 +171,8 @@ let find_signature' n = _with (fun ctx -> find_signature ctx n)
 let find_signature_exn' n = _with (fun ctx -> find_signature_exn ctx n)
 let declare' n ty = _with (fun ctx -> declare ctx n ty)
 let declare_syms' l = _with (fun ctx -> declare_syms ctx l)
-let on_new_symbol' = _with on_new_symbol
-let on_signature_update' = _with on_signature_update
+let on_new_symbol' () = _with on_new_symbol
+let on_signature_update' () = _with on_signature_update
 
 let set_injective_for_arg' n i =
   _with (fun ctx -> set_injective_for_arg ctx n i)

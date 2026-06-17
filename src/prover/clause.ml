@@ -428,13 +428,20 @@ let symbols ?(init = Name.Set.empty) ?(include_types = false) seq =
        init
 
 module Eligible = struct
+  type clause = t
   type t = int -> Literal.t -> bool
 
   let res c =
     let bv = eligible_res_no_subst c in
     fun idx lit -> CCBV.get bv idx
 
-  let param _c = failwith "Eligible.param unimplemented"
+  let _eligible_param : (clause * int -> Subst.t -> CCBV.t) ref =
+    ref (fun _ _ -> BV.empty ())
+
+  let param c =
+    let bv = !_eligible_param (c, 0) Subst.empty in
+    fun idx lit -> CCBV.get bv idx
+
   let eq = fun _ lit -> Literal.is_eq lit
   let filter f = fun _ lit -> f lit
   let max _c = failwith "Eligible.max unimplemented"
@@ -447,6 +454,8 @@ module Eligible = struct
   let ( ++ ) a b idx lit = a idx lit || b idx lit
   let ( ~~ ) a idx lit = not (a idx lit)
 end
+
+let () = Eligible._eligible_param := eligible_param
 
 module Pos = struct
   let at (c : t) p = Literals.Pos.at (lits c) p
