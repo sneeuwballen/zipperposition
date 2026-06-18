@@ -385,34 +385,54 @@ let emit_proof self ~get_lits (root : Proof.t) : offset * stats =
       Array.iter (fun lit -> ignore (emit_literal self lit)) (get_lits p))
     !steps;
   let step_offs : offset Int_tbl.t = Int_tbl.create 64 in
+  let define_offs : offset Int_tbl.t = Int_tbl.create 64 in
+  let compute_parents step =
+    List.map
+      (fun parent ->
+        let parent_proof = Proof.Parent.proof parent in
+        let p_off = Int_tbl.find step_offs (Proof.S.hash parent_proof) in
+        match Proof.Parent.subst parent with
+        | None -> p_off, None
+        | Some s ->
+          let parent_lits = get_lits parent_proof in
+          let parent_vars =
+            Array.fold_left
+              (fun acc lit ->
+                Term.VarSet.union acc (Term.vars (Literal.to_ho_term lit)))
+              Term.VarSet.empty parent_lits
+            |> Term.VarSet.to_list
+          in
+          p_off, Some (emit_subst self s parent_vars))
+      (Proof.Step.parents step)
+  in
+  (* First pass: emit all Define nodes so they are in step_offs *)
   List.iter
     (fun p ->
       let step = Proof.S.step p in
-      let proof_id = Proof.S.hash p in
-      let clause_off = emit_clause self (get_lits p) in
-      let parents =
-        List.map
-          (fun parent ->
-            let parent_proof = Proof.Parent.proof parent in
-            let p_off = Int_tbl.find step_offs (Proof.S.hash parent_proof) in
-            let s_off =
-              match Proof.Parent.subst parent with
-              | None -> None
-              | Some s ->
-                let parent_lits = get_lits parent_proof in
-                let parent_vars =
-                  Array.fold_left
-                    (fun acc lit ->
-                      Term.VarSet.union acc (Term.vars (Literal.to_ho_term lit)))
-                    Term.VarSet.empty parent_lits
-                  |> Term.VarSet.to_list
-                in
-                Some (emit_subst self s parent_vars)
-            in
-            p_off, s_off)
-          (Proof.Step.parents step)
-      in
-      Int_tbl.add step_offs proof_id (emit_step self ~clause_off ~parents step))
+      match Proof.Step.kind step with
+      | Proof.Define _ ->
+        let proof_id = Proof.S.hash p in
+        let clause_off = emit_clause self (get_lits p) in
+        let off = emit_step self ~clause_off ~parents:[] step in
+        Int_tbl.add step_offs proof_id off;
+        Int_tbl.add define_offs proof_id off
+      | _ -> ())
+    (List.rev !steps);
+  (* Second pass: emit remaining steps, adding define nodes as extra parents *)
+  List.iter
+    (fun p ->
+      let step = Proof.S.step p in
+      match Proof.Step.kind step with
+      | Proof.Define _ -> () (* already emitted *)
+      | _ ->
+        let proof_id = Proof.S.hash p in
+        let clause_off = emit_clause self (get_lits p) in
+        let parents = compute_parents step in
+        let extra_parents =
+          Int_tbl.fold (fun _ off acc -> (off, None) :: acc) define_offs []
+        in
+        Int_tbl.add step_offs proof_id
+          (emit_step self ~clause_off ~parents:(parents @ extra_parents) step))
     (List.rev !steps);
   let root_off = Int_tbl.find step_offs (Proof.S.hash root) in
   let result_off =

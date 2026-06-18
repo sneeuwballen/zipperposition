@@ -599,6 +599,30 @@ let print file env result =
   print_stats_env env;
   print_szs_result ~file env result >>= fun () -> print_dots env result
 
+let get_def_lits p =
+  match Proof.Result.view (Proof.S.result p) with
+  | Statement.Stmt_view st ->
+    (match Statement.get_formulas_from_defs st with
+    | [] -> [||]
+    | f :: _ ->
+      let ctx = Term.Conv.create () in
+      let clause =
+        try
+          let lit = SLiteral.of_form f in
+          [ lit ]
+        with SLiteral.NotALit _ ->
+          let open TypedSTerm.Form in
+          (match view f with
+          | Or l -> List.map SLiteral.of_form l
+          | _ -> [ SLiteral.of_form f ])
+      in
+      let fo_lits =
+        List.map Literal.Conv.of_form
+          (List.map (SLiteral.map ~f:(Term.Conv.of_simple_term_exn ctx)) clause)
+      in
+      Array.of_list fo_lits)
+  | _ -> [||]
+
 let check res =
   let@ _sp = Phases.with_span ~__FILE__ ~__LINE__ "phase.check-proof" in
   Phases.start_phase Phases.Check_proof >>= fun () ->
@@ -613,7 +637,7 @@ let check res =
           ~get_clause:(fun p ->
             match Proof.Result.view (Proof.S.result p) with
             | SClause.SClause_view c -> SClause.lits c
-            | _ -> [||])
+            | _ -> get_def_lits p)
           p
       in
       let errcode =
@@ -649,7 +673,7 @@ let check res =
             ~get_lits:(fun p ->
               match Proof.Result.view (Proof.S.result p) with
               | SClause.SClause_view c -> SClause.lits c
-              | _ -> [||])
+              | _ -> get_def_lits p)
             p
         in
         Trace.add_data_to_span _sp

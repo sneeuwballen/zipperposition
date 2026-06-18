@@ -97,6 +97,9 @@ val proof_step : (_, _, _) t -> proof
 val get_name : (_, _, _) t -> string
 (** Retrieve a name from the proof, or generate+save a new one *)
 
+type Proof.result_view += Stmt_view of input_t
+type Proof.result_view += Stmt_clause_view of clause_t
+
 val as_proof_i : input_t -> Proof.t
 val res_tc_i : input_t Proof.result_tc
 val as_proof_c : clause_t -> Proof.t
