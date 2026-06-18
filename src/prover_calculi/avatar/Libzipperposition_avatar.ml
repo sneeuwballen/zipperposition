@@ -24,7 +24,6 @@ let flag_cut_introduced = SClause.new_flag ()
 
 module type S = Avatar_intf.S
 
-let k_avatar : (module S) Flex_state.key = Flex_state.create_key ()
 let k_avatar_enabled = Flex_state.create_key ()
 let k_show_lemmas : bool Flex_state.key = Flex_state.create_key ()
 let k_simplify_trail : bool Flex_state.key = Flex_state.create_key ()
@@ -36,688 +35,663 @@ let k_split_only_ground : bool Flex_state.key = Flex_state.create_key ()
 let k_max_trail_size : int Flex_state.key = Flex_state.create_key ()
 let k_infer_from_components : bool Flex_state.key = Flex_state.create_key ()
 
-module Make (E : Env.S) (Sat : Sat_solver_intf.STATIC) = struct
-  module OuterEnv = Env
-  module E = E
-  module Ctx = E.Ctx
-  module C = E.C
-  module Solver = Sat
-  module BLit = BBox.Lit
+module Ctx = Ctx
+module C = Clause
+module BLit = BBox.Lit
+module Solver = Sat_solver.Make ()
 
-  (* union-find that maps vars to list of literals, used for splitting *)
-  module UF = UnionFind.Make (struct
-    type key = T.var
-    type value = Lit.Set.t
+(* union-find that maps vars to list of literals, used for splitting *)
+module UF = UnionFind.Make (struct
+  type key = T.var
+  type value = Lit.Set.t
 
-    let equal = HVar.equal Type.equal
-    let hash = HVar.hash
-    let zero = Lit.Set.empty
-    let merge = Lit.Set.union
-  end)
+  let equal = HVar.equal Type.equal
+  let hash = HVar.hash
+  let zero = Lit.Set.empty
+  let merge = Lit.Set.union
+end)
 
-  let simplify_split_ (c : C.t) : C.t list option =
-    let lits = C.lits c in
-    (* maps each variable to a list of literals. Sets can be merged whenever
-       two variables occur in the same literal.  *)
-    let uf_vars =
-      C.Seq.vars c |> T.VarSet.of_iter |> T.VarSet.to_list |> UF.create
-    (* set of ground literals (each one is its own component) *)
-    and cluster_ground = ref Lit.Set.empty in
+let simplify_split_ (c : C.t) : C.t list option =
+  let lits = C.lits c in
+  (* maps each variable to a list of literals. Sets can be merged whenever
+     two variables occur in the same literal.  *)
+  let uf_vars =
+    C.Seq.vars c |> T.VarSet.of_iter |> T.VarSet.to_list |> UF.create
+  (* set of ground literals (each one is its own component) *)
+  and cluster_ground = ref Lit.Set.empty in
 
-    (* literals belong to either their own ground component, or to every
-        sets in [uf_vars] associated to their variables *)
-    Array.iter
-      (fun lit ->
-        let v_opt = Lit.Seq.vars lit |> Iter.head in
-        match v_opt with
-        | None ->
-          (* ground, lit has its own component *)
-          cluster_ground := Lit.Set.add lit !cluster_ground
-        | Some v ->
-          (* merge other variables of the literal with [v] *)
-          Lit.Seq.vars lit
-          |> Iter.iter (fun v' ->
-                 (* lit is in the equiv class of [v'] *)
-                 UF.add uf_vars v' (Lit.Set.singleton lit);
-                 UF.union uf_vars v v'))
-      lits;
+  (* literals belong to either their own ground component, or to every
+      sets in [uf_vars] associated to their variables *)
+  Array.iter
+    (fun lit ->
+      let v_opt = Lit.Seq.vars lit |> Iter.head in
+      match v_opt with
+      | None ->
+        (* ground, lit has its own component *)
+        cluster_ground := Lit.Set.add lit !cluster_ground
+      | Some v ->
+        (* merge other variables of the literal with [v] *)
+        Lit.Seq.vars lit
+        |> Iter.iter (fun v' ->
+               (* lit is in the equiv class of [v'] *)
+               UF.add uf_vars v' (Lit.Set.singleton lit);
+               UF.union uf_vars v v'))
+    lits;
 
-    (* now gather all the components as a literal list list *)
-    let components = ref [] in
-    Lit.Set.iter
-      (fun lit -> components := [ lit ] :: !components)
-      !cluster_ground;
-    UF.iter uf_vars (fun _ comp ->
-        components := Lit.Set.to_list comp :: !components);
+  (* now gather all the components as a literal list list *)
+  let components = ref [] in
+  Lit.Set.iter (fun lit -> components := [ lit ] :: !components) !cluster_ground;
+  UF.iter uf_vars (fun _ comp ->
+      components := Lit.Set.to_list comp :: !components);
 
-    let proof = Proof.Step.esa [ Proof.Parent.from @@ C.proof c ] in
-    let bool_guard = C.trail c |> Trail.to_list |> List.map Trail.Lit.neg in
+  let proof = Proof.Step.esa [ Proof.Parent.from @@ C.proof c ] in
+  let bool_guard = C.trail c |> Trail.to_list |> List.map Trail.Lit.neg in
 
-    match !components with
-    | [] ->
-      assert (Array.length lits = 0);
-      None
-    | [ lits ] ->
-      if
-        OuterEnv.flex_get_of (OuterEnv.get_global ())
-          k_abstract_known_singletons
-      then (
-        let lits = Array.of_list lits in
-        let bool_name = BBox.find_boolean_lit lits in
-        CCOpt.iter
-          (fun bool_lit ->
-            (* asserting Trail -> bool_name *)
-            if
-              List.for_all
-                (fun bg -> BBox.Lit.equal (BBox.Lit.neg bg) bool_lit)
-                bool_guard
-            then
-              (* ignoring tautoligies *)
-              Sat.add_clause
-                ~proof:(proof ~rule:(Proof.Rule.mk "recognize_known"))
-                (bool_lit :: bool_guard))
-          bool_name
-      );
-      None
-    | _ :: _ ->
-      (* do a simplification! *)
-      Util.incr_stat stat_splits;
-
-      (* elements of the trail to keep *)
-      let keep_trail = C.trail c |> Trail.filter BBox.must_be_kept in
-      let clauses_and_names =
-        List.map
-          (fun lits ->
-            let lits = Array.of_list lits in
-            let bool_name = BBox.inject_lits lits in
-            Util.debugf ~section 5 "(@[<2>inject_lits@ :lits %a@ :blit %a@])"
-              (fun k -> k Literals.pp lits BBox.pp bool_name);
-            (* new trail: add the new one *)
-            let trail = Trail.add bool_name keep_trail in
-            let c =
-              C.create_a
-                ~ctx:(OuterEnv.get_ctx (OuterEnv.get_global ()))
-                ~trail ~penalty:(C.penalty c) lits
-                (proof ~rule:(Proof.Rule.mk "split"))
-            in
-            c, bool_name)
-          !components
-      in
-      let clauses, bool_clause = List.split clauses_and_names in
-      Util.debugf ~section 2 "@[split of @[%a@]@ yields @[%a@]@]" (fun k ->
-          k C.pp c (Util.pp_list C.pp) clauses);
-
-      (* add boolean constraint: trail(c) => bigor_{name in clauses} name *)
-      let bool_clause = List.append bool_clause bool_guard in
-      Sat.add_clause ~proof:(proof ~rule:(Proof.Rule.mk "split")) bool_clause;
-      Util.debugf ~section 2 "@[constraint clause is @[%a@]@]" (fun k ->
-          k BBox.pp_bclause bool_clause);
-      (* return the clauses *)
-      Some clauses
-
-  (* Avatar splitting *)
-  let split c =
-    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "avatar.split" in
-
-    let should_split c =
-      (not @@ Literals.is_trivial (C.lits c))
-      && (not
-          @@ OuterEnv.flex_get_of (OuterEnv.get_global ()) k_split_only_initial
-         || C.proof_depth c == 0)
-      && (not
-          @@ OuterEnv.flex_get_of (OuterEnv.get_global ()) k_split_only_ground
-         || C.is_ground c)
-      && (not
-          @@ OuterEnv.flex_get_of (OuterEnv.get_global ()) k_split_only_goals
-         || CCOpt.get_or ~default:(-1) (C.distance_to_goal c) >= 0)
-      && (not
-          @@ OuterEnv.flex_get_of (OuterEnv.get_global ())
-               k_abstract_known_singletons
-         || Array.length (C.lits c) != 0)
-      && (OuterEnv.flex_get_of (OuterEnv.get_global ())
-            k_abstract_known_singletons
-         || Array.length (C.lits c) > 1)
-      && (OuterEnv.flex_get_of (OuterEnv.get_global ()) k_max_trail_size < 0
-         || Trail.length (C.trail c)
-            <= OuterEnv.flex_get_of (OuterEnv.get_global ()) k_max_trail_size)
-    in
-
-    let res =
-      if should_split c then
-        simplify_split_ c
-      else
-        None
-    in
-
-    (match res with
-    | None ->
-      Util.debugf ~section 1 "Clause @[%a@] cannot be split@." (fun k ->
-          k C.pp c)
-    | Some res ->
-      Util.debugf ~section 1 "Clause @[%a@] split into:@.@[%a@]@." (fun k ->
-          k C.pp c (CCList.pp C.pp) res));
-
-    res
-
-  let filter_absurd_trails_ = ref (fun _ -> true)
-  let filter_absurd_trails f = filter_absurd_trails_ := f
-
-  (* if c.lits = [], negate c.trail *)
-  let check_empty c =
-    (* trail can be empty if clause is simplified into empty clause *)
-    if
-      Array.length (C.lits c) = 0
-      && (not (Trail.is_empty (C.trail c)))
-      && !filter_absurd_trails_ (C.trail c)
-    then (
-      assert (not (Trail.is_empty (C.trail c)));
-      let b_clause = C.trail c |> Trail.to_list |> List.map Trail.Lit.neg in
-      Util.debugf ~section 4 "@[negate trail of @[%a@] (id %d)@ with @[%a@]@]"
-        (fun k -> k C.pp c (C.id c) BBox.pp_bclause b_clause);
-      Sat.add_clause ~proof:(C.proof_step c) b_clause
+  match !components with
+  | [] ->
+    assert (Array.length lits = 0);
+    None
+  | [ lits ] ->
+    if Env.flex_get_of (Env.get_global ()) k_abstract_known_singletons then (
+      let lits = Array.of_list lits in
+      let bool_name = BBox.find_boolean_lit lits in
+      CCOpt.iter
+        (fun bool_lit ->
+          (* asserting Trail -> bool_name *)
+          if
+            List.for_all
+              (fun bg -> BBox.Lit.equal (BBox.Lit.neg bg) bool_lit)
+              bool_guard
+          then
+            (* ignoring tautoligies *)
+            Solver.add_clause
+              ~proof:(proof ~rule:(Proof.Rule.mk "recognize_known"))
+              (bool_lit :: bool_guard))
+        bool_name
     );
-    if
-      Array.length (C.lits c) = 0
-      && OuterEnv.flex_get_of (OuterEnv.get_global ()) k_infer_from_components
-      && Trail.length (C.trail c) = 1
-    then (
-      let bool_lit = List.hd (Trail.to_list (C.trail c)) in
-      let negate =
-        if BBox.Lit.sign bool_lit then
-          Lit.negate
-        else
-          CCFun.id
-      in
-      match BBox.as_lits bool_lit with
-      | Some lits ->
-        let skolemizer =
-          Literals.vars lits
-          |> List.map (fun v ->
-                 (v, 0), (snd @@ Term.mk_fresh_skolem [] (HVar.ty v), 0))
-          |> Subst.FO.of_list'
-        in
-        let lits' =
-          Literals.apply_subst Subst.Renaming.none skolemizer (lits, 0)
-          |> CCArray.to_list
-        in
-        let proof =
-          Proof.Step.inference
-            ~rule:(Proof.Rule.mk "ground_avatar")
-            [ C.proof_parent c ]
-        in
-        List.map
-          (fun lit ->
-            C.create ~ctx:(C.ctx_of c) ~penalty:(C.penalty c) ~trail:Trail.empty
-              [ negate lit ]
-              proof)
-          lits'
-      | None -> []
-    ) else
-      []
-  (* never infers anything -- 
-                 if ground empty avatar clauses 
-                 are not added to the proof state. *)
+    None
+  | _ :: _ ->
+    (* do a simplification! *)
+    Util.incr_stat stat_splits;
 
-  (* check whether the trail is false and will remain so *)
-  let trail_is_trivial_ (trail : Trail.t) : bool =
-    let res =
-      Trail.to_iter trail
-      |> Iter.find_map (fun lit ->
-             try
-               match Sat.valuation_level lit with
-               | false, 0 -> Some lit (* false at level 0: proven false *)
-               | _ -> None
-             with Sat.UndecidedLit -> None)
-    in
-    match res with
-    | None -> false
-    | Some lit ->
-      Util.incr_stat stat_trail_trivial;
-      Util.debugf ~section 3
-        "(@[<hv2>trivial_trail@ :trail @[<hv>%a@]@ :lit `%a`@]" (fun k ->
-          k C.pp_trail trail BBox.pp lit);
-      true
-
-  let trail_is_trivial tr = Sat.last_result () = Sat.Sat && trail_is_trivial_ tr
-
-  type trail_status =
-    | Tr_trivial
-    | Tr_simplify_into of BLit.t list * BLit.t list (* kept, removed *)
-    | Tr_same
-
-  exception Trail_is_trivial
-
-  (* return [new_trail], [is_trivial] *)
-  let simplify_opt (trail : Trail.t) : trail_status =
-    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "avatar.simplify-opt" in
-    let n_simpl = ref 0 in
-    try
-      let trail, removed =
-        Trail.to_list trail
-        |> List.partition (fun lit ->
-               try
-                 match Sat.valuation_level lit with
-                 | true, 0 ->
-                   (* [lit] is proven true, it is therefore not necessary
-                    to depend on it *)
-                   incr n_simpl;
-                   false
-                 | false, 0 ->
-                   (* [lit] is proven false, the whole trail is trivial *)
-                   raise Trail_is_trivial
-                 | _ -> true
-               with Sat.UndecidedLit -> true)
-      in
-      if !n_simpl > 0 then (
-        assert (removed <> []);
-        Tr_simplify_into (trail, removed)
-      ) else
-        Tr_same
-    with Trail_is_trivial -> Tr_trivial
-
-  (* simplify the trail of [c] using boolean literals that have been proven *)
-  let simplify_trail_ c =
-    let trail = C.trail c in
-    (* remove bool literals made trivial by SAT solver *)
-    match simplify_opt trail with
-    | Tr_same | Tr_trivial -> SimplM.return_same c (* handled by [is_trivial] *)
-    | Tr_simplify_into (new_trail, removed_trail) ->
-      Util.incr_stat stat_trail_simplify;
-      let new_trail = Trail.of_list new_trail in
-      (* use SAT resolution proofs for tracking why the trail
-           has been simplified, so that the other branches that have been
-           closed can appear in the proof *)
-      let proof_removed =
-        List.map
-          (CCFun.compose Sat.get_proof_of_lit Proof.Parent.from)
-          removed_trail
-      in
-      let proof =
-        Proof.Step.simp
-          ~rule:(Proof.Rule.mk "simpl_trail")
-          (Proof.Parent.from (C.proof c) :: proof_removed)
-      in
-      let c' =
-        C.create_a
-          ~ctx:(OuterEnv.get_ctx (OuterEnv.get_global ()))
-          ~trail:new_trail ~penalty:(C.penalty c) (C.lits c) proof
-      in
-      Util.debugf ~section 3
-        "@[<2>clause @[%a@]@ trail-simplifies into @[%a@]@]" (fun k ->
-          k C.pp c C.pp c');
-      SimplM.return_new c'
-
-  (* only simplify if SAT *)
-  let simplify_trail c =
-    if Sat.last_result () = Sat.Sat then
-      simplify_trail_ c
-    else
-      SimplM.return_same c
-
-  let new_proved_lits : unit -> bool =
-    let num_proved_last_ = ref 0 in
-    fun () ->
-      let set = Sat.all_proved () in
-      let n = BLit.Set.cardinal set in
-      assert (n >= !num_proved_last_);
-      let yes = n > !num_proved_last_ in
-      num_proved_last_ := n;
-      yes
-
-  (* subset of active clauses that have a trivial trail or simplifiable
-     trail *)
-  let backward_simplify_trails (_ : C.t) : C.ClauseSet.t =
-    if Sat.last_result () = Sat.Sat && new_proved_lits () then
-      ProofState.ActiveSet.clauses ()
-      |> Clause.ClauseSet.to_seq |> Iter.of_seq
-      |> Iter.filter (fun c -> not (Trail.is_empty @@ C.trail c))
-      |> Iter.filter (fun c ->
-             let ok =
-               match simplify_opt (C.trail c) with
-               | Tr_trivial | Tr_simplify_into _ -> true
-               | Tr_same -> false
-             in
-             if ok then (
-               Util.incr_stat stat_backward_simp_trail;
-               Util.debugf ~section 5 "(@[<2>backward_simplify_trail@ %a@])"
-                 (fun k -> k C.pp c)
-             );
-             ok)
-      |> Iter.fold (fun s x -> C.ClauseSet.add x s) C.ClauseSet.empty
-    else
-      C.ClauseSet.empty
-
-  let skolem_count_ = ref 0
-
-  type cut_res = {
-    cut_form: Cut_form.t;  (** the lemma itself *)
-    cut_pos: C.t list;  (** clauses true if lemma is true *)
-    cut_lit: BLit.t;  (** lit that is true if lemma is true *)
-    cut_depth: int;  (** if the lemma is used to prove another lemma *)
-    cut_proof: Proof.Step.t;  (** where does the lemma come from? *)
-    cut_proof_parent: Proof.Parent.t;  (** how to justify sth from the lemma *)
-    cut_reason: unit CCFormat.printer option;
-        (** Informal reason why the lemma was added *)
-  }
-
-  let cut_form c = c.cut_form
-  let cut_pos c = c.cut_pos
-  let cut_lit c = c.cut_lit
-  let cut_depth c = c.cut_depth
-  let cut_proof c = c.cut_proof
-  let cut_proof_parent c = c.cut_proof_parent
-
-  let pp_cut_res out (c : cut_res) : unit =
-    let pp_depth out d = if d > 0 then Format.fprintf out "@ :depth %d" d in
-    let pp_reason out r = Format.fprintf out "@ :reason @[%a@]" r () in
-    Format.fprintf out "(@[<4>@[<hv>cut@ :form @[%a@]@ :lit @[%a@]%a]%a@])"
-      (Util.pp_list C.pp) c.cut_pos BLit.pp c.cut_lit pp_depth c.cut_depth
-      (Fmt.some pp_reason) c.cut_reason
-
-  let cut_res_clauses c = Iter.of_list c.cut_pos
-
-  (* generic mechanism for adding clause(s)
-     and make a lemma out of them, including Skolemization, etc. *)
-  let introduce_cut ?reason ?(penalty = 1) ?(depth = 0) (f : Cut_form.t) proof :
-      cut_res =
-    let box = BBox.inject_lemma f in
-    let cut_proof_parent =
-      let form = Cut_form.to_s_form f in
-      let st =
-        Statement.lemma
-          ~proof:(Proof.Step.lemma @@ Proof.Src.internal [])
-          [ form ]
-      in
-      Proof.Parent.from @@ Statement.as_proof_i st
-    in
-    (* positive clauses *)
-    let proof_pos =
-      Proof.Step.esa ~rule:(Proof.Rule.mk "cut") [ cut_proof_parent ]
-    in
-    let c_pos =
+    (* elements of the trail to keep *)
+    let keep_trail = C.trail c |> Trail.filter BBox.must_be_kept in
+    let clauses_and_names =
       List.map
         (fun lits ->
-          C.create_a
-            ~ctx:(OuterEnv.get_ctx (OuterEnv.get_global ()))
-            ~trail:(Trail.singleton box) ~penalty lits proof_pos)
-        (Cut_form.cs f)
+          let lits = Array.of_list lits in
+          let bool_name = BBox.inject_lits lits in
+          Util.debugf ~section 5 "(@[<2>inject_lits@ :lits %a@ :blit %a@])"
+            (fun k -> k Literals.pp lits BBox.pp bool_name);
+          (* new trail: add the new one *)
+          let trail = Trail.add bool_name keep_trail in
+          let c =
+            C.create_a
+              ~ctx:(Env.get_ctx (Env.get_global ()))
+              ~trail ~penalty:(C.penalty c) lits
+              (proof ~rule:(Proof.Rule.mk "split"))
+          in
+          c, bool_name)
+        !components
     in
-    {
-      cut_form = f;
-      cut_pos = c_pos;
-      cut_lit = box;
-      cut_depth = depth;
-      cut_proof = proof;
-      cut_reason = reason;
-      cut_proof_parent;
-    }
+    let clauses, bool_clause = List.split clauses_and_names in
+    Util.debugf ~section 2 "@[split of @[%a@]@ yields @[%a@]@]" (fun k ->
+        k C.pp c (Util.pp_list C.pp) clauses);
 
-  let on_input_lemma : cut_res Signal.t = Signal.create ()
-  let on_lemma : cut_res Signal.t = Signal.create ()
+    (* add boolean constraint: trail(c) => bigor_{name in clauses} name *)
+    let bool_clause = List.append bool_clause bool_guard in
+    Solver.add_clause ~proof:(proof ~rule:(Proof.Rule.mk "split")) bool_clause;
+    Util.debugf ~section 2 "@[constraint clause is @[%a@]@]" (fun k ->
+        k BBox.pp_bclause bool_clause);
+    (* return the clauses *)
+    Some clauses
 
-  module Lemma_tbl = BBox.Lit.Tbl
+(* Avatar splitting *)
+let split c =
+  let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "avatar.split" in
 
-  (* map from [cut.cut_lit] to [cut] *)
-  let all_lemmas_ : cut_res Lemma_tbl.t = Lemma_tbl.create 64
+  let should_split c =
+    (not @@ Literals.is_trivial (C.lits c))
+    && ((not @@ Env.flex_get_of (Env.get_global ()) k_split_only_initial)
+       || C.proof_depth c == 0)
+    && ((not @@ Env.flex_get_of (Env.get_global ()) k_split_only_ground)
+       || C.is_ground c)
+    && ((not @@ Env.flex_get_of (Env.get_global ()) k_split_only_goals)
+       || CCOpt.get_or ~default:(-1) (C.distance_to_goal c) >= 0)
+    && ((not @@ Env.flex_get_of (Env.get_global ()) k_abstract_known_singletons)
+       || Array.length (C.lits c) != 0)
+    && (Env.flex_get_of (Env.get_global ()) k_abstract_known_singletons
+       || Array.length (C.lits c) > 1)
+    && (Env.flex_get_of (Env.get_global ()) k_max_trail_size < 0
+       || Trail.length (C.trail c)
+          <= Env.flex_get_of (Env.get_global ()) k_max_trail_size)
+  in
 
-  let prove_lemma_handlers_ : (cut_res -> C.t list E.conversion_result) list ref
-      =
-    ref []
+  let res =
+    if should_split c then
+      simplify_split_ c
+    else
+      None
+  in
 
-  let add_prove_lemma x = CCList.Ref.push prove_lemma_handlers_ x
+  (match res with
+  | None ->
+    Util.debugf ~section 1 "Clause @[%a@] cannot be split@." (fun k -> k C.pp c)
+  | Some res ->
+    Util.debugf ~section 1 "Clause @[%a@] split into:@.@[%a@]@." (fun k ->
+        k C.pp c (CCList.pp C.pp) res));
 
-  (* clauses recently pushed while trying to prove lemmas *)
-  let new_clauses_from_lemmas_ : C.t list ref = ref []
+  res
 
-  (* return the list of new lemmas *)
-  let inf_new_lemmas ~full:_ () =
-    let l = !new_clauses_from_lemmas_ in
-    new_clauses_from_lemmas_ := [];
-    l
+let filter_absurd_trails_ = ref (fun _ -> true)
+let filter_absurd_trails f = filter_absurd_trails_ := f
 
-  (* try to prove a lemma, by trying handlers one by one, or just skolemizing *)
-  let prove_lemma (c : cut_res) : unit =
-    let default () =
-      let g = cut_form c in
-      (* proof step *)
-      let proof =
-        Proof.Step.esa [ cut_proof_parent c ] ~rule:(Proof.Rule.mk "cut")
-      in
-      let vars = Cut_form.vars g |> T.VarSet.to_list in
-      Util.debugf ~section 2 "(@[<hv2>prove_lemma@ :form %a@ :vars (@[%a@])@])"
-        (fun k -> k Cut_form.pp g (Util.pp_list HVar.pp) vars);
-      (* map variables to skolems *)
-      let subst : Subst.t =
-        vars
+(* if c.lits = [], negate c.trail *)
+let check_empty c =
+  (* trail can be empty if clause is simplified into empty clause *)
+  if
+    Array.length (C.lits c) = 0
+    && (not (Trail.is_empty (C.trail c)))
+    && !filter_absurd_trails_ (C.trail c)
+  then (
+    assert (not (Trail.is_empty (C.trail c)));
+    let b_clause = C.trail c |> Trail.to_list |> List.map Trail.Lit.neg in
+    Util.debugf ~section 4 "@[negate trail of @[%a@] (id %d)@ with @[%a@]@]"
+      (fun k -> k C.pp c (C.id c) BBox.pp_bclause b_clause);
+    Solver.add_clause ~proof:(C.proof_step c) b_clause
+  );
+  if
+    Array.length (C.lits c) = 0
+    && Env.flex_get_of (Env.get_global ()) k_infer_from_components
+    && Trail.length (C.trail c) = 1
+  then (
+    let bool_lit = List.hd (Trail.to_list (C.trail c)) in
+    let negate =
+      if BBox.Lit.sign bool_lit then
+        Lit.negate
+      else
+        CCFun.id
+    in
+    match BBox.as_lits bool_lit with
+    | Some lits ->
+      let skolemizer =
+        Literals.vars lits
         |> List.map (fun v ->
-               let ty_v = HVar.ty v in
-               let id = Ind_cst.make_skolem ty_v in
-               Ctx.declare (OuterEnv.get_ctx (OuterEnv.get_global ())) id ty_v;
-               (v, 0), (T.const ~ty:ty_v id, 0))
-        |> Subst.FO.of_list' ?init:None
+               (v, 0), (snd @@ Term.mk_fresh_skolem [] (HVar.ty v), 0))
+        |> Subst.FO.of_list'
       in
-      (* for each clause, apply [subst] to it and negate its
-          literals, obtaining a DNF of [¬ And_i ctx_i[case]];
-          then turn DNF into CNF *)
-      let renaming = Subst.Renaming.create () in
-      let clauses =
-        Cut_form.apply_subst renaming subst (g, 0)
-        |> Cut_form.cs
-        |> Util.map_product ~f:(fun lits ->
-               let lits = Array.map (fun l -> [ Literal.negate l ]) lits in
-               Array.to_list lits)
-        |> CCList.map (fun l ->
-               let lits = Array.of_list l in
-               let trail = Trail.singleton (BLit.neg @@ cut_lit c) in
-               C.create_a
-                 ~ctx:(OuterEnv.get_ctx (OuterEnv.get_global ()))
-                 lits proof ~trail ~penalty:1)
-      in
-      clauses
-    in
-    let rec aux acc = function
-      | [] -> List.rev_append (default ()) acc
-      | proof_handler :: tail ->
-        (match proof_handler c with
-        | E.CR_drop | E.CR_skip -> aux acc tail
-        | E.CR_return cs -> List.rev_append cs acc
-        | E.CR_add cs -> aux (List.rev_append cs acc) tail)
-    in
-    (* add proof clauses to the positive clauses *)
-    let cs = aux (cut_pos c) !prove_lemma_handlers_ in
-    Util.debugf ~section 3 "(@[prove_lemma@ :lemma %a@ :clauses (@[<hv>%a@])@])"
-      (fun k -> k Cut_form.pp (cut_form c) (Util.pp_list C.pp) cs);
-    CCList.Ref.push_list new_clauses_from_lemmas_ cs
-
-  let add_lemma (c : cut_res) : unit =
-    if not (Lemma_tbl.mem all_lemmas_ c.cut_lit) then (
-      Util.debugf ~section 2 "(@[<2>add_lemma@ :on `[@[<hv>%a@]]`@ :lit %a@])"
-        (fun k -> k Cut_form.pp c.cut_form BBox.pp c.cut_lit);
-      Lemma_tbl.add all_lemmas_ c.cut_lit c;
-      (* start a subproof for the lemma *)
-      prove_lemma c;
-      Signal.send on_lemma c
-    ) else
-      (* already existing lemma *)
-        Util.debugf ~section 3
-          "(@[<2>add_lemma [already there]@ :on `[@[<hv>%a@]]`@])" (fun k ->
-          k Cut_form.pp c.cut_form)
-
-  let add_imply (l : cut_res list) (res : cut_res) (p : Proof.Step.t) : unit =
-    let c = res.cut_lit :: List.map (fun cut -> BLit.neg cut.cut_lit) l in
-    Util.debugf ~section 3
-      "(@[<2>add_imply@ :premises (@[<hv>%a@])@ :concl %a@ :proof %a@])"
-      (fun k -> k (Util.pp_list pp_cut_res) l pp_cut_res res Proof.Step.pp p);
-    Solver.add_clause ~proof:p c;
-    ()
-
-  let lemma_seq : cut_res Iter.t =
-   fun yield -> Lemma_tbl.iter (fun _ c -> yield c) all_lemmas_
-
-  (* is this literal involved in the proof? *)
-  let rec in_proof_of_ (p : Proof.t) (lit : BLit.t) : bool =
-    let eq_abs l1 l2 = BLit.equal (BLit.abs l1) (BLit.abs l2) in
-    let in_proof_ (p : Proof.Step.t) (lit : BLit.t) : bool =
-      List.exists
-        (fun parent -> in_proof_of_ (Proof.Parent.proof parent) lit)
-        (Proof.Step.parents p)
-    in
-    match Proof.S.result p with
-    | Proof.Res (_, Bool_clause.Bool_clause_view l) ->
-      List.exists (eq_abs lit) l || in_proof_ (Proof.S.step p) lit
-    | _ -> in_proof_ (Proof.S.step p) lit
-
-  let print_lemmas out () =
-    let in_core =
-      match Sat.get_proof_opt () with
-      | None -> fun _ -> false
-      | Some p -> in_proof_of_ p
-    and pp_reason out r = Format.fprintf out "@ :reason @[%a@]" r () in
-    let pp_lemma out c =
-      let status =
-        match Sat.proved_at_0 c.cut_lit with
-        | _ when in_core c.cut_lit -> "in_proof"
-        | None -> "unknown"
-        | Some true -> "proved"
-        | Some false -> "refuted"
-      in
-      Format.fprintf out "@[<4>@[<hv>@{<Green>*@} %s %a@]%a@]" status
-        Cut_form.pp c.cut_form (Fmt.some pp_reason) c.cut_reason
-    in
-    let l = lemma_seq |> Iter.to_rev_list in
-    Format.fprintf out "@[<v2>lemmas (%d): {@ %a@,@]}" (List.length l)
-      (Util.pp_list ~sep:"" pp_lemma)
-      l;
-    ()
-
-  let show_lemmas () = Format.printf "%a@." print_lemmas ()
-
-  let convert_lemma st =
-    match Statement.view st with
-    | Statement.Lemma l ->
-      let proof_st = Statement.proof_step st in
-      let f =
-        l
-        |> List.map (List.map Ctx.Lit.of_form)
-        |> List.map Array.of_list |> Cut_form.make
+      let lits' =
+        Literals.apply_subst Subst.Renaming.none skolemizer (lits, 0)
+        |> CCArray.to_list
       in
       let proof =
-        Cut_form.cs f
-        |> List.map (fun c ->
-               Proof.Parent.from @@ Proof.S.mk proof_st @@ SClause.mk_proof_res
-               @@ SClause.make ~trail:Trail.empty c)
-        |> Proof.Step.esa ~rule:(Proof.Rule.mk "lemma")
+        Proof.Step.inference
+          ~rule:(Proof.Rule.mk "ground_avatar")
+          [ C.proof_parent c ]
       in
-      let cut = introduce_cut ~reason:Fmt.(return "in-input") f proof in
-      let all_clauses = cut_res_clauses cut |> Iter.to_rev_list in
-      add_lemma cut;
-      Signal.send on_input_lemma cut;
-      (* interrupt here *)
-      OuterEnv.CR_return all_clauses
-    | _ -> OuterEnv.CR_skip
+      List.map
+        (fun lit ->
+          C.create ~ctx:(C.ctx_of c) ~penalty:(C.penalty c) ~trail:Trail.empty
+            [ negate lit ]
+            proof)
+        lits'
+    | None -> []
+  ) else
+    []
+(* never infers anything -- 
+               if ground empty avatar clauses 
+               are not added to the proof state. *)
 
-  let before_check_sat = Signal.create ()
-  let after_check_sat = Signal.create ()
+(* check whether the trail is false and will remain so *)
+let trail_is_trivial_ (trail : Trail.t) : bool =
+  let res =
+    Trail.to_iter trail
+    |> Iter.find_map (fun lit ->
+           try
+             match Solver.valuation_level lit with
+             | false, 0 -> Some lit (* false at level 0: proven false *)
+             | _ -> None
+           with Solver.UndecidedLit -> None)
+  in
+  match res with
+  | None -> false
+  | Some lit ->
+    Util.incr_stat stat_trail_trivial;
+    Util.debugf ~section 3
+      "(@[<hv2>trivial_trail@ :trail @[<hv>%a@]@ :lit `%a`@]" (fun k ->
+        k C.pp_trail trail BBox.pp lit);
+    true
 
-  (* Just check the solver *)
-  let check_satisfiability ~full () =
-    let@ _sp =
-      Trace.with_span ~__FILE__ ~__LINE__ "avatar.check-satisfiability"
+let trail_is_trivial tr =
+  Solver.last_result () = Solver.Sat && trail_is_trivial_ tr
+
+type trail_status =
+  | Tr_trivial
+  | Tr_simplify_into of BLit.t list * BLit.t list (* kept, removed *)
+  | Tr_same
+
+exception Trail_is_trivial
+
+(* return [new_trail], [is_trivial] *)
+let simplify_opt (trail : Trail.t) : trail_status =
+  let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "avatar.simplify-opt" in
+  let n_simpl = ref 0 in
+  try
+    let trail, removed =
+      Trail.to_list trail
+      |> List.partition (fun lit ->
+             try
+               match Solver.valuation_level lit with
+               | true, 0 ->
+                 (* [lit] is proven true, it is therefore not necessary
+                  to depend on it *)
+                 incr n_simpl;
+                 false
+               | false, 0 ->
+                 (* [lit] is proven false, the whole trail is trivial *)
+                 raise Trail_is_trivial
+               | _ -> true
+             with Solver.UndecidedLit -> true)
     in
-    Signal.send before_check_sat ();
-    let res =
-      match Sat.check ~full () with
-      | Sat.Sat ->
-        Util.debug ~section 3 "SAT-solver reports \"SAT\"";
-        []
-      | Sat.Unsat proof ->
-        Util.debug ~section 1 "SAT-solver reports \"UNSAT\"";
-        let proof = Proof.S.step proof in
-        let c =
-          C.create
-            ~ctx:(OuterEnv.get_ctx (OuterEnv.get_global ()))
-            ~trail:Trail.empty ~penalty:1 [] proof
-        in
-        [ c ]
+    if !n_simpl > 0 then (
+      assert (removed <> []);
+      Tr_simplify_into (trail, removed)
+    ) else
+      Tr_same
+  with Trail_is_trivial -> Tr_trivial
+
+(* simplify the trail of [c] using boolean literals that have been proven *)
+let simplify_trail_ c =
+  let trail = C.trail c in
+  (* remove bool literals made trivial by SAT solver *)
+  match simplify_opt trail with
+  | Tr_same | Tr_trivial -> SimplM.return_same c (* handled by [is_trivial] *)
+  | Tr_simplify_into (new_trail, removed_trail) ->
+    Util.incr_stat stat_trail_simplify;
+    let new_trail = Trail.of_list new_trail in
+    (* use SAT resolution proofs for tracking why the trail
+         has been simplified, so that the other branches that have been
+         closed can appear in the proof *)
+    let proof_removed =
+      List.map
+        (CCFun.compose Solver.get_proof_of_lit Proof.Parent.from)
+        removed_trail
     in
-    Signal.send after_check_sat ();
-    res
-
-  let register ~split_kind () =
-    let split_to_str = function
-      | `Lazy -> "lazy"
-      | `Eager -> "eager"
-      | `Off -> "off"
+    let proof =
+      Proof.Step.simp
+        ~rule:(Proof.Rule.mk "simpl_trail")
+        (Proof.Parent.from (C.proof c) :: proof_removed)
     in
+    let c' =
+      C.create_a
+        ~ctx:(Env.get_ctx (Env.get_global ()))
+        ~trail:new_trail ~penalty:(C.penalty c) (C.lits c) proof
+    in
+    Util.debugf ~section 3 "@[<2>clause @[%a@]@ trail-simplifies into @[%a@]@]"
+      (fun k -> k C.pp c C.pp c');
+    SimplM.return_new c'
 
-    Util.debugf ~section:Const.section 2 "register extension Avatar (split: %s)"
-      (fun k -> k (split_to_str split_kind));
-    Sat.set_printer BBox.pp;
-    (match split_kind with
-    | `Lazy ->
-      OuterEnv.add_multi_simpl_rule (OuterEnv.get_global ()) ~priority:0 split
-    | `Eager ->
-      OuterEnv.add_cheap_multi_simpl_rule (OuterEnv.get_global ()) split;
-      (* this rule is used to interfere with lazy clausification *)
-      OuterEnv.add_multi_simpl_rule (OuterEnv.get_global ()) ~priority:0 split
-    | `Off -> ());
+(* only simplify if SAT *)
+let simplify_trail c =
+  if Solver.last_result () = Solver.Sat then
+    simplify_trail_ c
+  else
+    SimplM.return_same c
 
-    OuterEnv.add_unary_inf (OuterEnv.get_global ()) "avatar_check_empty"
-      check_empty;
-    OuterEnv.add_generate (OuterEnv.get_global ()) ~priority:1000
-      "avatar_check_sat" check_satisfiability;
-    OuterEnv.add_generate (OuterEnv.get_global ()) ~priority:100 "avatar.lemmas"
-      inf_new_lemmas;
-    OuterEnv.add_clause_conversion (OuterEnv.get_global ()) convert_lemma;
+let new_proved_lits : unit -> bool =
+  let num_proved_last_ = ref 0 in
+  fun () ->
+    let set = Solver.all_proved () in
+    let n = BLit.Set.cardinal set in
+    assert (n >= !num_proved_last_);
+    let yes = n > !num_proved_last_ in
+    num_proved_last_ := n;
+    yes
 
-    if split_kind != `Off then
-      Signal.on
-        (OuterEnv.on_start (OuterEnv.get_global ()))
-        (fun () ->
-          OuterEnv.get_passive (OuterEnv.get_global ()) ()
-          |> Iter.iter (fun cl ->
-                 match split cl with
-                 | None -> ()
-                 | Some splitted ->
-                   OuterEnv.remove_passive (OuterEnv.get_global ())
-                     (Iter.singleton cl);
-                   OuterEnv.add_passive (OuterEnv.get_global ())
-                     (Iter.of_list splitted));
+(* subset of active clauses that have a trivial trail or simplifiable
+   trail *)
+let backward_simplify_trails (_ : C.t) : C.ClauseSet.t =
+  if Solver.last_result () = Solver.Sat && new_proved_lits () then
+    ProofState.ActiveSet.clauses ()
+    |> Clause.ClauseSet.to_seq |> Iter.of_seq
+    |> Iter.filter (fun c -> not (Trail.is_empty @@ C.trail c))
+    |> Iter.filter (fun c ->
+           let ok =
+             match simplify_opt (C.trail c) with
+             | Tr_trivial | Tr_simplify_into _ -> true
+             | Tr_same -> false
+           in
+           if ok then (
+             Util.incr_stat stat_backward_simp_trail;
+             Util.debugf ~section 5 "(@[<2>backward_simplify_trail@ %a@])"
+               (fun k -> k C.pp c)
+           );
+           ok)
+    |> Iter.fold (fun s x -> C.ClauseSet.add x s) C.ClauseSet.empty
+  else
+    C.ClauseSet.empty
 
-          Signal.ContinueListening);
-    OuterEnv.add_is_trivial_trail (OuterEnv.get_global ()) trail_is_trivial;
-    if OuterEnv.flex_get_of (OuterEnv.get_global ()) k_simplify_trail then (
-      OuterEnv.add_unary_simplify (OuterEnv.get_global ()) simplify_trail;
-      OuterEnv.add_backward_simplify (OuterEnv.get_global ()) (fun c ->
-          if Sat.last_result () = Sat.Sat && new_proved_lits () then
-            Clause.ClauseSet.filter
-              (fun c -> not (Trail.is_empty @@ C.trail c))
-              (E.ProofState.ActiveSet.clauses ())
-            |> Clause.ClauseSet.filter (fun c ->
-                   let ok =
-                     match simplify_opt (C.trail c) with
-                     | Tr_trivial | Tr_simplify_into _ -> true
-                     | Tr_same -> false
-                   in
-                   if ok then (
-                     Util.incr_stat stat_backward_simp_trail;
-                     Util.debugf ~section 5
-                       "(@[<2>backward_simplify_trail@ %a@])" (fun k ->
-                         k C.pp c)
-                   );
-                   ok)
-          else
-            Clause.ClauseSet.empty)
-    );
-    if OuterEnv.flex_get_of (OuterEnv.get_global ()) k_show_lemmas then
-      Signal.once Signals.on_exit (fun _ -> show_lemmas ());
-    (* be sure there is an initial valuation *)
-    ignore (Sat.check ~full:true ());
-    ()
-end
+let skolem_count_ = ref 0
 
-let get_env (env : Env.t) : (module S) =
-  Env.flex_get_of (Env.get_global ()) k_avatar
+type cut_res = {
+  cut_form: Cut_form.t;  (** the lemma itself *)
+  cut_pos: C.t list;  (** clauses true if lemma is true *)
+  cut_lit: BLit.t;  (** lit that is true if lemma is true *)
+  cut_depth: int;  (** if the lemma is used to prove another lemma *)
+  cut_proof: Proof.Step.t;  (** where does the lemma come from? *)
+  cut_proof_parent: Proof.Parent.t;  (** how to justify sth from the lemma *)
+  cut_reason: unit CCFormat.printer option;
+      (** Informal reason why the lemma was added *)
+}
+
+let cut_form c = c.cut_form
+let cut_pos c = c.cut_pos
+let cut_lit c = c.cut_lit
+let cut_depth c = c.cut_depth
+let cut_proof c = c.cut_proof
+let cut_proof_parent c = c.cut_proof_parent
+
+let pp_cut_res out (c : cut_res) : unit =
+  let pp_depth out d = if d > 0 then Format.fprintf out "@ :depth %d" d in
+  let pp_reason out r = Format.fprintf out "@ :reason @[%a@]" r () in
+  Format.fprintf out "(@[<4>@[<hv>cut@ :form @[%a@]@ :lit @[%a@]%a]%a@])"
+    (Util.pp_list C.pp) c.cut_pos BLit.pp c.cut_lit pp_depth c.cut_depth
+    (Fmt.some pp_reason) c.cut_reason
+
+let cut_res_clauses c = Iter.of_list c.cut_pos
+
+(* generic mechanism for adding clause(s)
+   and make a lemma out of them, including Skolemization, etc. *)
+let introduce_cut ?reason ?(penalty = 1) ?(depth = 0) (f : Cut_form.t) proof :
+    cut_res =
+  let box = BBox.inject_lemma f in
+  let cut_proof_parent =
+    let form = Cut_form.to_s_form f in
+    let st =
+      Statement.lemma
+        ~proof:(Proof.Step.lemma @@ Proof.Src.internal [])
+        [ form ]
+    in
+    Proof.Parent.from @@ Statement.as_proof_i st
+  in
+  (* positive clauses *)
+  let proof_pos =
+    Proof.Step.esa ~rule:(Proof.Rule.mk "cut") [ cut_proof_parent ]
+  in
+  let c_pos =
+    List.map
+      (fun lits ->
+        C.create_a
+          ~ctx:(Env.get_ctx (Env.get_global ()))
+          ~trail:(Trail.singleton box) ~penalty lits proof_pos)
+      (Cut_form.cs f)
+  in
+  {
+    cut_form = f;
+    cut_pos = c_pos;
+    cut_lit = box;
+    cut_depth = depth;
+    cut_proof = proof;
+    cut_reason = reason;
+    cut_proof_parent;
+  }
+
+let on_input_lemma : cut_res Signal.t = Signal.create ()
+let on_lemma : cut_res Signal.t = Signal.create ()
+
+module Lemma_tbl = BBox.Lit.Tbl
+
+(* map from [cut.cut_lit] to [cut] *)
+let all_lemmas_ : cut_res Lemma_tbl.t = Lemma_tbl.create 64
+
+let prove_lemma_handlers_ : (cut_res -> C.t list Env.conversion_result) list ref
+    =
+  ref []
+
+let add_prove_lemma x = CCList.Ref.push prove_lemma_handlers_ x
+
+(* clauses recently pushed while trying to prove lemmas *)
+let new_clauses_from_lemmas_ : C.t list ref = ref []
+
+(* return the list of new lemmas *)
+let inf_new_lemmas ~full:_ () =
+  let l = !new_clauses_from_lemmas_ in
+  new_clauses_from_lemmas_ := [];
+  l
+
+(* try to prove a lemma, by trying handlers one by one, or just skolemizing *)
+let prove_lemma (c : cut_res) : unit =
+  let default () =
+    let g = cut_form c in
+    (* proof step *)
+    let proof =
+      Proof.Step.esa [ cut_proof_parent c ] ~rule:(Proof.Rule.mk "cut")
+    in
+    let vars = Cut_form.vars g |> T.VarSet.to_list in
+    Util.debugf ~section 2 "(@[<hv2>prove_lemma@ :form %a@ :vars (@[%a@])@])"
+      (fun k -> k Cut_form.pp g (Util.pp_list HVar.pp) vars);
+    (* map variables to skolems *)
+    let subst : Subst.t =
+      vars
+      |> List.map (fun v ->
+             let ty_v = HVar.ty v in
+             let id = Ind_cst.make_skolem ty_v in
+             Ctx.declare (Env.get_ctx (Env.get_global ())) id ty_v;
+             (v, 0), (T.const ~ty:ty_v id, 0))
+      |> Subst.FO.of_list' ?init:None
+    in
+    (* for each clause, apply [subst] to it and negate its
+        literals, obtaining a DNF of [¬ And_i ctx_i[case]];
+        then turn DNF into CNF *)
+    let renaming = Subst.Renaming.create () in
+    let clauses =
+      Cut_form.apply_subst renaming subst (g, 0)
+      |> Cut_form.cs
+      |> Util.map_product ~f:(fun lits ->
+             let lits = Array.map (fun l -> [ Literal.negate l ]) lits in
+             Array.to_list lits)
+      |> CCList.map (fun l ->
+             let lits = Array.of_list l in
+             let trail = Trail.singleton (BLit.neg @@ cut_lit c) in
+             C.create_a
+               ~ctx:(Env.get_ctx (Env.get_global ()))
+               lits proof ~trail ~penalty:1)
+    in
+    clauses
+  in
+  let rec aux acc = function
+    | [] -> List.rev_append (default ()) acc
+    | proof_handler :: tail ->
+      (match proof_handler c with
+      | Env.CR_drop | Env.CR_skip -> aux acc tail
+      | Env.CR_return cs -> List.rev_append cs acc
+      | Env.CR_add cs -> aux (List.rev_append cs acc) tail)
+  in
+  (* add proof clauses to the positive clauses *)
+  let cs = aux (cut_pos c) !prove_lemma_handlers_ in
+  Util.debugf ~section 3 "(@[prove_lemma@ :lemma %a@ :clauses (@[<hv>%a@])@])"
+    (fun k -> k Cut_form.pp (cut_form c) (Util.pp_list C.pp) cs);
+  CCList.Ref.push_list new_clauses_from_lemmas_ cs
+
+let add_lemma (c : cut_res) : unit =
+  if not (Lemma_tbl.mem all_lemmas_ c.cut_lit) then (
+    Util.debugf ~section 2 "(@[<2>add_lemma@ :on `[@[<hv>%a@]]`@ :lit %a@])"
+      (fun k -> k Cut_form.pp c.cut_form BBox.pp c.cut_lit);
+    Lemma_tbl.add all_lemmas_ c.cut_lit c;
+    (* start a subproof for the lemma *)
+    prove_lemma c;
+    Signal.send on_lemma c
+  ) else
+    (* already existing lemma *)
+      Util.debugf ~section 3
+        "(@[<2>add_lemma [already there]@ :on `[@[<hv>%a@]]`@])" (fun k ->
+        k Cut_form.pp c.cut_form)
+
+let add_imply (l : cut_res list) (res : cut_res) (p : Proof.Step.t) : unit =
+  let c = res.cut_lit :: List.map (fun cut -> BLit.neg cut.cut_lit) l in
+  Util.debugf ~section 3
+    "(@[<2>add_imply@ :premises (@[<hv>%a@])@ :concl %a@ :proof %a@])" (fun k ->
+      k (Util.pp_list pp_cut_res) l pp_cut_res res Proof.Step.pp p);
+  Solver.add_clause ~proof:p c;
+  ()
+
+let lemma_seq : cut_res Iter.t =
+ fun yield -> Lemma_tbl.iter (fun _ c -> yield c) all_lemmas_
+
+(* is this literal involved in the proof? *)
+let rec in_proof_of_ (p : Proof.t) (lit : BLit.t) : bool =
+  let eq_abs l1 l2 = BLit.equal (BLit.abs l1) (BLit.abs l2) in
+  let in_proof_ (p : Proof.Step.t) (lit : BLit.t) : bool =
+    List.exists
+      (fun parent -> in_proof_of_ (Proof.Parent.proof parent) lit)
+      (Proof.Step.parents p)
+  in
+  match Proof.S.result p with
+  | Proof.Res (_, Bool_clause.Bool_clause_view l) ->
+    List.exists (eq_abs lit) l || in_proof_ (Proof.S.step p) lit
+  | _ -> in_proof_ (Proof.S.step p) lit
+
+let print_lemmas out () =
+  let in_core =
+    match Solver.get_proof_opt () with
+    | None -> fun _ -> false
+    | Some p -> in_proof_of_ p
+  and pp_reason out r = Format.fprintf out "@ :reason @[%a@]" r () in
+  let pp_lemma out c =
+    let status =
+      match Solver.proved_at_0 c.cut_lit with
+      | _ when in_core c.cut_lit -> "in_proof"
+      | None -> "unknown"
+      | Some true -> "proved"
+      | Some false -> "refuted"
+    in
+    Format.fprintf out "@[<4>@[<hv>@{<Green>*@} %s %a@]%a@]" status Cut_form.pp
+      c.cut_form (Fmt.some pp_reason) c.cut_reason
+  in
+  let l = lemma_seq |> Iter.to_rev_list in
+  Format.fprintf out "@[<v2>lemmas (%d): {@ %a@,@]}" (List.length l)
+    (Util.pp_list ~sep:"" pp_lemma)
+    l;
+  ()
+
+let show_lemmas () = Format.printf "%a@." print_lemmas ()
+
+let convert_lemma st =
+  match Statement.view st with
+  | Statement.Lemma l ->
+    let proof_st = Statement.proof_step st in
+    let f =
+      l
+      |> List.map (List.map Ctx.Lit.of_form)
+      |> List.map Array.of_list |> Cut_form.make
+    in
+    let proof =
+      Cut_form.cs f
+      |> List.map (fun c ->
+             Proof.Parent.from @@ Proof.S.mk proof_st @@ SClause.mk_proof_res
+             @@ SClause.make ~trail:Trail.empty c)
+      |> Proof.Step.esa ~rule:(Proof.Rule.mk "lemma")
+    in
+    let cut = introduce_cut ~reason:Fmt.(return "in-input") f proof in
+    let all_clauses = cut_res_clauses cut |> Iter.to_rev_list in
+    add_lemma cut;
+    Signal.send on_input_lemma cut;
+    (* interrupt here *)
+    Env.CR_return all_clauses
+  | _ -> Env.CR_skip
+
+let before_check_sat = Signal.create ()
+let after_check_sat = Signal.create ()
+
+(* Just check the solver *)
+let check_satisfiability ~full () =
+  let@ _sp =
+    Trace.with_span ~__FILE__ ~__LINE__ "avatar.check-satisfiability"
+  in
+  Signal.send before_check_sat ();
+  let res =
+    match Solver.check ~full () with
+    | Solver.Sat ->
+      Util.debug ~section 3 "SAT-solver reports \"SAT\"";
+      []
+    | Solver.Unsat proof ->
+      Util.debug ~section 1 "SAT-solver reports \"UNSAT\"";
+      let proof = Proof.S.step proof in
+      let c =
+        C.create
+          ~ctx:(Env.get_ctx (Env.get_global ()))
+          ~trail:Trail.empty ~penalty:1 [] proof
+      in
+      [ c ]
+  in
+  Signal.send after_check_sat ();
+  res
+
+let register ~split_kind () =
+  let split_to_str = function
+    | `Lazy -> "lazy"
+    | `Eager -> "eager"
+    | `Off -> "off"
+  in
+
+  Util.debugf ~section:Const.section 2 "register extension Avatar (split: %s)"
+    (fun k -> k (split_to_str split_kind));
+  Solver.set_printer BBox.pp;
+  (match split_kind with
+  | `Lazy -> Env.add_multi_simpl_rule (Env.get_global ()) ~priority:0 split
+  | `Eager ->
+    Env.add_cheap_multi_simpl_rule (Env.get_global ()) split;
+    (* this rule is used to interfere with lazy clausification *)
+    Env.add_multi_simpl_rule (Env.get_global ()) ~priority:0 split
+  | `Off -> ());
+
+  Env.add_unary_inf (Env.get_global ()) "avatar_check_empty" check_empty;
+  Env.add_generate (Env.get_global ()) ~priority:1000 "avatar_check_sat"
+    check_satisfiability;
+  Env.add_generate (Env.get_global ()) ~priority:100 "avatar.lemmas"
+    inf_new_lemmas;
+  Env.add_clause_conversion (Env.get_global ()) convert_lemma;
+
+  if split_kind != `Off then
+    Signal.on
+      (Env.on_start (Env.get_global ()))
+      (fun () ->
+        Env.get_passive (Env.get_global ()) ()
+        |> Iter.iter (fun cl ->
+               match split cl with
+               | None -> ()
+               | Some splitted ->
+                 Env.remove_passive (Env.get_global ()) (Iter.singleton cl);
+                 Env.add_passive (Env.get_global ()) (Iter.of_list splitted));
+
+        Signal.ContinueListening);
+  Env.add_is_trivial_trail (Env.get_global ()) trail_is_trivial;
+  if Env.flex_get_of (Env.get_global ()) k_simplify_trail then (
+    Env.add_unary_simplify (Env.get_global ()) simplify_trail;
+    Env.add_backward_simplify (Env.get_global ()) (fun c ->
+        if Solver.last_result () = Solver.Sat && new_proved_lits () then
+          Clause.ClauseSet.filter
+            (fun c -> not (Trail.is_empty @@ C.trail c))
+            (Env.ProofState.ActiveSet.clauses ())
+          |> Clause.ClauseSet.filter (fun c ->
+                 let ok =
+                   match simplify_opt (C.trail c) with
+                   | Tr_trivial | Tr_simplify_into _ -> true
+                   | Tr_same -> false
+                 in
+                 if ok then (
+                   Util.incr_stat stat_backward_simp_trail;
+                   Util.debugf ~section 5 "(@[<2>backward_simplify_trail@ %a@])"
+                     (fun k -> k C.pp c)
+                 );
+                 ok)
+        else
+          Clause.ClauseSet.empty)
+  );
+  if Env.flex_get_of (Env.get_global ()) k_show_lemmas then
+    Signal.once Signals.on_exit (fun _ -> show_lemmas ());
+  (* be sure there is an initial valuation *)
+  ignore (Solver.check ~full:true ())
 
 let avatar_kind = ref `Lazy
 let show_lemmas_ = ref false
@@ -732,12 +706,7 @@ let infer_from_components = ref false
 
 let extension =
   let action (env : Env.t) =
-    let module E = (val (module Env) : Env.S) in
-    Util.debug 1 "create new SAT solver";
-    let module Sat = Sat_solver.Make () in
-    Sat.setup ();
-    let module A = Make (E) (Sat) in
-    Env.flex_add_of (Env.get_global ()) k_avatar (module A);
+    Solver.setup ();
     Env.flex_add_of (Env.get_global ()) k_show_lemmas !show_lemmas_;
     Env.flex_add_of (Env.get_global ()) k_simplify_trail !simplify_trail_;
     Env.flex_add_of (Env.get_global ()) k_back_simplify_trail
@@ -753,7 +722,7 @@ let extension =
     Env.flex_add_of (Env.get_global ()) k_avatar_enabled (!avatar_kind != `Off);
 
     Util.debug 1 "enable Avatar";
-    A.register ~split_kind:!avatar_kind ()
+    register ~split_kind:!avatar_kind ()
   in
   Extensions.
     { default with name = "avatar"; env_actions = [ action ]; prio = 10 }
