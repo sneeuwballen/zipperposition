@@ -12,269 +12,251 @@ let k_pure_only = Flex_state.create_key ()
 let section = Util.Section.make ~parent:Const.section "qle"
 
 module A = Libzipperposition_avatar
+module C = Clause
+module CS = Clause.ClauseSet
+module L = Literal
+module T = Term
+module SAT = Sat_solver
 
-module type S = sig
-  module Env : Env.S
+let sat = SAT.create ()
 
-  val setup : unit -> unit
-end
+let remove_from_proof_state c =
+  Util.debugf ~section 1 "removing @[%a@]" (fun k -> k C.pp c);
 
-module Make (E : Env.S) = struct
-  module OuterEnv = Env
-  module Env = E
-  module C = Env.C
-  module CS = C.ClauseSet
-  module L = Literal
-  module T = Term
-  module SAT = Sat_solver
+  C.mark_redundant c;
+  Env.remove_active (Env.get_global ()) (Iter.singleton c);
+  Env.remove_passive (Env.get_global ()) (Iter.singleton c);
+  Env.remove_simpl (Env.get_global ()) (Iter.singleton c)
 
-  let sat = SAT.create ()
+let do_qle pure_only c_iter =
+  Util.debugf ~section 2 "init: @[%a@]@." (fun k -> k (Iter.pp_seq C.pp) c_iter);
 
-  let remove_from_proof_state c =
-    Util.debugf ~section 1 "removing @[%a@]" (fun k -> k C.pp c);
+  let add_SAT_clause c = SAT.add_clause sat ~proof:Proof.Step.trivial c in
+  let pred_of_lit lit =
+    match lit with
+    | L.Equation (lhs, _, _) when L.is_predicate_lit lit ->
+      if T.is_const (T.head_term lhs) then (
+        let sym = T.as_const_exn (T.head_term lhs) in
+        Some (L.is_positivoid lit, sym)
+      ) else
+        None
+    | _ -> None
+  in
+  let all_syms = Name.Tbl.create 128 in
 
-    C.mark_redundant c;
-    OuterEnv.remove_active (OuterEnv.get_global ()) (Iter.singleton c);
-    OuterEnv.remove_passive (OuterEnv.get_global ()) (Iter.singleton c);
-    OuterEnv.remove_simpl (OuterEnv.get_global ()) (Iter.singleton c)
+  SAT.clear sat ();
 
-  let do_qle pure_only c_iter =
-    Util.debugf ~section 2 "init: @[%a@]@." (fun k ->
-        k (Iter.pp_seq C.pp) c_iter);
+  (* For each clause l1 \/ ... \/ lN (ignoring equality literals), if
+     pure_only is false, generate N SAT clauses
+     v1 \/ ... \/ vI-1 \/ ~wI \/ vI+1 \/ ... \/ vN,
+     where vJ is the variable associated with lJ (sign and predicate symbol)
+     and wJ is the variable associated with its negation.
 
-    let add_SAT_clause c = SAT.add_clause sat ~proof:Proof.Step.trivial c in
-    let pred_of_lit lit =
+     If pure_only is true, generate N SAT clauses ~wI. *)
+  Iter.iter
+    (fun c ->
+      let pred_subcl = CCArray.filter_map pred_of_lit (C.lits c) in
+
+      let mk_pure_clauses (pol, pred) =
+        let pos_var, neg_var = Name.Tbl.find all_syms pred in
+        [
+          SAT.Lit.neg
+            (if not pol then
+               pos_var
+             else
+               neg_var);
+        ]
+        |> add_SAT_clause
+      in
+      let mk_quasipure_clauses special =
+        Array.map
+          (fun ((pol, pred) as lit) ->
+            let make_lit_pos, use_pos_var =
+              if lit = special then
+                false, not pol
+              else
+                true, pol
+            in
+            let pos_var, neg_var = Name.Tbl.find all_syms pred in
+            (if use_pos_var then
+               pos_var
+             else
+               neg_var)
+            |>
+            if make_lit_pos then
+              fun lit ->
+            lit
+            else
+              SAT.Lit.neg)
+          pred_subcl
+        |> Array.to_list |> add_SAT_clause
+      in
+
+      (* Create p+, p- variables for each predicate symbol p. *)
+      Array.iter
+        (fun (_, pred) ->
+          if not (Name.Tbl.mem all_syms pred) then
+            Name.Tbl.replace all_syms pred
+              (BBox.make_fresh (), BBox.make_fresh ()))
+        pred_subcl;
+
+      (* Create a number of SAT clauses for each clause. *)
+      Array.iter
+        (if pure_only then
+           mk_pure_clauses
+         else
+           mk_quasipure_clauses)
+        pred_subcl)
+    c_iter;
+
+  (* Make sure that deep, higher-order occurrences of predicate symbols are
+     protected by other symbols. If pure_only is true, prevent such symbols
+     from being pure. *)
+  Iter.iter
+    (fun c ->
+      let forget_or_protect_syms =
+        Iter.iter (fun bad ->
+            if Name.Tbl.mem all_syms bad then
+              if pure_only then
+                Name.Tbl.update all_syms ~f:(fun _ _ -> None) ~k:bad
+              else (
+                let bad_pos_var, bad_neg_var = Name.Tbl.find all_syms bad in
+                let mk_clause bad_var =
+                  Array.append
+                    (Array.make 1 (SAT.Lit.neg bad_var))
+                    (Array.map
+                       (fun (pol, pred) ->
+                         let pos_var, neg_var = Name.Tbl.find all_syms pred in
+                         if pol then
+                           pos_var
+                         else
+                           neg_var)
+                       (CCArray.filter_map pred_of_lit (C.lits c)))
+                  |> Array.to_list |> add_SAT_clause
+                in
+                mk_clause bad_pos_var;
+                mk_clause bad_neg_var
+              ))
+      in
+      Array.iter
+        (fun lit ->
+          match lit with
+          | L.Equation (lhs, _, _) when L.is_predicate_lit lit ->
+            if T.is_const (T.head_term lhs) then (
+              let bad_syms =
+                Iter.flat_map T.Seq.symbols (Iter.of_list (T.args lhs))
+              in
+              forget_or_protect_syms bad_syms
+            ) else
+              forget_or_protect_syms (T.Seq.symbols lhs)
+          | L.Equation (lhs, rhs, _) ->
+            forget_or_protect_syms (T.Seq.symbols lhs);
+            forget_or_protect_syms (T.Seq.symbols rhs)
+          | _ -> ())
+        (C.lits c))
+    c_iter;
+
+  (* For each predicate p, generate a SAT clause ~p+ \/ ~p-. *)
+  Iter.iter
+    (fun (pos_var, neg_var) ->
+      add_SAT_clause [ SAT.Lit.neg pos_var; SAT.Lit.neg neg_var ])
+    (Name.Tbl.values all_syms);
+
+  let unknown_syms = Name.Tbl.copy all_syms in
+  let quasipure_syms = Name.Tbl.create 32 in
+
+  (* Generate a SAT clause p1+ \/ p1- \/ ... \/ pN+ \/ pN-, where the pIs are
+     the predicate symbols of unknown purity status (initially all). *)
+  let generate_nontrivial_solution_SAT_clause () =
+    add_SAT_clause
+      (CCList.flat_map
+         (fun (pos_var, neg_var) -> [ pos_var; neg_var ])
+         (CCList.of_iter (Name.Tbl.values unknown_syms)))
+  in
+
+  let rec maximize_valuation () =
+    Iter.iter
+      (fun (pred, (pos_var, neg_var)) ->
+        if SAT.valuation sat pos_var then (
+          add_SAT_clause [ pos_var ];
+          Name.Tbl.replace quasipure_syms pred pos_var;
+          Name.Tbl.remove unknown_syms pred
+        );
+        if SAT.valuation sat neg_var then (
+          add_SAT_clause [ neg_var ];
+          Name.Tbl.replace quasipure_syms pred neg_var;
+          Name.Tbl.remove unknown_syms pred
+        ))
+      (Name.Tbl.to_iter unknown_syms);
+    generate_nontrivial_solution_SAT_clause ();
+    match SAT.check sat ~full:true () with
+    | SAT.Sat -> maximize_valuation ()
+    | _ -> ()
+  in
+  let filter_clauses () =
+    let is_quasipure_lit lit =
       match lit with
-      | L.Equation (lhs, _, _) when L.is_predicate_lit lit ->
+      | L.Equation (lhs, rhs, true) ->
         if T.is_const (T.head_term lhs) then (
           let sym = T.as_const_exn (T.head_term lhs) in
-          Some (L.is_positivoid lit, sym)
+          Name.Tbl.mem quasipure_syms sym
         ) else
-          None
-      | _ -> None
+          false
+      | _ -> false
     in
-    let all_syms = Name.Tbl.create 128 in
-
-    SAT.clear sat ();
-
-    (* For each clause l1 \/ ... \/ lN (ignoring equality literals), if
-       pure_only is false, generate N SAT clauses
-       v1 \/ ... \/ vI-1 \/ ~wI \/ vI+1 \/ ... \/ vN,
-       where vJ is the variable associated with lJ (sign and predicate symbol)
-       and wJ is the variable associated with its negation.
-
-       If pure_only is true, generate N SAT clauses ~wI. *)
+    let contains_quasipure_sym c = CCArray.exists is_quasipure_lit (C.lits c) in
+    Util.debugf ~section 1
+      (if pure_only then
+         "pure syms: @[%a@]"
+       else
+         "quasipure syms: @[%a@]")
+      (fun k -> k (CCList.pp Name.pp) (Name.Tbl.keys_list quasipure_syms));
     Iter.iter
-      (fun c ->
-        let pred_subcl = CCArray.filter_map pred_of_lit (C.lits c) in
+      (fun c -> if contains_quasipure_sym c then remove_from_proof_state c)
+      c_iter
+  in
 
-        let mk_pure_clauses (pol, pred) =
-          let pos_var, neg_var = Name.Tbl.find all_syms pred in
-          [
-            SAT.Lit.neg
-              (if not pol then
-                 pos_var
-               else
-                 neg_var);
-          ]
-          |> add_SAT_clause
-        in
-        let mk_quasipure_clauses special =
-          Array.map
-            (fun ((pol, pred) as lit) ->
-              let make_lit_pos, use_pos_var =
-                if lit = special then
-                  false, not pol
-                else
-                  true, pol
-              in
-              let pos_var, neg_var = Name.Tbl.find all_syms pred in
-              (if use_pos_var then
-                 pos_var
-               else
-                 neg_var)
-              |>
-              if make_lit_pos then
-                fun lit ->
-              lit
-              else
-                SAT.Lit.neg)
-            pred_subcl
-          |> Array.to_list |> add_SAT_clause
-        in
+  Util.debugf ~section 1 "In do_qle()@." CCFun.id;
+  generate_nontrivial_solution_SAT_clause ();
+  (match SAT.check sat ~full:true () with
+  | SAT.Sat ->
+    Util.debugf ~section 1 "Maximizing()@." CCFun.id;
+    maximize_valuation ();
+    filter_clauses ()
+  | _ ->
+    Util.debugf ~section 1 "Unsat()@." CCFun.id;
+    ());
+  SAT.clear sat ()
 
-        (* Create p+, p- variables for each predicate symbol p. *)
-        Array.iter
-          (fun (_, pred) ->
-            if not (Name.Tbl.mem all_syms pred) then
-              Name.Tbl.replace all_syms pred
-                (BBox.make_fresh (), BBox.make_fresh ()))
-          pred_subcl;
+let get_clauses () =
+  Iter.append
+    (Env.get_passive (Env.get_global ()) ())
+    (Env.get_active (Env.get_global ()) ())
 
-        (* Create a number of SAT clauses for each clause. *)
-        Array.iter
-          (if pure_only then
-             mk_pure_clauses
-           else
-             mk_quasipure_clauses)
-          pred_subcl)
-      c_iter;
+let steps = ref 0
 
-    (* Make sure that deep, higher-order occurrences of predicate symbols are
-       protected by other symbols. If pure_only is true, prevent such symbols
-       from being pure. *)
-    Iter.iter
-      (fun c ->
-        let forget_or_protect_syms =
-          Iter.iter (fun bad ->
-              if Name.Tbl.mem all_syms bad then
-                if pure_only then
-                  Name.Tbl.update all_syms ~f:(fun _ _ -> None) ~k:bad
-                else (
-                  let bad_pos_var, bad_neg_var = Name.Tbl.find all_syms bad in
-                  let mk_clause bad_var =
-                    Array.append
-                      (Array.make 1 (SAT.Lit.neg bad_var))
-                      (Array.map
-                         (fun (pol, pred) ->
-                           let pos_var, neg_var = Name.Tbl.find all_syms pred in
-                           if pol then
-                             pos_var
-                           else
-                             neg_var)
-                         (CCArray.filter_map pred_of_lit (C.lits c)))
-                    |> Array.to_list |> add_SAT_clause
-                  in
-                  mk_clause bad_pos_var;
-                  mk_clause bad_neg_var
-                ))
-        in
-        Array.iter
-          (fun lit ->
-            match lit with
-            | L.Equation (lhs, _, _) when L.is_predicate_lit lit ->
-              if T.is_const (T.head_term lhs) then (
-                let bad_syms =
-                  Iter.flat_map T.Seq.symbols (Iter.of_list (T.args lhs))
-                in
-                forget_or_protect_syms bad_syms
-              ) else
-                forget_or_protect_syms (T.Seq.symbols lhs)
-            | L.Equation (lhs, rhs, _) ->
-              forget_or_protect_syms (T.Seq.symbols lhs);
-              forget_or_protect_syms (T.Seq.symbols rhs)
-            | _ -> ())
-          (C.lits c))
-      c_iter;
+let inprocessing () =
+  if !steps = 0 then (
+    Util.debugf ~section 1 "doing inprocessing@." CCFun.id;
+    do_qle (Env.flex_get_of (Env.get_global ()) k_pure_only) (get_clauses ())
+  );
+  steps := (!steps + 1) mod Env.flex_get_of (Env.get_global ()) k_check_at
 
-    (* For each predicate p, generate a SAT clause ~p+ \/ ~p-. *)
-    Iter.iter
-      (fun (pos_var, neg_var) ->
-        add_SAT_clause [ SAT.Lit.neg pos_var; SAT.Lit.neg neg_var ])
-      (Name.Tbl.values all_syms);
-
-    let unknown_syms = Name.Tbl.copy all_syms in
-    let quasipure_syms = Name.Tbl.create 32 in
-
-    (* Generate a SAT clause p1+ \/ p1- \/ ... \/ pN+ \/ pN-, where the pIs are
-       the predicate symbols of unknown purity status (initially all). *)
-    let generate_nontrivial_solution_SAT_clause () =
-      add_SAT_clause
-        (CCList.flat_map
-           (fun (pos_var, neg_var) -> [ pos_var; neg_var ])
-           (CCList.of_iter (Name.Tbl.values unknown_syms)))
-    in
-
-    let rec maximize_valuation () =
-      Iter.iter
-        (fun (pred, (pos_var, neg_var)) ->
-          if SAT.valuation sat pos_var then (
-            add_SAT_clause [ pos_var ];
-            Name.Tbl.replace quasipure_syms pred pos_var;
-            Name.Tbl.remove unknown_syms pred
-          );
-          if SAT.valuation sat neg_var then (
-            add_SAT_clause [ neg_var ];
-            Name.Tbl.replace quasipure_syms pred neg_var;
-            Name.Tbl.remove unknown_syms pred
-          ))
-        (Name.Tbl.to_iter unknown_syms);
-      generate_nontrivial_solution_SAT_clause ();
-      match SAT.check sat ~full:true () with
-      | SAT.Sat -> maximize_valuation ()
-      | _ -> ()
-    in
-    let filter_clauses () =
-      let is_quasipure_lit lit =
-        match lit with
-        | L.Equation (lhs, rhs, true) ->
-          if T.is_const (T.head_term lhs) then (
-            let sym = T.as_const_exn (T.head_term lhs) in
-            Name.Tbl.mem quasipure_syms sym
-          ) else
-            false
-        | _ -> false
-      in
-      let contains_quasipure_sym c =
-        CCArray.exists is_quasipure_lit (C.lits c)
-      in
-      Util.debugf ~section 1
-        (if pure_only then
-           "pure syms: @[%a@]"
-         else
-           "quasipure syms: @[%a@]")
-        (fun k -> k (CCList.pp Name.pp) (Name.Tbl.keys_list quasipure_syms));
-      Iter.iter
-        (fun c -> if contains_quasipure_sym c then remove_from_proof_state c)
-        c_iter
-    in
-
-    Util.debugf ~section 1 "In do_qle()@." CCFun.id;
-    generate_nontrivial_solution_SAT_clause ();
-    (match SAT.check sat ~full:true () with
-    | SAT.Sat ->
-      Util.debugf ~section 1 "Maximizing()@." CCFun.id;
-      maximize_valuation ();
-      filter_clauses ()
-    | _ ->
-      Util.debugf ~section 1 "Unsat()@." CCFun.id;
-      ());
-    SAT.clear sat ()
-
-  let get_clauses () =
-    Iter.append
-      (OuterEnv.get_passive (OuterEnv.get_global ()) ())
-      (OuterEnv.get_active (OuterEnv.get_global ()) ())
-
-  let steps = ref 0
-
-  let inprocessing () =
-    if !steps = 0 then (
-      Util.debugf ~section 1 "doing inprocessing@." CCFun.id;
-      do_qle
-        (OuterEnv.flex_get_of (OuterEnv.get_global ()) k_pure_only)
-        (get_clauses ())
-    );
-    steps :=
-      (!steps + 1) mod OuterEnv.flex_get_of (OuterEnv.get_global ()) k_check_at
-
-  let setup () =
-    if OuterEnv.flex_get_of (OuterEnv.get_global ()) k_enabled then
-      if not (OuterEnv.flex_get_of (OuterEnv.get_global ()) A.k_avatar_enabled)
-      then
-        if OuterEnv.flex_get_of (OuterEnv.get_global ()) k_inprocessing then
-          OuterEnv.add_clause_elimination_rule (OuterEnv.get_global ())
-            ~priority:4 "qle" inprocessing
-        else
-          Signal.once
-            (OuterEnv.on_start (OuterEnv.get_global ()))
-            (fun () ->
-              do_qle
-                (OuterEnv.flex_get_of (OuterEnv.get_global ()) k_pure_only)
-                (get_clauses ()))
+let setup () =
+  if Env.flex_get_of (Env.get_global ()) k_enabled then
+    if not (Env.flex_get_of (Env.get_global ()) A.k_avatar_enabled) then
+      if Env.flex_get_of (Env.get_global ()) k_inprocessing then
+        Env.add_clause_elimination_rule (Env.get_global ()) ~priority:4 "qle"
+          inprocessing
       else
-        CCFormat.printf "AVATAR is not yet compatible with QLE@."
-end
+        Signal.once
+          (Env.on_start (Env.get_global ()))
+          (fun () ->
+            do_qle
+              (Env.flex_get_of (Env.get_global ()) k_pure_only)
+              (get_clauses ()))
+    else
+      CCFormat.printf "AVATAR is not yet compatible with QLE@."
 
 let _enabled = ref false
 let _inprocessing = ref false
@@ -283,13 +265,11 @@ let _pure_only = ref false
 
 let extension =
   let action (env : Env.t) =
-    let module E = (val (module Env) : Env.S) in
-    let module QLE = Make (E) in
     Env.flex_add_of (Env.get_global ()) k_enabled !_enabled;
     Env.flex_add_of (Env.get_global ()) k_inprocessing !_inprocessing;
     Env.flex_add_of (Env.get_global ()) k_check_at !_check_at;
     Env.flex_add_of (Env.get_global ()) k_pure_only !_pure_only;
-    QLE.setup ()
+    setup ()
   in
   {
     Extensions.default with

@@ -16,332 +16,315 @@ let flag_axiom = SClause.new_flag ()
 
 type spec = AC_intf.spec
 
-module type S = AC_intf.S
-
-let key_ac : (module S) Flex_state.key = Flex_state.create_key ()
 let key_scan_cl_ac = Flex_state.create_key ()
 let _scan_cl_ac = ref false
 
-module Make (ArgEnv : Env.S) : S with module E = ArgEnv = struct
-  module OuterEnv = Env
-  module Ctx = ArgEnv.Ctx
-  module E = ArgEnv
-  module Env = ArgEnv
-  module C = ArgEnv.C
+module E = Env
+module C = Clause
+module Ctx = Ctx
 
-  type cell = {
-    spec: spec;
-    proof: Proof.parent;
-    axioms: C.t list;
-        (* ground-complete set of axioms (see "E: a brainiac theorem prover") *)
-  }
+type cell = {
+  spec: spec;
+  proof: Proof.parent;
+  axioms: C.t list;
+      (* ground-complete set of axioms (see "E: a brainiac theorem prover") *)
+}
 
-  let tbl : cell Name.Tbl.t = Name.Tbl.create 3
-  let on_add : spec Signal.t = Signal.create ()
+let tbl : cell Name.Tbl.t = Name.Tbl.create 3
+let on_add : spec Signal.t = Signal.create ()
 
-  let mk_axioms_ proof s ty : C.t list =
-    let ty_args_n, ty_args, _ty_ret = Type.open_poly_fun ty in
-    if List.length ty_args <> 2 then
-      Util.errorf ~where:"AC" "AC symbol `%a`must be of arity 2" Name.pp s;
-    (* create type variables, for polymorphic AC symbols *)
-    let ty_vars = CCList.init ty_args_n (fun i -> HVar.make ~ty:Type.tType i) in
-    let ty_vars_t = List.map Type.var ty_vars in
-    (* type applied to the new variables *)
-    let ty' = Type.apply ty ty_vars_t in
-    let n', ty_args, ty_ret = Type.open_poly_fun ty' in
-    assert (n' = 0);
-    (* check consistency of types *)
-    (match ty_args with
-    | [ a; b ] ->
-      if not (Type.equal a b && Type.equal a ty_ret) then
-        Util.errorf ~where:"AC" "AC symbol `%a` argument types must be `@[%a@]`"
-          Name.pp s Type.pp ty_ret
-    | _ -> assert false);
-    let x = T.var_of_int ~ty:ty_ret (ty_args_n + 1) in
-    let y = T.var_of_int ~ty:ty_ret (ty_args_n + 2) in
-    let z = T.var_of_int ~ty:ty_ret (ty_args_n + 3) in
-    let f x y = T.app_full (T.const ~ty s) ty_vars_t [ x; y ] in
-    (* build clause l=r *)
-    let mk_clause l r =
-      let penalty = 1 in
-      let proof = Proof.Step.esa ~rule:(Proof.Rule.mk "ac") [ proof ] in
-      let c =
-        C.create
-          ~ctx:
-            (Ctx.create ~signature:Signature.empty ~ord:Ordering.none
-               ~select:Selection.no_select
-               ~bool_select:
-                 (Bool_selection.from_string ~ord:Ordering.none "none")
-               ~sk_ctx:(Skolem.create ()))
-          ~trail:Trail.empty ~penalty
-          [ Lit.mk_eq l r ]
-          proof
-      in
-      C.set_flag flag_axiom c true;
-      C.set_flag SClause.flag_persistent c true;
-      c
+let mk_axioms_ proof s ty : C.t list =
+  let ty_args_n, ty_args, _ty_ret = Type.open_poly_fun ty in
+  if List.length ty_args <> 2 then
+    Util.errorf ~where:"AC" "AC symbol `%a`must be of arity 2" Name.pp s;
+  (* create type variables, for polymorphic AC symbols *)
+  let ty_vars = CCList.init ty_args_n (fun i -> HVar.make ~ty:Type.tType i) in
+  let ty_vars_t = List.map Type.var ty_vars in
+  (* type applied to the new variables *)
+  let ty' = Type.apply ty ty_vars_t in
+  let n', ty_args, ty_ret = Type.open_poly_fun ty' in
+  assert (n' = 0);
+  (* check consistency of types *)
+  (match ty_args with
+  | [ a; b ] ->
+    if not (Type.equal a b && Type.equal a ty_ret) then
+      Util.errorf ~where:"AC" "AC symbol `%a` argument types must be `@[%a@]`"
+        Name.pp s Type.pp ty_ret
+  | _ -> assert false);
+  let x = T.var_of_int ~ty:ty_ret (ty_args_n + 1) in
+  let y = T.var_of_int ~ty:ty_ret (ty_args_n + 2) in
+  let z = T.var_of_int ~ty:ty_ret (ty_args_n + 3) in
+  let f x y = T.app_full (T.const ~ty s) ty_vars_t [ x; y ] in
+  (* build clause l=r *)
+  let mk_clause l r =
+    let penalty = 1 in
+    let proof = Proof.Step.esa ~rule:(Proof.Rule.mk "ac") [ proof ] in
+    let c =
+      C.create
+        ~ctx:
+          (Ctx.create ~signature:Signature.empty ~ord:Ordering.none
+             ~select:Selection.no_select
+             ~bool_select:(Bool_selection.from_string ~ord:Ordering.none "none")
+             ~sk_ctx:(Skolem.create ()))
+        ~trail:Trail.empty ~penalty
+        [ Lit.mk_eq l r ]
+        proof
     in
-    [
-      mk_clause (f x y) (f y x);
-      mk_clause (f (f x y) z) (f x (f y z));
-      mk_clause (f x (f y z)) (f z (f x y));
-      mk_clause (f x (f y z)) (f y (f x z));
-      mk_clause (f x (f y z)) (f z (f y x));
-    ]
+    C.set_flag flag_axiom c true;
+    C.set_flag SClause.flag_persistent c true;
+    c
+  in
+  [
+    mk_clause (f x y) (f y x);
+    mk_clause (f (f x y) z) (f x (f y z));
+    mk_clause (f x (f y z)) (f z (f x y));
+    mk_clause (f x (f y z)) (f y (f x z));
+    mk_clause (f x (f y z)) (f z (f y x));
+  ]
 
-  let add_ proof ~ty s =
-    try Name.Tbl.find tbl s
-    with Not_found ->
-      let spec = { ty; sym = s } in
-      let axioms = mk_axioms_ proof s ty in
-      let cell = { spec; proof; axioms } in
-      Name.Tbl.add tbl s cell;
-      Signal.send on_add spec;
-      cell
+let add_ proof ~ty s =
+  try Name.Tbl.find tbl s
+  with Not_found ->
+    let spec = { ty; sym = s } in
+    let axioms = mk_axioms_ proof s ty in
+    let cell = { spec; proof; axioms } in
+    Name.Tbl.add tbl s cell;
+    Signal.send on_add spec;
+    cell
 
-  let is_ac s = Name.Tbl.mem tbl s
-  let exists_ac () = Name.Tbl.length tbl > 0
-  let find_proof s = (Name.Tbl.find tbl s).proof
-  let symbols () = Name.Tbl.keys tbl |> Name.Set.of_iter
+let is_ac s = Name.Tbl.mem tbl s
+let exists_ac () = Name.Tbl.length tbl > 0
+let find_proof s = (Name.Tbl.find tbl s).proof
+let symbols () = Name.Tbl.keys tbl |> Name.Set.of_iter
 
-  module A = T.AC (struct
-    let is_ac = is_ac
-    let is_comm _ = false
-  end)
+module A = T.AC (struct
+  let is_ac = is_ac
+  let is_comm _ = false
+end)
 
-  let symbols_of_terms seq = A.symbols seq
+let symbols_of_terms seq = A.symbols seq
 
-  (** {2 Rules} *)
+(** {2 Rules} *)
 
-  (* does [l ?= r] have at least one AC symbol in it? *)
-  let has_ac_ids_ l r =
-    let seq = Iter.doubleton l r |> Iter.flat_map A.seq_symbols in
-    not (Iter.is_empty seq)
+(* does [l ?= r] have at least one AC symbol in it? *)
+let has_ac_ids_ l r =
+  let seq = Iter.doubleton l r |> Iter.flat_map A.seq_symbols in
+  not (Iter.is_empty seq)
 
-  let is_trivial_lit lit =
-    exists_ac ()
-    &&
-    match lit with
-    | Lit.Equation (l, r, true) ->
-      (not (Type.is_fun (T.ty l))) && has_ac_ids_ l r && A.equal l r
-    | _ -> false
+let is_trivial_lit lit =
+  exists_ac ()
+  &&
+  match lit with
+  | Lit.Equation (l, r, true) ->
+    (not (Type.is_fun (T.ty l))) && has_ac_ids_ l r && A.equal l r
+  | _ -> false
 
-  let is_trivial c =
-    let res =
-      (not (C.get_flag flag_axiom c))
-      && CCArray.exists is_trivial_lit (C.lits c)
+let is_trivial c =
+  let res =
+    (not (C.get_flag flag_axiom c)) && CCArray.exists is_trivial_lit (C.lits c)
+  in
+  if res then (
+    Util.incr_stat stat_ac_redundant;
+    Util.debugf ~section 3 "@[<2>clause `@[%a@]`@ is AC-trivial@]" (fun k ->
+        k C.pp c)
+  );
+  res
+
+(* simplify: remove literals that are redundant modulo AC *)
+let simplify c =
+  let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "prover.ac.simplify" in
+  if exists_ac () then (
+    let n = Array.length (C.lits c) in
+    let lits = Array.to_list (C.lits c) in
+    let lits =
+      List.filter
+        (fun lit ->
+          match lit with
+          | Literal.Equation (l, r, false) when not (Type.is_fun (T.ty l)) ->
+            not (has_ac_ids_ l r && A.equal l r)
+          | _ -> true)
+        lits
     in
-    if res then (
-      Util.incr_stat stat_ac_redundant;
-      Util.debugf ~section 3 "@[<2>clause `@[%a@]`@ is AC-trivial@]" (fun k ->
-          k C.pp c)
-    );
-    res
-
-  (* simplify: remove literals that are redundant modulo AC *)
-  let simplify c =
-    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "prover.ac.simplify" in
-    if exists_ac () then (
-      let n = Array.length (C.lits c) in
-      let lits = Array.to_list (C.lits c) in
-      let lits =
-        List.filter
-          (fun lit ->
-            match lit with
-            | Literal.Equation (l, r, false) when not (Type.is_fun (T.ty l)) ->
-              not (has_ac_ids_ l r && A.equal l r)
-            | _ -> true)
-          lits
+    let n' = List.length lits in
+    if n' < n && not (C.get_flag SClause.flag_persistent c) then (
+      (* did some simplification *)
+      let symbols = symbols_of_terms (C.Seq.terms c) in
+      let symbols = Name.Set.to_list symbols in
+      let tags = List.map (fun id -> Builtin.Tag.T_ac id) symbols in
+      let premises =
+        C.proof_parent c
+        :: List.map (fun id -> (Name.Tbl.find tbl id).proof) symbols
       in
-      let n' = List.length lits in
-      if n' < n && not (C.get_flag SClause.flag_persistent c) then (
-        (* did some simplification *)
-        let symbols = symbols_of_terms (C.Seq.terms c) in
-        let symbols = Name.Set.to_list symbols in
-        let tags = List.map (fun id -> Builtin.Tag.T_ac id) symbols in
-        let premises =
-          C.proof_parent c
-          :: List.map (fun id -> (Name.Tbl.find tbl id).proof) symbols
-        in
-        let proof =
-          Proof.Step.simp premises ~rule:(Proof.Rule.mk "AC.normalize") ~tags
-        in
-        let new_c =
-          C.create ~ctx:(C.ctx_of c) ~trail:(C.trail c) ~penalty:(C.penalty c)
-            lits proof
-        in
-        Util.incr_stat stat_ac_simplify;
-        Util.debugf ~section 3 "@[<2>@[%a@]@ AC-simplify into @[%a@]@]"
-          (fun k -> k C.pp c C.pp new_c);
-        SimplM.return_new new_c
-      ) else
-        (* no simplification *)
-        SimplM.return_same c
+      let proof =
+        Proof.Step.simp premises ~rule:(Proof.Rule.mk "AC.normalize") ~tags
+      in
+      let new_c =
+        C.create ~ctx:(C.ctx_of c) ~trail:(C.trail c) ~penalty:(C.penalty c)
+          lits proof
+      in
+      Util.incr_stat stat_ac_simplify;
+      Util.debugf ~section 3 "@[<2>@[%a@]@ AC-simplify into @[%a@]@]" (fun k ->
+          k C.pp c C.pp new_c);
+      SimplM.return_new new_c
     ) else
+      (* no simplification *)
       SimplM.return_same c
+  ) else
+    SimplM.return_same c
 
-  let install_rules_ env =
-    OuterEnv.add_is_trivial env is_trivial;
-    OuterEnv.add_basic_simplify env simplify
+let install_rules_ env =
+  Env.add_is_trivial env is_trivial;
+  Env.add_basic_simplify env simplify
 
-  let add ~proof s ty env =
-    Util.debugf ~section 1
-      "@[enable AC redundancy criterion@ for `@[%a : @[%a@]@]`@ :proof %a@]"
-      (fun k -> k Name.pp s Type.pp ty Proof.pp_parent proof);
-    (* is this the first case of AC symbols? If yes, then add inference rules *)
-    let first = not (exists_ac ()) in
-    if first then install_rules_ env;
-    (* remember that the symbols is AC *)
-    let cell = add_ proof ~ty s in
-    (* add clauses *)
-    Util.debugf ~section 3 "@[<2>add AC axioms for `%a : @[%a@]`:@ @[<hv>%a@]@]"
-      (fun k -> k Name.pp s Type.pp ty (Util.pp_list C.pp) cell.axioms);
-    (* add axioms to either passive, or active set *)
-    if
-      ProofState.ActiveSet.clauses ()
-      |> Clause.ClauseSet.for_all (C.get_flag flag_axiom)
-    then
-      (* the only active clauses are other AC axioms, we miss no
-         inference by adding the axioms to active set directly *)
-      OuterEnv.add_active env (Iter.of_list cell.axioms)
-    else
-      OuterEnv.add_passive env (Iter.of_list cell.axioms);
-    ()
+let add ~proof s ty env =
+  Util.debugf ~section 1
+    "@[enable AC redundancy criterion@ for `@[%a : @[%a@]@]`@ :proof %a@]"
+    (fun k -> k Name.pp s Type.pp ty Proof.pp_parent proof);
+  (* is this the first case of AC symbols? If yes, then add inference rules *)
+  let first = not (exists_ac ()) in
+  if first then install_rules_ env;
+  (* remember that the symbols is AC *)
+  let cell = add_ proof ~ty s in
+  (* add clauses *)
+  Util.debugf ~section 3 "@[<2>add AC axioms for `%a : @[%a@]`:@ @[<hv>%a@]@]"
+    (fun k -> k Name.pp s Type.pp ty (Util.pp_list C.pp) cell.axioms);
+  (* add axioms to either passive, or active set *)
+  if
+    ProofState.ActiveSet.clauses ()
+    |> Clause.ClauseSet.for_all (C.get_flag flag_axiom)
+  then
+    (* the only active clauses are other AC axioms, we miss no
+       inference by adding the axioms to active set directly *)
+    Env.add_active env (Iter.of_list cell.axioms)
+  else
+    Env.add_passive env (Iter.of_list cell.axioms);
+  ()
 
-  (* TODO: proof stuff *)
-  let scan_statement env st =
-    let module St = Statement in
-    let has_ac_attr =
-      List.exists
-        (function
-          | St.A_AC -> true
-          | _ -> false)
-        (Statement.attrs st)
-    in
-    if has_ac_attr then (
-      let proof = Proof.Parent.from @@ St.as_proof_c st in
-      match St.view st with
-      | St.TyDecl (id, ty) -> add ~proof id ty env
-      | St.Def l ->
-        List.iter
-          (fun { Statement.def_id; def_ty; _ } -> add ~proof def_id def_ty env)
-          l
-      | St.Data _ | St.Rewrite _ | St.Assert _ | St.Lemma _ | St.Goal _
-      | St.NegatedGoal _ ->
-        Util.error ~where:"AC"
-          "attribute 'AC' only supported on def/decl statements"
-    )
+(* TODO: proof stuff *)
+let scan_statement env st =
+  let module St = Statement in
+  let has_ac_attr =
+    List.exists
+      (function
+        | St.A_AC -> true
+        | _ -> false)
+      (Statement.attrs st)
+  in
+  if has_ac_attr then (
+    let proof = Proof.Parent.from @@ St.as_proof_c st in
+    match St.view st with
+    | St.TyDecl (id, ty) -> add ~proof id ty env
+    | St.Def l ->
+      List.iter
+        (fun { Statement.def_id; def_ty; _ } -> add ~proof def_id def_ty env)
+        l
+    | St.Data _ | St.Rewrite _ | St.Assert _ | St.Lemma _ | St.Goal _
+    | St.NegatedGoal _ ->
+      Util.error ~where:"AC"
+        "attribute 'AC' only supported on def/decl statements"
+  )
 
-  let register_ac env c id ty = add ~proof:(C.proof_parent c) id ty env
+let register_ac env c id ty = add ~proof:(C.proof_parent c) id ty env
 
-  let scan_clause env c =
-    let exception Fail in
-    Util.debugf ~section 1 "Scanning @[%a@]@." (fun k -> k C.pp c);
+let scan_clause env c =
+  let exception Fail in
+  Util.debugf ~section 1 "Scanning @[%a@]@." (fun k -> k C.pp c);
 
-    let fail_on cond = if cond then raise Fail in
+  let fail_on cond = if cond then raise Fail in
 
-    let is_binary_sym hd_s =
-      List.length (Type.expected_args (T.ty hd_s)) == 2
-    in
+  let is_binary_sym hd_s = List.length (Type.expected_args (T.ty hd_s)) == 2 in
 
-    (* commutativity test is symmetric *)
-    let test_commutativty s t =
-      try
-        Util.debugf ~section 1 "Testing commutativity @[(%a,%a)@]@." (fun k ->
-            k T.pp s T.pp t);
-        match T.view s, T.view t with
-        | T.App (hd_s, [ x_s; y_s ]), T.App (hd_t, [ x_t; y_t ]) ->
-          fail_on (not (T.equal hd_s hd_t));
+  (* commutativity test is symmetric *)
+  let test_commutativty s t =
+    try
+      Util.debugf ~section 1 "Testing commutativity @[(%a,%a)@]@." (fun k ->
+          k T.pp s T.pp t);
+      match T.view s, T.view t with
+      | T.App (hd_s, [ x_s; y_s ]), T.App (hd_t, [ x_t; y_t ]) ->
+        fail_on (not (T.equal hd_s hd_t));
+        fail_on (not (T.is_const hd_s));
+        fail_on (not (is_binary_sym hd_s));
+        fail_on ((not (T.is_var x_s)) || not (T.is_var y_s));
+        fail_on ((not (T.is_var x_t)) || not (T.is_var y_t));
+        fail_on (T.equal x_s y_s);
+        fail_on (T.equal x_t y_t);
+        fail_on (not (T.equal x_s y_t && T.equal y_s x_t));
+        Util.debugf ~section 1 "Commutativity recognized@." (fun k -> k);
+        true
+      | _ -> false
+    with Fail -> false
+  in
+
+  (* associativity test is NOT symmetric:
+     it specifically checks for equation of the kind
+     f X (f Y Z) = f (f X Y) Z *)
+  let test_associativity s t =
+    try
+      Util.debugf ~section 1 "Testing associativity @[(%a,%a)@]@." (fun k ->
+          k T.pp s T.pp t);
+      match T.view s, T.view t with
+      | T.App (hd_s, [ x_s; fyz_s ]), T.App (hd_t, [ fxy_t; z_t ]) ->
+        (match T.view fyz_s, T.view fxy_t with
+        | T.App (hd_s', [ y_s; z_s ]), T.App (hd_t', [ x_t; y_t ]) ->
+          fail_on
+            (not
+               (T.equal hd_s hd_t && T.equal hd_t hd_s' && T.equal hd_s' hd_t'));
           fail_on (not (T.is_const hd_s));
           fail_on (not (is_binary_sym hd_s));
-          fail_on ((not (T.is_var x_s)) || not (T.is_var y_s));
-          fail_on ((not (T.is_var x_t)) || not (T.is_var y_t));
-          fail_on (T.equal x_s y_s);
-          fail_on (T.equal x_t y_t);
-          fail_on (not (T.equal x_s y_t && T.equal y_s x_t));
-          Util.debugf ~section 1 "Commutativity recognized@." (fun k -> k);
+          fail_on (not (List.for_all T.is_var [ x_s; y_s; z_s ]));
+          fail_on (not (List.for_all T.is_var [ x_t; y_t; z_t ]));
+
+          fail_on (T.Set.cardinal (T.Set.of_list [ x_s; y_s; z_s ]) != 3);
+          fail_on (not (T.equal x_s x_t && T.equal y_s y_t && T.equal z_s z_t));
+          Util.debugf ~section 1 "Associativity recognized @." (fun k -> k);
           true
-        | _ -> false
-      with Fail -> false
-    in
+        | _ -> false)
+      | _ -> false
+    with Fail -> false
+  in
 
-    (* associativity test is NOT symmetric:
-       it specifically checks for equation of the kind
-       f X (f Y Z) = f (f X Y) Z *)
-    let test_associativity s t =
-      try
-        Util.debugf ~section 1 "Testing associativity @[(%a,%a)@]@." (fun k ->
-            k T.pp s T.pp t);
-        match T.view s, T.view t with
-        | T.App (hd_s, [ x_s; fyz_s ]), T.App (hd_t, [ fxy_t; z_t ]) ->
-          (match T.view fyz_s, T.view fxy_t with
-          | T.App (hd_s', [ y_s; z_s ]), T.App (hd_t', [ x_t; y_t ]) ->
-            fail_on
-              (not
-                 (T.equal hd_s hd_t && T.equal hd_t hd_s' && T.equal hd_s' hd_t'));
-            fail_on (not (T.is_const hd_s));
-            fail_on (not (is_binary_sym hd_s));
-            fail_on (not (List.for_all T.is_var [ x_s; y_s; z_s ]));
-            fail_on (not (List.for_all T.is_var [ x_t; y_t; z_t ]));
-
-            fail_on (T.Set.cardinal (T.Set.of_list [ x_s; y_s; z_s ]) != 3);
-            fail_on
-              (not (T.equal x_s x_t && T.equal y_s y_t && T.equal z_s z_t));
-            Util.debugf ~section 1 "Associativity recognized @." (fun k -> k);
-            true
-          | _ -> false)
-        | _ -> false
-      with Fail -> false
-    in
-
-    match C.lits c with
-    | [| Literal.Equation (lhs, rhs, true) |] ->
-      let ty = T.ty (T.head_term lhs) in
-      CCOpt.iter
-        (fun id ->
-          if not (Name.is_ac id) then
-            if Name.is_comm id then (
-              if test_associativity lhs rhs || test_associativity rhs lhs then (
-                Name_payload.add id Name.Attr_assoc;
-                assert (Name.is_ac id);
-                register_ac env c id ty
-              )
-            ) else if Name.is_assoc id then (
-              if test_commutativty lhs rhs then (
-                Name_payload.add id Name.Attr_comm;
-                assert (Name.is_ac id);
-                register_ac env c id ty
-              )
-            ) else if test_commutativty lhs rhs then (
-              Name_payload.add id Name.Attr_comm;
-              assert (Name.is_comm id)
-            ) else if test_associativity lhs rhs || test_associativity rhs lhs
-              then (
+  match C.lits c with
+  | [| Literal.Equation (lhs, rhs, true) |] ->
+    let ty = T.ty (T.head_term lhs) in
+    CCOpt.iter
+      (fun id ->
+        if not (Name.is_ac id) then
+          if Name.is_comm id then (
+            if test_associativity lhs rhs || test_associativity rhs lhs then (
               Name_payload.add id Name.Attr_assoc;
-              assert (Name.is_assoc id)
-            ))
-        (T.head lhs)
-    | _ -> ()
+              assert (Name.is_ac id);
+              register_ac env c id ty
+            )
+          ) else if Name.is_assoc id then (
+            if test_commutativty lhs rhs then (
+              Name_payload.add id Name.Attr_comm;
+              assert (Name.is_ac id);
+              register_ac env c id ty
+            )
+          ) else if test_commutativty lhs rhs then (
+            Name_payload.add id Name.Attr_comm;
+            assert (Name.is_comm id)
+          ) else if test_associativity lhs rhs || test_associativity rhs lhs
+            then (
+            Name_payload.add id Name.Attr_assoc;
+            assert (Name.is_assoc id)
+          ))
+      (T.head lhs)
+  | _ -> ()
 
-  (* just look for AC axioms *)
-  let setup env =
-    OuterEnv.flex_add_of env key_scan_cl_ac !_scan_cl_ac;
+(* just look for AC axioms *)
+let setup env =
+  Env.flex_add_of env key_scan_cl_ac !_scan_cl_ac;
 
-    if !_scan_cl_ac then
-      Signal.on_every ProofState.PassiveSet.on_add_clause (fun c ->
-          scan_clause env c;
-          Signal.ContinueListening);
+  if !_scan_cl_ac then
+    Signal.on_every ProofState.PassiveSet.on_add_clause (fun c ->
+        scan_clause env c;
+        Signal.ContinueListening);
 
-    Signal.on_every (OuterEnv.on_input_statement env) (scan_statement env)
-end
+  Signal.on_every (Env.on_input_statement env) (scan_statement env)
 
 let extension =
-  let action (env : Env.t) =
-    let module E = (val (module Env) : Env.S) in
-    let module AC = Make (E) in
-    Env.flex_add_of env key_ac (module AC : S);
-    AC.setup env
-  in
+  let action (env : Env.t) = setup env in
   { Extensions.default with Extensions.name = "ac"; env_actions = [ action ] }
 
 let () =

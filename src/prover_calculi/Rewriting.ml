@@ -35,299 +35,289 @@ let simpl_term t =
     Some (t', proof)
   )
 
-module Make (E : Env_intf.S) = struct
-  module OuterEnv = Env
-  module Env = E
-  module C = E.C
+module C = Clause
 
-  (* simplification rule *)
-  (* perform term narrowing in [c] *)
-  let narrow_term_passive c : C.t list =
-    let@ _sp =
-      Trace.with_span ~__FILE__ ~__LINE__ "rewriting.narrow-term-passive"
+(* simplification rule *)
+(* perform term narrowing in [c] *)
+let narrow_term_passive c : C.t list =
+  let@ _sp =
+    Trace.with_span ~__FILE__ ~__LINE__ "rewriting.narrow-term-passive"
+  in
+  let eligible = C.Eligible.(res c) in
+  let sc_rule = 1 in
+  let sc_c = 0 in
+  Literals.fold_terms ~vars:false ~subterms:true ~ty_args:false
+    ~ord:(C.Ctx.ord (Env.get_ctx (Env.get_global ())))
+    ~which:`All ~eligible (C.lits c)
+  |> Iter.flat_map (fun (u_p, passive_pos) ->
+         RW.Term.narrow_term ~scope_rules:sc_rule (u_p, sc_c)
+         |> Iter.filter_map (fun (rule, us) ->
+                let renaming = Subst.Renaming.create () in
+                let subst = Unif_subst.subst us in
+                let c_guard = Literal.of_unif_subst renaming us in
+                (* side literals *)
+                let lits_passive = C.lits c in
+                let lits' =
+                  Literals.apply_subst renaming subst (lits_passive, sc_c)
+                in
+                (* substitute in rule *)
+                let rhs =
+                  Subst.FO.apply renaming subst (RW.Term.Rule.rhs rule, sc_rule)
+                in
+                (* literal in which narrowing took place: replace lhs by rhs *)
+                Literals.Pos.replace lits' ~at:passive_pos ~by:rhs;
+                (* make new clause *)
+                Util.incr_stat stat_narrowing_term;
+                let proof =
+                  Proof.Step.inference
+                    [
+                      C.proof_parent_subst renaming (c, sc_c) subst;
+                      Proof.Parent.from_subst renaming
+                        (RW.Rule.as_proof (RW.T_rule rule), sc_rule)
+                        subst;
+                    ]
+                    ~rule:(Proof.Rule.mk "narrow")
+                in
+                let c' =
+                  C.create
+                    ~ctx:(Env.get_ctx (Env.get_global ()))
+                    ~trail:(C.trail c) ~penalty:(C.penalty c)
+                    (c_guard @ CCArray.to_list lits')
+                    proof
+                in
+
+                Util.debugf ~section 3
+                  "@[<2>term narrowing:@ from `@[%a@]`@ to `@[%a@]`@ using \
+                   rule `%a`@ and subst @[%a@]@]" (fun k ->
+                    k C.pp c C.pp c' RW.Term.Rule.pp rule Unif_subst.pp us);
+                Some c'))
+  |> Iter.to_rev_list
+
+(* XXX: for now, we only do one step, and let Env.multi_simplify
+   manage the fixpoint *)
+let simpl_clause c =
+  let lits = C.lits c in
+  match RW.Lit.normalize_clause lits with
+  | None -> None
+  | Some (clauses, r, subst, sc_r, renaming, tags) ->
+    let proof =
+      Proof.Step.simp
+        ~rule:(Proof.Rule.mk "rw_clause")
+        ~tags
+        [
+          C.proof_parent_subst renaming (c, 0) subst;
+          RW.Rule.lit_as_proof_parent_subst renaming subst (r, sc_r);
+        ]
     in
-    let eligible = C.Eligible.(res c) in
-    let sc_rule = 1 in
-    let sc_c = 0 in
-    Literals.fold_terms ~vars:false ~subterms:true ~ty_args:false
-      ~ord:(C.Ctx.ord (OuterEnv.get_ctx (OuterEnv.get_global ())))
-      ~which:`All ~eligible (C.lits c)
-    |> Iter.flat_map (fun (u_p, passive_pos) ->
-           RW.Term.narrow_term ~scope_rules:sc_rule (u_p, sc_c)
-           |> Iter.filter_map (fun (rule, us) ->
-                  let renaming = Subst.Renaming.create () in
-                  let subst = Unif_subst.subst us in
-                  let c_guard = Literal.of_unif_subst renaming us in
-                  (* side literals *)
-                  let lits_passive = C.lits c in
-                  let lits' =
-                    Literals.apply_subst renaming subst (lits_passive, sc_c)
-                  in
-                  (* substitute in rule *)
-                  let rhs =
-                    Subst.FO.apply renaming subst
-                      (RW.Term.Rule.rhs rule, sc_rule)
-                  in
-                  (* literal in which narrowing took place: replace lhs by rhs *)
-                  Literals.Pos.replace lits' ~at:passive_pos ~by:rhs;
-                  (* make new clause *)
-                  Util.incr_stat stat_narrowing_term;
-                  let proof =
-                    Proof.Step.inference
-                      [
-                        C.proof_parent_subst renaming (c, sc_c) subst;
-                        Proof.Parent.from_subst renaming
-                          (RW.Rule.as_proof (RW.T_rule rule), sc_rule)
-                          subst;
-                      ]
-                      ~rule:(Proof.Rule.mk "narrow")
-                  in
-                  let c' =
-                    C.create
-                      ~ctx:(OuterEnv.get_ctx (OuterEnv.get_global ()))
-                      ~trail:(C.trail c) ~penalty:(C.penalty c)
-                      (c_guard @ CCArray.to_list lits')
-                      proof
-                  in
+    let clauses =
+      List.map
+        (fun c' ->
+          C.create_a
+            ~ctx:(Env.get_ctx (Env.get_global ()))
+            ~trail:(C.trail c) ~penalty:(C.penalty c) c' proof)
+        clauses
+    in
+    Util.debugf ~section 2
+      "@[<2>@{<green>rewrite@} `@[%a@]`@ into `@[<v>%a@]`@]" (fun k ->
+        k C.pp c (Util.pp_list C.pp) clauses);
+    Some clauses
 
-                  Util.debugf ~section 3
-                    "@[<2>term narrowing:@ from `@[%a@]`@ to `@[%a@]`@ using \
-                     rule `%a`@ and subst @[%a@]@]" (fun k ->
-                      k C.pp c C.pp c' RW.Term.Rule.pp rule Unif_subst.pp us);
-                  Some c'))
-    |> Iter.to_rev_list
+(* narrowing on literals of given clause, using lits rewrite rules *)
+let narrow_lits c =
+  let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "rewriting.narrow-lits" in
+  let eligible = C.Eligible.res c in
+  let lits = C.lits c in
+  Literals.fold_lits ~eligible lits
+  |> Iter.fold
+       (fun acc (lit, i) ->
+         RW.Lit.narrow_lit ~scope_rules:1 (lit, 0)
+         |> Iter.fold
+              (fun acc (rule, us, tags) ->
+                let subst = Unif_subst.subst us in
+                let renaming = Subst.Renaming.create () in
+                let c_guard = Literal.of_unif_subst renaming us in
+                let proof =
+                  Proof.Step.inference
+                    [
+                      C.proof_parent_subst renaming (c, 0) subst;
+                      Proof.Parent.from_subst renaming
+                        (RW.Rule.as_proof (RW.L_rule rule), 1)
+                        subst;
+                    ]
+                    ~rule:(Proof.Rule.mk "narrow_clause")
+                    ~tags
+                in
+                let lits' = CCArray.except_idx lits i in
+                (* create new clauses that correspond to replacing [lit]
+               by [rule.rhs] *)
+                let clauses =
+                  List.map
+                    (fun c' ->
+                      let new_lits =
+                        c_guard
+                        @ Literal.apply_subst_list renaming subst (lits', 0)
+                        @ Literal.apply_subst_list renaming subst (c', 1)
+                      in
+                      C.create
+                        ~ctx:(Env.get_ctx (Env.get_global ()))
+                        ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof)
+                    (RW.Lit.Rule.rhs rule)
+                in
+                Util.debugf ~section 3
+                  "@[<2>narrowing of `@[%a@]`@ using `@[%a@]`@ with @[%a@]@ \
+                   yields @[%a@]@]" (fun k ->
+                    k C.pp c RW.Lit.Rule.pp rule Unif_subst.pp us
+                      CCFormat.(list (hovbox C.pp))
+                      clauses);
+                Util.incr_stat stat_narrowing_lit;
+                List.rev_append clauses acc)
+              acc)
+       []
 
-  (* XXX: for now, we only do one step, and let Env.multi_simplify
-     manage the fixpoint *)
-  let simpl_clause c =
-    let lits = C.lits c in
-    match RW.Lit.normalize_clause lits with
-    | None -> None
-    | Some (clauses, r, subst, sc_r, renaming, tags) ->
-      let proof =
-        Proof.Step.simp
-          ~rule:(Proof.Rule.mk "rw_clause")
-          ~tags
-          [
-            C.proof_parent_subst renaming (c, 0) subst;
-            RW.Rule.lit_as_proof_parent_subst renaming subst (r, sc_r);
-          ]
-      in
-      let clauses =
-        List.map
-          (fun c' ->
-            C.create_a
-              ~ctx:(OuterEnv.get_ctx (OuterEnv.get_global ()))
-              ~trail:(C.trail c) ~penalty:(C.penalty c) c' proof)
-          clauses
-      in
-      Util.debugf ~section 2
-        "@[<2>@{<green>rewrite@} `@[%a@]`@ into `@[<v>%a@]`@]" (fun k ->
-          k C.pp c (Util.pp_list C.pp) clauses);
-      Some clauses
+(* find positions in rules' LHS *)
+let ctx_narrow_find (s, sc_a) sc_p :
+    (RW.Rule.t * Position.t * Unif_subst.t) Iter.t =
+  let find_term (r : RW.Term.rule) =
+    let t = RW.Term.Rule.lhs r in
+    T.all_positions ~vars:false ~pos:P.stop ~ty_args:false t
+    |> Iter.filter (fun (_, p) -> not (P.equal p P.stop)) (* not root *)
+    |> Iter.filter (fun (t, _) ->
+           match T.Classic.view t with
+           | T.Classic.App (id, _) -> not (Ind_ty.is_constructor id)
+           | T.Classic.Var _ | T.Classic.DB _
+           | T.Classic.AppBuiltin (_, _)
+           | T.Classic.NonFO ->
+             false)
+    |> Iter.filter_map (fun (t, p) ->
+           try
+             let subst = Unif.FO.unify_full (s, sc_a) (t, sc_p) in
+             Some (RW.T_rule r, p, subst)
+           with Unif.Fail -> None)
+  and find_lit (r : RW.Lit.rule) =
+    let lit = RW.Lit.Rule.lhs r in
+    Literal.fold_terms lit ~position:P.stop ~vars:false ~ty_args:false
+      ~which:`All
+      ~ord:(Ctx.ord (Env.get_ctx (Env.get_global ())))
+      ~subterms:true
+    |> Iter.filter_map (fun (t, p) ->
+           match p with
+           | P.Left P.Stop -> None (* not root *)
+           | _ ->
+             (try
+                let subst = Unif.FO.unify_full (s, sc_a) (t, sc_p) in
+                Some (RW.L_rule r, p, subst)
+              with Unif.Fail -> None))
+  in
+  Rewrite.all_rules
+  |> Iter.flat_map (function
+       | RW.T_rule r -> find_term r
+       | RW.L_rule r -> find_lit r)
 
-  (* narrowing on literals of given clause, using lits rewrite rules *)
-  let narrow_lits c =
-    let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "rewriting.narrow-lits" in
-    let eligible = C.Eligible.res c in
-    let lits = C.lits c in
-    Literals.fold_lits ~eligible lits
+(* do narrowing with [s=t], a literal in [c], and add results to [acc] *)
+let ctx_narrow_with ~ord s t s_pos c acc : C.t list =
+  let sc_a = 1 and sc_p = 0 in
+  (* do narrowing inside this rule? *)
+  let do_narrowing rule rule_pos (us : Unif_subst.t) =
+    let rule_clauses =
+      match rule with
+      | RW.T_rule r -> [ [| RW.Term.Rule.as_lit r |] ]
+      | RW.L_rule r -> RW.Lit.Rule.as_clauses r
+    in
+    let renaming = Subst.Renaming.create () in
+    let subst = Unif_subst.subst us in
+    let c_guard = Literal.of_unif_subst renaming us in
+    let s' = Subst.FO.apply renaming subst (s, sc_a) in
+    let t' = Subst.FO.apply renaming subst (t, sc_a) in
+    match Ordering.compare ord s' t' with
+    | Comparison.Lt | Leq -> None
+    | _ ->
+      Util.incr_stat stat_ctx_narrowing;
+      rule_clauses
+      |> List.map (fun rule_clause ->
+             (* instantiate rule and replace [s'] by [t'] now *)
+             let new_lits =
+               Literals.apply_subst renaming subst (rule_clause, sc_p)
+               |> Literals.map (T.replace ~old:s' ~by:t')
+               |> Array.to_list
+             in
+             (* also instantiate context literals in [c] *)
+             let idx_active =
+               match s_pos with
+               | P.Arg (n, _) -> n
+               | _ -> assert false
+             in
+             let ctx =
+               Literal.apply_subst_list renaming subst
+                 (CCArray.except_idx (C.lits c) idx_active, sc_a)
+             in
+             (* build new clause *)
+             let proof =
+               Proof.Step.inference
+                 ~rule:(Proof.Rule.mk "contextual_narrowing")
+                 [
+                   C.proof_parent_subst renaming (c, sc_a) subst;
+                   Proof.Parent.from_subst renaming
+                     (RW.Rule.as_proof rule, sc_p)
+                     subst;
+                 ]
+             in
+             (* add some penalty on every inference *)
+             let penalty = Array.length (C.lits c) + C.penalty c in
+             let new_c =
+               C.create ~ctx:(C.ctx_of c)
+                 (c_guard @ new_lits @ ctx)
+                 proof ~trail:(C.trail c) ~penalty
+             in
+             Util.debugf ~section 4
+               "(@[<2>ctx_narrow@ :rule %a[%d]@ :clause %a[%d]@ :pos %a@ \
+                :subst %a@ :yield %a@])" (fun k ->
+                 k RW.Rule.pp rule sc_p C.pp c sc_a P.pp rule_pos Subst.pp subst
+                   C.pp new_c);
+             new_c)
+      |> CCOpt.return
+  in
+  ctx_narrow_find (s, sc_a) sc_p
+  |> Iter.fold
+       (fun acc (rule, rule_pos, subst) ->
+         match do_narrowing rule rule_pos subst with
+         | None -> acc
+         | Some cs -> cs @ acc)
+       acc
+
+let contextual_narrowing c : C.t list =
+  let@ _sp =
+    Trace.with_span ~__FILE__ ~__LINE__ "rewriting.contextual-narrowing"
+  in
+  (* no literal can be eligible for paramodulation if some are selected.
+     This checks if inferences with i-th literal are needed? *)
+  let eligible = C.Eligible.param c in
+  let ord = Ctx.ord (Env.get_ctx (Env.get_global ())) in
+  (* do the inferences where clause is active; for this,
+     we try to rewrite conditionally other clauses using
+     non-minimal sides of every positive literal *)
+  let new_clauses =
+    Literals.fold_eqn ~sign:true ~ord ~both:true ~eligible (C.lits c)
     |> Iter.fold
-         (fun acc (lit, i) ->
-           RW.Lit.narrow_lit ~scope_rules:1 (lit, 0)
-           |> Iter.fold
-                (fun acc (rule, us, tags) ->
-                  let subst = Unif_subst.subst us in
-                  let renaming = Subst.Renaming.create () in
-                  let c_guard = Literal.of_unif_subst renaming us in
-                  let proof =
-                    Proof.Step.inference
-                      [
-                        C.proof_parent_subst renaming (c, 0) subst;
-                        Proof.Parent.from_subst renaming
-                          (RW.Rule.as_proof (RW.L_rule rule), 1)
-                          subst;
-                      ]
-                      ~rule:(Proof.Rule.mk "narrow_clause")
-                      ~tags
-                  in
-                  let lits' = CCArray.except_idx lits i in
-                  (* create new clauses that correspond to replacing [lit]
-                 by [rule.rhs] *)
-                  let clauses =
-                    List.map
-                      (fun c' ->
-                        let new_lits =
-                          c_guard
-                          @ Literal.apply_subst_list renaming subst (lits', 0)
-                          @ Literal.apply_subst_list renaming subst (c', 1)
-                        in
-                        C.create
-                          ~ctx:(OuterEnv.get_ctx (OuterEnv.get_global ()))
-                          ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits
-                          proof)
-                      (RW.Lit.Rule.rhs rule)
-                  in
-                  Util.debugf ~section 3
-                    "@[<2>narrowing of `@[%a@]`@ using `@[%a@]`@ with @[%a@]@ \
-                     yields @[%a@]@]" (fun k ->
-                      k C.pp c RW.Lit.Rule.pp rule Unif_subst.pp us
-                        CCFormat.(list (hovbox C.pp))
-                        clauses);
-                  Util.incr_stat stat_narrowing_lit;
-                  List.rev_append clauses acc)
-                acc)
+         (fun acc (s, t, _, s_pos) ->
+           (* rewrite clauses using s *)
+           ctx_narrow_with ~ord s t s_pos c acc)
          []
+  in
+  new_clauses
 
-  (* find positions in rules' LHS *)
-  let ctx_narrow_find (s, sc_a) sc_p :
-      (RW.Rule.t * Position.t * Unif_subst.t) Iter.t =
-    let find_term (r : RW.Term.rule) =
-      let t = RW.Term.Rule.lhs r in
-      T.all_positions ~vars:false ~pos:P.stop ~ty_args:false t
-      |> Iter.filter (fun (_, p) -> not (P.equal p P.stop)) (* not root *)
-      |> Iter.filter (fun (t, _) ->
-             match T.Classic.view t with
-             | T.Classic.App (id, _) -> not (Ind_ty.is_constructor id)
-             | T.Classic.Var _ | T.Classic.DB _
-             | T.Classic.AppBuiltin (_, _)
-             | T.Classic.NonFO ->
-               false)
-      |> Iter.filter_map (fun (t, p) ->
-             try
-               let subst = Unif.FO.unify_full (s, sc_a) (t, sc_p) in
-               Some (RW.T_rule r, p, subst)
-             with Unif.Fail -> None)
-    and find_lit (r : RW.Lit.rule) =
-      let lit = RW.Lit.Rule.lhs r in
-      Literal.fold_terms lit ~position:P.stop ~vars:false ~ty_args:false
-        ~which:`All
-        ~ord:(Ctx.ord (OuterEnv.get_ctx (OuterEnv.get_global ())))
-        ~subterms:true
-      |> Iter.filter_map (fun (t, p) ->
-             match p with
-             | P.Left P.Stop -> None (* not root *)
-             | _ ->
-               (try
-                  let subst = Unif.FO.unify_full (s, sc_a) (t, sc_p) in
-                  Some (RW.L_rule r, p, subst)
-                with Unif.Fail -> None))
-    in
-    Rewrite.all_rules
-    |> Iter.flat_map (function
-         | RW.T_rule r -> find_term r
-         | RW.L_rule r -> find_lit r)
-
-  (* do narrowing with [s=t], a literal in [c], and add results to [acc] *)
-  let ctx_narrow_with ~ord s t s_pos c acc : C.t list =
-    let sc_a = 1 and sc_p = 0 in
-    (* do narrowing inside this rule? *)
-    let do_narrowing rule rule_pos (us : Unif_subst.t) =
-      let rule_clauses =
-        match rule with
-        | RW.T_rule r -> [ [| RW.Term.Rule.as_lit r |] ]
-        | RW.L_rule r -> RW.Lit.Rule.as_clauses r
-      in
-      let renaming = Subst.Renaming.create () in
-      let subst = Unif_subst.subst us in
-      let c_guard = Literal.of_unif_subst renaming us in
-      let s' = Subst.FO.apply renaming subst (s, sc_a) in
-      let t' = Subst.FO.apply renaming subst (t, sc_a) in
-      match Ordering.compare ord s' t' with
-      | Comparison.Lt | Leq -> None
-      | _ ->
-        Util.incr_stat stat_ctx_narrowing;
-        rule_clauses
-        |> List.map (fun rule_clause ->
-               (* instantiate rule and replace [s'] by [t'] now *)
-               let new_lits =
-                 Literals.apply_subst renaming subst (rule_clause, sc_p)
-                 |> Literals.map (T.replace ~old:s' ~by:t')
-                 |> Array.to_list
-               in
-               (* also instantiate context literals in [c] *)
-               let idx_active =
-                 match s_pos with
-                 | P.Arg (n, _) -> n
-                 | _ -> assert false
-               in
-               let ctx =
-                 Literal.apply_subst_list renaming subst
-                   (CCArray.except_idx (C.lits c) idx_active, sc_a)
-               in
-               (* build new clause *)
-               let proof =
-                 Proof.Step.inference
-                   ~rule:(Proof.Rule.mk "contextual_narrowing")
-                   [
-                     C.proof_parent_subst renaming (c, sc_a) subst;
-                     Proof.Parent.from_subst renaming
-                       (RW.Rule.as_proof rule, sc_p)
-                       subst;
-                   ]
-               in
-               (* add some penalty on every inference *)
-               let penalty = Array.length (C.lits c) + C.penalty c in
-               let new_c =
-                 C.create ~ctx:(C.ctx_of c)
-                   (c_guard @ new_lits @ ctx)
-                   proof ~trail:(C.trail c) ~penalty
-               in
-               Util.debugf ~section 4
-                 "(@[<2>ctx_narrow@ :rule %a[%d]@ :clause %a[%d]@ :pos %a@ \
-                  :subst %a@ :yield %a@])" (fun k ->
-                   k RW.Rule.pp rule sc_p C.pp c sc_a P.pp rule_pos Subst.pp
-                     subst C.pp new_c);
-               new_c)
-        |> CCOpt.return
-    in
-    ctx_narrow_find (s, sc_a) sc_p
-    |> Iter.fold
-         (fun acc (rule, rule_pos, subst) ->
-           match do_narrowing rule rule_pos subst with
-           | None -> acc
-           | Some cs -> cs @ acc)
-         acc
-
-  let contextual_narrowing c : C.t list =
-    let@ _sp =
-      Trace.with_span ~__FILE__ ~__LINE__ "rewriting.contextual-narrowing"
-    in
-    (* no literal can be eligible for paramodulation if some are selected.
-       This checks if inferences with i-th literal are needed? *)
-    let eligible = C.Eligible.param c in
-    let ord = Ctx.ord (OuterEnv.get_ctx (OuterEnv.get_global ())) in
-    (* do the inferences where clause is active; for this,
-       we try to rewrite conditionally other clauses using
-       non-minimal sides of every positive literal *)
-    let new_clauses =
-      Literals.fold_eqn ~sign:true ~ord ~both:true ~eligible (C.lits c)
-      |> Iter.fold
-           (fun acc (s, t, _, s_pos) ->
-             (* rewrite clauses using s *)
-             ctx_narrow_with ~ord s t s_pos c acc)
-           []
-    in
-    new_clauses
-
-  let setup ?(ctx_narrow = true) ~narrowing ~has_rw () =
-    Util.debug ~section 1 "register Rewriting to Env...";
-    OuterEnv.add_rewrite_rule (OuterEnv.get_global ()) "rewrite_defs" simpl_term;
-    if narrowing then (
-      OuterEnv.add_binary_inf (OuterEnv.get_global ()) "narrow_term_defs"
-        narrow_term_passive;
-      OuterEnv.add_unary_inf (OuterEnv.get_global ()) "narrow_lit_defs"
-        narrow_lits
-    );
-    if ctx_narrow then
-      OuterEnv.add_binary_inf (OuterEnv.get_global ()) "ctx_narrow"
-        contextual_narrowing;
-    if has_rw then
-      Ctx.lost_completeness (OuterEnv.get_ctx (OuterEnv.get_global ()));
-    OuterEnv.add_multi_simpl_rule (OuterEnv.get_global ()) ~priority:5
-      simpl_clause;
-    ()
-end
+let setup ?(ctx_narrow = true) ~narrowing ~has_rw () =
+  Util.debug ~section 1 "register Rewriting to Env...";
+  Env.add_rewrite_rule (Env.get_global ()) "rewrite_defs" simpl_term;
+  if narrowing then (
+    Env.add_binary_inf (Env.get_global ()) "narrow_term_defs"
+      narrow_term_passive;
+    Env.add_unary_inf (Env.get_global ()) "narrow_lit_defs" narrow_lits
+  );
+  if ctx_narrow then
+    Env.add_binary_inf (Env.get_global ()) "ctx_narrow" contextual_narrowing;
+  if has_rw then Ctx.lost_completeness (Env.get_ctx (Env.get_global ()));
+  Env.add_multi_simpl_rule (Env.get_global ()) ~priority:5 simpl_clause;
+  ()
 
 let ctx_narrow_ = ref true
 let narrowing = ref true
@@ -463,13 +453,10 @@ let post_tying stmts st =
 
 (* add a term simplification that normalizes terms w.r.t the set of rules *)
 let normalize_simpl (env : Env.t) =
-  let module E = (val (module Env) : Env.S) in
-  let module M = Make (E) in
   let has_rw = Env.flex_get_of (Env.get_global ()) Key.has_rw in
   Env.flex_add_of (Env.get_global ()) Key.ctx_narrow !ctx_narrow_;
   Env.flex_add_of (Env.get_global ()) Key.narrow !narrowing;
-
-  M.setup ~has_rw ~narrowing:!narrowing ~ctx_narrow:!ctx_narrow_ ()
+  setup ~has_rw ~narrowing:!narrowing ~ctx_narrow:!ctx_narrow_ ()
 
 let extension =
   let open Extensions in

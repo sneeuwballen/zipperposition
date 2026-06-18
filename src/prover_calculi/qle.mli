@@ -5,12 +5,4 @@
 open Logtk
 open Libzipperposition
 
-module type S = sig
-  module Env : Env.S
-
-  val setup : unit -> unit
-end
-
-module Make (E : Env.S) : S
-
 val extension : Extensions.t

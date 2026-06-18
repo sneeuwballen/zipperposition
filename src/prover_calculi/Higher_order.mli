@@ -19,21 +19,6 @@ val k_prune_arg_fun : prune_kind Flex_state.key
 (* diff const is of type ![alpha,beta]: (alpha->beta) -> (alpha->beta) -> alpha
    -- NB: EXPECTS TYPE ARGUMENTS! *)
 val k_diff_const : Term.t Flex_state.key
-
-module type S = sig
-  module Env : Env.S
-  module C : module type of Env.C
-
-  (** {5 Registration} *)
-
-  val setup : unit -> unit
-  (** Register rules in the environment *)
-
-  val prim_enum_tf : Env.C.t -> Env.C.t list
-end
-
-module Make (E : Env.S) : S with module Env = E
-
-(** {2 As Extension} *)
-
+val setup : unit -> unit
+val prim_enum_tf : Clause.t -> Clause.t list
 val extension : Extensions.t

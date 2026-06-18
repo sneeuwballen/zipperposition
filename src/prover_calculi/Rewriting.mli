@@ -5,9 +5,7 @@ open Libzipperposition
 
     Deal with definitions as rewrite rules *)
 
-module Make (E : Env_intf.S) : sig
-  val setup : ?ctx_narrow:bool -> narrowing:bool -> has_rw:bool -> unit -> unit
-end
+val setup : ?ctx_narrow:bool -> narrowing:bool -> has_rw:bool -> unit -> unit
 
 val unfold_def_before_cnf :
   ( ( Logtk.TypedSTerm.t,
@@ -23,4 +21,5 @@ val unfold_def_before_cnf :
     'c )
   CCVector.t
 
+val normalize_simpl : Env.t -> unit
 val extension : Extensions.t

@@ -21,78 +21,60 @@ let stat_vars = Util.mk_stat "trivial.too_many_vars"
 
 (** {2 Rules} *)
 
-module type S = sig
-  module Env : Env.S
-  module C : module type of Env.C
-  module PS : module type of Env.ProofState
+module C = Clause
+module Ctx = Ctx
 
-  val register : unit -> unit
-end
+let _depth_types lits =
+  Literals.Seq.terms lits |> Iter.map T.ty
+  |> Iter.map (fun t -> InnerTerm.depth (t : Type.t :> InnerTerm.t))
+  |> Iter.max ?lt:None
+  |> CCOpt.map_or ~default:0 CCFun.id
 
-module Make (E : Env.S) = struct
-  module OuterEnv = Env
-  module Env = E
-  module PS = Env.ProofState
-  module C = Env.C
-  module Ctx = Env.Ctx
-
-  let _depth_types lits =
-    Literals.Seq.terms lits |> Iter.map T.ty
-    |> Iter.map (fun t -> InnerTerm.depth (t : Type.t :> InnerTerm.t))
-    |> Iter.max ?lt:None
-    |> CCOpt.map_or ~default:0 CCFun.id
-
-  let is_too_deep c =
-    match !depth_limit_ with
-    | None -> false
-    | Some d ->
-      let lits = C.lits c in
-      let depth = max (_depth_types lits) (Literals.depth lits) in
-      if depth > d then (
-        Ctx.lost_completeness (OuterEnv.get_ctx (OuterEnv.get_global ()));
-        Util.incr_stat stat_depth_limit;
-        Util.debugf ~section 5
-          "@[<2>clause dismissed (too deep at %d):@ @[%a@]@]" (fun k ->
-            k depth C.pp c);
-        true
-      ) else
-        false
-
-  let has_too_many_vars c =
-    if !no_max_vars then
+let is_too_deep c =
+  match !depth_limit_ with
+  | None -> false
+  | Some d ->
+    let lits = C.lits c in
+    let depth = max (_depth_types lits) (Literals.depth lits) in
+    if depth > d then (
+      Ctx.lost_completeness (Env.get_ctx (Env.get_global ()));
+      Util.incr_stat stat_depth_limit;
+      Util.debugf ~section 5 "@[<2>clause dismissed (too deep at %d):@ @[%a@]@]"
+        (fun k -> k depth C.pp c);
+      true
+    ) else
       false
-    else (
-      let lits = C.lits c in
-      (* number of distinct term variables *)
-      let n_vars =
-        Literals.vars lits
-        |> List.filter (fun v -> not (Type.is_tType (HVar.ty v)))
-        |> List.length
-      in
-      if n_vars > !max_vars then (
-        Ctx.lost_completeness (OuterEnv.get_ctx (OuterEnv.get_global ()));
-        Util.incr_stat stat_vars;
-        Util.debugf ~section 5
-          "@[<2>clause dismissed (%d vars is too much):@ @[%a@]@]" (fun k ->
-            k n_vars C.pp c);
-        true
-      ) else
-        false
-    )
 
-  let register () =
-    Util.debug ~section 2 "register heuristics...";
-    OuterEnv.add_is_trivial (OuterEnv.get_global ()) is_too_deep;
-    OuterEnv.add_is_trivial (OuterEnv.get_global ()) has_too_many_vars;
-    ()
-end
+let has_too_many_vars c =
+  if !no_max_vars then
+    false
+  else (
+    let lits = C.lits c in
+    (* number of distinct term variables *)
+    let n_vars =
+      Literals.vars lits
+      |> List.filter (fun v -> not (Type.is_tType (HVar.ty v)))
+      |> List.length
+    in
+    if n_vars > !max_vars then (
+      Ctx.lost_completeness (Env.get_ctx (Env.get_global ()));
+      Util.incr_stat stat_vars;
+      Util.debugf ~section 5
+        "@[<2>clause dismissed (%d vars is too much):@ @[%a@]@]" (fun k ->
+          k n_vars C.pp c);
+      true
+    ) else
+      false
+  )
+
+let register () =
+  Util.debug ~section 2 "register heuristics...";
+  Env.add_is_trivial (Env.get_global ()) is_too_deep;
+  Env.add_is_trivial (Env.get_global ()) has_too_many_vars;
+  ()
 
 let extension =
-  let action (env : Env.t) =
-    let module E = (val (module Env) : Env.S) in
-    let module H = Make (E) in
-    H.register ()
-  in
+  let action (env : Env.t) = register () in
   Extensions.{ default with name = "heuristics"; env_actions = [ action ] }
 
 let () =

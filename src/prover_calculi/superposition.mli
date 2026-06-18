@@ -9,13 +9,6 @@ open Libzipperposition
 
 val section : Util.Section.t
 
-module type S = Superposition_intf.S
-
-val key : (module S) Flex_state.key
-(** key to access the {!Env.flex_state}. After registration (after calling
-    [register]), the Env's state contains a mapping from "superposition" to the
-    packed module. *)
-
 val k_unif_alg :
   (Term.t Scoped.t -> Term.t Scoped.t -> Unif_subst.t option OSeq.t)
   Flex_state.key
@@ -31,11 +24,9 @@ type unif_module = {
 
 val get_unif_module : Env.t -> unif_module
 
-val register : sup:(module S) -> unit
+val register : unit -> unit
 (** Register the superposition module to its Environment's mixtbl. Done
     automatically by the {!extension}. *)
-
-module Make (Env : Env.S) : S with module Env = Env
 
 (** {2 As Extension}
     Extension named "superposition" *)

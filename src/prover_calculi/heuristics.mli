@@ -10,16 +10,4 @@ val enable_depth_limit : int -> unit
 
     This breaks completeness in general, but can be very useful in practice. *)
 
-(** {2 Rules} *)
-
-module type S = sig
-  module Env : Env.S
-  module C : module type of Env.C
-  module PS : module type of Env.ProofState
-
-  val register : unit -> unit
-end
-
-module Make (E : Env.S) : S with module Env = E
-
 val extension : Extensions.t

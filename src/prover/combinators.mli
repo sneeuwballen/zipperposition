@@ -1,28 +1,19 @@
 open Logtk
 
-module type S = sig
-  module E : Env.S
-  module C : module type of E.C
+val setup : Env.t -> unit
 
-  (** {5 Registration} *)
+(* Converts lambdas to combinators 
+   if combinator reasoning is enabled. *)
+val maybe_conv_lams : Clause.t -> Clause.t
 
-  val setup : Env.t -> unit
+(* Converts lambdas in either case *)
+val force_conv_lams : Clause.t -> Clause.t
 
-  (* Converts lambdas to combinators 
-     if combinator reasoning is enabled. *)
-  val maybe_conv_lams : E.C.t -> E.C.t
+(* Expands the term to be of the form 
+    \lambda (all type vars). body of prop type *)
+val expand : Term.t -> Term.t
 
-  (* Converts lambdas in either case *)
-  val force_conv_lams : E.C.t -> E.C.t
+(** Register rules in the environment *)
 
-  (* Expands the term to be of the form 
-      \lambda (all type vars). body of prop type *)
-  val expand : Term.t -> Term.t
-
-  (** Register rules in the environment *)
-end
-
-module Make (E : Env.S) : S with module E = E
-
-val k_enable_combinators : bool Logtk.Flex_state.key
+val k_enable_combinators : bool Flex_state.key
 val extension : Extensions.t

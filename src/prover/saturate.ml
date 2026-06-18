@@ -62,27 +62,20 @@ type szs_status =
   | Error of string
   | Timeout
 
-(* TODO: remove this when E-prover isn't a functor *)
+(* Lazy E-prover interface — first call triggers setup *)
+let _e_setup_done = ref false
 
-(** Lazy E-prover interface — created on first use to avoid init-order issues *)
-let _eiface : (module Eprover_interface.S) option ref = ref None
+let _ensure_e_setup () =
+  if not !_e_setup_done then (
+    _e_setup_done := true;
+    Eprover_interface.setup ()
+  )
 
-let _get_eiface () =
-  match !_eiface with
-  | Some m -> m
-  | None ->
-    let module M = Eprover_interface.Make (Env) in
-    let m = (module M : Eprover_interface.S) in
-    _eiface := Some m;
-    m
-
-let eprover_set_e_bin path =
-  let (module M) = _get_eiface () in
-  M.set_e_bin path
+let eprover_set_e_bin path = Eprover_interface.set_e_bin path
 
 let eprover_try_e active passive =
-  let (module M) = _get_eiface () in
-  M.try_e active passive
+  _ensure_e_setup ();
+  Eprover_interface.try_e active passive
 
 module OuterEnv = Env
 
