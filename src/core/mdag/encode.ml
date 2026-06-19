@@ -36,8 +36,12 @@ let create ~out () : t =
   }
 
 let[@inline] abs_offset_ (self : t) : int = self.cur_offset + self.len
-let flush _self : unit = ()
-(* no-op: each node flushes itself immediately *)
+
+let flush self : unit =
+  if self.len > 0 then
+    failwith
+      "Encode.flush: pending data outside a write_node — use write_node for \
+       all output"
 
 type node_encoder = t
 type offset = int

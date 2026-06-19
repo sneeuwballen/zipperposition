@@ -7,6 +7,7 @@ module T = TypedSTerm
 module F = T.Form
 module Fmt = CCFormat
 module P = LLProof
+module VarTbl = Type.VarTbl
 
 type proof = LLProof.t
 type form = F.t
@@ -50,26 +51,31 @@ let () =
 (** {2 Applying Instantiation} *)
 
 (** One-shot variable replacement: replace each occurrence of [v] with [t] in
-    the term, without recursively substituting inside [t]. *)
-let rec replace_vars (subst : (Type.t HVar.t * Term.t) list) (t : Term.t) :
-    Term.t =
-  if Term.is_ground t then
+    the term, without recursively substituting inside [t]. Uses a hash table for
+    O(|subst| + |term|) lookup. *)
+let replace_vars (subst : (Type.t HVar.t * Term.t) list) (t : Term.t) : Term.t =
+  if subst = [] || Term.is_ground t then
     t
   else (
-    match Term.view t with
-    | Term.Var v ->
-      (match List.assq_opt v subst with
-      | Some t' -> t'
-      | None -> t)
-    | Term.DB _ -> t
-    | Term.Const _ -> t
-    | Term.App (hd, args) ->
-      let hd' = replace_vars subst hd in
-      let args' = List.map (replace_vars subst) args in
-      Term.app hd' args'
-    | Term.Fun (ty, body) -> Term.fun_ ty (replace_vars subst body)
-    | Term.AppBuiltin (b, args) ->
-      Term.app_builtin ~ty:(Term.ty t) b (List.map (replace_vars subst) args)
+    let ht = VarTbl.create (List.length subst) in
+    List.iter (fun (v, t') -> VarTbl.replace ht v t') subst;
+    let rec go t =
+      match Term.view t with
+      | Term.Var v ->
+        (match VarTbl.find_opt ht v with
+        | Some t' -> t'
+        | None -> t)
+      | Term.DB _ -> t
+      | Term.Const _ -> t
+      | Term.App (hd, args) ->
+        let hd' = go hd in
+        let args' = List.map go args in
+        Term.app hd' args'
+      | Term.Fun (ty, body) -> Term.fun_ ty (go body)
+      | Term.AppBuiltin (b, args) ->
+        Term.app_builtin ~ty:(Term.ty t) b (List.map go args)
+    in
+    go t
   )
 
 let replace_vars_lit (subst : (Type.t HVar.t * Term.t) list) (lit : Literal.t) :
@@ -161,7 +167,8 @@ let check_step ?dot_prefix (p : proof) : check_step_res =
   | P.Trivial -> CS_skip `Other
   | P.Esa (_, _) -> CS_skip `ESA
   | P.Inference { parents; tags; name; _ } ->
-    if name = "simplify_reflect-" || name = "simplify_reflect+" then
+    (* rules that the tableau checker cannot verify yet *)
+    if String.starts_with ~prefix:"simplify_reflect" name then
       CS_skip `Other
     else if LLProver.can_check tags then (
       (* Apply instantiations and build forms *)

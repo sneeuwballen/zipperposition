@@ -604,23 +604,29 @@ let get_def_lits p =
   | Statement.Stmt_view st ->
     (match Statement.get_formulas_from_defs st with
     | [] -> [||]
-    | f :: _ ->
+    | formulas ->
       let ctx = Term.Conv.create () in
-      let clause =
-        try
-          let lit = SLiteral.of_form f in
-          [ lit ]
-        with SLiteral.NotALit _ ->
-          let open TypedSTerm.Form in
-          (match view f with
-          | Or l -> List.map SLiteral.of_form l
-          | _ -> [ SLiteral.of_form f ])
-      in
-      let fo_lits =
+      let conv_form f =
+        let clause =
+          try
+            let lit = SLiteral.of_form f in
+            [ lit ]
+          with SLiteral.NotALit _ ->
+            let open TypedSTerm.Form in
+            (match view f with
+            | Or l -> List.map SLiteral.of_form l
+            | _ -> [ SLiteral.of_form f ])
+        in
         List.map Literal.Conv.of_form
           (List.map (SLiteral.map ~f:(Term.Conv.of_simple_term_exn ctx)) clause)
       in
+      let fo_lits = CCList.flat_map conv_form formulas in
       Array.of_list fo_lits)
+  | Statement.Stmt_clause_view c ->
+    let fo_lits =
+      Statement.Seq.lits c |> Iter.to_list |> List.map Literal.Conv.of_form
+    in
+    Array.of_list fo_lits
   | _ -> [||]
 
 let check res =

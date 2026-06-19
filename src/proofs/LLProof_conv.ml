@@ -50,7 +50,10 @@ and conv_step tbl get_clause p =
       List.map
         (function
           | Proof.P_of p -> LLProof.p_of (conv_proof tbl get_clause p)
-          | Proof.P_subst _ -> assert false)
+          | Proof.P_subst (p, _subst) ->
+            (* ESA steps don't carry instantiations in LLProof;
+               drop the substitution and keep the proof reference *)
+            LLProof.p_of (conv_proof tbl get_clause p))
         (Proof.Step.parents step)
     in
     let ps = List.map (fun par -> par.LLProof.p_proof) parents in

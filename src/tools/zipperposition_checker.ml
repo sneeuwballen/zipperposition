@@ -38,17 +38,18 @@ let parse_args () =
 let run file =
   let@ () = Trace_tef.with_setup () in
   let data = In_channel.with_open_bin file In_channel.input_all in
-  Printf.eprintf "[checker] reading %d bytes from %s\n%!" (String.length data)
-    file;
+  if !verbose then
+    Printf.eprintf "[checker] reading %d bytes from %s\n%!" (String.length data)
+      file;
   let decoder = Proof_trace_decode.create data in
-  Printf.eprintf "[checker] decoder created\n%!";
+  if !verbose then Printf.eprintf "[checker] decoder created\n%!";
   let proof, footer =
     let@ _sp = Trace_core.with_span ~__FILE__ ~__LINE__ "decoder-proof" in
     Proof_trace_decode.decode_proof decoder
   in
-  Printf.eprintf "[checker] proof decoded successfully\n%!";
-  Printf.eprintf "[checker] proof decoded successfully (id=%d)\n%!"
-    (LLProof.id proof);
+  if !verbose then
+    Printf.eprintf "[checker] proof decoded successfully (id=%d)\n%!"
+      (LLProof.id proof);
   if !verbose then
     Format.printf "@[<2>metadata:@,%a@]@."
       (fun out kv ->
@@ -56,7 +57,7 @@ let run file =
       footer;
   if !check_proof then (
     let@ _sp = Trace_core.with_span ~__FILE__ ~__LINE__ "check-proof" in
-    Printf.eprintf "[checker] checking proof...\n%!";
+    if !verbose then Printf.eprintf "[checker] checking proof...\n%!";
     let n_steps = ref 0 in
     let failures = ref [] in
     let on_check (p : LLProof.t) (r : LLProof_check.check_step_res) =
@@ -108,7 +109,8 @@ let run file =
     in
     (match !dot_file with
     | Some file ->
-      Printf.eprintf "[checker] writing LLProof DAG to %s\n%!" file;
+      if !verbose then
+        Printf.eprintf "[checker] writing LLProof DAG to %s\n%!" file;
       LLProof.Dot.pp_dot_file file proof
     | None -> ());
     if !verbose && !failures <> [] then (

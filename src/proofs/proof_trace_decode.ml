@@ -9,6 +9,13 @@ let section = Util.Section.make "proof_trace_decode"
 
 module Int_tbl = CCHashtbl.Make (CCInt)
 
+module HVar_cache = CCHashtbl.Make (struct
+  type t = int * Type.t
+
+  let equal (i1, t1) (i2, t2) = i1 = i2 && t1 == t2
+  let hash (i, t) = (46537 * i) + Hashtbl.hash t
+end)
+
 type t = {
   data: D.t;
   total_len: int;
@@ -17,7 +24,7 @@ type t = {
   mutable name_cache: Name.t Int_tbl.t;
   mutable clause_cache: Literal.t array Int_tbl.t;
   mutable subst_cache: Subst.Projection.t Int_tbl.t;
-  mutable hvar_cache: (int * Type.t, Term.var) Hashtbl.t;
+  mutable hvar_cache: Term.var HVar_cache.t;
   mutable proof_cache: LLProof.t Int_tbl.t;
 }
 
@@ -226,16 +233,16 @@ and decode_term_node (st : t) (c : cursor) (cmd : string) (off : D.offset) :
     let ty = ty_of_term (decode_term st ty_ref) in
     let hvar =
       let key = id, ty in
-      match Hashtbl.find st.hvar_cache key with
-      | v -> v
-      | exception Not_found ->
+      match HVar_cache.find_opt st.hvar_cache key with
+      | Some v -> v
+      | None ->
         let t = Term.var_of_int ~ty id in
         let v =
           match Term.view t with
           | Term.Var v -> v
           | _ -> assert false
         in
-        Hashtbl.add st.hvar_cache key v;
+        HVar_cache.replace st.hvar_cache key v;
         v
     in
     Term.var hvar
@@ -286,8 +293,11 @@ and decode_term_node (st : t) (c : cursor) (cmd : string) (off : D.offset) :
     term_of_type (Type.arrow [ dom ] cod)
   | "ty.name" ->
     let name_ref = read_ref c in
-    let _name = decode_name st name_ref in
-    term_of_type Type.tType
+    (* type constants fall through to term encoding in the encoder;
+       this case is never reached in the current format.  If added later,
+       this must decode the named type properly, not just return tType. *)
+    let name = decode_name st name_ref in
+    raise (D.Fail ("ty.name not implemented yet: " ^ Name.to_string name, off))
   | _ -> raise (D.Fail ("unexpected term command: " ^ cmd, off))
 
 and decode_name (st : t) (off : D.offset) : Name.t =
@@ -428,7 +438,11 @@ and decode_step_node (st : t) (c : cursor) (cmd : string) (off : D.offset) :
   | "s.esa" ->
     let rule_str = read_string c in
     let cl_ref = read_ref c in
-    let parents = read_parents_no_tags st c in
+    let parents = read_parents_skip_subst st c in
+    if c.pos < Array.length c.args && c.args.(c.pos) = D.String "|" then
+      c.pos <- c.pos + 1;
+    if c.pos < Array.length c.args then
+      raise (D.Fail ("unexpected trailing data after parents", 0));
     ( LLProof.Esa (rule_str, List.map (fun p -> p.LLProof.p_proof) parents),
       cl_ref )
   | "s.def" ->
@@ -478,6 +492,26 @@ and read_parent (st : t) (c : cursor) : LLProof.parent option =
     | _ -> None
   )
 
+and read_parents_skip_subst (st : t) (c : cursor) : LLProof.parent list =
+  let rec loop acc =
+    if c.pos >= Array.length c.args then
+      List.rev acc
+    else (
+      match c.args.(c.pos) with
+      | D.Ref p_ref ->
+        c.pos <- c.pos + 1;
+        (* skip the substitution ref/null slot *)
+        let _subst_off = read_ref c in
+        let p = decode_proof_at st p_ref in
+        loop (LLProof.p_of p :: acc)
+      | D.Null ->
+        c.pos <- c.pos + 1;
+        loop acc
+      | _ -> List.rev acc
+    )
+  in
+  loop []
+
 and read_parents (st : t) (c : cursor) : LLProof.parent list =
   let rec loop acc =
     match read_parent st c with
@@ -498,7 +532,8 @@ and read_tags (c : cursor) : Builtin.Tag.t list =
       | D.Int64 n ->
         c.pos <- c.pos + 1;
         loop (tag_of_int (Int64.to_int n) :: acc)
-      | _ -> List.rev acc
+      | D.String _ -> List.rev acc
+      | _ -> raise (D.Fail ("expected int for tag", 0))
     )
   in
   loop []
@@ -571,7 +606,7 @@ let create (s : string) : t =
     proof_cache = Int_tbl.create 64;
     clause_cache = Int_tbl.create 64;
     subst_cache = Int_tbl.create 64;
-    hvar_cache = Hashtbl.create 256;
+    hvar_cache = HVar_cache.create 256;
   }
 
 let decode_proof (st : t) : LLProof.t * (string * string) list =
