@@ -18,35 +18,35 @@ type t
 type 'a packed = unit
 (** Temporary backward compat *)
 
-type inf_rule = Clause.t -> Clause.t list
-type generate_rule = full:bool -> unit -> Clause.t list
-type clause_elim_rule = unit -> unit
+type inf_rule = t -> Clause.t -> Clause.t list
+type generate_rule = t -> full:bool -> unit -> Clause.t list
+type clause_elim_rule = t -> unit
 type binary_inf_rule = inf_rule
 type unary_inf_rule = inf_rule
-type simplify_rule = Clause.t -> Clause.t SimplM.t
+type simplify_rule = t -> Clause.t -> Clause.t SimplM.t
 type active_simplify_rule = simplify_rule
 type rw_simplify_rule = simplify_rule
-type backward_simplify_rule = Clause.t -> Clause.ClauseSet.t
-type redundant_rule = Clause.t -> bool
+type backward_simplify_rule = t -> Clause.t -> Clause.ClauseSet.t
+type redundant_rule = t -> Clause.t -> bool
 
 type backward_redundant_rule =
-  Clause.ClauseSet.t -> Clause.t -> Clause.ClauseSet.t
+  t -> Clause.ClauseSet.t -> Clause.t -> Clause.ClauseSet.t
 
 type immediate_simplification_rule =
-  Clause.t -> Clause.t Iter.t -> Clause.t Iter.t option
+  t -> Clause.t -> Clause.t Iter.t -> Clause.t Iter.t option
 
-type is_trivial_trail_rule = Trail.t -> bool
-type is_trivial_rule = Clause.t -> bool
+type is_trivial_trail_rule = t -> Trail.t -> bool
+type is_trivial_rule = t -> Clause.t -> bool
 
 type term_rewrite_rule =
-  Logtk.Term.t -> (Logtk.Term.t * Proof.parent list) option
+  t -> Logtk.Term.t -> (Logtk.Term.t * Proof.parent list) option
 
-type term_norm_rule = Logtk.Term.t -> Logtk.Term.t option
+type term_norm_rule = t -> Logtk.Term.t -> Logtk.Term.t option
 
 type lit_rewrite_rule =
-  Literal.t -> (Literal.t * Proof.parent list * Proof.tag list) option
+  t -> Literal.t -> (Literal.t * Proof.parent list * Proof.tag list) option
 
-type multi_simpl_rule = Clause.t -> Clause.t list option
+type multi_simpl_rule = t -> Clause.t -> Clause.t list option
 
 type 'a conversion_result =
   | CR_skip
@@ -55,7 +55,7 @@ type 'a conversion_result =
   | CR_return of 'a
 
 type clause_conversion_rule =
-  Statement.clause_t -> Clause.t list conversion_result
+  t -> Statement.clause_t -> Clause.t list conversion_result
 
 type stats = int * int * int
 
@@ -63,11 +63,7 @@ val create :
   params:Params.t -> flex_state:Logtk.Flex_state.t -> ctx:Ctx.t -> unit -> t
 (** Create a new env record *)
 
-val set_global : t -> unit
-(** Set the global env *)
-
-val get_global : unit -> t
-(** Get the global env *)
+(** Create a new env record *)
 
 val get_ctx : t -> Ctx.t
 val flex_state_of : t -> Logtk.Flex_state.t
@@ -116,8 +112,8 @@ val cr_skip : _ conversion_result
 val cr_return : 'a -> 'a conversion_result
 val cr_add : 'a -> 'a conversion_result
 val add_clause_conversion : t -> clause_conversion_rule -> unit
-val add_step_init : t -> (unit -> unit) -> unit
-val add_fragment_check : t -> (Clause.t -> bool) -> unit
+val add_step_init : t -> (t -> unit) -> unit
+val add_fragment_check : t -> (t -> Clause.t -> bool) -> unit
 val check_fragment : t -> Clause.t -> bool
 val multi_simplify : t -> depth:int -> Clause.t -> (Clause.t * int) list option
 val params_of : t -> Params.t
@@ -142,11 +138,11 @@ val is_trivial_trail : t -> Trail.t -> bool
 val is_trivial : t -> Clause.t -> bool
 val is_active : t -> Clause.t -> bool
 val is_passive : t -> Clause.t -> bool
-val basic_simplify : t -> simplify_rule
-val unary_simplify : t -> simplify_rule
+val basic_simplify : t -> Clause.t -> Clause.t SimplM.t
+val unary_simplify : t -> Clause.t -> Clause.t SimplM.t
 val backward_simplify : t -> Clause.t -> Clause.ClauseSet.t * Clause.t Iter.t
 val simplify_active_with : t -> (Clause.t -> Clause.t list option) -> unit
-val forward_simplify : t -> simplify_rule
+val forward_simplify : t -> Clause.t -> Clause.t SimplM.t
 val cheap_multi_simplify : t -> Clause.t -> Clause.t list option
 val immediate_simplify : t -> Clause.t -> Clause.t Iter.t -> Clause.t Iter.t
 val generate : t -> Clause.t -> Clause.t Iter.t
@@ -154,6 +150,7 @@ val is_redundant : t -> Clause.t -> bool
 val subsumed_by : t -> Clause.t -> Clause.ClauseSet.t
 val all_simplify : t -> Clause.t -> Clause.t list SimplM.t
 val step_init : t -> unit
+  (** Run all step init hooks *)
 val flex_add_of : t -> 'a Logtk.Flex_state.key -> 'a -> unit
 val update_flex_state : t -> (Logtk.Flex_state.t -> Logtk.Flex_state.t) -> unit
 

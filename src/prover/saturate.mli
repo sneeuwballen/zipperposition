@@ -18,17 +18,22 @@ type szs_status =
 
 val k_abort_after_fragment_check : bool Flex_state.key
 
-val given_clause_step : ?generating:bool -> int -> szs_status
+val given_clause_step : Env.t -> ?generating:bool -> int -> szs_status
 (** Perform one step of the given clause algorithm. It performs generating
     inferences only if [generating] is true (default); other parameters are the
     iteration number and the environment *)
 
 val given_clause :
-  ?generating:bool -> ?steps:int -> ?timeout:float -> unit -> szs_status * int
+  Env.t ->
+  ?generating:bool ->
+  ?steps:int ->
+  ?timeout:float ->
+  unit ->
+  szs_status * int
 (** run the given clause until a timeout occurs or a result is found. It returns
     a tuple (new state, result, number of steps done). It performs generating
     inferences only if [generating] is true (default) *)
 
-val presaturate : unit -> szs_status * int
+val presaturate : Env.t -> szs_status * int
 (** Interreduction of the given state, without generating inferences. Returns
     the number of steps done for presaturation, with status of the set. *)

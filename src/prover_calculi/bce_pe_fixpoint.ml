@@ -8,9 +8,9 @@ let k_fp_inprocessing = Flex_state.create_key ()
 module BCE = Bce
 module PE = Pred_elim
 
-let run_fixpoint () =
-  PE.begin_fixpoint ();
-  BCE.begin_fixpoint ();
+let run_fixpoint env =
+  PE.begin_fixpoint env;
+  BCE.begin_fixpoint env;
 
   let done_ = ref false in
   while not !done_ do
@@ -23,7 +23,7 @@ let run_fixpoint () =
 
 let steps = ref 0
 
-let inprocessing () =
+let inprocessing env =
   if !steps = 0 then (
     let done_ = ref false in
     while not !done_ do
@@ -32,20 +32,19 @@ let inprocessing () =
     done
   );
 
-  steps := (!steps + 1) mod Env.flex_get_of (Env.get_global ()) k_check_at
+  steps := (!steps + 1) mod Env.flex_get_of env k_check_at
 
-let setup () =
-  if Env.flex_get_of (Env.get_global ()) k_enabled then
-    if Env.flex_get_of (Env.get_global ()) k_fp_inprocessing then (
-      Env.flex_add_of (Env.get_global ()) Pred_elim.k_enabled true;
-      Env.flex_add_of (Env.get_global ()) Bce.k_enabled true;
-      PE.setup ~in_fp_mode:true ();
-      BCE.setup ~in_fp_mode:true ();
-      Env.Ctx.lost_completeness (Env.get_ctx (Env.get_global ()));
-      Env.add_clause_elimination_rule (Env.get_global ()) ~priority:5
-        "bce-pe-fp" inprocessing
+let setup env =
+  if Env.flex_get_of env k_enabled then
+    if Env.flex_get_of env k_fp_inprocessing then (
+      Env.flex_add_of env Pred_elim.k_enabled true;
+      Env.flex_add_of env Bce.k_enabled true;
+      PE.setup env ~in_fp_mode:true;
+      BCE.setup env ~in_fp_mode:true;
+      Env.Ctx.lost_completeness (Env.get_ctx env);
+      Env.add_clause_elimination_rule env ~priority:5 "bce-pe-fp" inprocessing
     ) else
-      Signal.once (Env.on_start (Env.get_global ())) run_fixpoint
+      Signal.once (Env.on_start env) (fun () -> run_fixpoint env)
 
 let _enabled = ref false
 let _check_at = ref 10
@@ -53,10 +52,10 @@ let _inprocessing = ref false
 
 let extension =
   let action (env : Env.t) =
-    Env.flex_add_of (Env.get_global ()) k_enabled !_enabled;
-    Env.flex_add_of (Env.get_global ()) k_fp_inprocessing !_inprocessing;
-    Env.flex_add_of (Env.get_global ()) k_check_at !_check_at;
-    setup ()
+    Env.flex_add_of env k_enabled !_enabled;
+    Env.flex_add_of env k_fp_inprocessing !_inprocessing;
+    Env.flex_add_of env k_check_at !_check_at;
+    setup env
   in
   {
     Extensions.default with

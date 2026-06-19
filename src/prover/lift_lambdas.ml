@@ -279,7 +279,7 @@ let lift_lambdas cl =
     lifted :: new_defs
   )
 
-let lift_lambdas_simp cl =
+let lift_lambdas_simp _env cl =
   let res = lift_lambdas cl in
   if CCList.is_empty res then (
     Util.debugf ~section 1 "Nothing to do for @[%a@]@." (fun k -> k C.pp cl);
@@ -290,14 +290,13 @@ let lift_lambdas_simp cl =
     Some (CCList.flat_map clausify_def res)
   )
 
-let lift_lambdas_cnf st =
+let lift_lambdas_cnf env st =
   Env.CR_return
     (CCList.flat_map
-       (fun c -> CCOpt.get_or ~default:[ c ] (lift_lambdas_simp c))
-       (C.of_statement ~ctx:(Env.get_ctx (Env.get_global ())) st))
+       (fun c -> CCOpt.get_or ~default:[ c ] (lift_lambdas_simp env c))
+       (C.of_statement ~ctx:(Env.get_ctx env) st))
 
-let setup () =
-  let env = Env.get_global () in
+let setup env =
   if Env.flex_get_of env k_live_lifting then
     Env.add_multi_simpl_rule env ~priority:5 lift_lambdas_simp;
   if Env.flex_get_of env k_post_cnf_lifting then
@@ -310,7 +309,7 @@ let extension =
   let register (env : Env.t) =
     Env.flex_add_of env k_live_lifting !_live_lifting;
     Env.flex_add_of env k_post_cnf_lifting !_post_cnf_lifting;
-    setup ()
+    setup env
   in
   {
     Extensions.default with

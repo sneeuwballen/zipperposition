@@ -275,7 +275,7 @@ let find_ty_ sc_decl ty sc_ty =
    found be E-unification *)
 
 (* instantiate variables that belong to an enum case *)
-let instantiate_vars c =
+let instantiate_vars env c =
   let@ _sp =
     Trace.with_span ~__FILE__ ~__LINE__ "enum-types.instantiate-vars"
   in
@@ -312,9 +312,7 @@ let instantiate_vars c =
               in
               let trail = C.trail c and penalty = C.penalty c in
               let c' =
-                C.create_a
-                  ~ctx:(Env.get_ctx (Env.get_global ()))
-                  ~trail ~penalty
+                C.create_a ~ctx:(Env.get_ctx env) ~trail ~penalty
                   (CCArray.append c_guard lits')
                   proof
               in
@@ -327,7 +325,7 @@ let instantiate_vars c =
         Some l)
     vars
 
-let instantiate_axiom_ ~ty_s s poly_args decl =
+let instantiate_axiom_ ~ty_s s poly_args decl env =
   if Name.Set.mem s decl.decl_symbols then
     None
   (* already declared *)
@@ -371,9 +369,7 @@ let instantiate_axiom_ ~ty_s s poly_args decl =
     (* start with initial penalty *)
     let penalty = 4 in
     let c' =
-      C.create
-        ~ctx:(Env.get_ctx (Env.get_global ()))
-        ~trail ~penalty (c_guard @ lits) proof
+      C.create ~ctx:(Env.get_ctx env) ~trail ~penalty (c_guard @ lits) proof
     in
     Util.debugf ~section 3
       "@[<2>instantiate axiom of enum type `%a` on @[%a@]:@ clause @[%a@]@]"
@@ -391,9 +387,9 @@ let instantiate_axiom_ ~ty_s s poly_args decl =
       or ....]
     where [c1, ..., ck] are the constructors of [decl].
     It uses the projectors instead of just skolemizing the "exists" *)
-let instantiate_axiom ~ty_s s poly_args decl =
+let instantiate_axiom ~ty_s s poly_args decl env =
   if !_instantiate_projector_axiom then
-    instantiate_axiom_ ~ty_s s poly_args decl
+    instantiate_axiom_ ~ty_s s poly_args decl env
   else
     None
 
@@ -402,23 +398,23 @@ let instantiate_axiom ~ty_s s poly_args decl =
    add the axiom
    [forall x1:a1...xn:an, id(x1...xn) = t_1[x := id(x1..xn)] or ... or t_m[...]]
    where the [t_i] are the cases of [decl] *)
-let check_decl_ ~ty s decl =
+let check_decl_ ~ty s decl env =
   let _, ty_ret = Type.open_fun ty in
   match Type.view ty_ret, decl.decl_ty_id with
-  | Type.Builtin b, B b' when b = b' -> instantiate_axiom ~ty_s:ty s [] decl
+  | Type.Builtin b, B b' when b = b' -> instantiate_axiom ~ty_s:ty s [] decl env
   | Type.App (c, args), I i
     when Name.equal c i
          && (not (is_projector_ s ~of_:i))
          && List.length args = List.length decl.decl_ty_vars ->
-    instantiate_axiom ~ty_s:ty s args decl
+    instantiate_axiom ~ty_s:ty s args decl env
   | _ -> None
 
 (* add axioms for new symbol [s] with type [ty], if needed *)
-let _on_new_symbol s ~ty =
+let _on_new_symbol env s ~ty =
   let aux i =
     try
       let decl = find_decl_ i in
-      check_decl_ ~ty s decl |> CCOpt.to_list
+      check_decl_ ~ty s decl env |> CCOpt.to_list
     with Not_found -> []
   in
   let clauses =
@@ -431,19 +427,19 @@ let _on_new_symbol s ~ty =
   (* set of support *)
   PS.ActiveSet.add (Iter.of_list clauses)
 
-let _on_new_decl decl =
+let _on_new_decl env decl =
   let clauses =
     Signature.fold
-      (Env.Ctx.signature (Env.get_ctx (Env.get_global ())))
+      (Env.Ctx.signature (Env.get_ctx env))
       []
       (fun acc s (ty, _) ->
-        match check_decl_ s ~ty decl with
+        match check_decl_ s ~ty decl env with
         | None -> acc
         | Some c -> c :: acc)
   in
   PS.PassiveSet.add (Iter.of_list clauses)
 
-let is_trivial c = C.get_flag flag_enumeration_clause c
+let is_trivial _env c = C.get_flag flag_enumeration_clause c
 
 (* detect whether the clause is a declaration of enum type, and if it
     is, declare the type! *)
@@ -498,15 +494,11 @@ let _declare_inductive ~proof d =
   ()
 
 (* detect whether the input statement contains some EnumType declaration *)
-let _detect_stmt stmt =
+let _detect_stmt env stmt =
   match Stmt.view stmt with
   | Stmt.Assert c ->
     let proof = Stmt.proof_step stmt in
-    let c =
-      C.of_forms
-        ~ctx:(Env.get_ctx (Env.get_global ()))
-        ~trail:Trail.empty c proof
-    in
+    let c = C.of_forms ~ctx:(Env.get_ctx env) ~trail:Trail.empty c proof in
     _detect_and_declare c
   | Stmt.Data l ->
     let proof = Stmt.as_proof_c stmt in
@@ -516,30 +508,32 @@ let _detect_stmt stmt =
     ()
 
 (** {2 As Extension} *)
-let setup () =
+let setup env =
   if !_enable then (
     Util.debug ~section 1 "register handling of enumerated types";
-    Env.add_multi_simpl_rule (Env.get_global ()) ~priority:5 instantiate_vars;
-    Env.add_is_trivial (Env.get_global ()) is_trivial;
+    Env.add_multi_simpl_rule env ~priority:5 (fun env c ->
+        instantiate_vars env c);
+    Env.add_is_trivial env is_trivial;
     (* look in input statements  for inductive types *)
-    Signal.on_every (Env.on_input_statement (Env.get_global ())) _detect_stmt;
+    Signal.on_every (Env.on_input_statement env) (fun stmt ->
+        _detect_stmt env stmt);
     (* signals: instantiate axioms upon new symbols, or when new
         declarations are added *)
     Signal.on_every
-      (Ctx.on_new_symbol (Env.get_ctx (Env.get_global ())))
-      (fun (s, ty) -> _on_new_symbol s ~ty);
+      (Ctx.on_new_symbol (Env.get_ctx env))
+      (fun (s, ty) -> _on_new_symbol env s ~ty);
     Signal.on_every on_new_decl (fun decl ->
-        _on_new_decl decl;
+        _on_new_decl env decl;
         (* need to simplify (instantiate) active clauses that have naked
             variables of the given type *)
-        Env.simplify_active_with (Env.get_global ()) instantiate_vars);
+        Env.simplify_active_with env (fun c -> instantiate_vars env c));
     Signature.iter
-      (Ctx.signature (Env.get_ctx (Env.get_global ())))
-      (fun s (ty, _) -> _on_new_symbol s ~ty)
+      (Ctx.signature (Env.get_ctx env))
+      (fun s (ty, _) -> _on_new_symbol env s ~ty)
   )
 
 let extension =
-  let register (env : Env.t) = setup () in
+  let register (env : Env.t) = setup env in
   {
     Extensions.default with
     Extensions.name = "enum_types";

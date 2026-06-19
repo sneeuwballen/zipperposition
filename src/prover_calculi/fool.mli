@@ -7,7 +7,7 @@ open Libzipperposition
 
 type term = Term.t
 
-val setup : unit -> unit
+val setup : Env.t -> unit
 
 val rw_bool_lits : Env.multi_simpl_rule
 (** Register rules in the environment *)

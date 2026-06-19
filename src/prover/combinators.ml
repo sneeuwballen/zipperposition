@@ -23,9 +23,6 @@ let k_combinators_max_depth = Flex_state.create_key ()
 module C = Clause
 module Ctx = Ctx
 
-let _env_ref : Env.t option ref = ref None
-let get_env () = CCOpt.get_exn !_env_ref
-
 let has_lams_aux =
   Iter.exists (fun t ->
       T.Seq.subterms ~include_builtin:true ~ignore_head:false t
@@ -36,7 +33,7 @@ let has_lams_c c = has_lams_aux @@ C.Seq.terms c
 let has_lams_lits lits =
   CCList.to_iter lits |> Iter.flat_map SLiteral.to_iter |> has_lams_aux
 
-let enocde_stmt st =
+let enocde_stmt env st =
   let rule = Proof.Rule.mk "lams2combs" in
   let rules = curry_optimizations @ bunder_optimizations in
   Env.CR_return
@@ -49,7 +46,7 @@ let enocde_stmt st =
              (Array.to_list lits') proof
          ) else
            c)
-       (C.of_statement ~ctx:(Env.get_ctx (get_env ())) st))
+       (C.of_statement ~ctx:(Env.get_ctx env) st))
 
 let comb_narrow c =
   let new_lits = Literals.map narrow (C.lits c) in
@@ -116,59 +113,59 @@ let alpha = T.var tyvarA
 let beta = T.var tyvarB
 let gamma = T.var tyvarC
 
-let partially_applied_s () =
+let partially_applied_s env =
   partially_apply
     ~comb:(mk_s ~alpha ~beta ~gamma ~args:[], 0)
-    [ s_arg1, 1; s_arg2, Env.flex_get_of (get_env ()) k_s_penalty ]
+    [ s_arg1, 1; s_arg2, Env.flex_get_of env k_s_penalty ]
 
-let partially_applied_b () =
+let partially_applied_b env =
   partially_apply
     ~comb:(mk_b ~alpha ~beta ~gamma ~args:[], 0)
-    [ b_arg1, 1; b_arg2, Env.flex_get_of (get_env ()) k_b_penalty ]
+    [ b_arg1, 1; b_arg2, Env.flex_get_of env k_b_penalty ]
 
-let partially_applied_c () =
+let partially_applied_c env =
   partially_apply
     ~comb:(mk_c ~alpha ~beta ~gamma ~args:[], 0)
-    [ c_arg1, 1; c_arg2, Env.flex_get_of (get_env ()) k_c_penalty ]
+    [ c_arg1, 1; c_arg2, Env.flex_get_of env k_c_penalty ]
 
-let partially_applied_k () =
+let partially_applied_k env =
   partially_apply
     ~comb:(mk_k ~alpha ~beta ~args:[], 0)
-    [ k_arg1, Env.flex_get_of (get_env ()) k_k_penalty ]
+    [ k_arg1, Env.flex_get_of env k_k_penalty ]
 
 let partially_applied_i () = [ mk_i ~alpha ~args:[], 0 ]
 
-let partially_applied_combs () =
-  partially_applied_s () @ partially_applied_b () @ partially_applied_c ()
-  @ partially_applied_k () @ partially_applied_i ()
+let partially_applied_combs env =
+  partially_applied_s env @ partially_applied_b env @ partially_applied_c env
+  @ partially_applied_k env @ partially_applied_i ()
 
-let instantiate_var_w_comb ~var =
+let instantiate_var_w_comb ~env ~var =
   CCList.filter_map
     (fun (comb, penalty) ->
       try Some (Unif.FO.unify_syn (comb, 0) (var, 1), penalty)
       with Unif.Fail -> None)
-    (partially_applied_combs ())
+    (partially_applied_combs env)
 
 let narrow_app_var_rule_name = "narrow_applied_variable"
 
-let narrow_app_vars_applicable cl =
-  match Env.flex_get_of (get_env ()) k_combinators_max_depth with
+let narrow_app_vars_applicable env cl =
+  match Env.flex_get_of env k_combinators_max_depth with
   | None -> true
   | Some max_depth ->
     Proof.Step.count_rules ~name:narrow_app_var_rule_name (C.proof_step cl)
     <= max_depth
 
-let narrow_app_vars clause =
+let narrow_app_vars env clause =
   (* CCFormat.printf "narrowing:@[%a@]@." C.pp clause; *)
   let rule = Proof.Rule.mk narrow_app_var_rule_name in
   let tags = [ Proof.Tag.T_ho ] in
 
-  let ord = Ctx.ord (Env.get_ctx (get_env ())) in
+  let ord = Ctx.ord (Env.get_ctx env) in
   let eligible = C.Eligible.(res clause) in
   let lits = C.lits clause in
   (* do the inferences in which clause is passive (rewritten),
       so we consider both negative and positive literals *)
-  (if narrow_app_vars_applicable clause then
+  (if narrow_app_vars_applicable env clause then
      Lits.fold_terms ~vars:false ~var_args:true ~fun_bodies:false ~subterms:true
        ~ord ~which:`Max ~eligible ~ty_args:false lits
    else
@@ -203,8 +200,7 @@ let narrow_app_vars clause =
                  Position.size (Literal.Pos.term_pos lits.(lit_idx) lit_pos)
                in
                let depth_mul =
-                 if not @@ Env.flex_get_of (get_env ()) k_deep_app_var_penalty
-                 then
+                 if not @@ Env.flex_get_of env k_deep_app_var_penalty then
                    1
                  else
                    max t_depth 1
@@ -228,10 +224,10 @@ let narrow_app_vars clause =
 
                Some new_clause
              ))
-           (instantiate_var_w_comb ~var))
+           (instantiate_var_w_comb ~env ~var))
   |> Iter.to_list
 
-let lams2combs_otf c =
+let lams2combs_otf _env c =
   if not @@ has_lams_c c then
     SimplM.return_same c
   else (
@@ -249,16 +245,16 @@ let lams2combs_otf c =
     SimplM.return_new new_
   )
 
-let maybe_conv_lams c =
-  if Env.flex_get_of (get_env ()) k_enable_combinators then
-    SimplM.get (lams2combs_otf c)
+let maybe_conv_lams env c =
+  if Env.flex_get_of env k_enable_combinators then
+    SimplM.get (lams2combs_otf env c)
   else
     c
 
-let ho_unif_solve c =
+let ho_unif_solve env c =
   let module PUnif = PUnif.Make (struct
     let st =
-      Env.flex_state_of (get_env ())
+      Env.flex_state_of env
       |> Flex_state.add PragUnifParams.k_fixpoint_decider true
       |> Flex_state.add PragUnifParams.k_pattern_decider true
       |> Flex_state.add PragUnifParams.k_solid_decider true
@@ -289,9 +285,9 @@ let ho_unif_solve c =
     | _ -> SimplM.return_same c)
   | _ -> SimplM.return_same c
 
-let force_conv_lams c =
+let force_conv_lams env c =
   assert (C.Seq.terms c |> Iter.for_all T.DB.is_closed);
-  let c' = lams2combs_otf c in
+  let c' = lams2combs_otf env c in
   if SimplM.is_same c' then
     c
   else
@@ -299,8 +295,8 @@ let force_conv_lams c =
 
 (* Expands the chosen term to be of the form 
      \lambda (all type vars). body of prop type *)
-let expand t =
-  if Env.flex_get_of (get_env ()) k_enable_combinators then (
+let expand env t =
+  if Env.flex_get_of env k_enable_combinators then (
     assert (not (T.is_fun t));
     (* no lambdas if combinators are on *)
     let ty_args, ret_ty = Type.open_fun (T.ty t) in
@@ -313,19 +309,16 @@ let expand t =
     Lambda.eta_expand t
 
 let setup (env : Env.t) =
-  _env_ref := Some env;
-  if Env.flex_get_of (get_env ()) k_enable_combinators then (
-    Env.add_clause_conversion (get_env ()) enocde_stmt;
-    if Env.flex_get_of (get_env ()) k_app_var_narrowing then
-      Env.add_unary_inf (get_env ()) "narrow applied variable" narrow_app_vars;
-    Env.add_basic_simplify (get_env ()) lams2combs_otf;
-    Ctx.set_ord
-      (Env.get_ctx (get_env ()))
-      (Ordering.compose cmp_by_max_weak_r_len
-         (Ctx.ord (Env.get_ctx (get_env ()))));
+  if Env.flex_get_of env k_enable_combinators then (
+    Env.add_clause_conversion env enocde_stmt;
+    if Env.flex_get_of env k_app_var_narrowing then
+      Env.add_unary_inf env "narrow applied variable" narrow_app_vars;
+    Env.add_basic_simplify env lams2combs_otf;
+    Ctx.set_ord (Env.get_ctx env)
+      (Ordering.compose cmp_by_max_weak_r_len (Ctx.ord (Env.get_ctx env)));
 
-    if Env.flex_get_of (get_env ()) k_unif_resolve then
-      Env.add_unary_simplify (get_env ()) ho_unif_solve;
+    if Env.flex_get_of env k_unif_resolve then
+      Env.add_unary_simplify env ho_unif_solve;
 
     Unif._allow_pattern_unif := false
   )

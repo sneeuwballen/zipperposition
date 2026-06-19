@@ -270,7 +270,6 @@ let make_env (st_ref : Phases.State.t ref) ~ctx ~params stmts =
   let@ () = Phases.with_phase st_ref Phases.MakeEnv in
   let state = !st_ref in
   let env = Env.create ~params ~flex_state:state ~ctx () in
-  Env.set_global env;
   Extensions.extensions ()
   |> List.iter (fun e -> List.iter (fun f -> f env) e.Extensions.env_actions);
   let c_sets = Env.convert_input_statements_env env stmts in
@@ -294,9 +293,9 @@ let print_stats_env (env : Env.t) =
     Format.printf "%sproof state stats: {active %d, passive %d, simpl %d}@."
       comment num_active num_passive num_simpl
   in
-  if (OuterEnv.params_of (OuterEnv.get_global ())).Params.stats then (
+  if (Env.params_of env).Params.stats then (
     print_hashcons_stats "terms" (InnerTerm.hashcons_stats ());
-    print_state_stats (OuterEnv.stats (OuterEnv.get_global ()))
+    print_state_stats (Env.stats env)
   )
 
 (* print stats *)
@@ -320,24 +319,20 @@ let print_stats (st_ref : Phases.State.t ref) =
   )
 
 (* pre-saturation *)
-let presaturate_clauses (st_ref : Phases.State.t ref) (_env : Env.t)
+let presaturate_clauses (st_ref : Phases.State.t ref) (env : Env.t)
     (c_sets : Clause.t Clause.sets) =
   let@ _sp = Phases.with_span ~__FILE__ ~__LINE__ "phase.presaturate" in
   let@ () = Phases.with_phase st_ref Phases.Pre_saturate in
   let num_clauses = CCVector.length c_sets.Clause.c_set in
-  if (OuterEnv.params_of (OuterEnv.get_global ())).Params.presaturate then (
+  if (Env.params_of env).Params.presaturate then (
     Util.debug ~section 2 "presaturate initial clauses";
-    OuterEnv.add_passive (OuterEnv.get_global ())
-      (CCVector.to_iter c_sets.Clause.c_set);
-    let result, num = Saturate.presaturate () in
+    Env.add_passive env (CCVector.to_iter c_sets.Clause.c_set);
+    let result, num = Saturate.presaturate env in
     Util.debugf ~section 2 "initial presaturation in %d steps" (fun k -> k num);
-    let c_set =
-      OuterEnv.get_active (OuterEnv.get_global ()) ()
-      |> CCVector.of_iter |> CCVector.freeze
-    in
+    let c_set = Env.get_active env () |> CCVector.of_iter |> CCVector.freeze in
     let clauses = { c_sets with Clause.c_set } in
-    OuterEnv.remove_active (OuterEnv.get_global ()) (CCVector.to_iter c_set);
-    OuterEnv.remove_passive (OuterEnv.get_global ()) (CCVector.to_iter c_set);
+    Env.remove_active env (CCVector.to_iter c_set);
+    Env.remove_passive env (CCVector.to_iter c_set);
     Util.debugf ~section 2 "@[<2>%d clauses pre-saturated into:@ @[<hv>%a@]@]"
       (fun k ->
         k num_clauses
@@ -349,52 +344,44 @@ let presaturate_clauses (st_ref : Phases.State.t ref) (_env : Env.t)
 
 (* try to refute the set of clauses contained in the [env]. Parameters are
    used to influence how saturation is done, for how long it runs, etc. *)
-let try_to_refute (st_ref : Phases.State.t ref) (_env : Env.t) clauses result =
+let try_to_refute (st_ref : Phases.State.t ref) (env : Env.t) clauses result =
   let@ _sp = Phases.with_span ~__FILE__ ~__LINE__ "phase.saturate" in
   let@ () = Phases.with_phase st_ref Phases.Saturate in
   if not (CCVector.is_empty clauses.Clause.c_sos) then
-    OuterEnv.Ctx.lost_completeness (OuterEnv.get_ctx (OuterEnv.get_global ()));
-  OuterEnv.add_active (OuterEnv.get_global ())
-    (CCVector.to_iter clauses.Clause.c_sos);
-  OuterEnv.add_passive (OuterEnv.get_global ())
-    (CCVector.to_iter clauses.Clause.c_set);
+    Env.Ctx.lost_completeness (Env.get_ctx env);
+  Env.add_active env (CCVector.to_iter clauses.Clause.c_sos);
+  Env.add_passive env (CCVector.to_iter clauses.Clause.c_set);
   let steps =
-    if (OuterEnv.params_of (OuterEnv.get_global ())).Params.steps < 0 then
+    if (Env.params_of env).Params.steps < 0 then
       None
     else (
       Util.debugf ~section 2 "run for %d steps" (fun k ->
-          k (OuterEnv.params_of (OuterEnv.get_global ())).Params.steps);
-      Some (OuterEnv.params_of (OuterEnv.get_global ())).Params.steps
+          k (Env.params_of env).Params.steps);
+      Some (Env.params_of env).Params.steps
     )
   and timeout =
-    if (OuterEnv.params_of (OuterEnv.get_global ())).Params.timeout = 0. then
+    if (Env.params_of env).Params.timeout = 0. then
       None
     else (
       Util.debugf ~section 2 "run for %.3f s" (fun k ->
-          k (OuterEnv.params_of (OuterEnv.get_global ())).Params.timeout);
-      ignore
-        (setup_alarm
-           (OuterEnv.params_of (OuterEnv.get_global ())).Params.timeout);
-      Some
-        (Util.total_time_s ()
-       +. (OuterEnv.params_of (OuterEnv.get_global ())).Params.timeout -. 0.25)
+          k (Env.params_of env).Params.timeout);
+      ignore (setup_alarm (Env.params_of env).Params.timeout);
+      Some (Util.total_time_s () +. (Env.params_of env).Params.timeout -. 0.25)
     )
   in
   Util.debugf ~section 1 "active(%d): @[%a@]" (fun k ->
       k
-        (Iter.length @@ OuterEnv.get_active (OuterEnv.get_global ()) ())
-        (Iter.pp_seq Env.C.pp)
-        (OuterEnv.get_active (OuterEnv.get_global ()) ()));
+        (Iter.length @@ Env.get_active env ())
+        (Iter.pp_seq Env.C.pp) (Env.get_active env ()));
   Util.debugf ~section 1 "passive(%d): @[%a@]" (fun k ->
       k
-        (Iter.length @@ OuterEnv.get_passive (OuterEnv.get_global ()) ())
-        (Iter.pp_seq Env.C.pp)
-        (OuterEnv.get_passive (OuterEnv.get_global ()) ()));
-  Signal.send (OuterEnv.on_start (OuterEnv.get_global ())) ();
+        (Iter.length @@ Env.get_passive env ())
+        (Iter.pp_seq Env.C.pp) (Env.get_passive env ()));
+  Signal.send (Env.on_start env) ();
   let result, num =
     match result with
     | Saturate.Unsat _ -> result, 0
-    | _ -> Saturate.given_clause ~generating:true ?steps ?timeout ()
+    | _ -> Saturate.given_clause env ~generating:true ?steps ?timeout ()
   in
   let comment = Options.comment () in
   Format.printf "%sdone %d iterations in %.3fs@." comment num
@@ -402,21 +389,17 @@ let try_to_refute (st_ref : Phases.State.t ref) (_env : Env.t) clauses result =
   result
 
 (* Print some content of the state, based on environment variables *)
-let print_dots (st_ref : Phases.State.t ref) (_env : Env.t)
+let print_dots (st_ref : Phases.State.t ref) (env : Env.t)
     (result : Saturate.szs_status) =
   let@ _sp = Phases.with_span ~__FILE__ ~__LINE__ "phase.print-dots" in
   let@ () = Phases.with_phase st_ref Phases.Print_dot in
   Signal.send Signals.on_dot_output ();
-  match
-    (OuterEnv.params_of (OuterEnv.get_global ())).Params.dot_file, result
-  with
+  match (Env.params_of env).Params.dot_file, result with
   | Some dot_f, Saturate.Unsat proof ->
     let name = "unsat_graph" in
     let proof =
-      if (OuterEnv.params_of (OuterEnv.get_global ())).Params.dot_all_roots then
-        Iter.append
-          (OuterEnv.get_active (OuterEnv.get_global ()) ())
-          (OuterEnv.get_passive (OuterEnv.get_global ()) ())
+      if (Env.params_of env).Params.dot_all_roots then
+        Iter.append (Env.get_active env ()) (Env.get_passive env ())
         |> Iter.filter_map (fun c ->
                if Literals.is_absurd (Env.C.lits c) then
                  Some (Env.C.proof c)
@@ -427,13 +410,9 @@ let print_dots (st_ref : Phases.State.t ref) (_env : Env.t)
     in
     Proof.S.pp_dot_seq_file ~name dot_f proof
   | Some dot_f, (Saturate.Sat | Saturate.Unknown)
-    when (OuterEnv.params_of (OuterEnv.get_global ())).Params.dot_sat ->
+    when (Env.params_of env).Params.dot_sat ->
     let name = "sat_set" in
-    let seq =
-      Iter.append
-        (OuterEnv.get_active (OuterEnv.get_global ()) ())
-        (OuterEnv.get_passive (OuterEnv.get_global ()) ())
-    in
+    let seq = Iter.append (Env.get_active env ()) (Env.get_passive env ()) in
     let seq = Iter.map Env.C.proof seq in
     Proof.S.pp_dot_seq_file ~name dot_f seq
   | _ -> ()
@@ -451,7 +430,7 @@ let unsat_to_str (st_ref : Phases.State.t ref) =
   else
     "Unsatisfiable"
 
-let print_szs_result (st_ref : Phases.State.t ref) ~file (_env : Env.t)
+let print_szs_result (st_ref : Phases.State.t ref) ~file (env : Env.t)
     (result : Saturate.szs_status) =
   let@ _sp = Phases.with_span ~__FILE__ ~__LINE__ "phase.print-szs-result" in
   let@ () = Phases.with_phase st_ref Phases.Print_result in
@@ -462,36 +441,26 @@ let print_szs_result (st_ref : Phases.State.t ref) ~file (_env : Env.t)
   | Saturate.Error s ->
     Format.printf "%sSZS status InternalError for '%s'@." comment file;
     Util.debugf ~section 2 "error is:@ %s" (fun k -> k s)
-  | Saturate.Sat
-    when OuterEnv.Ctx.is_completeness_preserved
-           (OuterEnv.get_ctx (OuterEnv.get_global ())) ->
-    Format.printf "%% Final clauses: %d@."
-      (Iter.length (OuterEnv.get_active (OuterEnv.get_global ()) ()));
+  | Saturate.Sat when Env.Ctx.is_completeness_preserved (Env.get_ctx env) ->
+    Format.printf "%% Final clauses: %d@." (Iter.length (Env.get_active env ()));
     Format.printf "Clauses:@.@[%a@]@."
       (Iter.pp_seq ~sep:"\n" Env.C.pp)
-      (OuterEnv.get_active (OuterEnv.get_global ()) ());
+      (Env.get_active env ());
     Format.printf "%sSZS status %s for '%s'@." comment (sat_to_str st_ref) file;
     Util.debugf ~section 2 "@[<2>saturated set:@ @[<hv>%a@]@]" (fun k ->
-        k
-          (Util.pp_iter ~sep:" " Env.C.pp_tstp_full)
-          (OuterEnv.get_active (OuterEnv.get_global ()) ()))
+        k (Util.pp_iter ~sep:" " Env.C.pp_tstp_full) (Env.get_active env ()))
   | Saturate.Sat ->
-    Format.printf "%% Final clauses: %d@."
-      (Iter.length (OuterEnv.get_active (OuterEnv.get_global ()) ()));
+    Format.printf "%% Final clauses: %d@." (Iter.length (Env.get_active env ()));
     Format.printf "%sSZS status GaveUp for '%s'@." comment file;
     (match !Options.output with
     | Options.O_none -> ()
     | Options.O_zf -> failwith "not implemented: printing in ZF"
     | Options.O_tptp ->
       Util.debugf ~section 2 "@[<2>saturated set:@ @[<hv>%a@]@]" (fun k ->
-          k
-            (Util.pp_iter ~sep:" " Env.C.pp_tstp_full)
-            (OuterEnv.get_active (OuterEnv.get_global ()) ()))
+          k (Util.pp_iter ~sep:" " Env.C.pp_tstp_full) (Env.get_active env ()))
     | Options.O_normal ->
       Util.debugf ~section 2 "@[<2>saturated set:@ @[<hv>%a@]@]" (fun k ->
-          k
-            (Util.pp_iter ~sep:" " Env.C.pp)
-            (OuterEnv.get_active (OuterEnv.get_global ()) ())))
+          k (Util.pp_iter ~sep:" " Env.C.pp) (Env.get_active env ())))
   | Saturate.Unsat proof ->
     Format.printf "%sSZS status %s for '%s'@." comment (unsat_to_str st_ref)
       file;

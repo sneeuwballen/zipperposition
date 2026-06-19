@@ -15,6 +15,7 @@ let stat_exhaustiveness = Util.mk_stat "ind_ty.exhaustiveness_steps"
 let enabled_ = ref true
 
 module C = Clause
+
 (** {1 Deal with Inductive Types} *)
 
 let as_cstor_app (t : term) : (Name.t * term list) option =
@@ -54,7 +55,7 @@ let acyclicity lit : [ `Absurd | `Trivial | `Neither ] =
       `Neither
   | _ -> `Neither
 
-let acyclicity_trivial c : bool =
+let acyclicity_trivial _env c : bool =
   let res =
     C.Seq.lits c
     |> Iter.exists (fun lit ->
@@ -69,7 +70,7 @@ let acyclicity_trivial c : bool =
   );
   res
 
-let acyclicity_simplify c : C.t SimplM.t =
+let acyclicity_simplify env c : C.t SimplM.t =
   let lits' =
     C.Seq.lits c
     |> Iter.filter (fun lit ->
@@ -88,9 +89,8 @@ let acyclicity_simplify c : C.t SimplM.t =
         [ C.proof_parent c ]
     in
     let c' =
-      C.create_a
-        ~ctx:(Env.get_ctx (Env.get_global ()))
-        ~trail:(C.trail c) ~penalty:(C.penalty c) lits' proof
+      C.create_a ~ctx:(Env.get_ctx env) ~trail:(C.trail c)
+        ~penalty:(C.penalty c) lits' proof
     in
     Util.incr_stat stat_acyclicity;
     Util.debugf ~section 3
@@ -99,7 +99,7 @@ let acyclicity_simplify c : C.t SimplM.t =
     SimplM.return_new c'
   )
 
-let acyclicity_inf (c : C.t) : C.t list =
+let acyclicity_inf (env : Env.t) (c : C.t) : C.t list =
   (* unify [sub] with cstor-prefixed subterms of [t] *)
   let unify_sub t ~sub =
     walk_cstor_args t
@@ -137,9 +137,8 @@ let acyclicity_inf (c : C.t) : C.t list =
              ~tags:[ Proof.Tag.T_data ]
          in
          let new_c =
-           C.create
-             ~ctx:(Env.get_ctx (Env.get_global ()))
-             ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof
+           C.create ~ctx:(Env.get_ctx env) ~trail:(C.trail c)
+             ~penalty:(C.penalty c) new_lits proof
          in
          Util.incr_stat stat_acyclicity;
          Util.debugf ~section 3
@@ -164,7 +163,7 @@ let find_cstor_pair ~sign ~eligible c =
 
 (* if c is `f(t1,...,tn) = f(t1',...,tn') or d`, with f inductive cstor, then
     replace c with `And_i (ti = ti' or d)` *)
-let injectivity_destruct_pos c =
+let injectivity_destruct_pos env c =
   let eligible = C.Eligible.(filter Literal.is_eq) in
   match find_cstor_pair ~sign:true ~eligible c with
   | Some (idx, s1, l1, s2, l2) when Name.equal s1 s2 ->
@@ -187,9 +186,8 @@ let injectivity_destruct_pos c =
     let clauses =
       List.map
         (fun lit ->
-          C.create
-            ~ctx:(Env.get_ctx (Env.get_global ()))
-            ~trail:(C.trail c) ~penalty:(C.penalty c) (lit :: other_lits) proof)
+          C.create ~ctx:(Env.get_ctx env) ~trail:(C.trail c)
+            ~penalty:(C.penalty c) (lit :: other_lits) proof)
         new_lits
     in
     Util.incr_stat stat_injectivity;
@@ -201,7 +199,7 @@ let injectivity_destruct_pos c =
 
 (* rule on literals that are trivial or absurd depending on toplevel
    constructor *)
-let disjointness lit =
+let disjointness _env lit =
   match lit with
   | Literal.Equation (l, r, sign) ->
     (match T.Classic.view l, T.Classic.view r with
@@ -240,7 +238,7 @@ let rec pure_value (t : term) : bool =
 (* NOTE: this is similar to
    "hierarchic superposition with weak abstraction"'s rule that
    introduces background constants to equate to foreground terms *)
-let exhaustiveness (c : C.t) : C.t list =
+let exhaustiveness env (c : C.t) : C.t list =
   let mk_sub_skolem (t : term) (ty : Type.t) : Name.t =
     if Ind_ty.is_inductive_type ty then (
       (* declare a constant, with a depth that (if any)
@@ -279,7 +277,7 @@ let exhaustiveness (c : C.t) : C.t list =
                List.map
                  (fun ty ->
                    let c = mk_sub_skolem t ty in
-                   Env.Ctx.declare (Env.get_ctx (Env.get_global ())) c ty;
+                   Env.Ctx.declare (Env.get_ctx env) c ty;
                    T.const ~ty c)
                  cstor_ty_args
              in
@@ -291,9 +289,7 @@ let exhaustiveness (c : C.t) : C.t list =
     let penalty = 5 in
     (* do not use too lightly! *)
     let new_c =
-      C.create
-        ~ctx:(Env.get_ctx (Env.get_global ()))
-        ~trail:Trail.empty ~penalty lits proof
+      C.create ~ctx:(Env.get_ctx env) ~trail:Trail.empty ~penalty lits proof
     in
     Util.incr_stat stat_exhaustiveness;
     Util.debugf ~section 3
@@ -332,20 +328,18 @@ let exhaustiveness (c : C.t) : C.t list =
          let ax = make_axiom t in
          ax)
 
-let setup () =
+let setup env =
   if !enabled_ then (
     Util.debug ~section 2 "setup inductive types calculus";
-    Env.add_is_trivial (Env.get_global ()) acyclicity_trivial;
-    Env.add_unary_simplify (Env.get_global ()) acyclicity_simplify;
-    Env.add_multi_simpl_rule (Env.get_global ()) ~priority:5
-      injectivity_destruct_pos;
-    Env.add_lit_rule (Env.get_global ()) "ind_types.disjointness" disjointness;
-    Env.add_unary_inf (Env.get_global ()) "ind_types.acyclicity" acyclicity_inf;
-    Env.add_unary_inf (Env.get_global ()) "ind_types.exhaustiveness"
-      exhaustiveness
+    Env.add_is_trivial env acyclicity_trivial;
+    Env.add_unary_simplify env acyclicity_simplify;
+    Env.add_multi_simpl_rule env ~priority:5 injectivity_destruct_pos;
+    Env.add_lit_rule env "ind_types.disjointness" disjointness;
+    Env.add_unary_inf env "ind_types.acyclicity" acyclicity_inf;
+    Env.add_unary_inf env "ind_types.exhaustiveness" exhaustiveness
   )
 
-let env_act (env : Env.t) = setup ()
+let env_act (env : Env.t) = setup env
 
 let extension =
   let open Extensions in

@@ -7,6 +7,9 @@ open Logtk
 
 val enabled : bool ref
 val k_pa_renaming : bool Flex_state.key
-val setup : unit -> unit
-val update_form_counter : action:[< `Decrease | `Increase ] -> Clause.t -> unit
+val setup : Env.t -> unit
+
+val update_form_counter :
+  action:[< `Decrease | `Increase ] -> Env.t -> Clause.t -> unit
+
 val extension : Extensions.t

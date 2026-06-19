@@ -19,6 +19,6 @@ val k_prune_arg_fun : prune_kind Flex_state.key
 (* diff const is of type ![alpha,beta]: (alpha->beta) -> (alpha->beta) -> alpha
    -- NB: EXPECTS TYPE ARGUMENTS! *)
 val k_diff_const : Term.t Flex_state.key
-val setup : unit -> unit
+val setup : Env.t -> unit
 val prim_enum_tf : Clause.t -> Clause.t list
 val extension : Extensions.t

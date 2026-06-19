@@ -17,7 +17,7 @@ module C = Clause
 module Ctx = Ctx
 
 (* replace [sub] by [true/false] in [c], obtaining a new clause *)
-let fool_param_sign ~sub sign c =
+let fool_param_sign env ~sub sign c =
   let lits =
     C.lits c
     |> Literals.map
@@ -40,15 +40,14 @@ let fool_param_sign ~sub sign c =
     Proof.Step.inference [ C.proof_parent c ] ~rule:(Proof.Rule.mk "fool_param")
   in
   let new_c =
-    C.create
-      ~ctx:(Env.get_ctx (Env.get_global ()))
-      ~trail:(C.trail c) ~penalty:(C.penalty c) (new_lit :: lits) proof
+    C.create ~ctx:(Env.get_ctx env) ~trail:(C.trail c) ~penalty:(C.penalty c)
+      (new_lit :: lits) proof
   in
   Util.debugf ~section 5 "... deduce `@[%a@]`" (fun k -> k C.pp new_c);
   new_c
 
 (* TODO: do not perform this under a connective (¬, ∧) or boolean combinator *)
-let fool_param c : C.t list =
+let fool_param env c : C.t list =
   let sub_terms =
     C.Seq.terms c
     |> Iter.flat_map (fun t ->
@@ -76,7 +75,7 @@ let fool_param c : C.t list =
         k C.pp c (T.Set.pp ~pp_sep:(CCFormat.return ",@,") T.pp) sub_terms);
   T.Set.to_iter sub_terms
   |> Iter.flat_map_l (fun sub ->
-         [ fool_param_sign ~sub true c; fool_param_sign ~sub false c ])
+         [ fool_param_sign env ~sub true c; fool_param_sign env ~sub false c ])
   |> Iter.to_rev_list
   |> CCFun.tap (fun l ->
          if l <> [] then (
@@ -87,7 +86,7 @@ let fool_param c : C.t list =
          ))
 
 (* eliminate [P ∨ C] into [C[P := ⊥]] (and same for [¬P]) *)
-let fool_elim_var (c : C.t) : C.t list =
+let fool_elim_var env (c : C.t) : C.t list =
   C.lits c |> Iter.of_array_i
   |> Iter.filter_map (fun (idx, lit) ->
          assert (Literal.no_prop_invariant lit);
@@ -115,9 +114,8 @@ let fool_elim_var (c : C.t) : C.t list =
                  [ C.proof_parent_subst renaming (c, 0) subst ]
              in
              let new_c =
-               C.create
-                 ~ctx:(Env.get_ctx (Env.get_global ()))
-                 new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c)
+               C.create ~ctx:(Env.get_ctx env) new_lits proof
+                 ~penalty:(C.penalty c) ~trail:(C.trail c)
              in
 
              Util.incr_stat stat_elim_var;
@@ -134,8 +132,7 @@ let fool_elim_var (c : C.t) : C.t list =
  - [(∧ a b) --> a ∧ b]
  - [(∨ a b) --> a ∨ b]
 *)
-let rw_bool_lits : Env.multi_simpl_rule =
- fun c ->
+let rw_bool_lits env c =
   let is_bool_val t =
     T.equal t T.true_ || T.equal t T.false_ || T.is_var t || T.is_ho_app t
   in
@@ -145,9 +142,8 @@ let rw_bool_lits : Env.multi_simpl_rule =
       Proof.Step.simp ~rule:(Proof.Rule.mk "cnf_fool")
         [ Proof.Parent.from @@ C.proof c ]
     in
-    C.create
-      ~ctx:(Env.get_ctx (Env.get_global ()))
-      lits proof ~penalty:(C.penalty c) ~trail:(C.trail c)
+    C.create ~ctx:(Env.get_ctx env) lits proof ~penalty:(C.penalty c)
+      ~trail:(C.trail c)
   in
   C.lits c
   |> CCArray.find_map_i (fun i lit ->
@@ -198,15 +194,15 @@ let rw_bool_lits : Env.multi_simpl_rule =
            Some [ c_a_imp_b; c_b_imp_a ]
          | _ -> None)
 
-let setup () =
+let setup env =
   Util.debug ~section 1 "setup fool rules";
-  Env.add_unary_inf (Env.get_global ()) "fool_param" fool_param;
-  Env.add_multi_simpl_rule (Env.get_global ()) ~priority:5 rw_bool_lits;
-  Env.add_unary_inf (Env.get_global ()) "fool_elim_var" fool_elim_var;
+  Env.add_unary_inf env "fool_param" fool_param;
+  Env.add_multi_simpl_rule env ~priority:5 rw_bool_lits;
+  Env.add_unary_inf env "fool_elim_var" fool_elim_var;
   ()
 
 let extension =
-  let register (env : Env.t) = if !enabled_ then setup () in
+  let register (env : Env.t) = if !enabled_ then setup env in
   {
     Extensions.default with
     Extensions.name = "fool";

@@ -119,7 +119,7 @@ let is_trivial_lit lit =
     (not (Type.is_fun (T.ty l))) && has_ac_ids_ l r && A.equal l r
   | _ -> false
 
-let is_trivial c =
+let is_trivial _env c =
   let res =
     (not (C.get_flag flag_axiom c)) && CCArray.exists is_trivial_lit (C.lits c)
   in
@@ -131,7 +131,7 @@ let is_trivial c =
   res
 
 (* simplify: remove literals that are redundant modulo AC *)
-let simplify c =
+let simplify _env c =
   let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "prover.ac.simplify" in
   if exists_ac () then (
     let n = Array.length (C.lits c) in

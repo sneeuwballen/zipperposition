@@ -28,18 +28,17 @@ module IntSet = CCSet.Make (CCInt)
 let ( ==> ) = Type.( ==> )
 let init_clauses = ref C.ClauseSet.empty
 
-let initialize () =
+let initialize env =
   init_clauses :=
     Iter.fold
       (fun set cl -> C.ClauseSet.add cl set)
-      C.ClauseSet.empty
-      (Env.get_passive (Env.get_global ()) ())
+      C.ClauseSet.empty (Env.get_passive env ())
 
 exception CantEncode of string
 
 let output_empty_conj ~out = Format.fprintf out "thf(conj,conjecture,($false))."
 
-let encode_ty_args_t ~encoded_symbols t =
+let encode_ty_args_t ~encoded_symbols ~env t =
   let make_new_sym mono_head =
     if not (T.is_ground mono_head) then (
       let err = CCFormat.sprintf "%a has non-ground type argument" T.pp t in
@@ -48,7 +47,7 @@ let encode_ty_args_t ~encoded_symbols t =
     let (id, ty), res =
       T.mk_fresh_skolem ~prefix:"ty_enc" [] (T.ty mono_head)
     in
-    Ctx.declare (Env.get_ctx (Env.get_global ())) id ty;
+    Ctx.declare (Env.get_ctx env) id ty;
     res
   in
 
@@ -104,14 +103,18 @@ let encode_ty_args_t ~encoded_symbols t =
   in
   aux ~sym_map:encoded_symbols t
 
-let encode_ty_args_cl ~encoded_symbols cl =
+let encode_ty_args_cl ~encoded_symbols ~env cl =
   let encoded_symbols, lits =
     CCArray.fold_right
       (fun l (encoded_symbols, ls) ->
         match l with
         | Literal.Equation (lhs, rhs, sign) ->
-          let encoded_symbols, lhs = encode_ty_args_t ~encoded_symbols lhs in
-          let encoded_symbols, rhs = encode_ty_args_t ~encoded_symbols rhs in
+          let encoded_symbols, lhs =
+            encode_ty_args_t ~encoded_symbols ~env lhs
+          in
+          let encoded_symbols, rhs =
+            encode_ty_args_t ~encoded_symbols ~env rhs
+          in
           encoded_symbols, Literal.mk_lit lhs rhs sign :: ls
         | _ -> encoded_symbols, l :: ls)
       (C.lits cl) (encoded_symbols, [])
@@ -147,7 +150,7 @@ let output_symdecl ~out sym ty =
   Format.fprintf out "@[thf(@['%a_type',type,@[%a@]:@ @[%a@]@]).@]@\n" Name.pp
     sym Name.pp_tstp sym (Type.TPTP.pp_ho ~depth:0) ty
 
-let output_all ?(already_defined = Name.Set.empty) ~out cl_set =
+let output_all ?(already_defined = Name.Set.empty) ~env ~out cl_set =
   let cl_iter = Iter.of_list cl_set in
   let syms =
     C.symbols ~include_types:true cl_iter
@@ -157,7 +160,7 @@ let output_all ?(already_defined = Name.Set.empty) ~out cl_set =
   (* first printing type declarations, and only then the types *)
   CCList.fold_right
     (fun sym acc ->
-      let ty = Ctx.find_signature_exn (Env.get_ctx (Env.get_global ())) sym in
+      let ty = Ctx.find_signature_exn (Env.get_ctx env) sym in
       if Type.is_tType ty then (
         output_symdecl ~out sym ty;
         acc
@@ -220,7 +223,7 @@ let run_e prob_path =
     res
   | None -> invalid_arg "cannot run E if E binary is not set up"
 
-let try_e active_set passive_set =
+let try_e env active_set passive_set =
   let lambdas_too_deep c =
     let lambda_limit = 6 in
     C.Seq.terms c
@@ -239,7 +242,9 @@ let try_e active_set passive_set =
       Iter.fold
         (fun (acc, encoded_symbols) cl ->
           try
-            let encoded_symbols, cl' = encode_ty_args_cl ~encoded_symbols cl in
+            let encoded_symbols, cl' =
+              encode_ty_args_cl ~encoded_symbols ~env cl
+            in
             cl' :: acc, encoded_symbols
           with CantEncode reason ->
             Util.debugf 5 "cannot encode(%s):@.@[%a@]@." (fun k ->
@@ -288,7 +293,7 @@ let try_e active_set passive_set =
             []
           else
             [ c ]
-      | `Combs -> fun c -> ([ Combinators.force_conv_lams c ] :> C.t list)
+      | `Combs -> fun c -> ([ Combinators.force_conv_lams env c ] :> C.t list)
       | _ ->
         fun c ->
           let lifted = Lift_lambdas.lift_lambdas c in
@@ -303,9 +308,9 @@ let try_e active_set passive_set =
       take_ho_clauses ~encoded_symbols ~converter
         (Iter.append active_set passive_set)
     in
-    let already_defined = output_all ~out initial in
+    let already_defined = output_all ~env ~out initial in
     Format.fprintf out "%% -- PASSIVE -- \n";
-    ignore (output_all ~already_defined ~out ho_clauses);
+    ignore (output_all ~env ~already_defined ~out ho_clauses);
     close_out prob_channel;
     let cl_set = initial @ ho_clauses in
 
@@ -335,7 +340,7 @@ let try_e active_set passive_set =
     CCFormat.printf "%% Running E stopped because polymorphism was detected @.";
     None
 
-let setup () = Signal.once (Env.on_start (Env.get_global ())) initialize
+let setup env = Signal.once (Env.on_start env) (fun () -> initialize env)
 
 let () =
   Options.add_opts

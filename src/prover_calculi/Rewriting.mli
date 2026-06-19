@@ -5,7 +5,8 @@ open Libzipperposition
 
     Deal with definitions as rewrite rules *)
 
-val setup : ?ctx_narrow:bool -> narrowing:bool -> has_rw:bool -> unit -> unit
+val setup :
+  Env.t -> ?ctx_narrow:bool -> narrowing:bool -> has_rw:bool -> unit -> unit
 
 val unfold_def_before_cnf :
   ( ( Logtk.TypedSTerm.t,

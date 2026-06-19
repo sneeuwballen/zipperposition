@@ -84,15 +84,16 @@ let tracked_unary = ref 0
 (* HLBE heartbeat will be set as soons as one rule modifies a clause *)
 let heartbeat_ = ref false
 let is_tauto c = Literals.is_trivial (C.lits c) || Trail.is_trivial (C.trail c)
-let[@inline] tracking_eq () = Env.flex_get_of (Env.get_global ()) k_track_eq
+let _env_ref_hlb = ref None
+let get_env_hlb () = CCOpt.get_exn !_env_ref_hlb
+let[@inline] tracking_eq () = Env.flex_get_of (get_env_hlb ()) k_track_eq
 
 (* constants denoting the scope of index and the query, respectively *)
 let idx_sc, q_sc = 0, 1
 
 let should_update_propagated () =
-  Env.flex_get_of (Env.get_global ()) k_unit_propagated_hle
-  && !propagated_size_
-     <= Env.flex_get_of (Env.get_global ()) k_max_tracked_clauses
+  Env.flex_get_of (get_env_hlb ()) k_unit_propagated_hle
+  && !propagated_size_ <= Env.flex_get_of (get_env_hlb ()) k_max_tracked_clauses
 
 let app_subst ?(sc = idx_sc) ~subst t =
   Subst.FO.apply Subst.Renaming.none subst (t, sc)
@@ -367,7 +368,7 @@ let extend_concl premise concl cl =
   Util.debugf ~section 3 "transitive conclusion: @[%a@] --> @[%a@]" (fun k ->
       k T.pp premise T.pp concl);
   let to_add_concl = ref [] in
-  let max_imps = Env.flex_get_of (Env.get_global ()) k_max_imp_entries in
+  let max_imps = Env.flex_get_of (get_env_hlb ()) k_max_imp_entries in
   retrieve_spec_concl_idx () (premise, q_sc)
   |> Iter.iter (fun (concl', premise', subst) ->
          (* add implication premise' -> subst (concl) *)
@@ -377,7 +378,7 @@ let extend_concl premise concl cl =
                | Some old_proofset ->
                  if
                    CS.cardinal old_proofset
-                   < Env.flex_get_of (Env.get_global ()) k_max_depth
+                   < Env.flex_get_of (get_env_hlb ()) k_max_depth
                  then (
                    let concl =
                      Subst.FO.apply Subst.Renaming.none subst (concl, q_sc)
@@ -425,7 +426,7 @@ let extend_premise tbl premise' concl cl =
     | _ -> ());
     register_cl_term cl premise';
 
-    let max_proof_size = Env.flex_get_of (Env.get_global ()) k_max_depth in
+    let max_proof_size = Env.flex_get_of (get_env_hlb ()) k_max_depth in
     retrieve_gen_prem_idx () (concl, q_sc)
     |> Iter.iter (fun (_, (tbl', _), subst) ->
            let to_add = ref [] in
@@ -454,13 +455,13 @@ let extend_premise tbl premise' concl cl =
        that variable we cannot pump the term -- give up *)
     if T.equal concl concl' then raise Unif.Fail;
     let concl = ref concl in
-    while !i <= Env.flex_get_of (Env.get_global ()) k_max_self_impls do
+    while !i <= Env.flex_get_of (get_env_hlb ()) k_max_self_impls do
       aux !concl;
       (* PUTTING concl IN THE SCOPE OF premise' -- intentional!!! *)
       concl := Subst.FO.apply Subst.Renaming.none subst (!concl, 0);
       if T.depth !concl > 3 then
         (* breaking out of the loop for the very deep terms *)
-        i := Env.flex_get_of (Env.get_global ()) k_max_self_impls + 1;
+        i := Env.flex_get_of (get_env_hlb ()) k_max_self_impls + 1;
       i := !i + 1
     done
   with Unif.Fail -> aux concl
@@ -496,7 +497,7 @@ let add_new_premise premise concl cl =
             (not (T.Tbl.mem tbl concl))
             && (not (T.Tbl.mem tbl (flip_eq concl)))
             && T.Tbl.length tbl
-               <= Env.flex_get_of (Env.get_global ()) k_max_imp_entries
+               <= Env.flex_get_of (get_env_hlb ()) k_max_imp_entries
           then (
             extend_premise tbl premise' concl cl;
             if not is_unit then (
@@ -566,7 +567,7 @@ let insert_into_indices cl =
   match CCArray.map get_predicate (C.lits cl) with
   | [| Some (a_lhs, a_sign); Some (b_lhs, b_sign) |] ->
     let elig =
-      if Env.flex_get_of (Env.get_global ()) k_insert_only_ordered then
+      if Env.flex_get_of (get_env_hlb ()) k_insert_only_ordered then
         C.eligible_param (cl, 0) Subst.empty
       else
         CCBV.create ~size:2 true
@@ -583,29 +584,29 @@ let insert_into_indices cl =
 
 let can_track_bin_cl cl =
   cl_is_ht_trackable cl
-  && (Env.flex_get_of (Env.get_global ()) k_max_tracked_clauses == -1
+  && (Env.flex_get_of (get_env_hlb ()) k_max_tracked_clauses == -1
      || !tracked_binary
-        <= Env.flex_get_of (Env.get_global ()) k_max_tracked_clauses)
+        <= Env.flex_get_of (get_env_hlb ()) k_max_tracked_clauses)
 
 let can_track_unary_cl cl =
-  Env.flex_get_of (Env.get_global ()) k_unit_propagated_hle
-  && (Env.flex_get_of (Env.get_global ()) k_max_tracked_clauses == -1
+  Env.flex_get_of (get_env_hlb ()) k_unit_propagated_hle
+  && (Env.flex_get_of (get_env_hlb ()) k_max_tracked_clauses == -1
      || !tracked_unary
-        <= 4 * Env.flex_get_of (Env.get_global ()) k_max_tracked_clauses)
+        <= 4 * Env.flex_get_of (get_env_hlb ()) k_max_tracked_clauses)
 
 let steps = ref 0
 
 let track_clause cl =
   try
-    if Env.flex_get_of (Env.get_global ()) k_heartbeat_disabled_hlbe then
+    if Env.flex_get_of (get_env_hlb ()) k_heartbeat_disabled_hlbe then
       raise RuleNotApplicable;
-    (match Env.flex_get_of (Env.get_global ()) k_heartbeat_steps with
+    (match Env.flex_get_of (get_env_hlb ()) k_heartbeat_steps with
     | Some h_steps when !steps != 0 && !steps mod h_steps = 0 ->
       if !heartbeat_ then
         heartbeat_ := false
       else (
         CCFormat.printf "disabling heartbeat %d@." !steps;
-        Env.flex_add_of (Env.get_global ()) k_heartbeat_disabled_hlbe true;
+        Env.flex_add_of (get_env_hlb ()) k_heartbeat_disabled_hlbe true;
         raise RuleNotApplicable
       )
     | _ -> ());
@@ -625,12 +626,12 @@ let track_clause cl =
 
 let make_tauto ~proof =
   C.create
-    ~ctx:(Env.get_ctx (Env.get_global ()))
+    ~ctx:(Env.get_ctx (get_env_hlb ()))
     ~penalty:1 ~trail:Trail.empty [ Literal.mk_tauto ] proof
 
 let penalize_hidden_tautology cl =
   if
-    Env.flex_get_of (Env.get_global ()) k_penalize_tautologies
+    Env.flex_get_of (get_env_hlb ()) k_penalize_tautologies
     && not
        @@ Name.Set.exists
             (fun id -> Signature.sym_in_conj id (Ctx.signature (C.ctx_of cl)))
@@ -661,7 +662,7 @@ let do_unit_hle_htr cl =
   let exception UnitHTR of int * (CS.t * propagation_kind) in
   let proofset = ref CS.empty in
   try
-    if Env.flex_get_of (Env.get_global ()) k_heartbeat_disabled_hlbe then
+    if Env.flex_get_of (get_env_hlb ()) k_heartbeat_disabled_hlbe then
       raise RuleNotApplicable;
     if n > 7 then raise RuleNotApplicable;
     CCArray.iteri
@@ -671,7 +672,7 @@ let do_unit_hle_htr cl =
           let i_t = lit_to_term i_lhs i_sign in
           let i_neg_t = lit_to_term ~negate:true i_lhs i_sign in
 
-          if n != 1 && Env.flex_get_of (Env.get_global ()) k_reduce_tautologies
+          if n != 1 && Env.flex_get_of (get_env_hlb ()) k_reduce_tautologies
           then
             retrieve_idx
               ~getter:
@@ -681,7 +682,7 @@ let do_unit_hle_htr cl =
             |> Iter.head
             |> CCOpt.iter (fun (_, ps, _) -> raise (UnitHTR (i, ps)));
 
-          if Env.flex_get_of (Env.get_global ()) k_delete_lits then
+          if Env.flex_get_of (get_env_hlb ()) k_delete_lits then
             retrieve_idx
               ~getter:
                 (PropagatedLitsIdx.retrieve_generalizations
@@ -747,7 +748,7 @@ let do_hte_hle cl =
   let exception HiddenTauto of int * int * CS.t in
   let n = C.length cl in
   try
-    if Env.flex_get_of (Env.get_global ()) k_heartbeat_disabled_hlbe then
+    if Env.flex_get_of (get_env_hlb ()) k_heartbeat_disabled_hlbe then
       raise RuleNotApplicable;
     if n > 7 then raise RuleNotApplicable;
     let bv = CCBV.create ~size:n true in
@@ -766,7 +767,7 @@ let do_hte_hle cl =
                 let j_t = lit_to_term j_lhs j_sign in
                 let j_neg_t = lit_to_term ~negate:true j_lhs j_sign in
                 if
-                  Env.flex_get_of (Env.get_global ()) k_reduce_tautologies
+                  Env.flex_get_of (get_env_hlb ()) k_reduce_tautologies
                   && C.length cl != 2
                 then (
                   match
@@ -781,7 +782,7 @@ let do_hte_hle cl =
                     raise (HiddenTauto (i, j, proofset))
                   | _ -> ()
                 );
-                if Env.flex_get_of (Env.get_global ()) k_delete_lits then (
+                if Env.flex_get_of (get_env_hlb ()) k_delete_lits then (
                   match
                     find_implication cl i_neg_t j_neg_t
                     <+> find_implication cl j_t i_t
@@ -960,21 +961,21 @@ let initialize () =
     Signal.on_every Env.ProofState.ActiveSet.on_add_clause track_clause;
     Signal.on_every Env.ProofState.ActiveSet.on_remove_clause untrack_clause;
     Signal.on_every
-      (Env.on_forward_simplified (Env.get_global ()))
+      (Env.on_forward_simplified (get_env_hlb ()))
       (fun (_, _) -> incr steps)
   in
   let track_passive () =
     Signal.on_every Env.ProofState.PassiveSet.on_add_clause track_clause;
     Signal.on_every Env.ProofState.PassiveSet.on_remove_clause untrack_clause;
     Signal.on_every
-      (Env.on_forward_simplified (Env.get_global ()))
+      (Env.on_forward_simplified (get_env_hlb ()))
       (fun (_, _) -> incr steps)
   in
   let track_all () =
     Signal.on_every Env.ProofState.PassiveSet.on_add_clause track_clause;
     Signal.on_every Env.ProofState.ActiveSet.on_remove_clause untrack_clause;
     Signal.on_every
-      (Env.on_forward_simplified (Env.get_global ()))
+      (Env.on_forward_simplified (get_env_hlb ()))
       (fun (c, new_state) ->
         incr steps;
         match new_state with
@@ -987,7 +988,7 @@ let initialize () =
   in
 
   let initialize_with_passive () =
-    Iter.iter track_clause (Env.get_passive (Env.get_global ()) ());
+    Iter.iter track_clause (Env.get_passive (get_env_hlb ()) ());
 
     Util.debugf ~section 3 "discovered implications:" CCFun.id;
     PremiseIdx.iter !prems_ (fun premise (tbl, _) ->
@@ -995,7 +996,7 @@ let initialize () =
             k T.pp premise (Iter.pp_seq T.pp) (T.Tbl.keys tbl)))
   in
 
-  (match Env.flex_get_of (Env.get_global ()) k_clauses_to_track with
+  (match Env.flex_get_of (get_env_hlb ()) k_clauses_to_track with
   | `Passive ->
     initialize_with_passive ();
     track_passive ()
@@ -1005,20 +1006,22 @@ let initialize () =
     track_all ());
   Signal.StopListening
 
-let setup () =
-  if Env.flex_get_of (Env.get_global ()) k_enabled then (
-    Signal.on (Env.on_start (Env.get_global ())) initialize;
+let setup env =
+  _env_ref_hlb := Some env;
+  if Env.flex_get_of (get_env_hlb ()) k_enabled then (
+    Signal.on (Env.on_start (get_env_hlb ())) initialize;
     let add_simpl =
-      if Env.flex_get_of (Env.get_global ()) k_simpl_new then
-        Env.add_basic_simplify (Env.get_global ())
+      if Env.flex_get_of (get_env_hlb ()) k_simpl_new then
+        Env.add_basic_simplify (get_env_hlb ())
       else
-        Env.add_active_simplify (Env.get_global ())
+        Env.add_active_simplify (get_env_hlb ())
     in
 
-    if Env.flex_get_of (Env.get_global ()) k_basic_rules then add_simpl hle_htr;
-    add_simpl ctx_simpl;
-    if Env.flex_get_of (Env.get_global ()) k_unit_propagated_hle then
-      add_simpl unit_hle_htr
+    if Env.flex_get_of (get_env_hlb ()) k_basic_rules then
+      add_simpl (fun _env cl -> hle_htr cl);
+    add_simpl (fun _env cl -> ctx_simpl cl);
+    if Env.flex_get_of (get_env_hlb ()) k_unit_propagated_hle then
+      add_simpl (fun _env cl -> unit_hle_htr cl)
   )
 
 let max_depth_ = ref 3
@@ -1039,25 +1042,24 @@ let penalize_tautologies_ = ref true
 
 let extension =
   let register (env : Env.t) =
-    Env.flex_add_of (Env.get_global ()) k_enabled !enabled_;
-    Env.flex_add_of (Env.get_global ()) k_max_depth !max_depth_;
-    Env.flex_add_of (Env.get_global ()) k_simpl_new !simpl_new_;
-    Env.flex_add_of (Env.get_global ()) k_clauses_to_track !clauses_to_track_;
-    Env.flex_add_of (Env.get_global ()) k_max_self_impls !max_self_impls_;
-    Env.flex_add_of (Env.get_global ()) k_unit_propagated_hle !propagated_hle;
-    Env.flex_add_of (Env.get_global ()) k_max_tracked_clauses
-      !max_tracked_clauses;
-    Env.flex_add_of (Env.get_global ()) k_track_eq !track_eq_;
-    Env.flex_add_of (Env.get_global ()) k_delete_lits !hle_;
-    Env.flex_add_of (Env.get_global ()) k_reduce_tautologies !hte_;
-    Env.flex_add_of (Env.get_global ()) k_insert_only_ordered !insert_ordered_;
-    Env.flex_add_of (Env.get_global ()) k_heartbeat_steps !heartbeat_steps;
-    Env.flex_add_of (Env.get_global ()) k_heartbeat_disabled_hlbe false;
-    Env.flex_add_of (Env.get_global ()) k_max_imp_entries !max_imp_;
-    Env.flex_add_of (Env.get_global ()) k_basic_rules !basic_rules_;
-    Env.flex_add_of (Env.get_global ()) k_penalize_tautologies
+    Env.flex_add_of (get_env_hlb ()) k_enabled !enabled_;
+    Env.flex_add_of (get_env_hlb ()) k_max_depth !max_depth_;
+    Env.flex_add_of (get_env_hlb ()) k_simpl_new !simpl_new_;
+    Env.flex_add_of (get_env_hlb ()) k_clauses_to_track !clauses_to_track_;
+    Env.flex_add_of (get_env_hlb ()) k_max_self_impls !max_self_impls_;
+    Env.flex_add_of (get_env_hlb ()) k_unit_propagated_hle !propagated_hle;
+    Env.flex_add_of (get_env_hlb ()) k_max_tracked_clauses !max_tracked_clauses;
+    Env.flex_add_of (get_env_hlb ()) k_track_eq !track_eq_;
+    Env.flex_add_of (get_env_hlb ()) k_delete_lits !hle_;
+    Env.flex_add_of (get_env_hlb ()) k_reduce_tautologies !hte_;
+    Env.flex_add_of (get_env_hlb ()) k_insert_only_ordered !insert_ordered_;
+    Env.flex_add_of (get_env_hlb ()) k_heartbeat_steps !heartbeat_steps;
+    Env.flex_add_of (get_env_hlb ()) k_heartbeat_disabled_hlbe false;
+    Env.flex_add_of (get_env_hlb ()) k_max_imp_entries !max_imp_;
+    Env.flex_add_of (get_env_hlb ()) k_basic_rules !basic_rules_;
+    Env.flex_add_of (get_env_hlb ()) k_penalize_tautologies
       !penalize_tautologies_;
-    setup ()
+    setup env
   in
   {
     Extensions.default with

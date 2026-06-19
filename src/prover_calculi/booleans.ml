@@ -39,6 +39,8 @@ let k_replace_unsupported_quants = Flex_state.create_key ()
 let k_disable_ho_bool_unif = Flex_state.create_key ()
 let k_generalize_trigger = Flex_state.create_key ()
 let k_bool_triggers_only = Flex_state.create_key ()
+let _env_ref : Env.t option ref = ref None
+let get_env () = CCOpt.get_exn !_env_ref
 
 module C = Clause
 module Ctx = Ctx
@@ -56,26 +58,24 @@ let yes a = a =~ T.true_
 let _trigger_bools = ref Type.Map.empty (* type --> boolean trigger *)
 let _cls_w_pred_vars = ref Type.Map.empty (* type --> (clause,var) *)
 
-let get_unif_alg () =
-  if Env.flex_get_of (Env.get_global ()) k_disable_ho_bool_unif then
+let get_unif_alg _env =
+  if Env.flex_get_of (get_env ()) k_disable_ho_bool_unif then
     fun _ _ ->
   OSeq.empty
   else
-    Env.flex_get_of (Env.get_global ()) Superposition.k_unif_alg
+    Env.flex_get_of (get_env ()) Superposition.k_unif_alg
 
-let get_unif_alg_l () =
-  if Env.flex_get_of (Env.get_global ()) k_disable_ho_bool_unif then
+let get_unif_alg_l env =
+  if Env.flex_get_of (get_env ()) k_disable_ho_bool_unif then
     fun _ _ ->
   OSeq.empty
   else (
-    let u =
-      Superposition.get_unif_module (Libzipperposition.Env.get_global ())
-    in
+    let u = Superposition.get_unif_module env in
     u.unify_scoped_l
   )
 
-let get_triggers c =
-  let ord = Ctx.ord (Env.get_ctx (Env.get_global ())) in
+let get_triggers env c =
+  let ord = Ctx.ord (Env.get_ctx (get_env ())) in
   let trivial_trigger t =
     let body = snd @@ T.open_fun t in
     T.is_var body || T.is_true_or_false body
@@ -89,7 +89,7 @@ let get_triggers c =
     | T.AppBuiltin ((And | Or | Not | Imply | Eq | Neq | Equiv | Xor), args) ->
       List.iter (fun t -> get_terms t k) args
     | T.AppBuiltin ((ForallConst | ExistsConst), [ _; body ]) ->
-      if Env.flex_get_of (Env.get_global ()) k_include_quants then k body
+      if Env.flex_get_of (get_env ()) k_include_quants then k body
     | _ -> ()
   in
 
@@ -109,7 +109,7 @@ let get_triggers c =
          else
            None)
 
-let instantiate_w_bool ~clause ~var ~trigger =
+let instantiate_w_bool env ~clause ~var ~trigger =
   assert (Type.equal (T.ty var) (T.ty trigger));
 
   let cl_sc, trig_sc = 0, 1 in
@@ -118,7 +118,7 @@ let instantiate_w_bool ~clause ~var ~trigger =
   in
   let renaming = Subst.Renaming.create () in
   let expand_quant =
-    not @@ Env.flex_get_of (Env.get_global ()) Combinators.k_enable_combinators
+    not @@ Env.flex_get_of (get_env ()) Combinators.k_enable_combinators
   in
   let lits = Literals.apply_subst renaming subst (C.lits clause, cl_sc) in
   let lits =
@@ -132,17 +132,17 @@ let instantiate_w_bool ~clause ~var ~trigger =
   in
   let res =
     C.create_a
-      ~ctx:(Env.get_ctx (Env.get_global ()))
+      ~ctx:(Env.get_ctx (get_env ()))
       lits proof ~penalty:(C.penalty clause) ~trail:(C.trail clause)
   in
   (* CCFormat.printf "instatiate:@.c:@[%a@]@.subst:@[%a@]@.res:@[%a@]@." C.pp clause Subst.pp subst C.pp res; *)
   res
 
-let inst_clauses_w_trigger t =
+let inst_clauses_w_trigger env t =
   let triggers = Type.Map.get_or ~default:[] (T.ty t) !_trigger_bools in
   if
     (not (CCList.mem ~eq:T.equal t triggers))
-    && ((not (Env.flex_get_of (Env.get_global ()) k_bool_triggers_only))
+    && ((not (Env.flex_get_of (get_env ()) k_bool_triggers_only))
        || Type.returns_prop (T.ty t))
   then (
     _trigger_bools :=
@@ -154,19 +154,20 @@ let inst_clauses_w_trigger t =
 
     Type.Map.get_or ~default:[] (T.ty t) !_cls_w_pred_vars
     |> CCList.map (fun (clause, var) ->
-           instantiate_w_bool ~clause ~var ~trigger:t)
+           instantiate_w_bool env ~clause ~var ~trigger:t)
   ) else
     []
 
-let insert_new_trigger t =
+let insert_new_trigger env t =
   let do_insert t =
-    inst_clauses_w_trigger t |> CCList.to_iter
-    |> Env.add_passive (Env.get_global ())
+    inst_clauses_w_trigger (get_env ()) t
+    |> CCList.to_iter
+    |> Env.add_passive (get_env ())
   in
   do_insert t;
   if Type.returns_prop (T.ty t) then (
     let t = Lambda.eta_expand t in
-    match Env.flex_get_of (Env.get_global ()) k_generalize_trigger with
+    match Env.flex_get_of (get_env ()) k_generalize_trigger with
     | `Neg ->
       let vars, body = T.open_fun t in
       if not (Type.is_prop (T.ty body)) then (
@@ -185,25 +186,24 @@ let insert_new_trigger t =
     | _ -> ()
   )
 
-let update_triggers cl =
+let update_triggers env cl =
   (* if triggered boolean instantiation is off
      k_trigger_bool_inst is -1 *)
-  if C.proof_depth cl < Env.flex_get_of (Env.get_global ()) k_trigger_bool_inst
-  then (
-    let new_triggers = get_triggers cl in
+  if C.proof_depth cl < Env.flex_get_of (get_env ()) k_trigger_bool_inst then (
+    let new_triggers = get_triggers (get_env ()) cl in
     if not (Iter.is_empty new_triggers) then
-      Iter.iter insert_new_trigger new_triggers
+      Iter.iter (insert_new_trigger (get_env ())) new_triggers
   );
   Signal.ContinueListening
 
-let handle_new_pred_var_clause (clause, var) =
+let handle_new_pred_var_clause env (clause, var) =
   assert (T.is_var var);
   assert (Type.returns_prop (T.ty var));
   let ty = T.ty var in
   Type.Map.get_or ~default:[] ty !_trigger_bools
-  |> CCList.map (fun trigger -> instantiate_w_bool ~clause ~var ~trigger)
-  |> CCList.to_iter
-  |> Env.add_passive (Env.get_global ());
+  |> CCList.map (fun trigger -> instantiate_w_bool env ~clause ~var ~trigger)
+  |> Iter.of_list
+  |> Env.add_passive (get_env ());
 
   _cls_w_pred_vars :=
     Type.Map.update ty
@@ -219,13 +219,12 @@ let handle_new_skolem_sym (c, trigger) =
   assert (T.is_const trig_hd);
   assert (Name.is_postcnf_skolem (T.as_const_exn trig_hd));
 
-  if C.proof_depth c < Env.flex_get_of (Env.get_global ()) k_trigger_bool_inst
-  then
-    insert_new_trigger trigger;
+  if C.proof_depth c < Env.flex_get_of (get_env ()) k_trigger_bool_inst then
+    insert_new_trigger (get_env ()) trigger;
 
   Signal.ContinueListening
 
-let trigger_induction cl =
+let trigger_induction _env cl =
   (* abstracts away closed subterm from the term t
       by replacing it with (accordingly shifted) DB variable 0 *)
   let abstract ~subterm t =
@@ -301,13 +300,14 @@ let trigger_induction cl =
   in
 
   if
-    C.proof_depth cl < Env.flex_get_of (Env.get_global ()) k_trigger_bool_ind
+    C.proof_depth cl < Env.flex_get_of (get_env ()) k_trigger_bool_ind
     && CCOpt.is_some (C.distance_to_goal cl)
   then (
     match C.lits cl with
     | [| Literal.Equation (lhs, rhs, _) as lit |] ->
       let res =
-        CCList.flat_map inst_clauses_w_trigger
+        CCList.flat_map
+          (inst_clauses_w_trigger (get_env ()))
           (make_triggers lhs rhs (Literal.is_positivoid lit))
       in
       res
@@ -315,18 +315,19 @@ let trigger_induction cl =
   ) else
     []
 
-let () = Signal.on PS.ActiveSet.on_add_clause (fun c -> update_triggers c)
+let () =
+  Signal.on PS.ActiveSet.on_add_clause (fun c -> update_triggers (get_env ()) c)
 
 let mk_res ~proof ~old ~repl new_lit c =
   C.create
-    ~ctx:(Env.get_ctx (Env.get_global ()))
+    ~ctx:(Env.get_ctx (get_env ()))
     ~trail:(C.trail c) ~penalty:(C.penalty c)
     (new_lit
     :: Array.to_list (C.lits c |> Literals.map (T.replace ~old ~by:repl)))
     proof
 
 let get_green_eligible c =
-  let ord = C.Ctx.ord (Env.get_ctx (Env.get_global ())) in
+  let ord = C.Ctx.ord (Env.get_ctx (get_env ())) in
   Ls.fold_terms ~vars:false ~var_args:false ~fun_bodies:false ~ty_args:false
     ~ord ~which:`Max ~subterms:true ~eligible:(C.Eligible.res c) (C.lits c)
 
@@ -382,7 +383,7 @@ let handle_poly_bool_hoist t c =
     t', c'
   )
 
-let bool_hoist (c : C.t) : C.t list =
+let bool_hoist _env (c : C.t) : C.t list =
   let proof =
     Proof.Step.inference
       [ C.proof_parent c ]
@@ -407,7 +408,7 @@ let bool_hoist (c : C.t) : C.t list =
          else
            Util.debugf ~section 3 " = @[%a@]" (fun k -> k (CCList.pp C.pp) res))
 
-let bool_hoist_simpl (c : C.t) : C.t list option =
+let bool_hoist_simpl _env (c : C.t) : C.t list option =
   let proof =
     Proof.Step.simp
       [ C.proof_parent c ]
@@ -435,7 +436,7 @@ let bool_hoist_simpl (c : C.t) : C.t list option =
          Util.debugf ~section 2 "bool_hoist_simpl(@[%a@])= None@." (fun k ->
              k C.pp c))
 
-let eq_hoist (c : C.t) : C.t list =
+let eq_hoist _env (c : C.t) : C.t list =
   let proof ~prefix =
     Proof.Step.inference
       [ C.proof_parent c ]
@@ -474,7 +475,7 @@ let eq_hoist (c : C.t) : C.t list =
          else
            Util.debugf ~section 3 " = @[%a@]" (fun k -> k (CCList.pp C.pp) res))
 
-let fluid_hoist (c : C.t) =
+let fluid_hoist _env (c : C.t) =
   let tyvar = Type.var (HVar.fresh ~ty:Type.tType ()) in
   let z = T.var (HVar.fresh ~ty:(Type.arrow [ Type.prop ] tyvar) ()) in
   let x = T.var (HVar.fresh ~ty:Type.prop ()) in
@@ -543,7 +544,7 @@ let fluid_hoist (c : C.t) =
     (fun acc (u, p) ->
       if T.is_app_var u || (T.is_fun u && not (T.is_ground u)) then (
         let unif_seq =
-          get_unif_alg () (zx, sc_zx) (u, sc_cl)
+          get_unif_alg (get_env ()) (zx, sc_zx) (u, sc_cl)
           |> OSeq.flat_map (fun us_opt ->
                  CCOpt.map_or ~default:OSeq.empty
                    (fun us ->
@@ -581,13 +582,13 @@ let fluid_hoist (c : C.t) =
                      ))
                    us_opt)
         in
-        if Env.should_force_stream_eval (Env.get_global ()) () then
-          Env.get_finite_infs (Env.get_global ()) [ unif_seq ] @ acc
+        if Env.should_force_stream_eval (get_env ()) () then
+          Env.get_finite_infs (get_env ()) [ unif_seq ] @ acc
         else (
           let stm_res =
             Env.Stm.make ~penalty:(C.penalty c + 2) ~parents:[ c ] unif_seq
           in
-          Env.StmQ.add (Env.get_stm_queue (Env.get_global ())) stm_res;
+          Env.StmQ.add (Env.get_stm_queue (get_env ())) stm_res;
           acc
         )
       ) else
@@ -604,7 +605,7 @@ type fluid_log_partner_info = {
 (* Fluid hoisting of logical symbols -- 
    rules EqHoist, NeqHoist, ForallHoist, ExistsHoist 
    and BoolRw where head is a variable*)
-let fluid_log_hoist (c : C.t) =
+let fluid_log_hoist _env (c : C.t) =
   (* It is assumed Boolean selection will 
      not select any top-level terms *)
   let a = Type.var (HVar.fresh ~ty:Type.tType ()) in
@@ -737,7 +738,9 @@ let fluid_log_hoist (c : C.t) =
                List.fold_left
                  (fun acc p ->
                    let seq =
-                     get_unif_alg () (p.unif_partner, sc_partner) (var, sc_cl)
+                     get_unif_alg (get_env ())
+                       (p.unif_partner, sc_partner)
+                       (var, sc_cl)
                      |> OSeq.filter_map
                           (CCOpt.map (fun us ->
                                assert (not (Unif_subst.has_constr us));
@@ -750,17 +753,15 @@ let fluid_log_hoist (c : C.t) =
                                  Some (mk_res sub pos p)))
                    in
 
-                   if Env.should_force_stream_eval (Env.get_global ()) () then
-                     Env.get_finite_infs (Env.get_global ()) [ seq ] @ acc
+                   if Env.should_force_stream_eval (get_env ()) () then
+                     Env.get_finite_infs (get_env ()) [ seq ] @ acc
                    else (
                      let stm_res =
                        Env.Stm.make
                          ~penalty:(C.penalty c + 2)
                          ~parents:[ c ] seq
                      in
-                     Env.StmQ.add
-                       (Env.get_stm_queue (Env.get_global ()))
-                       stm_res;
+                     Env.StmQ.add (Env.get_stm_queue (get_env ())) stm_res;
                      acc
                    ))
                  acc partners)
@@ -769,7 +770,7 @@ let fluid_log_hoist (c : C.t) =
        []
 
 (* Fluid version of (Forall|Exists)RW *)
-let fluid_quant_rw (c : C.t) =
+let fluid_quant_rw _env (c : C.t) =
   let module PB = Position.Build in
   let module F = T.Form in
   let sc_partner, sc_cl = 0, 1 in
@@ -798,8 +799,7 @@ let fluid_quant_rw (c : C.t) =
     (* Literals.Pos.replace lits ~at ~by:partner.repl; *)
     let renaming = Subst.Renaming.create () in
     let expand_quant =
-      not
-      @@ Env.flex_get_of (Env.get_global ()) Combinators.k_enable_combinators
+      not @@ Env.flex_get_of (get_env ()) Combinators.k_enable_combinators
     in
     let repl_sub =
       Lambda.eta_reduce ~expand_quant
@@ -854,7 +854,9 @@ let fluid_quant_rw (c : C.t) =
                List.fold_left
                  (fun acc p ->
                    let seq =
-                     get_unif_alg () (p.unif_partner, sc_partner) (var, sc_cl)
+                     get_unif_alg (get_env ())
+                       (p.unif_partner, sc_partner)
+                       (var, sc_cl)
                      |> OSeq.filter_map
                           (CCOpt.map (fun us ->
                                assert (not (Unif_subst.has_constr us));
@@ -866,17 +868,15 @@ let fluid_quant_rw (c : C.t) =
                                else
                                  Some (mk_res sub pos p)))
                    in
-                   if Env.should_force_stream_eval (Env.get_global ()) () then
-                     Env.get_finite_infs (Env.get_global ()) [ seq ] @ acc
+                   if Env.should_force_stream_eval (get_env ()) () then
+                     Env.get_finite_infs (get_env ()) [ seq ] @ acc
                    else (
                      let stm_res =
                        Env.Stm.make
                          ~penalty:(C.penalty c + 2)
                          ~parents:[ c ] seq
                      in
-                     Env.StmQ.add
-                       (Env.get_stm_queue (Env.get_global ()))
-                       stm_res;
+                     Env.StmQ.add (Env.get_stm_queue (get_env ())) stm_res;
                      acc
                    ))
                  acc partners)
@@ -884,7 +884,7 @@ let fluid_quant_rw (c : C.t) =
          | _ -> acc)
        []
 
-let false_elim c =
+let false_elim _env c =
   let module S = Subst.FO in
   let p sub renaming =
     Proof.Step.inference
@@ -902,7 +902,7 @@ let false_elim c =
   let schedule app_var target idx =
     assert (T.is_ground target);
     let seq =
-      get_unif_alg () (app_var, 0) (target, 0)
+      get_unif_alg (get_env ()) (app_var, 0) (target, 0)
       |> OSeq.filter_map
            (CCOpt.map (fun us ->
                 assert (not (Unif_subst.has_constr us));
@@ -918,11 +918,11 @@ let false_elim c =
                 else
                   Some res))
     in
-    if Env.should_force_stream_eval (Env.get_global ()) () then
-      Env.get_finite_infs (Env.get_global ()) [ seq ]
+    if Env.should_force_stream_eval (get_env ()) () then
+      Env.get_finite_infs (get_env ()) [ seq ]
     else (
       let stm_res = Env.Stm.make ~penalty:(C.penalty c) ~parents:[ c ] seq in
-      Env.StmQ.add (Env.get_stm_queue (Env.get_global ())) stm_res;
+      Env.StmQ.add (Env.get_stm_queue (get_env ())) stm_res;
       []
     )
   in
@@ -981,7 +981,7 @@ let false_elim c =
            acc)
        []
 
-let replace_bool_vars (c : C.t) =
+let replace_bool_vars _env (c : C.t) =
   let p =
     Proof.Step.simp
       [ C.proof_parent c ]
@@ -1030,7 +1030,7 @@ let replace_bool_vars (c : C.t) =
          assert (List.for_all (fun t -> Type.is_prop (HVar.ty t)) vars);
          all_bool_substs vars |> List.map (C.apply_subst ~proof:p (c, 0)))
 
-let replace_bool_app_vars (c : C.t) =
+let replace_bool_app_vars _env (c : C.t) =
   let p sub renaming =
     Proof.Step.simp
       [ C.proof_parent_subst renaming (c, 0) sub ]
@@ -1074,7 +1074,7 @@ let replace_bool_app_vars (c : C.t) =
     |> Iter.flat_map_l (fun args ->
            List.map
              (fun target ->
-               get_unif_alg_l () (args, 0) (target, 0)
+               get_unif_alg_l (get_env ()) (args, 0) (target, 0)
                |> OSeq.filter_map
                     (CCOpt.map (fun us ->
                          assert (not (Unif_subst.has_constr us));
@@ -1089,18 +1089,18 @@ let replace_bool_app_vars (c : C.t) =
              (create_targets (List.length args)))
     |> Iter.to_list
   in
-  if Env.should_force_stream_eval (Env.get_global ()) () then
-    Env.get_finite_infs (Env.get_global ()) stms
+  if Env.should_force_stream_eval (get_env ()) () then
+    Env.get_finite_infs (get_env ()) stms
   else (
     Env.StmQ.add_lst
-      (Env.get_stm_queue (Env.get_global ()))
+      (Env.get_stm_queue (get_env ()))
       (List.map
          (fun seq -> Env.Stm.make ~penalty:(C.penalty c) ~parents:[ c ] seq)
          stms);
     []
   )
 
-let quantifier_rw_and_hoist (c : C.t) =
+let quantifier_rw_and_hoist _env (c : C.t) =
   let quant_rw ~at b body =
     let quant_rw_unapplicable =
       let module P = Pos in
@@ -1124,7 +1124,7 @@ let quantifier_rw_and_hoist (c : C.t) =
           ~rule:(Proof.Rule.mk "quantifier_rw")
           ~tags:[ Proof.Tag.T_ho ]
       in
-      let body = Combs.expand body in
+      let body = Combs.expand (get_env ()) body in
       let form_for_skolem =
         (if b = Builtin.ForallConst then
            T.Form.not_
@@ -1141,7 +1141,7 @@ let quantifier_rw_and_hoist (c : C.t) =
       Literals.Pos.replace ~at ~by:repl new_lits;
       Some
         (C.create
-           ~ctx:(Env.get_ctx (Env.get_global ()))
+           ~ctx:(Env.get_ctx (get_env ()))
            ~trail:(C.trail c) ~penalty:(C.penalty c) (Array.to_list new_lits)
            proof)
     )
@@ -1171,9 +1171,7 @@ let quantifier_rw_and_hoist (c : C.t) =
         mk_res ~proof:(proof ~prefix:"forall") ~old ~repl:T.false_ new_lit c
       in
       if Type.returns_prop (T.ty subst_t) then
-        Signal.send
-          (Env.on_pred_var_elimination (Env.get_global ()))
-          (res, subst_t);
+        Signal.send (Env.on_pred_var_elimination (get_env ())) (res, subst_t);
       res
     | Builtin.ExistsConst ->
       let new_lit = no (T.app body [ subst_t ]) in
@@ -1181,9 +1179,7 @@ let quantifier_rw_and_hoist (c : C.t) =
         mk_res ~proof:(proof ~prefix:"exists") ~old ~repl:T.true_ new_lit c
       in
       if Type.returns_prop (T.ty subst_t) then
-        Signal.send
-          (Env.on_pred_var_elimination (Env.get_global ()))
-          (res, subst_t);
+        Signal.send (Env.on_pred_var_elimination (get_env ())) (res, subst_t);
       res
     | _ -> assert false
   in
@@ -1206,7 +1202,7 @@ let quantifier_rw_and_hoist (c : C.t) =
        []
   |> fun res -> CCOpt.return_if (not @@ CCList.is_empty res) res
 
-let nested_eq_rw c =
+let nested_eq_rw _env c =
   (* TODO(BOOL): currently incompatible with combiantors *)
   let sc = 0 in
   let mk_sc t = t, sc in
@@ -1218,7 +1214,7 @@ let nested_eq_rw c =
              ((Builtin.(Eq | Neq | Equiv | Xor) as hd), ([ a; b ] | [ _; a; b ]))
            ->
            Some
-             (get_unif_alg () (mk_sc a) (mk_sc b)
+             (get_unif_alg (get_env ()) (mk_sc a) (mk_sc b)
              |> OSeq.map (fun unif_subst_opt ->
                     CCOpt.map
                       (fun unif_subst ->
@@ -1254,18 +1250,18 @@ let nested_eq_rw c =
                       unif_subst_opt))
          | _ -> None)
   |> Iter.flat_map_l (fun clause_seq ->
-         if Env.should_force_stream_eval (Env.get_global ()) () then
-           Env.get_finite_infs (Env.get_global ()) [ clause_seq ]
+         if Env.should_force_stream_eval (get_env ()) () then
+           Env.get_finite_infs (get_env ()) [ clause_seq ]
          else (
            let stm_res =
              Env.Stm.make ~penalty:(C.penalty c) ~parents:[ c ] clause_seq
            in
-           Env.StmQ.add (Env.get_stm_queue (Env.get_global ())) stm_res;
+           Env.StmQ.add (Env.get_stm_queue (get_env ())) stm_res;
            []
          ))
   |> Iter.to_rev_list
 
-let rename_nested_booleans c =
+let rename_nested_booleans _env c =
   let module L = Literal in
   (* Introduce a new simple name of the form P(vars) for the
      given literal -- renaming clauses will stop combinatorial explosion
@@ -1562,7 +1558,7 @@ let simplify_bools t =
         cons a' b'
     | AppBuiltin (((ExistsConst | ForallConst) as b), [ tyarg; g ]) ->
       let g' = aux g in
-      let exp_g = Combs.expand g' in
+      let exp_g = Combs.expand (get_env ()) g' in
       let _, body = T.open_fun exp_g in
       assert (Type.is_prop (T.ty body));
       if T.Seq.subterms ~include_builtin:true body |> Iter.exists T.is_bvar then
@@ -1662,7 +1658,7 @@ let fix_unsupported_quant t =
         T.app_builtin ~ty:(T.ty t) hd args'
     | DB _ | Const _ | Var _ -> t
   in
-  if Env.flex_get_of (Env.get_global ()) Combinators.k_enable_combinators then
+  if Env.flex_get_of (get_env ()) Combinators.k_enable_combinators then
     t
   else
     aux (Lambda.eta_reduce @@ Lambda.snf t)
@@ -1679,13 +1675,13 @@ let replace_unsupported_quants c =
     in
     let new_ =
       C.create
-        ~ctx:(Env.get_ctx (Env.get_global ()))
+        ~ctx:(Env.get_ctx (get_env ()))
         ~trail:(C.trail c) ~penalty:(C.penalty c) (Array.to_list new_lits) proof
     in
     Some new_
   )
 
-let simpl_bool_subterms c =
+let simpl_bool_subterms _env c =
   try
     let new_lits = Literals.map simplify_bools (C.lits c) in
     if Literals.equal (C.lits c) new_lits then
@@ -1698,7 +1694,7 @@ let simpl_bool_subterms c =
       in
       let new_ =
         C.create
-          ~ctx:(Env.get_ctx (Env.get_global ()))
+          ~ctx:(Env.get_ctx (get_env ()))
           ~trail:(C.trail c) ~penalty:(C.penalty c) (Array.to_list new_lits)
           proof
       in
@@ -1712,7 +1708,7 @@ let simpl_bool_subterms c =
 let nnf_bools t =
   let module F = T.Form in
   let expand_quant =
-    not @@ Env.flex_get_of (Env.get_global ()) Combinators.k_enable_combinators
+    not @@ Env.flex_get_of (get_env ()) Combinators.k_enable_combinators
   in
   let rec aux t =
     match T.view t with
@@ -1748,7 +1744,7 @@ let nnf_bools t =
           else
             Builtin.ForallConst
         in
-        let g_ty_args, g_body = T.open_fun (Combs.expand g) in
+        let g_ty_args, g_body = T.open_fun (Combs.expand (get_env ()) g) in
         let g_body' = aux @@ F.not_ g_body in
         let g' = Lambda.eta_reduce ~expand_quant (T.fun_l g_ty_args g_body') in
         T.app_builtin ~ty:(T.ty t) flipped [ g' ]
@@ -1783,7 +1779,7 @@ let nnf_bools t =
   in
   aux t
 
-let nnf_bool_subters c =
+let nnf_bool_subters _env c =
   let new_lits = Literals.map nnf_bools (C.lits c) in
   if Literals.equal (C.lits c) new_lits then
     SimplM.return_same c
@@ -1795,13 +1791,13 @@ let nnf_bool_subters c =
     in
     let new_ =
       C.create
-        ~ctx:(Env.get_ctx (Env.get_global ()))
+        ~ctx:(Env.get_ctx (get_env ()))
         ~trail:(C.trail c) ~penalty:(C.penalty c) (Array.to_list new_lits) proof
     in
     SimplM.return_new new_
   )
 
-let normalize_bool_terms c =
+let normalize_bool_terms _env c =
   let new_lits = Literals.map T.normalize_bools (C.lits c) in
   if Literals.equal (C.lits c) new_lits then
     SimplM.return_same c
@@ -1813,7 +1809,7 @@ let normalize_bool_terms c =
     in
     let new_ =
       C.create
-        ~ctx:(Env.get_ctx (Env.get_global ()))
+        ~ctx:(Env.get_ctx (get_env ()))
         ~trail:(C.trail c) ~penalty:(C.penalty c) (Array.to_list new_lits) proof
     in
     SimplM.return_new new_
@@ -1898,10 +1894,8 @@ let solve_bool_formulas ~which c =
   in
 
   let unif_alg l r =
-    if
-      not (Env.flex_get_of (Env.get_global ()) Combinators.k_enable_combinators)
-    then
-      Env.flex_get_of (Env.get_global ()) Superposition.k_unif_alg (l, 0) (r, 0)
+    if not (Env.flex_get_of (get_env ()) Combinators.k_enable_combinators) then
+      Env.flex_get_of (get_env ()) Superposition.k_unif_alg (l, 0) (r, 0)
     else
       OSeq.return (Some (Unif.FO.unify_full (l, 0) (r, 0)))
   in
@@ -1954,7 +1948,7 @@ let solve_bool_formulas ~which c =
               match stm () with
               | OSeq.Cons (hd, rest) ->
                 let stm = Stm.make ~penalty:(C.penalty c) ~parents:[ c ] rest in
-                StmQ.add (Env.get_stm_queue (Env.get_global ())) stm;
+                StmQ.add (Env.get_stm_queue (get_env ())) stm;
                 hd
               | OSeq.Nil -> None
             with _ ->
@@ -1968,7 +1962,7 @@ let solve_bool_formulas ~which c =
   else
     Some l
 
-let cnf_otf c : C.t list option =
+let cnf_otf _env c : C.t list option =
   let idx =
     CCArray.find_idx
       (fun l ->
@@ -2008,19 +2002,17 @@ let cnf_otf c : C.t list option =
     let stmt = Statement.assert_ ~proof f in
     let cnf_vec =
       Cnf.convert @@ CCVector.to_iter
-      @@ Cnf.cnf_of ~opts
-           ~ctx:(Env.Ctx.sk_ctx (Env.get_ctx (Env.get_global ())))
-           stmt
+      @@ Cnf.cnf_of ~opts ~ctx:(Env.Ctx.sk_ctx (Env.get_ctx (get_env ()))) stmt
     in
     CCVector.iter
       (fun cl ->
         Statement.Seq.ty_decls cl
         |> Iter.iter (fun (id, ty) ->
-               Ctx.declare (Env.get_ctx (Env.get_global ())) id ty;
+               Ctx.declare (Env.get_ctx (get_env ())) id ty;
                Name_payload.add id (Name.Attr_skolem Name.K_after_cnf)))
       cnf_vec;
     let solved =
-      if Env.flex_get_of (Env.get_global ()) k_solve_formulas then
+      if Env.flex_get_of (get_env ()) k_solve_formulas then
         CCOpt.get_or ~default:[] (solve_bool_formulas ~which:`All c)
       else
         []
@@ -2028,9 +2020,7 @@ let cnf_otf c : C.t list option =
 
     let clauses =
       CCVector.map
-        (C.of_statement
-           ~ctx:(Env.get_ctx (Env.get_global ()))
-           ~convert_defs:true)
+        (C.of_statement ~ctx:(Env.get_ctx (get_env ())) ~convert_defs:true)
         cnf_vec
       |> CCVector.to_list |> CCList.flatten
       |> List.map (fun c ->
@@ -2046,9 +2036,9 @@ let cnf_otf c : C.t list option =
     Some (solved @ clauses)
   | None -> None
 
-let cnf_infer cl = CCOpt.get_or ~default:[] (cnf_otf cl)
+let cnf_infer _env cl = CCOpt.get_or ~default:[] (cnf_otf _env cl)
 
-let interpret_boolean_functions c =
+let interpret_boolean_functions _env c =
   (* Collects boolean functions only at top level, 
      and not the ones that are already a part of the quantifier *)
   let collect_tl_bool_funs t k =
@@ -2111,7 +2101,7 @@ let interpret_boolean_functions c =
              ~tags:[ Proof.Tag.T_ho ]
          in
 
-         let t' = Combs.expand t in
+         let t' = Combs.expand (get_env ()) t in
          let _, t'_body = T.open_fun t' in
 
          if not (T.is_true_or_false t'_body) then (
@@ -2121,7 +2111,7 @@ let interpret_boolean_functions c =
            in
            let forall_cl =
              C.create
-               ~ctx:(Env.get_ctx (Env.get_global ()))
+               ~ctx:(Env.get_ctx (get_env ()))
                ~trail:(C.trail c) ~penalty:(C.penalty c)
                (as_forall
                :: Array.to_list
@@ -2132,7 +2122,7 @@ let interpret_boolean_functions c =
            in
            let forall_neg_cl =
              C.create
-               ~ctx:(Env.get_ctx (Env.get_global ()))
+               ~ctx:(Env.get_ctx (get_env ()))
                ~trail:(C.trail c) ~penalty:(C.penalty c)
                (as_neg_forall
                :: Array.to_list
@@ -2155,83 +2145,81 @@ let interpret_boolean_functions c =
            res)
        []
 
-let setup () =
-  (* Env.add_basic_simplify (Env.get_global ()) normalize_equalities; put into superposition right now *)
-  if Env.flex_get_of (Env.get_global ()) k_replace_unsupported_quants then
+let setup env =
+  _env_ref := Some env;
+  (* Env.add_basic_simplify (get_env ()) normalize_equalities; put into superposition right now *)
+  if Env.flex_get_of (get_env ()) k_replace_unsupported_quants then
     Signal.once
-      (Env.on_start (Env.get_global ()))
+      (Env.on_start (get_env ()))
       (fun () ->
         Env.ProofState.PassiveSet.clauses ()
         |> Clause.ClauseSet.iter (fun cl ->
                match replace_unsupported_quants cl with
                | None -> ()
                | Some new_ ->
-                 Env.remove_passive (Env.get_global ()) (Iter.singleton cl);
-                 Env.add_passive (Env.get_global ()) (Iter.singleton new_)));
-  match Env.flex_get_of (Env.get_global ()) k_bool_reasoning with
+                 Env.remove_passive (get_env ()) (Iter.singleton cl);
+                 Env.add_passive (get_env ()) (Iter.singleton new_)));
+  match Env.flex_get_of (get_env ()) k_bool_reasoning with
   | BoolReasoningDisabled -> ()
   | BoolCasesPreprocess ->
-    Env.add_unary_inf (Env.get_global ()) "false_elim" false_elim
+    Env.add_unary_inf (get_env ()) "false_elim" false_elim
   | _ ->
-    if Env.flex_get_of (Env.get_global ()) k_solve_formulas then
-      Env.add_unary_inf (Env.get_global ()) "solve formulas" (fun c ->
+    if Env.flex_get_of (get_env ()) k_solve_formulas then
+      Env.add_unary_inf (get_env ()) "solve formulas" (fun _env c ->
           CCOpt.get_or ~default:[] @@ solve_bool_formulas ~which:`OnlyPositive c);
     if
-      Env.flex_get_of (Env.get_global ()) k_trigger_bool_inst > 0
-      || Env.flex_get_of (Env.get_global ()) k_trigger_bool_ind > 0
+      Env.flex_get_of (get_env ()) k_trigger_bool_inst > 0
+      || Env.flex_get_of (get_env ()) k_trigger_bool_ind > 0
     then (
       Signal.on
-        (Env.on_pred_var_elimination (Env.get_global ()))
-        handle_new_pred_var_clause;
+        (Env.on_pred_var_elimination (get_env ()))
+        (fun (clause, var) ->
+          handle_new_pred_var_clause (get_env ()) (clause, var));
       Signal.on FR.on_pred_skolem_introduction handle_new_skolem_sym
     );
-    if Env.flex_get_of (Env.get_global ()) k_trigger_bool_ind > 0 then
-      Env.add_unary_inf (Env.get_global ()) "trigger bool ind" trigger_induction;
-    if Env.flex_get_of (Env.get_global ()) k_simplify_bools then
-      Env.add_basic_simplify (Env.get_global ()) simpl_bool_subterms;
-    if Env.flex_get_of (Env.get_global ()) k_nnf then
-      Env.add_basic_simplify (Env.get_global ()) nnf_bool_subters;
-    if Env.flex_get_of (Env.get_global ()) k_norm_bools then
-      Env.add_basic_simplify (Env.get_global ()) normalize_bool_terms;
+    if Env.flex_get_of (get_env ()) k_trigger_bool_ind > 0 then
+      Env.add_unary_inf (get_env ()) "trigger bool ind" trigger_induction;
+    if Env.flex_get_of (get_env ()) k_simplify_bools then
+      Env.add_basic_simplify (get_env ()) simpl_bool_subterms;
+    if Env.flex_get_of (get_env ()) k_nnf then
+      Env.add_basic_simplify (get_env ()) nnf_bool_subters;
+    if Env.flex_get_of (get_env ()) k_norm_bools then
+      Env.add_basic_simplify (get_env ()) normalize_bool_terms;
     if not !Lazy_cnf.enabled then (
-      Env.add_multi_simpl_rule (Env.get_global ()) ~priority:2 Fool.rw_bool_lits;
-      if Env.flex_get_of (Env.get_global ()) k_cnf_non_simpl then
-        Env.add_unary_inf (Env.get_global ()) "cnf otf inf" cnf_infer
+      Env.add_multi_simpl_rule (get_env ()) ~priority:2 Fool.rw_bool_lits;
+      if Env.flex_get_of (get_env ()) k_cnf_non_simpl then
+        Env.add_unary_inf (get_env ()) "cnf otf inf" cnf_infer
       else
-        Env.add_multi_simpl_rule (Env.get_global ()) ~priority:2 cnf_otf
+        Env.add_multi_simpl_rule (get_env ()) ~priority:2 cnf_otf
     );
-    if Env.flex_get_of (Env.get_global ()) k_interpret_bool_funs then
-      Env.add_unary_inf (Env.get_global ()) "interpret boolean functions"
+    if Env.flex_get_of (get_env ()) k_interpret_bool_funs then
+      Env.add_unary_inf (get_env ()) "interpret boolean functions"
         interpret_boolean_functions;
 
-    Env.add_unary_inf (Env.get_global ()) "false_elim" false_elim;
-    if Env.flex_get_of (Env.get_global ()) k_bool_reasoning = BoolHoist then (
-      if Env.flex_get_of (Env.get_global ()) k_bool_hoist_simpl then
-        Env.add_multi_simpl_rule (Env.get_global ()) ~priority:1000
-          bool_hoist_simpl;
-      Env.add_unary_inf (Env.get_global ()) "bool_hoist" bool_hoist;
+    Env.add_unary_inf (get_env ()) "false_elim" false_elim;
+    if Env.flex_get_of (get_env ()) k_bool_reasoning = BoolHoist then (
+      if Env.flex_get_of (get_env ()) k_bool_hoist_simpl then
+        Env.add_multi_simpl_rule (get_env ()) ~priority:1000 bool_hoist_simpl;
+      Env.add_unary_inf (get_env ()) "bool_hoist" bool_hoist;
 
-      if Env.flex_get_of (Env.get_global ()) k_rename_nested_bools then
-        Env.add_multi_simpl_rule (Env.get_global ()) ~priority:500
+      if Env.flex_get_of (get_env ()) k_rename_nested_bools then
+        Env.add_multi_simpl_rule (get_env ()) ~priority:500
           rename_nested_booleans;
 
-      Env.add_unary_inf (Env.get_global ()) "formula_hoist" eq_hoist;
-      Env.add_multi_simpl_rule (Env.get_global ()) ~priority:100
-        replace_bool_vars;
-      Env.add_multi_simpl_rule (Env.get_global ()) ~priority:90
-        quantifier_rw_and_hoist;
-      Env.add_unary_inf (Env.get_global ()) "eq_rw" nested_eq_rw;
+      Env.add_unary_inf (get_env ()) "formula_hoist" eq_hoist;
+      Env.add_multi_simpl_rule (get_env ()) ~priority:100 replace_bool_vars;
+      Env.add_multi_simpl_rule (get_env ()) ~priority:90 quantifier_rw_and_hoist;
+      Env.add_unary_inf (get_env ()) "eq_rw" nested_eq_rw;
 
-      if Env.flex_get_of (Env.get_global ()) Superposition.k_ho_basic_rules then (
-        if Env.flex_get_of (Env.get_global ()) k_bool_app_var_repl then
-          Env.add_unary_inf (Env.get_global ()) "replace_bool_app_vars"
+      if Env.flex_get_of (get_env ()) Superposition.k_ho_basic_rules then (
+        if Env.flex_get_of (get_env ()) k_bool_app_var_repl then
+          Env.add_unary_inf (get_env ()) "replace_bool_app_vars"
             replace_bool_app_vars;
-        if Env.flex_get_of (Env.get_global ()) k_fluid_hoist then
-          Env.add_unary_inf (Env.get_global ()) "fluid_hoist" fluid_hoist;
-        if Env.flex_get_of (Env.get_global ()) k_fluid_log_hoist then (
-          Env.add_unary_inf (Env.get_global ()) "fluid_log_hoist"
-            fluid_log_hoist;
-          Env.add_unary_inf (Env.get_global ()) "fluid_quant_rw" fluid_quant_rw
+        if Env.flex_get_of (get_env ()) k_fluid_hoist then
+          Env.add_unary_inf (get_env ()) "fluid_hoist" fluid_hoist;
+        if Env.flex_get_of (get_env ()) k_fluid_log_hoist then (
+          Env.add_unary_inf (get_env ()) "fluid_log_hoist" fluid_log_hoist;
+          Env.add_unary_inf (get_env ()) "fluid_quant_rw" fluid_quant_rw
         )
       )
     )
@@ -2645,6 +2633,7 @@ let _bool_triggers_only = ref false
 
 let extension =
   let register (env : Env.t) =
+    _env_ref := Some env;
     Env.flex_add_of env k_bool_reasoning !_bool_reasoning;
     Env.flex_add_of env k_quant_rename !_quant_rename;
     Env.flex_add_of env k_interpret_bool_funs !_interpret_bool_funs;
@@ -2667,7 +2656,7 @@ let extension =
     Env.flex_add_of env k_generalize_trigger !_generalize_trigger;
     Env.flex_add_of env k_bool_triggers_only !_bool_triggers_only;
 
-    setup ()
+    setup env
   in
   {
     Extensions.default with

@@ -84,6 +84,3 @@ end
 module Key : sig
   val lost_completeness : bool Flex_state.key
 end
-
-val set_global : t -> unit
-(** Set the global ctx ref (bridge for transitional backward compat) *)

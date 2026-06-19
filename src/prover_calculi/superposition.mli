@@ -24,7 +24,7 @@ type unif_module = {
 
 val get_unif_module : Env.t -> unif_module
 
-val register : unit -> unit
+val register : Env.t -> unit
 (** Register the superposition module to its Environment's mixtbl. Done
     automatically by the {!extension}. *)
 

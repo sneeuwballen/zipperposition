@@ -26,5 +26,5 @@ val declare_ty :
   declare_result
 
 val instantiate_vars : Env.multi_simpl_rule
-val setup : unit -> unit
+val setup : Env.t -> unit
 val extension : Extensions.t

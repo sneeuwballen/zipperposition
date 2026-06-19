@@ -30,14 +30,14 @@ let _depth_types lits =
   |> Iter.max ?lt:None
   |> CCOpt.map_or ~default:0 CCFun.id
 
-let is_too_deep c =
+let is_too_deep env c =
   match !depth_limit_ with
   | None -> false
   | Some d ->
     let lits = C.lits c in
     let depth = max (_depth_types lits) (Literals.depth lits) in
     if depth > d then (
-      Ctx.lost_completeness (Env.get_ctx (Env.get_global ()));
+      Ctx.lost_completeness (Env.get_ctx env);
       Util.incr_stat stat_depth_limit;
       Util.debugf ~section 5 "@[<2>clause dismissed (too deep at %d):@ @[%a@]@]"
         (fun k -> k depth C.pp c);
@@ -45,7 +45,7 @@ let is_too_deep c =
     ) else
       false
 
-let has_too_many_vars c =
+let has_too_many_vars env c =
   if !no_max_vars then
     false
   else (
@@ -57,7 +57,7 @@ let has_too_many_vars c =
       |> List.length
     in
     if n_vars > !max_vars then (
-      Ctx.lost_completeness (Env.get_ctx (Env.get_global ()));
+      Ctx.lost_completeness (Env.get_ctx env);
       Util.incr_stat stat_vars;
       Util.debugf ~section 5
         "@[<2>clause dismissed (%d vars is too much):@ @[%a@]@]" (fun k ->
@@ -67,14 +67,14 @@ let has_too_many_vars c =
       false
   )
 
-let register () =
+let register env =
   Util.debug ~section 2 "register heuristics...";
-  Env.add_is_trivial (Env.get_global ()) is_too_deep;
-  Env.add_is_trivial (Env.get_global ()) has_too_many_vars;
+  Env.add_is_trivial env is_too_deep;
+  Env.add_is_trivial env has_too_many_vars;
   ()
 
 let extension =
-  let action (env : Env.t) = register () in
+  let action (env : Env.t) = register env in
   Extensions.{ default with name = "heuristics"; env_actions = [ action ] }
 
 let () =

@@ -25,39 +25,6 @@ type 'a packed = unit
 
 let k_max_multi_simpl_depth = Flex_state.create_key ()
 
-(** {2 Type definitions matching Env_intf.S} *)
-
-type inf_rule = C.t -> C.t list
-type generate_rule = full:bool -> unit -> C.t list
-type clause_elim_rule = unit -> unit
-type binary_inf_rule = inf_rule
-type unary_inf_rule = inf_rule
-type simplify_rule = C.t -> C.t SimplM.t
-type active_simplify_rule = simplify_rule
-type rw_simplify_rule = simplify_rule
-type backward_simplify_rule = C.t -> C.ClauseSet.t
-type redundant_rule = C.t -> bool
-type backward_redundant_rule = C.ClauseSet.t -> C.t -> C.ClauseSet.t
-type is_trivial_trail_rule = Trail.t -> bool
-type is_trivial_rule = C.t -> bool
-type term_rewrite_rule = Term.t -> (Term.t * Proof.parent list) option
-type term_norm_rule = Term.t -> Term.t option
-
-type lit_rewrite_rule =
-  Literal.t -> (Literal.t * Proof.parent list * Proof.tag list) option
-
-type multi_simpl_rule = C.t -> C.t list option
-type immediate_simplification_rule = C.t -> C.t Iter.t -> C.t Iter.t option
-
-type 'a conversion_result =
-  | CR_skip
-  | CR_drop
-  | CR_add of 'a
-  | CR_return of 'a
-
-type clause_conversion_rule = Statement.clause_t -> C.t list conversion_result
-type stats = int * int * int
-
 (** {2 Record type for the concrete environment (new-style)} *)
 
 type t = {
@@ -84,8 +51,8 @@ type t = {
   mutable generate_rules: (int * string * generate_rule) list;
   mutable cl_elim_rules: (int * string * clause_elim_rule) list;
   mutable clause_conversion_rules: clause_conversion_rule list;
-  mutable step_init: (unit -> unit) list;
-  mutable fragment_checks: (C.t -> bool) list;
+  mutable step_init: (t -> unit) list;
+  mutable fragment_checks: (t -> C.t -> bool) list;
   mutable immediate_simpl: immediate_simplification_rule list;
   queue: StmQ.t option ref;
   params: Params.t;
@@ -96,16 +63,38 @@ type t = {
   on_pred_var_elimination: (C.t * Term.t) Signal.t;
 }
 
-(** Global env ref for backward compat with old-style interface *)
-let _env : t option ref = ref None
+and inf_rule = t -> C.t -> C.t list
+and generate_rule = t -> full:bool -> unit -> C.t list
+and clause_elim_rule = t -> unit
+and binary_inf_rule = inf_rule
+and unary_inf_rule = inf_rule
+and simplify_rule = t -> C.t -> C.t SimplM.t
+and active_simplify_rule = simplify_rule
+and rw_simplify_rule = simplify_rule
+and backward_simplify_rule = t -> C.t -> C.ClauseSet.t
+and redundant_rule = t -> C.t -> bool
+and backward_redundant_rule = t -> C.ClauseSet.t -> C.t -> C.ClauseSet.t
+and is_trivial_trail_rule = t -> Trail.t -> bool
+and is_trivial_rule = t -> C.t -> bool
+and term_rewrite_rule = t -> Term.t -> (Term.t * Proof.parent list) option
+and term_norm_rule = t -> Term.t -> Term.t option
 
-(** Set the global env instance (called from phases_impl after creation) *)
-let set_global env =
-  _env := Some env;
-  Ctx.set_global env.ctx
+and lit_rewrite_rule =
+  t -> Literal.t -> (Literal.t * Proof.parent list * Proof.tag list) option
 
-(** Get the current env (for old-style bridge) *)
-let get_global () = CCOpt.get_exn !_env
+and multi_simpl_rule = t -> C.t -> C.t list option
+and immediate_simplification_rule = t -> C.t -> C.t Iter.t -> C.t Iter.t option
+
+and 'a conversion_result =
+  | CR_skip
+  | CR_drop
+  | CR_add of 'a
+  | CR_return of 'a
+
+and clause_conversion_rule =
+  t -> Statement.clause_t -> C.t list conversion_result
+
+and stats = int * int * int
 
 (** {2 Build a new Environment (new-style)} *)
 
@@ -116,7 +105,7 @@ let create ~params ~flex_state ~ctx () =
     binary_rules = [];
     unary_rules = [];
     rewrite_rules = [];
-    norm_rule = (fun _ -> None);
+    norm_rule = (fun _ _ -> None);
     norm_name = "lambda normalize";
     lit_rules = [];
     basic_simplify = [];
@@ -269,7 +258,7 @@ let add_clause_conversion env r =
 
 let add_step_init env f = env.step_init <- f :: env.step_init
 let add_fragment_check env f = env.fragment_checks <- f :: env.fragment_checks
-let check_fragment env c = CCList.for_all (fun f -> f c) env.fragment_checks
+let check_fragment env c = CCList.for_all (fun f -> f env c) env.fragment_checks
 let get_empty_clauses env = env.empty_clauses
 
 let get_some_empty_clause env =
@@ -294,7 +283,7 @@ let ho_normalize env c =
       (fun lit ->
         Lit.map
           (fun t ->
-            match env.norm_rule t with
+            match env.norm_rule env t with
             | None -> t
             | Some t' ->
               did_reduce := true;
@@ -324,13 +313,13 @@ let rewrite env c =
     match rules with
     | [] -> t
     | (name, r) :: rules' ->
-      (match r t with
+      (match r env t with
       | None -> reduce_term rules' t
       | Some (t', proof) ->
         applied_rules := StrSet.add name !applied_rules;
         proofs := List.rev_append proof !proofs;
         let new_t =
-          match env.norm_rule t' with
+          match env.norm_rule env t' with
           | None -> t'
           | Some tt -> tt
         in
@@ -362,7 +351,7 @@ let rewrite_lits env c =
     match rules with
     | [] -> lit
     | (name, r) :: rules' ->
-      (match r lit with
+      (match r env lit with
       | None -> rewrite_lit rules' lit
       | Some (lit', proof, tgs) ->
         applied_rules := StrSet.add name !applied_rules;
@@ -390,9 +379,9 @@ let basic_simplify env c =
   let open SimplM.Infix in
   match env.basic_simplify with
   | [] -> SimplM.return_same c
-  | [ f ] -> f c
-  | [ f; g ] -> f c >>= g
-  | l -> SimplM.app_list l c
+  | [ f ] -> f env c
+  | [ f; g ] -> f env c >>= g env
+  | l -> SimplM.app_list (List.map (fun f -> f env) l) c
 
 let unary_simplify env c =
   let open SimplM.Infix in
@@ -407,9 +396,9 @@ let unary_simplify env c =
       >>= fun c ->
       match env.unary_simplify with
       | [] -> SimplM.return_same c
-      | [ f ] -> f c
-      | [ f; g ] -> f c >>= g
-      | l -> SimplM.app_list l c)
+      | [ f ] -> f env c
+      | [ f; g ] -> f env c >>= g env
+      | l -> SimplM.app_list (List.map (fun f -> f env) l) c)
 
 let rw_simplify env c =
   let open SimplM.Infix in
@@ -419,9 +408,9 @@ let rw_simplify env c =
       else (
         match env.rw_simplify with
         | [] -> SimplM.return_same c
-        | [ f ] -> f c
-        | [ f; g ] -> f c >>= g
-        | l -> SimplM.app_list l c
+        | [ f ] -> f env c
+        | [ f; g ] -> f env c >>= g env
+        | l -> SimplM.app_list (List.map (fun f -> f env) l) c
       ))
 
 let active_simplify env c =
@@ -432,9 +421,9 @@ let active_simplify env c =
       else (
         match env.active_simplify with
         | [] -> SimplM.return_same c
-        | [ f ] -> f c
-        | [ f; g ] -> f c >>= g
-        | l -> SimplM.app_list l c
+        | [ f ] -> f env c
+        | [ f; g ] -> f env c >>= g env
+        | l -> SimplM.app_list (List.map (fun f -> f env) l) c
       ))
 
 let simplify env c =
@@ -473,7 +462,7 @@ let multi_simplify env ~depth c =
       match rules with
       | [] -> None
       | r :: rules' ->
-        (match r c with
+        (match r env c with
         | Some l -> Some l
         | None -> try_next ~depth c rules')
     )
@@ -511,18 +500,19 @@ let multi_simplify env ~depth c =
 let backward_simplify_find_candidates env given =
   match env.backward_simplify with
   | [] -> C.ClauseSet.empty
-  | [ f ] -> f given
-  | [ f; g ] -> C.ClauseSet.union (f given) (g given)
+  | [ f ] -> f env given
+  | [ f; g ] -> C.ClauseSet.union (f env given) (g env given)
   | l ->
     List.fold_left
-      (fun set f -> C.ClauseSet.union set (f given))
+      (fun set f -> C.ClauseSet.union set (f env given))
       C.ClauseSet.empty l
 
 let is_trivial_trail env trail =
   match env.is_trivial_trail with
   | [] -> false
-  | [ f ] -> f trail
-  | f1 :: f2 :: tl -> f1 trail || f2 trail || List.exists (fun f -> f trail) tl
+  | [ f ] -> f env trail
+  | f1 :: f2 :: tl ->
+    f1 env trail || f2 env trail || List.exists (fun f -> f env trail) tl
 
 let is_trivial env c =
   if C.get_flag SClause.flag_persistent c then
@@ -534,8 +524,8 @@ let is_trivial env c =
       ||
       match env.is_trivial with
       | [] -> false
-      | [ f ] -> f c
-      | f :: g :: tl -> f c || g c || List.exists (fun f -> f c) tl
+      | [ f ] -> f env c
+      | f :: g :: tl -> f env c || g env c || List.exists (fun f -> f env c) tl
     in
     if res then C.mark_redundant c;
     res
@@ -604,7 +594,7 @@ let immediate_simplify env given immediate =
   let rec aux = function
     | [] -> immediate
     | f :: fs ->
-      (match f given immediate with
+      (match f env given immediate with
       | Some res -> res
       | None -> aux fs)
   in
@@ -614,7 +604,7 @@ let do_binary_inferences env c =
   List.fold_left
     (fun acc (name, rule) ->
       Util.debugf ~section 3 "apply binary rule %s" (fun k -> k name);
-      List.rev_append (rule c) acc)
+      List.rev_append (rule env c) acc)
     [] env.binary_rules
   |> Iter.of_list
 
@@ -622,7 +612,7 @@ let do_unary_inferences env c =
   List.fold_left
     (fun acc (name, rule) ->
       Util.debugf ~section 3 "apply unary rule %s" (fun k -> k name);
-      List.rev_append (rule c) acc)
+      List.rev_append (rule env c) acc)
     [] env.unary_rules
   |> Iter.of_list
 
@@ -631,7 +621,7 @@ let do_generate env ~full () =
     (fun acc (_, name, g) ->
       Util.debugf ~section 3 "apply generating rule %s (full: %b)" (fun k ->
           k name full);
-      let from_g = g ~full () in
+      let from_g = g env ~full () in
       let status =
         if List.exists C.is_empty from_g then
           `Stop
@@ -665,15 +655,15 @@ let generate env given =
   result
 
 let do_clause_eliminate env =
-  List.iter (fun (_, _, elim) -> elim ()) env.cl_elim_rules
+  List.iter (fun (_, _, elim) -> elim env) env.cl_elim_rules
 
 let is_redundant__env env c =
   let res =
     match env.redundant with
     | [] -> false
-    | [ f ] -> f c
-    | [ f; g ] -> f c || g c
-    | l -> List.exists (fun f -> f c) l
+    | [ f ] -> f env c
+    | [ f; g ] -> f env c || g env c
+    | l -> List.exists (fun f -> f env c) l
   in
   if res then C.mark_redundant c;
   res
@@ -683,7 +673,7 @@ let is_redundant env c = C.is_redundant c || is_redundant__env env c
 let subsumed_by env c =
   let res =
     List.fold_left
-      (fun set rule -> rule set c)
+      (fun set rule -> rule env set c)
       C.ClauseSet.empty env.backward_redundant
   in
   C.ClauseSet.iter C.mark_redundant res;
@@ -719,7 +709,7 @@ let all_simplify env c =
   else
     SimplM.return_same res
 
-let step_init env = List.iter (fun f -> f ()) env.step_init
+let step_init env = List.iter (fun f -> f env) env.step_init
 
 (** {2 Forward simplify and cheap multi simplify — new-style} *)
 
@@ -731,7 +721,8 @@ let _apply_multi_rules_env env ~rule_list c =
   let rec apply_rules ~rules c =
     match rules with
     | [] -> None
-    | r :: rs -> CCOpt.or_lazy ~else_:(fun () -> apply_rules ~rules:rs c) (r c)
+    | r :: rs ->
+      CCOpt.or_lazy ~else_:(fun () -> apply_rules ~rules:rs c) (r env c)
   in
   let q = Queue.create () in
   Queue.add c q;
@@ -805,7 +796,7 @@ let convert_input_statements_env env stmts : C.t Clause.sets =
       List.iter (fun cl -> CCVector.push c_sos cl) c_sos_list;
       clauses
     | r :: rules' ->
-      (match r st with
+      (match r env st with
       | CR_skip -> conv_clause_ rules' st
       | CR_drop -> []
       | CR_add l -> l

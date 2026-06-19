@@ -100,6 +100,9 @@ let k_ho_prim_max_penalty : int Flex_state.key = Flex_state.create_key ()
 let k_ground_app_vars : [ `Off | `Fresh | `All ] Flex_state.key =
   Flex_state.create_key ()
 
+let _env_ref : Env.t option ref = ref None
+let get_env () = CCOpt.get_exn !_env_ref
+
 (* index for ext-neg, to ensure α-equivalent negative equations have the same skolems *)
 module FV_ext_neg_lit = FV_tree.Make (struct
   type t = Literal.t * T.t list (* lit -> skolems *)
@@ -128,7 +131,7 @@ let find_skolems_ (lit : Literal.t) : T.t list option =
            Some skolems
          | None -> None)
 
-let remove_ff_constraints c =
+let remove_ff_constraints _env c =
   let module VS = Term.VarSet in
   (* assumes literal is negative flex-flex lit *)
   let extract_hd_vars = function
@@ -201,12 +204,12 @@ let remove_ff_constraints c =
 let rec declare_skolems = function
   | [] -> ()
   | (sym, id) :: rest ->
-    Ctx.declare (Env.get_ctx (Env.get_global ())) sym id;
+    Ctx.declare (Env.get_ctx (get_env ())) sym id;
     declare_skolems rest
 
 (* negative extensionality rule:
    [f != g] where [f : a -> b] becomes [f k != g k] for a fresh parameter [k] *)
-let ext_neg_lit (lit : Literal.t) : _ option =
+let ext_neg_lit env (lit : Literal.t) : _ option =
   match lit with
   | Literal.Equation (f, g, false)
     when Type.is_fun (T.ty f)
@@ -242,7 +245,7 @@ let ext_neg_lit (lit : Literal.t) : _ option =
     Some (new_lit, [], [ Proof.Tag.T_ho; Proof.Tag.T_ext ])
   | _ -> None
 
-let ext_pos_general ?(all_lits = false) (c : C.t) : C.t list =
+let ext_pos_general ?(all_lits = false) env (c : C.t) : C.t list =
   let eligible =
     if all_lits then
       C.Eligible.always
@@ -250,7 +253,7 @@ let ext_pos_general ?(all_lits = false) (c : C.t) : C.t list =
       C.Eligible.param c
   in
   let expand_quant =
-    not @@ Env.flex_get_of (Env.get_global ()) Combinators.k_enable_combinators
+    not @@ Env.flex_get_of (get_env ()) Combinators.k_enable_combinators
   in
 
   (* Remove recursively variables at the end of the literal t = s if possible.
@@ -307,7 +310,7 @@ let ext_pos_general ?(all_lits = false) (c : C.t) : C.t list =
                     in
                     let new_c =
                       C.create
-                        ~ctx:(Env.get_ctx (Env.get_global ()))
+                        ~ctx:(Env.get_ctx (get_env ()))
                         new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c)
                     in
                     [ new_c ])
@@ -321,7 +324,7 @@ let ext_pos_general ?(all_lits = false) (c : C.t) : C.t list =
         k C.pp c (Util.pp_list ~sep:" " C.pp) new_clauses);
   new_clauses
 
-let neg_ext (c : C.t) : C.t list =
+let neg_ext env (c : C.t) : C.t list =
   let get_new_lits lhs rhs =
     let calc_skolem lhs rhs =
       let (pref_l, body_l), (pref_r, body_r) =
@@ -343,7 +346,7 @@ let neg_ext (c : C.t) : C.t list =
     in
 
     assert (Type.is_fun (T.ty lhs));
-    let lhs, rhs = CCPair.map_same Combinators.expand (lhs, rhs) in
+    let lhs, rhs = Combinators.expand env lhs, Combinators.expand env rhs in
 
     let rec aux acc lhs rhs =
       assert (Type.equal (T.ty lhs) (T.ty rhs));
@@ -417,7 +420,7 @@ let neg_ext (c : C.t) : C.t list =
   else
     compute_results new_lits_map
 
-let neg_ext_simpl (c : C.t) : C.t SimplM.t =
+let neg_ext_simpl (_env : Env.t) (c : C.t) : C.t SimplM.t =
   let is_eligible = C.Eligible.always in
   let applied_neg_ext = ref false in
   let new_lits =
@@ -455,31 +458,29 @@ let neg_ext_simpl (c : C.t) : C.t SimplM.t =
     in
     let c' =
       C.create_a
-        ~ctx:(Env.get_ctx (Env.get_global ()))
+        ~ctx:(Env.get_ctx (get_env ()))
         ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof
     in
     (* CCFormat.printf "[NE_simpl]: @[%a@] => @[%a@].\n" C.pp c C.pp c'; *)
     SimplM.return_new c'
   )
 
-let ord = Ctx.ord (Env.get_ctx (Env.get_global ()))
+let ord = Ctx.ord (Env.get_ctx (get_env ()))
 
 let ext_rule_eligible cl =
-  Env.flex_get_of (Env.get_global ()) k_ext_rules_max_depth < 0
-  || C.proof_depth cl
-     < Env.flex_get_of (Env.get_global ()) k_ext_rules_max_depth
+  Env.flex_get_of (get_env ()) k_ext_rules_max_depth < 0
+  || C.proof_depth cl < Env.flex_get_of (get_env ()) k_ext_rules_max_depth
 
 let update_ext_dec_indices f c =
-  let ord = Ctx.ord (Env.get_ctx (Env.get_global ())) in
+  let ord = Ctx.ord (Env.get_ctx (get_env ())) in
   let which, eligible =
-    if Env.flex_get_of (Env.get_global ()) k_ext_dec_lits = `OnlyMax then
+    if Env.flex_get_of (get_env ()) k_ext_dec_lits = `OnlyMax then
       `Max, C.Eligible.res c
     else
       `All, C.Eligible.always
   in
   if
-    Env.flex_get_of (Env.get_global ()) k_ext_rules_kind != `Off
-    && ext_rule_eligible c
+    Env.flex_get_of (get_env ()) k_ext_rules_kind != `Off && ext_rule_eligible c
   then (
     Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false ~ty_args:false
       ~ord ~which ~subterms:true ~eligible (C.lits c)
@@ -491,7 +492,7 @@ let update_ext_dec_indices f c =
     |> Iter.iter (fun (t, pos) -> f _ext_dec_into_idx (c, pos, t));
 
     let eligible =
-      if Env.flex_get_of (Env.get_global ()) k_ext_dec_lits = `OnlyMax then
+      if Env.flex_get_of (get_env ()) k_ext_dec_lits = `OnlyMax then
         C.Eligible.param c
       else
         C.Eligible.always
@@ -521,8 +522,7 @@ let find_ho_disagremeents ?(unify = true) (orig_s, s_sc) (orig_t, t_sc) =
 
   let cheap_unify ~subst (s, s_sc) (t, t_sc) =
     let unif_alg =
-      if Env.flex_get_of (Env.get_global ()) Combinators.k_enable_combinators
-      then
+      if Env.flex_get_of (get_env ()) Combinators.k_enable_combinators then
         fun s t ->
       Unif_subst.of_subst
       @@ Unif.FO.unify_syn ~subst:(Unif_subst.subst subst) s t
@@ -601,8 +601,7 @@ let find_ho_disagremeents ?(unify = true) (orig_s, s_sc) (orig_t, t_sc) =
       raise StopSearch;
 
     let norm =
-      if Env.flex_get_of (Env.get_global ()) Combinators.k_enable_combinators
-      then
+      if Env.flex_get_of (get_env ()) Combinators.k_enable_combinators then
         CCFun.id
       else
         Lambda.eta_expand
@@ -680,7 +679,7 @@ let find_ho_disagremeents ?(unify = true) (orig_s, s_sc) (orig_t, t_sc) =
     if CCList.is_empty (fst diss) then raise StopSearch;
 
     if
-      Env.flex_get_of (Env.get_global ()) k_ho_disagremeents == `AllHo
+      Env.flex_get_of (get_env ()) k_ho_disagremeents == `AllHo
       && List.exists (fun (si, _) -> not (t_type_is_ho si)) (fst diss)
     then
       raise StopSearch;
@@ -702,7 +701,7 @@ let ext_inst ~parents (s, s_sc) (t, t_sc) =
   let ty_args, ret = Type.open_fun (T.ty s) in
   let alpha = T.of_ty @@ List.hd ty_args in
   let beta = T.of_ty @@ Type.arrow (List.tl ty_args) ret in
-  let diff_const = Env.flex_get_of (Env.get_global ()) k_diff_const in
+  let diff_const = Env.flex_get_of (get_env ()) k_diff_const in
 
   let diff_s_t = T.app diff_const [ alpha; beta; s; t ] in
   let s_diff, t_diff = T.app s [ diff_s_t ], T.app t [ diff_s_t ] in
@@ -719,7 +718,7 @@ let ext_inst ~parents (s, s_sc) (t, t_sc) =
   let penalty = List.fold_left max 1 (List.map C.penalty parents) in
 
   C.create
-    ~ctx:(Env.get_ctx (Env.get_global ()))
+    ~ctx:(Env.get_ctx (get_env ()))
     ~trail:(C.trail_l parents) ~penalty new_lits proof
 
 let do_ext_inst ~parents ((from_t, sc_f) as s) ((into_t, sc_t) as t) =
@@ -736,7 +735,7 @@ let do_ext_inst ~parents ((from_t, sc_f) as s) ((into_t, sc_t) as t) =
       ho_dis
   | None -> []
 
-let ext_inst_or_family_eqfact cl =
+let ext_inst_or_family_eqfact _env cl =
   let try_ext_eq_fact (s, t) (u, v) idx =
     let sc = 0 in
     match find_ho_disagremeents (s, sc) (u, sc) with
@@ -759,7 +758,7 @@ let ext_inst_or_family_eqfact cl =
       (* ext_eqfact is rarely used *)
       let new_c =
         C.create
-          ~ctx:(Env.get_ctx (Env.get_global ()))
+          ~ctx:(Env.get_ctx (get_env ()))
           ~trail:(C.trail cl)
           ~penalty:(C.penalty cl + C.proof_depth cl)
           new_lits proof
@@ -775,8 +774,8 @@ let ext_inst_or_family_eqfact cl =
   let try_factorings (s, t) (u, v) idx =
     let ext_family =
       if
-        Env.flex_get_of (Env.get_global ()) k_ext_rules_kind = `Both
-        || Env.flex_get_of (Env.get_global ()) k_ext_rules_kind = `ExtFamily
+        Env.flex_get_of (get_env ()) k_ext_rules_kind = `Both
+        || Env.flex_get_of (get_env ()) k_ext_rules_kind = `ExtFamily
       then
         try_ext_eq_fact (s, t) (u, v) idx
       else
@@ -785,8 +784,8 @@ let ext_inst_or_family_eqfact cl =
 
     let ext_inst =
       if
-        Env.flex_get_of (Env.get_global ()) k_ext_rules_kind = `Both
-        || Env.flex_get_of (Env.get_global ()) k_ext_rules_kind = `ExtInst
+        Env.flex_get_of (get_env ()) k_ext_rules_kind = `Both
+        || Env.flex_get_of (get_env ()) k_ext_rules_kind = `ExtInst
       then
         try_ext_eq_factinst (s, t) (u, v)
       else
@@ -817,8 +816,7 @@ let ext_inst_or_family_eqfact cl =
          match lit with
          | Lit.Equation (s, t, _)
            when Lit.is_positivoid lit
-                && (Env.flex_get_of (Env.get_global ()) k_ext_dec_lits
-                    != `OnlyMax
+                && (Env.flex_get_of (get_env ()) k_ext_dec_lits != `OnlyMax
                    || BV.get maximal i) ->
            aux_eq_rest (s, t) i lits
          | _ -> [])
@@ -889,19 +887,17 @@ let do_ext_sup from_c from_p from_t into_c into_p into_t =
           ~rule:(Proof.Rule.mk "ext_sup") ~tags
       in
       let new_c =
-        C.create
-          ~ctx:(Env.get_ctx (Env.get_global ()))
-          ~trail ~penalty new_lits proof
+        C.create ~ctx:(Env.get_ctx (get_env ())) ~trail ~penalty new_lits proof
       in
       Some new_c
     | None -> None
   ) else
     None
 
-let ext_sup_act given =
+let ext_sup_act _env given =
   if ext_rule_eligible given then (
     let eligible =
-      if Env.flex_get_of (Env.get_global ()) k_ext_dec_lits = `OnlyMax then
+      if Env.flex_get_of (get_env ()) k_ext_dec_lits = `OnlyMax then
         C.Eligible.param given
       else
         C.Eligible.always
@@ -923,10 +919,10 @@ let ext_sup_act given =
   ) else
     []
 
-let ext_sup_pas given =
+let ext_sup_pas _env given =
   if ext_rule_eligible given then
     (let which, eligible =
-       if Env.flex_get_of (Env.get_global ()) k_ext_dec_lits = `OnlyMax then
+       if Env.flex_get_of (get_env ()) k_ext_dec_lits = `OnlyMax then
          `Max, C.Eligible.res given
        else
          `All, C.Eligible.always
@@ -949,10 +945,10 @@ let ext_sup_pas given =
   else
     []
 
-let ext_inst_sup_act given =
+let ext_inst_sup_act _env given =
   if ext_rule_eligible given then (
     let eligible =
-      if Env.flex_get_of (Env.get_global ()) k_ext_dec_lits = `OnlyMax then
+      if Env.flex_get_of (get_env ()) k_ext_dec_lits = `OnlyMax then
         C.Eligible.param given
       else
         C.Eligible.always
@@ -974,10 +970,10 @@ let ext_inst_sup_act given =
   ) else
     []
 
-let ext_inst_sup_pas given =
+let ext_inst_sup_pas _env given =
   if ext_rule_eligible given then
     (let which, eligible =
-       if Env.flex_get_of (Env.get_global ()) k_ext_dec_lits = `OnlyMax then
+       if Env.flex_get_of (get_env ()) k_ext_dec_lits = `OnlyMax then
          `Max, C.Eligible.res given
        else
          `All, C.Eligible.always
@@ -997,7 +993,7 @@ let ext_inst_sup_pas given =
   else
     []
 
-let ext_eqres c =
+let ext_eqres _env c =
   let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "HO.ext_eqres" in
   let eligible = C.Eligible.always in
 
@@ -1009,7 +1005,7 @@ let ext_eqres c =
              assert (sign = false);
              let idx = Lits.Pos.idx pos in
              if
-               Env.flex_get_of (Env.get_global ()) k_ext_dec_lits != `OnlyMax
+               Env.flex_get_of (get_env ()) k_ext_dec_lits != `OnlyMax
                || BV.get (C.eligible_res_no_subst c) idx
              then (
                let sc = 0 in
@@ -1034,7 +1030,7 @@ let ext_eqres c =
                  in
                  let new_c =
                    C.create
-                     ~ctx:(Env.get_ctx (Env.get_global ()))
+                     ~ctx:(Env.get_ctx (get_env ()))
                      ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof
                  in
                  Some new_c
@@ -1047,7 +1043,7 @@ let ext_eqres c =
   ) else
     []
 
-let ext_inst_eqres c =
+let ext_inst_eqres _env c =
   let eligible = C.Eligible.always in
   if ext_rule_eligible c then (
     let res =
@@ -1057,7 +1053,7 @@ let ext_inst_eqres c =
              assert (sign = false);
              let idx = Lits.Pos.idx pos in
              if
-               Env.flex_get_of (Env.get_global ()) k_ext_dec_lits != `OnlyMax
+               Env.flex_get_of (get_env ()) k_ext_dec_lits != `OnlyMax
                || BV.get (C.eligible_res_no_subst c) idx
              then
                do_ext_inst ~parents:[ c ] (lhs, 0) (rhs, 0)
@@ -1093,8 +1089,8 @@ let remove_from_ext_dec_index index (c, _, t) =
     index := Name.Map.add key res !index
 
 (* try to eliminate a predicate variable in one fell swoop *)
-let elim_pred_variable ?(proof_constructor = Proof.Step.inference) (c : C.t) :
-    C.t list =
+let elim_pred_variable _env ?(proof_constructor = Proof.Step.inference)
+    (c : C.t) : C.t list =
   (* find unshielded predicate vars *)
   let find_vars () : _ HVar.t Iter.t =
     Literals.vars (C.lits c)
@@ -1185,7 +1181,7 @@ let elim_pred_variable ?(proof_constructor = Proof.Step.inference) (c : C.t) :
       in
       let new_c =
         C.create
-          ~ctx:(Env.get_ctx (Env.get_global ()))
+          ~ctx:(Env.get_ctx (get_env ()))
           new_lits proof ~penalty:(C.penalty c) ~trail:(C.trail c)
       in
       Util.debugf ~section 3 "(@[<2>elim_pred_var %a@ :clause %a@ :yields %a@])"
@@ -1195,8 +1191,7 @@ let elim_pred_variable ?(proof_constructor = Proof.Step.inference) (c : C.t) :
   find_vars () |> Iter.filter_map try_elim_var |> Iter.to_rev_list
 
 (* maximum penalty on clauses to perform Primitive Enum on *)
-let max_penalty_prim_ =
-  Env.flex_get_of (Env.get_global ()) k_ho_prim_max_penalty
+let max_penalty_prim_ = Env.flex_get_of (get_env ()) k_ho_prim_max_penalty
 
 (* rule for primitive enumeration of predicates [P t1…tn]
    (using ¬ and ∧ and =) *)
@@ -1205,7 +1200,7 @@ let prim_enum_ ?(proof_constructor = Proof.Step.inference) ~mode (c : C.t) :
   (* set of variables to refine (only those occurring in "interesting" lits) *)
   let vars =
     Literals.fold_eqn ~both:false
-      ~ord:(Ctx.ord (Env.get_ctx (Env.get_global ())))
+      ~ord:(Ctx.ord (Env.get_ctx (get_env ())))
       ~eligible:C.Eligible.always (C.lits c)
     |> Iter.flat_map_l (fun (l, r, _, _) ->
            let extract_var t =
@@ -1227,9 +1222,9 @@ let prim_enum_ ?(proof_constructor = Proof.Step.inference) ~mode (c : C.t) :
   vars |> T.VarSet.to_iter
   |> Iter.flat_map_l (fun v ->
          HO_unif.enum_prop
-           ~add_var:(Env.flex_get_of (Env.get_global ()) k_prim_enum_add_var)
-           ~enum_cache:(Env.flex_get_of (Env.get_global ()) k_prim_enum_terms)
-           ~signature:(Ctx.signature (Env.get_ctx (Env.get_global ())))
+           ~add_var:(Env.flex_get_of (get_env ()) k_prim_enum_add_var)
+           ~enum_cache:(Env.flex_get_of (get_env ()) k_prim_enum_terms)
+           ~signature:(Ctx.signature (Env.get_ctx (get_env ())))
            ~mode ~offset (v, sc_c))
   |> Iter.map (fun (subst, penalty) ->
          let renaming = Subst.Renaming.create () in
@@ -1242,7 +1237,7 @@ let prim_enum_ ?(proof_constructor = Proof.Step.inference) ~mode (c : C.t) :
          in
          let new_c =
            C.create_a
-             ~ctx:(Env.get_ctx (Env.get_global ()))
+             ~ctx:(Env.get_ctx (get_env ()))
              lits proof
              ~penalty:(C.penalty c + penalty)
              ~trail:(C.trail c)
@@ -1254,7 +1249,7 @@ let prim_enum_ ?(proof_constructor = Proof.Step.inference) ~mode (c : C.t) :
          new_c)
   |> Iter.to_rev_list
 
-let prim_enum ~mode c =
+let prim_enum ~mode _env c =
   if C.proof_depth c < max_penalty_prim_ then
     prim_enum_ ~mode c
   else
@@ -1265,7 +1260,7 @@ let prim_enum_tf c = prim_enum_ ~mode:`TF c
 let choice_ops = ref Term.Map.empty
 let new_choice_counter = ref 0
 
-let insantiate_choice ?(proof_constructor = Proof.Step.inference)
+let insantiate_choice _env ?(proof_constructor = Proof.Step.inference)
     ?(inst_vars = true) ?(choice_ops = choice_ops) c =
   let max_var =
     ref
@@ -1345,8 +1340,7 @@ let insantiate_choice ?(proof_constructor = Proof.Step.inference)
     choice_inst_of_hd ~def_clause hd arg
     :: choice_inst_of_hd ~def_clause hd (neg_trigger arg)
     ::
-    (if not @@ Env.flex_get_of (Env.get_global ()) k_generalize_choice_trigger
-     then
+    (if not @@ Env.flex_get_of (get_env ()) k_generalize_choice_trigger then
        []
      else
        [ choice_inst_of_hd ~def_clause hd (generalize_trigger arg) ])
@@ -1397,7 +1391,7 @@ let insantiate_choice ?(proof_constructor = Proof.Step.inference)
    if there is a variable occurrence in which at least one of base-type arguments is
    not a bound variable.
    Penalty of the resulting clause is penalty of the original clause + penalty_inc *)
-let simple_projection ~penalty_inc ~max_depth c =
+let simple_projection ~penalty_inc ~max_depth _env c =
   if C.proof_depth c > max_depth then
     []
   else
@@ -1456,7 +1450,7 @@ let simple_projection ~penalty_inc ~max_depth c =
           bindings acc)
       var_map []
 
-let recognize_choice_ops c =
+let recognize_choice_ops _env c =
   let extract_not_p_x l =
     match l with
     | Literal.Equation (lhs, _, _)
@@ -1491,18 +1485,18 @@ let recognize_choice_ops c =
         if not (Term.Map.mem sym !choice_ops) then (
           choice_ops := Term.Map.add sym (Some c) !choice_ops;
           let new_cls =
-            Env.get_active (Env.get_global ()) ()
+            Env.get_active (get_env ()) ()
             |> Iter.flat_map_l (fun pas_cl ->
                    if C.id pas_cl = C.id c then
                      []
                    else
-                     insantiate_choice ~inst_vars:false
+                     insantiate_choice (get_env ()) ~inst_vars:false
                        ~choice_ops:(ref (Term.Map.singleton sym (Some c)))
                        pas_cl)
-            |> Iter.map Combinators.maybe_conv_lams
+            |> Iter.map (Combinators.maybe_conv_lams (get_env ()))
           in
 
-          Env.add_passive (Env.get_global ()) new_cls
+          Env.add_passive (get_env ()) new_cls
         );
         C.mark_redundant c;
         true
@@ -1512,7 +1506,7 @@ let recognize_choice_ops c =
     false
 
 let elim_leibniz_eq_ ?(proof_constructor = Proof.Step.inference) c =
-  let ord = Ctx.ord (Env.get_ctx (Env.get_global ())) in
+  let ord = Ctx.ord (Env.get_ctx (get_env ())) in
   let eligible = C.Eligible.always in
   let pos_pred_vars, neg_pred_vars, occurrences =
     Lits.fold_eqn ~both:false ~ord ~eligible (C.lits c)
@@ -1558,11 +1552,10 @@ let elim_leibniz_eq_ ?(proof_constructor = Proof.Step.inference) c =
                   in
                   let subs_term = T.fun_l tyargs body in
                   (let cached_t = Subst.FO.canonize_all_vars subs_term in
-                   Env.flex_add_of (Env.get_global ()) k_prim_enum_terms
+                   Env.flex_add_of (get_env ()) k_prim_enum_terms
                      (ref
                         (Term.Set.add cached_t
-                           !(Env.flex_get_of (Env.get_global ())
-                               k_prim_enum_terms))));
+                           !(Env.flex_get_of (get_env ()) k_prim_enum_terms))));
                   let subst =
                     Subst.FO.bind' Subst.empty (var_hd, 0) (subs_term, 0)
                   in
@@ -1592,15 +1585,14 @@ let elim_leibniz_eq_ ?(proof_constructor = Proof.Step.inference) c =
   in
   res
 
-let elim_leibniz_equality c =
-  if C.proof_depth c < Env.flex_get_of (Env.get_global ()) k_elim_leibniz_eq
-  then
+let elim_leibniz_equality _env c =
+  if C.proof_depth c < Env.flex_get_of (get_env ()) k_elim_leibniz_eq then
     elim_leibniz_eq_ c
   else
     []
 
 let elim_andrews_eq_ ?(proof_constructor = Proof.Step.inference) c =
-  let ord = Ctx.ord (Env.get_ctx (Env.get_global ())) in
+  let ord = Ctx.ord (Env.get_ctx (get_env ())) in
   let eligible = C.Eligible.always in
   Lits.fold_eqn ~both:false ~ord ~eligible (C.lits c)
   |> Iter.fold
@@ -1651,16 +1643,14 @@ let elim_andrews_eq_ ?(proof_constructor = Proof.Step.inference) c =
          in
          C.apply_subst ?proof (c, 0) subst)
 
-let elim_andrews_equality c =
-  if C.proof_depth c < Env.flex_get_of (Env.get_global ()) k_elim_andrews_eq
-  then
+let elim_andrews_equality _env c =
+  if C.proof_depth c < Env.flex_get_of (get_env ()) k_elim_andrews_eq then
     elim_andrews_eq_ c
   else
     []
 
-let elim_andrews_equality_simpls c =
-  if C.proof_depth c < Env.flex_get_of (Env.get_global ()) k_elim_andrews_eq
-  then (
+let elim_andrews_equality_simpls _env c =
+  if C.proof_depth c < Env.flex_get_of (get_env ()) k_elim_andrews_eq then (
     let res = elim_andrews_eq_ c in
     CCOpt.return_if (not (CCList.is_empty res)) res
   ) else
@@ -1700,7 +1690,7 @@ let ho_unif_real_ c pairs other_lits : C.t list =
          in
          let new_c =
            C.create
-             ~ctx:(Env.get_ctx (Env.get_global ()))
+             ~ctx:(Env.get_ctx (get_env ()))
              all_lits proof ~trail:(C.trail c)
              ~penalty:(C.penalty c + penalty)
          in
@@ -1711,7 +1701,7 @@ let ho_unif_real_ c pairs other_lits : C.t list =
          new_c)
 
 (* HO unification of constraints *)
-let ho_unif (c : C.t) : C.t list =
+let ho_unif _env (c : C.t) : C.t list =
   if C.lits c |> CCArray.exists Literal.is_ho_constraint then (
     let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "HO.ho-unif" in
     (* separate constraints from the rest *)
@@ -1745,13 +1735,11 @@ let beta_reduce t =
   )
 
 let eta_normalize () =
-  match Env.flex_get_of (Env.get_global ()) k_eta with
+  match Env.flex_get_of (get_env ()) k_eta with
   | `Reduce ->
     Lambda.eta_reduce
       ~expand_quant:
-        (not
-        @@ Env.flex_get_of (Env.get_global ()) Combinators.k_enable_combinators
-        )
+        (not @@ Env.flex_get_of (get_env ()) Combinators.k_enable_combinators)
       ~full:true
   | `Expand -> Lambda.eta_expand
   | `None -> fun t -> t
@@ -1798,11 +1786,11 @@ let mk_diff_const () =
   in
   let diff = Term.const ~ty:diff_type diff_id in
 
-  Env.Ctx.declare (Env.get_ctx (Env.get_global ())) diff_id diff_type;
-  Env.flex_add_of (Env.get_global ()) k_diff_const diff
+  Env.Ctx.declare (Env.get_ctx (get_env ())) diff_id diff_type;
+  Env.flex_add_of (get_env ()) k_diff_const diff
 
 let mk_extensionality_clause () =
-  let diff = Env.flex_get_of (Env.get_global ()) k_diff_const in
+  let diff = Env.flex_get_of (get_env ()) k_diff_const in
   let alpha_var = HVar.make ~ty:Type.tType 0 in
   let alpha = Type.var alpha_var in
   let beta_var = HVar.make ~ty:Type.tType 1 in
@@ -1818,8 +1806,8 @@ let mk_extensionality_clause () =
   in
   let lits = [ Literal.mk_eq x y; Literal.mk_neq x_diff y_diff ] in
   Env.C.create
-    ~ctx:(Env.get_ctx (Env.get_global ()))
-    ~penalty:(Env.flex_get_of (Env.get_global ()) k_ext_axiom_penalty)
+    ~ctx:(Env.get_ctx (get_env ()))
+    ~penalty:(Env.flex_get_of (get_env ()) k_ext_axiom_penalty)
     ~trail:Trail.empty lits Proof.Step.trivial
 
 let mk_choice_clause () =
@@ -1839,10 +1827,10 @@ let mk_choice_clause () =
   in
   (* ~ (p x) | p (choice p) *)
   let lits = [ Literal.mk_prop px false; Literal.mk_prop p_choice true ] in
-  Env.Ctx.declare (Env.get_ctx (Env.get_global ())) choice_id choice_type;
+  Env.Ctx.declare (Env.get_ctx (get_env ())) choice_id choice_type;
   Env.C.create
-    ~ctx:(Env.get_ctx (Env.get_global ()))
-    ~penalty:(Env.flex_get_of (Env.get_global ()) k_choice_axiom_penalty)
+    ~ctx:(Env.get_ctx (get_env ()))
+    ~penalty:(Env.flex_get_of (get_env ()) k_choice_axiom_penalty)
     ~trail:Trail.empty lits Proof.Step.trivial
 
 let mk_ite_clauses () =
@@ -1856,32 +1844,32 @@ let mk_ite_clauses () =
   let if_f = T.app ite_const [ T.false_; x; y ] in
   let if_t_cl =
     C.create
-      ~ctx:(Env.get_ctx (Env.get_global ()))
+      ~ctx:(Env.get_ctx (get_env ()))
       ~penalty:1 ~trail:Trail.empty
       [ Lit.mk_eq if_t x ]
       Proof.Step.trivial
   in
   let if_f_cl =
     C.create
-      ~ctx:(Env.get_ctx (Env.get_global ()))
+      ~ctx:(Env.get_ctx (get_env ()))
       ~penalty:1 ~trail:Trail.empty
       [ Lit.mk_eq if_f y ]
       Proof.Step.trivial
   in
-  Env.Ctx.declare (Env.get_ctx (Env.get_global ())) ite_id ite_ty;
+  Env.Ctx.declare (Env.get_ctx (get_env ())) ite_id ite_ty;
   Iter.of_list [ if_t_cl; if_f_cl ]
 
 let early_bird_prim_enum cl var =
   assert (T.is_var var);
   let offset = C.Seq.vars cl |> T.Seq.max_var |> succ in
-  let mode = Env.flex_get_of (Env.get_global ()) k_ho_prim_mode in
-  let add_var = Env.flex_get_of (Env.get_global ()) k_prim_enum_add_var in
+  let mode = Env.flex_get_of (get_env ()) k_ho_prim_mode in
+  let add_var = Env.flex_get_of (get_env ()) k_prim_enum_add_var in
   let sc = 0 in
 
   HO_unif.enum_prop
-    ~enum_cache:(Env.flex_get_of (Env.get_global ()) k_prim_enum_terms)
+    ~enum_cache:(Env.flex_get_of (get_env ()) k_prim_enum_terms)
     ~add_var
-    ~signature:(Ctx.signature (Env.get_ctx (Env.get_global ())))
+    ~signature:(Ctx.signature (Env.get_ctx (get_env ())))
     ~mode ~offset
     (T.as_var_exn var, sc)
   |> CCList.map (fun (subst, p) ->
@@ -1896,16 +1884,16 @@ let early_bird_prim_enum cl var =
          in
          let res =
            C.create_a
-             ~ctx:(Env.get_ctx (Env.get_global ()))
+             ~ctx:(Env.get_ctx (get_env ()))
              lits proof
              ~penalty:(C.penalty cl + max (p - 1) 0)
              ~trail:(C.trail cl)
          in
-         let res = Combinators.maybe_conv_lams res in
+         let res = Combinators.maybe_conv_lams (get_env ()) res in
          (* CCFormat.printf "orig:@[%a@]@.subst:@[%a@]@.res:@[%a@]@." C.pp cl Subst.pp subst C.pp res; *)
          res)
   |> CCList.to_iter
-  |> Env.add_passive (Env.get_global ())
+  |> Env.add_passive (get_env ())
 
 let recognize_injectivity c =
   let exception Fail in
@@ -2002,10 +1990,10 @@ let recognize_injectivity c =
           Proof.Step.inference ~rule:(Proof.Rule.mk "inj_rec")
             [ C.proof_parent c ]
         in
-        Ctx.declare (Env.get_ctx (Env.get_global ())) sk_id sk_ty;
+        Ctx.declare (Env.get_ctx (get_env ())) sk_id sk_ty;
         let new_clause =
           C.create
-            ~ctx:(Env.get_ctx (Env.get_global ()))
+            ~ctx:(Env.get_ctx (get_env ()))
             ~trail:(C.trail c) ~penalty:(C.penalty c) inv_lit proof
         in
         Util.debugf ~section 1 "Injectivity recognized: %a |---| %a" (fun k ->
@@ -2016,7 +2004,7 @@ let recognize_injectivity c =
   with Fail -> []
 
 (* complete [f = g] into [f x1…xn = g x1…xn] for each [n ≥ 1] *)
-let complete_eq_args (c : C.t) : C.t list =
+let complete_eq_args _env (c : C.t) : C.t list =
   let var_offset = C.Seq.vars c |> Type.Seq.max_var |> succ in
   let eligible = C.Eligible.param c in
   let aux ?(start = 1) ~poly lits lit_idx t u =
@@ -2050,7 +2038,7 @@ let complete_eq_args (c : C.t) : C.t list =
            in
            let new_c =
              C.create
-               ~ctx:(Env.get_ctx (Env.get_global ()))
+               ~ctx:(Env.get_ctx (get_env ()))
                new_lits proof ~penalty ~trail:(C.trail c)
            in
 
@@ -2107,7 +2095,7 @@ let complete_eq_args (c : C.t) : C.t list =
              let stm =
                Stm.make ~penalty:(C.penalty c + 20) ~parents:[ c ] rest
              in
-             StmQ.add (Env.get_stm_queue (Env.get_global ())) stm;
+             StmQ.add (Env.get_stm_queue (get_env ())) stm;
 
              OSeq.to_list first_two
            | _ -> [])
@@ -2120,7 +2108,7 @@ let complete_eq_args (c : C.t) : C.t list =
   );
   new_c
 
-let arg_cong_simpl c =
+let arg_cong_simpl _env c =
   let var_offset = ref (C.Seq.vars c |> Type.Seq.max_var |> succ) in
   let simplified = ref false in
   let new_lits =
@@ -2174,7 +2162,7 @@ type dupl_arg_status =
       all occurrences of F are applied to at least j arguments and the ith
       argument is syntactically same as the jth argument, we can systematically
       remove the ith argument (and repair F's type accordingly). *)
-let prune_arg_old c =
+let prune_arg_old _env c =
   let status : (fixed_arg_status * dupl_arg_status) list VTbl.t =
     VTbl.create 8
   in
@@ -2292,7 +2280,7 @@ let prune_arg_old c =
     in
     let c' =
       C.create_a
-        ~ctx:(Env.get_ctx (Env.get_global ()))
+        ~ctx:(Env.get_ctx (get_env ()))
         ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof
     in
     Util.debugf ~section 3
@@ -2302,7 +2290,7 @@ let prune_arg_old c =
   )
 (* TODO: Simplified flag like in first-order? Profiler?*)
 
-let prune_arg ~all_covers c =
+let prune_arg ~all_covers _env c =
   let get_covers ?(current_sets = []) head args =
     let ty_args, _ = Type.open_fun (T.ty head) in
     let missing =
@@ -2358,7 +2346,7 @@ let prune_arg ~all_covers c =
   let status = VTbl.create 8 in
   let free_vars = Literals.vars (C.lits c) |> T.VarSet.of_list in
   C.lits c
-  |> Literals.map (fun t -> Combinators.expand t)
+  |> Literals.map (fun t -> Combinators.expand (get_env ()) t)
      (* to make sure that DB indices are everywhere the same *)
   |> Literals.fold_terms ~vars:true ~ty_args:false ~which:`All
        ~ord:Ordering.none ~subterms:true ~eligible:(fun _ _ -> true)
@@ -2446,7 +2434,7 @@ let prune_arg ~all_covers c =
     in
     let c' =
       C.create_a
-        ~ctx:(Env.get_ctx (Env.get_global ()))
+        ~ctx:(Env.get_ctx (get_env ()))
         ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof
     in
 
@@ -2459,7 +2447,7 @@ let prune_arg ~all_covers c =
 
 let groundings = Type.Tbl.create 32
 
-let ground_app_vars ~mode c =
+let ground_app_vars ~mode _env c =
   assert (mode != `Off);
   let app_var =
     C.Seq.vars c
@@ -2472,9 +2460,9 @@ let ground_app_vars ~mode c =
     let introduce_new_const ty =
       let (f_id, f_ty), f = Term.mk_fresh_skolem [] ty in
       C.Ctx.add_signature
-        (Env.get_ctx (Env.get_global ()))
+        (Env.get_ctx (get_env ()))
         (Signature.declare
-           (C.Ctx.signature (Env.get_ctx (Env.get_global ())))
+           (C.Ctx.signature (Env.get_ctx (get_env ())))
            f_id f_ty);
       f
     in
@@ -2484,9 +2472,7 @@ let ground_app_vars ~mode c =
     | `Fresh -> [ Type.Tbl.get_or_add groundings ~f:introduce_new_const ~k:ty ]
     | `All ->
       let ids =
-        Signature.find_by_type
-          (C.Ctx.signature (Env.get_ctx (Env.get_global ())))
-          ty
+        Signature.find_by_type (C.Ctx.signature (Env.get_ctx (get_env ()))) ty
       in
       if not (Name.Set.is_empty ids) then
         List.map (Term.const ~ty) (Name.Set.to_list ids)
@@ -2524,26 +2510,24 @@ let prim_enum_simpl ~mode c =
     let proof_constructor = Proof.Step.simp in
 
     if
-      Env.flex_get_of (Env.get_global ()) k_instantiate_choice_ax
-      && recognize_choice_ops c
+      Env.flex_get_of (get_env ()) k_instantiate_choice_ax
+      && recognize_choice_ops (get_env ()) c
     then
       None
     else (
       let other_insts =
-        (if Env.flex_get_of (Env.get_global ()) k_instantiate_choice_ax then
-           insantiate_choice ~proof_constructor c
+        (if Env.flex_get_of (get_env ()) k_instantiate_choice_ax then
+           insantiate_choice (get_env ()) ~proof_constructor c
          else
            [])
-        @ (if
-             C.proof_depth c
-             < Env.flex_get_of (Env.get_global ()) k_elim_leibniz_eq
+        @ (if C.proof_depth c < Env.flex_get_of (get_env ()) k_elim_leibniz_eq
            then
              elim_leibniz_eq_ ~proof_constructor c
            else
              [])
         @
-        if Env.flex_get_of (Env.get_global ()) k_elim_pred_var then
-          elim_pred_variable ~proof_constructor c
+        if Env.flex_get_of (get_env ()) k_elim_pred_var then
+          elim_pred_variable (get_env ()) ~proof_constructor c
         else
           []
       in
@@ -2562,7 +2546,7 @@ let prim_enum_simpl ~mode c =
    - if they occur with differen argumetns ("ext" mode).
      Example: g X = X a \/ X a = b becomes g X = Y a \/ Y a = b \/ X != Y.
      Literals with only a variable on both sides are not affected. *)
-let purify_applied_variable c =
+let purify_applied_variable _env c =
   (* set of new literals *)
   let new_lits = ref [] in
   let add_lit_ lit = new_lits := lit :: !new_lits in
@@ -2596,10 +2580,10 @@ let purify_applied_variable c =
   let same_class t1 t2 =
     assert (T.is_var (fst (T.as_app t1)));
     assert (T.is_var (fst (T.as_app t2)));
-    if Env.flex_get_of (Env.get_global ()) k_purify_applied_vars == `Ext then
+    if Env.flex_get_of (get_env ()) k_purify_applied_vars == `Ext then
       T.equal t1 t2
     else (
-      assert (Env.flex_get_of (Env.get_global ()) k_purify_applied_vars == `Int);
+      assert (Env.flex_get_of (get_env ()) k_purify_applied_vars == `Int);
       match T.view t1, T.view t2 with
       | T.Var x, T.Var y when HVar.equal Type.equal x y -> true
       | T.App (f, _), T.App (g, _) when T.equal f g -> true
@@ -2669,7 +2653,7 @@ let purify_applied_variable c =
     in
     let new_clause =
       C.create
-        ~ctx:(Env.get_ctx (Env.get_global ()))
+        ~ctx:(Env.get_ctx (get_env ()))
         ~trail:(C.trail c) ~penalty:(C.penalty c) all_lits proof
     in
     Util.debugf ~section 5 "@[<hv2>Purified:@ Old: %a@ New: %a@]" (fun k ->
@@ -2682,101 +2666,101 @@ let () =
   Signal.on ProofState.ActiveSet.on_remove_clause (fun c ->
       update_ext_dec_indices remove_from_ext_dec_index c)
 
-let setup () =
+let setup env =
+  _env_ref := Some env;
   mk_diff_const ();
-  if not (Env.flex_get_of (Env.get_global ()) k_enabled) then
+  if not (Env.flex_get_of (get_env ()) k_enabled) then
     Util.debug ~section 1 "HO rules disabled"
   else (
     Util.debug ~section 1 "setup HO rules";
-    Env.Ctx.lost_completeness (Env.get_ctx (Env.get_global ()));
+    Env.Ctx.lost_completeness (Env.get_ctx (get_env ()));
 
-    if Env.flex_get_of (Env.get_global ()) k_neg_ext_as_simpl then
-      Env.add_unary_simplify (Env.get_global ()) neg_ext_simpl
-    else if Env.flex_get_of (Env.get_global ()) k_neg_ext then
-      Env.add_unary_inf (Env.get_global ()) "neg_ext" neg_ext;
+    if Env.flex_get_of (get_env ()) k_neg_ext_as_simpl then
+      Env.add_unary_simplify (get_env ()) neg_ext_simpl
+    else if Env.flex_get_of (get_env ()) k_neg_ext then
+      Env.add_unary_inf (get_env ()) "neg_ext" neg_ext;
 
     if
-      Env.flex_get_of (Env.get_global ()) k_ext_rules_kind == `ExtFamily
-      || Env.flex_get_of (Env.get_global ()) k_ext_rules_kind == `Both
+      Env.flex_get_of (get_env ()) k_ext_rules_kind == `ExtFamily
+      || Env.flex_get_of (get_env ()) k_ext_rules_kind == `Both
     then (
-      Env.add_binary_inf (Env.get_global ()) "ext_dec_act" ext_sup_act;
-      Env.add_binary_inf (Env.get_global ()) "ext_dec_pas" ext_sup_pas;
-      Env.add_unary_inf (Env.get_global ()) "ext_eqres_dec" ext_eqres
+      Env.add_binary_inf (get_env ()) "ext_dec_act" ext_sup_act;
+      Env.add_binary_inf (get_env ()) "ext_dec_pas" ext_sup_pas;
+      Env.add_unary_inf (get_env ()) "ext_eqres_dec" ext_eqres
     );
 
     if
-      Env.flex_get_of (Env.get_global ()) k_ext_rules_kind = `ExtInst
-      || Env.flex_get_of (Env.get_global ()) k_ext_rules_kind = `Both
+      Env.flex_get_of (get_env ()) k_ext_rules_kind = `ExtInst
+      || Env.flex_get_of (get_env ()) k_ext_rules_kind = `Both
     then (
-      Env.add_binary_inf (Env.get_global ()) "ext_dec_act" ext_inst_sup_act;
-      Env.add_binary_inf (Env.get_global ()) "ext_dec_pas" ext_inst_sup_pas;
-      Env.add_unary_inf (Env.get_global ()) "ext_eqres_dec" ext_inst_eqres
+      Env.add_binary_inf (get_env ()) "ext_dec_act" ext_inst_sup_act;
+      Env.add_binary_inf (get_env ()) "ext_dec_pas" ext_inst_sup_pas;
+      Env.add_unary_inf (get_env ()) "ext_eqres_dec" ext_inst_eqres
     );
 
-    if Env.flex_get_of (Env.get_global ()) k_ext_rules_kind != `Off then
-      Env.add_unary_inf (Env.get_global ()) "ext_eqfact_both"
-        ext_inst_or_family_eqfact;
+    if Env.flex_get_of (get_env ()) k_ext_rules_kind != `Off then
+      Env.add_unary_inf (get_env ()) "ext_eqfact_both" ext_inst_or_family_eqfact;
 
-    if Env.flex_get_of (Env.get_global ()) k_arg_cong_simpl then
-      Env.add_basic_simplify (Env.get_global ()) arg_cong_simpl
-    else if Env.flex_get_of (Env.get_global ()) k_arg_cong then
-      Env.add_unary_inf (Env.get_global ()) "ho_complete_eq" complete_eq_args;
+    if Env.flex_get_of (get_env ()) k_arg_cong_simpl then
+      Env.add_basic_simplify (get_env ()) arg_cong_simpl
+    else if Env.flex_get_of (get_env ()) k_arg_cong then
+      Env.add_unary_inf (get_env ()) "ho_complete_eq" complete_eq_args;
 
-    if Env.flex_get_of (Env.get_global ()) k_resolve_flex_flex then
-      Env.add_basic_simplify (Env.get_global ()) remove_ff_constraints;
+    if Env.flex_get_of (get_env ()) k_resolve_flex_flex then
+      Env.add_basic_simplify (get_env ()) remove_ff_constraints;
 
-    if Env.flex_get_of (Env.get_global ()) k_ground_app_vars != `Off then (
-      let mode = Env.flex_get_of (Env.get_global ()) k_ground_app_vars in
-      Env.add_cheap_multi_simpl_rule (Env.get_global ()) (ground_app_vars ~mode);
-      Env.add_multi_simpl_rule (Env.get_global ()) ~priority:1000
+    if Env.flex_get_of (get_env ()) k_ground_app_vars != `Off then (
+      let mode = Env.flex_get_of (get_env ()) k_ground_app_vars in
+      Env.add_cheap_multi_simpl_rule (get_env ()) (ground_app_vars ~mode);
+      Env.add_multi_simpl_rule (get_env ()) ~priority:1000
         (ground_app_vars ~mode)
     );
 
-    if Env.flex_get_of (Env.get_global ()) k_elim_pred_var then
-      Env.add_unary_inf (Env.get_global ()) "ho_elim_pred_var"
-        elim_pred_variable;
-    if Env.flex_get_of (Env.get_global ()) k_ext_neg_lit then
-      Env.add_lit_rule (Env.get_global ()) "ho_ext_neg_lit" ext_neg_lit;
+    if Env.flex_get_of (get_env ()) k_elim_pred_var then
+      Env.add_unary_inf (get_env ()) "ho_elim_pred_var" (fun env c ->
+          elim_pred_variable env c);
+    if Env.flex_get_of (get_env ()) k_ext_neg_lit then
+      Env.add_lit_rule (get_env ()) "ho_ext_neg_lit" ext_neg_lit;
 
-    if Env.flex_get_of (Env.get_global ()) k_elim_leibniz_eq > 0 then
-      Env.add_unary_inf (Env.get_global ()) "ho_elim_leibniz_eq"
-        elim_leibniz_equality;
-    if Env.flex_get_of (Env.get_global ()) k_elim_andrews_eq > 0 then
-      if Env.flex_get_of (Env.get_global ()) k_elim_andrews_eq_simpl then
-        Env.add_multi_simpl_rule (Env.get_global ()) ~priority:100
+    if Env.flex_get_of (get_env ()) k_elim_leibniz_eq > 0 then
+      Env.add_unary_inf (get_env ()) "ho_elim_leibniz_eq" elim_leibniz_equality;
+    if Env.flex_get_of (get_env ()) k_elim_andrews_eq > 0 then
+      if Env.flex_get_of (get_env ()) k_elim_andrews_eq_simpl then
+        Env.add_multi_simpl_rule (get_env ()) ~priority:100
           elim_andrews_equality_simpls
       else
-        Env.add_unary_inf (Env.get_global ()) "ho_elim_leibniz_eq"
+        Env.add_unary_inf (get_env ()) "ho_elim_leibniz_eq"
           elim_andrews_equality;
 
-    if Env.flex_get_of (Env.get_global ()) k_instantiate_choice_ax then (
-      Env.add_redundant (Env.get_global ()) recognize_choice_ops;
-      Env.add_unary_inf (Env.get_global ()) "inst_choice" insantiate_choice
+    if Env.flex_get_of (get_env ()) k_instantiate_choice_ax then (
+      Env.add_redundant (get_env ()) recognize_choice_ops;
+      Env.add_unary_inf (get_env ()) "inst_choice" (fun env c ->
+          insantiate_choice env c)
     );
 
-    if Env.flex_get_of (Env.get_global ()) k_ext_pos then
-      Env.add_unary_inf (Env.get_global ()) "ho_ext_pos"
+    if Env.flex_get_of (get_env ()) k_ext_pos then
+      Env.add_unary_inf (get_env ()) "ho_ext_pos"
         (ext_pos_general
-           ~all_lits:(Env.flex_get_of (Env.get_global ()) k_ext_pos_all_lits));
+           ~all_lits:(Env.flex_get_of (get_env ()) k_ext_pos_all_lits));
 
     (* removing unfolded clauses *)
-    if Env.flex_get_of (Env.get_global ()) k_enable_def_unfold then
-      Env.add_clause_conversion (Env.get_global ()) (fun c ->
+    if Env.flex_get_of (get_env ()) k_enable_def_unfold then
+      Env.add_clause_conversion (get_env ()) (fun _env c ->
           match Statement.get_rw_rule c with
           | Some _ -> Env.CR_drop
           | None -> Env.CR_skip);
 
-    (match Env.flex_get_of (Env.get_global ()) k_prune_arg_fun with
+    (match Env.flex_get_of (get_env ()) k_prune_arg_fun with
     | `PruneMaxCover ->
-      Env.add_unary_simplify (Env.get_global ()) (prune_arg ~all_covers:false)
+      Env.add_unary_simplify (get_env ()) (prune_arg ~all_covers:false)
     | `PruneAllCovers ->
-      Env.add_unary_simplify (Env.get_global ()) (prune_arg ~all_covers:true)
-    | `OldPrune -> Env.add_unary_simplify (Env.get_global ()) prune_arg_old
+      Env.add_unary_simplify (get_env ()) (prune_arg ~all_covers:true)
+    | `OldPrune -> Env.add_unary_simplify (get_env ()) prune_arg_old
     | `NoPrune -> ());
 
-    if Env.flex_get_of (Env.get_global ()) Combinators.k_enable_combinators then
-      Env.set_ho_normalization_rule (Env.get_global ()) "comb-normalize"
-        Combinators_base.comb_normalize
+    if Env.flex_get_of (get_env ()) Combinators.k_enable_combinators then
+      Env.set_ho_normalization_rule (get_env ()) "comb-normalize" (fun env t ->
+          Combinators_base.comb_normalize t)
     else (
       let ho_norm =
        fun t ->
@@ -2788,46 +2772,42 @@ let setup () =
           | None -> Some t'
           | Some tt -> Some tt)
       in
-      Env.set_ho_normalization_rule (Env.get_global ()) "ho_norm" ho_norm
+      Env.set_ho_normalization_rule (get_env ()) "ho_norm" (fun env t ->
+          ho_norm t)
     );
 
-    if Env.flex_get_of (Env.get_global ()) k_purify_applied_vars != `None then
-      Env.add_unary_simplify (Env.get_global ()) purify_applied_variable;
+    if Env.flex_get_of (get_env ()) k_purify_applied_vars != `None then
+      Env.add_unary_simplify (get_env ()) purify_applied_variable;
 
-    if Env.flex_get_of (Env.get_global ()) k_enable_ho_unif then
-      Env.add_unary_inf (Env.get_global ()) "ho_unif" ho_unif;
+    if Env.flex_get_of (get_env ()) k_enable_ho_unif then
+      Env.add_unary_inf (get_env ()) "ho_unif" ho_unif;
 
-    if Env.flex_get_of (Env.get_global ()) k_simple_projection >= 0 then (
-      let penalty_inc =
-        Env.flex_get_of (Env.get_global ()) k_simple_projection
-      in
-      let max_depth =
-        Env.flex_get_of (Env.get_global ()) k_simple_projection_md
-      in
-      Env.add_unary_inf (Env.get_global ()) "simple_projection"
+    if Env.flex_get_of (get_env ()) k_simple_projection >= 0 then (
+      let penalty_inc = Env.flex_get_of (get_env ()) k_simple_projection in
+      let max_depth = Env.flex_get_of (get_env ()) k_simple_projection_md in
+      Env.add_unary_inf (get_env ()) "simple_projection"
         (simple_projection ~penalty_inc ~max_depth)
     );
 
-    if not (Env.flex_get_of (Env.get_global ()) k_prim_enum_early_bird) then (
-      match Env.flex_get_of (Env.get_global ()) k_ho_prim_mode with
+    if not (Env.flex_get_of (get_env ()) k_prim_enum_early_bird) then (
+      match Env.flex_get_of (get_env ()) k_ho_prim_mode with
       | `None -> ()
-      | mode ->
-        Env.add_unary_inf (Env.get_global ()) "ho_prim_enum" (prim_enum ~mode)
+      | mode -> Env.add_unary_inf (get_env ()) "ho_prim_enum" (prim_enum ~mode)
     ) else
       Signal.on
-        (Env.on_pred_var_elimination (Env.get_global ()))
+        (Env.on_pred_var_elimination (get_env ()))
         (fun (cl, var) ->
           early_bird_prim_enum cl var;
           Signal.ContinueListening);
     Signal.once
-      (Env.on_start (Env.get_global ()))
+      (Env.on_start (get_env ()))
       (fun () ->
-        if Env.flex_get_of (Env.get_global ()) k_ext_axiom then
+        if Env.flex_get_of (get_env ()) k_ext_axiom then
           Env.ProofState.PassiveSet.add
             (Iter.singleton (mk_extensionality_clause ()));
-        if Env.flex_get_of (Env.get_global ()) k_choice_axiom then
+        if Env.flex_get_of (get_env ()) k_choice_axiom then
           Env.ProofState.PassiveSet.add (Iter.singleton (mk_choice_clause ()));
-        if Env.flex_get_of (Env.get_global ()) k_add_ite_axioms then
+        if Env.flex_get_of (get_env ()) k_add_ite_axioms then
           Env.ProofState.PassiveSet.add (mk_ite_clauses ()))
   );
   ()
@@ -2935,58 +2915,51 @@ let _ite_axioms = ref false
 
 let extension =
   let register (env : Env.t) =
-    Env.flex_add_of (Env.get_global ()) k_ext_pos !_ext_pos;
-    Env.flex_add_of (Env.get_global ()) k_ext_pos_all_lits !_ext_pos_all_lits;
-    Env.flex_add_of (Env.get_global ()) k_ext_axiom !_ext_axiom;
-    Env.flex_add_of (Env.get_global ()) k_choice_axiom !_choice_axiom;
-    Env.flex_add_of (Env.get_global ()) k_elim_pred_var !_elim_pred_var;
-    Env.flex_add_of (Env.get_global ()) k_ext_neg_lit !_ext_neg_lit;
-    Env.flex_add_of (Env.get_global ()) k_neg_ext !_neg_ext;
-    Env.flex_add_of (Env.get_global ()) k_neg_ext_as_simpl !_neg_ext_as_simpl;
-    Env.flex_add_of (Env.get_global ()) k_ext_axiom_penalty !_ext_axiom_penalty;
-    Env.flex_add_of (Env.get_global ()) k_choice_axiom_penalty
-      !_choice_axiom_penalty;
-    Env.flex_add_of (Env.get_global ()) k_instantiate_choice_ax
-      !_instantiate_choice_ax;
-    Env.flex_add_of (Env.get_global ()) k_elim_leibniz_eq !_elim_leibniz_eq;
-    Env.flex_add_of (Env.get_global ()) k_elim_andrews_eq !_elim_andrews_eq;
-    Env.flex_add_of (Env.get_global ()) k_elim_andrews_eq_simpl
-      !_elim_andrews_eq_simpl;
-    Env.flex_add_of (Env.get_global ()) k_prune_arg_fun !_prune_arg_fun;
-    Env.flex_add_of (Env.get_global ()) k_prim_enum_terms prim_enum_terms;
-    Env.flex_add_of (Env.get_global ()) k_simple_projection !_simple_projection;
-    Env.flex_add_of (Env.get_global ()) k_simple_projection_md
-      !_simple_projection_md;
-    Env.flex_add_of (Env.get_global ()) k_check_lambda_free !_check_lambda_free;
-    Env.flex_add_of (Env.get_global ()) k_purify_applied_vars
-      !_purify_applied_vars;
-    Env.flex_add_of (Env.get_global ()) k_eta !_eta;
-    Env.flex_add_of (Env.get_global ()) k_generalize_choice_trigger
+    _env_ref := Some env;
+    Env.flex_add_of (get_env ()) k_ext_pos !_ext_pos;
+    Env.flex_add_of (get_env ()) k_ext_pos_all_lits !_ext_pos_all_lits;
+    Env.flex_add_of (get_env ()) k_ext_axiom !_ext_axiom;
+    Env.flex_add_of (get_env ()) k_choice_axiom !_choice_axiom;
+    Env.flex_add_of (get_env ()) k_elim_pred_var !_elim_pred_var;
+    Env.flex_add_of (get_env ()) k_ext_neg_lit !_ext_neg_lit;
+    Env.flex_add_of (get_env ()) k_neg_ext !_neg_ext;
+    Env.flex_add_of (get_env ()) k_neg_ext_as_simpl !_neg_ext_as_simpl;
+    Env.flex_add_of (get_env ()) k_ext_axiom_penalty !_ext_axiom_penalty;
+    Env.flex_add_of (get_env ()) k_choice_axiom_penalty !_choice_axiom_penalty;
+    Env.flex_add_of (get_env ()) k_instantiate_choice_ax !_instantiate_choice_ax;
+    Env.flex_add_of (get_env ()) k_elim_leibniz_eq !_elim_leibniz_eq;
+    Env.flex_add_of (get_env ()) k_elim_andrews_eq !_elim_andrews_eq;
+    Env.flex_add_of (get_env ()) k_elim_andrews_eq_simpl !_elim_andrews_eq_simpl;
+    Env.flex_add_of (get_env ()) k_prune_arg_fun !_prune_arg_fun;
+    Env.flex_add_of (get_env ()) k_prim_enum_terms prim_enum_terms;
+    Env.flex_add_of (get_env ()) k_simple_projection !_simple_projection;
+    Env.flex_add_of (get_env ()) k_simple_projection_md !_simple_projection_md;
+    Env.flex_add_of (get_env ()) k_check_lambda_free !_check_lambda_free;
+    Env.flex_add_of (get_env ()) k_purify_applied_vars !_purify_applied_vars;
+    Env.flex_add_of (get_env ()) k_eta !_eta;
+    Env.flex_add_of (get_env ()) k_generalize_choice_trigger
       !_generalize_choice_trigger;
-    Env.flex_add_of (Env.get_global ()) k_prim_enum_add_var !_prim_enum_add_var;
-    Env.flex_add_of (Env.get_global ()) k_prim_enum_early_bird
-      !_prim_enum_early_bird;
-    Env.flex_add_of (Env.get_global ()) k_resolve_flex_flex !_resolve_flex_flex;
-    Env.flex_add_of (Env.get_global ()) k_ground_app_vars !_ground_app_vars;
-    Env.flex_add_of (Env.get_global ()) k_arg_cong !_arg_cong;
-    Env.flex_add_of (Env.get_global ()) k_arg_cong_simpl !_arg_cong_simpl;
+    Env.flex_add_of (get_env ()) k_prim_enum_add_var !_prim_enum_add_var;
+    Env.flex_add_of (get_env ()) k_prim_enum_early_bird !_prim_enum_early_bird;
+    Env.flex_add_of (get_env ()) k_resolve_flex_flex !_resolve_flex_flex;
+    Env.flex_add_of (get_env ()) k_ground_app_vars !_ground_app_vars;
+    Env.flex_add_of (get_env ()) k_arg_cong !_arg_cong;
+    Env.flex_add_of (get_env ()) k_arg_cong_simpl !_arg_cong_simpl;
 
-    Env.flex_add_of (Env.get_global ()) k_ho_disagremeents !_ho_disagremeents;
-    Env.flex_add_of (Env.get_global ()) k_ext_dec_lits !_ext_dec_lits;
-    Env.flex_add_of (Env.get_global ()) k_ext_rules_max_depth
-      !ext_rules_max_depth;
-    Env.flex_add_of (Env.get_global ()) k_ext_rules_kind !ext_rules_kind;
-    Env.flex_add_of (Env.get_global ()) k_add_ite_axioms !_ite_axioms;
+    Env.flex_add_of (get_env ()) k_ho_disagremeents !_ho_disagremeents;
+    Env.flex_add_of (get_env ()) k_ext_dec_lits !_ext_dec_lits;
+    Env.flex_add_of (get_env ()) k_ext_rules_max_depth !ext_rules_max_depth;
+    Env.flex_add_of (get_env ()) k_ext_rules_kind !ext_rules_kind;
+    Env.flex_add_of (get_env ()) k_add_ite_axioms !_ite_axioms;
 
-    if Env.flex_get_of (Env.get_global ()) k_check_lambda_free = `Only then
-      Env.flex_add_of (Env.get_global ()) Saturate.k_abort_after_fragment_check
-        true;
+    if Env.flex_get_of (get_env ()) k_check_lambda_free = `Only then
+      Env.flex_add_of (get_env ()) Saturate.k_abort_after_fragment_check true;
 
-    if Env.flex_get_of (Env.get_global ()) k_check_lambda_free != `False then
-      Env.add_fragment_check (Env.get_global ()) (fun c ->
+    if Env.flex_get_of (get_env ()) k_check_lambda_free != `False then
+      Env.add_fragment_check (get_env ()) (fun _env c ->
           Clause.Seq.terms c |> Iter.for_all Term.in_lfho_fragment);
 
-    if Env.flex_get_of env k_some_ho || !force_enabled_ then setup ()
+    if Env.flex_get_of env k_some_ho || !force_enabled_ then setup env
   (* check if there are HO variables *)
   and check_ho vec state =
     let is_ho = CCVector.to_iter vec |> Iter.exists st_contains_ho in

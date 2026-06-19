@@ -54,6 +54,7 @@ val cut_res_clauses : cut_res -> Clause.t Iter.t
 val print_lemmas : unit CCFormat.printer
 
 val introduce_cut :
+  Env.t ->
   ?reason:unit CCFormat.printer ->
   ?penalty:int ->
   ?depth:int ->
@@ -67,5 +68,8 @@ val add_imply : cut_res list -> cut_res -> Proof.Step.t -> unit
 val on_input_lemma : cut_res Signal.t
 val on_lemma : cut_res Signal.t
 val convert_lemma : Env.clause_conversion_rule
-val register : split_kind:[< `Eager | `Lazy | `Off > `Off ] -> unit -> unit
+
+val register :
+  Env.t -> split_kind:[< `Eager | `Lazy | `Off > `Off ] -> unit -> unit
+
 val extension : Extensions.t

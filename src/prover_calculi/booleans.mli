@@ -14,7 +14,7 @@ type reasoning_kind =
   | BoolCasesPreprocess
 
 val k_bool_reasoning : reasoning_kind Flex_state.key
-val setup : unit -> unit
+val setup : Env.t -> unit
 val extension : Extensions.t
 
 val name_quantifiers :
