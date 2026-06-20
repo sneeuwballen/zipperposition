@@ -95,8 +95,6 @@ let k_force_limit = Flex_state.create_key ()
 let k_formula_simplify_reflect = Flex_state.create_key ()
 let k_strong_sr = Flex_state.create_key ()
 let k_superpose_w_formulas = Flex_state.create_key ()
-let _env_ref : Env.t option ref = ref None
-let get_env () = CCOpt.get_exn !_env_ref
 let _NO_LAMSUP = -1
 
 let get_unif_module (env : Env.t) : unif_module =
@@ -154,8 +152,8 @@ let force_getting_cl env streams =
         )
       in
 
-      (* let limit = max 1 ((Env.flex_get_of (get_env ()) StreamQueue.k_guard) / ) in *)
-      let limit = Env.flex_get_of (get_env ()) k_force_limit in
+      (* let limit = max 1 ((Env.flex_get_of env StreamQueue.k_guard) / ) in *)
+      let limit = Env.flex_get_of env k_force_limit in
       drip_stream limit stm
   in
   aux ([], []) streams
@@ -174,12 +172,12 @@ let has_bad_occurrence_elsewhere c var pos =
          | _ -> false)
 
 let fluidsup_applicable env cl =
-  (not (Env.flex_get_of (get_env ()) k_restrict_fluidsup))
+  (not (Env.flex_get_of env k_restrict_fluidsup))
   || Array.length (C.lits cl) <= 2
   || C.proof_depth cl == 0
 
 (* Syntactic overapproximation of fluid or deep terms *)
-let is_fluid_or_deep c t =
+let is_fluid_or_deep env c t =
   (* Fluid (1): Applied variables *)
   (T.is_var (T.head_term t) && not (CCList.is_empty @@ T.args t))
   (* Fluid (2): A lambda-expression that might eta-reduce to a non-lambda-expression after substitution (overapproximated) *)
@@ -206,19 +204,17 @@ let is_fluid_or_deep c t =
    from the active set *)
 let _update_active env f c =
   (* index subterms that can be rewritten by superposition *)
-  let sup_at_vars = Env.flex_get_of (get_env ()) k_sup_at_vars in
-  let sup_in_var_args = Env.flex_get_of (get_env ()) k_sup_in_var_args in
-  let sup_under_lambdas = Env.flex_get_of (get_env ()) k_sup_under_lambdas in
-  let sup_at_var_headed = Env.flex_get_of (get_env ()) k_sup_at_var_headed in
-  let sup_from_var_headed =
-    Env.flex_get_of (get_env ()) k_sup_from_var_headed
-  in
-  let fluidsup = Env.flex_get_of (get_env ()) k_fluidsup in
-  let subvarsup = Env.flex_get_of (get_env ()) k_subvarsup in
-  let dupsup = Env.flex_get_of (get_env ()) k_dupsup in
-  let lambdasup = Env.flex_get_of (get_env ()) k_lambdasup in
-  let demod_in_var_args = Env.flex_get_of (get_env ()) k_demod_in_var_args in
-  let lambda_demod = Env.flex_get_of (get_env ()) k_lambda_demod in
+  let sup_at_vars = Env.flex_get_of env k_sup_at_vars in
+  let sup_in_var_args = Env.flex_get_of env k_sup_in_var_args in
+  let sup_under_lambdas = Env.flex_get_of env k_sup_under_lambdas in
+  let sup_at_var_headed = Env.flex_get_of env k_sup_at_var_headed in
+  let sup_from_var_headed = Env.flex_get_of env k_sup_from_var_headed in
+  let fluidsup = Env.flex_get_of env k_fluidsup in
+  let subvarsup = Env.flex_get_of env k_subvarsup in
+  let dupsup = Env.flex_get_of env k_dupsup in
+  let lambdasup = Env.flex_get_of env k_lambdasup in
+  let demod_in_var_args = Env.flex_get_of env k_demod_in_var_args in
+  let lambda_demod = Env.flex_get_of env k_lambda_demod in
   let module TPSet = SClause.TPSet in
   _idx_sup_into :=
     Lits.fold_terms ~vars:sup_at_vars ~var_args:sup_in_var_args
@@ -249,7 +245,7 @@ let _update_active env f c =
         ~ty_args:false ~ord:!_ord_ref ~which:`Max ~subterms:true
         ~eligible:(C.Eligible.res c) (C.lits c)
       (* TODO(BOOL): How is this going to be extended for Boolean reasoning? *)
-      |> Iter.filter (fun (t, _) -> is_fluid_or_deep c t)
+      |> Iter.filter (fun (t, _) -> is_fluid_or_deep env c t)
       |> Iter.fold
            (fun tree (t, pos) ->
              let with_pos = C.WithPos.make ~clause:c ~pos in
@@ -334,7 +330,7 @@ let _update_active env f c =
       (C.lits c)
     |> Iter.filter (fun (_, r, sign, _) -> sign || T.equal r T.false_)
     |> Iter.filter (fun (l, _, _, _) ->
-           Env.flex_get_of (get_env ()) k_superpose_w_formulas
+           Env.flex_get_of env k_superpose_w_formulas
            ||
            match T.view l with
            | T.AppBuiltin ((Eq | Neq), _) -> false
@@ -360,9 +356,7 @@ let _update_active env f c =
            match T.view t with
            | T.AppBuiltin (hd, [ _; body ]) ->
              let tree =
-               if
-                 Builtin.is_quantifier hd
-                 && Env.flex_get_of (get_env ()) k_quant_demod
+               if Builtin.is_quantifier hd && Env.flex_get_of env k_quant_demod
                then (
                  let _, unfolded = T.open_fun body in
                  let pos = P.(append pos (P.arg 1 (P.body P.stop))) in
@@ -381,7 +375,7 @@ let _update_active env f c =
 
 (* update simpl. index using the clause [c] just added or removed to
    the simplification set *)
-let _update_simpl f c =
+let _update_simpl env f c =
   assert (CCArray.for_all Lit.no_prop_invariant (C.lits c));
   let idx = !_idx_simpl in
   let idx' =
@@ -390,7 +384,7 @@ let _update_simpl f c =
       (* do not use formulas for rewriting... can have adverse
           effects on lazy cnf *)
       if
-        (not (Env.flex_get_of (get_env ()) k_rw_with_formulas))
+        (not (Env.flex_get_of env k_rw_with_formulas))
         && (T.is_appbuiltin l
            || (T.is_appbuiltin r && (not @@ T.is_true_or_false r)))
       then
@@ -409,27 +403,6 @@ let _update_simpl f c =
   in
   _idx_simpl := idx';
   Signal.ContinueListening
-
-let () =
-  Signal.on PS.ActiveSet.on_add_clause (fun c ->
-      _idx_fv := SubsumIdx.add !_idx_fv c;
-      _update_active (get_env ())
-        (fun tree t wp ->
-          TermIndex.add tree t
-            (Clause.WithPos.make ~clause:(C.WithPos.clause wp)
-               ~pos:(C.WithPos.pos wp)))
-        c);
-  Signal.on PS.ActiveSet.on_remove_clause (fun c ->
-      _idx_fv := SubsumIdx.remove !_idx_fv c;
-      _update_active (get_env ())
-        (fun tree t wp ->
-          TermIndex.remove tree t
-            (Clause.WithPos.make ~clause:(C.WithPos.clause wp)
-               ~pos:(C.WithPos.pos wp)))
-        c);
-  Signal.on PS.SimplSet.on_add_clause (_update_simpl UnitIdx.add);
-  Signal.on PS.SimplSet.on_remove_clause (_update_simpl UnitIdx.remove);
-  ()
 
 (** {5 Inference Rules} *)
 
@@ -472,8 +445,8 @@ end
 exception ExitSuperposition of string
 
 (* Checks whether we must allow superposition at variables to be complete. *)
-let sup_at_var_condition info var replacement =
-  if Env.flex_get_of (get_env ()) k_check_sup_at_var_cond then
+let sup_at_var_condition env info var replacement =
+  if Env.flex_get_of env k_check_sup_at_var_cond then
     let open SupInfo in
     let us = info.subst in
     let subst = US.subst us in
@@ -513,8 +486,7 @@ let sup_at_var_condition info var replacement =
              None
       in
       let unique_vars =
-        if Env.flex_get_of (get_env ()) Higher_order.k_prune_arg_fun != `NoPrune
-        then
+        if Env.flex_get_of env Higher_order.k_prune_arg_fun != `NoPrune then
           None
         else
           unique_args_of_var info.passive
@@ -655,7 +627,7 @@ let dup_sup_apply_subst t sc_a sc_p subst renaming =
 
 (* Helper that does one or zero superposition inference, with all
    the given parameters. Clauses have a scope. *)
-let do_classic_superposition info =
+let do_classic_superposition env info =
   let open SupInfo in
   let module P = Position in
   let module TPS = SClause.TPSet in
@@ -670,7 +642,7 @@ let do_classic_superposition info =
     (not (T.is_var info.u_p))
     || T.is_ho_var info.u_p || info.sup_kind = FluidSup);
   assert (
-    Env.flex_get_of (get_env ()) k_sup_at_var_headed
+    Env.flex_get_of env k_sup_at_var_headed
     || info.sup_kind = FluidSup || info.sup_kind = DupSup
     || info.sup_kind = SubVarSup
     || not (T.is_var (T.head_term info.u_p)));
@@ -760,9 +732,9 @@ let do_classic_superposition info =
      | P.Arg (_, P.Left P.Stop) | P.Arg (_, P.Right P.Stop) ->
        if T.equal t' T.false_ then (
          if
-           (not (Env.flex_get_of (get_env ()) k_superpose_w_formulas))
+           (not (Env.flex_get_of env k_superpose_w_formulas))
            && not (Lit.is_positivoid info.passive_lit)
-           || Env.flex_get_of (get_env ()) k_superpose_w_formulas
+           || Env.flex_get_of env k_superpose_w_formulas
               && not (T.is_appbuiltin info.s)
          then
            raise exit_negative_tl
@@ -777,7 +749,7 @@ let do_classic_superposition info =
      | _ ->
        if
          T.equal t' T.false_
-         && ((not (Env.flex_get_of (get_env ()) k_superpose_w_formulas))
+         && ((not (Env.flex_get_of env k_superpose_w_formulas))
             || (not @@ T.is_appbuiltin info.s))
        then
          raise @@ exit_negative_tl);
@@ -816,7 +788,7 @@ let do_classic_superposition info =
 
       if
         Util.Int_set.cardinal (Util.Int_set.of_list !dbs)
-        > Env.flex_get_of (get_env ()) k_lambdasup
+        > Env.flex_get_of env k_lambdasup
       then (
         let msg = "Too many skolems will be introduced for LambdaSup." in
         Util.debugf ~section 3 "%s" (fun k -> k msg);
@@ -834,7 +806,7 @@ let do_classic_superposition info =
       Lit.apply_subst_no_simp renaming subst' (info.passive_lit, sc_p)
     in
     let new_trail = C.trail_l [ info.active; info.passive ] in
-    if Env.is_trivial_trail (get_env ()) new_trail then
+    if Env.is_trivial_trail env new_trail then
       raise (ExitSuperposition "trivial trail");
     let s' = S.FO.apply ~shift_vars renaming subst (info.s, sc_a) in
     if
@@ -869,21 +841,22 @@ let do_classic_superposition info =
     );
     (* Check for superposition at a variable *)
     if info.sup_kind != FluidSup then
-      if not @@ Env.flex_get_of (get_env ()) k_sup_at_vars then (
+      if not @@ Env.flex_get_of env k_sup_at_vars then (
         if T.is_var info.u_p then
           raise (ExitSuperposition "sup at var position")
       ) else if
-          T.is_var info.u_p && not (sup_at_var_condition info info.u_p info.t)
+          T.is_var info.u_p
+          && not (sup_at_var_condition env info info.u_p info.t)
         then (
         Util.debugf ~section 3 "superposition at variable" (fun k -> k);
         raise (ExitSuperposition "superposition at variable")
       );
 
     (* Check for hidden superposition at a variable *)
-    if Env.flex_get_of (get_env ()) k_restrict_hidden_sup_at_vars then (
+    if Env.flex_get_of env k_restrict_hidden_sup_at_vars then (
       match is_hidden_sup_at_var info with
       | Some (var, replacement)
-        when not (sup_at_var_condition info var replacement) ->
+        when not (sup_at_var_condition env info var replacement) ->
         raise (ExitSuperposition "hidden superposition at variable")
       | _ -> ()
     );
@@ -953,7 +926,7 @@ let do_classic_superposition info =
       Proof.Rule.mk (r ^ sign)
     in
     CCList.iter
-      (fun (sym, ty) -> Ctx.declare (Env.get_ctx (get_env ())) sym ty)
+      (fun (sym, ty) -> Ctx.declare (Env.get_ctx env) sym ty)
       !skolem_decls;
     let tags =
       (if subst_is_ho || info.sup_kind != Classic then
@@ -992,11 +965,11 @@ let do_classic_superposition info =
          else
            0)
       + (if info.sup_kind == FluidSup then
-           Env.flex_get_of (get_env ()) k_fluidsup_penalty
+           Env.flex_get_of env k_fluidsup_penalty
          else
            0)
       + (if info.sup_kind == DupSup then
-           Env.flex_get_of (get_env ()) k_dupsup_penalty
+           Env.flex_get_of env k_dupsup_penalty
          else
            0)
       +
@@ -1006,9 +979,7 @@ let do_classic_superposition info =
         0
     in
     let new_clause =
-      C.create
-        ~ctx:(Env.get_ctx (get_env ()))
-        ~trail:new_trail ~penalty new_lits proof
+      C.create ~ctx:(Env.get_ctx env) ~trail:new_trail ~penalty new_lits proof
     in
     (* Format.printf "LS: %a\n" C.pp new_clause;  *)
     Util.debugf ~section 1 "@[... ok, conclusion@ @[%a@]@]" (fun k ->
@@ -1039,7 +1010,7 @@ let do_classic_superposition info =
 
 (* simultaneous superposition: when rewriting D with C \lor s=t,
     replace s with t everywhere in D rather than at one place. *)
-let do_simultaneous_superposition info =
+let do_simultaneous_superposition env info =
   let open SupInfo in
   let module P = Position in
   let module TPS = SClause.TPSet in
@@ -1060,7 +1031,7 @@ let do_simultaneous_superposition info =
     (not (T.is_var info.u_p))
     || T.is_ho_var info.u_p || info.sup_kind = FluidSup);
   assert (
-    Env.flex_get_of (get_env ()) k_sup_at_var_headed
+    Env.flex_get_of env k_sup_at_var_headed
     || info.sup_kind = FluidSup || info.sup_kind = DupSup
     || not (T.is_var (T.head_term info.u_p)));
   let active_idx = Lits.Pos.idx info.active_pos in
@@ -1114,7 +1085,7 @@ let do_simultaneous_superposition info =
       Lit.apply_subst_no_simp renaming subst (info.passive_lit, sc_p)
     in
     let new_trail = C.trail_l [ info.active; info.passive ] in
-    if Env.is_trivial_trail (get_env ()) new_trail then
+    if Env.is_trivial_trail env new_trail then
       raise (ExitSuperposition "trivial trail");
     let s' = S.FO.apply ~shift_vars renaming subst (info.s, sc_a) in
     if
@@ -1129,11 +1100,12 @@ let do_simultaneous_superposition info =
       raise (ExitSuperposition "bad ordering conditions");
     (* Check for superposition at a variable *)
     if info.sup_kind != FluidSup then
-      if not @@ Env.flex_get_of (get_env ()) k_sup_at_vars then (
+      if not @@ Env.flex_get_of env k_sup_at_vars then (
         if T.is_var info.u_p then
           raise (ExitSuperposition "sup at var position")
       ) else if
-          T.is_var info.u_p && not (sup_at_var_condition info info.u_p info.t)
+          T.is_var info.u_p
+          && not (sup_at_var_condition env info info.u_p info.t)
         then
         raise (ExitSuperposition "superposition at variable");
     (* ordering constraints are ok, build new active lits (excepted s=t) *)
@@ -1200,9 +1172,7 @@ let do_simultaneous_superposition info =
         0
     in
     let new_clause =
-      C.create
-        ~ctx:(Env.get_ctx (get_env ()))
-        ~trail:new_trail ~penalty new_lits proof
+      C.create ~ctx:(Env.get_ctx env) ~trail:new_trail ~penalty new_lits proof
     in
     Util.debugf ~section 2 "@[... ok, conclusion@ @[%a@]@]" (fun k ->
         k C.pp new_clause);
@@ -1213,7 +1183,7 @@ let do_simultaneous_superposition info =
     None
 
 (* choose between regular and simultaneous superposition *)
-let do_superposition info =
+let do_superposition env info =
   let open SupInfo in
   assert (
     info.sup_kind = DupSup || info.sup_kind = SubVarSup
@@ -1258,14 +1228,14 @@ let do_superposition info =
     assert false
   );
   if
-    Env.flex_get_of (get_env ()) k_use_simultaneous_sup
+    Env.flex_get_of env k_use_simultaneous_sup
     && info.sup_kind != LambdaSup && info.sup_kind != DupSup
   then
-    do_simultaneous_superposition info
+    do_simultaneous_superposition env info
   else
-    do_classic_superposition info
+    do_classic_superposition env info
 
-let infer_active_aux ~retrieve_from_index ~process_retrieved clause =
+let infer_active_aux env ~retrieve_from_index ~process_retrieved clause =
   let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "sup.infer-active" in
   (* no literal can be eligible for paramodulation if some are selected.
      This checks if inferences with i-th literal are needed? *)
@@ -1302,7 +1272,7 @@ let infer_active_aux ~retrieve_from_index ~process_retrieved clause =
                      sup_kind = Classic;
                    }
                in
-               do_superposition info
+               do_superposition env info
              ) else
                None
            in
@@ -1313,7 +1283,7 @@ let infer_active_aux ~retrieve_from_index ~process_retrieved clause =
   in
   new_clauses
 
-let infer_passive_aux ~retrieve_from_index ~process_retrieved clause =
+let infer_passive_aux ~retrieve_from_index ~process_retrieved clause env =
   let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "sup.infer-passive" in
   (* perform inference on this lit? *)
   let eligible = C.Eligible.(res clause) in
@@ -1322,9 +1292,9 @@ let infer_passive_aux ~retrieve_from_index ~process_retrieved clause =
   let module TPSet = SClause.TPSet in
   let new_clauses =
     Lits.fold_terms
-      ~vars:(Env.flex_get_of (get_env ()) k_sup_at_vars)
-      ~var_args:(Env.flex_get_of (get_env ()) k_sup_in_var_args)
-      ~fun_bodies:(Env.flex_get_of (get_env ()) k_sup_under_lambdas)
+      ~vars:(Env.flex_get_of env k_sup_at_vars)
+      ~var_args:(Env.flex_get_of env k_sup_in_var_args)
+      ~fun_bodies:(Env.flex_get_of env k_sup_under_lambdas)
       ~subterms:true ~ord:!_ord_ref ~which:`Max ~eligible ~ty_args:false
       (C.lits clause)
     |> Iter.append (TPSet.to_iter (C.eligible_subterms_of_bool clause))
@@ -1332,7 +1302,7 @@ let infer_passive_aux ~retrieve_from_index ~process_retrieved clause =
     |> Iter.filter (fun (u_p, _) -> (not (T.is_var u_p)) || T.is_ho_var u_p)
     |> Iter.filter (fun (u_p, _) -> T.DB.is_closed u_p)
     |> Iter.filter (fun (u_p, _) ->
-           Env.flex_get_of (get_env ()) k_sup_at_var_headed
+           Env.flex_get_of env k_sup_at_var_headed
            || not (T.is_var (T.head_term u_p)))
     |> Iter.flat_map (fun (u_p, passive_pos) ->
            let passive_lit, _ = Lits.Pos.lit_at (C.lits clause) passive_pos in
@@ -1358,7 +1328,7 @@ let infer_passive_aux ~retrieve_from_index ~process_retrieved clause =
                      sup_kind = Classic;
                    }
                in
-               do_superposition info
+               do_superposition env info
              | _ -> None
            in
            (* all terms that occur in an equation in the active_set
@@ -1369,13 +1339,13 @@ let infer_passive_aux ~retrieve_from_index ~process_retrieved clause =
   in
   new_clauses
 
-let infer_active _env clause =
-  infer_active_aux ~retrieve_from_index:I.retrieve_unifiables
+let infer_active env clause =
+  infer_active_aux env ~retrieve_from_index:I.retrieve_unifiables
     ~process_retrieved:(fun do_sup (u_p, with_pos, subst) ->
       do_sup u_p with_pos subst)
     clause
 
-let infer_lambdasup_from _env clause =
+let infer_lambdasup_from env clause =
   (* no literal can be eligible for paramodulation if some are selected.
      This checks if inferences with i-th literal are needed? *)
   let eligible = C.Eligible.param clause in
@@ -1411,20 +1381,20 @@ let infer_lambdasup_from _env clause =
              "[Trying lambdasup from %a into %a with term %a into term %a]"
              (fun k -> k C.pp clause C.pp passive T.pp s T.pp u_p);
 
-           do_superposition info
+           do_superposition env info
          in
          I.retrieve_unifiables (!_idx_lambdasup_into, 1) (s, 0)
          |> Iter.filter_map (fun (u_p, with_pos, subst) ->
                 do_lambdasup u_p with_pos subst))
   |> Iter.to_rev_list
 
-let infer_passive _env clause =
+let infer_passive env clause =
   infer_passive_aux ~retrieve_from_index:I.retrieve_unifiables
     ~process_retrieved:(fun do_sup (u_p, with_pos, subst) ->
       do_sup u_p with_pos subst)
-    clause
+    clause env
 
-let infer_lambdasup_into _env clause =
+let infer_lambdasup_into env clause =
   let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "sup.infer-lambdasup-into" in
   (* perform inference on this lit? *)
   let eligible = C.Eligible.(res clause) in
@@ -1432,8 +1402,8 @@ let infer_lambdasup_into _env clause =
      so we consider both negative and positive literals *)
   let new_clauses =
     Lits.fold_terms
-      ~vars:(Env.flex_get_of (get_env ()) k_sup_at_vars)
-      ~var_args:(Env.flex_get_of (get_env ()) k_sup_in_var_args)
+      ~vars:(Env.flex_get_of env k_sup_at_vars)
+      ~var_args:(Env.flex_get_of env k_sup_in_var_args)
       ~fun_bodies:true ~subterms:true ~ord:!_ord_ref ~which:`Max ~eligible
       ~ty_args:false (C.lits clause)
     |> Iter.filter_map (fun (u_p, p) ->
@@ -1451,7 +1421,7 @@ let infer_lambdasup_into _env clause =
                ((not (T.is_var body)) || T.is_ho_var body)
                && ((not (T.is_const hd))
                   || not (Name.is_skolem (T.as_const_exn hd)))
-               && (Env.flex_get_of (get_env ()) k_sup_at_var_headed
+               && (Env.flex_get_of env k_sup_at_var_headed
                   || not (T.is_var (T.head_term body)))
              then
                Some (body, new_pos)
@@ -1485,7 +1455,7 @@ let infer_lambdasup_into _env clause =
                Util.debugf ~section 10
                  "[Trying lambdasup from %a into %a with term %a into term %a]"
                  (fun k -> k C.pp active C.pp clause T.pp s T.pp u_p);
-               do_superposition info
+               do_superposition env info
              | _ -> None
            in
            (* all terms that occur in an equation in the active_set
@@ -1496,12 +1466,12 @@ let infer_lambdasup_into _env clause =
   in
   new_clauses
 
-let infer_active_complete_ho _env clause =
+let infer_active_complete_ho env clause =
   let inf_res =
-    infer_active_aux
+    infer_active_aux env
       ~retrieve_from_index:
         (I.retrieve_unifiables_complete
-           ~unif_alg:(Env.flex_get_of (get_env ()) k_unif_alg))
+           ~unif_alg:(Env.flex_get_of env k_unif_alg))
       ~process_retrieved:(fun do_sup (u_p, with_pos, substs) ->
         (* let penalty = max (C.penalty clause) (C.penalty (Clause.WithPos.clause with_pos)) in *)
         (* /!\ may differ from the actual penalty (by -2) *)
@@ -1513,20 +1483,20 @@ let infer_active_complete_ho _env clause =
       clause
   in
 
-  if Env.should_force_stream_eval (get_env ()) () then
-    Env.get_finite_infs (get_env ()) (List.map (fun (_, _, x) -> x) inf_res)
+  if Env.should_force_stream_eval env () then
+    Env.get_finite_infs env (List.map (fun (_, _, x) -> x) inf_res)
   else (
-    let clauses, streams = force_getting_cl (get_env ()) inf_res in
-    StmQ.add_lst (Env.get_stm_queue (get_env ())) streams;
+    let clauses, streams = force_getting_cl env inf_res in
+    StmQ.add_lst (Env.get_stm_queue env) streams;
     clauses
   )
 
-let infer_passive_complete_ho _env clause =
+let infer_passive_complete_ho env clause =
   let inf_res =
     infer_passive_aux
       ~retrieve_from_index:
         (I.retrieve_unifiables_complete
-           ~unif_alg:(Env.flex_get_of (get_env ()) k_unif_alg))
+           ~unif_alg:(Env.flex_get_of env k_unif_alg))
       ~process_retrieved:(fun do_sup (u_p, with_pos, substs) ->
         (* let penalty = max (C.penalty clause) (C.penalty (Clause.WithPos.clause with_pos)) in *)
         (* /!\ may differ from the actual penalty (by -2) *)
@@ -1535,14 +1505,14 @@ let infer_passive_complete_ho _env clause =
           max (C.penalty clause) (C.penalty (Clause.WithPos.clause with_pos))
         in
         Some (p, parents, OSeq.map (CCOpt.flat_map (do_sup u_p with_pos)) substs))
-      clause
+      clause env
   in
 
-  if Env.should_force_stream_eval (get_env ()) () then
-    Env.get_finite_infs (get_env ()) (List.map (fun (_, _, x) -> x) inf_res)
+  if Env.should_force_stream_eval env () then
+    Env.get_finite_infs env (List.map (fun (_, _, x) -> x) inf_res)
   else (
-    let clauses, streams = force_getting_cl (get_env ()) inf_res in
-    StmQ.add_lst (Env.get_stm_queue (get_env ())) streams;
+    let clauses, streams = force_getting_cl env inf_res in
+    StmQ.add_lst (Env.get_stm_queue env) streams;
     clauses
   )
 
@@ -1550,7 +1520,7 @@ let infer_passive_complete_ho _env clause =
  * FluidSup rule (Superposition at applied variables)
  * ---------------------------------------------------------------------- *)
 
-let infer_fluidsup_active _env clause =
+let infer_fluidsup_active env clause =
   let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "sup.infer-fluidsup-active" in
   (* no literal can be eligible for paramodulation if some are selected.
      This checks if inferences with i-th literal are needed? *)
@@ -1559,13 +1529,14 @@ let infer_fluidsup_active _env clause =
      we try to rewrite conditionally other clauses using
      non-minimal sides of every positive literal *)
   let new_clauses =
-    if fluidsup_applicable (get_env ()) clause then
+    if fluidsup_applicable env clause then
       Lits.fold_eqn ~ord:!_ord_ref ~both:true ~eligible (C.lits clause)
       |> Iter.filter (fun (_, t, sign, _) -> sign || T.equal t T.false_)
       |> Iter.flat_map (fun (s, t, _, s_pos) ->
              I.fold !_idx_fluidsup_into
                (fun acc u_p with_pos ->
-                 assert (is_fluid_or_deep (Clause.WithPos.clause with_pos) u_p);
+                 assert (
+                   is_fluid_or_deep env (Clause.WithPos.clause with_pos) u_p);
                  assert (T.DB.is_closed u_p);
                  (* Create prefix variable H and use H s = H t for superposition *)
                  let var_h =
@@ -1580,7 +1551,7 @@ let infer_fluidsup_active _env clause =
                  let hs = T.app var_h [ s ] in
                  let ht = T.app var_h [ t ] in
                  let res =
-                   Env.flex_get_of (get_env ()) k_unif_alg (u_p, 1) (hs, 0)
+                   Env.flex_get_of env k_unif_alg (u_p, 1) (hs, 0)
                    |> OSeq.map (fun osubst ->
                           osubst
                           |> CCOpt.flat_map (fun subst ->
@@ -1608,12 +1579,12 @@ let infer_fluidsup_active _env clause =
                                        sup_kind = FluidSup;
                                      }
                                  in
-                                 do_superposition info))
+                                 do_superposition env info))
                  in
                  let penalty =
                    max (C.penalty clause)
                      (C.penalty (Clause.WithPos.clause with_pos))
-                   + Env.flex_get_of (get_env ()) k_fluidsup_penalty
+                   + Env.flex_get_of env k_fluidsup_penalty
                  in
                  (* /!\ may differ from the actual penalty (by -2) *)
                  Iter.cons
@@ -1624,30 +1595,30 @@ let infer_fluidsup_active _env clause =
     else
       []
   in
-  if Env.should_force_stream_eval (get_env ()) () then
-    Env.get_finite_infs (get_env ()) (List.map (fun (_, x, _) -> x) new_clauses)
+  if Env.should_force_stream_eval env () then
+    Env.get_finite_infs env (List.map (fun (_, x, _) -> x) new_clauses)
   else (
     let stm_res =
       List.map
         (fun (p, s, parents) -> Stm.make ~penalty:p ~parents s)
         new_clauses
     in
-    StmQ.add_lst (Env.get_stm_queue (get_env ())) stm_res;
+    StmQ.add_lst (Env.get_stm_queue env) stm_res;
     []
   )
 
-let infer_fluidsup_passive _env clause =
+let infer_fluidsup_passive env clause =
   let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "sup.infer-fluidsup-passive" in
   (* perform inference on this lit? *)
   let eligible = C.Eligible.(res clause) in
   (* do the inferences in which clause is passive (rewritten),
      so we consider both negative and positive literals *)
   let new_clauses =
-    if fluidsup_applicable (get_env ()) clause then
+    if fluidsup_applicable env clause then
       Lits.fold_terms ~vars:true ~var_args:false ~fun_bodies:false
         ~subterms:true ~ord:!_ord_ref ~which:`Max ~eligible ~ty_args:false
         (C.lits clause)
-      |> Iter.filter (fun (u_p, _) -> is_fluid_or_deep clause u_p)
+      |> Iter.filter (fun (u_p, _) -> is_fluid_or_deep env clause u_p)
       |> Iter.flat_map (fun (u_p, passive_pos) ->
              let passive_lit, _ = Lits.Pos.lit_at (C.lits clause) passive_pos in
              I.fold !_idx_sup_from
@@ -1669,7 +1640,7 @@ let infer_fluidsup_passive _env clause =
                      in
                      let hs = T.app var_h [ s ] in
                      let ht = T.app var_h [ t ] in
-                     Env.flex_get_of (get_env ()) k_unif_alg (hs, 1) (u_p, 0)
+                     Env.flex_get_of env k_unif_alg (hs, 1) (u_p, 0)
                      |> OSeq.map (fun osubst ->
                             osubst
                             |> CCOpt.flat_map (fun subst ->
@@ -1690,13 +1661,13 @@ let infer_fluidsup_passive _env clause =
                                          sup_kind = FluidSup;
                                        }
                                    in
-                                   do_superposition info))
+                                   do_superposition env info))
                    | _ -> assert false
                  in
                  let penalty =
                    max (C.penalty clause)
                      (C.penalty (Clause.WithPos.clause with_pos))
-                   + Env.flex_get_of (get_env ()) k_fluidsup_penalty
+                   + Env.flex_get_of env k_fluidsup_penalty
                  in
                  (* /!\ may differ from the actual penalty (by -2) *)
                  Iter.cons
@@ -1707,15 +1678,15 @@ let infer_fluidsup_passive _env clause =
     else
       []
   in
-  if Env.should_force_stream_eval (get_env ()) () then
-    Env.get_finite_infs (get_env ()) (List.map (fun (_, x, _) -> x) new_clauses)
+  if Env.should_force_stream_eval env () then
+    Env.get_finite_infs env (List.map (fun (_, x, _) -> x) new_clauses)
   else (
     let stm_res =
       List.map
         (fun (p, s, parents) -> Stm.make ~penalty:p ~parents s)
         new_clauses
     in
-    StmQ.add_lst (Env.get_stm_queue (get_env ())) stm_res;
+    StmQ.add_lst (Env.get_stm_queue env) stm_res;
     []
   )
 
@@ -1723,7 +1694,7 @@ let infer_fluidsup_passive _env clause =
  * DupSup rule (Lightweight superposition at applied variables)
  * ---------------------------------------------------------------------- *)
 
-let infer_dupsup_active _env clause =
+let infer_dupsup_active env clause =
   let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "sup.infer-dupsup-active" in
   let eligible = C.Eligible.param clause in
   let new_clauses =
@@ -1773,7 +1744,7 @@ let infer_dupsup_active _env clause =
                  in
                  let z_args = T.app term_z (args_up @ [ t ]) in
                  let res =
-                   Env.flex_get_of (get_env ()) k_unif_alg (s, scope_active)
+                   Env.flex_get_of env k_unif_alg (s, scope_active)
                      (w_args, scope_passive)
                    |> OSeq.map (fun osubst ->
                           osubst
@@ -1803,12 +1774,12 @@ let infer_dupsup_active _env clause =
                                        sup_kind = DupSup;
                                      }
                                  in
-                                 do_superposition info))
+                                 do_superposition env info))
                  in
                  let penalty =
                    max (C.penalty clause)
                      (C.penalty (Clause.WithPos.clause with_pos))
-                   + (Env.flex_get_of (get_env ()) k_fluidsup_penalty / 3)
+                   + (Env.flex_get_of env k_fluidsup_penalty / 3)
                  in
                  (* /!\ may differ from the actual penalty (by -2) *)
                  Iter.cons
@@ -1818,19 +1789,19 @@ let infer_dupsup_active _env clause =
              Iter.empty)
     |> Iter.to_rev_list
   in
-  if Env.should_force_stream_eval (get_env ()) () then
-    Env.get_finite_infs (get_env ()) (List.map (fun (_, x, _) -> x) new_clauses)
+  if Env.should_force_stream_eval env () then
+    Env.get_finite_infs env (List.map (fun (_, x, _) -> x) new_clauses)
   else (
     let stm_res =
       List.map
         (fun (p, s, parents) -> Stm.make ~penalty:p ~parents s)
         new_clauses
     in
-    StmQ.add_lst (Env.get_stm_queue (get_env ())) stm_res;
+    StmQ.add_lst (Env.get_stm_queue env) stm_res;
     []
   )
 
-let infer_dupsup_passive _env clause =
+let infer_dupsup_passive env clause =
   let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "sup.infer-dupsup-passive" in
   (* perform inference on this lit? *)
   let eligible = C.Eligible.(res clause) in
@@ -1893,8 +1864,8 @@ let infer_dupsup_passive _env clause =
                    in
                    let z_args = T.app term_z (List.append args_up [ t ]) in
                    let res =
-                     Env.flex_get_of (get_env ()) k_unif_alg
-                       (w_args, scope_passive) (s, scope_active)
+                     Env.flex_get_of env k_unif_alg (w_args, scope_passive)
+                       (s, scope_active)
                      |> OSeq.map (fun osubst ->
                             osubst
                             |> CCOpt.flat_map (fun subst ->
@@ -1916,12 +1887,12 @@ let infer_dupsup_passive _env clause =
                                          sup_kind = DupSup;
                                        }
                                    in
-                                   do_superposition info))
+                                   do_superposition env info))
                    in
                    let penalty =
                      max (C.penalty clause)
                        (C.penalty (Clause.WithPos.clause with_pos))
-                     + (Env.flex_get_of (get_env ()) k_fluidsup_penalty / 3)
+                     + (Env.flex_get_of env k_fluidsup_penalty / 3)
                    in
                    (* /!\ may differ from the actual penalty (by -2) *)
                    Iter.cons
@@ -1932,15 +1903,15 @@ let infer_dupsup_passive _env clause =
              Iter.empty)
     |> Iter.to_rev_list
   in
-  if Env.should_force_stream_eval (get_env ()) () then
-    Env.get_finite_infs (get_env ()) (List.map (fun (_, x, _) -> x) new_clauses)
+  if Env.should_force_stream_eval env () then
+    Env.get_finite_infs env (List.map (fun (_, x, _) -> x) new_clauses)
   else (
     let stm_res =
       List.map
         (fun (p, s, parents) -> Stm.make ~penalty:p ~parents s)
         new_clauses
     in
-    StmQ.add_lst (Env.get_stm_queue (get_env ())) stm_res;
+    StmQ.add_lst (Env.get_stm_queue env) stm_res;
     []
   )
 
@@ -1948,7 +1919,7 @@ let infer_dupsup_passive _env clause =
  * SubVarSup rules
  * ---------------------------------------------------------------------- *)
 
-let do_subvarsup ~active_pos ~passive_pos =
+let do_subvarsup ~active_pos ~passive_pos env =
   (* Variable names in each clause renamed apart *)
   let renaming = Subst.Renaming.create () in
   let rename_term t = Subst.FO.apply renaming Subst.empty t in
@@ -1999,9 +1970,9 @@ let do_subvarsup ~active_pos ~passive_pos =
         sup_kind = SubVarSup;
       }
   in
-  do_superposition sup_info
+  do_superposition env sup_info
 
-let infer_subvarsup_active _env clause =
+let infer_subvarsup_active env clause =
   let eligible = C.Eligible.param clause in
   Lits.fold_eqn ~ord:!_ord_ref ~both:true ~eligible (C.lits clause)
   |> Iter.filter (fun (_, t, sign, _) -> sign || T.equal t T.false_)
@@ -2017,7 +1988,7 @@ let infer_subvarsup_active _env clause =
                  ~clause:(Clause.WithPos.clause with_pos)
                  ~pos:(Clause.WithPos.pos with_pos)
              in
-             match do_subvarsup ~passive_pos ~active_pos with
+             match do_subvarsup ~passive_pos ~active_pos env with
              | Some c ->
                Util.debugf ~section 2 "svs: @[%a@]@. @[%a@]. @[%a@]@." (fun k ->
                    k C.pp clause C.pp (Clause.WithPos.clause with_pos) C.pp c);
@@ -2026,7 +1997,7 @@ let infer_subvarsup_active _env clause =
            Iter.empty)
   |> Iter.to_rev_list
 
-let infer_subvarsup_passive _env clause =
+let infer_subvarsup_passive env clause =
   let eligible = C.Eligible.(res clause) in
   Lits.fold_terms ~vars:true ~var_args:false ~fun_bodies:false ~subterms:true
     ~ord:!_ord_ref ~which:`Max ~eligible ~ty_args:false (C.lits clause)
@@ -2051,7 +2022,7 @@ let infer_subvarsup_passive _env clause =
                    ~clause:(Clause.WithPos.clause with_pos)
                    ~pos:(Clause.WithPos.pos with_pos)
                in
-               (match do_subvarsup ~passive_pos ~active_pos with
+               (match do_subvarsup ~passive_pos ~active_pos env with
                | Some c ->
                  Util.debugf ~section 2 "svs: @[%a@]@. @[%a@]. @[%a@]@."
                    (fun k ->
@@ -2066,7 +2037,7 @@ let infer_subvarsup_passive _env clause =
  * Equality Resolution rule
  * ---------------------------------------------------------------------- *)
 
-let infer_equality_resolution_aux ~unify ~iterate_substs clause =
+let infer_equality_resolution_aux ~unify ~iterate_substs env clause =
   let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "sup.infer-eq-resolution" in
   let eligible =
     C.Eligible.filter (fun lit -> not @@ Lit.is_predicate_lit lit)
@@ -2119,9 +2090,8 @@ let infer_equality_resolution_aux ~unify ~iterate_substs clause =
                    [ C.proof_parent_subst renaming (clause, 0) subst ]
                in
                let new_clause =
-                 C.create
-                   ~ctx:(Env.get_ctx (get_env ()))
-                   ~trail ~penalty (c_guard @ new_lits) proof
+                 C.create ~ctx:(Env.get_ctx env) ~trail ~penalty
+                   (c_guard @ new_lits) proof
                in
                (* CCFormat.printf "success: @[%a@]@." C.pp new_clause; *)
                Util.debugf ~section 2
@@ -2138,29 +2108,29 @@ let infer_equality_resolution_aux ~unify ~iterate_substs clause =
   in
   new_clauses
 
-let infer_equality_resolution _env c =
+let infer_equality_resolution env c =
   infer_equality_resolution_aux
     ~unify:(fun l r ->
       try Some (Unif.FO.unify_full l r) with Unif.Fail -> None)
     ~iterate_substs:(fun substs do_eq_res -> CCOpt.flat_map do_eq_res substs)
-    c
+    env c
 
-let infer_equality_resolution_complete_ho _env clause =
+let infer_equality_resolution_complete_ho env clause =
   let inf_res =
     infer_equality_resolution_aux
-      ~unify:(Env.flex_get_of (get_env ()) k_unif_alg)
+      ~unify:(Env.flex_get_of env k_unif_alg)
       ~iterate_substs:(fun substs do_eq_res ->
         Some (OSeq.map (CCOpt.flat_map do_eq_res) substs))
-      clause
+      env clause
   in
-  if Env.should_force_stream_eval (get_env ()) () then
-    Env.get_finite_infs (get_env ()) inf_res
+  if Env.should_force_stream_eval env () then
+    Env.get_finite_infs env inf_res
   else (
     let cls, stm_res =
-      force_getting_cl (get_env ())
+      force_getting_cl env
         (List.map (fun stm -> C.penalty clause, [ clause ], stm) inf_res)
     in
-    StmQ.add_lst (Env.get_stm_queue (get_env ())) stm_res;
+    StmQ.add_lst (Env.get_stm_queue env) stm_res;
     cls
   )
 
@@ -2183,7 +2153,7 @@ module EqFactInfo = struct
 end
 
 (* do the inference between given positions, if ordering conditions are respected *)
-let do_eq_factoring info =
+let do_eq_factoring env info =
   let open EqFactInfo in
   let s = info.s and t = info.t and v = info.v and idx = info.active_idx in
   let us = info.subst in
@@ -2192,7 +2162,7 @@ let do_eq_factoring info =
   let subst = US.subst us in
 
   if
-    Env.flex_get_of (get_env ()) k_pred_var_eq_fact
+    Env.flex_get_of env k_pred_var_eq_fact
     && info.is_pred_var_eq_fact
     && C.proof_depth info.clause < 2
     && not (T.is_true_or_false t)
@@ -2241,9 +2211,8 @@ let do_eq_factoring info =
         C.penalty info.clause + 1
     in
     let new_clause =
-      C.create
-        ~ctx:(Env.get_ctx (get_env ()))
-        ~trail:(C.trail info.clause) ~penalty new_lits proof
+      C.create ~ctx:(Env.get_ctx env) ~trail:(C.trail info.clause) ~penalty
+        new_lits proof
     in
     Util.debugf ~section 3
       "@[<hv2>equality factoring on@ @[%a@]@ yields @[%a@]@]" (fun k ->
@@ -2253,7 +2222,7 @@ let do_eq_factoring info =
   ) else
     None
 
-let infer_equality_factoring_aux ~unify ~iterate_substs clause =
+let infer_equality_factoring_aux ~unify ~iterate_substs env clause =
   let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "sup.infer-eq-factoring" in
   let eligible = C.Eligible.(filter Lit.eqn_sign) in
   (* find root terms that are unifiable with s and are not in the
@@ -2298,34 +2267,34 @@ let infer_equality_factoring_aux ~unify ~iterate_substs clause =
                             is_pred_var_eq_fact;
                           }
                       in
-                      do_eq_factoring info)))
+                      do_eq_factoring env info)))
     |> Iter.to_rev_list
   in
   new_clauses
 
-let infer_equality_factoring _env c =
+let infer_equality_factoring env c =
   infer_equality_factoring_aux
     ~unify:(fun s t ->
       try Some (Unif.FO.unify_full s t) with Unif.Fail -> None)
     ~iterate_substs:(fun subst do_eq_fact -> CCOpt.flat_map do_eq_fact subst)
-    c
+    env c
 
-let infer_equality_factoring_complete_ho _env clause =
+let infer_equality_factoring_complete_ho env clause =
   let inf_res =
     infer_equality_factoring_aux
-      ~unify:(Env.flex_get_of (get_env ()) k_unif_alg)
+      ~unify:(Env.flex_get_of env k_unif_alg)
       ~iterate_substs:(fun substs do_eq_fact ->
         Some (OSeq.map (CCOpt.flat_map do_eq_fact) substs))
-      clause
+      env clause
   in
-  if Env.should_force_stream_eval (get_env ()) () then
-    Env.get_finite_infs (get_env ()) inf_res
+  if Env.should_force_stream_eval env () then
+    Env.get_finite_infs env inf_res
   else (
     let cls, stm_res =
-      force_getting_cl (get_env ())
+      force_getting_cl env
         (List.map (fun stm -> C.penalty clause, [ clause ], stm) inf_res)
     in
-    StmQ.add_lst (Env.get_stm_queue (get_env ())) stm_res;
+    StmQ.add_lst (Env.get_stm_queue env) stm_res;
     cls
   )
 
@@ -2333,30 +2302,30 @@ let infer_equality_factoring_complete_ho _env clause =
  * extraction of a clause from the stream queue (HO feature)
  * ---------------------------------------------------------------------- *)
 
-let extract_from_stream_queue _env ~full () =
+let extract_from_stream_queue env ~full () =
   let@ _sp =
     Trace.with_span ~__FILE__ ~__LINE__ "sup.extract-from-stream-queue"
   in
   let cl =
     if full then
-      StmQ.take_fair_anyway (Env.get_stm_queue (get_env ()))
+      StmQ.take_fair_anyway (Env.get_stm_queue env)
     else
-      StmQ.take_stm_nb (Env.get_stm_queue (get_env ()))
+      StmQ.take_stm_nb (Env.get_stm_queue env)
   in
   let opt_res = CCOpt.sequence_l (List.filter CCOpt.is_some cl) in
   match opt_res with
   | None -> []
   | Some l -> l
 
-let extract_from_stream_queue_fix_stm _env ~full () =
+let extract_from_stream_queue_fix_stm env ~full () =
   let@ _sp =
     Trace.with_span ~__FILE__ ~__LINE__ "sup.extract-from-stream-queue-fix-stm"
   in
   let cl =
     if full then
-      StmQ.take_fair_anyway (Env.get_stm_queue (get_env ()))
+      StmQ.take_fair_anyway (Env.get_stm_queue env)
     else
-      StmQ.take_stm_nb_fix_stm (Env.get_stm_queue (get_env ()))
+      StmQ.take_stm_nb_fix_stm (Env.get_stm_queue env)
   in
   let opt_res = CCOpt.sequence_l (List.filter CCOpt.is_some cl) in
   match opt_res with
@@ -2390,7 +2359,7 @@ type demod_state = {
 
 (** Compute normal form of term w.r.t active set. Clauses used to rewrite are
     added to the clauses hashset. *)
-let demod_nf (st : demod_state) c t : T.t =
+let demod_nf env (st : demod_state) c t : T.t =
   (* compute normal form of subterm. If `toplevel` is true, we need an extra check 
     whether the rewriting clause is smaller than the rewritten clause. *)
   let rec reduce_at_root ~toplevel t k =
@@ -2401,8 +2370,7 @@ let demod_nf (st : demod_state) c t : T.t =
       UnitIdx.retrieve ~sign:true (!_idx_simpl, cur_sc) (t, 0)
       |> Iter.find (fun (l, r, (_, _, sign, unit_clause), subst) ->
              let expand_quant =
-               not
-               @@ Env.flex_get_of (get_env ()) Combinators.k_enable_combinators
+               not @@ Env.flex_get_of env Combinators.k_enable_combinators
              in
              let norm t = Lambda.eta_reduce ~expand_quant @@ Lambda.snf t in
              let norm_b t = T.normalize_bools @@ norm t in
@@ -2515,7 +2483,7 @@ let demod_nf (st : demod_state) c t : T.t =
     | T.App (hd, l) ->
       (* rewrite subterms in call by value. *)
       let rewrite_args =
-        Env.flex_get_of (get_env ()) k_demod_in_var_args || not (T.is_var hd)
+        Env.flex_get_of env k_demod_in_var_args || not (T.is_var hd)
       in
       if rewrite_args then
         normal_form_l l (fun l' ->
@@ -2531,7 +2499,7 @@ let demod_nf (st : demod_state) c t : T.t =
         reduce_at_root ~toplevel t k
     | T.Fun (ty_arg, body) ->
       (* reduce under lambdas *)
-      if Env.flex_get_of (get_env ()) k_lambda_demod then
+      if Env.flex_get_of env k_lambda_demod then
         normal_form ~toplevel:false body (fun body' ->
             let u =
               if T.equal body body' then
@@ -2544,7 +2512,7 @@ let demod_nf (st : demod_state) c t : T.t =
         reduce_at_root ~toplevel t k (* TODO: DemodExt *)
     | T.Var _ | T.DB _ -> k t
     | T.AppBuiltin ((Builtin.(ForallConst | ExistsConst) as hd), [ _; body ]) ->
-      if not (Env.flex_get_of (get_env ()) k_quant_demod) then
+      if not (Env.flex_get_of env k_quant_demod) then
         reduce_at_root ~toplevel t k
       else (
         let mk_quant =
@@ -2585,7 +2553,7 @@ let[@inline] eq_c_subst (c1, s1, sc1) (c2, s2, sc2) =
   C.equal c1 c2 && sc1 = sc2 && Subst.equal s1 s2
 
 (* Demodulate the clause, with restrictions on which terms to rewrite *)
-let demodulate _env c =
+let demodulate env c =
   assert (
     Term.VarSet.for_all
       (fun v -> HVar.id v >= 0)
@@ -2597,7 +2565,7 @@ let demodulate _env c =
   let st = { demod_clauses = []; demod_sc = 1 } in
 
   (* demodulate every literal *)
-  let demod_lit i lit = Lit.map (fun t -> demod_nf st c t) lit in
+  let demod_lit i lit = Lit.map (fun t -> demod_nf env st c t) lit in
   let lits = Array.mapi demod_lit (C.lits c) in
   if CCList.is_empty st.demod_clauses then
     (* no rewriting performed *)
@@ -2618,9 +2586,7 @@ let demodulate _env c =
     let trail = C.trail c in
     (* we know that demodulating rules have smaller trail *)
     let new_c =
-      C.create_a
-        ~ctx:(Env.get_ctx (get_env ()))
-        ~trail ~penalty:(C.penalty c) lits proof
+      C.create_a ~ctx:(Env.get_ctx env) ~trail ~penalty:(C.penalty c) lits proof
     in
     Util.debugf ~section 3
       "@[<hv2>demodulate@ @[%a@]@ into @[%a@]@ using {@[<hv>%a@]}@]" (fun k ->
@@ -2632,9 +2598,9 @@ let demodulate _env c =
     SimplM.return_new new_c
   )
 
-let local_rewrite _env c =
+let local_rewrite env c =
   try
-    assert (Env.flex_get_of (get_env ()) k_local_rw != `Off);
+    assert (Env.flex_get_of env k_local_rw != `Off);
 
     let neqs, others =
       CCArray.fold_left
@@ -2662,9 +2628,7 @@ let local_rewrite _env c =
     in
 
     let normalize ~restrict ~neqs t =
-      let only_green_ctx =
-        Env.flex_get_of (get_env ()) k_local_rw == `GreenContext
-      in
+      let only_green_ctx = Env.flex_get_of env k_local_rw == `GreenContext in
 
       let rec aux ~top t =
         match T.Map.get t neqs with
@@ -2753,9 +2717,8 @@ let local_rewrite _env c =
           ~rule:(Proof.Rule.mk "local_rewriting")
       in
       let new_c =
-        C.create
-          ~ctx:(Env.get_ctx (get_env ()))
-          ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof
+        C.create ~ctx:(Env.get_ctx env) ~trail:(C.trail c)
+          ~penalty:(C.penalty c) new_lits proof
       in
       Util.debugf ~section 2 "local_rw(@[%a@]):@.@[%a@]@." (fun k ->
           k C.pp c C.pp new_c);
@@ -2768,7 +2731,7 @@ let local_rewrite _env c =
     Format.print_flush ();
     assert false
 
-let canonize_variables _env c =
+let canonize_variables env c =
   let all_vars =
     Literals.vars (C.lits c) |> fun v ->
     InnerTerm.VarSet.of_list (v :> InnerTerm.t HVar.t list)
@@ -2787,9 +2750,8 @@ let canonize_variables _env c =
         ~rule:(Proof.Rule.mk "cannonize vars")
     in
     let new_c =
-      C.create
-        ~ctx:(Env.get_ctx (get_env ()))
-        ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof
+      C.create ~ctx:(Env.get_ctx env) ~trail:(C.trail c) ~penalty:(C.penalty c)
+        new_lits proof
     in
     SimplM.return_new new_c
   )
@@ -2833,7 +2795,7 @@ let backward_demodulate set given =
   in
   set'
 
-let is_tautology _env c =
+let is_tautology env c =
   let is_tauto = Lits.is_trivial (C.lits c) || Trail.is_trivial (C.trail c) in
   if is_tauto then
     Util.debugf ~section 3 "@[@[%a@]@ is a tautology@]" (fun k -> k C.pp c);
@@ -2872,7 +2834,7 @@ let is_semantic_tautology_real (c : C.t) : bool =
   );
   res
 
-let is_semantic_tautology _env c =
+let is_semantic_tautology env c =
   if
     Array.length (C.lits c) >= 2
     && CCArray.exists Lit.is_negativoid (C.lits c)
@@ -2886,7 +2848,7 @@ let is_semantic_tautology _env c =
 let var_in_subst_ us v sc =
   S.mem (US.subst us) ((v : T.var :> InnerTerm.t HVar.t), sc)
 
-let basic_simplify _env c =
+let basic_simplify env c =
   if C.get_flag flag_simplified c then
     SimplM.return_same c
   else
@@ -2908,7 +2870,7 @@ let basic_simplify _env c =
       lits;
     (* eliminate inequations x != t *)
     let us = ref US.empty in
-    if Env.flex_get_of (get_env ()) k_destr_eq_res then (
+    if Env.flex_get_of env k_destr_eq_res then (
       let try_unif i t1 sc1 t2 sc2 =
         try
           let subst' = Unif.FO.unify_full ~subst:!us (t1, sc1) (t2, sc2) in
@@ -2974,9 +2936,8 @@ let basic_simplify _env c =
           new_lits
       in
       let new_clause =
-        C.create
-          ~ctx:(Env.get_ctx (get_env ()))
-          ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof
+        C.create ~ctx:(Env.get_ctx env) ~trail:(C.trail c)
+          ~penalty:(C.penalty c) new_lits proof
       in
       Util.debugf ~section 3
         "@[<>@[%a@]@ @[<2>basic_simplifies into@ @[%a@]@]@ with @[%a@]@]"
@@ -2985,7 +2946,7 @@ let basic_simplify _env c =
       SimplM.return_new new_clause
     )
 
-let handle_distinct_constants _env lit =
+let handle_distinct_constants env lit =
   match lit with
   | Lit.Equation (l, r, sign) when T.is_const l && T.is_const r ->
     assert (not (T.is_true_or_false r));
@@ -3003,7 +2964,7 @@ let handle_distinct_constants _env lit =
 
 exception FoundMatch of T.t * C.t * S.t
 
-let formula_simplify_reflect _env c =
+let formula_simplify_reflect env c =
   let q_sc, idx_sc = 0, 1 in
   let used_units = ref C.ClauseSet.empty in
 
@@ -3092,9 +3053,7 @@ let formula_simplify_reflect _env c =
     aux t
   in
 
-  if
-    Env.flex_get_of (get_env ()) k_formula_simplify_reflect && !Lazy_cnf.enabled
-  then (
+  if Env.flex_get_of env k_formula_simplify_reflect && !Lazy_cnf.enabled then (
     let lits =
       List.map
         (function
@@ -3111,9 +3070,7 @@ let formula_simplify_reflect _env c =
           (C.proof_parent c :: parents)
       in
       let trail = C.trail c and penalty = C.penalty c in
-      let new_c =
-        C.create ~ctx:(Env.get_ctx (get_env ())) ~trail ~penalty lits proof
-      in
+      let new_c = C.create ~ctx:(Env.get_ctx env) ~trail ~penalty lits proof in
       SimplM.return_new new_c
     ) else
       SimplM.return_same c
@@ -3136,7 +3093,7 @@ let equatable ~sign ~cl s t =
   in
   aux s t <+> aux t s
 
-let positive_simplify_reflect _env c =
+let positive_simplify_reflect env c =
   let driver ~is_simplified c =
     let kept_lits = CCBV.create ~size:(C.length c) true in
     let premises =
@@ -3210,7 +3167,7 @@ let positive_simplify_reflect _env c =
   let do_regular_sr = driver ~is_simplified:regular_sr_pair in
 
   let simplifier =
-    if Env.flex_get_of (get_env ()) k_strong_sr then
+    if Env.flex_get_of env k_strong_sr then
       do_strong_sr
     else
       do_regular_sr
@@ -3227,13 +3184,13 @@ let positive_simplify_reflect _env c =
     in
     let trail = C.trail c and penalty = C.penalty c in
     let new_c =
-      C.create ~ctx:(Env.get_ctx (get_env ())) ~trail ~penalty new_lits proof
+      C.create ~ctx:(Env.get_ctx env) ~trail ~penalty new_lits proof
     in
     Util.debugf ~section 3 "@[@[%a@]@ pos_simplify_reflect into @[%a@]@]"
       (fun k -> k C.pp c C.pp new_c);
     SimplM.return_new new_c
 
-let negative_simplify_reflect _env c =
+let negative_simplify_reflect env c =
   let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "sup.neg-simplify-reflect" in
   (* iterate through literals and try to resolve positive ones *)
   let rec iterate_lits acc lits clauses =
@@ -3265,9 +3222,8 @@ let negative_simplify_reflect _env c =
         (C.proof_parent c :: premises)
     in
     let new_c =
-      C.create
-        ~ctx:(Env.get_ctx (get_env ()))
-        ~trail:(C.trail c) ~penalty:(C.penalty c) lits proof
+      C.create ~ctx:(Env.get_ctx env) ~trail:(C.trail c) ~penalty:(C.penalty c)
+        lits proof
     in
     Util.debugf ~section 3 "@[@[%a@]@ neg_simplify_reflect into @[%a@]@]"
       (fun k -> k C.pp c C.pp new_c);
@@ -3278,7 +3234,7 @@ type sgn =
   | Lit of bool
   | Eqn
 
-let flex_resolve _env c =
+let flex_resolve env c =
   let exception CantFlexResolve in
   try
     let sgn_map = T.Tbl.create 8 in
@@ -3319,9 +3275,7 @@ let flex_resolve _env c =
       (C.lits c);
 
     let new_cl =
-      C.create
-        ~ctx:(Env.get_ctx (get_env ()))
-        ~trail:(C.trail c) []
+      C.create ~ctx:(Env.get_ctx env) ~trail:(C.trail c) []
         (Proof.Step.simp
            ~rule:(Proof.Rule.mk "flex_resolve")
            [ C.proof_parent c ])
@@ -3375,7 +3329,7 @@ let subsumes_with_ (a, sc_a) (b, sc_b) : _ option =
     (* sort a copy of [a] by decreasing difficulty *)
     let a = Array.copy a in
     let tags = ref [] in
-    (* try to subsumes literals of b whose index are not in bv, with [subst] *)
+    (* try to subsumes env literals of b whose index are not in bv, with [subst] *)
     let rec try_permutations i subst bv =
       if i = Array.length a then
         raise (SubsumptionFound subst)
@@ -3458,13 +3412,13 @@ let subsumes_classic a b =
   | None -> false
   | Some _ -> true
 
-let subsumes a b =
+let subsumes env a b =
   let module SS = SolidSubsumption.Make (struct
-    let st = Env.flex_state_of (get_env ())
+    let st = Env.flex_state_of env
   end) in
   if
-    (not @@ Env.flex_get_of (get_env ()) k_solid_subsumption)
-    || Env.flex_get_of (get_env ()) Combinators.k_enable_combinators
+    (not @@ Env.flex_get_of env k_solid_subsumption)
+    || Env.flex_get_of env Combinators.k_enable_combinators
   then
     subsumes_classic a b
   else (
@@ -3519,20 +3473,20 @@ let eq_subsumes_with (a, sc_a) (b, sc_b) =
           (fun k -> k Lits.pp a Lits.pp b Subst.pp subst);
         Util.incr_stat stat_eq_subsumption_success;
         Some subst)
-    | _ -> None (* only a positive unit clause unit-subsumes a clause *)
+    | _ -> None (* only a positive unit clause unit-subsumes env a clause *)
   in
   res
 
 let eq_subsumes a b = CCOpt.is_some (eq_subsumes_with (a, 1) (b, 0))
 
-let subsumed_by_active_set _env c =
+let subsumed_by_active_set env c =
   let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "sup.subsumed-by-active-set" in
   Util.incr_stat stat_subsumed_by_active_set_call;
   (* if there is an equation in c, try equality subsumption *)
   let try_eq_subsumption = CCArray.exists Lit.is_eqn (C.lits c) in
   (* use feature vector indexing *)
   let c =
-    if Env.flex_get_of (get_env ()) k_ground_subs_check > 0 then
+    if Env.flex_get_of env k_ground_subs_check > 0 then
       C.ground_clause c
     else
       c
@@ -3543,7 +3497,7 @@ let subsumed_by_active_set _env c =
            let res =
              C.trail_subsumes c' c
              && ((try_eq_subsumption && eq_subsumes (C.lits c') (C.lits c))
-                || subsumes (C.lits c') (C.lits c))
+                || subsumes env (C.lits c') (C.lits c))
            in
            if res then (
              Util.debugf ~section 2 "@[<2>@[%a@]@ subsumed by @[%a@]@]"
@@ -3554,7 +3508,7 @@ let subsumed_by_active_set _env c =
   in
   res
 
-let subsumed_in_active_set _env acc c =
+let subsumed_in_active_set env acc c =
   let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "sup.subsumed-in-active-set" in
   Util.incr_stat stat_subsumed_in_active_set_call;
   (* if c is a single unit clause *)
@@ -3566,14 +3520,14 @@ let subsumed_in_active_set _env acc c =
     let res : Clause.ClauseSet.t = acc in
     if C.trail_subsumes c c' then (
       let c' =
-        if Env.flex_get_of (get_env ()) k_ground_subs_check > 1 then
+        if Env.flex_get_of env k_ground_subs_check > 1 then
           C.ground_clause c'
         else
           c'
       in
       let redundant =
         (try_eq_subsumption && eq_subsumes (C.lits c) (C.lits c'))
-        || subsumes (C.lits c) (C.lits c')
+        || subsumes env (C.lits c) (C.lits c')
       in
       if redundant then (
         Util.incr_stat stat_clauses_subsumed;
@@ -3604,7 +3558,7 @@ let num_equational lits =
  * ---------------------------------------------------------------------- *)
 
 (* Performs successive contextual literal cuttings *)
-let rec contextual_literal_cutting_rec c =
+let rec contextual_literal_cutting_rec env c =
   let open SimplM.Infix in
   if
     Array.length (C.lits c) <= 1
@@ -3658,23 +3612,22 @@ let rec contextual_literal_cutting_rec c =
           ]
       in
       let new_c =
-        C.create
-          ~ctx:(Env.get_ctx (get_env ()))
-          ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof
+        C.create ~ctx:(Env.get_ctx env) ~trail:(C.trail c)
+          ~penalty:(C.penalty c) new_lits proof
       in
       Util.debugf ~section 3
         "@[<2>contextual literal cutting@ in @[%a@]@ using @[%a@]@ gives \
          @[%a@]@]" (fun k -> k C.pp c C.pp c' C.pp new_c);
       Util.incr_stat stat_clc;
       (* try to cut another literal *)
-      SimplM.return_new new_c >>= contextual_literal_cutting_rec
+      SimplM.return_new new_c >>= contextual_literal_cutting_rec env
   )
 
-let contextual_literal_cutting _env c =
+let contextual_literal_cutting env c =
   let@ _sp =
     Trace.with_span ~__FILE__ ~__LINE__ "sup.contextual-literal-cutting"
   in
-  contextual_literal_cutting_rec c
+  contextual_literal_cutting_rec env c
 
 (* ----------------------------------------------------------------------
  * contraction (condensation)
@@ -3683,12 +3636,12 @@ let contextual_literal_cutting _env c =
 exception CondensedInto of Lit.t array * S.t * Subst.Renaming.t * Proof.tag list
 
 (** performs condensation on the clause. It looks for two literals l1 and l2 of same
-    sign such that l1\sigma = l2, and hc\sigma \ {l2} subsumes hc. Then
+    sign such that l1\sigma = l2, and hc\sigma \ {l2} subsumes env hc. Then
     hc is simplified into hc\sigma \ {l2}.
     If there are too many equational literals, the simplification is disabled to
     avoid pathologically expensive subsumption checks.
     TODO remove this limitation after an efficient subsumption check is implemented. *)
-let rec condensation_rec c =
+let rec condensation_rec env c =
   let open SimplM.Infix in
   if
     Array.length (C.lits c) <= 1
@@ -3706,7 +3659,7 @@ let rec condensation_rec c =
         for j = i + 1 to n - 1 do
           let lit' = lits.(j) in
           (* see whether [lit |= lit'], and if removing [lit] gives a clause
-             that subsumes c. Also try to swap [lit] and [lit']. *)
+             that subsumes env c. Also try to swap [lit] and [lit']. *)
           let subst_remove_lit =
             Lit.subsumes (lit, 0) (lit', 0) |> Iter.map (fun s -> s, i)
           and subst_remove_lit' =
@@ -3723,7 +3676,7 @@ let rec condensation_rec c =
               let renaming = Subst.Renaming.create () in
               let new_lits = Lits.apply_subst renaming subst (new_lits, 0) in
               (* check subsumption *)
-              if subsumes new_lits lits then
+              if subsumes env new_lits lits then
                 raise (CondensedInto (new_lits, subst, renaming, tags)))
             substs
         done
@@ -3738,45 +3691,44 @@ let rec condensation_rec c =
           [ C.proof_parent_subst renaming (c, 0) subst ]
       in
       let c' =
-        C.create_a
-          ~ctx:(Env.get_ctx (get_env ()))
-          ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof
+        C.create_a ~ctx:(Env.get_ctx env) ~trail:(C.trail c)
+          ~penalty:(C.penalty c) new_lits proof
       in
       Util.debugf ~section 3
         "@[<2>condensation@ of @[%a@] (with @[%a@])@ gives @[%a@]@]" (fun k ->
           k C.pp c S.pp subst C.pp c');
       (* try to condense further *)
       Util.incr_stat stat_condensation;
-      SimplM.return_new c' >>= condensation_rec
+      SimplM.return_new c' >>= condensation_rec env
   )
 
-let condensation _env c =
+let condensation env c =
   let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "sup.condensation" in
-  condensation_rec c
+  condensation_rec env c
 
 let subsumption_weight c =
   C.Seq.terms c
   |> Iter.fold (fun acc t -> T.weight ~var:1 ~sym:(fun _ -> 2) t + acc) 0
 
-let immediate_subsume _env c immediate =
-  let subsumes subsumer subsumee =
+let immediate_subsume env c immediate =
+  let subsumes env subsumer subsumee =
     subsumption_weight subsumer <= subsumption_weight subsumee
     && C.trail_subsumes subsumer subsumee
     && (Array.exists Lit.is_eqn (C.lits subsumee)
         && eq_subsumes (C.lits subsumer) (C.lits subsumee)
-       || subsumes (C.lits subsumer) (C.lits subsumee))
+       || subsumes env (C.lits subsumer) (C.lits subsumee))
   in
 
-  let immediate = Iter.filter (fun c' -> not (subsumes c c')) immediate in
+  let immediate = Iter.filter (fun c' -> not (subsumes env c c')) immediate in
   if Iter.exists C.is_empty immediate then
     None
   else
     immediate
     |> Iter.find_map (fun c' ->
-           if subsumes c' c then (
+           if subsumes env c' c then (
              C.mark_redundant c;
-             Env.remove_active (get_env ()) (Iter.singleton c);
-             Env.remove_simpl (get_env ()) (Iter.singleton c);
+             Env.remove_active env (Iter.singleton c);
+             Env.remove_simpl env (Iter.singleton c);
              Util.debugf ~section 2 "immediate subsume @[%a@]@." (fun k ->
                  k C.pp c);
              Some c'
@@ -3791,7 +3743,7 @@ let is_orphaned c =
   if res then Util.incr_stat stat_orphan_checks;
   res
 
-let recognize_injectivity _env c =
+let recognize_injectivity env c =
   let exception Fail in
   (* avoiding cascading if-then-elses *)
   let fail_on condition = if condition then raise Fail in
@@ -3885,11 +3837,10 @@ let recognize_injectivity _env c =
           Proof.Step.inference ~rule:(Proof.Rule.mk "inj_rec")
             [ C.proof_parent c ]
         in
-        Ctx.declare (Env.get_ctx (get_env ())) sk_id sk_ty;
+        Ctx.declare (Env.get_ctx env) sk_id sk_ty;
         let new_clause =
-          C.create
-            ~ctx:(Env.get_ctx (get_env ()))
-            ~trail:(C.trail c) ~penalty:(C.penalty c) inv_lit proof
+          C.create ~ctx:(Env.get_ctx env) ~trail:(C.trail c)
+            ~penalty:(C.penalty c) inv_lit proof
         in
         Util.debugf ~section 2 "Injectivity recognized: %a |---| %a" (fun k ->
             k C.pp c C.pp new_clause);
@@ -3898,7 +3849,7 @@ let recognize_injectivity _env c =
     | _ -> assert false
   with Fail -> []
 
-let normalize_equalities _env c =
+let normalize_equalities env c =
   let lits = Array.to_list (C.lits c) in
   let normalized = List.map Literal.normalize_eq lits in
   if List.exists CCOpt.is_some normalized then (
@@ -3913,9 +3864,8 @@ let normalize_equalities _env c =
         ~rule:(Proof.Rule.mk "simplify nested equalities")
     in
     let new_c =
-      C.create
-        ~ctx:(Env.get_ctx (get_env ()))
-        ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof
+      C.create ~ctx:(Env.get_ctx env) ~trail:(C.trail c) ~penalty:(C.penalty c)
+        new_lits proof
     in
     SimplM.return_new new_c
   ) else
@@ -3935,31 +3885,49 @@ let setup_dot_printers env =
   CCOpt.iter (fun file ->
       Signal.once Signals.on_dot_output (fun () ->
           _print_idx ~f:(TermIndex.to_dot pp_leaf) file !_idx_sup_into))
-  @@ Env.flex_get_of (get_env ()) k_dot_sup_into;
+  @@ Env.flex_get_of env k_dot_sup_into;
   CCOpt.iter (fun file ->
       Signal.once Signals.on_dot_output (fun () ->
           _print_idx ~f:(TermIndex.to_dot pp_leaf) file !_idx_sup_from))
-  @@ Env.flex_get_of (get_env ()) k_dot_sup_from;
+  @@ Env.flex_get_of env k_dot_sup_from;
   CCOpt.iter (fun file ->
       Signal.once Signals.on_dot_output (fun () ->
           _print_idx ~f:UnitIdx.to_dot file !_idx_simpl))
-  @@ Env.flex_get_of (get_env ()) k_dot_simpl;
+  @@ Env.flex_get_of env k_dot_simpl;
   CCOpt.iter (fun file ->
       Signal.once Signals.on_dot_output (fun () ->
           _print_idx ~f:(TermIndex.to_dot pp_leaf) file !_idx_back_demod))
-  @@ Env.flex_get_of (get_env ()) k_dot_demod_into;
+  @@ Env.flex_get_of env k_dot_demod_into;
   ()
 
 let register_rules env =
+  Signal.on PS.ActiveSet.on_add_clause (fun c ->
+      _idx_fv := SubsumIdx.add !_idx_fv c;
+      _update_active env
+        (fun tree t wp ->
+          TermIndex.add tree t
+            (Clause.WithPos.make ~clause:(C.WithPos.clause wp)
+               ~pos:(C.WithPos.pos wp)))
+        c);
+  Signal.on PS.ActiveSet.on_remove_clause (fun c ->
+      _idx_fv := SubsumIdx.remove !_idx_fv c;
+      _update_active env
+        (fun tree t wp ->
+          TermIndex.remove tree t
+            (Clause.WithPos.make ~clause:(C.WithPos.clause wp)
+               ~pos:(C.WithPos.pos wp)))
+        c);
+  Signal.on PS.SimplSet.on_add_clause (_update_simpl env UnitIdx.add);
+  Signal.on PS.SimplSet.on_remove_clause (_update_simpl env UnitIdx.remove);
   let open SimplM.Infix in
-  let rw_simplify _env c =
-    canonize_variables _env c >>= demodulate _env >>= basic_simplify _env
-    >>= positive_simplify_reflect _env
-    >>= negative_simplify_reflect _env
-    >>= formula_simplify_reflect _env
-  and active_simplify _env c =
-    condensation _env c >>= contextual_literal_cutting _env
-  and backward_simplify _env c =
+  let rw_simplify env c =
+    canonize_variables env c >>= demodulate env >>= basic_simplify env
+    >>= positive_simplify_reflect env
+    >>= negative_simplify_reflect env
+    >>= formula_simplify_reflect env
+  and active_simplify env c =
+    condensation env c >>= contextual_literal_cutting env
+  and backward_simplify env c =
     let set = C.ClauseSet.empty in
     backward_demodulate set c |> C.ClauseSet.to_seq |> Iter.of_seq
     |> Iter.fold (fun s c -> Clause.ClauseSet.add c s) Clause.ClauseSet.empty
@@ -3967,76 +3935,70 @@ let register_rules env =
   and backward_redundant acc c = subsumed_in_active_set acc c
   and is_trivial = is_tautology in
 
-  Env.add_basic_simplify (get_env ()) normalize_equalities;
-  Env.add_basic_simplify (get_env ()) flex_resolve;
-  if Env.flex_get_of (get_env ()) k_local_rw != `Off then
-    Env.add_basic_simplify (get_env ()) local_rewrite;
+  Env.add_basic_simplify env normalize_equalities;
+  Env.add_basic_simplify env flex_resolve;
+  if Env.flex_get_of env k_local_rw != `Off then
+    Env.add_basic_simplify env local_rewrite;
 
   if
-    Env.flex_get_of (get_env ()) Combinators.k_enable_combinators
-    && Env.flex_get_of (get_env ()) k_subvarsup
+    Env.flex_get_of env Combinators.k_enable_combinators
+    && Env.flex_get_of env k_subvarsup
   then (
-    Env.add_binary_inf (get_env ()) "subvarsup" infer_subvarsup_active;
-    Env.add_binary_inf (get_env ()) "subvarsup" infer_subvarsup_passive
+    Env.add_binary_inf env "subvarsup" infer_subvarsup_active;
+    Env.add_binary_inf env "subvarsup" infer_subvarsup_passive
   );
 
-  if Env.flex_get_of (get_env ()) k_switch_stream_extraction then
-    Env.add_generate (get_env ()) ~priority:0 "stream_queue_extraction"
+  if Env.flex_get_of env k_switch_stream_extraction then
+    Env.add_generate env ~priority:0 "stream_queue_extraction"
       extract_from_stream_queue_fix_stm
   else
-    Env.add_generate (get_env ()) ~priority:0 "stream_queue_extraction"
+    Env.add_generate env ~priority:0 "stream_queue_extraction"
       extract_from_stream_queue;
 
-  if Env.flex_get_of (get_env ()) k_recognize_injectivity then
-    Env.add_unary_inf (get_env ()) "recognize injectivity" recognize_injectivity;
+  if Env.flex_get_of env k_recognize_injectivity then
+    Env.add_unary_inf env "recognize injectivity" recognize_injectivity;
 
-  if Env.flex_get_of (get_env ()) k_ho_basic_rules then (
-    Env.add_binary_inf (get_env ()) "superposition_passive"
-      infer_passive_complete_ho;
-    Env.add_binary_inf (get_env ()) "superposition_active"
-      infer_active_complete_ho;
-    Env.add_unary_inf (get_env ()) "equality_factoring"
+  if Env.flex_get_of env k_ho_basic_rules then (
+    Env.add_binary_inf env "superposition_passive" infer_passive_complete_ho;
+    Env.add_binary_inf env "superposition_active" infer_active_complete_ho;
+    Env.add_unary_inf env "equality_factoring"
       infer_equality_factoring_complete_ho;
-    Env.add_unary_inf (get_env ()) "equality_resolution"
+    Env.add_unary_inf env "equality_resolution"
       infer_equality_resolution_complete_ho;
 
-    if Env.flex_get_of (get_env ()) k_fluidsup then (
-      Env.add_binary_inf (get_env ()) "fluidsup_passive" infer_fluidsup_passive;
-      Env.add_binary_inf (get_env ()) "fluidsup_active" infer_fluidsup_active
+    if Env.flex_get_of env k_fluidsup then (
+      Env.add_binary_inf env "fluidsup_passive" infer_fluidsup_passive;
+      Env.add_binary_inf env "fluidsup_active" infer_fluidsup_active
     );
-    if Env.flex_get_of (get_env ()) k_dupsup then (
-      Env.add_binary_inf (get_env ()) "dupsup_passive(into)"
-        infer_dupsup_passive;
-      Env.add_binary_inf (get_env ()) "dupsup_active(from)" infer_dupsup_active
+    if Env.flex_get_of env k_dupsup then (
+      Env.add_binary_inf env "dupsup_passive(into)" infer_dupsup_passive;
+      Env.add_binary_inf env "dupsup_active(from)" infer_dupsup_active
     );
-    if Env.flex_get_of (get_env ()) k_lambdasup != -1 then (
-      Env.add_binary_inf (get_env ()) "lambdasup_active(from)"
-        infer_lambdasup_from;
-      Env.add_binary_inf (get_env ()) "lambdasup_passive(into)"
-        infer_lambdasup_into
+    if Env.flex_get_of env k_lambdasup != -1 then (
+      Env.add_binary_inf env "lambdasup_active(from)" infer_lambdasup_from;
+      Env.add_binary_inf env "lambdasup_passive(into)" infer_lambdasup_into
     )
   ) else (
-    Env.add_binary_inf (get_env ()) "superposition_passive" infer_passive;
-    Env.add_binary_inf (get_env ()) "superposition_active" infer_active;
-    Env.add_unary_inf (get_env ()) "equality_factoring" infer_equality_factoring;
-    Env.add_unary_inf (get_env ()) "equality_resolution"
-      infer_equality_resolution
+    Env.add_binary_inf env "superposition_passive" infer_passive;
+    Env.add_binary_inf env "superposition_active" infer_active;
+    Env.add_unary_inf env "equality_factoring" infer_equality_factoring;
+    Env.add_unary_inf env "equality_resolution" infer_equality_resolution
   );
-  if not (Env.flex_get_of (get_env ()) k_dont_simplify) then (
-    Env.add_rw_simplify (get_env ()) rw_simplify;
-    Env.add_basic_simplify (get_env ()) canonize_variables;
-    Env.add_basic_simplify (get_env ()) basic_simplify;
-    Env.add_active_simplify (get_env ()) active_simplify;
-    Env.add_backward_simplify (get_env ()) backward_simplify
+  if not (Env.flex_get_of env k_dont_simplify) then (
+    Env.add_rw_simplify env rw_simplify;
+    Env.add_basic_simplify env canonize_variables;
+    Env.add_basic_simplify env basic_simplify;
+    Env.add_active_simplify env active_simplify;
+    Env.add_backward_simplify env backward_simplify
   );
-  Env.add_redundant (get_env ()) redundant;
-  Env.add_backward_redundant (get_env ()) backward_redundant;
-  if Env.flex_get_of (get_env ()) k_use_semantic_tauto then
-    Env.add_is_trivial (get_env ()) is_semantic_tautology;
-  Env.add_is_trivial (get_env ()) is_trivial;
-  Env.add_lit_rule (get_env ()) "distinct_symbol" handle_distinct_constants;
-  if Env.flex_get_of (get_env ()) k_immediate_simplification then
-    Env.add_immediate_simpl_rule (get_env ()) immediate_subsume;
+  Env.add_redundant env redundant;
+  Env.add_backward_redundant env backward_redundant;
+  if Env.flex_get_of env k_use_semantic_tauto then
+    Env.add_is_trivial env is_semantic_tautology;
+  Env.add_is_trivial env is_trivial;
+  Env.add_lit_rule env "distinct_symbol" handle_distinct_constants;
+  if Env.flex_get_of env k_immediate_simplification then
+    Env.add_immediate_simpl_rule env immediate_subsume;
   setup_dot_printers env;
   ()
 
@@ -4113,115 +4075,102 @@ let unif_params_to_def () =
   _max_infs := 5
 
 let register env =
-  _env_ref := Some env;
   _ord_ref := Ctx.ord (Env.get_ctx env);
-  Env.flex_add_of (get_env ()) PragUnifParams.k_unif_alg_is_terminating true;
-  Env.flex_add_of (get_env ()) k_sup_at_vars !_sup_at_vars;
-  Env.flex_add_of (get_env ()) k_sup_in_var_args !_sup_in_var_args;
-  Env.flex_add_of (get_env ()) k_sup_under_lambdas !_sup_under_lambdas;
-  Env.flex_add_of (get_env ()) k_sup_at_var_headed !_sup_at_var_headed;
-  Env.flex_add_of (get_env ()) k_sup_from_var_headed !_sup_from_var_headed;
-  Env.flex_add_of (get_env ()) k_fluidsup !_fluidsup;
-  Env.flex_add_of (get_env ()) k_subvarsup !_subvarsup;
-  Env.flex_add_of (get_env ()) k_dupsup !_dupsup;
-  Env.flex_add_of (get_env ()) k_lambdasup !_lambdasup;
-  Env.flex_add_of (get_env ()) k_quant_demod !_quant_demod;
-  Env.flex_add_of (get_env ()) k_restrict_fluidsup !_restrict_fluidsup;
-  Env.flex_add_of (get_env ()) k_check_sup_at_var_cond !_check_sup_at_var_cond;
-  Env.flex_add_of (get_env ()) k_restrict_hidden_sup_at_vars
+  Env.flex_add_of env PragUnifParams.k_unif_alg_is_terminating true;
+  Env.flex_add_of env k_sup_at_vars !_sup_at_vars;
+  Env.flex_add_of env k_sup_in_var_args !_sup_in_var_args;
+  Env.flex_add_of env k_sup_under_lambdas !_sup_under_lambdas;
+  Env.flex_add_of env k_sup_at_var_headed !_sup_at_var_headed;
+  Env.flex_add_of env k_sup_from_var_headed !_sup_from_var_headed;
+  Env.flex_add_of env k_fluidsup !_fluidsup;
+  Env.flex_add_of env k_subvarsup !_subvarsup;
+  Env.flex_add_of env k_dupsup !_dupsup;
+  Env.flex_add_of env k_lambdasup !_lambdasup;
+  Env.flex_add_of env k_quant_demod !_quant_demod;
+  Env.flex_add_of env k_restrict_fluidsup !_restrict_fluidsup;
+  Env.flex_add_of env k_check_sup_at_var_cond !_check_sup_at_var_cond;
+  Env.flex_add_of env k_restrict_hidden_sup_at_vars
     !_restrict_hidden_sup_at_vars;
-  Env.flex_add_of (get_env ()) k_demod_in_var_args !_demod_in_var_args;
-  Env.flex_add_of (get_env ()) k_lambda_demod !_lambda_demod;
+  Env.flex_add_of env k_demod_in_var_args !_demod_in_var_args;
+  Env.flex_add_of env k_lambda_demod !_lambda_demod;
 
-  Env.flex_add_of (get_env ()) k_use_simultaneous_sup !_use_simultaneous_sup;
-  Env.flex_add_of (get_env ()) k_fluidsup_penalty !_fluidsup_penalty;
-  Env.flex_add_of (get_env ()) k_dupsup_penalty !_dupsup_penalty;
-  Env.flex_add_of (get_env ()) k_ground_subs_check !_ground_subs_check;
-  Env.flex_add_of (get_env ()) k_solid_subsumption !_solid_subsumption;
-  Env.flex_add_of (get_env ()) k_dot_sup_into !_dot_sup_into;
-  Env.flex_add_of (get_env ()) k_dot_sup_from !_dot_sup_from;
-  Env.flex_add_of (get_env ()) k_dot_simpl !_dot_simpl;
-  Env.flex_add_of (get_env ()) k_dot_demod_into !_dot_demod_into;
-  Env.flex_add_of (get_env ()) k_recognize_injectivity !_recognize_injectivity;
-  Env.flex_add_of (get_env ()) k_ho_basic_rules !_ho_basic_rules;
-  Env.flex_add_of (get_env ()) k_max_infs !_max_infs;
-  Env.flex_add_of (get_env ()) k_switch_stream_extraction
-    !_switch_stream_extraction;
-  Env.flex_add_of (get_env ()) k_dont_simplify !_dont_simplify;
-  Env.flex_add_of (get_env ()) k_use_semantic_tauto !_use_semantic_tauto;
-  Env.flex_add_of (get_env ()) k_bool_demod !_bool_demod;
-  Env.flex_add_of (get_env ()) k_immediate_simplification
-    !_immediate_simplification;
-  Env.flex_add_of (get_env ()) k_rw_with_formulas !_rw_w_formulas;
+  Env.flex_add_of env k_use_simultaneous_sup !_use_simultaneous_sup;
+  Env.flex_add_of env k_fluidsup_penalty !_fluidsup_penalty;
+  Env.flex_add_of env k_dupsup_penalty !_dupsup_penalty;
+  Env.flex_add_of env k_ground_subs_check !_ground_subs_check;
+  Env.flex_add_of env k_solid_subsumption !_solid_subsumption;
+  Env.flex_add_of env k_dot_sup_into !_dot_sup_into;
+  Env.flex_add_of env k_dot_sup_from !_dot_sup_from;
+  Env.flex_add_of env k_dot_simpl !_dot_simpl;
+  Env.flex_add_of env k_dot_demod_into !_dot_demod_into;
+  Env.flex_add_of env k_recognize_injectivity !_recognize_injectivity;
+  Env.flex_add_of env k_ho_basic_rules !_ho_basic_rules;
+  Env.flex_add_of env k_max_infs !_max_infs;
+  Env.flex_add_of env k_switch_stream_extraction !_switch_stream_extraction;
+  Env.flex_add_of env k_dont_simplify !_dont_simplify;
+  Env.flex_add_of env k_use_semantic_tauto !_use_semantic_tauto;
+  Env.flex_add_of env k_bool_demod !_bool_demod;
+  Env.flex_add_of env k_immediate_simplification !_immediate_simplification;
+  Env.flex_add_of env k_rw_with_formulas !_rw_w_formulas;
 
-  Env.flex_add_of (get_env ()) PragUnifParams.k_max_inferences !_max_infs;
-  Env.flex_add_of (get_env ()) PragUnifParams.k_skip_multiplier
-    !_skip_multiplier;
-  Env.flex_add_of (get_env ()) PragUnifParams.k_imit_first !_imit_first;
-  Env.flex_add_of (get_env ()) PragUnifParams.k_logop_mode !_unif_logop_mode;
-  Env.flex_add_of (get_env ()) PragUnifParams.k_max_depth !_max_depth;
-  Env.flex_add_of (get_env ()) PragUnifParams.k_max_rigid_imitations
+  Env.flex_add_of env PragUnifParams.k_max_inferences !_max_infs;
+  Env.flex_add_of env PragUnifParams.k_skip_multiplier !_skip_multiplier;
+  Env.flex_add_of env PragUnifParams.k_imit_first !_imit_first;
+  Env.flex_add_of env PragUnifParams.k_logop_mode !_unif_logop_mode;
+  Env.flex_add_of env PragUnifParams.k_max_depth !_max_depth;
+  Env.flex_add_of env PragUnifParams.k_max_rigid_imitations
     !_max_rigid_imitations;
-  Env.flex_add_of (get_env ()) PragUnifParams.k_max_app_projections
-    !_max_app_projections;
-  Env.flex_add_of (get_env ()) PragUnifParams.k_max_elims !_max_elims;
-  Env.flex_add_of (get_env ()) PragUnifParams.k_max_identifications
-    !_max_identifications;
-  Env.flex_add_of (get_env ()) PragUnifParams.k_pattern_decider
-    !_pattern_decider;
-  Env.flex_add_of (get_env ()) PragUnifParams.k_fixpoint_decider
-    !_fixpoint_decider;
-  Env.flex_add_of (get_env ()) PragUnifParams.k_solid_decider !_solid_decider;
-  Env.flex_add_of (get_env ()) PragUnifParams.k_solidification_limit
+  Env.flex_add_of env PragUnifParams.k_max_app_projections !_max_app_projections;
+  Env.flex_add_of env PragUnifParams.k_max_elims !_max_elims;
+  Env.flex_add_of env PragUnifParams.k_max_identifications !_max_identifications;
+  Env.flex_add_of env PragUnifParams.k_pattern_decider !_pattern_decider;
+  Env.flex_add_of env PragUnifParams.k_fixpoint_decider !_fixpoint_decider;
+  Env.flex_add_of env PragUnifParams.k_solid_decider !_solid_decider;
+  Env.flex_add_of env PragUnifParams.k_solidification_limit
     !_solidification_limit;
-  Env.flex_add_of (get_env ()) PragUnifParams.k_max_unifs_solid_ff
-    !_max_unifs_solid_ff;
-  Env.flex_add_of (get_env ()) PragUnifParams.k_use_weight_for_solid_subsumption
+  Env.flex_add_of env PragUnifParams.k_max_unifs_solid_ff !_max_unifs_solid_ff;
+  Env.flex_add_of env PragUnifParams.k_use_weight_for_solid_subsumption
     !_use_weight_for_solid_subsumption;
-  Env.flex_add_of (get_env ()) PragUnifParams.k_sort_constraints
-    !_sort_constraints;
-  Env.flex_add_of (get_env ()) PragUnifParams.k_try_lfho !_try_lfho_unif;
-  Env.flex_add_of (get_env ()) PragUnifParams.k_schedule_inferences
-    !_schedule_infs;
-  Env.flex_add_of (get_env ()) k_pred_var_eq_fact !_pred_var_eq_fact;
-  Env.flex_add_of (get_env ()) k_force_limit !_force_limit;
-  Env.flex_add_of (get_env ()) k_formula_simplify_reflect !_formula_sr;
-  Env.flex_add_of (get_env ()) k_superpose_w_formulas
-    !_superposition_with_formulas;
+  Env.flex_add_of env PragUnifParams.k_sort_constraints !_sort_constraints;
+  Env.flex_add_of env PragUnifParams.k_try_lfho !_try_lfho_unif;
+  Env.flex_add_of env PragUnifParams.k_schedule_inferences !_schedule_infs;
+  Env.flex_add_of env k_pred_var_eq_fact !_pred_var_eq_fact;
+  Env.flex_add_of env k_force_limit !_force_limit;
+  Env.flex_add_of env k_formula_simplify_reflect !_formula_sr;
+  Env.flex_add_of env k_superpose_w_formulas !_superposition_with_formulas;
 
-  Env.flex_add_of (get_env ()) StreamQueue.k_guard !_guard;
-  Env.flex_add_of (get_env ()) StreamQueue.k_ratio !_ratio;
-  Env.flex_add_of (get_env ()) StreamQueue.k_clause_num !_clause_num;
+  Env.flex_add_of env StreamQueue.k_guard !_guard;
+  Env.flex_add_of env StreamQueue.k_ratio !_ratio;
+  Env.flex_add_of env StreamQueue.k_clause_num !_clause_num;
 
-  Env.flex_add_of (get_env ()) k_local_rw !_local_rw;
-  Env.flex_add_of (get_env ()) k_destr_eq_res !_destr_eq_res;
-  Env.flex_add_of (get_env ()) k_strong_sr !_strong_sr;
+  Env.flex_add_of env k_local_rw !_local_rw;
+  Env.flex_add_of env k_destr_eq_res !_destr_eq_res;
+  Env.flex_add_of env k_strong_sr !_strong_sr;
 
   let module JPF = JPFull.Make (struct
-    let st = Env.flex_state_of (get_env ())
+    let st = Env.flex_state_of env
   end) in
   let module JPP = PUnif.Make (struct
-    let st = Env.flex_state_of (get_env ())
+    let st = Env.flex_state_of env
   end) in
-  Env.flex_add_of (get_env ()) k_unif_module
+  Env.flex_add_of env k_unif_module
     { unify_scoped = JPF.unify_scoped; unify_scoped_l = JPF.unify_scoped_l };
   match !_unif_alg with
   | `OldJP ->
-    Env.flex_add_of (get_env ()) k_unif_alg JP_unif.unify_scoped;
-    Env.flex_add_of (get_env ()) PragUnifParams.k_unif_alg_is_terminating false
+    Env.flex_add_of env k_unif_alg JP_unif.unify_scoped;
+    Env.flex_add_of env PragUnifParams.k_unif_alg_is_terminating false
   | `NewJPFull ->
-    Env.flex_add_of (get_env ()) k_unif_alg JPF.unify_scoped;
-    Env.flex_add_of (get_env ()) PragUnifParams.k_unif_alg_is_terminating false
+    Env.flex_add_of env k_unif_alg JPF.unify_scoped;
+    Env.flex_add_of env PragUnifParams.k_unif_alg_is_terminating false
   | `NewJPPragmatic ->
-    Env.flex_add_of (get_env ()) k_unif_alg JPP.unify_scoped;
-    Env.flex_add_of (get_env ()) k_unif_module
+    Env.flex_add_of env k_unif_alg JPP.unify_scoped;
+    Env.flex_add_of env k_unif_module
       { unify_scoped = JPP.unify_scoped; unify_scoped_l = JPP.unify_scoped_l }
 
 (* TODO: move DOT index printing into the extension *)
 
 let extension =
   let action (env : Env.t) =
-    _env_ref := Some env;
     register env;
     register_rules env
   in

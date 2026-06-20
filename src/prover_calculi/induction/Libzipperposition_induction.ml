@@ -20,8 +20,6 @@ type clause = Literals.t
 type form = clause list
 
 let section = Util.Section.make ~parent:Const.section "induction"
-let _env_ref : Env.t option ref = ref None
-let get_env () = CCOpt.get_exn !_env_ref
 let stat_lemmas = Util.mk_stat "induction.inductive_lemmas"
 let stat_trivial_lemmas = Util.mk_stat "induction.trivial_lemmas"
 let stat_absurd_lemmas = Util.mk_stat "induction.absurd_lemmas"
@@ -166,7 +164,7 @@ module Make_goal = struct
     in
     Util.debugf ~section 2
       "@[<2>@{<green>assess goal@}@ :goal %a@ :max-steps %d@]" (fun k ->
-        k pp g (max_steps_ (get_env ())));
+        k pp g (max_steps_ env));
     let module CQ = Libzipperposition.ClauseQueue in
     let q = CQ.almost_bfs () in
     (* clauses waiting *)
@@ -179,12 +177,11 @@ module Make_goal = struct
       List.iter
         (fun lits ->
           let c =
-            C.create_a
-              ~ctx:(Env.get_ctx (get_env ()))
-              ~trail:Trail.empty ~penalty:1 lits Proof.Step.trivial
+            C.create_a ~ctx:(Env.get_ctx env) ~trail:Trail.empty ~penalty:1 lits
+              Proof.Step.trivial
           in
-          let c, _ = Env.unary_simplify (get_env ()) c in
-          if Env.is_trivial (get_env ()) c then
+          let c, _ = Env.unary_simplify env c in
+          if Env.is_trivial env c then
             ()
           else if C.is_empty c then
             raise (Yield_false c)
@@ -194,33 +191,33 @@ module Make_goal = struct
           ))
         (cs g);
       (* do a few steps of saturation *)
-      while (not (CQ.is_empty q)) && !n < max_steps_ (get_env ()) do
+      while (not (CQ.is_empty q)) && !n < max_steps_ env do
         try
           incr n;
           let c = CQ.take_first q in
-          let c, _ = Env.unary_simplify (get_env ()) c in
+          let c, _ = Env.unary_simplify env c in
           (* check for empty clause *)
           if C.comes_from_goal c then
             ()
           (* ignore, a valid lemma might contradict goal *)
           else if C.is_empty c && Trail.is_empty (C.trail c) then
             raise (Yield_false c)
-          else if Env.is_trivial (get_env ()) c then
+          else if Env.is_trivial env c then
             ()
           else (
             trivial := false;
             (* at least one clause does not simplify to [true] *)
             (* now make inferences with [c] and push non-trivial clauses to [q],
               if needed *)
-            if !n + 2 < max_steps_ (get_env ()) then (
+            if !n + 2 < max_steps_ env then (
               let new_c =
                 Iter.append
-                  (Env.do_binary_inferences (get_env ()) c)
-                  (Env.do_unary_inferences (get_env ()) c)
+                  (Env.do_binary_inferences env c)
+                  (Env.do_unary_inferences env c)
               in
               new_c
               |> Iter.filter_map (fun new_c ->
-                     let new_c, _ = Env.unary_simplify (get_env ()) new_c in
+                     let new_c, _ = Env.unary_simplify env new_c in
                      (* discard trivial/conditional clauses, or clauses coming
                       from goals (as they might be true lemmas but contradict
                       the negated goal, which makes them even more useful);
@@ -229,7 +226,7 @@ module Make_goal = struct
                        None
                      else if not (Trail.is_empty (C.trail new_c)) then
                        None
-                     else if Env.is_trivial (get_env ()) new_c then
+                     else if Env.is_trivial env new_c then
                        None
                      else if C.is_empty new_c then
                        raise (Yield_false new_c)
@@ -256,9 +253,9 @@ module Make_goal = struct
       false
 
   (* some checks that [g] should be considered as a goal *)
-  let is_acceptable_goal (g : t) : bool =
+  let is_acceptable_goal env (g : t) : bool =
     Util.incr_stat stat_assess_goal;
-    let res = test_goal_is_ok g && check_not_absurd_or_trivial (get_env ()) g in
+    let res = test_goal_is_ok g && check_not_absurd_or_trivial env g in
     if res then Util.incr_stat stat_assess_goal_ok;
     res
 
@@ -432,9 +429,9 @@ let scan_terms ~mode (seq : term Iter.t) : Ind_cst.ind_skolem list =
 (* scan clauses for ground terms of an inductive type,
      and perform induction on these terms.
       @return a list of ways to generalize the given clause *)
-let scan_clause (c : C.t) : Ind_cst.ind_skolem list list =
+let scan_clause env (c : C.t) : Ind_cst.ind_skolem list list =
   let l1 =
-    if Env.flex_get_of (get_env ()) k_ind_on_subcst then
+    if Env.flex_get_of env k_ind_on_subcst then
       C.lits c |> Lits.Seq.terms |> scan_terms ~mode:`All
     else
       []
@@ -446,14 +443,14 @@ let scan_clause (c : C.t) : Ind_cst.ind_skolem list list =
 
 (* goal for induction *)
 (* ensure the proper declarations are done for this coverset *)
-let decl_cst_of_set (set : Cover_set.t) : unit =
+let decl_cst_of_set env (set : Cover_set.t) : unit =
   Util.debugf ~section 3 "@[<2>declare coverset@ `%a`@]" (fun k ->
       k Cover_set.pp set);
   Cover_set.declarations set
-  |> Iter.iter (fun (id, ty) -> Ctx.declare (Env.get_ctx (get_env ())) id ty)
+  |> Iter.iter (fun (id, ty) -> Ctx.declare (Env.get_ctx env) id ty)
 
 (* induction on the given variables *)
-let ind_on_vars (cut : Avatar.cut_res) (vars : T.var list) : C.t list =
+let ind_on_vars env (cut : Avatar.cut_res) (vars : T.var list) : C.t list =
   assert (vars <> []);
   let g = Avatar.cut_form cut in
   let depth = Avatar.cut_depth cut in
@@ -480,7 +477,7 @@ let ind_on_vars (cut : Avatar.cut_res) (vars : T.var list) : C.t list =
     |> List.map (fun v ->
            let ty_v = HVar.ty v in
            let id = Ind_cst.make_skolem ty_v in
-           Ctx.declare (Env.get_ctx (get_env ())) id ty_v;
+           Ctx.declare (Env.get_ctx env) id ty_v;
            (v, 0), (T.const ~ty:ty_v id, 1))
     |> Subst.FO.of_list' ?init:None
   in
@@ -491,13 +488,10 @@ let ind_on_vars (cut : Avatar.cut_res) (vars : T.var list) : C.t list =
         let ty =
           Subst.Ty.apply Subst.Renaming.none subst_skolems (HVar.ty v, 0)
         in
-        ( v,
-          Cover_set.make
-            ~cover_set_depth:(cover_set_depth (get_env ()))
-            ~depth ty ))
+        v, Cover_set.make ~cover_set_depth:(cover_set_depth env) ~depth ty)
       vars
   in
-  List.iter (fun (_, set) -> decl_cst_of_set set) c_sets;
+  List.iter (fun (_, set) -> decl_cst_of_set env set) c_sets;
   Util.debugf ~section 2
     "(@[<hv2>ind_on_vars (@[%a@])@ :form %a@ :cover_sets (@[<hv>%a@])@ \
      :subst_skolem %a@])" (fun k ->
@@ -544,9 +538,8 @@ let ind_on_vars (cut : Avatar.cut_res) (vars : T.var list) : C.t list =
                              [ b_lit_case; BoolLit.neg cut_blit ]
                              |> Trail.of_list
                            in
-                           C.create_a
-                             ~ctx:(Env.get_ctx (get_env ()))
-                             lits proof ~trail ~penalty:1))
+                           C.create_a ~ctx:(Env.get_ctx env) lits proof ~trail
+                             ~penalty:1))
              |> Iter.to_list
            in
            (* clauses [CNF[¬goal[case]) <- b_lit(case), ¬cut.blit] with
@@ -571,9 +564,8 @@ let ind_on_vars (cut : Avatar.cut_res) (vars : T.var list) : C.t list =
                     let trail =
                       [ BoolLit.neg cut_blit; b_lit_case ] |> Trail.of_list
                     in
-                    C.create_a
-                      ~ctx:(Env.get_ctx (get_env ()))
-                      lits proof ~trail ~penalty:1)
+                    C.create_a ~ctx:(Env.get_ctx env) lits proof ~trail
+                      ~penalty:1)
            in
            (* all new clauses *)
            let res = List.rev_append pos_clauses neg_clauses in
@@ -713,18 +705,15 @@ module Generalize : sig
   type generalization = form list
   type t = form -> generalization list
 
-  val id : t
-  (** Do nothing *)
-
-  val vars_at_active_pos : t
-  val terms_at_active_pos : t
-  val all : t
+  val vars_at_active_pos : Env.t -> t
+  val terms_at_active_pos : Env.t -> t
+  val all : Env.t -> t
 end = struct
   type form = Cut_form.t
   type generalization = form list
   type t = form -> generalization list
 
-  let id _ = []
+  let id f = []
 
   (* generalize on variables that occur both (several times) in active
        positions, and which also occur (several times) in passive position.
@@ -734,7 +723,7 @@ end = struct
        This should generalize [forall x. x + (x + x) = (x + x) + x]
        into [forall x y. y + (x + x) = (y + x) + x]
     *)
-  let vars_at_active_pos (f : form) : generalization list =
+  let vars_at_active_pos env (f : form) : generalization list =
     let vars =
       Cut_form.vars f |> T.VarSet.to_list
       |> List.filter (fun v ->
@@ -769,7 +758,7 @@ end = struct
           k Cut_form.pp f Cut_form.pp f' (Util.pp_list HVar.pp) vars
             (Position.Map.pp Position.pp Term.pp)
             m);
-      if Goal.is_acceptable_goal @@ Goal.of_cut_form f' then (
+      if Goal.is_acceptable_goal env @@ Goal.of_cut_form f' then (
         Util.incr_stat stat_generalize_vars_active_pos;
         [ [ f' ] ]
       ) else
@@ -777,7 +766,7 @@ end = struct
 
   (* generalize non-variable subterms occurring several times
        at active positions *)
-  let terms_at_active_pos (f : form) : generalization list =
+  let terms_at_active_pos env (f : form) : generalization list =
     let relevant_subterms =
       subterms_with_pos f
       |> Iter.filter_map (function
@@ -821,21 +810,21 @@ end = struct
              "(@[<2>candidate_generalize@ :of %a@ :gen_to %a@ :by \
               terms_active_pos@ :on %a@])" (fun k ->
                k Cut_form.pp f Cut_form.pp f' T.pp t);
-           if Goal.is_acceptable_goal @@ Goal.of_cut_form f' then (
+           if Goal.is_acceptable_goal env @@ Goal.of_cut_form f' then (
              Util.incr_stat stat_generalize_terms_active_pos;
              Some [ f' ]
            ) else
              None)
 
-  let all =
+  let all env : t =
     let g1 =
-      if Env.flex_get_of (get_env ()) k_generalize_var then
-        vars_at_active_pos
+      if Env.flex_get_of env k_generalize_var then
+        vars_at_active_pos env
       else
         id
     and g2 =
-      if Env.flex_get_of (get_env ()) k_generalize_term then
-        terms_at_active_pos
+      if Env.flex_get_of env k_generalize_term then
+        terms_at_active_pos env
       else
         id
     and ( <++> ) o (f, x) =
@@ -847,8 +836,8 @@ end = struct
 end
 
 (* should we do induction on [x] in [c]? *)
-let should_do_ind_on_var (f : Cut_form.t) (x : T.var) : bool =
-  (not (Env.flex_get_of (get_env ()) k_limit_to_active))
+let should_do_ind_on_var env (f : Cut_form.t) (x : T.var) : bool =
+  (not (Env.flex_get_of env k_limit_to_active))
   || var_occurs_under_active_pos f x
   || var_always_naked f x
 
@@ -933,7 +922,7 @@ let find_var_clusters (f : Cut_form.t) (vars : T.var list) : T.var list list =
   res
 
 (* proof by direct induction *)
-let prove_cut_by_ind (cut : Avatar.cut_res) : C.t list =
+let prove_cut_by_ind env (cut : Avatar.cut_res) : C.t list =
   let g = Avatar.cut_form cut in
   match Cut_form.ind_vars g with
   | [] -> []
@@ -942,7 +931,7 @@ let prove_cut_by_ind (cut : Avatar.cut_res) : C.t list =
     let ivars =
       List.filter
         (fun v ->
-          let ok = should_do_ind_on_var g v in
+          let ok = should_do_ind_on_var env g v in
           if not ok then
             Util.debugf ~section 3
               "(@[<hv>ind: inactive variable `%a`@ :in %a@])" (fun k ->
@@ -954,7 +943,7 @@ let prove_cut_by_ind (cut : Avatar.cut_res) : C.t list =
     (* for each variable, build a coverset of its type,
            and do a case distinction on the [top] constant of this
            coverset. *)
-    CCList.flat_map (ind_on_vars cut) clusters
+    CCList.flat_map (ind_on_vars env cut) clusters
 
 let new_lemma_ =
   let n = ref 0 in
@@ -964,12 +953,12 @@ let new_lemma_ =
 
 (* prove any lemma that has inductive variables. First we try
      to generalize it, otherwise we prove it by induction *)
-let inductions_on_lemma (cut : Avatar.cut_res) : C.t list =
+let inductions_on_lemma env (cut : Avatar.cut_res) : C.t list =
   let g = Avatar.cut_form cut in
   Util.debugf ~section 4 "(@[<hv>prove_lemma_by_induction@ %a@])" (fun k ->
       k Cut_form.pp g);
-  match Generalize.all g with
-  | [] -> prove_cut_by_ind cut
+  match Generalize.all env g with
+  | [] -> prove_cut_by_ind env cut
   | new_goals_l ->
     (* try each generalization in turn *)
     List.iter
@@ -979,7 +968,7 @@ let inductions_on_lemma (cut : Avatar.cut_res) : C.t list =
         let new_cuts =
           List.map
             (fun g ->
-              Avatar.introduce_cut (get_env ()) ~depth:(Avatar.cut_depth cut) g
+              Avatar.introduce_cut env ~depth:(Avatar.cut_depth cut) g
                 (Proof.Step.lemma @@ Proof.Src.internal [ new_lemma_ () ])
                 ~reason:
                   Fmt.(
@@ -994,7 +983,7 @@ let inductions_on_lemma (cut : Avatar.cut_res) : C.t list =
         let proof = Proof.Step.trivial in
         Avatar.add_imply new_cuts cut proof;
         (* now prove the lemmas in Avatar *)
-        List.iter Avatar.add_lemma new_cuts)
+        List.iter (Avatar.add_lemma env) new_cuts)
       new_goals_l;
     []
 
@@ -1048,7 +1037,7 @@ let generalize_clauses (cs : Lits.t list)
 
       @param generalize_on the set of (skolem) constants that are replaced
        by free variables in the negation of [clauses] *)
-let prove_by_ind (clauses : C.t list) ~ignore_depth ~generalize_on : unit =
+let prove_by_ind env (clauses : C.t list) ~ignore_depth ~generalize_on : unit =
   let pp_csts = Util.pp_list Fmt.(pair ~sep:(return ":@ ") Name.pp Type.pp) in
   (* remove trivial clauses *)
   let clauses =
@@ -1069,9 +1058,7 @@ let prove_by_ind (clauses : C.t list) ~ignore_depth ~generalize_on : unit =
     |> Iter.flat_map Trail.to_iter
     |> Iter.for_all (fun lit -> not (BoolLit.sign lit && BBox.is_lemma lit))
   in
-  if
-    (ignore_depth || depth < max_depth (get_env ())) && no_pos_lemma_in_trail ()
-  then (
+  if (ignore_depth || depth < max_depth env) && no_pos_lemma_in_trail () then (
     let goal =
       generalize_clauses (List.map C.lits clauses) ~generalize_on
       |> Goal.simplify
@@ -1085,7 +1072,7 @@ let prove_by_ind (clauses : C.t list) ~ignore_depth ~generalize_on : unit =
               k Goal.pp goal);
           Util.incr_stat stat_goal_duplicate;
           ()
-        ) else if Goal.is_acceptable_goal goal then (
+        ) else if Goal.is_acceptable_goal env goal then (
           Util.debugf ~section 1
             "(@[<2>@{<green>prove_by_induction@}@ :clauses (@[%a@])@ :goal \
              %a@])" (fun k -> k (Util.pp_list C.pp) clauses Goal.pp goal);
@@ -1095,8 +1082,7 @@ let prove_by_ind (clauses : C.t list) ~ignore_depth ~generalize_on : unit =
           (* new lemma has same penalty as the clauses *)
           let penalty = List.fold_left (fun n c -> n + C.penalty c) 0 clauses in
           let cut =
-            Avatar.introduce_cut (get_env ()) ~penalty ~depth (Goal.form goal)
-              proof
+            Avatar.introduce_cut env ~penalty ~depth (Goal.form goal) proof
               ~reason:
                 Fmt.(
                   fun out () ->
@@ -1104,26 +1090,26 @@ let prove_by_ind (clauses : C.t list) ~ignore_depth ~generalize_on : unit =
                       "(@[prove_ind@ :clauses (@[%a@])@ :on (@[%a@])@])"
                       (Util.pp_list C.pp) clauses pp_csts generalize_on)
           in
-          Avatar.add_lemma cut
+          Avatar.add_lemma env cut
         ))
       goals
   );
   ()
 
 (* Try to prove the given clause by introducing an inductive lemma. *)
-let inf_prove_by_ind _env (c : C.t) : C.t list =
+let inf_prove_by_ind env (c : C.t) : C.t list =
   List.iter
     (fun consts ->
       assert (consts <> []);
-      prove_by_ind [ c ] ~ignore_depth:false ~generalize_on:consts)
-    (scan_clause c);
+      prove_by_ind env [ c ] ~ignore_depth:false ~generalize_on:consts)
+    (scan_clause env c);
   []
 
 (* hook for converting some statements to clauses.
      It check if [Negated_goal l] contains clauses with inductive skolems,
      in which case it tries to prove these clauses by induction in a lemma.
   *)
-let convert_statement _env st =
+let convert_statement env st =
   match Statement.view st with
   | Statement.NegatedGoal (skolems, _) ->
     (* find inductive skolems in there *)
@@ -1142,10 +1128,10 @@ let convert_statement _env st =
                NOTE: do not use {!all_simplify} as it interacts badly
                with avatar splitting. *)
       let clauses =
-        C.of_statement ~ctx:(Env.get_ctx (get_env ())) st
-        |> List.map (fun c -> fst (Env.basic_simplify (get_env ()) c))
+        C.of_statement ~ctx:(Env.get_ctx env) st
+        |> List.map (fun c -> fst (Env.basic_simplify env c))
       in
-      prove_by_ind clauses ~ignore_depth:true ~generalize_on:consts;
+      prove_by_ind env clauses ~ignore_depth:true ~generalize_on:consts;
       (* "skip" in any case, because the proof is done in a cut anyway *)
       Env.CR_skip)
   | _ -> Env.CR_skip
@@ -1197,8 +1183,8 @@ let trail_is_trivial_lemmas _env trail =
          res)
 
 (* look whether, to prove the lemma, we need induction *)
-let prove_lemma_by_ind cut =
-  let l = inductions_on_lemma cut in
+let prove_lemma_by_ind env cut =
+  let l = inductions_on_lemma env cut in
   if l <> [] then (
     Util.incr_stat stat_lemmas;
     Env.CR_return l
@@ -1206,15 +1192,14 @@ let prove_lemma_by_ind cut =
     Env.CR_skip
 
 let register env =
-  _env_ref := Some env;
   Util.debug ~section 2 "register induction";
-  let d = Env.flex_get_of (get_env ()) k_ind_depth in
+  let d = Env.flex_get_of env k_ind_depth in
   Util.debugf ~section 2 "maximum induction depth: %d" (fun k -> k d);
-  Env.add_unary_inf (get_env ()) "induction.ind" inf_prove_by_ind;
-  Env.add_clause_conversion (get_env ()) convert_statement;
-  Env.add_is_trivial_trail (get_env ()) trail_is_trivial_cases;
-  if Env.flex_get_of (get_env ()) Avatar.k_simplify_trail then
-    Env.add_is_trivial_trail (get_env ()) trail_is_trivial_lemmas;
+  Env.add_unary_inf env "induction.ind" inf_prove_by_ind;
+  Env.add_clause_conversion env convert_statement;
+  Env.add_is_trivial_trail env trail_is_trivial_cases;
+  if Env.flex_get_of env Avatar.k_simplify_trail then
+    Env.add_is_trivial_trail env trail_is_trivial_lemmas;
   (* try to prove lemmas by induction *)
   Avatar.add_prove_lemma prove_lemma_by_ind;
   ()
@@ -1259,11 +1244,11 @@ let post_typing_hook stmts state =
 
 (* if enabled: register the main functor, with inference rules, etc. *)
 let env_action (env : Env.t) =
-  let is_enabled = Env.flex_get_of (get_env ()) k_enable in
+  let is_enabled = Env.flex_get_of env k_enable in
   if is_enabled then (
-    Ctx.lost_completeness (Env.get_ctx (get_env ()));
-    Ctx.set_selection_fun (Env.get_ctx (get_env ())) Selection.no_select;
-    register (get_env ())
+    Ctx.lost_completeness (Env.get_ctx env);
+    Ctx.set_selection_fun (Env.get_ctx env) Selection.no_select;
+    register env
   )
 
 let extension =

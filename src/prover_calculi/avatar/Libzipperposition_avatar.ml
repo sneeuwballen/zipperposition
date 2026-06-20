@@ -34,8 +34,6 @@ let k_split_only_goals : bool Flex_state.key = Flex_state.create_key ()
 let k_split_only_ground : bool Flex_state.key = Flex_state.create_key ()
 let k_max_trail_size : int Flex_state.key = Flex_state.create_key ()
 let k_infer_from_components : bool Flex_state.key = Flex_state.create_key ()
-let _env_ref : Env.t option ref = ref None
-let get_env () = CCOpt.get_exn !_env_ref
 
 module Ctx = Ctx
 module C = Clause
@@ -94,7 +92,7 @@ let simplify_split_ env (c : C.t) : C.t list option =
     assert (Array.length lits = 0);
     None
   | [ lits ] ->
-    if Env.flex_get_of (get_env ()) k_abstract_known_singletons then (
+    if Env.flex_get_of env k_abstract_known_singletons then (
       let lits = Array.of_list lits in
       let bool_name = BBox.find_boolean_lit lits in
       CCOpt.iter
@@ -128,9 +126,7 @@ let simplify_split_ env (c : C.t) : C.t list option =
           (* new trail: add the new one *)
           let trail = Trail.add bool_name keep_trail in
           let c =
-            C.create_a
-              ~ctx:(Env.get_ctx (get_env ()))
-              ~trail ~penalty:(C.penalty c) lits
+            C.create_a ~ctx:(Env.get_ctx env) ~trail ~penalty:(C.penalty c) lits
               (proof ~rule:(Proof.Rule.mk "split"))
           in
           c, bool_name)
@@ -154,19 +150,17 @@ let split env c =
 
   let should_split c =
     (not @@ Literals.is_trivial (C.lits c))
-    && ((not @@ Env.flex_get_of (get_env ()) k_split_only_initial)
+    && ((not @@ Env.flex_get_of env k_split_only_initial)
        || C.proof_depth c == 0)
-    && ((not @@ Env.flex_get_of (get_env ()) k_split_only_ground)
-       || C.is_ground c)
-    && ((not @@ Env.flex_get_of (get_env ()) k_split_only_goals)
+    && ((not @@ Env.flex_get_of env k_split_only_ground) || C.is_ground c)
+    && ((not @@ Env.flex_get_of env k_split_only_goals)
        || CCOpt.get_or ~default:(-1) (C.distance_to_goal c) >= 0)
-    && ((not @@ Env.flex_get_of (get_env ()) k_abstract_known_singletons)
+    && ((not @@ Env.flex_get_of env k_abstract_known_singletons)
        || Array.length (C.lits c) != 0)
-    && (Env.flex_get_of (get_env ()) k_abstract_known_singletons
+    && (Env.flex_get_of env k_abstract_known_singletons
        || Array.length (C.lits c) > 1)
-    && (Env.flex_get_of (get_env ()) k_max_trail_size < 0
-       || Trail.length (C.trail c)
-          <= Env.flex_get_of (get_env ()) k_max_trail_size)
+    && (Env.flex_get_of env k_max_trail_size < 0
+       || Trail.length (C.trail c) <= Env.flex_get_of env k_max_trail_size)
   in
 
   let res =
@@ -204,7 +198,7 @@ let check_empty env c =
   );
   if
     Array.length (C.lits c) = 0
-    && Env.flex_get_of (get_env ()) k_infer_from_components
+    && Env.flex_get_of env k_infer_from_components
     && Trail.length (C.trail c) = 1
   then (
     let bool_lit = List.hd (Trail.to_list (C.trail c)) in
@@ -325,9 +319,8 @@ let simplify_trail_ env c =
         (Proof.Parent.from (C.proof c) :: proof_removed)
     in
     let c' =
-      C.create_a
-        ~ctx:(Env.get_ctx (get_env ()))
-        ~trail:new_trail ~penalty:(C.penalty c) (C.lits c) proof
+      C.create_a ~ctx:(Env.get_ctx env) ~trail:new_trail ~penalty:(C.penalty c)
+        (C.lits c) proof
     in
     Util.debugf ~section 3 "@[<2>clause @[%a@]@ trail-simplifies into @[%a@]@]"
       (fun k -> k C.pp c C.pp c');
@@ -423,9 +416,8 @@ let introduce_cut env ?reason ?(penalty = 1) ?(depth = 0) (f : Cut_form.t) proof
   let c_pos =
     List.map
       (fun lits ->
-        C.create_a
-          ~ctx:(Env.get_ctx (get_env ()))
-          ~trail:(Trail.singleton box) ~penalty lits proof_pos)
+        C.create_a ~ctx:(Env.get_ctx env) ~trail:(Trail.singleton box) ~penalty
+          lits proof_pos)
       (Cut_form.cs f)
   in
   {
@@ -446,8 +438,8 @@ module Lemma_tbl = BBox.Lit.Tbl
 (* map from [cut.cut_lit] to [cut] *)
 let all_lemmas_ : cut_res Lemma_tbl.t = Lemma_tbl.create 64
 
-let prove_lemma_handlers_ : (cut_res -> C.t list Env.conversion_result) list ref
-    =
+let prove_lemma_handlers_ :
+    (Env.t -> cut_res -> C.t list Env.conversion_result) list ref =
   ref []
 
 let add_prove_lemma x = CCList.Ref.push prove_lemma_handlers_ x
@@ -478,7 +470,7 @@ let prove_lemma env (c : cut_res) : unit =
       |> List.map (fun v ->
              let ty_v = HVar.ty v in
              let id = Ind_cst.make_skolem ty_v in
-             Ctx.declare (Env.get_ctx (get_env ())) id ty_v;
+             Ctx.declare (Env.get_ctx env) id ty_v;
              (v, 0), (T.const ~ty:ty_v id, 0))
       |> Subst.FO.of_list' ?init:None
     in
@@ -495,16 +487,14 @@ let prove_lemma env (c : cut_res) : unit =
       |> CCList.map (fun l ->
              let lits = Array.of_list l in
              let trail = Trail.singleton (BLit.neg @@ cut_lit c) in
-             C.create_a
-               ~ctx:(Env.get_ctx (get_env ()))
-               lits proof ~trail ~penalty:1)
+             C.create_a ~ctx:(Env.get_ctx env) lits proof ~trail ~penalty:1)
     in
     clauses
   in
   let rec aux acc = function
     | [] -> List.rev_append (default ()) acc
     | proof_handler :: tail ->
-      (match proof_handler c with
+      (match proof_handler env c with
       | Env.CR_drop | Env.CR_skip -> aux acc tail
       | Env.CR_return cs -> List.rev_append cs acc
       | Env.CR_add cs -> aux (List.rev_append cs acc) tail)
@@ -515,13 +505,13 @@ let prove_lemma env (c : cut_res) : unit =
     (fun k -> k Cut_form.pp (cut_form c) (Util.pp_list C.pp) cs);
   CCList.Ref.push_list new_clauses_from_lemmas_ cs
 
-let add_lemma (c : cut_res) : unit =
+let add_lemma env (c : cut_res) : unit =
   if not (Lemma_tbl.mem all_lemmas_ c.cut_lit) then (
     Util.debugf ~section 2 "(@[<2>add_lemma@ :on `[@[<hv>%a@]]`@ :lit %a@])"
       (fun k -> k Cut_form.pp c.cut_form BBox.pp c.cut_lit);
     Lemma_tbl.add all_lemmas_ c.cut_lit c;
     (* start a subproof for the lemma *)
-    prove_lemma (get_env ()) c;
+    prove_lemma env c;
     Signal.send on_lemma c
   ) else
     (* already existing lemma *)
@@ -578,7 +568,7 @@ let print_lemmas out () =
 
 let show_lemmas () = Format.printf "%a@." print_lemmas ()
 
-let convert_lemma _env st =
+let convert_lemma env st =
   match Statement.view st with
   | Statement.Lemma l ->
     let proof_st = Statement.proof_step st in
@@ -594,11 +584,9 @@ let convert_lemma _env st =
              @@ SClause.make ~trail:Trail.empty c)
       |> Proof.Step.esa ~rule:(Proof.Rule.mk "lemma")
     in
-    let cut =
-      introduce_cut (get_env ()) ~reason:Fmt.(return "in-input") f proof
-    in
+    let cut = introduce_cut env ~reason:Fmt.(return "in-input") f proof in
     let all_clauses = cut_res_clauses cut |> Iter.to_rev_list in
-    add_lemma cut;
+    add_lemma env cut;
     Signal.send on_input_lemma cut;
     (* interrupt here *)
     Env.CR_return all_clauses
@@ -622,9 +610,7 @@ let check_satisfiability env ~full () =
       Util.debug ~section 1 "SAT-solver reports \"UNSAT\"";
       let proof = Proof.S.step proof in
       let c =
-        C.create
-          ~ctx:(Env.get_ctx (get_env ()))
-          ~trail:Trail.empty ~penalty:1 [] proof
+        C.create ~ctx:(Env.get_ctx env) ~trail:Trail.empty ~penalty:1 [] proof
       in
       [ c ]
   in
@@ -642,38 +628,35 @@ let register env ~split_kind () =
     (fun k -> k (split_to_str split_kind));
   Solver.set_printer BBox.pp;
   (match split_kind with
-  | `Lazy -> Env.add_multi_simpl_rule (get_env ()) ~priority:0 split
+  | `Lazy -> Env.add_multi_simpl_rule env ~priority:0 split
   | `Eager ->
-    Env.add_cheap_multi_simpl_rule (get_env ()) split;
+    Env.add_cheap_multi_simpl_rule env split;
     (* this rule is used to interfere with lazy clausification *)
-    Env.add_multi_simpl_rule (get_env ()) ~priority:0 split
+    Env.add_multi_simpl_rule env ~priority:0 split
   | `Off -> ());
 
-  Env.add_unary_inf (get_env ()) "avatar_check_empty" check_empty;
-  Env.add_generate (get_env ()) ~priority:1000 "avatar_check_sat"
-    check_satisfiability;
-  Env.add_generate (get_env ()) ~priority:100 "avatar.lemmas" inf_new_lemmas;
-  Env.add_clause_conversion (get_env ()) convert_lemma;
+  Env.add_unary_inf env "avatar_check_empty" check_empty;
+  Env.add_generate env ~priority:1000 "avatar_check_sat" check_satisfiability;
+  Env.add_generate env ~priority:100 "avatar.lemmas" inf_new_lemmas;
+  Env.add_clause_conversion env convert_lemma;
 
   if split_kind != `Off then
-    Signal.on
-      (Env.on_start (get_env ()))
-      (fun () ->
-        Env.get_passive (get_env ()) ()
+    Signal.on (Env.on_start env) (fun () ->
+        Env.get_passive env ()
         |> Iter.iter (fun cl ->
-               match split (get_env ()) cl with
+               match split env cl with
                | None -> ()
                | Some splitted ->
-                 Env.remove_passive (get_env ()) (Iter.singleton cl);
-                 Env.add_passive (get_env ()) (Iter.of_list splitted));
+                 Env.remove_passive env (Iter.singleton cl);
+                 Env.add_passive env (Iter.of_list splitted));
 
         Signal.ContinueListening);
-  Env.add_is_trivial_trail (get_env ()) trail_is_trivial;
-  if Env.flex_get_of (get_env ()) k_simplify_trail then (
-    Env.add_unary_simplify (get_env ()) simplify_trail;
-    Env.add_backward_simplify (get_env ()) backward_simplify_trails
+  Env.add_is_trivial_trail env trail_is_trivial;
+  if Env.flex_get_of env k_simplify_trail then (
+    Env.add_unary_simplify env simplify_trail;
+    Env.add_backward_simplify env backward_simplify_trails
   );
-  if Env.flex_get_of (get_env ()) k_show_lemmas then
+  if Env.flex_get_of env k_show_lemmas then
     Signal.once Signals.on_exit (fun _ -> show_lemmas ());
   (* be sure there is an initial valuation *)
   ignore (Solver.check ~full:true ())
@@ -691,19 +674,17 @@ let infer_from_components = ref false
 
 let extension =
   let action (env : Env.t) =
-    _env_ref := Some env;
     Solver.setup ();
-    Env.flex_add_of (get_env ()) k_show_lemmas !show_lemmas_;
-    Env.flex_add_of (get_env ()) k_simplify_trail !simplify_trail_;
-    Env.flex_add_of (get_env ()) k_back_simplify_trail !back_simplify_trail_;
-    Env.flex_add_of (get_env ()) k_abstract_known_singletons
-      !abstract_known_singletons;
-    Env.flex_add_of (get_env ()) k_split_only_initial !split_only_initial;
-    Env.flex_add_of (get_env ()) k_split_only_goals !split_only_goals;
-    Env.flex_add_of (get_env ()) k_split_only_ground !split_only_ground;
-    Env.flex_add_of (get_env ()) k_max_trail_size !max_trail_size;
-    Env.flex_add_of (get_env ()) k_infer_from_components !infer_from_components;
-    Env.flex_add_of (get_env ()) k_avatar_enabled (!avatar_kind != `Off);
+    Env.flex_add_of env k_show_lemmas !show_lemmas_;
+    Env.flex_add_of env k_simplify_trail !simplify_trail_;
+    Env.flex_add_of env k_back_simplify_trail !back_simplify_trail_;
+    Env.flex_add_of env k_abstract_known_singletons !abstract_known_singletons;
+    Env.flex_add_of env k_split_only_initial !split_only_initial;
+    Env.flex_add_of env k_split_only_goals !split_only_goals;
+    Env.flex_add_of env k_split_only_ground !split_only_ground;
+    Env.flex_add_of env k_max_trail_size !max_trail_size;
+    Env.flex_add_of env k_infer_from_components !infer_from_components;
+    Env.flex_add_of env k_avatar_enabled (!avatar_kind != `Off);
 
     Util.debug 1 "enable Avatar";
     register env ~split_kind:!avatar_kind ()

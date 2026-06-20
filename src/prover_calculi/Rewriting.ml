@@ -21,10 +21,7 @@ module Key = struct
   let narrow = Flex_state.create_key ()
 end
 
-let _env_ref : Env.t option ref = ref None
-let get_env () = CCOpt.get_exn !_env_ref
-
-let simpl_term env t =
+let simpl_term_ t =
   let t', rules = RW.Term.normalize_term ~max_steps t in
   if T.equal t t' then (
     assert (RW.Term.Rule_inst_set.is_empty rules);
@@ -38,6 +35,8 @@ let simpl_term env t =
     Some (t', proof)
   )
 
+let simpl_term env t = simpl_term_ t
+
 module C = Clause
 
 (* simplification rule *)
@@ -50,7 +49,7 @@ let narrow_term_passive env c : C.t list =
   let sc_rule = 1 in
   let sc_c = 0 in
   Literals.fold_terms ~vars:false ~subterms:true ~ty_args:false
-    ~ord:(C.Ctx.ord (Env.get_ctx (get_env ())))
+    ~ord:(C.Ctx.ord (Env.get_ctx env))
     ~which:`All ~eligible (C.lits c)
   |> Iter.flat_map (fun (u_p, passive_pos) ->
          RW.Term.narrow_term ~scope_rules:sc_rule (u_p, sc_c)
@@ -82,9 +81,8 @@ let narrow_term_passive env c : C.t list =
                     ~rule:(Proof.Rule.mk "narrow")
                 in
                 let c' =
-                  C.create
-                    ~ctx:(Env.get_ctx (get_env ()))
-                    ~trail:(C.trail c) ~penalty:(C.penalty c)
+                  C.create ~ctx:(Env.get_ctx env) ~trail:(C.trail c)
+                    ~penalty:(C.penalty c)
                     (c_guard @ CCArray.to_list lits')
                     proof
                 in
@@ -115,9 +113,8 @@ let simpl_clause env c =
     let clauses =
       List.map
         (fun c' ->
-          C.create_a
-            ~ctx:(Env.get_ctx (get_env ()))
-            ~trail:(C.trail c) ~penalty:(C.penalty c) c' proof)
+          C.create_a ~ctx:(Env.get_ctx env) ~trail:(C.trail c)
+            ~penalty:(C.penalty c) c' proof)
         clauses
     in
     Util.debugf ~section 2
@@ -161,9 +158,8 @@ let narrow_lits env c =
                         @ Literal.apply_subst_list renaming subst (lits', 0)
                         @ Literal.apply_subst_list renaming subst (c', 1)
                       in
-                      C.create
-                        ~ctx:(Env.get_ctx (get_env ()))
-                        ~trail:(C.trail c) ~penalty:(C.penalty c) new_lits proof)
+                      C.create ~ctx:(Env.get_ctx env) ~trail:(C.trail c)
+                        ~penalty:(C.penalty c) new_lits proof)
                     (RW.Lit.Rule.rhs rule)
                 in
                 Util.debugf ~section 3
@@ -200,7 +196,7 @@ let ctx_narrow_find env (s, sc_a) sc_p :
     let lit = RW.Lit.Rule.lhs r in
     Literal.fold_terms lit ~position:P.stop ~vars:false ~ty_args:false
       ~which:`All
-      ~ord:(Ctx.ord (Env.get_ctx (get_env ())))
+      ~ord:(Ctx.ord (Env.get_ctx env))
       ~subterms:true
     |> Iter.filter_map (fun (t, p) ->
            match p with
@@ -294,7 +290,7 @@ let contextual_narrowing env c : C.t list =
   (* no literal can be eligible for paramodulation if some are selected.
      This checks if inferences with i-th literal are needed? *)
   let eligible = C.Eligible.param c in
-  let ord = Ctx.ord (Env.get_ctx (get_env ())) in
+  let ord = Ctx.ord (Env.get_ctx env) in
   (* do the inferences where clause is active; for this,
      we try to rewrite conditionally other clauses using
      non-minimal sides of every positive literal *)
@@ -310,15 +306,14 @@ let contextual_narrowing env c : C.t list =
 
 let setup env ?(ctx_narrow = true) ~narrowing ~has_rw () =
   Util.debug ~section 1 "register Rewriting to Env...";
-  Env.add_rewrite_rule (get_env ()) "rewrite_defs" simpl_term;
+  Env.add_rewrite_rule env "rewrite_defs" simpl_term;
   if narrowing then (
-    Env.add_binary_inf (get_env ()) "narrow_term_defs" narrow_term_passive;
-    Env.add_unary_inf (get_env ()) "narrow_lit_defs" narrow_lits
+    Env.add_binary_inf env "narrow_term_defs" narrow_term_passive;
+    Env.add_unary_inf env "narrow_lit_defs" narrow_lits
   );
-  if ctx_narrow then
-    Env.add_binary_inf (get_env ()) "ctx_narrow" contextual_narrowing;
-  if has_rw then Ctx.lost_completeness (Env.get_ctx (get_env ()));
-  Env.add_multi_simpl_rule (get_env ()) ~priority:5 simpl_clause;
+  if ctx_narrow then Env.add_binary_inf env "ctx_narrow" contextual_narrowing;
+  if has_rw then Ctx.lost_completeness (Env.get_ctx env);
+  Env.add_multi_simpl_rule env ~priority:5 simpl_clause;
   ()
 
 let ctx_narrow_ = ref true
@@ -355,7 +350,7 @@ let rewrite_tst_stmt stmt =
     let snf = Lambda.snf in
     CCOpt.map
       (fun (t', p) -> Term.Conv.to_simple_term ctx (snf t'), p)
-      (simpl_term (get_env ()) t)
+      (simpl_term_ t)
   in
 
   let aux_l fs =
@@ -455,9 +450,9 @@ let post_tying stmts st =
 
 (* add a term simplification that normalizes terms w.r.t the set of rules *)
 let normalize_simpl (env : Env.t) =
-  let has_rw = Env.flex_get_of (get_env ()) Key.has_rw in
-  Env.flex_add_of (get_env ()) Key.ctx_narrow !ctx_narrow_;
-  Env.flex_add_of (get_env ()) Key.narrow !narrowing;
+  let has_rw = Env.flex_get_of env Key.has_rw in
+  Env.flex_add_of env Key.ctx_narrow !ctx_narrow_;
+  Env.flex_add_of env Key.narrow !narrowing;
   setup env ~has_rw ~narrowing:!narrowing ~ctx_narrow:!ctx_narrow_ ()
 
 let extension =

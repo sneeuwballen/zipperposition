@@ -32,8 +32,6 @@ end)
 let k_removed_active = Flex_state.create_key ()
 let k_removed_passive = Flex_state.create_key ()
 let k_bce_sat_tracked = Flex_state.create_key ()
-let _env_ref : Env.t option ref = ref None
-let get_env () = CCOpt.get_exn !_env_ref
 
 type logic =
   | NonequationalFO (* nonequational FO *)
@@ -120,8 +118,8 @@ let lit_to_term sign =
 let task_eq a b = a.lit_idx = b.lit_idx && C.equal a.clause b.clause
 
 let symbol_occurs_too_often env sym_count =
-  Env.flex_get_of (get_env ()) k_max_symbol_occ > 0
-  && sym_count > Env.flex_get_of (get_env ()) k_max_symbol_occ
+  Env.flex_get_of env k_max_symbol_occ > 0
+  && sym_count > Env.flex_get_of env k_max_symbol_occ
 
 let add_lit_to_idx env lit_lhs sign cl =
   let sym = T.head_exn lit_lhs in
@@ -240,11 +238,11 @@ let register_task ?(update_others = true) lit_idx clause =
   | _ -> ( (* equation literals do not represent tasks *) )
 
 (* Update all the bookeeping information when a new clause is introduced *)
-let add_clause cl =
+let add_clause env cl =
   try
     if !logic == Unsupported then raise UnsupportedLogic;
 
-    scan_cl_lits (get_env ()) cl;
+    scan_cl_lits env cl;
     CCArray.iteri (fun lit_idx _ -> register_task lit_idx cl) (C.lits cl)
   with UnsupportedLogic ->
     refine_logic Unsupported;
@@ -299,27 +297,27 @@ let release_locks clause =
     ()
 
 (* remove the clause from the whole BCE tracking system *)
-let deregister_clause clause =
+let deregister_clause env clause =
   deregister_symbols clause;
   release_locks clause
 
-let remove_from_proof_state clause =
+let remove_from_proof_state env clause =
   (try
-     if Env.is_active (get_env ()) clause then
-       C.Tbl.add (Env.flex_get_of (get_env ()) k_removed_active) clause ()
-     else if Env.is_passive (get_env ()) clause then
-       C.Tbl.add (Env.flex_get_of (get_env ()) k_removed_passive) clause ()
+     if Env.is_active env clause then
+       C.Tbl.add (Env.flex_get_of env k_removed_active) clause ()
+     else if Env.is_passive env clause then
+       C.Tbl.add (Env.flex_get_of env k_removed_passive) clause ()
    with _ ->
      (* we are in the preprocessing phase, so we can mark the clause *)
      C.mark_redundant clause);
-  if Env.flex_get_of (get_env ()) k_processing_kind != `InprocessingSat then
+  if Env.flex_get_of env k_processing_kind != `InprocessingSat then
     C.mark_redundant clause
   (* if we are doing the inprocessing in SAT mode, we cannot
        mark the clauses as redundant, since they might have to be returned
        to the proof state. *);
-  Env.remove_active (get_env ()) (Iter.singleton clause);
-  Env.remove_passive (get_env ()) (Iter.singleton clause);
-  Env.remove_simpl (get_env ()) (Iter.singleton clause)
+  Env.remove_active env (Iter.singleton clause);
+  Env.remove_passive env (Iter.singleton clause);
+  Env.remove_simpl env (Iter.singleton clause)
 
 (* checks whether all L-resolvents between orig_cl on literal with index
    lit_idx and partner are valid   *)
@@ -662,7 +660,7 @@ let get_validity_checker () =
     resolvent_is_valid_eq
 
 (* function that actually performs the blocked clause elimination *)
-let do_eliminate_blocked_clauses () =
+let do_eliminate_blocked_clauses env =
   let removed_cnt = ref 0 in
 
   (* checks if each candidate stored in the task has valid L-resolvent.
@@ -729,8 +727,8 @@ let do_eliminate_blocked_clauses () =
       | true ->
         Util.debugf ~section 2 "removed(%d): @[%a@]" (fun k ->
             k task.lit_idx C.pp cl);
-        deregister_clause cl;
-        remove_from_proof_state cl;
+        deregister_clause env cl;
+        remove_from_proof_state env cl;
         incr removed_cnt
       | false -> assert (not (TaskPriorityQueue.in_heap task))
     ) else
@@ -752,55 +750,49 @@ let steps = ref 0
 
 (* driver that does that every k-th step of given-clause loop *)
 let eliminate_blocked_clauses env =
-  steps := (!steps + 1) mod Env.flex_get_of (get_env ()) k_check_at;
+  steps := (!steps + 1) mod Env.flex_get_of env k_check_at;
 
   if !steps = 0 then (
     let original_cls =
       Iter.to_list
-        (Iter.append
-           (Env.get_active (get_env ()) ())
-           (Env.get_passive (get_env ()) ()))
+        (Iter.append (Env.get_active env ()) (Env.get_passive env ()))
     in
-    let eliminated = do_eliminate_blocked_clauses () in
+    let eliminated = do_eliminate_blocked_clauses env in
     if eliminated != 0 then
       Util.debugf ~section 2 "original clause set:@.@[%a@]" (fun k ->
           k (CCList.pp C.pp) original_cls)
   )
 
-let react_clause_addded cl = add_clause cl
-let react_clause_removed cl = deregister_clause cl
+let react_clause_addded env cl = add_clause env cl
+let react_clause_removed env cl = deregister_clause env cl
 
-let do_bce_sat () =
-  C.Tbl.clear (Env.flex_get_of (get_env ()) k_removed_active);
-  C.Tbl.clear (Env.flex_get_of (get_env ()) k_removed_passive);
+let do_bce_sat env () =
+  C.Tbl.clear (Env.flex_get_of env k_removed_active);
+  C.Tbl.clear (Env.flex_get_of env k_removed_passive);
 
   Util.debugf ~section 1 "new BCE-SAT attempt" CCFun.id;
 
-  ignore @@ do_eliminate_blocked_clauses ();
+  ignore @@ do_eliminate_blocked_clauses env;
 
-  if C.Tbl.length (Env.flex_get_of (get_env ()) k_bce_sat_tracked) == 0 then
+  if C.Tbl.length (Env.flex_get_of env k_bce_sat_tracked) == 0 then
     CCFormat.printf "%% BCE inprocessing removed all clauses"
   else (
     (* reinserting removed clauses *)
-    let removed_actives =
-      C.Tbl.keys (Env.flex_get_of (get_env ()) k_removed_active)
-    in
-    let removed_passives =
-      C.Tbl.keys (Env.flex_get_of (get_env ()) k_removed_passive)
-    in
+    let removed_actives = C.Tbl.keys (Env.flex_get_of env k_removed_active) in
+    let removed_passives = C.Tbl.keys (Env.flex_get_of env k_removed_passive) in
     Util.debugf ~section 1 "reinserting %d/%d clauses" (fun k ->
         k
           (Iter.length removed_actives + Iter.length removed_passives)
-          (C.Tbl.length (Env.flex_get_of (get_env ()) k_bce_sat_tracked)));
-    Env.add_active (get_env ()) removed_actives;
-    Env.add_simpl (get_env ()) removed_actives;
-    Env.add_passive (get_env ()) removed_passives
+          (C.Tbl.length (Env.flex_get_of env k_bce_sat_tracked)));
+    Env.add_active env removed_actives;
+    Env.add_simpl env removed_actives;
+    Env.add_passive env removed_passives
   )
 
 let eliminate_bce_sat env =
-  steps := (!steps + 1) mod Env.flex_get_of (get_env ()) k_check_at;
+  steps := (!steps + 1) mod Env.flex_get_of env k_check_at;
 
-  if !steps = 0 then do_bce_sat ()
+  if !steps = 0 then do_bce_sat env ()
 
 let initialize_regular env =
   let init_clauses =
@@ -816,7 +808,7 @@ let initialize_regular env =
      CCFormat.printf "%% BCE start: %d@." init_clause_num;
 
      (* build the symbol index *)
-     List.iter (scan_cl_lits (get_env ())) init_clauses;
+     List.iter (scan_cl_lits env) init_clauses;
 
      Util.debugf ~section 1 "logic is %s@." (fun k ->
          k
@@ -837,80 +829,74 @@ let initialize_regular env =
            (C.lits cl))
        init_clauses;
      (* eliminate clauses *)
-     ignore (do_eliminate_blocked_clauses ());
+     ignore (do_eliminate_blocked_clauses env);
 
      let clause_diff =
        init_clause_num
-       - (Iter.length (Env.get_active (get_env ()) ())
-         + Iter.length (Env.get_passive (get_env ()) ()))
+       - (Iter.length (Env.get_active env ())
+         + Iter.length (Env.get_passive env ()))
      in
      CCFormat.printf "%% BCE eliminated: %d@." clause_diff;
 
      if
-       Env.flex_get_of (get_env ()) k_processing_kind != `PreprocessingOnly
-       || Env.flex_get_of (get_env ()) k_fp_mode
+       Env.flex_get_of env k_processing_kind != `PreprocessingOnly
+       || Env.flex_get_of env k_fp_mode
      then (
-       if Env.flex_get_of (get_env ()) k_processing_kind == `InprocessingFull
-       then
-         Env.Ctx.lost_completeness (Env.get_ctx (get_env ()));
+       if Env.flex_get_of env k_processing_kind == `InprocessingFull then
+         Env.Ctx.lost_completeness (Env.get_ctx env);
 
-       if Env.flex_get_of (get_env ()) k_processing_kind == `InprocessingSat
-       then (
-         Env.flex_add_of (get_env ()) k_removed_active (C.Tbl.create 256);
-         Env.flex_add_of (get_env ()) k_removed_passive (C.Tbl.create 256);
-         Env.flex_add_of (get_env ()) k_bce_sat_tracked (C.Tbl.create 256);
+       if Env.flex_get_of env k_processing_kind == `InprocessingSat then (
+         Env.flex_add_of env k_removed_active (C.Tbl.create 256);
+         Env.flex_add_of env k_removed_passive (C.Tbl.create 256);
+         Env.flex_add_of env k_bce_sat_tracked (C.Tbl.create 256);
 
          let add_cl_sat cl =
-           C.Tbl.add (Env.flex_get_of (get_env ()) k_bce_sat_tracked) cl ();
-           react_clause_addded cl
+           C.Tbl.add (Env.flex_get_of env k_bce_sat_tracked) cl ();
+           react_clause_addded env cl
          in
          let remove_cl_sat cl =
-           C.Tbl.remove (Env.flex_get_of (get_env ()) k_bce_sat_tracked) cl;
+           C.Tbl.remove (Env.flex_get_of env k_bce_sat_tracked) cl;
            react_clause_removed cl
          in
 
          Clause.ClauseSet.to_seq (Env.ProofState.PassiveSet.clauses ())
          |> Iter.of_seq
          |> Iter.iter (fun cl ->
-                C.Tbl.add (Env.flex_get_of (get_env ()) k_bce_sat_tracked) cl ());
+                C.Tbl.add (Env.flex_get_of env k_bce_sat_tracked) cl ());
 
          Signal.on_every Env.ProofState.PassiveSet.on_add_clause (fun cl ->
              if C.proof_depth cl = 0 then add_cl_sat cl);
          Signal.on_every Env.ProofState.PassiveSet.on_remove_clause
            remove_cl_sat;
-         Signal.on_every
-           (Env.on_forward_simplified (get_env ()))
-           (fun (_, state) -> CCOpt.iter add_cl_sat state);
+         Signal.on_every (Env.on_forward_simplified env) (fun (_, state) ->
+             CCOpt.iter add_cl_sat state);
          Signal.on_every Env.ProofState.ActiveSet.on_remove_clause remove_cl_sat
        ) else (
          (* clauses begin their life when they are added to the passive set *)
-         Signal.on_every Env.ProofState.PassiveSet.on_add_clause
-           react_clause_addded;
+         Signal.on_every Env.ProofState.PassiveSet.on_add_clause (fun c ->
+             react_clause_addded env c);
          (* clauses can be calculus-removed from the active set only in DISCOUNT loop *)
-         Signal.on_every Env.ProofState.ActiveSet.on_remove_clause
-           react_clause_removed;
+         Signal.on_every Env.ProofState.ActiveSet.on_remove_clause (fun c ->
+             react_clause_removed env c);
          (* Clauses are removed from the passive set when they are moved to active.
           In this case clause can me modified or deemed redundant by forward
           modification procedures. we react accordingly.*)
-         Signal.on_every
-           (Env.on_forward_simplified (get_env ()))
-           (fun (c, new_state) ->
+         Signal.on_every (Env.on_forward_simplified env) (fun (c, new_state) ->
              match new_state with
              | Some c' ->
                if not (C.equal c c') then (
-                 react_clause_removed c;
-                 react_clause_addded c'
+                 react_clause_removed env c;
+                 react_clause_addded env c'
                )
-             | _ -> react_clause_removed c
+             | _ -> react_clause_removed env c
              (* c is redundant *))
        );
-       if not @@ Env.flex_get_of (get_env ()) k_fp_mode then
-         if Env.flex_get_of (get_env ()) k_processing_kind = `InprocessingFull
-         then
-           Env.add_clause_elimination_rule (get_env ()) ~priority:1 "BCE"
+       if not @@ Env.flex_get_of env k_fp_mode then
+         if Env.flex_get_of env k_processing_kind = `InprocessingFull then
+           Env.add_clause_elimination_rule env ~priority:1 "BCE"
              eliminate_blocked_clauses
          else
-           Env.add_clause_elimination_rule (get_env ()) ~priority:1 "BCE_SAT"
+           Env.add_clause_elimination_rule env ~priority:1 "BCE_SAT"
              eliminate_bce_sat
      ) else
        raise UnsupportedLogic
@@ -927,7 +913,7 @@ let initialize_regular env =
 let fixpoint_active = ref false
 
 let begin_fixpoint env =
-  Env.flex_add_of (get_env ()) k_max_symbol_occ !_max_symbol_occ;
+  Env.flex_add_of env k_max_symbol_occ !_max_symbol_occ;
 
   let init_clauses =
     Clause.ClauseSet.to_list (Env.ProofState.ActiveSet.clauses ())
@@ -936,7 +922,7 @@ let begin_fixpoint env =
   try
     fixpoint_active := true;
 
-    List.iter (scan_cl_lits (get_env ())) init_clauses;
+    List.iter (scan_cl_lits env) init_clauses;
     List.iter
       (fun cl ->
         CCArray.iteri
@@ -944,7 +930,7 @@ let begin_fixpoint env =
           (C.lits cl))
       init_clauses;
     (* eliminate clauses *)
-    let num_eliminated = do_eliminate_blocked_clauses () in
+    let num_eliminated = do_eliminate_blocked_clauses env in
     Util.debugf ~section 2 "Step eliminates %d clauses" (fun k ->
         k num_eliminated);
 
@@ -952,13 +938,13 @@ let begin_fixpoint env =
 
     Signal.on Env.ProofState.PassiveSet.on_add_clause (fun c ->
         if !fixpoint_active then (
-          react_clause_addded c;
+          react_clause_addded env c;
           Signal.ContinueListening
         ) else
           Signal.StopListening);
     Signal.on Env.ProofState.PassiveSet.on_remove_clause (fun c ->
         if !fixpoint_active then (
-          react_clause_removed c;
+          react_clause_removed env c;
           Signal.ContinueListening
         ) else
           Signal.StopListening)
@@ -971,15 +957,15 @@ let begin_fixpoint env =
     TaskPriorityQueue.clear task_queue;
     fixpoint_active := false
 
-let fixpoint_step () =
-  let num_eliminated = do_eliminate_blocked_clauses () in
+let fixpoint_step env =
+  let num_eliminated = do_eliminate_blocked_clauses env in
   Util.debugf ~section 1 "Step eliminates %d clauses" (fun k ->
       k num_eliminated);
   if num_eliminated != 0 then
     CCFormat.printf "%% BCE fixpoint: %d@." num_eliminated;
   num_eliminated != 0
 
-let end_fixpoint () =
+let end_fixpoint env =
   ss_idx := SymSignIdx.empty;
   clause_lock := Util.Int_map.empty;
   task_store := TaskStore.empty;
@@ -987,13 +973,12 @@ let end_fixpoint () =
   fixpoint_active := false
 
 let register env =
-  _env_ref := Some env;
-  Signal.on (Env.on_start (get_env ())) (fun () -> initialize_regular env)
+  Signal.on (Env.on_start env) (fun () -> initialize_regular env)
 
 let setup ?(in_fp_mode = false) env =
-  if Env.flex_get_of (get_env ()) k_enabled then (
-    Env.flex_add_of (get_env ()) k_fp_mode in_fp_mode;
-    if not (Env.flex_get_of (get_env ()) Avatar.k_avatar_enabled) then
+  if Env.flex_get_of env k_enabled then (
+    Env.flex_add_of env k_fp_mode in_fp_mode;
+    if not (Env.flex_get_of env Avatar.k_avatar_enabled) then
       register env
     else
       CCFormat.printf "AVATAR is not yet compatible with BCE@."
@@ -1001,11 +986,10 @@ let setup ?(in_fp_mode = false) env =
 
 let extension =
   let action (env : Env.t) =
-    _env_ref := Some env;
-    Env.flex_add_of (get_env ()) k_enabled !_enabled;
-    Env.flex_add_of (get_env ()) k_max_symbol_occ !_max_symbol_occ;
-    Env.flex_add_of (get_env ()) k_check_at !_check_at;
-    Env.flex_add_of (get_env ()) k_processing_kind !_processing_kind;
+    Env.flex_add_of env k_enabled !_enabled;
+    Env.flex_add_of env k_max_symbol_occ !_max_symbol_occ;
+    Env.flex_add_of env k_check_at !_check_at;
+    Env.flex_add_of env k_processing_kind !_processing_kind;
     setup env ~in_fp_mode:false
   in
   {

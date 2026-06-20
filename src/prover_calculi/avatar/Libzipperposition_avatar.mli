@@ -62,8 +62,10 @@ val introduce_cut :
   Proof.Step.t ->
   cut_res
 
-val add_prove_lemma : (cut_res -> Clause.t list Env.conversion_result) -> unit
-val add_lemma : cut_res -> unit
+val add_prove_lemma :
+  (Env.t -> cut_res -> Clause.t list Env.conversion_result) -> unit
+
+val add_lemma : Env.t -> cut_res -> unit
 val add_imply : cut_res list -> cut_res -> Proof.Step.t -> unit
 val on_input_lemma : cut_res Signal.t
 val on_lemma : cut_res Signal.t

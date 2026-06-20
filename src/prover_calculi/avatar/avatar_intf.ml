@@ -65,10 +65,11 @@ module type S = sig
   (** Introduce a cut on the given clause(s). Pure.
       @param reason some comment on why the lemma was added *)
 
-  val add_prove_lemma : (cut_res -> E.C.t list E.conversion_result) -> unit
+  val add_prove_lemma :
+    (Env.t -> cut_res -> E.C.t list E.conversion_result) -> unit
   (** Add a mean of proving lemmas *)
 
-  val add_lemma : cut_res -> unit
+  val add_lemma : Env.t -> cut_res -> unit
   (** Add the given cut to the list of lemmas. Modifies the global list of
       lemmas. It will call the functions added by {!add_prove_lemma} to try and
       prove this one. *)

@@ -82,18 +82,17 @@ let tracked_binary = ref 0
 let tracked_unary = ref 0
 
 (* HLBE heartbeat will be set as soons as one rule modifies a clause *)
+
 let heartbeat_ = ref false
 let is_tauto c = Literals.is_trivial (C.lits c) || Trail.is_trivial (C.trail c)
-let _env_ref_hlb = ref None
-let get_env_hlb () = CCOpt.get_exn !_env_ref_hlb
-let[@inline] tracking_eq () = Env.flex_get_of (get_env_hlb ()) k_track_eq
+let[@inline] tracking_eq env = Env.flex_get_of env k_track_eq
 
 (* constants denoting the scope of index and the query, respectively *)
 let idx_sc, q_sc = 0, 1
 
-let should_update_propagated () =
-  Env.flex_get_of (get_env_hlb ()) k_unit_propagated_hle
-  && !propagated_size_ <= Env.flex_get_of (get_env_hlb ()) k_max_tracked_clauses
+let should_update_propagated env =
+  Env.flex_get_of env k_unit_propagated_hle
+  && !propagated_size_ <= Env.flex_get_of env k_max_tracked_clauses
 
 let app_subst ?(sc = idx_sc) ~subst t =
   Subst.FO.apply Subst.Renaming.none subst (t, sc)
@@ -142,40 +141,42 @@ let iter_ctx a b k =
   in
   aux a b
 
-let retrieve_idx ~getter (premise, q_sc) =
+let retrieve_idx env ~getter (premise, q_sc) =
   match T.view premise with
-  | T.AppBuiltin (Builtin.Eq, ([ _; a; b ] | [ a; b ])) when tracking_eq () ->
+  | T.AppBuiltin (Builtin.Eq, ([ _; a; b ] | [ a; b ])) when tracking_eq env ->
     Iter.append (getter (premise, q_sc)) (getter (T.Form.eq b a, q_sc))
-  | T.AppBuiltin (Builtin.Neq, ([ _; a; b ] | [ a; b ])) when tracking_eq () ->
+  | T.AppBuiltin (Builtin.Neq, ([ _; a; b ] | [ a; b ])) when tracking_eq env ->
     Iter.append (getter (premise, q_sc)) (getter (T.Form.neq b a, q_sc))
   | _ -> getter (premise, q_sc)
 
-let retrieve_gen_prem_idx () =
-  retrieve_idx ~getter:(PremiseIdx.retrieve_generalizations (!prems_, idx_sc))
+let retrieve_gen_prem_idx env =
+  retrieve_idx env
+    ~getter:(PremiseIdx.retrieve_generalizations (!prems_, idx_sc))
 
-let retrieve_spec_prem_idx () =
-  retrieve_idx ~getter:(PremiseIdx.retrieve_specializations (!prems_, idx_sc))
+let retrieve_spec_prem_idx env =
+  retrieve_idx env
+    ~getter:(PremiseIdx.retrieve_specializations (!prems_, idx_sc))
 
-let retrieve_gen_concl_idx () =
-  retrieve_idx
+let retrieve_gen_concl_idx env =
+  retrieve_idx env
     ~getter:(ConclusionIdx.retrieve_generalizations (!concls_, idx_sc))
 
-let retrieve_spec_concl_idx () =
-  retrieve_idx
+let retrieve_spec_concl_idx env =
+  retrieve_idx env
     ~getter:(ConclusionIdx.retrieve_specializations (!concls_, idx_sc))
 
-let retrieve_gen_unit_idx unit_sc =
-  retrieve_idx ~getter:(UnitIdx.retrieve_generalizations (!units_, unit_sc))
+let retrieve_gen_unit_idx env unit_sc =
+  retrieve_idx env ~getter:(UnitIdx.retrieve_generalizations (!units_, unit_sc))
 
-let[@inline] get_predicate lit =
+let[@inline] get_predicate env lit =
   match lit with
   | L.Equation (lhs, _, _) when L.is_predicate_lit lit ->
     Some (lhs, Lit.is_positivoid lit)
-  | L.Equation (lhs, rhs, sign) when tracking_eq () ->
+  | L.Equation (lhs, rhs, sign) when tracking_eq env ->
     Some (T.Form.eq lhs rhs, sign)
   | _ -> None
 
-let[@inline] matching_eq ?(decompose = false) ~subst ~pattern (t, sc) =
+let[@inline] matching_eq ?(decompose = false) ~subst ~pattern env (t, sc) =
   let try_decompositions ?(cons = T.Form.eq) a b =
     iter_ctx a b
     |> Iter.find (fun (a, b) ->
@@ -191,28 +192,29 @@ let[@inline] matching_eq ?(decompose = false) ~subst ~pattern (t, sc) =
   try Unif.FO.matching ~subst ~pattern (t, sc)
   with Unif.Fail ->
     (match T.view t with
-    | T.AppBuiltin (Builtin.Eq, ([ _; a; b ] | [ a; b ])) when tracking_eq () ->
+    | T.AppBuiltin (Builtin.Eq, ([ _; a; b ] | [ a; b ])) when tracking_eq env
+      ->
       (try Unif.FO.matching ~subst ~pattern (T.Form.eq b a, sc)
        with Unif.Fail when decompose -> try_decompositions a b)
-    | T.AppBuiltin (Builtin.Neq, ([ _; a; b ] | [ a; b ])) when tracking_eq ()
+    | T.AppBuiltin (Builtin.Neq, ([ _; a; b ] | [ a; b ])) when tracking_eq env
       ->
       Unif.FO.matching ~subst ~pattern (T.Form.neq b a, sc)
     | _ -> raise Unif.Fail)
 
-let[@inline] flip_eq t =
+let[@inline] flip_eq env t =
   match T.view t with
-  | T.AppBuiltin (Builtin.Eq, ([ a; b ] | [ _; a; b ])) when tracking_eq () ->
+  | T.AppBuiltin (Builtin.Eq, ([ a; b ] | [ _; a; b ])) when tracking_eq env ->
     T.Form.eq b a
-  | T.AppBuiltin (Builtin.Neq, ([ a; b ] | [ _; a; b ])) when tracking_eq () ->
+  | T.AppBuiltin (Builtin.Neq, ([ a; b ] | [ _; a; b ])) when tracking_eq env ->
     T.Form.neq b a
   | _ -> t
 
-let[@inline] cl_is_ht_trackable cl =
+let[@inline] cl_is_ht_trackable env cl =
   Trail.is_empty (C.trail cl)
   &&
   match C.lits cl with
   | [| l1; l2 |] ->
-    CCOpt.is_some (get_predicate l1) && CCOpt.is_some (get_predicate l2)
+    CCOpt.is_some (get_predicate env l1) && CCOpt.is_some (get_predicate env l2)
   | _ -> false
 
 let[@inline] rec normalize_negations lhs =
@@ -260,11 +262,11 @@ let register_cl_propagated cl premise =
       (premises, Term.Set.add premise propagated)
       !cl_occs
 
-let register_propagated_lit ~prop_kind lit_t cl cs =
+let register_propagated_lit ~prop_kind env lit_t cl cs =
   let has_renaming = ref false in
   let to_remove = ref Term.Set.empty in
 
-  retrieve_idx
+  retrieve_idx env
     ~getter:(PropagatedLitsIdx.retrieve_specializations (!propagated_, idx_sc))
     (lit_t, q_sc)
   |> Iter.iter (fun (t, _, subst) ->
@@ -293,9 +295,9 @@ let register_propagated_lit ~prop_kind lit_t cl cs =
     incr propagated_size_
   )
 
-let react_unit_added unit_cl unit_term =
-  if should_update_propagated () then
-    retrieve_idx
+let react_unit_added env unit_cl unit_term =
+  if should_update_propagated env then
+    retrieve_idx env
       ~getter:(PremiseIdx.retrieve_unifiables (!prems_, idx_sc))
       (unit_term, q_sc)
     |> Iter.iter (fun (_, (concls, _), subst) ->
@@ -305,21 +307,22 @@ let react_unit_added unit_cl unit_term =
                   let concl =
                     Subst.FO.apply Subst.Renaming.none subst (concl, idx_sc)
                   in
-                  register_propagated_lit ~prop_kind:UnitPropagated concl
+                  register_propagated_lit ~prop_kind:UnitPropagated env concl
                     unit_cl cs))
 
-let generalization_present premise concl =
-  retrieve_gen_prem_idx () (premise, q_sc)
+let generalization_present env premise concl =
+  retrieve_gen_prem_idx env (premise, q_sc)
   |> Iter.exists (fun (_, (tbl, _), subst) ->
          T.Tbl.keys tbl
          |> Iter.exists (fun t ->
                 try
-                  ignore (matching_eq ~subst ~pattern:(t, idx_sc) (concl, q_sc));
+                  ignore
+                    (matching_eq ~subst ~pattern:(t, idx_sc) env (concl, q_sc));
                   true
                 with Unif.Fail -> false))
 
-let remove_instances premise concl =
-  retrieve_spec_prem_idx () (premise, q_sc)
+let remove_instances env premise concl =
+  retrieve_spec_prem_idx env (premise, q_sc)
   |> (fun i ->
   Iter.fold
     (fun tasks (t, (tbl, _), subst) ->
@@ -328,7 +331,7 @@ let remove_instances premise concl =
           (fun acc (s, cls) ->
             try
               let subst =
-                matching_eq ~subst ~pattern:(concl, q_sc) (s, idx_sc)
+                matching_eq ~subst ~pattern:(concl, q_sc) env (s, idx_sc)
               in
               if Subst.is_renaming subst then
                 acc
@@ -355,30 +358,28 @@ let remove_instances premise concl =
                  tbl;
                T.Tbl.length tbl != 0))
 
-let compute_is_unit tbl concl cl =
+let compute_is_unit env tbl concl cl =
   let neg_concl = normalize_negations (T.Form.not_ concl) in
-  let neg_concl_flip = normalize_negations (T.Form.not_ (flip_eq concl)) in
+  let neg_concl_flip = normalize_negations (T.Form.not_ (flip_eq env concl)) in
   T.Tbl.find_opt tbl neg_concl
   |> CCOpt.( <+> ) (T.Tbl.find_opt tbl neg_concl_flip)
   |> CCOpt.( <$> ) (CS.add cl)
 
 (* find already stored implications a -> b such that premise\sigma = b.
    Then, store the implication a -> concl\sigma   *)
-let extend_concl premise concl cl =
+let extend_concl env premise concl cl =
   Util.debugf ~section 3 "transitive conclusion: @[%a@] --> @[%a@]" (fun k ->
       k T.pp premise T.pp concl);
   let to_add_concl = ref [] in
-  let max_imps = Env.flex_get_of (get_env_hlb ()) k_max_imp_entries in
-  retrieve_spec_concl_idx () (premise, q_sc)
+  let max_imps = Env.flex_get_of env k_max_imp_entries in
+  retrieve_spec_concl_idx env (premise, q_sc)
   |> Iter.iter (fun (concl', premise', subst) ->
          (* add implication premise' -> subst (concl) *)
          prems_ :=
            PremiseIdx.update_leaf !prems_ premise' (fun (tbl, is_unit) ->
                (match T.Tbl.get tbl concl' with
                | Some old_proofset ->
-                 if
-                   CS.cardinal old_proofset
-                   < Env.flex_get_of (get_env_hlb ()) k_max_depth
+                 if CS.cardinal old_proofset < Env.flex_get_of env k_max_depth
                  then (
                    let concl =
                      Subst.FO.apply Subst.Renaming.none subst (concl, q_sc)
@@ -405,15 +406,15 @@ let extend_concl premise concl cl =
   (* checking if the literal became unit *)
   CCList.iter
     (fun (c, premise, ps, tbl) ->
-      match compute_is_unit tbl c cl with
+      match compute_is_unit env tbl c cl with
       | Some ps ->
         prems_ := PremiseIdx.add !prems_ premise (tbl, true);
         let neg_prem = normalize_negations (T.Form.not_ premise) in
-        register_propagated_lit ~prop_kind:Failed neg_prem cl ps
+        register_propagated_lit ~prop_kind:Failed env neg_prem cl ps
       | _ -> ())
     !to_add_concl
 
-let extend_premise tbl premise' concl cl =
+let extend_premise env tbl premise' concl cl =
   let aux concl =
     register_conclusion ~tbl ~premise:premise' concl (CS.singleton cl);
     (match T.view concl with
@@ -426,8 +427,8 @@ let extend_premise tbl premise' concl cl =
     | _ -> ());
     register_cl_term cl premise';
 
-    let max_proof_size = Env.flex_get_of (get_env_hlb ()) k_max_depth in
-    retrieve_gen_prem_idx () (concl, q_sc)
+    let max_proof_size = Env.flex_get_of env k_max_depth in
+    retrieve_gen_prem_idx env (concl, q_sc)
     |> Iter.iter (fun (_, (tbl', _), subst) ->
            let to_add = ref [] in
            T.Tbl.to_iter tbl'
@@ -455,31 +456,31 @@ let extend_premise tbl premise' concl cl =
        that variable we cannot pump the term -- give up *)
     if T.equal concl concl' then raise Unif.Fail;
     let concl = ref concl in
-    while !i <= Env.flex_get_of (get_env_hlb ()) k_max_self_impls do
+    while !i <= Env.flex_get_of env k_max_self_impls do
       aux !concl;
       (* PUTTING concl IN THE SCOPE OF premise' -- intentional!!! *)
       concl := Subst.FO.apply Subst.Renaming.none subst (!concl, 0);
       if T.depth !concl > 3 then
         (* breaking out of the loop for the very deep terms *)
-        i := Env.flex_get_of (get_env_hlb ()) k_max_self_impls + 1;
+        i := Env.flex_get_of env k_max_self_impls + 1;
       i := !i + 1
     done
   with Unif.Fail -> aux concl
 
-let get_unit_predicate cl =
+let get_unit_predicate env cl =
   if Trail.is_empty (C.trail cl) then (
     match C.lits cl with
     | [| L.Equation (lhs, _, _) as l |] when L.is_predicate_lit l ->
       Some (lit_to_term lhs (L.is_positivoid l))
-    | [| L.Equation (lhs, rhs, sign) |] when tracking_eq () ->
+    | [| L.Equation (lhs, rhs, sign) |] when tracking_eq env ->
       Some (lit_to_term (T.Form.eq lhs rhs) sign)
     | _ -> None
   ) else
     None
 
-let add_new_premise premise concl cl =
+let add_new_premise env premise concl cl =
   let alpha_renaming =
-    retrieve_spec_prem_idx () (premise, q_sc)
+    retrieve_spec_prem_idx env (premise, q_sc)
     |> Iter.find (fun (premise', tbl, subst) ->
            if Subst.is_renaming subst then
              Some (premise', subst)
@@ -495,13 +496,12 @@ let add_new_premise premise concl cl =
       PremiseIdx.update_leaf !prems_ premise' (fun (tbl, is_unit) ->
           if
             (not (T.Tbl.mem tbl concl))
-            && (not (T.Tbl.mem tbl (flip_eq concl)))
-            && T.Tbl.length tbl
-               <= Env.flex_get_of (get_env_hlb ()) k_max_imp_entries
+            && (not (T.Tbl.mem tbl (flip_eq env concl)))
+            && T.Tbl.length tbl <= Env.flex_get_of env k_max_imp_entries
           then (
-            extend_premise tbl premise' concl cl;
+            extend_premise env tbl premise' concl cl;
             if not is_unit then (
-              match compute_is_unit tbl concl cl with
+              match compute_is_unit env tbl concl cl with
               | Some ps -> became_unit := Some (ps, tbl)
               | None -> ()
             )
@@ -517,16 +517,16 @@ let add_new_premise premise concl cl =
              assert false));
       prems_ := PremiseIdx.add !prems_ premise' (tbl, true);
       let neg_prem = normalize_negations (T.Form.not_ premise') in
-      register_propagated_lit ~prop_kind:Failed neg_prem cl ps
+      register_propagated_lit ~prop_kind:Failed env neg_prem cl ps
     | None -> ())
   | _ ->
     let tbl = T.Tbl.create 64 in
-    extend_premise tbl premise concl cl;
-    (match compute_is_unit tbl concl cl with
+    extend_premise env tbl premise concl cl;
+    (match compute_is_unit env tbl concl cl with
     | Some ps ->
       prems_ := PremiseIdx.add !prems_ premise (tbl, true);
       let neg_prem = normalize_negations (T.Form.not_ premise) in
-      register_propagated_lit ~prop_kind:Failed neg_prem cl ps
+      register_propagated_lit ~prop_kind:Failed env neg_prem cl ps
     | None -> prems_ := PremiseIdx.add !prems_ premise (tbl, false))
 
 let normalize_variables premise concl =
@@ -546,92 +546,89 @@ let normalize_variables premise concl =
 
 let max_t_depth = 3
 
-let insert_implication premise concl cl =
+let insert_implication env premise concl cl =
   if
     T.depth premise <= max_t_depth
     && T.depth concl <= max_t_depth
     && (not (T.equal premise concl))
     && not
-         (T.equal premise (flip_eq concl)
-         && not (generalization_present premise concl))
+         (T.equal premise (flip_eq env concl)
+         && not (generalization_present env premise concl))
   then (
     Util.debugf ~section 3 "inserting @[%a@] -> @[%a@]" (fun k ->
         k T.pp premise T.pp concl);
     let premise, concl = normalize_variables premise concl in
-    remove_instances premise concl;
-    extend_concl premise concl cl;
-    add_new_premise premise concl cl
+    remove_instances env premise concl;
+    extend_concl env premise concl cl;
+    add_new_premise env premise concl cl
   )
 
-let insert_into_indices cl =
-  match CCArray.map get_predicate (C.lits cl) with
+let insert_into_indices env cl =
+  match CCArray.map (get_predicate env) (C.lits cl) with
   | [| Some (a_lhs, a_sign); Some (b_lhs, b_sign) |] ->
     let elig =
-      if Env.flex_get_of (get_env_hlb ()) k_insert_only_ordered then
+      if Env.flex_get_of env k_insert_only_ordered then
         C.eligible_param (cl, 0) Subst.empty
       else
         CCBV.create ~size:2 true
     in
     if CCBV.get elig 0 then
-      insert_implication
+      insert_implication env
         (lit_to_term ~negate:true a_lhs a_sign)
         (lit_to_term b_lhs b_sign) cl;
     if CCBV.get elig 1 then
-      insert_implication
+      insert_implication env
         (lit_to_term ~negate:true b_lhs b_sign)
         (lit_to_term a_lhs a_sign) cl
   | _ -> ()
 
-let can_track_bin_cl cl =
-  cl_is_ht_trackable cl
-  && (Env.flex_get_of (get_env_hlb ()) k_max_tracked_clauses == -1
-     || !tracked_binary
-        <= Env.flex_get_of (get_env_hlb ()) k_max_tracked_clauses)
+let can_track_bin_cl env cl =
+  cl_is_ht_trackable env cl
+  && (Env.flex_get_of env k_max_tracked_clauses == -1
+     || !tracked_binary <= Env.flex_get_of env k_max_tracked_clauses)
 
-let can_track_unary_cl cl =
-  Env.flex_get_of (get_env_hlb ()) k_unit_propagated_hle
-  && (Env.flex_get_of (get_env_hlb ()) k_max_tracked_clauses == -1
-     || !tracked_unary
-        <= 4 * Env.flex_get_of (get_env_hlb ()) k_max_tracked_clauses)
+let can_track_unary_cl env cl =
+  Env.flex_get_of env k_unit_propagated_hle
+  && (Env.flex_get_of env k_max_tracked_clauses == -1
+     || !tracked_unary <= 4 * Env.flex_get_of env k_max_tracked_clauses)
 
 let steps = ref 0
 
-let track_clause cl =
+let track_clause env cl =
   try
-    if Env.flex_get_of (get_env_hlb ()) k_heartbeat_disabled_hlbe then
+    if Env.flex_get_of env k_heartbeat_disabled_hlbe then
       raise RuleNotApplicable;
-    (match Env.flex_get_of (get_env_hlb ()) k_heartbeat_steps with
+    (match Env.flex_get_of env k_heartbeat_steps with
     | Some h_steps when !steps != 0 && !steps mod h_steps = 0 ->
       if !heartbeat_ then
         heartbeat_ := false
       else (
         CCFormat.printf "disabling heartbeat %d@." !steps;
-        Env.flex_add_of (get_env_hlb ()) k_heartbeat_disabled_hlbe true;
+        Env.flex_add_of env k_heartbeat_disabled_hlbe true;
         raise RuleNotApplicable
       )
     | _ -> ());
-    if can_track_bin_cl cl then (
+    if can_track_bin_cl env cl then (
       Util.debugf ~section 2 "tracking @[%a@]" (fun k -> k C.pp cl);
 
-      insert_into_indices cl;
+      insert_into_indices env cl;
       incr tracked_binary
-    ) else if can_track_unary_cl cl then (
-      match get_unit_predicate cl with
+    ) else if can_track_unary_cl env cl then (
+      match get_unit_predicate env cl with
       | Some unit ->
-        react_unit_added cl unit;
+        react_unit_added env cl unit;
         incr tracked_unary
       | None -> ()
     )
   with RuleNotApplicable -> ()
 
-let make_tauto ~proof =
-  C.create
-    ~ctx:(Env.get_ctx (get_env_hlb ()))
-    ~penalty:1 ~trail:Trail.empty [ Literal.mk_tauto ] proof
+let make_tauto env ~proof =
+  C.create ~ctx:(Env.get_ctx env) ~penalty:1 ~trail:Trail.empty
+    [ Literal.mk_tauto ] proof
 
-let penalize_hidden_tautology cl =
+let penalize_hidden_tautology env cl =
   if
-    Env.flex_get_of (get_env_hlb ()) k_penalize_tautologies
+    Env.flex_get_of env k_penalize_tautologies
     && not
        @@ Name.Set.exists
             (fun id -> Signature.sym_in_conj id (Ctx.signature (C.ctx_of cl)))
@@ -639,8 +636,8 @@ let penalize_hidden_tautology cl =
   then
     C.inc_penalty cl (C.length cl - 1)
 
-let find_implication cl premise concl =
-  retrieve_gen_prem_idx () (premise, q_sc)
+let find_implication env cl premise concl =
+  retrieve_gen_prem_idx env (premise, q_sc)
   |> Iter.find (fun (premise', (tbl, _), subst) ->
          T.Tbl.to_iter tbl
          |> Iter.find (fun (concl', proofset) ->
@@ -650,31 +647,30 @@ let find_implication cl premise concl =
                   else (
                     let subst =
                       matching_eq ~decompose:true ~subst
-                        ~pattern:(concl', idx_sc) (concl, q_sc)
+                        ~pattern:(concl', idx_sc) env (concl, q_sc)
                     in
                     Some (premise', concl', proofset, subst)
                   )
                 with Unif.Fail -> None))
 
-let do_unit_hle_htr cl =
+let do_unit_hle_htr env cl =
   let n = C.length cl in
   let bv = CCBV.create ~size:n true in
   let exception UnitHTR of int * (CS.t * propagation_kind) in
   let proofset = ref CS.empty in
   try
-    if Env.flex_get_of (get_env_hlb ()) k_heartbeat_disabled_hlbe then
+    if Env.flex_get_of env k_heartbeat_disabled_hlbe then
       raise RuleNotApplicable;
     if n > 7 then raise RuleNotApplicable;
     CCArray.iteri
       (fun i lit ->
-        match get_predicate lit with
+        match get_predicate env lit with
         | Some (i_lhs, i_sign) ->
           let i_t = lit_to_term i_lhs i_sign in
           let i_neg_t = lit_to_term ~negate:true i_lhs i_sign in
 
-          if n != 1 && Env.flex_get_of (get_env_hlb ()) k_reduce_tautologies
-          then
-            retrieve_idx
+          if n != 1 && Env.flex_get_of env k_reduce_tautologies then
+            retrieve_idx env
               ~getter:
                 (PropagatedLitsIdx.retrieve_generalizations
                    (!propagated_, idx_sc))
@@ -682,8 +678,8 @@ let do_unit_hle_htr cl =
             |> Iter.head
             |> CCOpt.iter (fun (_, ps, _) -> raise (UnitHTR (i, ps)));
 
-          if Env.flex_get_of (get_env_hlb ()) k_delete_lits then
-            retrieve_idx
+          if Env.flex_get_of env k_delete_lits then
+            retrieve_idx env
               ~getter:
                 (PropagatedLitsIdx.retrieve_generalizations
                    (!propagated_, idx_sc))
@@ -732,7 +728,7 @@ let do_unit_hle_htr cl =
       C.create ~ctx:(C.ctx_of cl) ~penalty:(C.penalty cl) ~trail:(C.trail cl)
         lit_l proof
     in
-    penalize_hidden_tautology repl;
+    penalize_hidden_tautology env repl;
 
     Util.debugf ~section 2
       (if prop_kind = Failed then
@@ -744,11 +740,11 @@ let do_unit_hle_htr cl =
     Some repl
   | RuleNotApplicable -> None
 
-let do_hte_hle cl =
+let do_hte_hle env cl =
   let exception HiddenTauto of int * int * CS.t in
   let n = C.length cl in
   try
-    if Env.flex_get_of (get_env_hlb ()) k_heartbeat_disabled_hlbe then
+    if Env.flex_get_of env k_heartbeat_disabled_hlbe then
       raise RuleNotApplicable;
     if n > 7 then raise RuleNotApplicable;
     let bv = CCBV.create ~size:n true in
@@ -756,23 +752,21 @@ let do_hte_hle cl =
     let proofset = ref CS.empty in
     CCArray.iteri
       (fun i i_lit ->
-        match get_predicate i_lit with
+        match get_predicate env i_lit with
         | Some (i_lhs, i_sign) when CCBV.get bv i ->
           let i_t = lit_to_term i_lhs i_sign in
           let i_neg_t = lit_to_term ~negate:true i_lhs i_sign in
           CCArray.iteri
             (fun j j_lit ->
-              match get_predicate j_lit with
+              match get_predicate env j_lit with
               | Some (j_lhs, j_sign) when CCBV.get bv j && i != j ->
                 let j_t = lit_to_term j_lhs j_sign in
                 let j_neg_t = lit_to_term ~negate:true j_lhs j_sign in
-                if
-                  Env.flex_get_of (get_env_hlb ()) k_reduce_tautologies
-                  && C.length cl != 2
+                if Env.flex_get_of env k_reduce_tautologies && C.length cl != 2
                 then (
                   match
-                    find_implication cl i_neg_t j_t
-                    <+> find_implication cl j_neg_t i_t
+                    find_implication env cl i_neg_t j_t
+                    <+> find_implication env cl j_neg_t i_t
                   with
                   | Some (lit_a, lit_b, proofset, subst)
                     when (not (CS.mem cl proofset))
@@ -782,10 +776,10 @@ let do_hte_hle cl =
                     raise (HiddenTauto (i, j, proofset))
                   | _ -> ()
                 );
-                if Env.flex_get_of (get_env_hlb ()) k_delete_lits then (
+                if Env.flex_get_of env k_delete_lits then (
                   match
-                    find_implication cl i_neg_t j_neg_t
-                    <+> find_implication cl j_t i_t
+                    find_implication env cl i_neg_t j_neg_t
+                    <+> find_implication env cl j_t i_t
                   with
                   | Some (_, _, proofset', subst) ->
                     CCBV.reset bv j;
@@ -835,7 +829,7 @@ let do_hte_hle cl =
       C.create ~ctx:(C.ctx_of cl) ~penalty:(C.penalty cl) ~trail:(C.trail cl)
         lit_l proof
     in
-    penalize_hidden_tautology repl;
+    penalize_hidden_tautology env repl;
     Some repl
     |> CCFun.tap (function
          | Some res ->
@@ -910,14 +904,14 @@ let[@inline] check_heartbeat arg =
   if CCOpt.is_some arg then heartbeat_ := true;
   arg
 
-let hle_htr = simplify_opt ~f:(fun a -> check_heartbeat @@ do_hte_hle a)
+let hle_htr env = simplify_opt ~f:(fun a -> check_heartbeat @@ do_hte_hle env a)
 
-let unit_hle_htr =
-  simplify_opt ~f:(fun a -> check_heartbeat @@ do_unit_hle_htr a)
+let unit_hle_htr env =
+  simplify_opt ~f:(fun a -> check_heartbeat @@ do_unit_hle_htr env a)
 
 let ctx_simpl = simplify_opt ~f:do_context_simplification
 
-let untrack_clause cl =
+let untrack_clause env cl =
   (match Util.Int_map.get (C.id cl) !cl_occs with
   | Some (premises, propagated) ->
     Term.Set.iter
@@ -950,45 +944,42 @@ let untrack_clause cl =
     decr tracked_binary
   );
   cl_occs := Util.Int_map.remove (C.id cl) !cl_occs;
-  match get_unit_predicate cl with
+  match get_unit_predicate env cl with
   | Some unit ->
     units_ := UnitIdx.remove !units_ unit cl;
     decr tracked_unary
   | None -> ()
 
-let initialize () =
-  let track_active () =
-    Signal.on_every Env.ProofState.ActiveSet.on_add_clause track_clause;
-    Signal.on_every Env.ProofState.ActiveSet.on_remove_clause untrack_clause;
-    Signal.on_every
-      (Env.on_forward_simplified (get_env_hlb ()))
-      (fun (_, _) -> incr steps)
+let initialize env =
+  let track_active env =
+    Signal.on_every Env.ProofState.ActiveSet.on_add_clause (track_clause env);
+    Signal.on_every Env.ProofState.ActiveSet.on_remove_clause
+      (untrack_clause env);
+    Signal.on_every (Env.on_forward_simplified env) (fun (_, _) -> incr steps)
   in
-  let track_passive () =
-    Signal.on_every Env.ProofState.PassiveSet.on_add_clause track_clause;
-    Signal.on_every Env.ProofState.PassiveSet.on_remove_clause untrack_clause;
-    Signal.on_every
-      (Env.on_forward_simplified (get_env_hlb ()))
-      (fun (_, _) -> incr steps)
+  let track_passive env =
+    Signal.on_every Env.ProofState.PassiveSet.on_add_clause (track_clause env);
+    Signal.on_every Env.ProofState.PassiveSet.on_remove_clause
+      (untrack_clause env);
+    Signal.on_every (Env.on_forward_simplified env) (fun (_, _) -> incr steps)
   in
-  let track_all () =
-    Signal.on_every Env.ProofState.PassiveSet.on_add_clause track_clause;
-    Signal.on_every Env.ProofState.ActiveSet.on_remove_clause untrack_clause;
-    Signal.on_every
-      (Env.on_forward_simplified (get_env_hlb ()))
-      (fun (c, new_state) ->
+  let track_all env =
+    Signal.on_every Env.ProofState.PassiveSet.on_add_clause (track_clause env);
+    Signal.on_every Env.ProofState.ActiveSet.on_remove_clause
+      (untrack_clause env);
+    Signal.on_every (Env.on_forward_simplified env) (fun (c, new_state) ->
         incr steps;
         match new_state with
         | Some c' ->
           if not (C.equal c c') then (
-            untrack_clause c;
-            track_clause c'
+            untrack_clause env c;
+            track_clause env c'
           )
-        | _ -> untrack_clause c (* c is redundant *))
+        | _ -> untrack_clause env c (* c is redundant *))
   in
 
-  let initialize_with_passive () =
-    Iter.iter track_clause (Env.get_passive (get_env_hlb ()) ());
+  let initialize_with_passive env =
+    Iter.iter (track_clause env) (Env.get_passive env ());
 
     Util.debugf ~section 3 "discovered implications:" CCFun.id;
     PremiseIdx.iter !prems_ (fun premise (tbl, _) ->
@@ -996,32 +987,31 @@ let initialize () =
             k T.pp premise (Iter.pp_seq T.pp) (T.Tbl.keys tbl)))
   in
 
-  (match Env.flex_get_of (get_env_hlb ()) k_clauses_to_track with
+  (match Env.flex_get_of env k_clauses_to_track with
   | `Passive ->
-    initialize_with_passive ();
-    track_passive ()
-  | `Active -> track_active ()
+    initialize_with_passive env;
+    track_passive env
+  | `Active -> track_active env
   | `All ->
-    initialize_with_passive ();
-    track_all ());
+    initialize_with_passive env;
+    track_all env);
   Signal.StopListening
 
 let setup env =
-  _env_ref_hlb := Some env;
-  if Env.flex_get_of (get_env_hlb ()) k_enabled then (
-    Signal.on (Env.on_start (get_env_hlb ())) initialize;
+  if Env.flex_get_of env k_enabled then (
+    Signal.on (Env.on_start env) (fun () -> initialize env);
     let add_simpl =
-      if Env.flex_get_of (get_env_hlb ()) k_simpl_new then
-        Env.add_basic_simplify (get_env_hlb ())
+      if Env.flex_get_of env k_simpl_new then
+        Env.add_basic_simplify env
       else
-        Env.add_active_simplify (get_env_hlb ())
+        Env.add_active_simplify env
     in
 
-    if Env.flex_get_of (get_env_hlb ()) k_basic_rules then
-      add_simpl (fun _env cl -> hle_htr cl);
-    add_simpl (fun _env cl -> ctx_simpl cl);
-    if Env.flex_get_of (get_env_hlb ()) k_unit_propagated_hle then
-      add_simpl (fun _env cl -> unit_hle_htr cl)
+    if Env.flex_get_of env k_basic_rules then
+      add_simpl (fun env cl -> hle_htr env cl);
+    add_simpl (fun env cl -> ctx_simpl cl);
+    if Env.flex_get_of env k_unit_propagated_hle then
+      add_simpl (fun env cl -> unit_hle_htr env cl)
   )
 
 let max_depth_ = ref 3
@@ -1042,23 +1032,22 @@ let penalize_tautologies_ = ref true
 
 let extension =
   let register (env : Env.t) =
-    Env.flex_add_of (get_env_hlb ()) k_enabled !enabled_;
-    Env.flex_add_of (get_env_hlb ()) k_max_depth !max_depth_;
-    Env.flex_add_of (get_env_hlb ()) k_simpl_new !simpl_new_;
-    Env.flex_add_of (get_env_hlb ()) k_clauses_to_track !clauses_to_track_;
-    Env.flex_add_of (get_env_hlb ()) k_max_self_impls !max_self_impls_;
-    Env.flex_add_of (get_env_hlb ()) k_unit_propagated_hle !propagated_hle;
-    Env.flex_add_of (get_env_hlb ()) k_max_tracked_clauses !max_tracked_clauses;
-    Env.flex_add_of (get_env_hlb ()) k_track_eq !track_eq_;
-    Env.flex_add_of (get_env_hlb ()) k_delete_lits !hle_;
-    Env.flex_add_of (get_env_hlb ()) k_reduce_tautologies !hte_;
-    Env.flex_add_of (get_env_hlb ()) k_insert_only_ordered !insert_ordered_;
-    Env.flex_add_of (get_env_hlb ()) k_heartbeat_steps !heartbeat_steps;
-    Env.flex_add_of (get_env_hlb ()) k_heartbeat_disabled_hlbe false;
-    Env.flex_add_of (get_env_hlb ()) k_max_imp_entries !max_imp_;
-    Env.flex_add_of (get_env_hlb ()) k_basic_rules !basic_rules_;
-    Env.flex_add_of (get_env_hlb ()) k_penalize_tautologies
-      !penalize_tautologies_;
+    Env.flex_add_of env k_enabled !enabled_;
+    Env.flex_add_of env k_max_depth !max_depth_;
+    Env.flex_add_of env k_simpl_new !simpl_new_;
+    Env.flex_add_of env k_clauses_to_track !clauses_to_track_;
+    Env.flex_add_of env k_max_self_impls !max_self_impls_;
+    Env.flex_add_of env k_unit_propagated_hle !propagated_hle;
+    Env.flex_add_of env k_max_tracked_clauses !max_tracked_clauses;
+    Env.flex_add_of env k_track_eq !track_eq_;
+    Env.flex_add_of env k_delete_lits !hle_;
+    Env.flex_add_of env k_reduce_tautologies !hte_;
+    Env.flex_add_of env k_insert_only_ordered !insert_ordered_;
+    Env.flex_add_of env k_heartbeat_steps !heartbeat_steps;
+    Env.flex_add_of env k_heartbeat_disabled_hlbe false;
+    Env.flex_add_of env k_max_imp_entries !max_imp_;
+    Env.flex_add_of env k_basic_rules !basic_rules_;
+    Env.flex_add_of env k_penalize_tautologies !penalize_tautologies_;
     setup env
   in
   {

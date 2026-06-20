@@ -20,5 +20,5 @@ val k_prune_arg_fun : prune_kind Flex_state.key
    -- NB: EXPECTS TYPE ARGUMENTS! *)
 val k_diff_const : Term.t Flex_state.key
 val setup : Env.t -> unit
-val prim_enum_tf : Clause.t -> Clause.t list
+val prim_enum_tf : Env.t -> Clause.t -> Clause.t list
 val extension : Extensions.t

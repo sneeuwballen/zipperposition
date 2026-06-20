@@ -189,8 +189,6 @@ module TaskSet = struct
 end
 
 let k_measure_fun = Flex_state.create_key ()
-let _env_ref : Env.t option ref = ref None
-let get_env () = CCOpt.get_exn !_env_ref
 let _task_queue = TaskSet.create ()
 
 (* an optimization -- profiler showed that much time is spent in
@@ -290,15 +288,15 @@ let _measure = ref relaxed_measure
 
 let should_schedule env task =
   let eligible_for_non_singular_pe task =
-    Env.flex_get_of (get_env ()) k_non_singular_pe
+    Env.flex_get_of env k_non_singular_pe
     &&
     match task.maybe_gate with
     | Some (pos, neg) ->
       let limit =
-        if Env.flex_get_of (get_env ()) k_max_resolvents < 0 then
+        if Env.flex_get_of env k_max_resolvents < 0 then
           max_int
         else
-          Env.flex_get_of (get_env ()) k_max_resolvents
+          Env.flex_get_of env k_max_resolvents
       in
       let pos_num, neg_num = List.length pos, List.length neg in
       let max_resolvents =
@@ -349,10 +347,9 @@ let possibly_ignore_sym env entry =
       + (List.length neg_gates * card entry.pos_cls)
     | None -> card entry.neg_cls * card entry.pos_cls
   in
-  if Env.flex_get_of (get_env ()) k_max_resolvents < 0 then
+  if Env.flex_get_of env k_max_resolvents < 0 then
     ()
-  else if possible_resolvents > Env.flex_get_of (get_env ()) k_max_resolvents
-  then
+  else if possible_resolvents > Env.flex_get_of env k_max_resolvents then
     remove_symbol entry
 
 let scan_cl_lits env ?(handle_gates = true) cl =
@@ -405,10 +402,7 @@ let scan_cl_lits env ?(handle_gates = true) cl =
               possibly_ignore_sym env entry
             | `Offending ->
               entry.offending_cls <- CS.add cl entry.offending_cls;
-              if
-                TaskSet.in_heap entry
-                && not (should_schedule (get_env ()) entry)
-              then
+              if TaskSet.in_heap entry && not (should_schedule env entry) then
                 TaskSet.remove_el _task_queue entry
             | `Gates ->
               if handle_gates then
@@ -501,21 +495,21 @@ let scan_cl_lits env ?(handle_gates = true) cl =
 
   update_idx pos neg offending gates num_vars cl
 
-let react_clause_added cl =
+let react_clause_added env cl =
   if not !_done then (
     if not (CS.mem cl !_tracked) then (
       Util.debugf ~section 5 "added:@[%a@]" (fun k -> k C.pp cl);
       _tracked := CS.add cl !_tracked;
-      scan_cl_lits (get_env ()) ~handle_gates:false cl
+      scan_cl_lits env ~handle_gates:false cl
     );
     Signal.ContinueListening
   ) else
     Signal.StopListening
 
-let react_clause_removed cl =
+let react_clause_removed env cl =
   if not !_done then (
     let should_retry task =
-      should_schedule (get_env ()) task
+      should_schedule env task
       && (not (Name.Set.mem task.sym !_ignored_symbols))
       &&
       match task.last_check with
@@ -534,7 +528,7 @@ let react_clause_removed cl =
           task.pos_cls <- CS.union task.pos_cls (CS.of_list pos_cls);
           task.neg_cls <- CS.union task.neg_cls (CS.of_list neg_cls);
           if
-            Env.flex_get_of (get_env ()) k_non_singular_pe
+            Env.flex_get_of env k_non_singular_pe
             && TaskSet.in_heap task
             && not (CS.is_empty task.offending_cls)
           then
@@ -590,7 +584,7 @@ let react_clause_removed cl =
   ) else
     Signal.StopListening
 
-let replace_clauses task clauses =
+let replace_clauses env task clauses =
   Util.debugf ~section 2
     "replaced clauses(%a):@. regular:@[%a@]@. gates:@[%a@]@." (fun k ->
       k Name.pp task.sym C.pp_set
@@ -601,21 +595,20 @@ let replace_clauses task clauses =
       k (CCList.pp C.pp) clauses);
   _ignored_symbols := Name.Set.add task.sym !_ignored_symbols;
   let remove iter =
-    Env.remove_active (get_env ()) iter;
-    Env.remove_passive (get_env ()) iter;
-    Env.remove_simpl (get_env ()) iter;
+    Env.remove_active env iter;
+    Env.remove_passive env iter;
+    Env.remove_simpl env iter;
     Iter.iter
       (fun c ->
         C.mark_redundant c;
         if CS.mem c !_newly_added then (
           _newly_added := CS.remove c !_newly_added;
-          ignore (react_clause_removed c)
+          ignore (react_clause_removed env c)
         ))
       iter
   in
   assert (
-    CS.is_empty task.offending_cls
-    || Env.flex_get_of (get_env ()) k_non_singular_pe);
+    CS.is_empty task.offending_cls || Env.flex_get_of env k_non_singular_pe);
   remove (CS.to_seq task.offending_cls |> Iter.of_seq);
   remove (CS.to_seq task.pos_cls |> Iter.of_seq);
   remove (CS.to_seq task.neg_cls |> Iter.of_seq);
@@ -625,7 +618,7 @@ let replace_clauses task clauses =
     remove (CCList.to_iter neg_cls)
   | None -> ());
   _newly_added := List.fold_left (fun s x -> CS.add x s) !_newly_added clauses;
-  List.iter (fun cl -> ignore (react_clause_added cl)) clauses;
+  List.iter (fun cl -> ignore (react_clause_added env cl)) clauses;
 
   _pred_sym_idx := Name.Map.remove task.sym !_pred_sym_idx
 
@@ -756,7 +749,7 @@ let eq_resolver ~sym ~pos_cl ~neg_cl =
     CCOpt.return_if (not (is_tauto c)) c
   with Unif.Fail -> None
 
-let check_if_gate task =
+let check_if_gate env task =
   let sym = task.sym in
   let gates_l = CS.to_list task.possible_gates in
   let filter_gates ?(sign = None) ~lit_num_filter gates_l =
@@ -1030,30 +1023,29 @@ let check_if_gate task =
     | _ -> false
   in
   if
-    Env.flex_get_of (get_env ()) k_check_gates
-    && ((not (Env.flex_get_of (get_env ()) k_only_original_gates))
+    Env.flex_get_of env k_check_gates
+    && ((not (Env.flex_get_of env k_only_original_gates))
        || not
           @@ Name_payload.exists
                ~f:(function
                  | Name.Attr_cnf_def -> true
                  | _ -> false)
                task.sym)
-    && ((not (Env.flex_get_of (get_env ()) k_only_non_conjecture_gates))
+    && ((not (Env.flex_get_of env k_only_non_conjecture_gates))
        || not
-          @@ Signature.sym_in_conj task.sym
-               (Ctx.signature (Env.get_ctx (get_env ()))))
+          @@ Signature.sym_in_conj task.sym (Ctx.signature (Env.get_ctx env)))
   then
-    if Env.flex_get_of (get_env ()) k_check_gates_semantically then
+    if Env.flex_get_of env k_check_gates_semantically then
       ignore (check_sat ())
     else
       ignore (check_and () || check_or () || check_ite ())
 
-let schedule_tasks () =
+let schedule_tasks env =
   Name.Map.iter
     (fun _ task ->
-      check_if_gate task;
+      check_if_gate env task;
 
-      if should_schedule (get_env ()) task then (
+      if should_schedule env task then (
         Util.debugf ~section 5 "inserting: @[%a@]" (fun k -> k pp_task task);
         TaskSet.insert _task_queue task
       ))
@@ -1071,7 +1063,7 @@ let calc_resolvents ~sym ~pos ~neg =
       CCList.filter_map (fun neg_cl -> get_resolver () ~sym ~pos_cl ~neg_cl) neg)
     pos
 
-let calc_non_singular_resolvents ~sym ~pos ~neg ~offending =
+let calc_non_singular_resolvents env ~sym ~pos ~neg ~offending =
   let find_lit_by_sym_opt sign cl =
     try CCOpt.return (find_lit_by_sym sym sign cl) with _ -> None
   in
@@ -1079,7 +1071,7 @@ let calc_non_singular_resolvents ~sym ~pos ~neg ~offending =
   let rename_pos_sym_vars new_vars cl =
     let _, t = find_lit_by_sym sym true cl in
     let sym_ty =
-      Option.get (Signature.find (Ctx.signature (Env.get_ctx (get_env ()))) sym)
+      Option.get (Signature.find (Ctx.signature (Env.get_ctx env)) sym)
     in
     let sym_cst = Term.const ~ty:sym_ty sym in
     let new_t = Term.app sym_cst new_vars in
@@ -1195,9 +1187,9 @@ let calc_non_singular_resolvents ~sym ~pos ~neg ~offending =
 
   aux (CS.to_list offending) []
 
-let measure_decreases () = Env.flex_get_of (get_env ()) k_measure_fun
+let measure_decreases env = Env.flex_get_of env k_measure_fun
 
-let do_pred_elim () =
+let do_pred_elim env =
   let removed_cls = ref None in
   let updated_removed inc =
     match !removed_cls with
@@ -1207,8 +1199,7 @@ let do_pred_elim () =
 
   let process_task task =
     assert (
-      CS.is_empty task.offending_cls
-      || Env.flex_get_of (get_env ()) k_non_singular_pe);
+      CS.is_empty task.offending_cls || Env.flex_get_of env k_non_singular_pe);
     let pos_cls, neg_cls =
       CCPair.map_same CS.to_list (task.pos_cls, task.neg_cls)
     in
@@ -1216,9 +1207,7 @@ let do_pred_elim () =
     let resolvents =
       match task.maybe_gate with
       | Some (pos_gates, neg_gates) ->
-        if
-          Env.flex_get_of (get_env ()) k_prefer_spe
-          && CS.is_empty task.offending_cls
+        if Env.flex_get_of env k_prefer_spe && CS.is_empty task.offending_cls
         then (
           let results =
             calc_resolvents ~sym ~pos:pos_gates ~neg:neg_cls
@@ -1227,16 +1216,14 @@ let do_pred_elim () =
           in
 
           if
-            measure_decreases ()
-              (Env.flex_get_of (get_env ()) k_relax_val)
-              task results
+            measure_decreases env (Env.flex_get_of env k_relax_val) task results
           then
             results
           else
             calc_resolvents ~sym ~pos:pos_gates ~neg:neg_cls
             @ calc_resolvents ~sym ~pos:pos_cls ~neg:neg_gates
         ) else
-          calc_non_singular_resolvents ~sym ~pos:pos_gates ~neg:neg_gates
+          calc_non_singular_resolvents env ~sym ~pos:pos_gates ~neg:neg_gates
             ~offending:task.offending_cls
           @ calc_resolvents ~sym ~pos:pos_gates ~neg:neg_cls
           @ calc_resolvents ~sym ~pos:pos_cls ~neg:neg_gates
@@ -1244,14 +1231,11 @@ let do_pred_elim () =
         assert (CS.is_empty task.offending_cls);
         calc_resolvents ~sym ~pos:pos_cls ~neg:neg_cls
     in
-    if
-      measure_decreases ()
-        (Env.flex_get_of (get_env ()) k_relax_val)
-        task resolvents
+    if measure_decreases env (Env.flex_get_of env k_relax_val) task resolvents
     then (
       Util.debugf ~section 1 "task info: @[%a@]" (fun k -> k pp_task task);
       updated_removed (calc_num_cls task - List.length resolvents);
-      replace_clauses task resolvents
+      replace_clauses env task resolvents
     ) else
       task.last_check <- Some (task.sq_var_weight, task.num_lits)
   in
@@ -1267,7 +1251,7 @@ let do_pred_elim () =
   done;
 
   (* storing all newly computed clauses *)
-  Env.add_passive (get_env ()) (CS.to_seq !_newly_added |> Iter.of_seq);
+  Env.add_passive env (CS.to_seq !_newly_added |> Iter.of_seq);
   _newly_added := CS.empty;
   !removed_cls
 
@@ -1275,9 +1259,9 @@ let steps = ref 0
 
 (* driver that does that every k-th step of given-clause loop *)
 let do_predicate_elimination env =
-  steps := (!steps + 1) mod Env.flex_get_of (get_env ()) k_check_at;
+  steps := (!steps + 1) mod Env.flex_get_of env k_check_at;
 
-  if !steps = 0 then ignore (do_pred_elim ())
+  if !steps = 0 then ignore (do_pred_elim env)
 
 let initialize env =
   let init_clauses =
@@ -1293,13 +1277,13 @@ let initialize env =
 
   List.iter
     (fun cl ->
-      scan_cl_lits (get_env ()) cl;
+      scan_cl_lits env cl;
       _tracked := CS.add cl !_tracked)
     init_clauses;
 
   Util.debugf ~section 1 "logic: %s@." (fun k -> k (logic_to_str !_logic));
 
-  schedule_tasks ();
+  schedule_tasks env;
 
   Util.debugf ~section 5 "state:@[%a@]@." (fun k ->
       k (Iter.pp_seq pp_task) (Name.Map.values !_pred_sym_idx));
@@ -1311,22 +1295,24 @@ let initialize env =
          else
            " no "));
 
-  Signal.on Env.ProofState.PassiveSet.on_add_clause react_clause_added;
-  Signal.on Env.ProofState.PassiveSet.on_remove_clause react_clause_removed;
-  Signal.on Env.ProofState.ActiveSet.on_add_clause react_clause_added;
-  Signal.on Env.ProofState.ActiveSet.on_remove_clause react_clause_removed;
-  Signal.on_every
-    (Env.on_forward_simplified (get_env ()))
-    (fun (c, new_state) ->
+  Signal.on Env.ProofState.PassiveSet.on_add_clause (fun c ->
+      react_clause_added env c);
+  Signal.on Env.ProofState.PassiveSet.on_remove_clause (fun c ->
+      react_clause_removed env c);
+  Signal.on Env.ProofState.ActiveSet.on_add_clause (fun c ->
+      react_clause_added env c);
+  Signal.on Env.ProofState.ActiveSet.on_remove_clause (fun c ->
+      react_clause_removed env c);
+  Signal.on_every (Env.on_forward_simplified env) (fun (c, new_state) ->
       if not !_done then (
         match new_state with
         | Some c' ->
-          ignore (react_clause_removed c);
-          ignore (react_clause_added c')
-        | _ -> ignore (react_clause_removed c) (* c is redundant *)
+          ignore (react_clause_removed env c);
+          ignore (react_clause_added env c')
+        | _ -> ignore (react_clause_removed env c) (* c is redundant *)
       ));
 
-  ignore (do_pred_elim ());
+  ignore (do_pred_elim env);
 
   Util.debugf ~section 5 "after elim: @[%a@]@." (fun k ->
       k Clause.pp_set (Env.ProofState.PassiveSet.clauses ()));
@@ -1335,26 +1321,23 @@ let initialize env =
 
   let clause_diff =
     init_clause_num
-    - (Iter.length (Env.get_active (get_env ()) ())
-      + Iter.length (Env.get_passive (get_env ()) ()))
+    - (Iter.length (Env.get_active env ())
+      + Iter.length (Env.get_passive env ()))
   in
   Util.debugf ~section 1 "%% PE eliminated: %d@." (fun k -> k clause_diff);
 
-  if Env.flex_get_of (get_env ()) k_inprocessing then
+  if Env.flex_get_of env k_inprocessing then
     (* Env.Ctx.lost_completeness (); *)
-    Env.add_clause_elimination_rule (get_env ()) ~priority:2 "pred_elim"
+    Env.add_clause_elimination_rule env ~priority:2 "pred_elim"
       do_predicate_elimination
-  else if not @@ Env.flex_get_of (get_env ()) k_fp_mode then
+  else if not @@ Env.flex_get_of env k_fp_mode then
     Util.debugf ~section 1 "processing is done" CCFun.id;
   (* releasing possibly used memory *)
   _done := true;
   _pred_sym_idx := Name.Map.empty;
   Signal.StopListening
 
-let register env =
-  _env_ref := Some env;
-  Signal.on (Env.on_start (get_env ())) initialize
-
+let register env = Signal.on (Env.on_start env) (fun () -> initialize env)
 let fixpoint_active = ref false
 
 let begin_fixpoint env =
@@ -1362,7 +1345,7 @@ let begin_fixpoint env =
   register_parameters env;
   (*  has to be called after register parameters as 
       measure functions are not visible outside the module *)
-  Env.flex_add_of (get_env ()) k_measure_fun
+  Env.flex_add_of env k_measure_fun
     (match !_measure_name with
     | "kk" -> kk_measure
     | "relaxed" -> relaxed_measure
@@ -1376,33 +1359,33 @@ let begin_fixpoint env =
 
   List.iter
     (fun cl ->
-      scan_cl_lits (get_env ()) cl;
+      scan_cl_lits env cl;
       _tracked := CS.add cl !_tracked)
     init_clauses;
 
-  schedule_tasks ();
+  schedule_tasks env;
 
   Signal.on Env.ProofState.PassiveSet.on_add_clause (fun c ->
       if !fixpoint_active then
-        react_clause_added c
+        react_clause_added env c
       else
         Signal.StopListening);
   Signal.on Env.ProofState.PassiveSet.on_remove_clause (fun c ->
       if !fixpoint_active then
-        react_clause_removed c
+        react_clause_removed env c
       else
         Signal.StopListening);
 
-  let ans = do_pred_elim () in
+  let ans = do_pred_elim env in
   Util.debugf ~section 1 "%% PE start fixpoint: @[%a@]@." (fun k ->
       k (CCOpt.pp CCInt.pp) ans);
   Util.debugf ~section 2 "Clause number changed for %a" (fun k ->
       k (CCOpt.pp CCInt.pp) ans)
 
-let fixpoint_step () =
+let fixpoint_step env =
   Util.debugf ~section 1 "relax val: %d@." (fun k ->
-      k (Env.flex_get_of (get_env ()) k_relax_val));
-  let ans = do_pred_elim () in
+      k (Env.flex_get_of env k_relax_val));
+  let ans = do_pred_elim env in
   Util.debugf ~section 1 "Clause number changed for %a" (fun k ->
       k (CCOpt.pp CCInt.pp) ans);
   if CCOpt.is_some ans then
@@ -1410,7 +1393,7 @@ let fixpoint_step () =
         k (CCOpt.get_exn ans));
   CCOpt.is_some ans
 
-let end_fixpoint () =
+let end_fixpoint env =
   _done := true;
   _pred_sym_idx := Name.Map.empty;
   fixpoint_active := false
@@ -1432,7 +1415,6 @@ let setup ?(in_fp_mode = false) env =
 
 let extension =
   let action (env : Env.t) =
-    _env_ref := Some env;
     register_parameters env;
     Env.flex_add_of env k_enabled !_enabled;
     Env.flex_add_of env k_check_at !_check_at;

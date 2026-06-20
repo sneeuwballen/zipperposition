@@ -14,12 +14,12 @@ let run_fixpoint env =
 
   let done_ = ref false in
   while not !done_ do
-    ignore (PE.fixpoint_step ());
-    done_ := not (BCE.fixpoint_step ())
+    ignore (PE.fixpoint_step env);
+    done_ := not (BCE.fixpoint_step env)
   done;
 
-  PE.end_fixpoint ();
-  BCE.end_fixpoint ()
+  PE.end_fixpoint env;
+  BCE.end_fixpoint env
 
 let steps = ref 0
 
@@ -27,8 +27,8 @@ let inprocessing env =
   if !steps = 0 then (
     let done_ = ref false in
     while not !done_ do
-      ignore (PE.fixpoint_step ());
-      done_ := not (BCE.fixpoint_step ())
+      ignore (PE.fixpoint_step env);
+      done_ := not (BCE.fixpoint_step env)
     done
   );
 
