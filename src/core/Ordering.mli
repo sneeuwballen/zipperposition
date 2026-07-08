@@ -77,6 +77,15 @@ val lambda_lpo : Precedence.t -> t
 val epo : Precedence.t -> t
 (** Embedding path order *)
 
+val wpo : Precedence.t -> t
+  (** Weighted path order *)
+
+module RelaxedInterpr : sig 
+  val algebraic_compare : Precedence.t -> Term.t -> Term.t -> Comparison.t
+  val algebraic_eval : Precedence.t -> Term.t -> int
+end 
+  (* TR * Temporary *)
+
 val none : t
 (** All terms are incomparable (equality still works). Not a simplification
     ordering. *)

@@ -6,10 +6,12 @@ module Prec = Precedence
 module MT = Multiset.Make (Term)
 module W = Precedence.Weight
 module C = Comparison
+module Alg = Algebra
 
 let prof_rpo = ZProf.make "compare_rpo"
 let prof_kbo = ZProf.make "compare_kbo"
 let prof_epo = ZProf.make "compare_epo"
+let prof_wpo = ZProf.make "compare_wpo"
 let prof_lambdafree_kbo_coeff = ZProf.make "compare_lambdafree_kbo_coeff"
 let prof_lambda_kbo = ZProf.make "compare_lambda_kbo"
 let prof_lambda_lpo = ZProf.make "compare_lambda_lpo"
@@ -162,6 +164,7 @@ end
 (** {3 Ordering implementations} *)
 
 (* compare the two heads (ID or builtin or variable) using the precedence *)
+(* TR * prec_compare: Prec -> Head -> Head -> Comp *)
 let prec_compare prec a b =
   match a, b with
   | Head.I a, Head.I b ->
@@ -214,6 +217,7 @@ let prec_compare prec a b =
   | _, Head.V _ -> Incomparable
 
 let prec_status prec = function
+  (* TR * sucre pour p_s prec x = match x | ... *)
   | Head.I s -> Prec.status prec s
   | _ -> Prec.LengthLexicographic
 
@@ -250,6 +254,7 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
   (** used to keep track of the balance of variables *)
 
   (** create a balance for the two terms *)
+  (* TR * mk_balance: T.t -> T.t -> var_balance *)
   let mk_balance t1 t2 =
     let numvars = Iter.length (T.Seq.vars t1) + Iter.length (T.Seq.vars t2) in
     {
@@ -302,6 +307,7 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
   (** Higher-order KBO *)
 
   let kbo ~prec t1 t2 =
+    (* TR * de type var_balance *)
     let balance = mk_balance t1 t2 in
     (* Update variable balance, weight balance, and check whether the term contains the fluid term s.
         @param pos stands for positive (is t the left term?)
@@ -427,9 +433,12 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
           tckbo_composite wb h1 h2 (Head.term_to_args t1) (Head.term_to_args t2)
             ~below_lam
       ) else (
+        (* TR * version "lambda free" (voire FOL) *)
+        (* TR * conversions obscures *)
         let t1 = ty1comb_to_var t1 balance.comb2var in
         let t2 = ty1comb_to_var t2 balance.comb2var in
         match T.view t1, T.view t2 with
+        (* TR * déballage *)
         | T.Var x, T.Var y ->
           add_pos_var balance t1 ~below_lam;
           add_neg_var balance t2 ~below_lam;
@@ -460,10 +469,12 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
             ~below_lam
       )
     (* tckbo, for non-variable-headed terms). *)
+    (* TR * c'est cette fonction qui breakdown tous les cas de la def de >KBO *)
     and tckbo_composite wb f g ss ts ~below_lam =
       (* do the recursive computation of kbo *)
       let wb', res = tckbo_rec wb f g ss ts ~below_lam in
       let wb'' =
+        (* TR * semble être la comparaison sur les poids *)
         W.(wb' + weight prec f ~below_lam - weight prec g ~below_lam)
       in
       if not P.lambda_mode then (
@@ -475,6 +486,7 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
         | _ -> ()
       );
       (* check variable condition *)
+      (* TR * sur le nombre d'apparition de chaque variable, qui doit permettre une comparaison *)
       let g_or_n =
         if balance.neg_counter = 0 then
           C.Gt
@@ -1014,6 +1026,255 @@ module LambdaFreeKBOCoeff : ORD = struct
     | Head.V _, _ | _, Head.V _ -> true
     | _ -> assert false
 end
+
+(* type alg = {
+  coeffor: int -> int -> int;
+  empty: int;
+  cumulator: int -> int -> int;
+  prec : Prec.t;
+} *)
+
+(* module Inter = struct 
+
+  type t = alg
+  
+  
+
+
+  let print_eval alg t = 
+    let x = eval alg t in 
+    Printf.printf "[%s ~> %d] " (T.to_string t) x; 
+    x
+  
+  let compare alg s t = 
+    let a, b = (print_eval alg s), (print_eval alg t) in
+    C.of_total (CCInt.compare a b)
+end *)
+
+(* let alg_eval = Inter.print_eval *)
+
+
+
+module type INTERPR = sig 
+  val algebraic_compare : Prec.t -> T.t -> C.t
+end
+
+module NonRelaxedInterpr = struct 
+  
+  module VarMap = struct 
+    include Map.Make(Int)
+
+    let merge a b = 
+      union (fun _ x y -> Some (x + y)) a b 
+
+    (**)
+
+    let compare a b = 
+      0
+  end 
+  
+  type t = int VarMap.t
+
+  let rec eval prec t = 
+    let alg = Prec.algebra prec in
+    match Head.term_to_head t with
+    | Head.V v -> VarMap.singleton (HVar.id v) (Alg.empty alg)
+    | Head.I i -> VarMap.map (Alg.coeff_app alg 1) (eval_lst prec (Head.term_to_args t))
+      | _ -> VarMap.empty
+
+  and eval_lst prec = function
+    | [] -> VarMap.empty
+    | t::ts' -> VarMap.merge (eval prec t) (eval_lst prec ts')
+    
+  let algebraic_compare prec s t = 
+    let a, b = (eval prec s), (eval prec t) in
+    C.of_total (VarMap.compare a b)
+
+end
+  
+
+module RelaxedInterpr = struct
+  include Trousse
+  (* these functions should eventually be part of MakeWPO *)
+
+  let rec algebraic_eval prec t =
+    let alg = Prec.algebra prec in
+    match Head.term_to_head t with 
+    | Head.V _ -> 1
+    | Head.B b ->
+      accumulate prec (fun x -> Alg.empty alg) (Head.term_to_args t)
+    | Head.I i -> 
+        Alg.accumulator alg
+        (W.get_one (Prec.weight prec i))
+        (accumulate prec (Prec.arg_coeff prec i) (Head.term_to_args t))
+    | _ -> 1000
+  
+  and accumulate ?(i=0) prec coeffs ts = 
+    let alg = Prec.algebra prec in 
+    let accumulator = Alg.accumulator alg in 
+    let coeff_app = Alg.coeff_app alg in
+    let empty = Alg.empty alg in
+    match ts with
+    | [] -> empty
+    | t :: ts' -> accumulator
+        (coeff_app (coeffs i) (algebraic_eval prec t)) 
+        (accumulate ~i:(i+1) prec coeffs ts')
+
+  (* TR * debug *)
+  let printed_eval prec t = 
+    let x = algebraic_eval prec t in 
+    print_term t; 
+    print_eval x;
+    print " ";
+    x
+  
+  let algebraic_compare prec s t =
+    (* let algebraic_eval = printed_eval in (* TR * DEBUG *) *)
+    let a, b = (algebraic_eval prec s), (algebraic_eval prec t) in
+    C.of_total (CCInt.compare a b)
+end
+  
+module MakeWPO (P: PARAMETERS) : ORD = struct 
+  let name = P.name
+
+  let algebraic_compare = 
+    if P.lambda_mode then 
+      NonRelaxedInterpr.algebraic_compare 
+    else 
+      RelaxedInterpr.algebraic_compare 
+
+  
+  let rec wpo ~prec s t = 
+    if T.equal s t then
+      C.Eq
+    else if P.lambda_mode then (
+      (* assert false; (* TR * not supposed to stay *) *)
+      match Head.term_to_head s, Head.term_to_head t with 
+      | Head.V _, Head.V _ -> Incomparable
+      | Head.V _, _ -> 
+        if has_subterm t s then
+          Lt 
+        else 
+          Incomparable
+      | _, Head.V _ -> 
+        if has_subterm s t then 
+          Gt 
+        else 
+          Incomparable
+      | _, _ -> wpo_composite ~prec s t
+    )
+    else (
+      match T.view s, T.view t with 
+      | T.Var _, T.Var _ -> Incomparable
+      | T.Var x, _ -> if T.var_occurs ~var:x t then Lt else Incomparable
+      | _, T.Var x -> if T.var_occurs ~var:x s then Gt else Incomparable
+      | _, _ -> wpo_composite ~prec s t 
+    )
+
+  and has_subterm t sub =
+    T.Seq.subterms ~ignore_head:true ~include_builtin:true
+      ~include_app_vars:false t
+    |> Iter.mem ~eq:T.equal sub
+
+  and wpo_composite ~prec s t =
+    let a = algebraic_compare prec s t in
+    match a with
+    | Lt | Gt -> a
+    | Eq -> begin
+      let compare = prec_compare prec (Head.term_to_head s) (Head.term_to_head t) in
+      match compare with
+      | Gt -> cMA ~prec s (Head.term_to_args t)
+      | Lt -> C.opp (cMA ~prec t (Head.term_to_args s))
+      | Eq -> cLMA ~prec s t (Head.term_to_args s) (Head.term_to_args t)
+      | _ -> Incomparable
+      end
+    | _ -> Incomparable
+
+  and cMA ~prec s = function
+    | [] -> Gt
+    | t :: ts' ->
+      (match wpo ~prec s t with
+      | C.Gt -> cMA ~prec s ts'
+      | Eq | Lt -> Lt
+      | _ -> C.opp (alpha ~prec ts' s))
+
+  (* lexicographic comparison of s=f(ss), and t=f(ts) *)
+  and cLMA ~prec s t ss ts =
+    match ss, ts with
+    | si :: ss', ti :: ts' ->
+      (match wpo ~prec si ti with
+      | C.Eq -> cLMA ~prec s t ss' ts'
+      | Gt ->
+        cMA ~prec s ts' (* just need s to dominate the remaining elements *)
+      | Lt -> C.opp (cMA ~prec t ss')
+      | _ -> cAA ~prec s t ss' ts')
+    | [], [] -> Eq
+    | [], _ :: _ -> Lt
+    | _ :: _, [] -> Gt
+
+  (* length-lexicographic comparison of s=f(ss), and t=f(ts) *)
+  and cLLMA ~prec s t ss ts =
+    if List.length ss = List.length ts then
+      cLMA ~prec s t ss ts
+    else if List.length ss > List.length ts then
+      cMA ~prec s ts
+    else
+      C.opp (cMA ~prec t ss)
+
+  (* multiset comparison of subterms (not optimized) *)
+  and cMultiset ~prec s t ss ts =
+    match MT.compare_partial_l (wpo ~prec) ss ts with
+    | C.Gt -> cMA ~prec s ts
+    | Lt -> C.opp (cMA ~prec t ss)
+    | _ -> Incomparable
+
+  (* bidirectional comparison by subterm property (bidirectional alpha) *)
+  and cAA ~prec s t ss ts =
+    match alpha ~prec ss t with
+    | Gt -> Gt
+    | Incomparable -> C.opp (alpha ~prec ts s)
+    | _ -> assert false
+
+  (* if some s in ss is >= t, then s > t by subterm property and transitivity *)
+  and alpha ~prec ss t =
+    match ss with
+    | [] -> Incomparable
+    | s :: ss' ->
+      (match wpo ~prec s t with
+      | Eq | Gt -> Gt
+      | _ -> alpha ~prec ss' t)
+  ;;
+  
+  
+  let debug_wpo ~prec x y =
+
+    let compare_wpo = wpo ~prec x y in 
+    let compare_epo = EPO.compare_terms ~prec x y in 
+    
+    (* Trousse.print_term x; print " ";
+    print_comp compare_wpo;
+    print_comp compare_epo;
+    print " "; print_term y; print "\n"; *)
+    compare_wpo
+  ;;
+
+
+  
+  let compare_terms ~prec x y  = 
+    let _span = ZProf.enter_prof prof_wpo in 
+    let compare = 
+      debug_wpo 
+      ~prec x y in
+    ZProf.exit_prof _span;
+    compare
+
+  let might_flip prec t1 t2 = 
+    Trousse.printn "mightflip"; 
+    false
+
+end 
+
+ 
 
 (* This imperative polynomial data structure is designed to offer good
    performance. *)
@@ -1831,6 +2092,35 @@ let derived_ho_rpo prec =
     monotonic;
   }
 
+let wpo prec = 
+  let module WPO = MakeWPO (struct 
+    let name = "wpo"
+    let lambda_mode = false
+    let ignore_deep_quants = true
+  end) in
+  let cache_compare = mk_cache 256 in 
+  let compare prec a b =
+    CCCache.with_cache cache_compare
+      (fun (a, b) -> WPO.compare_terms ~prec a b)
+      (a, b)
+  in
+  let cache_might_flip = mk_cache 256 in
+  let might_flip prec a b =
+    CCCache.with_cache cache_might_flip
+      (fun (a, b) -> WPO.might_flip prec a b)
+      (a, b)
+  in
+  let monotonic = false in
+  {
+    cache_compare;
+    compare;
+    name = WPO.name;
+    prec;
+    might_flip;
+    cache_might_flip;
+    monotonic;
+  }
+
 let compose f ord =
   {
     ord with
@@ -2021,6 +2311,7 @@ let tbl_ =
   Hashtbl.add h "lambda_lpo" lambda_lpo;
   Hashtbl.add h "none" (fun _ -> none);
   Hashtbl.add h "subterm" (fun _ -> subterm);
+  Hashtbl.add h "wpo" wpo;
   h
 
 let default_of_list l = derived_ho_rpo (Prec.default l)
