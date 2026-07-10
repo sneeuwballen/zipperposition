@@ -1017,33 +1017,6 @@ module LambdaFreeKBOCoeff : ORD = struct
     | _ -> assert false
 end
 
-(* type alg = {
-  coeffor: int -> int -> int;
-  empty: int;
-  cumulator: int -> int -> int;
-  prec : Prec.t;
-} *)
-
-(* module Inter = struct 
-
-  type t = alg
-  
-  
-
-
-  let print_eval alg t = 
-    let x = eval alg t in 
-    Printf.printf "[%s ~> %d] " (T.to_string t) x; 
-    x
-  
-  let compare alg s t = 
-    let a, b = (print_eval alg s), (print_eval alg t) in
-    C.of_total (CCInt.compare a b)
-end *)
-
-(* let alg_eval = Inter.print_eval *)
-
-
 
 module type INTERPR = sig 
   val algebraic_compare : Prec.t -> T.t -> C.t
@@ -1206,23 +1179,12 @@ module WPO : ORD = struct
       | _ -> alpha ~prec ss' t)
   ;;
   
-  
-  let debug_wpo ~prec x y =
 
-    let compare_wpo = wpo ~prec x y in 
-    let compare_epo = EPO.compare_terms ~prec x y in 
-    
-    (* Trousse.print_term x; print " ";
-    print_comp compare_wpo;
-    print_comp compare_epo;
-    print " "; print_term y; print "\n"; *)
-    compare_wpo
-  ;;
 
   
   let compare_terms ~prec x y  = 
     let _span = ZProf.enter_prof prof_wpo in 
-    let compare = debug_wpo ~prec x y in
+    let compare = wpo ~prec x y in
     ZProf.exit_prof _span;
     compare
 
