@@ -1018,11 +1018,12 @@ module LambdaFreeKBOCoeff : ORD = struct
 end
 
 
-(* This structure allows term comparison over a given algebra *)
+(* These structures allow term comparison over a given algebra *)
 module type INTERPR = sig 
   val algebraic_compare : Prec.t -> T.t -> C.t
 end
 
+(* "Relaxed" WPO is a simplification where variables are set to 0 or 1 *)
 module RelaxedInterpr = struct
 
   exception UnsupportedTerm
