@@ -227,7 +227,7 @@ let compute_prec ~signature stmts =
     (* |> Compute_prec.set_weight_rule (fun _ -> Classify_cst.weight_fun) *)
     (* use "invfreq", with low priority *)
     |> Compute_prec.set_arg_coeff_rule (Precedence.arg_coeff_fun_of_string ~signature !_wpo_acf)
-    |> Compute_prec.set_algebra (Algebra.alg_of_string !_wpo_alg)
+    |> Compute_prec.set_algebra (T.Algebra.alg_of_string !_wpo_alg)
     |> Compute_prec.add_constr_rule 90 (fun seq ->
            let syms = Signature.Seq.symbols signature in
            Precedence.Constr.prec_fun_of_str !_prec_fun ~signature syms)

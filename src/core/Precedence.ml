@@ -3,6 +3,7 @@
 (** {1 Precedence (total ordering) on symbols} *)
 
 module T = Term
+module Alg = T.Algebra
 
 type symbol_status =
   | Multiset
@@ -12,8 +13,6 @@ type symbol_status =
 let section = Util.Section.(make "precedence")
 let db_w_def = 1
 let lmb_w_def = 1
-
-module Alg = Algebra
 
 (** {2 Weight of Symbols} *)
 module Weight = struct
@@ -380,7 +379,7 @@ type t = {
   (* weight function *)
   mutable arg_coeff: ID.t -> int list;
   (* argument coefficients *)
-  mutable algebra: Algebra.t;
+  mutable algebra: Alg.t;
   db_w: int;
   lmb_w: int;
   constr: [ `total ] Constr.t;

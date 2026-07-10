@@ -27,7 +27,7 @@ val set_weight_rule : Precedence.weight_fun parametrized -> t -> t
 
 val set_arg_coeff_rule : Precedence.arg_coeff_fun -> t -> t
 
-val set_algebra: Algebra.t -> t -> t
+val set_algebra: Term.Algebra.t -> t -> t
 
 val add_status : (ID.t * Precedence.symbol_status) list -> t -> t
 (** Specify explicitly the status of some symbols *)

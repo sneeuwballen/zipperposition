@@ -515,6 +515,23 @@ module Conv : sig
   val var_to_simple_var : ?prefix:string -> ctx -> var -> TypedSTerm.t Var.t
 end
 
+module Algebra : sig 
+  type operator = int -> int -> int 
+  
+  type t
+  
+  val create : operator -> int -> operator -> t
+  
+  val accumulator : t -> operator
+  val base_value: t -> int
+  val coeff_app : t -> operator
+
+  val sum_algebra : t
+  val max_algebra : t
+  
+  val alg_of_string : string -> t
+end
+
 (**/**)
 
 val rebuild_rec : t -> t (* rebuild term fully, checking types *)

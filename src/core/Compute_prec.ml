@@ -20,13 +20,14 @@ type t = {
   last_constr: [ `total ] Precedence.Constr.t;
   weight_rule: Precedence.weight_fun parametrized;
   arg_coeff_rule: Precedence.arg_coeff_fun;
-  algebra: Algebra.t;
+  algebra: T.Algebra.t;
   status: (ID.t * Precedence.symbol_status) list;
 }
 
 (* uniform weight *)
 let _default_weight _ = Precedence.weight_constant
 let _default_arg_coeff _ = []
+let _default_algebra = T.Algebra.sum_algebra
 
 let empty =
   {
@@ -36,7 +37,7 @@ let empty =
     weight_rule = _default_weight;
     arg_coeff_rule = _default_arg_coeff;
     status = [];
-    algebra = Algebra.sum_algebra;
+    algebra = _default_algebra;
   }
 
 let add_constr p c t = { t with constrs = (p, c) :: t.constrs }

@@ -167,7 +167,7 @@ val arg_coeff_fun_of_string :
   string ->
   arg_coeff_fun
 
-val algebra : t -> Algebra.t
+val algebra : t -> Term.Algebra.t
 
 (** {2 Creation of a precedence from constraints} *)
 
@@ -176,7 +176,7 @@ val create :
   ?arg_coeff:arg_coeff_fun ->
   ?db_w:int ->
   ?lmb_w:int ->
-  ?algebra:Algebra.t -> 
+  ?algebra:Term.Algebra.t -> 
   [ `total ] Constr.t ->
   ID.t list ->
   t

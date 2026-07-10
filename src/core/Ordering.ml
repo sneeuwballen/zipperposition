@@ -6,7 +6,6 @@ module Prec = Precedence
 module MT = Multiset.Make (Term)
 module W = Precedence.Weight
 module C = Comparison
-module Alg = Algebra
 
 let prof_rpo = ZProf.make "compare_rpo"
 let prof_kbo = ZProf.make "compare_kbo"
@@ -18,6 +17,7 @@ let prof_lambda_lpo = ZProf.make "compare_lambda_lpo"
 
 module T = Term
 module TC = Term.Classic
+module Alg = T.Algebra
 
 let mk_cache n =
   let hash (a, b) = Hash.combine3 42 (T.hash a) (T.hash b) in
@@ -1078,7 +1078,7 @@ module NonRelaxedInterpr = struct
   let rec eval prec t = 
     let alg = Prec.algebra prec in
     match Head.term_to_head t with
-    | Head.V v -> VarMap.singleton (HVar.id v) (Alg.empty alg)
+    | Head.V v -> VarMap.singleton (HVar.id v) (Alg.base_value alg)
     | Head.I i -> VarMap.map (Alg.coeff_app alg 1) (eval_lst prec (Head.term_to_args t))
       | _ -> VarMap.empty
 
@@ -1089,35 +1089,33 @@ module NonRelaxedInterpr = struct
   let algebraic_compare prec s t = 
     let a, b = (eval prec s), (eval prec t) in
     C.of_total (VarMap.compare a b)
-
 end
-  
+
 
 module RelaxedInterpr = struct
   include Trousse
-  (* these functions should eventually be part of MakeWPO *)
+
+  exception UnsupportedTerm
 
   let rec algebraic_eval prec t =
     let alg = Prec.algebra prec in
     match Head.term_to_head t with 
     | Head.V _ -> 1
     | Head.B b ->
-      accumulate prec (fun x -> Alg.empty alg) (Head.term_to_args t)
-    | Head.I i -> 
+      (* arguments of builtins are ignored *)
+      accumulate prec (fun x -> Alg.base_value alg) (Head.term_to_args t)
+    | Head.I id -> 
         Alg.accumulator alg
-        (W.get_one (Prec.weight prec i))
-        (accumulate prec (Prec.arg_coeff prec i) (Head.term_to_args t))
-    | _ -> 1000
+          (W.get_one (Prec.weight prec id)) (* dirty way to get weights *)
+          (accumulate prec (Prec.arg_coeff prec id) (Head.term_to_args t))
+    | _ -> raise UnsupportedTerm
   
   and accumulate ?(i=0) prec coeffs ts = 
-    let alg = Prec.algebra prec in 
-    let accumulator = Alg.accumulator alg in 
-    let coeff_app = Alg.coeff_app alg in
-    let empty = Alg.empty alg in
+    let alg = Prec.algebra prec in
     match ts with
-    | [] -> empty
-    | t :: ts' -> accumulator
-        (coeff_app (coeffs i) (algebraic_eval prec t)) 
+    | [] -> Alg.base_value alg
+    | t :: ts' -> Alg.accumulator alg 
+        (Alg.coeff_app alg (coeffs i) (algebraic_eval prec t)) 
         (accumulate ~i:(i+1) prec coeffs ts')
 
   (* TR * debug *)
@@ -1130,39 +1128,21 @@ module RelaxedInterpr = struct
   
   let algebraic_compare prec s t =
     (* let algebraic_eval = printed_eval in (* TR * DEBUG *) *)
-    let a, b = (algebraic_eval prec s), (algebraic_eval prec t) in
-    C.of_total (CCInt.compare a b)
+    try 
+      let a, b = (algebraic_eval prec s), (algebraic_eval prec t) in
+      C.of_total (CCInt.compare a b)
+    with UnsupportedTerm -> Incomparable
 end
-  
-module MakeWPO (P: PARAMETERS) : ORD = struct 
-  let name = P.name
 
-  let algebraic_compare = 
-    if P.lambda_mode then 
-      NonRelaxedInterpr.algebraic_compare 
-    else 
-      RelaxedInterpr.algebraic_compare 
+module WPO : ORD = struct 
+  let name = "wpo"
+  
+  let algebraic_compare = RelaxedInterpr.algebraic_compare 
 
   
   let rec wpo ~prec s t = 
     if T.equal s t then
       C.Eq
-    else if P.lambda_mode then (
-      (* assert false; (* TR * not supposed to stay *) *)
-      match Head.term_to_head s, Head.term_to_head t with 
-      | Head.V _, Head.V _ -> Incomparable
-      | Head.V _, _ -> 
-        if has_subterm t s then
-          Lt 
-        else 
-          Incomparable
-      | _, Head.V _ -> 
-        if has_subterm s t then 
-          Gt 
-        else 
-          Incomparable
-      | _, _ -> wpo_composite ~prec s t
-    )
     else (
       match T.view s, T.view t with 
       | T.Var _, T.Var _ -> Incomparable
@@ -1258,18 +1238,16 @@ module MakeWPO (P: PARAMETERS) : ORD = struct
     compare_wpo
   ;;
 
-
   
   let compare_terms ~prec x y  = 
     let _span = ZProf.enter_prof prof_wpo in 
-    let compare = 
-      debug_wpo 
-      ~prec x y in
+    let compare = debug_wpo ~prec x y in
     ZProf.exit_prof _span;
     compare
 
   let might_flip prec t1 t2 = 
     Trousse.printn "mightflip"; 
+    (* TODO *)
     false
 
 end 
@@ -2093,11 +2071,6 @@ let derived_ho_rpo prec =
   }
 
 let wpo prec = 
-  let module WPO = MakeWPO (struct 
-    let name = "wpo"
-    let lambda_mode = false
-    let ignore_deep_quants = true
-  end) in
   let cache_compare = mk_cache 256 in 
   let compare prec a b =
     CCCache.with_cache cache_compare
