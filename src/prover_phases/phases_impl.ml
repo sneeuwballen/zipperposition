@@ -211,7 +211,6 @@ let compute_prec ~signature stmts =
     (* add constraint about inductive constructors, etc. *)
     |> Compute_prec.add_constr 10 Classify_cst.prec_constr
     |> Compute_prec.set_weight_rule (fun stmts ->
-      (* Iter.for_each stmts (fun x -> Printf.printf "[STATEMENTS] %s\n" (CCFormat.to_string Statement.pp_clause x)); (* TR *) *)
            let sym_depth =
              stmts
              |> Iter.flat_map Statement.Seq.terms
@@ -221,7 +220,6 @@ let compute_prec ~signature stmts =
                            CCOpt.map (fun id -> id, d) (Term.head st)))
            in
            let clauses = Iter.map Statement.Seq.lits stmts in
-           (* TR * determine une fonction de poids à partir du parametre dans kbo_wf*)
            Precedence.weight_fun_of_string ~signature ~clauses ~lm_w:!_lmb_w
              ~db_w:!_db_w !_kbo_wf sym_depth)
     (* |> Compute_prec.set_weight_rule (fun _ -> Classify_cst.weight_fun) *)

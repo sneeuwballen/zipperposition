@@ -164,7 +164,6 @@ end
 (** {3 Ordering implementations} *)
 
 (* compare the two heads (ID or builtin or variable) using the precedence *)
-(* TR * prec_compare: Prec -> Head -> Head -> Comp *)
 let prec_compare prec a b =
   match a, b with
   | Head.I a, Head.I b ->
@@ -217,7 +216,6 @@ let prec_compare prec a b =
   | _, Head.V _ -> Incomparable
 
 let prec_status prec = function
-  (* TR * sucre pour p_s prec x = match x | ... *)
   | Head.I s -> Prec.status prec s
   | _ -> Prec.LengthLexicographic
 
@@ -254,7 +252,6 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
   (** used to keep track of the balance of variables *)
 
   (** create a balance for the two terms *)
-  (* TR * mk_balance: T.t -> T.t -> var_balance *)
   let mk_balance t1 t2 =
     let numvars = Iter.length (T.Seq.vars t1) + Iter.length (T.Seq.vars t2) in
     {
@@ -307,7 +304,6 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
   (** Higher-order KBO *)
 
   let kbo ~prec t1 t2 =
-    (* TR * de type var_balance *)
     let balance = mk_balance t1 t2 in
     (* Update variable balance, weight balance, and check whether the term contains the fluid term s.
         @param pos stands for positive (is t the left term?)
@@ -433,12 +429,9 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
           tckbo_composite wb h1 h2 (Head.term_to_args t1) (Head.term_to_args t2)
             ~below_lam
       ) else (
-        (* TR * version "lambda free" (voire FOL) *)
-        (* TR * conversions obscures *)
         let t1 = ty1comb_to_var t1 balance.comb2var in
         let t2 = ty1comb_to_var t2 balance.comb2var in
         match T.view t1, T.view t2 with
-        (* TR * déballage *)
         | T.Var x, T.Var y ->
           add_pos_var balance t1 ~below_lam;
           add_neg_var balance t2 ~below_lam;
@@ -469,12 +462,10 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
             ~below_lam
       )
     (* tckbo, for non-variable-headed terms). *)
-    (* TR * c'est cette fonction qui breakdown tous les cas de la def de >KBO *)
     and tckbo_composite wb f g ss ts ~below_lam =
       (* do the recursive computation of kbo *)
       let wb', res = tckbo_rec wb f g ss ts ~below_lam in
       let wb'' =
-        (* TR * semble être la comparaison sur les poids *)
         W.(wb' + weight prec f ~below_lam - weight prec g ~below_lam)
       in
       if not P.lambda_mode then (
@@ -486,7 +477,6 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
         | _ -> ()
       );
       (* check variable condition *)
-      (* TR * sur le nombre d'apparition de chaque variable, qui doit permettre une comparaison *)
       let g_or_n =
         if balance.neg_counter = 0 then
           C.Gt
@@ -1093,7 +1083,6 @@ end
 
 
 module RelaxedInterpr = struct
-  include Trousse
 
   exception UnsupportedTerm
 
@@ -1118,16 +1107,8 @@ module RelaxedInterpr = struct
         (Alg.coeff_app alg (coeffs i) (algebraic_eval prec t)) 
         (accumulate ~i:(i+1) prec coeffs ts')
 
-  (* TR * debug *)
-  let printed_eval prec t = 
-    let x = algebraic_eval prec t in 
-    print_term t; 
-    print_eval x;
-    print " ";
-    x
   
   let algebraic_compare prec s t =
-    (* let algebraic_eval = printed_eval in (* TR * DEBUG *) *)
     try 
       let a, b = (algebraic_eval prec s), (algebraic_eval prec t) in
       C.of_total (CCInt.compare a b)

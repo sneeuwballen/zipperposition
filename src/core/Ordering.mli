@@ -83,8 +83,8 @@ val wpo : Precedence.t -> t
 module RelaxedInterpr : sig 
   val algebraic_compare : Precedence.t -> Term.t -> Term.t -> Comparison.t
   val algebraic_eval : Precedence.t -> Term.t -> int
-end 
-  (* TR * Temporary *)
+end
+(** temporary, debug purpose *)
 
 val none : t
 (** All terms are incomparable (equality still works). Not a simplification

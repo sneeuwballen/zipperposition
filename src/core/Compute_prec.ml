@@ -114,7 +114,6 @@ let force_const_weight ~weight ~signature = function
   | None -> weight
 
 let mk_precedence ~db_w ~lmb_w ~signature t seq =
-  (* TR * t:t  seq: (Statement.clause * Term * Type) Statement Iter    *)
   let _span = ZProf.enter_prof prof_mk_prec in
   (* set of symbols *)
   let symbols =
@@ -145,9 +144,7 @@ let mk_precedence ~db_w ~lmb_w ~signature t seq =
   in
   let arg_coeff = 
     t.arg_coeff_rule 
-  in 
-  (* TR * weight: Prec.weight_fun ; arg_coeff: ID -> int list *)
-  (* TR * a this point, all constraints on weight have been processed -> overwritten by custom *)
+  in
   let weight, arg_coeff = _add_custom_weights weight arg_coeff in
   let weight = force_const_weight ~weight ~signature !_kbo_const_weight in
   let algebra = t.algebra in
