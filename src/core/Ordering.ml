@@ -1018,42 +1018,10 @@ module LambdaFreeKBOCoeff : ORD = struct
 end
 
 
+(* This structure allows term comparison over a given algebra *)
 module type INTERPR = sig 
   val algebraic_compare : Prec.t -> T.t -> C.t
 end
-
-module NonRelaxedInterpr = struct 
-  
-  module VarMap = struct 
-    include Map.Make(Int)
-
-    let merge a b = 
-      union (fun _ x y -> Some (x + y)) a b 
-
-    (**)
-
-    let compare a b = 
-      0
-  end 
-  
-  type t = int VarMap.t
-
-  let rec eval prec t = 
-    let alg = Prec.algebra prec in
-    match Head.term_to_head t with
-    | Head.V v -> VarMap.singleton (HVar.id v) (Alg.base_value alg)
-    | Head.I i -> VarMap.map (Alg.coeff_app alg 1) (eval_lst prec (Head.term_to_args t))
-      | _ -> VarMap.empty
-
-  and eval_lst prec = function
-    | [] -> VarMap.empty
-    | t::ts' -> VarMap.merge (eval prec t) (eval_lst prec ts')
-    
-  let algebraic_compare prec s t = 
-    let a, b = (eval prec s), (eval prec t) in
-    C.of_total (VarMap.compare a b)
-end
-
 
 module RelaxedInterpr = struct
 
