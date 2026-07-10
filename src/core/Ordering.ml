@@ -1158,7 +1158,6 @@ module WPO : ORD = struct
     compare
 
   let might_flip prec t1 t2 = 
-    Trousse.printn "mightflip"; 
     (* TODO *)
     false
 
