@@ -811,12 +811,21 @@ let convert_input_statements_env env stmts : C.t Clause.sets =
       k (CCVector.length c_set) (CCVector.length c_sos));
   { Clause.c_set = CCVector.freeze c_set; c_sos = CCVector.freeze c_sos }
 
-let convert_input_statements _stmts = failwith "TODO: convert_input_statements"
-let should_force_stream_eval _env () = failwith "TODO: should_force_stream_eval"
-let get_finite_infs _env streams = failwith "TODO: get_finite_infs"
 let stats _env = ProofState.stats ()
 let next_passive _env () = ProofState.PassiveSet.next ()
-let simplify_active_with _env _f = failwith "TODO: simplify_active_with"
+
+let should_force_stream_eval env () =
+  flex_get_of env PragUnifParams.k_unif_alg_is_terminating
+  && (not (flex_get_of env PragUnifParams.k_schedule_inferences))
+  && flex_get_of env PragUnifParams.k_max_inferences > 0
+
+let get_finite_infs env streams =
+  assert (flex_get_of env PragUnifParams.k_unif_alg_is_terminating);
+  CCList.flat_map
+    (fun s -> OSeq.to_rev_list @@ OSeq.filter_map CCFun.id s)
+    streams
+
+let simplify_active_with env f = simplify_active_with_env env f
 let on_start env = env.on_start
 let on_input_statement env = env.on_input_statement
 let on_empty_clause env = env.on_empty_clause
