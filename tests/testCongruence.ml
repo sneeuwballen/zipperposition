@@ -81,7 +81,7 @@ end = struct
           s2)
       s1
 
-  (* fixpoint: merge classes that are congruent *)
+  (* fixpoint: merge classes that are congruent, or that share a term *)
   let rec update (cc : t) : t =
     let find_merge_ cc =
       TSet_set.to_iter cc
@@ -103,15 +103,53 @@ end = struct
       |> TSet_set.add (T.Set.union s1 s2)
       |> update
 
-  let of_classes (l : T.t list list) : t =
-    let s = List.map T.Set.of_list l |> TSet_set.of_list in
-    update s
+  (* [t] and, recursively, the arguments of its (first-order) applications.
+     Heads are deliberately NOT included: [Congruence.FO] treats function
+     symbols as opaque, so two terms are congruent only if they have the same
+     head symbol and congruent arguments. *)
+  let rec fo_subterms (t : T.t) : T.t list =
+    t
+    ::
+    (match T.Classic.view t with
+     | T.Classic.App (_, l) -> List.concat_map fo_subterms l
+     | _ -> [])
+
+  (* ---- operations mirroring [Congruence.FO] (create / add / mk_eq) ---- *)
+  let empty = TSet_set.empty
+
+  (* Insert [t] and all its FO-subterms as singleton nodes, then propagate.
+     Like [Congruence.FO.add], which inserts every subterm as a node. *)
+  let add (cc : t) (t : T.t) : t =
+    let cc =
+      List.fold_left
+        (fun acc u -> TSet_set.add (T.Set.singleton u) acc)
+        cc (fo_subterms t)
+    in
+    update cc
+
+  (* Assert [t = t']: put them in a common class; [update] then unions that
+     class with any existing class containing [t] or [t'] (shared-element
+     rule) and re-propagates congruence. *)
+  let mk_eq (cc : t) (t : T.t) (t' : T.t) : t =
+    let cc = add cc t in
+    let cc = add cc t' in
+    update (TSet_set.add (T.Set.of_list [ t; t' ]) cc)
+
+  (* Same structure as [_cc_of_classes]: fold over the classes, [add] the
+     first term then [mk_eq] it with each of the others; skip empty classes. *)
+  let of_classes (classes : T.t list list) : t =
+    List.fold_left
+      (fun cc cls ->
+        match cls with
+        | [] -> cc
+        | t :: cls' ->
+          let cc = add cc t in
+          List.fold_left (fun cc t' -> mk_eq cc t t') cc cls')
+      empty classes
 
   let is_eq (cc : t) (t : T.t) (u : T.t) : bool =
-    (* add t and u *)
-    let cc =
-      TSet_set.add_list cc [ T.Set.singleton t; T.Set.singleton u ] |> update
-    in
+    (* ensure t and u (and their subterms) are nodes, then query *)
+    let cc = add (add cc t) u in
     is_eq_ cc t u
 
   let pp out (cc : t) : unit =
