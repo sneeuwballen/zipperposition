@@ -26,7 +26,14 @@ exception Fail of string * offset
 let fail off msg = raise (Fail (msg, off))
 let failf off msg = Printf.ksprintf (fail off) msg
 
+(** check that there's at least [n] readable bytes left. *)
+let[@inline] check_n (self : node_decoder) n =
+  let total = String.length self.dec.str in
+  if self.off < 0 || n < 0 || self.off > total - n then
+    fail self.off "truncated or malformed MDAG input"
+
 let[@inline] read_byte_ (self : node_decoder) : int =
+  check_n self 1;
   let c = String.get self.dec.str self.off in
   self.off <- self.off + 1;
   Char.code c
@@ -40,14 +47,17 @@ let read_uint64 self ~low =
   | _ when low < 12 -> Int64.of_int low
   | 12 -> read_byte_ self |> Int64.of_int
   | 13 ->
+    check_n self 2;
     let n = String.get_int16_le self.dec.str self.off in
     self.off <- self.off + 2;
     Int64.of_int (n land 0xFFFF)
   | 14 ->
+    check_n self 4;
     let n = String.get_int32_le self.dec.str self.off in
     self.off <- self.off + 4;
     Int64.logand (Int64.of_int32 n) 0xFFFFFFFFL
   | 15 ->
+    check_n self 8;
     let n = String.get_int64_le self.dec.str self.off in
     self.off <- self.off + 8;
     n
@@ -55,6 +65,8 @@ let read_uint64 self ~low =
 
 let string_ self ~low : string =
   let len = read_uint64 self ~low |> Int64.to_int in
+  if len < 0 then fail self.off "negative string/blob length";
+  check_n self len;
   let s = String.sub self.dec.str self.off len in
   self.off <- self.off + len;
   s
