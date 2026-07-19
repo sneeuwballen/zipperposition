@@ -220,7 +220,7 @@ module Seq : sig
   val forms : t -> Term.t SLiteral.t Iter.t
   val terms : t -> Term.t Iter.t
   val vars : t -> Term.var Iter.t
-  val symbols : t -> Name.t Iter.t
+  val symbols : ?include_types:bool -> t -> Name.t Iter.t
 end
 
 (** {2 Debug helpers} *)

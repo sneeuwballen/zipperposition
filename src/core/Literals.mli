@@ -79,6 +79,7 @@ module Seq : sig
   val vars : t -> Type.t HVar.t Iter.t
   val terms : t -> term Iter.t
   val to_form : t -> term SLiteral.t Iter.t
+  val symbols : ?include_types:bool -> t -> Name.t Iter.t
 end
 
 (** {3 High order combinators} *)

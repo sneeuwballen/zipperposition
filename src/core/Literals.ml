@@ -193,6 +193,9 @@ module Seq = struct
   let vars lits = Iter.of_array lits |> Iter.flat_map Lit.Seq.vars
   let terms a = Iter.of_array a |> Iter.flat_map Lit.Seq.terms
   let to_form a = Iter.of_array a |> Iter.map Lit.Conv.to_form
+
+  let symbols ?(include_types = false) lits =
+    Iter.of_array lits |> Iter.flat_map (Lit.Seq.symbols ~include_types)
 end
 
 (** {3 High Order combinators} *)

@@ -609,7 +609,9 @@ module Seq = struct
 
   let terms c = Lits.Seq.terms c.sclause.lits
   let vars c = Lits.Seq.vars c.sclause.lits
-  let symbols c = Iter.empty (* TODO: implement properly *)
+
+  let symbols ?(include_types = false) c =
+    Lits.Seq.symbols ~include_types c.sclause.lits
 end
 
 (** {2 Types checking} *)
