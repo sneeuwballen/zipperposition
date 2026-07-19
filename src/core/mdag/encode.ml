@@ -150,15 +150,22 @@ let write_node (self : t) cmd (f : node_encoder -> unit) : offset =
   let node_buf = Pool.Raw.acquire self.node_pool in
   self.buf <- node_buf;
   self.len <- 0;
-  string self cmd;
-  f self;
-  stop self;
-  (* capture offset after all nested nodes have been flushed *)
-  let offset = self.cur_offset in
-  self.out#write self.buf 0 self.len;
-  self.cur_offset <- self.cur_offset + self.len;
-  let released_buf = self.buf in
-  self.buf <- saved_buf;
-  self.len <- saved_len;
-  Pool.Raw.release self.node_pool released_buf;
-  offset
+  let restore () =
+    self.buf <- saved_buf;
+    self.len <- saved_len;
+    Pool.Raw.release self.node_pool node_buf
+  in
+  try
+    string self cmd;
+    f self;
+    stop self;
+    (* capture offset after all nested nodes have been flushed *)
+    let offset = self.cur_offset in
+    self.out#write self.buf 0 self.len;
+    self.cur_offset <- self.cur_offset + self.len;
+    restore ();
+    offset
+  with e ->
+    let bt = Printexc.get_raw_backtrace () in
+    restore ();
+    Printexc.raise_with_backtrace e bt
