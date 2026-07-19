@@ -258,7 +258,16 @@ let emit_rule_with_tags self cmd rule clause_off parents tags =
       E.ref enc clause_off;
       emit_parents_list enc parents;
       E.string enc "|";
-      List.iter (fun t -> E.int enc (tag_to_int t)) tags)
+      List.iter
+        (fun t ->
+          match t with
+          | Builtin.Tag.T_ac name ->
+            (* AC tag: int 11 followed by a ref to the name node, so the
+               symbol identity survives the round-trip. *)
+            E.int enc 11;
+            E.ref enc (emit_name self name)
+          | _ -> E.int enc (tag_to_int t))
+        tags)
 
 let emit_step self ~clause_off ~parents (step : Proof.Step.t) : offset =
   self.n_steps <- 1 + self.n_steps;
@@ -432,11 +441,11 @@ let emit_proof self ~get_lits (root : Proof.t) : offset * stats =
         E.string enc "tool";
         E.string enc "zipperposition")
   in
-  let u32_bytes = Bytes.create 4 in
-  Bytes.set_int32_le u32_bytes 0 (Int32.of_int (footer_off :> int));
+  let footer_bytes = Bytes.create 8 in
+  Bytes.set_int64_le footer_bytes 0 (Int64.of_int (footer_off :> int));
   let _ : offset =
     E.write_node self.enc "mdag.end" (fun enc ->
-        E.blob enc (Bytes.to_string u32_bytes))
+        E.blob enc (Bytes.to_string footer_bytes))
   in
   E.flush self.enc;
   let stats = { n_steps = self.n_steps; n_terms = self.n_terms } in

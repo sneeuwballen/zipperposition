@@ -189,7 +189,9 @@ let tag_of_int = function
   | 8 -> T_data
   | 9 -> T_distinct
   | 10 -> T_cannot_orphan
-  | 11 -> T_ac (Name.make "?ac")
+  | 11 ->
+    raise
+      (D.Fail ("AC tag (11) must carry a name ref; handled in read_tags", 0))
   | n -> raise (D.Fail (Printf.sprintf "unknown tag int: %d" n, 0))
 
 let role_of_string = function
@@ -520,7 +522,7 @@ and read_parents (st : t) (c : cursor) : LLProof.parent list =
   in
   loop []
 
-and read_tags (c : cursor) : Builtin.Tag.t list =
+and read_tags (st : t) (c : cursor) : Builtin.Tag.t list =
   let rec loop acc =
     if c.pos >= Array.length c.args then
       List.rev acc
@@ -531,7 +533,14 @@ and read_tags (c : cursor) : Builtin.Tag.t list =
         loop acc
       | D.Int64 n ->
         c.pos <- c.pos + 1;
-        loop (tag_of_int (Int64.to_int n) :: acc)
+        let i = Int64.to_int n in
+        if i = 11 then (
+          (* AC tag: followed by a name ref *)
+          let name_off = read_ref c in
+          let name = decode_name st name_off in
+          loop (Builtin.Tag.T_ac name :: acc)
+        ) else
+          loop (tag_of_int i :: acc)
       | D.String _ -> List.rev acc
       | _ -> raise (D.Fail ("expected int for tag", 0))
     )
@@ -545,7 +554,7 @@ and read_parents_and_tags (st : t) (c : cursor) :
     if c.pos < Array.length c.args && c.args.(c.pos) = D.String "|" then
       c.pos <- c.pos + 1
   in
-  let tags = read_tags c in
+  let tags = read_tags st c in
   parents, tags
 
 and read_parents_no_tags (st : t) (c : cursor) : LLProof.parent list =
@@ -591,10 +600,26 @@ let read_footer (st : t) (footer_off : D.offset) : (string * footer_val) list =
   loop []
 
 let find_footer_offset (st : t) : D.offset =
+  (* Wire format of the trailing [mdag.end] node (emitted by [Proof_trace]):
+       ┌──────────────┬────────────┬──────────────────────────┬──────┐
+       │ "mdag.end"   │ blob-hdr   │ 8-byte LE footer offset  │ stop │
+       │ (string cmd) │ 0x68       │ (int64)                   │ 0x00 │
+       └──────────────┴────────────┴──────────────────────────┴──────┘
+     The last 10 bytes of the file are: blob-hdr | 8 offset bytes | stop.
+     We validate the trailing blob-hdr and stop, then read the 8-byte offset. *)
   let raw = D.raw_string st.data in
-  if st.total_len < 6 then raise (D.Fail ("file too small for mdag.end", 0));
-  let u32_bytes = Bytes.of_string (String.sub raw (st.total_len - 5) 4) in
-  Int32.to_int (Bytes.get_int32_le u32_bytes 0)
+  if st.total_len < 10 then raise (D.Fail ("file too small for mdag.end", 0));
+  let stop_pos = st.total_len - 1 in
+  let stop = String.get raw stop_pos in
+  if Char.code stop <> 0 then
+    raise (D.Fail ("expected stop byte at end of file", stop_pos));
+  let blob_hdr_pos = st.total_len - 10 in
+  let blob_hdr = String.get raw blob_hdr_pos in
+  (* blob header for an 8-byte blob: high nibble 6 (blob), low nibble 8 (len) *)
+  if Char.code blob_hdr <> (6 lsl 4) lor 8 then
+    raise (D.Fail ("expected 8-byte blob header in mdag.end", blob_hdr_pos));
+  let off_bytes = Bytes.of_string (String.sub raw (st.total_len - 9) 8) in
+  Int64.to_int (Bytes.get_int64_le off_bytes 0)
 
 let create (s : string) : t =
   {
