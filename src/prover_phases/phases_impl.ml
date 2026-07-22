@@ -673,7 +673,11 @@ let check res =
       | Some file ->
         let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "proof.mdag-trace" in
         Util.debugf ~section 2 "write proof trace to `%s`" (fun k -> k file);
-        let enc = Proof_trace.create (open_out_bin file) in
+        let oc = open_out_bin file in
+        let enc =
+          Proof_trace.create
+            (Zipperposition_mdag.Encode.output_of_out_channel oc)
+        in
         let off, stats =
           Proof_trace.emit_proof enc
             ~get_lits:(fun p ->

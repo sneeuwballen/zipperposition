@@ -35,6 +35,16 @@ let create ~out () : t =
     node_pool = pool;
   }
 
+let output_of_out_channel oc =
+  object
+    method write str off len = output oc str off len
+  end
+
+let output_of_buffer buf =
+  object
+    method write str off len = Buffer.add_subbytes buf str off len
+  end
+
 let[@inline] abs_offset_ (self : t) : int = self.cur_offset + self.len
 
 let flush self : unit =

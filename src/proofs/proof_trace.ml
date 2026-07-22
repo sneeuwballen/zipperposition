@@ -29,7 +29,6 @@ type stats = {
 
 type t = {
   enc: E.t;
-  oc: out_channel;
   tbl_term: offset Term_cache.t;
   tbl_name: offset Name_cache.t;
   tbl_lit: offset Lit_tbl.t;
@@ -38,15 +37,9 @@ type t = {
   mutable n_terms: int;
 }
 
-let create oc : t =
-  let out =
-    object
-      method write (s : bytes) (ofs : int) (len : int) = output oc s ofs len
-    end
-  in
+let create (out : #E.output) : t =
   {
     enc = E.create ~out ();
-    oc;
     tbl_term = Term_cache.create 1024;
     tbl_name = Name_cache.create 256;
     tbl_lit = Lit_tbl.create 256;
@@ -56,8 +49,7 @@ let create oc : t =
   }
 
 let close self =
-  E.flush self.enc;
-  close_out self.oc
+  E.flush self.enc
 
 (** {2 Names} *)
 

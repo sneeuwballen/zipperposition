@@ -5,6 +5,8 @@ class type output = object
   method write : bytes -> int -> int -> unit
 end
 
+val output_of_out_channel : out_channel -> output
+val output_of_buffer : Buffer.t -> output
 val create : out:#output -> unit -> t
 
 val flush : t -> unit

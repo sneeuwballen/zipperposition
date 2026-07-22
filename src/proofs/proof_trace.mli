@@ -6,7 +6,7 @@ open Logtk
 
 type t
 
-val create : out_channel -> t
+val create : #Zipperposition_mdag.Encode.output -> t
 val close : t -> unit
 
 type stats = {
