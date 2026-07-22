@@ -23,6 +23,7 @@ let units : unit Alcotest.test_case list =
     TestTerm.suite;
     TestUnif.suite;
     TestTerm_dag.suite;
+    TestProof_trace.suite;
   ]
   |> List.flatten
 

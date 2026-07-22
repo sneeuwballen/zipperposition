@@ -5,6 +5,7 @@
   logtk.parsers
   logtk.arbitrary
   logtk.arith
+  logtk.proofs
   iter
   qcheck-core
   qcheck-alcotest

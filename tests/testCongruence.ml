@@ -103,15 +103,35 @@ end = struct
       |> TSet_set.add (T.Set.union s1 s2)
       |> update
 
+  (* collect a term and all its (recursive) subterms into the accumulator. *)
+  let rec collect_subterms acc t =
+    match T.Classic.view t with
+    | T.Classic.App (_, l) ->
+      List.fold_left collect_subterms (T.Set.add t acc) l
+    | _ -> T.Set.add t acc
+
   let of_classes (l : T.t list list) : t =
-    let s = List.map T.Set.of_list l |> TSet_set.of_list in
+    let given = List.filter (fun cls -> not (List.is_empty cls)) l in
+    let in_given = T.Set.of_list (List.concat given) in
+    (* every subterm not already in an explicit class becomes its own
+       singleton class *)
+    let singletons =
+      List.fold_left
+        (fun acc cls -> List.fold_left collect_subterms acc cls)
+        T.Set.empty given
+      |> fun subterms ->
+      T.Set.diff subterms in_given |> T.Set.to_list |> List.map T.Set.singleton
+    in
+    let s = TSet_set.of_list (List.map T.Set.of_list given @ singletons) in
     update s
 
   let is_eq (cc : t) (t : T.t) (u : T.t) : bool =
-    (* add t and u *)
-    let cc =
-      TSet_set.add_list cc [ T.Set.singleton t; T.Set.singleton u ] |> update
+    (* add t, u and their subterms as singletons, then close *)
+    let singletons =
+      collect_subterms (collect_subterms T.Set.empty t) u
+      |> T.Set.to_list |> List.map T.Set.singleton
     in
+    let cc = TSet_set.add_list cc singletons |> update in
     is_eq_ cc t u
 
   let pp out (cc : t) : unit =
