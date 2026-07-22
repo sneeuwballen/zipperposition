@@ -444,7 +444,7 @@ module Eligible = struct
 
   let eq = fun _ lit -> Literal.is_eq lit
   let filter f = fun _ lit -> f lit
-  let max _c = failwith "Eligible.max unimplemented"
+  let max c = fun i _ -> BV.get (BV.of_list @@ Lazy.force c.max_lits) i
   let pos = fun _ lit -> Literal.is_positivoid lit
   let pos_eq = fun _ lit -> Literal.is_positivoid lit && Literal.is_eq lit
   let neg = fun _ lit -> not (Literal.is_positivoid lit)
