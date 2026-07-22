@@ -167,10 +167,7 @@ let check_step ?dot_prefix (p : proof) : check_step_res =
   | P.Trivial -> CS_skip `Other
   | P.Esa (_, _) -> CS_skip `ESA
   | P.Inference { parents; tags; name; _ } ->
-    (* rules that the tableau checker cannot verify yet *)
-    if String.starts_with ~prefix:"simplify_reflect" name then
-      CS_skip `Other
-    else if LLProver.can_check tags then (
+    if LLProver.can_check tags then (
       (* Apply instantiations and build forms *)
       let prem_forms =
         List.map
