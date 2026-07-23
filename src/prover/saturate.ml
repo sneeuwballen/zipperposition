@@ -6,7 +6,6 @@
 open Logtk
 module C = Clause
 module O = Ordering
-module PS = ProofState
 module Sel = Selection
 module EIntf = Eprover_interface
 
@@ -347,13 +346,21 @@ let presaturate env =
 let () =
   Params.add_opts
     [
-      "--progress", Arg.Unit (fun () -> Params.Cli.set_progress true), " progress bar";
-      "-p", Arg.Unit (fun () -> Params.Cli.set_progress true), " alias for --progress";
-      "--no-progress", Arg.Unit (fun () -> Params.Cli.set_progress false), " disable progress bar";
+      ( "--progress",
+        Arg.Unit (fun () -> Params.Cli.set_progress true),
+        " progress bar" );
+      ( "-p",
+        Arg.Unit (fun () -> Params.Cli.set_progress true),
+        " alias for --progress" );
+      ( "--no-progress",
+        Arg.Unit (fun () -> Params.Cli.set_progress false),
+        " disable progress bar" );
       ( "--check-types",
         Arg.Unit (fun () -> Params.Cli.set_check_types true),
         " check types in new clauses" );
-      "--no-check-types", Arg.Unit (fun () -> Params.Cli.set_check_types false), " disable type checking";
+      ( "--no-check-types",
+        Arg.Unit (fun () -> Params.Cli.set_check_types false),
+        " disable type checking" );
       ( "--max-multi-simpl-depth",
         Arg.Int Params.Cli.set_max_multi_simpl,
         " maixmum depth of multi step simplification. -1 disables maximum \

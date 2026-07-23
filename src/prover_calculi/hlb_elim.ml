@@ -952,21 +952,18 @@ let untrack_clause env cl =
 
 let initialize env =
   let track_active env =
-    Signal.on_every Env.ProofState.ActiveSet.on_add_clause (track_clause env);
-    Signal.on_every Env.ProofState.ActiveSet.on_remove_clause
-      (untrack_clause env);
+    Signal.on_every (Env.on_active_add env) (track_clause env);
+    Signal.on_every (Env.on_active_remove env) (untrack_clause env);
     Signal.on_every (Env.on_forward_simplified env) (fun (_, _) -> incr steps)
   in
   let track_passive env =
-    Signal.on_every Env.ProofState.PassiveSet.on_add_clause (track_clause env);
-    Signal.on_every Env.ProofState.PassiveSet.on_remove_clause
-      (untrack_clause env);
+    Signal.on_every (Env.on_passive_add env) (track_clause env);
+    Signal.on_every (Env.on_passive_remove env) (untrack_clause env);
     Signal.on_every (Env.on_forward_simplified env) (fun (_, _) -> incr steps)
   in
   let track_all env =
-    Signal.on_every Env.ProofState.PassiveSet.on_add_clause (track_clause env);
-    Signal.on_every Env.ProofState.ActiveSet.on_remove_clause
-      (untrack_clause env);
+    Signal.on_every (Env.on_passive_add env) (track_clause env);
+    Signal.on_every (Env.on_active_remove env) (untrack_clause env);
     Signal.on_every (Env.on_forward_simplified env) (fun (c, new_state) ->
         incr steps;
         match new_state with

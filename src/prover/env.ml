@@ -53,6 +53,7 @@ type t = {
   mutable fragment_checks: (t -> C.t -> bool) list;
   mutable immediate_simpl: immediate_simplification_rule list;
   queue: StmQ.t option ref;
+  proof_state: ProofState.t;
   params: Params.t;
   on_start: unit Signal.t;
   on_input_statement: Statement.clause_t Signal.t;
@@ -125,6 +126,7 @@ let create ~params ~flex_state ~ctx () =
     fragment_checks = [];
     immediate_simpl = [];
     queue = ref None;
+    proof_state = ProofState.create ();
     params;
     on_start = Signal.create ();
     on_input_statement = Signal.create ();
@@ -168,23 +170,23 @@ let add_empty env c =
   Signal.send env.on_empty_clause c
 
 let add_passive env cs =
-  ProofState.PassiveSet.add cs;
+  env.proof_state.passive#add cs;
   Iter.iter (fun c -> if C.is_empty c then add_empty env c) cs
 
 let add_active env cs =
-  ProofState.ActiveSet.add cs;
+  env.proof_state.active#add cs;
   Iter.iter (fun c -> if C.is_empty c then add_empty env c) cs
 
-let add_simpl _env = ProofState.SimplSet.add
-let remove_active _env = ProofState.ActiveSet.remove
-let remove_passive _env = ProofState.PassiveSet.remove
-let remove_simpl _env = ProofState.SimplSet.remove
+let add_simpl env = env.proof_state.simpl#add
+let remove_active env = env.proof_state.active#remove
+let remove_passive env = env.proof_state.passive#remove
+let remove_simpl env = env.proof_state.simpl#remove
 
-let get_passive _env () =
-  ProofState.PassiveSet.clauses () |> C.ClauseSet.to_seq |> Iter.of_seq
+let get_passive env () =
+  env.proof_state.passive#clauses () |> C.ClauseSet.to_seq |> Iter.of_seq
 
-let get_active _env () =
-  ProofState.ActiveSet.clauses () |> C.ClauseSet.to_seq |> Iter.of_seq
+let get_active env () =
+  env.proof_state.active#clauses () |> C.ClauseSet.to_seq |> Iter.of_seq
 
 let add_binary_inf env name rule =
   if not (List.mem_assoc name env.binary_rules) then
@@ -535,8 +537,8 @@ let is_trivial env c =
     res
   )
 
-let is_active _env c = C.ClauseSet.mem c (ProofState.ActiveSet.clauses ())
-let is_passive _env = ProofState.PassiveSet.is_passive
+let is_active env c = C.ClauseSet.mem c (env.proof_state.active#clauses ())
+let is_passive env = env.proof_state.passive#is_passive
 
 let backward_simplify env given =
   let candidates = backward_simplify_find_candidates env given in
@@ -765,12 +767,12 @@ let simplify_active_with_env env f =
           in
           if redundant then C.mark_redundant c;
           (c, clauses) :: set)
-      (ProofState.ActiveSet.clauses ())
+      (env.proof_state.active#clauses ())
       []
   in
-  ProofState.ActiveSet.remove (Iter.of_list set |> Iter.map fst);
+  env.proof_state.active#remove (Iter.of_list set |> Iter.map fst);
   Iter.of_list set |> Iter.map snd |> Iter.flat_map Iter.of_list
-  |> ProofState.PassiveSet.add;
+  |> env.proof_state.passive#add;
   ()
 
 let convert_input_statements_env env stmts : C.t Clause.sets =
@@ -815,8 +817,17 @@ let convert_input_statements_env env stmts : C.t Clause.sets =
       k (CCVector.length c_set) (CCVector.length c_sos));
   { Clause.c_set = CCVector.freeze c_set; c_sos = CCVector.freeze c_sos }
 
-let stats _env = ProofState.stats ()
-let next_passive _env () = ProofState.PassiveSet.next ()
+let stats env = ProofState.stats env.proof_state
+let next_passive env () = env.proof_state.passive#next ()
+let proof_state env = env.proof_state
+let active_clauses env = env.proof_state.active#clauses ()
+let passive_clauses env = env.proof_state.passive#clauses ()
+let on_passive_add env = env.proof_state.passive#on_add_clause
+let on_passive_remove env = env.proof_state.passive#on_remove_clause
+let on_active_add env = env.proof_state.active#on_add_clause
+let on_active_remove env = env.proof_state.active#on_remove_clause
+let on_simpl_add env = env.proof_state.simpl#on_add_clause
+let on_simpl_remove env = env.proof_state.simpl#on_remove_clause
 
 let should_force_stream_eval env () =
   flex_get_of env PragUnifParams.k_unif_alg_is_terminating

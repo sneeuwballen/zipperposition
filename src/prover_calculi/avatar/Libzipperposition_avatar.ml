@@ -347,8 +347,7 @@ let new_proved_lits : unit -> bool =
    trail *)
 let backward_simplify_trails _env (_ : C.t) : C.ClauseSet.t =
   if Solver.last_result () = Solver.Sat && new_proved_lits () then
-    ProofState.ActiveSet.clauses ()
-    |> Clause.ClauseSet.to_seq |> Iter.of_seq
+    Env.active_clauses _env |> Clause.ClauseSet.to_seq |> Iter.of_seq
     |> Iter.filter (fun c -> not (Trail.is_empty @@ C.trail c))
     |> Iter.filter (fun c ->
            let ok =

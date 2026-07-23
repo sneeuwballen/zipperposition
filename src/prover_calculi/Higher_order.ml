@@ -2661,9 +2661,9 @@ let setup env =
       Env.add_unary_inf env "ext_eqfact_both" ext_inst_or_family_eqfact;
 
     if Env.flex_get_of env k_ext_rules_kind != `Off then (
-      Signal.on Env.ProofState.ActiveSet.on_add_clause (fun c ->
+      Signal.on (Env.on_active_add env) (fun c ->
           update_ext_dec_indices env insert_into_ext_dec_index c);
-      Signal.on Env.ProofState.ActiveSet.on_remove_clause (fun c ->
+      Signal.on (Env.on_active_remove env) (fun c ->
           update_ext_dec_indices env remove_from_ext_dec_index c)
     );
 
@@ -2757,12 +2757,11 @@ let setup env =
           Signal.ContinueListening);
     Signal.once (Env.on_start env) (fun () ->
         if Env.flex_get_of env k_ext_axiom then
-          Env.ProofState.PassiveSet.add
-            (Iter.singleton (mk_extensionality_clause env));
+          Env.add_passive env (Iter.singleton (mk_extensionality_clause env));
         if Env.flex_get_of env k_choice_axiom then
-          Env.ProofState.PassiveSet.add (Iter.singleton (mk_choice_clause env));
+          Env.add_passive env (Iter.singleton (mk_choice_clause env));
         if Env.flex_get_of env k_add_ite_axioms then
-          Env.ProofState.PassiveSet.add (mk_ite_clauses env))
+          Env.add_passive env (mk_ite_clauses env))
   );
   ()
 

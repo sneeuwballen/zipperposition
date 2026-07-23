@@ -19,38 +19,55 @@ module UnitIndex :
 
 module SubsumptionIndex : Index.SUBSUMPTION_IDX with type C.t = Clause.t
 
-(** {2 Sets of clauses} *)
+(** {2 Common clause-set class type} *)
+
+module ClauseSet : sig
+  class type t = object
+    method on_add_clause : Clause.t Signal.t
+    method on_remove_clause : Clause.t Signal.t
+    method add : Clause.t Iter.t -> unit
+    method remove : Clause.t Iter.t -> unit
+    method clauses : unit -> Clause.ClauseSet.t
+    method iter_clauses : Clause.t Iter.t
+    method num_clauses : unit -> int
+  end
+end
+
+(** {2 Sets} *)
 
 module ActiveSet : sig
-  val on_add_clause : Clause.t Signal.t
-  val on_remove_clause : Clause.t Signal.t
-  val add : Clause.t Iter.t -> unit
-  val remove : Clause.t Iter.t -> unit
-  val clauses : unit -> Clause.ClauseSet.t
-  val num_clauses : unit -> int
+  type t = ClauseSet.t
+
+  val create : unit -> t
 end
 
 module SimplSet : sig
-  val on_add_clause : Clause.t Signal.t
-  val on_remove_clause : Clause.t Signal.t
-  val add : Clause.t Iter.t -> unit
-  val remove : Clause.t Iter.t -> unit
+  type t = ClauseSet.t
+
+  val create : unit -> t
 end
 
 module PassiveSet : sig
-  val on_add_clause : Clause.t Signal.t
-  val on_remove_clause : Clause.t Signal.t
-  val add : Clause.t Iter.t -> unit
-  val remove : Clause.t Iter.t -> unit
-  val clauses : unit -> Clause.ClauseSet.t
-  val is_passive : Clause.t -> bool
-  val queue : ClauseQueue.t
-  val next : unit -> Clause.t option
-  val num_clauses : unit -> int
+  class type t = object
+    inherit ClauseSet.t
+    method next : unit -> Clause.t option
+    method is_passive : Clause.t -> bool
+    method queue : ClauseQueue.t
+  end
+
+  val create : unit -> t
 end
+
+type t = {
+  active: ActiveSet.t;
+  passive: PassiveSet.t;
+  simpl: SimplSet.t;
+}
+
+val create : unit -> t
 
 type stats = int * int * int
 
-val stats : unit -> stats
-val pp : unit CCFormat.printer
-val debug : unit CCFormat.printer
+val stats : t -> stats
+val pp : t CCFormat.printer
+val debug : t CCFormat.printer

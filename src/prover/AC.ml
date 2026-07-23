@@ -189,9 +189,7 @@ let add ~proof s ty env =
   Util.debugf ~section 3 "@[<2>add AC axioms for `%a : @[%a@]`:@ @[<hv>%a@]@]"
     (fun k -> k Name.pp s Type.pp ty (Util.pp_list C.pp) cell.axioms);
   (* add axioms to either passive, or active set *)
-  if
-    ProofState.ActiveSet.clauses ()
-    |> Clause.ClauseSet.for_all (C.get_flag flag_axiom)
+  if Env.active_clauses env |> Clause.ClauseSet.for_all (C.get_flag flag_axiom)
   then
     (* the only active clauses are other AC axioms, we miss no
        inference by adding the axioms to active set directly *)
@@ -317,7 +315,7 @@ let setup env =
   Env.flex_add_of env key_scan_cl_ac !_scan_cl_ac;
 
   if !_scan_cl_ac then
-    Signal.on_every ProofState.PassiveSet.on_add_clause (fun c ->
+    Signal.on_every (Env.on_passive_add env) (fun c ->
         scan_clause env c;
         Signal.ContinueListening);
 

@@ -41,7 +41,6 @@ let pp_id_or_builtin out = function
 (** {2 Inference rules} *)
 
 module C = Clause
-module PS = ProofState
 module Ctx = Ctx
 
 let _enable = ref false
@@ -425,7 +424,7 @@ let _on_new_symbol env s ~ty =
     | _ -> []
   in
   (* set of support *)
-  PS.ActiveSet.add (Iter.of_list clauses)
+  Env.add_active env (Iter.of_list clauses)
 
 let _on_new_decl env decl =
   let clauses =
@@ -437,7 +436,7 @@ let _on_new_decl env decl =
         | None -> acc
         | Some c -> c :: acc)
   in
-  PS.PassiveSet.add (Iter.of_list clauses)
+  Env.add_passive env (Iter.of_list clauses)
 
 let is_trivial _env c = C.get_flag flag_enumeration_clause c
 

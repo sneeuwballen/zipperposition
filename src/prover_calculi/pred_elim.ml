@@ -1265,8 +1265,8 @@ let do_predicate_elimination env =
 
 let initialize env =
   let init_clauses =
-    Clause.ClauseSet.to_list (Env.ProofState.ActiveSet.clauses ())
-    @ Clause.ClauseSet.to_list (Env.ProofState.PassiveSet.clauses ())
+    Clause.ClauseSet.to_list (Env.active_clauses env)
+    @ Clause.ClauseSet.to_list (Env.passive_clauses env)
   in
   Util.debugf ~section 5 "init_cl: @[%a@]@." (fun k ->
       k (CCList.pp C.pp) init_clauses);
@@ -1295,14 +1295,10 @@ let initialize env =
          else
            " no "));
 
-  Signal.on Env.ProofState.PassiveSet.on_add_clause (fun c ->
-      react_clause_added env c);
-  Signal.on Env.ProofState.PassiveSet.on_remove_clause (fun c ->
-      react_clause_removed env c);
-  Signal.on Env.ProofState.ActiveSet.on_add_clause (fun c ->
-      react_clause_added env c);
-  Signal.on Env.ProofState.ActiveSet.on_remove_clause (fun c ->
-      react_clause_removed env c);
+  Signal.on (Env.on_passive_add env) (fun c -> react_clause_added env c);
+  Signal.on (Env.on_passive_remove env) (fun c -> react_clause_removed env c);
+  Signal.on (Env.on_active_add env) (fun c -> react_clause_added env c);
+  Signal.on (Env.on_active_remove env) (fun c -> react_clause_removed env c);
   Signal.on_every (Env.on_forward_simplified env) (fun (c, new_state) ->
       if not !_done then (
         match new_state with
@@ -1315,7 +1311,7 @@ let initialize env =
   ignore (do_pred_elim env);
 
   Util.debugf ~section 5 "after elim: @[%a@]@." (fun k ->
-      k Clause.pp_set (Env.ProofState.PassiveSet.clauses ()));
+      k Clause.pp_set (Env.passive_clauses env));
   Util.debugf ~section 5 "state:@[%a@]@." (fun k ->
       k (Iter.pp_seq pp_task) (Name.Map.values !_pred_sym_idx));
 
@@ -1353,8 +1349,8 @@ let begin_fixpoint env =
     | _ -> invalid_arg "measure function not found");
 
   let init_clauses =
-    Clause.ClauseSet.to_list (Env.ProofState.ActiveSet.clauses ())
-    @ Clause.ClauseSet.to_list (Env.ProofState.PassiveSet.clauses ())
+    Clause.ClauseSet.to_list (Env.active_clauses env)
+    @ Clause.ClauseSet.to_list (Env.passive_clauses env)
   in
 
   List.iter
@@ -1365,12 +1361,12 @@ let begin_fixpoint env =
 
   schedule_tasks env;
 
-  Signal.on Env.ProofState.PassiveSet.on_add_clause (fun c ->
+  Signal.on (Env.on_passive_add env) (fun c ->
       if !fixpoint_active then
         react_clause_added env c
       else
         Signal.StopListening);
-  Signal.on Env.ProofState.PassiveSet.on_remove_clause (fun c ->
+  Signal.on (Env.on_passive_remove env) (fun c ->
       if !fixpoint_active then
         react_clause_removed env c
       else

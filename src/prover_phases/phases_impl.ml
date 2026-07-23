@@ -271,9 +271,9 @@ let make_env (st_ref : Phases.State.t ref) ~ctx ~params stmts =
   |> List.iter (fun e -> List.iter (fun f -> f env) e.Extensions.env_actions);
   let c_sets = Env.convert_input_statements_env env stmts in
   CCVector.to_iter c_sets.Clause.c_set
-  |> Iter.iter (fun c -> ProofState.PassiveSet.add (Iter.singleton c));
+  |> Iter.iter (fun c -> OuterEnv.add_passive env (Iter.singleton c));
   CCVector.to_iter c_sets.Clause.c_sos
-  |> Iter.iter (fun c -> ProofState.ActiveSet.add (Iter.singleton c));
+  |> Iter.iter (fun c -> OuterEnv.add_active env (Iter.singleton c));
   env, c_sets
 
 let _key_has_goal = Flex_state.create_key ()

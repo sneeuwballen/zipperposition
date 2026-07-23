@@ -796,8 +796,8 @@ let eliminate_bce_sat env =
 
 let initialize_regular env =
   let init_clauses =
-    Clause.ClauseSet.to_list (Env.ProofState.ActiveSet.clauses ())
-    @ Clause.ClauseSet.to_list (Env.ProofState.PassiveSet.clauses ())
+    Clause.ClauseSet.to_list (Env.active_clauses env)
+    @ Clause.ClauseSet.to_list (Env.passive_clauses env)
   in
   (try
      Util.debugf ~section 3 "init_cl: @[%a@]@." (fun k ->
@@ -859,24 +859,23 @@ let initialize_regular env =
            react_clause_removed cl
          in
 
-         Clause.ClauseSet.to_seq (Env.ProofState.PassiveSet.clauses ())
+         Clause.ClauseSet.to_seq (Env.passive_clauses env)
          |> Iter.of_seq
          |> Iter.iter (fun cl ->
                 C.Tbl.add (Env.flex_get_of env k_bce_sat_tracked) cl ());
 
-         Signal.on_every Env.ProofState.PassiveSet.on_add_clause (fun cl ->
+         Signal.on_every (Env.on_passive_add env) (fun cl ->
              if C.proof_depth cl = 0 then add_cl_sat cl);
-         Signal.on_every Env.ProofState.PassiveSet.on_remove_clause
-           remove_cl_sat;
+         Signal.on_every (Env.on_passive_remove env) remove_cl_sat;
          Signal.on_every (Env.on_forward_simplified env) (fun (_, state) ->
              CCOpt.iter add_cl_sat state);
-         Signal.on_every Env.ProofState.ActiveSet.on_remove_clause remove_cl_sat
+         Signal.on_every (Env.on_active_remove env) remove_cl_sat
        ) else (
          (* clauses begin their life when they are added to the passive set *)
-         Signal.on_every Env.ProofState.PassiveSet.on_add_clause (fun c ->
+         Signal.on_every (Env.on_passive_add env) (fun c ->
              react_clause_addded env c);
          (* clauses can be calculus-removed from the active set only in DISCOUNT loop *)
-         Signal.on_every Env.ProofState.ActiveSet.on_remove_clause (fun c ->
+         Signal.on_every (Env.on_active_remove env) (fun c ->
              react_clause_removed env c);
          (* Clauses are removed from the passive set when they are moved to active.
           In this case clause can me modified or deemed redundant by forward
@@ -916,8 +915,8 @@ let begin_fixpoint env =
   Env.flex_add_of env k_max_symbol_occ !_max_symbol_occ;
 
   let init_clauses =
-    Clause.ClauseSet.to_list (Env.ProofState.ActiveSet.clauses ())
-    @ Clause.ClauseSet.to_list (Env.ProofState.PassiveSet.clauses ())
+    Clause.ClauseSet.to_list (Env.active_clauses env)
+    @ Clause.ClauseSet.to_list (Env.passive_clauses env)
   in
   try
     fixpoint_active := true;
@@ -936,13 +935,13 @@ let begin_fixpoint env =
 
     CCFormat.printf "%% BCE start fixpoint: @[%d@]@." num_eliminated;
 
-    Signal.on Env.ProofState.PassiveSet.on_add_clause (fun c ->
+    Signal.on (Env.on_passive_add env) (fun c ->
         if !fixpoint_active then (
           react_clause_addded env c;
           Signal.ContinueListening
         ) else
           Signal.StopListening);
-    Signal.on Env.ProofState.PassiveSet.on_remove_clause (fun c ->
+    Signal.on (Env.on_passive_remove env) (fun c ->
         if !fixpoint_active then (
           react_clause_removed env c;
           Signal.ContinueListening

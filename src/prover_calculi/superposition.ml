@@ -3901,7 +3901,7 @@ let setup_dot_printers env =
   ()
 
 let register_rules env =
-  Signal.on PS.ActiveSet.on_add_clause (fun c ->
+  Signal.on (Env.on_active_add env) (fun c ->
       _idx_fv := SubsumIdx.add !_idx_fv c;
       _update_active env
         (fun tree t wp ->
@@ -3909,7 +3909,7 @@ let register_rules env =
             (Clause.WithPos.make ~clause:(C.WithPos.clause wp)
                ~pos:(C.WithPos.pos wp)))
         c);
-  Signal.on PS.ActiveSet.on_remove_clause (fun c ->
+  Signal.on (Env.on_active_remove env) (fun c ->
       _idx_fv := SubsumIdx.remove !_idx_fv c;
       _update_active env
         (fun tree t wp ->
@@ -3917,8 +3917,8 @@ let register_rules env =
             (Clause.WithPos.make ~clause:(C.WithPos.clause wp)
                ~pos:(C.WithPos.pos wp)))
         c);
-  Signal.on PS.SimplSet.on_add_clause (_update_simpl env UnitIdx.add);
-  Signal.on PS.SimplSet.on_remove_clause (_update_simpl env UnitIdx.remove);
+  Signal.on (Env.on_simpl_add env) (_update_simpl env UnitIdx.add);
+  Signal.on (Env.on_simpl_remove env) (_update_simpl env UnitIdx.remove);
   let open SimplM.Infix in
   let rw_simplify env c =
     canonize_variables env c >>= demodulate env >>= basic_simplify env

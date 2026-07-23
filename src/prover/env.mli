@@ -132,6 +132,12 @@ val get_stm_queue : t -> StreamQueue.t
 val should_force_stream_eval : t -> unit -> bool
 val get_finite_infs : t -> 'a option OSeq.t CCList.t -> 'a CCList.t
 val stats : t -> stats
+
+val proof_state : t -> ProofState.t
+(** Access the full proof state record *)
+
+val active_clauses : t -> Clause.ClauseSet.t
+val passive_clauses : t -> Clause.ClauseSet.t
 val next_passive : t -> unit -> Clause.t option
 val do_binary_inferences : t -> Clause.t -> Clause.t Iter.t
 val do_unary_inferences : t -> Clause.t -> Clause.t Iter.t
@@ -158,3 +164,9 @@ val step_init : t -> unit
 
 val flex_add_of : t -> 'a Logtk.Flex_state.key -> 'a -> unit
 val update_flex_state : t -> (Logtk.Flex_state.t -> Logtk.Flex_state.t) -> unit
+val on_passive_add : t -> Clause.t Signal.t
+val on_passive_remove : t -> Clause.t Signal.t
+val on_active_add : t -> Clause.t Signal.t
+val on_active_remove : t -> Clause.t Signal.t
+val on_simpl_add : t -> Clause.t Signal.t
+val on_simpl_remove : t -> Clause.t Signal.t

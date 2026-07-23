@@ -42,7 +42,6 @@ let k_bool_triggers_only = Flex_state.create_key ()
 
 module C = Clause
 module Ctx = Ctx
-module PS = ProofState
 module Fool = Fool
 module Combs = Combinators
 module FR = Env.FormRename
@@ -2124,12 +2123,12 @@ let interpret_boolean_functions env c =
        []
 
 let setup env =
-  Signal.on PS.ActiveSet.on_add_clause (fun c -> update_triggers env c);
+  Signal.on (Env.on_active_add env) (fun c -> update_triggers env c);
 
   (* Env.add_basic_simplify env normalize_equalities; put into superposition right now *)
   if Env.flex_get_of env k_replace_unsupported_quants then
     Signal.once (Env.on_start env) (fun () ->
-        Env.ProofState.PassiveSet.clauses ()
+        Env.passive_clauses env
         |> Clause.ClauseSet.iter (fun cl ->
                match replace_unsupported_quants env cl with
                | None -> ()

@@ -904,13 +904,14 @@ let setup env =
       Signal.ContinueListening
     in
 
-    Signal.on ProofState.PassiveSet.on_add_clause
+    Signal.on (Env.on_passive_add env)
       (handler (update_form_counter ~action:`Increase env));
-    Signal.on ProofState.ActiveSet.on_add_clause
+    Signal.on (Env.on_active_add env)
       (handler (update_form_counter ~action:`Increase env));
-    Signal.on ProofState.PassiveSet.on_remove_clause
+    Signal.on
+      (Env.on_passive_remove env)
       (handler (update_form_counter ~action:`Decrease env));
-    Signal.on ProofState.ActiveSet.on_remove_clause
+    Signal.on (Env.on_active_remove env)
       (handler (update_form_counter ~action:`Decrease env));
 
     (* Env.Ctx.lost_completeness (); *)
