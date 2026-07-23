@@ -14,7 +14,6 @@ module Pos = Position
 module PB = Position.Build
 module CQ = ClauseQueue
 
-module type S = ProofState_intf.S
 (** {2 Set of active clauses} *)
 
 (* module TermIndex = NPDtree.MakeTerm(Clause.WithPos) *)

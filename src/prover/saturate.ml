@@ -101,7 +101,8 @@ let check_fragment env =
   )
 
 let register_conjectures env =
-  Env.get_passive env () |> Iter.iter ClauseQueue.register_conjecture_clause
+  let q = (Env.proof_state env).passive#queue in
+  Env.get_passive env () |> Iter.iter (ClauseQueue.register_conjecture_clause q)
 
 let setup_once env =
   let st = State.get env in

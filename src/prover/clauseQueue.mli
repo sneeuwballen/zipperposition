@@ -7,7 +7,18 @@
     criteria that {b should} include at least one fair criterion (e.g. the age
     of the clause, so that older clauses are more likely to be chosen). *)
 
-type profile = ClauseQueue_intf.profile
+type profile =
+  | P_default
+  | P_bfs
+  | P_almost_bfs
+  | P_explore
+  | P_ground
+  | P_goal
+  | P_conj_rel
+  | P_conj_rel_var
+  | P_ho_weight
+  | P_ho_weight_init
+  | P_avoid_expensive
 
 val profile_of_string : string -> profile
 (** @raise Invalid_argument if the string is not recognized *)
@@ -18,9 +29,6 @@ val ignoring_orphans : unit -> bool
 val disable_ignoring_orphans : unit -> unit
 
 (** {1 A priority queue of clauses, purely functional} *)
-
-val register_conjecture_clause : Clause.t -> unit
-val on_proof_state_init : Clause.t Iter.t Logtk.Signal.t
 
 (** {6 Weight functions} *)
 module WeightFun : sig
@@ -39,6 +47,7 @@ module WeightFun : sig
     ?distinct_vars_mul:float ->
     ?parameters_magnitude:[< `Large | `Small > `Large ] ->
     ?goal_penalty:bool ->
+    ?related_terms:Logtk.Term.Set.t ref ->
     t
 
   val combine : (t * int) list -> t
@@ -52,6 +61,7 @@ end
 
 type t
 
+val register_conjecture_clause : t -> Clause.t -> unit
 val add : t -> Clause.t -> bool
 val add_seq : t -> Clause.t Iter.t -> unit
 val length : t -> int

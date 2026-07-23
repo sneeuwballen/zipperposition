@@ -36,7 +36,6 @@
   clauseContext
   clause_intf
   clauseQueue
-  clauseQueue_intf
   combinators_base
   Const
   Cover_set
@@ -52,7 +51,6 @@
   lift_lambdas
   params
   proofState
-  proofState_intf
   sat_solver
   sat_solver_intf
   saturate

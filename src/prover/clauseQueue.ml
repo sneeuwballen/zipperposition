@@ -7,7 +7,18 @@ module O = Ordering
 module Lit = Literal
 module Lits = Literals
 
-type profile = ClauseQueue_intf.profile
+type profile =
+  | P_default
+  | P_bfs
+  | P_almost_bfs
+  | P_explore
+  | P_ground
+  | P_goal
+  | P_conj_rel
+  | P_conj_rel_var
+  | P_ho_weight
+  | P_ho_weight_init
+  | P_avoid_expensive
 
 module C = Clause
 
@@ -18,7 +29,6 @@ let parameters_magnitude = ref `Large
 let goal_penalty = ref false
 
 let profiles_ =
-  let open ClauseQueue_intf in
   [
     "default", P_default;
     "bfs", P_bfs;
@@ -77,13 +87,13 @@ let profile_of_string s =
               false
             else
               invalid_arg err_msg;
-          ClauseQueue_intf.P_conj_rel_var
+          P_conj_rel_var
         )
       )
     | None -> List.assoc s profiles_
   with Not_found -> invalid_arg ("unknown queue profile: " ^ s)
 
-let _profile = ref ClauseQueue_intf.P_default
+let _profile = ref P_default
 let get_profile () = !_profile
 let set_profile p = _profile := p
 let parse_profile s = _profile := profile_of_string s
@@ -95,9 +105,16 @@ let disable_ignoring_orphans () = _ignoring_orphans := false
 
 (* weight of a term [t], using the precedence's weight *)
 let term_weight t = Term.size t
-let _related_terms = ref Term.Set.empty
 let max_related_ = 100
-let on_proof_state_init = Signal.create ()
+
+(* temporary ref set during queue construction so weight-fun parsers can
+   access the queue's on_init signal and related_terms *)
+type _queue_ctx = {
+  on_init: C.t Iter.t Signal.t;
+  related_terms: Term.Set.t ref;
+}
+
+let _current_queue : _queue_ctx option ref = ref None
 
 let norm_app hd arg =
   let body = Term.app hd [ arg ] in
@@ -127,22 +144,22 @@ let unroll_logical_symbols t =
   |> Term.Set.filter (fun t ->
          (not (Term.is_true_or_false t)) && not (Term.is_const t))
 
-let add_related_term_ t =
-  if Term.Set.cardinal !_related_terms < max_related_ then (
+let add_related_term_ (related_terms : Term.Set.t ref) t =
+  if Term.Set.cardinal !related_terms < max_related_ then (
     let new_terms = unroll_logical_symbols t in
     Util.debugf ~section 20 "addding related terms:@.@[%a@]@." (fun k ->
         k (Term.Set.pp Term.pp) new_terms);
-    _related_terms := Term.Set.union !_related_terms new_terms
+    related_terms := Term.Set.union !related_terms new_terms
   )
 
-let register_conjecture_clause cl =
+let register_conjecture_clause_q related_terms cl =
   match C.distance_to_goal cl with
   | Some 0
-    when !_rel_terms_enabled && Term.Set.cardinal !_related_terms < max_related_
+    when !_rel_terms_enabled && Term.Set.cardinal !related_terms < max_related_
     ->
     C.Seq.terms cl
     |> Iter.filter (fun t -> not (Term.is_true_or_false t))
-    |> Iter.iter add_related_term_
+    |> Iter.iter (add_related_term_ related_terms)
   | _ -> ()
 
 (** {5 Weight functions} *)
@@ -460,7 +477,7 @@ module WeightFun = struct
     int_of_float ((dist_var_mul ** float_of_int dist_vars) *. res)
 
   let conj_relative ?(distinct_vars_mul = -1.0) ?(parameters_magnitude = `Large)
-      ?(goal_penalty = false) c =
+      ?(goal_penalty = false) ?(related_terms = ref Term.Set.empty) c =
     let sgn = Ctx.signature (Clause.ctx_of c) in
     let max_lits =
       if C.has_selected_lits c then
@@ -517,7 +534,8 @@ module WeightFun = struct
     )
 
   (* function inspired by Struct from the paper https://arxiv.org/abs/1606.03888 *)
-  let conj_relative_struct ~inst_penalty ~gen_penalty ~var_w ~sym_w c =
+  let conj_relative_struct ~inst_penalty ~gen_penalty ~var_w ~sym_w
+      ?(related_terms = ref Term.Set.empty) c =
     let pos_mul, max_mul = 2.0, 1.5 in
     let max_lits =
       if C.has_selected_lits c then
@@ -562,10 +580,10 @@ module WeightFun = struct
       in
 
       let t = Lambda.eta_expand t in
-      if Term.Set.is_empty !_related_terms then
+      if Term.Set.is_empty !related_terms then
         int_of_float (w t)
       else
-        Term.Set.to_iter !_related_terms
+        Term.Set.to_iter !related_terms
         |> Iter.map (fun conj_term ->
                let conj_term = Lambda.eta_expand conj_term in
                w_diff ~given_term:t ~conj_term)
@@ -974,6 +992,7 @@ module WeightFun = struct
         |> CCString.prefix ~pre:"t"
       in
       conj_relative ~distinct_vars_mul ~parameters_magnitude ~goal_penalty
+        ~related_terms:(CCOpt.get_exn !_current_queue).related_terms
     with Not_found | Invalid_argument _ ->
       invalid_arg
         "expected \
@@ -1051,6 +1070,7 @@ module WeightFun = struct
       let var_w = CCOpt.get_exn @@ CCInt.of_string (Str.matched_group 3 s) in
       let sym_w = CCOpt.get_exn @@ CCInt.of_string (Str.matched_group 4 s) in
       conj_relative_struct ~inst_penalty ~gen_penalty ~var_w ~sym_w
+        ~related_terms:(CCOpt.get_exn !_current_queue).related_terms
     with Not_found | Invalid_argument _ ->
       invalid_arg
         "expected \
@@ -1230,7 +1250,7 @@ module WeightFun = struct
       let max_lit_mul = CCFloat.of_string_exn (Str.matched_group 10 s) in
       let pos_lit_mul = CCFloat.of_string_exn (Str.matched_group 11 s) in
 
-      Signal.once on_proof_state_init (fun cls ->
+      Signal.once (CCOpt.get_exn !_current_queue).on_init (fun cls ->
           let ctx =
             match Iter.head cls with
             | Some c -> Clause.ctx_of c
@@ -1332,7 +1352,7 @@ module WeightFun = struct
         let match_weight = match_w
         let miss_weight = miss_w
       end) in
-      Signal.once on_proof_state_init (fun cls ->
+      Signal.once (CCOpt.get_exn !_current_queue).on_init (fun cls ->
           Iter.iter
             (fun cl ->
               match C.distance_to_goal cl with
@@ -1412,7 +1432,8 @@ module WeightFun = struct
       ( "conjecture-relative",
         fun _ ->
           conj_relative ~distinct_vars_mul:1.0 ~parameters_magnitude:`Large
-            ~goal_penalty:false );
+            ~goal_penalty:false
+            ~related_terms:(CCOpt.get_exn !_current_queue).related_terms );
       "conjecture-relative-var", parse_crv;
       "conjecture-relative-struct", parse_cr_struct;
       "conjecture-relative-cheap", parse_conj_relative_cheap;
@@ -1869,9 +1890,17 @@ and mixed = {
   mutable ratios_limit: int;
   mutable current_step: int;
   mutable current_heap_idx: int;
+  related_terms: Term.Set.t ref;
+  on_init: C.t Iter.t Signal.t;
+  initialized: bool ref;
 }
 
 and t = { data: data }
+
+let register_conjecture_clause (q : t) cl =
+  match q with
+  | { data = Mixed m } -> register_conjecture_clause_q m.related_terms cl
+  | { data = FIFO _ } -> ()
 
 (** generic clause queue based on some ordering on clauses, given by a weight
     function *)
@@ -1909,12 +1938,11 @@ let add q c =
       false
 
 let add_seq q hcs = Iter.iter (fun c -> ignore (add q c)) hcs
-let _initialized = ref false
 
 let rec take_first_mixed q =
-  if not !_initialized then (
-    _initialized := true;
-    Signal.send on_proof_state_init (C.Tbl.keys q.tbl)
+  if not !(q.initialized) then (
+    q.initialized := true;
+    Signal.send q.on_init (C.Tbl.keys q.tbl)
   );
 
   let move_queue q =
@@ -1974,6 +2002,9 @@ let mixed_eval () : mixed =
     ratios_limit = 0;
     current_step = 0;
     current_heap_idx = 0;
+    related_terms = ref Term.Set.empty;
+    on_init = Signal.create ();
+    initialized = ref false;
   }
 
 let add_to_mixed_eval ~ratio ~weight_fun mixed_eval : unit =
@@ -2063,8 +2094,11 @@ let default () : t =
 
 let conj_relative_mk () : t =
   (* make ~ratio:6 ~weight:WeightFun.conj_relative "conj_relative" *)
-  let weight_fun = const_prioritize_fun WeightFun.conj_relative in
   let mixed = mixed_eval () in
+  let weight_fun =
+    const_prioritize_fun
+      (WeightFun.conj_relative ~related_terms:mixed.related_terms)
+  in
   add_to_mixed_eval ~ratio:5 ~weight_fun mixed;
   add_to_mixed_eval ~ratio:1 ~weight_fun:fifo_wf mixed;
   { data = Mixed mixed }
@@ -2072,12 +2106,13 @@ let conj_relative_mk () : t =
 let conj_var_relative_mk () : t =
   (* make ~ratio:!cr_var_ratio ~weight:(WeightFun.conj_relative ~distinct_vars_mul:!cr_var_mul)
          "conj_relative_var" *)
+  let mixed = mixed_eval () in
   let weight_fun =
     const_prioritize_fun
       (WeightFun.conj_relative ~distinct_vars_mul:!cr_var_mul
-         ~parameters_magnitude:!parameters_magnitude ~goal_penalty:!goal_penalty)
+         ~parameters_magnitude:!parameters_magnitude ~goal_penalty:!goal_penalty
+         ~related_terms:mixed.related_terms)
   in
-  let mixed = mixed_eval () in
   add_to_mixed_eval ~ratio:!cr_var_ratio ~weight_fun mixed;
   add_to_mixed_eval ~ratio:1 ~weight_fun:fifo_wf mixed;
   { data = Mixed mixed }
@@ -2107,7 +2142,6 @@ let avoid_expensive_mk () : t =
   { data = Mixed mixed }
 
 let of_profile p =
-  let open ClauseQueue_intf in
   if CCList.is_empty !funs_to_parse then (
     match p with
     | P_default -> default ()
@@ -2123,6 +2157,8 @@ let of_profile p =
     | P_avoid_expensive -> avoid_expensive_mk ()
   ) else (
     let mixed = mixed_eval () in
+    _current_queue :=
+      Some { on_init = mixed.on_init; related_terms = mixed.related_terms };
     List.iter
       (fun (ratio, prio, weight) ->
         let prio_fun = PriorityFun.of_string prio in
@@ -2131,6 +2167,7 @@ let of_profile p =
           ~weight_fun:(fun c -> prio_fun c, weight_fun c)
           mixed)
       !funs_to_parse;
+    _current_queue := None;
     { data = Mixed mixed }
   )
 

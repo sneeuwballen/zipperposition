@@ -6,8 +6,6 @@
 
 open Logtk
 
-module type S = ProofState_intf.S
-
 (** {2 Index modules} *)
 
 module TermIndex : Index.TERM_IDX with type elt = Clause.WithPos.t
