@@ -445,6 +445,21 @@ let of_bool b =
   else
     false_
 
+let is_var t =
+  match view t with
+  | Var _ -> true
+  | _ -> false
+
+let has_bool_type t =
+  match ty t with
+  | Some ty' -> equal ty' bool
+  | None -> false
+
+let is_true_or_false t =
+  match view t with
+  | AppBuiltin (Builtin.True, []) | AppBuiltin (Builtin.False, []) -> true
+  | _ -> false
+
 let int_pred l o =
   if Linexp_int.is_const l then
     let module O = Int_op in

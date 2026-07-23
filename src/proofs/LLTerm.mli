@@ -92,6 +92,10 @@ val equal : t -> t -> bool
 val hash : t -> int
 val compare : t -> t -> int
 val is_type : t -> bool
+val is_var : t -> bool
+val has_bool_type : t -> bool
+val is_true_or_false : t -> bool
+val subterms : t -> t Iter.t
 val t_type : ty
 val var : var -> t
 val const : ty:ty -> Name.t -> t

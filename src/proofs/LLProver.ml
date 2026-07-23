@@ -300,7 +300,32 @@ end = struct
     | F.And l -> [ l ]
     | _ -> []
 
-  let all = [ or_; and_ ]
+  let is_bool_candidate t =
+    T.has_bool_type t && (not (T.is_var t)) && not (T.is_true_or_false t)
+
+  (* find subterms of the shape [f t] where [t:bool].
+     add branches [[t;t=true]; [not t;t=false]] to the tableau *)
+  let fool_ f =
+    let rec find_arg_bool t =
+      if t != f then (
+        match T.view t with
+        | T.App (fn, arg) ->
+          if is_bool_candidate arg then
+            Some arg
+          else (
+            match find_arg_bool fn with
+            | Some _ as r -> r
+            | None -> find_arg_bool arg
+          )
+        | _ -> Iter.find_map find_arg_bool (T.subterms t)
+      ) else
+        Iter.find_map find_arg_bool (T.subterms f)
+    in
+    match find_arg_bool f with
+    | Some t -> [ [ t; F.eq t F.true_ ]; [ F.not_ t; F.eq t F.false_ ] ]
+    | None -> []
+
+  let all = [ or_; and_; fool_ ]
 
   let[@inline] apply (l : t list) (f : F.t) : F.t list list =
     CCList.flat_map (fun r -> r f) l
@@ -374,10 +399,9 @@ let solve_ (tab : t) : res =
 let can_check : LLProof.tag list -> bool =
   let open Builtin.Tag in
   let f = function
-    | T_ho -> true
+    | T_ho | T_fool -> true
     | T_lra | T_lia | T_ind | T_data | T_live_cnf | T_ho_norm
-    | T_dont_increase_depth | T_distinct | T_ac _ | T_ext | T_cannot_orphan
-    | T_fool ->
+    | T_dont_increase_depth | T_distinct | T_ac _ | T_ext | T_cannot_orphan ->
       false
   in
   List.for_all f
