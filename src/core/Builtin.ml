@@ -353,6 +353,7 @@ module Tag = struct
     | T_distinct  (** distinct constants *)
     | T_ac of Name.t  (** AC symbols *)
     | T_cannot_orphan
+    | T_fool  (** FOOL parameterization *)
 
   let compare = Stdlib.compare
 
@@ -369,6 +370,7 @@ module Tag = struct
     | T_distinct -> Fmt.string out "distinct_constants"
     | T_ac id -> Fmt.fprintf out "(ac %a)" Name.pp_full id
     | T_cannot_orphan -> Fmt.fprintf out "cannot orphan"
+    | T_fool -> Fmt.string out "fool"
 end
 
 module Arith = struct

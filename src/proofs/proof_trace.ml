@@ -229,6 +229,7 @@ let tag_to_int = function
   | T_distinct -> 9
   | T_cannot_orphan -> 10
   | T_ac _ -> 11
+  | T_fool -> 12
 
 let role_to_str = function
   | Proof.R_assert -> "a"

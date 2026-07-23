@@ -51,7 +51,7 @@ module Make (E : Env.S) : S with module Env = E = struct
            T.true_)
     in
     let proof =
-      Proof.Step.inference
+      Proof.Step.inference ~tags:[ Builtin.Tag.T_fool ]
         [ C.proof_parent c ]
         ~rule:(Proof.Rule.mk "fool_param")
     in
@@ -125,7 +125,7 @@ module Make (E : Env.S) : S with module Env = E = struct
                  Literal.apply_subst_list renaming subst (new_lits, 0)
                in
                let proof =
-                 Proof.Step.inference
+                 Proof.Step.inference ~tags:[ Builtin.Tag.T_fool ]
                    ~rule:(Proof.Rule.mk "fool.elim_var")
                    [ C.proof_parent_subst renaming (c, 0) subst ]
                in
@@ -156,7 +156,8 @@ module Make (E : Env.S) : S with module Env = E = struct
     (* how to build a new clause *)
     let mk_c lits =
       let proof =
-        Proof.Step.simp ~rule:(Proof.Rule.mk "cnf_fool")
+        Proof.Step.simp ~tags:[ Builtin.Tag.T_fool ]
+          ~rule:(Proof.Rule.mk "cnf_fool")
           [ Proof.Parent.from @@ C.proof c ]
       in
       C.create lits proof ~penalty:(C.penalty c) ~trail:(C.trail c)

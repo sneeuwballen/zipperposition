@@ -192,6 +192,7 @@ module Tag : sig
     | T_distinct  (** distinct constants *)
     | T_ac of Name.t  (** AC symbol *)
     | T_cannot_orphan
+    | T_fool  (** FOOL parameterization *)
 
   val compare : t -> t -> int
   val pp : t CCFormat.printer

@@ -192,6 +192,7 @@ let tag_of_int = function
   | 11 ->
     raise
       (D.Fail ("AC tag (11) must carry a name ref; handled in read_tags", 0))
+  | 12 -> T_fool
   | n -> raise (D.Fail (Printf.sprintf "unknown tag int: %d" n, 0))
 
 let role_of_string = function

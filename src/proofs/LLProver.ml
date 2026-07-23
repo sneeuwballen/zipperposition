@@ -376,7 +376,8 @@ let can_check : LLProof.tag list -> bool =
   let f = function
     | T_ho -> true
     | T_lra | T_lia | T_ind | T_data | T_live_cnf | T_ho_norm
-    | T_dont_increase_depth | T_distinct | T_ac _ | T_ext | T_cannot_orphan ->
+    | T_dont_increase_depth | T_distinct | T_ac _ | T_ext | T_cannot_orphan
+    | T_fool ->
       false
   in
   List.for_all f
