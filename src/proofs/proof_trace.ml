@@ -81,7 +81,10 @@ let rec emit_type self (ty : Type.t) : offset =
         E.write_node self.enc "ty.arrow" (fun enc ->
             E.ref enc (emit_type self dom);
             E.ref enc (emit_type self cod))
-      | Type.Var _ | Type.DB _ | Type.App _ | Type.Fun _ | Type.Forall _ ->
+      | Type.Forall body ->
+        E.write_node self.enc "ty.forall" (fun enc ->
+            E.ref enc (emit_type self body))
+      | Type.Var _ | Type.DB _ | Type.App _ | Type.Fun _ ->
         emit_term self (term_of_type ty)
     in
     Type_cache.add self.tbl_type ty off;

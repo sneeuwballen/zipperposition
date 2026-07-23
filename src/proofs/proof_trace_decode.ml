@@ -293,6 +293,10 @@ and decode_term_node (st : t) (c : cursor) (cmd : string) (off : D.offset) :
     let dom = ty_of_term (decode_term st dom_ref) in
     let cod = ty_of_term (decode_term st cod_ref) in
     term_of_type (Type.arrow [ dom ] cod)
+  | "ty.forall" ->
+    let body_ref = read_ref c in
+    let body = ty_of_term (decode_term st body_ref) in
+    term_of_type (Type.forall body)
   | "ty.name" ->
     let name_ref = read_ref c in
     (* type constants fall through to term encoding in the encoder;
