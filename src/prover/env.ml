@@ -141,6 +141,14 @@ let ctx_of env = env.ctx
 let get_ctx env = env.ctx
 let flex_state_of env = env.flex_state
 let flex_get_of env k = Flex_state.get_exn k env.flex_state
+
+let flex_get_or_create ~init env k =
+  try Flex_state.get_exn k env.flex_state
+  with Not_found ->
+    let x = init () in
+    env.flex_state <- Flex_state.add k x env.flex_state;
+    x
+
 let flex_add_of env k v = env.flex_state <- Flex_state.add k v env.flex_state
 let params_of env = env.params
 let update_flex_state env f = env.flex_state <- f env.flex_state

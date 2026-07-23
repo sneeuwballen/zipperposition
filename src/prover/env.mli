@@ -71,6 +71,9 @@ val flex_state_of : t -> Logtk.Flex_state.t
 val flex_get_of : t -> 'a Logtk.Flex_state.key -> 'a
 (** Get a value from the environment's flex state *)
 
+val flex_get_or_create : init:(unit -> 'a) -> t -> 'a Logtk.Flex_state.key -> 'a
+(** Get or create a flexstate key *)
+
 val convert_input_statements_env :
   t -> Logtk.Statement.clause_t CCVector.ro_vector -> Clause.t Clause.sets
 (** Convert input statements to clauses *)
