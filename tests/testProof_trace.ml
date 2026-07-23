@@ -67,7 +67,7 @@ let encode_decode root ~get_lits : LLProof.t =
   let enc =
     Proof_trace.create
       (object
-        method write s ofs len = Buffer.add_subbytes buf s ofs len
+         method write s ofs len = Buffer.add_subbytes buf s ofs len
       end)
   in
   let _ = Proof_trace.emit_proof enc ~get_lits root in

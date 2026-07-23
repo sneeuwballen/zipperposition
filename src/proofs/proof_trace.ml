@@ -48,8 +48,7 @@ let create (out : #E.output) : t =
     n_terms = 0;
   }
 
-let close self =
-  E.flush self.enc
+let close self = E.flush self.enc
 
 (** {2 Names} *)
 
