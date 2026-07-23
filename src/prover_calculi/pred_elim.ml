@@ -1065,7 +1065,7 @@ let calc_resolvents ~sym ~pos ~neg =
 
 let calc_non_singular_resolvents env ~sym ~pos ~neg ~offending =
   let find_lit_by_sym_opt sign cl =
-    try CCOpt.return (find_lit_by_sym sym sign cl) with _ -> None
+    try CCOpt.return (find_lit_by_sym sym sign cl) with Not_found -> None
   in
 
   let rename_pos_sym_vars new_vars cl =

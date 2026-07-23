@@ -1068,7 +1068,7 @@ let insert_into_ext_dec_index index (c, pos, t) =
     | Some res -> res
   in
   let all_pos =
-    try (t, pos) :: C.Tbl.find clause_map c with _ -> [ t, pos ]
+    try (t, pos) :: C.Tbl.find clause_map c with Not_found -> [ t, pos ]
   in
   C.Tbl.replace clause_map c all_pos;
   index := Name.Map.add key clause_map !index
