@@ -29,6 +29,10 @@ type t = {
   presaturate: bool;  (** initial interreduction of proof state? *)
   unary_depth: int;  (** Maximum successive levels of unary inferences *)
   check: bool;  (** check proof *)
+  e_path: string option;  (** path to E binary *)
+  progress: bool;  (** progress bar *)
+  check_types: bool;  (** check types in new clauses *)
+  max_multi_simpl: int;  (** max multi-simplification depth. -1 = unlimited *)
 }
 
 let default : t =
@@ -54,10 +58,28 @@ let default : t =
     dot_sat = false;
     expand_def = false;
     check = false;
+    e_path = None;
+    progress = false;
+    check_types = false;
+    max_multi_simpl = -1;
   }
 
 let select = ref default.select
 let bool_select = ref default.bool_select
+let e_path_ref = ref default.e_path
+let progress_ref = ref default.progress
+let check_types_ref = ref default.check_types
+let max_multi_simpl_ref = ref default.max_multi_simpl
+
+module Cli = struct
+  let set_select s = select := s
+  let set_bool_select s = bool_select := s
+  let set_e_path p = e_path_ref := p
+  let set_progress b = progress_ref := b
+  let set_check_types b = check_types_ref := b
+  let set_max_multi_simpl n = max_multi_simpl_ref := n
+end
+
 let _modes = Hashtbl.create 10
 
 let mode_spec () =
@@ -87,7 +109,11 @@ let parse_args () =
   and def_as_rewrite = ref default.def_as_rewrite
   and prelude = CCVector.create ()
   and files = CCVector.create ()
-  and check = ref default.check in
+  and check = ref default.check
+  and e_path = ref !e_path_ref
+  and progress = ref !progress_ref
+  and check_types = ref !check_types_ref
+  and max_multi_simpl = ref !max_multi_simpl_ref in
   (* special handlers *)
   let add_file s = CCVector.push files s in
   (* options list *)
@@ -175,6 +201,10 @@ let parse_args () =
     dot_sat = !dot_sat;
     expand_def = !expand_def;
     check = !check;
+    e_path = !e_path;
+    progress = !progress;
+    check_types = !check_types;
+    max_multi_simpl = !max_multi_simpl;
   }
 
 let add_opt = Options.add_opt

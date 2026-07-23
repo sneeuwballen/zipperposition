@@ -12,7 +12,6 @@ val parse_cli : (Phases.filename list * Params.t) Phases.t
 
 val load_extensions : Extensions.t list Phases.t
 val setup_gc : unit Phases.t
-val setup_signal : unit Phases.t
 
 val process_file :
   ?prelude:Phases.prelude -> Phases.filename -> Phases.env_with_result Phases.t

@@ -1176,7 +1176,7 @@ let ho_restriction_opt =
   Arg.Symbol (List.map fst l, fun s -> set_ (List.assoc s l))
 
 let () =
-  let set_select s = Params.select := s in
+  let set_select = Params.Cli.set_select in
   Params.add_opts
     [
       ( "--select",
@@ -1201,7 +1201,7 @@ let () =
       _ho_restriction := `NoMaxVarInFoContext);
   Params.add_to_mode "best" (fun () ->
       _ho_restriction := `None;
-      Params.select := "bb+ho-selection5");
+      Params.Cli.set_select "bb+ho-selection5");
   Params.add_to_modes
     [
       "lambda-free-intensional";

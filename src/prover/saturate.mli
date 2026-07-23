@@ -18,7 +18,8 @@ type szs_status =
 
 val k_abort_after_fragment_check : bool Flex_state.key
 
-val given_clause_step : Env.t -> ?generating:bool -> int -> szs_status
+val given_clause_step :
+  Params.t -> Env.t -> ?generating:bool -> int -> szs_status
 (** Perform one step of the given clause algorithm. It performs generating
     inferences only if [generating] is true (default); other parameters are the
     iteration number and the environment *)

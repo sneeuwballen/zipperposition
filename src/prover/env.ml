@@ -23,8 +23,6 @@ module FormRename = FormulaRename.Make (Clause)
 
 type 'a packed = unit
 
-let k_max_multi_simpl_depth = Flex_state.create_key ()
-
 (** {2 Record type for the concrete environment (new-style)} *)
 
 type t = {
@@ -461,10 +459,8 @@ let multi_simplify env ~depth c =
   let init_cl = c in
   let did_something = ref false in
   let rec try_next ~depth c rules =
-    if
-      flex_get_of env k_max_multi_simpl_depth != -1
-      && depth > flex_get_of env k_max_multi_simpl_depth
-    then
+    let max_depth = (params_of env).Params.max_multi_simpl in
+    if max_depth != -1 && depth > max_depth then
       None
     else (
       match rules with

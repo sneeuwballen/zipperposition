@@ -474,7 +474,7 @@ let from_string ~ord name lits =
              k Literals.pp lits (CCList.pp Term.pp) (List.map fst l)))
 
 let () =
-  let set_bselect s = Params.bool_select := s in
+  let set_bselect = Params.Cli.set_bool_select in
   Params.add_opts
     [
       ( "--bool-select",
@@ -482,4 +482,4 @@ let () =
         " set boolean literal selection function" );
     ];
   Params.add_to_mode "best" (fun () ->
-      Params.bool_select := "sel1(consequent_ctx)")
+      Params.Cli.set_bool_select "sel1(consequent_ctx)")

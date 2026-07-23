@@ -21,7 +21,6 @@ type prelude = UntypedAST.statement Iter.t
 type phase =
   | Init
   | Setup_gc
-  | Setup_signal
   | Parse_CLI
   | LoadExtensions
   | Parse_prelude

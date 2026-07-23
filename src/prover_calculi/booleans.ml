@@ -2652,7 +2652,7 @@ let () =
                  | _ -> assert false);
               if !_bool_reasoning == BoolHoist then
                 (* setting default Boolean selection if BoolHoist is on *)
-                Params.bool_select := "smallest" ),
+                Params.Cli.set_bool_select "smallest" ),
         " enable/disable boolean axioms" );
       ( "--quantifier-renaming",
         Arg.Bool (fun v -> _quant_rename := v),
@@ -2754,7 +2754,7 @@ let () =
       "fo-complete-basic";
     ] (fun () ->
       _bool_reasoning := BoolReasoningDisabled;
-      Params.bool_select := "smallest");
+      Params.Cli.set_bool_select "smallest");
   Params.add_to_mode "ho-complete-basic" (fun () ->
       _bool_reasoning := BoolHoist;
       _fluid_hoist := true;

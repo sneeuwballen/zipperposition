@@ -22,6 +22,10 @@ type t = {
   presaturate: bool;  (** initial interreduction of proof state? *)
   unary_depth: int;  (** Maximum successive levels of unary inferences *)
   check: bool;  (** check proof *)
+  e_path: string option;  (** path to E binary *)
+  progress: bool;  (** progress bar *)
+  check_types: bool;  (** check types in new clauses *)
+  max_multi_simpl: int;  (** max multi-simplification depth. -1 = unlimited *)
 }
 
 val parse_args : unit -> t
@@ -34,7 +38,13 @@ val key : t Flex_state.key
 
 (**/**)
 
-val select : string ref
-val bool_select : string ref
+module Cli : sig
+  val set_select : string -> unit
+  val set_bool_select : string -> unit
+  val set_e_path : string option -> unit
+  val set_progress : bool -> unit
+  val set_check_types : bool -> unit
+  val set_max_multi_simpl : int -> unit
+end
 
 (**/**)

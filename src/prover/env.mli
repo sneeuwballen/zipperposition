@@ -158,6 +158,3 @@ val step_init : t -> unit
 
 val flex_add_of : t -> 'a Logtk.Flex_state.key -> 'a -> unit
 val update_flex_state : t -> (Logtk.Flex_state.t -> Logtk.Flex_state.t) -> unit
-
-val k_max_multi_simpl_depth : int Logtk.Flex_state.key
-(** Key for max multi-simplification depth *)

@@ -263,9 +263,6 @@ let make_ctx (st_ref : Phases.State.t ref) ~signature ~ord ~select ~bool_select
   do_extensions ~field:(fun e -> e.Extensions.ctx_actions) ~x:ctx st_ref;
   ctx
 
-let _key_env = Flex_state.create_key ()
-let _key_c_sets = Flex_state.create_key ()
-
 let make_env (st_ref : Phases.State.t ref) ~ctx ~params stmts =
   let@ () = Phases.with_phase st_ref Phases.MakeEnv in
   let state = !st_ref in
@@ -611,16 +608,6 @@ let setup_gc (st_ref : Phases.State.t ref) =
   let@ () = Phases.with_phase st_ref Phases.Setup_gc in
   let gc = Gc.get () in
   Gc.set { gc with Gc.space_overhead = 150 }
-
-let setup_signal (st_ref : Phases.State.t ref) =
-  let@ () = Phases.with_phase st_ref Phases.Setup_signal in
-  Signal.set_exn_handler (fun e ->
-      let stack = Printexc.get_backtrace () in
-      let msg = Printexc.to_string e in
-      output_string stderr ("exception raised in signal: " ^ msg ^ "\n");
-      output_string stderr stack;
-      flush stderr;
-      raise e)
 
 (* process several files, printing the result *)
 let process_files_and_print ?(params = Params.default) files

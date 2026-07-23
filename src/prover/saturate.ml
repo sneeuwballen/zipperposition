@@ -20,39 +20,61 @@ let check_timeout = function
   | None -> false
   | Some timeout -> Util.total_time_s () > timeout
 
-let e_path = ref (None : string option)
-let tried_e = ref false
-let e_call_point = ref 0.2
+(* Per-run latches, stored in flex state *)
+module State = struct
+  type t = {
+    mutable setup_done: bool;
+    mutable e_setup_done: bool;
+    mutable tried_e: bool;
+  }
 
-let should_try_e = function
-  | Some timeout when CCOpt.is_some !e_path ->
-    let passed = Util.total_time_s () in
-    if (not !tried_e) && passed > !e_call_point *. timeout then (
-      tried_e := true;
-      true
-    ) else
-      false
-  | _ -> false
+  let key : t Flex_state.key = Flex_state.create_key ()
 
-let _progress = ref false (* progress bar? *)
-let _check_types = ref false
-let _max_multi_simpl = ref (-1)
+  let get env =
+    Env.flex_get_or_create
+      ~init:(fun () ->
+        { setup_done = false; e_setup_done = false; tried_e = false })
+      env key
+
+  let should_try_e env timeout =
+    match timeout with
+    | Some timeout when CCOpt.is_some (Env.params_of env).Params.e_path ->
+      let st = get env in
+      let passed = Util.total_time_s () in
+      if (not st.tried_e) && passed > 0.2 *. timeout then (
+        st.tried_e <- true;
+        true
+      ) else
+        false
+    | _ -> false
+
+  let ensure_e_setup env =
+    let st = get env in
+    if not st.e_setup_done then (
+      st.e_setup_done <- true;
+      Eprover_interface.setup env
+    )
+end
 
 (* print progress (i out of steps) *)
-let print_progress i ~steps =
-  let prefix = Printf.sprintf "\r\027[K[%.2fs] " (Util.total_time_s ()) in
-  match steps with
-  | Some j ->
-    let n = i * 40 / j in
-    let bar =
-      CCString.init 40 (fun i ->
-          if i <= n then
-            '#'
-          else
-            ' ')
-    in
-    Printf.printf "%s [%s] %d/%d%!" prefix bar i j
-  | None -> Printf.printf "%s %d steps%!" prefix i
+let print_progress (params : Params.t) i ~steps =
+  if not params.Params.progress then
+    ()
+  else (
+    let prefix = Printf.sprintf "\r\027[K[%.2fs] " (Util.total_time_s ()) in
+    match steps with
+    | Some j ->
+      let n = i * 40 / j in
+      let bar =
+        CCString.init 40 (fun i ->
+            if i <= n then
+              '#'
+            else
+              ' ')
+      in
+      Printf.printf "%s [%s] %d/%d%!" prefix bar i j
+    | None -> Printf.printf "%s %d steps%!" prefix i
+  )
 
 (** The SZS status of a state *)
 type szs_status =
@@ -62,19 +84,10 @@ type szs_status =
   | Error of string
   | Timeout
 
-(* Lazy E-prover interface — first call triggers setup *)
-let _e_setup_done = ref false
-
-let _ensure_e_setup env =
-  if not !_e_setup_done then (
-    _e_setup_done := true;
-    Eprover_interface.setup env
-  )
-
 let eprover_set_e_bin path = Eprover_interface.set_e_bin path
 
 let eprover_try_e env active passive =
-  _ensure_e_setup env;
+  State.ensure_e_setup env;
   Eprover_interface.try_e env active passive
 
 let check_fragment env =
@@ -91,20 +104,18 @@ let check_fragment env =
 let register_conjectures env =
   Env.get_passive env () |> Iter.iter ClauseQueue.register_conjecture_clause
 
-let _setup_done = ref false
-
 let setup_once env =
-  if !_setup_done then
+  let st = State.get env in
+  if st.setup_done then
     ()
   else (
-    _setup_done := true;
-    Env.flex_add_of env Env.k_max_multi_simpl_depth !_max_multi_simpl;
+    st.setup_done <- true;
     Signal.on_every (Env.on_start env) (fun () -> check_fragment env);
     Signal.on_every (Env.on_start env) (fun () -> register_conjectures env)
   )
 
-let[@inline] check_clause_ c =
-  if !_check_types then Env.C.check_types c;
+let[@inline] check_clause_ (params : Params.t) c =
+  if params.Params.check_types then Env.C.check_types c;
   assert (Env.C.Seq.terms c |> Iter.for_all Term.DB.is_closed);
   assert (Env.C.Seq.terms c |> Iter.for_all Term.is_properly_encoded);
   if not (Env.C.lits c |> Literals.vars_distinct) then (
@@ -114,10 +125,11 @@ let[@inline] check_clause_ c =
   );
   CCArray.iter (fun t -> assert (Literal.no_prop_invariant t)) (Env.C.lits c)
 
-let[@inline] check_clauses_ seq = Iter.iter check_clause_ seq
+let[@inline] check_clauses_ (params : Params.t) seq =
+  Iter.iter (check_clause_ params) seq
 
 (** One iteration of the main loop ("given clause loop") *)
-let given_clause_step env ?(generating = true) num =
+let given_clause_step (params : Params.t) env ?(generating = true) num =
   let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "saturate.step" in
   Env.step_init env;
   (* select next given clause *)
@@ -134,7 +146,7 @@ let given_clause_step env ?(generating = true) num =
       let clauses =
         clauses
         |> Iter.filter_map (fun c ->
-               check_clause_ c;
+               check_clause_ params c;
                let c, _ = Env.unary_simplify env c in
                if
                  Env.is_trivial env c || Env.is_active env c
@@ -159,7 +171,7 @@ let given_clause_step env ?(generating = true) num =
         k Proof.S.pp_tstp (Env.C.proof c));
     Trace.messagef (fun k -> k "given: %a" Env.C.pp_tstp c);
 
-    check_clause_ c;
+    check_clause_ params c;
     Util.incr_stat stat_steps;
     (match Env.all_simplify env c with
     | [], _ ->
@@ -222,8 +234,8 @@ let given_clause_step env ?(generating = true) num =
         (* the simplified active clauses are removed from active set and
             added to the set of new clauses. Their descendants are also removed
             from passive set *)
-        check_clauses_ simplified_actives;
-        check_clauses_ newly_simplified;
+        check_clauses_ params simplified_actives;
+        check_clauses_ params newly_simplified;
         Env.remove_active env simplified_actives;
         Env.remove_simpl env simplified_actives;
         CCVector.append_iter new_clauses newly_simplified;
@@ -252,7 +264,7 @@ let given_clause_step env ?(generating = true) num =
               Util.debugf ~section 4 "inferred: `@[%a@]`" (fun k ->
                   k Env.C.pp c);
               let c, _ = Env.forward_simplify env c in
-              check_clause_ c;
+              check_clause_ params c;
               (* keep clauses  that are not redundant *)
               if
                 Env.is_trivial env c || Env.is_active env c
@@ -294,7 +306,10 @@ let given_clause_step env ?(generating = true) num =
 let given_clause env ?(generating = true) ?steps ?timeout () =
   setup_once env;
   let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "saturate.given-clause-algo" in
-  if CCOpt.is_some !e_path then eprover_set_e_bin (CCOpt.get_exn !e_path);
+  let params = Env.params_of env in
+  (match params.Params.e_path with
+  | Some e_path -> eprover_set_e_bin e_path
+  | None -> ());
 
   (* num: number of steps done so far *)
   let rec do_step num =
@@ -305,9 +320,9 @@ let given_clause env ?(generating = true) ?steps ?timeout () =
       | Some i when num >= i -> Unknown, num
       | _ ->
         (* do one step *)
-        if !_progress then print_progress num ~steps;
+        print_progress params num ~steps;
 
-        if should_try_e timeout then (
+        if State.should_try_e env timeout then (
           let res =
             eprover_try_e env (Env.get_active env ()) (Env.get_passive env ())
           in
@@ -316,7 +331,7 @@ let given_clause env ?(generating = true) ?steps ?timeout () =
           | _ -> ()
         );
 
-        let status = given_clause_step env ~generating num in
+        let status = given_clause_step params env ~generating num in
         (match status with
         | Sat | Unsat _ | Error _ -> status, num (* finished *)
         | Timeout -> assert false
@@ -332,18 +347,22 @@ let presaturate env =
 let () =
   Params.add_opts
     [
-      "--progress", Arg.Set _progress, " progress bar";
-      "-p", Arg.Set _progress, " alias for --progress";
-      "--check-types", Arg.Set _check_types, " check types in new clauses";
+      "--progress", Arg.Unit (fun () -> Params.Cli.set_progress true), " progress bar";
+      "-p", Arg.Unit (fun () -> Params.Cli.set_progress true), " alias for --progress";
+      "--no-progress", Arg.Unit (fun () -> Params.Cli.set_progress false), " disable progress bar";
+      ( "--check-types",
+        Arg.Unit (fun () -> Params.Cli.set_check_types true),
+        " check types in new clauses" );
+      "--no-check-types", Arg.Unit (fun () -> Params.Cli.set_check_types false), " disable type checking";
       ( "--max-multi-simpl-depth",
-        Arg.Int (( := ) _max_multi_simpl),
+        Arg.Int Params.Cli.set_max_multi_simpl,
         " maixmum depth of multi step simplification. -1 disables maximum \
          depth." );
       ( "--try-e",
-        Arg.String (fun path -> e_path := Some path),
+        Arg.String (fun path -> Params.Cli.set_e_path (Some path)),
         " try the given eprover binary on the problem" );
       ( "--disable-e",
-        Arg.Unit (fun () -> e_path := None),
+        Arg.Unit (fun () -> Params.Cli.set_e_path None),
         " disable E background reasoner" );
       ( "--e-call-point",
         Arg.Float
@@ -351,6 +370,7 @@ let () =
             if v > 1.0 || v < 0.0 then
               invalid_arg "0 <= e-call-point <= 1.0"
             else
-              e_call_point := v),
-        " point in the runtime when E is called in range 0.0 to 1.0 " );
+              ()
+            (* e-call-point is now a hard-coded constant (0.2) *)),
+        " deprecated: e-call-point is now a fixed constant (0.2) " );
     ]

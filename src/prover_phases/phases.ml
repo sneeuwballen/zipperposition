@@ -18,7 +18,6 @@ type prelude = UntypedAST.statement Iter.t
 type phase =
   | Init
   | Setup_gc
-  | Setup_signal
   | Parse_CLI
   | LoadExtensions
   | Parse_prelude
@@ -52,7 +51,6 @@ type 'a t = State.t ref -> 'a
 let show_phase = function
   | Init -> "init"
   | Setup_gc -> "setup_gc"
-  | Setup_signal -> "setup_signal"
   | Parse_CLI -> "parse_cli"
   | LoadExtensions -> "load_extensions"
   | Parse_prelude -> "parse_prelude"
