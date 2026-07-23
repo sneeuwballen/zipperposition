@@ -23,9 +23,11 @@
 ; Guards per-file state isolation (see 2026-07-23-fixes.md). Currently FAILS
 ; (binary exits 1: file 2 crashes with Not_found) until the global-state
 ; reset fix lands; passes (exit 0) once both files prove.
+
 (rule
  (alias runtest)
  (action
-  (run %{bin:zipperposition}
+  (run
+   %{bin:zipperposition}
    %{dep:regressions/multi_input/easy1.p}
    %{dep:regressions/multi_input/easy2.p})))

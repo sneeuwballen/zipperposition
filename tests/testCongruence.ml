@@ -111,8 +111,8 @@ end = struct
     t
     ::
     (match T.Classic.view t with
-     | T.Classic.App (_, l) -> List.concat_map fo_subterms l
-     | _ -> [])
+    | T.Classic.App (_, l) -> List.concat_map fo_subterms l
+    | _ -> [])
 
   (* ---- operations mirroring [Congruence.FO] (create / add / mk_eq) ---- *)
   let empty = TSet_set.empty
