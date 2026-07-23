@@ -3067,7 +3067,7 @@ module Make (Env : Env.S) : S with module Env = Env = struct
     ) else
       SimplM.return_same c
 
-  let equatable ~sign ~cl s t =
+  let equatable ~sign ~cl s t : (C.t * Subst.t * int) option =
     let idx_sc, q_sc = 1, 0 in
     let ( <+> ) = CCOpt.( <+> ) in
     let aux s t =
@@ -3077,7 +3077,7 @@ module Make (Env : Env.S) : S with module Env = Env = struct
                try
                  ignore
                    (Unif.FO.matching ~subst ~pattern:(rhs, idx_sc) (t, q_sc));
-                 Some c'
+                 Some (c', subst, idx_sc)
                with _ -> None
              ) else
                None)
@@ -3094,7 +3094,7 @@ module Make (Env : Env.S) : S with module Env = Env = struct
               match is_simplified lhs rhs with
               | Some prems ->
                 CCBV.reset kept_lits i;
-                C.ClauseSet.union premises prems
+                premises @ prems
               | None -> premises
             in
 
@@ -3103,7 +3103,7 @@ module Make (Env : Env.S) : S with module Env = Env = struct
             | Lit.Equation (lhs, rhs, true) when T.equal T.false_ rhs ->
               find_simplifying_premise lhs T.true_
             | _ -> premises)
-          C.ClauseSet.empty (C.lits c)
+          [] (C.lits c)
       in
       CCOpt.return_if
         (not (CCBV.is_empty (CCBV.negate kept_lits)))
@@ -3115,12 +3115,12 @@ module Make (Env : Env.S) : S with module Env = Env = struct
       let exception CantSimplify in
       try
         Queue.push (lhs, rhs) tasks;
-        let premises = ref C.ClauseSet.empty in
+        let premises = ref [] in
         while not (Queue.is_empty tasks) do
           let s, t = Queue.pop tasks in
           if not (T.equal s t) then (
             match equatable ~sign:true ~cl:c s t with
-            | Some cl -> premises := C.ClauseSet.add cl !premises
+            | Some (cl, subst, sc) -> premises := (cl, subst, sc) :: !premises
             | None ->
               (match T.view s, T.view t with
               | T.App (hd_s, args_s), T.App (hd_t, args_t)
@@ -3143,14 +3143,14 @@ module Make (Env : Env.S) : S with module Env = Env = struct
 
     let regular_sr_pair lhs rhs =
       if T.equal lhs rhs then
-        Some C.ClauseSet.empty
+        Some []
       else (
         match equatable ~sign:true ~cl:c lhs rhs with
-        | Some cl -> Some (C.ClauseSet.singleton cl)
+        | Some (cl, subst, sc) -> Some [ cl, subst, sc ]
         | None ->
           T.Seq.common_contexts lhs rhs
           |> Iter.find_map (fun (a, b) -> equatable ~sign:true ~cl:c a b)
-          |> CCOpt.map C.ClauseSet.singleton
+          |> CCOpt.map (fun (cl, subst, sc) -> [ cl, subst, sc ])
       )
     in
 
@@ -3171,7 +3171,11 @@ module Make (Env : Env.S) : S with module Env = Env = struct
       let proof =
         Proof.Step.simp
           ~rule:(Proof.Rule.mk "simplify_reflect+")
-          (List.map C.proof_parent (c :: C.ClauseSet.to_list premises))
+          (C.proof_parent c
+          :: List.map
+               (fun (c', subst, sc) ->
+                 C.proof_parent_subst Subst.Renaming.none (c', sc) subst)
+               premises)
       in
       let trail = C.trail c and penalty = C.penalty c in
       let new_c = C.create ~trail ~penalty new_lits proof in
@@ -3190,13 +3194,16 @@ module Make (Env : Env.S) : S with module Env = Env = struct
         | None ->
           (* keep literal *)
           iterate_lits (lit :: acc) lits' clauses
-        | Some new_clause ->
-          (* drop literal, remember clause *)
-          iterate_lits acc lits' (new_clause :: clauses))
+        | Some parent ->
+          (* drop literal, remember proof parent *)
+          iterate_lits acc lits' (parent :: clauses))
       | lit :: lits' -> iterate_lits (lit :: acc) lits' clauses
     (* try to remove the literal using a negative unit clause *)
     and can_refute s t =
-      equatable ~sign:false ~cl:c s t |> CCOpt.map C.proof_parent
+      match equatable ~sign:false ~cl:c s t with
+      | Some (c', subst, sc) ->
+        Some (C.proof_parent_subst Subst.Renaming.none (c', sc) subst)
+      | None -> None
     in
     (* fold over literals *)
     let lits, premises = iterate_lits [] (C.lits c |> Array.to_list) [] in
