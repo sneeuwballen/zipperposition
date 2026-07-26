@@ -50,6 +50,9 @@ test-long:
 test-reg1:
 	@QCHECK_SEED=712032581 ./tests/run_tests.sh test qcheck
 
+test-reg2:
+	@QCHECK_SEED=697203357 ./tests/run_tests.sh test qcheck
+
 test-unit:
 	@./tests/run_tests.sh test units
 

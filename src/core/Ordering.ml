@@ -395,15 +395,20 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
     (* tupled version of kbo (kbo_5 of the paper) *)
     and tckbo (wb : W.t) t1 t2 ~below_lam =
       if T.equal t1 t2 then
-        wb, C.Eq
-      (* do not update weight or var balance *)
+        wb, C.Eq (* do not update weight or var balance *)
       else if P.lambda_mode then (
-        match Head.term_to_head t1, Head.term_to_head t2 with
-        | Head.V _, Head.V _ ->
+        let var_hd_or_fluid t =
+          match Head.term_to_head t with
+          | Head.V _ -> None
+          | _ when is_fluid t -> None
+          | hd -> Some hd
+        in
+        match var_hd_or_fluid t1, var_hd_or_fluid t2 with
+        | None, None ->
           add_pos_var balance t1 ~below_lam;
           add_neg_var balance t2 ~below_lam;
           wb, Incomparable
-        | Head.V _, _ ->
+        | None, Some _ ->
           add_pos_var balance t1 ~below_lam;
           let wb', contains =
             balance_weight wb t2 (Some t1) ~pos:false ~below_lam
@@ -413,7 +418,7 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
               Lt
             else
               Incomparable )
-        | _, Head.V _ ->
+        | Some _, None ->
           add_neg_var balance t2 ~below_lam;
           let wb', contains =
             balance_weight wb t1 (Some t2) ~pos:true ~below_lam
@@ -423,7 +428,7 @@ module MakeKBO (P : PARAMETERS) : ORD = struct
               Gt
             else
               Incomparable )
-        | h1, h2 ->
+        | Some h1, Some h2 ->
           tckbo_composite wb h1 h2 (Head.term_to_args t1) (Head.term_to_args t2)
             ~below_lam
       ) else (
