@@ -600,28 +600,36 @@ let print file env result =
   print_szs_result ~file env result >>= fun () -> print_dots env result
 
 let get_def_lits p =
+  let ctx = Term.Conv.create () in
+  let conv_form f =
+    let clause =
+      try
+        let lit = SLiteral.of_form f in
+        [ lit ]
+      with SLiteral.NotALit _ ->
+        let open TypedSTerm.Form in
+        (match view f with
+        | Or l -> List.map SLiteral.of_form l
+        | _ -> [ SLiteral.of_form f ])
+    in
+    List.map Literal.Conv.of_form
+      (List.map (SLiteral.map ~f:(Term.Conv.of_simple_term_exn ctx)) clause)
+  in
   match Proof.Result.view (Proof.S.result p) with
   | Statement.Stmt_view st ->
-    (match Statement.get_formulas_from_defs st with
-    | [] -> [||]
-    | formulas ->
-      let ctx = Term.Conv.create () in
-      let conv_form f =
-        let clause =
-          try
-            let lit = SLiteral.of_form f in
-            [ lit ]
-          with SLiteral.NotALit _ ->
-            let open TypedSTerm.Form in
-            (match view f with
-            | Or l -> List.map SLiteral.of_form l
-            | _ -> [ SLiteral.of_form f ])
-        in
-        List.map Literal.Conv.of_form
-          (List.map (SLiteral.map ~f:(Term.Conv.of_simple_term_exn ctx)) clause)
-      in
-      let fo_lits = CCList.flat_map conv_form formulas in
-      Array.of_list fo_lits)
+    (match Statement.view st with
+    | Statement.Assert f | Statement.Goal f ->
+      let fo_lits = conv_form f in
+      Array.of_list fo_lits
+    | Statement.Lemma l | Statement.NegatedGoal (_, l) ->
+      let fo_lits = CCList.flat_map conv_form l in
+      Array.of_list fo_lits
+    | _ ->
+      (match Statement.get_formulas_from_defs st with
+      | [] -> [||]
+      | formulas ->
+        let fo_lits = CCList.flat_map conv_form formulas in
+        Array.of_list fo_lits))
   | Statement.Stmt_clause_view c ->
     let fo_lits =
       Statement.Seq.lits c |> Iter.to_list |> List.map Literal.Conv.of_form
