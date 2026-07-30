@@ -579,8 +579,8 @@ type footer_val =
 
 let read_footer (st : t) (footer_off : D.offset) : (string * footer_val) list =
   let cmd = cmd_of_offset st footer_off in
-  if cmd <> "zip.footer" then
-    raise (D.Fail ("expected zip.footer node", footer_off));
+  if cmd <> "mdag.footer" then
+    raise (D.Fail ("expected mdag.footer node", footer_off));
   let fc = cursor_of_offset st footer_off in
   let rec loop acc =
     if fc.pos >= Array.length fc.args then
@@ -653,7 +653,7 @@ let decode_proof (st : t) : LLProof.t * (string * string) list =
         footer_kv
     with
     | Some off -> off
-    | None -> raise (D.Fail ("zip.footer missing result-offset", footer_off))
+    | None -> raise (D.Fail ("mdag.footer missing result-offset", footer_off))
   in
   let cmd = cmd_of_offset st result_off in
   let proof =

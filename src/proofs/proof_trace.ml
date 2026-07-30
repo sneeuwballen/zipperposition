@@ -428,7 +428,7 @@ let emit_proof self ~get_lits (root : Proof.t) : offset * stats =
     E.write_node self.enc "result.unsat" (fun enc -> E.ref enc root_off)
   in
   let footer_off =
-    E.write_node self.enc "zip.footer" (fun enc ->
+    E.write_node self.enc "mdag.footer" (fun enc ->
         E.string enc "result";
         E.string enc "unsat";
         E.string enc "result-offset";
