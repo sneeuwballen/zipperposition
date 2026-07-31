@@ -149,6 +149,11 @@ let flex_get_or_create ~init env k =
     env.flex_state <- Flex_state.add k x env.flex_state;
     x
 
+let flex_ensure env k v =
+  match Flex_state.get k env.flex_state with
+  | Some _ -> ()
+  | None -> env.flex_state <- Flex_state.add k v env.flex_state
+
 let flex_add_of env k v = env.flex_state <- Flex_state.add k v env.flex_state
 let params_of env = env.params
 let update_flex_state env f = env.flex_state <- f env.flex_state

@@ -52,8 +52,24 @@ let ( =~ ), ( /~ ) = Literal.mk_eq, Literal.mk_neq
 let ( @: ) = T.app_builtin ~ty:Type.prop
 let no a = a =~ T.false_
 let yes a = a =~ T.true_
-let _trigger_bools = ref Type.Map.empty (* type --> boolean trigger *)
-let _cls_w_pred_vars = ref Type.Map.empty (* type --> (clause,var) *)
+
+type bool_trigger_state = {
+  mutable trigger_bools: Term.t list Type.Map.t;
+  mutable cls_w_pred_vars: (C.t * Term.t) list Type.Map.t;
+}
+
+let k_bool_trigger_state : bool_trigger_state Flex_state.key =
+  Flex_state.create_key ()
+
+let get_bool_trigger_state env =
+  match Flex_state.get k_bool_trigger_state (Env.flex_state_of env) with
+  | Some st -> st
+  | None ->
+    let st =
+      { trigger_bools = Type.Map.empty; cls_w_pred_vars = Type.Map.empty }
+    in
+    Env.flex_add_of env k_bool_trigger_state st;
+    st
 
 let get_unif_alg env =
   if Env.flex_get_of env k_disable_ho_bool_unif then
@@ -135,20 +151,21 @@ let instantiate_w_bool env ~clause ~var ~trigger =
   res
 
 let inst_clauses_w_trigger env t =
-  let triggers = Type.Map.get_or ~default:[] (T.ty t) !_trigger_bools in
+  let st = get_bool_trigger_state env in
+  let triggers = Type.Map.get_or ~default:[] (T.ty t) st.trigger_bools in
   if
     (not (CCList.mem ~eq:T.equal t triggers))
     && ((not (Env.flex_get_of env k_bool_triggers_only))
        || Type.returns_prop (T.ty t))
   then (
-    _trigger_bools :=
+    st.trigger_bools <-
       Type.Map.update (T.ty t)
         (function
           | None -> Some [ t ]
           | Some res -> Some (t :: res))
-        !_trigger_bools;
+        st.trigger_bools;
 
-    Type.Map.get_or ~default:[] (T.ty t) !_cls_w_pred_vars
+    Type.Map.get_or ~default:[] (T.ty t) st.cls_w_pred_vars
     |> CCList.map (fun (clause, var) ->
            instantiate_w_bool env ~clause ~var ~trigger:t)
   ) else
@@ -194,16 +211,17 @@ let handle_new_pred_var_clause env (clause, var) =
   assert (T.is_var var);
   assert (Type.returns_prop (T.ty var));
   let ty = T.ty var in
-  Type.Map.get_or ~default:[] ty !_trigger_bools
+  let st = get_bool_trigger_state env in
+  Type.Map.get_or ~default:[] ty st.trigger_bools
   |> CCList.map (fun trigger -> instantiate_w_bool env ~clause ~var ~trigger)
   |> Iter.of_list |> Env.add_passive env;
 
-  _cls_w_pred_vars :=
+  st.cls_w_pred_vars <-
     Type.Map.update ty
       (function
         | None -> Some [ clause, var ]
         | Some res -> Some ((clause, var) :: res))
-      !_cls_w_pred_vars;
+      st.cls_w_pred_vars;
 
   Signal.ContinueListening
 
@@ -760,6 +778,7 @@ let fluid_log_hoist env (c : C.t) =
 
 (* Fluid version of (Forall|Exists)RW *)
 let fluid_quant_rw env (c : C.t) =
+  let flex_ref = ref (Env.flex_state_of env) in
   let module PB = Position.Build in
   let module F = T.Form in
   let sc_partner, sc_cl = 0, 1 in
@@ -795,7 +814,7 @@ let fluid_quant_rw env (c : C.t) =
       @@ Lambda.snf
       @@ Subst.FO.apply renaming sub (partner.repl, sc_partner)
     in
-    let sk = FR.get_skolem ~parent:c ~mode:`SkolemRecycle repl_sub in
+    let sk = FR.get_skolem ~flex_ref ~parent:c ~mode:`SkolemRecycle repl_sub in
     let y_sk =
       T.app (Subst.FO.apply renaming sub (y_quant, sc_partner)) [ sk ]
     in
@@ -820,56 +839,63 @@ let fluid_quant_rw env (c : C.t) =
   in
 
   let eligible = C.Eligible.res c in
-  Literals.fold_lits ~eligible (C.lits c)
-  |> Iter.fold
-       (fun acc (lit, idx) ->
-         let lit_pos = PB.arg idx PB.empty in
-         match lit with
-         | Literal.Equation (u, v, true)
-           when (Type.is_var (T.ty u) || Type.is_prop (T.ty u))
-                && T.is_app_var u ->
-           let app_vars =
-             if Literal.is_predicate_lit lit then
-               [ u, PB.to_pos (PB.left lit_pos) ]
-             else if Term.is_app_var v then
-               [
-                 u, PB.to_pos (PB.left lit_pos); v, PB.to_pos (PB.right lit_pos);
-               ]
-             else
-               []
-           in
-           List.fold_left
-             (fun acc (var, pos) ->
-               List.fold_left
-                 (fun acc p ->
-                   let seq =
-                     get_unif_alg env (p.unif_partner, sc_partner) (var, sc_cl)
-                     |> OSeq.filter_map
-                          (CCOpt.map (fun us ->
-                               assert (not (Unif_subst.has_constr us));
-                               let sub = Unif_subst.subst us in
-                               let eligible' = C.eligible_res (c, sc_cl) sub in
-                               (* not eligible under substitution *)
-                               if not (CCBV.get eligible' idx) then
-                                 None
-                               else
-                                 Some (mk_res sub pos p)))
-                   in
-                   if Env.should_force_stream_eval env () then
-                     Env.get_finite_infs env [ seq ] @ acc
-                   else (
-                     let stm_res =
-                       Env.Stm.make
-                         ~penalty:(C.penalty c + 2)
-                         ~parents:[ c ] seq
+  let res =
+    Literals.fold_lits ~eligible (C.lits c)
+    |> Iter.fold
+         (fun acc (lit, idx) ->
+           let lit_pos = PB.arg idx PB.empty in
+           match lit with
+           | Literal.Equation (u, v, true)
+             when (Type.is_var (T.ty u) || Type.is_prop (T.ty u))
+                  && T.is_app_var u ->
+             let app_vars =
+               if Literal.is_predicate_lit lit then
+                 [ u, PB.to_pos (PB.left lit_pos) ]
+               else if Term.is_app_var v then
+                 [
+                   u, PB.to_pos (PB.left lit_pos);
+                   v, PB.to_pos (PB.right lit_pos);
+                 ]
+               else
+                 []
+             in
+             List.fold_left
+               (fun acc (var, pos) ->
+                 List.fold_left
+                   (fun acc p ->
+                     let seq =
+                       get_unif_alg env (p.unif_partner, sc_partner) (var, sc_cl)
+                       |> OSeq.filter_map
+                            (CCOpt.map (fun us ->
+                                 assert (not (Unif_subst.has_constr us));
+                                 let sub = Unif_subst.subst us in
+                                 let eligible' =
+                                   C.eligible_res (c, sc_cl) sub
+                                 in
+                                 (* not eligible under substitution *)
+                                 if not (CCBV.get eligible' idx) then
+                                   None
+                                 else
+                                   Some (mk_res sub pos p)))
                      in
-                     Env.StmQ.add (Env.get_stm_queue env) stm_res;
-                     acc
-                   ))
-                 acc partners)
-             acc app_vars
-         | _ -> acc)
-       []
+                     if Env.should_force_stream_eval env () then
+                       Env.get_finite_infs env [ seq ] @ acc
+                     else (
+                       let stm_res =
+                         Env.Stm.make
+                           ~penalty:(C.penalty c + 2)
+                           ~parents:[ c ] seq
+                       in
+                       Env.StmQ.add (Env.get_stm_queue env) stm_res;
+                       acc
+                     ))
+                   acc partners)
+               acc app_vars
+           | _ -> acc)
+         []
+  in
+  Env.update_flex_state env (fun _ -> !flex_ref);
+  res
 
 let false_elim env c =
   let module S = Subst.FO in
@@ -1087,6 +1113,7 @@ let replace_bool_app_vars env (c : C.t) =
   )
 
 let quantifier_rw_and_hoist env (c : C.t) =
+  let flex_ref = ref (Env.flex_state_of env) in
   let quant_rw ~at b body =
     let quant_rw_unapplicable =
       let module P = Pos in
@@ -1119,7 +1146,7 @@ let quantifier_rw_and_hoist env (c : C.t) =
           (snd @@ T.open_fun body)
       in
       let sk =
-        FR.get_skolem ~parent:c ~mode:`SkolemRecycle
+        FR.get_skolem ~flex_ref ~parent:c ~mode:`SkolemRecycle
           (T.fun_l (fst @@ T.open_fun body) form_for_skolem)
       in
       let repl = T.app body [ sk ] in
@@ -1168,23 +1195,27 @@ let quantifier_rw_and_hoist env (c : C.t) =
     | _ -> assert false
   in
 
-  get_bool_eligible env c
-  |> Iter.fold
-       (fun acc (t, p) ->
-         match T.view t with
-         | T.AppBuiltin ((Builtin.(ForallConst | ExistsConst) as b), [ _; body ])
-           ->
-           let hoisted = quant_hoist ~old:t b body in
-           let rest =
-             if CCArray.exists Literal.is_trivial (C.lits hoisted) then
-               acc
-             else
-               hoisted :: acc
-           in
-           CCList.cons_maybe (quant_rw ~at:p b body) rest
-         | _ -> acc)
-       []
-  |> fun res -> CCOpt.return_if (not @@ CCList.is_empty res) res
+  let result =
+    get_bool_eligible env c
+    |> Iter.fold
+         (fun acc (t, p) ->
+           match T.view t with
+           | T.AppBuiltin
+               ((Builtin.(ForallConst | ExistsConst) as b), [ _; body ]) ->
+             let hoisted = quant_hoist ~old:t b body in
+             let rest =
+               if CCArray.exists Literal.is_trivial (C.lits hoisted) then
+                 acc
+               else
+                 hoisted :: acc
+             in
+             CCList.cons_maybe (quant_rw ~at:p b body) rest
+           | _ -> acc)
+         []
+    |> fun res -> CCOpt.return_if (not @@ CCList.is_empty res) res
+  in
+  Env.update_flex_state env (fun _ -> !flex_ref);
+  result
 
 let nested_eq_rw env c =
   (* TODO(BOOL): currently incompatible with combiantors *)
@@ -1246,6 +1277,7 @@ let nested_eq_rw env c =
   |> Iter.to_rev_list
 
 let rename_nested_booleans env c =
+  let flex_ref = ref (Env.flex_state_of env) in
   let module L = Literal in
   (* Introduce a new simple name of the form P(vars) for the
      given literal -- renaming clauses will stop combinatorial explosion
@@ -1255,7 +1287,8 @@ let rename_nested_booleans env c =
     if L.is_predicate_lit lit then (
       match lit with
       | L.Equation (lhs, _, _) ->
-        CCOpt.get_exn (FR.rename_form ~polarity_aware:false ~c lhs sign)
+        CCOpt.get_exn
+          (FR.rename_form ~flex_ref ~polarity_aware:false ~c lhs sign)
       | _ -> assert false
     ) else (
       let mk_form =
@@ -1267,7 +1300,8 @@ let rename_nested_booleans env c =
       match lit with
       | L.Equation (lhs, rhs, _) ->
         CCOpt.get_exn
-          (FR.rename_form ~polarity_aware:false ~c (mk_form lhs rhs) sign)
+          (FR.rename_form ~flex_ref ~polarity_aware:false ~c (mk_form lhs rhs)
+             sign)
       | _ -> assert false
     )
   in
@@ -1275,40 +1309,44 @@ let rename_nested_booleans env c =
   (* literal needs to have at least 2 nested booleans *)
   let threshold = 2 in
 
-  C.bool_selected c
-  |> List.map (fun (_, lit_pos) -> Literals.Pos.idx lit_pos)
-  |> CCList.group_by ~hash:CCInt.hash ~eq:CCInt.equal
-  |> List.map (fun idx_list -> List.hd idx_list, List.length idx_list)
-  |> List.filter (fun (_, cnt) -> cnt >= threshold)
-  |> function
-  | x :: xs when not (CCList.is_empty xs) ->
-    (* there need to be at least two literals with deep booleans.
+  let result =
+    C.bool_selected c
+    |> List.map (fun (_, lit_pos) -> Literals.Pos.idx lit_pos)
+    |> CCList.group_by ~hash:CCInt.hash ~eq:CCInt.equal
+    |> List.map (fun idx_list -> List.hd idx_list, List.length idx_list)
+    |> List.filter (fun (_, cnt) -> cnt >= threshold)
+    |> function
+    | x :: xs when not (CCList.is_empty xs) ->
+      (* there need to be at least two literals with deep booleans.
           we will rename all but one (for example the first one) *)
-    let new_lits = CCArray.copy (C.lits c) in
-    let new_defs, new_parents =
-      CCList.fold_left
-        (fun (defs, parents) (idx, _) ->
-          let lit = (C.lits c).(idx) in
-          let renamer, new_defs, new_parents = rename_lit lit in
-          let new_lit = Literal.mk_prop renamer (Literal.is_positivoid lit) in
-          new_lits.(idx) <- new_lit;
-          new_defs @ defs, new_parents @ parents)
-        ([], []) xs
-    in
-    let rule = Proof.Rule.mk "rename_nested_bools" in
-    let parents = List.map C.proof_parent (c :: new_parents) in
-    let proof = Proof.Step.simp ~rule parents in
-    let renamed =
-      C.create_a ~ctx:(C.ctx_of c) ~penalty:(C.penalty c) ~trail:(C.trail c)
-        new_lits proof
-    in
+      let new_lits = CCArray.copy (C.lits c) in
+      let new_defs, new_parents =
+        CCList.fold_left
+          (fun (defs, parents) (idx, _) ->
+            let lit = (C.lits c).(idx) in
+            let renamer, new_defs, new_parents = rename_lit lit in
+            let new_lit = Literal.mk_prop renamer (Literal.is_positivoid lit) in
+            new_lits.(idx) <- new_lit;
+            new_defs @ defs, new_parents @ parents)
+          ([], []) xs
+      in
+      let rule = Proof.Rule.mk "rename_nested_bools" in
+      let parents = List.map C.proof_parent (c :: new_parents) in
+      let proof = Proof.Step.simp ~rule parents in
+      let renamed =
+        C.create_a ~ctx:(C.ctx_of c) ~penalty:(C.penalty c) ~trail:(C.trail c)
+          new_lits proof
+      in
 
-    Util.debugf ~section 1 "renamed @[%a@] into@. @[%a@]" (fun k ->
-        k C.pp c C.pp renamed);
-    Util.debugf ~section 1 "new_defs @[%a@]" (fun k ->
-        k (CCList.pp C.pp) new_defs);
-    Some (renamed :: new_defs)
-  | _ -> None
+      Util.debugf ~section 1 "renamed @[%a@] into@. @[%a@]" (fun k ->
+          k C.pp c C.pp renamed);
+      Util.debugf ~section 1 "new_defs @[%a@]" (fun k ->
+          k (CCList.pp C.pp) new_defs);
+      Some (renamed :: new_defs)
+    | _ -> None
+  in
+  Env.update_flex_state env (fun _ -> !flex_ref);
+  result
 
 let simplify_bools env t =
   let negate t =
@@ -2159,7 +2197,10 @@ let setup env =
       Env.add_basic_simplify env nnf_bool_subters;
     if Env.flex_get_of env k_norm_bools then
       Env.add_basic_simplify env normalize_bool_terms;
-    if not !Lazy_cnf.enabled then (
+    if
+      not
+        (Flex_state.get_or ~or_:false Lazy_cnf.k_enabled (Env.flex_state_of env))
+    then (
       Env.add_multi_simpl_rule env ~priority:2 Fool.rw_bool_lits;
       if Env.flex_get_of env k_cnf_non_simpl then
         Env.add_unary_inf env "cnf otf inf" cnf_infer
@@ -2583,49 +2624,29 @@ let preprocess_cnf_booleans stmts =
     res
   | _ -> stmts
 
-let _interpret_bool_funs = ref false
-let _cnf_non_simpl = ref false
-let _norm_bools = ref false
-let _filter_literals = ref `Max
-let _nnf = ref false
-let _simplify_bools = ref true
-let _trigger_bool_inst = ref (-1)
-let _trigger_bool_ind = ref (-1)
-let _generalize_trigger = ref `Off
-let _include_quants = ref true
-let _bool_hoist_simpl = ref false
-let _rename_nested_bools = ref false
-let _fluid_hoist = ref false
-let _bool_app_var_repl = ref false
-let _fluid_log_hoist = ref false
-let _solve_formulas = ref false
-let _replace_quants = ref false
-let _disable_ho_unif = ref false
-let _bool_triggers_only = ref false
-
 let extension =
   let register (env : Env.t) =
     Env.flex_add_of env k_bool_reasoning !_bool_reasoning;
     Env.flex_add_of env k_quant_rename !_quant_rename;
-    Env.flex_add_of env k_interpret_bool_funs !_interpret_bool_funs;
-    Env.flex_add_of env k_cnf_non_simpl !_cnf_non_simpl;
-    Env.flex_add_of env k_norm_bools !_norm_bools;
-    Env.flex_add_of env k_filter_literals !_filter_literals;
-    Env.flex_add_of env k_nnf !_nnf;
-    Env.flex_add_of env k_simplify_bools !_simplify_bools;
-    Env.flex_add_of env k_trigger_bool_inst !_trigger_bool_inst;
-    Env.flex_add_of env k_trigger_bool_ind !_trigger_bool_ind;
-    Env.flex_add_of env k_include_quants !_include_quants;
-    Env.flex_add_of env k_bool_hoist_simpl !_bool_hoist_simpl;
-    Env.flex_add_of env k_rename_nested_bools !_rename_nested_bools;
-    Env.flex_add_of env k_fluid_hoist !_fluid_hoist;
-    Env.flex_add_of env k_bool_app_var_repl !_bool_app_var_repl;
-    Env.flex_add_of env k_fluid_log_hoist !_fluid_log_hoist;
-    Env.flex_add_of env k_solve_formulas !_solve_formulas;
-    Env.flex_add_of env k_replace_unsupported_quants !_replace_quants;
-    Env.flex_add_of env k_disable_ho_bool_unif !_disable_ho_unif;
-    Env.flex_add_of env k_generalize_trigger !_generalize_trigger;
-    Env.flex_add_of env k_bool_triggers_only !_bool_triggers_only;
+    Env.flex_ensure env k_interpret_bool_funs false;
+    Env.flex_ensure env k_cnf_non_simpl false;
+    Env.flex_ensure env k_norm_bools false;
+    Env.flex_ensure env k_filter_literals `Max;
+    Env.flex_ensure env k_nnf false;
+    Env.flex_ensure env k_simplify_bools true;
+    Env.flex_ensure env k_trigger_bool_inst (-1);
+    Env.flex_ensure env k_trigger_bool_ind (-1);
+    Env.flex_ensure env k_include_quants true;
+    Env.flex_ensure env k_bool_hoist_simpl false;
+    Env.flex_ensure env k_rename_nested_bools false;
+    Env.flex_ensure env k_fluid_hoist false;
+    Env.flex_ensure env k_bool_app_var_repl false;
+    Env.flex_ensure env k_fluid_log_hoist false;
+    Env.flex_ensure env k_solve_formulas false;
+    Env.flex_ensure env k_replace_unsupported_quants false;
+    Env.flex_ensure env k_disable_ho_bool_unif false;
+    Env.flex_ensure env k_generalize_trigger `Off;
+    Env.flex_ensure env k_bool_triggers_only false;
 
     setup env
   in
@@ -2636,6 +2657,7 @@ let extension =
   }
 
 let () =
+  (* _bool_reasoning and _quant_rename kept as module refs — used before env *)
   Options.add_opts
     [
       ( "--boolean-reasoning",
@@ -2650,97 +2672,123 @@ let () =
                  | "cases-preprocess" -> BoolCasesPreprocess
                  | _ -> assert false);
               if !_bool_reasoning == BoolHoist then
-                (* setting default Boolean selection if BoolHoist is on *)
                 Params.Cli.set_bool_select "smallest" ),
         " enable/disable boolean axioms" );
       ( "--quantifier-renaming",
         Arg.Bool (fun v -> _quant_rename := v),
         " turn the quantifier renaming on or off" );
-      ( "--replace-quants",
-        Arg.Bool (fun v -> _replace_quants := v),
-        " replace unsupported quantifiers" );
-      ( "--replace-bool-app-vars",
-        Arg.Bool (fun v -> _bool_app_var_repl := v),
-        " unify applied variables with combinations of T and F" );
-      ( "--rename-nested-bools",
-        Arg.Bool (fun v -> _rename_nested_bools := v),
-        " rename deeply nested bool subterms" );
-      ( "--trigger-bool-ind",
-        Arg.Set_int _trigger_bool_ind,
-        " abstract away constants from the goal and use them to trigger axioms \
-         of induction" );
-      ( "--trigger-bool-inst",
-        Arg.Set_int _trigger_bool_inst,
-        " instantiate predicate variables with boolean terms already in the \
-         proof state. Argument is the maximal proof depth of predicate \
-         variable" );
-      ( "--trigger-bool-inst-prop-only",
-        Arg.Bool (( := ) _bool_triggers_only),
-        " make sure that lambdas are REALLY only of Boolean type" );
-      ( "--trigger-bool-include-quants",
-        Arg.Bool (( := ) _include_quants),
-        " include lambdas directly under a quant in consdieration" );
-      ( "--trigger-bool-generalize",
-        Arg.Symbol
-          ( [ "off"; "neg"; "var" ],
-            fun s ->
-              _generalize_trigger :=
-                match s with
-                | "off" -> `Off
-                | "neg" -> `Neg
-                | "var" -> `Var
-                | _ -> invalid_arg "off, neg or var are the only options" ),
-        " generalize the trigger: neg adds the negation before the trigger \
-         body, " ^ " and var applies the body to a fresh variable" );
-      ( "--disable-simplifying-cnf",
-        Arg.Set _cnf_non_simpl,
-        " implement cnf on-the-fly as an inference rule" );
-      ( "--interpret-bool-funs",
-        Arg.Bool (fun v -> _interpret_bool_funs := v),
-        " turn interpretation of boolean functions as forall or negation of \
-         forall on or off" );
-      ( "--bool-hoist-simpl",
-        Arg.Bool
-          (fun v ->
-            _bool_hoist_simpl := v;
-            _rename_nested_bools := true),
-        " use BoolHoistSimpl instead of BoolHoist; NOTE: Setting this option \
-         triggers nested booleans renaming" );
-      ( "--normalize-bool-terms",
-        Arg.Bool (fun v -> _norm_bools := v),
-        " normalize boolean subterms using their weight." );
-      ( "--nnf-nested-formulas",
-        Arg.Bool (fun v -> _nnf := v),
-        " convert nested formulas into negation normal form" );
-      ( "--simplify-bools",
-        Arg.Bool (fun v -> _simplify_bools := v),
-        " simplify boolean subterms" );
-      ( "--fluid-hoist",
-        Arg.Bool (fun v -> _fluid_hoist := v),
-        " enable/disable Fluid(Bool|Loob)Hoist rules" );
-      ( "--fluid-log-hoist",
-        Arg.Bool (fun v -> _fluid_log_hoist := v),
-        " enable/disable fluid version of BoolRW, (Forall|Exists)RW, \
-         (Eq|Neq|Forall|Exists)Hoist rules" );
-      ( "--solve-formulas",
-        Arg.Bool (fun v -> _solve_formulas := v),
-        " solve phi = psi eagerly by unifying phi != ~psi, where phi and psi \
-         are formulas" );
-      ( "--boolean-reasoning-filter-literals",
-        Arg.Symbol
-          ( [ "all"; "max" ],
-            fun v ->
-              match v with
-              | "all" -> _filter_literals := `All
-              | "max" -> _filter_literals := `Max
-              | _ -> assert false ),
-        " select on which literals to apply bool reasoning rules" );
     ];
-  Params.add_to_mode "best" (fun () ->
+  Params.add_flex_opts (fun ~flex_ref ->
+      [
+        ( "--replace-quants",
+          Arg.Bool
+            (fun v ->
+              flex_ref :=
+                Flex_state.add k_replace_unsupported_quants v !flex_ref),
+          " replace unsupported quantifiers" );
+        ( "--replace-bool-app-vars",
+          Arg.Bool
+            (fun v ->
+              flex_ref := Flex_state.add k_bool_app_var_repl v !flex_ref),
+          " unify applied variables with combinations of T and F" );
+        ( "--rename-nested-bools",
+          Arg.Bool
+            (fun v ->
+              flex_ref := Flex_state.add k_rename_nested_bools v !flex_ref),
+          " rename deeply nested bool subterms" );
+        ( "--trigger-bool-ind",
+          Arg.Int
+            (fun n -> flex_ref := Flex_state.add k_trigger_bool_ind n !flex_ref),
+          " abstract away constants from the goal and use them to trigger \
+           axioms of induction" );
+        ( "--trigger-bool-inst",
+          Arg.Int
+            (fun n ->
+              flex_ref := Flex_state.add k_trigger_bool_inst n !flex_ref),
+          " instantiate predicate variables with boolean terms already in the \
+           proof state. Argument is the maximal proof depth of predicate \
+           variable" );
+        ( "--trigger-bool-inst-prop-only",
+          Arg.Bool
+            (fun v ->
+              flex_ref := Flex_state.add k_bool_triggers_only v !flex_ref),
+          " make sure that lambdas are REALLY only of Boolean type" );
+        ( "--trigger-bool-include-quants",
+          Arg.Bool
+            (fun v -> flex_ref := Flex_state.add k_include_quants v !flex_ref),
+          " include lambdas directly under a quant in consdieration" );
+        ( "--trigger-bool-generalize",
+          Arg.Symbol
+            ( [ "off"; "neg"; "var" ],
+              fun s ->
+                flex_ref :=
+                  Flex_state.add k_generalize_trigger
+                    (match s with
+                    | "off" -> `Off
+                    | "neg" -> `Neg
+                    | _ -> `Var)
+                    !flex_ref ),
+          " generalize the trigger: neg adds the negation before the trigger \
+           body, and var applies the body to a fresh variable" );
+        ( "--disable-simplifying-cnf",
+          Arg.Bool
+            (fun v -> flex_ref := Flex_state.add k_cnf_non_simpl v !flex_ref),
+          " implement cnf on-the-fly as an inference rule" );
+        ( "--interpret-bool-funs",
+          Arg.Bool
+            (fun v ->
+              flex_ref := Flex_state.add k_interpret_bool_funs v !flex_ref),
+          " turn interpretation of boolean functions as forall or negation of \
+           forall on or off" );
+        ( "--bool-hoist-simpl",
+          Arg.Bool
+            (fun v ->
+              flex_ref := Flex_state.add k_bool_hoist_simpl v !flex_ref;
+              flex_ref := Flex_state.add k_rename_nested_bools true !flex_ref),
+          " use BoolHoistSimpl instead of BoolHoist; NOTE: Setting this option \
+           triggers nested booleans renaming" );
+        ( "--normalize-bool-terms",
+          Arg.Bool
+            (fun v -> flex_ref := Flex_state.add k_norm_bools v !flex_ref),
+          " normalize boolean subterms using their weight." );
+        ( "--nnf-nested-formulas",
+          Arg.Bool (fun v -> flex_ref := Flex_state.add k_nnf v !flex_ref),
+          " convert nested formulas into negation normal form" );
+        ( "--simplify-bools",
+          Arg.Bool
+            (fun v -> flex_ref := Flex_state.add k_simplify_bools v !flex_ref),
+          " simplify boolean subterms" );
+        ( "--fluid-hoist",
+          Arg.Bool
+            (fun v -> flex_ref := Flex_state.add k_fluid_hoist v !flex_ref),
+          " enable/disable Fluid(Bool|Loob)Hoist rules" );
+        ( "--fluid-log-hoist",
+          Arg.Bool
+            (fun v -> flex_ref := Flex_state.add k_fluid_log_hoist v !flex_ref),
+          " enable/disable fluid version of BoolRW, (Forall|Exists)RW, \
+           (Eq|Neq|Forall|Exists)Hoist rules" );
+        ( "--solve-formulas",
+          Arg.Bool
+            (fun v -> flex_ref := Flex_state.add k_solve_formulas v !flex_ref),
+          " solve phi = psi eagerly by unifying phi != ~psi, where phi and psi \
+           are formulas" );
+        ( "--boolean-reasoning-filter-literals",
+          Arg.Symbol
+            ( [ "all"; "max" ],
+              fun s ->
+                flex_ref :=
+                  Flex_state.add k_filter_literals
+                    (match s with
+                    | "all" -> `All
+                    | _ -> `Max)
+                    !flex_ref ),
+          " select on which literals to apply bool reasoning rules" );
+      ]);
+  Params.add_to_mode "best" (fun flex_ref ->
       _bool_reasoning := BoolHoist;
-      _trigger_bool_inst := 1;
-      _trigger_bool_ind := 1;
-      _include_quants := false);
+      flex_ref := Flex_state.add k_trigger_bool_inst 1 !flex_ref;
+      flex_ref := Flex_state.add k_trigger_bool_ind 1 !flex_ref;
+      flex_ref := Flex_state.add k_include_quants false !flex_ref);
   Params.add_to_modes
     [
       "best";
@@ -2751,15 +2799,15 @@ let () =
       "ho-comb-complete";
       "lambda-free-purify-extensional";
       "fo-complete-basic";
-    ] (fun () ->
+    ] (fun flex_ref ->
       _bool_reasoning := BoolReasoningDisabled;
       Params.Cli.set_bool_select "smallest");
-  Params.add_to_mode "ho-complete-basic" (fun () ->
+  Params.add_to_mode "ho-complete-basic" (fun flex_ref ->
       _bool_reasoning := BoolHoist;
-      _fluid_hoist := true;
-      _bool_app_var_repl := true;
-      _fluid_log_hoist := true;
-      _replace_quants := true);
+      flex_ref := Flex_state.add k_fluid_hoist true !flex_ref;
+      flex_ref := Flex_state.add k_bool_app_var_repl true !flex_ref;
+      flex_ref := Flex_state.add k_fluid_log_hoist true !flex_ref;
+      flex_ref := Flex_state.add k_replace_unsupported_quants true !flex_ref);
   Params.add_to_modes
     [
       "best";
@@ -2771,7 +2819,8 @@ let () =
       "ho-competitive";
       "lambda-free-purify-extensional";
       "fo-complete-basic";
-    ] (fun () -> _replace_quants := false);
+    ] (fun flex_ref ->
+      flex_ref := Flex_state.add k_replace_unsupported_quants false !flex_ref);
   Params.add_to_modes
     [
       "lambda-free-intensional";
@@ -2779,5 +2828,6 @@ let () =
       "lambda-free-extensional";
       "ho-comb-complete";
       "lambda-free-purify-extensional";
-    ] (fun () -> _disable_ho_unif := true);
+    ] (fun flex_ref ->
+      flex_ref := Flex_state.add k_disable_ho_bool_unif true !flex_ref);
   Extensions.register extension

@@ -323,30 +323,19 @@ let setup (env : Env.t) =
     Unif._allow_pattern_unif := false
   )
 
-let _enable_combinators = ref false
-let _app_var_narrowing = ref true
-let _s_penalty = ref 1
-let _b_penalty = ref 1
-let _c_penalty = ref 1
-let _k_penalty = ref 1
-let _app_var_constraints = ref false
-let _deep_app_var_penalty = ref false
-let _unif_resolve = ref false
-let _combinators_max_depth = ref None
-
 let extension =
   let lam2combs seq = seq in
 
   let register (env : Env.t) =
-    Env.flex_add_of env k_enable_combinators !_enable_combinators;
-    Env.flex_add_of env k_app_var_narrowing !_app_var_narrowing;
-    Env.flex_add_of env k_s_penalty !_s_penalty;
-    Env.flex_add_of env k_c_penalty !_c_penalty;
-    Env.flex_add_of env k_b_penalty !_b_penalty;
-    Env.flex_add_of env k_k_penalty !_k_penalty;
-    Env.flex_add_of env k_deep_app_var_penalty !_deep_app_var_penalty;
-    Env.flex_add_of env k_unif_resolve !_unif_resolve;
-    Env.flex_add_of env k_combinators_max_depth !_combinators_max_depth;
+    Env.flex_ensure env k_enable_combinators false;
+    Env.flex_ensure env k_app_var_narrowing true;
+    Env.flex_ensure env k_s_penalty 1;
+    Env.flex_ensure env k_c_penalty 1;
+    Env.flex_ensure env k_b_penalty 1;
+    Env.flex_ensure env k_k_penalty 1;
+    Env.flex_ensure env k_deep_app_var_penalty false;
+    Env.flex_ensure env k_unif_resolve false;
+    Env.flex_ensure env k_combinators_max_depth None;
 
     setup env
   in
@@ -359,39 +348,47 @@ let extension =
   }
 
 let () =
-  Options.add_opts
-    [
-      ( "--combinator-based-reasoning",
-        Arg.Bool (fun v -> _enable_combinators := v),
-        " enable / disable combinator based reasoning" );
-      ( "--app-var-constraints",
-        Arg.Bool (fun v -> _app_var_constraints := v),
-        " enable / disable delaying app var clashes as constraints" );
-      ( "--app-var-narrowing",
-        Arg.Bool (( := ) _app_var_narrowing),
-        " enable / disable app_var_narrowing" );
-      ( "--penalize-deep-appvars",
-        Arg.Bool (fun v -> _deep_app_var_penalty := v),
-        " enable / disable penalizing narrow app var inferences with deep \
-         variables" );
-      ( "--comb-max-depth",
-        Arg.Int (fun v -> _combinators_max_depth := Some v),
-        " set the maximal number off variable narrowings allowed. " );
-      ( "--comb-unif-resolve",
-        Arg.Bool (( := ) _unif_resolve),
-        " enable / disable higher-order unit clause resolutions" );
-      ( "--comb-s-penalty",
-        Arg.Set_int _s_penalty,
-        "penalty for narrowing with $S X Y" );
-      ( "--comb-c-penalty",
-        Arg.Set_int _c_penalty,
-        "penalty for narrowing with $C X Y" );
-      ( "--comb-b-penalty",
-        Arg.Set_int _b_penalty,
-        "penalty for narrowing with $B X Y" );
-      ( "--comb-k-penalty",
-        Arg.Set_int _k_penalty,
-        "penalty for narrowing with $K X" );
-    ];
-  Params.add_to_mode "ho-comb-complete" (fun () -> _enable_combinators := true);
+  Params.add_flex_opts (fun ~flex_ref ->
+      [
+        ( "--combinator-based-reasoning",
+          Arg.Bool
+            (fun v ->
+              flex_ref := Flex_state.add k_enable_combinators v !flex_ref),
+          " enable / disable combinator based reasoning" );
+        ( "--app-var-narrowing",
+          Arg.Bool
+            (fun v ->
+              flex_ref := Flex_state.add k_app_var_narrowing v !flex_ref),
+          " enable / disable app_var_narrowing" );
+        ( "--penalize-deep-appvars",
+          Arg.Bool
+            (fun v ->
+              flex_ref := Flex_state.add k_deep_app_var_penalty v !flex_ref),
+          " enable / disable penalizing narrow app var inferences with deep \
+           variables" );
+        ( "--comb-max-depth",
+          Arg.Int
+            (fun v ->
+              flex_ref :=
+                Flex_state.add k_combinators_max_depth (Some v) !flex_ref),
+          " set the maximal number off variable narrowings allowed. " );
+        ( "--comb-unif-resolve",
+          Arg.Bool
+            (fun v -> flex_ref := Flex_state.add k_unif_resolve v !flex_ref),
+          " enable / disable higher-order unit clause resolutions" );
+        ( "--comb-s-penalty",
+          Arg.Int (fun n -> flex_ref := Flex_state.add k_s_penalty n !flex_ref),
+          "penalty for narrowing with $S X Y" );
+        ( "--comb-c-penalty",
+          Arg.Int (fun n -> flex_ref := Flex_state.add k_c_penalty n !flex_ref),
+          "penalty for narrowing with $C X Y" );
+        ( "--comb-b-penalty",
+          Arg.Int (fun n -> flex_ref := Flex_state.add k_b_penalty n !flex_ref),
+          "penalty for narrowing with $B X Y" );
+        ( "--comb-k-penalty",
+          Arg.Int (fun n -> flex_ref := Flex_state.add k_k_penalty n !flex_ref),
+          "penalty for narrowing with $K X" );
+      ]);
+  Params.add_to_mode "ho-comb-complete" (fun flex_ref ->
+      flex_ref := Flex_state.add k_enable_combinators true !flex_ref);
   Extensions.register extension

@@ -46,15 +46,11 @@ let setup env =
     ) else
       Signal.once (Env.on_start env) (fun () -> run_fixpoint env)
 
-let _enabled = ref false
-let _check_at = ref 10
-let _inprocessing = ref false
-
 let extension =
   let action (env : Env.t) =
-    Env.flex_add_of env k_enabled !_enabled;
-    Env.flex_add_of env k_fp_inprocessing !_inprocessing;
-    Env.flex_add_of env k_check_at !_check_at;
+    Env.flex_ensure env k_enabled false;
+    Env.flex_ensure env k_fp_inprocessing false;
+    Env.flex_ensure env k_check_at 10;
     setup env
   in
   {
@@ -65,15 +61,16 @@ let extension =
   }
 
 let () =
-  Options.add_opts
-    [
-      ( "--bce-pe-fixpoint",
-        Arg.Bool (( := ) _enabled),
-        " enable BCE/PE fixpoint simplification" );
-      ( "--bce-pe-fixpoint-inprocessing",
-        Arg.Bool (( := ) _inprocessing),
-        " enable BCE/PE fixpoint as inprocessing rule" );
-      ( "--bce-pe-fixpoint-check-at",
-        Arg.Int (( := ) _check_at),
-        " BCE/PE fixpoint inprocessing periodicity" );
-    ]
+  Params.add_flex_opts (fun ~flex_ref ->
+      [
+        ( "--bce-pe-fixpoint",
+          Arg.Bool (fun v -> flex_ref := Flex_state.add k_enabled v !flex_ref),
+          " enable BCE/PE fixpoint simplification" );
+        ( "--bce-pe-fixpoint-inprocessing",
+          Arg.Bool
+            (fun v -> flex_ref := Flex_state.add k_fp_inprocessing v !flex_ref),
+          " enable BCE/PE fixpoint as inprocessing rule" );
+        ( "--bce-pe-fixpoint-check-at",
+          Arg.Int (fun n -> flex_ref := Flex_state.add k_check_at n !flex_ref),
+          " BCE/PE fixpoint inprocessing periodicity" );
+      ])

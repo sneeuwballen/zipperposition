@@ -4,8 +4,7 @@ module L = Literal
 module Ls = Literals
 module T = Term
 
-let enabled = ref false
-let _eager_lcnf = ref false
+let k_enabled : bool Flex_state.key = Flex_state.create_key ()
 let k_lazy_cnf_kind = Flex_state.create_key ()
 let k_lazy_cnf_eager = Flex_state.create_key ()
 let k_renaming_threshold = Flex_state.create_key ()
@@ -28,26 +27,38 @@ module C = Clause
 module FR = Env.FormRename
 
 let _form_counter = Term.Tbl.create 256
-let _counted_clauses = ref Util.Int_set.empty
+
+let k_counted_clauses : Util.Int_set.t Flex_state.key = Flex_state.create_key ()
+
+let get_counted_clauses env =
+  Flex_state.get_or ~or_:Util.Int_set.empty k_counted_clauses
+    (Env.flex_state_of env)
+
+let update_counted_clauses env f =
+  Env.update_flex_state env (fun fs ->
+    Flex_state.add k_counted_clauses
+      (f (Flex_state.get_or ~or_:Util.Int_set.empty k_counted_clauses fs))
+      fs)
 
 let update_form_counter ~action env c =
+  let flex_ref = ref (Env.flex_state_of env) in
   let should_update c =
-    (not (FR.is_renaming_clause c))
+    (not (FR.is_renaming_clause ~flex_ref c))
     &&
     (* we make sure than we do not add or remove the clause twice *)
     match action with
     | `Increase ->
-      if Util.Int_set.mem (C.id c) !_counted_clauses then
+      if Util.Int_set.mem (C.id c) (get_counted_clauses env) then
         false
       else (
-        _counted_clauses := Util.Int_set.add (C.id c) !_counted_clauses;
+        update_counted_clauses env (Util.Int_set.add (C.id c));
         true
       )
     | `Decrease ->
-      if not (Util.Int_set.mem (C.id c) !_counted_clauses) then
+      if not (Util.Int_set.mem (C.id c) (get_counted_clauses env)) then
         false
       else (
-        _counted_clauses := Util.Int_set.remove (C.id c) !_counted_clauses;
+        update_counted_clauses env (Util.Int_set.remove (C.id c));
         true
       )
   in
@@ -77,7 +88,8 @@ let update_form_counter ~action env c =
                | `Decrease -> Term.Tbl.decr _form_counter t)
              terms)
   else
-    ( (* CCFormat.printf "not updating @[%a@]@." C.pp c; *) )
+    ( (* CCFormat.printf "not updating @[%a@]@." C.pp c; *) );
+  Env.update_flex_state env (fun _ -> !flex_ref)
 
 let fold_lits env c =
   let lits = Ls.fold_eqn_simple (C.lits c) in
@@ -241,12 +253,11 @@ let check_size_limits env sign f =
 let proof ~constructor ~name ~parents c =
   constructor ~rule:(Proof.Rule.mk name) (List.map C.proof_parent parents)
 
-let rename_eq env ~c ~should_rename lhs rhs sign =
+let rename_eq env ~flex_ref ~c ~should_rename lhs rhs sign =
   assert (Type.equal (T.ty lhs) (T.ty rhs));
   assert (Type.is_prop (T.ty lhs));
   assert (T.is_appbuiltin lhs || T.is_appbuiltin rhs);
   assert ((not (T.is_true_or_false lhs)) || T.is_true_or_false rhs);
-
   let yields_clauses f =
     match T.view f with
     | T.AppBuiltin ((Eq | Neq), [ ty; _; _ ]) ->
@@ -266,16 +277,18 @@ let rename_eq env ~c ~should_rename lhs rhs sign =
     if yields_clauses lhs && yields_clauses rhs then
       CCOpt.map
         (fun (r, d, p) -> app_sign r, d, p)
-        (FR.rename_form ~should_rename ~polarity_aware ~c (T.Form.equiv lhs rhs)
-           sign)
+        (FR.rename_form ~flex_ref ~should_rename ~polarity_aware ~c
+           (T.Form.equiv lhs rhs) sign)
     else if yields_clauses lhs then
       CCOpt.map
         (fun (r, d, p) -> app_sign (T.Form.eq r rhs), d, p)
-        (FR.rename_form ~should_rename ~polarity_aware:false ~c lhs sign)
+        (FR.rename_form ~flex_ref ~should_rename ~polarity_aware:false ~c lhs
+           sign)
     else if yields_clauses rhs then
       CCOpt.map
         (fun (r, d, p) -> app_sign (T.Form.eq lhs r), d, p)
-        (FR.rename_form ~should_rename ~polarity_aware:false ~c rhs sign)
+        (FR.rename_form ~flex_ref ~should_rename ~polarity_aware:false ~c rhs
+           sign)
     else
       None
   else
@@ -376,6 +389,7 @@ let cnf_scope_form env form =
 
 let clausify_quant env ~parent ~var_offset ~sign ~quant_body
     ~(quant_hd : Builtin.t) =
+  let flex_ref = ref (Env.flex_state_of env) in
   let f = Combinators.expand env quant_body in
   let var_tys, body = T.open_fun f in
   assert (List.length var_tys = 1);
@@ -401,7 +415,9 @@ let clausify_quant env ~parent ~var_offset ~sign ~quant_body
     if hd = ForallConst then
       T.var @@ HVar.make ~ty:var_ty (var_offset + 1)
     else
-      FR.get_skolem ~parent ~mode:(Env.flex_get_of env k_skolem_mode) f
+      FR.get_skolem ~flex_ref ~parent
+        ~mode:(Env.flex_get_of env k_skolem_mode)
+        f
       |> CCFun.tap (fun t ->
              CCOpt.iter
                (fun hd_id ->
@@ -414,7 +430,9 @@ let clausify_quant env ~parent ~var_offset ~sign ~quant_body
   let res_t =
     Lambda.eta_reduce ~expand_quant @@ Lambda.snf @@ T.app f [ subst_term ]
   in
-  res_t, hd, subst_term, rule_name
+  let result = res_t, hd, subst_term, rule_name in
+  Env.update_flex_state env (fun _ -> !flex_ref);
+  result
 
 let lazy_clausify_driver env ?(ignore_eq = false)
     ?(force_clausification = false) ~proof_cons c =
@@ -619,6 +637,7 @@ let reduce_quantifiers env c =
 
 let rename_subformulas env c =
   Util.debugf ~section 3 "lazy-cnf-rename(@[%a@])@." (fun k -> k C.pp c);
+  let flex_ref = ref (Env.flex_state_of env) in
   let proof_cons =
     Proof.Step.simp ~infos:[]
       ~tags:[ Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth ]
@@ -679,69 +698,77 @@ let rename_subformulas env c =
     let num_occurences = Term.Tbl.get_or _form_counter f ~default:0 in
     (* CCFormat.printf "|@[%a@]| = %d@." T.pp f num_occurences; *)
     num_occurences >= Env.flex_get_of env k_renaming_threshold
-    && (not (FR.is_renaming_clause c))
+    && (not (FR.is_renaming_clause ~flex_ref c))
     && will_yield_claues f
   in
 
-  Ls.fold_eqn_simple (C.lits c)
-  |> Iter.fold_while
-       (fun _ (lhs, rhs, sign, pos) ->
-         let i, _ = Ls.Pos.cut pos in
-         let lit = (C.lits c).(i) in
-         let proof_cons =
-           Proof.Step.simp ~infos:[]
-             ~tags:[ Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth ]
-         in
-         let polarity_aware = Env.flex_get_of env k_pa_renaming in
-         let should_rename = should_rename sign in
-         if L.is_predicate_lit lit && T.is_appbuiltin lhs then (
-           match FR.rename_form ~should_rename ~polarity_aware ~c lhs sign with
-           | Some (renamer, new_defs, parents) ->
-             Term.Tbl.remove _form_counter lhs;
-             let rule_name = "renaming" in
-             let new_defs = clausify_defs new_defs in
-             let renamer =
-               (if sign then
-                  CCFun.id
-                else
-                  T.Form.not_)
-                 renamer
-             in
-             let renamed =
-               mk_or ~proof_cons ~rule_name [ renamer ] c
-                 ~parents:(c :: parents) i
-             in
-             let res = renamed @ new_defs in
-             Util.debugf ~section 3
-               "  @[renamed subformula %d:(@[%a@])=@. @[%a@]@]@." (fun k ->
-                 k i C.pp c (CCList.pp C.pp) renamed);
-             Util.debugf ~section 3 "  new defs:@[%a@]@." (fun k ->
-                 k (CCList.pp C.pp) new_defs);
-             Some res, `Stop
-           | None -> None, `Continue
-         ) else if
-             Type.is_prop (T.ty lhs)
-             && (not (L.is_predicate_lit lit))
-             && (T.is_appbuiltin lhs || T.is_appbuiltin rhs)
-           then (
-           match rename_eq env ~should_rename ~c lhs rhs sign with
-           | Some (renamer, new_defs, parents) ->
-             let rule_name = "renaming" in
-             let new_defs = clausify_defs new_defs in
-             let renamed =
-               mk_or ~proof_cons ~rule_name [ renamer ] c
-                 ~parents:(c :: parents) i
-             in
-             let res = renamed @ new_defs in
-             Util.debugf ~section 3 "  @[renamed eq %d(@[%a@]) into @[%a@]@]@."
-               (fun k -> k i L.pp (C.lits c).(i) (CCList.pp C.pp) renamed);
-             Util.debugf ~section 3 "  new defs:@[%a@]@." (fun k ->
-                 k (CCList.pp C.pp) new_defs);
-             Some res, `Stop
-           | None -> None, `Continue
-         ) else
-           None, `Continue)
-       None
+  let result =
+    Ls.fold_eqn_simple (C.lits c)
+    |> Iter.fold_while
+         (fun _ (lhs, rhs, sign, pos) ->
+           let i, _ = Ls.Pos.cut pos in
+           let lit = (C.lits c).(i) in
+           let proof_cons =
+             Proof.Step.simp ~infos:[]
+               ~tags:[ Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth ]
+           in
+           let polarity_aware = Env.flex_get_of env k_pa_renaming in
+           let should_rename = should_rename sign in
+           if L.is_predicate_lit lit && T.is_appbuiltin lhs then (
+             match
+               FR.rename_form ~flex_ref ~should_rename ~polarity_aware ~c lhs
+                 sign
+             with
+             | Some (renamer, new_defs, parents) ->
+               Term.Tbl.remove _form_counter lhs;
+               let rule_name = "renaming" in
+               let new_defs = clausify_defs new_defs in
+               let renamer =
+                 (if sign then
+                    CCFun.id
+                  else
+                    T.Form.not_)
+                   renamer
+               in
+               let renamed =
+                 mk_or ~proof_cons ~rule_name [ renamer ] c
+                   ~parents:(c :: parents) i
+               in
+               let res = renamed @ new_defs in
+               Util.debugf ~section 3
+                 "  @[renamed subformula %d:(@[%a@])=@. @[%a@]@]@." (fun k ->
+                   k i C.pp c (CCList.pp C.pp) renamed);
+               Util.debugf ~section 3 "  new defs:@[%a@]@." (fun k ->
+                   k (CCList.pp C.pp) new_defs);
+               Some res, `Stop
+             | None -> None, `Continue
+           ) else if
+               Type.is_prop (T.ty lhs)
+               && (not (L.is_predicate_lit lit))
+               && (T.is_appbuiltin lhs || T.is_appbuiltin rhs)
+             then (
+             match rename_eq env ~flex_ref ~should_rename ~c lhs rhs sign with
+             | Some (renamer, new_defs, parents) ->
+               let rule_name = "renaming" in
+               let new_defs = clausify_defs new_defs in
+               let renamed =
+                 mk_or ~proof_cons ~rule_name [ renamer ] c
+                   ~parents:(c :: parents) i
+               in
+               let res = renamed @ new_defs in
+               Util.debugf ~section 3
+                 "  @[renamed eq %d(@[%a@]) into @[%a@]@]@." (fun k ->
+                   k i L.pp (C.lits c).(i) (CCList.pp C.pp) renamed);
+               Util.debugf ~section 3 "  new defs:@[%a@]@." (fun k ->
+                   k (CCList.pp C.pp) new_defs);
+               Some res, `Stop
+             | None -> None, `Continue
+           ) else
+             None, `Continue)
+         None
+  in
+  Env.update_flex_state env (fun _ -> !flex_ref);
+  result
 
 let inf_quantifiers env c =
   let proof_cons =
@@ -898,7 +925,7 @@ let lazy_clausify_inf env c =
   res
 
 let setup env =
-  if !enabled then (
+  if Env.flex_get_or_create ~init:(fun () -> false) env k_enabled then (
     let handler f c =
       f c;
       Signal.ContinueListening
@@ -941,41 +968,24 @@ let setup env =
       Env.add_multi_simpl_rule env ~priority:3 cnf_scope
   )
 
-let _lazy_cnf_kind = ref `Simp
-let _renaming_threshold = ref 8
-let _rename_eq = ref true
-let _enum_bool_funs = ref false
-let _replace_bool_fun_quant = ref false
-let _scoping = ref `Off
-let _skolem_mode = ref `SkolemRecycle
-let _pa_renaming = ref true
-let _only_eligible = ref false
-let _clausify_eq_pen = ref false
-let _clausify_eq_max_noninterpreted = ref true
-let _clausify_impls = ref true
-let _simp_limit = ref (-1)
-let _simp_quant = ref false
-let _inf_quant = ref false
-
 let extension =
   let register (env : Env.t) =
-    Env.flex_add_of env k_lazy_cnf_kind !_lazy_cnf_kind;
-    Env.flex_add_of env k_lazy_cnf_eager !_eager_lcnf;
-    Env.flex_add_of env k_enum_bool_funs !_enum_bool_funs;
-    Env.flex_add_of env k_replace_bool_fun_quants !_replace_bool_fun_quant;
-    Env.flex_add_of env k_renaming_threshold !_renaming_threshold;
-    Env.flex_add_of env k_rename_eq !_rename_eq;
-    Env.flex_add_of env k_scoping !_scoping;
-    Env.flex_add_of env k_skolem_mode !_skolem_mode;
-    Env.flex_add_of env k_pa_renaming !_pa_renaming;
-    Env.flex_add_of env k_only_eligible !_only_eligible;
-    Env.flex_add_of env k_penalize_eq_cnf !_clausify_eq_pen;
-    Env.flex_add_of env k_clausify_eq_max_nonint
-      !_clausify_eq_max_noninterpreted;
-    Env.flex_add_of env k_simp_limit !_simp_limit;
-    Env.flex_add_of env k_clausify_implications !_clausify_impls;
-    Env.flex_add_of env k_simplify_quant !_simp_quant;
-    Env.flex_add_of env k_inf_quant !_inf_quant;
+    Env.flex_ensure env k_lazy_cnf_kind `Simp;
+    Env.flex_ensure env k_lazy_cnf_eager false;
+    Env.flex_ensure env k_enum_bool_funs false;
+    Env.flex_ensure env k_replace_bool_fun_quants false;
+    Env.flex_ensure env k_renaming_threshold 8;
+    Env.flex_ensure env k_rename_eq true;
+    Env.flex_ensure env k_scoping `Off;
+    Env.flex_ensure env k_skolem_mode `SkolemRecycle;
+    Env.flex_ensure env k_pa_renaming true;
+    Env.flex_ensure env k_only_eligible false;
+    Env.flex_ensure env k_penalize_eq_cnf false;
+    Env.flex_ensure env k_clausify_eq_max_nonint true;
+    Env.flex_ensure env k_simp_limit (-1);
+    Env.flex_ensure env k_clausify_implications true;
+    Env.flex_ensure env k_simplify_quant false;
+    Env.flex_ensure env k_inf_quant false;
 
     setup env
   in
@@ -986,87 +996,109 @@ let extension =
   }
 
 let () =
-  Options.add_opts
+  Params.add_flex_opts (fun ~flex_ref ->
     [
-      "--lazy-cnf", Arg.Bool (( := ) enabled), " turn on lazy clausification";
+      ( "--lazy-cnf",
+        Arg.Bool (fun v -> flex_ref := Flex_state.add k_enabled v !flex_ref),
+        " turn on lazy clausification" );
       ( "--lazy-cnf-eager",
-        Arg.Bool (( := ) _eager_lcnf),
-        " apply the rule to every newly created clause" );
-      ( "--lazy-cnf-only-eligible-lits",
-        Arg.Bool (( := ) _only_eligible),
-        " apply lazy clausification only on eligible literals" );
-      ( "--lazy-cnf-clausify-max-eq",
-        Arg.Bool (( := ) _clausify_eq_max_noninterpreted),
-        " enable/disable clausification of an EQ literal if max side is \
-         non-interpreted " );
-      ( "--lazy-cnf-clausify-implications",
-        Arg.Bool (( := ) _clausify_impls),
-        " apply simplifying clausification to implications" );
-      ( "--lazy-cnf-simp-depth-limit",
-        Arg.Int (( := ) _simp_limit),
-        " apply simplifying clausification only to formulas that would yield \
-         less than N" ^ " clauses; negative value is interpreted as infinity" );
-      ( "--lazy-cnf-scoping",
-        Arg.Symbol
-          ( [ "off"; "mini"; "maxi" ],
-            fun str ->
-              match str with
-              | "mini" -> _scoping := `Mini
-              | "maxi" -> _scoping := `Maxi
-              | "off" -> _scoping := `Off
-              | _ -> assert false ),
-        " use mini/maxi scoping rules for lazy cnf" );
-      ( "--lazy-cnf-renaming-threshold",
-        Arg.Int (( := ) _renaming_threshold),
-        " set the subformula renaming threshold -- negative value turns \
-         renaming off" );
-      ( "--polarity-aware-renaming",
-        Arg.Bool (fun v -> _pa_renaming := v),
-        " enable/disable polarity aware renaming (introducing clause with only \
-         one definition polarity)" );
-      ( "--lazy-cnf-skolem-mode",
-        Arg.Symbol
-          ( [ "skolem-recycle"; "skolem-fresh"; "choice" ],
-            fun str ->
-              match str with
-              | "skolem-recycle" -> _skolem_mode := `SkolemRecycle
-              | "skolem-fresh" -> _skolem_mode := `SkolemAlwaysFresh
-              | "choice" -> _skolem_mode := `Choice
-              | _ -> assert false ),
-        " use lazy cnf as either simplification or inference" );
-      ( "--lazy-cnf-kind",
-        Arg.Symbol
-          ( [ "inf"; "simp"; "ignore" ],
-            fun str ->
-              match str with
-              | "inf" -> _lazy_cnf_kind := `Inf
-              | "simp" -> _lazy_cnf_kind := `Simp
-              | "ignore" -> _lazy_cnf_kind := `Ignore
-              | _ -> assert false ),
-        " use lazy cnf as either simplification, inference, or let calculus \
-         clausify" );
-      ( "--lazy-cnf-rename-eq",
-        Arg.Bool (( := ) _rename_eq),
-        " turn on/of renaming of boolean equalities" );
-      ( "--lazy-cnf-simplify-quant",
-        Arg.Bool (( := ) _simp_quant),
-        " when non-simplifying clausification is used, clausify quantifiers in \
-         a simplifying manner" );
-      ( "--lazy-cnf-inf-quant",
-        Arg.Bool (( := ) _inf_quant),
-        " when simplifying clausification is used, clausify quantifiers in a \
-         non-simplifying manner" );
-      ( "--enum-bool-funs",
-        Arg.Bool (( := ) _enum_bool_funs),
-        " enumerate all functions over Boolean domain (up to the order of the \
-         problem)" );
-      ( "--replace-bool-quant-fun",
-        Arg.Bool (( := ) _replace_bool_fun_quant),
-        " replace Boolean fun quantifier with all possible values" );
-      ( "--lazy-cnf-clausify-eq-penalty",
-        Arg.Bool (( := ) _clausify_eq_pen),
-        " turn on/of penalizing clausification of equivalences" );
-    ];
+          Arg.Bool
+            (fun v -> flex_ref := Flex_state.add k_lazy_cnf_eager v !flex_ref),
+          " apply the rule to every newly created clause" );
+        ( "--lazy-cnf-only-eligible-lits",
+          Arg.Bool
+            (fun v -> flex_ref := Flex_state.add k_only_eligible v !flex_ref),
+          " apply lazy clausification only on eligible literals" );
+        ( "--lazy-cnf-clausify-max-eq",
+          Arg.Bool
+            (fun v ->
+              flex_ref := Flex_state.add k_clausify_eq_max_nonint v !flex_ref),
+          " enable/disable clausification of an EQ literal if max side is \
+           non-interpreted " );
+        ( "--lazy-cnf-clausify-implications",
+          Arg.Bool
+            (fun v ->
+              flex_ref := Flex_state.add k_clausify_implications v !flex_ref),
+          " apply simplifying clausification to implications" );
+        ( "--lazy-cnf-simp-depth-limit",
+          Arg.Int (fun n -> flex_ref := Flex_state.add k_simp_limit n !flex_ref),
+          " apply simplifying clausification only to formulas that would yield \
+           less than N clauses; negative value is interpreted as infinity" );
+        ( "--lazy-cnf-scoping",
+          Arg.Symbol
+            ( [ "off"; "mini"; "maxi" ],
+              fun s ->
+                flex_ref :=
+                  Flex_state.add k_scoping
+                    (match s with
+                    | "mini" -> `Mini
+                    | "maxi" -> `Maxi
+                    | _ -> `Off)
+                    !flex_ref ),
+          " use mini/maxi scoping rules for lazy cnf" );
+        ( "--lazy-cnf-renaming-threshold",
+          Arg.Int
+            (fun n ->
+              flex_ref := Flex_state.add k_renaming_threshold n !flex_ref),
+          " set the subformula renaming threshold -- negative value turns \
+           renaming off" );
+        ( "--polarity-aware-renaming",
+          Arg.Bool
+            (fun v -> flex_ref := Flex_state.add k_pa_renaming v !flex_ref),
+          " enable/disable polarity aware renaming (introducing clause with \
+           only one definition polarity)" );
+        ( "--lazy-cnf-skolem-mode",
+          Arg.Symbol
+            ( [ "skolem-recycle"; "skolem-fresh"; "choice" ],
+              fun s ->
+                flex_ref :=
+                  Flex_state.add k_skolem_mode
+                    (match s with
+                    | "skolem-recycle" -> `SkolemRecycle
+                    | "skolem-fresh" -> `SkolemAlwaysFresh
+                    | _ -> `Choice)
+                    !flex_ref ),
+          " use lazy cnf as either simplification or inference" );
+        ( "--lazy-cnf-kind",
+          Arg.Symbol
+            ( [ "inf"; "simp"; "ignore" ],
+              fun s ->
+                flex_ref :=
+                  Flex_state.add k_lazy_cnf_kind
+                    (match s with
+                    | "inf" -> `Inf
+                    | "simp" -> `Simp
+                    | _ -> `Ignore)
+                    !flex_ref ),
+          " use lazy cnf as either simplification, inference, or let calculus \
+           clausify" );
+        ( "--lazy-cnf-rename-eq",
+          Arg.Bool (fun v -> flex_ref := Flex_state.add k_rename_eq v !flex_ref),
+          " turn on/of renaming of boolean equalities" );
+        ( "--lazy-cnf-simplify-quant",
+          Arg.Bool
+            (fun v -> flex_ref := Flex_state.add k_simplify_quant v !flex_ref),
+          " when non-simplifying clausification is used, clausify quantifiers \
+           in a simplifying manner" );
+        ( "--lazy-cnf-inf-quant",
+          Arg.Bool (fun v -> flex_ref := Flex_state.add k_inf_quant v !flex_ref),
+          " when simplifying clausification is used, clausify quantifiers in a \
+           non-simplifying manner" );
+        ( "--enum-bool-funs",
+          Arg.Bool
+            (fun v -> flex_ref := Flex_state.add k_enum_bool_funs v !flex_ref),
+          " enumerate all functions over Boolean domain (up to the order of \
+           the problem)" );
+        ( "--replace-bool-quant-fun",
+          Arg.Bool
+            (fun v ->
+              flex_ref := Flex_state.add k_replace_bool_fun_quants v !flex_ref),
+          " replace Boolean fun quantifier with all possible values" );
+        ( "--lazy-cnf-clausify-eq-penalty",
+          Arg.Bool
+            (fun v -> flex_ref := Flex_state.add k_penalize_eq_cnf v !flex_ref),
+          " turn on/of penalizing clausification of equivalences" );
+      ]);
 
   Params.add_to_modes
     [
@@ -1078,9 +1110,9 @@ let () =
       "ho-comb-complete";
       "lambda-free-purify-extensional";
       "fo-complete-basic";
-    ] (fun () -> enabled := false);
-  Params.add_to_mode "best" (fun () ->
-      enabled := true;
-      _lazy_cnf_kind := `Simp;
-      _renaming_threshold := 4);
+    ] (fun flex_ref -> flex_ref := Flex_state.add k_enabled false !flex_ref);
+  Params.add_to_mode "best" (fun flex_ref ->
+      flex_ref := Flex_state.add k_enabled true !flex_ref;
+      flex_ref := Flex_state.add k_lazy_cnf_kind `Simp !flex_ref;
+      flex_ref := Flex_state.add k_renaming_threshold 4 !flex_ref);
   Extensions.register extension

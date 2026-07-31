@@ -9,17 +9,19 @@ module type S = sig
   module C : Clause_intf.S with module Ctx = Ctx
 
   val on_pred_skolem_introduction : (C.t * Term.t) Signal.t
-  val is_renaming_clause : C.t -> bool
+  val is_renaming_clause : flex_ref:Flex_state.t ref -> C.t -> bool
 
   val rename_form :
     ?should_rename:(T.t -> bool) ->
     ?polarity_aware:bool ->
+    flex_ref:Flex_state.t ref ->
     c:C.t ->
     T.t ->
     bool ->
     (T.t * C.t list * C.t list) option
 
   val get_skolem :
+    flex_ref:Flex_state.t ref ->
     parent:C.t ->
     mode:[< `Choice | `SkolemRecycle | `SkolemAlwaysFresh ] ->
     T.t ->
@@ -40,18 +42,38 @@ module Make (C : Clause_intf.S) = struct
   let on_pred_skolem_introduction : (C.t * Logtk.Term.t) Logtk.Signal.t =
     Signal.create ()
 
-  let _skolem_idx = ref @@ Idx.empty ()
-  let _renaming_idx = ref @@ Idx.empty ()
-  let _renamer_symbols = ref @@ Name.Set.empty
+  type rename_state = {
+    mutable skolem_idx: Idx.t;
+    mutable renaming_idx: Idx.t;
+    mutable renamer_symbols: Name.Set.t;
+  }
+
+  let k_state : rename_state Flex_state.key = Flex_state.create_key ()
+
+  let mk_rename_state () =
+    {
+      skolem_idx = Idx.empty ();
+      renaming_idx = Idx.empty ();
+      renamer_symbols = Name.Set.empty;
+    }
+
+  let get_state (flex_ref : Flex_state.t ref) : rename_state =
+    match Flex_state.get k_state !flex_ref with
+    | Some st -> st
+    | None ->
+      let st = mk_rename_state () in
+      flex_ref := Flex_state.add k_state st !flex_ref;
+      st
 
   (* Two-literal clause of which one is a renaming literal
      and the other one is a formula *)
-  let is_renaming_clause c =
+  let is_renaming_clause ~flex_ref c =
+    let st = get_state flex_ref in
     let is_renaming_lit = function
       | L.Equation (lhs, _, _) as lit when L.is_predicate_lit lit ->
         let hd = T.head_term lhs in
         (match T.head hd with
-        | Some id -> Name.Set.mem id !_renamer_symbols
+        | Some id -> Name.Set.mem id st.renamer_symbols
         | None -> false)
       | _ -> false
     in
@@ -94,8 +116,9 @@ module Make (C : Clause_intf.S) = struct
 
     res
 
-  let rename_form ?(should_rename = fun _ -> true) ?(polarity_aware = true) ~c
-      form sign =
+  let rename_form ?(should_rename = fun _ -> true) ?(polarity_aware = true)
+      ~flex_ref ~c form sign =
+    let st = get_state flex_ref in
     assert (Type.is_prop (T.ty form));
     let mk_sign sign =
       if polarity_aware then
@@ -112,11 +135,11 @@ module Make (C : Clause_intf.S) = struct
       | _ -> invalid_arg "wrong definition state"
     in
 
-    if is_renaming_clause c || T.is_true_or_false form then
+    if is_renaming_clause ~flex_ref c || T.is_true_or_false form then
       None
     else (
       let gen =
-        Iter.head @@ Idx.retrieve_generalizations (!_renaming_idx, 0) (form, 1)
+        Iter.head @@ Idx.retrieve_generalizations (st.renaming_idx, 0) (form, 1)
       in
       match gen with
       | Some (orig, (renamer, defined_as), subst) ->
@@ -184,15 +207,16 @@ module Make (C : Clause_intf.S) = struct
           in
           Ctx.declare (C.ctx_of c) id ty;
           let def = mk_renaming_clause c ~renamer ~polarity_aware ~form sign in
-          _renaming_idx :=
-            Idx.add !_renaming_idx form (renamer, ref [ def, mk_sign sign ]);
-          _renamer_symbols := Name.Set.add id !_renamer_symbols;
+          st.renaming_idx <-
+            Idx.add st.renaming_idx form (renamer, ref [ def, mk_sign sign ]);
+          st.renamer_symbols <- Name.Set.add id st.renamer_symbols;
           Some (renamer, [ def ], [ def ])
         ) else
           None
     )
 
-  let get_skolem ~parent ~mode f =
+  let get_skolem ~flex_ref ~parent ~mode f =
+    let st = get_state flex_ref in
     let free_vars = T.Seq.vars f in
     let var_tys, _ = Type.open_fun (T.ty f) in
     assert (List.length var_tys = 1);
@@ -209,14 +233,14 @@ module Make (C : Clause_intf.S) = struct
     match mode with
     | `SkolemRecycle ->
       let gen =
-        Iter.head @@ Idx.retrieve_generalizations (!_skolem_idx, 0) (f, 1)
+        Iter.head @@ Idx.retrieve_generalizations (st.skolem_idx, 0) (f, 1)
       in
       (match gen with
       | Some (orig, (skolem, _), subst) ->
         Subst.FO.apply Subst.Renaming.none subst (skolem, 0)
       | None ->
         let t = mk_skolem () in
-        _skolem_idx := Idx.add !_skolem_idx f (t, ref []);
+        st.skolem_idx <- Idx.add st.skolem_idx f (t, ref []);
         t)
     | `SkolemAlwaysFresh -> mk_skolem ()
     | `Choice -> T.Form.choice f

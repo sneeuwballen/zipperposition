@@ -2228,7 +2228,7 @@ let () =
         " whether to ignore the orphans during clause selection" );
     ];
 
-  Params.add_to_mode "best" (fun () ->
+  Params.add_to_mode "best" (fun flex_ref ->
       parse_wf_with_priority "3|prefer-fo|conjecture-relative-var(1.02,l,f)";
       parse_wf_with_priority "3|prefer-sos|pnrefined(1,1,1,2,2,2,0.5)";
       parse_wf_with_priority "4|prefer-ground|default";
@@ -2246,7 +2246,7 @@ let () =
       "lambda-free-extensional";
       "lambda-free-purify-intensional";
       "lambda-free-purify-extensional";
-    ] (fun () ->
+    ] (fun flex_ref ->
       if CCList.is_empty !funs_to_parse then (
         _profile := P_conj_rel_var;
         cr_var_ratio := 8;

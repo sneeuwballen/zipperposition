@@ -452,6 +452,7 @@ let decl_cst_of_set env (set : Cover_set.t) : unit =
 (* induction on the given variables *)
 let ind_on_vars env (cut : Avatar.cut_res) (vars : T.var list) : C.t list =
   assert (vars <> []);
+  let flex_ref = ref (Env.flex_state_of env) in
   let g = Avatar.cut_form cut in
   let depth = Avatar.cut_depth cut in
   let cut_blit = Avatar.cut_lit cut in
@@ -510,7 +511,7 @@ let ind_on_vars env (cut : Avatar.cut_res) (vars : T.var list) : C.t list =
     |> CCList.flat_map (fun (cases : (T.var * Cover_set.case) list) ->
            assert (cases <> []);
            (* literal for this case *)
-           let b_lit_case = BBox.inject_case (List.map snd cases) in
+           let b_lit_case = BBox.inject_case ~flex_ref (List.map snd cases) in
            CCList.Ref.push b_lits b_lit_case;
            (* clauses [goal[v := t'] <- b_lit(case), ¬cut.blit]
               for every [t'] sub-constant of [case] *)
@@ -595,7 +596,9 @@ let ind_on_vars env (cut : Avatar.cut_res) (vars : T.var list) : C.t list =
     (fun k -> k (Util.pp_list BBox.pp_bclause) b_clauses Proof.Step.pp proof);
   Util.incr_stat stat_inductions;
   (* return the clauses *)
-  clauses
+  let result = clauses in
+  Env.update_flex_state env (fun _ -> !flex_ref);
+  result
 
 type defined_path =
   | P_root
@@ -1301,4 +1304,4 @@ let () =
       "ho-comb-complete";
       "lambda-free-purify-intensional";
       "lambda-free-purify-extensional";
-    ] (fun () -> enabled_ := false)
+    ] (fun _ -> enabled_ := false)

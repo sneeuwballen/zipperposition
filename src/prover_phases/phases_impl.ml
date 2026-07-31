@@ -14,18 +14,43 @@ let section = Util.Section.make ~parent:Const.section "phases"
 
 module OuterEnv = Env
 
-let _db_w = ref 1
-let _lmb_w = ref 1
-let _kbo_wf = ref "invfreqrank"
-let _prec_fun = ref "invfreq"
-let _trim_implications = ref false
-let _take_only_defs = ref false
-let _ignore_k_most_common_symbols = ref None
-let _take_conj_defs = ref true
-let _sine_d_min = ref 1
-let _sine_d_max = ref 5
-let _sine_tolerance = ref 1.5
-let _sine_threshold = ref (-1)
+type state = {
+  mutable db_w : int;
+  mutable lmb_w : int;
+  mutable kbo_wf : string;
+  mutable prec_fun : string;
+  mutable trim_implications : bool;
+  mutable take_only_defs : bool;
+  mutable ignore_k_most_common_symbols : int option;
+  mutable take_conj_defs : bool;
+  mutable sine_d_min : int;
+  mutable sine_d_max : int;
+  mutable sine_tolerance : float;
+  mutable sine_threshold : int;
+}
+
+let k_state : state Flex_state.key = Flex_state.create_key ()
+
+let get_state (st_ref : Flex_state.t ref) =
+  match Flex_state.get k_state !st_ref with
+  | Some st -> st
+  | None ->
+    let st =
+      { db_w = 1;
+        lmb_w = 1;
+        kbo_wf = "invfreqrank";
+        prec_fun = "invfreq";
+        trim_implications = false;
+        take_only_defs = false;
+        ignore_k_most_common_symbols = None;
+        take_conj_defs = true;
+        sine_d_min = 1;
+        sine_d_max = 5;
+        sine_tolerance = 1.5;
+        sine_threshold = -1 }
+    in
+    st_ref := Flex_state.add k_state st !st_ref;
+    st
 
 (** setup an alarm for abrupt stop *)
 let setup_alarm timeout =
@@ -138,17 +163,18 @@ let has_arith stmt : bool =
        | `ID _ -> Iter.empty)
   |> Iter.exists ty_is_arith
 
-let sine_filter stmts =
-  if !_sine_threshold < 0 || CCVector.length stmts < !_sine_threshold then
+let sine_filter st_ref stmts =
+  let st = get_state st_ref in
+  if st.sine_threshold < 0 || CCVector.length stmts < st.sine_threshold then
     stmts
   else (
     let seq = CCVector.to_iter stmts in
     let filtered =
       Statement.sine_axiom_selector
-        ~ignore_k_most_common_symbols:!_ignore_k_most_common_symbols
-        ~take_conj_defs:!_take_conj_defs ~take_only_defs:!_take_only_defs
-        ~trim_implications:!_trim_implications ~depth_start:!_sine_d_min
-        ~depth_end:!_sine_d_max ~tolerance:!_sine_tolerance seq
+        ~ignore_k_most_common_symbols:st.ignore_k_most_common_symbols
+        ~take_conj_defs:st.take_conj_defs ~take_only_defs:st.take_only_defs
+        ~trim_implications:st.trim_implications ~depth_start:st.sine_d_min
+        ~depth_end:st.sine_d_max ~tolerance:st.sine_tolerance seq
     in
     CCVector.freeze (CCVector.of_iter filtered)
   )
@@ -170,13 +196,13 @@ let typing (st_ref : Phases.State.t ref) ~file prelude (input, stmts) =
     | Ok x -> x
     | Error msg -> Phases.failwith msg st_ref
   in
-  let stmts = sine_filter stmts in
+  let stmts = sine_filter st_ref stmts in
   Util.debugf ~section 3 "@[<hv2>@{<green>typed statements@}@ %a@]" (fun k ->
       k (Util.pp_iter Statement.pp_input) (CCVector.to_iter stmts));
   if has_arith stmts then (
     Util.debug ~section 1 "problem contains arithmetic, lost completeness";
     Phases.set_key Ctx.Key.lost_completeness true st_ref
-  ) else if !_sine_threshold >= 0 then (
+  ) else if (get_state st_ref).sine_threshold >= 0 then (
     Util.debug ~section 2 "sine is applied, lost completeness";
     Phases.set_key Ctx.Key.lost_completeness true st_ref
   );
@@ -189,7 +215,7 @@ let typing (st_ref : Phases.State.t ref) ~file prelude (input, stmts) =
 let cnf (st_ref : Phases.State.t ref) ~sk_ctx decls =
   let@ () = Phases.with_phase st_ref Phases.CNF in
   let opts =
-    if !Lazy_cnf.enabled then
+    if Flex_state.get_or ~or_:false Lazy_cnf.k_enabled !st_ref then
       [ Cnf.LazyCnf ]
     else
       []
@@ -208,6 +234,7 @@ let cnf (st_ref : Phases.State.t ref) ~sk_ctx decls =
 let compute_prec (st_ref : Phases.State.t ref) ~signature stmts =
   let@ () = Phases.with_phase st_ref Phases.Compute_prec in
   let state = !st_ref in
+  let st = get_state st_ref in
   let cp =
     Extensions.extensions ()
     |> List.fold_left
@@ -225,13 +252,13 @@ let compute_prec (st_ref : Phases.State.t ref) ~signature stmts =
                            CCOpt.map (fun id -> id, d) (Term.head st)))
            in
            let clauses = Iter.map Statement.Seq.lits stmts in
-           Precedence.weight_fun_of_string ~signature ~clauses ~lm_w:!_lmb_w
-             ~db_w:!_db_w !_kbo_wf sym_depth)
+           Precedence.weight_fun_of_string ~signature ~clauses ~lm_w:st.lmb_w
+             ~db_w:st.db_w st.kbo_wf sym_depth)
     |> Compute_prec.add_constr_rule 90 (fun seq ->
            let syms = Signature.Seq.symbols signature in
-           Precedence.Constr.prec_fun_of_str !_prec_fun ~signature syms)
+           Precedence.Constr.prec_fun_of_str st.prec_fun ~signature syms)
   in
-  Compute_prec.mk_precedence ~signature ~db_w:!_db_w ~lmb_w:!_lmb_w cp stmts
+  Compute_prec.mk_precedence ~signature ~db_w:st.db_w ~lmb_w:st.lmb_w cp stmts
 
 let compute_ord_select (st_ref : Phases.State.t ref) precedence =
   let@ () = Phases.with_phase st_ref Phases.Compute_ord_select in
@@ -483,7 +510,7 @@ let has_goal_decls_ decls =
 let parse_cli (st_ref : Phases.State.t ref) =
   let@ () = Phases.with_phase st_ref Phases.Parse_CLI in
   CCFormat.set_color_default true;
-  let params = Params.parse_args () in
+  let params = Params.parse_args ~flex_ref:st_ref () in
   let files = CCVector.to_list params.Params.files in
   Phases.set_key Params.key params st_ref;
   print_version ~params;
@@ -531,7 +558,7 @@ let process_file ?(prelude = Iter.empty) file (st_ref : Phases.State.t ref) =
          else
            "no"));
   let transformed =
-    Booleans.preprocess_booleans (Rewriting.unfold_def_before_cnf decls)
+    Booleans.preprocess_booleans (Rewriting.unfold_def_before_cnf ~flex_ref:st_ref decls)
   in
   let sk_ctx = Skolem.create () in
   let stmts = cnf st_ref ~sk_ctx transformed in
@@ -653,65 +680,69 @@ let main ?setup_gc:(gc = true) ?params file (st_ref : Phases.State.t ref) =
 
 let () =
   let open Libzipperposition in
-  Params.add_opts
+  Params.add_flex_opts (fun ~flex_ref ->
     [
       ( "--de-bruijn-weight",
-        Arg.Set_int _db_w,
+        Arg.Int (fun v -> (get_state flex_ref).db_w <- v),
         " Set weight of de Bruijn index for KBO" );
       ( "--lambda-weight",
-        Arg.Set_int _lmb_w,
+        Arg.Int (fun v -> (get_state flex_ref).lmb_w <- v),
         " Set weight of lambda symbol for KBO" );
       ( "--kbo-weight-fun",
-        Arg.Set_string _kbo_wf,
+        Arg.String (fun v -> (get_state flex_ref).kbo_wf <- v),
         " Set the function for symbol weight calculation." );
       ( "--prec-gen-fun",
-        Arg.Set_string _prec_fun,
+        Arg.String (fun v -> (get_state flex_ref).prec_fun <- v),
         " Set the function used for precedence generation" );
       ( "--sine-depth-min",
         Arg.Int
           (fun v ->
-            if !_sine_threshold == -1 then _sine_threshold := 100;
-            _sine_d_min := v),
+            let st = get_state flex_ref in
+            if st.sine_threshold = -1 then st.sine_threshold <- 100;
+            st.sine_d_min <- v),
         " Turn on SinE with threshold and set min SinE depth." );
       ( "--sine-depth-max",
         Arg.Int
           (fun v ->
-            if !_sine_threshold == -1 then _sine_threshold := 100;
-            _sine_d_max := v),
+            let st = get_state flex_ref in
+            if st.sine_threshold = -1 then st.sine_threshold <- 100;
+            st.sine_d_max <- v),
         " Turn on SinE with threshold and set max SinE depth." );
       ( "--sine-tolerance",
         Arg.Float
           (fun v ->
-            if !_sine_threshold == -1 then _sine_threshold := 100;
-            _sine_tolerance := v),
+            let st = get_state flex_ref in
+            if st.sine_threshold = -1 then st.sine_threshold <- 100;
+            st.sine_tolerance <- v),
         " Turn on SinE with threshold of 100 and set SinE symbol tolerance." );
       ( "--sine-trim-implications",
-        Arg.Bool (( := ) _trim_implications),
+        Arg.Bool (fun v -> (get_state flex_ref).trim_implications <- v),
         " trim long implications while getting symbols from conjecture" );
       ( "--sine-take-only-defs",
-        Arg.Bool (( := ) _take_only_defs),
+        Arg.Bool (fun v -> (get_state flex_ref).take_only_defs <- v),
         " take only axioms marked as definitions and the conjecture" );
       ( "--sine-ignore-k-most-common-syms",
-        Arg.Int (fun v -> _ignore_k_most_common_symbols := Some v),
+        Arg.Int
+          (fun v -> (get_state flex_ref).ignore_k_most_common_symbols <- Some v),
         " if conjecture symbol is within k most common occurring ones, then it \
          will be disregarded as conjecture symbol" );
       ( "--sine-take-conj-defs",
-        Arg.Bool (( := ) _take_conj_defs),
+        Arg.Bool (fun v -> (get_state flex_ref).take_conj_defs <- v),
         " force taking definitions of symbols ocurring in conjecture" );
       ( "--sine",
-        Arg.Set_int _sine_threshold,
+        Arg.Int (fun v -> (get_state flex_ref).sine_threshold <- v),
         " Set SinE axiom number threshold (negative number turns it off)"
         ^ " with default settings: depth in range 1-5 and tolerance 1.5" );
-    ];
-  Params.add_to_mode "best" (fun () ->
-      _lmb_w := 20;
-      _db_w := 10);
-  Params.add_to_mode "ho-pragmatic" (fun () ->
-      _lmb_w := 20;
-      _db_w := 10);
-  Params.add_to_mode "ho-complete-basic" (fun () ->
-      _lmb_w := 20;
-      _db_w := 10);
-  Params.add_to_mode "ho-competitive" (fun () ->
-      _lmb_w := 20;
-      _db_w := 10)
+    ]);
+  Params.add_to_mode "best" (fun flex_ref ->
+      (get_state flex_ref).lmb_w <- 20;
+      (get_state flex_ref).db_w <- 10);
+  Params.add_to_mode "ho-pragmatic" (fun flex_ref ->
+      (get_state flex_ref).lmb_w <- 20;
+      (get_state flex_ref).db_w <- 10);
+  Params.add_to_mode "ho-complete-basic" (fun flex_ref ->
+      (get_state flex_ref).lmb_w <- 20;
+      (get_state flex_ref).db_w <- 10);
+  Params.add_to_mode "ho-competitive" (fun flex_ref ->
+      (get_state flex_ref).lmb_w <- 20;
+      (get_state flex_ref).db_w <- 10)

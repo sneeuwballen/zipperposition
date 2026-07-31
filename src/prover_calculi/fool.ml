@@ -11,7 +11,7 @@ type term = Term.t
 let section = Util.Section.make ~parent:Const.section "fool"
 let stat_fool_param = Util.mk_stat "fool.param_step"
 let stat_elim_var = Util.mk_stat "fool.elim_var"
-let enabled_ = ref true
+let k_enabled : bool Flex_state.key = Flex_state.create_key ()
 
 module C = Clause
 module Ctx = Ctx
@@ -202,7 +202,7 @@ let setup env =
   ()
 
 let extension =
-  let register (env : Env.t) = if !enabled_ then setup env in
+  let register (env : Env.t) = if Env.flex_get_or_create ~init:(fun () -> true) env k_enabled then setup env in
   {
     Extensions.default with
     Extensions.name = "fool";
@@ -210,12 +210,12 @@ let extension =
   }
 
 let () =
-  Options.add_opts
+  Params.add_flex_opts (fun ~flex_ref ->
     [
       ( "--fool",
-        Arg.Bool (fun v -> enabled_ := v),
+        Arg.Bool (fun v -> flex_ref := Flex_state.add k_enabled v !flex_ref),
         " enable/disable fool (first-class booleans)" );
-    ];
+    ]);
   Params.add_to_modes
     [
       "best";
@@ -228,5 +228,6 @@ let () =
       "ho-comb-complete";
       "lambda-free-purify-intensional";
       "lambda-free-purify-extensional";
-    ] (fun () -> enabled_ := false);
+    ] (fun flex_ref ->
+      flex_ref := Flex_state.add k_enabled false !flex_ref);
   Extensions.register extension

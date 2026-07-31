@@ -82,16 +82,22 @@ end
 
 let _modes = Hashtbl.create 10
 
-let mode_spec () =
+let mode_spec ~flex_ref () =
   Arg.Symbol
     ( List.sort_uniq String.compare (CCHashtbl.keys_list _modes),
-      fun s -> List.iter (fun f -> f ()) (Hashtbl.find_all _modes s) )
+      fun s -> List.iter (fun f -> f flex_ref) (Hashtbl.find_all _modes s) )
 
 let add_to_mode mode f = Hashtbl.add _modes mode f
 let add_to_modes modes f = List.iter (fun m -> add_to_mode m f) modes
 
+type flex_opt_fun =
+  flex_ref:Flex_state.t ref -> (string * Arg.spec * string) list
+
+let _flex_opt_funs : flex_opt_fun list ref = ref []
+let add_flex_opts (f : flex_opt_fun) = _flex_opt_funs := f :: !_flex_opt_funs
+
 (** parse_args returns parameters *)
-let parse_args () =
+let parse_args ~(flex_ref : Flex_state.t ref) () =
   let ord = default.ord
   and seed = ref default.seed
   and steps = ref default.steps
@@ -119,7 +125,7 @@ let parse_args () =
   (* options list *)
   let options =
     [
-      "--mode", mode_spec (), " mode";
+      "--mode", mode_spec ~flex_ref (), " mode";
       ( "--ord",
         Arg.Symbol (Ordering.names (), ( := ) ord),
         " choose term ordering" );
@@ -167,6 +173,7 @@ let parse_args () =
       "--no-check", Arg.Clear check, " do not check proof";
     ]
     @ Options.make ()
+    @ List.concat_map (fun f -> f ~flex_ref) !_flex_opt_funs
     |> List.sort (fun (s1, _, _) (s2, _, _) -> String.compare s1 s2)
     |> Arg.align
   in
@@ -221,12 +228,12 @@ let () =
       "ho-comb-complete";
       "lambda-free-purify-intensional";
       "lambda-free-purify-extensional";
-    ] (fun () -> default.ord := "lambdafree_kbo");
+    ] (fun _ -> default.ord := "lambdafree_kbo");
 
-  add_to_mode "ho-complete-basic" (fun () ->
+  add_to_mode "ho-complete-basic" (fun _ ->
       default.ord := "derived_ho_kbo_complete");
 
-  add_to_mode "best" (fun () -> TypeInference._rw_forms_only := true);
+  add_to_mode "best" (fun _ -> TypeInference._rw_forms_only := true);
 
-  add_to_modes [ "best"; "ho-competitive"; "ho-pragmatic" ] (fun () ->
+  add_to_modes [ "best"; "ho-competitive"; "ho-pragmatic" ] (fun _ ->
       default.ord := "derived_ho_kbo")

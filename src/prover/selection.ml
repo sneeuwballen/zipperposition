@@ -1193,13 +1193,13 @@ let () =
          (none/no-var-heading-max-term/no-var-different-args/no-unapplied-var-occurring-applied/no-ho-vars)"
       );
     ];
-  Params.add_to_mode "ho-complete-basic" (fun () ->
+  Params.add_to_mode "ho-complete-basic" (fun flex_ref ->
       _ho_restriction := `NoMaxVarInFoContext);
-  Params.add_to_mode "ho-competitive" (fun () ->
+  Params.add_to_mode "ho-competitive" (fun flex_ref ->
       _ho_restriction := `NoMaxVarInFoContext);
-  Params.add_to_mode "ho-pragmatic" (fun () ->
+  Params.add_to_mode "ho-pragmatic" (fun flex_ref ->
       _ho_restriction := `NoMaxVarInFoContext);
-  Params.add_to_mode "best" (fun () ->
+  Params.add_to_mode "best" (fun flex_ref ->
       _ho_restriction := `None;
       Params.Cli.set_select "bb+ho-selection5");
   Params.add_to_modes
@@ -1208,6 +1208,6 @@ let () =
       "lambda-free-extensional";
       "lambda-free-purify-intensional";
       "lambda-free-purify-extensional";
-    ] (fun () -> _ho_restriction := `NoHigherOrderVariables);
-  Params.add_to_modes [ "ho-comb-complete" ] (fun () ->
+    ] (fun flex_ref -> _ho_restriction := `NoHigherOrderVariables);
+  Params.add_to_modes [ "ho-comb-complete" ] (fun flex_ref ->
       _ho_restriction := `NoMaxVarInFoContext)

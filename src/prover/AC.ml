@@ -17,7 +17,6 @@ let flag_axiom = SClause.new_flag ()
 type spec = AC_intf.spec
 
 let key_scan_cl_ac = Flex_state.create_key ()
-let _scan_cl_ac = ref false
 
 module E = Env
 module C = Clause
@@ -312,9 +311,9 @@ let scan_clause env c =
 
 (* just look for AC axioms *)
 let setup env =
-  Env.flex_add_of env key_scan_cl_ac !_scan_cl_ac;
+  Env.flex_ensure env key_scan_cl_ac false;
 
-  if !_scan_cl_ac then
+  if Flex_state.get_or ~or_:false key_scan_cl_ac (Env.flex_state_of env) then
     Signal.on_every (Env.on_passive_add env) (fun c ->
         scan_clause env c;
         Signal.ContinueListening);
@@ -326,9 +325,10 @@ let extension =
   { Extensions.default with Extensions.name = "ac"; env_actions = [ action ] }
 
 let () =
-  Options.add_opts
-    [
-      ( "--scan-clause-ac",
-        Arg.Bool (( := ) _scan_cl_ac),
-        " scan clauses for AC definitions" );
-    ]
+  Params.add_flex_opts (fun ~flex_ref ->
+      [
+        ( "--scan-clause-ac",
+          Arg.Bool
+            (fun v -> flex_ref := Flex_state.add key_scan_cl_ac v !flex_ref),
+          " scan clauses for AC definitions" );
+      ])

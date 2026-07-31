@@ -130,14 +130,20 @@ let add_lit_to_hook t h = t.lit_to_hooks <- h :: t.lit_to_hooks
 
 module Lit = struct
   (* Bridge: uses global ref for backward compat *)
-  let _from_hooks : Literal.Conv.hook_from list ref = ref []
-  let _to_hooks : Literal.Conv.hook_to list ref = ref []
-  let from_hooks () = !_from_hooks
-  let add_from_hook h = _from_hooks := h :: !_from_hooks
-  let to_hooks () = !_to_hooks
-  let add_to_hook h = _to_hooks := h :: !_to_hooks
-  let of_form f = Literal.Conv.of_form ~hooks:!_from_hooks f
-  let to_form f = Literal.Conv.to_form ~hooks:!_to_hooks f
+  let from_hooks () = Atomic.get Ctx_global.from_hooks
+
+  let add_from_hook h =
+    Atomic.set Ctx_global.from_hooks (h :: Atomic.get Ctx_global.from_hooks)
+
+  let to_hooks () = Atomic.get Ctx_global.to_hooks
+
+  let add_to_hook h =
+    Atomic.set Ctx_global.to_hooks (h :: Atomic.get Ctx_global.to_hooks)
+
+  let of_form f =
+    Literal.Conv.of_form ~hooks:(Atomic.get Ctx_global.from_hooks) f
+
+  let to_form f = Literal.Conv.to_form ~hooks:(Atomic.get Ctx_global.to_hooks) f
 end
 
 module Key = struct

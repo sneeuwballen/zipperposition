@@ -481,5 +481,5 @@ let () =
         Arg.String set_bselect,
         " set boolean literal selection function" );
     ];
-  Params.add_to_mode "best" (fun () ->
+  Params.add_to_mode "best" (fun flex_ref ->
       Params.Cli.set_bool_select "sel1(consequent_ctx)")

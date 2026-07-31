@@ -11,10 +11,6 @@ let k_max_symbol_occ = Flex_state.create_key ()
 let k_processing_kind = Flex_state.create_key ()
 let k_fp_mode = Flex_state.create_key ()
 let section = Util.Section.make ~parent:Const.section "bce"
-let _enabled = ref false
-let _processing_kind = ref `PreprocessingOnly
-let _check_at = ref 10
-let _max_symbol_occ = ref (-1) (* -1 stands for infinity *)
 
 module Avatar = Libzipperposition_avatar
 module C = Clause
@@ -912,7 +908,7 @@ let initialize_regular env =
 let fixpoint_active = ref false
 
 let begin_fixpoint env =
-  Env.flex_add_of env k_max_symbol_occ !_max_symbol_occ;
+  Env.flex_ensure env k_max_symbol_occ (-1);
 
   let init_clauses =
     Clause.ClauseSet.to_list (Env.active_clauses env)
@@ -985,10 +981,11 @@ let setup ?(in_fp_mode = false) env =
 
 let extension =
   let action (env : Env.t) =
-    Env.flex_add_of env k_enabled !_enabled;
-    Env.flex_add_of env k_max_symbol_occ !_max_symbol_occ;
-    Env.flex_add_of env k_check_at !_check_at;
-    Env.flex_add_of env k_processing_kind !_processing_kind;
+    Env.flex_ensure env k_enabled false;
+    (* -1 stands for infinity *)
+    Env.flex_ensure env k_max_symbol_occ (-1);
+    Env.flex_ensure env k_check_at 10;
+    Env.flex_ensure env k_processing_kind `PreprocessingOnly;
     setup env ~in_fp_mode:false
   in
   {
@@ -999,22 +996,28 @@ let extension =
   }
 
 let () =
-  Options.add_opts
-    [
-      "--bce", Arg.Bool (( := ) _enabled), " scan clauses for AC definitions";
-      ( "--bce-processing-kind",
-        Arg.Symbol
-          ( [ "preprocessing"; "inprocessing-full"; "inprocessing-sat" ],
-            function
-            | "preprocessing" -> _processing_kind := `PreprocessingOnly
-            | "inprocessing-full" -> _processing_kind := `InprocessingFull
-            | "inprocessing-sat" -> _processing_kind := `InprocessingSat
-            | _ -> assert false ),
-        " scan clauses for AC definitions" );
-      ( "--bce-check-every",
-        Arg.Int (( := ) _check_at),
-        " check BCE every n steps of saturation algorithm" );
-      ( "--bce-max-symbol-occurences",
-        Arg.Int (( := ) _max_symbol_occ),
-        " limit a given symbol to n occurences only" );
-    ]
+  Params.add_flex_opts (fun ~flex_ref ->
+      [
+        ( "--bce",
+          Arg.Bool (fun v -> flex_ref := Flex_state.add k_enabled v !flex_ref),
+          " scan clauses for BC definitions" );
+        ( "--bce-processing-kind",
+          Arg.Symbol
+            ( [ "preprocessing"; "inprocessing-full"; "inprocessing-sat" ],
+              fun s ->
+                flex_ref :=
+                  Flex_state.add k_processing_kind
+                    (match s with
+                    | "preprocessing" -> `PreprocessingOnly
+                    | "inprocessing-full" -> `InprocessingFull
+                    | _ -> `InprocessingSat)
+                    !flex_ref ),
+          " scan clauses for AC definitions" );
+        ( "--bce-check-every",
+          Arg.Int (fun n -> flex_ref := Flex_state.add k_check_at n !flex_ref),
+          " check BCE every n steps of saturation algorithm" );
+        ( "--bce-max-symbol-occurences",
+          Arg.Int
+            (fun n -> flex_ref := Flex_state.add k_max_symbol_occ n !flex_ref),
+          " limit a given symbol to n occurences only" );
+      ])

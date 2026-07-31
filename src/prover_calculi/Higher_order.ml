@@ -110,8 +110,23 @@ module FV_ext_neg_lit = FV_tree.Make (struct
 end)
 
 let idx_ext_neg_lit_ : FV_ext_neg_lit.t ref = ref (FV_ext_neg_lit.empty ())
-let _ext_dec_from_idx = ref Name.Map.empty
-let _ext_dec_into_idx = ref Name.Map.empty
+
+type ext_dec_state = {
+  mutable ext_dec_from_idx: (Term.t * Position.t) list C.Tbl.t Name.Map.t;
+  mutable ext_dec_into_idx: (Term.t * Position.t) list C.Tbl.t Name.Map.t;
+}
+
+let k_ext_dec_state : ext_dec_state Flex_state.key = Flex_state.create_key ()
+
+let get_ext_dec_state env =
+  match Flex_state.get k_ext_dec_state (Env.flex_state_of env) with
+  | Some st -> st
+  | None ->
+    let st =
+      { ext_dec_from_idx = Name.Map.empty; ext_dec_into_idx = Name.Map.empty }
+    in
+    Env.flex_add_of env k_ext_dec_state st;
+    st
 
 (* retrieve skolems for this literal, if any *)
 let find_skolems_ (lit : Literal.t) : T.t list option =
@@ -321,6 +336,7 @@ let ext_pos_general ?(all_lits = false) env (c : C.t) : C.t list =
   new_clauses
 
 let neg_ext env (c : C.t) : C.t list =
+  let flex_ref = ref (Env.flex_state_of env) in
   let get_new_lits lhs rhs =
     let calc_skolem lhs rhs =
       let (pref_l, body_l), (pref_r, body_r) =
@@ -338,7 +354,7 @@ let neg_ext env (c : C.t) : C.t list =
       in
 
       assert (T.DB.is_closed body);
-      FR.get_skolem ~parent:c ~mode:`SkolemRecycle body
+      FR.get_skolem ~flex_ref ~parent:c ~mode:`SkolemRecycle body
     in
 
     assert (Type.is_fun (T.ty lhs));
@@ -411,10 +427,14 @@ let neg_ext env (c : C.t) : C.t list =
     in
     aux 0 lits_map
   in
-  if CCList.is_empty new_lits_map then
-    []
-  else
-    compute_results new_lits_map
+  let result =
+    if CCList.is_empty new_lits_map then
+      []
+    else
+      compute_results new_lits_map
+  in
+  Env.update_flex_state env (fun _ -> !flex_ref);
+  result
 
 let neg_ext_simpl (env : Env.t) (c : C.t) : C.t SimplM.t =
   let is_eligible = C.Eligible.always in
@@ -476,6 +496,7 @@ let update_ext_dec_indices env f c =
   in
   if Env.flex_get_of env k_ext_rules_kind != `Off && ext_rule_eligible env c
   then (
+    let st = get_ext_dec_state env in
     Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false ~ty_args:false
       ~ord ~which ~subterms:true ~eligible (C.lits c)
     |> Iter.filter (fun (t, _) -> (not (T.is_var t)) || T.is_ho_var t)
@@ -483,7 +504,7 @@ let update_ext_dec_indices env f c =
            (not (T.is_var (T.head_term t)))
            && T.is_const (T.head_term t)
            && Term.has_ho_subterm t)
-    |> Iter.iter (fun (t, pos) -> f _ext_dec_into_idx (c, pos, t));
+    |> Iter.iter (fun (t, pos) -> f st `Into (c, pos, t));
 
     let eligible =
       if Env.flex_get_of env k_ext_dec_lits = `OnlyMax then
@@ -495,8 +516,7 @@ let update_ext_dec_indices env f c =
     |> Iter.iter (fun (l, _, sign, pos) ->
            assert sign;
            let hd, _ = T.as_app l in
-           if T.is_const hd && Term.has_ho_subterm l then
-             f _ext_dec_from_idx (c, pos, l))
+           if T.is_const hd && Term.has_ho_subterm l then f st `From (c, pos, l))
   );
   Signal.ContinueListening
 
@@ -897,8 +917,9 @@ let ext_sup_act env given =
     |> Iter.flat_map (fun (l, _, sign, pos) ->
            let hd, args = T.as_app l in
            if T.is_const hd && T.has_ho_subterm l then (
+             let st = get_ext_dec_state env in
              let inf_partners =
-               retrieve_from_extdec_idx !_ext_dec_into_idx (T.as_const_exn hd)
+               retrieve_from_extdec_idx st.ext_dec_into_idx (T.as_const_exn hd)
              in
              Iter.map
                (fun (into_c, into_t, into_p) ->
@@ -924,8 +945,9 @@ let ext_sup_pas env given =
      |> Iter.flat_map (fun (t, p) ->
             let hd, args = T.as_app t in
             if T.is_const hd && T.has_ho_subterm t then (
+              let st = get_ext_dec_state env in
               let inf_partners =
-                retrieve_from_extdec_idx !_ext_dec_from_idx (T.as_const_exn hd)
+                retrieve_from_extdec_idx st.ext_dec_from_idx (T.as_const_exn hd)
               in
               Iter.map
                 (fun (from_c, from_t, from_p) ->
@@ -949,8 +971,9 @@ let ext_inst_sup_act env given =
     |> Iter.flat_map (fun (l, _, sign, pos) ->
            let hd, args = T.as_app l in
            if T.is_const hd && T.has_ho_subterm l then (
+             let st = get_ext_dec_state env in
              let inf_partners =
-               retrieve_from_extdec_idx !_ext_dec_into_idx (T.as_const_exn hd)
+               retrieve_from_extdec_idx st.ext_dec_into_idx (T.as_const_exn hd)
              in
              Iter.map
                (fun (into_c, into_t, _) ->
@@ -979,7 +1002,8 @@ let ext_inst_sup_pas env given =
               Iter.map
                 (fun (from_c, from_t, from_p) ->
                   do_ext_inst env ~parents:[ from_c; given ] (from_t, 0) (t, 1))
-                (retrieve_from_extdec_idx !_ext_dec_from_idx (T.as_const_exn hd))
+                (retrieve_from_extdec_idx
+                   (get_ext_dec_state env).ext_dec_from_idx (T.as_const_exn hd))
             else
               Iter.empty))
     |> Iter.to_list |> CCList.flatten
@@ -1059,9 +1083,14 @@ let ext_inst_eqres env c =
   ) else
     []
 
-let insert_into_ext_dec_index index (c, pos, t) =
+let insert_into_ext_dec_index st field (c, pos, t) =
+  let index =
+    match field with
+    | `From -> st.ext_dec_from_idx
+    | `Into -> st.ext_dec_into_idx
+  in
   let key = T.head_exn t in
-  let clause_map = Name.Map.find_opt key !index in
+  let clause_map = Name.Map.find_opt key index in
   let clause_map =
     match clause_map with
     | None -> C.Tbl.create 8
@@ -1071,16 +1100,27 @@ let insert_into_ext_dec_index index (c, pos, t) =
     try (t, pos) :: C.Tbl.find clause_map c with Not_found -> [ t, pos ]
   in
   C.Tbl.replace clause_map c all_pos;
-  index := Name.Map.add key clause_map !index
+  let new_index = Name.Map.add key clause_map index in
+  match field with
+  | `From -> st.ext_dec_from_idx <- new_index
+  | `Into -> st.ext_dec_into_idx <- new_index
 
-let remove_from_ext_dec_index index (c, _, t) =
+let remove_from_ext_dec_index st field (c, _, t) =
+  let index =
+    match field with
+    | `From -> st.ext_dec_from_idx
+    | `Into -> st.ext_dec_into_idx
+  in
   let key = T.head_exn t in
-  let clause_map = Name.Map.find_opt key !index in
+  let clause_map = Name.Map.find_opt key index in
   match clause_map with
   | None -> Util.debugf ~section 1 "all clauses allready deleted." CCFun.id
   | Some res ->
     C.Tbl.remove res c;
-    index := Name.Map.add key res !index
+    let new_index = Name.Map.add key res index in
+    (match field with
+    | `From -> st.ext_dec_from_idx <- new_index
+    | `Into -> st.ext_dec_into_idx <- new_index)
 
 (* try to eliminate a predicate variable in one fell swoop *)
 let elim_pred_variable env ?(proof_constructor = Proof.Step.inference) (c : C.t)
@@ -2826,82 +2866,44 @@ let st_contains_ho (st : (_, _, _) Statement.t) : bool =
   in
   has_ho_sym () || has_ho_var () || has_ho_eq ()
 
-let _ext_pos = ref true
-let _ext_pos_all_lits = ref false
-let _ext_axiom = ref false
-let _choice_axiom = ref false
-let _elim_pred_var = ref true
-let _ext_neg_lit = ref false
-let _neg_ext = ref true
-let _neg_ext_as_simpl = ref false
-let _ext_axiom_penalty = ref 5
-let _choice_axiom_penalty = ref 1
-let _huet_style = ref false
-let _cons_elim = ref true
-let _imit_first = ref false
-let _compose_subs = ref false
-let _var_solve = ref false
-let _instantiate_choice_ax = ref false
-let _elim_leibniz_eq = ref (-1)
-let _elim_andrews_eq = ref (-1)
-let _elim_andrews_eq_simpl = ref false
-let _prune_arg_fun = ref `NoPrune
-let _check_lambda_free = ref `False
 let prim_enum_terms = ref Term.Set.empty
-let _simple_projection = ref (-1)
-let _simple_projection_md = ref 2
-let _purify_applied_vars = ref `None
-let _eta = ref `Reduce
-let _generalize_choice_trigger = ref false
-let _prim_enum_simpl = ref false
-let _prim_enum_add_var = ref false
-let _prim_enum_early_bird = ref false
-let _resolve_flex_flex = ref false
-let _ground_app_vars = ref `Off
-let _arg_cong = ref true
-let _arg_cong_simpl = ref false
-let ext_rules_max_depth = ref (-1)
-let ext_rules_kind = ref `Off
-let _ext_dec_lits = ref `All
-let _ho_disagremeents = ref `SomeHo
-let _ite_axioms = ref false
 
 let extension =
   let register (env : Env.t) =
-    Env.flex_add_of env k_ext_pos !_ext_pos;
-    Env.flex_add_of env k_ext_pos_all_lits !_ext_pos_all_lits;
-    Env.flex_add_of env k_ext_axiom !_ext_axiom;
-    Env.flex_add_of env k_choice_axiom !_choice_axiom;
-    Env.flex_add_of env k_elim_pred_var !_elim_pred_var;
-    Env.flex_add_of env k_ext_neg_lit !_ext_neg_lit;
-    Env.flex_add_of env k_neg_ext !_neg_ext;
-    Env.flex_add_of env k_neg_ext_as_simpl !_neg_ext_as_simpl;
-    Env.flex_add_of env k_ext_axiom_penalty !_ext_axiom_penalty;
-    Env.flex_add_of env k_choice_axiom_penalty !_choice_axiom_penalty;
-    Env.flex_add_of env k_instantiate_choice_ax !_instantiate_choice_ax;
-    Env.flex_add_of env k_elim_leibniz_eq !_elim_leibniz_eq;
-    Env.flex_add_of env k_elim_andrews_eq !_elim_andrews_eq;
-    Env.flex_add_of env k_elim_andrews_eq_simpl !_elim_andrews_eq_simpl;
-    Env.flex_add_of env k_prune_arg_fun !_prune_arg_fun;
+    Env.flex_ensure env k_ext_pos true;
+    Env.flex_ensure env k_ext_pos_all_lits false;
+    Env.flex_ensure env k_ext_axiom false;
+    Env.flex_ensure env k_choice_axiom false;
+    Env.flex_ensure env k_elim_pred_var true;
+    Env.flex_ensure env k_ext_neg_lit false;
+    Env.flex_ensure env k_neg_ext true;
+    Env.flex_ensure env k_neg_ext_as_simpl false;
+    Env.flex_ensure env k_ext_axiom_penalty 5;
+    Env.flex_ensure env k_choice_axiom_penalty 1;
+    Env.flex_ensure env k_instantiate_choice_ax false;
+    Env.flex_ensure env k_elim_leibniz_eq (-1);
+    Env.flex_ensure env k_elim_andrews_eq (-1);
+    Env.flex_ensure env k_elim_andrews_eq_simpl false;
+    Env.flex_ensure env k_prune_arg_fun `NoPrune;
     Env.flex_add_of env k_prim_enum_terms prim_enum_terms;
-    Env.flex_add_of env k_simple_projection !_simple_projection;
-    Env.flex_add_of env k_simple_projection_md !_simple_projection_md;
-    Env.flex_add_of env k_check_lambda_free !_check_lambda_free;
-    Env.flex_add_of env k_purify_applied_vars !_purify_applied_vars;
-    Env.flex_add_of env k_eta !_eta;
-    Env.flex_add_of env k_generalize_choice_trigger !_generalize_choice_trigger;
-    Env.flex_add_of env k_prim_enum_add_var !_prim_enum_add_var;
-    Env.flex_add_of env k_prim_enum_early_bird !_prim_enum_early_bird;
-    Env.flex_add_of env k_resolve_flex_flex !_resolve_flex_flex;
-    Env.flex_add_of env k_ground_app_vars !_ground_app_vars;
-    Env.flex_add_of env k_arg_cong !_arg_cong;
-    Env.flex_add_of env k_arg_cong_simpl !_arg_cong_simpl;
+    Env.flex_ensure env k_simple_projection (-1);
+    Env.flex_ensure env k_simple_projection_md 2;
+    Env.flex_ensure env k_check_lambda_free `False;
+    Env.flex_ensure env k_purify_applied_vars `None;
+    Env.flex_ensure env k_eta `Reduce;
+    Env.flex_ensure env k_generalize_choice_trigger false;
+    Env.flex_ensure env k_prim_enum_add_var false;
+    Env.flex_ensure env k_prim_enum_early_bird false;
+    Env.flex_ensure env k_resolve_flex_flex false;
+    Env.flex_ensure env k_ground_app_vars `Off;
+    Env.flex_ensure env k_arg_cong true;
+    Env.flex_ensure env k_arg_cong_simpl false;
 
-    Env.flex_add_of env k_ho_disagremeents !_ho_disagremeents;
-    Env.flex_add_of env k_ext_dec_lits !_ext_dec_lits;
-    Env.flex_add_of env k_ext_rules_max_depth !ext_rules_max_depth;
-    Env.flex_add_of env k_ext_rules_kind !ext_rules_kind;
-    Env.flex_add_of env k_add_ite_axioms !_ite_axioms;
+    Env.flex_ensure env k_ho_disagremeents `SomeHo;
+    Env.flex_ensure env k_ext_dec_lits `All;
+    Env.flex_ensure env k_ext_rules_max_depth (-1);
+    Env.flex_ensure env k_ext_rules_kind `Off;
+    Env.flex_ensure env k_add_ite_axioms false;
 
     if Env.flex_get_of env k_check_lambda_free = `Only then
       Env.flex_add_of env Saturate.k_abort_after_fragment_check true;
@@ -2947,284 +2949,354 @@ let extension =
     env_actions = [ register ];
   }
 
-let purify_opt =
-  let set_ n = _purify_applied_vars := n in
-  let l = [ "ext", `Ext; "int", `Int; "none", `None ] in
-  Arg.Symbol (List.map fst l, fun s -> set_ (List.assoc s l))
+let purify_opt ~flex_ref =
+  Arg.Symbol
+    ( [ "ext"; "int"; "none" ],
+      fun s ->
+        flex_ref :=
+          Flex_state.add k_purify_applied_vars
+            (match s with
+            | "ext" -> `Ext
+            | "int" -> `Int
+            | _ -> `None)
+            !flex_ref )
 
-let eta_opt =
-  let set_ n = _eta := n in
-  let l = [ "reduce", `Reduce; "expand", `Expand; "none", `None ] in
-  Arg.Symbol (List.map fst l, fun s -> set_ (List.assoc s l))
+let eta_opt ~flex_ref =
+  Arg.Symbol
+    ( [ "reduce"; "expand"; "none" ],
+      fun s ->
+        flex_ref :=
+          Flex_state.add k_eta
+            (match s with
+            | "reduce" -> `Reduce
+            | "expand" -> `Expand
+            | _ -> `None)
+            !flex_ref )
 
 let () =
+  (* kept as module refs — no flex keys *)
   Options.add_opts
     [
       "--ho", Arg.Bool (fun b -> enabled_ := b), " enable/disable HO reasoning";
       ( "--force-ho",
         Arg.Bool (fun b -> force_enabled_ := b),
         " enable/disable HO reasoning even if the problem is first-order" );
-      ( "--arg-cong",
-        Arg.Bool (fun v -> _arg_cong := v),
-        " enable/disable ArgCong" );
-      ( "--arg-cong-simpl",
-        Arg.Bool (fun v -> _arg_cong_simpl := v),
-        " enable/disable ArgCong as a simplification rule" );
       ( "--ho-unif",
         Arg.Bool (fun v -> enable_unif_ := v),
         " enable full HO unification" );
-      ( "--ho-elim-pred-var",
-        Arg.Bool (fun b -> _elim_pred_var := b),
-        " disable predicate variable elimination" );
       "--ho-prim-enum", set_prim_mode_, " set HO primitive enum mode";
       ( "--ho-prim-max",
         Arg.Set_int prim_max_penalty,
         " max penalty for HO primitive enum" );
-      ( "--ho-prim-enum-add-var",
-        Arg.Bool (( := ) _prim_enum_add_var),
-        " turn an instantiation %x. t into %x. (F x | t)" );
-      ( "--ho-prim-enum-early-bird",
-        Arg.Bool (( := ) _prim_enum_early_bird),
-        " use early-bird primitive enumeration (requires lazy CNF)" );
-      ( "--ho-resolve-flex-flex",
-        Arg.Bool (( := ) _resolve_flex_flex),
-        " eagerly remove non-essential flex-flex constraints" );
-      ( "--ho-ext-axiom",
-        Arg.Bool (fun v -> _ext_axiom := v),
-        " enable/disable extensionality axiom" );
-      ( "--ho-choice-axiom",
-        Arg.Bool (fun v -> _choice_axiom := v),
-        " enable choice axiom" );
-      ( "--ho-choice-axiom-penalty",
-        Arg.Int (fun v -> _choice_axiom_penalty := v),
-        " choice axiom penalty" );
-      ( "--ho-ext-pos",
-        Arg.Bool (fun v -> _ext_pos := v),
-        " enable/disable positive extensionality rule" );
-      ( "--ho-neg-ext",
-        Arg.Bool (fun v -> _neg_ext := v),
-        " turn NegExt on or off" );
-      ( "--ho-neg-ext-simpl",
-        Arg.Bool (fun v -> _neg_ext_as_simpl := v),
-        " turn NegExt as simplification rule on or off" );
-      ( "--ho-ext-pos-all-lits",
-        Arg.Bool (fun v -> _ext_pos_all_lits := v),
-        " turn ExtPos on for all or only eligible literals" );
-      ( "--ho-prune-arg",
-        Arg.Symbol
-          ( [ "all-covers"; "max-covers"; "old-prune"; "off" ],
-            fun s ->
-              if s = "all-covers" then
-                _prune_arg_fun := `PruneAllCovers
-              else if s = "max-covers" then
-                _prune_arg_fun := `PruneMaxCover
-              else if s = "old-prune" then
-                _prune_arg_fun := `OldPrune
-              else
-                _prune_arg_fun := `NoPrune ),
-        " choose arg prune mode" );
-      ( "--ho-ext-neg-lit",
-        Arg.Bool (fun v -> _ext_neg_lit := v),
-        " enable/disable negative extensionality rule on literal level [?]" );
-      ( "--ho-elim-leibniz",
-        Arg.String
-          (fun v ->
-            match v with
-            | "inf" -> _elim_leibniz_eq := max_int
-            | "off" -> _elim_leibniz_eq := -1
-            | _ ->
-              (match CCInt.of_string v with
-              | None -> invalid_arg "number expected for --ho-elim-leibniz"
-              | Some x -> _elim_leibniz_eq := x)),
-        " enable/disable treatment of Leibniz equality. inf enables it for \
-         infinte depth of clauses"
-        ^ "; off disables it; number enables it for a given depth of clause" );
-      ( "--ho-elim-andrews",
-        Arg.String
-          (fun v ->
-            match v with
-            | "inf" -> _elim_andrews_eq := max_int
-            | "off" -> _elim_andrews_eq := -1
-            | _ ->
-              (match CCInt.of_string v with
-              | None -> invalid_arg "number expected for --ho-elim-leibniz"
-              | Some x -> _elim_andrews_eq := x)),
-        " enable/disable treatment of Andrews equality. inf enables it for \
-         infinte depth of clauses"
-        ^ "; off disables it; number enables it for a given depth of clause" );
-      ( "--ho-elim-andrews-simpl",
-        Arg.Bool (( := ) _elim_andrews_eq_simpl),
-        " use Andrews equality replacement as simplification " );
       ( "--ho-def-unfold",
         Arg.Bool (fun v -> def_unfold_enabled_ := v),
         " enable ho definition unfolding" );
-      ( "--ho-choice-inst",
-        Arg.Bool (fun v -> _instantiate_choice_ax := v),
-        " enable heuristic Hilbert choice instantiation" );
-      ( "--ho-simple-projection",
-        Arg.Int (fun v -> _simple_projection := v),
-        " enable simple projection instantiation."
-        ^ " positive argument is increase in clause penalty for the \
-           conclusion; " ^ " negative argument turns the inference off" );
-      ( "--ho-simple-projection-max-depth",
-        Arg.Set_int _simple_projection_md,
-        " sets the max depth for simple projection" );
-      ( "--ho-ext-axiom-penalty",
-        Arg.Int (fun p -> _ext_axiom_penalty := p),
-        " penalty for extensionality axiom" );
-      ( "--ho-purify",
-        purify_opt,
-        " enable purification of applied variables: 'ext' purifies"
-        ^ " whenever a variable is applied to different arguments."
-        ^ " 'int' purifies whenever a variable appears applied and unapplied." );
-      "--ho-eta", eta_opt, " eta-expansion/reduction";
-      ( "--ground-app-vars",
-        Arg.Symbol
-          ( [ "off"; "fresh"; "all" ],
-            fun kind ->
-              match kind with
-              | "off" -> _ground_app_vars := `Off
-              | "fresh" -> _ground_app_vars := `Fresh
-              | "all" -> _ground_app_vars := `All
-              | _ -> assert false ),
-        " ground all applied variables to either all constants of the right \
-         type in signature or a fresh constant" );
-      ( "--ho-generalize-choice-trigger",
-        Arg.Bool (( := ) _generalize_choice_trigger),
-        " apply choice trigger to a fresh variable" );
-      ( "--check-lambda-free",
-        Arg.Symbol
-          ( [ "true"; "false"; "only" ],
-            fun s ->
-              match s with
-              | "true" -> _check_lambda_free := `True
-              | "only" -> _check_lambda_free := `Only
-              | _ -> _check_lambda_free := `False ),
-        "check whether problem belongs to lambda-free ('only' will abort after \
-         the check)" );
-      ( "--ext-rules-max-depth",
-        Arg.Set_int ext_rules_max_depth,
-        " Sets the maximal proof depth of the clause eligible for Ext-* or \
-         ExtInst inferences" );
-      ( "--ext-rules",
-        Arg.Symbol
-          ( [ "off"; "ext-inst"; "ext-family"; "both" ],
-            function
-            | "off" ->
-              ext_rules_kind := `Off;
-              ext_rules_max_depth := -1
-            | "ext-inst" -> ext_rules_kind := `ExtInst
-            | "ext-family" -> ext_rules_kind := `ExtFamily
-            | "both" -> ext_rules_kind := `Both
-            | _ -> assert false ),
-        " Chooses the kind of extensionality rules to use" );
-      ( "--ite-axioms",
-        Arg.Bool (( := ) _ite_axioms),
-        " include if-then-else definition axioms" );
-      ( "--ext-decompose-lits",
-        Arg.Symbol
-          ( [ "all"; "max" ],
-            fun str ->
-              _ext_dec_lits :=
-                if String.equal str "all" then
-                  `All
-                else
-                  `OnlyMax ),
-        " Sets the maximal number of literals clause can have for ExtDec \
-         inference." );
-      ( "--ext-decompose-ho-disagreements",
-        Arg.Symbol
-          ( [ "all-ho"; "some-ho" ],
-            fun str ->
-              _ho_disagremeents :=
-                if String.equal str "all-ho" then
-                  `AllHo
-                else
-                  `SomeHo ),
-        " Perform Ext-Sup, Ext-EqFact, or Ext-EqRes rules only when all \
-         disagreements are HO" ^ " or when there exists a HO disagremeent" );
     ];
-  Params.add_to_mode "best" (fun () ->
+  Params.add_flex_opts (fun ~flex_ref ->
+      [
+        ( "--arg-cong",
+          Arg.Bool (fun v -> flex_ref := Flex_state.add k_arg_cong v !flex_ref),
+          " enable/disable ArgCong" );
+        ( "--arg-cong-simpl",
+          Arg.Bool
+            (fun v -> flex_ref := Flex_state.add k_arg_cong_simpl v !flex_ref),
+          " enable/disable ArgCong as a simplification rule" );
+        ( "--ho-elim-pred-var",
+          Arg.Bool
+            (fun v -> flex_ref := Flex_state.add k_elim_pred_var v !flex_ref),
+          " disable predicate variable elimination" );
+        ( "--ho-prim-enum-add-var",
+          Arg.Bool
+            (fun v ->
+              flex_ref := Flex_state.add k_prim_enum_add_var v !flex_ref),
+          " turn an instantiation %x. t into %x. (F x | t)" );
+        ( "--ho-prim-enum-early-bird",
+          Arg.Bool
+            (fun v ->
+              flex_ref := Flex_state.add k_prim_enum_early_bird v !flex_ref),
+          " use early-bird primitive enumeration (requires lazy CNF)" );
+        ( "--ho-resolve-flex-flex",
+          Arg.Bool
+            (fun v ->
+              flex_ref := Flex_state.add k_resolve_flex_flex v !flex_ref),
+          " eagerly remove non-essential flex-flex constraints" );
+        ( "--ho-ext-axiom",
+          Arg.Bool (fun v -> flex_ref := Flex_state.add k_ext_axiom v !flex_ref),
+          " enable/disable extensionality axiom" );
+        ( "--ho-choice-axiom",
+          Arg.Bool
+            (fun v -> flex_ref := Flex_state.add k_choice_axiom v !flex_ref),
+          " enable choice axiom" );
+        ( "--ho-choice-axiom-penalty",
+          Arg.Int
+            (fun n ->
+              flex_ref := Flex_state.add k_choice_axiom_penalty n !flex_ref),
+          " choice axiom penalty" );
+        ( "--ho-ext-pos",
+          Arg.Bool (fun v -> flex_ref := Flex_state.add k_ext_pos v !flex_ref),
+          " enable/disable positive extensionality rule" );
+        ( "--ho-neg-ext",
+          Arg.Bool (fun v -> flex_ref := Flex_state.add k_neg_ext v !flex_ref),
+          " turn NegExt on or off" );
+        ( "--ho-neg-ext-simpl",
+          Arg.Bool
+            (fun v -> flex_ref := Flex_state.add k_neg_ext_as_simpl v !flex_ref),
+          " turn NegExt as simplification rule on or off" );
+        ( "--ho-ext-pos-all-lits",
+          Arg.Bool
+            (fun v -> flex_ref := Flex_state.add k_ext_pos_all_lits v !flex_ref),
+          " turn ExtPos on for all or only eligible literals" );
+        ( "--ho-prune-arg",
+          Arg.Symbol
+            ( [ "all-covers"; "max-covers"; "old-prune"; "off" ],
+              fun s ->
+                flex_ref :=
+                  Flex_state.add k_prune_arg_fun
+                    (match s with
+                    | "all-covers" -> `PruneAllCovers
+                    | "max-covers" -> `PruneMaxCover
+                    | "old-prune" -> `OldPrune
+                    | _ -> `NoPrune)
+                    !flex_ref ),
+          " choose arg prune mode" );
+        ( "--ho-ext-neg-lit",
+          Arg.Bool
+            (fun v -> flex_ref := Flex_state.add k_ext_neg_lit v !flex_ref),
+          " enable/disable negative extensionality rule on literal level [?]" );
+        ( "--ho-elim-leibniz",
+          Arg.String
+            (fun v ->
+              flex_ref :=
+                Flex_state.add k_elim_leibniz_eq
+                  (match v with
+                  | "inf" -> max_int
+                  | "off" -> -1
+                  | _ ->
+                    (match CCInt.of_string v with
+                    | None ->
+                      invalid_arg "number expected for --ho-elim-leibniz"
+                    | Some x -> x))
+                  !flex_ref),
+          " enable/disable treatment of Leibniz equality. inf enables it for \
+           infinte depth of clauses"
+          ^ "; off disables it; number enables it for a given depth of clause" );
+        ( "--ho-elim-andrews",
+          Arg.String
+            (fun v ->
+              flex_ref :=
+                Flex_state.add k_elim_andrews_eq
+                  (match v with
+                  | "inf" -> max_int
+                  | "off" -> -1
+                  | _ ->
+                    (match CCInt.of_string v with
+                    | None ->
+                      invalid_arg "number expected for --ho-elim-leibniz"
+                    | Some x -> x))
+                  !flex_ref),
+          " enable/disable treatment of Andrews equality. inf enables it for \
+           infinte depth of clauses"
+          ^ "; off disables it; number enables it for a given depth of clause" );
+        ( "--ho-elim-andrews-simpl",
+          Arg.Bool
+            (fun v ->
+              flex_ref := Flex_state.add k_elim_andrews_eq_simpl v !flex_ref),
+          " use Andrews equality replacement as simplification " );
+        ( "--ho-choice-inst",
+          Arg.Bool
+            (fun v ->
+              flex_ref := Flex_state.add k_instantiate_choice_ax v !flex_ref),
+          " enable heuristic Hilbert choice instantiation" );
+        ( "--ho-simple-projection",
+          Arg.Int
+            (fun n ->
+              flex_ref := Flex_state.add k_simple_projection n !flex_ref),
+          " enable simple projection instantiation."
+          ^ " positive argument is increase in clause penalty for the \
+             conclusion; negative argument turns the inference off" );
+        ( "--ho-simple-projection-max-depth",
+          Arg.Int
+            (fun n ->
+              flex_ref := Flex_state.add k_simple_projection_md n !flex_ref),
+          " sets the max depth for simple projection" );
+        ( "--ho-ext-axiom-penalty",
+          Arg.Int
+            (fun n ->
+              flex_ref := Flex_state.add k_ext_axiom_penalty n !flex_ref),
+          " penalty for extensionality axiom" );
+        ( "--ho-purify",
+          purify_opt ~flex_ref,
+          " enable purification of applied variables: 'ext' purifies"
+          ^ " whenever a variable is applied to different arguments."
+          ^ " 'int' purifies whenever a variable appears applied and unapplied."
+        );
+        "--ho-eta", eta_opt ~flex_ref, " eta-expansion/reduction";
+        ( "--ground-app-vars",
+          Arg.Symbol
+            ( [ "off"; "fresh"; "all" ],
+              fun s ->
+                flex_ref :=
+                  Flex_state.add k_ground_app_vars
+                    (match s with
+                    | "off" -> `Off
+                    | "fresh" -> `Fresh
+                    | _ -> `All)
+                    !flex_ref ),
+          " ground all applied variables to either all constants of the right \
+           type in signature or a fresh constant" );
+        ( "--ho-generalize-choice-trigger",
+          Arg.Bool
+            (fun v ->
+              flex_ref := Flex_state.add k_generalize_choice_trigger v !flex_ref),
+          " apply choice trigger to a fresh variable" );
+        ( "--check-lambda-free",
+          Arg.Symbol
+            ( [ "true"; "false"; "only" ],
+              fun s ->
+                flex_ref :=
+                  Flex_state.add k_check_lambda_free
+                    (match s with
+                    | "true" -> `True
+                    | "only" -> `Only
+                    | _ -> `False)
+                    !flex_ref ),
+          "check whether problem belongs to lambda-free ('only' will abort \
+           after the check)" );
+        ( "--ext-rules-max-depth",
+          Arg.Int
+            (fun n ->
+              flex_ref := Flex_state.add k_ext_rules_max_depth n !flex_ref),
+          " Sets the maximal proof depth of the clause eligible for Ext-* or \
+           ExtInst inferences" );
+        ( "--ext-rules",
+          Arg.Symbol
+            ( [ "off"; "ext-inst"; "ext-family"; "both" ],
+              fun s ->
+                match s with
+                | "off" ->
+                  flex_ref := Flex_state.add k_ext_rules_kind `Off !flex_ref;
+                  flex_ref :=
+                    Flex_state.add k_ext_rules_max_depth (-1) !flex_ref
+                | "ext-inst" ->
+                  flex_ref := Flex_state.add k_ext_rules_kind `ExtInst !flex_ref
+                | "ext-family" ->
+                  flex_ref :=
+                    Flex_state.add k_ext_rules_kind `ExtFamily !flex_ref
+                | _ ->
+                  flex_ref := Flex_state.add k_ext_rules_kind `Both !flex_ref ),
+          " Chooses the kind of extensionality rules to use" );
+        ( "--ite-axioms",
+          Arg.Bool
+            (fun v -> flex_ref := Flex_state.add k_add_ite_axioms v !flex_ref),
+          " include if-then-else definition axioms" );
+        ( "--ext-decompose-lits",
+          Arg.Symbol
+            ( [ "all"; "max" ],
+              fun s ->
+                flex_ref :=
+                  Flex_state.add k_ext_dec_lits
+                    (if String.equal s "all" then
+                       `All
+                     else
+                       `OnlyMax)
+                    !flex_ref ),
+          " Sets the maximal number of literals clause can have for ExtDec \
+           inference." );
+        ( "--ext-decompose-ho-disagreements",
+          Arg.Symbol
+            ( [ "all-ho"; "some-ho" ],
+              fun s ->
+                flex_ref :=
+                  Flex_state.add k_ho_disagremeents
+                    (if String.equal s "all-ho" then
+                       `AllHo
+                     else
+                       `SomeHo)
+                    !flex_ref ),
+          " Perform Ext-Sup, Ext-EqFact, or Ext-EqRes rules only when all \
+           disagreements are HO or when there exists a HO disagremeent" );
+      ]);
+  Params.add_to_mode "best" (fun flex_ref ->
       enabled_ := true;
       def_unfold_enabled_ := false;
       force_enabled_ := true;
-      _ext_axiom := false;
-      ext_rules_kind := `ExtFamily;
-      ext_rules_max_depth := 1;
-      _ext_neg_lit := false;
-      _neg_ext := true;
-      _neg_ext_as_simpl := false;
-      _ext_pos := true;
-      _ext_pos_all_lits := true;
+      flex_ref := Flex_state.add k_ext_axiom false !flex_ref;
+      flex_ref := Flex_state.add k_ext_rules_kind `ExtFamily !flex_ref;
+      flex_ref := Flex_state.add k_ext_rules_max_depth 1 !flex_ref;
+      flex_ref := Flex_state.add k_ext_neg_lit false !flex_ref;
+      flex_ref := Flex_state.add k_neg_ext true !flex_ref;
+      flex_ref := Flex_state.add k_neg_ext_as_simpl false !flex_ref;
+      flex_ref := Flex_state.add k_ext_pos true !flex_ref;
+      flex_ref := Flex_state.add k_ext_pos_all_lits true !flex_ref;
       prim_mode_ := `Neg;
-      _elim_pred_var := true;
+      flex_ref := Flex_state.add k_elim_pred_var true !flex_ref;
       enable_unif_ := false;
-      _prune_arg_fun := `PruneMaxCover;
-      _instantiate_choice_ax := true);
-  Params.add_to_mode "ho-complete-basic" (fun () ->
+      flex_ref := Flex_state.add k_prune_arg_fun `PruneMaxCover !flex_ref;
+      flex_ref := Flex_state.add k_instantiate_choice_ax true !flex_ref);
+  Params.add_to_mode "ho-complete-basic" (fun flex_ref ->
       enabled_ := true;
       def_unfold_enabled_ := false;
       force_enabled_ := true;
-      _ext_axiom := true;
-      _choice_axiom := true;
-      _ext_neg_lit := false;
-      _neg_ext := true;
-      _neg_ext_as_simpl := false;
-      _ext_pos := true;
-      _ext_pos_all_lits := false;
+      flex_ref := Flex_state.add k_ext_axiom true !flex_ref;
+      flex_ref := Flex_state.add k_choice_axiom true !flex_ref;
+      flex_ref := Flex_state.add k_ext_neg_lit false !flex_ref;
+      flex_ref := Flex_state.add k_neg_ext true !flex_ref;
+      flex_ref := Flex_state.add k_neg_ext_as_simpl false !flex_ref;
+      flex_ref := Flex_state.add k_ext_pos true !flex_ref;
+      flex_ref := Flex_state.add k_ext_pos_all_lits false !flex_ref;
       prim_mode_ := `None;
-      _elim_pred_var := false;
+      flex_ref := Flex_state.add k_elim_pred_var false !flex_ref;
       enable_unif_ := false;
-      _prune_arg_fun := `PruneMaxCover);
-  Params.add_to_mode "ho-pragmatic" (fun () ->
+      flex_ref := Flex_state.add k_prune_arg_fun `PruneMaxCover !flex_ref);
+  Params.add_to_mode "ho-pragmatic" (fun flex_ref ->
       enabled_ := true;
       def_unfold_enabled_ := false;
       force_enabled_ := true;
-      _ext_axiom := false;
-      _ext_neg_lit := false;
-      _neg_ext := true;
-      _neg_ext_as_simpl := false;
-      _ext_pos := true;
-      _ext_pos_all_lits := true;
+      flex_ref := Flex_state.add k_ext_axiom false !flex_ref;
+      flex_ref := Flex_state.add k_ext_neg_lit false !flex_ref;
+      flex_ref := Flex_state.add k_neg_ext true !flex_ref;
+      flex_ref := Flex_state.add k_neg_ext_as_simpl false !flex_ref;
+      flex_ref := Flex_state.add k_ext_pos true !flex_ref;
+      flex_ref := Flex_state.add k_ext_pos_all_lits true !flex_ref;
       prim_mode_ := `None;
-      _elim_pred_var := true;
+      flex_ref := Flex_state.add k_elim_pred_var true !flex_ref;
       enable_unif_ := false;
-      _prune_arg_fun := `PruneMaxCover);
-  Params.add_to_mode "ho-competitive" (fun () ->
+      flex_ref := Flex_state.add k_prune_arg_fun `PruneMaxCover !flex_ref);
+  Params.add_to_mode "ho-competitive" (fun flex_ref ->
       enabled_ := true;
       def_unfold_enabled_ := false;
       force_enabled_ := true;
-      _ext_axiom := false;
-      _ext_neg_lit := false;
-      _neg_ext := true;
-      _neg_ext_as_simpl := false;
-      _ext_pos := true;
-      _ext_pos_all_lits := true;
+      flex_ref := Flex_state.add k_ext_axiom false !flex_ref;
+      flex_ref := Flex_state.add k_ext_neg_lit false !flex_ref;
+      flex_ref := Flex_state.add k_neg_ext true !flex_ref;
+      flex_ref := Flex_state.add k_neg_ext_as_simpl false !flex_ref;
+      flex_ref := Flex_state.add k_ext_pos true !flex_ref;
+      flex_ref := Flex_state.add k_ext_pos_all_lits true !flex_ref;
       prim_mode_ := `None;
-      _elim_pred_var := true;
+      flex_ref := Flex_state.add k_elim_pred_var true !flex_ref;
       enable_unif_ := false;
-      _prune_arg_fun := `PruneMaxCover);
-  Params.add_to_mode "ho-comb-complete" (fun () ->
+      flex_ref := Flex_state.add k_prune_arg_fun `PruneMaxCover !flex_ref);
+  Params.add_to_mode "ho-comb-complete" (fun flex_ref ->
       enabled_ := true;
       def_unfold_enabled_ := false;
-      _resolve_flex_flex := false;
+      flex_ref := Flex_state.add k_resolve_flex_flex false !flex_ref;
       force_enabled_ := true;
-      _ext_axiom := false;
-      _ext_neg_lit := false;
-      _neg_ext := true;
-      _neg_ext_as_simpl := false;
-      _ext_pos := true;
-      _ext_pos_all_lits := true;
+      flex_ref := Flex_state.add k_ext_axiom false !flex_ref;
+      flex_ref := Flex_state.add k_ext_neg_lit false !flex_ref;
+      flex_ref := Flex_state.add k_neg_ext true !flex_ref;
+      flex_ref := Flex_state.add k_neg_ext_as_simpl false !flex_ref;
+      flex_ref := Flex_state.add k_ext_pos true !flex_ref;
+      flex_ref := Flex_state.add k_ext_pos_all_lits true !flex_ref;
       prim_mode_ := `None;
-      _elim_pred_var := true;
+      flex_ref := Flex_state.add k_elim_pred_var true !flex_ref;
       enable_unif_ := false;
-      _prune_arg_fun := `NoPrune;
+      flex_ref := Flex_state.add k_prune_arg_fun `NoPrune !flex_ref;
       Unif._allow_pattern_unif := false;
-      _eta := `None);
-  Params.add_to_mode "fo-complete-basic" (fun () ->
+      flex_ref := Flex_state.add k_eta `None !flex_ref);
+  Params.add_to_mode "fo-complete-basic" (fun flex_ref ->
       enabled_ := false;
-      _resolve_flex_flex := false;
-      _arg_cong := false;
+      flex_ref := Flex_state.add k_resolve_flex_flex false !flex_ref;
+      flex_ref := Flex_state.add k_arg_cong false !flex_ref;
       Unif._allow_pattern_unif := false;
       Unif._unif_bool := false);
   Params.add_to_modes
@@ -3233,34 +3305,36 @@ let () =
       "lambda-free-extensional";
       "lambda-free-purify-intensional";
       "lambda-free-purify-extensional";
-    ] (fun () ->
+    ] (fun flex_ref ->
       enabled_ := true;
       enable_unif_ := false;
-      _resolve_flex_flex := false;
+      flex_ref := Flex_state.add k_resolve_flex_flex false !flex_ref;
       force_enabled_ := true;
-      _elim_pred_var := false;
-      _neg_ext_as_simpl := false;
-      _prune_arg_fun := `NoPrune;
+      flex_ref := Flex_state.add k_elim_pred_var false !flex_ref;
+      flex_ref := Flex_state.add k_neg_ext_as_simpl false !flex_ref;
+      flex_ref := Flex_state.add k_prune_arg_fun `NoPrune !flex_ref;
       prim_mode_ := `None;
-      _check_lambda_free := `True;
+      flex_ref := Flex_state.add k_check_lambda_free `True !flex_ref;
       Unif._allow_pattern_unif := false;
       Unif._unif_bool := false;
-      _eta := `None);
+      flex_ref := Flex_state.add k_eta `None !flex_ref);
   Params.add_to_modes
-    [ "lambda-free-extensional"; "lambda-free-purify-extensional" ] (fun () ->
-      _ext_axiom := true;
-      _neg_ext := true;
-      _ext_pos := true;
-      _ext_pos_all_lits := true);
+    [ "lambda-free-extensional"; "lambda-free-purify-extensional" ]
+    (fun flex_ref ->
+      flex_ref := Flex_state.add k_ext_axiom true !flex_ref;
+      flex_ref := Flex_state.add k_neg_ext true !flex_ref;
+      flex_ref := Flex_state.add k_ext_pos true !flex_ref;
+      flex_ref := Flex_state.add k_ext_pos_all_lits true !flex_ref);
   Params.add_to_modes
-    [ "lambda-free-intensional"; "lambda-free-purify-intensional" ] (fun () ->
-      _ext_axiom := false;
-      _neg_ext := false;
-      _ext_pos := false;
-      _ext_pos_all_lits := false);
-  Params.add_to_mode "lambda-free-purify-intensional" (fun () ->
-      _purify_applied_vars := `Int);
-  Params.add_to_mode "lambda-free-purify-extensional" (fun () ->
-      _purify_applied_vars := `Ext);
+    [ "lambda-free-intensional"; "lambda-free-purify-intensional" ]
+    (fun flex_ref ->
+      flex_ref := Flex_state.add k_ext_axiom false !flex_ref;
+      flex_ref := Flex_state.add k_neg_ext false !flex_ref;
+      flex_ref := Flex_state.add k_ext_pos false !flex_ref;
+      flex_ref := Flex_state.add k_ext_pos_all_lits false !flex_ref);
+  Params.add_to_mode "lambda-free-purify-intensional" (fun flex_ref ->
+      flex_ref := Flex_state.add k_purify_applied_vars `Int !flex_ref);
+  Params.add_to_mode "lambda-free-purify-extensional" (fun flex_ref ->
+      flex_ref := Flex_state.add k_purify_applied_vars `Ext !flex_ref);
 
   Extensions.register extension

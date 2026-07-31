@@ -5,7 +5,7 @@ open Libzipperposition
 
 open Logtk
 
-val enabled : bool ref
+val k_enabled : bool Flex_state.key
 val k_pa_renaming : bool Flex_state.key
 val setup : Env.t -> unit
 

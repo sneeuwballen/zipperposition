@@ -52,6 +52,7 @@ module UF = UnionFind.Make (struct
 end)
 
 let simplify_split_ env (c : C.t) : C.t list option =
+  let flex_ref = ref (Env.flex_state_of env) in
   let lits = C.lits c in
   (* maps each variable to a list of literals. Sets can be merged whenever
      two variables occur in the same literal.  *)
@@ -87,62 +88,67 @@ let simplify_split_ env (c : C.t) : C.t list option =
   let proof = Proof.Step.esa [ Proof.Parent.from @@ C.proof c ] in
   let bool_guard = C.trail c |> Trail.to_list |> List.map Trail.Lit.neg in
 
-  match !components with
-  | [] ->
-    assert (Array.length lits = 0);
-    None
-  | [ lits ] ->
-    if Env.flex_get_of env k_abstract_known_singletons then (
-      let lits = Array.of_list lits in
-      let bool_name = BBox.find_boolean_lit lits in
-      CCOpt.iter
-        (fun bool_lit ->
-          (* asserting Trail -> bool_name *)
-          if
-            List.for_all
-              (fun bg -> BBox.Lit.equal (BBox.Lit.neg bg) bool_lit)
-              bool_guard
-          then
-            (* ignoring tautoligies *)
-            Solver.add_clause
-              ~proof:(proof ~rule:(Proof.Rule.mk "recognize_known"))
-              (bool_lit :: bool_guard))
-        bool_name
-    );
-    None
-  | _ :: _ ->
-    (* do a simplification! *)
-    Util.incr_stat stat_splits;
+  let result =
+    match !components with
+    | [] ->
+      assert (Array.length lits = 0);
+      None
+    | [ lits ] ->
+      if Env.flex_get_of env k_abstract_known_singletons then (
+        let lits = Array.of_list lits in
+        let bool_name = BBox.find_boolean_lit ~flex_ref lits in
+        CCOpt.iter
+          (fun bool_lit ->
+            (* asserting Trail -> bool_name *)
+            if
+              List.for_all
+                (fun bg -> BBox.Lit.equal (BBox.Lit.neg bg) bool_lit)
+                bool_guard
+            then
+              (* ignoring tautoligies *)
+              Solver.add_clause
+                ~proof:(proof ~rule:(Proof.Rule.mk "recognize_known"))
+                (bool_lit :: bool_guard))
+          bool_name
+      );
+      None
+    | _ :: _ ->
+      (* do a simplification! *)
+      Util.incr_stat stat_splits;
 
-    (* elements of the trail to keep *)
-    let keep_trail = C.trail c |> Trail.filter BBox.must_be_kept in
-    let clauses_and_names =
-      List.map
-        (fun lits ->
-          let lits = Array.of_list lits in
-          let bool_name = BBox.inject_lits lits in
-          Util.debugf ~section 5 "(@[<2>inject_lits@ :lits %a@ :blit %a@])"
-            (fun k -> k Literals.pp lits BBox.pp bool_name);
-          (* new trail: add the new one *)
-          let trail = Trail.add bool_name keep_trail in
-          let c =
-            C.create_a ~ctx:(Env.get_ctx env) ~trail ~penalty:(C.penalty c) lits
-              (proof ~rule:(Proof.Rule.mk "split"))
-          in
-          c, bool_name)
-        !components
-    in
-    let clauses, bool_clause = List.split clauses_and_names in
-    Util.debugf ~section 2 "@[split of @[%a@]@ yields @[%a@]@]" (fun k ->
-        k C.pp c (Util.pp_list C.pp) clauses);
+      (* elements of the trail to keep *)
+      let keep_trail = C.trail c |> Trail.filter BBox.must_be_kept in
+      let clauses_and_names =
+        List.map
+          (fun lits ->
+            let lits = Array.of_list lits in
+            let bool_name = BBox.inject_lits ~flex_ref lits in
+            Util.debugf ~section 5 "(@[<2>inject_lits@ :lits %a@ :blit %a@])"
+              (fun k -> k Literals.pp lits BBox.pp bool_name);
+            (* new trail: add the new one *)
+            let trail = Trail.add bool_name keep_trail in
+            let c =
+              C.create_a ~ctx:(Env.get_ctx env) ~trail ~penalty:(C.penalty c)
+                lits
+                (proof ~rule:(Proof.Rule.mk "split"))
+            in
+            c, bool_name)
+          !components
+      in
+      let clauses, bool_clause = List.split clauses_and_names in
+      Util.debugf ~section 2 "@[split of @[%a@]@ yields @[%a@]@]" (fun k ->
+          k C.pp c (Util.pp_list C.pp) clauses);
 
-    (* add boolean constraint: trail(c) => bigor_{name in clauses} name *)
-    let bool_clause = List.append bool_clause bool_guard in
-    Solver.add_clause ~proof:(proof ~rule:(Proof.Rule.mk "split")) bool_clause;
-    Util.debugf ~section 2 "@[constraint clause is @[%a@]@]" (fun k ->
-        k BBox.pp_bclause bool_clause);
-    (* return the clauses *)
-    Some clauses
+      (* add boolean constraint: trail(c) => bigor_{name in clauses} name *)
+      let bool_clause = List.append bool_clause bool_guard in
+      Solver.add_clause ~proof:(proof ~rule:(Proof.Rule.mk "split")) bool_clause;
+      Util.debugf ~section 2 "@[constraint clause is @[%a@]@]" (fun k ->
+          k BBox.pp_bclause bool_clause);
+      (* return the clauses *)
+      Some clauses
+  in
+  Env.update_flex_state env (fun _ -> !flex_ref);
+  result
 
 (* Avatar splitting *)
 let split env c =
@@ -398,7 +404,8 @@ let cut_res_clauses c = Iter.of_list c.cut_pos
    and make a lemma out of them, including Skolemization, etc. *)
 let introduce_cut env ?reason ?(penalty = 1) ?(depth = 0) (f : Cut_form.t) proof
     : cut_res =
-  let box = BBox.inject_lemma f in
+  let flex_ref = ref (Env.flex_state_of env) in
+  let box = BBox.inject_lemma ~flex_ref f in
   let cut_proof_parent =
     let form = Cut_form.to_s_form f in
     let st =
@@ -419,15 +426,19 @@ let introduce_cut env ?reason ?(penalty = 1) ?(depth = 0) (f : Cut_form.t) proof
           lits proof_pos)
       (Cut_form.cs f)
   in
-  {
-    cut_form = f;
-    cut_pos = c_pos;
-    cut_lit = box;
-    cut_depth = depth;
-    cut_proof = proof;
-    cut_reason = reason;
-    cut_proof_parent;
-  }
+  let result =
+    {
+      cut_form = f;
+      cut_pos = c_pos;
+      cut_lit = box;
+      cut_depth = depth;
+      cut_proof = proof;
+      cut_reason = reason;
+      cut_proof_parent;
+    }
+  in
+  Env.update_flex_state env (fun _ -> !flex_ref);
+  result
 
 let on_input_lemma : cut_res Signal.t = Signal.create ()
 let on_lemma : cut_res Signal.t = Signal.create ()
@@ -754,4 +765,4 @@ let () =
       "ho-comb-complete";
       "lambda-free-purify-intensional";
       "lambda-free-purify-extensional";
-    ] (fun () -> avatar_kind := `Off)
+    ] (fun _ -> avatar_kind := `Off)

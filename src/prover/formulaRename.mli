@@ -8,12 +8,13 @@ module type S = sig
   val on_pred_skolem_introduction : (C.t * Term.t) Signal.t
   (** this signal is raised when a predicate Skolem is introduced *)
 
-  val is_renaming_clause : C.t -> bool
+  val is_renaming_clause : flex_ref:Flex_state.t ref -> C.t -> bool
   (** This clause has the shape of the renaming clause *)
 
   val rename_form :
     ?should_rename:(T.t -> bool) ->
     ?polarity_aware:bool ->
+    flex_ref:Flex_state.t ref ->
     c:C.t ->
     T.t ->
     bool ->
@@ -41,6 +42,7 @@ module type S = sig
   *)
 
   val get_skolem :
+    flex_ref:Flex_state.t ref ->
     parent:C.t ->
     mode:[< `Choice | `SkolemRecycle | `SkolemAlwaysFresh ] ->
     T.t ->

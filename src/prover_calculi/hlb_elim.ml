@@ -1011,40 +1011,24 @@ let setup env =
       add_simpl (fun env cl -> unit_hle_htr env cl)
   )
 
-let max_depth_ = ref 3
-let enabled_ = ref false
-let simpl_new_ = ref false
-let clauses_to_track_ = ref `Active
-let max_self_impls_ = ref 1
-let max_tracked_clauses = ref (-1)
-let propagated_hle = ref true
-let hte_ = ref true
-let hle_ = ref true
-let track_eq_ = ref false
-let insert_ordered_ = ref false
-let heartbeat_steps = ref None
-let max_imp_ = ref 48
-let basic_rules_ = ref true
-let penalize_tautologies_ = ref true
-
 let extension =
   let register (env : Env.t) =
-    Env.flex_add_of env k_enabled !enabled_;
-    Env.flex_add_of env k_max_depth !max_depth_;
-    Env.flex_add_of env k_simpl_new !simpl_new_;
-    Env.flex_add_of env k_clauses_to_track !clauses_to_track_;
-    Env.flex_add_of env k_max_self_impls !max_self_impls_;
-    Env.flex_add_of env k_unit_propagated_hle !propagated_hle;
-    Env.flex_add_of env k_max_tracked_clauses !max_tracked_clauses;
-    Env.flex_add_of env k_track_eq !track_eq_;
-    Env.flex_add_of env k_delete_lits !hle_;
-    Env.flex_add_of env k_reduce_tautologies !hte_;
-    Env.flex_add_of env k_insert_only_ordered !insert_ordered_;
-    Env.flex_add_of env k_heartbeat_steps !heartbeat_steps;
+    Env.flex_ensure env k_enabled false;
+    Env.flex_ensure env k_max_depth 3;
+    Env.flex_ensure env k_simpl_new false;
+    Env.flex_ensure env k_clauses_to_track `Active;
+    Env.flex_ensure env k_max_self_impls 1;
+    Env.flex_ensure env k_unit_propagated_hle true;
+    Env.flex_ensure env k_max_tracked_clauses (-1);
+    Env.flex_ensure env k_track_eq false;
+    Env.flex_ensure env k_delete_lits true;
+    Env.flex_ensure env k_reduce_tautologies true;
+    Env.flex_ensure env k_insert_only_ordered false;
+    Env.flex_ensure env k_heartbeat_steps None;
     Env.flex_add_of env k_heartbeat_disabled_hlbe false;
-    Env.flex_add_of env k_max_imp_entries !max_imp_;
-    Env.flex_add_of env k_basic_rules !basic_rules_;
-    Env.flex_add_of env k_penalize_tautologies !penalize_tautologies_;
+    Env.flex_ensure env k_max_imp_entries 48;
+    Env.flex_ensure env k_basic_rules true;
+    Env.flex_ensure env k_penalize_tautologies true;
     setup env
   in
   {
@@ -1055,60 +1039,80 @@ let extension =
   }
 
 let () =
-  Options.add_opts
-    [
-      ( "--hlbe-elim",
-        Arg.Bool (( := ) enabled_),
-        " enable/disable hidden literal and tautology elimination" );
-      ( "--hlbe-elim-max-tracked",
-        Arg.Int (( := ) max_tracked_clauses),
-        " negative value for disabling the limit" );
-      ( "--hlbe-elim-lits",
-        Arg.Bool (( := ) hle_),
-        " remove literals using HLBE (--hlbe-elim must be on)" );
-      ( "--hlbe-reduce-tautologies",
-        Arg.Bool (( := ) hte_),
-        " reduce tautologies using HLBE (--hlbe-elim must be on)" );
-      ( "--hlbe-max-depth",
-        Arg.Set_int max_depth_,
-        " max depth of binary implication graph precomputation" );
-      ( "--hlbe-simplify-new",
-        Arg.Bool (( := ) simpl_new_),
-        " apply HLBE also when moving a clause from fresh to passive" );
-      ( "--hlbe-track-eq",
-        Arg.Bool (( := ) track_eq_),
-        " enable/disable tracking and simplifying equality literals" );
-      ( "--hlbe-heartbeat",
-        Arg.Int (fun v -> heartbeat_steps := Some v),
-        " when set to n, every n steps it will be checked if any HLBE \
-         simplification is performed." ^ " If not, any HLBE will be disabled." );
-      ( "--hlbe-clauses-to-track",
-        Arg.Symbol
-          ( [ "all"; "passive"; "active" ],
-            function
-            | "all" -> clauses_to_track_ := `All
-            | "passive" -> clauses_to_track_ := `Passive
-            | "active" -> clauses_to_track_ := `Active
-            | _ -> () ),
-        " what clauses to use for simplification" );
-      ( "--hlbe-max-self-implications",
-        Arg.Int (( := ) max_self_impls_),
-        " how many times do we loop implications of the kind p(X) -> p(f(X)) " );
-      ( "--hlbe-unit-rules",
-        Arg.Bool (( := ) propagated_hle),
-        " do unit-triggered removal of literals " );
-      ( "--hlbe-insert-ordered",
-        Arg.Bool (( := ) insert_ordered_),
-        " for clauses of the form l|r where l > r then insert only ~l -> r " );
-      ( "--hlbe-max-entries",
-        Arg.Int (( := ) max_imp_),
-        " maximal number of entries stored for each element mapped by \
-         implication map " );
-      ( "--hlbe-basic-rules",
-        Arg.Bool (( := ) basic_rules_),
-        " enable/disable basic (non unit) rules HLE and HTR" );
-      ( "--hlbe-penalize-tautologies",
-        Arg.Bool (( := ) penalize_tautologies_),
-        " penalize hidden tautologies" );
-    ];
+  Params.add_flex_opts (fun ~flex_ref ->
+      [
+        ( "--hlbe-elim",
+          Arg.Bool (fun v -> flex_ref := Flex_state.add k_enabled v !flex_ref),
+          " enable/disable hidden literal and tautology elimination" );
+        ( "--hlbe-elim-max-tracked",
+          Arg.Int
+            (fun n ->
+              flex_ref := Flex_state.add k_max_tracked_clauses n !flex_ref),
+          " negative value for disabling the limit" );
+        ( "--hlbe-elim-lits",
+          Arg.Bool
+            (fun v -> flex_ref := Flex_state.add k_delete_lits v !flex_ref),
+          " remove literals using HLBE (--hlbe-elim must be on)" );
+        ( "--hlbe-reduce-tautologies",
+          Arg.Bool
+            (fun v ->
+              flex_ref := Flex_state.add k_reduce_tautologies v !flex_ref),
+          " reduce tautologies using HLBE (--hlbe-elim must be on)" );
+        ( "--hlbe-max-depth",
+          Arg.Int (fun n -> flex_ref := Flex_state.add k_max_depth n !flex_ref),
+          " max depth of binary implication graph precomputation" );
+        ( "--hlbe-simplify-new",
+          Arg.Bool (fun v -> flex_ref := Flex_state.add k_simpl_new v !flex_ref),
+          " apply HLBE also when moving a clause from fresh to passive" );
+        ( "--hlbe-track-eq",
+          Arg.Bool (fun v -> flex_ref := Flex_state.add k_track_eq v !flex_ref),
+          " enable/disable tracking and simplifying equality literals" );
+        ( "--hlbe-heartbeat",
+          Arg.Int
+            (fun n ->
+              flex_ref := Flex_state.add k_heartbeat_steps (Some n) !flex_ref),
+          " when set to n, every n steps it will be checked if any HLBE \
+           simplification is performed. If not, any HLBE will be disabled." );
+        ( "--hlbe-clauses-to-track",
+          Arg.Symbol
+            ( [ "all"; "passive"; "active" ],
+              fun s ->
+                flex_ref :=
+                  Flex_state.add k_clauses_to_track
+                    (match s with
+                    | "all" -> `All
+                    | "passive" -> `Passive
+                    | _ -> `Active)
+                    !flex_ref ),
+          " what clauses to use for simplification" );
+        ( "--hlbe-max-self-implications",
+          Arg.Int
+            (fun n -> flex_ref := Flex_state.add k_max_self_impls n !flex_ref),
+          " how many times do we loop implications of the kind p(X) -> p(f(X)) "
+        );
+        ( "--hlbe-unit-rules",
+          Arg.Bool
+            (fun v ->
+              flex_ref := Flex_state.add k_unit_propagated_hle v !flex_ref),
+          " do unit-triggered removal of literals " );
+        ( "--hlbe-insert-ordered",
+          Arg.Bool
+            (fun v ->
+              flex_ref := Flex_state.add k_insert_only_ordered v !flex_ref),
+          " for clauses of the form l|r where l > r then insert only ~l -> r " );
+        ( "--hlbe-max-entries",
+          Arg.Int
+            (fun n -> flex_ref := Flex_state.add k_max_imp_entries n !flex_ref),
+          " maximal number of entries stored for each element mapped by \
+           implication map " );
+        ( "--hlbe-basic-rules",
+          Arg.Bool
+            (fun v -> flex_ref := Flex_state.add k_basic_rules v !flex_ref),
+          " enable/disable basic (non unit) rules HLE and HTR" );
+        ( "--hlbe-penalize-tautologies",
+          Arg.Bool
+            (fun v ->
+              flex_ref := Flex_state.add k_penalize_tautologies v !flex_ref),
+          " penalize hidden tautologies" );
+      ]);
   Extensions.register extension

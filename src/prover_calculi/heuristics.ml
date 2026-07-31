@@ -7,13 +7,9 @@ open Libzipperposition
 module T = Term
 module Lit = Literal
 
-let depth_limit_ = ref None
-let max_vars = ref 10
-let no_max_vars = ref false
-
-let enable_depth_limit i =
-  if i <= 0 then invalid_arg "Heuristics.enable_depth_limit";
-  depth_limit_ := Some i
+let k_depth_limit : int option Flex_state.key = Flex_state.create_key ()
+let k_max_vars : int Flex_state.key = Flex_state.create_key ()
+let k_no_max_vars : bool Flex_state.key = Flex_state.create_key ()
 
 let section = Util.Section.make ~parent:Const.section "heuristics"
 let stat_depth_limit = Util.mk_stat "trivial.too_deep"
@@ -31,7 +27,7 @@ let _depth_types lits =
   |> CCOpt.map_or ~default:0 CCFun.id
 
 let is_too_deep env c =
-  match !depth_limit_ with
+  match Option.join (Flex_state.get k_depth_limit (Env.flex_state_of env)) with
   | None -> false
   | Some d ->
     let lits = C.lits c in
@@ -46,7 +42,10 @@ let is_too_deep env c =
       false
 
 let has_too_many_vars env c =
-  if !no_max_vars then
+  if
+    CCOpt.get_or ~default:false
+      (Flex_state.get k_no_max_vars (Env.flex_state_of env))
+  then
     false
   else (
     let lits = C.lits c in
@@ -56,7 +55,10 @@ let has_too_many_vars env c =
       |> List.filter (fun v -> not (Type.is_tType (HVar.ty v)))
       |> List.length
     in
-    if n_vars > !max_vars then (
+    if
+      n_vars
+      > CCOpt.get_or ~default:10 (Flex_state.get k_max_vars (Env.flex_state_of env))
+    then (
       Ctx.lost_completeness (Env.get_ctx env);
       Util.incr_stat stat_vars;
       Util.debugf ~section 5
@@ -78,22 +80,26 @@ let extension =
   Extensions.{ default with name = "heuristics"; env_actions = [ action ] }
 
 let () =
-  Params.add_opts
+  Params.add_flex_opts (fun ~flex_ref ->
     [
-      "--depth-limit", Arg.Int enable_depth_limit, " set maximal term depth";
+      ( "--depth-limit",
+        Arg.Int
+          (fun i -> flex_ref := Flex_state.add k_depth_limit (Some i) !flex_ref),
+        " set maximal term depth" );
       ( "--max-vars",
-        Arg.Set_int max_vars,
+        Arg.Int (fun n -> flex_ref := Flex_state.add k_max_vars n !flex_ref),
         " maximum number of variables per clause" );
       ( "--no-max-vars",
-        Arg.Set no_max_vars,
-        " disable maximum number of variables per clause" );
-      ( "--enable-max-vars",
-        Arg.Clear no_max_vars,
-        "enable maximum number of variables per clause" );
-    ];
-  Params.add_to_mode "best" (fun () -> no_max_vars := true);
-  Params.add_to_mode "ho-pragmatic" (fun () -> no_max_vars := true);
-  Params.add_to_mode "ho-competitive" (fun () -> no_max_vars := true);
+        Arg.Bool
+          (fun v -> flex_ref := Flex_state.add k_no_max_vars v !flex_ref),
+        " disable/enable maximum number of variables per clause" );
+    ]);
+  Params.add_to_mode "best" (fun flex_ref ->
+    flex_ref := Flex_state.add k_no_max_vars true !flex_ref);
+  Params.add_to_mode "ho-pragmatic" (fun flex_ref ->
+    flex_ref := Flex_state.add k_no_max_vars true !flex_ref);
+  Params.add_to_mode "ho-competitive" (fun flex_ref ->
+    flex_ref := Flex_state.add k_no_max_vars true !flex_ref);
   Params.add_to_modes
     [
       "ho-complete-basic";
@@ -103,5 +109,5 @@ let () =
       "ho-comb-complete";
       "lambda-free-purify-intensional";
       "lambda-free-purify-extensional";
-    ] (fun () -> no_max_vars := true);
+    ] (fun flex_ref -> flex_ref := Flex_state.add k_no_max_vars true !flex_ref);
   ()

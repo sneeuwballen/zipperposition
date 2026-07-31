@@ -108,32 +108,51 @@ module TermIndex = PS.TermIndex
 module SubsumIdx = PS.SubsumptionIndex
 module UnitIdx = PS.UnitIndex
 module Stm = Stream
-module StmQ = StreamQueue
 
+module StmQ = StreamQueue
 (** {6 Stream queue} *)
-let _cc_simpl = ref (Congruence.FO.create ~size:256 ())
 
 (** {6 Index Management} *)
 
-let _idx_sup_into = ref (TermIndex.empty ())
-let _idx_lambdasup_into = ref (TermIndex.empty ())
-let _idx_fluidsup_into = ref (TermIndex.empty ())
-let _idx_subvarsup_into = ref (TermIndex.empty ())
-let _idx_dupsup_into = ref (TermIndex.empty ())
-let _idx_sup_from = ref (TermIndex.empty ())
-let _idx_back_demod = ref (TermIndex.empty ())
-let _idx_fv = ref (SubsumIdx.empty ())
-(* let _idx_fv = ref (SubsumIdx.of_signature (Ctx.signature()) ()) *)
+type state = {
+  mutable ord_ref: O.t;
+  mutable idx_sup_into: TermIndex.t;
+  mutable idx_lambdasup_into: TermIndex.t;
+  mutable idx_fluidsup_into: TermIndex.t;
+  mutable idx_subvarsup_into: TermIndex.t;
+  mutable idx_dupsup_into: TermIndex.t;
+  mutable idx_sup_from: TermIndex.t;
+  mutable idx_back_demod: TermIndex.t;
+  mutable idx_fv: SubsumIdx.t;
+  mutable idx_simpl: UnitIdx.t;
+}
 
-let _idx_simpl = ref (UnitIdx.empty ())
-let idx_sup_into () = !_idx_sup_into
-let idx_sup_from () = !_idx_sup_from
-let idx_fv () = !_idx_fv
+let k_state : state Flex_state.key = Flex_state.create_key ()
+
+let get_state env =
+  match Flex_state.get k_state (Env.flex_state_of env) with
+  | Some st -> st
+  | None ->
+    let st =
+      {
+        ord_ref = O.none;
+        idx_sup_into = TermIndex.empty ();
+        idx_lambdasup_into = TermIndex.empty ();
+        idx_fluidsup_into = TermIndex.empty ();
+        idx_subvarsup_into = TermIndex.empty ();
+        idx_dupsup_into = TermIndex.empty ();
+        idx_sup_from = TermIndex.empty ();
+        idx_back_demod = TermIndex.empty ();
+        idx_fv = SubsumIdx.empty ();
+        idx_simpl = UnitIdx.empty ();
+      }
+    in
+    Env.flex_add_of env k_state st;
+    st
 
 (* Beta-Eta-Normalizes terms before comparing them. Note that the Clause
    module calls Ctx.ord () independently, but clauses should be normalized
    independently by simplification rules. *)
-let _ord_ref = ref O.none
 
 let force_getting_cl env streams =
   let rec aux ((clauses, streams) as acc) = function
@@ -158,10 +177,10 @@ let force_getting_cl env streams =
   in
   aux ([], []) streams
 
-let has_bad_occurrence_elsewhere c var pos =
+let has_bad_occurrence_elsewhere env c var pos =
   assert (T.is_var var);
-  Lits.fold_terms ~ord:!_ord_ref ~subterms:true ~eligible:C.Eligible.always
-    ~which:`All (C.lits c)
+  Lits.fold_terms ~ord:(get_state env).ord_ref ~subterms:true
+    ~eligible:C.Eligible.always ~which:`All (C.lits c)
   |> Iter.exists (fun (t, pos') ->
          (not (Position.equal pos pos'))
          &&
@@ -187,7 +206,7 @@ let is_fluid_or_deep env c t =
   match T.as_var t with
   | Some v ->
     Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false ~ty_args:false
-      ~which:`All ~ord:!_ord_ref ~subterms:true
+      ~which:`All ~ord:(get_state env).ord_ref ~subterms:true
       ~eligible:(fun _ _ -> true)
       (C.lits c)
     |> Iter.exists (fun (t, _) ->
@@ -216,10 +235,10 @@ let _update_active env f c =
   let demod_in_var_args = Env.flex_get_of env k_demod_in_var_args in
   let lambda_demod = Env.flex_get_of env k_lambda_demod in
   let module TPSet = SClause.TPSet in
-  _idx_sup_into :=
+  (get_state env).idx_sup_into <-
     Lits.fold_terms ~vars:sup_at_vars ~var_args:sup_in_var_args
-      ~fun_bodies:sup_under_lambdas ~ty_args:false ~ord:!_ord_ref ~which:`Max
-      ~subterms:true ~eligible:(C.Eligible.res c) (C.lits c)
+      ~fun_bodies:sup_under_lambdas ~ty_args:false ~ord:(get_state env).ord_ref
+      ~which:`Max ~subterms:true ~eligible:(C.Eligible.res c) (C.lits c)
     |> Iter.append (TPSet.to_iter @@ C.eligible_subterms_of_bool c)
     |> Iter.sort_uniq ~cmp:(fun (_, p1) (_, p2) -> Position.compare p1 p2)
     |> Iter.filter (fun (t, _) ->
@@ -236,13 +255,13 @@ let _update_active env f c =
                k C.pp c Term.pp t);
            let with_pos = C.WithPos.make ~clause:c ~pos in
            f tree t with_pos)
-         !_idx_sup_into;
+         (get_state env).idx_sup_into;
 
   (* index subterms that can be rewritten by FluidSup *)
   if fluidsup then
-    _idx_fluidsup_into :=
+    (get_state env).idx_fluidsup_into <-
       Lits.fold_terms ~vars:true ~var_args:false ~fun_bodies:false
-        ~ty_args:false ~ord:!_ord_ref ~which:`Max ~subterms:true
+        ~ty_args:false ~ord:(get_state env).ord_ref ~which:`Max ~subterms:true
         ~eligible:(C.Eligible.res c) (C.lits c)
       (* TODO(BOOL): How is this going to be extended for Boolean reasoning? *)
       |> Iter.filter (fun (t, _) -> is_fluid_or_deep env c t)
@@ -250,31 +269,31 @@ let _update_active env f c =
            (fun tree (t, pos) ->
              let with_pos = C.WithPos.make ~clause:c ~pos in
              f tree t with_pos)
-           !_idx_fluidsup_into;
+           (get_state env).idx_fluidsup_into;
 
   (* index subterms that can be rewritten by FluidSup *)
   if subvarsup then
-    _idx_subvarsup_into :=
+    (get_state env).idx_subvarsup_into <-
       Lits.fold_terms ~vars:true ~var_args:false ~fun_bodies:false
-        ~ty_args:false ~ord:!_ord_ref ~which:`Max ~subterms:true
+        ~ty_args:false ~ord:(get_state env).ord_ref ~which:`Max ~subterms:true
         ~eligible:(C.Eligible.res c) (C.lits c)
       (* TODO(BOOL): How is this going to be extended for Boolean reasoning? *)
       |> Iter.filter (fun (t, pos) ->
              match T.view t with
-             | T.Var _ -> has_bad_occurrence_elsewhere c t pos
+             | T.Var _ -> has_bad_occurrence_elsewhere env c t pos
              | T.App (hd, [ _ ]) when T.is_var hd ->
-               has_bad_occurrence_elsewhere c hd pos
+               has_bad_occurrence_elsewhere env c hd pos
              | _ -> false)
       |> Iter.fold
            (fun tree (t, pos) ->
              let with_pos = C.WithPos.make ~clause:c ~pos in
              f tree t with_pos)
-           !_idx_subvarsup_into;
+           (get_state env).idx_subvarsup_into;
 
   if dupsup then
-    _idx_dupsup_into :=
+    (get_state env).idx_dupsup_into <-
       Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false
-        ~ty_args:false ~ord:!_ord_ref ~which:`Max ~subterms:true
+        ~ty_args:false ~ord:(get_state env).ord_ref ~which:`Max ~subterms:true
         ~eligible:(C.Eligible.res c) (C.lits c)
       (* TODO(BOOL): How is this going to be extended for Boolean reasoning? *)
       |> Iter.filter (fun (t, _) ->
@@ -286,15 +305,15 @@ let _update_active env f c =
            (fun tree (t, pos) ->
              let with_pos = C.WithPos.make ~clause:c ~pos in
              f tree t with_pos)
-           !_idx_dupsup_into;
+           (get_state env).idx_dupsup_into;
 
   (* index subterms that can be rewritten by LambdaSup --
      the ones that can rewrite those are actually the ones
      already indexed by _idx_sup_from*)
   if lambdasup != _NO_LAMSUP then
-    _idx_lambdasup_into :=
+    (get_state env).idx_lambdasup_into <-
       Lits.fold_terms ~vars:sup_at_vars ~var_args:sup_in_var_args
-        ~fun_bodies:true ~ty_args:false ~ord:!_ord_ref ~which:`Max
+        ~fun_bodies:true ~ty_args:false ~ord:(get_state env).ord_ref ~which:`Max
         ~subterms:true ~eligible:(C.Eligible.res c) (C.lits c)
       (* We are going only under lambdas *)
       (* TODO(BOOL): Maybe add bool stuff to LambdaSup *)
@@ -322,12 +341,12 @@ let _update_active env f c =
            (fun tree (t, pos) ->
              let with_pos = C.WithPos.make ~clause:c ~pos in
              f tree t with_pos)
-           !_idx_lambdasup_into;
+           (get_state env).idx_lambdasup_into;
 
   (* index terms that can rewrite into other clauses *)
-  _idx_sup_from :=
-    Lits.fold_eqn ~ord:!_ord_ref ~both:true ~eligible:(C.Eligible.param c)
-      (C.lits c)
+  (get_state env).idx_sup_from <-
+    Lits.fold_eqn ~ord:(get_state env).ord_ref ~both:true
+      ~eligible:(C.Eligible.param c) (C.lits c)
     |> Iter.filter (fun (_, r, sign, _) -> sign || T.equal r T.false_)
     |> Iter.filter (fun (l, _, _, _) ->
            Env.flex_get_of env k_superpose_w_formulas
@@ -344,13 +363,13 @@ let _update_active env f c =
            Util.debugf ~section 2 "inserting(from):@[@[%a@]|@[%a]@]" (fun k ->
                k C.pp c Term.pp l);
            f tree l with_pos)
-         !_idx_sup_from;
+         (get_state env).idx_sup_from;
   (* terms that can be demodulated: all subterms (but vars) *)
-  _idx_back_demod :=
+  (get_state env).idx_back_demod <-
     (* TODO: allow demod under lambdas under certain conditions (DemodExt) *)
     Lits.fold_terms ~vars:false ~var_args:demod_in_var_args
-      ~fun_bodies:lambda_demod ~ty_args:false ~ord:!_ord_ref ~subterms:true
-      ~which:`All ~eligible:C.Eligible.always (C.lits c)
+      ~fun_bodies:lambda_demod ~ty_args:false ~ord:(get_state env).ord_ref
+      ~subterms:true ~which:`All ~eligible:C.Eligible.always (C.lits c)
     |> Iter.fold
          (fun tree (t, pos) ->
            match T.view t with
@@ -370,14 +389,14 @@ let _update_active env f c =
            | _ ->
              let with_pos = C.WithPos.make ~clause:c ~pos in
              f tree t with_pos)
-         !_idx_back_demod;
+         (get_state env).idx_back_demod;
   Signal.ContinueListening
 
 (* update simpl. index using the clause [c] just added or removed to
    the simplification set *)
 let _update_simpl env f c =
   assert (CCArray.for_all Lit.no_prop_invariant (C.lits c));
-  let idx = !_idx_simpl in
+  let idx = (get_state env).idx_simpl in
   let idx' =
     match C.lits c with
     | [| Lit.Equation (l, r, true) |] ->
@@ -390,7 +409,7 @@ let _update_simpl env f c =
       then
         idx
       else (
-        match Ordering.compare !_ord_ref l r with
+        match Ordering.compare (get_state env).ord_ref l r with
         | Comp.Gt | Geq -> f idx (l, r, true, c)
         | Lt | Leq -> f idx (r, l, true, c)
         | Incomparable ->
@@ -401,7 +420,7 @@ let _update_simpl env f c =
     | [| Lit.Equation (l, r, false) |] -> f idx (l, r, false, c)
     | _ -> idx
   in
-  _idx_simpl := idx';
+  (get_state env).idx_simpl <- idx';
   Signal.ContinueListening
 
 (** {5 Inference Rules} *)
@@ -457,7 +476,7 @@ let sup_at_var_condition env info var replacement =
     let var' = S.FO.apply renaming subst (var, info.scope_passive) in
     if
       (not (Type.is_fun (Term.ty var')))
-      || not (O.might_flip !_ord_ref var' replacement')
+      || not (O.might_flip (get_state env).ord_ref var' replacement')
     then (
       Util.debugf ~section 5 "Cannot flip: %a = %a" (fun k ->
           k T.pp var' T.pp replacement');
@@ -466,8 +485,9 @@ let sup_at_var_condition env info var replacement =
       (* Check whether var occurs only with the same arguments everywhere. *)
       let unique_args_of_var c =
         C.lits c
-        |> Lits.fold_terms ~vars:true ~ty_args:false ~which:`All ~ord:!_ord_ref
-             ~subterms:true ~eligible:(fun _ _ -> true)
+        |> Lits.fold_terms ~vars:true ~ty_args:false ~which:`All
+             ~ord:(get_state env).ord_ref ~subterms:true ~eligible:(fun _ _ ->
+               true)
         |> Iter.fold_while
              (fun unique_args (t, _) ->
                if Term.equal (fst (T.as_app t)) var then
@@ -527,7 +547,8 @@ let sup_at_var_condition env info var replacement =
         in
         if
           Comp.is_Gt_or_Geq
-            (Lits.compare_multiset ~ord:!_ord_ref passive'_lits passive_t'_lits)
+            (Lits.compare_multiset ~ord:(get_state env).ord_ref passive'_lits
+               passive_t'_lits)
         then (
           Util.debugf ~section 3
             "Sup at var condition is not fulfilled because: %a >= %a" (fun k ->
@@ -810,7 +831,7 @@ let do_classic_superposition env info =
       raise (ExitSuperposition "trivial trail");
     let s' = S.FO.apply ~shift_vars renaming subst (info.s, sc_a) in
     if
-      Comp.is_Lt_or_Leq (O.compare !_ord_ref s' t')
+      Comp.is_Lt_or_Leq (O.compare (get_state env).ord_ref s' t')
       (* if it was an inference into selected Bool position, 
             we do not reevaluate BoolSelection on the new literal set
             -- in 99% of cases it is selected again,
@@ -818,15 +839,18 @@ let do_classic_superposition env info =
             check ordering restrictions*)
       || (not bool_inference)
          && not
-              (Lit.Pos.is_max_term ~ord:!_ord_ref passive_lit' passive_lit_pos)
+              (Lit.Pos.is_max_term ~ord:(get_state env).ord_ref passive_lit'
+                 passive_lit_pos)
       || (not bool_inference)
          && not (BV.get (C.eligible_res (info.passive, sc_p) subst) passive_idx)
       || not (C.is_eligible_param (info.active, sc_a) subst ~idx:active_idx)
     then (
-      let c1 = Comp.is_Lt_or_Leq (O.compare !_ord_ref s' t') in
+      let c1 = Comp.is_Lt_or_Leq (O.compare (get_state env).ord_ref s' t') in
       let c2 =
         (not bool_inference)
-        && not (Lit.Pos.is_max_term ~ord:!_ord_ref passive_lit' passive_lit_pos)
+        && not
+             (Lit.Pos.is_max_term ~ord:(get_state env).ord_ref passive_lit'
+                passive_lit_pos)
       in
       let c3 =
         (not bool_inference)
@@ -1089,10 +1113,11 @@ let do_simultaneous_superposition env info =
       raise (ExitSuperposition "trivial trail");
     let s' = S.FO.apply ~shift_vars renaming subst (info.s, sc_a) in
     if
-      Comp.is_Lt_or_Leq (O.compare !_ord_ref s' t')
+      Comp.is_Lt_or_Leq (O.compare (get_state env).ord_ref s' t')
       || (not bool_inference)
          && not
-              (Lit.Pos.is_max_term ~ord:!_ord_ref passive_lit' passive_lit_pos)
+              (Lit.Pos.is_max_term ~ord:(get_state env).ord_ref passive_lit'
+                 passive_lit_pos)
       || (not bool_inference)
          && not (BV.get (C.eligible_res (info.passive, sc_p) subst) passive_idx)
       || not (C.is_eligible_param (info.active, sc_a) subst ~idx:active_idx)
@@ -1244,7 +1269,8 @@ let infer_active_aux env ~retrieve_from_index ~process_retrieved clause =
      we try to rewrite conditionally other clauses using
      non-minimal sides of every positive literal *)
   let new_clauses =
-    Lits.fold_eqn ~ord:!_ord_ref ~both:true ~eligible (C.lits clause)
+    Lits.fold_eqn ~ord:(get_state env).ord_ref ~both:true ~eligible
+      (C.lits clause)
     |> Iter.filter (fun (_, t, sign, _) -> sign || T.equal t T.false_)
     |> Iter.flat_map (fun (s, t, _, s_pos) ->
            let do_sup u_p with_pos subst =
@@ -1277,7 +1303,7 @@ let infer_active_aux env ~retrieve_from_index ~process_retrieved clause =
                None
            in
            (* rewrite clauses using s *)
-           retrieve_from_index (!_idx_sup_into, 1) (s, 0)
+           retrieve_from_index ((get_state env).idx_sup_into, 1) (s, 0)
            |> Iter.filter_map (process_retrieved do_sup))
     |> Iter.to_rev_list
   in
@@ -1295,8 +1321,8 @@ let infer_passive_aux ~retrieve_from_index ~process_retrieved clause env =
       ~vars:(Env.flex_get_of env k_sup_at_vars)
       ~var_args:(Env.flex_get_of env k_sup_in_var_args)
       ~fun_bodies:(Env.flex_get_of env k_sup_under_lambdas)
-      ~subterms:true ~ord:!_ord_ref ~which:`Max ~eligible ~ty_args:false
-      (C.lits clause)
+      ~subterms:true ~ord:(get_state env).ord_ref ~which:`Max ~eligible
+      ~ty_args:false (C.lits clause)
     |> Iter.append (TPSet.to_iter (C.eligible_subterms_of_bool clause))
     |> Iter.sort_uniq ~cmp:(fun (_, p1) (_, p2) -> Position.compare p1 p2)
     |> Iter.filter (fun (u_p, _) -> (not (T.is_var u_p)) || T.is_ho_var u_p)
@@ -1333,7 +1359,7 @@ let infer_passive_aux ~retrieve_from_index ~process_retrieved clause env =
            in
            (* all terms that occur in an equation in the active_set
             and that are potentially unifiable with u_p (u at position p) *)
-           retrieve_from_index (!_idx_sup_from, 1) (u_p, 0)
+           retrieve_from_index ((get_state env).idx_sup_from, 1) (u_p, 0)
            |> Iter.filter_map (process_retrieved do_sup))
     |> Iter.to_rev_list
   in
@@ -1352,7 +1378,8 @@ let infer_lambdasup_from env clause =
   (* do the inferences where clause is active; for this,
      we try to rewrite conditionally other clauses using
      non-minimal sides of every positive literal *)
-  Lits.fold_eqn ~ord:!_ord_ref ~both:true ~eligible (C.lits clause)
+  Lits.fold_eqn ~ord:(get_state env).ord_ref ~both:true ~eligible
+    (C.lits clause)
   |> Iter.filter (fun (_, t, sign, _) -> sign || T.equal t T.false_)
   |> Iter.flat_map (fun (s, t, _, s_pos) ->
          let do_lambdasup u_p with_pos subst =
@@ -1383,7 +1410,7 @@ let infer_lambdasup_from env clause =
 
            do_superposition env info
          in
-         I.retrieve_unifiables (!_idx_lambdasup_into, 1) (s, 0)
+         I.retrieve_unifiables ((get_state env).idx_lambdasup_into, 1) (s, 0)
          |> Iter.filter_map (fun (u_p, with_pos, subst) ->
                 do_lambdasup u_p with_pos subst))
   |> Iter.to_rev_list
@@ -1404,8 +1431,8 @@ let infer_lambdasup_into env clause =
     Lits.fold_terms
       ~vars:(Env.flex_get_of env k_sup_at_vars)
       ~var_args:(Env.flex_get_of env k_sup_in_var_args)
-      ~fun_bodies:true ~subterms:true ~ord:!_ord_ref ~which:`Max ~eligible
-      ~ty_args:false (C.lits clause)
+      ~fun_bodies:true ~subterms:true ~ord:(get_state env).ord_ref ~which:`Max
+      ~eligible ~ty_args:false (C.lits clause)
     |> Iter.filter_map (fun (u_p, p) ->
            (* we rewrite only under lambdas  *)
            if not (T.is_fun u_p) then
@@ -1460,7 +1487,7 @@ let infer_lambdasup_into env clause =
            in
            (* all terms that occur in an equation in the active_set
             and that are potentially unifiable with u_p (u at position p) *)
-           I.retrieve_unifiables (!_idx_sup_from, 1) (u_p, 0)
+           I.retrieve_unifiables ((get_state env).idx_sup_from, 1) (u_p, 0)
            |> Iter.filter_map (fun (t, p, s) -> do_sup t p s))
     |> Iter.to_rev_list
   in
@@ -1530,10 +1557,11 @@ let infer_fluidsup_active env clause =
      non-minimal sides of every positive literal *)
   let new_clauses =
     if fluidsup_applicable env clause then
-      Lits.fold_eqn ~ord:!_ord_ref ~both:true ~eligible (C.lits clause)
+      Lits.fold_eqn ~ord:(get_state env).ord_ref ~both:true ~eligible
+        (C.lits clause)
       |> Iter.filter (fun (_, t, sign, _) -> sign || T.equal t T.false_)
       |> Iter.flat_map (fun (s, t, _, s_pos) ->
-             I.fold !_idx_fluidsup_into
+             I.fold (get_state env).idx_fluidsup_into
                (fun acc u_p with_pos ->
                  assert (
                    is_fluid_or_deep env (Clause.WithPos.clause with_pos) u_p);
@@ -1616,12 +1644,12 @@ let infer_fluidsup_passive env clause =
   let new_clauses =
     if fluidsup_applicable env clause then
       Lits.fold_terms ~vars:true ~var_args:false ~fun_bodies:false
-        ~subterms:true ~ord:!_ord_ref ~which:`Max ~eligible ~ty_args:false
-        (C.lits clause)
+        ~subterms:true ~ord:(get_state env).ord_ref ~which:`Max ~eligible
+        ~ty_args:false (C.lits clause)
       |> Iter.filter (fun (u_p, _) -> is_fluid_or_deep env clause u_p)
       |> Iter.flat_map (fun (u_p, passive_pos) ->
              let passive_lit, _ = Lits.Pos.lit_at (C.lits clause) passive_pos in
-             I.fold !_idx_sup_from
+             I.fold (get_state env).idx_sup_from
                (fun acc _ with_pos ->
                  let active = Clause.WithPos.clause with_pos in
                  let s_pos = Clause.WithPos.pos with_pos in
@@ -1698,10 +1726,11 @@ let infer_dupsup_active env clause =
   let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "sup.infer-dupsup-active" in
   let eligible = C.Eligible.param clause in
   let new_clauses =
-    Lits.fold_eqn ~ord:!_ord_ref ~both:true ~eligible (C.lits clause)
+    Lits.fold_eqn ~ord:(get_state env).ord_ref ~both:true ~eligible
+      (C.lits clause)
     |> Iter.filter (fun (_, t, sign, _) -> sign || T.equal t T.false_)
     |> Iter.flat_map (fun (s, t, _, s_pos) ->
-           I.fold !_idx_dupsup_into
+           I.fold (get_state env).idx_dupsup_into
              (fun acc u_p with_pos ->
                assert (T.is_var (T.head_term u_p));
                assert (T.DB.is_closed u_p);
@@ -1809,14 +1838,15 @@ let infer_dupsup_passive env clause =
      so we consider both negative and positive literals *)
   let new_clauses =
     Lits.fold_terms ~vars:false ~var_args:false ~fun_bodies:false ~subterms:true
-      ~ord:!_ord_ref ~which:`Max ~eligible ~ty_args:false (C.lits clause)
+      ~ord:(get_state env).ord_ref ~which:`Max ~eligible ~ty_args:false
+      (C.lits clause)
     |> Iter.filter (fun (u_p, _) ->
            T.is_var (T.head_term u_p)
            && (not (CCList.is_empty @@ T.args u_p))
            && Type.is_ground (T.ty u_p))
     |> Iter.flat_map (fun (u_p, passive_pos) ->
            let passive_lit, _ = Lits.Pos.lit_at (C.lits clause) passive_pos in
-           I.fold !_idx_sup_from
+           I.fold (get_state env).idx_sup_from
              (fun acc _ with_pos ->
                let active = Clause.WithPos.clause with_pos in
                let s_pos = Clause.WithPos.pos with_pos in
@@ -1974,13 +2004,14 @@ let do_subvarsup ~active_pos ~passive_pos env =
 
 let infer_subvarsup_active env clause =
   let eligible = C.Eligible.param clause in
-  Lits.fold_eqn ~ord:!_ord_ref ~both:true ~eligible (C.lits clause)
+  Lits.fold_eqn ~ord:(get_state env).ord_ref ~both:true ~eligible
+    (C.lits clause)
   |> Iter.filter (fun (_, t, sign, _) -> sign || T.equal t T.false_)
   |> Iter.filter (fun (_, t, _, _) ->
          T.is_var t || T.is_app_var t || T.is_comb t)
   |> Iter.flat_map (fun (s, t, _, s_pos) ->
          (* rewrite clauses using s *)
-         I.fold !_idx_subvarsup_into
+         I.fold (get_state env).idx_subvarsup_into
            (fun acc _ with_pos ->
              let active_pos = C.WithPos.make ~clause ~pos:s_pos in
              let passive_pos =
@@ -2000,14 +2031,15 @@ let infer_subvarsup_active env clause =
 let infer_subvarsup_passive env clause =
   let eligible = C.Eligible.(res clause) in
   Lits.fold_terms ~vars:true ~var_args:false ~fun_bodies:false ~subterms:true
-    ~ord:!_ord_ref ~which:`Max ~eligible ~ty_args:false (C.lits clause)
+    ~ord:(get_state env).ord_ref ~which:`Max ~eligible ~ty_args:false
+    (C.lits clause)
   |> Iter.filter (fun (t, pos) ->
          match T.view t with
-         | T.Var _ -> has_bad_occurrence_elsewhere clause t pos
-         | T.App (hd, [ x ]) -> has_bad_occurrence_elsewhere clause hd pos
+         | T.Var _ -> has_bad_occurrence_elsewhere env clause t pos
+         | T.App (hd, [ x ]) -> has_bad_occurrence_elsewhere env clause hd pos
          | _ -> false)
   |> Iter.flat_map (fun (u_p, passive_pos) ->
-         I.fold !_idx_sup_from
+         I.fold (get_state env).idx_sup_from
            (fun acc _ with_pos ->
              let passive_pos = C.WithPos.make ~clause ~pos:passive_pos in
              match
@@ -2044,7 +2076,7 @@ let infer_equality_resolution_aux ~unify ~iterate_substs env clause =
   in
   (* iterate on those literals *)
   let new_clauses =
-    Lits.fold_eqn ~sign:false ~ord:!_ord_ref ~both:false ~eligible
+    Lits.fold_eqn ~sign:false ~ord:(get_state env).ord_ref ~both:false ~eligible
       (C.lits clause)
     |> Iter.filter_map (fun (l, r, _, l_pos) ->
            let do_eq_res us =
@@ -2168,7 +2200,7 @@ let do_eq_factoring env info =
     && not (T.is_true_or_false t)
     || (not
           (Comp.is_Lt_or_Leq
-             (O.compare !_ord_ref
+             (O.compare (get_state env).ord_ref
                 (S.FO.apply renaming subst (s, info.scope))
                 (S.FO.apply renaming subst (t, info.scope)))))
        && CCList.for_all (fun (c, i) -> i = idx) (C.selected_lits info.clause)
@@ -2242,7 +2274,8 @@ let infer_equality_factoring_aux ~unify ~iterate_substs env clause =
   in
   (* try to do inferences with each positive literal *)
   let new_clauses =
-    Lits.fold_eqn ~ord:!_ord_ref ~both:true ~eligible (C.lits clause)
+    Lits.fold_eqn ~ord:(get_state env).ord_ref ~both:true ~eligible
+      (C.lits clause)
     |> Iter.flat_map (fun (s, t, _, s_pos) ->
            (* try with s=t *)
            let active_idx = Lits.Pos.idx s_pos in
@@ -2367,7 +2400,7 @@ let demod_nf env (st : demod_state) c t : T.t =
     let cur_sc = st.demod_sc in
     assert (cur_sc > 0);
     let step =
-      UnitIdx.retrieve ~sign:true (!_idx_simpl, cur_sc) (t, 0)
+      UnitIdx.retrieve ~sign:true ((get_state env).idx_simpl, cur_sc) (t, 0)
       |> Iter.find (fun (l, r, (_, _, sign, unit_clause), subst) ->
              let expand_quant =
                not @@ Env.flex_get_of env Combinators.k_enable_combinators
@@ -2397,23 +2430,25 @@ let demod_nf env (st : demod_state) c t : T.t =
                      |> CCArray.exists (fun lit ->
                             Lit.Seq.terms lit
                             |> Iter.exists (fun s ->
-                                   Comp.is_Gt_or_Geq (O.compare !_ord_ref s t)))
+                                   Comp.is_Gt_or_Geq
+                                     (O.compare (get_state env).ord_ref s t)))
                   || C.lits c
                      |> CCArray.exists (fun lit ->
                             match Literal.View.as_eqn lit with
                             | Some (litl, litr, true) ->
                               T.equal t litl
-                              && Comp.is_Gt_or_Geq (O.compare !_ord_ref litr r')
+                              && Comp.is_Gt_or_Geq
+                                   (O.compare (get_state env).ord_ref litr r')
                               || T.equal t litr
                                  && Comp.is_Gt_or_Geq
-                                      (O.compare !_ord_ref litl r')
+                                      (O.compare (get_state env).ord_ref litl r')
                             | Some (litl, litr, false) ->
                               T.equal t litl || T.equal t litr
                             | None -> false))
                &&
                (* - subst(l) > subst(r) *)
                Comp.is_Gt_or_Geq
-                 (O.compare !_ord_ref
+                 (O.compare (get_state env).ord_ref
                     (S.FO.apply Subst.Renaming.none subst (l, cur_sc))
                     (S.FO.apply Subst.Renaming.none subst (r, cur_sc)))
              then (
@@ -2617,7 +2652,7 @@ let local_rewrite env c =
               in
               T.Map.add lhs (negate rhs) neq_map, others
             ) else if not sign then (
-              match Ordering.compare !_ord_ref lhs rhs with
+              match Ordering.compare (get_state env).ord_ref lhs rhs with
               | Gt -> T.Map.add lhs rhs neq_map, others
               | Lt -> T.Map.add rhs lhs neq_map, others
               | _ -> neq_map, lit :: others
@@ -2676,7 +2711,7 @@ let local_rewrite env c =
                 l
             ) else if not sign then (
               let lhs', rhs' =
-                match Ordering.compare !_ord_ref lhs rhs with
+                match Ordering.compare (get_state env).ord_ref lhs rhs with
                 | Gt ->
                   ( normalize ~restrict:true ~neqs lhs,
                     normalize ~restrict:false ~neqs rhs )
@@ -2757,12 +2792,12 @@ let canonize_variables env c =
   )
 
 (** Find clauses that [given] may demodulate, add them to set *)
-let backward_demodulate set given =
+let backward_demodulate env set given =
   let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "sup.backward-demodulate" in
   let renaming = Subst.Renaming.create () in
   (* find clauses that might be rewritten by l -> r *)
   let recurse ~oriented set l r =
-    I.retrieve_specializations (!_idx_back_demod, 1) (l, 0)
+    I.retrieve_specializations ((get_state env).idx_back_demod, 1) (l, 0)
     |> Iter.fold
          (fun set (_t', with_pos, subst) ->
            let c = Clause.WithPos.clause with_pos in
@@ -2771,7 +2806,7 @@ let backward_demodulate set given =
              C.trail_subsumes c given
              && (oriented
                 || Comp.is_Gt_or_Geq
-                     (O.compare !_ord_ref
+                     (O.compare (get_state env).ord_ref
                         (S.FO.apply renaming subst (l, 0))
                         (S.FO.apply renaming subst (r, 0))))
            then
@@ -2784,7 +2819,7 @@ let backward_demodulate set given =
   let set' =
     match C.lits given with
     | [| Lit.Equation (l, r, true) |] ->
-      (match Ordering.compare !_ord_ref l r with
+      (match Ordering.compare (get_state env).ord_ref l r with
       | Comp.Gt | Geq -> recurse ~oriented:true set l r
       | Lt | Leq -> recurse ~oriented:true set r l
       | _ ->
@@ -2972,7 +3007,7 @@ let formula_simplify_reflect env c =
     let simplify ~sign lhs rhs =
       let ( <+> ) = CCOpt.( <+> ) in
       let top_level ~sign ~repl lhs rhs =
-        UnitIdx.retrieve ~sign (!_idx_simpl, idx_sc) (lhs, q_sc)
+        UnitIdx.retrieve ~sign ((get_state env).idx_simpl, idx_sc) (lhs, q_sc)
         |> Iter.find_map (fun (_, rhs', (_, _, _, c'), subst) ->
                if C.trail_subsumes c' c then (
                  try
@@ -3053,7 +3088,9 @@ let formula_simplify_reflect env c =
     aux t
   in
 
-  if Env.flex_get_of env k_formula_simplify_reflect && !Lazy_cnf.enabled then (
+  if Env.flex_get_of env k_formula_simplify_reflect
+     && Flex_state.get_or ~or_:false Lazy_cnf.k_enabled (Env.flex_state_of env)
+  then (
     let lits =
       List.map
         (function
@@ -3077,11 +3114,11 @@ let formula_simplify_reflect env c =
   ) else
     SimplM.return_same c
 
-let equatable ~sign ~cl s t =
+let equatable env ~sign ~cl s t =
   let idx_sc, q_sc = 1, 0 in
   let ( <+> ) = CCOpt.( <+> ) in
   let aux s t =
-    UnitIdx.retrieve ~sign (!_idx_simpl, idx_sc) (s, q_sc)
+    UnitIdx.retrieve ~sign ((get_state env).idx_simpl, idx_sc) (s, q_sc)
     |> Iter.find_map (fun (_, rhs, (_, _, _, c'), subst) ->
            if C.trail_subsumes c' cl then (
              try
@@ -3128,7 +3165,7 @@ let positive_simplify_reflect env c =
       while not (Queue.is_empty tasks) do
         let s, t = Queue.pop tasks in
         if not (T.equal s t) then (
-          match equatable ~sign:true ~cl:c s t with
+          match equatable env ~sign:true ~cl:c s t with
           | Some cl -> premises := C.ClauseSet.add cl !premises
           | None ->
             (match T.view s, T.view t with
@@ -3154,11 +3191,11 @@ let positive_simplify_reflect env c =
     if T.equal lhs rhs then
       Some C.ClauseSet.empty
     else (
-      match equatable ~sign:true ~cl:c lhs rhs with
+      match equatable env ~sign:true ~cl:c lhs rhs with
       | Some cl -> Some (C.ClauseSet.singleton cl)
       | None ->
         T.Seq.common_contexts lhs rhs
-        |> Iter.find_map (fun (a, b) -> equatable ~sign:true ~cl:c a b)
+        |> Iter.find_map (fun (a, b) -> equatable env ~sign:true ~cl:c a b)
         |> CCOpt.map C.ClauseSet.singleton
     )
   in
@@ -3207,7 +3244,7 @@ let negative_simplify_reflect env c =
     | lit :: lits' -> iterate_lits (lit :: acc) lits' clauses
   (* try to remove the literal using a negative unit clause *)
   and can_refute s t =
-    equatable ~sign:false ~cl:c s t |> CCOpt.map C.proof_parent
+    equatable env ~sign:false ~cl:c s t |> CCOpt.map C.proof_parent
   in
   (* fold over literals *)
   let lits, premises = iterate_lits [] (C.lits c |> Array.to_list) [] in
@@ -3492,7 +3529,7 @@ let subsumed_by_active_set env c =
       c
   in
   let res =
-    SubsumIdx.retrieve_subsuming_c !_idx_fv c
+    SubsumIdx.retrieve_subsuming_c (get_state env).idx_fv c
     |> Iter.exists (fun c' ->
            let res =
              C.trail_subsumes c' c
@@ -3537,7 +3574,10 @@ let subsumed_in_active_set env acc c =
     ) else
       res
   in
-  let res = SubsumIdx.retrieve_subsumed_c !_idx_fv c |> Iter.fold fold_f acc in
+  let res =
+    SubsumIdx.retrieve_subsumed_c (get_state env).idx_fv c
+    |> Iter.fold fold_f acc
+  in
   res
 
 (* Number of equational lits. Used as an estimation for the difficulty of the subsumption
@@ -3577,7 +3617,8 @@ let rec contextual_literal_cutting_rec env c =
              (* negate literal *)
              lits.(i) <- Lit.negate old_lit;
              (* test for subsumption *)
-             SubsumIdx.retrieve_subsuming !_idx_fv (Lits.Seq.to_form lits)
+             SubsumIdx.retrieve_subsuming (get_state env).idx_fv
+               (Lits.Seq.to_form lits)
                (C.trail c |> Trail.labels)
              |> Iter.filter (fun c' -> C.trail_subsumes c' c)
              |> Iter.find_map (fun c' ->
@@ -3884,25 +3925,28 @@ let setup_dot_printers env =
   let pp_leaf _ _ = () in
   CCOpt.iter (fun file ->
       Signal.once Signals.on_dot_output (fun () ->
-          _print_idx ~f:(TermIndex.to_dot pp_leaf) file !_idx_sup_into))
+          _print_idx ~f:(TermIndex.to_dot pp_leaf) file
+            (get_state env).idx_sup_into))
   @@ Env.flex_get_of env k_dot_sup_into;
   CCOpt.iter (fun file ->
       Signal.once Signals.on_dot_output (fun () ->
-          _print_idx ~f:(TermIndex.to_dot pp_leaf) file !_idx_sup_from))
+          _print_idx ~f:(TermIndex.to_dot pp_leaf) file
+            (get_state env).idx_sup_from))
   @@ Env.flex_get_of env k_dot_sup_from;
   CCOpt.iter (fun file ->
       Signal.once Signals.on_dot_output (fun () ->
-          _print_idx ~f:UnitIdx.to_dot file !_idx_simpl))
+          _print_idx ~f:UnitIdx.to_dot file (get_state env).idx_simpl))
   @@ Env.flex_get_of env k_dot_simpl;
   CCOpt.iter (fun file ->
       Signal.once Signals.on_dot_output (fun () ->
-          _print_idx ~f:(TermIndex.to_dot pp_leaf) file !_idx_back_demod))
+          _print_idx ~f:(TermIndex.to_dot pp_leaf) file
+            (get_state env).idx_back_demod))
   @@ Env.flex_get_of env k_dot_demod_into;
   ()
 
 let register_rules env =
   Signal.on (Env.on_active_add env) (fun c ->
-      _idx_fv := SubsumIdx.add !_idx_fv c;
+      (get_state env).idx_fv <- SubsumIdx.add (get_state env).idx_fv c;
       _update_active env
         (fun tree t wp ->
           TermIndex.add tree t
@@ -3910,7 +3954,7 @@ let register_rules env =
                ~pos:(C.WithPos.pos wp)))
         c);
   Signal.on (Env.on_active_remove env) (fun c ->
-      _idx_fv := SubsumIdx.remove !_idx_fv c;
+      (get_state env).idx_fv <- SubsumIdx.remove (get_state env).idx_fv c;
       _update_active env
         (fun tree t wp ->
           TermIndex.remove tree t
@@ -3929,7 +3973,8 @@ let register_rules env =
     condensation env c >>= contextual_literal_cutting env
   and backward_simplify env c =
     let set = C.ClauseSet.empty in
-    backward_demodulate set c |> C.ClauseSet.to_seq |> Iter.of_seq
+    backward_demodulate env set c
+    |> C.ClauseSet.to_seq |> Iter.of_seq
     |> Iter.fold (fun s c -> Clause.ClauseSet.add c s) Clause.ClauseSet.empty
   and redundant = subsumed_by_active_set
   and backward_redundant acc c = subsumed_in_active_set acc c
@@ -4002,150 +4047,86 @@ let register_rules env =
   setup_dot_printers env;
   ()
 
-let _use_semantic_tauto = ref true
-let _use_simultaneous_sup = ref true
-let _dot_sup_into = ref None
-let _dot_sup_from = ref None
-let _dot_simpl = ref None
-let _dont_simplify = ref false
-let _sup_at_vars = ref false
-let _sup_at_var_headed = ref true
-let _sup_from_var_headed = ref true
-let _sup_in_var_args = ref true
-let _sup_under_lambdas = ref true
-let _lambda_demod = ref false
-let _quant_demod = ref false
-let _demod_in_var_args = ref true
-let _dot_demod_into = ref None
-let _ho_basic_rules = ref false
-let _switch_stream_extraction = ref false
-let _fluidsup_penalty = ref 9
-let _dupsup_penalty = ref 2
-let _fluidsup = ref true
-let _subvarsup = ref true
-let _dupsup = ref true
-let _recognize_injectivity = ref false
-let _restrict_fluidsup = ref false
-let _check_sup_at_var_cond = ref true
-let _restrict_hidden_sup_at_vars = ref false
-let _local_rw = ref `Off
-let _destr_eq_res = ref true
-let _lambdasup = ref (-1)
-let _max_infs = ref (-1)
 let _unif_alg = ref `NewJPFull
-let _unif_level = ref `Full
-let _ground_subs_check = ref 0
-let _solid_subsumption = ref false
-let _skip_multiplier = ref 4.0
-let _imit_first = ref false
-let _unif_logop_mode = ref `Pragmatic
-let _max_depth = ref 2
-let _max_rigid_imitations = ref 2
-let _max_app_projections = ref 1
-let _max_elims = ref 0
-let _max_identifications = ref 0
-let _pattern_decider = ref true
-let _fixpoint_decider = ref false
-let _solid_decider = ref false
-let _solidification_limit = ref 3
-let _max_unifs_solid_ff = ref 60
-let _use_weight_for_solid_subsumption = ref false
-let _sort_constraints = ref false
-let _bool_demod = ref false
-let _immediate_simplification = ref false
-let _try_lfho_unif = ref true
-let _rw_w_formulas = ref false
-let _pred_var_eq_fact = ref false
-let _schedule_infs = ref true
-let _force_limit = ref 3
-let _formula_sr = ref true
-let _strong_sr = ref false
-let _superposition_with_formulas = ref false
-let _guard = ref 30
-let _ratio = ref 100
-let _clause_num = ref (-1)
 let key = Flex_state.create_key ()
 
-let unif_params_to_def () =
-  _max_depth := 2;
-  _max_app_projections := 1;
-  _max_rigid_imitations := 2;
-  _max_identifications := 0;
-  _max_elims := 0;
-  _max_infs := 5
+let unif_params_to_def ~flex_ref =
+  flex_ref := Flex_state.add PragUnifParams.k_max_depth 2 !flex_ref;
+  flex_ref := Flex_state.add PragUnifParams.k_max_app_projections 1 !flex_ref;
+  flex_ref := Flex_state.add PragUnifParams.k_max_rigid_imitations 2 !flex_ref;
+  flex_ref := Flex_state.add PragUnifParams.k_max_identifications 0 !flex_ref;
+  flex_ref := Flex_state.add PragUnifParams.k_max_elims 0 !flex_ref;
+  flex_ref := Flex_state.add PragUnifParams.k_max_inferences 5 !flex_ref;
+  flex_ref := Flex_state.add k_max_infs 5 !flex_ref
 
 let register env =
-  _ord_ref := Ctx.ord (Env.get_ctx env);
+  (get_state env).ord_ref <- Ctx.ord (Env.get_ctx env);
   Env.flex_add_of env PragUnifParams.k_unif_alg_is_terminating true;
-  Env.flex_add_of env k_sup_at_vars !_sup_at_vars;
-  Env.flex_add_of env k_sup_in_var_args !_sup_in_var_args;
-  Env.flex_add_of env k_sup_under_lambdas !_sup_under_lambdas;
-  Env.flex_add_of env k_sup_at_var_headed !_sup_at_var_headed;
-  Env.flex_add_of env k_sup_from_var_headed !_sup_from_var_headed;
-  Env.flex_add_of env k_fluidsup !_fluidsup;
-  Env.flex_add_of env k_subvarsup !_subvarsup;
-  Env.flex_add_of env k_dupsup !_dupsup;
-  Env.flex_add_of env k_lambdasup !_lambdasup;
-  Env.flex_add_of env k_quant_demod !_quant_demod;
-  Env.flex_add_of env k_restrict_fluidsup !_restrict_fluidsup;
-  Env.flex_add_of env k_check_sup_at_var_cond !_check_sup_at_var_cond;
-  Env.flex_add_of env k_restrict_hidden_sup_at_vars
-    !_restrict_hidden_sup_at_vars;
-  Env.flex_add_of env k_demod_in_var_args !_demod_in_var_args;
-  Env.flex_add_of env k_lambda_demod !_lambda_demod;
+  Env.flex_ensure env k_sup_at_vars false;
+  Env.flex_ensure env k_sup_in_var_args true;
+  Env.flex_ensure env k_sup_under_lambdas true;
+  Env.flex_ensure env k_sup_at_var_headed true;
+  Env.flex_ensure env k_sup_from_var_headed true;
+  Env.flex_ensure env k_fluidsup true;
+  Env.flex_ensure env k_subvarsup true;
+  Env.flex_ensure env k_dupsup true;
+  Env.flex_ensure env k_lambdasup (-1);
+  Env.flex_ensure env k_quant_demod false;
+  Env.flex_ensure env k_restrict_fluidsup false;
+  Env.flex_ensure env k_check_sup_at_var_cond true;
+  Env.flex_ensure env k_restrict_hidden_sup_at_vars false;
+  Env.flex_ensure env k_demod_in_var_args true;
+  Env.flex_ensure env k_lambda_demod false;
 
-  Env.flex_add_of env k_use_simultaneous_sup !_use_simultaneous_sup;
-  Env.flex_add_of env k_fluidsup_penalty !_fluidsup_penalty;
-  Env.flex_add_of env k_dupsup_penalty !_dupsup_penalty;
-  Env.flex_add_of env k_ground_subs_check !_ground_subs_check;
-  Env.flex_add_of env k_solid_subsumption !_solid_subsumption;
-  Env.flex_add_of env k_dot_sup_into !_dot_sup_into;
-  Env.flex_add_of env k_dot_sup_from !_dot_sup_from;
-  Env.flex_add_of env k_dot_simpl !_dot_simpl;
-  Env.flex_add_of env k_dot_demod_into !_dot_demod_into;
-  Env.flex_add_of env k_recognize_injectivity !_recognize_injectivity;
-  Env.flex_add_of env k_ho_basic_rules !_ho_basic_rules;
-  Env.flex_add_of env k_max_infs !_max_infs;
-  Env.flex_add_of env k_switch_stream_extraction !_switch_stream_extraction;
-  Env.flex_add_of env k_dont_simplify !_dont_simplify;
-  Env.flex_add_of env k_use_semantic_tauto !_use_semantic_tauto;
-  Env.flex_add_of env k_bool_demod !_bool_demod;
-  Env.flex_add_of env k_immediate_simplification !_immediate_simplification;
-  Env.flex_add_of env k_rw_with_formulas !_rw_w_formulas;
+  Env.flex_ensure env k_use_simultaneous_sup true;
+  Env.flex_ensure env k_fluidsup_penalty 9;
+  Env.flex_ensure env k_dupsup_penalty 2;
+  Env.flex_ensure env k_ground_subs_check 0;
+  Env.flex_ensure env k_solid_subsumption false;
+  Env.flex_ensure env k_dot_sup_into None;
+  Env.flex_ensure env k_dot_sup_from None;
+  Env.flex_ensure env k_dot_simpl None;
+  Env.flex_ensure env k_dot_demod_into None;
+  Env.flex_ensure env k_recognize_injectivity false;
+  Env.flex_ensure env k_ho_basic_rules false;
+  Env.flex_ensure env k_max_infs (-1);
+  Env.flex_ensure env k_switch_stream_extraction false;
+  Env.flex_ensure env k_dont_simplify false;
+  Env.flex_ensure env k_use_semantic_tauto true;
+  Env.flex_ensure env k_bool_demod false;
+  Env.flex_ensure env k_immediate_simplification false;
+  Env.flex_ensure env k_rw_with_formulas false;
 
-  Env.flex_add_of env PragUnifParams.k_max_inferences !_max_infs;
-  Env.flex_add_of env PragUnifParams.k_skip_multiplier !_skip_multiplier;
-  Env.flex_add_of env PragUnifParams.k_imit_first !_imit_first;
-  Env.flex_add_of env PragUnifParams.k_logop_mode !_unif_logop_mode;
-  Env.flex_add_of env PragUnifParams.k_max_depth !_max_depth;
-  Env.flex_add_of env PragUnifParams.k_max_rigid_imitations
-    !_max_rigid_imitations;
-  Env.flex_add_of env PragUnifParams.k_max_app_projections !_max_app_projections;
-  Env.flex_add_of env PragUnifParams.k_max_elims !_max_elims;
-  Env.flex_add_of env PragUnifParams.k_max_identifications !_max_identifications;
-  Env.flex_add_of env PragUnifParams.k_pattern_decider !_pattern_decider;
-  Env.flex_add_of env PragUnifParams.k_fixpoint_decider !_fixpoint_decider;
-  Env.flex_add_of env PragUnifParams.k_solid_decider !_solid_decider;
-  Env.flex_add_of env PragUnifParams.k_solidification_limit
-    !_solidification_limit;
-  Env.flex_add_of env PragUnifParams.k_max_unifs_solid_ff !_max_unifs_solid_ff;
-  Env.flex_add_of env PragUnifParams.k_use_weight_for_solid_subsumption
-    !_use_weight_for_solid_subsumption;
-  Env.flex_add_of env PragUnifParams.k_sort_constraints !_sort_constraints;
-  Env.flex_add_of env PragUnifParams.k_try_lfho !_try_lfho_unif;
-  Env.flex_add_of env PragUnifParams.k_schedule_inferences !_schedule_infs;
-  Env.flex_add_of env k_pred_var_eq_fact !_pred_var_eq_fact;
-  Env.flex_add_of env k_force_limit !_force_limit;
-  Env.flex_add_of env k_formula_simplify_reflect !_formula_sr;
-  Env.flex_add_of env k_superpose_w_formulas !_superposition_with_formulas;
+  Env.flex_ensure env PragUnifParams.k_max_inferences (-1);
+  Env.flex_ensure env PragUnifParams.k_skip_multiplier 4.0;
+  Env.flex_ensure env PragUnifParams.k_imit_first false;
+  Env.flex_ensure env PragUnifParams.k_logop_mode `Pragmatic;
+  Env.flex_ensure env PragUnifParams.k_max_depth 2;
+  Env.flex_ensure env PragUnifParams.k_max_rigid_imitations 2;
+  Env.flex_ensure env PragUnifParams.k_max_app_projections 1;
+  Env.flex_ensure env PragUnifParams.k_max_elims 0;
+  Env.flex_ensure env PragUnifParams.k_max_identifications 0;
+  Env.flex_ensure env PragUnifParams.k_pattern_decider true;
+  Env.flex_ensure env PragUnifParams.k_fixpoint_decider false;
+  Env.flex_ensure env PragUnifParams.k_solid_decider false;
+  Env.flex_ensure env PragUnifParams.k_solidification_limit 3;
+  Env.flex_ensure env PragUnifParams.k_max_unifs_solid_ff 60;
+  Env.flex_ensure env PragUnifParams.k_use_weight_for_solid_subsumption false;
+  Env.flex_ensure env PragUnifParams.k_sort_constraints false;
+  Env.flex_ensure env PragUnifParams.k_try_lfho true;
+  Env.flex_ensure env PragUnifParams.k_schedule_inferences true;
+  Env.flex_ensure env k_pred_var_eq_fact false;
+  Env.flex_ensure env k_force_limit 3;
+  Env.flex_ensure env k_formula_simplify_reflect true;
+  Env.flex_ensure env k_superpose_w_formulas false;
 
-  Env.flex_add_of env StreamQueue.k_guard !_guard;
-  Env.flex_add_of env StreamQueue.k_ratio !_ratio;
-  Env.flex_add_of env StreamQueue.k_clause_num !_clause_num;
+  Env.flex_ensure env StreamQueue.k_guard 30;
+  Env.flex_ensure env StreamQueue.k_ratio 100;
+  Env.flex_ensure env StreamQueue.k_clause_num (-1);
 
-  Env.flex_add_of env k_local_rw !_local_rw;
-  Env.flex_add_of env k_destr_eq_res !_destr_eq_res;
-  Env.flex_add_of env k_strong_sr !_strong_sr;
+  Env.flex_ensure env k_local_rw `Off;
+  Env.flex_ensure env k_destr_eq_res true;
+  Env.flex_ensure env k_strong_sr false;
 
   let module JPF = JPFull.Make (struct
     let st = Env.flex_state_of env
@@ -4182,318 +4163,447 @@ let extension =
   }
 
 let () =
-  Params.add_opts
-    [
-      ( "--semantic-tauto",
-        Arg.Bool (fun v -> _use_semantic_tauto := v),
-        " enable/disable semantic tautology check" );
-      ( "--dot-sup-into",
-        Arg.String (fun s -> _dot_sup_into := Some s),
-        " print superposition-into index into file" );
-      ( "--dot-sup-from",
-        Arg.String (fun s -> _dot_sup_from := Some s),
-        " print superposition-from index into file" );
-      ( "--dot-demod",
-        Arg.String (fun s -> _dot_simpl := Some s),
-        " print forward rewriting index into file" );
-      ( "--dot-demod-into",
-        Arg.String (fun s -> _dot_demod_into := Some s),
-        " print backward rewriting index into file" );
-      ( "--simultaneous-sup",
-        Arg.Bool (fun b -> _use_simultaneous_sup := b),
-        " enable/disable simultaneous superposition" );
-      "--dont-simplify", Arg.Set _dont_simplify, " disable simplification rules";
-      ( "--sup-at-vars",
-        Arg.Bool (fun v -> _sup_at_vars := v),
-        " enable/disable superposition at variables under certain ordering \
-         conditions" );
-      ( "--sup-at-var-headed",
-        Arg.Bool (fun b -> _sup_at_var_headed := b),
-        " enable/disable superposition at variable headed terms" );
-      ( "--sup-from-var-headed",
-        Arg.Bool (fun b -> _sup_from_var_headed := b),
-        " enable/disable superposition from variable headed terms" );
-      ( "--sup-in-var-args",
-        Arg.Bool (fun b -> _sup_in_var_args := b),
-        " enable/disable superposition in arguments of applied variables" );
-      ( "--sup-under-lambdas",
-        Arg.Bool (fun b -> _sup_under_lambdas := b),
-        " enable/disable superposition in bodies of lambda-expressions" );
-      ( "--lambda-demod",
-        Arg.Bool (fun b -> _lambda_demod := b),
-        " enable/disable demodulation in bodies of lambda-expressions" );
-      ( "--quant-demod",
-        Arg.Bool (fun b -> _quant_demod := b),
-        " enable/disable demodulation in bodies of quantifiers" );
-      ( "--demod-in-var-args",
-        Arg.Bool (fun b -> _demod_in_var_args := b),
-        " enable demodulation in arguments of variables" );
-      ( "--ho-basic-rules",
-        Arg.Bool (fun b -> _ho_basic_rules := b),
-        " enable/disable HO version of base superposition calculus rules" );
-      ( "--switch-stream-extract",
-        Arg.Bool (fun b -> _switch_stream_extraction := b),
-        " in ho mode, switches heuristic of clause extraction from the stream \
-         queue" );
-      ( "--fluidsup-penalty",
-        Arg.Int (fun p -> _fluidsup_penalty := p),
-        " penalty for FluidSup inferences" );
-      ( "--dupsup-penalty",
-        Arg.Int (fun p -> _dupsup_penalty := p),
-        " penalty for DupSup inferences" );
-      ( "--fluidsup",
-        Arg.Bool (fun b -> _fluidsup := b),
-        " enable/disable FluidSup inferences (only effective when complete \
-         higher-order unification is enabled)" );
-      ( "--subvarsup",
-        Arg.Bool (( := ) _subvarsup),
-        " enable/disable SubVarSup inferences" );
-      ( "--lambdasup",
-        Arg.Int
-          (fun l ->
-            if l < 0 then
-              raise
-                (Util.Error
-                   ( "argument parsing",
-                     "lambdaSup argument should be non-negative" ));
-            _lambdasup := l),
-        " enable LambdaSup -- argument is the maximum number of skolems \
-         introduced in an inference" );
-      ( "--dupsup",
-        Arg.Bool (fun v -> _dupsup := v),
-        " enable/disable DupSup inferences" );
-      ( "--rw-with-formulas",
-        Arg.Bool (fun v -> _rw_w_formulas := v),
-        " enable/disable rewriting with formulas" );
-      ( "--ground-before-subs",
-        Arg.Set_int _ground_subs_check,
-        " set the level of grounding before substitution. 0 - no grounding. 1 \
-         - only active. 2 - both." );
-      ( "--solid-subsumption",
-        Arg.Bool (fun v -> _solid_subsumption := v),
-        " set solid subsumption on or off" );
-      ( "--recognize-injectivity",
-        Arg.Bool (fun v -> _recognize_injectivity := v),
-        " recognize injectivity axiom and axiomatize corresponding inverse" );
-      ( "--restrict-fluidsup",
-        Arg.Bool (fun v -> _restrict_fluidsup := v),
-        " enable/disable restriction of fluidSup to up to two literal or \
-         inital clauses" );
-      ( "--use-weight-for-solid-subsumption",
-        Arg.Bool (fun v -> _use_weight_for_solid_subsumption := v),
-        " enable/disable superposition to and from pure variable equations" );
-      ( "--ho-unif-level",
-        Arg.Symbol
-          ( [ "full-framework"; "full"; "pragmatic-framework" ],
-            fun str ->
-              _unif_alg :=
-                if String.equal "full" str then
-                  `OldJP
-                else if String.equal "full-framework" str then
-                  `NewJPFull
-                else if String.equal "pragmatic-framework" str then (
-                  unif_params_to_def ();
-                  `NewJPPragmatic
-                ) else
-                  invalid_arg "unknown argument" ),
-        "set the level of HO unification" );
-      ( "--ho-imitation-first",
-        Arg.Bool (fun v -> _imit_first := v),
-        " Use imitation rule before projection rule" );
-      ( "--ho-unif-logop-mode",
-        Arg.Symbol
-          ( [ "conservative"; "pragmatic"; "off" ],
-            function
-            | "conservative" -> _unif_logop_mode := `Conservative
-            | "pragmatic" -> _unif_logop_mode := `Pragmatic
-            | _ -> _unif_logop_mode := `Off ),
-        " Choose level of AC reasoning on logical symbols in unification \
-         algorithm" );
-      ( "--ho-unif-max-depth",
-        Arg.Set_int _max_depth,
-        " set pragmatic unification max depth" );
-      ( "--ho-max-app-projections",
-        Arg.Set_int _max_app_projections,
-        " set maximal number of functional type projections" );
-      ( "--ho-max-elims",
-        Arg.Set_int _max_elims,
-        " set maximal number of eliminations" );
-      ( "--ho-max-identifications",
-        Arg.Set_int _max_identifications,
-        " set maximal number of flex-flex identifications" );
-      ( "--ho-skip-multiplier",
-        Arg.Set_float _skip_multiplier,
-        " set maximal number of flex-flex identifications" );
-      ( "--ho-max-rigid-imitations",
-        Arg.Set_int _max_rigid_imitations,
-        " set maximal number of rigid imitations" );
-      ( "--ho-max-solidification",
-        Arg.Set_int _solidification_limit,
-        " set maximal number of rigid imitations" );
-      ( "--ho-max-unifs-solid-flex-flex",
-        Arg.Set_int _max_unifs_solid_ff,
-        " set maximal number of found unifiers for solid flex-flex pairs. -1 \
-         stands for finding the MGU" );
-      ( "--ho-pattern-decider",
-        Arg.Bool (fun b -> _pattern_decider := b),
-        "turn pattern decider on or off" );
-      ( "--ho-solid-decider",
-        Arg.Bool (fun b -> _solid_decider := b),
-        "turn solid decider on or off" );
-      ( "--ho-fixpoint-decider",
-        Arg.Bool (fun b -> _fixpoint_decider := b),
-        "turn fixpoint decider on or off" );
-      ( "--max-inferences",
-        Arg.Int (fun p -> _max_infs := p),
-        " set maximal number of inferences" );
-      ( "--stream-queue-guard",
-        Arg.Set_int _guard,
-        "set value of guard for streamQueue" );
-      ( "--stream-queue-ratio",
-        Arg.Set_int _ratio,
-        "set value of ratio for streamQueue" );
-      "--bool-demod", Arg.Bool (( := ) _bool_demod), " turn BoolDemod on/off";
-      ( "--schedule-inferences",
-        Arg.Bool (( := ) _schedule_infs),
-        " schedule inferences into streams even when terminating unification \
-         is used" );
-      ( "--destr-eq-res",
-        Arg.Bool (( := ) _destr_eq_res),
-        " turn destructive equality resolution on/off" );
-      ( "--pred-var-eq-fact",
-        Arg.Bool (( := ) _pred_var_eq_fact),
-        " force equality factoring when one side is applied variable" );
-      ( "--local-rw",
-        Arg.Symbol
-          ( [ "any-context"; "green-context"; "off" ],
-            fun opt ->
-              match opt with
-              | "any-context" -> _local_rw := `AnyContext
-              | "green-context" -> _local_rw := `GreenContext
-              | "off" -> _local_rw := `Off
-              | _ ->
-                invalid_arg
-                  "possible arugments are: [any-context; green-context; off]" ),
-        " turn local rewriting rule on/off" );
-      ( "--immediate-simplification",
-        Arg.Bool (( := ) _immediate_simplification),
-        " turn immediate simplification on/off" );
-      ( "--try-lfho-unif",
-        Arg.Bool (( := ) _try_lfho_unif),
-        " if term is of the right shape, try LFHO unification before HO \
-         unification" );
-      ( "--stream-clause-num",
-        Arg.Set_int _clause_num,
-        "how many clauses to take from streamQueue; by default as many as \
-         there are streams" );
-      ( "--ho-sort-constraints",
-        Arg.Bool (fun b -> _sort_constraints := b),
-        "sort constraints in unification algorithm by weight" );
-      ( "--check-sup-at-var-cond",
-        Arg.Bool (fun b -> _check_sup_at_var_cond := b),
-        " enable/disable superposition at variable monotonicity check" );
-      ( "--restrict-hidden-sup-at-vars",
-        Arg.Bool (fun b -> _restrict_hidden_sup_at_vars := b),
-        " enable/disable hidden superposition at variables only under certain \
-         ordering conditions" );
-      ( "--stream-force-limit",
-        Arg.Int (( := ) _force_limit),
-        " number of attempts to get a clause when the stream is just created" );
-      ( "--formula-simplify-reflect",
-        Arg.Bool (( := ) _formula_sr),
-        " apply simplify reflect on the formula level" );
-      ( "--superposition-with-formulas",
-        Arg.Bool (( := ) _superposition_with_formulas),
-        " enable superposition from (negative) formulas into any subterm" );
-      ( "--strong-simplify-reflect",
-        Arg.Bool (( := ) _strong_sr),
-        " full effort simplify reflect -- tries to find an equation for each \
-         pair of subterms" );
-    ];
+  Params.add_flex_opts (fun ~flex_ref ->
+      [
+        ( "--semantic-tauto",
+          Arg.Bool
+            (fun v ->
+              flex_ref := Flex_state.add k_use_semantic_tauto v !flex_ref),
+          " enable/disable semantic tautology check" );
+        ( "--dot-sup-into",
+          Arg.String
+            (fun s ->
+              flex_ref := Flex_state.add k_dot_sup_into (Some s) !flex_ref),
+          " print superposition-into index into file" );
+        ( "--dot-sup-from",
+          Arg.String
+            (fun s ->
+              flex_ref := Flex_state.add k_dot_sup_from (Some s) !flex_ref),
+          " print superposition-from index into file" );
+        ( "--dot-demod",
+          Arg.String
+            (fun s -> flex_ref := Flex_state.add k_dot_simpl (Some s) !flex_ref),
+          " print forward rewriting index into file" );
+        ( "--dot-demod-into",
+          Arg.String
+            (fun s ->
+              flex_ref := Flex_state.add k_dot_demod_into (Some s) !flex_ref),
+          " print backward rewriting index into file" );
+        ( "--simultaneous-sup",
+          Arg.Bool
+            (fun v ->
+              flex_ref := Flex_state.add k_use_simultaneous_sup v !flex_ref),
+          " enable/disable simultaneous superposition" );
+        ( "--dont-simplify",
+          Arg.Bool
+            (fun v -> flex_ref := Flex_state.add k_dont_simplify v !flex_ref),
+          " disable simplification rules" );
+        ( "--sup-at-vars",
+          Arg.Bool
+            (fun v -> flex_ref := Flex_state.add k_sup_at_vars v !flex_ref),
+          " enable/disable superposition at variables under certain ordering \
+           conditions" );
+        ( "--sup-at-var-headed",
+          Arg.Bool
+            (fun v ->
+              flex_ref := Flex_state.add k_sup_at_var_headed v !flex_ref),
+          " enable/disable superposition at variable headed terms" );
+        ( "--sup-from-var-headed",
+          Arg.Bool
+            (fun v ->
+              flex_ref := Flex_state.add k_sup_from_var_headed v !flex_ref),
+          " enable/disable superposition from variable headed terms" );
+        ( "--sup-in-var-args",
+          Arg.Bool
+            (fun v -> flex_ref := Flex_state.add k_sup_in_var_args v !flex_ref),
+          " enable/disable superposition in arguments of applied variables" );
+        ( "--sup-under-lambdas",
+          Arg.Bool
+            (fun v ->
+              flex_ref := Flex_state.add k_sup_under_lambdas v !flex_ref),
+          " enable/disable superposition in bodies of lambda-expressions" );
+        ( "--lambda-demod",
+          Arg.Bool
+            (fun v -> flex_ref := Flex_state.add k_lambda_demod v !flex_ref),
+          " enable/disable demodulation in bodies of lambda-expressions" );
+        ( "--quant-demod",
+          Arg.Bool
+            (fun v -> flex_ref := Flex_state.add k_quant_demod v !flex_ref),
+          " enable/disable demodulation in bodies of quantifiers" );
+        ( "--demod-in-var-args",
+          Arg.Bool
+            (fun v ->
+              flex_ref := Flex_state.add k_demod_in_var_args v !flex_ref),
+          " enable demodulation in arguments of variables" );
+        ( "--ho-basic-rules",
+          Arg.Bool
+            (fun v -> flex_ref := Flex_state.add k_ho_basic_rules v !flex_ref),
+          " enable/disable HO version of base superposition calculus rules" );
+        ( "--switch-stream-extract",
+          Arg.Bool
+            (fun v ->
+              flex_ref := Flex_state.add k_switch_stream_extraction v !flex_ref),
+          " in ho mode, switches heuristic of clause extraction from the \
+           stream queue" );
+        ( "--fluidsup-penalty",
+          Arg.Int
+            (fun n -> flex_ref := Flex_state.add k_fluidsup_penalty n !flex_ref),
+          " penalty for FluidSup inferences" );
+        ( "--dupsup-penalty",
+          Arg.Int
+            (fun n -> flex_ref := Flex_state.add k_dupsup_penalty n !flex_ref),
+          " penalty for DupSup inferences" );
+        ( "--fluidsup",
+          Arg.Bool (fun v -> flex_ref := Flex_state.add k_fluidsup v !flex_ref),
+          " enable/disable FluidSup inferences (only effective when complete \
+           higher-order unification is enabled)" );
+        ( "--subvarsup",
+          Arg.Bool (fun v -> flex_ref := Flex_state.add k_subvarsup v !flex_ref),
+          " enable/disable SubVarSup inferences" );
+        ( "--lambdasup",
+          Arg.Int
+            (fun l ->
+              if l < 0 then
+                raise
+                  (Util.Error
+                     ( "argument parsing",
+                       "lambdaSup argument should be non-negative" ));
+              flex_ref := Flex_state.add k_lambdasup l !flex_ref),
+          " enable LambdaSup -- argument is the maximum number of skolems \
+           introduced in an inference" );
+        ( "--dupsup",
+          Arg.Bool (fun v -> flex_ref := Flex_state.add k_dupsup v !flex_ref),
+          " enable/disable DupSup inferences" );
+        ( "--rw-with-formulas",
+          Arg.Bool
+            (fun v -> flex_ref := Flex_state.add k_rw_with_formulas v !flex_ref),
+          " enable/disable rewriting with formulas" );
+        ( "--ground-before-subs",
+          Arg.Int
+            (fun n ->
+              flex_ref := Flex_state.add k_ground_subs_check n !flex_ref),
+          " set the level of grounding before substitution. 0 - no grounding. \
+           1 - only active. 2 - both." );
+        ( "--solid-subsumption",
+          Arg.Bool
+            (fun v ->
+              flex_ref := Flex_state.add k_solid_subsumption v !flex_ref),
+          " set solid subsumption on or off" );
+        ( "--recognize-injectivity",
+          Arg.Bool
+            (fun v ->
+              flex_ref := Flex_state.add k_recognize_injectivity v !flex_ref),
+          " recognize injectivity axiom and axiomatize corresponding inverse" );
+        ( "--restrict-fluidsup",
+          Arg.Bool
+            (fun v ->
+              flex_ref := Flex_state.add k_restrict_fluidsup v !flex_ref),
+          " enable/disable restriction of fluidSup to up to two literal or \
+           inital clauses" );
+        ( "--use-weight-for-solid-subsumption",
+          Arg.Bool
+            (fun v ->
+              flex_ref :=
+                Flex_state.add PragUnifParams.k_use_weight_for_solid_subsumption
+                  v !flex_ref),
+          " enable/disable superposition to and from pure variable equations" );
+        ( "--ho-unif-level",
+          Arg.Symbol
+            ( [ "full-framework"; "full"; "pragmatic-framework" ],
+              fun str ->
+                _unif_alg :=
+                  if String.equal "full" str then
+                    `OldJP
+                  else if String.equal "full-framework" str then
+                    `NewJPFull
+                  else if String.equal "pragmatic-framework" str then (
+                    unif_params_to_def ~flex_ref;
+                    `NewJPPragmatic
+                  ) else
+                    invalid_arg "unknown argument" ),
+          "set the level of HO unification" );
+        ( "--ho-imitation-first",
+          Arg.Bool
+            (fun v ->
+              flex_ref := Flex_state.add PragUnifParams.k_imit_first v !flex_ref),
+          " Use imitation rule before projection rule" );
+        ( "--ho-unif-logop-mode",
+          Arg.Symbol
+            ( [ "conservative"; "pragmatic"; "off" ],
+              fun s ->
+                flex_ref :=
+                  Flex_state.add PragUnifParams.k_logop_mode
+                    (match s with
+                    | "conservative" -> `Conservative
+                    | "pragmatic" -> `Pragmatic
+                    | _ -> `Off)
+                    !flex_ref ),
+          " Choose level of AC reasoning on logical symbols in unification \
+           algorithm" );
+        ( "--ho-unif-max-depth",
+          Arg.Int
+            (fun n ->
+              flex_ref := Flex_state.add PragUnifParams.k_max_depth n !flex_ref),
+          " set pragmatic unification max depth" );
+        ( "--ho-max-app-projections",
+          Arg.Int
+            (fun n ->
+              flex_ref :=
+                Flex_state.add PragUnifParams.k_max_app_projections n !flex_ref),
+          " set maximal number of functional type projections" );
+        ( "--ho-max-elims",
+          Arg.Int
+            (fun n ->
+              flex_ref := Flex_state.add PragUnifParams.k_max_elims n !flex_ref),
+          " set maximal number of eliminations" );
+        ( "--ho-max-identifications",
+          Arg.Int
+            (fun n ->
+              flex_ref :=
+                Flex_state.add PragUnifParams.k_max_identifications n !flex_ref),
+          " set maximal number of flex-flex identifications" );
+        ( "--ho-skip-multiplier",
+          Arg.Float
+            (fun f ->
+              flex_ref :=
+                Flex_state.add PragUnifParams.k_skip_multiplier f !flex_ref),
+          " set maximal number of flex-flex identifications" );
+        ( "--ho-max-rigid-imitations",
+          Arg.Int
+            (fun n ->
+              flex_ref :=
+                Flex_state.add PragUnifParams.k_max_rigid_imitations n !flex_ref),
+          " set maximal number of rigid imitations" );
+        ( "--ho-max-solidification",
+          Arg.Int
+            (fun n ->
+              flex_ref :=
+                Flex_state.add PragUnifParams.k_solidification_limit n !flex_ref),
+          " set maximal number of rigid imitations" );
+        ( "--ho-max-unifs-solid-flex-flex",
+          Arg.Int
+            (fun n ->
+              flex_ref :=
+                Flex_state.add PragUnifParams.k_max_unifs_solid_ff n !flex_ref),
+          " set maximal number of found unifiers for solid flex-flex pairs. -1 \
+           stands for finding the MGU" );
+        ( "--ho-pattern-decider",
+          Arg.Bool
+            (fun v ->
+              flex_ref :=
+                Flex_state.add PragUnifParams.k_pattern_decider v !flex_ref),
+          "turn pattern decider on or off" );
+        ( "--ho-solid-decider",
+          Arg.Bool
+            (fun v ->
+              flex_ref :=
+                Flex_state.add PragUnifParams.k_solid_decider v !flex_ref),
+          "turn solid decider on or off" );
+        ( "--ho-fixpoint-decider",
+          Arg.Bool
+            (fun v ->
+              flex_ref :=
+                Flex_state.add PragUnifParams.k_fixpoint_decider v !flex_ref),
+          "turn fixpoint decider on or off" );
+        ( "--max-inferences",
+          Arg.Int
+            (fun n ->
+              flex_ref := Flex_state.add k_max_infs n !flex_ref;
+              flex_ref :=
+                Flex_state.add PragUnifParams.k_max_inferences n !flex_ref),
+          " set maximal number of inferences" );
+        ( "--stream-queue-guard",
+          Arg.Int
+            (fun n ->
+              flex_ref := Flex_state.add StreamQueue.k_guard n !flex_ref),
+          "set value of guard for streamQueue" );
+        ( "--stream-queue-ratio",
+          Arg.Int
+            (fun n ->
+              flex_ref := Flex_state.add StreamQueue.k_ratio n !flex_ref),
+          "set value of ratio for streamQueue" );
+        ( "--bool-demod",
+          Arg.Bool
+            (fun v -> flex_ref := Flex_state.add k_bool_demod v !flex_ref),
+          " turn BoolDemod on/off" );
+        ( "--schedule-inferences",
+          Arg.Bool
+            (fun v ->
+              flex_ref :=
+                Flex_state.add PragUnifParams.k_schedule_inferences v !flex_ref),
+          " schedule inferences into streams even when terminating unification \
+           is used" );
+        ( "--destr-eq-res",
+          Arg.Bool
+            (fun v -> flex_ref := Flex_state.add k_destr_eq_res v !flex_ref),
+          " turn destructive equality resolution on/off" );
+        ( "--pred-var-eq-fact",
+          Arg.Bool
+            (fun v -> flex_ref := Flex_state.add k_pred_var_eq_fact v !flex_ref),
+          " force equality factoring when one side is applied variable" );
+        ( "--local-rw",
+          Arg.Symbol
+            ( [ "any-context"; "green-context"; "off" ],
+              fun s ->
+                flex_ref :=
+                  Flex_state.add k_local_rw
+                    (match s with
+                    | "any-context" -> `AnyContext
+                    | "green-context" -> `GreenContext
+                    | _ -> `Off)
+                    !flex_ref ),
+          " turn local rewriting rule on/off" );
+        ( "--immediate-simplification",
+          Arg.Bool
+            (fun v ->
+              flex_ref := Flex_state.add k_immediate_simplification v !flex_ref),
+          " turn immediate simplification on/off" );
+        ( "--try-lfho-unif",
+          Arg.Bool
+            (fun v ->
+              flex_ref := Flex_state.add PragUnifParams.k_try_lfho v !flex_ref),
+          " if term is of the right shape, try LFHO unification before HO \
+           unification" );
+        ( "--stream-clause-num",
+          Arg.Int
+            (fun n ->
+              flex_ref := Flex_state.add StreamQueue.k_clause_num n !flex_ref),
+          "how many clauses to take from streamQueue; by default as many as \
+           there are streams" );
+        ( "--ho-sort-constraints",
+          Arg.Bool
+            (fun v ->
+              flex_ref :=
+                Flex_state.add PragUnifParams.k_sort_constraints v !flex_ref),
+          "sort constraints in unification algorithm by weight" );
+        ( "--check-sup-at-var-cond",
+          Arg.Bool
+            (fun v ->
+              flex_ref := Flex_state.add k_check_sup_at_var_cond v !flex_ref),
+          " enable/disable superposition at variable monotonicity check" );
+        ( "--restrict-hidden-sup-at-vars",
+          Arg.Bool
+            (fun v ->
+              flex_ref :=
+                Flex_state.add k_restrict_hidden_sup_at_vars v !flex_ref),
+          " enable/disable hidden superposition at variables only under \
+           certain ordering conditions" );
+        ( "--stream-force-limit",
+          Arg.Int
+            (fun n -> flex_ref := Flex_state.add k_force_limit n !flex_ref),
+          " number of attempts to get a clause when the stream is just created"
+        );
+        ( "--formula-simplify-reflect",
+          Arg.Bool
+            (fun v ->
+              flex_ref := Flex_state.add k_formula_simplify_reflect v !flex_ref),
+          " apply simplify reflect on the formula level" );
+        ( "--superposition-with-formulas",
+          Arg.Bool
+            (fun v ->
+              flex_ref := Flex_state.add k_superpose_w_formulas v !flex_ref),
+          " enable superposition from (negative) formulas into any subterm" );
+        ( "--strong-simplify-reflect",
+          Arg.Bool (fun v -> flex_ref := Flex_state.add k_strong_sr v !flex_ref),
+          " full effort simplify reflect -- tries to find an equation for each \
+           pair of subterms" );
+      ]);
 
-  Params.add_to_mode "best" (fun () ->
-      _use_simultaneous_sup := false;
-      _sup_at_vars := true;
-      _sup_in_var_args := false;
-      _sup_under_lambdas := false;
-      _lambda_demod := false;
-      _local_rw := `GreenContext;
-      _demod_in_var_args := false;
-      _ho_basic_rules := true;
+  Params.add_to_mode "best" (fun flex_ref ->
+      flex_ref := Flex_state.add k_use_simultaneous_sup false !flex_ref;
+      flex_ref := Flex_state.add k_sup_at_vars true !flex_ref;
+      flex_ref := Flex_state.add k_sup_in_var_args false !flex_ref;
+      flex_ref := Flex_state.add k_sup_under_lambdas false !flex_ref;
+      flex_ref := Flex_state.add k_lambda_demod false !flex_ref;
+      flex_ref := Flex_state.add k_local_rw `GreenContext !flex_ref;
+      flex_ref := Flex_state.add k_demod_in_var_args false !flex_ref;
+      flex_ref := Flex_state.add k_ho_basic_rules true !flex_ref;
       _unif_alg := `NewJPFull;
-      _sup_at_var_headed := true;
-      _pred_var_eq_fact := false;
-      _lambdasup := -1;
-      _dupsup := false;
-      _max_infs := 4;
-      _max_depth := 2;
-      _max_app_projections := 0;
-      _max_rigid_imitations := 2;
-      _max_identifications := 1;
-      _max_elims := 0;
-      _fluidsup := false;
-      _ratio := 50;
-      _guard := 10;
-      _clause_num := 30;
-      _fixpoint_decider := true;
-      _pattern_decider := true);
-  Params.add_to_mode "ho-complete-basic" (fun () ->
-      _use_simultaneous_sup := false;
-      _local_rw := `GreenContext;
-      _destr_eq_res := false;
-      _unif_logop_mode := `Conservative;
-      _sup_at_vars := true;
-      _sup_in_var_args := false;
-      _sup_under_lambdas := false;
-      _lambda_demod := false;
-      _demod_in_var_args := false;
-      _ho_basic_rules := true;
-      _sup_at_var_headed := false;
+      flex_ref := Flex_state.add k_sup_at_var_headed true !flex_ref;
+      flex_ref := Flex_state.add k_pred_var_eq_fact false !flex_ref;
+      flex_ref := Flex_state.add k_lambdasup (-1) !flex_ref;
+      flex_ref := Flex_state.add k_dupsup false !flex_ref;
+      flex_ref := Flex_state.add k_max_infs 4 !flex_ref;
+      flex_ref := Flex_state.add PragUnifParams.k_max_inferences 4 !flex_ref;
+      flex_ref := Flex_state.add PragUnifParams.k_max_depth 2 !flex_ref;
+      flex_ref :=
+        Flex_state.add PragUnifParams.k_max_app_projections 0 !flex_ref;
+      flex_ref :=
+        Flex_state.add PragUnifParams.k_max_rigid_imitations 2 !flex_ref;
+      flex_ref :=
+        Flex_state.add PragUnifParams.k_max_identifications 1 !flex_ref;
+      flex_ref := Flex_state.add PragUnifParams.k_max_elims 0 !flex_ref;
+      flex_ref := Flex_state.add k_fluidsup false !flex_ref;
+      flex_ref := Flex_state.add StreamQueue.k_ratio 50 !flex_ref;
+      flex_ref := Flex_state.add StreamQueue.k_guard 10 !flex_ref;
+      flex_ref := Flex_state.add StreamQueue.k_clause_num 30 !flex_ref;
+      flex_ref :=
+        Flex_state.add PragUnifParams.k_fixpoint_decider true !flex_ref;
+      flex_ref := Flex_state.add PragUnifParams.k_pattern_decider true !flex_ref);
+  Params.add_to_mode "ho-complete-basic" (fun flex_ref ->
+      flex_ref := Flex_state.add k_use_simultaneous_sup false !flex_ref;
+      flex_ref := Flex_state.add k_local_rw `GreenContext !flex_ref;
+      flex_ref := Flex_state.add k_destr_eq_res false !flex_ref;
+      flex_ref :=
+        Flex_state.add PragUnifParams.k_logop_mode `Conservative !flex_ref;
+      flex_ref := Flex_state.add k_sup_at_vars true !flex_ref;
+      flex_ref := Flex_state.add k_sup_in_var_args false !flex_ref;
+      flex_ref := Flex_state.add k_sup_under_lambdas false !flex_ref;
+      flex_ref := Flex_state.add k_lambda_demod false !flex_ref;
+      flex_ref := Flex_state.add k_demod_in_var_args false !flex_ref;
+      flex_ref := Flex_state.add k_ho_basic_rules true !flex_ref;
+      flex_ref := Flex_state.add k_sup_at_var_headed false !flex_ref;
       _unif_alg := `NewJPFull;
-      _lambdasup := -1;
-      _dupsup := false);
-  Params.add_to_mode "ho-pragmatic" (fun () ->
-      _use_simultaneous_sup := false;
-      _sup_at_vars := true;
-      _sup_in_var_args := false;
-      _sup_under_lambdas := false;
-      _lambda_demod := false;
-      _local_rw := `GreenContext;
-      _demod_in_var_args := false;
-      _ho_basic_rules := true;
+      flex_ref := Flex_state.add k_lambdasup (-1) !flex_ref;
+      flex_ref := Flex_state.add k_dupsup false !flex_ref);
+  Params.add_to_mode "ho-pragmatic" (fun flex_ref ->
+      flex_ref := Flex_state.add k_use_simultaneous_sup false !flex_ref;
+      flex_ref := Flex_state.add k_sup_at_vars true !flex_ref;
+      flex_ref := Flex_state.add k_sup_in_var_args false !flex_ref;
+      flex_ref := Flex_state.add k_sup_under_lambdas false !flex_ref;
+      flex_ref := Flex_state.add k_lambda_demod false !flex_ref;
+      flex_ref := Flex_state.add k_local_rw `GreenContext !flex_ref;
+      flex_ref := Flex_state.add k_demod_in_var_args false !flex_ref;
+      flex_ref := Flex_state.add k_ho_basic_rules true !flex_ref;
       _unif_alg := `NewJPPragmatic;
-      _sup_at_var_headed := true;
-      _pred_var_eq_fact := false;
-      _lambdasup := -1;
-      _dupsup := false;
-      _max_infs := 4;
-      _max_depth := 2;
-      _max_app_projections := 0;
-      _max_rigid_imitations := 2;
-      _max_identifications := 1;
-      _max_elims := 0;
-      _fluidsup := false);
-  Params.add_to_mode "ho-competitive" (fun () ->
-      _use_simultaneous_sup := false;
-      _sup_at_vars := true;
-      _sup_in_var_args := false;
-      _sup_under_lambdas := false;
-      _lambda_demod := false;
-      _demod_in_var_args := false;
-      _ho_basic_rules := true;
+      flex_ref := Flex_state.add k_sup_at_var_headed true !flex_ref;
+      flex_ref := Flex_state.add k_pred_var_eq_fact false !flex_ref;
+      flex_ref := Flex_state.add k_lambdasup (-1) !flex_ref;
+      flex_ref := Flex_state.add k_dupsup false !flex_ref;
+      flex_ref := Flex_state.add k_max_infs 4 !flex_ref;
+      flex_ref := Flex_state.add PragUnifParams.k_max_inferences 4 !flex_ref;
+      flex_ref := Flex_state.add PragUnifParams.k_max_depth 2 !flex_ref;
+      flex_ref :=
+        Flex_state.add PragUnifParams.k_max_app_projections 0 !flex_ref;
+      flex_ref :=
+        Flex_state.add PragUnifParams.k_max_rigid_imitations 2 !flex_ref;
+      flex_ref :=
+        Flex_state.add PragUnifParams.k_max_identifications 1 !flex_ref;
+      flex_ref := Flex_state.add PragUnifParams.k_max_elims 0 !flex_ref;
+      flex_ref := Flex_state.add k_fluidsup false !flex_ref);
+  Params.add_to_mode "ho-competitive" (fun flex_ref ->
+      flex_ref := Flex_state.add k_use_simultaneous_sup false !flex_ref;
+      flex_ref := Flex_state.add k_sup_at_vars true !flex_ref;
+      flex_ref := Flex_state.add k_sup_in_var_args false !flex_ref;
+      flex_ref := Flex_state.add k_sup_under_lambdas false !flex_ref;
+      flex_ref := Flex_state.add k_lambda_demod false !flex_ref;
+      flex_ref := Flex_state.add k_demod_in_var_args false !flex_ref;
+      flex_ref := Flex_state.add k_ho_basic_rules true !flex_ref;
       _unif_alg := `NewJPFull;
-      _local_rw := `GreenContext;
-      _sup_at_var_headed := true;
-      _pred_var_eq_fact := true;
-      _lambdasup := -1;
-      _dupsup := false;
-      _fluidsup := false);
-  Params.add_to_mode "fo-complete-basic" (fun () ->
-      _use_simultaneous_sup := false;
-      _local_rw := `Off;
-      _destr_eq_res := false;
-      _unif_logop_mode := `Conservative;
-      _schedule_infs := false);
+      flex_ref := Flex_state.add k_local_rw `GreenContext !flex_ref;
+      flex_ref := Flex_state.add k_sup_at_var_headed true !flex_ref;
+      flex_ref := Flex_state.add k_pred_var_eq_fact true !flex_ref;
+      flex_ref := Flex_state.add k_lambdasup (-1) !flex_ref;
+      flex_ref := Flex_state.add k_dupsup false !flex_ref;
+      flex_ref := Flex_state.add k_fluidsup false !flex_ref);
+  Params.add_to_mode "fo-complete-basic" (fun flex_ref ->
+      flex_ref := Flex_state.add k_use_simultaneous_sup false !flex_ref;
+      flex_ref := Flex_state.add k_local_rw `Off !flex_ref;
+      flex_ref := Flex_state.add k_destr_eq_res false !flex_ref;
+      flex_ref :=
+        Flex_state.add PragUnifParams.k_logop_mode `Conservative !flex_ref;
+      flex_ref :=
+        Flex_state.add PragUnifParams.k_schedule_inferences false !flex_ref);
   Params.add_to_modes
     [
       "lambda-free-intensional";
@@ -4501,31 +4611,34 @@ let () =
       "ho-comb-complete";
       "lambda-free-purify-intensional";
       "lambda-free-purify-extensional";
-    ] (fun () ->
-      _use_simultaneous_sup := false;
-      _sup_in_var_args := true;
-      _unif_logop_mode := `Conservative;
-      _demod_in_var_args := true;
-      _local_rw := `GreenContext;
-      _dupsup := false;
-      _ho_basic_rules := false;
-      _destr_eq_res := false;
-      _lambdasup := -1;
-      _fluidsup := false);
+    ] (fun flex_ref ->
+      flex_ref := Flex_state.add k_use_simultaneous_sup false !flex_ref;
+      flex_ref := Flex_state.add k_sup_in_var_args true !flex_ref;
+      flex_ref :=
+        Flex_state.add PragUnifParams.k_logop_mode `Conservative !flex_ref;
+      flex_ref := Flex_state.add k_demod_in_var_args true !flex_ref;
+      flex_ref := Flex_state.add k_local_rw `GreenContext !flex_ref;
+      flex_ref := Flex_state.add k_dupsup false !flex_ref;
+      flex_ref := Flex_state.add k_ho_basic_rules false !flex_ref;
+      flex_ref := Flex_state.add k_destr_eq_res false !flex_ref;
+      flex_ref := Flex_state.add k_lambdasup (-1) !flex_ref;
+      flex_ref := Flex_state.add k_fluidsup false !flex_ref);
   Params.add_to_modes
     [
       "lambda-free-extensional";
       "ho-comb-complete";
       "lambda-free-purify-extensional";
-    ] (fun () -> _restrict_hidden_sup_at_vars := true);
+    ] (fun flex_ref ->
+      flex_ref := Flex_state.add k_restrict_hidden_sup_at_vars true !flex_ref);
   Params.add_to_modes
-    [ "lambda-free-intensional"; "lambda-free-purify-intensional" ] (fun () ->
-      _restrict_hidden_sup_at_vars := false);
+    [ "lambda-free-intensional"; "lambda-free-purify-intensional" ]
+    (fun flex_ref ->
+      flex_ref := Flex_state.add k_restrict_hidden_sup_at_vars false !flex_ref);
   Params.add_to_modes
     [ "lambda-free-intensional"; "lambda-free-extensional"; "ho-comb-complete" ]
-    (fun () -> _sup_at_vars := true);
+    (fun flex_ref -> flex_ref := Flex_state.add k_sup_at_vars true !flex_ref);
   Params.add_to_modes
     [ "lambda-free-purify-intensional"; "lambda-free-purify-extensional" ]
-    (fun () ->
-      _sup_at_vars := false;
-      _check_sup_at_var_cond := false)
+    (fun flex_ref ->
+      flex_ref := Flex_state.add k_sup_at_vars false !flex_ref;
+      flex_ref := Flex_state.add k_check_sup_at_var_cond false !flex_ref)

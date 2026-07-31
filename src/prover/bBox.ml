@@ -86,32 +86,51 @@ module ICaseTbl = CCHashtbl.Make (struct
   let hash = Hash.list Cover_set.Case.hash
 end)
 
-let _clause_set = ref (FV_components.empty ()) (* FO lits -> blit *)
-let _lemma_set = FV_lemma.create () (* lemma -> blit *)
-let _case_set = ICaseTbl.create 16 (* cst=term-> blit *)
-let _term_set = Term.Tbl.create 16
+type state = {
+  mutable clause_set: FV_components.t;
+  mutable lemma_set: FV_lemma.t;
+  mutable case_set: (payload * lit) ICaseTbl.t;
+  mutable term_set: Lit.t Term.Tbl.t;
+}
+
+let k_state : state Flex_state.key = Flex_state.create_key ()
+
+let get_state (flex_ref : Flex_state.t ref) =
+  match Flex_state.get k_state !flex_ref with
+  | Some st -> st
+  | None ->
+    let st =
+      {
+        clause_set = FV_components.empty ();
+        lemma_set = FV_lemma.create ();
+        case_set = ICaseTbl.create 16;
+        term_set = Term.Tbl.create 16;
+      }
+    in
+    flex_ref := Flex_state.add k_state st !flex_ref;
+    st
 
 (* should never be used *)
 let dummy_payload = Fresh
 let dummy_t = Lit.make dummy_payload
 let make_fresh () = Lit.make dummy_payload
 
-let _retrieve_alpha_equiv lits =
-  FV_components.retrieve_alpha_equiv_c !_clause_set
+let _retrieve_alpha_equiv st lits =
+  FV_components.retrieve_alpha_equiv_c st.clause_set
     (lits, dummy_payload, dummy_t)
 
-let _retrieve_lemma (f : Cut_form.t) = FV_lemma.get _lemma_set f
+let _retrieve_lemma st (f : Cut_form.t) = FV_lemma.get st.lemma_set f
 
 (* put [lit] inside mappings, for retrieval by definition *)
-let save_ lit =
+let save_ st lit =
   let payload = Lit.payload lit in
   match payload with
   | Fresh -> ()
   | Clause_component lits ->
     (* be able to retrieve by lits *)
-    _clause_set := FV_components.add !_clause_set (lits, payload, lit)
-  | Lemma f -> FV_lemma.add _lemma_set f (payload, lit)
-  | Case p -> ICaseTbl.add _case_set p (payload, lit)
+    st.clause_set <- FV_components.add st.clause_set (lits, payload, lit)
+  | Lemma f -> FV_lemma.add st.lemma_set f (payload, lit)
+  | Case p -> ICaseTbl.add st.case_set p (payload, lit)
 
 let _check_variant lits lits' =
   Lits.matches lits lits' && Lits.matches lits' lits
@@ -124,11 +143,12 @@ let negate_ground lits =
     [| Literal.negate lits.(0) |], false
   | _ -> lits, true
 
-let find_boolean_lit lits =
+let find_boolean_lit ~flex_ref lits =
+  let st = get_state flex_ref in
   (* special case, negative ground literal *)
   let lits, sign = negate_ground lits in
   (* retrieve clause. the index doesn't matter for retrieval *)
-  _retrieve_alpha_equiv lits
+  _retrieve_alpha_equiv st lits
   |> Iter.find_map (function
        | lits', Clause_component _, blit when Lits.are_variant lits lits' ->
          assert (Lit.sign blit);
@@ -138,21 +158,23 @@ let find_boolean_lit lits =
   |> CCOpt.map (fun t -> Lit.apply_sign sign t)
 
 (* clause -> boolean lit *)
-let inject_lits lits =
+let inject_lits ~flex_ref lits =
   let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "bbox.inject-lits" in
-  let old_lit = find_boolean_lit lits in
+  let old_lit = find_boolean_lit ~flex_ref lits in
   match old_lit with
   | Some t -> t (* sign already applied*)
   | None ->
+    let st = get_state flex_ref in
     (* build new literal *)
     let lits, sign = negate_ground lits in
     let lits_copy = Array.copy lits in
     let t = Lit.make (Clause_component lits_copy) in
     (* maintain mapping *)
-    save_ t;
+    save_ st t;
     Lit.apply_sign sign t
 
-let inject_lit lit =
+let inject_lit ~flex_ref lit =
+  let st = get_state flex_ref in
   let exception CantConvert in
   let lit_to_term lit =
     match lit with
@@ -171,19 +193,20 @@ let inject_lit lit =
   try
     CCOpt.return
     @@
-    match Term.Tbl.find_opt _term_set (lit_to_term lit) with
+    match Term.Tbl.find_opt st.term_set (lit_to_term lit) with
     | Some t -> Lit.apply_sign (Literal.is_positivoid lit) t
     | None ->
       let term = lit_to_term lit in
       let bool_lit = Lit.make Fresh in
-      Term.Tbl.add _term_set term bool_lit;
+      Term.Tbl.add st.term_set term bool_lit;
       Lit.apply_sign (Literal.is_positivoid lit) bool_lit
   with CantConvert -> None
 
-let inject_lemma (f : Cut_form.t) : t =
+let inject_lemma ~flex_ref (f : Cut_form.t) : t =
   let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "bbox.inject-lemma" in
+  let st = get_state flex_ref in
   let old_lit =
-    match _retrieve_lemma f with
+    match _retrieve_lemma st f with
     | None -> None
     | Some (Lemma _, blit) -> Some blit
     | Some _ -> assert false
@@ -194,19 +217,20 @@ let inject_lemma (f : Cut_form.t) : t =
     (* build new literal *)
     let lit = Lit.make (Lemma f) in
     (* maintain mapping *)
-    save_ lit;
+    save_ st lit;
     lit
 
-let inject_case p =
+let inject_case ~flex_ref p =
+  let st = get_state flex_ref in
   (* normalize by sorting the list of cases *)
   let p = List.sort Cover_set.Case.compare p in
   try
-    let _, i = ICaseTbl.find _case_set p in
+    let _, i = ICaseTbl.find st.case_set p in
     i
   with Not_found ->
     let payload = Case p in
     let t = Lit.make payload in
-    save_ t;
+    save_ st t;
     t
 
 let must_be_kept lit =

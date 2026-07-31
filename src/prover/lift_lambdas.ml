@@ -302,13 +302,12 @@ let setup env =
   if Env.flex_get_of env k_post_cnf_lifting then
     Env.add_clause_conversion env lift_lambdas_cnf
 
-let _live_lifting = ref false
-let _post_cnf_lifting = ref false
+(* CLI refs migrated to Params.add_flex_opts *)
 
 let extension =
   let register (env : Env.t) =
-    Env.flex_add_of env k_live_lifting !_live_lifting;
-    Env.flex_add_of env k_post_cnf_lifting !_post_cnf_lifting;
+    Env.flex_ensure env k_live_lifting false;
+    Env.flex_ensure env k_post_cnf_lifting false;
     setup env
   in
   {
@@ -319,15 +318,17 @@ let extension =
   }
 
 let () =
-  Options.add_opts
-    [
-      ( "--live-lambda-lifting",
-        Arg.Bool (( := ) _live_lifting),
-        " enable/disable lambda lifting as simplifying inference" );
-      ( "--post-cnf-lambda-lifting",
-        Arg.Bool (( := ) _post_cnf_lifting),
-        "enable/disable post-cnf lambda lifting" );
-    ];
+  Params.add_flex_opts (fun ~flex_ref ->
+      [
+        ( "--live-lambda-lifting",
+          Arg.Bool
+            (fun v -> flex_ref := Flex_state.add k_live_lifting v !flex_ref),
+          " enable/disable lambda lifting as simplifying inference" );
+        ( "--post-cnf-lambda-lifting",
+          Arg.Bool
+            (fun v -> flex_ref := Flex_state.add k_post_cnf_lifting v !flex_ref),
+          "enable/disable post-cnf lambda lifting" );
+      ]);
   Params.add_to_modes
     [
       "best";
@@ -339,6 +340,7 @@ let () =
       "ho-comb-complete";
       "lambda-free-purify-extensional";
       "fo-complete-basic";
-    ] (fun () -> _live_lifting := false);
+    ] (fun flex_ref ->
+      flex_ref := Flex_state.add k_live_lifting false !flex_ref);
 
   Extensions.register extension

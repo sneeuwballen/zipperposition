@@ -162,6 +162,9 @@ val all_simplify : t -> Clause.t -> Clause.t list SimplM.t
 val step_init : t -> unit
 (** Run all step init hooks *)
 
+val flex_ensure : t -> 'a Logtk.Flex_state.key -> 'a -> unit
+(** Set key to value only if not already present *)
+
 val flex_add_of : t -> 'a Logtk.Flex_state.key -> 'a -> unit
 val update_flex_state : t -> (Logtk.Flex_state.t -> Logtk.Flex_state.t) -> unit
 val on_passive_add : t -> Clause.t Signal.t

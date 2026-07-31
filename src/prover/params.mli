@@ -28,12 +28,16 @@ type t = {
   max_multi_simpl: int;  (** max multi-simplification depth. -1 = unlimited *)
 }
 
-val parse_args : unit -> t
+val parse_args : flex_ref:Flex_state.t ref -> unit -> t
 val default : t
 val add_opt : string * Arg.spec * string -> unit
 val add_opts : (string * Arg.spec * string) list -> unit
-val add_to_mode : string -> (unit -> unit) -> unit
-val add_to_modes : string list -> (unit -> unit) -> unit
+
+val add_flex_opts :
+  (flex_ref:Flex_state.t ref -> (string * Arg.spec * string) list) -> unit
+
+val add_to_mode : string -> (Flex_state.t ref -> unit) -> unit
+val add_to_modes : string list -> (Flex_state.t ref -> unit) -> unit
 val key : t Flex_state.key
 
 (**/**)

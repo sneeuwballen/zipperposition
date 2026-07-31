@@ -12,7 +12,7 @@ let stat_acyclicity = Util.mk_stat "ind_ty.acyclicity_steps"
 let stat_disjointness = Util.mk_stat "ind_ty.disjointness_steps"
 let stat_injectivity = Util.mk_stat "ind_ty.injectivity_steps"
 let stat_exhaustiveness = Util.mk_stat "ind_ty.exhaustiveness_steps"
-let enabled_ = ref true
+let k_enabled : bool Flex_state.key = Flex_state.create_key ()
 
 module C = Clause
 
@@ -329,7 +329,7 @@ let exhaustiveness env (c : C.t) : C.t list =
          ax)
 
 let setup env =
-  if !enabled_ then (
+  if Env.flex_get_or_create ~init:(fun () -> true) env k_enabled then (
     Util.debug ~section 2 "setup inductive types calculus";
     Env.add_is_trivial env acyclicity_trivial;
     Env.add_unary_simplify env acyclicity_simplify;
@@ -346,8 +346,13 @@ let extension =
   { default with name = "ind_types"; env_actions = [ env_act ] }
 
 let () =
-  Params.add_to_mode "ho-complete-basic" (fun () -> enabled_ := false);
-  Params.add_to_mode "best" (fun () -> enabled_ := false);
-  Params.add_to_mode "ho-pragmatic" (fun () -> enabled_ := false);
-  Params.add_to_mode "ho-competitive" (fun () -> enabled_ := false);
-  Params.add_to_mode "fo-complete-basic" (fun () -> enabled_ := false)
+  Params.add_to_mode "ho-complete-basic" (fun flex_ref ->
+    flex_ref := Flex_state.add k_enabled false !flex_ref);
+  Params.add_to_mode "best" (fun flex_ref ->
+    flex_ref := Flex_state.add k_enabled false !flex_ref);
+  Params.add_to_mode "ho-pragmatic" (fun flex_ref ->
+    flex_ref := Flex_state.add k_enabled false !flex_ref);
+  Params.add_to_mode "ho-competitive" (fun flex_ref ->
+    flex_ref := Flex_state.add k_enabled false !flex_ref);
+  Params.add_to_mode "fo-complete-basic" (fun flex_ref ->
+    flex_ref := Flex_state.add k_enabled false !flex_ref)

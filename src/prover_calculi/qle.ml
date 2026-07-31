@@ -251,17 +251,14 @@ let setup env =
     else
       CCFormat.printf "AVATAR is not yet compatible with QLE@."
 
-let _enabled = ref false
-let _inprocessing = ref false
-let _check_at = ref 100
-let _pure_only = ref false
+(* CLI refs migrated to Params.add_flex_opts *)
 
 let extension =
   let action (env : Env.t) =
-    Env.flex_add_of env k_enabled !_enabled;
-    Env.flex_add_of env k_inprocessing !_inprocessing;
-    Env.flex_add_of env k_check_at !_check_at;
-    Env.flex_add_of env k_pure_only !_pure_only;
+    Env.flex_ensure env k_enabled false;
+    Env.flex_ensure env k_inprocessing false;
+    Env.flex_ensure env k_check_at 100;
+    Env.flex_ensure env k_pure_only false;
     setup env
   in
   {
@@ -272,16 +269,19 @@ let extension =
   }
 
 let () =
-  Options.add_opts
-    [
-      "--qle", Arg.Bool (( := ) _enabled), " enable/disable QLE";
-      ( "--qle-inprocessing",
-        Arg.Bool (( := ) _inprocessing),
-        " QLE as inprocessing rule" );
-      ( "--qle-check-at",
-        Arg.Int (( := ) _check_at),
-        " QLE inprocessing periodicity" );
-      ( "--qle-pure-only",
-        Arg.Bool (( := ) _pure_only),
-        " restrict QLE to pure literals" );
-    ]
+  Params.add_flex_opts (fun ~flex_ref ->
+      [
+        ( "--qle",
+          Arg.Bool (fun v -> flex_ref := Flex_state.add k_enabled v !flex_ref),
+          " enable/disable QLE" );
+        ( "--qle-inprocessing",
+          Arg.Bool
+            (fun v -> flex_ref := Flex_state.add k_inprocessing v !flex_ref),
+          " QLE as inprocessing rule" );
+        ( "--qle-check-at",
+          Arg.Int (fun n -> flex_ref := Flex_state.add k_check_at n !flex_ref),
+          " QLE inprocessing periodicity" );
+        ( "--qle-pure-only",
+          Arg.Bool (fun v -> flex_ref := Flex_state.add k_pure_only v !flex_ref),
+          " restrict QLE to pure literals" );
+      ])
