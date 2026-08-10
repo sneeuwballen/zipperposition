@@ -10,12 +10,14 @@ module C = Comparison
 let prof_rpo = ZProf.make "compare_rpo"
 let prof_kbo = ZProf.make "compare_kbo"
 let prof_epo = ZProf.make "compare_epo"
+let prof_wpo = ZProf.make "compare_wpo"
 let prof_lambdafree_kbo_coeff = ZProf.make "compare_lambdafree_kbo_coeff"
 let prof_lambda_kbo = ZProf.make "compare_lambda_kbo"
 let prof_lambda_lpo = ZProf.make "compare_lambda_lpo"
 
 module T = Term
 module TC = Term.Classic
+module Alg = T.Algebra
 
 let mk_cache n =
   let hash (a, b) = Hash.combine3 42 (T.hash a) (T.hash b) in
@@ -1020,6 +1022,154 @@ module LambdaFreeKBOCoeff : ORD = struct
     | _ -> assert false
 end
 
+
+(* These structures allow term comparison over a given algebra *)
+module type INTERPR = sig 
+  val algebraic_compare : Prec.t -> T.t -> C.t
+end
+
+(* "Relaxed" WPO is a simplification where variables are set to 0 or 1 *)
+module RelaxedInterpr = struct
+
+  exception UnsupportedTerm
+
+  let rec algebraic_eval prec t =
+    let alg = Prec.algebra prec in
+    match Head.term_to_head t with 
+    | Head.V _ -> 1
+    | Head.B b ->
+      (* arguments of builtins are ignored *)
+      accumulate prec (fun x -> Alg.base_value alg) (Head.term_to_args t)
+    | Head.I id -> 
+        Alg.accumulator alg
+          (W.get_one (Prec.weight prec id)) (* dirty way to get weights *)
+          (accumulate prec (Prec.arg_coeff prec id) (Head.term_to_args t))
+    | _ -> raise UnsupportedTerm
+  
+  and accumulate ?(i=0) prec coeffs ts = 
+    let alg = Prec.algebra prec in
+    match ts with
+    | [] -> Alg.base_value alg
+    | t :: ts' -> Alg.accumulator alg 
+        (Alg.coeff_app alg (coeffs i) (algebraic_eval prec t)) 
+        (accumulate ~i:(i+1) prec coeffs ts')
+
+  
+  let algebraic_compare prec s t =
+    try 
+      let a, b = (algebraic_eval prec s), (algebraic_eval prec t) in
+      C.of_total (CCInt.compare a b)
+    with UnsupportedTerm -> Incomparable
+end
+
+module WPO : ORD = struct 
+  let name = "wpo"
+  
+  let algebraic_compare = RelaxedInterpr.algebraic_compare 
+
+  
+  let rec wpo ~prec s t = 
+    if T.equal s t then
+      C.Eq
+    else (
+      match T.view s, T.view t with 
+      | T.Var _, T.Var _ -> Incomparable
+      | T.Var x, _ -> if T.var_occurs ~var:x t then Lt else Incomparable
+      | _, T.Var x -> if T.var_occurs ~var:x s then Gt else Incomparable
+      | _, _ -> wpo_composite ~prec s t 
+    )
+
+  and has_subterm t sub =
+    T.Seq.subterms ~ignore_head:true ~include_builtin:true
+      ~include_app_vars:false t
+    |> Iter.mem ~eq:T.equal sub
+
+  and wpo_composite ~prec s t =
+    let a = algebraic_compare prec s t in
+    match a with
+    | Lt | Gt -> a
+    | Eq -> begin
+      let compare = prec_compare prec (Head.term_to_head s) (Head.term_to_head t) in
+      match compare with
+      | Gt -> cMA ~prec s (Head.term_to_args t)
+      | Lt -> C.opp (cMA ~prec t (Head.term_to_args s))
+      | Eq -> cLMA ~prec s t (Head.term_to_args s) (Head.term_to_args t)
+      | _ -> Incomparable
+      end
+    | _ -> Incomparable
+
+  and cMA ~prec s = function
+    | [] -> Gt
+    | t :: ts' ->
+      (match wpo ~prec s t with
+      | C.Gt -> cMA ~prec s ts'
+      | Eq | Lt -> Lt
+      | _ -> C.opp (alpha ~prec ts' s))
+
+  (* lexicographic comparison of s=f(ss), and t=f(ts) *)
+  and cLMA ~prec s t ss ts =
+    match ss, ts with
+    | si :: ss', ti :: ts' ->
+      (match wpo ~prec si ti with
+      | C.Eq -> cLMA ~prec s t ss' ts'
+      | Gt ->
+        cMA ~prec s ts' (* just need s to dominate the remaining elements *)
+      | Lt -> C.opp (cMA ~prec t ss')
+      | _ -> cAA ~prec s t ss' ts')
+    | [], [] -> Eq
+    | [], _ :: _ -> Lt
+    | _ :: _, [] -> Gt
+
+  (* length-lexicographic comparison of s=f(ss), and t=f(ts) *)
+  and cLLMA ~prec s t ss ts =
+    if List.length ss = List.length ts then
+      cLMA ~prec s t ss ts
+    else if List.length ss > List.length ts then
+      cMA ~prec s ts
+    else
+      C.opp (cMA ~prec t ss)
+
+  (* multiset comparison of subterms (not optimized) *)
+  and cMultiset ~prec s t ss ts =
+    match MT.compare_partial_l (wpo ~prec) ss ts with
+    | C.Gt -> cMA ~prec s ts
+    | Lt -> C.opp (cMA ~prec t ss)
+    | _ -> Incomparable
+
+  (* bidirectional comparison by subterm property (bidirectional alpha) *)
+  and cAA ~prec s t ss ts =
+    match alpha ~prec ss t with
+    | Gt -> Gt
+    | Incomparable -> C.opp (alpha ~prec ts s)
+    | _ -> assert false
+
+  (* if some s in ss is >= t, then s > t by subterm property and transitivity *)
+  and alpha ~prec ss t =
+    match ss with
+    | [] -> Incomparable
+    | s :: ss' ->
+      (match wpo ~prec s t with
+      | Eq | Gt -> Gt
+      | _ -> alpha ~prec ss' t)
+  ;;
+  
+
+
+  
+  let compare_terms ~prec x y  = 
+    let _span = ZProf.enter_prof prof_wpo in 
+    let compare = wpo ~prec x y in
+    ZProf.exit_prof _span;
+    compare
+
+  let might_flip prec t1 t2 = 
+    (* TODO *)
+    false
+
+end 
+
+ 
+
 (* This imperative polynomial data structure is designed to offer good
    performance. *)
 module Polynomial = struct
@@ -1836,6 +1986,30 @@ let derived_ho_rpo prec =
     monotonic;
   }
 
+let wpo prec = 
+  let cache_compare = mk_cache 256 in 
+  let compare prec a b =
+    CCCache.with_cache cache_compare
+      (fun (a, b) -> WPO.compare_terms ~prec a b)
+      (a, b)
+  in
+  let cache_might_flip = mk_cache 256 in
+  let might_flip prec a b =
+    CCCache.with_cache cache_might_flip
+      (fun (a, b) -> WPO.might_flip prec a b)
+      (a, b)
+  in
+  let monotonic = false in
+  {
+    cache_compare;
+    compare;
+    name = WPO.name;
+    prec;
+    might_flip;
+    cache_might_flip;
+    monotonic;
+  }
+
 let compose f ord =
   {
     ord with
@@ -2026,6 +2200,7 @@ let tbl_ =
   Hashtbl.add h "lambda_lpo" lambda_lpo;
   Hashtbl.add h "none" (fun _ -> none);
   Hashtbl.add h "subterm" (fun _ -> subterm);
+  Hashtbl.add h "wpo" wpo;
   h
 
 let default_of_list l = derived_ho_rpo (Prec.default l)

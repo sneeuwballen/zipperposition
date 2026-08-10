@@ -19,12 +19,15 @@ type t = {
   constr_rules: (int * [ `partial ] Precedence.Constr.t parametrized) list;
   last_constr: [ `total ] Precedence.Constr.t;
   weight_rule: Precedence.weight_fun parametrized;
+  arg_coeff_rule: Precedence.arg_coeff_fun;
+  algebra: T.Algebra.t;
   status: (ID.t * Precedence.symbol_status) list;
 }
 
 (* uniform weight *)
 let _default_weight _ = Precedence.weight_constant
 let _default_arg_coeff _ = []
+let _default_algebra = T.Algebra.sum_algebra
 
 let empty =
   {
@@ -32,13 +35,17 @@ let empty =
     constr_rules = [];
     last_constr = Precedence.Constr.alpha;
     weight_rule = _default_weight;
+    arg_coeff_rule = _default_arg_coeff;
     status = [];
+    algebra = _default_algebra;
   }
 
 let add_constr p c t = { t with constrs = (p, c) :: t.constrs }
 let add_constrs l = List.fold_right (fun (p, c) -> add_constr p c) l
 let add_constr_rule p r t = { t with constr_rules = (p, r) :: t.constr_rules }
 let set_weight_rule r t = { t with weight_rule = r }
+let set_arg_coeff_rule r t = { t with arg_coeff_rule = r }
+let set_algebra a t = {t with algebra = a}
 let add_status l t = { t with status = List.rev_append l t.status }
 
 (* Add weights specified by the user using the cli option *)
@@ -135,9 +142,13 @@ let mk_precedence ~db_w ~lmb_w ~signature t seq =
     else
       t.weight_rule seq
   in
-  let weight, arg_coeff = _add_custom_weights weight _default_arg_coeff in
+  let arg_coeff = 
+    t.arg_coeff_rule 
+  in
+  let weight, arg_coeff = _add_custom_weights weight arg_coeff in
   let weight = force_const_weight ~weight ~signature !_kbo_const_weight in
-  let p = Precedence.create ~weight ~arg_coeff ~db_w ~lmb_w constr symbols in
+  let algebra = t.algebra in
+  let p = Precedence.create ~weight ~arg_coeff ~db_w ~lmb_w ~algebra constr symbols in
   (* multiset status *)
   List.iter (fun (s, status) -> Precedence.declare_status p s status) t.status;
   ZProf.exit_prof _span;

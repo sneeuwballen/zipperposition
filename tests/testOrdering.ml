@@ -1418,6 +1418,29 @@ let test_lambda_lpo =
                 T.app app [ ty1; ty1; s; y ];
               ])) )
 
+
+let test_wpo = 
+  (
+    "ordering.wpo",
+    `Quick,
+    fun () -> 
+      let ord = 
+        O.wpo (Precedence.default [a_; b_; c_; d_; e_; f_; g_; h_ ])
+      in
+      let compare = O.compare ord in 
+
+      (* b > a *)
+      let a = Term.const ~ty a_ in
+      let b = Term.const ~ty b_ in
+      Alcotest.(check comp_test) "b > a" Comparison.Gt (compare b a);
+
+      let a = Term.const ~ty:(Type.arrow [ty] ty) a_ in
+      let b = Term.const ~ty b_ in
+      let ab = Term.app a [b] in
+      Alcotest.(check comp_test) "a b > b" Comparison.Gt (compare ab b)
+      
+  )
+
 let suite =
   [
     test_derived_ho_rpo;
@@ -1426,6 +1449,7 @@ let suite =
     test_lambdafree_kbo;
     test_lambda_kbo;
     test_lambda_lpo;
+    test_wpo;
   ]
 
 let props =
@@ -1441,6 +1465,7 @@ let props =
       O.derived_ho_kbo ~ignore_quans_under_lam:true (Precedence.default []);
       O.derived_ho_rpo (Precedence.default []);
       O.lambda_kbo (Precedence.default []);
+      O.wpo (Precedence.default []);
     ]
   @ CCList.flat_map
       (fun o ->
@@ -1454,4 +1479,5 @@ let props =
         O.lambdafree_kbo (Precedence.default []);
         O.lambdafree_rpo (Precedence.default []);
         O.epo (Precedence.default []);
+        O.wpo (Precedence.default []);
       ]

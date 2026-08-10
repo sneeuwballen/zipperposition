@@ -3,6 +3,7 @@
 (** {1 Precedence (total ordering) on symbols} *)
 
 module T = Term
+module Alg = T.Algebra
 
 type symbol_status =
   | Multiset
@@ -20,6 +21,9 @@ module Weight = struct
     one: int;
   }
   (** [a, b] is [a·ω + b] *)
+
+  let get_one a = a.one
+  let get_omega a = a.omega
 
   let make omega one = { omega; one }
   let int i : t = make 0 i
@@ -375,6 +379,7 @@ type t = {
   (* weight function *)
   mutable arg_coeff: ID.t -> int list;
   (* argument coefficients *)
+  mutable algebra: Alg.t;
   db_w: int;
   lmb_w: int;
   constr: [ `total ] Constr.t;
@@ -422,6 +427,8 @@ let db_weight p = Weight.int p.db_w
 let lam_weight p = Weight.int p.lmb_w
 let arg_coeff p s i = try List.nth (p.arg_coeff s) i with _ -> 1
 let declare_status p s status = ID.Tbl.replace p.status s status
+
+let algebra p = p.algebra
 
 module Seq = struct
   let symbols p = Iter.of_list p.snapshot
@@ -828,6 +835,36 @@ let weight_fun_of_string ~signature ~clauses ~lm_w ~db_w s sd =
 
 (* default argument coefficients *)
 let arg_coeff_default _ = []
+
+let rec range n = 
+  if (n = 0) then 
+    []
+  else 
+    n :: (range (n-1))
+
+let arg_coeff_index ~signature = 
+  let m = max_arity signature in 
+  fun _ -> List.rev (range m)
+
+let arg_coeff_invindex ~signature = 
+  let m = max_arity signature in 
+  fun _ -> range m
+
+
+let arg_coeff_fun_of_string ~signature s = 
+
+  let acf_map = 
+    [
+      "constant", arg_coeff_default;
+      "index", arg_coeff_index ~signature;
+      "invindex", arg_coeff_invindex ~signature;
+    ]
+  in
+  try 
+    List.assoc s acf_map 
+  with Not_found -> invalid_arg "WPO coefficents function not found"
+
+
 let set_weight p f = p.weight <- f
 
 (** {2 Creation of a precedence from constraints} *)
@@ -843,7 +880,7 @@ let check_inv_ p =
   sorted_ p.snapshot
 
 let create ?(weight = weight_constant) ?(arg_coeff = arg_coeff_default)
-    ?(db_w = db_w_def) ?(lmb_w = lmb_w_def) c l =
+    ?(db_w = db_w_def) ?(lmb_w = lmb_w_def) ?(algebra = Alg.sum_algebra) c l =
   let l = CCList.sort_uniq ~cmp:c l in
   let tbl = lazy (mk_tbl_ l) in
   let res =
@@ -852,6 +889,7 @@ let create ?(weight = weight_constant) ?(arg_coeff = arg_coeff_default)
       tbl;
       weight;
       arg_coeff;
+      algebra;
       db_w;
       lmb_w;
       status = ID.Tbl.create 16;

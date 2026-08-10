@@ -11,6 +11,9 @@ type symbol_status =
 module Weight : sig
   type t
 
+  val get_one: t -> int 
+  val get_omega: t -> int
+
   val int : int -> t
   val zero : t
   val one : t
@@ -159,6 +162,13 @@ val set_weight : t -> weight_fun -> unit
 (** Change the weight function of the precedence
     @since 0.5.3 *)
 
+val arg_coeff_fun_of_string :
+  signature:Signature.t -> 
+  string ->
+  arg_coeff_fun
+
+val algebra : t -> Term.Algebra.t
+
 (** {2 Creation of a precedence from constraints} *)
 
 val create :
@@ -166,6 +176,7 @@ val create :
   ?arg_coeff:arg_coeff_fun ->
   ?db_w:int ->
   ?lmb_w:int ->
+  ?algebra:Term.Algebra.t -> 
   [ `total ] Constr.t ->
   ID.t list ->
   t

@@ -1469,6 +1469,48 @@ module Conv = struct
     res
 end
 
+module Algebra = struct
+  type operator = int -> int -> int 
+  
+  type t = {  
+    accumulator: operator;
+    base_value: int;
+    coeff_app: operator;
+  }
+  
+  let create accumulator base_value coeff_app = 
+    { accumulator; base_value; coeff_app; }
+  
+  let accumulator alg = alg.accumulator 
+  let base_value alg = alg.base_value
+  let coeff_app alg = alg.coeff_app 
+  
+  let sum_algebra = {
+    accumulator = ( + );
+    base_value = 0;
+    coeff_app = ( * ) ;
+  }
+  
+  let max_algebra = {
+    accumulator = max;
+    base_value = 0;
+    coeff_app = ( + );
+  }
+  
+  let alg_of_string s =
+  
+    let alg_map = 
+      [
+        "sum", sum_algebra;
+        "max", max_algebra;
+      ]
+    in 
+    try 
+      List.assoc s alg_map
+    with Not_found -> invalid_arg "Algebra not found"
+  
+end
+
 let rebuild_rec t =
   let rec aux env t =
     let ty = Type.rebuild_rec ~env (ty t) in

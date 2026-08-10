@@ -16,6 +16,8 @@ let section = Util.Section.make ~parent:Const.section "phases"
 let _db_w = ref 1
 let _lmb_w = ref 1
 let _kbo_wf = ref "invfreqrank"
+let _wpo_acf = ref "constant"
+let _wpo_alg = ref "sum"
 let _prec_fun = ref "invfreq"
 let _trim_implications = ref false
 let _take_only_defs = ref false
@@ -222,10 +224,13 @@ let compute_prec ~signature stmts =
              ~db_w:!_db_w !_kbo_wf sym_depth)
     (* |> Compute_prec.set_weight_rule (fun _ -> Classify_cst.weight_fun) *)
     (* use "invfreq", with low priority *)
+    |> Compute_prec.set_arg_coeff_rule (Precedence.arg_coeff_fun_of_string ~signature !_wpo_acf)
+    |> Compute_prec.set_algebra (T.Algebra.alg_of_string !_wpo_alg)
     |> Compute_prec.add_constr_rule 90 (fun seq ->
            let syms = Signature.Seq.symbols signature in
            Precedence.Constr.prec_fun_of_str !_prec_fun ~signature syms)
   in
+  (* Precedence.arg_coeff_fun_of_string ~signature !_wpo_acf *)
   let prec =
     Compute_prec.mk_precedence ~signature ~db_w:!_db_w ~lmb_w:!_lmb_w cp stmts
   in
@@ -698,9 +703,15 @@ let () =
       ( "--kbo-weight-fun",
         Arg.Set_string _kbo_wf,
         " Set the function for symbol weight calculation." );
+      ( "--ord-arg-coeff-fun",
+        Arg.Set_string _wpo_acf,
+        " Set the function for symbol argument coefficients calculation." );
       ( "--prec-gen-fun",
         Arg.Set_string _prec_fun,
         " Set the function used for precedence generation" );
+      ( "--wpo-algebra",
+        Arg.Set_string _wpo_alg,
+        " Set the term algebra for wpo" );
       ( "--sine-depth-min",
         Arg.Int
           (fun v ->
