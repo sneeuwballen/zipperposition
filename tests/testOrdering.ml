@@ -418,6 +418,50 @@ let test_derived_ho_kbo =
            (pow n (fun t -> Term.app f [ t ]) b)
            (pow n (fun t -> Term.app f [ t ]) a));
 
+      (* regression test for issue #110*)
+      let ty = Type.term in
+      let ite_ = ID.make "ite" in
+      let p_ho2_ = ID.make "p_ho2" in
+      let a = T.const ~ty a_ in
+      let b = T.const ~ty b_ in
+      let d = T.const ~ty d_ in
+      let e = T.const ~ty e_ in
+      let f = T.const ~ty:(Type.arrow [ ty; ty ] ty) f_ in
+      let ite = T.const ~ty:(Type.arrow [ ty; ty; ty ] ty) ite_ in
+      let ty_fun1 = Type.arrow [ ty ] ty in
+      let p_ho2 = T.const ~ty:(Type.arrow [ ty_fun1; ty_fun1 ] ty) p_ho2_ in
+      (* free variables *)
+      let x0 = T.var (HVar.make ~ty 0) in
+      let f0 = T.var (HVar.make ~ty:ty_fun1 1) in
+      (* t1 = ite e b e *)
+      let t1 = T.app ite [ e; b; e ] in
+      (* t2 = p_ho2 (fun y. b) (fun y. a) *)
+      let t2 = T.app p_ho2 [ T.fun_l [ ty ] b; T.fun_l [ ty ] a ] in
+      (* t3 = p_ho2 (fun y. f d ((fun y1. f0 d) (fun y1 y2. y))) (fun y. x0) *)
+      let t3 =
+        let g2ty = Type.arrow [ ty; ty ] ty in
+        let redex =
+          T.app
+            (T.fun_l [ g2ty ] (T.app f0 [ d ]))
+            [ T.fun_l [ ty; ty ] (T.bvar ~ty 1) ]
+        in
+        T.app p_ho2 [ T.fun_l [ ty ] (T.app f [ d; redex ]); T.fun_l [ ty ] x0 ]
+      in
+      let ord =
+        O.derived_ho_kbo ~ignore_quans_under_lam:true (Precedence.default [])
+      in
+      let compare = O.compare ord in
+      Alcotest.(check comp_test)
+        "ite e b e < p_ho2 (fun y. b) (fun y. a) " Comparison.Lt (compare t1 t2);
+      Alcotest.(check comp_test)
+        "ite e b e <=>? p_ho2 (fun y. f d ((fun y1. f0 d) (fun y1 y2. y))) \
+         (fun y. x0)"
+        Comparison.Incomparable (compare t1 t3);
+      Alcotest.(check comp_test)
+        "p_ho2 (fun y. b) (fun y. a) <=>? p_ho2 (fun y. f d ((fun y1. f0 d) \
+         (fun y1 y2. y))) (fun y. x0)"
+        Comparison.Incomparable (compare t2 t3);
+
       (* polymorphic example *)
       let funty_ = ID.make "funty" in
       let appty =
