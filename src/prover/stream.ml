@@ -48,27 +48,84 @@ let penalty s = s.penalty
 
 (** {2 Access} *)
 
-let drip s =
-  try
-    let x = OSeq.head_exn s.stm in
-    s.stm <- OSeq.tail_exn s.stm;
+(* orphaned streams are killed when orphans are ignored, and each drip
+   increases [penalty] (used by [StreamQueue] to order streams), so stream
+   selection is not static. *)
+
+let clause_penalty s = function
+  | None ->
     s.hits <- s.hits + 1;
-    x
-  with Invalid_argument _ -> raise Empty_Stream
+    max 2 (s.hits - 16)
+  | Some c ->
+    s.hits <- s.hits + 1;
+    Clause.penalty c * max 1 (s.hits - 64)
+
+let is_orphaned s = List.exists Clause.is_redundant s.parents
+
+let drip s =
+  let orig_penalty = s.penalty in
+  let res =
+    if ClauseQueue.ignoring_orphans () && is_orphaned s then (
+      s.penalty <- max_int;
+      s.stm <- OSeq.empty;
+      raise Empty_Stream
+    ) else (
+      match s.stm () with
+      | OSeq.Nil ->
+        s.penalty <- max_int;
+        raise Empty_Stream
+      | OSeq.Cons (hd, tl) ->
+        s.stm <- tl;
+        let cl_p = clause_penalty s hd in
+        s.penalty <- s.penalty + cl_p;
+        hd
+    )
+  in
+  if CCOpt.is_some res then
+    Util.debugf ~section 1 "drip:%d/%d->@[%a@]:@. @[%a@]@." (fun k ->
+        k orig_penalty s.hits pp s (CCOpt.pp Clause.pp) res);
+  res
 
 let drip_n s n guard =
-  let rec aux i acc =
-    if i < n then (
-      try
-        let x = OSeq.head_exn s.stm in
-        s.stm <- OSeq.tail_exn s.stm;
-        s.hits <- s.hits + 1;
-        aux (i + 1) (x :: acc)
-      with Invalid_argument _ ->
-        raise (Drip_n_Unfinished (List.rev acc, n, guard))
-    ) else if guard > 0 && i >= n + guard then
-      List.rev acc
-    else
-      aux (i + 1) acc
+  let rec _drip_n st n guard =
+    if guard = 0 then
+      st, 0, []
+    else (
+      match n with
+      | 0 -> st, 0, []
+      | _ ->
+        (match st () with
+        | OSeq.Nil -> raise (Drip_n_Unfinished ([], 0, n))
+        | OSeq.Cons (hd, tl) ->
+          let p = clause_penalty s hd in
+          (match hd with
+          | None ->
+            (try
+               let s', p_tl, tl_res = _drip_n tl n (guard - 1) in
+               s', p + p_tl, tl_res
+             with Drip_n_Unfinished (partial_res, p_partial, n') ->
+               raise (Drip_n_Unfinished (hd :: partial_res, p + p_partial, n')))
+          | _ ->
+            (try
+               let s', p_tl, tl_res = _drip_n tl (n - 1) (guard - 1) in
+               s', p + p_tl, hd :: tl_res
+             with Drip_n_Unfinished (partial_res, p_partial, n') ->
+               raise (Drip_n_Unfinished (hd :: partial_res, p + p_partial, n')))))
+    )
   in
-  aux 0 []
+
+  let orig_penalty = s.penalty in
+  let res =
+    try
+      let s', p_add, cl = _drip_n s.stm n guard in
+      s.penalty <- s.penalty + p_add;
+      s.stm <- s';
+      cl
+    with Drip_n_Unfinished (res, p_add, n') ->
+      s.stm <- OSeq.empty;
+      s.penalty <- s.penalty + p_add;
+      raise (Drip_n_Unfinished (res, p_add, n'))
+  in
+  Util.debugf ~section 1 "drip_n:%d->@[%a@]:@. @[%a@]@." (fun k ->
+      k orig_penalty pp s (CCList.pp (CCOpt.pp Clause.pp)) res);
+  res
