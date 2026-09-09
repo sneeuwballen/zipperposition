@@ -117,7 +117,7 @@ module SimplSet = struct
         seq (fun c ->
             Atomic.decr n;
             Signal.send on_remove c);
-        Trace.counter_int "passive.n-clauses" (Atomic.get n)
+        Trace.counter_int "simpl.n-clauses" (Atomic.get n)
 
       method clauses () = Clause.ClauseSet.empty
       method iter_clauses = Iter.empty
