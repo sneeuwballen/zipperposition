@@ -24,7 +24,7 @@
   (containers (and (>= "3.0") (< "4.0")))
   (containers-data (and (>= "3.0") (< "4.0")))
   (iter (>= "1.2"))
-  (menhir :build)
+  (menhir (and (>= "20180523") :build))
   atomic
   (trace (>= 0.11))
   (alcotest :with-test)
@@ -52,7 +52,7 @@
   (containers-data (and (>= "3.1") (< "4.0")))
   (iter (>= "1.2"))
   oseq
-  (menhir :build)
+  (menhir (and (>= "20180523") :build))
   (msat (and (>= "0.8.1") (< "0.10")))))
 
 (package
@@ -68,7 +68,7 @@
   (containers (and (>= "3.0") (< "4.0")))
   (iter (>= "1.2"))
   oseq
-  (menhir :build)
+  (menhir (and (>= "20180523") :build))
   (msat (and (>= "0.8") (< "0.10")))))
 
 (package

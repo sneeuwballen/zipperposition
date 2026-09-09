@@ -24,7 +24,7 @@ depends: [
   "containers" {>= "3.0" & < "4.0"}
   "iter" {>= "1.2"}
   "oseq"
-  "menhir" {build}
+  "menhir" {>= "20180523" & build}
   "msat" {>= "0.8" & < "0.10"}
   "odoc" {with-doc}
 ]
