@@ -591,7 +591,9 @@ let ind_on_vars env (cut : Avatar.cut_res) (vars : T.var list) : C.t list =
     in
     b_at_least_one :: b_at_most_one
   in
-  Avatar.Solver.add_clauses ~proof b_clauses;
+  Sat_solver.add_clauses
+    (Env.flex_get_of env Avatar.k_sat_solver)
+    ~proof b_clauses;
   Util.debugf ~section 2 "@[<2>add boolean constraints@ @[<hv>%a@]@ :proof %a@]"
     (fun k -> k (Util.pp_list BBox.pp_bclause) b_clauses Proof.Step.pp proof);
   Util.incr_stat stat_inductions;
@@ -984,7 +986,7 @@ let inductions_on_lemma env (cut : Avatar.cut_res) : C.t list =
         Util.incr_stat stat_generalize;
         (* assert that the new goals imply the old one *)
         let proof = Proof.Step.trivial in
-        Avatar.add_imply new_cuts cut proof;
+        Avatar.add_imply env new_cuts cut proof;
         (* now prove the lemmas in Avatar *)
         List.iter (Avatar.add_lemma env) new_cuts)
       new_goals_l;

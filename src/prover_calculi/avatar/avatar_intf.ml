@@ -5,7 +5,6 @@ open Libzipperposition
 
 module type S = sig
   module E : Env.S
-  module Solver : Sat_solver_intf.STATIC
   module BLit = BBox.Lit
 
   val split : E.multi_simpl_rule
@@ -52,7 +51,7 @@ module type S = sig
   val pp_cut_res : cut_res CCFormat.printer
   val cut_res_clauses : cut_res -> E.C.t Iter.t
 
-  val print_lemmas : unit CCFormat.printer
+  val print_lemmas : Env.t -> unit CCFormat.printer
   (** print the current list of lemmas, and their status *)
 
   val introduce_cut :
@@ -74,9 +73,9 @@ module type S = sig
       lemmas. It will call the functions added by {!add_prove_lemma} to try and
       prove this one. *)
 
-  val add_imply : cut_res list -> cut_res -> Proof.Step.t -> unit
-  (** [add_imply l res] means that the conjunction of lemmas in [l] implies that
-      the lemma [res] is proven *)
+  val add_imply : Env.t -> cut_res list -> cut_res -> Proof.Step.t -> unit
+  (** [add_imply env l res] means that the conjunction of lemmas in [l] implies
+      that the lemma [res] is proven *)
 
   val on_input_lemma : cut_res Signal.t
   (** Triggered every time a cut is introduced for an input lemma (i.e. every

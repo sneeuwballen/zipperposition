@@ -24,6 +24,8 @@ let flag_cut_introduced = SClause.new_flag ()
 
 module type S = Avatar_intf.S
 
+let k_sat_solver : Sat_solver.t Flex_state.key = Flex_state.create_key ()
+let k_num_proved_last : int Flex_state.key = Flex_state.create_key ()
 let k_avatar_enabled = Flex_state.create_key ()
 let k_show_lemmas : bool Flex_state.key = Flex_state.create_key ()
 let k_simplify_trail : bool Flex_state.key = Flex_state.create_key ()
@@ -38,7 +40,6 @@ let k_infer_from_components : bool Flex_state.key = Flex_state.create_key ()
 module Ctx = Ctx
 module C = Clause
 module BLit = BBox.Lit
-module Solver = Sat_solver.Make ()
 
 (* union-find that maps vars to list of literals, used for splitting *)
 module UF = UnionFind.Make (struct
@@ -53,6 +54,7 @@ end)
 
 let simplify_split_ env (c : C.t) : C.t list option =
   let flex_ref = ref (Env.flex_state_of env) in
+  let sat = Env.flex_get_of env k_sat_solver in
   let lits = C.lits c in
   (* maps each variable to a list of literals. Sets can be merged whenever
      two variables occur in the same literal.  *)
@@ -106,7 +108,7 @@ let simplify_split_ env (c : C.t) : C.t list option =
                 bool_guard
             then
               (* ignoring tautoligies *)
-              Solver.add_clause
+              Sat_solver.add_clause sat
                 ~proof:(proof ~rule:(Proof.Rule.mk "recognize_known"))
                 (bool_lit :: bool_guard))
           bool_name
@@ -141,7 +143,9 @@ let simplify_split_ env (c : C.t) : C.t list option =
 
       (* add boolean constraint: trail(c) => bigor_{name in clauses} name *)
       let bool_clause = List.append bool_clause bool_guard in
-      Solver.add_clause ~proof:(proof ~rule:(Proof.Rule.mk "split")) bool_clause;
+      Sat_solver.add_clause sat
+        ~proof:(proof ~rule:(Proof.Rule.mk "split"))
+        bool_clause;
       Util.debugf ~section 2 "@[constraint clause is @[%a@]@]" (fun k ->
           k BBox.pp_bclause bool_clause);
       (* return the clauses *)
@@ -200,7 +204,9 @@ let check_empty env c =
     let b_clause = C.trail c |> Trail.to_list |> List.map Trail.Lit.neg in
     Util.debugf ~section 4 "@[negate trail of @[%a@] (id %d)@ with @[%a@]@]"
       (fun k -> k C.pp c (C.id c) BBox.pp_bclause b_clause);
-    Solver.add_clause ~proof:(C.proof_step c) b_clause
+    Sat_solver.add_clause
+      (Env.flex_get_of env k_sat_solver)
+      ~proof:(C.proof_step c) b_clause
   );
   if
     Array.length (C.lits c) = 0
@@ -245,15 +251,16 @@ let check_empty env c =
                are not added to the proof state. *)
 
 (* check whether the trail is false and will remain so *)
-let trail_is_trivial_ (trail : Trail.t) : bool =
+let trail_is_trivial_ env (trail : Trail.t) : bool =
+  let sat = Env.flex_get_of env k_sat_solver in
   let res =
     Trail.to_iter trail
     |> Iter.find_map (fun lit ->
            try
-             match Solver.valuation_level lit with
+             match Sat_solver.valuation_level sat lit with
              | false, 0 -> Some lit (* false at level 0: proven false *)
              | _ -> None
-           with Solver.UndecidedLit -> None)
+           with Sat_solver.UndecidedLit -> None)
   in
   match res with
   | None -> false
@@ -264,8 +271,9 @@ let trail_is_trivial_ (trail : Trail.t) : bool =
         k C.pp_trail trail BBox.pp lit);
     true
 
-let trail_is_trivial _env tr =
-  Solver.last_result () = Solver.Sat && trail_is_trivial_ tr
+let trail_is_trivial env tr =
+  Sat_solver.last_result (Env.flex_get_of env k_sat_solver) = Sat_solver.Sat
+  && trail_is_trivial_ env tr
 
 type trail_status =
   | Tr_trivial
@@ -275,7 +283,8 @@ type trail_status =
 exception Trail_is_trivial
 
 (* return [new_trail], [is_trivial] *)
-let simplify_opt (trail : Trail.t) : trail_status =
+let simplify_opt env (trail : Trail.t) : trail_status =
+  let sat = Env.flex_get_of env k_sat_solver in
   let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "avatar.simplify-opt" in
   let n_simpl = ref 0 in
   try
@@ -283,7 +292,7 @@ let simplify_opt (trail : Trail.t) : trail_status =
       Trail.to_list trail
       |> List.partition (fun lit ->
              try
-               match Solver.valuation_level lit with
+               match Sat_solver.valuation_level sat lit with
                | true, 0 ->
                  (* [lit] is proven true, it is therefore not necessary
                   to depend on it *)
@@ -293,7 +302,7 @@ let simplify_opt (trail : Trail.t) : trail_status =
                  (* [lit] is proven false, the whole trail is trivial *)
                  raise Trail_is_trivial
                | _ -> true
-             with Solver.UndecidedLit -> true)
+             with Sat_solver.UndecidedLit -> true)
     in
     if !n_simpl > 0 then (
       assert (removed <> []);
@@ -304,9 +313,10 @@ let simplify_opt (trail : Trail.t) : trail_status =
 
 (* simplify the trail of [c] using boolean literals that have been proven *)
 let simplify_trail_ env c =
+  let sat = Env.flex_get_of env k_sat_solver in
   let trail = C.trail c in
   (* remove bool literals made trivial by SAT solver *)
-  match simplify_opt trail with
+  match simplify_opt env trail with
   | Tr_same | Tr_trivial -> SimplM.return_same c (* handled by [is_trivial] *)
   | Tr_simplify_into (new_trail, removed_trail) ->
     Util.incr_stat stat_trail_simplify;
@@ -316,7 +326,7 @@ let simplify_trail_ env c =
          closed can appear in the proof *)
     let proof_removed =
       List.map
-        (CCFun.compose Solver.get_proof_of_lit Proof.Parent.from)
+        (CCFun.compose (Sat_solver.get_proof_of_lit sat) Proof.Parent.from)
         removed_trail
     in
     let proof =
@@ -334,30 +344,34 @@ let simplify_trail_ env c =
 
 (* only simplify if SAT *)
 let simplify_trail env c =
-  if Solver.last_result () = Solver.Sat then
+  if Sat_solver.last_result (Env.flex_get_of env k_sat_solver) = Sat_solver.Sat
+  then
     simplify_trail_ env c
   else
     SimplM.return_same c
 
-let new_proved_lits : unit -> bool =
-  let num_proved_last_ = ref 0 in
-  fun () ->
-    let set = Solver.all_proved () in
-    let n = BLit.Set.cardinal set in
-    assert (n >= !num_proved_last_);
-    let yes = n > !num_proved_last_ in
-    num_proved_last_ := n;
-    yes
+let new_proved_lits env : bool =
+  let sat = Env.flex_get_of env k_sat_solver in
+  let num_proved_last = Env.flex_get_of env k_num_proved_last in
+  let set = Sat_solver.all_proved sat in
+  let n = BLit.Set.cardinal set in
+  assert (n >= num_proved_last);
+  let yes = n > num_proved_last in
+  Env.update_flex_state env (Flex_state.add k_num_proved_last n);
+  yes
 
 (* subset of active clauses that have a trivial trail or simplifiable
    trail *)
-let backward_simplify_trails _env (_ : C.t) : C.ClauseSet.t =
-  if Solver.last_result () = Solver.Sat && new_proved_lits () then
-    Env.active_clauses _env |> Clause.ClauseSet.to_seq |> Iter.of_seq
+let backward_simplify_trails env (_ : C.t) : C.ClauseSet.t =
+  if
+    Sat_solver.last_result (Env.flex_get_of env k_sat_solver) = Sat_solver.Sat
+    && new_proved_lits env
+  then
+    Env.active_clauses env |> Clause.ClauseSet.to_seq |> Iter.of_seq
     |> Iter.filter (fun c -> not (Trail.is_empty @@ C.trail c))
     |> Iter.filter (fun c ->
            let ok =
-             match simplify_opt (C.trail c) with
+             match simplify_opt env (C.trail c) with
              | Tr_trivial | Tr_simplify_into _ -> true
              | Tr_same -> false
            in
@@ -529,12 +543,12 @@ let add_lemma env (c : cut_res) : unit =
         "(@[<2>add_lemma [already there]@ :on `[@[<hv>%a@]]`@])" (fun k ->
         k Cut_form.pp c.cut_form)
 
-let add_imply (l : cut_res list) (res : cut_res) (p : Proof.Step.t) : unit =
+let add_imply env (l : cut_res list) (res : cut_res) (p : Proof.Step.t) : unit =
   let c = res.cut_lit :: List.map (fun cut -> BLit.neg cut.cut_lit) l in
   Util.debugf ~section 3
     "(@[<2>add_imply@ :premises (@[<hv>%a@])@ :concl %a@ :proof %a@])" (fun k ->
       k (Util.pp_list pp_cut_res) l pp_cut_res res Proof.Step.pp p);
-  Solver.add_clause ~proof:p c;
+  Sat_solver.add_clause (Env.flex_get_of env k_sat_solver) ~proof:p c;
   ()
 
 let lemma_seq : cut_res Iter.t =
@@ -553,15 +567,16 @@ let rec in_proof_of_ (p : Proof.t) (lit : BLit.t) : bool =
     List.exists (eq_abs lit) l || in_proof_ (Proof.S.step p) lit
   | _ -> in_proof_ (Proof.S.step p) lit
 
-let print_lemmas out () =
+let print_lemmas env out () =
+  let sat = Env.flex_get_of env k_sat_solver in
   let in_core =
-    match Solver.get_proof_opt () with
+    match Sat_solver.get_proof_opt sat with
     | None -> fun _ -> false
     | Some p -> in_proof_of_ p
   and pp_reason out r = Format.fprintf out "@ :reason @[%a@]" r () in
   let pp_lemma out c =
     let status =
-      match Solver.proved_at_0 c.cut_lit with
+      match Sat_solver.proved_at_0 sat c.cut_lit with
       | _ when in_core c.cut_lit -> "in_proof"
       | None -> "unknown"
       | Some true -> "proved"
@@ -576,7 +591,7 @@ let print_lemmas out () =
     l;
   ()
 
-let show_lemmas () = Format.printf "%a@." print_lemmas ()
+let show_lemmas env = Format.printf "%a@." (print_lemmas env) ()
 
 let convert_lemma env st =
   match Statement.view st with
@@ -611,12 +626,13 @@ let check_satisfiability env ~full () =
     Trace.with_span ~__FILE__ ~__LINE__ "avatar.check-satisfiability"
   in
   Signal.send before_check_sat ();
+  let sat = Env.flex_get_of env k_sat_solver in
   let res =
-    match Solver.check ~full () with
-    | Solver.Sat ->
+    match Sat_solver.check sat ~full () with
+    | Sat_solver.Sat ->
       Util.debug ~section 3 "SAT-solver reports \"SAT\"";
       []
-    | Solver.Unsat proof ->
+    | Sat_solver.Unsat proof ->
       Util.debug ~section 1 "SAT-solver reports \"UNSAT\"";
       let proof = Proof.S.step proof in
       let c =
@@ -636,7 +652,7 @@ let register env ~split_kind () =
 
   Util.debugf ~section:Const.section 2 "register extension Avatar (split: %s)"
     (fun k -> k (split_to_str split_kind));
-  Solver.set_printer BBox.pp;
+  Sat_solver.set_printer (Env.flex_get_of env k_sat_solver) BBox.pp;
   (match split_kind with
   | `Lazy -> Env.add_multi_simpl_rule env ~priority:0 split
   | `Eager ->
@@ -667,9 +683,9 @@ let register env ~split_kind () =
     Env.add_backward_simplify env backward_simplify_trails
   );
   if Env.flex_get_of env k_show_lemmas then
-    Signal.once Signals.on_exit (fun _ -> show_lemmas ());
+    Signal.once Signals.on_exit (fun _ -> show_lemmas env);
   (* be sure there is an initial valuation *)
-  ignore (Solver.check ~full:true ())
+  ignore (Sat_solver.check (Env.flex_get_of env k_sat_solver) ~full:true ())
 
 let avatar_kind = ref `Lazy
 let show_lemmas_ = ref false
@@ -684,7 +700,11 @@ let infer_from_components = ref false
 
 let extension =
   let action (env : Env.t) =
-    Solver.setup ();
+    Util.debug 1 "create new SAT solver";
+    let sat = Sat_solver.create () in
+    Sat_solver.setup sat;
+    Env.flex_add_of env k_sat_solver sat;
+    Env.flex_add_of env k_num_proved_last 0;
     Env.flex_add_of env k_show_lemmas !show_lemmas_;
     Env.flex_add_of env k_simplify_trail !simplify_trail_;
     Env.flex_add_of env k_back_simplify_trail !back_simplify_trail_;

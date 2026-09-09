@@ -337,53 +337,6 @@ let create () =
 
 let set_compact b = sat_compact_ := b
 
-(* Capture outer functions for Make() backward compat functor *)
-let _add_clause = add_clause
-let _add_clauses = add_clauses
-let _add_clause_seq = add_clause_seq
-let _check = check
-let _last_result = last_result
-let _valuation = valuation
-let _valuation_level = valuation_level
-let _proved_at_0 = proved_at_0
-let _all_proved = all_proved
-let _set_printer = set_printer
-let _get_proof = get_proof
-let _get_proof_opt = get_proof_opt
-let _get_proof_of_lit = get_proof_of_lit
-let _setup = setup
-let _clear = clear
-
-(* Backward-compatible generative functor for avatar/qle/pred_elim *)
-module Make () = struct
-  module Lit = BBox.Lit
-
-  exception UndecidedLit = Solver.UndecidedLit
-
-  type clause = Lit.t list
-
-  type nonrec result = Sat_solver_intf.result =
-    | Sat
-    | Unsat of proof
-
-  let _st = create ()
-  let add_clause = _add_clause _st
-  let add_clauses = _add_clauses _st
-  let add_clause_seq = _add_clause_seq _st
-  let check = _check _st
-  let last_result () = _last_result _st
-  let valuation = _valuation _st
-  let valuation_level = _valuation_level _st
-  let proved_at_0 = _proved_at_0 _st
-  let all_proved () = _all_proved _st
-  let set_printer = _set_printer _st
-  let get_proof () = _get_proof _st
-  let get_proof_opt () = _get_proof_opt _st
-  let get_proof_of_lit = _get_proof_of_lit _st
-  let setup () = _setup _st
-  let clear = _clear _st
-end
-
 let () =
   Params.add_opts
     [

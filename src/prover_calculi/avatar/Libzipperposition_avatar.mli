@@ -20,9 +20,10 @@ type 'a printer = Format.formatter -> 'a -> unit
 
 val flag_cut_introduced : SClause.flag
 
-module Solver : Sat_solver_intf.STATIC
-
 module type S = Avatar_intf.S
+
+val k_sat_solver : Sat_solver.t Flex_state.key
+(** Per-environment SAT solver instance, created by {!extension} *)
 
 val k_simplify_trail : bool Flex_state.key
 val k_avatar_enabled : bool Flex_state.key
@@ -51,7 +52,7 @@ val cut_proof : cut_res -> Proof.Step.t
 val cut_proof_parent : cut_res -> Proof.Parent.t
 val pp_cut_res : cut_res CCFormat.printer
 val cut_res_clauses : cut_res -> Clause.t Iter.t
-val print_lemmas : unit CCFormat.printer
+val print_lemmas : Env.t -> unit CCFormat.printer
 
 val introduce_cut :
   Env.t ->
@@ -66,7 +67,7 @@ val add_prove_lemma :
   (Env.t -> cut_res -> Clause.t list Env.conversion_result) -> unit
 
 val add_lemma : Env.t -> cut_res -> unit
-val add_imply : cut_res list -> cut_res -> Proof.Step.t -> unit
+val add_imply : Env.t -> cut_res list -> cut_res -> Proof.Step.t -> unit
 val on_input_lemma : cut_res Signal.t
 val on_lemma : cut_res Signal.t
 val convert_lemma : Env.clause_conversion_rule

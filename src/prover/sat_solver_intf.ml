@@ -40,33 +40,3 @@ module type S = sig
   val setup : t -> unit
   val clear : t -> ?size:[ `Big | `Small | `Tiny ] -> unit -> unit
 end
-
-(** Static (backward-compatible) interface: no [type t], functions take unit for
-    "self". Used temporarily by Avatar which wraps a solver in a module. *)
-module type STATIC = sig
-  module Lit = BBox.Lit
-
-  exception UndecidedLit
-
-  type clause = Lit.t list
-
-  type result =
-    | Sat
-    | Unsat of proof
-
-  val add_clause : proof:proof_step -> Lit.t list -> unit
-  val add_clauses : proof:proof_step -> Lit.t list list -> unit
-  val add_clause_seq : proof:proof_step -> Lit.t list Iter.t -> unit
-  val check : full:bool -> unit -> result
-  val last_result : unit -> result
-  val valuation : Lit.t -> bool
-  val valuation_level : Lit.t -> bool * int
-  val proved_at_0 : Lit.t -> bool option
-  val all_proved : unit -> Lit.Set.t
-  val set_printer : Lit.t CCFormat.printer -> unit
-  val get_proof : unit -> proof
-  val get_proof_opt : unit -> proof option
-  val get_proof_of_lit : Lit.t -> proof
-  val setup : unit -> unit
-  val clear : ?size:[ `Big | `Small | `Tiny ] -> unit -> unit
-end
