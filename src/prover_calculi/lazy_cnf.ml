@@ -27,7 +27,6 @@ module C = Clause
 module FR = Env.FormRename
 
 let _form_counter = Term.Tbl.create 256
-
 let k_counted_clauses : Util.Int_set.t Flex_state.key = Flex_state.create_key ()
 
 let get_counted_clauses env =
@@ -36,9 +35,9 @@ let get_counted_clauses env =
 
 let update_counted_clauses env f =
   Env.update_flex_state env (fun fs ->
-    Flex_state.add k_counted_clauses
-      (f (Flex_state.get_or ~or_:Util.Int_set.empty k_counted_clauses fs))
-      fs)
+      Flex_state.add k_counted_clauses
+        (f (Flex_state.get_or ~or_:Util.Int_set.empty k_counted_clauses fs))
+        fs)
 
 let update_form_counter ~action env c =
   let flex_ref = ref (Env.flex_state_of env) in
@@ -997,11 +996,11 @@ let extension =
 
 let () =
   Params.add_flex_opts (fun ~flex_ref ->
-    [
-      ( "--lazy-cnf",
-        Arg.Bool (fun v -> flex_ref := Flex_state.add k_enabled v !flex_ref),
-        " turn on lazy clausification" );
-      ( "--lazy-cnf-eager",
+      [
+        ( "--lazy-cnf",
+          Arg.Bool (fun v -> flex_ref := Flex_state.add k_enabled v !flex_ref),
+          " turn on lazy clausification" );
+        ( "--lazy-cnf-eager",
           Arg.Bool
             (fun v -> flex_ref := Flex_state.add k_lazy_cnf_eager v !flex_ref),
           " apply the rule to every newly created clause" );

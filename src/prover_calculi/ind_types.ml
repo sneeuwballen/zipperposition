@@ -347,12 +347,12 @@ let extension =
 
 let () =
   Params.add_to_mode "ho-complete-basic" (fun flex_ref ->
-    flex_ref := Flex_state.add k_enabled false !flex_ref);
+      flex_ref := Flex_state.add k_enabled false !flex_ref);
   Params.add_to_mode "best" (fun flex_ref ->
-    flex_ref := Flex_state.add k_enabled false !flex_ref);
+      flex_ref := Flex_state.add k_enabled false !flex_ref);
   Params.add_to_mode "ho-pragmatic" (fun flex_ref ->
-    flex_ref := Flex_state.add k_enabled false !flex_ref);
+      flex_ref := Flex_state.add k_enabled false !flex_ref);
   Params.add_to_mode "ho-competitive" (fun flex_ref ->
-    flex_ref := Flex_state.add k_enabled false !flex_ref);
+      flex_ref := Flex_state.add k_enabled false !flex_ref);
   Params.add_to_mode "fo-complete-basic" (fun flex_ref ->
-    flex_ref := Flex_state.add k_enabled false !flex_ref)
+      flex_ref := Flex_state.add k_enabled false !flex_ref)

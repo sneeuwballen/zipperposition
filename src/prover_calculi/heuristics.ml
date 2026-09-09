@@ -10,7 +10,6 @@ module Lit = Literal
 let k_depth_limit : int option Flex_state.key = Flex_state.create_key ()
 let k_max_vars : int Flex_state.key = Flex_state.create_key ()
 let k_no_max_vars : bool Flex_state.key = Flex_state.create_key ()
-
 let section = Util.Section.make ~parent:Const.section "heuristics"
 let stat_depth_limit = Util.mk_stat "trivial.too_deep"
 let stat_vars = Util.mk_stat "trivial.too_many_vars"
@@ -57,7 +56,8 @@ let has_too_many_vars env c =
     in
     if
       n_vars
-      > CCOpt.get_or ~default:10 (Flex_state.get k_max_vars (Env.flex_state_of env))
+      > CCOpt.get_or ~default:10
+          (Flex_state.get k_max_vars (Env.flex_state_of env))
     then (
       Ctx.lost_completeness (Env.get_ctx env);
       Util.incr_stat stat_vars;
@@ -81,25 +81,26 @@ let extension =
 
 let () =
   Params.add_flex_opts (fun ~flex_ref ->
-    [
-      ( "--depth-limit",
-        Arg.Int
-          (fun i -> flex_ref := Flex_state.add k_depth_limit (Some i) !flex_ref),
-        " set maximal term depth" );
-      ( "--max-vars",
-        Arg.Int (fun n -> flex_ref := Flex_state.add k_max_vars n !flex_ref),
-        " maximum number of variables per clause" );
-      ( "--no-max-vars",
-        Arg.Bool
-          (fun v -> flex_ref := Flex_state.add k_no_max_vars v !flex_ref),
-        " disable/enable maximum number of variables per clause" );
-    ]);
+      [
+        ( "--depth-limit",
+          Arg.Int
+            (fun i ->
+              flex_ref := Flex_state.add k_depth_limit (Some i) !flex_ref),
+          " set maximal term depth" );
+        ( "--max-vars",
+          Arg.Int (fun n -> flex_ref := Flex_state.add k_max_vars n !flex_ref),
+          " maximum number of variables per clause" );
+        ( "--no-max-vars",
+          Arg.Bool
+            (fun v -> flex_ref := Flex_state.add k_no_max_vars v !flex_ref),
+          " disable/enable maximum number of variables per clause" );
+      ]);
   Params.add_to_mode "best" (fun flex_ref ->
-    flex_ref := Flex_state.add k_no_max_vars true !flex_ref);
+      flex_ref := Flex_state.add k_no_max_vars true !flex_ref);
   Params.add_to_mode "ho-pragmatic" (fun flex_ref ->
-    flex_ref := Flex_state.add k_no_max_vars true !flex_ref);
+      flex_ref := Flex_state.add k_no_max_vars true !flex_ref);
   Params.add_to_mode "ho-competitive" (fun flex_ref ->
-    flex_ref := Flex_state.add k_no_max_vars true !flex_ref);
+      flex_ref := Flex_state.add k_no_max_vars true !flex_ref);
   Params.add_to_modes
     [
       "ho-complete-basic";

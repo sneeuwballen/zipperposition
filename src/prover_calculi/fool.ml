@@ -202,7 +202,10 @@ let setup env =
   ()
 
 let extension =
-  let register (env : Env.t) = if Env.flex_get_or_create ~init:(fun () -> true) env k_enabled then setup env in
+  let register (env : Env.t) =
+    if Env.flex_get_or_create ~init:(fun () -> true) env k_enabled then
+      setup env
+  in
   {
     Extensions.default with
     Extensions.name = "fool";
@@ -211,11 +214,11 @@ let extension =
 
 let () =
   Params.add_flex_opts (fun ~flex_ref ->
-    [
-      ( "--fool",
-        Arg.Bool (fun v -> flex_ref := Flex_state.add k_enabled v !flex_ref),
-        " enable/disable fool (first-class booleans)" );
-    ]);
+      [
+        ( "--fool",
+          Arg.Bool (fun v -> flex_ref := Flex_state.add k_enabled v !flex_ref),
+          " enable/disable fool (first-class booleans)" );
+      ]);
   Params.add_to_modes
     [
       "best";
@@ -228,6 +231,5 @@ let () =
       "ho-comb-complete";
       "lambda-free-purify-intensional";
       "lambda-free-purify-extensional";
-    ] (fun flex_ref ->
-      flex_ref := Flex_state.add k_enabled false !flex_ref);
+    ] (fun flex_ref -> flex_ref := Flex_state.add k_enabled false !flex_ref);
   Extensions.register extension

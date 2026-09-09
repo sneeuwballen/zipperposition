@@ -13,6 +13,7 @@ let stat_narrowing_lit = Util.mk_stat "narrow.lit_steps"
 let stat_narrowing_term = Util.mk_stat "narrow.term_steps"
 let stat_ctx_narrowing = Util.mk_stat "narrow.ctx_narrow_steps"
 let max_steps = 500
+
 module Key = struct
   let has_rw = Flex_state.create_key ()
   let ctx_narrow = Flex_state.create_key ()
@@ -316,7 +317,9 @@ let setup env ?(ctx_narrow = true) ~narrowing ~has_rw () =
   ()
 
 let post_cnf stmts st =
-  let rewrite_before_cnf = Flex_state.get_or ~or_:false Key.rewrite_before_cnf st in
+  let rewrite_before_cnf =
+    Flex_state.get_or ~or_:false Key.rewrite_before_cnf st
+  in
   CCVector.iter Statement.scan_stmt_for_defined_cst
     (if not rewrite_before_cnf then
        stmts
@@ -416,7 +419,9 @@ let rewrite_tst_stmt stmt =
   | _ -> stmt
 
 let unfold_def_before_cnf ~flex_ref stmts =
-  let rewrite_before_cnf = Flex_state.get_or ~or_:false Key.rewrite_before_cnf !flex_ref in
+  let rewrite_before_cnf =
+    Flex_state.get_or ~or_:false Key.rewrite_before_cnf !flex_ref
+  in
   if rewrite_before_cnf then (
     let cnt = ref 0 in
     CCVector.map
@@ -433,7 +438,9 @@ let unfold_def_before_cnf ~flex_ref stmts =
     stmts
 
 let post_tying stmts st =
-  let rewrite_before_cnf = Flex_state.get_or ~or_:false Key.rewrite_before_cnf st in
+  let rewrite_before_cnf =
+    Flex_state.get_or ~or_:false Key.rewrite_before_cnf st
+  in
   if rewrite_before_cnf then (
     CCVector.iter Statement.scan_tst_rewrite stmts;
     let has_rw =
@@ -450,8 +457,12 @@ let post_tying stmts st =
 (* add a term simplification that normalizes terms w.r.t the set of rules *)
 let normalize_simpl (env : Env.t) =
   let has_rw = Env.flex_get_of env Key.has_rw in
-  let narrowing = Env.flex_get_or_create ~init:(fun () -> true) env Key.narrow in
-  let ctx_narrow = Env.flex_get_or_create ~init:(fun () -> true) env Key.ctx_narrow in
+  let narrowing =
+    Env.flex_get_or_create ~init:(fun () -> true) env Key.narrow
+  in
+  let ctx_narrow =
+    Env.flex_get_or_create ~init:(fun () -> true) env Key.ctx_narrow
+  in
   setup env ~has_rw ~narrowing ~ctx_narrow ()
 
 let extension =
@@ -466,15 +477,17 @@ let extension =
 
 let () =
   Params.add_flex_opts (fun ~flex_ref ->
-    [
-      ( "--rw-ctx-narrow",
-        Arg.Bool (fun v -> flex_ref := Flex_state.add Key.ctx_narrow v !flex_ref),
-        " enable/disable contextual narrowing" );
-      ( "--rewrite-before-cnf",
-        Arg.Bool
-          (fun v -> flex_ref := Flex_state.add Key.rewrite_before_cnf v !flex_ref),
-        " enable/disable rewriting before CNF" );
-    ]);
+      [
+        ( "--rw-ctx-narrow",
+          Arg.Bool
+            (fun v -> flex_ref := Flex_state.add Key.ctx_narrow v !flex_ref),
+          " enable/disable contextual narrowing" );
+        ( "--rewrite-before-cnf",
+          Arg.Bool
+            (fun v ->
+              flex_ref := Flex_state.add Key.rewrite_before_cnf v !flex_ref),
+          " enable/disable rewriting before CNF" );
+      ]);
   Params.add_to_modes
     [
       "best";
@@ -491,4 +504,4 @@ let () =
       flex_ref := Flex_state.add Key.narrow false !flex_ref;
       flex_ref := Flex_state.add Key.ctx_narrow false !flex_ref);
   Params.add_to_mode "best" (fun flex_ref ->
-    flex_ref := Flex_state.add Key.rewrite_before_cnf true !flex_ref)
+      flex_ref := Flex_state.add Key.rewrite_before_cnf true !flex_ref)

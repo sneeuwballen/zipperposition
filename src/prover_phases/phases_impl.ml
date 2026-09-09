@@ -15,18 +15,18 @@ let section = Util.Section.make ~parent:Const.section "phases"
 module OuterEnv = Env
 
 type state = {
-  mutable db_w : int;
-  mutable lmb_w : int;
-  mutable kbo_wf : string;
-  mutable prec_fun : string;
-  mutable trim_implications : bool;
-  mutable take_only_defs : bool;
-  mutable ignore_k_most_common_symbols : int option;
-  mutable take_conj_defs : bool;
-  mutable sine_d_min : int;
-  mutable sine_d_max : int;
-  mutable sine_tolerance : float;
-  mutable sine_threshold : int;
+  mutable db_w: int;
+  mutable lmb_w: int;
+  mutable kbo_wf: string;
+  mutable prec_fun: string;
+  mutable trim_implications: bool;
+  mutable take_only_defs: bool;
+  mutable ignore_k_most_common_symbols: int option;
+  mutable take_conj_defs: bool;
+  mutable sine_d_min: int;
+  mutable sine_d_max: int;
+  mutable sine_tolerance: float;
+  mutable sine_threshold: int;
 }
 
 let k_state : state Flex_state.key = Flex_state.create_key ()
@@ -36,7 +36,8 @@ let get_state (st_ref : Flex_state.t ref) =
   | Some st -> st
   | None ->
     let st =
-      { db_w = 1;
+      {
+        db_w = 1;
         lmb_w = 1;
         kbo_wf = "invfreqrank";
         prec_fun = "invfreq";
@@ -47,7 +48,8 @@ let get_state (st_ref : Flex_state.t ref) =
         sine_d_min = 1;
         sine_d_max = 5;
         sine_tolerance = 1.5;
-        sine_threshold = -1 }
+        sine_threshold = -1;
+      }
     in
     st_ref := Flex_state.add k_state st !st_ref;
     st
@@ -558,7 +560,8 @@ let process_file ?(prelude = Iter.empty) file (st_ref : Phases.State.t ref) =
          else
            "no"));
   let transformed =
-    Booleans.preprocess_booleans (Rewriting.unfold_def_before_cnf ~flex_ref:st_ref decls)
+    Booleans.preprocess_booleans
+      (Rewriting.unfold_def_before_cnf ~flex_ref:st_ref decls)
   in
   let sk_ctx = Skolem.create () in
   let stmts = cnf st_ref ~sk_ctx transformed in
@@ -681,59 +684,60 @@ let main ?setup_gc:(gc = true) ?params file (st_ref : Phases.State.t ref) =
 let () =
   let open Libzipperposition in
   Params.add_flex_opts (fun ~flex_ref ->
-    [
-      ( "--de-bruijn-weight",
-        Arg.Int (fun v -> (get_state flex_ref).db_w <- v),
-        " Set weight of de Bruijn index for KBO" );
-      ( "--lambda-weight",
-        Arg.Int (fun v -> (get_state flex_ref).lmb_w <- v),
-        " Set weight of lambda symbol for KBO" );
-      ( "--kbo-weight-fun",
-        Arg.String (fun v -> (get_state flex_ref).kbo_wf <- v),
-        " Set the function for symbol weight calculation." );
-      ( "--prec-gen-fun",
-        Arg.String (fun v -> (get_state flex_ref).prec_fun <- v),
-        " Set the function used for precedence generation" );
-      ( "--sine-depth-min",
-        Arg.Int
-          (fun v ->
-            let st = get_state flex_ref in
-            if st.sine_threshold = -1 then st.sine_threshold <- 100;
-            st.sine_d_min <- v),
-        " Turn on SinE with threshold and set min SinE depth." );
-      ( "--sine-depth-max",
-        Arg.Int
-          (fun v ->
-            let st = get_state flex_ref in
-            if st.sine_threshold = -1 then st.sine_threshold <- 100;
-            st.sine_d_max <- v),
-        " Turn on SinE with threshold and set max SinE depth." );
-      ( "--sine-tolerance",
-        Arg.Float
-          (fun v ->
-            let st = get_state flex_ref in
-            if st.sine_threshold = -1 then st.sine_threshold <- 100;
-            st.sine_tolerance <- v),
-        " Turn on SinE with threshold of 100 and set SinE symbol tolerance." );
-      ( "--sine-trim-implications",
-        Arg.Bool (fun v -> (get_state flex_ref).trim_implications <- v),
-        " trim long implications while getting symbols from conjecture" );
-      ( "--sine-take-only-defs",
-        Arg.Bool (fun v -> (get_state flex_ref).take_only_defs <- v),
-        " take only axioms marked as definitions and the conjecture" );
-      ( "--sine-ignore-k-most-common-syms",
-        Arg.Int
-          (fun v -> (get_state flex_ref).ignore_k_most_common_symbols <- Some v),
-        " if conjecture symbol is within k most common occurring ones, then it \
-         will be disregarded as conjecture symbol" );
-      ( "--sine-take-conj-defs",
-        Arg.Bool (fun v -> (get_state flex_ref).take_conj_defs <- v),
-        " force taking definitions of symbols ocurring in conjecture" );
-      ( "--sine",
-        Arg.Int (fun v -> (get_state flex_ref).sine_threshold <- v),
-        " Set SinE axiom number threshold (negative number turns it off)"
-        ^ " with default settings: depth in range 1-5 and tolerance 1.5" );
-    ]);
+      [
+        ( "--de-bruijn-weight",
+          Arg.Int (fun v -> (get_state flex_ref).db_w <- v),
+          " Set weight of de Bruijn index for KBO" );
+        ( "--lambda-weight",
+          Arg.Int (fun v -> (get_state flex_ref).lmb_w <- v),
+          " Set weight of lambda symbol for KBO" );
+        ( "--kbo-weight-fun",
+          Arg.String (fun v -> (get_state flex_ref).kbo_wf <- v),
+          " Set the function for symbol weight calculation." );
+        ( "--prec-gen-fun",
+          Arg.String (fun v -> (get_state flex_ref).prec_fun <- v),
+          " Set the function used for precedence generation" );
+        ( "--sine-depth-min",
+          Arg.Int
+            (fun v ->
+              let st = get_state flex_ref in
+              if st.sine_threshold = -1 then st.sine_threshold <- 100;
+              st.sine_d_min <- v),
+          " Turn on SinE with threshold and set min SinE depth." );
+        ( "--sine-depth-max",
+          Arg.Int
+            (fun v ->
+              let st = get_state flex_ref in
+              if st.sine_threshold = -1 then st.sine_threshold <- 100;
+              st.sine_d_max <- v),
+          " Turn on SinE with threshold and set max SinE depth." );
+        ( "--sine-tolerance",
+          Arg.Float
+            (fun v ->
+              let st = get_state flex_ref in
+              if st.sine_threshold = -1 then st.sine_threshold <- 100;
+              st.sine_tolerance <- v),
+          " Turn on SinE with threshold of 100 and set SinE symbol tolerance." );
+        ( "--sine-trim-implications",
+          Arg.Bool (fun v -> (get_state flex_ref).trim_implications <- v),
+          " trim long implications while getting symbols from conjecture" );
+        ( "--sine-take-only-defs",
+          Arg.Bool (fun v -> (get_state flex_ref).take_only_defs <- v),
+          " take only axioms marked as definitions and the conjecture" );
+        ( "--sine-ignore-k-most-common-syms",
+          Arg.Int
+            (fun v ->
+              (get_state flex_ref).ignore_k_most_common_symbols <- Some v),
+          " if conjecture symbol is within k most common occurring ones, then \
+           it will be disregarded as conjecture symbol" );
+        ( "--sine-take-conj-defs",
+          Arg.Bool (fun v -> (get_state flex_ref).take_conj_defs <- v),
+          " force taking definitions of symbols ocurring in conjecture" );
+        ( "--sine",
+          Arg.Int (fun v -> (get_state flex_ref).sine_threshold <- v),
+          " Set SinE axiom number threshold (negative number turns it off)"
+          ^ " with default settings: depth in range 1-5 and tolerance 1.5" );
+      ]);
   Params.add_to_mode "best" (fun flex_ref ->
       (get_state flex_ref).lmb_w <- 20;
       (get_state flex_ref).db_w <- 10);

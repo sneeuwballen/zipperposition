@@ -3088,8 +3088,9 @@ let formula_simplify_reflect env c =
     aux t
   in
 
-  if Env.flex_get_of env k_formula_simplify_reflect
-     && Flex_state.get_or ~or_:false Lazy_cnf.k_enabled (Env.flex_state_of env)
+  if
+    Env.flex_get_of env k_formula_simplify_reflect
+    && Flex_state.get_or ~or_:false Lazy_cnf.k_enabled (Env.flex_state_of env)
   then (
     let lits =
       List.map
