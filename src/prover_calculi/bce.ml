@@ -83,26 +83,45 @@ module TaskPriorityQueue = CCMutHeap.Make (TaskWrapper)
 
 let init_heap_idx = -1
 
-(* (symbol, sign) -> clauses with the corresponding occurrence *)
-let ss_idx = ref SymSignIdx.empty
+type state = {
+  mutable ss_idx: C.ClauseSet.t SymSignIdx.t;
+      (** (symbol, sign) -> clauses with the corresponding occurrence *)
+  mutable clause_lock: bce_check_task list Util.Int_map.t;
+      (** clause (or its id) -> all clauses that it locks *)
+  mutable task_store: bce_check_task TaskStore.t;
+      (** a store that implements perfect sharing of tasks *)
+  task_queue: TaskPriorityQueue.t;
+      (** priority queue of the tasks to be performed (only mutated in place,
+          never reassigned) *)
+  mutable ignored_symbols: Name.Set.t;
+      (** a set containing symbols for which BCE will not be tried *)
+  mutable logic: logic;  (** assuming the weakest logic *)
+  mutable steps: int;
+      (** counter used by [eliminate_blocked_clauses] and [eliminate_bce_sat] *)
+  mutable fixpoint_active: bool;
+      (** whether the BCE fixpoint of [begin_fixpoint] is running *)
+}
+(** Mutable BCE state. On master these fields were process-wide toplevel refs,
+    shared by all problems solved in the same process; they are now stored in
+    the environment's flex state, i.e. one fresh state per run. *)
 
-(* clause (or its id) -> all clauses that it locks *)
-let clause_lock = ref Util.Int_map.empty
+let k_state = Flex_state.create_key ()
 
-(* a store that implements perfect sharing of tasks  *)
-let task_store = ref TaskStore.empty
+let new_state () : state =
+  {
+    ss_idx = SymSignIdx.empty;
+    clause_lock = Util.Int_map.empty;
+    task_store = TaskStore.empty;
+    task_queue = TaskPriorityQueue.create ();
+    ignored_symbols = Name.Set.empty;
+    logic = NonequationalFO;
+    steps = 0;
+    fixpoint_active = false;
+  }
 
-(* priority queue of the tasks to be performed *)
-let task_queue = TaskPriorityQueue.create ()
-
-(* a set containing symbols for which BCE will not be tried *)
-let ignored_symbols = ref Name.Set.empty
-
-(* assuming the weakest logic *)
-let logic = ref NonequationalFO
-
-let refine_logic new_val =
-  if log_compare new_val !logic > 0 then logic := new_val
+let refine_logic env new_val =
+  let st = Env.flex_get_of env k_state in
+  if log_compare new_val st.logic > 0 then st.logic <- new_val
 
 let lit_to_term sign =
   if sign then
@@ -118,46 +137,49 @@ let symbol_occurs_too_often env sym_count =
   && sym_count > Env.flex_get_of env k_max_symbol_occ
 
 let add_lit_to_idx env lit_lhs sign cl =
+  let st = Env.flex_get_of env k_state in
   let sym = T.head_exn lit_lhs in
 
-  if not (Name.Set.mem sym !ignored_symbols) then (
+  if not (Name.Set.mem sym st.ignored_symbols) then (
     let sym_occs sym sign =
       CCOpt.map_or ~default:0 C.ClauseSet.cardinal
-        (SymSignIdx.find_opt (sym, sign) !ss_idx)
+        (SymSignIdx.find_opt (sym, sign) st.ss_idx)
     in
 
     let total_sym_occs = sym_occs sym true + sym_occs sym false + 1 in
 
     if symbol_occurs_too_often env total_sym_occs then (
-      ss_idx :=
-        SymSignIdx.remove (sym, false) (SymSignIdx.remove (sym, true) !ss_idx);
-      ignored_symbols := Name.Set.add sym !ignored_symbols;
+      st.ss_idx <-
+        SymSignIdx.remove (sym, false) (SymSignIdx.remove (sym, true) st.ss_idx);
+      st.ignored_symbols <- Name.Set.add sym st.ignored_symbols;
       Util.debugf ~section 5 "ignoring symbol @[%a@]@." (fun k -> k Name.pp sym)
     ) else
-      ss_idx :=
+      st.ss_idx <-
         SymSignIdx.update (sym, sign)
           (fun old ->
             Some
               (C.ClauseSet.add cl (CCOpt.get_or ~default:C.ClauseSet.empty old)))
-          !ss_idx
+          st.ss_idx
   )
 
 (* find all clauses for which L-resolution should be tried against literal
    with given lhs and sign  *)
-let find_candidates hd sign =
+let find_candidates env hd sign =
+  let st = Env.flex_get_of env k_state in
   C.ClauseSet.to_list
     (CCOpt.get_or ~default:C.ClauseSet.empty
-       (SymSignIdx.find_opt (hd, not sign) !ss_idx))
+       (SymSignIdx.find_opt (hd, not sign) st.ss_idx))
 
 (* Scan the clause and if it is in supported logic fragment,
    store its literals in the symbol index *)
 let scan_cl_lits env cl =
+  let st = Env.flex_get_of env k_state in
   CCArray.iter
     (function
       | L.Equation (lhs, rhs, _) as lit ->
         let sign = L.is_positivoid lit in
         let ignore_syms_in t =
-          ignored_symbols := T.symbols ~init:!ignored_symbols t
+          st.ignored_symbols <- T.symbols ~init:st.ignored_symbols t
         in
         if L.is_predicate_lit lit then
           List.iter ignore_syms_in (T.args lhs)
@@ -166,26 +188,27 @@ let scan_cl_lits env cl =
         if (not (Type.is_var (T.ty lhs))) && not (Type.is_fun (T.ty lhs)) then
           if Type.is_prop (T.ty lhs) then
             if L.is_predicate_lit lit && Option.is_some (T.head lhs) then (
-              if not (T.is_fo_term lhs) then refine_logic EquationalHO;
+              if not (T.is_fo_term lhs) then refine_logic env EquationalHO;
               let hd_sym = T.head_exn lhs in
-              if not (Name.Set.mem hd_sym !ignored_symbols) then
+              if not (Name.Set.mem hd_sym st.ignored_symbols) then
                 add_lit_to_idx env lhs sign cl
             ) else
-              refine_logic EquationalHO
+              refine_logic env EquationalHO
           else if T.is_fo_term lhs && T.is_fo_term rhs then
-            refine_logic EquationalFO
+            refine_logic env EquationalFO
           else
-            refine_logic EquationalHO
+            refine_logic env EquationalHO
         else
-          logic := EquationalHO
+          st.logic <- EquationalHO
       | _ -> ())
     (C.lits cl)
 
 (* Add candidates to already registered task *)
-let add_candidates lit_idx cl cand_cls =
-  let t = TaskStore.find (lit_idx, cl) !task_store in
+let add_candidates env lit_idx cl cand_cls =
+  let st = Env.flex_get_of env k_state in
+  let t = TaskStore.find (lit_idx, cl) st.task_store in
   DEQ.add_iter_back t.cands (CCList.to_iter cand_cls);
-  if TaskPriorityQueue.in_heap t then TaskPriorityQueue.increase task_queue t
+  if TaskPriorityQueue.in_heap t then TaskPriorityQueue.increase st.task_queue t
 
 (* Register a new task, calculate its candidates and make it active. Only
    clauses within the supported logic fragment can be registered.
@@ -195,7 +218,8 @@ let add_candidates lit_idx cl cand_cls =
    as index state will be update when the time for registering new clause
    comes and updating of states is an expensive operation since it traverses
    the heap in O(n) *)
-let register_task ?(update_others = true) lit_idx clause =
+let register_task ?(update_others = true) env lit_idx clause =
+  let st = Env.flex_get_of env k_state in
   (* insert new clause into the candidate list of previously inserted clauses *)
   let update_cand_lists hd sign clause cands =
     List.iter
@@ -208,7 +232,7 @@ let register_task ?(update_others = true) lit_idx clause =
                 when L.is_predicate_lit lit
                      && Option.equal Name.equal (T.head lhs) (Some hd)
                      && sign != L.is_positivoid lit ->
-                add_candidates lit_idx cand [ clause ]
+                add_candidates env lit_idx cand [ clause ]
               | _ -> ())
             (C.lits cand))
       cands
@@ -219,39 +243,41 @@ let register_task ?(update_others = true) lit_idx clause =
     when L.is_predicate_lit lit
          &&
          match T.head lhs with
-         | Some hd -> not (Name.Set.mem hd !ignored_symbols)
+         | Some hd -> not (Name.Set.mem hd st.ignored_symbols)
          | None -> false ->
     (* assert (T.is_fo_term lhs); *)
     let hd = T.head_exn lhs in
     let sign = L.is_positivoid lit in
-    let cands = find_candidates hd sign in
+    let cands = find_candidates env hd sign in
     if update_others then update_cand_lists hd sign clause cands;
     let task =
       { lit_idx; clause; cands = DEQ.of_list cands; heap_idx = init_heap_idx }
     in
-    task_store := TaskStore.add (lit_idx, clause) task !task_store;
-    TaskPriorityQueue.insert task_queue task
+    st.task_store <- TaskStore.add (lit_idx, clause) task st.task_store;
+    TaskPriorityQueue.insert st.task_queue task
   | _ -> ( (* equation literals do not represent tasks *) )
 
 (* Update all the bookeeping information when a new clause is introduced *)
 let add_clause env cl =
+  let st = Env.flex_get_of env k_state in
   try
-    if !logic == Unsupported then raise UnsupportedLogic;
+    if st.logic == Unsupported then raise UnsupportedLogic;
 
     scan_cl_lits env cl;
-    CCArray.iteri (fun lit_idx _ -> register_task lit_idx cl) (C.lits cl)
+    CCArray.iteri (fun lit_idx _ -> register_task env lit_idx cl) (C.lits cl)
   with UnsupportedLogic ->
-    refine_logic Unsupported;
-    TaskPriorityQueue.clear task_queue
+    refine_logic env Unsupported;
+    TaskPriorityQueue.clear st.task_queue
 
 (* remove the clause from symbol index *)
-let deregister_symbols cl =
+let deregister_symbols env cl =
+  let st = Env.flex_get_of env k_state in
   CCArray.iteri
     (fun _ lit ->
       match lit with
       | L.Equation (lhs, _, _)
         when L.is_predicate_lit lit && Option.is_some (T.head lhs) ->
-        ss_idx :=
+        st.ss_idx <-
           SymSignIdx.update
             (T.head_exn lhs, L.is_positivoid lit)
             (function
@@ -259,22 +285,24 @@ let deregister_symbols cl =
                 let new_ = C.ClauseSet.remove cl old in
                 CCOpt.return_if (not (C.ClauseSet.is_empty new_)) new_
               | None -> None (*already removed*))
-            !ss_idx
+            st.ss_idx
       | _ -> ())
     (C.lits cl)
 
-let lock_clause locker locked_task =
+let lock_clause env locker locked_task =
+  let st = Env.flex_get_of env k_state in
   assert (C.id locker == C.id (DEQ.peek_front locked_task.cands));
-  clause_lock :=
+  st.clause_lock <-
     Util.Int_map.update (C.id locker)
       (fun old_val ->
         let locked_tasks = CCOpt.get_or ~default:[] old_val in
         Some (locked_task :: locked_tasks))
-      !clause_lock
+      st.clause_lock
 
 (* If clause is removed from the active/passive set, then release
    the locks that it holds, and make all the locked clauses active *)
-let release_locks clause =
+let release_locks env clause =
+  let st = Env.flex_get_of env k_state in
   Util.debugf ~section 3 "clearing locks: @[%a@]@." (fun k -> k C.pp clause);
   try
     List.iter
@@ -285,17 +313,17 @@ let release_locks clause =
         assert (C.id locking_cl = C.id clause);
         Util.debugf ~section 3 " |@[%a@]|%d@." (fun k ->
             k C.pp task.clause task.lit_idx);
-        TaskPriorityQueue.insert task_queue task)
-      (Util.Int_map.find (C.id clause) !clause_lock);
-    clause_lock := Util.Int_map.remove (C.id clause) !clause_lock
+        TaskPriorityQueue.insert st.task_queue task)
+      (Util.Int_map.find (C.id clause) st.clause_lock);
+    st.clause_lock <- Util.Int_map.remove (C.id clause) st.clause_lock
   with Not_found ->
     (* clause was already removed *)
     ()
 
 (* remove the clause from the whole BCE tracking system *)
 let deregister_clause env clause =
-  deregister_symbols clause;
-  release_locks clause
+  deregister_symbols env clause;
+  release_locks env clause
 
 let remove_from_proof_state env clause =
   (try
@@ -461,7 +489,8 @@ let resolvent_is_valid_neq lit_idx orig_cl partner =
 
 (* checks whether all *flat* L-resolvents between orig_cl on literal with
    index lit_idx and partner are valid *using congruence closure algorithm*  *)
-let resolvent_is_valid_eq lit_idx orig_cl partner =
+let resolvent_is_valid_eq env lit_idx orig_cl partner =
+  let st = Env.flex_get_of env k_state in
   assert (lit_idx < C.length orig_cl);
   let sc_orig, sc_partner = 0, 1 in
   let renaming = Subst.Renaming.create () in
@@ -620,7 +649,7 @@ let resolvent_is_valid_eq lit_idx orig_cl partner =
            (* clause is not valid *)
            if CCList.is_empty congruent then
              false
-           else if !logic == EquationalHO then
+           else if st.logic == EquationalHO then
              (* for HOL, binary flat L-resolvents suffice *)
              true
            else (
@@ -648,15 +677,17 @@ let resolvent_is_valid_eq lit_idx orig_cl partner =
   in
   check_resolvents lit_idx orig_cl (split_partner orig_lhs orig_sign partner)
 
-let get_validity_checker () =
-  assert (!logic != Unsupported);
-  if !logic == NonequationalFO then
+let get_validity_checker env () =
+  let st = Env.flex_get_of env k_state in
+  assert (st.logic != Unsupported);
+  if st.logic == NonequationalFO then
     resolvent_is_valid_neq
   else
-    resolvent_is_valid_eq
+    resolvent_is_valid_eq env
 
 (* function that actually performs the blocked clause elimination *)
 let do_eliminate_blocked_clauses env =
+  let st = Env.flex_get_of env k_state in
   let removed_cnt = ref 0 in
 
   (* checks if each candidate stored in the task has valid L-resolvent.
@@ -688,7 +719,7 @@ let do_eliminate_blocked_clauses env =
              ))
            (C.lits cl))
     in
-    let validity_checker = get_validity_checker () in
+    let validity_checker = get_validity_checker env () in
 
     let rec task_is_blocked deq =
       DEQ.is_empty deq
@@ -705,7 +736,7 @@ let do_eliminate_blocked_clauses env =
         Util.debugf ~section 5 "maybe-invalid-res(@[%a@], @[%a@])@." (fun k ->
             k C.pp partner C.pp cl);
         DEQ.push_front deq partner;
-        lock_clause partner task;
+        lock_clause env partner task;
         false
       )
     in
@@ -713,9 +744,9 @@ let do_eliminate_blocked_clauses env =
     if
       (not (C.is_empty cl))
       && (not (C.is_redundant cl))
-      && (not (Name.Set.mem hd_sym !ignored_symbols))
+      && (not (Name.Set.mem hd_sym st.ignored_symbols))
       && Literals.is_polymorphism_safe lit_idx (C.lits cl)
-      && (!logic != EquationalHO || is_alone_with_polarity ())
+      && (st.logic != EquationalHO || is_alone_with_polarity ())
     then (
       Util.debugf ~section 3 "checking blockedness" CCFun.id;
       (* let original_partners = CCDeque.to_list task.cands in *)
@@ -731,24 +762,23 @@ let do_eliminate_blocked_clauses env =
       Util.debugf ~section 3 "ignoring %b %b %b" (fun k ->
           k (C.is_empty task.clause)
             (C.is_redundant task.clause)
-            (Name.Set.mem hd_sym !ignored_symbols))
+            (Name.Set.mem hd_sym st.ignored_symbols))
   in
 
   let module Q = TaskPriorityQueue in
-  while not (Q.is_empty task_queue) do
-    process_task (Q.remove_min task_queue)
+  while not (Q.is_empty st.task_queue) do
+    process_task (Q.remove_min st.task_queue)
   done;
 
   Util.debugf ~section 2 "bce removed %d clauses@." (fun k -> k !removed_cnt);
   !removed_cnt
 
-let steps = ref 0
-
 (* driver that does that every k-th step of given-clause loop *)
 let eliminate_blocked_clauses env =
-  steps := (!steps + 1) mod Env.flex_get_of env k_check_at;
+  let st = Env.flex_get_of env k_state in
+  st.steps <- (st.steps + 1) mod Env.flex_get_of env k_check_at;
 
-  if !steps = 0 then (
+  if st.steps = 0 then (
     let original_cls =
       Iter.to_list
         (Iter.append (Env.get_active env ()) (Env.get_passive env ()))
@@ -786,11 +816,13 @@ let do_bce_sat env () =
   )
 
 let eliminate_bce_sat env =
-  steps := (!steps + 1) mod Env.flex_get_of env k_check_at;
+  let st = Env.flex_get_of env k_state in
+  st.steps <- (st.steps + 1) mod Env.flex_get_of env k_check_at;
 
-  if !steps = 0 then do_bce_sat env ()
+  if st.steps = 0 then do_bce_sat env ()
 
 let initialize_regular env =
+  let st = Env.flex_get_of env k_state in
   let init_clauses =
     Clause.ClauseSet.to_list (Env.active_clauses env)
     @ Clause.ClauseSet.to_list (Env.passive_clauses env)
@@ -808,11 +840,11 @@ let initialize_regular env =
 
      Util.debugf ~section 1 "logic is %s@." (fun k ->
          k
-           (if !logic == NonequationalFO then
+           (if st.logic == NonequationalFO then
               "nonequational FO"
-            else if !logic == EquationalFO then
+            else if st.logic == EquationalFO then
               "equational FO"
-            else if !logic == EquationalHO then
+            else if st.logic == EquationalHO then
               "equational HO"
             else
               "unknown"));
@@ -821,7 +853,7 @@ let initialize_regular env =
      List.iter
        (fun cl ->
          CCArray.iteri
-           (fun lit_idx _ -> register_task ~update_others:false lit_idx cl)
+           (fun lit_idx _ -> register_task env ~update_others:false lit_idx cl)
            (C.lits cl))
        init_clauses;
      (* eliminate clauses *)
@@ -852,7 +884,7 @@ let initialize_regular env =
          in
          let remove_cl_sat cl =
            C.Tbl.remove (Env.flex_get_of env k_bce_sat_tracked) cl;
-           react_clause_removed cl
+           react_clause_removed env cl
          in
 
          Clause.ClauseSet.to_seq (Env.passive_clauses env)
@@ -899,29 +931,30 @@ let initialize_regular env =
    with UnsupportedLogic ->
      Util.debugf ~section 1 "logic is unsupported" CCFun.id;
      (* releasing possibly used memory *)
-     ss_idx := SymSignIdx.empty;
-     clause_lock := Util.Int_map.empty;
-     task_store := TaskStore.empty;
-     TaskPriorityQueue.clear task_queue);
+     st.ss_idx <- SymSignIdx.empty;
+     st.clause_lock <- Util.Int_map.empty;
+     st.task_store <- TaskStore.empty;
+     TaskPriorityQueue.clear st.task_queue);
   Signal.StopListening
-
-let fixpoint_active = ref false
 
 let begin_fixpoint env =
   Env.flex_ensure env k_max_symbol_occ (-1);
+  (* be self-sufficient, like the functor application was on master *)
+  Env.flex_ensure env k_state (new_state ());
+  let st = Env.flex_get_of env k_state in
 
   let init_clauses =
     Clause.ClauseSet.to_list (Env.active_clauses env)
     @ Clause.ClauseSet.to_list (Env.passive_clauses env)
   in
   try
-    fixpoint_active := true;
+    st.fixpoint_active <- true;
 
     List.iter (scan_cl_lits env) init_clauses;
     List.iter
       (fun cl ->
         CCArray.iteri
-          (fun lit_idx _ -> register_task ~update_others:false lit_idx cl)
+          (fun lit_idx _ -> register_task env ~update_others:false lit_idx cl)
           (C.lits cl))
       init_clauses;
     (* eliminate clauses *)
@@ -932,13 +965,13 @@ let begin_fixpoint env =
     CCFormat.printf "%% BCE start fixpoint: @[%d@]@." num_eliminated;
 
     Signal.on (Env.on_passive_add env) (fun c ->
-        if !fixpoint_active then (
+        if st.fixpoint_active then (
           react_clause_addded env c;
           Signal.ContinueListening
         ) else
           Signal.StopListening);
     Signal.on (Env.on_passive_remove env) (fun c ->
-        if !fixpoint_active then (
+        if st.fixpoint_active then (
           react_clause_removed env c;
           Signal.ContinueListening
         ) else
@@ -946,13 +979,14 @@ let begin_fixpoint env =
   with UnsupportedLogic ->
     Util.debugf ~section 2 "logic is unsupported" CCFun.id;
     (* releasing possibly used memory *)
-    ss_idx := SymSignIdx.empty;
-    clause_lock := Util.Int_map.empty;
-    task_store := TaskStore.empty;
-    TaskPriorityQueue.clear task_queue;
-    fixpoint_active := false
+    st.ss_idx <- SymSignIdx.empty;
+    st.clause_lock <- Util.Int_map.empty;
+    st.task_store <- TaskStore.empty;
+    TaskPriorityQueue.clear st.task_queue;
+    st.fixpoint_active <- false
 
 let fixpoint_step env =
+  Env.flex_ensure env k_state (new_state ());
   let num_eliminated = do_eliminate_blocked_clauses env in
   Util.debugf ~section 1 "Step eliminates %d clauses" (fun k ->
       k num_eliminated);
@@ -961,16 +995,22 @@ let fixpoint_step env =
   num_eliminated != 0
 
 let end_fixpoint env =
-  ss_idx := SymSignIdx.empty;
-  clause_lock := Util.Int_map.empty;
-  task_store := TaskStore.empty;
-  TaskPriorityQueue.clear task_queue;
-  fixpoint_active := false
+  Env.flex_ensure env k_state (new_state ());
+  let st = Env.flex_get_of env k_state in
+  st.ss_idx <- SymSignIdx.empty;
+  st.clause_lock <- Util.Int_map.empty;
+  st.task_store <- TaskStore.empty;
+  TaskPriorityQueue.clear st.task_queue;
+  st.fixpoint_active <- false
 
 let register env =
   Signal.on (Env.on_start env) (fun () -> initialize_regular env)
 
 let setup ?(in_fp_mode = false) env =
+  (* create the per-run state if it does not exist yet (e.g. when called from
+     the bce_pe_fixpoint extension, like the functor application did on
+     master) *)
+  Env.flex_ensure env k_state (new_state ());
   if Env.flex_get_of env k_enabled then (
     Env.flex_add_of env k_fp_mode in_fp_mode;
     if not (Env.flex_get_of env Avatar.k_avatar_enabled) then
@@ -981,6 +1021,10 @@ let setup ?(in_fp_mode = false) env =
 
 let extension =
   let action (env : Env.t) =
+    (* create the fresh per-run state for this environment (on master, the
+       [Make] functor was applied for every environment, re-initializing the
+       mutable state) *)
+    Env.flex_ensure env k_state (new_state ());
     Env.flex_ensure env k_enabled false;
     (* -1 stands for infinity *)
     Env.flex_ensure env k_max_symbol_occ (-1);
