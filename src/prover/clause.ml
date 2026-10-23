@@ -187,7 +187,7 @@ let update_trail f c =
 
 let proof_step c = c.proof
 let proof c = Proof.S.mk c.proof (SClause.mk_proof_res c.sclause)
-let proof_depth c = 0 (* not easily computable without modding Proof *)
+let proof_depth c = Proof.Step.inferences_performed (proof_step c)
 let proof_parent c = Proof.Parent.from (proof c)
 
 let proof_parent_subst renaming (c, sc) subst =
