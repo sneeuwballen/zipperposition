@@ -42,6 +42,7 @@ type t = {
   mutable fair_tries: int;
   ratio: int;
   guard: int;
+  clause_num: int;
   weight: Stream.t -> int;
       (* function that assigns an initial weight to a stream (based on what criteria?) *)
   mutable stm_nb: int;
@@ -51,7 +52,7 @@ type t = {
 
 (** generic stream queue based on some ordering on streams, given by a weight
     function *)
-let make ~guard ~ratio ~weight name =
+let make ~guard ~ratio ~clause_num ~weight name =
   if ratio < 0 then
     invalid_arg "StreamQueue.make: ratio must be greater or equal to 0";
   {
@@ -61,6 +62,7 @@ let make ~guard ~ratio ~weight name =
     time_before_fair = ratio;
     fair_tries = 0;
     guard;
+    clause_num;
     stm_nb = 0;
     hp = H.empty;
   }
@@ -192,7 +194,7 @@ let rec _take_nb q nb prev_res =
   )
 
 let clauses_to_take q =
-  let max_clause = -1 in
+  let max_clause = q.clause_num in
   if max_clause < 0 then
     q.stm_nb
   else
@@ -241,10 +243,10 @@ let take_stm_nb_fix_stm q =
 
 let name q = q.name
 
-let default () : t =
+let default ~guard ~ratio ~clause_num () : t =
   let open WeightFun in
   let weight = penalty in
-  make ~guard:1 ~ratio:1 ~weight "default"
+  make ~guard ~ratio ~clause_num ~weight "default"
 
 let pp out q = CCFormat.fprintf out "queue %s" (name q)
 let to_string = CCFormat.to_string pp

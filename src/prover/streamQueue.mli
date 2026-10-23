@@ -26,7 +26,14 @@ module WeightFun : sig
   val combine : (t * int) list -> t
 end
 
-val make : guard:int -> ratio:int -> weight:(Stream.t -> int) -> string -> t
+val make :
+  guard:int ->
+  ratio:int ->
+  clause_num:int ->
+  weight:(Stream.t -> int) ->
+  string ->
+  t
+
 val is_empty : t -> bool
 val length : t -> int
 val add : t -> Stream.t -> unit
@@ -36,6 +43,6 @@ val take_fair_anyway : t -> Clause.t option list
 val take_stm_nb : t -> Clause.t option list
 val take_stm_nb_fix_stm : t -> Clause.t option list
 val name : t -> string
-val default : unit -> t
+val default : guard:int -> ratio:int -> clause_num:int -> unit -> t
 val pp : t CCFormat.printer
 val to_string : t -> string

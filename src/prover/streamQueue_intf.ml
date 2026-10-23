@@ -65,7 +65,13 @@ module type S = sig
 
   (** {5 Available Queues} *)
 
-  val make : guard:int -> ratio:int -> weight:(Stm.t -> int) -> string -> t
+  val make :
+    guard:int ->
+    ratio:int ->
+    clause_num:int ->
+    weight:(Stm.t -> int) ->
+    string ->
+    t
   (** Creates a priority queue that uses [weight] to sort streams.
       @param ratio
         pick-given ratio. Only one in [ratio] truly returns a clause if there is
@@ -73,7 +79,7 @@ module type S = sig
         {!take_fair_anyway}.
       @param name the name of this stream queue *)
 
-  val default : unit -> t
+  val default : guard:int -> ratio:int -> clause_num:int -> unit -> t
   (** Obtain the default queue *)
 
   (** {5 IO} *)

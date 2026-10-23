@@ -165,7 +165,10 @@ module StrSet = CCSet.Make (String)
 let get_stm_queue env =
   match !(env.queue) with
   | None ->
-    env.queue := Some (StmQ.default ());
+    let guard = flex_get_of env StreamQueue.k_guard in
+    let ratio = flex_get_of env StreamQueue.k_ratio in
+    let clause_num = flex_get_of env StreamQueue.k_clause_num in
+    env.queue := Some (StmQ.default ~guard ~ratio ~clause_num ());
     CCOpt.get_exn !(env.queue)
   | Some q -> q
 
