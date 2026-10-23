@@ -8,7 +8,9 @@ module type S = sig
   module Ctx : module type of Ctx
   module C : Clause_intf.S with module Ctx = Ctx
 
-  val on_pred_skolem_introduction : (C.t * Term.t) Signal.t
+  val on_pred_skolem_introduction :
+    flex_ref:Flex_state.t ref -> (C.t * Term.t) Signal.t
+
   val init : Flex_state.t -> Flex_state.t
   val is_renaming_clause : flex_ref:Flex_state.t ref -> C.t -> bool
 
@@ -40,8 +42,17 @@ module Make (C : Clause_intf.S) = struct
     let compare (a1, c1) (a2, c2) = T.compare a1 a2
   end)
 
-  let on_pred_skolem_introduction : (C.t * Logtk.Term.t) Logtk.Signal.t =
-    Signal.create ()
+  let k_on_pred_skolem_introduction :
+      (C.t * Logtk.Term.t) Logtk.Signal.t Flex_state.key =
+    Flex_state.create_key ()
+
+  let on_pred_skolem_introduction ~flex_ref =
+    match Flex_state.get k_on_pred_skolem_introduction !flex_ref with
+    | Some s -> s
+    | None ->
+      let s = Signal.create () in
+      flex_ref := Flex_state.add k_on_pred_skolem_introduction s !flex_ref;
+      s
 
   type rename_state = {
     mutable skolem_idx: Idx.t;
@@ -59,9 +70,15 @@ module Make (C : Clause_intf.S) = struct
     }
 
   let init flex_state =
-    match Flex_state.get k_state flex_state with
+    let flex_state =
+      match Flex_state.get k_state flex_state with
+      | Some _ -> flex_state
+      | None -> Flex_state.add k_state (mk_rename_state ()) flex_state
+    in
+    match Flex_state.get k_on_pred_skolem_introduction flex_state with
     | Some _ -> flex_state
-    | None -> Flex_state.add k_state (mk_rename_state ()) flex_state
+    | None ->
+      Flex_state.add k_on_pred_skolem_introduction (Signal.create ()) flex_state
 
   let get_state (flex_ref : Flex_state.t ref) : rename_state =
     match Flex_state.get k_state !flex_ref with
@@ -232,7 +249,7 @@ module Make (C : Clause_intf.S) = struct
       let free_vars_l = T.VarSet.to_list (T.VarSet.of_iter free_vars) in
       let (id, ty), t = T.mk_fresh_skolem ~prefix:"sk" free_vars_l ret_ty in
       Ctx.declare (C.ctx_of parent) id ty;
-      Signal.send on_pred_skolem_introduction (parent, t);
+      Signal.send (on_pred_skolem_introduction ~flex_ref) (parent, t);
       t
     in
 

@@ -94,8 +94,37 @@ let test_cr_add =
         "CR_add keeps converting with the remaining rules" 2
         (CCVector.length sets.Clause.c_set) )
 
+let test_pred_skolem_signal_per_env =
+  ( "env.form_rename.pred_skolem_signal",
+    `Quick,
+    fun () ->
+      let flex_ref env = ref (Env.flex_state_of env) in
+      let env1 = mk_env () in
+      let env2 = mk_env () in
+      let s1 =
+        Env.FormRename.on_pred_skolem_introduction ~flex_ref:(flex_ref env1)
+      in
+      let s1' =
+        Env.FormRename.on_pred_skolem_introduction ~flex_ref:(flex_ref env1)
+      in
+      let s2 =
+        Env.FormRename.on_pred_skolem_introduction ~flex_ref:(flex_ref env2)
+      in
+      Alcotest.(check bool) "signal is stable per env" true (s1 == s1');
+      Alcotest.(check bool) "signal is distinct across envs" true (s1 != s2);
+      let fired = ref 0 in
+      Signal.on s1 (fun _ ->
+          incr fired;
+          Signal.StopListening);
+      Signal.send s2 (mk_clause env2, Term.true_);
+      Alcotest.(check int)
+        "handler from first env not fired by second env" 0 !fired;
+      Signal.send s1 (mk_clause env1, Term.true_);
+      Alcotest.(check int) "handler fires on its own env" 1 !fired )
+
 let suite =
   [
+    test_pred_skolem_signal_per_env;
     test_stm_queue_guard;
     test_stm_queue_ratio;
     test_stm_queue_clause_num;

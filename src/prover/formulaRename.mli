@@ -5,7 +5,8 @@ module type S = sig
   module Ctx : module type of Ctx
   module C : Clause_intf.S with module Ctx = Ctx
 
-  val on_pred_skolem_introduction : (C.t * Term.t) Signal.t
+  val on_pred_skolem_introduction :
+    flex_ref:Flex_state.t ref -> (C.t * Term.t) Signal.t
   (** this signal is raised when a predicate Skolem is introduced *)
 
   val init : Flex_state.t -> Flex_state.t

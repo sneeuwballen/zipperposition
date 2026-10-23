@@ -2181,7 +2181,9 @@ let setup env =
     then (
       Signal.on (Env.on_pred_var_elimination env) (fun (clause, var) ->
           handle_new_pred_var_clause env (clause, var));
-      Signal.on FR.on_pred_skolem_introduction (handle_new_skolem_sym env)
+      Signal.on
+        (FR.on_pred_skolem_introduction ~flex_ref:(ref (Env.flex_state_of env)))
+        (handle_new_skolem_sym env)
     );
     if Env.flex_get_of env k_trigger_bool_ind > 0 then
       Env.add_unary_inf env "trigger bool ind" trigger_induction;
