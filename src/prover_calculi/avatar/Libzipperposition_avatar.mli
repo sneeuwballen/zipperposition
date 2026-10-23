@@ -31,7 +31,7 @@ val split : Env.multi_simpl_rule
 val check_empty : Env.unary_inf_rule
 val before_check_sat : unit Signal.t
 val after_check_sat : unit Signal.t
-val filter_absurd_trails : (Trail.t -> bool) -> unit
+val filter_absurd_trails : Env.t -> (Trail.t -> bool) -> unit
 val check_satisfiability : Env.generate_rule
 
 type cut_res = private {
@@ -64,7 +64,7 @@ val introduce_cut :
   cut_res
 
 val add_prove_lemma :
-  (Env.t -> cut_res -> Clause.t list Env.conversion_result) -> unit
+  Env.t -> (Env.t -> cut_res -> Clause.t list Env.conversion_result) -> unit
 
 val add_lemma : Env.t -> cut_res -> unit
 val add_imply : Env.t -> cut_res list -> cut_res -> Proof.Step.t -> unit

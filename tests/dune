@@ -189,3 +189,26 @@
      %{dep:regressions/multi_input/ho2.p}))
    (system
     "awk '/SZS status/ { n++ } n == 2 && /fresh_sk1/ { bad = 1 } END { exit (n < 2 || bad) }' ho_state_multi.out"))))
+
+; Regression test: Avatar and induction state is per-Env. Two files using
+; splitting and induction in one CLI call must each be processed, and each
+; Env's lemma table must contain only its own input lemma. Guards rcmh.
+
+(rule
+ (alias runtest)
+ (targets avatar_multi.out)
+ (action
+  (progn
+   (with-outputs-to
+    avatar_multi.out
+    (run
+     %{bin:zipperposition}
+     --avatar=eager
+     --induction
+     --print-lemmas
+     %{dep:regressions/multi_input/avatar1.zf}
+     %{dep:regressions/multi_input/avatar2.zf}))
+   (system "test $(grep -c 'SZS status Theorem' avatar_multi.out) -eq 2")
+   (system "test $(grep -c ':reason in-input' avatar_multi.out) -eq 2")
+   (system
+    "awk '/SZS status/ { n++ } n == 2 && /avatar1.zf/ { bad = 1 } END { exit (n < 2 || bad) }' avatar_multi.out"))))

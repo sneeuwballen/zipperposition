@@ -946,11 +946,12 @@ let prove_cut_by_ind env (cut : Avatar.cut_res) : C.t list =
            coverset. *)
     CCList.flat_map (ind_on_vars env cut) clusters
 
-let new_lemma_ =
-  let n = ref 0 in
-  fun () ->
-    let s = Printf.sprintf "zip_lemma_%d" (CCRef.incr_then_get n) in
-    UntypedAST.(A_app ("name", [ A_quoted s ]))
+let k_lemma_counter : int ref Flex_state.key = Flex_state.create_key ()
+
+let new_lemma_ env =
+  let n = Env.flex_get_or_create ~init:(fun () -> ref 0) env k_lemma_counter in
+  let s = Printf.sprintf "zip_lemma_%d" (CCRef.incr_then_get n) in
+  UntypedAST.(A_app ("name", [ A_quoted s ]))
 
 (* prove any lemma that has inductive variables. First we try
      to generalize it, otherwise we prove it by induction *)
@@ -970,7 +971,7 @@ let inductions_on_lemma env (cut : Avatar.cut_res) : C.t list =
           List.map
             (fun g ->
               Avatar.introduce_cut env ~depth:(Avatar.cut_depth cut) g
-                (Proof.Step.lemma @@ Proof.Src.internal [ new_lemma_ () ])
+                (Proof.Step.lemma @@ Proof.Src.internal [ new_lemma_ env ])
                 ~reason:
                   Fmt.(
                     fun out () -> fprintf out "generalizing %a" Cut_form.pp g0))
@@ -1074,7 +1075,7 @@ let prove_by_ind env (clauses : C.t list) ~ignore_depth ~generalize_on : unit =
             "(@[<2>@{<green>prove_by_induction@}@ :clauses (@[%a@])@ :goal \
              %a@])" (fun k -> k (Util.pp_list C.pp) clauses Goal.pp goal);
           let proof =
-            Proof.Step.lemma @@ Proof.Src.internal [ new_lemma_ () ]
+            Proof.Step.lemma @@ Proof.Src.internal [ new_lemma_ env ]
           in
           (* new lemma has same penalty as the clauses *)
           let penalty = List.fold_left (fun n c -> n + C.penalty c) 0 clauses in
@@ -1197,7 +1198,7 @@ let register env =
   if Env.flex_get_of env Avatar.k_simplify_trail then
     Env.add_is_trivial_trail env trail_is_trivial_lemmas;
   (* try to prove lemmas by induction *)
-  Avatar.add_prove_lemma prove_lemma_by_ind;
+  Avatar.add_prove_lemma env prove_lemma_by_ind;
   ()
 
 let enabled_ = ref true

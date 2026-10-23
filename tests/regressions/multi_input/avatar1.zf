@@ -1,0 +1,16 @@
+# expect: unsat
+
+# not that easy…
+
+data unit := Unit.
+data nat := Z | S nat.
+data list a := Nil | Cons a (list a).
+
+def length : pi a. list a -> nat where
+  length (Nil _) = Z;
+  forall x l. length (Cons x l) = S (length l).
+
+lemma forall (l1 l2:list unit). length l1 != length l2 => l1 != l2.
+
+goal forall (l1 l2 : list unit). (length l1=length l2 => l1=l2).
+

@@ -17,7 +17,7 @@ module type S = sig
   val before_check_sat : unit Signal.t
   val after_check_sat : unit Signal.t
 
-  val filter_absurd_trails : (Trail.t -> bool) -> unit
+  val filter_absurd_trails : Env.t -> (Trail.t -> bool) -> unit
   (** [filter_trails f] calls [f] on every trail associated with the empty
       clause. If [f] returns [false], the trail is ignored, otherwise it's
       negated and sent to the SAT solver *)
@@ -65,13 +65,12 @@ module type S = sig
       @param reason some comment on why the lemma was added *)
 
   val add_prove_lemma :
-    (Env.t -> cut_res -> E.C.t list E.conversion_result) -> unit
+    Env.t -> (Env.t -> cut_res -> E.C.t list E.conversion_result) -> unit
   (** Add a mean of proving lemmas *)
 
   val add_lemma : Env.t -> cut_res -> unit
-  (** Add the given cut to the list of lemmas. Modifies the global list of
-      lemmas. It will call the functions added by {!add_prove_lemma} to try and
-      prove this one. *)
+  (** Add the given cut to the list of lemmas of [env]. It will call the
+      functions added by {!add_prove_lemma} to try and prove this one. *)
 
   val add_imply : Env.t -> cut_res list -> cut_res -> Proof.Step.t -> unit
   (** [add_imply env l res] means that the conjunction of lemmas in [l] implies

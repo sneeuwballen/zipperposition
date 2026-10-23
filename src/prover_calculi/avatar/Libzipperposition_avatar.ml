@@ -189,8 +189,10 @@ let split env c =
 
   res
 
-let filter_absurd_trails_ = ref (fun _ -> true)
-let filter_absurd_trails f = filter_absurd_trails_ := f
+let k_filter_absurd_trails : (Trail.t -> bool) Flex_state.key =
+  Flex_state.create_key ()
+
+let filter_absurd_trails env f = Env.flex_add_of env k_filter_absurd_trails f
 
 (* if c.lits = [], negate c.trail *)
 let check_empty env c =
@@ -198,7 +200,9 @@ let check_empty env c =
   if
     Array.length (C.lits c) = 0
     && (not (Trail.is_empty (C.trail c)))
-    && !filter_absurd_trails_ (C.trail c)
+    && Env.flex_get_or_create
+         ~init:(fun () -> fun _ -> true)
+         env k_filter_absurd_trails (C.trail c)
   then (
     assert (not (Trail.is_empty (C.trail c)));
     let b_clause = C.trail c |> Trail.to_list |> List.map Trail.Lit.neg in
@@ -385,8 +389,6 @@ let backward_simplify_trails env (_ : C.t) : C.ClauseSet.t =
   else
     C.ClauseSet.empty
 
-let skolem_count_ = ref 0
-
 type cut_res = {
   cut_form: Cut_form.t;  (** the lemma itself *)
   cut_pos: C.t list;  (** clauses true if lemma is true *)
@@ -459,22 +461,34 @@ let on_lemma : cut_res Signal.t = Signal.create ()
 
 module Lemma_tbl = BBox.Lit.Tbl
 
-(* map from [cut.cut_lit] to [cut] *)
-let all_lemmas_ : cut_res Lemma_tbl.t = Lemma_tbl.create 64
+type lemma_state = {
+  all_lemmas: cut_res Lemma_tbl.t;
+  mutable prove_lemma_handlers:
+    (Env.t -> cut_res -> C.t list Env.conversion_result) list;
+  mutable new_clauses_from_lemmas: C.t list;
+}
 
-let prove_lemma_handlers_ :
-    (Env.t -> cut_res -> C.t list Env.conversion_result) list ref =
-  ref []
+let k_lemma_state : lemma_state Flex_state.key = Flex_state.create_key ()
 
-let add_prove_lemma x = CCList.Ref.push prove_lemma_handlers_ x
+let lemma_state env =
+  Env.flex_get_or_create
+    ~init:(fun () ->
+      {
+        all_lemmas = Lemma_tbl.create 64;
+        prove_lemma_handlers = [];
+        new_clauses_from_lemmas = [];
+      })
+    env k_lemma_state
 
-(* clauses recently pushed while trying to prove lemmas *)
-let new_clauses_from_lemmas_ : C.t list ref = ref []
+let add_prove_lemma env x =
+  let st = lemma_state env in
+  st.prove_lemma_handlers <- x :: st.prove_lemma_handlers
 
 (* return the list of new lemmas *)
 let inf_new_lemmas env ~full:_ () =
-  let l = !new_clauses_from_lemmas_ in
-  new_clauses_from_lemmas_ := [];
+  let st = lemma_state env in
+  let l = st.new_clauses_from_lemmas in
+  st.new_clauses_from_lemmas <- [];
   l
 
 (* try to prove a lemma, by trying handlers one by one, or just skolemizing *)
@@ -524,16 +538,18 @@ let prove_lemma env (c : cut_res) : unit =
       | Env.CR_add cs -> aux (List.rev_append cs acc) tail)
   in
   (* add proof clauses to the positive clauses *)
-  let cs = aux (cut_pos c) !prove_lemma_handlers_ in
+  let st = lemma_state env in
+  let cs = aux (cut_pos c) st.prove_lemma_handlers in
   Util.debugf ~section 3 "(@[prove_lemma@ :lemma %a@ :clauses (@[<hv>%a@])@])"
     (fun k -> k Cut_form.pp (cut_form c) (Util.pp_list C.pp) cs);
-  CCList.Ref.push_list new_clauses_from_lemmas_ cs
+  st.new_clauses_from_lemmas <- List.rev_append cs st.new_clauses_from_lemmas
 
 let add_lemma env (c : cut_res) : unit =
-  if not (Lemma_tbl.mem all_lemmas_ c.cut_lit) then (
+  let st = lemma_state env in
+  if not (Lemma_tbl.mem st.all_lemmas c.cut_lit) then (
     Util.debugf ~section 2 "(@[<2>add_lemma@ :on `[@[<hv>%a@]]`@ :lit %a@])"
       (fun k -> k Cut_form.pp c.cut_form BBox.pp c.cut_lit);
-    Lemma_tbl.add all_lemmas_ c.cut_lit c;
+    Lemma_tbl.add st.all_lemmas c.cut_lit c;
     (* start a subproof for the lemma *)
     prove_lemma env c;
     Signal.send on_lemma c
@@ -551,8 +567,9 @@ let add_imply env (l : cut_res list) (res : cut_res) (p : Proof.Step.t) : unit =
   Sat_solver.add_clause (Env.flex_get_of env k_sat_solver) ~proof:p c;
   ()
 
-let lemma_seq : cut_res Iter.t =
- fun yield -> Lemma_tbl.iter (fun _ c -> yield c) all_lemmas_
+let lemma_seq env : cut_res Iter.t =
+  let st = lemma_state env in
+  fun yield -> Lemma_tbl.iter (fun _ c -> yield c) st.all_lemmas
 
 (* is this literal involved in the proof? *)
 let rec in_proof_of_ (p : Proof.t) (lit : BLit.t) : bool =
@@ -585,7 +602,7 @@ let print_lemmas env out () =
     Format.fprintf out "@[<4>@[<hv>@{<Green>*@} %s %a@]%a@]" status Cut_form.pp
       c.cut_form (Fmt.some pp_reason) c.cut_reason
   in
-  let l = lemma_seq |> Iter.to_rev_list in
+  let l = lemma_seq env |> Iter.to_rev_list in
   Format.fprintf out "@[<v2>lemmas (%d): {@ %a@,@]}" (List.length l)
     (Util.pp_list ~sep:"" pp_lemma)
     l;
