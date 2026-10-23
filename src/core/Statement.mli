@@ -202,8 +202,15 @@ val scan_stmt_for_ind_ty : clause_t -> unit
 val scan_simple_stmt_for_ind_ty : input_t -> unit
 (** Same as {!scan_stmt} but on earlier statements *)
 
+type def_sym_cache
+
+val create_def_sym_cache : unit -> def_sym_cache
+
 val get_rw_rule :
-  ?weight_incr:int -> clause_t -> (Name.Set.elt * Rewrite.rule) option
+  ?weight_incr:int ->
+  cache:def_sym_cache ->
+  clause_t ->
+  (Name.Set.elt * Rewrite.rule) option
 
 val get_formulas_from_defs : ('a, _, _) t -> 'a CCList.t
 

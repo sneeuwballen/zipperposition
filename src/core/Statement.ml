@@ -1140,10 +1140,11 @@ let scan_simple_stmt_for_ind_ty st =
       l
   | _ -> ()
 
-(** TODO: Ask Simon how to hide this in the fun *)
-let def_sym = ref IdMap.empty
+type def_sym_cache = (Term.t * (Name.t * Rewrite.rule) option) IdMap.t ref
 
-let get_rw_rule ?weight_incr:(w_i = 1000000) c =
+let create_def_sym_cache () : def_sym_cache = ref IdMap.empty
+
+let get_rw_rule ?weight_incr:(w_i = 1000000) ~cache c =
   let distinct_free_vars l =
     l
     |> List.map (fun t ->
@@ -1195,7 +1196,7 @@ let get_rw_rule ?weight_incr:(w_i = 1000000) c =
     then (
       (* Here I skipped proof object creation *)
       let res_rw = Some (sym, make_rw sym vars rhs) in
-      def_sym := IdMap.add sym (rhs, res_rw) !def_sym;
+      cache := IdMap.add sym (rhs, res_rw) !cache;
       res_rw
     ) else
       None
@@ -1207,7 +1208,7 @@ let get_rw_rule ?weight_incr:(w_i = 1000000) c =
     let hd, l = Term.as_app reduced in
     if Term.is_const hd && distinct_free_vars l && Type.is_fun (Term.ty hd) then (
       let sym = Term.as_const_exn hd in
-      match IdMap.find_opt sym !def_sym with
+      match IdMap.find_opt sym !cache with
       | Some (rhs, rw_rule) ->
         let rhs = Lambda.eta_reduce rhs in
         if not (Unif.FO.are_variant rhs t2') then

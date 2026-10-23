@@ -43,6 +43,7 @@ let k_elim_andrews_eq = Flex_state.create_key ()
 let k_elim_andrews_eq_simpl = Flex_state.create_key ()
 let k_prune_arg_fun = Flex_state.create_key ()
 let k_prim_enum_terms = Flex_state.create_key ()
+let k_def_sym_cache = Flex_state.create_key ()
 let k_simple_projection = Flex_state.create_key ()
 let k_simple_projection_md = Flex_state.create_key ()
 let k_check_lambda_free = Flex_state.create_key ()
@@ -2754,7 +2755,13 @@ let setup env =
     (* removing unfolded clauses *)
     if Env.flex_get_of env k_enable_def_unfold then
       Env.add_clause_conversion env (fun _env c ->
-          match Statement.get_rw_rule c with
+          match
+            Statement.get_rw_rule
+              ~cache:
+                (Env.flex_get_or_create ~init:Statement.create_def_sym_cache env
+                   k_def_sym_cache)
+              c
+          with
           | Some _ -> Env.CR_drop
           | None -> Env.CR_skip);
 
@@ -2926,12 +2933,17 @@ let extension =
   and check_ho vec state =
     let is_ho = CCVector.to_iter vec |> Iter.exists st_contains_ho in
     if is_ho then Util.debug ~section 2 "problem is HO";
+    let def_sym_cache =
+      match Flex_state.get k_def_sym_cache state with
+      | Some c -> c
+      | None -> Statement.create_def_sym_cache ()
+    in
 
     if !def_unfold_enabled_ then
       (* let new_vec = *)
       CCVector.iter
         (fun c ->
-          match Statement.get_rw_rule c with
+          match Statement.get_rw_rule ~cache:def_sym_cache c with
           | Some (sym, r) ->
             Util.debugf ~section 1 "@[<2> Adding constant def rule: `@[%a@]`@]"
               (fun k -> k Rewrite.Rule.pp r);
@@ -2940,6 +2952,7 @@ let extension =
         vec (*vec in*);
 
     state
+    |> Flex_state.add k_def_sym_cache def_sym_cache
     |> Flex_state.add k_some_ho is_ho
     |> Flex_state.add k_enabled !enabled_
     |> Flex_state.add k_enable_def_unfold !def_unfold_enabled_
