@@ -137,6 +137,28 @@
    (system "test $(grep -c 'SZS status' datatype_multi.out) -eq 2")
    (system "! grep -q 'already declared' datatype_multi.out"))))
 
+; Regression test: the inductive-constant counter is reset per file.
+; Processing the same induction problem twice in one CLI call must number
+; generated inductive constants from scratch in each file. Guards 4w1m.
+
+(rule
+ (alias runtest)
+ (package zipperposition)
+ (targets ind_cst_multi.out)
+ (action
+  (progn
+   (with-outputs-to
+    ind_cst_multi.out
+    (run
+     %{bin:zipperposition}
+     --avatar=eager
+     --induction
+     --print-lemmas
+     %{dep:regressions/multi_input/avatar1.zf}
+     %{dep:regressions/multi_input/avatar1.zf}))
+   (system
+    "awk '/SZS status/ { n++; next } n == 1 && !a && match($0, /#[A-Za-z0-9_]+/) { a = substr($0, RSTART, RLENGTH) } n == 2 && !b && match($0, /#[A-Za-z0-9_]+/) { b = substr($0, RSTART, RLENGTH) } END { exit !(n == 2 && length(a) > 0 && a == b) }' ind_cst_multi.out"))))
+
 ; Regression test: enum type state is per-Env. Two files declaring the same
 ; type name with different cases must each use their own declaration. Guards 2d89.
 
