@@ -801,22 +801,20 @@ let convert_input_statements_env env stmts : C.t Clause.sets =
     | [] when is_lemma_ st ->
       Util.warnf "@[drop lemma `%a`@]" Statement.pp_clause st;
       []
-    | [] ->
-      let clauses = C.of_statement ~ctx:env.ctx st in
-      let c_sos_list = [] in
-      List.iter (fun cl -> CCVector.push c_sos cl) c_sos_list;
-      clauses
+    | [] -> C.of_statement ~ctx:env.ctx st
     | r :: rules' ->
       (match r env st with
       | CR_skip -> conv_clause_ rules' st
       | CR_drop -> []
-      | CR_add l -> l
+      | CR_add l -> List.rev_append l (conv_clause_ rules' st)
       | CR_return l -> l)
   in
   CCVector.iter
     (fun st ->
       let l = conv_clause_ env.clause_conversion_rules st in
-      List.iter (fun cl -> CCVector.push c_set cl) l)
+      match Statement.view st with
+      | Statement.Assert _ when has_sos_attr st -> CCVector.append_list c_sos l
+      | _ -> CCVector.append_list c_set l)
     stmts;
   Util.debugf ~section 1 "cnf: got %d + %d clauses" (fun k ->
       k (CCVector.length c_set) (CCVector.length c_sos));
