@@ -221,7 +221,13 @@ let disjointness _env lit =
   | _ -> None
 
 (* all ground terms for which we already applied the exhaustiveness inf *)
-let exhaustiveness_tbl_ : unit T.Tbl.t = T.Tbl.create 128
+let k_exhaustiveness_tbl : unit T.Tbl.t Flex_state.key =
+  Flex_state.create_key ()
+
+let exhaustiveness_tbl env =
+  Env.flex_get_or_create
+    ~init:(fun () -> T.Tbl.create 128)
+    env k_exhaustiveness_tbl
 
 (* purely made of cstors and skolems and undefined constants *)
 let rec pure_value (t : term) : bool =
@@ -309,6 +315,7 @@ let exhaustiveness env (c : C.t) : C.t list =
           (not (Ind_ty.is_recursive ity)) && pure_value t)
   in
   (* find terms to instantiate exhaustiveness for, and do it *)
+  let exhaustiveness_tbl = exhaustiveness_tbl env in
   let eligible = C.Eligible.(res c ** neg) in
   C.lits c |> Iter.of_array_i
   |> Iter.filter_map (fun (i, lit) ->
@@ -320,10 +327,10 @@ let exhaustiveness env (c : C.t) : C.t list =
   |> Iter.flat_map find_terms
   (* remove cstor-headed terms *)
   |> Iter.filter (fun t ->
-      (not (is_cstor_app t)) && not (T.Tbl.mem exhaustiveness_tbl_ t))
+      (not (is_cstor_app t)) && not (T.Tbl.mem exhaustiveness_tbl t))
   |> T.Set.of_iter |> T.Set.to_list
   |> List.rev_map (fun t ->
-      T.Tbl.add exhaustiveness_tbl_ t ();
+      T.Tbl.add exhaustiveness_tbl t ();
       let ax = make_axiom t in
       ax)
 

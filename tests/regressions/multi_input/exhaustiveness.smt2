@@ -1,0 +1,5 @@
+(declare-datatypes () ((Color (Red) (Blue))))
+(declare-fun c () Color)
+(assert (not (= c Red)))
+(assert (not (= c Blue)))
+(check-sat)

@@ -406,3 +406,24 @@
      --dont-simplify
      %{dep:regressions/multi_input/easy1.p}))
    (run grep -q "SZS status Theorem" dont_simplify.out))))
+
+; Regression test: inductive-types exhaustiveness state is per-Env. The same
+; file twice in one CLI call must instantiate exhaustiveness in both Envs,
+; rather than the second file reusing the first file's table and giving up.
+; Guards 5ryw.
+
+(rule
+ (alias runtest)
+ (package zipperposition)
+ (targets exhaustiveness_multi.out)
+ (action
+  (progn
+   (with-outputs-to
+    exhaustiveness_multi.out
+    (run
+     %{bin:zipperposition}
+     --check
+     %{dep:regressions/multi_input/exhaustiveness.smt2}
+     %{dep:regressions/multi_input/exhaustiveness.smt2}))
+   (system
+    "test $(grep -c 'SZS status Unsatisfiable' exhaustiveness_multi.out) -eq 2"))))
