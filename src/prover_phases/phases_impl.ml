@@ -116,7 +116,6 @@ let apply_modifiers ~field o =
 let start_file (st_ref : Phases.State.t ref) file =
   let@ () = Phases.with_phase st_ref Phases.Start_file in
   Name_payload.clear ();
-  Ind_cst.reset ();
   Util.debugf ~section 2 "@[@{<Yellow>### process file@ `%s` ###@}@]" (fun k ->
       k file);
   do_extensions ~field:(fun e -> e.Extensions.start_file_actions) ~x:file st_ref

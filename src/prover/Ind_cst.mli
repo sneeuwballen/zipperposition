@@ -28,7 +28,6 @@ val on_new_cst : t Signal.t
 (** Triggered with new inductive constants *)
 
 val make_skolem : Type.t -> Name.t
-val reset : unit -> unit
 
 val make : ?depth:int -> is_sub:bool -> Type.t -> t
 (** Make a new constant of the given type *)

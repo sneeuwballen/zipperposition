@@ -74,7 +74,6 @@ let id_is_sub id = id_as_cst id |> CCOpt.map_or ~default:false is_sub
 (** {5 Creation of Coverset and Cst} *)
 
 let n_ = ref 0
-let reset () = n_ := 0
 
 let make_skolem ty : Name.t =
   let c = Name.makef "#%s_%d" (Type.mangle ty) !n_ in
