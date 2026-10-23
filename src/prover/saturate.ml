@@ -14,6 +14,7 @@ let stat_processed_given = Util.mk_stat "saturate.processed given clauses"
 let stat_steps = Util.mk_stat "saturate.steps"
 let section = Util.Section.make ~parent:Const.section "saturate"
 let k_abort_after_fragment_check = Flex_state.create_key ()
+let k_e_call_point : float Flex_state.key = Flex_state.create_key ()
 
 let check_timeout = function
   | None -> false
@@ -39,8 +40,11 @@ module State = struct
     match timeout with
     | Some timeout when CCOpt.is_some (Env.params_of env).Params.e_path ->
       let st = get env in
+      let e_call_point =
+        Env.flex_get_or_create ~init:(fun () -> 0.2) env k_e_call_point
+      in
       let passed = Util.total_time_s () in
-      if (not st.tried_e) && passed > 0.2 *. timeout then (
+      if (not st.tried_e) && passed > e_call_point *. timeout then (
         st.tried_e <- true;
         true
       ) else
@@ -373,13 +377,17 @@ let () =
       ( "--disable-e",
         Arg.Unit (fun () -> Params.Cli.set_e_path None),
         " disable E background reasoner" );
-      ( "--e-call-point",
-        Arg.Float
-          (fun v ->
-            if v > 1.0 || v < 0.0 then
-              invalid_arg "0 <= e-call-point <= 1.0"
-            else
-              ()
-            (* e-call-point is now a hard-coded constant (0.2) *)),
-        " deprecated: e-call-point is now a fixed constant (0.2) " );
     ]
+
+let () =
+  Params.add_flex_opts (fun ~flex_ref ->
+      [
+        ( "--e-call-point",
+          Arg.Float
+            (fun v ->
+              if v > 1.0 || v < 0.0 then
+                invalid_arg "0 <= e-call-point <= 1.0"
+              else
+                flex_ref := Flex_state.add k_e_call_point v !flex_ref),
+          " point in the runtime when E is called in range 0.0 to 1.0 " );
+      ])
