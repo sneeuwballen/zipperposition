@@ -14,7 +14,7 @@
 
 (rule
  (alias runtest)
- (package logtk)
+ (package libzipperposition)
  (locks /tlock)
  (deps run_tests.exe)
  (action
@@ -25,6 +25,7 @@
 
 (rule
  (alias runtest)
+ (package zipperposition)
  (action
   (run
    %{bin:zipperposition}
@@ -37,6 +38,7 @@
 
 (rule
  (alias runtest)
+ (package zipperposition)
  (targets queue_ctx_multi.out)
  (action
   (progn
@@ -61,6 +63,7 @@
 
 (rule
  (alias runtest)
+ (package zipperposition)
  (targets lambda_free.out)
  (action
   (progn
@@ -78,6 +81,7 @@
 
 (rule
  (alias runtest)
+ (package zipperposition)
  (targets progress.out no_progress.out)
  (action
   (progn
@@ -99,6 +103,7 @@
 
 (rule
  (alias runtest)
+ (package zipperposition)
  (targets ac_multi.out)
  (action
   (progn
@@ -118,6 +123,7 @@
 
 (rule
  (alias runtest)
+ (package zipperposition)
  (targets datatype_multi.out)
  (action
   (progn
@@ -136,6 +142,7 @@
 
 (rule
  (alias runtest)
+ (package zipperposition)
  (targets enum_multi.out)
  (action
   (progn
@@ -154,6 +161,7 @@
 
 (rule
  (alias runtest)
+ (package zipperposition)
  (targets lambda_multi.out)
  (action
   (progn
@@ -176,6 +184,7 @@
 
 (rule
  (alias runtest)
+ (package zipperposition)
  (targets ho_state_multi.out)
  (action
   (progn
@@ -196,6 +205,7 @@
 
 (rule
  (alias runtest)
+ (package zipperposition)
  (targets avatar_multi.out)
  (action
   (progn
@@ -218,6 +228,7 @@
 
 (rule
  (alias runtest)
+ (package zipperposition)
  (targets bce_pe_fixpoint.out)
  (action
   (progn
@@ -241,6 +252,7 @@
 
 (rule
  (alias runtest)
+ (package zipperposition)
  (targets bce_pe_fixpoint_inprocessing.out)
  (action
   (progn
@@ -267,6 +279,7 @@
 
 (rule
  (alias runtest)
+ (package zipperposition)
  (targets queue_init.out)
  (action
   (progn
@@ -284,6 +297,7 @@
 
 (rule
  (alias runtest)
+ (package zipperposition)
  (targets queue_rel_lvl_multi.out)
  (deps
   regressions/multi_input/enum1.p
@@ -304,6 +318,7 @@
 
 (rule
  (alias runtest)
+ (package zipperposition)
  (targets sat_log.out sat_log.log)
  (action
   (progn
@@ -320,6 +335,7 @@
 
 (rule
  (alias runtest)
+ (package zipperposition)
  (targets max_vars_flags.out)
  (action
   (progn
@@ -336,6 +352,7 @@
 
 (rule
  (alias runtest)
+ (package zipperposition)
  (targets rw_ctx_flags.out)
  (action
   (progn
@@ -352,6 +369,7 @@
 
 (rule
  (alias runtest)
+ (package zipperposition)
  (targets dont_simplify.out)
  (action
   (progn
