@@ -26,13 +26,13 @@ let reg_thf_clause = Str.regexp "thf(zip_cl_\\([0-9]+\\),.*"
 module IntSet = CCSet.Make (CCInt)
 
 let ( ==> ) = Type.( ==> )
-let init_clauses = ref C.ClauseSet.empty
+let k_init_clauses : C.ClauseSet.t Flex_state.key = Flex_state.create_key ()
 
 let initialize env =
-  init_clauses :=
-    Iter.fold
-      (fun set cl -> C.ClauseSet.add cl set)
-      C.ClauseSet.empty (Env.get_passive env ())
+  Env.flex_add_of env k_init_clauses
+    (Iter.fold
+       (fun set cl -> C.ClauseSet.add cl set)
+       C.ClauseSet.empty (Env.get_passive env ()))
 
 exception CantEncode of string
 
@@ -257,7 +257,10 @@ let try_e env active_set passive_set =
 
   let take_initial ~converter () =
     let module CS = C.ClauseSet in
-    CS.filter (fun c -> not (lambdas_too_deep c)) !init_clauses
+    let init_clauses =
+      Env.flex_get_or_create ~init:(fun () -> CS.empty) env k_init_clauses
+    in
+    CS.filter (fun c -> not (lambdas_too_deep c)) init_clauses
     |> CS.to_seq |> Iter.of_seq
     |> convert_clauses ~converter ~encoded_symbols:T.Map.empty
   in
