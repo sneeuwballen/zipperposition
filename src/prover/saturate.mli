@@ -18,6 +18,10 @@ type szs_status =
 
 val k_abort_after_fragment_check : bool Flex_state.key
 
+val setup : Env.t -> unit
+(** Register the [on_start] hooks; must run before the signal is sent.
+    Idempotent. *)
+
 val given_clause_step :
   Params.t -> Env.t -> ?generating:bool -> int -> szs_status
 (** Perform one step of the given clause algorithm. It performs generating

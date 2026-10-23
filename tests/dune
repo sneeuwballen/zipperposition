@@ -30,3 +30,20 @@
    %{bin:zipperposition}
    %{dep:regressions/multi_input/easy1.p}
    %{dep:regressions/multi_input/easy2.p})))
+
+; Regression test: `--check-lambda-free=only` runs the fragment check at
+; [on_start] and prints its verdict, i.e. the hook is registered before the
+; signal is sent. Guards q3qh.
+
+(rule
+ (alias runtest)
+ (targets lambda_free.out)
+ (action
+  (progn
+   (with-outputs-to
+    %{targets}
+    (run
+     %{bin:zipperposition}
+     --check-lambda-free=only
+     %{dep:regressions/lambda_free/lambda.p}))
+   (run grep -q "Problem in fragment" %{targets}))))

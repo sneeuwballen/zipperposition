@@ -297,6 +297,7 @@ let make_env (st_ref : Phases.State.t ref) ~ctx ~params stmts =
   let env = Env.create ~params ~flex_state:state ~ctx () in
   Extensions.extensions ()
   |> List.iter (fun e -> List.iter (fun f -> f env) e.Extensions.env_actions);
+  Saturate.setup env;
   let c_sets = Env.convert_input_statements_env env stmts in
   CCVector.to_iter c_sets.Clause.c_set
   |> Iter.iter (fun c -> OuterEnv.add_passive env (Iter.singleton c));

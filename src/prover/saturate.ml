@@ -104,12 +104,13 @@ let register_conjectures env =
   let q = (Env.proof_state env).passive#queue in
   Env.get_passive env () |> Iter.iter (ClauseQueue.register_conjecture_clause q)
 
-let setup_once env =
+let setup env =
   let st = State.get env in
   if st.setup_done then
     ()
   else (
     st.setup_done <- true;
+    State.ensure_e_setup env;
     Signal.on_every (Env.on_start env) (fun () -> check_fragment env);
     Signal.on_every (Env.on_start env) (fun () -> register_conjectures env)
   )
@@ -304,7 +305,7 @@ let given_clause_step (params : Params.t) env ?(generating = true) num =
       ))
 
 let given_clause env ?(generating = true) ?steps ?timeout () =
-  setup_once env;
+  setup env;
   let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "saturate.given-clause-algo" in
   let params = Env.params_of env in
   (match params.Params.e_path with
@@ -341,7 +342,7 @@ let given_clause env ?(generating = true) ?steps ?timeout () =
   do_step 0
 
 let presaturate env =
-  setup_once env;
+  setup env;
   given_clause env ?steps:None ?timeout:None ~generating:false ()
 
 let () =
