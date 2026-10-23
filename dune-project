@@ -30,12 +30,7 @@
   (alcotest :with-test)
   (qcheck-core (and :with-test (>= "0.9")))
   (qcheck-alcotest (and :with-test (>= "0.9"))))
- (depopts
-  msat
-  trace-tef
-  tracy-client)
  (conflicts
-  (msat (or (< "0.8.1") (>= "0.10")))
   (zarith (< "1.7"))))
 
 (package
@@ -69,7 +64,10 @@
   (iter (>= "1.2"))
   oseq
   (menhir (and (>= "20180523") :build))
-  (msat (and (>= "0.8") (< "0.10")))))
+  (msat (and (>= "0.8") (< "0.10"))))
+ (depopts
+  trace-tef
+  tracy-client))
 
 (package
  (name zipperposition-tools)

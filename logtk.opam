@@ -32,9 +32,7 @@ depends: [
   "qcheck-alcotest" {with-test & >= "0.9"}
   "odoc" {with-doc}
 ]
-depopts: ["msat" "trace-tef" "tracy-client"]
 conflicts: [
-  "msat" {< "0.8.1" | >= "0.10"}
   "zarith" {< "1.7"}
 ]
 build: [

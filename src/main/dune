@@ -16,6 +16,6 @@
   (select
    setup_trace.ml
    from
-   (tracy-client tracy-client.trace -> setup_trace.tracy.ml)
    (trace-tef -> setup_trace.tef.ml)
+   (tracy-client tracy-client.trace -> setup_trace.tracy.ml)
    (-> setup_trace.dummy.ml))))
