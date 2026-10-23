@@ -217,21 +217,21 @@ module Make_goal = struct
               in
               new_c
               |> Iter.filter_map (fun new_c ->
-                     let new_c, _ = Env.unary_simplify env new_c in
-                     (* discard trivial/conditional clauses, or clauses coming
+                  let new_c, _ = Env.unary_simplify env new_c in
+                  (* discard trivial/conditional clauses, or clauses coming
                       from goals (as they might be true lemmas but contradict
                       the negated goal, which makes them even more useful);
                       also scan for empty clauses *)
-                     if C.comes_from_goal new_c then
-                       None
-                     else if not (Trail.is_empty (C.trail new_c)) then
-                       None
-                     else if Env.is_trivial env new_c then
-                       None
-                     else if C.is_empty new_c then
-                       raise (Yield_false new_c)
-                     else
-                       Some new_c)
+                  if C.comes_from_goal new_c then
+                    None
+                  else if not (Trail.is_empty (C.trail new_c)) then
+                    None
+                  else if Env.is_trivial env new_c then
+                    None
+                  else if C.is_empty new_c then
+                    raise (Yield_false new_c)
+                  else
+                    Some new_c)
               |> Iter.iter (fun c -> ignore @@ push_c c)
             )
           )
@@ -416,13 +416,13 @@ let scan_terms ~mode (seq : term Iter.t) : Ind_cst.ind_skolem list =
   seq
   |> Iter.flat_map Ind_cst.find_ind_skolems
   |> Iter.filter (fun (id, _) ->
-         match Ind_cst.id_as_cst id, mode with
-         | None, _ -> true
-         | Some _, `All -> true
-         | Some c, `No_sub_cst ->
-           (* do not generalize on sub-constants,
+      match Ind_cst.id_as_cst id, mode with
+      | None, _ -> true
+      | Some _, `All -> true
+      | Some c, `No_sub_cst ->
+        (* do not generalize on sub-constants,
                 there are induction hypothesis on them that we will need *)
-           not (Ind_cst.is_sub c))
+        not (Ind_cst.is_sub c))
   |> Iter.to_rev_list
   |> CCList.sort_uniq ~cmp:Ind_cst.ind_skolem_compare
 
@@ -476,10 +476,10 @@ let ind_on_vars env (cut : Avatar.cut_res) (vars : T.var list) : C.t list =
     |> (fun set -> T.VarSet.diff set (T.VarSet.of_list vars))
     |> T.VarSet.to_list
     |> List.map (fun v ->
-           let ty_v = HVar.ty v in
-           let id = Ind_cst.make_skolem ty_v in
-           Ctx.declare (Env.get_ctx env) id ty_v;
-           (v, 0), (T.const ~ty:ty_v id, 1))
+        let ty_v = HVar.ty v in
+        let id = Ind_cst.make_skolem ty_v in
+        Ctx.declare (Env.get_ctx env) id ty_v;
+        (v, 0), (T.const ~ty:ty_v id, 1))
     |> Subst.FO.of_list' ?init:None
   in
   (* make cover-sets for the variables, for the {b skolemized} type *)
@@ -509,75 +509,72 @@ let ind_on_vars env (cut : Avatar.cut_res) (vars : T.var list) : C.t list =
         |> Iter.to_list
         |> List.map (fun case -> [ v, case ]))
     |> CCList.flat_map (fun (cases : (T.var * Cover_set.case) list) ->
-           assert (cases <> []);
-           (* literal for this case *)
-           let b_lit_case = BBox.inject_case ~flex_ref (List.map snd cases) in
-           CCList.Ref.push b_lits b_lit_case;
-           (* clauses [goal[v := t'] <- b_lit(case), ¬cut.blit]
+        assert (cases <> []);
+        (* literal for this case *)
+        let b_lit_case = BBox.inject_case ~flex_ref (List.map snd cases) in
+        CCList.Ref.push b_lits b_lit_case;
+        (* clauses [goal[v := t'] <- b_lit(case), ¬cut.blit]
               for every [t'] sub-constant of [case] *)
-           let pos_clauses =
-             Util.seq_map_l cases ~f:(fun (v, case) ->
-                 Cover_set.Case.sub_constants case
-                 |> CCList.filter_map (fun sub_cst ->
-                        (* only keep sub-constants that have the same type as [v] *)
-                        if Type.equal (Ind_cst.ty sub_cst) (HVar.ty v) then (
-                          let t = Ind_cst.to_term sub_cst in
-                          Some (v, t)
-                        ) else
-                          None))
-             |> Iter.flat_map_l (fun v_and_t_list ->
-                    let subst =
-                      v_and_t_list
-                      |> List.map (fun (v, t) -> (v, 0), (t, 1))
-                      |> Subst.FO.of_list' ?init:None
-                    in
-                    let renaming = Subst.Renaming.create () in
-                    let g' = Cut_form.apply_subst renaming subst (g, 0) in
-                    Cut_form.cs g'
-                    |> List.map (fun lits ->
-                           let trail =
-                             [ b_lit_case; BoolLit.neg cut_blit ]
-                             |> Trail.of_list
-                           in
-                           C.create_a ~ctx:(Env.get_ctx env) lits proof ~trail
-                             ~penalty:1))
-             |> Iter.to_list
-           in
-           (* clauses [CNF[¬goal[case]) <- b_lit(case), ¬cut.blit] with
+        let pos_clauses =
+          Util.seq_map_l cases ~f:(fun (v, case) ->
+              Cover_set.Case.sub_constants case
+              |> CCList.filter_map (fun sub_cst ->
+                  (* only keep sub-constants that have the same type as [v] *)
+                  if Type.equal (Ind_cst.ty sub_cst) (HVar.ty v) then (
+                    let t = Ind_cst.to_term sub_cst in
+                    Some (v, t)
+                  ) else
+                    None))
+          |> Iter.flat_map_l (fun v_and_t_list ->
+              let subst =
+                v_and_t_list
+                |> List.map (fun (v, t) -> (v, 0), (t, 1))
+                |> Subst.FO.of_list' ?init:None
+              in
+              let renaming = Subst.Renaming.create () in
+              let g' = Cut_form.apply_subst renaming subst (g, 0) in
+              Cut_form.cs g'
+              |> List.map (fun lits ->
+                  let trail =
+                    [ b_lit_case; BoolLit.neg cut_blit ] |> Trail.of_list
+                  in
+                  C.create_a ~ctx:(Env.get_ctx env) lits proof ~trail ~penalty:1))
+          |> Iter.to_list
+        in
+        (* clauses [CNF[¬goal[case]) <- b_lit(case), ¬cut.blit] with
               other variables being replaced by skolem symbols *)
-           let neg_clauses =
-             let subst =
-               cases
-               |> List.map (fun (v, c) -> (v, 0), (Cover_set.Case.to_term c, 1))
-               |> Subst.FO.of_list' ~init:subst_skolems
-             in
-             let renaming = Subst.Renaming.create () in
-             (* for each clause, apply [subst] to it and negate its
+        let neg_clauses =
+          let subst =
+            cases
+            |> List.map (fun (v, c) -> (v, 0), (Cover_set.Case.to_term c, 1))
+            |> Subst.FO.of_list' ~init:subst_skolems
+          in
+          let renaming = Subst.Renaming.create () in
+          (* for each clause, apply [subst] to it and negate its
                 literals, obtaining a DNF of [¬ And_i ctx_i[case]];
                 then turn DNF into CNF *)
-             Cut_form.apply_subst renaming subst (g, 0)
-             |> Cut_form.cs
-             |> Util.map_product ~f:(fun lits ->
-                    let lits = Array.map (fun l -> [ Literal.negate l ]) lits in
-                    Array.to_list lits)
-             |> CCList.map (fun l ->
-                    let lits = Array.of_list l in
-                    let trail =
-                      [ BoolLit.neg cut_blit; b_lit_case ] |> Trail.of_list
-                    in
-                    C.create_a ~ctx:(Env.get_ctx env) lits proof ~trail
-                      ~penalty:1)
-           in
-           (* all new clauses *)
-           let res = List.rev_append pos_clauses neg_clauses in
-           Util.debugf ~section 2
-             "(@[<2>induction on (@[%a@])@ :form %a@ @[<2>:cases (@[%a@])@]@ \
-              :depth %d@ @[<2>:res [@[<hv>%a@]]@]@])" (fun k ->
-               k (Util.pp_list HVar.pp) vars Cut_form.pp g
-                 (Util.pp_list
-                    Fmt.(pair ~sep:(return ":=@ ") HVar.pp Cover_set.Case.pp))
-                 cases depth (Util.pp_list C.pp) res);
-           res)
+          Cut_form.apply_subst renaming subst (g, 0)
+          |> Cut_form.cs
+          |> Util.map_product ~f:(fun lits ->
+              let lits = Array.map (fun l -> [ Literal.negate l ]) lits in
+              Array.to_list lits)
+          |> CCList.map (fun l ->
+              let lits = Array.of_list l in
+              let trail =
+                [ BoolLit.neg cut_blit; b_lit_case ] |> Trail.of_list
+              in
+              C.create_a ~ctx:(Env.get_ctx env) lits proof ~trail ~penalty:1)
+        in
+        (* all new clauses *)
+        let res = List.rev_append pos_clauses neg_clauses in
+        Util.debugf ~section 2
+          "(@[<2>induction on (@[%a@])@ :form %a@ @[<2>:cases (@[%a@])@]@ \
+           :depth %d@ @[<2>:res [@[<hv>%a@]]@]@])" (fun k ->
+            k (Util.pp_list HVar.pp) vars Cut_form.pp g
+              (Util.pp_list
+                 Fmt.(pair ~sep:(return ":=@ ") HVar.pp Cover_set.Case.pp))
+              cases depth (Util.pp_list C.pp) res);
+        res)
   in
   (* FIXME: should do CNF here, too *)
   (* boolean constraint(s) *)
@@ -671,8 +668,8 @@ let term_is_var x t : bool =
 let var_active_pos_seq (f : Cut_form.t) (x : T.var) : _ Iter.t =
   subterms_with_pos f
   |> Iter.filter (function
-       | P_active, _, t -> term_is_var x t
-       | _ -> false)
+    | P_active, _, t -> term_is_var x t
+    | _ -> false)
 
 (* does the variable occur in an active position in [f],
      or under some uninterpreted position? *)
@@ -682,8 +679,8 @@ let var_occurs_under_active_pos (f : Cut_form.t) (x : T.var) : bool =
 let var_invariant_pos_seq f x : _ Iter.t =
   subterms_with_pos f
   |> Iter.filter (function
-       | P_inactive, _, t -> term_is_var x t
-       | _ -> false)
+    | P_inactive, _, t -> term_is_var x t
+    | _ -> false)
 
 (* does the variable occur in a position that is invariant? *)
 let var_occurs_under_invariant_pos (f : Cut_form.t) (x : T.var) : bool =
@@ -694,10 +691,10 @@ let var_always_naked (f : Cut_form.t) (x : T.var) : bool =
   Cut_form.cs f |> Iter.of_list
   |> Iter.flat_map Iter.of_array
   |> Iter.for_all (function
-       | Literal.Equation (l, r, _) ->
-         let check_t t = T.is_var t || not (T.var_occurs ~var:x t) in
-         check_t l && check_t r
-       | Literal.True | Literal.False -> true)
+    | Literal.Equation (l, r, _) ->
+      let check_t t = T.is_var t || not (T.var_occurs ~var:x t) in
+      check_t l && check_t r
+    | Literal.True | Literal.False -> true)
 
 let active_subterms_form (f : Cut_form.t) : T.t Iter.t =
   Cut_form.cs f |> Iter.of_list
@@ -732,9 +729,9 @@ end = struct
     let vars =
       Cut_form.vars f |> T.VarSet.to_list
       |> List.filter (fun v ->
-             (not (Type.is_tType (HVar.ty v)))
-             && Iter.length @@ var_active_pos_seq f v >= 2
-             && Iter.length @@ var_invariant_pos_seq f v >= 2)
+          (not (Type.is_tType (HVar.ty v)))
+          && Iter.length @@ var_active_pos_seq f v >= 2
+          && Iter.length @@ var_invariant_pos_seq f v >= 2)
     in
     match vars with
     | [] -> []
@@ -751,8 +748,8 @@ end = struct
             let v' = HVar.make ~ty:(HVar.ty v) (i + offset) in
             subterms_with_pos f
             |> Iter.filter_map (function
-                 | P_active, pos, t when term_is_var v t -> Some (pos, T.var v')
-                 | _ -> None)
+              | P_active, pos, t when term_is_var v t -> Some (pos, T.var v')
+              | _ -> None)
             |> Position.Map.add_iter m)
           Position.Map.empty vars
       in
@@ -775,51 +772,50 @@ end = struct
     let relevant_subterms =
       subterms_with_pos f
       |> Iter.filter_map (function
-           | P_active, pos, t ->
-             (match T_view.view t with
-             | T_view.T_app_unin (id, []) when Ind_cst.id_is_sub id ->
-               None (* probably there because there are induction hyp. on it *)
-             | _ when Type.is_tType (T.ty t |> Type.returns) ->
-               None (* do not generalize on type or type constructors *)
-             | (T_view.T_app_unin _ | T_view.T_app_defined _) when T.is_ground t
-               ->
-               Some (pos, t)
-             | _ -> None)
-           | _ -> None)
+        | P_active, pos, t ->
+          (match T_view.view t with
+          | T_view.T_app_unin (id, []) when Ind_cst.id_is_sub id ->
+            None (* probably there because there are induction hyp. on it *)
+          | _ when Type.is_tType (T.ty t |> Type.returns) ->
+            None (* do not generalize on type or type constructors *)
+          | (T_view.T_app_unin _ | T_view.T_app_defined _) when T.is_ground t ->
+            Some (pos, t)
+          | _ -> None)
+        | _ -> None)
     in
     let subterms =
       relevant_subterms |> Iter.map snd
       |> Iter.group_by ~hash:T.hash ~eq:T.equal
       |> Iter.filter_map (function
-           | t :: _ :: _ -> Some t (* at least 2 *)
-           | _ -> None)
+        | t :: _ :: _ -> Some t (* at least 2 *)
+        | _ -> None)
       |> Iter.to_rev_list
     in
     subterms
     |> CCList.filter_map (fun t ->
-           (* introduce variable for [t] *)
-           let v =
-             Cut_form.vars f |> T.VarSet.to_iter |> Iter.map HVar.id |> Iter.max
-             |> CCOpt.get_or ~default:0 |> succ
-             |> HVar.make ~ty:(T.ty t)
-           in
-           let m =
-             relevant_subterms
-             |> Iter.filter_map (function
-                  | pos, u when T.equal t u -> Some (pos, T.var v)
-                  | _ -> None)
-             |> Position.Map.of_iter
-           in
-           let f' = Cut_form.Pos.replace_many f m in
-           Util.debugf ~section 4
-             "(@[<2>candidate_generalize@ :of %a@ :gen_to %a@ :by \
-              terms_active_pos@ :on %a@])" (fun k ->
-               k Cut_form.pp f Cut_form.pp f' T.pp t);
-           if Goal.is_acceptable_goal env @@ Goal.of_cut_form f' then (
-             Util.incr_stat stat_generalize_terms_active_pos;
-             Some [ f' ]
-           ) else
-             None)
+        (* introduce variable for [t] *)
+        let v =
+          Cut_form.vars f |> T.VarSet.to_iter |> Iter.map HVar.id |> Iter.max
+          |> CCOpt.get_or ~default:0 |> succ
+          |> HVar.make ~ty:(T.ty t)
+        in
+        let m =
+          relevant_subterms
+          |> Iter.filter_map (function
+            | pos, u when T.equal t u -> Some (pos, T.var v)
+            | _ -> None)
+          |> Position.Map.of_iter
+        in
+        let f' = Cut_form.Pos.replace_many f m in
+        Util.debugf ~section 4
+          "(@[<2>candidate_generalize@ :of %a@ :gen_to %a@ :by \
+           terms_active_pos@ :on %a@])" (fun k ->
+            k Cut_form.pp f Cut_form.pp f' T.pp t);
+        if Goal.is_acceptable_goal env @@ Goal.of_cut_form f' then (
+          Util.incr_stat stat_generalize_terms_active_pos;
+          Some [ f' ]
+        ) else
+          None)
 
   let all env : t =
     let g1 =
@@ -879,44 +875,44 @@ let find_var_clusters (f : Cut_form.t) (vars : T.var list) : T.var list list =
   Cut_form.cs f |> Iter.of_list
   |> Iter.flat_map Iter.of_array
   |> Iter.iter (function
-       | Literal.Equation (l, r, _) ->
-         (match T.view l, T.view r with
-         | T.Var x, T.Var y -> UF_vars.union uf x y
-         | _ -> ())
-       | _ -> ());
+    | Literal.Equation (l, r, _) ->
+      (match T.view l, T.view r with
+      | T.Var x, T.Var y -> UF_vars.union uf x y
+      | _ -> ())
+    | _ -> ());
   (* other variables grouped by occurring at active pos in same subterm *)
   active_subterms_form f
   |> Iter.iter (fun t ->
-         match T_view.view t with
-         | T_view.T_app_defined (_, c, l) ->
-           let pos = RW.Defined_cst.defined_positions c in
-           Iter.of_list l |> Util.seq_zipi |> Iter.diagonal
-           |> Iter.filter_map (fun ((i1, t1), (i2, t2)) ->
-                  match T.as_var t1, T.as_var t2 with
-                  | Some x, Some y
-                    when i1 < i2
-                         && IArray.get pos i1 = Defined_pos.P_active
-                         && IArray.get pos i2 = Defined_pos.P_active
-                         && (not (eq_var x y))
-                         && CCList.mem ~eq:eq_var x vars
-                         && CCList.mem ~eq:eq_var y vars ->
-                    Some (x, y)
-                  | _ -> None)
-           |> Iter.iter (fun (x, y) ->
-                  assert (not (eq_var x y));
-                  UF_vars.union uf x y)
-         | _ -> ());
+      match T_view.view t with
+      | T_view.T_app_defined (_, c, l) ->
+        let pos = RW.Defined_cst.defined_positions c in
+        Iter.of_list l |> Util.seq_zipi |> Iter.diagonal
+        |> Iter.filter_map (fun ((i1, t1), (i2, t2)) ->
+            match T.as_var t1, T.as_var t2 with
+            | Some x, Some y
+              when i1 < i2
+                   && IArray.get pos i1 = Defined_pos.P_active
+                   && IArray.get pos i2 = Defined_pos.P_active
+                   && (not (eq_var x y))
+                   && CCList.mem ~eq:eq_var x vars
+                   && CCList.mem ~eq:eq_var y vars ->
+              Some (x, y)
+            | _ -> None)
+        |> Iter.iter (fun (x, y) ->
+            assert (not (eq_var x y));
+            UF_vars.union uf x y)
+      | _ -> ());
   let res =
     UF_vars.to_iter uf |> Iter.map snd
     |> Iter.filter_map (fun vars ->
-           (* eliminate non-inductive variables *)
-           let vars =
-             List.filter (fun v -> Ind_ty.is_inductive_type @@ HVar.ty v) vars
-           in
-           if vars = [] then
-             None
-           else
-             Some vars)
+        (* eliminate non-inductive variables *)
+        let vars =
+          List.filter (fun v -> Ind_ty.is_inductive_type @@ HVar.ty v) vars
+        in
+        if vars = [] then
+          None
+        else
+          Some vars)
     |> Iter.to_rev_list
   in
   Util.debugf ~section 3
@@ -1020,19 +1016,15 @@ let generalize_clauses (cs : Lits.t list)
          Purification constraints are kept as hypotheses in each resulting clause. *)
     cs
     |> Util.map_product ~f:(fun lits ->
-           let lits_l = Array.to_list lits in
-           (* separate the guard (constraints) from other literals *)
-           let guard, other_lits =
-             List.partition Literal.is_constraint lits_l
-           in
-           let replace_lits =
-             List.map (Literal.map (fun t -> T.replace_m t pairs))
-           in
-           let guard = replace_lits guard in
-           let other_lits = replace_lits other_lits in
-           List.map
-             (fun other_lit -> Literal.negate other_lit :: guard)
-             other_lits)
+        let lits_l = Array.to_list lits in
+        (* separate the guard (constraints) from other literals *)
+        let guard, other_lits = List.partition Literal.is_constraint lits_l in
+        let replace_lits =
+          List.map (Literal.map (fun t -> T.replace_m t pairs))
+        in
+        let guard = replace_lits guard in
+        let other_lits = replace_lits other_lits in
+        List.map (fun other_lit -> Literal.negate other_lit :: guard) other_lits)
     |> List.map Array.of_list |> Goal.of_form
   )
 
@@ -1150,20 +1142,20 @@ let trail_is_trivial_cases _env trail =
   (* are there two distinct incompatible cases in the trail? *)
   Iter.diagonal relevant_cases
   |> Iter.exists (fun (c1, c2) ->
-         let res =
-           (not (List.length c1 = List.length c2))
-           || not (CCList.equal Cover_set.Case.equal c1 c2)
-         in
-         if res then
-           Util.debugf ~section 4
-             "(@[<2>trail@ @[%a@]@ is trivial because of@ {@[(@[%a@]),@,\
-              (@[%a@])}@]@])" (fun k ->
-               k C.pp_trail trail
-                 (Util.pp_list Cover_set.Case.pp)
-                 c1
-                 (Util.pp_list Cover_set.Case.pp)
-                 c2);
-         res)
+      let res =
+        (not (List.length c1 = List.length c2))
+        || not (CCList.equal Cover_set.Case.equal c1 c2)
+      in
+      if res then
+        Util.debugf ~section 4
+          "(@[<2>trail@ @[%a@]@ is trivial because of@ {@[(@[%a@]),@,\
+           (@[%a@])}@]@])" (fun k ->
+            k C.pp_trail trail
+              (Util.pp_list Cover_set.Case.pp)
+              c1
+              (Util.pp_list Cover_set.Case.pp)
+              c2);
+      res)
 
 (* make trails with several lemmas in them trivial, so that we have to wait
      for a lemma to be proved before we can  use it to prove another lemma *)
@@ -1173,19 +1165,18 @@ let trail_is_trivial_lemmas _env trail =
   let relevant_cases =
     seq
     |> Iter.filter_map (fun lit ->
-           BoolBox.as_lemma lit
-           |> CCOpt.map (fun lemma -> lemma, BoolLit.sign lit))
+        BoolBox.as_lemma lit |> CCOpt.map (fun lemma -> lemma, BoolLit.sign lit))
   in
   (* are there two distinct positive lemma literals in the trail? *)
   Iter.diagonal relevant_cases
   |> Iter.exists (fun ((c1, sign1), (c2, sign2)) ->
-         let res = sign1 && sign2 && not (Cut_form.equal c1 c2) in
-         if res then
-           Util.debugf ~section 4
-             "(@[<2>trail@ @[%a@]@ is trivial because of lemmas@ {@[(@[%a@]),@,\
-              (@[%a@])}@]@])" (fun k ->
-               k C.pp_trail trail Cut_form.pp c1 Cut_form.pp c2);
-         res)
+      let res = sign1 && sign2 && not (Cut_form.equal c1 c2) in
+      if res then
+        Util.debugf ~section 4
+          "(@[<2>trail@ @[%a@]@ is trivial because of lemmas@ {@[(@[%a@]),@,\
+           (@[%a@])}@]@])" (fun k ->
+            k C.pp_trail trail Cut_form.pp c1 Cut_form.pp c2);
+      res)
 
 (* look whether, to prove the lemma, we need induction *)
 let prove_lemma_by_ind env cut =

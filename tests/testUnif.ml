@@ -501,11 +501,11 @@ let reg_matching1 =
       in
       terms
       |> List.iter (fun (t1, t2) ->
-             try
-               let _ = Unif.FO.matching ~pattern:(t1, 0) (t2, 1) in
-               Alcotest.failf "@[<hv>`%a`@ and `%a@ should not match@]" T.ZF.pp
-                 t1 T.ZF.pp t2
-             with Unif.Fail -> ()) )
+          try
+            let _ = Unif.FO.matching ~pattern:(t1, 0) (t2, 1) in
+            Alcotest.failf "@[<hv>`%a`@ and `%a@ should not match@]" T.ZF.pp t1
+              T.ZF.pp t2
+          with Unif.Fail -> ()) )
 
 let reg_unif_makes_eq =
   ( Printf.sprintf "regression %d" __LINE__,
@@ -750,7 +750,7 @@ let check_ho_unify_gives_unifiers =
     let l =
       HO_unif.unif_pairs ~fuel:20 ~offset ([ [], t1, t2 ], 0)
       |> List.filter (fun (pairs, us, _, _) ->
-             pairs = [] && not (Unif_subst.has_constr us))
+          pairs = [] && not (Unif_subst.has_constr us))
     in
     if l = [] then
       QCheck.assume_fail ()

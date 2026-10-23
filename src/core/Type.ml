@@ -487,8 +487,8 @@ let mangle (ty : t) : string =
     let s =
       Name.to_string name
       |> CCString.filter (function
-           | '#' | '_' -> false
-           | _ -> true)
+        | '#' | '_' -> false
+        | _ -> true)
     in
     Buffer.add_string buf s
   in

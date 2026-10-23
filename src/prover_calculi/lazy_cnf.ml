@@ -66,26 +66,26 @@ let update_form_counter ~action env c =
       ~ord:(Ctx.ord (Env.get_ctx env))
       ~eligible:C.Eligible.always (C.lits c)
     |> Iter.iter (fun (lhs, rhs, _, pos) ->
-           let i, _ = Ls.Pos.cut pos in
-           let lit = (C.lits c).(i) in
-           let terms =
-             if L.is_predicate_lit lit && T.is_appbuiltin lhs then
-               [ lhs ]
-             else if
-               Type.is_prop (T.ty lhs)
-               && (not (L.is_predicate_lit lit))
-               && (Term.is_appbuiltin lhs || T.is_appbuiltin rhs)
-             then
-               [ T.Form.equiv lhs rhs ]
-             else
-               []
-           in
-           List.iter
-             (fun t ->
-               match action with
-               | `Increase -> Term.Tbl.incr _form_counter t
-               | `Decrease -> Term.Tbl.decr _form_counter t)
-             terms)
+        let i, _ = Ls.Pos.cut pos in
+        let lit = (C.lits c).(i) in
+        let terms =
+          if L.is_predicate_lit lit && T.is_appbuiltin lhs then
+            [ lhs ]
+          else if
+            Type.is_prop (T.ty lhs)
+            && (not (L.is_predicate_lit lit))
+            && (Term.is_appbuiltin lhs || T.is_appbuiltin rhs)
+          then
+            [ T.Form.equiv lhs rhs ]
+          else
+            []
+        in
+        List.iter
+          (fun t ->
+            match action with
+            | `Increase -> Term.Tbl.incr _form_counter t
+            | `Decrease -> Term.Tbl.decr _form_counter t)
+          terms)
   else
     ( (* CCFormat.printf "not updating @[%a@]@." C.pp c; *) );
   Env.update_flex_state env (fun _ -> !flex_ref)
@@ -160,13 +160,13 @@ let rec enum_bool_funs env ~ty =
 
     iter_funs ()
     |> Iter.map (fun table ->
-           let (id, id_ty), fresh_sym = Term.mk_fresh_skolem ~prefix [] ty in
-           insert_defining_clauses id fresh_sym arg_combinations table;
-           (* let stm = definition_stream id fresh_sym arg_combinations table in
+        let (id, id_ty), fresh_sym = Term.mk_fresh_skolem ~prefix [] ty in
+        insert_defining_clauses id fresh_sym arg_combinations table;
+        (* let stm = definition_stream id fresh_sym arg_combinations table in
       let stm_res = Env.Stm.make ~penalty:(1) ~parents:[] (stm) in
       Env.StmQ.add (Env.get_stm_queue env stm_res;  *)
-           Util.debugf ~section 2 "declaring %a" (fun k -> k Name.pp id);
-           fresh_sym)
+        Util.debugf ~section 2 "declaring %a" (fun k -> k Name.pp id);
+        fresh_sym)
     |> Iter.to_list
   in
 
@@ -418,10 +418,10 @@ let clausify_quant env ~parent ~var_offset ~sign ~quant_body
         ~mode:(Env.flex_get_of env k_skolem_mode)
         f
       |> CCFun.tap (fun t ->
-             CCOpt.iter
-               (fun hd_id ->
-                 Name_payload.add hd_id (Name.Attr_skolem Name.K_lazy_cnf))
-               (T.head t))
+          CCOpt.iter
+            (fun hd_id ->
+              Name_payload.add hd_id (Name.Attr_skolem Name.K_lazy_cnf))
+            (T.head t))
   in
   let expand_quant =
     not @@ Env.flex_get_of env Combinators.k_enable_combinators
@@ -606,25 +606,24 @@ let lazy_clausify_driver env ?(ignore_eq = false)
 let clausify_quants env ~proof_cons c =
   C.lits c
   |> CCArray.find_map_i (fun i -> function
-       | Literal.Equation (lhs, _, _) as lit when Literal.is_predicate_lit lit
-         ->
-         (match T.view lhs with
-         | T.AppBuiltin (((ForallConst | ExistsConst) as hd), [ _; body ]) ->
-           let var_offset = T.Seq.max_var (C.Seq.vars c) + 1 in
-           let sign = Literal.is_positivoid lit in
-           let res, hd, subst_term, rule_name =
-             clausify_quant env ~parent:c ~var_offset ~sign ~quant_body:body
-               ~quant_hd:hd
-           in
-           assert (Type.is_prop (T.ty res));
-           let res_cl = List.hd @@ mk_or ~proof_cons ~rule_name [ res ] c i in
-           if Type.returns_prop (T.ty subst_term) && hd == ForallConst then (
-             assert (T.is_var subst_term);
-             Signal.send (Env.on_pred_var_elimination env) (res_cl, subst_term)
-           );
-           Some res_cl
-         | _ -> None)
-       | _ -> None)
+    | Literal.Equation (lhs, _, _) as lit when Literal.is_predicate_lit lit ->
+      (match T.view lhs with
+      | T.AppBuiltin (((ForallConst | ExistsConst) as hd), [ _; body ]) ->
+        let var_offset = T.Seq.max_var (C.Seq.vars c) + 1 in
+        let sign = Literal.is_positivoid lit in
+        let res, hd, subst_term, rule_name =
+          clausify_quant env ~parent:c ~var_offset ~sign ~quant_body:body
+            ~quant_hd:hd
+        in
+        assert (Type.is_prop (T.ty res));
+        let res_cl = List.hd @@ mk_or ~proof_cons ~rule_name [ res ] c i in
+        if Type.returns_prop (T.ty subst_term) && hd == ForallConst then (
+          assert (T.is_var subst_term);
+          Signal.send (Env.on_pred_var_elimination env) (res_cl, subst_term)
+        );
+        Some res_cl
+      | _ -> None)
+    | _ -> None)
 
 let reduce_quantifiers env c =
   let proof_cons =
@@ -818,11 +817,11 @@ let clausify_eq env c =
            acc)
        []
   |> CCFun.tap (fun res ->
-         Util.debugf ~section 3 "eq_elim(@[%a@])" (fun k -> k C.pp c);
-         if CCList.is_empty res then
-           Util.debugf ~section 3 "=∅" CCFun.id
-         else
-           Util.debugf ~section 3 "=@[%a@]" (fun k -> k (CCList.pp C.pp) res))
+      Util.debugf ~section 3 "eq_elim(@[%a@])" (fun k -> k C.pp c);
+      if CCList.is_empty res then
+        Util.debugf ~section 3 "=∅" CCFun.id
+      else
+        Util.debugf ~section 3 "=@[%a@]" (fun k -> k (CCList.pp C.pp) res))
 
 let clausify_imp env c =
   let rule_name = "imp_elim" in

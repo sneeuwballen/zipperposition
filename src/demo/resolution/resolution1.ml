@@ -235,33 +235,33 @@ let _resolve_with c =
            such that [term] unifies with [t]. 0 and 1 are again scopes. *)
       Index.retrieve_unifiables (!_idx, 0) (t, 1)
       |> Iter.iter (fun (_t', (d, j), uf) ->
-             let subst = Unif_subst.subst uf in
-             let _, b' = List.nth d j in
-             (* We have found [_t'], and a pair [(d, j)] such
+          let subst = Unif_subst.subst uf in
+          let _, b' = List.nth d j in
+          (* We have found [_t'], and a pair [(d, j)] such
                 that [d] is another clause, and the [j]-th literal of [d]
                 begin [_t', b']).
                 If [b] and [b'] are complementary we are in the case where
                 resolution applies.
             *)
-             if b <> b' then (
-               let renaming = Subst.Renaming.create () in
-               (* Build the conclusion clause, merging the remainders [c']
+          if b <> b' then (
+            let renaming = Subst.Renaming.create () in
+            (* Build the conclusion clause, merging the remainders [c']
                   and [d'] (which live respectively in scope 1 and 0)
                   of the clauses together after applying the substitution. *)
-               let concl =
-                 (let c' = CCList.remove_at_idx i c in
-                  Clause.apply_subst ~renaming subst (c', 1))
-                 @
-                 let d' = CCList.remove_at_idx j d in
-                 Clause.apply_subst ~renaming subst (d', 0)
-               in
-               (* Simplify the resulting clause (remove duplicate literals)
+            let concl =
+              (let c' = CCList.remove_at_idx i c in
+               Clause.apply_subst ~renaming subst (c', 1))
+              @
+              let d' = CCList.remove_at_idx j d in
+              Clause.apply_subst ~renaming subst (d', 0)
+            in
+            (* Simplify the resulting clause (remove duplicate literals)
                   and add it into the passive set, to be processed later *)
-               let concl = Clause.make concl in
-               Util.debugf 3 "resolution of %a and %a ---> %a" (fun k ->
-                   k Clause.pp c Clause.pp d Clause.pp concl);
-               _add_passive concl
-             )))
+            let concl = Clause.make concl in
+            Util.debugf 3 "resolution of %a and %a ---> %a" (fun k ->
+                k Clause.pp c Clause.pp d Clause.pp concl);
+            _add_passive concl
+          )))
     c
 
 (** Main saturation algorithm, a simple "given clause" loop. This is the outer

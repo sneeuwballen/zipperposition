@@ -132,10 +132,10 @@ module Constr = struct
     let max_unary_freq =
       Signature.Seq.symbols signature
       |> Iter.filter_map (fun id ->
-             if snd @@ Signature.arity signature id == 1 then
-               Some (find_freq id)
-             else
-               None)
+          if snd @@ Signature.arity signature id == 1 then
+            Some (find_freq id)
+          else
+            None)
       |> Iter.max
       |> CCOpt.get_or ~default:max_int
     in
@@ -488,14 +488,14 @@ let depth_occ_driver ~flip stmt_d =
   let sorted =
     Name.Tbl.to_list tbl
     |> List.map (fun (id, depths) ->
-           let d_sum = sum depths and n = List.length depths in
-           d_sum / n, n, id)
+        let d_sum = sum depths and n = List.length depths in
+        d_sum / n, n, id)
     |> List.sort (fun (avg1, n1, id1) (avg2, n2, id2) ->
-           let open CCOrd in
-           if flip then
-             compare avg2 avg1 <?> (compare, n2, n1) <?> (Name.compare, id2, id1)
-           else
-             compare avg1 avg2 <?> (compare, n1, n2) <?> (Name.compare, id1, id2))
+        let open CCOrd in
+        if flip then
+          compare avg2 avg1 <?> (compare, n2, n1) <?> (Name.compare, id2, id1)
+        else
+          compare avg1 avg2 <?> (compare, n1, n2) <?> (Name.compare, id1, id2))
   in
 
   Name.Tbl.clear tbl;
@@ -734,11 +734,11 @@ let lambda_def_weight lm_w db_w base_weight clauses =
               ~k:hd_id;
             Term.Seq.symbols r
             |> Iter.iter (fun k ->
-                   Name.Tbl.update dependencies
-                     ~f:(fun _ -> function
-                       | None -> Some [ hd_id ]
-                       | Some res -> Some (hd_id :: res))
-                     ~k)
+                Name.Tbl.update dependencies
+                  ~f:(fun _ -> function
+                    | None -> Some [ hd_id ]
+                    | Some res -> Some (hd_id :: res))
+                  ~k)
           | _ ->
             Util.debugf ~section 2 "is not def: %a := %a" (fun k ->
                 k T.pp lhs T.pp rhs))
@@ -777,19 +777,18 @@ let lambda_def_weight lm_w db_w base_weight clauses =
        ~all_nodes:(Name.Set.of_iter (Name.Tbl.keys definition_map))
        dependencies
      |> CCList.iter (fun id ->
-            let w_opt =
-              Iter.max
-                ~lt:(fun x y -> Weight.compare x y < 0)
-                (Iter.map (eval_weight ~weights)
-                   (Iter.of_list
-                   @@ Name.Tbl.get_or ~default:[] definition_map id))
-            in
-            match w_opt with
-            | Some w ->
-              Util.debugf ~section 1 "lambda weight lift of %a = %a" (fun k ->
-                  k Name.pp id Weight.pp w);
-              Name.Tbl.add weights id w
-            | None -> ())
+         let w_opt =
+           Iter.max
+             ~lt:(fun x y -> Weight.compare x y < 0)
+             (Iter.map (eval_weight ~weights)
+                (Iter.of_list @@ Name.Tbl.get_or ~default:[] definition_map id))
+         in
+         match w_opt with
+         | Some w ->
+           Util.debugf ~section 1 "lambda weight lift of %a = %a" (fun k ->
+               k Name.pp id Weight.pp w);
+           Name.Tbl.add weights id w
+         | None -> ())
    with Loop -> Util.debugf ~section 1 "warning looped" (fun k -> k));
 
   fun sy ->

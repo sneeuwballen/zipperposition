@@ -39,16 +39,16 @@ let clausify_def c : C.t list =
       (fun cl ->
         Statement.Seq.ty_decls cl
         |> Iter.iter (fun (id, ty) ->
-               Ctx.declare (C.ctx_of c) id ty;
-               Name_payload.add id (Name.Attr_skolem Name.K_after_cnf)))
+            Ctx.declare (C.ctx_of c) id ty;
+            Name_payload.add id (Name.Attr_skolem Name.K_after_cnf)))
       cnf_vec;
 
     CCVector.map (C.of_statement ~ctx:(C.ctx_of c) ~convert_defs:true) cnf_vec
     |> CCVector.to_list |> CCList.flatten
     |> List.map (fun c' ->
-           C.create ~ctx:(C.ctx_of c') ~penalty ~trail
-             (CCArray.to_list (C.lits c'))
-             proof)
+        C.create ~ctx:(C.ctx_of c') ~penalty ~trail
+          (CCArray.to_list (C.lits c'))
+          proof)
   | _ -> [ c ]
 
 let setup () = ()
@@ -161,8 +161,8 @@ let lift_lambdas_t ~parent ~counter t =
                  let subst_has_lams subst =
                    Subst.codomain subst
                    |> Iter.exists (fun (t, _) ->
-                          Iter.exists T.is_fun
-                            (T.Seq.subterms (T.of_term_unsafe t)))
+                       Iter.exists T.is_fun
+                         (T.Seq.subterms (T.of_term_unsafe t)))
                  in
 
                  if not (subst_has_lams subst) then (

@@ -96,7 +96,7 @@ end = struct
       |> Iter.flat_map Literals.Seq.terms
       |> Iter.flat_map T.Seq.subterms
       |> Iter.flat_map (fun t ->
-             RW.Term.narrow_term ~scope_rules:sc_rule (t, sc_c))
+          RW.Term.narrow_term ~scope_rules:sc_rule (t, sc_c))
       |> Iter.to_rev_list
       |> CCList.sort_uniq
            ~cmp:CCOrd.(pair RW.Term.Rule.compare Unif_subst.compare)
@@ -104,25 +104,25 @@ end = struct
     (* now do one step for each *)
     Iter.of_list subst_rule_l
     |> Iter.map (fun (rule, us) ->
-           let renaming = Subst.Renaming.create () in
-           let subst = Unif_subst.subst us in
-           let c_guard = Literals.of_unif_subst renaming us in
-           (* evaluate new formula by substituting and evaluating *)
-           let f' =
-             f
-             |> List.map (fun lits ->
-                    CCArray.append c_guard
-                      (Literals.apply_subst renaming subst (lits, sc_c)))
-             |> Libzipperposition.Cut_form.normalize_form
-           in
-           (* make new formula *)
-           Util.incr_stat stat_narrow_step_term;
-           Util.debugf ~section 5
-             "(@[<2>test_prop.narrow_term@ :from %a@ :to %a@ :rule %a@ :subst \
-              %a@])" (fun k ->
-               k pp_form f pp_form f' RW.Term.Rule.pp rule Subst.pp subst);
-           let new_acc = compose renaming subst (acc, sc_c) in
-           new_acc, f')
+        let renaming = Subst.Renaming.create () in
+        let subst = Unif_subst.subst us in
+        let c_guard = Literals.of_unif_subst renaming us in
+        (* evaluate new formula by substituting and evaluating *)
+        let f' =
+          f
+          |> List.map (fun lits ->
+              CCArray.append c_guard
+                (Literals.apply_subst renaming subst (lits, sc_c)))
+          |> Libzipperposition.Cut_form.normalize_form
+        in
+        (* make new formula *)
+        Util.incr_stat stat_narrow_step_term;
+        Util.debugf ~section 5
+          "(@[<2>test_prop.narrow_term@ :from %a@ :to %a@ :rule %a@ :subst \
+           %a@])" (fun k ->
+            k pp_form f pp_form f' RW.Term.Rule.pp rule Subst.pp subst);
+        let new_acc = compose renaming subst (acc, sc_c) in
+        new_acc, f')
 
   (* perform lit narrowing in [f] *)
   let narrow_lit (acc : subst_acc) (f : form) : (subst_acc * form) Iter.t =
@@ -133,7 +133,7 @@ end = struct
       Iter.of_list f
       |> Iter.flat_map Iter.of_array
       |> Iter.flat_map (fun lit ->
-             RW.Lit.narrow_lit ~scope_rules:sc_rule (lit, sc_c))
+          RW.Lit.narrow_lit ~scope_rules:sc_rule (lit, sc_c))
       |> Iter.to_rev_list
       |> CCList.sort_uniq
            ~cmp:
@@ -143,25 +143,24 @@ end = struct
     (* now do one step for each *)
     Iter.of_list subst_rule_l
     |> Iter.map (fun (rule, us, _) ->
-           let renaming = Subst.Renaming.create () in
-           let subst = Unif_subst.subst us in
-           let c_guard = Literals.of_unif_subst renaming us in
-           (* evaluate new formula by substituting and evaluating *)
-           let f' =
-             f
-             |> List.map (fun lits ->
-                    CCArray.append c_guard
-                      (Literals.apply_subst renaming subst (lits, sc_c)))
-             |> Libzipperposition.Cut_form.normalize_form
-           in
-           (* make new formula *)
-           Util.incr_stat stat_narrow_step_lit;
-           Util.debugf ~section 5
-             "(@[<2>test_prop.narrow_lit@ :from %a@ :to %a@ :rule %a@ :subst \
-              %a@])" (fun k ->
-               k pp_form f pp_form f' RW.Lit.Rule.pp rule Subst.pp subst);
-           let new_acc = compose renaming subst (acc, sc_c) in
-           new_acc, f')
+        let renaming = Subst.Renaming.create () in
+        let subst = Unif_subst.subst us in
+        let c_guard = Literals.of_unif_subst renaming us in
+        (* evaluate new formula by substituting and evaluating *)
+        let f' =
+          f
+          |> List.map (fun lits ->
+              CCArray.append c_guard
+                (Literals.apply_subst renaming subst (lits, sc_c)))
+          |> Libzipperposition.Cut_form.normalize_form
+        in
+        (* make new formula *)
+        Util.incr_stat stat_narrow_step_lit;
+        Util.debugf ~section 5
+          "(@[<2>test_prop.narrow_lit@ :from %a@ :to %a@ :rule %a@ :subst %a@])"
+          (fun k -> k pp_form f pp_form f' RW.Lit.Rule.pp rule Subst.pp subst);
+        let new_acc = compose renaming subst (acc, sc_c) in
+        new_acc, f')
 
   exception Found_unsat of Subst.t
 

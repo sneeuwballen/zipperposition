@@ -105,7 +105,7 @@ let load_extensions (st_ref : Phases.State.t ref) =
 let do_extensions ~x ~field (st_ref : Phases.State.t ref) =
   Extensions.extensions ()
   |> List.iter (fun e ->
-         field e |> List.iter (fun f -> Phases.update ~f:(f x) st_ref))
+      field e |> List.iter (fun f -> Phases.update ~f:(f x) st_ref))
 
 let apply_modifiers ~field o =
   Extensions.extensions ()
@@ -128,11 +128,10 @@ let parse_prelude (st_ref : Phases.State.t ref) (params : Params.t) =
     else
       CCVector.to_list prelude_files
       |> CCResult.map_l (fun file ->
-             Util.debugf ~section 2
-               "@[@{<Yellow>### parse prelude file@ `%s` ###@}@]" (fun k ->
-                 k file);
-             let fmt = Parsing_utils.guess_input file in
-             Parsing_utils.parse_file fmt file)
+          Util.debugf ~section 2
+            "@[@{<Yellow>### parse prelude file@ `%s` ###@}@]" (fun k -> k file);
+          let fmt = Parsing_utils.guess_input file in
+          Parsing_utils.parse_file fmt file)
       |> CCResult.map Iter.of_list |> CCResult.map Iter.flatten
   in
   match res with
@@ -160,9 +159,9 @@ let has_arith stmt : bool =
   CCVector.to_iter stmt
   |> Iter.flat_map Statement.Seq.to_iter
   |> Iter.flat_map (function
-       | `Ty ty -> Iter.return ty
-       | `Term t | `Form t -> TS.Seq.subterms t |> Iter.filter_map TS.ty
-       | `ID _ -> Iter.empty)
+    | `Ty ty -> Iter.return ty
+    | `Term t | `Form t -> TS.Seq.subterms t |> Iter.filter_map TS.ty
+    | `ID _ -> Iter.empty)
   |> Iter.exists ty_is_arith
 
 let sine_filter st_ref stmts =
@@ -245,20 +244,20 @@ let compute_prec (st_ref : Phases.State.t ref) ~signature stmts =
          Compute_prec.empty
     |> Compute_prec.add_constr 10 Classify_cst.prec_constr
     |> Compute_prec.set_weight_rule (fun stmts ->
-           let sym_depth =
-             stmts
-             |> Iter.flat_map Statement.Seq.terms
-             |> Iter.flat_map (fun t ->
-                    Term.Seq.subterms_depth t
-                    |> Iter.filter_map (fun (st, d) ->
-                           CCOpt.map (fun id -> id, d) (Term.head st)))
-           in
-           let clauses = Iter.map Statement.Seq.lits stmts in
-           Precedence.weight_fun_of_string ~signature ~clauses ~lm_w:st.lmb_w
-             ~db_w:st.db_w st.kbo_wf sym_depth)
+        let sym_depth =
+          stmts
+          |> Iter.flat_map Statement.Seq.terms
+          |> Iter.flat_map (fun t ->
+              Term.Seq.subterms_depth t
+              |> Iter.filter_map (fun (st, d) ->
+                  CCOpt.map (fun id -> id, d) (Term.head st)))
+        in
+        let clauses = Iter.map Statement.Seq.lits stmts in
+        Precedence.weight_fun_of_string ~signature ~clauses ~lm_w:st.lmb_w
+          ~db_w:st.db_w st.kbo_wf sym_depth)
     |> Compute_prec.add_constr_rule 90 (fun seq ->
-           let syms = Signature.Seq.symbols signature in
-           Precedence.Constr.prec_fun_of_str st.prec_fun ~signature syms)
+        let syms = Signature.Seq.symbols signature in
+        Precedence.Constr.prec_fun_of_str st.prec_fun ~signature syms)
   in
   Compute_prec.mk_precedence ~signature ~db_w:st.db_w ~lmb_w:st.lmb_w cp stmts
 
@@ -427,10 +426,10 @@ let print_dots (st_ref : Phases.State.t ref) (env : Env.t)
       if (Env.params_of env).Params.dot_all_roots then
         Iter.append (Env.get_active env ()) (Env.get_passive env ())
         |> Iter.filter_map (fun c ->
-               if Literals.is_absurd (Env.C.lits c) then
-                 Some (Env.C.proof c)
-               else
-                 None)
+            if Literals.is_absurd (Env.C.lits c) then
+              Some (Env.C.proof c)
+            else
+              None)
       else
         Iter.singleton proof
     in
@@ -522,11 +521,11 @@ let syms_in_conj decls =
   let open Iter in
   decls |> CCVector.to_iter
   |> flat_map (fun st ->
-         let pr = Statement.proof_step st in
-         if CCOpt.is_some (Proof.Step.distance_to_goal pr) then
-           Statement.Seq.symbols st
-         else
-           empty)
+      let pr = Statement.proof_step st in
+      if CCOpt.is_some (Proof.Step.distance_to_goal pr) then
+        Statement.Seq.symbols st
+      else
+        empty)
 
 let syms_in_conj_f decls =
   CCVector.fold

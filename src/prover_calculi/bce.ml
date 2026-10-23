@@ -890,7 +890,7 @@ let initialize_regular env =
          Clause.ClauseSet.to_seq (Env.passive_clauses env)
          |> Iter.of_seq
          |> Iter.iter (fun cl ->
-                C.Tbl.add (Env.flex_get_of env k_bce_sat_tracked) cl ());
+             C.Tbl.add (Env.flex_get_of env k_bce_sat_tracked) cl ());
 
          Signal.on_every (Env.on_passive_add env) (fun cl ->
              if C.proof_depth cl = 0 then add_cl_sat cl);

@@ -461,8 +461,8 @@ module MakeTerm (X : Set.OrderedType) = struct
         and s2 =
           SIMap.to_iter t.map
           |> Iter.map (fun ((sym, i), t') ->
-                 let label = CCFormat.sprintf "%a/%d" Name.pp sym i in
-                 label, t')
+              let label = CCFormat.sprintf "%a/%d" Name.pp sym i in
+              label, t')
         in
         prefix s2)
 

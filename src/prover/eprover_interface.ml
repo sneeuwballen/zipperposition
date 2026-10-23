@@ -269,11 +269,11 @@ let try_e env active_set passive_set =
         pd > 0 && pd <= 5)
       clauses
     |> Iter.sort ~cmp:(fun c1 c2 ->
-           let pd1 = C.proof_depth c1 and pd2 = C.proof_depth c2 in
-           if pd1 = pd2 || !_sort_by_weight_only then
-             CCInt.compare (C.ho_weight c1) (C.ho_weight c2)
-           else
-             CCInt.compare pd1 pd2)
+        let pd1 = C.proof_depth c1 and pd2 = C.proof_depth c2 in
+        if pd1 = pd2 || !_sort_by_weight_only then
+          CCInt.compare (C.ho_weight c1) (C.ho_weight c2)
+        else
+          CCInt.compare pd1 pd2)
     |> Iter.take !_max_derived
     |> convert_clauses ~converter ~encoded_symbols
   in

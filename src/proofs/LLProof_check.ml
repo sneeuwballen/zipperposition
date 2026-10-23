@@ -136,7 +136,7 @@ let check_step ?dot_prefix (p : proof) : check_step_res =
     let subst =
       vars
       |> List.mapi (fun i v ->
-             v, T.const ~ty:(Var.ty v) (Name.makef "$$sk_%d" i))
+          v, T.const ~ty:(Var.ty v) (Name.makef "$$sk_%d" i))
       |> Var.Subst.of_list
     in
     CS_check

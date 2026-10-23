@@ -76,9 +76,9 @@ let simplify_split_ env (c : C.t) : C.t list option =
         (* merge other variables of the literal with [v] *)
         Lit.Seq.vars lit
         |> Iter.iter (fun v' ->
-               (* lit is in the equiv class of [v'] *)
-               UF.add uf_vars v' (Lit.Set.singleton lit);
-               UF.union uf_vars v v'))
+            (* lit is in the equiv class of [v'] *)
+            UF.add uf_vars v' (Lit.Set.singleton lit);
+            UF.union uf_vars v v'))
     lits;
 
   (* now gather all the components as a literal list list *)
@@ -225,7 +225,7 @@ let check_empty env c =
       let skolemizer =
         Literals.vars lits
         |> List.map (fun v ->
-               (v, 0), (snd @@ Term.mk_fresh_skolem [] (HVar.ty v), 0))
+            (v, 0), (snd @@ Term.mk_fresh_skolem [] (HVar.ty v), 0))
         |> Subst.FO.of_list'
       in
       let lits' =
@@ -256,11 +256,11 @@ let trail_is_trivial_ env (trail : Trail.t) : bool =
   let res =
     Trail.to_iter trail
     |> Iter.find_map (fun lit ->
-           try
-             match Sat_solver.valuation_level sat lit with
-             | false, 0 -> Some lit (* false at level 0: proven false *)
-             | _ -> None
-           with Sat_solver.UndecidedLit -> None)
+        try
+          match Sat_solver.valuation_level sat lit with
+          | false, 0 -> Some lit (* false at level 0: proven false *)
+          | _ -> None
+        with Sat_solver.UndecidedLit -> None)
   in
   match res with
   | None -> false
@@ -291,18 +291,18 @@ let simplify_opt env (trail : Trail.t) : trail_status =
     let trail, removed =
       Trail.to_list trail
       |> List.partition (fun lit ->
-             try
-               match Sat_solver.valuation_level sat lit with
-               | true, 0 ->
-                 (* [lit] is proven true, it is therefore not necessary
+          try
+            match Sat_solver.valuation_level sat lit with
+            | true, 0 ->
+              (* [lit] is proven true, it is therefore not necessary
                   to depend on it *)
-                 incr n_simpl;
-                 false
-               | false, 0 ->
-                 (* [lit] is proven false, the whole trail is trivial *)
-                 raise Trail_is_trivial
-               | _ -> true
-             with Sat_solver.UndecidedLit -> true)
+              incr n_simpl;
+              false
+            | false, 0 ->
+              (* [lit] is proven false, the whole trail is trivial *)
+              raise Trail_is_trivial
+            | _ -> true
+          with Sat_solver.UndecidedLit -> true)
     in
     if !n_simpl > 0 then (
       assert (removed <> []);
@@ -370,17 +370,17 @@ let backward_simplify_trails env (_ : C.t) : C.ClauseSet.t =
     Env.active_clauses env |> Clause.ClauseSet.to_seq |> Iter.of_seq
     |> Iter.filter (fun c -> not (Trail.is_empty @@ C.trail c))
     |> Iter.filter (fun c ->
-           let ok =
-             match simplify_opt env (C.trail c) with
-             | Tr_trivial | Tr_simplify_into _ -> true
-             | Tr_same -> false
-           in
-           if ok then (
-             Util.incr_stat stat_backward_simp_trail;
-             Util.debugf ~section 5 "(@[<2>backward_simplify_trail@ %a@])"
-               (fun k -> k C.pp c)
-           );
-           ok)
+        let ok =
+          match simplify_opt env (C.trail c) with
+          | Tr_trivial | Tr_simplify_into _ -> true
+          | Tr_same -> false
+        in
+        if ok then (
+          Util.incr_stat stat_backward_simp_trail;
+          Util.debugf ~section 5 "(@[<2>backward_simplify_trail@ %a@])"
+            (fun k -> k C.pp c)
+        );
+        ok)
     |> Iter.fold (fun s x -> C.ClauseSet.add x s) C.ClauseSet.empty
   else
     C.ClauseSet.empty
@@ -492,10 +492,10 @@ let prove_lemma env (c : cut_res) : unit =
     let subst : Subst.t =
       vars
       |> List.map (fun v ->
-             let ty_v = HVar.ty v in
-             let id = Ind_cst.make_skolem ty_v in
-             Ctx.declare (Env.get_ctx env) id ty_v;
-             (v, 0), (T.const ~ty:ty_v id, 0))
+          let ty_v = HVar.ty v in
+          let id = Ind_cst.make_skolem ty_v in
+          Ctx.declare (Env.get_ctx env) id ty_v;
+          (v, 0), (T.const ~ty:ty_v id, 0))
       |> Subst.FO.of_list' ?init:None
     in
     (* for each clause, apply [subst] to it and negate its
@@ -506,12 +506,12 @@ let prove_lemma env (c : cut_res) : unit =
       Cut_form.apply_subst renaming subst (g, 0)
       |> Cut_form.cs
       |> Util.map_product ~f:(fun lits ->
-             let lits = Array.map (fun l -> [ Literal.negate l ]) lits in
-             Array.to_list lits)
+          let lits = Array.map (fun l -> [ Literal.negate l ]) lits in
+          Array.to_list lits)
       |> CCList.map (fun l ->
-             let lits = Array.of_list l in
-             let trail = Trail.singleton (BLit.neg @@ cut_lit c) in
-             C.create_a ~ctx:(Env.get_ctx env) lits proof ~trail ~penalty:1)
+          let lits = Array.of_list l in
+          let trail = Trail.singleton (BLit.neg @@ cut_lit c) in
+          C.create_a ~ctx:(Env.get_ctx env) lits proof ~trail ~penalty:1)
     in
     clauses
   in
@@ -539,8 +539,8 @@ let add_lemma env (c : cut_res) : unit =
     Signal.send on_lemma c
   ) else
     (* already existing lemma *)
-      Util.debugf ~section 3
-        "(@[<2>add_lemma [already there]@ :on `[@[<hv>%a@]]`@])" (fun k ->
+    Util.debugf ~section 3
+      "(@[<2>add_lemma [already there]@ :on `[@[<hv>%a@]]`@])" (fun k ->
         k Cut_form.pp c.cut_form)
 
 let add_imply env (l : cut_res list) (res : cut_res) (p : Proof.Step.t) : unit =
@@ -605,8 +605,8 @@ let convert_lemma env st =
     let proof =
       Cut_form.cs f
       |> List.map (fun c ->
-             Proof.Parent.from @@ Proof.S.mk proof_st @@ SClause.mk_proof_res
-             @@ SClause.make ~trail:Trail.empty c)
+          Proof.Parent.from @@ Proof.S.mk proof_st @@ SClause.mk_proof_res
+          @@ SClause.make ~trail:Trail.empty c)
       |> Proof.Step.esa ~rule:(Proof.Rule.mk "lemma")
     in
     let cut = introduce_cut env ~reason:Fmt.(return "in-input") f proof in
@@ -670,11 +670,11 @@ let register env ~split_kind () =
     Signal.on (Env.on_start env) (fun () ->
         Env.get_passive env ()
         |> Iter.iter (fun cl ->
-               match split env cl with
-               | None -> ()
-               | Some splitted ->
-                 Env.remove_passive env (Iter.singleton cl);
-                 Env.add_passive env (Iter.of_list splitted));
+            match split env cl with
+            | None -> ()
+            | Some splitted ->
+              Env.remove_passive env (Iter.singleton cl);
+              Env.add_passive env (Iter.of_list splitted));
 
         Signal.ContinueListening);
   Env.add_is_trivial_trail env trail_is_trivial;

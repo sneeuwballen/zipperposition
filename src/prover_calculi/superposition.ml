@@ -182,13 +182,13 @@ let has_bad_occurrence_elsewhere env c var pos =
   Lits.fold_terms ~ord:(get_state env).ord_ref ~subterms:true
     ~eligible:C.Eligible.always ~which:`All (C.lits c)
   |> Iter.exists (fun (t, pos') ->
-         (not (Position.equal pos pos'))
-         &&
-         (* variable appears at a prefix position
+      (not (Position.equal pos pos'))
+      &&
+      (* variable appears at a prefix position
       somewhere else (pos ≠ pos') *)
-         match T.view t with
-         | T.App (hd, _) -> T.equal hd var
-         | _ -> false)
+      match T.view t with
+      | T.App (hd, _) -> T.equal hd var
+      | _ -> false)
 
 let fluidsup_applicable env cl =
   (not (Env.flex_get_of env k_restrict_fluidsup))
@@ -210,13 +210,13 @@ let is_fluid_or_deep env c t =
       ~eligible:(fun _ _ -> true)
       (C.lits c)
     |> Iter.exists (fun (t, _) ->
-           match T.view t with
-           | App (head, args) when T.is_var head ->
-             Iter.exists (HVar.equal Type.equal v)
-               (args |> Iter.of_list |> Iter.flat_map T.Seq.vars)
-           | Fun (_, body) ->
-             Iter.exists (HVar.equal Type.equal v) (T.Seq.vars body)
-           | _ -> false)
+        match T.view t with
+        | App (head, args) when T.is_var head ->
+          Iter.exists (HVar.equal Type.equal v)
+            (args |> Iter.of_list |> Iter.flat_map T.Seq.vars)
+        | Fun (_, body) ->
+          Iter.exists (HVar.equal Type.equal v) (T.Seq.vars body)
+        | _ -> false)
   | None -> false
 
 (* apply operation [f] to some parts of the clause [c] just added/removed
@@ -242,13 +242,13 @@ let _update_active env f c =
     |> Iter.append (TPSet.to_iter @@ C.eligible_subterms_of_bool c)
     |> Iter.sort_uniq ~cmp:(fun (_, p1) (_, p2) -> Position.compare p1 p2)
     |> Iter.filter (fun (t, _) ->
-           (* Util.debugf ~section 3 "@[ Filtering vars %a,1  @]" (fun k-> k T.pp t); *)
-           (not (T.is_var t)) || T.is_ho_var t)
+        (* Util.debugf ~section 3 "@[ Filtering vars %a,1  @]" (fun k-> k T.pp t); *)
+        (not (T.is_var t)) || T.is_ho_var t)
     (* TODO: could exclude more variables from the index:
        they are not needed if they occur with the same args everywhere in the clause *)
     |> Iter.filter (fun (t, _) ->
-           (* Util.debugf ~section 3 "@[ Filtering vars %a,2  @]" (fun k-> k T.pp t); *)
-           sup_at_var_headed || not (T.is_var (T.head_term t)))
+        (* Util.debugf ~section 3 "@[ Filtering vars %a,2  @]" (fun k-> k T.pp t); *)
+        sup_at_var_headed || not (T.is_var (T.head_term t)))
     |> Iter.fold
          (fun tree (t, pos) ->
            Util.debugf ~section 2 "inserting(into):@[@[%a@]|@[%a]@]" (fun k ->
@@ -279,11 +279,11 @@ let _update_active env f c =
         ~eligible:(C.Eligible.res c) (C.lits c)
       (* TODO(BOOL): How is this going to be extended for Boolean reasoning? *)
       |> Iter.filter (fun (t, pos) ->
-             match T.view t with
-             | T.Var _ -> has_bad_occurrence_elsewhere env c t pos
-             | T.App (hd, [ _ ]) when T.is_var hd ->
-               has_bad_occurrence_elsewhere env c hd pos
-             | _ -> false)
+          match T.view t with
+          | T.Var _ -> has_bad_occurrence_elsewhere env c t pos
+          | T.App (hd, [ _ ]) when T.is_var hd ->
+            has_bad_occurrence_elsewhere env c hd pos
+          | _ -> false)
       |> Iter.fold
            (fun tree (t, pos) ->
              let with_pos = C.WithPos.make ~clause:c ~pos in
@@ -297,10 +297,9 @@ let _update_active env f c =
         ~eligible:(C.Eligible.res c) (C.lits c)
       (* TODO(BOOL): How is this going to be extended for Boolean reasoning? *)
       |> Iter.filter (fun (t, _) ->
-             T.is_var (T.head_term t)
-             && (not (CCList.is_empty @@ T.args t))
-             && Type.is_ground (T.ty t))
-         (* Only applied variables *)
+          T.is_var (T.head_term t)
+          && (not (CCList.is_empty @@ T.args t))
+          && Type.is_ground (T.ty t)) (* Only applied variables *)
       |> Iter.fold
            (fun tree (t, pos) ->
              let with_pos = C.WithPos.make ~clause:c ~pos in
@@ -318,25 +317,25 @@ let _update_active env f c =
       (* We are going only under lambdas *)
       (* TODO(BOOL): Maybe add bool stuff to LambdaSup *)
       |> Iter.filter_map (fun (t, p) ->
-             if not (T.is_fun t) then
-               None
-             else (
-               let tyargs, body = T.open_fun t in
-               let new_pos =
-                 List.fold_left (fun p _ -> P.(append p (body stop))) p tyargs
-               in
-               let hd = T.head_term body in
-               if
-                 ((not (T.is_var body)) || T.is_ho_var body)
-                 && ((not (T.is_const hd))
-                    || not (Name.is_skolem (T.as_const_exn hd)))
-                 && (sup_at_var_headed || not (T.is_var (T.head_term body)))
-               then
-                 (*CCFormat.printf "Adding %a to LS index.\n" T.pp body; *)
-                 Some (body, new_pos)
-               else
-                 None
-             ))
+          if not (T.is_fun t) then
+            None
+          else (
+            let tyargs, body = T.open_fun t in
+            let new_pos =
+              List.fold_left (fun p _ -> P.(append p (body stop))) p tyargs
+            in
+            let hd = T.head_term body in
+            if
+              ((not (T.is_var body)) || T.is_ho_var body)
+              && ((not (T.is_const hd))
+                 || not (Name.is_skolem (T.as_const_exn hd)))
+              && (sup_at_var_headed || not (T.is_var (T.head_term body)))
+            then
+              (*CCFormat.printf "Adding %a to LS index.\n" T.pp body; *)
+              Some (body, new_pos)
+            else
+              None
+          ))
       |> Iter.fold
            (fun tree (t, pos) ->
              let with_pos = C.WithPos.make ~clause:c ~pos in
@@ -349,13 +348,13 @@ let _update_active env f c =
       ~eligible:(C.Eligible.param c) (C.lits c)
     |> Iter.filter (fun (_, r, sign, _) -> sign || T.equal r T.false_)
     |> Iter.filter (fun (l, _, _, _) ->
-           Env.flex_get_of env k_superpose_w_formulas
-           ||
-           match T.view l with
-           | T.AppBuiltin ((Eq | Neq), _) -> false
-           | _ -> not (T.is_formula l))
+        Env.flex_get_of env k_superpose_w_formulas
+        ||
+        match T.view l with
+        | T.AppBuiltin ((Eq | Neq), _) -> false
+        | _ -> not (T.is_formula l))
     |> Iter.filter (fun (l, _, _, _) ->
-           sup_from_var_headed || not (T.is_app_var l))
+        sup_from_var_headed || not (T.is_app_var l))
     |> Iter.fold
          (fun tree (l, r, sign, pos) ->
            assert (sign || T.equal r T.false_);
@@ -604,25 +603,25 @@ let is_hidden_sup_at_var info =
           && CCList.(
                Array.length s_args - List.length args --^ Array.length s_args)
              |> List.for_all (fun idx ->
-                    match T.as_var (Array.get s_args idx) with
-                    | Some v ->
-                      (* Check whether variable occurs in previous arguments: *)
-                      (not
-                         (CCArray.exists (T.var_occurs ~var:v)
-                            (Array.sub s_args 0 idx)))
-                      && not
-                           (CCArray.exists (T.var_occurs ~var:v)
-                              (Array.sub t_args 0
-                                 (Array.length t_args - List.length args))
-                           (* Check whether variable occurs in heads: *)
-                           && (not (T.var_occurs ~var:v f))
-                           && (not (T.var_occurs ~var:v g))
-                           (* Check whether variable occurs in other literals: *)
-                           && not
-                                (List.exists (Literal.var_occurs v)
-                                   (CCArray.except_idx (C.lits info.active)
-                                      active_idx)))
-                    | None -> false)
+                 match T.as_var (Array.get s_args idx) with
+                 | Some v ->
+                   (* Check whether variable occurs in previous arguments: *)
+                   (not
+                      (CCArray.exists (T.var_occurs ~var:v)
+                         (Array.sub s_args 0 idx)))
+                   && not
+                        (CCArray.exists (T.var_occurs ~var:v)
+                           (Array.sub t_args 0
+                              (Array.length t_args - List.length args))
+                        (* Check whether variable occurs in heads: *)
+                        && (not (T.var_occurs ~var:v f))
+                        && (not (T.var_occurs ~var:v g))
+                        (* Check whether variable occurs in other literals: *)
+                        && not
+                             (List.exists (Literal.var_occurs v)
+                                (CCArray.except_idx (C.lits info.active)
+                                   active_idx)))
+                 | None -> false)
         then (
           (* Calculate the part of t that unifies with the variable *)
           let t_prefix =
@@ -934,9 +933,9 @@ let do_classic_superposition env info =
     let subst_is_ho =
       Subst.codomain subst
       |> Iter.exists (fun (t, _) ->
-             Iter.exists
-               (fun t -> T.is_fun t || T.is_comb t)
-               (T.Seq.subterms ~include_builtin:true (T.of_term_unsafe t)))
+          Iter.exists
+            (fun t -> T.is_fun t || T.is_comb t)
+            (T.Seq.subterms ~include_builtin:true (T.of_term_unsafe t)))
     in
 
     let rule =
@@ -1161,9 +1160,9 @@ let do_simultaneous_superposition env info =
     let subst_is_ho =
       Subst.codomain subst
       |> Iter.exists (fun (t, _) ->
-             Iter.exists
-               (fun t -> T.is_fun t || T.is_comb t)
-               (T.Seq.subterms ~include_builtin:true (T.of_term_unsafe t)))
+          Iter.exists
+            (fun t -> T.is_fun t || T.is_comb t)
+            (T.Seq.subterms ~include_builtin:true (T.of_term_unsafe t)))
     in
     let tags =
       (if subst_is_ho then
@@ -1273,38 +1272,36 @@ let infer_active_aux env ~retrieve_from_index ~process_retrieved clause =
       (C.lits clause)
     |> Iter.filter (fun (_, t, sign, _) -> sign || T.equal t T.false_)
     |> Iter.flat_map (fun (s, t, _, s_pos) ->
-           let do_sup u_p with_pos subst =
-             (* rewrite u_p with s *)
-             if T.DB.is_closed u_p then (
-               let passive = Clause.WithPos.clause with_pos in
-               let passive_pos = Clause.WithPos.pos with_pos in
-               let passive_lit, _ =
-                 Lits.Pos.lit_at (C.lits passive) passive_pos
-               in
-               let info =
-                 SupInfo.
-                   {
-                     s;
-                     t;
-                     active = clause;
-                     active_pos = s_pos;
-                     scope_active = 0;
-                     u_p;
-                     passive;
-                     passive_lit;
-                     passive_pos;
-                     scope_passive = 1;
-                     subst;
-                     sup_kind = Classic;
-                   }
-               in
-               do_superposition env info
-             ) else
-               None
-           in
-           (* rewrite clauses using s *)
-           retrieve_from_index ((get_state env).idx_sup_into, 1) (s, 0)
-           |> Iter.filter_map (process_retrieved do_sup))
+        let do_sup u_p with_pos subst =
+          (* rewrite u_p with s *)
+          if T.DB.is_closed u_p then (
+            let passive = Clause.WithPos.clause with_pos in
+            let passive_pos = Clause.WithPos.pos with_pos in
+            let passive_lit, _ = Lits.Pos.lit_at (C.lits passive) passive_pos in
+            let info =
+              SupInfo.
+                {
+                  s;
+                  t;
+                  active = clause;
+                  active_pos = s_pos;
+                  scope_active = 0;
+                  u_p;
+                  passive;
+                  passive_lit;
+                  passive_pos;
+                  scope_passive = 1;
+                  subst;
+                  sup_kind = Classic;
+                }
+            in
+            do_superposition env info
+          ) else
+            None
+        in
+        (* rewrite clauses using s *)
+        retrieve_from_index ((get_state env).idx_sup_into, 1) (s, 0)
+        |> Iter.filter_map (process_retrieved do_sup))
     |> Iter.to_rev_list
   in
   new_clauses
@@ -1328,39 +1325,39 @@ let infer_passive_aux ~retrieve_from_index ~process_retrieved clause env =
     |> Iter.filter (fun (u_p, _) -> (not (T.is_var u_p)) || T.is_ho_var u_p)
     |> Iter.filter (fun (u_p, _) -> T.DB.is_closed u_p)
     |> Iter.filter (fun (u_p, _) ->
-           Env.flex_get_of env k_sup_at_var_headed
-           || not (T.is_var (T.head_term u_p)))
+        Env.flex_get_of env k_sup_at_var_headed
+        || not (T.is_var (T.head_term u_p)))
     |> Iter.flat_map (fun (u_p, passive_pos) ->
-           let passive_lit, _ = Lits.Pos.lit_at (C.lits clause) passive_pos in
-           let do_sup _ with_pos subst =
-             let active = Clause.WithPos.clause with_pos in
-             let s_pos = Clause.WithPos.pos with_pos in
-             match Lits.View.get_eqn (C.lits active) s_pos with
-             | Some (s, t, true) ->
-               let info =
-                 SupInfo.
-                   {
-                     s;
-                     t;
-                     active;
-                     active_pos = s_pos;
-                     scope_active = 1;
-                     subst;
-                     u_p;
-                     passive = clause;
-                     passive_lit;
-                     passive_pos;
-                     scope_passive = 0;
-                     sup_kind = Classic;
-                   }
-               in
-               do_superposition env info
-             | _ -> None
-           in
-           (* all terms that occur in an equation in the active_set
+        let passive_lit, _ = Lits.Pos.lit_at (C.lits clause) passive_pos in
+        let do_sup _ with_pos subst =
+          let active = Clause.WithPos.clause with_pos in
+          let s_pos = Clause.WithPos.pos with_pos in
+          match Lits.View.get_eqn (C.lits active) s_pos with
+          | Some (s, t, true) ->
+            let info =
+              SupInfo.
+                {
+                  s;
+                  t;
+                  active;
+                  active_pos = s_pos;
+                  scope_active = 1;
+                  subst;
+                  u_p;
+                  passive = clause;
+                  passive_lit;
+                  passive_pos;
+                  scope_passive = 0;
+                  sup_kind = Classic;
+                }
+            in
+            do_superposition env info
+          | _ -> None
+        in
+        (* all terms that occur in an equation in the active_set
             and that are potentially unifiable with u_p (u at position p) *)
-           retrieve_from_index ((get_state env).idx_sup_from, 1) (u_p, 0)
-           |> Iter.filter_map (process_retrieved do_sup))
+        retrieve_from_index ((get_state env).idx_sup_from, 1) (u_p, 0)
+        |> Iter.filter_map (process_retrieved do_sup))
     |> Iter.to_rev_list
   in
   new_clauses
@@ -1382,37 +1379,37 @@ let infer_lambdasup_from env clause =
     (C.lits clause)
   |> Iter.filter (fun (_, t, sign, _) -> sign || T.equal t T.false_)
   |> Iter.flat_map (fun (s, t, _, s_pos) ->
-         let do_lambdasup u_p with_pos subst =
-           (* rewrite u_p with s *)
-           let passive = Clause.WithPos.clause with_pos in
-           let passive_pos = Clause.WithPos.pos with_pos in
-           let passive_lit, _ = Lits.Pos.lit_at (C.lits passive) passive_pos in
-           let info =
-             SupInfo.
-               {
-                 s;
-                 t;
-                 active = clause;
-                 active_pos = s_pos;
-                 scope_active = 0;
-                 u_p;
-                 passive;
-                 passive_lit;
-                 passive_pos;
-                 scope_passive = 1;
-                 subst;
-                 sup_kind = LambdaSup;
-               }
-           in
-           Util.debugf ~section 10
-             "[Trying lambdasup from %a into %a with term %a into term %a]"
-             (fun k -> k C.pp clause C.pp passive T.pp s T.pp u_p);
+      let do_lambdasup u_p with_pos subst =
+        (* rewrite u_p with s *)
+        let passive = Clause.WithPos.clause with_pos in
+        let passive_pos = Clause.WithPos.pos with_pos in
+        let passive_lit, _ = Lits.Pos.lit_at (C.lits passive) passive_pos in
+        let info =
+          SupInfo.
+            {
+              s;
+              t;
+              active = clause;
+              active_pos = s_pos;
+              scope_active = 0;
+              u_p;
+              passive;
+              passive_lit;
+              passive_pos;
+              scope_passive = 1;
+              subst;
+              sup_kind = LambdaSup;
+            }
+        in
+        Util.debugf ~section 10
+          "[Trying lambdasup from %a into %a with term %a into term %a]"
+          (fun k -> k C.pp clause C.pp passive T.pp s T.pp u_p);
 
-           do_superposition env info
-         in
-         I.retrieve_unifiables ((get_state env).idx_lambdasup_into, 1) (s, 0)
-         |> Iter.filter_map (fun (u_p, with_pos, subst) ->
-                do_lambdasup u_p with_pos subst))
+        do_superposition env info
+      in
+      I.retrieve_unifiables ((get_state env).idx_lambdasup_into, 1) (s, 0)
+      |> Iter.filter_map (fun (u_p, with_pos, subst) ->
+          do_lambdasup u_p with_pos subst))
   |> Iter.to_rev_list
 
 let infer_passive env clause =
@@ -1434,61 +1431,61 @@ let infer_lambdasup_into env clause =
       ~fun_bodies:true ~subterms:true ~ord:(get_state env).ord_ref ~which:`Max
       ~eligible ~ty_args:false (C.lits clause)
     |> Iter.filter_map (fun (u_p, p) ->
-           (* we rewrite only under lambdas  *)
-           if not (T.is_fun u_p) then
-             None
-           else (
-             let tyargs, body = T.open_fun u_p in
-             let hd = T.head_term body in
-             let new_pos =
-               List.fold_left (fun p _ -> P.(append p (body stop))) p tyargs
-             in
-             (* we check normal superposition conditions  *)
-             if
-               ((not (T.is_var body)) || T.is_ho_var body)
-               && ((not (T.is_const hd))
-                  || not (Name.is_skolem (T.as_const_exn hd)))
-               && (Env.flex_get_of env k_sup_at_var_headed
-                  || not (T.is_var (T.head_term body)))
-             then
-               Some (body, new_pos)
-             else
-               None
-           ))
+        (* we rewrite only under lambdas  *)
+        if not (T.is_fun u_p) then
+          None
+        else (
+          let tyargs, body = T.open_fun u_p in
+          let hd = T.head_term body in
+          let new_pos =
+            List.fold_left (fun p _ -> P.(append p (body stop))) p tyargs
+          in
+          (* we check normal superposition conditions  *)
+          if
+            ((not (T.is_var body)) || T.is_ho_var body)
+            && ((not (T.is_const hd))
+               || not (Name.is_skolem (T.as_const_exn hd)))
+            && (Env.flex_get_of env k_sup_at_var_headed
+               || not (T.is_var (T.head_term body)))
+          then
+            Some (body, new_pos)
+          else
+            None
+        ))
     |> Iter.flat_map (fun (u_p, passive_pos) ->
-           let passive_lit, _ = Lits.Pos.lit_at (C.lits clause) passive_pos in
-           let do_sup _ with_pos subst =
-             let active = Clause.WithPos.clause with_pos in
-             let s_pos = Clause.WithPos.pos with_pos in
-             match Lits.View.get_eqn (C.lits active) s_pos with
-             | Some (s, t, true) ->
-               let info =
-                 SupInfo.
-                   {
-                     s;
-                     t;
-                     active;
-                     active_pos = s_pos;
-                     scope_active = 1;
-                     subst;
-                     u_p;
-                     passive = clause;
-                     passive_lit;
-                     passive_pos;
-                     scope_passive = 0;
-                     sup_kind = LambdaSup;
-                   }
-               in
-               Util.debugf ~section 10
-                 "[Trying lambdasup from %a into %a with term %a into term %a]"
-                 (fun k -> k C.pp active C.pp clause T.pp s T.pp u_p);
-               do_superposition env info
-             | _ -> None
-           in
-           (* all terms that occur in an equation in the active_set
+        let passive_lit, _ = Lits.Pos.lit_at (C.lits clause) passive_pos in
+        let do_sup _ with_pos subst =
+          let active = Clause.WithPos.clause with_pos in
+          let s_pos = Clause.WithPos.pos with_pos in
+          match Lits.View.get_eqn (C.lits active) s_pos with
+          | Some (s, t, true) ->
+            let info =
+              SupInfo.
+                {
+                  s;
+                  t;
+                  active;
+                  active_pos = s_pos;
+                  scope_active = 1;
+                  subst;
+                  u_p;
+                  passive = clause;
+                  passive_lit;
+                  passive_pos;
+                  scope_passive = 0;
+                  sup_kind = LambdaSup;
+                }
+            in
+            Util.debugf ~section 10
+              "[Trying lambdasup from %a into %a with term %a into term %a]"
+              (fun k -> k C.pp active C.pp clause T.pp s T.pp u_p);
+            do_superposition env info
+          | _ -> None
+        in
+        (* all terms that occur in an equation in the active_set
             and that are potentially unifiable with u_p (u at position p) *)
-           I.retrieve_unifiables ((get_state env).idx_sup_from, 1) (u_p, 0)
-           |> Iter.filter_map (fun (t, p, s) -> do_sup t p s))
+        I.retrieve_unifiables ((get_state env).idx_sup_from, 1) (u_p, 0)
+        |> Iter.filter_map (fun (t, p, s) -> do_sup t p s))
     |> Iter.to_rev_list
   in
   new_clauses
@@ -1561,64 +1558,61 @@ let infer_fluidsup_active env clause =
         (C.lits clause)
       |> Iter.filter (fun (_, t, sign, _) -> sign || T.equal t T.false_)
       |> Iter.flat_map (fun (s, t, _, s_pos) ->
-             I.fold (get_state env).idx_fluidsup_into
-               (fun acc u_p with_pos ->
-                 assert (
-                   is_fluid_or_deep env (Clause.WithPos.clause with_pos) u_p);
-                 assert (T.DB.is_closed u_p);
-                 (* Create prefix variable H and use H s = H t for superposition *)
-                 let var_h =
-                   T.var
-                     (HVar.fresh
-                        ~ty:
-                          (Type.arrow
-                             [ T.ty s ]
-                             (Type.var (HVar.fresh ~ty:Type.tType ())))
-                        ())
-                 in
-                 let hs = T.app var_h [ s ] in
-                 let ht = T.app var_h [ t ] in
-                 let res =
-                   Env.flex_get_of env k_unif_alg (u_p, 1) (hs, 0)
-                   |> OSeq.map (fun osubst ->
-                          osubst
-                          |> CCOpt.flat_map (fun subst ->
-                                 let passive = Clause.WithPos.clause with_pos in
-                                 let passive_pos =
-                                   Clause.WithPos.pos with_pos
-                                 in
-                                 let passive_lit, _ =
-                                   Lits.Pos.lit_at (C.lits passive) passive_pos
-                                 in
-                                 let info =
-                                   SupInfo.
-                                     {
-                                       s = hs;
-                                       t = ht;
-                                       active = clause;
-                                       active_pos = s_pos;
-                                       scope_active = 0;
-                                       u_p;
-                                       passive;
-                                       passive_lit;
-                                       passive_pos;
-                                       scope_passive = 1;
-                                       subst;
-                                       sup_kind = FluidSup;
-                                     }
-                                 in
-                                 do_superposition env info))
-                 in
-                 let penalty =
-                   max (C.penalty clause)
-                     (C.penalty (Clause.WithPos.clause with_pos))
-                   + Env.flex_get_of env k_fluidsup_penalty
-                 in
-                 (* /!\ may differ from the actual penalty (by -2) *)
-                 Iter.cons
-                   (penalty, res, [ clause; Clause.WithPos.clause with_pos ])
-                   acc)
-               Iter.empty)
+          I.fold (get_state env).idx_fluidsup_into
+            (fun acc u_p with_pos ->
+              assert (is_fluid_or_deep env (Clause.WithPos.clause with_pos) u_p);
+              assert (T.DB.is_closed u_p);
+              (* Create prefix variable H and use H s = H t for superposition *)
+              let var_h =
+                T.var
+                  (HVar.fresh
+                     ~ty:
+                       (Type.arrow
+                          [ T.ty s ]
+                          (Type.var (HVar.fresh ~ty:Type.tType ())))
+                     ())
+              in
+              let hs = T.app var_h [ s ] in
+              let ht = T.app var_h [ t ] in
+              let res =
+                Env.flex_get_of env k_unif_alg (u_p, 1) (hs, 0)
+                |> OSeq.map (fun osubst ->
+                    osubst
+                    |> CCOpt.flat_map (fun subst ->
+                        let passive = Clause.WithPos.clause with_pos in
+                        let passive_pos = Clause.WithPos.pos with_pos in
+                        let passive_lit, _ =
+                          Lits.Pos.lit_at (C.lits passive) passive_pos
+                        in
+                        let info =
+                          SupInfo.
+                            {
+                              s = hs;
+                              t = ht;
+                              active = clause;
+                              active_pos = s_pos;
+                              scope_active = 0;
+                              u_p;
+                              passive;
+                              passive_lit;
+                              passive_pos;
+                              scope_passive = 1;
+                              subst;
+                              sup_kind = FluidSup;
+                            }
+                        in
+                        do_superposition env info))
+              in
+              let penalty =
+                max (C.penalty clause)
+                  (C.penalty (Clause.WithPos.clause with_pos))
+                + Env.flex_get_of env k_fluidsup_penalty
+              in
+              (* /!\ may differ from the actual penalty (by -2) *)
+              Iter.cons
+                (penalty, res, [ clause; Clause.WithPos.clause with_pos ])
+                acc)
+            Iter.empty)
       |> Iter.to_rev_list
     else
       []
@@ -1648,60 +1642,60 @@ let infer_fluidsup_passive env clause =
         ~ty_args:false (C.lits clause)
       |> Iter.filter (fun (u_p, _) -> is_fluid_or_deep env clause u_p)
       |> Iter.flat_map (fun (u_p, passive_pos) ->
-             let passive_lit, _ = Lits.Pos.lit_at (C.lits clause) passive_pos in
-             I.fold (get_state env).idx_sup_from
-               (fun acc _ with_pos ->
-                 let active = Clause.WithPos.clause with_pos in
-                 let s_pos = Clause.WithPos.pos with_pos in
-                 let res =
-                   match Lits.View.get_eqn (C.lits active) s_pos with
-                   | Some (s, t, true) ->
-                     (* Create prefix variable H and use H s = H t for superposition *)
-                     let var_h =
-                       T.var
-                         (HVar.fresh
-                            ~ty:
-                              (Type.arrow
-                                 [ T.ty s ]
-                                 (Type.var (HVar.fresh ~ty:Type.tType ())))
-                            ())
-                     in
-                     let hs = T.app var_h [ s ] in
-                     let ht = T.app var_h [ t ] in
-                     Env.flex_get_of env k_unif_alg (hs, 1) (u_p, 0)
-                     |> OSeq.map (fun osubst ->
-                            osubst
-                            |> CCOpt.flat_map (fun subst ->
-                                   let info =
-                                     SupInfo.
-                                       {
-                                         s = hs;
-                                         t = ht;
-                                         active;
-                                         active_pos = s_pos;
-                                         scope_active = 1;
-                                         subst;
-                                         u_p;
-                                         passive = clause;
-                                         passive_lit;
-                                         passive_pos;
-                                         scope_passive = 0;
-                                         sup_kind = FluidSup;
-                                       }
-                                   in
-                                   do_superposition env info))
-                   | _ -> assert false
-                 in
-                 let penalty =
-                   max (C.penalty clause)
-                     (C.penalty (Clause.WithPos.clause with_pos))
-                   + Env.flex_get_of env k_fluidsup_penalty
-                 in
-                 (* /!\ may differ from the actual penalty (by -2) *)
-                 Iter.cons
-                   (penalty, res, [ clause; Clause.WithPos.clause with_pos ])
-                   acc)
-               Iter.empty)
+          let passive_lit, _ = Lits.Pos.lit_at (C.lits clause) passive_pos in
+          I.fold (get_state env).idx_sup_from
+            (fun acc _ with_pos ->
+              let active = Clause.WithPos.clause with_pos in
+              let s_pos = Clause.WithPos.pos with_pos in
+              let res =
+                match Lits.View.get_eqn (C.lits active) s_pos with
+                | Some (s, t, true) ->
+                  (* Create prefix variable H and use H s = H t for superposition *)
+                  let var_h =
+                    T.var
+                      (HVar.fresh
+                         ~ty:
+                           (Type.arrow
+                              [ T.ty s ]
+                              (Type.var (HVar.fresh ~ty:Type.tType ())))
+                         ())
+                  in
+                  let hs = T.app var_h [ s ] in
+                  let ht = T.app var_h [ t ] in
+                  Env.flex_get_of env k_unif_alg (hs, 1) (u_p, 0)
+                  |> OSeq.map (fun osubst ->
+                      osubst
+                      |> CCOpt.flat_map (fun subst ->
+                          let info =
+                            SupInfo.
+                              {
+                                s = hs;
+                                t = ht;
+                                active;
+                                active_pos = s_pos;
+                                scope_active = 1;
+                                subst;
+                                u_p;
+                                passive = clause;
+                                passive_lit;
+                                passive_pos;
+                                scope_passive = 0;
+                                sup_kind = FluidSup;
+                              }
+                          in
+                          do_superposition env info))
+                | _ -> assert false
+              in
+              let penalty =
+                max (C.penalty clause)
+                  (C.penalty (Clause.WithPos.clause with_pos))
+                + Env.flex_get_of env k_fluidsup_penalty
+              in
+              (* /!\ may differ from the actual penalty (by -2) *)
+              Iter.cons
+                (penalty, res, [ clause; Clause.WithPos.clause with_pos ])
+                acc)
+            Iter.empty)
       |> Iter.to_rev_list
     else
       []
@@ -1730,92 +1724,88 @@ let infer_dupsup_active env clause =
       (C.lits clause)
     |> Iter.filter (fun (_, t, sign, _) -> sign || T.equal t T.false_)
     |> Iter.flat_map (fun (s, t, _, s_pos) ->
-           I.fold (get_state env).idx_dupsup_into
-             (fun acc u_p with_pos ->
-               assert (T.is_var (T.head_term u_p));
-               assert (T.DB.is_closed u_p);
-               if
-                 T.Seq.vars s
-                 |> Iter.append (T.Seq.vars t)
-                 |> Iter.exists (fun v -> Type.is_tType (HVar.ty v))
-               then
-                 acc
-               else (
-                 let scope_passive, scope_active = 0, 1 in
-                 let hd_up, args_up = T.as_app u_p in
-                 let arg_types = List.map T.ty args_up in
-                 let n = List.length args_up in
-                 let var_up = T.as_var_exn hd_up in
-                 let var_w =
-                   HVar.fresh ~ty:(Type.arrow arg_types (T.ty t)) ()
-                 in
-                 let var_z =
-                   HVar.fresh
-                     ~ty:(Type.arrow (arg_types @ [ T.ty t ]) (T.ty u_p))
-                     ()
-                 in
-                 let db_args =
-                   List.mapi (fun i ty -> T.bvar ~ty (n - 1 - i)) arg_types
-                 in
-                 let term_w, term_z = T.var var_w, T.var var_z in
-                 let w_db = T.app term_w db_args in
-                 let z_db = T.app term_z (db_args @ [ w_db ]) in
-                 let y_subst_val = T.fun_l arg_types z_db in
-                 assert (T.DB.is_closed y_subst_val);
-                 let subst_y =
-                   US.FO.bind US.empty (var_up, scope_passive)
-                     (y_subst_val, scope_passive)
-                 in
-                 let w_args = T.app term_w args_up in
-                 let w_args =
-                   Subst.FO.apply Subst.Renaming.none (US.subst subst_y)
-                     (w_args, scope_passive)
-                 in
-                 let z_args = T.app term_z (args_up @ [ t ]) in
-                 let res =
-                   Env.flex_get_of env k_unif_alg (s, scope_active)
-                     (w_args, scope_passive)
-                   |> OSeq.map (fun osubst ->
-                          osubst
-                          |> CCOpt.flat_map (fun subst ->
-                                 let subst = US.merge subst subst_y in
-                                 let passive = Clause.WithPos.clause with_pos in
-                                 let passive_pos =
-                                   Clause.WithPos.pos with_pos
-                                 in
-                                 let passive_lit, _ =
-                                   Lits.Pos.lit_at (C.lits passive) passive_pos
-                                 in
-                                 let info =
-                                   SupInfo.
-                                     {
-                                       s;
-                                       t = z_args;
-                                       active = clause;
-                                       active_pos = s_pos;
-                                       scope_active;
-                                       u_p = w_args;
-                                       passive;
-                                       passive_lit;
-                                       passive_pos;
-                                       scope_passive;
-                                       subst;
-                                       sup_kind = DupSup;
-                                     }
-                                 in
-                                 do_superposition env info))
-                 in
-                 let penalty =
-                   max (C.penalty clause)
-                     (C.penalty (Clause.WithPos.clause with_pos))
-                   + (Env.flex_get_of env k_fluidsup_penalty / 3)
-                 in
-                 (* /!\ may differ from the actual penalty (by -2) *)
-                 Iter.cons
-                   (penalty, res, [ clause; Clause.WithPos.clause with_pos ])
-                   acc
-               ))
-             Iter.empty)
+        I.fold (get_state env).idx_dupsup_into
+          (fun acc u_p with_pos ->
+            assert (T.is_var (T.head_term u_p));
+            assert (T.DB.is_closed u_p);
+            if
+              T.Seq.vars s
+              |> Iter.append (T.Seq.vars t)
+              |> Iter.exists (fun v -> Type.is_tType (HVar.ty v))
+            then
+              acc
+            else (
+              let scope_passive, scope_active = 0, 1 in
+              let hd_up, args_up = T.as_app u_p in
+              let arg_types = List.map T.ty args_up in
+              let n = List.length args_up in
+              let var_up = T.as_var_exn hd_up in
+              let var_w = HVar.fresh ~ty:(Type.arrow arg_types (T.ty t)) () in
+              let var_z =
+                HVar.fresh
+                  ~ty:(Type.arrow (arg_types @ [ T.ty t ]) (T.ty u_p))
+                  ()
+              in
+              let db_args =
+                List.mapi (fun i ty -> T.bvar ~ty (n - 1 - i)) arg_types
+              in
+              let term_w, term_z = T.var var_w, T.var var_z in
+              let w_db = T.app term_w db_args in
+              let z_db = T.app term_z (db_args @ [ w_db ]) in
+              let y_subst_val = T.fun_l arg_types z_db in
+              assert (T.DB.is_closed y_subst_val);
+              let subst_y =
+                US.FO.bind US.empty (var_up, scope_passive)
+                  (y_subst_val, scope_passive)
+              in
+              let w_args = T.app term_w args_up in
+              let w_args =
+                Subst.FO.apply Subst.Renaming.none (US.subst subst_y)
+                  (w_args, scope_passive)
+              in
+              let z_args = T.app term_z (args_up @ [ t ]) in
+              let res =
+                Env.flex_get_of env k_unif_alg (s, scope_active)
+                  (w_args, scope_passive)
+                |> OSeq.map (fun osubst ->
+                    osubst
+                    |> CCOpt.flat_map (fun subst ->
+                        let subst = US.merge subst subst_y in
+                        let passive = Clause.WithPos.clause with_pos in
+                        let passive_pos = Clause.WithPos.pos with_pos in
+                        let passive_lit, _ =
+                          Lits.Pos.lit_at (C.lits passive) passive_pos
+                        in
+                        let info =
+                          SupInfo.
+                            {
+                              s;
+                              t = z_args;
+                              active = clause;
+                              active_pos = s_pos;
+                              scope_active;
+                              u_p = w_args;
+                              passive;
+                              passive_lit;
+                              passive_pos;
+                              scope_passive;
+                              subst;
+                              sup_kind = DupSup;
+                            }
+                        in
+                        do_superposition env info))
+              in
+              let penalty =
+                max (C.penalty clause)
+                  (C.penalty (Clause.WithPos.clause with_pos))
+                + (Env.flex_get_of env k_fluidsup_penalty / 3)
+              in
+              (* /!\ may differ from the actual penalty (by -2) *)
+              Iter.cons
+                (penalty, res, [ clause; Clause.WithPos.clause with_pos ])
+                acc
+            ))
+          Iter.empty)
     |> Iter.to_rev_list
   in
   if Env.should_force_stream_eval env () then
@@ -1841,96 +1831,92 @@ let infer_dupsup_passive env clause =
       ~ord:(get_state env).ord_ref ~which:`Max ~eligible ~ty_args:false
       (C.lits clause)
     |> Iter.filter (fun (u_p, _) ->
-           T.is_var (T.head_term u_p)
-           && (not (CCList.is_empty @@ T.args u_p))
-           && Type.is_ground (T.ty u_p))
+        T.is_var (T.head_term u_p)
+        && (not (CCList.is_empty @@ T.args u_p))
+        && Type.is_ground (T.ty u_p))
     |> Iter.flat_map (fun (u_p, passive_pos) ->
-           let passive_lit, _ = Lits.Pos.lit_at (C.lits clause) passive_pos in
-           I.fold (get_state env).idx_sup_from
-             (fun acc _ with_pos ->
-               let active = Clause.WithPos.clause with_pos in
-               let s_pos = Clause.WithPos.pos with_pos in
-               match Lits.View.get_eqn (C.lits active) s_pos with
-               | Some (s, t, true) ->
-                 if
-                   T.Seq.vars s
-                   |> Iter.append (T.Seq.vars t)
-                   |> Iter.exists (fun v -> Type.is_tType (HVar.ty v))
-                 then
-                   acc
-                 else (
-                   let scope_passive, scope_active = 0, 1 in
-                   let hd_up, args_up = T.as_app u_p in
-                   let arg_types = List.map T.ty args_up in
-                   let n = List.length args_up in
-                   let var_up = T.as_var_exn hd_up in
-                   let var_w =
-                     HVar.fresh ~ty:(Type.arrow arg_types (T.ty t)) ()
-                   in
-                   let var_z =
-                     HVar.fresh
-                       ~ty:
-                         (Type.arrow
-                            (List.append arg_types [ T.ty t ])
-                            (T.ty u_p))
-                       ()
-                   in
-                   let db_args =
-                     List.mapi (fun i ty -> T.bvar ~ty (n - 1 - i)) arg_types
-                   in
-                   let term_w, term_z = T.var var_w, T.var var_z in
-                   let w_db = T.app term_w db_args in
-                   let z_db = T.app term_z (List.append db_args [ w_db ]) in
-                   let y_subst_val = T.fun_l arg_types z_db in
-                   assert (T.DB.is_closed y_subst_val);
-                   let subst_y =
-                     US.FO.bind US.empty (var_up, scope_passive)
-                       (y_subst_val, scope_passive)
-                   in
-                   let w_args = T.app term_w args_up in
-                   let w_args =
-                     Subst.FO.apply Subst.Renaming.none (US.subst subst_y)
-                       (w_args, scope_passive)
-                   in
-                   let z_args = T.app term_z (List.append args_up [ t ]) in
-                   let res =
-                     Env.flex_get_of env k_unif_alg (w_args, scope_passive)
-                       (s, scope_active)
-                     |> OSeq.map (fun osubst ->
-                            osubst
-                            |> CCOpt.flat_map (fun subst ->
-                                   let subst = US.merge subst subst_y in
-                                   let info =
-                                     SupInfo.
-                                       {
-                                         s;
-                                         t = z_args;
-                                         active;
-                                         active_pos = s_pos;
-                                         scope_active;
-                                         u_p = w_args;
-                                         passive = clause;
-                                         passive_lit;
-                                         passive_pos;
-                                         scope_passive;
-                                         subst;
-                                         sup_kind = DupSup;
-                                       }
-                                   in
-                                   do_superposition env info))
-                   in
-                   let penalty =
-                     max (C.penalty clause)
-                       (C.penalty (Clause.WithPos.clause with_pos))
-                     + (Env.flex_get_of env k_fluidsup_penalty / 3)
-                   in
-                   (* /!\ may differ from the actual penalty (by -2) *)
-                   Iter.cons
-                     (penalty, res, [ clause; Clause.WithPos.clause with_pos ])
-                     acc
-                 )
-               | _ -> acc)
-             Iter.empty)
+        let passive_lit, _ = Lits.Pos.lit_at (C.lits clause) passive_pos in
+        I.fold (get_state env).idx_sup_from
+          (fun acc _ with_pos ->
+            let active = Clause.WithPos.clause with_pos in
+            let s_pos = Clause.WithPos.pos with_pos in
+            match Lits.View.get_eqn (C.lits active) s_pos with
+            | Some (s, t, true) ->
+              if
+                T.Seq.vars s
+                |> Iter.append (T.Seq.vars t)
+                |> Iter.exists (fun v -> Type.is_tType (HVar.ty v))
+              then
+                acc
+              else (
+                let scope_passive, scope_active = 0, 1 in
+                let hd_up, args_up = T.as_app u_p in
+                let arg_types = List.map T.ty args_up in
+                let n = List.length args_up in
+                let var_up = T.as_var_exn hd_up in
+                let var_w = HVar.fresh ~ty:(Type.arrow arg_types (T.ty t)) () in
+                let var_z =
+                  HVar.fresh
+                    ~ty:
+                      (Type.arrow (List.append arg_types [ T.ty t ]) (T.ty u_p))
+                    ()
+                in
+                let db_args =
+                  List.mapi (fun i ty -> T.bvar ~ty (n - 1 - i)) arg_types
+                in
+                let term_w, term_z = T.var var_w, T.var var_z in
+                let w_db = T.app term_w db_args in
+                let z_db = T.app term_z (List.append db_args [ w_db ]) in
+                let y_subst_val = T.fun_l arg_types z_db in
+                assert (T.DB.is_closed y_subst_val);
+                let subst_y =
+                  US.FO.bind US.empty (var_up, scope_passive)
+                    (y_subst_val, scope_passive)
+                in
+                let w_args = T.app term_w args_up in
+                let w_args =
+                  Subst.FO.apply Subst.Renaming.none (US.subst subst_y)
+                    (w_args, scope_passive)
+                in
+                let z_args = T.app term_z (List.append args_up [ t ]) in
+                let res =
+                  Env.flex_get_of env k_unif_alg (w_args, scope_passive)
+                    (s, scope_active)
+                  |> OSeq.map (fun osubst ->
+                      osubst
+                      |> CCOpt.flat_map (fun subst ->
+                          let subst = US.merge subst subst_y in
+                          let info =
+                            SupInfo.
+                              {
+                                s;
+                                t = z_args;
+                                active;
+                                active_pos = s_pos;
+                                scope_active;
+                                u_p = w_args;
+                                passive = clause;
+                                passive_lit;
+                                passive_pos;
+                                scope_passive;
+                                subst;
+                                sup_kind = DupSup;
+                              }
+                          in
+                          do_superposition env info))
+                in
+                let penalty =
+                  max (C.penalty clause)
+                    (C.penalty (Clause.WithPos.clause with_pos))
+                  + (Env.flex_get_of env k_fluidsup_penalty / 3)
+                in
+                (* /!\ may differ from the actual penalty (by -2) *)
+                Iter.cons
+                  (penalty, res, [ clause; Clause.WithPos.clause with_pos ])
+                  acc
+              )
+            | _ -> acc)
+          Iter.empty)
     |> Iter.to_rev_list
   in
   if Env.should_force_stream_eval env () then
@@ -2008,24 +1994,24 @@ let infer_subvarsup_active env clause =
     (C.lits clause)
   |> Iter.filter (fun (_, t, sign, _) -> sign || T.equal t T.false_)
   |> Iter.filter (fun (_, t, _, _) ->
-         T.is_var t || T.is_app_var t || T.is_comb t)
+      T.is_var t || T.is_app_var t || T.is_comb t)
   |> Iter.flat_map (fun (s, t, _, s_pos) ->
-         (* rewrite clauses using s *)
-         I.fold (get_state env).idx_subvarsup_into
-           (fun acc _ with_pos ->
-             let active_pos = C.WithPos.make ~clause ~pos:s_pos in
-             let passive_pos =
-               C.WithPos.make
-                 ~clause:(Clause.WithPos.clause with_pos)
-                 ~pos:(Clause.WithPos.pos with_pos)
-             in
-             match do_subvarsup ~passive_pos ~active_pos env with
-             | Some c ->
-               Util.debugf ~section 2 "svs: @[%a@]@. @[%a@]. @[%a@]@." (fun k ->
-                   k C.pp clause C.pp (Clause.WithPos.clause with_pos) C.pp c);
-               Iter.cons c acc
-             | None -> acc)
-           Iter.empty)
+      (* rewrite clauses using s *)
+      I.fold (get_state env).idx_subvarsup_into
+        (fun acc _ with_pos ->
+          let active_pos = C.WithPos.make ~clause ~pos:s_pos in
+          let passive_pos =
+            C.WithPos.make
+              ~clause:(Clause.WithPos.clause with_pos)
+              ~pos:(Clause.WithPos.pos with_pos)
+          in
+          match do_subvarsup ~passive_pos ~active_pos env with
+          | Some c ->
+            Util.debugf ~section 2 "svs: @[%a@]@. @[%a@]. @[%a@]@." (fun k ->
+                k C.pp clause C.pp (Clause.WithPos.clause with_pos) C.pp c);
+            Iter.cons c acc
+          | None -> acc)
+        Iter.empty)
   |> Iter.to_rev_list
 
 let infer_subvarsup_passive env clause =
@@ -2034,35 +2020,33 @@ let infer_subvarsup_passive env clause =
     ~ord:(get_state env).ord_ref ~which:`Max ~eligible ~ty_args:false
     (C.lits clause)
   |> Iter.filter (fun (t, pos) ->
-         match T.view t with
-         | T.Var _ -> has_bad_occurrence_elsewhere env clause t pos
-         | T.App (hd, [ x ]) -> has_bad_occurrence_elsewhere env clause hd pos
-         | _ -> false)
+      match T.view t with
+      | T.Var _ -> has_bad_occurrence_elsewhere env clause t pos
+      | T.App (hd, [ x ]) -> has_bad_occurrence_elsewhere env clause hd pos
+      | _ -> false)
   |> Iter.flat_map (fun (u_p, passive_pos) ->
-         I.fold (get_state env).idx_sup_from
-           (fun acc _ with_pos ->
-             let passive_pos = C.WithPos.make ~clause ~pos:passive_pos in
-             match
-               Lits.View.get_eqn
-                 (C.lits (Clause.WithPos.clause with_pos))
-                 (Clause.WithPos.pos with_pos)
-             with
-             | Some (l, r, _) when T.is_var r || T.is_app_var r || T.is_comb r
-               ->
-               let active_pos =
-                 C.WithPos.make
-                   ~clause:(Clause.WithPos.clause with_pos)
-                   ~pos:(Clause.WithPos.pos with_pos)
-               in
-               (match do_subvarsup ~passive_pos ~active_pos env with
-               | Some c ->
-                 Util.debugf ~section 2 "svs: @[%a@]@. @[%a@]. @[%a@]@."
-                   (fun k ->
-                     k C.pp (Clause.WithPos.clause with_pos) C.pp clause C.pp c);
-                 Iter.cons c acc
-               | None -> acc)
-             | _ -> acc)
-           Iter.empty)
+      I.fold (get_state env).idx_sup_from
+        (fun acc _ with_pos ->
+          let passive_pos = C.WithPos.make ~clause ~pos:passive_pos in
+          match
+            Lits.View.get_eqn
+              (C.lits (Clause.WithPos.clause with_pos))
+              (Clause.WithPos.pos with_pos)
+          with
+          | Some (l, r, _) when T.is_var r || T.is_app_var r || T.is_comb r ->
+            let active_pos =
+              C.WithPos.make
+                ~clause:(Clause.WithPos.clause with_pos)
+                ~pos:(Clause.WithPos.pos with_pos)
+            in
+            (match do_subvarsup ~passive_pos ~active_pos env with
+            | Some c ->
+              Util.debugf ~section 2 "svs: @[%a@]@. @[%a@]. @[%a@]@." (fun k ->
+                  k C.pp (Clause.WithPos.clause with_pos) C.pp clause C.pp c);
+              Iter.cons c acc
+            | None -> acc)
+          | _ -> acc)
+        Iter.empty)
   |> Iter.to_rev_list
 
 (* ----------------------------------------------------------------------
@@ -2079,63 +2063,60 @@ let infer_equality_resolution_aux ~unify ~iterate_substs env clause =
     Lits.fold_eqn ~sign:false ~ord:(get_state env).ord_ref ~both:false ~eligible
       (C.lits clause)
     |> Iter.filter_map (fun (l, r, _, l_pos) ->
-           let do_eq_res us =
-             let pos = Lits.Pos.idx l_pos in
-             (* CCFormat.printf "trying %d@." pos; *)
-             let eligible = BV.get (C.eligible_res_no_subst clause) pos in
-             if eligible
-             (* subst(lit) is maximal, we can do the inference *)
-             then (
-               Util.incr_stat stat_equality_resolution_call;
-               let renaming = Subst.Renaming.create () in
-               let subst = US.subst us in
-               let rule = Proof.Rule.mk "eq_res" in
-               let new_lits = CCArray.except_idx (C.lits clause) pos in
-               let new_lits =
-                 Lit.apply_subst_list renaming subst (new_lits, 0)
-               in
-               let c_guard = Literal.of_unif_subst renaming us in
-               let subst_is_ho =
-                 Subst.codomain subst
-                 |> Iter.exists (fun (t, _) ->
-                        Iter.exists
-                          (fun t -> T.is_fun t || T.is_comb t)
-                          (T.Seq.subterms ~include_builtin:true
-                             (T.of_term_unsafe t)))
-               in
-               let tags =
-                 (if subst_is_ho then
-                    [ Proof.Tag.T_ho ]
-                  else
-                    [])
-                 @ Unif_subst.tags us
-               in
-               let trail = C.trail clause in
-               let penalty =
-                 if C.penalty clause = 1 then
-                   1
-                 else
-                   C.penalty clause + 1
-               in
-               let proof =
-                 Proof.Step.inference ~rule ~tags
-                   [ C.proof_parent_subst renaming (clause, 0) subst ]
-               in
-               let new_clause =
-                 C.create ~ctx:(Env.get_ctx env) ~trail ~penalty
-                   (c_guard @ new_lits) proof
-               in
-               (* CCFormat.printf "success: @[%a@]@." C.pp new_clause; *)
-               Util.debugf ~section 2
-                 "@[<hv2>equality resolution on@ @[%a@]@ yields @[%a@],\n\
-                 \ subst @[%a@]@]" (fun k ->
-                   k C.pp clause C.pp new_clause US.pp us);
-               Some new_clause
-             ) else
-               None
-           in
-           let substs = unify (l, 0) (r, 0) in
-           iterate_substs substs do_eq_res)
+        let do_eq_res us =
+          let pos = Lits.Pos.idx l_pos in
+          (* CCFormat.printf "trying %d@." pos; *)
+          let eligible = BV.get (C.eligible_res_no_subst clause) pos in
+          if eligible
+          (* subst(lit) is maximal, we can do the inference *)
+          then (
+            Util.incr_stat stat_equality_resolution_call;
+            let renaming = Subst.Renaming.create () in
+            let subst = US.subst us in
+            let rule = Proof.Rule.mk "eq_res" in
+            let new_lits = CCArray.except_idx (C.lits clause) pos in
+            let new_lits = Lit.apply_subst_list renaming subst (new_lits, 0) in
+            let c_guard = Literal.of_unif_subst renaming us in
+            let subst_is_ho =
+              Subst.codomain subst
+              |> Iter.exists (fun (t, _) ->
+                  Iter.exists
+                    (fun t -> T.is_fun t || T.is_comb t)
+                    (T.Seq.subterms ~include_builtin:true (T.of_term_unsafe t)))
+            in
+            let tags =
+              (if subst_is_ho then
+                 [ Proof.Tag.T_ho ]
+               else
+                 [])
+              @ Unif_subst.tags us
+            in
+            let trail = C.trail clause in
+            let penalty =
+              if C.penalty clause = 1 then
+                1
+              else
+                C.penalty clause + 1
+            in
+            let proof =
+              Proof.Step.inference ~rule ~tags
+                [ C.proof_parent_subst renaming (clause, 0) subst ]
+            in
+            let new_clause =
+              C.create ~ctx:(Env.get_ctx env) ~trail ~penalty
+                (c_guard @ new_lits) proof
+            in
+            (* CCFormat.printf "success: @[%a@]@." C.pp new_clause; *)
+            Util.debugf ~section 2
+              "@[<hv2>equality resolution on@ @[%a@]@ yields @[%a@],\n\
+              \ subst @[%a@]@]" (fun k ->
+                k C.pp clause C.pp new_clause US.pp us);
+            Some new_clause
+          ) else
+            None
+        in
+        let substs = unify (l, 0) (r, 0) in
+        iterate_substs substs do_eq_res)
     |> Iter.to_rev_list
   in
   new_clauses
@@ -2210,9 +2191,9 @@ let do_eq_factoring env info =
     let subst_is_ho =
       Subst.codomain subst
       |> Iter.exists (fun (t, _) ->
-             Iter.exists
-               (fun t -> T.is_fun t || T.is_comb t)
-               (T.Seq.subterms ~include_builtin:true (T.of_term_unsafe t)))
+          Iter.exists
+            (fun t -> T.is_fun t || T.is_comb t)
+            (T.Seq.subterms ~include_builtin:true (T.of_term_unsafe t)))
     in
     let tags =
       (if subst_is_ho then
@@ -2277,30 +2258,30 @@ let infer_equality_factoring_aux ~unify ~iterate_substs env clause =
     Lits.fold_eqn ~ord:(get_state env).ord_ref ~both:true ~eligible
       (C.lits clause)
     |> Iter.flat_map (fun (s, t, _, s_pos) ->
-           (* try with s=t *)
-           let active_idx = Lits.Pos.idx s_pos in
-           find_unifiable_lits active_idx s s_pos
-           |> Iter.filter_map (fun (u, v, substs) ->
-                  let is_pred_var_eq_fact =
-                    (T.is_app_var s && Type.is_prop (T.ty s))
-                    || (T.is_app_var u && Type.is_prop (T.ty u))
-                  in
-                  iterate_substs substs (fun subst ->
-                      let info =
-                        EqFactInfo.
-                          {
-                            clause;
-                            s;
-                            t;
-                            u;
-                            v;
-                            active_idx;
-                            subst;
-                            scope = 0;
-                            is_pred_var_eq_fact;
-                          }
-                      in
-                      do_eq_factoring env info)))
+        (* try with s=t *)
+        let active_idx = Lits.Pos.idx s_pos in
+        find_unifiable_lits active_idx s s_pos
+        |> Iter.filter_map (fun (u, v, substs) ->
+            let is_pred_var_eq_fact =
+              (T.is_app_var s && Type.is_prop (T.ty s))
+              || (T.is_app_var u && Type.is_prop (T.ty u))
+            in
+            iterate_substs substs (fun subst ->
+                let info =
+                  EqFactInfo.
+                    {
+                      clause;
+                      s;
+                      t;
+                      u;
+                      v;
+                      active_idx;
+                      subst;
+                      scope = 0;
+                      is_pred_var_eq_fact;
+                    }
+                in
+                do_eq_factoring env info)))
     |> Iter.to_rev_list
   in
   new_clauses
@@ -2402,102 +2383,100 @@ let demod_nf env (st : demod_state) c t : T.t =
     let step =
       UnitIdx.retrieve ~sign:true ((get_state env).idx_simpl, cur_sc) (t, 0)
       |> Iter.find (fun (l, r, (_, _, sign, unit_clause), subst) ->
-             let expand_quant =
-               not @@ Env.flex_get_of env Combinators.k_enable_combinators
-             in
-             let norm t = Lambda.eta_reduce ~expand_quant @@ Lambda.snf t in
-             let norm_b t = T.normalize_bools @@ norm t in
-             (* r' is the subterm is going to be rewritten into *)
-             let r' =
-               norm @@ Subst.FO.apply Subst.Renaming.none subst (r, cur_sc)
-             in
-             assert (C.is_unit_clause unit_clause);
-             (* NOTE: The conditions of Schulz's "braniac" paper cannot be 
+          let expand_quant =
+            not @@ Env.flex_get_of env Combinators.k_enable_combinators
+          in
+          let norm t = Lambda.eta_reduce ~expand_quant @@ Lambda.snf t in
+          let norm_b t = T.normalize_bools @@ norm t in
+          (* r' is the subterm is going to be rewritten into *)
+          let r' =
+            norm @@ Subst.FO.apply Subst.Renaming.none subst (r, cur_sc)
+          in
+          assert (C.is_unit_clause unit_clause);
+          (* NOTE: The conditions of Schulz's "braniac" paper cannot be 
               justified by the standard redundancy criterion.
               Instead, we check whether the rewriting clause is smaller 
               than the rewritten clause. *)
-             (* Only perform the rewrite if: *)
-             if
-               (* - The rewriting clause is positive *)
-               sign
-               (* - The clause trails are compatible *)
-               && C.trail_subsumes unit_clause c
-               (* - The clauses are distinct *)
-               && (not (C.equal unit_clause c))
-               (* - The rewriting clause is smaller than the rewritten clause *)
-               && ((not toplevel)
-                  || C.lits c
-                     |> CCArray.exists (fun lit ->
-                            Lit.Seq.terms lit
-                            |> Iter.exists (fun s ->
-                                   Comp.is_Gt_or_Geq
-                                     (O.compare (get_state env).ord_ref s t)))
-                  || C.lits c
-                     |> CCArray.exists (fun lit ->
-                            match Literal.View.as_eqn lit with
-                            | Some (litl, litr, true) ->
-                              T.equal t litl
-                              && Comp.is_Gt_or_Geq
-                                   (O.compare (get_state env).ord_ref litr r')
-                              || T.equal t litr
-                                 && Comp.is_Gt_or_Geq
-                                      (O.compare (get_state env).ord_ref litl r')
-                            | Some (litl, litr, false) ->
-                              T.equal t litl || T.equal t litr
-                            | None -> false))
-               &&
-               (* - subst(l) > subst(r) *)
-               Comp.is_Gt_or_Geq
-                 (O.compare (get_state env).ord_ref
-                    (S.FO.apply Subst.Renaming.none subst (l, cur_sc))
-                    (S.FO.apply Subst.Renaming.none subst (r, cur_sc)))
-             then (
-               Util.debugf ~section 3
-                 "@[<hv2>demod(%d):@ @[<hv>t=%a[%d],@ l=%a[%d],@ r=%a[%d]@],@ \
-                  subst=@[%a@]@]" (fun k ->
-                   k (C.id c) T.pp t 0 T.pp l cur_sc T.pp r cur_sc S.pp subst);
+          (* Only perform the rewrite if: *)
+          if
+            (* - The rewriting clause is positive *)
+            sign
+            (* - The clause trails are compatible *)
+            && C.trail_subsumes unit_clause c
+            (* - The clauses are distinct *)
+            && (not (C.equal unit_clause c))
+            (* - The rewriting clause is smaller than the rewritten clause *)
+            && ((not toplevel)
+               || C.lits c
+                  |> CCArray.exists (fun lit ->
+                      Lit.Seq.terms lit
+                      |> Iter.exists (fun s ->
+                          Comp.is_Gt_or_Geq
+                            (O.compare (get_state env).ord_ref s t)))
+               || C.lits c
+                  |> CCArray.exists (fun lit ->
+                      match Literal.View.as_eqn lit with
+                      | Some (litl, litr, true) ->
+                        T.equal t litl
+                        && Comp.is_Gt_or_Geq
+                             (O.compare (get_state env).ord_ref litr r')
+                        || T.equal t litr
+                           && Comp.is_Gt_or_Geq
+                                (O.compare (get_state env).ord_ref litl r')
+                      | Some (litl, litr, false) ->
+                        T.equal t litl || T.equal t litr
+                      | None -> false))
+            &&
+            (* - subst(l) > subst(r) *)
+            Comp.is_Gt_or_Geq
+              (O.compare (get_state env).ord_ref
+                 (S.FO.apply Subst.Renaming.none subst (l, cur_sc))
+                 (S.FO.apply Subst.Renaming.none subst (r, cur_sc)))
+          then (
+            Util.debugf ~section 3
+              "@[<hv2>demod(%d):@ @[<hv>t=%a[%d],@ l=%a[%d],@ r=%a[%d]@],@ \
+               subst=@[%a@]@]" (fun k ->
+                k (C.id c) T.pp t 0 T.pp l cur_sc T.pp r cur_sc S.pp subst);
 
-               let t' = Lambda.eta_expand @@ norm_b t in
-               let l' =
-                 Lambda.eta_expand @@ norm_b
-                 @@ Subst.FO.apply Subst.Renaming.none subst (l, cur_sc)
-               in
-               (* sanity checks *)
-               assert (Type.equal (T.ty l) (T.ty r));
-               assert (T.equal l' t');
-               st.demod_clauses <-
-                 (unit_clause, subst, cur_sc) :: st.demod_clauses;
-               st.demod_sc <- 1 + st.demod_sc;
-               (* allocate new scope *)
-               Util.incr_stat stat_demodulate_step;
-               (* reduce [rhs] in current scope [cur_sc] *)
-               assert (cur_sc < st.demod_sc);
-               (* bind variables not occurring in [rhs] to fresh ones *)
-               let subst =
-                 InnerTerm.Seq.vars (r :> InnerTerm.t)
-                 |> Iter.fold
-                      (fun subst v ->
-                        if S.mem subst (v, cur_sc) then
-                          subst
-                        else
-                          S.bind subst (v, cur_sc)
-                            ( InnerTerm.var (HVar.fresh ~ty:(HVar.ty v) ()),
-                              cur_sc ))
-                      subst
-               in
-               Util.debugf ~section 2
-                 "@[<2>demod(%d):@ rewrite `@[%a@]`@ into `@[%a@]`@ resulting \
-                  `@[%a@]`@ nf `@[%a@]` using %a[%d]@]" (fun k ->
-                   k (C.id c) T.pp t T.pp r T.pp r' T.pp (Lambda.snf r')
-                     Subst.pp subst cur_sc);
-               Some r'
-             ) else (
-               Util.debugf ~section 2
-                 "demodulation of @[%a@] using @[%a@]=@[%a@] failed@." (fun k ->
-                   k T.pp t T.pp l T.pp r);
+            let t' = Lambda.eta_expand @@ norm_b t in
+            let l' =
+              Lambda.eta_expand @@ norm_b
+              @@ Subst.FO.apply Subst.Renaming.none subst (l, cur_sc)
+            in
+            (* sanity checks *)
+            assert (Type.equal (T.ty l) (T.ty r));
+            assert (T.equal l' t');
+            st.demod_clauses <- (unit_clause, subst, cur_sc) :: st.demod_clauses;
+            st.demod_sc <- 1 + st.demod_sc;
+            (* allocate new scope *)
+            Util.incr_stat stat_demodulate_step;
+            (* reduce [rhs] in current scope [cur_sc] *)
+            assert (cur_sc < st.demod_sc);
+            (* bind variables not occurring in [rhs] to fresh ones *)
+            let subst =
+              InnerTerm.Seq.vars (r :> InnerTerm.t)
+              |> Iter.fold
+                   (fun subst v ->
+                     if S.mem subst (v, cur_sc) then
+                       subst
+                     else
+                       S.bind subst (v, cur_sc)
+                         (InnerTerm.var (HVar.fresh ~ty:(HVar.ty v) ()), cur_sc))
+                   subst
+            in
+            Util.debugf ~section 2
+              "@[<2>demod(%d):@ rewrite `@[%a@]`@ into `@[%a@]`@ resulting \
+               `@[%a@]`@ nf `@[%a@]` using %a[%d]@]" (fun k ->
+                k (C.id c) T.pp t T.pp r T.pp r' T.pp (Lambda.snf r') Subst.pp
+                  subst cur_sc);
+            Some r'
+          ) else (
+            Util.debugf ~section 2
+              "demodulation of @[%a@] using @[%a@]=@[%a@] failed@." (fun k ->
+                k T.pp t T.pp l T.pp r);
 
-               None
-             ))
+            None
+          ))
     in
     match step with
     | None -> k t (* not found any match, normal form found *)
@@ -3009,33 +2988,33 @@ let formula_simplify_reflect env c =
       let top_level ~sign ~repl lhs rhs =
         UnitIdx.retrieve ~sign ((get_state env).idx_simpl, idx_sc) (lhs, q_sc)
         |> Iter.find_map (fun (_, rhs', (_, _, _, c'), subst) ->
-               if C.trail_subsumes c' c then (
-                 try
-                   ignore
-                     (Unif.FO.matching ~subst ~pattern:(rhs', idx_sc) (rhs, q_sc));
-                   used_units := C.ClauseSet.add c' !used_units;
-                   Some repl
-                 with _ -> None
-               ) else
-                 None)
+            if C.trail_subsumes c' c then (
+              try
+                ignore
+                  (Unif.FO.matching ~subst ~pattern:(rhs', idx_sc) (rhs, q_sc));
+                used_units := C.ClauseSet.add c' !used_units;
+                Some repl
+              with _ -> None
+            ) else
+              None)
       in
       let nested lhs rhs =
         T.Seq.common_contexts lhs rhs
         |> Iter.find_map (fun (lhs, rhs) ->
-               top_level ~sign:true
-                 ~repl:
-                   (if sign then
-                      T.true_
-                    else
-                      T.false_)
-                 lhs rhs
-               <+> top_level ~sign:true
-                     ~repl:
-                       (if sign then
-                          T.true_
-                        else
-                          T.false_)
-                     rhs lhs)
+            top_level ~sign:true
+              ~repl:
+                (if sign then
+                   T.true_
+                 else
+                   T.false_)
+              lhs rhs
+            <+> top_level ~sign:true
+                  ~repl:
+                    (if sign then
+                       T.true_
+                     else
+                       T.false_)
+                  rhs lhs)
       in
 
       top_level ~sign ~repl:T.true_ lhs rhs
@@ -3121,13 +3100,13 @@ let equatable env ~sign ~cl s t =
   let aux s t =
     UnitIdx.retrieve ~sign ((get_state env).idx_simpl, idx_sc) (s, q_sc)
     |> Iter.find_map (fun (_, rhs, (_, _, _, c'), subst) ->
-           if C.trail_subsumes c' cl then (
-             try
-               ignore (Unif.FO.matching ~subst ~pattern:(rhs, idx_sc) (t, q_sc));
-               Some c'
-             with _ -> None
-           ) else
-             None)
+        if C.trail_subsumes c' cl then (
+          try
+            ignore (Unif.FO.matching ~subst ~pattern:(rhs, idx_sc) (t, q_sc));
+            Some c'
+          with _ -> None
+        ) else
+          None)
   in
   aux s t <+> aux t s
 
@@ -3532,17 +3511,17 @@ let subsumed_by_active_set env c =
   let res =
     SubsumIdx.retrieve_subsuming_c (get_state env).idx_fv c
     |> Iter.exists (fun c' ->
-           let res =
-             C.trail_subsumes c' c
-             && ((try_eq_subsumption && eq_subsumes (C.lits c') (C.lits c))
-                || subsumes env (C.lits c') (C.lits c))
-           in
-           if res then (
-             Util.debugf ~section 2 "@[<2>@[%a@]@ subsumed by @[%a@]@]"
-               (fun k -> k C.pp c C.pp c');
-             Util.incr_stat stat_clauses_subsumed
-           );
-           res)
+        let res =
+          C.trail_subsumes c' c
+          && ((try_eq_subsumption && eq_subsumes (C.lits c') (C.lits c))
+             || subsumes env (C.lits c') (C.lits c))
+        in
+        if res then (
+          Util.debugf ~section 2 "@[<2>@[%a@]@ subsumed by @[%a@]@]" (fun k ->
+              k C.pp c C.pp c');
+          Util.incr_stat stat_clauses_subsumed
+        );
+        res)
   in
   res
 
@@ -3615,31 +3594,31 @@ let rec contextual_literal_cutting_rec env c =
       Iter.of_array_i lits
       |> Iter.filter (fun (_, lit) -> not (Lit.is_constraint lit))
       |> Iter.find_map (fun (i, old_lit) ->
-             (* negate literal *)
-             lits.(i) <- Lit.negate old_lit;
-             (* test for subsumption *)
-             SubsumIdx.retrieve_subsuming (get_state env).idx_fv
-               (Lits.Seq.to_form lits)
-               (C.trail c |> Trail.labels)
-             |> Iter.filter (fun c' -> C.trail_subsumes c' c)
-             |> Iter.find_map (fun c' ->
-                    let subst =
-                      match
-                        if try_eq_subsumption then
-                          eq_subsumes_with (C.lits c', 1) (lits, 0)
-                        else
-                          None
-                      with
-                      | Some s -> Some (s, [])
-                      | None -> subsumes_with (C.lits c', 1) (lits, 0)
-                    in
-                    subst
-                    |> CCOpt.map (fun (subst, tags) ->
-                           (* remove the literal and recurse *)
-                           CCArray.except_idx lits i, i, c', subst, tags))
-             |> CCFun.tap (fun _ ->
-                    (* restore literal *)
-                    lits.(i) <- old_lit))
+          (* negate literal *)
+          lits.(i) <- Lit.negate old_lit;
+          (* test for subsumption *)
+          SubsumIdx.retrieve_subsuming (get_state env).idx_fv
+            (Lits.Seq.to_form lits)
+            (C.trail c |> Trail.labels)
+          |> Iter.filter (fun c' -> C.trail_subsumes c' c)
+          |> Iter.find_map (fun c' ->
+              let subst =
+                match
+                  if try_eq_subsumption then
+                    eq_subsumes_with (C.lits c', 1) (lits, 0)
+                  else
+                    None
+                with
+                | Some s -> Some (s, [])
+                | None -> subsumes_with (C.lits c', 1) (lits, 0)
+              in
+              subst
+              |> CCOpt.map (fun (subst, tags) ->
+                  (* remove the literal and recurse *)
+                  CCArray.except_idx lits i, i, c', subst, tags))
+          |> CCFun.tap (fun _ ->
+              (* restore literal *)
+              lits.(i) <- old_lit))
     in
     match remove_one_lit (Array.copy (C.lits c)) with
     | None -> SimplM.return_same c (* no literal removed *)
@@ -3767,15 +3746,15 @@ let immediate_subsume env c immediate =
   else
     immediate
     |> Iter.find_map (fun c' ->
-           if subsumes env c' c then (
-             C.mark_redundant c;
-             Env.remove_active env (Iter.singleton c);
-             Env.remove_simpl env (Iter.singleton c);
-             Util.debugf ~section 2 "immediate subsume @[%a@]@." (fun k ->
-                 k C.pp c);
-             Some c'
-           ) else
-             None)
+        if subsumes env c' c then (
+          C.mark_redundant c;
+          Env.remove_active env (Iter.singleton c);
+          Env.remove_simpl env (Iter.singleton c);
+          Util.debugf ~section 2 "immediate subsume @[%a@]@." (fun k ->
+              k C.pp c);
+          Some c'
+        ) else
+          None)
     |> function
     | Some subsumer -> Some (Iter.singleton subsumer)
     | None -> Some immediate

@@ -324,11 +324,11 @@ let rec cover_with_terms ?(depth = 0) ?(recurse = true) t ts =
           -1, false_)
       ts
     |> CCList.filter_map (fun (i, x) ->
-           if i != -1 && equal x t then (
-             assert (Type.equal (ty x) (ty t));
-             Some (bvar ~ty:(ty t) (n - 1 - i + depth))
-           ) else
-             None)
+        if i != -1 && equal x t then (
+          assert (Type.equal (ty x) (ty t));
+          Some (bvar ~ty:(ty t) (n - 1 - i + depth))
+        ) else
+          None)
   in
   let rest =
     if recurse then (
@@ -462,9 +462,9 @@ module Seq = struct
   let typed_symbols t =
     subterms t
     |> Iter.filter_map (fun t ->
-           match T.view t with
-           | T.Const s -> Some (s, ty t)
-           | _ -> None)
+        match T.view t with
+        | T.Const s -> Some (s, ty t)
+        | _ -> None)
 
   let common_contexts a b k =
     let common_arg xs ys =
@@ -507,7 +507,7 @@ let has_ho_subterm t =
   && (not (equal false_ t))
   && Seq.subterms ~include_builtin:true ~ignore_head:true t
      |> Iter.exists (fun st ->
-            (not (T.equal st t)) && (Type.is_fun (ty st) || Type.is_prop (ty st)))
+         (not (T.equal st t)) && (Type.is_fun (ty st) || Type.is_prop (ty st)))
 
 let close_quantifier b ty_args body =
   CCList.fold_right
@@ -636,8 +636,8 @@ and type_ok ty_ =
   not
     (Type.Seq.sub ty_
     |> Iter.exists (fun t ->
-           Type.equal t Type.prop || Type.equal t Type.rat
-           || Type.equal t Type.int))
+        Type.equal t Type.prop || Type.equal t Type.rat || Type.equal t Type.int)
+    )
 
 let in_lfho_fragment t =
   in_pfho_fragment t

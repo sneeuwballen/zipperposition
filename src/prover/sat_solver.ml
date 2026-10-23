@@ -210,10 +210,10 @@ let conv_proof_ p =
 let rec get_proved_lits_ t : Lit.Set.t =
   Lit.Tbl.to_iter t.lit_tbl_
   |> Iter.filter_map (fun (lit, _) ->
-         match proved_at_0 t lit with
-         | Some true -> Some lit
-         | Some false -> Some (Lit.neg lit)
-         | None -> None)
+      match proved_at_0 t lit with
+      | Some true -> Some lit
+      | Some false -> Some (Lit.neg lit)
+      | None -> None)
   |> Lit.Set.of_iter
 
 (* call [S.solve()] in any case, and enforce invariant about eval/unsat_core *)

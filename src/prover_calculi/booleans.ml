@@ -110,17 +110,17 @@ let get_triggers env c =
     ~which:`All (C.lits c) ~fun_bodies:false
   |> Iter.flat_map (fun (t, p) -> get_terms t)
   |> Iter.filter_map (fun t ->
-         let ty = Term.ty t and hd = Term.head_term t in
-         let cached_t = Subst.FO.canonize_all_vars t in
-         if
-           (not (Term.Set.mem cached_t !Higher_order.prim_enum_terms))
-           && Type.is_fun ty && Type.returns_prop ty
-           && (not (Term.is_var hd))
-           && not (trivial_trigger t)
-         then
-           Some t
-         else
-           None)
+      let ty = Term.ty t and hd = Term.head_term t in
+      let cached_t = Subst.FO.canonize_all_vars t in
+      if
+        (not (Term.Set.mem cached_t !Higher_order.prim_enum_terms))
+        && Type.is_fun ty && Type.returns_prop ty
+        && (not (Term.is_var hd))
+        && not (trivial_trigger t)
+      then
+        Some t
+      else
+        None)
 
 let instantiate_w_bool env ~clause ~var ~trigger =
   assert (Type.equal (T.ty var) (T.ty trigger));
@@ -167,7 +167,7 @@ let inst_clauses_w_trigger env t =
 
     Type.Map.get_or ~default:[] (T.ty t) st.cls_w_pred_vars
     |> CCList.map (fun (clause, var) ->
-           instantiate_w_bool env ~clause ~var ~trigger:t)
+        instantiate_w_bool env ~clause ~var ~trigger:t)
   ) else
     []
 
@@ -345,27 +345,27 @@ let get_bool_eligible env c =
 let get_bool_hoist_eligible env c =
   get_bool_eligible env c
   |> Iter.filter (fun (t, p) ->
-         let module P = Position in
-         match p with
-         | P.Arg (idx, P.Left P.Stop) | P.Arg (idx, P.Right P.Stop) ->
-           (match (C.lits c).(idx) with
-           | L.Equation (_, _, false) -> true
-           | _ -> false)
-         | _ -> true)
+      let module P = Position in
+      match p with
+      | P.Arg (idx, P.Left P.Stop) | P.Arg (idx, P.Right P.Stop) ->
+        (match (C.lits c).(idx) with
+        | L.Equation (_, _, false) -> true
+        | _ -> false)
+      | _ -> true)
   |> Iter.filter (fun (t, _) ->
-         let ty = T.ty t in
-         (Type.is_prop ty || Type.is_var ty)
-         && (not (T.is_true_or_false t))
-         && (not (T.is_var t))
-         &&
-         match T.view t with
-         | T.AppBuiltin (hd, _) ->
-           (* check that the term has no interpreted sym on top *)
-           not
-             (List.mem hd Builtin.[ Eq; Neq; ForallConst; ExistsConst; Not ]
-             || Builtin.is_logical_binop hd)
-         | T.App (hd, _) -> not @@ T.is_var hd
-         | _ -> true)
+      let ty = T.ty t in
+      (Type.is_prop ty || Type.is_var ty)
+      && (not (T.is_true_or_false t))
+      && (not (T.is_var t))
+      &&
+      match T.view t with
+      | T.AppBuiltin (hd, _) ->
+        (* check that the term has no interpreted sym on top *)
+        not
+          (List.mem hd Builtin.[ Eq; Neq; ForallConst; ExistsConst; Not ]
+          || Builtin.is_logical_binop hd)
+      | T.App (hd, _) -> not @@ T.is_var hd
+      | _ -> true)
   |> Iter.to_list
   (* since we are doing simultaneous version -- we take only unique terms *)
   |> CCList.sort_uniq ~cmp:(fun (t1, _) (t2, _) -> T.compare t1 t2)
@@ -403,16 +403,16 @@ let bool_hoist env (c : C.t) : C.t list =
       mk_res env ~proof ~old:t ~repl:T.false_ (yes t) c)
     (get_bool_hoist_eligible env c)
   |> CCFun.tap (fun res ->
-         Util.debugf ~section 3 "hoist(@[%a@])" (fun k -> k C.pp c);
-         if CCList.is_empty res then
-           Util.debugf ~section 3 " = ∅ (%d)(%a)(%d)" (fun k ->
-               k
-                 (Iter.length (get_green_eligible env c))
-                 (Iter.pp_seq Term.pp)
-                 (Iter.map fst (get_bool_eligible env c))
-                 (List.length (get_bool_hoist_eligible env c)))
-         else
-           Util.debugf ~section 3 " = @[%a@]" (fun k -> k (CCList.pp C.pp) res))
+      Util.debugf ~section 3 "hoist(@[%a@])" (fun k -> k C.pp c);
+      if CCList.is_empty res then
+        Util.debugf ~section 3 " = ∅ (%d)(%a)(%d)" (fun k ->
+            k
+              (Iter.length (get_green_eligible env c))
+              (Iter.pp_seq Term.pp)
+              (Iter.map fst (get_bool_eligible env c))
+              (List.length (get_bool_hoist_eligible env c)))
+      else
+        Util.debugf ~section 3 " = @[%a@]" (fun k -> k (CCList.pp C.pp) res))
 
 let bool_hoist_simpl env (c : C.t) : C.t list option =
   let proof =
@@ -435,12 +435,12 @@ let bool_hoist_simpl env (c : C.t) : C.t list option =
          :: acc)
        [] bool_subterms)
   |> CCFun.tap (function
-       | Some res ->
-         Util.debugf ~section 2 "bool_hoist_simpl(@[%a@])=@. @[%a@]@." (fun k ->
-             k C.pp c (CCList.pp C.pp) res)
-       | None ->
-         Util.debugf ~section 2 "bool_hoist_simpl(@[%a@])= None@." (fun k ->
-             k C.pp c))
+    | Some res ->
+      Util.debugf ~section 2 "bool_hoist_simpl(@[%a@])=@. @[%a@]@." (fun k ->
+          k C.pp c (CCList.pp C.pp) res)
+    | None ->
+      Util.debugf ~section 2 "bool_hoist_simpl(@[%a@])= None@." (fun k ->
+          k C.pp c))
 
 let eq_hoist env (c : C.t) : C.t list =
   let proof ~prefix =
@@ -452,36 +452,34 @@ let eq_hoist env (c : C.t) : C.t list =
 
   get_bool_eligible env c
   |> Iter.filter (fun (t, _) ->
-         match T.view t with
-         | T.AppBuiltin (hd, _) ->
-           List.mem hd [ Builtin.Eq; Neq; Xor; Equiv; ForallConst; ExistsConst ]
-           && Type.is_prop (T.ty t)
-         | _ -> false)
+      match T.view t with
+      | T.AppBuiltin (hd, _) ->
+        List.mem hd [ Builtin.Eq; Neq; Xor; Equiv; ForallConst; ExistsConst ]
+        && Type.is_prop (T.ty t)
+      | _ -> false)
   |> Iter.to_list
   (* since we are doing simultaneous version -- we take only unique terms *)
   |> CCList.sort_uniq ~cmp:(fun (t1, _) (t2, _) -> T.compare t1 t2)
   |> List.map (fun (t, _) ->
-         match T.view t with
-         | T.AppBuiltin (Builtin.(Eq | Equiv), ([ a; b ] | [ _; a; b ])) ->
-           let new_lit = Literal.mk_eq a b in
-           mk_res env ~proof:(proof ~prefix:"eq") ~old:t ~repl:T.false_ new_lit
-             c
-         | T.AppBuiltin (Builtin.(Neq | Xor), ([ a; b ] | [ _; a; b ])) ->
-           let new_lit = Literal.mk_eq a b in
-           mk_res env ~proof:(proof ~prefix:"neq") ~old:t ~repl:T.true_ new_lit
-             c
-         | _ -> assert false)
+      match T.view t with
+      | T.AppBuiltin (Builtin.(Eq | Equiv), ([ a; b ] | [ _; a; b ])) ->
+        let new_lit = Literal.mk_eq a b in
+        mk_res env ~proof:(proof ~prefix:"eq") ~old:t ~repl:T.false_ new_lit c
+      | T.AppBuiltin (Builtin.(Neq | Xor), ([ a; b ] | [ _; a; b ])) ->
+        let new_lit = Literal.mk_eq a b in
+        mk_res env ~proof:(proof ~prefix:"neq") ~old:t ~repl:T.true_ new_lit c
+      | _ -> assert false)
   |> CCFun.tap (fun res ->
-         Util.debugf ~section 3 "eq-hoist(@[%a@])" (fun k -> k C.pp c);
-         if CCList.is_empty res then
-           Util.debugf ~section 3 " = ∅ (%d)(%d)(%a)" (fun k ->
-               k
-                 (Iter.length (get_green_eligible env c))
-                 (Iter.length (get_bool_eligible env c))
-                 (Iter.pp_seq Term.pp)
-                 (Iter.map fst (get_bool_eligible env c)))
-         else
-           Util.debugf ~section 3 " = @[%a@]" (fun k -> k (CCList.pp C.pp) res))
+      Util.debugf ~section 3 "eq-hoist(@[%a@])" (fun k -> k C.pp c);
+      if CCList.is_empty res then
+        Util.debugf ~section 3 " = ∅ (%d)(%d)(%a)" (fun k ->
+            k
+              (Iter.length (get_green_eligible env c))
+              (Iter.length (get_bool_eligible env c))
+              (Iter.pp_seq Term.pp)
+              (Iter.map fst (get_bool_eligible env c)))
+      else
+        Util.debugf ~section 3 " = @[%a@]" (fun k -> k (CCList.pp C.pp) res))
 
 let fluid_hoist env (c : C.t) =
   let tyvar = Type.var (HVar.fresh ~ty:Type.tType ()) in
@@ -555,41 +553,41 @@ let fluid_hoist env (c : C.t) =
         let unif_seq =
           get_unif_alg env (zx, sc_zx) (u, sc_cl)
           |> OSeq.flat_map (fun us_opt ->
-                 CCOpt.map_or ~default:OSeq.empty
-                   (fun us ->
-                     assert (not @@ US.has_constr us);
-                     let sub = US.subst us in
-                     let renaming = Subst.Renaming.create () in
-                     let z_false_sub =
-                       Lambda.snf @@ Subst.FO.apply renaming sub (z_false, sc_zx)
-                     in
-                     let z_true_sub =
-                       Lambda.snf @@ Subst.FO.apply renaming sub (z_true, sc_zx)
-                     in
-                     let x_sub =
-                       Lambda.snf @@ Subst.FO.apply renaming sub (x, sc_zx)
-                     in
-                     let zx_sub =
-                       Lambda.snf @@ Subst.FO.apply renaming sub (zx, sc_zx)
-                     in
-                     if T.is_true_or_false x_sub then
-                       OSeq.empty
-                     else (
-                       let bool_res =
-                         if T.equal z_false_sub zx_sub then
-                           []
-                         else
-                           [ mk_res true renaming sub p ]
-                       in
-                       let loob_res =
-                         if T.equal z_true_sub zx_sub then
-                           []
-                         else
-                           [ mk_res false renaming sub p ]
-                       in
-                       OSeq.of_list (bool_res @ loob_res)
-                     ))
-                   us_opt)
+              CCOpt.map_or ~default:OSeq.empty
+                (fun us ->
+                  assert (not @@ US.has_constr us);
+                  let sub = US.subst us in
+                  let renaming = Subst.Renaming.create () in
+                  let z_false_sub =
+                    Lambda.snf @@ Subst.FO.apply renaming sub (z_false, sc_zx)
+                  in
+                  let z_true_sub =
+                    Lambda.snf @@ Subst.FO.apply renaming sub (z_true, sc_zx)
+                  in
+                  let x_sub =
+                    Lambda.snf @@ Subst.FO.apply renaming sub (x, sc_zx)
+                  in
+                  let zx_sub =
+                    Lambda.snf @@ Subst.FO.apply renaming sub (zx, sc_zx)
+                  in
+                  if T.is_true_or_false x_sub then
+                    OSeq.empty
+                  else (
+                    let bool_res =
+                      if T.equal z_false_sub zx_sub then
+                        []
+                      else
+                        [ mk_res true renaming sub p ]
+                    in
+                    let loob_res =
+                      if T.equal z_true_sub zx_sub then
+                        []
+                      else
+                        [ mk_res false renaming sub p ]
+                    in
+                    OSeq.of_list (bool_res @ loob_res)
+                  ))
+                us_opt)
         in
         if Env.should_force_stream_eval env () then
           Env.get_finite_infs env [ unif_seq ] @ acc
@@ -945,8 +943,8 @@ let false_elim env c =
 
   Ls.fold_eqn_simple (C.lits c)
   |> Iter.filter (fun (_, _, _, p) ->
-         let idx = Ls.Pos.idx p in
-         CCBV.get eligible idx)
+      let idx = Ls.Pos.idx p in
+      CCBV.get eligible idx)
   |> Iter.fold
        (fun acc (lhs, rhs, sign, p) ->
          let idx = Ls.Pos.idx p in
@@ -1027,21 +1025,21 @@ let replace_bool_vars env (c : C.t) =
 
   get_bool_eligible env c
   |> Iter.find_pred (fun (t, _) ->
-         Type.is_prop (T.ty t)
-         &&
-         match T.view t with
-         | T.AppBuiltin (Builtin.(Eq | Neq), [ _; a; b ])
-           when Type.is_prop (T.ty a) ->
-           (* tyarg does not have to be a variable *)
-           T.is_var a && T.is_var b
-         | T.AppBuiltin (hd, args) ->
-           (Builtin.is_logical_binop hd || hd = Builtin.Not)
-           && List.for_all T.is_var args
-         | _ -> false)
+      Type.is_prop (T.ty t)
+      &&
+      match T.view t with
+      | T.AppBuiltin (Builtin.(Eq | Neq), [ _; a; b ])
+        when Type.is_prop (T.ty a) ->
+        (* tyarg does not have to be a variable *)
+        T.is_var a && T.is_var b
+      | T.AppBuiltin (hd, args) ->
+        (Builtin.is_logical_binop hd || hd = Builtin.Not)
+        && List.for_all T.is_var args
+      | _ -> false)
   |> CCOpt.map (fun (t, _) ->
-         let vars = T.VarSet.to_list (T.vars t) in
-         assert (List.for_all (fun t -> Type.is_prop (HVar.ty t)) vars);
-         all_bool_substs vars |> List.map (C.apply_subst ~proof:p (c, 0)))
+      let vars = T.VarSet.to_list (T.vars t) in
+      assert (List.for_all (fun t -> Type.is_prop (HVar.ty t)) vars);
+      all_bool_substs vars |> List.map (C.apply_subst ~proof:p (c, 0)))
 
 let replace_bool_app_vars env (c : C.t) =
   let p sub renaming =
@@ -1074,32 +1072,31 @@ let replace_bool_app_vars env (c : C.t) =
   let stms =
     get_bool_eligible env c
     |> Iter.filter_map (fun (t, _) ->
-           match T.view t with
-           | T.AppBuiltin ((Eq | Neq), [ _; a; b ]) when Type.is_prop (T.ty a)
-             ->
-             (* tyarg does not have to be a variable *)
-             is_eligible [ a; b ]
-           | T.AppBuiltin (hd, args)
-             when (Builtin.is_logical_binop hd || hd = Builtin.Not)
-                  && Type.is_prop (T.ty t) ->
-             is_eligible args
-           | _ -> None)
+        match T.view t with
+        | T.AppBuiltin ((Eq | Neq), [ _; a; b ]) when Type.is_prop (T.ty a) ->
+          (* tyarg does not have to be a variable *)
+          is_eligible [ a; b ]
+        | T.AppBuiltin (hd, args)
+          when (Builtin.is_logical_binop hd || hd = Builtin.Not)
+               && Type.is_prop (T.ty t) ->
+          is_eligible args
+        | _ -> None)
     |> Iter.flat_map_l (fun args ->
-           List.map
-             (fun target ->
-               get_unif_alg_l env (args, 0) (target, 0)
-               |> OSeq.filter_map
-                    (CCOpt.map (fun us ->
-                         assert (not (Unif_subst.has_constr us));
-                         let sub = Unif_subst.subst us in
-                         let renaming = Subst.Renaming.create () in
-                         let res =
-                           C.apply_subst ~penalty_inc:1 ~renaming
-                             ~proof:(p sub renaming) (c, 0) sub
-                         in
-                         (* not eligible under substitution *)
-                         Some res)))
-             (create_targets (List.length args)))
+        List.map
+          (fun target ->
+            get_unif_alg_l env (args, 0) (target, 0)
+            |> OSeq.filter_map
+                 (CCOpt.map (fun us ->
+                      assert (not (Unif_subst.has_constr us));
+                      let sub = Unif_subst.subst us in
+                      let renaming = Subst.Renaming.create () in
+                      let res =
+                        C.apply_subst ~penalty_inc:1 ~renaming
+                          ~proof:(p sub renaming) (c, 0) sub
+                      in
+                      (* not eligible under substitution *)
+                      Some res)))
+          (create_targets (List.length args)))
     |> Iter.to_list
   in
   if Env.should_force_stream_eval env () then
@@ -1224,56 +1221,56 @@ let nested_eq_rw env c =
   let parents r s = [ C.proof_parent_subst r (mk_sc c) s ] in
   get_bool_eligible env c
   |> Iter.filter_map (fun (t, p) ->
-         match T.view t with
-         | T.AppBuiltin
-             ((Builtin.(Eq | Neq | Equiv | Xor) as hd), ([ a; b ] | [ _; a; b ]))
-           ->
-           Some
-             (get_unif_alg env (mk_sc a) (mk_sc b)
-             |> OSeq.map (fun unif_subst_opt ->
-                    CCOpt.map
-                      (fun unif_subst ->
-                        assert (not @@ US.has_constr unif_subst);
-                        let subst = US.subst unif_subst in
-                        let repl =
-                          if hd = Builtin.Eq || hd = Builtin.Equiv then
-                            T.true_
-                          else
-                            T.false_
-                        in
-                        let new_lits = Array.copy (C.lits c) in
-                        Literals.Pos.replace ~at:p ~by:repl new_lits;
-                        let renaming = Subst.Renaming.create () in
-                        let new_lits =
-                          Literals.apply_subst renaming subst (mk_sc new_lits)
-                          |> CCArray.to_list
-                        in
-                        let rule =
-                          Proof.Rule.mk
-                            ((if T.equal repl T.true_ then
-                                "eq"
-                              else
-                                "neq")
-                            ^ "_rw")
-                        in
-                        let proof =
-                          Proof.Step.inference ~tags:[ Proof.Tag.T_ho ] ~rule
-                            (parents renaming subst)
-                        in
-                        C.create ~ctx:(C.ctx_of c) ~penalty:(C.penalty c)
-                          ~trail:(C.trail c) new_lits proof)
-                      unif_subst_opt))
-         | _ -> None)
+      match T.view t with
+      | T.AppBuiltin
+          ((Builtin.(Eq | Neq | Equiv | Xor) as hd), ([ a; b ] | [ _; a; b ]))
+        ->
+        Some
+          (get_unif_alg env (mk_sc a) (mk_sc b)
+          |> OSeq.map (fun unif_subst_opt ->
+              CCOpt.map
+                (fun unif_subst ->
+                  assert (not @@ US.has_constr unif_subst);
+                  let subst = US.subst unif_subst in
+                  let repl =
+                    if hd = Builtin.Eq || hd = Builtin.Equiv then
+                      T.true_
+                    else
+                      T.false_
+                  in
+                  let new_lits = Array.copy (C.lits c) in
+                  Literals.Pos.replace ~at:p ~by:repl new_lits;
+                  let renaming = Subst.Renaming.create () in
+                  let new_lits =
+                    Literals.apply_subst renaming subst (mk_sc new_lits)
+                    |> CCArray.to_list
+                  in
+                  let rule =
+                    Proof.Rule.mk
+                      ((if T.equal repl T.true_ then
+                          "eq"
+                        else
+                          "neq")
+                      ^ "_rw")
+                  in
+                  let proof =
+                    Proof.Step.inference ~tags:[ Proof.Tag.T_ho ] ~rule
+                      (parents renaming subst)
+                  in
+                  C.create ~ctx:(C.ctx_of c) ~penalty:(C.penalty c)
+                    ~trail:(C.trail c) new_lits proof)
+                unif_subst_opt))
+      | _ -> None)
   |> Iter.flat_map_l (fun clause_seq ->
-         if Env.should_force_stream_eval env () then
-           Env.get_finite_infs env [ clause_seq ]
-         else (
-           let stm_res =
-             Env.Stm.make ~penalty:(C.penalty c) ~parents:[ c ] clause_seq
-           in
-           Env.StmQ.add (Env.get_stm_queue env) stm_res;
-           []
-         ))
+      if Env.should_force_stream_eval env () then
+        Env.get_finite_infs env [ clause_seq ]
+      else (
+        let stm_res =
+          Env.Stm.make ~penalty:(C.penalty c) ~parents:[ c ] clause_seq
+        in
+        Env.StmQ.add (Env.get_stm_queue env) stm_res;
+        []
+      ))
   |> Iter.to_rev_list
 
 let rename_nested_booleans env c =
@@ -1921,56 +1918,56 @@ let solve_bool_formulas ~which env c =
 
   C.lits c
   |> CCArray.mapi (fun i lit ->
-         match find_resolvable_form lit with
-         | None ->
-           Util.debugf ~section 5
-             "for lit %d(@[%a@]) of @[%a@] no resolvable lits found@." (fun k ->
-               k i Literal.pp lit C.pp c);
-           None
-         | Some (l, r) ->
-           let module US = Unif_subst in
-           (try
-              Util.debugf ~section 5 "trying lit @[%d:%a@]@." (fun k ->
-                  k i Literal.pp lit);
-              Util.debugf ~section 5 "unif problem: @[%a=?=%a@]@." (fun k ->
-                  k T.pp l T.pp r);
-              let stm =
-                unif_alg l r
-                |> OSeq.map
-                     (CCOpt.map (fun subst ->
-                          let renaming = Subst.Renaming.create () in
-                          let new_lits =
-                            CCArray.except_idx (C.lits c) i
-                            |> CCArray.of_list
-                            |> (fun l ->
-                            Literals.apply_subst renaming (US.subst subst) (l, 0))
-                            |> CCArray.to_list
-                          in
-                          let proof =
-                            Proof.Step.simp ~tags:[ Proof.Tag.T_ho ]
-                              ~rule:(Proof.Rule.mk "solve_formulas")
-                              [
-                                C.proof_parent_subst renaming (c, 0)
-                                  (US.subst subst);
-                              ]
-                          in
-                          let res =
-                            C.create ~ctx:(C.ctx_of c) ~penalty:(C.penalty c)
-                              ~trail:(C.trail c) new_lits proof
-                          in
-                          Util.debugf ~section 5 "solved by @[%a@]@." (fun k ->
-                              k C.pp res);
-                          res))
-              in
-              match stm () with
-              | OSeq.Cons (hd, rest) ->
-                let stm = Stm.make ~penalty:(C.penalty c) ~parents:[ c ] rest in
-                StmQ.add (Env.get_stm_queue env) stm;
-                hd
-              | OSeq.Nil -> None
-            with _ ->
-              Util.debugf ~section 5 "failed @." (fun k -> k);
-              None))
+      match find_resolvable_form lit with
+      | None ->
+        Util.debugf ~section 5
+          "for lit %d(@[%a@]) of @[%a@] no resolvable lits found@." (fun k ->
+            k i Literal.pp lit C.pp c);
+        None
+      | Some (l, r) ->
+        let module US = Unif_subst in
+        (try
+           Util.debugf ~section 5 "trying lit @[%d:%a@]@." (fun k ->
+               k i Literal.pp lit);
+           Util.debugf ~section 5 "unif problem: @[%a=?=%a@]@." (fun k ->
+               k T.pp l T.pp r);
+           let stm =
+             unif_alg l r
+             |> OSeq.map
+                  (CCOpt.map (fun subst ->
+                       let renaming = Subst.Renaming.create () in
+                       let new_lits =
+                         CCArray.except_idx (C.lits c) i
+                         |> CCArray.of_list
+                         |> (fun l ->
+                         Literals.apply_subst renaming (US.subst subst) (l, 0))
+                         |> CCArray.to_list
+                       in
+                       let proof =
+                         Proof.Step.simp ~tags:[ Proof.Tag.T_ho ]
+                           ~rule:(Proof.Rule.mk "solve_formulas")
+                           [
+                             C.proof_parent_subst renaming (c, 0)
+                               (US.subst subst);
+                           ]
+                       in
+                       let res =
+                         C.create ~ctx:(C.ctx_of c) ~penalty:(C.penalty c)
+                           ~trail:(C.trail c) new_lits proof
+                       in
+                       Util.debugf ~section 5 "solved by @[%a@]@." (fun k ->
+                           k C.pp res);
+                       res))
+           in
+           match stm () with
+           | OSeq.Cons (hd, rest) ->
+             let stm = Stm.make ~penalty:(C.penalty c) ~parents:[ c ] rest in
+             StmQ.add (Env.get_stm_queue env) stm;
+             hd
+           | OSeq.Nil -> None
+         with _ ->
+           Util.debugf ~section 5 "failed @." (fun k -> k);
+           None))
   |> CCArray.filter_map CCFun.id
   |> CCArray.to_list
   |> fun l ->
@@ -2025,8 +2022,8 @@ let cnf_otf env c : C.t list option =
       (fun cl ->
         Statement.Seq.ty_decls cl
         |> Iter.iter (fun (id, ty) ->
-               Ctx.declare (Env.get_ctx env) id ty;
-               Name_payload.add id (Name.Attr_skolem Name.K_after_cnf)))
+            Ctx.declare (Env.get_ctx env) id ty;
+            Name_payload.add id (Name.Attr_skolem Name.K_after_cnf)))
       cnf_vec;
     let solved =
       if Env.flex_get_of env k_solve_formulas then
@@ -2041,9 +2038,9 @@ let cnf_otf env c : C.t list option =
         cnf_vec
       |> CCVector.to_list |> CCList.flatten
       |> List.map (fun c ->
-             C.create ~ctx:(C.ctx_of c) ~penalty ~trail
-               (CCArray.to_list (C.lits c))
-               proof)
+          C.create ~ctx:(C.ctx_of c) ~penalty ~trail
+            (CCArray.to_list (C.lits c))
+            proof)
     in
     Util.debugf ~section 5 "cl:@[%a@]@." (fun k -> k C.pp c);
     Util.debugf ~section 5 " @[%a@]@." (fun k -> k (CCList.pp C.pp) clauses);
@@ -2105,8 +2102,8 @@ let interpret_boolean_functions env c =
     |> Iter.filter (fun t -> not @@ Type.is_fun (T.ty t)))
   (* avoiding terms introduced by primitive enumeration *)
   |> Iter.filter (fun t ->
-         let cached_t = Subst.FO.canonize_all_vars t in
-         not (Term.Set.mem cached_t !Higher_order.prim_enum_terms))
+      let cached_t = Subst.FO.canonize_all_vars t in
+      not (Term.Set.mem cached_t !Higher_order.prim_enum_terms))
   |> Iter.sort_uniq ~cmp:Term.compare
   |> Iter.fold
        (fun res t ->
@@ -2168,11 +2165,11 @@ let setup env =
     Signal.once (Env.on_start env) (fun () ->
         Env.passive_clauses env
         |> Clause.ClauseSet.iter (fun cl ->
-               match replace_unsupported_quants env cl with
-               | None -> ()
-               | Some new_ ->
-                 Env.remove_passive env (Iter.singleton cl);
-                 Env.add_passive env (Iter.singleton new_)));
+            match replace_unsupported_quants env cl with
+            | None -> ()
+            | Some new_ ->
+              Env.remove_passive env (Iter.singleton cl);
+              Env.add_passive env (Iter.singleton new_)));
   match Env.flex_get_of env k_bool_reasoning with
   | BoolReasoningDisabled -> ()
   | BoolCasesPreprocess -> Env.add_unary_inf env "false_elim" false_elim
@@ -2350,16 +2347,16 @@ let name_quantifiers stmts =
   in
   stmts
   |> CCVector.map (fun s ->
-         match Statement.view s with
-         | TyDecl (id, t) -> s
-         | Data ts -> s
-         | Def defs -> s
-         | Rewrite _ -> s
-         | Assert p -> if_changed assert_ s (name_prop_Qs s p)
-         | Lemma ps -> if_changed_list lemma s (map (name_prop_Qs s) ps)
-         | Goal p -> if_changed goal s (name_prop_Qs s p)
-         | NegatedGoal (ts, ps) ->
-           if_changed_list (neg_goal ~skolems:ts) s (map (name_prop_Qs s) ps))
+      match Statement.view s with
+      | TyDecl (id, t) -> s
+      | Data ts -> s
+      | Def defs -> s
+      | Rewrite _ -> s
+      | Assert p -> if_changed assert_ s (name_prop_Qs s p)
+      | Lemma ps -> if_changed_list lemma s (map (name_prop_Qs s) ps)
+      | Goal p -> if_changed goal s (name_prop_Qs s p)
+      | NegatedGoal (ts, ps) ->
+        if_changed_list (neg_goal ~skolems:ts) s (map (name_prop_Qs s) ps))
   |> CCVector.append new_stmts;
   CCVector.freeze new_stmts
 

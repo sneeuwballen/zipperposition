@@ -404,8 +404,8 @@ let unary_simplify env c =
       ho_normalize env c >>= fun c ->
       rewrite env c >>= fun c ->
       (match env.lit_rules with
-      | [] -> SimplM.return_same c
-      | _ -> rewrite_lits env c)
+        | [] -> SimplM.return_same c
+        | _ -> rewrite_lits env c)
       >>= fun c ->
       match env.unary_simplify with
       | [] -> SimplM.return_same c

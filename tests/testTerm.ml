@@ -471,9 +471,9 @@ let check_snf_no_redex =
     else
       T.Seq.subterms t'
       |> Iter.for_all (fun t ->
-             match T.view t with
-             | T.App (f, _) -> not (is_fun f)
-             | _ -> true)
+          match T.view t with
+          | T.App (f, _) -> not (is_fun f)
+          | _ -> true)
   in
   QCheck.Test.make gen prop ~count:10_000 ~long_factor:10
     ~name:"snf_no_remaining_redex"

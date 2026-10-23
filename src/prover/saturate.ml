@@ -146,15 +146,15 @@ let given_clause_step (params : Params.t) env ?(generating = true) num =
       let clauses =
         clauses
         |> Iter.filter_map (fun c ->
-               check_clause_ params c;
-               let c, _ = Env.unary_simplify env c in
-               if
-                 Env.is_trivial env c || Env.is_active env c
-                 || Env.is_passive env c
-               then
-                 None
-               else
-                 Some c)
+            check_clause_ params c;
+            let c, _ = Env.unary_simplify env c in
+            if
+              Env.is_trivial env c || Env.is_active env c
+              || Env.is_passive env c
+            then
+              None
+            else
+              Some c)
         |> Iter.to_list
       in
       Util.debugf 5 ~section "@[<2>inferred @{<green>new clauses@}@ @[<v>%a@]@]"

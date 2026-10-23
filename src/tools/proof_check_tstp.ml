@@ -62,9 +62,9 @@ let _do_not_check proof =
   | TT.InferClause (_, (lazy step)) | TT.InferForm (_, (lazy step)) ->
     step.TT.esa
     ||
-    (match step.TT.parents with
-    | [| a |] when TT.is_axiom a -> true (* axiom *)
-    | _ -> false)
+      (match step.TT.parents with
+      | [| a |] when TT.is_axiom a -> true (* axiom *)
+      | _ -> false)
 
 let slit_to_form = function
   | SLiteral.Atom (t, true) -> t

@@ -86,15 +86,15 @@ end = struct
     let find_merge_ cc =
       TSet_set.to_iter cc
       |> Iter.flat_map (fun s1 ->
-             assert (not (T.Set.is_empty s1));
-             TSet_set.to_iter cc
-             |> Iter.filter (fun s2 -> s1 != s2)
-             |> Iter.map (fun s2 -> s1, s2))
+          assert (not (T.Set.is_empty s1));
+          TSet_set.to_iter cc
+          |> Iter.filter (fun s2 -> s1 != s2)
+          |> Iter.map (fun s2 -> s1, s2))
       |> Iter.find_map (fun (s1, s2) ->
-             if are_congruent_ cc s1 s2 then
-               Some (s1, s2)
-             else
-               None)
+          if are_congruent_ cc s1 s2 then
+            Some (s1, s2)
+          else
+            None)
     in
     match find_merge_ cc with
     | None -> cc (* fixpoint *)
@@ -173,15 +173,15 @@ let check_ref =
     (* check every pair of terms *)
     Iter.diagonal_l all_terms
     |> Iter.for_all (fun (t, u) ->
-           let eq1 = CC.is_eq cc1 t u in
-           let eq2 = CC_ref.is_eq cc2 t u in
-           if eq1 <> eq2 then
-             QCheck.Test.fail_reportf
-               "@[<2>cc.check_ref:@ inconsistency for terms `%a`@ and `%a`:@ \
-                eq_cc %B, eq_cc_ref %B@ :cc_ref %a@]"
-               T.pp t T.pp u eq1 eq2 CC_ref.pp cc2
-           else
-             true)
+        let eq1 = CC.is_eq cc1 t u in
+        let eq2 = CC_ref.is_eq cc2 t u in
+        if eq1 <> eq2 then
+          QCheck.Test.fail_reportf
+            "@[<2>cc.check_ref:@ inconsistency for terms `%a`@ and `%a`:@ \
+             eq_cc %B, eq_cc_ref %B@ :cc_ref %a@]"
+            T.pp t T.pp u eq1 eq2 CC_ref.pp cc2
+        else
+          true)
   in
   let name = "congruence_ref" in
   QCheck.Test.make ~long_factor:20 ~name gen prop

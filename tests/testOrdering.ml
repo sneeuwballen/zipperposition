@@ -153,10 +153,10 @@ let check_ordering_subterm ~arb_t ord =
       |> O.add_list ~signature:!signature !ord;
     T.Seq.subterms_depth t
     |> Iter.filter_map (fun (t, i) ->
-           if i > 0 then
-             Some t
-           else
-             None)
+        if i > 0 then
+          Some t
+        else
+          None)
     |> Iter.for_all (fun sub -> O.compare !ord t sub = Comparison.Gt)
   in
   QCheck.Test.make ~count ~long_factor ~name arb prop
