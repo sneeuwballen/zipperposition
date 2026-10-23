@@ -88,3 +88,21 @@
    (system "test $(grep -c 'SZS status Theorem' ac_multi.out) -eq 2")
    (system
     "awk '/SZS status Theorem/ { n++ } n == 2 && /ac1.zf/ { bad = 1 } n == 2 && /AC.normalize/ { norm = 1 } END { exit (n < 2 || bad || !norm) }' ac_multi.out"))))
+
+; Regression test: Name_payload is cleared per file. Two files declaring the
+; same datatype in one CLI call must both be processed. Guards fcxr.
+
+(rule
+ (alias runtest)
+ (targets datatype_multi.out)
+ (action
+  (progn
+   (with-outputs-to
+    datatype_multi.out
+    (run
+     %{bin:zipperposition}
+     --check
+     %{dep:regressions/multi_input/datatype1.smt2}
+     %{dep:regressions/multi_input/datatype2.smt2}))
+   (system "test $(grep -c 'SZS status' datatype_multi.out) -eq 2")
+   (system "! grep -q 'already declared' datatype_multi.out"))))

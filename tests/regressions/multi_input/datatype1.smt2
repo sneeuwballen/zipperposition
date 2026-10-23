@@ -1,0 +1,5 @@
+(declare-datatypes () ((Nat (Z) (S (p Nat)))))
+(declare-fun q (Nat) Bool)
+(assert (q Z))
+(assert (not (q (S Z))))
+(check-sat)
