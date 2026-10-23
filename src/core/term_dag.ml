@@ -388,12 +388,10 @@ and decode_term_node (st : decode_state) (nd : D.node_decoder) (cmd : string) :
     in
     let args = List.map (decode_term_from_value st) term_vals in
     let ty = decode_type_from_value st ty_v in
-    let ty_term =
-      match ty with
-      | HasType t -> t
-      | NoType -> InnerTerm.tType
-    in
-    InnerTerm.app_builtin ~ty:ty_term b args
+    (match ty, b with
+    | NoType, Builtin.TType -> InnerTerm.tType
+    | HasType t, _ -> InnerTerm.app_builtin ~ty:t b args
+    | NoType, _ -> InnerTerm.app_builtin ~ty:InnerTerm.tType b args)
   | _ -> failwith (Printf.sprintf "Term_dag.decode: unknown cmd %S" cmd)
 
 let decode_terms_from_string (data : string) : (int * InnerTerm.t) list =

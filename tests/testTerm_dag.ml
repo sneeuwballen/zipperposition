@@ -70,6 +70,25 @@ let test_bind =
       let t = Term.fun_ ty body in
       Alcotest.(check bool) "bind roundtrip" true (roundtrip t) )
 
+let test_builtin_ttype =
+  ( "builtin tType roundtrip",
+    `Quick,
+    fun () ->
+      let t = Term.of_ty Type.tType in
+      let data, _ =
+        TD.encode_to_string (fun td ->
+            ignore (TD.encode_term td (t :> InnerTerm.t)))
+      in
+      let decoded = TD.decode_all data in
+      let t' =
+        match List.rev decoded with
+        | [] -> Alcotest.fail "no terms decoded"
+        | (_, t) :: _ -> t
+      in
+      Alcotest.(check bool)
+        "exact tType roundtrip" true
+        (InnerTerm.equal (t :> InnerTerm.t) t') )
+
 let test_builtin_int =
   ( "builtin Int roundtrip",
     `Quick,
@@ -143,6 +162,7 @@ let suite =
     test_app;
     test_bvar;
     test_bind;
+    test_builtin_ttype;
     test_builtin_int;
     test_builtin_arrow;
     test_nested_app;
