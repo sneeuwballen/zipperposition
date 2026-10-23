@@ -261,3 +261,20 @@
    (run grep -q "SZS status Theorem" bce_pe_fixpoint_inprocessing.out)
    (system
     "test $(grep -c '% BCE start:' bce_pe_fixpoint_inprocessing.out) -eq 1"))))
+
+; Regression test: the clause queue is initialized before initial clauses are
+; inserted, so `rel_lvl_weight` sees them. Guards pwbw.
+
+(rule
+ (alias runtest)
+ (targets queue_init.out)
+ (action
+  (progn
+   (with-outputs-to
+    queue_init.out
+    (run
+     %{bin:zipperposition}
+     -q
+     "2|prefer-processed|rel_lvl_weight(0,1,2,1,1,1,200,200,2.5,999,999)"
+     %{dep:regressions/multi_input/easy1.p}))
+   (run grep -q "SZS status Theorem" queue_init.out))))

@@ -1935,6 +1935,15 @@ let add q c =
 
 let add_seq q hcs = Iter.iter (fun c -> ignore (add q c)) hcs
 
+let init q cls =
+  match q with
+  | { data = Mixed m } ->
+    if not !(m.initialized) then (
+      m.initialized := true;
+      Signal.send m.on_init cls
+    )
+  | { data = FIFO _ } -> ()
+
 let rec take_first_mixed q =
   if not !(q.initialized) then (
     q.initialized := true;

@@ -67,6 +67,7 @@ end
 type t
 
 val register_conjecture_clause : t -> Clause.t -> unit
+val init : t -> Clause.t Iter.t -> unit
 val add : t -> Clause.t -> bool
 val add_seq : t -> Clause.t Iter.t -> unit
 val length : t -> int
