@@ -124,6 +124,9 @@ let declare st ~depth ~is_sub id ty =
     }
   in
   Name.Tbl.replace st.payload id cst;
+  Name_payload.erase id ~f:(function
+    | Name.Attr_skolem Name.K_ind -> true
+    | _ -> false);
   cst
 
 let make st ?(depth = 0) ~is_sub (ty : Type.t) : t =

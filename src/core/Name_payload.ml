@@ -43,6 +43,11 @@ let add ?can_erase (s : Hstring.t) p =
   Hstring.Tbl.replace payloads s (Pure.add ?can_erase p l)
 
 let[@inline] get s = Hstring.Tbl.get_or payloads ~default:[] s
+
+let erase s ~f =
+  let l = get s in
+  Hstring.Tbl.replace payloads s (List.filter (fun p -> not (f p)) l)
+
 let clear () = Hstring.Tbl.clear payloads
 
 (* TODO: keep moving payload to this. Then we can use Hstring in inner term,
