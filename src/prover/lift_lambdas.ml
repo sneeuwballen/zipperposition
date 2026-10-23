@@ -53,7 +53,10 @@ let clausify_def c : C.t list =
 
 let setup () = ()
 let sc t = t, 0
-let idx = ref (Idx.empty ())
+let k_idx : Idx.t ref Flex_state.key = Flex_state.create_key ()
+
+let idx_of env =
+  Env.flex_get_or_create ~init:(fun () -> ref (Idx.empty ())) env k_idx
 
 let loose_bound_to_fvars ~counter t =
   let rec aux ~depth ~lb_map ~subst t =
@@ -112,7 +115,7 @@ let fully_apply ~counter s t =
     Lambda.whnf @@ T.app s fresh_vars, Lambda.whnf @@ T.app t fresh_vars
   )
 
-let lift_lambdas_t ~parent ~counter t =
+let lift_lambdas_t ~idx ~parent ~counter t =
   let rec aux t =
     match T.view t with
     | T.Fun _ ->
@@ -237,7 +240,8 @@ let lift_lambdas_t ~parent ~counter t =
   Ctx.declare_syms (C.ctx_of parent) declared_syms;
   res, defs
 
-let lift_lambdas cl =
+let lift_lambdas env cl =
+  let idx = idx_of env in
   let counter =
     ref
       ((C.Seq.vars cl |> Iter.map HVar.id |> Iter.max |> CCOpt.get_or ~default:0)
@@ -250,10 +254,10 @@ let lift_lambdas cl =
         match lit with
         | Literal.Equation (lhs, rhs, sign) ->
           let lhs', (reused_lhs, new_lhs) =
-            lift_lambdas_t ~parent:cl ~counter lhs
+            lift_lambdas_t ~idx ~parent:cl ~counter lhs
           in
           let rhs', (reused_rhs, new_rhs) =
-            lift_lambdas_t ~parent:cl ~counter rhs
+            lift_lambdas_t ~idx ~parent:cl ~counter rhs
           in
           let reused = reused_lhs @ reused_rhs and new_ = new_rhs @ new_lhs in
           let lit' = Literal.mk_lit lhs' rhs' sign in
@@ -279,8 +283,8 @@ let lift_lambdas cl =
     lifted :: new_defs
   )
 
-let lift_lambdas_simp _env cl =
-  let res = lift_lambdas cl in
+let lift_lambdas_simp env cl =
+  let res = lift_lambdas env cl in
   if CCList.is_empty res then (
     Util.debugf ~section 1 "Nothing to do for @[%a@]@." (fun k -> k C.pp cl);
     None

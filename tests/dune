@@ -147,3 +147,25 @@
      %{dep:regressions/multi_input/enum1.p}
      %{dep:regressions/multi_input/enum2.p}))
    (system "test $(grep -c 'SZS status Theorem' enum_multi.out) -eq 2"))))
+
+; Regression test: lambda-lifting index is per-Env. Two files with the same
+; lambda must each lift it locally, not reuse the first file's definition.
+; Guards r3qf.
+
+(rule
+ (alias runtest)
+ (targets lambda_multi.out)
+ (action
+  (progn
+   (with-outputs-to
+    lambda_multi.out
+    (run
+     %{bin:zipperposition}
+     --live-lambda-lifting
+     true
+     --post-cnf-lambda-lifting
+     true
+     %{dep:regressions/multi_input/lambda1.p}
+     %{dep:regressions/multi_input/lambda2.p}))
+   (system
+    "awk '/SZS status/ { n++ } n == 2 && /lambda1.p/ { bad = 1 } END { exit (n < 2 || bad) }' lambda_multi.out"))))

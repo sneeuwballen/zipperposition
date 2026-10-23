@@ -299,7 +299,7 @@ let try_e env active_set passive_set =
       | `Combs -> fun c -> ([ Combinators.force_conv_lams env c ] :> C.t list)
       | _ ->
         fun c ->
-          let lifted = Lift_lambdas.lift_lambdas c in
+          let lifted = Lift_lambdas.lift_lambdas env c in
           if CCList.is_empty lifted then
             [ c ]
           else
