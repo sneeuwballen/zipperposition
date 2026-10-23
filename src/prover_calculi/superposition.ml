@@ -4175,8 +4175,9 @@ let () =
               flex_ref := Flex_state.add k_use_simultaneous_sup v !flex_ref),
           " enable/disable simultaneous superposition" );
         ( "--dont-simplify",
-          Arg.Bool
-            (fun v -> flex_ref := Flex_state.add k_dont_simplify v !flex_ref),
+          Arg.Unit
+            (fun () ->
+              flex_ref := Flex_state.add k_dont_simplify true !flex_ref),
           " disable simplification rules" );
         ( "--sup-at-vars",
           Arg.Bool

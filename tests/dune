@@ -347,3 +347,18 @@
      --no-rw-ctx-narrow
      %{dep:regressions/multi_input/easy1.p}))
    (run grep -q "SZS status Theorem" rw_ctx_flags.out))))
+
+; Regression test: --dont-simplify is an argument-less flag. Guards 7q5c.
+
+(rule
+ (alias runtest)
+ (targets dont_simplify.out)
+ (action
+  (progn
+   (with-outputs-to
+    dont_simplify.out
+    (run
+     %{bin:zipperposition}
+     --dont-simplify
+     %{dep:regressions/multi_input/easy1.p}))
+   (run grep -q "SZS status Theorem" dont_simplify.out))))
