@@ -144,20 +144,21 @@ module State_ = struct
   let run : 'a mm -> t -> 'a list = fun m st -> List.map snd (m st)
 end
 
-let make_coverset_ ~cover_set_depth ~depth (ty : Type.t) (ity : Ind_ty.t) : t =
+let make_coverset_ ~state ~cover_set_depth ~depth (ty : Type.t) (ity : Ind_ty.t)
+    : t =
   let open State_ in
   (* map variables from [ity] to this concrete type *)
   let scope = 0 in
-  let cs_top = Ind_cst.make ~depth ~is_sub:false ty in
+  let cs_top = Ind_cst.make state ~depth ~is_sub:false ty in
   (* how to make a simple skolem *)
   let mk_skolem ty : T.t mm =
-    let id = Ind_cst.make_skolem ty in
+    let id = Ind_cst.make_skolem state ty in
     add_constant id ty >|= fun () -> T.const ~ty id
   in
   (* how to make a sub-constant of type [ty] and register it in [cs_top] *)
   let decl_sub ty : T.t mm =
     if Ind_ty.is_inductive_type ty then (
-      let sub = Ind_cst.make ~depth:(depth + 1) ~is_sub:true ty in
+      let sub = Ind_cst.make state ~depth:(depth + 1) ~is_sub:true ty in
       add_sub_case sub >|= fun () -> Ind_cst.to_term sub
     ) else
       mk_skolem ty
@@ -244,13 +245,13 @@ let make_coverset_ ~cover_set_depth ~depth (ty : Type.t) (ity : Ind_ty.t) : t =
   { cs_top; cs_cases }
 
 (* compute coverset on the fly, if need be *)
-let make ?(cover_set_depth = 1) ~depth (ty : Type.t) : t =
+let make ~state ?(cover_set_depth = 1) ~depth (ty : Type.t) : t =
   if cover_set_depth <= 0 then
     Util.invalid_argf "Cover_set.make: cover_set_depth=%d must be > 0"
       cover_set_depth;
   match Ind_ty.as_inductive_type ty with
   | Some (ity, _) ->
-    let set = make_coverset_ ~cover_set_depth ~depth ty ity in
+    let set = make_coverset_ ~state ~cover_set_depth ~depth ty ity in
     Util.debugf ~section:Ind_ty.section 2 "@[<2>new coverset:@ %a@]" (fun k ->
         k pp set);
     Util.debugf ~section:Ind_ty.section 5 "@[<2>sub-constants:@ @[<v>%a@]@]"

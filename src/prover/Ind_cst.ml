@@ -30,7 +30,25 @@ type t = {
 }
 [@@warning "-69"]
 
-type Name_payload.t += Payload_cst of t
+type state = {
+  mutable counter: int;
+  payload: t Name.Tbl.t;
+}
+
+let k_state : state Flex_state.key = Flex_state.create_key ()
+
+let init flex_state =
+  match Flex_state.get k_state flex_state with
+  | Some _ -> flex_state
+  | None ->
+    Flex_state.add k_state
+      { counter = 0; payload = Name.Tbl.create 128 }
+      flex_state
+
+let get_state flex_state =
+  match Flex_state.get k_state flex_state with
+  | Some st -> st
+  | None -> invalid_arg "Ind_cst state is not initialized"
 
 (** {5 Inductive Constants} *)
 
@@ -51,33 +69,26 @@ end)
 let depth c = c.cst_depth
 let same_type c1 c2 = Type.equal c1.cst_ty c2.cst_ty
 let pp out c = Name.pp out c.cst_id
-let on_new_cst = Signal.create ()
+let id_as_cst st id = Name.Tbl.find_opt st.payload id
 
-let id_as_cst id =
-  Name_payload.find id ~f:(function
-    | Payload_cst c -> Some c
-    | _ -> None)
-
-let id_as_cst_exn id =
-  match id_as_cst id with
+let id_as_cst_exn st id =
+  match id_as_cst st id with
   | None -> raise (NotAnInductiveConstant id)
   | Some c -> c
 
-let id_is_cst id =
-  match id_as_cst id with
+let id_is_cst st id =
+  match id_as_cst st id with
   | Some _ -> true
   | _ -> false
 
 let is_sub c = c.cst_is_sub
-let id_is_sub id = id_as_cst id |> CCOpt.map_or ~default:false is_sub
+let id_is_sub st id = id_as_cst st id |> CCOpt.map_or ~default:false is_sub
 
 (** {5 Creation of Coverset and Cst} *)
 
-let n_ = ref 0
-
-let make_skolem ty : Name.t =
-  let c = Name.makef "#%s_%d" (Type.mangle ty) !n_ in
-  incr n_;
+let make_skolem st ty : Name.t =
+  let c = Name.makef "#%s_%d" (Type.mangle ty) st.counter in
+  st.counter <- st.counter + 1;
   (* declare as a skolem *)
   let k =
     if Ind_ty.is_inductive_type ty then
@@ -89,11 +100,11 @@ let make_skolem ty : Name.t =
   c
 
 (* declare new constant *)
-let declare ~depth ~is_sub id ty =
+let declare st ~depth ~is_sub id ty =
   Util.debugf ~section:Ind_ty.section 2
     "@[<2>declare new inductive symbol@ `@[%a : %a@]`@ :depth %d :is_sub %B@]"
     (fun k -> k Name.pp id Type.pp ty depth is_sub);
-  assert (not (id_is_cst id));
+  assert (not (id_is_cst st id));
   assert (Type.is_ground ty);
   (* constant --> not polymorphic *)
   let ity, args =
@@ -112,17 +123,12 @@ let declare ~depth ~is_sub id ty =
       cst_is_sub = is_sub;
     }
   in
-  Name_payload.add id (Payload_cst cst) ~can_erase:(function
-    | Name.Attr_skolem Name.K_ind ->
-      true (* special case: promotion from skolem to inductive const *)
-    | _ -> false);
-  (* return *)
-  Signal.send on_new_cst cst;
+  Name.Tbl.replace st.payload id cst;
   cst
 
-let make ?(depth = 0) ~is_sub (ty : Type.t) : t =
-  let id = make_skolem ty in
-  declare ~depth ~is_sub id ty
+let make st ?(depth = 0) ~is_sub (ty : Type.t) : t =
+  let id = make_skolem st ty in
+  declare st ~depth ~is_sub id ty
 
 let dominates (c1 : t) (c2 : t) : bool = c1.cst_depth < c2.cst_depth
 
@@ -133,29 +139,29 @@ type ind_skolem = Name.t * Type.t
 let ind_skolem_compare = CCOrd.pair Name.compare Type.compare
 let ind_skolem_equal a b = ind_skolem_compare a b = 0
 
-let id_is_ind_skolem (id : Name.t) (ty : Type.t) : bool =
+let id_is_ind_skolem st (id : Name.t) (ty : Type.t) : bool =
   let n_tyvars, ty_args, ty_ret = Type.open_poly_fun ty in
   n_tyvars = 0
   && ty_args = [] (* constant *)
   && Ind_ty.is_inductive_type ty_ret
   && Ind_ty.is_recursive (Ind_ty.as_inductive_type_exn ty_ret |> fst)
   && Type.is_ground ty
-  && (id_is_cst id
+  && (id_is_cst st id
      || ((not (Ind_ty.is_constructor id)) && not (Rewrite.is_defined_cst id)))
 
-let ind_skolem_depth (id : Name.t) : int =
-  match id_as_cst id with
+let ind_skolem_depth st (id : Name.t) : int =
+  match id_as_cst st id with
   | None -> 0
   | Some c -> depth c
 
 (* find inductive constant candidates in terms *)
-let find_ind_skolems t : ind_skolem Iter.t =
+let find_ind_skolems st t : ind_skolem Iter.t =
   T.Seq.subterms t
   |> Iter.filter_map (fun t ->
       match T.view t with
       | T.Const id ->
         let ty = T.ty t in
-        if id_is_ind_skolem id ty then (
+        if id_is_ind_skolem st id ty then (
           let n_tyvars, ty_args, _ = Type.open_poly_fun ty in
           assert (n_tyvars = 0 && ty_args = []);
           Some (id, ty)

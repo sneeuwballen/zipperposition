@@ -14,7 +14,7 @@ type res =
   | Skolem
   | Other
 
-let classify id =
+let classify state id =
   let rec aux = function
     | [] -> Other
     | p :: tail ->
@@ -32,7 +32,7 @@ let classify id =
       (Ind_ty.as_constructor |>> fun (c, t) -> Cstor (c, t));
       (Ind_ty.as_inductive_ty |>> fun x -> Ty x);
       (Name.as_parameter |>> fun x -> Parameter x);
-      (Ind_cst.id_as_cst |>> fun c -> Inductive_cst (Some c));
+      (Ind_cst.id_as_cst state |>> fun c -> Inductive_cst (Some c));
       (fun id ->
         let open CCOpt.Infix in
         Name.as_skolem id >>= function
@@ -44,20 +44,17 @@ let classify id =
       );
     ]
 
-let id_is_cstor id =
-  match classify id with
+let id_is_cstor state id =
+  match classify state id with
   | Cstor _ -> true
   | _ -> false
 
-let id_is_projector id =
-  match classify id with
+let id_is_projector state id =
+  match classify state id with
   | Projector _ -> true
   | _ -> false
 
-let id_is_defined id =
-  match classify id with
-  | DefinedCst _ -> true
-  | _ -> false
+let id_is_defined id = CCOpt.is_some (Rewrite.as_defined_cst id)
 
 let pp_res out = function
   | Ty _ -> Format.fprintf out "ind_ty"
@@ -69,10 +66,10 @@ let pp_res out = function
   | Skolem -> CCFormat.string out "skolem"
   | Other -> CCFormat.string out "other"
 
-let pp_signature out sigma =
+let pp_signature state out sigma =
   let pp_pair out (id, (ty, _)) =
     Format.fprintf out "(@[%a : %a (%a)@])" Name.pp id Type.pp ty pp_res
-      (classify id)
+      (classify state id)
   in
   Format.fprintf out "{@[<hv>%a@]}"
     (Util.pp_list ~sep:"," pp_pair)
@@ -81,7 +78,7 @@ let pp_signature out sigma =
 let dominates_ opt_c opt_sub =
   CCOpt.(get_or ~default:false (map2 Ind_cst.dominates opt_c opt_sub))
 
-let prec_constr_ a b =
+let prec_constr_ state a b =
   let to_int_ = function
     | Ty _ -> 0
     | Projector _ -> 1
@@ -91,8 +88,8 @@ let prec_constr_ a b =
     | Skolem | Other -> 10 (* skolem and other constants, at the same level *)
     | DefinedCst _ -> 20 (* defined: biggest *)
   in
-  let c_a = classify a in
-  let c_b = classify b in
+  let c_a = classify state a in
+  let c_b = classify state b in
   match c_a, c_b with
   | Ty _, Ty _
   | Cstor _, Cstor _
@@ -123,11 +120,11 @@ let prec_constr_ a b =
   | Other, _ ->
     CCInt.compare (to_int_ c_a) (to_int_ c_b)
 
-let prec_constr = Precedence.Constr.make prec_constr_
+let prec_constr state = Precedence.Constr.make (prec_constr_ state)
 
-let weight_fun (id : Name.t) : Precedence.Weight.t =
+let weight_fun state (id : Name.t) : Precedence.Weight.t =
   let module W = Precedence.Weight in
-  match classify id with
+  match classify state id with
   | Ty _ -> W.int 1
   | Projector _ -> W.int 1
   | Parameter _ -> W.int 1

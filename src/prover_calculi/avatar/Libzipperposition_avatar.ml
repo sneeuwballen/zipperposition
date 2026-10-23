@@ -507,7 +507,9 @@ let prove_lemma env (c : cut_res) : unit =
       vars
       |> List.map (fun v ->
           let ty_v = HVar.ty v in
-          let id = Ind_cst.make_skolem ty_v in
+          let id =
+            Ind_cst.make_skolem (Ind_cst.get_state (Env.flex_state_of env)) ty_v
+          in
           Ctx.declare (Env.get_ctx env) id ty_v;
           (v, 0), (T.const ~ty:ty_v id, 0))
       |> Subst.FO.of_list' ?init:None

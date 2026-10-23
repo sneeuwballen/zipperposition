@@ -21,19 +21,19 @@ type res =
   | Skolem
   | Other
 
-val classify : Name.t -> res
+val classify : Ind_cst.state -> Name.t -> res
 (** [classify id] returns the role [id] plays in inductive reasoning *)
 
-val id_is_cstor : Name.t -> bool
-val id_is_projector : Name.t -> bool
+val id_is_cstor : Ind_cst.state -> Name.t -> bool
+val id_is_projector : Ind_cst.state -> Name.t -> bool
 val id_is_defined : Name.t -> bool
 val pp_res : res CCFormat.printer
 
-val pp_signature : Signature.t CCFormat.printer
+val pp_signature : Ind_cst.state -> Signature.t CCFormat.printer
 (** Print classification of signature *)
 
-val prec_constr : [ `partial ] Precedence.Constr.t
+val prec_constr : Ind_cst.state -> [ `partial ] Precedence.Constr.t
 (** Partial order on [Name.t], with: regular > constant > sub_constant > cstor
 *)
 
-val weight_fun : Precedence.weight_fun
+val weight_fun : Ind_cst.state -> Precedence.weight_fun

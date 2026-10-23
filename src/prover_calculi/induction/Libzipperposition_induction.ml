@@ -412,11 +412,11 @@ let fresh_var_gen_ () : Type.t -> T.t =
     v
 
 (* scan terms for inductive skolems. *)
-let scan_terms ~mode (seq : term Iter.t) : Ind_cst.ind_skolem list =
+let scan_terms ~state ~mode (seq : term Iter.t) : Ind_cst.ind_skolem list =
   seq
-  |> Iter.flat_map Ind_cst.find_ind_skolems
+  |> Iter.flat_map (Ind_cst.find_ind_skolems state)
   |> Iter.filter (fun (id, _) ->
-      match Ind_cst.id_as_cst id, mode with
+      match Ind_cst.id_as_cst state id, mode with
       | None, _ -> true
       | Some _, `All -> true
       | Some c, `No_sub_cst ->
@@ -430,12 +430,13 @@ let scan_terms ~mode (seq : term Iter.t) : Ind_cst.ind_skolem list =
      and perform induction on these terms.
       @return a list of ways to generalize the given clause *)
 let scan_clause env (c : C.t) : Ind_cst.ind_skolem list list =
+  let state = Ind_cst.get_state (Env.flex_state_of env) in
   let l1 =
     if Env.flex_get_of env k_ind_on_subcst then
-      C.lits c |> Lits.Seq.terms |> scan_terms ~mode:`All
+      C.lits c |> Lits.Seq.terms |> scan_terms ~state ~mode:`All
     else
       []
-  and l2 = C.lits c |> Lits.Seq.terms |> scan_terms ~mode:`No_sub_cst in
+  and l2 = C.lits c |> Lits.Seq.terms |> scan_terms ~state ~mode:`No_sub_cst in
   (* remove duplicates, empty lists, etc. *)
   [ l1; l2 ]
   |> CCList.sort_uniq ~cmp:(CCList.compare Ind_cst.ind_skolem_compare)
@@ -470,6 +471,7 @@ let ind_on_vars env (cut : Avatar.cut_res) (vars : T.var list) : C.t list =
       ~rule:(Proof.Rule.mk "induction")
       ~tags:[ Proof.Tag.T_ind ]
   in
+  let state = Ind_cst.get_state (Env.flex_state_of env) in
   (* other variables -> become skolems *)
   let subst_skolems : Subst.t =
     Cut_form.vars g
@@ -477,7 +479,7 @@ let ind_on_vars env (cut : Avatar.cut_res) (vars : T.var list) : C.t list =
     |> T.VarSet.to_list
     |> List.map (fun v ->
         let ty_v = HVar.ty v in
-        let id = Ind_cst.make_skolem ty_v in
+        let id = Ind_cst.make_skolem state ty_v in
         Ctx.declare (Env.get_ctx env) id ty_v;
         (v, 0), (T.const ~ty:ty_v id, 1))
     |> Subst.FO.of_list' ?init:None
@@ -489,7 +491,9 @@ let ind_on_vars env (cut : Avatar.cut_res) (vars : T.var list) : C.t list =
         let ty =
           Subst.Ty.apply Subst.Renaming.none subst_skolems (HVar.ty v, 0)
         in
-        v, Cover_set.make ~cover_set_depth:(cover_set_depth env) ~depth ty)
+        ( v,
+          Cover_set.make ~state ~cover_set_depth:(cover_set_depth env) ~depth ty
+        ))
       vars
   in
   List.iter (fun (_, set) -> decl_cst_of_set env set) c_sets;
@@ -769,12 +773,13 @@ end = struct
   (* generalize non-variable subterms occurring several times
        at active positions *)
   let terms_at_active_pos env (f : form) : generalization list =
+    let state = Ind_cst.get_state (Env.flex_state_of env) in
     let relevant_subterms =
       subterms_with_pos f
       |> Iter.filter_map (function
         | P_active, pos, t ->
           (match T_view.view t with
-          | T_view.T_app_unin (id, []) when Ind_cst.id_is_sub id ->
+          | T_view.T_app_unin (id, []) when Ind_cst.id_is_sub state id ->
             None (* probably there because there are induction hyp. on it *)
           | _ when Type.is_tType (T.ty t |> Type.returns) ->
             None (* do not generalize on type or type constructors *)
@@ -1036,6 +1041,7 @@ let generalize_clauses (cs : Lits.t list)
       @param generalize_on the set of (skolem) constants that are replaced
        by free variables in the negation of [clauses] *)
 let prove_by_ind env (clauses : C.t list) ~ignore_depth ~generalize_on : unit =
+  let state = Ind_cst.get_state (Env.flex_state_of env) in
   let pp_csts = Util.pp_list Fmt.(pair ~sep:(return ":@ ") Name.pp Type.pp) in
   (* remove trivial clauses *)
   let clauses =
@@ -1046,7 +1052,7 @@ let prove_by_ind env (clauses : C.t list) ~ignore_depth ~generalize_on : unit =
      (@[%a@])@]" (fun k -> k (Util.pp_list C.pp) clauses pp_csts generalize_on);
   let depth =
     Iter.of_list generalize_on
-    |> Iter.map (fun (id, _) -> Ind_cst.ind_skolem_depth id)
+    |> Iter.map (fun (id, _) -> Ind_cst.ind_skolem_depth state id)
     |> Iter.max |> CCOpt.get_or ~default:0
   (* the trail should not contain a positive "lemma" atom.
        We accept negative lemma atoms because the induction can be used to
@@ -1111,8 +1117,9 @@ let convert_statement env st =
   match Statement.view st with
   | Statement.NegatedGoal (skolems, _) ->
     (* find inductive skolems in there *)
+    let state = Ind_cst.get_state (Env.flex_state_of env) in
     let ind_skolems =
-      List.filter (fun (id, ty) -> Ind_cst.id_is_ind_skolem id ty) skolems
+      List.filter (fun (id, ty) -> Ind_cst.id_is_ind_skolem state id ty) skolems
     in
     (match ind_skolems with
     | [] -> Env.CR_skip

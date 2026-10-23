@@ -55,7 +55,8 @@ val cases : ?which:[ `Rec | `Base | `All ] -> t -> case Iter.t
 val sub_constants : t -> cst Iter.t
 (** All sub-constants of a given inductive constant *)
 
-val make : ?cover_set_depth:int -> depth:int -> Type.t -> t
+val make :
+  state:Ind_cst.state -> ?cover_set_depth:int -> depth:int -> Type.t -> t
 (** Build a cover set for the given type.
 
     a set of ground terms [[t1,...,tn]] with fresh constants inside (that are

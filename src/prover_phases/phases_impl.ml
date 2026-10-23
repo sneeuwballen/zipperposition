@@ -235,7 +235,8 @@ let cnf (st_ref : Phases.State.t ref) ~sk_ctx decls =
 (* compute a precedence *)
 let compute_prec (st_ref : Phases.State.t ref) ~signature stmts =
   let@ () = Phases.with_phase st_ref Phases.Compute_prec in
-  let state = !st_ref in
+  let state = Ind_cst.init !st_ref in
+  st_ref := state;
   let st = get_state st_ref in
   let cp =
     Extensions.extensions ()
@@ -243,7 +244,8 @@ let compute_prec (st_ref : Phases.State.t ref) ~signature stmts =
          (fun cp e ->
            List.fold_left (fun cp f -> f state cp) cp e.Extensions.prec_actions)
          Compute_prec.empty
-    |> Compute_prec.add_constr 10 Classify_cst.prec_constr
+    |> Compute_prec.add_constr 10
+         (Classify_cst.prec_constr (Ind_cst.get_state state))
     |> Compute_prec.set_weight_rule (fun stmts ->
         let sym_depth =
           stmts

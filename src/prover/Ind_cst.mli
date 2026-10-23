@@ -15,27 +15,34 @@ type t
 exception InvalidDecl of string
 exception NotAnInductiveConstant of Name.t
 
-val id_as_cst : Name.t -> t option
+type state
 
-val id_as_cst_exn : Name.t -> t
+val k_state : state Flex_state.key
+
+val init : Flex_state.t -> Flex_state.t
+(** Ensure the inductive-constant state exists in the given flex state. *)
+
+val get_state : Flex_state.t -> state
+(** @raise Invalid_argument if {!init} was not called. *)
+
+val id_as_cst : state -> Name.t -> t option
+
+val id_as_cst_exn : state -> Name.t -> t
 (** Unsafe version of {!as_cst}
     @raise NotAnInductiveConstant if it fails *)
 
-val id_is_cst : Name.t -> bool
+val id_is_cst : state -> Name.t -> bool
 (** Check whether the given constant is an inductive constant *)
 
-val on_new_cst : t Signal.t
-(** Triggered with new inductive constants *)
+val make_skolem : state -> Type.t -> Name.t
 
-val make_skolem : Type.t -> Name.t
-
-val make : ?depth:int -> is_sub:bool -> Type.t -> t
+val make : state -> ?depth:int -> is_sub:bool -> Type.t -> t
 (** Make a new constant of the given type *)
 
 val is_sub : t -> bool
 (** Is the constant a sub-constant (i.e. a subterm of a case in a coverset)? *)
 
-val id_is_sub : Name.t -> bool
+val id_is_sub : state -> Name.t -> bool
 val equal : t -> t -> bool
 val compare : t -> t -> int
 val hash : t -> int
@@ -63,19 +70,17 @@ type ind_skolem = Name.t * Type.t
 val ind_skolem_compare : ind_skolem -> ind_skolem -> int
 val ind_skolem_equal : ind_skolem -> ind_skolem -> bool
 
-val id_is_ind_skolem : Name.t -> Type.t -> bool
+val id_is_ind_skolem : state -> Name.t -> Type.t -> bool
 (** [id_is_potential_cst id ty] returns [true] if [id:ty] is a skolem constant
     of an inductive type, or if it is already an inductive constant. *)
 
-val find_ind_skolems : Term.t -> ind_skolem Iter.t
+val find_ind_skolems : state -> Term.t -> ind_skolem Iter.t
 (** [find_ind_skolem term] searches subterms of [term] for constants that are of
     an inductive type and that are skolems or (already) inductive constants. *)
 
-val ind_skolem_depth : Name.t -> int
+val ind_skolem_depth : state -> Name.t -> int
 (** depth of the skolem (0 if not an inductive constant) *)
 
 (**/**)
-
-type Name_payload.t += Payload_cst of t
 
 (**/**)

@@ -244,6 +244,7 @@ let rec pure_value (t : term) : bool =
    "hierarchic superposition with weak abstraction"'s rule that
    introduces background constants to equate to foreground terms *)
 let exhaustiveness env (c : C.t) : C.t list =
+  let state = Ind_cst.get_state (Env.flex_state_of env) in
   let mk_sub_skolem (t : term) (ty : Type.t) : Name.t =
     if Ind_ty.is_inductive_type ty then (
       (* declare a constant, with a depth that (if any)
@@ -252,12 +253,13 @@ let exhaustiveness env (c : C.t) : C.t list =
       let depth =
         match T.view t with
         | T.Const id ->
-          Ind_cst.id_as_cst id |> CCOpt.map Ind_cst.depth |> CCOpt.map succ
+          Ind_cst.id_as_cst state id |> CCOpt.map Ind_cst.depth
+          |> CCOpt.map succ
         | _ -> None
       in
-      Ind_cst.make ~is_sub:false ?depth ty |> Ind_cst.id
+      Ind_cst.make state ~is_sub:false ?depth ty |> Ind_cst.id
     ) else
-      Ind_cst.make_skolem ty
+      Ind_cst.make_skolem state ty
   in
   (* how to build exhaustiveness axiom for a term [t] *)
   let make_axiom (t : term) : C.t =
