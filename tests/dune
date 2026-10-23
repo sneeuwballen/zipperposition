@@ -6,6 +6,7 @@
   logtk.arbitrary
   logtk.arith
   libzipperposition
+  libzipperposition.avatar
   iter
   qcheck-core
   qcheck-alcotest

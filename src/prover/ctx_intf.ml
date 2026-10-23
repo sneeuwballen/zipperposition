@@ -29,13 +29,4 @@ module type S = sig
   val on_signature_update : Signature.t Signal.t
   val set_injective_for_arg : Name.t -> int -> unit
   val is_injective_for_arg : Name.t -> int -> bool
-
-  module Lit : sig
-    val from_hooks : unit -> Literal.Conv.hook_from list
-    val add_from_hook : Literal.Conv.hook_from -> unit
-    val to_hooks : unit -> Literal.Conv.hook_to list
-    val add_to_hook : Literal.Conv.hook_to -> unit
-    val of_form : Term.t SLiteral.t -> Literal.t
-    val to_form : Literal.t -> Term.t SLiteral.t
-  end
 end

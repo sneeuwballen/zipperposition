@@ -128,24 +128,6 @@ let lit_to_form t f = Literal.Conv.to_form ~hooks:t.lit_to_hooks f
 let add_lit_from_hook t h = t.lit_from_hooks <- h :: t.lit_from_hooks
 let add_lit_to_hook t h = t.lit_to_hooks <- h :: t.lit_to_hooks
 
-module Lit = struct
-  (* Bridge: uses global ref for backward compat *)
-  let from_hooks () = Atomic.get Ctx_global.from_hooks
-
-  let add_from_hook h =
-    Atomic.set Ctx_global.from_hooks (h :: Atomic.get Ctx_global.from_hooks)
-
-  let to_hooks () = Atomic.get Ctx_global.to_hooks
-
-  let add_to_hook h =
-    Atomic.set Ctx_global.to_hooks (h :: Atomic.get Ctx_global.to_hooks)
-
-  let of_form f =
-    Literal.Conv.of_form ~hooks:(Atomic.get Ctx_global.from_hooks) f
-
-  let to_form f = Literal.Conv.to_form ~hooks:(Atomic.get Ctx_global.to_hooks) f
-end
-
 module Key = struct
   let lost_completeness = Flex_state.create_key ()
 end

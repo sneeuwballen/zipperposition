@@ -616,7 +616,7 @@ let convert_lemma env st =
     let proof_st = Statement.proof_step st in
     let f =
       l
-      |> List.map (List.map Ctx.Lit.of_form)
+      |> List.map (List.map (Ctx.lit_of_form (Env.get_ctx env)))
       |> List.map Array.of_list |> Cut_form.make
     in
     let proof =
