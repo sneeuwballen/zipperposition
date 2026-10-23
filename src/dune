@@ -3,9 +3,9 @@
   (flags
    :standard
    -warn-error
-   +a-3-8-27-32-50-69
+   +a-3-26-27-32-33-34-37-38-50-67-69
    -w
-   -3-26-32-33-34-37-38-50-67
+   -3
    -color
    always
    -safe-string)
