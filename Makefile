@@ -4,10 +4,10 @@
 J?=3
 DUNE_OPTS= -j $(J) --profile=release
 
+all: build test-cached
+
 build:
 	@dune build @install $(DUNE_OPTS)
-
-all: build test-cached
 
 check:
 	@dune build @check $(DUNE_OPTS)
