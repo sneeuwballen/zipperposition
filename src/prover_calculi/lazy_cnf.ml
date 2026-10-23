@@ -26,7 +26,13 @@ let section = Util.Section.make ~parent:Const.section "lazy_cnf"
 module C = Clause
 module FR = Env.FormRename
 
-let _form_counter = Term.Tbl.create 256
+let k_form_counter : int Term.Tbl.t Flex_state.key = Flex_state.create_key ()
+
+let form_counter env =
+  Env.flex_get_or_create
+    ~init:(fun () -> Term.Tbl.create 256)
+    env k_form_counter
+
 let k_counted_clauses : Util.Int_set.t Flex_state.key = Flex_state.create_key ()
 
 let get_counted_clauses env =
@@ -61,6 +67,7 @@ let update_form_counter ~action env c =
         true
       )
   in
+  let form_counter = form_counter env in
   if should_update c then
     Ls.fold_eqn ~both:false
       ~ord:(Ctx.ord (Env.get_ctx env))
@@ -83,8 +90,8 @@ let update_form_counter ~action env c =
         List.iter
           (fun t ->
             match action with
-            | `Increase -> Term.Tbl.incr _form_counter t
-            | `Decrease -> Term.Tbl.decr _form_counter t)
+            | `Increase -> Term.Tbl.incr form_counter t
+            | `Decrease -> Term.Tbl.decr form_counter t)
           terms)
   else
     ( (* CCFormat.printf "not updating @[%a@]@." C.pp c; *) )
@@ -109,8 +116,15 @@ let check_eq_cnf_ordering_conditions env lhs rhs =
   | Gt | Geq -> is_noninterpeted lhs
   | _ -> is_noninterpeted lhs || is_noninterpeted rhs
 
-let _ty_map = Type.Tbl.create 16
-let init_ty_map () = Type.Tbl.add _ty_map Type.prop [ T.true_; T.false_ ]
+let k_ty_map : Term.t list Type.Tbl.t Flex_state.key = Flex_state.create_key ()
+
+let ty_map env =
+  Env.flex_get_or_create
+    ~init:(fun () ->
+      let tbl = Type.Tbl.create 16 in
+      Type.Tbl.add tbl Type.prop [ T.true_; T.false_ ];
+      tbl)
+    env k_ty_map
 
 let rec enum_bool_funs env ~ty =
   assert (
@@ -169,16 +183,15 @@ let rec enum_bool_funs env ~ty =
     |> Iter.to_list
   in
 
-  if Type.Tbl.length _ty_map == 0 then init_ty_map ();
-
-  try Type.Tbl.find _ty_map ty
+  let ty_map = ty_map env in
+  try Type.Tbl.find ty_map ty
   with Not_found ->
     let args, ret = Type.open_fun ty in
     let arg_members = List.map (fun ty -> enum_bool_funs env ~ty) args in
     let ret_members = enum_bool_funs env ~ty:ret in
     let new_members = create_members arg_members ret_members in
 
-    Type.Tbl.add _ty_map ty new_members;
+    Type.Tbl.add ty_map ty new_members;
 
     Ctx.declare_syms (Env.get_ctx env)
       (List.map (fun t -> T.head_exn t, T.ty t) new_members);
@@ -633,6 +646,7 @@ let reduce_quantifiers env c =
 let rename_subformulas env c =
   Util.debugf ~section 3 "lazy-cnf-rename(@[%a@])@." (fun k -> k C.pp c);
   let flex_ref = ref (Env.flex_state_of env) in
+  let form_counter = form_counter env in
   let proof_cons =
     Proof.Step.simp ~infos:[]
       ~tags:[ Proof.Tag.T_live_cnf; Proof.Tag.T_dont_increase_depth ]
@@ -690,7 +704,7 @@ let rename_subformulas env c =
       ans
     in
 
-    let num_occurences = Term.Tbl.get_or _form_counter f ~default:0 in
+    let num_occurences = Term.Tbl.get_or form_counter f ~default:0 in
     (* CCFormat.printf "|@[%a@]| = %d@." T.pp f num_occurences; *)
     num_occurences >= Env.flex_get_of env k_renaming_threshold
     && (not (FR.is_renaming_clause ~flex_ref c))
@@ -715,7 +729,7 @@ let rename_subformulas env c =
                  sign
              with
              | Some (renamer, new_defs, parents) ->
-               Term.Tbl.remove _form_counter lhs;
+               Term.Tbl.remove form_counter lhs;
                let rule_name = "renaming" in
                let new_defs = clausify_defs new_defs in
                let renamer =

@@ -365,6 +365,32 @@
      %{dep:regressions/multi_input/easy1.p}))
    (run grep -q "SZS status Theorem" rw_ctx_flags.out))))
 
+; Regression test: the Boolean function enumeration cache is per-Env. The same
+; file twice in one CLI call must be proved twice, not reuse the first file's
+; enumerated symbols (which carry no defining clauses in the second Env).
+; Guards s2rr.
+
+(rule
+ (alias runtest)
+ (package zipperposition)
+ (targets bool_fun_enum_multi.out)
+ (action
+  (progn
+   (with-outputs-to
+    bool_fun_enum_multi.out
+    (run
+     %{bin:zipperposition}
+     --lazy-cnf
+     true
+     --enum-bool-funs
+     true
+     --replace-bool-quant-fun
+     true
+     %{dep:regressions/multi_input/bool_fun_enum.p}
+     %{dep:regressions/multi_input/bool_fun_enum.p}))
+   (system
+    "test $(grep -c 'SZS status Theorem' bool_fun_enum_multi.out) -eq 2"))))
+
 ; Regression test: --dont-simplify is an argument-less flag. Guards 7q5c.
 
 (rule
