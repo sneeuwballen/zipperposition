@@ -29,8 +29,31 @@ type cell = {
       (* ground-complete set of axioms (see "E: a brainiac theorem prover") *)
 }
 
-let tbl : cell Name.Tbl.t = Name.Tbl.create 3
-let on_add : spec Signal.t = Signal.create ()
+module type AC_TERM = module type of T.AC (struct
+  let is_ac _ = false
+  let is_comm _ = false
+end)
+
+type state = {
+  tbl: cell Name.Tbl.t;
+  on_add: spec Signal.t;
+  ac: (module AC_TERM);
+}
+
+let key_ac_state : state Flex_state.key = Flex_state.create_key ()
+
+let create_state () =
+  let tbl = Name.Tbl.create 3 in
+  let is_ac s = Name.Tbl.mem tbl s in
+  let ac =
+    (module T.AC (struct
+      let is_ac = is_ac
+      let is_comm _ = false
+    end) : AC_TERM)
+  in
+  { tbl; on_add = Signal.create (); ac }
+
+let state_of env = Env.flex_get_or_create ~init:create_state env key_ac_state
 
 let mk_axioms_ proof s ty : C.t list =
   let ty_args_n, ty_args, _ty_ret = Type.open_poly_fun ty in
@@ -81,46 +104,47 @@ let mk_axioms_ proof s ty : C.t list =
     mk_clause (f x (f y z)) (f z (f y x));
   ]
 
-let add_ proof ~ty s =
-  try Name.Tbl.find tbl s
+let add_ state proof ~ty s =
+  try Name.Tbl.find state.tbl s
   with Not_found ->
     let spec = { ty; sym = s } in
     let axioms = mk_axioms_ proof s ty in
     let cell = { spec; proof; axioms } in
-    Name.Tbl.add tbl s cell;
-    Signal.send on_add spec;
+    Name.Tbl.add state.tbl s cell;
+    Signal.send state.on_add spec;
     cell
 
-let is_ac s = Name.Tbl.mem tbl s
-let exists_ac () = Name.Tbl.length tbl > 0
-let find_proof s = (Name.Tbl.find tbl s).proof
-let symbols () = Name.Tbl.keys tbl |> Name.Set.of_iter
+let exists_ac state = Name.Tbl.length state.tbl > 0
 
-module A = T.AC (struct
-  let is_ac = is_ac
-  let is_comm _ = false
-end)
+let symbols_of_terms state seq =
+  let module A = (val state.ac) in
+  A.symbols seq
 
-let symbols_of_terms seq = A.symbols seq
+let ac_equal state l r =
+  let module A = (val state.ac) in
+  A.equal l r
 
 (** {2 Rules} *)
 
 (* does [l ?= r] have at least one AC symbol in it? *)
-let has_ac_ids_ l r =
+let has_ac_ids_ state l r =
+  let module A = (val state.ac) in
   let seq = Iter.doubleton l r |> Iter.flat_map A.seq_symbols in
   not (Iter.is_empty seq)
 
-let is_trivial_lit lit =
-  exists_ac ()
+let is_trivial_lit state lit =
+  exists_ac state
   &&
   match lit with
   | Lit.Equation (l, r, true) ->
-    (not (Type.is_fun (T.ty l))) && has_ac_ids_ l r && A.equal l r
+    (not (Type.is_fun (T.ty l))) && has_ac_ids_ state l r && ac_equal state l r
   | _ -> false
 
-let is_trivial _env c =
+let is_trivial env c =
+  let state = state_of env in
   let res =
-    (not (C.get_flag flag_axiom c)) && CCArray.exists is_trivial_lit (C.lits c)
+    (not (C.get_flag flag_axiom c))
+    && CCArray.exists (is_trivial_lit state) (C.lits c)
   in
   if res then (
     Util.incr_stat stat_ac_redundant;
@@ -130,9 +154,10 @@ let is_trivial _env c =
   res
 
 (* simplify: remove literals that are redundant modulo AC *)
-let simplify _env c =
+let simplify env c =
+  let state = state_of env in
   let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "prover.ac.simplify" in
-  if exists_ac () then (
+  if exists_ac state then (
     let n = Array.length (C.lits c) in
     let lits = Array.to_list (C.lits c) in
     let lits =
@@ -140,19 +165,19 @@ let simplify _env c =
         (fun lit ->
           match lit with
           | Literal.Equation (l, r, false) when not (Type.is_fun (T.ty l)) ->
-            not (has_ac_ids_ l r && A.equal l r)
+            not (has_ac_ids_ state l r && ac_equal state l r)
           | _ -> true)
         lits
     in
     let n' = List.length lits in
     if n' < n && not (C.get_flag SClause.flag_persistent c) then (
       (* did some simplification *)
-      let symbols = symbols_of_terms (C.Seq.terms c) in
+      let symbols = symbols_of_terms state (C.Seq.terms c) in
       let symbols = Name.Set.to_list symbols in
       let tags = List.map (fun id -> Builtin.Tag.T_ac id) symbols in
       let premises =
         C.proof_parent c
-        :: List.map (fun id -> (Name.Tbl.find tbl id).proof) symbols
+        :: List.map (fun id -> (Name.Tbl.find state.tbl id).proof) symbols
       in
       let proof =
         Proof.Step.simp premises ~rule:(Proof.Rule.mk "AC.normalize") ~tags
@@ -179,11 +204,12 @@ let add ~proof s ty env =
   Util.debugf ~section 1
     "@[enable AC redundancy criterion@ for `@[%a : @[%a@]@]`@ :proof %a@]"
     (fun k -> k Name.pp s Type.pp ty Proof.pp_parent proof);
+  let state = state_of env in
   (* is this the first case of AC symbols? If yes, then add inference rules *)
-  let first = not (exists_ac ()) in
+  let first = not (exists_ac state) in
   if first then install_rules_ env;
   (* remember that the symbols is AC *)
-  let cell = add_ proof ~ty s in
+  let cell = add_ state proof ~ty s in
   (* add clauses *)
   Util.debugf ~section 3 "@[<2>add AC axioms for `%a : @[%a@]`:@ @[<hv>%a@]@]"
     (fun k -> k Name.pp s Type.pp ty (Util.pp_list C.pp) cell.axioms);

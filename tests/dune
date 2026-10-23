@@ -69,3 +69,22 @@
      --no-progress
      %{dep:regressions/multi_input/easy1.p}))
    (system "! grep -q steps no_progress.out"))))
+
+; Regression test: AC state is per-Env. Two files with the same AC symbol in
+; one CLI call must each get their own AC table and rules. Guards 9m9f.
+
+(rule
+ (alias runtest)
+ (targets ac_multi.out)
+ (action
+  (progn
+   (with-outputs-to
+    ac_multi.out
+    (run
+     %{bin:zipperposition}
+     --check
+     %{dep:regressions/multi_input/ac1.zf}
+     %{dep:regressions/multi_input/ac2.zf}))
+   (system "test $(grep -c 'SZS status Theorem' ac_multi.out) -eq 2")
+   (system
+    "awk '/SZS status Theorem/ { n++ } n == 2 && /ac1.zf/ { bad = 1 } n == 2 && /AC.normalize/ { norm = 1 } END { exit (n < 2 || bad || !norm) }' ac_multi.out"))))
