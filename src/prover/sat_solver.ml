@@ -54,6 +54,16 @@ module ClauseTbl = CCHashtbl.Make (struct
   let hash = Hash.list Lit.hash
 end)
 
+module ResTbl = CCHashtbl.Make (struct
+  type t = clause * Proof.t list
+
+  let equal (c, l1) (c', l2) =
+    CCList.equal Lit.equal c c' && CCList.equal Proof.S.equal l1 l2
+
+  let hash (c, l) =
+    CCHash.combine2 (CCHash.int @@ List.length c) (CCHash.list Proof.S.hash l)
+end)
+
 type t = {
   solver: Solver.t ref;
   queue_: (Lit.t list list * proof_step) Queue.t;
@@ -67,6 +77,7 @@ type t = {
   pp_: Lit.t CCFormat.printer ref;
   clause_tbl_: unit ClauseTbl.t;
   lit_tbl_: unit Lit.Tbl.t;
+  res_tbl_: proof ResTbl.t;
 }
 
 let eval_fail_ _ = wrong_state_ "eval"
@@ -106,8 +117,6 @@ let init_from_log () =
         Format.pp_print_flush fmt ();
         close_out_noerr oc)
   )
-
-let () = init_from_log ()
 
 (* add clause, if not added already *)
 let add_clause_ t ~proof c =
@@ -157,7 +166,7 @@ let proof_of_leaf c step : proof =
   Proof.S.mk step (Bool_clause.mk_proof_res c)
 
 (* convert a SAT proof into a tree of ProofStep *)
-let conv_proof_atomic_ p : proof =
+let conv_proof_atomic_ t p : proof =
   let rec aux p =
     let module P = Solver.Proof in
     match P.expand p with
@@ -169,11 +178,16 @@ let conv_proof_atomic_ p : proof =
       (* atomic resolution step *)
       let q1 = aux hr_init in
       let q2 = List.map (fun (_, p) -> aux p) hr_steps in
-      let parents = Proof.Parent.from q1 :: List.map Proof.Parent.from q2 in
-      let step =
-        Proof.Step.inference parents ~rule:(Proof.Rule.mk "sat_resolution")
-      in
-      Proof.S.mk step (Bool_clause.mk_proof_res c)
+      (match ResTbl.get t.res_tbl_ (c, q1 :: q2) with
+      | Some s -> s
+      | None ->
+        let parents = Proof.Parent.from q1 :: List.map Proof.Parent.from q2 in
+        let step =
+          Proof.Step.inference parents ~rule:(Proof.Rule.mk "sat_resolution")
+        in
+        let s = Proof.S.mk step (Bool_clause.mk_proof_res c) in
+        ResTbl.add t.res_tbl_ (c, q1 :: q2) s;
+        s)
     | { P.conclusion = c; step = P.Hypothesis step; _ } -> proof_of_leaf c step
   in
   Solver.Proof.check p;
@@ -201,11 +215,11 @@ let conv_proof_compact_ p : proof =
   in
   Proof.S.mk step (Bool_clause.mk_proof_res c)
 
-let conv_proof_ p =
+let conv_proof_ t p =
   if !sat_compact_ then
     conv_proof_compact_ p
   else
-    conv_proof_atomic_ p
+    conv_proof_atomic_ t p
 
 let rec get_proved_lits_ t : Lit.Set.t =
   Lit.Tbl.to_iter t.lit_tbl_
@@ -241,7 +255,7 @@ and check_unconditional_ t =
     t.proved_lits_ := lazy (get_proved_lits_ t);
     t.result_ := Sat
   | Solver.Unsat us ->
-    let p = us.SI.get_proof () |> conv_proof_ in
+    let p = us.SI.get_proof () |> conv_proof_ t in
     t.result_ := Unsat p;
     t.proof_ := Some p);
   !(t.result_)
@@ -262,7 +276,7 @@ let get_proof_of_lit t lit =
   if (not b) || l <> 0 then invalid_arg "get_proof_of_lit";
   let a = Solver.make_atom !(t.solver) lit in
   match P.prove_atom a with
-  | Some p -> conv_proof_ p
+  | Some p -> conv_proof_ t p
   | None -> assert false
 
 let check t ~full () =
@@ -314,6 +328,7 @@ let clear t ?(size = `Big) () =
   t.solver := Solver.create ~size ()
 
 let create () =
+  init_from_log ();
   let solver = ref (Solver.create ~size:`Big ()) in
   let result =
     {
@@ -329,6 +344,7 @@ let create () =
       pp_ = ref Lit.pp;
       clause_tbl_ = ClauseTbl.create 32;
       lit_tbl_ = Lit.Tbl.create 32;
+      res_tbl_ = ResTbl.create 16;
     }
   in
   (* initialize: check once to set up eval_/eval_level_ *)

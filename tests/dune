@@ -298,3 +298,20 @@
     %{bin:zipperposition}
     %{dep:regressions/multi_input/enum1.p}
     %{dep:regressions/multi_input/enum2.p}))))
+
+; Regression test: --sat-log is applied after CLI parsing, so the log file is
+; actually populated. Guards 0a3a.
+
+(rule
+ (alias runtest)
+ (targets sat_log.out sat_log.log)
+ (action
+  (progn
+   (with-outputs-to
+    sat_log.out
+    (run
+     %{bin:zipperposition}
+     --sat-log
+     sat_log.log
+     %{dep:regressions/multi_input/easy1.p}))
+   (run test -s sat_log.log))))
