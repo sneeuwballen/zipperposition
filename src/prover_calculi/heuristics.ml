@@ -85,15 +85,20 @@ let () =
         ( "--depth-limit",
           Arg.Int
             (fun i ->
+              if i <= 0 then invalid_arg "Heuristics.enable_depth_limit";
               flex_ref := Flex_state.add k_depth_limit (Some i) !flex_ref),
           " set maximal term depth" );
         ( "--max-vars",
           Arg.Int (fun n -> flex_ref := Flex_state.add k_max_vars n !flex_ref),
           " maximum number of variables per clause" );
         ( "--no-max-vars",
-          Arg.Bool
-            (fun v -> flex_ref := Flex_state.add k_no_max_vars v !flex_ref),
-          " disable/enable maximum number of variables per clause" );
+          Arg.Unit
+            (fun () -> flex_ref := Flex_state.add k_no_max_vars true !flex_ref),
+          " disable maximum number of variables per clause" );
+        ( "--enable-max-vars",
+          Arg.Unit
+            (fun () -> flex_ref := Flex_state.add k_no_max_vars false !flex_ref),
+          " enable maximum number of variables per clause" );
       ]);
   Params.add_to_mode "best" (fun flex_ref ->
       flex_ref := Flex_state.add k_no_max_vars true !flex_ref);

@@ -315,3 +315,19 @@
      sat_log.log
      %{dep:regressions/multi_input/easy1.p}))
    (run test -s sat_log.log))))
+
+; Regression test: max-vars flags are argument-less. Guards qse1.
+
+(rule
+ (alias runtest)
+ (targets max_vars_flags.out)
+ (action
+  (progn
+   (with-outputs-to
+    max_vars_flags.out
+    (run
+     %{bin:zipperposition}
+     --no-max-vars
+     --enable-max-vars
+     %{dep:regressions/multi_input/easy1.p}))
+   (run grep -q "SZS status Theorem" max_vars_flags.out))))
