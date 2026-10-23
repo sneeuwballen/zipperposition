@@ -697,7 +697,8 @@ let register env ~split_kind () =
   Env.add_is_trivial_trail env trail_is_trivial;
   if Env.flex_get_of env k_simplify_trail then (
     Env.add_unary_simplify env simplify_trail;
-    Env.add_backward_simplify env backward_simplify_trails
+    if Env.flex_get_of env k_back_simplify_trail then
+      Env.add_backward_simplify env backward_simplify_trails
   );
   if Env.flex_get_of env k_show_lemmas then
     Signal.once Signals.on_exit (fun _ -> show_lemmas env);
