@@ -19,6 +19,7 @@ let units : unit Alcotest.test_case list =
   [
     TestSubsts.suite;
     TestProofState.suite;
+    TestClause.suite;
     TestMultiset.suite;
     TestOrdering.suite;
     TestTerm.suite;

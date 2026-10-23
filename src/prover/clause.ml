@@ -394,19 +394,14 @@ let bool_selected c = Lazy.force c.bool_selected
 let is_unit_clause c = Array.length c.sclause.lits = 1
 
 let is_oriented_rule c =
-  let ctx = ctx_of c in
-  let lits = c.sclause.lits in
-  if Array.length lits <> 2 then
-    false
-  else (
-    match lits.(0), lits.(1) with
-    | Literal.Equation (lhs1, rhs1, true), Literal.Equation (lhs2, rhs2, false)
-      ->
-      let ord = Ctx.ord ctx in
-      Ordering.compare ord lhs1 rhs1 = Comparison.Gt
-      && Ordering.compare ord lhs2 rhs2 = Comparison.Gt
-    | _ -> false
-  )
+  let ord = Ctx.ord (ctx_of c) in
+  match c.sclause.lits with
+  | [| Literal.Equation (l, r, true) |] ->
+    (* counting predicate literals of the form p = FALSE as rewrite rules *)
+    (match Ordering.compare ord l r with
+    | Comparison.Gt | Lt | Geq | Leq -> true
+    | Eq | Incomparable -> false)
+  | _ -> false
 
 let is_inj_axiom _c = None
 let ctx_of c = c.ctx
