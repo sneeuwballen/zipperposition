@@ -212,3 +212,52 @@
    (system "test $(grep -c ':reason in-input' avatar_multi.out) -eq 2")
    (system
     "awk '/SZS status/ { n++ } n == 2 && /avatar1.zf/ { bad = 1 } END { exit (n < 2 || bad) }' avatar_multi.out"))))
+
+; Regression test: BCE, PredElim, and their fixpoint extension can be enabled
+; together without duplicate setup or shared-state interference. Guards 36sd.
+
+(rule
+ (alias runtest)
+ (targets bce_pe_fixpoint.out)
+ (action
+  (progn
+   (with-outputs-to
+    bce_pe_fixpoint.out
+    (run
+     %{bin:zipperposition}
+     --avatar=off
+     --bce
+     true
+     --pred-elim
+     true
+     --bce-pe-fixpoint
+     true
+     %{dep:regressions/bce_pe_fixpoint.p}))
+   (run grep -q "SZS status Theorem" bce_pe_fixpoint.out))))
+
+; Regression test: the inprocessing fixpoint setup must not register BCE's
+; [initialize_regular] a second time when standalone BCE is already enabled.
+; Guards 36sd.
+
+(rule
+ (alias runtest)
+ (targets bce_pe_fixpoint_inprocessing.out)
+ (action
+  (progn
+   (with-outputs-to
+    bce_pe_fixpoint_inprocessing.out
+    (run
+     %{bin:zipperposition}
+     --avatar=off
+     --bce
+     true
+     --pred-elim
+     true
+     --bce-pe-fixpoint
+     true
+     --bce-pe-fixpoint-inprocessing
+     true
+     %{dep:regressions/bce_pe_fixpoint.p}))
+   (run grep -q "SZS status Theorem" bce_pe_fixpoint_inprocessing.out)
+   (system
+    "test $(grep -c '% BCE start:' bce_pe_fixpoint_inprocessing.out) -eq 1"))))

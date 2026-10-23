@@ -245,26 +245,29 @@ type state = {
 }
 
 let k_state : state Flex_state.key = Flex_state.create_key ()
+let k_saved_state : state option Flex_state.key = Flex_state.create_key ()
+let k_setup_done : bool Flex_state.key = Flex_state.create_key ()
+
+let new_state () : state =
+  {
+    sat_st = SAT.create ();
+    task_queue = TaskSet.create ();
+    newly_added = CS.empty;
+    tracked = CS.empty;
+    done_ = false;
+    logic = Nonequational;
+    ignored_symbols = Name.Set.empty;
+    pred_sym_idx = Name.Map.empty;
+    measure = relaxed_measure;
+    steps = 0;
+    fixpoint_active = false;
+  }
 
 let get_state env =
   match Flex_state.get k_state (Env.flex_state_of env) with
   | Some st -> st
   | None ->
-    let st =
-      {
-        sat_st = SAT.create ();
-        task_queue = TaskSet.create ();
-        newly_added = CS.empty;
-        tracked = CS.empty;
-        done_ = false;
-        logic = Nonequational;
-        ignored_symbols = Name.Set.empty;
-        pred_sym_idx = Name.Map.empty;
-        measure = relaxed_measure;
-        steps = 0;
-        fixpoint_active = false;
-      }
-    in
+    let st = new_state () in
     Env.flex_add_of env k_state st;
     st
 
@@ -1359,6 +1362,10 @@ let initialize env =
 let register env = Signal.on (Env.on_start env) (fun () -> initialize env)
 
 let begin_fixpoint env =
+  (match Flex_state.get k_state (Env.flex_state_of env) with
+  | Some st -> Env.flex_add_of env k_saved_state (Some st)
+  | None -> Env.flex_add_of env k_saved_state None);
+  Env.flex_add_of env k_state (new_state ());
   (get_state env).fixpoint_active <- true;
   register_parameters env;
   (*  has to be called after register parameters as 
@@ -1416,7 +1423,11 @@ let fixpoint_step env =
 let end_fixpoint env =
   (get_state env).done_ <- true;
   (get_state env).pred_sym_idx <- Name.Map.empty;
-  (get_state env).fixpoint_active <- false
+  (get_state env).fixpoint_active <- false;
+  (match Flex_state.get k_saved_state (Env.flex_state_of env) with
+  | Some (Some st) -> Env.flex_add_of env k_state st
+  | Some None | None -> ());
+  Env.flex_add_of env k_saved_state None
 
 let setup ?(in_fp_mode = false) env =
   Env.flex_add_of env k_fp_mode in_fp_mode;
@@ -1431,9 +1442,13 @@ let setup ?(in_fp_mode = false) env =
     | _ -> invalid_arg "measure function not found");
 
   if Env.flex_get_of env k_enabled then
-    if not (Env.flex_get_of env A.k_avatar_enabled) then
-      register env
-    else
+    if not (Env.flex_get_of env A.k_avatar_enabled) then (
+      if not (Env.flex_get_or_create ~init:(fun () -> false) env k_setup_done)
+      then (
+        Env.flex_add_of env k_setup_done true;
+        register env
+      )
+    ) else
       CCFormat.printf "AVATAR is not yet compatible with PredElim@."
 
 let extension =

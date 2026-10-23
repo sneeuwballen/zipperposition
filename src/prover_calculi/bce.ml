@@ -106,6 +106,8 @@ type state = {
     the environment's flex state, i.e. one fresh state per run. *)
 
 let k_state = Flex_state.create_key ()
+let k_saved_state : state option Flex_state.key = Flex_state.create_key ()
+let k_setup_done : bool Flex_state.key = Flex_state.create_key ()
 
 let new_state () : state =
   {
@@ -939,8 +941,10 @@ let initialize_regular env =
 
 let begin_fixpoint env =
   Env.flex_ensure env k_max_symbol_occ (-1);
-  (* be self-sufficient, like the functor application was on master *)
-  Env.flex_ensure env k_state (new_state ());
+  (match Flex_state.get k_state (Env.flex_state_of env) with
+  | Some st -> Env.flex_add_of env k_saved_state (Some st)
+  | None -> Env.flex_add_of env k_saved_state None);
+  Env.flex_add_of env k_state (new_state ());
   let st = Env.flex_get_of env k_state in
 
   let init_clauses =
@@ -1001,7 +1005,11 @@ let end_fixpoint env =
   st.clause_lock <- Util.Int_map.empty;
   st.task_store <- TaskStore.empty;
   TaskPriorityQueue.clear st.task_queue;
-  st.fixpoint_active <- false
+  st.fixpoint_active <- false;
+  (match Flex_state.get k_saved_state (Env.flex_state_of env) with
+  | Some (Some saved) -> Env.flex_add_of env k_state saved
+  | Some None | None -> ());
+  Env.flex_add_of env k_saved_state None
 
 let register env =
   Signal.on (Env.on_start env) (fun () -> initialize_regular env)
@@ -1013,9 +1021,13 @@ let setup ?(in_fp_mode = false) env =
   Env.flex_ensure env k_state (new_state ());
   if Env.flex_get_of env k_enabled then (
     Env.flex_add_of env k_fp_mode in_fp_mode;
-    if not (Env.flex_get_of env Avatar.k_avatar_enabled) then
-      register env
-    else
+    if not (Env.flex_get_of env Avatar.k_avatar_enabled) then (
+      if not (Env.flex_get_or_create ~init:(fun () -> false) env k_setup_done)
+      then (
+        Env.flex_add_of env k_setup_done true;
+        register env
+      )
+    ) else
       CCFormat.printf "AVATAR is not yet compatible with BCE@."
   )
 
