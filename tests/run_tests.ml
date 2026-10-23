@@ -18,6 +18,7 @@ let props = "qcheck", List.map QCheck_alcotest.to_alcotest props
 let units : unit Alcotest.test_case list =
   [
     TestSubsts.suite;
+    TestProofState.suite;
     TestMultiset.suite;
     TestOrdering.suite;
     TestTerm.suite;

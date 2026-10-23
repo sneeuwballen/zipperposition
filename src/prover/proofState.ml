@@ -134,7 +134,6 @@ module PassiveSet = struct
   end
 
   let create () : t =
-    let set = ref Clause.ClauseSet.empty in
     let queue = ClauseQueue.of_profile (ClauseQueue.get_profile ()) in
     let on_add = Signal.create () in
     let on_remove = Signal.create () in
@@ -143,23 +142,11 @@ module PassiveSet = struct
       method on_remove_clause = on_remove
 
       method add seq =
-        seq (fun c ->
-            if not (Clause.ClauseSet.mem c !set) then (
-              set := Clause.ClauseSet.add c !set;
-              Signal.send on_add c
-            );
-            if ClauseQueue.add queue c then
-              Signal.send on_add c
-            else
-              ());
+        seq (fun c -> if ClauseQueue.add queue c then Signal.send on_add c);
         Trace.counter_int "passive.n-clauses" (self#num_clauses ())
 
       method remove seq =
         seq (fun c ->
-            if Clause.ClauseSet.mem c !set then (
-              set := Clause.ClauseSet.remove c !set;
-              Signal.send on_remove c
-            );
             if ClauseQueue.remove queue c then Signal.send on_remove c);
         Trace.counter_int "passive.n-clauses" (self#num_clauses ())
 
@@ -178,7 +165,6 @@ module PassiveSet = struct
           try
             let x = ClauseQueue.take_first queue in
             Signal.send on_remove x;
-            set := Clause.ClauseSet.remove x !set;
             Some x
           with Not_found -> None
         )

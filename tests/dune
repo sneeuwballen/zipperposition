@@ -5,6 +5,7 @@
   logtk.parsers
   logtk.arbitrary
   logtk.arith
+  libzipperposition
   iter
   qcheck-core
   qcheck-alcotest
