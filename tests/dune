@@ -278,3 +278,23 @@
      "2|prefer-processed|rel_lvl_weight(0,1,2,1,1,1,200,200,2.5,999,999)"
      %{dep:regressions/multi_input/easy1.p}))
    (run grep -q "SZS status Theorem" queue_init.out))))
+
+; Regression test: rel_lvl_weight tables are per-queue. Swapping the order of
+; two problems must not change any computed clause weight. Guards 258r.
+
+(rule
+ (alias runtest)
+ (targets queue_rel_lvl_multi.out)
+ (deps
+  regressions/multi_input/enum1.p
+  regressions/multi_input/enum2.p
+  queue_rel_lvl_multi.sh)
+ (action
+  (with-stdout-to
+   queue_rel_lvl_multi.out
+   (run
+    sh
+    %{dep:queue_rel_lvl_multi.sh}
+    %{bin:zipperposition}
+    %{dep:regressions/multi_input/enum1.p}
+    %{dep:regressions/multi_input/enum2.p}))))

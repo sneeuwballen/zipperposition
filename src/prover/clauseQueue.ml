@@ -107,10 +107,16 @@ let disable_ignoring_orphans () = _ignoring_orphans := false
 let term_weight t = Term.size t
 let max_related_ = 100
 
+type rel_state = {
+  f_weights: int Name.Tbl.t;
+  default: int ref;
+}
+
 (* queue state needed by weight-fun parsers, passed to [WeightFun.of_string] *)
 type _queue_ctx = {
   on_init: C.t Iter.t Signal.t;
   related_terms: Term.Set.t ref;
+  rel_state: rel_state;
 }
 
 let norm_app hd arg =
@@ -1116,14 +1122,15 @@ module WeightFun = struct
       ^ "-fun_weight:int,-var_weight:int"
       ^ "max_t_mult:float, max_lit_mul:float, pos_lit_mult:float)"
 
-  let _f_weights = Name.Tbl.create 100
-  let _default = ref (-1)
+  let create_rel_state () : rel_state =
+    { f_weights = Name.Tbl.create 100; default = ref (-1) }
 
   let calc_poly base x ~c ~lin ~sq =
     base
     * int_of_float (c +. (lin *. float_of_int x) +. (sq *. float_of_int (x * x)))
 
-  let rel_weight ~vw ~max_t_mul ~max_lit_mul ~pos_lit_mul c =
+  let rel_weight ~f_weights ~default ~vw ~max_t_mul ~max_lit_mul ~pos_lit_mul c
+      =
     let max_lits =
       if C.has_selected_lits c then
         C.selected_lits_bv c
@@ -1134,7 +1141,7 @@ module WeightFun = struct
     let res =
       CCArray.foldi
         (fun sum i lit ->
-          assert (!_default != -1);
+          assert (!default != -1);
 
           let w =
             match lit with
@@ -1143,7 +1150,7 @@ module WeightFun = struct
                 float_of_int
                 @@ Term.weight ~var:vw
                      ~sym:(fun id ->
-                       Name.Tbl.get_or _f_weights ~default:!_default id)
+                       Name.Tbl.get_or f_weights ~default:!default id)
                      t
               in
               let ord_side = Ordering.compare ord l r in
@@ -1227,6 +1234,7 @@ module WeightFun = struct
     int_of_float res
 
   let parse_rel_lvl_weight qctx s =
+    let { f_weights; default } = qctx.rel_state in
     let r_str =
       "rel_lvl_weight(\\([0-9]+[.]?[0-9]*\\),\\([0-9]+[.]?[0-9]*\\),\\([0-9]+[.]?[0-9]*\\),"
       ^ "\\([0-9]+\\),\\([0-9]+\\),\\([0-9]+\\),\\([0-9]+\\),\\([0-9]+\\),"
@@ -1279,8 +1287,8 @@ module WeightFun = struct
           let rec fill_levels syms_at_level level =
             Name.Set.iter
               (fun id ->
-                assert (not (Name.Tbl.mem _f_weights id));
-                Name.Tbl.replace _f_weights id level)
+                assert (not (Name.Tbl.mem f_weights id));
+                Name.Tbl.replace f_weights id level)
               syms_at_level;
             let new_syms =
               Name.Set.fold
@@ -1288,7 +1296,7 @@ module WeightFun = struct
                   let cls = Name.Tbl.get_or ~default:[] cl_map id in
                   Name.Set.fold
                     (fun id acc ->
-                      if not (Name.Tbl.mem _f_weights id) then
+                      if not (Name.Tbl.mem f_weights id) then
                         Name.Set.add id acc
                       else
                         acc)
@@ -1303,7 +1311,7 @@ module WeightFun = struct
           in
 
           let max_lvl = fill_levels goal_syms 1 in
-          _default :=
+          default :=
             calc_poly ~c:l_poly_const ~lin:l_poly_lin ~sq:l_poly_sq
               (max cw (max pw fw))
               (def_l + max_lvl);
@@ -1323,8 +1331,8 @@ module WeightFun = struct
                 calc_poly ~c:l_poly_const ~lin:l_poly_lin ~sq:l_poly_sq base lvl
               in
               Some v)
-            _f_weights);
-      rel_weight ~vw ~max_t_mul ~max_lit_mul ~pos_lit_mul
+            f_weights);
+      rel_weight ~f_weights ~default ~vw ~max_t_mul ~max_lit_mul ~pos_lit_mul
     with Not_found | Invalid_argument _ ->
       invalid_arg
       @@ "expected \
@@ -1444,8 +1452,8 @@ module WeightFun = struct
       "orient-lmax", parse_orient_lmax;
     ]
 
-  let of_string ~on_init ~related_terms s =
-    let qctx = { on_init; related_terms } in
+  let of_string ~on_init ~related_terms ~rel_state s =
+    let qctx = { on_init; related_terms; rel_state } in
     try
       let splitted = CCString.split ~by:"(" s in
       let name = List.hd splitted in
@@ -2162,12 +2170,13 @@ let of_profile p =
     | P_avoid_expensive -> avoid_expensive_mk ()
   ) else (
     let mixed = mixed_eval () in
+    let rel_state = WeightFun.create_rel_state () in
     List.iter
       (fun (ratio, prio, weight) ->
         let prio_fun = PriorityFun.of_string prio in
         let weight_fun =
           WeightFun.of_string ~on_init:mixed.on_init
-            ~related_terms:mixed.related_terms weight
+            ~related_terms:mixed.related_terms ~rel_state weight
         in
         add_to_mixed_eval ~ratio
           ~weight_fun:(fun c -> prio_fun c, weight_fun c)

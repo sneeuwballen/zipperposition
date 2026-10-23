@@ -31,12 +31,21 @@ val disable_ignoring_orphans : unit -> unit
 (** {1 A priority queue of clauses, purely functional} *)
 
 (** {6 Weight functions} *)
+
+type rel_state = {
+  f_weights: int Logtk.Name.Tbl.t;
+  default: int ref;
+}
+
 module WeightFun : sig
   type t = Clause.t -> int
+
+  val create_rel_state : unit -> rel_state
 
   val of_string :
     on_init:Clause.t Iter.t Logtk.Signal.t ->
     related_terms:Logtk.Term.Set.t ref ->
+    rel_state:rel_state ->
     string ->
     t
 
