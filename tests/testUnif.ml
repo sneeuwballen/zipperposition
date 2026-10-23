@@ -539,7 +539,37 @@ let reg_stack_overflow =
         Alcotest.failf "not eq";
       () )
 
-let suite_unif2 = [ reg_matching1; reg_stack_overflow; reg_unif_makes_eq ]
+module Solid_unif = SolidUnif.Make (struct
+  let st =
+    Flex_state.empty
+    |> Flex_state.add PragUnifParams.k_solidification_limit 10
+    |> Flex_state.add PragUnifParams.k_max_inferences 5
+    |> Flex_state.add PragUnifParams.k_max_unifs_solid_ff 60
+end)
+
+let reg_covering_impossible =
+  ( "SolidUnif: covering-impossible degrades to NotUnifiable",
+    `Quick,
+    fun () ->
+      let ty = Type.const (Hstring.make "term") in
+      let ty_fun = Type.arrow [ ty ] ty in
+      let f = T.var (HVar.fresh ~ty:ty_fun ()) in
+      let t1 = T.fun_ ty (T.fun_ ty (T.app f [ T.bvar ~ty 0 ])) in
+      let t2 = T.fun_ ty (T.fun_ ty (T.bvar ~ty 1)) in
+      match Solid_unif.unify_scoped (Scoped.make t1 0) (Scoped.make t2 1) with
+      | exception PatternUnif.NotUnifiable -> ()
+      | exception e ->
+        Alcotest.failf "unexpected exception %s" (Printexc.to_string e)
+      | _ -> Alcotest.failf "expected NotUnifiable" )
+
+let suite_unif2 =
+  [
+    reg_matching1;
+    reg_stack_overflow;
+    reg_unif_makes_eq;
+    reg_covering_impossible;
+  ]
+
 let suite = suite_unif1 @ suite_unif2
 
 (** {2 Properties} *)

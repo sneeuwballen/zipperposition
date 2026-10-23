@@ -226,7 +226,7 @@ struct
     in
 
     let@ _sp = Trace.with_span ~__FILE__ ~__LINE__ "su.cover-rigid" in
-    aux ~depth:0 solids t
+    try aux ~depth:0 solids t with CoveringImpossible -> []
 
   let collect_flex_flex ~counter ~flex_args t =
     let replace_var ~bvar_tys ~target =
