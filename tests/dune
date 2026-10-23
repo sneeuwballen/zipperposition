@@ -47,3 +47,25 @@
      --check-lambda-free=only
      %{dep:regressions/lambda_free/lambda.p}))
    (run grep -q "Problem in fragment" %{targets}))))
+
+; Regression test: `-p`/`--progress`/`--no-progress` reach `Params.t`, i.e.
+; the CLI handlers write refs that [parse_args] reads after [Arg.parse].
+; Guards shxy.
+
+(rule
+ (alias runtest)
+ (targets progress.out no_progress.out)
+ (action
+  (progn
+   (with-outputs-to
+    progress.out
+    (run %{bin:zipperposition} -p %{dep:regressions/multi_input/easy1.p}))
+   (run grep -q "steps" progress.out)
+   (with-outputs-to
+    no_progress.out
+    (run
+     %{bin:zipperposition}
+     --progress
+     --no-progress
+     %{dep:regressions/multi_input/easy1.p}))
+   (system "! grep -q steps no_progress.out"))))

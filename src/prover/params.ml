@@ -115,11 +115,7 @@ let parse_args ~(flex_ref : Flex_state.t ref) () =
   and def_as_rewrite = ref default.def_as_rewrite
   and prelude = CCVector.create ()
   and files = CCVector.create ()
-  and check = ref default.check
-  and e_path = ref !e_path_ref
-  and progress = ref !progress_ref
-  and check_types = ref !check_types_ref
-  and max_multi_simpl = ref !max_multi_simpl_ref in
+  and check = ref default.check in
   (* special handlers *)
   let add_file s = CCVector.push files s in
   (* options list *)
@@ -208,10 +204,10 @@ let parse_args ~(flex_ref : Flex_state.t ref) () =
     dot_sat = !dot_sat;
     expand_def = !expand_def;
     check = !check;
-    e_path = !e_path;
-    progress = !progress;
-    check_types = !check_types;
-    max_multi_simpl = !max_multi_simpl;
+    e_path = !e_path_ref;
+    progress = !progress_ref;
+    check_types = !check_types_ref;
+    max_multi_simpl = !max_multi_simpl_ref;
   }
 
 let add_opt = Options.add_opt
