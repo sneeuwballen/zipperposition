@@ -66,24 +66,46 @@ end)
 
 exception RuleNotApplicable
 
-let prems_ = ref (PremiseIdx.empty ())
-let concls_ = ref (ConclusionIdx.empty ())
-let units_ = ref (UnitIdx.empty ())
-let propagated_ = ref (PropagatedLitsIdx.empty ())
-let propagated_size_ = ref 0
+type state = {
+  mutable prems_: PremiseIdx.t;
+      (** index from literals to the map implied literal -> clauses necessary
+          for the proof, with an additional field storing whether there are
+          literals l,\\neg l in the set of implied literals *)
+  mutable concls_: ConclusionIdx.t;
+      (** index from literals that appear as conclusions to all the premises in
+          which they appear *)
+  mutable units_: UnitIdx.t;  (** index from unit literals to unit clauses *)
+  mutable propagated_: PropagatedLitsIdx.t;
+      (** index of propagated literals to their proof set and kind *)
+  mutable propagated_size_: int;  (** number of entries in [propagated_] *)
+  mutable cl_occs: (Term.Set.t * Term.Set.t) Util.Int_map.t;
+      (** occurrences of the clause in the premise_idx *)
+  mutable tracked_binary: int;  (** binary clauses tracked so far *)
+  mutable tracked_unary: int;  (** unary clauses tracked so far *)
+  mutable heartbeat_: bool;
+      (** HLBE heartbeat, set as soon as one rule modifies a clause *)
+  mutable steps: int;  (** number of forward simplification steps so far *)
+}
+(** Mutable HLBE state. On master these fields were functor-local (inside the
+    [Make] functor), i.e. re-initialized for every environment; they are now
+    stored in the environment's flex state, i.e. one fresh state per run. *)
 
-(* occurrences of the clause in the premise_idx *)
-let cl_occs = ref Util.Int_map.empty
+let k_state = Flex_state.create_key ()
 
-(* binary clauses tracked so far *)
-let tracked_binary = ref 0
+let new_state () : state =
+  {
+    prems_ = PremiseIdx.empty ();
+    concls_ = ConclusionIdx.empty ();
+    units_ = UnitIdx.empty ();
+    propagated_ = PropagatedLitsIdx.empty ();
+    propagated_size_ = 0;
+    cl_occs = Util.Int_map.empty;
+    tracked_binary = 0;
+    tracked_unary = 0;
+    heartbeat_ = false;
+    steps = 0;
+  }
 
-(* binary clauses tracked so far *)
-let tracked_unary = ref 0
-
-(* HLBE heartbeat will be set as soons as one rule modifies a clause *)
-
-let heartbeat_ = ref false
 let is_tauto c = Literals.is_trivial (C.lits c) || Trail.is_trivial (C.trail c)
 let[@inline] tracking_eq env = Env.flex_get_of env k_track_eq
 
@@ -91,16 +113,18 @@ let[@inline] tracking_eq env = Env.flex_get_of env k_track_eq
 let idx_sc, q_sc = 0, 1
 
 let should_update_propagated env =
+  let st = Env.flex_get_of env k_state in
   Env.flex_get_of env k_unit_propagated_hle
-  && !propagated_size_ <= Env.flex_get_of env k_max_tracked_clauses
+  && st.propagated_size_ <= Env.flex_get_of env k_max_tracked_clauses
 
 let app_subst ?(sc = idx_sc) ~subst t =
   Subst.FO.apply Subst.Renaming.none subst (t, sc)
 
-let register_conclusion ~tbl ~premise concl proofset =
+let register_conclusion env ~tbl ~premise concl proofset =
+  let st = Env.flex_get_of env k_state in
   if (not @@ T.Tbl.mem tbl concl) && T.depth concl <= 4 then (
     T.Tbl.replace tbl concl proofset;
-    concls_ := ConclusionIdx.add !concls_ concl premise
+    st.concls_ <- ConclusionIdx.add st.concls_ concl premise
   )
 
 (* iterate over the parts of the common context of the term --
@@ -150,23 +174,29 @@ let retrieve_idx env ~getter (premise, q_sc) =
   | _ -> getter (premise, q_sc)
 
 let retrieve_gen_prem_idx env =
+  let st = Env.flex_get_of env k_state in
   retrieve_idx env
-    ~getter:(PremiseIdx.retrieve_generalizations (!prems_, idx_sc))
+    ~getter:(PremiseIdx.retrieve_generalizations (st.prems_, idx_sc))
 
 let retrieve_spec_prem_idx env =
+  let st = Env.flex_get_of env k_state in
   retrieve_idx env
-    ~getter:(PremiseIdx.retrieve_specializations (!prems_, idx_sc))
+    ~getter:(PremiseIdx.retrieve_specializations (st.prems_, idx_sc))
 
 let retrieve_gen_concl_idx env =
+  let st = Env.flex_get_of env k_state in
   retrieve_idx env
-    ~getter:(ConclusionIdx.retrieve_generalizations (!concls_, idx_sc))
+    ~getter:(ConclusionIdx.retrieve_generalizations (st.concls_, idx_sc))
 
 let retrieve_spec_concl_idx env =
+  let st = Env.flex_get_of env k_state in
   retrieve_idx env
-    ~getter:(ConclusionIdx.retrieve_specializations (!concls_, idx_sc))
+    ~getter:(ConclusionIdx.retrieve_specializations (st.concls_, idx_sc))
 
 let retrieve_gen_unit_idx env unit_sc =
-  retrieve_idx env ~getter:(UnitIdx.retrieve_generalizations (!units_, unit_sc))
+  let st = Env.flex_get_of env k_state in
+  retrieve_idx env
+    ~getter:(UnitIdx.retrieve_generalizations (st.units_, unit_sc))
 
 let[@inline] get_predicate env lit =
   match lit with
@@ -240,34 +270,38 @@ let[@inline] lit_to_term ?(negate = false) a_lhs sign =
      else
        T.Form.not_ a_lhs)
 
-let register_cl_term cl premise =
+let register_cl_term env cl premise =
+  let st = Env.flex_get_of env k_state in
   let premises, propagated =
     Util.Int_map.get_or
       ~default:(Term.Set.empty, Term.Set.empty)
-      (C.id cl) !cl_occs
+      (C.id cl) st.cl_occs
   in
-  cl_occs :=
+  st.cl_occs <-
     Util.Int_map.add (C.id cl)
       (Term.Set.add premise premises, propagated)
-      !cl_occs
+      st.cl_occs
 
-let register_cl_propagated cl premise =
+let register_cl_propagated env cl premise =
+  let st = Env.flex_get_of env k_state in
   let premises, propagated =
     Util.Int_map.get_or
       ~default:(Term.Set.empty, Term.Set.empty)
-      (C.id cl) !cl_occs
+      (C.id cl) st.cl_occs
   in
-  cl_occs :=
+  st.cl_occs <-
     Util.Int_map.add (C.id cl)
       (premises, Term.Set.add premise propagated)
-      !cl_occs
+      st.cl_occs
 
 let register_propagated_lit ~prop_kind env lit_t cl cs =
+  let st = Env.flex_get_of env k_state in
   let has_renaming = ref false in
   let to_remove = ref Term.Set.empty in
 
   retrieve_idx env
-    ~getter:(PropagatedLitsIdx.retrieve_specializations (!propagated_, idx_sc))
+    ~getter:
+      (PropagatedLitsIdx.retrieve_specializations (st.propagated_, idx_sc))
     (lit_t, q_sc)
   |> Iter.iter (fun (t, _, subst) ->
          if Subst.is_renaming subst then
@@ -279,26 +313,28 @@ let register_propagated_lit ~prop_kind env lit_t cl cs =
         k (Term.Set.pp T.pp) !to_remove);
   Term.Set.iter
     (fun t ->
-      decr propagated_size_;
-      propagated_ :=
-        PropagatedLitsIdx.update_leaf !propagated_ t (fun _ -> false))
+      st.propagated_size_ <- st.propagated_size_ - 1;
+      st.propagated_ <-
+        PropagatedLitsIdx.update_leaf st.propagated_ t (fun _ -> false))
     !to_remove;
 
-  if not (!propagated_size_ >= 0) then (
-    CCFormat.printf "prop size: %d@." !propagated_size_;
+  if not (st.propagated_size_ >= 0) then (
+    Printf.printf "%s%!" (Printf.sprintf "prop size: %d\n" st.propagated_size_);
     assert false
   );
   if not !has_renaming then (
     let proofset = CS.add cl cs in
-    CS.iter (fun c -> register_cl_propagated c lit_t) proofset;
-    propagated_ := PropagatedLitsIdx.add !propagated_ lit_t (proofset, prop_kind);
-    incr propagated_size_
+    CS.iter (fun c -> register_cl_propagated env c lit_t) proofset;
+    st.propagated_ <-
+      PropagatedLitsIdx.add st.propagated_ lit_t (proofset, prop_kind);
+    st.propagated_size_ <- st.propagated_size_ + 1
   )
 
 let react_unit_added env unit_cl unit_term =
+  let st = Env.flex_get_of env k_state in
   if should_update_propagated env then
     retrieve_idx env
-      ~getter:(PremiseIdx.retrieve_unifiables (!prems_, idx_sc))
+      ~getter:(PremiseIdx.retrieve_unifiables (st.prems_, idx_sc))
       (unit_term, q_sc)
     |> Iter.iter (fun (_, (concls, _), subst) ->
            let subst = Unif_subst.subst subst in
@@ -322,6 +358,7 @@ let generalization_present env premise concl =
                 with Unif.Fail -> false))
 
 let remove_instances env premise concl =
+  let st = Env.flex_get_of env k_state in
   retrieve_spec_prem_idx env (premise, q_sc)
   |> (fun i ->
   Iter.fold
@@ -346,12 +383,12 @@ let remove_instances env premise concl =
         (t, sets_to_remove) :: tasks)
     [] i)
   |> CCList.iter (fun (t, sets) ->
-         prems_ :=
-           PremiseIdx.update_leaf !prems_ t (fun (tbl, _) ->
+         st.prems_ <-
+           PremiseIdx.update_leaf st.prems_ t (fun (tbl, _) ->
                T.Tbl.filter_map_inplace
                  (fun concl proofset ->
                    if List.exists (fun set -> CS.subset set proofset) sets then (
-                     concls_ := ConclusionIdx.remove !concls_ concl t;
+                     st.concls_ <- ConclusionIdx.remove st.concls_ concl t;
                      None
                    ) else
                      Some proofset)
@@ -368,6 +405,7 @@ let compute_is_unit env tbl concl cl =
 (* find already stored implications a -> b such that premise\sigma = b.
    Then, store the implication a -> concl\sigma   *)
 let extend_concl env premise concl cl =
+  let st = Env.flex_get_of env k_state in
   Util.debugf ~section 3 "transitive conclusion: @[%a@] --> @[%a@]" (fun k ->
       k T.pp premise T.pp concl);
   let to_add_concl = ref [] in
@@ -375,8 +413,8 @@ let extend_concl env premise concl cl =
   retrieve_spec_concl_idx env (premise, q_sc)
   |> Iter.iter (fun (concl', premise', subst) ->
          (* add implication premise' -> subst (concl) *)
-         prems_ :=
-           PremiseIdx.update_leaf !prems_ premise' (fun (tbl, is_unit) ->
+         st.prems_ <-
+           PremiseIdx.update_leaf st.prems_ premise' (fun (tbl, is_unit) ->
                (match T.Tbl.get tbl concl' with
                | Some old_proofset ->
                  if CS.cardinal old_proofset < Env.flex_get_of env k_max_depth
@@ -390,7 +428,7 @@ let extend_concl env premise concl cl =
                      && T.Tbl.length tbl <= max_imps
                    then (
                      let proofset = CS.add cl old_proofset in
-                     register_cl_term cl premise';
+                     register_cl_term env cl premise';
                      to_add_concl :=
                        (concl, premise', proofset, tbl) :: !to_add_concl
                    )
@@ -401,14 +439,14 @@ let extend_concl env premise concl cl =
                true));
 
   CCList.iter
-    (fun (c, premise, ps, tbl) -> register_conclusion ~tbl ~premise c ps)
+    (fun (c, premise, ps, tbl) -> register_conclusion env ~tbl ~premise c ps)
     !to_add_concl;
   (* checking if the literal became unit *)
   CCList.iter
     (fun (c, premise, ps, tbl) ->
       match compute_is_unit env tbl c cl with
       | Some ps ->
-        prems_ := PremiseIdx.add !prems_ premise (tbl, true);
+        st.prems_ <- PremiseIdx.add st.prems_ premise (tbl, true);
         let neg_prem = normalize_negations (T.Form.not_ premise) in
         register_propagated_lit ~prop_kind:Failed env neg_prem cl ps
       | _ -> ())
@@ -416,16 +454,16 @@ let extend_concl env premise concl cl =
 
 let extend_premise env tbl premise' concl cl =
   let aux concl =
-    register_conclusion ~tbl ~premise:premise' concl (CS.singleton cl);
+    register_conclusion env ~tbl ~premise:premise' concl (CS.singleton cl);
     (match T.view concl with
     | T.AppBuiltin (Builtin.Neq, ([ _; a; b ] | [ a; b ])) ->
       iter_ctx a b
       |> Iter.iter (fun (a, b) ->
              let new_neq = T.Form.neq a b in
-             register_conclusion ~tbl ~premise:premise' new_neq
+             register_conclusion env ~tbl ~premise:premise' new_neq
                (CS.singleton cl))
     | _ -> ());
-    register_cl_term cl premise';
+    register_cl_term env cl premise';
 
     let max_proof_size = Env.flex_get_of env k_max_depth in
     retrieve_gen_prem_idx env (concl, q_sc)
@@ -439,12 +477,14 @@ let extend_premise env tbl premise' concl cl =
                     in
                     if T.depth concl <= 4 then (
                       let new_cls = CS.add cl proof_set in
-                      CS.iter (fun cl -> register_cl_term cl premise') new_cls;
+                      CS.iter
+                        (fun cl -> register_cl_term env cl premise')
+                        new_cls;
                       to_add := (concl, new_cls) :: !to_add
                     )
                   ));
            CCList.iter
-             (fun (c, n) -> register_conclusion ~tbl ~premise:premise' c n)
+             (fun (c, n) -> register_conclusion env ~tbl ~premise:premise' c n)
              !to_add)
   in
 
@@ -479,6 +519,7 @@ let get_unit_predicate env cl =
     None
 
 let add_new_premise env premise concl cl =
+  let st = Env.flex_get_of env k_state in
   let alpha_renaming =
     retrieve_spec_prem_idx env (premise, q_sc)
     |> Iter.find (fun (premise', tbl, subst) ->
@@ -492,8 +533,8 @@ let add_new_premise env premise concl cl =
   | Some (premise', subst) ->
     let concl = Subst.FO.apply Subst.Renaming.none subst (concl, q_sc) in
     let became_unit = ref None in
-    prems_ :=
-      PremiseIdx.update_leaf !prems_ premise' (fun (tbl, is_unit) ->
+    st.prems_ <-
+      PremiseIdx.update_leaf st.prems_ premise' (fun (tbl, is_unit) ->
           if
             (not (T.Tbl.mem tbl concl))
             && (not (T.Tbl.mem tbl (flip_eq env concl)))
@@ -513,9 +554,9 @@ let add_new_premise env premise concl cl =
     (match !became_unit with
     | Some (ps, tbl) ->
       ignore
-        (PremiseIdx.update_leaf !prems_ premise' (fun (tbl, is_unit) ->
+        (PremiseIdx.update_leaf st.prems_ premise' (fun (tbl, is_unit) ->
              assert false));
-      prems_ := PremiseIdx.add !prems_ premise' (tbl, true);
+      st.prems_ <- PremiseIdx.add st.prems_ premise' (tbl, true);
       let neg_prem = normalize_negations (T.Form.not_ premise') in
       register_propagated_lit ~prop_kind:Failed env neg_prem cl ps
     | None -> ())
@@ -524,10 +565,10 @@ let add_new_premise env premise concl cl =
     extend_premise env tbl premise concl cl;
     (match compute_is_unit env tbl concl cl with
     | Some ps ->
-      prems_ := PremiseIdx.add !prems_ premise (tbl, true);
+      st.prems_ <- PremiseIdx.add st.prems_ premise (tbl, true);
       let neg_prem = normalize_negations (T.Form.not_ premise) in
       register_propagated_lit ~prop_kind:Failed env neg_prem cl ps
-    | None -> prems_ := PremiseIdx.add !prems_ premise (tbl, false))
+    | None -> st.prems_ <- PremiseIdx.add st.prems_ premise (tbl, false))
 
 let normalize_variables premise concl =
   let to_rename = T.VarSet.diff (T.vars concl) (T.vars premise) in
@@ -583,27 +624,28 @@ let insert_into_indices env cl =
   | _ -> ()
 
 let can_track_bin_cl env cl =
+  let st = Env.flex_get_of env k_state in
   cl_is_ht_trackable env cl
   && (Env.flex_get_of env k_max_tracked_clauses == -1
-     || !tracked_binary <= Env.flex_get_of env k_max_tracked_clauses)
+     || st.tracked_binary <= Env.flex_get_of env k_max_tracked_clauses)
 
 let can_track_unary_cl env cl =
+  let st = Env.flex_get_of env k_state in
   Env.flex_get_of env k_unit_propagated_hle
   && (Env.flex_get_of env k_max_tracked_clauses == -1
-     || !tracked_unary <= 4 * Env.flex_get_of env k_max_tracked_clauses)
-
-let steps = ref 0
+     || st.tracked_unary <= 4 * Env.flex_get_of env k_max_tracked_clauses)
 
 let track_clause env cl =
+  let st = Env.flex_get_of env k_state in
   try
     if Env.flex_get_of env k_heartbeat_disabled_hlbe then
       raise RuleNotApplicable;
     (match Env.flex_get_of env k_heartbeat_steps with
-    | Some h_steps when !steps != 0 && !steps mod h_steps = 0 ->
-      if !heartbeat_ then
-        heartbeat_ := false
+    | Some h_steps when st.steps != 0 && st.steps mod h_steps = 0 ->
+      if st.heartbeat_ then
+        st.heartbeat_ <- false
       else (
-        CCFormat.printf "disabling heartbeat %d@." !steps;
+        Printf.printf "%s%!" (Printf.sprintf "disabling heartbeat %d\n" st.steps);
         Env.flex_add_of env k_heartbeat_disabled_hlbe true;
         raise RuleNotApplicable
       )
@@ -612,12 +654,12 @@ let track_clause env cl =
       Util.debugf ~section 2 "tracking @[%a@]" (fun k -> k C.pp cl);
 
       insert_into_indices env cl;
-      incr tracked_binary
+      st.tracked_binary <- st.tracked_binary + 1
     ) else if can_track_unary_cl env cl then (
       match get_unit_predicate env cl with
       | Some unit ->
         react_unit_added env cl unit;
-        incr tracked_unary
+        st.tracked_unary <- st.tracked_unary + 1
       | None -> ()
     )
   with RuleNotApplicable -> ()
@@ -654,6 +696,7 @@ let find_implication env cl premise concl =
                 with Unif.Fail -> None))
 
 let do_unit_hle_htr env cl =
+  let st = Env.flex_get_of env k_state in
   let n = C.length cl in
   let bv = CCBV.create ~size:n true in
   let exception UnitHTR of int * (CS.t * propagation_kind) in
@@ -673,7 +716,7 @@ let do_unit_hle_htr env cl =
             retrieve_idx env
               ~getter:
                 (PropagatedLitsIdx.retrieve_generalizations
-                   (!propagated_, idx_sc))
+                   (st.propagated_, idx_sc))
               (i_t, q_sc)
             |> Iter.head
             |> CCOpt.iter (fun (_, ps, _) -> raise (UnitHTR (i, ps)));
@@ -682,7 +725,7 @@ let do_unit_hle_htr env cl =
             retrieve_idx env
               ~getter:
                 (PropagatedLitsIdx.retrieve_generalizations
-                   (!propagated_, idx_sc))
+                   (st.propagated_, idx_sc))
               (i_neg_t, q_sc)
             |> Iter.head
             |> CCOpt.iter (fun (_, (ps, _), _) ->
@@ -900,28 +943,31 @@ let simplify_opt ~f cl =
     | None -> SimplM.return_same cl
   )
 
-let[@inline] check_heartbeat arg =
-  if CCOpt.is_some arg then heartbeat_ := true;
+let[@inline] check_heartbeat env arg =
+  let st = Env.flex_get_of env k_state in
+  if CCOpt.is_some arg then st.heartbeat_ <- true;
   arg
 
-let hle_htr env = simplify_opt ~f:(fun a -> check_heartbeat @@ do_hte_hle env a)
+let hle_htr env =
+  simplify_opt ~f:(fun a -> check_heartbeat env @@ do_hte_hle env a)
 
 let unit_hle_htr env =
-  simplify_opt ~f:(fun a -> check_heartbeat @@ do_unit_hle_htr env a)
+  simplify_opt ~f:(fun a -> check_heartbeat env @@ do_unit_hle_htr env a)
 
 let ctx_simpl = simplify_opt ~f:do_context_simplification
 
 let untrack_clause env cl =
-  (match Util.Int_map.get (C.id cl) !cl_occs with
+  let st = Env.flex_get_of env k_state in
+  (match Util.Int_map.get (C.id cl) st.cl_occs with
   | Some (premises, propagated) ->
     Term.Set.iter
       (fun premise ->
-        prems_ :=
-          PremiseIdx.update_leaf !prems_ premise (fun (tbl, _) ->
+        st.prems_ <-
+          PremiseIdx.update_leaf st.prems_ premise (fun (tbl, _) ->
               T.Tbl.filter_map_inplace
                 (fun concl proofset ->
                   if CS.mem cl proofset then (
-                    concls_ := ConclusionIdx.remove !concls_ concl premise;
+                    st.concls_ <- ConclusionIdx.remove st.concls_ concl premise;
                     None
                   ) else
                     Some proofset)
@@ -930,42 +976,45 @@ let untrack_clause env cl =
       premises;
     Term.Set.iter
       (fun prop_lit ->
-        propagated_ :=
-          PropagatedLitsIdx.update_leaf !propagated_ prop_lit (fun (cs, _) ->
+        st.propagated_ <-
+          PropagatedLitsIdx.update_leaf st.propagated_ prop_lit (fun (cs, _) ->
               if not @@ CS.mem cl cs then (
-                decr propagated_size_;
+                st.propagated_size_ <- st.propagated_size_ - 1;
                 false
               ) else
                 true))
       propagated
   | _ -> ());
-  if Util.Int_map.mem (C.id cl) !cl_occs then (
+  if Util.Int_map.mem (C.id cl) st.cl_occs then (
     Util.debugf ~section 3 "removed: @[%a@]." (fun k -> k C.pp cl);
-    decr tracked_binary
+    st.tracked_binary <- st.tracked_binary - 1
   );
-  cl_occs := Util.Int_map.remove (C.id cl) !cl_occs;
+  st.cl_occs <- Util.Int_map.remove (C.id cl) st.cl_occs;
   match get_unit_predicate env cl with
   | Some unit ->
-    units_ := UnitIdx.remove !units_ unit cl;
-    decr tracked_unary
+    st.units_ <- UnitIdx.remove st.units_ unit cl;
+    st.tracked_unary <- st.tracked_unary - 1
   | None -> ()
 
 let initialize env =
+  let st = Env.flex_get_of env k_state in
   let track_active env =
     Signal.on_every (Env.on_active_add env) (track_clause env);
     Signal.on_every (Env.on_active_remove env) (untrack_clause env);
-    Signal.on_every (Env.on_forward_simplified env) (fun (_, _) -> incr steps)
+    Signal.on_every (Env.on_forward_simplified env) (fun (_, _) ->
+        st.steps <- st.steps + 1)
   in
   let track_passive env =
     Signal.on_every (Env.on_passive_add env) (track_clause env);
     Signal.on_every (Env.on_passive_remove env) (untrack_clause env);
-    Signal.on_every (Env.on_forward_simplified env) (fun (_, _) -> incr steps)
+    Signal.on_every (Env.on_forward_simplified env) (fun (_, _) ->
+        st.steps <- st.steps + 1)
   in
   let track_all env =
     Signal.on_every (Env.on_passive_add env) (track_clause env);
     Signal.on_every (Env.on_active_remove env) (untrack_clause env);
     Signal.on_every (Env.on_forward_simplified env) (fun (c, new_state) ->
-        incr steps;
+        st.steps <- st.steps + 1;
         match new_state with
         | Some c' ->
           if not (C.equal c c') then (
@@ -979,7 +1028,7 @@ let initialize env =
     Iter.iter (track_clause env) (Env.get_passive env ());
 
     Util.debugf ~section 3 "discovered implications:" CCFun.id;
-    PremiseIdx.iter !prems_ (fun premise (tbl, _) ->
+    PremiseIdx.iter st.prems_ (fun premise (tbl, _) ->
         Util.debugf ~section 3 "@[%a@] --> @[%a@]" (fun k ->
             k T.pp premise (Iter.pp_seq T.pp) (T.Tbl.keys tbl)))
   in
@@ -995,6 +1044,9 @@ let initialize env =
   Signal.StopListening
 
 let setup env =
+  (* create the per-run state if it does not exist yet (self-sufficiency for
+     direct callers of [setup]) *)
+  Env.flex_ensure env k_state (new_state ());
   if Env.flex_get_of env k_enabled then (
     Signal.on (Env.on_start env) (fun () -> initialize env);
     let add_simpl =
@@ -1013,6 +1065,10 @@ let setup env =
 
 let extension =
   let register (env : Env.t) =
+    (* create the fresh per-run state for this environment (on master, the
+       [Make] functor was applied for every environment, re-initializing the
+       mutable state) *)
+    Env.flex_ensure env k_state (new_state ());
     Env.flex_ensure env k_enabled false;
     Env.flex_ensure env k_max_depth 3;
     Env.flex_ensure env k_simpl_new false;
