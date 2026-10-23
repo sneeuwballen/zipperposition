@@ -346,14 +346,15 @@ let positive_maxlits_ ?max_lits ~ord lits =
   in
   let res = BV.create ~size:(Array.length lits) false in
   for i = 0 to Array.length lits - 1 do
-    if BV.get max_bv i && Literal.is_positivoid lits.(i) then BV.set res i
+    if BV.get max_bv i && Literal.eqn_sign lits.(i) then BV.set res i
   done;
   res
 
 let eligible_param (c, sc) subst =
   let ord = Ctx.ord (ctx_of c) in
   let selected = Lazy.force c.selected in
-  if BV.is_empty selected then
+  let bool_selected = Lazy.force c.bool_selected in
+  if BV.is_empty selected && CCList.is_empty bool_selected then
     if not @@ Subst.is_empty subst then (
       let lits' = _apply_subst_no_simpl subst (lits c, sc) in
       positive_maxlits_ ~ord lits'
@@ -364,19 +365,10 @@ let eligible_param (c, sc) subst =
     BV.empty ()
 
 let is_eligible_param (c, sc) subst ~idx =
-  let ord = Ctx.ord (ctx_of c) in
-  let selected = Lazy.force c.selected in
-  (* different from [eligible_param] because it doesn't use the
-     lazy max_lits and uses a single lit; it's used for the
-     negative side only (res lit is never selected) *)
-  if BV.is_empty selected then
-    if not @@ Subst.is_empty subst then (
-      let lits' = _apply_subst_no_simpl subst (lits c, sc) in
-      Lit.is_positivoid lits'.(idx) && Lits.is_max ~ord lits' idx
-    ) else
-      Lit.is_positivoid (lits c).(idx) && Lits.is_max ~ord (lits c) idx
-  else
-    false
+  Lit.eqn_sign (lits c).(idx)
+  && BV.is_empty (Lazy.force c.selected)
+  && CCList.is_empty (Lazy.force c.bool_selected)
+  && is_maxlit (c, sc) subst ~idx
 
 let has_selected_lits c = not (BV.is_empty (Lazy.force c.selected))
 let is_selected c i = BV.get (Lazy.force c.selected) i
