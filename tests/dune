@@ -31,6 +31,30 @@
    %{dep:regressions/multi_input/easy1.p}
    %{dep:regressions/multi_input/easy2.p})))
 
+; Regression test: custom queue weight functions receive the queue context
+; (`on_init`, `related_terms`) explicitly and work for each file in one CLI
+; call. Guards nzbg.
+
+(rule
+ (alias runtest)
+ (targets queue_ctx_multi.out)
+ (action
+  (progn
+   (with-outputs-to
+    queue_ctx_multi.out
+    (run
+     %{bin:zipperposition}
+     --check
+     --add-queue
+     "3|prefer-fo|conjecture-relative-var(1.02,l,f)"
+     --add-queue
+     "1|prefer-processed|fifo"
+     --add-queue
+     "3|prefer-sos|conj_pref_weight(1,0,1,1,1)"
+     %{dep:regressions/multi_input/easy1.p}
+     %{dep:regressions/multi_input/easy2.p}))
+   (system "test $(grep -c 'SZS status Theorem' queue_ctx_multi.out) -eq 2"))))
+
 ; Regression test: `--check-lambda-free=only` runs the fragment check at
 ; [on_start] and prints its verdict, i.e. the hook is registered before the
 ; signal is sent. Guards q3qh.

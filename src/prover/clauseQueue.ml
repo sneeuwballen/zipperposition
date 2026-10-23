@@ -107,14 +107,11 @@ let disable_ignoring_orphans () = _ignoring_orphans := false
 let term_weight t = Term.size t
 let max_related_ = 100
 
-(* temporary ref set during queue construction so weight-fun parsers can
-   access the queue's on_init signal and related_terms *)
+(* queue state needed by weight-fun parsers, passed to [WeightFun.of_string] *)
 type _queue_ctx = {
   on_init: C.t Iter.t Signal.t;
   related_terms: Term.Set.t ref;
 }
-
-let _current_queue : _queue_ctx option ref = ref None
 
 let norm_app hd arg =
   let body = Term.app hd [ arg ] in
@@ -941,7 +938,7 @@ module WeightFun = struct
          ])
 
   (* imitation of the E function of the same name *)
-  let parse_diversity_weight s =
+  let parse_diversity_weight _qctx s =
     let crv_regex =
       Str.regexp
         ("diversity-weight("
@@ -971,7 +968,7 @@ module WeightFun = struct
        ^ "f_w:int,v_w:int,max_t_mul:float,max_l_mul:float,pos_mul:float,"
        ^ "fdiff_a:float,fdiff_b:flaot,vdiff_a:float,vdiff_b:float)")
 
-  let parse_crv s =
+  let parse_crv qctx s =
     let crv_regex =
       Str.regexp
         "conjecture-relative-var(\\([0-9]+[.]?[0-9]*\\),\\([lsLS]\\),\\([tfTF]\\))"
@@ -992,13 +989,13 @@ module WeightFun = struct
         |> CCString.prefix ~pre:"t"
       in
       conj_relative ~distinct_vars_mul ~parameters_magnitude ~goal_penalty
-        ~related_terms:(CCOpt.get_exn !_current_queue).related_terms
+        ~related_terms:qctx.related_terms
     with Not_found | Invalid_argument _ ->
       invalid_arg
         "expected \
          conjecture-relative-var(dist_var_mul:float,parameters_magnitude:l/s,goal_penalty:t/f)"
 
-  let parse_dag_weight s =
+  let parse_dag_weight _qctx s =
     let crv_regex =
       Str.regexp
         ("dagweight(\\([0-9]+\\),\\([0-9]+\\),\\([0-9]+[.]?[0-9]*\\),\\([0-9]+\\),"
@@ -1030,7 +1027,7 @@ module WeightFun = struct
        ^ "pos_use_dag,pos_t_reset,pos_eqn_reset,neg_use_dag,"
        ^ "neg_t_reset,neg_eqn_reset,pos_neg_reset)")
 
-  let parse_cr_e s =
+  let parse_cr_e _qctx s =
     let crv_regex =
       Str.regexp
         ("conjecture-relative-e(\\([0-9]+[.]?[0-9]*\\),\\([0-9]+[.]?[0-9]*\\),\\([0-9]+\\),\\([0-9]+\\),"
@@ -1057,7 +1054,7 @@ module WeightFun = struct
           f:int, const:int,"
        ^ "p:int, v:int, max_term_mul:float, max_lit_mul:float, pos_mul:float)")
 
-  let parse_cr_struct s =
+  let parse_cr_struct qctx s =
     _rel_terms_enabled := true;
     let crs_regex =
       Str.regexp
@@ -1070,13 +1067,13 @@ module WeightFun = struct
       let var_w = CCOpt.get_exn @@ CCInt.of_string (Str.matched_group 3 s) in
       let sym_w = CCOpt.get_exn @@ CCInt.of_string (Str.matched_group 4 s) in
       conj_relative_struct ~inst_penalty ~gen_penalty ~var_w ~sym_w
-        ~related_terms:(CCOpt.get_exn !_current_queue).related_terms
+        ~related_terms:qctx.related_terms
     with Not_found | Invalid_argument _ ->
       invalid_arg
         "expected \
          conjecture-relative-struct(inst_penalty:float,gen_penalty:float,var_weight:int,sym_weight:int)"
 
-  let parse_orient_lmax s =
+  let parse_orient_lmax _qctx s =
     let or_lmax_regex =
       Str.regexp
         ("orient-lmax(\\([0-9]+[.]?[0-9]*\\)," ^ "\\([0-9]+[.]?[0-9]*\\),"
@@ -1096,7 +1093,7 @@ module WeightFun = struct
       invalid_arg @@ "expected orient-lmax(var_weight:int,fun_weight:int"
       ^ "pos_lit_mult:float, unorderable_lit_mul:float, max_lit_mul:float)"
 
-  let parse_pnrefine s =
+  let parse_pnrefine _qctx s =
     let or_lmax_regex =
       Str.regexp
         ("pnrefined(\\([0-9]+[.]?[0-9]*\\)," ^ "\\([0-9]+[.]?[0-9]*\\),"
@@ -1229,7 +1226,7 @@ module WeightFun = struct
     in
     int_of_float res
 
-  let parse_rel_lvl_weight s =
+  let parse_rel_lvl_weight qctx s =
     let r_str =
       "rel_lvl_weight(\\([0-9]+[.]?[0-9]*\\),\\([0-9]+[.]?[0-9]*\\),\\([0-9]+[.]?[0-9]*\\),"
       ^ "\\([0-9]+\\),\\([0-9]+\\),\\([0-9]+\\),\\([0-9]+\\),\\([0-9]+\\),"
@@ -1250,7 +1247,7 @@ module WeightFun = struct
       let max_lit_mul = CCFloat.of_string_exn (Str.matched_group 10 s) in
       let pos_lit_mul = CCFloat.of_string_exn (Str.matched_group 11 s) in
 
-      Signal.once (CCOpt.get_exn !_current_queue).on_init (fun cls ->
+      Signal.once qctx.on_init (fun cls ->
           let ctx =
             match Iter.head cls with
             | Some c -> Clause.ctx_of c
@@ -1335,7 +1332,7 @@ module WeightFun = struct
       ^ "def_l:int, fun_w:int, const_w:int, pred_w:int, var_w:int,"
       ^ "max_t_mul:float,max_lit_mul:float,pos_lit_mul:float)"
 
-  let parse_conj_pref_weight s =
+  let parse_conj_pref_weight qctx s =
     let r_str =
       "conj_pref_weight(\\([0-9]+[.]?[0-9]*\\),\\([0-9]+[.]?[0-9]*\\),"
       ^ "\\([0-9]+[.]?[0-9]*\\),\\([0-9]+[.]?[0-9]*\\),\\([0-9]+[.]?[0-9]*\\))"
@@ -1352,7 +1349,7 @@ module WeightFun = struct
         let match_weight = match_w
         let miss_weight = miss_w
       end) in
-      Signal.once (CCOpt.get_exn !_current_queue).on_init (fun cls ->
+      Signal.once qctx.on_init (fun cls ->
           Iter.iter
             (fun cl ->
               match C.distance_to_goal cl with
@@ -1379,7 +1376,7 @@ module WeightFun = struct
       @@ "expected conj_pref_weight(match_weight:float,miss_weight:float,"
       ^ "max_t_mul:float,max_lit_mul:float,pos_lit_mul:float)"
 
-  let parse_clauseweight s =
+  let parse_clauseweight _qctx s =
     let or_lmax_regex =
       Str.regexp "clauseweight(\\([0-9]+\\),\\([0-9]+\\),\\([0-9]+[.]?[0-9]*\\)"
     in
@@ -1393,7 +1390,7 @@ module WeightFun = struct
       invalid_arg @@ "expected clauseweight(+fun_weight:int,+var_weight:int,"
       ^ "pos_lit_mult:float)"
 
-  let parse_staggered s =
+  let parse_staggered _qctx s =
     let or_lmax_regex = Str.regexp "staggered(\\([0-9]+[.]?[0-9]*\\))" in
     try
       ignore (Str.search_forward or_lmax_regex s 0);
@@ -1402,7 +1399,7 @@ module WeightFun = struct
     with Not_found | Invalid_argument _ ->
       invalid_arg @@ "expected staggered(+stagger_factor:int)"
 
-  let parse_conj_relative_cheap s =
+  let parse_conj_relative_cheap _qctx s =
     let or_lmax_regex =
       Str.regexp
         ("conjecture-relative-cheap(\\([0-9]+\\)," ^ "\\([0-9]+\\),"
@@ -1426,14 +1423,13 @@ module WeightFun = struct
 
   let parsers =
     [
-      ("fifo", fun _ c -> C.id c);
-      ("default", fun _ -> default_fun);
-      ("explore", fun _ -> explore_fun);
+      ("fifo", fun _qctx _ c -> C.id c);
+      ("default", fun _qctx _ -> default_fun);
+      ("explore", fun _qctx _ -> explore_fun);
       ( "conjecture-relative",
-        fun _ ->
+        fun qctx _ ->
           conj_relative ~distinct_vars_mul:1.0 ~parameters_magnitude:`Large
-            ~goal_penalty:false
-            ~related_terms:(CCOpt.get_exn !_current_queue).related_terms );
+            ~goal_penalty:false ~related_terms:qctx.related_terms );
       "conjecture-relative-var", parse_crv;
       "conjecture-relative-struct", parse_cr_struct;
       "conjecture-relative-cheap", parse_conj_relative_cheap;
@@ -1448,11 +1444,12 @@ module WeightFun = struct
       "orient-lmax", parse_orient_lmax;
     ]
 
-  let of_string s =
+  let of_string ~on_init ~related_terms s =
+    let qctx = { on_init; related_terms } in
     try
       let splitted = CCString.split ~by:"(" s in
       let name = List.hd splitted in
-      let w = List.assoc name parsers s in
+      let w = List.assoc name parsers qctx s in
       fun c ->
         let res = penalize w c in
         Util.debugf ~section 2 "@[%s(%a)@]=@[%d@]" (fun k -> k name C.pp c res);
@@ -2156,17 +2153,17 @@ let of_profile p =
     | P_avoid_expensive -> avoid_expensive_mk ()
   ) else (
     let mixed = mixed_eval () in
-    _current_queue :=
-      Some { on_init = mixed.on_init; related_terms = mixed.related_terms };
     List.iter
       (fun (ratio, prio, weight) ->
         let prio_fun = PriorityFun.of_string prio in
-        let weight_fun = WeightFun.of_string weight in
+        let weight_fun =
+          WeightFun.of_string ~on_init:mixed.on_init
+            ~related_terms:mixed.related_terms weight
+        in
         add_to_mixed_eval ~ratio
           ~weight_fun:(fun c -> prio_fun c, weight_fun c)
           mixed)
       !funs_to_parse;
-    _current_queue := None;
     { data = Mixed mixed }
   )
 

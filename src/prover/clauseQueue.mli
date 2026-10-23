@@ -34,7 +34,12 @@ val disable_ignoring_orphans : unit -> unit
 module WeightFun : sig
   type t = Clause.t -> int
 
-  val of_string : string -> t
+  val of_string :
+    on_init:Clause.t Iter.t Logtk.Signal.t ->
+    related_terms:Logtk.Term.Set.t ref ->
+    string ->
+    t
+
   val default : t
   val penalty : t
   val favor_all_neg : t
