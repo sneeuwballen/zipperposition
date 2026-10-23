@@ -274,6 +274,63 @@
    (system
     "test $(grep -c '% BCE start:' bce_pe_fixpoint_inprocessing.out) -eq 1"))))
 
+; Regression test: QLE's inprocessing step counter is per-Env. With a long
+; period, each file must run QLE at its first step; a shared counter would
+; skip QLE in the second file. Guards 98sc.
+
+(rule
+ (alias runtest)
+ (package zipperposition)
+ (targets qle_multi.out)
+ (action
+  (progn
+   (with-outputs-to
+    qle_multi.out
+    (run
+     %{bin:zipperposition}
+     --avatar=off
+     --qle
+     true
+     --qle-inprocessing
+     true
+     --qle-check-at
+     100000
+     --debug.zip.qle
+     1
+     %{dep:regressions/multi_input/easy1.p}
+     %{dep:regressions/multi_input/easy2.p}))
+   (system "test $(grep -c 'SZS status Theorem' qle_multi.out) -eq 2")
+   (system "test $(grep -c 'doing inprocessing' qle_multi.out) -eq 2"))))
+
+; Regression test: the BCE/PE fixpoint inprocessing step counter is per-Env.
+; With a long period, each file must run a fixpoint step; a shared counter
+; would skip the second file. Guards 98sc.
+
+(rule
+ (alias runtest)
+ (package zipperposition)
+ (targets bce_pe_fixpoint_multi.out)
+ (action
+  (progn
+   (with-outputs-to
+    bce_pe_fixpoint_multi.out
+    (run
+     %{bin:zipperposition}
+     --avatar=off
+     --bce-pe-fixpoint
+     true
+     --bce-pe-fixpoint-inprocessing
+     true
+     --bce-pe-fixpoint-check-at
+     100000
+     --debug.zip.pred-elim
+     1
+     %{dep:regressions/multi_input/easy1.p}
+     %{dep:regressions/multi_input/easy2.p}))
+   (system
+    "test $(grep -c 'SZS status Theorem' bce_pe_fixpoint_multi.out) -eq 2")
+   (system "test $(grep -c 'relax val' bce_pe_fixpoint_multi.out) -eq 2"))))
+
 ; Regression test: the clause queue is initialized before initial clauses are
 ; inserted, so `rel_lvl_weight` sees them. Guards pwbw.
 

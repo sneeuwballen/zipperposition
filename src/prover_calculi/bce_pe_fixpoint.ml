@@ -21,9 +21,11 @@ let run_fixpoint env =
   PE.end_fixpoint env;
   BCE.end_fixpoint env
 
-let steps = ref 0
+let k_steps : int ref Flex_state.key = Flex_state.create_key ()
+let steps env = Env.flex_get_or_create ~init:(fun () -> ref 0) env k_steps
 
 let inprocessing env =
+  let steps = steps env in
   if !steps = 0 then (
     let done_ = ref false in
     while not !done_ do

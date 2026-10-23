@@ -231,9 +231,11 @@ let do_qle env pure_only c_iter =
 let get_clauses env =
   Iter.append (Env.get_passive env ()) (Env.get_active env ())
 
-let steps = ref 0
+let k_steps : int ref Flex_state.key = Flex_state.create_key ()
+let steps env = Env.flex_get_or_create ~init:(fun () -> ref 0) env k_steps
 
 let inprocessing env =
+  let steps = steps env in
   if !steps = 0 then (
     Util.debugf ~section 1 "doing inprocessing@." CCFun.id;
     do_qle env (Env.flex_get_of env k_pure_only) (get_clauses env)
