@@ -70,21 +70,32 @@ let pp_decl out d =
   Format.fprintf out "@[<1>{enum_ty=@[%a@],@ cases=@[%a@]}@]" Type.pp d.decl_ty
     (Util.pp_list T.pp) d.decl_cases
 
-(* set of enumerated types (indexed by [decl_ty_id]) *)
-let decls_by_id = Name.Tbl.create 16
-let decls_builtin = ref []
+type state = {
+  decls_by_id: decl Name.Tbl.t;
+  mutable decls_builtin: (Type.builtin * decl) list;
+  on_new_decl: decl Signal.t;
+}
 
-let find_decl_ = function
-  | I i -> Name.Tbl.find decls_by_id i
-  | B b -> List.assoc b !decls_builtin
+let k_state : state Flex_state.key = Flex_state.create_key ()
 
-let add_decl_ id decl =
+let state_of env =
+  Env.flex_get_or_create
+    ~init:(fun () ->
+      {
+        decls_by_id = Name.Tbl.create 16;
+        decls_builtin = [];
+        on_new_decl = Signal.create ();
+      })
+    env k_state
+
+let find_decl_ state = function
+  | I i -> Name.Tbl.find state.decls_by_id i
+  | B b -> List.assoc b state.decls_builtin
+
+let add_decl_ state id decl =
   match id with
-  | I id -> Name.Tbl.add decls_by_id id decl
-  | B b -> decls_builtin := (b, decl) :: !decls_builtin
-
-(* triggered whenever a new EnumType is added *)
-let on_new_decl = Signal.create ()
+  | I id -> Name.Tbl.add state.decls_by_id id decl
+  | B b -> state.decls_builtin <- (b, decl) :: state.decls_builtin
 
 (* check that [var] is the only free (term) variable in all cases *)
 let check_uniq_var_is_ ~var cases =
@@ -104,7 +115,7 @@ type declare_result =
   | New of decl
   | AlreadyDeclared of decl
 
-let declare_ ~proof ~ty_id:id ~ty_vars ~var cases =
+let declare_ ~state ~proof ~ty_id:id ~ty_vars ~var cases =
   if not (check_all_distinct_ [] ty_vars) then
     errorf_ "invalid declaration %a: duplicate type variable" pp_id_or_builtin
       id;
@@ -112,7 +123,7 @@ let declare_ ~proof ~ty_id:id ~ty_vars ~var cases =
     errorf_ "invalid declaration %a: %a is not the only variable in @[%a@]"
       pp_id_or_builtin id (Util.pp_list T.pp) cases HVar.pp var;
   try
-    let decl = find_decl_ id in
+    let decl = find_decl_ state id in
     Util.debugf ~section 3 "@[an enum is already declared for type %a@]"
       (fun k -> k pp_id_or_builtin id);
     AlreadyDeclared decl
@@ -148,13 +159,14 @@ let declare_ ~proof ~ty_id:id ~ty_vars ~var cases =
         decl_proof = proof;
       }
     in
-    add_decl_ id decl;
-    Signal.send on_new_decl decl;
+    add_decl_ state id decl;
+    Signal.send state.on_new_decl decl;
     New decl
 
 (* declare an enumerated type *)
-let declare_ty ~proof ~ty_id ~ty_vars ~var cases =
-  declare_ ~proof:(`Clause proof) ~var ~ty_id:(I ty_id) ~ty_vars cases
+let declare_ty ~env ~proof ~ty_id ~ty_vars ~var cases =
+  declare_ ~state:(state_of env) ~proof:(`Clause proof) ~var ~ty_id:(I ty_id)
+    ~ty_vars cases
 
 let as_simple_ty ty =
   match Type.view ty with
@@ -250,10 +262,10 @@ let bind_vars_ (d, sc_decl) (args, sc_args) =
 
 (* given a type [ty], find whether it's an enum type, and if it is the
    case return [Some (decl, subst)] *)
-let find_ty_ sc_decl ty sc_ty =
+let find_ty_ state sc_decl ty sc_ty =
   let find_aux i l =
     try
-      let d = find_decl_ i in
+      let d = find_decl_ state i in
       if List.length l = List.length d.decl_ty_vars then (
         let subst = bind_vars_ (d, sc_decl) (l, sc_ty) in
         Some (d, subst)
@@ -285,10 +297,11 @@ let instantiate_vars env c =
     else
       naked_vars_ (C.lits c)
   in
+  let state = state_of env in
   let s_c = 0 and s_decl = 1 in
   CCList.find_map
     (fun v ->
-      match find_ty_ s_decl (T.ty v) s_c with
+      match find_ty_ state s_decl (T.ty v) s_c with
       | None -> None
       | Some (decl, subst) ->
         (* we found an enum type declaration for [v], replace it
@@ -410,9 +423,10 @@ let check_decl_ ~ty s decl env =
 
 (* add axioms for new symbol [s] with type [ty], if needed *)
 let _on_new_symbol env s ~ty =
+  let state = state_of env in
   let aux i =
     try
-      let decl = find_decl_ i in
+      let decl = find_decl_ state i in
       check_decl_ ~ty s decl env |> CCOpt.to_list
     with Not_found -> []
   in
@@ -442,14 +456,15 @@ let is_trivial _env c = C.get_flag flag_enumeration_clause c
 
 (* detect whether the clause is a declaration of enum type, and if it
     is, declare the type! *)
-let _detect_and_declare c =
+let _detect_and_declare env c =
+  let state = state_of env in
   Util.debugf ~section 5 "@[<2>examine clause@ `@[%a@]`@]" (fun k -> k C.pp c);
   match detect_declaration c with
   | None -> ()
   | Some (var, cases) ->
     let ty_id = CCOpt.get_exn (as_simple_ty (HVar.ty var)) in
     let is_new =
-      declare_ ~ty_id ~ty_vars:[] ~var ~proof:(`Clause (C.proof c)) cases
+      declare_ ~state ~ty_id ~ty_vars:[] ~var ~proof:(`Clause (C.proof c)) cases
     in
     (* clause becomes redundant if it's a new declaration *)
     (match is_new with
@@ -458,7 +473,8 @@ let _detect_and_declare c =
 
 (* introduce projectors for each constructor's argument, in order to
    declare the inductive type as an EnumType. *)
-let _declare_inductive ~proof d =
+let _declare_inductive env ~proof d =
+  let state = state_of env in
   Util.debugf ~section 5 "@[<2>examine data `%a`@]" (fun k ->
       k Name.pp d.Stmt.data_id);
   (* make HVars *)
@@ -486,7 +502,7 @@ let _declare_inductive ~proof d =
       d.Stmt.data_cstors
   in
   let _ =
-    declare_
+    declare_ ~state
       ~proof:(`Data (proof, d))
       ~var:v ~ty_id:(I d.Stmt.data_id) ~ty_vars cases
   in
@@ -498,10 +514,10 @@ let _detect_stmt env stmt =
   | Stmt.Assert c ->
     let proof = Stmt.proof_step stmt in
     let c = C.of_forms ~ctx:(Env.get_ctx env) ~trail:Trail.empty c proof in
-    _detect_and_declare c
+    _detect_and_declare env c
   | Stmt.Data l ->
     let proof = Stmt.as_proof_c stmt in
-    List.iter (_declare_inductive ~proof) l
+    List.iter (_declare_inductive env ~proof) l
   | Stmt.TyDecl _ | Stmt.Def _ | Stmt.Rewrite _ | Stmt.Lemma _
   | Stmt.NegatedGoal _ | Stmt.Goal _ ->
     ()
@@ -510,6 +526,7 @@ let _detect_stmt env stmt =
 let setup env =
   if !_enable then (
     Util.debug ~section 1 "register handling of enumerated types";
+    let state = state_of env in
     Env.add_multi_simpl_rule env ~priority:5 (fun env c ->
         instantiate_vars env c);
     Env.add_is_trivial env is_trivial;
@@ -521,7 +538,7 @@ let setup env =
     Signal.on_every
       (Ctx.on_new_symbol (Env.get_ctx env))
       (fun (s, ty) -> _on_new_symbol env s ~ty);
-    Signal.on_every on_new_decl (fun decl ->
+    Signal.on_every state.on_new_decl (fun decl ->
         _on_new_decl env decl;
         (* need to simplify (instantiate) active clauses that have naked
             variables of the given type *)

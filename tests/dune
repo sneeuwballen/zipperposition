@@ -130,3 +130,20 @@
      %{dep:regressions/multi_input/datatype2.smt2}))
    (system "test $(grep -c 'SZS status' datatype_multi.out) -eq 2")
    (system "! grep -q 'already declared' datatype_multi.out"))))
+
+; Regression test: enum type state is per-Env. Two files declaring the same
+; type name with different cases must each use their own declaration. Guards 2d89.
+
+(rule
+ (alias runtest)
+ (targets enum_multi.out)
+ (action
+  (progn
+   (with-outputs-to
+    enum_multi.out
+    (run
+     %{bin:zipperposition}
+     --enum-types
+     %{dep:regressions/multi_input/enum1.p}
+     %{dep:regressions/multi_input/enum2.p}))
+   (system "test $(grep -c 'SZS status Theorem' enum_multi.out) -eq 2"))))

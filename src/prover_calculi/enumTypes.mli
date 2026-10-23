@@ -18,6 +18,7 @@ type declare_result =
   | AlreadyDeclared of decl
 
 val declare_ty :
+  env:Env.t ->
   proof:Proof.t ->
   ty_id:Name.t ->
   ty_vars:Type.t HVar.t list ->
