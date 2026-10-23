@@ -479,9 +479,14 @@ let () =
   Params.add_flex_opts (fun ~flex_ref ->
       [
         ( "--rw-ctx-narrow",
-          Arg.Bool
-            (fun v -> flex_ref := Flex_state.add Key.ctx_narrow v !flex_ref),
-          " enable/disable contextual narrowing" );
+          Arg.Unit
+            (fun () -> flex_ref := Flex_state.add Key.ctx_narrow true !flex_ref),
+          " enable contextual narrowing" );
+        ( "--no-rw-ctx-narrow",
+          Arg.Unit
+            (fun () ->
+              flex_ref := Flex_state.add Key.ctx_narrow false !flex_ref),
+          " disable contextual narrowing" );
         ( "--rewrite-before-cnf",
           Arg.Bool
             (fun v ->

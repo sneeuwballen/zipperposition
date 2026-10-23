@@ -331,3 +331,19 @@
      --enable-max-vars
      %{dep:regressions/multi_input/easy1.p}))
    (run grep -q "SZS status Theorem" max_vars_flags.out))))
+
+; Regression test: contextual narrowing flags are argument-less. Guards t1c9.
+
+(rule
+ (alias runtest)
+ (targets rw_ctx_flags.out)
+ (action
+  (progn
+   (with-outputs-to
+    rw_ctx_flags.out
+    (run
+     %{bin:zipperposition}
+     --rw-ctx-narrow
+     --no-rw-ctx-narrow
+     %{dep:regressions/multi_input/easy1.p}))
+   (run grep -q "SZS status Theorem" rw_ctx_flags.out))))
