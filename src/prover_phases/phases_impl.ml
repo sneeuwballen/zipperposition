@@ -663,9 +663,19 @@ let process_files_and_print ?(params = Params.default) files
   print_stats st_ref;
   r
 
+let setup_signal () =
+  Signal.set_exn_handler (fun e ->
+      let stack = Printexc.get_backtrace () in
+      let msg = Printexc.to_string e in
+      output_string stderr ("exception raised in signal: " ^ msg ^ "\n");
+      output_string stderr stack;
+      flush stderr;
+      raise e)
+
 let main_cli ?setup_gc:(gc = true) () (st_ref : Phases.State.t ref) =
   let@ _sp = Phases.with_span ~__FILE__ ~__LINE__ "phase.main-cli" in
   if gc then setup_gc st_ref;
+  setup_signal ();
   let files, params = parse_cli st_ref in
   let _exts = load_extensions st_ref in
   let errcode = process_files_and_print ~params files st_ref in
