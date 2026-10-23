@@ -892,7 +892,6 @@ let fluid_quant_rw env (c : C.t) =
            | _ -> acc)
          []
   in
-  Env.update_flex_state env (fun _ -> !flex_ref);
   res
 
 let false_elim env c =
@@ -1211,7 +1210,6 @@ let quantifier_rw_and_hoist env (c : C.t) =
          []
     |> fun res -> CCOpt.return_if (not @@ CCList.is_empty res) res
   in
-  Env.update_flex_state env (fun _ -> !flex_ref);
   result
 
 let nested_eq_rw env c =
@@ -1342,7 +1340,6 @@ let rename_nested_booleans env c =
       Some (renamed :: new_defs)
     | _ -> None
   in
-  Env.update_flex_state env (fun _ -> !flex_ref);
   result
 
 let simplify_bools env t =

@@ -100,7 +100,7 @@ and stats = int * int * int
 let create ~params ~flex_state ~ctx () =
   {
     ctx;
-    flex_state;
+    flex_state = FormRename.init flex_state;
     binary_rules = [];
     unary_rules = [];
     rewrite_rules = [];

@@ -8,6 +8,9 @@ module type S = sig
   val on_pred_skolem_introduction : (C.t * Term.t) Signal.t
   (** this signal is raised when a predicate Skolem is introduced *)
 
+  val init : Flex_state.t -> Flex_state.t
+  (** Add an empty rename state to the flex state if absent. *)
+
   val is_renaming_clause : flex_ref:Flex_state.t ref -> C.t -> bool
   (** This clause has the shape of the renaming clause *)
 

@@ -87,8 +87,7 @@ let update_form_counter ~action env c =
             | `Decrease -> Term.Tbl.decr _form_counter t)
           terms)
   else
-    ( (* CCFormat.printf "not updating @[%a@]@." C.pp c; *) );
-  Env.update_flex_state env (fun _ -> !flex_ref)
+    ( (* CCFormat.printf "not updating @[%a@]@." C.pp c; *) )
 
 let fold_lits env c =
   let lits = Ls.fold_eqn_simple (C.lits c) in
@@ -429,9 +428,7 @@ let clausify_quant env ~parent ~var_offset ~sign ~quant_body
   let res_t =
     Lambda.eta_reduce ~expand_quant @@ Lambda.snf @@ T.app f [ subst_term ]
   in
-  let result = res_t, hd, subst_term, rule_name in
-  Env.update_flex_state env (fun _ -> !flex_ref);
-  result
+  res_t, hd, subst_term, rule_name
 
 let lazy_clausify_driver env ?(ignore_eq = false)
     ?(force_clausification = false) ~proof_cons c =
@@ -765,7 +762,6 @@ let rename_subformulas env c =
              None, `Continue)
          None
   in
-  Env.update_flex_state env (fun _ -> !flex_ref);
   result
 
 let inf_quantifiers env c =

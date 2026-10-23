@@ -9,6 +9,7 @@ module type S = sig
   module C : Clause_intf.S with module Ctx = Ctx
 
   val on_pred_skolem_introduction : (C.t * Term.t) Signal.t
+  val init : Flex_state.t -> Flex_state.t
   val is_renaming_clause : flex_ref:Flex_state.t ref -> C.t -> bool
 
   val rename_form :
@@ -56,6 +57,11 @@ module Make (C : Clause_intf.S) = struct
       renaming_idx = Idx.empty ();
       renamer_symbols = Name.Set.empty;
     }
+
+  let init flex_state =
+    match Flex_state.get k_state flex_state with
+    | Some _ -> flex_state
+    | None -> Flex_state.add k_state (mk_rename_state ()) flex_state
 
   let get_state (flex_ref : Flex_state.t ref) : rename_state =
     match Flex_state.get k_state !flex_ref with
