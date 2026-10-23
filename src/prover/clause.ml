@@ -183,7 +183,7 @@ let of_statement ~ctx ?(convert_defs = false) st =
 let update_trail f c =
   let sclause = SClause.update_trail f c.sclause in
   create_inner ~ctx:c.ctx ~penalty:c.penalty ~selected:c.selected
-    ~bool_selected:c.bool_selected c.sclause c.proof
+    ~bool_selected:c.bool_selected sclause c.proof
 
 let proof_step c = c.proof
 let proof c = Proof.S.mk c.proof (SClause.mk_proof_res c.sclause)
@@ -395,14 +395,50 @@ let is_oriented_rule c =
     | Eq | Incomparable -> false)
   | _ -> false
 
-let is_inj_axiom _c = None
-let ctx_of c = c.ctx
+let is_inj_axiom c =
+  if CCArray.length (lits c) = 2 then (
+    let inj_defs = CCArray.filter_map Literal.as_inj_def (lits c) in
+    if CCArray.length inj_defs != 1 then
+      None
+    else (
+      let sym, var_pairs = CCArray.get inj_defs 0 in
+      let l =
+        CCArray.filter_map Literal.as_pos_pure_var (lits c) |> CCArray.to_list
+      in
+      if List.length l != 1 then
+        None
+      else (
+        let x, y = List.hd l in
+        let v_eq = HVar.equal Type.equal in
+        let rec args_same n = function
+          | [] -> None
+          | (x', y') :: xs ->
+            if (v_eq x x' && v_eq y y') || (v_eq x y' && v_eq y x') then
+              Some (sym, n)
+            else
+              args_same (n + 1) xs
+        in
+        args_same 0 var_pairs
+      )
+    )
+  ) else
+    None
+
+let is_orphaned c =
+  let aux proof =
+    let p_res, step = Proof.S.result proof, Proof.S.step proof in
+    if Proof.Result.is_stmt p_res then
+      false
+    else
+      Proof.Step.is_inference step
+      && (not (List.mem Proof.Tag.T_cannot_orphan (Proof.Step.tags step)))
+      && List.exists
+           (fun pr -> Proof.Result.is_dead_cl (Proof.S.result pr) ())
+           (List.map Proof.Parent.proof (Proof.Step.parents step))
+  in
+  (not (is_empty c)) && aux (proof c)
 
 (** {2 Constructors} *)
-let flag_orphan = SClause.new_flag ()
-
-let is_orphaned c = SClause.get_flag flag_orphan c.sclause
-let mark_orphaned c = SClause.set_flag flag_orphan c.sclause true
 
 (* internal *)
 let symbols ?(init = Name.Set.empty) ?(include_types = false) seq =
@@ -452,48 +488,31 @@ end
 
 (* Other conversion — of_sclause is publicly available as the constructor above *)
 let to_sclause c = c.sclause
-
-let to_forms c =
-  let conv lit =
-    let open SLiteral in
-    match lit with
-    | Logtk.Literal.True -> true_
-    | Logtk.Literal.False -> false_
-    | Logtk.Literal.Equation (l, r, _) ->
-      let sign = Logtk.Literal.is_positivoid lit in
-      if Type.is_prop (Term.ty l) then
-        if Term.is_true_or_false r then
-          atom l sign
-        else (
-          let hd =
-            if sign then
-              Builtin.Equiv
-            else
-              Builtin.Xor
-          in
-          atom (Term.app_builtin ~ty:Type.prop hd [ l; r ]) true
-        )
-      else if sign then
-        eq l r
-      else
-        neq l r
-  in
-  List.map conv (Array.to_list (lits c))
-
-let to_s_form c =
-  let ctx = Term.Conv.create () in
-  let forms = to_forms c in
-  let forms =
-    List.map (SLiteral.map ~f:(fun t -> Term.Conv.to_simple_term ctx t)) forms
-  in
-  TypedSTerm.Form.or_ (List.map SLiteral.to_form forms)
+let to_forms c = Lits.Conv.to_forms c.sclause.lits
+let to_s_form c = SClause.to_s_form c.sclause
 
 let ground_clause c =
   let lits' = Literals.ground_lits (lits c) in
   create_a ~ctx:c.ctx ~penalty:c.penalty ~trail:c.sclause.trail lits'
     (proof_step c)
 
-let eta_reduce _c = None
+let eta_reduce c =
+  let lit_arr = lits c in
+  let changed = ref false in
+  let new_lits =
+    Literals.map
+      (fun t ->
+        let reduced = Lambda.eta_reduce (Lambda.snf t) in
+        if not (Term.equal t reduced) then changed := true;
+        reduced)
+      lit_arr
+  in
+  if !changed then
+    Some
+      (create ~ctx:(ctx_of c) ~penalty:(penalty c) ~trail:(trail c)
+         (CCArray.to_list new_lits) (proof_step c))
+  else
+    None
 
 (** {2 Sets} *)
 
@@ -603,4 +622,7 @@ end
 
 (** {2 Types checking} *)
 
-let check_types _c = ()
+let check_types c =
+  Util.debugf 5 "(@[check_types@ %a@])" (fun k -> k pp c);
+  lits c |> Literals.Seq.terms
+  |> Iter.iter (fun t -> ignore (Term.rebuild_rec t))
