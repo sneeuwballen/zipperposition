@@ -169,3 +169,23 @@
      %{dep:regressions/multi_input/lambda2.p}))
    (system
     "awk '/SZS status/ { n++ } n == 2 && /lambda1.p/ { bad = 1 } END { exit (n < 2 || bad) }' lambda_multi.out"))))
+
+; Regression test: higher-order extensionality state is per-Env. Two files
+; with the same negative extensionality literal must each create their own
+; skolems. Guards kfrf.
+
+(rule
+ (alias runtest)
+ (targets ho_state_multi.out)
+ (action
+  (progn
+   (with-outputs-to
+    ho_state_multi.out
+    (run
+     %{bin:zipperposition}
+     --ho-ext-neg-lit
+     true
+     %{dep:regressions/multi_input/ho1.p}
+     %{dep:regressions/multi_input/ho2.p}))
+   (system
+    "awk '/SZS status/ { n++ } n == 2 && /fresh_sk1/ { bad = 1 } END { exit (n < 2 || bad) }' ho_state_multi.out"))))

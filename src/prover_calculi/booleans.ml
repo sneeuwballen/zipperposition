@@ -113,7 +113,7 @@ let get_triggers env c =
       let ty = Term.ty t and hd = Term.head_term t in
       let cached_t = Subst.FO.canonize_all_vars t in
       if
-        (not (Term.Set.mem cached_t !Higher_order.prim_enum_terms))
+        (not (Term.Set.mem cached_t !(Higher_order.prim_enum_terms env)))
         && Type.is_fun ty && Type.returns_prop ty
         && (not (Term.is_var hd))
         && not (trivial_trigger t)
@@ -2103,7 +2103,7 @@ let interpret_boolean_functions env c =
   (* avoiding terms introduced by primitive enumeration *)
   |> Iter.filter (fun t ->
       let cached_t = Subst.FO.canonize_all_vars t in
-      not (Term.Set.mem cached_t !Higher_order.prim_enum_terms))
+      not (Term.Set.mem cached_t !(Higher_order.prim_enum_terms env)))
   |> Iter.sort_uniq ~cmp:Term.compare
   |> Iter.fold
        (fun res t ->

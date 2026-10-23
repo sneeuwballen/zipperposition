@@ -5,7 +5,7 @@ open Logtk
 
 open Libzipperposition
 
-val prim_enum_terms : Term.Set.t ref
+val prim_enum_terms : Env.t -> Term.Set.t ref
 
 type prune_kind =
   [ `NoPrune

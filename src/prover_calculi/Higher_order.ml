@@ -109,7 +109,13 @@ module FV_ext_neg_lit = FV_tree.Make (struct
   let labels _ = Util.Int_set.empty
 end)
 
-let idx_ext_neg_lit_ : FV_ext_neg_lit.t ref = ref (FV_ext_neg_lit.empty ())
+let k_idx_ext_neg_lit : FV_ext_neg_lit.t ref Flex_state.key =
+  Flex_state.create_key ()
+
+let idx_ext_neg_lit_of env =
+  Env.flex_get_or_create
+    ~init:(fun () -> ref (FV_ext_neg_lit.empty ()))
+    env k_idx_ext_neg_lit
 
 type ext_dec_state = {
   mutable ext_dec_from_idx: (Term.t * Position.t) list C.Tbl.t Name.Map.t;
@@ -129,8 +135,8 @@ let get_ext_dec_state env =
     st
 
 (* retrieve skolems for this literal, if any *)
-let find_skolems_ (lit : Literal.t) : T.t list option =
-  FV_ext_neg_lit.retrieve_alpha_equiv_c !idx_ext_neg_lit_ (lit, [])
+let find_skolems_ env (lit : Literal.t) : T.t list option =
+  FV_ext_neg_lit.retrieve_alpha_equiv_c !(idx_ext_neg_lit_of env) (lit, [])
   |> Iter.find_map (fun (lit', skolems) ->
       let subst = Literal.variant (lit', 0) (lit, 1) |> Iter.head in
       match subst with
@@ -231,7 +237,7 @@ let ext_neg_lit env (lit : Literal.t) : _ option =
     let n_ty_params, ty_args, _ = Type.open_poly_fun (T.ty f) in
     assert (n_ty_params = 0);
     let params =
-      match find_skolems_ lit with
+      match find_skolems_ env lit with
       | Some l -> l
       | None ->
         (* create new skolems, parametrized by free variables *)
@@ -247,7 +253,8 @@ let ext_neg_lit env (lit : Literal.t) : _ option =
         in
         (* save list *)
         declare_skolems env !skolems;
-        idx_ext_neg_lit_ := FV_ext_neg_lit.add !idx_ext_neg_lit_ (lit, l);
+        let idx = idx_ext_neg_lit_of env in
+        idx := FV_ext_neg_lit.add !idx (lit, l);
         l
     in
     let new_lit = Literal.mk_neq (T.app f params) (T.app g params) in
@@ -1285,11 +1292,20 @@ let prim_enum ~mode env c =
 (* prim_enum_ ~mode env c *)
 
 let prim_enum_tf c = prim_enum_ ~mode:`TF c
-let choice_ops = ref Term.Map.empty
-let new_choice_counter = ref 0
+
+let k_choice_ops : C.t option Term.Map.t ref Flex_state.key =
+  Flex_state.create_key ()
+
+let choice_ops_of env =
+  Env.flex_get_or_create ~init:(fun () -> ref Term.Map.empty) env k_choice_ops
 
 let insantiate_choice env ?(proof_constructor = Proof.Step.inference)
-    ?(inst_vars = true) ?(choice_ops = choice_ops) c =
+    ?(inst_vars = true) ?choice_ops c =
+  let choice_ops =
+    match choice_ops with
+    | Some c -> c
+    | None -> choice_ops_of env
+  in
   let max_var =
     ref
       ((C.Seq.vars c |> Iter.map HVar.id |> Iter.max |> CCOpt.get_or ~default:0)
@@ -1479,6 +1495,7 @@ let simple_projection ~penalty_inc ~max_depth _env c =
       var_map []
 
 let recognize_choice_ops env c =
+  let choice_ops = choice_ops_of env in
   let extract_not_p_x l =
     match l with
     | Literal.Equation (lhs, _, _)
@@ -2447,7 +2464,7 @@ let prune_arg ~all_covers env c =
   )
 (* TODO: Simplified flag like in first-order? Profiler?*)
 
-let groundings = Type.Tbl.create 32
+let k_groundings : T.t Type.Tbl.t Flex_state.key = Flex_state.create_key ()
 
 let ground_app_vars ~mode env c =
   assert (mode != `Off);
@@ -2458,6 +2475,9 @@ let ground_app_vars ~mode env c =
     |> Iter.head
   in
 
+  let groundings =
+    Env.flex_get_or_create ~init:(fun () -> Type.Tbl.create 32) env k_groundings
+  in
   let get_groundings var =
     let introduce_new_const ty =
       let (f_id, f_ty), f = Term.mk_fresh_skolem [] ty in
@@ -2852,7 +2872,10 @@ let st_contains_ho (st : (_, _, _) Statement.t) : bool =
   in
   has_ho_sym () || has_ho_var () || has_ho_eq ()
 
-let prim_enum_terms = ref Term.Set.empty
+let prim_enum_terms env =
+  Env.flex_get_or_create
+    ~init:(fun () -> ref Term.Set.empty)
+    env k_prim_enum_terms
 
 let extension =
   let register (env : Env.t) =
@@ -2871,7 +2894,7 @@ let extension =
     Env.flex_ensure env k_elim_andrews_eq (-1);
     Env.flex_ensure env k_elim_andrews_eq_simpl false;
     Env.flex_ensure env k_prune_arg_fun `NoPrune;
-    Env.flex_add_of env k_prim_enum_terms prim_enum_terms;
+    Env.flex_ensure env k_prim_enum_terms (ref Term.Set.empty);
     Env.flex_ensure env k_simple_projection (-1);
     Env.flex_ensure env k_simple_projection_md 2;
     Env.flex_ensure env k_check_lambda_free `False;
