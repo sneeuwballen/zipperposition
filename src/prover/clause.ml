@@ -226,8 +226,8 @@ let apply_subst ?renaming ?proof ?penalty_inc (c_scoped : t Scoped.t) subst =
   let c = Scoped.get c_scoped in
   let sc = Scoped.scope c_scoped in
   let renaming = CCOpt.get_or ~default:(S.Renaming.create ()) renaming in
-  let lits' = _apply_subst_no_simpl subst (lits c, sc) in
-  let penalty = c.penalty + CCOpt.get_or ~default:0 penalty_inc in
+  let lits' = Lits.apply_subst renaming subst (lits c, sc) in
+  let penalty = max (c.penalty + CCOpt.get_or ~default:0 penalty_inc) 1 in
   let proof = CCOpt.get_or ~default:c.proof proof in
   create_a ~ctx:c.ctx ~penalty ~trail:c.sclause.trail lits' proof
 
