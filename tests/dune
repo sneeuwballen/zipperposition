@@ -507,3 +507,30 @@
      %{dep:regressions/multi_input/exhaustiveness.smt2}))
    (system
     "test $(grep -c 'SZS status Unsatisfiable' exhaustiveness_multi.out) -eq 2"))))
+
+; Regression test: hidden literal elimination state is per-Env. Two files with
+; the same implication symbols in one CLI call must each build their own
+; tracking indices and prove independently. Guards 8s4b.
+
+(rule
+ (alias runtest)
+ (package zipperposition)
+ (targets hlb_multi.out)
+ (action
+  (progn
+   (with-outputs-to
+    hlb_multi.out
+    (run
+     %{bin:zipperposition}
+     --avatar=off
+     --hlbe-elim
+     true
+     --hlbe-clauses-to-track
+     passive
+     --debug.zip.hlb-elim
+     2
+     %{dep:regressions/multi_input/hlb1.zf}
+     %{dep:regressions/multi_input/hlb2.zf}))
+   (system "test $(grep -c 'SZS status Theorem' hlb_multi.out) -eq 2")
+   (system "test $(grep -c 'tracking ' hlb_multi.out) -ge 4")
+   (system "! grep -qi 'already\\|error' hlb_multi.out"))))

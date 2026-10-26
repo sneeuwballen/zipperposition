@@ -1,0 +1,8 @@
+# expect: unsat
+
+val p : prop.
+val q : prop.
+val r : prop.
+assert (p => q).
+assert (q => r).
+goal (p => r).
