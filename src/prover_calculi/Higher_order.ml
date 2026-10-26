@@ -2933,11 +2933,8 @@ let extension =
   and check_ho vec state =
     let is_ho = CCVector.to_iter vec |> Iter.exists st_contains_ho in
     if is_ho then Util.debug ~section 2 "problem is HO";
-    let def_sym_cache =
-      match Flex_state.get k_def_sym_cache state with
-      | Some c -> c
-      | None -> Statement.create_def_sym_cache ()
-    in
+    (* the cache is per-file: [state] is shared by all files of a run *)
+    let def_sym_cache = Statement.create_def_sym_cache () in
 
     if !def_unfold_enabled_ then
       (* let new_vec = *)
@@ -2952,7 +2949,6 @@ let extension =
         vec (*vec in*);
 
     state
-    |> Flex_state.add k_def_sym_cache def_sym_cache
     |> Flex_state.add k_some_ho is_ho
     |> Flex_state.add k_enabled !enabled_
     |> Flex_state.add k_enable_def_unfold !def_unfold_enabled_
