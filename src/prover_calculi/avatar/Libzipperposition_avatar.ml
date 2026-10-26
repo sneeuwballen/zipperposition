@@ -703,7 +703,10 @@ let register env ~split_kind () =
       Env.add_backward_simplify env backward_simplify_trails
   );
   if Env.flex_get_of env k_show_lemmas then
-    Signal.once Signals.on_exit (fun _ -> show_lemmas env);
+    Signal.once Signals.on_exit (fun _ ->
+        (* payload scopes are gone after the pipeline; lemmas are printed at
+           the end of the pipeline while scopes are still active *)
+        if Option.is_some (Name_payload.get_opt ()) then show_lemmas env);
   (* be sure there is an initial valuation *)
   ignore (Sat_solver.check (Env.flex_get_of env k_sat_solver) ~full:true ())
 

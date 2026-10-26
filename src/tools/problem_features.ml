@@ -305,20 +305,21 @@ let options =
 let process file =
   Util.debugf 1 "process file %s" (fun k -> k file);
   let res =
-    (* parse *)
-    Util_tptp.enable_def_as_rewrite := true;
-    let input = Parsing_utils.input_of_file file in
-    Parsing_utils.parse_file input file
-    >>= TypeInference.infer_statements ?ctx:None ~file
-          ~on_var:(Input_format.on_var input)
-          ~on_undef:(Input_format.on_undef_id input)
-          ~on_shadow:(Input_format.on_shadow input)
-          ~implicit_ty_args:(Input_format.implicit_ty_args input)
-    >|= fun st ->
-    collect_formula_features st;
-    if !cnf_features then
-      collect_clause_features
-        (Cnf.cnf_of_iter ~ctx:(Skolem.create ()) (CCVector.to_iter st))
+    Name_payload.with_scope (fun () ->
+        (* parse *)
+        Util_tptp.enable_def_as_rewrite := true;
+        let input = Parsing_utils.input_of_file file in
+        Parsing_utils.parse_file input file
+        >>= TypeInference.infer_statements ?ctx:None ~file
+              ~on_var:(Input_format.on_var input)
+              ~on_undef:(Input_format.on_undef_id input)
+              ~on_shadow:(Input_format.on_shadow input)
+              ~implicit_ty_args:(Input_format.implicit_ty_args input)
+        >|= fun st ->
+        collect_formula_features st;
+        if !cnf_features then
+          collect_clause_features
+            (Cnf.cnf_of_iter ~ctx:(Skolem.create ()) (CCVector.to_iter st)))
   in
   match res with
   | CCResult.Ok () ->

@@ -115,7 +115,6 @@ let apply_modifiers ~field o =
 
 let start_file (st_ref : Phases.State.t ref) file =
   let@ () = Phases.with_phase st_ref Phases.Start_file in
-  Name_payload.clear ();
   Util.debugf ~section 2 "@[@{<Yellow>### process file@ `%s` ###@}@]" (fun k ->
       k file);
   do_extensions ~field:(fun e -> e.Extensions.start_file_actions) ~x:file st_ref
@@ -655,9 +654,12 @@ let process_files_and_print ?(params = Params.default) files
   let prelude = parse_prelude st_ref params in
   let f file : _ Phases.t =
    fun st_ref ->
-    let env, res = process_file ~prelude file st_ref in
-    print file env res st_ref;
-    check res st_ref
+    (* each file is a payload scope: symbols, skolems and notations declared
+       for it are retracted once it is printed and checked *)
+    Name_payload.with_scope (fun () ->
+        let env, res = process_file ~prelude file st_ref in
+        print file env res st_ref;
+        check res st_ref)
   in
   let phases = List.map f files in
   let r = Phases.run_and_discard_l phases st_ref in
@@ -675,13 +677,17 @@ let setup_signal () =
 
 let main_cli ?setup_gc:(gc = true) () (st_ref : Phases.State.t ref) =
   let@ _sp = Phases.with_span ~__FILE__ ~__LINE__ "phase.main-cli" in
-  if gc then setup_gc st_ref;
-  setup_signal ();
-  let files, params = parse_cli st_ref in
-  let _exts = load_extensions st_ref in
-  let errcode = process_files_and_print ~params files st_ref in
-  Phases.exit st_ref;
-  errcode
+  (* base payload scope for the whole pipeline (prelude, etc.) *)
+  Name_payload.with_scope (fun () ->
+      if gc then setup_gc st_ref;
+      setup_signal ();
+      let files, params = parse_cli st_ref in
+      let _exts = load_extensions st_ref in
+      let errcode = process_files_and_print ~params files st_ref in
+      (* fire exit handlers while payload scopes are still active *)
+      Signal.send Signals.on_exit errcode;
+      Phases.exit st_ref;
+      errcode)
 
 let skip_parse_cli (st_ref : Phases.State.t ref) ?(params = Params.default) file
     =
@@ -691,12 +697,14 @@ let skip_parse_cli (st_ref : Phases.State.t ref) ?(params = Params.default) file
   [ file ], params
 
 let main ?setup_gc:(gc = true) ?params file (st_ref : Phases.State.t ref) =
-  if gc then setup_gc st_ref;
-  let files, params = skip_parse_cli st_ref ?params file in
-  let _ = load_extensions st_ref in
-  let errcode = process_files_and_print ~params files st_ref in
-  Phases.exit st_ref;
-  errcode
+  Name_payload.with_scope (fun () ->
+      if gc then setup_gc st_ref;
+      let files, params = skip_parse_cli st_ref ?params file in
+      let _ = load_extensions st_ref in
+      let errcode = process_files_and_print ~params files st_ref in
+      Signal.send Signals.on_exit errcode;
+      Phases.exit st_ref;
+      errcode)
 
 let () =
   let open Libzipperposition in

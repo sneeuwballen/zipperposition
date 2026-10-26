@@ -26,6 +26,7 @@
   (iter (>= "1.2"))
   (menhir (and (>= "20180523") :build))
   atomic
+  thread-local-storage
   (trace (>= 0.11))
   (alcotest :with-test)
   (qcheck-core (and :with-test (>= "0.9")))

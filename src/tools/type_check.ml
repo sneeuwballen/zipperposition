@@ -44,38 +44,39 @@ let check file =
        Format.printf "checking file `%s`...@." file; *)
     ();
   let input = Parsing_utils.input_of_file file in
-  ( Parsing_utils.parse_file input file
-  >>= TypeInference.infer_statements
-        ~on_var:(Input_format.on_var input)
-        ~on_undef:(Input_format.on_undef_id input)
-        ~on_shadow:(Input_format.on_shadow input)
-        ~implicit_ty_args:(Input_format.implicit_ty_args input)
-        ?ctx:None
-  >>= fun decls ->
-    decls |> CCVector.to_iter
-    |> Cnf.cnf_of_iter ~ctx:(Skolem.create ())
-    |> CCVector.to_iter |> Cnf.convert |> CCResult.return )
-  >>= fun stmts ->
-  let found_fool_subterm = ref false in
-  ( CCVector.to_iter stmts |> Iter.flat_map Statement.Seq.terms |> fun trm ->
-    try
-      ignore
-        (Iter.for_all
-           (fun t ->
-             let ans, is_fool = Term.in_fool_fragment t in
-             found_fool_subterm := !found_fool_subterm || is_fool;
-             ans)
-           trm);
-      ""
-    with Failure msg -> msg )
-  |> fun x ->
-  if x = "" then
-    if !found_fool_subterm then
-      CCResult.return ()
-    else
-      CCResult.fail "FAIL: Pure FO problem"
-  else
-    CCResult.fail ("FAIL: " ^ x)
+  Name_payload.with_scope (fun () ->
+      ( Parsing_utils.parse_file input file
+      >>= TypeInference.infer_statements
+            ~on_var:(Input_format.on_var input)
+            ~on_undef:(Input_format.on_undef_id input)
+            ~on_shadow:(Input_format.on_shadow input)
+            ~implicit_ty_args:(Input_format.implicit_ty_args input)
+            ?ctx:None
+      >>= fun decls ->
+        decls |> CCVector.to_iter
+        |> Cnf.cnf_of_iter ~ctx:(Skolem.create ())
+        |> CCVector.to_iter |> Cnf.convert |> CCResult.return )
+      >>= fun stmts ->
+      let found_fool_subterm = ref false in
+      ( CCVector.to_iter stmts |> Iter.flat_map Statement.Seq.terms |> fun trm ->
+        try
+          ignore
+            (Iter.for_all
+               (fun t ->
+                 let ans, is_fool = Term.in_fool_fragment t in
+                 found_fool_subterm := !found_fool_subterm || is_fool;
+                 ans)
+               trm);
+          ""
+        with Failure msg -> msg )
+      |> fun x ->
+      if x = "" then
+        if !found_fool_subterm then
+          CCResult.return ()
+        else
+          CCResult.fail "FAIL: Pure FO problem"
+      else
+        CCResult.fail ("FAIL: " ^ x))
 
 let main () =
   CCFormat.set_color_default true;

@@ -13,6 +13,7 @@
   mtime
   mtime.clock.os
   atomic
+  thread-local-storage
   logtk.common
   logtk.arith
   logtk.hash

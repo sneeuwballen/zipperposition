@@ -27,6 +27,7 @@ let units : unit Alcotest.test_case list =
     TestTerm_dag.suite;
     TestEnv.suite;
     TestAvatar.suite;
+    TestNamePayload.suite;
   ]
   |> List.flatten
 
@@ -34,4 +35,6 @@ let units = "units", units
 
 let () =
   CCFormat.set_color_default true;
-  Alcotest.run ~and_exit:true "all" [ units; props ]
+  (* one payload scope for the whole test process *)
+  Logtk.Name_payload.with_scope (fun () ->
+      Alcotest.run ~and_exit:true "all" [ units; props ])
