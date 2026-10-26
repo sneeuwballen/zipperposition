@@ -445,7 +445,6 @@ let active_simplify env c =
 let simplify env c =
   let open SimplM.Infix in
   fix_simpl c ~f:(fun c ->
-      let old_c = c in
       ho_normalize env c >>= basic_simplify env >>= ho_normalize env
       >>= rewrite env >>= rw_simplify env >>= unary_simplify env
       >>= active_simplify env
@@ -553,35 +552,6 @@ let backward_simplify env given =
   let back_simplify c =
     let open SimplM.Infix in
     fix_simpl c ~f:(fun c ->
-        let old_c = c in
-        ho_normalize env c >>= basic_simplify env >>= ho_normalize env
-        >>= rewrite env >>= rw_simplify env >>= unary_simplify env
-        >|= fun c -> c)
-  in
-  let before, after =
-    C.ClauseSet.fold
-      (fun c (before, after) ->
-        let c', is_new = back_simplify c in
-        match is_new with
-        | `Same ->
-          if is_trivial env c' then
-            C.ClauseSet.add c before, after
-          else
-            before, after
-        | `New ->
-          C.mark_redundant c;
-          C.mark_backward_simplified c;
-          C.ClauseSet.add c before, c' :: after)
-      candidates (C.ClauseSet.empty, [])
-  in
-  before, Iter.of_list after
-
-let backward_simplify env given =
-  let candidates = backward_simplify_find_candidates env given in
-  let back_simplify c =
-    let open SimplM.Infix in
-    fix_simpl c ~f:(fun c ->
-        let old_c = c in
         ho_normalize env c >>= basic_simplify env >>= ho_normalize env
         >>= rewrite env >>= rw_simplify env >>= unary_simplify env
         >|= fun c -> c)

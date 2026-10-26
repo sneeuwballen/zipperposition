@@ -1043,7 +1043,6 @@ let check_if_gate env task =
     Env.update_flex_state env (fun _ -> !flex_ref);
     result
   in
-  let result = check_sat in
   if
     Env.flex_get_of env k_check_gates
     && ((not (Env.flex_get_of env k_only_original_gates))
