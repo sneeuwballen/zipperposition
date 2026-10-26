@@ -7,7 +7,11 @@ open Logtk
 
 val k_enabled : bool Flex_state.key
 val k_pa_renaming : bool Flex_state.key
+
+(** {5 Registration} *)
+
 val setup : Env.t -> unit
+(** Register rules in the environment *)
 
 val update_form_counter :
   action:[< `Decrease | `Increase ] -> Env.t -> Clause.t -> unit

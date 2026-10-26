@@ -14,7 +14,12 @@ type reasoning_kind =
   | BoolCasesPreprocess
 
 val k_bool_reasoning : reasoning_kind Flex_state.key
+
+(** {5 Registration} *)
+
 val setup : Env.t -> unit
+(** Register rules in the environment *)
+
 val extension : Extensions.t
 
 val name_quantifiers :

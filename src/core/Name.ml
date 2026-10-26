@@ -21,6 +21,7 @@ type Name_payload.t +=
   | Attr_comm
   | Attr_assoc
   | Attr_cnf_def
+(* Symbol is a name introduced during CNF *)
 
 let as_prefix =
   NP.find ~f:(function
@@ -57,6 +58,7 @@ let as_parameter s =
     | Attr_parameter i -> Some i
     | _ -> None)
 
+(** whether the identifier is a distinct object (as defined in TPTP syntax) *)
 let is_distinct_object s =
   NP.exists s ~f:(function
     | Attr_distinct -> true

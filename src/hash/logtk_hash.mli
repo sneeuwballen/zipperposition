@@ -25,6 +25,8 @@ val bytes : bytes t
 (** Hash a byte array. *)
 
 val poly : 'a t
+(** the regular polymorphic hash function *)
+
 val list : 'a t -> 'a list t
 val array : 'a t -> 'a array t
 val opt : 'a t -> 'a option t

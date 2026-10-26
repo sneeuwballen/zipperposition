@@ -2,6 +2,10 @@
 
 (** {1 Clauses} *)
 
+(** The clauses are hashconsed within a context (see {!Ctx}). Now clauses also
+    have a {b trail}, that is, a set of boolean literals that it depends upon as
+    a conditional guard. *)
+
 open Logtk
 
 type proof_step = Proof.Step.t

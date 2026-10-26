@@ -59,10 +59,10 @@ type clause_conversion_rule =
 
 type stats = int * int * int
 
+(** {2 Build a new Environment} *)
+
 val create :
   params:Params.t -> flex_state:Logtk.Flex_state.t -> ctx:Ctx.t -> unit -> t
-(** Create a new env record *)
-
 (** Create a new env record *)
 
 val get_ctx : t -> Ctx.t

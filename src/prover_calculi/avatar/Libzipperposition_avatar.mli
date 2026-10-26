@@ -76,3 +76,4 @@ val register :
   Env.t -> split_kind:[< `Eager | `Lazy | `Off > `Off ] -> unit -> unit
 
 val extension : Extensions.t
+(** Extension that enables Avatar splitting and create a new SAT-solver. *)

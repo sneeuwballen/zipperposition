@@ -19,6 +19,8 @@ type t = private {
 exception Empty_Stream
 exception Drip_n_Unfinished of Clause.t option list * int * int
 
+(** {2 Build a new Stream} *)
+
 val make : ?penalty:int -> parents:Clause.t list -> Clause.t option OSeq.t -> t
 val equal : t -> t -> bool
 val compare : t -> t -> int

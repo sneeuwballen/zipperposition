@@ -1,6 +1,9 @@
 open Logtk
 
+(** {5 Registration} *)
+
 val setup : Env.t -> unit
+(** Register rules in the environment *)
 
 (* Converts lambdas to combinators 
    if combinator reasoning is enabled. *)
@@ -12,8 +15,5 @@ val force_conv_lams : Env.t -> Clause.t -> Clause.t
 (* Expands the term to be of the form 
     \lambda (all type vars). body of prop type *)
 val expand : Env.t -> Term.t -> Term.t
-
-(** Register rules in the environment *)
-
 val k_enable_combinators : bool Flex_state.key
 val extension : Extensions.t

@@ -4,10 +4,14 @@
 
 open Logtk
 
+(** {2 Context for a Proof} *)
+
 type t
 
 module type S = Ctx_intf.S
 (** Temporary backward-compatibility alias *)
+
+(** {2 Create a new context} *)
 
 val create :
   signature:Signature.t ->

@@ -62,6 +62,8 @@ type t = {
   simpl: SimplSet.t;
 }
 
+(** {2 Create a Proof State} *)
+
 val create : unit -> t
 
 type stats = int * int * int
