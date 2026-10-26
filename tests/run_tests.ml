@@ -11,6 +11,7 @@ let props =
       TestType.props;
       TestOrdering.props;
       TestMultiset.props;
+      TestHash.props;
     ]
 
 let props = "qcheck", List.map QCheck_alcotest.to_alcotest props
@@ -28,6 +29,7 @@ let units : unit Alcotest.test_case list =
     TestEnv.suite;
     TestAvatar.suite;
     TestNamePayload.suite;
+    TestHash.suite;
   ]
   |> List.flatten
 

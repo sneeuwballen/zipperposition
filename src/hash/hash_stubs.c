@@ -108,7 +108,9 @@ CAMLprim value caml_cc_hash_combine_char_byte(value v_state, value v_c)
 /* --- combine_string ------------------------------------------------------ */
 
 /* Hashes all bytes of [str] into [state] using 8-byte chunks where possible.
-   [str] is a regular OCaml value; [state] is unboxed int64. */
+   [str] is a regular OCaml value; [state] is unboxed int64.
+   Chunks are read with memcpy, so string hashes are native-endian-dependent
+   (deterministic per platform, never persisted). */
 CAMLprim int64_t caml_cc_hash_combine_string(int64_t state, value str)
 {
   const char *data = String_val(str);
