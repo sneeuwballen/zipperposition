@@ -12,7 +12,6 @@ module RW = Rewrite
 module Avatar = Libzipperposition_avatar
 
 module type AVATAR = Libzipperposition_avatar.S
-module type S = Induction_intf.S
 
 type term = T.t
 type var = T.var
